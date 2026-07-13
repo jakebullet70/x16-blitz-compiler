@@ -40,7 +40,15 @@ class Tokeniser(object):
 		if s[0] >= "A" and s[0] <= "Z":
 			m = re.match("^([A-Z]+[\\(\\$\\#]?)(.*)$",s)
 			assert m is not None
-			for l in range(7,1,-1):
+			#
+			#		Longest match first, up to self.longest -- NOT a hardcoded 7. The X16 has
+			#		two 8-character keywords, PSGCHORD and POWEROFF, and capping at 7 did not
+			#		merely fail to tokenise them: it fell through to a character-at-a-time
+			#		scan, so PSGCHORD matched the OR in psgchORd and came out as
+			#		P S G C H <$B0 OR> D -- a boolean operator welded into the keyword.
+			#		PSGCHORD is a command the compiler supports, so it was unusable.
+			#
+			for l in range(self.longest,1,-1):
 				token = self.tokens.getID(s[:l])
 				if token is not None and len(self.tokens.getToken(token)) == l:
 					if token >= 0x100:
