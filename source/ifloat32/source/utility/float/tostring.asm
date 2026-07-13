@@ -36,13 +36,26 @@ _CNTMain:
 		jsr 	WriteDecimalBuffer
 		lda 	NSExponent,x 				; check if decimal
 		beq 	_CNTSNotFloat
-
-		inx 								; round up so we don't get too many 6.999999
-		lda 	#1
-		jsr 	FloatSetByte		
-		lda		NSExponent-1,x
-		sta 	NSExponent,x
-		jsr 	FloatAdd
+		;
+		;		Round to the last decimal place that will actually be printed, by adding half
+		;		of it -- 5 x 10^-(dp+1). The digits below that are then truncated away, which
+		;		is what makes 2/3 come out as .6666667 rather than .6666666, and stops a value
+		;		held a hair under 7 from printing as 6.9999999.
+		;
+		;		This used to add 1 x 2^exponent instead: one whole ULP of the BINARY mantissa,
+		;		which has nothing to do with the decimal place being rounded to, and on a large
+		;		value is enormous. 1000000000-999999999 is EXACTLY 1.0, held as mantissa 2 with
+		;		exponent -1, so its ULP is 0.5 -- and it printed as "1.5".
+		;
+		inx 								; S[X+1] = 5
+		lda 	#5
+		jsr 	FloatSetByte
+		lda 	decimalPlaces 				; A = -(dp+1)
+		inc 	a
+		eor 	#$FF
+		inc 	a
+		jsr 	FloatScalePower10 			; S[X+1] = 5 x 10^-(dp+1)
+		jsr 	FloatAdd 					; does its own dex, so X is back on the value
 _CNTSNotFloat:
 
 		jsr 	MakePlusTwoString 			; do the integer part.
@@ -60,12 +73,58 @@ _CNTSDecimal:
 		jsr 	FloatMultiply
 		jsr 	MakePlusTwoString 			; put the integer e.g. next digit out.
 		jsr 	FloatFractionalPart 		; get the fractional part
-		jsr 	FloatNormalise 				; normalise it.
+		jsr 	FloatNormalise 				; Z set when nothing is left over
 		;
-		lda 	NSExponent,x 				; gone to zero, exit.
-		cmp 	#$D0 						; very small remainder, so don't bother.
-		bcs 	_CNTSDecimal 				; keep going.
+		;		Keep going while there is a remainder. The loop is already bounded by
+		;		decimalPlaces, and the digits it emits are now correctly rounded, so there is
+		;		nothing to protect against by stopping early. The old guard bailed out as soon
+		;		as the remainder fell below about 4e-6, which silently ate the significant
+		;		digits of any small number: 0.0000001 printed as "0.0".
+		;
+		bne 	_CNTSDecimal
 _CNTSExit:
+		jsr 	TrimTrailingZeros
+		ply
+		plx
+		rts
+
+; ************************************************************************************************
+;
+;		Drop the fraction's trailing zeros, and the decimal point with them if the whole
+;		fraction goes. Rounding always fills the fraction out to the full width, so without
+;		this 3.14159 prints as "3.1415900", and a whole number that happens to be held as a
+;		float prints as "500000000.0000000". Everything downstream reads the buffer as ASCIIZ,
+;		so it is enough to move the terminator back.
+;
+; ************************************************************************************************
+
+TrimTrailingZeros:
+		phx
+		phy
+		ldy 	#0 							; find the decimal point, if there is one
+_TTZFind:
+		cpy 	dbOffset
+		beq 	_TTZExit 					; no point: a whole number, leave it alone
+		lda 	decimalBuffer,y
+		cmp 	#"."
+		beq 	_TTZTrim
+		iny
+		bra 	_TTZFind
+		;
+_TTZTrim:
+		ldx 	dbOffset 					; walk back from the end over the zeros
+_TTZLoop:
+		dex
+		lda 	decimalBuffer,x
+		cmp 	#"0"
+		beq 	_TTZLoop
+		cmp 	#"." 						; the fraction went entirely: drop the point too
+		beq 	_TTZCut
+		inx 								; else keep the last significant digit
+_TTZCut:
+		stx 	dbOffset
+		stz 	decimalBuffer,x 			; re-terminate
+_TTZExit:
 		ply
 		plx
 		rts
