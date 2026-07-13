@@ -1,0 +1,147 @@
+# TODO — Blitz-X16
+
+Replaces the original `TODO.txt`, which was written against **R43** and predated everything R44 added
+(sprites, ovals, tiles, `MOD`). This list is derived from **R49** and nothing on it is inherited on trust:
+
+- the keyword set was decoded straight out of BASIC ROM bank 4 of `bin/x16emu/rom.bin` — 76 base
+  keywords at `$C142`, then 81 extended ones in two blocks at `$C242` and `$C32C`;
+- what the compiler can actually *compile* was read off the `.def` files
+  (`source/compiler/source/generation/*.def` and `.../system-specific/x16/generation/*.def`);
+- the gap between the two is below.
+
+**46 of the 81 extended keywords compile today. 35 do not.**
+
+Tier 1 is done: `MOD`, `OVAL`, `RING`, `POWEROFF` and `REBOOT` all compile and are tested against the
+ROM. What follows is what is left.
+
+## How to decide whether a keyword is worth having
+
+Not by the manual's **TYPE** column. That is a hint, not a rule: `LOAD` and `NEW` are both typed
+*Command*, yet the manual documents using both from inside a running program. Triage on semantics instead:
+
+> **Blitz compiles to a standalone binary. At runtime there is no BASIC program in memory, no editor
+> and no interpreter.** A keyword that acts on the BASIC *environment* has nothing to act on. A keyword
+> that drives the *hardware* is worth having.
+
+That single test sorts all 40.
+
+## Worth implementing (19 left)
+
+### Tier 1 — DONE
+
+`MOD` `$CEDE` · `OVAL` `$CEBF` · `RING` `$CEC0` · `POWEROFF` `$CEAD` · `REBOOT` `$CEAC`
+
+- `MOD(<dividend>,<divisor>)` is the truncated remainder, so it takes the sign of the *dividend*.
+  It leans on `Int32Divide`, which already computes a remainder and leaves it in `S[X]` — `DivideInt32`
+  simply throws that half away. It also zeroes only the *mantissa* of `S[X]`, so the dividend's status
+  byte (its sign) survives the divide untouched, which is exactly the sign a truncated remainder wants:
+  there is no sign fixup in `MOD` at all. Checked against the R49 ROM across all four sign combinations
+  — Blitz and stock BASIC agree exactly. The ROM caps `MOD` at 16-bit operands; ours is a full 32-bit
+  remainder, a superset.
+- `OVAL`/`RING` were the freebie predicted here: `GRAPH_draw_oval` takes the same bounding box and
+  carry-as-fill flag that `GRAPH_draw_rect` does, so they reuse `GraphicsRectCoords` verbatim.
+- `POWEROFF`/`REBOOT` are one I2C write each to the SMC ($42), offsets 1 and 2. `bench/run-bench.sh`
+  no longer has to substitute `I2CPOKE 66,1,0`, so both benchmark columns now run identical source.
+
+**A bug found and fixed on the way.** `GraphicsRectCoords` ended with `stz 8,x` / `stz 9,x`, commented
+"zero rounding". At that point `X` is `X16_r1` (4), so those write to 12/13 — that is **r5**, which is
+not an input to anything. The corner radius `GRAPH_draw_rect` reads is **r4** (10/11), at offset 6. So
+`RECT` and `FRAME` had been handing the KERNAL an uninitialised corner radius all along.
+
+### Tier 2 — sprites and tiles
+
+`SPRITE` `$CEBB` · `SPRMEM` `$CEBC` · `MOVSPR` `$CEBD` · `TILE` · `TDATA` `$CEDC` · `TATTR` `$CEDD`
+
+Real work — no existing runtime support to lean on.
+
+### Tier 3 — data in and out
+
+- **Binary load/save:** `BLOAD` `BVLOAD` `BSAVE` `BVERIFY` `VLOAD`. The manual types these *Command*,
+  and the old TODO put them on its "Add" list; both are beside the point. Loading binary data (a
+  sprite sheet, a level, a tile map) is exactly what a compiled game wants, so they stay.
+- **Banking:** `BANK`
+- **Input:** `LINPUT` `LINPUT#` `BINPUT#`. NB their tokens were **swapped** in Blitz's table
+  (`LINPUT#` is `$CEB3`, `LINPUT` is `$CEB4`); the order is fixed now, so they will tokenise correctly
+  the moment a handler exists.
+- **String:** `RPT$`
+
+### Tier 4 — one loose end
+
+`RESET` `$CE8F` — a warm reset, where `REBOOT` is a cold one through the SMC. Now that `REBOOT` exists
+this is close to a duplicate, but it is a couple of bytes and it is the one keyword the first pass of
+this list never classified at all. Cheap to finish.
+
+## Rejected (16) — nothing for them to act on
+
+`MON` `DOS` `OLD` `GEOS` `TEST` `CODEX` `BOOT` `KEYMAP` `MENU` `REN` `HELP` `EXEC` `EDIT` `BASLOAD`
+`HBLOAD` `BANNER`
+
+These drive the editor, the monitor, the DOS shell or the BASIC program text — none of which exist in a
+compiled binary. Same reasoning retires `LIST` `NEW` `RUN` `CONT` `CLR` from the base set. (`HBLOAD` and
+`BANNER` have no manual entry at all; `BASLOAD` is a development-time loader.)
+
+## Undecided (2)
+
+`POINTER` `STRPTR` — they hand back the address of a BASIC variable or string. Blitz lays variables out
+its own way at compile time, so these would either mean something different or nothing. The original
+author rejected them outright; leaving them parked rather than deciding in the abstract.
+
+## Bugs
+
+### Anything past 2^31 is wrong — and it is TWO bugs, not one
+
+The mantissa holds 31 bits plus a sign (in `NSStatus`), so `2147483647` is the largest integer it can
+hold *bare*. Larger values have to become floats — mantissa x 2^exponent. Two separate things stop
+that working, and **both** must be fixed before `PRINT 3000000000` is right:
+
+1. **The literal parser wraps silently.** `ESTAShiftDigitIntoMantissa` (`tofloat.asm`) does
+   `mantissa = mantissa*10 + digit` with no overflow check at all — `FloatShiftLeft` is a `rol` chain,
+   so bits pushed out of bit 31 are simply dropped. `2196679407` becomes `-49195759`; `2147483648`
+   becomes `-0`. A wrong answer, not a missing feature.
+
+2. **The printer cannot print a positive exponent.** `MakePlusTwoString` (`tostring.asm`) calls
+   `FloatIntegerPart` and then `ConvertInt32`, which renders the **mantissa** in base 10 and never
+   looks at `NSExponent`. `FloatIntegerPart` leaves a positive exponent alone (it only shifts while the
+   exponent is negative), so any value of 2^31 or more prints as its mantissa — off by a factor of
+   2^exponent.
+
+The arithmetic itself is **fine**, which is the surprise and which is why (2) went unnoticed.
+`FloatMultiplyShort` already spots the mantissa overflowing bit 31, shifts right and hands the shift
+count back for the exponent to absorb. Proved it by dividing the result back down:
+`b=1000000*1000000 : PRINT b/1000000` gives exactly `1000000`, and `c=2e9+2e9 : PRINT c/2` gives
+exactly `2000000000` — the values are right, only `PRINT` lies about them. (`PRINT b` says
+`1953125000`, which is 1e12's mantissa with its exponent of 9 thrown away.)
+
+Stock X16 BASIC prints these in scientific notation (`3E+09`, `2.19667941E+09`), and Blitz's printer
+has no scientific notation at all — so fixing (2) properly means adding it, not just widening the
+integer conversion. That is the real shape of this job.
+
+The randomised suites cannot see any of it: they draw integers from -50000..50000.
+
+### Cosmetic
+
+- **`PRINT` keeps a leading zero.** Blitz prints `0.5`, X16 BASIC prints `.5`. The trailing zeros and
+  the rounding are already fixed.
+
+## Performance
+
+`02_floatmath` is **1.73×** (was 1.25× — see `bench/RESULTS.md`), and no longer the outlier. What is
+left is fixed overhead rather than an algorithmic hole: `FloatMultiply` and `FloatAdd` normalise **both**
+operands on every call, and for an integer operand that is work the new byte-skip immediately undoes.
+Diminishing returns; only worth revisiting if float-heavy code matters more than features.
+
+## Build / infrastructure
+
+- Copy the object code *down* after compiling, rather than leaving it above the compiler and its
+  libraries (must stay on a page boundary). Inherited from the old TODO and still true.
+
+## Notes that are easy to lose
+
+- The randomised test suites **cannot see a 1-ULP error** — they assert through `f.cmp`, which is
+  `FloatCompare`, and that deliberately ignores the low 12 bits of a float difference. Green suites
+  prove nothing about precision. To check float internals, hand-build the stack slots in a throwaway
+  `.asm`, `jsr` the routine, and read the raw bytes out of the emulator's `-dump R` image.
+- `x16emu` will not overwrite an existing dump — it silently writes `dump-1.bin`. Delete the old one or
+  you will read stale bits.
+- If the emulator exits instantly with `SDL_OpenAudioDevice failed`, that is the host's audio device,
+  not the build. Pass `-sound none`.

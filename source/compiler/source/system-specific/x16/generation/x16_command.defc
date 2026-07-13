@@ -8,43 +8,51 @@
 ;
 ;	OPEN    #,# X:CommandOPEN T N
 ;
-	.byte	$0a,$9f,$00,$ea,$e3,CommandOPEN & $FF,CommandOPEN >> 8,$10,199,$06
+	.byte	$0a,$9f,$00,$ea,$e3,CommandOPEN & $FF,CommandOPEN >> 8,$10,202,$06
 ;
 ;	CLOSE    # T N
 ;
-	.byte	$06,$a0,$00,$e1,196,$06
+	.byte	$06,$a0,$00,$e1,199,$06
 ;
 ;	CLS    T N
 ;
-	.byte	$07,$ce,$90,$20,44491 & $FF,44491 >> 8,$06
+	.byte	$07,$ce,$90,$20,45006 & $FF,45006 >> 8,$06
 ;
 ;	LOCATE    # X:OptionalParameterCompile T N
 ;
-	.byte	$0a,$ce,$92,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,44747 & $FF,44747 >> 8,$06
+	.byte	$0a,$ce,$92,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,45262 & $FF,45262 >> 8,$06
 ;
 ;	COLOR    # X:OptionalParameterCompile T N
 ;
-	.byte	$0a,$ce,$8d,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,45003 & $FF,45003 >> 8,$06
+	.byte	$0a,$ce,$8d,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,45518 & $FF,45518 >> 8,$06
 ;
 ;	SCREEN    # T N
 ;
-	.byte	$06,$ce,$86,$e1,200,$06
+	.byte	$06,$ce,$86,$e1,203,$06
 ;
 ;	VPOKE    #,#,# T N
 ;
-	.byte	$08,$ce,$84,$ea,$ea,$e1,201,$06
+	.byte	$08,$ce,$84,$ea,$ea,$e1,204,$06
 ;
 ;	SLEEP    # T N
 ;
-	.byte	$07,$ce,$af,$e2,39371 & $FF,39371 >> 8,$06
+	.byte	$07,$ce,$af,$e2,39886 & $FF,39886 >> 8,$06
 ;
 ;	MOUSE    # T N
 ;
-	.byte	$07,$ce,$8c,$e2,36043 & $FF,36043 >> 8,$06
+	.byte	$07,$ce,$8c,$e2,36046 & $FF,36046 >> 8,$06
 ;
 ;	I2CPOKE   #,#,# T N
 ;
-	.byte	$09,$ce,$ae,$ea,$ea,$e2,38603 & $FF,38603 >> 8,$06
+	.byte	$09,$ce,$ae,$ea,$ea,$e2,38606 & $FF,38606 >> 8,$06
+;
+;	POWEROFF   T N
+;
+	.byte	$07,$ce,$ad,$20,38862 & $FF,38862 >> 8,$06
+;
+;	REBOOT    T N
+;
+	.byte	$07,$ce,$ac,$20,39118 & $FF,39118 >> 8,$06
 ;
 ;	PSET    #,#,# T N
 ;
@@ -62,6 +70,14 @@
 ;
 	.byte	$0a,$ce,$89,$ea,$ea,$ea,$ea,$e1,156,$06
 ;
+;	OVAL    #,#,#,#,# T N
+;
+	.byte	$0a,$ce,$bf,$ea,$ea,$ea,$ea,$e1,157,$06
+;
+;	RING    #,#,#,#,# T N
+;
+	.byte	$0a,$ce,$c0,$ea,$ea,$ea,$ea,$e1,158,$06
+;
 ;	CHAR    #,#,#,$ T N
 ;
-	.byte	$09,$ce,$8b,$ea,$ea,$ea,$f1,157,$06
+	.byte	$09,$ce,$8b,$ea,$ea,$ea,$f1,159,$06

@@ -22,9 +22,13 @@ VPOKE 			#,#,# T N
 SLEEP 			# T N
 MOUSE 			# T N
 I2CPOKE 		#,#,# T N
+POWEROFF 		T N
+REBOOT 			T N
 
 PSET 			#,#,# T N
 LINE 			#,#,#,#,# T N
 RECT 			#,#,#,#,# T N
 FRAME 			#,#,#,#,# T N
+OVAL 			#,#,#,#,# T N
+RING 			#,#,#,#,# T N
 CHAR 			#,#,#,$ T N

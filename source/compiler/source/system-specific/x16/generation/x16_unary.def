@@ -18,3 +18,4 @@ MX  			T N
 MY  			T N
 MWHEEL 			T N
 I2CPEEK 		(#,#) T N
+MOD 			(#,#) T N
