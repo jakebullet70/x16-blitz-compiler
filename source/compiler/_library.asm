@@ -1233,31 +1233,61 @@ _ECAHaveToken:
 		sta 	zTemp0+1 					; save the precedence of the operator.
 		jsr 	GetNext 					; consume the token.
 		;
-		;		Now check for >= <= <>
+		;		Now fold the two-character relational operators. CBM/X16 BASIC accepts <, = and >
+		;		in ANY order, so all six of  <>  ><  <=  =<  >=  =>  are legal and reduce to three
+		;		operators. Only <> <= >= were handled here: a leading "=" was never examined at
+		;		all, and ">" only ever looked for "=", so =< => and >< were rejected as syntax
+		;		errors on perfectly valid X16 BASIC.
 		;
-		cpx 	#C64_GREATER				; checks for < or > which could be two character tokens
-		beq 	_ECAGreaterCheck
+		;		The operator token is later turned into P-Code by adding a FIXED offset, so these
+		;		exact values matter:
+		;			>=  = C64_GREATER+3  ($B4 -> PCD_GREATEREQUAL $8A)
+		;			<>  = C64_LESS+2     ($B5 -> PCD_LESSGREATER  $8B)
+		;			<=  = C64_LESS+3     ($B6 -> PCD_LESSEQUAL    $8C)
+		;		Precedence has already been read from the FIRST token above, and <, = and > all
+		;		share precedence 2, so rewriting X here is safe.
+		;
+		cpx 	#C64_GREATER
+		beq 	_ECAAfterGreater
+		cpx 	#C64_EQUAL
+		beq 	_ECAAfterEqual
 		cpx 	#C64_LESS
 		bne 	_ECAHaveFullToken
 		;
-		jsr 	LookNext 					; checks for < (<= or <>)
-		cmp 	#C64_GREATER 				; <> is 2 on from <
-		beq	 	_ECAToNotEqual
-		cmp 	#C64_EQUAL 					; <= is 3 on from <
-		bne 	_ECAHaveFullToken
-		bra 	_ECAAddEqual
+		jsr 	LookNext 					; seen "<" : accept <> and <=
+		cmp 	#C64_GREATER
+		beq 	_ECASetNotEqual
+		cmp 	#C64_EQUAL
+		beq 	_ECASetLessEqual
+		bra 	_ECAHaveFullToken
 
-_ECAGreaterCheck: 							; checks for > (>=)		
+_ECAAfterGreater: 							; seen ">" : accept >= and ><
 		jsr 	LookNext
 		cmp 	#C64_EQUAL
-		bne 	_ECAHaveFullToken
-_ECAAddEqual:
-		inx 								; > => >= and < to <= is three tokens on.
-_ECAToNotEqual:		
-		inx
-		inx
-		jsr 	GetNext 					; consume the = or > in >= <= <>		
-_ECAHaveFullToken:		
+		beq 	_ECASetGreaterEqual
+		cmp 	#C64_LESS
+		beq 	_ECASetNotEqual
+		bra 	_ECAHaveFullToken
+
+_ECAAfterEqual: 							; seen "=" : accept => and =<
+		jsr 	LookNext
+		cmp 	#C64_GREATER
+		beq 	_ECASetGreaterEqual
+		cmp 	#C64_LESS
+		beq 	_ECASetLessEqual
+		bra 	_ECAHaveFullToken
+
+_ECASetNotEqual:
+		ldx 	#C64_LESS+2
+		bra 	_ECAConsumeSecond
+_ECASetGreaterEqual:
+		ldx 	#C64_GREATER+3
+		bra 	_ECAConsumeSecond
+_ECASetLessEqual:
+		ldx 	#C64_LESS+3
+_ECAConsumeSecond:
+		jsr 	GetNext 					; consume the second character of the operator
+_ECAHaveFullToken:
 		;
 		;		Check for + string => concat
 		;
@@ -1366,9 +1396,9 @@ PrecedenceTable:
 		.byte 	2 					; '>'
 		.byte 	2 					; '='
 		.byte 	2 					; '<'
-		.byte 	2 					; '>='
-		.byte 	2 					; '<='
-		.byte 	2 					; '<>'
+		.byte 	2 					; '>=' (C64_GREATER+3)
+		.byte 	2 					; '<>' (C64_LESS+2)   -- these two were the wrong way round
+		.byte 	2 					; '<=' (C64_LESS+3)
 
 		.send code
 

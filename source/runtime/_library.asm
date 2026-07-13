@@ -2085,7 +2085,18 @@ CommandXFor: ;; [for]
 		iny
 		ora 	(runtimeStackPtr),y
 
-		bne 	_CFNoOptimise 	
+		bne 	_CFNoOptimise
+		;
+		;		A ZERO step must never take the optimised path. Two reasons: its increment loop
+		;		in next.asm propagates carry with "beq _CNOIncrement", and adding 0 to a 0 byte
+		;		leaves 0 -- so with a zero index it walks Y straight off the end of the 4-byte
+		;		variable, corrupting whatever follows. And the optimised exit test is a plain
+		;		"terminal < value" magnitude check, which cannot express the exact-equality exit
+		;		that STEP 0 requires. Send it to the general path, which handles both.
+		;
+		ldy 	#7 							; step low byte (mantissa1..3 are already known zero)
+		lda 	(runtimeStackPtr),y
+		beq 	_CFNoOptimise
 
 		ldy 	#4 							; set the runtime stack pointer optimisation flag.
 		lda 	(runtimeStackPtr),y
@@ -3654,6 +3665,28 @@ _CNNoIndexVariable:
 		jsr 	FloatCompare 				; and compare the floats.
 		dex 								; throw result (in NSMantissa0+1)
 
+		;
+		;		Exit iff sign(compare(index,limit)) == sign(step), where sign(0) = 0. That is a
+		;		THREE-way test. Branching on the step's sign BIT alone only gives two cases and
+		;		drops a ZERO step into the ascending path, so it exited the moment index > limit
+		;		-- i.e. immediately. A zero step is neither ascending nor descending: it must
+		;		exit ONLY on exact equality, which is what makes
+		;
+		;			FOR I=0 TO -1 STEP 0 ... NEXT
+		;
+		;		work -- a real idiom that loops until the body itself sets I to the limit.
+		;		(FloatCompare returns 0 equal, 1 greater, $FF less.)
+		;
+		ldy 	#7 							; is the step zero ? test its mantissa, as FloatIsZero
+		lda 	(runtimeStackPtr),y 		; does -- a zero mantissa is zero whatever the exponent.
+		iny
+		ora 	(runtimeStackPtr),y
+		iny
+		ora 	(runtimeStackPtr),y
+		iny
+		ora 	(runtimeStackPtr),y
+		beq 	_CNZeroStep
+
 		ldy 	#12 						; get the sign of the step.
 		lda 	(runtimeStackPtr),y
 		bmi 	_CNDownStep
@@ -3662,10 +3695,16 @@ _CNNoIndexVariable:
 		cmp 	#1 							; gone higher
 		beq 	_CNExitFor 					; if so exit the loop
 		bra 	_CNLoopBack
+
+_CNZeroStep:
+		lda 	NSMantissa0+1,x 			; zero step: exit only on EXACT equality.
+		beq 	_CNExitFor
+		bra 	_CNLoopBack
+
 _CNDownStep:
 		lda 	NSMantissa0+1,x 			; get comparator
 		cmp 	#255 						; gone lower
-		beq 	_CNExitFor		
+		beq 	_CNExitFor
 		;
 		; 		Here to loop back
 		;

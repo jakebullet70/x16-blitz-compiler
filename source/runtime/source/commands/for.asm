@@ -75,7 +75,18 @@ CommandXFor: ;; [for]
 		iny
 		ora 	(runtimeStackPtr),y
 
-		bne 	_CFNoOptimise 	
+		bne 	_CFNoOptimise
+		;
+		;		A ZERO step must never take the optimised path. Two reasons: its increment loop
+		;		in next.asm propagates carry with "beq _CNOIncrement", and adding 0 to a 0 byte
+		;		leaves 0 -- so with a zero index it walks Y straight off the end of the 4-byte
+		;		variable, corrupting whatever follows. And the optimised exit test is a plain
+		;		"terminal < value" magnitude check, which cannot express the exact-equality exit
+		;		that STEP 0 requires. Send it to the general path, which handles both.
+		;
+		ldy 	#7 							; step low byte (mantissa1..3 are already known zero)
+		lda 	(runtimeStackPtr),y
+		beq 	_CFNoOptimise
 
 		ldy 	#4 							; set the runtime stack pointer optimisation flag.
 		lda 	(runtimeStackPtr),y
