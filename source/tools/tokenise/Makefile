@@ -15,8 +15,12 @@ else
 include ../../../documents/common.make
 endif
 
-all:	
+#
+#		Build the runnable zipapp with Python's stdlib zipfile rather than shelling out
+#		to zip(1), which is not present on a stock Windows box. Equivalent to "zip -j".
+#
+all:
 	$(CCOPY) tokenise.py __main__.py
-	zip -j -q tokenise.zip __main__.py ..$(S)..$(S)common-scripts$(S)c64tokens.py
+	$(PYTHON) -c "import zipfile; z = zipfile.ZipFile('tokenise.zip','w',zipfile.ZIP_DEFLATED); z.write('__main__.py','__main__.py'); z.write('../../common-scripts/c64tokens.py','c64tokens.py'); z.close()"
 	$(CCOPY) tokenise.zip $(BINDIR)
 	$(CDEL) __main__.py

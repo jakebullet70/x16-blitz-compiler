@@ -48,7 +48,11 @@ release:  build
 	$(CCOPY) build$(S)*.bas $(RELEASEDIR)
 	$(CCOPY) $(BINDIR)tokenise.zip $(RELEASEDIR)
 	$(CCOPY) $(ROOTDIR)CHANGES.txt $(RELEASEDIR)
-	cd $(RELEASEDIR) ; $(CDEL) blitz.zip ; zip -q blitz.zip *
+	#
+	#		Bundle the release with Python's stdlib zipfile rather than zip(1), which is
+	#		not present on a stock Windows box.
+	#
+	cd $(RELEASEDIR) ; $(CDEL) blitz.zip ; $(PYTHON) -c "import glob, os, zipfile; z = zipfile.ZipFile('blitz.zip','w',zipfile.ZIP_DEFLATED); [z.write(f) for f in sorted(glob.glob('*')) if os.path.isfile(f)]; z.close()"
 	
 run: build	
 	$(CDEL) OBJECT.PRG

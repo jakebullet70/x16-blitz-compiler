@@ -1,0 +1,15 @@
+# Per-machine toolchain paths (TASS / PYTHON overrides)
+documents/local.make
+
+# Emulator memory dumps (x16emu writes dump*.bin, Box16 writes dump*.txt)
+dump*.bin
+dump*.txt
+memory_stats.txt
+
+# Python
+__pycache__/
+*.pyc
+
+# Transient: pcode.py emits scripts/pcodeconstraw.py here, the Makefile then
+# moves it to common-scripts/. The directory itself must exist to build.
+source/common-source/scripts/

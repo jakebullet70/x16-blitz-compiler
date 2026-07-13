@@ -37,8 +37,20 @@ class Builder(object):
 					if f.endswith(".asm"):
 						self.asmFiles.append(root+os.sep+f)			
 
-		self.asmFiles.sort(key = lambda x:x.split(os.sep)[-1])
-		self.incFiles.sort(key = lambda x:x.split(os.sep)[-1])
+		#
+		#		Sort by leafname, then by full path as a tie-breaker. Without the
+		#		tie-breaker, files sharing a leafname (e.g. commands/get.asm and
+		#		helpers/get.asm) are left in os.walk() order, which varies by platform
+		#		and filesystem -- so the same sources linked in a different order and
+		#		the build was not reproducible.
+		#
+		self.asmFiles.sort(key = self.sortKey)
+		self.incFiles.sort(key = self.sortKey)
+		self.defFiles.sort(key = self.sortKey)
+
+	def sortKey(self,path):
+		parts = path.replace("\\",os.sep).replace("/",os.sep).split(os.sep)
+		return (parts[-1],parts)
 
 	def createFile(self):
 		h = open("_library.asm","w")
