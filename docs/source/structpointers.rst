@@ -1,0 +1,317 @@
+.. _pointers:
+
+********************
+Structs and Pointers
+********************
+
+.. index::
+      pair: Structs; Overview
+      pair: Pointers; Overview
+
+.. attention::
+    The 6502 cpu lacks some features (addressing modes, registers) to make pointers work efficiently.
+    Also it requires that pointer variables have to be in zero page, or copied to a temporary zero page variable,
+    before they can even be used as a pointer. This means that pointer operations in prog8 compile
+    to rather large and inefficient assembly code most of the time, when compared to direct array access or regular variables.
+    At least try to place heavily used pointer variables in zero page using ``@requirezp`` on their declaration,
+    if zero page space allows.
+    Pointer variables that don't have a zeropage tag specified will be treated as having ``@zp`` so they get
+    priority over other variables to be placed into zeropage.
+
+.. note::
+    Due to a few limitations in the language parser, some pointer related syntax is currently unsupported.
+    The compiler tries its best to give a descriptive error message but sometimes there is still a
+    parser limitation that has to be worked around at the moment. For example, this assignment syntax doesn't parse correctly::
+
+        ^^Node  np
+        np[2].field = 9999          ; cannot use this syntax as assignment target right now
+        ubyte value = np[2].field   ; note that using it as expression value works fine
+
+    To work around this you'll have to explicitly write the pointer dereferencing operator,
+    or break up the expression in multiple steps (which can be beneficial too when you are assigning multiple fields
+    because it will save a pointer calculation for every assignment)::
+
+        ^^Node  np
+        np[2]^^.field = 9999
+
+        ; alternatively, split up:
+        ^^Node thenode = &&np[2]
+        thenode.field = 9999
+
+
+Legacy untyped pointers (uword)
+-------------------------------
+.. index:: single: Pointers; legacy untyped
+
+Prior to version 12 of the language, the only pointer type available was a plain ``uword`` value (the memory address)
+which could be used as a pointer to an ``ubyte`` (the byte value at that memory address).
+Array indexing on an ``uword`` simply means to point to the ``ubyte`` at the location of the address + index value.
+
+When the address of a value (explicitly) or a value of a reference type (string, array) was passed as an argument to a subroutine call,
+it became one of these plain ``uword`` 'pointers'. The subroutine receiving it always had to interpret the 'pointer'
+explicitly for what it actually pointed to, if that wasn't a simple byte.
+
+Some implicit conversions were allowed too (such as putting ``str`` as the type of a subroutine parameter,
+which would be changed to ``uword`` by the compiler).
+
+Since Prog8 version 12 there now are *typed pointers* that better express the intent and tell the compiler how to use the pointer;
+these are explained below.
+
+*For backward compatibility reasons, this untyped uword pointer still exists in the language.*
+You can assign any other pointer type to an untyped pointer variable (uword) without the need for an explicit cast.
+You can assign an untyped pointer (uword) to a typed pointer variable without the need for an explicit cast.
+
+
+
+Typed pointer to simple datatype
+--------------------------------
+.. index:: single: Pointers; Simple Typed
+
+Prog8 syntax has the 'double hat' token ``^^`` that appears either in front of a type ("pointer to this type") or
+after a pointer variable ("get the value it points to" - a pointer dereference).
+
+So the syntax for declaring typed pointers looks like this:
+
+``^^type``: pointer to a type
+    You can declare a pointer to any numeric datatype (bytes, words, longs, floats), and booleans, and struct types.
+    Structs are explained in the next section.
+    So for example; ``^^float fptr`` declares fptr as a pointer to a float value.
+
+``^^type[size]``: array with size size containing pointers to a type.
+    So for example; ``^^word[100] values`` declares values to be an array of 100 pointers to words.
+    Note that an array of pointers (regardless of the type they point to) is always a split word array.
+    (this is the most efficient way to access the pointers, and they need to be copied to zeropage first to
+    be able to use them anyway. It also allows for arrays of up to 256 pointers instead of 128.)
+
+It is not possible to define pointers to *arrays*; ``^^(type[])`` is invalid syntax.
+
+Pointers of different types cannot be assigned to one another, unless you use an explicit cast.
+This rule is not enforced for untyped pointers/regular uword, as described earlier.
+
+The ``str`` type in subroutine parameters and return values has always been a bit weird in the sense that in these cases,
+the string is actually passed by reference (it's address pointer is passed) instead of a ``str`` variable that is accessed by value.
+In previous Prog8 versions these were untyped uword pointers, but since version 12, these are now translated as ``^^ubyte``.
+Resulting assembly code should be equivalent still.
+
+.. note::
+    **Pointers to subroutines:**
+    While Prog8 allows you to take the address of a subroutine, it has no support yet for typed function pointers.
+    Calling a routine through a pointer with ``goto``, ``call()`` and such, only works with the raw uword address for now.
+
+
+Dereferencing a pointer, pointer arithmetic
+-------------------------------------------
+.. index::
+    pair: Pointers; Dereferencing a pointer
+    pair: Pointers; Pointer arithmetic
+
+To get the value the pointer points at, you *dereference* the pointer. The syntax for that is: ``pointer^^``.
+Say the pointer variable is of type ``^^float``, then ``pointer^^`` will return the float value it points at.
+
+You can also use array indexing syntax to get the n-th value. For example: ``floatpointer[3]`` will return the
+fourth floating point value in the sequence that the floatpointer points at. Because the pointer is a typed pointer,
+the compiler knows what the size of the value is that it points at and correctly skips forward the required number of bytes in memory.
+In this case, say a float takes 5 bytes, then ``floatpointer[3]`` will return the float value stored at memory address floatpointer+15.
+Notice that ``floatpointer[0]`` is equivalent to ``floatpointer^^``.
+
+You can add and subtract values from a pointer, this is called **pointer arithmetic**.
+For example, to advance a pointer to the next value, you can use ``pointer++``.
+To make it point to the preceding value, you can use ``pointer--``.
+**Adding or subtracting X to a pointer will change the pointer by X times the size of the value it points at (the same as the C language does it),
+instead of simply adding or subtracting the value from the pointer address value.**
+(that is what Prog8 still does for untyped uword pointers, or pointers to a type that just takes up a single byte of memory).
+
+That special pointer arithmetic is also performed for pointers to struct types:
+the compiler knows the memory storage size of the whole struct type and advances or rewinds
+the pointer value (memory address) by the appropriate number of bytes (X times the size of the struct). More info about structs can be found below.
+
+
+Structs
+-------
+.. index:: pair: Structs; Definition
+
+A struct is a grouping of multiple variables. Say your game is going to track several enemy sprites on the screen,
+in which case it may be useful to describe the various properties of an enemy together in a struct type, rather than
+dealing with all of them separately.  You first define the struct type like so::
+
+    struct Enemy {
+        ubyte xpos, ypos
+        uword health
+        bool elite
+    }
+
+You can use boolean fields, numeric fields (byte, word, long, float), and pointer fields (including str, which is translated into ^^ubyte).
+You cannot nest struct types nor put arrays in them as a field.
+Fields in a struct are 'packed' (meaning the values are placed back-to-back in memory), and placed in memory in order of declaration. This guarantees exact size and place of the fields.
+``sizeof()`` knows how to calculate the combined size of a struct, and ``offsetof()`` can be used to get the byte offset of a given field in the struct.
+The size of a struct cannot exceed 1 memory page (256 bytes).
+
+You can copy the whole contents of a struct to another one by assigning the dereferenced pointers::
+
+    ^^Enemy e1,e2
+    e1^^ = e2^^     ; copies all fields of e2 into e1
+
+
+The struct type creates a new name scope, so accessing the fields of a struct is done as usual with the dotted notation.
+Because it implies pointer dereferencing you can usually omit the explicit `^^`, prog8 will know what it means::
+
+    if e1.ypos > 300
+        e1.health -= 10
+
+    ; explicit dereferencing notation:
+
+    if e1^^.ypos > 300
+        e1^^.health -= 10
+
+
+.. note::
+    Structs are currently only supported as a *reference type* (they always have to be accessed through a pointer).
+    It is not yet possible to use them as a value type, or as memory-mapped types.
+    This means you cannot create an array of structs either - only arrays of pointers to structs.
+    There are a couple of simple case where the compiler does allow assignment of struct instances though, and it will
+    automatically copy all the fields for you. You are allowed to write::
+
+        ptr2^^ = ptr1^^
+        ptr2^^ = ptr1[2]
+        ptr2[2] = ptr1^^
+
+    The compiler replaces this with a memory copy if these are pointers to a struct.
+    In the future more cases may be supported.
+
+.. note::
+    Using structs instead of plain arrays usually results in more and less efficient code being generated.
+    This is because the 6502 CPU is not particularly well equipped to dealing with pointers and accessing struct fields via offsets,
+    as compared to direct variable access or array indexing. The prog8 program code may be easier to work with though!
+
+.. note::
+    Accessing the first field in a struct is more efficient than subsequent fields, because it
+    is at offset 0 so no additional addition has to be computed on a pointer to reach the first field.
+    Try to put the most often accessed field as the first field to potentially gain a rather substantial boost in code efficiency.
+
+
+Static initialization of structs
+================================
+.. index:: pair: Structs; Static initialization
+
+You can 'allocate' and statically initialize a struct. This behave much like initializing arrays does,
+and it won't reset to the original value when the program is restarted, so beware.
+*Remember that the struct is statically allocated, and appears just once in the memory:*
+This means that, for instance, if you do this in a subroutine that gets
+called multiple times, or inside a loop, the struct *will be the same instance every time*.
+Read below if you need *dynamic* struct allocation!
+You write a static struct initialization expression like this:
+
+``^^Node : [1,"one", 1000, true, 1.111]``
+    statically places an instance of struct 'Node' in memory, with its fields set to 1, "one", 1000 etcetera and returns the address of this struct.
+    The values in the initialization array must correspond exactly with the first to last declared fields in the struct type.
+``^^Node : []``
+    (without values) Places a 'Node' instance in BSS variable space instead, which gets zeroed out at program startup.
+    Returns the address of this empty struct.
+
+The field values in a struct initializer must be constants. You can use numeric literals, ``address-of`` expressions,
+or ``memory()`` calls (either directly or via ``const`` variables).
+It is also possible to put struct initializer inside arrays to make them all statically initialized and accessible via the array::
+
+    ^^Node[] allnodes = [
+        ^^Node: [1,"one", 1000, true, 1.111],
+        ^^Node: [2,"two", 2000, false, 2.222],
+        ^^Node: [],
+        ^^Node: [],
+    ]
+
+Short form initializers
+^^^^^^^^^^^^^^^^^^^^^^^
+.. index:: pair: Structs; Initializers
+
+If the required type can be inferred from the context you can also omit the struct pointer type prefix altogether.
+The initializer value then is syntactically the same as an array, but Prog8 internally turns it back into a proper
+struct initializer value based on the the type of the array element or pointer variable it is assigned to.
+So you can write the above in short form as::
+
+    ^^Node nodepointer = [1,2,3,4]
+
+    ^^Node[] allnodes = [
+        [1,"one", 1000, true, 1.111],
+        [2,"two", 2000, false, 2.222],
+        [],
+        []
+    ]
+
+
+
+Dynamic allocation of structs
+=============================
+.. index:: pair: Structs; Dynamic allocation
+
+There is no real 'dynamic' memory allocation in Prog8. Everything is statically allocated. This doesn't change with struct types.
+However, it is possible to write a dynamic memory handling library yourself (it has to track memory blocks manually).
+If you ask such a library to give you a pointer to a piece of memory with size ``sizeof(Enemy)`` you can use that as
+a dynamic pointer to an Enemy struct.
+
+An example of how a super simple dynamic allocator could look like::
+
+    ^^Node newnode = allocator.alloc(sizeof(Node))
+    ...
+
+    allocator {
+        ; extremely trivial arena allocator
+        uword buffer = memory("arena", 2000, 0)
+        uword next = buffer
+
+        sub alloc(ubyte size) -> uword {
+            defer next += size
+            return next
+        }
+
+        sub freeall() {
+            ; cannot free individual allocations only the whole arena at once
+            next = buffer
+        }
+    }
+
+
+Address-Of: untyped vs typed
+----------------------------
+.. index:: single: Structs; Address-Of
+
+``&`` still returns an untyped (uword) pointer, as it did in older Prog8 versions. This is for backward compatibility reasons so existing programs don't break.
+The new *double ampersand* operator ``&&`` returns a *typed* pointer to the value. The semantics are slightly different from the old untyped address-of operator, because adding or subtracting
+a number from a typed pointer uses *pointer arithmetic* that takes the size of the value that it points to into account.
+
+
+Accessing struct definitions in Assembly code
+---------------------------------------------
+.. index:: single: Structs; Access from assembly
+
+Prog8 lets you query the size of a struct type, and the offsets of a field.
+You can do the same in assembly code if needed: the struct definition gets written as `.struct` into the assembly file::
+
+    ; prog8 struct declaration:
+    struct Node {
+        ubyte type
+        uword value
+        bool flag
+    }
+
+    ; generates this assembly code:
+    ; (the symbol prefixes are explained in the 'Technical details' chapter)
+    p8b_main.p8t_Node    .struct f0,f1,f2
+    p8v_type  .byte  \f0
+    p8v_value  .word  \f1
+    p8v_flag  .byte  \f2
+        .endstruct
+
+
+64tass then lets you query that information::
+
+    ; prog8 code:
+    ubyte size = sizeof(Node)
+    ubyte offset1 = offsetof(Node.type)
+    ubyte offset2 = offsetof(Node.value)
+    ubyte offset3 = offsetof(Node.flag)
+
+    ; assembly equivalents (64tass syntax):
+    lda  #size(p8t_Node)
+    lda  #p8t_Node.p8v_type
+    lda  #p8t_Node.p8v_value
+    lda  #p8t_Node.p8v_flag

@@ -1,0 +1,1361 @@
+---
+date: 2026-06-30
+title: X16 Edit user manual
+---
+
+::: huge
+X16 Edit user manual
+:::
+
+2026-06-30
+
+# Introduction
+
+Thank you for trying out X16 Edit!
+
+X16 Edit is a simple text editor written in 65C02 assembly especially
+for the Commander X16 retro computer.
+
+The look and feel of the program is inspired by GNU Nano. There are,
+naturally, a lot of differences, but you will feel at home if you are
+used to Nano.
+
+The Commander X16 was devised by David Murray a.k.a. the 8-Bit Guy. For
+more information on the platform, go to
+[www.commanderx16.com](http://www.commanderx16.com).
+
+# Basic usage
+
+## Getting started
+
+As of Kernal version R45, the editor is stored in ROM and can be started
+with the BASIC command EDIT.
+
+There is also a RAM based version of the editor. It consists of just one
+file, X16EDIT-x.x.x.PRG, where x.x.x is the version number. The RAM
+based editor is loaded and run in the same way as a BASIC program.
+
+To run the RAM based editor on hardware, just store the program file on
+an SD card. Insert the SD card into your X16 computer. Type
+`LOAD"X16EDIT-x.x.x.PRG"` to load the program. And then `RUN` to start
+it.
+
+If you want to run the RAM based editor in the x16emu emulator, you
+first need to store the X16 Edit executable in the host computer's file
+system. Then type the following command in the terminal:
+
+        x16emu -prg X16EDIT-x.x.x.PRG -run
+
+A valid path to the editor executable must be specified after the
+\"-prg\" option. Otherwise the emulator will not know where to find the
+program.
+
+The \"-run\" option automatically starts the editor after the emulator
+is booted. You may remove this option and start the editor manually by
+typing `RUN` in the emulator.
+
+## Entering text
+
+X16 Edit is a modeless text editor. As soon as it is started, everything
+you type is stored in the text buffer.
+
+The cursor is moved with keys normally used for that purpose on a modern
+keyboard, *i.e.* the arrow keys, Tab, Home, End, PgUp and PgDn.
+
+The go to line feature (Ctrl+L) lets you move the cursor to a specific
+line number.
+
+As you type and reach the right margin, the editor does not by default
+insert a line break. Instead the current line is scrolled horizontally
+to make room for more characters. There is no limit to the length of a
+line other than the available memory.
+
+## Saving and loading text files
+
+The current text buffer is saved to file on the SD card when you press
+Ctrl+O. Type in the file name you like to use, and press the ENTER key.
+You will be prompted to confirm before overwriting a file that already
+exists.
+
+To load a file from the SD card, press Ctrl+R. Just type in the name of
+the file you want to load, and then press the ENTER key.
+
+## Keyboard shortcuts
+
+X16 Edit is controlled by keyboard shortcuts. You find a complete list
+of shortcuts in Appendix A.
+
+Shortcuts are primarily selected by pressing and holding down Ctrl at
+the same time as you press a shortcut key.
+
+You may also press and release the ESC key. A message is displayed in
+the status bar indicating that the program is ready to receive a
+command. Just press a shortcut key without holding down any modifier.
+
+## Mouse control
+
+The editor is primarily made to be controlled by the keyboard. There
+are, however, some basic mouse controls.
+
+The cursor may be positioned in the file by clicking the left mouse
+button.
+
+You may select part of the text by pressing the left mouse button where
+you want the selection to start and release it where you want the
+selection to end. Selections can be copied or cut. More on that later.
+
+The mouse is automatically enabled when you start the editor. The mouse
+pointer is hidden while typing on the keyboard, and shown again when you
+move or click the mouse.
+
+## User interface
+
+X16 Edit's user interface is similar to GNU Nano, and should be mostly
+self-explanatory. It consists of the following main parts:
+
+-   Title bar
+
+-   Editor area
+
+-   Status bar
+
+-   Shortcut list
+
+The *title bar* is at the top row of the screen. The name of the current
+file is displayed at the center. If the text buffer has not been saved
+to file, it displays \"New text buffer\". At the right edge the letters
+\"MOD\" are shown if the text buffer has been changed since last saved
+to file.
+
+The *editor area* is right below the title bar. It takes up most of the
+screen, and it is here you do all text editing.
+
+The *status bar* is at the third row from the bottom of the screen. All
+messages from the program are displayed in the status bar. If the
+program needs to prompt you for input, the input prompt is displayed
+here as well.
+
+At the input prompt you may either press ENTER to confirm your input or
+press ESC to abort the current operation.
+
+The active *line break encoding* and the current *cursor position* are
+displayed at the left and right edge of the status bar respectively, if
+there is no active message or prompt.
+
+The *shortcut list* takes up the last two rows of the screen. Here you
+find the most common keyboard shortcuts.
+
+X16 Edit uses the screen mode (screen height and width) that is active
+when starting the program. Especially the shortcut list and the help
+screen change appearance to fit in low screen resolutions.
+
+## Built-in help
+
+A lists of all keyboard shortcuts and a short description of each
+command is available in the built-in help screen (Ctrl+G).
+
+# More on text editing
+
+## Supported character sets
+
+The editor supports the following built-in character sets:
+
+-   PETSCII upper case/graphics (standard and thin). This is the default
+    mode of both the Commander X16 and the C64.
+
+-   PETSCII upper/lower case (standard and thin). This is the same mode
+    as is available on the C64.
+
+-   ISO character set (standard and thin). This mode is new for the X16,
+    and there is no corresponding mode supported by Commodore 8 bit
+    computers. Text is encoded according to ISO-8859-15, making it
+    easier to transfer files to and from modern computers.
+
+-   CP437.
+
+-   Cyrillic (standard and thin).
+
+-   Eastern latin (standard and thin).
+
+On startup, the editor detects the current character set and continues
+using that.
+
+You may change the character set by pressing Ctrl+E. Press left or right
+cursor keys to browse the supported character sets, and press Enter to
+select the new character set you want to use.
+
+## Quote mode
+
+The PETSCII character set contains control codes that are commonly used
+in BASIC programs. The control codes are, for instance, used to clear
+the screen and to move the cursor. Normally, it is not possible to type
+PETSCII control codes in the editor. Control codes may be typed by
+activating the quote mode (Ctrl+Q). You exit quote mode by pressing ESC.
+
+## Tab stop
+
+The default tab stop width is four spaces.
+
+You may change the width by Ctrl+1--9.
+
+## Auto-indent
+
+The auto-indent feature is used to keep the level of indentation when
+line breaks are inserted manually or automatically by the word wrap
+feature.
+
+Auto-indent is turned off when the editor starts. To toggle the feature
+on or off, press Ctrl+A.
+
+## Word wrap
+
+The editor does not automatically insert line breaks by default. Instead
+the current line is scrolled horizontally when you reach the right
+margin.
+
+Automatic word wrap may be toggled on or off by pressing Ctrl+Z. When
+turned on you are prompted for the column where to wrap.
+
+The word wrap feature works in a very simplified way. When you reach the
+right margin the editor breaks the line after the previous blank space.
+If there is no blank space on the line, the line break is inserted at
+the right margin. The line break position is not recalculated if you
+delete characters from the line or if you insert new characters at the
+beginning of the line.
+
+## Text justification
+
+The justify command (Ctrl+J) divides the text buffer into paragraphs and
+recalculates all line breaks according to the line width specified in
+the word wrap feature (default 80). The word wrap function need not be
+enabled to run the justify function.
+
+When auto-indent is turned off a new paragraph is considered to begin
+
+-   if two or more consecutive line breaks are found, or
+
+-   if a line starts with one or more blank spaces.
+
+If auto-indent is turned on, a new paragraph is considered to begin
+
+-   if two or more consecutive line breaks are found,
+
+-   if a line contains only blank space characters, or
+
+-   if the level of indentation is different from the previous line.
+
+## Cut, copy and uncut
+
+The editor supports cut, copy, and uncut (commonly called paste in other
+editors).
+
+Parts of the text can be selected for copying or cutting with the
+keyboard or mouse. A selection is made with the keyboard by holding down
+Shift while you move the cursor with the arrow keys or the Home or End
+keys. A selection can similarily be made by holding the left mouse
+button and move the pointer to the end of the selection before the
+button is released.
+
+If no text has been selected, the copy (Ctrl+C) and cut (Ctrl+K)
+commands copy a whole line into the clipboard.
+
+You may do multiple copies or cuts into the clipboard. The clipboard
+holds a maximum of 3 kB of data.
+
+Uncut (Ctrl+U) copies the content of the clipboard into the text buffer
+at the cursor position. It is possible to do repeated uncuts. The
+clipboard is cleared upon the first cut or copy after uncutting.
+
+## Search and replace
+
+The search command (Ctrl+W) lets you search the text buffer for a
+particular string. The replace function (Ctrl+S) lets you replace it
+with another string.
+
+Both search and replace are case sensitive. Search starts from the
+character after the cursor and is forward looking.
+
+If the string you are searching for is found, the cursor is moved to
+that position.
+
+When replacing a string, you are given the option to only replace the
+next occurrence or all subsequent occurrences.
+
+## Line break encoding
+
+The currently used line break encoding is displayed at the left edge of
+the status bar.
+
+The editor's default behavior is to use CR (ASCII 13) as line break when
+started in one of the PETSCII modes, and LF (ASCII 10) when started in
+ISO mode.
+
+On opening a file, the editor detects the use of any of the following
+line break encodings:
+
+-   CR -- Commodore or old Mac style
+
+-   LF -- Unix style
+
+-   CRLF -- Windows style
+
+The line break encoding found in the file is thereafter used by the
+editor.
+
+You can manually change the active line break encoding by pressing
+Ctrl+Enter.
+
+# More on file handling
+
+## Commodore DOS file paths
+
+The editor accepts a full Commodore DOS file path when prompting you for
+a file name.
+
+A Commodore DOS file path consists of a directory and a file name
+separated by a colon, for example:
+
+-   //MY-APP/:APPNAME.PRG
+
+-   /MY-APP/:APPNAME.PRG
+
+The first example starting with double slashes is an absolute path from
+the root of the SD card. The second example starting with a single slash
+is a realtive path starting from the current directory.
+
+## The built-in file browser
+
+At the prompt where a file name is entered you may alternatively press
+Ctrl+T to show the built-in file browser. The file browser is there to
+make it easier to move between directories and select files.
+
+To select an item in the file browser, first highlight it with the up or
+down arrow keys, and then press Enter.
+
+If the selected item is a directory, it will be made the new current
+directory, and its content will be displayed in the file browser.
+
+If not all items fit on one page the listing is ended with \"--- MORE
+---\". In case the items are spread over several pages, you may go to
+the next page with PgDn or Ctrl+V and back to a previous page with PgUp
+or Ctrl+Y.
+
+If there are no more items to show the listing is ended with \"--- END
+---\".
+
+## Change disk drive device number
+
+By default the file handling functions use device #8. The device number
+may be changed by pressing Ctrl+D.
+
+## Disk drive commands
+
+You may invoke disk drive commands by pressing Ctrl+I. The raw disk
+drive command is entered in the prompt that is displayed.
+
+Any valid command may be invoked. Some of the most useful commands are:
+
+-   \"C:dst=src\", copy src file to dst file
+
+-   \"R:dst=src\", rename src file to dst file
+
+-   \"S:filename\", delete filename
+
+-   \"CD:dirname\", change current directory
+
+-   \"MD:dirname\", create directory
+
+-   \"RD:dirname\", remove directory
+
+Just be careful! There is nothing stopping you from deleting files or
+even formatting the disk.
+
+# Miscellaneous functions
+
+## Color settings
+
+Both the background and the text color may be changed while using the
+editor. The program runs in 16 color text mode, so there are 16
+background and 16 text colors to choose from.
+
+Ctrl+T cycles through text color options. And Ctrl+B cycles through
+background colors.
+
+## Text buffer size
+
+The text buffer is stored in banked RAM, which is 512 kB expandable to 2
+MB.
+
+The text buffer may not exceed the available banked RAM.
+
+Press Ctrl+M to get information on the remaining memory reserved for the
+text buffer. It will be reported as blocks free. A block may at most
+hold 251 characters.
+
+## Programming toolbox
+
+Ctrl+F opens the Programming toolbox.
+
+Currently only one tool, BASLOAD, is supported. By pressing Ctrl+B or
+only B when the toolbox is active, the open text text file is run
+through BASLOAD. BASLOAD loads and tokenizes a BASIC program stored in a
+plain text file so that it can run on the X16. The text file needs to
+saved to disk before the function is used.
+
+## Print hard copy
+
+Printing to hard copy is supported through loadable drivers. The driver
+specification is available in Appendix C.
+
+Press Ctrl+H to open the printing dialog. The editor attempts to load
+the driver from the root of the SD card (device 8) using the file name
+pattern \"X16EDITPD-\*\". It is not recommended to store more than one
+driver in the root folder that matches this file name pattern, as you
+can't affect which driver the editor loads. If you want to keep multiple
+drivers in the root folder you may prepend the file name of unused
+drivers with any character to avoid them being loaded.
+
+The \"printer driver load error\" message is displayed if
+
+-   no SD card is present in device #8,
+
+-   a storage device mounted as device #8 doesn't support the Kernal's
+    MACPTR function; would require a customized Kernal,
+
+-   no file matching the driver name pattern is found in the root
+    folder,
+
+-   any other read error occured while loading the driver, or
+
+-   the end of the printer driver is not at address \$9eff.
+
+The \"unsupported printer driver\" message is displayed if the API
+version implemented by the driver is not supported by the editor.
+Currently there is only one API version (1).
+
+What printing options are available is controlled by the driver. Options
+may be of the following types:
+
+-   int8
+
+-   int16
+
+-   list
+
+-   string
+
+Use the up and down arrow keys to highlight the option you want to set.
+
+Options of types int8, int16 and list can be incremented or decremented
+using the left and right arrow keys.
+
+Options of types int8, int16 and string can also be set by pressing the
+Enter key. An input prompt is opened in the status bar, enabling the
+user to enter a new value.
+
+The driver is responsible for validating option values and to return
+plain text error messages in case of invalid options.
+
+Press P or Ctrl+P to start printing. The print operation can be paused
+by pressing ESC. The driver can also pause printing, for instance at the
+end of a page. Resume printing by pressing P or Ctrl+P.
+
+Press S or Ctrl+S to save the current settings as default, if the
+function is supported by the driver.
+
+After the printing has finished a \"printing complete\" message is
+displayed in the status bar.
+
+You can leave the printing dialog by pressing the ESC key.
+
+## Custom key scancode handlers
+
+The X16 Kernal allows custom key scancode handlers by changing the
+vector at \$032e-032f. A scancode handler gets the raw IBM key number
+read from the System Management Controller (SMC). The handler can
+intercept and change the scancode before it is processed by the Kernal's
+keyboard functions.
+
+The editor itself uses a scancode handler to keep track of modifier key
+status. The handler also consumes all Ctrl key events. By default, the
+editor's scancode handler returns to the Kernal when done, disabling any
+custom scancode handler that was set up before starting the editor.
+
+You can enable a custom scancode handler by pressing Ctrl+semicolon (;).
+The editor's scancode handler is called first, and the custom scancode
+handler is linked in thereafter. The chain of scancode handlers must
+eventually return to the Kernal for the keyboard to work. This is not
+within the editor's control after you enable custom scancode handlers.
+
+## User-configurable key bindings
+
+The shortcut key bindings in X16 Edit are user-configurable.
+
+On startup the editor reads custom key bindings from the file X16EDITRC
+in the root directory of the SD card. If that file is not found, the
+default key bindings are used.
+
+X16EDITRC is simply a stream of bytes representing the custom shortcuts
+without any metadata. Each key is represented by the value returned from
+the Kernal function GETIN.
+
+The values in X16EDITRC are bound to shortcuts in a fixed order, the
+same order as the shortcuts appear in Appendix A.
+
+If X16EDITRC holds fewer values than there are shortcuts, the editor
+will use default bindings for the remaining ones. If there are more
+values in the file than there are shortcuts, the excess is ignored.
+
+To make it a bit easier to setup X16EDITRC, you may use the provided
+tool (X16EDIT-KEYBINDINGS.PRG).
+
+# Advanced topics
+
+## Building X16 Edit from source
+
+If you like to build X16 Edit yourself you may download the source code
+from www.github.com/stefan-b-jakobsson/x16-edit.
+
+You will need the cc65 development tools to build the project. You will
+also need the lzsa compression utility.
+
+The project is built using Makefile.
+
+-   \"make\" or \"make ram\" will build the standard RAM version
+
+-   \"make rom\" builds the ROM version
+
+-   \"make all\" builds both targets
+
+## X16 Edit ROM version
+
+The ROM version of the editor consists of two consequtive 16 kB ROM
+banks.
+
+As of Kernal version R45, the editor is stored in ROM. If you want to
+store your own version of the editor in ROM as well you first need to
+prepare a custom ROM image. When you download the emulator you get the
+standard rom.bin image. Append X16 Edit to the end of it with the
+following command (Linux and MacOS):
+
+        cat rom.bin x16edit-rom-x.x.x.bin > customrom.bin
+
+You then need to write the custom ROM image to the actual ROM circuit to
+use it on real hardware.
+
+A custom ROM image can easily be attached to the emulator with the
+\"-rom\" option, for example as follows:
+
+        x16emu -sdcard sdcard.img -rom customrom.bin
+
+The Kernal is in development, and the ROM bank layout may change over
+time. A user may also store other utilities in ROM. In order to
+programatically find in which ROM bank X16 Edit is stored, there is an
+application signature at \$FFF0. The signature consists of the text
+\"X16EDIT\" followed by three bytes representing the program version
+(major, minor, patch).
+
+If the editor's first ROM bank is 16, it can be started from BASIC like
+this:
+
+        BANK 16,16
+        SYS $C000
+
+If you like to use one of the other entry points that are described in
+Appendix B, you need to write a startup program stored in RAM. Code
+samples doing this are also found in Appendix B.
+
+## The X16 Edit API
+
+The X16 Edit API consists of the following four entry points:
+
+-   Default entry point, starts the editor with default options and an
+    empty new text buffer
+
+-   Load file entry point, starts the editor with default options and
+    then loads the specified text file
+
+-   Load file with options 1, starts the editor with custom options and
+    then loads the specified text file
+
+-   Load file with options 2, same as previous, in addition supports
+    moving the cursor to a specified line in the opened file
+
+Information on how to call the different entry points and code samples
+is available in Appendix B.
+
+# List of keyboard shortcuts
+
+This is a complete list of keyboard shortcuts supported by X16 Edit. You
+may select commands in any of the following ways:
+
+-   Ctrl+shortcut key
+
+-   Press and release ESC+shortcut key
+
+-   A function key from the F-key column
+
+   **Key**   **F-key**  **Description**
+  --------- ----------- ---------------------------------------------------
+                        
+      G         F1      Display built-in help screen
+      X         F2      Exit from the program
+      O         F3      Write text buffer to file
+      R         F5      Open and read a file into the buffer
+      N         ---     Create new text buffer
+      J         F4      Justify text buffer
+      Y         F7      Page up
+      V         F8      Page down
+      K         ---     Cut line or selection to clipboard
+      C         ---     Copy line or selection to clipboard
+      U         ---     Paste (uncut) all content from clipboard
+     DEL        ---     Deletes current line, no copy to clipboard
+      W         F6      Search and find string in buffer (case sensitive)
+      S         ---     Replace string (case sensitive)
+      L         ---     Goto line number
+      A         ---     Toggle auto indent on/off
+      Z         ---     Toggle word wrap on/off
+      E         ---     Change charset
+      Q         ---     Quote mode
+      I         ---     Invoke DOS command
+      D         ---     Set file storage device number, default is 8
+      T         ---     Cycle through text colors
+      B         ---     Cycle through background colors
+      M         ---     Show memory usage (1 block=251 bytes)
+    space       ---     Insert non-breaking space
+    1..9        ---     Set tab stop width
+    ENTER       ---     Set line break encoding
+      F         ---     Programming toolbox
+      ;         ---     Custom scancode handler on/off
+      H         ---     Print hard copy
+
+# X16 Edit API
+
+## Default entry point
+
+**Purpose:** Start the editor with default options and an empty new text
+buffer
+
+**Call address:** \$080D (RAM version), \$C000 (ROM version)
+
+**Parameters:** None
+
+## Load file entry point
+
+**Purpose:** Start the editor and load a specified text file
+
+**Call address:** \$0810 (RAM version), \$C003 (ROM version)
+
+**Parameters:**
+
+  **Register**   **Address**   **Description**
+  -------------- ------------- ------------------------------------
+                               
+  X                            First RAM bank used by the program
+  Y                            Last RAM bank used by the program
+  r0             \$02--03      Pointer to file name
+  r1L            \$04          File name length, or 0=no file
+
+If the specified file does not exist, the editor will display an error
+message. If the file name length is 0, the program will not try to load
+a text file on startup.
+
+The first and last RAM bank settings control what part of banked RAM is
+used by the program. This option may be used to reserve the rest of
+banked RAM for other purposes.
+
+## Load file with options entry point 1
+
+**Purpose:** Start editor with custom options and then load the
+specified text file
+
+**Call address:** \$0813 (RAM version), \$C006 (ROM version)
+
+**Parameters:**
+
+  **Register**   **Address**   **Bits**   **Description**
+  -------------- ------------- ---------- ------------------------------------
+                                          
+  X                                       First RAM bank used by the program
+  Y                                       Last RAM bank used by the program
+  r0             \$02--03                 Pointer to file name
+  r1L            \$04                     File name length, or 0=no file
+  r1H            \$05          0          Auto indent on/off
+  r1H            \$05          1          Word wrap on/off
+  r1H            \$05          2--7       Unused
+  r2L            \$06                     Tab stop width (1..9)
+  r2H            \$07                     Word wrap position (10..250)
+  r3L            \$08                     Current device number (8..30)
+  r3H            \$09          0--3       Text color
+  r3H            \$09          4--7       Background color
+  r4L            \$0A          0--3       Header text color
+  r4L            \$0A          4--7       Header background color
+  r4H            \$0B          0--3       Status bar text color
+  r4H            \$0B          4--7       Status bar background color
+
+Parameters out of range are silently ignored, and default values are
+used instead.
+
+Color settings are ignored if both the text and background color is 0.
+
+If the specified file does not exist, the editor will display an error
+message. If the file name length is 0, the program will not try to load
+a text file.
+
+The first and last RAM bank settings control what part of banked RAM is
+used by the program. This option may be used to reserve the rest of
+banked RAM for other purposes.
+
+## Load file with options entry point 2
+
+**Purpose:** Start editor with custom options and then load the
+specified text file. In addition to Load file with options entry point
+1, this entry point adds an optional line number whereto the cursor is
+moved after opening the file.
+
+**Call address:** \$0816 (RAM version), \$C009 (ROM version)
+
+**Parameters:**
+
+  **Register**   **Address**   **Bits**   **Description**
+  -------------- ------------- ---------- ------------------------------------
+                                          
+  X                                       First RAM bank used by the program
+  Y                                       Last RAM bank used by the program
+  r0             \$02--03                 Pointer to file name
+  r1L            \$04                     File name length, or 0=no file
+  r1H            \$05          0          Auto indent on/off
+  r1H            \$05          1          Word wrap on/off
+  r1H            \$05          2--7       Unused
+  r2L            \$06                     Tab stop width (1..9)
+  r2H            \$07                     Word wrap position (10..250)
+  r3L            \$08                     Current device number (8..30)
+  r3H            \$09          0--3       Text color
+  r3H            \$09          4--7       Background color
+  r4L            \$0A          0--3       Header text color
+  r4L            \$0A          4--7       Header background color
+  r4H            \$0B          0--3       Status bar text color
+  r4H            \$0B          4--7       Status bar background color
+  r5--r6L        \$0C                     Goto line number (24 bits)
+
+Parameters out of range are silently ignored, and default values are
+used instead.
+
+Color settings are ignored if both the text and background color is 0.
+
+If the specified file does not exist, the editor will display an error
+message. If the file name length is 0, the program will not try to load
+a text file.
+
+The first and last RAM bank settings control what part of banked RAM is
+used by the program. This option may be used to reserve the rest of
+banked RAM for other purposes.
+
+The cursor is moved to the goto line number (24 bits) on file open. The
+goto line number is ignored if 0. The cursor is placed on the last line,
+if the requested line does not exist.
+
+## Code samples for the RAM version
+
+### Default entry point
+
+        jsr $080d  ; No parameters, just call the entry point
+        rts
+
+### Load file entry point
+
+        ldx #$01               ; First RAM bank used by the editor
+        ldy #$ff               ; And last RAM bank
+        lda #<fname            ; Pointer to file name (LSB)
+        sta $02                ; Store in r0L
+        lda #>fname            ; Pointer to file name (MSB)
+        sta $03                ; Store in r0H
+        lda #fname_end-fname   ; File name length
+        sta $04                ; Store in r1L
+        jsr $0810              ; Call entry point
+        rts
+
+        fname:
+            .byt "mytextfile.txt"
+        fname_end:
+
+### Load file with options entry point 1
+
+        ldx #$01               ; First RAM bank used by the editor
+        ldy #$ff               ; And last RAM bank
+        lda #<fname            ; Pointer to file name (LSB)
+        sta $02                ; Store in r0L
+        lda #>fname            ; Pointer to file name (MSB)
+        sta $03                ; Store in r0H
+        lda #fname_end-fname   ; File name length
+        sta $04                ; Store in r1L
+        lda #$01               ; Auto-indent on, word wrap off
+        sta $05                ; Store in r1H
+        lda #$04               ; Tab width
+        sta $06                ; Store in r2L
+        lda #$28               ; Word wrap position
+        sta $07                ; Store in r2H
+        lda #$08               ; Disk drive device number
+        sta $08                ; Store in r3L
+        lda #$b1               ; Text white, background light green
+        sta $09                ; Store in r3H (screen color)
+        lda #$07               ; Text yellow, background black
+        sta $0a                ; Store in r4L (header color)
+        lda #$00               ; Use default color
+        sta $0b                ; Store in r4H (status bar color)
+        jsr $0813              ; Call entry point
+        rts
+
+    fname:
+        .byt "mytextfile.txt"
+    fname_end:
+
+### Load file with options entry point 2
+
+        ldx #$01               ; First RAM bank used by the editor
+        ldy #$ff               ; And last RAM bank
+        lda #<fname            ; Pointer to file name (LSB)
+        sta $02                ; Store in r0L
+        lda #>fname            ; Pointer to file name (MSB)
+        sta $03                ; Store in r0H
+        lda #fname_end-fname   ; File name length
+        sta $04                ; Store in r1L
+        lda #$01               ; Auto-indent on, word wrap off
+        sta $05                ; Store in r1H
+        lda #$04               ; Tab width
+        sta $06                ; Store in r2L
+        lda #$28               ; Word wrap position
+        sta $07                ; Store in r2H
+        lda #$08               ; Disk drive device number
+        sta $08                ; Store in r3L
+        lda #$b1               ; Text white, background light green
+        sta $09                ; Store in r3H (screen color)
+        lda #$07               ; Text yellow, background black
+        sta $0a                ; Store in r4L (header color)
+        lda #$00               ; Use default color
+        sta $0b                ; Store in r4H (status bar color)
+        lda #$2c               ; Goto line number 300 on file open
+        sta $0c
+        lda #$01
+        sta $0d
+        lda #$00
+        sta $0e
+        jsr $0816              ; Call entry point
+        rts
+
+    fname:
+        .byt "mytextfile.txt"
+    fname_end:
+
+## Code samples for the ROM version
+
+### Search ROM banks for X16 Edit
+
+The X16 Edit ROM bank may be identified by the application signature
+(\"X16EDIT\") stored at \$FFF0. This code sample searches all ROM banks
+for the signature. If found, the ROM bank is returned in A with carry
+clear; otherwise carry is set on return.
+
+    find_me:
+        lda $01                ; Store current ROM bank on stack
+        pha
+        stz $01                ; Prepare searching from ROM bank 0
+        ldy #$00
+
+    scan:
+        lda $fff0,y            ; Signature starts at $fff0
+        cmp signature,y
+        bne next               ; Signature didn't match, check next ROM bank
+        iny                    ; Increase char pointer
+        cpy #$07               ; Have we got 7 matching chars? If not, keep looking
+        bne scan
+        clc                    ; Set C = 0 as indicator X16 Edit was found
+        lda $01                ; Load ROM bank into A
+        bra exit
+
+    next:
+        ldy #$00               ; Reset char pointer
+        inc $01                ; Select next ROM bank
+        lda $01            
+        cmp #$20               ; Have we checked all ROM banks?
+        bne scan
+        sec                    ; Set C = 1 as indicator X16 Edit was not found
+
+    exit:
+        plx                    ; Restore original ROM bank
+        stx $01
+        rts
+
+    signature: .byt $58,$31,$36,$45,$44,$49,$54     ; = "X16EDIT"
+
+### Default entry point
+
+        lda $01                ; Store current ROM bank on stack
+        pha
+        jsr find_me            ; Search ROM banks
+        bcs done               ; Exit if X16 Edit wasn't found
+        sta $01                ; Set ROM bank
+        jsr $c000              ; Call entry point
+    done:
+        pla                    ; Restore original ROM bank
+        sta $01
+        rts
+
+### Load file entry point
+
+        lda $01                ; Store current ROM bank on stack
+        pha
+        jsr find_me            ; Search ROM banks
+        bcs done               ; Exit if X16 Edit wasn't found
+        sta $01                ; Set ROM bank  
+        ldx #$01               ; First RAM bank used by the editor
+        ldy #$ff               ; And last RAM bank
+        lda #<fname            ; Pointer to file name (LSB)
+        sta $02                ; Store in r0L
+        lda #>fname            ; Pointer to file name (MSB)
+        sta $03                ; Store in r0H
+        lda #fname_end-fname   ; File name length
+        sta $04                ; Store in r1L
+        jsr $c003              ; Call entry point
+    done:
+        pla                    ; Restore original ROM bank
+        sta $01
+        rts
+
+    fname:
+        .byt "mytextfile.txt"
+    fname_end:
+
+### Load file with options entry point 1
+
+        lda $01                ; Store current ROM bank on stack
+        pha
+        jsr find_me            ; Search ROM banks
+        bcs done               ; Exit if X16 Edit wasn't found
+        sta $01                ; Set ROM bank
+        
+        ldx #$01               ; First RAM bank used by the editor
+        ldy #$ff               ; And last RAM bank
+        lda #<fname            ; Pointer to file name (LSB)
+        sta $02                ; Store in r0L
+        lda #>fname            ; Pointer to file name (MSB)
+        sta $03                ; Store in r0H
+        lda #fname_end-fname   ; File name length
+        sta $04                ; Store in r1L
+        lda #$01               ; Auto-indent on, word wrap off
+        sta $05                ; Store in r1H
+        lda #$04               ; Tab width
+        sta $06                ; Store in r2L
+        lda #$28               ; Word wrap position
+        sta $07                ; Store in r2H
+        lda #$08               ; Disk drive device number
+        sta $08                ; Store in r3L
+        lda #$b1               ; Text white, background light green
+        sta $09                ; Store in r3H (screen color)
+        lda #$07               ; Text yellow, background black
+        sta $0a                ; Store in r4L (header color)
+        lda #$00               ; Use default color
+        sta $0b                ; Store in r4H (status bar color)
+        jsr $c006              ; Call entry point
+    done:
+        pla                    ; Restore original ROM bank
+        sta $01
+        rts
+       
+    fname:
+        .byt "mytextfile.txt"
+    fname_end:
+
+### Load file with options entry point 2
+
+        lda $01                ; Store current ROM bank on stack
+        pha
+        jsr find_me            ; Search ROM banks
+        bcs done               ; Exit if X16 Edit wasn't found
+        sta $01                ; Set ROM bank
+        
+        ldx #$01               ; First RAM bank used by the editor
+        ldy #$ff               ; And last RAM bank
+        lda #<fname            ; Pointer to file name (LSB)
+        sta $02                ; Store in r0L
+        lda #>fname            ; Pointer to file name (MSB)
+        sta $03                ; Store in r0H
+        lda #fname_end-fname   ; File name length
+        sta $04                ; Store in r1L
+        lda #$01               ; Auto-indent on, word wrap off
+        sta $05                ; Store in r1H
+        lda #$04               ; Tab width
+        sta $06                ; Store in r2L
+        lda #$28               ; Word wrap position
+        sta $07                ; Store in r2H
+        lda #$08               ; Disk drive device number
+        sta $08                ; Store in r3L
+        lda #$b1               ; Text white, background light green
+        sta $09                ; Store in r3H (screen color)
+        lda #$07               ; Text yellow, background black
+        sta $0a                ; Store in r4L (header color)
+        lda #$00               ; Use default color
+        sta $0b                ; Store in r4H (status bar color)
+        lda #$2c               ; Goto line 300 on file open
+        sta $0c
+        lda #$01
+        sta $0d
+        lda #$00
+        sta $0e
+        jsr $c009              ; Call entry point
+    done:
+        pla                    ; Restore original ROM bank
+        sta $01
+        rts
+       
+    fname:
+        .byt "mytextfile.txt"
+    fname_end:
+
+# Printer driver specification
+
+## Introduction
+
+Built-in support for the vast amount of printers that exist and all the
+ways printers can be connected to the system would be difficult at best.
+To overcome this complexity and to enable users to use any setup they
+may have, printing is supported through loadable drivers.
+
+A printer driver is a separate machine language program implementing the
+API specified below.
+
+The driver must be stored in the root folder of the SD card. The name of
+the file must begin with \"X16EDITPD-\", followed by an optional name
+identifying the printer, for instance \"X16EDITPD-MPS801\". You must be
+able to load the driver into the correct memory address using the BASIC
+command LOAD \"X16EDITPD-\*\",8,1.
+
+The actual printing is done by three functions: channel_open,
+print_char, and channel_close. The other functions are mainly used to
+initialize the driver, and to get and set printer options.
+
+Options may be any of the following types:
+
+-   int8: an 8 bit integer value
+
+-   int16: a 16 bit integer value
+
+-   list: represented by an array of null-terminated string
+
+-   string: a null-terminated string
+
+## Driver API version 1
+
+The driver may start at any point in low RAM but must always end at
+address \$9eff. If you want the driver to work with the RAM based
+version of X16 Edit, it must, however, avoid affecting the range of low
+RAM used by the editor program.
+
+The zero page addresses \$36-39 are reserved for and can be used by the
+printer driver. The driver should not use any of the golden RAM
+(\$0400-\$7fff) or banked RAM (\$a000-\$bfff). Using any other parts of
+zero page, golden RAM or banked RAM may cause conflicts with the editor.
+
+The driver must implement the following jump table. Each entry is
+expected to be a JMP instruction.
+
+  **Address**   **Name**
+  ------------- ----------------------
+                
+  \$9efd        init
+  \$9efa        get_api_version
+  \$9ef7        get_driver_name
+  \$9ef4        set_charset
+  \$9ef1        get_option_count
+  \$9eee        get_option_labels
+  \$9eeb        get_option_value
+  \$9ee8        set_set_option_value
+  \$9ee5        option_add_offset
+  \$9ee2        channel_open
+  \$9edf        print_char
+  \$9edc        channel_close
+  \$9ed9        get_message
+  \$9ed6        save_defaults
+
+All string messages returned by the driver must be unshifted PETSCII to
+display correctly in the print dialog.
+
+### init
+
+Purpose: Called once by the editor after loading the driver into memory.
+Can be used to make necessary setup in the driver before any other
+functions are called.
+
+Call address: \$9efd.
+
+Input: None.
+
+Output: None.
+
+Error returns: None.
+
+Registers affected: May affect all registers.
+
+### get_api_version
+
+Purpose: Returns the printer driver API version that the driver was
+designed for.
+
+Call address: \$9efa.
+
+Input: None.
+
+Output: .A = API version number.
+
+Error returns: None.
+
+Registers affected: .A
+
+### get_driver_name
+
+Purpose: Returns the driver name, typically the name of the supported
+printer.
+
+Call address: \$9ef7.
+
+Input: None.
+
+Output: .X/.Y = Pointer to null-terminated string.
+
+Error returns: None.
+
+Registers affected: May affect all registers.
+
+### set_charset
+
+Purpose: Sets the charset used to display the current document. Called
+by the editor just before opening the printer channel.
+
+Call address: \$9ef4.
+
+Input: .A = Charset (0 = ASCII, 1 = PETSCII upper case, 2 = PETSCII
+lower case).
+
+Output: None.
+
+Error returns: .C = 1 if invalid input.
+
+Registers affected: May affect all registers.
+
+### get_option_count
+
+Purpose: Returns the number of options that may be changed through the
+editor's print dialog.
+
+Call address: \$9ef1.
+
+Input: None.
+
+Output: .A = Option count.
+
+Error returns: None.
+
+Registers affected: .A.
+
+### get_option_labels
+
+Purpose: Returns a pointer to a null-terminated string that contains
+labels for all driver options. Labels must be separated from each other
+with CR (PETSCII 13). The number of labels must match the option count
+returned by the function get_option_count.
+
+Call address: \$9eee.
+
+Input: None.
+
+Output: .X/.Y = Pointer to null-terminated string.
+
+Error returns: None.
+
+Registers affected: May affect all registers.
+
+Example return value, from the MPS-801 driver:
+
+        SERIAL DEVICE:<CR>
+        PAGE HEIGHT..:<CR>
+        TOP MARGIN...:<CR>
+        BOTTOM MARGIN:<CR>
+        ON PAGE BREAK:<NULL>
+
+It is recommended that all lines have the same length and that each line
+ends with a colon, as demonstrated in the above example. The editor
+displays all option values starting from the column after the longest
+label.
+
+### get_option_value
+
+Purpose: Returns the type and value of the specified driver option.
+
+Call address: \$9eeb.
+
+Input: .X = Option index (zero-based).
+
+Output: .A = Type (0 = uint8, 1 = uint16, 2 = list item, 3 =
+null-terminated string). .X = uint8 value. .X/.Y = uint16 value. .X/.Y =
+Pointer to null-terminated string representing a list item or a string.
+
+Error returns: .C = 1 if option does not exist. A plain text error
+message is expected to be available through the get_message function.
+
+Registers affected: May affect all registers.
+
+### set_option_value
+
+Purpose: Changes the specified driver option. The new option value is
+always received as a null-terminated string. The driver is responsible
+for converting and verifying the value.
+
+Call address: \$9ee8.
+
+Input: .X = Option index. .A/.Y = Pointer to null-terminated string.
+This function always expects values in string format. It is for the
+driver to convert the string into format usable by the driver.
+
+Output: .A = Type (0 = uint8, 1 = uint16, 2 = list item, 3 =
+null-terminated string). .X = uint8 value. .X/.Y = uint16 value. .X/.Y =
+Pointer to null-terminated string representing a list item or a string.
+
+Error returns: .C = 1 if option does not exist or if the value is
+invalid. A plain text error message is expected to be available through
+the get_message function.
+
+Registers affected: May affect all registers.
+
+### option_add_offset
+
+Purpose: Adds a signed 8-bit integer to the selected option. The option
+must be any of the following types: int8, int16 or list.
+
+Call address: \$9EE5.
+
+Input: .A = offset to add.
+
+Output: .A = Type (0 = uint8, 1 = uint16, 2 = list item, 3 =
+null-terminated string). .X = uint8 value. .X/.Y = uint16 value. .X/.Y =
+Pointer to null-terminated string representing a list item or a string.
+
+Error returns: .C = 1 if option does not exist. A plain text error
+message is expected to be available through the get_message function.
+
+Registers affected: May affect all registers.
+
+### channel_open
+
+Purpose: Opens the printer channel. This function may also do any other
+necessary tasks to prepare for printing, for instance setting printer
+options or resetting the printer.
+
+Call address: \$9ee2.
+
+Input: None.
+
+Output: None.
+
+Error returns: .C = 1 if an error occured. A plain text error message is
+expected to be available through the get_message function.
+
+Registers affected: May affect all registers.
+
+### print_char
+
+Purpose: Prints a character. The driver may pause printing before the
+received character is outputted, indicated by returning .A = 1. This
+option may for instance be used to pause printing on page breaks. The
+text editor will resend the same character when printing is resumed.
+
+Call address: \$9edf.
+
+Input: .A = character, encoded as set by the set_charset function.
+
+Output: .A = response code (0 = OK, 1 = Printing paused, need to resend
+the same character).
+
+Error returns: .C = 1 if an error occured. A plain text error message is
+expected to be available through the get_message function.
+
+Registers affected: .X, .Y
+
+### channel_close
+
+Purpose: Closes the printer channel. This function may also do any other
+tasks needed to finish printing.
+
+Call address: \$9edc.
+
+Input: None.
+
+Output: None.
+
+Error returns: .C = 1 on error. A plain text error message is expected
+to be available through the get_message function.
+
+Registers affected: May affect all registers.
+
+### get_message
+
+Purpose: Returns a pointer to the last driver (error) message. The
+message is cleared after calling this function. If no message is
+available, this function should return a pointer to a zero length
+string.
+
+Call address: \$9ed9.
+
+Input: None.
+
+Output: .X/.Y = Pointer to null-terminated string.
+
+Error returns: None.
+
+Registers affected: May affect all registers.
+
+### save_defaults
+
+Purpose: Saves default printer options in a way that can be retrieved
+when loading or initializing the driver next time. The driver can load
+default options, for instance as part of the init function.
+
+Call address: \$9ed6.
+
+Input: None.
+
+Output: None.
+
+Error returns: .C = 1 on error. A plain text error message is expected
+to be available through the get_message function.
+
+Registers affected: May affect all registers.
+
+# License
+
+Copyright 2020--2026, Stefan Jakobsson.
+
+The X16 Edit program, including this manual, is released under the
+2-Clause BSD License.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+1\. Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+
+2\. Redistributions in binary form must reproduce the above copyright
+notice, this list of conditions and the following disclaimer in the
+documentation and/or other materials provided with the distribution.
+
+THE SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.

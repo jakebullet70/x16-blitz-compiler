@@ -1,0 +1,349 @@
+;
+; This program can stream a regular .wav file from the sdcard.
+; It can be uncompressed or IMA-adpcm compressed (factor 4 lossy compression).
+; See the "adpcm" module source for tips how to create those files.
+;
+; Note that 8 bit wav files are *unsigned* values whereas Vera wants *signed* values
+; so these have to be converted on the fly. 16 bit wav files are signed already.
+;
+; The playback is done via AFLOW irq handler that fills the audio fifo buffer
+; with around 1 Kb of new audio data. (copies raw pcm data or decodes adpcm block)
+; In the meantime the main program loop reads new data blocks from the wav file
+; as it is being played.
+;
+; NOTE: stripping the wav header and just having the raw pcm data in the file
+; is slightly more efficient because the data blocks are then sector-aligned on the disk
+;
+
+%import diskio
+%import floats
+%import adpcm
+%import wavfile
+%import textio
+%zeropage basicsafe
+%option no_sysinit
+
+main {
+
+    str MUSIC_FILENAME = "?"*32
+    uword vera_rate_hz
+    ubyte vera_rate
+
+    sub start() {
+        void diskio.fastmode(1)
+        txt.cls()
+        txt.print("streaming wav file example\n\n")
+        txt.print("name of .wav file to play on drive 8: ")
+        while 0==txt.input_chars(MUSIC_FILENAME) {
+            ; until user types a name...
+        }
+        prepare_music()
+        txt.print("\ngood file! playback starts!\n\n")
+        interrupts.set_handler()
+        play_stuff()
+        interrupts.clear_handler()
+        txt.print("\n\ndone!\n")
+    }
+
+    sub error(str msg) {
+        txt.print(msg)
+        sys.exit(1)
+    }
+
+    sub prepare_music() {
+        txt.print("\n\nchecking ")
+        txt.print(MUSIC_FILENAME)
+        txt.nl()
+        bool wav_ok = false
+        if diskio.f_open(MUSIC_FILENAME) {
+            void diskio.f_read(music.buffer, 128)
+            wav_ok = wavfile.parse_header(music.buffer)
+            diskio.f_close()
+        }
+        if not wav_ok
+            error("unsupported wav file!")
+
+        calculate_vera_rate()
+
+        txt.print("           format: ")
+        txt.print_ub(wavfile.wavefmt)
+        txt.print("\n         channels: ")
+        txt.print_ub(wavfile.nchannels)
+        txt.print("\n      sample rate: ")
+        txt.print_uw(wavfile.sample_rate)
+        txt.print(" hz\n        vera rate: ")
+        txt.print_ub(vera_rate)
+        txt.print(" = ")
+        txt.print_uw(vera_rate_hz)
+        txt.print(" hz\n  bits per sample: ")
+        txt.print_uw(wavfile.bits_per_sample)
+        if wavfile.wavefmt==wavfile.Format::DVI_ADPCM {
+            txt.print("\n adpcm block size: ")
+            txt.print_uw(wavfile.block_align)
+        }
+        float bytes_per_sample = wavfile.bits_per_sample as float / 8.0
+        float duration = wavfile.data_size as float / (wavfile.nchannels as float) / (wavfile.sample_rate as float) / bytes_per_sample
+        txt.print("\n         duration: ")
+        cx16.r0 = duration as uword
+        if wavfile.wavefmt==wavfile.Format::DVI_ADPCM
+            cx16.r0 *= 4    ; adpcm is 1:4 compression
+        txt.print_uw(cx16.r0)
+        txt.print(" seconds\n")
+
+        if wavfile.nchannels>2 or
+           (wavfile.wavefmt!=wavfile.Format::DVI_ADPCM and wavfile.wavefmt!=wavfile.Format::PCM) or
+           wavfile.sample_rate > 48828 or
+           wavfile.bits_per_sample>16
+                error("unsupported format!")
+
+        if wavfile.wavefmt==wavfile.Format::DVI_ADPCM {
+            if(wavfile.block_align!=256) {
+                error("unsupported block alignment!")
+            }
+        }
+
+        cx16.VERA_AUDIO_RATE = 0                ; halt playback
+        cx16.VERA_AUDIO_CTRL = %10101011        ; mono 16 bit, volume 11
+        if wavfile.nchannels==2
+            cx16.VERA_AUDIO_CTRL = %10111011    ; stereo 16 bit, volume 11
+        if(wavfile.bits_per_sample==8)
+            cx16.VERA_AUDIO_CTRL &= %11011111    ; set to 8 bit instead
+        repeat 1024
+            cx16.VERA_AUDIO_DATA = 0            ; fill buffer with short silence
+    }
+
+    sub calculate_vera_rate() {
+        const float vera_freq_factor = 25e6 / 65536.0
+        vera_rate = (wavfile.sample_rate as float / vera_freq_factor) + 1.0 as ubyte
+        vera_rate_hz = (vera_rate as float) * vera_freq_factor as uword
+    }
+
+    sub play_stuff() {
+        if diskio.f_open(MUSIC_FILENAME) {
+            uword block_size = 1024
+            if wavfile.wavefmt==wavfile.Format::DVI_ADPCM
+                block_size = 512      ; read 2 adpcm blocks at a time (2*256 bytes)
+            void diskio.f_read(music.buffer, wavfile.data_offset)       ; skip to actual sample data start
+            music.pre_buffer(block_size)
+            cx16.VERA_AUDIO_RATE = vera_rate    ; start audio playback
+
+            long prev_disk_read_bytes, prev_pcm_fifo_bytes
+            ubyte statx,staty
+            txt.print("disk i/o: ")
+            statx,staty = txt.get_cursor()
+            txt.print("\npcm fifo: ")
+            txt.print("\n    idle:\n")
+
+            repeat {
+                interrupts.wait()
+                if interrupts.aflow {
+                    interrupts.aflow=false
+                    if not music.load_next_block(block_size)
+                        break
+                    ; Note: copying the samples into the fifo buffer is done by the aflow interrupt handler itself.
+
+                    print_stats()
+                    prev_disk_read_bytes = music.disk_read_bytes
+                    prev_pcm_fifo_bytes = music.pcm_fifo_bytes
+                }
+            }
+
+            diskio.f_close()
+        } else {
+            error("load error")
+        }
+
+        cx16.VERA_AUDIO_RATE = 0                ; halt playback
+
+        sub print_stats() {
+            ; don't print decimal numbers, that take quite a bit of cpu time to calculate
+            txt.plot(statx,staty)
+            txt.print_ulhex(music.disk_read_bytes, true)
+            txt.print(" +")
+            txt.print_uwhex(lsw(music.disk_read_bytes - prev_disk_read_bytes), true)
+            txt.print("   ")
+            txt.plot(statx,staty+1)
+            txt.print_ulhex(music.pcm_fifo_bytes, true)
+            txt.print(" +")
+            txt.print_uwhex(lsw(music.pcm_fifo_bytes - prev_pcm_fifo_bytes), true)
+            txt.print("   ")
+            txt.plot(statx,staty+2)
+            txt.print_uwhex(interrupts.idle_counter, true)
+            if interrupts.idle_counter < 100
+                txt.print("  !!!")
+            else
+                txt.print("     ")
+        }
+    }
+
+}
+
+
+interrupts {
+
+    uword system_irq
+
+    sub set_handler() {
+        sys.set_irqd()
+        system_irq = cbm.CINV
+        cbm.CINV = &handler          ; irq handler for AFLOW
+        cx16.VERA_IEN = %00001000    ; enable AFLOW only
+        sys.clear_irqd()
+    }
+
+    sub clear_handler() {
+        sys.set_irqd()
+        cbm.CINV = system_irq
+        cx16.VERA_IEN = 1
+        sys.clear_irqd()
+    }
+
+    bool aflow
+    uword idle_counter
+
+    sub wait() {
+        ; NOTE: should just be calling sys.waitirq() here to wait for the next AFLOW irq,
+        ; but for this example program we want to gather "idle time" counter statistics.
+        idle_counter = 0
+        while not aflow {
+            idle_counter++
+        }
+    }
+
+    sub handler() {
+        ; we only handle aflow in this example.
+
+        if cx16.VERA_ISR & %00001000 !=0 {
+            ; Filling the fifo is the only way to clear the Aflow irq.
+            ; So we do this here, otherwise the aflow irq will keep triggering.
+            ; Note that filling the buffer with fresh audio samples is NOT done here,
+            ; but instead in the main program code that triggers on the 'aflow' being true!
+            cx16.save_virtual_registers()
+            music.aflow_play_block()
+            cx16.restore_virtual_registers()
+            aflow = true
+        }
+
+        %asm {{
+            ply
+            plx
+            pla
+            rti
+        }}
+    }
+
+}
+
+
+music {
+    long disk_read_bytes
+    long pcm_fifo_bytes
+
+    uword buffer = memory("buffer", 1024, 256)
+
+    sub pre_buffer(uword block_size) {
+        ; pre-buffer first block
+        disk_read_bytes = diskio.f_read(buffer, block_size)
+    }
+
+    sub aflow_play_block() {
+        ; play audio data that is currently in the buffer
+        if wavfile.wavefmt==wavfile.Format::DVI_ADPCM {
+            ; we have 2 adpcm blocks loaded of 256 bytes each, decode them both
+            if wavfile.nchannels==2 {
+                adpcm.decode_block_stereo(buffer)
+                adpcm.decode_block_stereo(buffer+256)
+                music.pcm_fifo_bytes += 996 * 2
+            }
+            else {
+                adpcm.decode_block_mono(buffer)
+                adpcm.decode_block_mono(buffer+256)
+                music.pcm_fifo_bytes += 1010 * 2
+            }
+        }
+        else if wavfile.bits_per_sample==16 {
+            uncompressed_block_16()
+            music.pcm_fifo_bytes += 1024
+        }
+        else {
+            uncompressed_block_8()
+            music.pcm_fifo_bytes += 1024
+        }
+    }
+
+    sub load_next_block(uword block_size) -> bool {
+        ; read next block from disk into the buffer, for next time the irq triggers
+        disk_read_bytes += block_size
+        return diskio.f_read(buffer, block_size) == block_size
+    }
+
+    asmsub uncompressed_block_8() {
+        ; copy 1024 bytes of audio data from the buffer into vera's fifo, quickly!
+        ; converting unsigned wav 8 bit samples to signed 8 bit on the fly.
+        %asm {{
+            lda  p8v_buffer
+            sta  _loop+1
+            sta  _lp2+1
+            lda  p8v_buffer+1
+            sta  _loop+2
+            sta  _lp2+2
+            ldx  #4
+            ldy  #0
+_loop       lda  $ffff,y    ;modified
+            eor  #$80       ; convert to signed
+            sta  cx16.VERA_AUDIO_DATA
+            iny
+_lp2        lda  $ffff,y    ; modified
+            eor  #$80       ; convert to signed
+            sta  cx16.VERA_AUDIO_DATA
+            iny
+            bne  _loop
+            inc  _loop+2
+            inc  _lp2+2
+            dex
+            bne  _loop
+            rts
+        }}
+
+; original prog8 code:
+;        uword @requirezp ptr = main.start.buffer
+;        ubyte @requirezp sample
+;        repeat 1024 {
+;            sample = @(ptr) - 128
+;            cx16.VERA_AUDIO_DATA = sample
+;            ptr++
+;        }
+    }
+
+    asmsub uncompressed_block_16() {
+        ; copy 1024 bytes of audio data from the buffer into vera's fifo, quickly!
+        %asm {{
+            lda  p8v_buffer
+            sta  _loop+1
+            sta  _lp2+1
+            lda  p8v_buffer+1
+            sta  _loop+2
+            sta  _lp2+2
+            ldx  #4
+            ldy  #0
+_loop       lda  $ffff,y    ; modified
+            sta  cx16.VERA_AUDIO_DATA
+            iny
+_lp2        lda  $ffff,y    ; modified
+            sta  cx16.VERA_AUDIO_DATA
+            iny
+            bne  _loop
+            inc  _loop+2
+            inc  _lp2+2
+            dex
+            bne  _loop
+            rts
+        }}
+; original prog8 code:
+;        uword @requirezp ptr = main.start.buffer
+;        repeat 1024 {
+;            cx16.VERA_AUDIO_DATA = @(ptr)
+;            ptr++
+;        }
+    }
+}

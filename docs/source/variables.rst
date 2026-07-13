@@ -1,0 +1,756 @@
+.. _variables:
+
+********************
+Variables and Values
+********************
+.. index:: single: Variables; Overview
+
+Because this is such a big subject, variables and values have their own chapter.
+Structs and pointers are in a separate chapter again: :ref:`pointers`.
+
+
+Variables
+---------
+
+Variables are named values that can be modified during the execution of the program.
+The compiler allocates the required memory for them.
+There is *no dynamic memory allocation*. The storage size of all variables
+is fixed and is determined at compile time.
+Variable declarations tend to appear at the top of the code block that uses them, but this is not mandatory.
+They define the name and type of the variable, and its initial value.
+Prog8 supports a small list of data types, including special memory-mapped types
+that don't allocate storage but instead point to a fixed location in the address space.
+
+
+Declaring a variable
+^^^^^^^^^^^^^^^^^^^^
+.. index:: pair: Variables; Declaring
+
+Variables should be declared with their exact type and size so the compiler can allocate storage
+for them. You can give them an initial value as well. That value can be a simple literal value,
+or an expression. If you don't provide an initial value yourself, zero will be used.
+The syntax for variable declarations is::
+
+	<datatype>  [ @tag ]  <variable name>   [ = <initial value> ]
+
+.. index::
+    pair: Data Types; word
+    pair: Data Types; uword
+    pair: Data Types; byte
+    pair: Data Types; ubyte
+    pair: Data Types; float
+    pair: Data Types; bool
+    pair: Data Types; long
+    pair: Data Types; str
+
+For boolean and numeric variables, you can actually declare them in one go by listing the names in a comma separated list.
+Type tags, and the optional initialization value, are applied equally to all variables in such a list.
+Various examples::
+
+    word        thing   = 0
+    byte        counter = len([1, 2, 3]) * 20
+    byte        age     = 2018 - 1974
+    float       wallet  = 55.25
+    long        large   = 998877
+    ubyte       x,y,z                   ; declare three ubyte variables x y and z
+    str         name    = "my name is Alice"
+    uword       address = &counter
+    bool        flag    = true
+    byte[]      values  = [11, 22, 33, 44, 55]
+    byte[5]     values                  ; array of 5 bytes, initially set to zero
+    byte[5]     values  = [255]*5       ; initialize with five 255 bytes
+
+    word  @zp         zpword = 9999     ; prioritize this when selecting vars for zeropage storage
+    uword @requirezp  zpaddr = $3000    ; we require this variable in zeropage
+    word  @shared asmvar                ; variable is used in assembly code but not elsewhere
+    byte  @nozp memvar                  ; variable that is never in zeropage
+
+
+Here are the tags you can add to a variable:
+
+==========  ======
+Tag         Effect
+==========  ======
+@zp         prioritize the variable for putting it into Zero page. No guarantees; if ZP is full the variable will be placed in another memory location.
+@requirezp  force the variable into Zero page. If ZP is full, compilation will fail.
+@nozp       force the variable to normal system ram, never place it into zeropage.
+@shared     means the variable is shared with some assembly code and that it cannot be optimized away if not used elsewhere.
+@nosplit    (only valid on (u)word arrays) Store the array as a single linear array instead of a separate array for lsb and msb values
+@alignword  aligns string or array variable on an even memory address
+@align64    aligns string or array variable on a 64 byte address interval (example: for C64 sprite data)
+@alignpage  aligns string or array variable on a 256 byte address interval (example: to avoid page boundaries)
+@dirty      the variable won't be set to zero when entering the subroutine (note: it will still be set to zero once on program startup, like all other uninitialized variables). You'll usually have to make sure to assign a value yourself before using the variable! This is used to reduce overhead in certain scenarios. 🦶🔫 Footgun warning.
+==========  ======
+
+.. _private-variables:
+.. index:: pair: Variables; Private
+
+You can use the ``private`` keyword (must come first, before the datatype and any tags) to make a variable or constant invisible from outside its block::
+
+    private ubyte secret = 42
+    private ubyte @shared hiddenvar = 10
+    private const ubyte fixed_value = 99
+
+This makes the variable only accessible within the block where it's declared. Accessing it from another block will result in a compilation error.
+
+
+Variables can be defined inside any scope (blocks, subroutines etc.) See :ref:`blocks`.
+When declaring a numeric variable it is possible to specify the initial value, if you don't want it to be zero.
+For other data types it is required to specify that initial value it should get.
+Values will usually be part of an expression or assignment statement::
+
+    12345                 ; integer number
+    $aa43                 ; hex integer number
+    %100101               ; binary integer number (% is also remainder operator so be careful)
+    false                 ; boolean false
+    -33.456e52            ; floating point number
+    "Hi, I am a string"   ; text string, encoded with default encoding
+    'a'                   ; byte value (ubyte) for the letter a
+    sc:"Alternate"        ; text string, encoded with c64 screencode encoding
+    sc:'a'                ; byte value of the letter a in c64 screencode encoding
+
+    byte  counter  = 42   ; variable of size 8 bits, with initial value 42
+
+
+.. index:: pair: Variables; Zeropage
+
+**putting a variable in zeropage:**
+If you add the ``@zp`` tag to the variable declaration, the compiler will prioritize this variable
+when selecting variables to put into zeropage (but no guarantees). If there are enough free locations in the zeropage,
+it will try to fill it with as much other variables as possible (before they will be put in regular memory pages).
+Use ``@requirezp`` tag to *force* the variable into zeropage, but if there is no more free space the compilation will fail.
+It's possible to put strings, arrays and floats into zeropage too, however because Zp space is really scarce
+this is not advised as they will eat up the available space very quickly. It's best to only put byte or word
+variables in zeropage.  By the way, there is also ``@nozp`` to keep a variable *out of the zeropage* at all times.
+
+Example::
+
+    byte   @zp  smallcounter = 42
+    uword  @requirezp  zppointer = $4000
+
+
+.. index:: pair: Variables; shared
+
+**shared variables:**
+If you add the ``@shared`` tag to the variable declaration, the compiler will know that this variable
+is a prog8 variable shared with some assembly code elsewhere. This means that the assembly code can
+refer to the variable even if it's otherwise not used in prog8 code itself.
+(usually, these kinds of 'unused' variables are optimized away by the compiler, resulting in an error
+when assembling the rest of the code). Example::
+
+    byte  @shared  assemblyVariable = 42
+
+
+.. index:: pair: Variables; uninitialized
+
+**uninitialized variables:**
+All variables will be initialized by prog8 at startup, they'll get their assigned initialization value, or be cleared to zero.
+This (re)initialization is also done on each subroutine entry for the variables declared in the subroutine.
+
+There may be certain scenarios where this initialization is redundant and/or where you want to avoid the overhead of it.
+In some cases, Prog8 itself can detect that a variable doesn't need a separate automatic initialization to zero, if
+it's trivial that it is not being read between the variable's declaration and the first assignment. For instance, when
+you declare a variable immediately before a for loop where it is the loop variable. However Prog8 is not yet very smart
+at detecting these redundant initializations. If you want to be sure, check the generated assembly output.
+
+In any case, you can use the ``@dirty`` tag on the variable declaration to make the variable *not* being reinitialized
+when entering the subroutine (it will still be set to 0 once at program startup).
+This means you usually have to make sure to assign a value yourself, before using the variable. 🦶🔫 Footgun warning.
+
+
+**memory alignment:**
+A string or array variable can be aligned to a couple of possible interval sizes in memory.
+The use for this is very situational, but two examples are: sprite data for the C64 that needs
+to be on a 64 byte aligned memory address, or an array aligned on a full page boundary to avoid
+any possible extra page boundary clock cycles on certain instructions when accessing the array.
+You can align on word, 64 bytes, and page boundaries::
+
+    ubyte[] @alignword array = [1, 2, 3, 4, ...]
+    ubyte[] @align64 spritedata = [ %00000000, %11111111, ...]
+    ubyte[] @alignpage lookup = [11, 22, 33, 44, ...]
+
+
+Initializing a variable
+^^^^^^^^^^^^^^^^^^^^^^^
+.. index:: pair: Variables; Initializing
+
+You can specify an initialization value in the variable declaration.
+This will then be used to initialize the variable with at the start of the subroutine, instead of the default value 0.
+The provided value doesn't have to be a constant; it can be any expression.
+It is a shorter notation for declaring the variables and then assigning the values to them in separate assignment statement(s).
+
+There are a few special situations:
+
+initializing an array: ``ubyte[3] array = [11,22,33]``
+    The initialization value has to be a range value or an array literal (remember you can use '[4] * 3' and such).
+    Of course the size of the range or the number of values in the array has to match the declared array size.
+
+initializing a multi variable declaration with different values: ``ubyte a,b,c = 11,22,33``
+    Here we have separate initialization values for each of the declared variables in that order.
+    This is just a shorter way to write this as writing it as three separate variable declarations.
+
+initializing a multi variable declaration with the same value for all: ``ubyte a,b,c = 42``
+    The initialization value here is a single constant value which will then be assigned to each of the variables.
+
+initializing from a subroutine returning multiple result values: ``ubyte a,b,c = multi()``
+    Here the initialization value can also be a subroutine call to a subroutine returning multiple result values, which will then be put
+    into the declared variables in order.  Of course the number of values has to match the number of variables.
+
+
+Constants
+---------
+.. index:: single: Constants
+
+When using ``const``, the value of the 'variable' cannot be changed; it has become a compile-time constant value instead.
+You'll have to specify the initial value expression. This value is then used
+by the compiler everywhere you refer to the constant (and no memory is allocated
+for the constant itself). Only the simple numeric types (byte, word, long, float) and pointer types can be defined as a constant.
+If something is defined as a constant, very efficient code can usually be generated from it.
+Variables on the other hand can't be optimized as much, need memory, and more code to manipulate them.
+Note that a subset of the library routines in the ``math``, ``strings`` and ``floats`` modules are recognised in
+compile time expressions. For example, the compiler knows what ``math.sin8u(12)`` is and replaces it with the computed result.
+
+Enums
+-----
+.. index:: single: Enums
+
+There is a more convenient way to define a bunch of constants that belong together: a "enum".
+That is a grouped list of constants that get autonumbered for you (unless you override the numeric value yourself).
+It starts numbering from zero by default. Right now the enum declaration does not define a new type, only a list of constants. Here's an example::
+
+    enum Priority {
+        LOW = 1,
+        NORMAL,
+        HIGH,
+        EXTREME=255
+    }
+
+This will define a bunch of constants like so (the "Enum::Field" syntax is specific for enumeration elements)::
+
+    const ubyte Priority::LOW = 1
+    const ubyte Priority::NORMAL= 2
+    const ubyte Priority::HIGH = 3
+    const ubyte Priority::EXTREME = 255
+
+Data Types
+----------
+.. index:: pair: Data Types; Overview
+
+Prog8 supports the following data types:
+
+===============  =======================  =================  =========================================
+type identifier  type                     storage size       example var declaration and literal value
+===============  =======================  =================  =========================================
+``byte``         signed byte              1 byte = 8 bits    ``byte myvar = -22``
+``ubyte``        unsigned byte            1 byte = 8 bits    ``ubyte myvar = $8f``,   ``ubyte c = 'a'``
+``bool``         boolean                  1 byte = 8 bits    ``bool myvar = true`` or ``bool myvar = false``
+``word``         signed word              2 bytes = 16 bits  ``word myvar = -12345``
+``uword``        unsigned word            2 bytes = 16 bits  ``uword myvar = $8fee``
+``long``         signed 32 bits integer   4 bytes            ``long large = $12345678``
+                                                             there is no unsigned long type at the moment.
+``float``        floating-point           5 bytes = 40 bits  ``float myvar = 1.2345``
+                                                             stored in 5-byte cbm MFLPT format
+``byte[x]``      signed byte array        x bytes            ``byte[4] myvar``
+``ubyte[x]``     unsigned byte array      x bytes            ``ubyte[4] myvar``
+``word[x]``      signed word array        2*x bytes          ``word[4] myvar``
+``uword[x]``     unsigned word array      2*x bytes          ``uword[4] myvar``
+``float[x]``     floating-point array     5*x bytes          ``float[4] myvar``.   The 5 bytes per float is on CBM targets.
+``bool[x]``      boolean array            x bytes            ``bool[4] myvar``  note: consider using bit flags in a byte or word instead to save space
+``byte[]``       signed byte array        depends on value   ``byte[] myvar = [1, 2, 3, 4]``
+``ubyte[]``      unsigned byte array      depends on value   ``ubyte[] myvar = [1, 2, 3, 4]``
+``word[]``       signed word array        depends on value   ``word[] myvar = [1, 2, 3, 4]``
+``uword[]``      unsigned word array      depends on value   ``uword[] myvar = [1, 2, 3, 4]``
+``float[]``      floating-point array     depends on value   ``float[] myvar = [1.1, 2.2, 3.3, 4.4]``
+``bool[]``       boolean array            depends on value   ``bool[] myvar = [true, false, true]``  note: consider using bit flags in a byte or word instead to save space
+``str[]``        array with string ptrs   2*x bytes + strs   ``str[] names = ["ally", "pete"]``  note: equivalent to a uword array.
+``str``          string (PETSCII)         varies             ``str myvar = "hello."``
+                                                             implicitly terminated by a 0-byte
+``^^type``       typed pointer            2 bytes            pointer types are explained in their own chapter :ref:`pointers`
+===============  =======================  =================  =========================================
+
+Integers (bytes, words, longs)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. index:: pair: Data Types; Integers
+
+Integers are 8, 16 or 32 bit numbers and can be written in normal decimal notation,
+in hexadecimal and in binary notation. There is no octal notation. Hexadecimal has the '$' prefix,
+binary has the '%' prefix. Note that ``%`` is also the remainder operator so be careful: if you want to take the remainder
+of something with an operand starting with 1 or 0, you'll have to add a space in between, otherwise
+the parser thinks you've typed an invalid binary number.
+
+You can use underscores to group digits to make long numbers more readable: any underscores in the number are ignored by the compiler.
+For instance ``3_000_000`` is a valid decimal number and so is ``%1001_0001`` a valid binary number.
+
+A single character in single quotes such as ``'a'`` is translated into a byte integer,
+which is the PETSCII value for that character. You can prefix it with the desired encoding, like with strings, see :ref:`encodings`.
+
+*Endianness:* all integers are stored in *little endian* byte order, so the Least significant byte first and the Most significant byte last.
+
+**bytes versus words versus longs:**
+
+Prog8 tries to determine the data type of integer values according to the table below,
+and sometimes the context in which they are used.
+
+========================= =================
+value                     datatype
+========================= =================
+-128 .. 127               byte
+0 .. 255                  ubyte
+-32768 .. 32767           word
+0 .. 65535                uword
+-2147483648 .. 2147483647 long  (there is no unsigned long right now)
+========================= =================
+
+Numeric expressions usually 'stay within their type' unless a cast is used, see :ref:`arithmetic`.
+If the number fits in a byte but you really require it as a word value, you'll have to explicitly cast it: ``60 as uword``
+or you can use the full word hexadecimal notation ``$003c``.  This is useful in expressions where you want a calculation
+to be done on word values, and don't want to explicitly have to cast everything all the time.  For instance::
+
+    ubyte  column
+    uword  offset = column * 64       ; does (column * 64) as uword, wrong result?
+    uword  offset = column * $0040    ; does (column as uword) * 64 , a word calculation
+
+.. attention::
+    Doing math on signed integers can result in code that is a lot larger and slower than
+    when using unsigned integers. Make sure you really need the signed numbers, otherwise
+    stick to unsigned integers for efficiency.
+
+.. attention::
+    Not all operations on Long integers are supported at the moment, although most common
+    operations should work fine. Notably absent for now are multiplication and division of longs.
+    There is no unsigned long type at the moment, but you can sometimes simply treat the signed
+    long value as an unsigned 32 bits value just fine.
+    Operations on long integers take a lot of instructions on 8 bit CPUs so code that uses them
+    a lot will be much slower than when you restrict yourself to 8 or 16 bit values. Use long values sparingly.
+
+.. danger::
+    **longs and cx16.R12,R13,R14,R15**:
+    **Some operations on long values require the use of the R12-R15 virtual register as temporary storage**
+    So if you are working with long values, you should assume that the contents of R12-R15 could be destroyed.
+    (Many operations preserve the values, but not all, because of reasons)
+    **Using R12,R13,R14,R15 in expressions that work with longs, will sometimes give a corrupted result, without
+    a warning of the compiler!** It is strongly advised to *not* use R12-R15 at all when dealing with longs.
+
+
+Booleans
+^^^^^^^^
+.. index:: pair: Data Types; Booleans
+
+Booleans are a distinct type called ``bool`` in Prog8 and can have only the values ``true`` or ``false``.
+In memory, they are stored as a byte containing 0 or 1.
+You can cast any numeric to a bool, in which case 0 will become ``false`` and any nonzero value will become ``true``.
+
+
+Floating point numbers
+^^^^^^^^^^^^^^^^^^^^^^
+.. index:: pair: Data Types; Floating point
+
+Floats are stored in the 5-byte 'MFLPT' format that is used on CBM machines.
+Floating point support is available on the c64 and cx16 (and virtual) compiler targets.
+On the cbm-compatible systems, the rom routines are used for floating point operations,
+so on both systems the correct rom banks have to be banked in to make this work.
+Although the C128 shares the same floating point format, Prog8 currently doesn't support
+using floating point on that system (because the c128 fp routines require the fp variables
+to be in another ram bank than the program, which Prog8 doesn't support yet).
+
+Also your code needs to import the ``floats`` library to enable floating point support
+in the compiler, and to gain access to the floating point routines.
+(this library contains the directive to enable floating points, you don't have
+to worry about this yourself)
+
+The largest 5-byte MFLPT float that can be stored is: **1.7014118345e+38**   (negative: **-1.7014118345e+38**)
+
+You can use underscores to group digits in floating point literals to make long numbers more readable:
+any underscores in the number are ignored by the compiler.
+For instance ``30_000.999_999`` is a valid floating point number 30000.999999.
+
+.. attention::
+    On the X16, make sure rom bank 4 is still active before doing floating point operations (it's the bank that contains the fp routines).
+    On the C64, you have to make sure the Basic ROM is still banked in (same reason).
+
+
+.. _arrayvars:
+
+Arrays
+^^^^^^
+.. index:: pair: Data Types; Arrays
+
+Arrays can be created from a list of booleans, bytes, words, floats, addresses of other variables
+(such as explicit address-of expressions, strings, or other array variables), pointers, struct initializers,
+or ``memory()`` calls (either directly or via ``const`` variables holding ``memory()`` results).
+The values in an array literal always have to be constants.
+A trailing comma is allowed, sometimes this is easier when copying values
+or when adding more stuff to the array later. Here are some examples of arrays::
+
+    byte[10]  array                   ; array of 10 bytes, initially set to 0
+    byte[]  array = [1, 2, 3, 4]      ; initialize the array, size taken from value
+    ubyte[99] array = [255]*99        ; initialize array with 99 times 255 [255, 255, 255, 255, ...]
+    byte[] array = 100 to 199         ; initialize array with [100, 101, ..., 198, 199]
+    str[] names = ["ally", "pete"]    ; array of string pointers/addresses (equivalent to array of uwords)
+    uword[] others = [names, array]   ; array of pointers/addresses to other arrays
+    bool[2] flags = [true, false]     ; array of two boolean values  (take up 1 byte each, like a byte array)
+    ^^float[3] values                 ; array of three pointers to floats
+    uword[2] memarr = [memory("m1",10,0), memory("m2",20,0)]  ; array of memory block addresses
+
+    value = array[3]            ; the fourth value in the array (index is 0-based)
+    char = string[4]            ; the fifth character (=byte) in the string
+    char = string[-2]           ; the second-to-last character in the string (Python-style indexing from the end)
+
+.. note::
+    To allow the 6502 CPU to efficiently access values in an array, the array should be small enough to be
+    indexable by a single byte index.
+    This means byte arrays should be <= 256 elements, word arrays <= 256 elements as well (if split, which
+    is the default. When not split, the maximum length is 128. See below for details about this distinction).
+    Float arrays should be <= 51 elements.
+
+Arrays can be initialized with a range expression or an array literal value.
+You can write out such an initializer value over several lines if you want to improve readability.
+When an initialization value is given, you are allowed to omit the array size in the declaration,
+because it can be inferred from the initialization value.
+You can use '*' to repeat array fragments to build up a larger array.
+
+You can assign a new value to an element in the array, but you can't assign a whole
+new array to another array at once. This is usually a costly operation. If you really
+need this you have to write it out depending on the use case: you can copy the memory using
+``sys.memcopy(sourcearray, targetarray, sizeof(targetarray))``. Or perhaps use ``sys.memset`` instead to
+set it all to the same value, or maybe even simply assign the individual elements.
+
+Note that the various keywords for the data type and variable type (``byte``, ``word``, ``const``, etc.)
+can't be used as *identifiers* elsewhere. You can't make a variable, block or subroutine with the name ``byte``
+for instance.
+
+Using the ``in`` operator you can easily check if a value is present in an array,
+example: ``if choice in [1,2,3,4] {....}``
+
+2D Arrays
+^^^^^^^^^
+.. index:: triple: Data Types; Matrixes; Two-dimensional Arrays
+    
+Prog8 provides a convenient syntactic sugar for working with two-dimensional arrays.
+Instead of manually calculating offsets into a flat 1D array, you can declare and
+access arrays using familiar 2D syntax.
+
+Declaration uses two bracket pairs to specify the number of rows and columns::
+
+    ubyte[3][4] matrix   ; 3 rows, 4 columns (12 elements total)
+
+Access uses chained indexing with ``[row][column]``::
+
+    ubyte value = matrix[1][2]   ; element at row 1, column 2
+    matrix[0][0] = 42            ; set top-left element
+
+This is purely **syntactic sugar**. The compiler automatically transforms
+``matrix[row][col]`` into the equivalent 1D index calculation
+``matrix[row * numCols + col]``. There is no runtime overhead or special
+2D tracking — after compilation it behaves exactly like a regular 1D array access.
+
+**Initialization:**
+
+When initializing a 2D array, provide the values as a **flat list** that matches
+the total number of elements (rows × columns). Nested list initializers
+(such as ``[[1,2,3],[4,5,6]]``) are **not supported**::
+
+    ubyte[2][3] matrix = [1, 2, 3, 4, 5, 6]   ; correct: flat list
+
+**Size limitations:**
+
+The combined array size is subject to the same limits as regular 1D arrays:
+
+- For byte arrays (``ubyte``, ``byte``, ``bool``): maximum **256 elements** total (rows × columns ≤ 256).
+- For split word arrays (``uword``, ``word``, ``str``): maximum **256 elements** total, which occupies 512 bytes of storage (LSB and MSB arrays).
+- For long arrays (``long``): maximum **64 elements** total (rows × columns ≤ 64), which occupies 256 bytes.
+- For float arrays (``float``): maximum **51 elements** total (rows × columns ≤ 51), which occupies 255 bytes.
+- For sequential word arrays (``@nosplit uword`` etc): maximum **128 elements** total, which occupies 256 bytes.
+- The ``@split`` tag works normally with 2D syntax.
+- The ``@nosplit`` tag can also be used on 2D word arrays if sequential storage is needed.
+
+**Not supported:**
+
+- 3D or higher-dimensional arrays are not supported.
+- Chained indexing (``arr[y][x]``) can only be used on variables that were
+  explicitly declared with the 2D ``[rows][cols]`` syntax. Using it on a
+  regular 1D array variable will produce a compile error.
+
+**Arrays at a specific memory location:**
+
+Using the memory-mapped syntax it is possible to define an array to be located at a specific memory location.
+For instance to reference the first 5 rows of the Commodore 64's screen matrix as an array, you can define::
+
+    &ubyte[5*40]  top5screenrows = $0400
+
+This way you can set the second character on the second row from the top like this::
+
+    top5screenrows[41] = '!'
+
+**Array indexing on a pointer variable:**
+
+An uword variable can be used in limited scenarios as a 'pointer' to a byte in memory at a specific,
+dynamic, location. You can use array indexing on a pointer variable to use it as a byte array at
+a dynamic location in memory: currently this is equivalent to directly referencing the bytes in
+memory at the given index. In contrast to a real array variable, the index value can be the size of a word.
+Unlike array variables, negative indexing for pointer variables does *not* mean it will be counting from the end, because the size of the buffer is unknown.
+Instead, it simply addresses memory that lies *before* the pointer variable.
+See also :ref:`pointervars` and the chapter about it :ref:`pointers`.
+
+**LSB/MSB split word and str arrays:**
+
+As an optimization, (u)word arrays, pointer arrays, and str arrays are split by the compiler in memory as two separate arrays,
+one with the LSBs and one with the MSBs of the word values. This is more efficient to access by the 6502 cpu.
+It also allows a maximum length of 256 for word arrays, where normally it would have been 128.
+
+For normal prog8 array indexing, the compiler takes care of the distinction for you under water.
+*But for assembly code, or code that otherwise accesses the array elements directly, you have to be aware of the distinction from 'normal' arrays.*
+In the assembly code, the array is generated as two byte arrays namely ``name_lsb`` and ``name_msb``, immediately following each other in memory.
+
+The ``@nosplit`` tag can be added to the variable declaration to *not* split the array. This is useful for compatibility with
+code that expects the words to be sequentially in memory (such as the cx16.FB_set_palette routine).
+
+.. note::
+    Some obscure array operations may not yet be supported on "split word arrays".
+    If you get a compiler error message hinting that this is the case,
+    simply revert to a regular sequential word array using ``@nosplit``, and please report the issue so that
+    the missing function can be added.
+
+.. note::
+    Array literals are stored as split arrays if they're initializing a split word array, otherwise,
+    they are stored as sequential words!  So if you pass one directly to a subroutine (like ``func([1111,2222,3333])``),
+    the array values are sequential in memory.  If this is undesirable (i.e. the subroutine expects a split word array),
+    you have to create a normal array variable first and then pass that to the subroutine.
+
+.. caution::
+    Be aware that the default is to split word arrays. Normal array access is taken care of by Prog8, so you won't
+    notice this optimization. However if you are accessing the array's values using other ways (for example via a pointer,
+    and then using ``peekw`` to get the value) you have to be aware of this. In that ``peekw`` example you have
+    to make sure to use ``@nosplit`` on the word array so that the words stay sequentially in memory which is what ``peekw`` needs.
+    Also be careful when passing arrays to library routines (this is via a pointer!): you have to make sure
+    the library routine can deal with the split array otherwise you have to use ``@nosplit`` as well.
+
+
+.. _encodings:
+
+Strings
+^^^^^^^
+.. index:: pair: Data Types; Strings
+
+Strings are a sequence of characters enclosed in double quotes. The length is limited to 255 characters.
+They're stored and treated much the same as a byte array,
+but they have some special properties because they are considered to be *text*.
+Strings (without encoding prefix) will be encoded (translated from ASCII/UTF-8) into bytes via the
+*default encoding* for the target platform. On the CBM machines, this is CBM PETSCII.
+
+Strings without an encoding prefix are stored in the machine's default character encoding (which is PETSCII on the CBM machines,
+but can be something else on other targets).
+There are ways to change the encoding: prefix the string with an encoding name, or use the ``%encoding`` directive to
+change it for the whole file at once. Here are examples of the possible encodings:
+
+    - ``"hello"``   a string translated into the default character encoding (PETSCII on the CBM machines)
+    - ``petscii:"hello"``               string in CBM PETSCII encoding
+    - ``sc:"my name is Alice"``         string in CBM screencode encoding
+    - ``iso:"Ich heiße François"``      string in iso-8859-15 encoding (Latin)
+    - ``iso5:"Хозяин и Работник"``      string in iso-8859-5 encoding (Cyrillic)
+    - ``iso16:"zażółć gęślą jaźń"``     string in iso-8859-16 encoding (Eastern Europe)
+    - ``atascii:"I am Atari!"``         string in "atascii" encoding (Atari 8-bit)
+    - ``cp437:"≈ IBM Pc ≈ ♂♀♪☺¶"``     string in "cp437" encoding (IBM PC codepage 437) See note below!
+    - ``kata:"ｱﾉ ﾆﾎﾝｼﾞﾝ ﾜ ｶﾞｲｺｸｼﾞﾝ｡ # が # ガ"``  string in "kata" encoding (Katakana)
+    - ``c64os:"^Hello_World! \\ ~{_}~"`` string in "c64os" encoding (C64 OS)
+
+So what follows below is a string literal that will be encoded into memory bytes using the iso encoding.
+It can be correctly displayed on the screen only if a iso-8859-15 charset has been activated first
+(the Commander X16 has this capability)::
+
+    iso:"Käse, Straße"
+
+
+.. sidebar:: str parameters in subroutines
+
+    A subroutine parameter declared as type ``str`` will be changed into a ``^^ubyte`` type (pointer to ubyte) instead
+    because Prog8 doesn't pass strings by value. This means you *can* assign new values to this parameter variable: you can
+    set it to a new memory address. You're not actually assigning something to a string variable, because that's not what its type actually is.
+
+You can concatenate two string literals using '+', which can be useful to
+split long strings over separate lines. But remember that the length
+of the total string still cannot exceed 255 characters.
+A string literal can also be repeated a given number of times using '*', where the repeat number must be a constant value.
+
+You cannot assign a new value to a ``str`` variable. If you really want to set a new string value into the variable,
+you have to explicitly copy it over the old value with ``strings.copy()`` or ``strings.ncopy()`` for instance.
+
+
+There are several escape sequences available to put special characters into your string value:
+
+- ``\\`` - the backslash itself, has to be escaped because it is the escape symbol by itself
+- ``\n`` - newline character (move cursor down and to beginning of next line)
+- ``\r`` - carriage return character (more or less the same as newline if printing to the screen)
+- ``\"`` - quote character (otherwise it would terminate the string)
+- ``\'`` - apostrophe character (has to be escaped in character literals, is okay inside a string)
+- ``\uHHHH`` - a unicode codepoint \u0000 - \uffff (16-bit hexadecimal)
+- ``\xHH`` - 8-bit hex value that will be copied verbatim *without encoding*
+
+- String literals can contain many symbols directly if they have a PETSCII equivalent, such as "♠♥♣♦π▚●○╳".
+  Characters like ^, _, \\, {, } and | (that have no direct PETSCII counterpart) are still accepted and converted to the closest PETSCII equivalents. (Make sure you save the source file in UTF-8 encoding if you use this.)
+
+Using the ``in`` operator you can easily check if a character is present in a string,
+example: ``if '@' in email_address {....}`` (however this gives no clue about the location
+in the string where the character is present, if you need that, use the ``strings.find()``
+library function instead)
+**Caution:**
+This checks *all* elements in the string with the length as it was initially declared.
+Even when a string was changed and is terminated early with a 0-byte early,
+the containment check with ``in`` will still look at all character positions in the initial string.
+Consider using ``strings.find`` followed by ``if_cs`` (for instance) to do a "safer" search
+for a character in such strings (one that stops at the first 0 byte)
+
+
+.. hint::
+    Strings/arrays and uwords (=memory address) can often be interchanged.
+    An array of strings is actually an array of uwords where every element is the memory
+    address of the string. You can pass a memory address to assembly functions
+    that require a string as an argument.
+    For regular assignments you still need to use an explicit ``&`` (address-of) to take
+    the address of the string or array.
+
+.. hint::
+    You can declare parameters and return values of subroutines as ``str``,
+    but in this case that is equivalent to declaring them as ``uword`` (because
+    in this case, the address of the string is passed as argument or returned as value).
+
+.. note:: Strings and their (im)mutability
+
+    *String literals outside of a string variable's initialization value*,
+    are considered to be "constant", i.e. the string isn't going to change
+    during the execution of the program. The compiler takes advantage of this in certain
+    ways. For instance, multiple identical occurrences of a string literal are folded into
+    just one string allocation in memory. Examples of such strings are the string literals
+    passed to a subroutine as arguments.
+
+    *Strings that aren't such string literals are considered to be unique*, even if they
+    are the same as a string defined elsewhere. This includes the strings assigned to
+    a string variable in its declaration! These kind of strings are not deduplicated and
+    are just copied into the program in their own unique part of memory. This means that
+    it is okay to treat those strings as mutable; you can safely change the contents
+    of such a string without destroying other occurrences (as long as you stay within
+    the size of the allocated string!)
+
+.. note:: printing **cp437** encoded strings
+
+    To print strings in the **cp437** encoding, you will probably need ``txt.print_lit(message)`` to properly print
+    them to the screen. This is because this encoding has symbols in place of where normally ASCII
+    control characters such as Line feed would be. A regular ``txt.print(message)`` will likely get confused
+    by such symbols and print them as control characters, messing up the output.
+
+
+Structs and Pointers
+^^^^^^^^^^^^^^^^^^^^
+Struct and Pointer types are explained in their own separate chapter :ref:`pointers`.
+
+
+.. _range-expression:
+
+Ranges
+^^^^^^
+.. index:: pair: Data Types; Ranges
+
+A special value is the *range expression* which represents a range of integer numbers or characters,
+from the starting value to (and including) the ending value::
+
+    <start>  to  <end>   [ step  <step> ]
+    <start>  downto  <end>   [ step  <step> ]
+
+You an provide a step value if you need something else than the default increment which is one (or,
+in case of downto, a decrement of one).  Unlike the start and end values, the step value must be a constant.
+Because a step of minus one is so common you can just use
+the downto variant to avoid having to specify the step as well::
+
+    0 to 7                   ; range of values 0, 1, 2, 3, 4, 5, 6, 7
+    20 downto 10 step -3     ; range of values 20, 17, 14, 11
+
+    aa = 5
+    xx = 10
+    aa to xx                 ; range of 5, 6, 7, 8, 9, 10
+
+    for  i  in  0 to 127  {
+        ; i loops 0, 1, 2, ... 127
+    }
+
+
+Range expressions are most often used in for loops, but can be also be used to create array initialization values::
+
+	byte[] array = 100 to 199     ; initialize array with [100, 101, ..., 198, 199]
+
+
+Memory-mapped
+^^^^^^^^^^^^^
+.. index:: pair: Data Types; Memory-mapped
+
+When using ``&`` (the address-of operator but now applied to the datatype in the variable's declaration),
+the variable will be placed at a designated position in memory rather than being newly allocated somewhere.
+The initial value in the declaration should be the valid memory address where the variable should be placed.
+Reading the variable will then read its value from that address, and setting the variable will directly modify those memory location(s)::
+
+	const  byte  max_age = 2000 - 1974      ; max_age will be the constant value 26
+	&word  SCREENCOLORS = $d020             ; a 16-bit word at the address $d020-$d021
+
+If you need to use the variable's memory address instead of the value placed there, you can still use `&variable` as usual.
+You can memory map all datatypes except strings.
+
+
+.. _pointervars:
+
+Direct access to memory locations ('peek' and 'poke')
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Usually specific memory locations are accessed through a memory-mapped variable, such as ``cbm.BGCOL0`` that is defined
+as the background color register at the memory address $d021 (on the c64 target).
+
+If you want to access any memory location directly (by using the address itself or via an uword pointer variable),
+without defining a memory-mapped location, you can do so by enclosing the address in ``@(...)``::
+
+    color = @($d020)  ; set the variable 'color' to the current c64 screen border color ("peek(53280)")
+    @($d020) = 0      ; set the c64 screen border to black ("poke 53280,0")
+    @(vic+$20) = 6    ; you can also use expressions to 'calculate' the address
+
+You can actually also use the array indexing notation for this. It will be silently converted into
+the direct memory access expression as explained above. Note that unlike regular arrays,
+the index is not limited to an ubyte value. You can use a full uword to index a pointer variable like this::
+
+    pointervar[999] = 0     ; set memory byte to zero at location pointervar + 999.
+
+More information about *typed pointers* can be found in the chapter :ref:`pointers`.
+
+
+Converting/Casting types into other types
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Sometimes you need an unsigned word where you have an unsigned byte, or you need some other type conversion.
+Many type conversions are possible by just writing ``as <type>`` at the end of an expression::
+
+    uword  uw = $ea31
+    ubyte  ub = uw as ubyte     ; ub will be $31, identical to lsb(uw)
+    float  f = uw as float      ; f will be 59953, but this conversion can be omitted in this case
+    word   w = uw as word       ; w will be -5583 (simply reinterpret $ea31 as 2-complement negative number)
+    f = 56.777
+    ub = f as ubyte             ; ub will be 56
+
+.. note::
+    The ``as`` operator has very low precedence, lower than almost all other operators.
+    This means that ``a + b as long`` is parsed as ``(a + b) as long``.
+    Use parentheses if you want to cast an operand before an operation: ``(a as long) * b``.
+
+Sometimes it is a straight reinterpretation of the given value as being of the other type,
+sometimes an actual value conversion is done to convert it into the other type.
+Try to avoid those type conversions as much as possible.
+
+
+Initial values across multiple runs of the program
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. index:: pair: Data Types; Initial values
+
+When declaring values with an initial value, this value will be set into the variable each time
+the program reaches the declaration again. This can be in loops, multiple subroutine calls,
+or even multiple invocations of the entire program.
+If you omit the initial value, zero will be used instead.
+
+This only works for simple types, *and not for string variables and arrays*.
+It is assumed these are left unchanged by the program; they are not re-initialized on
+a second run.
+If you do modify them in-place, you should take care yourself that they work as
+expected when the program is restarted.
+(This is an optimization choice to avoid having to store two copies of every string and array)

@@ -1,0 +1,1385 @@
+; Internal Math library routines - always included by the compiler
+; Generic machine independent 6502 code.
+;
+;  some more interesting routines can be found here:
+;	http://6502org.wikidot.com/software-math
+;	https://codebase64.net/doku.php?id=base:6502_6510_maths
+;       https://github.com/TobyLobster/multiply_test
+;       https://github.com/TobyLobster/sqrt_test
+
+
+multiply_bytes	.proc
+	; -- multiply 2 bytes A and Y, result as byte in A  (signed or unsigned)
+	; https://github.com/TobyLobster/multiply_test/blob/main/tests/mult29.a
+
+_multiplicand    = P8ZP_SCRATCH_B1
+_multiplier      = P8ZP_SCRATCH_REG
+
+    sty  _multiplicand
+    lsr  a
+    sta  _multiplier
+    lda  #0
+    ldx  #2
+-
+    bcc  +
+    clc
+    adc  _multiplicand
++
+    ror  a
+    ror  _multiplier
+    bcc  +
+    clc
+    adc  _multiplicand
++
+    ror  a
+    ror  _multiplier
+
+    bcc  +
+    clc
+    adc  _multiplicand
++
+    ror  a
+    ror  _multiplier
+    bcc  +
+    clc
+    adc  _multiplicand
++
+    ror  a
+    ror  _multiplier
+    dex
+    bne  -
+    ; tay       ; if you want 16 bits result in AY, enable this again
+    lda  _multiplier
+    rts
+		.pend
+
+
+multiply_words	.proc
+	; -- multiply two 16-bit words into a 32-bit result  (UNSIGNED)
+	;      input: A/Y = first 16-bit number, multiply_words.multiplier = second 16-bit number
+	;      output: multiply_words.result, 4-bytes/32-bits product, LSB order (low-to-high)  low 16 bits also in AY.
+	;      you can retrieve the upper 16 bits via math.mul16_last_upper()
+
+	; NOTE FOR NEGATIVE VALUES:
+	;      The routine also works for NEGATIVE (signed) word values, but ONLY the lower 16 bits of the result are correct then!
+	;      Prog8 only uses those so that's not an issue, but math.mul16_last_upper() no longer gives the correct result here.
+
+; mult62.a
+; from: https://github.com/TobyLobster/multiply_test/blob/main/tests/mult62.a
+; based on Dr Jefyll, http://forum.6502.org/viewtopic.php?f=9&t=689&start=0#p19958
+; - adjusted to use fixed zero page addresses
+; - removed 'decrement to avoid clc' as this is slower on average
+; - rearranged memory use to remove final memory copy and give LSB first order to result
+; - removed temp zp storage bytes
+; - unrolled the outer loop
+; - unrolled the two inner loops once
+;
+; 16 bit x 16 bit unsigned multiply, 32 bit result
+; Average cycles: ~442 ?
+; 93 bytes
+
+_multiplicand    = P8ZP_SCRATCH_W2   ; 2 bytes
+multiplier      = result
+
+; 16 bit x 16 bit unsigned multiply, 32 bit result
+;
+; On Entry:
+;   (multiplier, multiplier+1): two byte multiplier, four bytes needed for result
+;   (multiplicand, multiplicand+1): two byte multiplicand
+; On Exit:
+;   (result, result+1, result+2, result+3): product
+
+    sta  _multiplicand
+    sty  _multiplicand+1
+
+    lda  #0              ;
+    sta  result+2        ; 16 bits of zero in A, result+2
+                        ;  Note:    First 8 shifts are  A -> result+2 -> result
+                        ;           Final 8 shifts are  A -> result+2 -> result+1
+
+    ; --- 1st byte ---
+    ldy  #4              ; count for inner loop
+    lsr  result
+
+    ; inner loop (8 times)
+_inner_loop
+    ; first time
+    bcc +
+    tax                 ; retain A
+    lda  result+2
+    clc
+    adc  _multiplicand
+    sta  result+2
+    txa                 ; recall A
+    adc  _multiplicand+1
+
++
+    ror  a                ; shift
+    ror  result+2
+    ror  result
+
+    ; second time
+    bcc +
+    tax                 ; retain A
+    lda  result+2
+    clc
+    adc  _multiplicand
+    sta  result+2
+    txa                 ; recall A
+    adc  _multiplicand+1
+
++
+    ror  a                 ; shift
+    ror  result+2
+    ror  result
+
+    dey
+    bne  _inner_loop      ; go back for 1 more shift?
+
+    ; --- 2nd byte ---
+    ldy  #4              ; count for inner loop
+    lsr  result+1
+
+    ; inner loop (8 times)
+_inner_loop2
+    ; first time
+    bcc  +
+    tax                 ; retain A
+    lda  result+2
+    clc
+    adc  _multiplicand
+    sta  result+2
+    txa                 ; recall A
+    adc  _multiplicand+1
+
++
+    ror  a                ; shift
+    ror  result+2
+    ror  result+1
+
+    ; second time
+    bcc  +
+    tax                 ; retain A
+    lda  result+2
+    clc
+    adc  _multiplicand
+    sta  result+2
+    txa                 ; recall A
+    adc  _multiplicand+1
+
++
+    ror  a                ; shift
+    ror  result+2
+    ror  result+1
+    dey
+    bne  _inner_loop2     ; go back for 1 more shift?
+
+    sta  result+3        ; ms byte of hi-word of result
+
+    lda  result
+    ldy  result+1
+    rts
+
+		.section BSS
+result		.byte  ?,?,?,?       ; routine could be faster if this were in Zeropage...
+		.send BSS
+		.pend
+
+
+multiply_longs  .proc
+            ; 32-bit SIGNED multiplication.
+            ; long1 in cx16.r12/r13, long2 in cx16.r14/r15, result in cx16.r14/r15
+            ; clobbers R12+R13.
+
+            lda  cx16.r13+1
+            eor  cx16.r15+1
+            sta  P8ZP_SCRATCH_B1       ; save sign info
+
+            ; Negate l1 if negative
+            lda  cx16.r13+1
+            bpl  _l2_check
+            jsr  _neg_r12r13
+
+_l2_check
+            ; Negate l2 if negative
+            lda  cx16.r15+1
+            bpl  _copy_mult
+            jsr  _neg_r14r15
+
+_copy_mult
+            ; Copy multiplier to scratch (will be shifted)
+            lda  cx16.r14
+            sta  P8ZP_SCRATCH_W1
+            lda  cx16.r14+1
+            sta  P8ZP_SCRATCH_W1+1
+            lda  cx16.r15
+            sta  P8ZP_SCRATCH_W2
+            lda  cx16.r15+1
+            sta  P8ZP_SCRATCH_W2+1
+
+            ; Clear result (R14R15 = 0)
+            lda  #$00
+            sta  cx16.r14
+            sta  cx16.r14+1
+            sta  cx16.r15
+            sta  cx16.r15+1
+
+            ldx  #32
+
+_loop
+            lda  P8ZP_SCRATCH_W1
+            and  #1
+            beq  _shift
+
+            ; Add multiplicand to result
+            clc
+            lda  cx16.r14
+            adc  cx16.r12
+            sta  cx16.r14
+            lda  cx16.r14+1
+            adc  cx16.r12+1
+            sta  cx16.r14+1
+            lda  cx16.r15
+            adc  cx16.r13
+            sta  cx16.r15
+            lda  cx16.r15+1
+            adc  cx16.r13+1
+            sta  cx16.r15+1
+
+_shift
+            ; Shift multiplicand left
+            asl  cx16.r12
+            rol  cx16.r12+1
+            rol  cx16.r13
+            rol  cx16.r13+1
+
+            ; Shift multiplier right
+            lsr  P8ZP_SCRATCH_W2+1
+            ror  P8ZP_SCRATCH_W2
+            ror  P8ZP_SCRATCH_W1+1
+            ror  P8ZP_SCRATCH_W1
+
+            dex
+            bne  _loop
+
+            ; Apply sign if needed
+            lda  P8ZP_SCRATCH_B1
+            bpl  _done
+            jsr  _neg_r14r15
+
+_done
+            rts
+
+            ; Subroutine: negate R12R13 in place
+_neg_r12r13
+            sec
+            lda  #$00
+            sbc  cx16.r12
+            sta  cx16.r12
+            lda  #$00
+            sbc  cx16.r12+1
+            sta  cx16.r12+1
+            lda  #$00
+            sbc  cx16.r13
+            sta  cx16.r13
+            lda  #$00
+            sbc  cx16.r13+1
+            sta  cx16.r13+1
+            rts
+
+            ; Subroutine: negate R14R15 in place
+_neg_r14r15
+            sec
+            lda  #$00
+            sbc  cx16.r14
+            sta  cx16.r14
+            lda  #$00
+            sbc  cx16.r14+1
+            sta  cx16.r14+1
+            lda  #$00
+            sbc  cx16.r15
+            sta  cx16.r15
+            lda  #$00
+            sbc  cx16.r15+1
+            sta  cx16.r15+1
+            rts
+		.pend
+
+divmod_b_asm	.proc
+	; signed byte division: make everything positive and fix sign afterwards
+		sta  P8ZP_SCRATCH_B1
+		tya
+		eor  P8ZP_SCRATCH_B1
+		php			; save sign
+		lda  P8ZP_SCRATCH_B1
+		bpl  +
+		eor  #$ff
+		sec
+		adc  #0			; make it positive
++		pha
+		tya
+		bpl  +
+		eor  #$ff
+		sec
+		adc  #0			; make it positive
+		tay
++		pla
+		jsr  divmod_ub_asm
+		sta  _remainder
+		plp
+		bpl  +
+		tya
+		eor  #$ff
+		sec
+		adc  #0			; negate result
+		tay
++		rts
+		.section BSS
+_remainder	.byte  ?
+		.send BSS
+		.pend
+
+
+divmod_ub_asm	.proc
+	; -- divide A by Y, result quotient in Y, remainder in A   (unsigned)
+	;    division by zero will result in quotient = 255 and remainder = 0
+		cpy  #0
+		bne  _nonzero
+		ldy  #255
+		lda  #0
+		rts
+_nonzero	sty  P8ZP_SCRATCH_REG
+		sta  P8ZP_SCRATCH_B1
+
+		lda  #0
+		ldx  #8
+		asl  P8ZP_SCRATCH_B1
+-		rol  a
+		cmp  P8ZP_SCRATCH_REG
+		bcc  +
+		sbc  P8ZP_SCRATCH_REG
++		rol  P8ZP_SCRATCH_B1
+		dex
+		bne  -
+		ldy  P8ZP_SCRATCH_B1
+		rts
+		.pend
+
+remainder_ub_asm        .proc
+		; -- divide A by Y, returns remainder in A   (unsigned)
+		;    division by zero will result in just the original number.
+		;    This routine specialcases 0,1,2 and otherwise is just a repeated subtraction.
+		cpy  #0
+		beq  _zero
+		cpy  #1
+		bne  +
+		lda  #0
+		rts
++		cpy  #2
+		bne  +
+		and  #1
+		rts
++		sty  P8ZP_SCRATCH_REG
+		sec
+-		sbc  P8ZP_SCRATCH_REG
+		bcs  -
+		adc  P8ZP_SCRATCH_REG
+_zero		rts
+		.pend
+
+divmod_w_asm	.proc
+	; signed word division: make everything positive and fix sign afterwards
+		sta  P8ZP_SCRATCH_W2
+		sty  P8ZP_SCRATCH_W2+1
+		lda  P8ZP_SCRATCH_W1+1
+		eor  P8ZP_SCRATCH_W2+1
+		php			; save sign
+		lda  P8ZP_SCRATCH_W1+1
+		bpl  +
+		lda  #0
+		sec
+		sbc  P8ZP_SCRATCH_W1
+		sta  P8ZP_SCRATCH_W1
+		lda  #0
+		sbc  P8ZP_SCRATCH_W1+1
+		sta  P8ZP_SCRATCH_W1+1
++		lda  P8ZP_SCRATCH_W2+1
+		bpl  +
+		lda  #0
+		sec
+		sbc  P8ZP_SCRATCH_W2
+		sta  P8ZP_SCRATCH_W2
+		lda  #0
+		sbc  P8ZP_SCRATCH_W2+1
+		sta  P8ZP_SCRATCH_W2+1
++		tay
+		lda  P8ZP_SCRATCH_W2
+		jsr  divmod_uw_asm
+		plp			; restore sign
+		bpl  +
+		sta  P8ZP_SCRATCH_W2
+		sty  P8ZP_SCRATCH_W2+1
+		lda  #0
+		sec
+		sbc  P8ZP_SCRATCH_W2
+		pha
+		lda  #0
+		sbc  P8ZP_SCRATCH_W2+1
+		tay
+		pla
++		rts
+		.pend
+
+
+divmod_uw_asm	.proc
+	; -- divide two unsigned words (16 bit each) into 16 bit results
+	;    input:  P8ZP_SCRATCH_W1 in ZP: 16 bit number, A/Y: 16 bit divisor
+	;    output: P8ZP_SCRATCH_W2: 16 bit remainder, A/Y: 16 bit division result
+	;    division by zero will result in quotient = 65535 and remainder = 0
+	;    NOTE: does not clobber any cx16.rX registers.
+
+dividend = P8ZP_SCRATCH_W1
+remainder = P8ZP_SCRATCH_W2
+result = dividend ;save memory by reusing dividend to store the result
+
+		cpy  #0
+		bne  _nonzero
+		ora  #0
+		bne  _nonzero
+		lda  #0		; remainder = 0
+		sta  remainder
+		sta  remainder+1
+		lda  #$ff		; quotient = 65535 (A/Y)
+		tay
+		rts
+_nonzero
+		sta  _divisor
+		sty  _divisor+1
+		lda  #0	        	;preset remainder to 0
+		sta  remainder
+		sta  remainder+1
+		ldx  #16	        ;repeat for each bit: ...
+
+-		asl  dividend		;dividend lb & hb*2, msb -> Carry
+		rol  dividend+1
+		rol  remainder		;remainder lb & hb * 2 + msb from carry
+		rol  remainder+1
+		lda  remainder
+		sec
+		sbc  _divisor		;substract divisor to see if it fits in
+		tay	       		;lb result -> Y, for we may need it later
+		lda  remainder+1
+		sbc  _divisor+1
+		bcc  +			;if carry=0 then divisor didn't fit in yet
+
+		sta  remainder+1	;else save substraction result as new remainder,
+		sty  remainder
+		inc  result		;and INCrement result cause divisor fit in 1 times
+
++		dex
+		bne  -
+
+		lda  result
+		ldy  result+1
+		rts
+		.section BSS
+_divisor	.word ?
+		.send BSS
+		.pend
+
+randword	.proc
+	; -- 16 bit pseudo random number generator into AY
+	;    default seed = $00c2 $1137.  NOTE:  uses self-modifying code so won't work in ROM (use randword_rom instead)
+        ;    routine from https://codebase64.net/doku.php?id=6502_6510_maths:x_abc_random_number_generator_8_16_bit
+		inc x1
+		clc
+x1=*+1
+		lda #$00	;x1
+c1=*+1
+		eor #$c2	;c1
+a1=*+1
+		eor #$11	;a1
+		sta a1
+b1=*+1
+		adc #$37	;b1
+		sta b1
+		lsr a
+		eor a1
+		adc c1
+		sta c1
+		ldy b1
+		rts
+		.pend
+
+randword_rom	.proc
+	; -- 16 bit pseudo random number generator into AY. Can run from ROM.
+	;    NOTE: you have to set the initial seed using randseed_rom! (a good default seed = $00c2 $1137)
+        ;    routine from https://codebase64.net/doku.php?id=6502_6510_maths:x_abc_random_number_generator_8_16_bit
+		inc  _x1
+		clc
+		lda  _x1
+		eor  _c1
+		eor  _a1
+		sta  _a1
+		adc  _b1
+		sta  _b1
+		lsr  a
+		eor  _a1
+		adc  _c1
+		sta  _c1
+		ldy  _b1
+		rts
+		.section BSS
+_x1      .byte  ?
+_c1      .byte  ?
+_a1      .byte  ?
+_b1      .byte  ?
+		.send BSS
+		.pend
+
+randbyte = randword             ; -- 8 bit pseudo random number generator into A (by just reusing randword) NOTE: can not run from ROM
+randbyte_rom = randword_rom     ; -- 8 bit pseudo random number generator into A (by just reusing randword). Can run from ROM
+
+
+; ----------- optimized multiplications (in-place A (byte) and ?? (word)) : ---------
+mul_byte_3	.proc
+		; A = A + A*2
+		sta  P8ZP_SCRATCH_REG
+		asl  a
+		clc
+		adc  P8ZP_SCRATCH_REG
+		rts
+		.pend
+
+mul_word_3	.proc
+		; AY = AY*2 + AY
+		sta  P8ZP_SCRATCH_W1
+		sty  P8ZP_SCRATCH_W1+1
+		sta  P8ZP_SCRATCH_W2
+		sty  P8ZP_SCRATCH_W2+1
+		asl  a
+		rol  P8ZP_SCRATCH_W1+1
+		clc
+		adc  P8ZP_SCRATCH_W2
+		sta  P8ZP_SCRATCH_W1
+		lda  P8ZP_SCRATCH_W1+1
+		adc  P8ZP_SCRATCH_W2+1
+		tay
+		lda  P8ZP_SCRATCH_W1
+		rts
+		.pend
+
+
+mul_byte_5	.proc
+		; A = A*4 + A
+		sta  P8ZP_SCRATCH_REG
+		asl  a
+		asl  a
+		clc
+		adc  P8ZP_SCRATCH_REG
+		rts
+		.pend
+
+mul_word_5	.proc
+		; AY = AY*4 + AY
+		sta  P8ZP_SCRATCH_W1
+		sty  P8ZP_SCRATCH_W1+1
+		sta  P8ZP_SCRATCH_W2
+		sty  P8ZP_SCRATCH_W2+1
+		asl  a
+		rol  P8ZP_SCRATCH_W1+1
+		asl  a
+		rol  P8ZP_SCRATCH_W1+1
+		clc
+		adc  P8ZP_SCRATCH_W2
+		sta  P8ZP_SCRATCH_W1
+		lda  P8ZP_SCRATCH_W1+1
+		adc  P8ZP_SCRATCH_W2+1
+		tay
+		lda  P8ZP_SCRATCH_W1
+		rts
+		.pend
+
+
+mul_byte_6	.proc
+		; A = (A*2 + A)*2
+		sta  P8ZP_SCRATCH_REG
+		asl  a
+                clc
+                adc  P8ZP_SCRATCH_REG
+		asl  a
+		rts
+		.pend
+
+mul_word_6	.proc
+		; AY = (AY*2 + AY)*2
+		sta  P8ZP_SCRATCH_W1
+		sty  P8ZP_SCRATCH_W1+1
+		sta  P8ZP_SCRATCH_W2
+		sty  P8ZP_SCRATCH_W2+1
+		asl  a
+		rol  P8ZP_SCRATCH_W1+1
+		clc
+		adc  P8ZP_SCRATCH_W2
+		sta  P8ZP_SCRATCH_W1
+		tay
+		lda  P8ZP_SCRATCH_W1+1
+		adc  P8ZP_SCRATCH_W2+1
+		sta  P8ZP_SCRATCH_W1+1
+		tya
+		asl  a
+		rol  P8ZP_SCRATCH_W1+1
+		ldy  P8ZP_SCRATCH_W1+1
+		rts
+		.pend
+
+mul_byte_7	.proc
+		; A = A*8 - A
+		sta  P8ZP_SCRATCH_REG
+		asl  a
+		asl  a
+		asl  a
+		sec
+		sbc  P8ZP_SCRATCH_REG
+		rts
+		.pend
+
+mul_word_7	.proc
+		; AY = AY*8 - AY
+		sta  P8ZP_SCRATCH_W1
+		sty  P8ZP_SCRATCH_W1+1
+		sta  P8ZP_SCRATCH_W2
+		sty  P8ZP_SCRATCH_W2+1
+		asl  a
+		rol  P8ZP_SCRATCH_W1+1
+		asl  a
+		rol  P8ZP_SCRATCH_W1+1
+		asl  a
+		rol  P8ZP_SCRATCH_W1+1
+		sec
+		sbc  P8ZP_SCRATCH_W2
+		sta  P8ZP_SCRATCH_W1
+		lda  P8ZP_SCRATCH_W1+1
+		sbc  P8ZP_SCRATCH_W2+1
+		tay
+		lda  P8ZP_SCRATCH_W1
+		rts
+		.pend
+
+mul_byte_9	.proc
+		; A = A*8 + A
+		sta  P8ZP_SCRATCH_REG
+		asl  a
+		asl  a
+		asl  a
+		clc
+		adc  P8ZP_SCRATCH_REG
+		rts
+		.pend
+
+mul_word_9	.proc
+		; AY = AY*8 + AY
+		sta  P8ZP_SCRATCH_W1
+		sty  P8ZP_SCRATCH_W1+1
+		sta  P8ZP_SCRATCH_W2
+		sty  P8ZP_SCRATCH_W2+1
+		asl  a
+		rol  P8ZP_SCRATCH_W1+1
+		asl  a
+		rol  P8ZP_SCRATCH_W1+1
+		asl  a
+		rol  P8ZP_SCRATCH_W1+1
+		clc
+		adc  P8ZP_SCRATCH_W2
+		sta  P8ZP_SCRATCH_W1
+		lda  P8ZP_SCRATCH_W1+1
+		adc  P8ZP_SCRATCH_W2+1
+		tay
+		lda  P8ZP_SCRATCH_W1
+		rts
+		.pend
+
+mul_byte_10	.proc
+		; A=(A*4 + A)*2
+		sta  P8ZP_SCRATCH_REG
+		asl  a
+		asl  a
+		clc
+		adc  P8ZP_SCRATCH_REG
+		asl  a
+		rts
+		.pend
+
+mul_word_10	.proc
+		; AY=(AY*4 + AY)*2
+		sta  P8ZP_SCRATCH_W1
+		sty  P8ZP_SCRATCH_W1+1
+		sta  P8ZP_SCRATCH_W2
+		sty  P8ZP_SCRATCH_W2+1
+		asl  a
+		rol  P8ZP_SCRATCH_W1+1
+		asl  a
+		rol  P8ZP_SCRATCH_W1+1
+		clc
+		adc  P8ZP_SCRATCH_W2
+		sta  P8ZP_SCRATCH_W1
+		lda  P8ZP_SCRATCH_W1+1
+		adc  P8ZP_SCRATCH_W2+1
+		sta  P8ZP_SCRATCH_W1+1
+		lda  P8ZP_SCRATCH_W1
+		asl  a
+		rol  P8ZP_SCRATCH_W1+1
+		ldy  P8ZP_SCRATCH_W1+1
+		rts
+		.pend
+
+mul_byte_11	.proc
+		; A=(A*2 + A)*4 - A
+		sta  P8ZP_SCRATCH_REG
+		asl  a
+		clc
+		adc  P8ZP_SCRATCH_REG
+		asl  a
+		asl  a
+		sec
+		sbc  P8ZP_SCRATCH_REG
+		rts
+		.pend
+
+; mul_word_11 is skipped (too much code)
+
+mul_byte_12	.proc
+		; A=(A*2 + A)*4
+		sta  P8ZP_SCRATCH_REG
+		asl  a
+		clc
+		adc  P8ZP_SCRATCH_REG
+		asl  a
+		asl  a
+		rts
+		.pend
+
+mul_word_12	.proc
+		; AY=(AY*2 + AY)*4
+		sta  P8ZP_SCRATCH_W1
+		sty  P8ZP_SCRATCH_W1+1
+		sta  P8ZP_SCRATCH_W2
+		sty  P8ZP_SCRATCH_W2+1
+		asl  a
+		rol  P8ZP_SCRATCH_W1+1
+		clc
+		adc  P8ZP_SCRATCH_W2
+		sta  P8ZP_SCRATCH_W1
+		lda  P8ZP_SCRATCH_W1+1
+		adc  P8ZP_SCRATCH_W2+1
+		sta  P8ZP_SCRATCH_W1+1
+		lda  P8ZP_SCRATCH_W1
+		asl  a
+		rol  P8ZP_SCRATCH_W1+1
+		asl  a
+		rol  P8ZP_SCRATCH_W1+1
+		ldy  P8ZP_SCRATCH_W1+1
+		rts
+		.pend
+
+mul_byte_13	.proc
+		; A=(A*2 + A)*4 + A
+		sta  P8ZP_SCRATCH_REG
+		asl  a
+                clc
+		adc  P8ZP_SCRATCH_REG
+		asl  a
+		asl  a
+                clc
+		adc  P8ZP_SCRATCH_REG
+		rts
+		.pend
+
+; mul_word_13 is skipped (too much code)
+
+mul_byte_14	.proc
+		; A=(A*8 - A)*2
+		sta  P8ZP_SCRATCH_REG
+		asl  a
+		asl  a
+		asl  a
+                sec
+		sbc  P8ZP_SCRATCH_REG
+                asl  a
+		rts
+		.pend
+
+; mul_word_14 is skipped (too much code)
+
+mul_byte_15	.proc
+		; A=A*16 - A
+		sta  P8ZP_SCRATCH_REG
+		asl  a
+		asl  a
+		asl  a
+		asl  a
+		sec
+		sbc  P8ZP_SCRATCH_REG
+		rts
+		.pend
+
+mul_word_15	.proc
+		; AY = AY * 16 - AY
+		sta  P8ZP_SCRATCH_W1
+		sty  P8ZP_SCRATCH_W1+1
+		sta  P8ZP_SCRATCH_W2
+		sty  P8ZP_SCRATCH_W2+1
+		asl  a
+		rol  P8ZP_SCRATCH_W1+1
+		asl  a
+		rol  P8ZP_SCRATCH_W1+1
+		asl  a
+		rol  P8ZP_SCRATCH_W1+1
+		asl  a
+		rol  P8ZP_SCRATCH_W1+1
+		sec
+		sbc  P8ZP_SCRATCH_W2
+		sta  P8ZP_SCRATCH_W1
+		lda  P8ZP_SCRATCH_W1+1
+		sbc  P8ZP_SCRATCH_W2+1
+		tay
+		lda  P8ZP_SCRATCH_W1
+		rts
+		.pend
+
+mul_byte_20	.proc
+		; A=(A*4 + A)*4
+		sta  P8ZP_SCRATCH_REG
+		asl  a
+		asl  a
+		clc
+		adc  P8ZP_SCRATCH_REG
+		asl  a
+		asl  a
+		rts
+		.pend
+
+mul_word_20	.proc
+		; AY = AY * 10 * 2
+		jsr  mul_word_10
+		sty  P8ZP_SCRATCH_REG
+		asl  a
+		rol  P8ZP_SCRATCH_REG
+		ldy  P8ZP_SCRATCH_REG
+		rts
+		.pend
+
+mul_byte_25	.proc
+		; A=(A*2 + A)*8 + A
+		sta  P8ZP_SCRATCH_REG
+		asl  a
+		clc
+		adc  P8ZP_SCRATCH_REG
+		asl  a
+		asl  a
+		asl  a
+		clc
+		adc  P8ZP_SCRATCH_REG
+		rts
+		.pend
+
+mul_word_25	.proc
+		; AY = (AY*2 + AY) *8 + AY
+		sta  P8ZP_SCRATCH_W1
+		sty  P8ZP_SCRATCH_W1+1
+		sta  P8ZP_SCRATCH_W2
+		sty  P8ZP_SCRATCH_W2+1
+		asl  a
+		rol  P8ZP_SCRATCH_W1+1
+		clc
+		adc  P8ZP_SCRATCH_W2
+		sta  P8ZP_SCRATCH_W1
+		lda  P8ZP_SCRATCH_W1+1
+		adc  P8ZP_SCRATCH_W2+1
+		sta  P8ZP_SCRATCH_W1+1
+		lda  P8ZP_SCRATCH_W1
+		asl  a
+		rol  P8ZP_SCRATCH_W1+1
+		asl  a
+		rol  P8ZP_SCRATCH_W1+1
+		asl  a
+		rol  P8ZP_SCRATCH_W1+1
+		clc
+		adc  P8ZP_SCRATCH_W2
+		sta  P8ZP_SCRATCH_W1
+		lda  P8ZP_SCRATCH_W1+1
+		adc  P8ZP_SCRATCH_W2+1
+		tay
+		lda  P8ZP_SCRATCH_W1
+		rts
+		.pend
+
+mul_byte_40	.proc
+		and  #7
+		tay
+		lda  _forties,y
+		rts
+_forties	.byte  0*40, 1*40, 2*40, 3*40, 4*40, 5*40, 6*40, 7*40 & 255
+		.pend
+
+mul_word_40	.proc
+		; AY = (AY*4 + AY)*8
+		sta  P8ZP_SCRATCH_W1
+		sty  P8ZP_SCRATCH_W1+1
+		sta  P8ZP_SCRATCH_W2
+		sty  P8ZP_SCRATCH_W2+1
+		asl  a
+		rol  P8ZP_SCRATCH_W1+1
+		asl  a
+		rol  P8ZP_SCRATCH_W1+1
+		clc
+		adc  P8ZP_SCRATCH_W2
+		sta  P8ZP_SCRATCH_W1
+		lda  P8ZP_SCRATCH_W1+1
+		adc  P8ZP_SCRATCH_W2+1
+		asl  P8ZP_SCRATCH_W1
+		rol  a
+		asl  P8ZP_SCRATCH_W1
+		rol  a
+		asl  P8ZP_SCRATCH_W1
+		rol  a
+		tay
+		lda  P8ZP_SCRATCH_W1
+		rts
+		.pend
+
+mul_byte_50	.proc
+		and  #7
+		tay
+		lda  _fifties, y
+		rts
+_fifties	.byte  0*50, 1*50, 2*50, 3*50, 4*50, 5*50, 6*50 & 255, 7*50 & 255
+		.pend
+
+mul_word_50	.proc
+		; AY = AY * 25 * 2
+		jsr  mul_word_25
+		sty  P8ZP_SCRATCH_REG
+		asl  a
+		rol  P8ZP_SCRATCH_REG
+		ldy  P8ZP_SCRATCH_REG
+		rts
+		.pend
+
+mul_byte_80	.proc
+		and  #3
+		tay
+		lda  _eighties, y
+		rts
+_eighties	.byte  0*80, 1*80, 2*80, 3*80
+		.pend
+
+mul_word_80	.proc
+		; AY = AY * 40 * 2
+		jsr  mul_word_40
+		sty  P8ZP_SCRATCH_REG
+		asl  a
+		rol  P8ZP_SCRATCH_REG
+		ldy  P8ZP_SCRATCH_REG
+		rts
+		.pend
+
+mul_byte_100	.proc
+		and  #3
+		tay
+		lda  _hundreds, y
+		rts
+_hundreds	.byte  0*100, 1*100, 2*100, 3*100 & 255
+		.pend
+
+mul_word_100	.proc
+		; AY = AY * 25 * 4
+		jsr  mul_word_25
+		sty  P8ZP_SCRATCH_REG
+		asl  a
+		rol  P8ZP_SCRATCH_REG
+		asl  a
+		rol  P8ZP_SCRATCH_REG
+		ldy  P8ZP_SCRATCH_REG
+		rts
+		.pend
+
+mul_word_320	.proc
+		; AY = A * 256 + A * 64	 (msb in Y doesn't matter)
+		sta  P8ZP_SCRATCH_B1
+		ldy  #0
+		sty  P8ZP_SCRATCH_REG
+		asl  a
+		rol  P8ZP_SCRATCH_REG
+		asl  a
+		rol  P8ZP_SCRATCH_REG
+		asl  a
+		rol  P8ZP_SCRATCH_REG
+		asl  a
+		rol  P8ZP_SCRATCH_REG
+		asl  a
+		rol  P8ZP_SCRATCH_REG
+		asl  a
+		rol  P8ZP_SCRATCH_REG
+		pha
+		clc
+		lda  P8ZP_SCRATCH_B1
+		adc  P8ZP_SCRATCH_REG
+		tay
+		pla
+		rts
+		.pend
+
+mul_word_640	.proc
+		; AY = (A * 2 * 320) (msb in Y doesn't matter)
+		asl  a
+		jmp  mul_word_320
+		.pend
+
+
+; ----------- end optimized multiplications -----------
+
+
+; support for bit shifting that is too large to be unrolled:
+
+lsr_byte_A	.proc
+		; -- lsr signed byte in A times the value in Y
+		cpy  #0
+		beq  +
+		cmp  #0
+		bpl  lsr_ubyte_A
+-       	sec
+		ror  a
+		dey
+		bne  -
++		rts
+		.pend
+
+lsr_ubyte_A	.proc
+		; -- lsr unsigned byte in A times the value in Y
+		cpy  #0
+		beq  +
+-		lsr  a
+		dey
+		bne  -
++		rts
+		.pend
+
+asl_byte_A      .proc
+		; -- asl any byte in A times the value in Y
+		cpy  #0
+		beq  +
+-		asl  a
+		dey
+		bne  -
++		rts
+		.pend
+
+
+lsr_word_AY     .proc
+		; -- lsr signed word in AY times the value in X
+		cpx  #0
+		beq  +
+		cpy  #0
+		bpl  lsr_uword_AY
+		sty  P8ZP_SCRATCH_B1
+-		sec
+		ror  P8ZP_SCRATCH_B1
+		ror  a
+		dex
+		bne  -
+		ldy  P8ZP_SCRATCH_B1
++		rts
+		.pend
+
+lsr_uword_AY    .proc
+		; -- lsr unsigned word in AY times the value in X
+		cpx  #0
+		beq  +
+		sty  P8ZP_SCRATCH_B1
+-		lsr  P8ZP_SCRATCH_B1
+		ror  a
+		dex
+		bne  -
+		ldy  P8ZP_SCRATCH_B1
++		rts
+		.pend
+
+asl_word_AY     .proc
+		; -- asl any word in AY times the value in X
+		cpx  #0
+		beq  +
+		sty  P8ZP_SCRATCH_B1
+-               asl  a
+		rol  P8ZP_SCRATCH_B1
+		dex
+		bne  -
+		ldy  P8ZP_SCRATCH_B1
++		rts
+		.pend
+
+
+square_long     .proc
+; -- calculate square of 32-bit long in cx16.R14:R15, result as 32-bit long in cx16.R14:R15
+; Input:  cx16.R14:R15 = 32-bit value to square (R14=low word, R15=high word)
+; Output: cx16.R14:R15 = 32-bit square result (R14=low word, R15=high word)
+; Clobbers: A, X, Y
+
+        lda  cx16.r14
+        ldy  cx16.r14+1
+        ldx  cx16.r15+1
+        bpl  +
+        jsr  prog8_lib.abs_w_into_AY
+
++
+        ; Square R14 only
+        sta  multiply_words.multiplier
+        sty  multiply_words.multiplier+1
+        jsr  multiply_words
+
+        ; Copy 4-byte result to cx16.r14:cx16.r15
+        sta  cx16.r14
+        sty  cx16.r14+1
+        lda  multiply_words.result+2
+        sta  cx16.r15
+        lda  multiply_words.result+3
+        sta  cx16.r15+1
+
+        rts
+		.pend
+
+
+square          .proc
+; -- calculate square of signed word (actually -255..255) in AY, result in AY
+; routine by Lee Davison, source: http://6502.org/source/integers/square.htm
+; using this routine is a lot faster as doing a regular multiplication (for words)
+;
+; Calculates the 16 bit unsigned integer square of the signed 16 bit integer in
+; Numberl/Numberh.  The result is always in the range 0 to 65025 and is held in
+; Squarel/Squareh
+;
+; The maximum input range is only +/-255 and no checking is done to ensure that
+; this is so.
+;
+; This routine is useful if you are trying to draw circles as for any circle
+; x^2+y^2=r^2 where x and y are the co-ordinates of any point on the circle and
+; r is the circle radius
+
+numberl = P8ZP_SCRATCH_W1       ; number to square low byte
+numberh = P8ZP_SCRATCH_W1+1     ; number to square high byte
+squarel = P8ZP_SCRATCH_W2       ; square low byte
+squareh = P8ZP_SCRATCH_W2+1     ; square high byte
+tempsq = P8ZP_SCRATCH_B1        ; temp byte for intermediate result
+
+	sta  numberl
+	sty  numberh
+
+        lda     #$00        ; clear a
+        sta     squarel     ; clear square low byte
+                            ; (no need to clear the high byte, it gets shifted out)
+        lda	numberl     ; get number low byte
+	ldx	numberh     ; get number high  byte
+	bpl	_nonneg      ; if +ve don't negate it
+                            ; else do a two's complement
+	eor	#$ff        ; invert
+        sec	            ; +1
+	adc	#$00        ; and add it
+
+_nonneg:
+	sta	tempsq      ; save abs(number)
+	ldx	#$08        ; set bit count
+
+_nextr2bit:
+	asl	squarel     ; low byte *2
+	rol	squareh     ; high byte *2+carry from low
+	asl	a           ; shift number byte
+	bcc	_nosqadd     ; don't do add if c = 0
+	tay                 ; save a
+	clc                 ; clear carry for add
+	lda	tempsq      ; get number
+	adc	squarel     ; add number^2 low byte
+	sta	squarel     ; save number^2 low byte
+	lda	#$00        ; clear a
+	adc	squareh     ; add number^2 high byte
+	sta	squareh     ; save number^2 high byte
+	tya                 ; get a back
+
+_nosqadd:
+	dex                 ; decrement bit count
+	bne	_nextr2bit   ; go do next bit
+
+	lda  squarel
+	ldy  squareh
+	rts
+
+		.pend
+
+
+
+
+div_longs  .proc
+            ; 32-bit SIGNED division.
+            ; long1 in cx16.r12/r13, long2 in cx16.r14/r15, result in cx16.r14/r15
+            ; clobbers A,X, cx16.r0, cx16.r1, cx16.r2, P8ZP_SCRATCH_W1, P8ZP_SCRATCH_W2
+
+dividend_lo = cx16.r12       ; low word of dividend (also receives quotient bits)
+dividend_hi = cx16.r13       ; high word of dividend
+divisor_lo  = cx16.r14       ; low word of divisor (also output quotient)
+divisor_hi  = cx16.r15       ; high word of divisor
+saved_div_lo = cx16.r0       ; absolute divisor saved copy (low word)
+saved_div_hi = cx16.r1       ; absolute divisor saved copy (high word)
+remainder_lo = P8ZP_SCRATCH_W1     ; remainder low word (zeropage)
+remainder_hi = P8ZP_SCRATCH_W2     ; remainder high word (zeropage)
+sign        = P8ZP_SCRATCH_B1      ; result sign
+temp        = P8ZP_SCRATCH_REG     ; temporary byte storage
+
+            ; Check for division by zero
+            lda  divisor_lo
+            ora  divisor_lo+1
+            ora  divisor_hi
+            ora  divisor_hi+1
+            bne  _non_zero
+            lda  #0
+            sta  divisor_lo
+            sta  divisor_lo+1
+            sta  divisor_hi
+            sta  divisor_hi+1
+            rts
+
+_non_zero
+            ; Determine result sign: XOR MSBs of dividend and divisor
+            lda  dividend_hi+1
+            eor  divisor_hi+1
+            sta  sign
+
+            ; Take absolute value of dividend if negative
+            lda  dividend_hi+1
+            bpl  _abs_divisor
+            jsr  _neg_dividend
+
+_abs_divisor
+            ; Take absolute value of divisor if negative
+            lda  divisor_hi+1
+            bpl  _save_div
+            jsr  _neg_divisor
+
+_save_div
+            ; Save absolute divisor into saved_div
+            lda  divisor_lo
+            sta  saved_div_lo
+            lda  divisor_lo+1
+            sta  saved_div_lo+1
+            lda  divisor_hi
+            sta  saved_div_hi
+            lda  divisor_hi+1
+            sta  saved_div_hi+1
+
+            ; Clear remainder
+            lda  #0
+            sta  remainder_lo
+            sta  remainder_lo+1
+            sta  remainder_hi
+            sta  remainder_hi+1
+
+            ; 32-bit restoring division loop (32 iterations)
+            ldx  #32
+
+_loop
+            ; Shift (remainder : dividend) left 1 bit
+            asl  dividend_lo
+            rol  dividend_lo+1
+            rol  dividend_hi
+            rol  dividend_hi+1
+            rol  remainder_lo
+            rol  remainder_lo+1
+            rol  remainder_hi
+            rol  remainder_hi+1
+
+            ; Subtract saved_div from remainder, check for borrow
+            sec
+            lda  remainder_lo
+            sbc  saved_div_lo
+            sta  cx16.r2L           ; byte 0 result -> r2L (NOT tax! X is loop counter)
+
+            lda  remainder_lo+1
+            sbc  saved_div_lo+1
+            sta  cx16.r2H           ; byte 1 result -> r2H
+
+            lda  remainder_hi
+            sbc  saved_div_hi
+            sta  temp               ; byte 2 result -> temp
+
+            lda  remainder_hi+1
+            sbc  saved_div_hi+1
+            bcc  _next              ; borrow means divisor didn't fit
+
+            ; Divisor fits - store subtraction result as new remainder
+            sta  remainder_hi+1     ; byte 3 result from A
+            lda  temp
+            sta  remainder_hi       ; byte 2
+            lda  cx16.r2H
+            sta  remainder_lo+1     ; byte 1
+            lda  cx16.r2L
+            sta  remainder_lo       ; byte 0
+            inc  dividend_lo        ; set quotient bit
+
+_next
+            dex
+            bne  _loop
+
+            ; Copy quotient from dividend (r12/r13) to divisor (r14/r15)
+            lda  dividend_lo
+            sta  divisor_lo
+            lda  dividend_lo+1
+            sta  divisor_lo+1
+            lda  dividend_hi
+            sta  divisor_hi
+            lda  dividend_hi+1
+            sta  divisor_hi+1
+
+            ; Apply sign if needed
+            lda  sign
+            bpl  _done
+            jsr  _neg_result
+
+_done
+            rts
+
+            ; Helper: negate dividend (R12R13) in place
+_neg_dividend
+            sec
+            lda  #0
+            sbc  dividend_lo
+            sta  dividend_lo
+            lda  #0
+            sbc  dividend_lo+1
+            sta  dividend_lo+1
+            lda  #0
+            sbc  dividend_hi
+            sta  dividend_hi
+            lda  #0
+            sbc  dividend_hi+1
+            sta  dividend_hi+1
+            rts
+
+            ; Helper: negate divisor (R14R15) in place
+_neg_divisor
+            sec
+            lda  #0
+            sbc  divisor_lo
+            sta  divisor_lo
+            lda  #0
+            sbc  divisor_lo+1
+            sta  divisor_lo+1
+            lda  #0
+            sbc  divisor_hi
+            sta  divisor_hi
+            lda  #0
+            sbc  divisor_hi+1
+            sta  divisor_hi+1
+            rts
+
+            ; Helper: negate result (R14R15) — same as negating divisor
+_neg_result = _neg_divisor
+
+	.pend

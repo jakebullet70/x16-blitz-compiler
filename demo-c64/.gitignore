@@ -1,0 +1,4 @@
+# SnappyROM cart + docs are third-party (github.com/adrianglz64/snappyrom).
+# Not committed here -- fetch from its GitHub release (see run64.bat) instead.
+*.crt
+snappyrom-readme.txt
