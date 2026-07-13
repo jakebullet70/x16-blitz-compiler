@@ -8,6 +8,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [Build setup](blitz-x16-build-setup.md) — how to build it, and the 5 blockers that made a fresh clone unbuildable on any OS
 - [Emulator split](blitz-x16-emulator-split.md) — x16emu r49 runs the tests, Box16 is for debugging; why Box16 can't run the suites
 - [X16 BASIC conformance](blitz-x16-basic-conformance.md) — Blitz vs stock BASIC: 4 real defects (float literals, STEP 0, sci notation, reversed relops)
+- [R44+ keywords](blitz-x16-r44-plus-keywords.md) — 10 keywords added after R43 that Blitz doesn't know (SPRITE, MOVSPR, OVAL, RING, MOD…) + a LINPUT/LINPUT# token swap
 - [Blitz-X16 prior attempt](blitz-x16-prior-attempt.md) — the earlier Prog8 self-hosted compiler (now deleted from disk)
 
 ## X16 BASIC semantics (ROM-verified — apply to any compiler)
