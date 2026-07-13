@@ -400,68 +400,6 @@ FloatScalarTable:
 ; ************************************************************************************************
 ;
 ;		Name:		divide.asm
-;		Purpose:	Divide Stack[x] by Stack[x+1] floating point
-;		Created:	11th April 2023
-;		Reviewed: 	No
-;		Author : 	Paul Robson (paul@robsons.org.uk)
-;
-; ************************************************************************************************
-; ************************************************************************************************
-
-		.section 	code
-
-; ************************************************************************************************
-;
-;							Floating point division (CS if Div Zero)
-;
-; ************************************************************************************************
-
-FloatDivide:	
-		pha
-		jsr 	FloatNormalise		 		; normalise S[x+1] and error if zero.
-		dex
-		cmp 	#0
-		beq 	_FDZero 					
-
-		jsr 	FloatNormalise		 		; normalise S[X] and exit if zero
-		beq 	_FDExit 					; return zero if zero (e.g. zero/something)
-
-		jsr 	Int32ShiftDivide 			; do the shift division for dividing.
-		jsr 	NSMCopyPlusTwoToZero 		; copy the mantissa down
-		jsr		FloatNormalise 				; renormalise
-		jsr 	FloatCalculateSign 			; calculate result sign
-
-		lda 	NSExponent,x 				; calculate exponent
-		sec
-		sbc 	NSExponent+1,x
-		sec
-		sbc 	#30
-		sta 	NSExponent,x
-_FDExit:
-		pla
-		clc
-		rts
-_FDZero:
-		pla
-		sec
-		rts
-
-		.send 	code
-
-; ************************************************************************************************
-;
-;									Changes and Updates
-;
-; ************************************************************************************************
-;
-;		Date			Notes
-;		==== 			=====
-;
-; ************************************************************************************************
-; ************************************************************************************************
-; ************************************************************************************************
-;
-;		Name:		divide.asm
 ;		Purpose:	32x32 bit integer division (2 variants)
 ;		Created:	11th April 2023
 ;		Reviewed: 	No
@@ -581,6 +519,68 @@ FloatDivideCheck:
 		clc 								; and return False
 _DCSExit:
 		rts		
+
+		.send 	code
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;
+; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		Name:		divide.asm
+;		Purpose:	Divide Stack[x] by Stack[x+1] floating point
+;		Created:	11th April 2023
+;		Reviewed: 	No
+;		Author : 	Paul Robson (paul@robsons.org.uk)
+;
+; ************************************************************************************************
+; ************************************************************************************************
+
+		.section 	code
+
+; ************************************************************************************************
+;
+;							Floating point division (CS if Div Zero)
+;
+; ************************************************************************************************
+
+FloatDivide:	
+		pha
+		jsr 	FloatNormalise		 		; normalise S[x+1] and error if zero.
+		dex
+		cmp 	#0
+		beq 	_FDZero 					
+
+		jsr 	FloatNormalise		 		; normalise S[X] and exit if zero
+		beq 	_FDExit 					; return zero if zero (e.g. zero/something)
+
+		jsr 	Int32ShiftDivide 			; do the shift division for dividing.
+		jsr 	NSMCopyPlusTwoToZero 		; copy the mantissa down
+		jsr		FloatNormalise 				; renormalise
+		jsr 	FloatCalculateSign 			; calculate result sign
+
+		lda 	NSExponent,x 				; calculate exponent
+		sec
+		sbc 	NSExponent+1,x
+		sec
+		sbc 	#30
+		sta 	NSExponent,x
+_FDExit:
+		pla
+		clc
+		rts
+_FDZero:
+		pla
+		sec
+		rts
 
 		.send 	code
 
@@ -897,89 +897,6 @@ _FI8MNoAdd:
 ; ************************************************************************************************
 ;
 ;		Name:		multiply.asm
-;		Purpose:	Multiply Stack[x] by Stack[x+1] floating point
-;		Created:	11th April 2023
-;		Reviewed: 	No
-;		Author : 	Paul Robson (paul@robsons.org.uk)
-;
-; ************************************************************************************************
-; ************************************************************************************************
-
-		.section 	code
-
-; ************************************************************************************************
-;
-;									Floating point multiplication
-;
-; ************************************************************************************************
-
-FloatMultiply:	
-		dex
-		lda 	NSExponent,x 				; can use optimised ?
-		ora 	NSExponent+1,x
-		ora 	NSMantissa3,x
-		ora 	NSMantissa3+1,x		
-		bne 	_FMUseFloat
-
-		lda 	NSStatus,x 					; check if it is 8 bit unsigned
-		ora 	NSStatus+1,x		
-		and 	#$80
-		ora 	NSMantissa3,x
-		ora 	NSMantissa2,x
-		ora 	NSMantissa1,x
-		ora 	NSMantissa3+1,x
-		ora 	NSMantissa2+1,x
-		ora 	NSMantissa1+1,x
-		bne 	_FMInt32
-
-		jsr 	FloatInt8Multiply 			; use fast 8x8 multiply.
-		rts
-
-_FMInt32:
-		jsr 	FloatMultiplyShort			; use the int32 one.
-		clc 								; fix it up if gone out of range
-		adc 	NSExponent,x
-		sta 	NSExponent,x
-		rts
-
-_FMUseFloat:
-		jsr 	FloatNormalise		 		; normalise S[X] and exit if zero
-		beq 	_FDExit 					; return zero if zero (e.g. zero*something)
-		inx 
-		jsr 	FloatNormalise		 		; normalise S[x+1] and error if zero.
-		dex
-		cmp 	#0
-		beq 	_FDSetZero 					
-
-		jsr 	FloatMultiplyShort 			; calculate the result.		
-		adc 	NSExponent,x 				; calculate exponent including the shift.
-		clc
-		adc 	NSExponent+1,x
-		sta 	NSExponent,x
-		bra 	_FDExit
-
-_FDSetZero:
-		jsr 	FloatSetZero 				; return 0
-_FDExit:
-		jsr 	FloatNormalise 				; normalise the result
-		rts
-
-		.send 	code
-
-; ************************************************************************************************
-;
-;									Changes and Updates
-;
-; ************************************************************************************************
-;
-;		Date			Notes
-;		==== 			=====
-;
-; ************************************************************************************************
-; ************************************************************************************************
-; ************************************************************************************************
-;
-;		Name:		multiply.asm
 ;		Purpose:	32x32 bit integer multiplication, 32 bit result with rounding and shift
 ;		Created:	11th April 2023
 ;		Reviewed: 	No
@@ -1070,6 +987,89 @@ FloatCalculateSign:
 
 		.send 	code
 		
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;
+; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		Name:		multiply.asm
+;		Purpose:	Multiply Stack[x] by Stack[x+1] floating point
+;		Created:	11th April 2023
+;		Reviewed: 	No
+;		Author : 	Paul Robson (paul@robsons.org.uk)
+;
+; ************************************************************************************************
+; ************************************************************************************************
+
+		.section 	code
+
+; ************************************************************************************************
+;
+;									Floating point multiplication
+;
+; ************************************************************************************************
+
+FloatMultiply:	
+		dex
+		lda 	NSExponent,x 				; can use optimised ?
+		ora 	NSExponent+1,x
+		ora 	NSMantissa3,x
+		ora 	NSMantissa3+1,x		
+		bne 	_FMUseFloat
+
+		lda 	NSStatus,x 					; check if it is 8 bit unsigned
+		ora 	NSStatus+1,x		
+		and 	#$80
+		ora 	NSMantissa3,x
+		ora 	NSMantissa2,x
+		ora 	NSMantissa1,x
+		ora 	NSMantissa3+1,x
+		ora 	NSMantissa2+1,x
+		ora 	NSMantissa1+1,x
+		bne 	_FMInt32
+
+		jsr 	FloatInt8Multiply 			; use fast 8x8 multiply.
+		rts
+
+_FMInt32:
+		jsr 	FloatMultiplyShort			; use the int32 one.
+		clc 								; fix it up if gone out of range
+		adc 	NSExponent,x
+		sta 	NSExponent,x
+		rts
+
+_FMUseFloat:
+		jsr 	FloatNormalise		 		; normalise S[X] and exit if zero
+		beq 	_FDExit 					; return zero if zero (e.g. zero*something)
+		inx 
+		jsr 	FloatNormalise		 		; normalise S[x+1] and error if zero.
+		dex
+		cmp 	#0
+		beq 	_FDSetZero 					
+
+		jsr 	FloatMultiplyShort 			; calculate the result.		
+		adc 	NSExponent,x 				; calculate exponent including the shift.
+		clc
+		adc 	NSExponent+1,x
+		sta 	NSExponent,x
+		bra 	_FDExit
+
+_FDSetZero:
+		jsr 	FloatSetZero 				; return 0
+_FDExit:
+		jsr 	FloatNormalise 				; normalise the result
+		rts
+
+		.send 	code
+
 ; ************************************************************************************************
 ;
 ;									Changes and Updates
@@ -1534,6 +1534,100 @@ decimalCount:								; how many decimal places to date
 ;		==== 			=====
 ;
 ; ************************************************************************************************
+; ***************************************************************************************
+; ***************************************************************************************
+;
+;		Name : 		tostring.asm
+;		Author :	Paul Robson (paul@robsons.org.uk)
+;		Created : 	11th April 2023
+;		Reviewed :	No
+;		Purpose :	Convert Integer to String
+;
+; ***************************************************************************************
+; ***************************************************************************************
+
+		.section 	code
+
+; ***************************************************************************************
+;
+;							Convert XA to string return in XA
+;
+; ***************************************************************************************
+
+ConvertInt16:
+		sta 	NSMantissa0 				; set up as 32 bit conversion
+		stx 	NSMantissa1
+		stz 	NSMantissa2
+		stz 	NSMantissa3		
+		stz 	NSStatus 					; positive integer
+		ldx 	#0 							; stack level
+		lda 	#10 						; base 10 decimal.
+		bra 	ConvertInt32
+
+; ***************************************************************************************
+;
+;						Convert string at Level X Base A
+;
+; ***************************************************************************************
+
+ConvertInt32:
+		phy
+		ldy  	#0 							; index into buffer.
+		bit 	NSStatus 					; output a - if not negative.
+		bpl 	_CI32NotNeg
+		pha
+		lda 	#'-'
+		sta 	numberBuffer,y
+		iny
+		pla
+_CI32NotNeg:
+		jsr 	_CI32DivideConvert 			; recursive conversion
+		lda 	#0 							; make ASCIIZ
+		sta 	numberBuffer,y
+		ply
+		ldx 	#numberBuffer >> 8 			; return address in XA
+		lda 	#numberBuffer & $FF
+		rts
+
+_CI32DivideConvert:
+		inx 								; write to next slot up
+		jsr 	FloatSetByte 		 		; write the base out.
+		dex
+		jsr 	Int32Divide 				; divide
+		;
+		lda 	NSMantissa0,x 				; save remainder
+		pha 
+
+		jsr 	NSMCopyPlusTwoToZero 		; Copy the divide result into place.
+		;
+		jsr 	FloatIsZero 				; is it zero ?
+		beq 	_CI32NoRecurse 				; if so, don't recursively call.
+		;
+		lda 	NSMantissa0+1,x 			; this is the base which is not changed by divide
+		jsr 	_CI32DivideConvert 			; and recusrively call.
+_CI32NoRecurse:
+		pla 								; remainder
+		cmp 	#10 						; convert to ASCII, allowing for hexadecimal.
+		bcc 	_CI32NotHex
+		adc 	#6+32
+_CI32NotHex:
+		adc 	#48		
+		sta 	numberBuffer,y 				; write out and exit		
+		iny
+		rts
+
+		.send 	code
+		
+; ***************************************************************************************
+;
+;									Changes and Updates
+;
+; ***************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;
+; ***************************************************************************************
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;
@@ -1668,100 +1762,6 @@ decimalBuffer:
 ;		==== 			=====
 ;
 ; ************************************************************************************************
-; ***************************************************************************************
-; ***************************************************************************************
-;
-;		Name : 		tostring.asm
-;		Author :	Paul Robson (paul@robsons.org.uk)
-;		Created : 	11th April 2023
-;		Reviewed :	No
-;		Purpose :	Convert Integer to String
-;
-; ***************************************************************************************
-; ***************************************************************************************
-
-		.section 	code
-
-; ***************************************************************************************
-;
-;							Convert XA to string return in XA
-;
-; ***************************************************************************************
-
-ConvertInt16:
-		sta 	NSMantissa0 				; set up as 32 bit conversion
-		stx 	NSMantissa1
-		stz 	NSMantissa2
-		stz 	NSMantissa3		
-		stz 	NSStatus 					; positive integer
-		ldx 	#0 							; stack level
-		lda 	#10 						; base 10 decimal.
-		bra 	ConvertInt32
-
-; ***************************************************************************************
-;
-;						Convert string at Level X Base A
-;
-; ***************************************************************************************
-
-ConvertInt32:
-		phy
-		ldy  	#0 							; index into buffer.
-		bit 	NSStatus 					; output a - if not negative.
-		bpl 	_CI32NotNeg
-		pha
-		lda 	#'-'
-		sta 	numberBuffer,y
-		iny
-		pla
-_CI32NotNeg:
-		jsr 	_CI32DivideConvert 			; recursive conversion
-		lda 	#0 							; make ASCIIZ
-		sta 	numberBuffer,y
-		ply
-		ldx 	#numberBuffer >> 8 			; return address in XA
-		lda 	#numberBuffer & $FF
-		rts
-
-_CI32DivideConvert:
-		inx 								; write to next slot up
-		jsr 	FloatSetByte 		 		; write the base out.
-		dex
-		jsr 	Int32Divide 				; divide
-		;
-		lda 	NSMantissa0,x 				; save remainder
-		pha 
-
-		jsr 	NSMCopyPlusTwoToZero 		; Copy the divide result into place.
-		;
-		jsr 	FloatIsZero 				; is it zero ?
-		beq 	_CI32NoRecurse 				; if so, don't recursively call.
-		;
-		lda 	NSMantissa0+1,x 			; this is the base which is not changed by divide
-		jsr 	_CI32DivideConvert 			; and recusrively call.
-_CI32NoRecurse:
-		pla 								; remainder
-		cmp 	#10 						; convert to ASCII, allowing for hexadecimal.
-		bcc 	_CI32NotHex
-		adc 	#6+32
-_CI32NotHex:
-		adc 	#48		
-		sta 	numberBuffer,y 				; write out and exit		
-		iny
-		rts
-
-		.send 	code
-		
-; ***************************************************************************************
-;
-;									Changes and Updates
-;
-; ***************************************************************************************
-;
-;		Date			Notes
-;		==== 			=====
-;
-; ***************************************************************************************
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;

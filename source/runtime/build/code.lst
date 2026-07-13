@@ -1,7 +1,7 @@
 
-; 64tass Turbo Assembler Macro V1.59.3120 listing file
-; 64tass -q -c -Wall -o build/code.prg -L build/code.lst -l build/code.lbl testing/testing.asm /home/paulr/Projects/blitz-compiler/documents/../bin/runtime.library /home/paulr/Projects/blitz-compiler/documents/../bin/common.library /home/paulr/Projects/blitz-compiler/documents/../bin/ifloat32.library /home/paulr/Projects/blitz-compiler/documents/../bin/polynomials.library testing/testend.asm
-; Sun Oct 15 10:25:14 2023
+; 64tass Turbo Assembler Macro V1.60.3243 listing file
+; 64tass -q -c -Wall -o build/code.prg -L build/code.lst -l build/code.lbl testing/testing.asm C:/dev/CmdrX16/dos_tools/x16-blitz-compiler/documents/../bin/runtime.library C:/dev/CmdrX16/dos_tools/x16-blitz-compiler/documents/../bin/common.library C:/dev/CmdrX16/dos_tools/x16-blitz-compiler/documents/../bin/ifloat32.library C:/dev/CmdrX16/dos_tools/x16-blitz-compiler/documents/../bin/polynomials.library testing/testend.asm
+; Mon Jul 13 14:21:38 2026
 
 ;Offset	;Hex		;Monitor	;Source
 
@@ -16,7 +16,7 @@
 .080a	b0 fe		bcs $080a			bcs 	_WBStop
 .080c	4c ff ff	jmp $ffff			jmp 	$FFFF 						; then exit.
 
-;******  Processing input file: /home/paulr/Projects/blitz-compiler/documents/../bin/runtime.library
+;******  Processing input file: C:/dev/CmdrX16/dos_tools/x16-blitz-compiler/documents/../bin/runtime.library
 
 .0022					zsTemp:
 >0022							.fill 	2
@@ -1534,13 +1534,13 @@
 .10aa					LinkFloatMultiply:
 .10aa	fa		plx				plx
 .10ab	5a		phy			phy
-.10ac	20 51 23	jsr $2351		jsr	FloatMultiply
+.10ac	20 99 23	jsr $2399		jsr	FloatMultiply
 .10af	7a		ply			ply
 .10b0	4c 38 08	jmp $0838			jmp 	NextCommand
 .10b3					LinkFloatDivide:
 .10b3	fa		plx				plx
 .10b4	5a		phy			phy
-.10b5	20 da 21	jsr $21da		jsr	FloatDivide
+.10b5	20 47 22	jsr $2247		jsr	FloatDivide
 .10b8	b0 5c		bcs $1116		bcs	DivZeroError
 .10ba	7a		ply			ply
 .10bb	4c 38 08	jmp $0838			jmp 	NextCommand
@@ -1651,7 +1651,7 @@
 .115c					LinkDivideInt32:
 .115c	fa		plx				plx
 .115d	5a		phy			phy
-.115e	20 04 22	jsr $2204		jsr	DivideInt32
+.115e	20 da 21	jsr $21da		jsr	DivideInt32
 .1161	b0 b0		bcs $1113		bcs	MapRangeError
 .1163	7a		ply			ply
 .1164	4c 38 08	jmp $0838			jmp 	NextCommand
@@ -1992,7 +1992,7 @@
 .1394					PrintNumber:
 .1394	fa		plx				plx
 .1395	a9 07		lda #$07			lda 	#7
-.1397	20 79 25	jsr $2579			jsr 	FloatToString 				; to number in decimal buffer
+.1397	20 cc 25	jsr $25cc			jsr 	FloatToString 				; to number in decimal buffer
 .139a	ca		dex				dex 								; drop
 .139b	da		phx				phx
 .139c	a2 00		ldx #$00			ldx 	#0 							; print buffer.
@@ -2518,7 +2518,7 @@
 .16f6	fa		plx				plx
 .16f7	5a		phy				phy
 .16f8	a9 08		lda #$08			lda 	#8 							; maximum decimal places.
-.16fa	20 79 25	jsr $2579			jsr 	FloatToString 				; do the conversion.
+.16fa	20 cc 25	jsr $25cc			jsr 	FloatToString 				; do the conversion.
 .16fd	a9 21		lda #$21			lda		#33 						; create buffer
 .16ff	20 3b 17	jsr $173b			jsr 	StringAllocTemp 			; allocate memory
 .1702	a0 01		ldy #$01			ldy 	#1  						; copy the converted string into the buffer.
@@ -2791,10 +2791,10 @@
 .18b7	e8		inx				inx
 .18b8	20 93 26	jsr $2693			jsr 	FloatSetByte
 .18bb	ca		dex				dex
-.18bc	20 27 22	jsr $2227			jsr 	Int32Divide
+.18bc	20 fd 21	jsr $21fd			jsr 	Int32Divide
 .18bf	b5 3e		lda $3e,x			lda 	NSMantissa0,x 				; get modulus
 .18c1	48		pha				pha
-.18c2	20 16 22	jsr $2216			jsr 	NSMCopyPlusTwoToZero
+.18c2	20 ec 21	jsr $21ec			jsr 	NSMCopyPlusTwoToZero
 .18c5	68		pla				pla
 .18c6	60		rts				rts
 .18c7					_TSWriteDecimal:
@@ -2890,7 +2890,7 @@
 .1959	e8		inx				inx
 .195a	20 93 26	jsr $2693			jsr 	FloatSetByte
 .195d	ca		dex				dex
-.195e	20 9e 23	jsr $239e			jsr 	FloatMultiplyShort
+.195e	20 51 23	jsr $2351			jsr 	FloatMultiplyShort
 .1961	60		rts				rts
 .1962					CTIWError:
 .1962	4c 2c 1f	jmp $1f2c		jmp	ErrorV_value
@@ -3754,7 +3754,7 @@
 .1f0c	20 93 26	jsr $2693			jsr 	FloatSetByte 				; return as byte
 .1f0f	4c 38 08	jmp $0838			jmp 	NextCommand
 
-;******  Processing input file: /home/paulr/Projects/blitz-compiler/documents/../bin/common.library
+;******  Processing input file: C:/dev/CmdrX16/dos_tools/x16-blitz-compiler/documents/../bin/common.library
 
 =$80					C64_END                  = $80 ; $80 end
 =$81					C64_FOR                  = $81 ; $81 for
@@ -4198,7 +4198,7 @@
 >20ad	02					.byte	2         	; $d5 .varspace
 >20ae	02					.byte	2         	; $d6 .restore
 
-;******  Processing input file: /home/paulr/Projects/blitz-compiler/documents/../bin/ifloat32.library
+;******  Processing input file: C:/dev/CmdrX16/dos_tools/x16-blitz-compiler/documents/../bin/ifloat32.library
 
 =12					MathStackSize = 12
 =$40					NSSString = $40 							; string vs typemask
@@ -4392,102 +4392,102 @@
 >21d4	c0					.byte $c0
 >21d5	86 ff f5 57				.dword $57f5ff86 ; 1e-11
 >21d9	bd					.byte $bd
-.21da					FloatDivide:
-.21da	48		pha				pha
-.21db	20 e6 23	jsr $23e6			jsr 	FloatNormalise		 		; normalise S[x+1] and error if zero.
-.21de	ca		dex				dex
-.21df	c9 00		cmp #$00			cmp 	#0
-.21e1	f0 1e		beq $2201			beq 	_FDZero
-.21e3	20 e6 23	jsr $23e6			jsr 	FloatNormalise		 		; normalise S[X] and exit if zero
-.21e6	f0 16		beq $21fe			beq 	_FDExit 					; return zero if zero (e.g. zero/something)
-.21e8	20 49 22	jsr $2249			jsr 	Int32ShiftDivide 			; do the shift division for dividing.
-.21eb	20 16 22	jsr $2216			jsr 	NSMCopyPlusTwoToZero 		; copy the mantissa down
-.21ee	20 e6 23	jsr $23e6			jsr		FloatNormalise 				; renormalise
-.21f1	20 dc 23	jsr $23dc			jsr 	FloatCalculateSign 			; calculate result sign
-.21f4	b5 6e		lda $6e,x			lda 	NSExponent,x 				; calculate exponent
-.21f6	38		sec				sec
-.21f7	f5 6f		sbc $6f,x			sbc 	NSExponent+1,x
-.21f9	38		sec				sec
-.21fa	e9 1e		sbc #$1e			sbc 	#30
-.21fc	95 6e		sta $6e,x			sta 	NSExponent,x
-.21fe					_FDExit:
-.21fe	68		pla				pla
-.21ff	18		clc				clc
-.2200	60		rts				rts
-.2201					_FDZero:
-.2201	68		pla				pla
-.2202	38		sec				sec
-.2203	60		rts				rts
-.2204					DivideInt32:
-.2204	20 cc 22	jsr $22cc			jsr 	FloatIntegerPart 			; make both integers
-.2207	ca		dex				dex
-.2208	20 cc 22	jsr $22cc			jsr 	FloatIntegerPart
-.220b	20 27 22	jsr $2227			jsr 	Int32Divide 				; divide
-.220e	20 16 22	jsr $2216			jsr 	NSMCopyPlusTwoToZero 		; copy result
-.2211	20 dc 23	jsr $23dc			jsr 	FloatCalculateSign 			; calculate result sign
-.2214	18		clc				clc
-.2215	60		rts				rts
-.2216					NSMCopyPlusTwoToZero:
-.2216	b5 40		lda $40,x			lda 	NSMantissa0+2,x 			; copy result down from +2
-.2218	95 3e		sta $3e,x			sta 	NSMantissa0,x
-.221a	b5 4c		lda $4c,x			lda 	NSMantissa1+2,x
-.221c	95 4a		sta $4a,x			sta 	NSMantissa1,x
-.221e	b5 58		lda $58,x			lda 	NSMantissa2+2,x
-.2220	95 56		sta $56,x			sta 	NSMantissa2,x
-.2222	b5 64		lda $64,x			lda 	NSMantissa3+2,x
-.2224	95 62		sta $62,x			sta 	NSMantissa3,x
-.2226	60		rts				rts
-.2227					Int32Divide:
-.2227	48		pha				pha 								; save AXY
-.2228	5a		phy				phy
-.2229	20 74 26	jsr $2674			jsr 	FloatShiftUpTwo 			; copy S[X] to S[X+2]
-.222c	20 8d 26	jsr $268d			jsr 	FloatSetZeroMantissaOnly 	; set S[X] to zero
-.222f	a0 20		ldy #$20			ldy 	#32 						; loop 32 times
-.2231					_I32DivideLoop:
-.2231	e8		inx				inx
-.2232	e8		inx				inx
-.2233	20 a0 26	jsr $26a0			jsr 	FloatShiftLeft				; shift S[X+2] S[X] left as a 64 bit element
-.2236	ca		dex				dex
-.2237	ca		dex				dex
-.2238	20 a1 26	jsr $26a1			jsr 	FloatRotateLeft
-.223b	20 67 22	jsr $2267			jsr 	FloatDivideCheck 			; check if subtract possible
-.223e	90 02		bcc $2242			bcc 	_I32DivideNoCarryIn
-.2240	f6 40		inc $40,x			inc 	NSMantissa0+2,x 			; if possible, set Mantissa0[X+2].0
-.2242					_I32DivideNoCarryIn:
-.2242	88		dey				dey 								; loop round till division completed.
-.2243	d0 ec		bne $2231			bne 	_I32DivideLoop
-.2245	7a		ply				ply 								; restore AXY and exit
-.2246	68		pla				pla
-.2247	18		clc				clc
-.2248	60		rts				rts
-.2249					Int32ShiftDivide:
-.2249	48		pha				pha 								; save AY
-.224a	5a		phy				phy
-.224b	e8		inx				inx 								; clear S[X+2]
-.224c	e8		inx				inx
-.224d	20 91 26	jsr $2691			jsr 	FloatSetZero
-.2250	ca		dex				dex
-.2251	ca		dex				dex
-.2252	a0 1f		ldy #$1f			ldy 	#31 						; loop 31 times.
-.2254					_I32SDLoop:
-.2254	20 67 22	jsr $2267			jsr 	FloatDivideCheck 			; check if subtract possible
-.2257	e8		inx				inx
-.2258	e8		inx				inx
-.2259	20 a1 26	jsr $26a1			jsr 	FloatRotateLeft				; shift 64 bit FPA left, rotating carry in
-.225c	ca		dex				dex
-.225d	ca		dex				dex
-.225e	20 a1 26	jsr $26a1			jsr 	FloatRotateLeft
-.2261	88		dey				dey 	 							; do 31 times
-.2262	d0 f0		bne $2254			bne 	_I32SDLoop
-.2264	7a		ply				ply 								; restore AY and exit
-.2265	68		pla				pla
-.2266	60		rts				rts
-.2267					FloatDivideCheck:
-.2267	20 37 24	jsr $2437			jsr 	FloatSubTopTwoStack 		; subtract Stack[X+1] from Stack[X+0]
-.226a	b0 04		bcs $2270			bcs 	_DCSExit 					; if carry set, then could do, exit
-.226c	20 1d 24	jsr $241d			jsr 	FloatAddTopTwoStack 		; add it back in
-.226f	18		clc				clc 								; and return False
-.2270					_DCSExit:
+.21da					DivideInt32:
+.21da	20 cc 22	jsr $22cc			jsr 	FloatIntegerPart 			; make both integers
+.21dd	ca		dex				dex
+.21de	20 cc 22	jsr $22cc			jsr 	FloatIntegerPart
+.21e1	20 fd 21	jsr $21fd			jsr 	Int32Divide 				; divide
+.21e4	20 ec 21	jsr $21ec			jsr 	NSMCopyPlusTwoToZero 		; copy result
+.21e7	20 8f 23	jsr $238f			jsr 	FloatCalculateSign 			; calculate result sign
+.21ea	18		clc				clc
+.21eb	60		rts				rts
+.21ec					NSMCopyPlusTwoToZero:
+.21ec	b5 40		lda $40,x			lda 	NSMantissa0+2,x 			; copy result down from +2
+.21ee	95 3e		sta $3e,x			sta 	NSMantissa0,x
+.21f0	b5 4c		lda $4c,x			lda 	NSMantissa1+2,x
+.21f2	95 4a		sta $4a,x			sta 	NSMantissa1,x
+.21f4	b5 58		lda $58,x			lda 	NSMantissa2+2,x
+.21f6	95 56		sta $56,x			sta 	NSMantissa2,x
+.21f8	b5 64		lda $64,x			lda 	NSMantissa3+2,x
+.21fa	95 62		sta $62,x			sta 	NSMantissa3,x
+.21fc	60		rts				rts
+.21fd					Int32Divide:
+.21fd	48		pha				pha 								; save AXY
+.21fe	5a		phy				phy
+.21ff	20 74 26	jsr $2674			jsr 	FloatShiftUpTwo 			; copy S[X] to S[X+2]
+.2202	20 8d 26	jsr $268d			jsr 	FloatSetZeroMantissaOnly 	; set S[X] to zero
+.2205	a0 20		ldy #$20			ldy 	#32 						; loop 32 times
+.2207					_I32DivideLoop:
+.2207	e8		inx				inx
+.2208	e8		inx				inx
+.2209	20 a0 26	jsr $26a0			jsr 	FloatShiftLeft				; shift S[X+2] S[X] left as a 64 bit element
+.220c	ca		dex				dex
+.220d	ca		dex				dex
+.220e	20 a1 26	jsr $26a1			jsr 	FloatRotateLeft
+.2211	20 3d 22	jsr $223d			jsr 	FloatDivideCheck 			; check if subtract possible
+.2214	90 02		bcc $2218			bcc 	_I32DivideNoCarryIn
+.2216	f6 40		inc $40,x			inc 	NSMantissa0+2,x 			; if possible, set Mantissa0[X+2].0
+.2218					_I32DivideNoCarryIn:
+.2218	88		dey				dey 								; loop round till division completed.
+.2219	d0 ec		bne $2207			bne 	_I32DivideLoop
+.221b	7a		ply				ply 								; restore AXY and exit
+.221c	68		pla				pla
+.221d	18		clc				clc
+.221e	60		rts				rts
+.221f					Int32ShiftDivide:
+.221f	48		pha				pha 								; save AY
+.2220	5a		phy				phy
+.2221	e8		inx				inx 								; clear S[X+2]
+.2222	e8		inx				inx
+.2223	20 91 26	jsr $2691			jsr 	FloatSetZero
+.2226	ca		dex				dex
+.2227	ca		dex				dex
+.2228	a0 1f		ldy #$1f			ldy 	#31 						; loop 31 times.
+.222a					_I32SDLoop:
+.222a	20 3d 22	jsr $223d			jsr 	FloatDivideCheck 			; check if subtract possible
+.222d	e8		inx				inx
+.222e	e8		inx				inx
+.222f	20 a1 26	jsr $26a1			jsr 	FloatRotateLeft				; shift 64 bit FPA left, rotating carry in
+.2232	ca		dex				dex
+.2233	ca		dex				dex
+.2234	20 a1 26	jsr $26a1			jsr 	FloatRotateLeft
+.2237	88		dey				dey 	 							; do 31 times
+.2238	d0 f0		bne $222a			bne 	_I32SDLoop
+.223a	7a		ply				ply 								; restore AY and exit
+.223b	68		pla				pla
+.223c	60		rts				rts
+.223d					FloatDivideCheck:
+.223d	20 37 24	jsr $2437			jsr 	FloatSubTopTwoStack 		; subtract Stack[X+1] from Stack[X+0]
+.2240	b0 04		bcs $2246			bcs 	_DCSExit 					; if carry set, then could do, exit
+.2242	20 1d 24	jsr $241d			jsr 	FloatAddTopTwoStack 		; add it back in
+.2245	18		clc				clc 								; and return False
+.2246					_DCSExit:
+.2246	60		rts				rts
+.2247					FloatDivide:
+.2247	48		pha				pha
+.2248	20 e6 23	jsr $23e6			jsr 	FloatNormalise		 		; normalise S[x+1] and error if zero.
+.224b	ca		dex				dex
+.224c	c9 00		cmp #$00			cmp 	#0
+.224e	f0 1e		beq $226e			beq 	_FDZero
+.2250	20 e6 23	jsr $23e6			jsr 	FloatNormalise		 		; normalise S[X] and exit if zero
+.2253	f0 16		beq $226b			beq 	_FDExit 					; return zero if zero (e.g. zero/something)
+.2255	20 1f 22	jsr $221f			jsr 	Int32ShiftDivide 			; do the shift division for dividing.
+.2258	20 ec 21	jsr $21ec			jsr 	NSMCopyPlusTwoToZero 		; copy the mantissa down
+.225b	20 e6 23	jsr $23e6			jsr		FloatNormalise 				; renormalise
+.225e	20 8f 23	jsr $238f			jsr 	FloatCalculateSign 			; calculate result sign
+.2261	b5 6e		lda $6e,x			lda 	NSExponent,x 				; calculate exponent
+.2263	38		sec				sec
+.2264	f5 6f		sbc $6f,x			sbc 	NSExponent+1,x
+.2266	38		sec				sec
+.2267	e9 1e		sbc #$1e			sbc 	#30
+.2269	95 6e		sta $6e,x			sta 	NSExponent,x
+.226b					_FDExit:
+.226b	68		pla				pla
+.226c	18		clc				clc
+.226d	60		rts				rts
+.226e					_FDZero:
+.226e	68		pla				pla
+.226f	38		sec				sec
 .2270	60		rts				rts
 .2271					FloatFractionalPart:
 .2271	5a		phy				phy
@@ -4630,95 +4630,95 @@
 .234d	d0 e6		bne $2335			bne 	_FI8MLoop 					; until right shifter zero.
 .234f	7a		ply				ply
 .2350	60		rts				rts
-.2351					FloatMultiply:
-.2351	ca		dex				dex
-.2352	b5 6e		lda $6e,x			lda 	NSExponent,x 				; can use optimised ?
-.2354	15 6f		ora $6f,x			ora 	NSExponent+1,x
-.2356	15 62		ora $62,x			ora 	NSMantissa3,x
-.2358	15 63		ora $63,x			ora 	NSMantissa3+1,x
-.235a	d0 21		bne $237d			bne 	_FMUseFloat
-.235c	b5 32		lda $32,x			lda 	NSStatus,x 					; check if it is 8 bit unsigned
-.235e	15 33		ora $33,x			ora 	NSStatus+1,x
-.2360	29 80		and #$80			and 	#$80
-.2362	15 62		ora $62,x			ora 	NSMantissa3,x
-.2364	15 56		ora $56,x			ora 	NSMantissa2,x
-.2366	15 4a		ora $4a,x			ora 	NSMantissa1,x
-.2368	15 63		ora $63,x			ora 	NSMantissa3+1,x
-.236a	15 57		ora $57,x			ora 	NSMantissa2+1,x
-.236c	15 4b		ora $4b,x			ora 	NSMantissa1+1,x
-.236e	d0 04		bne $2374			bne 	_FMInt32
-.2370	20 2f 23	jsr $232f			jsr 	FloatInt8Multiply 			; use fast 8x8 multiply.
-.2373	60		rts				rts
-.2374					_FMInt32:
-.2374	20 9e 23	jsr $239e			jsr 	FloatMultiplyShort			; use the int32 one.
-.2377	18		clc				clc 								; fix it up if gone out of range
-.2378	75 6e		adc $6e,x			adc 	NSExponent,x
-.237a	95 6e		sta $6e,x			sta 	NSExponent,x
-.237c	60		rts				rts
-.237d					_FMUseFloat:
-.237d	20 e6 23	jsr $23e6			jsr 	FloatNormalise		 		; normalise S[X] and exit if zero
-.2380	f0 18		beq $239a			beq 	_FDExit 					; return zero if zero (e.g. zero*something)
-.2382	e8		inx				inx
-.2383	20 e6 23	jsr $23e6			jsr 	FloatNormalise		 		; normalise S[x+1] and error if zero.
+.2351					FloatMultiplyShort:
+.2351	5a		phy				phy 								; save Y
+.2352	20 74 26	jsr $2674			jsr 	FloatShiftUpTwo 			; copy S[X] to S[X+2]
+.2355	20 8d 26	jsr $268d			jsr 	FloatSetZeroMantissaOnly 	; set mantissa S[X] to zero
+.2358	a0 00		ldy #$00			ldy 	#0 							; Y is the shift count.
+.235a					_I32MLoop:
+.235a	b5 40		lda $40,x			lda 	NSMantissa0+2,x 			; check S[X+2] is zero
+.235c	15 4c		ora $4c,x			ora 	NSMantissa1+2,x
+.235e	15 58		ora $58,x			ora 	NSMantissa2+2,x
+.2360	15 64		ora $64,x			ora 	NSMantissa3+2,x
+.2362	f0 25		beq $2389			beq 	_I32MExit 					; exit if zero
+.2364	b5 40		lda $40,x			lda 	NSMantissa0+2,x 			; check LSB of n1
+.2366	29 01		and #$01			and 	#1
+.2368	f0 0d		beq $2377			beq 	_I32MNoAdd
+.236a	20 1d 24	jsr $241d			jsr 	FloatAddTopTwoStack 		; if so add S[X+1] to S[X+0]
+.236d	b5 62		lda $62,x			lda 	NSMantissa3,x 				; has MantissaA overflowed ?
+.236f	10 06		bpl $2377			bpl 	_I32MNoAdd
+.2371					_I32ShiftRight:
+.2371	20 aa 26	jsr $26aa			jsr 	FloatShiftRight 			; shift S[X] right
+.2374	c8		iny				iny 								; increment shift count
+.2375	80 09		bra $2380			bra 	_I32MShiftUpper 			; n2 is doubled by default.
+.2377					_I32MNoAdd:
+.2377	34 63		bit $63,x			bit 	NSMantissa3+1,x				; if we can't shift S[X+1] left, shift everything right
+.2379	70 f6		bvs $2371			bvs 	_I32ShiftRight 				; instead.
+.237b	e8		inx				inx
+.237c	20 a0 26	jsr $26a0			jsr 	FloatShiftLeft 				; shift additive S[X+1] left
+.237f	ca		dex				dex
+.2380					_I32MShiftUpper:
+.2380	e8		inx				inx 								; shift S[X+2] right
+.2381	e8		inx				inx
+.2382	20 aa 26	jsr $26aa			jsr 	FloatShiftRight
+.2385	ca		dex				dex
 .2386	ca		dex				dex
-.2387	c9 00		cmp #$00			cmp 	#0
-.2389	f0 0c		beq $2397			beq 	_FDSetZero
-.238b	20 9e 23	jsr $239e			jsr 	FloatMultiplyShort 			; calculate the result.
-.238e	75 6e		adc $6e,x			adc 	NSExponent,x 				; calculate exponent including the shift.
-.2390	18		clc				clc
-.2391	75 6f		adc $6f,x			adc 	NSExponent+1,x
-.2393	95 6e		sta $6e,x			sta 	NSExponent,x
-.2395	80 03		bra $239a			bra 	_FDExit
-.2397					_FDSetZero:
-.2397	20 91 26	jsr $2691			jsr 	FloatSetZero 				; return 0
-.239a					_FDExit:
-.239a	20 e6 23	jsr $23e6			jsr 	FloatNormalise 				; normalise the result
-.239d	60		rts				rts
-.239e					FloatMultiplyShort:
-.239e	5a		phy				phy 								; save Y
-.239f	20 74 26	jsr $2674			jsr 	FloatShiftUpTwo 			; copy S[X] to S[X+2]
-.23a2	20 8d 26	jsr $268d			jsr 	FloatSetZeroMantissaOnly 	; set mantissa S[X] to zero
-.23a5	a0 00		ldy #$00			ldy 	#0 							; Y is the shift count.
-.23a7					_I32MLoop:
-.23a7	b5 40		lda $40,x			lda 	NSMantissa0+2,x 			; check S[X+2] is zero
-.23a9	15 4c		ora $4c,x			ora 	NSMantissa1+2,x
-.23ab	15 58		ora $58,x			ora 	NSMantissa2+2,x
-.23ad	15 64		ora $64,x			ora 	NSMantissa3+2,x
-.23af	f0 25		beq $23d6			beq 	_I32MExit 					; exit if zero
-.23b1	b5 40		lda $40,x			lda 	NSMantissa0+2,x 			; check LSB of n1
-.23b3	29 01		and #$01			and 	#1
-.23b5	f0 0d		beq $23c4			beq 	_I32MNoAdd
-.23b7	20 1d 24	jsr $241d			jsr 	FloatAddTopTwoStack 		; if so add S[X+1] to S[X+0]
-.23ba	b5 62		lda $62,x			lda 	NSMantissa3,x 				; has MantissaA overflowed ?
-.23bc	10 06		bpl $23c4			bpl 	_I32MNoAdd
-.23be					_I32ShiftRight:
-.23be	20 aa 26	jsr $26aa			jsr 	FloatShiftRight 			; shift S[X] right
-.23c1	c8		iny				iny 								; increment shift count
-.23c2	80 09		bra $23cd			bra 	_I32MShiftUpper 			; n2 is doubled by default.
-.23c4					_I32MNoAdd:
-.23c4	34 63		bit $63,x			bit 	NSMantissa3+1,x				; if we can't shift S[X+1] left, shift everything right
-.23c6	70 f6		bvs $23be			bvs 	_I32ShiftRight 				; instead.
-.23c8	e8		inx				inx
-.23c9	20 a0 26	jsr $26a0			jsr 	FloatShiftLeft 				; shift additive S[X+1] left
-.23cc	ca		dex				dex
-.23cd					_I32MShiftUpper:
-.23cd	e8		inx				inx 								; shift S[X+2] right
-.23ce	e8		inx				inx
-.23cf	20 aa 26	jsr $26aa			jsr 	FloatShiftRight
-.23d2	ca		dex				dex
-.23d3	ca		dex				dex
-.23d4	80 d1		bra $23a7			bra 	_I32MLoop 					; try again.
-.23d6					_I32MExit:
-.23d6	20 dc 23	jsr $23dc			jsr 	FloatCalculateSign
-.23d9	98		tya				tya 								; shift in A
-.23da	7a		ply				ply 								; restore Y and exit
-.23db	60		rts				rts
-.23dc					FloatCalculateSign:
-.23dc	b5 32		lda $32,x			lda 	NSStatus,x 					; sign of result is 0 if same, 1 if different.
-.23de	16 32		asl $32,x			asl 	NSStatus,x 					; shift result left
-.23e0	55 33		eor $33,x			eor 	NSStatus+1,x
-.23e2	0a		asl a				asl 	a 							; shift bit 7 into carry
-.23e3	76 32		ror $32,x			ror 	NSStatus,x 					; shift right into status byte.
+.2387	80 d1		bra $235a			bra 	_I32MLoop 					; try again.
+.2389					_I32MExit:
+.2389	20 8f 23	jsr $238f			jsr 	FloatCalculateSign
+.238c	98		tya				tya 								; shift in A
+.238d	7a		ply				ply 								; restore Y and exit
+.238e	60		rts				rts
+.238f					FloatCalculateSign:
+.238f	b5 32		lda $32,x			lda 	NSStatus,x 					; sign of result is 0 if same, 1 if different.
+.2391	16 32		asl $32,x			asl 	NSStatus,x 					; shift result left
+.2393	55 33		eor $33,x			eor 	NSStatus+1,x
+.2395	0a		asl a				asl 	a 							; shift bit 7 into carry
+.2396	76 32		ror $32,x			ror 	NSStatus,x 					; shift right into status byte.
+.2398	60		rts				rts
+.2399					FloatMultiply:
+.2399	ca		dex				dex
+.239a	b5 6e		lda $6e,x			lda 	NSExponent,x 				; can use optimised ?
+.239c	15 6f		ora $6f,x			ora 	NSExponent+1,x
+.239e	15 62		ora $62,x			ora 	NSMantissa3,x
+.23a0	15 63		ora $63,x			ora 	NSMantissa3+1,x
+.23a2	d0 21		bne $23c5			bne 	_FMUseFloat
+.23a4	b5 32		lda $32,x			lda 	NSStatus,x 					; check if it is 8 bit unsigned
+.23a6	15 33		ora $33,x			ora 	NSStatus+1,x
+.23a8	29 80		and #$80			and 	#$80
+.23aa	15 62		ora $62,x			ora 	NSMantissa3,x
+.23ac	15 56		ora $56,x			ora 	NSMantissa2,x
+.23ae	15 4a		ora $4a,x			ora 	NSMantissa1,x
+.23b0	15 63		ora $63,x			ora 	NSMantissa3+1,x
+.23b2	15 57		ora $57,x			ora 	NSMantissa2+1,x
+.23b4	15 4b		ora $4b,x			ora 	NSMantissa1+1,x
+.23b6	d0 04		bne $23bc			bne 	_FMInt32
+.23b8	20 2f 23	jsr $232f			jsr 	FloatInt8Multiply 			; use fast 8x8 multiply.
+.23bb	60		rts				rts
+.23bc					_FMInt32:
+.23bc	20 51 23	jsr $2351			jsr 	FloatMultiplyShort			; use the int32 one.
+.23bf	18		clc				clc 								; fix it up if gone out of range
+.23c0	75 6e		adc $6e,x			adc 	NSExponent,x
+.23c2	95 6e		sta $6e,x			sta 	NSExponent,x
+.23c4	60		rts				rts
+.23c5					_FMUseFloat:
+.23c5	20 e6 23	jsr $23e6			jsr 	FloatNormalise		 		; normalise S[X] and exit if zero
+.23c8	f0 18		beq $23e2			beq 	_FDExit 					; return zero if zero (e.g. zero*something)
+.23ca	e8		inx				inx
+.23cb	20 e6 23	jsr $23e6			jsr 	FloatNormalise		 		; normalise S[x+1] and error if zero.
+.23ce	ca		dex				dex
+.23cf	c9 00		cmp #$00			cmp 	#0
+.23d1	f0 0c		beq $23df			beq 	_FDSetZero
+.23d3	20 51 23	jsr $2351			jsr 	FloatMultiplyShort 			; calculate the result.
+.23d6	75 6e		adc $6e,x			adc 	NSExponent,x 				; calculate exponent including the shift.
+.23d8	18		clc				clc
+.23d9	75 6f		adc $6f,x			adc 	NSExponent+1,x
+.23db	95 6e		sta $6e,x			sta 	NSExponent,x
+.23dd	80 03		bra $23e2			bra 	_FDExit
+.23df					_FDSetZero:
+.23df	20 91 26	jsr $2691			jsr 	FloatSetZero 				; return 0
+.23e2					_FDExit:
+.23e2	20 e6 23	jsr $23e6			jsr 	FloatNormalise 				; normalise the result
 .23e5	60		rts				rts
 .23e6					FloatNormalise:
 .23e6	20 b3 26	jsr $26b3			jsr 	FloatIsZero 				; if zero exit
@@ -4923,7 +4923,7 @@
 .252c	74 34		stz $34,x			stz 	NSStatus+2,x 				; make +ve
 .252e	e8		inx				inx 								; multiply decimal const by decimal scalar
 .252f	e8		inx				inx
-.2530	20 51 23	jsr $2351			jsr 	FloatMultiply
+.2530	20 99 23	jsr $2399			jsr 	FloatMultiply
 .2533	20 b5 20	jsr $20b5			jsr 	FloatAdd 					; add to integer part.
 .2536	7a		ply				ply
 .2537					_ENCFExit:
@@ -4974,133 +4974,133 @@
 >0594							.fill 	1
 .0595					decimalCount:
 >0595							.fill 	1
-.2579					FloatToString:
-.2579	da		phx				phx
-.257a	5a		phy				phy 								; save code position
-.257b	8d 96 05	sta $0596			sta 	decimalPlaces	 			; save number of DPs.
-.257e	9c 97 05	stz $0597			stz 	dbOffset 					; offset into decimal buffer = start.
-.2581	b5 32		lda $32,x			lda 	NSStatus,x  				; is it -ve.
-.2583	10 08		bpl $258d			bpl 	_CNTSNotNegative
-.2585	29 7f		and #$7f			and 	#$7F 						; make +ve
-.2587	95 32		sta $32,x			sta 	NSStatus,x
-.2589	a9 2d		lda #$2d			lda 	#"-"
-.258b	80 02		bra $258f			bra 	_CNTMain
-.258d					_CNTSNotNegative:
-.258d	a9 20		lda #$20			lda 	#" "
-.258f					_CNTMain:
-.258f	20 f1 25	jsr $25f1			jsr 	WriteDecimalBuffer
-.2592	b5 6e		lda $6e,x			lda 	NSExponent,x 				; check if decimal
-.2594	f0 0d		beq $25a3			beq 	_CNTSNotFloat
-.2596	e8		inx				inx 								; round up so we don't get too many 6.999999
-.2597	a9 01		lda #$01			lda 	#1
-.2599	20 93 26	jsr $2693			jsr 	FloatSetByte
-.259c	b5 6d		lda $6d,x			lda		NSExponent-1,x
-.259e	95 6e		sta $6e,x			sta 	NSExponent,x
-.25a0	20 b5 20	jsr $20b5			jsr 	FloatAdd
-.25a3					_CNTSNotFloat:
-.25a3	20 d3 25	jsr $25d3			jsr 	MakePlusTwoString 			; do the integer part.
-.25a6	20 71 22	jsr $2271			jsr 	FloatFractionalPart 		; get the fractional part
-.25a9	20 e6 23	jsr $23e6			jsr 	FloatNormalise					; normalise , exit if zero
-.25ac	f0 22		beq $25d0			beq 	_CNTSExit
-.25ae	a9 2e		lda #$2e			lda 	#"."
-.25b0	20 f1 25	jsr $25f1			jsr 	WriteDecimalBuffer 			; write decimal place
-.25b3					_CNTSDecimal:
-.25b3	ce 96 05	dec $0596			dec 	decimalPlaces 				; done all the decimals
-.25b6	30 18		bmi $25d0			bmi 	_CNTSExit
-.25b8	e8		inx				inx 								; x 10.0
-.25b9	a9 0a		lda #$0a			lda 	#10
-.25bb	20 93 26	jsr $2693			jsr 	FloatSetByte
-.25be	20 51 23	jsr $2351			jsr 	FloatMultiply
-.25c1	20 d3 25	jsr $25d3			jsr 	MakePlusTwoString 			; put the integer e.g. next digit out.
-.25c4	20 71 22	jsr $2271			jsr 	FloatFractionalPart 		; get the fractional part
-.25c7	20 e6 23	jsr $23e6			jsr 	FloatNormalise 				; normalise it.
-.25ca	b5 6e		lda $6e,x			lda 	NSExponent,x 				; gone to zero, exit.
-.25cc	c9 d0		cmp #$d0			cmp 	#$D0 						; very small remainder, so don't bother.
-.25ce	b0 e3		bcs $25b3			bcs 	_CNTSDecimal 				; keep going.
-.25d0					_CNTSExit:
-.25d0	7a		ply				ply
-.25d1	fa		plx				plx
-.25d2	60		rts				rts
-.25d3					MakePlusTwoString:
-.25d3	da		phx				phx
-.25d4	20 74 26	jsr $2674			jsr 	FloatShiftUpTwo 			; copy S[X] to S[X+2] - we will use S[X+2] for the intege part.
-.25d7	e8		inx				inx 								; access it
-.25d8	e8		inx				inx
-.25d9	20 cc 22	jsr $22cc			jsr 	FloatIntegerPart 			; make it an integer
-.25dc	a9 0a		lda #$0a			lda 	#10 						; convert it in base 10
-.25de	20 10 26	jsr $2610			jsr 	ConvertInt32
-.25e1	a2 00		ldx #$00			ldx	 	#0 							; write that to the decimal buffer.
-.25e3					_MPTSCopy:
-.25e3	bd 71 05	lda $0571,x			lda 	numberBuffer,x
-.25e6	20 f1 25	jsr $25f1			jsr 	WriteDecimalBuffer
-.25e9	e8		inx				inx
-.25ea	bd 71 05	lda $0571,x			lda 	numberBuffer,x
-.25ed	d0 f4		bne $25e3			bne 	_MPTSCopy
-.25ef	fa		plx				plx
-.25f0	60		rts				rts
-.25f1					WriteDecimalBuffer:
-.25f1	da		phx				phx
-.25f2	ae 97 05	ldx $0597			ldx 	dbOffset
-.25f5	9d 98 05	sta $0598,x			sta 	decimalBuffer,x
-.25f8	9e 99 05	stz $0599,x			stz 	decimalBuffer+1,x
-.25fb	ee 97 05	inc $0597			inc 	dbOffset
-.25fe	fa		plx				plx
-.25ff	60		rts				rts
+.2579					ConvertInt16:
+.2579	85 3e		sta $3e				sta 	NSMantissa0 				; set up as 32 bit conversion
+.257b	86 4a		stx $4a				stx 	NSMantissa1
+.257d	64 56		stz $56				stz 	NSMantissa2
+.257f	64 62		stz $62				stz 	NSMantissa3
+.2581	64 32		stz $32				stz 	NSStatus 					; positive integer
+.2583	a2 00		ldx #$00			ldx 	#0 							; stack level
+.2585	a9 0a		lda #$0a			lda 	#10 						; base 10 decimal.
+.2587	80 00		bra $2589			bra 	ConvertInt32
+.2589					ConvertInt32:
+.2589	5a		phy				phy
+.258a	a0 00		ldy #$00			ldy  	#0 							; index into buffer.
+.258c	24 32		bit $32				bit 	NSStatus 					; output a - if not negative.
+.258e	10 08		bpl $2598			bpl 	_CI32NotNeg
+.2590	48		pha				pha
+.2591	a9 2d		lda #$2d			lda 	#'-'
+.2593	99 71 05	sta $0571,y			sta 	numberBuffer,y
+.2596	c8		iny				iny
+.2597	68		pla				pla
+.2598					_CI32NotNeg:
+.2598	20 a6 25	jsr $25a6			jsr 	_CI32DivideConvert 			; recursive conversion
+.259b	a9 00		lda #$00			lda 	#0 							; make ASCIIZ
+.259d	99 71 05	sta $0571,y			sta 	numberBuffer,y
+.25a0	7a		ply				ply
+.25a1	a2 05		ldx #$05			ldx 	#numberBuffer >> 8 			; return address in XA
+.25a3	a9 71		lda #$71			lda 	#numberBuffer & $FF
+.25a5	60		rts				rts
+.25a6					_CI32DivideConvert:
+.25a6	e8		inx				inx 								; write to next slot up
+.25a7	20 93 26	jsr $2693			jsr 	FloatSetByte 		 		; write the base out.
+.25aa	ca		dex				dex
+.25ab	20 fd 21	jsr $21fd			jsr 	Int32Divide 				; divide
+.25ae	b5 3e		lda $3e,x			lda 	NSMantissa0,x 				; save remainder
+.25b0	48		pha				pha
+.25b1	20 ec 21	jsr $21ec			jsr 	NSMCopyPlusTwoToZero 		; Copy the divide result into place.
+.25b4	20 b3 26	jsr $26b3			jsr 	FloatIsZero 				; is it zero ?
+.25b7	f0 05		beq $25be			beq 	_CI32NoRecurse 				; if so, don't recursively call.
+.25b9	b5 3f		lda $3f,x			lda 	NSMantissa0+1,x 			; this is the base which is not changed by divide
+.25bb	20 a6 25	jsr $25a6			jsr 	_CI32DivideConvert 			; and recusrively call.
+.25be					_CI32NoRecurse:
+.25be	68		pla				pla 								; remainder
+.25bf	c9 0a		cmp #$0a			cmp 	#10 						; convert to ASCII, allowing for hexadecimal.
+.25c1	90 02		bcc $25c5			bcc 	_CI32NotHex
+.25c3	69 26		adc #$26			adc 	#6+32
+.25c5					_CI32NotHex:
+.25c5	69 30		adc #$30			adc 	#48
+.25c7	99 71 05	sta $0571,y			sta 	numberBuffer,y 				; write out and exit
+.25ca	c8		iny				iny
+.25cb	60		rts				rts
+.25cc					FloatToString:
+.25cc	da		phx				phx
+.25cd	5a		phy				phy 								; save code position
+.25ce	8d 96 05	sta $0596			sta 	decimalPlaces	 			; save number of DPs.
+.25d1	9c 97 05	stz $0597			stz 	dbOffset 					; offset into decimal buffer = start.
+.25d4	b5 32		lda $32,x			lda 	NSStatus,x  				; is it -ve.
+.25d6	10 08		bpl $25e0			bpl 	_CNTSNotNegative
+.25d8	29 7f		and #$7f			and 	#$7F 						; make +ve
+.25da	95 32		sta $32,x			sta 	NSStatus,x
+.25dc	a9 2d		lda #$2d			lda 	#"-"
+.25de	80 02		bra $25e2			bra 	_CNTMain
+.25e0					_CNTSNotNegative:
+.25e0	a9 20		lda #$20			lda 	#" "
+.25e2					_CNTMain:
+.25e2	20 44 26	jsr $2644			jsr 	WriteDecimalBuffer
+.25e5	b5 6e		lda $6e,x			lda 	NSExponent,x 				; check if decimal
+.25e7	f0 0d		beq $25f6			beq 	_CNTSNotFloat
+.25e9	e8		inx				inx 								; round up so we don't get too many 6.999999
+.25ea	a9 01		lda #$01			lda 	#1
+.25ec	20 93 26	jsr $2693			jsr 	FloatSetByte
+.25ef	b5 6d		lda $6d,x			lda		NSExponent-1,x
+.25f1	95 6e		sta $6e,x			sta 	NSExponent,x
+.25f3	20 b5 20	jsr $20b5			jsr 	FloatAdd
+.25f6					_CNTSNotFloat:
+.25f6	20 26 26	jsr $2626			jsr 	MakePlusTwoString 			; do the integer part.
+.25f9	20 71 22	jsr $2271			jsr 	FloatFractionalPart 		; get the fractional part
+.25fc	20 e6 23	jsr $23e6			jsr 	FloatNormalise					; normalise , exit if zero
+.25ff	f0 22		beq $2623			beq 	_CNTSExit
+.2601	a9 2e		lda #$2e			lda 	#"."
+.2603	20 44 26	jsr $2644			jsr 	WriteDecimalBuffer 			; write decimal place
+.2606					_CNTSDecimal:
+.2606	ce 96 05	dec $0596			dec 	decimalPlaces 				; done all the decimals
+.2609	30 18		bmi $2623			bmi 	_CNTSExit
+.260b	e8		inx				inx 								; x 10.0
+.260c	a9 0a		lda #$0a			lda 	#10
+.260e	20 93 26	jsr $2693			jsr 	FloatSetByte
+.2611	20 99 23	jsr $2399			jsr 	FloatMultiply
+.2614	20 26 26	jsr $2626			jsr 	MakePlusTwoString 			; put the integer e.g. next digit out.
+.2617	20 71 22	jsr $2271			jsr 	FloatFractionalPart 		; get the fractional part
+.261a	20 e6 23	jsr $23e6			jsr 	FloatNormalise 				; normalise it.
+.261d	b5 6e		lda $6e,x			lda 	NSExponent,x 				; gone to zero, exit.
+.261f	c9 d0		cmp #$d0			cmp 	#$D0 						; very small remainder, so don't bother.
+.2621	b0 e3		bcs $2606			bcs 	_CNTSDecimal 				; keep going.
+.2623					_CNTSExit:
+.2623	7a		ply				ply
+.2624	fa		plx				plx
+.2625	60		rts				rts
+.2626					MakePlusTwoString:
+.2626	da		phx				phx
+.2627	20 74 26	jsr $2674			jsr 	FloatShiftUpTwo 			; copy S[X] to S[X+2] - we will use S[X+2] for the intege part.
+.262a	e8		inx				inx 								; access it
+.262b	e8		inx				inx
+.262c	20 cc 22	jsr $22cc			jsr 	FloatIntegerPart 			; make it an integer
+.262f	a9 0a		lda #$0a			lda 	#10 						; convert it in base 10
+.2631	20 89 25	jsr $2589			jsr 	ConvertInt32
+.2634	a2 00		ldx #$00			ldx	 	#0 							; write that to the decimal buffer.
+.2636					_MPTSCopy:
+.2636	bd 71 05	lda $0571,x			lda 	numberBuffer,x
+.2639	20 44 26	jsr $2644			jsr 	WriteDecimalBuffer
+.263c	e8		inx				inx
+.263d	bd 71 05	lda $0571,x			lda 	numberBuffer,x
+.2640	d0 f4		bne $2636			bne 	_MPTSCopy
+.2642	fa		plx				plx
+.2643	60		rts				rts
+.2644					WriteDecimalBuffer:
+.2644	da		phx				phx
+.2645	ae 97 05	ldx $0597			ldx 	dbOffset
+.2648	9d 98 05	sta $0598,x			sta 	decimalBuffer,x
+.264b	9e 99 05	stz $0599,x			stz 	decimalBuffer+1,x
+.264e	ee 97 05	inc $0597			inc 	dbOffset
+.2651	fa		plx				plx
+.2652	60		rts				rts
 .0596					decimalPlaces:
 >0596							.fill 	1
 .0597					dbOffset:
 >0597							.fill 	1
 .0598					decimalBuffer:
 >0598							.fill 	32
-.2600					ConvertInt16:
-.2600	85 3e		sta $3e				sta 	NSMantissa0 				; set up as 32 bit conversion
-.2602	86 4a		stx $4a				stx 	NSMantissa1
-.2604	64 56		stz $56				stz 	NSMantissa2
-.2606	64 62		stz $62				stz 	NSMantissa3
-.2608	64 32		stz $32				stz 	NSStatus 					; positive integer
-.260a	a2 00		ldx #$00			ldx 	#0 							; stack level
-.260c	a9 0a		lda #$0a			lda 	#10 						; base 10 decimal.
-.260e	80 00		bra $2610			bra 	ConvertInt32
-.2610					ConvertInt32:
-.2610	5a		phy				phy
-.2611	a0 00		ldy #$00			ldy  	#0 							; index into buffer.
-.2613	24 32		bit $32				bit 	NSStatus 					; output a - if not negative.
-.2615	10 08		bpl $261f			bpl 	_CI32NotNeg
-.2617	48		pha				pha
-.2618	a9 2d		lda #$2d			lda 	#'-'
-.261a	99 71 05	sta $0571,y			sta 	numberBuffer,y
-.261d	c8		iny				iny
-.261e	68		pla				pla
-.261f					_CI32NotNeg:
-.261f	20 2d 26	jsr $262d			jsr 	_CI32DivideConvert 			; recursive conversion
-.2622	a9 00		lda #$00			lda 	#0 							; make ASCIIZ
-.2624	99 71 05	sta $0571,y			sta 	numberBuffer,y
-.2627	7a		ply				ply
-.2628	a2 05		ldx #$05			ldx 	#numberBuffer >> 8 			; return address in XA
-.262a	a9 71		lda #$71			lda 	#numberBuffer & $FF
-.262c	60		rts				rts
-.262d					_CI32DivideConvert:
-.262d	e8		inx				inx 								; write to next slot up
-.262e	20 93 26	jsr $2693			jsr 	FloatSetByte 		 		; write the base out.
-.2631	ca		dex				dex
-.2632	20 27 22	jsr $2227			jsr 	Int32Divide 				; divide
-.2635	b5 3e		lda $3e,x			lda 	NSMantissa0,x 				; save remainder
-.2637	48		pha				pha
-.2638	20 16 22	jsr $2216			jsr 	NSMCopyPlusTwoToZero 		; Copy the divide result into place.
-.263b	20 b3 26	jsr $26b3			jsr 	FloatIsZero 				; is it zero ?
-.263e	f0 05		beq $2645			beq 	_CI32NoRecurse 				; if so, don't recursively call.
-.2640	b5 3f		lda $3f,x			lda 	NSMantissa0+1,x 			; this is the base which is not changed by divide
-.2642	20 2d 26	jsr $262d			jsr 	_CI32DivideConvert 			; and recusrively call.
-.2645					_CI32NoRecurse:
-.2645	68		pla				pla 								; remainder
-.2646	c9 0a		cmp #$0a			cmp 	#10 						; convert to ASCII, allowing for hexadecimal.
-.2648	90 02		bcc $264c			bcc 	_CI32NotHex
-.264a	69 26		adc #$26			adc 	#6+32
-.264c					_CI32NotHex:
-.264c	69 30		adc #$30			adc 	#48
-.264e	99 71 05	sta $0571,y			sta 	numberBuffer,y 				; write out and exit
-.2651	c8		iny				iny
-.2652	60		rts				rts
 .2653					FloatNegate:
 .2653	b5 32		lda $32,x			lda 	NSStatus,x 					; everything is sign/magnitude usually so just
 .2655	49 80		eor #$80			eor 	#$80  						; toggle the negative flag
@@ -5171,7 +5171,7 @@
 .26b9	15 3e		ora $3e,x			ora		NSMantissa0,x
 .26bb	60		rts				rts
 
-;******  Processing input file: /home/paulr/Projects/blitz-compiler/documents/../bin/polynomials.library
+;******  Processing input file: C:/dev/CmdrX16/dos_tools/x16-blitz-compiler/documents/../bin/polynomials.library
 
 .26bc					FloatArcTan:
 .26bc	20 e6 23	jsr $23e6			jsr 	FloatNormalise 					; normalise x
@@ -5188,7 +5188,7 @@
 .26d0	a9 01		lda #$01			lda 	#1 								; 1.0 in +0
 .26d2	20 93 26	jsr $2693			jsr 	FloatSetByte
 .26d5	e8		inx				inx
-.26d6	20 da 21	jsr $21da			jsr 	FloatDivide
+.26d6	20 47 22	jsr $2247			jsr 	FloatDivide
 .26d9	b0 21		bcs $26fc			bcs 	_FATError
 .26db	20 ff 26	jsr $26ff			jsr 	CoreAtn 						; calculate the root
 .26de	20 6a 28	jsr $286a			jsr 	CompletePolynomial
@@ -5324,7 +5324,7 @@
 .27e3	a9 0a		lda #$0a			lda 	#Const_Log2_e-Const_Base
 .27e5	20 c1 28	jsr $28c1			jsr 	LoadConstant
 .27e8	e8		inx				inx
-.27e9	20 51 23	jsr $2351			jsr 	FloatMultiply
+.27e9	20 99 23	jsr $2399			jsr 	FloatMultiply
 .27ec	20 2e 28	jsr $282e			jsr 	_UECopy01 				; copy 0 to 1, get integer part to 1
 .27ef	e8		inx				inx
 .27f0	20 cc 22	jsr $22cc			jsr 	FloatIntegerPart
@@ -5391,7 +5391,7 @@
 .2850	20 75 28	jsr $2875			jsr 	CopyFloatXY 				; e.g. stack is <current> <x>
 .2853	e8		inx				inx
 .2854	e8		inx				inx
-.2855	20 51 23	jsr $2351			jsr 	FloatMultiply 				; times current by X
+.2855	20 99 23	jsr $2399			jsr 	FloatMultiply 				; times current by X
 .2858	e8		inx				inx
 .2859	20 94 28	jsr $2894			jsr 	GetCoefficient 				; coefficient into X+1
 .285c	20 b5 20	jsr $20b5			jsr 	FloatAdd 					; and add
@@ -5401,7 +5401,7 @@
 .2867	d0 e3		bne $284c			bne 	_CHPLoop
 .2869	60		rts				rts
 .286a					CompletePolynomial:
-.286a	20 51 23	jsr $2351			jsr 	FloatMultiply
+.286a	20 99 23	jsr $2399			jsr 	FloatMultiply
 .286d	e8		inx				inx 								; get the last value
 .286e	20 94 28	jsr $2894			jsr 	GetCoefficient
 .2871	20 b5 20	jsr $20b5			jsr 	FloatAdd 					; and add it
@@ -5496,7 +5496,7 @@
 .290b	20 c1 28	jsr $28c1			jsr 	LoadConstant
 .290e	e8		inx				inx
 .290f	e8		inx				inx
-.2910	20 da 21	jsr $21da			jsr 	FloatDivide 				; if zero, error.
+.2910	20 47 22	jsr $2247			jsr 	FloatDivide 				; if zero, error.
 .2913	b0 33		bcs $2948			bcs 	_ULRangePla
 .2915	20 53 26	jsr $2653			jsr 	FloatNegate 				; subtract from 1
 .2918	e8		inx				inx
@@ -5522,7 +5522,7 @@
 .293d	a9 23		lda #$23			lda 	#Const_ln_e-Const_Base
 .293f	20 c1 28	jsr $28c1			jsr 	LoadConstant
 .2942	e8		inx				inx
-.2943	20 51 23	jsr $2351			jsr 	FloatMultiply
+.2943	20 99 23	jsr $2399			jsr 	FloatMultiply
 .2946	18		clc				clc
 .2947	60		rts				rts
 .2948					_ULRangePla:
@@ -5551,7 +5551,7 @@
 .2963	e8		inx				inx
 .2964	20 e6 28	jsr $28e6			jsr 	FloatLogarithm
 .2967	b0 0d		bcs $2976			bcs 	_FPWExit
-.2969	20 51 23	jsr $2351			jsr 	FloatMultiply			; Multiply by original 1, into 1.
+.2969	20 99 23	jsr $2399			jsr 	FloatMultiply			; Multiply by original 1, into 1.
 .296c	8a		txa				txa 							; copy to slot 0
 .296d	a8		tay				tay
 .296e	88		dey				dey
@@ -5567,7 +5567,7 @@
 .297c	a9 00		lda #$00			lda 	#Const_1Div2Pi-Const_Base
 .297e	20 c1 28	jsr $28c1			jsr 	LoadConstant
 .2981	e8		inx				inx
-.2982	20 51 23	jsr $2351			jsr 	FloatMultiply
+.2982	20 99 23	jsr $2399			jsr 	FloatMultiply
 .2985	20 71 22	jsr $2271			jsr 	FloatFractionalPart 		; take the fractional part
 .2988	b5 6e		lda $6e,x			lda 	NSExponent,x 				; check exponent
 .298a	c9 e0		cmp #$e0			cmp 	#$E0 						; < $E0 exponent : 0-0.25
@@ -5610,7 +5610,7 @@
 .29c7	20 75 28	jsr $2875			jsr 	CopyFloatXY
 .29ca	e8		inx				inx 								; point to the pair and put x^2 on stack
 .29cb	e8		inx				inx
-.29cc	20 51 23	jsr $2351			jsr 	FloatMultiply
+.29cc	20 99 23	jsr $2399			jsr 	FloatMultiply
 .29cf	7a		ply				ply 								; coefficient table back.
 .29d0	68		pla				pla
 .29d1	20 3e 28	jsr $283e			jsr 	CalculateHornerPolynomial
@@ -5645,7 +5645,7 @@
 .29fb	e8		inx				inx
 .29fc	e8		inx				inx
 .29fd	20 d7 27	jsr $27d7			jsr 	FloatCosine
-.2a00	20 da 21	jsr $21da			jsr 	FloatDivide 				; calculate sin/cos
+.2a00	20 47 22	jsr $2247			jsr 	FloatDivide 				; calculate sin/cos
 .2a03	b0 07		bcs $2a0c			bcs 	_FTExit 					; divide by zero
 .2a05	8a		txa				txa 								; copy result down.
 .2a06	a8		tay				tay
@@ -5660,11 +5660,187 @@
 
 =$2b00							nextPage = (* + $FF) & $FF00 		; so I can include with that f*****g header.
 .2afe					ObjectCodePreHeader:
->2afe	00 a0 d5 00 00 a6 cc 80				.binary "code/code.bin"
->2b06	c8 a6 01 cd 0c fa 00 c9 a6 01 cd 0d fa 00 c9 a6
->2b16	00 00 cd 3f 01 cc ef 10 9b a6 01 cc ff cb af 04
->2b26	0d cb ae cf 09 5a 55 52 52 45 4e 54 3a 20 b2 a6
->2b36	cb 91 c5 ff
+>2afe	00 a0 d5 36 00 a6 a6 0c				.binary "code/code.bin"
+>2b06	01 00 cb 81 58 00 a6 02 01 20 cb 81 58 03 a6 0c
+>2b16	01 cc 40 cb 81 58 06 a6 0a 01 00 cb 81 58 09 a6
+>2b26	04 04 02 20 cb 81 58 0c a6 03 02 02 cc 40 cb 81
+>2b36	58 0f a6 02 03 02 00 cb 81 58 12 a6 09 01 20 cb
+>2b46	81 58 15 a6 0c 01 cc 40 cb 81 58 18 a6 04 01 50
+>2b56	00 8e ce f0 99 59 8b 66 a5 7c a6 02 01 50 03 8e
+>2b66	cd 08 6a a5 7d a6 01 01 50 06 8e cf 08 4c 57 4a
+>2b76	49 4e 4d 4b 54 7e a6 01 01 50 09 8e ce f0 cc 8c
+>2b86	94 67 7c a6 03 02 02 50 0c 8e cd 96 48 7d a6 02
+>2b96	02 02 50 0f 8e cf 01 52 7e a6 02 00 02 50 12 8e
+>2ba6	ce ed b8 1e 95 50 7c a6 05 01 50 15 8e cd 81 48
+>2bb6	a5 7d a6 04 01 50 18 8e cf 01 4f 7e a6 09 01 50
+>2bc6	00 8e ce f0 cc 4c f4 5e 7c a6 00 01 50 03 8e cd
+>2bd6	13 43 7d a6 01 01 50 06 8e cf 08 52 50 4b 55 4b
+>2be6	57 53 4c 7e a6 03 01 50 09 8e ce ef 47 61 42 7e
+>2bf6	7c a6 02 04 02 50 0c 8e cd 92 64 a5 7d a6 02 02
+>2c06	02 50 0f 8e cf 00 7e a6 01 02 02 50 12 8e ce ef
+>2c16	a3 70 5f 69 7c a6 04 01 50 15 8e cd 2b 1f a5 7d
+>2c26	a6 0a 01 50 18 8e cf 01 4e 7e a6 08 01 50 00 8e
+>2c36	ce f0 3d 8a d0 58 7c a6 02 01 50 03 8e cd b5 6b
+>2c46	7d a6 0a 01 50 06 8e cf 08 41 4a 52 4d 57 45 49
+>2c56	53 7e a6 06 01 50 09 8e ce ef 33 b3 35 70 a5 7c
+>2c66	a6 01 01 02 50 0c 8e cd f3 50 a5 7d a6 01 01 02
+>2c76	50 0f 8e cf 04 49 48 55 55 7e a6 02 02 02 50 12
+>2c86	8e ce ef 33 b3 d4 7a 7c a6 04 01 50 15 8e cd 30
+>2c96	5c 7d a6 0b 01 50 18 8e cf 00 7e a6 08 01 50 00
+>2ca6	8e ce f0 c2 35 65 41 a5 7c a6 01 01 50 03 8e cd
+>2cb6	7f 2d 7d a6 0a 01 50 06 8e cf 00 7e a6 08 01 50
+>2cc6	09 8e ce f0 47 a1 bf 4d 7c a6 04 04 02 50 0c 8e
+>2cd6	cd 97 1a 7d a6 00 02 02 50 0f 8e cf 06 54 59 46
+>2ce6	50 48 5a 7e a6 01 03 02 50 12 8e ce ef 3d 8a 77
+>2cf6	4e 7c a6 09 01 50 15 8e cd 70 13 a5 7d a6 07 01
+>2d06	50 18 8e cf 08 53 49 4f 48 58 57 43 42 7e a6 08
+>2d16	01 50 00 8e ce ef ae 47 28 6e 7c a6 01 01 50 03
+>2d26	8e cd 22 3e a5 7d a6 05 01 50 06 8e cf 03 42 4e
+>2d36	5a 7e a6 07 01 50 09 8e ce ef cc cc 4e 53 7c a6
+>2d46	00 00 02 50 0c 8e cd 94 2d 7d a6 02 01 02 50 0f
+>2d56	8e cf 00 7e a6 00 01 02 50 12 8e cd 63 0c 7c a6
+>2d66	04 01 50 15 8e cd 0e 78 a5 7d a6 02 01 50 18 8e
+>2d76	cf 04 5a 58 4f 47 7e a6 00 01 50 00 8e ce f0 d7
+>2d86	63 c8 75 7c a6 00 01 50 03 8e cd b9 6a a5 7d a6
+>2d96	04 01 50 06 8e cf 04 55 4b 49 50 7e a6 0a 01 50
+>2da6	09 8e ce f0 66 66 d0 7c 7c a6 03 02 02 50 0c 8e
+>2db6	cd 9e 29 a5 7d a6 00 00 02 50 0f 8e cf 05 4c 50
+>2dc6	5a 57 4f 7e a6 00 02 02 50 12 8e ce ee 3d 0a 72
+>2dd6	59 7c a6 06 01 50 15 8e cd 72 06 a5 7d a6 06 01
+>2de6	50 18 8e cf 08 58 55 56 45 50 56 50 44 7e a6 02
+>2df6	01 50 00 8e ce f0 66 e6 d9 5f a5 7c a6 00 01 50
+>2e06	03 8e cd 19 5a 7d a6 04 01 50 06 8e cf 02 52 55
+>2e16	7e a6 03 01 50 09 8e ce f0 d7 e3 f8 4c a5 7c a6
+>2e26	01 03 02 50 0c 8e cd a2 3e a5 7d a6 00 00 02 50
+>2e36	0f 8e cf 01 56 7e a6 01 01 02 50 12 8e ce f0 e1
+>2e46	3a 64 5f a5 7c a6 06 01 50 15 8e cd fd 43 7d a6
+>2e56	05 01 50 18 8e cf 08 42 53 44 48 4e 4c 59 49 7e
+>2e66	a6 0a 01 50 00 8e ce ed eb 51 20 70 7c a6 00 01
+>2e76	50 03 8e cd 7a 17 a5 7d a6 09 01 50 06 8e cf 06
+>2e86	46 45 52 4f 42 59 7e a6 02 01 50 09 8e ce f0 eb
+>2e96	11 28 7a a5 7c a6 02 00 02 50 0c 8e cd b8 04 a5
+>2ea6	7d a6 02 02 02 50 0f 8e cf 04 59 44 45 50 7e a6
+>2eb6	02 03 02 50 12 8e ce f0 ae c7 3c 76 7c a6 01 01
+>2ec6	50 15 8e cd de 14 7d a6 01 01 50 18 8e cf 05 59
+>2ed6	49 49 49 46 7e a6 07 01 50 00 8e ce f0 e1 3a 0c
+>2ee6	6a a5 7c a6 00 01 50 03 8e cd 90 03 7d a6 07 01
+>2ef6	50 06 8e cf 08 41 53 4e 4d 4b 4b 42 43 7e a6 04
+>2f06	01 50 09 8e ce ec 47 e1 ea 4f 7c a6 02 00 02 50
+>2f16	0c 8e cd 3d 5b a5 7d a6 00 00 02 50 0f 8e cf 01
+>2f26	4a 7e a6 01 01 02 50 12 8e ce ef eb 51 83 5c 7c
+>2f36	a6 05 01 50 15 8e cd f5 56 7d a6 0c 01 50 18 8e
+>2f46	cf 06 52 52 45 5a 58 44 7e a6 0c 01 50 00 8e ce
+>2f56	f0 66 e6 bd 73 7c a6 02 01 50 03 8e cd 96 3b a5
+>2f66	7d a6 0a 01 50 06 8e cf 01 51 7e a6 09 01 50 09
+>2f76	8e ce ee 99 99 9c 5c a5 7c a6 02 02 02 50 0c 8e
+>2f86	cd 73 33 a5 7d a6 03 01 02 50 0f 8e cf 07 47 47
+>2f96	49 4f 4a 56 4f 7e a6 00 03 02 50 12 8e ce f0 8f
+>2fa6	02 1d 52 a5 7c a6 07 01 50 15 8e cd 23 42 a5 7d
+>2fb6	a6 06 01 50 18 8e cf 07 48 4c 54 57 58 4b 41 7e
+>2fc6	a6 00 01 50 00 8e 78 ce f0 d7 63 c8 75 a3 8b d3
+>2fd6	0a 00 cd 4c 04 b1 0d 92 cb 91 a6 0a 01 50 00 8e
+>2fe6	78 ce ed eb 51 20 70 a3 8b d3 0a 00 cd 56 04 b1
+>2ff6	0d 92 cb 91 a6 0c 01 50 00 8e 78 ce f0 66 e6 bd
+>3006	73 a3 8b d3 0a 00 cd 60 04 b1 0d 92 cb 91 a6 02
+>3016	01 50 00 8e 78 ce f0 66 e6 d9 5f a5 a3 8b d3 0a
+>3026	00 cd 6a 04 b1 0d 92 cb 91 a6 04 01 50 00 8e 78
+>3036	ce f0 99 59 8b 66 a5 a3 8b d3 0a 00 cd 74 04 b1
+>3046	0d 92 cb 91 a6 07 01 50 00 8e 78 ce f0 e1 3a 0c
+>3056	6a a5 a3 8b d3 0a 00 cd 7e 04 b1 0d 92 cb 91 a6
+>3066	08 01 50 00 8e 78 ce ef ae 47 28 6e a3 8b d3 0a
+>3076	00 cd 88 04 b1 0d 92 cb 91 a6 09 01 50 00 8e 78
+>3086	ce f0 cc 4c f4 5e a3 8b d3 0a 00 cd 92 04 b1 0d
+>3096	92 cb 91 a6 00 01 50 03 8e 79 cd 90 03 a3 8b d3
+>30a6	0a 00 cd 9c 04 b1 0d 92 cb 91 a6 01 01 50 03 8e
+>30b6	79 cd 22 3e a5 a3 8b d3 0a 00 cd a6 04 b1 0d 92
+>30c6	cb 91 a6 02 01 50 03 8e 79 cd 96 3b a5 a3 8b d3
+>30d6	0a 00 cd b0 04 b1 0d 92 cb 91 a6 01 01 50 06 8e
+>30e6	7a cf 08 52 50 4b 55 4b 57 53 4c 94 8b d3 0a 00
+>30f6	cd ba 04 b1 0d 92 cb 91 a6 0a 01 50 06 8e 7a cf
+>3106	01 51 94 8b d3 0a 00 cd c4 04 b1 0d 92 cb 91 a6
+>3116	04 01 50 06 8e 7a cf 02 52 55 94 8b d3 0a 00 cd
+>3126	ce 04 b1 0d 92 cb 91 a6 05 01 50 06 8e 7a cf 03
+>3136	42 4e 5a 94 8b d3 0a 00 cd d8 04 b1 0d 92 cb 91
+>3146	a6 07 01 50 06 8e 7a cf 08 41 53 4e 4d 4b 4b 42
+>3156	43 94 8b d3 0a 00 cd e2 04 b1 0d 92 cb 91 a6 09
+>3166	01 50 06 8e 7a cf 06 46 45 52 4f 42 59 94 8b d3
+>3176	0a 00 cd ec 04 b1 0d 92 cb 91 a6 01 01 50 09 8e
+>3186	78 ce f0 cc 8c 94 67 a3 8b d3 0a 00 cd f6 04 b1
+>3196	0d 92 cb 91 a6 0a 01 50 09 8e 78 ce f0 66 66 d0
+>31a6	7c a3 8b d3 0a 00 cd 00 05 b1 0d 92 cb 91 a6 02
+>31b6	01 50 09 8e 78 ce f0 eb 11 28 7a a5 a3 8b d3 0a
+>31c6	00 cd 0a 05 b1 0d 92 cb 91 a6 03 01 50 09 8e 78
+>31d6	ce f0 d7 e3 f8 4c a5 a3 8b d3 0a 00 cd 14 05 b1
+>31e6	0d 92 cb 91 a6 04 01 50 09 8e 78 ce ec 47 e1 ea
+>31f6	4f a3 8b d3 0a 00 cd 1e 05 b1 0d 92 cb 91 a6 06
+>3206	01 50 09 8e 78 ce ef 33 b3 35 70 a5 a3 8b d3 0a
+>3216	00 cd 28 05 b1 0d 92 cb 91 a6 07 01 50 09 8e 78
+>3226	ce ef cc cc 4e 53 a3 8b d3 0a 00 cd 32 05 b1 0d
+>3236	92 cb 91 a6 08 01 50 09 8e 78 ce f0 47 a1 bf 4d
+>3246	a3 8b d3 0a 00 cd 3c 05 b1 0d 92 cb 91 a6 09 01
+>3256	50 09 8e 78 ce ee 99 99 9c 5c a5 a3 8b d3 0a 00
+>3266	cd 46 05 b1 0d 92 cb 91 a6 00 00 02 50 0c 8e 79
+>3276	cd 94 2d a3 8b d3 0a 00 cd 50 05 b1 0d 92 cb 91
+>3286	a6 01 01 02 50 0c 8e 79 cd f3 50 a5 a3 8b d3 0a
+>3296	00 cd 5a 05 b1 0d 92 cb 91 a6 01 03 02 50 0c 8e
+>32a6	79 cd a2 3e a5 a3 8b d3 0a 00 cd 64 05 b1 0d 92
+>32b6	cb 91 a6 02 00 02 50 0c 8e 79 cd 3d 5b a5 a3 8b
+>32c6	d3 0a 00 cd 6e 05 b1 0d 92 cb 91 a6 02 02 02 50
+>32d6	0c 8e 79 cd 73 33 a5 a3 8b d3 0a 00 cd 78 05 b1
+>32e6	0d 92 cb 91 a6 02 04 02 50 0c 8e 79 cd 92 64 a5
+>32f6	a3 8b d3 0a 00 cd 82 05 b1 0d 92 cb 91 a6 03 02
+>3306	02 50 0c 8e 79 cd 9e 29 a5 a3 8b d3 0a 00 cd 8c
+>3316	05 b1 0d 92 cb 91 a6 04 04 02 50 0c 8e 79 cd 97
+>3326	1a a3 8b d3 0a 00 cd 96 05 b1 0d 92 cb 91 a6 00
+>3336	00 02 50 0f 8e 7a cf 01 4a 94 8b d3 0a 00 cd a0
+>3346	05 b1 0d 92 cb 91 a6 00 02 02 50 0f 8e 7a cf 06
+>3356	54 59 46 50 48 5a 94 8b d3 0a 00 cd aa 05 b1 0d
+>3366	92 cb 91 a6 01 01 02 50 0f 8e 7a cf 04 49 48 55
+>3376	55 94 8b d3 0a 00 cd b4 05 b1 0d 92 cb 91 a6 02
+>3386	01 02 50 0f 8e 7a cf 00 94 8b d3 0a 00 cd be 05
+>3396	b1 0d 92 cb 91 a6 02 02 02 50 0f 8e 7a cf 04 59
+>33a6	44 45 50 94 8b d3 0a 00 cd c8 05 b1 0d 92 cb 91
+>33b6	a6 03 01 02 50 0f 8e 7a cf 07 47 47 49 4f 4a 56
+>33c6	4f 94 8b d3 0a 00 cd d2 05 b1 0d 92 cb 91 a6 00
+>33d6	01 02 50 12 8e 78 cd 63 0c a3 8b d3 0a 00 cd dc
+>33e6	05 b1 0d 92 cb 91 a6 00 02 02 50 12 8e 78 ce ee
+>33f6	3d 0a 72 59 a3 8b d3 0a 00 cd e6 05 b1 0d 92 cb
+>3406	91 a6 00 03 02 50 12 8e 78 ce f0 8f 02 1d 52 a5
+>3416	a3 8b d3 0a 00 cd f0 05 b1 0d 92 cb 91 a6 01 01
+>3426	02 50 12 8e 78 ce ef eb 51 83 5c a3 8b d3 0a 00
+>3436	cd fa 05 b1 0d 92 cb 91 a6 01 02 02 50 12 8e 78
+>3446	ce ef a3 70 5f 69 a3 8b d3 0a 00 cd 04 06 b1 0d
+>3456	92 cb 91 a6 01 03 02 50 12 8e 78 ce ef 3d 8a 77
+>3466	4e a3 8b d3 0a 00 cd 0e 06 b1 0d 92 cb 91 a6 02
+>3476	00 02 50 12 8e 78 ce ed b8 1e 95 50 a3 8b d3 0a
+>3486	00 cd 18 06 b1 0d 92 cb 91 a6 02 02 02 50 12 8e
+>3496	78 ce ef 33 b3 d4 7a a3 8b d3 0a 00 cd 22 06 b1
+>34a6	0d 92 cb 91 a6 02 03 02 50 12 8e 78 ce f0 ae c7
+>34b6	3c 76 a3 8b d3 0a 00 cd 2c 06 b1 0d 92 cb 91 a6
+>34c6	01 01 50 15 8e 79 cd de 14 a3 8b d3 0a 00 cd 36
+>34d6	06 b1 0d 92 cb 91 a6 04 01 50 15 8e 79 cd 0e 78
+>34e6	a5 a3 8b d3 0a 00 cd 40 06 b1 0d 92 cb 91 a6 05
+>34f6	01 50 15 8e 79 cd f5 56 a3 8b d3 0a 00 cd 4a 06
+>3506	b1 0d 92 cb 91 a6 06 01 50 15 8e 79 cd fd 43 a3
+>3516	8b d3 0a 00 cd 54 06 b1 0d 92 cb 91 a6 07 01 50
+>3526	15 8e 79 cd 23 42 a5 a3 8b d3 0a 00 cd 5e 06 b1
+>3536	0d 92 cb 91 a6 09 01 50 15 8e 79 cd 70 13 a5 a3
+>3546	8b d3 0a 00 cd 68 06 b1 0d 92 cb 91 a6 01 01 50
+>3556	18 8e 7a cf 05 59 49 49 49 46 94 8b d3 0a 00 cd
+>3566	72 06 b1 0d 92 cb 91 a6 0a 01 50 18 8e 7a cf 01
+>3576	4e 94 8b d3 0a 00 cd 7c 06 b1 0d 92 cb 91 a6 0b
+>3586	01 50 18 8e 7a cf 00 94 8b d3 0a 00 cd 86 06 b1
+>3596	0d 92 cb 91 a6 0c 01 50 18 8e 7a cf 06 52 52 45
+>35a6	5a 58 44 94 8b d3 0a 00 cd 90 06 b1 0d 92 cb 91
+>35b6	a6 02 01 50 18 8e 7a cf 04 5a 58 4f 47 94 8b d3
+>35c6	0a 00 cd 9a 06 b1 0d 92 cb 91 a6 04 01 50 18 8e
+>35d6	7a cf 01 4f 94 8b d3 0a 00 cd a4 06 b1 0d 92 cb
+>35e6	91 a6 05 01 50 18 8e 7a cf 08 42 53 44 48 4e 4c
+>35f6	59 49 94 8b d3 0a 00 cd ae 06 b1 0d 92 cb 91 a6
+>3606	06 01 50 18 8e 7a cf 07 48 4c 54 57 58 4b 41 94
+>3616	8b d3 0a 00 cd b8 06 b1 0d 92 cb 91 a6 07 01 50
+>3626	18 8e 7a cf 08 53 49 4f 48 58 57 43 42 94 8b d3
+>3636	0a 00 cd c2 06 b1 0d 92 cb 91 a6 cb 82 c5 ff
 =11008					ObjectCode = ObjectCodePreHeader+2 			; so the code is at XX00
 
 ;******  End of listing
