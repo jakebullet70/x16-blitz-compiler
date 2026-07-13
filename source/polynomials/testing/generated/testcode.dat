@@ -1,44 +1,29 @@
-	jsr	FPPushConstant	; 71.93658379
-	.dword	$47efc3f5
-	.byte	$e8,$00
+	jsr	FPPushConstant	; 17.89641208
+	.dword	$4795ed0c
+	.byte	$e6,$00
 	jsr	FloatNegate
-	jsr	FPPushConstant	; -71.93658379
-	.dword	$47efc3f5
-	.byte	$e8,$80
+	jsr	FPPushConstant	; -17.89641208
+	.dword	$4795ed0c
+	.byte	$e6,$80
 	jsr	FloatCompare
 	jsr	CompareEqual
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 71.93658379
-	.dword	$47efc3f5
-	.byte	$e8,$00
+	jsr	FPPushConstant	; 17.89641208
+	.dword	$4795ed0c
+	.byte	$e6,$00
 	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; 71
-	.dword	$00000047
+	jsr	FPPushConstant	; 17
+	.dword	$00000011
 	.byte	$00,$00
 	jsr	FloatCompare
 	jsr	CompareEqual
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 14.74
-	.dword	$75eb851f
-	.byte	$e5,$00
+	jsr	FPPushConstant	; 17.96
+	.dword	$47d70a3d
+	.byte	$e6,$00
 	jsr	FloatSine
-	jsr	FPPushConstant	; 0.82373264
-	.dword	$69701237
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 14.74
-	.dword	$75eb851f
-	.byte	$e5,$00
-	jsr	FloatCosine
-	jsr	FPPushConstant	; -0.56697843
-	.dword	$4892bfcb
+	jsr	FPPushConstant	; -0.77679216
+	.dword	$636deced
 	.byte	$e1,$80
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -48,119 +33,12 @@
 	jsr	FloatCompare
 	jsr	CompareLess
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.21
-	.dword	$6b851eb8
-	.byte	$df,$00
-	jsr	FloatTangent
-	jsr	FPPushConstant	; 0.21314244
-	.dword	$6d210182
-	.byte	$df,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.897
-	.dword	$72d0e560
-	.byte	$e1,$00
-	jsr	FloatArcTan
-	jsr	FPPushConstant	; 0.73115517
-	.dword	$5d967e1c
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -0.21
-	.dword	$6b851eb8
-	.byte	$df,$80
-	jsr	FloatExponent
-	jsr	FPPushConstant	; 0.81058425
-	.dword	$67c13986
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 17.23
-	.dword	$44eb851f
+	jsr	FPPushConstant	; 17.96
+	.dword	$47d70a3d
 	.byte	$e6,$00
-	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 2.84665205
-	.dword	$5b17c60a
-	.byte	$e3,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 76.78
-	.dword	$4cc7ae14
-	.byte	$e8,$00
-	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 8.76241976
-	.dword	$46196f88
-	.byte	$e5,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 3.25333333
-	.dword	$681b4e80
-	.byte	$e3,$00
-	jsr	FPPushConstant	; 1.6
-	.dword	$66666666
-	.byte	$e2,$00
-	jsr	FloatPower
-	jsr	FPPushConstant	; 6.60276287
-	.dword	$69a4eaae
-	.byte	$e4,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.01
-	.dword	$51eb851f
-	.byte	$db,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -3.79379606
-	.dword	$7966c6ff
-	.byte	$e3,$80
-	jsr	FloatNegate
-	jsr	FPPushConstant	; 3.79379606
-	.dword	$7966c6ff
-	.byte	$e3,$00
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -3.79379606
-	.dword	$7966c6ff
-	.byte	$e3,$80
-	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; -3
-	.dword	$00000003
-	.byte	$00,$80
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -11.56
-	.dword	$5c7ae148
-	.byte	$e5,$80
-	jsr	FloatSine
-	jsr	FPPushConstant	; 0.84489594
-	.dword	$6c258cd7
+	jsr	FloatCosine
+	jsr	FPPushConstant	; 0.62975705
+	.dword	$509be107
 	.byte	$e1,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -170,13 +48,135 @@
 	jsr	FloatCompare
 	jsr	CompareLess
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -11.56
-	.dword	$5c7ae148
-	.byte	$e5,$80
-	jsr	FloatCosine
-	jsr	FPPushConstant	; 0.53493069
-	.dword	$44789bde
+	jsr	FPPushConstant	; 0.3
+	.dword	$4ccccccd
+	.byte	$e0,$00
+	jsr	FloatTangent
+	jsr	FPPushConstant	; 0.30933625
+	.dword	$4f30a915
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.723
+	.dword	$5c8b4396
 	.byte	$e1,$00
+	jsr	FloatArcTan
+	jsr	FPPushConstant	; 0.62599601
+	.dword	$5020a323
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.88
+	.dword	$70a3d70a
+	.byte	$e1,$00
+	jsr	FloatExponent
+	jsr	FPPushConstant	; 2.41089971
+	.dword	$4d261726
+	.byte	$e3,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 31.38
+	.dword	$7d851eb8
+	.byte	$e6,$00
+	jsr	FloatLogarithm
+	jsr	FPPushConstant	; 3.44617075
+	.dword	$6e4707e1
+	.byte	$e3,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 15.24
+	.dword	$79eb851f
+	.byte	$e5,$00
+	jsr	FloatSquareRoot
+	jsr	FPPushConstant	; 3.90384426
+	.dword	$7cec4acc
+	.byte	$e3,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 2.16666667
+	.dword	$45555557
+	.byte	$e3,$00
+	jsr	FPPushConstant	; 1.5
+	.dword	$60000000
+	.byte	$e2,$00
+	jsr	FloatPower
+	jsr	FPPushConstant	; 3.18924698
+	.dword	$660e4faf
+	.byte	$e3,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.01
+	.dword	$51eb851f
+	.byte	$db,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -37.08261116
+	.dword	$4a2a4c03
+	.byte	$e7,$80
+	jsr	FloatNegate
+	jsr	FPPushConstant	; 37.08261116
+	.dword	$4a2a4c03
+	.byte	$e7,$00
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -37.08261116
+	.dword	$4a2a4c03
+	.byte	$e7,$80
+	jsr	FloatIntegerPart
+	jsr	FPPushConstant	; -37
+	.dword	$00000025
+	.byte	$00,$80
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 2.82
+	.dword	$5a3d70a4
+	.byte	$e3,$00
+	jsr	FloatSine
+	jsr	FPPushConstant	; 0.31607796
+	.dword	$50ea7c35
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 2.82
+	.dword	$5a3d70a4
+	.byte	$e3,$00
+	jsr	FloatCosine
+	jsr	FPPushConstant	; -0.94873322
+	.dword	$79701714
+	.byte	$e1,$80
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.001
@@ -199,286 +199,12 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.317
-	.dword	$5449ba5e
-	.byte	$e2,$00
-	jsr	FloatArcTan
-	jsr	FPPushConstant	; 0.92136882
-	.dword	$75ef69db
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -0.69
-	.dword	$5851eb85
-	.byte	$e1,$80
-	jsr	FloatExponent
-	jsr	FPPushConstant	; 0.50157607
-	.dword	$4033a509
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 69.45
-	.dword	$45733333
-	.byte	$e8,$00
-	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 4.24060707
-	.dword	$43d986cd
-	.byte	$e4,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 64.11
-	.dword	$401c28f6
-	.byte	$e8,$00
-	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 8.00687205
-	.dword	$400e12ef
-	.byte	$e5,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.04
-	.dword	$51eb851f
-	.byte	$dd,$00
-	jsr	FPPushConstant	; 1.9
-	.dword	$7999999a
-	.byte	$e2,$00
-	jsr	FloatPower
-	jsr	FPPushConstant	; 0.00220757
-	.dword	$4856707a
-	.byte	$d9,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.01
-	.dword	$51eb851f
-	.byte	$db,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 15.90297238
-	.dword	$7f394995
-	.byte	$e5,$00
-	jsr	FloatNegate
-	jsr	FPPushConstant	; -15.90297238
-	.dword	$7f394995
-	.byte	$e5,$80
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 15.90297238
-	.dword	$7f394995
-	.byte	$e5,$00
-	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; 15
-	.dword	$0000000f
-	.byte	$00,$00
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 12.28
-	.dword	$623d70a4
-	.byte	$e5,$00
-	jsr	FloatSine
-	jsr	FPPushConstant	; -0.28247251
-	.dword	$48501e50
-	.byte	$e0,$80
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 12.28
-	.dword	$623d70a4
-	.byte	$e5,$00
-	jsr	FloatCosine
-	jsr	FPPushConstant	; 0.95927539
-	.dword	$7ac98936
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.4
-	.dword	$66666666
-	.byte	$e0,$00
-	jsr	FloatTangent
-	jsr	FPPushConstant	; 0.42279322
-	.dword	$6c3c2d2d
-	.byte	$e0,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.697
-	.dword	$6c9ba5e3
-	.byte	$e2,$00
-	jsr	FloatArcTan
-	jsr	FPPushConstant	; 1.03830004
-	.dword	$42738203
-	.byte	$e2,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -0.68
-	.dword	$570a3d71
-	.byte	$e1,$80
-	jsr	FloatExponent
-	jsr	FPPushConstant	; 0.50661699
-	.dword	$40d8d356
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 86.7
-	.dword	$56b33333
-	.byte	$e8,$00
-	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 4.46245388
-	.dword	$4766360a
-	.byte	$e4,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 32.94
-	.dword	$41e147ae
-	.byte	$e7,$00
-	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 5.73933794
-	.dword	$5bd45405
-	.byte	$e4,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.07
-	.dword	$47ae147b
-	.byte	$de,$00
-	jsr	FPPushConstant	; 1.6
-	.dword	$66666666
-	.byte	$e2,$00
-	jsr	FloatPower
-	jsr	FPPushConstant	; 0.0141957
-	.dword	$744a8a68
-	.byte	$db,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.01
-	.dword	$51eb851f
-	.byte	$db,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -48.92516401
-	.dword	$61d9af19
-	.byte	$e7,$80
-	jsr	FloatNegate
-	jsr	FPPushConstant	; 48.92516401
-	.dword	$61d9af19
-	.byte	$e7,$00
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -48.92516401
-	.dword	$61d9af19
-	.byte	$e7,$80
-	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; -48
-	.dword	$00000030
-	.byte	$00,$80
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -14.99
-	.dword	$77eb851f
-	.byte	$e5,$80
-	jsr	FloatSine
-	jsr	FPPushConstant	; -0.65785208
-	.dword	$54347f39
-	.byte	$e1,$80
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -14.99
-	.dword	$77eb851f
-	.byte	$e5,$80
-	jsr	FloatCosine
-	jsr	FPPushConstant	; -0.75314716
-	.dword	$6067204b
-	.byte	$e1,$80
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.28
-	.dword	$47ae147b
-	.byte	$e0,$00
-	jsr	FloatTangent
-	jsr	FPPushConstant	; 0.28755433
-	.dword	$499d291b
-	.byte	$e0,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.305
-	.dword	$4e147ae1
+	jsr	FPPushConstant	; 0.265
+	.dword	$43d70a3d
 	.byte	$e0,$00
 	jsr	FloatArcTan
-	jsr	FPPushConstant	; 0.29603761
-	.dword	$4bc91eed
+	jsr	FPPushConstant	; 0.25904573
+	.dword	$4250d22b
 	.byte	$e0,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -487,272 +213,12 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -0.62
-	.dword	$4f5c28f6
-	.byte	$e1,$80
-	jsr	FloatExponent
-	jsr	FPPushConstant	; 0.53794444
-	.dword	$44db5d08
+	jsr	FPPushConstant	; 0.67
+	.dword	$55c28f5c
 	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 15.38
-	.dword	$7b0a3d71
-	.byte	$e5,$00
-	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 2.73306796
-	.dword	$57754af0
-	.byte	$e3,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 30.0
-	.dword	$0000001e
-	.byte	$00,$00
-	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 5.47722558
-	.dword	$57a2b74a
-	.byte	$e4,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 2.11666667
-	.dword	$43bbbbbe
-	.byte	$e3,$00
-	jsr	FPPushConstant	; 0.5
-	.dword	$40000000
-	.byte	$e1,$00
-	jsr	FloatPower
-	jsr	FPPushConstant	; 1.45487686
-	.dword	$5d1cb3d5
-	.byte	$e2,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.01
-	.dword	$51eb851f
-	.byte	$db,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -5.80869847
-	.dword	$5cf06dcf
-	.byte	$e4,$80
-	jsr	FloatNegate
-	jsr	FPPushConstant	; 5.80869847
-	.dword	$5cf06dcf
-	.byte	$e4,$00
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -5.80869847
-	.dword	$5cf06dcf
-	.byte	$e4,$80
-	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; -5
-	.dword	$00000005
-	.byte	$00,$80
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 11.46
-	.dword	$5bae147b
-	.byte	$e5,$00
-	jsr	FloatSine
-	jsr	FPPushConstant	; -0.89407894
-	.dword	$72712dc0
-	.byte	$e1,$80
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 11.46
-	.dword	$5bae147b
-	.byte	$e5,$00
-	jsr	FloatCosine
-	jsr	FPPushConstant	; 0.44790942
-	.dword	$72aa3116
-	.byte	$e0,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.1
-	.dword	$66666666
-	.byte	$de,$00
-	jsr	FloatTangent
-	jsr	FPPushConstant	; 0.10033467
-	.dword	$66be21b9
-	.byte	$de,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.475
-	.dword	$7999999a
-	.byte	$e0,$00
-	jsr	FloatArcTan
-	jsr	FPPushConstant	; 0.44344834
-	.dword	$7185d496
-	.byte	$e0,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.42
-	.dword	$5ae147ae
-	.byte	$e2,$00
 	jsr	FloatExponent
-	jsr	FPPushConstant	; 4.13712044
-	.dword	$4231a534
-	.byte	$e4,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 47.16
-	.dword	$5e51eb85
-	.byte	$e7,$00
-	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 3.85354608
-	.dword	$7b503fde
-	.byte	$e3,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 94.0
-	.dword	$0000005e
-	.byte	$00,$00
-	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 9.69535971
-	.dword	$4d9018c0
-	.byte	$e5,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.72
-	.dword	$6e147ae1
-	.byte	$e2,$00
-	jsr	FPPushConstant	; 1.0
-	.dword	$00000001
-	.byte	$00,$00
-	jsr	FloatPower
-	jsr	FPPushConstant	; 1.72
-	.dword	$6e147ae1
-	.byte	$e2,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.01
-	.dword	$51eb851f
-	.byte	$db,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 13.86676926
-	.dword	$6eef24b9
-	.byte	$e5,$00
-	jsr	FloatNegate
-	jsr	FPPushConstant	; -13.86676926
-	.dword	$6eef24b9
-	.byte	$e5,$80
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 13.86676926
-	.dword	$6eef24b9
-	.byte	$e5,$00
-	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; 13
-	.dword	$0000000d
-	.byte	$00,$00
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 3.05
-	.dword	$6199999a
-	.byte	$e3,$00
-	jsr	FloatSine
-	jsr	FPPushConstant	; 0.09146464
-	.dword	$5da8e816
-	.byte	$de,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 3.05
-	.dword	$6199999a
-	.byte	$e3,$00
-	jsr	FloatCosine
-	jsr	FPPushConstant	; -0.99580832
-	.dword	$7f76a5a4
-	.byte	$e1,$80
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.17
-	.dword	$570a3d71
-	.byte	$df,$00
-	jsr	FloatTangent
-	jsr	FPPushConstant	; 0.17165682
-	.dword	$57e36718
-	.byte	$df,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.833
-	.dword	$754fdf3b
-	.byte	$e2,$00
-	jsr	FloatArcTan
-	jsr	FPPushConstant	; 1.07137316
-	.dword	$449160bb
+	jsr	FPPushConstant	; 1.95423732
+	.dword	$7d123969
 	.byte	$e2,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -761,300 +227,12 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.12
-	.dword	$47ae147b
-	.byte	$e2,$00
-	jsr	FloatExponent
-	jsr	FPPushConstant	; 3.0648542
-	.dword	$6213491e
-	.byte	$e3,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 97.78
-	.dword	$61c7ae14
-	.byte	$e8,$00
-	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 4.58272006
-	.dword	$4952d245
-	.byte	$e4,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 49.57
-	.dword	$6323d70a
-	.byte	$e7,$00
-	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 7.04059657
-	.dword	$70a64897
-	.byte	$e4,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.98666667
-	.dword	$7f258bf6
-	.byte	$e2,$00
-	jsr	FPPushConstant	; 0.3
-	.dword	$4ccccccd
-	.byte	$e0,$00
-	jsr	FloatPower
-	jsr	FPPushConstant	; 1.22867636
-	.dword	$4ea2a22c
-	.byte	$e2,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.01
-	.dword	$51eb851f
-	.byte	$db,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 69.94800356
-	.dword	$45f2b05c
-	.byte	$e8,$00
-	jsr	FloatNegate
-	jsr	FPPushConstant	; -69.94800356
-	.dword	$45f2b05c
-	.byte	$e8,$80
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 69.94800356
-	.dword	$45f2b05c
-	.byte	$e8,$00
-	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; 69
-	.dword	$00000045
-	.byte	$00,$00
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -16.13
-	.dword	$40851eb8
-	.byte	$e6,$80
-	jsr	FloatSine
-	jsr	FPPushConstant	; 0.40961932
-	.dword	$68dccfcf
-	.byte	$e0,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -16.13
-	.dword	$40851eb8
-	.byte	$e6,$80
-	jsr	FloatCosine
-	jsr	FPPushConstant	; -0.91225655
-	.dword	$74c4d298
-	.byte	$e1,$80
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.18
-	.dword	$5c28f5c3
-	.byte	$df,$00
-	jsr	FloatTangent
-	jsr	FPPushConstant	; 0.18196953
-	.dword	$5d2b1c38
-	.byte	$df,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.423
-	.dword	$6c49ba5e
-	.byte	$e0,$00
-	jsr	FloatArcTan
-	jsr	FPPushConstant	; 0.40017541
-	.dword	$6671e54b
-	.byte	$e0,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -0.33
-	.dword	$547ae148
-	.byte	$e0,$80
-	jsr	FloatExponent
-	jsr	FPPushConstant	; 0.71892373
-	.dword	$5c05b15a
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 37.22
-	.dword	$4a70a3d7
-	.byte	$e7,$00
-	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 3.61684625
-	.dword	$73bd3459
-	.byte	$e3,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 95.85
-	.dword	$5fd9999a
-	.byte	$e8,$00
-	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 9.79030132
-	.dword	$4e528980
-	.byte	$e5,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 2.31333333
-	.dword	$4a06d39f
-	.byte	$e3,$00
-	jsr	FPPushConstant	; 1.9
-	.dword	$7999999a
-	.byte	$e2,$00
-	jsr	FloatPower
-	jsr	FPPushConstant	; 4.92099144
-	.dword	$4ebc6185
-	.byte	$e4,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.01
-	.dword	$51eb851f
-	.byte	$db,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -27.65562485
-	.dword	$6e9f5c1f
-	.byte	$e6,$80
-	jsr	FloatNegate
-	jsr	FPPushConstant	; 27.65562485
-	.dword	$6e9f5c1f
-	.byte	$e6,$00
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -27.65562485
-	.dword	$6e9f5c1f
-	.byte	$e6,$80
-	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; -27
-	.dword	$0000001b
-	.byte	$00,$80
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -7.84
-	.dword	$7d70a3d7
-	.byte	$e4,$80
-	jsr	FloatSine
-	jsr	FPPushConstant	; -0.99990226
-	.dword	$7ffccc19
-	.byte	$e1,$80
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -7.84
-	.dword	$7d70a3d7
-	.byte	$e4,$80
-	jsr	FloatCosine
-	jsr	FPPushConstant	; 0.01398118
-	.dword	$7288a8dc
-	.byte	$db,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.39
-	.dword	$63d70a3d
-	.byte	$e0,$00
-	jsr	FloatTangent
-	jsr	FPPushConstant	; 0.41105492
-	.dword	$693ae52e
-	.byte	$e0,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.653
-	.dword	$53958106
-	.byte	$e1,$00
-	jsr	FloatArcTan
-	jsr	FPPushConstant	; 0.57848129
-	.dword	$4a0bacc7
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.69
-	.dword	$6c28f5c3
-	.byte	$e2,$00
-	jsr	FloatExponent
-	jsr	FPPushConstant	; 5.41948071
-	.dword	$56b63168
-	.byte	$e4,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 19.71
-	.dword	$4ed70a3d
+	jsr	FPPushConstant	; 27.77
+	.dword	$6f147ae1
 	.byte	$e6,$00
 	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 2.98112612
-	.dword	$5f65629b
+	jsr	FPPushConstant	; 3.3239563
+	.dword	$6a5dd99a
 	.byte	$e3,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -1063,12 +241,12 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 88.1
-	.dword	$5819999a
+	jsr	FPPushConstant	; 66.02
+	.dword	$42051eb8
 	.byte	$e8,$00
 	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 9.38616002
-	.dword	$4b16db11
+	jsr	FPPushConstant	; 8.12526923
+	.dword	$41008d27
 	.byte	$e5,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -1077,16 +255,16 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.10333333
-	.dword	$69d03664
-	.byte	$de,$00
-	jsr	FPPushConstant	; 0.6
-	.dword	$4ccccccd
+	jsr	FPPushConstant	; 1.53666667
+	.dword	$6258bf29
+	.byte	$e2,$00
+	jsr	FPPushConstant	; 0.7
+	.dword	$5999999a
 	.byte	$e1,$00
 	jsr	FloatPower
-	jsr	FPPushConstant	; 0.25617943
-	.dword	$4194f9a2
-	.byte	$e0,$00
+	jsr	FPPushConstant	; 1.35084578
+	.dword	$567441dc
+	.byte	$e2,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.01
@@ -1094,32 +272,32 @@
 	.byte	$db,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -75.2289625
-	.dword	$4b3a9d49
-	.byte	$e8,$80
+	jsr	FPPushConstant	; -59.50862558
+	.dword	$77046a92
+	.byte	$e7,$80
 	jsr	FloatNegate
-	jsr	FPPushConstant	; 75.2289625
-	.dword	$4b3a9d49
-	.byte	$e8,$00
+	jsr	FPPushConstant	; 59.50862558
+	.dword	$77046a92
+	.byte	$e7,$00
 	jsr	FloatCompare
 	jsr	CompareEqual
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -75.2289625
-	.dword	$4b3a9d49
-	.byte	$e8,$80
+	jsr	FPPushConstant	; -59.50862558
+	.dword	$77046a92
+	.byte	$e7,$80
 	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; -75
-	.dword	$0000004b
+	jsr	FPPushConstant	; -59
+	.dword	$0000003b
 	.byte	$00,$80
 	jsr	FloatCompare
 	jsr	CompareEqual
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 8.18
-	.dword	$4170a3d7
+	jsr	FPPushConstant	; 13.79
+	.dword	$6e51eb85
 	.byte	$e5,$00
 	jsr	FloatSine
-	jsr	FPPushConstant	; 0.94732506
-	.dword	$7941f294
+	jsr	FPPushConstant	; 0.94034039
+	.dword	$785d12eb
 	.byte	$e1,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -1129,13 +307,13 @@
 	jsr	FloatCompare
 	jsr	CompareLess
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 8.18
-	.dword	$4170a3d7
+	jsr	FPPushConstant	; 13.79
+	.dword	$6e51eb85
 	.byte	$e5,$00
 	jsr	FloatCosine
-	jsr	FPPushConstant	; -0.32027368
-	.dword	$51fd74b5
-	.byte	$e0,$80
+	jsr	FPPushConstant	; 0.34023514
+	.dword	$5719a66f
+	.byte	$e0,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.001
@@ -1144,12 +322,12 @@
 	jsr	FloatCompare
 	jsr	CompareLess
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.18
-	.dword	$5c28f5c3
+	jsr	FPPushConstant	; 0.14
+	.dword	$47ae147b
 	.byte	$df,$00
 	jsr	FloatTangent
-	jsr	FPPushConstant	; 0.18196953
-	.dword	$5d2b1c38
+	jsr	FPPushConstant	; 0.14092189
+	.dword	$4826e9fa
 	.byte	$df,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -1158,12 +336,12 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.765
-	.dword	$61eb851f
-	.byte	$e1,$00
+	jsr	FPPushConstant	; 1.109
+	.dword	$46f9db23
+	.byte	$e2,$00
 	jsr	FloatArcTan
-	jsr	FPPushConstant	; 0.65303219
-	.dword	$53968f0e
+	jsr	FPPushConstant	; 0.83703548
+	.dword	$6b23fa86
 	.byte	$e1,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -1172,13 +350,13 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -0.39
-	.dword	$63d70a3d
-	.byte	$e0,$80
+	jsr	FPPushConstant	; -1.74
+	.dword	$6f5c28f6
+	.byte	$e2,$80
 	jsr	FloatExponent
-	jsr	FPPushConstant	; 0.67705687
-	.dword	$56a9ccad
-	.byte	$e1,$00
+	jsr	FPPushConstant	; 0.1755204
+	.dword	$59ddcf54
+	.byte	$df,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.001
@@ -1186,26 +364,12 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 25.0
-	.dword	$00000019
-	.byte	$00,$00
-	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 3.21887582
-	.dword	$670107dd
-	.byte	$e3,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 51.8
-	.dword	$6799999a
+	jsr	FPPushConstant	; 54.92
+	.dword	$6dd70a3d
 	.byte	$e7,$00
-	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 7.19722169
-	.dword	$7327d1ee
+	jsr	FloatLogarithm
+	jsr	FPPushConstant	; 4.00587758
+	.dword	$40181317
 	.byte	$e4,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -1214,136 +378,13 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.61333333
-	.dword	$4e81b4e1
-	.byte	$e1,$00
-	jsr	FPPushConstant	; 1.3
-	.dword	$53333333
-	.byte	$e2,$00
-	jsr	FloatPower
-	jsr	FPPushConstant	; 0.5296702
-	.dword	$43cc3bad
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.01
-	.dword	$51eb851f
-	.byte	$db,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 66.93593585
-	.dword	$42ef997e
+	jsr	FPPushConstant	; 66.84
+	.dword	$42d70a3d
 	.byte	$e8,$00
-	jsr	FloatNegate
-	jsr	FPPushConstant	; -66.93593585
-	.dword	$42ef997e
-	.byte	$e8,$80
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 66.93593585
-	.dword	$42ef997e
-	.byte	$e8,$00
-	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; 66
-	.dword	$00000042
-	.byte	$00,$00
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 8.96
-	.dword	$47ae147b
-	.byte	$e5,$00
-	jsr	FloatSine
-	jsr	FPPushConstant	; 0.44822433
-	.dword	$72bed467
-	.byte	$e0,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 8.96
-	.dword	$47ae147b
-	.byte	$e5,$00
-	jsr	FloatCosine
-	jsr	FPPushConstant	; -0.89392111
-	.dword	$726c01c6
-	.byte	$e1,$80
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.39
-	.dword	$63d70a3d
-	.byte	$e0,$00
-	jsr	FloatTangent
-	jsr	FPPushConstant	; 0.41105492
-	.dword	$693ae52e
-	.byte	$e0,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.756
-	.dword	$70624dd3
-	.byte	$e2,$00
-	jsr	FloatArcTan
-	jsr	FPPushConstant	; 1.05312333
-	.dword	$43665f65
-	.byte	$e2,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -0.46
-	.dword	$75c28f5c
-	.byte	$e0,$80
-	jsr	FloatExponent
-	jsr	FPPushConstant	; 0.63128365
-	.dword	$50cde714
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 2.28
-	.dword	$48f5c28f
-	.byte	$e3,$00
-	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 0.82417544
-	.dword	$697e94b0
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 12.19
-	.dword	$61851eb8
-	.byte	$e5,$00
 	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 3.49141805
-	.dword	$6fb9b259
-	.byte	$e3,$00
+	jsr	FPPushConstant	; 8.17557337
+	.dword	$41679303
+	.byte	$e5,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.001
@@ -1351,16 +392,16 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.45
+	jsr	FPPushConstant	; 1.51333333
+	.dword	$60da740a
+	.byte	$e2,$00
+	jsr	FPPushConstant	; 1.8
 	.dword	$73333333
-	.byte	$e0,$00
-	jsr	FPPushConstant	; 1.7
-	.dword	$6ccccccd
 	.byte	$e2,$00
 	jsr	FloatPower
-	jsr	FPPushConstant	; 0.25731273
-	.dword	$41df3f40
-	.byte	$e0,$00
+	jsr	FPPushConstant	; 2.10805665
+	.dword	$43753338
+	.byte	$e3,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.01
@@ -1368,32 +409,32 @@
 	.byte	$db,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -76.6878594
-	.dword	$4cb0178e
-	.byte	$e8,$80
+	jsr	FPPushConstant	; -28.08123431
+	.dword	$70532f16
+	.byte	$e6,$80
 	jsr	FloatNegate
-	jsr	FPPushConstant	; 76.6878594
-	.dword	$4cb0178e
-	.byte	$e8,$00
+	jsr	FPPushConstant	; 28.08123431
+	.dword	$70532f16
+	.byte	$e6,$00
 	jsr	FloatCompare
 	jsr	CompareEqual
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -76.6878594
-	.dword	$4cb0178e
-	.byte	$e8,$80
+	jsr	FPPushConstant	; -28.08123431
+	.dword	$70532f16
+	.byte	$e6,$80
 	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; -76
-	.dword	$0000004c
+	jsr	FPPushConstant	; -28
+	.dword	$0000001c
 	.byte	$00,$80
 	jsr	FloatCompare
 	jsr	CompareEqual
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 17.45
-	.dword	$45cccccd
-	.byte	$e6,$00
+	jsr	FPPushConstant	; -0.82
+	.dword	$68f5c28f
+	.byte	$e1,$80
 	jsr	FloatSine
-	jsr	FPPushConstant	; -0.98537415
-	.dword	$7e20bd7a
+	jsr	FPPushConstant	; -0.73114583
+	.dword	$5d962fc2
 	.byte	$e1,$80
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -1403,13 +444,150 @@
 	jsr	FloatCompare
 	jsr	CompareLess
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 17.45
-	.dword	$45cccccd
-	.byte	$e6,$00
+	jsr	FPPushConstant	; -0.82
+	.dword	$68f5c28f
+	.byte	$e1,$80
 	jsr	FloatCosine
-	jsr	FPPushConstant	; 0.17040474
-	.dword	$573f4a43
+	jsr	FPPushConstant	; 0.68222121
+	.dword	$5753064d
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.23
+	.dword	$75c28f5c
 	.byte	$df,$00
+	jsr	FloatTangent
+	jsr	FPPushConstant	; 0.23414336
+	.dword	$77e1a374
+	.byte	$df,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 1.89
+	.dword	$78f5c28f
+	.byte	$e2,$00
+	jsr	FloatArcTan
+	jsr	FPPushConstant	; 1.08414023
+	.dword	$45628db4
+	.byte	$e2,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.75
+	.dword	$60000000
+	.byte	$e1,$00
+	jsr	FloatExponent
+	jsr	FPPushConstant	; 2.11700002
+	.dword	$43be76d3
+	.byte	$e3,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 85.99
+	.dword	$55fd70a4
+	.byte	$e8,$00
+	jsr	FloatLogarithm
+	jsr	FPPushConstant	; 4.45423101
+	.dword	$474487bc
+	.byte	$e4,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 17.46
+	.dword	$45d70a3d
+	.byte	$e6,$00
+	jsr	FloatSquareRoot
+	jsr	FPPushConstant	; 4.17851648
+	.dword	$42db3419
+	.byte	$e4,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 2.06666667
+	.dword	$42222224
+	.byte	$e3,$00
+	jsr	FPPushConstant	; 2.0
+	.dword	$00000002
+	.byte	$00,$00
+	jsr	FloatPower
+	jsr	FPPushConstant	; 4.27111111
+	.dword	$4456789a
+	.byte	$e4,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.01
+	.dword	$51eb851f
+	.byte	$db,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -74.17737102
+	.dword	$4a2d6830
+	.byte	$e8,$80
+	jsr	FloatNegate
+	jsr	FPPushConstant	; 74.17737102
+	.dword	$4a2d6830
+	.byte	$e8,$00
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -74.17737102
+	.dword	$4a2d6830
+	.byte	$e8,$80
+	jsr	FloatIntegerPart
+	jsr	FPPushConstant	; -74
+	.dword	$0000004a
+	.byte	$00,$80
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 3.52
+	.dword	$70a3d70a
+	.byte	$e3,$00
+	jsr	FloatSine
+	jsr	FPPushConstant	; -0.36944096
+	.dword	$5e93aec9
+	.byte	$e0,$80
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 3.52
+	.dword	$70a3d70a
+	.byte	$e3,$00
+	jsr	FloatCosine
+	jsr	FPPushConstant	; -0.92925421
+	.dword	$76f1cd4d
+	.byte	$e1,$80
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.001
@@ -1432,12 +610,12 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.465
-	.dword	$5dc28f5c
-	.byte	$e2,$00
+	jsr	FPPushConstant	; 0.735
+	.dword	$5e147ae1
+	.byte	$e1,$00
 	jsr	FloatArcTan
-	jsr	FPPushConstant	; 0.97184811
-	.dword	$7c6584d5
+	jsr	FPPushConstant	; 0.63383179
+	.dword	$5121666d
 	.byte	$e1,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -1446,300 +624,26 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.38
-	.dword	$6147ae14
-	.byte	$e0,$00
-	jsr	FloatExponent
-	jsr	FPPushConstant	; 1.46228459
-	.dword	$5d96121b
-	.byte	$e2,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 33.19
-	.dword	$426147ae
-	.byte	$e7,$00
-	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 3.50224863
-	.dword	$70126bb8
-	.byte	$e3,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 96.84
-	.dword	$60d70a3d
-	.byte	$e8,$00
-	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 9.84073168
-	.dword	$4eb9d188
-	.byte	$e5,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 3.13
-	.dword	$6428f5c3
-	.byte	$e3,$00
-	jsr	FPPushConstant	; 0.8
-	.dword	$66666666
-	.byte	$e1,$00
-	jsr	FloatPower
-	jsr	FPPushConstant	; 2.49135416
-	.dword	$4fb92c5c
-	.byte	$e3,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.01
+	jsr	FPPushConstant	; 0.16
 	.dword	$51eb851f
-	.byte	$db,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 49.62849275
-	.dword	$6341c9cd
-	.byte	$e7,$00
-	jsr	FloatNegate
-	jsr	FPPushConstant	; -49.62849275
-	.dword	$6341c9cd
-	.byte	$e7,$80
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 49.62849275
-	.dword	$6341c9cd
-	.byte	$e7,$00
-	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; 49
-	.dword	$00000031
-	.byte	$00,$00
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -11.25
-	.dword	$5a000000
-	.byte	$e5,$80
-	jsr	FloatSine
-	jsr	FPPushConstant	; 0.967808
-	.dword	$7be121ee
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -11.25
-	.dword	$5a000000
-	.byte	$e5,$80
-	jsr	FloatCosine
-	jsr	FPPushConstant	; 0.25168965
-	.dword	$406ebb9f
-	.byte	$e0,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.21
-	.dword	$6b851eb8
 	.byte	$df,$00
-	jsr	FloatTangent
-	jsr	FPPushConstant	; 0.21314244
-	.dword	$6d210182
-	.byte	$df,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.118
-	.dword	$78d4fdf4
-	.byte	$de,$00
-	jsr	FloatArcTan
-	jsr	FPPushConstant	; 0.11745685
-	.dword	$78469bc6
-	.byte	$de,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -1.28
-	.dword	$51eb851f
-	.byte	$e2,$80
 	jsr	FloatExponent
-	jsr	FPPushConstant	; 0.2780373
-	.dword	$472d73d7
-	.byte	$e0,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 30.19
-	.dword	$78c28f5c
-	.byte	$e6,$00
-	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 3.40751074
-	.dword	$6d0a53f7
-	.byte	$e3,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 70.12
-	.dword	$461eb852
-	.byte	$e8,$00
-	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 8.37376857
-	.dword	$42fd7a60
-	.byte	$e5,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.55
-	.dword	$63333333
-	.byte	$e2,$00
-	jsr	FPPushConstant	; 1.4
-	.dword	$5999999a
-	.byte	$e2,$00
-	jsr	FloatPower
-	jsr	FPPushConstant	; 1.84698929
-	.dword	$76351291
+	jsr	FPPushConstant	; 1.17351087
+	.dword	$4b1acd56
 	.byte	$e2,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
-	jsr	FPPushConstant	; 0.01
-	.dword	$51eb851f
-	.byte	$db,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 53.36049243
-	.dword	$6ab89277
-	.byte	$e7,$00
-	jsr	FloatNegate
-	jsr	FPPushConstant	; -53.36049243
-	.dword	$6ab89277
-	.byte	$e7,$80
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 53.36049243
-	.dword	$6ab89277
-	.byte	$e7,$00
-	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; 53
-	.dword	$00000035
-	.byte	$00,$00
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -16.19
-	.dword	$40c28f5c
-	.byte	$e6,$80
-	jsr	FloatSine
-	jsr	FPPushConstant	; 0.46358479
-	.dword	$76ad7e28
-	.byte	$e0,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -16.19
-	.dword	$40c28f5c
-	.byte	$e6,$80
-	jsr	FloatCosine
-	jsr	FPPushConstant	; -0.88605256
-	.dword	$716a2b98
-	.byte	$e1,$80
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.11
-	.dword	$70a3d70a
-	.byte	$de,$00
-	jsr	FloatTangent
-	jsr	FPPushConstant	; 0.11044582
-	.dword	$7118b584
-	.byte	$de,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
 	jsr	FPPushConstant	; 0.001
 	.dword	$4189374c
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.276
-	.dword	$51a9fbe7
-	.byte	$e2,$00
-	jsr	FloatArcTan
-	jsr	FPPushConstant	; 0.90607432
-	.dword	$73fa3e4a
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -0.07
-	.dword	$47ae147b
-	.byte	$de,$80
-	jsr	FloatExponent
-	jsr	FPPushConstant	; 0.93239382
-	.dword	$7758ae42
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 87.39
-	.dword	$5763d70a
+	jsr	FPPushConstant	; 77.96
+	.dword	$4df5c28f
 	.byte	$e8,$00
 	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 4.47038086
-	.dword	$4786ae15
+	jsr	FPPushConstant	; 4.35619587
+	.dword	$45b2fa71
 	.byte	$e4,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -1748,13 +652,13 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 74.49
-	.dword	$4a7d70a4
-	.byte	$e8,$00
+	jsr	FPPushConstant	; 40.44
+	.dword	$50e147ae
+	.byte	$e7,$00
 	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 8.63075895
-	.dword	$450bcb59
-	.byte	$e5,$00
+	jsr	FPPushConstant	; 6.35924524
+	.dword	$65bf77f0
+	.byte	$e4,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.001
@@ -1762,16 +666,16 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 2.36333333
-	.dword	$4ba06d38
-	.byte	$e3,$00
-	jsr	FPPushConstant	; 1.4
-	.dword	$5999999a
+	jsr	FPPushConstant	; 1.27666667
+	.dword	$51b4e81f
 	.byte	$e2,$00
+	jsr	FPPushConstant	; 0.6
+	.dword	$4ccccccd
+	.byte	$e1,$00
 	jsr	FloatPower
-	jsr	FPPushConstant	; 3.33376492
-	.dword	$6aae33c5
-	.byte	$e3,$00
+	jsr	FPPushConstant	; 1.15783457
+	.dword	$4a19f62b
+	.byte	$e2,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.01
@@ -1779,32 +683,47 @@
 	.byte	$db,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -10.39993521
-	.dword	$5333113b
-	.byte	$e5,$80
+	jsr	FPPushConstant	; -36.59261359
+	.dword	$492f6b0c
+	.byte	$e7,$80
 	jsr	FloatNegate
-	jsr	FPPushConstant	; 10.39993521
-	.dword	$5333113b
-	.byte	$e5,$00
+	jsr	FPPushConstant	; 36.59261359
+	.dword	$492f6b0c
+	.byte	$e7,$00
 	jsr	FloatCompare
 	jsr	CompareEqual
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -10.39993521
-	.dword	$5333113b
-	.byte	$e5,$80
+	jsr	FPPushConstant	; -36.59261359
+	.dword	$492f6b0c
+	.byte	$e7,$80
 	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; -10
-	.dword	$0000000a
+	jsr	FPPushConstant	; -36
+	.dword	$00000024
 	.byte	$00,$80
 	jsr	FloatCompare
 	jsr	CompareEqual
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -9.17
-	.dword	$495c28f6
-	.byte	$e5,$80
+	jsr	FPPushConstant	; 8.37
+	.dword	$42f5c28f
+	.byte	$e5,$00
 	jsr	FloatSine
-	jsr	FPPushConstant	; -0.25203054
-	.dword	$408512cf
+	jsr	FPPushConstant	; 0.86979069
+	.dword	$6f554d24
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 8.37
+	.dword	$42f5c28f
+	.byte	$e5,$00
+	jsr	FloatCosine
+	jsr	FPPushConstant	; -0.49342087
+	.dword	$7e50d484
 	.byte	$e0,$80
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -1814,28 +733,13 @@
 	jsr	FloatCompare
 	jsr	CompareLess
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -9.17
-	.dword	$495c28f6
-	.byte	$e5,$80
-	jsr	FloatCosine
-	jsr	FPPushConstant	; -0.96771928
-	.dword	$7bde39b2
-	.byte	$e1,$80
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.31
-	.dword	$4f5c28f6
-	.byte	$e0,$00
+	jsr	FPPushConstant	; 0.17
+	.dword	$570a3d71
+	.byte	$df,$00
 	jsr	FloatTangent
-	jsr	FPPushConstant	; 0.32032751
-	.dword	$5200fbd3
-	.byte	$e0,$00
+	jsr	FPPushConstant	; 0.17165682
+	.dword	$57e36718
+	.byte	$df,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.001
@@ -1843,13 +747,13 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.348
-	.dword	$5916872b
-	.byte	$e0,$00
+	jsr	FPPushConstant	; 0.787
+	.dword	$64bc6a7f
+	.byte	$e1,$00
 	jsr	FloatArcTan
-	jsr	FPPushConstant	; 0.33489197
-	.dword	$55bb7aeb
-	.byte	$e0,$00
+	jsr	FPPushConstant	; 0.66676369
+	.dword	$55588339
+	.byte	$e1,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.001
@@ -1857,13 +761,13 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -1.12
-	.dword	$47ae147b
+	jsr	FPPushConstant	; -1.42
+	.dword	$5ae147ae
 	.byte	$e2,$80
 	jsr	FloatExponent
-	jsr	FPPushConstant	; 0.32627979
-	.dword	$53871283
-	.byte	$e0,$00
+	jsr	FPPushConstant	; 0.24171402
+	.dword	$7bc1f0a6
+	.byte	$df,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.001
@@ -1871,12 +775,12 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 61.98
-	.dword	$7bf5c28f
-	.byte	$e7,$00
+	jsr	FPPushConstant	; 81.49
+	.dword	$517d70a4
+	.byte	$e8,$00
 	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 4.12681175
-	.dword	$42076bc2
+	jsr	FPPushConstant	; 4.40048031
+	.dword	$46685e0b
 	.byte	$e4,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -1885,13 +789,13 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 93.25
-	.dword	$5d400000
-	.byte	$e8,$00
+	jsr	FPPushConstant	; 46.36
+	.dword	$5cb851ec
+	.byte	$e7,$00
 	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 9.65660396
-	.dword	$4d40b994
-	.byte	$e5,$00
+	jsr	FPPushConstant	; 6.80881781
+	.dword	$6cf0eaf2
+	.byte	$e4,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.001
@@ -1899,15 +803,15 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 2.41
-	.dword	$4d1eb852
+	jsr	FPPushConstant	; 2.76333333
+	.dword	$586d3a05
 	.byte	$e3,$00
 	jsr	FPPushConstant	; 0.9
 	.dword	$73333333
 	.byte	$e1,$00
 	jsr	FloatPower
-	jsr	FPPushConstant	; 2.20706609
-	.dword	$46a04911
+	jsr	FPPushConstant	; 2.49626075
+	.dword	$4fe15e39
 	.byte	$e3,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -1916,32 +820,321 @@
 	.byte	$db,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 44.19381226
-	.dword	$58633b5c
-	.byte	$e7,$00
+	jsr	FPPushConstant	; 7.11913825
+	.dword	$71e7fd82
+	.byte	$e4,$00
 	jsr	FloatNegate
-	jsr	FPPushConstant	; -44.19381226
-	.dword	$58633b5c
-	.byte	$e7,$80
+	jsr	FPPushConstant	; -7.11913825
+	.dword	$71e7fd82
+	.byte	$e4,$80
 	jsr	FloatCompare
 	jsr	CompareEqual
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 44.19381226
-	.dword	$58633b5c
-	.byte	$e7,$00
+	jsr	FPPushConstant	; 7.11913825
+	.dword	$71e7fd82
+	.byte	$e4,$00
 	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; 44
-	.dword	$0000002c
+	jsr	FPPushConstant	; 7
+	.dword	$00000007
 	.byte	$00,$00
 	jsr	FloatCompare
 	jsr	CompareEqual
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -14.64
-	.dword	$751eb852
+	jsr	FPPushConstant	; -18.57
+	.dword	$4a47ae14
+	.byte	$e6,$80
+	jsr	FloatSine
+	jsr	FPPushConstant	; 0.27592884
+	.dword	$46a345c0
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -18.57
+	.dword	$4a47ae14
+	.byte	$e6,$80
+	jsr	FloatCosine
+	jsr	FPPushConstant	; 0.96117807
+	.dword	$7b07e20c
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.18
+	.dword	$5c28f5c3
+	.byte	$df,$00
+	jsr	FloatTangent
+	jsr	FPPushConstant	; 0.18196953
+	.dword	$5d2b1c38
+	.byte	$df,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 1.846
+	.dword	$7624dd2f
+	.byte	$e2,$00
+	jsr	FloatArcTan
+	jsr	FPPushConstant	; 1.07433867
+	.dword	$44c1f6fb
+	.byte	$e2,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -1.72
+	.dword	$6e147ae1
+	.byte	$e2,$80
+	jsr	FloatExponent
+	jsr	FPPushConstant	; 0.17906615
+	.dword	$5bae8ef4
+	.byte	$df,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 59.33
+	.dword	$76a8f5c3
+	.byte	$e7,$00
+	jsr	FloatLogarithm
+	jsr	FPPushConstant	; 4.08311508
+	.dword	$4154707a
+	.byte	$e4,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 93.96
+	.dword	$5df5c28f
+	.byte	$e8,$00
+	jsr	FloatSquareRoot
+	jsr	FPPushConstant	; 9.69329665
+	.dword	$4d8bdf1d
+	.byte	$e5,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 1.35666667
+	.dword	$56d3a071
+	.byte	$e2,$00
+	jsr	FPPushConstant	; 1.5
+	.dword	$60000000
+	.byte	$e2,$00
+	jsr	FloatPower
+	jsr	FPPushConstant	; 1.58019154
+	.dword	$6521dbb2
+	.byte	$e2,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.01
+	.dword	$51eb851f
+	.byte	$db,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 22.04260144
+	.dword	$582b9fb6
+	.byte	$e6,$00
+	jsr	FloatNegate
+	jsr	FPPushConstant	; -22.04260144
+	.dword	$582b9fb6
+	.byte	$e6,$80
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 22.04260144
+	.dword	$582b9fb6
+	.byte	$e6,$00
+	jsr	FloatIntegerPart
+	jsr	FPPushConstant	; 22
+	.dword	$00000016
+	.byte	$00,$00
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -13.07
+	.dword	$688f5c29
 	.byte	$e5,$80
 	jsr	FloatSine
-	jsr	FPPushConstant	; -0.8762208
-	.dword	$702800d0
+	jsr	FPPushConstant	; -0.48260746
+	.dword	$7b8c299a
+	.byte	$e0,$80
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -13.07
+	.dword	$688f5c29
+	.byte	$e5,$80
+	jsr	FloatCosine
+	jsr	FPPushConstant	; 0.87583677
+	.dword	$701b6b56
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.33
+	.dword	$547ae148
+	.byte	$e0,$00
+	jsr	FloatTangent
+	jsr	FPPushConstant	; 0.34252487
+	.dword	$57afb5bb
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 1.22
+	.dword	$4e147ae1
+	.byte	$e2,$00
+	jsr	FloatArcTan
+	jsr	FPPushConstant	; 0.88417476
+	.dword	$712ca377
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.75
+	.dword	$60000000
+	.byte	$e1,$00
+	jsr	FloatExponent
+	jsr	FPPushConstant	; 2.11700002
+	.dword	$43be76d3
+	.byte	$e3,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 93.04
+	.dword	$5d0a3d71
+	.byte	$e8,$00
+	jsr	FloatLogarithm
+	jsr	FPPushConstant	; 4.53302951
+	.dword	$488749f4
+	.byte	$e4,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 17.2
+	.dword	$44cccccd
+	.byte	$e6,$00
+	jsr	FloatSquareRoot
+	jsr	FPPushConstant	; 4.14728827
+	.dword	$425b4af2
+	.byte	$e4,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.33333333
+	.dword	$55555547
+	.byte	$e0,$00
+	jsr	FPPushConstant	; 1.8
+	.dword	$73333333
+	.byte	$e2,$00
+	jsr	FloatPower
+	jsr	FPPushConstant	; 0.13841455
+	.dword	$46de459b
+	.byte	$df,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.01
+	.dword	$51eb851f
+	.byte	$db,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 38.44010691
+	.dword	$4ce155b1
+	.byte	$e7,$00
+	jsr	FloatNegate
+	jsr	FPPushConstant	; -38.44010691
+	.dword	$4ce155b1
+	.byte	$e7,$80
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 38.44010691
+	.dword	$4ce155b1
+	.byte	$e7,$00
+	jsr	FloatIntegerPart
+	jsr	FPPushConstant	; 38
+	.dword	$00000026
+	.byte	$00,$00
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -16.11
+	.dword	$4070a3d7
+	.byte	$e6,$80
+	jsr	FloatSine
+	jsr	FPPushConstant	; 0.39129349
+	.dword	$642bcf67
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -16.11
+	.dword	$4070a3d7
+	.byte	$e6,$80
+	jsr	FloatCosine
+	jsr	FPPushConstant	; -0.92026594
+	.dword	$75cb463a
 	.byte	$e1,$80
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -1951,12 +1144,545 @@
 	jsr	FloatCompare
 	jsr	CompareLess
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -14.64
+	jsr	FPPushConstant	; 0.26
+	.dword	$428f5c29
+	.byte	$e0,$00
+	jsr	FloatTangent
+	jsr	FPPushConstant	; 0.26602154
+	.dword	$4419fcd6
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.44
+	.dword	$70a3d70a
+	.byte	$e0,$00
+	jsr	FloatArcTan
+	jsr	FPPushConstant	; 0.41450687
+	.dword	$6a1d1f4b
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -1.47
+	.dword	$5e147ae1
+	.byte	$e2,$80
+	jsr	FloatExponent
+	jsr	FPPushConstant	; 0.22992549
+	.dword	$75b8cb38
+	.byte	$df,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 47.46
+	.dword	$5eeb851f
+	.byte	$e7,$00
+	jsr	FloatLogarithm
+	jsr	FPPushConstant	; 3.85988725
+	.dword	$7b843244
+	.byte	$e3,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 51.6
+	.dword	$67333333
+	.byte	$e7,$00
+	jsr	FloatSquareRoot
+	jsr	FPPushConstant	; 7.183314
+	.dword	$72eedaa9
+	.byte	$e4,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.87
+	.dword	$6f5c28f6
+	.byte	$e1,$00
+	jsr	FPPushConstant	; 2.0
+	.dword	$00000002
+	.byte	$00,$00
+	jsr	FloatPower
+	jsr	FPPushConstant	; 0.7569
+	.dword	$60e21965
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.01
+	.dword	$51eb851f
+	.byte	$db,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 3.94792257
+	.dword	$7e5561b7
+	.byte	$e3,$00
+	jsr	FloatNegate
+	jsr	FPPushConstant	; -3.94792257
+	.dword	$7e5561b7
+	.byte	$e3,$80
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 3.94792257
+	.dword	$7e5561b7
+	.byte	$e3,$00
+	jsr	FloatIntegerPart
+	jsr	FPPushConstant	; 3
+	.dword	$00000003
+	.byte	$00,$00
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 1.27
+	.dword	$5147ae14
+	.byte	$e2,$00
+	jsr	FloatSine
+	jsr	FPPushConstant	; 0.95510086
+	.dword	$7a40beb7
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 1.27
+	.dword	$5147ae14
+	.byte	$e2,$00
+	jsr	FloatCosine
+	jsr	FPPushConstant	; 0.29628087
+	.dword	$4bd91027
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.2
+	.dword	$66666666
+	.byte	$df,$00
+	jsr	FloatTangent
+	jsr	FPPushConstant	; 0.20271004
+	.dword	$67c99c41
+	.byte	$df,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 1.456
+	.dword	$5d2f1aa0
+	.byte	$e2,$00
+	jsr	FloatArcTan
+	jsr	FPPushConstant	; 0.96897551
+	.dword	$7c0763b7
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 1.93
+	.dword	$7b851eb8
+	.byte	$e2,$00
+	jsr	FloatExponent
+	jsr	FPPushConstant	; 6.88951024
+	.dword	$6e3b6f17
+	.byte	$e4,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 34.55
+	.dword	$4519999a
+	.byte	$e7,$00
+	jsr	FloatLogarithm
+	jsr	FPPushConstant	; 3.54240755
+	.dword	$715b6714
+	.byte	$e3,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 85.55
+	.dword	$558ccccd
+	.byte	$e8,$00
+	jsr	FloatSquareRoot
+	jsr	FPPushConstant	; 9.2493243
+	.dword	$49fe9dbd
+	.byte	$e5,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 2.87
+	.dword	$5bd70a3d
+	.byte	$e3,$00
+	jsr	FPPushConstant	; 0.3
+	.dword	$4ccccccd
+	.byte	$e0,$00
+	jsr	FloatPower
+	jsr	FPPushConstant	; 1.37203304
+	.dword	$57cf63ab
+	.byte	$e2,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.01
+	.dword	$51eb851f
+	.byte	$db,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -26.93383008
+	.dword	$6bbc3df4
+	.byte	$e6,$80
+	jsr	FloatNegate
+	jsr	FPPushConstant	; 26.93383008
+	.dword	$6bbc3df4
+	.byte	$e6,$00
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -26.93383008
+	.dword	$6bbc3df4
+	.byte	$e6,$80
+	jsr	FloatIntegerPart
+	jsr	FPPushConstant	; -26
+	.dword	$0000001a
+	.byte	$00,$80
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 10.28
+	.dword	$523d70a4
+	.byte	$e5,$00
+	jsr	FloatSine
+	jsr	FPPushConstant	; -0.7547166
+	.dword	$609a8db5
+	.byte	$e1,$80
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 10.28
+	.dword	$523d70a4
+	.byte	$e5,$00
+	jsr	FloatCosine
+	jsr	FPPushConstant	; -0.65605095
+	.dword	$53f97a3f
+	.byte	$e1,$80
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.14
+	.dword	$47ae147b
+	.byte	$df,$00
+	jsr	FloatTangent
+	jsr	FPPushConstant	; 0.14092189
+	.dword	$4826e9fa
+	.byte	$df,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 1.509
+	.dword	$609374bc
+	.byte	$e2,$00
+	jsr	FloatArcTan
+	jsr	FPPushConstant	; 0.98555149
+	.dword	$7e268d1d
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 1.83
 	.dword	$751eb852
+	.byte	$e2,$00
+	jsr	FloatExponent
+	jsr	FPPushConstant	; 6.23388666
+	.dword	$63bdfff0
+	.byte	$e4,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 45.96
+	.dword	$5beb851f
+	.byte	$e7,$00
+	jsr	FloatLogarithm
+	jsr	FPPushConstant	; 3.82777145
+	.dword	$7a7d1a8d
+	.byte	$e3,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 9.36
+	.dword	$4ae147ae
+	.byte	$e5,$00
+	jsr	FloatSquareRoot
+	jsr	FPPushConstant	; 3.05941171
+	.dword	$61e6b363
+	.byte	$e3,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 3.2
+	.dword	$66666666
+	.byte	$e3,$00
+	jsr	FPPushConstant	; 1.3
+	.dword	$53333333
+	.byte	$e2,$00
+	jsr	FloatPower
+	jsr	FPPushConstant	; 4.53622901
+	.dword	$489464df
+	.byte	$e4,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.01
+	.dword	$51eb851f
+	.byte	$db,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 53.2439459
+	.dword	$6a7ce67a
+	.byte	$e7,$00
+	jsr	FloatNegate
+	jsr	FPPushConstant	; -53.2439459
+	.dword	$6a7ce67a
+	.byte	$e7,$80
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 53.2439459
+	.dword	$6a7ce67a
+	.byte	$e7,$00
+	jsr	FloatIntegerPart
+	jsr	FPPushConstant	; 53
+	.dword	$00000035
+	.byte	$00,$00
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -13.49
+	.dword	$6beb851f
+	.byte	$e5,$80
+	jsr	FloatSine
+	jsr	FPPushConstant	; -0.79779513
+	.dword	$661e269c
+	.byte	$e1,$80
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -13.49
+	.dword	$6beb851f
 	.byte	$e5,$80
 	jsr	FloatCosine
-	jsr	FPPushConstant	; -0.48190985
-	.dword	$7b5e71a5
+	jsr	FPPushConstant	; 0.60292863
+	.dword	$4d2cc3ee
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.34
+	.dword	$570a3d71
+	.byte	$e0,$00
+	jsr	FloatTangent
+	jsr	FPPushConstant	; 0.35373688
+	.dword	$5a8e800b
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 1.236
+	.dword	$4f1a9fbe
+	.byte	$e2,$00
+	jsr	FloatArcTan
+	jsr	FPPushConstant	; 0.89055446
+	.dword	$71fdb045
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.77
+	.dword	$628f5c29
+	.byte	$e1,$00
+	jsr	FloatExponent
+	jsr	FPPushConstant	; 2.15976625
+	.dword	$451cce1c
+	.byte	$e3,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 96.99
+	.dword	$60fd70a4
+	.byte	$e8,$00
+	jsr	FloatLogarithm
+	jsr	FPPushConstant	; 4.57460788
+	.dword	$49319808
+	.byte	$e4,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 11.6
+	.dword	$5ccccccd
+	.byte	$e5,$00
+	jsr	FloatSquareRoot
+	jsr	FPPushConstant	; 3.40587727
+	.dword	$6cfcf254
+	.byte	$e3,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 1.42333333
+	.dword	$5b17e4ae
+	.byte	$e2,$00
+	jsr	FPPushConstant	; 1.7
+	.dword	$6ccccccd
+	.byte	$e2,$00
+	jsr	FloatPower
+	jsr	FPPushConstant	; 1.82230579
+	.dword	$74a0a877
+	.byte	$e2,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.01
+	.dword	$51eb851f
+	.byte	$db,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 57.12172997
+	.dword	$723e5364
+	.byte	$e7,$00
+	jsr	FloatNegate
+	jsr	FPPushConstant	; -57.12172997
+	.dword	$723e5364
+	.byte	$e7,$80
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 57.12172997
+	.dword	$723e5364
+	.byte	$e7,$00
+	jsr	FloatIntegerPart
+	jsr	FPPushConstant	; 57
+	.dword	$00000039
+	.byte	$00,$00
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -4.44
+	.dword	$470a3d71
+	.byte	$e4,$80
+	jsr	FloatSine
+	jsr	FPPushConstant	; 0.96313093
+	.dword	$7b47dfd3
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -4.44
+	.dword	$470a3d71
+	.byte	$e4,$80
+	jsr	FloatCosine
+	jsr	FPPushConstant	; -0.2690331
+	.dword	$44df5a6e
 	.byte	$e0,$80
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -1980,27 +1706,13 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.803
-	.dword	$66c8b439
-	.byte	$e1,$00
-	jsr	FloatArcTan
-	jsr	FPPushConstant	; 0.67656754
-	.dword	$5699c3e1
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.06
-	.dword	$7ae147ae
-	.byte	$dd,$00
-	jsr	FloatExponent
-	jsr	FPPushConstant	; 1.06183655
-	.dword	$43f5214a
+	jsr	FPPushConstant	; 1.219
+	.dword	$4e041893
 	.byte	$e2,$00
+	jsr	FloatArcTan
+	jsr	FPPushConstant	; 0.88377269
+	.dword	$711f76a8
+	.byte	$e1,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.001
@@ -2008,12 +1720,12 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 56.16
-	.dword	$7051eb85
-	.byte	$e7,$00
-	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 4.02820476
-	.dword	$407386d6
+	jsr	FPPushConstant	; 1.96
+	.dword	$7d70a3d7
+	.byte	$e2,$00
+	jsr	FloatExponent
+	jsr	FPPushConstant	; 7.09932707
+	.dword	$7196d7fb
 	.byte	$e4,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -2022,12 +1734,26 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 60.9
-	.dword	$79cccccd
+	jsr	FPPushConstant	; 95.78
+	.dword	$5fc7ae14
+	.byte	$e8,$00
+	jsr	FloatLogarithm
+	jsr	FPPushConstant	; 4.56205389
+	.dword	$48fe2c38
+	.byte	$e4,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 53.89
+	.dword	$6bc7ae14
 	.byte	$e7,$00
 	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 7.80384521
-	.dword	$7cdc8ccb
+	jsr	FPPushConstant	; 7.34098086
+	.dword	$7574a859
 	.byte	$e4,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -2036,15 +1762,152 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.99666667
-	.dword	$7f92c600
-	.byte	$e1,$00
-	jsr	FPPushConstant	; 1.1
-	.dword	$46666666
+	jsr	FPPushConstant	; 3.19666667
+	.dword	$664b17e6
+	.byte	$e3,$00
+	jsr	FPPushConstant	; 1.4
+	.dword	$5999999a
 	.byte	$e2,$00
 	jsr	FloatPower
-	jsr	FPPushConstant	; 0.99633395
-	.dword	$7f87def2
+	jsr	FPPushConstant	; 5.088342
+	.dword	$5169d94d
+	.byte	$e4,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.01
+	.dword	$51eb851f
+	.byte	$db,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -28.23374099
+	.dword	$70ef59cc
+	.byte	$e6,$80
+	jsr	FloatNegate
+	jsr	FPPushConstant	; 28.23374099
+	.dword	$70ef59cc
+	.byte	$e6,$00
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -28.23374099
+	.dword	$70ef59cc
+	.byte	$e6,$80
+	jsr	FloatIntegerPart
+	jsr	FPPushConstant	; -28
+	.dword	$0000001c
+	.byte	$00,$80
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 11.95
+	.dword	$5f99999a
+	.byte	$e5,$00
+	jsr	FloatSine
+	jsr	FPPushConstant	; -0.57807746
+	.dword	$49fe7135
+	.byte	$e1,$80
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 11.95
+	.dword	$5f99999a
+	.byte	$e5,$00
+	jsr	FloatCosine
+	jsr	FPPushConstant	; 0.81598189
+	.dword	$68721836
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.19
+	.dword	$6147ae14
+	.byte	$df,$00
+	jsr	FloatTangent
+	jsr	FPPushConstant	; 0.19231984
+	.dword	$6277befe
+	.byte	$df,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 1.382
+	.dword	$5872b021
+	.byte	$e2,$00
+	jsr	FloatArcTan
+	jsr	FPPushConstant	; 0.94441362
+	.dword	$78e28ba6
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -1.24
+	.dword	$4f5c28f6
+	.byte	$e2,$80
+	jsr	FloatExponent
+	jsr	FPPushConstant	; 0.28938422
+	.dword	$4a151591
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 3.27
+	.dword	$68a3d70a
+	.byte	$e3,$00
+	jsr	FloatLogarithm
+	jsr	FPPushConstant	; 1.18478998
+	.dword	$4bd3995a
+	.byte	$e2,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 1.04
+	.dword	$428f5c29
+	.byte	$e2,$00
+	jsr	FloatSquareRoot
+	jsr	FPPushConstant	; 1.0198039
+	.dword	$41447794
+	.byte	$e2,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.86
+	.dword	$6e147ae1
+	.byte	$e1,$00
+	jsr	FPPushConstant	; 1.7
+	.dword	$6ccccccd
+	.byte	$e2,$00
+	jsr	FloatPower
+	jsr	FPPushConstant	; 0.77383322
+	.dword	$630cf78a
 	.byte	$e1,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -2053,32 +1916,306 @@
 	.byte	$db,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -65.4448854
-	.dword	$4171e402
-	.byte	$e8,$80
-	jsr	FloatNegate
-	jsr	FPPushConstant	; 65.4448854
-	.dword	$4171e402
+	jsr	FPPushConstant	; 71.32226452
+	.dword	$47527fed
 	.byte	$e8,$00
+	jsr	FloatNegate
+	jsr	FPPushConstant	; -71.32226452
+	.dword	$47527fed
+	.byte	$e8,$80
 	jsr	FloatCompare
 	jsr	CompareEqual
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -65.4448854
-	.dword	$4171e402
-	.byte	$e8,$80
+	jsr	FPPushConstant	; 71.32226452
+	.dword	$47527fed
+	.byte	$e8,$00
 	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; -65
-	.dword	$00000041
+	jsr	FPPushConstant	; 71
+	.dword	$00000047
+	.byte	$00,$00
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 3.68
+	.dword	$75c28f5c
+	.byte	$e3,$00
+	jsr	FloatSine
+	jsr	FPPushConstant	; -0.51276931
+	.dword	$41a26cbc
+	.byte	$e1,$80
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 3.68
+	.dword	$75c28f5c
+	.byte	$e3,$00
+	jsr	FloatCosine
+	jsr	FPPushConstant	; -0.85852643
+	.dword	$6de431ae
+	.byte	$e1,$80
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.27
+	.dword	$451eb852
+	.byte	$e0,$00
+	jsr	FloatTangent
+	jsr	FPPushConstant	; 0.27675814
+	.dword	$46d99f18
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 1.656
+	.dword	$69fbe76d
+	.byte	$e2,$00
+	jsr	FloatArcTan
+	jsr	FPPushConstant	; 1.02753995
+	.dword	$41c336ec
+	.byte	$e2,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -1.78
+	.dword	$71eb851f
+	.byte	$e2,$80
+	jsr	FloatExponent
+	jsr	FPPushConstant	; 0.16863815
+	.dword	$5657bd56
+	.byte	$df,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 68.51
+	.dword	$44828f5c
+	.byte	$e8,$00
+	jsr	FloatLogarithm
+	jsr	FPPushConstant	; 4.22697972
+	.dword	$43a1b57d
+	.byte	$e4,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 43.6
+	.dword	$57333333
+	.byte	$e7,$00
+	jsr	FloatSquareRoot
+	jsr	FPPushConstant	; 6.60302961
+	.dword	$69a60260
+	.byte	$e4,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 1.34
+	.dword	$55c28f5c
+	.byte	$e2,$00
+	jsr	FPPushConstant	; 1.6
+	.dword	$66666666
+	.byte	$e2,$00
+	jsr	FloatPower
+	jsr	FPPushConstant	; 1.5972308
+	.dword	$66390789
+	.byte	$e2,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.01
+	.dword	$51eb851f
+	.byte	$db,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -39.08747064
+	.dword	$4e2cc8f4
+	.byte	$e7,$80
+	jsr	FloatNegate
+	jsr	FPPushConstant	; 39.08747064
+	.dword	$4e2cc8f4
+	.byte	$e7,$00
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -39.08747064
+	.dword	$4e2cc8f4
+	.byte	$e7,$80
+	jsr	FloatIntegerPart
+	jsr	FPPushConstant	; -39
+	.dword	$00000027
 	.byte	$00,$80
 	jsr	FloatCompare
 	jsr	CompareEqual
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 6.64
-	.dword	$6a3d70a4
+	jsr	FPPushConstant	; 4.09
+	.dword	$4170a3d7
 	.byte	$e4,$00
 	jsr	FloatSine
-	jsr	FPPushConstant	; 0.34929133
-	.dword	$596b2817
+	jsr	FPPushConstant	; -0.81248805
+	.dword	$67ff9bc2
+	.byte	$e1,$80
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 4.09
+	.dword	$4170a3d7
+	.byte	$e4,$00
+	jsr	FloatCosine
+	jsr	FPPushConstant	; -0.58297784
+	.dword	$4a9f0493
+	.byte	$e1,$80
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.26
+	.dword	$428f5c29
+	.byte	$e0,$00
+	jsr	FloatTangent
+	jsr	FPPushConstant	; 0.26602154
+	.dword	$4419fcd6
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.596
+	.dword	$4c49ba5e
+	.byte	$e1,$00
+	jsr	FloatArcTan
+	jsr	FPPushConstant	; 0.53747313
+	.dword	$44cbeb66
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -1.22
+	.dword	$4e147ae1
+	.byte	$e2,$80
+	jsr	FloatExponent
+	jsr	FPPushConstant	; 0.29523017
+	.dword	$4b943455
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 14.12
+	.dword	$70f5c28f
+	.byte	$e5,$00
+	jsr	FloatLogarithm
+	jsr	FPPushConstant	; 2.64759223
+	.dword	$54b91357
+	.byte	$e3,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 59.45
+	.dword	$76e66666
+	.byte	$e7,$00
+	jsr	FloatSquareRoot
+	jsr	FPPushConstant	; 7.71038261
+	.dword	$7b5dba28
+	.byte	$e4,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.43666667
+	.dword	$6fc9630b
+	.byte	$e0,$00
+	jsr	FPPushConstant	; 1.1
+	.dword	$46666666
+	.byte	$e2,$00
+	jsr	FloatPower
+	jsr	FPPushConstant	; 0.40194353
+	.dword	$66e5c56c
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.01
+	.dword	$51eb851f
+	.byte	$db,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 15.39782943
+	.dword	$7b2ec132
+	.byte	$e5,$00
+	jsr	FloatNegate
+	jsr	FPPushConstant	; -15.39782943
+	.dword	$7b2ec132
+	.byte	$e5,$80
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 15.39782943
+	.dword	$7b2ec132
+	.byte	$e5,$00
+	jsr	FloatIntegerPart
+	jsr	FPPushConstant	; 15
+	.dword	$0000000f
+	.byte	$00,$00
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -12.19
+	.dword	$61851eb8
+	.byte	$e5,$80
+	jsr	FloatSine
+	jsr	FPPushConstant	; 0.36754755
+	.dword	$5e1798a3
 	.byte	$e0,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -2088,12 +2225,834 @@
 	jsr	FloatCompare
 	jsr	CompareLess
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 6.64
-	.dword	$6a3d70a4
+	jsr	FPPushConstant	; -12.19
+	.dword	$61851eb8
+	.byte	$e5,$80
+	jsr	FloatCosine
+	jsr	FPPushConstant	; 0.93000473
+	.dword	$770a651e
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.37
+	.dword	$5eb851ec
+	.byte	$e0,$00
+	jsr	FloatTangent
+	jsr	FPPushConstant	; 0.38786316
+	.dword	$634b0004
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.621
+	.dword	$4f7ced91
+	.byte	$e1,$00
+	jsr	FloatArcTan
+	jsr	FPPushConstant	; 0.55571774
+	.dword	$4721c248
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.85
+	.dword	$6ccccccd
+	.byte	$e1,$00
+	jsr	FloatExponent
+	jsr	FPPushConstant	; 2.33964685
+	.dword	$4ade6312
+	.byte	$e3,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 20.68
+	.dword	$52b851ec
+	.byte	$e6,$00
+	jsr	FloatLogarithm
+	jsr	FPPushConstant	; 3.02916705
+	.dword	$60eeefbd
+	.byte	$e3,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 75.58
+	.dword	$4b947ae1
+	.byte	$e8,$00
+	jsr	FloatSquareRoot
+	jsr	FPPushConstant	; 8.69367586
+	.dword	$458ca5ee
+	.byte	$e5,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.56
+	.dword	$47ae147b
+	.byte	$e1,$00
+	jsr	FPPushConstant	; 1.6
+	.dword	$66666666
+	.byte	$e2,$00
+	jsr	FloatPower
+	jsr	FPPushConstant	; 0.39545843
+	.dword	$653cc380
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.01
+	.dword	$51eb851f
+	.byte	$db,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -37.98615048
+	.dword	$4bf8e8b7
+	.byte	$e7,$80
+	jsr	FloatNegate
+	jsr	FPPushConstant	; 37.98615048
+	.dword	$4bf8e8b7
+	.byte	$e7,$00
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -37.98615048
+	.dword	$4bf8e8b7
+	.byte	$e7,$80
+	jsr	FloatIntegerPart
+	jsr	FPPushConstant	; -37
+	.dword	$00000025
+	.byte	$00,$80
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.68
+	.dword	$570a3d71
+	.byte	$e1,$00
+	jsr	FloatSine
+	jsr	FPPushConstant	; 0.62879302
+	.dword	$507c4a28
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.68
+	.dword	$570a3d71
+	.byte	$e1,$00
+	jsr	FloatCosine
+	jsr	FPPushConstant	; 0.77757272
+	.dword	$638780bd
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.26
+	.dword	$428f5c29
+	.byte	$e0,$00
+	jsr	FloatTangent
+	jsr	FPPushConstant	; 0.26602154
+	.dword	$4419fcd6
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.605
+	.dword	$4d70a3d7
+	.byte	$e1,$00
+	jsr	FloatArcTan
+	jsr	FPPushConstant	; 0.54408786
+	.dword	$45a4abc6
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.44
+	.dword	$70a3d70a
+	.byte	$e0,$00
+	jsr	FloatExponent
+	jsr	FPPushConstant	; 1.55270722
+	.dword	$635f8e1b
+	.byte	$e2,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 69.57
+	.dword	$4591eb85
+	.byte	$e8,$00
+	jsr	FloatLogarithm
+	jsr	FPPushConstant	; 4.24233344
+	.dword	$43e09907
+	.byte	$e4,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 33.88
+	.dword	$43c28f5c
+	.byte	$e7,$00
+	jsr	FloatSquareRoot
+	jsr	FPPushConstant	; 5.82065288
+	.dword	$5d2164ea
+	.byte	$e4,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 2.08333333
+	.dword	$42aaaaa9
+	.byte	$e3,$00
+	jsr	FPPushConstant	; 1.2
+	.dword	$4ccccccd
+	.byte	$e2,$00
+	jsr	FloatPower
+	jsr	FPPushConstant	; 2.41273995
+	.dword	$4d352a69
+	.byte	$e3,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.01
+	.dword	$51eb851f
+	.byte	$db,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -64.09265409
+	.dword	$4017b82e
+	.byte	$e8,$80
+	jsr	FloatNegate
+	jsr	FPPushConstant	; 64.09265409
+	.dword	$4017b82e
+	.byte	$e8,$00
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -64.09265409
+	.dword	$4017b82e
+	.byte	$e8,$80
+	jsr	FloatIntegerPart
+	jsr	FPPushConstant	; -64
+	.dword	$00000040
+	.byte	$00,$80
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -16.07
+	.dword	$4047ae14
+	.byte	$e6,$80
+	jsr	FloatSine
+	jsr	FPPushConstant	; 0.35417967
+	.dword	$5aab84d4
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -16.07
+	.dword	$4047ae14
+	.byte	$e6,$80
+	jsr	FloatCosine
+	jsr	FPPushConstant	; -0.93517739
+	.dword	$77b3e489
+	.byte	$e1,$80
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.36
+	.dword	$5c28f5c3
+	.byte	$e0,$00
+	jsr	FloatTangent
+	jsr	FPPushConstant	; 0.37640285
+	.dword	$605befeb
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.486
+	.dword	$7c6a7efa
+	.byte	$e0,$00
+	jsr	FloatArcTan
+	jsr	FPPushConstant	; 0.45238501
+	.dword	$73cf8107
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 1.27
+	.dword	$5147ae14
+	.byte	$e2,$00
+	jsr	FloatExponent
+	jsr	FPPushConstant	; 3.56085256
+	.dword	$71f28111
+	.byte	$e3,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 28.12
+	.dword	$707ae148
+	.byte	$e6,$00
+	jsr	FloatLogarithm
+	jsr	FPPushConstant	; 3.33648107
+	.dword	$6ac473f3
+	.byte	$e3,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 14.87
+	.dword	$76f5c28f
+	.byte	$e5,$00
+	jsr	FloatSquareRoot
+	jsr	FPPushConstant	; 3.8561639
+	.dword	$7b65b1d6
+	.byte	$e3,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 2.10666667
+	.dword	$4369d038
+	.byte	$e3,$00
+	jsr	FPPushConstant	; 0.8
+	.dword	$66666666
+	.byte	$e1,$00
+	jsr	FloatPower
+	jsr	FPPushConstant	; 1.81500012
+	.dword	$7428f643
+	.byte	$e2,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.01
+	.dword	$51eb851f
+	.byte	$db,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -80.9037013
+	.dword	$50e758f8
+	.byte	$e8,$80
+	jsr	FloatNegate
+	jsr	FPPushConstant	; 80.9037013
+	.dword	$50e758f8
+	.byte	$e8,$00
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -80.9037013
+	.dword	$50e758f8
+	.byte	$e8,$80
+	jsr	FloatIntegerPart
+	jsr	FPPushConstant	; -80
+	.dword	$00000050
+	.byte	$00,$80
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -16.97
+	.dword	$43e147ae
+	.byte	$e6,$80
+	jsr	FloatSine
+	jsr	FPPushConstant	; 0.95271123
+	.dword	$79f2710c
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -16.97
+	.dword	$43e147ae
+	.byte	$e6,$80
+	jsr	FloatCosine
+	jsr	FPPushConstant	; -0.30387712
+	.dword	$4dcae414
+	.byte	$e0,$80
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.15
+	.dword	$4ccccccd
+	.byte	$df,$00
+	jsr	FloatTangent
+	jsr	FPPushConstant	; 0.15113522
+	.dword	$4d619876
+	.byte	$df,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.662
+	.dword	$54bc6a7f
+	.byte	$e1,$00
+	jsr	FloatArcTan
+	jsr	FPPushConstant	; 0.58476487
+	.dword	$4ad99344
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 1.41
+	.dword	$5a3d70a4
+	.byte	$e2,$00
+	jsr	FloatExponent
+	jsr	FPPushConstant	; 4.0959554
+	.dword	$41890888
+	.byte	$e4,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 11.55
+	.dword	$5c666666
+	.byte	$e5,$00
+	jsr	FloatLogarithm
+	jsr	FPPushConstant	; 2.44668544
+	.dword	$4e4b3f44
+	.byte	$e3,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 55.79
+	.dword	$6f947ae1
+	.byte	$e7,$00
+	jsr	FloatSquareRoot
+	jsr	FPPushConstant	; 7.46927038
+	.dword	$778221a8
+	.byte	$e4,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 2.66
+	.dword	$551eb852
+	.byte	$e3,$00
+	jsr	FPPushConstant	; 1.7
+	.dword	$6ccccccd
+	.byte	$e2,$00
+	jsr	FloatPower
+	jsr	FPPushConstant	; 5.27592705
+	.dword	$546a327b
+	.byte	$e4,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.01
+	.dword	$51eb851f
+	.byte	$db,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -9.82943225
+	.dword	$4ea2ad60
+	.byte	$e5,$80
+	jsr	FloatNegate
+	jsr	FPPushConstant	; 9.82943225
+	.dword	$4ea2ad60
+	.byte	$e5,$00
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -9.82943225
+	.dword	$4ea2ad60
+	.byte	$e5,$80
+	jsr	FloatIntegerPart
+	jsr	FPPushConstant	; -9
+	.dword	$00000009
+	.byte	$00,$80
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -7.16
+	.dword	$728f5c29
+	.byte	$e4,$80
+	jsr	FloatSine
+	jsr	FPPushConstant	; -0.76870545
+	.dword	$6264f0b0
+	.byte	$e1,$80
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -7.16
+	.dword	$728f5c29
+	.byte	$e4,$80
+	jsr	FloatCosine
+	jsr	FPPushConstant	; 0.63960295
+	.dword	$51de826c
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.17
+	.dword	$570a3d71
+	.byte	$df,$00
+	jsr	FloatTangent
+	jsr	FPPushConstant	; 0.17165682
+	.dword	$57e36718
+	.byte	$df,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 1.895
+	.dword	$7947ae14
+	.byte	$e2,$00
+	jsr	FloatArcTan
+	jsr	FPPushConstant	; 1.08523156
+	.dword	$45746f13
+	.byte	$e2,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 1.85
+	.dword	$76666666
+	.byte	$e2,$00
+	jsr	FloatExponent
+	jsr	FPPushConstant	; 6.35981952
+	.dword	$65c1d21d
+	.byte	$e4,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 44.46
+	.dword	$58eb851f
+	.byte	$e7,$00
+	jsr	FloatLogarithm
+	jsr	FPPushConstant	; 3.79458991
+	.dword	$796d47d2
+	.byte	$e3,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 99.71
+	.dword	$63b5c28f
+	.byte	$e8,$00
+	jsr	FloatSquareRoot
+	jsr	FPPushConstant	; 9.98548947
+	.dword	$4fe2484e
+	.byte	$e5,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 1.62
+	.dword	$67ae147b
+	.byte	$e2,$00
+	jsr	FPPushConstant	; 1.2
+	.dword	$4ccccccd
+	.byte	$e2,$00
+	jsr	FloatPower
+	jsr	FPPushConstant	; 1.78409517
+	.dword	$722e9d82
+	.byte	$e2,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.01
+	.dword	$51eb851f
+	.byte	$db,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -34.95909938
+	.dword	$45eb0f13
+	.byte	$e7,$80
+	jsr	FloatNegate
+	jsr	FPPushConstant	; 34.95909938
+	.dword	$45eb0f13
+	.byte	$e7,$00
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -34.95909938
+	.dword	$45eb0f13
+	.byte	$e7,$80
+	jsr	FloatIntegerPart
+	jsr	FPPushConstant	; -34
+	.dword	$00000022
+	.byte	$00,$80
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 5.14
+	.dword	$523d70a4
+	.byte	$e4,$00
+	jsr	FloatSine
+	jsr	FPPushConstant	; -0.90995905
+	.dword	$747989c4
+	.byte	$e1,$80
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 5.14
+	.dword	$523d70a4
 	.byte	$e4,$00
 	jsr	FloatCosine
-	jsr	FPPushConstant	; 0.93701418
-	.dword	$77f014a5
+	jsr	FPPushConstant	; 0.41469811
+	.dword	$6a29a7c4
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.16
+	.dword	$51eb851f
+	.byte	$df,$00
+	jsr	FloatTangent
+	jsr	FPPushConstant	; 0.16137946
+	.dword	$52a0541e
+	.byte	$df,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.645
+	.dword	$528f5c29
+	.byte	$e1,$00
+	jsr	FloatArcTan
+	jsr	FPPushConstant	; 0.57285225
+	.dword	$495338f8
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -1.37
+	.dword	$57ae147b
+	.byte	$e2,$80
+	jsr	FloatExponent
+	jsr	FPPushConstant	; 0.25410696
+	.dword	$410d275b
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 80.24
+	.dword	$503d70a4
+	.byte	$e8,$00
+	jsr	FloatLogarithm
+	jsr	FPPushConstant	; 4.38502214
+	.dword	$46290cfa
+	.byte	$e4,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 33.04
+	.dword	$42147ae1
+	.byte	$e7,$00
+	jsr	FloatSquareRoot
+	jsr	FPPushConstant	; 5.74804315
+	.dword	$5bf7fc18
+	.byte	$e4,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 2.98333333
+	.dword	$5f777776
+	.byte	$e3,$00
+	jsr	FPPushConstant	; 0.5
+	.dword	$40000000
+	.byte	$e1,$00
+	jsr	FloatPower
+	jsr	FPPushConstant	; 1.72723285
+	.dword	$6e8afba7
+	.byte	$e2,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.01
+	.dword	$51eb851f
+	.byte	$db,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -79.57074593
+	.dword	$4f921c68
+	.byte	$e8,$80
+	jsr	FloatNegate
+	jsr	FPPushConstant	; 79.57074593
+	.dword	$4f921c68
+	.byte	$e8,$00
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -79.57074593
+	.dword	$4f921c68
+	.byte	$e8,$80
+	jsr	FloatIntegerPart
+	jsr	FPPushConstant	; -79
+	.dword	$0000004f
+	.byte	$00,$80
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 19.57
+	.dword	$4e47ae14
+	.byte	$e6,$00
+	jsr	FloatSine
+	jsr	FPPushConstant	; 0.65971847
+	.dword	$5471a7a3
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 19.57
+	.dword	$4e47ae14
+	.byte	$e6,$00
+	jsr	FloatCosine
+	jsr	FPPushConstant	; 0.75151284
+	.dword	$6031929f
 	.byte	$e1,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -2117,13 +3076,13 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.6
-	.dword	$66666666
-	.byte	$e2,$00
+	jsr	FPPushConstant	; 0.164
+	.dword	$53f7ced9
+	.byte	$df,$00
 	jsr	FloatArcTan
-	jsr	FPPushConstant	; 1.01219701
-	.dword	$40c7d5f8
-	.byte	$e2,$00
+	jsr	FPPushConstant	; 0.16255297
+	.dword	$533a2494
+	.byte	$df,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.001
@@ -2131,12 +3090,12 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -0.34
-	.dword	$570a3d71
+	jsr	FPPushConstant	; -0.26
+	.dword	$428f5c29
 	.byte	$e0,$80
 	jsr	FloatExponent
-	jsr	FPPushConstant	; 0.71177032
-	.dword	$5b1b4a33
+	jsr	FPPushConstant	; 0.77105159
+	.dword	$62b1d189
 	.byte	$e1,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -2145,409 +3104,12 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 67.6
-	.dword	$4399999a
-	.byte	$e8,$00
+	jsr	FPPushConstant	; 14.31
+	.dword	$727ae148
+	.byte	$e5,$00
 	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 4.21360798
-	.dword	$436af034
-	.byte	$e4,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 3.05
-	.dword	$6199999a
-	.byte	$e3,$00
-	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 1.74642492
-	.dword	$6fc56d07
-	.byte	$e2,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.35
-	.dword	$5999999a
-	.byte	$e0,$00
-	jsr	FPPushConstant	; 0.1
-	.dword	$66666666
-	.byte	$de,$00
-	jsr	FloatPower
-	jsr	FPPushConstant	; 0.90034054
-	.dword	$733e5bdb
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.01
-	.dword	$51eb851f
-	.byte	$db,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -38.57827812
-	.dword	$4d281412
-	.byte	$e7,$80
-	jsr	FloatNegate
-	jsr	FPPushConstant	; 38.57827812
-	.dword	$4d281412
-	.byte	$e7,$00
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -38.57827812
-	.dword	$4d281412
-	.byte	$e7,$80
-	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; -38
-	.dword	$00000026
-	.byte	$00,$80
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -0.65
-	.dword	$53333333
-	.byte	$e1,$80
-	jsr	FloatSine
-	jsr	FPPushConstant	; -0.60518641
-	.dword	$4d76bf8f
-	.byte	$e1,$80
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -0.65
-	.dword	$53333333
-	.byte	$e1,$80
-	jsr	FloatCosine
-	jsr	FPPushConstant	; 0.7960838
-	.dword	$65e612ef
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.31
-	.dword	$4f5c28f6
-	.byte	$e0,$00
-	jsr	FloatTangent
-	jsr	FPPushConstant	; 0.32032751
-	.dword	$5200fbd3
-	.byte	$e0,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.591
-	.dword	$4ba5e354
-	.byte	$e1,$00
-	jsr	FloatArcTan
-	jsr	FPPushConstant	; 0.53377557
-	.dword	$4452c204
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -0.23
-	.dword	$75c28f5c
-	.byte	$df,$80
-	jsr	FloatExponent
-	jsr	FPPushConstant	; 0.7945336
-	.dword	$65b346ea
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 94.31
-	.dword	$5e4f5c29
-	.byte	$e8,$00
-	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 4.54658723
-	.dword	$48bed240
-	.byte	$e4,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 64.24
-	.dword	$403d70a4
-	.byte	$e8,$00
-	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 8.01498596
-	.dword	$401eb0f6
-	.byte	$e5,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 3.06666667
-	.dword	$62222224
-	.byte	$e3,$00
-	jsr	FPPushConstant	; 1.7
-	.dword	$6ccccccd
-	.byte	$e2,$00
-	jsr	FloatPower
-	jsr	FPPushConstant	; 6.71944144
-	.dword	$6b82d507
-	.byte	$e4,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.01
-	.dword	$51eb851f
-	.byte	$db,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 8.13371669
-	.dword	$4111da0e
-	.byte	$e5,$00
-	jsr	FloatNegate
-	jsr	FPPushConstant	; -8.13371669
-	.dword	$4111da0e
-	.byte	$e5,$80
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 8.13371669
-	.dword	$4111da0e
-	.byte	$e5,$00
-	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; 8
-	.dword	$00000008
-	.byte	$00,$00
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 9.26
-	.dword	$4a147ae1
-	.byte	$e5,$00
-	jsr	FloatSine
-	jsr	FPPushConstant	; 0.1640333
-	.dword	$53fc2c36
-	.byte	$df,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 9.26
-	.dword	$4a147ae1
-	.byte	$e5,$00
-	jsr	FloatCosine
-	jsr	FPPushConstant	; -0.9864548
-	.dword	$7e4426a0
-	.byte	$e1,$80
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.39
-	.dword	$63d70a3d
-	.byte	$e0,$00
-	jsr	FloatTangent
-	jsr	FPPushConstant	; 0.41105492
-	.dword	$693ae52e
-	.byte	$e0,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.231
-	.dword	$7645a1cb
-	.byte	$df,$00
-	jsr	FloatArcTan
-	jsr	FPPushConstant	; 0.22701794
-	.dword	$743bb208
-	.byte	$df,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -1.57
-	.dword	$647ae148
-	.byte	$e2,$80
-	jsr	FloatExponent
-	jsr	FPPushConstant	; 0.20804518
-	.dword	$6a84e5d8
-	.byte	$df,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 61.96
-	.dword	$7beb851f
-	.byte	$e7,$00
-	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 4.12648902
-	.dword	$4206195a
-	.byte	$e4,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 57.79
-	.dword	$73947ae1
-	.byte	$e7,$00
-	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 7.60197343
-	.dword	$79a1aee4
-	.byte	$e4,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 3.04666667
-	.dword	$617e4b1a
-	.byte	$e3,$00
-	jsr	FPPushConstant	; 0.4
-	.dword	$66666666
-	.byte	$e0,$00
-	jsr	FloatPower
-	jsr	FPPushConstant	; 1.56145681
-	.dword	$63eee88b
-	.byte	$e2,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.01
-	.dword	$51eb851f
-	.byte	$db,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 80.27334575
-	.dword	$5045f9fd
-	.byte	$e8,$00
-	jsr	FloatNegate
-	jsr	FPPushConstant	; -80.27334575
-	.dword	$5045f9fd
-	.byte	$e8,$80
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 80.27334575
-	.dword	$5045f9fd
-	.byte	$e8,$00
-	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; 80
-	.dword	$00000050
-	.byte	$00,$00
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 7.94
-	.dword	$7f0a3d71
-	.byte	$e4,$00
-	jsr	FloatSine
-	jsr	FPPushConstant	; 0.9963027
-	.dword	$7f86d8cd
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 7.94
-	.dword	$7f0a3d71
-	.byte	$e4,$00
-	jsr	FloatCosine
-	jsr	FPPushConstant	; -0.08591233
-	.dword	$57f966df
-	.byte	$de,$80
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.32
-	.dword	$51eb851f
-	.byte	$e0,$00
-	jsr	FloatTangent
-	jsr	FPPushConstant	; 0.33138941
-	.dword	$54d5efb6
-	.byte	$e0,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.778
-	.dword	$63958106
-	.byte	$e1,$00
-	jsr	FloatArcTan
-	jsr	FPPushConstant	; 0.66118162
-	.dword	$54a1996d
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.86
-	.dword	$6e147ae1
-	.byte	$e1,$00
-	jsr	FloatExponent
-	jsr	FPPushConstant	; 2.36316069
-	.dword	$4b9f032b
+	jsr	FPPushConstant	; 2.66095859
+	.dword	$552692a1
 	.byte	$e3,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -2556,27 +3118,13 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 67.21
-	.dword	$4335c28f
+	jsr	FPPushConstant	; 87.06
+	.dword	$570f5c29
 	.byte	$e8,$00
-	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 4.20782205
-	.dword	$43533d37
-	.byte	$e4,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 32.97
-	.dword	$41f0a3d7
-	.byte	$e7,$00
 	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 5.74195089
-	.dword	$5bdf07e5
-	.byte	$e4,$00
+	jsr	FPPushConstant	; 9.33059484
+	.dword	$4aa50ee8
+	.byte	$e5,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.001
@@ -2584,16 +3132,16 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.28333333
-	.dword	$5222221f
-	.byte	$e2,$00
-	jsr	FPPushConstant	; 1.3
-	.dword	$53333333
-	.byte	$e2,$00
+	jsr	FPPushConstant	; 2.42333333
+	.dword	$4d8bf257
+	.byte	$e3,$00
+	jsr	FPPushConstant	; 0.9
+	.dword	$73333333
+	.byte	$e1,$00
 	jsr	FloatPower
-	jsr	FPPushConstant	; 1.38306094
-	.dword	$58841208
-	.byte	$e2,$00
+	jsr	FPPushConstant	; 2.2180526
+	.dword	$46fa4972
+	.byte	$e3,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.01
@@ -2601,33 +3149,33 @@
 	.byte	$db,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 20.89527821
-	.dword	$5394c3d0
+	jsr	FPPushConstant	; 26.90831781
+	.dword	$6ba21e10
 	.byte	$e6,$00
 	jsr	FloatNegate
-	jsr	FPPushConstant	; -20.89527821
-	.dword	$5394c3d0
+	jsr	FPPushConstant	; -26.90831781
+	.dword	$6ba21e10
 	.byte	$e6,$80
 	jsr	FloatCompare
 	jsr	CompareEqual
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 20.89527821
-	.dword	$5394c3d0
+	jsr	FPPushConstant	; 26.90831781
+	.dword	$6ba21e10
 	.byte	$e6,$00
 	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; 20
-	.dword	$00000014
+	jsr	FPPushConstant	; 26
+	.dword	$0000001a
 	.byte	$00,$00
 	jsr	FloatCompare
 	jsr	CompareEqual
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -12.24
-	.dword	$61eb851f
+	jsr	FPPushConstant	; -12.39
+	.dword	$631eb852
 	.byte	$e5,$80
 	jsr	FloatSine
-	jsr	FPPushConstant	; 0.32060735
-	.dword	$521352c3
-	.byte	$e0,$00
+	jsr	FPPushConstant	; 0.17545765
+	.dword	$59d595c9
+	.byte	$df,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.001
@@ -2636,424 +3184,13 @@
 	jsr	FloatCompare
 	jsr	CompareLess
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -12.24
-	.dword	$61eb851f
+	jsr	FPPushConstant	; -12.39
+	.dword	$631eb852
 	.byte	$e5,$80
 	jsr	FloatCosine
-	jsr	FPPushConstant	; 0.94721219
-	.dword	$793e3fc1
+	jsr	FPPushConstant	; 0.98448698
+	.dword	$7e03ab5b
 	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.24
-	.dword	$7ae147ae
-	.byte	$df,$00
-	jsr	FloatTangent
-	jsr	FPPushConstant	; 0.2447167
-	.dword	$7d4b81df
-	.byte	$df,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.361
-	.dword	$5c6a7efa
-	.byte	$e0,$00
-	jsr	FloatArcTan
-	jsr	FPPushConstant	; 0.34644057
-	.dword	$58b05446
-	.byte	$e0,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.07
-	.dword	$447ae148
-	.byte	$e2,$00
-	jsr	FloatExponent
-	jsr	FPPushConstant	; 2.9153795
-	.dword	$5d4ac9f3
-	.byte	$e3,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 70.39
-	.dword	$4663d70a
-	.byte	$e8,$00
-	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 4.25405121
-	.dword	$44109800
-	.byte	$e4,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 98.27
-	.dword	$62451eb8
-	.byte	$e8,$00
-	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 9.91312262
-	.dword	$4f4e133b
-	.byte	$e5,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 3.21333333
-	.dword	$66d3a06b
-	.byte	$e3,$00
-	jsr	FPPushConstant	; 1.9
-	.dword	$7999999a
-	.byte	$e2,$00
-	jsr	FloatPower
-	jsr	FPPushConstant	; 9.18789409
-	.dword	$4980ce9e
-	.byte	$e5,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.01
-	.dword	$51eb851f
-	.byte	$db,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -37.08576982
-	.dword	$4a2bea06
-	.byte	$e7,$80
-	jsr	FloatNegate
-	jsr	FPPushConstant	; 37.08576982
-	.dword	$4a2bea06
-	.byte	$e7,$00
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -37.08576982
-	.dword	$4a2bea06
-	.byte	$e7,$80
-	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; -37
-	.dword	$00000025
-	.byte	$00,$80
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 18.24
-	.dword	$48f5c28f
-	.byte	$e6,$00
-	jsr	FloatSine
-	jsr	FPPushConstant	; -0.57250342
-	.dword	$4947cac5
-	.byte	$e1,$80
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 18.24
-	.dword	$48f5c28f
-	.byte	$e6,$00
-	jsr	FloatCosine
-	jsr	FPPushConstant	; 0.81990234
-	.dword	$68f28f54
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.13
-	.dword	$428f5c29
-	.byte	$df,$00
-	jsr	FloatTangent
-	jsr	FPPushConstant	; 0.13073732
-	.dword	$42f00084
-	.byte	$df,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.115
-	.dword	$75c28f5c
-	.byte	$de,$00
-	jsr	FloatArcTan
-	jsr	FPPushConstant	; 0.11449703
-	.dword	$753eb59d
-	.byte	$de,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.43
-	.dword	$6e147ae1
-	.byte	$e0,$00
-	jsr	FloatExponent
-	jsr	FPPushConstant	; 1.53725752
-	.dword	$62626d5d
-	.byte	$e2,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 75.53
-	.dword	$4b87ae14
-	.byte	$e8,$00
-	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 4.32452993
-	.dword	$4531464c
-	.byte	$e4,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 26.22
-	.dword	$68e147ae
-	.byte	$e6,$00
-	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 5.12054685
-	.dword	$51edc289
-	.byte	$e4,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.81333333
-	.dword	$681b4e7b
-	.byte	$e1,$00
-	jsr	FPPushConstant	; 2.0
-	.dword	$00000002
-	.byte	$00,$00
-	jsr	FloatPower
-	jsr	FPPushConstant	; 0.66151111
-	.dword	$54ac6564
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.01
-	.dword	$51eb851f
-	.byte	$db,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -63.39353689
-	.dword	$7ec97dab
-	.byte	$e7,$80
-	jsr	FloatNegate
-	jsr	FPPushConstant	; 63.39353689
-	.dword	$7ec97dab
-	.byte	$e7,$00
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -63.39353689
-	.dword	$7ec97dab
-	.byte	$e7,$80
-	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; -63
-	.dword	$0000003f
-	.byte	$00,$80
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.86
-	.dword	$6e147ae1
-	.byte	$e1,$00
-	jsr	FloatSine
-	jsr	FPPushConstant	; 0.75784256
-	.dword	$6100fc29
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.86
-	.dword	$6e147ae1
-	.byte	$e1,$00
-	jsr	FloatCosine
-	jsr	FPPushConstant	; 0.65243747
-	.dword	$5383122e
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.38
-	.dword	$6147ae14
-	.byte	$e0,$00
-	jsr	FloatTangent
-	jsr	FPPushConstant	; 0.39941272
-	.dword	$663fe97a
-	.byte	$e0,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.862
-	.dword	$772b020c
-	.byte	$e2,$00
-	jsr	FloatArcTan
-	jsr	FPPushConstant	; 1.07794449
-	.dword	$44fd0ae3
-	.byte	$e2,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.19
-	.dword	$6147ae14
-	.byte	$df,$00
-	jsr	FloatExponent
-	jsr	FPPushConstant	; 1.2092496
-	.dword	$4d64586f
-	.byte	$e2,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 93.96
-	.dword	$5df5c28f
-	.byte	$e8,$00
-	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 4.54286916
-	.dword	$48af9793
-	.byte	$e4,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 95.06
-	.dword	$5f0f5c29
-	.byte	$e8,$00
-	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 9.74987179
-	.dword	$4dffbcc8
-	.byte	$e5,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 2.58333333
-	.dword	$52aaaaa9
-	.byte	$e3,$00
-	jsr	FPPushConstant	; 0.6
-	.dword	$4ccccccd
-	.byte	$e1,$00
-	jsr	FloatPower
-	jsr	FPPushConstant	; 1.76729183
-	.dword	$711b4f31
-	.byte	$e2,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.01
-	.dword	$51eb851f
-	.byte	$db,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 72.89616911
-	.dword	$48e56b57
-	.byte	$e8,$00
-	jsr	FloatNegate
-	jsr	FPPushConstant	; -72.89616911
-	.dword	$48e56b57
-	.byte	$e8,$80
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 72.89616911
-	.dword	$48e56b57
-	.byte	$e8,$00
-	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; 72
-	.dword	$00000048
-	.byte	$00,$00
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 16.76
-	.dword	$430a3d71
-	.byte	$e6,$00
-	jsr	FloatSine
-	jsr	FPPushConstant	; -0.86843484
-	.dword	$6f28df72
-	.byte	$e1,$80
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 16.76
-	.dword	$430a3d71
-	.byte	$e6,$00
-	jsr	FloatCosine
-	jsr	FPPushConstant	; -0.49580331
-	.dword	$7eecf73a
-	.byte	$e0,$80
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.001
@@ -3076,120 +3213,12 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.142
-	.dword	$48b43958
-	.byte	$df,$00
+	jsr	FPPushConstant	; 1.339
+	.dword	$55b22d0e
+	.byte	$e2,$00
 	jsr	FloatArcTan
-	jsr	FPPushConstant	; 0.14105695
-	.dword	$48389dd6
-	.byte	$df,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.03
-	.dword	$41eb851f
-	.byte	$e2,$00
-	jsr	FloatExponent
-	jsr	FPPushConstant	; 2.80106583
-	.dword	$59a254cf
-	.byte	$e3,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 89.19
-	.dword	$5930a3d7
-	.byte	$e8,$00
-	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 4.49076893
-	.dword	$47da3086
-	.byte	$e4,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 12.09
-	.dword	$60b851ec
-	.byte	$e5,$00
-	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 3.47706773
-	.dword	$6f44238b
-	.byte	$e3,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.95333333
-	.dword	$7d0369cd
-	.byte	$e2,$00
-	jsr	FPPushConstant	; 1.0
-	.dword	$00000001
-	.byte	$00,$00
-	jsr	FloatPower
-	jsr	FPPushConstant	; 1.95333333
-	.dword	$7d0369cd
-	.byte	$e2,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.01
-	.dword	$51eb851f
-	.byte	$db,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -46.53154612
-	.dword	$5d1026d0
-	.byte	$e7,$80
-	jsr	FloatNegate
-	jsr	FPPushConstant	; 46.53154612
-	.dword	$5d1026d0
-	.byte	$e7,$00
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -46.53154612
-	.dword	$5d1026d0
-	.byte	$e7,$80
-	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; -46
-	.dword	$0000002e
-	.byte	$00,$80
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -12.26
-	.dword	$62147ae1
-	.byte	$e5,$80
-	jsr	FloatSine
-	jsr	FPPushConstant	; 0.30160025
-	.dword	$4d35ac8a
-	.byte	$e0,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -12.26
-	.dword	$62147ae1
-	.byte	$e5,$80
-	jsr	FloatCosine
-	jsr	FPPushConstant	; 0.95343447
-	.dword	$7a0a2406
+	jsr	FPPushConstant	; 0.92932968
+	.dword	$76f44663
 	.byte	$e1,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -3197,42 +3226,13 @@
 	.dword	$4189374c
 	.byte	$d8,$00
 	jsr	FloatCompare
-	jsr	CompareLess
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.1
-	.dword	$66666666
-	.byte	$de,$00
-	jsr	FloatTangent
-	jsr	FPPushConstant	; 0.10033467
-	.dword	$66be21b9
-	.byte	$de,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.585
-	.dword	$6570a3d7
-	.byte	$e2,$00
-	jsr	FloatArcTan
-	jsr	FPPushConstant	; 1.00795496
-	.dword	$40825585
-	.byte	$e2,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -1.22
-	.dword	$4e147ae1
+	jsr	FPPushConstant	; -1.35
+	.dword	$56666666
 	.byte	$e2,$80
 	jsr	FloatExponent
-	jsr	FPPushConstant	; 0.29523017
-	.dword	$4b943455
+	jsr	FPPushConstant	; 0.25924026
+	.dword	$425d91d7
 	.byte	$e0,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -3241,26 +3241,12 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 69.51
-	.dword	$45828f5c
-	.byte	$e8,$00
+	jsr	FPPushConstant	; 53.17
+	.dword	$6a570a3d
+	.byte	$e7,$00
 	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 4.24147063
-	.dword	$43dd104f
-	.byte	$e4,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 15.48
-	.dword	$7bd70a3d
-	.byte	$e5,$00
-	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 3.93446311
-	.dword	$7de71f2e
+	jsr	FPPushConstant	; 3.97349433
+	.dword	$7f26dd95
 	.byte	$e3,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -3269,16 +3255,30 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.35666667
-	.dword	$5b4e81c3
-	.byte	$e0,$00
-	jsr	FPPushConstant	; 0.7
-	.dword	$5999999a
-	.byte	$e1,$00
+	jsr	FPPushConstant	; 46.42
+	.dword	$5cd70a3d
+	.byte	$e7,$00
+	jsr	FloatSquareRoot
+	jsr	FPPushConstant	; 6.81322244
+	.dword	$6d02f589
+	.byte	$e4,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 2.97
+	.dword	$5f0a3d71
+	.byte	$e3,$00
+	jsr	FPPushConstant	; 1.2
+	.dword	$4ccccccd
+	.byte	$e2,$00
 	jsr	FloatPower
-	jsr	FPPushConstant	; 0.48594125
-	.dword	$7c66a551
-	.byte	$e0,$00
+	jsr	FPPushConstant	; 3.69239147
+	.dword	$76281228
+	.byte	$e3,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.01
@@ -3286,47 +3286,32 @@
 	.byte	$db,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 59.69028914
-	.dword	$77616d94
+	jsr	FPPushConstant	; 52.01384952
+	.dword	$68071749
 	.byte	$e7,$00
 	jsr	FloatNegate
-	jsr	FPPushConstant	; -59.69028914
-	.dword	$77616d94
+	jsr	FPPushConstant	; -52.01384952
+	.dword	$68071749
 	.byte	$e7,$80
 	jsr	FloatCompare
 	jsr	CompareEqual
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 59.69028914
-	.dword	$77616d94
+	jsr	FPPushConstant	; 52.01384952
+	.dword	$68071749
 	.byte	$e7,$00
 	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; 59
-	.dword	$0000003b
+	jsr	FPPushConstant	; 52
+	.dword	$00000034
 	.byte	$00,$00
 	jsr	FloatCompare
 	jsr	CompareEqual
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.89
-	.dword	$78f5c28f
-	.byte	$e2,$00
+	jsr	FPPushConstant	; 3.41
+	.dword	$6d1eb852
+	.byte	$e3,$00
 	jsr	FloatSine
-	jsr	FPPushConstant	; 0.94948561
-	.dword	$7988be95
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.89
-	.dword	$78f5c28f
-	.byte	$e2,$00
-	jsr	FloatCosine
-	jsr	FPPushConstant	; -0.31381056
-	.dword	$5055e38c
+	jsr	FPPushConstant	; -0.26519615
+	.dword	$43e3e517
 	.byte	$e0,$80
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -3336,119 +3321,12 @@
 	jsr	FloatCompare
 	jsr	CompareLess
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.37
-	.dword	$5eb851ec
-	.byte	$e0,$00
-	jsr	FloatTangent
-	jsr	FPPushConstant	; 0.38786316
-	.dword	$634b0004
-	.byte	$e0,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.496
-	.dword	$5fbe76c9
-	.byte	$e2,$00
-	jsr	FloatArcTan
-	jsr	FPPushConstant	; 0.98156068
-	.dword	$7da3c7c6
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -1.71
-	.dword	$6d70a3d7
-	.byte	$e2,$80
-	jsr	FloatExponent
-	jsr	FPPushConstant	; 0.18086579
-	.dword	$5c9a70da
-	.byte	$df,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 5.78
-	.dword	$5c7ae148
-	.byte	$e4,$00
-	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 1.75440368
-	.dword	$7048265f
-	.byte	$e2,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 36.69
-	.dword	$496147ae
-	.byte	$e7,$00
-	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 6.05722709
-	.dword	$60ea66f4
-	.byte	$e4,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 3.11666667
-	.dword	$63bbbbbe
+	jsr	FPPushConstant	; 3.41
+	.dword	$6d1eb852
 	.byte	$e3,$00
-	jsr	FPPushConstant	; 1.4
-	.dword	$5999999a
-	.byte	$e2,$00
-	jsr	FloatPower
-	jsr	FPPushConstant	; 4.91096115
-	.dword	$4e934c00
-	.byte	$e4,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.01
-	.dword	$51eb851f
-	.byte	$db,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -5.80634972
-	.dword	$5ce6cef7
-	.byte	$e4,$80
-	jsr	FloatNegate
-	jsr	FPPushConstant	; 5.80634972
-	.dword	$5ce6cef7
-	.byte	$e4,$00
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -5.80634972
-	.dword	$5ce6cef7
-	.byte	$e4,$80
-	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; -5
-	.dword	$00000005
-	.byte	$00,$80
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -7.03
-	.dword	$707ae148
-	.byte	$e4,$80
-	jsr	FloatSine
-	jsr	FPPushConstant	; -0.67930465
-	.dword	$56f3746c
+	jsr	FloatCosine
+	jsr	FPPushConstant	; -0.96419448
+	.dword	$7b6ab987
 	.byte	$e1,$80
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -3458,27 +3336,26 @@
 	jsr	FloatCompare
 	jsr	CompareLess
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -7.03
-	.dword	$707ae148
-	.byte	$e4,$80
-	jsr	FloatCosine
-	jsr	FPPushConstant	; 0.73385638
-	.dword	$5def0180
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.25
-	.dword	$40000000
-	.byte	$e0,$00
+	jsr	FPPushConstant	; 0.14
+	.dword	$47ae147b
+	.byte	$df,$00
 	jsr	FloatTangent
-	jsr	FPPushConstant	; 0.25534192
-	.dword	$415e168c
+	jsr	FPPushConstant	; 0.14092189
+	.dword	$4826e9fa
+	.byte	$df,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.29
+	.dword	$4a3d70a4
+	.byte	$e0,$00
+	jsr	FloatArcTan
+	jsr	FPPushConstant	; 0.28225742
+	.dword	$484205b4
 	.byte	$e0,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -3487,27 +3364,13 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.245
-	.dword	$4fae147b
-	.byte	$e2,$00
-	jsr	FloatArcTan
-	jsr	FPPushConstant	; 0.8940994
-	.dword	$7271d961
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -0.37
-	.dword	$5eb851ec
-	.byte	$e0,$80
+	jsr	FPPushConstant	; -0.87
+	.dword	$6f5c28f6
+	.byte	$e1,$80
 	jsr	FloatExponent
-	jsr	FPPushConstant	; 0.69073433
-	.dword	$5869fb87
-	.byte	$e1,$00
+	jsr	FPPushConstant	; 0.41895155
+	.dword	$6b4068a6
+	.byte	$e0,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.001
@@ -3515,27 +3378,13 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 36.98
-	.dword	$49f5c28f
-	.byte	$e7,$00
-	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 3.61037723
-	.dword	$738835d4
-	.byte	$e3,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 76.35
-	.dword	$4c59999a
+	jsr	FPPushConstant	; 95.22
+	.dword	$5f3851ec
 	.byte	$e8,$00
-	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 8.73784871
-	.dword	$45e71d39
-	.byte	$e5,$00
+	jsr	FloatLogarithm
+	jsr	FPPushConstant	; 4.55619
+	.dword	$48e6277c
+	.byte	$e4,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.001
@@ -3543,16 +3392,30 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 2.66333333
-	.dword	$553a06d2
+	jsr	FPPushConstant	; 10.98
+	.dword	$57d70a3d
+	.byte	$e5,$00
+	jsr	FloatSquareRoot
+	jsr	FPPushConstant	; 3.31360831
+	.dword	$6a09144b
 	.byte	$e3,$00
-	jsr	FPPushConstant	; 1.8
-	.dword	$73333333
-	.byte	$e2,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.8
+	.dword	$66666666
+	.byte	$e1,$00
+	jsr	FPPushConstant	; 0.5
+	.dword	$40000000
+	.byte	$e1,$00
 	jsr	FloatPower
-	jsr	FPPushConstant	; 5.83130751
-	.dword	$5d4d091b
-	.byte	$e4,$00
+	jsr	FPPushConstant	; 0.89442719
+	.dword	$727c9715
+	.byte	$e1,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.01
@@ -3560,33 +3423,33 @@
 	.byte	$db,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 12.55106504
-	.dword	$646894ca
-	.byte	$e5,$00
+	jsr	FPPushConstant	; 26.14797117
+	.dword	$689785c1
+	.byte	$e6,$00
 	jsr	FloatNegate
-	jsr	FPPushConstant	; -12.55106504
-	.dword	$646894ca
-	.byte	$e5,$80
+	jsr	FPPushConstant	; -26.14797117
+	.dword	$689785c1
+	.byte	$e6,$80
 	jsr	FloatCompare
 	jsr	CompareEqual
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 12.55106504
-	.dword	$646894ca
-	.byte	$e5,$00
+	jsr	FPPushConstant	; 26.14797117
+	.dword	$689785c1
+	.byte	$e6,$00
 	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; 12
-	.dword	$0000000c
+	jsr	FPPushConstant	; 26
+	.dword	$0000001a
 	.byte	$00,$00
 	jsr	FloatCompare
 	jsr	CompareEqual
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 15.65
-	.dword	$7d333333
-	.byte	$e5,$00
+	jsr	FPPushConstant	; 6.47
+	.dword	$67851eb8
+	.byte	$e4,$00
 	jsr	FloatSine
-	jsr	FPPushConstant	; 0.05793082
-	.dword	$76a46f0b
-	.byte	$dd,$00
+	jsr	FPPushConstant	; 0.18572996
+	.dword	$5f17ff50
+	.byte	$df,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.001
@@ -3595,12 +3458,423 @@
 	jsr	FloatCompare
 	jsr	CompareLess
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 15.65
-	.dword	$7d333333
+	jsr	FPPushConstant	; 6.47
+	.dword	$67851eb8
+	.byte	$e4,$00
+	jsr	FloatCosine
+	jsr	FPPushConstant	; 0.98260083
+	.dword	$7dc5dd2f
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.17
+	.dword	$570a3d71
+	.byte	$df,$00
+	jsr	FloatTangent
+	jsr	FPPushConstant	; 0.17165682
+	.dword	$57e36718
+	.byte	$df,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.481
+	.dword	$7b22d0e5
+	.byte	$e0,$00
+	jsr	FloatArcTan
+	jsr	FPPushConstant	; 0.4483324
+	.dword	$72c5e984
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 1.01
+	.dword	$40a3d70a
+	.byte	$e2,$00
+	jsr	FloatExponent
+	jsr	FPPushConstant	; 2.74560102
+	.dword	$57dbf6ac
+	.byte	$e3,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 43.52
+	.dword	$570a3d71
+	.byte	$e7,$00
+	jsr	FloatLogarithm
+	jsr	FPPushConstant	; 3.7732206
+	.dword	$78be3921
+	.byte	$e3,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.24
+	.dword	$7ae147ae
+	.byte	$df,$00
+	jsr	FloatSquareRoot
+	jsr	FPPushConstant	; 0.48989795
+	.dword	$7d69f3ba
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 1.28
+	.dword	$51eb851f
+	.byte	$e2,$00
+	jsr	FPPushConstant	; 0.1
+	.dword	$66666666
+	.byte	$de,$00
+	jsr	FloatPower
+	jsr	FPPushConstant	; 1.02499323
+	.dword	$41997d34
+	.byte	$e2,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.01
+	.dword	$51eb851f
+	.byte	$db,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -0.54742043
+	.dword	$4611df66
+	.byte	$e1,$80
+	jsr	FloatNegate
+	jsr	FPPushConstant	; 0.54742043
+	.dword	$4611df66
+	.byte	$e1,$00
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -0.54742043
+	.dword	$4611df66
+	.byte	$e1,$80
+	jsr	FloatIntegerPart
+	jsr	FPPushConstant	; 0
+	.dword	$00000000
+	.byte	$00,$00
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 12.87
+	.dword	$66f5c28f
+	.byte	$e5,$00
+	jsr	FloatSine
+	jsr	FPPushConstant	; 0.29898554
+	.dword	$4c8a50fc
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 12.87
+	.dword	$66f5c28f
 	.byte	$e5,$00
 	jsr	FloatCosine
-	jsr	FPPushConstant	; -0.9983206
-	.dword	$7fc8f82c
+	jsr	FPPushConstant	; 0.95425764
+	.dword	$7a251d46
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.36
+	.dword	$5c28f5c3
+	.byte	$e0,$00
+	jsr	FloatTangent
+	jsr	FPPushConstant	; 0.37640285
+	.dword	$605befeb
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 1.381
+	.dword	$58624dd3
+	.byte	$e2,$00
+	jsr	FloatArcTan
+	jsr	FPPushConstant	; 0.94406981
+	.dword	$78d74790
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.31
+	.dword	$4f5c28f6
+	.byte	$e0,$00
+	jsr	FloatExponent
+	jsr	FPPushConstant	; 1.36342511
+	.dword	$57425b64
+	.byte	$e2,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 81.74
+	.dword	$51bd70a4
+	.byte	$e8,$00
+	jsr	FloatLogarithm
+	jsr	FPPushConstant	; 4.40354348
+	.dword	$4674ea02
+	.byte	$e4,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 92.91
+	.dword	$5ce8f5c3
+	.byte	$e8,$00
+	jsr	FloatSquareRoot
+	jsr	FPPushConstant	; 9.63898335
+	.dword	$4d1ca34d
+	.byte	$e5,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 1.89333333
+	.dword	$792c5f8f
+	.byte	$e2,$00
+	jsr	FPPushConstant	; 1.6
+	.dword	$66666666
+	.byte	$e2,$00
+	jsr	FloatPower
+	jsr	FPPushConstant	; 2.77691975
+	.dword	$58dc86cf
+	.byte	$e3,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.01
+	.dword	$51eb851f
+	.byte	$db,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -69.83574957
+	.dword	$45d5f3af
+	.byte	$e8,$80
+	jsr	FloatNegate
+	jsr	FPPushConstant	; 69.83574957
+	.dword	$45d5f3af
+	.byte	$e8,$00
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -69.83574957
+	.dword	$45d5f3af
+	.byte	$e8,$80
+	jsr	FloatIntegerPart
+	jsr	FPPushConstant	; -69
+	.dword	$00000045
+	.byte	$00,$80
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 12.33
+	.dword	$62a3d70a
+	.byte	$e5,$00
+	jsr	FloatSine
+	jsr	FPPushConstant	; -0.23417571
+	.dword	$77e5e0f0
+	.byte	$df,$80
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 12.33
+	.dword	$62a3d70a
+	.byte	$e5,$00
+	jsr	FloatCosine
+	jsr	FPPushConstant	; 0.97219429
+	.dword	$7c70dccc
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.3
+	.dword	$4ccccccd
+	.byte	$e0,$00
+	jsr	FloatTangent
+	jsr	FPPushConstant	; 0.30933625
+	.dword	$4f30a915
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.576
+	.dword	$49ba5e35
+	.byte	$e1,$00
+	jsr	FloatArcTan
+	jsr	FPPushConstant	; 0.52258548
+	.dword	$42e414bd
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -1.77
+	.dword	$7147ae14
+	.byte	$e2,$80
+	jsr	FloatExponent
+	jsr	FPPushConstant	; 0.17033299
+	.dword	$5735e2bb
+	.byte	$df,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 98.82
+	.dword	$62d1eb85
+	.byte	$e8,$00
+	jsr	FloatLogarithm
+	jsr	FPPushConstant	; 4.59330001
+	.dword	$497e2827
+	.byte	$e4,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 31.85
+	.dword	$7f666666
+	.byte	$e6,$00
+	jsr	FloatSquareRoot
+	jsr	FPPushConstant	; 5.64358042
+	.dword	$5a4c1afc
+	.byte	$e4,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 2.27333333
+	.dword	$48bf258a
+	.byte	$e3,$00
+	jsr	FPPushConstant	; 0.1
+	.dword	$66666666
+	.byte	$de,$00
+	jsr	FloatPower
+	jsr	FPPushConstant	; 1.08559119
+	.dword	$457a5378
+	.byte	$e2,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.01
+	.dword	$51eb851f
+	.byte	$db,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 33.09832348
+	.dword	$42325775
+	.byte	$e7,$00
+	jsr	FloatNegate
+	jsr	FPPushConstant	; -33.09832348
+	.dword	$42325775
+	.byte	$e7,$80
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 33.09832348
+	.dword	$42325775
+	.byte	$e7,$00
+	jsr	FloatIntegerPart
+	jsr	FPPushConstant	; 33
+	.dword	$00000021
+	.byte	$00,$00
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -16.6
+	.dword	$42666666
+	.byte	$e6,$80
+	jsr	FloatSine
+	jsr	FPPushConstant	; 0.77835208
+	.dword	$63a10a7c
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -16.6
+	.dword	$42666666
+	.byte	$e6,$80
+	jsr	FloatCosine
+	jsr	FPPushConstant	; -0.62782804
+	.dword	$505cab52
 	.byte	$e1,$80
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -3624,12 +3898,12 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.303
-	.dword	$53645a1d
+	jsr	FPPushConstant	; 1.529
+	.dword	$61db22d1
 	.byte	$e2,$00
 	jsr	FloatArcTan
-	jsr	FPPushConstant	; 0.91621433
-	.dword	$754682dc
+	jsr	FPPushConstant	; 0.99159872
+	.dword	$7eecb4f5
 	.byte	$e1,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -3638,13 +3912,13 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -1.11
-	.dword	$470a3d71
+	jsr	FPPushConstant	; -1.48
+	.dword	$5eb851ec
 	.byte	$e2,$80
 	jsr	FloatExponent
-	jsr	FPPushConstant	; 0.32955896
-	.dword	$545df9db
-	.byte	$e0,$00
+	jsr	FPPushConstant	; 0.22763769
+	.dword	$748ced64
+	.byte	$df,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.001
@@ -3652,12 +3926,12 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 87.16
-	.dword	$5728f5c3
+	jsr	FPPushConstant	; 87.69
+	.dword	$57b0a3d7
 	.byte	$e8,$00
 	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 4.46774551
-	.dword	$477be2b7
+	jsr	FPPushConstant	; 4.47380787
+	.dword	$4794b790
 	.byte	$e4,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -3666,12 +3940,12 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 60.36
-	.dword	$78b851ec
+	jsr	FPPushConstant	; 49.27
+	.dword	$628a3d71
 	.byte	$e7,$00
 	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 7.76916984
-	.dword	$7c4e8509
+	jsr	FPPushConstant	; 7.01925922
+	.dword	$704ee2c2
 	.byte	$e4,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -3680,16 +3954,16 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 2.38666667
-	.dword	$4c5f92c8
-	.byte	$e3,$00
-	jsr	FPPushConstant	; 1.9
-	.dword	$7999999a
+	jsr	FPPushConstant	; 1.37333333
+	.dword	$57e4b17b
+	.byte	$e2,$00
+	jsr	FPPushConstant	; 1.8
+	.dword	$73333333
 	.byte	$e2,$00
 	jsr	FloatPower
-	jsr	FPPushConstant	; 5.22160912
-	.dword	$538bb601
-	.byte	$e4,$00
+	jsr	FPPushConstant	; 1.77009563
+	.dword	$71493f2e
+	.byte	$e2,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.01
@@ -3697,33 +3971,33 @@
 	.byte	$db,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -61.00048595
-	.dword	$7a003fb2
+	jsr	FPPushConstant	; -47.84741233
+	.dword	$5fb1e007
 	.byte	$e7,$80
 	jsr	FloatNegate
-	jsr	FPPushConstant	; 61.00048595
-	.dword	$7a003fb2
+	jsr	FPPushConstant	; 47.84741233
+	.dword	$5fb1e007
 	.byte	$e7,$00
 	jsr	FloatCompare
 	jsr	CompareEqual
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -61.00048595
-	.dword	$7a003fb2
+	jsr	FPPushConstant	; -47.84741233
+	.dword	$5fb1e007
 	.byte	$e7,$80
 	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; -61
-	.dword	$0000003d
+	jsr	FPPushConstant	; -47
+	.dword	$0000002f
 	.byte	$00,$80
 	jsr	FloatCompare
 	jsr	CompareEqual
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 17.19
-	.dword	$44c28f5c
-	.byte	$e6,$00
+	jsr	FPPushConstant	; -5.41
+	.dword	$568f5c29
+	.byte	$e4,$80
 	jsr	FloatSine
-	jsr	FPPushConstant	; -0.99606345
-	.dword	$7f7f01d3
-	.byte	$e1,$80
+	jsr	FPPushConstant	; 0.76637903
+	.dword	$6218b543
+	.byte	$e1,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.001
@@ -3732,13 +4006,13 @@
 	jsr	FloatCompare
 	jsr	CompareLess
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 17.19
-	.dword	$44c28f5c
-	.byte	$e6,$00
+	jsr	FPPushConstant	; -5.41
+	.dword	$568f5c29
+	.byte	$e4,$80
 	jsr	FloatCosine
-	jsr	FPPushConstant	; -0.0886431
-	.dword	$5ac541be
-	.byte	$de,$80
+	jsr	FPPushConstant	; 0.64238866
+	.dword	$5239caa7
+	.byte	$e1,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.001
@@ -3747,13 +4021,13 @@
 	jsr	FloatCompare
 	jsr	CompareLess
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.38
-	.dword	$6147ae14
-	.byte	$e0,$00
+	jsr	FPPushConstant	; 0.14
+	.dword	$47ae147b
+	.byte	$df,$00
 	jsr	FloatTangent
-	jsr	FPPushConstant	; 0.39941272
-	.dword	$663fe97a
-	.byte	$e0,$00
+	jsr	FPPushConstant	; 0.14092189
+	.dword	$4826e9fa
+	.byte	$df,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.001
@@ -3761,12 +4035,12 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.481
-	.dword	$5ec8b439
+	jsr	FPPushConstant	; 1.213
+	.dword	$4da1cac1
 	.byte	$e2,$00
 	jsr	FloatArcTan
-	jsr	FPPushConstant	; 0.97689592
-	.dword	$7d0aecee
+	jsr	FPPushConstant	; 0.88135202
+	.dword	$70d0249b
 	.byte	$e1,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -3775,12 +4049,12 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -0.99
-	.dword	$7eb851ec
+	jsr	FPPushConstant	; -0.79
+	.dword	$651eb852
 	.byte	$e1,$80
 	jsr	FloatExponent
-	jsr	FPPushConstant	; 0.37157669
-	.dword	$5f1fa664
+	jsr	FPPushConstant	; 0.4538448
+	.dword	$742f2c3d
 	.byte	$e0,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -3789,13 +4063,13 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 3.33
-	.dword	$6a8f5c29
-	.byte	$e3,$00
+	jsr	FPPushConstant	; 49.28
+	.dword	$628f5c29
+	.byte	$e7,$00
 	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 1.2029723
-	.dword	$4cfd7f88
-	.byte	$e2,$00
+	jsr	FPPushConstant	; 3.89751832
+	.dword	$7cb87857
+	.byte	$e3,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.001
@@ -3803,12 +4077,12 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 47.06
-	.dword	$5e1eb852
+	jsr	FPPushConstant	; 58.05
+	.dword	$7419999a
 	.byte	$e7,$00
 	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 6.86002915
-	.dword	$6dc2aded
+	jsr	FPPushConstant	; 7.61905506
+	.dword	$79e7a647
 	.byte	$e4,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -3817,15 +4091,15 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.12333333
-	.dword	$47e4b17b
+	jsr	FPPushConstant	; 1.09666667
+	.dword	$462fc967
 	.byte	$e2,$00
-	jsr	FPPushConstant	; 1.2
-	.dword	$4ccccccd
-	.byte	$e2,$00
+	jsr	FPPushConstant	; 1.0
+	.dword	$00000001
+	.byte	$00,$00
 	jsr	FloatPower
-	jsr	FPPushConstant	; 1.14976842
-	.dword	$4995ce48
+	jsr	FPPushConstant	; 1.09666667
+	.dword	$462fc967
 	.byte	$e2,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -3834,32 +4108,32 @@
 	.byte	$db,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 58.66574876
-	.dword	$7554dd05
-	.byte	$e7,$00
+	jsr	FPPushConstant	; 79.11768041
+	.dword	$4f1e204e
+	.byte	$e8,$00
 	jsr	FloatNegate
-	jsr	FPPushConstant	; -58.66574876
-	.dword	$7554dd05
-	.byte	$e7,$80
+	jsr	FPPushConstant	; -79.11768041
+	.dword	$4f1e204e
+	.byte	$e8,$80
 	jsr	FloatCompare
 	jsr	CompareEqual
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 58.66574876
-	.dword	$7554dd05
-	.byte	$e7,$00
+	jsr	FPPushConstant	; 79.11768041
+	.dword	$4f1e204e
+	.byte	$e8,$00
 	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; 58
-	.dword	$0000003a
+	jsr	FPPushConstant	; 79
+	.dword	$0000004f
 	.byte	$00,$00
 	jsr	FloatCompare
 	jsr	CompareEqual
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 7.46
-	.dword	$775c28f6
-	.byte	$e4,$00
+	jsr	FPPushConstant	; 1.59
+	.dword	$65c28f5c
+	.byte	$e2,$00
 	jsr	FloatSine
-	jsr	FPPushConstant	; 0.92338796
-	.dword	$763193a1
+	jsr	FPPushConstant	; 0.99981562
+	.dword	$7ff9f54f
 	.byte	$e1,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -3869,13 +4143,13 @@
 	jsr	FloatCompare
 	jsr	CompareLess
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 7.46
-	.dword	$775c28f6
-	.byte	$e4,$00
+	jsr	FPPushConstant	; 1.59
+	.dword	$65c28f5c
+	.byte	$e2,$00
 	jsr	FloatCosine
-	jsr	FPPushConstant	; 0.38386804
-	.dword	$62452d06
-	.byte	$e0,$00
+	jsr	FPPushConstant	; -0.01920249
+	.dword	$4ea74529
+	.byte	$dc,$80
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.001
@@ -3884,12 +4158,12 @@
 	jsr	FloatCompare
 	jsr	CompareLess
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.34
-	.dword	$570a3d71
+	jsr	FPPushConstant	; 0.26
+	.dword	$428f5c29
 	.byte	$e0,$00
 	jsr	FloatTangent
-	jsr	FPPushConstant	; 0.35373688
-	.dword	$5a8e800b
+	jsr	FPPushConstant	; 0.26602154
+	.dword	$4419fcd6
 	.byte	$e0,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -3898,13 +4172,13 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.78
-	.dword	$63d70a3d
-	.byte	$e1,$00
+	jsr	FPPushConstant	; 1.671
+	.dword	$6af1a9fc
+	.byte	$e2,$00
 	jsr	FloatArcTan
-	jsr	FPPushConstant	; 0.66242629
-	.dword	$54ca627a
-	.byte	$e1,$00
+	jsr	FPPushConstant	; 1.0315217
+	.dword	$42047398
+	.byte	$e2,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.001
@@ -3912,150 +4186,13 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.01
-	.dword	$40a3d70a
-	.byte	$e2,$00
+	jsr	FPPushConstant	; -1.69
+	.dword	$6c28f5c3
+	.byte	$e2,$80
 	jsr	FloatExponent
-	jsr	FPPushConstant	; 2.74560102
-	.dword	$57dbf6ac
-	.byte	$e3,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 30.01
-	.dword	$780a3d71
-	.byte	$e6,$00
-	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 3.40153066
-	.dword	$6cd956d4
-	.byte	$e3,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 53.52
-	.dword	$6b0a3d71
-	.byte	$e7,$00
-	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 7.31573646
-	.dword	$750d41ad
-	.byte	$e4,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.57
-	.dword	$647ae148
-	.byte	$e2,$00
-	jsr	FPPushConstant	; 1.7
-	.dword	$6ccccccd
-	.byte	$e2,$00
-	jsr	FloatPower
-	jsr	FPPushConstant	; 2.15292752
-	.dword	$44e4c841
-	.byte	$e3,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.01
-	.dword	$51eb851f
-	.byte	$db,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -66.58281364
-	.dword	$42953346
-	.byte	$e8,$80
-	jsr	FloatNegate
-	jsr	FPPushConstant	; 66.58281364
-	.dword	$42953346
-	.byte	$e8,$00
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -66.58281364
-	.dword	$42953346
-	.byte	$e8,$80
-	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; -66
-	.dword	$00000042
-	.byte	$00,$80
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 16.26
-	.dword	$410a3d71
-	.byte	$e6,$00
-	jsr	FloatSine
-	jsr	FPPushConstant	; -0.52442251
-	.dword	$432046dd
-	.byte	$e1,$80
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 16.26
-	.dword	$410a3d71
-	.byte	$e6,$00
-	jsr	FloatCosine
-	jsr	FPPushConstant	; -0.85145818
-	.dword	$6cfc94e7
-	.byte	$e1,$80
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.23
-	.dword	$75c28f5c
+	jsr	FPPushConstant	; 0.18451952
+	.dword	$5e7957b0
 	.byte	$df,$00
-	jsr	FloatTangent
-	jsr	FPPushConstant	; 0.23414336
-	.dword	$77e1a374
-	.byte	$df,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.346
-	.dword	$589374bc
-	.byte	$e0,$00
-	jsr	FloatArcTan
-	jsr	FPPushConstant	; 0.33310691
-	.dword	$55467e95
-	.byte	$e0,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -0.97
-	.dword	$7c28f5c3
-	.byte	$e1,$80
-	jsr	FloatExponent
-	jsr	FPPushConstant	; 0.37908304
-	.dword	$610b960b
-	.byte	$e0,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.001
@@ -4077,12 +4214,12 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 60.05
-	.dword	$7819999a
+	jsr	FPPushConstant	; 46.71
+	.dword	$5d6b851f
 	.byte	$e7,$00
 	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 7.74919351
-	.dword	$7bfcb255
+	jsr	FPPushConstant	; 6.83447145
+	.dword	$6d59febc
 	.byte	$e4,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -4091,460 +4228,49 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 2.20333333
-	.dword	$4681b4e6
-	.byte	$e3,$00
-	jsr	FPPushConstant	; 1.0
-	.dword	$00000001
-	.byte	$00,$00
-	jsr	FloatPower
-	jsr	FPPushConstant	; 2.20333333
-	.dword	$4681b4e6
-	.byte	$e3,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.01
-	.dword	$51eb851f
-	.byte	$db,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 33.92119543
-	.dword	$43d7a6ed
-	.byte	$e7,$00
-	jsr	FloatNegate
-	jsr	FPPushConstant	; -33.92119543
-	.dword	$43d7a6ed
-	.byte	$e7,$80
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 33.92119543
-	.dword	$43d7a6ed
-	.byte	$e7,$00
-	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; 33
-	.dword	$00000021
-	.byte	$00,$00
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -6.99
-	.dword	$6fd70a3d
-	.byte	$e4,$80
-	jsr	FloatSine
-	jsr	FPPushConstant	; -0.64941485
-	.dword	$5320069b
-	.byte	$e1,$80
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -6.99
-	.dword	$6fd70a3d
-	.byte	$e4,$80
-	jsr	FloatCosine
-	jsr	FPPushConstant	; 0.76043432
-	.dword	$6155e96c
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.29
-	.dword	$4a3d70a4
-	.byte	$e0,$00
-	jsr	FloatTangent
-	jsr	FPPushConstant	; 0.29841279
-	.dword	$4c64c7d6
-	.byte	$e0,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.497
-	.dword	$5fced917
-	.byte	$e2,$00
-	jsr	FloatArcTan
-	jsr	FPPushConstant	; 0.98186937
-	.dword	$7dade541
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -0.38
-	.dword	$6147ae14
-	.byte	$e0,$80
-	jsr	FloatExponent
-	jsr	FPPushConstant	; 0.68386141
-	.dword	$5788c54b
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 60.61
-	.dword	$793851ec
-	.byte	$e7,$00
-	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 4.1044599
-	.dword	$41abde25
-	.byte	$e4,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 31.63
-	.dword	$7e851eb8
-	.byte	$e6,$00
-	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 5.62405548
-	.dword	$59fc2199
-	.byte	$e4,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 2.10333333
-	.dword	$434e81b3
-	.byte	$e3,$00
-	jsr	FPPushConstant	; 0.5
-	.dword	$40000000
-	.byte	$e1,$00
-	jsr	FloatPower
-	jsr	FPPushConstant	; 1.45028733
-	.dword	$5cd181f3
-	.byte	$e2,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.01
-	.dword	$51eb851f
-	.byte	$db,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -15.81598769
-	.dword	$7e87248e
-	.byte	$e5,$80
-	jsr	FloatNegate
-	jsr	FPPushConstant	; 15.81598769
-	.dword	$7e87248e
-	.byte	$e5,$00
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -15.81598769
-	.dword	$7e87248e
-	.byte	$e5,$80
-	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; -15
-	.dword	$0000000f
-	.byte	$00,$80
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 14.55
-	.dword	$74666666
-	.byte	$e5,$00
-	jsr	FloatSine
-	jsr	FPPushConstant	; 0.91598786
-	.dword	$753f1717
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 14.55
-	.dword	$74666666
-	.byte	$e5,$00
-	jsr	FloatCosine
-	jsr	FPPushConstant	; -0.40120598
-	.dword	$66b56f63
-	.byte	$e0,$80
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.3
-	.dword	$4ccccccd
-	.byte	$e0,$00
-	jsr	FloatTangent
-	jsr	FPPushConstant	; 0.30933625
-	.dword	$4f30a915
-	.byte	$e0,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.505
-	.dword	$6051eb85
-	.byte	$e2,$00
-	jsr	FloatArcTan
-	jsr	FPPushConstant	; 0.98432864
-	.dword	$7dfe7b1b
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -0.96
-	.dword	$7ae147ae
-	.byte	$e1,$80
-	jsr	FloatExponent
-	jsr	FPPushConstant	; 0.38289289
-	.dword	$620544b8
-	.byte	$e0,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 16.24
-	.dword	$40f5c28f
-	.byte	$e6,$00
-	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 2.78747733
-	.dword	$593303a8
-	.byte	$e3,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 62.62
-	.dword	$7d3d70a4
-	.byte	$e7,$00
-	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 7.91327998
-	.dword	$7e9ccb78
-	.byte	$e4,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 3.29
-	.dword	$6947ae14
+	jsr	FPPushConstant	; 2.04
+	.dword	$4147ae14
 	.byte	$e3,$00
 	jsr	FPPushConstant	; 1.8
 	.dword	$73333333
 	.byte	$e2,$00
 	jsr	FloatPower
-	jsr	FPPushConstant	; 8.53007042
-	.dword	$443d958f
-	.byte	$e5,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.01
-	.dword	$51eb851f
-	.byte	$db,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 17.84498259
-	.dword	$4761431e
-	.byte	$e6,$00
-	jsr	FloatNegate
-	jsr	FPPushConstant	; -17.84498259
-	.dword	$4761431e
-	.byte	$e6,$80
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 17.84498259
-	.dword	$4761431e
-	.byte	$e6,$00
-	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; 17
-	.dword	$00000011
-	.byte	$00,$00
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 10.14
-	.dword	$511eb852
-	.byte	$e5,$00
-	jsr	FloatSine
-	jsr	FPPushConstant	; -0.65578506
-	.dword	$53f0c3cd
-	.byte	$e1,$80
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 10.14
-	.dword	$511eb852
-	.byte	$e5,$00
-	jsr	FloatCosine
-	jsr	FPPushConstant	; -0.75494765
-	.dword	$60a21fe5
-	.byte	$e1,$80
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.12
-	.dword	$7ae147ae
-	.byte	$de,$00
-	jsr	FloatTangent
-	jsr	FPPushConstant	; 0.12057934
-	.dword	$7b792687
-	.byte	$de,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.685
-	.dword	$57ae147b
-	.byte	$e1,$00
-	jsr	FloatArcTan
-	jsr	FPPushConstant	; 0.60058775
-	.dword	$4ce00f34
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -0.63
-	.dword	$50a3d70a
-	.byte	$e1,$80
-	jsr	FloatExponent
-	jsr	FPPushConstant	; 0.5325918
-	.dword	$442bf7d6
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 24.88
-	.dword	$63851eb8
-	.byte	$e6,$00
-	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 3.21406427
-	.dword	$66d99d50
+	jsr	FPPushConstant	; 3.60856308
+	.dword	$73795948
 	.byte	$e3,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 90.66
-	.dword	$5aa8f5c3
-	.byte	$e8,$00
-	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 9.52155449
-	.dword	$4c2c24c3
-	.byte	$e5,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.75333333
-	.dword	$70369d00
-	.byte	$e2,$00
-	jsr	FPPushConstant	; 0.1
-	.dword	$66666666
-	.byte	$de,$00
-	jsr	FloatPower
-	jsr	FPPushConstant	; 1.05775832
-	.dword	$43b24ff4
-	.byte	$e2,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
 	jsr	FPPushConstant	; 0.01
 	.dword	$51eb851f
 	.byte	$db,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -24.56531951
-	.dword	$6242e31e
-	.byte	$e6,$80
+	jsr	FPPushConstant	; -54.17024378
+	.dword	$6c572a31
+	.byte	$e7,$80
 	jsr	FloatNegate
-	jsr	FPPushConstant	; 24.56531951
-	.dword	$6242e31e
-	.byte	$e6,$00
+	jsr	FPPushConstant	; 54.17024378
+	.dword	$6c572a31
+	.byte	$e7,$00
 	jsr	FloatCompare
 	jsr	CompareEqual
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -24.56531951
-	.dword	$6242e31e
-	.byte	$e6,$80
+	jsr	FPPushConstant	; -54.17024378
+	.dword	$6c572a31
+	.byte	$e7,$80
 	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; -24
-	.dword	$00000018
+	jsr	FPPushConstant	; -54
+	.dword	$00000036
 	.byte	$00,$80
 	jsr	FloatCompare
 	jsr	CompareEqual
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 16.69
-	.dword	$42c28f5c
-	.byte	$e6,$00
+	jsr	FPPushConstant	; -7.11
+	.dword	$71c28f5c
+	.byte	$e4,$80
 	jsr	FloatSine
-	jsr	FPPushConstant	; -0.83163015
-	.dword	$6a72db54
+	jsr	FPPushConstant	; -0.73577794
+	.dword	$5e2df8b7
 	.byte	$e1,$80
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -4554,13 +4280,13 @@
 	jsr	FloatCompare
 	jsr	CompareLess
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 16.69
-	.dword	$42c28f5c
-	.byte	$e6,$00
+	jsr	FPPushConstant	; -7.11
+	.dword	$71c28f5c
+	.byte	$e4,$80
 	jsr	FloatCosine
-	jsr	FPPushConstant	; -0.55532989
-	.dword	$47150cc2
-	.byte	$e1,$80
+	jsr	FPPushConstant	; 0.67722287
+	.dword	$56af3d2f
+	.byte	$e1,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.001
@@ -4569,12 +4295,26 @@
 	jsr	FloatCompare
 	jsr	CompareLess
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.18
-	.dword	$5c28f5c3
-	.byte	$df,$00
+	jsr	FPPushConstant	; 0.32
+	.dword	$51eb851f
+	.byte	$e0,$00
 	jsr	FloatTangent
-	jsr	FPPushConstant	; 0.18196953
-	.dword	$5d2b1c38
+	jsr	FPPushConstant	; 0.33138941
+	.dword	$54d5efb6
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.227
+	.dword	$74395810
+	.byte	$df,$00
+	jsr	FloatArcTan
+	jsr	FPPushConstant	; 0.22321725
+	.dword	$72498809
 	.byte	$df,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -4583,13 +4323,13 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.605
-	.dword	$4d70a3d7
+	jsr	FPPushConstant	; 0.54
+	.dword	$451eb852
 	.byte	$e1,$00
-	jsr	FloatArcTan
-	jsr	FPPushConstant	; 0.54408786
-	.dword	$45a4abc6
-	.byte	$e1,$00
+	jsr	FloatExponent
+	jsr	FPPushConstant	; 1.71600686
+	.dword	$6dd30e70
+	.byte	$e2,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.001
@@ -4597,12 +4337,12 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.95
-	.dword	$7ccccccd
-	.byte	$e2,$00
-	jsr	FloatExponent
-	jsr	FPPushConstant	; 7.02868758
-	.dword	$7075811c
+	jsr	FPPushConstant	; 74.91
+	.dword	$4ae8f5c3
+	.byte	$e8,$00
+	jsr	FloatLogarithm
+	jsr	FPPushConstant	; 4.31628739
+	.dword	$450f835e
 	.byte	$e4,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -4611,163 +4351,12 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 14.06
-	.dword	$707ae148
-	.byte	$e5,$00
-	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 2.64333389
-	.dword	$549630f4
-	.byte	$e3,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 84.59
-	.dword	$54970a3d
-	.byte	$e8,$00
-	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 9.19728221
-	.dword	$499408b2
-	.byte	$e5,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 2.18
-	.dword	$45c28f5c
-	.byte	$e3,$00
-	jsr	FPPushConstant	; 0.1
-	.dword	$66666666
-	.byte	$de,$00
-	jsr	FloatPower
-	jsr	FPPushConstant	; 1.08104967
-	.dword	$452feaf5
-	.byte	$e2,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.01
-	.dword	$51eb851f
-	.byte	$db,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -42.54887827
-	.dword	$55190693
-	.byte	$e7,$80
-	jsr	FloatNegate
-	jsr	FPPushConstant	; 42.54887827
-	.dword	$55190693
-	.byte	$e7,$00
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -42.54887827
-	.dword	$55190693
-	.byte	$e7,$80
-	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; -42
-	.dword	$0000002a
-	.byte	$00,$80
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 11.41
-	.dword	$5b47ae14
-	.byte	$e5,$00
-	jsr	FloatSine
-	jsr	FPPushConstant	; -0.91534772
-	.dword	$752a1d35
-	.byte	$e1,$80
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 11.41
-	.dword	$5b47ae14
-	.byte	$e5,$00
-	jsr	FloatCosine
-	jsr	FPPushConstant	; 0.40266432
-	.dword	$67150246
-	.byte	$e0,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.12
-	.dword	$7ae147ae
-	.byte	$de,$00
-	jsr	FloatTangent
-	jsr	FPPushConstant	; 0.12057934
-	.dword	$7b792687
-	.byte	$de,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.801
-	.dword	$73439581
-	.byte	$e2,$00
-	jsr	FloatArcTan
-	jsr	FPPushConstant	; 1.06393357
-	.dword	$44177cd4
-	.byte	$e2,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.09
-	.dword	$45c28f5c
-	.byte	$e2,$00
-	jsr	FloatExponent
-	jsr	FPPushConstant	; 2.97427407
-	.dword	$5f2d40d0
-	.byte	$e3,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 3.99
-	.dword	$7fae147b
-	.byte	$e3,$00
-	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 1.38379123
-	.dword	$58900917
-	.byte	$e2,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 44.63
-	.dword	$59428f5c
+	jsr	FPPushConstant	; 55.72
+	.dword	$6f70a3d7
 	.byte	$e7,$00
 	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 6.68056884
-	.dword	$6ae39c27
+	jsr	FPPushConstant	; 7.46458304
+	.dword	$776eeea0
 	.byte	$e4,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -4776,16 +4365,16 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 2.53
-	.dword	$50f5c28f
-	.byte	$e3,$00
-	jsr	FPPushConstant	; 0.2
-	.dword	$66666666
-	.byte	$df,$00
-	jsr	FloatPower
-	jsr	FPPushConstant	; 1.20399339
-	.dword	$4d0e3a4b
+	jsr	FPPushConstant	; 1.85
+	.dword	$76666666
 	.byte	$e2,$00
+	jsr	FPPushConstant	; 1.3
+	.dword	$53333333
+	.byte	$e2,$00
+	jsr	FloatPower
+	jsr	FPPushConstant	; 2.22496532
+	.dword	$4732ea79
+	.byte	$e3,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.01
@@ -4793,169 +4382,32 @@
 	.byte	$db,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 27.47452823
-	.dword	$6de5eaba
-	.byte	$e6,$00
+	jsr	FPPushConstant	; -75.5121892
+	.dword	$4b831ed5
+	.byte	$e8,$80
 	jsr	FloatNegate
-	jsr	FPPushConstant	; -27.47452823
-	.dword	$6de5eaba
-	.byte	$e6,$80
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 27.47452823
-	.dword	$6de5eaba
-	.byte	$e6,$00
-	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; 27
-	.dword	$0000001b
-	.byte	$00,$00
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 14.89
-	.dword	$771eb852
-	.byte	$e5,$00
-	jsr	FloatSine
-	jsr	FPPushConstant	; 0.72975481
-	.dword	$5d689b0a
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 14.89
-	.dword	$771eb852
-	.byte	$e5,$00
-	jsr	FloatCosine
-	jsr	FPPushConstant	; -0.68370894
-	.dword	$5783c649
-	.byte	$e1,$80
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.31
-	.dword	$4f5c28f6
-	.byte	$e0,$00
-	jsr	FloatTangent
-	jsr	FPPushConstant	; 0.32032751
-	.dword	$5200fbd3
-	.byte	$e0,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.56
-	.dword	$63d70a3d
-	.byte	$e2,$00
-	jsr	FloatArcTan
-	jsr	FPPushConstant	; 1.00075586
-	.dword	$400c624e
-	.byte	$e2,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.49
-	.dword	$7d70a3d7
-	.byte	$e0,$00
-	jsr	FloatExponent
-	jsr	FPPushConstant	; 1.63231622
-	.dword	$6877de73
-	.byte	$e2,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 33.58
-	.dword	$4328f5c3
-	.byte	$e7,$00
-	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 3.51393065
-	.dword	$70721eb1
-	.byte	$e3,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 87.08
-	.dword	$57147ae1
+	jsr	FPPushConstant	; 75.5121892
+	.dword	$4b831ed5
 	.byte	$e8,$00
-	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 9.33166652
-	.dword	$4aa740c7
-	.byte	$e5,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.53
-	.dword	$61eb851f
-	.byte	$e2,$00
-	jsr	FPPushConstant	; 0.9
-	.dword	$73333333
-	.byte	$e1,$00
-	jsr	FloatPower
-	jsr	FPPushConstant	; 1.46629815
-	.dword	$5dd7d432
-	.byte	$e2,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.01
-	.dword	$51eb851f
-	.byte	$db,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 57.76366729
-	.dword	$7386ff66
-	.byte	$e7,$00
-	jsr	FloatNegate
-	jsr	FPPushConstant	; -57.76366729
-	.dword	$7386ff66
-	.byte	$e7,$80
 	jsr	FloatCompare
 	jsr	CompareEqual
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 57.76366729
-	.dword	$7386ff66
-	.byte	$e7,$00
+	jsr	FPPushConstant	; -75.5121892
+	.dword	$4b831ed5
+	.byte	$e8,$80
 	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; 57
-	.dword	$00000039
-	.byte	$00,$00
+	jsr	FPPushConstant	; -75
+	.dword	$0000004b
+	.byte	$00,$80
 	jsr	FloatCompare
 	jsr	CompareEqual
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 18.19
-	.dword	$48c28f5c
-	.byte	$e6,$00
+	jsr	FPPushConstant	; 10.35
+	.dword	$52cccccd
+	.byte	$e5,$00
 	jsr	FloatSine
-	jsr	FPPushConstant	; -0.61276597
-	.dword	$4e6f1d85
+	jsr	FPPushConstant	; -0.79875437
+	.dword	$663d954c
 	.byte	$e1,$80
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -4965,13 +4417,13 @@
 	jsr	FloatCompare
 	jsr	CompareLess
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 18.19
-	.dword	$48c28f5c
-	.byte	$e6,$00
+	jsr	FPPushConstant	; 10.35
+	.dword	$52cccccd
+	.byte	$e5,$00
 	jsr	FloatCosine
-	jsr	FPPushConstant	; 0.79026443
-	.dword	$65276285
-	.byte	$e1,$00
+	jsr	FPPushConstant	; -0.60165725
+	.dword	$4d031ad2
+	.byte	$e1,$80
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.001
@@ -4980,13 +4432,13 @@
 	jsr	FloatCompare
 	jsr	CompareLess
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.28
-	.dword	$47ae147b
-	.byte	$e0,$00
+	jsr	FPPushConstant	; 0.24
+	.dword	$7ae147ae
+	.byte	$df,$00
 	jsr	FloatTangent
-	jsr	FPPushConstant	; 0.28755433
-	.dword	$499d291b
-	.byte	$e0,$00
+	jsr	FPPushConstant	; 0.2447167
+	.dword	$7d4b81df
+	.byte	$df,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.001
@@ -4994,12 +4446,12 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.896
-	.dword	$79581062
+	jsr	FPPushConstant	; 1.629
+	.dword	$68418937
 	.byte	$e2,$00
 	jsr	FloatArcTan
-	jsr	FPPushConstant	; 1.08544929
-	.dword	$4578004d
+	jsr	FPPushConstant	; 1.0202381
+	.dword	$414b94be
 	.byte	$e2,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -5008,12 +4460,12 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -0.03
-	.dword	$7ae147ae
+	jsr	FPPushConstant	; -0.02
+	.dword	$51eb851f
 	.byte	$dc,$80
 	jsr	FloatExponent
-	jsr	FPPushConstant	; 0.97044553
-	.dword	$7c378f23
+	jsr	FPPushConstant	; 0.98019867
+	.dword	$7d772668
 	.byte	$e1,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -5022,27 +4474,13 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 77.52
-	.dword	$4d851eb8
-	.byte	$e8,$00
-	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 4.35053597
-	.dword	$459bcb9b
-	.byte	$e4,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 32.69
-	.dword	$416147ae
+	jsr	FPPushConstant	; 34.74
+	.dword	$457ae148
 	.byte	$e7,$00
-	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 5.71751694
-	.dword	$5b7af30b
-	.byte	$e4,$00
+	jsr	FloatLogarithm
+	jsr	FPPushConstant	; 3.54789176
+	.dword	$7188544d
+	.byte	$e3,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.001
@@ -5050,15 +4488,29 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 2.91666667
-	.dword	$5d555557
+	jsr	FPPushConstant	; 65.48
+	.dword	$417ae148
+	.byte	$e8,$00
+	jsr	FloatSquareRoot
+	jsr	FPPushConstant	; 8.09197133
+	.dword	$40bc5b77
+	.byte	$e5,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 2.78666667
+	.dword	$592c5f95
 	.byte	$e3,$00
-	jsr	FPPushConstant	; 1.4
-	.dword	$5999999a
+	jsr	FPPushConstant	; 1.5
+	.dword	$60000000
 	.byte	$e2,$00
 	jsr	FloatPower
-	jsr	FPPushConstant	; 4.47549955
-	.dword	$479ba56b
+	jsr	FPPushConstant	; 4.65186962
+	.dword	$4a6e0ed7
 	.byte	$e4,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
@@ -5067,33 +4519,33 @@
 	.byte	$db,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 58.51073135
-	.dword	$75057e94
-	.byte	$e7,$00
+	jsr	FPPushConstant	; 13.65651575
+	.dword	$6d408b54
+	.byte	$e5,$00
 	jsr	FloatNegate
-	jsr	FPPushConstant	; -58.51073135
-	.dword	$75057e94
-	.byte	$e7,$80
+	jsr	FPPushConstant	; -13.65651575
+	.dword	$6d408b54
+	.byte	$e5,$80
 	jsr	FloatCompare
 	jsr	CompareEqual
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 58.51073135
-	.dword	$75057e94
-	.byte	$e7,$00
+	jsr	FPPushConstant	; 13.65651575
+	.dword	$6d408b54
+	.byte	$e5,$00
 	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; 58
-	.dword	$0000003a
+	jsr	FPPushConstant	; 13
+	.dword	$0000000d
 	.byte	$00,$00
 	jsr	FloatCompare
 	jsr	CompareEqual
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.95
+	jsr	FPPushConstant	; 15.2
 	.dword	$7999999a
-	.byte	$e1,$00
+	.byte	$e5,$00
 	jsr	FloatSine
-	jsr	FPPushConstant	; 0.8134155
-	.dword	$681dffc5
-	.byte	$e1,$00
+	jsr	FPPushConstant	; 0.48639869
+	.dword	$7c849fe2
+	.byte	$e0,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.001
@@ -5102,13 +4554,13 @@
 	jsr	FloatCompare
 	jsr	CompareLess
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.95
+	jsr	FPPushConstant	; 15.2
 	.dword	$7999999a
-	.byte	$e1,$00
+	.byte	$e5,$00
 	jsr	FloatCosine
-	jsr	FPPushConstant	; 0.58168309
-	.dword	$4a74976c
-	.byte	$e1,$00
+	jsr	FPPushConstant	; -0.87373698
+	.dword	$6fd69d05
+	.byte	$e1,$80
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.001
@@ -5131,13 +4583,835 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.169
-	.dword	$56872b02
-	.byte	$df,$00
+	jsr	FPPushConstant	; 0.721
+	.dword	$5c49ba5e
+	.byte	$e1,$00
 	jsr	FloatArcTan
-	jsr	FPPushConstant	; 0.16741809
-	.dword	$55b7d2eb
+	jsr	FPPushConstant	; 0.62468133
+	.dword	$4ff58ecd
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -0.87
+	.dword	$6f5c28f6
+	.byte	$e1,$80
+	jsr	FloatExponent
+	jsr	FPPushConstant	; 0.41895155
+	.dword	$6b4068a6
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 36.48
+	.dword	$48f5c28f
+	.byte	$e7,$00
+	jsr	FloatLogarithm
+	jsr	FPPushConstant	; 3.59676417
+	.dword	$7318b12c
+	.byte	$e3,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 33.55
+	.dword	$4319999a
+	.byte	$e7,$00
+	jsr	FloatSquareRoot
+	jsr	FPPushConstant	; 5.79223618
+	.dword	$5cacffd8
+	.byte	$e4,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 1.92
+	.dword	$7ae147ae
+	.byte	$e2,$00
+	jsr	FPPushConstant	; 0.5
+	.dword	$40000000
+	.byte	$e1,$00
+	jsr	FloatPower
+	jsr	FPPushConstant	; 1.38564065
+	.dword	$58ae561f
+	.byte	$e2,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.01
+	.dword	$51eb851f
+	.byte	$db,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -80.8560784
+	.dword	$50db27f4
+	.byte	$e8,$80
+	jsr	FloatNegate
+	jsr	FPPushConstant	; 80.8560784
+	.dword	$50db27f4
+	.byte	$e8,$00
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -80.8560784
+	.dword	$50db27f4
+	.byte	$e8,$80
+	jsr	FloatIntegerPart
+	jsr	FPPushConstant	; -80
+	.dword	$00000050
+	.byte	$00,$80
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -2.57
+	.dword	$523d70a4
+	.byte	$e3,$80
+	jsr	FloatSine
+	jsr	FPPushConstant	; -0.54097222
+	.dword	$453e93e4
+	.byte	$e1,$80
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -2.57
+	.dword	$523d70a4
+	.byte	$e3,$80
+	jsr	FloatCosine
+	jsr	FPPushConstant	; -0.84104046
+	.dword	$6ba736bb
+	.byte	$e1,$80
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.21
+	.dword	$6b851eb8
 	.byte	$df,$00
+	jsr	FloatTangent
+	jsr	FPPushConstant	; 0.21314244
+	.dword	$6d210182
+	.byte	$df,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.531
+	.dword	$43f7ced9
+	.byte	$e1,$00
+	jsr	FloatArcTan
+	jsr	FPPushConstant	; 0.48813896
+	.dword	$7cf6acc5
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -1.79
+	.dword	$728f5c29
+	.byte	$e2,$80
+	jsr	FloatExponent
+	jsr	FPPushConstant	; 0.16696017
+	.dword	$557bcdac
+	.byte	$df,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 81.79
+	.dword	$51ca3d71
+	.byte	$e8,$00
+	jsr	FloatLogarithm
+	jsr	FPPushConstant	; 4.40415499
+	.dword	$46776b39
+	.byte	$e4,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 14.6
+	.dword	$74cccccd
+	.byte	$e5,$00
+	jsr	FloatSquareRoot
+	jsr	FPPushConstant	; 3.82099463
+	.dword	$7a459688
+	.byte	$e3,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 1.41333333
+	.dword	$5a740da4
+	.byte	$e2,$00
+	jsr	FPPushConstant	; 1.4
+	.dword	$5999999a
+	.byte	$e2,$00
+	jsr	FloatPower
+	jsr	FPPushConstant	; 1.6230894
+	.dword	$67e0b25d
+	.byte	$e2,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.01
+	.dword	$51eb851f
+	.byte	$db,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -21.42658136
+	.dword	$55b4d1be
+	.byte	$e6,$80
+	jsr	FloatNegate
+	jsr	FPPushConstant	; 21.42658136
+	.dword	$55b4d1be
+	.byte	$e6,$00
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -21.42658136
+	.dword	$55b4d1be
+	.byte	$e6,$80
+	jsr	FloatIntegerPart
+	jsr	FPPushConstant	; -21
+	.dword	$00000015
+	.byte	$00,$80
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -1.26
+	.dword	$50a3d70a
+	.byte	$e2,$80
+	jsr	FloatSine
+	jsr	FPPushConstant	; -0.95209034
+	.dword	$79de18a5
+	.byte	$e1,$80
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -1.26
+	.dword	$50a3d70a
+	.byte	$e2,$80
+	jsr	FloatCosine
+	jsr	FPPushConstant	; 0.30581691
+	.dword	$4e4a045b
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.4
+	.dword	$66666666
+	.byte	$e0,$00
+	jsr	FloatTangent
+	jsr	FPPushConstant	; 0.42279322
+	.dword	$6c3c2d2d
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.73
+	.dword	$5d70a3d7
+	.byte	$e1,$00
+	jsr	FloatArcTan
+	jsr	FPPushConstant	; 0.63057776
+	.dword	$50b6c5a4
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.64
+	.dword	$51eb851f
+	.byte	$e1,$00
+	jsr	FloatExponent
+	jsr	FPPushConstant	; 1.89648088
+	.dword	$795ff157
+	.byte	$e2,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 88.05
+	.dword	$580ccccd
+	.byte	$e8,$00
+	jsr	FloatLogarithm
+	jsr	FPPushConstant	; 4.47790483
+	.dword	$47a57f89
+	.byte	$e4,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 30.76
+	.dword	$7b0a3d71
+	.byte	$e6,$00
+	jsr	FloatSquareRoot
+	jsr	FPPushConstant	; 5.54616985
+	.dword	$58bd1c99
+	.byte	$e4,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 2.57333333
+	.dword	$5258bf24
+	.byte	$e3,$00
+	jsr	FPPushConstant	; 1.1
+	.dword	$46666666
+	.byte	$e2,$00
+	jsr	FloatPower
+	jsr	FPPushConstant	; 2.8284314
+	.dword	$5a828291
+	.byte	$e3,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.01
+	.dword	$51eb851f
+	.byte	$db,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 55.4551713
+	.dword	$6ee90c36
+	.byte	$e7,$00
+	jsr	FloatNegate
+	jsr	FPPushConstant	; -55.4551713
+	.dword	$6ee90c36
+	.byte	$e7,$80
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 55.4551713
+	.dword	$6ee90c36
+	.byte	$e7,$00
+	jsr	FloatIntegerPart
+	jsr	FPPushConstant	; 55
+	.dword	$00000037
+	.byte	$00,$00
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 17.1
+	.dword	$44666666
+	.byte	$e6,$00
+	jsr	FloatSine
+	jsr	FPPushConstant	; -0.98406501
+	.dword	$7df5d79e
+	.byte	$e1,$80
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 17.1
+	.dword	$44666666
+	.byte	$e6,$00
+	jsr	FloatCosine
+	jsr	FPPushConstant	; -0.17780907
+	.dword	$5b09ca59
+	.byte	$df,$80
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.32
+	.dword	$51eb851f
+	.byte	$e0,$00
+	jsr	FloatTangent
+	jsr	FPPushConstant	; 0.33138941
+	.dword	$54d5efb6
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.779
+	.dword	$63b645a2
+	.byte	$e1,$00
+	jsr	FloatArcTan
+	jsr	FPPushConstant	; 0.66180426
+	.dword	$54b60083
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -1.63
+	.dword	$6851eb85
+	.byte	$e2,$80
+	jsr	FloatExponent
+	jsr	FPPushConstant	; 0.19592957
+	.dword	$6450e16f
+	.byte	$df,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 92.95
+	.dword	$5cf33333
+	.byte	$e8,$00
+	jsr	FloatLogarithm
+	jsr	FPPushConstant	; 4.53206171
+	.dword	$48835324
+	.byte	$e4,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 51.02
+	.dword	$660a3d71
+	.byte	$e7,$00
+	jsr	FloatSquareRoot
+	jsr	FPPushConstant	; 7.14282857
+	.dword	$7249069c
+	.byte	$e4,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 1.88666667
+	.dword	$78bf2590
+	.byte	$e2,$00
+	jsr	FPPushConstant	; 0.9
+	.dword	$73333333
+	.byte	$e1,$00
+	jsr	FloatPower
+	jsr	FPPushConstant	; 1.7706212
+	.dword	$7151db95
+	.byte	$e2,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.01
+	.dword	$51eb851f
+	.byte	$db,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -1.76042763
+	.dword	$70aad8a6
+	.byte	$e2,$80
+	jsr	FloatNegate
+	jsr	FPPushConstant	; 1.76042763
+	.dword	$70aad8a6
+	.byte	$e2,$00
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -1.76042763
+	.dword	$70aad8a6
+	.byte	$e2,$80
+	jsr	FloatIntegerPart
+	jsr	FPPushConstant	; -1
+	.dword	$00000001
+	.byte	$00,$80
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -11.94
+	.dword	$5f851eb8
+	.byte	$e5,$80
+	jsr	FloatSine
+	jsr	FPPushConstant	; 0.58620824
+	.dword	$4b08df22
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -11.94
+	.dword	$5f851eb8
+	.byte	$e5,$80
+	jsr	FloatCosine
+	jsr	FPPushConstant	; 0.81016042
+	.dword	$67b3562e
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.39
+	.dword	$63d70a3d
+	.byte	$e0,$00
+	jsr	FloatTangent
+	jsr	FPPushConstant	; 0.41105492
+	.dword	$693ae52e
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 1.55
+	.dword	$63333333
+	.byte	$e2,$00
+	jsr	FloatArcTan
+	jsr	FPPushConstant	; 0.99783018
+	.dword	$7fb8e63b
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -0.4
+	.dword	$66666666
+	.byte	$e0,$80
+	jsr	FloatExponent
+	jsr	FPPushConstant	; 0.67032005
+	.dword	$55cd0c22
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 90.48
+	.dword	$5a7ae148
+	.byte	$e8,$00
+	jsr	FloatLogarithm
+	jsr	FPPushConstant	; 4.50512883
+	.dword	$481501f8
+	.byte	$e4,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 75.44
+	.dword	$4b70a3d7
+	.byte	$e8,$00
+	jsr	FloatSquareRoot
+	jsr	FPPushConstant	; 8.6856203
+	.dword	$457c267f
+	.byte	$e5,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 1.46
+	.dword	$5d70a3d7
+	.byte	$e2,$00
+	jsr	FPPushConstant	; 0.7
+	.dword	$5999999a
+	.byte	$e1,$00
+	jsr	FloatPower
+	jsr	FPPushConstant	; 1.30330781
+	.dword	$53696529
+	.byte	$e2,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.01
+	.dword	$51eb851f
+	.byte	$db,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -25.68397182
+	.dword	$66bc631c
+	.byte	$e6,$80
+	jsr	FloatNegate
+	jsr	FPPushConstant	; 25.68397182
+	.dword	$66bc631c
+	.byte	$e6,$00
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -25.68397182
+	.dword	$66bc631c
+	.byte	$e6,$80
+	jsr	FloatIntegerPart
+	jsr	FPPushConstant	; -25
+	.dword	$00000019
+	.byte	$00,$80
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -5.73
+	.dword	$5bae147b
+	.byte	$e4,$80
+	jsr	FloatSine
+	jsr	FPPushConstant	; 0.52540013
+	.dword	$43404fbc
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -5.73
+	.dword	$5bae147b
+	.byte	$e4,$80
+	jsr	FloatCosine
+	jsr	FPPushConstant	; 0.85085528
+	.dword	$6ce8d369
+	.byte	$e1,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.33
+	.dword	$547ae148
+	.byte	$e0,$00
+	jsr	FloatTangent
+	jsr	FPPushConstant	; 0.34252487
+	.dword	$57afb5bb
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.529
+	.dword	$43b645a2
+	.byte	$e1,$00
+	jsr	FloatArcTan
+	jsr	FPPushConstant	; 0.48657756
+	.dword	$7c9058d3
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.71
+	.dword	$5ae147ae
+	.byte	$e1,$00
+	jsr	FloatExponent
+	jsr	FPPushConstant	; 2.03399126
+	.dword	$411674d7
+	.byte	$e3,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 41.59
+	.dword	$532e147b
+	.byte	$e7,$00
+	jsr	FloatLogarithm
+	jsr	FPPushConstant	; 3.72785975
+	.dword	$774aa088
+	.byte	$e3,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 9.79
+	.dword	$4e51eb85
+	.byte	$e5,$00
+	jsr	FloatSquareRoot
+	jsr	FPPushConstant	; 3.12889757
+	.dword	$641fedcc
+	.byte	$e3,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 1.01
+	.dword	$40a3d70a
+	.byte	$e2,$00
+	jsr	FPPushConstant	; 1.6
+	.dword	$66666666
+	.byte	$e2,$00
+	jsr	FloatPower
+	jsr	FPPushConstant	; 1.01604794
+	.dword	$4106edf0
+	.byte	$e2,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.01
+	.dword	$51eb851f
+	.byte	$db,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -65.39305094
+	.dword	$41649efd
+	.byte	$e8,$80
+	jsr	FloatNegate
+	jsr	FPPushConstant	; 65.39305094
+	.dword	$41649efd
+	.byte	$e8,$00
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -65.39305094
+	.dword	$41649efd
+	.byte	$e8,$80
+	jsr	FloatIntegerPart
+	jsr	FPPushConstant	; -65
+	.dword	$00000041
+	.byte	$00,$80
+	jsr	FloatCompare
+	jsr	CompareEqual
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -9.62
+	.dword	$4cf5c28f
+	.byte	$e5,$80
+	jsr	FloatSine
+	jsr	FPPushConstant	; 0.19398436
+	.dword	$6351eb04
+	.byte	$df,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; -9.62
+	.dword	$4cf5c28f
+	.byte	$e5,$80
+	jsr	FloatCosine
+	jsr	FPPushConstant	; -0.98100462
+	.dword	$7d918f34
+	.byte	$e1,$80
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	CompareLess
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 0.39
+	.dword	$63d70a3d
+	.byte	$e0,$00
+	jsr	FloatTangent
+	jsr	FPPushConstant	; 0.41105492
+	.dword	$693ae52e
+	.byte	$e0,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 1.178
+	.dword	$4b645a1d
+	.byte	$e2,$00
+	jsr	FloatArcTan
+	jsr	FPPushConstant	; 0.86694329
+	.dword	$6ef7ff6b
+	.byte	$e1,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.001
@@ -5159,318 +5433,44 @@
 	.byte	$d8,$00
 	jsr	FloatCompare
 	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 4.06
-	.dword	$40f5c28f
-	.byte	$e4,$00
-	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 1.40118297
-	.dword	$59acfb56
-	.byte	$e2,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 20.66
-	.dword	$52a3d70a
+	jsr	FPPushConstant	; 28.78
+	.dword	$731eb852
 	.byte	$e6,$00
-	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 4.54532727
-	.dword	$48b9a916
-	.byte	$e4,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.14
-	.dword	$47ae147b
-	.byte	$df,$00
-	jsr	FPPushConstant	; 1.2
-	.dword	$4ccccccd
-	.byte	$e2,$00
-	jsr	FloatPower
-	jsr	FPPushConstant	; 0.09448299
-	.dword	$60c02620
-	.byte	$de,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.01
-	.dword	$51eb851f
-	.byte	$db,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 74.29164979
-	.dword	$4a4aa990
-	.byte	$e8,$00
-	jsr	FloatNegate
-	jsr	FPPushConstant	; -74.29164979
-	.dword	$4a4aa990
-	.byte	$e8,$80
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 74.29164979
-	.dword	$4a4aa990
-	.byte	$e8,$00
-	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; 74
-	.dword	$0000004a
-	.byte	$00,$00
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 3.22
-	.dword	$670a3d71
-	.byte	$e3,$00
-	jsr	FloatSine
-	jsr	FPPushConstant	; -0.07832703
-	.dword	$5034f601
-	.byte	$de,$80
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 3.22
-	.dword	$670a3d71
-	.byte	$e3,$00
-	jsr	FloatCosine
-	jsr	FPPushConstant	; -0.99692772
-	.dword	$7f9b53d9
-	.byte	$e1,$80
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.34
-	.dword	$570a3d71
-	.byte	$e0,$00
-	jsr	FloatTangent
-	jsr	FPPushConstant	; 0.35373688
-	.dword	$5a8e800b
-	.byte	$e0,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.487
-	.dword	$5f2b020c
-	.byte	$e2,$00
-	jsr	FloatArcTan
-	jsr	FPPushConstant	; 0.9787696
-	.dword	$7d48527f
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.05
-	.dword	$43333333
-	.byte	$e2,$00
-	jsr	FloatExponent
-	jsr	FPPushConstant	; 2.85765112
-	.dword	$5b71e0c3
-	.byte	$e3,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 67.27
-	.dword	$43451eb8
-	.byte	$e8,$00
 	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 4.20871437
-	.dword	$4356e4e1
-	.byte	$e4,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 85.2
-	.dword	$55333333
-	.byte	$e8,$00
-	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 9.23038461
-	.dword	$49d7d3e3
-	.byte	$e5,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 1.52
-	.dword	$6147ae14
-	.byte	$e2,$00
-	jsr	FPPushConstant	; 1.4
-	.dword	$5999999a
-	.byte	$e2,$00
-	jsr	FloatPower
-	jsr	FPPushConstant	; 1.79713633
-	.dword	$73044819
-	.byte	$e2,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.01
-	.dword	$51eb851f
-	.byte	$db,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 46.52984531
-	.dword	$5d0f47e2
-	.byte	$e7,$00
-	jsr	FloatNegate
-	jsr	FPPushConstant	; -46.52984531
-	.dword	$5d0f47e2
-	.byte	$e7,$80
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 46.52984531
-	.dword	$5d0f47e2
-	.byte	$e7,$00
-	jsr	FloatIntegerPart
-	jsr	FPPushConstant	; 46
-	.dword	$0000002e
-	.byte	$00,$00
-	jsr	FloatCompare
-	jsr	CompareEqual
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -2.77
-	.dword	$58a3d70a
-	.byte	$e3,$80
-	jsr	FloatSine
-	jsr	FPPushConstant	; -0.36309985
-	.dword	$5cf41c9d
-	.byte	$e0,$80
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -2.77
-	.dword	$58a3d70a
-	.byte	$e3,$80
-	jsr	FloatCosine
-	jsr	FPPushConstant	; -0.93175024
-	.dword	$77439784
-	.byte	$e1,$80
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	CompareLess
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.12
-	.dword	$7ae147ae
-	.byte	$de,$00
-	jsr	FloatTangent
-	jsr	FPPushConstant	; 0.12057934
-	.dword	$7b792687
-	.byte	$de,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 0.731
-	.dword	$5d916873
-	.byte	$e1,$00
-	jsr	FloatArcTan
-	jsr	FPPushConstant	; 0.6312298
-	.dword	$50cc235a
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; -0.06
-	.dword	$7ae147ae
-	.byte	$dd,$80
-	jsr	FloatExponent
-	jsr	FPPushConstant	; 0.94176453
-	.dword	$788bbd78
-	.byte	$e1,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 86.58
-	.dword	$56947ae1
-	.byte	$e8,$00
-	jsr	FloatLogarithm
-	jsr	FPPushConstant	; 4.46106884
-	.dword	$476089b8
-	.byte	$e4,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 89.81
-	.dword	$59cf5c29
-	.byte	$e8,$00
-	jsr	FloatSquareRoot
-	jsr	FPPushConstant	; 9.47681381
-	.dword	$4bd083c2
-	.byte	$e5,$00
-	jsr	FloatSubtract
-	jsr	FPAbs
-	jsr	FPPushConstant	; 0.001
-	.dword	$4189374c
-	.byte	$d8,$00
-	jsr	FloatCompare
-	jsr	FPAssertCheck
-	jsr	FPPushConstant	; 3.25
-	.dword	$68000000
+	jsr	FPPushConstant	; 3.3596807
+	.dword	$6b828119
 	.byte	$e3,$00
-	jsr	FPPushConstant	; 0.5
-	.dword	$40000000
-	.byte	$e1,$00
-	jsr	FloatPower
-	jsr	FPPushConstant	; 1.80277564
-	.dword	$7360ad14
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 61.54
+	.dword	$7b147ae1
+	.byte	$e7,$00
+	jsr	FloatSquareRoot
+	jsr	FPPushConstant	; 7.84474346
+	.dword	$7d8411b8
+	.byte	$e4,$00
+	jsr	FloatSubtract
+	jsr	FPAbs
+	jsr	FPPushConstant	; 0.001
+	.dword	$4189374c
+	.byte	$d8,$00
+	jsr	FloatCompare
+	jsr	FPAssertCheck
+	jsr	FPPushConstant	; 3.23333333
+	.dword	$67777776
+	.byte	$e3,$00
+	jsr	FPPushConstant	; 1.3
+	.dword	$53333333
 	.byte	$e2,$00
+	jsr	FloatPower
+	jsr	FPPushConstant	; 4.59775286
+	.dword	$4990654e
+	.byte	$e4,$00
 	jsr	FloatSubtract
 	jsr	FPAbs
 	jsr	FPPushConstant	; 0.01

@@ -37,6 +37,7 @@ prelim:
 build: prelim
 	$(ASM) 	source$(S)main$(S)00main.header \
 			$(BINDIR)runtime.library $(BINDIR)common.library $(BINDIR)ifloat32.library $(BINDIR)polynomials.library \
+			source$(S)main$(S)10object.divider \
 			$(BINDIR)compiler.library \
 			_library.asm \
 			source$(S)main$(S)zzfree.footer
