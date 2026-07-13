@@ -88,40 +88,62 @@ author rejected them outright; leaving them parked rather than deciding in the a
 
 ## Bugs
 
-### Anything past 2^31 is wrong — and it is TWO bugs, not one
+### Values past 2^31 — FIXED, in two halves
 
 The mantissa holds 31 bits plus a sign (in `NSStatus`), so `2147483647` is the largest integer it can
-hold *bare*. Larger values have to become floats — mantissa x 2^exponent. Two separate things stop
-that working, and **both** must be fixed before `PRINT 3000000000` is right:
+hold *bare*. Anything larger has to become a float, mantissa x 2^exponent. Two independent things
+stopped that working, and both are now fixed:
 
-1. **The literal parser wraps silently.** `ESTAShiftDigitIntoMantissa` (`tofloat.asm`) does
+1. **The literal parser wrapped silently.** `ESTAShiftDigitIntoMantissa` (`tofloat.asm`) did
    `mantissa = mantissa*10 + digit` with no overflow check at all — `FloatShiftLeft` is a `rol` chain,
-   so bits pushed out of bit 31 are simply dropped. `2196679407` becomes `-49195759`; `2147483648`
-   becomes `-0`. A wrong answer, not a missing feature.
+   so bits pushed out of bit 31 were simply dropped. `2196679407` compiled to `-49195759`,
+   `2147483648` to `-0`. Now the quick path runs only while the result still fits and the rest goes
+   through `FloatMultiply`/`FloatAdd`.
 
-2. **The printer cannot print a positive exponent.** `MakePlusTwoString` (`tostring.asm`) calls
-   `FloatIntegerPart` and then `ConvertInt32`, which renders the **mantissa** in base 10 and never
-   looks at `NSExponent`. `FloatIntegerPart` leaves a positive exponent alone (it only shifts while the
-   exponent is negative), so any value of 2^31 or more prints as its mantissa — off by a factor of
-   2^exponent.
+2. **`PRINT` could not show a positive exponent.** `MakePlusTwoString` (`tostring.asm`) rendered the
+   **mantissa** in base 10 and never looked at `NSExponent`, so a correctly-held 3e9 printed as
+   `1500000000`. Now `FloatToStringScientific` handles it in E notation, as BASIC does.
 
-The arithmetic itself is **fine**, which is the surprise and which is why (2) went unnoticed.
-`FloatMultiplyShort` already spots the mantissa overflowing bit 31, shifts right and hands the shift
-count back for the exponent to absorb. Proved it by dividing the result back down:
-`b=1000000*1000000 : PRINT b/1000000` gives exactly `1000000`, and `c=2e9+2e9 : PRINT c/2` gives
-exactly `2000000000` — the values are right, only `PRINT` lies about them. (`PRINT b` says
-`1953125000`, which is 1e12's mantissa with its exponent of 9 thrown away.)
+The arithmetic was **fine all along**, which is why (2) went unnoticed for so long: the values were
+right, only `PRINT` lied about them.
 
-Stock X16 BASIC prints these in scientific notation (`3E+09`, `2.19667941E+09`), and Blitz's printer
-has no scientific notation at all — so fixing (2) properly means adding it, not just widening the
-integer conversion. That is the real shape of this job.
+### The one that is left: the float ops truncate, and truncation is biased
 
-The randomised suites cannot see any of it: they draw integers from -50000..50000.
+`PRINT 1E15` gives `9.99999999E+14`, where stock BASIC gives `1E+15`. Everything else matches stock
+exactly — `3E+09`, `2.19667941E+09`, `2.14748365E+09`, `5E+09`, `1E+10`. The drift only shows on large
+powers of ten, and it **grows with the exponent**, which is the tell:
+
+| literal | Blitz | stock |
+|---|---|---|
+| `1E15` | `9.99999999E+14` | `1E+15` |
+| `1E20` | `9.99999998E+19` | `1E+20` |
+| `1E30` | `9.99999997E+29` | `1E+30` |
+| `1E38` | `9.99999996E+37` | `1E+38` |
+
+This is **not** a printer bug. `FloatMultiplyShort` and `Int32ShiftDivide` both **truncate** — they
+never round to nearest — so every operation lands slightly LOW, and because the error always points
+the same way it accumulates instead of cancelling. `FloatScalePower10` applies a power of ten a
+tableful (10^9) at a time, so `1E38` is four chained multiplies and comes out about four ulp light.
+The printer then faithfully reports the value it was given.
+
+Measured, so it is not a guess: `b = 1E15 : PRINT b/1000000` gives exactly `999999999`, and
+`PRINT b/1000000 - 999999999` gives exactly `0`. The true quotient is `999999999.574`, and the nearest
+value the format can hold is `999999999.5` — so the divide lost a full ulp *below even truncation*.
+Had it rounded, the printer's own rounding would have carried it to `1000000000` and printed `1E+15`.
+
+**The fix is round-to-nearest in `FloatMultiplyShort` and `Int32ShiftDivide`** (keep the guard bit,
+increment when it is set). It would make every float operation slightly more accurate, at a cost of a
+few bytes and cycles. It is a core numerical change, so it wants its own pass and its own verification
+— and note the suites **cannot see it**: they assert through `f.cmp`, which is `FloatCompare`, and that
+deliberately ignores the low 12 bits. Check it with the raw-float-bytes probe instead.
 
 ### Cosmetic
 
 - **`PRINT` keeps a leading zero.** Blitz prints `0.5`, X16 BASIC prints `.5`. The trailing zeros and
   the rounding are already fixed.
+- **Integers below 2^31 print in full**, where stock switches to E notation above 9 digits: we print
+  `2147483647`, stock prints `2.14748365E+09`. This is deliberate — we hold it exactly, so printing it
+  exactly is *more* precise, not less. Only mentioning it because it is a visible difference.
 
 ## Performance
 
