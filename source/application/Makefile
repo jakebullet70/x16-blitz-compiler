@@ -50,10 +50,11 @@ release:  build
 	$(CCOPY) $(BINDIR)tokenise.zip $(RELEASEDIR)
 	$(CCOPY) $(ROOTDIR)CHANGES.txt $(RELEASEDIR)
 	#
-	#		Bundle the release with Python's stdlib zipfile rather than zip(1), which is
-	#		not present on a stock Windows box.
+	#		Bundle the release. mkzip.py replaces zip(1) (absent on a stock Windows box) and
+	#		writes reproducibly, so an unchanged release no longer produces a new blitz.zip.
+	#		It skips the archive it is writing, so the * glob cannot swallow a stale one.
 	#
-	cd $(RELEASEDIR) ; $(CDEL) blitz.zip ; $(PYTHON) -c "import glob, os, zipfile; z = zipfile.ZipFile('blitz.zip','w',zipfile.ZIP_DEFLATED); [z.write(f) for f in sorted(glob.glob('*')) if os.path.isfile(f)]; z.close()"
+	cd $(RELEASEDIR) ; $(CDEL) blitz.zip ; $(PYTHON) $(CSCRIPTS)mkzip.py blitz.zip *
 	
 run: build	
 	$(CDEL) OBJECT.PRG
