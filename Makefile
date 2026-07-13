@@ -19,9 +19,10 @@ include documents/common.make
 endif
 
 #
-#		The revision of the current release
+#		The revision of the current release. Must match the ROM in bin/x16emu/ --
+#		bumping this without refreshing that rom.bin will mismatch emulator and ROM.
 #
-REVISION = r43
+REVISION = r49
 
 all: libs
 
@@ -40,26 +41,31 @@ release:
 #		repositories to be in the same directory as the blitz repository
 #	
 pullbuild:
-	cd ..$(S)x16-docs ; git pull	
+	cd ..$(S)x16-docs ; git pull
 	cd ..$(S)x16-rom ; git pull ; make
-	cd ..$(S)x16-emulator ; git pull ; make 
-	$(CCOPY) ..$(S)x16-rom$(S)build$(S)x16$(S)rom.bin $(BINDIR)
-	$(CCOPY) ..$(S)x16-emulator$(S)x16emu$(APPSTEM) $(BINDIR)
+	cd ..$(S)x16-emulator ; git pull ; make
+	$(CCOPY) ..$(S)x16-rom$(S)build$(S)x16$(S)rom.bin $(EMUDIR)
+	$(CCOPY) ..$(S)x16-emulator$(S)x16emu$(APPSTEM) $(EMUDIR)
 #
-#		Get latest release.
-#	
+#		Get latest release. Unpacks into bin/x16emu/ -- NOT bin/ -- because
+#		common.make reads the emulator and its rom.bin from there (and bin/box16/
+#		holds a second emulator with an incompatible SDL2.dll). Keeps the .sym
+#		files: they are how ROM addresses in x16_*_include.inc get verified.
+#
+#		wget(1) and unzip(1) are not present on a stock Windows box, so the
+#		download and extract both go through Python's stdlib.
+#
 BTEMP = $(BINDIR)temp$(S)
+EMUURL = https://github.com/X16Community/x16-emulator/releases/download/$(REVISION)
 
 latest:
-	wget -q -c https://github.com/X16Community/x16-emulator/releases/download/$(REVISION)/x16emu_linux-x86_64-$(REVISION).zip -P $(BTEMP)
-	wget -q -c https://github.com/X16Community/x16-emulator/releases/download/$(REVISION)/x16emu_win64-$(REVISION).zip -P $(BTEMP)
-	cd $(BTEMP) ; unzip -q -o x16emu_linux-x86_64-$(REVISION).zip
-	cd $(BTEMP) ; unzip -q -o x16emu_win64-$(REVISION).zip
-	$(CDEL) $(BTEMP)*.sym
+	$(PYTHON) -c "import os, urllib.request as u; d=r'$(BTEMP)'; os.makedirs(d, exist_ok=True); [u.urlretrieve('$(EMUURL)/'+z, os.path.join(d,z)) for z in ('x16emu_linux-x86_64-$(REVISION).zip','x16emu_win64-$(REVISION).zip')]"
+	$(PYTHON) -c "import os, glob, zipfile; d=r'$(BTEMP)'; [zipfile.ZipFile(z).extractall(d) for z in glob.glob(os.path.join(d,'*.zip'))]"
 	$(CDEL) $(BTEMP)*.pdf
 	$(CDEL) $(BTEMP)*.zip
-	$(CCOPY) $(BTEMP)x16emu $(BINDIR)
-	$(CCOPY) $(BTEMP)x16emu.exe $(BINDIR)
-	$(CCOPY) $(BTEMP)rom.bin $(BINDIR)	
-	$(CCOPY) $(BTEMP)*.dll $(BINDIR)	
+	$(CCOPY) $(BTEMP)x16emu $(EMUDIR)
+	$(CCOPY) $(BTEMP)x16emu.exe $(EMUDIR)
+	$(CCOPY) $(BTEMP)rom.bin $(EMUDIR)
+	$(CCOPY) $(BTEMP)*.sym $(EMUDIR)
+	$(CCOPY) $(BTEMP)*.dll $(EMUDIR)
 
