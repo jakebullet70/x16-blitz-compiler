@@ -345,26 +345,23 @@ ENConstructFinal:
 		lda 	decimalCount
 		beq 	_ENCFNoFraction
 		;
-		;		S[1] is also the scratch slot FloatScalePower10 needs in order to scale S[0],
-		;		so lift the fraction digits clear of it first.
+		;		Scale the fraction FIRST, while it is still in S[1] and S[2]/S[3] are free, and
+		;		lift it clear only afterwards -- S[1] is the slot FloatScalePower10 needs in order
+		;		to scale S[0]. Lifting first and scaling up there works too, but it reaches S[5],
+		;		and VAL() encodes at the CURRENT expression depth rather than at the bottom of the
+		;		stack, so the whole conversion wants to stay as shallow as it can.
 		;
-		inx 								; X = 1
-		jsr 	FloatShiftUpTwo 			; S[3] = S[1]
-		dex 								; X = 0
-		;
-		jsr 	ENGetExponent 				; S[0] = integer digits x 10^e   (scratch S[1])
-		jsr 	FloatScalePower10
-		;
-		jsr 	ENGetExponent 				; S[3] = fraction digits x 10^(e-dc)  (scratch S[4])
+		jsr 	ENGetExponent 				; S[1] = fraction digits x 10^(e-dc)
 		sec
 		sbc 	decimalCount
-		inx
-		inx
-		inx 								; X = 3
+		inx 								; X = 1
 		jsr 	FloatScalePower10
-		dex
-		dex
+		;
+		jsr 	FloatShiftUpTwo 			; S[3] = S[1], which frees S[1] and S[2] again
 		dex 								; X = 0
+		;
+		jsr 	ENGetExponent 				; S[0] = integer digits x 10^e
+		jsr 	FloatScalePower10
 		;
 		lda 	NSMantissa0+3,x 			; bring the scaled fraction back down to S[1], so that
 		sta 	NSMantissa0+1,x 			; it sits alongside S[0] for the add.
@@ -410,14 +407,26 @@ _ENGENegate:
 
 ; ************************************************************************************************
 ;
-;		Scale S[X] by 10^A, where A is a SIGNED byte. X is preserved. S[X+1] is used as scratch,
-;		so the caller must have a free slot directly above X.
+;		Scale S[X] by 10^A, where A is a SIGNED byte. X is preserved. S[X+1] and S[X+2] are used
+;		by the multiply/divide, so the caller must have two free slots above X.
 ;
-;		Negative powers that the table covers are a single multiply by the tabulated 10^-n --
-;		exactly what the plain decimal path has always done, so a literal with no exponent is
-;		scaled bit for bit as before and cannot regress. Everything else is built by repeated
-;		x10 or /10: that costs nothing at compile time, and the positive case is EXACT while the
-;		mantissa stays whole, which is what lets 9.2E5 come out as precisely 920000.
+;		Both directions go through the SAME table of POSITIVE powers: scaling up multiplies by
+;		10^n, scaling down DIVIDES by it. The dividing is the whole point. 10^-n can never be
+;		exact, because 1/10 is not a binary fraction, so the old code -- which multiplied by a
+;		tabulated 10^-n -- inherited that error, and the error was LOW: 5 x 10^-1 gave
+;		0.4999999998 even though 0.5 is exactly representable. 5/10 lands on it exactly, because
+;		Int32ShiftDivide is exact whenever the quotient is.
+;
+;		The table entries are INTEGERS (see constants.py), and that is load bearing on the way
+;		up: FloatMultiply's integer fast path is exact whenever the product fits, and it returns
+;		an integer, whereas a normalised operand would force the truncating float path and return
+;		a float. Both get 9 x 10^5 right, but only the integer one PRINTS as "900000" -- the
+;		float printer is lossy. So whole-number literals must stay whole. FloatDivide normalises
+;		its operands itself, so the way down does not care.
+;
+;		A power deeper than the table is applied a tableful at a time. Such literals are outside
+;		the format's range anyway; the point is only that they degrade rather than do something
+;		wild.
 ;
 ; ************************************************************************************************
 
@@ -426,57 +435,62 @@ FloatScalePower10:
 		beq 	_FSPDone 					; 10^0, nothing to do
 		bmi 	_FSPNegative
 ;
-_FSPMultiplyLoop: 							; positive: multiply by 10, A times.
+_FSPMultiplyLoop: 							; positive: S[X] = S[X] x 10^n
+		jsr 	_FSPLoadPower 				; S[X+1] = 10^chunk, A = power still to apply
 		pha
-		inx
-		lda 	#10
-		jsr 	FloatSetByte 				; S[X+1] = 10
-		jsr 	FloatMultiply 				; does its own dex: S[X] = S[X] x 10, X restored
-		pla
-		dec 	a
+		inx 								; FloatMultiply does its own dex
+		jsr 	FloatMultiply
+		pla 								; sets Z if there is nothing left to apply
 		bne 	_FSPMultiplyLoop
 _FSPDone:
 		rts
 ;
-_FSPNegative:
+_FSPNegative: 								; negative: S[X] = S[X] / 10^n
 		eor 	#$FF 						; A = |A|
 		inc 	a
-		cmp 	#FloatScalarTableSize+1
-		bcs 	_FSPDivideLoop 				; deeper than the table reaches: divide instead.
-		;
+_FSPDivideLoop:
+		jsr 	_FSPLoadPower 				; S[X+1] = 10^chunk, A = power still to apply
+		pha
+		inx 								; FloatDivide does its own dex
+		jsr 	FloatDivide
+		pla
+		bne 	_FSPDivideLoop
+		rts
+
+;
+;		Load 10^chunk into S[X+1], where chunk is as much of the power in A as the table can do
+;		in one go. Returns A reduced by chunk, so the caller loops until it reaches zero.
+;		A > 0 on entry. X and Y are preserved.
+;
+_FSPLoadPower:
 		phy
-		sta 	scaleTemp 					; index it: five byte entries, 10^-1 first
+		pha 								; save the power still outstanding
+		cmp 	#FloatPower10TableSize+1
+		bcc 	_FSPLPHaveChunk
+		lda 	#FloatPower10TableSize 		; deeper than the table: take the largest exact power
+_FSPLPHaveChunk:
+		sta 	scaleTemp 					; index it: five byte entries, 10^1 first
 		asl 	a
-		asl 	a 							; x4 (clears carry: n <= table size)
+		asl 	a 							; x4 (clears carry: chunk <= table size)
 		adc 	scaleTemp 					; x5
 		tay
 		;
-		lda 	FloatScalarTable-5,y 		; copy 10^-n into S[X+1]
+		lda 	FloatPower10Table-5,y 		; copy 10^chunk into S[X+1]
 		sta 	NSMantissa0+1,x
-		lda 	FloatScalarTable-5+1,y
+		lda 	FloatPower10Table-5+1,y
 		sta 	NSMantissa1+1,x
-		lda 	FloatScalarTable-5+2,y
+		lda 	FloatPower10Table-5+2,y
 		sta 	NSMantissa2+1,x
-		lda 	FloatScalarTable-5+3,y
+		lda 	FloatPower10Table-5+3,y
 		sta 	NSMantissa3+1,x
-		lda 	FloatScalarTable-5+4,y
+		lda 	FloatPower10Table-5+4,y
 		sta 	NSExponent+1,x
 		stz 	NSStatus+1,x 				; the constant is positive
-		ply
 		;
-		inx 								; FloatMultiply does its own dex
-		jsr 	FloatMultiply 				; S[X] = S[X] x 10^-n, X restored
-		rts
-;
-_FSPDivideLoop: 							; past the table: divide by 10, A times.
-		pha
-		inx
-		lda 	#10
-		jsr 	FloatSetByte
-		jsr 	FloatDivide 				; does its own dex: S[X] = S[X] / 10, X restored
-		pla
-		dec 	a
-		bne 	_FSPDivideLoop
+		pla 								; power outstanding, less the chunk just loaded
+		sec
+		sbc 	scaleTemp
+		ply
 		rts
 
 ; ************************************************************************************************
