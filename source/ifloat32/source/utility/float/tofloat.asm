@@ -497,25 +497,73 @@ _FSPLPHaveChunk:
 ;
 ;			Put digit A into the mantissa at X, e.g. mantissa = mantissa x 10 + digit
 ;
+;		The quick way below is a rol chain, and a rol chain silently drops whatever it pushes
+;		out of the top of the mantissa. Only 31 bits of that mantissa are usable -- the sign
+;		lives in NSStatus -- so once the running value got large, digits were being shifted into
+;		oblivion and the literal quietly became a DIFFERENT number: 2196679407 came out as
+;		-49195759, and 2147483648 as -0.
+;
+;		So do it the quick way only while the result is still going to fit, and hand the rest to
+;		FloatMultiply/FloatAdd, which normalise and degrade to a float -- which is what BASIC
+;		does with a number this big.
+;
+;		The test has to be EXACT, not merely safe. FloatMultiply's exact integer path needs both
+;		operands under 2^24; above that it takes the normalising float path and hands back a
+;		float even when the product would have fitted. So a conservative test that sent
+;		2147483647 (which is representable, and prints correctly today) down the float path
+;		would turn it into a float and break it. Hence:
+;
+;			room for the digit  iff  mantissa x 10 + digit <= $7FFFFFFF
+;			                    iff  mantissa <  214748364
+;			                    or   mantissa == 214748364 and digit <= 7
+;
+;		214748364 is $0CCCCCCC, and 214748364 x 10 + 7 is exactly $7FFFFFFF, the largest integer
+;		the mantissa holds. Small numbers fail the very first compare and take the quick path, so
+;		this costs two instructions in the common case.
+;
 ; ************************************************************************************************
 
 ESTAShiftDigitIntoMantissa:
-		and 	#15 						; save digit
-		pha
+		and 	#15
+		sta 	digitTemp 					; keep the digit out of the 6502 stack, so that the
+											; test below can look at it without juggling.
+		lda 	NSExponent,x 				; already a float ? then there is no exact path left.
+		bne 	_ESTASDFloat
+		;
+		lda 	NSMantissa3,x 				; mantissa vs $0CCCCCCC, most significant byte first
+		cmp 	#$0C
+		bcc 	_ESTASDExact 				; below : always room
+		bne 	_ESTASDFloat 				; above : never room
+		lda 	NSMantissa2,x
+		cmp 	#$CC
+		bcc 	_ESTASDExact
+		bne 	_ESTASDFloat
+		lda 	NSMantissa1,x
+		cmp 	#$CC
+		bcc 	_ESTASDExact
+		bne 	_ESTASDFloat
+		lda 	NSMantissa0,x
+		cmp 	#$CC
+		bcc 	_ESTASDExact
+		bne 	_ESTASDFloat
+		lda 	digitTemp 					; exactly $0CCCCCCC : room for 0..7, and no more
+		cmp 	#8
+		bcs 	_ESTASDFloat
 
+_ESTASDExact: 								; mantissa = mantissa x 10 + digit, exactly
 		lda 	NSMantissa3,x 				; push mantissa on stack
 		pha
-		lda 	NSMantissa2,x 
+		lda 	NSMantissa2,x
 		pha
-		lda 	NSMantissa1,x 
+		lda 	NSMantissa1,x
 		pha
-		lda 	NSMantissa0,x 
+		lda 	NSMantissa0,x
 		pha
 		jsr 	FloatShiftLeft 				; x 2
 		jsr 	FloatShiftLeft 				; x 4
 
 		clc 								; pop mantissa and add
-		pla 
+		pla
 		adc 	NSMantissa0,x
 		sta 	NSMantissa0,x
 		pla
@@ -529,7 +577,7 @@ ESTAShiftDigitIntoMantissa:
 		sta 	NSMantissa3,x 				; x 5
 		jsr 	FloatShiftLeft 				; x 10
 		;
-		pla 								; add digit
+		lda 	digitTemp 					; add digit
 		clc
 		adc 	NSMantissa0,x
 		sta 	NSMantissa0,x
@@ -540,6 +588,19 @@ ESTAShiftDigitIntoMantissa:
 		bne 	_ESTASDExit
 		inc 	NSMantissa3,x
 _ESTASDExit:
+		rts
+
+_ESTASDFloat: 								; the same sum, but through the float operators
+		phy 								; they clobber Y, and the encoder is holding a pointer
+		inx 								; S[X+1] = 10
+		lda 	#10
+		jsr 	FloatSetByte
+		jsr 	FloatMultiply 				; does its own dex : S[X] = S[X] x 10
+		inx 								; S[X+1] = digit
+		lda 	digitTemp
+		jsr 	FloatSetByte
+		jsr 	FloatAdd 					; does its own dex : S[X] = S[X] + digit
+		ply
 		rts
 
 		.send code
