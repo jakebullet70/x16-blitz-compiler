@@ -34,19 +34,19 @@ for src in "$ROOT"/bench/*.bas; do
 
     # --- interpreted: stock X16 BASIC, uppercased, POWEROFF to exit
     tr 'a-z' 'A-Z' < "$src" > "$w/stock.bas"
-    stock=$( cd "$w" && timeout 300 "$EMU" -rom "$ROM" -zeroram -bas stock.bas -run -warp -echo raw 2>&1 \
+    stock=$( cd "$w" && timeout 300 "$EMU" -rom "$ROM" -sound none -zeroram -bas stock.bas -run -warp -echo raw 2>&1 \
              | tr -d '\000' | jiffies )
 
     # --- compiled: Blitz. POWEROFF -> I2CPOKE (same SMC poweroff), tokenise, compile, run.
     sed 's/^\([0-9]*\) *[Pp][Oo][Ww][Ee][Rr][Oo][Ff][Ff].*/\1 i2cpoke 66,1,0/' "$src" > "$w/p.bas"
     cp "$BLITZ" "$w/"
     ( cd "$ROOT" && python bin/tokenise.zip "$w/p.bas" "$w/SOURCE.PRG" >/dev/null 2>&1 )
-    ( cd "$w" && timeout 120 "$EMU" -rom "$ROM" -zeroram -fsroot "$w" -prg BLITZ.PRG -run -warp >/dev/null 2>&1 )
+    ( cd "$w" && timeout 120 "$EMU" -rom "$ROM" -sound none -zeroram -fsroot "$w" -prg BLITZ.PRG -run -warp >/dev/null 2>&1 )
     if [ ! -f "$w/OBJECT.PRG" ]; then
         printf "%-14s %10s %10s %8s\n" "$name" "${stock:-?}" "COMPILE-ERR" "-"
         continue
     fi
-    comp=$( cd "$w" && timeout 300 "$EMU" -rom "$ROM" -zeroram -fsroot "$w" -prg OBJECT.PRG -run -warp -echo raw 2>&1 \
+    comp=$( cd "$w" && timeout 300 "$EMU" -rom "$ROM" -sound none -zeroram -fsroot "$w" -prg OBJECT.PRG -run -warp -echo raw 2>&1 \
             | tr -d '\000' | jiffies )
 
     if [ -n "${stock:-}" ] && [ -n "${comp:-}" ] && [ "${comp:-0}" -gt 0 ]; then

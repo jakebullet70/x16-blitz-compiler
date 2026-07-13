@@ -218,17 +218,43 @@ _FAExit:
 
 _FAShiftToExponent:
 		;
-		; 	Possible byte shift optimise here, but is it worth it ?
+		;		Whole bytes first, one bit at a time only for the last seven places. Eight trips
+		;		through a ror chain move the same bits as one four-byte move, so this is exactly
+		;		equivalent -- just far cheaper. And the distances are not small: adding an integer
+		;		to a float means aligning against a normalised mantissa, so X=I*1.5+2 lines the
+		;		product up against 2 across some fifteen places, every time round the loop.
+		;		(There was a note here wondering whether the byte shift was worth it. It is.)
+		;
+_FASEByteLoop:
+		tya 								; how many places still to go ?
+		sec
+		sbc 	NSExponent,x
+		cmp 	#8 							; fewer than eight: finish it bit by bit
+		bcc 	_FAShiftToExponent2
+		;
+		lda 	NSMantissa1,x 				; mantissa >>= 8
+		sta 	NSMantissa0,x
+		lda 	NSMantissa2,x
+		sta 	NSMantissa1,x
+		lda 	NSMantissa3,x
+		sta 	NSMantissa2,x
+		stz 	NSMantissa3,x
+		;
+		lda 	NSExponent,x 				; and the exponent catches up
+		clc
+		adc 	#8
+		sta 	NSExponent,x
+		bra 	_FASEByteLoop
 		;
 _FAShiftToExponent2:
-		tya 								; compare Y to exponent  								
+		tya 								; compare Y to exponent
 		cmp 	NSExponent,x 				; reached the exponent required ?
 		beq 	_FASEExit 					; exit if so.
 		jsr 	FloatShiftRight	 			; shift the mantissa right
 		inc 	NSExponent,x 				; increment exponent
 		bra 	_FAShiftToExponent2
 _FASEExit:
-		rts		
+		rts
 
 		.send 	code
 
@@ -935,7 +961,51 @@ _I32MLoop:
 		ora 	NSMantissa3+2,x
 		beq 	_I32MExit 					; exit if zero
 
-		lda 	NSMantissa0+2,x 			; check LSB of n1 
+		;
+		;		Eat eight zero bits of the multiplier at a time.
+		;
+		;		When the multiplicand has bit 30 set it can never be doubled, so an iteration
+		;		whose multiplier bit is zero does nothing at all except halve the accumulator and
+		;		bump the shift count. Eight of those in a row are just "accumulator >>= 8,
+		;		multiplier >>= 8, count += 8" -- three byte moves instead of eight trips round the
+		;		loop. Truncation composes, so the result is bit for bit identical; only the loop
+		;		gets shorter.
+		;
+		;		This is what makes integer x float fast, and it is not a corner case: normalising
+		;		shifts LEFT, so an integer operand arrives packed with trailing zeros. I=8000
+		;		normalises to $7D000000 -- eighteen of them -- and the loop used to grind through
+		;		every one a bit at a time. (It is guarded on bit 30 because the integer fast path
+		;		still wants to double a small multiplicand rather than halve the accumulator.)
+		;
+		lda 	NSMantissa0+2,x 			; low byte of the multiplier all zero ?
+		bne 	_I32MByBit
+		bit 	NSMantissa3+1,x 			; and the multiplicand cannot be doubled ?
+		bvc 	_I32MByBit
+
+		lda 	NSMantissa1+2,x 			; multiplier >>= 8
+		sta 	NSMantissa0+2,x
+		lda 	NSMantissa2+2,x
+		sta 	NSMantissa1+2,x
+		lda 	NSMantissa3+2,x
+		sta 	NSMantissa2+2,x
+		stz 	NSMantissa3+2,x
+
+		lda 	NSMantissa1,x 				; accumulator >>= 8
+		sta 	NSMantissa0,x
+		lda 	NSMantissa2,x
+		sta 	NSMantissa1,x
+		lda 	NSMantissa3,x
+		sta 	NSMantissa2,x
+		stz 	NSMantissa3,x
+
+		tya 								; and the shift count catches up
+		clc
+		adc 	#8
+		tay
+		bra 	_I32MLoop
+
+_I32MByBit:
+		lda 	NSMantissa0+2,x 			; check LSB of n1
 		and 	#1
 		beq 	_I32MNoAdd
 		;
