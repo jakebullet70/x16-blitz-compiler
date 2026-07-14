@@ -141,14 +141,10 @@ _WOCDone:
 		jsr 	IOWriteClose 				; close the file.
 		rts
 
+newWorkspacePage: 							; first page of workspace in the saved file. In the code
+		.fill 	1 							; section, not storage -- see the note in
+											; file-io/read.asm.
 		.send code
-
-		.section storage
-
-newWorkspacePage: 							; first page of workspace in the saved file
-		.fill 	1
-
-		.send storage
 
 ; ************************************************************************************************
 ;

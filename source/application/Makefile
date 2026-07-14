@@ -22,10 +22,17 @@ BASICSRC = build$(S)balls.bas
 libraries:
 	make -C ..
 
-prelim: 
+#
+#		GPC.INPUT is the compiler's control file: source, object, options, one per line. The
+#		compiler falls back to SOURCE.PRG and OBJECT.PRG without it, so this only spells out
+#		what it would have done anyway -- but it is also the template a caller copies, so it
+#		is worth having one sitting next to the compiler.
+#
+prelim:
 	make -B -C ..$(S)common-source
 	$(PYTHON) $(CSCRIPTS)build.py
 	$(PYTHON) $(BINDIR)tokenise.zip $(BASICSRC) SOURCE.PRG
+	printf 'SOURCE.PRG\nOBJECT.PRG\n\n' >GPC.INPUT
 
 #
 #		This order matters. 00main.header contains the BASIC header followed by the runtime components
@@ -46,6 +53,7 @@ build: prelim
 release:  build
 	$(CDEL) OBJECT.PRG
 	$(CCOPY) *.PRG $(RELEASEDIR)
+	$(CCOPY) GPC.INPUT $(RELEASEDIR)
 	$(CCOPY) build$(S)*.bas $(RELEASEDIR)
 	$(CCOPY) $(BINDIR)tokenise.zip $(RELEASEDIR)
 	#

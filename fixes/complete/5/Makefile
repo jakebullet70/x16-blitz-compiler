@@ -41,6 +41,7 @@ run:
 	$(CDEL) dump*.bin
 	$(CDEL) OBJECT.BASIC
 	$(CCOPY) $(BASICPRG) SOURCE.PRG
+	printf 'SOURCE.PRG\nOBJECT.PRG\n\n' >GPC.INPUT
 	$(COMBASIC) 
 
 basic:

@@ -199,6 +199,34 @@ author rejected them outright; leaving them parked rather than deciding in the a
 
 ## Bugs
 
+### The `storage` section had silently run off the end of its 1K hole — FIXED
+
+`common.inc` places the `storage` `.dsection` at `$0400` and the code at `$0801`. That is **1025
+bytes, and no more** — the section simply carries on over the top of the BASIC stub when it runs
+out, and nothing says a word. It *had* run out. `IONameBuffer` sat at `$07F1` with 64 bytes declared
+and only 15 of them below `$0801`:
+
+```text
+IONameBuffer  = $07F1
+"SOURCE.PRG" + ",S,R" + NUL  =  15 bytes  ->  $07F1 .. $07FF
+```
+
+It fit by **one byte**, and only because the two filenames were hardcoded and both were ten
+characters. A twelve-character name would have written straight over the BASIC link pointer at
+`$0801` and destroyed the running program. Nobody had ever been able to reach that, because nobody
+could change the names.
+
+`GPC.INPUT` makes the names arbitrary, so this went from latent to certain — it is what the first
+`GPC.INPUT` build actually did (`?SYNTAX ERROR`: the blanking loop wiped the BASIC stub). The
+compiler's buffers — `IONameBuffer`, `SourceLine`, `newWorkspacePage` and the three control lines —
+are now in the **`code`** section, which lands above `ObjectBase` and is discarded when the object
+code is written, so they cost a compiled program nothing. `storage` is back to `$0400..$06F0`.
+
+There is now a `.cerror` in `common.inc` that fails the build if `storage` ever crosses `$0801`
+again. **Nothing warned. That is the whole lesson** — a `.dsection` given a fixed origin will
+happily overrun whatever is above it, and the failure surfaces as a corrupt program somewhere else
+entirely.
+
 ### `REBOOT` was a hard reset — FIXED
 
 `REBOOT` did the offset-2 I²C write to the SMC, which makes the SMC assert the system reset line.
@@ -382,13 +410,22 @@ Diminishing returns; only worth revisiting if float-heavy code matters more than
 
 ## Wanted
 
-### Name the output after the source, with a `C.` prefix
+### Name the output after the source — DONE, but by the caller
 
-Blitz reads `SOURCE.PRG` and writes `OBJECT.PRG`, both hardcoded. It should instead derive the output
-name from the input: compiling `DIR.PRG` should produce **`C.DIR.PRG`**. That makes the compiled
-artifact self-identifying, lets several programs be compiled into one directory without clobbering
-each other, and puts the compiled and interpreted versions of a program side by side on the disk —
-which is what a directory-lister wants and cannot have while every compile produces `OBJECT.PRG`.
+The ask was for Blitz to derive the output name from the input, so that compiling `DIR.PRG` produced
+`C.DIR.PRG`. It does better than that now: **it takes both names from `GPC.INPUT`**, a three-line
+control file (source, object, options — options are read but ignored). So the caller says what the
+output is called, and `C.DIR.PRG` is just what you happen to type. Compiling several programs into
+one directory no longer clobbers anything, and the compiled and interpreted versions of a program
+can sit side by side on the disk.
+
+There is **no fallback**: without a readable `GPC.INPUT` the compiler prints `NO GPC.INPUT FILE` and
+stops. A compiler that guesses at what it was asked to build is worse than one that refuses. Every
+caller in the tree — `source/application/Makefile`, `bench/run-bench.sh`, the reproductions under
+`fixes/` — therefore writes one.
+
+`GPC.PRG` (`source/gpc/GPC.P8`, prog8) is the front end: it asks for the two names, writes the file,
+and hands the machine over to the compiler.
 
 ## Build / infrastructure
 

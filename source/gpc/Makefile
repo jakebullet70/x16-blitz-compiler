@@ -1,0 +1,55 @@
+# *******************************************************************************************
+# *******************************************************************************************
+#
+#		Name : 		Makefile
+#		Purpose :	GPC.PRG -- the front end for the compiler
+#		Date :		14th July 2026
+#
+# *******************************************************************************************
+# *******************************************************************************************
+#
+#		This is deliberately NOT part of "make libs". Prog8 is a 5MB jar and needs a JRE, and
+#		nothing else in this tree does -- making the whole build depend on both, to produce one
+#		1K program that changes about once a year, would be a poor trade. So GPC.PRG is built
+#		here on demand and the result is committed to release/.
+#
+#			make -C source/gpc			build GPC.PRG
+#			make -C source/gpc release	build it and put it in release/
+#			make -C source/gpc run		build it and run it in the emulator
+#
+#		Set PROG8C (and JAVA) in documents/local.make if the jar is not where common.make
+#		expects it.
+#
+# *******************************************************************************************
+
+ifeq ($(OS),Windows_NT)
+include ..\..\documents\common.make
+else
+include ../../documents/common.make
+endif
+
+all: build
+
+#
+#		Prog8 names its output after the source, in lowercase -- GPC.prg. The X16 wants GPC.PRG,
+#		and on a case sensitive host those are two different files. It has to be renamed, and it
+#		cannot be renamed in place: on Windows GPC.prg and GPC.PRG ARE the same file and cp
+#		refuses to copy one onto itself. Hence the build/ directory.
+#
+build:
+	$(PROG8) -out build GPC.P8
+	$(CCOPY) build$(S)GPC.prg GPC.PRG
+
+release: build
+	$(CCOPY) GPC.PRG $(RELEASEDIR)
+
+#
+#		GPC chain-loads BLITZ.PRG by name, so the compiler has to be sitting next to it.
+#
+run: build
+	$(CCOPY) ..$(S)application$(S)BLITZ.PRG .
+	$(CDEL) dump*.bin dump*.txt
+	$(EMULATOR) -prg GPC.PRG -run
+
+clean:
+	$(CDEL) GPC.PRG BLITZ.PRG build$(S)GPC.*
