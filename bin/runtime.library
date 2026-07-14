@@ -3597,14 +3597,21 @@ liCount:
 ;		branch on purpose: the five commands are spread over far more than a branch can reach,
 ;		and carry survives a jsr untouched.
 ;
+;		EVERY error path comes through the jsr, so that the stack below is always the same shape.
+;
 ; ************************************************************************************************
 
 LoadSaveCheckError:
 		bcs 	LoadSaveError
 		rts
 
-LoadSaveError:
-		.error_channel
+LoadSaveError: 								; the stack here is [ saved Y ][ return address ], so
+		pla 								; the return address has to be dropped before the saved Y
+		pla 								; can be reached. Y is the interpreter's instruction
+		ply 								; pointer, LOAD and BSAVE trash it, and the error report
+		.error_channel 						; prints codePtr+Y -- so without this the "@ $xxxx" is
+											; a line picked at random, which is exactly the false
+											; trail that hid the OPEN bug for so long.
 
 ; ************************************************************************************************
 ;
@@ -3753,7 +3760,10 @@ Command_BVERIFY: ;; [!bverify]
 		jsr 	X16_READST 					; bit 4 is the CBM "verify mismatch" flag
 		and 	#$10
 		beq 	_BVMatched
-		jmp 	LoadSaveError 				; jmp, not a branch: out of range from here
+		sec 								; a mismatch is raised as an I/O error, and raised through
+		jsr 	LoadSaveCheckError 			; the same jsr a KERNAL failure uses rather than jumping
+											; straight to LoadSaveError -- that is the stack depth
+											; LoadSaveError unwinds. It does not come back.
 _BVMatched:
 		ply
 		ldx 	#$FF
@@ -3944,7 +3954,8 @@ X16SMCWrite: 								; global, not a cheap local: POWEROFF branches here
 		.exitcmd 							; Tidy up properly rather than assume we die here.
 
 X16SMCError:
-		.error_channel
+		ply 								; put the interpreter's instruction pointer back before
+		.error_channel 						; the error report, which prints codePtr+Y
 
 ; ************************************************************************************************
 ;
@@ -8097,12 +8108,16 @@ _XCSStop:
 
 CommandClose: ;; [close]
 		.entercmd
+		phy 								; Y is the interpreter's instruction pointer and the
+											; KERNAL's CLOSE is free to clobber it -- see the note
+											; in x16_open.asm, which had the same bug
 		jsr 	GetInteger8Bit 				; channel to close
 		cmp 	currentChannel 				; is it the current channel
 		bne 	_CCNotCurrent
 		stz 	currentChannel 				; effectively disables CMD
 _CCNotCurrent:
 		jsr 	X16_CLOSE 					; close the file
+		ply
 		ldx 	#$FF 						; and empty the float stack, as every other command
 											; does -- see the note in x16_open.asm
 		.exitcmd
@@ -8200,7 +8215,9 @@ _XGetChar:
 		plx
 		rts
 _XGCError:
-		.error_channel
+		ply 								; Y is the interpreter's instruction pointer and CHKIN has
+		.error_channel 						; just trashed it. The error report prints codePtr+Y, so
+											; without this the "@ $xxxx" names a line at random.
 
 		.send code
 
@@ -8295,8 +8312,9 @@ X16I2CPoke: ;; [!I2CPOKE]
 		ldx 	#$FF
 		.exitcmd
 
-X16I2CError:
-		.error_channel
+X16I2CError: 								; both callers arrive with the saved Y on top of the stack
+		ply 								; -- the interpreter's instruction pointer, trashed by the
+		.error_channel 						; I2C call. The error report prints codePtr+Y.
 
 ; ************************************************************************************************
 ;
@@ -8356,20 +8374,27 @@ X16I2CPeek: ;; [!I2CPEEK]
 
 CommandXOpen: ;; [open]
 		.entercmd
+		phy 								; Y is the INTERPRETER'S INSTRUCTION POINTER -- the
+											; offset from codePtr that NextCommand fetches through.
+											; SETLFS loads Y with the secondary address, so without
+											; this, every OPEN resumed execution at codePtr plus
+											; whatever the KERNAL left in Y, and whether the program
+											; survived was pure luck of code layout: the same OPEN
+											; worked at one line offset and crashed at another.
 		;
 		;		Set up the file name
 		;
 		lda 	NSMantissa0+3  				; point zTemp0 to string head, also in XY
 		sta 	zTemp0
 		tax
-		lda 	NSMantissa1+3 
+		lda 	NSMantissa1+3
 		sta 	zTemp0+1
 		tay
 
 		inx 								; XY points to first character
 		bne 	_CONoCarry
 		iny
-_CONoCarry:		
+_CONoCarry:
 		lda 	(zTemp0) 					; get length of filename
 		jsr 	X16_SETNAM
 		;
@@ -8384,6 +8409,7 @@ _CONoCarry:
 		;
 		jsr 	X16_OPEN
 		bcs 	_COError
+		ply
 		ldx 	#$FF 						; empty the float stack, as every other command does.
 											; This is NOT cosmetic: OPEN reads its arguments from
 											; slots 0-3 ABSOLUTELY, which only works if the stack
@@ -8392,7 +8418,8 @@ _CONoCarry:
 											; filename pointer.
 		.exitcmd
 _COError:
-		.error_channel
+		ply 								; the error report prints codePtr+Y, so put Y back
+		.error_channel 						; first or the @ address is nonsense
 
 		.send 	code
 		
@@ -8545,7 +8572,9 @@ _XPCSend:
 		pla
 		rts
 _XPCError:
-		.error_channel
+		pla 								; drop the saved character, uncovering the saved Y --
+		ply 								; the interpreter's instruction pointer, which CHKOUT has
+		.error_channel 						; just trashed. The error report prints codePtr+Y.
 
 		.send code
 

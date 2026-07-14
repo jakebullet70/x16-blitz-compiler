@@ -37,8 +37,9 @@ X16I2CPoke: ;; [!I2CPOKE]
 		ldx 	#$FF
 		.exitcmd
 
-X16I2CError:
-		.error_channel
+X16I2CError: 								; both callers arrive with the saved Y on top of the stack
+		ply 								; -- the interpreter's instruction pointer, trashed by the
+		.error_channel 						; I2C call. The error report prints codePtr+Y.
 
 ; ************************************************************************************************
 ;

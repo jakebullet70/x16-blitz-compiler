@@ -36,7 +36,9 @@ _XGetChar:
 		plx
 		rts
 _XGCError:
-		.error_channel
+		ply 								; Y is the interpreter's instruction pointer and CHKIN has
+		.error_channel 						; just trashed it. The error report prints codePtr+Y, so
+											; without this the "@ $xxxx" names a line at random.
 
 		.send code
 
