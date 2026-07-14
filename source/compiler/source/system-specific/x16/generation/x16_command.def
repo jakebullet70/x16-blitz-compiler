@@ -42,3 +42,24 @@ SPRITE 			#,# X:OptionalParameterCompile X:OptionalParameterCompile X:OptionalPa
 SPRMEM 			#,#,# X:OptionalParameterCompile T N
 MOVSPR 			#,#,# T N
 TILE 			#,#,# X:OptionalParameterCompile T N
+
+# 	Banking. The runtime handler for this has existed all along -- CommandBank already reads the
+# 	ROM bank as $FF meaning "not given", which is exactly what OptionalParameterCompile pushes.
+# 	It was only ever missing this one line.
+
+BANK 			# X:OptionalParameterCompile T N
+
+# 	Binary load and save. See loadsave.asm for the two knobs (secondary address, and A) that
+# 	decide between these.
+
+# 	BVERIFY takes FOUR arguments, not the five the manual gives it. The manual's
+# 	"BVERIFY <filename>,<device>,<bank>,<start address>,<end address>" is a hard syntax error in
+# 	the R49 ROM -- checked by running it. It looks like BSAVE's signature was copied by mistake.
+# 	The four argument form is also what the KERNAL implies: LOAD with A=1 verifies, and it has no
+# 	end address at all, because the file's own length bounds the comparison.
+
+BLOAD 			$,#,#,# T N
+BVLOAD 			$,#,#,# T N
+VLOAD 			$,#,#,# T N
+BSAVE 			$,#,#,#,# T N
+BVERIFY 		$,#,#,# T N
