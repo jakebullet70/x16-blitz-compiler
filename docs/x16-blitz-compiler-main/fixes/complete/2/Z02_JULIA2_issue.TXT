@@ -1,3 +1,0 @@
-
-Seems to slow this down, and the graphical
-result isn't quite the same (smaller pixels?)

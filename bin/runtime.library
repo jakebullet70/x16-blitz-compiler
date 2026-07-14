@@ -1161,9 +1161,10 @@ X16_Audio_Parameters8_String:
 		;
 		phx 								; set the voice
 		phy
-		jsr 	X16_JSRFAR
-		jsr 	X16A_bas_playstringvoice
-		.byte 	X16_AudioCodeBank
+		jsr 	X16_JSRFAR 					; JSRFAR reads its target from the THREE bytes that
+		.word 	X16A_bas_playstringvoice 	; follow the jsr: address then bank. This was a "jsr",
+		.byte 	X16_AudioCodeBank 			; which assembles to 20 0c c0 -- so the payload read as
+											; address $0c20, bank $c0, and it far-called low RAM.
 		ply
 		plx
 		;
@@ -2085,7 +2086,18 @@ CommandXFor: ;; [for]
 		iny
 		ora 	(runtimeStackPtr),y
 
-		bne 	_CFNoOptimise 	
+		bne 	_CFNoOptimise
+		;
+		;		A ZERO step must never take the optimised path. Two reasons: its increment loop
+		;		in next.asm propagates carry with "beq _CNOIncrement", and adding 0 to a 0 byte
+		;		leaves 0 -- so with a zero index it walks Y straight off the end of the 4-byte
+		;		variable, corrupting whatever follows. And the optimised exit test is a plain
+		;		"terminal < value" magnitude check, which cannot express the exact-equality exit
+		;		that STEP 0 requires. Send it to the general path, which handles both.
+		;
+		ldy 	#7 							; step low byte (mantissa1..3 are already known zero)
+		lda 	(runtimeStackPtr),y
+		beq 	_CFNoOptimise
 
 		ldy 	#4 							; set the runtime stack pointer optimisation flag.
 		lda 	(runtimeStackPtr),y
@@ -2566,6 +2578,42 @@ Command_FRAME: ;; [frame]
 
 ; ************************************************************************************************
 ;
+;										OVAL Command
+;
+;		OVAL and RING are RECT and FRAME with the ellipse renderer in place of the rectangle
+;		one. GRAPH_draw_oval takes its bounding box in r0..r3 and the fill flag in carry,
+;		exactly as GRAPH_draw_rect does, so GraphicsRectCoords sets up both unchanged.
+;
+; ************************************************************************************************
+
+Command_OVAL: ;; [oval]
+		.entercmd
+		phy
+		jsr 	GraphicsRectCoords
+		sec 								; carry set = filled
+		jsr 	X16_GRAPH_draw_oval
+		ply
+		ldx 	#$FF
+		.exitcmd
+
+; ************************************************************************************************
+;
+;										RING Command
+;
+; ************************************************************************************************
+
+Command_RING: ;; [ring]
+		.entercmd
+		phy
+		jsr 	GraphicsRectCoords
+		clc 								; carry clear = outline
+		jsr 	X16_GRAPH_draw_oval
+		ply
+		ldx 	#$FF
+		.exitcmd
+
+; ************************************************************************************************
+;
 ;										CHAR Command
 ;
 ; ************************************************************************************************
@@ -2650,9 +2698,9 @@ GraphicsRectCoords:
 		jsr 	_GRCSortSubtract
 		ldx 	#X16_r1 					; sort r1/r3
 		jsr 	_GRCSortSubtract
-		stz 	8,x 						; zero rounding
-		stz 	9,x 
-		rts
+		stz 	X16_r4-X16_r1,x 			; zero the corner rounding in r4. X is X16_r1 here, so
+		stz 	X16_r4-X16_r1+1,x 			; the offset is 6, not 8 -- 8 lands on r5, which is not
+		rts 								; an input to GRAPH_draw_rect and left r4 uninitialised.
 
 _GRCSortSubtract:
 		lda 	4,x 						; calculate r2-r0
@@ -3382,6 +3430,72 @@ StackLoadCurrentPosition:
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;
+;		Name:		mod.asm
+;		Purpose:	MOD(dividend,divisor) function
+;		Created:	13th July 2026
+;		Reviewed: 	No
+;		Author : 	Steven De George SR
+;
+; ************************************************************************************************
+; ************************************************************************************************
+
+		.section 	code
+
+; ************************************************************************************************
+;
+;								MOD(<dividend>,<divisor>)
+;
+;		The truncated remainder, so the result takes the sign of the DIVIDEND:
+;		-7 MOD 3 is -1, and 7 MOD -3 is 1.
+;
+;		Int32Divide already does all the work, we just keep the half that DivideInt32 throws
+;		away. It is an unsigned mantissa divide leaving the quotient in S[X+2] and the
+;		remainder in S[X], and it clears S[X] with FloatSetZeroMantissaOnly -- the mantissa
+;		and nothing else -- so the dividend's status byte survives the divide untouched. That
+;		byte is its sign, which is exactly the sign a truncated remainder needs, so there is
+;		no sign fixup here at all. (Contrast FloatCalculateSign, which DivideInt32 uses to xor
+;		the two signs together: right for a quotient, wrong for a remainder.)
+;
+;		The X16 ROM restricts MOD to 16 bit signed operands. Blitz does not need to: this is
+;		a full 32 bit remainder, which is a superset.
+;
+; ************************************************************************************************
+
+UnaryMOD: ;; [mod]
+		.entercmd 							; X is the divisor, the dividend is below it at S[X-1]
+		phy
+		jsr 	FloatIntegerPart 			; make the divisor an integer
+		jsr 	FloatIsZero 				; dividing by zero is an error
+		beq 	_UMDivideByZero
+		dex 								; X is now the dividend, so S[X+1] is the divisor
+		jsr 	FloatIntegerPart 			; make the dividend an integer
+		jsr 	Int32Divide 				; S[X] mantissa = |dividend| mod |divisor|
+		stz 	NSExponent,x 				; below the divisor, so it is a whole number
+		jsr 	FloatIsZero 				; a zero remainder must not come back as -0
+		bne 	_UMExit
+		stz 	NSStatus,x
+_UMExit:
+		ply
+		.exitcmd
+
+_UMDivideByZero:
+		.error_divzero
+
+		.send 	code
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;
+; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
 ;		Name:		mouse.asm
 ;		Purpose:	Mouse commands/functions
 ;		Created:	9th May 2023
@@ -3654,6 +3768,28 @@ _CNNoIndexVariable:
 		jsr 	FloatCompare 				; and compare the floats.
 		dex 								; throw result (in NSMantissa0+1)
 
+		;
+		;		Exit iff sign(compare(index,limit)) == sign(step), where sign(0) = 0. That is a
+		;		THREE-way test. Branching on the step's sign BIT alone only gives two cases and
+		;		drops a ZERO step into the ascending path, so it exited the moment index > limit
+		;		-- i.e. immediately. A zero step is neither ascending nor descending: it must
+		;		exit ONLY on exact equality, which is what makes
+		;
+		;			FOR I=0 TO -1 STEP 0 ... NEXT
+		;
+		;		work -- a real idiom that loops until the body itself sets I to the limit.
+		;		(FloatCompare returns 0 equal, 1 greater, $FF less.)
+		;
+		ldy 	#7 							; is the step zero ? test its mantissa, as FloatIsZero
+		lda 	(runtimeStackPtr),y 		; does -- a zero mantissa is zero whatever the exponent.
+		iny
+		ora 	(runtimeStackPtr),y
+		iny
+		ora 	(runtimeStackPtr),y
+		iny
+		ora 	(runtimeStackPtr),y
+		beq 	_CNZeroStep
+
 		ldy 	#12 						; get the sign of the step.
 		lda 	(runtimeStackPtr),y
 		bmi 	_CNDownStep
@@ -3662,10 +3798,16 @@ _CNNoIndexVariable:
 		cmp 	#1 							; gone higher
 		beq 	_CNExitFor 					; if so exit the loop
 		bra 	_CNLoopBack
+
+_CNZeroStep:
+		lda 	NSMantissa0+1,x 			; zero step: exit only on EXACT equality.
+		beq 	_CNExitFor
+		bra 	_CNLoopBack
+
 _CNDownStep:
 		lda 	NSMantissa0+1,x 			; get comparator
 		cmp 	#255 						; gone lower
-		beq 	_CNExitFor		
+		beq 	_CNExitFor
 		;
 		; 		Here to loop back
 		;
@@ -6160,115 +6302,120 @@ VectorTable:
 	.word	Command_LINE             ; $9a line
 	.word	Command_RECT             ; $9b rect
 	.word	Command_FRAME            ; $9c frame
-	.word	Command_CHAR             ; $9d char
-	.word	Unary16Hex               ; $9e hex$
-	.word	CommandXInput            ; $9f input
-	.word	CommandInputString       ; $a0 input$
-	.word	CommandInputReset        ; $a1 input.start
-	.word	UnaryLen                 ; $a2 len
-	.word	LinkFloatCompare         ; $a3 f.cmp
-	.word	LinkDivideInt32          ; $a4 int.div
-	.word	NegateTOS                ; $a5 negate
-	.word	CommandNewLine           ; $a6 new.line
-	.word	CommandXNext             ; $a7 next
-	.word	NotTOS                   ; $a8 not
-	.word	CommandXOn               ; $a9 on
-	.word	CommandMoreOn            ; $aa moreon
-	.word	UnaryPeek                ; $ab peek
-	.word	UnaryPI                  ; $ac pi
-	.word	CommandPOKE              ; $ad poke
-	.word	UnaryPos                 ; $ae pos
-	.word	GetChannel               ; $af getchannel
-	.word	SetChannel               ; $b0 setchannel
-	.word	PrintNumber              ; $b1 print.n
-	.word	PrintString              ; $b2 print.s
-	.word	CommandXRead             ; $b3 read
-	.word	CommandReadString        ; $b4 read$
-	.word	UnaryRND                 ; $b5 rnd
-	.word	StringConcatenate        ; $b6 concat
-	.word	SignTOS                  ; $b7 sgn
-	.word	PrintTab                 ; $b8 print.tab
-	.word	PrintPos                 ; $b9 print.pos
-	.word	PrintSpace               ; $ba print.spc
-	.word	Unary_Str                ; $bb str$
-	.word	Unary_Left               ; $bc left$
-	.word	Unary_Right              ; $bd right$
-	.word	Unary_Mid                ; $be mid$
-	.word	CommandSwap              ; $bf swap
-	.word	TimeTOS                  ; $c0 ti
-	.word	TimeString               ; $c1 ti$
-	.word	UnaryUsr                 ; $c2 usr
-	.word	ValUnary                 ; $c3 val
-	.word	CommandClose             ; $c4 close
-	.word	CommandExit              ; $c5 exit
-	.word	CommandDebug             ; $c6 debug
-	.word	CommandXOpen             ; $c7 open
-	.word	CommandScreen            ; $c8 screen
-	.word	CommandVPOKE             ; $c9 vpoke
-	.word	CommandVPEEK             ; $ca vpeek
-	.word	CommandShift             ; $cb .shift
-	.word	PushByteCommand          ; $cc .byte
-	.word	PushWordCommand          ; $cd .word
-	.word	CommandPushN             ; $ce .float
-	.word	CommandPushS             ; $cf .string
-	.word	CommandXData             ; $d0 .data
-	.word	CommandXGoto             ; $d1 .goto
-	.word	CommandXGosub            ; $d2 .gosub
-	.word	CommandGotoZ             ; $d3 .goto.z
-	.word	CommandGotoNZ            ; $d4 .goto.nz
-	.word	CommandVarSpace          ; $d5 .varspace
-	.word	CommandRestoreX          ; $d6 .restore
+	.word	Command_OVAL             ; $9d oval
+	.word	Command_RING             ; $9e ring
+	.word	Command_CHAR             ; $9f char
+	.word	Unary16Hex               ; $a0 hex$
+	.word	CommandXInput            ; $a1 input
+	.word	CommandInputString       ; $a2 input$
+	.word	CommandInputReset        ; $a3 input.start
+	.word	UnaryLen                 ; $a4 len
+	.word	LinkFloatCompare         ; $a5 f.cmp
+	.word	LinkDivideInt32          ; $a6 int.div
+	.word	UnaryMOD                 ; $a7 mod
+	.word	NegateTOS                ; $a8 negate
+	.word	CommandNewLine           ; $a9 new.line
+	.word	CommandXNext             ; $aa next
+	.word	NotTOS                   ; $ab not
+	.word	CommandXOn               ; $ac on
+	.word	CommandMoreOn            ; $ad moreon
+	.word	UnaryPeek                ; $ae peek
+	.word	UnaryPI                  ; $af pi
+	.word	CommandPOKE              ; $b0 poke
+	.word	UnaryPos                 ; $b1 pos
+	.word	GetChannel               ; $b2 getchannel
+	.word	SetChannel               ; $b3 setchannel
+	.word	PrintNumber              ; $b4 print.n
+	.word	PrintString              ; $b5 print.s
+	.word	CommandXRead             ; $b6 read
+	.word	CommandReadString        ; $b7 read$
+	.word	UnaryRND                 ; $b8 rnd
+	.word	StringConcatenate        ; $b9 concat
+	.word	SignTOS                  ; $ba sgn
+	.word	PrintTab                 ; $bb print.tab
+	.word	PrintPos                 ; $bc print.pos
+	.word	PrintSpace               ; $bd print.spc
+	.word	Unary_Str                ; $be str$
+	.word	Unary_Left               ; $bf left$
+	.word	Unary_Right              ; $c0 right$
+	.word	Unary_Mid                ; $c1 mid$
+	.word	CommandSwap              ; $c2 swap
+	.word	TimeTOS                  ; $c3 ti
+	.word	TimeString               ; $c4 ti$
+	.word	UnaryUsr                 ; $c5 usr
+	.word	ValUnary                 ; $c6 val
+	.word	CommandClose             ; $c7 close
+	.word	CommandExit              ; $c8 exit
+	.word	CommandDebug             ; $c9 debug
+	.word	CommandXOpen             ; $ca open
+	.word	CommandScreen            ; $cb screen
+	.word	CommandVPOKE             ; $cc vpoke
+	.word	CommandVPEEK             ; $cd vpeek
+	.word	CommandShift             ; $ce .shift
+	.word	PushByteCommand          ; $cf .byte
+	.word	PushWordCommand          ; $d0 .word
+	.word	CommandPushN             ; $d1 .float
+	.word	CommandPushS             ; $d2 .string
+	.word	CommandXData             ; $d3 .data
+	.word	CommandXGoto             ; $d4 .goto
+	.word	CommandXGosub            ; $d5 .gosub
+	.word	CommandGotoZ             ; $d6 .goto.z
+	.word	CommandGotoNZ            ; $d7 .goto.nz
+	.word	CommandVarSpace          ; $d8 .varspace
+	.word	CommandRestoreX          ; $d9 .restore
 
 
 ShiftVectorTable:
-	.word	CommandClr               ; $cb80 clr
-	.word	CommandXDIM              ; $cb81 dim
-	.word	CommandEnd               ; $cb82 end
-	.word	UnaryJoy                 ; $cb83 joy
-	.word	LinkFloatIntegerPartDown ; $cb84 int
-	.word	LinkFloatSquareRoot      ; $cb85 sqr
-	.word	LinkFloatLogarithm       ; $cb86 log
-	.word	LinkFloatExponent        ; $cb87 exp
-	.word	LinkFloatCosine          ; $cb88 cos
-	.word	LinkFloatSine            ; $cb89 sin
-	.word	LinkFloatTangent         ; $cb8a tan
-	.word	LinkFloatArcTan          ; $cb8b atn
-	.word	XCommandMouse            ; $cb8c mouse
-	.word	XUnaryMB                 ; $cb8d mb
-	.word	XUnaryMX                 ; $cb8e mx
-	.word	XUnaryMY                 ; $cb8f my
-	.word	XUnaryMWheel             ; $cb90 mwheel
-	.word	CommandStop              ; $cb91 stop
-	.word	CommandSYS               ; $cb92 sys
-	.word	CommandTIWriteN          ; $cb93 ti.write
-	.word	CommandTIWriteS          ; $cb94 ti$.write
-	.word	CommandXWAIT             ; $cb95 wait
-	.word	X16I2CPoke               ; $cb96 i2cpoke
-	.word	X16I2CPeek               ; $cb97 i2cpeek
-	.word	CommandBank              ; $cb98 bank
-	.word	XCommandSleep            ; $cb99 sleep
-	.word	X16_Audio_FMINIT         ; $cb9a fminit
-	.word	X16_Audio_FMNOTE         ; $cb9b fmnote
-	.word	X16_Audio_FMDRUM         ; $cb9c fmdrum
-	.word	X16_Audio_FMINST         ; $cb9d fminst
-	.word	X16_Audio_FMVIB          ; $cb9e fmvib
-	.word	X16_Audio_FMFREQ         ; $cb9f fmfreq
-	.word	X16_Audio_FMVOL          ; $cba0 fmvol
-	.word	X16_Audio_FMPAN          ; $cba1 fmpan
-	.word	X16_Audio_FMPLAY         ; $cba2 fmplay
-	.word	X16_Audio_FMCHORD        ; $cba3 fmchord
-	.word	X16_Audio_FMPOKE         ; $cba4 fmpoke
-	.word	X16_Audio_PSGINIT        ; $cba5 psginit
-	.word	X16_Audio_PSGNOTE        ; $cba6 psgnote
-	.word	X16_Audio_PSGVOL         ; $cba7 psgvol
-	.word	X16_Audio_PSGWAV         ; $cba8 psgwav
-	.word	X16_Audio_PSGFREQ        ; $cba9 psgfreq
-	.word	X16_Audio_PSGPAN         ; $cbaa psgpan
-	.word	X16_Audio_PSGPLAY        ; $cbab psgplay
-	.word	X16_Audio_PSGCHORD       ; $cbac psgchord
-	.word	CommandCls               ; $cbad cls
-	.word	CommandLocate            ; $cbae locate
-	.word	CommandColor             ; $cbaf color
+	.word	CommandClr               ; $ce80 clr
+	.word	CommandXDIM              ; $ce81 dim
+	.word	CommandEnd               ; $ce82 end
+	.word	UnaryJoy                 ; $ce83 joy
+	.word	LinkFloatIntegerPartDown ; $ce84 int
+	.word	LinkFloatSquareRoot      ; $ce85 sqr
+	.word	LinkFloatLogarithm       ; $ce86 log
+	.word	LinkFloatExponent        ; $ce87 exp
+	.word	LinkFloatCosine          ; $ce88 cos
+	.word	LinkFloatSine            ; $ce89 sin
+	.word	LinkFloatTangent         ; $ce8a tan
+	.word	LinkFloatArcTan          ; $ce8b atn
+	.word	XCommandMouse            ; $ce8c mouse
+	.word	XUnaryMB                 ; $ce8d mb
+	.word	XUnaryMX                 ; $ce8e mx
+	.word	XUnaryMY                 ; $ce8f my
+	.word	XUnaryMWheel             ; $ce90 mwheel
+	.word	CommandStop              ; $ce91 stop
+	.word	CommandSYS               ; $ce92 sys
+	.word	CommandTIWriteN          ; $ce93 ti.write
+	.word	CommandTIWriteS          ; $ce94 ti$.write
+	.word	CommandXWAIT             ; $ce95 wait
+	.word	X16I2CPoke               ; $ce96 i2cpoke
+	.word	X16CommandPowerOff       ; $ce97 poweroff
+	.word	X16CommandReboot         ; $ce98 reboot
+	.word	X16I2CPeek               ; $ce99 i2cpeek
+	.word	CommandBank              ; $ce9a bank
+	.word	XCommandSleep            ; $ce9b sleep
+	.word	X16_Audio_FMINIT         ; $ce9c fminit
+	.word	X16_Audio_FMNOTE         ; $ce9d fmnote
+	.word	X16_Audio_FMDRUM         ; $ce9e fmdrum
+	.word	X16_Audio_FMINST         ; $ce9f fminst
+	.word	X16_Audio_FMVIB          ; $cea0 fmvib
+	.word	X16_Audio_FMFREQ         ; $cea1 fmfreq
+	.word	X16_Audio_FMVOL          ; $cea2 fmvol
+	.word	X16_Audio_FMPAN          ; $cea3 fmpan
+	.word	X16_Audio_FMPLAY         ; $cea4 fmplay
+	.word	X16_Audio_FMCHORD        ; $cea5 fmchord
+	.word	X16_Audio_FMPOKE         ; $cea6 fmpoke
+	.word	X16_Audio_PSGINIT        ; $cea7 psginit
+	.word	X16_Audio_PSGNOTE        ; $cea8 psgnote
+	.word	X16_Audio_PSGVOL         ; $cea9 psgvol
+	.word	X16_Audio_PSGWAV         ; $ceaa psgwav
+	.word	X16_Audio_PSGFREQ        ; $ceab psgfreq
+	.word	X16_Audio_PSGPAN         ; $ceac psgpan
+	.word	X16_Audio_PSGPLAY        ; $cead psgplay
+	.word	X16_Audio_PSGCHORD       ; $ceae psgchord
+	.word	CommandCls               ; $ceaf cls
+	.word	CommandLocate            ; $ceb0 locate
+	.word	CommandColor             ; $ceb1 color
 	.send code
 ; ************************************************************************************************
 ; ************************************************************************************************
@@ -6821,7 +6968,41 @@ X16I2CPoke: ;; [!I2CPOKE]
 		.exitcmd
 
 X16I2CError:
-		.error_channel 
+		.error_channel
+
+; ************************************************************************************************
+;
+;								POWEROFF and REBOOT
+;
+;		Both are a single I2C write to the System Management Controller, which is what X16
+;		BASIC does for them. Neither takes a parameter, so X arrives as $FF (empty stack) and
+;		only has to be put back that way after we borrow it for the device number.
+;
+; ************************************************************************************************
+
+X16_SMC_Device = $42 						; the SMC's I2C address
+X16_SMC_PowerOff = 1 						; offset 1 : power down
+X16_SMC_Reset = 2 							; offset 2 : reset
+
+X16CommandPowerOff: ;; [!poweroff]
+		.entercmd
+		phy
+		ldy 	#X16_SMC_PowerOff
+		bra 	X16SMCWrite
+
+X16CommandReboot: ;; [!reboot]
+		.entercmd
+		phy
+		ldy 	#X16_SMC_Reset
+
+X16SMCWrite: 								; global, not a cheap local: POWEROFF branches here
+		ldx 	#X16_SMC_Device 			; from its own scope, and _locals do not cross one.
+		lda 	#0
+		jsr 	X16_i2c_write_byte
+		bcs 	X16I2CError
+		ply 								; the write returns, and the SMC only cuts power a
+		ldx 	#$FF 						; moment later, so we do carry on running until it
+		.exitcmd 							; does. Tidy up properly rather than assume we die here.
 
 ; ************************************************************************************************
 ;

@@ -85,6 +85,42 @@ Command_FRAME: ;; [frame]
 
 ; ************************************************************************************************
 ;
+;										OVAL Command
+;
+;		OVAL and RING are RECT and FRAME with the ellipse renderer in place of the rectangle
+;		one. GRAPH_draw_oval takes its bounding box in r0..r3 and the fill flag in carry,
+;		exactly as GRAPH_draw_rect does, so GraphicsRectCoords sets up both unchanged.
+;
+; ************************************************************************************************
+
+Command_OVAL: ;; [oval]
+		.entercmd
+		phy
+		jsr 	GraphicsRectCoords
+		sec 								; carry set = filled
+		jsr 	X16_GRAPH_draw_oval
+		ply
+		ldx 	#$FF
+		.exitcmd
+
+; ************************************************************************************************
+;
+;										RING Command
+;
+; ************************************************************************************************
+
+Command_RING: ;; [ring]
+		.entercmd
+		phy
+		jsr 	GraphicsRectCoords
+		clc 								; carry clear = outline
+		jsr 	X16_GRAPH_draw_oval
+		ply
+		ldx 	#$FF
+		.exitcmd
+
+; ************************************************************************************************
+;
 ;										CHAR Command
 ;
 ; ************************************************************************************************
@@ -169,9 +205,9 @@ GraphicsRectCoords:
 		jsr 	_GRCSortSubtract
 		ldx 	#X16_r1 					; sort r1/r3
 		jsr 	_GRCSortSubtract
-		stz 	8,x 						; zero rounding
-		stz 	9,x 
-		rts
+		stz 	X16_r4-X16_r1,x 			; zero the corner rounding in r4. X is X16_r1 here, so
+		stz 	X16_r4-X16_r1+1,x 			; the offset is 6, not 8 -- 8 lands on r5, which is not
+		rts 								; an input to GRAPH_draw_rect and left r4 uninitialised.
 
 _GRCSortSubtract:
 		lda 	4,x 						; calculate r2-r0

@@ -17,7 +17,14 @@ endif
 
 all: binary compare unary variables parenthesis arrays
 
+#
+#		Everything in build/ and examples/ here is generated -- build/ holds the randomised
+#		test program and its binaries, and examples/ is just a copy of the last run's program.
+#		Neither is tracked, and git cannot track an empty directory, so both must be created
+#		or a fresh clone dies on the first cp.
+#
 prelim:
+	mkdir -p build examples
 
 binary : prelim
 	$(call run_test,$@)

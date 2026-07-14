@@ -1,0 +1,31 @@
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		Name:		10object.divider
+;		Purpose:	Marks the end of the runtime and the start of the compiler.
+;		Created:	13th July 2026
+;		Reviewed: 	No
+;
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		Linked between the runtime components (runtime/common/ifloat32/polynomials) and
+;		compiler.library, so ObjectBase is the first page the compiler occupies.
+;
+;		A saved OBJECT.PRG needs the runtime but has no use for the compiler, so
+;		WriteObjectCode writes the object code out at ObjectBase rather than at FreeMemory.
+;		That reclaims everything the compiler was using -- several KB in every compiled
+;		program -- and lets the workspace start much lower, which is where the real win is.
+;
+;		NB the extension is deliberately not .asm: common-scripts/build.py globs every .asm
+;		under source/ into _library.asm, so an .asm here would be assembled twice. Same
+;		reason 00main.header and zzfree.footer are named as they are.
+;
+; ************************************************************************************************
+
+		.section code
+
+		.align 	256 						; object code must start on a page boundary
+ObjectBase:
+
+		.send code

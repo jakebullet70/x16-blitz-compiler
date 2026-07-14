@@ -71,14 +71,31 @@ class C64TokenStore(object):
 				|199:CHR$|200:LEFT$|201:RIGHT$|202:MID$|203:GO|255:PI"""
 
 	#
-	#		X16 keywords sequential from $CE80
+	#		X16 keywords. Statements run sequentially from $CE80; the functions re-anchor at a
+	#		FIXED $CED0, keyed off where VPEEK sits in this list. That is what makes the table
+	#		extensible: statements can be appended without disturbing a single function token.
+	#
+	#		THE ORDER HERE IS THE ROM'S ORDER AND MUST STAY THAT WAY -- it is not cosmetic, it
+	#		IS the token numbering. Verified against R49 by decoding the keyword table out of
+	#		BASIC ROM bank 4 (see docs/memory/blitz-x16-rom-abi-verification.md). Two fixes
+	#		from that check:
+	#
+	#		  - LINPUT# precedes LINPUT in the ROM. They were the other way round here, so both
+	#		    tokenised to the wrong byte.
+	#		  - SPRITE..HBLOAD and TDATA/TATTR/MOD were added to X16 BASIC after R43 and were
+	#		    missing entirely. The list dated from the R42/R43 era.
+	#
+	#		BASLOAD and HBLOAD are listed for correct TOKENISATION only; they are interactive
+	#		(BASLOAD is typed "Command" in the manual, HBLOAD is not documented at all), so the
+	#		compiler is not expected to ever generate code for them -- like LIST or NEW.
 	#
 	def getX16(self):
 		s = """
 				MON|DOS|OLD|GEOS|VPOKE|VLOAD|SCREEN|PSET|LINE|FRAME|RECT|CHAR|MOUSE|COLOR|TEST|RESET|CLS|CODEX|LOCATE|BOOT|KEYMAP|BLOAD|BVLOAD
 				|BVERIFY|BANK|FMINIT|FMNOTE|FMDRUM|FMINST|FMVIB|FMFREQ|FMVOL|FMPAN|FMPLAY|FMCHORD|FMPOKE|PSGINIT|PSGNOTE|PSGVOL|PSGWAV|PSGFREQ
-				|PSGPAN|PSGPLAY|PSGCHORD|REBOOT|POWEROFF|I2CPOKE|SLEEP|BSAVE|MENU|REN|LINPUT|LINPUT#|BINPUT#|HELP|BANNER|EXEC|TILE|EDIT
-				|VPEEK|MX|MY|MB|JOY|HEX$|BIN$|I2CPEEK|POINTER|STRPTR|RPT$|MWHEEL"""
+				|PSGPAN|PSGPLAY|PSGCHORD|REBOOT|POWEROFF|I2CPOKE|SLEEP|BSAVE|MENU|REN|LINPUT#|LINPUT|BINPUT#|HELP|BANNER|EXEC|TILE|EDIT
+				|SPRITE|SPRMEM|MOVSPR|BASLOAD|OVAL|RING|HBLOAD
+				|VPEEK|MX|MY|MB|JOY|HEX$|BIN$|I2CPEEK|POINTER|STRPTR|RPT$|MWHEEL|TDATA|TATTR|MOD"""
 
 		s = s.replace("\n","").replace(" ","").replace("\t","").split("|")
 		vpeek = s.index("VPEEK")

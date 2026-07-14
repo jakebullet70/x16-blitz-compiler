@@ -32,12 +32,24 @@ StartBasicProgram:
 ;		
 ; ************************************************************************************************
 
+;
+;		The two immediates below are the defaults used when the compiled code is run
+;		straight out of the compiler's memory (RUN a second time), where the object code
+;		is still sitting up at FreeMemory.
+;
+;		WriteObjectCode patches BOTH of them as it streams the bytes into OBJECT.PRG, so
+;		that the saved file instead runs its object code from ObjectBase -- i.e. on top of
+;		the compiler, which the saved file has no use for. It patches the file, not RAM, so
+;		running from memory keeps working.
+;
 StartCode: 									; this is patched out, so we drop through
 		jmp 	CompileCode 				; to starting the runtime in the saved code.
 
-		lda 	#FreeMemory >> 8 			; address of object code to run.	
-		ldx 	#$80 						; 8000-9EFF is used for workspace.
-		ldy 	#$9F 						
+RunCodePage:
+		lda 	#FreeMemory >> 8 			; address of object code to run. (operand +1)
+RunWorkspacePage:
+		ldx 	#$80 						; first page of workspace. (operand +1)
+		ldy 	#$9F 						; byte after the last page ($9F00 is I/O).
 		jmp 	StartRuntime 				; and go do it !
 
 ; ************************************************************************************************

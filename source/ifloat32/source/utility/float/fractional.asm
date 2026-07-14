@@ -26,13 +26,20 @@ FloatFractionalPart:
 		sta 	NSStatus,x
 		jsr 	FloatNormalise
 
-		lda 	NSExponent,x 				; calculate exponent-$E0 = digits to blank
-		sec
-		sbc 	#$E0
-		bcc 	_FFPExit 					; already fractional
-
-		cmp 	#32 						; will be zero as blanking 32+ digits.
-		bcs 	_FFPZero
+		;
+		;		The value is normalised, so the mantissa is in [2^30,2^31) and the number of
+		;		bits above the point is exponent+32. The exponent is SIGNED, and the old code
+		;		worked it out with an unsigned "sbc #$E0" and branched on the borrow -- which
+		;		underflows for any exponent >= 0, i.e. for every value >= 2^30. Those were
+		;		declared "already fractional" and handed back whole, so PRINT 2000000000 came
+		;		out as 2000000000.125. Test the sign the way FloatIntegerPart does instead.
+		;
+		lda 	NSExponent,x 				; exponent >= 0 : a whole number, nothing below the
+		bpl 	_FFPZero 					; point at all.
+		;
+		clc 								; bits to blank = exponent+32, for exponents -32..-1
+		adc 	#32
+		bmi 	_FFPExit 					; under -32 : entirely fractional, blank nothing
 		;
 		tay 								; put count to do in Y
 		;

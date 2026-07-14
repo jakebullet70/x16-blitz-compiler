@@ -37,6 +37,7 @@ prelim:
 build: prelim
 	$(ASM) 	source$(S)main$(S)00main.header \
 			$(BINDIR)runtime.library $(BINDIR)common.library $(BINDIR)ifloat32.library $(BINDIR)polynomials.library \
+			source$(S)main$(S)10object.divider \
 			$(BINDIR)compiler.library \
 			_library.asm \
 			source$(S)main$(S)zzfree.footer
@@ -48,7 +49,12 @@ release:  build
 	$(CCOPY) build$(S)*.bas $(RELEASEDIR)
 	$(CCOPY) $(BINDIR)tokenise.zip $(RELEASEDIR)
 	$(CCOPY) $(ROOTDIR)CHANGES.txt $(RELEASEDIR)
-	cd $(RELEASEDIR) ; $(CDEL) blitz.zip ; zip -q blitz.zip *
+	#
+	#		Bundle the release. mkzip.py replaces zip(1) (absent on a stock Windows box) and
+	#		writes reproducibly, so an unchanged release no longer produces a new blitz.zip.
+	#		It skips the archive it is writing, so the * glob cannot swallow a stale one.
+	#
+	cd $(RELEASEDIR) ; $(CDEL) blitz.zip ; $(PYTHON) $(CSCRIPTS)mkzip.py blitz.zip *
 	
 run: build	
 	$(CDEL) OBJECT.PRG

@@ -1,22 +1,29 @@
 # Memory Index
 
-- [GPC project](gpc-project.md) — what the Greased Piglet Compiler is + locked design decisions
-- [GPC increment 2 design](gpc-inc2-design.md) — 2a int-compare/IJZ + 2b int-FOR + 2c int-arrays (DIM A%()) all SHIPPED; banked-RAM tables kept
-- [GPC array-load-loop bug](gpc-array-load-loop-bug.md) — RESOLVED: was DIM not zero-initing elements; garbage float hung ROM FOUT on PRINT. Fixed in op_dim.
-- [GPC print-large-number bug](gpc-print-large-number-bug.md) — RESOLVED: PRINT of any n>=32768 crashed ?ILLEGAL QUANTITY; op_printi's range-checked float->word mailbox cast. Guarded.
-- [GPC gating requirement](gpc-gating-requirement.md) — GARBAG + pass-through must work (no-go otherwise); both PROVEN on R49
-- [GPC X16-BASIC look/act](gpc-x16basic-look-act.md) — compiled .prg LISTs as `10 SYS ..` + screen-preserving startup; no_sysinit+IOINIT/RESTOR gotchas
-- [X16 ROM internal calls](x16-rom-internal-calls.md) — verified R49 dispatcher/GC addresses + ZP pointers for GPC
-- [X16 toolchain](x16-toolchain.md) — prog8c/64tass/x16emu paths + headless testbench recipe
-- [Prog8 PETSCII char literals](prog8-petscii-charlits.md) — cx16 'a'..'z' = $C1..$DA; guard >= $80 before is_alpha on tokens
-- [Blitz-X16 prior attempt](blitz-x16-prior-attempt.md) — the ~90%-done sibling compiler GPC ports proven code from
-- [GPC runtime asm conversion](gpc-runtime-asm-conversion.md) — branch runtime-asm: Prog8->hand-asm VM, phases/sizes; P7b string handlers + Tier-1 slab-relocation (C.DIR 80->52 blocks); ~8-9KB floor
-- [GPC engine shrink](gpc-engine-shrink.md) — branch engine-shrink: 3-phase tiered runtime (universal base tighten + nosarr auto-tier + noint compiler-mode tier); build_tier strip mechanism; PCODE_BASE is the size lever
-- [GPC X16 BASIC coverage](gpc-x16-basic-coverage.md) — what GPC compiles vs real X16 BASIC; 7 lexer blockers + MOD/TAB/SPC/plain-GET FIXED; **X16FONTS (492-line proof case) now compiles end-to-end** via banked-pool relocation (litpool+datapool → POOLS_BANK 12, vm.p8 untouched); only niche fns left (FRE/POS/USR/POINTER/STRPTR/pi)
-- [GPC IF semantics](gpc-if-semantics.md) — false IF skips the whole LINE (CBM V2); verified against ref/x16-rom ROM source
-- [GPC FOR STEP 0 semantics](gpc-for-step0-semantics.md) — NEXT ends iff sign(loopvar-limit)==sign(step); STEP 0 loops until EXACT equality (`FOR I=0 TO -1 STEP 0` idiom). Fixed op_fornext/op_ifornext.
-- [Blitz C64 benchmark yardstick](blitz-c64-benchmark-yardstick.md) — Blitz ~2.6x vs GPC ~1.5x; VM dispatch gap real, but the "sieve 1.0x" was DEGENERATE (array too big for heap), not slow indexing — see corrections
-- [GPC array-heap capacity](gpc-array-heap-capacity.md) — array heaps are tiny (2048 B float / 1024 B int); DIM > ~409 float / 512 int elems silently becomes unusable (all OOB→0). THIS is the Blitz-sieve blocker, not indexing
-- [GPC array-index fast path](gpc-array-index-fastpath.md) — perf/vm-speed: 1-D access skips generic index_of; ~31% faster on fitting arrays; total==0 short-circuit avoids an OOB regression
-- [Memory is git-tracked](memory-is-git-tracked.md) — this memory folder is a junction into the repo (docs/memory); notes auto-version with the project
-- [x16emu -echo doubling](x16emu-echo-doubling.md) — non-warp `-echo raw` prints every VM char TWICE; breaks bench/run-bench.sh's R= grep (silent ERR); de-double by every-2nd-char
+Knowledge base for the Blitz-X16 compiler. The `gpc-*` notes are what survived the prune of the
+abandoned sibling project (GPC): everything kept here is a fact about **X16 BASIC or the X16 itself**,
+not about GPC's internals. The rest are recoverable from git history (commit `0f3f82b`).
+
+## This project
+- [Build setup](blitz-x16-build-setup.md) — how to build it, and the 5 blockers that made a fresh clone unbuildable on any OS
+- [Emulator split](blitz-x16-emulator-split.md) — x16emu r49 runs the tests, Box16 is for debugging; why Box16 can't run the suites
+- [X16 BASIC conformance](blitz-x16-basic-conformance.md) — Blitz vs stock BASIC: 4 real defects (float literals, STEP 0, sci notation, reversed relops)
+- [R44+ keywords](blitz-x16-r44-plus-keywords.md) — 10 keywords added after R43 that Blitz doesn't know (SPRITE, MOVSPR, OVAL, RING, MOD…) + a LINPUT/LINPUT# token swap
+- [Blitz-X16 prior attempt](blitz-x16-prior-attempt.md) — the earlier Prog8 self-hosted compiler (now deleted from disk)
+
+## X16 BASIC semantics (ROM-verified — apply to any compiler)
+- [IF semantics](gpc-if-semantics.md) — a false IF skips the WHOLE line, not just the first statement. Blitz gets this right.
+- [FOR STEP 0 semantics](gpc-for-step0-semantics.md) — NEXT exits iff sign(loopvar−limit)==sign(step); STEP 0 needs EXACT equality. **Blitz gets this wrong.**
+- [X16 BASIC coverage](gpc-x16-basic-coverage.md) — the 7 lexer blockers on valid X16 BASIC (hex, binary, .5, >=65536, 9.2E5, long names, `=<` `=>` `><`)
+
+## Performance
+- [C64 Blitz benchmark yardstick](blitz-c64-benchmark-yardstick.md) — real C64 Blitz ≈2.6× vs stock BASIC; the bar to beat
+- [Array heap capacity](gpc-array-heap-capacity.md) — arrays that don't fit silently invalidate benchmarks; check allocation before trusting a timing
+- [Array index fast path](gpc-array-index-fastpath.md) — 1-D indexing fast path was worth ~31%; incl. the OOB short-circuit gotcha
+
+## X16 platform / toolchain
+- [X16 ROM internal calls](x16-rom-internal-calls.md) — verified R49 dispatcher/GC addresses + ZP pointers
+- [X16 toolchain](x16-toolchain.md) — 64tass / emulator paths on this machine
+- [x16emu -echo doubling](x16emu-echo-doubling.md) — non-warp `-echo raw` prints every char TWICE
+- [Memory is git-tracked](memory-is-git-tracked.md) — this folder versions with the project
+- [Prog8 PETSCII char literals](prog8-petscii-charlits.md) — legacy; only relevant if Prog8 comes back

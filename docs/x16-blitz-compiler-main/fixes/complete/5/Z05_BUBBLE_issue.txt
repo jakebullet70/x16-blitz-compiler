@@ -1,3 +1,0 @@
-
-The Blitz version is actually slower than the
-original SOURCE.PRG
