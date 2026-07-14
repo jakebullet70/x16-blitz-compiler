@@ -239,11 +239,11 @@ _LSSNoCarry:
 		lda 	(zTemp0)
 		jsr 	X16_SETNAM
 
-		lda 	#1 							; the logical file number is not used for anything
-		ldx 	NSMantissa0+1 				; here; the device and the secondary are what matter
-		ldy 	lsSecondary
-		jsr 	X16_SETLFS
-		rts
+		lda 	#0 							; logical file number 0, which is what BASIC's own LOAD
+		ldx 	NSMantissa0+1 				; and SAVE use. This is NOT free to pick: a load or a
+		ldy 	lsSecondary 				; save leaves its number registered, so using 1 here
+		jsr 	X16_SETLFS 					; made a later OPEN 1 fail or hang. 0 is reserved for
+		rts 								; exactly this and belongs to nobody.
 
 		.send 	code
 

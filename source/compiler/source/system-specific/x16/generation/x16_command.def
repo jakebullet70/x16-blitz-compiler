@@ -63,3 +63,12 @@ BVLOAD 			$,#,#,# T N
 VLOAD 			$,#,#,# T N
 BSAVE 			$,#,#,#,# T N
 BVERIFY 		$,#,#,# T N
+
+# 	Line and block input. These assign INTO a string variable, so the handler does all of it --
+# 	no T here, exactly like INPUT and INPUT#. The "#" forms take C: (channel execute), which
+# 	compiles the channel and sets it around the command, so the runtime never sees a channel:
+# 	one pair of P-codes serves all three, the same way INPUT and INPUT# already share one.
+
+LINPUT 			X:CommandLINPUT N
+LINPUT# 		C:CommandLINPUTStream N
+BINPUT# 		C:CommandBINPUTStream N

@@ -3392,6 +3392,171 @@ LinkDivideInt32: ;; [int.div]
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;
+;		Name:		linput.asm
+;		Purpose:	LINPUT, LINPUT# and BINPUT#
+;		Created:	14th July 2026
+;		Reviewed: 	No
+;
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		Two P-codes serve all three keywords, because the CHANNEL is not their business: the "#"
+;		forms are compiled with the C: (channel execute) prefix, which sets currentChannel around
+;		the command and puts it back afterwards. That is exactly how INPUT and INPUT# already
+;		share one runtime. So:
+;
+;			[linput]	S[X] = a delimiter	->	S[X] = everything up to it
+;			[binput]	S[X] = a count		->	S[X] = that many bytes
+;
+;		LINPUT (no #) is simply [linput] on channel 0 with a delimiter of 13, and channel 0 is the
+;		KERNAL's screen editor -- CHRIN hands back the logical line a character at a time as the
+;		user types it, with every editor key working. That is what LINPUT is FOR, and it is also
+;		why the manual warns that an empty line comes back as a single space and trailing spaces
+;		are lost: that is the editor's doing, not ours, and we inherit it for free.
+;
+;		END OF FILE is checked BEFORE each read, never after. The KERNAL sets ST when it hands
+;		over the LAST byte, so that byte is real and must be kept; it is the NEXT read that has
+;		nothing to give. Testing first keeps the last byte and still stops. See st.asm -- without
+;		ST a program could not tell EOF from a blank line, and a read loop could never end.
+;
+; ************************************************************************************************
+
+		.section 	code
+
+; ************************************************************************************************
+;
+;					LINPUT <var$>  /  LINPUT# <n>,<var$>[,<delimiter>]
+;
+; ************************************************************************************************
+
+CommandXLinput: ;; [!linput]
+		.entercmd 							; S[X] is the delimiter
+		phy
+		jsr 	GetInteger8Bit
+		sta 	liDelimiter
+		phx 								; the KERNAL calls below are free to trash X, so park
+											; the float stack pointer and use X as the index
+		jsr 	LinputOpenChannel
+		stz 	ReadBufferSize
+_CLILoop:
+		jsr 	LinputAtEndOfFile
+		bne 	_CLIDone
+		jsr 	X16_CHRIN
+		cmp 	liDelimiter
+		beq 	_CLIDone 					; the delimiter is consumed, but never stored
+		ldx 	ReadBufferSize
+		cpx 	#255 						; ReadBuffer is 255 bytes. A full one takes no more, but
+		beq 	_CLILoop 					; still runs on to the delimiter, so that the next read
+											; starts at the beginning of a line rather than mid-way
+		sta 	ReadBuffer,x
+		inc 	ReadBufferSize
+		bra 	_CLILoop
+_CLIDone:
+		jsr 	LinputCloseChannel
+		plx
+		jsr 	LinputResult
+		ply
+		.exitcmd
+
+; ************************************************************************************************
+;
+;							BINPUT# <n>,<var$>,<len>
+;
+; ************************************************************************************************
+
+CommandXBinput: ;; [!binput]
+		.entercmd 							; S[X] is how many bytes are wanted
+		phy
+		jsr 	GetInteger8Bit
+		sta 	liCount
+		phx
+		jsr 	LinputOpenChannel
+		stz 	ReadBufferSize
+_CBILoop:
+		lda 	ReadBufferSize 				; got them all ?
+		cmp 	liCount
+		beq 	_CBIDone
+		jsr 	LinputAtEndOfFile 			; "if there are fewer than <len> bytes available to
+		bne 	_CBIDone 					; be read, fewer bytes will be stored"
+		jsr 	X16_CHRIN
+		ldx 	ReadBufferSize
+		sta 	ReadBuffer,x
+		inc 	ReadBufferSize
+		bra 	_CBILoop
+_CBIDone:
+		jsr 	LinputCloseChannel
+		plx
+		jsr 	LinputResult
+		ply
+		.exitcmd
+
+; ************************************************************************************************
+;
+;		Z clear when the channel has run out. Bit 6 of the KERNAL status is end of file.
+;
+; ************************************************************************************************
+
+LinputAtEndOfFile:
+		jsr 	X16_READST
+		and 	#$40
+		rts
+
+; ************************************************************************************************
+;
+;		Point the KERNAL's input at the current channel, and afterwards put it back. Channel 0
+;		means the keyboard, which is CLRCHN's default, not a file to CHKIN.
+;
+; ************************************************************************************************
+
+LinputOpenChannel:
+		ldx 	currentChannel
+		beq 	LinputCloseChannel
+		jmp 	X16_CHKIN
+
+LinputCloseChannel:
+		jmp 	X16_CLRCHN
+
+; ************************************************************************************************
+;
+;		Leave the buffer in S[X] as a string. ReadBufferSize is the length byte and ReadBuffer
+;		follows it, which IS Blitz's string layout, so the buffer's own address is the string.
+;		This overwrites the parameter that was in S[X], so the stack comes out level and the
+;		store the compiler emits next pops the result straight into the variable.
+;
+; ************************************************************************************************
+
+LinputResult:
+		jsr 	FloatSetZero
+		lda 	#ReadBufferSize & $FF
+		sta 	NSMantissa0,x
+		lda 	#ReadBufferSize >> 8
+		sta 	NSMantissa1,x
+		lda 	#NSSString
+		sta 	NSStatus,x
+		rts
+
+		.send 	code
+
+		.section storage
+liDelimiter:
+		.fill 	1
+liCount:
+		.fill 	1
+		.send storage
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;
+; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
 ;		Name:		loadsave.asm
 ;		Purpose:	BLOAD, BVLOAD, VLOAD, BSAVE and BVERIFY
 ;		Created:	14th July 2026
@@ -3630,11 +3795,11 @@ _LSSNoCarry:
 		lda 	(zTemp0)
 		jsr 	X16_SETNAM
 
-		lda 	#1 							; the logical file number is not used for anything
-		ldx 	NSMantissa0+1 				; here; the device and the secondary are what matter
-		ldy 	lsSecondary
-		jsr 	X16_SETLFS
-		rts
+		lda 	#0 							; logical file number 0, which is what BASIC's own LOAD
+		ldx 	NSMantissa0+1 				; and SAVE use. This is NOT free to pick: a load or a
+		ldy 	lsSecondary 				; save leaves its number registered, so using 1 here
+		jsr 	X16_SETLFS 					; made a later OPEN 1 fail or hang. 0 is reserved for
+		rts 								; exactly this and belongs to nobody.
 
 		.send 	code
 
@@ -6139,6 +6304,55 @@ spriteY:
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;
+;		Name:		st.asm
+;		Purpose:	ST, the KERNAL status byte
+;		Created:	14th July 2026
+;		Reviewed: 	No
+;
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		ST is not a keyword and never gets tokenised -- like TI and TI$ it is a RESERVED VARIABLE
+;		NAME, so it reaches the compiler as a plain identifier and is intercepted in FindVariable.
+;
+;		It exists because LINPUT#, BINPUT# and INPUT# have no other way to say "that was the end
+;		of the file". Without it a read loop cannot terminate: at EOF LINPUT# hands back an empty
+;		string, which is indistinguishable from a blank line in the file, and the program spins.
+;
+;			ST and  16 = verify mismatch (BVERIFY)
+;			ST and  64 = end of file
+;			ST and 128 = device not present
+;
+; ************************************************************************************************
+
+		.section 	code
+
+UnaryST: ;; [!st]
+		.entercmd
+		phx 								; READST is documented as only touching A, but the
+		phy 								; float stack pointer is not worth gambling on
+		jsr 	X16_READST
+		ply
+		plx
+		inx 								; ST reads as a value, so it pushes one
+		jsr 	FloatSetByte
+		.exitcmd
+
+		.send 	code
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;
+; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
 ;		Name:		stop.asm
 ;		Purpose:	Stop command
 ;		Created:	19th April 2023
@@ -7370,56 +7584,59 @@ ShiftVectorTable:
 	.word	LinkFloatSine            ; $ce89 sin
 	.word	LinkFloatTangent         ; $ce8a tan
 	.word	LinkFloatArcTan          ; $ce8b atn
-	.word	Command_BLOAD            ; $ce8c bload
-	.word	Command_BVLOAD           ; $ce8d bvload
-	.word	Command_VLOAD            ; $ce8e vload
-	.word	Command_BSAVE            ; $ce8f bsave
-	.word	Command_BVERIFY          ; $ce90 bverify
-	.word	XCommandMouse            ; $ce91 mouse
-	.word	XUnaryMB                 ; $ce92 mb
-	.word	XUnaryMX                 ; $ce93 mx
-	.word	XUnaryMY                 ; $ce94 my
-	.word	XUnaryMWheel             ; $ce95 mwheel
-	.word	UnaryRPT                 ; $ce96 rpt$
-	.word	Command_SPRITE           ; $ce97 sprite
-	.word	Command_SPRMEM           ; $ce98 sprmem
-	.word	Command_MOVSPR           ; $ce99 movspr
-	.word	CommandStop              ; $ce9a stop
-	.word	CommandSYS               ; $ce9b sys
-	.word	UnaryTDATA               ; $ce9c tdata
-	.word	UnaryTATTR               ; $ce9d tattr
-	.word	Command_TILE             ; $ce9e tile
-	.word	CommandTIWriteN          ; $ce9f ti.write
-	.word	CommandTIWriteS          ; $cea0 ti$.write
-	.word	CommandXWAIT             ; $cea1 wait
-	.word	X16I2CPoke               ; $cea2 i2cpoke
-	.word	X16CommandPowerOff       ; $cea3 poweroff
-	.word	X16CommandReboot         ; $cea4 reboot
-	.word	X16I2CPeek               ; $cea5 i2cpeek
-	.word	CommandBank              ; $cea6 bank
-	.word	XCommandSleep            ; $cea7 sleep
-	.word	X16_Audio_FMINIT         ; $cea8 fminit
-	.word	X16_Audio_FMNOTE         ; $cea9 fmnote
-	.word	X16_Audio_FMDRUM         ; $ceaa fmdrum
-	.word	X16_Audio_FMINST         ; $ceab fminst
-	.word	X16_Audio_FMVIB          ; $ceac fmvib
-	.word	X16_Audio_FMFREQ         ; $cead fmfreq
-	.word	X16_Audio_FMVOL          ; $ceae fmvol
-	.word	X16_Audio_FMPAN          ; $ceaf fmpan
-	.word	X16_Audio_FMPLAY         ; $ceb0 fmplay
-	.word	X16_Audio_FMCHORD        ; $ceb1 fmchord
-	.word	X16_Audio_FMPOKE         ; $ceb2 fmpoke
-	.word	X16_Audio_PSGINIT        ; $ceb3 psginit
-	.word	X16_Audio_PSGNOTE        ; $ceb4 psgnote
-	.word	X16_Audio_PSGVOL         ; $ceb5 psgvol
-	.word	X16_Audio_PSGWAV         ; $ceb6 psgwav
-	.word	X16_Audio_PSGFREQ        ; $ceb7 psgfreq
-	.word	X16_Audio_PSGPAN         ; $ceb8 psgpan
-	.word	X16_Audio_PSGPLAY        ; $ceb9 psgplay
-	.word	X16_Audio_PSGCHORD       ; $ceba psgchord
-	.word	CommandCls               ; $cebb cls
-	.word	CommandLocate            ; $cebc locate
-	.word	CommandColor             ; $cebd color
+	.word	CommandXLinput           ; $ce8c linput
+	.word	CommandXBinput           ; $ce8d binput
+	.word	Command_BLOAD            ; $ce8e bload
+	.word	Command_BVLOAD           ; $ce8f bvload
+	.word	Command_VLOAD            ; $ce90 vload
+	.word	Command_BSAVE            ; $ce91 bsave
+	.word	Command_BVERIFY          ; $ce92 bverify
+	.word	XCommandMouse            ; $ce93 mouse
+	.word	XUnaryMB                 ; $ce94 mb
+	.word	XUnaryMX                 ; $ce95 mx
+	.word	XUnaryMY                 ; $ce96 my
+	.word	XUnaryMWheel             ; $ce97 mwheel
+	.word	UnaryRPT                 ; $ce98 rpt$
+	.word	Command_SPRITE           ; $ce99 sprite
+	.word	Command_SPRMEM           ; $ce9a sprmem
+	.word	Command_MOVSPR           ; $ce9b movspr
+	.word	UnaryST                  ; $ce9c st
+	.word	CommandStop              ; $ce9d stop
+	.word	CommandSYS               ; $ce9e sys
+	.word	UnaryTDATA               ; $ce9f tdata
+	.word	UnaryTATTR               ; $cea0 tattr
+	.word	Command_TILE             ; $cea1 tile
+	.word	CommandTIWriteN          ; $cea2 ti.write
+	.word	CommandTIWriteS          ; $cea3 ti$.write
+	.word	CommandXWAIT             ; $cea4 wait
+	.word	X16I2CPoke               ; $cea5 i2cpoke
+	.word	X16CommandPowerOff       ; $cea6 poweroff
+	.word	X16CommandReboot         ; $cea7 reboot
+	.word	X16I2CPeek               ; $cea8 i2cpeek
+	.word	CommandBank              ; $cea9 bank
+	.word	XCommandSleep            ; $ceaa sleep
+	.word	X16_Audio_FMINIT         ; $ceab fminit
+	.word	X16_Audio_FMNOTE         ; $ceac fmnote
+	.word	X16_Audio_FMDRUM         ; $cead fmdrum
+	.word	X16_Audio_FMINST         ; $ceae fminst
+	.word	X16_Audio_FMVIB          ; $ceaf fmvib
+	.word	X16_Audio_FMFREQ         ; $ceb0 fmfreq
+	.word	X16_Audio_FMVOL          ; $ceb1 fmvol
+	.word	X16_Audio_FMPAN          ; $ceb2 fmpan
+	.word	X16_Audio_FMPLAY         ; $ceb3 fmplay
+	.word	X16_Audio_FMCHORD        ; $ceb4 fmchord
+	.word	X16_Audio_FMPOKE         ; $ceb5 fmpoke
+	.word	X16_Audio_PSGINIT        ; $ceb6 psginit
+	.word	X16_Audio_PSGNOTE        ; $ceb7 psgnote
+	.word	X16_Audio_PSGVOL         ; $ceb8 psgvol
+	.word	X16_Audio_PSGWAV         ; $ceb9 psgwav
+	.word	X16_Audio_PSGFREQ        ; $ceba psgfreq
+	.word	X16_Audio_PSGPAN         ; $cebb psgpan
+	.word	X16_Audio_PSGPLAY        ; $cebc psgplay
+	.word	X16_Audio_PSGCHORD       ; $cebd psgchord
+	.word	CommandCls               ; $cebe cls
+	.word	CommandLocate            ; $cebf locate
+	.word	CommandColor             ; $cec0 color
 	.send code
 ; ************************************************************************************************
 ; ************************************************************************************************
@@ -7780,7 +7997,9 @@ CommandClose: ;; [close]
 		bne 	_CCNotCurrent
 		stz 	currentChannel 				; effectively disables CMD
 _CCNotCurrent:
-		jsr 	X16_CLOSE 					; close the file		
+		jsr 	X16_CLOSE 					; close the file
+		ldx 	#$FF 						; and empty the float stack, as every other command
+											; does -- see the note in x16_open.asm
 		.exitcmd
 
 
@@ -8094,6 +8313,12 @@ _CONoCarry:
 		;
 		jsr 	X16_OPEN
 		bcs 	_COError
+		ldx 	#$FF 						; empty the float stack, as every other command does.
+											; This is NOT cosmetic: OPEN reads its arguments from
+											; slots 0-3 ABSOLUTELY, which only works if the stack
+											; started empty. Leaving X at 3 meant a SECOND OPEN in
+											; a program read garbage and handed the KERNAL a junk
+											; filename pointer.
 		.exitcmd
 _COError:
 		.error_channel

@@ -16,15 +16,15 @@
 ;
 ;	CLS    T N
 ;
-	.byte	$07,$ce,$90,$20,48078 & $FF,48078 >> 8,$06
+	.byte	$07,$ce,$90,$20,48846 & $FF,48846 >> 8,$06
 ;
 ;	LOCATE    # X:OptionalParameterCompile T N
 ;
-	.byte	$0a,$ce,$92,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,48334 & $FF,48334 >> 8,$06
+	.byte	$0a,$ce,$92,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,49102 & $FF,49102 >> 8,$06
 ;
 ;	COLOR    # X:OptionalParameterCompile T N
 ;
-	.byte	$0a,$ce,$8d,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,48590 & $FF,48590 >> 8,$06
+	.byte	$0a,$ce,$8d,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,49358 & $FF,49358 >> 8,$06
 ;
 ;	SCREEN    # T N
 ;
@@ -36,23 +36,23 @@
 ;
 ;	SLEEP    # T N
 ;
-	.byte	$07,$ce,$af,$e2,42958 & $FF,42958 >> 8,$06
+	.byte	$07,$ce,$af,$e2,43726 & $FF,43726 >> 8,$06
 ;
 ;	MOUSE    # T N
 ;
-	.byte	$07,$ce,$8c,$e2,37326 & $FF,37326 >> 8,$06
+	.byte	$07,$ce,$8c,$e2,37838 & $FF,37838 >> 8,$06
 ;
 ;	I2CPOKE   #,#,# T N
 ;
-	.byte	$09,$ce,$ae,$ea,$ea,$e2,41678 & $FF,41678 >> 8,$06
+	.byte	$09,$ce,$ae,$ea,$ea,$e2,42446 & $FF,42446 >> 8,$06
 ;
 ;	POWEROFF   T N
 ;
-	.byte	$07,$ce,$ad,$20,41934 & $FF,41934 >> 8,$06
+	.byte	$07,$ce,$ad,$20,42702 & $FF,42702 >> 8,$06
 ;
 ;	REBOOT    T N
 ;
-	.byte	$07,$ce,$ac,$20,42190 & $FF,42190 >> 8,$06
+	.byte	$07,$ce,$ac,$20,42958 & $FF,42958 >> 8,$06
 ;
 ;	PSET    #,#,# T N
 ;
@@ -84,40 +84,52 @@
 ;
 ;	SPRITE    #,# X:OptionalParameterCompile X:OptionalParameterCompile X:OptionalParameterCompile X:OptionalParameterCompile X:OptionalParameterCompile T N
 ;
-	.byte	$17,$ce,$bb,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,38862 & $FF,38862 >> 8,$06
+	.byte	$17,$ce,$bb,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,39374 & $FF,39374 >> 8,$06
 ;
 ;	SPRMEM    #,#,# X:OptionalParameterCompile T N
 ;
-	.byte	$0c,$ce,$bc,$ea,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,39118 & $FF,39118 >> 8,$06
+	.byte	$0c,$ce,$bc,$ea,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,39630 & $FF,39630 >> 8,$06
 ;
 ;	MOVSPR    #,#,# T N
 ;
-	.byte	$09,$ce,$bd,$ea,$ea,$e2,39374 & $FF,39374 >> 8,$06
+	.byte	$09,$ce,$bd,$ea,$ea,$e2,39886 & $FF,39886 >> 8,$06
 ;
 ;	TILE    #,#,# X:OptionalParameterCompile T N
 ;
-	.byte	$0c,$ce,$b9,$ea,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,40654 & $FF,40654 >> 8,$06
+	.byte	$0c,$ce,$b9,$ea,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,41422 & $FF,41422 >> 8,$06
 ;
 ;	BANK    # X:OptionalParameterCompile T N
 ;
-	.byte	$0a,$ce,$98,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,42702 & $FF,42702 >> 8,$06
+	.byte	$0a,$ce,$98,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,43470 & $FF,43470 >> 8,$06
 ;
 ;	BLOAD    $,#,#,# T N
 ;
-	.byte	$0a,$ce,$95,$fa,$ea,$ea,$e2,36046 & $FF,36046 >> 8,$06
+	.byte	$0a,$ce,$95,$fa,$ea,$ea,$e2,36558 & $FF,36558 >> 8,$06
 ;
 ;	BVLOAD    $,#,#,# T N
 ;
-	.byte	$0a,$ce,$96,$fa,$ea,$ea,$e2,36302 & $FF,36302 >> 8,$06
+	.byte	$0a,$ce,$96,$fa,$ea,$ea,$e2,36814 & $FF,36814 >> 8,$06
 ;
 ;	VLOAD    $,#,#,# T N
 ;
-	.byte	$0a,$ce,$85,$fa,$ea,$ea,$e2,36558 & $FF,36558 >> 8,$06
+	.byte	$0a,$ce,$85,$fa,$ea,$ea,$e2,37070 & $FF,37070 >> 8,$06
 ;
 ;	BSAVE    $,#,#,#,# T N
 ;
-	.byte	$0b,$ce,$b0,$fa,$ea,$ea,$ea,$e2,36814 & $FF,36814 >> 8,$06
+	.byte	$0b,$ce,$b0,$fa,$ea,$ea,$ea,$e2,37326 & $FF,37326 >> 8,$06
 ;
 ;	BVERIFY   $,#,#,# T N
 ;
-	.byte	$0a,$ce,$97,$fa,$ea,$ea,$e2,37070 & $FF,37070 >> 8,$06
+	.byte	$0a,$ce,$97,$fa,$ea,$ea,$e2,37582 & $FF,37582 >> 8,$06
+;
+;	LINPUT    X:CommandLINPUT N
+;
+	.byte	$07,$ce,$b4,$03,CommandLINPUT & $FF,CommandLINPUT >> 8,$06
+;
+;	LINPUT#   C:CommandLINPUTStream N
+;
+	.byte	$07,$ce,$b3,$04,CommandLINPUTStream & $FF,CommandLINPUTStream >> 8,$06
+;
+;	BINPUT#   C:CommandBINPUTStream N
+;
+	.byte	$07,$ce,$b5,$04,CommandBINPUTStream & $FF,CommandBINPUTStream >> 8,$06

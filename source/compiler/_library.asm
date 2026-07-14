@@ -1438,11 +1438,19 @@ FindVariable:
 		stx 	zTemp1 						; save name.
 		sty 	zTemp1+1
 		;
-		;		Check for TI $1409 and TI$ $5409 which return 6 and 8 as addresses.
+		;		The CBM reserved names. These are NOT keywords and never get tokenised -- they
+		;		arrive here as ordinary identifiers -- so this is the only place they can be
+		;		caught. ExtractVariableName has already packed the name into X = first character
+		;		and 31 (with the type bits) and Y = second character and 63:
 		;
-_IVCheckSpecial:		
-		cpy 	#$09	 					; both end $09 e.g. I
-		bne 	_IVStandard
+		;			TI  = $14,$09		TI$ = $54,$09		ST = $13,$14
+		;
+		;		Each returns a FAKE address with bit 7 of Y set, which is what tells GetSetVariable
+		;		to emit a keyword instead of a variable access. The high byte picks which one.
+		;
+_IVCheckSpecial:
+		cpy 	#$09	 					; TI and TI$ both end $09 e.g. I
+		bne 	_IVCheckStatus
 		cpx 	#$14 						; TI is $14
 		beq 	_IVTIFloat
 		cpx 	#$54 						; TI$ is $54
@@ -1459,7 +1467,23 @@ _IVTIFloat: 								; TI returns ifloat at $8000
 		sec
 		rts
 		;
-		;		Not TI or TI$
+		;		ST, the KERNAL status byte. Two significant characters, exactly as CBM has it, so
+		;		STATUS is the same name as ST and is reserved too -- which is what stock does.
+		;		A type or array suffix leaves the bits in X set, so ST$, ST% and ST( all miss this
+		;		and stay ordinary variables.
+		;
+_IVCheckStatus:
+		cpy 	#$14 						; ST is $13,$14
+		bne 	_IVStandard
+		cpx 	#$13
+		bne 	_IVStandard
+		ldy 	#$A0 						; ST returns ifloat at $A000
+		ldx 	#$00
+		lda 	#0
+		sec
+		rts
+		;
+		;		Not a reserved name
 		;
 _IVStandard:
 		lda 	compilerStartHigh			; start scanning from here.
@@ -1937,7 +1961,7 @@ CommandTables:
 ;
 ;	SYS    # T N
 ;
-	.byte	$07,$9e,$00,$e2,39886 & $FF,39886 >> 8,$06
+	.byte	$07,$9e,$00,$e2,40654 & $FF,40654 >> 8,$06
 ;
 ;	POKE    #,# T N
 ;
@@ -1949,7 +1973,7 @@ CommandTables:
 ;
 ;	STOP    T N
 ;
-	.byte	$07,$90,$00,$20,39630 & $FF,39630 >> 8,$06
+	.byte	$07,$90,$00,$20,40398 & $FF,40398 >> 8,$06
 ;
 ;	END    T N
 ;
@@ -1972,15 +1996,15 @@ CommandTables:
 ;
 ;	CLS    T N
 ;
-	.byte	$07,$ce,$90,$20,48078 & $FF,48078 >> 8,$06
+	.byte	$07,$ce,$90,$20,48846 & $FF,48846 >> 8,$06
 ;
 ;	LOCATE    # X:OptionalParameterCompile T N
 ;
-	.byte	$0a,$ce,$92,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,48334 & $FF,48334 >> 8,$06
+	.byte	$0a,$ce,$92,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,49102 & $FF,49102 >> 8,$06
 ;
 ;	COLOR    # X:OptionalParameterCompile T N
 ;
-	.byte	$0a,$ce,$8d,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,48590 & $FF,48590 >> 8,$06
+	.byte	$0a,$ce,$8d,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,49358 & $FF,49358 >> 8,$06
 ;
 ;	SCREEN    # T N
 ;
@@ -1992,23 +2016,23 @@ CommandTables:
 ;
 ;	SLEEP    # T N
 ;
-	.byte	$07,$ce,$af,$e2,42958 & $FF,42958 >> 8,$06
+	.byte	$07,$ce,$af,$e2,43726 & $FF,43726 >> 8,$06
 ;
 ;	MOUSE    # T N
 ;
-	.byte	$07,$ce,$8c,$e2,37326 & $FF,37326 >> 8,$06
+	.byte	$07,$ce,$8c,$e2,37838 & $FF,37838 >> 8,$06
 ;
 ;	I2CPOKE   #,#,# T N
 ;
-	.byte	$09,$ce,$ae,$ea,$ea,$e2,41678 & $FF,41678 >> 8,$06
+	.byte	$09,$ce,$ae,$ea,$ea,$e2,42446 & $FF,42446 >> 8,$06
 ;
 ;	POWEROFF   T N
 ;
-	.byte	$07,$ce,$ad,$20,41934 & $FF,41934 >> 8,$06
+	.byte	$07,$ce,$ad,$20,42702 & $FF,42702 >> 8,$06
 ;
 ;	REBOOT    T N
 ;
-	.byte	$07,$ce,$ac,$20,42190 & $FF,42190 >> 8,$06
+	.byte	$07,$ce,$ac,$20,42958 & $FF,42958 >> 8,$06
 ;
 ;	PSET    #,#,# T N
 ;
@@ -2040,122 +2064,134 @@ CommandTables:
 ;
 ;	SPRITE    #,# X:OptionalParameterCompile X:OptionalParameterCompile X:OptionalParameterCompile X:OptionalParameterCompile X:OptionalParameterCompile T N
 ;
-	.byte	$17,$ce,$bb,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,38862 & $FF,38862 >> 8,$06
+	.byte	$17,$ce,$bb,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,39374 & $FF,39374 >> 8,$06
 ;
 ;	SPRMEM    #,#,# X:OptionalParameterCompile T N
 ;
-	.byte	$0c,$ce,$bc,$ea,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,39118 & $FF,39118 >> 8,$06
+	.byte	$0c,$ce,$bc,$ea,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,39630 & $FF,39630 >> 8,$06
 ;
 ;	MOVSPR    #,#,# T N
 ;
-	.byte	$09,$ce,$bd,$ea,$ea,$e2,39374 & $FF,39374 >> 8,$06
+	.byte	$09,$ce,$bd,$ea,$ea,$e2,39886 & $FF,39886 >> 8,$06
 ;
 ;	TILE    #,#,# X:OptionalParameterCompile T N
 ;
-	.byte	$0c,$ce,$b9,$ea,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,40654 & $FF,40654 >> 8,$06
+	.byte	$0c,$ce,$b9,$ea,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,41422 & $FF,41422 >> 8,$06
 ;
 ;	BANK    # X:OptionalParameterCompile T N
 ;
-	.byte	$0a,$ce,$98,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,42702 & $FF,42702 >> 8,$06
+	.byte	$0a,$ce,$98,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,43470 & $FF,43470 >> 8,$06
 ;
 ;	BLOAD    $,#,#,# T N
 ;
-	.byte	$0a,$ce,$95,$fa,$ea,$ea,$e2,36046 & $FF,36046 >> 8,$06
+	.byte	$0a,$ce,$95,$fa,$ea,$ea,$e2,36558 & $FF,36558 >> 8,$06
 ;
 ;	BVLOAD    $,#,#,# T N
 ;
-	.byte	$0a,$ce,$96,$fa,$ea,$ea,$e2,36302 & $FF,36302 >> 8,$06
+	.byte	$0a,$ce,$96,$fa,$ea,$ea,$e2,36814 & $FF,36814 >> 8,$06
 ;
 ;	VLOAD    $,#,#,# T N
 ;
-	.byte	$0a,$ce,$85,$fa,$ea,$ea,$e2,36558 & $FF,36558 >> 8,$06
+	.byte	$0a,$ce,$85,$fa,$ea,$ea,$e2,37070 & $FF,37070 >> 8,$06
 ;
 ;	BSAVE    $,#,#,#,# T N
 ;
-	.byte	$0b,$ce,$b0,$fa,$ea,$ea,$ea,$e2,36814 & $FF,36814 >> 8,$06
+	.byte	$0b,$ce,$b0,$fa,$ea,$ea,$ea,$e2,37326 & $FF,37326 >> 8,$06
 ;
 ;	BVERIFY   $,#,#,# T N
 ;
-	.byte	$0a,$ce,$97,$fa,$ea,$ea,$e2,37070 & $FF,37070 >> 8,$06
+	.byte	$0a,$ce,$97,$fa,$ea,$ea,$e2,37582 & $FF,37582 >> 8,$06
+;
+;	LINPUT    X:CommandLINPUT N
+;
+	.byte	$07,$ce,$b4,$03,CommandLINPUT & $FF,CommandLINPUT >> 8,$06
+;
+;	LINPUT#   C:CommandLINPUTStream N
+;
+	.byte	$07,$ce,$b3,$04,CommandLINPUTStream & $FF,CommandLINPUTStream >> 8,$06
+;
+;	BINPUT#   C:CommandBINPUTStream N
+;
+	.byte	$07,$ce,$b5,$04,CommandBINPUTStream & $FF,CommandBINPUTStream >> 8,$06
 ;
 ;	This file is automatically generated.
 ;
 ;
 ;	FMINIT       T N
 ;
-	.byte	$07,$ce,$99,$20,43214 & $FF,43214 >> 8,$06
+	.byte	$07,$ce,$99,$20,43982 & $FF,43982 >> 8,$06
 ;
 ;	FMNOTE      #,# T N
 ;
-	.byte	$08,$ce,$9a,$ea,$e2,43470 & $FF,43470 >> 8,$06
+	.byte	$08,$ce,$9a,$ea,$e2,44238 & $FF,44238 >> 8,$06
 ;
 ;	FMDRUM      #,# T N
 ;
-	.byte	$08,$ce,$9b,$ea,$e2,43726 & $FF,43726 >> 8,$06
+	.byte	$08,$ce,$9b,$ea,$e2,44494 & $FF,44494 >> 8,$06
 ;
 ;	FMINST      #,# T N
 ;
-	.byte	$08,$ce,$9c,$ea,$e2,43982 & $FF,43982 >> 8,$06
+	.byte	$08,$ce,$9c,$ea,$e2,44750 & $FF,44750 >> 8,$06
 ;
 ;	FMVIB       #,# T N
 ;
-	.byte	$08,$ce,$9d,$ea,$e2,44238 & $FF,44238 >> 8,$06
+	.byte	$08,$ce,$9d,$ea,$e2,45006 & $FF,45006 >> 8,$06
 ;
 ;	FMFREQ      #,# T N
 ;
-	.byte	$08,$ce,$9e,$ea,$e2,44494 & $FF,44494 >> 8,$06
+	.byte	$08,$ce,$9e,$ea,$e2,45262 & $FF,45262 >> 8,$06
 ;
 ;	FMVOL       #,# T N
 ;
-	.byte	$08,$ce,$9f,$ea,$e2,44750 & $FF,44750 >> 8,$06
+	.byte	$08,$ce,$9f,$ea,$e2,45518 & $FF,45518 >> 8,$06
 ;
 ;	FMPAN       #,# T N
 ;
-	.byte	$08,$ce,$a0,$ea,$e2,45006 & $FF,45006 >> 8,$06
+	.byte	$08,$ce,$a0,$ea,$e2,45774 & $FF,45774 >> 8,$06
 ;
 ;	FMPLAY      #,$ T N
 ;
-	.byte	$08,$ce,$a1,$ea,$f2,45262 & $FF,45262 >> 8,$06
+	.byte	$08,$ce,$a1,$ea,$f2,46030 & $FF,46030 >> 8,$06
 ;
 ;	FMCHORD     #,$ T N
 ;
-	.byte	$08,$ce,$a2,$ea,$f2,45518 & $FF,45518 >> 8,$06
+	.byte	$08,$ce,$a2,$ea,$f2,46286 & $FF,46286 >> 8,$06
 ;
 ;	FMPOKE      #,# T N
 ;
-	.byte	$08,$ce,$a3,$ea,$e2,45774 & $FF,45774 >> 8,$06
+	.byte	$08,$ce,$a3,$ea,$e2,46542 & $FF,46542 >> 8,$06
 ;
 ;	PSGINIT      T N
 ;
-	.byte	$07,$ce,$a4,$20,46030 & $FF,46030 >> 8,$06
+	.byte	$07,$ce,$a4,$20,46798 & $FF,46798 >> 8,$06
 ;
 ;	PSGNOTE     #,# T N
 ;
-	.byte	$08,$ce,$a5,$ea,$e2,46286 & $FF,46286 >> 8,$06
+	.byte	$08,$ce,$a5,$ea,$e2,47054 & $FF,47054 >> 8,$06
 ;
 ;	PSGVOL      #,# T N
 ;
-	.byte	$08,$ce,$a6,$ea,$e2,46542 & $FF,46542 >> 8,$06
+	.byte	$08,$ce,$a6,$ea,$e2,47310 & $FF,47310 >> 8,$06
 ;
 ;	PSGWAV      #,# T N
 ;
-	.byte	$08,$ce,$a7,$ea,$e2,46798 & $FF,46798 >> 8,$06
+	.byte	$08,$ce,$a7,$ea,$e2,47566 & $FF,47566 >> 8,$06
 ;
 ;	PSGFREQ     #,# T N
 ;
-	.byte	$08,$ce,$a8,$ea,$e2,47054 & $FF,47054 >> 8,$06
+	.byte	$08,$ce,$a8,$ea,$e2,47822 & $FF,47822 >> 8,$06
 ;
 ;	PSGPAN      #,# T N
 ;
-	.byte	$08,$ce,$a9,$ea,$e2,47310 & $FF,47310 >> 8,$06
+	.byte	$08,$ce,$a9,$ea,$e2,48078 & $FF,48078 >> 8,$06
 ;
 ;	PSGPLAY     #,$ T N
 ;
-	.byte	$08,$ce,$aa,$ea,$f2,47566 & $FF,47566 >> 8,$06
+	.byte	$08,$ce,$aa,$ea,$f2,48334 & $FF,48334 >> 8,$06
 ;
 ;	PSGCHORD    #,$ T N
 ;
-	.byte	$08,$ce,$ab,$ea,$f2,47822 & $FF,47822 >> 8,$06
+	.byte	$08,$ce,$ab,$ea,$f2,48590 & $FF,48590 >> 8,$06
 		.byte 	0
 
 UnaryTables:
@@ -2288,23 +2324,23 @@ UnaryTables:
 ;
 ;	MB     T N
 ;
-	.byte	$07,$ce,$d3,$20,37582 & $FF,37582 >> 8,$06
+	.byte	$07,$ce,$d3,$20,38094 & $FF,38094 >> 8,$06
 ;
 ;	MX     T N
 ;
-	.byte	$07,$ce,$d1,$20,37838 & $FF,37838 >> 8,$06
+	.byte	$07,$ce,$d1,$20,38350 & $FF,38350 >> 8,$06
 ;
 ;	MY     T N
 ;
-	.byte	$07,$ce,$d2,$20,38094 & $FF,38094 >> 8,$06
+	.byte	$07,$ce,$d2,$20,38606 & $FF,38606 >> 8,$06
 ;
 ;	MWHEEL    T N
 ;
-	.byte	$07,$ce,$db,$20,38350 & $FF,38350 >> 8,$06
+	.byte	$07,$ce,$db,$20,38862 & $FF,38862 >> 8,$06
 ;
 ;	I2CPEEK   (#,#) T N
 ;
-	.byte	$09,$ce,$d7,$8e,$ae,$92,42446 & $FF,42446 >> 8,$06
+	.byte	$09,$ce,$d7,$8e,$ae,$92,43214 & $FF,43214 >> 8,$06
 ;
 ;	MOD    (#,#) T N
 ;
@@ -2312,15 +2348,15 @@ UnaryTables:
 ;
 ;	TDATA    (#,#) T N
 ;
-	.byte	$09,$ce,$dc,$8e,$ae,$92,40142 & $FF,40142 >> 8,$06
+	.byte	$09,$ce,$dc,$8e,$ae,$92,40910 & $FF,40910 >> 8,$06
 ;
 ;	TATTR    (#,#) T N
 ;
-	.byte	$09,$ce,$dd,$8e,$ae,$92,40398 & $FF,40398 >> 8,$06
+	.byte	$09,$ce,$dd,$8e,$ae,$92,41166 & $FF,41166 >> 8,$06
 ;
 ;	RPT$    (#,#) T S
 ;
-	.byte	$09,$ce,$da,$8e,$ae,$92,38606 & $FF,38606 >> 8,$07
+	.byte	$09,$ce,$da,$8e,$ae,$92,39118 & $FF,39118 >> 8,$07
 		.byte 	0
 
 		.send  code		
@@ -3361,6 +3397,143 @@ _CLType:
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;
+;		Name:		linput.asm
+;		Purpose:	LINPUT, LINPUT# and BINPUT#
+;		Created:	14th July 2026
+;		Reviewed: 	No
+;
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		The emitted code has to come out in this order:
+;
+;			push the delimiter (or the count)		<- the P-code reads it from S[X]
+;			[linput] / [binput]						<- and replaces it with the string
+;			store into the variable
+;
+;		but the SOURCE reads the other way round -- "LINPUT# 1,A$,34" names the variable first and
+;		the delimiter last. GetReferenceTerm emits nothing, so the variable can be parsed early and
+;		its store emitted late; what it DOES do is hand back the address in X and Y, which is what
+;		GetSetVariable wants. Compiling the delimiter expression in between will certainly not leave
+;		X and Y alone, so the address is parked on the 6502 stack across it.
+;
+; ************************************************************************************************
+
+		.section code
+
+; ************************************************************************************************
+;
+;										LINPUT <var$>
+;
+; ************************************************************************************************
+
+CommandLINPUT:
+		jsr 	LinputGetVariable 			; A = type, XY = address; nothing emitted yet
+		pha
+		phx
+		phy
+		lda 	#13 						; the keyboard form always ends at a carriage return
+		jsr 	PushIntegerA
+		bra 	LinputEmit
+
+; ************************************************************************************************
+;
+;					LINPUT# <n>,<var$>[,<delimiter>]
+;
+;		The channel and its comma have already been eaten by the C: prefix (ChannelPrefix).
+;
+; ************************************************************************************************
+
+CommandLINPUTStream:
+		jsr 	LinputGetVariable
+		pha
+		phx
+		phy
+		jsr 	LookNextNonSpace 			; an explicit delimiter ?
+		cmp 	#","
+		bne 	_CLISDefault
+		jsr 	GetNext 					; consume the comma
+		jsr 	CompileExpressionAt0
+		and 	#NSSTypeMask
+		cmp 	#NSSIFloat
+		bne 	LinputType
+		bra 	LinputEmit
+_CLISDefault:
+		lda 	#13 						; "the delimiter of a line by default is 13"
+		jsr 	PushIntegerA
+
+LinputEmit: 								; global, not a cheap local: LINPUT branches in from its
+		.keyword PCD_LINPUT 				; own scope, and _locals do not cross one
+LinputStore:
+		ply 								; the variable was parked before the delimiter was
+		plx 								; compiled; take it back and write the store
+		pla
+		sec
+		jsr 	GetSetVariable
+		rts
+
+; ************************************************************************************************
+;
+;						BINPUT# <n>,<var$>,<len>
+;
+;		The length is not optional, so there is no default to fall back on.
+;
+; ************************************************************************************************
+
+CommandBINPUTStream:
+		jsr 	LinputGetVariable
+		pha
+		phx
+		phy
+		jsr 	GetNextNonSpace
+		cmp 	#","
+		bne 	LinputSyntax
+		jsr 	CompileExpressionAt0
+		and 	#NSSTypeMask
+		cmp 	#NSSIFloat
+		bne 	LinputType
+		.keyword PCD_BINPUT
+		bra 	LinputStore
+
+; ************************************************************************************************
+;
+;		Parse the target variable. All three of these read into a string and nothing else.
+;
+; ************************************************************************************************
+
+LinputGetVariable:
+		jsr 	GetNextNonSpace
+		jsr 	CharIsAlpha
+		bcc 	LinputSyntax
+		jsr 	GetReferenceTerm 			; A = type, XY = the variable's address
+		pha
+		and 	#NSSTypeMask
+		cmp 	#NSSString
+		bne 	LinputType
+		pla 								; leaves XY alone, which is the whole point
+		rts
+
+LinputType:
+		.error_type
+
+LinputSyntax:
+		.error_syntax
+
+		.send code
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;
+; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
 ;		Name:		mark_line.asm
 ;		Purpose:	Line Number Tracking
 ;		Created:	15th April 2023
@@ -3949,22 +4122,28 @@ _GSVNotWrite:
 		;
 		;		Special read/writes
 		;
+		;
+		;		A reserved name. FindVariable handed back a fake address with bit 7 of Y set, and
+		;		the high byte says which one: $80 = TI, $C0 = TI$, $A0 = ST. All three are read
+		;		only through this path -- LET has its own code for writing TI and TI$, and ST is
+		;		the KERNAL's, so writing it is a syntax error.
+		;
 _GSVReadWriteSpecial:
-		;
-		;		TODO: TI TI$ code missing		
-		;
 		plp
-		bcs 	_GSVSyntax		
-		;
-		;		Handle clock read
+		bcs 	_GSVSyntax
 		;
 		cpy 	#$C0 						; TI$ ?
 		beq 	_GSVRWString
+		cpy 	#$A0 						; ST ?
+		beq 	_GSVRWStatus
 		.keyword PCD_TI
 		rts
 _GSVRWString:
 		.keyword PCD_TIDOLLAR
-		rts		
+		rts
+_GSVRWStatus:
+		.keyword PCD_ST
+		rts
 
 _GSVSyntax:
 		.error_syntax

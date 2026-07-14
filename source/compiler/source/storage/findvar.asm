@@ -24,11 +24,19 @@ FindVariable:
 		stx 	zTemp1 						; save name.
 		sty 	zTemp1+1
 		;
-		;		Check for TI $1409 and TI$ $5409 which return 6 and 8 as addresses.
+		;		The CBM reserved names. These are NOT keywords and never get tokenised -- they
+		;		arrive here as ordinary identifiers -- so this is the only place they can be
+		;		caught. ExtractVariableName has already packed the name into X = first character
+		;		and 31 (with the type bits) and Y = second character and 63:
 		;
-_IVCheckSpecial:		
-		cpy 	#$09	 					; both end $09 e.g. I
-		bne 	_IVStandard
+		;			TI  = $14,$09		TI$ = $54,$09		ST = $13,$14
+		;
+		;		Each returns a FAKE address with bit 7 of Y set, which is what tells GetSetVariable
+		;		to emit a keyword instead of a variable access. The high byte picks which one.
+		;
+_IVCheckSpecial:
+		cpy 	#$09	 					; TI and TI$ both end $09 e.g. I
+		bne 	_IVCheckStatus
 		cpx 	#$14 						; TI is $14
 		beq 	_IVTIFloat
 		cpx 	#$54 						; TI$ is $54
@@ -45,7 +53,23 @@ _IVTIFloat: 								; TI returns ifloat at $8000
 		sec
 		rts
 		;
-		;		Not TI or TI$
+		;		ST, the KERNAL status byte. Two significant characters, exactly as CBM has it, so
+		;		STATUS is the same name as ST and is reserved too -- which is what stock does.
+		;		A type or array suffix leaves the bits in X set, so ST$, ST% and ST( all miss this
+		;		and stay ordinary variables.
+		;
+_IVCheckStatus:
+		cpy 	#$14 						; ST is $13,$14
+		bne 	_IVStandard
+		cpx 	#$13
+		bne 	_IVStandard
+		ldy 	#$A0 						; ST returns ifloat at $A000
+		ldx 	#$00
+		lda 	#0
+		sec
+		rts
+		;
+		;		Not a reserved name
 		;
 _IVStandard:
 		lda 	compilerStartHigh			; start scanning from here.

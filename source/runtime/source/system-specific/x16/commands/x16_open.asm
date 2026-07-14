@@ -48,6 +48,12 @@ _CONoCarry:
 		;
 		jsr 	X16_OPEN
 		bcs 	_COError
+		ldx 	#$FF 						; empty the float stack, as every other command does.
+											; This is NOT cosmetic: OPEN reads its arguments from
+											; slots 0-3 ABSOLUTELY, which only works if the stack
+											; started empty. Leaving X at 3 meant a SECOND OPEN in
+											; a program read garbage and handed the KERNAL a junk
+											; filename pointer.
 		.exitcmd
 _COError:
 		.error_channel

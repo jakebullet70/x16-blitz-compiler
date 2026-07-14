@@ -9,11 +9,12 @@ Replaces the original `TODO.txt`, which was written against **R43** and predated
   (`source/compiler/source/generation/*.def` and `.../system-specific/x16/generation/*.def`);
 - the gap between the two is below.
 
-**52 of the 81 extended keywords compile today. 29 do not.**
+**62 of the 81 extended keywords compile today. 19 do not.**
 
-Tiers 1 and 2 are done — `MOD`, `OVAL`, `RING`, `POWEROFF`, `REBOOT`, `SPRITE`, `SPRMEM`, `MOVSPR`,
-`TILE`, `TDATA` and `TATTR` all compile, and every one is checked against the R49 ROM rather than
-against a reading of the manual. What follows is what is left.
+Tiers 1, 2 and 3 are done — every keyword below compiles, and every one is checked against the R49
+ROM rather than against a reading of the manual. That caught the manual being **wrong** about
+`BVERIFY`'s signature. `ST` was added along the way: not one of the 81, but `LINPUT#` and `BINPUT#`
+are unusable without it. Only `RESET` is left.
 
 ## How to decide whether a keyword is worth having
 
@@ -26,7 +27,7 @@ Not by the manual's **TYPE** column. That is a hint, not a rule: `LOAD` and `NEW
 
 That single test sorts all 40.
 
-## Worth implementing (11 left)
+## Worth implementing (1 left)
 
 ### Tier 1 — DONE
 
@@ -90,16 +91,45 @@ Two bugs found on the way, both mine, both caught by that comparison:
 - `_SSACommon` was a cheap local branched into from another global's scope. 64tass `_locals` do not
   cross a global label — the same trap already documented in `x16_i2c.asm`.
 
-### Tier 3 — data in and out
+### Tier 3 — DONE
 
-- **Binary load/save:** `BLOAD` `BVLOAD` `BSAVE` `BVERIFY` `VLOAD`. The manual types these *Command*,
-  and the old TODO put them on its "Add" list; both are beside the point. Loading binary data (a
-  sprite sheet, a level, a tile map) is exactly what a compiled game wants, so they stay.
-- **Banking:** `BANK`
-- **Input:** `LINPUT` `LINPUT#` `BINPUT#`. NB their tokens were **swapped** in Blitz's table
-  (`LINPUT#` is `$CEB3`, `LINPUT` is `$CEB4`); the order is fixed now, so they will tokenise correctly
-  the moment a handler exists.
-- **String:** `RPT$`
+`BLOAD` `BVLOAD` `VLOAD` `BSAVE` `BVERIFY` · `BANK` · `RPT$` · `LINPUT` `LINPUT#` `BINPUT#`
+
+**The manual's `BVERIFY` signature is wrong.** It documents
+`BVERIFY <filename>,<device>,<bank>,<start address>,<end address>` and that form is a hard
+`?SYNTAX ERROR` in the R49 ROM — run it. It takes **four** arguments. BSAVE's signature looks to have
+been copied by mistake, and four is what the KERNAL implies anyway: `LOAD` with `A=1` verifies and has
+no end address at all, because the length of the file bounds the comparison. Every other signature
+here was probed against the ROM rather than read off the manual, after that.
+
+**`BANK` needed one line.** Its runtime handler had existed all along, and already read `$FF` as "ROM
+bank not given" — exactly what `OptionalParameterCompile` pushes for a missing optional. It was only
+ever missing its `.def` entry.
+
+**`ST` had to be built first.** `LINPUT#` and `BINPUT#` report end-of-file through `ST`, and Blitz had
+no `ST` — without it a read loop *cannot terminate*, because at EOF `LINPUT#` hands back an empty
+string and that is indistinguishable from a blank line in the file. `ST` is not a keyword and never
+gets tokenised: like `TI` and `TI$` it is a reserved CBM *name*, so it arrives at the compiler as an
+ordinary identifier. `FindVariable` already had the mechanism for exactly this (it returns a fake
+address with bit 7 of Y set, and `GetSetVariable` dispatches on the high byte) — `ST` is `$A0`
+alongside TI's `$80` and TI$'s `$C0`. Two significant characters, as CBM has it, so `STATUS` is the
+same name as `ST` and is reserved too, which is what stock does.
+
+Checked against stock R49, byte for byte, and the interesting case is the one `ST` exists for:
+
+| | blank line in the file | end of file |
+|---|---|---|
+| `LEN(A$)` | 0 | 1 |
+| `ST` | **0** | **64** |
+
+`BINPUT#` short-reads at EOF (asked for 20, got 3, `ST=64`), a custom `LINPUT#` delimiter works, and
+`LINPUT` on the keyboard is the same P-code on channel 0 — channel 0 *is* the KERNAL's screen editor,
+so the manual's warnings (an empty line comes back as one space, trailing spaces are lost) are the
+editor's doing and we inherit them for free.
+
+Two P-codes serve all three keywords. The channel is not their business: the `#` forms compile with
+the `C:` (channel execute) prefix, which sets `currentChannel` around the command and puts it back —
+exactly how `INPUT` and `INPUT#` already share one runtime.
 
 ### Tier 4 — one loose end
 
@@ -123,6 +153,35 @@ its own way at compile time, so these would either mean something different or n
 author rejected them outright; leaving them parked rather than deciding in the abstract.
 
 ## Bugs
+
+### `OPEN` after any load or save still fails — OPEN, NOT FIXED
+
+`BSAVE "F",8,0,A,B` followed by `OPEN 1,8,2,"F,S,R"` raises an I/O error, and the same OPEN on its
+own works perfectly. Instrumented: on its own OPEN gets exactly the right arguments through to the
+KERNAL (`lfn=1 dev=8 sa=2 namelen=9`) and comes back with carry clear. After a `BSAVE` it does not
+come back at all — the machine goes down inside the KERNAL call. Re-opening the *same* logical file
+number on a file that does not exist does the same thing.
+
+What it is **not**: the RAM and ROM bank registers are both correct across a `BSAVE` (checked — `$01`
+stays 4 and `BSAVE` restores `$00`), `BSAVE` itself writes a byte-perfect file, `BSAVE` -> `BLOAD` ->
+`PRINT` chains fine, and closing the KERNAL's logical file plus a `CLRCHN` afterwards changes nothing.
+Stock BASIC does `BSAVE` then `OPEN` happily, so the KERNAL can clearly be driven this way.
+
+It does not block the `LINPUT` family — a program that opens a data file it did not just write works,
+and that is the normal case — but it wants finding. Next step is probably to watch the KERNAL call in
+Box16 rather than guess.
+
+### `OPEN` and `CLOSE` never emptied the float stack — FIXED
+
+Every command in Blitz ends `ldx #$FF`, because a command consumes all of its arguments and the next
+one's are pushed from slot 0. `CommandXOpen` and `CommandClose` were the only two that did not, so
+OPEN left the stack pointer at 3 and CLOSE at 0.
+
+That is not a leak, it is a corruption: **`CommandXOpen` reads its arguments from slots 0-3
+ABSOLUTELY** (`NSMantissa0+0` … `+3`), which only works if the stack started empty. So the *second*
+`OPEN` in any program read whatever happened to be sitting in those slots, handed the KERNAL a junk
+filename pointer and a junk logical file number, and took the machine down. File I/O had only ever
+worked for the first `OPEN` in a program.
 
 ### `FMPLAY` / `FMCHORD` / `PSGPLAY` / `PSGCHORD` hard-crashed — FIXED
 
