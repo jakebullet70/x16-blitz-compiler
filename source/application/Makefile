@@ -48,7 +48,11 @@ release:  build
 	$(CCOPY) *.PRG $(RELEASEDIR)
 	$(CCOPY) build$(S)*.bas $(RELEASEDIR)
 	$(CCOPY) $(BINDIR)tokenise.zip $(RELEASEDIR)
-	$(CCOPY) $(ROOTDIR)CHANGES.txt $(RELEASEDIR)
+	#
+	#		There is deliberately no CHANGES.txt here. The original author's was deleted ("Del
+	#		old files from previous build") and git history is the changelog -- copying one in
+	#		unconditionally only meant the release failed to package over a missing text file.
+	#
 	#
 	#		Bundle the release. mkzip.py replaces zip(1) (absent on a stock Windows box) and
 	#		writes reproducibly, so an unchanged release no longer produces a new blitz.zip.

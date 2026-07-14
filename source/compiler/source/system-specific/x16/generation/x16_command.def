@@ -22,7 +22,13 @@ VPOKE 			#,#,# T N
 SLEEP 			# T N
 MOUSE 			# T N
 I2CPOKE 		#,#,# T N
+
+# 	Three different ways to stop the machine, and they are not interchangeable -- POWEROFF cuts
+# 	the power, RESET has the SMC assert the reset line (a hard reset), and REBOOT goes through the
+# 	ROM's reset vector without resetting any hardware at all. See machine.asm.
+
 POWEROFF 		T N
+RESET 			T N
 REBOOT 			T N
 
 PSET 			#,#,# T N
@@ -32,3 +38,43 @@ FRAME 			#,#,#,#,# T N
 OVAL 			#,#,#,#,# T N
 RING 			#,#,#,#,# T N
 CHAR 			#,#,#,$ T N
+
+# 	Sprites and tiles. OptionalParameterCompile pushes 255 when its comma is missing, and once
+# 	one optional is absent every one after it is too -- so chaining it is exactly "the rest are
+# 	optional". 255 is out of range for all of these fields, so the runtime reads it as "leave
+# 	this one alone", which is what SPRITE and SPRMEM need in order not to undo each other.
+
+SPRITE 			#,# X:OptionalParameterCompile X:OptionalParameterCompile X:OptionalParameterCompile X:OptionalParameterCompile X:OptionalParameterCompile T N
+SPRMEM 			#,#,# X:OptionalParameterCompile T N
+MOVSPR 			#,#,# T N
+TILE 			#,#,# X:OptionalParameterCompile T N
+
+# 	Banking. The runtime handler for this has existed all along -- CommandBank already reads the
+# 	ROM bank as $FF meaning "not given", which is exactly what OptionalParameterCompile pushes.
+# 	It was only ever missing this one line.
+
+BANK 			# X:OptionalParameterCompile T N
+
+# 	Binary load and save. See loadsave.asm for the two knobs (secondary address, and A) that
+# 	decide between these.
+
+# 	BVERIFY takes FOUR arguments, not the five the manual gives it. The manual's
+# 	"BVERIFY <filename>,<device>,<bank>,<start address>,<end address>" is a hard syntax error in
+# 	the R49 ROM -- checked by running it. It looks like BSAVE's signature was copied by mistake.
+# 	The four argument form is also what the KERNAL implies: LOAD with A=1 verifies, and it has no
+# 	end address at all, because the file's own length bounds the comparison.
+
+BLOAD 			$,#,#,# T N
+BVLOAD 			$,#,#,# T N
+VLOAD 			$,#,#,# T N
+BSAVE 			$,#,#,#,# T N
+BVERIFY 		$,#,#,# T N
+
+# 	Line and block input. These assign INTO a string variable, so the handler does all of it --
+# 	no T here, exactly like INPUT and INPUT#. The "#" forms take C: (channel execute), which
+# 	compiles the channel and sets it around the command, so the runtime never sees a channel:
+# 	one pair of P-codes serves all three, the same way INPUT and INPUT# already share one.
+
+LINPUT 			X:CommandLINPUT N
+LINPUT# 		C:CommandLINPUTStream N
+BINPUT# 		C:CommandBINPUTStream N

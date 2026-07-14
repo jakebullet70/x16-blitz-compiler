@@ -217,6 +217,28 @@ VRAMLow0 = $9F20
 VRAMMed0 = $9F21
 VRAMHigh0 = $9F22
 VRAMData0 = $9F23
+;
+;		VRAMHigh0 is not just the top address bit: 7:4 are the auto-increment, 3 is DECR,
+;		2:1 are the nibble controls, and only bit 0 is VRAM address bit 16. So writing a
+;		bare bank number (as VPOKE does) means "this bank, do not increment", and $10 is
+;		the increment-by-one that lets consecutive reads or writes walk a structure.
+;
+VRAMBank1 = $01 							; VRAM address bit 16
+VRAMIncrement1 = $10 						; step the address on by one after each access
+;
+VERACtrl = $9F25 							; 7 = reset, 6:1 = DCSEL, 0 = ADDRSEL
+VERADCSelMask = $81 						; keep reset and ADDRSEL, clear DCSEL
+VERADCVideo = $9F29 						; only at this address while DCSEL is zero
+VERASpritesEnable = $40
+;
+VERAL1Config = $9F34 						; 7:6 map height, 5:4 map width, 1:0 colour depth
+VERAL1MapBase = $9F35 						; map base address, bits 16:9
+;
+;		The 128 sprite attribute blocks are 8 bytes each, based at VRAM $1FC00. Sprite 127
+;		starts at $FC00 + 127*8 = $FFF8, so the offset never carries out of the low 16 bits
+;		and the VRAM bank is always 1.
+;
+SpriteAttributeBase = $FC 					; high byte of $FC00
 
 		.send code
 
@@ -3370,6 +3392,437 @@ LinkDivideInt32: ;; [int.div]
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;
+;		Name:		linput.asm
+;		Purpose:	LINPUT, LINPUT# and BINPUT#
+;		Created:	14th July 2026
+;		Reviewed: 	No
+;
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		Two P-codes serve all three keywords, because the CHANNEL is not their business: the "#"
+;		forms are compiled with the C: (channel execute) prefix, which sets currentChannel around
+;		the command and puts it back afterwards. That is exactly how INPUT and INPUT# already
+;		share one runtime. So:
+;
+;			[linput]	S[X] = a delimiter	->	S[X] = everything up to it
+;			[binput]	S[X] = a count		->	S[X] = that many bytes
+;
+;		LINPUT (no #) is simply [linput] on channel 0 with a delimiter of 13, and channel 0 is the
+;		KERNAL's screen editor -- CHRIN hands back the logical line a character at a time as the
+;		user types it, with every editor key working. That is what LINPUT is FOR, and it is also
+;		why the manual warns that an empty line comes back as a single space and trailing spaces
+;		are lost: that is the editor's doing, not ours, and we inherit it for free.
+;
+;		END OF FILE is checked BEFORE each read, never after. The KERNAL sets ST when it hands
+;		over the LAST byte, so that byte is real and must be kept; it is the NEXT read that has
+;		nothing to give. Testing first keeps the last byte and still stops. See st.asm -- without
+;		ST a program could not tell EOF from a blank line, and a read loop could never end.
+;
+; ************************************************************************************************
+
+		.section 	code
+
+; ************************************************************************************************
+;
+;					LINPUT <var$>  /  LINPUT# <n>,<var$>[,<delimiter>]
+;
+; ************************************************************************************************
+
+CommandXLinput: ;; [!linput]
+		.entercmd 							; S[X] is the delimiter
+		phy
+		jsr 	GetInteger8Bit
+		sta 	liDelimiter
+		phx 								; the KERNAL calls below are free to trash X, so park
+											; the float stack pointer and use X as the index
+		jsr 	LinputOpenChannel
+		stz 	ReadBufferSize
+_CLILoop:
+		jsr 	LinputAtEndOfFile
+		bne 	_CLIDone
+		jsr 	X16_CHRIN
+		cmp 	liDelimiter
+		beq 	_CLIDone 					; the delimiter is consumed, but never stored
+		ldx 	ReadBufferSize
+		cpx 	#255 						; ReadBuffer is 255 bytes. A full one takes no more, but
+		beq 	_CLILoop 					; still runs on to the delimiter, so that the next read
+											; starts at the beginning of a line rather than mid-way
+		sta 	ReadBuffer,x
+		inc 	ReadBufferSize
+		bra 	_CLILoop
+_CLIDone:
+		jsr 	LinputCloseChannel
+		plx
+		jsr 	LinputResult
+		ply
+		.exitcmd
+
+; ************************************************************************************************
+;
+;							BINPUT# <n>,<var$>,<len>
+;
+; ************************************************************************************************
+
+CommandXBinput: ;; [!binput]
+		.entercmd 							; S[X] is how many bytes are wanted
+		phy
+		jsr 	GetInteger8Bit
+		sta 	liCount
+		phx
+		jsr 	LinputOpenChannel
+		stz 	ReadBufferSize
+_CBILoop:
+		lda 	ReadBufferSize 				; got them all ?
+		cmp 	liCount
+		beq 	_CBIDone
+		jsr 	LinputAtEndOfFile 			; "if there are fewer than <len> bytes available to
+		bne 	_CBIDone 					; be read, fewer bytes will be stored"
+		jsr 	X16_CHRIN
+		ldx 	ReadBufferSize
+		sta 	ReadBuffer,x
+		inc 	ReadBufferSize
+		bra 	_CBILoop
+_CBIDone:
+		jsr 	LinputCloseChannel
+		plx
+		jsr 	LinputResult
+		ply
+		.exitcmd
+
+; ************************************************************************************************
+;
+;		Z clear when the channel has run out. Bit 6 of the KERNAL status is end of file.
+;
+; ************************************************************************************************
+
+LinputAtEndOfFile:
+		jsr 	X16_READST
+		and 	#$40
+		rts
+
+; ************************************************************************************************
+;
+;		Point the KERNAL's input at the current channel, and afterwards put it back. Channel 0
+;		means the keyboard, which is CLRCHN's default, not a file to CHKIN.
+;
+; ************************************************************************************************
+
+LinputOpenChannel:
+		ldx 	currentChannel
+		beq 	LinputCloseChannel
+		jmp 	X16_CHKIN
+
+LinputCloseChannel:
+		jmp 	X16_CLRCHN
+
+; ************************************************************************************************
+;
+;		Leave the buffer in S[X] as a string. ReadBufferSize is the length byte and ReadBuffer
+;		follows it, which IS Blitz's string layout, so the buffer's own address is the string.
+;		This overwrites the parameter that was in S[X], so the stack comes out level and the
+;		store the compiler emits next pops the result straight into the variable.
+;
+; ************************************************************************************************
+
+LinputResult:
+		jsr 	FloatSetZero
+		lda 	#ReadBufferSize & $FF
+		sta 	NSMantissa0,x
+		lda 	#ReadBufferSize >> 8
+		sta 	NSMantissa1,x
+		lda 	#NSSString
+		sta 	NSStatus,x
+		rts
+
+		.send 	code
+
+		.section storage
+liDelimiter:
+		.fill 	1
+liCount:
+		.fill 	1
+		.send storage
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;
+; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		Name:		loadsave.asm
+;		Purpose:	BLOAD, BVLOAD, VLOAD, BSAVE and BVERIFY
+;		Created:	14th July 2026
+;		Reviewed: 	No
+;
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		All five are the KERNAL's LOAD ($FFD5) and BSAVE ($FEBA) with SETNAM and SETLFS in front,
+;		which is exactly what BASIC does with them. Two separate knobs decide what a load means,
+;		and it is easy to conflate them:
+;
+;		The SECONDARY ADDRESS, given to SETLFS, says what to do with the file's first two bytes:
+;
+;			0	they are an address header; skip them and load at the address we passed
+;			1	they are an address header; load THERE and ignore the address we passed
+;			2	there is no header; load the whole file at the address we passed
+;
+;		The ACCUMULATOR, given to LOAD, says where the bytes go:
+;
+;			0	system memory			2	VRAM, from $00000 + address
+;			1	verify, do not write	3	VRAM, from $10000 + address
+;
+;		So BLOAD is (secondary 2, A=0), BVLOAD is (secondary 2, A=2+bank), and VLOAD is the same
+;		as BVLOAD but secondary 0 -- the one difference between them is that VLOAD eats the
+;		two byte header and BVLOAD does not. BVERIFY is (secondary 2, A=1).
+;
+;		LOAD into banked RAM starts at whatever bank $00 selects and advances it by itself when a
+;		file runs past $BFFF, so setting the bank IS the whole of the bank handling.
+;
+; ************************************************************************************************
+
+		.section 	code
+
+; ************************************************************************************************
+;
+;		Carry set means the KERNAL reported a failure. This is reached by jsr rather than by a
+;		branch on purpose: the five commands are spread over far more than a branch can reach,
+;		and carry survives a jsr untouched.
+;
+; ************************************************************************************************
+
+LoadSaveCheckError:
+		bcs 	LoadSaveError
+		rts
+
+LoadSaveError:
+		.error_channel
+
+; ************************************************************************************************
+;
+;						BLOAD <filename>,<device>,<bank>,<address>
+;
+; ************************************************************************************************
+
+Command_BLOAD: ;; [!bload]
+		.entercmd
+		phy
+		ldx 	#3
+		jsr 	LoadSaveIntegers
+
+		lda 	NSMantissa0+2 				; the bank the load begins in
+		sta 	SelectRAMBank
+		sta 	ramBank
+
+		lda 	#2 							; no header: BLOAD takes the file exactly as it is
+		jsr 	LoadSaveSetup
+
+		lda 	#0 							; into system memory
+		ldx 	NSMantissa0+3
+		ldy 	NSMantissa1+3
+		jsr 	X16_LOAD
+		jsr 	LoadSaveCheckError 			; carry set = the KERNAL failed
+
+		stx 	SYS_Reg_X 					; "after a successful load, $030D and $030E will contain
+		sty 	SYS_Reg_Y 					; the address of the final byte loaded + 1"
+		lda 	SelectRAMBank 				; LOAD advances the bank as it fills each one, and BLOAD
+		sta 	ramBank 					; leaves it where it stopped, as if BANK had been called
+		ply
+		ldx 	#$FF
+		.exitcmd
+
+; ************************************************************************************************
+;
+;			BVLOAD <filename>,<device>,<VERA high>,<VERA low>   -- raw, no header
+;			VLOAD  <filename>,<device>,<VERA high>,<VERA low>   -- skips a two byte header
+;
+; ************************************************************************************************
+
+Command_BVLOAD: ;; [!bvload]
+		.entercmd
+		phy
+		lda 	#2 							; no header
+		bra 	VLoadCommon
+
+Command_VLOAD: ;; [!vload]
+		.entercmd
+		phy
+		lda 	#0 							; skip the two byte address header
+
+VLoadCommon: 								; global, not a cheap local: BVLOAD branches in from
+		pha 								; its own scope, and _locals do not cross one
+		ldx 	#3
+		jsr 	LoadSaveIntegers
+		pla
+		jsr 	LoadSaveSetup
+
+		lda 	NSMantissa0+2 				; LOAD takes A=2 for VRAM at $00000 + address and A=3
+		and 	#1 							; for $10000 + address, so the VERA high address is
+		clc 								; simply added on
+		adc 	#2
+		ldx 	NSMantissa0+3
+		ldy 	NSMantissa1+3
+		jsr 	X16_LOAD
+		jsr 	LoadSaveCheckError 			; carry set = the KERNAL failed
+		ply
+		ldx 	#$FF
+		.exitcmd
+
+; ************************************************************************************************
+;
+;					BSAVE <filename>,<device>,<bank>,<start>,<end>
+;
+; ************************************************************************************************
+
+Command_BSAVE: ;; [!bsave]
+		.entercmd
+		phy
+		ldx 	#4
+		jsr 	LoadSaveIntegers
+
+		lda 	SelectRAMBank 				; the manual documents BLOAD and BVERIFY as leaving the
+		sta 	lsSavedBank 		 		; bank where they stopped, "as if you called BANK", and
+		lda 	NSMantissa0+2 				; says nothing at all about BSAVE. A save cannot advance
+		sta 	SelectRAMBank 				; a bank, so there is nothing to report -- put it back
+											; rather than silently redirect the next PEEK.
+		lda 	#1 							; secondary 1 is the CBM "this is a save" convention
+		jsr 	LoadSaveSetup 				; -- and it uses zTemp0, so the start address below
+											; has to be put there AFTERWARDS, not before
+		lda 	NSMantissa0+3 				; BSAVE wants the start address in zero page and A
+		sta 	zTemp0 						; holding the address OF that pointer
+		lda 	NSMantissa1+3
+		sta 	zTemp0+1
+
+		ldx 	NSMantissa0+4 				; and the EXCLUSIVE end in XY: "the save will stop one
+		ldy 	NSMantissa1+4 				; byte before <end address>"
+		lda 	#zTemp0
+		jsr 	X16_BSAVE
+		php 								; putting the bank back must not lose the carry that
+		lda 	lsSavedBank 				; says whether the save worked
+		sta 	SelectRAMBank
+		plp
+		jsr 	LoadSaveCheckError 			; carry set = the KERNAL failed
+		ply
+		ldx 	#$FF
+		.exitcmd
+
+; ************************************************************************************************
+;
+;					BVERIFY <filename>,<device>,<bank>,<start>
+;
+;		FOUR parameters, not the five the manual gives it. "BVERIFY <filename>,<device>,<bank>,
+;		<start address>,<end address>" is a hard ?SYNTAX ERROR in the R49 ROM -- run it and see.
+;		BSAVE's signature looks to have been copied into the manual by mistake. Four is also what
+;		the KERNAL implies: LOAD with A=1 verifies, and takes no end address, because the length
+;		of the file is what bounds the comparison.
+;
+;		Stock reports a mismatch by setting ST, and Blitz has no ST -- it is a CBM pseudo variable
+;		rather than a keyword, and nothing in the compiler recognises it. A compiled program that
+;		could not see the answer would be pointless, so a mismatch is raised as an I/O error.
+;		That is a deliberate difference from stock, and the only one here.
+;
+; ************************************************************************************************
+
+Command_BVERIFY: ;; [!bverify]
+		.entercmd
+		phy
+		ldx 	#3
+		jsr 	LoadSaveIntegers
+
+		lda 	NSMantissa0+2
+		sta 	SelectRAMBank
+		sta 	ramBank
+
+		lda 	#2 							; no header
+		jsr 	LoadSaveSetup
+
+		lda 	#1 							; compare, do not write
+		ldx 	NSMantissa0+3
+		ldy 	NSMantissa1+3
+		jsr 	X16_LOAD
+		jsr 	LoadSaveCheckError 			; carry set = the KERNAL failed
+
+		jsr 	X16_READST 					; bit 4 is the CBM "verify mismatch" flag
+		and 	#$10
+		beq 	_BVMatched
+		jmp 	LoadSaveError 				; jmp, not a branch: out of range from here
+_BVMatched:
+		ply
+		ldx 	#$FF
+		.exitcmd
+
+; ************************************************************************************************
+;
+;		Make S[1]..S[X] integers. S[0] is the filename and is skipped -- it is a string, and
+;		FloatIntegerPart would happily maul its address into nonsense.
+;
+; ************************************************************************************************
+
+LoadSaveIntegers:
+_LSILoop:
+		.floatinteger
+		dex
+		bne 	_LSILoop
+		rts
+
+; ************************************************************************************************
+;
+;		SETNAM from the filename in S[0] and SETLFS from the device in S[1], with the secondary
+;		address in A. Clobbers X, so it must be called once the parameters are already integers.
+;
+; ************************************************************************************************
+
+LoadSaveSetup:
+		sta 	lsSecondary
+		lda 	NSMantissa0+0 				; the string's first byte is its length and the
+		sta 	zTemp0 						; characters follow it, so XY has to point one on
+		tax
+		lda 	NSMantissa1+0
+		sta 	zTemp0+1
+		tay
+		inx
+		bne 	_LSSNoCarry
+		iny
+_LSSNoCarry:
+		lda 	(zTemp0)
+		jsr 	X16_SETNAM
+
+		lda 	#0 							; logical file number 0, which is what BASIC's own LOAD
+		ldx 	NSMantissa0+1 				; and SAVE use. This is NOT free to pick: a load or a
+		ldy 	lsSecondary 				; save leaves its number registered, so using 1 here
+		jsr 	X16_SETLFS 					; made a later OPEN 1 fail or hang. 0 is reserved for
+		rts 								; exactly this and belongs to nobody.
+
+		.send 	code
+
+		.section storage
+lsSecondary:
+		.fill 	1
+lsSavedBank: 								; BSAVE puts the RAM bank back; see the note there
+		.fill 	1
+		.send storage
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;
+; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
 ;		Name:		location.asm
 ;		Purpose:	Save/Restore location on stack.
 ;		Created:	19th April 2023
@@ -3416,6 +3869,110 @@ StackLoadCurrentPosition:
 		rts
 
 		.send code
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;
+; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		Name:		machine.asm
+;		Purpose:	POWEROFF, RESET and REBOOT
+;		Created:	14th July 2026
+;		Reviewed: 	No
+;
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		The three keywords that stop or restart the machine. They are not interchangeable, and it
+;		is worth being exact about which is which, because two of them were the wrong way round
+;		here. Read out of BASIC ROM bank 4 -- the extended keyword vector table is at $C0A0 and is
+;		C64 style, so each entry holds its handler's address minus one:
+;
+;			POWEROFF	$E7BC	one I2C write, SMC $42 offset 1. Cuts the power.
+;			RESET		$E7B8	one I2C write, SMC $42 offset 2. The SMC asserts the reset LINE,
+;								so this is a HARD reset -- the same as the physical reset switch.
+;			REBOOT		$E6EF	jmp ($FFFC). A SOFT reset: no hardware is reset at all, the KERNAL
+;								simply starts again through its own reset vector.
+;
+;		REBOOT used to do RESET's I2C write, which made a compiled REBOOT hard reset the machine.
+;		The manual agrees with the ROM on both, and it was this file that was wrong.
+;
+; ************************************************************************************************
+
+		.section 	code
+
+X16_SMC_Device = $42 						; the SMC's I2C address
+X16_SMC_PowerOff = 1 						; offset 1 : cut the power
+X16_SMC_Reset = 2 							; offset 2 : assert the reset line
+
+; ************************************************************************************************
+;
+;									POWEROFF and RESET
+;
+;		One I2C write to the System Management Controller each, which is what BASIC does for them.
+;		Neither takes a parameter, so X arrives as $FF (an empty stack) and only has to be put
+;		back that way after we borrow it for the device number.
+;
+; ************************************************************************************************
+
+X16CommandPowerOff: ;; [!poweroff]
+		.entercmd
+		phy
+		ldy 	#X16_SMC_PowerOff
+		bra 	X16SMCWrite
+
+X16CommandReset: ;; [!reset]
+		.entercmd
+		phy
+		ldy 	#X16_SMC_Reset
+
+X16SMCWrite: 								; global, not a cheap local: POWEROFF branches here
+		ldx 	#X16_SMC_Device 			; from its own scope, and _locals do not cross one.
+		lda 	#0
+		jsr 	X16_i2c_write_byte
+		bcs 	X16SMCError
+		ply 								; the write returns, and the SMC only acts a moment
+		ldx 	#$FF 						; later, so we do carry on running until it does.
+		.exitcmd 							; Tidy up properly rather than assume we die here.
+
+X16SMCError:
+		.error_channel
+
+; ************************************************************************************************
+;
+;										REBOOT
+;
+;		A software reset, straight through the ROM's own reset vector.
+;
+;		The bank switch is not tidying up, it is the whole trick. $C000-$FFFF is banked, and only
+;		bank 0 holds a real reset vector: bank 4, which is the one we are running under, has $AA
+;		filler at $FFFA-$FFFF, so jmp ($FFFC) without the stz would jump to $AAAA. (Bank 4 gets
+;		away with that because its $FF00 page is a table of trampolines into bank 0, which is also
+;		why every KERNAL call in this runtime works without ever touching $01.)
+;
+;		BASIC cannot do these two instructions inline -- it IS the ROM it is banking away, so it
+;		copies a six byte stub to $0100 and jumps to that. We run from RAM, so there is nothing to
+;		pull out from under us and the stub is unnecessary.
+;
+;		No sei, for the same reason BASIC does not bother with one: the KERNAL's reset entry masks
+;		interrupts itself, and until it does the IRQ vector still points somewhere valid.
+;
+; ************************************************************************************************
+
+X16CommandReboot: ;; [!reboot]
+		.entercmd
+		stz 	SelectROMBank 				; bank 0 = KERNAL, the only bank with a reset vector
+		jmp 	($FFFC) 					; and we do not come back
+
+		.send 	code
 
 ; ************************************************************************************************
 ;
@@ -5079,6 +5636,87 @@ randomSeed:
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;
+;		Name:		rpt.asm
+;		Purpose:	RPT$()
+;		Created:	14th July 2026
+;		Reviewed: 	No
+;
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		RPT$(<byte>,<count>) is CHR$ with a repeat count, and it is built the same way: allocate
+;		a temp string of the right length, write the length byte, then fill it.
+;
+;		StringAllocTemp puts the new string's address into S[X], so the dex below is what makes
+;		the result land in the FIRST argument's slot, which is where a function's result belongs.
+;
+; ************************************************************************************************
+
+		.section 	code
+
+UnaryRPT: ;; [!rpt$]
+		.entercmd
+		;
+		;		The count is the last argument. It cannot go through GetInteger8Bit, which just
+		;		takes the low byte of the mantissa -- RPT$(65,300) would quietly hand back 44
+		;		characters instead of complaining. Stock raises ?ILLEGAL QUANTITY for a count of
+		;		zero as well, rather than returning an empty string, so zero is an error too.
+		;
+		.floatinteger
+		lda 	NSStatus,x 					; negative
+		bmi 	_URPTRange
+		lda 	NSMantissa1,x 				; or too big to be a byte
+		ora 	NSMantissa2,x
+		ora 	NSMantissa3,x
+		bne 	_URPTRange
+		lda 	NSMantissa0,x
+		beq 	_URPTRange 					; or zero
+		sta 	rptCount
+
+		dex 								; X now addresses the character -- and that is also
+		jsr 	GetInteger8Bit 				; the slot the result has to be left in
+		sta 	rptChar
+
+		lda 	rptCount
+		jsr 	StringAllocTemp 			; address into zsTemp, and into S[X] as the result
+		lda 	rptCount
+		sta 	(zsTemp) 					; the length byte comes first
+
+		phy 								; Y is the code position
+		ldy 	rptCount
+_URPTFill:
+		lda 	rptChar
+		sta 	(zsTemp),y
+		dey
+		bne 	_URPTFill
+		ply
+		.exitcmd
+
+_URPTRange:
+		.error_range
+
+		.send 	code
+
+		.section storage
+rptCount:
+		.fill 	1
+rptChar:
+		.fill 	1
+		.send storage
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;
+; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
 ;		Name:		sconcat.asm
 ;		Purpose:	Concatenate strings
 ;		Created:	14th April 2023
@@ -5365,6 +6003,446 @@ _PSExit:
 		.exitcmd
 		
 		.send code
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;
+; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		Name:		sprites.asm
+;		Purpose:	SPRITE, SPRMEM and MOVSPR
+;		Created:	14th July 2026
+;		Reviewed: 	No
+;
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		These three write VERA's sprite attributes directly, because there is no ROM layer to
+;		call. The KERNAL does have sprite_set_image and sprite_set_position, but neither is the
+;		right shape: sprite_set_position only handles sprites 0-31 where MOVSPR takes 0-127, and
+;		sprite_set_image converts pixel data out of host RAM where SPRMEM merely points a sprite
+;		at pixels already sitting in VRAM. BASIC writes the attributes itself, and so do we.
+;
+;		A sprite's 8 attribute bytes (VERA reference, "Sprite attributes"):
+;
+;			0	Address (12:5)
+;			1	7 = mode (0 = 4bpp, 1 = 8bpp), 3:0 = Address (16:13)
+;			2	X (7:0)
+;			3	1:0 = X (9:8)
+;			4	Y (7:0)
+;			5	1:0 = Y (9:8)
+;			6	7:4 = collision mask, 3:2 = Z-depth, 1 = V-flip, 0 = H-flip
+;			7	7:6 = height, 5:4 = width, 3:0 = palette offset
+;
+;		EVERY OPTIONAL PARAMETER IS READ-MODIFY-WRITE. The compiler pushes 255 for an argument
+;		that was not supplied (OptionalParameterCompile), and 255 is out of range for all of
+;		these fields -- the widest is a nibble -- so it makes an unambiguous "leave this alone".
+;		That is not a convenience, it is required: the manual's own example is
+;
+;			20 SPRMEM 1,1,$3000,1
+;			30 SPRITE 1,3,0,0,3,3
+;
+;		where SPRITE omits the colour depth. Defaulting it to 0 would silently undo the 8bpp
+;		that SPRMEM just set on the line before.
+;
+; ************************************************************************************************
+
+		.section 	code
+
+; ************************************************************************************************
+;
+;			SPRITE <idx>,<priority>[,<paloffset>[,<flip>[,<x-width>[,<y-width>[,<depth>]]]]]
+;
+; ************************************************************************************************
+
+Command_SPRITE: ;; [!sprite]
+		.entercmd
+		phy
+		ldx 	#6 							; make all seven parameters integers up front, so
+_CSPInteger: 								; that nothing below has to worry about floats
+		.floatinteger
+		dex
+		bpl 	_CSPInteger
+
+		;
+		;		Byte 6 : Z-depth and the flip bits. The collision mask lives in the top nibble
+		;		of the same byte and no keyword touches it, so it has to survive.
+		;
+		lda 	NSMantissa0+0 				; sprite index
+		ldy 	#6
+		jsr 	SpriteSetAddress
+		lda 	VRAMData0
+		sta 	spriteByte
+
+		lda 	NSMantissa0+1 				; priority is the Z-depth, bits 3:2
+		cmp 	#255
+		beq 	_CSPNoPriority
+		and 	#3
+		asl 	a
+		asl 	a
+		sta 	spriteTemp
+		lda 	spriteByte
+		and 	#$F3
+		ora 	spriteTemp
+		sta 	spriteByte
+_CSPNoPriority:
+		lda 	NSMantissa0+3 				; BASIC's flip is bit 0 = "X is flipped" and bit 1 =
+		cmp 	#255 						; "Y is flipped"; VERA's byte 6 is bit 0 = H-flip and
+		beq 	_CSPNoFlip 					; bit 1 = V-flip. Same two bits in the same order, so
+		and 	#3 							; the parameter drops straight in.
+		sta 	spriteTemp
+		lda 	spriteByte
+		and 	#$FC
+		ora 	spriteTemp
+		sta 	spriteByte
+_CSPNoFlip:
+		lda 	spriteByte 					; the increment is zero, so this goes back to byte 6
+		sta 	VRAMData0
+
+		;
+		;		Byte 7 : palette offset, and the two size fields.
+		;
+		lda 	NSMantissa0+0
+		ldy 	#7
+		jsr 	SpriteSetAddress
+		lda 	VRAMData0
+		sta 	spriteByte
+
+		lda 	NSMantissa0+2 				; palette offset, bits 3:0
+		cmp 	#255
+		beq 	_CSPNoPalette
+		and 	#$0F
+		sta 	spriteTemp
+		lda 	spriteByte
+		and 	#$F0
+		ora 	spriteTemp
+		sta 	spriteByte
+_CSPNoPalette:
+		lda 	NSMantissa0+4 				; x-width is VERA's sprite width, bits 5:4
+		cmp 	#255
+		beq 	_CSPNoWidth
+		and 	#3
+		asl 	a
+		asl 	a
+		asl 	a
+		asl 	a
+		sta 	spriteTemp
+		lda 	spriteByte
+		and 	#$CF
+		ora 	spriteTemp
+		sta 	spriteByte
+_CSPNoWidth:
+		lda 	NSMantissa0+5 				; y-width is VERA's sprite height, bits 7:6
+		cmp 	#255
+		beq 	_CSPNoHeight
+		and 	#3
+		asl 	a
+		asl 	a
+		asl 	a
+		asl 	a
+		asl 	a
+		asl 	a
+		sta 	spriteTemp
+		lda 	spriteByte
+		and 	#$3F
+		ora 	spriteTemp
+		sta 	spriteByte
+_CSPNoHeight:
+		lda 	spriteByte
+		sta 	VRAMData0
+
+		;
+		;		Byte 1 : the colour depth shares a byte with the top of the pixel address, so
+		;		it is only touched when it was actually given.
+		;
+		lda 	NSMantissa0+6
+		cmp 	#255
+		beq 	_CSPNoDepth
+		lda 	NSMantissa0+0
+		ldy 	#1
+		jsr 	SpriteSetAddress
+		lda 	VRAMData0
+		ldy 	NSMantissa0+6
+		jsr 	SpriteApplyDepth
+		sta 	VRAMData0
+_CSPNoDepth:
+		jsr 	SpriteEnableLayer 			; "If VERA's sprite layer is disabled when the SPRITE
+											; command is called, the sprite layer will be enabled"
+		ply
+		ldx 	#$FF
+		.exitcmd
+
+; ************************************************************************************************
+;
+;					SPRMEM <idx>,<VRAM bank>,<VRAM address>[,<depth>]
+;
+; ************************************************************************************************
+
+Command_SPRMEM: ;; [!sprmem]
+		.entercmd
+		phy
+		ldx 	#3
+_CSMInteger:
+		.floatinteger
+		dex
+		bpl 	_CSMInteger
+
+		;
+		;		The pixel address is 17 bits -- the bank is bit 16 -- and the attribute holds it
+		;		shifted right by five. That shift is the manual's "the lowest 5 bits are ignored".
+		;
+		;			byte 0 = Address (12:5)  = (high & $1F) << 3 | low >> 5
+		;			byte 1 = Address (16:13) = bank << 3 | high >> 5
+		;
+		lda 	NSMantissa1+2 				; address, high byte
+		and 	#$1F
+		asl 	a
+		asl 	a
+		asl 	a
+		sta 	spriteTemp
+		lda 	NSMantissa0+2 				; address, low byte
+		lsr 	a
+		lsr 	a
+		lsr 	a
+		lsr 	a
+		lsr 	a
+		ora 	spriteTemp
+		sta 	spriteByte
+
+		lda 	NSMantissa1+2
+		lsr 	a
+		lsr 	a
+		lsr 	a
+		lsr 	a
+		lsr 	a
+		sta 	spriteTemp
+		lda 	NSMantissa0+1 				; VRAM bank, 0 or 1, becomes address bit 16
+		and 	#1
+		asl 	a
+		asl 	a
+		asl 	a
+		ora 	spriteTemp
+		sta 	spriteTemp
+
+		lda 	NSMantissa0+0
+		ldy 	#0
+		jsr 	SpriteSetAddress
+		lda 	spriteByte
+		sta 	VRAMData0 					; byte 0
+
+		lda 	NSMantissa0+0
+		ldy 	#1
+		jsr 	SpriteSetAddress
+		lda 	VRAMData0 					; byte 1 carries the mode bit as well as the top of
+		and 	#$80 						; the address, and the depth is optional, so read it
+		ora 	spriteTemp 					; back and keep bit 7 unless we were given one
+		ldy 	NSMantissa0+3
+		jsr 	SpriteApplyDepth
+		sta 	VRAMData0
+		ply
+		ldx 	#$FF
+		.exitcmd
+
+; ************************************************************************************************
+;
+;								MOVSPR <idx>,<x>,<y>
+;
+; ************************************************************************************************
+
+Command_MOVSPR: ;; [!movspr]
+		.entercmd
+		phy
+		;
+		;		x and y are signed, and the manual says they "wrap every 1024 values" -- -10 and
+		;		1014 are the same place. VERA's X and Y are 10 bit fields, so taking the low ten
+		;		bits of the two's complement value IS that wrap, with nothing to special-case.
+		;		GetInteger16Bit hands back exactly that two's complement value.
+		;
+		ldx 	#2
+		jsr 	GetInteger16Bit 			; y
+		lda 	zTemp0
+		sta 	spriteY
+		lda 	zTemp0+1
+		and 	#3
+		sta 	spriteY+1
+
+		dex
+		jsr 	GetInteger16Bit 			; x
+		lda 	zTemp0
+		sta 	spriteX
+		lda 	zTemp0+1
+		and 	#3
+		sta 	spriteX+1
+
+		lda 	NSMantissa0+0 				; sprite index; bytes 2..5 are written in order so
+		ldy 	#2 							; the auto-increment can walk them
+		jsr 	SpriteSetAddressInc
+		lda 	spriteX
+		sta 	VRAMData0 					; byte 2 : X (7:0)
+		lda 	spriteX+1
+		sta 	VRAMData0 					; byte 3 : X (9:8)
+		lda 	spriteY
+		sta 	VRAMData0 					; byte 4 : Y (7:0)
+		lda 	spriteY+1
+		sta 	VRAMData0 					; byte 5 : Y (9:8)
+		ply
+		ldx 	#$FF
+		.exitcmd
+
+; ************************************************************************************************
+;
+;		Point VERA data port 0 at byte Y of sprite A's attribute block. A is the sprite index
+;		and Y the offset 0-7. The float stack pointer X is not touched.
+;
+; ************************************************************************************************
+
+SpriteSetAddress: 							; leave the address alone after each access
+		pha
+		lda 	#VRAMBank1
+		bra 	SpriteSetAddressCommon
+
+SpriteSetAddressInc: 						; step it on by one, to walk a run of bytes
+		pha
+		lda 	#VRAMBank1 | VRAMIncrement1
+
+;		This scratches spriteLow/spriteMed/spriteHigh and NOTHING else. It must not touch
+;		spriteTemp: SPRMEM works out an attribute byte and only then calls this to point at
+;		where the byte goes, so anything this borrowed would be destroyed on the way.
+
+SpriteSetAddressCommon: 					; global, not a cheap local: SpriteSetAddress branches
+		sta 	spriteHigh 					; in from its own scope, and _locals do not cross one
+		pla
+		and 	#$7F 						; sprite index is 0-127
+		stz 	spriteMed
+		asl 	a 							; spriteMed:A = index x 8, the block's byte offset
+		rol 	spriteMed 					; from $1FC00. The top comes out at index >> 5, which
+		asl 	a 							; is at most 3.
+		rol 	spriteMed
+		asl 	a
+		rol 	spriteMed
+		sta 	spriteLow
+		tya 								; the low three bits of index x 8 are clear and Y is
+		ora 	spriteLow 					; 0-7, so the byte offset just ORs in
+		sta 	VRAMLow0
+		lda 	spriteMed
+		clc
+		adc 	#SpriteAttributeBase 		; never carries: 3 + $FC = $FF
+		sta 	VRAMMed0
+		lda 	spriteHigh
+		sta 	VRAMHigh0
+		rts
+
+; ************************************************************************************************
+;
+;		Apply an optional colour depth to attribute byte 1, which arrives in A. The parameter
+;		is in Y, and 255 means it was not supplied, so the mode bit is left as it was.
+;
+; ************************************************************************************************
+
+SpriteApplyDepth:
+		cpy 	#255
+		beq 	_SADExit
+		and 	#$7F 						; 0 = 4bpp, anything else = 8bpp
+		cpy 	#0
+		beq 	_SADExit
+		ora 	#$80
+_SADExit:
+		rts
+
+; ************************************************************************************************
+;
+;		Switch VERA's sprite layer on. DC_VIDEO is only at $9F29 while DCSEL is zero, and a
+;		program is free to have left DCSEL pointing anywhere, so park it and put it back.
+;
+; ************************************************************************************************
+
+SpriteEnableLayer:
+		lda 	VERACtrl
+		pha
+		and 	#VERADCSelMask 				; DCSEL is bits 6:1; clear it, keep reset and ADDRSEL
+		sta 	VERACtrl
+		lda 	VERADCVideo
+		ora 	#VERASpritesEnable
+		sta 	VERADCVideo
+		pla
+		sta 	VERACtrl
+		rts
+
+		.send 	code
+
+		.section storage
+spriteLow: 									; SpriteSetAddress's private scratch -- see the note
+		.fill 	1 							; there, it must not overlap spriteTemp
+spriteMed:
+		.fill 	1
+spriteHigh:
+		.fill 	1
+spriteTemp: 								; a field being assembled by the caller
+		.fill 	1
+spriteByte: 								; the attribute byte being read-modify-written
+		.fill 	1
+spriteX:
+		.fill 	2
+spriteY:
+		.fill 	2
+		.send storage
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;
+; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		Name:		st.asm
+;		Purpose:	ST, the KERNAL status byte
+;		Created:	14th July 2026
+;		Reviewed: 	No
+;
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		ST is not a keyword and never gets tokenised -- like TI and TI$ it is a RESERVED VARIABLE
+;		NAME, so it reaches the compiler as a plain identifier and is intercepted in FindVariable.
+;
+;		It exists because LINPUT#, BINPUT# and INPUT# have no other way to say "that was the end
+;		of the file". Without it a read loop cannot terminate: at EOF LINPUT# hands back an empty
+;		string, which is indistinguishable from a blank line in the file, and the program spins.
+;
+;			ST and  16 = verify mismatch (BVERIFY)
+;			ST and  64 = end of file
+;			ST and 128 = device not present
+;
+; ************************************************************************************************
+
+		.section 	code
+
+UnaryST: ;; [!st]
+		.entercmd
+		phx 								; READST is documented as only touching A, but the
+		phy 								; float stack pointer is not worth gambling on
+		jsr 	X16_READST
+		ply
+		plx
+		inx 								; ST reads as a value, so it pushes one
+		jsr 	FloatSetByte
+		.exitcmd
+
+		.send 	code
 
 ; ************************************************************************************************
 ;
@@ -6007,6 +7085,238 @@ TIPushClock:
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;
+;		Name:		tiledata.asm
+;		Purpose:	TDATA() and TATTR()
+;		Created:	14th July 2026
+;		Reviewed: 	No
+;
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		The read half of TILE. Both share TileSetAddress (tiles.asm), which leaves VERA pointing
+;		at the cell with the auto-increment on -- so the tile is the first byte read and its
+;		attribute is the second.
+;
+; ************************************************************************************************
+
+		.section 	code
+
+; ************************************************************************************************
+;
+;								TDATA(<x>,<y>) and TATTR(<x>,<y>)
+;
+; ************************************************************************************************
+
+UnaryTDATA: ;; [!tdata]
+		.entercmd
+		phy 								; Y is the code position
+		lda 	#0 							; TDATA wants the tile itself
+		bra 	TileRead
+
+UnaryTATTR: ;; [!tattr]
+		.entercmd
+		phy
+		lda 	#1 							; TATTR wants the attribute, one byte further on
+
+TileRead: 									; global, not a cheap local: TDATA branches in from
+		sta 	tileSelect 					; its own scope and _locals do not cross one
+		.floatinteger 						; y is the last argument, so it is the one X is on
+		lda 	NSMantissa0,x
+		sta 	tileY
+		lda 	NSMantissa1,x
+		sta 	tileY+1
+		dex 								; X now addresses x -- which is also the slot the
+		.floatinteger 						; result has to be left in, first argument's slot
+		lda 	NSMantissa0,x
+		sta 	tileX
+		lda 	NSMantissa1,x
+		sta 	tileX+1
+		jsr 	TileSetAddress
+
+		lda 	tileSelect
+		beq 	_TRRead
+		lda 	VRAMData0 					; step over the tile to reach its attribute
+_TRRead:
+		lda 	VRAMData0
+		jsr 	FloatSetByte
+		ply
+		.exitcmd
+
+		.send 	code
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;
+; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		Name:		tiles.asm
+;		Purpose:	TILE, and the layer 1 map address it shares with TDATA and TATTR
+;		Created:	14th July 2026
+;		Reviewed: 	No
+;
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		TILE, TDATA and TATTR are conveniences over layer 1's tile map: they work out the VRAM
+;		address of a character cell so a program does not have to. Each map entry is two bytes,
+;		the tile (or screen code) and its attribute (the foreground/background colours in text
+;		mode), so the address of cell (x,y) is
+;
+;			mapbase + y * rowbytes + x * 2
+;
+;		Both mapbase and rowbytes are read from VERA every time rather than assumed, because the
+;		manual is explicit that these work "if VERA Layer 1's map base value is changed or the
+;		map size is changed". In the default 80x60 text mode that is a 128-tile-wide map at
+;		$1B000, so a row is 256 bytes and the cell is $1B000 + y*256 + x*2 -- but nothing here
+;		depends on that.
+;
+; ************************************************************************************************
+
+		.section 	code
+
+; ************************************************************************************************
+;
+;						TILE <x>,<y>,<tile/screen code>[,<attribute>]
+;
+; ************************************************************************************************
+
+Command_TILE: ;; [!tile]
+		.entercmd
+		phy
+		ldx 	#3
+_CTLInteger:
+		.floatinteger
+		dex
+		bpl 	_CTLInteger
+
+		lda 	NSMantissa0+0
+		sta 	tileX
+		lda 	NSMantissa1+0
+		sta 	tileX+1
+		lda 	NSMantissa0+1
+		sta 	tileY
+		lda 	NSMantissa1+1
+		sta 	tileY+1
+		jsr 	TileSetAddress
+
+		lda 	NSMantissa0+2 				; the tile or screen code, and the auto-increment
+		sta 	VRAMData0 					; then steps on to the attribute
+
+		lda 	NSMantissa0+3 				; the attribute is optional. 255 means it was not
+		cmp 	#255 						; supplied, and the cell keeps the colours it had.
+		beq 	_CTLNoAttribute
+		sta 	VRAMData0
+_CTLNoAttribute:
+		ply
+		ldx 	#$FF
+		.exitcmd
+
+; ************************************************************************************************
+;
+;		Point VERA data port 0 at the layer 1 map entry for the cell in tileX,tileY, with the
+;		auto-increment set so that a second access reaches the attribute byte. X is untouched.
+;
+; ************************************************************************************************
+
+TileSetAddress:
+		lda 	VERAL1Config 				; a map row is 2 x (32 << map width) bytes, which is
+		lsr 	a 							; 64 << map width. So the row offset is y shifted
+		lsr 	a 							; left by 6 + map width, and the width field is
+		lsr 	a 							; bits 5:4 of L1_CONFIG.
+		lsr 	a
+		and 	#3
+		clc
+		adc 	#6
+		tay 								; Y = shift count, 6 to 9
+
+		lda 	tileY 						; a 24 bit accumulator, because a 256 x 256 map of
+		sta 	tileAddr 					; two byte entries is 128K -- the whole of VRAM
+		lda 	tileY+1
+		sta 	tileAddr+1
+		stz 	tileAddr+2
+_TSARow:
+		asl 	tileAddr
+		rol 	tileAddr+1
+		rol 	tileAddr+2
+		dey
+		bne 	_TSARow
+
+		lda 	tileX 						; + x * 2, one for the tile and one for its attribute
+		asl 	a
+		sta 	tileTemp
+		lda 	tileX+1
+		rol 	a
+		sta 	tileTemp+1
+
+		clc
+		lda 	tileAddr
+		adc 	tileTemp
+		sta 	tileAddr
+		lda 	tileAddr+1
+		adc 	tileTemp+1
+		sta 	tileAddr+1
+		lda 	tileAddr+2
+		adc 	#0
+		sta 	tileAddr+2
+
+		lda 	VERAL1MapBase 				; the map base register holds address bits 16:9, so
+		stz 	tileTemp 					; the base is that shifted left by nine. Nine zero low
+		asl 	a 							; bits means it only ever reaches the middle byte and
+		sta 	tileTemp+1 					; bit 16.
+		lda 	#0
+		rol 	a
+		sta 	tileTemp+2
+
+		clc
+		lda 	tileAddr
+		adc 	tileTemp
+		sta 	VRAMLow0
+		lda 	tileAddr+1
+		adc 	tileTemp+1
+		sta 	VRAMMed0
+		lda 	tileAddr+2
+		adc 	tileTemp+2
+		and 	#VRAMBank1 					; VRAM is 17 bits, so bit 16 is all that is left
+		ora 	#VRAMIncrement1
+		sta 	VRAMHigh0
+		rts
+
+		.send 	code
+
+		.section storage
+tileX:
+		.fill 	2
+tileY:
+		.fill 	2
+tileAddr: 									; 24 bit, see above
+		.fill 	3
+tileTemp:
+		.fill 	3
+tileSelect: 								; TDATA reads the tile, TATTR the byte after it
+		.fill 	1
+		.send storage
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;
+; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
 ;		Name:		tiwrite.asm
 ;		Purpose:	Set TI from string
 ;		Created:	4th May 2023
@@ -6378,44 +7688,60 @@ ShiftVectorTable:
 	.word	LinkFloatSine            ; $ce89 sin
 	.word	LinkFloatTangent         ; $ce8a tan
 	.word	LinkFloatArcTan          ; $ce8b atn
-	.word	XCommandMouse            ; $ce8c mouse
-	.word	XUnaryMB                 ; $ce8d mb
-	.word	XUnaryMX                 ; $ce8e mx
-	.word	XUnaryMY                 ; $ce8f my
-	.word	XUnaryMWheel             ; $ce90 mwheel
-	.word	CommandStop              ; $ce91 stop
-	.word	CommandSYS               ; $ce92 sys
-	.word	CommandTIWriteN          ; $ce93 ti.write
-	.word	CommandTIWriteS          ; $ce94 ti$.write
-	.word	CommandXWAIT             ; $ce95 wait
-	.word	X16I2CPoke               ; $ce96 i2cpoke
-	.word	X16CommandPowerOff       ; $ce97 poweroff
-	.word	X16CommandReboot         ; $ce98 reboot
-	.word	X16I2CPeek               ; $ce99 i2cpeek
-	.word	CommandBank              ; $ce9a bank
-	.word	XCommandSleep            ; $ce9b sleep
-	.word	X16_Audio_FMINIT         ; $ce9c fminit
-	.word	X16_Audio_FMNOTE         ; $ce9d fmnote
-	.word	X16_Audio_FMDRUM         ; $ce9e fmdrum
-	.word	X16_Audio_FMINST         ; $ce9f fminst
-	.word	X16_Audio_FMVIB          ; $cea0 fmvib
-	.word	X16_Audio_FMFREQ         ; $cea1 fmfreq
-	.word	X16_Audio_FMVOL          ; $cea2 fmvol
-	.word	X16_Audio_FMPAN          ; $cea3 fmpan
-	.word	X16_Audio_FMPLAY         ; $cea4 fmplay
-	.word	X16_Audio_FMCHORD        ; $cea5 fmchord
-	.word	X16_Audio_FMPOKE         ; $cea6 fmpoke
-	.word	X16_Audio_PSGINIT        ; $cea7 psginit
-	.word	X16_Audio_PSGNOTE        ; $cea8 psgnote
-	.word	X16_Audio_PSGVOL         ; $cea9 psgvol
-	.word	X16_Audio_PSGWAV         ; $ceaa psgwav
-	.word	X16_Audio_PSGFREQ        ; $ceab psgfreq
-	.word	X16_Audio_PSGPAN         ; $ceac psgpan
-	.word	X16_Audio_PSGPLAY        ; $cead psgplay
-	.word	X16_Audio_PSGCHORD       ; $ceae psgchord
-	.word	CommandCls               ; $ceaf cls
-	.word	CommandLocate            ; $ceb0 locate
-	.word	CommandColor             ; $ceb1 color
+	.word	CommandXLinput           ; $ce8c linput
+	.word	CommandXBinput           ; $ce8d binput
+	.word	Command_BLOAD            ; $ce8e bload
+	.word	Command_BVLOAD           ; $ce8f bvload
+	.word	Command_VLOAD            ; $ce90 vload
+	.word	Command_BSAVE            ; $ce91 bsave
+	.word	Command_BVERIFY          ; $ce92 bverify
+	.word	X16CommandPowerOff       ; $ce93 poweroff
+	.word	X16CommandReset          ; $ce94 reset
+	.word	X16CommandReboot         ; $ce95 reboot
+	.word	XCommandMouse            ; $ce96 mouse
+	.word	XUnaryMB                 ; $ce97 mb
+	.word	XUnaryMX                 ; $ce98 mx
+	.word	XUnaryMY                 ; $ce99 my
+	.word	XUnaryMWheel             ; $ce9a mwheel
+	.word	UnaryRPT                 ; $ce9b rpt$
+	.word	Command_SPRITE           ; $ce9c sprite
+	.word	Command_SPRMEM           ; $ce9d sprmem
+	.word	Command_MOVSPR           ; $ce9e movspr
+	.word	UnaryST                  ; $ce9f st
+	.word	CommandStop              ; $cea0 stop
+	.word	CommandSYS               ; $cea1 sys
+	.word	UnaryTDATA               ; $cea2 tdata
+	.word	UnaryTATTR               ; $cea3 tattr
+	.word	Command_TILE             ; $cea4 tile
+	.word	CommandTIWriteN          ; $cea5 ti.write
+	.word	CommandTIWriteS          ; $cea6 ti$.write
+	.word	CommandXWAIT             ; $cea7 wait
+	.word	X16I2CPoke               ; $cea8 i2cpoke
+	.word	X16I2CPeek               ; $cea9 i2cpeek
+	.word	CommandBank              ; $ceaa bank
+	.word	XCommandSleep            ; $ceab sleep
+	.word	X16_Audio_FMINIT         ; $ceac fminit
+	.word	X16_Audio_FMNOTE         ; $cead fmnote
+	.word	X16_Audio_FMDRUM         ; $ceae fmdrum
+	.word	X16_Audio_FMINST         ; $ceaf fminst
+	.word	X16_Audio_FMVIB          ; $ceb0 fmvib
+	.word	X16_Audio_FMFREQ         ; $ceb1 fmfreq
+	.word	X16_Audio_FMVOL          ; $ceb2 fmvol
+	.word	X16_Audio_FMPAN          ; $ceb3 fmpan
+	.word	X16_Audio_FMPLAY         ; $ceb4 fmplay
+	.word	X16_Audio_FMCHORD        ; $ceb5 fmchord
+	.word	X16_Audio_FMPOKE         ; $ceb6 fmpoke
+	.word	X16_Audio_PSGINIT        ; $ceb7 psginit
+	.word	X16_Audio_PSGNOTE        ; $ceb8 psgnote
+	.word	X16_Audio_PSGVOL         ; $ceb9 psgvol
+	.word	X16_Audio_PSGWAV         ; $ceba psgwav
+	.word	X16_Audio_PSGFREQ        ; $cebb psgfreq
+	.word	X16_Audio_PSGPAN         ; $cebc psgpan
+	.word	X16_Audio_PSGPLAY        ; $cebd psgplay
+	.word	X16_Audio_PSGCHORD       ; $cebe psgchord
+	.word	CommandCls               ; $cebf cls
+	.word	CommandLocate            ; $cec0 locate
+	.word	CommandColor             ; $cec1 color
 	.send code
 ; ************************************************************************************************
 ; ************************************************************************************************
@@ -6776,7 +8102,9 @@ CommandClose: ;; [close]
 		bne 	_CCNotCurrent
 		stz 	currentChannel 				; effectively disables CMD
 _CCNotCurrent:
-		jsr 	X16_CLOSE 					; close the file		
+		jsr 	X16_CLOSE 					; close the file
+		ldx 	#$FF 						; and empty the float stack, as every other command
+											; does -- see the note in x16_open.asm
 		.exitcmd
 
 
@@ -6972,40 +8300,6 @@ X16I2CError:
 
 ; ************************************************************************************************
 ;
-;								POWEROFF and REBOOT
-;
-;		Both are a single I2C write to the System Management Controller, which is what X16
-;		BASIC does for them. Neither takes a parameter, so X arrives as $FF (empty stack) and
-;		only has to be put back that way after we borrow it for the device number.
-;
-; ************************************************************************************************
-
-X16_SMC_Device = $42 						; the SMC's I2C address
-X16_SMC_PowerOff = 1 						; offset 1 : power down
-X16_SMC_Reset = 2 							; offset 2 : reset
-
-X16CommandPowerOff: ;; [!poweroff]
-		.entercmd
-		phy
-		ldy 	#X16_SMC_PowerOff
-		bra 	X16SMCWrite
-
-X16CommandReboot: ;; [!reboot]
-		.entercmd
-		phy
-		ldy 	#X16_SMC_Reset
-
-X16SMCWrite: 								; global, not a cheap local: POWEROFF branches here
-		ldx 	#X16_SMC_Device 			; from its own scope, and _locals do not cross one.
-		lda 	#0
-		jsr 	X16_i2c_write_byte
-		bcs 	X16I2CError
-		ply 								; the write returns, and the SMC only cuts power a
-		ldx 	#$FF 						; moment later, so we do carry on running until it
-		.exitcmd 							; does. Tidy up properly rather than assume we die here.
-
-; ************************************************************************************************
-;
 ;									I2CPEEK(device,register)
 ;
 ; ************************************************************************************************
@@ -7090,6 +8384,12 @@ _CONoCarry:
 		;
 		jsr 	X16_OPEN
 		bcs 	_COError
+		ldx 	#$FF 						; empty the float stack, as every other command does.
+											; This is NOT cosmetic: OPEN reads its arguments from
+											; slots 0-3 ABSOLUTELY, which only works if the stack
+											; started empty. Leaving X at 3 meant a SECOND OPEN in
+											; a program read garbage and handed the KERNAL a junk
+											; filename pointer.
 		.exitcmd
 _COError:
 		.error_channel

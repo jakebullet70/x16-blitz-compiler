@@ -1,38 +1,42 @@
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;
-;		Name:		x16_close.asm
-;		Purpose:	CLOSE
-;		Created:	2nd May 2023
+;		Name:		st.asm
+;		Purpose:	ST, the KERNAL status byte
+;		Created:	14th July 2026
 ;		Reviewed: 	No
-;		Author : 	Paul Robson (paul@robsons.org.uk)
 ;
 ; ************************************************************************************************
+; ************************************************************************************************
+;
+;		ST is not a keyword and never gets tokenised -- like TI and TI$ it is a RESERVED VARIABLE
+;		NAME, so it reaches the compiler as a plain identifier and is intercepted in FindVariable.
+;
+;		It exists because LINPUT#, BINPUT# and INPUT# have no other way to say "that was the end
+;		of the file". Without it a read loop cannot terminate: at EOF LINPUT# hands back an empty
+;		string, which is indistinguishable from a blank line in the file, and the program spins.
+;
+;			ST and  16 = verify mismatch (BVERIFY)
+;			ST and  64 = end of file
+;			ST and 128 = device not present
+;
 ; ************************************************************************************************
 
 		.section 	code
 
-; ************************************************************************************************
-;
-;					<logical> CLOSE (cancels CMD effect if that channel closed)
-;
-; ************************************************************************************************
-
-CommandClose: ;; [close]
+UnaryST: ;; [!st]
 		.entercmd
-		jsr 	GetInteger8Bit 				; channel to close
-		cmp 	currentChannel 				; is it the current channel
-		bne 	_CCNotCurrent
-		stz 	currentChannel 				; effectively disables CMD
-_CCNotCurrent:
-		jsr 	X16_CLOSE 					; close the file
-		ldx 	#$FF 						; and empty the float stack, as every other command
-											; does -- see the note in x16_open.asm
+		phx 								; READST is documented as only touching A, but the
+		phy 								; float stack pointer is not worth gambling on
+		jsr 	X16_READST
+		ply
+		plx
+		inx 								; ST reads as a value, so it pushes one
+		jsr 	FloatSetByte
 		.exitcmd
 
-
 		.send 	code
-		
+
 ; ************************************************************************************************
 ;
 ;									Changes and Updates

@@ -9,10 +9,19 @@ Replaces the original `TODO.txt`, which was written against **R43** and predated
   (`source/compiler/source/generation/*.def` and `.../system-specific/x16/generation/*.def`);
 - the gap between the two is below.
 
-**46 of the 81 extended keywords compile today. 35 do not.**
+**63 of the 81 extended keywords compile today. 18 do not** — and every one of the 18 is a
+deliberate rejection, not a gap. There is nothing left on the "worth implementing" list.
 
-Tier 1 is done: `MOD`, `OVAL`, `RING`, `POWEROFF` and `REBOOT` all compile and are tested against the
-ROM. What follows is what is left.
+Tiers 1 to 4 are done. Every keyword below compiles, and every one is checked against the R49 ROM
+rather than against a reading of the manual — which caught the manual being **wrong** about
+`BVERIFY`'s signature, and then caught *this file* being wrong about `RESET` and `REBOOT`. `ST` was
+added along the way: not one of the 81, but `LINPUT#` and `BINPUT#` are unusable without it.
+
+**The extended keyword vector table is at `$C0A0` in BASIC ROM bank 4**, and it is C64 style, so
+each of the 81 entries holds its handler's address *minus one*. 66 statements (`$CE80`-`$CEC1`) then
+15 functions (which re-anchor at `$CED0`), and it ends exactly where the base keyword text begins at
+`$C142`. That is the fact to start from next time a keyword's real behaviour is in doubt — it is how
+the `RESET`/`REBOOT` mix-up below was found, and it beats reading the manual.
 
 ## How to decide whether a keyword is worth having
 
@@ -25,7 +34,7 @@ Not by the manual's **TYPE** column. That is a hint, not a rule: `LOAD` and `NEW
 
 That single test sorts all 40.
 
-## Worth implementing (19 left)
+## Worth implementing — ALL DONE
 
 ### Tier 1 — DONE
 
@@ -40,36 +49,138 @@ That single test sorts all 40.
   remainder, a superset.
 - `OVAL`/`RING` were the freebie predicted here: `GRAPH_draw_oval` takes the same bounding box and
   carry-as-fill flag that `GRAPH_draw_rect` does, so they reuse `GraphicsRectCoords` verbatim.
-- `POWEROFF`/`REBOOT` are one I2C write each to the SMC ($42), offsets 1 and 2. `bench/run-bench.sh`
-  no longer has to substitute `I2CPOKE 66,1,0`, so both benchmark columns now run identical source.
+- `POWEROFF` is one I2C write to the SMC (`$42`), offset 1. `bench/run-bench.sh` no longer has to
+  substitute `I2CPOKE 66,1,0`, so both benchmark columns now run identical source.
+- `REBOOT` was **wrong**, and Tier 4 is what found it — it did the offset-2 SMC write, which is
+  `RESET`'s job, so a compiled `REBOOT` hard reset the machine. See the bug below. This tier was
+  written from an assumption about which keyword was which, and the assumption was backwards.
 
 **A bug found and fixed on the way.** `GraphicsRectCoords` ended with `stz 8,x` / `stz 9,x`, commented
 "zero rounding". At that point `X` is `X16_r1` (4), so those write to 12/13 — that is **r5**, which is
 not an input to anything. The corner radius `GRAPH_draw_rect` reads is **r4** (10/11), at offset 6. So
 `RECT` and `FRAME` had been handing the KERNAL an uninitialised corner radius all along.
 
-### Tier 2 — sprites and tiles
+### Tier 2 — DONE
 
 `SPRITE` `$CEBB` · `SPRMEM` `$CEBC` · `MOVSPR` `$CEBD` · `TILE` · `TDATA` `$CEDC` · `TATTR` `$CEDD`
 
-Real work — no existing runtime support to lean on.
+These write VERA directly, because unlike the audio keywords there is **no ROM layer to call**. The
+KERNAL does have `sprite_set_image` and `sprite_set_position`, and neither is the right shape:
+`sprite_set_position` only handles sprites 0-31 where `MOVSPR` takes 0-127, and `sprite_set_image`
+converts pixel data out of host RAM where `SPRMEM` merely points a sprite at pixels already in VRAM.
+BASIC writes the attributes itself and so do we.
 
-### Tier 3 — data in and out
+**Optional parameters are read-modify-write, and that is a requirement, not a nicety.** The compiler
+already had `OptionalParameterCompile`, which pushes **255** when its comma is missing; chaining it
+gives "and the rest are optional", and 255 is out of range for every one of these fields (the widest
+is a nibble), so the runtime reads it as *leave this one alone*. The manual's own example is why:
 
-- **Binary load/save:** `BLOAD` `BVLOAD` `BSAVE` `BVERIFY` `VLOAD`. The manual types these *Command*,
-  and the old TODO put them on its "Add" list; both are beside the point. Loading binary data (a
-  sprite sheet, a level, a tile map) is exactly what a compiled game wants, so they stay.
-- **Banking:** `BANK`
-- **Input:** `LINPUT` `LINPUT#` `BINPUT#`. NB their tokens were **swapped** in Blitz's table
-  (`LINPUT#` is `$CEB3`, `LINPUT` is `$CEB4`); the order is fixed now, so they will tokenise correctly
-  the moment a handler exists.
-- **String:** `RPT$`
+```BASIC
+20 SPRMEM 1,1,$3000,1
+30 SPRITE 1,3,0,0,3,3
+```
 
-### Tier 4 — one loose end
+`SPRITE` omits the colour depth. Defaulting it to 0 would silently undo the 8bpp `SPRMEM` set on the
+line before.
 
-`RESET` `$CE8F` — a warm reset, where `REBOOT` is a cold one through the SMC. Now that `REBOOT` exists
-this is close to a duplicate, but it is a couple of bytes and it is the one keyword the first pass of
-this list never classified at all. Cheap to finish.
+**How they were verified.** Sprites are invisible to a text-diffing harness, so the test reads the
+attributes *back* with `VPEEK` and compares against stock R49 running the identical program — 8
+attribute bytes x several configurations, plus `PEEK($9F29)` for the sprite-layer enable, which is an
+I/O register and not reachable by `VPEEK`. Every byte matches: z-depth, both flips, both size fields,
+palette offset, the 17-bit pixel address, sprite 0 and sprite 127 (which is the one that exercises the
+`$FC + 3 = $FF` carry in the attribute address), the negative-coordinate wrap (`MOVSPR 0,-1024,2048`
+lands on 0, as the manual says it must), and preserve-on-omit. Identical VERA state means identical
+rendering, which is as close as anything can get to proving a sprite is on the screen from inside a
+program.
+
+Two bugs found on the way, both mine, both caught by that comparison:
+
+- `SpriteSetAddress` used `spriteTemp` as scratch, and `SPRMEM` computes an attribute byte into
+  `spriteTemp` *before* calling it to find out where the byte goes. One byte of the pixel address came
+  out as 0 instead of 9. It now has its own private scratch, and says so.
+- `_SSACommon` was a cheap local branched into from another global's scope. 64tass `_locals` do not
+  cross a global label — the same trap already documented in `x16_i2c.asm`.
+
+### Tier 3 — DONE
+
+`BLOAD` `BVLOAD` `VLOAD` `BSAVE` `BVERIFY` · `BANK` · `RPT$` · `LINPUT` `LINPUT#` `BINPUT#`
+
+**The manual's `BVERIFY` signature is wrong.** It documents
+`BVERIFY <filename>,<device>,<bank>,<start address>,<end address>` and that form is a hard
+`?SYNTAX ERROR` in the R49 ROM — run it. It takes **four** arguments. BSAVE's signature looks to have
+been copied by mistake, and four is what the KERNAL implies anyway: `LOAD` with `A=1` verifies and has
+no end address at all, because the length of the file bounds the comparison. Every other signature
+here was probed against the ROM rather than read off the manual, after that.
+
+**`BANK` needed one line.** Its runtime handler had existed all along, and already read `$FF` as "ROM
+bank not given" — exactly what `OptionalParameterCompile` pushes for a missing optional. It was only
+ever missing its `.def` entry.
+
+**`ST` had to be built first.** `LINPUT#` and `BINPUT#` report end-of-file through `ST`, and Blitz had
+no `ST` — without it a read loop *cannot terminate*, because at EOF `LINPUT#` hands back an empty
+string and that is indistinguishable from a blank line in the file. `ST` is not a keyword and never
+gets tokenised: like `TI` and `TI$` it is a reserved CBM *name*, so it arrives at the compiler as an
+ordinary identifier. `FindVariable` already had the mechanism for exactly this (it returns a fake
+address with bit 7 of Y set, and `GetSetVariable` dispatches on the high byte) — `ST` is `$A0`
+alongside TI's `$80` and TI$'s `$C0`. Two significant characters, as CBM has it, so `STATUS` is the
+same name as `ST` and is reserved too, which is what stock does.
+
+Checked against stock R49, byte for byte, and the interesting case is the one `ST` exists for:
+
+| | blank line in the file | end of file |
+|---|---|---|
+| `LEN(A$)` | 0 | 1 |
+| `ST` | **0** | **64** |
+
+`BINPUT#` short-reads at EOF (asked for 20, got 3, `ST=64`), a custom `LINPUT#` delimiter works, and
+`LINPUT` on the keyboard is the same P-code on channel 0 — channel 0 *is* the KERNAL's screen editor,
+so the manual's warnings (an empty line comes back as one space, trailing spaces are lost) are the
+editor's doing and we inherit them for free.
+
+Two P-codes serve all three keywords. The channel is not their business: the `#` forms compile with
+the `C:` (channel execute) prefix, which sets `currentChannel` around the command and puts it back —
+exactly how `INPUT` and `INPUT#` already share one runtime.
+
+### Tier 4 — DONE
+
+`RESET` `$CE8F`
+
+This was written up above as "a warm reset, where `REBOOT` is a cold one through the SMC", and as a
+near-duplicate worth a couple of bytes. **Both halves of that were wrong**, and it is the reason the
+keyword is worth having rather than a reason to skip it. The ROM (bank 4, vectors at `$C0A0`):
+
+| keyword | handler | what it actually does |
+|---|---|---|
+| `POWEROFF` `$CEAD` | `$E7BC` | `ldy #1` → I²C write, SMC `$42`. Cuts the power. |
+| `RESET` `$CE8F` | `$E7B8` | `ldy #2` → I²C write, SMC `$42`. The SMC asserts the reset **line** — a **hard** reset, the same as the physical reset switch. |
+| `REBOOT` `$CEAC` | `$E6EF` | `jmp ($FFFC)` — a **soft** reset. No hardware is reset at all; the KERNAL just starts again through its own reset vector. |
+
+They are the exact opposite way round from the claim, and the three keywords are genuinely three
+different things. The manual agrees with the ROM on all three ("*RESET … instructs the SMC to assert
+the reset line … a hard reset*", "*REBOOT … a software reset … by calling the ROM reset vector*") — so
+for once the manual was right and this file was wrong. All three now live in `machine.asm`, which
+leaves `x16_i2c.asm` holding only `I2CPEEK`/`I2CPOKE`, as its name says.
+
+**`REBOOT` cannot be written the way BASIC writes it, and cannot be written naively either.** BASIC
+copies a six byte stub (`stz $01` / `jmp ($FFFC)`) to `$0100` and jumps to *that*, because it is the
+ROM it is banking away — `stz $01` executed in place would pull BASIC out from under its own program
+counter. We run from RAM, so the two instructions can stand where they are.
+
+But the `stz` itself is not optional, and that is the interesting part: **`$C000-$FFFF` is banked, and
+only bank 0 has a real reset vector.** Bank 4 — the bank a compiled Blitz program is running under,
+measured, not assumed (`PRINT PEEK(1)` gives `4`, under Blitz *and* under stock) — has `$AA` filler at
+`$FFFA-$FFFF`. Bank 4 gets away with that because its `$FF00` page is a table of trampolines into
+bank 0, which is also why every KERNAL call in the runtime works without ever touching `$01`.
+
+Proved rather than argued: built once with the `stz` commented out, and `REBOOT` breaks straight into
+the machine-language monitor at **`PC = $AAAB`**, with `RO 04` in the register dump. That negative test
+is doing real work — `RESET` and `REBOOT` are observationally *identical* from outside (both reboot the
+machine), so it is the only thing that distinguishes "`REBOOT` really does take the `$FFFC` path" from
+"`REBOOT` is still quietly doing an SMC write". An SMC write would have rebooted with or without the
+`stz`.
+
+Both are byte-for-byte conformant with stock R49: the program prints its marker, and then the whole
+KERNAL boot banner is printed a second time.
 
 ## Rejected (16) — nothing for them to act on
 
@@ -87,6 +198,49 @@ its own way at compile time, so these would either mean something different or n
 author rejected them outright; leaving them parked rather than deciding in the abstract.
 
 ## Bugs
+
+### `REBOOT` was a hard reset — FIXED
+
+`REBOOT` did the offset-2 I²C write to the SMC, which makes the SMC assert the system reset line.
+That is a **hard** reset — the physical reset switch — and it is `RESET`'s job, not `REBOOT`'s.
+`REBOOT` is supposed to be a *software* reset through the ROM's own reset vector, touching no
+hardware at all. Tier 1 implemented one keyword's behaviour under the other's name, and because
+Blitz had no `RESET` at all there was nothing to collide with and nothing to notice.
+
+Nothing caught this, and nothing could have: on the emulator the two are indistinguishable — both
+restart the machine and reprint the boot banner — and no suite or benchmark uses `REBOOT` (they all
+use `POWEROFF`). It took reading the ROM's dispatch table to see it, which is the same lesson as
+`BVERIFY`: **the keyword's behaviour is whatever bank 4 says it is.** Now `RESET` is the SMC write
+and `REBOOT` is `stz $01` / `jmp ($FFFC)`.
+
+### `OPEN` after any load or save still fails — OPEN, NOT FIXED
+
+`BSAVE "F",8,0,A,B` followed by `OPEN 1,8,2,"F,S,R"` raises an I/O error, and the same OPEN on its
+own works perfectly. Instrumented: on its own OPEN gets exactly the right arguments through to the
+KERNAL (`lfn=1 dev=8 sa=2 namelen=9`) and comes back with carry clear. After a `BSAVE` it does not
+come back at all — the machine goes down inside the KERNAL call. Re-opening the *same* logical file
+number on a file that does not exist does the same thing.
+
+What it is **not**: the RAM and ROM bank registers are both correct across a `BSAVE` (checked — `$01`
+stays 4 and `BSAVE` restores `$00`), `BSAVE` itself writes a byte-perfect file, `BSAVE` -> `BLOAD` ->
+`PRINT` chains fine, and closing the KERNAL's logical file plus a `CLRCHN` afterwards changes nothing.
+Stock BASIC does `BSAVE` then `OPEN` happily, so the KERNAL can clearly be driven this way.
+
+It does not block the `LINPUT` family — a program that opens a data file it did not just write works,
+and that is the normal case — but it wants finding. Next step is probably to watch the KERNAL call in
+Box16 rather than guess.
+
+### `OPEN` and `CLOSE` never emptied the float stack — FIXED
+
+Every command in Blitz ends `ldx #$FF`, because a command consumes all of its arguments and the next
+one's are pushed from slot 0. `CommandXOpen` and `CommandClose` were the only two that did not, so
+OPEN left the stack pointer at 3 and CLOSE at 0.
+
+That is not a leak, it is a corruption: **`CommandXOpen` reads its arguments from slots 0-3
+ABSOLUTELY** (`NSMantissa0+0` … `+3`), which only works if the stack started empty. So the *second*
+`OPEN` in any program read whatever happened to be sitting in those slots, handed the KERNAL a junk
+filename pointer and a junk logical file number, and took the machine down. File I/O had only ever
+worked for the first `OPEN` in a program.
 
 ### `FMPLAY` / `FMCHORD` / `PSGPLAY` / `PSGCHORD` hard-crashed — FIXED
 
@@ -178,6 +332,11 @@ Diminishing returns; only worth revisiting if float-heavy code matters more than
 
 - Copy the object code *down* after compiling, rather than leaving it above the compiler and its
   libraries (must stay on a page boundary). Inherited from the old TODO and still true.
+- **`release` copied `CHANGES.txt` unconditionally** — the original author's 2023 changelog, deleted
+  in "Del old files from previous build". `make libs` then failed at the packaging step, well after
+  the assembler had already succeeded, which reads like a build break but is not one. It is copied
+  only if present now. Same class as the five blockers that once made this repo unbuildable anywhere:
+  a recipe asserting on a file nothing guarantees.
 
 ## Notes that are easy to lose
 

@@ -56,22 +56,28 @@ _GSVNotWrite:
 		;
 		;		Special read/writes
 		;
+		;
+		;		A reserved name. FindVariable handed back a fake address with bit 7 of Y set, and
+		;		the high byte says which one: $80 = TI, $C0 = TI$, $A0 = ST. All three are read
+		;		only through this path -- LET has its own code for writing TI and TI$, and ST is
+		;		the KERNAL's, so writing it is a syntax error.
+		;
 _GSVReadWriteSpecial:
-		;
-		;		TODO: TI TI$ code missing		
-		;
 		plp
-		bcs 	_GSVSyntax		
-		;
-		;		Handle clock read
+		bcs 	_GSVSyntax
 		;
 		cpy 	#$C0 						; TI$ ?
 		beq 	_GSVRWString
+		cpy 	#$A0 						; ST ?
+		beq 	_GSVRWStatus
 		.keyword PCD_TI
 		rts
 _GSVRWString:
 		.keyword PCD_TIDOLLAR
-		rts		
+		rts
+_GSVRWStatus:
+		.keyword PCD_ST
+		rts
 
 _GSVSyntax:
 		.error_syntax
