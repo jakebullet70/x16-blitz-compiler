@@ -1161,9 +1161,10 @@ X16_Audio_Parameters8_String:
 		;
 		phx 								; set the voice
 		phy
-		jsr 	X16_JSRFAR
-		jsr 	X16A_bas_playstringvoice
-		.byte 	X16_AudioCodeBank
+		jsr 	X16_JSRFAR 					; JSRFAR reads its target from the THREE bytes that
+		.word 	X16A_bas_playstringvoice 	; follow the jsr: address then bank. This was a "jsr",
+		.byte 	X16_AudioCodeBank 			; which assembles to 20 0c c0 -- so the payload read as
+											; address $0c20, bank $c0, and it far-called low RAM.
 		ply
 		plx
 		;

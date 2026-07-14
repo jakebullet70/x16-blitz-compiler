@@ -88,6 +88,28 @@ author rejected them outright; leaving them parked rather than deciding in the a
 
 ## Bugs
 
+### `FMPLAY` / `FMCHORD` / `PSGPLAY` / `PSGCHORD` hard-crashed — FIXED
+
+All four string-playing audio commands go through `X16_Audio_Parameters8_String` (`audioparams.asm`),
+and it set up its `JSRFAR` payload with a **`jsr`** where every other call site in the tree uses a
+`.word`:
+
+```asm
+        jsr     X16_JSRFAR
+        jsr     X16A_bas_playstringvoice     ; <-- assembles to 20 0c c0
+        .byte   X16_AudioCodeBank
+```
+
+`JSRFAR` takes its target from the *three bytes following the `jsr`* — address, then bank. Those bytes
+were `20 0c c0`, so it far-called **address `$0C20` in bank `$C0`**: the middle of the compiled
+program's own code, in a bank that does not exist. On return it landed on the stray `$0A` bank byte and
+executed it as `ASL A`. Confirmed by rebuilding with the bug: `FMPLAY 1,"CDEFGAB"` `BRK`s straight into
+the machine-language monitor and hangs. With the `.word` it plays and the program runs on.
+
+The suites never caught this because **nothing tests audio** — the nine suites are float, then
+compiler-runtime (binary/compare/unary/parenthesis/variables/arrays). Worth remembering the next time
+a runtime command "obviously works".
+
 ### Values past 2^31 — FIXED, in two halves
 
 The mantissa holds 31 bits plus a sign (in `NSStatus`), so `2147483647` is the largest integer it can
