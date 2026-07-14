@@ -217,6 +217,28 @@ VRAMLow0 = $9F20
 VRAMMed0 = $9F21
 VRAMHigh0 = $9F22
 VRAMData0 = $9F23
+;
+;		VRAMHigh0 is not just the top address bit: 7:4 are the auto-increment, 3 is DECR,
+;		2:1 are the nibble controls, and only bit 0 is VRAM address bit 16. So writing a
+;		bare bank number (as VPOKE does) means "this bank, do not increment", and $10 is
+;		the increment-by-one that lets consecutive reads or writes walk a structure.
+;
+VRAMBank1 = $01 							; VRAM address bit 16
+VRAMIncrement1 = $10 						; step the address on by one after each access
+;
+VERACtrl = $9F25 							; 7 = reset, 6:1 = DCSEL, 0 = ADDRSEL
+VERADCSelMask = $81 						; keep reset and ADDRSEL, clear DCSEL
+VERADCVideo = $9F29 						; only at this address while DCSEL is zero
+VERASpritesEnable = $40
+;
+VERAL1Config = $9F34 						; 7:6 map height, 5:4 map width, 1:0 colour depth
+VERAL1MapBase = $9F35 						; map base address, bits 16:9
+;
+;		The 128 sprite attribute blocks are 8 bytes each, based at VRAM $1FC00. Sprite 127
+;		starts at $FC00 + 127*8 = $FFF8, so the offset never carries out of the low 16 bits
+;		and the VRAM bank is always 1.
+;
+SpriteAttributeBase = $FC 					; high byte of $FC00
 
 		.send code
 
@@ -5379,6 +5401,397 @@ _PSExit:
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;
+;		Name:		sprites.asm
+;		Purpose:	SPRITE, SPRMEM and MOVSPR
+;		Created:	14th July 2026
+;		Reviewed: 	No
+;
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		These three write VERA's sprite attributes directly, because there is no ROM layer to
+;		call. The KERNAL does have sprite_set_image and sprite_set_position, but neither is the
+;		right shape: sprite_set_position only handles sprites 0-31 where MOVSPR takes 0-127, and
+;		sprite_set_image converts pixel data out of host RAM where SPRMEM merely points a sprite
+;		at pixels already sitting in VRAM. BASIC writes the attributes itself, and so do we.
+;
+;		A sprite's 8 attribute bytes (VERA reference, "Sprite attributes"):
+;
+;			0	Address (12:5)
+;			1	7 = mode (0 = 4bpp, 1 = 8bpp), 3:0 = Address (16:13)
+;			2	X (7:0)
+;			3	1:0 = X (9:8)
+;			4	Y (7:0)
+;			5	1:0 = Y (9:8)
+;			6	7:4 = collision mask, 3:2 = Z-depth, 1 = V-flip, 0 = H-flip
+;			7	7:6 = height, 5:4 = width, 3:0 = palette offset
+;
+;		EVERY OPTIONAL PARAMETER IS READ-MODIFY-WRITE. The compiler pushes 255 for an argument
+;		that was not supplied (OptionalParameterCompile), and 255 is out of range for all of
+;		these fields -- the widest is a nibble -- so it makes an unambiguous "leave this alone".
+;		That is not a convenience, it is required: the manual's own example is
+;
+;			20 SPRMEM 1,1,$3000,1
+;			30 SPRITE 1,3,0,0,3,3
+;
+;		where SPRITE omits the colour depth. Defaulting it to 0 would silently undo the 8bpp
+;		that SPRMEM just set on the line before.
+;
+; ************************************************************************************************
+
+		.section 	code
+
+; ************************************************************************************************
+;
+;			SPRITE <idx>,<priority>[,<paloffset>[,<flip>[,<x-width>[,<y-width>[,<depth>]]]]]
+;
+; ************************************************************************************************
+
+Command_SPRITE: ;; [!sprite]
+		.entercmd
+		phy
+		ldx 	#6 							; make all seven parameters integers up front, so
+_CSPInteger: 								; that nothing below has to worry about floats
+		.floatinteger
+		dex
+		bpl 	_CSPInteger
+
+		;
+		;		Byte 6 : Z-depth and the flip bits. The collision mask lives in the top nibble
+		;		of the same byte and no keyword touches it, so it has to survive.
+		;
+		lda 	NSMantissa0+0 				; sprite index
+		ldy 	#6
+		jsr 	SpriteSetAddress
+		lda 	VRAMData0
+		sta 	spriteByte
+
+		lda 	NSMantissa0+1 				; priority is the Z-depth, bits 3:2
+		cmp 	#255
+		beq 	_CSPNoPriority
+		and 	#3
+		asl 	a
+		asl 	a
+		sta 	spriteTemp
+		lda 	spriteByte
+		and 	#$F3
+		ora 	spriteTemp
+		sta 	spriteByte
+_CSPNoPriority:
+		lda 	NSMantissa0+3 				; BASIC's flip is bit 0 = "X is flipped" and bit 1 =
+		cmp 	#255 						; "Y is flipped"; VERA's byte 6 is bit 0 = H-flip and
+		beq 	_CSPNoFlip 					; bit 1 = V-flip. Same two bits in the same order, so
+		and 	#3 							; the parameter drops straight in.
+		sta 	spriteTemp
+		lda 	spriteByte
+		and 	#$FC
+		ora 	spriteTemp
+		sta 	spriteByte
+_CSPNoFlip:
+		lda 	spriteByte 					; the increment is zero, so this goes back to byte 6
+		sta 	VRAMData0
+
+		;
+		;		Byte 7 : palette offset, and the two size fields.
+		;
+		lda 	NSMantissa0+0
+		ldy 	#7
+		jsr 	SpriteSetAddress
+		lda 	VRAMData0
+		sta 	spriteByte
+
+		lda 	NSMantissa0+2 				; palette offset, bits 3:0
+		cmp 	#255
+		beq 	_CSPNoPalette
+		and 	#$0F
+		sta 	spriteTemp
+		lda 	spriteByte
+		and 	#$F0
+		ora 	spriteTemp
+		sta 	spriteByte
+_CSPNoPalette:
+		lda 	NSMantissa0+4 				; x-width is VERA's sprite width, bits 5:4
+		cmp 	#255
+		beq 	_CSPNoWidth
+		and 	#3
+		asl 	a
+		asl 	a
+		asl 	a
+		asl 	a
+		sta 	spriteTemp
+		lda 	spriteByte
+		and 	#$CF
+		ora 	spriteTemp
+		sta 	spriteByte
+_CSPNoWidth:
+		lda 	NSMantissa0+5 				; y-width is VERA's sprite height, bits 7:6
+		cmp 	#255
+		beq 	_CSPNoHeight
+		and 	#3
+		asl 	a
+		asl 	a
+		asl 	a
+		asl 	a
+		asl 	a
+		asl 	a
+		sta 	spriteTemp
+		lda 	spriteByte
+		and 	#$3F
+		ora 	spriteTemp
+		sta 	spriteByte
+_CSPNoHeight:
+		lda 	spriteByte
+		sta 	VRAMData0
+
+		;
+		;		Byte 1 : the colour depth shares a byte with the top of the pixel address, so
+		;		it is only touched when it was actually given.
+		;
+		lda 	NSMantissa0+6
+		cmp 	#255
+		beq 	_CSPNoDepth
+		lda 	NSMantissa0+0
+		ldy 	#1
+		jsr 	SpriteSetAddress
+		lda 	VRAMData0
+		ldy 	NSMantissa0+6
+		jsr 	SpriteApplyDepth
+		sta 	VRAMData0
+_CSPNoDepth:
+		jsr 	SpriteEnableLayer 			; "If VERA's sprite layer is disabled when the SPRITE
+											; command is called, the sprite layer will be enabled"
+		ply
+		ldx 	#$FF
+		.exitcmd
+
+; ************************************************************************************************
+;
+;					SPRMEM <idx>,<VRAM bank>,<VRAM address>[,<depth>]
+;
+; ************************************************************************************************
+
+Command_SPRMEM: ;; [!sprmem]
+		.entercmd
+		phy
+		ldx 	#3
+_CSMInteger:
+		.floatinteger
+		dex
+		bpl 	_CSMInteger
+
+		;
+		;		The pixel address is 17 bits -- the bank is bit 16 -- and the attribute holds it
+		;		shifted right by five. That shift is the manual's "the lowest 5 bits are ignored".
+		;
+		;			byte 0 = Address (12:5)  = (high & $1F) << 3 | low >> 5
+		;			byte 1 = Address (16:13) = bank << 3 | high >> 5
+		;
+		lda 	NSMantissa1+2 				; address, high byte
+		and 	#$1F
+		asl 	a
+		asl 	a
+		asl 	a
+		sta 	spriteTemp
+		lda 	NSMantissa0+2 				; address, low byte
+		lsr 	a
+		lsr 	a
+		lsr 	a
+		lsr 	a
+		lsr 	a
+		ora 	spriteTemp
+		sta 	spriteByte
+
+		lda 	NSMantissa1+2
+		lsr 	a
+		lsr 	a
+		lsr 	a
+		lsr 	a
+		lsr 	a
+		sta 	spriteTemp
+		lda 	NSMantissa0+1 				; VRAM bank, 0 or 1, becomes address bit 16
+		and 	#1
+		asl 	a
+		asl 	a
+		asl 	a
+		ora 	spriteTemp
+		sta 	spriteTemp
+
+		lda 	NSMantissa0+0
+		ldy 	#0
+		jsr 	SpriteSetAddress
+		lda 	spriteByte
+		sta 	VRAMData0 					; byte 0
+
+		lda 	NSMantissa0+0
+		ldy 	#1
+		jsr 	SpriteSetAddress
+		lda 	VRAMData0 					; byte 1 carries the mode bit as well as the top of
+		and 	#$80 						; the address, and the depth is optional, so read it
+		ora 	spriteTemp 					; back and keep bit 7 unless we were given one
+		ldy 	NSMantissa0+3
+		jsr 	SpriteApplyDepth
+		sta 	VRAMData0
+		ply
+		ldx 	#$FF
+		.exitcmd
+
+; ************************************************************************************************
+;
+;								MOVSPR <idx>,<x>,<y>
+;
+; ************************************************************************************************
+
+Command_MOVSPR: ;; [!movspr]
+		.entercmd
+		phy
+		;
+		;		x and y are signed, and the manual says they "wrap every 1024 values" -- -10 and
+		;		1014 are the same place. VERA's X and Y are 10 bit fields, so taking the low ten
+		;		bits of the two's complement value IS that wrap, with nothing to special-case.
+		;		GetInteger16Bit hands back exactly that two's complement value.
+		;
+		ldx 	#2
+		jsr 	GetInteger16Bit 			; y
+		lda 	zTemp0
+		sta 	spriteY
+		lda 	zTemp0+1
+		and 	#3
+		sta 	spriteY+1
+
+		dex
+		jsr 	GetInteger16Bit 			; x
+		lda 	zTemp0
+		sta 	spriteX
+		lda 	zTemp0+1
+		and 	#3
+		sta 	spriteX+1
+
+		lda 	NSMantissa0+0 				; sprite index; bytes 2..5 are written in order so
+		ldy 	#2 							; the auto-increment can walk them
+		jsr 	SpriteSetAddressInc
+		lda 	spriteX
+		sta 	VRAMData0 					; byte 2 : X (7:0)
+		lda 	spriteX+1
+		sta 	VRAMData0 					; byte 3 : X (9:8)
+		lda 	spriteY
+		sta 	VRAMData0 					; byte 4 : Y (7:0)
+		lda 	spriteY+1
+		sta 	VRAMData0 					; byte 5 : Y (9:8)
+		ply
+		ldx 	#$FF
+		.exitcmd
+
+; ************************************************************************************************
+;
+;		Point VERA data port 0 at byte Y of sprite A's attribute block. A is the sprite index
+;		and Y the offset 0-7. The float stack pointer X is not touched.
+;
+; ************************************************************************************************
+
+SpriteSetAddress: 							; leave the address alone after each access
+		pha
+		lda 	#VRAMBank1
+		bra 	SpriteSetAddressCommon
+
+SpriteSetAddressInc: 						; step it on by one, to walk a run of bytes
+		pha
+		lda 	#VRAMBank1 | VRAMIncrement1
+
+;		This scratches spriteLow/spriteMed/spriteHigh and NOTHING else. It must not touch
+;		spriteTemp: SPRMEM works out an attribute byte and only then calls this to point at
+;		where the byte goes, so anything this borrowed would be destroyed on the way.
+
+SpriteSetAddressCommon: 					; global, not a cheap local: SpriteSetAddress branches
+		sta 	spriteHigh 					; in from its own scope, and _locals do not cross one
+		pla
+		and 	#$7F 						; sprite index is 0-127
+		stz 	spriteMed
+		asl 	a 							; spriteMed:A = index x 8, the block's byte offset
+		rol 	spriteMed 					; from $1FC00. The top comes out at index >> 5, which
+		asl 	a 							; is at most 3.
+		rol 	spriteMed
+		asl 	a
+		rol 	spriteMed
+		sta 	spriteLow
+		tya 								; the low three bits of index x 8 are clear and Y is
+		ora 	spriteLow 					; 0-7, so the byte offset just ORs in
+		sta 	VRAMLow0
+		lda 	spriteMed
+		clc
+		adc 	#SpriteAttributeBase 		; never carries: 3 + $FC = $FF
+		sta 	VRAMMed0
+		lda 	spriteHigh
+		sta 	VRAMHigh0
+		rts
+
+; ************************************************************************************************
+;
+;		Apply an optional colour depth to attribute byte 1, which arrives in A. The parameter
+;		is in Y, and 255 means it was not supplied, so the mode bit is left as it was.
+;
+; ************************************************************************************************
+
+SpriteApplyDepth:
+		cpy 	#255
+		beq 	_SADExit
+		and 	#$7F 						; 0 = 4bpp, anything else = 8bpp
+		cpy 	#0
+		beq 	_SADExit
+		ora 	#$80
+_SADExit:
+		rts
+
+; ************************************************************************************************
+;
+;		Switch VERA's sprite layer on. DC_VIDEO is only at $9F29 while DCSEL is zero, and a
+;		program is free to have left DCSEL pointing anywhere, so park it and put it back.
+;
+; ************************************************************************************************
+
+SpriteEnableLayer:
+		lda 	VERACtrl
+		pha
+		and 	#VERADCSelMask 				; DCSEL is bits 6:1; clear it, keep reset and ADDRSEL
+		sta 	VERACtrl
+		lda 	VERADCVideo
+		ora 	#VERASpritesEnable
+		sta 	VERADCVideo
+		pla
+		sta 	VERACtrl
+		rts
+
+		.send 	code
+
+		.section storage
+spriteLow: 									; SpriteSetAddress's private scratch -- see the note
+		.fill 	1 							; there, it must not overlap spriteTemp
+spriteMed:
+		.fill 	1
+spriteHigh:
+		.fill 	1
+spriteTemp: 								; a field being assembled by the caller
+		.fill 	1
+spriteByte: 								; the attribute byte being read-modify-written
+		.fill 	1
+spriteX:
+		.fill 	2
+spriteY:
+		.fill 	2
+		.send storage
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;
+; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
 ;		Name:		stop.asm
 ;		Purpose:	Stop command
 ;		Created:	19th April 2023
@@ -6007,6 +6420,238 @@ TIPushClock:
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;
+;		Name:		tiledata.asm
+;		Purpose:	TDATA() and TATTR()
+;		Created:	14th July 2026
+;		Reviewed: 	No
+;
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		The read half of TILE. Both share TileSetAddress (tiles.asm), which leaves VERA pointing
+;		at the cell with the auto-increment on -- so the tile is the first byte read and its
+;		attribute is the second.
+;
+; ************************************************************************************************
+
+		.section 	code
+
+; ************************************************************************************************
+;
+;								TDATA(<x>,<y>) and TATTR(<x>,<y>)
+;
+; ************************************************************************************************
+
+UnaryTDATA: ;; [!tdata]
+		.entercmd
+		phy 								; Y is the code position
+		lda 	#0 							; TDATA wants the tile itself
+		bra 	TileRead
+
+UnaryTATTR: ;; [!tattr]
+		.entercmd
+		phy
+		lda 	#1 							; TATTR wants the attribute, one byte further on
+
+TileRead: 									; global, not a cheap local: TDATA branches in from
+		sta 	tileSelect 					; its own scope and _locals do not cross one
+		.floatinteger 						; y is the last argument, so it is the one X is on
+		lda 	NSMantissa0,x
+		sta 	tileY
+		lda 	NSMantissa1,x
+		sta 	tileY+1
+		dex 								; X now addresses x -- which is also the slot the
+		.floatinteger 						; result has to be left in, first argument's slot
+		lda 	NSMantissa0,x
+		sta 	tileX
+		lda 	NSMantissa1,x
+		sta 	tileX+1
+		jsr 	TileSetAddress
+
+		lda 	tileSelect
+		beq 	_TRRead
+		lda 	VRAMData0 					; step over the tile to reach its attribute
+_TRRead:
+		lda 	VRAMData0
+		jsr 	FloatSetByte
+		ply
+		.exitcmd
+
+		.send 	code
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;
+; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		Name:		tiles.asm
+;		Purpose:	TILE, and the layer 1 map address it shares with TDATA and TATTR
+;		Created:	14th July 2026
+;		Reviewed: 	No
+;
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		TILE, TDATA and TATTR are conveniences over layer 1's tile map: they work out the VRAM
+;		address of a character cell so a program does not have to. Each map entry is two bytes,
+;		the tile (or screen code) and its attribute (the foreground/background colours in text
+;		mode), so the address of cell (x,y) is
+;
+;			mapbase + y * rowbytes + x * 2
+;
+;		Both mapbase and rowbytes are read from VERA every time rather than assumed, because the
+;		manual is explicit that these work "if VERA Layer 1's map base value is changed or the
+;		map size is changed". In the default 80x60 text mode that is a 128-tile-wide map at
+;		$1B000, so a row is 256 bytes and the cell is $1B000 + y*256 + x*2 -- but nothing here
+;		depends on that.
+;
+; ************************************************************************************************
+
+		.section 	code
+
+; ************************************************************************************************
+;
+;						TILE <x>,<y>,<tile/screen code>[,<attribute>]
+;
+; ************************************************************************************************
+
+Command_TILE: ;; [!tile]
+		.entercmd
+		phy
+		ldx 	#3
+_CTLInteger:
+		.floatinteger
+		dex
+		bpl 	_CTLInteger
+
+		lda 	NSMantissa0+0
+		sta 	tileX
+		lda 	NSMantissa1+0
+		sta 	tileX+1
+		lda 	NSMantissa0+1
+		sta 	tileY
+		lda 	NSMantissa1+1
+		sta 	tileY+1
+		jsr 	TileSetAddress
+
+		lda 	NSMantissa0+2 				; the tile or screen code, and the auto-increment
+		sta 	VRAMData0 					; then steps on to the attribute
+
+		lda 	NSMantissa0+3 				; the attribute is optional. 255 means it was not
+		cmp 	#255 						; supplied, and the cell keeps the colours it had.
+		beq 	_CTLNoAttribute
+		sta 	VRAMData0
+_CTLNoAttribute:
+		ply
+		ldx 	#$FF
+		.exitcmd
+
+; ************************************************************************************************
+;
+;		Point VERA data port 0 at the layer 1 map entry for the cell in tileX,tileY, with the
+;		auto-increment set so that a second access reaches the attribute byte. X is untouched.
+;
+; ************************************************************************************************
+
+TileSetAddress:
+		lda 	VERAL1Config 				; a map row is 2 x (32 << map width) bytes, which is
+		lsr 	a 							; 64 << map width. So the row offset is y shifted
+		lsr 	a 							; left by 6 + map width, and the width field is
+		lsr 	a 							; bits 5:4 of L1_CONFIG.
+		lsr 	a
+		and 	#3
+		clc
+		adc 	#6
+		tay 								; Y = shift count, 6 to 9
+
+		lda 	tileY 						; a 24 bit accumulator, because a 256 x 256 map of
+		sta 	tileAddr 					; two byte entries is 128K -- the whole of VRAM
+		lda 	tileY+1
+		sta 	tileAddr+1
+		stz 	tileAddr+2
+_TSARow:
+		asl 	tileAddr
+		rol 	tileAddr+1
+		rol 	tileAddr+2
+		dey
+		bne 	_TSARow
+
+		lda 	tileX 						; + x * 2, one for the tile and one for its attribute
+		asl 	a
+		sta 	tileTemp
+		lda 	tileX+1
+		rol 	a
+		sta 	tileTemp+1
+
+		clc
+		lda 	tileAddr
+		adc 	tileTemp
+		sta 	tileAddr
+		lda 	tileAddr+1
+		adc 	tileTemp+1
+		sta 	tileAddr+1
+		lda 	tileAddr+2
+		adc 	#0
+		sta 	tileAddr+2
+
+		lda 	VERAL1MapBase 				; the map base register holds address bits 16:9, so
+		stz 	tileTemp 					; the base is that shifted left by nine. Nine zero low
+		asl 	a 							; bits means it only ever reaches the middle byte and
+		sta 	tileTemp+1 					; bit 16.
+		lda 	#0
+		rol 	a
+		sta 	tileTemp+2
+
+		clc
+		lda 	tileAddr
+		adc 	tileTemp
+		sta 	VRAMLow0
+		lda 	tileAddr+1
+		adc 	tileTemp+1
+		sta 	VRAMMed0
+		lda 	tileAddr+2
+		adc 	tileTemp+2
+		and 	#VRAMBank1 					; VRAM is 17 bits, so bit 16 is all that is left
+		ora 	#VRAMIncrement1
+		sta 	VRAMHigh0
+		rts
+
+		.send 	code
+
+		.section storage
+tileX:
+		.fill 	2
+tileY:
+		.fill 	2
+tileAddr: 									; 24 bit, see above
+		.fill 	3
+tileTemp:
+		.fill 	3
+tileSelect: 								; TDATA reads the tile, TATTR the byte after it
+		.fill 	1
+		.send storage
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;
+; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
 ;		Name:		tiwrite.asm
 ;		Purpose:	Set TI from string
 ;		Created:	4th May 2023
@@ -6383,39 +7028,45 @@ ShiftVectorTable:
 	.word	XUnaryMX                 ; $ce8e mx
 	.word	XUnaryMY                 ; $ce8f my
 	.word	XUnaryMWheel             ; $ce90 mwheel
-	.word	CommandStop              ; $ce91 stop
-	.word	CommandSYS               ; $ce92 sys
-	.word	CommandTIWriteN          ; $ce93 ti.write
-	.word	CommandTIWriteS          ; $ce94 ti$.write
-	.word	CommandXWAIT             ; $ce95 wait
-	.word	X16I2CPoke               ; $ce96 i2cpoke
-	.word	X16CommandPowerOff       ; $ce97 poweroff
-	.word	X16CommandReboot         ; $ce98 reboot
-	.word	X16I2CPeek               ; $ce99 i2cpeek
-	.word	CommandBank              ; $ce9a bank
-	.word	XCommandSleep            ; $ce9b sleep
-	.word	X16_Audio_FMINIT         ; $ce9c fminit
-	.word	X16_Audio_FMNOTE         ; $ce9d fmnote
-	.word	X16_Audio_FMDRUM         ; $ce9e fmdrum
-	.word	X16_Audio_FMINST         ; $ce9f fminst
-	.word	X16_Audio_FMVIB          ; $cea0 fmvib
-	.word	X16_Audio_FMFREQ         ; $cea1 fmfreq
-	.word	X16_Audio_FMVOL          ; $cea2 fmvol
-	.word	X16_Audio_FMPAN          ; $cea3 fmpan
-	.word	X16_Audio_FMPLAY         ; $cea4 fmplay
-	.word	X16_Audio_FMCHORD        ; $cea5 fmchord
-	.word	X16_Audio_FMPOKE         ; $cea6 fmpoke
-	.word	X16_Audio_PSGINIT        ; $cea7 psginit
-	.word	X16_Audio_PSGNOTE        ; $cea8 psgnote
-	.word	X16_Audio_PSGVOL         ; $cea9 psgvol
-	.word	X16_Audio_PSGWAV         ; $ceaa psgwav
-	.word	X16_Audio_PSGFREQ        ; $ceab psgfreq
-	.word	X16_Audio_PSGPAN         ; $ceac psgpan
-	.word	X16_Audio_PSGPLAY        ; $cead psgplay
-	.word	X16_Audio_PSGCHORD       ; $ceae psgchord
-	.word	CommandCls               ; $ceaf cls
-	.word	CommandLocate            ; $ceb0 locate
-	.word	CommandColor             ; $ceb1 color
+	.word	Command_SPRITE           ; $ce91 sprite
+	.word	Command_SPRMEM           ; $ce92 sprmem
+	.word	Command_MOVSPR           ; $ce93 movspr
+	.word	CommandStop              ; $ce94 stop
+	.word	CommandSYS               ; $ce95 sys
+	.word	UnaryTDATA               ; $ce96 tdata
+	.word	UnaryTATTR               ; $ce97 tattr
+	.word	Command_TILE             ; $ce98 tile
+	.word	CommandTIWriteN          ; $ce99 ti.write
+	.word	CommandTIWriteS          ; $ce9a ti$.write
+	.word	CommandXWAIT             ; $ce9b wait
+	.word	X16I2CPoke               ; $ce9c i2cpoke
+	.word	X16CommandPowerOff       ; $ce9d poweroff
+	.word	X16CommandReboot         ; $ce9e reboot
+	.word	X16I2CPeek               ; $ce9f i2cpeek
+	.word	CommandBank              ; $cea0 bank
+	.word	XCommandSleep            ; $cea1 sleep
+	.word	X16_Audio_FMINIT         ; $cea2 fminit
+	.word	X16_Audio_FMNOTE         ; $cea3 fmnote
+	.word	X16_Audio_FMDRUM         ; $cea4 fmdrum
+	.word	X16_Audio_FMINST         ; $cea5 fminst
+	.word	X16_Audio_FMVIB          ; $cea6 fmvib
+	.word	X16_Audio_FMFREQ         ; $cea7 fmfreq
+	.word	X16_Audio_FMVOL          ; $cea8 fmvol
+	.word	X16_Audio_FMPAN          ; $cea9 fmpan
+	.word	X16_Audio_FMPLAY         ; $ceaa fmplay
+	.word	X16_Audio_FMCHORD        ; $ceab fmchord
+	.word	X16_Audio_FMPOKE         ; $ceac fmpoke
+	.word	X16_Audio_PSGINIT        ; $cead psginit
+	.word	X16_Audio_PSGNOTE        ; $ceae psgnote
+	.word	X16_Audio_PSGVOL         ; $ceaf psgvol
+	.word	X16_Audio_PSGWAV         ; $ceb0 psgwav
+	.word	X16_Audio_PSGFREQ        ; $ceb1 psgfreq
+	.word	X16_Audio_PSGPAN         ; $ceb2 psgpan
+	.word	X16_Audio_PSGPLAY        ; $ceb3 psgplay
+	.word	X16_Audio_PSGCHORD       ; $ceb4 psgchord
+	.word	CommandCls               ; $ceb5 cls
+	.word	CommandLocate            ; $ceb6 locate
+	.word	CommandColor             ; $ceb7 color
 	.send code
 ; ************************************************************************************************
 ; ************************************************************************************************

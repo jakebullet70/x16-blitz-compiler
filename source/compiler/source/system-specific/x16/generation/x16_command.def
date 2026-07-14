@@ -32,3 +32,13 @@ FRAME 			#,#,#,#,# T N
 OVAL 			#,#,#,#,# T N
 RING 			#,#,#,#,# T N
 CHAR 			#,#,#,$ T N
+
+# 	Sprites and tiles. OptionalParameterCompile pushes 255 when its comma is missing, and once
+# 	one optional is absent every one after it is too -- so chaining it is exactly "the rest are
+# 	optional". 255 is out of range for all of these fields, so the runtime reads it as "leave
+# 	this one alone", which is what SPRITE and SPRMEM need in order not to undo each other.
+
+SPRITE 			#,# X:OptionalParameterCompile X:OptionalParameterCompile X:OptionalParameterCompile X:OptionalParameterCompile X:OptionalParameterCompile T N
+SPRMEM 			#,#,# X:OptionalParameterCompile T N
+MOVSPR 			#,#,# T N
+TILE 			#,#,# X:OptionalParameterCompile T N

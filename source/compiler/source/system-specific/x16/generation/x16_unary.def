@@ -19,3 +19,5 @@ MY  			T N
 MWHEEL 			T N
 I2CPEEK 		(#,#) T N
 MOD 			(#,#) T N
+TDATA 			(#,#) T N
+TATTR 			(#,#) T N

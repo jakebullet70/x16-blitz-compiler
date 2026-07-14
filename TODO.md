@@ -9,10 +9,11 @@ Replaces the original `TODO.txt`, which was written against **R43** and predated
   (`source/compiler/source/generation/*.def` and `.../system-specific/x16/generation/*.def`);
 - the gap between the two is below.
 
-**46 of the 81 extended keywords compile today. 35 do not.**
+**52 of the 81 extended keywords compile today. 29 do not.**
 
-Tier 1 is done: `MOD`, `OVAL`, `RING`, `POWEROFF` and `REBOOT` all compile and are tested against the
-ROM. What follows is what is left.
+Tiers 1 and 2 are done — `MOD`, `OVAL`, `RING`, `POWEROFF`, `REBOOT`, `SPRITE`, `SPRMEM`, `MOVSPR`,
+`TILE`, `TDATA` and `TATTR` all compile, and every one is checked against the R49 ROM rather than
+against a reading of the manual. What follows is what is left.
 
 ## How to decide whether a keyword is worth having
 
@@ -25,7 +26,7 @@ Not by the manual's **TYPE** column. That is a hint, not a rule: `LOAD` and `NEW
 
 That single test sorts all 40.
 
-## Worth implementing (19 left)
+## Worth implementing (11 left)
 
 ### Tier 1 — DONE
 
@@ -48,11 +49,46 @@ That single test sorts all 40.
 not an input to anything. The corner radius `GRAPH_draw_rect` reads is **r4** (10/11), at offset 6. So
 `RECT` and `FRAME` had been handing the KERNAL an uninitialised corner radius all along.
 
-### Tier 2 — sprites and tiles
+### Tier 2 — DONE
 
 `SPRITE` `$CEBB` · `SPRMEM` `$CEBC` · `MOVSPR` `$CEBD` · `TILE` · `TDATA` `$CEDC` · `TATTR` `$CEDD`
 
-Real work — no existing runtime support to lean on.
+These write VERA directly, because unlike the audio keywords there is **no ROM layer to call**. The
+KERNAL does have `sprite_set_image` and `sprite_set_position`, and neither is the right shape:
+`sprite_set_position` only handles sprites 0-31 where `MOVSPR` takes 0-127, and `sprite_set_image`
+converts pixel data out of host RAM where `SPRMEM` merely points a sprite at pixels already in VRAM.
+BASIC writes the attributes itself and so do we.
+
+**Optional parameters are read-modify-write, and that is a requirement, not a nicety.** The compiler
+already had `OptionalParameterCompile`, which pushes **255** when its comma is missing; chaining it
+gives "and the rest are optional", and 255 is out of range for every one of these fields (the widest
+is a nibble), so the runtime reads it as *leave this one alone*. The manual's own example is why:
+
+```BASIC
+20 SPRMEM 1,1,$3000,1
+30 SPRITE 1,3,0,0,3,3
+```
+
+`SPRITE` omits the colour depth. Defaulting it to 0 would silently undo the 8bpp `SPRMEM` set on the
+line before.
+
+**How they were verified.** Sprites are invisible to a text-diffing harness, so the test reads the
+attributes *back* with `VPEEK` and compares against stock R49 running the identical program — 8
+attribute bytes x several configurations, plus `PEEK($9F29)` for the sprite-layer enable, which is an
+I/O register and not reachable by `VPEEK`. Every byte matches: z-depth, both flips, both size fields,
+palette offset, the 17-bit pixel address, sprite 0 and sprite 127 (which is the one that exercises the
+`$FC + 3 = $FF` carry in the attribute address), the negative-coordinate wrap (`MOVSPR 0,-1024,2048`
+lands on 0, as the manual says it must), and preserve-on-omit. Identical VERA state means identical
+rendering, which is as close as anything can get to proving a sprite is on the screen from inside a
+program.
+
+Two bugs found on the way, both mine, both caught by that comparison:
+
+- `SpriteSetAddress` used `spriteTemp` as scratch, and `SPRMEM` computes an attribute byte into
+  `spriteTemp` *before* calling it to find out where the byte goes. One byte of the pixel address came
+  out as 0 instead of 9. It now has its own private scratch, and says so.
+- `_SSACommon` was a cheap local branched into from another global's scope. 64tass `_locals` do not
+  cross a global label — the same trap already documented in `x16_i2c.asm`.
 
 ### Tier 3 — data in and out
 
@@ -178,6 +214,11 @@ Diminishing returns; only worth revisiting if float-heavy code matters more than
 
 - Copy the object code *down* after compiling, rather than leaving it above the compiler and its
   libraries (must stay on a page boundary). Inherited from the old TODO and still true.
+- **`release` copied `CHANGES.txt` unconditionally** — the original author's 2023 changelog, deleted
+  in "Del old files from previous build". `make libs` then failed at the packaging step, well after
+  the assembler had already succeeded, which reads like a build break but is not one. It is copied
+  only if present now. Same class as the five blockers that once made this repo unbuildable anywhere:
+  a recipe asserting on a file nothing guarantees.
 
 ## Notes that are easy to lose
 
