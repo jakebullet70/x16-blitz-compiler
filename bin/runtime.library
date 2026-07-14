@@ -5367,6 +5367,87 @@ randomSeed:
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;
+;		Name:		rpt.asm
+;		Purpose:	RPT$()
+;		Created:	14th July 2026
+;		Reviewed: 	No
+;
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		RPT$(<byte>,<count>) is CHR$ with a repeat count, and it is built the same way: allocate
+;		a temp string of the right length, write the length byte, then fill it.
+;
+;		StringAllocTemp puts the new string's address into S[X], so the dex below is what makes
+;		the result land in the FIRST argument's slot, which is where a function's result belongs.
+;
+; ************************************************************************************************
+
+		.section 	code
+
+UnaryRPT: ;; [!rpt$]
+		.entercmd
+		;
+		;		The count is the last argument. It cannot go through GetInteger8Bit, which just
+		;		takes the low byte of the mantissa -- RPT$(65,300) would quietly hand back 44
+		;		characters instead of complaining. Stock raises ?ILLEGAL QUANTITY for a count of
+		;		zero as well, rather than returning an empty string, so zero is an error too.
+		;
+		.floatinteger
+		lda 	NSStatus,x 					; negative
+		bmi 	_URPTRange
+		lda 	NSMantissa1,x 				; or too big to be a byte
+		ora 	NSMantissa2,x
+		ora 	NSMantissa3,x
+		bne 	_URPTRange
+		lda 	NSMantissa0,x
+		beq 	_URPTRange 					; or zero
+		sta 	rptCount
+
+		dex 								; X now addresses the character -- and that is also
+		jsr 	GetInteger8Bit 				; the slot the result has to be left in
+		sta 	rptChar
+
+		lda 	rptCount
+		jsr 	StringAllocTemp 			; address into zsTemp, and into S[X] as the result
+		lda 	rptCount
+		sta 	(zsTemp) 					; the length byte comes first
+
+		phy 								; Y is the code position
+		ldy 	rptCount
+_URPTFill:
+		lda 	rptChar
+		sta 	(zsTemp),y
+		dey
+		bne 	_URPTFill
+		ply
+		.exitcmd
+
+_URPTRange:
+		.error_range
+
+		.send 	code
+
+		.section storage
+rptCount:
+		.fill 	1
+rptChar:
+		.fill 	1
+		.send storage
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;
+; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
 ;		Name:		sconcat.asm
 ;		Purpose:	Concatenate strings
 ;		Created:	14th April 2023
@@ -7299,45 +7380,46 @@ ShiftVectorTable:
 	.word	XUnaryMX                 ; $ce93 mx
 	.word	XUnaryMY                 ; $ce94 my
 	.word	XUnaryMWheel             ; $ce95 mwheel
-	.word	Command_SPRITE           ; $ce96 sprite
-	.word	Command_SPRMEM           ; $ce97 sprmem
-	.word	Command_MOVSPR           ; $ce98 movspr
-	.word	CommandStop              ; $ce99 stop
-	.word	CommandSYS               ; $ce9a sys
-	.word	UnaryTDATA               ; $ce9b tdata
-	.word	UnaryTATTR               ; $ce9c tattr
-	.word	Command_TILE             ; $ce9d tile
-	.word	CommandTIWriteN          ; $ce9e ti.write
-	.word	CommandTIWriteS          ; $ce9f ti$.write
-	.word	CommandXWAIT             ; $cea0 wait
-	.word	X16I2CPoke               ; $cea1 i2cpoke
-	.word	X16CommandPowerOff       ; $cea2 poweroff
-	.word	X16CommandReboot         ; $cea3 reboot
-	.word	X16I2CPeek               ; $cea4 i2cpeek
-	.word	CommandBank              ; $cea5 bank
-	.word	XCommandSleep            ; $cea6 sleep
-	.word	X16_Audio_FMINIT         ; $cea7 fminit
-	.word	X16_Audio_FMNOTE         ; $cea8 fmnote
-	.word	X16_Audio_FMDRUM         ; $cea9 fmdrum
-	.word	X16_Audio_FMINST         ; $ceaa fminst
-	.word	X16_Audio_FMVIB          ; $ceab fmvib
-	.word	X16_Audio_FMFREQ         ; $ceac fmfreq
-	.word	X16_Audio_FMVOL          ; $cead fmvol
-	.word	X16_Audio_FMPAN          ; $ceae fmpan
-	.word	X16_Audio_FMPLAY         ; $ceaf fmplay
-	.word	X16_Audio_FMCHORD        ; $ceb0 fmchord
-	.word	X16_Audio_FMPOKE         ; $ceb1 fmpoke
-	.word	X16_Audio_PSGINIT        ; $ceb2 psginit
-	.word	X16_Audio_PSGNOTE        ; $ceb3 psgnote
-	.word	X16_Audio_PSGVOL         ; $ceb4 psgvol
-	.word	X16_Audio_PSGWAV         ; $ceb5 psgwav
-	.word	X16_Audio_PSGFREQ        ; $ceb6 psgfreq
-	.word	X16_Audio_PSGPAN         ; $ceb7 psgpan
-	.word	X16_Audio_PSGPLAY        ; $ceb8 psgplay
-	.word	X16_Audio_PSGCHORD       ; $ceb9 psgchord
-	.word	CommandCls               ; $ceba cls
-	.word	CommandLocate            ; $cebb locate
-	.word	CommandColor             ; $cebc color
+	.word	UnaryRPT                 ; $ce96 rpt$
+	.word	Command_SPRITE           ; $ce97 sprite
+	.word	Command_SPRMEM           ; $ce98 sprmem
+	.word	Command_MOVSPR           ; $ce99 movspr
+	.word	CommandStop              ; $ce9a stop
+	.word	CommandSYS               ; $ce9b sys
+	.word	UnaryTDATA               ; $ce9c tdata
+	.word	UnaryTATTR               ; $ce9d tattr
+	.word	Command_TILE             ; $ce9e tile
+	.word	CommandTIWriteN          ; $ce9f ti.write
+	.word	CommandTIWriteS          ; $cea0 ti$.write
+	.word	CommandXWAIT             ; $cea1 wait
+	.word	X16I2CPoke               ; $cea2 i2cpoke
+	.word	X16CommandPowerOff       ; $cea3 poweroff
+	.word	X16CommandReboot         ; $cea4 reboot
+	.word	X16I2CPeek               ; $cea5 i2cpeek
+	.word	CommandBank              ; $cea6 bank
+	.word	XCommandSleep            ; $cea7 sleep
+	.word	X16_Audio_FMINIT         ; $cea8 fminit
+	.word	X16_Audio_FMNOTE         ; $cea9 fmnote
+	.word	X16_Audio_FMDRUM         ; $ceaa fmdrum
+	.word	X16_Audio_FMINST         ; $ceab fminst
+	.word	X16_Audio_FMVIB          ; $ceac fmvib
+	.word	X16_Audio_FMFREQ         ; $cead fmfreq
+	.word	X16_Audio_FMVOL          ; $ceae fmvol
+	.word	X16_Audio_FMPAN          ; $ceaf fmpan
+	.word	X16_Audio_FMPLAY         ; $ceb0 fmplay
+	.word	X16_Audio_FMCHORD        ; $ceb1 fmchord
+	.word	X16_Audio_FMPOKE         ; $ceb2 fmpoke
+	.word	X16_Audio_PSGINIT        ; $ceb3 psginit
+	.word	X16_Audio_PSGNOTE        ; $ceb4 psgnote
+	.word	X16_Audio_PSGVOL         ; $ceb5 psgvol
+	.word	X16_Audio_PSGWAV         ; $ceb6 psgwav
+	.word	X16_Audio_PSGFREQ        ; $ceb7 psgfreq
+	.word	X16_Audio_PSGPAN         ; $ceb8 psgpan
+	.word	X16_Audio_PSGPLAY        ; $ceb9 psgplay
+	.word	X16_Audio_PSGCHORD       ; $ceba psgchord
+	.word	CommandCls               ; $cebb cls
+	.word	CommandLocate            ; $cebc locate
+	.word	CommandColor             ; $cebd color
 	.send code
 ; ************************************************************************************************
 ; ************************************************************************************************
