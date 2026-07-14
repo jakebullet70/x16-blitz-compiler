@@ -1961,7 +1961,7 @@ CommandTables:
 ;
 ;	SYS    # T N
 ;
-	.byte	$07,$9e,$00,$e2,40654 & $FF,40654 >> 8,$06
+	.byte	$07,$9e,$00,$e2,41422 & $FF,41422 >> 8,$06
 ;
 ;	POKE    #,# T N
 ;
@@ -1973,7 +1973,7 @@ CommandTables:
 ;
 ;	STOP    T N
 ;
-	.byte	$07,$90,$00,$20,40398 & $FF,40398 >> 8,$06
+	.byte	$07,$90,$00,$20,41166 & $FF,41166 >> 8,$06
 ;
 ;	END    T N
 ;
@@ -1996,15 +1996,15 @@ CommandTables:
 ;
 ;	CLS    T N
 ;
-	.byte	$07,$ce,$90,$20,48846 & $FF,48846 >> 8,$06
+	.byte	$07,$ce,$90,$20,49102 & $FF,49102 >> 8,$06
 ;
 ;	LOCATE    # X:OptionalParameterCompile T N
 ;
-	.byte	$0a,$ce,$92,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,49102 & $FF,49102 >> 8,$06
+	.byte	$0a,$ce,$92,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,49358 & $FF,49358 >> 8,$06
 ;
 ;	COLOR    # X:OptionalParameterCompile T N
 ;
-	.byte	$0a,$ce,$8d,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,49358 & $FF,49358 >> 8,$06
+	.byte	$0a,$ce,$8d,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,49614 & $FF,49614 >> 8,$06
 ;
 ;	SCREEN    # T N
 ;
@@ -2016,23 +2016,27 @@ CommandTables:
 ;
 ;	SLEEP    # T N
 ;
-	.byte	$07,$ce,$af,$e2,43726 & $FF,43726 >> 8,$06
+	.byte	$07,$ce,$af,$e2,43982 & $FF,43982 >> 8,$06
 ;
 ;	MOUSE    # T N
 ;
-	.byte	$07,$ce,$8c,$e2,37838 & $FF,37838 >> 8,$06
+	.byte	$07,$ce,$8c,$e2,38606 & $FF,38606 >> 8,$06
 ;
 ;	I2CPOKE   #,#,# T N
 ;
-	.byte	$09,$ce,$ae,$ea,$ea,$e2,42446 & $FF,42446 >> 8,$06
+	.byte	$09,$ce,$ae,$ea,$ea,$e2,43214 & $FF,43214 >> 8,$06
 ;
 ;	POWEROFF   T N
 ;
-	.byte	$07,$ce,$ad,$20,42702 & $FF,42702 >> 8,$06
+	.byte	$07,$ce,$ad,$20,37838 & $FF,37838 >> 8,$06
+;
+;	RESET    T N
+;
+	.byte	$07,$ce,$8f,$20,38094 & $FF,38094 >> 8,$06
 ;
 ;	REBOOT    T N
 ;
-	.byte	$07,$ce,$ac,$20,42958 & $FF,42958 >> 8,$06
+	.byte	$07,$ce,$ac,$20,38350 & $FF,38350 >> 8,$06
 ;
 ;	PSET    #,#,# T N
 ;
@@ -2064,23 +2068,23 @@ CommandTables:
 ;
 ;	SPRITE    #,# X:OptionalParameterCompile X:OptionalParameterCompile X:OptionalParameterCompile X:OptionalParameterCompile X:OptionalParameterCompile T N
 ;
-	.byte	$17,$ce,$bb,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,39374 & $FF,39374 >> 8,$06
+	.byte	$17,$ce,$bb,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,40142 & $FF,40142 >> 8,$06
 ;
 ;	SPRMEM    #,#,# X:OptionalParameterCompile T N
 ;
-	.byte	$0c,$ce,$bc,$ea,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,39630 & $FF,39630 >> 8,$06
+	.byte	$0c,$ce,$bc,$ea,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,40398 & $FF,40398 >> 8,$06
 ;
 ;	MOVSPR    #,#,# T N
 ;
-	.byte	$09,$ce,$bd,$ea,$ea,$e2,39886 & $FF,39886 >> 8,$06
+	.byte	$09,$ce,$bd,$ea,$ea,$e2,40654 & $FF,40654 >> 8,$06
 ;
 ;	TILE    #,#,# X:OptionalParameterCompile T N
 ;
-	.byte	$0c,$ce,$b9,$ea,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,41422 & $FF,41422 >> 8,$06
+	.byte	$0c,$ce,$b9,$ea,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,42190 & $FF,42190 >> 8,$06
 ;
 ;	BANK    # X:OptionalParameterCompile T N
 ;
-	.byte	$0a,$ce,$98,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,43470 & $FF,43470 >> 8,$06
+	.byte	$0a,$ce,$98,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,43726 & $FF,43726 >> 8,$06
 ;
 ;	BLOAD    $,#,#,# T N
 ;
@@ -2119,79 +2123,79 @@ CommandTables:
 ;
 ;	FMINIT       T N
 ;
-	.byte	$07,$ce,$99,$20,43982 & $FF,43982 >> 8,$06
+	.byte	$07,$ce,$99,$20,44238 & $FF,44238 >> 8,$06
 ;
 ;	FMNOTE      #,# T N
 ;
-	.byte	$08,$ce,$9a,$ea,$e2,44238 & $FF,44238 >> 8,$06
+	.byte	$08,$ce,$9a,$ea,$e2,44494 & $FF,44494 >> 8,$06
 ;
 ;	FMDRUM      #,# T N
 ;
-	.byte	$08,$ce,$9b,$ea,$e2,44494 & $FF,44494 >> 8,$06
+	.byte	$08,$ce,$9b,$ea,$e2,44750 & $FF,44750 >> 8,$06
 ;
 ;	FMINST      #,# T N
 ;
-	.byte	$08,$ce,$9c,$ea,$e2,44750 & $FF,44750 >> 8,$06
+	.byte	$08,$ce,$9c,$ea,$e2,45006 & $FF,45006 >> 8,$06
 ;
 ;	FMVIB       #,# T N
 ;
-	.byte	$08,$ce,$9d,$ea,$e2,45006 & $FF,45006 >> 8,$06
+	.byte	$08,$ce,$9d,$ea,$e2,45262 & $FF,45262 >> 8,$06
 ;
 ;	FMFREQ      #,# T N
 ;
-	.byte	$08,$ce,$9e,$ea,$e2,45262 & $FF,45262 >> 8,$06
+	.byte	$08,$ce,$9e,$ea,$e2,45518 & $FF,45518 >> 8,$06
 ;
 ;	FMVOL       #,# T N
 ;
-	.byte	$08,$ce,$9f,$ea,$e2,45518 & $FF,45518 >> 8,$06
+	.byte	$08,$ce,$9f,$ea,$e2,45774 & $FF,45774 >> 8,$06
 ;
 ;	FMPAN       #,# T N
 ;
-	.byte	$08,$ce,$a0,$ea,$e2,45774 & $FF,45774 >> 8,$06
+	.byte	$08,$ce,$a0,$ea,$e2,46030 & $FF,46030 >> 8,$06
 ;
 ;	FMPLAY      #,$ T N
 ;
-	.byte	$08,$ce,$a1,$ea,$f2,46030 & $FF,46030 >> 8,$06
+	.byte	$08,$ce,$a1,$ea,$f2,46286 & $FF,46286 >> 8,$06
 ;
 ;	FMCHORD     #,$ T N
 ;
-	.byte	$08,$ce,$a2,$ea,$f2,46286 & $FF,46286 >> 8,$06
+	.byte	$08,$ce,$a2,$ea,$f2,46542 & $FF,46542 >> 8,$06
 ;
 ;	FMPOKE      #,# T N
 ;
-	.byte	$08,$ce,$a3,$ea,$e2,46542 & $FF,46542 >> 8,$06
+	.byte	$08,$ce,$a3,$ea,$e2,46798 & $FF,46798 >> 8,$06
 ;
 ;	PSGINIT      T N
 ;
-	.byte	$07,$ce,$a4,$20,46798 & $FF,46798 >> 8,$06
+	.byte	$07,$ce,$a4,$20,47054 & $FF,47054 >> 8,$06
 ;
 ;	PSGNOTE     #,# T N
 ;
-	.byte	$08,$ce,$a5,$ea,$e2,47054 & $FF,47054 >> 8,$06
+	.byte	$08,$ce,$a5,$ea,$e2,47310 & $FF,47310 >> 8,$06
 ;
 ;	PSGVOL      #,# T N
 ;
-	.byte	$08,$ce,$a6,$ea,$e2,47310 & $FF,47310 >> 8,$06
+	.byte	$08,$ce,$a6,$ea,$e2,47566 & $FF,47566 >> 8,$06
 ;
 ;	PSGWAV      #,# T N
 ;
-	.byte	$08,$ce,$a7,$ea,$e2,47566 & $FF,47566 >> 8,$06
+	.byte	$08,$ce,$a7,$ea,$e2,47822 & $FF,47822 >> 8,$06
 ;
 ;	PSGFREQ     #,# T N
 ;
-	.byte	$08,$ce,$a8,$ea,$e2,47822 & $FF,47822 >> 8,$06
+	.byte	$08,$ce,$a8,$ea,$e2,48078 & $FF,48078 >> 8,$06
 ;
 ;	PSGPAN      #,# T N
 ;
-	.byte	$08,$ce,$a9,$ea,$e2,48078 & $FF,48078 >> 8,$06
+	.byte	$08,$ce,$a9,$ea,$e2,48334 & $FF,48334 >> 8,$06
 ;
 ;	PSGPLAY     #,$ T N
 ;
-	.byte	$08,$ce,$aa,$ea,$f2,48334 & $FF,48334 >> 8,$06
+	.byte	$08,$ce,$aa,$ea,$f2,48590 & $FF,48590 >> 8,$06
 ;
 ;	PSGCHORD    #,$ T N
 ;
-	.byte	$08,$ce,$ab,$ea,$f2,48590 & $FF,48590 >> 8,$06
+	.byte	$08,$ce,$ab,$ea,$f2,48846 & $FF,48846 >> 8,$06
 		.byte 	0
 
 UnaryTables:
@@ -2324,23 +2328,23 @@ UnaryTables:
 ;
 ;	MB     T N
 ;
-	.byte	$07,$ce,$d3,$20,38094 & $FF,38094 >> 8,$06
+	.byte	$07,$ce,$d3,$20,38862 & $FF,38862 >> 8,$06
 ;
 ;	MX     T N
 ;
-	.byte	$07,$ce,$d1,$20,38350 & $FF,38350 >> 8,$06
+	.byte	$07,$ce,$d1,$20,39118 & $FF,39118 >> 8,$06
 ;
 ;	MY     T N
 ;
-	.byte	$07,$ce,$d2,$20,38606 & $FF,38606 >> 8,$06
+	.byte	$07,$ce,$d2,$20,39374 & $FF,39374 >> 8,$06
 ;
 ;	MWHEEL    T N
 ;
-	.byte	$07,$ce,$db,$20,38862 & $FF,38862 >> 8,$06
+	.byte	$07,$ce,$db,$20,39630 & $FF,39630 >> 8,$06
 ;
 ;	I2CPEEK   (#,#) T N
 ;
-	.byte	$09,$ce,$d7,$8e,$ae,$92,43214 & $FF,43214 >> 8,$06
+	.byte	$09,$ce,$d7,$8e,$ae,$92,43470 & $FF,43470 >> 8,$06
 ;
 ;	MOD    (#,#) T N
 ;
@@ -2348,15 +2352,15 @@ UnaryTables:
 ;
 ;	TDATA    (#,#) T N
 ;
-	.byte	$09,$ce,$dc,$8e,$ae,$92,40910 & $FF,40910 >> 8,$06
+	.byte	$09,$ce,$dc,$8e,$ae,$92,41678 & $FF,41678 >> 8,$06
 ;
 ;	TATTR    (#,#) T N
 ;
-	.byte	$09,$ce,$dd,$8e,$ae,$92,41166 & $FF,41166 >> 8,$06
+	.byte	$09,$ce,$dd,$8e,$ae,$92,41934 & $FF,41934 >> 8,$06
 ;
 ;	RPT$    (#,#) T S
 ;
-	.byte	$09,$ce,$da,$8e,$ae,$92,39118 & $FF,39118 >> 8,$07
+	.byte	$09,$ce,$da,$8e,$ae,$92,39886 & $FF,39886 >> 8,$07
 		.byte 	0
 
 		.send  code		

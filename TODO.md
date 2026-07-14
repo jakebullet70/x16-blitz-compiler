@@ -9,12 +9,19 @@ Replaces the original `TODO.txt`, which was written against **R43** and predated
   (`source/compiler/source/generation/*.def` and `.../system-specific/x16/generation/*.def`);
 - the gap between the two is below.
 
-**62 of the 81 extended keywords compile today. 19 do not.**
+**63 of the 81 extended keywords compile today. 18 do not** — and every one of the 18 is a
+deliberate rejection, not a gap. There is nothing left on the "worth implementing" list.
 
-Tiers 1, 2 and 3 are done — every keyword below compiles, and every one is checked against the R49
-ROM rather than against a reading of the manual. That caught the manual being **wrong** about
-`BVERIFY`'s signature. `ST` was added along the way: not one of the 81, but `LINPUT#` and `BINPUT#`
-are unusable without it. Only `RESET` is left.
+Tiers 1 to 4 are done. Every keyword below compiles, and every one is checked against the R49 ROM
+rather than against a reading of the manual — which caught the manual being **wrong** about
+`BVERIFY`'s signature, and then caught *this file* being wrong about `RESET` and `REBOOT`. `ST` was
+added along the way: not one of the 81, but `LINPUT#` and `BINPUT#` are unusable without it.
+
+**The extended keyword vector table is at `$C0A0` in BASIC ROM bank 4**, and it is C64 style, so
+each of the 81 entries holds its handler's address *minus one*. 66 statements (`$CE80`-`$CEC1`) then
+15 functions (which re-anchor at `$CED0`), and it ends exactly where the base keyword text begins at
+`$C142`. That is the fact to start from next time a keyword's real behaviour is in doubt — it is how
+the `RESET`/`REBOOT` mix-up below was found, and it beats reading the manual.
 
 ## How to decide whether a keyword is worth having
 
@@ -27,7 +34,7 @@ Not by the manual's **TYPE** column. That is a hint, not a rule: `LOAD` and `NEW
 
 That single test sorts all 40.
 
-## Worth implementing (1 left)
+## Worth implementing — ALL DONE
 
 ### Tier 1 — DONE
 
@@ -42,8 +49,11 @@ That single test sorts all 40.
   remainder, a superset.
 - `OVAL`/`RING` were the freebie predicted here: `GRAPH_draw_oval` takes the same bounding box and
   carry-as-fill flag that `GRAPH_draw_rect` does, so they reuse `GraphicsRectCoords` verbatim.
-- `POWEROFF`/`REBOOT` are one I2C write each to the SMC ($42), offsets 1 and 2. `bench/run-bench.sh`
-  no longer has to substitute `I2CPOKE 66,1,0`, so both benchmark columns now run identical source.
+- `POWEROFF` is one I2C write to the SMC (`$42`), offset 1. `bench/run-bench.sh` no longer has to
+  substitute `I2CPOKE 66,1,0`, so both benchmark columns now run identical source.
+- `REBOOT` was **wrong**, and Tier 4 is what found it — it did the offset-2 SMC write, which is
+  `RESET`'s job, so a compiled `REBOOT` hard reset the machine. See the bug below. This tier was
+  written from an assumption about which keyword was which, and the assumption was backwards.
 
 **A bug found and fixed on the way.** `GraphicsRectCoords` ended with `stz 8,x` / `stz 9,x`, commented
 "zero rounding". At that point `X` is `X16_r1` (4), so those write to 12/13 — that is **r5**, which is
@@ -131,11 +141,46 @@ Two P-codes serve all three keywords. The channel is not their business: the `#`
 the `C:` (channel execute) prefix, which sets `currentChannel` around the command and puts it back —
 exactly how `INPUT` and `INPUT#` already share one runtime.
 
-### Tier 4 — one loose end
+### Tier 4 — DONE
 
-`RESET` `$CE8F` — a warm reset, where `REBOOT` is a cold one through the SMC. Now that `REBOOT` exists
-this is close to a duplicate, but it is a couple of bytes and it is the one keyword the first pass of
-this list never classified at all. Cheap to finish.
+`RESET` `$CE8F`
+
+This was written up above as "a warm reset, where `REBOOT` is a cold one through the SMC", and as a
+near-duplicate worth a couple of bytes. **Both halves of that were wrong**, and it is the reason the
+keyword is worth having rather than a reason to skip it. The ROM (bank 4, vectors at `$C0A0`):
+
+| keyword | handler | what it actually does |
+|---|---|---|
+| `POWEROFF` `$CEAD` | `$E7BC` | `ldy #1` → I²C write, SMC `$42`. Cuts the power. |
+| `RESET` `$CE8F` | `$E7B8` | `ldy #2` → I²C write, SMC `$42`. The SMC asserts the reset **line** — a **hard** reset, the same as the physical reset switch. |
+| `REBOOT` `$CEAC` | `$E6EF` | `jmp ($FFFC)` — a **soft** reset. No hardware is reset at all; the KERNAL just starts again through its own reset vector. |
+
+They are the exact opposite way round from the claim, and the three keywords are genuinely three
+different things. The manual agrees with the ROM on all three ("*RESET … instructs the SMC to assert
+the reset line … a hard reset*", "*REBOOT … a software reset … by calling the ROM reset vector*") — so
+for once the manual was right and this file was wrong. All three now live in `machine.asm`, which
+leaves `x16_i2c.asm` holding only `I2CPEEK`/`I2CPOKE`, as its name says.
+
+**`REBOOT` cannot be written the way BASIC writes it, and cannot be written naively either.** BASIC
+copies a six byte stub (`stz $01` / `jmp ($FFFC)`) to `$0100` and jumps to *that*, because it is the
+ROM it is banking away — `stz $01` executed in place would pull BASIC out from under its own program
+counter. We run from RAM, so the two instructions can stand where they are.
+
+But the `stz` itself is not optional, and that is the interesting part: **`$C000-$FFFF` is banked, and
+only bank 0 has a real reset vector.** Bank 4 — the bank a compiled Blitz program is running under,
+measured, not assumed (`PRINT PEEK(1)` gives `4`, under Blitz *and* under stock) — has `$AA` filler at
+`$FFFA-$FFFF`. Bank 4 gets away with that because its `$FF00` page is a table of trampolines into
+bank 0, which is also why every KERNAL call in the runtime works without ever touching `$01`.
+
+Proved rather than argued: built once with the `stz` commented out, and `REBOOT` breaks straight into
+the machine-language monitor at **`PC = $AAAB`**, with `RO 04` in the register dump. That negative test
+is doing real work — `RESET` and `REBOOT` are observationally *identical* from outside (both reboot the
+machine), so it is the only thing that distinguishes "`REBOOT` really does take the `$FFFC` path" from
+"`REBOOT` is still quietly doing an SMC write". An SMC write would have rebooted with or without the
+`stz`.
+
+Both are byte-for-byte conformant with stock R49: the program prints its marker, and then the whole
+KERNAL boot banner is printed a second time.
 
 ## Rejected (16) — nothing for them to act on
 
@@ -153,6 +198,20 @@ its own way at compile time, so these would either mean something different or n
 author rejected them outright; leaving them parked rather than deciding in the abstract.
 
 ## Bugs
+
+### `REBOOT` was a hard reset — FIXED
+
+`REBOOT` did the offset-2 I²C write to the SMC, which makes the SMC assert the system reset line.
+That is a **hard** reset — the physical reset switch — and it is `RESET`'s job, not `REBOOT`'s.
+`REBOOT` is supposed to be a *software* reset through the ROM's own reset vector, touching no
+hardware at all. Tier 1 implemented one keyword's behaviour under the other's name, and because
+Blitz had no `RESET` at all there was nothing to collide with and nothing to notice.
+
+Nothing caught this, and nothing could have: on the emulator the two are indistinguishable — both
+restart the machine and reprint the boot banner — and no suite or benchmark uses `REBOOT` (they all
+use `POWEROFF`). It took reading the ROM's dispatch table to see it, which is the same lesson as
+`BVERIFY`: **the keyword's behaviour is whatever bank 4 says it is.** Now `RESET` is the SMC write
+and `REBOOT` is `stz $01` / `jmp ($FFFC)`.
 
 ### `OPEN` after any load or save still fails — OPEN, NOT FIXED
 

@@ -3883,6 +3883,110 @@ StackLoadCurrentPosition:
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;
+;		Name:		machine.asm
+;		Purpose:	POWEROFF, RESET and REBOOT
+;		Created:	14th July 2026
+;		Reviewed: 	No
+;
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		The three keywords that stop or restart the machine. They are not interchangeable, and it
+;		is worth being exact about which is which, because two of them were the wrong way round
+;		here. Read out of BASIC ROM bank 4 -- the extended keyword vector table is at $C0A0 and is
+;		C64 style, so each entry holds its handler's address minus one:
+;
+;			POWEROFF	$E7BC	one I2C write, SMC $42 offset 1. Cuts the power.
+;			RESET		$E7B8	one I2C write, SMC $42 offset 2. The SMC asserts the reset LINE,
+;								so this is a HARD reset -- the same as the physical reset switch.
+;			REBOOT		$E6EF	jmp ($FFFC). A SOFT reset: no hardware is reset at all, the KERNAL
+;								simply starts again through its own reset vector.
+;
+;		REBOOT used to do RESET's I2C write, which made a compiled REBOOT hard reset the machine.
+;		The manual agrees with the ROM on both, and it was this file that was wrong.
+;
+; ************************************************************************************************
+
+		.section 	code
+
+X16_SMC_Device = $42 						; the SMC's I2C address
+X16_SMC_PowerOff = 1 						; offset 1 : cut the power
+X16_SMC_Reset = 2 							; offset 2 : assert the reset line
+
+; ************************************************************************************************
+;
+;									POWEROFF and RESET
+;
+;		One I2C write to the System Management Controller each, which is what BASIC does for them.
+;		Neither takes a parameter, so X arrives as $FF (an empty stack) and only has to be put
+;		back that way after we borrow it for the device number.
+;
+; ************************************************************************************************
+
+X16CommandPowerOff: ;; [!poweroff]
+		.entercmd
+		phy
+		ldy 	#X16_SMC_PowerOff
+		bra 	X16SMCWrite
+
+X16CommandReset: ;; [!reset]
+		.entercmd
+		phy
+		ldy 	#X16_SMC_Reset
+
+X16SMCWrite: 								; global, not a cheap local: POWEROFF branches here
+		ldx 	#X16_SMC_Device 			; from its own scope, and _locals do not cross one.
+		lda 	#0
+		jsr 	X16_i2c_write_byte
+		bcs 	X16SMCError
+		ply 								; the write returns, and the SMC only acts a moment
+		ldx 	#$FF 						; later, so we do carry on running until it does.
+		.exitcmd 							; Tidy up properly rather than assume we die here.
+
+X16SMCError:
+		.error_channel
+
+; ************************************************************************************************
+;
+;										REBOOT
+;
+;		A software reset, straight through the ROM's own reset vector.
+;
+;		The bank switch is not tidying up, it is the whole trick. $C000-$FFFF is banked, and only
+;		bank 0 holds a real reset vector: bank 4, which is the one we are running under, has $AA
+;		filler at $FFFA-$FFFF, so jmp ($FFFC) without the stz would jump to $AAAA. (Bank 4 gets
+;		away with that because its $FF00 page is a table of trampolines into bank 0, which is also
+;		why every KERNAL call in this runtime works without ever touching $01.)
+;
+;		BASIC cannot do these two instructions inline -- it IS the ROM it is banking away, so it
+;		copies a six byte stub to $0100 and jumps to that. We run from RAM, so there is nothing to
+;		pull out from under us and the stub is unnecessary.
+;
+;		No sei, for the same reason BASIC does not bother with one: the KERNAL's reset entry masks
+;		interrupts itself, and until it does the IRQ vector still points somewhere valid.
+;
+; ************************************************************************************************
+
+X16CommandReboot: ;; [!reboot]
+		.entercmd
+		stz 	SelectROMBank 				; bank 0 = KERNAL, the only bank with a reset vector
+		jmp 	($FFFC) 					; and we do not come back
+
+		.send 	code
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;
+; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
 ;		Name:		mod.asm
 ;		Purpose:	MOD(dividend,divisor) function
 ;		Created:	13th July 2026
@@ -7591,52 +7695,53 @@ ShiftVectorTable:
 	.word	Command_VLOAD            ; $ce90 vload
 	.word	Command_BSAVE            ; $ce91 bsave
 	.word	Command_BVERIFY          ; $ce92 bverify
-	.word	XCommandMouse            ; $ce93 mouse
-	.word	XUnaryMB                 ; $ce94 mb
-	.word	XUnaryMX                 ; $ce95 mx
-	.word	XUnaryMY                 ; $ce96 my
-	.word	XUnaryMWheel             ; $ce97 mwheel
-	.word	UnaryRPT                 ; $ce98 rpt$
-	.word	Command_SPRITE           ; $ce99 sprite
-	.word	Command_SPRMEM           ; $ce9a sprmem
-	.word	Command_MOVSPR           ; $ce9b movspr
-	.word	UnaryST                  ; $ce9c st
-	.word	CommandStop              ; $ce9d stop
-	.word	CommandSYS               ; $ce9e sys
-	.word	UnaryTDATA               ; $ce9f tdata
-	.word	UnaryTATTR               ; $cea0 tattr
-	.word	Command_TILE             ; $cea1 tile
-	.word	CommandTIWriteN          ; $cea2 ti.write
-	.word	CommandTIWriteS          ; $cea3 ti$.write
-	.word	CommandXWAIT             ; $cea4 wait
-	.word	X16I2CPoke               ; $cea5 i2cpoke
-	.word	X16CommandPowerOff       ; $cea6 poweroff
-	.word	X16CommandReboot         ; $cea7 reboot
-	.word	X16I2CPeek               ; $cea8 i2cpeek
-	.word	CommandBank              ; $cea9 bank
-	.word	XCommandSleep            ; $ceaa sleep
-	.word	X16_Audio_FMINIT         ; $ceab fminit
-	.word	X16_Audio_FMNOTE         ; $ceac fmnote
-	.word	X16_Audio_FMDRUM         ; $cead fmdrum
-	.word	X16_Audio_FMINST         ; $ceae fminst
-	.word	X16_Audio_FMVIB          ; $ceaf fmvib
-	.word	X16_Audio_FMFREQ         ; $ceb0 fmfreq
-	.word	X16_Audio_FMVOL          ; $ceb1 fmvol
-	.word	X16_Audio_FMPAN          ; $ceb2 fmpan
-	.word	X16_Audio_FMPLAY         ; $ceb3 fmplay
-	.word	X16_Audio_FMCHORD        ; $ceb4 fmchord
-	.word	X16_Audio_FMPOKE         ; $ceb5 fmpoke
-	.word	X16_Audio_PSGINIT        ; $ceb6 psginit
-	.word	X16_Audio_PSGNOTE        ; $ceb7 psgnote
-	.word	X16_Audio_PSGVOL         ; $ceb8 psgvol
-	.word	X16_Audio_PSGWAV         ; $ceb9 psgwav
-	.word	X16_Audio_PSGFREQ        ; $ceba psgfreq
-	.word	X16_Audio_PSGPAN         ; $cebb psgpan
-	.word	X16_Audio_PSGPLAY        ; $cebc psgplay
-	.word	X16_Audio_PSGCHORD       ; $cebd psgchord
-	.word	CommandCls               ; $cebe cls
-	.word	CommandLocate            ; $cebf locate
-	.word	CommandColor             ; $cec0 color
+	.word	X16CommandPowerOff       ; $ce93 poweroff
+	.word	X16CommandReset          ; $ce94 reset
+	.word	X16CommandReboot         ; $ce95 reboot
+	.word	XCommandMouse            ; $ce96 mouse
+	.word	XUnaryMB                 ; $ce97 mb
+	.word	XUnaryMX                 ; $ce98 mx
+	.word	XUnaryMY                 ; $ce99 my
+	.word	XUnaryMWheel             ; $ce9a mwheel
+	.word	UnaryRPT                 ; $ce9b rpt$
+	.word	Command_SPRITE           ; $ce9c sprite
+	.word	Command_SPRMEM           ; $ce9d sprmem
+	.word	Command_MOVSPR           ; $ce9e movspr
+	.word	UnaryST                  ; $ce9f st
+	.word	CommandStop              ; $cea0 stop
+	.word	CommandSYS               ; $cea1 sys
+	.word	UnaryTDATA               ; $cea2 tdata
+	.word	UnaryTATTR               ; $cea3 tattr
+	.word	Command_TILE             ; $cea4 tile
+	.word	CommandTIWriteN          ; $cea5 ti.write
+	.word	CommandTIWriteS          ; $cea6 ti$.write
+	.word	CommandXWAIT             ; $cea7 wait
+	.word	X16I2CPoke               ; $cea8 i2cpoke
+	.word	X16I2CPeek               ; $cea9 i2cpeek
+	.word	CommandBank              ; $ceaa bank
+	.word	XCommandSleep            ; $ceab sleep
+	.word	X16_Audio_FMINIT         ; $ceac fminit
+	.word	X16_Audio_FMNOTE         ; $cead fmnote
+	.word	X16_Audio_FMDRUM         ; $ceae fmdrum
+	.word	X16_Audio_FMINST         ; $ceaf fminst
+	.word	X16_Audio_FMVIB          ; $ceb0 fmvib
+	.word	X16_Audio_FMFREQ         ; $ceb1 fmfreq
+	.word	X16_Audio_FMVOL          ; $ceb2 fmvol
+	.word	X16_Audio_FMPAN          ; $ceb3 fmpan
+	.word	X16_Audio_FMPLAY         ; $ceb4 fmplay
+	.word	X16_Audio_FMCHORD        ; $ceb5 fmchord
+	.word	X16_Audio_FMPOKE         ; $ceb6 fmpoke
+	.word	X16_Audio_PSGINIT        ; $ceb7 psginit
+	.word	X16_Audio_PSGNOTE        ; $ceb8 psgnote
+	.word	X16_Audio_PSGVOL         ; $ceb9 psgvol
+	.word	X16_Audio_PSGWAV         ; $ceba psgwav
+	.word	X16_Audio_PSGFREQ        ; $cebb psgfreq
+	.word	X16_Audio_PSGPAN         ; $cebc psgpan
+	.word	X16_Audio_PSGPLAY        ; $cebd psgplay
+	.word	X16_Audio_PSGCHORD       ; $cebe psgchord
+	.word	CommandCls               ; $cebf cls
+	.word	CommandLocate            ; $cec0 locate
+	.word	CommandColor             ; $cec1 color
 	.send code
 ; ************************************************************************************************
 ; ************************************************************************************************
@@ -8192,40 +8297,6 @@ X16I2CPoke: ;; [!I2CPOKE]
 
 X16I2CError:
 		.error_channel
-
-; ************************************************************************************************
-;
-;								POWEROFF and REBOOT
-;
-;		Both are a single I2C write to the System Management Controller, which is what X16
-;		BASIC does for them. Neither takes a parameter, so X arrives as $FF (empty stack) and
-;		only has to be put back that way after we borrow it for the device number.
-;
-; ************************************************************************************************
-
-X16_SMC_Device = $42 						; the SMC's I2C address
-X16_SMC_PowerOff = 1 						; offset 1 : power down
-X16_SMC_Reset = 2 							; offset 2 : reset
-
-X16CommandPowerOff: ;; [!poweroff]
-		.entercmd
-		phy
-		ldy 	#X16_SMC_PowerOff
-		bra 	X16SMCWrite
-
-X16CommandReboot: ;; [!reboot]
-		.entercmd
-		phy
-		ldy 	#X16_SMC_Reset
-
-X16SMCWrite: 								; global, not a cheap local: POWEROFF branches here
-		ldx 	#X16_SMC_Device 			; from its own scope, and _locals do not cross one.
-		lda 	#0
-		jsr 	X16_i2c_write_byte
-		bcs 	X16I2CError
-		ply 								; the write returns, and the SMC only cuts power a
-		ldx 	#$FF 						; moment later, so we do carry on running until it
-		.exitcmd 							; does. Tidy up properly rather than assume we die here.
 
 ; ************************************************************************************************
 ;

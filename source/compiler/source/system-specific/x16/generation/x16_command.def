@@ -22,7 +22,13 @@ VPOKE 			#,#,# T N
 SLEEP 			# T N
 MOUSE 			# T N
 I2CPOKE 		#,#,# T N
+
+# 	Three different ways to stop the machine, and they are not interchangeable -- POWEROFF cuts
+# 	the power, RESET has the SMC assert the reset line (a hard reset), and REBOOT goes through the
+# 	ROM's reset vector without resetting any hardware at all. See machine.asm.
+
 POWEROFF 		T N
+RESET 			T N
 REBOOT 			T N
 
 PSET 			#,#,# T N
