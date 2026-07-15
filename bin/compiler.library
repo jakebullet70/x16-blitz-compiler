@@ -568,9 +568,11 @@ _MCLSameLine:
 		beq 	MainCompileLoop 			; end of line, get next line.
 		cmp 	#":"						; if : then loop back.
 		beq 	_MCLSameLine
+		cmp 	#";" 						; a stray ; between statements (e.g. GOSUB 970;) is
+		beq 	_MCLSameLine 				; tolerated by BASIC, so skip it like a colon.
 
-		cmp 	#0 							; if ASCII then check for implied LET.		
-		bpl 	_MCLCheckAssignment 
+		cmp 	#0 							; if ASCII then check for implied LET.
+		bpl 	_MCLCheckAssignment
 
 		ldx 	#CommandTables & $FF 		; do command tables.
 		ldy 	#CommandTables >> 8
