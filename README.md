@@ -1,4 +1,4 @@
-# Blitz-X16 — a BASIC compiler for the Commander X16
+# GPC Blitz-X16 — a BASIC compiler for the Commander X16
 
 > Code name… Greased Piglet!
 
