@@ -90,12 +90,15 @@ _RBGetText:
 		stz 	ReadBuffer+1,x 				; make ASCIIZ as well.
 		plx
 		bra 	_RBGetText
-_RBEndGet: 									; value is in the read buffer,	
-		cmp 	#'"'
-		bne 	_RBNotQuote
-		jsr 	GetBumpNext
-_RBNotQuote:		
-		rts
+_RBEndGet: 									; value is in the read buffer,
+		cmp 	#'"' 						; a closing quote may be followed by a comma
+		bne 	_RBNotQuote 				; separator: DATA "a","b" or INPUT "a","b".
+		jsr 	GetLookNext 				; but ONLY skip it if a comma is really there.
+		cmp 	#',' 						; the old code consumed a byte unconditionally,
+		bne 	_RBNotQuote 				; which ran past the end of a DATA statement whose
+		jsr 	GetBumpNext 				; last value was quoted -- corrupting objPtr and
+_RBNotQuote:								; dataRemaining, so the *next* READ found garbage
+		rts 								; and hit OUT OF DATA (every quoted-DATA program).
 
 _RBError:
 		.error_data
