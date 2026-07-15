@@ -31,6 +31,13 @@ endif
 all: build
 
 #
+#		Every target here is a command, not a file -- and one, "build", collides with the build/
+#		directory prog8 writes into. Without this, make sees that directory, decides "build" is
+#		already made, and silently skips recompiling. Mark them all phony so they always run.
+#
+.PHONY: all build release run clean
+
+#
 #		Prog8 names its output after the source, in lowercase -- GPC.prg. The X16 wants GPC.PRG,
 #		and on a case sensitive host those are two different files. It has to be renamed, and it
 #		cannot be renamed in place: on Windows GPC.prg and GPC.PRG ARE the same file and cp
@@ -44,12 +51,12 @@ release: build
 	$(CCOPY) GPC.PRG $(RELEASEDIR)
 
 #
-#		GPC chain-loads BLITZ.PRG by name, so the compiler has to be sitting next to it.
+#		GPC chain-loads GPC.BLITZ.PRG by name, so the compiler has to be sitting next to it.
 #
 run: build
-	$(CCOPY) ..$(S)application$(S)BLITZ.PRG .
+	$(CCOPY) ..$(S)application$(S)GPC.BLITZ.PRG .
 	$(CDEL) dump*.bin dump*.txt
 	$(EMULATOR) -prg GPC.PRG -run
 
 clean:
-	$(CDEL) GPC.PRG BLITZ.PRG build$(S)GPC.*
+	$(CDEL) GPC.PRG GPC.BLITZ.PRG build$(S)GPC.*

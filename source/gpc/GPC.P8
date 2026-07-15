@@ -44,7 +44,7 @@ main {
 			return
 		}
 
-		chain_run("blitz.prg")
+		chain_run("gpc.blitz.prg")
 	}
 
 	; ********************************************************************************************
@@ -101,7 +101,7 @@ main {
 	;
 	;		Hand the machine over to the compiler.
 	;
-	;		BLITZ.PRG loads at $0801, which is exactly where THIS program is sitting, so we cannot
+	;		GPC.BLITZ.PRG loads at $0801, which is exactly where THIS program is sitting, so we cannot
 	;		load it ourselves: the KERNAL's LOAD would overwrite the code that called it and
 	;		return into the wreckage. So we do not load it at all. We leave the LOAD command on
 	;		the screen, put the cursor back on it, drop CR + RUN into the keyboard buffer, and
@@ -109,7 +109,7 @@ main {
 	;		-- by which time we are long gone and $0801 is free.
 	;
 	;		The keyboard buffer is only ten bytes, which is why the LOAD line goes on the screen
-	;		rather than into the buffer: LOAD"BLITZ.PRG" alone would not fit.
+	;		rather than into the buffer: LOAD"GPC.BLITZ.PRG" alone would not fit.
 	;
 	;		The rows are counted, and the count matters. After we exit, BASIC prints CR, "READY.",
 	;		CR -- which walks the cursor down two rows from wherever we left it. So we leave the
@@ -125,7 +125,7 @@ main {
 		txt.chrout($93) 						; clear screen, cursor home  -> row 0
 		txt.nl() 								; -> row 1, which "READY." will be printed over
 		txt.nl() 								; -> row 2
-		txt.print("load") 						; row 2 : load"blitz.prg"
+		txt.print("load") 						; row 2 : load"gpc.blitz.prg"
 		txt.chrout($22)
 		txt.print(name)
 		txt.chrout($22)

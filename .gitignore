@@ -53,7 +53,7 @@ source/unit-tests/compiler-runtime/CODE.BIN
 # ---------------------------------------------------------------------------
 # source/gpc build products. Prog8 writes GPC.prg/.asm/.vice-mon-list into build/;
 # the Makefile renames the .prg up to GPC.PRG. The copy that SHIPS, and the only
-# one committed, is release/GPC.PRG. BLITZ.PRG is copied in by the "run" target,
+# one committed, is release/GPC.PRG. GPC.BLITZ.PRG is copied in by the "run" target,
 # because GPC chain-loads the compiler by name and needs it alongside.
 # ---------------------------------------------------------------------------
 source/gpc/build/

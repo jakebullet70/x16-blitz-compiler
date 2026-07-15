@@ -48,7 +48,7 @@ build: prelim
 			$(BINDIR)compiler.library \
 			_library.asm \
 			source$(S)main$(S)zzfree.footer
-	$(CCOPY) build$(S)code.prg BLITZ.PRG
+	$(CCOPY) build$(S)code.prg GPC.BLITZ.PRG
 
 release:  build
 	$(CDEL) OBJECT.PRG
@@ -71,7 +71,7 @@ release:  build
 run: build	
 	$(CDEL) OBJECT.PRG
 	$(EXEBASIC)
-	$(CCOPY) BLITZ.PRG $(BINDIR)	
+	$(CCOPY) GPC.BLITZ.PRG $(BINDIR)
 	
 x16:
 	$(EMULATOR)
