@@ -1,0 +1,186 @@
+==============================================================================
+ XFMGR2 - an XTree-style file manager for the Commander X16    (Build 185)
+==============================================================================
+
+ A dual-pane, keyboard-driven file manager. A collapsible DIRECTORY tree on
+ the left, the selected directory's FILES on the right, with file tagging, a
+ banked text/hex viewer, a BMX image viewer, a whole-disk Find, and a full set
+ of file operations - copy, move, rename, delete, mkdir and prune - plus edit
+ via the ROM X16 Edit and switchable colour themes.
+
+ The bottom command menu is MODIFIER-DRIVEN. By default it shows MENU (plain
+ keys). Hold CTRL for the CTRL menu, hold ALT (the Commodore key) for the ALT
+ menu; release to return to MENU. The plain menu is context-sensitive: the
+ DIRECTORY pane and the FILE pane offer different commands.
+
+------------------------------------------------------------------------------
+ NAVIGATION (either pane)
+------------------------------------------------------------------------------
+   Up / Dn     Move the cursor within the focused pane
+   TAB         Switch focus between the DIRECTORY and FILE panes
+   Right       Focus the FILE pane (logs the dir's files on the fly)
+   Left        Focus the DIRECTORY pane
+   F1          Show this help
+   Q           Quit, leaving the shell in the LAUNCH directory
+
+------------------------------------------------------------------------------
+ DIRECTORY pane (plain keys)
+------------------------------------------------------------------------------
+   Enter       Log the directory if new; else expand / collapse it
+   M           Make a new subdirectory in the selected folder
+   R           Rename the selected directory
+   D           Delete the selected folder (empty folders only)
+   P           Prune - recursively delete the folder and all its contents
+               (type 'prune' to confirm)
+   F3          Re-log sub-folders (picks up folders made since logging)
+   A           About box (version, banked-RAM usage, credits)
+
+------------------------------------------------------------------------------
+ FILE pane (plain keys)
+------------------------------------------------------------------------------
+   T           Tag current file, then advance
+   U           Untag current file, then advance
+   V           View - .bmx in the image viewer, else the text/hex viewer
+   P           Play music - .zsm (ZSound) or .wav (PCM) audio
+   E           Edit file in the ROM X16 Edit, then return
+   C           Copy selected (or all tagged) file(s) to a directory
+   M           Move selected (or all tagged) file(s) to a directory
+   R           Rename (supports * and ? wildcards)
+   D           Delete current file (confirm)
+   F           Set the file-spec filter (e.g. *.prg, Enter = * = all)
+
+------------------------------------------------------------------------------
+ CTRL menu (acts on the current directory / all tagged)
+------------------------------------------------------------------------------
+   Ctrl-T      Tag all files in this directory
+   Ctrl-U      Untag all files in this directory
+   Ctrl-I      Invert tags in this directory
+   Ctrl-W      Tag files matching a wildcard
+   Ctrl-G      ShowAll - modal list of every tagged file across all dirs
+   Ctrl-F      Find files across the whole disk
+               (Ctrl-N in the emulator, Ctrl-F on hardware)
+   Ctrl-C      Copy all tagged files (from all dirs) to one destination
+   Ctrl-M      Move all tagged files (from all dirs) to one destination
+               (Ctrl-O in the emulator, Ctrl-M on hardware)
+   Ctrl-X      Delete all tagged files in this directory
+               (Ctrl-X in the emulator, Ctrl-D on hardware)
+
+------------------------------------------------------------------------------
+ ALT menu  (ALT = the Commodore key)
+------------------------------------------------------------------------------
+   Alt-S       Cycle sort order: name -> extension -> size
+   Alt-X       Execute - quit XFMGR and chain-run the selected program
+   Alt-Q       Quit, leaving the shell in the CURRENTLY SELECTED directory
+   Alt-F3      Re-log the current context (sub-folders in DIR, files in FILE)
+   Alt-F10     Open the colour-theme setup (quits to XFSETUP.PRG)
+
+------------------------------------------------------------------------------
+ In text prompts (Copy, Move, Rename, Mkdir, Filespec, Tag-spec, Find)
+------------------------------------------------------------------------------
+   Up          Pop up the recent-entry history for this prompt
+   F2          Open the directory picker (Copy/Move destinations)
+   Left/Right  Move the cursor in the field   (Home = start)
+   Enter       Accept (saved to history)
+   Esc         Cancel
+
+------------------------------------------------------------------------------
+ In the ShowAll / Find / directory-picker modals
+------------------------------------------------------------------------------
+   Up / Dn     Move          Enter  Select / jump to the file
+   +           Expand (picker, logs on demand)     - Collapse
+   Esc / Q     Cancel        U      Untag the highlighted entry (ShowAll)
+
+------------------------------------------------------------------------------
+ File formats the viewer handles
+------------------------------------------------------------------------------
+   Text        ANY file opens as text. Non-printable bytes show as '.'.
+               Press H at any time for a raw hex dump, H again for text.
+   Hex         Any file, as a hex + ASCII dump (H toggles text <-> hex).
+   ZSM music   .zsm files (auto-detected) show a parsed header breakout -
+               version, tick rate, loop point, PCM, FM (YM) and PSG voices.
+               Press H for the raw hex bytes.
+   BMX image   .bmx bitmaps do NOT open here - V sends them full-screen to
+               the BMX image viewer; any key returns to the file list.
+
+   Big files that are too large for the pager fall back to the ROM X16 Edit.
+
+------------------------------------------------------------------------------
+ Music playback (P)
+------------------------------------------------------------------------------
+   ZSM         .zsm songs play through the zsmkit engine (FM + PSG + PCM).
+               The whole song is loaded into free RAM banks, so a very large
+               song may report "no free RAM banks" - close/relog to free some.
+               (V on a .zsm still shows the header breakout; P plays it.)
+   WAV         .wav plays uncompressed PCM: 8- or 16-bit, mono or stereo, up
+               to ~48 kHz. Compressed (ADPCM) wavs are not supported yet.
+   Controls    SPACE pauses / resumes; Q, ESC or STOP stops and returns.
+   Needs       zsmkit.bin (ZSM) and xmusic.ovl (WAV) beside the program; if
+               either is missing, P reports it and does nothing.
+
+------------------------------------------------------------------------------
+ In the text / hex viewer (V, and this help)
+------------------------------------------------------------------------------
+   PgDn/PgUp   Page          T  Top        B  Bottom
+   H           Toggle hex / text
+   F           Find a string
+   N / Space    Repeat the search (find next)
+   Q / Esc     Exit back to the file list
+
+------------------------------------------------------------------------------
+ EMULATOR vs REAL HARDWARE  (key differences)
+------------------------------------------------------------------------------
+   XFMGR detects whether it is running under the x16emu emulator and rebinds
+   the CTRL commands the emulator window grabs before they reach the app. The
+   bottom CTRL menu always shows the binding that is ACTIVE right now.
+
+     Command          Emulator     Real hardware
+     Delete tagged    Ctrl-X       Ctrl-D
+     Find files       Ctrl-N       Ctrl-F
+     Move tagged      Ctrl-O       Ctrl-M
+
+   Ctrl-S is also swallowed by the emulator, so Tag-by-wildcard is Ctrl-W in
+   both environments. ALT is the Commodore (C=) key on a real X16; in the
+   emulator it is the left Alt key. Everything else - plain keys, function
+   keys, arrows - behaves identically in both.
+
+------------------------------------------------------------------------------
+ LIMITS
+------------------------------------------------------------------------------
+   Directories Up to 254 directories are logged per session (the tree caps
+               there). Find scans the WHOLE disk no matter how many folders it
+               holds, but only logs the folders that CONTAIN a match. If one
+               search's matches are spread across more than 254 folders,
+               logging stops there and the results are marked "(partial)".
+   Find/ShowAll At most 255 matching files are collected; beyond that the list
+               is marked "(partial)". Very deep folder paths may be skipped
+               (also shown as "(partial)").
+
+------------------------------------------------------------------------------
+ HOW IT IS INSTALLED  (folder layout)
+------------------------------------------------------------------------------
+   The installer keeps the whole app in ONE folder and drops a tiny launcher
+   in the drive root, so you can start it from anywhere:
+
+     /                     drive root
+     +-- XT                one-line BASIC launcher  (LOAD "/XFMGR/XFMGR.PRG")
+     +-- XFMGR/            everything else lives here
+          +-- XFMGR.PRG        the main program
+          +-- *.OVL            banked overlays (viewer, image, music, ui, misc)
+          +-- XFSETUP.PRG      the colour-theme setup (Alt-F10)
+          +-- ZSMKIT.BIN       the ZSM music engine
+          +-- XFMGR.HLP        this help file
+          +-- XFMGR.CFG        your saved theme (kept across updates)
+
+   To install: Copy the unpacked release files plus INSTALL.PRG into one
+   folder, boot the X16, CD into that folder and run INSTALL. It creates
+   /XFMGR, copies the app files into it, and writes the root /XT launcher.
+   (The install folder can be removed after the install is complete)
+
+   To launch from *any* directory afterwards:   ^/xt
+   (XFMGR itself always presents the tree rooted at "/", so you can roam the
+   whole drive no matter where you started it.)
+
+==============================================================================
+ (c) 2025-26 sadLogic, JakeInErope  -  written in Prog8 with help from AI
+ (Thanks to the many Discord members keeping this cool retro computer alive!)
+==============================================================================
