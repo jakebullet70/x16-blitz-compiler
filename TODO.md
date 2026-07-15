@@ -425,8 +425,13 @@ green.
   positive, `[`,`-`,`5`,`$1D`,`]` for a negative). The leading space (the sign column) was always
   correct — it comes from `FloatToString` — only the trailing pad was wrong. A terminal diff could
   not see this, because `$1D` renders as nothing; found by hexdumping `PRINT n;"X"`.
-- **`PRINT` keeps a leading zero.** Blitz prints `0.5`, X16 BASIC prints `.5`. The trailing zeros and
-  the rounding are already fixed.
+- **`PRINT` kept a leading zero — FIXED.** Blitz printed `0.5` where stock X16 BASIC prints `.5` (and
+  `-0.5` where stock prints `-.5`). `FloatToString` (`utility/float/tostring.asm`) writes the integer
+  part first, so a pure fraction came out with a `0` in front. It now drops that zero when it is the
+  whole integer part — the character before it is the sign/space, not another digit — so `10.5` and
+  `100.5` keep theirs. Verified with the raw-buffer probe against stock: `.5`, `-.5`, `.25`, `.125`,
+  `10.5`, `100.5`, and a whole `0` is untouched. The trailing zeros and the rounding were already
+  fixed.
 - **Integers below 2^31 print in full**, where stock switches to E notation above 9 digits: we print
   `2147483647`, stock prints `2.14748365E+09`. This is deliberate — we hold it exactly, so printing it
   exactly is *more* precise, not less. Only mentioning it because it is a visible difference.
@@ -460,7 +465,21 @@ and hands the machine over to the compiler.
 ## Build / infrastructure
 
 - Copy the object code *down* after compiling, rather than leaving it above the compiler and its
-  libraries (must stay on a page boundary). Inherited from the old TODO and still true.
+  libraries (must stay on a page boundary). **The part that matters is DONE** — a saved `OBJECT.PRG`
+  already reclaims the compiler's ~5.5K: `WriteObjectCode` writes runtime + object as two pieces so the
+  object lands at `ObjectBase` on reload, with an adaptive low workspace (commit "Reclaim the compiler's
+  memory from compiled programs"). What is *not* done is the in-memory "RUN the compiler a second time"
+  path, which still runs the object where it was generated (up at `FreeMemory`, workspace hardcoded at
+  `$8000`). **Parked as a low-value dev-path cleanup:** it only affects testing a program in the
+  compiler's own memory without reloading the saved file — the shipped `OBJECT.PRG` is unaffected. The
+  one real wrinkle is a size ceiling on that path (object code over ~14K grows past `$8000` and the
+  in-memory run's workspace stomps it, even though the saved file is fine). If it is ever worth doing:
+  insert a `RelocateObject` routine *below* `ObjectBase` (so the copy cannot overwrite itself), reached
+  by the NOP fall-through `PatchOutCompile` already leaves at `StartCode`; guard it on `RunCodePage+1
+  == FreeMemory>>8` (false in the saved file, so it self-skips), forward-copy `FreeMemory`→`ObjectBase`
+  (dst < src, overlap-safe), patch the `RunCodePage`/`RunWorkspacePage` immediates in RAM, then fall
+  through to run. Length must come from `newWorkspacePage` (a code-section byte that survives), not
+  `objPtr` (zero page, gone once BASIC re-runs).
 - **`release` copied `CHANGES.txt` unconditionally** — the original author's 2023 changelog, deleted
   in "Del old files from previous build". `make libs` then failed at the packaging step, well after
   the assembler had already succeeded, which reads like a build break but is not one. It is copied
