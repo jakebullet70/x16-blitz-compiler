@@ -19,7 +19,7 @@ COLOR 			# X:OptionalParameterCompile T N
 
 SCREEN 			# T N
 VPOKE 			#,#,# T N
-SLEEP 			# T N
+SLEEP 			X:OptionalNumberCompile T N
 MOUSE 			# T N
 I2CPOKE 		#,#,# T N
 
