@@ -31,8 +31,9 @@ _PNLoop:
 		inx
 		lda	 	decimalBuffer,x
 		bne 	_PNLoop
-		lda 	#32 						; trailing space
-		jsr 	VectorPrintCharacter
+		lda 	#$1D 						; trailing CRSR-RIGHT, as stock BASIC does -- it looks
+		jsr 	VectorPrintCharacter 		; like a space on screen but writes $1D not $20 to a
+											; file (PRINT#) or through CMD, which is what stock does
 		plx
 		.exitcmd
 

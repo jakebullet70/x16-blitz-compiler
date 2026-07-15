@@ -390,11 +390,14 @@ deliberately ignores the low 12 bits. Check it with the raw-float-bytes probe in
 
 ### Cosmetic
 
-- **`PRINT` pads a number with a space, stock pads with a cursor-right.** After printing a number,
-  stock emits `$1D` (CRSR-RIGHT) where Blitz emits `$20`. Both advance one column, so on screen the
-  two are indistinguishable — but they are different *bytes*, so a numeric `PRINT#` to a file, or a
-  `PRINT` through `CMD`, writes something stock would not. Found by hexdumping a `PRINT n;"X"`; a
-  terminal diff cannot see it, because `$1D` renders as nothing.
+- **`PRINT` padded a number with a space, stock pads with a cursor-right — FIXED.** After printing a
+  number `PrintNumber` (`print/printvalues.asm`) emitted `$20` where stock emits `$1D` (CRSR-RIGHT).
+  Both advance one column, so on screen they are indistinguishable — but they are different *bytes*,
+  so a numeric `PRINT#` to a file, or a `PRINT` through `CMD`, wrote something stock would not. Now
+  `PrintNumber` emits `$1D`; verified byte-for-byte against stock R49 (`[`,`$20`,`5`,`$1D`,`]` for a
+  positive, `[`,`-`,`5`,`$1D`,`]` for a negative). The leading space (the sign column) was always
+  correct — it comes from `FloatToString` — only the trailing pad was wrong. A terminal diff could
+  not see this, because `$1D` renders as nothing; found by hexdumping `PRINT n;"X"`.
 - **`PRINT` keeps a leading zero.** Blitz prints `0.5`, X16 BASIC prints `.5`. The trailing zeros and
   the rounding are already fixed.
 - **Integers below 2^31 print in full**, where stock switches to E notation above 9 digits: we print
