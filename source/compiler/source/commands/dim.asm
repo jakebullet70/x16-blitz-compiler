@@ -22,11 +22,11 @@ CommandDIM:
 		jsr 	GetNextNonSpace 			; get the first non space character
 		jsr 	ExtractVariableName 		; variable name to XY
 		phx 								; save name with type bits.
-		cpx 	#0 							; check it is an array.
-		bpl 	_CDError
+		cpx 	#0 							; is it an array (bit 7 / NSSArray set) ?
+		bpl 	_CDScalar 					; no -- DIM of a simple variable, just reserve it.
 		jsr 	FindVariable	 			; see if already exist
 		bcs 	_CDRedefine 				; it still exists.
-		jsr 	CreateVariableRecord 		; create the basic variable 
+		jsr 	CreateVariableRecord 		; create the basic variable
 		jsr 	AllocateBytesForType 		; allocate memory for it
 
 		pla 								; restore type bits
@@ -39,23 +39,37 @@ CommandDIM:
 		jsr 	PushIntegerA 				; push that type data out.
 
 		.keyword PCD_DIM 					; call the keyword to dimension the array with this information.
-		
+
 		plx 								; restore address
 		ply
 		lda 	#NSSIFloat+NSSIInt16 		; pretend it is an int16 reference.
 		sec
 		jsr 	GetSetVariable 				; store the address in the reference to the array structure.
+		bra 	_CDComma
 		;
+		;		DIM of a simple variable. Stock BASIC allows this (e.g. DIM A%,B%) and it is
+		;		valid on the X16 -- it just forces the variable to exist now instead of on first
+		;		use. There is nothing to dimension and no runtime code to emit, so we only reserve
+		;		the record. Already exists (used before the DIM) -> leave it, don't redefine-error;
+		;		the redefine rule is for arrays, and scalars carry no dimensions to conflict.
+		;
+_CDScalar:
+		jsr 	FindVariable 				; does it already exist ?
+		bcs 	_CDScalarDone 				; yes -- nothing to do.
+		jsr 	CreateVariableRecord 		; no -- create it
+		jsr 	AllocateBytesForType 		; and give it storage.
+_CDScalarDone:
+		pla 								; discard the saved type bits.
+		;
+_CDComma:
 		jsr 	LookNextNonSpace 			; , follows ?
 		cmp 	#","
 		bne 	_CDExit
 		jsr 	GetNext 					; consume comma
 		bra 	CommandDIM 					; do another DIM
-_CDExit:		
-		rts		
+_CDExit:
+		rts
 
-_CDError:
-		.error_syntax
 _CDRedefine:
 		.error_redefine
 

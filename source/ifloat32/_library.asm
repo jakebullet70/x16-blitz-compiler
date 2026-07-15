@@ -2217,6 +2217,25 @@ _CNTSNotFloat:
 		jsr 	FloatFractionalPart 		; get the fractional part
 		jsr 	FloatNormalise					; normalise , exit if zero
 		beq 	_CNTSExit
+		;
+		;		Stock BASIC drops the leading zero of a pure fraction: .5, not 0.5 (and -.5,
+		;		not -0.5). MakePlusTwoString has just written the integer part; if it is a lone
+		;		"0" -- the character before it is the sign/space, not another digit -- back the
+		;		buffer up over it so the point lands where the zero was.
+		;
+		ldy 	dbOffset
+		dey 								; Y -> last integer digit
+		lda 	decimalBuffer,y
+		cmp 	#"0"
+		bne 	_CNTSPoint 					; not a zero, so nothing to drop
+		dey
+		bmi 	_CNTSDropZero 				; nothing before it at all (no sign) : lone zero
+		lda 	decimalBuffer,y 			; the character before the zero
+		cmp 	#"0"
+		bcs 	_CNTSPoint 					; a digit : the 0 belongs to a bigger integer, keep it
+_CNTSDropZero:
+		dec 	dbOffset 					; sign/space before it : the 0 was the whole integer part
+_CNTSPoint:
 		lda 	#"."
 		jsr 	WriteDecimalBuffer 			; write decimal place
 _CNTSDecimal:

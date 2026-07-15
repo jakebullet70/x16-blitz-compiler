@@ -22,3 +22,12 @@ MOD 			(#,#) T N
 TDATA 			(#,#) T N
 TATTR 			(#,#) T N
 RPT$ 			(#,#) T S
+
+# 	POINTER and STRPTR return the RAM address of a variable's value in stock BASIC. Their
+# 	whole purpose is to expose the *interpreter's* internal variable/string layout, which the
+# 	compiled runtime does not replicate (strings here are [MaxLen][Control][ActLen][Data], not
+# 	the CBM [len,lo,hi] descriptor). Recognise the tokens but reject them with NOT IMPLEMENTED
+# 	rather than emit code that would compile and then read the wrong memory. See gensupport.asm.
+
+POINTER 		X:UnsupportedCompile N
+STRPTR 			X:UnsupportedCompile N

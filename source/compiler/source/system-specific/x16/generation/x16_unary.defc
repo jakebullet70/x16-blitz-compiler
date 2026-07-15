@@ -53,3 +53,11 @@
 ;	RPT$    (#,#) T S
 ;
 	.byte	$09,$ce,$da,$8e,$ae,$92,39886 & $FF,39886 >> 8,$07
+;
+;	POINTER   X:UnsupportedCompile N
+;
+	.byte	$07,$ce,$d8,$03,UnsupportedCompile & $FF,UnsupportedCompile >> 8,$06
+;
+;	STRPTR    X:UnsupportedCompile N
+;
+	.byte	$07,$ce,$d9,$03,UnsupportedCompile & $FF,UnsupportedCompile >> 8,$06

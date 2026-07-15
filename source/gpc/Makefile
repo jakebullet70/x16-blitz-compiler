@@ -51,12 +51,12 @@ release: build
 	$(CCOPY) GPC.PRG $(RELEASEDIR)
 
 #
-#		GPC chain-loads GPC.BLITZ.PRG by name, so the compiler has to be sitting next to it.
+#		GPC chain-loads GPC.BLITZ.BIN by name, so the compiler has to be sitting next to it.
 #
 run: build
-	$(CCOPY) ..$(S)application$(S)GPC.BLITZ.PRG .
+	$(CCOPY) ..$(S)application$(S)GPC.BLITZ.BIN .
 	$(CDEL) dump*.bin dump*.txt
 	$(EMULATOR) -prg GPC.PRG -run
 
 clean:
-	$(CDEL) GPC.PRG GPC.BLITZ.PRG build$(S)GPC.*
+	$(CDEL) GPC.PRG GPC.BLITZ.BIN build$(S)GPC.*

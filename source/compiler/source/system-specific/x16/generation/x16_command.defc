@@ -34,9 +34,9 @@
 ;
 	.byte	$08,$ce,$84,$ea,$ea,$e1,204,$06
 ;
-;	SLEEP    # T N
+;	SLEEP    X:OptionalNumberCompile T N
 ;
-	.byte	$07,$ce,$af,$e2,43982 & $FF,43982 >> 8,$06
+	.byte	$0a,$ce,$af,$03,OptionalNumberCompile & $FF,OptionalNumberCompile >> 8,$20,43982 & $FF,43982 >> 8,$06
 ;
 ;	MOUSE    # T N
 ;

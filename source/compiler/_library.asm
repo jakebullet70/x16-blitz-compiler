@@ -1035,11 +1035,11 @@ CommandDIM:
 		jsr 	GetNextNonSpace 			; get the first non space character
 		jsr 	ExtractVariableName 		; variable name to XY
 		phx 								; save name with type bits.
-		cpx 	#0 							; check it is an array.
-		bpl 	_CDError
+		cpx 	#0 							; is it an array (bit 7 / NSSArray set) ?
+		bpl 	_CDScalar 					; no -- DIM of a simple variable, just reserve it.
 		jsr 	FindVariable	 			; see if already exist
 		bcs 	_CDRedefine 				; it still exists.
-		jsr 	CreateVariableRecord 		; create the basic variable 
+		jsr 	CreateVariableRecord 		; create the basic variable
 		jsr 	AllocateBytesForType 		; allocate memory for it
 
 		pla 								; restore type bits
@@ -1052,23 +1052,37 @@ CommandDIM:
 		jsr 	PushIntegerA 				; push that type data out.
 
 		.keyword PCD_DIM 					; call the keyword to dimension the array with this information.
-		
+
 		plx 								; restore address
 		ply
 		lda 	#NSSIFloat+NSSIInt16 		; pretend it is an int16 reference.
 		sec
 		jsr 	GetSetVariable 				; store the address in the reference to the array structure.
+		bra 	_CDComma
 		;
+		;		DIM of a simple variable. Stock BASIC allows this (e.g. DIM A%,B%) and it is
+		;		valid on the X16 -- it just forces the variable to exist now instead of on first
+		;		use. There is nothing to dimension and no runtime code to emit, so we only reserve
+		;		the record. Already exists (used before the DIM) -> leave it, don't redefine-error;
+		;		the redefine rule is for arrays, and scalars carry no dimensions to conflict.
+		;
+_CDScalar:
+		jsr 	FindVariable 				; does it already exist ?
+		bcs 	_CDScalarDone 				; yes -- nothing to do.
+		jsr 	CreateVariableRecord 		; no -- create it
+		jsr 	AllocateBytesForType 		; and give it storage.
+_CDScalarDone:
+		pla 								; discard the saved type bits.
+		;
+_CDComma:
 		jsr 	LookNextNonSpace 			; , follows ?
 		cmp 	#","
 		bne 	_CDExit
 		jsr 	GetNext 					; consume comma
 		bra 	CommandDIM 					; do another DIM
-_CDExit:		
-		rts		
+_CDExit:
+		rts
 
-_CDError:
-		.error_syntax
 _CDRedefine:
 		.error_redefine
 
@@ -2014,9 +2028,9 @@ CommandTables:
 ;
 	.byte	$08,$ce,$84,$ea,$ea,$e1,204,$06
 ;
-;	SLEEP    # T N
+;	SLEEP    X:OptionalNumberCompile T N
 ;
-	.byte	$07,$ce,$af,$e2,43982 & $FF,43982 >> 8,$06
+	.byte	$0a,$ce,$af,$03,OptionalNumberCompile & $FF,OptionalNumberCompile >> 8,$20,43982 & $FF,43982 >> 8,$06
 ;
 ;	MOUSE    # T N
 ;
@@ -2361,6 +2375,14 @@ UnaryTables:
 ;	RPT$    (#,#) T S
 ;
 	.byte	$09,$ce,$da,$8e,$ae,$92,39886 & $FF,39886 >> 8,$07
+;
+;	POINTER   X:UnsupportedCompile N
+;
+	.byte	$07,$ce,$d8,$03,UnsupportedCompile & $FF,UnsupportedCompile >> 8,$06
+;
+;	STRPTR    X:UnsupportedCompile N
+;
+	.byte	$07,$ce,$d9,$03,UnsupportedCompile & $FF,UnsupportedCompile >> 8,$06
 		.byte 	0
 
 		.send  code		
@@ -2766,6 +2788,51 @@ _MidComplete:
 
 MidFailType:
 		.error_type
+
+; ************************************************************************************************
+;
+;		An optional *leading* numeric parameter, for commands that are valid with or without
+;		an argument in stock BASIC (e.g. bare SLEEP as well as SLEEP <ticks>). Unlike
+;		OptionalParameterCompile this argument has no leading comma to key off -- it is the
+;		first and only parameter -- so absence is end-of-statement, tested exactly as
+;		CommandRESTORE tests its optional line number (a ':' or EOL). When absent we push 0,
+;		so bare SLEEP compiles to SLEEP 0 (an immediate return in the runtime handler).
+;
+; ************************************************************************************************
+
+OptionalNumberCompile:
+		jsr 	LookNextNonSpace 			; what follows the keyword ?
+		cmp 	#':' 						; end of statement -> argument omitted
+		beq 	_ONCDefault
+		cmp 	#0 							; end of line     -> argument omitted
+		beq 	_ONCDefault
+		jsr 	CompileExpressionAt0 		; else compile the supplied expression
+		and 	#NSSTypeMask
+		cmp 	#NSSIFloat
+		bne 	MidFailType 				; which must be numeric
+		clc
+		rts
+_ONCDefault:
+		lda 	#0 							; bare command == argument 0
+		jsr 	PushIntegerA
+		clc
+		rts
+
+; ************************************************************************************************
+;
+;		A generation helper for keywords that are recognised (so tokenised BASIC loads and
+;		round-trips) but are not implemented by this version of the compiler. Rather than let
+;		the term evaluator fall through to a bare "SYNTAX ERROR" -- which makes a valid-BASIC
+;		keyword look like a typo -- we route the token here and raise NOT IMPLEMENTED, so the
+;		user sees "NOT IMPLEMENTED @ <line>" and knows the feature, not their spelling, is the
+;		problem. Used by POINTER and STRPTR (x16_unary.def): both expose the interpreter's
+;		internal variable layout, which the compiled runtime stores differently, so honouring
+;		them would silently misbehave rather than fail loudly. This never returns.
+;
+; ************************************************************************************************
+
+UnsupportedCompile:
+		.error_unimplemented
 
 ; ************************************************************************************************
 ;
@@ -4695,7 +4762,8 @@ CommandOPEN:
 		lda 	#0		 					; so we have n,n,$,0 so swap !
 		jsr 	PushIntegerA
 		.keyword PCD_SWAP
-		rts
+		clc 								; see _COCompileNullString: WriteCodeByte returns CS,
+		rts 								; and CS here would abort generation before PCD_OPEN.
 		;
 		;		Two numeric values, add default 0 and empty string.
 		;
@@ -4703,11 +4771,22 @@ _COTwoDefaults:
 		lda 	#0
 		jsr 	PushIntegerA
 _COCompileNullString:
-		.keyword PCD_CMD_STRING
-		lda 	#0
-		jsr 	WriteCodeByte
-		jsr 	WriteCodeByte
-		rts		
+		.keyword PCD_CMD_STRING 			; an empty (no filename) string is just a zero length
+		lda 	#0 							; byte -- BufferOutput emits [length][chars], so length
+		jsr 	WriteCodeByte 				; 0 and no data. (The old code wrote a SECOND $0 here,
+		;									; a stray push that was harmless in itself.)
+		;
+		;		WriteCodeByte returns with CARRY SET (its CompilerAPI dispatch matches on
+		;		cmp #BLC_WRITEOUT and _CAWriteByte never clears it). This routine is an X:
+		;		generator helper, and the generator loop is "jsr GeneratorExecute / bcc" --
+		;		a carry-SET return STOPS generation, which dropped the PCD_OPEN token that the
+		;		OPEN descriptor emits next. With no OPEN opcode the logical file was never
+		;		registered, so a later CHKIN failed and CHRIN blocked on the keyboard -- which
+		;		is why OPEN15,8,15 (the one OPEN with no filename) hung on the first read while
+		;		every named OPEN worked. Clear carry so the OPEN token is still emitted.
+		;
+		clc
+		rts
 		;
 		;		Full constants e.g. 1,8,2 possibly no file name
 		;
