@@ -522,6 +522,46 @@ _I32SDLoop:
 		jsr 	FloatRotateLeft
 		dey 	 							; do 31 times
 		bne 	_I32SDLoop
+		;
+		;		Round to nearest. The quotient in S[X+2] is floor((a<<30)/b), a 30- or 31-bit
+		;		value. If bit 30 is already set it is 31-bit normalised and FloatNormalise will
+		;		leave it alone, so one guard bit (the next quotient bit) rounds it. If bit 30 is
+		;		clear it is 30-bit and FloatNormalise would shift it left one, filling the new LSB
+		;		with a zero and throwing away a bit of precision -- so run one more division step
+		;		to make that LSB a REAL quotient bit and drop the exponent to match, leaving a
+		;		31-bit value that its own guard bit then rounds. Truncation was biased low; this
+		;		is round-half-up and unbiased.
+		;
+		bit 	NSMantissa3+2,x 			; quotient bit 30 set ?
+		bvs 	_I32SDGuard 				; yes -> already 31-bit, just round
+		jsr 	FloatDivideCheck 			; no -> compute the 31st real bit ...
+		inx
+		inx
+		jsr 	FloatRotateLeft 			; ... shift it in (now 31-bit normalised) ...
+		dex
+		dex
+		jsr 	FloatRotateLeft
+		dec 	NSExponent,x 				; ... and the extra shift is worth one exponent
+_I32SDGuard:
+		jsr 	FloatDivideCheck 			; guard bit = the next quotient bit
+		bcc 	_I32SDDone
+		inc 	NSMantissa0+2,x 			; round half up
+		bne 	_I32SDDone
+		inc 	NSMantissa1+2,x
+		bne 	_I32SDDone
+		inc 	NSMantissa2+2,x
+		bne 	_I32SDDone
+		inc 	NSMantissa3+2,x
+_I32SDDone:
+		bit 	NSMantissa3+2,x 			; did rounding carry into bit 31 ($80000000) ?
+		bpl 	_I32SDExit
+		inx
+		inx
+		jsr 	FloatShiftRight 			; renormalise $80000000 -> $40000000 ...
+		dex
+		dex
+		inc 	NSExponent,x 				; ... at one higher exponent
+_I32SDExit:
 		ply 								; restore AY and exit
 		pla
 		rts
