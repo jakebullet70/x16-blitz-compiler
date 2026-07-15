@@ -383,10 +383,37 @@ value the format can hold is `999999999.5` — so the divide lost a full ulp *be
 Had it rounded, the printer's own rounding would have carried it to `1000000000` and printed `1E+15`.
 
 **The fix is round-to-nearest in `FloatMultiplyShort` and `Int32ShiftDivide`** (keep the guard bit,
-increment when it is set). It would make every float operation slightly more accurate, at a cost of a
-few bytes and cycles. It is a core numerical change, so it wants its own pass and its own verification
-— and note the suites **cannot see it**: they assert through `f.cmp`, which is `FloatCompare`, and that
-deliberately ignores the low 12 bits. Check it with the raw-float-bytes probe instead.
+increment when it is set). It is a core numerical change, so it wants its own pass and its own
+verification — and note the suites **cannot see it**: they assert through `f.cmp`, which is
+`FloatCompare`, and that deliberately ignores the low 12 bits. Check it with the raw-float-bytes probe
+instead (hand-build the stack slots in a throwaway `.asm`, `jsr` the routine, read the result bytes out
+of the `-dump R` image; `bin/x16emu` dump.bin is a flat RAM image so byte offset == address).
+
+**`Int32ShiftDivide` — DONE.** The divide now rounds to nearest. The wrinkle is the 31-bit mantissa
+(normalised to bit 30, not bit 31): `Int32ShiftDivide` yields floor((a<<30)/b) as a 30- OR 31-bit
+value, and rounding has to respect the `FloatNormalise` that follows. Bit-30 set → 31-bit, one guard
+bit rounds it; bit-30 clear → 30-bit, so run one extra division step to make the new low bit a real
+quotient bit (drop the exponent to match) then round, and renormalise a carry out of bit 31. Verified
+126/126 against exact round-to-nearest with the probe; the old code failed ~half. A naive single guard
+bit does **not** work — it double-counts in the bit-30-clear case and overshoots.
+
+**`FloatMultiplyShort` — DONE.** The multiply now rounds to nearest. Measured with the probe, the old
+truncating multiply was wrong in ~55% of large-product cases (56/102) and by up to ~1.9 ULP. The "up to
+two ULP" looked like truncation compounding as bits fell off, but it is **not** — the shift-add loop
+already keeps the top 31 bits *exactly* (proved by simulation: the kept mantissa plus every dropped bit
+reconstructs the full product, so the accumulator is exact `floor(P / 2^Y)`, error strictly < 1 ULP).
+The extra ULP is the **same bit-30 wrinkle as the divide.** The product of two normalised mantissas is
+in `[2^60, 2^62)`, so the 31-bit result lands in `[2^30, 2^31)` (bit 30 set) *or* `[2^29, 2^30)` (bit 30
+clear); in the second case `FloatNormalise` shifts it left one place afterwards, which moves the rounding
+point out from under a single guard bit. So capture **two** dropped bits at both shift points (`FMulGuard`
+= 0.5 ulp, `FMulGuard2` = 0.25 ulp): if bit 30 is set, round on the guard; if bit 30 is clear but bit 29
+set, fold the guard in as the real low bit it now is (`dey` to match the ×2) and round on guard2; if
+neither is set the value is too small to have dropped a bit, so leave the whole normalise to
+`FloatNormalise`. Verified **106/106** within 0.5 ULP with the probe. A single guard bit gets 88/102 —
+the 14 it misses are exactly the bit-30-clear cases, where it rounds on a bit that is about to become a
+real mantissa bit. The `>>=8` fast path did not have to change: it drops bits 0–7, so bit 7 is the new
+guard and bit 6 the new guard2, and the suites (incl. the fast-path-heavy compiler-runtime `binary`) stay
+green.
 
 ### Cosmetic
 
