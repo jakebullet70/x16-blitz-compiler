@@ -139,6 +139,9 @@ main {
 		control[n] = 13 						; line 3 : options. Empty -- Blitz ignores it for
 		n++ 									; now, but the line still has to be there.
 
+		diskio.delete("gpc.input") 				; scratch any old one first: CBM DOS will not
+												; overwrite an existing file, so a second run
+												; would otherwise fail with FILE EXISTS.
 		if not diskio.f_open_w("gpc.input")
 			return false
 		void diskio.f_write(control, n)
