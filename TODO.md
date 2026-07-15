@@ -383,10 +383,28 @@ value the format can hold is `999999999.5` — so the divide lost a full ulp *be
 Had it rounded, the printer's own rounding would have carried it to `1000000000` and printed `1E+15`.
 
 **The fix is round-to-nearest in `FloatMultiplyShort` and `Int32ShiftDivide`** (keep the guard bit,
-increment when it is set). It would make every float operation slightly more accurate, at a cost of a
-few bytes and cycles. It is a core numerical change, so it wants its own pass and its own verification
-— and note the suites **cannot see it**: they assert through `f.cmp`, which is `FloatCompare`, and that
-deliberately ignores the low 12 bits. Check it with the raw-float-bytes probe instead.
+increment when it is set). It is a core numerical change, so it wants its own pass and its own
+verification — and note the suites **cannot see it**: they assert through `f.cmp`, which is
+`FloatCompare`, and that deliberately ignores the low 12 bits. Check it with the raw-float-bytes probe
+instead (hand-build the stack slots in a throwaway `.asm`, `jsr` the routine, read the result bytes out
+of the `-dump R` image; `bin/x16emu` dump.bin is a flat RAM image so byte offset == address).
+
+**`Int32ShiftDivide` — DONE.** The divide now rounds to nearest. The wrinkle is the 31-bit mantissa
+(normalised to bit 30, not bit 31): `Int32ShiftDivide` yields floor((a<<30)/b) as a 30- OR 31-bit
+value, and rounding has to respect the `FloatNormalise` that follows. Bit-30 set → 31-bit, one guard
+bit rounds it; bit-30 clear → 30-bit, so run one extra division step to make the new low bit a real
+quotient bit (drop the exponent to match) then round, and renormalise a carry out of bit 31. Verified
+126/126 against exact round-to-nearest with the probe; the old code failed ~half. A naive single guard
+bit does **not** work — it double-counts in the bit-30-clear case and overshoots.
+
+**`FloatMultiplyShort` — still open, and it is the harder half.** Measured with the same probe, the
+truncating multiply is wrong in ~55% of large-product cases, and by up to **two** ULP, not one. That
+is because it truncates *as it goes* — the accumulator is shifted right on overflow (and eight bits at
+a time on the zero-multiplier fast path), so low bits are dropped before later adds could have carried
+out of them. A single guard bit only mops up the one-ULP cases. Doing it properly means either keeping
+a guard+sticky as bits leave the accumulator (through both shift points), or widening the accumulator
+so nothing is dropped until a single final round — the latter also costs the `>>=8` fast path that
+`02_floatmath` relies on. This is the one that is left.
 
 ### Cosmetic
 
