@@ -203,11 +203,21 @@ MemoryStorage = $400
 		* = ZeroPageMandatory 				; *must* be in zero page
 		.dsection zeropage
 
-		* = MemoryStorage 					; doesn't matter if zero page or not 
+		* = MemoryStorage 					; doesn't matter if zero page or not
 		.dsection storage
+StorageEnd:
 
 		* = CodeStart
 		.dsection code
+
+;
+;		storage is a 1K hole -- $0400 to $0801, and no further, because the code starts there.
+;		Nothing warns you when it runs out: the section simply carries on over the top of the
+;		BASIC stub, and the program corrupts itself the first time it writes to the buffer that
+;		spilled. It HAD run out, silently, and only survived because the one buffer hanging over
+;		the edge was never filled past its fifteenth byte. So say so, loudly.
+;
+		.cerror StorageEnd > CodeStart, "storage has overflowed into the code - put compiler-only buffers in the code section (see application/source/file-io/read.asm)"
 
 ; ************************************************************************************************
 ;

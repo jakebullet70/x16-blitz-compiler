@@ -19,22 +19,22 @@
 ; ************************************************************************************************
 
 CompileCode:
-		ldx 	#0
-_Prompt:lda 	Prompt,x
-		jsr 	$FFD2
-		inx
-		cmp 	#0
-		bne 	_Prompt
+		jsr 	ReadControlFile 			; GPC.INPUT says what to compile and where to put it
+		bcs 	_CCNoControlFile 			; and without it there is nothing to be done
+		jsr 	PrintWorking 				; which is all the compiler now says for itself
 
 		ldx 	#APIDesc & $FF
 		ldy 	#APIDesc >> 8
 		jsr 	StartCompiler
 		jsr 	WriteObjectCode
-		lda 	#"O"
-		jsr 	$FFD2
-		lda 	#"K"
+		lda 	#"O" 						; the only other thing it prints, and the only way a
+		jsr 	$FFD2 						; caller can tell a compile that worked from one that
+		lda 	#"K" 						; stopped on an error, so it stays.
 		jsr 	$FFD2
 		rts
+
+_CCNoControlFile: 							; a compiler that guesses at what it was asked to
+		jmp 	PrintNoControlFile 			; build is worse than one that refuses
 
 ; ************************************************************************************************
 ;
@@ -47,19 +47,10 @@ APIDesc:
 		.byte 	$80 						; start of workspace for compiler $8000
 		.byte 	$9F							; end of workspace for compiler $9F00
 
-; ************************************************************************************************
 ;
-;									File names for the compiler
+;		The source and object file names used to be two .text constants here. They are now the
+;		first two lines of GPC.INPUT -- see file-io/control.asm.
 ;
-; ************************************************************************************************
-
-ObjectFile:
-		.text 	'OBJECT.PRG',0		
-SourceFile:
-		.text 	'SOURCE.PRG',0					
-Prompt:
-		.text 	'*** BLITZ (ALPHA 14-10-23) ***',13,13
-		.text 	'BUGS -> HTTPS://GITHUB.COM/PAULSCOTTROBSON/BLITZ-COMPILER',13,13,0								
 
 		.send code
 

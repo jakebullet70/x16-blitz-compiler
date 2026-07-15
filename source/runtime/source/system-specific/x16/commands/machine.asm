@@ -62,7 +62,8 @@ X16SMCWrite: 								; global, not a cheap local: POWEROFF branches here
 		.exitcmd 							; Tidy up properly rather than assume we die here.
 
 X16SMCError:
-		.error_channel
+		ply 								; put the interpreter's instruction pointer back before
+		.error_channel 						; the error report, which prints codePtr+Y
 
 ; ************************************************************************************************
 ;

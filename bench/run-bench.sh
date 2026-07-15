@@ -18,7 +18,7 @@ set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 EMU="$ROOT/bin/x16emu/x16emu.exe"
 ROM="$ROOT/bin/x16emu/rom.bin"
-BLITZ="$ROOT/source/application/BLITZ.PRG"
+BLITZ="$ROOT/source/application/GPC.BLITZ.PRG"
 WORK="${TMPDIR:-/tmp}/blitzbench.$$"
 mkdir -p "$WORK"
 trap 'rm -rf "$WORK"' EXIT
@@ -38,9 +38,12 @@ for src in "$ROOT"/bench/*.bas; do
              | tr -d '\000' | jiffies )
 
     # --- compiled: Blitz. Same source, unedited: tokenise, compile, run.
+    #     GPC.INPUT is how the compiler is told what to build; it has no defaults and will
+    #     print NO GPC.INPUT FILE and stop without one.
     cp "$BLITZ" "$w/"
+    printf 'SOURCE.PRG\nOBJECT.PRG\n\n' >"$w/GPC.INPUT"
     ( cd "$ROOT" && python bin/tokenise.zip "$src" "$w/SOURCE.PRG" >/dev/null 2>&1 )
-    ( cd "$w" && timeout 120 "$EMU" -rom "$ROM" -sound none -zeroram -fsroot "$w" -prg BLITZ.PRG -run -warp >/dev/null 2>&1 )
+    ( cd "$w" && timeout 120 "$EMU" -rom "$ROM" -sound none -zeroram -fsroot "$w" -prg GPC.BLITZ.PRG -run -warp >/dev/null 2>&1 )
     if [ ! -f "$w/OBJECT.PRG" ]; then
         printf "%-14s %10s %10s %8s\n" "$name" "${stock:-?}" "COMPILE-ERR" "-"
         continue

@@ -43,7 +43,9 @@ _XPCSend:
 		pla
 		rts
 _XPCError:
-		.error_channel
+		pla 								; drop the saved character, uncovering the saved Y --
+		ply 								; the interpreter's instruction pointer, which CHKOUT has
+		.error_channel 						; just trashed. The error report prints codePtr+Y.
 
 		.send code
 

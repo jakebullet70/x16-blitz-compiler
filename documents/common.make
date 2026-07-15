@@ -60,6 +60,15 @@ CSOURCE =  $(SRCDIR)common-source$(S)
 TASS ?= 64tass
 ASM = $(TASS) -q -c -Wall -o build$(S)code.prg -L build$(S)code.lst -l build$(S)code.lbl
 #
+#		Prog8, which builds GPC.PRG (source/gpc) -- the compiler's front end. It is a 5MB jar
+#		and needs a JRE, so it is NOT vendored here and NOT part of "make libs": source/gpc has
+#		its own target and the built GPC.PRG is committed to release/. Override either of these
+#		in documents/local.make if your paths differ.
+#
+JAVA ?= java
+PROG8C ?= C:$(S)dev$(S)CmdrX16$(S)dos_tools$(S)XFMGR2$(S)prog8c.jar
+PROG8 = $(JAVA) -jar $(PROG8C) -target cx16
+#
 #		Two emulators, both current (r49). The r43 build that used to ship in bin/ is gone.
 #		They need different SDL2 versions, so each lives in its own directory.
 #
@@ -72,7 +81,7 @@ ASM = $(TASS) -q -c -Wall -o build$(S)code.prg -L build$(S)code.lst -l build$(S)
 #
 #		Box16 is NOT used for the tests: the test .prg files are raw machine code at $0801
 #		with no BASIC stub, and given "-prg x.prg,801 -run" x16emu SYSes to the load address
-#		whereas Box16 issues RUN, which just yields ?SYNTAX ERROR. BLITZ.PRG does carry a
+#		whereas Box16 issues RUN, which just yields ?SYNTAX ERROR. GPC.BLITZ.PRG does carry a
 #		BASIC SYS stub, so Box16 runs it fine -- hence it drives the interactive targets.
 #
 EMUDIR = $(BINDIR)x16emu$(S)
@@ -84,7 +93,7 @@ DEBUGGER = $(BOXDIR)Box16$(APPSTEM) -rom $(BOXDIR)rom.bin -scale 2 -zeroram
 #
 EXECUTE = $(CDEL) dump*.bin dump*.txt ; $(EMULATOR) -prg build$(S)code.prg,801 -run
 EXEBASIC = $(CDEL) dump*.bin dump*.txt ; $(DEBUGGER) -prg build$(S)code.prg -run
-COMBASIC = $(DEBUGGER) -prg $(ROOTDIR)source$(S)application$(S)BLITZ.PRG -run
+COMBASIC = $(DEBUGGER) -prg $(ROOTDIR)source$(S)application$(S)GPC.BLITZ.PRG -run
 FAST = -warp
 MAKEOPTS = --no-print-directory
 #

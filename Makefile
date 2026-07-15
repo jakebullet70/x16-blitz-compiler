@@ -24,6 +24,13 @@ endif
 #
 REVISION = r49
 
+#
+#		These are all commands, and "release" collides with the release/ directory: without this
+#		make sees that directory and decides the target is already made, so "make release" does
+#		nothing. Mark them phony so they always run.
+#
+.PHONY: all libs release pullbuild latest
+
 all: libs
 
 #

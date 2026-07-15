@@ -22,10 +22,17 @@ BASICSRC = build$(S)balls.bas
 libraries:
 	make -C ..
 
-prelim: 
+#
+#		GPC.INPUT is the compiler's control file: source, object, options, one per line. The
+#		compiler falls back to SOURCE.PRG and OBJECT.PRG without it, so this only spells out
+#		what it would have done anyway -- but it is also the template a caller copies, so it
+#		is worth having one sitting next to the compiler.
+#
+prelim:
 	make -B -C ..$(S)common-source
 	$(PYTHON) $(CSCRIPTS)build.py
 	$(PYTHON) $(BINDIR)tokenise.zip $(BASICSRC) SOURCE.PRG
+	printf 'SOURCE.PRG\nOBJECT.PRG\n\n' >GPC.INPUT
 
 #
 #		This order matters. 00main.header contains the BASIC header followed by the runtime components
@@ -41,11 +48,12 @@ build: prelim
 			$(BINDIR)compiler.library \
 			_library.asm \
 			source$(S)main$(S)zzfree.footer
-	$(CCOPY) build$(S)code.prg BLITZ.PRG
+	$(CCOPY) build$(S)code.prg GPC.BLITZ.PRG
 
 release:  build
 	$(CDEL) OBJECT.PRG
 	$(CCOPY) *.PRG $(RELEASEDIR)
+	$(CCOPY) GPC.INPUT $(RELEASEDIR)
 	$(CCOPY) build$(S)*.bas $(RELEASEDIR)
 	$(CCOPY) $(BINDIR)tokenise.zip $(RELEASEDIR)
 	#
@@ -54,16 +62,15 @@ release:  build
 	#		unconditionally only meant the release failed to package over a missing text file.
 	#
 	#
-	#		Bundle the release. mkzip.py replaces zip(1) (absent on a stock Windows box) and
-	#		writes reproducibly, so an unchanged release no longer produces a new blitz.zip.
-	#		It skips the archive it is writing, so the * glob cannot swallow a stale one.
-	#
-	cd $(RELEASEDIR) ; $(CDEL) blitz.zip ; $(PYTHON) $(CSCRIPTS)mkzip.py blitz.zip *
+	#		No archive is bundled. blitz.zip -- a git-tracked binary rebuilt on every release --
+	#		has been dropped: nothing in the tree ever consumed it, and its "*" glob swept
+	#		whatever else lived in release/ (e.g. the XFMGR launcher) into the download. The
+	#		release is simply the contents of release/.
 	
 run: build	
 	$(CDEL) OBJECT.PRG
 	$(EXEBASIC)
-	$(CCOPY) BLITZ.PRG $(BINDIR)	
+	$(CCOPY) GPC.BLITZ.PRG $(BINDIR)
 	
 x16:
 	$(EMULATOR)

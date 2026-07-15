@@ -41,14 +41,21 @@
 ;		branch on purpose: the five commands are spread over far more than a branch can reach,
 ;		and carry survives a jsr untouched.
 ;
+;		EVERY error path comes through the jsr, so that the stack below is always the same shape.
+;
 ; ************************************************************************************************
 
 LoadSaveCheckError:
 		bcs 	LoadSaveError
 		rts
 
-LoadSaveError:
-		.error_channel
+LoadSaveError: 								; the stack here is [ saved Y ][ return address ], so
+		pla 								; the return address has to be dropped before the saved Y
+		pla 								; can be reached. Y is the interpreter's instruction
+		ply 								; pointer, LOAD and BSAVE trash it, and the error report
+		.error_channel 						; prints codePtr+Y -- so without this the "@ $xxxx" is
+											; a line picked at random, which is exactly the false
+											; trail that hid the OPEN bug for so long.
 
 ; ************************************************************************************************
 ;
@@ -197,7 +204,10 @@ Command_BVERIFY: ;; [!bverify]
 		jsr 	X16_READST 					; bit 4 is the CBM "verify mismatch" flag
 		and 	#$10
 		beq 	_BVMatched
-		jmp 	LoadSaveError 				; jmp, not a branch: out of range from here
+		sec 								; a mismatch is raised as an I/O error, and raised through
+		jsr 	LoadSaveCheckError 			; the same jsr a KERNAL failure uses rather than jumping
+											; straight to LoadSaveError -- that is the stack depth
+											; LoadSaveError unwinds. It does not come back.
 _BVMatched:
 		ply
 		ldx 	#$FF

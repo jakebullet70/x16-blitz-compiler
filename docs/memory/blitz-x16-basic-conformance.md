@@ -7,7 +7,7 @@ metadata:
 
 Ran the [[gpc-x16-basic-coverage]] lexer-blocker list and the [[gpc-for-step0-semantics]] / [[gpc-if-semantics]] semantics
 checks against the **compiled** Blitz output, with stock X16 BASIC (interpreted, R49) as the control. Method: tokenise with
-`bin/tokenise.zip`, compile via `BLITZ.PRG` under `bin/x16emu`, run `OBJECT.PRG`, compare printed output. NB the emulator does
+`bin/tokenise.zip`, compile via `GPC.BLITZ.PRG` under `bin/x16emu`, run `OBJECT.PRG`, compare printed output. NB the emulator does
 not self-exit for these, so each run must be `timeout`-capped; and `-bas` injection types through the keyboard, so control
 programs must be **UPPERCASE**. A compiled program can end with `I2CPOKE 66,1,0` to power the machine off (Blitz has no
 `POWEROFF` handler), which makes the emulator exit immediately.

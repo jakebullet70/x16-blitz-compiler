@@ -199,6 +199,34 @@ author rejected them outright; leaving them parked rather than deciding in the a
 
 ## Bugs
 
+### The `storage` section had silently run off the end of its 1K hole — FIXED
+
+`common.inc` places the `storage` `.dsection` at `$0400` and the code at `$0801`. That is **1025
+bytes, and no more** — the section simply carries on over the top of the BASIC stub when it runs
+out, and nothing says a word. It *had* run out. `IONameBuffer` sat at `$07F1` with 64 bytes declared
+and only 15 of them below `$0801`:
+
+```text
+IONameBuffer  = $07F1
+"SOURCE.PRG" + ",S,R" + NUL  =  15 bytes  ->  $07F1 .. $07FF
+```
+
+It fit by **one byte**, and only because the two filenames were hardcoded and both were ten
+characters. A twelve-character name would have written straight over the BASIC link pointer at
+`$0801` and destroyed the running program. Nobody had ever been able to reach that, because nobody
+could change the names.
+
+`GPC.INPUT` makes the names arbitrary, so this went from latent to certain — it is what the first
+`GPC.INPUT` build actually did (`?SYNTAX ERROR`: the blanking loop wiped the BASIC stub). The
+compiler's buffers — `IONameBuffer`, `SourceLine`, `newWorkspacePage` and the three control lines —
+are now in the **`code`** section, which lands above `ObjectBase` and is discarded when the object
+code is written, so they cost a compiled program nothing. `storage` is back to `$0400..$06F0`.
+
+There is now a `.cerror` in `common.inc` that fails the build if `storage` ever crosses `$0801`
+again. **Nothing warned. That is the whole lesson** — a `.dsection` given a fixed origin will
+happily overrun whatever is above it, and the failure surfaces as a corrupt program somewhere else
+entirely.
+
 ### `REBOOT` was a hard reset — FIXED
 
 `REBOOT` did the offset-2 I²C write to the SMC, which makes the SMC assert the system reset line.
@@ -213,22 +241,49 @@ use `POWEROFF`). It took reading the ROM's dispatch table to see it, which is th
 `BVERIFY`: **the keyword's behaviour is whatever bank 4 says it is.** Now `RESET` is the SMC write
 and `REBOOT` is `stz $01` / `jmp ($FFFC)`.
 
-### `OPEN` after any load or save still fails — OPEN, NOT FIXED
+### `OPEN` and `CLOSE` clobbered the interpreter's instruction pointer — FIXED
 
-`BSAVE "F",8,0,A,B` followed by `OPEN 1,8,2,"F,S,R"` raises an I/O error, and the same OPEN on its
-own works perfectly. Instrumented: on its own OPEN gets exactly the right arguments through to the
-KERNAL (`lfn=1 dev=8 sa=2 namelen=9`) and comes back with carry clear. After a `BSAVE` it does not
-come back at all — the machine goes down inside the KERNAL call. Re-opening the *same* logical file
-number on a file that does not exist does the same thing.
+**`Y` is not a spare register. It is the live instruction pointer.** `NextCommand` fetches every
+P-code byte with `lda (codePtr),y`, and `FixUpY` only folds `Y` back into `codePtr` when it crosses
+`$80`. So between folds, `Y` *is* how far into the program we are. A command handler must therefore
+hand `Y` back exactly as it found it (or advanced past the inline operand bytes it consumed, which
+for `OPEN` and `CLOSE` is none).
 
-What it is **not**: the RAM and ROM bank registers are both correct across a `BSAVE` (checked — `$01`
-stays 4 and `BSAVE` restores `$00`), `BSAVE` itself writes a byte-perfect file, `BSAVE` -> `BLOAD` ->
-`PRINT` chains fine, and closing the KERNAL's logical file plus a `CLRCHN` afterwards changes nothing.
-Stock BASIC does `BSAVE` then `OPEN` happily, so the KERNAL can clearly be driven this way.
+`CommandXOpen` and `CommandClose` did not. Both call the KERNAL, which is free to trash `Y` — and
+`SETLFS` does not merely trash it, it **takes `Y` as an argument**: `Y` is the secondary address. So
+every `OPEN` resumed execution at `codePtr` + *the secondary address the user asked for*, and every
+`CLOSE` at `codePtr` + whatever `CLOSE` happened to leave behind.
 
-It does not block the `LINPUT` family — a program that opens a data file it did not just write works,
-and that is the normal case — but it wants finding. Next step is probably to watch the KERNAL call in
-Box16 rather than guess.
+Whether a program survived that was pure luck of code layout, which is why the symptoms made no
+sense and every pattern anyone fitted to them was a coincidence:
+
+| what it looked like | what it actually was |
+|---|---|
+| long filenames fail, short ones work | different name lengths → different code offsets |
+| the `"$"` directory open fails | one-character name, so a short offset that happened to land badly |
+| every *second* `OPEN` fails | the float-stack bug below, a genuinely separate fault |
+| `OPEN` fails after a `BSAVE` | `BSAVE`'s P-code moved the `OPEN` to a different offset |
+
+It also explains why the runtime error it raised pointed nowhere: `RuntimeErrorHandler` reports
+`codePtr + Y`, so a clobbered `Y` produces a garbage `@ $xxxx` — and that garbage address is what
+sent every earlier attempt at this bug looking in the wrong place. The fix is `phy` after `.entercmd`
+and `ply` before `.exitcmd`, and it is four lines.
+
+**Every other KERNAL caller in the runtime was already correct** (audited: graphics, mouse, joy, I²C,
+sound, sleep, `TI`, `ST`, `LINPUT`, `BLOAD`/`BSAVE`, and the `XPrintCharacterToChannel` /
+`XGetCharacterFromChannel` interface routines all bracket the call with `phy`/`ply`). `OPEN` and
+`CLOSE` were the only two, and they were also the only two that skipped the `ldx #$FF` below. The
+tell for the whole class is a `jsr X16_…` inside a `;; [pcode]` handler with no `phy` above it.
+
+### `OPEN` after any load or save — FIXED, same cause
+
+`BSAVE "F",8,0,A,B` followed by `OPEN 1,8,2,"F,S,R"` raised an I/O error while the same `OPEN` on its
+own worked perfectly. This was the `Y` bug above: `BSAVE` is more P-code, so the `OPEN` after it sat
+at a different offset, and the KERNAL's leftover `Y` sent execution somewhere fatal from *there* and
+somewhere harmless from where it had been tested alone. `BSAVE` was never at fault — which is exactly
+what the old note here concluded, having ruled out the bank registers, the written file, and the
+logical file number one by one, and then looked for the fault in `BSAVE` anyway because that is what
+the reproducer named. Now `BSAVE` → `OPEN` → `CLOSE` → `OPEN` → `CLOSE` is byte-identical to stock.
 
 ### `OPEN` and `CLOSE` never emptied the float stack — FIXED
 
@@ -241,6 +296,26 @@ ABSOLUTELY** (`NSMantissa0+0` … `+3`), which only works if the stack started e
 `OPEN` in any program read whatever happened to be sitting in those slots, handed the KERNAL a junk
 filename pointer and a junk logical file number, and took the machine down. File I/O had only ever
 worked for the first `OPEN` in a program.
+
+### A failed I/O operation named a line at random — FIXED
+
+Same root cause, one level down. Every error exit — `XPrintCharacterToChannel`, `XGetCharacterFromChannel`,
+the I²C commands, the SMC ones, and all five of `loadsave.asm` — jumped straight to `.error_channel`
+with `Y` still holding whatever the KERNAL had left in it. `RuntimeErrorHandler` reports `codePtr + Y`,
+so the `@ $xxxx` on a runtime I/O error pointed at a line chosen by the KERNAL rather than the line
+that failed. **That false address is what hid the `OPEN` bug**: it sent every previous investigation
+looking at the wrong statement, which is why the fault kept seeming to be in whatever came *before*
+the `OPEN` — `BSAVE`, usually.
+
+`loadsave.asm` needed a small restructure to fix: `LoadSaveError` unwinds a `jsr`'s worth of stack to
+reach the saved `Y`, and `BVERIFY`'s mismatch case reached it by a bare `jmp`, at a different depth.
+The mismatch now goes through `sec` / `jsr LoadSaveCheckError` like every other failure, so there is
+exactly one stack shape to unwind.
+
+Verified by putting the same failing `BLOAD` at two different points in a program: `@ $0017` at the
+top, `@ $003A` after five `PRINT`s — a delta of 35 bytes, which is 7 bytes of P-code per `PRINT`.
+The address tracks the code now. A `BVERIFY` mismatch is still detected and a matching one still
+passes silently.
 
 ### `FMPLAY` / `FMCHORD` / `PSGPLAY` / `PSGCHORD` hard-crashed — FIXED
 
@@ -315,6 +390,14 @@ deliberately ignores the low 12 bits. Check it with the raw-float-bytes probe in
 
 ### Cosmetic
 
+- **`PRINT` padded a number with a space, stock pads with a cursor-right — FIXED.** After printing a
+  number `PrintNumber` (`print/printvalues.asm`) emitted `$20` where stock emits `$1D` (CRSR-RIGHT).
+  Both advance one column, so on screen they are indistinguishable — but they are different *bytes*,
+  so a numeric `PRINT#` to a file, or a `PRINT` through `CMD`, wrote something stock would not. Now
+  `PrintNumber` emits `$1D`; verified byte-for-byte against stock R49 (`[`,`$20`,`5`,`$1D`,`]` for a
+  positive, `[`,`-`,`5`,`$1D`,`]` for a negative). The leading space (the sign column) was always
+  correct — it comes from `FloatToString` — only the trailing pad was wrong. A terminal diff could
+  not see this, because `$1D` renders as nothing; found by hexdumping `PRINT n;"X"`.
 - **`PRINT` keeps a leading zero.** Blitz prints `0.5`, X16 BASIC prints `.5`. The trailing zeros and
   the rounding are already fixed.
 - **Integers below 2^31 print in full**, where stock switches to E notation above 9 digits: we print
@@ -327,6 +410,25 @@ deliberately ignores the low 12 bits. Check it with the raw-float-bytes probe in
 left is fixed overhead rather than an algorithmic hole: `FloatMultiply` and `FloatAdd` normalise **both**
 operands on every call, and for an integer operand that is work the new byte-skip immediately undoes.
 Diminishing returns; only worth revisiting if float-heavy code matters more than features.
+
+## Wanted
+
+### Name the output after the source — DONE, but by the caller
+
+The ask was for Blitz to derive the output name from the input, so that compiling `DIR.PRG` produced
+`C.DIR.PRG`. It does better than that now: **it takes both names from `GPC.INPUT`**, a three-line
+control file (source, object, options — options are read but ignored). So the caller says what the
+output is called, and `C.DIR.PRG` is just what you happen to type. Compiling several programs into
+one directory no longer clobbers anything, and the compiled and interpreted versions of a program
+can sit side by side on the disk.
+
+There is **no fallback**: without a readable `GPC.INPUT` the compiler prints `NO GPC.INPUT FILE` and
+stops. A compiler that guesses at what it was asked to build is worse than one that refuses. Every
+caller in the tree — `source/application/Makefile`, `bench/run-bench.sh`, the reproductions under
+`fixes/` — therefore writes one.
+
+`GPC.PRG` (`source/gpc/GPC.P8`, prog8) is the front end: it asks for the two names, writes the file,
+and hands the machine over to the compiler.
 
 ## Build / infrastructure
 

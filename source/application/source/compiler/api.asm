@@ -141,12 +141,11 @@ _CARExit:
 ;		jsr 	IOWriteByte
 ;		jsr 	IOWriteClose
 				
+SourceLine: 								; line for source code storage. In the code section, not
+		.fill 	256 						; storage: see the note in file-io/read.asm -- this was
+											; the single biggest thing in a 1K hole that had run
+											; out of room.
 		.send code
-
-		.section storage
-SourceLine: 								; line for source code storage
-		.fill 	256		
-		.send storage
 
 ; ************************************************************************************************
 ;
