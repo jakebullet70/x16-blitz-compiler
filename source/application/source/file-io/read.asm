@@ -77,18 +77,31 @@ _IOSCopy:
 		sta 	IONameBuffer,y
 		bne 	_IOSCopy
 		;
-		sta 	IONameBuffer+4,y
-		lda 	#',' 						; append ,S,[R|W]
+		pla 								; recover R/W
+		cmp 	#'W'
+		bne 	_IOSRead 					; reading uses the PLAIN name -- see the note below
+		lda 	#',' 						; writing appends ",S,W" to create the file
 		sta 	IONameBuffer+0,y
 		sta 	IONameBuffer+2,y
 		lda 	#'S'
 		sta 	IONameBuffer+1,y
-		pla 								; write R/W out
+		lda 	#'W'
 		sta 	IONameBuffer+3,y
-
-		tya 								; length of name to A
+		lda 	#0 							; terminator after the suffix
+		sta 	IONameBuffer+4,y
+		tya 								; name length plus the four we appended
 		clc
-		adc 	#4 							; we added 4 characters.
+		adc 	#4
+		bra 	_IOSSetName
+_IOSRead:
+		tya 								; READ: the length is just the name -- NO ",S,R". Box16's
+											; -hypercall_path opens the raw SETNAM string, so a
+											; ",S,R" suffix makes it hunt for a host file literally
+											; called "NAME,S,R" and the open fails. A plain name
+											; reads on x16emu, Box16 and real CMDR-DOS alike (x16emu
+											; only tolerated the suffix by parsing it off first).
+											; Writing still needs ",S,W", which Box16 does honour.
+_IOSSetName:
  								
 		ldx 	#IONameBuffer & $FF			; name address to YX
 		ldy 	#IONameBuffer >> 8

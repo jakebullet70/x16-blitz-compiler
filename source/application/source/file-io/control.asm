@@ -116,19 +116,26 @@ _RCFFail:
 
 ; ************************************************************************************************
 ;
-;		"WORKING... <source> --> <object>", which is now the whole of the compiler's startup
-;		output. The banner that used to be here was noise to anything reading that output.
+;		"GPC SQUEALING..." then the two names, each on its own labelled line -- the whole of the
+;		compiler's startup output. Three short lines so nothing wraps in 40 columns.
+;
+;			GPC SQUEALING...
+;			in:  <source>
+;			out: <object>
 ;
 ; ************************************************************************************************
 
 PrintWorking:
-		ldx 	#WorkingText & $FF
+		ldx 	#WorkingText & $FF 			; "GPC SQUEALING...",CR
 		ldy 	#WorkingText >> 8
+		jsr 	PrintMessage
+		ldx 	#InText & $FF 				; "in:  "
+		ldy 	#InText >> 8
 		jsr 	PrintMessage
 		ldx 	#0 							; line 1, the source
 		jsr 	PrintControlLine
-		ldx 	#ArrowText & $FF
-		ldy 	#ArrowText >> 8
+		ldx 	#OutText & $FF 				; CR then "out: "
+		ldy 	#OutText >> 8
 		jsr 	PrintMessage
 		ldx 	#CFLineSize 				; line 2, the object
 		jsr 	PrintControlLine
@@ -194,9 +201,11 @@ _PCLExit:
 ControlFile:
 		.text 	'GPC.INPUT',0
 WorkingText:
-		.text 	'WORKING... ',0
-ArrowText:
-		.text 	' --> ',0
+		.text 	'GPC SQUEALING...',13,0
+InText: 									; uppercase: the screen boots in PETSCII upper/graphics, where
+		.text 	'IN:  ',0 				; lowercase bytes are graphics glyphs, not letters
+OutText: 									; the CR ends the source line and starts the object's
+		.text 	13,'OUT: ',0
 NoControlText:
 		.text 	'NO GPC.INPUT FILE',13,0
 

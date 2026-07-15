@@ -279,19 +279,26 @@ _RCFFail:
 
 ; ************************************************************************************************
 ;
-;		"WORKING... <source> --> <object>", which is now the whole of the compiler's startup
-;		output. The banner that used to be here was noise to anything reading that output.
+;		"GPC SQUEALING..." then the two names, each on its own labelled line -- the whole of the
+;		compiler's startup output. Three short lines so nothing wraps in 40 columns.
+;
+;			GPC SQUEALING...
+;			in:  <source>
+;			out: <object>
 ;
 ; ************************************************************************************************
 
 PrintWorking:
-		ldx 	#WorkingText & $FF
+		ldx 	#WorkingText & $FF 			; "GPC SQUEALING...",CR
 		ldy 	#WorkingText >> 8
+		jsr 	PrintMessage
+		ldx 	#InText & $FF 				; "in:  "
+		ldy 	#InText >> 8
 		jsr 	PrintMessage
 		ldx 	#0 							; line 1, the source
 		jsr 	PrintControlLine
-		ldx 	#ArrowText & $FF
-		ldy 	#ArrowText >> 8
+		ldx 	#OutText & $FF 				; CR then "out: "
+		ldy 	#OutText >> 8
 		jsr 	PrintMessage
 		ldx 	#CFLineSize 				; line 2, the object
 		jsr 	PrintControlLine
@@ -357,9 +364,11 @@ _PCLExit:
 ControlFile:
 		.text 	'GPC.INPUT',0
 WorkingText:
-		.text 	'WORKING... ',0
-ArrowText:
-		.text 	' --> ',0
+		.text 	'GPC SQUEALING...',13,0
+InText: 									; uppercase: the screen boots in PETSCII upper/graphics, where
+		.text 	'IN:  ',0 				; lowercase bytes are graphics glyphs, not letters
+OutText: 									; the CR ends the source line and starts the object's
+		.text 	13,'OUT: ',0
 NoControlText:
 		.text 	'NO GPC.INPUT FILE',13,0
 
@@ -632,18 +641,31 @@ _IOSCopy:
 		sta 	IONameBuffer,y
 		bne 	_IOSCopy
 		;
-		sta 	IONameBuffer+4,y
-		lda 	#',' 						; append ,S,[R|W]
+		pla 								; recover R/W
+		cmp 	#'W'
+		bne 	_IOSRead 					; reading uses the PLAIN name -- see the note below
+		lda 	#',' 						; writing appends ",S,W" to create the file
 		sta 	IONameBuffer+0,y
 		sta 	IONameBuffer+2,y
 		lda 	#'S'
 		sta 	IONameBuffer+1,y
-		pla 								; write R/W out
+		lda 	#'W'
 		sta 	IONameBuffer+3,y
-
-		tya 								; length of name to A
+		lda 	#0 							; terminator after the suffix
+		sta 	IONameBuffer+4,y
+		tya 								; name length plus the four we appended
 		clc
-		adc 	#4 							; we added 4 characters.
+		adc 	#4
+		bra 	_IOSSetName
+_IOSRead:
+		tya 								; READ: the length is just the name -- NO ",S,R". Box16's
+											; -hypercall_path opens the raw SETNAM string, so a
+											; ",S,R" suffix makes it hunt for a host file literally
+											; called "NAME,S,R" and the open fails. A plain name
+											; reads on x16emu, Box16 and real CMDR-DOS alike (x16emu
+											; only tolerated the suffix by parsing it off first).
+											; Writing still needs ",S,W", which Box16 does honour.
+_IOSSetName:
  								
 		ldx 	#IONameBuffer & $FF			; name address to YX
 		ldy 	#IONameBuffer >> 8

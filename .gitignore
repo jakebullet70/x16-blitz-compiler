@@ -58,7 +58,11 @@ source/unit-tests/compiler-runtime/CODE.BIN
 # ---------------------------------------------------------------------------
 source/gpc/build/
 source/gpc/GPC.PRG
-source/gpc/BLITZ.PRG
+source/gpc/GPC.BLITZ.PRG
+
+# The release used to be bundled into release/blitz.zip (mkzip.py). That was dropped:
+# nothing consumed it, and it was a git-tracked binary rebuilt on every release.
+release/blitz.zip
 
 # GPC.INPUT is generated next to the compiler by "make -C source/application";
 # the one that ships is release/GPC.INPUT.
