@@ -397,14 +397,23 @@ quotient bit (drop the exponent to match) then round, and renormalise a carry ou
 126/126 against exact round-to-nearest with the probe; the old code failed ~half. A naive single guard
 bit does **not** work — it double-counts in the bit-30-clear case and overshoots.
 
-**`FloatMultiplyShort` — still open, and it is the harder half.** Measured with the same probe, the
-truncating multiply is wrong in ~55% of large-product cases, and by up to **two** ULP, not one. That
-is because it truncates *as it goes* — the accumulator is shifted right on overflow (and eight bits at
-a time on the zero-multiplier fast path), so low bits are dropped before later adds could have carried
-out of them. A single guard bit only mops up the one-ULP cases. Doing it properly means either keeping
-a guard+sticky as bits leave the accumulator (through both shift points), or widening the accumulator
-so nothing is dropped until a single final round — the latter also costs the `>>=8` fast path that
-`02_floatmath` relies on. This is the one that is left.
+**`FloatMultiplyShort` — DONE.** The multiply now rounds to nearest. Measured with the probe, the old
+truncating multiply was wrong in ~55% of large-product cases (56/102) and by up to ~1.9 ULP. The "up to
+two ULP" looked like truncation compounding as bits fell off, but it is **not** — the shift-add loop
+already keeps the top 31 bits *exactly* (proved by simulation: the kept mantissa plus every dropped bit
+reconstructs the full product, so the accumulator is exact `floor(P / 2^Y)`, error strictly < 1 ULP).
+The extra ULP is the **same bit-30 wrinkle as the divide.** The product of two normalised mantissas is
+in `[2^60, 2^62)`, so the 31-bit result lands in `[2^30, 2^31)` (bit 30 set) *or* `[2^29, 2^30)` (bit 30
+clear); in the second case `FloatNormalise` shifts it left one place afterwards, which moves the rounding
+point out from under a single guard bit. So capture **two** dropped bits at both shift points (`FMulGuard`
+= 0.5 ulp, `FMulGuard2` = 0.25 ulp): if bit 30 is set, round on the guard; if bit 30 is clear but bit 29
+set, fold the guard in as the real low bit it now is (`dey` to match the ×2) and round on guard2; if
+neither is set the value is too small to have dropped a bit, so leave the whole normalise to
+`FloatNormalise`. Verified **106/106** within 0.5 ULP with the probe. A single guard bit gets 88/102 —
+the 14 it misses are exactly the bit-30-clear cases, where it rounds on a bit that is about to become a
+real mantissa bit. The `>>=8` fast path did not have to change: it drops bits 0–7, so bit 7 is the new
+guard and bit 6 the new guard2, and the suites (incl. the fast-path-heavy compiler-runtime `binary`) stay
+green.
 
 ### Cosmetic
 
