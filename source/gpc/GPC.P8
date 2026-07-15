@@ -39,7 +39,7 @@ main {
 		cx16.kbdbuf_clear() 					; drop the RETURN that ran us, and any type-ahead
 
 		if read_line("input  file: ", source_name) == 0 {
-			txt.print("\nnothing done, exit\n") 	; a bare RETURN here means "never mind"
+			txt.print("\nbye, exiting\n") 	; a bare RETURN here means "never mind"
 			return
 		}
 
