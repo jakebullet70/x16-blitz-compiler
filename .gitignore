@@ -67,3 +67,11 @@ release/blitz.zip
 # GPC.INPUT is generated next to the compiler by "make -C source/application";
 # the one that ships is release/GPC.INPUT.
 source/application/GPC.INPUT
+
+# ---------------------------------------------------------------------------
+# Scratch area for batch-testing user BASIC programs against the compiler.
+# testing/prg-batch/ is the queue (drop source PRGs in), testing/archive/ holds
+# the ones already run. Both are transient personal test material -- inputs we
+# compile to find compiler gaps, not part of the project or the build.
+# ---------------------------------------------------------------------------
+testing/
