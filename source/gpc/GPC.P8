@@ -32,18 +32,31 @@
 main {
 	const ubyte NAMEMAX = 40 					; the longest name we will take. Blitz allows 63.
 
+	word build_num = 104	
 	str source_name = " " * NAMEMAX
 	str object_name = " " * NAMEMAX
 	str map_name = " " * NAMEMAX
 	str control = " " * (NAMEMAX * 3 + 8) 		; the three lines of GPC.INPUT, built up in memory
 
 	sub start() {
-		txt.print("\ngpc... a blitz inspired x16 compiler\n\n")
+		txt.print("\ngpc... a blitz inspired x16 compiler\n")
+		txt.print("summer 2026, v0.9.")
+		txt.print_uw(build_num)
+		txt.nl()
+		txt.nl()
 
 		cx16.kbdbuf_clear() 					; drop the RETURN that ran us, and any type-ahead
 
 		if read_line("input  file: ", source_name) == 0 {
 			txt.print("\nbye, exiting\n") 	; a bare RETURN here means "never mind"
+			return
+		}
+
+		; the source has to exist -- check before asking for an output name or deleting anything,
+		; so a mistyped name stops here instead of scratching last time's good build for a compile
+		; that cannot even start.
+		if not diskio.exists(source_name) {
+			txt.print("\ninput file not found\n")
 			return
 		}
 
@@ -54,12 +67,30 @@ main {
 		if ask_yesno("make a debug map? ") 		; a line#->offset file, for reading runtime errors
 			default_map() 						; yes : name it after the source, m. for c.
 
+		clear_old_output()
+
 		if not write_control() {
 			txt.print("\ncannot write gpc.input\n")
 			return
 		}
 
 		chain_run("gpc.blitz.bin")
+	}
+
+	; ********************************************************************************************
+	;
+	;		Scratch last time's object and map before compiling. CBM DOS will not overwrite an
+	;		existing file, so a second compile would otherwise fail with FILE EXISTS; and a stale
+	;		map left beside a compile that failed would decode a later error to the wrong line.
+	;		delete() is harmless when the file is not there. Only reached once the source has been
+	;		found, so a good previous build is never thrown away for a compile that cannot run.
+	;
+	; ********************************************************************************************
+
+	sub clear_old_output() {
+		diskio.delete(object_name)
+		if map_name[0] != 0 					; only when this run asked for a map
+			diskio.delete(map_name)
 	}
 
 	; ********************************************************************************************

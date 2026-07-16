@@ -72,19 +72,37 @@ make latest      # download & install the matching x16emu + ROM into bin/x16emu/
 
 ## Compiling a program
 
-The compiler reads its job from **`GPC.INPUT`** — two lines, the tokenised source `.PRG` and
-the output `.PRG`:
+The compiler engine is **`GPC.BLITZ.BIN`**. It reads its job from a control file, **`GPC.INPUT`**,
+of up to three text lines:
 
-```text
-SOURCE.PRG
-OBJECT.PRG
-```
+| Line | Contents | |
+| --- | --- | --- |
+| 1 | the tokenised BASIC `.PRG` to compile | required |
+| 2 | the compiled `.PRG` to write | required |
+| 3 | a debug map to write (see below), or empty for none | optional |
 
-Load and run the compiler in the emulator; it reads `SOURCE.PRG`, compiles, and writes
-`OBJECT.PRG`:
+A line ends at a CR, an LF, or any control byte, and blank lines are skipped — so a `GPC.INPUT`
+typed on a CRLF host drives the X16 compiler unchanged. Names may be lowercase; the compiler folds
+them to the uppercase PETSCII the KERNAL wants in a filename. With the source or object line missing
+the compiler prints `NO GPC.INPUT FILE` and stops, rather than guess at what to build.
+
+### Driving it — two ways
+
+**Interactively, with `GPC.PRG`.** The front end asks the three questions, writes `GPC.INPUT`, and
+chain-loads the engine. A bare RETURN at the output prompt names the object `C.` + source (`DIR.PRG`
+→ `C.DIR.PRG`); answer the map question and the map is named `M.` + source:
 
 ```sh
 cd release
+../bin/x16emu/x16emu.exe -rom ../bin/x16emu/rom.bin -fsroot . -prg GPC.PRG -run
+```
+
+**Scripted, by writing `GPC.INPUT` yourself** and running the engine directly — this is what lets
+one program drive another:
+
+```sh
+cd release
+printf 'SOURCE.PRG\nOBJECT.PRG\n\n' > GPC.INPUT   # third line empty: no map
 ../bin/x16emu/x16emu.exe -rom ../bin/x16emu/rom.bin -fsroot . -prg GPC.BLITZ.BIN -run
 #  -> GPC SQUEALING...
 #     IN:  SOURCE.PRG
@@ -95,6 +113,20 @@ On success `OBJECT.PRG` is a standalone program you can `LOAD"OBJECT.PRG"` / `RU
 identifies itself — the BASIC stub reads `SYS 2069 : REM GPC!` (the way the original C64 Blitz stamps
 `REM Blitz!` and Prog8 stamps `REM PROG8`). On failure the compiler prints the error and the offending
 line, e.g. `SYNTAX ERROR @ 610` or `NOT IMPLEMENTED @ 2400`.
+
+### The debug map (line 3)
+
+Name a third file and the compiler writes a **line-number map** beside the object — one line per
+source line, in code order: a 4-digit hex **p-code offset** and the decimal BASIC line that begins
+there.
+
+```text
+0030 12
+```
+
+It exists for *runtime* errors, which report a p-code offset, not a line — `DIVIDE BY ZERO @ $0030`.
+To place one, find the largest offset in the map that is `<=` the reported value: `$0030` is line 12.
+(Two synthetic entries, lines 65024 and 65535, are the implicit-`DIM` prologue's own code, not yours.)
 
 To get a tokenised `SOURCE.PRG` from a text listing without a running X16, use the host
 tokeniser (`bin/tokenise.zip`, stdlib Python) — the test harness does exactly this.
