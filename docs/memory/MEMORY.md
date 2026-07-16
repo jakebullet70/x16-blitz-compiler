@@ -10,6 +10,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [X16 BASIC conformance](blitz-x16-basic-conformance.md) — Blitz vs stock BASIC: 4 real defects (float literals, STEP 0, sci notation, reversed relops)
 - [R44+ keywords](blitz-x16-r44-plus-keywords.md) — 10 keywords added after R43 that Blitz doesn't know (SPRITE, MOVSPR, OVAL, RING, MOD…) + a LINPUT/LINPUT# token swap
 - [Blitz-X16 prior attempt](blitz-x16-prior-attempt.md) — the earlier Prog8 self-hosted compiler (now deleted from disk)
+- [Runtime footprint](blitz-x16-runtime-footprint.md) — the 10,956 B runtime copied into every program, why it's ~2× the C64 Blitz runtime (~5.8K), and how to shrink it
 
 ## X16 BASIC semantics (ROM-verified — apply to any compiler)
 - [IF semantics](gpc-if-semantics.md) — a false IF skips the WHOLE line, not just the first statement. Blitz gets this right.

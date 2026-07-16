@@ -38,12 +38,20 @@ all: build
 .PHONY: all build release run clean
 
 #
+#		Every build first stamps a fresh number into GPC.P8 -- the "V0.9.N" GPC prints at startup --
+#		so each built GPC.PRG is identifiable on sight. In place, in PowerShell; this is a Windows box.
+#		release and run both depend on build, so all three routes bump it.
+#
+BUMP = powershell -NoProfile -ExecutionPolicy Bypass -File bump-build.ps1
+
+#
 #		Prog8 names its output after the source, in lowercase -- GPC.prg. The X16 wants GPC.PRG,
 #		and on a case sensitive host those are two different files. It has to be renamed, and it
 #		cannot be renamed in place: on Windows GPC.prg and GPC.PRG ARE the same file and cp
 #		refuses to copy one onto itself. Hence the build/ directory.
 #
 build:
+	$(BUMP)
 	$(PROG8) -out build GPC.P8
 	$(CCOPY) build$(S)GPC.prg GPC.PRG
 
