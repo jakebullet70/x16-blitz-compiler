@@ -2570,7 +2570,7 @@ Command_PSET: ;; [pset]
 Command_LINE: ;; [line]
 		.entercmd
 		phy
-		jsr 	GraphicsColour
+		jsr 	GraphicsColourOptional 		; LINE's colour is optional (keeps current if omitted)
 		ldx 	#0 							; copy 0/1/2/3 to r0,1,2,3
 		ldy 	#X16_r0
 		jsr 	GraphicsCopy4
@@ -2690,6 +2690,17 @@ _CCExit:
 ;
 ; ************************************************************************************************
 
+GraphicsColourOptional:
+		.floatinteger 						; integer form of the colour argument.
+		lda 	NSMantissa1,x 				; high byte is non-zero only for the 256 "omitted"
+		bne 	_GCOKeep 					; marker OptionalColourCompile pushes -- so leave the
+		lda 	NSMantissa0,x 				; current draw colour. Otherwise it is a real 0..255
+		tax 								; colour (an explicit ",255" still lands here), set it.
+		ldy 	#0
+		jsr 	X16_GRAPH_set_colors
+_GCOKeep:
+		rts
+
 GraphicsColour:
 		jsr 	GetInteger8Bit
 		tax
@@ -2725,7 +2736,7 @@ GraphicsCopy1:
 ; ************************************************************************************************
 
 GraphicsRectCoords:
-		jsr 	GraphicsColour 				; set colour
+		jsr 	GraphicsColourOptional 		; set colour (optional: keeps current if omitted)
 		ldx 	#0 							; copy in order.
 		ldy 	#X16_r0
 		jsr 	GraphicsCopy4 

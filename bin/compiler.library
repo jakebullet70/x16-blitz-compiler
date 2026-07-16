@@ -2194,25 +2194,25 @@ CommandTables:
 ;
 	.byte	$08,$ce,$87,$ea,$ea,$e1,153,$06
 ;
-;	LINE    #,#,#,#,# T N
+;	LINE    #,#,#,# X:OptionalColourCompile T N
 ;
-	.byte	$0a,$ce,$88,$ea,$ea,$ea,$ea,$e1,154,$06
+	.byte	$0c,$ce,$88,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,154,$06
 ;
-;	RECT    #,#,#,#,# T N
+;	RECT    #,#,#,# X:OptionalColourCompile T N
 ;
-	.byte	$0a,$ce,$8a,$ea,$ea,$ea,$ea,$e1,155,$06
+	.byte	$0c,$ce,$8a,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,155,$06
 ;
-;	FRAME    #,#,#,#,# T N
+;	FRAME    #,#,#,# X:OptionalColourCompile T N
 ;
-	.byte	$0a,$ce,$89,$ea,$ea,$ea,$ea,$e1,156,$06
+	.byte	$0c,$ce,$89,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,156,$06
 ;
-;	OVAL    #,#,#,#,# T N
+;	OVAL    #,#,#,# X:OptionalColourCompile T N
 ;
-	.byte	$0a,$ce,$bf,$ea,$ea,$ea,$ea,$e1,157,$06
+	.byte	$0c,$ce,$bf,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,157,$06
 ;
-;	RING    #,#,#,#,# T N
+;	RING    #,#,#,# X:OptionalColourCompile T N
 ;
-	.byte	$0a,$ce,$c0,$ea,$ea,$ea,$ea,$e1,158,$06
+	.byte	$0c,$ce,$c0,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,158,$06
 ;
 ;	CHAR    #,#,#,$ T N
 ;
@@ -2926,6 +2926,34 @@ _MidComplete:
 
 MidFailType:
 		.error_type
+
+; ************************************************************************************************
+;
+;		As OptionalParameterCompile, but for a trailing COLOUR argument (RECT/LINE/FRAME/OVAL/
+;		RING). A palette index is 0..255, so 255 is a real colour and cannot double as the
+;		"omitted" sentinel the way it can for sprite fields. The default is 256 instead -- out of
+;		range for an 8-bit colour -- so the runtime (GraphicsColourOptional) reads a non-zero
+;		high byte as "leave the current draw colour", and every explicit 0..255 still works.
+;
+; ************************************************************************************************
+
+OptionalColourCompile:
+		jsr 	LookNextNonSpace 			; what follows.
+		cmp 	#","
+		bne 	_OCCDefault
+		jsr 	GetNext 					; consume ,
+		jsr 	CompileExpressionAt0 		; the supplied colour
+		and 	#NSSTypeMask
+		cmp 	#NSSIFloat
+		bne 	MidFailType 				; which must be numeric
+		clc
+		rts
+_OCCDefault:
+		lda 	#0 							; default of 256 = $0100: PushIntegerYA emits a 16-bit
+		ldy 	#1 							; constant when Y (the high byte) is non-zero, and that
+		jsr 	PushIntegerYA 				; high byte is what marks the colour as omitted.
+		clc
+		rts
 
 ; ************************************************************************************************
 ;
