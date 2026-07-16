@@ -94,6 +94,7 @@ VectorTable:
 	.word	CommandVarSpace          ; $d8 .varspace
 	.word	CommandRestoreX          ; $d9 .restore
 	.word	CommandXFnGosub          ; $da .fngosub
+	.word	CommandDeferredError     ; $db .deferror
 
 
 ShiftVectorTable:

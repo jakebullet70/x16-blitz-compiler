@@ -61,6 +61,10 @@ class PCode(object):
 		self.extra(".fngosub",2) 			# FN call: a GOSUB to a DEF FN body. A distinct opcode
 											# (not .gosub) so FixBranches resolves its operand as an
 											# absolute address, not a source line number.
+		self.extra(".deferror",0) 			# Throw-stub with no operand: raises SYNTAX ERROR at
+											# runtime. The compiler drops it in place of a statement
+											# it could not parse (defer-to-runtime), so unreachable
+											# garbage compiles and only errors if actually executed.
 		self.define("PCD_ENDSYSTEM")
 		self.endCommands = self.currentID	
 

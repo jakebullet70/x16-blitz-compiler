@@ -69,6 +69,7 @@ StartCompiler:
 		stz 	implicitDimFirstSet
 		stz 	clrCheckpoint 				; no CLR compiled yet -> no array is re-DIMmable
 		stz 	clrCheckpoint+1
+		stz 	deferErrors 				; not deferring compile errors until a statement arms it
 		lda 	#$00 						; default return target $FE00 (the END marker) so an
 		sta 	implicitDimFirst 			; empty program's prologue just exits cleanly.
 		lda 	#$FE
@@ -109,13 +110,33 @@ _MCLSameLine:
 		cmp 	#";" 						; a stray ; between statements (e.g. GOSUB 970;) is
 		beq 	_MCLSameLine 				; tolerated by BASIC, so skip it like a colon.
 
+		;
+		;		A real statement follows. Checkpoint it for defer-to-runtime: remember the
+		;		object write cursor and the compile-loop stack level, and arm SYNTAX-error
+		;		deferral. If it then fails to compile with a SYNTAX error, CompilerErrorHandler
+		;		rolls back to here and drops a runtime throw-stub in its place (see
+		;		DeferStatementToRuntime) instead of aborting. Preserve A (the first character).
+		;
+		pha
+		lda 	objPtr
+		sta 	stmtRecoverObj
+		lda 	objPtr+1
+		sta 	stmtRecoverObj+1
+		lda 	#1
+		sta 	deferErrors
+		pla
+		tsx
+		stx 	stmtRecoverSP
+		;
 		cmp 	#0 							; if ASCII then check for implied LET.
 		bpl 	_MCLCheckAssignment
 
 		ldx 	#CommandTables & $FF 		; do command tables.
 		ldy 	#CommandTables >> 8
 		jsr 	GeneratorProcess
-		bcs 	_MCLSameLine 				; keep trying to compile the line.
+		bcc 	_MCLSyntax 				; not compiled -> syntax error (deferred if armed)
+		stz 	deferErrors 				; compiled OK -> disarm the deferral
+		bra 	_MCLSameLine 				; keep trying to compile the line.
 
 _MCLSyntax: 								; syntax error.
 		.error_syntax
@@ -126,10 +147,27 @@ _MCLCheckAssignment:
 		jsr 	CharIsAlpha 				; if not alpha then syntax error
 		bcc 	_MCLSyntax
 		jsr 	CommandLETHaveFirst  		; LET first character, do assign
+		stz 	deferErrors 				; assignment compiled OK -> disarm the deferral
 		bra		_MCLSameLine 				; loop back.
 		;
 		;		End of compile, fix up GOTO/GOSUB etc., save it and exit.
 		;
+; ************************************************************************************************
+;
+;		Reached from CompilerErrorHandler when a statement failed to compile with a SYNTAX error
+;		while deferral was armed. The stack is already unwound to stmtRecoverSP and the object
+;		cursor rolled back to stmtRecoverObj, so just drop a single throw-stub in the statement's
+;		place (raises SYNTAX ERROR at runtime, but only if reached) and carry on at the next
+;		line -- the remainder of this line sits after the stub, so it can never run.
+;
+; ************************************************************************************************
+
+DeferStatementToRuntime:
+		lda 	#PCD_CMD_DEFERROR
+		jsr 	WriteCodeByte
+		jmp 	MainCompileLoop 			; drop the rest of this source line: everything after the
+										; stub is unreachable (it throws first), so read the next line.
+
 SaveCodeAndExit:
 		lda 	#BLC_CLOSEIN				; finish input.
 		jsr 	CallAPIHandler
@@ -271,6 +309,12 @@ implicitDimType:							; scratch: element type bits
 		.fill 	1
 implicitDimList:							; per entry: slot addr lo, slot addr hi, type, dim count
 		.fill 	4*32 						; capacity 32 -- more than that falls back to the old error
+deferErrors: 								; nonzero while a statement is compiling whose SYNTAX errors
+		.fill 	1 							; should defer to a runtime throw-stub, not abort the compile
+stmtRecoverSP: 							; 6502 stack level to unwind to when deferring a statement
+		.fill 	1
+stmtRecoverObj: 						; object write cursor to roll back to (discards partial code)
+		.fill 	2
 		.send storage
 
 ; ************************************************************************************************

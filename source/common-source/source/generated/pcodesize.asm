@@ -16,4 +16,5 @@ MOFSizeTable:
 	.byte	2         	; $d8 .varspace
 	.byte	2         	; $d9 .restore
 	.byte	2         	; $da .fngosub
+	.byte	0         	; $db .deferror
 .send code
