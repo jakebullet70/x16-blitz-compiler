@@ -6,7 +6,7 @@ PCD_ENDBINARY = $8d
 PCD_STARTCOMMAND = $8d
 PCD_ENDCOMMAND = $ce
 PCD_STARTSYSTEM = $ce
-PCD_ENDSYSTEM = $da
+PCD_ENDSYSTEM = $db
 
 PCD_PLUS             = $80 ; +
 PCD_MINUS            = $81 ; -
@@ -98,6 +98,7 @@ PCD_CMD_GOTOCMD_Z    = $d6 ; .goto.z
 PCD_CMD_GOTOCMD_NZ   = $d7 ; .goto.nz
 PCD_CMD_VARSPACE     = $d8 ; .varspace
 PCD_CMD_RESTORE      = $d9 ; .restore
+PCD_CMD_FNGOSUB      = $da ; .fngosub
 PCD_CLR              = $ce80 ; clr
 PCD_DIM              = $ce81 ; dim
 PCD_END              = $ce82 ; end

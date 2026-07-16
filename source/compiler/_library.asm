@@ -928,12 +928,12 @@ SetVariableRecordToCodePosition:
 		.storage_access
 		pha
 		phy
-		ldy 	#3
-		lda 	objPtr+1
-		sta 	(zTemp0),y
-		iny 	
-		lda 	objPtr
-		sta 	(zTemp0),y
+		ldy 	#3 							; store the position LOW-then-HIGH, the same address
+		lda 	objPtr 						; order CreateVariableRecord uses (offset 3 = low,
+		sta 	(zTemp0),y 					; offset 4 = high). It used to be stored byte-swapped,
+		iny 								; which FindVariable (X=[3], Y=[4]) then handed to the FN
+		lda 	objPtr+1 					; call code with the bytes reversed -- so a called FN
+		sta 	(zTemp0),y 					; jumped to a garbage address. FNCompile is the only reader.
 		ply
 		pla
 		.storage_release
@@ -1714,6 +1714,8 @@ _FBLoop:
 		beq 	_FBFixGotoGosub
 		cmp 	#PCD_CMD_GOSUB
 		beq 	_FBFixGotoGosub
+		cmp 	#PCD_CMD_FNGOSUB 			; an FN call: resolve like a branch but from an
+		beq 	_FBFixFnGosub 				; absolute address, not a line number.
 		cmp 	#PCD_CMD_GOTOCMD_NZ 		; patch the conditional GOTOs for Z/NZ TOS.
 		beq 	_FBFixGotoGosub
 		cmp 	#PCD_CMD_GOTOCMD_Z 
@@ -1725,8 +1727,22 @@ _FBLoop:
 _FBNext:		
 		jsr 	MoveObjectForward 			; move forward in object code.
 		bcc 	_FBLoop 					; not finished
-_FBExit:		
+_FBExit:
 		rts
+;
+;		Found an FN call (.fngosub). Its operand is already the ABSOLUTE code position of the FN
+;		body, not a source line number, so skip STRFindLine: load the address into YA and join the
+;		shared tail, which turns it into an offset from this opcode -- exactly like every branch.
+;
+_FBFixFnGosub:
+		ldy 	#1
+		lda 	(objPtr),y 					; operand byte 1 = abs LOW
+		pha
+		iny
+		lda 	(objPtr),y 					; operand byte 2 = abs HIGH
+		tay 								; Y = abs HIGH
+		pla 								; A = abs LOW
+		jmp 	_FBFFound
 ;
 ;		Found GOTO/GOSUB - look it up in the line# table and fix it up.
 ;
@@ -1947,33 +1963,29 @@ FNCompile:
 		;		Check to see if it is defined.
 		;
 		jsr 	FindVariable				; does it already exist ?
-		bcc 	_FNError 					; no.
-		jsr 	STRMakeOffset 				; convert to a relative address.
-
-		cmp 	#0 							; fix up.
-		bne 	_FNNoBorrow
-		dey
-_FNNoBorrow:
-		dec 	a
-
-		phy 								; save location of routine on stack.
-		pha
-		phx
+		bcc 	_FNError 					; no -- a forward FN reference is not supported.
+		;
+		;		FindVariable returns the FN body's ABSOLUTE code position in X (low) and Y (high),
+		;		as stored by SetVariableRecordToCodePosition. Emit it verbatim as the operand of a
+		;		.fngosub -- its own opcode, so FixBranches turns this absolute address into an
+		;		offset (like any branch) instead of mistaking it for a source line number. Push
+		;		high then low so, after the argument is compiled, the low byte is written first.
+		;
+		phy 								; abs HIGH
+		phx 								; abs LOW  (top of stack)
 		;
 		;		Handle <expression>)
 		;
 		jsr 	CompileExpressionAt0
 		jsr 	CheckNextRParen
 		;
-		;		Compile routine call
+		;		Compile the call : .fngosub <lo> <hi>
 		;
-		lda 	#PCD_CMD_GOSUB
+		lda 	#PCD_CMD_FNGOSUB
 		jsr 	WriteCodeByte
-		pla
+		pla 								; abs LOW  -> operand byte 1
 		jsr 	WriteCodeByte
-		pla
-		jsr 	WriteCodeByte
-		pla
+		pla 								; abs HIGH -> operand byte 2
 		jsr 	WriteCodeByte
 
 		clc

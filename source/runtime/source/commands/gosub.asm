@@ -18,6 +18,13 @@
 ;
 ; ************************************************************************************************
 
+CommandXFnGosub: ;; [.fngosub]
+		.entercmd 							; a DEF FN call. Identical to GOSUB at runtime -- open a
+		lda 	#FRAME_GOSUB 				; frame, save the return position, jump. Its own opcode
+		jsr 	StackOpenFrame 				; exists only so the compiler's FixBranches can tell an
+		jsr 	StackSaveCurrentPosition 	; FN call (operand = absolute address) apart from an
+		jmp 	PerformGOTO 				; ordinary GOSUB (operand = source line number).
+
 CommandXGosub: ;; [.gosub]
 		.entercmd
 		lda 	#FRAME_GOSUB

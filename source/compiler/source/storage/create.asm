@@ -78,12 +78,12 @@ SetVariableRecordToCodePosition:
 		.storage_access
 		pha
 		phy
-		ldy 	#3
-		lda 	objPtr+1
-		sta 	(zTemp0),y
-		iny 	
-		lda 	objPtr
-		sta 	(zTemp0),y
+		ldy 	#3 							; store the position LOW-then-HIGH, the same address
+		lda 	objPtr 						; order CreateVariableRecord uses (offset 3 = low,
+		sta 	(zTemp0),y 					; offset 4 = high). It used to be stored byte-swapped,
+		iny 								; which FindVariable (X=[3], Y=[4]) then handed to the FN
+		lda 	objPtr+1 					; call code with the bytes reversed -- so a called FN
+		sta 	(zTemp0),y 					; jumped to a garbage address. FNCompile is the only reader.
 		ply
 		pla
 		.storage_release
