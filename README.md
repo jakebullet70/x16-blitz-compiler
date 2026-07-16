@@ -37,6 +37,26 @@ Forked from Paul Robson's original: <https://github.com/paulscottrobson/blitz-co
 | `release/` | the built compiler and sample programs, ready to run |
 | `documents/` | build include (`common.make`), notes, and reference PDFs |
 
+## Runtime footprint
+
+Every compiled program carries the same support runtime — the P-code VM, all command handlers, and the
+math libraries — copied in ahead of its own code. It measures **~11 KB** (10,956 bytes): `runtime.library`
+7.3K (the VM plus all 158 handlers), `ifloat32` 2.3K, `polynomials` 0.9K, then the error vectors and the
+BASIC stub.
+
+For comparison, the vintage **C64 Blitz!** runtime (in `demo-c64/`) is roughly **half** ours — its compiled `DIR`
+is 6.2 KB against our 11 KB build of the same program, an estimated ~5.8 KB of runtime. The difference
+is two design choices, not overhead:
+
+- **Our own floating point.** We bundle a 32-bit float + transcendental library (`ifloat32` +
+  `polynomials`, ~3.2K) by design (a 32-bit format, not the ROM's 40-bit); C64 Blitz calls the C64 ROM's
+40-bit BASIC floats instead.
+- **X16 hardware.** ~2K of handlers for `SPRITE`, `MOVSPR`, VERA graphics, `TILE`, `MOUSE`, FM/PSG sound,
+  `BLOAD`/`BSAVE` — none of which exist as C64 BASIC V2 keywords.
+
+Those two (~5.2K) account for essentially the whole gap. [`TODO.md`](TODO.md#shrinking-the-runtime) covers
+how a program that uses less could ship less.
+
 ## Building
 
 Needs **GNU make**, **[64tass](https://sourceforge.net/projects/tass64/)**, and **Python 3**.
@@ -71,9 +91,10 @@ cd release
 #     OUT: OBJECT.PRG
 ```
 
-On success `OBJECT.PRG` is a standalone program you can `LOAD"OBJECT.PRG"` / `RUN`. On failure
-the compiler prints the error and the offending line, e.g. `SYNTAX ERROR @ 610` or
-`NOT IMPLEMENTED @ 2400`.
+On success `OBJECT.PRG` is a standalone program you can `LOAD"OBJECT.PRG"` / `RUN`. `LIST` it and it
+identifies itself — the BASIC stub reads `SYS 2069 : REM GPC!` (the way the original C64 Blitz stamps
+`REM Blitz!` and Prog8 stamps `REM PROG8`). On failure the compiler prints the error and the offending
+line, e.g. `SYNTAX ERROR @ 610` or `NOT IMPLEMENTED @ 2400`.
 
 To get a tokenised `SOURCE.PRG` from a text listing without a running X16, use the host
 tokeniser (`bin/tokenise.zip`, stdlib Python) — the test harness does exactly this.

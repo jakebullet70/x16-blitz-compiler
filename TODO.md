@@ -443,6 +443,71 @@ left is fixed overhead rather than an algorithmic hole: `FloatMultiply` and `Flo
 operands on every call, and for an integer operand that is work the new byte-skip immediately undoes.
 Diminishing returns; only worth revisiting if float-heavy code matters more than features.
 
+## Shrinking the runtime
+
+The runtime is copied **verbatim** into every compiled program — one pre-linked image, `$0801` up to
+`ObjectBase` (`$3300`), measured at **10,956 bytes**: `runtime.library` 7,288 (the VM plus all 158
+command handlers), `ifloat32` 2,349, `polynomials` 860, `common` 415, the BASIC stub 44. There is no
+per-program dead-code elimination — `10 PRINT"HI"` ships the sprite engine, the disk loader and the
+transcendental library it never calls.
+
+For scale: the vintage **C64 Blitz!** runtime is roughly **half** ours — its compiled `C/DIR` is
+6,244 B against our own 10,992 B build of the same program (0.57× whole-program), and subtracting the
+compiler's runtime-less `Z/DIR` intermediate (444 B) *estimates* the embedded runtime at ~5.8K — a
+rough difference, not an exact extraction. It stays small two ways, both where our extra bytes went:
+it calls the C64 ROM for floating point and number↔string conversion (verified — the compiled `C/DIR`
+makes the ROM/KERNAL float calls, the runtime-less `Z/DIR` makes none), and C64 BASIC V2 has no
+graphics/sprite/sound keywords to compile at all. We spend ~3.2K on our own 32-bit float (by design,
+over the ROM's 40-bit) and ~2K on X16 hardware handlers. Two ways to give a program back the bytes it
+does not use, neither small, plus a cheap first step that both depend on.
+
+### Runtime without graphics — selective handler inclusion
+
+A pure text/math program never calls `PSET`/`LINE`/`RECT`/`FRAME`/`OVAL`/`RING`/`CHAR`
+(`graphics.asm`, **280 B**), and usually not `SPRITE`/`MOVSPR` (**463 B**), `TILE`/`TDATA`/`TATTR`
+(**244 B**), `MOUSE` (**107 B**), the FM/PSG sound handlers (**328 B**), nor `I2CPOKE`/`VPOKE`/`BLOAD`
+— ~**2 KB** of hardware handlers in all. Every one is reachable **only** through its keyword's
+`VectorTable` slot, and the emitted p-code addresses commands by *token*, never by handler address —
+so the compiler already has everything it needs to ship only the handlers a program references.
+
+The obstacle is layout, not information. The runtime is one image copied whole, and these handlers sit
+in the **middle** of it, so dropping one means either repointing its dead vector slot at a stub (which
+reclaims nothing — the bytes stay) or a per-program relocating link (which reclaims them but is a real
+linker). The honest first cut is to **group the optional hardware handlers at the tail** of the image,
+in dependency order, so an unused group truncates with `ObjectBase` lowered to match — no relocator.
+
+### Runtime on X16 ROM floats
+
+`ifloat32` + `polynomials` are **3,209 B — 29 % of the runtime** — of custom 32-bit float and
+transcendentals. The X16 has a complete 40-bit floating-point BASIC in ROM (bank 4, which a compiled
+program is already running under), so calling it — the way C64 Blitz calls the C64 ROM — would drop
+most of that and move the runtime toward the C64 figure. But the saving is **gross, not net**: the
+marshalling glue below is added back, and it is not a drop-in — which is the whole reason to weigh it
+against the cost:
+
+- the number format changes (31-bit mantissa + separate status/exponent → 40-bit FAC), so **numeric
+  results change** and the suites move with them — `f.cmp` tolerance would have to be re-baselined;
+- every operand marshals through FAC1/FAC2 instead of the custom **12-deep zero-page number stack**,
+  and that stack currently lives in the same zero page the ROM's FAC scratch wants;
+- the integer fast-paths the 32-bit format buys (`FloatInt8Multiply`, integer add/compare) go away —
+  which is exactly the speed the fork spent those 3.2K to get.
+
+It is the single biggest lever and the single biggest rewrite. Parked as the deliberate
+size-for-speed trade to revisit only if footprint ever outweighs it.
+
+### The cheap first step both of the above want
+
+`polynomials` (860 B, the transcendentals) and the string→float parser inside `ifloat32` (~518 B,
+reached at runtime **only** by `VAL`) already sit at the very **tail** of the runtime image
+(`$2f71`…`$3300` is entirely `FloatSine`/`Cosine`/`Exponent`/`Logarithm`/… and their coefficient
+tables). A program that uses no `SIN`/`COS`/`^`/`SQR`/… and no `VAL` could therefore ship a runtime
+**truncated** below them, `ObjectBase` lowered to match — no relocation, the handlers below keep their
+addresses, the dropped vector slots just never execute. It needs the compiler to scan the emitted
+p-code for those opcodes and pick the trimmed image, and the generated `vectors.asm`/`links.asm`/
+`pi.asm` made conditional (repoint the dropped slots to a range-error stub, inline `PI`'s constant).
+Bounded work, ~**1.4 KB** off a non-trig/non-`VAL` program, and it builds the conditional-runtime
+machinery the two larger items above both need.
+
 ## Wanted
 
 ### Name the output after the source — DONE, but by the caller
