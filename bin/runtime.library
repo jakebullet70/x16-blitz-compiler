@@ -551,7 +551,29 @@ StartRuntime:
 		ldx 	#RuntimeErrorHandler & $FF
 		jsr 	SetErrorHandler
 
+		;
+		;		Fresh start clears the variable space; a LOAD chain does NOT, so the loaded
+		;		program inherits this one's variables and strings. LOAD (load.asm) arms a
+		;		signature in low RAM before it chains -- it survives the load (it is below the
+		;		program) and RUN's CLR. If it is set, disarm it and keep the variables.
+		;
+		ldx 	#3
+_SRChainCheck:
+		lda 	loadChainSig,x
+		cmp 	LoadChainMagic,x
+		bne 	_SRFreshStart
+		dex
+		bpl 	_SRChainCheck
+		lda 	#0 							; matched: disarm the signature and preserve memory
+		ldx 	#3
+_SRDisarm:
+		sta 	loadChainSig,x
+		dex
+		bpl 	_SRDisarm
+		bra 	_SRAfterClear
+_SRFreshStart:
 		jsr 	ClearMemory 				; clear memory.
+_SRAfterClear:
 		jsr 	XRuntimeSetup 				; initialise the runtime stuff.
 	 	jsr		SetDefaultChannel			; set default input/output channel.
 
@@ -682,11 +704,25 @@ _NoCPCarry:
 		pla
 		rts
 
+; ************************************************************************************************
+;
+;		The signature LOAD writes to loadChainSig to say "this is a chain -- keep the variables".
+;		Four bytes so a cold-boot random match is a non-event; shared with load.asm so both ends
+;		agree on it.
+;
+; ************************************************************************************************
+
+LoadChainMagic:
+		.text 	"GPCL"
+
 		.send code
 
 		.section storage
 runtimeHigh:								; high byte of runtime start.
 		.fill 	1
+
+loadChainSig: 								; LOAD arms this before chaining; StartRuntime disarms it
+		.fill 	4 							; and skips the memory clear so variables survive the chain
 
 storeStartHigh:								; p-code run space.
 		.fill 	1
@@ -3604,6 +3640,175 @@ LinputResult:
 liDelimiter:
 		.fill 	1
 liCount:
+		.fill 	1
+		.send storage
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;
+; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		Name:		load.asm
+;		Purpose:	LOAD "<name>" -- chain-load and run another program
+;		Created:	16th July 2026
+;		Reviewed: 	No
+;
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		LOAD "<name>" loads another program over this one and runs it -- program chaining, the
+;		same thing stock BASIC does when a LOAD is executed from a running program.
+;
+;		We do this the way it demonstrably works: by building a real one-line BASIC program
+;
+;			10 LOAD "<name>"
+;
+;		at the start of BASIC ($0801) and handing it to the ROM's RUN. LOAD, executed under a
+;		genuine RUN (proper stack, CLR done, program-mode line number), loads the file over $0801
+;		and chain-runs it exactly as the interpreter does -- which a synthetic single-statement
+;		dispatch does NOT (the ROM's post-load rerun needs the full RUN context to land in the
+;		interpreter loop; without it the load happens but nothing runs).
+;
+;		Layout built here (see the R49 ROM's newstt/RUN, disassembled to get this right):
+;
+;			$0800 : $00                the leading zero every BASIC program sits behind
+;			$0801 : <link>             two bytes -> the $00 $00 end-of-program marker
+;			$0803 : 10  0              line number, low/high
+;			$0805 : $93 $22 <name> $22 $00     LOAD "<name>" , end of line
+;			      : $00 $00            end of program
+;
+;		vartab is pointed just past that so RUN's CLR has an empty variable space, and txttab is
+;		pinned to $0801.  RUN (.runc) sets TXTPTR = txttab-1, does CLR, resets the stack and RTSes
+;		to the interpreter's per-statement loop at $CC60 (JMP newstt) -- so we push $CC5F for it
+;		to return through.  Command_LOAD itself lives far above $0801, so writing the little
+;		program here never touches the code doing the writing; and by the time RUN's LOAD
+;		overwrites $0801 we are running in the ROM.
+;
+;		Variables carry across the chain, like stock's LOAD-in-a-program. RUN would normally CLR,
+;		but the compiled runtime keeps its variables and strings in high RAM ($8100+), not BASIC's
+;		variable space, and RUN's CLR does not touch that. What WOULD wipe them is the loaded
+;		program's own StartRuntime, which clears memory -- so LOAD arms a signature (see below and
+;		00runtime.asm) that tells StartRuntime this is a chain and to skip that clear. This only
+;		makes sense when the two programs share a variable layout (the compiler assigns addresses
+;		by first appearance, so declare the shared variables in the same order in both).
+;
+;		Zero page is clear: the runtime's ZP tops out around $79, well below txttab ($DF) and the
+;		CHRGET/TXTPTR area ($E7/$EE), and it never touches $0200-$0800 or $03E1/$03EB.
+;
+; ************************************************************************************************
+
+		.section 	code
+
+LD_LOADTOK = $93 							; CBM BASIC token for LOAD
+LD_PROG    = $0801 							; start of BASIC program space
+LD_TXTTAB  = $00DF 							; ROM: start-of-program pointer
+LD_VARTAB  = $03E1 							; ROM: start of variables (= end of program) -- CLR reads it
+LD_RUN     = $CD30 							; ROM: the RUN statement
+LD_RUNLOOP = $CC60 							; ROM: the "JMP newstt" a statement handler returns to
+
+Command_LOAD: ;; [!load]
+		.entercmd
+		;
+		;		zTemp0 -> filename string: a length byte followed by the characters.
+		;
+		lda 	NSMantissa0+0
+		sta 	zTemp0
+		lda 	NSMantissa1+0
+		sta 	zTemp0+1
+		;
+		;		Arm the chain signature. The loaded program's StartRuntime sees it and skips its
+		;		memory clear, so our variables (and strings) carry across the chain. It lives in
+		;		low RAM, below $0801, so neither the load nor RUN's CLR disturbs it.
+		;
+		ldx 	#3
+_LDArm:
+		lda 	LoadChainMagic,x
+		sta 	loadChainSig,x
+		dex
+		bpl 	_LDArm
+		;
+		;		Fixed part of the little program.
+		;
+		stz 	LD_PROG-1 					; $0800 = 0, the leading zero
+		lda 	#10 						; line number 10
+		sta 	LD_PROG+2
+		stz 	LD_PROG+3
+		lda 	#LD_LOADTOK 				; LOAD token
+		sta 	LD_PROG+4
+		lda 	#$22 						; opening quote
+		sta 	LD_PROG+5
+		;
+		;		Copy the filename in, then close the quote, end the line, and mark end of program.
+		;
+		lda 	(zTemp0) 					; filename length
+		sta 	ldNameLen
+		ldy 	#0
+_LDCopy:
+		cpy 	ldNameLen
+		beq 	_LDCopyDone
+		iny
+		lda 	(zTemp0),y 					; character i (1..len)
+		sta 	LD_PROG+5,y 				; -> $0807 upward
+		bra 	_LDCopy
+_LDCopyDone:
+		iny 								; closing quote
+		lda 	#$22
+		sta 	LD_PROG+5,y
+		iny 								; end-of-line
+		lda 	#0
+		sta 	LD_PROG+5,y
+		iny 								; end-of-program marker (two zero bytes)
+		sta 	LD_PROG+5,y
+		iny
+		sta 	LD_PROG+5,y
+		;
+		;		Y = namelen+4.  The link at $0801 points to the first end-of-program byte, which is
+		;		$0805 + Y; vartab is two past it (the byte after the second marker).
+		;
+		tya
+		clc
+		adc 	#$05 						; low of $0805 + Y
+		sta 	LD_PROG 					; link low
+		lda 	#$08
+		adc 	#0
+		sta 	LD_PROG+1 					; link high
+		;
+		lda 	LD_PROG 					; vartab = link + 2
+		clc
+		adc 	#2
+		sta 	LD_VARTAB
+		lda 	LD_PROG+1
+		adc 	#0
+		sta 	LD_VARTAB+1
+		;
+		lda 	#<LD_PROG 					; txttab = $0801
+		sta 	LD_TXTTAB
+		lda 	#>LD_PROG
+		sta 	LD_TXTTAB+1
+		;
+		;		Enter RUN. Its CLR resets the stack and RTSes to $CC60 (JMP newstt); push $CC5F so
+		;		it returns there and runs our one-line program -- which LOADs and chains.
+		;
+		lda 	#>(LD_RUNLOOP-1)
+		pha
+		lda 	#<(LD_RUNLOOP-1)
+		pha
+		lda 	#0 							; RUN's first act is to test Z: set => "RUN" (from the
+		jmp 	LD_RUN 						; start), clear => "RUN <line>" (which would hunt for a
+											; bogus line and raise UNDEF'D STATEMENT). Enter with Z=1.
+
+		.send 	code
+
+		.section storage
+ldNameLen: 									; filename length, held across the copy loop
 		.fill 	1
 		.send storage
 
@@ -7852,58 +8057,59 @@ ShiftVectorTable:
 	.word	LinkFloatArcTan          ; $ce8b atn
 	.word	CommandXLinput           ; $ce8c linput
 	.word	CommandXBinput           ; $ce8d binput
-	.word	Command_BLOAD            ; $ce8e bload
-	.word	Command_BVLOAD           ; $ce8f bvload
-	.word	Command_VLOAD            ; $ce90 vload
-	.word	Command_BSAVE            ; $ce91 bsave
-	.word	Command_BVERIFY          ; $ce92 bverify
-	.word	X16CommandPowerOff       ; $ce93 poweroff
-	.word	X16CommandReset          ; $ce94 reset
-	.word	X16CommandReboot         ; $ce95 reboot
-	.word	XCommandMouse            ; $ce96 mouse
-	.word	XUnaryMB                 ; $ce97 mb
-	.word	XUnaryMX                 ; $ce98 mx
-	.word	XUnaryMY                 ; $ce99 my
-	.word	XUnaryMWheel             ; $ce9a mwheel
-	.word	UnaryRPT                 ; $ce9b rpt$
-	.word	Command_SPRITE           ; $ce9c sprite
-	.word	Command_SPRMEM           ; $ce9d sprmem
-	.word	Command_MOVSPR           ; $ce9e movspr
-	.word	UnaryST                  ; $ce9f st
-	.word	CommandStop              ; $cea0 stop
-	.word	CommandSYS               ; $cea1 sys
-	.word	UnaryTDATA               ; $cea2 tdata
-	.word	UnaryTATTR               ; $cea3 tattr
-	.word	Command_TILE             ; $cea4 tile
-	.word	CommandTIWriteN          ; $cea5 ti.write
-	.word	CommandTIWriteS          ; $cea6 ti$.write
-	.word	CommandXWAIT             ; $cea7 wait
-	.word	X16I2CPoke               ; $cea8 i2cpoke
-	.word	X16I2CPeek               ; $cea9 i2cpeek
-	.word	CommandBank              ; $ceaa bank
-	.word	XCommandSleep            ; $ceab sleep
-	.word	X16_Audio_FMINIT         ; $ceac fminit
-	.word	X16_Audio_FMNOTE         ; $cead fmnote
-	.word	X16_Audio_FMDRUM         ; $ceae fmdrum
-	.word	X16_Audio_FMINST         ; $ceaf fminst
-	.word	X16_Audio_FMVIB          ; $ceb0 fmvib
-	.word	X16_Audio_FMFREQ         ; $ceb1 fmfreq
-	.word	X16_Audio_FMVOL          ; $ceb2 fmvol
-	.word	X16_Audio_FMPAN          ; $ceb3 fmpan
-	.word	X16_Audio_FMPLAY         ; $ceb4 fmplay
-	.word	X16_Audio_FMCHORD        ; $ceb5 fmchord
-	.word	X16_Audio_FMPOKE         ; $ceb6 fmpoke
-	.word	X16_Audio_PSGINIT        ; $ceb7 psginit
-	.word	X16_Audio_PSGNOTE        ; $ceb8 psgnote
-	.word	X16_Audio_PSGVOL         ; $ceb9 psgvol
-	.word	X16_Audio_PSGWAV         ; $ceba psgwav
-	.word	X16_Audio_PSGFREQ        ; $cebb psgfreq
-	.word	X16_Audio_PSGPAN         ; $cebc psgpan
-	.word	X16_Audio_PSGPLAY        ; $cebd psgplay
-	.word	X16_Audio_PSGCHORD       ; $cebe psgchord
-	.word	CommandCls               ; $cebf cls
-	.word	CommandLocate            ; $cec0 locate
-	.word	CommandColor             ; $cec1 color
+	.word	Command_LOAD             ; $ce8e load
+	.word	Command_BLOAD            ; $ce8f bload
+	.word	Command_BVLOAD           ; $ce90 bvload
+	.word	Command_VLOAD            ; $ce91 vload
+	.word	Command_BSAVE            ; $ce92 bsave
+	.word	Command_BVERIFY          ; $ce93 bverify
+	.word	X16CommandPowerOff       ; $ce94 poweroff
+	.word	X16CommandReset          ; $ce95 reset
+	.word	X16CommandReboot         ; $ce96 reboot
+	.word	XCommandMouse            ; $ce97 mouse
+	.word	XUnaryMB                 ; $ce98 mb
+	.word	XUnaryMX                 ; $ce99 mx
+	.word	XUnaryMY                 ; $ce9a my
+	.word	XUnaryMWheel             ; $ce9b mwheel
+	.word	UnaryRPT                 ; $ce9c rpt$
+	.word	Command_SPRITE           ; $ce9d sprite
+	.word	Command_SPRMEM           ; $ce9e sprmem
+	.word	Command_MOVSPR           ; $ce9f movspr
+	.word	UnaryST                  ; $cea0 st
+	.word	CommandStop              ; $cea1 stop
+	.word	CommandSYS               ; $cea2 sys
+	.word	UnaryTDATA               ; $cea3 tdata
+	.word	UnaryTATTR               ; $cea4 tattr
+	.word	Command_TILE             ; $cea5 tile
+	.word	CommandTIWriteN          ; $cea6 ti.write
+	.word	CommandTIWriteS          ; $cea7 ti$.write
+	.word	CommandXWAIT             ; $cea8 wait
+	.word	X16I2CPoke               ; $cea9 i2cpoke
+	.word	X16I2CPeek               ; $ceaa i2cpeek
+	.word	CommandBank              ; $ceab bank
+	.word	XCommandSleep            ; $ceac sleep
+	.word	X16_Audio_FMINIT         ; $cead fminit
+	.word	X16_Audio_FMNOTE         ; $ceae fmnote
+	.word	X16_Audio_FMDRUM         ; $ceaf fmdrum
+	.word	X16_Audio_FMINST         ; $ceb0 fminst
+	.word	X16_Audio_FMVIB          ; $ceb1 fmvib
+	.word	X16_Audio_FMFREQ         ; $ceb2 fmfreq
+	.word	X16_Audio_FMVOL          ; $ceb3 fmvol
+	.word	X16_Audio_FMPAN          ; $ceb4 fmpan
+	.word	X16_Audio_FMPLAY         ; $ceb5 fmplay
+	.word	X16_Audio_FMCHORD        ; $ceb6 fmchord
+	.word	X16_Audio_FMPOKE         ; $ceb7 fmpoke
+	.word	X16_Audio_PSGINIT        ; $ceb8 psginit
+	.word	X16_Audio_PSGNOTE        ; $ceb9 psgnote
+	.word	X16_Audio_PSGVOL         ; $ceba psgvol
+	.word	X16_Audio_PSGWAV         ; $cebb psgwav
+	.word	X16_Audio_PSGFREQ        ; $cebc psgfreq
+	.word	X16_Audio_PSGPAN         ; $cebd psgpan
+	.word	X16_Audio_PSGPLAY        ; $cebe psgplay
+	.word	X16_Audio_PSGCHORD       ; $cebf psgchord
+	.word	CommandCls               ; $cec0 cls
+	.word	CommandLocate            ; $cec1 locate
+	.word	CommandColor             ; $cec2 color
 	.send code
 ; ************************************************************************************************
 ; ************************************************************************************************

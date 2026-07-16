@@ -76,6 +76,13 @@ VLOAD 			$,#,#,# T N
 BSAVE 			$,#,#,#,# T N
 BVERIFY 		$,#,#,# T N
 
+# 	Program chain-load. LOAD "<name>" loads another program over this one and runs it, exactly
+# 	as stock BASIC does when LOAD is executed inside a running program -- variables are NOT
+# 	cleared, so data carries across the chain. See load.asm: it hands a tokenised LOAD statement
+# 	to the ROM's own dispatcher rather than reimplementing the load+relink+rerun itself.
+
+LOAD 			$ T N
+
 # 	Line and block input. These assign INTO a string variable, so the handler does all of it --
 # 	no T here, exactly like INPUT and INPUT#. The "#" forms take C: (channel execute), which
 # 	compiles the channel and sets it around the command, so the runtime never sees a channel:

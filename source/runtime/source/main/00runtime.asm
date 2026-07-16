@@ -43,7 +43,29 @@ StartRuntime:
 		ldx 	#RuntimeErrorHandler & $FF
 		jsr 	SetErrorHandler
 
+		;
+		;		Fresh start clears the variable space; a LOAD chain does NOT, so the loaded
+		;		program inherits this one's variables and strings. LOAD (load.asm) arms a
+		;		signature in low RAM before it chains -- it survives the load (it is below the
+		;		program) and RUN's CLR. If it is set, disarm it and keep the variables.
+		;
+		ldx 	#3
+_SRChainCheck:
+		lda 	loadChainSig,x
+		cmp 	LoadChainMagic,x
+		bne 	_SRFreshStart
+		dex
+		bpl 	_SRChainCheck
+		lda 	#0 							; matched: disarm the signature and preserve memory
+		ldx 	#3
+_SRDisarm:
+		sta 	loadChainSig,x
+		dex
+		bpl 	_SRDisarm
+		bra 	_SRAfterClear
+_SRFreshStart:
 		jsr 	ClearMemory 				; clear memory.
+_SRAfterClear:
 		jsr 	XRuntimeSetup 				; initialise the runtime stuff.
 	 	jsr		SetDefaultChannel			; set default input/output channel.
 
@@ -174,11 +196,25 @@ _NoCPCarry:
 		pla
 		rts
 
+; ************************************************************************************************
+;
+;		The signature LOAD writes to loadChainSig to say "this is a chain -- keep the variables".
+;		Four bytes so a cold-boot random match is a non-event; shared with load.asm so both ends
+;		agree on it.
+;
+; ************************************************************************************************
+
+LoadChainMagic:
+		.text 	"GPCL"
+
 		.send code
 
 		.section storage
 runtimeHigh:								; high byte of runtime start.
 		.fill 	1
+
+loadChainSig: 								; LOAD arms this before chaining; StartRuntime disarms it
+		.fill 	4 							; and skips the memory clear so variables survive the chain
 
 storeStartHigh:								; p-code run space.
 		.fill 	1
