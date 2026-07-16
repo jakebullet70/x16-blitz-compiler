@@ -547,9 +547,174 @@ _WOCDone:
 		jsr 	IOWriteClose 				; close the file.
 		rts
 
+; ************************************************************************************************
+;
+;		Write the debug MAP file, if GPC.INPUT gave a third line (its name). The map turns a
+;		runtime error's "@ $XXXX" back into a source line, which is otherwise a hand decode of
+;		the p-code. One text line per source line, in ascending code order:
+;
+;			0030 12
+;
+;		the 4-digit hex P-CODE OFFSET -- exactly what the runtime prints as "@ $0030" -- then a
+;		space and the DECIMAL BASIC line number that begins there. To place an error, find the
+;		largest offset that is <= the one reported.
+;
+;		It is built straight from the compiler's line-number table (STRMarkLine): 4-byte entries
+;		[line# lo, line# hi, addr lo, addr hi], growing DOWNWARD from compilerEndHigh:$00 to
+;		lineNumberTable, walked here from the top down so the file comes out in code order. The
+;		stored addr is the compile-time position in the object buffer (based at FreeMemory), so
+;		offset = addr - FreeMemory -- the same number the runtime reports, because the object is
+;		copied verbatim from FreeMemory to its run address. The two synthetic lines the implicit
+;		-DIM prologue adds show up as line 65024 ($FE00, the end marker) and 65535 ($FFFF, the
+;		prologue); they are real code positions, just not the user's.
+;
+; ************************************************************************************************
+
+WriteMapFile:
+		lda 	OptionsText 				; no third line -> no map asked for.
+		bne 	_WMFStart
+		rts
+_WMFStart:
+		ldy 	#OptionsText >> 8 			; open the map file for write (logical file 3, as the
+		ldx 	#OptionsText & $FF 			; object write already closed).
+		jsr 	IOOpenWrite
+		lda 	compilerEndHigh 			; walk from the top of the table ...
+		sta 	mapWalk+1
+		stz 	mapWalk
+_WMFLoop:
+		sec 								; ... down one 4-byte entry at a time.
+		lda 	mapWalk
+		sbc 	#4
+		sta 	mapWalk
+		lda 	mapWalk+1
+		sbc 	#0
+		sta 	mapWalk+1
+		lda 	mapWalk+1 					; stop once below the last (lowest) entry.
+		cmp 	lineNumberTable+1
+		bcc 	_WMFDone
+		bne 	_WMFEntry
+		lda 	mapWalk
+		cmp 	lineNumberTable
+		bcc 	_WMFDone
+_WMFEntry:
+		jsr 	_WMFWriteEntry
+		bra 	_WMFLoop
+_WMFDone:
+		jmp 	IOWriteClose
+
+;
+;		Write one entry: "<hhhh> <ddddd>",CR. Everything the line needs is pulled out through
+;		zTemp0 up front, before any IOWriteByte -- CHROUT to a file is free to trash zero page,
+;		but mapValue/mapOff are plain RAM and survive it.
+;
+_WMFWriteEntry:
+		lda 	mapWalk 					; point zTemp0 at the entry.
+		sta 	zTemp0
+		lda 	mapWalk+1
+		sta 	zTemp0+1
+		ldy 	#0 							; line number -> mapValue (consumed by the decimal print)
+		lda 	(zTemp0),y
+		sta 	mapValue
+		ldy 	#1
+		lda 	(zTemp0),y
+		sta 	mapValue+1
+		ldy 	#2 							; offset = stored address - FreeMemory (page aligned)
+		lda 	(zTemp0),y
+		sec
+		sbc 	#FreeMemory & $FF
+		sta 	mapOff
+		ldy 	#3
+		lda 	(zTemp0),y
+		sbc 	#FreeMemory >> 8
+		sta 	mapOff+1
+		lda 	mapOff+1 					; hex offset, high byte then low.
+		jsr 	_WMFHexByte
+		lda 	mapOff
+		jsr 	_WMFHexByte
+		lda 	#' '
+		jsr 	IOWriteByte
+		jsr 	_WMFDecimal 				; decimal line number.
+		lda 	#10 						; LF ends the line -- this file is read on the host (grep,
+		jmp 	IOWriteByte 				; VS Code), not the X16, so a Unix newline suits it best.
+
+;
+;		A (0..255) as two hex digits. Same trick as the runtime error handler.
+;
+_WMFHexByte:
+		pha
+		lsr 	a
+		lsr 	a
+		lsr 	a
+		lsr 	a
+		jsr 	_WMFNibble
+		pla
+_WMFNibble:
+		and 	#15
+		cmp 	#10
+		bcc 	_WMFDigit
+		adc 	#6 							; carry set here: 10 -> +6+1 = 'A'
+_WMFDigit:
+		adc 	#48
+		jmp 	IOWriteByte
+
+;
+;		mapValue (16 bit) as decimal, leading zeros suppressed but always at least one digit.
+;		Subtract each power of ten as many times as it goes; the count is the digit.
+;
+_WMFDecimal:
+		stz 	mapLead 					; 0 while we are still dropping leading zeros
+		ldx 	#0
+_WMFDPow:
+		ldy 	#48 						; '0' + number of subtractions = the digit
+_WMFDSub:
+		sec
+		lda 	mapValue
+		sbc 	_WMFPow10L,x
+		sta 	mapTemp
+		lda 	mapValue+1
+		sbc 	_WMFPow10H,x
+		bcc 	_WMFDUnder 					; borrow -> this power no longer goes
+		sta 	mapValue+1
+		lda 	mapTemp
+		sta 	mapValue
+		iny
+		bra 	_WMFDSub
+_WMFDUnder:
+		cpy 	#48 						; a zero digit ...
+		bne 	_WMFDEmit
+		lda 	mapLead 					; ... is dropped while still leading
+		beq 	_WMFDNext
+_WMFDEmit:
+		lda 	#1
+		sta 	mapLead
+		tya
+		jsr 	IOWriteByte
+_WMFDNext:
+		inx
+		cpx 	#4 							; 10000, 1000, 100, 10
+		bne 	_WMFDPow
+		lda 	mapValue 					; the units digit is always written
+		ora 	#48
+		jmp 	IOWriteByte
+
+_WMFPow10L:
+		.byte 	<10000, <1000, <100, <10
+_WMFPow10H:
+		.byte 	>10000, >1000, >100, >10
+
 newWorkspacePage: 							; first page of workspace in the saved file. In the code
 		.fill 	1 							; section, not storage -- see the note in
 											; file-io/read.asm.
+mapWalk: 									; these too live in the code section, not storage -- they
+		.fill 	2 							; belong to the compiler and are thrown away when the
+mapValue: 									; object is written, so they cost a compiled program
+		.fill 	2 							; nothing. See the note in file-io/read.asm.
+mapOff:
+		.fill 	2
+mapTemp:
+		.fill 	2
+mapLead:
+		.fill 	1
 		.send code
 
 ; ************************************************************************************************
@@ -742,6 +907,7 @@ CompileCode:
 		ldy 	#APIDesc >> 8
 		jsr 	StartCompiler
 		jsr 	WriteObjectCode
+		jsr 	WriteMapFile 				; and the line#->offset map, if GPC.INPUT asked for one
 		lda 	#"O" 						; the only other thing it prints, and the only way a
 		jsr 	$FFD2 						; caller can tell a compile that worked from one that
 		lda 	#"K" 						; stopped on an error, so it stays.
