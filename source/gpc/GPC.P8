@@ -2,15 +2,17 @@
 ; ************************************************************************************************
 ;
 ;		Name:		GPC.P8
-;		Purpose:	Front end for the Blitz-X16 compiler
+;		Purpose:	Front end for GPC, the Blitz inspired X16 compiler
+;		Code name:  Greased Piglet Compiler!
 ;		Created:	14th July 2026
 ;
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;
-;		Blitz is driven by GPC.INPUT, a three line control file -- source, object, options. That
-;		is what lets a program drive it, but it is a poor thing to ask a person to write by hand.
-;		So this asks the two questions, writes the file, and hands the machine over to Blitz.
+;		GPC.BLITZ.BIN is driven by GPC.INPUT, a three line control file -- source, object, options. 
+;		That is what lets a program drive it, but it is a poor thing to ask a person to write by 
+;		hand. So this asks the two questions, writes the file, and hands the machine over to the 
+;		GPC.BLITZ.BIN file.
 ;
 ;		%option no_sysinit is not decoration. Prog8's normal startup calls sys.init_system(),
 ;		which resets the screen mode, the charset and the colours. This program is a prompt and
