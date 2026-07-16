@@ -25,10 +25,21 @@ CommandDIM:
 		cpx 	#0 							; is it an array (bit 7 / NSSArray set) ?
 		bpl 	_CDScalar 					; no -- DIM of a simple variable, just reserve it.
 		jsr 	FindVariable	 			; see if already exist
-		bcs 	_CDRedefine 				; it still exists.
+		bcc 	_CDCreate 					; brand new array -> create its record
+		;
+		;		The array already has a record. If an earlier reference (before this DIM in source
+		;		order) auto-registered it via RegisterImplicitArray, THIS DIM is the real one: take
+		;		it over -- tombstone the implicit entry so the startup prologue does not also
+		;		default-dimension it, reuse the record, and dimension it to the bounds written here.
+		;		Otherwise it is a genuine second DIM of the same array and the redefine error stands.
+		;
+		jsr 	TakeOverImplicitArray 		; CS: taken over (YX = slot address). CC: not implicit.
+		bcs 	_CDDimension
+		.error_redefine
+_CDCreate:
 		jsr 	CreateVariableRecord 		; create the basic variable
 		jsr 	AllocateBytesForType 		; allocate memory for it
-
+_CDDimension:
 		pla 								; restore type bits
 		phy 								; save the address of the basic storage
 		phx
@@ -69,9 +80,6 @@ _CDComma:
 		bra 	CommandDIM 					; do another DIM
 _CDExit:
 		rts
-
-_CDRedefine:
-		.error_redefine
 
 ; ************************************************************************************************
 ;

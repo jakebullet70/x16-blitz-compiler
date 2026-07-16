@@ -197,7 +197,8 @@ _EIDGo:
 _EIDLoop:
 		ldx 	implicitDimIdx 				; dimension count for this array (registered >= 1)
 		lda 	implicitDimList+3,x
-		sta 	implicitDimN
+		beq 	_EIDSkip 					; 0 = tombstoned: an explicit DIM took this array over,
+		sta 	implicitDimN 				; so it dimensions it for real -- emit nothing here.
 		sta 	implicitDimRem
 _EIDPushBound:								; push the bound 10 once per dimension
 		lda 	implicitDimRem
@@ -220,6 +221,7 @@ _EIDPushed:
 		lda 	#NSSIFloat+NSSIInt16 		; pretend int16, exactly as CommandDIM stores it
 		sec
 		jsr 	GetSetVariable
+_EIDSkip:
 		lda 	implicitDimIdx 				; advance to the next entry
 		clc
 		adc 	#4

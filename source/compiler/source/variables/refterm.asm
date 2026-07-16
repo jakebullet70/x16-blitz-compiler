@@ -110,6 +110,52 @@ _RIAHaveCount:
 _RIAFull:
 		.error_undeclared
 
+; ************************************************************************************************
+;
+;		An explicit DIM found that its array already has a record. Decide whether that record was
+;		created by RegisterImplicitArray (i.e. a reference auto-registered the array before this
+;		DIM in source order) rather than by a real earlier DIM. On entry YX is the array's slot
+;		address, exactly as FindVariable returned it. If a live list entry matches that address,
+;		tombstone it -- set its dimension count to 0 so EmitImplicitDims emits nothing for it --
+;		and return CS with YX preserved, so the DIM dimensions the array for real at the bounds
+;		the programmer wrote. If nothing matches, return CC: this is a genuine re-DIM.
+;
+; ************************************************************************************************
+
+TakeOverImplicitArray:
+		stx 	zTemp0 						; remember the slot address to match, and to hand back
+		sty 	zTemp0+1
+		ldy 	implicitDimCount 			; entries to scan
+		beq 	_TOIANo 					; none registered -> cannot be an implicit array
+		ldx 	#0 							; byte offset into the 4-bytes-per-entry list
+_TOIALoop:
+		lda 	implicitDimList+3,x 		; dimension count; 0 = already tombstoned, skip it
+		beq 	_TOIANext
+		lda 	implicitDimList+0,x 		; match the slot address, low then high
+		cmp 	zTemp0
+		bne 	_TOIANext
+		lda 	implicitDimList+1,x
+		cmp 	zTemp0+1
+		bne 	_TOIANext
+		lda 	#0 							; found it -> tombstone so the prologue skips this array
+		sta 	implicitDimList+3,x
+		ldx 	zTemp0 						; hand the slot address back in YX
+		ldy 	zTemp0+1
+		sec 								; CS = taken over
+		rts
+_TOIANext:
+		inx 								; step over this 4-byte entry
+		inx
+		inx
+		inx
+		dey
+		bne 	_TOIALoop
+_TOIANo:
+		ldx 	zTemp0 						; restore YX = slot address
+		ldy 	zTemp0+1
+		clc 								; CC = not an implicitly-registered array
+		rts
+
 		.send code
 
 ; ************************************************************************************************
