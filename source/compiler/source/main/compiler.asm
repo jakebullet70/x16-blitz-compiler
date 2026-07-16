@@ -67,6 +67,8 @@ StartCompiler:
 		;
 		stz 	implicitDimCount
 		stz 	implicitDimFirstSet
+		stz 	clrCheckpoint 				; no CLR compiled yet -> no array is re-DIMmable
+		stz 	clrCheckpoint+1
 		lda 	#$00 						; default return target $FE00 (the END marker) so an
 		sta 	implicitDimFirst 			; empty program's prologue just exits cleanly.
 		lda 	#$FE

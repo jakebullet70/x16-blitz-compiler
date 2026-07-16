@@ -51,6 +51,6 @@ END 			T N
 #		vectored via its ;; [!CLR] marker -- this command-table line, emitting the shifted CLR
 #		token, was the only missing piece. Token only, no operands, like RETURN/STOP/END.
 #
-CLR 			T N
+CLR 			X:CommandClrCompile T N
 
 
