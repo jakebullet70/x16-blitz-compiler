@@ -53,25 +53,28 @@ source/unit-tests/compiler-runtime/CODE.BIN
 # ---------------------------------------------------------------------------
 # source/gpc build products. Prog8 writes GPC.prg/.asm/.vice-mon-list into build/;
 # the Makefile renames the .prg up to GPC.PRG. The copy that SHIPS, and the only
-# one committed, is release/GPC.PRG. GPC.BLITZ.BIN is copied in by the "run" target,
+# one committed, is testing/GPC.PRG. GPC.BLITZ.BIN is copied in by the "run" target,
 # because GPC chain-loads the compiler by name and needs it alongside.
 # ---------------------------------------------------------------------------
 source/gpc/build/
 source/gpc/GPC.PRG
 source/gpc/GPC.BLITZ.BIN
 
-# The release used to be bundled into release/blitz.zip (mkzip.py). That was dropped:
+# The release used to be bundled into testing/blitz.zip (mkzip.py). That was dropped:
 # nothing consumed it, and it was a git-tracked binary rebuilt on every release.
-release/blitz.zip
+testing/blitz.zip
 
 # GPC.INPUT is generated next to the compiler by "make -C source/application";
-# the one that ships is release/GPC.INPUT.
+# the one that ships is testing/GPC.INPUT.
 source/application/GPC.INPUT
 
 # ---------------------------------------------------------------------------
-# Scratch area for batch-testing user BASIC programs against the compiler.
+# testing/ is now the shipping release directory (moved here from release/) AND
+# the scratch area for batch-testing user BASIC programs. The release artifacts
+# in testing/ ARE tracked; only the two scratch subdirs below are ignored:
 # testing/prg-batch/ is the queue (drop source PRGs in), testing/archive/ holds
 # the ones already run. Both are transient personal test material -- inputs we
 # compile to find compiler gaps, not part of the project or the build.
 # ---------------------------------------------------------------------------
-testing/
+testing/prg-batch/
+testing/archive/

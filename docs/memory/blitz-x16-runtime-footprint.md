@@ -42,7 +42,7 @@ object code is already decoupled from runtime layout — the compiler knows what
 ## Why the C64 Blitz runtime is ~half (est. ~5.8K)
 
 The **exact, direct** comparison: C64 Blitz compiles `DIR` to **6,244 B** (`demo-c64/utils.d64`
-`C/DIR`); our own build of the same program (`release/C.DIR.PRG`) is **10,992 B** — **0.57×**
+`C/DIR`); our own build of the same program (`testing/C.DIR.PRG`) is **10,992 B** — **0.57×**
 (whole compiled program, not runtime-only). Subtracting the compiler's runtime-less intermediate
 (`Z/DIR`, 444 B — the "scratch" file the [[blitz-c64-benchmark-yardstick]] method note names)
 **estimates** the embedded C64 Blitz runtime at **~5.8K** — a rough difference, *not* a byte-exact

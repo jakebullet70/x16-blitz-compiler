@@ -11,10 +11,10 @@
 #		This is deliberately NOT part of "make libs". Prog8 is a 5MB jar and needs a JRE, and
 #		nothing else in this tree does -- making the whole build depend on both, to produce one
 #		1K program that changes about once a year, would be a poor trade. So GPC.PRG is built
-#		here on demand and the result is committed to release/.
+#		here on demand and the result is committed to testing/.
 #
 #			make -C source/gpc			build GPC.PRG
-#			make -C source/gpc release	build it and put it in release/
+#			make -C source/gpc release	build it and put it in testing/
 #			make -C source/gpc run		build it and run it in the emulator
 #
 #		Set PROG8C (and JAVA) in documents/local.make if the jar is not where common.make

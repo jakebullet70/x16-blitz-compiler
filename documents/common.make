@@ -46,7 +46,7 @@ endif
 #
 ROOTDIR =  $(dir $(realpath $(lastword $(MAKEFILE_LIST))))..$(S)
 BINDIR = $(ROOTDIR)bin$(S)
-RELEASEDIR = $(ROOTDIR)release$(S)
+RELEASEDIR = $(ROOTDIR)testing$(S)
 SRCDIR = $(ROOTDIR)source$(S)
 CSCRIPTS = $(SRCDIR)common-scripts$(S)
 CSOURCE =  $(SRCDIR)common-source$(S)
@@ -62,7 +62,7 @@ ASM = $(TASS) -q -c -Wall -o build$(S)code.prg -L build$(S)code.lst -l build$(S)
 #
 #		Prog8, which builds GPC.PRG (source/gpc) -- the compiler's front end. It is a 5MB jar
 #		and needs a JRE, so it is NOT vendored here and NOT part of "make libs": source/gpc has
-#		its own target and the built GPC.PRG is committed to release/. Override either of these
+#		its own target and the built GPC.PRG is committed to testing/. Override either of these
 #		in documents/local.make if your paths differ.
 #
 JAVA ?= java

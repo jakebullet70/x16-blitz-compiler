@@ -32,7 +32,7 @@
 main {
 	const ubyte NAMEMAX = 40 					; the longest name we will take. Blitz allows 63.
 
-	word build_num = 104	
+	word build_num = 105	
 	str source_name = " " * NAMEMAX
 	str object_name = " " * NAMEMAX
 	str map_name = " " * NAMEMAX

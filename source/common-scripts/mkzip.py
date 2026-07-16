@@ -9,7 +9,7 @@
 # *******************************************************************************************
 #
 #		zipfile stamps every member with its mtime, so re-zipping byte-identical content
-#		still yields a byte-different archive. That made bin/tokenise.zip, release/blitz.zip
+#		still yields a byte-different archive. That made bin/tokenise.zip, testing/blitz.zip
 #		and source/tools/tokenise/tokenise.zip show up as modified after every single build,
 #		which buried real changes in the diff. Pinning the timestamp, the member order and
 #		the permission bits makes the archive a pure function of its inputs.

@@ -34,8 +34,9 @@ Forked from Paul Robson's original: <https://github.com/paulscottrobson/blitz-co
 | `source/unit-tests` | the randomised compiler-runtime regression suites |
 | `source/application` | packages the release |
 | `bin/` | `x16emu/` (test emulator + ROM) and `box16/` (debugger) |
-| `release/` | the built compiler and sample programs, ready to run |
+| `testing/` | the built compiler and sample programs, ready to run (also the scratch `prg-batch/`/`archive/` test inputs) |
 | `documents/` | build include (`common.make`), notes, and reference PDFs |
+| `x16emu.bat` / `box16.bat` | project-root launchers that boot the emulators with `testing/` as the drive |
 
 ## Runtime footprint
 
@@ -66,7 +67,7 @@ forces `SHELL := sh` accordingly. Per-machine tool paths go in an untracked
 
 ```sh
 make libs        # build the five bin/*.library files and the compiler
-make release     # package release/ (the compiler + samples)
+make release     # package testing/ (the compiler + samples)
 make latest      # download & install the matching x16emu + ROM into bin/x16emu/
 ```
 
@@ -137,8 +138,8 @@ Two emulators live in `bin/`, each in its own directory because they need incomp
 `SDL2.dll` versions:
 
 - **`bin/x16emu/`** — runs the automated test suites and is the correct emulator for anything
-  that reads hardware (e.g. VERA sprite collision). Launch with **`release/x16emu.bat`**.
-- **`bin/box16/`** — the debugger. Launch with **`release/box16.bat`**.
+  that reads hardware (e.g. VERA sprite collision). Launch with **`x16emu.bat`** (project root).
+- **`bin/box16/`** — the debugger. Launch with **`box16.bat`** (project root).
 
 The launch conventions differ (`-fsroot` vs `-hypercall_path`, `-run` vs an issued `RUN`), so
 prefer the `.bat` wrappers, which get this right. Box16 does **not** emulate sprite collision —

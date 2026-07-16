@@ -28,7 +28,7 @@ case "$1" in
         echo "== make release =="
         make release
         echo "== launching x16emu with GPC.PRG =="
-        cmd //c "release\\x16emu.bat" GPC.PRG
+        cmd //c "x16emu.bat" GPC.PRG
         exit 0
         ;;
     "")

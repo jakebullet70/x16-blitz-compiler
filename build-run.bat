@@ -32,5 +32,5 @@ if errorlevel 1 (
 
 rem --- launch the emulator on the freshly built compiler --------------------
 echo == launching x16emu with GPC.PRG ==
-call "%~dp0release\x16emu.bat" GPC.PRG
+call "%~dp0x16emu.bat" GPC.PRG
 exit /b %ERRORLEVEL%

@@ -34,6 +34,6 @@ if errorlevel 1 exit /b %ERRORLEVEL%
 rem --- if "run" was requested, launch the emulator on the freshly built PRG ----
 if /i "%~1"=="run" (
     echo == launching x16emu with GPC.PRG ==
-    call "%~dp0release\x16emu.bat" GPC.PRG
+    call "%~dp0x16emu.bat" GPC.PRG
 )
 exit /b %ERRORLEVEL%

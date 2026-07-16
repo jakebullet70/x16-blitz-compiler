@@ -2,11 +2,12 @@
 setlocal
 
 rem ---------------------------------------------------------------------------
-rem  Launch x16emu with this release directory as its drive, so LOAD "BLITZ.PRG"
-rem  and the rest just work.
+rem  Launch x16emu with the testing/ directory as its drive, so LOAD "GPC.PRG"
+rem  and the rest just work. This .bat lives in the project root; the programs
+rem  live in testing/ (the shipping release), and the emulator in bin/x16emu/.
 rem
-rem      x16emu.bat                boot to BASIC in this directory
-rem      x16emu.bat BLITZ.PRG      load the compiler and RUN it
+rem      x16emu.bat                boot to BASIC in testing/
+rem      x16emu.bat GPC.PRG        load the compiler and RUN it
 rem      x16emu.bat OBJECT.PRG     run a compiled program
 rem
 rem  x16emu is the emulator the test suites drive; box16.bat runs the other one
@@ -17,10 +18,11 @@ rem  .PRG needs). Sprite collision is worth a mention: x16emu emulates VERA
 rem  sprite collisions, so games that read $9F27 behave here as on hardware.
 rem ---------------------------------------------------------------------------
 
-set "REL=%~dp0"
-set "REL=%REL:~0,-1%"
-set "X16EMU=%REL%\..\bin\x16emu\x16emu.exe"
-set "ROM=%REL%\..\bin\x16emu\rom.bin"
+set "ROOT=%~dp0"
+set "ROOT=%ROOT:~0,-1%"
+set "DRIVE=%ROOT%\testing"
+set "X16EMU=%ROOT%\bin\x16emu\x16emu.exe"
+set "ROM=%ROOT%\bin\x16emu\rom.bin"
 
 rem  If x16emu exits at once complaining "SDL_OpenAudioDevice failed", this box
 rem  has no usable audio endpoint -- uncomment the next line to run it silent.
@@ -35,11 +37,11 @@ if not exist "%ROM%" (
 	exit /b 1
 )
 
-pushd "%REL%"
+pushd "%DRIVE%"
 if "%~1"=="" (
-	"%X16EMU%" -rom "%ROM%" -fsroot "%REL%" -scale 2 %SOUND%
+	"%X16EMU%" -rom "%ROM%" -fsroot "%DRIVE%" -scale 2 %SOUND%
 ) else (
-	"%X16EMU%" -rom "%ROM%" -fsroot "%REL%" -scale 2 %SOUND% -prg "%~1" -run
+	"%X16EMU%" -rom "%ROM%" -fsroot "%DRIVE%" -scale 2 %SOUND% -prg "%~1" -run
 )
 popd
 
