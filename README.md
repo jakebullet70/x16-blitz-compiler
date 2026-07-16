@@ -46,7 +46,7 @@ BASIC stub.
 
 For comparison, the vintage **C64 Blitz!** runtime (in `demo-c64/`) is roughly **half** ours — its compiled `DIR`
 is 6.2 KB against our 11 KB build of the same program, an estimated ~5.8 KB of runtime. The difference
-is two design choices, not overhead:
+is two design choices, not overhead: (Note: Blitz for the Commodore 128 is about the same size as GPC)
 
 - **Our own floating point.** We bundle a 32-bit float + transcendental library (`ifloat32` +
   `polynomials`, ~3.2K) by design (a 32-bit format, not the ROM's 40-bit); C64 Blitz calls the C64 ROM's
