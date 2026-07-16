@@ -27,6 +27,8 @@ _FBLoop:
 		beq 	_FBFixGotoGosub
 		cmp 	#PCD_CMD_GOSUB
 		beq 	_FBFixGotoGosub
+		cmp 	#PCD_CMD_FNGOSUB 			; an FN call: resolve like a branch but from an
+		beq 	_FBFixFnGosub 				; absolute address, not a line number.
 		cmp 	#PCD_CMD_GOTOCMD_NZ 		; patch the conditional GOTOs for Z/NZ TOS.
 		beq 	_FBFixGotoGosub
 		cmp 	#PCD_CMD_GOTOCMD_Z 
@@ -38,8 +40,22 @@ _FBLoop:
 _FBNext:		
 		jsr 	MoveObjectForward 			; move forward in object code.
 		bcc 	_FBLoop 					; not finished
-_FBExit:		
+_FBExit:
 		rts
+;
+;		Found an FN call (.fngosub). Its operand is already the ABSOLUTE code position of the FN
+;		body, not a source line number, so skip STRFindLine: load the address into YA and join the
+;		shared tail, which turns it into an offset from this opcode -- exactly like every branch.
+;
+_FBFixFnGosub:
+		ldy 	#1
+		lda 	(objPtr),y 					; operand byte 1 = abs LOW
+		pha
+		iny
+		lda 	(objPtr),y 					; operand byte 2 = abs HIGH
+		tay 								; Y = abs HIGH
+		pla 								; A = abs LOW
+		jmp 	_FBFFound
 ;
 ;		Found GOTO/GOSUB - look it up in the line# table and fix it up.
 ;

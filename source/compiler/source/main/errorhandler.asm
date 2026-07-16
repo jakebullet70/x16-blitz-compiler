@@ -17,6 +17,30 @@ CompilerErrorHandler:
 		ply
 		sta 	zTemp0
 		sty 	zTemp0+1
+		;
+		;		Defer-to-runtime: while a statement compiles (deferErrors armed) a SYNTAX error
+		;		does not abort -- roll the statement back and let DeferStatementToRuntime drop a
+		;		runtime throw-stub in its place. Identified by the message pointer: ErrorV_syntax's
+		;		text sits at ErrorV_syntax+3, so the pushed return (=that-1) is +2. Other error
+		;		types, and any error while not armed, report and abort as before.
+		;
+		lda 	deferErrors
+		beq 	_EHReport
+		lda 	zTemp0
+		cmp 	#<(ErrorV_syntax+2)
+		bne 	_EHReport
+		lda 	zTemp0+1
+		cmp 	#>(ErrorV_syntax+2)
+		bne 	_EHReport
+		stz 	deferErrors 				; disarm
+		ldx 	stmtRecoverSP 			; unwind the 6502 stack to the statement-dispatch level
+		txs
+		lda 	stmtRecoverObj 			; roll the object cursor back -> discard partial p-code
+		sta 	objPtr
+		lda 	stmtRecoverObj+1
+		sta 	objPtr+1
+		jmp 	DeferStatementToRuntime
+_EHReport:
 		ldx 	#0 							; output msg to channel #0 
 		ldy 	#1
 _EHDisplayMsg:

@@ -45,5 +45,12 @@ POKE 			#,# T N
 RETURN 			T N
 STOP 			T N
 END 			T N
+#
+#		CLR clears every variable and array (and resets the string heap and BASIC stack) at
+#		runtime. The runtime handler (CommandClr -> ClearMemory) already existed and is already
+#		vectored via its ;; [!CLR] marker -- this command-table line, emitting the shifted CLR
+#		token, was the only missing piece. Token only, no operands, like RETURN/STOP/END.
+#
+CLR 			X:CommandClrCompile T N
 
 

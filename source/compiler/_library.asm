@@ -549,6 +549,29 @@ StartCompiler:
 		jsr 	WriteCodeByte
 		jsr 	WriteCodeByte
 		;
+		;		Reset implicit-array tracking, and emit the jump to the implicit-DIM prologue.
+		;		The prologue lives at line $FFFF (emitted at the end); it dimensions every
+		;		undimensioned array and then jumps to the first real line. It is emitted whether
+		;		or not any arrays need it -- with none it is just a jump straight back -- because
+		;		we don't yet know if the program has any. VARSPACE has already run, so the array
+		;		allocator (availableMemory) is set up by the time the prologue executes.
+		;
+		stz 	implicitDimCount
+		stz 	implicitDimFirstSet
+		stz 	clrCheckpoint 				; no CLR compiled yet -> no array is re-DIMmable
+		stz 	clrCheckpoint+1
+		stz 	deferErrors 				; not deferring compile errors until a statement arms it
+		lda 	#$00 						; default return target $FE00 (the END marker) so an
+		sta 	implicitDimFirst 			; empty program's prologue just exits cleanly.
+		lda 	#$FE
+		sta 	implicitDimFirst+1
+		;
+		lda 	#PCD_CMD_GOTO
+		jsr 	WriteCodeByte
+		lda 	#$FF 						; -> line $FFFF (the prologue)
+		jsr 	WriteCodeByte
+		jsr 	WriteCodeByte
+		;
 		;		Main compilation loop
 		;
 MainCompileLoop:
@@ -558,7 +581,14 @@ MainCompileLoop:
 		bcc 	SaveCodeAndExit 			; end of source.
 		jsr 	ProcessNewLine 				; set up pointer and line number.
 		;
-		jsr 	GetLineNumber 				; get line #
+		jsr 	GetLineNumber 				; get line # (=> A low, Y high)
+		;
+		ldx 	implicitDimFirstSet 		; remember the first real line: the implicit-DIM prologue
+		bne 	_MCLHaveFirst 				; jumps back here when it has finished. (A/Y untouched.)
+		inc 	implicitDimFirstSet
+		sta 	implicitDimFirst
+		sty 	implicitDimFirst+1
+_MCLHaveFirst:
 		jsr 	STRMarkLine 				; remember the code position and number of this line.
 		lda 	#PCD_NEWCMD_LINE 			; generate new command line
 		jsr 	WriteCodeByte
@@ -568,14 +598,36 @@ _MCLSameLine:
 		beq 	MainCompileLoop 			; end of line, get next line.
 		cmp 	#":"						; if : then loop back.
 		beq 	_MCLSameLine
+		cmp 	#";" 						; a stray ; between statements (e.g. GOSUB 970;) is
+		beq 	_MCLSameLine 				; tolerated by BASIC, so skip it like a colon.
 
-		cmp 	#0 							; if ASCII then check for implied LET.		
-		bpl 	_MCLCheckAssignment 
+		;
+		;		A real statement follows. Checkpoint it for defer-to-runtime: remember the
+		;		object write cursor and the compile-loop stack level, and arm SYNTAX-error
+		;		deferral. If it then fails to compile with a SYNTAX error, CompilerErrorHandler
+		;		rolls back to here and drops a runtime throw-stub in its place (see
+		;		DeferStatementToRuntime) instead of aborting. Preserve A (the first character).
+		;
+		pha
+		lda 	objPtr
+		sta 	stmtRecoverObj
+		lda 	objPtr+1
+		sta 	stmtRecoverObj+1
+		lda 	#1
+		sta 	deferErrors
+		pla
+		tsx
+		stx 	stmtRecoverSP
+		;
+		cmp 	#0 							; if ASCII then check for implied LET.
+		bpl 	_MCLCheckAssignment
 
 		ldx 	#CommandTables & $FF 		; do command tables.
 		ldy 	#CommandTables >> 8
 		jsr 	GeneratorProcess
-		bcs 	_MCLSameLine 				; keep trying to compile the line.
+		bcc 	_MCLSyntax 				; not compiled -> syntax error (deferred if armed)
+		stz 	deferErrors 				; compiled OK -> disarm the deferral
+		bra 	_MCLSameLine 				; keep trying to compile the line.
 
 _MCLSyntax: 								; syntax error.
 		.error_syntax
@@ -586,19 +638,52 @@ _MCLCheckAssignment:
 		jsr 	CharIsAlpha 				; if not alpha then syntax error
 		bcc 	_MCLSyntax
 		jsr 	CommandLETHaveFirst  		; LET first character, do assign
+		stz 	deferErrors 				; assignment compiled OK -> disarm the deferral
 		bra		_MCLSameLine 				; loop back.
 		;
 		;		End of compile, fix up GOTO/GOSUB etc., save it and exit.
 		;
+; ************************************************************************************************
+;
+;		Reached from CompilerErrorHandler when a statement failed to compile with a SYNTAX error
+;		while deferral was armed. The stack is already unwound to stmtRecoverSP and the object
+;		cursor rolled back to stmtRecoverObj, so just drop a single throw-stub in the statement's
+;		place (raises SYNTAX ERROR at runtime, but only if reached) and carry on at the next
+;		line -- the remainder of this line sits after the stub, so it can never run.
+;
+; ************************************************************************************************
+
+DeferStatementToRuntime:
+		lda 	#PCD_CMD_DEFERROR
+		jsr 	WriteCodeByte
+		jmp 	MainCompileLoop 			; drop the rest of this source line: everything after the
+										; stub is unreachable (it throws first), so read the next line.
+
 SaveCodeAndExit:
 		lda 	#BLC_CLOSEIN				; finish input.
 		jsr 	CallAPIHandler
 
-		lda 	#$FF 						; fake line number $FFFF for forward THEN.
-		tay
+		lda 	#$00 						; end-of-program line = $FE00 for forward THEN / goto-past-end.
+		ldy 	#$FE 						; Deliberately NOT $FFxx: STRFindLine treats any entry whose
+		jsr 	STRMarkLine 				; line-number high byte is $FF as the end-of-table sentinel,
+		lda 	#PCD_EXIT 					; so only the $FFFF prologue line (the last entry) may use it.
+		jsr 	WriteCodeByte 				; ($FE00 is above every real line and forward-THEN target.)
+		;
+		;		The implicit-DIM prologue. Unreachable by fall-through (the END above stops first);
+		;		entered only by the GOTO $FFFF that StartCompiler emitted at the very top. It
+		;		dimensions every undimensioned array, then jumps back to the first real line.
+		;
+		lda 	#$FF 						; prologue line = $FFFF (the largest line, marked last, so it
+		ldy 	#$FF 						; is also the $FF end-of-table sentinel STRFindLine expects)
 		jsr 	STRMarkLine
-		lda 	#PCD_EXIT 					; add an END
+		jsr 	EmitImplicitDims
+		lda 	#PCD_CMD_GOTO 				; return to the first real line (or $FFFE if none)
 		jsr 	WriteCodeByte
+		lda 	implicitDimFirst
+		jsr 	WriteCodeByte
+		lda 	implicitDimFirst+1
+		jsr 	WriteCodeByte
+		;
 		lda 	#$FF 						; add end marker
 		jsr 	WriteCodeByte
 		jsr 	FixBranches 				; fix up GOTO/GOSUB etc.
@@ -621,17 +706,106 @@ ExitCompiler:
 CallAPIHandler:
 		jmp 	(APIVector)
 
+; ************************************************************************************************
+;
+;		Emit the runtime code that dimensions every registered undimensioned array to bound 10
+;		(11 elements, 0..10) in each dimension -- exactly what interpreted BASIC does on first
+;		use. Emitted once, into the prologue. Each list entry is 4 bytes: slot addr lo, slot addr
+;		hi, element type, dimension count. The emitted sequence per array mirrors CommandDIM:
+;		push the bound once per dimension, push the dimension count, push the type, DIM (which
+;		builds the array and leaves its offset on the stack), then store that offset into the
+;		array variable's slot.
+;
+; ************************************************************************************************
+
+EmitImplicitDims:
+		lda 	implicitDimCount
+		bne 	_EIDGo
+		rts 								; nothing undimensioned -> emit nothing.
+_EIDGo:
+		sta 	implicitDimEntries
+		stz 	implicitDimIdx
+_EIDLoop:
+		ldx 	implicitDimIdx 				; dimension count for this array (registered >= 1)
+		lda 	implicitDimList+3,x
+		beq 	_EIDSkip 					; 0 = tombstoned: an explicit DIM took this array over,
+		sta 	implicitDimN 				; so it dimensions it for real -- emit nothing here.
+		sta 	implicitDimRem
+_EIDPushBound:								; push the bound 10 once per dimension
+		lda 	implicitDimRem
+		beq 	_EIDPushed
+		lda 	#10
+		jsr 	PushIntegerA
+		dec 	implicitDimRem
+		bra 	_EIDPushBound
+_EIDPushed:
+		lda 	implicitDimN 				; push the dimension count
+		jsr 	PushIntegerA
+		ldx 	implicitDimIdx 				; push the element type
+		lda 	implicitDimList+2,x
+		jsr 	PushIntegerA
+		.keyword PCD_DIM 					; build the array, leaving its offset on the stack
+		ldx 	implicitDimIdx 				; store that offset into the array variable's slot
+		lda 	implicitDimList+0,x
+		ldy 	implicitDimList+1,x
+		tax 								; X = addr lo, Y = addr hi
+		lda 	#NSSIFloat+NSSIInt16 		; pretend int16, exactly as CommandDIM stores it
+		sec
+		jsr 	GetSetVariable
+_EIDSkip:
+		lda 	implicitDimIdx 				; advance to the next entry
+		clc
+		adc 	#4
+		sta 	implicitDimIdx
+		dec 	implicitDimEntries
+		bne 	_EIDLoop
+		rts
+
 		.send code
 
 		.section storage
 compilerSP:									; stack pointer 6502 on entry.
 		.fill 	1
 APIVector: 									; call API here
-		.fill 	2		
+		.fill 	2
 compilerStartHigh:							; MSB of workspace start address
-		.fill 	1		
+		.fill 	1
 compilerEndHigh:							; MSB of workspace end address
-		.fill 	1		
+		.fill 	1
+;
+;		Implicit array dimensioning. Interpreted BASIC auto-creates an array (0..10 per
+;		dimension) the first time it is used without a DIM. We can't do that lazily -- this VM
+;		has no branch that targets a point inside a line, so there is nowhere to put a per-access
+;		"dimension it if it isn't yet" test. Instead every undimensioned array is registered here
+;		as it is discovered, and a prologue at the very start of the program (jumped to before any
+;		user code) dimensions them all once. See EmitImplicitDims and _GRTArray.
+;
+implicitDimCount:							; number of undimensioned arrays registered
+		.fill 	1
+implicitDimFirst:							; first real line number = where the prologue returns to
+		.fill 	2
+implicitDimFirstSet:						; nonzero once implicitDimFirst has been captured
+		.fill 	1
+implicitDimIdx:								; scratch: byte offset into the list while emitting
+		.fill 	1
+implicitDimEntries:							; scratch: entries left to emit
+		.fill 	1
+implicitDimN:								; scratch: dimension count of the array being emitted
+		.fill 	1
+implicitDimRem:								; scratch: bounds left to push for this array
+		.fill 	1
+implicitDimAddr:							; scratch: a variable slot address
+		.fill 	2
+implicitDimType:							; scratch: element type bits
+		.fill 	1
+implicitDimList:							; per entry: slot addr lo, slot addr hi, type, dim count
+		.fill 	4*32 						; capacity 32 -- more than that falls back to the old error
+deferErrors: 								; nonzero while a statement is compiling whose SYNTAX errors
+		.fill 	1 							; should defer to a runtime throw-stub, not abort the compile
+stmtRecoverSP: 							; 6502 stack level to unwind to when deferring a statement
+		.fill 	1
+stmtRecoverObj: 						; object write cursor to roll back to (discards partial code)
+		.fill 	2
 		.send storage
 
 ; ************************************************************************************************
@@ -802,12 +976,12 @@ SetVariableRecordToCodePosition:
 		.storage_access
 		pha
 		phy
-		ldy 	#3
-		lda 	objPtr+1
-		sta 	(zTemp0),y
-		iny 	
-		lda 	objPtr
-		sta 	(zTemp0),y
+		ldy 	#3 							; store the position LOW-then-HIGH, the same address
+		lda 	objPtr 						; order CreateVariableRecord uses (offset 3 = low,
+		sta 	(zTemp0),y 					; offset 4 = high). It used to be stored byte-swapped,
+		iny 								; which FindVariable (X=[3], Y=[4]) then handed to the FN
+		lda 	objPtr+1 					; call code with the bytes reversed -- so a called FN
+		sta 	(zTemp0),y 					; jumped to a garbage address. FNCompile is the only reader.
 		ply
 		pla
 		.storage_release
@@ -1038,10 +1212,23 @@ CommandDIM:
 		cpx 	#0 							; is it an array (bit 7 / NSSArray set) ?
 		bpl 	_CDScalar 					; no -- DIM of a simple variable, just reserve it.
 		jsr 	FindVariable	 			; see if already exist
-		bcs 	_CDRedefine 				; it still exists.
+		bcc 	_CDCreate 					; brand new array -> create its record
+		;
+		;		The array already has a record. If an earlier reference (before this DIM in source
+		;		order) auto-registered it via RegisterImplicitArray, THIS DIM is the real one: take
+		;		it over -- tombstone the implicit entry so the startup prologue does not also
+		;		default-dimension it, reuse the record, and dimension it to the bounds written here.
+		;		Otherwise it is a genuine second DIM of the same array and the redefine error stands.
+		;
+		jsr 	TakeOverImplicitArray 		; CS: taken over (YX = slot address). CC: not implicit.
+		bcs 	_CDDimension
+		jsr 	WasClearedSinceDim 			; or was it explicitly DIMmed before a CLR that reset it?
+		bcs 	_CDDimension 				; if so this is a legal re-DIM -- take the record over too.
+		.error_redefine
+_CDCreate:
 		jsr 	CreateVariableRecord 		; create the basic variable
 		jsr 	AllocateBytesForType 		; allocate memory for it
-
+_CDDimension:
 		pla 								; restore type bits
 		phy 								; save the address of the basic storage
 		phx
@@ -1083,8 +1270,46 @@ _CDComma:
 _CDExit:
 		rts
 
-_CDRedefine:
-		.error_redefine
+; ************************************************************************************************
+;
+;		Compile-time hook for CLR (its .def entry is: CLR X:CommandClrCompile T N). CLR clears
+;		every variable and array at runtime, so a DIM that follows a CLR in source order is a
+;		legal fresh DIM, not a redefine -- but the compiler works statically and would otherwise
+;		reject re-DIMming an array. Snapshot the variable-allocation high-water mark here: any
+;		array whose slot was allocated below it was defined before this CLR and may be taken over
+;		by a later DIM (see WasClearedSinceDim). Emits nothing itself -- the T in the .def emits
+;		the CLR token. Must return carry clear, like every generator helper (see gensupport.asm).
+;
+; ************************************************************************************************
+
+CommandClrCompile:
+		lda 	freeVariableMemory
+		sta 	clrCheckpoint
+		lda 	freeVariableMemory+1
+		sta 	clrCheckpoint+1
+		clc
+		rts
+
+; ************************************************************************************************
+;
+;		CS if the array whose slot address is in YX (as FindVariable returned it) was defined
+;		before the most recent CLR -- i.e. its slot lies below clrCheckpoint -- so a CLR has since
+;		cleared it and this DIM is a legal re-DIM. CC otherwise (defined after the last CLR, or no
+;		CLR at all: clrCheckpoint starts at 0, below every real slot). YX is left unchanged so the
+;		caller can dimension the array in place.
+;
+; ************************************************************************************************
+
+WasClearedSinceDim:
+		cpx 	clrCheckpoint 				; 16-bit compare: slot (YX) - clrCheckpoint
+		tya
+		sbc 	clrCheckpoint+1
+		bcs 	_WCSAfter 					; slot >= checkpoint -> not cleared since its DIM
+		sec 								; slot <  checkpoint -> cleared -> legal re-DIM
+		rts
+_WCSAfter:
+		clc
+		rts
 
 ; ************************************************************************************************
 ;
@@ -1119,7 +1344,9 @@ _OIGType:
 		.section storage
 IndexCount:
 		.fill 	1
-		.send storage		
+clrCheckpoint: 								; variable-allocation high-water at the last compiled CLR;
+		.fill 	2 							; an array whose slot lies below this may be legally re-DIMmed.
+		.send storage
 
 ; ************************************************************************************************
 ;
@@ -1150,6 +1377,30 @@ CompilerErrorHandler:
 		ply
 		sta 	zTemp0
 		sty 	zTemp0+1
+		;
+		;		Defer-to-runtime: while a statement compiles (deferErrors armed) a SYNTAX error
+		;		does not abort -- roll the statement back and let DeferStatementToRuntime drop a
+		;		runtime throw-stub in its place. Identified by the message pointer: ErrorV_syntax's
+		;		text sits at ErrorV_syntax+3, so the pushed return (=that-1) is +2. Other error
+		;		types, and any error while not armed, report and abort as before.
+		;
+		lda 	deferErrors
+		beq 	_EHReport
+		lda 	zTemp0
+		cmp 	#<(ErrorV_syntax+2)
+		bne 	_EHReport
+		lda 	zTemp0+1
+		cmp 	#>(ErrorV_syntax+2)
+		bne 	_EHReport
+		stz 	deferErrors 				; disarm
+		ldx 	stmtRecoverSP 			; unwind the 6502 stack to the statement-dispatch level
+		txs
+		lda 	stmtRecoverObj 			; roll the object cursor back -> discard partial p-code
+		sta 	objPtr
+		lda 	stmtRecoverObj+1
+		sta 	objPtr+1
+		jmp 	DeferStatementToRuntime
+_EHReport:
 		ldx 	#0 							; output msg to channel #0 
 		ldy 	#1
 _EHDisplayMsg:
@@ -1588,6 +1839,8 @@ _FBLoop:
 		beq 	_FBFixGotoGosub
 		cmp 	#PCD_CMD_GOSUB
 		beq 	_FBFixGotoGosub
+		cmp 	#PCD_CMD_FNGOSUB 			; an FN call: resolve like a branch but from an
+		beq 	_FBFixFnGosub 				; absolute address, not a line number.
 		cmp 	#PCD_CMD_GOTOCMD_NZ 		; patch the conditional GOTOs for Z/NZ TOS.
 		beq 	_FBFixGotoGosub
 		cmp 	#PCD_CMD_GOTOCMD_Z 
@@ -1599,8 +1852,22 @@ _FBLoop:
 _FBNext:		
 		jsr 	MoveObjectForward 			; move forward in object code.
 		bcc 	_FBLoop 					; not finished
-_FBExit:		
+_FBExit:
 		rts
+;
+;		Found an FN call (.fngosub). Its operand is already the ABSOLUTE code position of the FN
+;		body, not a source line number, so skip STRFindLine: load the address into YA and join the
+;		shared tail, which turns it into an offset from this opcode -- exactly like every branch.
+;
+_FBFixFnGosub:
+		ldy 	#1
+		lda 	(objPtr),y 					; operand byte 1 = abs LOW
+		pha
+		iny
+		lda 	(objPtr),y 					; operand byte 2 = abs HIGH
+		tay 								; Y = abs HIGH
+		pla 								; A = abs LOW
+		jmp 	_FBFFound
 ;
 ;		Found GOTO/GOSUB - look it up in the line# table and fix it up.
 ;
@@ -1821,33 +2088,29 @@ FNCompile:
 		;		Check to see if it is defined.
 		;
 		jsr 	FindVariable				; does it already exist ?
-		bcc 	_FNError 					; no.
-		jsr 	STRMakeOffset 				; convert to a relative address.
-
-		cmp 	#0 							; fix up.
-		bne 	_FNNoBorrow
-		dey
-_FNNoBorrow:
-		dec 	a
-
-		phy 								; save location of routine on stack.
-		pha
-		phx
+		bcc 	_FNError 					; no -- a forward FN reference is not supported.
+		;
+		;		FindVariable returns the FN body's ABSOLUTE code position in X (low) and Y (high),
+		;		as stored by SetVariableRecordToCodePosition. Emit it verbatim as the operand of a
+		;		.fngosub -- its own opcode, so FixBranches turns this absolute address into an
+		;		offset (like any branch) instead of mistaking it for a source line number. Push
+		;		high then low so, after the argument is compiled, the low byte is written first.
+		;
+		phy 								; abs HIGH
+		phx 								; abs LOW  (top of stack)
 		;
 		;		Handle <expression>)
 		;
 		jsr 	CompileExpressionAt0
 		jsr 	CheckNextRParen
 		;
-		;		Compile routine call
+		;		Compile the call : .fngosub <lo> <hi>
 		;
-		lda 	#PCD_CMD_GOSUB
+		lda 	#PCD_CMD_FNGOSUB
 		jsr 	WriteCodeByte
-		pla
+		pla 								; abs LOW  -> operand byte 1
 		jsr 	WriteCodeByte
-		pla
-		jsr 	WriteCodeByte
-		pla
+		pla 								; abs HIGH -> operand byte 2
 		jsr 	WriteCodeByte
 
 		clc
@@ -1993,6 +2256,10 @@ CommandTables:
 ;
 	.byte	$07,$80,$00,$20,33486 & $FF,33486 >> 8,$06
 ;
+;	CLR    X:CommandClrCompile T N
+;
+	.byte	$0a,$9c,$00,$03,CommandClrCompile & $FF,CommandClrCompile >> 8,$20,32974 & $FF,32974 >> 8,$06
+;
 ;	This file is automatically generated.
 ;
 ;
@@ -2056,25 +2323,25 @@ CommandTables:
 ;
 	.byte	$08,$ce,$87,$ea,$ea,$e1,153,$06
 ;
-;	LINE    #,#,#,#,# T N
+;	LINE    #,#,#,# X:OptionalColourCompile T N
 ;
-	.byte	$0a,$ce,$88,$ea,$ea,$ea,$ea,$e1,154,$06
+	.byte	$0c,$ce,$88,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,154,$06
 ;
-;	RECT    #,#,#,#,# T N
+;	RECT    #,#,#,# X:OptionalColourCompile T N
 ;
-	.byte	$0a,$ce,$8a,$ea,$ea,$ea,$ea,$e1,155,$06
+	.byte	$0c,$ce,$8a,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,155,$06
 ;
-;	FRAME    #,#,#,#,# T N
+;	FRAME    #,#,#,# X:OptionalColourCompile T N
 ;
-	.byte	$0a,$ce,$89,$ea,$ea,$ea,$ea,$e1,156,$06
+	.byte	$0c,$ce,$89,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,156,$06
 ;
-;	OVAL    #,#,#,#,# T N
+;	OVAL    #,#,#,# X:OptionalColourCompile T N
 ;
-	.byte	$0a,$ce,$bf,$ea,$ea,$ea,$ea,$e1,157,$06
+	.byte	$0c,$ce,$bf,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,157,$06
 ;
-;	RING    #,#,#,#,# T N
+;	RING    #,#,#,# X:OptionalColourCompile T N
 ;
-	.byte	$0a,$ce,$c0,$ea,$ea,$ea,$ea,$e1,158,$06
+	.byte	$0c,$ce,$c0,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,158,$06
 ;
 ;	CHAR    #,#,#,$ T N
 ;
@@ -2788,6 +3055,34 @@ _MidComplete:
 
 MidFailType:
 		.error_type
+
+; ************************************************************************************************
+;
+;		As OptionalParameterCompile, but for a trailing COLOUR argument (RECT/LINE/FRAME/OVAL/
+;		RING). A palette index is 0..255, so 255 is a real colour and cannot double as the
+;		"omitted" sentinel the way it can for sprite fields. The default is 256 instead -- out of
+;		range for an 8-bit colour -- so the runtime (GraphicsColourOptional) reads a non-zero
+;		high byte as "leave the current draw colour", and every explicit 0..255 still works.
+;
+; ************************************************************************************************
+
+OptionalColourCompile:
+		jsr 	LookNextNonSpace 			; what follows.
+		cmp 	#","
+		bne 	_OCCDefault
+		jsr 	GetNext 					; consume ,
+		jsr 	CompileExpressionAt0 		; the supplied colour
+		and 	#NSSTypeMask
+		cmp 	#NSSIFloat
+		bne 	MidFailType 				; which must be numeric
+		clc
+		rts
+_OCCDefault:
+		lda 	#0 							; default of 256 = $0100: PushIntegerYA emits a 16-bit
+		ldy 	#1 							; constant when Y (the high byte) is non-zero, and that
+		jsr 	PushIntegerYA 				; high byte is what marks the colour as omitted.
+		clc
+		rts
 
 ; ************************************************************************************************
 ;
@@ -4284,14 +4579,27 @@ _GRTNoCreate:
 		rts		
 	
 _GRTArray:
-		phx 								; save type information 		
-		jsr 	FindVariable 				; read its data, the base address in YX
-		bcc 	_GRTUndeclared 				; undeclared array.
-		phx 								; save base address
+		phx 								; save type information (also = the name if we must create)
+		jsr 	FindVariable 				; CS: found, base address in YX. CC: unknown -> YX = name.
+		lda 	#0 							; flag: 0 = the array already exists (LDA leaves carry alone)
+		bcs 	_GRTKnown
+		lda 	#$FF 						; $FF = undimensioned, create it once we know how many indices
+_GRTKnown:
+		pha 								; save that flag, and the name/address, over OutputIndexGroup
+		phx
 		phy
-		jsr 	OutputIndexGroup 			; create an index group and generate them
-		ply 								; get the array base address into YX
+		jsr 	OutputIndexGroup 			; create an index group; IndexCount = the dimension count
+		ply 								; restore name/address into YX
 		plx
+		pla 								; and the create flag
+		beq 	_GRTResolved 				; existing array -> YX is already its base address
+		;
+		;		Undimensioned array. Interpreted BASIC would auto-create it here as 0..10 in each
+		;		dimension. We now know the dimension count (IndexCount), so register it -- the
+		;		prologue emitted at the start of the program dimensions it before any code runs.
+		;
+		jsr 	RegisterImplicitArray 		; create the record now, returning its slot address in YX
+_GRTResolved:
 		lda 	#NSSIFloat+NSSIInt16 		; pretend it is an int16 reference.
 		clc
 		jsr 	GetSetVariable 				; load the address of the array structure.
@@ -4300,10 +4608,98 @@ _GRTArray:
 		pla 								; and the type data into A
 		and 	#NSSTypeMask+NSSIInt16
 		ora 	#$80 						; with the array flag set.
-		rts		
+		rts
 
-_GRTUndeclared:
+; ************************************************************************************************
+;
+;		Register an undimensioned array so the implicit-DIM prologue can create it. On entry YX
+;		is the (array) name and IndexCount is the number of indices in the reference that
+;		discovered it, which becomes its dimension count. Creates the variable record and its
+;		pointer slot now (so this reference and later ones resolve normally) and records the slot
+;		address, element type and dimension count for EmitImplicitDims. Returns YX = slot address.
+;		Falls back to the old "unknown array" error only if more than 32 need dimensioning.
+;
+; ************************************************************************************************
+
+RegisterImplicitArray:
+		lda 	implicitDimCount 			; capacity check
+		cmp 	#32
+		bcs 	_RIAFull
+		txa 								; element type comes from the name's type bits
+		and 	#NSSTypeMask+NSSIInt16
+		sta 	implicitDimType
+		jsr 	CreateVariableRecord 		; make the record (YX = name) -> YX = slot address
+		stx 	implicitDimAddr
+		sty 	implicitDimAddr+1
+		lda 	implicitDimType
+		jsr 	AllocateBytesForType 		; reserve the pointer slot
+		lda 	implicitDimCount 			; append a list entry at count*4
+		asl 	a
+		asl 	a
+		tax
+		lda 	implicitDimAddr
+		sta 	implicitDimList+0,x
+		lda 	implicitDimAddr+1
+		sta 	implicitDimList+1,x
+		lda 	implicitDimType
+		sta 	implicitDimList+2,x
+		lda 	IndexCount 					; dimension count (>= 1 for a real reference)
+		bne 	_RIAHaveCount
+		lda 	#1
+_RIAHaveCount:
+		sta 	implicitDimList+3,x
+		inc 	implicitDimCount
+		ldx 	implicitDimAddr 			; return the slot address in YX for GetSetVariable
+		ldy 	implicitDimAddr+1
+		rts
+_RIAFull:
 		.error_undeclared
+
+; ************************************************************************************************
+;
+;		An explicit DIM found that its array already has a record. Decide whether that record was
+;		created by RegisterImplicitArray (i.e. a reference auto-registered the array before this
+;		DIM in source order) rather than by a real earlier DIM. On entry YX is the array's slot
+;		address, exactly as FindVariable returned it. If a live list entry matches that address,
+;		tombstone it -- set its dimension count to 0 so EmitImplicitDims emits nothing for it --
+;		and return CS with YX preserved, so the DIM dimensions the array for real at the bounds
+;		the programmer wrote. If nothing matches, return CC: this is a genuine re-DIM.
+;
+; ************************************************************************************************
+
+TakeOverImplicitArray:
+		stx 	zTemp0 						; remember the slot address to match, and to hand back
+		sty 	zTemp0+1
+		ldy 	implicitDimCount 			; entries to scan
+		beq 	_TOIANo 					; none registered -> cannot be an implicit array
+		ldx 	#0 							; byte offset into the 4-bytes-per-entry list
+_TOIALoop:
+		lda 	implicitDimList+3,x 		; dimension count; 0 = already tombstoned, skip it
+		beq 	_TOIANext
+		lda 	implicitDimList+0,x 		; match the slot address, low then high
+		cmp 	zTemp0
+		bne 	_TOIANext
+		lda 	implicitDimList+1,x
+		cmp 	zTemp0+1
+		bne 	_TOIANext
+		lda 	#0 							; found it -> tombstone so the prologue skips this array
+		sta 	implicitDimList+3,x
+		ldx 	zTemp0 						; hand the slot address back in YX
+		ldy 	zTemp0+1
+		sec 								; CS = taken over
+		rts
+_TOIANext:
+		inx 								; step over this 4-byte entry
+		inx
+		inx
+		inx
+		dey
+		bne 	_TOIALoop
+_TOIANo:
+		ldx 	zTemp0 						; restore YX = slot address
+		ldy 	zTemp0+1
+		clc 								; CC = not an implicitly-registered array
+		rts
 
 		.send code
 

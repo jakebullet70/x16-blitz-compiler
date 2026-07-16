@@ -2,15 +2,18 @@
 ; ************************************************************************************************
 ;
 ;		Name:		GPC.P8
-;		Purpose:	Front end for the Blitz-X16 compiler
+;		Purpose:	Front end for GPC, the Blitz inspired X16 compiler
+;		Code name:  Greased Piglet Compiler!
 ;		Created:	14th July 2026
 ;
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;
-;		Blitz is driven by GPC.INPUT, a three line control file -- source, object, options. That
-;		is what lets a program drive it, but it is a poor thing to ask a person to write by hand.
-;		So this asks the two questions, writes the file, and hands the machine over to Blitz.
+;		GPC.BLITZ.BIN is driven by GPC.INPUT, a three line control file -- source, object, and a
+;		third line that names a debug map file (line#->offset, for reading runtime errors) or is
+;		empty for none. That is what lets a program drive it, but it is a poor thing to ask a
+;		person to write by hand. So this asks the three questions, writes the file, and hands the
+;		machine over to the GPC.BLITZ.BIN file.
 ;
 ;		%option no_sysinit is not decoration. Prog8's normal startup calls sys.init_system(),
 ;		which resets the screen mode, the charset and the colours. This program is a prompt and
@@ -31,7 +34,8 @@ main {
 
 	str source_name = " " * NAMEMAX
 	str object_name = " " * NAMEMAX
-	str control = " " * (NAMEMAX * 2 + 8) 		; the three lines of GPC.INPUT, built up in memory
+	str map_name = " " * NAMEMAX
+	str control = " " * (NAMEMAX * 3 + 8) 		; the three lines of GPC.INPUT, built up in memory
 
 	sub start() {
 		txt.print("\ngpc... a blitz inspired x16 compiler\n\n")
@@ -45,6 +49,10 @@ main {
 
 		if read_line("output file: ", object_name) == 0
 			default_object() 					; a bare RETURN : name the object after the source
+
+		map_name[0] = 0 						; no map unless the user asks for one
+		if ask_yesno("make a debug map? ") 		; a line#->offset file, for reading runtime errors
+			default_map() 						; yes : name it after the source, m. for c.
 
 		if not write_control() {
 			txt.print("\ncannot write gpc.input\n")
@@ -104,6 +112,31 @@ main {
 
 	; ********************************************************************************************
 	;
+	;		Print a prompt and wait for a yes/no answer: Y (or y) is yes, N (or n) or a bare
+	;		RETURN is no, everything else is ignored -- the same one-line discipline as read_line.
+	;		The answer is echoed so the screen reads back cleanly.
+	;
+	; ********************************************************************************************
+
+	sub ask_yesno(str prompt) -> bool {
+		txt.print(prompt)
+		repeat {
+			ubyte key = cbm.GETIN2() 			; keyboard only, 0 when nothing is waiting
+			when key {
+				'y', 'Y' -> {
+					txt.print("yes\n")
+					return true
+				}
+				'n', 'N', $0d -> {
+					txt.print("no\n")
+					return false
+				}
+			}
+		}
+	}
+
+	; ********************************************************************************************
+	;
 	;		A bare RETURN on the output prompt means "name the object after the source". The
 	;		convention the compiler shipped with is a "c." in front -- DIR.PRG compiles to
 	;		C.DIR.PRG -- so the two sit on the disk side by side. Lowercase c and . in the source
@@ -124,6 +157,25 @@ main {
 
 	; ********************************************************************************************
 	;
+	;		"Yes" to the map question names it after the source with an "m." in front, the same
+	;		convention as the "c." object -- so DIR.PRG gives C.DIR.PRG and M.DIR.PRG, the trio
+	;		sitting together on the disk.
+	;
+	; ********************************************************************************************
+
+	sub default_map() {
+		map_name[0] = 'm'
+		map_name[1] = '.'
+		ubyte i = 0
+		while i < NAMEMAX-3 and source_name[i] != 0 {
+			map_name[i+2] = source_name[i]
+			i++
+		}
+		map_name[i+2] = 0
+	}
+
+	; ********************************************************************************************
+	;
 	;		Write the three lines out.
 	;
 	;		Type the names in lowercase. That is not a style preference: an unshifted letter on
@@ -136,8 +188,8 @@ main {
 	sub write_control() -> bool {
 		ubyte n = add_line(0, source_name) 		; line 1 : what to compile
 		n = add_line(n, object_name) 			; line 2 : where to put it
-		control[n] = 13 						; line 3 : options. Empty -- Blitz ignores it for
-		n++ 									; now, but the line still has to be there.
+		n = add_line(n, map_name) 				; line 3 : the map file, or empty (just a CR) if the
+												; user did not want one -- add_line handles both.
 
 		diskio.delete("gpc.input") 				; scratch any old one first: CBM DOS will not
 												; overwrite an existing file, so a second run

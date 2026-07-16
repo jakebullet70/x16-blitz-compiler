@@ -27,6 +27,7 @@ CompileCode:
 		ldy 	#APIDesc >> 8
 		jsr 	StartCompiler
 		jsr 	WriteObjectCode
+		jsr 	WriteMapFile 				; and the line#->offset map, if GPC.INPUT asked for one
 		lda 	#"O" 						; the only other thing it prints, and the only way a
 		jsr 	$FFD2 						; caller can tell a compile that worked from one that
 		lda 	#"K" 						; stopped on an error, so it stays.

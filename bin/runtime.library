@@ -1660,6 +1660,45 @@ CommandXData: ;; [.data]
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;
+;		Name:		deferror.asm
+;		Purpose:	Deferred syntax error (defer-to-runtime throw-stub)
+;		Created:	16th July 2026
+;		Author : 	Claude
+;
+; ************************************************************************************************
+; ************************************************************************************************
+
+		.section 	code
+
+; ************************************************************************************************
+;
+;		The compiler emits this opcode in place of a statement it could not parse (see
+;		DeferStatementToRuntime / CompilerErrorHandler). If execution never reaches it -- the
+;		usual case, unreachable or dead code -- nothing happens. If it IS reached, it raises a
+;		SYNTAX ERROR at runtime, exactly where the interpreter would, reported at the current
+;		line. It carries no operand.
+;
+; ************************************************************************************************
+
+CommandDeferredError: ;; [.deferror]
+		.entercmd
+		.error_syntax
+
+		.send 	code
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;
+; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
 ;		Name:		dim.asm
 ;		Purpose:	Create new array
 ;		Created:	26th April 2023
@@ -2407,6 +2446,13 @@ _CGNone:
 ;
 ; ************************************************************************************************
 
+CommandXFnGosub: ;; [.fngosub]
+		.entercmd 							; a DEF FN call. Identical to GOSUB at runtime -- open a
+		lda 	#FRAME_GOSUB 				; frame, save the return position, jump. Its own opcode
+		jsr 	StackOpenFrame 				; exists only so the compiler's FixBranches can tell an
+		jsr 	StackSaveCurrentPosition 	; FN call (operand = absolute address) apart from an
+		jmp 	PerformGOTO 				; ordinary GOSUB (operand = source line number).
+
 CommandXGosub: ;; [.gosub]
 		.entercmd
 		lda 	#FRAME_GOSUB
@@ -2563,7 +2609,7 @@ Command_PSET: ;; [pset]
 Command_LINE: ;; [line]
 		.entercmd
 		phy
-		jsr 	GraphicsColour
+		jsr 	GraphicsColourOptional 		; LINE's colour is optional (keeps current if omitted)
 		ldx 	#0 							; copy 0/1/2/3 to r0,1,2,3
 		ldy 	#X16_r0
 		jsr 	GraphicsCopy4
@@ -2683,6 +2729,17 @@ _CCExit:
 ;
 ; ************************************************************************************************
 
+GraphicsColourOptional:
+		.floatinteger 						; integer form of the colour argument.
+		lda 	NSMantissa1,x 				; high byte is non-zero only for the 256 "omitted"
+		bne 	_GCOKeep 					; marker OptionalColourCompile pushes -- so leave the
+		lda 	NSMantissa0,x 				; current draw colour. Otherwise it is a real 0..255
+		tax 								; colour (an explicit ",255" still lands here), set it.
+		ldy 	#0
+		jsr 	X16_GRAPH_set_colors
+_GCOKeep:
+		rts
+
 GraphicsColour:
 		jsr 	GetInteger8Bit
 		tax
@@ -2718,7 +2775,7 @@ GraphicsCopy1:
 ; ************************************************************************************************
 
 GraphicsRectCoords:
-		jsr 	GraphicsColour 				; set colour
+		jsr 	GraphicsColourOptional 		; set colour (optional: keeps current if omitted)
 		ldx 	#0 							; copy in order.
 		ldy 	#X16_r0
 		jsr 	GraphicsCopy4 
@@ -7516,76 +7573,76 @@ _UUCallVector:
 ;
 ; ************************************************************************************************
 
-ValUnary: ;; [val]	
+ValUnary: ;; [val]
 		.entercmd 							; restore stack pos
 		lda 	NSMantissa0,x
 		sta 	zTemp0
 		lda 	NSMantissa1,x
 		sta 	zTemp0+1
-		jsr 	ValEvaluateZTemp0
-		bcs 	_VUError 					; couldn't convert
+		jsr 	ValEvaluateZTemp0 			; always succeeds now (see below)
 		.exitcmd
-_VUError:
-		.error_value
-
-
 
 ; ************************************************************************************************
 ;
 ;								Evaluate value at zTemp0 into X.
 ;
+;		Interpreted BASIC's VAL never errors: it returns the value of the LEADING numeric part of
+;		the string, or 0 when there is none -- VAL("")=0, VAL("AB")=0, VAL("12AB")=12, VAL(" -3")
+;		=-3. This used to raise BAD VALUE on an empty string and on the first non-numeric
+;		character (which broke, e.g., JUSTACLOCK's VAL(YO$) when YO$ was empty). Now it seeds the
+;		result to 0, stops at the first character that is not part of a number, and returns what
+;		it has built.
+;
 ; ************************************************************************************************
 
 ValEvaluateZTemp0:
 		phy
-		lda 	(zTemp0) 					; check not empty string
-		beq 	_VMCFail2 		
-		ldy 	#0 							; start position		
+		jsr 	FloatSetZero 				; default result 0 -- covers "" and non-numeric input
+		lda 	#ESTA_Low 					; a first-character rejection must take FloatEncode's
+		sta 	encodeState 				; integer path (_ENFail), never ENConstructFinal with a
+		;									; stale decimal/exponent state left by an earlier VAL.
+		lda 	(zTemp0) 					; length: empty string is just 0
+		beq 	_VMCReturn
+		ldy 	#0 							; start position
 _VMCSpaces:
 		iny 								; skip leading spaces
-		lda 	(zTemp0),y		
-		cmp 	#" "		
+		lda 	(zTemp0),y
+		cmp 	#" "
 		beq 	_VMCSpaces
-		pha 								; save first character
+		pha 								; save first character (for the sign test)
 		cmp 	#"-"		 				; is it - ?
 		bne 	_VMCStart
 		iny 								; skip over - if so.
 		;
 		;		Evaluation loop
 		;
-_VMCStart:		
+_VMCStart:
 		sec 								; initialise first time round.
 _VMCNext:
 		tya 								; reached end of string
 		dec 	a
 		eor 	(zTemp0) 					; compare length preserve carry.
-		beq 	_VMCSuccess 				; successful.
+		beq 	_VMCFinalise 				; yes -- finalise the number built so far.
 
 		lda 	(zTemp0),y 					; encode a number.
 		iny
 		jsr 	FloatEncode 				; send it to the number-builder
-		bcc 	_VMCFail 					; if failed, give up.
-		clc 								; next time round, countinue
+		bcc 	_VMCStopped 				; not part of a number: stop, it is already finalised.
+		clc 								; next time round, continue
 		bra 	_VMCNext
 
-_VMCFail:
-		pla
-_VMCFail2:		
-		ply
-		sec
-		rts
-
-_VMCSuccess:
-		lda 	#0 							; construct final
-		jsr 	FloatEncode 				; by sending a duff value.
+_VMCFinalise:
+		lda 	#0 							; end of string: feed a duff value to finalise the last
+		jsr 	FloatEncode 				; digit (a no-op for an integer, constructs a fraction/exp).
+_VMCStopped:
 		pla 								; if it was -ve
 		cmp 	#"-"
-		bne 	_VMCNotNegative
+		bne 	_VMCReturn
 		jsr		FloatNegate 				; negate it.
-_VMCNotNegative:		
+_VMCReturn:
 		ply
-		clc
-		rts		
+		clc 								; VAL always succeeds
+		rts
 
 		.send	code
 
@@ -7694,6 +7751,8 @@ VectorTable:
 	.word	CommandGotoNZ            ; $d7 .goto.nz
 	.word	CommandVarSpace          ; $d8 .varspace
 	.word	CommandRestoreX          ; $d9 .restore
+	.word	CommandXFnGosub          ; $da .fngosub
+	.word	CommandDeferredError     ; $db .deferror
 
 
 ShiftVectorTable:

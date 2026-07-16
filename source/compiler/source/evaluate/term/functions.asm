@@ -37,33 +37,29 @@ FNCompile:
 		;		Check to see if it is defined.
 		;
 		jsr 	FindVariable				; does it already exist ?
-		bcc 	_FNError 					; no.
-		jsr 	STRMakeOffset 				; convert to a relative address.
-
-		cmp 	#0 							; fix up.
-		bne 	_FNNoBorrow
-		dey
-_FNNoBorrow:
-		dec 	a
-
-		phy 								; save location of routine on stack.
-		pha
-		phx
+		bcc 	_FNError 					; no -- a forward FN reference is not supported.
+		;
+		;		FindVariable returns the FN body's ABSOLUTE code position in X (low) and Y (high),
+		;		as stored by SetVariableRecordToCodePosition. Emit it verbatim as the operand of a
+		;		.fngosub -- its own opcode, so FixBranches turns this absolute address into an
+		;		offset (like any branch) instead of mistaking it for a source line number. Push
+		;		high then low so, after the argument is compiled, the low byte is written first.
+		;
+		phy 								; abs HIGH
+		phx 								; abs LOW  (top of stack)
 		;
 		;		Handle <expression>)
 		;
 		jsr 	CompileExpressionAt0
 		jsr 	CheckNextRParen
 		;
-		;		Compile routine call
+		;		Compile the call : .fngosub <lo> <hi>
 		;
-		lda 	#PCD_CMD_GOSUB
+		lda 	#PCD_CMD_FNGOSUB
 		jsr 	WriteCodeByte
-		pla
+		pla 								; abs LOW  -> operand byte 1
 		jsr 	WriteCodeByte
-		pla
-		jsr 	WriteCodeByte
-		pla
+		pla 								; abs HIGH -> operand byte 2
 		jsr 	WriteCodeByte
 
 		clc

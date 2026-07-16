@@ -32,11 +32,17 @@ RESET 			T N
 REBOOT 			T N
 
 PSET 			#,#,# T N
-LINE 			#,#,#,#,# T N
-RECT 			#,#,#,#,# T N
-FRAME 			#,#,#,#,# T N
-OVAL 			#,#,#,#,# T N
-RING 			#,#,#,#,# T N
+# 	The trailing colour is optional: stock BASIC's 4-argument RECT/LINE/FRAME/OVAL/RING draw in
+# 	the current colour. OptionalColourCompile (not OptionalParameterCompile) supplies the default,
+# 	because a colour is 0..255 -- so 255 is a real colour and cannot be the "omitted" sentinel the
+# 	way it is for sprite fields. The default is 256 instead, which no 8-bit colour can be, so the
+# 	runtime (GraphicsColourOptional in graphics.asm) tells an omitted colour from an explicit one.
+
+LINE 			#,#,#,# X:OptionalColourCompile T N
+RECT 			#,#,#,# X:OptionalColourCompile T N
+FRAME 			#,#,#,# X:OptionalColourCompile T N
+OVAL 			#,#,#,# X:OptionalColourCompile T N
+RING 			#,#,#,# X:OptionalColourCompile T N
 CHAR 			#,#,#,$ T N
 
 # 	Sprites and tiles. OptionalParameterCompile pushes 255 when its comma is missing, and once

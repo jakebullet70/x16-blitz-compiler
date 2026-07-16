@@ -62,25 +62,25 @@
 ;
 	.byte	$08,$ce,$87,$ea,$ea,$e1,153,$06
 ;
-;	LINE    #,#,#,#,# T N
+;	LINE    #,#,#,# X:OptionalColourCompile T N
 ;
-	.byte	$0a,$ce,$88,$ea,$ea,$ea,$ea,$e1,154,$06
+	.byte	$0c,$ce,$88,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,154,$06
 ;
-;	RECT    #,#,#,#,# T N
+;	RECT    #,#,#,# X:OptionalColourCompile T N
 ;
-	.byte	$0a,$ce,$8a,$ea,$ea,$ea,$ea,$e1,155,$06
+	.byte	$0c,$ce,$8a,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,155,$06
 ;
-;	FRAME    #,#,#,#,# T N
+;	FRAME    #,#,#,# X:OptionalColourCompile T N
 ;
-	.byte	$0a,$ce,$89,$ea,$ea,$ea,$ea,$e1,156,$06
+	.byte	$0c,$ce,$89,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,156,$06
 ;
-;	OVAL    #,#,#,#,# T N
+;	OVAL    #,#,#,# X:OptionalColourCompile T N
 ;
-	.byte	$0a,$ce,$bf,$ea,$ea,$ea,$ea,$e1,157,$06
+	.byte	$0c,$ce,$bf,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,157,$06
 ;
-;	RING    #,#,#,#,# T N
+;	RING    #,#,#,# X:OptionalColourCompile T N
 ;
-	.byte	$0a,$ce,$c0,$ea,$ea,$ea,$ea,$e1,158,$06
+	.byte	$0c,$ce,$c0,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,158,$06
 ;
 ;	CHAR    #,#,#,$ T N
 ;

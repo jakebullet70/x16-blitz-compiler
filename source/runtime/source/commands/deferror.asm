@@ -1,11 +1,10 @@
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;
-;		Name:		sqr.asm
-;		Purpose:	Square root function.
-;		Created:	11th April 2023
-;		Reviewed: 	No
-;		Author : 	Paul Robson (paul@robsons.org.uk)
+;		Name:		deferror.asm
+;		Purpose:	Deferred syntax error (defer-to-runtime throw-stub)
+;		Created:	16th July 2026
+;		Author : 	Claude
 ;
 ; ************************************************************************************************
 ; ************************************************************************************************
@@ -14,26 +13,17 @@
 
 ; ************************************************************************************************
 ;
-;									calculate SQR(x)
+;		The compiler emits this opcode in place of a statement it could not parse (see
+;		DeferStatementToRuntime / CompilerErrorHandler). If execution never reaches it -- the
+;		usual case, unreachable or dead code -- nothing happens. If it IS reached, it raises a
+;		SYNTAX ERROR at runtime, exactly where the interpreter would, reported at the current
+;		line. It carries no operand.
 ;
 ; ************************************************************************************************
 
-FloatSquareRoot:
-		jsr 	FloatIsZero 				; SQR(0) = 0. This routine computes the root as
-		beq 	_FSQZero 					; exp(0.5*ln(x)), but ln(0) is undefined so
-		;									; FloatLogarithm errors on 0 -- special-case it here,
-		;									; matching interpreted BASIC (SQR(0)=0, SQR(-x)=error).
-		jsr 	FloatLogarithm
-		bcs 	_FSQExit
-		dec 	NSExponent,x
-		jsr 	FloatExponent
-		clc
-_FSQExit:
-		rts
-_FSQZero:
-		jsr 	FloatSetZero 				; canonical +0 in slot X
-		clc 								; CC = success
-		rts
+CommandDeferredError: ;; [.deferror]
+		.entercmd
+		.error_syntax
 
 		.send 	code
 

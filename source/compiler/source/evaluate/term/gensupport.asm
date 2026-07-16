@@ -42,6 +42,34 @@ MidFailType:
 
 ; ************************************************************************************************
 ;
+;		As OptionalParameterCompile, but for a trailing COLOUR argument (RECT/LINE/FRAME/OVAL/
+;		RING). A palette index is 0..255, so 255 is a real colour and cannot double as the
+;		"omitted" sentinel the way it can for sprite fields. The default is 256 instead -- out of
+;		range for an 8-bit colour -- so the runtime (GraphicsColourOptional) reads a non-zero
+;		high byte as "leave the current draw colour", and every explicit 0..255 still works.
+;
+; ************************************************************************************************
+
+OptionalColourCompile:
+		jsr 	LookNextNonSpace 			; what follows.
+		cmp 	#","
+		bne 	_OCCDefault
+		jsr 	GetNext 					; consume ,
+		jsr 	CompileExpressionAt0 		; the supplied colour
+		and 	#NSSTypeMask
+		cmp 	#NSSIFloat
+		bne 	MidFailType 				; which must be numeric
+		clc
+		rts
+_OCCDefault:
+		lda 	#0 							; default of 256 = $0100: PushIntegerYA emits a 16-bit
+		ldy 	#1 							; constant when Y (the high byte) is non-zero, and that
+		jsr 	PushIntegerYA 				; high byte is what marks the colour as omitted.
+		clc
+		rts
+
+; ************************************************************************************************
+;
 ;		An optional *leading* numeric parameter, for commands that are valid with or without
 ;		an argument in stock BASIC (e.g. bare SLEEP as well as SLEEP <ticks>). Unlike
 ;		OptionalParameterCompile this argument has no leading comma to key off -- it is the

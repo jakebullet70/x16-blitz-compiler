@@ -19,16 +19,19 @@
 ; ************************************************************************************************
 
 StartBasicProgram:
-		.word 	$080C 						; offset to next.
+		.word 	$0813 						; offset to next.
 		.word 	10 							; line #
 		.byte 	$9E 						; token for 'SYS'		
-		.text 	' 2062'						; space, $080E in decimal
+		.text 	' 2069'						; space, $0815 in decimal
+		.byte 	$3A 						; ':' statement separator
+		.byte 	$8F 						; token for 'REM'
+		.text 	' GPC!'						; compiler signature -- shows on LIST
 		.byte  	0 							; end of line
 		.word 	0 							; end of program
 
 ; ************************************************************************************************
 ;
-;								We actually enter here (SYS 2062)
+;								We actually enter here (SYS 2069)
 ;		
 ; ************************************************************************************************
 
