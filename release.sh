@@ -39,15 +39,15 @@ root    = os.getcwd()
 testing = os.path.join(root, "testing")
 out     = os.path.join(root, "release.zip")
 
-# Scratch that lives in testing/ but must never ship:
-#   OBJECT.PRG  -- the last sample compile's output (regenerated constantly)
-#   XT          -- a foreign XFMGR launcher, nothing to do with GPC
-#   release.zip -- don't nest a previous package inside the new one
-DENY = {"OBJECT.PRG", "XT", "release.zip"}
-
-# Top-level docs to ship alongside the drive contents. README's links point at
-# TODO.md and LICENSE, so include them too and the links resolve offline.
-DOCS = ("README.md", "LICENSE", "TODO.md")
+# The release is ONLY the files needed to run the compiler, plus the README.
+# Everything else in testing/ (samples, compiled demos, the host tokeniser, scratch)
+# is deliberately left out.
+#   GPC.PRG        the front end you launch on the X16
+#   GPC.BLITZ.BIN  the compiler engine GPC.PRG chain-loads
+#   GPC.RT.BIN     the shared runtime, loaded once in "shared" compile mode
+#   GPC.INPUT      the control-file template
+GPC  = ("GPC.PRG", "GPC.BLITZ.BIN", "GPC.RT.BIN", "GPC.INPUT")
+DOCS = ("README.md", "LICENSE")
 
 # Version string GPC prints at startup: "v0.9.<build_num>", from GPC.P8.
 p8  = open(os.path.join(root, "source", "gpc", "GPC.P8"), encoding="utf-8").read()
@@ -56,11 +56,12 @@ ver = "v0.9." + (m.group(1) if m else "?")
 
 names = []
 with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
-    for name in sorted(os.listdir(testing)):
+    for name in GPC:
         full = os.path.join(testing, name)
-        if os.path.isfile(full) and name not in DENY:
-            z.write(full, name)
-            names.append(name)
+        if not os.path.isfile(full):
+            raise SystemExit("release: missing required file testing/%s -- build first" % name)
+        z.write(full, name)
+        names.append(name)
     for doc in DOCS:
         full = os.path.join(root, doc)
         if os.path.isfile(full):
