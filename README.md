@@ -37,28 +37,11 @@ and **shared runtime?** — writes `GPC.INPUT`, and chain-loads the engine. A ba
 prompt names the object `C.` + source (`DIR.PRG` → `C.DIR.PRG`); answer the map question and the map
 is named `M.` + source. Answer *yes* to "shared runtime?" and it writes `shared` as line 4:
 
-```sh
-cd release
-../bin/x16emu/x16emu.exe -rom ../bin/x16emu/rom.bin -fsroot . -prg GPC.PRG -run
-```
-
 **Scripted, by writing `GPC.INPUT` yourself** and running the engine directly — this is what lets
 one program drive another:
 
-```sh
-cd release
-printf 'SOURCE.PRG\nOBJECT.PRG\n\n' > GPC.INPUT           # default self-contained build (no map)
-printf 'SOURCE.PRG\nOBJECT.PRG\n\nshared\n' > GPC.INPUT   # shared-runtime build (line 4 = mode)
-../bin/x16emu/x16emu.exe -rom ../bin/x16emu/rom.bin -fsroot . -prg GPC.BLITZ.BIN -run
-#  -> GPC SQUEALING...
-#     IN:  SOURCE.PRG
-#     OUT: OBJECT.PRG
-```
-
 On success `OBJECT.PRG` is a standalone program you can `LOAD"OBJECT.PRG"` / `RUN`. `LIST` it and it
-identifies itself — the BASIC stub reads `SYS 2069 : REM GPC!` (the way the original C64 Blitz stamps
-`REM Blitz!` and Prog8 stamps `REM PROG8`). On failure the compiler prints the error and the offending
-line, e.g. `SYNTAX ERROR @ 610` or `NOT IMPLEMENTED @ 2400`.
+identifies itself — the BASIC stub reads `SYS 2069 : REM GPC!`. On failure the compiler prints the error and the offending line, e.g. `SYNTAX ERROR @ 610` or `NOT IMPLEMENTED @ 2400`.
 
 ### The debug map (line 3)
 
