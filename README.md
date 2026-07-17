@@ -11,66 +11,6 @@ tokenised BASIC file, and writes a compiled `.PRG`.
 
 Forked from Paul Robson's original: <https://github.com/paulscottrobson/blitz-compiler>
 
-## Status
-
-- Targets **ROM revision R49**. 
-- **63 of the X16's 81 extended keywords compile**; the remaining 18 are deliberate rejections
-  (keywords that act on the BASIC *environment*, which a standalone binary doesn't have).
-  `POINTER` and `STRPTR` are recognised but rejected with `NOT IMPLEMENTED`, because they expose
-  the interpreter's internal variable layout, which the compiled runtime stores differently.
-- See [`TODO.md`](TODO.md) for the full keyword-by-keyword status, decoded against the R49 ROM.
-
-## Repository layout
-
-| Path | What it is |
-| --- | --- |
-| `source/compiler` | the compiler front end (parsing, code generation) |
-| `source/runtime` | the runtime support library linked into every compiled program |
-| `source/ifloat32` | the 32-bit float / integer math library |
-| `source/polynomials` | polynomial approximations (`SIN`, `COS`, `LOG`, …) |
-| `source/common-source` / `common-scripts` | shared assembly + Python build tooling |
-| `source/tools` | host-side helpers (tokeniser, detokeniser) |
-| `source/unit-tests` | the randomised compiler-runtime regression suites |
-| `source/application` | packages the release |
-| `bin/` | `x16emu/` (test emulator + ROM) and `box16/` (debugger) |
-| `testing/` | the built compiler, the shared runtime `GPC.RT.BIN`, and sample programs, ready to run (also the scratch `prg-batch/`/`archive/` test inputs) |
-| `documents/` | build include (`common.make`), notes, and reference PDFs |
-| `x16emu.bat` / `box16.bat` | project-root launchers that boot the emulators with `testing/` as the drive |
-
-## Runtime footprint
-
-By default every compiled program carries the same support runtime — the P-code VM, all command handlers,
-and the math libraries — copied in ahead of its own code. It measures **~11 KB** (10,956 bytes): `runtime.library`
-7.3K (the VM plus all 158 handlers), `ifloat32` 2.3K, `polynomials` 0.9K, then the error vectors and the
-BASIC stub. (A program can instead **share** one resident copy of this runtime — see
-[the shared runtime](#the-shared-runtime-line-4--shared) — so its object is just a bootstrap plus p-code.)
-
-For comparison, the vintage **C64 Blitz!** runtime (in `demo-c64/`) is roughly **half** ours — its compiled `DIR`
-is 6.2 KB against our 11 KB build of the same program, an estimated ~5.8 KB of runtime. The difference
-is two design choices, not overhead: (Note: Blitz for the Commodore 128 is about the same size as GPC)
-
-- **Our own floating point.** We bundle a 32-bit float + transcendental library (`ifloat32` +
-  `polynomials`, ~3.2K) by design (a 32-bit format, not the ROM's 40-bit); C64 Blitz calls the C64 ROM's
-40-bit BASIC floats instead.
-- **X16 hardware.** ~2K of handlers for `SPRITE`, `MOVSPR`, VERA graphics, `TILE`, `MOUSE`, FM/PSG sound,
-  `BLOAD`/`BSAVE` — none of which exist as C64 BASIC V2 keywords.
-
-Those two (~5.2K) account for essentially the whole gap. [`TODO.md`](TODO.md#shrinking-the-runtime) covers
-how a program that uses less could ship less.
-
-## Building
-
-Needs **GNU make**, **[64tass](https://sourceforge.net/projects/tass64/)**, and **Python 3**.
-On Windows, build from **Git Bash** — every recipe in the tree is POSIX, and `common.make`
-forces `SHELL := sh` accordingly. Per-machine tool paths go in an untracked
-`documents/local.make`.
-
-```sh
-make libs        # build the five bin/*.library files and the compiler
-make release     # package testing/ (the compiler + samples)
-make latest      # download & install the matching x16emu + ROM into bin/x16emu/
-```
-
 ## Compiling a program
 
 The compiler engine is **`GPC.BLITZ.BIN`**. It reads its job from a control file, **`GPC.INPUT`**,
@@ -168,6 +108,66 @@ Requirements and limits:
 The regression test lives in `source/unit-tests/shared-runtime/` — it compiles a program shared,
 checks the object layout, and proves both a cold start (fresh machine loads `GPC.RT.BIN`) and a warm
 start (runtime already resident, and provably reused rather than reloaded).
+
+## Status
+
+- Targets **ROM revision R49**.
+- **63 of the X16's 81 extended keywords compile**; the remaining 18 are deliberate rejections
+  (keywords that act on the BASIC *environment*, which a standalone binary doesn't have).
+  `POINTER` and `STRPTR` are recognised but rejected with `NOT IMPLEMENTED`, because they expose
+  the interpreter's internal variable layout, which the compiled runtime stores differently.
+- See [`TODO.md`](TODO.md) for the full keyword-by-keyword status, decoded against the R49 ROM.
+
+## Repository layout
+
+| Path | What it is |
+| --- | --- |
+| `source/compiler` | the compiler front end (parsing, code generation) |
+| `source/runtime` | the runtime support library linked into every compiled program |
+| `source/ifloat32` | the 32-bit float / integer math library |
+| `source/polynomials` | polynomial approximations (`SIN`, `COS`, `LOG`, …) |
+| `source/common-source` / `common-scripts` | shared assembly + Python build tooling |
+| `source/tools` | host-side helpers (tokeniser, detokeniser) |
+| `source/unit-tests` | the randomised compiler-runtime regression suites |
+| `source/application` | packages the release |
+| `bin/` | `x16emu/` (test emulator + ROM) and `box16/` (debugger) |
+| `testing/` | the built compiler, the shared runtime `GPC.RT.BIN`, and sample programs, ready to run (also the scratch `prg-batch/`/`archive/` test inputs) |
+| `documents/` | build include (`common.make`), notes, and reference PDFs |
+| `x16emu.bat` / `box16.bat` | project-root launchers that boot the emulators with `testing/` as the drive |
+
+## Runtime footprint
+
+By default every compiled program carries the same support runtime — the P-code VM, all command handlers,
+and the math libraries — copied in ahead of its own code. It measures **~11 KB** (10,956 bytes): `runtime.library`
+7.3K (the VM plus all 158 handlers), `ifloat32` 2.3K, `polynomials` 0.9K, then the error vectors and the
+BASIC stub. (A program can instead **share** one resident copy of this runtime — see
+[the shared runtime](#the-shared-runtime-line-4--shared) — so its object is just a bootstrap plus p-code.)
+
+For comparison, the vintage **C64 Blitz!** runtime (in `demo-c64/`) is roughly **half** ours — its compiled `DIR`
+is 6.2 KB against our 11 KB build of the same program, an estimated ~5.8 KB of runtime. The difference
+is two design choices, not overhead: (Note: Blitz for the Commodore 128 is about the same size as GPC)
+
+- **Our own floating point.** We bundle a 32-bit float + transcendental library (`ifloat32` +
+  `polynomials`, ~3.2K) by design (a 32-bit format, not the ROM's 40-bit); C64 Blitz calls the C64 ROM's
+40-bit BASIC floats instead.
+- **X16 hardware.** ~2K of handlers for `SPRITE`, `MOVSPR`, VERA graphics, `TILE`, `MOUSE`, FM/PSG sound,
+  `BLOAD`/`BSAVE` — none of which exist as C64 BASIC V2 keywords.
+
+Those two (~5.2K) account for essentially the whole gap. [`TODO.md`](TODO.md#shrinking-the-runtime) covers
+how a program that uses less could ship less.
+
+## Building
+
+Needs **GNU make**, **[64tass](https://sourceforge.net/projects/tass64/)**, and **Python 3**.
+On Windows, build from **Git Bash** — every recipe in the tree is POSIX, and `common.make`
+forces `SHELL := sh` accordingly. Per-machine tool paths go in an untracked
+`documents/local.make`.
+
+```sh
+make libs        # build the five bin/*.library files and the compiler
+make release     # package testing/ (the compiler + samples)
+make latest      # download & install the matching x16emu + ROM into bin/x16emu/
+```
 
 ## Emulators
 
