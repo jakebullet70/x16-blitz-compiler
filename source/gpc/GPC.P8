@@ -9,11 +9,12 @@
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;
-;		GPC.BLITZ.BIN is driven by GPC.INPUT, a three line control file -- source, object, and a
-;		third line that names a debug map file (line#->offset, for reading runtime errors) or is
-;		empty for none. That is what lets a program drive it, but it is a poor thing to ask a
-;		person to write by hand. So this asks the three questions, writes the file, and hands the
-;		machine over to the GPC.BLITZ.BIN file.
+;		GPC.BLITZ.BIN is driven by GPC.INPUT, a four line control file -- source, object, a third
+;		line that names a debug map file (line#->offset, for reading runtime errors) or is empty
+;		for none, and a fourth line that is "shared" to use the shared runtime (GPC.RT.BIN) or
+;		empty for the default self-contained runtime. That is what lets a program drive it, but it
+;		is a poor thing to ask a person to write by hand. So this asks the questions, writes the
+;		file, and hands the machine over to the GPC.BLITZ.BIN file.
 ;
 ;		%option no_sysinit is not decoration. Prog8's normal startup calls sys.init_system(),
 ;		which resets the screen mode, the charset and the colours. This program is a prompt and
@@ -32,15 +33,16 @@
 main {
 	const ubyte NAMEMAX = 40 					; the longest name we will take. Blitz allows 63.
 
-	word build_num = 105	
+	word build_num = 109
 	str source_name = " " * NAMEMAX
 	str object_name = " " * NAMEMAX
 	str map_name = " " * NAMEMAX
-	str control = " " * (NAMEMAX * 3 + 8) 		; the three lines of GPC.INPUT, built up in memory
+	bool use_shared = false 					; true -> 4th control line "shared" (the shared runtime)
+	str control = " " * (NAMEMAX * 4 + 8) 		; the four lines of GPC.INPUT, built up in memory
 
 	sub start() {
 		txt.print("\ngpc... a blitz inspired x16 compiler\n")
-		txt.print("summer 2026, v0.9.")
+		txt.print("         summer 2026, v0.9.")
 		txt.print_uw(build_num)
 		txt.nl()
 		txt.nl()
@@ -66,6 +68,11 @@ main {
 		map_name[0] = 0 						; no map unless the user asks for one
 		if ask_yesno("make a debug map? ") 		; a line#->offset file, for reading runtime errors
 			default_map() 						; yes : name it after the source, m. for c.
+
+		; Shared runtime: emit a small bootstrap that loads GPC.RT.BIN once and shares it across
+		; programs, instead of embedding an ~11K runtime copy in each. Needs GPC.RT.BIN on the disk
+		; at run time; a bare RETURN or "n" keeps the default self-contained program.
+		use_shared = ask_yesno("shared runtime? ")
 
 		clear_old_output()
 
@@ -221,6 +228,8 @@ main {
 		n = add_line(n, object_name) 			; line 2 : where to put it
 		n = add_line(n, map_name) 				; line 3 : the map file, or empty (just a CR) if the
 												; user did not want one -- add_line handles both.
+		if use_shared 							; line 4 : mode. Only written when the user chose the
+			n = add_line(n, "shared") 			; shared runtime; a 3-line file means embedded.
 
 		diskio.delete("gpc.input") 				; scratch any old one first: CBM DOS will not
 												; overwrite an existing file, so a second run

@@ -184,15 +184,32 @@ C64_MOD                  = $cede ; $cede mod
 ;
 ;		Where to assemble the runnable code. Happy now , Dave ?
 ;
+;		Weak so the standalone resident-runtime build (GPC.RT.BIN) can override it to RTBASE with
+;		-D CodeStart=$7300 on the command line; every other build keeps $801.
+;
+		.weak
 CodeStart = $801
+		.endweak
 ;
 ;		Variables that have to be in zero page because it's used in (xx),y
 ;
-ZeroPageMandatory = $22 
+ZeroPageMandatory = $22
 ;
 ;		Variables that can go anywhere
 ;
 MemoryStorage = $400
+;
+;		Resident-runtime (GPC.RT.BIN) ABI -- see application/source/compiler/bootstrap.asm and
+;		runtime/source/main/00rt.header. RTBASE is the fixed home the standalone runtime is linked
+;		at and loaded to; a shared-mode program's bootstrap checks the magic there, loads it if
+;		absent, and enters at RT_ENTRY. RTBASE is PINNED (baked into every shared program's
+;		bootstrap), so it is an ABI constant, not auto-computed; zzrt.footer guards it against the
+;		runtime outgrowing $9F00.
+;
+RTBASE = $7300 								; resident runtime home ($7300..$9EFF, ~11K)
+RT_ENTRY = RTBASE+4 						; 4-byte magic at RTBASE, then jmp StartRuntime
+PCODE_PAGE = $09 							; shared-mode p-code base page ($0900, page-aligned)
+MIN_WS_PAGES = 16 							; smallest workspace a shared program keeps (4K)
 
 ; ************************************************************************************************
 ;

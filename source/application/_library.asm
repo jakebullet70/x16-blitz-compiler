@@ -164,6 +164,149 @@ SourceLine: 								; line for source code storage. In the code section, not
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;
+;		Name:		bootstrap.asm
+;		Purpose:	Per-program bootstrap streamed into a "resident runtime" (SHARED) compile.
+;		Created:	17th July 2026
+;		Reviewed: 	No
+;
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		When GPC.INPUT's 4th line selects SHARED mode, a compiled program carries NO embedded
+;		runtime. Instead WriteObjectCode (object.asm) streams this template as the program's first
+;		255 bytes ($0801..$08FF), followed by the p-code at $0900. On RUN, BASIC's SYS 2069 enters
+;		BootEntry, which:
+;
+;			1. checks the 4-byte magic at RTBASE -- is the shared runtime already resident?
+;			2. if not, LOADs GPC.RT.BIN to its own home ($7300) with secondary address 1;
+;			3. enters the resident runtime at RT_ENTRY, handing it this program's p-code page,
+;			   workspace start (patched per program) and workspace end.
+;
+;		So any program brings the runtime up if it is missing, and reuses it if it is already
+;		there -- one runtime on disk, loaded once in memory.
+;
+;		This template runs at $0801 but is STORED up in compiler space (it is globbed into the
+;		application _library.asm, linked above ObjectBase). `.logical $0801 ... .here` makes 64tass
+;		resolve every label inside to $08xx while placing the physical bytes in compiler space, so
+;		the streamed bytes are correct for execution at $0801 after reload. object.asm streams from
+;		the PHYSICAL labels ProgramBootstrap..ProgramBootstrapEnd and patches the one WS_START byte
+;		at BootWSPatchOffset. The compiler's own $0801 entry (00main.header) is untouched -- this is
+;		inert data the compiler only writes to disk, never executes.
+;
+; ************************************************************************************************
+
+		.section code
+
+ProgramBootstrap: 							; PHYSICAL label (compiler space) -- object.asm streams here
+		.logical $0801
+
+; ------------------------------------------------------------------------------------------------
+;		BASIC stub -- byte-identical to StartBasicProgram (00main.header): 10 SYS 2069:REM GPC!
+; ------------------------------------------------------------------------------------------------
+		.word 	$0813 						; link -> the end-of-program marker at $0813
+		.word 	10 							; line number
+		.byte 	$9E 						; SYS token
+		.text 	' 2069' 					; space, $0815 in decimal
+		.byte 	$3A 						; ':' statement separator
+		.byte 	$8F 						; REM token
+		.text 	' GPC!' 					; compiler signature -- shows on LIST
+		.byte 	0 							; end of line
+		.word 	0 							; end of program
+
+; ------------------------------------------------------------------------------------------------
+;		SYS 2069 lands here ($0815).
+; ------------------------------------------------------------------------------------------------
+BootEntry:
+		.cerror BootEntry != $0815, "bootstrap SYS entry is not at $0815 -- BASIC stub size drifted"
+		;
+		;		Is the shared runtime already resident? Compare the 4 magic bytes at RTBASE.
+		;
+		ldx 	#3
+_BBCheck:
+		lda 	RTBASE,x
+		cmp 	BBMagic,x
+		bne 	_BBCold
+		dex
+		bpl 	_BBCheck
+		bra 	_BBEnter 					; WARM -- runtime already up, just enter it
+_BBCold:
+		;
+		;		Cold: LOAD GPC.RT.BIN to its own home. Secondary address 1 makes the KERNAL honour
+		;		the file's own load address ($7300), ignoring the address in X/Y. Logical file 0
+		;		(file 1 has been seen to hang a later OPEN). Loading high never touches $0801 or the
+		;		p-code, so this bootstrap survives its own load.
+		;
+		lda 	#BBNameEnd-BBName 		; SETNAM(length, name)
+		ldx 	#<BBName
+		ldy 	#>BBName
+		jsr 	X16_SETNAM
+		lda 	#0 							; SETLFS(logical file 0, device 8, secondary 1)
+		ldx 	#8
+		ldy 	#1
+		jsr 	X16_SETLFS
+		lda 	#0 							; LOAD into system memory
+		ldx 	#<RTBASE 					; load address (ignored under SA=1, but pass the home)
+		ldy 	#>RTBASE
+		jsr 	X16_LOAD
+		bcc 	_BBEnter 					; carry clear = loaded OK
+		;
+		;		Load failed (GPC.RT.BIN not on the disk). Print a short notice and drop back to
+		;		BASIC READY -- no runtime is up, so there is no runtime error path to take.
+		;
+		ldx 	#0
+_BBErr:
+		lda 	BBErrText,x
+		beq 	_BBErrDone
+		phx
+		jsr 	X16_CHROUT
+		plx
+		inx
+		bne 	_BBErr
+_BBErrDone:
+		rts 								; return to the SYS caller -> BASIC READY
+
+; ------------------------------------------------------------------------------------------------
+;		Hand off to the resident runtime. Both cold and warm paths funnel through here, so the
+;		SYS return address is preserved on the stack -- an END in the program RTSes cleanly back
+;		to BASIC, exactly as an embedded program does.
+; ------------------------------------------------------------------------------------------------
+_BBEnter:
+		lda 	#PCODE_PAGE 				; A = p-code base page ($09), page-aligned for codePtr
+BootWS:
+		ldx 	#$FF 						; X = workspace start page -- PATCHED by WriteObjectCode
+		ldy 	#RTBASE >> 8 				; Y = workspace end page ($73 -- just below the runtime)
+		jmp 	RT_ENTRY 					; RTBASE+4 -> jmp StartRuntime
+
+BBMagic:
+		.text 	"GPC1" 						; MUST match the magic in runtime/source/main/00rt.header
+BBName:
+		.text 	"GPC.RT.BIN"
+BBNameEnd:
+BBErrText:
+		.text 	"?RT", 13, 0 				; brief -- a full line would wrap in 40 columns
+
+		.fill 	$0900 - *, 0 				; pad through $08FF so the p-code starts exactly at $0900
+
+		.here
+ProgramBootstrapEnd: 						; PHYSICAL end -- (End - Start) == 255 bytes ($0801..$08FF)
+
+BootWSPatchOffset = BootWS + 1 - $0801 		; offset of the WS_START operand within the streamed bytes
+
+		.send code
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;
+; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
 ;		Name:		control.asm
 ;		Purpose:	The compiler's control file, GPC.INPUT
 ;		Created:	14th July 2026
@@ -193,10 +336,14 @@ SourceLine: 								; line for source code storage. In the code section, not
 ;
 ; ************************************************************************************************
 
-CFLineSize = 64 							; the three lines are ONE 192 byte block, so a single
-											; 8 bit index walks all of them. Nothing else works:
-											; three separate buffers would need a pointer, and
-											; the KERNAL calls in here are free to trash one.
+CFLineSize = 64 							; each line is a fixed 64-byte slot; the four lines are one
+CFLineCount = 4 							; contiguous 256-byte block (source, object, map, mode).
+											; ReadControlFile counts lines (cfLine) and tracks CR/LF,
+											; so an EMPTY line still advances -- an empty line 3 (no
+											; map) must not mis-slot line 4 (the mode). Fixed slots
+											; mean a single index walks the block with no pointer,
+											; which matters because the KERNAL calls here are free
+											; to trash zero page.
 
 		.section code
 
@@ -209,70 +356,88 @@ CFLineSize = 64 							; the three lines are ONE 192 byte block, so a single
 ; ************************************************************************************************
 
 ReadControlFile:
-		lda 	#0 							; blank all three lines. This is what puts the zero
-		ldx 	#CFLineSize*3-1 			; terminator on the end of each of them, and what
-_RCFBlank: 									; leaves a short control file holding empty strings
-		sta 	SourceFile,x 				; rather than whatever happened to be in memory.
-		dex
-		bpl 	_RCFBlank
+		lda 	#0 							; blank all FOUR lines (256 bytes). This zero-terminates
+		tax 								; each of them and leaves a short control file holding
+_RCFBlank: 									; empty strings rather than whatever was in memory.
+		sta 	SourceFile,x
+		inx
+		bne 	_RCFBlank
 
 		ldy 	#ControlFile >> 8
 		ldx 	#ControlFile & $FF
 		jsr 	IOOpenRead
-		ldx 	#0 							; X walks the three lines as one block (preserves C)
-		bcs 	_RCFClose 					; carry set means we have no input channel, and then
-											; reading is NOT harmless: CHRIN would fall back to
-											; the keyboard and sit there waiting to be typed at.
+		bcs 	_RCFClose 					; no input channel -- reading is NOT harmless: CHRIN would
+											; fall back to the keyboard and wait to be typed at.
+		ldx 	#0 							; X = write offset (cfLine*CFLineSize + column)
+		stz 	cfLine 						; current line, 0..3
+		stz 	cfJustCR 					; nonzero => the previous byte was CR (to swallow a CRLF's LF)
 _RCFRead:
 		jsr 	IOReadByte 					; carry set at end of file
 		bcs 	_RCFClose
 
-		cmp 	#' ' 						; CR, LF, and anything else below a space, ends the
-		bcc 	_RCFEndOfLine 				; line
+		cmp 	#' ' 						; CR, LF, and anything else below a space, ends the line
+		bcc 	_RCFEndOfLine
 
-		cmp 	#$C1 						; PETSCII shifted letters, which is what the X16 hands
-		bcc 	_RCFNotShifted 				; you if you type the name with SHIFT held down. CBM
-		cmp 	#$DB 						; DOS wants the UNshifted ones in a filename, and they
-		bcs 	_RCFNotShifted 				; are a different character entirely, not a case.
+		stz 	cfJustCR 					; a real character clears any pending CR
+		cmp 	#$C1 						; PETSCII shifted letters ($C1-$DA), what SHIFT-typing gives;
+		bcc 	_RCFNotShifted 				; CBM DOS wants the UNshifted bytes in a filename, and they
+		cmp 	#$DB 						; are a different character entirely, not a case.
+		bcs 	_RCFNotShifted
 		and 	#$7F 						; $C1-$DA -> $41-$5A
 		bra 	_RCFStore
 _RCFNotShifted:
-		cmp 	#'a' 						; and ASCII lowercase, which is what a text editor on
-		bcc 	_RCFStore 					; the host gives you
+		cmp 	#'a' 						; and ASCII lowercase, which is what a host text editor
+		bcc 	_RCFStore 					; gives you
 		cmp 	#'z'+1
 		bcs 	_RCFStore
 		and 	#$DF 						; $61-$7A -> $41-$5A
 _RCFStore:
 		pha
-		txa 								; the last byte of a line is its zero terminator and
-		and 	#CFLineSize-1 				; is never written to, so an over-long name is
-		cmp 	#CFLineSize-1 				; truncated rather than left to run on into the next
-		pla 								; line.
+		txa 								; the last byte of a line is its zero terminator and is
+		and 	#CFLineSize-1 				; never written to, so an over-long name is truncated
+		cmp 	#CFLineSize-1 				; rather than running on into the next line.
+		pla
 		bcs 	_RCFRead
 		sta 	SourceFile,x
 		inx
 		bra 	_RCFRead
 
-_RCFEndOfLine:
-		txa
-		and 	#CFLineSize-1 				; nothing on this line yet ? then this is the LF of a
-		beq 	_RCFRead 					; CRLF, or a blank line -- there is nothing to end.
-		txa 								; otherwise step X on to the start of the next line.
-		clc
-		adc 	#CFLineSize
-		and 	#$100-CFLineSize
+_RCFEndOfLine: 								; A < ' '
+		cmp 	#$0A 						; LF ?
+		bne 	_RCFAdvance
+		lda 	cfJustCR 					; an LF right after a CR (a CRLF) -> swallow it, do not
+		bne 	_RCFSwallow 				; advance again; the CR already ended the line.
+_RCFAdvance: 								; CR, a lone LF, or any other control ends the line
+		ldy 	#0 							; remember whether this was a CR (so a following LF is eaten)
+		cmp 	#$0D
+		bne 	_RCFSetCR
+		iny
+_RCFSetCR:
+		sty 	cfJustCR
+		inc 	cfLine 						; advance even on an empty line -- so an empty line 3 (no
+		lda 	cfLine 						; map) does not mis-slot line 4 (the mode), which the old
+		cmp 	#CFLineCount 				; positional walker got wrong.
+		bcs 	_RCFClose 					; captured all four lines -> stop, ignore any more
+		asl 	a 							; X = cfLine * CFLineSize (64) = start of the next line
+		asl 	a
+		asl 	a
+		asl 	a
+		asl 	a
+		asl 	a
 		tax
-		cpx 	#CFLineSize*3 				; stop at three lines, whatever else the file holds
-		bcc 	_RCFRead
+		bra 	_RCFRead
+_RCFSwallow:
+		stz 	cfJustCR
+		bra 	_RCFRead
 
 _RCFClose:
-		jsr 	IOReadClose 				; close it either way. Logical file 3 is the one the
-											; source is read on, so it has to be free.
+		jsr 	IOReadClose 				; close it either way. Logical file 3 is the one the source
+											; is read on, so it has to be free.
 		sec
-		lda 	SourceFile 					; no source name means there was no usable control
-		beq 	_RCFFail 					; file: missing, empty, or a first line we could not
-		lda 	ObjectFile 					; use. No object name is just as useless -- we would
-		beq 	_RCFFail 					; have nowhere to put the answer.
+		lda 	SourceFile 					; no source name means there was no usable control file:
+		beq 	_RCFFail 					; missing, empty, or a first line we could not use. No object
+		lda 	ObjectFile 					; name is just as useless -- nowhere to put the answer.
+		beq 	_RCFFail 					; Line 4 (the mode) is optional, so it is not checked here.
 		clc
 _RCFFail:
 		rts
@@ -388,9 +553,15 @@ SourceFile: 								; line 1 : what to compile
 		.fill 	CFLineSize
 ObjectFile: 								; line 2 : where to write it
 		.fill 	CFLineSize
-OptionsText: 								; line 3 : read and thrown away for now, so that a
-		.fill 	CFLineSize 					; caller can already write options that will one day
-											; be honoured.
+OptionsText: 								; line 3 : the debug map file name, or empty for none
+		.fill 	CFLineSize 					; (WriteMapFile keys off its first byte)
+ModeText: 									; line 4 : compile mode -- first byte 'S' (SHARED) selects
+		.fill 	CFLineSize 					; the resident runtime (GPC.RT.BIN); empty/anything else
+											; = the default self-contained (embedded) runtime.
+cfLine: 									; ReadControlFile scratch: current line, 0..3
+		.fill 	1
+cfJustCR: 									; ReadControlFile scratch: nonzero if the last byte was a CR
+		.fill 	1
 
 		.send code
 
@@ -453,6 +624,11 @@ FrameStackPages = 16 						; 4K, ~250 frames
 ; ************************************************************************************************
 
 WriteObjectCode:
+		lda 	ModeText 					; GPC.INPUT line 4 -- 'S' (SHARED) selects resident-runtime
+		cmp 	#'S' 						; mode: emit a bootstrap + p-code, no embedded runtime
+		bne 	_WOCEmbedded 				; (see the shared branch below and compiler/bootstrap.asm).
+		jmp 	_WOCShared 					; jmp, not a branch -- the embedded path is >127 bytes
+_WOCEmbedded:
 		jsr 	PatchOutCompile 			; makes it run the runtime on reload
 		;
 		;		zTemp1 = length of the object code.
@@ -545,7 +721,115 @@ _WOCCodeByte:
 		bra 	_WOCCode
 _WOCDone:
 		jsr 	IOWriteClose 				; close the file.
+		clc 								; success -- CompileCode reads the carry (set = rejected)
 		rts
+
+; ************************************************************************************************
+;
+;		Shared (resident-runtime) output: [$0801 bootstrap][$0900 p-code], no embedded runtime.
+;		The bootstrap (compiler/bootstrap.asm) is streamed as the first 255 bytes with WS_START
+;		patched in; the p-code follows and lands at $0900 on reload. A program whose p-code +
+;		frame-stack gap + minimum workspace would not fit below RTBASE is rejected (carry set).
+;
+; ************************************************************************************************
+
+_WOCShared:
+		;
+		;		p-code length -> whole pages (same as the embedded path)
+		;
+		sec
+		lda 	objPtr
+		sbc 	#FreeMemory & $FF
+		sta 	zTemp1
+		lda 	objPtr+1
+		sbc 	#FreeMemory >> 8
+		sta 	zTemp1+1
+		lda 	zTemp1
+		beq 	_WOCSWhole
+		inc 	zTemp1+1
+_WOCSWhole:
+		;
+		;		WS_START = PCODE_PAGE + pages(p-code) + the frame-stack gap. Reject if that leaves
+		;		fewer than MIN_WS_PAGES below RTBASE, or if the page count itself overflowed a byte.
+		;
+		clc
+		lda 	#PCODE_PAGE
+		adc 	zTemp1+1
+		bcs 	_WOCSBig
+		adc 	#FrameStackPages
+		bcs 	_WOCSBig
+		sta 	newWorkspacePage 			; reuse this byte to carry WS_START
+		cmp 	#(RTBASE >> 8) - MIN_WS_PAGES + 1
+		bcs 	_WOCSBig
+		;
+		;		Header: a normal PRG loading at $0801 -- the bootstrap sits there.
+		;
+		ldy 	#ObjectFile >> 8
+		ldx 	#ObjectFile & $FF
+		jsr 	IOOpenWrite
+		lda 	#1
+		jsr 	IOWriteByte
+		lda 	#8
+		jsr 	IOWriteByte
+		;
+		;		Part one: the bootstrap, ProgramBootstrap..ProgramBootstrapEnd, patching the single
+		;		WS_START operand byte as it streams past.
+		;
+		.set16 	zTemp0,ProgramBootstrap
+_WOCSBoot:
+		lda 	zTemp0
+		cmp 	#<(ProgramBootstrap+BootWSPatchOffset)
+		bne 	_WOCSBootPlain
+		lda 	zTemp0+1
+		cmp 	#>(ProgramBootstrap+BootWSPatchOffset)
+		bne 	_WOCSBootPlain
+		lda 	newWorkspacePage 			; substitute the WS_START operand
+		bra 	_WOCSBootEmit
+_WOCSBootPlain:
+		lda 	(zTemp0)
+_WOCSBootEmit:
+		jsr 	IOWriteByte
+		inc 	zTemp0
+		bne 	_WOCSBootNoHi
+		inc 	zTemp0+1
+_WOCSBootNoHi:
+		lda 	zTemp0
+		cmp 	#<ProgramBootstrapEnd
+		bne 	_WOCSBoot
+		lda 	zTemp0+1
+		cmp 	#>ProgramBootstrapEnd
+		bne 	_WOCSBoot
+		;
+		;		Part two: the p-code from FreeMemory..objPtr, which lands at $0900 on reload.
+		;
+		.set16 	zTemp0,FreeMemory
+_WOCSCode:
+		lda 	zTemp0
+		cmp 	objPtr
+		bne 	_WOCSCodeByte
+		lda 	zTemp0+1
+		cmp 	objPtr+1
+		beq 	_WOCSCodeDone
+_WOCSCodeByte:
+		lda 	(zTemp0)
+		jsr 	IOWriteByte
+		inc 	zTemp0
+		bne 	_WOCSCode
+		inc 	zTemp0+1
+		bra 	_WOCSCode
+_WOCSCodeDone:
+		jsr 	IOWriteClose
+		clc 								; success
+		rts
+_WOCSBig:
+		ldx 	#ProgramTooBigText & $FF
+		ldy 	#ProgramTooBigText >> 8
+		jsr 	PrintMessage
+		sec 								; rejected -- CompileCode skips the map file and the OK
+		rts
+
+ProgramTooBigText:
+		.text 	"PROGRAM TOO BIG", 13, 0
 
 ; ************************************************************************************************
 ;
@@ -907,12 +1191,16 @@ CompileCode:
 		ldy 	#APIDesc >> 8
 		jsr 	StartCompiler
 		jsr 	WriteObjectCode
+		bcs 	_CCRejected 				; shared-mode reject (PROGRAM TOO BIG) -- already reported
 		jsr 	WriteMapFile 				; and the line#->offset map, if GPC.INPUT asked for one
 		lda 	#"O" 						; the only other thing it prints, and the only way a
 		jsr 	$FFD2 						; caller can tell a compile that worked from one that
 		lda 	#"K" 						; stopped on an error, so it stays.
 		jsr 	$FFD2
 		rts
+
+_CCRejected: 								; WriteObjectCode set carry (e.g. PROGRAM TOO BIG); it has
+		rts 								; already printed why, so stop -- no map file, no OK.
 
 _CCNoControlFile: 							; a compiler that guesses at what it was asked to
 		jmp 	PrintNoControlFile 			; build is worse than one that refuses

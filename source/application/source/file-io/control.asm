@@ -30,10 +30,14 @@
 ;
 ; ************************************************************************************************
 
-CFLineSize = 64 							; the three lines are ONE 192 byte block, so a single
-											; 8 bit index walks all of them. Nothing else works:
-											; three separate buffers would need a pointer, and
-											; the KERNAL calls in here are free to trash one.
+CFLineSize = 64 							; each line is a fixed 64-byte slot; the four lines are one
+CFLineCount = 4 							; contiguous 256-byte block (source, object, map, mode).
+											; ReadControlFile counts lines (cfLine) and tracks CR/LF,
+											; so an EMPTY line still advances -- an empty line 3 (no
+											; map) must not mis-slot line 4 (the mode). Fixed slots
+											; mean a single index walks the block with no pointer,
+											; which matters because the KERNAL calls here are free
+											; to trash zero page.
 
 		.section code
 
@@ -46,70 +50,88 @@ CFLineSize = 64 							; the three lines are ONE 192 byte block, so a single
 ; ************************************************************************************************
 
 ReadControlFile:
-		lda 	#0 							; blank all three lines. This is what puts the zero
-		ldx 	#CFLineSize*3-1 			; terminator on the end of each of them, and what
-_RCFBlank: 									; leaves a short control file holding empty strings
-		sta 	SourceFile,x 				; rather than whatever happened to be in memory.
-		dex
-		bpl 	_RCFBlank
+		lda 	#0 							; blank all FOUR lines (256 bytes). This zero-terminates
+		tax 								; each of them and leaves a short control file holding
+_RCFBlank: 									; empty strings rather than whatever was in memory.
+		sta 	SourceFile,x
+		inx
+		bne 	_RCFBlank
 
 		ldy 	#ControlFile >> 8
 		ldx 	#ControlFile & $FF
 		jsr 	IOOpenRead
-		ldx 	#0 							; X walks the three lines as one block (preserves C)
-		bcs 	_RCFClose 					; carry set means we have no input channel, and then
-											; reading is NOT harmless: CHRIN would fall back to
-											; the keyboard and sit there waiting to be typed at.
+		bcs 	_RCFClose 					; no input channel -- reading is NOT harmless: CHRIN would
+											; fall back to the keyboard and wait to be typed at.
+		ldx 	#0 							; X = write offset (cfLine*CFLineSize + column)
+		stz 	cfLine 						; current line, 0..3
+		stz 	cfJustCR 					; nonzero => the previous byte was CR (to swallow a CRLF's LF)
 _RCFRead:
 		jsr 	IOReadByte 					; carry set at end of file
 		bcs 	_RCFClose
 
-		cmp 	#' ' 						; CR, LF, and anything else below a space, ends the
-		bcc 	_RCFEndOfLine 				; line
+		cmp 	#' ' 						; CR, LF, and anything else below a space, ends the line
+		bcc 	_RCFEndOfLine
 
-		cmp 	#$C1 						; PETSCII shifted letters, which is what the X16 hands
-		bcc 	_RCFNotShifted 				; you if you type the name with SHIFT held down. CBM
-		cmp 	#$DB 						; DOS wants the UNshifted ones in a filename, and they
-		bcs 	_RCFNotShifted 				; are a different character entirely, not a case.
+		stz 	cfJustCR 					; a real character clears any pending CR
+		cmp 	#$C1 						; PETSCII shifted letters ($C1-$DA), what SHIFT-typing gives;
+		bcc 	_RCFNotShifted 				; CBM DOS wants the UNshifted bytes in a filename, and they
+		cmp 	#$DB 						; are a different character entirely, not a case.
+		bcs 	_RCFNotShifted
 		and 	#$7F 						; $C1-$DA -> $41-$5A
 		bra 	_RCFStore
 _RCFNotShifted:
-		cmp 	#'a' 						; and ASCII lowercase, which is what a text editor on
-		bcc 	_RCFStore 					; the host gives you
+		cmp 	#'a' 						; and ASCII lowercase, which is what a host text editor
+		bcc 	_RCFStore 					; gives you
 		cmp 	#'z'+1
 		bcs 	_RCFStore
 		and 	#$DF 						; $61-$7A -> $41-$5A
 _RCFStore:
 		pha
-		txa 								; the last byte of a line is its zero terminator and
-		and 	#CFLineSize-1 				; is never written to, so an over-long name is
-		cmp 	#CFLineSize-1 				; truncated rather than left to run on into the next
-		pla 								; line.
+		txa 								; the last byte of a line is its zero terminator and is
+		and 	#CFLineSize-1 				; never written to, so an over-long name is truncated
+		cmp 	#CFLineSize-1 				; rather than running on into the next line.
+		pla
 		bcs 	_RCFRead
 		sta 	SourceFile,x
 		inx
 		bra 	_RCFRead
 
-_RCFEndOfLine:
-		txa
-		and 	#CFLineSize-1 				; nothing on this line yet ? then this is the LF of a
-		beq 	_RCFRead 					; CRLF, or a blank line -- there is nothing to end.
-		txa 								; otherwise step X on to the start of the next line.
-		clc
-		adc 	#CFLineSize
-		and 	#$100-CFLineSize
+_RCFEndOfLine: 								; A < ' '
+		cmp 	#$0A 						; LF ?
+		bne 	_RCFAdvance
+		lda 	cfJustCR 					; an LF right after a CR (a CRLF) -> swallow it, do not
+		bne 	_RCFSwallow 				; advance again; the CR already ended the line.
+_RCFAdvance: 								; CR, a lone LF, or any other control ends the line
+		ldy 	#0 							; remember whether this was a CR (so a following LF is eaten)
+		cmp 	#$0D
+		bne 	_RCFSetCR
+		iny
+_RCFSetCR:
+		sty 	cfJustCR
+		inc 	cfLine 						; advance even on an empty line -- so an empty line 3 (no
+		lda 	cfLine 						; map) does not mis-slot line 4 (the mode), which the old
+		cmp 	#CFLineCount 				; positional walker got wrong.
+		bcs 	_RCFClose 					; captured all four lines -> stop, ignore any more
+		asl 	a 							; X = cfLine * CFLineSize (64) = start of the next line
+		asl 	a
+		asl 	a
+		asl 	a
+		asl 	a
+		asl 	a
 		tax
-		cpx 	#CFLineSize*3 				; stop at three lines, whatever else the file holds
-		bcc 	_RCFRead
+		bra 	_RCFRead
+_RCFSwallow:
+		stz 	cfJustCR
+		bra 	_RCFRead
 
 _RCFClose:
-		jsr 	IOReadClose 				; close it either way. Logical file 3 is the one the
-											; source is read on, so it has to be free.
+		jsr 	IOReadClose 				; close it either way. Logical file 3 is the one the source
+											; is read on, so it has to be free.
 		sec
-		lda 	SourceFile 					; no source name means there was no usable control
-		beq 	_RCFFail 					; file: missing, empty, or a first line we could not
-		lda 	ObjectFile 					; use. No object name is just as useless -- we would
-		beq 	_RCFFail 					; have nowhere to put the answer.
+		lda 	SourceFile 					; no source name means there was no usable control file:
+		beq 	_RCFFail 					; missing, empty, or a first line we could not use. No object
+		lda 	ObjectFile 					; name is just as useless -- nowhere to put the answer.
+		beq 	_RCFFail 					; Line 4 (the mode) is optional, so it is not checked here.
 		clc
 _RCFFail:
 		rts
@@ -225,9 +247,15 @@ SourceFile: 								; line 1 : what to compile
 		.fill 	CFLineSize
 ObjectFile: 								; line 2 : where to write it
 		.fill 	CFLineSize
-OptionsText: 								; line 3 : read and thrown away for now, so that a
-		.fill 	CFLineSize 					; caller can already write options that will one day
-											; be honoured.
+OptionsText: 								; line 3 : the debug map file name, or empty for none
+		.fill 	CFLineSize 					; (WriteMapFile keys off its first byte)
+ModeText: 									; line 4 : compile mode -- first byte 'S' (SHARED) selects
+		.fill 	CFLineSize 					; the resident runtime (GPC.RT.BIN); empty/anything else
+											; = the default self-contained (embedded) runtime.
+cfLine: 									; ReadControlFile scratch: current line, 0..3
+		.fill 	1
+cfJustCR: 									; ReadControlFile scratch: nonzero if the last byte was a CR
+		.fill 	1
 
 		.send code
 

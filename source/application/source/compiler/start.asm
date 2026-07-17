@@ -27,12 +27,16 @@ CompileCode:
 		ldy 	#APIDesc >> 8
 		jsr 	StartCompiler
 		jsr 	WriteObjectCode
+		bcs 	_CCRejected 				; shared-mode reject (PROGRAM TOO BIG) -- already reported
 		jsr 	WriteMapFile 				; and the line#->offset map, if GPC.INPUT asked for one
 		lda 	#"O" 						; the only other thing it prints, and the only way a
 		jsr 	$FFD2 						; caller can tell a compile that worked from one that
 		lda 	#"K" 						; stopped on an error, so it stays.
 		jsr 	$FFD2
 		rts
+
+_CCRejected: 								; WriteObjectCode set carry (e.g. PROGRAM TOO BIG); it has
+		rts 								; already printed why, so stop -- no map file, no OK.
 
 _CCNoControlFile: 							; a compiler that guesses at what it was asked to
 		jmp 	PrintNoControlFile 			; build is worse than one that refuses

@@ -197,6 +197,27 @@ compiled binary. Same reasoning retires `LIST` `NEW` `RUN` `CONT` `CLR` from the
 its own way at compile time, so these would either mean something different or nothing. The original
 author rejected them outright; leaving them parked rather than deciding in the abstract.
 
+They are not silently dropped: both tokens are *recognised* by `x16_unary.def` (so tokenised BASIC that
+uses them still loads and round-trips) but routed to `UnsupportedCompile` in `gensupport.asm`, which
+raises `NOT IMPLEMENTED @ <line>`. That is a deliberate fail-loud choice — emitting *some* address would
+compile and then read the wrong memory, so the compiler stops at the reference rather than misbehave
+silently.
+
+**The layout mismatch is the whole obstacle, and `testing/POINTER.PRG` makes it concrete.** That program
+does `X%=POINTER(A$)` and then treats `X%` as a CBM `[len, ptr-lo, ptr-hi]` descriptor — `PEEK(X%)` for
+the length, `PEEK(X%+1/+2)` for the data pointer — walks the bytes, and `POKE Y+3,90` to mutate the
+string in place. Every one of those offsets is baked to the *interpreter's* descriptor. Blitz stores a
+string as `[MaxLen][Control][ActLen][Data]`, a different four-field shape, so that descriptor walk reads
+garbage under Blitz no matter what address `POINTER` returned. This is what "mean something different or
+nothing" looks like in practice: there is no address Blitz can hand back that makes an existing
+descriptor-walking program like `POINTER.PRG` behave.
+
+If it is ever revisited, `STRPTR` returning the address of Blitz's `Data` field is the only variant with
+clean, non-misleading semantics (it points at the actual characters, so `POKE`-style mutation works);
+`POINTER` returning the address of the four-byte control block would necessarily mean something no stock
+C64/C128 program expects. Scope either against the real string-block layout in the runtime before
+committing.
+
 ## Bugs
 
 ### The `storage` section had silently run off the end of its 1K hole — FIXED
