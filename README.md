@@ -13,8 +13,7 @@ Forked from Paul Robson's original: <https://github.com/paulscottrobson/blitz-co
 
 ## Status
 
-- Targets **ROM revision R49**. The bundled emulator ROM in `bin/x16emu/` must match; bumping
-  `REVISION` in the `Makefile` means refreshing that `rom.bin` too.
+- Targets **ROM revision R49**. 
 - **63 of the X16's 81 extended keywords compile**; the remaining 18 are deliberate rejections
   (keywords that act on the BASIC *environment*, which a standalone binary doesn't have).
   `POINTER` and `STRPTR` are recognised but rejected with `NOT IMPLEMENTED`, because they expose
