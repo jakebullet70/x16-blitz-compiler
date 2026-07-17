@@ -33,7 +33,7 @@
 main {
 	const ubyte NAMEMAX = 40 					; the longest name we will take. Blitz allows 63.
 
-	word build_num = 109
+	word build_num = 110
 	str source_name = " " * NAMEMAX
 	str object_name = " " * NAMEMAX
 	str map_name = " " * NAMEMAX
@@ -42,7 +42,7 @@ main {
 
 	sub start() {
 		txt.print("\ngpc... a blitz inspired x16 compiler\n")
-		txt.print("         summer 2026, v0.9.")
+		txt.print("             summer 2026, v0.9.")
 		txt.print_uw(build_num)
 		txt.nl()
 		txt.nl()
