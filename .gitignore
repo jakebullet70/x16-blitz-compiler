@@ -51,14 +51,17 @@ source/unit-tests/compiler-runtime/examples/*.bas
 source/unit-tests/compiler-runtime/CODE.BIN
 
 # ---------------------------------------------------------------------------
-# source/gpc build products. Prog8 writes GPC.prg/.asm/.vice-mon-list into build/;
-# the Makefile renames the .prg up to GPC.PRG. The copy that SHIPS, and the only
-# one committed, is testing/GPC.PRG. GPC.BLITZ.BIN is copied in by the "run" target,
-# because GPC chain-loads the compiler by name and needs it alongside.
+# source/gpc front end. GPC.BASL (BASLOAD source) is tokenised into testing/GPC.PRG by
+# build_basl.py driving the emulator -- both GPC.BASL and GPC.PRG SHIP and are tracked in
+# testing/. Ignore only the tokenise scratch (a one-line driver, an echo log) and the
+# #SYMFILE debug map. The retired Prog8 front end sits in source/gpc/old-archive/: its .P8
+# source and bump script are kept (tracked), but not its binary or build scratch.
 # ---------------------------------------------------------------------------
-source/gpc/build/
-source/gpc/GPC.PRG
-source/gpc/GPC.BLITZ.BIN
+testing/GPCBLD.BAS
+testing/GPCBLD.LOG
+testing/GPC.SYM
+source/gpc/old-archive/GPC.PRG
+source/gpc/old-archive/build/
 
 # The release used to be bundled into testing/blitz.zip (mkzip.py). That was dropped:
 # nothing consumed it, and it was a git-tracked binary rebuilt on every release.

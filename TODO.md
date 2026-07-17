@@ -545,8 +545,8 @@ stops. A compiler that guesses at what it was asked to build is worse than one t
 caller in the tree — `source/application/Makefile`, `bench/run-bench.sh`, the reproductions under
 `fixes/` — therefore writes one.
 
-`GPC.PRG` (`source/gpc/GPC.P8`, prog8) is the front end: it asks for the two names, writes the file,
-and hands the machine over to the compiler.
+`GPC.PRG` (`source/gpc/GPC.BASL`, BASLOAD source) is the front end: it asks for the two names, writes
+the file, and hands the machine over to the compiler.
 
 ## Build / infrastructure
 

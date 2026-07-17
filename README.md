@@ -113,6 +113,7 @@ start (runtime already resident, and provably reused rather than reloaded).
 | `source/tools` | host-side helpers (tokeniser, detokeniser) |
 | `source/unit-tests` | the randomised compiler-runtime regression suites |
 | `source/application` | packages the release |
+| `source/gpc` | the interactive front end `GPC.PRG`, tokenised from BASLOAD source `GPC.BASL` by `build_basl.py` (no Java/Prog8) |
 | `bin/` | `x16emu/` (test emulator + ROM) and `box16/` (debugger) |
 | `testing/` | the built compiler, the shared runtime `GPC.RT.BIN`, and sample programs, ready to run (also the scratch `prg-batch/`/`archive/` test inputs) |
 | `documents/` | build include (`common.make`), notes, and reference PDFs |

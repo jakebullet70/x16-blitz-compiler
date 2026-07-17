@@ -7,7 +7,7 @@ rem  Bash. This wrapper just puts GNU make + 64tass on PATH and calls it.
 rem
 rem  Usage:
 rem     build            build libs + release (the compiler + BLITZ.PRG)
-rem     build gpc        also build GPC.PRG (the prog8 front end)
+rem     build gpc        also build GPC.PRG (the BASLOAD front end)
 rem     build run        build libs + release, then launch x16emu on GPC.PRG
 rem     build clean      clean the source tree
 rem ***************************************************************************

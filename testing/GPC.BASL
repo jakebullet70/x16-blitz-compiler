@@ -1,0 +1,109 @@
+#SAVEAS "@:GPC.PRG"
+#SYMFILE "@:GPC.SYM"
+#AUTONUM 5
+#REM 0
+
+REM --------------------------------------------------------
+REM ---> GPC FRONT-END (BASLOAD SOURCE)
+REM ---> KEEP THE OPTIONS ABOVE AT THE TOP --
+REM ---> SYMFILE MUST PRECEDE ANY RUNNABLE CODE.
+REM ---> SADLOGIC, JULY 2026
+REM --------------------------------------------------------
+
+PRINT : PRINT
+PRINT "GPC... A BLITZ INSPIRED X16 COMPILER"
+PRINT "             SUMMER 2026, V0.9.110"
+PRINT
+GOSUB CLEAR.KB
+
+REM ---- INPUT FILE (BARE RETURN = QUIT) ----
+PR$="INPUT  FILE: " : GOSUB READLINE
+IF LEN(NM$)=0 THEN PRINT : PRINT "BYE, EXITING" : END
+SRC$=NM$
+
+REM === THE SOURCE MUST EXIST BEFORE WE ASK FOR OUTPUT OR SCRATCH ANYTHING
+GOSUB FILE.EXISTS
+IF EX=0 THEN PRINT : PRINT "INPUT FILE NOT FOUND" : END
+
+REM ---- OUTPUT FILE (BARE RETURN = C.+SOURCE) ----
+PR$="OUTPUT FILE: " : GOSUB READLINE
+OBJ$=NM$
+IF LEN(NM$)=0 THEN OBJ$="C."+SRC$
+
+REM ---- DEBUG MAP? (YES = M.+SOURCE) ----
+PR$="MAKE A DEBUG MAP? " : GOSUB YESNO
+MAP$="" : IF YN=1 THEN MAP$="M."+SRC$
+
+REM ---- SHARED RUNTIME? ----
+PR$="SHARED RUNTIME? " : GOSUB YESNO
+SH=YN
+
+REM ---- DELETE LAST TIME'S OBJECT + MAP (DOS WON'T OVERWRITE) ----
+OPEN 15,8,15
+PRINT#15,"S:"+OBJ$
+IF LEN(MAP$)>0 THEN PRINT#15,"S:"+MAP$
+CLOSE 15
+
+REM --- WRITE GPC.INPUT: CR-TERMINATED LINES 1..4 ----
+OPEN 1,8,2,"@:GPC.INPUT,S,W"
+PRINT#1,SRC$
+PRINT#1,OBJ$
+PRINT#1,MAP$
+IF SH=1 THEN PRINT#1,"SHARED"
+CLOSE 1
+
+GOSUB CLEAR.KB
+REM --- HAND OFF TO THE COMPILER ENGINE  ---
+LOAD "GPC.BLITZ.BIN",8
+END : REM THIS LINE DOES NOT MATTER
+
+
+REM =====================================================================
+REM READLINE: PROMPT PR$, READ A FILENAME INTO NM$.
+REM   RETURN ENDS; DEL($14) ERASES; PRINTABLE PETSCII KEPT; CONTROL IGNORED
+REM =====================================================================
+READLINE:
+  PRINT PR$; : NM$=""
+RL_KEY:
+  GET K$ : IF K$="" THEN RL_KEY
+  K=ASC(K$)
+  IF K=13 THEN PRINT : RETURN
+  IF K=20 THEN GOSUB RL_DEL : GOTO RL_KEY
+  IF K<32 THEN RL_KEY
+  IF K>=128 AND K<160 THEN RL_KEY
+  IF LEN(NM$)>=39 THEN RL_KEY
+  NM$=NM$+K$ : PRINT K$; : GOTO RL_KEY
+RL_DEL:
+  IF LEN(NM$)=0 THEN RETURN
+  NM$=LEFT$(NM$,LEN(NM$)-1)
+  PRINT CHR$(20);
+  RETURN
+
+
+REM =====================================================================
+REM YESNO: PROMPT PR$, SET YN=1 (Y) OR 0 (N / BARE RETURN); ECHO YES/NO.
+REM =====================================================================
+YESNO:
+  PRINT PR$;
+YN.KEY:
+  GET K$ : IF K$="" THEN YN.KEY
+  IF K$="Y" OR K$="y" THEN PRINT "YES" : YN=1 : RETURN
+  IF K$="N" OR K$="n" OR K$=CHR$(13) THEN PRINT "NO" : YN=0 : RETURN
+  GOTO YN.KEY
+
+
+REM =====================================================================
+REM EXISTS: EX=1 IF SRC$ EXISTS, ELSE 0 (DOS ERROR CHANNEL).
+REM =====================================================================
+FILE.EXISTS:
+  EX=0
+  OPEN 15,8,15
+  OPEN 2,8,3,SRC$+",P,R"
+  INPUT#15,EN,EM$,ET,ES
+  CLOSE 2 : CLOSE 15
+  IF EN<20 THEN EX=1
+  RETURN
+
+CLEAR.KB:
+  GET K$ : IF K$<>"" THEN CLEAR.KB
+  RETURN

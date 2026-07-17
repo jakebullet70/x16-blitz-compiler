@@ -42,17 +42,18 @@ out     = os.path.join(root, "release.zip")
 # The release is ONLY the files needed to run the compiler, plus the README.
 # Everything else in testing/ (samples, compiled demos, the host tokeniser, scratch)
 # is deliberately left out.
+#   GPC.BASL       the BASLOAD source of the front end (ships alongside the PRG)
 #   GPC.PRG        the front end you launch on the X16
 #   GPC.BLITZ.BIN  the compiler engine GPC.PRG chain-loads
 #   GPC.RT.BIN     the shared runtime, loaded once in "shared" compile mode
 #   GPC.INPUT      the control-file template
-GPC  = ("GPC.PRG", "GPC.BLITZ.BIN", "GPC.RT.BIN", "GPC.INPUT")
+GPC  = ("GPC.BASL", "GPC.PRG", "GPC.BLITZ.BIN", "GPC.RT.BIN", "GPC.INPUT")
 DOCS = ("README.md", "LICENSE")
 
-# Version string GPC prints at startup: "v0.9.<build_num>", from GPC.P8.
-p8  = open(os.path.join(root, "source", "gpc", "GPC.P8"), encoding="utf-8").read()
-m   = re.search(r"build_num\s*=\s*(\d+)", p8)
-ver = "v0.9." + (m.group(1) if m else "?")
+# Version string GPC prints at startup: "V0.9.<n>", static in the GPC.BASL banner now.
+basl = open(os.path.join(root, "source", "gpc", "GPC.BASL"), encoding="utf-8").read()
+m    = re.search(r"[Vv]0\.9\.(\d+)", basl)
+ver  = "v0.9." + (m.group(1) if m else "?")
 
 names = []
 with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
