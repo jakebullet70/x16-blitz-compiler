@@ -33,16 +33,17 @@ Forked from Paul Robson's original: <https://github.com/paulscottrobson/blitz-co
 | `source/unit-tests` | the randomised compiler-runtime regression suites |
 | `source/application` | packages the release |
 | `bin/` | `x16emu/` (test emulator + ROM) and `box16/` (debugger) |
-| `testing/` | the built compiler and sample programs, ready to run (also the scratch `prg-batch/`/`archive/` test inputs) |
+| `testing/` | the built compiler, the shared runtime `GPC.RT.BIN`, and sample programs, ready to run (also the scratch `prg-batch/`/`archive/` test inputs) |
 | `documents/` | build include (`common.make`), notes, and reference PDFs |
 | `x16emu.bat` / `box16.bat` | project-root launchers that boot the emulators with `testing/` as the drive |
 
 ## Runtime footprint
 
-Every compiled program carries the same support runtime — the P-code VM, all command handlers, and the
-math libraries — copied in ahead of its own code. It measures **~11 KB** (10,956 bytes): `runtime.library`
+By default every compiled program carries the same support runtime — the P-code VM, all command handlers,
+and the math libraries — copied in ahead of its own code. It measures **~11 KB** (10,956 bytes): `runtime.library`
 7.3K (the VM plus all 158 handlers), `ifloat32` 2.3K, `polynomials` 0.9K, then the error vectors and the
-BASIC stub.
+BASIC stub. (A program can instead **share** one resident copy of this runtime — see
+[the shared runtime](#the-shared-runtime-line-4--shared) — so its object is just a bootstrap plus p-code.)
 
 For comparison, the vintage **C64 Blitz!** runtime (in `demo-c64/`) is roughly **half** ours — its compiled `DIR`
 is 6.2 KB against our 11 KB build of the same program, an estimated ~5.8 KB of runtime. The difference
@@ -73,24 +74,28 @@ make latest      # download & install the matching x16emu + ROM into bin/x16emu/
 ## Compiling a program
 
 The compiler engine is **`GPC.BLITZ.BIN`**. It reads its job from a control file, **`GPC.INPUT`**,
-of up to three text lines:
+of up to four text lines:
 
 | Line | Contents | |
 | --- | --- | --- |
 | 1 | the tokenised BASIC `.PRG` to compile | required |
 | 2 | the compiled `.PRG` to write | required |
 | 3 | a debug map to write (see below), or empty for none | optional |
+| 4 | the compile **mode** — `shared` (first byte `S`) selects the shared runtime; empty/anything else = the default self-contained build | optional |
 
 A line ends at a CR, an LF, or any control byte, and blank lines are skipped — so a `GPC.INPUT`
-typed on a CRLF host drives the X16 compiler unchanged. Names may be lowercase; the compiler folds
+typed on a CRLF host drives the X16 compiler unchanged. An empty line 3 (no map) still holds its
+slot, so line 4 is read as the mode either way. Names may be lowercase; the compiler folds
 them to the uppercase PETSCII the KERNAL wants in a filename. With the source or object line missing
-the compiler prints `NO GPC.INPUT FILE` and stops, rather than guess at what to build.
+the compiler prints `NO GPC.INPUT FILE` and stops, rather than guess at what to build. Line 4 is
+optional and is not checked — omit it for the default build.
 
 ### Driving it — two ways
 
-**Interactively, with `GPC.PRG`.** The front end asks the three questions, writes `GPC.INPUT`, and
-chain-loads the engine. A bare RETURN at the output prompt names the object `C.` + source (`DIR.PRG`
-→ `C.DIR.PRG`); answer the map question and the map is named `M.` + source:
+**Interactively, with `GPC.PRG`.** The front end asks the questions — input file, output file, map,
+and **shared runtime?** — writes `GPC.INPUT`, and chain-loads the engine. A bare RETURN at the output
+prompt names the object `C.` + source (`DIR.PRG` → `C.DIR.PRG`); answer the map question and the map
+is named `M.` + source. Answer *yes* to "shared runtime?" and it writes `shared` as line 4:
 
 ```sh
 cd release
@@ -102,7 +107,8 @@ one program drive another:
 
 ```sh
 cd release
-printf 'SOURCE.PRG\nOBJECT.PRG\n\n' > GPC.INPUT   # third line empty: no map
+printf 'SOURCE.PRG\nOBJECT.PRG\n\n' > GPC.INPUT           # default self-contained build (no map)
+printf 'SOURCE.PRG\nOBJECT.PRG\n\nshared\n' > GPC.INPUT   # shared-runtime build (line 4 = mode)
 ../bin/x16emu/x16emu.exe -rom ../bin/x16emu/rom.bin -fsroot . -prg GPC.BLITZ.BIN -run
 #  -> GPC SQUEALING...
 #     IN:  SOURCE.PRG
@@ -130,6 +136,38 @@ To place one, find the largest offset in the map that is `<=` the reported value
 
 To get a tokenised `SOURCE.PRG` from a text listing without a running X16, use the host
 tokeniser (`bin/tokenise.zip`, stdlib Python) — the test harness does exactly this.
+
+### The shared runtime (line 4 = `shared`)
+
+By default every object is **self-contained**: the ~11 KB runtime is copied in ahead of the
+program's own code (see [Runtime footprint](#runtime-footprint)). That is ideal for shipping one
+program, but wasteful when several compiled programs load one after another — each carries its own
+copy of the same runtime.
+
+The **shared** mode factors that runtime out into a single resident copy. A program compiled with
+line 4 = `shared` (first byte `S`) carries **no embedded runtime**: the compiler streams a 255-byte
+bootstrap at `$0801` followed by the p-code, and the object is just that — bootstrap plus p-code.
+The runtime lives once, on the drive, as a standalone binary **`GPC.RT.BIN`** that loads at `$7300`.
+
+On `RUN`, the bootstrap checks for the magic `GPC1` at `$7300`. If the runtime isn't already
+resident it `LOAD`s `GPC.RT.BIN` once (device 8, secondary 1, so the file's own load address is
+honoured); otherwise it reuses the copy already in memory. It then enters the runtime and runs the
+p-code. So the first shared program to run pays the load cost, and every shared program after it
+starts instantly and shares the one resident runtime — the payoff for a suite of programs that hand
+off to each other.
+
+Requirements and limits:
+
+- **`GPC.RT.BIN` must be on the drive** alongside the shared objects. It is built by the runtime
+  makefile and ships in `testing/`.
+- Programs mixing shared and self-contained builds are fine; a shared object simply needs the
+  resident runtime present when it runs.
+- Very large programs can be rejected with `PROGRAM TOO BIG` (the p-code must leave room for the
+  work area below the runtime); in practice the compiler's general memory ceiling is hit first.
+
+The regression test lives in `source/unit-tests/shared-runtime/` — it compiles a program shared,
+checks the object layout, and proves both a cold start (fresh machine loads `GPC.RT.BIN`) and a warm
+start (runtime already resident, and provably reused rather than reloaded).
 
 ## Emulators
 

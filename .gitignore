@@ -64,6 +64,10 @@ source/gpc/GPC.BLITZ.BIN
 # nothing consumed it, and it was a git-tracked binary rebuilt on every release.
 testing/blitz.zip
 
+# release.zip is the packaged download, built by release.sh / release.bat. Like the
+# old blitz.zip it is a rebuilt-on-demand artifact, not something to commit.
+release.zip
+
 # GPC.INPUT is generated next to the compiler by "make -C source/application";
 # the one that ships is testing/GPC.INPUT.
 source/application/GPC.INPUT
