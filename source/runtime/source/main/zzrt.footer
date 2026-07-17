@@ -1,0 +1,38 @@
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		Name:		zzrt.footer
+;		Purpose:	End marker + size guard for the standalone resident runtime, GPC.RT.BIN
+;		Created:	17th July 2026
+;		Reviewed: 	No
+;
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		Linked LAST in the "gpc-rt" target. RTBASE ($7300) is a pinned ABI constant, so it cannot
+;		silently move when the runtime grows. This guard makes the runtime NOT-fitting a loud build
+;		failure instead: if the rebased image reaches the $9F00 I/O page, the link fails here and
+;		you consciously lower RTBASE (an ABI version bump -- bump the magic ordinal in 00rt.header
+;		and bootstrap.asm, and rebuild GPC.RT.BIN + every shared-mode program).
+;
+;		Same non-.asm naming reason as 00rt.header.
+;
+; ************************************************************************************************
+
+		.section code
+
+RTTop:
+		.cerror RTTop > $9F00, "resident runtime overflows $9F00 (I/O) - lower RTBASE"
+
+		.send code
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;
+; ************************************************************************************************

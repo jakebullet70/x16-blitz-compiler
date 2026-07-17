@@ -1,0 +1,53 @@
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		Name:		00rt.header
+;		Purpose:	Entry header for the standalone resident runtime, GPC.RT.BIN
+;		Created:	17th July 2026
+;		Reviewed: 	No
+;
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		This is linked FIRST in the "gpc-rt" make target (in front of runtime/common/ifloat32/
+;		polynomials), with -D CodeStart=$7300, so its first byte lands at RTBASE and the whole
+;		image assembles up from there. The result, GPC.RT.BIN, is a headerless-to-BASIC raw PRG
+;		(load address $00,$73, no SYS stub) that a shared-mode program's bootstrap loads to $7300
+;		with secondary address 1 and enters via RT_ENTRY.
+;
+;		Layout at RTBASE:
+;			$7300 : "GPC1"            resident magic + ABI ordinal -- the bootstrap tests these 4
+;			                          bytes to decide "runtime already resident?"; bump the digit
+;			                          whenever the runtime layout/ABI changes so an old program
+;			                          reloads the matching runtime instead of jumping into a
+;			                          mismatched one.
+;			$7304 : jmp StartRuntime  RT_ENTRY -- a stable trampoline, so a program enters at a
+;			                          fixed address regardless of where StartRuntime floats to.
+;
+;		NB the extension is deliberately not .asm/.inc: common-scripts/build.py globs those into
+;		_library.asm, and this header must be linked explicitly, exactly once, at the front. Same
+;		reason 00main.header / 10object.divider / zzfree.footer are named as they are.
+;
+; ************************************************************************************************
+
+		.section code
+
+RTHeader:
+		.cerror RTHeader != RTBASE, "GPC.RT.BIN header not at RTBASE - check -D CodeStart vs RTBASE"
+		.text 	"GPC1" 						; resident magic + ABI ordinal (RTBASE..RTBASE+3);
+											; MUST match the copy the bootstrap compares (bootstrap.asm)
+RTEntryVec: 								; == RT_ENTRY (RTBASE+4)
+		jmp 	StartRuntime 				; stable trampoline into the (floating) real entry
+
+		.send code
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;
+; ************************************************************************************************

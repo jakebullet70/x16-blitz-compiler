@@ -47,6 +47,11 @@ FrameStackPages = 16 						; 4K, ~250 frames
 ; ************************************************************************************************
 
 WriteObjectCode:
+		lda 	ModeText 					; GPC.INPUT line 4 -- 'S' (SHARED) selects resident-runtime
+		cmp 	#'S' 						; mode: emit a bootstrap + p-code, no embedded runtime
+		bne 	_WOCEmbedded 				; (see the shared branch below and compiler/bootstrap.asm).
+		jmp 	_WOCShared 					; jmp, not a branch -- the embedded path is >127 bytes
+_WOCEmbedded:
 		jsr 	PatchOutCompile 			; makes it run the runtime on reload
 		;
 		;		zTemp1 = length of the object code.
@@ -139,7 +144,115 @@ _WOCCodeByte:
 		bra 	_WOCCode
 _WOCDone:
 		jsr 	IOWriteClose 				; close the file.
+		clc 								; success -- CompileCode reads the carry (set = rejected)
 		rts
+
+; ************************************************************************************************
+;
+;		Shared (resident-runtime) output: [$0801 bootstrap][$0900 p-code], no embedded runtime.
+;		The bootstrap (compiler/bootstrap.asm) is streamed as the first 255 bytes with WS_START
+;		patched in; the p-code follows and lands at $0900 on reload. A program whose p-code +
+;		frame-stack gap + minimum workspace would not fit below RTBASE is rejected (carry set).
+;
+; ************************************************************************************************
+
+_WOCShared:
+		;
+		;		p-code length -> whole pages (same as the embedded path)
+		;
+		sec
+		lda 	objPtr
+		sbc 	#FreeMemory & $FF
+		sta 	zTemp1
+		lda 	objPtr+1
+		sbc 	#FreeMemory >> 8
+		sta 	zTemp1+1
+		lda 	zTemp1
+		beq 	_WOCSWhole
+		inc 	zTemp1+1
+_WOCSWhole:
+		;
+		;		WS_START = PCODE_PAGE + pages(p-code) + the frame-stack gap. Reject if that leaves
+		;		fewer than MIN_WS_PAGES below RTBASE, or if the page count itself overflowed a byte.
+		;
+		clc
+		lda 	#PCODE_PAGE
+		adc 	zTemp1+1
+		bcs 	_WOCSBig
+		adc 	#FrameStackPages
+		bcs 	_WOCSBig
+		sta 	newWorkspacePage 			; reuse this byte to carry WS_START
+		cmp 	#(RTBASE >> 8) - MIN_WS_PAGES + 1
+		bcs 	_WOCSBig
+		;
+		;		Header: a normal PRG loading at $0801 -- the bootstrap sits there.
+		;
+		ldy 	#ObjectFile >> 8
+		ldx 	#ObjectFile & $FF
+		jsr 	IOOpenWrite
+		lda 	#1
+		jsr 	IOWriteByte
+		lda 	#8
+		jsr 	IOWriteByte
+		;
+		;		Part one: the bootstrap, ProgramBootstrap..ProgramBootstrapEnd, patching the single
+		;		WS_START operand byte as it streams past.
+		;
+		.set16 	zTemp0,ProgramBootstrap
+_WOCSBoot:
+		lda 	zTemp0
+		cmp 	#<(ProgramBootstrap+BootWSPatchOffset)
+		bne 	_WOCSBootPlain
+		lda 	zTemp0+1
+		cmp 	#>(ProgramBootstrap+BootWSPatchOffset)
+		bne 	_WOCSBootPlain
+		lda 	newWorkspacePage 			; substitute the WS_START operand
+		bra 	_WOCSBootEmit
+_WOCSBootPlain:
+		lda 	(zTemp0)
+_WOCSBootEmit:
+		jsr 	IOWriteByte
+		inc 	zTemp0
+		bne 	_WOCSBootNoHi
+		inc 	zTemp0+1
+_WOCSBootNoHi:
+		lda 	zTemp0
+		cmp 	#<ProgramBootstrapEnd
+		bne 	_WOCSBoot
+		lda 	zTemp0+1
+		cmp 	#>ProgramBootstrapEnd
+		bne 	_WOCSBoot
+		;
+		;		Part two: the p-code from FreeMemory..objPtr, which lands at $0900 on reload.
+		;
+		.set16 	zTemp0,FreeMemory
+_WOCSCode:
+		lda 	zTemp0
+		cmp 	objPtr
+		bne 	_WOCSCodeByte
+		lda 	zTemp0+1
+		cmp 	objPtr+1
+		beq 	_WOCSCodeDone
+_WOCSCodeByte:
+		lda 	(zTemp0)
+		jsr 	IOWriteByte
+		inc 	zTemp0
+		bne 	_WOCSCode
+		inc 	zTemp0+1
+		bra 	_WOCSCode
+_WOCSCodeDone:
+		jsr 	IOWriteClose
+		clc 								; success
+		rts
+_WOCSBig:
+		ldx 	#ProgramTooBigText & $FF
+		ldy 	#ProgramTooBigText >> 8
+		jsr 	PrintMessage
+		sec 								; rejected -- CompileCode skips the map file and the OK
+		rts
+
+ProgramTooBigText:
+		.text 	"PROGRAM TOO BIG", 13, 0
 
 ; ************************************************************************************************
 ;
