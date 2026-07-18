@@ -1,0 +1,4 @@
+10 A=-4
+20 B=SQR(A)
+30 PRINT B
+40 END

@@ -1,0 +1,162 @@
+#SAVEAS "@:GPC.ERR.HELPER.PRG"
+#AUTONUM 5
+#REM 0
+
+REM --------------------------------------------------------
+REM ---> GPC.ERR.HELPER (BASLOAD SOURCE)
+REM ---> READS A GPC DEBUG MAP (M.<SOURCE>) AND TURNS A
+REM ---> RUNTIME ERROR  "<MSG> @ $XXXX"  INTO A BASIC LINE.
+REM ---> MAKE THE MAP BY ANSWERING "MAKE A DEBUG MAP? YES"
+REM ---> WHEN YOU COMPILE WITH GPC.
+REM ---> SADLOGIC, JULY 2026
+REM --------------------------------------------------------
+
+PRINT : PRINT
+PRINT "GPC.ERR.HELPER"
+PRINT "TURN A RUNTIME ERROR @ $XXXX INTO A LINE #"
+PRINT
+GOSUB CLEAR.KB
+
+REM ---- ASK FOR THE MAP FILE ONCE (BARE RETURN QUITS) ----
+MAP_ASK:
+  PR$="MAP FILE (E.G. M.MYPROG): " : GOSUB READLINE
+  IF LEN(NM$)=0 THEN PRINT : PRINT "BYE" : END
+  MP$=NM$
+  GOSUB MAP.CHECK
+  IF EX=0 THEN PRINT "  NOT FOUND, TRY AGAIN" : GOTO MAP_ASK
+
+PRINT
+PRINT "NOW ENTER AN ERROR ADDRESS LIKE  $0030"
+PRINT "(OR PASTE THE WHOLE ERROR LINE). RETURN QUITS."
+PRINT
+
+REM ---- LOOP: READ AN ADDRESS, LOOK IT UP ----
+ADDR_LOOP:
+  PR$="ERROR ADDRESS: " : GOSUB READLINE
+  IF LEN(NM$)=0 THEN PRINT : PRINT "BYE" : END
+  GOSUB PARSE.ADDR
+  IF PV<0 THEN PRINT "  NO HEX ADDRESS FOUND" : GOTO ADDR_LOOP
+  TG=PV : GOSUB SCAN : GOSUB REPORT
+  GOTO ADDR_LOOP
+
+REM =====================================================================
+REM SCAN: WALK THE MAP, KEEP THE LARGEST OFFSET <= TG.
+REM   OUT: BO = BEST OFFSET (-1 IF NONE), BL = ITS BASIC LINE.
+REM   THE MAP IS A SEQ FILE, LINES "HHHH DDDDD" ENDED BY LF ($0A).
+REM   OPENED BY PLAIN NAME (PORTABLE); ADD ",S,R" ONLY IF A DOS NEEDS IT.
+REM =====================================================================
+SCAN:
+  BO=-1 : BL=-1 : L$=""
+  OPEN 2,8,2,MP$
+SC_BYTE:
+  GET#2,C$
+  IF C$=CHR$(10) THEN GOSUB SC_LINE : L$="" : GOTO SC_CHK
+  IF C$=CHR$(13) THEN GOTO SC_CHK
+  IF LEN(C$)>0 THEN L$=L$+C$
+SC_CHK:
+  IF ST=0 THEN GOTO SC_BYTE
+  IF LEN(L$)>0 THEN GOSUB SC_LINE
+  CLOSE 2
+  RETURN
+SC_LINE:
+  IF LEN(L$)<6 THEN RETURN
+  H$=LEFT$(L$,4) : GOSUB HEXVAL : OF=HV
+  LN=VAL(MID$(L$,6))
+  IF OF<=TG AND OF>BO THEN BO=OF : BL=LN
+  RETURN
+
+REM =====================================================================
+REM REPORT: PRINT THE ANSWER FOR ADDRESS TG USING BO/BL.
+REM   LINES 65024/65535 ARE THE COMPILER'S OWN SETUP CODE, NOT SOURCE.
+REM =====================================================================
+REPORT:
+  PH=TG : PRINT "  $"; : GOSUB PHEX4
+  IF BO<0 THEN PRINT " IS BEFORE THE FIRST MAPPED LINE" : RETURN
+  IF BL>=65024 THEN PRINT " IS IN COMPILER SETUP CODE, NOT A LINE" : RETURN
+  IF BO=TG THEN PRINT " IS ON BASIC LINE ";BL : RETURN
+  PRINT " IS ON/NEAR BASIC LINE ";BL
+  RETURN
+
+REM =====================================================================
+REM PARSE.ADDR: NM$ -> PV (HEX VALUE) OR -1. TAKES THE TEXT AFTER THE
+REM   LAST "$" IF PRESENT, THEN ITS LEADING HEX DIGITS.
+REM =====================================================================
+PARSE.ADDR:
+  PV=-1 : H$="" : S$=NM$
+  LP=0
+  FOR I=1 TO LEN(S$)
+  IF MID$(S$,I,1)="$" THEN LP=I
+  NEXT
+  IF LP>0 THEN S$=MID$(S$,LP+1)
+  P=1
+PA_LOOP:
+  IF P>LEN(S$) THEN GOTO PA_DONE
+  C=ASC(MID$(S$,P,1))
+  IF C=32 AND LEN(H$)=0 THEN P=P+1 : GOTO PA_LOOP
+  IF C>=97 AND C<=102 THEN C=C-32
+  IF (C>=48 AND C<=57) OR (C>=65 AND C<=70) THEN H$=H$+CHR$(C) : P=P+1 : GOTO PA_LOOP
+PA_DONE:
+  IF LEN(H$)=0 THEN RETURN
+  GOSUB HEXVAL : PV=HV
+  RETURN
+
+REM =====================================================================
+REM HEXVAL: H$ (HEX DIGITS) -> HV. ASSUMES H$ IS VALID HEX.
+REM =====================================================================
+HEXVAL:
+  HV=0
+  FOR I=1 TO LEN(H$)
+  C=ASC(MID$(H$,I,1))
+  IF C>=97 THEN C=C-32
+  D=C-48 : IF C>=65 THEN D=C-55
+  HV=HV*16+D
+  NEXT
+  RETURN
+
+REM =====================================================================
+REM PHEX4: PRINT PH (0..65535) AS 4 UPPERCASE HEX DIGITS, NO NEWLINE.
+REM =====================================================================
+PHEX4:
+  Z$="0123456789ABCDEF" : N=PH
+  A3=INT(N/4096) : N=N-A3*4096
+  A2=INT(N/256)  : N=N-A2*256
+  A1=INT(N/16)   : N=N-A1*16
+  PRINT MID$(Z$,A3+1,1);MID$(Z$,A2+1,1);MID$(Z$,A1+1,1);MID$(Z$,N+1,1);
+  RETURN
+
+REM =====================================================================
+REM MAP.CHECK: EX=1 IF MP$ EXISTS ON DEVICE 8, ELSE 0 (DOS ERR CHANNEL).
+REM =====================================================================
+MAP.CHECK:
+  EX=0
+  OPEN 15,8,15
+  OPEN 2,8,2,MP$
+  INPUT#15,EN,EM$,ET,ES
+  CLOSE 2 : CLOSE 15
+  IF EN<20 THEN EX=1
+  RETURN
+
+REM =====================================================================
+REM READLINE / CLEAR.KB: FROM GPC.BASL. RETURN ENDS; DEL($14) ERASES;
+REM   PRINTABLE PETSCII KEPT; CONTROL IGNORED.
+REM =====================================================================
+READLINE:
+  PRINT PR$; : NM$=""
+RL_KEY:
+  GET K$ : IF K$="" THEN RL_KEY
+  K=ASC(K$)
+  IF K=13 THEN PRINT : RETURN
+  IF K=20 THEN GOSUB RL_DEL : GOTO RL_KEY
+  IF K<32 THEN RL_KEY
+  IF K>=128 AND K<160 THEN RL_KEY
+  IF LEN(NM$)>=39 THEN RL_KEY
+  NM$=NM$+K$ : PRINT K$; : GOTO RL_KEY
+RL_DEL:
+  IF LEN(NM$)=0 THEN RETURN
+  NM$=LEFT$(NM$,LEN(NM$)-1)
+  PRINT CHR$(20);
+  RETURN
+
+CLEAR.KB:
+  GET K$ : IF K$<>"" THEN CLEAR.KB
+  RETURN

@@ -1,0 +1,59 @@
+ERRTEST -- LIVE TEST FIXTURE FOR GPC.ERR.HELPER
+===============================================
+
+WHAT THIS IS
+------------
+A tiny compiled program that deliberately raises a runtime error, so you can
+watch GPC.ERR.HELPER turn the reported "@ $XXXX" address back into a source line.
+
+FILES
+-----
+  ERRTEST.BAS    the readable source (4 lines)
+  ERRTEST.PRG    ERRTEST.BAS tokenised -- exactly what GPC compiled
+  C.ERRTEST      the compiled program -- RUN THIS to see the error
+  M.ERRTEST      the debug map GPC emitted -- GPC.ERR.HELPER READS THIS
+
+THE PROGRAM (ERRTEST.BAS)
+-------------------------
+  10 A=-4
+  20 B=SQR(A)        <-- SQR of a negative number: OUT OF RANGE
+  30 PRINT B
+  40 END
+
+THE LIVE TEST
+-------------
+  1. Run the broken program:
+        LOAD"C.ERRTEST",8
+        RUN
+     It prints:    OUT OF RANGE @ $0010
+
+  2. Build GPC.ERR.HELPER if you have not already:
+        BASLOAD "GPC.ERR.HELPER.BASL"      (writes GPC.ERR.HELPER.PRG)
+
+  3. Run the helper and look the address up:
+        LOAD"GPC.ERR.HELPER.PRG",8
+        RUN
+        MAP FILE (E.G. M.MYPROG): M.ERRTEST
+        ERROR ADDRESS:            $0010
+        ( you can also paste the whole "OUT OF RANGE @ $0010" line )
+
+     Expected answer:
+        $0010 IS ON/NEAR BASIC LINE 20
+
+WHY LINE 20
+-----------
+M.ERRTEST lists each source line's start offset (hex), lowest first:
+        0006 10
+        000B 20
+        0012 30
+        0018 40
+        001B 65024      <-- compiler end marker, not your code
+        001C 65535      <-- compiler prologue,   not your code
+The error address $0010 is >= $000B (line 20) and < $0012 (line 30), so it
+belongs to line 20 -- the SQR that overflowed. $0010 is not an exact line start
+(it is the SQR opcode inside line 20), so the tool says "ON/NEAR": the closest
+line at or before the error. That is as precise as a p-code offset can be.
+
+NOTE: array-bounds errors (BAD ARRAY INDEX) are raised from a runtime helper and
+report a very low address that lands before line 1 -- those do not map to a line.
+Math/value errors like this one (OUT OF RANGE, BAD VALUE) map cleanly.
