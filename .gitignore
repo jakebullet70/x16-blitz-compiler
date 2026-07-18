@@ -92,3 +92,6 @@ testing/archive/
 # folder as gpc-release-<n>.zip. Build artifact (matches in any folder), not committed.
 gpc-release.zip
 gpc-release-*.zip
+testing/C.DIR.PRG
+testing/GPC.INPUT
+testing/GPC.INPUT
