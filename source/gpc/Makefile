@@ -14,7 +14,7 @@
 #		no prog8c.jar. build_basl.py bumps the build number (VERSION$ in GPC.BASL) on every build.
 #
 #			make -C source/gpc			build testing/GPC.PRG from GPC.BASL
-#			make -C source/gpc release	same -- GPC.BASL and GPC.PRG both land in testing/
+#			make -C source/gpc release	build, plus re-tokenise the GPC.ERR helper (GPC.ERR.PRG)
 #			make -C source/gpc run		build, then launch the front end in the emulator
 #
 # *******************************************************************************************
@@ -40,9 +40,13 @@ build:
 	$(PYTHON) build_basl.py
 
 #
-#		Everything already lands in testing/ (RELEASEDIR) during build, so release == build.
+#		release = the front-end build, plus a fresh tokenise of the GPC.ERR companion tool
+#		(GPC.ERR.BASL -> GPC.ERR.PRG) so the shipped helper matches its source. build_basl.py with
+#		two args just tokenises (no VERSION$ bump, no mirror), and skips if the source is absent.
+#		Everything lands in testing/ (RELEASEDIR).
 #
 release: build
+	$(PYTHON) build_basl.py GPC.ERR.BASL GPC.ERR.PRG
 
 #
 #		Launch the freshly built front end. It chain-loads GPC.BLITZ.BIN, which must sit beside

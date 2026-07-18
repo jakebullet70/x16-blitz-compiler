@@ -10,7 +10,7 @@
 #     make libs                        the libraries + the compiler engine GPC.BLITZ.BIN
 #     make release                     stage the engine + samples into testing/
 #     make -C source/runtime gpc-rt    the shared runtime GPC.RT.BIN (into testing/)
-#     make -C source/gpc release       the front end GPC.PRG (tokenises GPC.BASL via BASLOAD)
+#     make -C source/gpc release       GPC.PRG + the GPC.ERR helper, tokenised via BASLOAD
 #
 #  The zip lands in release/ -- the release drop folder, kept apart from the daily testing/
 #  build cycle -- named gpc-release-<n>.zip (n = the build number, last part of VERSION$). It is a
@@ -26,7 +26,7 @@ if [ "$1" != "zip" ]; then
     make release
     echo "== make -C source/runtime gpc-rt  (GPC.RT.BIN shared runtime) =="
     make -C source/runtime gpc-rt
-    echo "== make -C source/gpc release  (GPC.PRG front end, tokenised from GPC.BASL) =="
+    echo "== make -C source/gpc release  (GPC.PRG + GPC.ERR, tokenised via BASLOAD) =="
     make -C source/gpc release
 fi
 
@@ -59,16 +59,20 @@ out = os.path.join(release_dir, "gpc-release-%s.zip" % num)
 
 # The release layout:
 #   * the files needed to RUN the compiler, at the zip root
-#   * the BASLOAD source under SRC/ -- reference only, NOT needed to run (with a note)
+#   * the companion tools, also at the root
+#   * ALL BASLOAD source under SRC/ -- reference only, NOT needed to run (with a note)
 #   * the top-level docs
 # Everything else in testing/ (samples like DIR.BASL, compiled demos, scratch) is left out.
 #   GPC.PRG        the front end you launch on the X16
 #   GPC.BLITZ.BIN  the compiler engine GPC.PRG chain-loads
 #   GPC.RT.BIN     the shared runtime, loaded once in "shared" compile mode
-#   GPC.INPUT      the control-file template
-#   SRC/GPC.BASL   the BASLOAD source of the front end (NOT needed to run; see SRC/README.TXT)
-RUNTIME = ("GPC.PRG", "GPC.BLITZ.BIN", "GPC.RT.BIN", "GPC.INPUT")
-SRCBASL = ("GPC.BASL",)   # BASLOAD source -- goes under SRC/, not needed at run time
+#   GPC.ERR.PRG    the error-address-to-line helper (companion tool)
+#   SRC/*.BASL     the BASLOAD sources (NOT needed to run; see SRC/README.TXT)
+# GPC.INPUT (the control-file template) is deliberately NOT shipped: GPC.PRG drives
+# the compile interactively, and the file is per-user state (git-ignored in testing/).
+RUNTIME = ("GPC.PRG", "GPC.BLITZ.BIN", "GPC.RT.BIN")
+TOOLS   = ("GPC.ERR.PRG",)                 # companion tools -- also shipped at the root
+SRCBASL = ("GPC.BASL", "GPC.ERR.BASL")     # ALL BASLOAD source -- goes under SRC/
 DOCS    = ("README.md", "LICENSE")
 
 # The note that ships inside SRC/, explaining the folder is source and not required to run.
@@ -76,18 +80,23 @@ SRC_README = (
     "GPC -- SRC FOLDER (SOURCE, NOT NEEDED TO RUN)\n"
     "=============================================\n"
     "\n"
-    "This folder holds the BASLOAD source of the GPC front end (GPC.BASL). It is\n"
-    "here for reference only -- you do NOT need anything in this folder to run GPC.\n"
+    "This folder holds the BASLOAD source of the GPC tools:\n"
     "\n"
-    "To run GPC, use GPC.PRG in the parent folder (with GPC.BLITZ.BIN, GPC.RT.BIN\n"
-    "and GPC.INPUT beside it). GPC.BASL is never loaded at run time.\n"
+    "    GPC.BASL       the compiler front end  ->  GPC.PRG\n"
+    "    GPC.ERR.BASL   the error-line helper   ->  GPC.ERR.PRG\n"
     "\n"
-    "GPC.BASL is human-readable BASLOAD source. To regenerate GPC.PRG from it on an\n"
-    "X16 (any R49 ROM -- BASLOAD is built in), load BASLOAD and type:\n"
+    "It is here for reference only -- you do NOT need anything in this folder to\n"
+    "run GPC. The ready-to-run programs are in the parent folder.\n"
     "\n"
-    '    BASLOAD "GPC.BASL"\n'
+    "To compile, run GPC.PRG (with GPC.BLITZ.BIN and GPC.RT.BIN beside it). To\n"
+    "turn a runtime error's \"@ $XXXX\" into a source line, run GPC.ERR.PRG.\n"
+    "The .BASL sources are never loaded at run time.\n"
     "\n"
-    "Its own #SAVEAS directive writes GPC.PRG back out.\n"
+    "BASLOAD is built into every R49 X16 ROM. To rebuild a PRG from its source,\n"
+    "load the source with BASLOAD -- its own #SAVEAS writes the PRG back out:\n"
+    "\n"
+    '    BASLOAD "GPC.BASL"        (writes GPC.PRG)\n'
+    '    BASLOAD "GPC.ERR.BASL"    (writes GPC.ERR.PRG)\n'
 )
 
 names = []
@@ -96,6 +105,12 @@ with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         full = os.path.join(testing, name)
         if not os.path.isfile(full):
             raise SystemExit("release: missing required file testing/%s -- build first" % name)
+        z.write(full, name)
+        names.append(name)
+    for name in TOOLS:
+        full = os.path.join(testing, name)
+        if not os.path.isfile(full):
+            raise SystemExit("release: missing tool testing/%s -- build first" % name)
         z.write(full, name)
         names.append(name)
     for name in SRCBASL:
