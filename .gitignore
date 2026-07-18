@@ -60,6 +60,7 @@ source/unit-tests/compiler-runtime/CODE.BIN
 testing/GPCBLD.BAS
 testing/GPCBLD.LOG
 testing/GPC.SYM
+testing/GPC.ERR.SYM
 source/gpc/old-archive/GPC.PRG
 source/gpc/old-archive/build/
 
