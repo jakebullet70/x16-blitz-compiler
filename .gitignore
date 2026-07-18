@@ -96,3 +96,4 @@ gpc-release-*.zip
 testing/C.DIR.PRG
 testing/GPC.INPUT
 testing/GPC.INPUT
+/testing/XFMGR
