@@ -67,8 +67,10 @@ source/gpc/old-archive/build/
 # nothing consumed it, and it was a git-tracked binary rebuilt on every release.
 testing/blitz.zip
 
-# release.zip is the packaged download, built by release.sh / release.bat. Like the
-# old blitz.zip it is a rebuilt-on-demand artifact, not something to commit.
+# The packaged download is built by release.sh / release.bat into the release/ drop folder
+# as gpc-release-<n>.zip (see the gpc-release-*.zip rule below) -- a rebuilt-on-demand
+# artifact, not something to commit. "release.zip" is the pre-2026-07-18 root name, kept
+# ignored so any old local build lying around doesn't get committed.
 release.zip
 
 # GPC.INPUT is generated next to the compiler by "make -C source/application";
@@ -85,5 +87,8 @@ source/application/GPC.INPUT
 # ---------------------------------------------------------------------------
 testing/prg-batch/
 testing/archive/
+
+# The packaged release zip -- built by release.sh / release.bat into the release/ drop
+# folder as gpc-release-<n>.zip. Build artifact (matches in any folder), not committed.
 gpc-release.zip
 gpc-release-*.zip

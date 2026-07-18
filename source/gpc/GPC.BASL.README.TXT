@@ -1,0 +1,60 @@
+GPC.BASL -- WHERE THE SOURCE ACTUALLY LIVES
+===========================================
+
+SHORT VERSION
+-------------
+The GPC.BASL in THIS folder is not the one you edit.
+
+  MASTER  ->  testing/GPC.BASL       <-- edit + test HERE
+  MIRROR  ->  source/gpc/GPC.BASL    <-- committed copy; the build OVERWRITES it
+
+Do NOT hand-edit source/gpc/GPC.BASL expecting your changes to survive -- the
+build replaces it with whatever is in testing/GPC.BASL.
+
+
+WHY testing/ IS THE MASTER
+--------------------------
+GPC's front end is BASLOAD source now (not Prog8). BASLOAD is an X16 ROM
+utility -- there is no host-side tokeniser for it. We tokenise by running
+BASLOAD inside the bundled emulator, and the emulator's drive IS the testing/
+folder. So the file BASLOAD reads -- and the file you interactively edit and
+re-test with
+
+    BASLOAD "GPC.BASL"
+
+-- is testing/GPC.BASL. That is the working copy.
+
+source/gpc/GPC.BASL is a committed mirror so the front-end source is carried
+in the source tree too, and a fresh checkout can seed testing/ from it.
+
+
+THE BUILD
+---------
+    make -C source/gpc            (runs source/gpc/build_basl.py)
+
+build_basl.py:
+  1. tokenises testing/GPC.BASL in place, headless, into testing/GPC.PRG
+     (boots x16emu with SDL_VIDEODRIVER=dummy, "types" BASLOAD "GPC.BASL";
+      the source's own  #SAVEAS "@:GPC.PRG"  writes the PRG)
+  2. on success, mirrors testing/GPC.BASL back to source/gpc/GPC.BASL
+     (only when they differ, to avoid needless git churn)
+  3. on a fresh checkout with no testing/GPC.BASL, seeds it from this mirror
+
+No Java, no prog8c.jar -- just python + the bundled emulator.
+
+
+THE DEV LOOP
+------------
+  1. edit    testing/GPC.BASL
+  2. test    BASLOAD "GPC.BASL"   (in the emulator), then run GPC.PRG
+  3. build   make -C source/gpc   (mirrors it here, ready to commit)
+
+THE BUILD NUMBER
+----------------
+VERSION$ = "0.9.<n>" (one whole string) near the top of GPC.BASL is a
+daily-work build counter. EVERY build bumps it (0.9.110 -> 0.9.111 -> ...)
+so the banner always shows the exact build you are on. It is not the release
+version -- real releases will get their own V-number (e.g. V1.0.x) and do not
+track this counter.
+
+The retired Prog8 front end (GPC.P8, bump-build.ps1) is in old-archive/.

@@ -11,7 +11,7 @@
 #		there is no host tokeniser: build_basl.py boots the bundled emulator, runs BASLOAD on
 #		GPC.BASL, and the source's own  #SAVEAS "@:GPC.PRG"  writes the tokenised program straight
 #		into testing/. This replaced the old Prog8/Java build (kept in old-archive/) -- no Java,
-#		no prog8c.jar, and the version string is now static (no per-build bump).
+#		no prog8c.jar. build_basl.py bumps the build number (VERSION$ in GPC.BASL) on every build.
 #
 #			make -C source/gpc			build testing/GPC.PRG from GPC.BASL
 #			make -C source/gpc release	same -- GPC.BASL and GPC.PRG both land in testing/
