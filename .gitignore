@@ -94,6 +94,12 @@ testing/archive/
 gpc-release.zip
 gpc-release-*.zip
 testing/C.DIR.PRG
-testing/GPC.INPUT
+# Local compiler input config. Every automated consumer (bench/run-bench.sh,
+# fixes/*/Makefile) writes its own, and `make release` overwrites it, so it is
+# a working file, not shipped content. Untracked 2026-07-19.
 testing/GPC.INPUT
 /testing/XFMGR
+
+# Claude Code local settings (personal, not team config)
+.claude/settings.local.json
+.claude/session-todo.json

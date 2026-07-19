@@ -1063,6 +1063,18 @@ _ACNoCarry:
 		.exitcmd
 
 _ACBadIndex:
+		plx 								; drop the saved parameter slot index, and
+		ply 	 							; RESTORE THE CODE POINTER, exactly as the normal exit
+											; above does. Every branch here (the two in the index
+											; loop and the sub-array check) still has the entry
+											; phy/phx on the stack, and Y is whatever the bounds
+											; compare last left it -- 1. The error report prints
+											; codePtr+Y, so without this the "@ $xxxx" was a fixed
+											; meaningless address ($0002, or $FFFB when an implicit
+											; array shifts things) no matter which line the bad
+											; subscript was on, and GPC.ERR could only answer
+											; "before the first mapped line". Same trap, and same
+											; fix, as LoadSaveError in x16/commands/loadsave.asm.
 		.error_index
 
 		.send 	code
