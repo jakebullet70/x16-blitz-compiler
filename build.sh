@@ -18,6 +18,8 @@ case "$1" in
         make release
         echo "== make -C source/gpc release  (GPC.PRG) =="
         make -C source/gpc release
+        echo "== make samples  (mirror samples/ -> testing/samples) =="
+        make samples
         ;;
     run)
         # build.bat handles "run": it builds (default target) then launches the
@@ -27,6 +29,8 @@ case "$1" in
         make libs
         echo "== make release =="
         make release
+        echo "== make samples  (mirror samples/ -> testing/samples) =="
+        make samples
         echo "== launching x16emu with GPC.PRG =="
         cmd //c "x16emu.bat" GPC.PRG
         exit 0
@@ -36,6 +40,8 @@ case "$1" in
         make libs
         echo "== make release =="
         make release
+        echo "== make samples  (mirror samples/ -> testing/samples) =="
+        make samples
         ;;
     *)
         echo "usage: build.sh [gpc|run|clean]" >&2

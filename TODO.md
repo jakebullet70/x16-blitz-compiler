@@ -548,6 +548,74 @@ caller in the tree — `source/application/Makefile`, `bench/run-bench.sh`, the 
 `GPC.PRG` (`source/gpc/GPC.BASL`, BASLOAD source) is the front end: it asks for the two names, writes
 the file, and hands the machine over to the compiler.
 
+## Samples
+
+A `samples/` tree of real programs that show off what the compiler buys you, one directory per sample
+with its own `readme.md`. `make samples` mirrors the whole tree into `testing/samples/` (the emulator
+drive and the root of the release zip), so every sample is runnable in the emulator and ships in the
+release; `samples/` is the tracked master and `testing/samples/` is a wiped-and-recopied build
+artifact. Two exist:
+
+- **`samples/prg2basload/`** — the X16 ROM BASLOAD detokenizer written as BASLOAD source, whose own
+  header measures the win: the 919-line, 17,883-byte paint program converts in 12:22 interpreted and
+  1:51 compiled, ~6.7x. The template: a genuinely useful program, plus a readme that names the speed
+  number rather than asserting "it's faster".
+- **`samples/shared-vars/`** — two programs (`PRG1`/`PRG2`) chained by `LOAD`, sharing variables across
+  the chain, compiled in SHARED mode. Built and verified 2026-07-21 (see the findings below).
+
+### Shared-vars sample — findings from building it (verified in emu, R49)
+
+Measured while building `samples/shared-vars/`, worth keeping:
+
+- **Interpreted, variables do NOT survive a program-mode `LOAD` on the X16** (they come back zero/empty).
+  This is NOT the old C64 chain behaviour — so the sample is inherently a *compiled-only* demo. This
+  contradicts the earlier assumption that CBM chaining preserves variables here; it does not.
+- **Compiled, string and numeric *scalars* carry across cleanly** via [[blitz-load-chain]] (runtime keeps
+  vars/strings in high RAM ~`$8100`, the loaded program skips its clear on the chain signature).
+- **A string ARRAY does not carry.** The loaded program needs a `DIM` to use the array and that `DIM`
+  re-initialises it, wiping the carried data; omitting the `DIM` leaves the array with no descriptor on
+  the loaded side (crashes/hangs). The sample uses scalars and documents this. Open question if ever
+  worth chasing: can an array descriptor be made to survive the chain like a scalar does?
+- **Both programs must first-touch the shared variables in the same order** — the compiler assigns
+  addresses by first appearance, so a differing order silently misaligns them.
+- SHARED-mode compiled programs are tiny (~0.5K each here) because they share one `GPC.RT.BIN` (~11K).
+
+### Shared-runtime, THREE programs sharing variables — TODO
+
+Extend the two-program `samples/shared-vars/` to **three** programs A→B→C that accumulate state (A sets,
+B reads and adds, C prints the total) — the original ask. Same rules as above (scalars, identical
+first-appearance order, all compiled SHARED). See [[blitz-shared-runtime]] and [[blitz-load-chain]].
+
+### Ideas for more samples — TODO
+
+Candidates, each meant to demonstrate one concrete reason to reach for the compiler:
+
+- **A benchmark pair** — the same program shipped as `FOO.PRG` (interpreted) and `C.FOO.PRG` (compiled)
+  next to each other on the disk, with a one-screen driver that times both off `TI` and prints the
+  ratio. `bench/` already has the numbers; this makes them runnable by a user on real hardware.
+- **A graphics / demo program** where the interpreter is visibly too slow — something animating with
+  `RECT`/`OVAL`/`LINE` or the sprite keywords that stutters interpreted and runs smooth compiled, so
+  the speedup is *seen*, not read off a clock.
+- **A tight numeric loop** (Mandelbrot, a sieve, a fractal) — the case the compiler helps most, since
+  it is all float math and control flow with no I/O to hide behind.
+- **Something using the X16 hardware keywords** the compiler now supports (`MOD`, `OVAL`/`RING`, tiles,
+  `FMPLAY`/`PSGPLAY`) so the samples double as a living check that those handlers still work.
+- **A "convert an old C64/CBM BASIC program and compile it" walkthrough** — feed a tokenised program
+  through PRG2BASLOAD to get BASLOAD source, then compile that with GPC. Ties the first sample to the
+  rest and shows the whole pipeline end to end.
+
+## To check
+
+### Check GPC.ERR — TODO
+
+Give `GPC.ERR` (the runtime error decoder, renamed from `GPC.ERR.HELPER` in bab...; `testing/GPC.ERR.BASL`
+→ `GPC.ERR.PRG`, freshened on release by `build_basl.py GPC.ERR.BASL GPC.ERR.PRG`) a pass. It decodes a
+runtime `<err> @ $XXXX` — a P-code byte offset — back to a source line, and it has been wrong before:
+see the recent "BAD ARRAY INDEX reporting a meaningless code address" fix and the caveat that GPC.ERR is
+*not* the culprit when a helper stashes the code pointer in Y and fails to restore it. Confirm it still
+decodes offsets to the right line across the current error set, and that its `.PRG` is up to date with
+its `.BASL`.
+
 ## Build / infrastructure
 
 - Copy the object code *down* after compiling, rather than leaving it above the compiler and its

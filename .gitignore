@@ -89,6 +89,11 @@ source/application/GPC.INPUT
 testing/prg-batch/
 testing/archive/
 
+# testing/samples/ is a build artifact: the root-level samples/ tree is the tracked
+# master, mirrored here by `make samples` so the samples are runnable in the emulator
+# and ship in the release zip. Ignore the mirror; edit samples/ instead.
+testing/samples/
+
 # The packaged release zip -- built by release.sh / release.bat into the release/ drop
 # folder as gpc-release-<n>.zip. Build artifact (matches in any folder), not committed.
 gpc-release.zip

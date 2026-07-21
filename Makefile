@@ -29,9 +29,19 @@ REVISION = r49
 #		release/ directory (now merged into testing/) -- make would see the directory, decide the
 #		target was already made, and skip it. Mark them phony so they always run regardless.
 #
-.PHONY: all libs release pullbuild latest
+.PHONY: all libs release pullbuild latest samples
 
-all: libs
+all: libs samples
+
+#
+#		Mirror the samples/ tree into testing/ (the emulator's drive and the root of the release
+#		zip), so every sample is runnable in the emulator and ships in the release. samples/ is the
+#		master; testing/samples is a build artifact, wiped and re-copied each time so a renamed or
+#		deleted sample never lingers. Runs on every build (it is a prerequisite of `all`).
+#
+samples:
+	rm -rf $(RELEASEDIR)samples
+	cp -r samples $(RELEASEDIR)samples
 
 #
 #		Build the library version of the components. 
