@@ -601,8 +601,11 @@ own branch as a checkpoint; **not** merged and **not** yet relocated to `samples
   it is GPC's P-code dispatch over 6-byte float operands vs native machine code, not the VERA method
   (we already match the fast VERA path). Measured on the GPC side (render table above; INT `%` bought
   only ~4.6%); NOT yet confirmed by profiling GPC dispatch or reading prog8's emitted render loop.
-- **Inline ASM in GPC** — see the separate feasibility note; if viable, hot render loops could drop to
-  native speed without leaving BASLOAD.
+- **Inline ASM in GPC** — feasibility assessed and written up in `docs/blitz/inline-asm-feasibility.md`
+  (source-verified: the VM already jumps to arbitrary code, codegen is one-line extensible, in-stream
+  bytes need no relocation; the hard parts are the authoring pipeline and the iFloat32/dynamic-base
+  variable ABI). Option A measured: a native `SYS`'d char+attr row render is **~37× GPC's best compiled
+  render** (13 vs ~480 jiffies/1000 rows) — so render cost is per-cell VM dispatch, not the VERA path.
 
 ### Ideas for more samples — TODO
 
