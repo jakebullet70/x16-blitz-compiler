@@ -1,0 +1,183 @@
+REM ============================================================================
+REM STORE.BASL -- line-pointer table + banked memory for the editor.
+REM
+REM Included by the main editor with #INCLUDE (BASLOAD expands it inline; one
+REM global symbol table, so the DOC.* labels below are called by GOSUB from the
+REM main program and the shared API variables are visible to both).
+REM
+REM No pointers: a "far pointer" is just two numbers (bank, offset). The compiled
+REM runtime's PEEK/POKE honour the last BANK statement, so a banked access is
+REM   BANK <bank> : PEEK/POKE $A000+<offset>
+REM
+REM SHARED API VARIABLES (the interface; the main program uses these names):
+REM   LINE.TEXT$      a line's text  (in for DOC.STORE, out for DOC.LOAD)
+REM   LINE.INDEX      line index     (in for DOC.STORE / DOC.LOAD)
+REM   LINE.COUNT      number of lines (maintained on file load; read by editor)
+REM   DOC.FILE.NAME$  file to load   (in for DOC.LOADFILE)
+REM
+REM Names avoid keyword prefixes on purpose: BASLOAD's scanner grabs the maximal
+REM A-Z0-9_. run before a $, and if THAT whole run is a keyword it tokenises as
+REM the keyword (FN$ -> FN + $, ON$ -> ON + $ both break). Dotted names like
+REM DOC.FILE.NAME$ or LINE.INDEX are safe because the whole run is not a keyword.
+REM
+REM STORAGE LAYOUT
+REM   Line table : 3 bytes per line [bank][off_lo][off_hi], in banks 1..3
+REM                (2048 entries per bank -> up to 6144 lines). Random access:
+REM                line I lives at bank BASE+INT(I/2048), byte (I mod 2048)*3 of
+REM                the $A000 window -> go-to-line is O(1).
+REM   Content    : a bump allocator over $A000..$BF00 in banks 4.. ; each line
+REM                is stored length-prefixed [len][chars]. Never frees a single
+REM                record; "free all" = DOC.INIT. Reclamation is bulk, at save.
+REM ============================================================================
+
+REM ---- reset the store (empty document) ----
+DOC.INIT:
+  DOC.WIN.START = 40960 : REM $A000
+  DOC.WIN.END = 48896   : REM $BF00 -- $BF00..$BFFF left as a guard tail
+  DOC.TABLE.PER.BANK = 2048
+  DOC.TABLE.BASE.BANK = 1 : REM line table occupies banks 1..3
+  DOC.FIRST.BANK = 4      : REM content arena starts here
+  DOC.CUR.BANK = DOC.FIRST.BANK
+  DOC.CUR.PTR = DOC.WIN.START
+  DOC.HIGH.BANK = DOC.FIRST.BANK
+  LINE.COUNT = 0
+  RETURN
+
+REM ---- reserve DOC.ALLOC.SIZE bytes -> DOC.RESULT.BANK, DOC.RESULT.OFF ----
+DOC.ALLOC:
+  IF DOC.CUR.PTR + DOC.ALLOC.SIZE <= DOC.WIN.END THEN GOTO DOC.ALLOC.PLACE
+  DOC.CUR.BANK = DOC.CUR.BANK + 1
+  DOC.CUR.PTR = DOC.WIN.START
+  IF DOC.CUR.BANK > DOC.HIGH.BANK THEN DOC.HIGH.BANK = DOC.CUR.BANK
+DOC.ALLOC.PLACE:
+  DOC.RESULT.BANK = DOC.CUR.BANK
+  DOC.RESULT.OFF = DOC.CUR.PTR
+  DOC.CUR.PTR = DOC.CUR.PTR + DOC.ALLOC.SIZE
+  RETURN
+
+REM ---- table slot for LINE.INDEX -> DOC.SLOT.ADDR in bank DOC.SLOT.BANK ----
+DOC.SLOT.LOCATE:
+  DOC.SEGMENT = INT(LINE.INDEX / DOC.TABLE.PER.BANK)
+  DOC.SLOT.BANK = DOC.TABLE.BASE.BANK + DOC.SEGMENT
+  DOC.SLOT.ADDR = DOC.WIN.START + (LINE.INDEX - DOC.SEGMENT * DOC.TABLE.PER.BANK) * 3
+  RETURN
+
+REM ---- write table slot LINE.INDEX = (DOC.PUT.BANK, DOC.PUT.OFF) ----
+DOC.SLOT.WRITE:
+  GOSUB DOC.SLOT.LOCATE
+  BANK DOC.SLOT.BANK
+  POKE DOC.SLOT.ADDR, DOC.PUT.BANK
+  DOC.OFF.HIGH = INT(DOC.PUT.OFF / 256)
+  POKE DOC.SLOT.ADDR + 1, DOC.PUT.OFF - DOC.OFF.HIGH * 256
+  POKE DOC.SLOT.ADDR + 2, DOC.OFF.HIGH
+  RETURN
+
+REM ---- read table slot LINE.INDEX -> DOC.GOT.BANK, DOC.GOT.OFF ----
+DOC.SLOT.READ:
+  GOSUB DOC.SLOT.LOCATE
+  BANK DOC.SLOT.BANK
+  DOC.GOT.BANK = PEEK(DOC.SLOT.ADDR)
+  DOC.GOT.OFF = PEEK(DOC.SLOT.ADDR + 2) * 256 + PEEK(DOC.SLOT.ADDR + 1)
+  RETURN
+
+REM ---- store LINE.TEXT$ at LINE.INDEX (allocates, copies, updates the table) ----
+DOC.STORE:
+  DOC.LEN = LEN(LINE.TEXT$)
+  DOC.ALLOC.SIZE = DOC.LEN + 1
+  GOSUB DOC.ALLOC
+  BANK DOC.RESULT.BANK
+  POKE DOC.RESULT.OFF, DOC.LEN
+  IF DOC.LEN > 0 THEN GOSUB DOC.STORE.CHARS
+  DOC.PUT.BANK = DOC.RESULT.BANK : DOC.PUT.OFF = DOC.RESULT.OFF
+  GOSUB DOC.SLOT.WRITE
+  RETURN
+DOC.STORE.CHARS:
+  FOR DOC.CHAR.INDEX = 1 TO DOC.LEN
+    POKE DOC.RESULT.OFF + DOC.CHAR.INDEX, ASC(MID$(LINE.TEXT$, DOC.CHAR.INDEX, 1))
+  NEXT DOC.CHAR.INDEX
+  RETURN
+
+REM ---- load line LINE.INDEX into LINE.TEXT$ ----
+DOC.LOAD:
+  GOSUB DOC.SLOT.READ
+  BANK DOC.GOT.BANK
+  DOC.LEN = PEEK(DOC.GOT.OFF)
+  LINE.TEXT$ = ""
+  IF DOC.LEN > 0 THEN GOSUB DOC.LOAD.CHARS
+  RETURN
+DOC.LOAD.CHARS:
+  FOR DOC.CHAR.INDEX = 1 TO DOC.LEN
+    LINE.TEXT$ = LINE.TEXT$ + CHR$(PEEK(DOC.GOT.OFF + DOC.CHAR.INDEX))
+  NEXT DOC.CHAR.INDEX
+  RETURN
+
+REM ---- load text file DOC.FILE.NAME$ into the store (fills table, sets count) ----
+REM Splits on CR, LF or CRLF; caps a line at 250 chars.
+DOC.LOADFILE:
+  GOSUB DOC.INIT
+  DOC.OPEN.NAME$ = DOC.FILE.NAME$ + ",S,R"
+  OPEN 2, 8, 2, DOC.OPEN.NAME$
+  LINE.TEXT$ = "" : DOC.PREV.CH = 0
+DOC.READ.LOOP:
+  GET#2, DOC.CH$
+  DOC.STATUS = ST
+  IF LEN(DOC.CH$) = 0 THEN GOTO DOC.READ.CHECK
+  DOC.CH = ASC(DOC.CH$)
+  IF DOC.CH = 10 AND DOC.PREV.CH = 13 THEN DOC.PREV.CH = 10 : GOTO DOC.READ.CHECK
+  IF DOC.CH = 13 OR DOC.CH = 10 THEN GOSUB DOC.PUSH.LINE : DOC.PREV.CH = DOC.CH : GOTO DOC.READ.CHECK
+  IF LEN(LINE.TEXT$) < 250 THEN LINE.TEXT$ = LINE.TEXT$ + DOC.CH$
+  DOC.PREV.CH = DOC.CH
+DOC.READ.CHECK:
+  IF DOC.STATUS = 0 THEN GOTO DOC.READ.LOOP
+  IF LEN(LINE.TEXT$) > 0 THEN GOSUB DOC.PUSH.LINE
+  CLOSE 2
+  RETURN
+DOC.PUSH.LINE:
+  LINE.INDEX = LINE.COUNT : GOSUB DOC.STORE : LINE.COUNT = LINE.COUNT + 1
+  LINE.TEXT$ = ""
+  RETURN
+
+REM ---- open a slot at LINE.INDEX (shift entries up), count++ ----
+REM The caller then DOC.STOREs the new line's content at that index.
+DOC.INSERT.SLOT:
+  DOC.INS.AT = LINE.INDEX
+  DOC.SHIFT.J = LINE.COUNT - 1
+DOC.INS.LOOP:
+  IF DOC.SHIFT.J < DOC.INS.AT THEN GOTO DOC.INS.DONE
+  LINE.INDEX = DOC.SHIFT.J : GOSUB DOC.SLOT.READ
+  DOC.PUT.BANK = DOC.GOT.BANK : DOC.PUT.OFF = DOC.GOT.OFF
+  LINE.INDEX = DOC.SHIFT.J + 1 : GOSUB DOC.SLOT.WRITE
+  DOC.SHIFT.J = DOC.SHIFT.J - 1
+  GOTO DOC.INS.LOOP
+DOC.INS.DONE:
+  LINE.COUNT = LINE.COUNT + 1
+  RETURN
+
+REM ---- remove the slot at LINE.INDEX (shift entries down), count-- ----
+REM The removed line's content record just leaks until the next save/compaction.
+DOC.DELETE.SLOT:
+  DOC.DEL.AT = LINE.INDEX
+  DOC.SHIFT.J = DOC.DEL.AT + 1
+DOC.DEL.LOOP:
+  IF DOC.SHIFT.J > LINE.COUNT - 1 THEN GOTO DOC.DEL.DONE
+  LINE.INDEX = DOC.SHIFT.J : GOSUB DOC.SLOT.READ
+  DOC.PUT.BANK = DOC.GOT.BANK : DOC.PUT.OFF = DOC.GOT.OFF
+  LINE.INDEX = DOC.SHIFT.J - 1 : GOSUB DOC.SLOT.WRITE
+  DOC.SHIFT.J = DOC.SHIFT.J + 1
+  GOTO DOC.DEL.LOOP
+DOC.DEL.DONE:
+  LINE.COUNT = LINE.COUNT - 1
+  RETURN
+
+REM ---- write the whole document to DOC.FILE.NAME$ (CR line endings) ----
+REM "@:" replaces an existing file. Each line is written with a trailing CR by
+REM PRINT#. This is also the moment to compact: the caller may reload afterwards.
+DOC.SAVEFILE:
+  DOC.OPEN.NAME$ = "@:" + DOC.FILE.NAME$ + ",S,W"
+  OPEN 2, 8, 2, DOC.OPEN.NAME$
+  FOR DOC.SAVE.INDEX = 0 TO LINE.COUNT - 1
+    LINE.INDEX = DOC.SAVE.INDEX : GOSUB DOC.LOAD
+    PRINT#2, LINE.TEXT$
+  NEXT DOC.SAVE.INDEX
+  CLOSE 2
+  RETURN

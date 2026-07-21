@@ -586,6 +586,24 @@ Extend the two-program `samples/shared-vars/` to **three** programs A→B→C th
 B reads and adds, C prints the total) — the original ask. Same rules as above (scalars, identical
 first-appearance order, all compiled SHARED). See [[blitz-shared-runtime]] and [[blitz-load-chain]].
 
+### Editor sample (text / Markdown editor) — TODO, parked on branch `editor-sample`
+
+An MS-DOS-EDIT-styled text/Markdown editor in BASLOAD (`testing/EDITOR.BASL` + `testing/STORE.BASL`,
+design record in `testing/EDITOR.md`). M1–M4 done and verified headless; render is all-VERA with
+three load-bearing speedups — O(1) caret movement, FX-text row render (32-bit cache write, ~48 vs 80
+jiffies/100 for char+attr), and **hardware VSCROLL** (`L1_VSCROLL`, repaint 3 rows not ~28; map is
+64×128, `ED.MAP.TOP` bounded to [0,34] so it never relies on VERA's vertical wrap). Committed to its
+own branch as a checkpoint; **not** merged and **not** yet relocated to `samples/`. To revisit:
+
+- **M5 ship** — move to `samples/editor/`, add a real sample `.md` + `readme.md` that names the render
+  numbers (per the sample template), wire `make samples`, headless smoke test.
+- **The prog8 speed gap** — `x16-MSEDIT` (prog8, native 6502) repaints visibly faster. *Hypothesis:*
+  it is GPC's P-code dispatch over 6-byte float operands vs native machine code, not the VERA method
+  (we already match the fast VERA path). Measured on the GPC side (render table above; INT `%` bought
+  only ~4.6%); NOT yet confirmed by profiling GPC dispatch or reading prog8's emitted render loop.
+- **Inline ASM in GPC** — see the separate feasibility note; if viable, hot render loops could drop to
+  native speed without leaving BASLOAD.
+
 ### Ideas for more samples — TODO
 
 Candidates, each meant to demonstrate one concrete reason to reach for the compiler:

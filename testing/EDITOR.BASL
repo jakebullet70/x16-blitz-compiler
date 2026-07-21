@@ -1,0 +1,841 @@
+#SAVEAS "@:EDITOR.PRG"
+#AUTONUM 1
+#REM 0
+
+REM ============================================================================
+REM EDITOR.BASL -- a simple text / Markdown editor for the Commander X16,
+REM compiled with GPC. Milestone 3: MS-DOS EDIT style menu bar.
+REM
+REM Rendering is HYBRID: the text area is written straight into VERA's text map;
+REM the menu bar, dropdowns, status bar and prompts use the KERNAL (LOCATE /
+REM COLOR / PRINT). The document lives in banked RAM through the DOC.* storage
+REM layer in STORE.BASL, pulled in with #INCLUDE at the bottom.
+REM
+REM Colours (like DETOK): blue bars, black text area, white text, cyan prompts,
+REM white-on-red errors.
+REM ============================================================================
+
+DEBUG.MODE = 0 : REM 1 = run the self-check to the log and stop. 0 = interactive.
+ED.SCREEN.MODE = 1 : REM 1 = 80x30, 3 = 40x30 (see KERNAL screen_mode $FF5F)
+
+GOSUB ED.INIT
+DOC.FILE.NAME$ = "TEST.MD"
+GOSUB DOC.LOADFILE
+GOSUB ED.OPEN.DONE
+GOSUB ED.RENDER.ALL
+
+IF DEBUG.MODE = 1 THEN GOSUB ED.SELFCHECK : END
+
+REM ---- main loop ----
+ED.LOOP:
+  GET ED.KEY$
+  IF ED.KEY$ = "" THEN GOTO ED.LOOP
+  ED.KEY = ASC(ED.KEY$)
+  IF ED.KEY = 27 THEN MENU.ACTIVE = 0 : GOSUB ED.OPEN.MENUBAR : GOTO ED.LOOP
+  IF ED.KEY >= 161 AND ED.KEY <= 191 THEN GOSUB ED.ALT.MENU : GOTO ED.LOOP
+  IF ED.KEY = 157 THEN GOSUB ED.MOVE.LEFT : GOTO ED.LOOP
+  IF ED.KEY = 29 THEN GOSUB ED.MOVE.RIGHT : GOTO ED.LOOP
+  IF ED.KEY = 145 THEN GOSUB ED.MOVE.UP : GOTO ED.LOOP
+  IF ED.KEY = 17 THEN GOSUB ED.MOVE.DOWN : GOTO ED.LOOP
+  IF ED.KEY = 19 THEN GOSUB ED.MOVE.HOME : GOTO ED.LOOP
+  IF ED.KEY = 4 THEN GOSUB ED.MOVE.END : GOTO ED.LOOP
+  IF ED.KEY = 130 THEN GOSUB ED.MOVE.PAGEUP : GOTO ED.LOOP
+  IF ED.KEY = 2 THEN GOSUB ED.MOVE.PAGEDOWN : GOTO ED.LOOP
+  IF ED.KEY = 13 THEN GOSUB ED.DO.ENTER : GOTO ED.LOOP
+  IF ED.KEY = 20 THEN GOSUB ED.DO.BACKSPACE : GOTO ED.LOOP
+  IF ED.KEY = 25 THEN GOSUB ED.DO.DELETE : GOTO ED.LOOP
+  IF ED.KEY = 148 THEN GOSUB ED.TOGGLE.INSERT : GOTO ED.LOOP
+  IF ED.KEY = 137 THEN GOSUB ED.CMD.SAVE : GOTO ED.LOOP
+  IF ED.KEY = 134 THEN GOSUB ED.FIND.NEXT : GOTO ED.LOOP
+  IF ED.KEY >= 32 AND ED.KEY <= 126 THEN GOSUB ED.DO.INSERT : GOTO ED.LOOP
+  GOTO ED.LOOP
+
+ED.QUIT:
+  POKE 40761, 0 : POKE 40762, 0 : REM undo any hardware VSCROLL before returning to BASIC
+  PRINT CHR$(147);
+  COLOR 1, 0 : PRINT "BYE."
+  END
+
+REM ============================================================================
+REM SETUP
+REM ============================================================================
+ED.INIT:
+  POKE 780, ED.SCREEN.MODE : POKE 783, 0
+  SYS 65375        : REM $FF5F screen_mode -> set ED.SCREEN.MODE (also clears screen)
+  PRINT CHR$(15);  : REM ISO mode: VERA tile index = ASCII code, both cases show
+  PRINT CHR$(147);
+  POKE 783, 0
+  SYS 65517        : REM $FFED SCREEN -> columns in X ($030D), rows in Y ($030E)
+  SCREEN.COLS = PEEK(781)
+  SCREEN.ROWS = PEEK(782)
+  IF SCREEN.COLS < 20 THEN SCREEN.COLS = 80
+  IF SCREEN.ROWS < 8 THEN SCREEN.ROWS = 60
+  ED.TEXT.WIDTH = SCREEN.COLS
+  ED.TEXT.BOTTOM = SCREEN.ROWS - 2
+  ED.TEXT.ROWS = SCREEN.ROWS - 2
+  ED.ATTR.TEXT = 1   : REM white on black
+  ED.ATTR.CARET = 16 : REM black on white
+  ED.QUIET = 0
+  ED.SIM.MODE = 0
+  ED.EXIT.FLAG = 0
+  ED.LAST.MSG$ = ""
+  REM ---- hardware vertical scroll setup (see ED.DO.SCROLL) ----
+  REM The text-map layer is scrolled by VERA's L1_VSCROLL ($9F39/$9F3A, in map pixels,
+  REM 8 per text row) so a 1-line move repaints 3 rows instead of the whole screen. Every
+  REM screen row is drawn at map row (screen_row + ED.MAP.TOP); ED.MAP.TOP = VSCROLL/8.
+  REM Read the map height from L1_CONFIG bits 7:6 (32<<n) and keep ED.MAP.TOP in
+  REM [0, MAP.H - SCREEN.ROWS] so the visible window never crosses the map's bottom edge
+  REM -- that means we never rely on VERA's vertical wrap; at the bound we rewind + repaint.
+  ED.MAP.TOP = 0
+  POKE 40761, 0 : POKE 40762, 0
+  ED.MAP.CFG = PEEK(40756)
+  ED.MAP.HB = INT(ED.MAP.CFG / 64)
+  ED.MAP.H = 32
+  IF ED.MAP.HB = 1 THEN ED.MAP.H = 64
+  IF ED.MAP.HB = 2 THEN ED.MAP.H = 128
+  IF ED.MAP.HB = 3 THEN ED.MAP.H = 256
+  ED.MAP.MAXTOP = ED.MAP.H - SCREEN.ROWS
+  ED.HW.OK = 0
+  IF ED.MAP.MAXTOP >= 4 THEN ED.HW.OK = 1
+  MENU.ACTIVE = 0 - 1
+  GOSUB ED.MENU.SETUP
+  RETURN
+
+ED.OPEN.DONE:
+  ED.TOP.LINE = 0 : ED.LEFT.COL = 0
+  ED.CUR.ROW = 0 :  ED.CUR.COL = 0
+  ED.INSERT.MODE = 1 : ED.DOC.DIRTY = 0
+  GOSUB ED.LOAD.LIVE
+  RETURN
+
+REM ---- menu tables (data-driven) ----
+ED.MENU.SETUP:
+  MENU.COUNT = 3
+  DIM MENU.NAME$(3) : DIM MENU.ITEMS(3)
+  DIM MENU.COL(3) : DIM MENU.WIDTH(3)
+  DIM MENU.ITEM$(24) : REM flat: menu * 8 + item
+  MENU.NAME$(0) = "File" : MENU.ITEMS(0) = 5
+  MENU.ITEM$(0) = "New" : MENU.ITEM$(1) = "Open..." : MENU.ITEM$(2) = "Save"
+  MENU.ITEM$(3) = "Save As..." : MENU.ITEM$(4) = "Exit"
+  MENU.NAME$(1) = "Search" : MENU.ITEMS(1) = 2
+  MENU.ITEM$(8) = "Find..." : MENU.ITEM$(9) = "Go to Line..."
+  MENU.NAME$(2) = "Help" : MENU.ITEMS(2) = 1
+  MENU.ITEM$(16) = "About"
+  MENU.NEXT.COL = 2
+  FOR MENU.I = 0 TO MENU.COUNT - 1
+    MENU.COL(MENU.I) = MENU.NEXT.COL
+    MENU.NEXT.COL = MENU.NEXT.COL + LEN(MENU.NAME$(MENU.I)) + 2
+    MENU.W = LEN(MENU.NAME$(MENU.I))
+    FOR MENU.J = 0 TO MENU.ITEMS(MENU.I) - 1
+      IF LEN(MENU.ITEM$(MENU.I * 8 + MENU.J)) > MENU.W THEN MENU.W = LEN(MENU.ITEM$(MENU.I * 8 + MENU.J))
+    NEXT MENU.J
+    MENU.WIDTH(MENU.I) = MENU.W + 2
+  NEXT MENU.I
+  RETURN
+
+REM ============================================================================
+REM LIVE LINE
+REM ============================================================================
+ED.LOAD.LIVE:
+  LINE.INDEX = ED.CUR.ROW : GOSUB DOC.LOAD
+  ED.CUR.LINE$ = LINE.TEXT$
+  ED.CUR.DIRTY = 0
+  RETURN
+ED.COMMIT.LIVE:
+  IF ED.CUR.DIRTY = 0 THEN RETURN
+  LINE.TEXT$ = ED.CUR.LINE$ : LINE.INDEX = ED.CUR.ROW : GOSUB DOC.STORE
+  ED.CUR.DIRTY = 0
+  RETURN
+ED.CLAMP.COL:
+  IF ED.CUR.COL > LEN(ED.CUR.LINE$) THEN ED.CUR.COL = LEN(ED.CUR.LINE$)
+  RETURN
+
+REM ============================================================================
+REM CURSOR MOVEMENT
+REM ============================================================================
+ED.MOVE.LEFT:
+  IF ED.CUR.COL > 0 THEN ED.CUR.COL = ED.CUR.COL - 1 : GOSUB ED.CARET.REFRESH : RETURN
+  IF ED.CUR.ROW = 0 THEN RETURN
+  GOSUB ED.COMMIT.LIVE
+  ED.CUR.ROW = ED.CUR.ROW - 1 : GOSUB ED.LOAD.LIVE
+  ED.CUR.COL = LEN(ED.CUR.LINE$)
+  GOSUB ED.CARET.REFRESH
+  RETURN
+ED.MOVE.RIGHT:
+  IF ED.CUR.COL < LEN(ED.CUR.LINE$) THEN ED.CUR.COL = ED.CUR.COL + 1 : GOSUB ED.CARET.REFRESH : RETURN
+  IF ED.CUR.ROW >= LINE.COUNT - 1 THEN RETURN
+  GOSUB ED.COMMIT.LIVE
+  ED.CUR.ROW = ED.CUR.ROW + 1 : GOSUB ED.LOAD.LIVE
+  ED.CUR.COL = 0 : GOSUB ED.CARET.REFRESH
+  RETURN
+ED.MOVE.UP:
+  IF ED.CUR.ROW = 0 THEN RETURN
+  GOSUB ED.COMMIT.LIVE
+  ED.CUR.ROW = ED.CUR.ROW - 1 : GOSUB ED.LOAD.LIVE : GOSUB ED.CLAMP.COL
+  GOSUB ED.CARET.REFRESH
+  RETURN
+ED.MOVE.DOWN:
+  IF ED.CUR.ROW >= LINE.COUNT - 1 THEN RETURN
+  GOSUB ED.COMMIT.LIVE
+  ED.CUR.ROW = ED.CUR.ROW + 1 : GOSUB ED.LOAD.LIVE : GOSUB ED.CLAMP.COL
+  GOSUB ED.CARET.REFRESH
+  RETURN
+ED.MOVE.HOME:
+  ED.CUR.COL = 0 : GOSUB ED.CARET.REFRESH
+  RETURN
+ED.MOVE.END:
+  ED.CUR.COL = LEN(ED.CUR.LINE$) : GOSUB ED.CARET.REFRESH
+  RETURN
+ED.MOVE.PAGEUP:
+  GOSUB ED.COMMIT.LIVE
+  ED.CUR.ROW = ED.CUR.ROW - ED.TEXT.ROWS
+  IF ED.CUR.ROW < 0 THEN ED.CUR.ROW = 0
+  GOSUB ED.LOAD.LIVE : GOSUB ED.CLAMP.COL : GOSUB ED.CARET.REFRESH
+  RETURN
+ED.MOVE.PAGEDOWN:
+  GOSUB ED.COMMIT.LIVE
+  ED.CUR.ROW = ED.CUR.ROW + ED.TEXT.ROWS
+  IF ED.CUR.ROW > LINE.COUNT - 1 THEN ED.CUR.ROW = LINE.COUNT - 1
+  GOSUB ED.LOAD.LIVE : GOSUB ED.CLAMP.COL : GOSUB ED.CARET.REFRESH
+  RETURN
+
+REM ============================================================================
+REM EDITING
+REM ============================================================================
+ED.DO.INSERT:
+  IF LEN(ED.CUR.LINE$) >= 250 THEN RETURN
+  ED.CH$ = CHR$(ED.KEY)
+  IF ED.INSERT.MODE = 0 AND ED.CUR.COL < LEN(ED.CUR.LINE$) THEN GOTO ED.INS.OVER
+  ED.CUR.LINE$ = LEFT$(ED.CUR.LINE$, ED.CUR.COL) + ED.CH$ + MID$(ED.CUR.LINE$, ED.CUR.COL + 1, 250)
+  GOTO ED.INS.DONE
+ED.INS.OVER:
+  ED.CUR.LINE$ = LEFT$(ED.CUR.LINE$, ED.CUR.COL) + ED.CH$ + MID$(ED.CUR.LINE$, ED.CUR.COL + 2, 250)
+ED.INS.DONE:
+  ED.CUR.COL = ED.CUR.COL + 1
+  ED.CUR.DIRTY = 1 : ED.DOC.DIRTY = 1
+  GOSUB ED.REFRESH.INTRA
+  RETURN
+
+ED.DO.BACKSPACE:
+  IF ED.CUR.COL = 0 THEN GOTO ED.BS.JOIN
+  ED.CUR.LINE$ = LEFT$(ED.CUR.LINE$, ED.CUR.COL - 1) + MID$(ED.CUR.LINE$, ED.CUR.COL + 1, 250)
+  ED.CUR.COL = ED.CUR.COL - 1
+  ED.CUR.DIRTY = 1 : ED.DOC.DIRTY = 1
+  GOSUB ED.REFRESH.INTRA
+  RETURN
+ED.BS.JOIN:
+  IF ED.CUR.ROW = 0 THEN RETURN
+  LINE.INDEX = ED.CUR.ROW - 1 : GOSUB DOC.LOAD
+  ED.JOIN.COL = LEN(LINE.TEXT$)
+  ED.CUR.LINE$ = LEFT$(LINE.TEXT$ + ED.CUR.LINE$, 250)
+  LINE.TEXT$ = ED.CUR.LINE$ : LINE.INDEX = ED.CUR.ROW - 1 : GOSUB DOC.STORE
+  LINE.INDEX = ED.CUR.ROW : GOSUB DOC.DELETE.SLOT
+  ED.CUR.ROW = ED.CUR.ROW - 1
+  ED.CUR.COL = ED.JOIN.COL
+  ED.CUR.DIRTY = 0 : ED.DOC.DIRTY = 1
+  GOSUB ED.REFRESH.FULL
+  RETURN
+
+ED.DO.DELETE:
+  IF ED.CUR.COL < LEN(ED.CUR.LINE$) THEN GOTO ED.DEL.CHAR
+  IF ED.CUR.ROW >= LINE.COUNT - 1 THEN RETURN
+  LINE.INDEX = ED.CUR.ROW + 1 : GOSUB DOC.LOAD
+  ED.CUR.LINE$ = LEFT$(ED.CUR.LINE$ + LINE.TEXT$, 250)
+  LINE.TEXT$ = ED.CUR.LINE$ : LINE.INDEX = ED.CUR.ROW : GOSUB DOC.STORE
+  LINE.INDEX = ED.CUR.ROW + 1 : GOSUB DOC.DELETE.SLOT
+  ED.CUR.DIRTY = 0 : ED.DOC.DIRTY = 1
+  GOSUB ED.REFRESH.FULL
+  RETURN
+ED.DEL.CHAR:
+  ED.CUR.LINE$ = LEFT$(ED.CUR.LINE$, ED.CUR.COL) + MID$(ED.CUR.LINE$, ED.CUR.COL + 2, 250)
+  ED.CUR.DIRTY = 1 : ED.DOC.DIRTY = 1
+  GOSUB ED.REFRESH.INTRA
+  RETURN
+
+ED.DO.ENTER:
+  ED.LEFT.HALF$ = LEFT$(ED.CUR.LINE$, ED.CUR.COL)
+  ED.RIGHT.HALF$ = MID$(ED.CUR.LINE$, ED.CUR.COL + 1, 250)
+  LINE.TEXT$ = ED.LEFT.HALF$ : LINE.INDEX = ED.CUR.ROW : GOSUB DOC.STORE
+  LINE.INDEX = ED.CUR.ROW + 1 : GOSUB DOC.INSERT.SLOT
+  LINE.TEXT$ = ED.RIGHT.HALF$ : LINE.INDEX = ED.CUR.ROW + 1 : GOSUB DOC.STORE
+  ED.CUR.ROW = ED.CUR.ROW + 1
+  ED.CUR.COL = 0
+  ED.CUR.LINE$ = ED.RIGHT.HALF$ : ED.CUR.DIRTY = 0 : ED.DOC.DIRTY = 1
+  GOSUB ED.REFRESH.FULL
+  RETURN
+
+ED.TOGGLE.INSERT:
+  ED.INSERT.MODE = 1 - ED.INSERT.MODE
+  GOSUB ED.RENDER.STATUS
+  RETURN
+
+REM ============================================================================
+REM MENUS
+REM ============================================================================
+ED.ALT.MENU:
+  ED.ALT.CH = ED.KEY - 96 : REM Commodore+letter graphics code -> A..Z (161->65)
+  FOR MENU.I = 0 TO MENU.COUNT - 1
+    IF ASC(LEFT$(MENU.NAME$(MENU.I), 1)) = ED.ALT.CH THEN MENU.ACTIVE = MENU.I : GOSUB ED.OPEN.MENUBAR : RETURN
+  NEXT MENU.I
+  RETURN
+
+ED.OPEN.MENUBAR:
+  MENU.SEL = 0 : GOSUB ED.RENDER.MENUBAR : GOSUB ED.DRAW.DROPDOWN
+ED.MENU.LOOP:
+  GET ED.KEY$ : IF ED.KEY$ = "" THEN GOTO ED.MENU.LOOP
+  ED.KEY = ASC(ED.KEY$)
+  IF ED.KEY = 145 THEN GOSUB ED.MENU.UP : GOTO ED.MENU.LOOP
+  IF ED.KEY = 17 THEN GOSUB ED.MENU.DOWN : GOTO ED.MENU.LOOP
+  IF ED.KEY = 157 THEN GOSUB ED.MENU.LEFT : GOTO ED.MENU.LOOP
+  IF ED.KEY = 29 THEN GOSUB ED.MENU.RIGHT : GOTO ED.MENU.LOOP
+  IF ED.KEY = 13 THEN GOTO ED.MENU.SELECT
+  IF ED.KEY = 27 THEN GOTO ED.MENU.CANCEL
+  GOTO ED.MENU.LOOP
+ED.MENU.SELECT:
+  MENU.CHOICE.MENU = MENU.ACTIVE : MENU.CHOICE.ITEM = MENU.SEL
+  MENU.ACTIVE = 0 - 1
+  GOSUB ED.RENDER.ALL : GOSUB ED.MENU.DISPATCH
+  RETURN
+ED.MENU.CANCEL:
+  MENU.ACTIVE = 0 - 1
+  GOSUB ED.RENDER.ALL
+  RETURN
+
+ED.MENU.UP:
+  MENU.SEL = MENU.SEL - 1
+  IF MENU.SEL < 0 THEN MENU.SEL = MENU.ITEMS(MENU.ACTIVE) - 1
+  GOSUB ED.DRAW.DROPDOWN
+  RETURN
+ED.MENU.DOWN:
+  MENU.SEL = MENU.SEL + 1
+  IF MENU.SEL >= MENU.ITEMS(MENU.ACTIVE) THEN MENU.SEL = 0
+  GOSUB ED.DRAW.DROPDOWN
+  RETURN
+ED.MENU.LEFT:
+  MENU.ACTIVE = MENU.ACTIVE - 1
+  IF MENU.ACTIVE < 0 THEN MENU.ACTIVE = MENU.COUNT - 1
+  MENU.SEL = 0
+  GOSUB ED.RENDER.ALL : GOSUB ED.DRAW.DROPDOWN
+  RETURN
+ED.MENU.RIGHT:
+  MENU.ACTIVE = MENU.ACTIVE + 1
+  IF MENU.ACTIVE >= MENU.COUNT THEN MENU.ACTIVE = 0
+  MENU.SEL = 0
+  GOSUB ED.RENDER.ALL : GOSUB ED.DRAW.DROPDOWN
+  RETURN
+
+ED.MENU.DISPATCH:
+  IF MENU.CHOICE.MENU = 0 THEN GOSUB ED.DISP.FILE : RETURN
+  IF MENU.CHOICE.MENU = 1 THEN GOSUB ED.DISP.SEARCH : RETURN
+  IF MENU.CHOICE.MENU = 2 THEN GOSUB ED.CMD.ABOUT : RETURN
+  RETURN
+ED.DISP.FILE:
+  ON MENU.CHOICE.ITEM + 1 GOSUB ED.CMD.NEW, ED.CMD.OPEN, ED.CMD.SAVE, ED.CMD.SAVEAS, ED.CMD.EXIT
+  RETURN
+ED.DISP.SEARCH:
+  ON MENU.CHOICE.ITEM + 1 GOSUB ED.CMD.FIND, ED.CMD.GOTO
+  RETURN
+
+REM ============================================================================
+REM COMMANDS
+REM ============================================================================
+ED.CMD.NEW:
+  GOSUB ED.CONFIRM.DISCARD
+  IF ED.DISCARD.OK = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
+  GOSUB DOC.INIT
+  LINE.TEXT$ = "" : LINE.INDEX = 0 : GOSUB DOC.STORE : LINE.COUNT = 1
+  DOC.FILE.NAME$ = "UNTITLED"
+  GOSUB ED.OPEN.DONE : GOSUB ED.REFRESH.FULL
+  RETURN
+
+ED.OPEN.FILE:
+  GOSUB DOC.LOADFILE
+  IF LINE.COUNT = 0 THEN LINE.TEXT$ = "" : LINE.INDEX = 0 : GOSUB DOC.STORE : LINE.COUNT = 1
+  GOSUB ED.OPEN.DONE : GOSUB ED.REFRESH.FULL
+  RETURN
+ED.CMD.OPEN:
+  GOSUB ED.CONFIRM.DISCARD
+  IF ED.DISCARD.OK = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
+  ED.PROMPT.MSG$ = "Open file: " : GOSUB ED.PROMPT
+  IF ED.PROMPT.OK = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
+  DOC.FILE.NAME$ = ED.INPUT$
+  GOSUB ED.OPEN.FILE
+  RETURN
+
+ED.SAVE.FILE:
+  GOSUB ED.COMMIT.LIVE : GOSUB DOC.SAVEFILE
+  ED.DOC.DIRTY = 0
+  RETURN
+ED.CMD.SAVE:
+  IF DOC.FILE.NAME$ = "UNTITLED" THEN GOSUB ED.CMD.SAVEAS : RETURN
+  GOSUB ED.SAVE.FILE : GOSUB ED.REFRESH.FULL
+  ED.MSG$ = "Saved " + DOC.FILE.NAME$ : GOSUB ED.INFO.MSG
+  RETURN
+ED.CMD.SAVEAS:
+  ED.PROMPT.MSG$ = "Save as: " : GOSUB ED.PROMPT
+  IF ED.PROMPT.OK = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
+  DOC.FILE.NAME$ = ED.INPUT$
+  GOSUB ED.SAVE.FILE : GOSUB ED.REFRESH.FULL
+  ED.MSG$ = "Saved " + DOC.FILE.NAME$ : GOSUB ED.INFO.MSG
+  RETURN
+ED.CMD.EXIT:
+  IF ED.DOC.DIRTY = 0 THEN GOTO ED.CMD.EXIT.GO
+  ED.PROMPT.MSG$ = "Discard changes? (Y/N) " : GOSUB ED.PROMPT.YN
+  IF ED.YN = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
+ED.CMD.EXIT.GO:
+  IF ED.SIM.MODE = 1 THEN ED.EXIT.FLAG = 1 : RETURN
+  GOTO ED.QUIT
+ED.CMD.ABOUT:
+  ED.MSG$ = "GPC EDIT -- a simple X16 text editor" : GOSUB ED.INFO.MSG
+  RETURN
+ED.CONFIRM.DISCARD:
+  ED.DISCARD.OK = 1
+  IF ED.DOC.DIRTY = 0 THEN RETURN
+  ED.PROMPT.MSG$ = "Discard changes? (Y/N) " : GOSUB ED.PROMPT.YN
+  ED.DISCARD.OK = ED.YN
+  RETURN
+
+ED.CMD.FIND:
+  ED.PROMPT.MSG$ = "Find: " : GOSUB ED.PROMPT
+  IF ED.PROMPT.OK = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
+  ED.FIND$ = ED.INPUT$
+  GOSUB ED.FIND.NEXT
+  RETURN
+
+ED.CMD.GOTO:
+  ED.PROMPT.MSG$ = "Go to line: " : GOSUB ED.PROMPT
+  IF ED.PROMPT.OK = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
+  ED.GOTO.N = VAL(ED.INPUT$)
+  IF ED.GOTO.N < 1 THEN ED.GOTO.N = 1
+  IF ED.GOTO.N > LINE.COUNT THEN ED.GOTO.N = LINE.COUNT
+  GOSUB ED.COMMIT.LIVE
+  ED.CUR.ROW = ED.GOTO.N - 1
+  ED.CUR.COL = 0
+  GOSUB ED.LOAD.LIVE
+  GOSUB ED.REFRESH.FULL
+  ED.MSG$ = "Line " + MID$(STR$(ED.GOTO.N), 2) : GOSUB ED.INFO.MSG
+  RETURN
+
+REM ---- forward, wrapping, case-insensitive substring search for ED.FIND$ ----
+ED.FIND.NEXT:
+  IF LEN(ED.FIND$) = 0 THEN RETURN
+  ED.FOLD.IN$ = ED.FIND$ : GOSUB ED.FOLD : ED.NEEDLE$ = ED.FOLD.OUT$
+  GOSUB ED.COMMIT.LIVE
+  ED.FR = ED.CUR.ROW
+  ED.FROM = ED.CUR.COL + 2
+  ED.SCANNED = 0
+ED.FN.LOOP:
+  IF ED.SCANNED > LINE.COUNT THEN GOTO ED.FN.NONE
+  LINE.INDEX = ED.FR : GOSUB DOC.LOAD
+  ED.FOLD.IN$ = LINE.TEXT$ : GOSUB ED.FOLD : ED.HAY$ = ED.FOLD.OUT$
+  GOSUB ED.STRFIND
+  IF ED.FOUND.AT > 0 THEN GOTO ED.FN.HIT
+  ED.FR = ED.FR + 1
+  IF ED.FR > LINE.COUNT - 1 THEN ED.FR = 0
+  ED.FROM = 1
+  ED.SCANNED = ED.SCANNED + 1
+  GOTO ED.FN.LOOP
+ED.FN.HIT:
+  ED.CUR.ROW = ED.FR
+  ED.CUR.COL = ED.FOUND.AT - 1
+  GOSUB ED.LOAD.LIVE
+  GOSUB ED.REFRESH.FULL
+  ED.MSG$ = "Found: " + ED.FIND$ : GOSUB ED.INFO.MSG
+  RETURN
+ED.FN.NONE:
+  ED.MSG$ = "Not found: " + ED.FIND$ : GOSUB ED.ERR.MSG
+  RETURN
+
+REM find ED.NEEDLE$ in ED.HAY$ from 1-based ED.FROM -> ED.FOUND.AT (0 = miss)
+ED.STRFIND:
+  ED.FOUND.AT = 0
+  ED.NLEN = LEN(ED.NEEDLE$)
+  IF ED.NLEN = 0 THEN RETURN
+  ED.HLEN = LEN(ED.HAY$)
+  ED.SI = ED.FROM
+  IF ED.SI < 1 THEN ED.SI = 1
+ED.SF.LOOP:
+  IF ED.SI + ED.NLEN - 1 > ED.HLEN THEN RETURN
+  IF MID$(ED.HAY$, ED.SI, ED.NLEN) = ED.NEEDLE$ THEN ED.FOUND.AT = ED.SI : RETURN
+  ED.SI = ED.SI + 1
+  GOTO ED.SF.LOOP
+
+REM uppercase ED.FOLD.IN$ -> ED.FOLD.OUT$ (ASCII a-z only)
+ED.FOLD:
+  ED.FOLD.OUT$ = ""
+  FOR ED.FOLD.I = 1 TO LEN(ED.FOLD.IN$)
+    ED.FOLD.CH = ASC(MID$(ED.FOLD.IN$, ED.FOLD.I, 1))
+    IF ED.FOLD.CH >= 97 AND ED.FOLD.CH <= 122 THEN ED.FOLD.CH = ED.FOLD.CH - 32
+    ED.FOLD.OUT$ = ED.FOLD.OUT$ + CHR$(ED.FOLD.CH)
+  NEXT ED.FOLD.I
+  RETURN
+
+REM ============================================================================
+REM PROMPTS (cyan line input; sim hook for the headless self-check)
+REM ============================================================================
+ED.PROMPT:
+  IF ED.SIM.MODE = 1 THEN ED.INPUT$ = ED.SIM.INPUT$ : ED.PROMPT.OK = 1 : RETURN
+  ED.INPUT$ = ""
+ED.PROMPT.LOOP:
+  ED.PS.ROW = SCREEN.ROWS - 1 : ED.PS.COL = 0 : ED.PS.WIDTH = SCREEN.COLS
+  ED.PS$ = " " + ED.PROMPT.MSG$ + ED.INPUT$ : ED.PS.ATTR = 3 : GOSUB ED.PUT.FIELD
+ED.PROMPT.WAIT:
+  GET ED.KEY$ : IF ED.KEY$ = "" THEN GOTO ED.PROMPT.WAIT
+  ED.KEY = ASC(ED.KEY$)
+  IF ED.KEY = 13 THEN ED.PROMPT.OK = 1 : RETURN
+  IF ED.KEY = 27 THEN ED.PROMPT.OK = 0 : ED.INPUT$ = "" : RETURN
+  IF ED.KEY = 20 AND LEN(ED.INPUT$) > 0 THEN ED.INPUT$ = LEFT$(ED.INPUT$, LEN(ED.INPUT$) - 1) : GOTO ED.PROMPT.LOOP
+  IF ED.KEY >= 32 AND ED.KEY <= 126 AND LEN(ED.INPUT$) < 60 THEN ED.INPUT$ = ED.INPUT$ + ED.KEY$ : GOTO ED.PROMPT.LOOP
+  GOTO ED.PROMPT.WAIT
+
+ED.PROMPT.YN:
+  IF ED.SIM.MODE = 1 THEN ED.YN = ED.SIM.YN : RETURN
+  ED.PS.ROW = SCREEN.ROWS - 1 : ED.PS.COL = 0 : ED.PS.WIDTH = SCREEN.COLS
+  ED.PS$ = " " + ED.PROMPT.MSG$ : ED.PS.ATTR = 3 : GOSUB ED.PUT.FIELD
+ED.YN.WAIT:
+  GET ED.KEY$ : IF ED.KEY$ = "" THEN GOTO ED.YN.WAIT
+  ED.KEY = ASC(ED.KEY$)
+  IF ED.KEY = 89 OR ED.KEY = 121 THEN ED.YN = 1 : RETURN
+  IF ED.KEY = 78 OR ED.KEY = 110 OR ED.KEY = 27 THEN ED.YN = 0 : RETURN
+  GOTO ED.YN.WAIT
+
+REM ============================================================================
+REM MESSAGES
+REM ============================================================================
+ED.INFO.MSG:
+  ED.LAST.MSG$ = ED.MSG$
+  IF ED.QUIET = 1 THEN RETURN
+  ED.PS.ROW = SCREEN.ROWS - 1 : ED.PS.COL = 0 : ED.PS.WIDTH = SCREEN.COLS
+  ED.PS$ = " " + ED.MSG$ : ED.PS.ATTR = 97 : GOSUB ED.PUT.FIELD
+  RETURN
+ED.ERR.MSG:
+  ED.LAST.MSG$ = ED.MSG$
+  IF ED.QUIET = 1 THEN RETURN
+  ED.PS.ROW = SCREEN.ROWS - 1 : ED.PS.COL = 0 : ED.PS.WIDTH = SCREEN.COLS
+  ED.PS$ = " " + ED.MSG$ : ED.PS.ATTR = 33 : GOSUB ED.PUT.FIELD
+  RETURN
+
+REM ============================================================================
+REM RENDERING
+REM ============================================================================
+ED.REFRESH.FULL:
+  IF ED.QUIET = 1 THEN RETURN
+  GOSUB ED.ENSURE.VISIBLE
+  GOSUB ED.RENDER.ALL
+  RETURN
+ED.REFRESH.INTRA:
+  IF ED.QUIET = 1 THEN RETURN
+  GOSUB ED.ENSURE.VISIBLE
+  IF ED.SCROLLED = 1 THEN GOSUB ED.DO.SCROLL : RETURN
+  ED.SCREEN.ROW = ED.CUR.ROW - ED.TOP.LINE + 1
+  ED.DOC.LINE = ED.CUR.ROW
+  GOSUB ED.RENDER.ROW
+  GOSUB ED.PLACE.CARET
+  GOSUB ED.RENDER.STATUS
+  RETURN
+REM Cheap cursor move (no content change): restore the old caret cell, and if the view
+REM did not scroll just invert the new cell + repaint the status line. Touches ~2 cells
+REM instead of the whole screen. Only an actual scroll falls back to a full repaint.
+ED.CARET.REFRESH:
+  IF ED.QUIET = 1 THEN RETURN
+  GOSUB ED.UNCARET
+  GOSUB ED.ENSURE.VISIBLE
+  IF ED.SCROLLED = 1 THEN GOSUB ED.DO.SCROLL : RETURN
+  GOSUB ED.PLACE.CARET
+  GOSUB ED.RENDER.STATUS
+  RETURN
+
+ED.ENSURE.VISIBLE:
+  ED.SCROLLED = 0 : ED.HSCROLLED = 0 : ED.EV.OLDTOP = ED.TOP.LINE
+  IF ED.CUR.ROW < ED.TOP.LINE THEN ED.TOP.LINE = ED.CUR.ROW
+  IF ED.CUR.ROW > ED.TOP.LINE + ED.TEXT.ROWS - 1 THEN ED.TOP.LINE = ED.CUR.ROW - ED.TEXT.ROWS + 1
+  IF ED.CUR.COL < ED.LEFT.COL THEN ED.LEFT.COL = ED.CUR.COL : ED.HSCROLLED = 1
+  IF ED.CUR.COL > ED.LEFT.COL + ED.TEXT.WIDTH - 1 THEN ED.LEFT.COL = ED.CUR.COL - ED.TEXT.WIDTH + 1 : ED.HSCROLLED = 1
+  ED.VDELTA = ED.TOP.LINE - ED.EV.OLDTOP
+  IF ED.VDELTA <> 0 THEN ED.SCROLLED = 1
+  IF ED.HSCROLLED = 1 THEN ED.SCROLLED = 1
+  RETURN
+
+REM A view change (ED.SCROLLED=1) is served by hardware VERA VSCROLL when it is a single
+REM text-row vertical move with no horizontal scroll: bump L1_VSCROLL by one text row and
+REM repaint only the menu bar (it must stay put on screen while the map slides under it),
+REM the one newly-exposed text row, and the status bar -- 3 rows, not ~28. Everything else
+REM (a multi-line jump from PageUp/Down/GoTo/Find, or any horizontal scroll) is a full
+REM repaint at the current map offset. The newly-exposed row is always the current row in
+REM a cursor-move scroll, so ED.RENDER.ROW streams it live from ED.CUR.LINE$.
+ED.DO.SCROLL:
+  IF ED.HW.OK = 0 THEN GOSUB ED.RENDER.ALL : RETURN
+  IF ED.HSCROLLED = 1 THEN GOSUB ED.RENDER.ALL : RETURN
+  IF ED.VDELTA = 1 THEN GOSUB ED.HW.SCROLL.DOWN : RETURN
+  IF ED.VDELTA = 0 - 1 THEN GOSUB ED.HW.SCROLL.UP : RETURN
+  GOSUB ED.RENDER.ALL
+  RETURN
+REM scroll down one line: content slides up, a new line appears at the bottom text row.
+ED.HW.SCROLL.DOWN:
+  ED.MAP.TOP = ED.MAP.TOP + 1
+  IF ED.MAP.TOP > ED.MAP.MAXTOP THEN ED.MAP.TOP = 0 : GOSUB ED.SET.VSCROLL : GOSUB ED.RENDER.ALL : RETURN
+  GOSUB ED.SET.VSCROLL
+  GOSUB ED.RENDER.MENUBAR
+  ED.SCREEN.ROW = ED.TEXT.BOTTOM : ED.DOC.LINE = ED.TOP.LINE + ED.SCREEN.ROW - 1 : GOSUB ED.RENDER.ROW
+  GOSUB ED.RENDER.STATUS
+  GOSUB ED.PLACE.CARET
+  RETURN
+REM scroll up one line: content slides down, a new line appears at the top text row (1).
+ED.HW.SCROLL.UP:
+  ED.MAP.TOP = ED.MAP.TOP - 1
+  IF ED.MAP.TOP < 0 THEN ED.MAP.TOP = ED.MAP.MAXTOP : GOSUB ED.SET.VSCROLL : GOSUB ED.RENDER.ALL : RETURN
+  GOSUB ED.SET.VSCROLL
+  GOSUB ED.RENDER.MENUBAR
+  ED.SCREEN.ROW = 1 : ED.DOC.LINE = ED.TOP.LINE + ED.SCREEN.ROW - 1 : GOSUB ED.RENDER.ROW
+  GOSUB ED.RENDER.STATUS
+  GOSUB ED.PLACE.CARET
+  RETURN
+ED.SET.VSCROLL:
+  ED.VSP = ED.MAP.TOP * 8
+  POKE 40761, ED.VSP - INT(ED.VSP / 256) * 256 : REM $9F39 L1 VSCROLL (7:0)
+  POKE 40762, INT(ED.VSP / 256)                : REM $9F3A L1 VSCROLL (11:8)
+  RETURN
+
+ED.RENDER.ALL:
+  GOSUB ED.RENDER.MENUBAR
+  FOR ED.SCREEN.ROW = 1 TO ED.TEXT.BOTTOM
+    ED.DOC.LINE = ED.TOP.LINE + ED.SCREEN.ROW - 1
+    GOSUB ED.RENDER.ROW
+  NEXT ED.SCREEN.ROW
+  GOSUB ED.RENDER.STATUS
+  GOSUB ED.PLACE.CARET
+  RETURN
+
+REM Rows render through VERA FX 32-bit cache write: one DATA0 write flushes 4 VRAM bytes
+REM = 2 text cells [char,attr,char,attr]. The attribute is identical for every cell in a
+REM row (ED.ATTR.TEXT), so it is loaded into the cache's two attr slots ONCE, then each
+REM iteration only pokes the two CHAR slots + one flush -- 3 pokes per 2 cells instead of
+REM char+attr's 4. ~2x the +1 streamer (benchmarked 48 vs 80 jiffies/100). Writing the
+REM attr every cell keeps it coupling-free (unlike the reverted char-only hack). A non-
+REM current row reads bytes straight from the banked store; the current row streams from
+REM ED.CUR.LINE$. FX regs: $9F25 CTRL bits6:1=DCSEL; DCSEL 2 -> FX_CTRL $9F29 (bit6 cache-
+REM write-enable); DCSEL 6 -> FX_CACHE L/M/H/U $9F29-2C = [char0,attr0,char1,attr1].
+REM Address increment is +4 (49) so DATA0 walks 2 cells per flush. ED.TEXT.WIDTH is even.
+ED.RENDER.ROW:
+  ED.ROW.BASE = 45056 + (ED.SCREEN.ROW + ED.MAP.TOP) * 256
+  POKE 40736, ED.ROW.BASE - INT(ED.ROW.BASE / 256) * 256 : REM $9F20 addr (7:0)
+  POKE 40737, INT(ED.ROW.BASE / 256)                     : REM $9F21 addr (15:8)
+  POKE 40738, 49                                          : REM $9F22 bank 1, increment=+4
+  POKE 40741, 4 : POKE 40745, 64                          : REM DCSEL=2, FX_CTRL cache-write-enable
+  POKE 40741, 12 : POKE 40746, ED.ATTR.TEXT : POKE 40748, ED.ATTR.TEXT : REM DCSEL=6, attr slots
+  IF ED.DOC.LINE >= LINE.COUNT THEN GOTO ED.ROW.BLANK
+  IF ED.DOC.LINE = ED.CUR.ROW THEN GOTO ED.ROW.LIVE
+  LINE.INDEX = ED.DOC.LINE : GOSUB DOC.SLOT.READ
+  BANK DOC.GOT.BANK
+  ED.VIS = PEEK(DOC.GOT.OFF) - ED.LEFT.COL : REM visible chars after horizontal scroll
+  ED.SRC = DOC.GOT.OFF + 1 + ED.LEFT.COL
+  FOR ED.COL = 0 TO ED.TEXT.WIDTH - 2 STEP 2
+    ED.CHAR = 32 : IF ED.COL < ED.VIS THEN ED.CHAR = PEEK(ED.SRC + ED.COL)
+    ED.CHAR2 = 32 : IF ED.COL + 1 < ED.VIS THEN ED.CHAR2 = PEEK(ED.SRC + ED.COL + 1)
+    POKE 40745, ED.CHAR : POKE 40747, ED.CHAR2 : POKE 40739, 0 : REM char0,char1 -> flush 2 cells
+  NEXT ED.COL
+  GOTO ED.ROW.FXDONE
+ED.ROW.LIVE:
+  ED.LINE.LEN = LEN(ED.CUR.LINE$)
+  FOR ED.COL = 0 TO ED.TEXT.WIDTH - 2 STEP 2
+    ED.SRC.COL = ED.COL + ED.LEFT.COL
+    ED.CHAR = 32 : IF ED.SRC.COL < ED.LINE.LEN THEN ED.CHAR = ASC(MID$(ED.CUR.LINE$, ED.SRC.COL + 1, 1))
+    ED.CHAR2 = 32 : IF ED.SRC.COL + 1 < ED.LINE.LEN THEN ED.CHAR2 = ASC(MID$(ED.CUR.LINE$, ED.SRC.COL + 2, 1))
+    POKE 40745, ED.CHAR : POKE 40747, ED.CHAR2 : POKE 40739, 0
+  NEXT ED.COL
+  GOTO ED.ROW.FXDONE
+ED.ROW.BLANK:
+  FOR ED.COL = 0 TO ED.TEXT.WIDTH - 2 STEP 2
+    POKE 40745, 32 : POKE 40747, 32 : POKE 40739, 0
+  NEXT ED.COL
+ED.ROW.FXDONE:
+  POKE 40741, 4 : POKE 40745, 0 : POKE 40741, 0 : REM DCSEL=2, FX_CTRL=0, DCSEL=0 (restore normal VERA)
+  RETURN
+
+REM Caret = one inverted attribute cell. Remember the exact cell so a plain cursor move
+REM can restore it (ED.UNCARET) instead of repainting the whole screen.
+ED.PLACE.CARET:
+  ED.CARET.SROW = ED.CUR.ROW - ED.TOP.LINE + 1
+  ED.CARET.SCOL = ED.CUR.COL - ED.LEFT.COL
+  ED.CARET.VALID = 0
+  IF ED.CARET.SROW < 1 OR ED.CARET.SROW > ED.TEXT.BOTTOM THEN RETURN
+  IF ED.CARET.SCOL < 0 OR ED.CARET.SCOL >= ED.TEXT.WIDTH THEN RETURN
+  ED.CARET.ADDR = 45056 + (ED.CARET.SROW + ED.MAP.TOP) * 256 + ED.CARET.SCOL * 2 + 1
+  VPOKE 1, ED.CARET.ADDR, ED.ATTR.CARET
+  ED.CARET.VALID = 1
+  RETURN
+ED.UNCARET:
+  IF ED.CARET.VALID = 0 THEN RETURN
+  VPOKE 1, ED.CARET.ADDR, ED.ATTR.TEXT
+  ED.CARET.VALID = 0
+  RETURN
+
+REM ---- menu bar (VERA row 0). Attr = bg*16+fg: white-on-blue bar = 97,
+REM ---- yellow accelerator = 103, active title (blue-on-white) = 22. ----
+ED.RENDER.MENUBAR:
+  ED.PS.ROW = 0 : ED.PS.COL = 0 : ED.PS.WIDTH = SCREEN.COLS
+  ED.PS$ = "" : ED.PS.ATTR = 97 : GOSUB ED.PUT.FIELD
+  FOR MENU.I = 0 TO MENU.COUNT - 1
+    GOSUB ED.DRAW.MENU.TITLE
+  NEXT MENU.I
+  ED.NAME$ = DOC.FILE.NAME$
+  IF ED.DOC.DIRTY = 1 THEN ED.NAME$ = ED.NAME$ + " *"
+  ED.NCOL = SCREEN.COLS - LEN(ED.NAME$) - 1
+  IF ED.NCOL > 1 THEN ED.PS.ROW = 0 : ED.PS.COL = ED.NCOL - 1 : ED.PS.WIDTH = LEN(ED.NAME$) : ED.PS$ = ED.NAME$ : ED.PS.ATTR = 97 : GOSUB ED.PUT.FIELD
+  RETURN
+ED.DRAW.MENU.TITLE:
+  ED.MT.COL = MENU.COL(MENU.I) - 1 : ED.MT$ = MENU.NAME$(MENU.I)
+  IF MENU.I = MENU.ACTIVE THEN ED.PS.ROW = 0 : ED.PS.COL = ED.MT.COL : ED.PS.WIDTH = LEN(ED.MT$) : ED.PS$ = ED.MT$ : ED.PS.ATTR = 22 : GOSUB ED.PUT.FIELD : RETURN
+  ED.PS.ROW = 0 : ED.PS.COL = ED.MT.COL : ED.PS.WIDTH = 1 : ED.PS$ = LEFT$(ED.MT$, 1) : ED.PS.ATTR = 103 : GOSUB ED.PUT.FIELD
+  ED.PS.COL = ED.MT.COL + 1 : ED.PS.WIDTH = LEN(ED.MT$) - 1 : ED.PS$ = MID$(ED.MT$, 2, 20) : ED.PS.ATTR = 97 : GOSUB ED.PUT.FIELD
+  RETURN
+
+REM ---- dropdown (VERA rows 1..). normal item = black-on-grey 240,
+REM ---- selected = white-on-blue 97. ----
+ED.DRAW.DROPDOWN:
+  ED.DD.N = MENU.ITEMS(MENU.ACTIVE)
+  ED.DD.COL = MENU.COL(MENU.ACTIVE) - 1
+  ED.DD.W = MENU.WIDTH(MENU.ACTIVE)
+  FOR ED.DD.I = 0 TO ED.DD.N - 1
+    ED.PS.ROW = 1 + ED.DD.I : ED.PS.COL = ED.DD.COL : ED.PS.WIDTH = ED.DD.W
+    ED.PS$ = " " + MENU.ITEM$(MENU.ACTIVE * 8 + ED.DD.I)
+    ED.PS.ATTR = 240
+    IF ED.DD.I = MENU.SEL THEN ED.PS.ATTR = 97
+    GOSUB ED.PUT.FIELD
+  NEXT ED.DD.I
+  RETURN
+
+ED.RENDER.STATUS:
+  ED.MARK$ = "   "
+  IF ED.DOC.DIRTY = 1 THEN ED.MARK$ = " * "
+  ED.MODE$ = "INS"
+  IF ED.INSERT.MODE = 0 THEN ED.MODE$ = "OVR"
+  ED.BAR$ = ED.MARK$ + "L" + MID$(STR$(ED.CUR.ROW + 1), 2) + " C" + MID$(STR$(ED.CUR.COL + 1), 2) + "  " + ED.MODE$ + "  LINES=" + MID$(STR$(LINE.COUNT), 2) + "   ESC=MENU  F2=SAVE  F3=FIND"
+  ED.PS.ROW = SCREEN.ROWS - 1 : ED.PS.COL = 0 : ED.PS.WIDTH = SCREEN.COLS
+  ED.PS$ = ED.BAR$ : ED.PS.ATTR = 97 : GOSUB ED.PUT.FIELD
+  RETURN
+
+REM ---- write ED.PS$ into the VERA text map at 0-based (ED.PS.ROW, ED.PS.COL),
+REM attribute byte ED.PS.ATTR (= bg*16 + fg), padding with spaces out to ED.PS.WIDTH
+REM cells and truncating past it. No KERNAL PRINT, no O(n^2) padding.
+REM Uses VERA AUTO-INCREMENT: program the start address + "+1" step ONCE, then stream
+REM char,attr,char,attr,... to DATA0 ($9F23). Within a cell the char and attr bytes are
+REM adjacent and consecutive cells follow, so +1 walks the whole field -- no per-cell
+REM address math and no re-programming the address 160 times a row. ----
+ED.PUT.FIELD:
+  ED.PS.BASE = 45056 + (ED.PS.ROW + ED.MAP.TOP) * 256 + ED.PS.COL * 2
+  ED.PS.HI = INT(ED.PS.BASE / 256)
+  POKE 40736, ED.PS.BASE - ED.PS.HI * 256 : REM $9F20 VERA addr (7:0)
+  POKE 40737, ED.PS.HI                     : REM $9F21 VERA addr (15:8)
+  POKE 40738, 17                           : REM $9F22 addr(16)=bank 1, increment=+1
+  ED.PS.LEN = LEN(ED.PS$)
+  FOR ED.PS.I = 0 TO ED.PS.WIDTH - 1
+    ED.PS.CH = 32
+    IF ED.PS.I < ED.PS.LEN THEN ED.PS.CH = ASC(MID$(ED.PS$, ED.PS.I + 1, 1))
+    POKE 40739, ED.PS.CH   : REM char -> DATA0; VERA steps to the attribute byte
+    POKE 40739, ED.PS.ATTR : REM attr -> DATA0; VERA steps to the next cell
+  NEXT ED.PS.I
+  RETURN
+
+REM ============================================================================
+REM HEADLESS SELF-CHECK (DEBUG.MODE=1): drive menu dispatch + commands.
+REM ============================================================================
+ED.SELFCHECK:
+  ED.QUIET = 1
+  ED.SIM.MODE = 1
+  DOC.FILE.NAME$ = "TEST.MD" : GOSUB ED.OPEN.FILE
+
+  REM go to line 3 (row 2)
+  ED.SIM.INPUT$ = "3" : GOSUB ED.CMD.GOTO
+  PRINT "GOTO ROW=";ED.CUR.ROW;" COL=";ED.CUR.COL
+
+  REM find "bullet" (row 2), then find-next (row 3)
+  ED.SIM.INPUT$ = "bullet" : GOSUB ED.CMD.FIND
+  PRINT "FIND1 ROW=";ED.CUR.ROW;" COL=";ED.CUR.COL;" MSG=";ED.LAST.MSG$
+  GOSUB ED.FIND.NEXT
+  PRINT "FIND2 ROW=";ED.CUR.ROW;" COL=";ED.CUR.COL
+
+  REM find "markdown" -- must wrap around to row 0, case-insensitive
+  ED.SIM.INPUT$ = "markdown" : GOSUB ED.CMD.FIND
+  PRINT "FINDM ROW=";ED.CUR.ROW;" COL=";ED.CUR.COL
+
+  REM a miss
+  ED.SIM.INPUT$ = "zzq" : GOSUB ED.CMD.FIND
+  PRINT "FINDZ MSG=";ED.LAST.MSG$
+
+  REM discard-confirm: decline blocks New, accept resets
+  ED.DOC.DIRTY = 1 : ED.SIM.YN = 0
+  GOSUB ED.CMD.NEW
+  PRINT "DECLINE COUNT=";LINE.COUNT;" DIRTY=";ED.DOC.DIRTY
+  ED.SIM.YN = 1
+  GOSUB ED.CMD.NEW
+  PRINT "ACCEPT COUNT=";LINE.COUNT;" NAME=";DOC.FILE.NAME$
+
+  REM ---- verify chrome (char+attr) + text render + the O(1) caret ----
+  ED.QUIET = 0
+  PRINT "DIM ";SCREEN.COLS;"x";SCREEN.ROWS
+  MENU.ACTIVE = 0 - 1 : GOSUB ED.RENDER.MENUBAR
+  PRINT "MB CH=";VPEEK(1, 45058);" AT=";VPEEK(1, 45059)
+  MENU.ACTIVE = 0 : MENU.SEL = 0 : GOSUB ED.DRAW.DROPDOWN
+  PRINT "DD CH=";VPEEK(1, 45316);" AT=";VPEEK(1, 45317)
+  ED.MSG$ = "HELLO" : GOSUB ED.INFO.MSG
+  ED.SR = SCREEN.ROWS - 1
+  PRINT "MSG CH=";VPEEK(1, 45056 + ED.SR * 256 + 2);" AT=";VPEEK(1, 45056 + ED.SR * 256 + 3)
+  REM REAL repaint path: open a file (full RENDER.ALL), drop the caret, sample clean cells.
+  REM Every text cell must be char + ED.ATTR.TEXT(1) -- content rows AND blank rows.
+  DOC.FILE.NAME$ = "TEST.MD" : GOSUB ED.OPEN.FILE
+  GOSUB ED.UNCARET
+  PRINT "TR CH=";VPEEK(1, 45312);" AT=";VPEEK(1, 45313)
+  PRINT "TR2 CH=";VPEEK(1, 45568);" AT=";VPEEK(1, 45569)
+  PRINT "A10 AT=";VPEEK(1, 45056 + 10 * 256 + 41)
+  PRINT "A20 AT=";VPEEK(1, 45056 + 20 * 256 + 61)
+  REM caret place/restore (the O(1) cursor-move primitive)
+  ED.CUR.ROW = 0 : ED.CUR.COL = 0 : ED.TOP.LINE = 0 : ED.LEFT.COL = 0
+  GOSUB ED.PLACE.CARET : PRINT "CARET AT=";VPEEK(1, 45313)
+  GOSUB ED.UNCARET : PRINT "UNCARET AT=";VPEEK(1, 45313)
+
+  REM ---- hardware VSCROLL: register writes + map-offset render + rewind bound ----
+  PRINT "MAPH=";ED.MAP.H;" MAXTOP=";ED.MAP.MAXTOP;" HWOK=";ED.HW.OK
+  ED.TOP.LINE = 1 : ED.LEFT.COL = 0 : ED.CUR.ROW = 1 : ED.CUR.COL = 0
+  ED.MAP.TOP = 0 : GOSUB ED.SET.VSCROLL
+  GOSUB ED.HW.SCROLL.DOWN
+  REM after +1: VSCROLL = 8, MAP.TOP = 1, menu bar re-drawn at map row 1 ('F' = 70)
+  PRINT "HWD TOP=";ED.MAP.TOP;" VSL=";PEEK(40761);" VSH=";PEEK(40762)
+  PRINT "HWD MB=";VPEEK(1, 45056 + ED.MAP.TOP * 256 + 2)
+  GOSUB ED.HW.SCROLL.UP
+  REM back to 0: VSCROLL = 0, menu bar at map row 0 ('F' = 70)
+  PRINT "HWU TOP=";ED.MAP.TOP;" VSL=";PEEK(40761)
+  PRINT "HWU MB=";VPEEK(1, 45058)
+  REM at the bottom bound a +1 scroll rewinds to 0 (never crosses the map edge)
+  ED.MAP.TOP = ED.MAP.MAXTOP : GOSUB ED.SET.VSCROLL
+  GOSUB ED.HW.SCROLL.DOWN
+  PRINT "HWREW TOP=";ED.MAP.TOP;" VSL=";PEEK(40761)
+  ED.MAP.TOP = 0 : GOSUB ED.SET.VSCROLL
+
+  REM ---- end-to-end: build a tall doc, walk the cursor down through several
+  REM      hardware scrolls, then confirm the visible map window holds the right
+  REM      document lines at exactly the map rows VSCROLL is displaying. ----
+  ED.QUIET = 0
+  GOSUB DOC.INIT
+  FOR ED.T = 0 TO 39
+    LINE.TEXT$ = "L" + MID$(STR$(ED.T), 2) : GOSUB DOC.PUSH.LINE
+  NEXT ED.T
+  ED.TOP.LINE = 0 : ED.LEFT.COL = 0 : ED.CUR.ROW = 0 : ED.CUR.COL = 0
+  ED.MAP.TOP = 0 : GOSUB ED.SET.VSCROLL
+  GOSUB ED.LOAD.LIVE : GOSUB ED.RENDER.ALL
+  FOR ED.T = 1 TO 35
+    GOSUB ED.MOVE.DOWN
+  NEXT ED.T
+  PRINT "WALK CUR=";ED.CUR.ROW;" TOP=";ED.TOP.LINE;" MAPTOP=";ED.MAP.TOP;" VSL=";PEEK(40761)
+  ED.MR = 1 + ED.MAP.TOP
+  PRINT "WTOP DOC=";ED.TOP.LINE;" MAPCH=";VPEEK(1, 45056 + ED.MR * 256);VPEEK(1, 45056 + ED.MR * 256 + 2)
+  ED.MR = ED.TEXT.BOTTOM + ED.MAP.TOP
+  ED.BL = ED.TOP.LINE + ED.TEXT.BOTTOM - 1
+  PRINT "WBOT DOC=";ED.BL;" MAPCH=";VPEEK(1, 45056 + ED.MR * 256);VPEEK(1, 45056 + ED.MR * 256 + 2)
+  ED.MAP.TOP = 0 : GOSUB ED.SET.VSCROLL
+  ED.QUIET = 1 : MENU.ACTIVE = 0 - 1
+
+  PRINT "M4 OK"
+  RETURN
+
+#INCLUDE "STORE.BASL"
