@@ -586,26 +586,37 @@ Extend the two-program `samples/shared-vars/` to **three** programs A→B→C th
 B reads and adds, C prints the total) — the original ask. Same rules as above (scalars, identical
 first-appearance order, all compiled SHARED). See [[blitz-shared-runtime]] and [[blitz-load-chain]].
 
-### Editor sample (text / Markdown editor) — TODO, parked on branch `editor-sample`
+### Editor sample (text / Markdown editor) — SHELVED on branch `editor-sample`
 
 An MS-DOS-EDIT-styled text/Markdown editor in BASLOAD (`testing/EDITOR.BASL` + `testing/STORE.BASL`,
 design record in `testing/EDITOR.md`). M1–M4 done and verified headless; render is all-VERA with
 three load-bearing speedups — O(1) caret movement, FX-text row render (32-bit cache write, ~48 vs 80
 jiffies/100 for char+attr), and **hardware VSCROLL** (`L1_VSCROLL`, repaint 3 rows not ~28; map is
 64×128, `ED.MAP.TOP` bounded to [0,34] so it never relies on VERA's vertical wrap). Committed to its
-own branch as a checkpoint; **not** merged and **not** yet relocated to `samples/`. To revisit:
+own branch as a checkpoint; **not** merged and **not** relocated to `samples/`. **Parked 2026-07-21**
+— the perf question that was driving it is now answered (below). To resume:
 
 - **M5 ship** — move to `samples/editor/`, add a real sample `.md` + `readme.md` that names the render
   numbers (per the sample template), wire `make samples`, headless smoke test.
-- **The prog8 speed gap** — `x16-MSEDIT` (prog8, native 6502) repaints visibly faster. *Hypothesis:*
-  it is GPC's P-code dispatch over 6-byte float operands vs native machine code, not the VERA method
-  (we already match the fast VERA path). Measured on the GPC side (render table above; INT `%` bought
-  only ~4.6%); NOT yet confirmed by profiling GPC dispatch or reading prog8's emitted render loop.
-- **Inline ASM in GPC** — feasibility assessed and written up in `docs/blitz/inline-asm-feasibility.md`
-  (source-verified: the VM already jumps to arbitrary code, codegen is one-line extensible, in-stream
-  bytes need no relocation; the hard parts are the authoring pipeline and the iFloat32/dynamic-base
-  variable ABI). Option A measured: a native `SYS`'d char+attr row render is **~37× GPC's best compiled
-  render** (13 vs ~480 jiffies/1000 rows) — so render cost is per-cell VM dispatch, not the VERA path.
+- **The prog8 speed gap — CLOSED (measured 2026-07-21).** `x16-MSEDIT`'s real render loop
+  (`draw_wrapped_row`, `edit.p8:1080-1104`) drives VERA the *same* way the GPC editor does (one ADDR0
+  setup, auto-increment, 2 DATA0 writes/cell) — so the VERA method is NOT the difference. Its no-syntax
+  cell loop, copied verbatim into `pbench.p8`, built with MSEDIT's own `prog8c.jar` and run on the same
+  emulator/ROM/jiffy clock, renders an 80-cell row in **67 jiffies/1000 reps vs GPC's ~480** (FX, its
+  best) / ~800 (plain): prog8 is **~7×/~12×**. Native hand-asm floor = 13. Static cycle count of
+  prog8's emitted loop (~112 cyc/cell) reconciles with the 67. The entire gap is **codegen** — native
+  `STA`s per cell vs P-code the VM dispatches per `POKE`. Writeup: `docs/blitz/inline-asm-feasibility.md`
+  ("MSEDIT measured directly").
+- **Inline ASM in GPC** — feasibility written up in `docs/blitz/inline-asm-feasibility.md` (source-
+  verified: the VM already jumps to arbitrary code, codegen is one-line extensible, in-stream bytes need
+  no relocation; hard parts are the authoring pipeline and the iFloat32/dynamic-base variable ABI).
+- **The better render fix than general inline ASM — a native block-blit command (unbuilt).** Since the
+  measurement proves the cost is per-cell VM dispatch, adding ONE built-in command whose native handler
+  streams a whole row-buffer to VERA `DATA0` collapses 80 cells of P-code into a single dispatch →
+  approaches native (13–67), i.e. ~7–35× over current GPC. Same VM plumbing as any command
+  (`commands.def` + generator + vector + handler, ~30 lines) and it *dodges* inline ASM's hard parts (no
+  on-device assembler, no iFloat32/variable-base ABI exposed). This is the recommended speed path if the
+  editor is ever resumed; pure-BASIC loop-unrolling is the only alternative and buys only ~1.5–2×.
 
 ### Ideas for more samples — TODO
 
