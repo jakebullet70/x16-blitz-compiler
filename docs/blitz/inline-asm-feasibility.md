@@ -110,9 +110,40 @@ push-float-address / push-float-value / dispatch / `XPokeMemory`-with-bank-save-
 **What this does and does not settle.** *Measured:* native row-render is ~37× GPC's best compiled
 render, so the render cost is almost entirely per-cell VM dispatch, not the VERA write path (we already
 matched the fast VERA path in the editor). That strongly supports the standing *hypothesis* that GPC's
-P-code dispatch — not the VERA method — is why its render trails prog8's native MSEDIT. It does **not**
-fully close it: prog8's MSEDIT itself was not profiled here, and this routine is a clean char+attr row,
-not MSEDIT's exact render. The remaining step to prove the causal claim is to measure MSEDIT directly.
+P-code dispatch — not the VERA method — is why its render trails prog8's native MSEDIT. The clean
+char+attr routine is a floor, not MSEDIT's exact render — so the causal claim was closed separately by
+measuring MSEDIT's real loop directly (next section).
+
+## MSEDIT measured directly — the causal claim, closed
+
+The hand-asm floor above did not by itself prove prog8's *actual* editor renders faster than GPC — it
+was an idealized raw-write loop, and MSEDIT was never profiled. So MSEDIT's real render was reproduced
+and timed. MSEDIT's row renderer is `draw_wrapped_row` (`x16-MSEDIT/SRC/edit.p8:1080-1104`): it programs
+VERA `ADDR0` once with auto-increment and streams two `DATA0` writes per cell — **the same VERA path the
+GPC editor's FX render uses**. Its no-syntax cell loop was copied verbatim into a small prog8 program
+(`scratchpad` `pbench.p8`), compiled with the same `prog8c.jar` MSEDIT ships, and run on the **same
+emulator + ROM + jiffy clock** at real speed, `RP=1000` reps of an 80-cell row — identical protocol to
+the GPC and native benches:
+
+| render of one 80-cell row | jiffies / 1000 rows | cycles / cell | vs GPC's best |
+|---|--:|--:|--:|
+| native char+attr, raw char (SYS'd 6502) | 13 | ~21 | ~37× faster |
+| **prog8 — MSEDIT's real loop** (`petscii2scr` per cell) | **67** | **~112** | **~7× faster** |
+| GPC FX-text (GPC's fastest) | ~480 | ~800 | 1× |
+| GPC plain char+attr | ~800 | ~1300 | 0.6× |
+
+Verified real: after the timed run, cell 0 of the target row read back `char=1, colour=1`
+(`petscii2scr('A'=65)` = screencode 1, body colour 1), so the loop rendered — it was not elided. The
+number is physically sound too: the emitted 6502 (`pbench.asm:250-292`) is ~81 cycles/cell of prog8
+loop/branch/store plus a `jsr txt.petscii2scr` (~30 cyc) ≈ 111, matching the measured 111.7 cyc/cell to
+rounding. The `petscii2scr` JSR per cell is why prog8 (67) trails the raw-write native floor (13) —
+MSEDIT pays that conversion too, so 67 is its *real* render cost, not an idealized one.
+
+**Settled:** MSEDIT and the GPC editor drive VERA the same way, yet prog8's real compiled render is ~7×
+GPC's best and ~12× GPC's plain `POKE` render. The entire gap is codegen — prog8 emits a handful of
+native `STA`s per cell, GPC emits P-code the VM dispatches per `POKE` (push-float-addr, push-float-val,
+dispatch, `XPokeMemory` with bank save/restore, ~1300 cyc/cell). "Native vs P-code dispatch" is no
+longer a hypothesis; it is measured, both dynamically and by static cycle count.
 
 First hazard, learned the hard way: the very first attempt POKEd this routine to `$0400` and used
 zero-page `$FB/$FC` from inside a **compiled** program, and it crashed (PC ran wild to `$B438`) — the GPC
