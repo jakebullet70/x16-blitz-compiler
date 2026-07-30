@@ -5,79 +5,112 @@
 
 ExpCoefficients:
 	.byte	7
-	.dword	$5a2c1f2b ; 2.1498763701e-05
-	.byte	$d2
-	.dword	$4b3f598e ; 0.00014352314037
-	.byte	$d5
-	.dword	$57f771c3 ; 0.0013422634825
-	.byte	$d8
-	.dword	$4ec20e15 ; 0.0096140170135
-	.byte	$db
-	.dword	$71acac05 ; 0.05550512686
-	.byte	$dd
-	.dword	$7afef3e3 ; 0.2402263846
-	.byte	$df
-	.dword	$58b90c08 ; 0.69314718618
+	.dword	$b4583e56 ; 2.1498763701e-05
+	.byte	$d1
+	.byte	$00
+	.dword	$967eb31b ; 0.00014352314037
+	.byte	$d4
+	.byte	$00
+	.dword	$afeee385 ; 0.0013422634825
+	.byte	$d7
+	.byte	$00
+	.dword	$9d841c2a ; 0.0096140170135
+	.byte	$da
+	.byte	$00
+	.dword	$e359580a ; 0.05550512686
+	.byte	$dc
+	.byte	$00
+	.dword	$f5fde7c6 ; 0.2402263846
+	.byte	$de
+	.byte	$00
+	.dword	$b1721810 ; 0.69314718618
+	.byte	$e0
+	.byte	$00
+	.dword	$80000000 ; 1.0
 	.byte	$e1
-	.dword	$40000000 ; 1.0
-	.byte	$e2
+	.byte	$00
 
 SinCoefficients:
 	.byte	6
-	.dword	$f30d168d ; -14.381390672
-	.byte	$e5
-	.dword	$5403fdfc ; 42.007797122
-	.byte	$e7
-	.dword	$ccb44481 ; -76.704170257
-	.byte	$e8
-	.dword	$519aeff1 ; 81.605223686
-	.byte	$e8
-	.dword	$d2aef394 ; -41.341702104
-	.byte	$e7
-	.dword	$6487ed51 ; 6.2831853069
+	.dword	$e61a2d1b ; -14.381390672
 	.byte	$e4
+	.byte	$80
+	.dword	$a807fbf8 ; 42.007797122
+	.byte	$e6
+	.byte	$00
+	.dword	$99688901 ; -76.704170257
+	.byte	$e7
+	.byte	$80
+	.dword	$a335dfe1 ; 81.605223686
+	.byte	$e7
+	.byte	$00
+	.dword	$a55de728 ; -41.341702104
+	.byte	$e6
+	.byte	$80
+	.dword	$c90fdaa2 ; 6.2831853069
+	.byte	$e3
+	.byte	$00
 	.dword	$00000000 ; 0.0
+	.byte	$00
 	.byte	$00
 
 LogCoefficients:
 	.byte	4
-	.dword	$6f2b65bd ; 0.43425594189
+	.dword	$de56cb79 ; 0.43425594189
+	.byte	$df
+	.byte	$00
+	.dword	$939b0b64 ; 0.57658454124
 	.byte	$e0
-	.dword	$49cd85b2 ; 0.57658454124
-	.byte	$e1
-	.dword	$7b1c498b ; 0.96180075919
-	.byte	$e1
-	.dword	$5c551d90 ; 2.8853900731
-	.byte	$e3
-	.dword	$c0000000 ; -0.5
-	.byte	$e1
+	.byte	$00
+	.dword	$f6389316 ; 0.96180075919
+	.byte	$e0
+	.byte	$00
+	.dword	$b8aa3b20 ; 2.8853900731
+	.byte	$e2
+	.byte	$00
+	.dword	$80000000 ; -0.5
+	.byte	$e0
+	.byte	$80
 
 AtnCoefficients:
 	.byte	12
-	.dword	$d9c1deea ; -0.00068479391189
-	.byte	$d7
-	.dword	$4f7a537a ; 0.0048509421558
-	.byte	$da
-	.dword	$c1fe5808 ; -0.016111701843
+	.dword	$b383bdd3 ; -0.00068479391189
+	.byte	$d6
+	.byte	$80
+	.dword	$9ef4a6f5 ; 0.0048509421558
+	.byte	$d9
+	.byte	$00
+	.dword	$83fcb010 ; -0.016111701843
+	.byte	$db
+	.byte	$80
+	.dword	$8c1f67ca ; 0.034209638048
 	.byte	$dc
-	.dword	$460fb3e5 ; 0.034209638048
+	.byte	$00
+	.dword	$de53cbc1 ; -0.054279132761
+	.byte	$dc
+	.byte	$80
+	.dword	$9464704c ; 0.07245719654
 	.byte	$dd
-	.dword	$ef29e5e1 ; -0.054279132761
+	.byte	$00
+	.dword	$b7ea517a ; -0.089802395378
 	.byte	$dd
-	.dword	$4a323826 ; 0.07245719654
+	.byte	$80
+	.dword	$e330887e ; 0.11093241343
+	.byte	$dd
+	.byte	$00
+	.dword	$9244993a ; -0.14283980767
 	.byte	$de
-	.dword	$dbf528bd ; -0.089802395378
+	.byte	$80
+	.dword	$cccc91c7 ; 0.19999912049
 	.byte	$de
-	.dword	$7198443f ; 0.11093241343
-	.byte	$de
-	.dword	$c9224c9d ; -0.14283980767
+	.byte	$00
+	.dword	$aaaaaa13 ; -0.33333331568
 	.byte	$df
-	.dword	$666648e3 ; 0.19999912049
-	.byte	$df
-	.dword	$d555550a ; -0.33333331568
-	.byte	$e0
-	.dword	$40000000 ; 1.0
-	.byte	$e2
+	.byte	$80
+	.dword	$80000000 ; 1.0
+	.byte	$e1
+	.byte	$00
 	.dword	$00000000 ; 0.0
+	.byte	$00
 	.byte	$00
 	.send code

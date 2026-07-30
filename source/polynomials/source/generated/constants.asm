@@ -4,27 +4,35 @@
 .section code
 Const_Base:
 Const_1Div2Pi:
-	.dword	$517cc1b7 ; 0.15915494
-	.byte	$df
+	.dword	$a2f9836e ; 0.15915494
+	.byte	$de
+	.byte	$00
 Const_PiDiv2:
-	.dword	$6487ed51 ; 1.57079633
-	.byte	$e2
+	.dword	$c90fdaa2 ; 1.57079633
+	.byte	$e1
+	.byte	$00
 Const_Log2_e:
-	.dword	$5c551d95 ; 1.44269504
-	.byte	$e2
+	.dword	$b8aa3b29 ; 1.44269504
+	.byte	$e1
+	.byte	$00
 Const_sqrt_2:
-	.dword	$5a82799a ; 1.41421356
-	.byte	$e2
+	.dword	$b504f334 ; 1.41421356
+	.byte	$e1
+	.byte	$00
 Const_sqrt_half:
-	.dword	$5a82799a ; 0.70710678
-	.byte	$e1
+	.dword	$b504f334 ; 0.70710678
+	.byte	$e0
+	.byte	$00
 Const_pi:
-	.dword	$6487ed51 ; 3.14159265
-	.byte	$e3
+	.dword	$c90fdaa2 ; 3.14159265
+	.byte	$e2
+	.byte	$00
 Const_half:
-	.dword	$40000000 ; 0.50000000
-	.byte	$e1
+	.dword	$80000000 ; 0.50000000
+	.byte	$e0
+	.byte	$00
 Const_ln_e:
-	.dword	$58b90bfc ; 0.69314718
-	.byte	$e1
+	.dword	$b17217f8 ; 0.69314718
+	.byte	$e0
+	.byte	$00
 .send code

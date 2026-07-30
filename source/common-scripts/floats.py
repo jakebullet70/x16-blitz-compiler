@@ -28,11 +28,16 @@ class Float(object):
 		sign = 0x80 if decimal < 0 else 0x00
 		decimal = abs(decimal)
 
-		if normalise or decimal != int(decimal) or abs(decimal) >= 0x7FFFFFFF:
+		#
+		#	The mantissa is a full 32 bits and normalises into [2^31,2^32) -- it used to stop at
+		#	bit 30, reserving bit 31 as carry headroom for addition. Must match FloatNormalise,
+		#	or the constants this generates for the test suites disagree with the runtime.
+		#
+		if normalise or decimal != int(decimal) or abs(decimal) > 0xFFFFFFFF:
 			exponent = int(math.log(decimal,2))
 			mantissa = decimal / pow(2,exponent)
-			while mantissa < 0x40000000:
-				mantissa *= 2 
+			while mantissa < 0x80000000:
+				mantissa *= 2
 				exponent -= 1
 			mantissa = int(mantissa+0.5)
 		else:

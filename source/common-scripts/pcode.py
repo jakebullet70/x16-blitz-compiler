@@ -49,7 +49,10 @@ class PCode(object):
 		self.extra(".shift",1)
 		self.extra(".byte",1)
 		self.extra(".word",2)
-		self.extra(".float",5)
+		self.extra(".float",6) 				# exponent, 4 mantissa bytes, sign. Six, not five: the
+											# sign used to ride in bit 7 of the top mantissa byte,
+											# which stopped being free when the mantissa went to a
+											# full 32 bits (see PushFloatCommand).
 		self.extra(".string",0xFF)
 		self.extra(".data",0xFF)
 		self.extra(".goto",2)
@@ -161,7 +164,7 @@ if __name__ == "__main__":
 #							.SHIFT nn   		1		Shifted action word
 #							.BYTE nn 			1 		Load unsigned int
 #							.WORD ll hh 		2 		Load 16 bit integer
-#							.FLOAT ex mtp 		$FF		Float as exponent,mantissa with sign in mantissa[3].7
+#							.FLOAT ex mmmm sg 	6 		Float as exponent, 4 byte mantissa, sign byte
 #							.STRING ll ss 		$FF		ASCIIZ string
 #							.DATA ll ss 		$FF		Packed data statements
 #							.GOTO ll hh			2 		Go to offset from the current page beginning.

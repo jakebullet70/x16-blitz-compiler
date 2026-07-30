@@ -45,6 +45,18 @@ _PIWriteA:
 ;
 ;										Push TOS Float
 ;
+;		Six bytes: exponent, then the four mantissa bytes, then the sign in a byte of its own.
+;
+;		The sign used to ride in bit 7 of the top mantissa byte, which was free while the mantissa
+;		normalised to bit 30 and integers were capped at $7FFFFFFF. Bit 31 is a value bit now
+;		(see FloatNormalise), so packing the sign there DESTROYED it: the constant 4000000000
+;		($EE6B2800) was written as $EE, read back as mantissa $6E6B2800 with the sign set, and
+;		printed as -1852516352 -- the value less 2^31, negated. Every literal from 2^31 up was
+;		wrong, and everything computed from one with it.
+;
+;		The extra byte costs one byte per float constant in the object code, and CommandPushN and
+;		pcode.py's .float size must agree with it.
+;
 ; ************************************************************************************************
 
 PushFloatCommand:
@@ -58,9 +70,10 @@ PushFloatCommand:
 		jsr 	WriteCodeByte
 		lda 	NSMantissa2,x
 		jsr 	WriteCodeByte
-		lda 	NSStatus,x 					; with sign packed in byte 3 MSB
+		lda 	NSMantissa3,x 				; all four mantissa bytes are value now
+		jsr 	WriteCodeByte
+		lda 	NSStatus,x 					; the sign, on its own
 		and 	#$80
-		ora 	NSMantissa3,x
 		jsr 	WriteCodeByte
 		rts
 

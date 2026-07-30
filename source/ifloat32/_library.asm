@@ -2254,15 +2254,25 @@ _CNTSNotNegative:
 _CNTMain:
 		jsr 	WriteDecimalBuffer
 		;
-		;		The exponent says which of the three shapes this is. Zero means the mantissa IS
-		;		the value, a plain integer. Negative means there is something below the point.
-		;		Positive means the value needs more than the mantissa's 31 bits -- it is 2^31 or
-		;		more -- and there is no way to write it as a plain integer at all, so it goes out
-		;		in E notation, exactly as BASIC does.
+		;		Values of 1e9 and up go out in E notation, as BASIC does. The old test was the
+		;		exponent alone -- nonzero and positive meant 2^31 or more, which was the most the
+		;		31 bit mantissa could hold as an integer. Two things are wrong with that now. The
+		;		mantissa holds a full 32 bits, so it reaches 2^32 and the old test let 3000000000
+		;		print as "3000000000"; and 2^31 was never where BASIC switches anyway. BASIC
+		;		carries NINE significant digits, so it turns over at 1e9:
 		;
-		lda 	NSExponent,x
-		beq 	_CNTSNotFloat
-		bpl 	_CNTSBig
+		;			 999999999  ->  999999999			2147483647  ->  2.14748365E+09
+		;			1000000000  ->  1E+09				4294967295  ->  4.2949673E+09
+		;
+		;		Note X16 loses the low digits doing it -- 4294967295 prints as 4294967300 -- even
+		;		though its float holds the value exactly. That is the behaviour to copy.
+		;
+		jsr 	_CNTSIsBig 					; CS if |value| >= 1e9
+		bcs 	_CNTSBig
+		lda 	NSExponent,x 				; zero: the mantissa IS the value, a plain integer,
+		beq 	_CNTSNotFloat 				; and there is nothing below the point to round
+		bpl 	_CNTSBig 					; positive: only reachable unnormalised, and that is
+											; what it used to do -- leave it alone
 		;
 		;		Round to the last decimal place that will actually be printed, by adding half
 		;		of it -- 5 x 10^-(dp+1). The digits below that are then truncated away, which
@@ -2341,12 +2351,62 @@ _CNTSExit:
 
 ; ************************************************************************************************
 ;
-;								Print a value of 2^31 or more, as d.dddddddE+nn
+;		CS if |S[X]| >= 1e9, the point at which BASIC gives up on fixed notation. Works on a copy
+;		in S[X+2] so the value itself is untouched, and it is EXACT -- not a compare by
+;		subtraction, so nothing rounds and 999999999 cannot be mistaken for 1e9.
 ;
-;		The mantissa carries 31 bits, so it simply cannot hold a number this big as an integer
-;		and there is nothing sensible to print in full: 4294967295 is not representable, and
-;		writing it out as "4294967294" would only claim a precision that is not there. BASIC
-;		prints these in E notation and so do we.
+;		Normalised, value = mantissa x 2^e with the mantissa in [2^31,2^32), so:
+;
+;			e >= -1 : value >= 2^30 = 1073741824, always over 1e9
+;			e == -2 : value in [2^29,2^30) -- this alone straddles 1e9, so compare the mantissa
+;			          against 1e9 x 2^2 = 4000000000 = $EE6B2800
+;			e <= -3 : value < 2^29 = 536870912, never over 1e9
+;
+; ************************************************************************************************
+
+_CNTSIsBig:
+		jsr 	FloatShiftUpTwo 			; copy S[X] to S[X+2] and work on that
+		inx
+		inx
+		jsr 	FloatNormalise
+		beq 	_CNTSIBSmall 				; zero is not big
+		;
+		lda 	NSExponent,x
+		bpl 	_CNTSIBBig 					; e >= 0 : 2^31 or more
+		cmp 	#$FF 						; e == -1 : 2^30 or more
+		beq 	_CNTSIBBig
+		cmp 	#$FE 						; e <= -3 : under 2^29, cannot reach 1e9
+		bne 	_CNTSIBSmall
+		;
+		lda 	NSMantissa3,x 				; e == -2 : mantissa vs $EE6B2800, top byte first
+		cmp 	#$EE
+		bne 	_CNTSIBCarry 				; the cmp's carry is already the answer
+		lda 	NSMantissa2,x
+		cmp 	#$6B
+		bne 	_CNTSIBCarry
+		lda 	NSMantissa1,x
+		cmp 	#$28
+		bne 	_CNTSIBCarry 				; equal on all three: mantissa0 can only add, so >= 1e9
+_CNTSIBBig:
+		sec
+		bra 	_CNTSIBExit
+_CNTSIBCarry:
+		bcs 	_CNTSIBBig
+_CNTSIBSmall:
+		clc
+_CNTSIBExit:
+		dex 								; back down to the value, carry intact
+		dex
+		rts
+
+; ************************************************************************************************
+;
+;								Print a value of 1e9 or more, as d.dddddddE+nn
+;
+;		BASIC carries nine significant digits and turns over to E notation once the integer part
+;		would need a tenth, so 999999999 prints in full and 1000000000 prints as 1E+09. The
+;		mantissa can hold rather more than that -- 4294967295 is exact in it -- but X16 prints it
+;		as 4.2949673E+09 all the same, and matching X16 is the point.
 ;
 ;		Entered by jmp from FloatToString, with the sign already written to the buffer, the value
 ;		made positive, and X and Y saved on the 6502 stack. Leaves through its own ply/plx.
@@ -2354,17 +2414,17 @@ _CNTSExit:
 ; ************************************************************************************************
 
 FloatToStringScientific:
-		jsr 	FloatNormalise 				; mantissa is now in [2^30,2^31), so the value is in
-											; [2^(30+e), 2^(31+e)) -- call that exponent E.
+		jsr 	FloatNormalise 				; mantissa is now in [2^31,2^32), so the value is in
+											; [2^(31+e), 2^(32+e)) -- call that exponent E.
 		;
 		;		Estimate the decimal exponent from the binary one: log10(v) is about E x log10(2),
 		;		and 77/256 is log10(2) to within a quarter of a percent. It is only an estimate,
 		;		and it can read one low, but it can never read high -- which is what makes the
 		;		correction below safe.
 		;
-		lda 	NSExponent,x 				; E = e + 30, and e >= 1 here so E >= 31
-		clc
-		adc 	#30
+		lda 	NSExponent,x 				; E = e + 31 (it was +30 while the mantissa normalised
+		clc 							 	; to bit 30). We only come here for values of 1e9 and
+		adc 	#31 						; up, so E >= 29 and the countdown below is safe.
 		tay 								; Y counts the loop down
 		stz 	sciTemp 					; sciTemp:A is 8.8 fixed point
 		lda 	#0
@@ -2380,8 +2440,8 @@ _FTSENoCarry:
 		;		Scale by 10^-(k-8) to land the value in [1e8,1e9) : a nine digit integer, which is
 		;		as much as the mantissa can carry and exactly what BASIC prints.
 		;
-		lda 	sciTemp 					; k >= 9, because E >= 31, so the scale is at least 1
-		sec
+		lda 	sciTemp 					; k >= 8, because E >= 29, so the scale is never
+		sec 								; negative and FloatScalePower10 handles the 0
 		sbc 	#8
 		sta 	sciScale
 		eor 	#$FF 						; A = -scale
@@ -2439,8 +2499,9 @@ _FTSCounted:
 _FTSDigits:
 		cpy 	sciDigits
 		beq 	_FTSDigitsDone
-		cpy 	#9 							; nine significant digits. The mantissa holds about
-		beq 	_FTSDigitsDone 				; 9.3, so a tenth would only be printing noise.
+		cpy 	#9 							; nine significant digits, as BASIC prints. The mantissa
+		beq 	_FTSDigitsDone 				; holds about 9.6, so a tenth would be near enough
+											; noise -- and X16 does not print it either.
 		lda 	numberBuffer,y
 		jsr 	WriteDecimalBuffer
 		iny

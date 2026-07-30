@@ -5256,34 +5256,37 @@ _PSExit:
 
 ; ************************************************************************************************
 ;
-;								Push Number <EXP> <MANTISSA W/SIGN>
+;								Push Number <EXP> <MANTISSA> <SIGN>
+;
+;		Six bytes, matching PushFloatCommand: the sign has a byte to itself because bit 31 of the
+;		mantissa is a value bit now (see FloatNormalise) and can no longer be borrowed to carry it.
+;		Masking bit 31 off here and reading it as the sign turned every constant of 2^31 or more
+;		into value-2^31, negated.
 ;
 ; ************************************************************************************************
 
 CommandPushN: ;; [.float]
 		.entercmd
 
-		inx 								; next slot on stack		
+		inx 								; next slot on stack
 
 		lda 	(codePtr),y 				; exponent
 		sta 	NSExponent,x
 		iny
 
-		lda 	(codePtr),y 				; mantissa
+		lda 	(codePtr),y 				; mantissa, all four bytes of it
 		sta 	NSMantissa0,x
 		iny
-		lda 	(codePtr),y 				
+		lda 	(codePtr),y
 		sta 	NSMantissa1,x
 		iny
-		lda 	(codePtr),y 				
+		lda 	(codePtr),y
 		sta 	NSMantissa2,x
 		iny
-		lda 	(codePtr),y 				
-		pha
-		and 	#$7F
+		lda 	(codePtr),y
 		sta 	NSMantissa3,x
-		pla 								; sign in mantissa3:7
-		and 	#$80
+		iny
+		lda 	(codePtr),y 				; and the sign, already masked to bit 7
 		sta 	NSStatus,x
 		iny
 		.exitcmd

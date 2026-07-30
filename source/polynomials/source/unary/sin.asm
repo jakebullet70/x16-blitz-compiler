@@ -28,13 +28,18 @@ FloatSine:
 		jsr 	FloatMultiply 
 		jsr 	FloatFractionalPart 		; take the fractional part
 
+		;
+		;		Quadrant split on the normalised exponent. The mantissa is in [2^31,2^32) now, so
+		;		these are one lower than they were: 0.25-0.5 is exponent -33 ($DF, was $E0) and
+		;		0.75 is mantissa $C0000000 (was $60000000) -- see FloatNormalise.
+		;
 		lda 	NSExponent,x 				; check exponent
-		cmp 	#$E0 						; < $E0 exponent : 0-0.25
+		cmp 	#$DF 						; < $DF exponent : 0-0.25
 		bcc 	_USProcessExit
-		beq 	_USSubtractFromHalf 		; = $E0 exponent : 0.25-0.5
-		lda 	NSMantissa3,x 				; if > 0.75 which is $60000000:$E1
-		cmp 	#$60
-		bcs 	_USSubtractOne 				
+		beq 	_USSubtractFromHalf 		; = $DF exponent : 0.25-0.5
+		lda 	NSMantissa3,x 				; if > 0.75 which is $C0000000:$E0
+		cmp 	#$C0
+		bcs 	_USSubtractOne
 _USSubtractFromHalf:						; 0.25 - 0.75 calculate 0.5-x
 		.pushfloat Const_half 				; so calculate x-0.5
 		jsr 	FloatSubtract

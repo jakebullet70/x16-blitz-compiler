@@ -738,7 +738,7 @@ MOFSizeTable:
 	.byte	1         	; $ce .shift
 	.byte	1         	; $cf .byte
 	.byte	2         	; $d0 .word
-	.byte	5         	; $d1 .float
+	.byte	6         	; $d1 .float
 	.byte	255       	; $d2 .string
 	.byte	255       	; $d3 .data
 	.byte	2         	; $d4 .goto

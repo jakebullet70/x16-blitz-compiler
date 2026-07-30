@@ -63,9 +63,11 @@ class PCodeDecompiler(object):
 						s = ".word {0}".format(self.data[p]+self.data[p+1]*256)
 						p = p + 2
 					if s == ".float":
-						mantissa = (self.data[p+1] + (self.data[p+2] << 8) + (self.data[p+3] << 16) + (self.data[p+4] << 24)) & 0x7FFFFFFF
-						f = self.float.toDecimal([mantissa,self.data[p],self.data[p+4] & 0x80])
-						p = p + 5
+						#	exponent, four mantissa bytes, then the sign in a byte of its own.
+						#	All 32 mantissa bits are value: the sign no longer rides in bit 31.
+						mantissa = self.data[p+1] + (self.data[p+2] << 8) + (self.data[p+3] << 16) + (self.data[p+4] << 24)
+						f = self.float.toDecimal([mantissa,self.data[p],self.data[p+5] & 0x80])
+						p = p + 6
 						s = ".float {0:.5f}".format(f)
 					if s == ".shift":
 						s = self.pcode.getToken((self.data[p-1] << 8)| self.data[p])+" <shift>"

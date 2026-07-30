@@ -87,15 +87,20 @@ CopyFloatXY:
 ;
 ;						Get current coefficient to stack,X
 ;
+;		Six bytes per coefficient: four mantissa, exponent, sign (see coremaths.py). As in
+;		LoadConstant, the sign no longer rides in bit 7 of the top mantissa byte -- that bit is
+;		part of the value now, and masking it off wrecked every coefficient it was set in.
+;
 ; ************************************************************************************************
 
-GetCoefficient:		
+GetCoefficient:
 		phy
-		lda 	coefficientCount 			; 5 per block
-		asl 	a
-		asl 	a
-		sec 								; +1 for count
-		adc 	coefficientCount
+		lda 	coefficientCount 			; six bytes per coefficient
+		asl 	a 							; x2
+		clc
+		adc 	coefficientCount 			; x3
+		asl 	a 							; x6
+		inc 	a 							; +1 for the leading count byte
 		tay
 
 		lda 	(zTemp0),y 					; copy mantissa
@@ -107,17 +112,14 @@ GetCoefficient:
 		lda 	(zTemp0),y
 		sta 	NSMantissa2,x
 		iny
-		lda 	(zTemp0),y
-		pha
-		and 	#$7F 						; clear sign bit.
+		lda 	(zTemp0),y 					; all four mantissa bytes are value
 		sta 	NSMantissa3,x
 		iny
-		pla
-		and 	#$80
-		sta 	NSStatus,x 					; put in status 
-		;
 		lda 	(zTemp0),y
 		sta 	NSExponent,x
+		iny
+		lda 	(zTemp0),y 					; and the sign, on its own
+		sta 	NSStatus,x
 		ply
 		rts
 

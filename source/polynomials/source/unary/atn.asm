@@ -25,9 +25,9 @@ FloatArcTan:
 		pha
 		stz 	NSStatus,x
 
-		lda 	NSExponent,x 					; $40000000 ^ $E2 is 1.0
-		cmp 	#$E2
-		bcc 	_UANoFixup
+		lda 	NSExponent,x 					; $80000000 ^ $E1 is 1.0, so an exponent of -31
+		cmp 	#$E1 							; or more means |x| >= 1 and needs the reciprocal.
+		bcc 	_UANoFixup 						; ($E2 while the mantissa normalised to bit 30.)
 
 		txa 									; value in +1
 		tay

@@ -1,400 +1,400 @@
-69.64501498 negate -69.64501498 f.cmp = assert
-69.64501498 int 69 f.cmp = assert
--8.28000000 sin -0.91061837 - abs 0.001 f.cmp < assert
--8.28000000 cos -0.41324834 - abs 0.001 f.cmp < assert
-0.29000000 tan 0.29841279 - abs 0.001 f.cmp assert
-0.21100000 atn 0.20794976 - abs 0.001 f.cmp assert
--1.02000000 exp 0.36059494 - abs 0.001 f.cmp assert
-64.35000000 log 4.16433693 - abs 0.001 f.cmp assert
-72.33000000 sqr 8.50470458 - abs 0.001 f.cmp assert
-2.67000000 0.30000000 ^ 1.34262082 - abs 0.01 f.cmp assert
-25.36729570 negate -25.36729570 f.cmp = assert
-25.36729570 int 25 f.cmp = assert
-4.74000000 sin -0.99961884 - abs 0.001 f.cmp < assert
-4.74000000 cos 0.02760751 - abs 0.001 f.cmp < assert
-0.38000000 tan 0.39941272 - abs 0.001 f.cmp assert
-1.45300000 atn 0.96801260 - abs 0.001 f.cmp assert
--0.50000000 exp 0.60653066 - abs 0.001 f.cmp assert
-23.98000000 log 3.17722015 - abs 0.001 f.cmp assert
-3.12000000 sqr 1.76635217 - abs 0.001 f.cmp assert
-0.70666667 0.90000000 ^ 0.73163276 - abs 0.01 f.cmp assert
-57.47687697 negate -57.47687697 f.cmp = assert
-57.47687697 int 57 f.cmp = assert
-10.44000000 sin -0.84959768 - abs 0.001 f.cmp < assert
-10.44000000 cos -0.52743130 - abs 0.001 f.cmp < assert
-0.12000000 tan 0.12057934 - abs 0.001 f.cmp assert
-0.12000000 atn 0.11942893 - abs 0.001 f.cmp assert
--1.02000000 exp 0.36059494 - abs 0.001 f.cmp assert
-92.12000000 log 4.52309207 - abs 0.001 f.cmp assert
-59.83000000 sqr 7.73498546 - abs 0.001 f.cmp assert
-0.34000000 0.30000000 ^ 0.72350856 - abs 0.01 f.cmp assert
-6.63756378 negate -6.63756378 f.cmp = assert
-6.63756378 int 6 f.cmp = assert
--19.04000000 sin -0.18929496 - abs 0.001 f.cmp < assert
--19.04000000 cos 0.98192027 - abs 0.001 f.cmp < assert
-0.20000000 tan 0.20271004 - abs 0.001 f.cmp assert
-0.53800000 atn 0.49358350 - abs 0.001 f.cmp assert
-1.50000000 exp 4.48168907 - abs 0.001 f.cmp assert
-97.61000000 log 4.58097995 - abs 0.001 f.cmp assert
-48.58000000 sqr 6.96993544 - abs 0.001 f.cmp assert
-3.09666667 1.00000000 ^ 3.09666667 - abs 0.01 f.cmp assert
-56.48092654 negate -56.48092654 f.cmp = assert
-56.48092654 int 56 f.cmp = assert
--18.13000000 sin 0.65905075 - abs 0.001 f.cmp < assert
--18.13000000 cos 0.75209847 - abs 0.001 f.cmp < assert
-0.40000000 tan 0.42279322 - abs 0.001 f.cmp assert
-1.41400000 atn 0.95524542 - abs 0.001 f.cmp assert
--1.71000000 exp 0.18086579 - abs 0.001 f.cmp assert
-1.15000000 log 0.13976194 - abs 0.001 f.cmp assert
-99.32000000 sqr 9.96594200 - abs 0.001 f.cmp assert
-2.69000000 1.30000000 ^ 3.61974489 - abs 0.01 f.cmp assert
-12.74196161 negate -12.74196161 f.cmp = assert
-12.74196161 int 12 f.cmp = assert
--7.25000000 sin -0.82308088 - abs 0.001 f.cmp < assert
--7.25000000 cos 0.56792417 - abs 0.001 f.cmp < assert
-0.22000000 tan 0.22361942 - abs 0.001 f.cmp assert
-1.41300000 atn 0.95491187 - abs 0.001 f.cmp assert
-1.71000000 exp 5.52896148 - abs 0.001 f.cmp assert
-65.48000000 log 4.18174475 - abs 0.001 f.cmp assert
-88.19000000 sqr 9.39095309 - abs 0.001 f.cmp assert
-2.79666667 0.20000000 ^ 1.22836700 - abs 0.01 f.cmp assert
-75.67854540 negate -75.67854540 f.cmp = assert
-75.67854540 int 75 f.cmp = assert
--8.72000000 sin -0.64786471 - abs 0.001 f.cmp < assert
--8.72000000 cos -0.76175542 - abs 0.001 f.cmp < assert
-0.24000000 tan 0.24471670 - abs 0.001 f.cmp assert
-1.54300000 atn 0.99576629 - abs 0.001 f.cmp assert
-0.12000000 exp 1.12749685 - abs 0.001 f.cmp assert
-67.42000000 log 4.21094171 - abs 0.001 f.cmp assert
-81.48000000 sqr 9.02662728 - abs 0.001 f.cmp assert
-1.17333333 0.40000000 ^ 1.06602788 - abs 0.01 f.cmp assert
--69.22815259 negate 69.22815259 f.cmp = assert
--69.22815259 int -69 f.cmp = assert
--17.58000000 sin 0.95496919 - abs 0.001 f.cmp < assert
--17.58000000 cos 0.29670498 - abs 0.001 f.cmp < assert
-0.26000000 tan 0.26602154 - abs 0.001 f.cmp assert
-0.29800000 atn 0.28962092 - abs 0.001 f.cmp assert
-0.67000000 exp 1.95423732 - abs 0.001 f.cmp assert
-77.94000000 log 4.35593930 - abs 0.001 f.cmp assert
-98.80000000 sqr 9.93981891 - abs 0.001 f.cmp assert
-1.30666667 1.90000000 ^ 1.66231431 - abs 0.01 f.cmp assert
-21.77322427 negate -21.77322427 f.cmp = assert
-21.77322427 int 21 f.cmp = assert
-7.32000000 sin 0.86078739 - abs 0.001 f.cmp < assert
-7.32000000 cos 0.50896471 - abs 0.001 f.cmp < assert
-0.23000000 tan 0.23414336 - abs 0.001 f.cmp assert
-0.11400000 atn 0.11350997 - abs 0.001 f.cmp assert
-1.13000000 exp 3.09565650 - abs 0.001 f.cmp assert
-46.80000000 log 3.84588320 - abs 0.001 f.cmp assert
-94.73000000 sqr 9.73293378 - abs 0.001 f.cmp assert
-2.97000000 0.10000000 ^ 1.11500200 - abs 0.01 f.cmp assert
-14.41499960 negate -14.41499960 f.cmp = assert
-14.41499960 int 14 f.cmp = assert
-2.55000000 sin 0.55768372 - abs 0.001 f.cmp < assert
-2.55000000 cos -0.83005354 - abs 0.001 f.cmp < assert
-0.14000000 tan 0.14092189 - abs 0.001 f.cmp assert
-0.12700000 atn 0.12632374 - abs 0.001 f.cmp assert
-0.41000000 exp 1.50681779 - abs 0.001 f.cmp assert
-72.44000000 log 4.28275863 - abs 0.001 f.cmp assert
-48.93000000 sqr 6.99499821 - abs 0.001 f.cmp assert
-0.20666667 0.70000000 ^ 0.33165710 - abs 0.01 f.cmp assert
--62.98201992 negate 62.98201992 f.cmp = assert
--62.98201992 int -62 f.cmp = assert
-13.59000000 sin 0.85400190 - abs 0.001 f.cmp < assert
-13.59000000 cos 0.52026988 - abs 0.001 f.cmp < assert
-0.37000000 tan 0.38786316 - abs 0.001 f.cmp assert
-0.56300000 atn 0.51276920 - abs 0.001 f.cmp assert
--1.31000000 exp 0.26982006 - abs 0.001 f.cmp assert
-75.66000000 log 4.32624962 - abs 0.001 f.cmp assert
-52.11000000 sqr 7.21872565 - abs 0.001 f.cmp assert
-0.24000000 1.90000000 ^ 0.06643568 - abs 0.01 f.cmp assert
--79.55624848 negate 79.55624848 f.cmp = assert
--79.55624848 int -79 f.cmp = assert
--13.61000000 sin -0.86423581 - abs 0.001 f.cmp < assert
--13.61000000 cos 0.50308693 - abs 0.001 f.cmp < assert
-0.29000000 tan 0.29841279 - abs 0.001 f.cmp assert
-1.30200000 atn 0.91584348 - abs 0.001 f.cmp assert
-0.27000000 exp 1.30996445 - abs 0.001 f.cmp assert
-95.28000000 log 4.55681993 - abs 0.001 f.cmp assert
-52.82000000 sqr 7.26773692 - abs 0.001 f.cmp assert
-0.92000000 1.50000000 ^ 0.88243300 - abs 0.01 f.cmp assert
--61.61853082 negate 61.61853082 f.cmp = assert
--61.61853082 int -61 f.cmp = assert
--6.96000000 sin -0.62631303 - abs 0.001 f.cmp < assert
--6.96000000 cos 0.77957167 - abs 0.001 f.cmp < assert
-0.36000000 tan 0.37640285 - abs 0.001 f.cmp assert
-1.21800000 atn 0.88337024 - abs 0.001 f.cmp assert
-1.17000000 exp 3.22199264 - abs 0.001 f.cmp assert
-87.32000000 log 4.46957953 - abs 0.001 f.cmp assert
-2.61000000 sqr 1.61554944 - abs 0.001 f.cmp assert
-1.90666667 0.80000000 ^ 1.67579087 - abs 0.01 f.cmp assert
-64.37231716 negate -64.37231716 f.cmp = assert
-64.37231716 int 64 f.cmp = assert
-0.25000000 sin 0.24740396 - abs 0.001 f.cmp < assert
-0.25000000 cos 0.96891242 - abs 0.001 f.cmp < assert
-0.17000000 tan 0.17165682 - abs 0.001 f.cmp assert
-1.37400000 atn 0.94165393 - abs 0.001 f.cmp assert
-0.23000000 exp 1.25860001 - abs 0.001 f.cmp assert
-11.74000000 log 2.46300181 - abs 0.001 f.cmp assert
-63.56000000 sqr 7.97245257 - abs 0.001 f.cmp assert
-2.42333333 1.90000000 ^ 5.37508079 - abs 0.01 f.cmp assert
-44.18814287 negate -44.18814287 f.cmp = assert
-44.18814287 int 44 f.cmp = assert
--10.38000000 sin 0.81644197 - abs 0.001 f.cmp < assert
--10.38000000 cos -0.57742749 - abs 0.001 f.cmp < assert
-0.34000000 tan 0.35373688 - abs 0.001 f.cmp assert
-1.67400000 atn 1.03231174 - abs 0.001 f.cmp assert
--1.61000000 exp 0.19988761 - abs 0.001 f.cmp assert
-90.51000000 log 4.50546034 - abs 0.001 f.cmp assert
-37.28000000 sqr 6.10573501 - abs 0.001 f.cmp assert
-1.82666667 0.40000000 ^ 1.27251738 - abs 0.01 f.cmp assert
--50.26071110 negate 50.26071110 f.cmp = assert
--50.26071110 int -50 f.cmp = assert
--7.54000000 sin -0.95111139 - abs 0.001 f.cmp < assert
--7.54000000 cos 0.30884805 - abs 0.001 f.cmp < assert
-0.24000000 tan 0.24471670 - abs 0.001 f.cmp assert
-1.51800000 atn 0.98828650 - abs 0.001 f.cmp assert
-1.60000000 exp 4.95303242 - abs 0.001 f.cmp assert
-11.19000000 log 2.41502052 - abs 0.001 f.cmp assert
-48.04000000 sqr 6.93108938 - abs 0.001 f.cmp assert
-1.48000000 1.00000000 ^ 1.48000000 - abs 0.01 f.cmp assert
-18.64768770 negate -18.64768770 f.cmp = assert
-18.64768770 int 18 f.cmp = assert
--10.92000000 sin 0.99714562 - abs 0.001 f.cmp < assert
--10.92000000 cos -0.07550237 - abs 0.001 f.cmp < assert
-0.15000000 tan 0.15113522 - abs 0.001 f.cmp assert
-0.13000000 atn 0.12927500 - abs 0.001 f.cmp assert
--2.00000000 exp 0.13533528 - abs 0.001 f.cmp assert
-69.14000000 log 4.23613343 - abs 0.001 f.cmp assert
-5.60000000 sqr 2.36643191 - abs 0.001 f.cmp assert
-2.61333333 0.40000000 ^ 1.46851343 - abs 0.01 f.cmp assert
-25.91066656 negate -25.91066656 f.cmp = assert
-25.91066656 int 25 f.cmp = assert
-19.74000000 sin 0.77735118 - abs 0.001 f.cmp < assert
-19.74000000 cos 0.62906688 - abs 0.001 f.cmp < assert
-0.16000000 tan 0.16137946 - abs 0.001 f.cmp assert
-1.44100000 atn 0.96413386 - abs 0.001 f.cmp assert
--1.08000000 exp 0.33959553 - abs 0.001 f.cmp assert
-20.32000000 log 3.01160562 - abs 0.001 f.cmp assert
-17.75000000 sqr 4.21307489 - abs 0.001 f.cmp assert
-0.79333333 1.80000000 ^ 0.65920465 - abs 0.01 f.cmp assert
-20.27820523 negate -20.27820523 f.cmp = assert
-20.27820523 int 20 f.cmp = assert
-9.02000000 sin 0.39381467 - abs 0.001 f.cmp < assert
-9.02000000 cos -0.91918986 - abs 0.001 f.cmp < assert
-0.30000000 tan 0.30933625 - abs 0.001 f.cmp assert
-1.81100000 atn 1.06628010 - abs 0.001 f.cmp assert
--0.43000000 exp 0.65050909 - abs 0.001 f.cmp assert
-63.33000000 log 4.14835915 - abs 0.001 f.cmp assert
-82.06000000 sqr 9.05869748 - abs 0.001 f.cmp assert
-2.23333333 1.80000000 ^ 4.24733373 - abs 0.01 f.cmp assert
--58.19081558 negate 58.19081558 f.cmp = assert
--58.19081558 int -58 f.cmp = assert
-18.36000000 sin -0.47023402 - abs 0.001 f.cmp < assert
-18.36000000 cos 0.88254177 - abs 0.001 f.cmp < assert
-0.15000000 tan 0.15113522 - abs 0.001 f.cmp assert
-0.69500000 atn 0.60736237 - abs 0.001 f.cmp assert
-0.71000000 exp 2.03399126 - abs 0.001 f.cmp assert
-7.55000000 log 2.02154756 - abs 0.001 f.cmp assert
-48.19000000 sqr 6.94190176 - abs 0.001 f.cmp assert
-2.75333333 1.50000000 ^ 4.56865316 - abs 0.01 f.cmp assert
-25.05685592 negate -25.05685592 f.cmp = assert
-25.05685592 int 25 f.cmp = assert
-14.99000000 sin 0.65785208 - abs 0.001 f.cmp < assert
-14.99000000 cos -0.75314716 - abs 0.001 f.cmp < assert
-0.38000000 tan 0.39941272 - abs 0.001 f.cmp assert
-0.44600000 atn 0.41952255 - abs 0.001 f.cmp assert
--1.08000000 exp 0.33959553 - abs 0.001 f.cmp assert
-81.91000000 log 4.40562108 - abs 0.001 f.cmp assert
-6.65000000 sqr 2.57875939 - abs 0.001 f.cmp assert
-1.43666667 1.80000000 ^ 1.91973299 - abs 0.01 f.cmp assert
--35.81404390 negate 35.81404390 f.cmp = assert
--35.81404390 int -35 f.cmp = assert
--18.88000000 sin -0.03043938 - abs 0.001 f.cmp < assert
--18.88000000 cos 0.99953661 - abs 0.001 f.cmp < assert
-0.18000000 tan 0.18196953 - abs 0.001 f.cmp assert
-0.64500000 atn 0.57285225 - abs 0.001 f.cmp assert
--1.60000000 exp 0.20189652 - abs 0.001 f.cmp assert
-42.40000000 log 3.74714836 - abs 0.001 f.cmp assert
-69.80000000 sqr 8.35463943 - abs 0.001 f.cmp assert
-1.30333333 0.80000000 ^ 1.23607380 - abs 0.01 f.cmp assert
--13.90386329 negate 13.90386329 f.cmp = assert
--13.90386329 int -13 f.cmp = assert
-16.36000000 sin -0.60680656 - abs 0.001 f.cmp < assert
-16.36000000 cos -0.79484955 - abs 0.001 f.cmp < assert
-0.23000000 tan 0.23414336 - abs 0.001 f.cmp assert
-0.17500000 atn 0.17324567 - abs 0.001 f.cmp assert
--1.08000000 exp 0.33959553 - abs 0.001 f.cmp assert
-19.51000000 log 2.97092715 - abs 0.001 f.cmp assert
-0.28000000 sqr 0.52915026 - abs 0.001 f.cmp assert
-0.54666667 0.60000000 ^ 0.69603897 - abs 0.01 f.cmp assert
-32.57017899 negate -32.57017899 f.cmp = assert
-32.57017899 int 32 f.cmp = assert
-7.91000000 sin 0.99843138 - abs 0.001 f.cmp < assert
-7.91000000 cos -0.05598907 - abs 0.001 f.cmp < assert
-0.25000000 tan 0.25534192 - abs 0.001 f.cmp assert
-1.66500000 atn 1.02993533 - abs 0.001 f.cmp assert
-1.27000000 exp 3.56085256 - abs 0.001 f.cmp assert
-55.52000000 log 4.01674332 - abs 0.001 f.cmp assert
-68.81000000 sqr 8.29517932 - abs 0.001 f.cmp assert
-2.45000000 1.40000000 ^ 3.50616636 - abs 0.01 f.cmp assert
-18.18846683 negate -18.18846683 f.cmp = assert
-18.18846683 int 18 f.cmp = assert
-17.52000000 sin -0.97104238 - abs 0.001 f.cmp < assert
-17.52000000 cos 0.23890730 - abs 0.001 f.cmp < assert
-0.15000000 tan 0.15113522 - abs 0.001 f.cmp assert
-0.70200000 atn 0.61206699 - abs 0.001 f.cmp assert
--1.70000000 exp 0.18268352 - abs 0.001 f.cmp assert
-78.20000000 log 4.35926965 - abs 0.001 f.cmp assert
-4.83000000 sqr 2.19772610 - abs 0.001 f.cmp assert
-2.52333333 0.80000000 ^ 2.09690956 - abs 0.01 f.cmp assert
--47.98258686 negate 47.98258686 f.cmp = assert
--47.98258686 int -47 f.cmp = assert
-17.50000000 sin -0.97562601 - abs 0.001 f.cmp < assert
-17.50000000 cos 0.21943996 - abs 0.001 f.cmp < assert
-0.34000000 tan 0.35373688 - abs 0.001 f.cmp assert
-1.89400000 atn 1.08501365 - abs 0.001 f.cmp assert
-0.82000000 exp 2.27049984 - abs 0.001 f.cmp assert
-73.91000000 log 4.30284814 - abs 0.001 f.cmp assert
-8.13000000 sqr 2.85131549 - abs 0.001 f.cmp assert
-0.21666667 0.40000000 ^ 0.54239645 - abs 0.01 f.cmp assert
-58.25293594 negate -58.25293594 f.cmp = assert
-58.25293594 int 58 f.cmp = assert
-10.14000000 sin -0.65578506 - abs 0.001 f.cmp < assert
-10.14000000 cos -0.75494765 - abs 0.001 f.cmp < assert
-0.39000000 tan 0.41105492 - abs 0.001 f.cmp assert
-0.42300000 atn 0.40017541 - abs 0.001 f.cmp assert
--1.49000000 exp 0.22537266 - abs 0.001 f.cmp assert
-46.84000000 log 3.84673754 - abs 0.001 f.cmp assert
-95.64000000 sqr 9.77957054 - abs 0.001 f.cmp assert
-2.79000000 1.50000000 ^ 4.66021877 - abs 0.01 f.cmp assert
--22.10447882 negate 22.10447882 f.cmp = assert
--22.10447882 int -22 f.cmp = assert
--5.56000000 sin 0.66177605 - abs 0.001 f.cmp < assert
--5.56000000 cos 0.74970158 - abs 0.001 f.cmp < assert
-0.26000000 tan 0.26602154 - abs 0.001 f.cmp assert
-1.71200000 atn 1.04214099 - abs 0.001 f.cmp assert
--0.76000000 exp 0.46766643 - abs 0.001 f.cmp assert
-19.56000000 log 2.97348666 - abs 0.001 f.cmp assert
-12.75000000 sqr 3.57071421 - abs 0.001 f.cmp assert
-2.28666667 1.20000000 ^ 2.69800924 - abs 0.01 f.cmp assert
-11.75969871 negate -11.75969871 f.cmp = assert
-11.75969871 int 11 f.cmp = assert
--6.01000000 sin 0.26979998 - abs 0.001 f.cmp < assert
--6.01000000 cos 0.96291639 - abs 0.001 f.cmp < assert
-0.23000000 tan 0.23414336 - abs 0.001 f.cmp assert
-0.55300000 atn 0.50514356 - abs 0.001 f.cmp assert
-0.26000000 exp 1.29693009 - abs 0.001 f.cmp assert
-48.19000000 log 3.87515153 - abs 0.001 f.cmp assert
-13.48000000 sqr 3.67151195 - abs 0.001 f.cmp assert
-0.53333333 1.20000000 ^ 0.47032544 - abs 0.01 f.cmp assert
-69.83137604 negate -69.83137604 f.cmp = assert
-69.83137604 int 69 f.cmp = assert
-1.14000000 sin 0.90863350 - abs 0.001 f.cmp < assert
-1.14000000 cos 0.41759450 - abs 0.001 f.cmp < assert
-0.35000000 tan 0.36502849 - abs 0.001 f.cmp assert
-1.31000000 atn 0.91880028 - abs 0.001 f.cmp assert
--1.57000000 exp 0.20804518 - abs 0.001 f.cmp assert
-8.63000000 log 2.15524451 - abs 0.001 f.cmp assert
-12.58000000 sqr 3.54682957 - abs 0.001 f.cmp assert
-3.19000000 1.30000000 ^ 4.51780923 - abs 0.01 f.cmp assert
--58.96468778 negate 58.96468778 f.cmp = assert
--58.96468778 int -58 f.cmp = assert
--18.98000000 sin -0.13007446 - abs 0.001 f.cmp < assert
--18.98000000 cos 0.99150423 - abs 0.001 f.cmp < assert
-0.27000000 tan 0.27675814 - abs 0.001 f.cmp assert
-0.43900000 atn 0.41366876 - abs 0.001 f.cmp assert
-1.83000000 exp 6.23388666 - abs 0.001 f.cmp assert
-76.51000000 log 4.33742145 - abs 0.001 f.cmp assert
-63.86000000 sqr 7.99124521 - abs 0.001 f.cmp assert
-1.63000000 1.30000000 ^ 1.88731280 - abs 0.01 f.cmp assert
--77.41888718 negate 77.41888718 f.cmp = assert
--77.41888718 int -77 f.cmp = assert
--4.32000000 sin 0.92399816 - abs 0.001 f.cmp < assert
--4.32000000 cos -0.38239692 - abs 0.001 f.cmp < assert
-0.35000000 tan 0.36502849 - abs 0.001 f.cmp assert
-0.54900000 atn 0.50207513 - abs 0.001 f.cmp assert
--1.23000000 exp 0.29229258 - abs 0.001 f.cmp assert
-22.74000000 log 3.12412549 - abs 0.001 f.cmp assert
-81.71000000 sqr 9.03935838 - abs 0.001 f.cmp assert
-0.39666667 1.20000000 ^ 0.32969385 - abs 0.01 f.cmp assert
-78.45176966 negate -78.45176966 f.cmp = assert
-78.45176966 int 78 f.cmp = assert
-11.94000000 sin -0.58620824 - abs 0.001 f.cmp < assert
-11.94000000 cos 0.81016042 - abs 0.001 f.cmp < assert
-0.34000000 tan 0.35373688 - abs 0.001 f.cmp assert
-0.71300000 atn 0.61939762 - abs 0.001 f.cmp assert
-0.83000000 exp 2.29331874 - abs 0.001 f.cmp assert
-57.23000000 log 4.04707824 - abs 0.001 f.cmp assert
-90.53000000 sqr 9.51472543 - abs 0.001 f.cmp assert
-3.11000000 0.50000000 ^ 1.76351921 - abs 0.01 f.cmp assert
-12.52198915 negate -12.52198915 f.cmp = assert
-12.52198915 int 12 f.cmp = assert
--6.23000000 sin 0.05316024 - abs 0.001 f.cmp < assert
--6.23000000 cos 0.99858599 - abs 0.001 f.cmp < assert
+-77.33149753 negate 77.33149753 f.cmp = assert
+-77.33149753 int -77 f.cmp = assert
+5.34000000 sin -0.80943266 - abs 0.001 f.cmp < assert
+5.34000000 cos 0.58721272 - abs 0.001 f.cmp < assert
 0.13000000 tan 0.13073732 - abs 0.001 f.cmp assert
-0.77400000 atn 0.65868501 - abs 0.001 f.cmp assert
-1.98000000 exp 7.24274299 - abs 0.001 f.cmp assert
-47.84000000 log 3.86786211 - abs 0.001 f.cmp assert
-4.61000000 sqr 2.14709106 - abs 0.001 f.cmp assert
-0.96333333 1.00000000 ^ 0.96333333 - abs 0.01 f.cmp assert
-21.63910262 negate -21.63910262 f.cmp = assert
-21.63910262 int 21 f.cmp = assert
-13.22000000 sin 0.60807171 - abs 0.001 f.cmp < assert
-13.22000000 cos 0.79388211 - abs 0.001 f.cmp < assert
-0.24000000 tan 0.24471670 - abs 0.001 f.cmp assert
-1.10100000 atn 0.83343353 - abs 0.001 f.cmp assert
-1.30000000 exp 3.66929667 - abs 0.001 f.cmp assert
-1.29000000 log 0.25464222 - abs 0.001 f.cmp assert
-47.43000000 sqr 6.88694417 - abs 0.001 f.cmp assert
-0.86000000 1.50000000 ^ 0.79753119 - abs 0.01 f.cmp assert
--13.92978051 negate 13.92978051 f.cmp = assert
--13.92978051 int -13 f.cmp = assert
--8.76000000 sin -0.61688439 - abs 0.001 f.cmp < assert
--8.76000000 cos -0.78705378 - abs 0.001 f.cmp < assert
+1.89200000 atn 1.08457730 - abs 0.001 f.cmp assert
+-0.97000000 exp 0.37908304 - abs 0.001 f.cmp assert
+58.80000000 log 4.07414185 - abs 0.001 f.cmp assert
+90.35000000 sqr 9.50526170 - abs 0.001 f.cmp assert
+2.61333333 0.10000000 ^ 1.10082803 - abs 0.01 f.cmp assert
+-37.74293351 negate 37.74293351 f.cmp = assert
+-37.74293351 int -37 f.cmp = assert
+-19.03000000 sin -0.17946646 - abs 0.001 f.cmp < assert
+-19.03000000 cos 0.98376409 - abs 0.001 f.cmp < assert
+0.18000000 tan 0.18196953 - abs 0.001 f.cmp assert
+1.13900000 atn 0.85029056 - abs 0.001 f.cmp assert
+-0.10000000 exp 0.90483742 - abs 0.001 f.cmp assert
+9.06000000 log 2.20386912 - abs 0.001 f.cmp assert
+84.16000000 sqr 9.17387595 - abs 0.001 f.cmp assert
+0.33666667 1.10000000 ^ 0.30193964 - abs 0.01 f.cmp assert
+80.67814044 negate -80.67814044 f.cmp = assert
+80.67814044 int 80 f.cmp = assert
+12.86000000 sin 0.28942817 - abs 0.001 f.cmp < assert
+12.86000000 cos 0.95719974 - abs 0.001 f.cmp < assert
+0.39000000 tan 0.41105492 - abs 0.001 f.cmp assert
+1.12600000 atn 0.84459515 - abs 0.001 f.cmp assert
+-1.24000000 exp 0.28938422 - abs 0.001 f.cmp assert
+2.01000000 log 0.69813472 - abs 0.001 f.cmp assert
+60.77000000 sqr 7.79551153 - abs 0.001 f.cmp assert
+0.64333333 0.30000000 ^ 0.87605388 - abs 0.01 f.cmp assert
+-33.11670851 negate 33.11670851 f.cmp = assert
+-33.11670851 int -33 f.cmp = assert
+-18.19000000 sin 0.61276597 - abs 0.001 f.cmp < assert
+-18.19000000 cos 0.79026443 - abs 0.001 f.cmp < assert
+0.33000000 tan 0.34252487 - abs 0.001 f.cmp assert
+1.77800000 atn 1.05846027 - abs 0.001 f.cmp assert
+1.36000000 exp 3.89619330 - abs 0.001 f.cmp assert
+90.39000000 log 4.50413364 - abs 0.001 f.cmp assert
+64.71000000 sqr 8.04425261 - abs 0.001 f.cmp assert
+0.45333333 1.40000000 ^ 0.33035791 - abs 0.01 f.cmp assert
+37.67895035 negate -37.67895035 f.cmp = assert
+37.67895035 int 37 f.cmp = assert
+-12.59000000 sin -0.02362719 - abs 0.001 f.cmp < assert
+-12.59000000 cos 0.99972084 - abs 0.001 f.cmp < assert
+0.30000000 tan 0.30933625 - abs 0.001 f.cmp assert
+1.39100000 atn 0.94749331 - abs 0.001 f.cmp assert
+-0.06000000 exp 0.94176453 - abs 0.001 f.cmp assert
+30.77000000 log 3.42654019 - abs 0.001 f.cmp assert
+64.77000000 sqr 8.04798111 - abs 0.001 f.cmp assert
+2.82000000 2.00000000 ^ 7.95240000 - abs 0.01 f.cmp assert
+73.30841500 negate -73.30841500 f.cmp = assert
+73.30841500 int 73 f.cmp = assert
+-18.80000000 sin 0.04953564 - abs 0.001 f.cmp < assert
+-18.80000000 cos 0.99877236 - abs 0.001 f.cmp < assert
+0.11000000 tan 0.11044582 - abs 0.001 f.cmp assert
+1.71500000 atn 1.04290317 - abs 0.001 f.cmp assert
+-0.76000000 exp 0.46766643 - abs 0.001 f.cmp assert
+54.42000000 log 3.99673173 - abs 0.001 f.cmp assert
+23.46000000 sqr 4.84355242 - abs 0.001 f.cmp assert
+0.70333333 1.10000000 ^ 0.67901180 - abs 0.01 f.cmp assert
+3.76391026 negate -3.76391026 f.cmp = assert
+3.76391026 int 3 f.cmp = assert
+18.31000000 sin -0.51375505 - abs 0.001 f.cmp < assert
+18.31000000 cos 0.85793691 - abs 0.001 f.cmp < assert
+0.17000000 tan 0.17165682 - abs 0.001 f.cmp assert
+1.43000000 atn 0.96053985 - abs 0.001 f.cmp assert
+1.70000000 exp 5.47394739 - abs 0.001 f.cmp assert
+8.42000000 log 2.13060983 - abs 0.001 f.cmp assert
+64.32000000 sqr 8.01997506 - abs 0.001 f.cmp assert
+0.01666667 1.70000000 ^ 0.00094873 - abs 0.01 f.cmp assert
+-18.86717421 negate 18.86717421 f.cmp = assert
+-18.86717421 int -18 f.cmp = assert
+3.98000000 sin -0.74357914 - abs 0.001 f.cmp < assert
+3.98000000 cos -0.66864794 - abs 0.001 f.cmp < assert
+0.20000000 tan 0.20271004 - abs 0.001 f.cmp assert
+0.60900000 atn 0.54701088 - abs 0.001 f.cmp assert
+-1.14000000 exp 0.31981902 - abs 0.001 f.cmp assert
+39.14000000 log 3.66714496 - abs 0.001 f.cmp assert
+86.66000000 sqr 9.30913530 - abs 0.001 f.cmp assert
+1.26666667 1.90000000 ^ 1.56696195 - abs 0.01 f.cmp assert
+-74.40025917 negate 74.40025917 f.cmp = assert
+-74.40025917 int -74 f.cmp = assert
+-8.24000000 sin -0.92641550 - abs 0.001 f.cmp < assert
+-8.24000000 cos -0.37650276 - abs 0.001 f.cmp < assert
+0.35000000 tan 0.36502849 - abs 0.001 f.cmp assert
+0.63900000 atn 0.56860345 - abs 0.001 f.cmp assert
+1.89000000 exp 6.61936868 - abs 0.001 f.cmp assert
+38.47000000 log 3.64987872 - abs 0.001 f.cmp assert
+11.88000000 sqr 3.44673759 - abs 0.001 f.cmp assert
+0.15666667 1.00000000 ^ 0.15666667 - abs 0.01 f.cmp assert
+-71.70000810 negate 71.70000810 f.cmp = assert
+-71.70000810 int -71 f.cmp = assert
+-6.31000000 sin -0.02681148 - abs 0.001 f.cmp < assert
+-6.31000000 cos 0.99964051 - abs 0.001 f.cmp < assert
+0.40000000 tan 0.42279322 - abs 0.001 f.cmp assert
+1.49000000 atn 0.97970254 - abs 0.001 f.cmp assert
+-1.23000000 exp 0.29229258 - abs 0.001 f.cmp assert
+91.75000000 log 4.51906749 - abs 0.001 f.cmp assert
+78.85000000 sqr 8.87975225 - abs 0.001 f.cmp assert
+2.41333333 1.30000000 ^ 3.14342067 - abs 0.01 f.cmp assert
+-48.81671661 negate 48.81671661 f.cmp = assert
+-48.81671661 int -48 f.cmp = assert
+-4.24000000 sin 0.89048381 - abs 0.001 f.cmp < assert
+-4.24000000 cos -0.45501493 - abs 0.001 f.cmp < assert
+0.28000000 tan 0.28755433 - abs 0.001 f.cmp assert
+0.61200000 atn 0.54919634 - abs 0.001 f.cmp assert
+-1.84000000 exp 0.15881743 - abs 0.001 f.cmp assert
+37.15000000 log 3.61496377 - abs 0.001 f.cmp assert
+19.05000000 sqr 4.36463057 - abs 0.001 f.cmp assert
+1.90333333 1.30000000 ^ 2.30870960 - abs 0.01 f.cmp assert
+16.09062930 negate -16.09062930 f.cmp = assert
+16.09062930 int 16 f.cmp = assert
+3.85000000 sin -0.65062514 - abs 0.001 f.cmp < assert
+3.85000000 cos -0.75939906 - abs 0.001 f.cmp < assert
+0.31000000 tan 0.32032751 - abs 0.001 f.cmp assert
+1.31000000 atn 0.91880028 - abs 0.001 f.cmp assert
+1.20000000 exp 3.32011692 - abs 0.001 f.cmp assert
+13.19000000 log 2.57945897 - abs 0.001 f.cmp assert
+9.55000000 sqr 3.09030743 - abs 0.001 f.cmp assert
+1.18000000 0.80000000 ^ 1.14157804 - abs 0.01 f.cmp assert
+-77.78942253 negate 77.78942253 f.cmp = assert
+-77.78942253 int -77 f.cmp = assert
+-18.95000000 sin -0.10027527 - abs 0.001 f.cmp < assert
+-18.95000000 cos 0.99495973 - abs 0.001 f.cmp < assert
+0.40000000 tan 0.42279322 - abs 0.001 f.cmp assert
+0.88500000 atn 0.72446573 - abs 0.001 f.cmp assert
+0.55000000 exp 1.73325302 - abs 0.001 f.cmp assert
+90.50000000 log 4.50534985 - abs 0.001 f.cmp assert
+87.24000000 sqr 9.34023554 - abs 0.001 f.cmp assert
+1.12000000 0.50000000 ^ 1.05830052 - abs 0.01 f.cmp assert
+52.54588159 negate -52.54588159 f.cmp = assert
+52.54588159 int 52 f.cmp = assert
+14.50000000 sin 0.93489506 - abs 0.001 f.cmp < assert
+14.50000000 cos -0.35492427 - abs 0.001 f.cmp < assert
+0.22000000 tan 0.22361942 - abs 0.001 f.cmp assert
+1.54300000 atn 0.99576629 - abs 0.001 f.cmp assert
+-1.17000000 exp 0.31036694 - abs 0.001 f.cmp assert
+46.99000000 log 3.84993481 - abs 0.001 f.cmp assert
+67.49000000 sqr 8.21522976 - abs 0.001 f.cmp assert
+2.30333333 1.90000000 ^ 4.88065271 - abs 0.01 f.cmp assert
+11.43694825 negate -11.43694825 f.cmp = assert
+11.43694825 int 11 f.cmp = assert
+9.12000000 sin 0.30008138 - abs 0.001 f.cmp < assert
+9.12000000 cos -0.95391361 - abs 0.001 f.cmp < assert
+0.22000000 tan 0.22361942 - abs 0.001 f.cmp assert
+1.65600000 atn 1.02753995 - abs 0.001 f.cmp assert
+0.57000000 exp 1.76826705 - abs 0.001 f.cmp assert
+62.68000000 log 4.13804242 - abs 0.001 f.cmp assert
+44.11000000 sqr 6.64153597 - abs 0.001 f.cmp assert
+2.63666667 0.60000000 ^ 1.78909391 - abs 0.01 f.cmp assert
+-61.42220782 negate 61.42220782 f.cmp = assert
+-61.42220782 int -61 f.cmp = assert
+18.99000000 sin 0.13998283 - abs 0.001 f.cmp < assert
+18.99000000 cos 0.99015393 - abs 0.001 f.cmp < assert
+0.14000000 tan 0.14092189 - abs 0.001 f.cmp assert
+0.26100000 atn 0.25530451 - abs 0.001 f.cmp assert
+0.23000000 exp 1.25860001 - abs 0.001 f.cmp assert
+11.45000000 log 2.43798973 - abs 0.001 f.cmp assert
+9.94000000 sqr 3.15277655 - abs 0.001 f.cmp assert
+0.39333333 1.20000000 ^ 0.32637201 - abs 0.01 f.cmp assert
+-26.46116466 negate 26.46116466 f.cmp = assert
+-26.46116466 int -26 f.cmp = assert
+9.05000000 sin 0.36606591 - abs 0.001 f.cmp < assert
+9.05000000 cos -0.93058893 - abs 0.001 f.cmp < assert
 0.34000000 tan 0.35373688 - abs 0.001 f.cmp assert
-0.50100000 atn 0.46444729 - abs 0.001 f.cmp assert
--0.83000000 exp 0.43604929 - abs 0.001 f.cmp assert
-81.23000000 log 4.39728464 - abs 0.001 f.cmp assert
-63.99000000 sqr 7.99937498 - abs 0.001 f.cmp assert
-0.59000000 1.80000000 ^ 0.38684200 - abs 0.01 f.cmp assert
--76.96331093 negate 76.96331093 f.cmp = assert
--76.96331093 int -76 f.cmp = assert
-1.93000000 sin 0.93617705 - abs 0.001 f.cmp < assert
-1.93000000 cos -0.35152884 - abs 0.001 f.cmp < assert
-0.25000000 tan 0.25534192 - abs 0.001 f.cmp assert
-1.32700000 atn 0.92500827 - abs 0.001 f.cmp assert
-1.56000000 exp 4.75882125 - abs 0.001 f.cmp assert
-60.54000000 log 4.10330430 - abs 0.001 f.cmp assert
-86.63000000 sqr 9.30752384 - abs 0.001 f.cmp assert
-0.71666667 1.40000000 ^ 0.62725494 - abs 0.01 f.cmp assert
-17.55373775 negate -17.55373775 f.cmp = assert
-17.55373775 int 17 f.cmp = assert
-16.42000000 sin -0.65337700 - abs 0.001 f.cmp < assert
-16.42000000 cos -0.75703269 - abs 0.001 f.cmp < assert
-0.16000000 tan 0.16137946 - abs 0.001 f.cmp assert
-1.61100000 atn 1.01527169 - abs 0.001 f.cmp assert
--0.81000000 exp 0.44485807 - abs 0.001 f.cmp assert
-84.69000000 log 4.43899753 - abs 0.001 f.cmp assert
-68.29000000 sqr 8.26377638 - abs 0.001 f.cmp assert
-1.06333333 0.90000000 ^ 1.05682356 - abs 0.01 f.cmp assert
--52.53535272 negate 52.53535272 f.cmp = assert
--52.53535272 int -52 f.cmp = assert
+1.56900000 atn 1.00336634 - abs 0.001 f.cmp assert
+-0.80000000 exp 0.44932896 - abs 0.001 f.cmp assert
+7.76000000 log 2.04898233 - abs 0.001 f.cmp assert
+14.69000000 sqr 3.83275358 - abs 0.001 f.cmp assert
+1.48666667 1.10000000 ^ 1.54680285 - abs 0.01 f.cmp assert
+-55.97173402 negate 55.97173402 f.cmp = assert
+-55.97173402 int -55 f.cmp = assert
+-12.60000000 sin -0.03362305 - abs 0.001 f.cmp < assert
+-12.60000000 cos 0.99943459 - abs 0.001 f.cmp < assert
+0.20000000 tan 0.20271004 - abs 0.001 f.cmp assert
+1.73900000 atn 1.04892964 - abs 0.001 f.cmp assert
+-1.50000000 exp 0.22313016 - abs 0.001 f.cmp assert
+89.99000000 log 4.49969855 - abs 0.001 f.cmp assert
+32.56000000 sqr 5.70613705 - abs 0.001 f.cmp assert
+1.24000000 1.40000000 ^ 1.35142005 - abs 0.01 f.cmp assert
+-65.46586215 negate 65.46586215 f.cmp = assert
+-65.46586215 int -65 f.cmp = assert
 -19.50000000 sin -0.60553987 - abs 0.001 f.cmp < assert
 -19.50000000 cos 0.79581497 - abs 0.001 f.cmp < assert
-0.21000000 tan 0.21314244 - abs 0.001 f.cmp assert
-1.24200000 atn 0.89292121 - abs 0.001 f.cmp assert
--0.24000000 exp 0.78662786 - abs 0.001 f.cmp assert
-32.98000000 log 3.49590132 - abs 0.001 f.cmp assert
-79.06000000 sqr 8.89156904 - abs 0.001 f.cmp assert
-1.43333333 1.80000000 ^ 1.91172298 - abs 0.01 f.cmp assert
-75.15031992 negate -75.15031992 f.cmp = assert
-75.15031992 int 75 f.cmp = assert
-13.31000000 sin 0.67696365 - abs 0.001 f.cmp < assert
-13.31000000 cos 0.73601645 - abs 0.001 f.cmp < assert
-0.30000000 tan 0.30933625 - abs 0.001 f.cmp assert
-0.69900000 atn 0.61005451 - abs 0.001 f.cmp assert
-0.72000000 exp 2.05443321 - abs 0.001 f.cmp assert
-67.15000000 log 4.20692892 - abs 0.001 f.cmp assert
-49.92000000 sqr 7.06540869 - abs 0.001 f.cmp assert
-2.09000000 0.20000000 ^ 1.15885542 - abs 0.01 f.cmp assert
+0.34000000 tan 0.35373688 - abs 0.001 f.cmp assert
+0.65900000 atn 0.58267611 - abs 0.001 f.cmp assert
+1.24000000 exp 3.45561346 - abs 0.001 f.cmp assert
+77.72000000 log 4.35311262 - abs 0.001 f.cmp assert
+81.24000000 sqr 9.01332347 - abs 0.001 f.cmp assert
+0.74333333 1.80000000 ^ 0.58631431 - abs 0.01 f.cmp assert
+24.00161983 negate -24.00161983 f.cmp = assert
+24.00161983 int 24 f.cmp = assert
+-15.47000000 sin -0.23572378 - abs 0.001 f.cmp < assert
+-15.47000000 cos -0.97182010 - abs 0.001 f.cmp < assert
+0.19000000 tan 0.19231984 - abs 0.001 f.cmp assert
+1.38500000 atn 0.94544311 - abs 0.001 f.cmp assert
+0.91000000 exp 2.48432253 - abs 0.001 f.cmp assert
+32.81000000 log 3.49073335 - abs 0.001 f.cmp assert
+82.54000000 sqr 9.08515272 - abs 0.001 f.cmp assert
+2.42333333 1.70000000 ^ 4.50300434 - abs 0.01 f.cmp assert
+-16.47177452 negate 16.47177452 f.cmp = assert
+-16.47177452 int -16 f.cmp = assert
+2.00000000 sin 0.90929743 - abs 0.001 f.cmp < assert
+2.00000000 cos -0.41614684 - abs 0.001 f.cmp < assert
+0.12000000 tan 0.12057934 - abs 0.001 f.cmp assert
+1.40800000 atn 0.95323935 - abs 0.001 f.cmp assert
+-1.37000000 exp 0.25410696 - abs 0.001 f.cmp assert
+83.77000000 log 4.42807495 - abs 0.001 f.cmp assert
+72.64000000 sqr 8.52291030 - abs 0.001 f.cmp assert
+0.76333333 0.10000000 ^ 0.97335536 - abs 0.01 f.cmp assert
+68.28946303 negate -68.28946303 f.cmp = assert
+68.28946303 int 68 f.cmp = assert
+0.80000000 sin 0.71735609 - abs 0.001 f.cmp < assert
+0.80000000 cos 0.69670671 - abs 0.001 f.cmp < assert
+0.26000000 tan 0.26602154 - abs 0.001 f.cmp assert
+0.86300000 atn 0.71199299 - abs 0.001 f.cmp assert
+1.66000000 exp 5.25931084 - abs 0.001 f.cmp assert
+60.78000000 log 4.10726079 - abs 0.001 f.cmp assert
+76.50000000 sqr 8.74642784 - abs 0.001 f.cmp assert
+3.00333333 0.40000000 ^ 1.55253505 - abs 0.01 f.cmp assert
+7.74682109 negate -7.74682109 f.cmp = assert
+7.74682109 int 7 f.cmp = assert
+-10.76000000 sin 0.97238046 - abs 0.001 f.cmp < assert
+-10.76000000 cos -0.23340145 - abs 0.001 f.cmp < assert
+0.36000000 tan 0.37640285 - abs 0.001 f.cmp assert
+1.26100000 atn 0.90032513 - abs 0.001 f.cmp assert
+1.54000000 exp 4.66459027 - abs 0.001 f.cmp assert
+70.79000000 log 4.25971775 - abs 0.001 f.cmp assert
+82.24000000 sqr 9.06862724 - abs 0.001 f.cmp assert
+2.42333333 1.90000000 ^ 5.37508079 - abs 0.01 f.cmp assert
+29.32655706 negate -29.32655706 f.cmp = assert
+29.32655706 int 29 f.cmp = assert
+14.19000000 sin 0.99860466 - abs 0.001 f.cmp < assert
+14.19000000 cos -0.05280848 - abs 0.001 f.cmp < assert
+0.37000000 tan 0.38786316 - abs 0.001 f.cmp assert
+0.30800000 atn 0.29877999 - abs 0.001 f.cmp assert
+1.16000000 exp 3.18993328 - abs 0.001 f.cmp assert
+36.05000000 log 3.58490686 - abs 0.001 f.cmp assert
+69.99000000 sqr 8.36600263 - abs 0.001 f.cmp assert
+2.65000000 1.00000000 ^ 2.65000000 - abs 0.01 f.cmp assert
+-41.77338625 negate 41.77338625 f.cmp = assert
+-41.77338625 int -41 f.cmp = assert
+17.88000000 sin -0.82463459 - abs 0.001 f.cmp < assert
+17.88000000 cos 0.56566579 - abs 0.001 f.cmp < assert
+0.23000000 tan 0.23414336 - abs 0.001 f.cmp assert
+1.23600000 atn 0.89055446 - abs 0.001 f.cmp assert
+-0.81000000 exp 0.44485807 - abs 0.001 f.cmp assert
+80.77000000 log 4.39160561 - abs 0.001 f.cmp assert
+28.14000000 sqr 5.30471488 - abs 0.001 f.cmp assert
+2.71666667 1.20000000 ^ 3.31774975 - abs 0.01 f.cmp assert
+5.18206852 negate -5.18206852 f.cmp = assert
+5.18206852 int 5 f.cmp = assert
+3.34000000 sin -0.19710817 - abs 0.001 f.cmp < assert
+3.34000000 cos -0.98038175 - abs 0.001 f.cmp < assert
+0.10000000 tan 0.10033467 - abs 0.001 f.cmp assert
+1.86200000 atn 1.07794449 - abs 0.001 f.cmp assert
+-0.68000000 exp 0.50661699 - abs 0.001 f.cmp assert
+7.42000000 log 2.00417906 - abs 0.001 f.cmp assert
+72.10000000 sqr 8.49117189 - abs 0.001 f.cmp assert
+2.21333333 1.90000000 ^ 4.52469143 - abs 0.01 f.cmp assert
+-10.73993683 negate 10.73993683 f.cmp = assert
+-10.73993683 int -10 f.cmp = assert
+1.48000000 sin 0.99588084 - abs 0.001 f.cmp < assert
+1.48000000 cos 0.09067162 - abs 0.001 f.cmp < assert
+0.10000000 tan 0.10033467 - abs 0.001 f.cmp assert
+0.67100000 atn 0.59099661 - abs 0.001 f.cmp assert
+0.15000000 exp 1.16183424 - abs 0.001 f.cmp assert
+74.83000000 log 4.31521887 - abs 0.001 f.cmp assert
+47.69000000 sqr 6.90579467 - abs 0.001 f.cmp assert
+1.50666667 0.30000000 ^ 1.13085039 - abs 0.01 f.cmp assert
+-35.52166518 negate 35.52166518 f.cmp = assert
+-35.52166518 int -35 f.cmp = assert
+-7.61000000 sin -0.97038383 - abs 0.001 f.cmp < assert
+-7.61000000 cos 0.24156824 - abs 0.001 f.cmp < assert
+0.25000000 tan 0.25534192 - abs 0.001 f.cmp assert
+1.64000000 atn 1.02323409 - abs 0.001 f.cmp assert
+-0.45000000 exp 0.63762815 - abs 0.001 f.cmp assert
+38.52000000 log 3.65117759 - abs 0.001 f.cmp assert
+44.12000000 sqr 6.64228876 - abs 0.001 f.cmp assert
+3.19333333 0.30000000 ^ 1.41668494 - abs 0.01 f.cmp assert
+36.87211468 negate -36.87211468 f.cmp = assert
+36.87211468 int 36 f.cmp = assert
+5.89000000 sin -0.38313260 - abs 0.001 f.cmp < assert
+5.89000000 cos 0.92369335 - abs 0.001 f.cmp < assert
+0.22000000 tan 0.22361942 - abs 0.001 f.cmp assert
+0.28000000 atn 0.27300870 - abs 0.001 f.cmp assert
+0.48000000 exp 1.61607440 - abs 0.001 f.cmp assert
+34.03000000 log 3.52724249 - abs 0.001 f.cmp assert
+72.13000000 sqr 8.49293824 - abs 0.001 f.cmp assert
+2.85333333 0.90000000 ^ 2.56931445 - abs 0.01 f.cmp assert
+-5.19640398 negate 5.19640398 f.cmp = assert
+-5.19640398 int -5 f.cmp = assert
+18.27000000 sin -0.54765243 - abs 0.001 f.cmp < assert
+18.27000000 cos 0.83670593 - abs 0.001 f.cmp < assert
+0.39000000 tan 0.41105492 - abs 0.001 f.cmp assert
+0.50600000 atn 0.46843608 - abs 0.001 f.cmp assert
+0.22000000 exp 1.24607673 - abs 0.001 f.cmp assert
+40.90000000 log 3.71113006 - abs 0.001 f.cmp assert
+32.19000000 sqr 5.67362318 - abs 0.001 f.cmp assert
+0.66000000 1.60000000 ^ 0.51436368 - abs 0.01 f.cmp assert
+25.24588969 negate -25.24588969 f.cmp = assert
+25.24588969 int 25 f.cmp = assert
+11.57000000 sin -0.83950448 - abs 0.001 f.cmp < assert
+11.57000000 cos 0.54335276 - abs 0.001 f.cmp < assert
+0.35000000 tan 0.36502849 - abs 0.001 f.cmp assert
+1.44000000 atn 0.96380866 - abs 0.001 f.cmp assert
+0.25000000 exp 1.28402542 - abs 0.001 f.cmp assert
+57.31000000 log 4.04847513 - abs 0.001 f.cmp assert
+36.21000000 sqr 6.01747455 - abs 0.001 f.cmp assert
+0.22000000 1.40000000 ^ 0.12005818 - abs 0.01 f.cmp assert
+0.86401555 negate -0.86401555 f.cmp = assert
+0.86401555 int 0 f.cmp = assert
+-6.62000000 sin -0.33048244 - abs 0.001 f.cmp < assert
+-6.62000000 cos 0.94381214 - abs 0.001 f.cmp < assert
+0.38000000 tan 0.39941272 - abs 0.001 f.cmp assert
+1.51700000 atn 0.98798372 - abs 0.001 f.cmp assert
+0.88000000 exp 2.41089971 - abs 0.001 f.cmp assert
+1.89000000 log 0.63657683 - abs 0.001 f.cmp assert
+23.26000000 sqr 4.82286222 - abs 0.001 f.cmp assert
+2.79666667 1.90000000 ^ 7.05695489 - abs 0.01 f.cmp assert
+23.38616668 negate -23.38616668 f.cmp = assert
+23.38616668 int 23 f.cmp = assert
+14.03000000 sin 0.99426312 - abs 0.001 f.cmp < assert
+14.03000000 cos 0.10696193 - abs 0.001 f.cmp < assert
+0.26000000 tan 0.26602154 - abs 0.001 f.cmp assert
+1.48100000 atn 0.97689592 - abs 0.001 f.cmp assert
+-1.16000000 exp 0.31348618 - abs 0.001 f.cmp assert
+62.89000000 log 4.14138717 - abs 0.001 f.cmp assert
+5.86000000 sqr 2.42074369 - abs 0.001 f.cmp assert
+0.50333333 0.90000000 ^ 0.53910098 - abs 0.01 f.cmp assert
+-65.49267028 negate 65.49267028 f.cmp = assert
+-65.49267028 int -65 f.cmp = assert
+12.39000000 sin -0.17545765 - abs 0.001 f.cmp < assert
+12.39000000 cos 0.98448698 - abs 0.001 f.cmp < assert
+0.37000000 tan 0.38786316 - abs 0.001 f.cmp assert
+0.19300000 atn 0.19065582 - abs 0.001 f.cmp assert
+-0.81000000 exp 0.44485807 - abs 0.001 f.cmp assert
+6.40000000 log 1.85629799 - abs 0.001 f.cmp assert
+56.10000000 sqr 7.48999332 - abs 0.001 f.cmp assert
+0.68666667 2.00000000 ^ 0.47151111 - abs 0.01 f.cmp assert
+7.49258929 negate -7.49258929 f.cmp = assert
+7.49258929 int 7 f.cmp = assert
+-16.28000000 sin 0.54134565 - abs 0.001 f.cmp < assert
+-16.28000000 cos -0.84080014 - abs 0.001 f.cmp < assert
+0.36000000 tan 0.37640285 - abs 0.001 f.cmp assert
+0.82300000 atn 0.68860884 - abs 0.001 f.cmp assert
+-0.95000000 exp 0.38674102 - abs 0.001 f.cmp assert
+39.62000000 log 3.67933404 - abs 0.001 f.cmp assert
+75.36000000 sqr 8.68101377 - abs 0.001 f.cmp assert
+1.86666667 0.80000000 ^ 1.64760620 - abs 0.01 f.cmp assert
+64.88645015 negate -64.88645015 f.cmp = assert
+64.88645015 int 64 f.cmp = assert
+-14.74000000 sin -0.82373264 - abs 0.001 f.cmp < assert
+-14.74000000 cos -0.56697843 - abs 0.001 f.cmp < assert
+0.36000000 tan 0.37640285 - abs 0.001 f.cmp assert
+0.70100000 atn 0.61139679 - abs 0.001 f.cmp assert
+1.74000000 exp 5.69734342 - abs 0.001 f.cmp assert
+80.18000000 log 4.38427411 - abs 0.001 f.cmp assert
+71.60000000 sqr 8.46167832 - abs 0.001 f.cmp assert
+1.40666667 1.30000000 ^ 1.55829097 - abs 0.01 f.cmp assert
+-50.71920305 negate 50.71920305 f.cmp = assert
+-50.71920305 int -50 f.cmp = assert
+-6.18000000 sin 0.10300230 - abs 0.001 f.cmp < assert
+-6.18000000 cos 0.99468112 - abs 0.001 f.cmp < assert
+0.32000000 tan 0.33138941 - abs 0.001 f.cmp assert
+0.85400000 atn 0.70681169 - abs 0.001 f.cmp assert
+-0.14000000 exp 0.86935824 - abs 0.001 f.cmp assert
+27.06000000 log 3.29805662 - abs 0.001 f.cmp assert
+59.79000000 sqr 7.73239937 - abs 0.001 f.cmp assert
+2.98000000 1.00000000 ^ 2.98000000 - abs 0.01 f.cmp assert
+62.14367863 negate -62.14367863 f.cmp = assert
+62.14367863 int 62 f.cmp = assert
+7.11000000 sin 0.73577794 - abs 0.001 f.cmp < assert
+7.11000000 cos 0.67722287 - abs 0.001 f.cmp < assert
+0.40000000 tan 0.42279322 - abs 0.001 f.cmp assert
+1.30100000 atn 0.91547227 - abs 0.001 f.cmp assert
+-0.73000000 exp 0.48190899 - abs 0.001 f.cmp assert
+38.66000000 log 3.65480547 - abs 0.001 f.cmp assert
+0.28000000 sqr 0.52915026 - abs 0.001 f.cmp assert
+0.27666667 0.50000000 ^ 0.52599113 - abs 0.01 f.cmp assert
+-42.65692071 negate 42.65692071 f.cmp = assert
+-42.65692071 int -42 f.cmp = assert
+12.67000000 sin 0.10344401 - abs 0.001 f.cmp < assert
+12.67000000 cos 0.99463528 - abs 0.001 f.cmp < assert
+0.16000000 tan 0.16137946 - abs 0.001 f.cmp assert
+0.26800000 atn 0.26184679 - abs 0.001 f.cmp assert
+1.71000000 exp 5.52896148 - abs 0.001 f.cmp assert
+78.12000000 log 4.35824611 - abs 0.001 f.cmp assert
+72.71000000 sqr 8.52701589 - abs 0.001 f.cmp assert
+2.47000000 2.00000000 ^ 6.10090000 - abs 0.01 f.cmp assert
+32.84895116 negate -32.84895116 f.cmp = assert
+32.84895116 int 32 f.cmp = assert
+6.77000000 sin 0.46781300 - abs 0.001 f.cmp < assert
+6.77000000 cos 0.88382747 - abs 0.001 f.cmp < assert
+0.39000000 tan 0.41105492 - abs 0.001 f.cmp assert
+0.69800000 atn 0.60938242 - abs 0.001 f.cmp assert
+-0.13000000 exp 0.87809543 - abs 0.001 f.cmp assert
+78.09000000 log 4.35786201 - abs 0.001 f.cmp assert
+16.24000000 sqr 4.02988834 - abs 0.001 f.cmp assert
+1.86333333 1.10000000 ^ 1.98298582 - abs 0.01 f.cmp assert

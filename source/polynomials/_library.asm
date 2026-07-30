@@ -62,9 +62,9 @@ FloatArcTan:
 		pha
 		stz 	NSStatus,x
 
-		lda 	NSExponent,x 					; $40000000 ^ $E2 is 1.0
-		cmp 	#$E2
-		bcc 	_UANoFixup
+		lda 	NSExponent,x 					; $80000000 ^ $E1 is 1.0, so an exponent of -31
+		cmp 	#$E1 							; or more means |x| >= 1 and needs the reciprocal.
+		bcc 	_UANoFixup 						; ($E2 while the mantissa normalised to bit 30.)
 
 		txa 									; value in +1
 		tay
@@ -156,80 +156,113 @@ CoreAtn:
 
 ExpCoefficients:
 	.byte	7
-	.dword	$5a2c1f2b ; 2.1498763701e-05
-	.byte	$d2
-	.dword	$4b3f598e ; 0.00014352314037
-	.byte	$d5
-	.dword	$57f771c3 ; 0.0013422634825
-	.byte	$d8
-	.dword	$4ec20e15 ; 0.0096140170135
-	.byte	$db
-	.dword	$71acac05 ; 0.05550512686
-	.byte	$dd
-	.dword	$7afef3e3 ; 0.2402263846
-	.byte	$df
-	.dword	$58b90c08 ; 0.69314718618
+	.dword	$b4583e56 ; 2.1498763701e-05
+	.byte	$d1
+	.byte	$00
+	.dword	$967eb31b ; 0.00014352314037
+	.byte	$d4
+	.byte	$00
+	.dword	$afeee385 ; 0.0013422634825
+	.byte	$d7
+	.byte	$00
+	.dword	$9d841c2a ; 0.0096140170135
+	.byte	$da
+	.byte	$00
+	.dword	$e359580a ; 0.05550512686
+	.byte	$dc
+	.byte	$00
+	.dword	$f5fde7c6 ; 0.2402263846
+	.byte	$de
+	.byte	$00
+	.dword	$b1721810 ; 0.69314718618
+	.byte	$e0
+	.byte	$00
+	.dword	$80000000 ; 1.0
 	.byte	$e1
-	.dword	$40000000 ; 1.0
-	.byte	$e2
+	.byte	$00
 
 SinCoefficients:
 	.byte	6
-	.dword	$f30d168d ; -14.381390672
-	.byte	$e5
-	.dword	$5403fdfc ; 42.007797122
-	.byte	$e7
-	.dword	$ccb44481 ; -76.704170257
-	.byte	$e8
-	.dword	$519aeff1 ; 81.605223686
-	.byte	$e8
-	.dword	$d2aef394 ; -41.341702104
-	.byte	$e7
-	.dword	$6487ed51 ; 6.2831853069
+	.dword	$e61a2d1b ; -14.381390672
 	.byte	$e4
+	.byte	$80
+	.dword	$a807fbf8 ; 42.007797122
+	.byte	$e6
+	.byte	$00
+	.dword	$99688901 ; -76.704170257
+	.byte	$e7
+	.byte	$80
+	.dword	$a335dfe1 ; 81.605223686
+	.byte	$e7
+	.byte	$00
+	.dword	$a55de728 ; -41.341702104
+	.byte	$e6
+	.byte	$80
+	.dword	$c90fdaa2 ; 6.2831853069
+	.byte	$e3
+	.byte	$00
 	.dword	$00000000 ; 0.0
+	.byte	$00
 	.byte	$00
 
 LogCoefficients:
 	.byte	4
-	.dword	$6f2b65bd ; 0.43425594189
+	.dword	$de56cb79 ; 0.43425594189
+	.byte	$df
+	.byte	$00
+	.dword	$939b0b64 ; 0.57658454124
 	.byte	$e0
-	.dword	$49cd85b2 ; 0.57658454124
-	.byte	$e1
-	.dword	$7b1c498b ; 0.96180075919
-	.byte	$e1
-	.dword	$5c551d90 ; 2.8853900731
-	.byte	$e3
-	.dword	$c0000000 ; -0.5
-	.byte	$e1
+	.byte	$00
+	.dword	$f6389316 ; 0.96180075919
+	.byte	$e0
+	.byte	$00
+	.dword	$b8aa3b20 ; 2.8853900731
+	.byte	$e2
+	.byte	$00
+	.dword	$80000000 ; -0.5
+	.byte	$e0
+	.byte	$80
 
 AtnCoefficients:
 	.byte	12
-	.dword	$d9c1deea ; -0.00068479391189
-	.byte	$d7
-	.dword	$4f7a537a ; 0.0048509421558
-	.byte	$da
-	.dword	$c1fe5808 ; -0.016111701843
+	.dword	$b383bdd3 ; -0.00068479391189
+	.byte	$d6
+	.byte	$80
+	.dword	$9ef4a6f5 ; 0.0048509421558
+	.byte	$d9
+	.byte	$00
+	.dword	$83fcb010 ; -0.016111701843
+	.byte	$db
+	.byte	$80
+	.dword	$8c1f67ca ; 0.034209638048
 	.byte	$dc
-	.dword	$460fb3e5 ; 0.034209638048
+	.byte	$00
+	.dword	$de53cbc1 ; -0.054279132761
+	.byte	$dc
+	.byte	$80
+	.dword	$9464704c ; 0.07245719654
 	.byte	$dd
-	.dword	$ef29e5e1 ; -0.054279132761
+	.byte	$00
+	.dword	$b7ea517a ; -0.089802395378
 	.byte	$dd
-	.dword	$4a323826 ; 0.07245719654
+	.byte	$80
+	.dword	$e330887e ; 0.11093241343
+	.byte	$dd
+	.byte	$00
+	.dword	$9244993a ; -0.14283980767
 	.byte	$de
-	.dword	$dbf528bd ; -0.089802395378
+	.byte	$80
+	.dword	$cccc91c7 ; 0.19999912049
 	.byte	$de
-	.dword	$7198443f ; 0.11093241343
-	.byte	$de
-	.dword	$c9224c9d ; -0.14283980767
+	.byte	$00
+	.dword	$aaaaaa13 ; -0.33333331568
 	.byte	$df
-	.dword	$666648e3 ; 0.19999912049
-	.byte	$df
-	.dword	$d555550a ; -0.33333331568
-	.byte	$e0
-	.dword	$40000000 ; 1.0
-	.byte	$e2
+	.byte	$80
+	.dword	$80000000 ; 1.0
+	.byte	$e1
+	.byte	$00
 	.dword	$00000000 ; 0.0
+	.byte	$00
 	.byte	$00
 	.send code
 ;
@@ -238,29 +271,37 @@ AtnCoefficients:
 .section code
 Const_Base:
 Const_1Div2Pi:
-	.dword	$517cc1b7 ; 0.15915494
-	.byte	$df
+	.dword	$a2f9836e ; 0.15915494
+	.byte	$de
+	.byte	$00
 Const_PiDiv2:
-	.dword	$6487ed51 ; 1.57079633
-	.byte	$e2
+	.dword	$c90fdaa2 ; 1.57079633
+	.byte	$e1
+	.byte	$00
 Const_Log2_e:
-	.dword	$5c551d95 ; 1.44269504
-	.byte	$e2
+	.dword	$b8aa3b29 ; 1.44269504
+	.byte	$e1
+	.byte	$00
 Const_sqrt_2:
-	.dword	$5a82799a ; 1.41421356
-	.byte	$e2
+	.dword	$b504f334 ; 1.41421356
+	.byte	$e1
+	.byte	$00
 Const_sqrt_half:
-	.dword	$5a82799a ; 0.70710678
-	.byte	$e1
+	.dword	$b504f334 ; 0.70710678
+	.byte	$e0
+	.byte	$00
 Const_pi:
-	.dword	$6487ed51 ; 3.14159265
-	.byte	$e3
+	.dword	$c90fdaa2 ; 3.14159265
+	.byte	$e2
+	.byte	$00
 Const_half:
-	.dword	$40000000 ; 0.50000000
-	.byte	$e1
+	.dword	$80000000 ; 0.50000000
+	.byte	$e0
+	.byte	$00
 Const_ln_e:
-	.dword	$58b90bfc ; 0.69314718
-	.byte	$e1
+	.dword	$b17217f8 ; 0.69314718
+	.byte	$e0
+	.byte	$00
 .send code
 ; ************************************************************************************************
 ; ************************************************************************************************
@@ -558,15 +599,20 @@ CopyFloatXY:
 ;
 ;						Get current coefficient to stack,X
 ;
+;		Six bytes per coefficient: four mantissa, exponent, sign (see coremaths.py). As in
+;		LoadConstant, the sign no longer rides in bit 7 of the top mantissa byte -- that bit is
+;		part of the value now, and masking it off wrecked every coefficient it was set in.
+;
 ; ************************************************************************************************
 
-GetCoefficient:		
+GetCoefficient:
 		phy
-		lda 	coefficientCount 			; 5 per block
-		asl 	a
-		asl 	a
-		sec 								; +1 for count
-		adc 	coefficientCount
+		lda 	coefficientCount 			; six bytes per coefficient
+		asl 	a 							; x2
+		clc
+		adc 	coefficientCount 			; x3
+		asl 	a 							; x6
+		inc 	a 							; +1 for the leading count byte
 		tay
 
 		lda 	(zTemp0),y 					; copy mantissa
@@ -578,17 +624,14 @@ GetCoefficient:
 		lda 	(zTemp0),y
 		sta 	NSMantissa2,x
 		iny
-		lda 	(zTemp0),y
-		pha
-		and 	#$7F 						; clear sign bit.
+		lda 	(zTemp0),y 					; all four mantissa bytes are value
 		sta 	NSMantissa3,x
 		iny
-		pla
-		and 	#$80
-		sta 	NSStatus,x 					; put in status 
-		;
 		lda 	(zTemp0),y
 		sta 	NSExponent,x
+		iny
+		lda 	(zTemp0),y 					; and the sign, on its own
+		sta 	NSStatus,x
 		ply
 		rts
 
@@ -629,6 +672,14 @@ xValueSlot:
 ;
 ;									Load Constant
 ;
+;		Six bytes per entry: four mantissa, exponent, sign (see mathconstants.py).
+;
+;		The sign used to ride in bit 7 of the top mantissa byte and be masked off here. That was
+;		safe only while the mantissa normalised to bit 30 and left bit 31 spare; it holds a full
+;		32 bits now, so the mask DESTROYED the top bit of every constant and read it back as a
+;		minus. Const_Log2_e (1.44269504) came through as -0.442695, which is what made EXP(1)
+;		return 2/e and took LOG, SQR and the trig functions with it.
+;
 ; ************************************************************************************************
 
 LoadConstant:
@@ -640,15 +691,12 @@ LoadConstant:
 		sta 	NSMantissa1+1,x
 		lda 	Const_Base+2,y
 		sta 	NSMantissa2+1,x
-		lda 	Const_Base+3,y
-		pha
-		and 	#$7F
+		lda 	Const_Base+3,y 				; all four mantissa bytes are value now
 		sta 	NSMantissa3+1,x
-		pla
-		and 	#$80
-		sta 	NSStatus+1,x
 		lda 	Const_Base+4,y
 		sta 	NSExponent+1,x
+		lda 	Const_Base+5,y 				; and the sign, in a byte of its own
+		sta 	NSStatus+1,x
 		ply
 		rts
 
@@ -695,7 +743,15 @@ FloatLogarithm:
 		lda 	NSExponent,x 				; get power
 		pha
 
-		lda 	#(-31) & $FF 				; force into range 0.5 -> 1
+		;
+		;		Split the value as f x 2^k with f in [0.5,1), which is the range the polynomial is
+		;		fitted over. Normalised, the mantissa is in [2^31,2^32), so f is the mantissa read
+		;		with an exponent of -32 and k is the real exponent plus 32. It was -31/+31 while
+		;		the mantissa normalised to bit 30 -- see FloatNormalise. The two errors very nearly
+		;		cancel (log2(2f) = log2(f)+1) which is why this looked half-alive, but it fed the
+		;		polynomial an argument outside the interval it is fitted on.
+		;
+		lda 	#(-32) & $FF 				; force into range 0.5 -> 1
 		sta 	NSExponent,x
 
 
@@ -725,7 +781,7 @@ FloatLogarithm:
 
 		pla 								; add exponent
 		clc
-		adc 	#31 						; fix up
+		adc 	#32 						; fix up, matching the -32 forced above
 
 		pha
 		bpl 	_LogNotNeg
@@ -1067,13 +1123,18 @@ FloatSine:
 		jsr 	FloatMultiply 
 		jsr 	FloatFractionalPart 		; take the fractional part
 
+		;
+		;		Quadrant split on the normalised exponent. The mantissa is in [2^31,2^32) now, so
+		;		these are one lower than they were: 0.25-0.5 is exponent -33 ($DF, was $E0) and
+		;		0.75 is mantissa $C0000000 (was $60000000) -- see FloatNormalise.
+		;
 		lda 	NSExponent,x 				; check exponent
-		cmp 	#$E0 						; < $E0 exponent : 0-0.25
+		cmp 	#$DF 						; < $DF exponent : 0-0.25
 		bcc 	_USProcessExit
-		beq 	_USSubtractFromHalf 		; = $E0 exponent : 0.25-0.5
-		lda 	NSMantissa3,x 				; if > 0.75 which is $60000000:$E1
-		cmp 	#$60
-		bcs 	_USSubtractOne 				
+		beq 	_USSubtractFromHalf 		; = $DF exponent : 0.25-0.5
+		lda 	NSMantissa3,x 				; if > 0.75 which is $C0000000:$E0
+		cmp 	#$C0
+		bcs 	_USSubtractOne
 _USSubtractFromHalf:						; 0.25 - 0.75 calculate 0.5-x
 		.pushfloat Const_half 				; so calculate x-0.5
 		jsr 	FloatSubtract

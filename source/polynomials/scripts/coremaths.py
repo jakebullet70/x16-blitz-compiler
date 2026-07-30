@@ -76,13 +76,18 @@ class Evaluator(object):
 		p = self.getCoefficients()
 		return p.hornerMethod(x*x,track) * x + p.additive
 
+	#
+	#	Normalise into [2^31,2^32), matching FloatNormalise. It used to stop at bit 30, leaving
+	#	bit 31 spare so that dumpWord could pack the sign into it -- which is why the sign now
+	#	needs a byte of its own (see GetCoefficient).
+	#
 	def convert(self,decimal):
 		if decimal == 0:
 			return [0,0]
 		exponent = int(math.log(decimal,2))
 		mantissa = decimal / pow(2,exponent)
-		while mantissa < 0x40000000:
-			mantissa *= 2 
+		while mantissa < 0x80000000:
+			mantissa *= 2
 			exponent -= 1
 		mantissa = int(mantissa+0.5)
 		return [mantissa,exponent & 0xFF]
@@ -95,11 +100,15 @@ class Evaluator(object):
 			self.dumpWord(h,c)
 		self.dumpWord(h,p.additive)
 
+	#
+	#	Six bytes: mantissa, exponent, sign. The sign used to be OR'd into bit 31 of the mantissa,
+	#	which is a value bit now -- doing that would corrupt the coefficient rather than label it.
+	#
 	def dumpWord(self,h,c):
 		n = self.convert(abs(c))
-		n[0] = n[0] if c >= 0 else (n[0]|0x80000000)
 		h.write("\t.dword\t${0:08x} ; {1}\n".format(n[0],c))
 		h.write("\t.byte\t${0:02x}\n".format(n[1]))
+		h.write("\t.byte\t${0:02x}\n".format(0x80 if c < 0 else 0x00))
 
 # *******************************************************************************************
 #

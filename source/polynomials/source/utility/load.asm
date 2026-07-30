@@ -16,6 +16,14 @@
 ;
 ;									Load Constant
 ;
+;		Six bytes per entry: four mantissa, exponent, sign (see mathconstants.py).
+;
+;		The sign used to ride in bit 7 of the top mantissa byte and be masked off here. That was
+;		safe only while the mantissa normalised to bit 30 and left bit 31 spare; it holds a full
+;		32 bits now, so the mask DESTROYED the top bit of every constant and read it back as a
+;		minus. Const_Log2_e (1.44269504) came through as -0.442695, which is what made EXP(1)
+;		return 2/e and took LOG, SQR and the trig functions with it.
+;
 ; ************************************************************************************************
 
 LoadConstant:
@@ -27,15 +35,12 @@ LoadConstant:
 		sta 	NSMantissa1+1,x
 		lda 	Const_Base+2,y
 		sta 	NSMantissa2+1,x
-		lda 	Const_Base+3,y
-		pha
-		and 	#$7F
+		lda 	Const_Base+3,y 				; all four mantissa bytes are value now
 		sta 	NSMantissa3+1,x
-		pla
-		and 	#$80
-		sta 	NSStatus+1,x
 		lda 	Const_Base+4,y
 		sta 	NSExponent+1,x
+		lda 	Const_Base+5,y 				; and the sign, in a byte of its own
+		sta 	NSStatus+1,x
 		ply
 		rts
 

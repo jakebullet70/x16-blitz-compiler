@@ -29,7 +29,15 @@ FloatLogarithm:
 		lda 	NSExponent,x 				; get power
 		pha
 
-		lda 	#(-31) & $FF 				; force into range 0.5 -> 1
+		;
+		;		Split the value as f x 2^k with f in [0.5,1), which is the range the polynomial is
+		;		fitted over. Normalised, the mantissa is in [2^31,2^32), so f is the mantissa read
+		;		with an exponent of -32 and k is the real exponent plus 32. It was -31/+31 while
+		;		the mantissa normalised to bit 30 -- see FloatNormalise. The two errors very nearly
+		;		cancel (log2(2f) = log2(f)+1) which is why this looked half-alive, but it fed the
+		;		polynomial an argument outside the interval it is fitted on.
+		;
+		lda 	#(-32) & $FF 				; force into range 0.5 -> 1
 		sta 	NSExponent,x
 
 
@@ -59,7 +67,7 @@ FloatLogarithm:
 
 		pla 								; add exponent
 		clc
-		adc 	#31 						; fix up
+		adc 	#32 						; fix up, matching the -32 forced above
 
 		pha
 		bpl 	_LogNotNeg

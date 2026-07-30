@@ -44,11 +44,13 @@ f.write("FloatPower10Table:\n")
 for i in range(1,POWER_COUNT+1):
 	#
 	#		Exponent 0 means "the mantissa IS the value", so the entry is 10^i outright. Assert
-	#		it still fits the signed 31 bit mantissa, so that raising POWER_COUNT past what the
-	#		format can hold fails the build rather than quietly emitting a wrapped constant.
+	#		it still fits the 32 bit mantissa, so that raising POWER_COUNT past what the format
+	#		can hold fails the build rather than quietly emitting a wrapped constant. (10^9 is
+	#		the last power that fits either way -- 10^10 is over 2^33 -- so widening the mantissa
+	#		to 32 bits does not buy another entry.)
 	#
 	value = pow(10,i)
-	assert value < pow(2,31), "10^{0} does not fit the mantissa".format(i)
+	assert value < pow(2,32), "10^{0} does not fit the mantissa".format(i)
 
 	f.write("\t.dword ${0:08x} ; 10^{1} = {2}\n".format(value,i,value))
 	f.write("\t.byte $00\n")
