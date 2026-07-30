@@ -5475,8 +5475,10 @@ GetStringToBuffer:
 		jsr		GetLookNext 				; skip all leading spaces.
 		beq 	_RBError 					; end of data
 		bcs 	GetStringToBuffer 			; switched to new data line.
-		cmp 	#' ' 						; non space got something
-		bcs 	_RBNoSpace
+		cmp 	#' '+1 						; non space got something. Compare against ' '+1 so
+		bcs 	_RBNoSpace 					; that a space itself falls through and is consumed;
+											; cmp #' ' sets carry on a space, so the loop below
+											; only ever skipped the control characters.
 		jsr 	GetBumpNext 				; consume space and loop round.
 		bra 	GetStringToBuffer
 _RBNoSpace:

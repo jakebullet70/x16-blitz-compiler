@@ -220,6 +220,47 @@ committing.
 
 ## Bugs
 
+### READ/INPUT kept the leading spaces stock BASIC strips — FIXED
+
+Turned up while differentially testing `OPEN` on a missing file. The standard idiom
+
+```basic
+OPEN 15,8,15 : INPUT#15,EN,EM$,ET,ES
+```
+
+gave `EM$ = " FILE NOT FOUND"` under GPC and `"FILE NOT FOUND"` under stock, because the drive really
+does send a space after the comma — the raw `GET#15` byte dump is identical both ways. So any program
+testing `EM$="FILE NOT FOUND"` silently failed.
+
+Not specific to the error channel: `GetStringToBuffer` in `commands/read.asm` is shared by
+`READ`/`DATA`, `INPUT` and `INPUT#`, and its "skip all leading spaces" loop did
+
+```asm
+    cmp     #' '
+    bcs     _RBNoSpace
+```
+
+`cmp` sets carry when A **equals** the operand, so a space took the exit branch — the loop only ever
+skipped the control characters below `$20`. `cmp #' '+1` makes `bcs` mean "greater than a space",
+which is what the comment always claimed. Numeric fields were already right; they go through
+`val.asm`, which does its own skipping.
+
+Verified against stock R49 with a fixture whose fields carry leading and trailing spaces
+(`A, HELLO ,  C` on one line, two space-padded numbers on the next):
+
+| | before | after (= stock) |
+| --- | --- | --- |
+| `INPUT#1,A$,B$,C$` | `[A][ HELLO ][  C]` — 1/7/3 | `[A][HELLO ][C]` — 1/6/1 |
+| `READ A$,B$,C$` | `[A][ HELLO ][  C]` — 1/7/3 | `[A][HELLO ][C]` — 1/6/1 |
+| `INPUT#15,EN,EM$` | `62/ FILE NOT FOUND` | `62/FILE NOT FOUND` |
+
+Trailing spaces are kept, by both — that is also what stock does. All six compiler-runtime suites,
+the ifloat32 suite and the MD5 end-to-end still pass.
+
+`OPEN` on a missing file itself is **correct** and was never a bug: stock lets the `OPEN` succeed,
+reports the failure only on the DOS command channel, leaves `ST` at 64, and gives `ST`=66 with an
+empty string on the first `GET#`. GPC matches it exactly.
+
 ### A runtime error named the line AFTER the one that failed — FIXED
 
 Found by the GPC.ERR pass above, and it was the runtime's fault, not the decoder's. `NXCommand`
