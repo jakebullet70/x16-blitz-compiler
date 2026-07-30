@@ -220,6 +220,42 @@ committing.
 
 ## Bugs
 
+### A runtime error named the line AFTER the one that failed — FIXED
+
+Found by the GPC.ERR pass above, and it was the runtime's fault, not the decoder's. `NXCommand`
+consumes the opcode (`iny`) **before** `jmp (VectorTable,x)`, so on entry to a handler `codePtr + Y`
+already points *past* that handler's own instruction. `RuntimeErrorHandler` reports `codePtr + Y`.
+So any error raised during a command's **execution** — rather than while its arguments are being
+evaluated — reported one byte too far.
+
+That only crosses a line boundary when the failing opcode is the **last one on its line** — which is
+a one-statement line, i.e. how most BASIC is written. Measured before the fix:
+
+| faulting statement | reported | GPC.ERR said |
+|---|---|---|
+| `RETURN` with no `GOSUB` on line 110 | `STRUCTURE IMBALANCE @ $005D` | line **120** |
+| a failing `BLOAD` on line 110 | `INPUT/OUTPUT ERROR @ $006D` | line **120** |
+
+`$005D` and `$006D` are *exactly* line 120's first byte in those maps. The worst part was the
+wording: an address that lands on a line start is an exact hit, so GPC.ERR printed the confident
+"IS **ON** BASIC LINE 120" rather than "ON/NEAR". It read as certain and was wrong.
+
+`READ A,B,C` running out of data was **right** all along, and that is the tell: it fails on the second
+of three ops, so the over-advanced address is still inside its own line.
+
+The fix is a 16-bit decrement in `RuntimeErrorHandler` (`errorhandler.asm`) — report the opcode that
+failed, not the one after it. Every raise site is at least one byte into its statement (operand fetches
+`iny` past the byte they read), so `-1` can never leave the failing statement, and at worst lands on
+its first byte.
+
+Verified across the error set — 16 programs compiled and run, **0 decoding to the wrong line**:
+`BAD ARRAY INDEX`, `DIVIDE BY ZERO`, `OUT OF DATA`, `STRUCTURE IMBALANCE` (from both `RETURN` and
+`NEXT`), `INPUT/OUTPUT ERROR`, and `OUT OF RANGE` (from both `MID$` and `SQR`). The cases that prove
+`-1` cannot overshoot are the two with the fault on **line 10**, where there is no earlier line to fall
+back into: a bare `RETURN` reports `$0007` against a line starting at `$0006` — one byte of margin, and
+it holds. End to end afterwards: a `RETURN` alone on line 80 reports `$0037`, and GPC.ERR answers
+"ON/NEAR BASIC LINE 80" (it used to answer "ON BASIC LINE 90").
+
 ### The `storage` section had silently run off the end of its 1K hole — FIXED
 
 `common.inc` places the `storage` `.dsection` at `$0400` and the code at `$0801`. That is **1025
@@ -606,15 +642,28 @@ Candidates, each meant to demonstrate one concrete reason to reach for the compi
 
 ## To check
 
-### Check GPC.ERR — TODO
+### Check GPC.ERR — DONE
 
-Give `GPC.ERR` (the runtime error decoder, renamed from `GPC.ERR.HELPER` in bab...; `testing/GPC.ERR.BASL`
-→ `GPC.ERR.PRG`, freshened on release by `build_basl.py GPC.ERR.BASL GPC.ERR.PRG`) a pass. It decodes a
-runtime `<err> @ $XXXX` — a P-code byte offset — back to a source line, and it has been wrong before:
-see the recent "BAD ARRAY INDEX reporting a meaningless code address" fix and the caveat that GPC.ERR is
-*not* the culprit when a helper stashes the code pointer in Y and fails to restore it. Confirm it still
-decodes offsets to the right line across the current error set, and that its `.PRG` is up to date with
-its `.BASL`.
+`GPC.ERR` (the runtime error decoder; `testing/GPC.ERR.BASL` → `GPC.ERR.PRG`, freshened on release by
+`build_basl.py GPC.ERR.BASL GPC.ERR.PRG`) was given a pass. **Both halves check out, and the pass found
+a bug in the runtime rather than in GPC.ERR** — see "A runtime error named the line after the one that
+failed" below.
+
+- **The `.PRG` is up to date with its `.BASL`.** Rebuilt through BASLOAD under a scratch name: 1949
+  bytes both, and the only differing bytes are offsets 1947-1948 — exactly the two nondeterministic
+  trailing bytes past the end marker that `build_basl.py` documents.
+- **The decoding is right, 16/16**, checked against answers computed independently from the map file:
+  a real error address, a whole `<err> @ $XXXX` line pasted in, an address with no `$` sigil, exact line
+  starts, the last byte of a line's range, `$0000` (before the first mapped line), and the 65024/65535
+  setup-code entries. The boundary pair is the one that matters and it is exact: `$0041` → line 80 and
+  `$0042` → line 90 are adjacent bytes across a line edge.
+
+**`-bas` cannot drive GPC.ERR as shipped, and that is a harness limit, not a fault.** Both `GPC.ERR` and
+`GPC.PRG` open with `GOSUB CLEAR.KB`, and a `GET`-drain loop eats the *entire* remaining paste — measured,
+a 46-character tail after `RUN` vanished completely and the program then waited forever at its first
+prompt. `-pastewarp`, and dropping `-warp`, change nothing. To test it headlessly, rebuild the same
+`.BASL` with only `CLEAR.KB` stubbed to a bare `RETURN` and drive that; the decode logic under test is
+untouched. (`LINPUT` programs such as `testing/MD5` are unaffected — no drain loop.)
 
 ## Build / infrastructure
 

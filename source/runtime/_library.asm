@@ -2061,7 +2061,24 @@ RuntimeErrorHandler:
 		sta 	codePtr
 		bcc 	_EHNoCarry
 		inc 	codePtr+1
-_EHNoCarry:		
+_EHNoCarry:
+		;
+		;		Step back one byte, onto the opcode that failed rather than the one after it.
+		;		NXCommand consumes the opcode (iny) BEFORE it jumps through VectorTable, so a
+		;		handler that raises during its own execution -- rather than while its arguments
+		;		are being evaluated -- reports a codePtr+Y already past its own instruction. When
+		;		that instruction is the LAST on its line (a one-statement line, which is how most
+		;		BASIC is written) the address lands on the first byte of the NEXT line, and
+		;		GPC.ERR then names that line as an exact hit. Measured: a bare RETURN raising
+		;		STRUCTURE IMBALANCE, and a failing BLOAD, both reported the following line.
+		;		Every other raise site is at least one byte into its statement too -- operand
+		;		fetches iny past the byte they read -- so -1 never leaves the failing statement.
+		;
+		lda 	codePtr
+		bne 	_EHNoBorrow
+		dec 	codePtr+1
+_EHNoBorrow:
+		dec 	codePtr
 		pla
 		ply
 		sta 	zTemp0
