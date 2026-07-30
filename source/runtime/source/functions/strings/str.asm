@@ -21,8 +21,8 @@
 Unary_Str: ;; [str$]
 		.entercmd
 		phy
-		lda 	#8 							; maximum decimal places.
-		jsr 	FloatToString 				; do the conversion.
+		lda 	#9 							; nine significant digits: STR$ must give exactly what
+		jsr 	FloatToString 				; PRINT gives, and that is what stock BASIC shows
 		lda		#33 						; create buffer
 		jsr 	StringAllocTemp 			; allocate memory		
 		ldy 	#1  						; copy the converted string into the buffer.

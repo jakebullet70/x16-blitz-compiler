@@ -20,8 +20,8 @@
 
 PrintNumber: ;; [print.n]
 		.entercmd
-		lda 	#7
-		jsr 	FloatToString 				; to number in decimal buffer
+		lda 	#9 							; nine significant digits, as stock BASIC prints -- not
+		jsr 	FloatToString 				; a fixed count of decimal places, see FloatToString
 		dex 								; drop
 		phx
 		ldx 	#0 							; print buffer.

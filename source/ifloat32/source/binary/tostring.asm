@@ -37,8 +37,11 @@ ConvertInt16:
 ConvertInt32:
 		phy
 		ldy  	#0 							; index into buffer.
-		bit 	NSStatus 					; output a - if not negative.
-		bpl 	_CI32NotNeg
+		bit 	NSStatus,x 					; output a - if negative. INDEXED: unindexed it read
+		bpl 	_CI32NotNeg 				; slot 0's sign rather than that of the value being
+											; converted, and every caller but ConvertInt16 passes
+											; a slot above 0 -- MakePlusTwoString uses X+2. It only
+											; escaped notice because slot 0 is usually positive.
 		pha
 		lda 	#'-'
 		sta 	numberBuffer,y

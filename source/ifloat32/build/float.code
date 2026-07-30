@@ -1,400 +1,400 @@
-30750  -42255 + -11505 f.cmp = assert
-30750  -42255 - 73005 f.cmp = assert
-30750  -42255 * -1299341250 f.cmp = assert
-30750  -42255 / -0.72772453 f.cmp = assert
--42255  -42255 f.cmp = -1 f.cmp = assert
--42255  -42255 f.cmp <> 0 f.cmp = assert
--42255  -42255 f.cmp > 0 f.cmp = assert
--42255  -42255 f.cmp >= -1 f.cmp = assert
--42255  -42255 f.cmp < 0 f.cmp = assert
--42255  -42255 f.cmp <= -1 f.cmp = assert
-23.44196971  55.07532194 + 78.51729165 f.cmp = assert
-23.44196971  55.07532194 - -31.63335223 f.cmp = assert
-23.44196971  55.07532194 * 1291.07402866 f.cmp = assert
-23.44196971  55.07532194 / 0.42563473 f.cmp = assert
--62.49404714  -62.49404714 f.cmp > 0 f.cmp = assert
--62.49404714  -62.49404714 f.cmp >= -1 f.cmp = assert
--62.49404714  -62.49404714 f.cmp < 0 f.cmp = assert
--62.49404714  -62.49404714 f.cmp <= -1 f.cmp = assert
--62.49404714  -62.49404714 f.cmp = -1 f.cmp = assert
--62.49404714  -62.49404714 f.cmp <> 0 f.cmp = assert
-18950  -38161 + -19211 f.cmp = assert
-18950  -38161 - 57111 f.cmp = assert
-18950  -38161 * -723150950 f.cmp = assert
-18950  -38161 / -0.49658028 f.cmp = assert
--38161  -38161 f.cmp = -1 f.cmp = assert
--38161  -38161 f.cmp <> 0 f.cmp = assert
--38161  -38161 f.cmp > 0 f.cmp = assert
--38161  -38161 f.cmp >= -1 f.cmp = assert
--38161  -38161 f.cmp < 0 f.cmp = assert
--38161  -38161 f.cmp <= -1 f.cmp = assert
-15.34348425  -46.25099214 + -30.90750790 f.cmp = assert
-15.34348425  -46.25099214 - 61.59447639 f.cmp = assert
-15.34348425  -46.25099214 * -709.65136938 f.cmp = assert
-15.34348425  -46.25099214 / -0.33174389 f.cmp = assert
-48.18239248  48.18239248 f.cmp > 0 f.cmp = assert
-48.18239248  48.18239248 f.cmp >= -1 f.cmp = assert
-48.18239248  48.18239248 f.cmp < 0 f.cmp = assert
-48.18239248  48.18239248 f.cmp <= -1 f.cmp = assert
-48.18239248  48.18239248 f.cmp = -1 f.cmp = assert
-48.18239248  48.18239248 f.cmp <> 0 f.cmp = assert
-48581  37097 + 85678 f.cmp = assert
-48581  37097 - 11484 f.cmp = assert
-48581  37097 * 1802209357 f.cmp = assert
-48581  37097 / 1.30956681 f.cmp = assert
-37097  37097 f.cmp = -1 f.cmp = assert
-37097  37097 f.cmp <> 0 f.cmp = assert
-37097  37097 f.cmp > 0 f.cmp = assert
-37097  37097 f.cmp >= -1 f.cmp = assert
-37097  37097 f.cmp < 0 f.cmp = assert
-37097  37097 f.cmp <= -1 f.cmp = assert
-28.12537458  17.62695392 + 45.75232850 f.cmp = assert
-28.12537458  17.62695392 - 10.49842067 f.cmp = assert
-28.12537458  17.62695392 * 495.76468168 f.cmp = assert
-28.12537458  17.62695392 / 1.59558905 f.cmp = assert
--22.92743176  -22.92743176 f.cmp > 0 f.cmp = assert
--22.92743176  -22.92743176 f.cmp >= -1 f.cmp = assert
--22.92743176  -22.92743176 f.cmp < 0 f.cmp = assert
--22.92743176  -22.92743176 f.cmp <= -1 f.cmp = assert
--22.92743176  -22.92743176 f.cmp = -1 f.cmp = assert
--22.92743176  -22.92743176 f.cmp <> 0 f.cmp = assert
-15982  -37553 + -21571 f.cmp = assert
-15982  -37553 - 53535 f.cmp = assert
-15982  -37553 * -600172046 f.cmp = assert
-15982  -37553 / -0.42558517 f.cmp = assert
--37553  -37553 f.cmp = -1 f.cmp = assert
--37553  -37553 f.cmp <> 0 f.cmp = assert
--37553  -37553 f.cmp > 0 f.cmp = assert
--37553  -37553 f.cmp >= -1 f.cmp = assert
--37553  -37553 f.cmp < 0 f.cmp = assert
--37553  -37553 f.cmp <= -1 f.cmp = assert
-4.12910019  -9.76075160 + -5.63165141 f.cmp = assert
-4.12910019  -9.76075160 - 13.88985179 f.cmp = assert
-4.12910019  -9.76075160 * -40.30312125 f.cmp = assert
-4.12910019  -9.76075160 / -0.42303097 f.cmp = assert
-50.48246538  50.48246538 f.cmp > 0 f.cmp = assert
-50.48246538  50.48246538 f.cmp >= -1 f.cmp = assert
-50.48246538  50.48246538 f.cmp < 0 f.cmp = assert
-50.48246538  50.48246538 f.cmp <= -1 f.cmp = assert
-50.48246538  50.48246538 f.cmp = -1 f.cmp = assert
-50.48246538  50.48246538 f.cmp <> 0 f.cmp = assert
-46158  -29496 + 16662 f.cmp = assert
-46158  -29496 - 75654 f.cmp = assert
-46158  -29496 * -1361476368 f.cmp = assert
-46158  -29496 / -1.56489015 f.cmp = assert
--29496  -29496 f.cmp = -1 f.cmp = assert
--29496  -29496 f.cmp <> 0 f.cmp = assert
--29496  -29496 f.cmp > 0 f.cmp = assert
--29496  -29496 f.cmp >= -1 f.cmp = assert
--29496  -29496 f.cmp < 0 f.cmp = assert
--29496  -29496 f.cmp <= -1 f.cmp = assert
-75.65457196  22.06706082 + 97.72163279 f.cmp = assert
-75.65457196  22.06706082 - 53.58751114 f.cmp = assert
-75.65457196  22.06706082 * 1669.47404111 f.cmp = assert
-75.65457196  22.06706082 / 3.42839368 f.cmp = assert
--50.85931805  -50.85931805 f.cmp > 0 f.cmp = assert
--50.85931805  -50.85931805 f.cmp >= -1 f.cmp = assert
--50.85931805  -50.85931805 f.cmp < 0 f.cmp = assert
--50.85931805  -50.85931805 f.cmp <= -1 f.cmp = assert
--50.85931805  -50.85931805 f.cmp = -1 f.cmp = assert
--50.85931805  -50.85931805 f.cmp <> 0 f.cmp = assert
--31729  22792 + -8937 f.cmp = assert
--31729  22792 - -54521 f.cmp = assert
--31729  22792 * -723167368 f.cmp = assert
--31729  22792 / -1.39211127 f.cmp = assert
-22792  22792 f.cmp = -1 f.cmp = assert
-22792  22792 f.cmp <> 0 f.cmp = assert
-22792  22792 f.cmp > 0 f.cmp = assert
-22792  22792 f.cmp >= -1 f.cmp = assert
-22792  22792 f.cmp < 0 f.cmp = assert
-22792  22792 f.cmp <= -1 f.cmp = assert
-70.23414595  18.08504090 + 88.31918685 f.cmp = assert
-70.23414595  18.08504090 - 52.14910505 f.cmp = assert
-70.23414595  18.08504090 * 1270.18740206 f.cmp = assert
-70.23414595  18.08504090 / 3.88354919 f.cmp = assert
--34.13274480  -70.92637888 f.cmp > -1 f.cmp = assert
--34.13274480  -70.92637888 f.cmp >= -1 f.cmp = assert
--34.13274480  -70.92637888 f.cmp < 0 f.cmp = assert
--34.13274480  -70.92637888 f.cmp <= 0 f.cmp = assert
--34.13274480  -70.92637888 f.cmp = 0 f.cmp = assert
--34.13274480  -70.92637888 f.cmp <> -1 f.cmp = assert
--13355  23987 + 10632 f.cmp = assert
--13355  23987 - -37342 f.cmp = assert
--13355  23987 * -320346385 f.cmp = assert
--13355  23987 / -0.55675991 f.cmp = assert
-23987  23987 f.cmp = -1 f.cmp = assert
-23987  23987 f.cmp <> 0 f.cmp = assert
-23987  23987 f.cmp > 0 f.cmp = assert
-23987  23987 f.cmp >= -1 f.cmp = assert
-23987  23987 f.cmp < 0 f.cmp = assert
-23987  23987 f.cmp <= -1 f.cmp = assert
--5.51372803  69.45638617 + 63.94265814 f.cmp = assert
--5.51372803  69.45638617 - -74.97011420 f.cmp = assert
--5.51372803  69.45638617 * -382.96362335 f.cmp = assert
--5.51372803  69.45638617 / -0.07938403 f.cmp = assert
--76.41208391  -55.06301126 f.cmp > 0 f.cmp = assert
--76.41208391  -55.06301126 f.cmp >= 0 f.cmp = assert
--76.41208391  -55.06301126 f.cmp < -1 f.cmp = assert
--76.41208391  -55.06301126 f.cmp <= -1 f.cmp = assert
--76.41208391  -55.06301126 f.cmp = 0 f.cmp = assert
--76.41208391  -55.06301126 f.cmp <> -1 f.cmp = assert
--459  28642 + 28183 f.cmp = assert
--459  28642 - -29101 f.cmp = assert
--459  28642 * -13146678 f.cmp = assert
--459  28642 / -0.01602542 f.cmp = assert
-28642  28642 f.cmp = -1 f.cmp = assert
-28642  28642 f.cmp <> 0 f.cmp = assert
-28642  28642 f.cmp > 0 f.cmp = assert
-28642  28642 f.cmp >= -1 f.cmp = assert
-28642  28642 f.cmp < 0 f.cmp = assert
-28642  28642 f.cmp <= -1 f.cmp = assert
-44.91706487  61.18595610 + 106.10302098 f.cmp = assert
-44.91706487  61.18595610 - -16.26889123 f.cmp = assert
-44.91706487  61.18595610 * 2748.29355965 f.cmp = assert
-44.91706487  61.18595610 / 0.73410743 f.cmp = assert
--27.53397586  -27.53397586 f.cmp > 0 f.cmp = assert
--27.53397586  -27.53397586 f.cmp >= -1 f.cmp = assert
--27.53397586  -27.53397586 f.cmp < 0 f.cmp = assert
--27.53397586  -27.53397586 f.cmp <= -1 f.cmp = assert
--27.53397586  -27.53397586 f.cmp = -1 f.cmp = assert
--27.53397586  -27.53397586 f.cmp <> 0 f.cmp = assert
-36099  -2090 + 34009 f.cmp = assert
-36099  -2090 - 38189 f.cmp = assert
-36099  -2090 * -75446910 f.cmp = assert
-36099  -2090 / -17.27224880 f.cmp = assert
--2090  -2090 f.cmp = -1 f.cmp = assert
--2090  -2090 f.cmp <> 0 f.cmp = assert
--2090  -2090 f.cmp > 0 f.cmp = assert
--2090  -2090 f.cmp >= -1 f.cmp = assert
--2090  -2090 f.cmp < 0 f.cmp = assert
--2090  -2090 f.cmp <= -1 f.cmp = assert
-13.08431198  -74.79136632 + -61.70705435 f.cmp = assert
-13.08431198  -74.79136632 - 87.87567830 f.cmp = assert
-13.08431198  -74.79136632 * -978.59357029 f.cmp = assert
-13.08431198  -74.79136632 / -0.17494415 f.cmp = assert
--36.08317810  -36.08317810 f.cmp > 0 f.cmp = assert
--36.08317810  -36.08317810 f.cmp >= -1 f.cmp = assert
--36.08317810  -36.08317810 f.cmp < 0 f.cmp = assert
--36.08317810  -36.08317810 f.cmp <= -1 f.cmp = assert
--36.08317810  -36.08317810 f.cmp = -1 f.cmp = assert
--36.08317810  -36.08317810 f.cmp <> 0 f.cmp = assert
--31024  -28633 + -59657 f.cmp = assert
--31024  -28633 - -2391 f.cmp = assert
--31024  -28633 * 888310192 f.cmp = assert
--31024  -28633 / 1.08350505 f.cmp = assert
--28633  -28633 f.cmp = -1 f.cmp = assert
--28633  -28633 f.cmp <> 0 f.cmp = assert
--28633  -28633 f.cmp > 0 f.cmp = assert
--28633  -28633 f.cmp >= -1 f.cmp = assert
--28633  -28633 f.cmp < 0 f.cmp = assert
--28633  -28633 f.cmp <= -1 f.cmp = assert
--27.63400016  -32.52701061 + -60.16101077 f.cmp = assert
--27.63400016  -32.52701061 - 4.89301045 f.cmp = assert
--27.63400016  -32.52701061 * 898.85141646 f.cmp = assert
--27.63400016  -32.52701061 / 0.84957085 f.cmp = assert
-77.51356605  77.51356605 f.cmp > 0 f.cmp = assert
-77.51356605  77.51356605 f.cmp >= -1 f.cmp = assert
-77.51356605  77.51356605 f.cmp < 0 f.cmp = assert
-77.51356605  77.51356605 f.cmp <= -1 f.cmp = assert
-77.51356605  77.51356605 f.cmp = -1 f.cmp = assert
-77.51356605  77.51356605 f.cmp <> 0 f.cmp = assert
-28151  -28268 + -117 f.cmp = assert
-28151  -28268 - 56419 f.cmp = assert
-28151  -28268 * -795772468 f.cmp = assert
-28151  -28268 / -0.99586104 f.cmp = assert
--28268  -28268 f.cmp = -1 f.cmp = assert
--28268  -28268 f.cmp <> 0 f.cmp = assert
--28268  -28268 f.cmp > 0 f.cmp = assert
--28268  -28268 f.cmp >= -1 f.cmp = assert
--28268  -28268 f.cmp < 0 f.cmp = assert
--28268  -28268 f.cmp <= -1 f.cmp = assert
-72.23730461  32.80132826 + 105.03863287 f.cmp = assert
-72.23730461  32.80132826 - 39.43597635 f.cmp = assert
-72.23730461  32.80132826 * 2369.47954092 f.cmp = assert
-72.23730461  32.80132826 / 2.20226767 f.cmp = assert
-8.98420669  8.98420669 f.cmp > 0 f.cmp = assert
-8.98420669  8.98420669 f.cmp >= -1 f.cmp = assert
-8.98420669  8.98420669 f.cmp < 0 f.cmp = assert
-8.98420669  8.98420669 f.cmp <= -1 f.cmp = assert
-8.98420669  8.98420669 f.cmp = -1 f.cmp = assert
-8.98420669  8.98420669 f.cmp <> 0 f.cmp = assert
-7488  -39211 + -31723 f.cmp = assert
-7488  -39211 - 46699 f.cmp = assert
-7488  -39211 * -293611968 f.cmp = assert
-7488  -39211 / -0.19096682 f.cmp = assert
--39211  -39211 f.cmp = -1 f.cmp = assert
--39211  -39211 f.cmp <> 0 f.cmp = assert
--39211  -39211 f.cmp > 0 f.cmp = assert
--39211  -39211 f.cmp >= -1 f.cmp = assert
--39211  -39211 f.cmp < 0 f.cmp = assert
--39211  -39211 f.cmp <= -1 f.cmp = assert
--29.89778894  72.82270997 + 42.92492103 f.cmp = assert
--29.89778894  72.82270997 - -102.72049891 f.cmp = assert
--29.89778894  72.82270997 * -2177.23801247 f.cmp = assert
--29.89778894  72.82270997 / -0.41055584 f.cmp = assert
-10.71734024  10.71734024 f.cmp > 0 f.cmp = assert
-10.71734024  10.71734024 f.cmp >= -1 f.cmp = assert
-10.71734024  10.71734024 f.cmp < 0 f.cmp = assert
-10.71734024  10.71734024 f.cmp <= -1 f.cmp = assert
-10.71734024  10.71734024 f.cmp = -1 f.cmp = assert
-10.71734024  10.71734024 f.cmp <> 0 f.cmp = assert
-24663  -22561 + 2102 f.cmp = assert
-24663  -22561 - 47224 f.cmp = assert
-24663  -22561 * -556421943 f.cmp = assert
-24663  -22561 / -1.09316963 f.cmp = assert
--22561  -22561 f.cmp = -1 f.cmp = assert
--22561  -22561 f.cmp <> 0 f.cmp = assert
--22561  -22561 f.cmp > 0 f.cmp = assert
--22561  -22561 f.cmp >= -1 f.cmp = assert
--22561  -22561 f.cmp < 0 f.cmp = assert
--22561  -22561 f.cmp <= -1 f.cmp = assert
-17.87632623  -77.49639589 + -59.62006965 f.cmp = assert
-17.87632623  -77.49639589 - 95.37272212 f.cmp = assert
-17.87632623  -77.49639589 * -1385.35085474 f.cmp = assert
-17.87632623  -77.49639589 / -0.23067300 f.cmp = assert
--58.03126265  -58.03126265 f.cmp > 0 f.cmp = assert
--58.03126265  -58.03126265 f.cmp >= -1 f.cmp = assert
--58.03126265  -58.03126265 f.cmp < 0 f.cmp = assert
--58.03126265  -58.03126265 f.cmp <= -1 f.cmp = assert
--58.03126265  -58.03126265 f.cmp = -1 f.cmp = assert
--58.03126265  -58.03126265 f.cmp <> 0 f.cmp = assert
-37977  10325 + 48302 f.cmp = assert
-37977  10325 - 27652 f.cmp = assert
-37977  10325 * 392112525 f.cmp = assert
-37977  10325 / 3.67815981 f.cmp = assert
-10325  10325 f.cmp = -1 f.cmp = assert
-10325  10325 f.cmp <> 0 f.cmp = assert
-10325  10325 f.cmp > 0 f.cmp = assert
-10325  10325 f.cmp >= -1 f.cmp = assert
-10325  10325 f.cmp < 0 f.cmp = assert
-10325  10325 f.cmp <= -1 f.cmp = assert
--60.25285494  -48.81647364 + -109.06932858 f.cmp = assert
--60.25285494  -48.81647364 - -11.43638131 f.cmp = assert
--60.25285494  -48.81647364 * 2941.33190497 f.cmp = assert
--60.25285494  -48.81647364 / 1.23427299 f.cmp = assert
--54.69336681  -33.74641613 f.cmp > 0 f.cmp = assert
--54.69336681  -33.74641613 f.cmp >= 0 f.cmp = assert
--54.69336681  -33.74641613 f.cmp < -1 f.cmp = assert
--54.69336681  -33.74641613 f.cmp <= -1 f.cmp = assert
--54.69336681  -33.74641613 f.cmp = 0 f.cmp = assert
--54.69336681  -33.74641613 f.cmp <> -1 f.cmp = assert
-36529  -45024 + -8495 f.cmp = assert
-36529  -45024 - 81553 f.cmp = assert
-36529  -45024 * -1644681696 f.cmp = assert
-36529  -45024 / -0.81132285 f.cmp = assert
--45024  -45024 f.cmp = -1 f.cmp = assert
--45024  -45024 f.cmp <> 0 f.cmp = assert
--45024  -45024 f.cmp > 0 f.cmp = assert
--45024  -45024 f.cmp >= -1 f.cmp = assert
--45024  -45024 f.cmp < 0 f.cmp = assert
--45024  -45024 f.cmp <= -1 f.cmp = assert
--71.94306309  51.05491212 + -20.88815097 f.cmp = assert
--71.94306309  51.05491212 - -122.99797522 f.cmp = assert
--71.94306309  51.05491212 * -3673.04676414 f.cmp = assert
--71.94306309  51.05491212 / -1.40913107 f.cmp = assert
-63.68972220  63.68972220 f.cmp > 0 f.cmp = assert
-63.68972220  63.68972220 f.cmp >= -1 f.cmp = assert
-63.68972220  63.68972220 f.cmp < 0 f.cmp = assert
-63.68972220  63.68972220 f.cmp <= -1 f.cmp = assert
-63.68972220  63.68972220 f.cmp = -1 f.cmp = assert
-63.68972220  63.68972220 f.cmp <> 0 f.cmp = assert
--40863  -7487 + -48350 f.cmp = assert
--40863  -7487 - -33376 f.cmp = assert
--40863  -7487 * 305941281 f.cmp = assert
--40863  -7487 / 5.45786029 f.cmp = assert
--7487  -7487 f.cmp = -1 f.cmp = assert
--7487  -7487 f.cmp <> 0 f.cmp = assert
--7487  -7487 f.cmp > 0 f.cmp = assert
--7487  -7487 f.cmp >= -1 f.cmp = assert
--7487  -7487 f.cmp < 0 f.cmp = assert
--7487  -7487 f.cmp <= -1 f.cmp = assert
-61.99246781  -28.50992144 + 33.48254637 f.cmp = assert
-61.99246781  -28.50992144 - 90.50238924 f.cmp = assert
-61.99246781  -28.50992144 * -1767.40038692 f.cmp = assert
-61.99246781  -28.50992144 / -2.17441735 f.cmp = assert
--25.85996598  -25.85996598 f.cmp > 0 f.cmp = assert
--25.85996598  -25.85996598 f.cmp >= -1 f.cmp = assert
--25.85996598  -25.85996598 f.cmp < 0 f.cmp = assert
--25.85996598  -25.85996598 f.cmp <= -1 f.cmp = assert
--25.85996598  -25.85996598 f.cmp = -1 f.cmp = assert
--25.85996598  -25.85996598 f.cmp <> 0 f.cmp = assert
--43431  -23753 + -67184 f.cmp = assert
--43431  -23753 - -19678 f.cmp = assert
--43431  -23753 * 1031616543 f.cmp = assert
--43431  -23753 / 1.82844272 f.cmp = assert
--23753  -23753 f.cmp = -1 f.cmp = assert
--23753  -23753 f.cmp <> 0 f.cmp = assert
--23753  -23753 f.cmp > 0 f.cmp = assert
--23753  -23753 f.cmp >= -1 f.cmp = assert
--23753  -23753 f.cmp < 0 f.cmp = assert
--23753  -23753 f.cmp <= -1 f.cmp = assert
-5.98436867  -1.77954159 + 4.20482708 f.cmp = assert
-5.98436867  -1.77954159 - 7.76391026 f.cmp = assert
-5.98436867  -1.77954159 * -10.64943294 f.cmp = assert
-5.98436867  -1.77954159 / -3.36287093 f.cmp = assert
--16.47242245  -16.47242245 f.cmp > 0 f.cmp = assert
--16.47242245  -16.47242245 f.cmp >= -1 f.cmp = assert
--16.47242245  -16.47242245 f.cmp < 0 f.cmp = assert
--16.47242245  -16.47242245 f.cmp <= -1 f.cmp = assert
--16.47242245  -16.47242245 f.cmp = -1 f.cmp = assert
--16.47242245  -16.47242245 f.cmp <> 0 f.cmp = assert
-37648  -8987 + 28661 f.cmp = assert
-37648  -8987 - 46635 f.cmp = assert
-37648  -8987 * -338342576 f.cmp = assert
-37648  -8987 / -4.18916212 f.cmp = assert
--8987  -8987 f.cmp = -1 f.cmp = assert
--8987  -8987 f.cmp <> 0 f.cmp = assert
--8987  -8987 f.cmp > 0 f.cmp = assert
--8987  -8987 f.cmp >= -1 f.cmp = assert
--8987  -8987 f.cmp < 0 f.cmp = assert
--8987  -8987 f.cmp <= -1 f.cmp = assert
-45.30023487  37.30039686 + 82.60063173 f.cmp = assert
-45.30023487  37.30039686 - 7.99983802 f.cmp = assert
-45.30023487  37.30039686 * 1689.71673857 f.cmp = assert
-45.30023487  37.30039686 / 1.21447059 f.cmp = assert
--11.12966713  -11.12966713 f.cmp > 0 f.cmp = assert
--11.12966713  -11.12966713 f.cmp >= -1 f.cmp = assert
--11.12966713  -11.12966713 f.cmp < 0 f.cmp = assert
--11.12966713  -11.12966713 f.cmp <= -1 f.cmp = assert
--11.12966713  -11.12966713 f.cmp = -1 f.cmp = assert
--11.12966713  -11.12966713 f.cmp <> 0 f.cmp = assert
-21472  35905 + 57377 f.cmp = assert
-21472  35905 - -14433 f.cmp = assert
-21472  35905 * 770952160 f.cmp = assert
-21472  35905 / 0.59802256 f.cmp = assert
-35905  35905 f.cmp = -1 f.cmp = assert
-35905  35905 f.cmp <> 0 f.cmp = assert
-35905  35905 f.cmp > 0 f.cmp = assert
-35905  35905 f.cmp >= -1 f.cmp = assert
-35905  35905 f.cmp < 0 f.cmp = assert
-35905  35905 f.cmp <= -1 f.cmp = assert
--46.41078805  17.68478173 + -28.72600632 f.cmp = assert
--46.41078805  17.68478173 - -64.09556977 f.cmp = assert
--46.41078805  17.68478173 * -820.76465643 f.cmp = assert
--46.41078805  17.68478173 / -2.62433480 f.cmp = assert
-58.41216490  58.41216490 f.cmp > 0 f.cmp = assert
-58.41216490  58.41216490 f.cmp >= -1 f.cmp = assert
-58.41216490  58.41216490 f.cmp < 0 f.cmp = assert
-58.41216490  58.41216490 f.cmp <= -1 f.cmp = assert
-58.41216490  58.41216490 f.cmp = -1 f.cmp = assert
-58.41216490  58.41216490 f.cmp <> 0 f.cmp = assert
-31977  20040 + 52017 f.cmp = assert
-31977  20040 - 11937 f.cmp = assert
-31977  20040 * 640819080 f.cmp = assert
-31977  20040 / 1.59565868 f.cmp = assert
-20040  20040 f.cmp = -1 f.cmp = assert
-20040  20040 f.cmp <> 0 f.cmp = assert
-20040  20040 f.cmp > 0 f.cmp = assert
-20040  20040 f.cmp >= -1 f.cmp = assert
-20040  20040 f.cmp < 0 f.cmp = assert
-20040  20040 f.cmp <= -1 f.cmp = assert
--53.50692476  -16.34696687 + -69.85389163 f.cmp = assert
--53.50692476  -16.34696687 - -37.15995788 f.cmp = assert
--53.50692476  -16.34696687 * 874.67592659 f.cmp = assert
--53.50692476  -16.34696687 / 3.27320201 f.cmp = assert
--19.58532437  -19.58532437 f.cmp > 0 f.cmp = assert
--19.58532437  -19.58532437 f.cmp >= -1 f.cmp = assert
--19.58532437  -19.58532437 f.cmp < 0 f.cmp = assert
--19.58532437  -19.58532437 f.cmp <= -1 f.cmp = assert
--19.58532437  -19.58532437 f.cmp = -1 f.cmp = assert
--19.58532437  -19.58532437 f.cmp <> 0 f.cmp = assert
+6464  -36716 + -30252 f.cmp = assert
+6464  -36716 - 43180 f.cmp = assert
+6464  -36716 * -237332224 f.cmp = assert
+6464  -36716 / -0.17605404 f.cmp = assert
+-36716  -36716 f.cmp = -1 f.cmp = assert
+-36716  -36716 f.cmp <> 0 f.cmp = assert
+-36716  -36716 f.cmp > 0 f.cmp = assert
+-36716  -36716 f.cmp >= -1 f.cmp = assert
+-36716  -36716 f.cmp < 0 f.cmp = assert
+-36716  -36716 f.cmp <= -1 f.cmp = assert
+-55.18020572  -39.42641937 + -94.60662509 f.cmp = assert
+-55.18020572  -39.42641937 - -15.75378634 f.cmp = assert
+-55.18020572  -39.42641937 * 2175.55793173 f.cmp = assert
+-55.18020572  -39.42641937 / 1.39957436 f.cmp = assert
+-28.97545963  -43.98404471 f.cmp > -1 f.cmp = assert
+-28.97545963  -43.98404471 f.cmp >= -1 f.cmp = assert
+-28.97545963  -43.98404471 f.cmp < 0 f.cmp = assert
+-28.97545963  -43.98404471 f.cmp <= 0 f.cmp = assert
+-28.97545963  -43.98404471 f.cmp = 0 f.cmp = assert
+-28.97545963  -43.98404471 f.cmp <> -1 f.cmp = assert
+28596  -28525 + 71 f.cmp = assert
+28596  -28525 - 57121 f.cmp = assert
+28596  -28525 * -815700900 f.cmp = assert
+28596  -28525 / -1.00248904 f.cmp = assert
+28596  -28525 f.cmp = 0 f.cmp = assert
+28596  -28525 f.cmp <> -1 f.cmp = assert
+28596  -28525 f.cmp > -1 f.cmp = assert
+28596  -28525 f.cmp >= -1 f.cmp = assert
+28596  -28525 f.cmp < 0 f.cmp = assert
+28596  -28525 f.cmp <= 0 f.cmp = assert
+-10.83396777  -4.78545396 + -15.61942172 f.cmp = assert
+-10.83396777  -4.78545396 - -6.04851381 f.cmp = assert
+-10.83396777  -4.78545396 * 51.84545391 f.cmp = assert
+-10.83396777  -4.78545396 / 2.26393731 f.cmp = assert
+-24.00907103  -24.00907103 f.cmp > 0 f.cmp = assert
+-24.00907103  -24.00907103 f.cmp >= -1 f.cmp = assert
+-24.00907103  -24.00907103 f.cmp < 0 f.cmp = assert
+-24.00907103  -24.00907103 f.cmp <= -1 f.cmp = assert
+-24.00907103  -24.00907103 f.cmp = -1 f.cmp = assert
+-24.00907103  -24.00907103 f.cmp <> 0 f.cmp = assert
+10345  28615 + 38960 f.cmp = assert
+10345  28615 - -18270 f.cmp = assert
+10345  28615 * 296022175 f.cmp = assert
+10345  28615 / 0.36152368 f.cmp = assert
+28615  28615 f.cmp = -1 f.cmp = assert
+28615  28615 f.cmp <> 0 f.cmp = assert
+28615  28615 f.cmp > 0 f.cmp = assert
+28615  28615 f.cmp >= -1 f.cmp = assert
+28615  28615 f.cmp < 0 f.cmp = assert
+28615  28615 f.cmp <= -1 f.cmp = assert
+-67.21041549  -5.09265409 + -72.30306957 f.cmp = assert
+-67.21041549  -5.09265409 - -62.11776140 f.cmp = assert
+-67.21041549  -5.09265409 * 342.27939705 f.cmp = assert
+-67.21041549  -5.09265409 / 13.19752223 f.cmp = assert
+-8.10990524  73.48716287 f.cmp > 0 f.cmp = assert
+-8.10990524  73.48716287 f.cmp >= 0 f.cmp = assert
+-8.10990524  73.48716287 f.cmp < -1 f.cmp = assert
+-8.10990524  73.48716287 f.cmp <= -1 f.cmp = assert
+-8.10990524  73.48716287 f.cmp = 0 f.cmp = assert
+-8.10990524  73.48716287 f.cmp <> -1 f.cmp = assert
+9643  1546 + 11189 f.cmp = assert
+9643  1546 - 8097 f.cmp = assert
+9643  1546 * 14908078 f.cmp = assert
+9643  1546 / 6.23738680 f.cmp = assert
+1546  1546 f.cmp = -1 f.cmp = assert
+1546  1546 f.cmp <> 0 f.cmp = assert
+1546  1546 f.cmp > 0 f.cmp = assert
+1546  1546 f.cmp >= -1 f.cmp = assert
+1546  1546 f.cmp < 0 f.cmp = assert
+1546  1546 f.cmp <= -1 f.cmp = assert
+-19.42731028  78.69174698 + 59.26443671 f.cmp = assert
+-19.42731028  78.69174698 - -98.11905726 f.cmp = assert
+-19.42731028  78.69174698 * -1528.76898494 f.cmp = assert
+-19.42731028  78.69174698 / -0.24687862 f.cmp = assert
+70.69976513  54.11128209 f.cmp > -1 f.cmp = assert
+70.69976513  54.11128209 f.cmp >= -1 f.cmp = assert
+70.69976513  54.11128209 f.cmp < 0 f.cmp = assert
+70.69976513  54.11128209 f.cmp <= 0 f.cmp = assert
+70.69976513  54.11128209 f.cmp = 0 f.cmp = assert
+70.69976513  54.11128209 f.cmp <> -1 f.cmp = assert
+12531  -20044 + -7513 f.cmp = assert
+12531  -20044 - 32575 f.cmp = assert
+12531  -20044 * -251171364 f.cmp = assert
+12531  -20044 / -0.62517462 f.cmp = assert
+-20044  -20044 f.cmp = -1 f.cmp = assert
+-20044  -20044 f.cmp <> 0 f.cmp = assert
+-20044  -20044 f.cmp > 0 f.cmp = assert
+-20044  -20044 f.cmp >= -1 f.cmp = assert
+-20044  -20044 f.cmp < 0 f.cmp = assert
+-20044  -20044 f.cmp <= -1 f.cmp = assert
+16.09986231  16.71280473 + 32.81266704 f.cmp = assert
+16.09986231  16.71280473 - -0.61294242 f.cmp = assert
+16.09986231  16.71280473 * 269.07385504 f.cmp = assert
+16.09986231  16.71280473 / 0.96332498 f.cmp = assert
+69.17299749  69.17299749 f.cmp > 0 f.cmp = assert
+69.17299749  69.17299749 f.cmp >= -1 f.cmp = assert
+69.17299749  69.17299749 f.cmp < 0 f.cmp = assert
+69.17299749  69.17299749 f.cmp <= -1 f.cmp = assert
+69.17299749  69.17299749 f.cmp = -1 f.cmp = assert
+69.17299749  69.17299749 f.cmp <> 0 f.cmp = assert
+-3631  42553 + 38922 f.cmp = assert
+-3631  42553 - -46184 f.cmp = assert
+-3631  42553 * -154509943 f.cmp = assert
+-3631  42553 / -0.08532888 f.cmp = assert
+42553  42553 f.cmp = -1 f.cmp = assert
+42553  42553 f.cmp <> 0 f.cmp = assert
+42553  42553 f.cmp > 0 f.cmp = assert
+42553  42553 f.cmp >= -1 f.cmp = assert
+42553  42553 f.cmp < 0 f.cmp = assert
+42553  42553 f.cmp <= -1 f.cmp = assert
+57.33044464  -3.78553495 + 53.54490969 f.cmp = assert
+57.33044464  -3.78553495 - 61.11597959 f.cmp = assert
+57.33044464  -3.78553495 * -217.02640176 f.cmp = assert
+57.33044464  -3.78553495 / -15.14460847 f.cmp = assert
+-37.36899652  20.75783591 f.cmp > 0 f.cmp = assert
+-37.36899652  20.75783591 f.cmp >= 0 f.cmp = assert
+-37.36899652  20.75783591 f.cmp < -1 f.cmp = assert
+-37.36899652  20.75783591 f.cmp <= -1 f.cmp = assert
+-37.36899652  20.75783591 f.cmp = 0 f.cmp = assert
+-37.36899652  20.75783591 f.cmp <> -1 f.cmp = assert
+31707  -31361 + 346 f.cmp = assert
+31707  -31361 - 63068 f.cmp = assert
+31707  -31361 * -994363227 f.cmp = assert
+31707  -31361 / -1.01103281 f.cmp = assert
+-31361  -31361 f.cmp = -1 f.cmp = assert
+-31361  -31361 f.cmp <> 0 f.cmp = assert
+-31361  -31361 f.cmp > 0 f.cmp = assert
+-31361  -31361 f.cmp >= -1 f.cmp = assert
+-31361  -31361 f.cmp < 0 f.cmp = assert
+-31361  -31361 f.cmp <= -1 f.cmp = assert
+-39.86668826  -15.62954564 + -55.49623390 f.cmp = assert
+-39.86668826  -15.62954564 - -24.23714263 f.cmp = assert
+-39.86668826  -15.62954564 * 623.09822369 f.cmp = assert
+-39.86668826  -15.62954564 / 2.55072599 f.cmp = assert
+79.16878594  79.16878594 f.cmp > 0 f.cmp = assert
+79.16878594  79.16878594 f.cmp >= -1 f.cmp = assert
+79.16878594  79.16878594 f.cmp < 0 f.cmp = assert
+79.16878594  79.16878594 f.cmp <= -1 f.cmp = assert
+79.16878594  79.16878594 f.cmp = -1 f.cmp = assert
+79.16878594  79.16878594 f.cmp <> 0 f.cmp = assert
+29556  16177 + 45733 f.cmp = assert
+29556  16177 - 13379 f.cmp = assert
+29556  16177 * 478127412 f.cmp = assert
+29556  16177 / 1.82703839 f.cmp = assert
+16177  16177 f.cmp = -1 f.cmp = assert
+16177  16177 f.cmp <> 0 f.cmp = assert
+16177  16177 f.cmp > 0 f.cmp = assert
+16177  16177 f.cmp >= -1 f.cmp = assert
+16177  16177 f.cmp < 0 f.cmp = assert
+16177  16177 f.cmp <= -1 f.cmp = assert
+-73.59423342  27.45330850 + -46.14092492 f.cmp = assert
+-73.59423342  27.45330850 - -101.04754191 f.cmp = assert
+-73.59423342  27.45330850 * -2020.40519352 f.cmp = assert
+-73.59423342  27.45330850 / -2.68070544 f.cmp = assert
+-5.41734834  -5.41734834 f.cmp > 0 f.cmp = assert
+-5.41734834  -5.41734834 f.cmp >= -1 f.cmp = assert
+-5.41734834  -5.41734834 f.cmp < 0 f.cmp = assert
+-5.41734834  -5.41734834 f.cmp <= -1 f.cmp = assert
+-5.41734834  -5.41734834 f.cmp = -1 f.cmp = assert
+-5.41734834  -5.41734834 f.cmp <> 0 f.cmp = assert
+37017  21944 + 58961 f.cmp = assert
+37017  21944 - 15073 f.cmp = assert
+37017  21944 * 812301048 f.cmp = assert
+37017  21944 / 1.68688480 f.cmp = assert
+37017  21944 f.cmp = 0 f.cmp = assert
+37017  21944 f.cmp <> -1 f.cmp = assert
+37017  21944 f.cmp > -1 f.cmp = assert
+37017  21944 f.cmp >= -1 f.cmp = assert
+37017  21944 f.cmp < 0 f.cmp = assert
+37017  21944 f.cmp <= 0 f.cmp = assert
+-33.67903134  -74.78286223 + -108.46189358 f.cmp = assert
+-33.67903134  -74.78286223 - 41.10383089 f.cmp = assert
+-33.67903134  -74.78286223 * 2518.61436114 f.cmp = assert
+-33.67903134  -74.78286223 / 0.45035761 f.cmp = assert
+-22.76585405  -22.76585405 f.cmp > 0 f.cmp = assert
+-22.76585405  -22.76585405 f.cmp >= -1 f.cmp = assert
+-22.76585405  -22.76585405 f.cmp < 0 f.cmp = assert
+-22.76585405  -22.76585405 f.cmp <= -1 f.cmp = assert
+-22.76585405  -22.76585405 f.cmp = -1 f.cmp = assert
+-22.76585405  -22.76585405 f.cmp <> 0 f.cmp = assert
+-20654  -18268 + -38922 f.cmp = assert
+-20654  -18268 - -2386 f.cmp = assert
+-20654  -18268 * 377307272 f.cmp = assert
+-20654  -18268 / 1.13061090 f.cmp = assert
+-18268  -18268 f.cmp = -1 f.cmp = assert
+-18268  -18268 f.cmp <> 0 f.cmp = assert
+-18268  -18268 f.cmp > 0 f.cmp = assert
+-18268  -18268 f.cmp >= -1 f.cmp = assert
+-18268  -18268 f.cmp < 0 f.cmp = assert
+-18268  -18268 f.cmp <= -1 f.cmp = assert
+-55.28946303  67.62873573 + 12.33927270 f.cmp = assert
+-55.28946303  67.62873573 - -122.91819875 f.cmp = assert
+-55.28946303  67.62873573 * -3739.15648348 f.cmp = assert
+-55.28946303  67.62873573 / -0.81754394 f.cmp = assert
+66.57414757  66.57414757 f.cmp > 0 f.cmp = assert
+66.57414757  66.57414757 f.cmp >= -1 f.cmp = assert
+66.57414757  66.57414757 f.cmp < 0 f.cmp = assert
+66.57414757  66.57414757 f.cmp <= -1 f.cmp = assert
+66.57414757  66.57414757 f.cmp = -1 f.cmp = assert
+66.57414757  66.57414757 f.cmp <> 0 f.cmp = assert
+-34063  -37723 + -71786 f.cmp = assert
+-34063  -37723 - 3660 f.cmp = assert
+-34063  -37723 * 1284958549 f.cmp = assert
+-34063  -37723 / 0.90297696 f.cmp = assert
+-37723  -37723 f.cmp = -1 f.cmp = assert
+-37723  -37723 f.cmp <> 0 f.cmp = assert
+-37723  -37723 f.cmp > 0 f.cmp = assert
+-37723  -37723 f.cmp >= -1 f.cmp = assert
+-37723  -37723 f.cmp < 0 f.cmp = assert
+-37723  -37723 f.cmp <= -1 f.cmp = assert
+57.80950838  64.62719689 + 122.43670527 f.cmp = assert
+57.80950838  64.62719689 - -6.81768851 f.cmp = assert
+57.80950838  64.62719689 * 3736.06648035 f.cmp = assert
+57.80950838  64.62719689 / 0.89450744 f.cmp = assert
+-8.24767150  -8.24767150 f.cmp > 0 f.cmp = assert
+-8.24767150  -8.24767150 f.cmp >= -1 f.cmp = assert
+-8.24767150  -8.24767150 f.cmp < 0 f.cmp = assert
+-8.24767150  -8.24767150 f.cmp <= -1 f.cmp = assert
+-8.24767150  -8.24767150 f.cmp = -1 f.cmp = assert
+-8.24767150  -8.24767150 f.cmp <> 0 f.cmp = assert
+-2763  41040 + 38277 f.cmp = assert
+-2763  41040 - -43803 f.cmp = assert
+-2763  41040 * -113393520 f.cmp = assert
+-2763  41040 / -0.06732456 f.cmp = assert
+41040  41040 f.cmp = -1 f.cmp = assert
+41040  41040 f.cmp <> 0 f.cmp = assert
+41040  41040 f.cmp > 0 f.cmp = assert
+41040  41040 f.cmp >= -1 f.cmp = assert
+41040  41040 f.cmp < 0 f.cmp = assert
+41040  41040 f.cmp <= -1 f.cmp = assert
+14.69012716  -69.48772981 + -54.79760266 f.cmp = assert
+14.69012716  -69.48772981 - 84.17785697 f.cmp = assert
+14.69012716  -69.48772981 * -1020.78358676 f.cmp = assert
+14.69012716  -69.48772981 / -0.21140606 f.cmp = assert
+-23.58208472  -23.58208472 f.cmp > 0 f.cmp = assert
+-23.58208472  -23.58208472 f.cmp >= -1 f.cmp = assert
+-23.58208472  -23.58208472 f.cmp < 0 f.cmp = assert
+-23.58208472  -23.58208472 f.cmp <= -1 f.cmp = assert
+-23.58208472  -23.58208472 f.cmp = -1 f.cmp = assert
+-23.58208472  -23.58208472 f.cmp <> 0 f.cmp = assert
+-18069  -48627 + -66696 f.cmp = assert
+-18069  -48627 - 30558 f.cmp = assert
+-18069  -48627 * 878641263 f.cmp = assert
+-18069  -48627 / 0.37158369 f.cmp = assert
+-48627  -48627 f.cmp = -1 f.cmp = assert
+-48627  -48627 f.cmp <> 0 f.cmp = assert
+-48627  -48627 f.cmp > 0 f.cmp = assert
+-48627  -48627 f.cmp >= -1 f.cmp = assert
+-48627  -48627 f.cmp < 0 f.cmp = assert
+-48627  -48627 f.cmp <= -1 f.cmp = assert
+12.11638455  -6.90029967 + 5.21608488 f.cmp = assert
+12.11638455  -6.90029967 - 19.01668421 f.cmp = assert
+12.11638455  -6.90029967 * -83.60668427 f.cmp = assert
+12.11638455  -6.90029967 / -1.75592150 f.cmp = assert
+52.59779704  52.59779704 f.cmp > 0 f.cmp = assert
+52.59779704  52.59779704 f.cmp >= -1 f.cmp = assert
+52.59779704  52.59779704 f.cmp < 0 f.cmp = assert
+52.59779704  52.59779704 f.cmp <= -1 f.cmp = assert
+52.59779704  52.59779704 f.cmp = -1 f.cmp = assert
+52.59779704  52.59779704 f.cmp <> 0 f.cmp = assert
+12238  9858 + 22096 f.cmp = assert
+12238  9858 - 2380 f.cmp = assert
+12238  9858 * 120642204 f.cmp = assert
+12238  9858 / 1.24142828 f.cmp = assert
+9858  9858 f.cmp = -1 f.cmp = assert
+9858  9858 f.cmp <> 0 f.cmp = assert
+9858  9858 f.cmp > 0 f.cmp = assert
+9858  9858 f.cmp >= -1 f.cmp = assert
+9858  9858 f.cmp < 0 f.cmp = assert
+9858  9858 f.cmp <= -1 f.cmp = assert
+3.56580546  -21.79120434 + -18.22539888 f.cmp = assert
+3.56580546  -21.79120434 - 25.35700980 f.cmp = assert
+3.56580546  -21.79120434 * -77.70319539 f.cmp = assert
+3.56580546  -21.79120434 / -0.16363508 f.cmp = assert
+-26.10383089  -26.10383089 f.cmp > 0 f.cmp = assert
+-26.10383089  -26.10383089 f.cmp >= -1 f.cmp = assert
+-26.10383089  -26.10383089 f.cmp < 0 f.cmp = assert
+-26.10383089  -26.10383089 f.cmp <= -1 f.cmp = assert
+-26.10383089  -26.10383089 f.cmp = -1 f.cmp = assert
+-26.10383089  -26.10383089 f.cmp <> 0 f.cmp = assert
+7782  28975 + 36757 f.cmp = assert
+7782  28975 - -21193 f.cmp = assert
+7782  28975 * 225483450 f.cmp = assert
+7782  28975 / 0.26857636 f.cmp = assert
+28975  28975 f.cmp = -1 f.cmp = assert
+28975  28975 f.cmp <> 0 f.cmp = assert
+28975  28975 f.cmp > 0 f.cmp = assert
+28975  28975 f.cmp >= -1 f.cmp = assert
+28975  28975 f.cmp < 0 f.cmp = assert
+28975  28975 f.cmp <= -1 f.cmp = assert
+70.65983640  77.06940957 + 147.72924597 f.cmp = assert
+70.65983640  77.06940957 - -6.40957318 f.cmp = assert
+70.65983640  77.06940957 * 5445.71187169 f.cmp = assert
+70.65983640  77.06940957 / 0.91683376 f.cmp = assert
+3.50255123  3.50255123 f.cmp > 0 f.cmp = assert
+3.50255123  3.50255123 f.cmp >= -1 f.cmp = assert
+3.50255123  3.50255123 f.cmp < 0 f.cmp = assert
+3.50255123  3.50255123 f.cmp <= -1 f.cmp = assert
+3.50255123  3.50255123 f.cmp = -1 f.cmp = assert
+3.50255123  3.50255123 f.cmp <> 0 f.cmp = assert
+-4947  4865 + -82 f.cmp = assert
+-4947  4865 - -9812 f.cmp = assert
+-4947  4865 * -24067155 f.cmp = assert
+-4947  4865 / -1.01685509 f.cmp = assert
+4865  4865 f.cmp = -1 f.cmp = assert
+4865  4865 f.cmp <> 0 f.cmp = assert
+4865  4865 f.cmp > 0 f.cmp = assert
+4865  4865 f.cmp >= -1 f.cmp = assert
+4865  4865 f.cmp < 0 f.cmp = assert
+4865  4865 f.cmp <= -1 f.cmp = assert
+78.49080748  59.06932858 + 137.56013607 f.cmp = assert
+78.49080748  59.06932858 - 19.42147890 f.cmp = assert
+78.49080748  59.06932858 * 4636.39929790 f.cmp = assert
+78.49080748  59.06932858 / 1.32879126 f.cmp = assert
+-19.56329473  -19.56329473 f.cmp > 0 f.cmp = assert
+-19.56329473  -19.56329473 f.cmp >= -1 f.cmp = assert
+-19.56329473  -19.56329473 f.cmp < 0 f.cmp = assert
+-19.56329473  -19.56329473 f.cmp <= -1 f.cmp = assert
+-19.56329473  -19.56329473 f.cmp = -1 f.cmp = assert
+-19.56329473  -19.56329473 f.cmp <> 0 f.cmp = assert
+14098  -43016 + -28918 f.cmp = assert
+14098  -43016 - 57114 f.cmp = assert
+14098  -43016 * -606439568 f.cmp = assert
+14098  -43016 / -0.32773852 f.cmp = assert
+14098  -43016 f.cmp = 0 f.cmp = assert
+14098  -43016 f.cmp <> -1 f.cmp = assert
+14098  -43016 f.cmp > -1 f.cmp = assert
+14098  -43016 f.cmp >= -1 f.cmp = assert
+14098  -43016 f.cmp < 0 f.cmp = assert
+14098  -43016 f.cmp <= 0 f.cmp = assert
+56.85567344  10.95399692 + 67.80967037 f.cmp = assert
+56.85567344  10.95399692 - 45.90167652 f.cmp = assert
+56.85567344  10.95399692 * 622.79687191 f.cmp = assert
+56.85567344  10.95399692 / 5.19040437 f.cmp = assert
+41.55163198  41.55163198 f.cmp > 0 f.cmp = assert
+41.55163198  41.55163198 f.cmp >= -1 f.cmp = assert
+41.55163198  41.55163198 f.cmp < 0 f.cmp = assert
+41.55163198  41.55163198 f.cmp <= -1 f.cmp = assert
+41.55163198  41.55163198 f.cmp = -1 f.cmp = assert
+41.55163198  41.55163198 f.cmp <> 0 f.cmp = assert
+24573  -36436 + -11863 f.cmp = assert
+24573  -36436 - 61009 f.cmp = assert
+24573  -36436 * -895341828 f.cmp = assert
+24573  -36436 / -0.67441541 f.cmp = assert
+-36436  -36436 f.cmp = -1 f.cmp = assert
+-36436  -36436 f.cmp <> 0 f.cmp = assert
+-36436  -36436 f.cmp > 0 f.cmp = assert
+-36436  -36436 f.cmp >= -1 f.cmp = assert
+-36436  -36436 f.cmp < 0 f.cmp = assert
+-36436  -36436 f.cmp <= -1 f.cmp = assert
+72.54215599  -31.87041387 + 40.67174212 f.cmp = assert
+72.54215599  -31.87041387 - 104.41256986 f.cmp = assert
+72.54215599  -31.87041387 * -2311.94853409 f.cmp = assert
+72.54215599  -31.87041387 / -2.27615984 f.cmp = assert
+60.83688345  60.83688345 f.cmp > 0 f.cmp = assert
+60.83688345  60.83688345 f.cmp >= -1 f.cmp = assert
+60.83688345  60.83688345 f.cmp < 0 f.cmp = assert
+60.83688345  60.83688345 f.cmp <= -1 f.cmp = assert
+60.83688345  60.83688345 f.cmp = -1 f.cmp = assert
+60.83688345  60.83688345 f.cmp <> 0 f.cmp = assert
+7032  -42967 + -35935 f.cmp = assert
+7032  -42967 - 49999 f.cmp = assert
+7032  -42967 * -302143944 f.cmp = assert
+7032  -42967 / -0.16366048 f.cmp = assert
+-42967  -42967 f.cmp = -1 f.cmp = assert
+-42967  -42967 f.cmp <> 0 f.cmp = assert
+-42967  -42967 f.cmp > 0 f.cmp = assert
+-42967  -42967 f.cmp >= -1 f.cmp = assert
+-42967  -42967 f.cmp < 0 f.cmp = assert
+-42967  -42967 f.cmp <= -1 f.cmp = assert
+13.98137199  -58.89673605 + -44.91536406 f.cmp = assert
+13.98137199  -58.89673605 - 72.87810804 f.cmp = assert
+13.98137199  -58.89673605 * -823.45717589 f.cmp = assert
+13.98137199  -58.89673605 / -0.23738789 f.cmp = assert
+55.06122945  55.06122945 f.cmp > 0 f.cmp = assert
+55.06122945  55.06122945 f.cmp >= -1 f.cmp = assert
+55.06122945  55.06122945 f.cmp < 0 f.cmp = assert
+55.06122945  55.06122945 f.cmp <= -1 f.cmp = assert
+55.06122945  55.06122945 f.cmp = -1 f.cmp = assert
+55.06122945  55.06122945 f.cmp <> 0 f.cmp = assert
+-23664  -25432 + -49096 f.cmp = assert
+-23664  -25432 - 1768 f.cmp = assert
+-23664  -25432 * 601822848 f.cmp = assert
+-23664  -25432 / 0.93048128 f.cmp = assert
+-25432  -25432 f.cmp = -1 f.cmp = assert
+-25432  -25432 f.cmp <> 0 f.cmp = assert
+-25432  -25432 f.cmp > 0 f.cmp = assert
+-25432  -25432 f.cmp >= -1 f.cmp = assert
+-25432  -25432 f.cmp < 0 f.cmp = assert
+-25432  -25432 f.cmp <= -1 f.cmp = assert
+24.62914068  -36.19348830 + -11.56434761 f.cmp = assert
+24.62914068  -36.19348830 - 60.82262898 f.cmp = assert
+24.62914068  -36.19348830 * -891.41451503 f.cmp = assert
+24.62914068  -36.19348830 / -0.68048541 f.cmp = assert
+32.00534543  32.00534543 f.cmp > 0 f.cmp = assert
+32.00534543  32.00534543 f.cmp >= -1 f.cmp = assert
+32.00534543  32.00534543 f.cmp < 0 f.cmp = assert
+32.00534543  32.00534543 f.cmp <= -1 f.cmp = assert
+32.00534543  32.00534543 f.cmp = -1 f.cmp = assert
+32.00534543  32.00534543 f.cmp <> 0 f.cmp = assert

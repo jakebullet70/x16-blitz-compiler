@@ -18,12 +18,23 @@
 ;
 ; ************************************************************************************************
 
+;
+;		A on entry is the number of SIGNIFICANT digits to print, not the number of decimal places
+;		-- BASIC always shows nine of them and puts the point wherever the value needs it, so the
+;		decimal places are whatever the integer part does not use. Passing a fixed count of decimal
+;		places instead is what printed 12345678.9 as "12345678.8984375", exposing the binary noise
+;		below the ninth digit, while 1/3 got only ".3333333".
+;
 FloatToString:
 		phx
 		phy 								; save code position
-		sta 	decimalPlaces	 			; save number of DPs.
+		sta 	sigDigits 					; significant digits wanted (BASIC prints 9)
 		stz 	dbOffset 					; offset into decimal buffer = start.
 
+		jsr 	FloatIsZero 				; a zero mantissa is zero whatever the exponent and
+		bne 	_CNTSNotZero 				; sign say, and needs none of the machinery below
+		jmp 	_CNTSZero 					; (out of branch range)
+_CNTSNotZero:
 		lda 	NSStatus,x  				; is it -ve.
 		bpl 	_CNTSNotNegative
 		and 	#$7F 						; make +ve
@@ -50,6 +61,19 @@ _CNTMain:
 		;
 		jsr 	_CNTSIsBig 					; CS if |value| >= 1e9
 		bcs 	_CNTSBig
+		;
+		;		Share the nine digits out: the integer part takes what it needs, the fraction gets
+		;		the remainder. 33333333.3 and .333333333 both carry nine, which is the whole point.
+		;
+		jsr 	_CNTSIntegerDigits 			; A = digits in the integer part, 1 upwards
+		eor 	#$FF 						; decimalPlaces = sigDigits - A, without a scratch byte:
+		sec 								; ~A is -A-1, so +sigDigits+1 gives sigDigits-A
+		adc 	sigDigits
+		bcs 	_CNTSHaveDP
+		lda 	#0 							; more integer digits than we have to give
+_CNTSHaveDP:
+		sta 	decimalPlaces
+		;
 		lda 	NSExponent,x 				; zero: the mantissa IS the value, a plain integer,
 		beq 	_CNTSNotFloat 				; and there is nothing below the point to round
 		bpl 	_CNTSBig 					; positive: only reachable unnormalised, and that is
@@ -128,6 +152,56 @@ _CNTSExit:
 		jsr 	TrimTrailingZeros
 		ply
 		plx
+		rts
+
+;
+;		Zero, printed as BASIC prints it: the sign column, then a single "0". The path above cannot
+;		produce that -- it drops a lone leading zero and then trims the trailing ones, which leaves
+;		the buffer empty. That is why a cancellation zero such as 16777216-16777216 printed as
+;		nothing at all. It also catches -0, which BASIC shows as 0.
+;
+_CNTSZero:
+		lda 	#" "
+		jsr 	WriteDecimalBuffer
+		lda 	#"0"
+		jsr 	WriteDecimalBuffer
+		ply
+		plx
+		rts
+
+;
+;		Count the SIGNIFICANT digits in the integer part of S[X], in A. Works on a copy in S[X+2],
+;		as MakePlusTwoString does, so the value itself is untouched -- this runs before the value is
+;		rounded, and rounding needs the count.
+;
+;		A value below 1 has an integer part of "0", and that zero is not a significant digit: it is
+;		not even printed (BASIC writes .5, not 0.5). So it counts as none, and the whole nine go to
+;		the fraction -- which is what makes 1/3 print as .333333333 rather than .33333333.
+;
+_CNTSIntegerDigits:
+		phx
+		jsr 	FloatShiftUpTwo
+		inx
+		inx
+		jsr 	FloatIntegerPart
+		lda 	#10
+		jsr 	ConvertInt32 				; returns the buffer address in XA, so X is gone
+		ldy 	#0 							; counting does not need it back yet
+_CNTSIDCount:
+		lda 	numberBuffer,y
+		beq 	_CNTSIDDone
+		iny
+		bra 	_CNTSIDCount
+_CNTSIDDone:
+		cpy 	#1 							; a lone "0" is a placeholder, not a digit
+		bne 	_CNTSIDExit
+		lda 	numberBuffer
+		cmp 	#"0"
+		bne 	_CNTSIDExit
+		ldy 	#0
+_CNTSIDExit:
+		plx
+		tya
 		rts
 
 ; ************************************************************************************************
@@ -399,6 +473,8 @@ WriteDecimalBuffer:
 		
 		.section storage
 
+sigDigits: 									; significant digits the caller asked for; the decimal
+		.fill 	1 						; places below are derived from it and the integer width
 decimalPlaces:
 		.fill 	1
 dbOffset:

@@ -5178,8 +5178,8 @@ currentChannel:
 
 PrintNumber: ;; [print.n]
 		.entercmd
-		lda 	#7
-		jsr 	FloatToString 				; to number in decimal buffer
+		lda 	#9 							; nine significant digits, as stock BASIC prints -- not
+		jsr 	FloatToString 				; a fixed count of decimal places, see FloatToString
 		dex 								; drop
 		phx
 		ldx 	#0 							; print buffer.
@@ -6813,8 +6813,8 @@ CommandStop: ;; [!stop]
 Unary_Str: ;; [str$]
 		.entercmd
 		phy
-		lda 	#8 							; maximum decimal places.
-		jsr 	FloatToString 				; do the conversion.
+		lda 	#9 							; nine significant digits: STR$ must give exactly what
+		jsr 	FloatToString 				; PRINT gives, and that is what stock BASIC shows
 		lda		#33 						; create buffer
 		jsr 	StringAllocTemp 			; allocate memory		
 		ldy 	#1  						; copy the converted string into the buffer.

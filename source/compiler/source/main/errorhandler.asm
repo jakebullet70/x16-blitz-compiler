@@ -60,7 +60,8 @@ _EHDisplayMsg:
 		sta 	NSMantissa0,x
 		tya
 		sta 	NSMantissa1,x
-		jsr 	FloatToString
+		lda 	#9 							; significant digits. A line number is a whole number so
+		jsr 	FloatToString 				; this never bites, but do not leave it to chance
 		ldy 	#0 							; display that string.
 		ldx 	#0
 _EHDisplayLine:
