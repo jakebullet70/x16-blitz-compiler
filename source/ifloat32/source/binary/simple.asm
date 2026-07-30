@@ -62,10 +62,11 @@ FloatInt32Add:
 		jsr		FloatAddTopTwoStack
 		rts
 		;
-_DiffSigns:		
+_DiffSigns:
 		jsr 	FloatSubTopTwoStack 		; do a physical subtraction
-		bit 	NSMantissa3,x 				; result is +ve, okay
-		bpl 	_AddExit 	
+		bcs 	_AddExit 					; no borrow, so the result is +ve and we are done.
+											; This reads the BORROW, not bit 31, because the
+											; mantissa uses all 32 bits now -- see FloatNormalise.
 		lda 	NSStatus+1,x 				; sign is that of 11th value
 		sta 	NSStatus,x
 		jsr 	FloatNegateMantissa 		; negate the mantissa and exit

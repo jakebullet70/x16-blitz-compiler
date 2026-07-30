@@ -37,7 +37,9 @@ FloatDivide:
 		sec
 		sbc 	NSExponent+1,x
 		sec
-		sbc 	#30
+		sbc 	#31 						; Int32ShiftDivide now scales by (a << 31), one more
+											; than before, because the mantissa normalises to
+											; bit 31 -- see FloatNormalise.
 		sta 	NSExponent,x
 _FDExit:
 		pla

@@ -83,19 +83,26 @@ _FAExponentsEqual:
 		;
 		;		"Add" code, e.g. both have same sign
 		;
+		;
+		;		The mantissa now uses all 32 bits (see FloatNormalise), so bit 31 is a VALUE bit
+		;		and can no longer double as the overflow flag. The 33rd bit of the sum is in the
+		;		CARRY, and FloatRotateRight puts it back as bit 31 on the way down.
+		;
 		jsr 	FloatAddTopTwoStack 		; do the add of the mantissae
-		lda 	NSMantissa3,x 				; do we have an overflow in Mantissa A ?
-		bpl 	_FAExit 					; if no, we are done.
-		jsr 	FloatShiftRight 				; shift A right, renormalising it.
+		bcc 	_FAExit 					; no carry out of bit 31: we are done
+		jsr 	FloatRotateRight 			; shift A right, the carry becoming bit 31
 		inc 	NSExponent,x 				; bump the exponent and exit
 		bra 	_FAExit
 		;
 		;		"Subtract" code, e.g. both have different sign.
 		;
 _FADifferentSigns:
+		;
+		;		Likewise the sign of the difference is the BORROW, not bit 31: carry clear means
+		;		the subtraction went below zero.
+		;
 		jsr 	FloatSubTopTwoStack 		; subtract mantissa B from A
-		lda 	NSMantissa3,x 				; is the result negative ?
-		bpl 	_FACheckZero 				; if no, check for -0
+		bcs 	_FACheckZero 				; no borrow, so positive: check for -0
 		jsr 	FloatNegate 					; netate result
 		jsr 	FloatNegateMantissa 			; negate (2'c) the mantissa
 _FACheckZero:		

@@ -173,19 +173,26 @@ _FAExponentsEqual:
 		;
 		;		"Add" code, e.g. both have same sign
 		;
+		;
+		;		The mantissa now uses all 32 bits (see FloatNormalise), so bit 31 is a VALUE bit
+		;		and can no longer double as the overflow flag. The 33rd bit of the sum is in the
+		;		CARRY, and FloatRotateRight puts it back as bit 31 on the way down.
+		;
 		jsr 	FloatAddTopTwoStack 		; do the add of the mantissae
-		lda 	NSMantissa3,x 				; do we have an overflow in Mantissa A ?
-		bpl 	_FAExit 					; if no, we are done.
-		jsr 	FloatShiftRight 				; shift A right, renormalising it.
+		bcc 	_FAExit 					; no carry out of bit 31: we are done
+		jsr 	FloatRotateRight 			; shift A right, the carry becoming bit 31
 		inc 	NSExponent,x 				; bump the exponent and exit
 		bra 	_FAExit
 		;
 		;		"Subtract" code, e.g. both have different sign.
 		;
 _FADifferentSigns:
+		;
+		;		Likewise the sign of the difference is the BORROW, not bit 31: carry clear means
+		;		the subtraction went below zero.
+		;
 		jsr 	FloatSubTopTwoStack 		; subtract mantissa B from A
-		lda 	NSMantissa3,x 				; is the result negative ?
-		bpl 	_FACheckZero 				; if no, check for -0
+		bcs 	_FACheckZero 				; no borrow, so positive: check for -0
 		jsr 	FloatNegate 					; netate result
 		jsr 	FloatNegateMantissa 			; negate (2'c) the mantissa
 _FACheckZero:		
@@ -511,59 +518,98 @@ Int32ShiftDivide:
 		dex
 		dex
 
-		ldy 	#31 						; loop 31 times.
+		stz 	divRemHigh 					; the remainder's 33rd bit, see below
+
+		ldy 	#32 						; loop 32 times: the mantissa is normalised to bit 31
+											; now, so the quotient wants one more bit than it did
+											; and the shift is (a << 31), not (a << 30). The
+											; caller's exponent fixup matches (sbc #31).
+;
+;		The remainder needs 33 bits now. It used to fit in 32 because a normalised mantissa left
+;		bit 31 spare, so the shift below could never push anything out. With all 32 bits in use, a
+;		dividend SMALLER than the divisor keeps bit 31 set and the shift threw it away -- which is
+;		why 1/3 came out 0: the remainder was gone after the first step and every quotient bit
+;		after it was zero. divRemHigh carries that bit. When it is set the remainder is >= 2^32,
+;		which certainly exceeds the divisor, so the subtraction is known to succeed without a
+;		compare and the quotient bit is 1.
+;
 _I32SDLoop:
-		jsr 	FloatDivideCheck 			; check if subtract possible
-		inx
-		inx
-		jsr 	FloatRotateLeft				; shift 64 bit FPA left, rotating carry in
-		dex
-		dex
-		jsr 	FloatRotateLeft
-		dey 	 							; do 31 times
+		jsr 	_I32SDCheck 				; carry = this quotient bit
+		jsr 	_I32SDShift 				; shift it into the quotient, advance the remainder
+		dey 	 							; do 32 times
 		bne 	_I32SDLoop
 		;
-		;		Round to nearest. The quotient in S[X+2] is floor((a<<30)/b), a 30- or 31-bit
-		;		value. If bit 30 is already set it is 31-bit normalised and FloatNormalise will
-		;		leave it alone, so one guard bit (the next quotient bit) rounds it. If bit 30 is
-		;		clear it is 30-bit and FloatNormalise would shift it left one, filling the new LSB
+		;		Round to nearest. The quotient in S[X+2] is floor((a<<31)/b), a 31- or 32-bit
+		;		value. If bit 31 is already set it is 32-bit normalised and FloatNormalise will
+		;		leave it alone, so one guard bit (the next quotient bit) rounds it. If bit 31 is
+		;		clear it is 31-bit and FloatNormalise would shift it left one, filling the new LSB
 		;		with a zero and throwing away a bit of precision -- so run one more division step
 		;		to make that LSB a REAL quotient bit and drop the exponent to match, leaving a
-		;		31-bit value that its own guard bit then rounds. Truncation was biased low; this
+		;		32-bit value that its own guard bit then rounds. Truncation was biased low; this
 		;		is round-half-up and unbiased.
 		;
-		bit 	NSMantissa3+2,x 			; quotient bit 30 set ?
-		bvs 	_I32SDGuard 				; yes -> already 31-bit, just round
-		jsr 	FloatDivideCheck 			; no -> compute the 31st real bit ...
-		inx
-		inx
-		jsr 	FloatRotateLeft 			; ... shift it in (now 31-bit normalised) ...
-		dex
-		dex
-		jsr 	FloatRotateLeft
+		bit 	NSMantissa3+2,x 			; quotient bit 31 set ?
+		bmi 	_I32SDGuard 				; yes -> already 32-bit, just round
+		jsr 	_I32SDCheck 				; no -> compute the 32nd real bit ...
+		jsr 	_I32SDShift 				; ... shift it in (now 32-bit normalised) ...
 		dec 	NSExponent,x 				; ... and the extra shift is worth one exponent
 _I32SDGuard:
-		jsr 	FloatDivideCheck 			; guard bit = the next quotient bit
-		bcc 	_I32SDDone
+		jsr 	_I32SDCheck 				; guard bit = the next quotient bit
+		bcc 	_I32SDExit
 		inc 	NSMantissa0+2,x 			; round half up
-		bne 	_I32SDDone
+		bne 	_I32SDExit
 		inc 	NSMantissa1+2,x
-		bne 	_I32SDDone
+		bne 	_I32SDExit
 		inc 	NSMantissa2+2,x
-		bne 	_I32SDDone
+		bne 	_I32SDExit
 		inc 	NSMantissa3+2,x
-_I32SDDone:
-		bit 	NSMantissa3+2,x 			; did rounding carry into bit 31 ($80000000) ?
-		bpl 	_I32SDExit
-		inx
-		inx
-		jsr 	FloatShiftRight 			; renormalise $80000000 -> $40000000 ...
-		dex
-		dex
-		inc 	NSExponent,x 				; ... at one higher exponent
+		bne 	_I32SDExit
+		;
+		;		Rounding up $FFFFFFFF wrapped the quotient to zero, so its true value is 2^32. Put
+		;		the 1 back as bit 31 and raise the exponent to match; bit 31 set is the normalised
+		;		state now, so nothing else needs fixing.
+		;
+		lda 	#$80
+		sta 	NSMantissa3+2,x
+		inc 	NSExponent,x
 _I32SDExit:
 		ply 								; restore AY and exit
 		pla
+		rts
+
+;
+;		One division step, split in two so the main loop and the two extra steps after it all
+;		honour the remainder's 33rd bit identically.
+;
+;		_I32SDCheck returns the quotient bit in carry, subtracting the divisor when it fits. A set
+;		divRemHigh means the remainder is already >= 2^32 and so certainly exceeds the divisor:
+;		subtract without comparing. That subtraction always brings it back below 2^32 (the
+;		remainder is under 2*divisor before each shift, and the divisor is >= 2^31), so the 33rd
+;		bit is spent.
+;
+_I32SDCheck:
+		lda 	divRemHigh
+		bne 	_I32SDCForce
+		jmp 	FloatDivideCheck 			; tail call -- its carry is our answer
+_I32SDCForce:
+		jsr 	FloatSubTopTwoStack
+		stz 	divRemHigh
+		sec 								; the quotient bit is 1
+		rts
+
+;
+;		_I32SDShift puts the carry into the quotient as its new low bit and advances the remainder,
+;		catching whatever leaves bit 31 in divRemHigh.
+;
+_I32SDShift:
+		inx
+		inx
+		jsr 	FloatRotateLeft				; quotient <<= 1, the carry entering as its new bit
+		dex
+		dex
+		clc 								; remainder <<= 1 with a zero at the bottom -- NOT the
+		jsr 	FloatRotateLeft 			; carry out of the quotient, which is a value bit now
+		rol 	divRemHigh 					; and whatever left bit 31 is the 33rd bit
 		rts
 
 ; ************************************************************************************************
@@ -581,9 +627,14 @@ FloatDivideCheck:
 		jsr 	FloatAddTopTwoStack 		; add it back in
 		clc 								; and return False
 _DCSExit:
-		rts		
+		rts
 
 		.send 	code
+
+		.section storage
+divRemHigh: 								; bit 32 of the division remainder
+		.fill 	1
+		.send storage
 
 ; ************************************************************************************************
 ;
@@ -634,7 +685,9 @@ FloatDivide:
 		sec
 		sbc 	NSExponent+1,x
 		sec
-		sbc 	#30
+		sbc 	#31 						; Int32ShiftDivide now scales by (a << 31), one more
+											; than before, because the mantissa normalises to
+											; bit 31 -- see FloatNormalise.
 		sta 	NSExponent,x
 _FDExit:
 		pla
@@ -1022,7 +1075,7 @@ _I32MLoop:
 		lda 	NSMantissa0+2,x 			; low byte of the multiplier all zero ?
 		bne 	_I32MByBit
 		bit 	NSMantissa3+1,x 			; and the multiplicand cannot be doubled ?
-		bvc 	_I32MByBit
+		bpl 	_I32MByBit 					; (bit 31, not bit 30 -- see FloatNormalise)
 
 		lda 	NSMantissa1+2,x 			; multiplier >>= 8
 		sta 	NSMantissa0+2,x
@@ -1060,26 +1113,29 @@ _I32MByBit:
 		;
 		jsr 	FloatAddTopTwoStack 		; if so add S[X+1] to S[X+0]
 		;
-		lda 	NSMantissa3,x 				; has MantissaA overflowed ?
-		bpl 	_I32MNoAdd
+		bcc 	_I32MNoAdd 					; has MantissaA overflowed ? That is the CARRY now,
+											; bit 31 being a value bit -- see FloatNormalise.
 		;
-		;		Overflow. Shift result right, increment the shift count, keeping the
-		; 		result in 31 bits - now we lose some precision though.
+		;		Overflow. Shift result right, keeping the 33rd bit: it is in the carry, and
+		;		FloatRotateRight brings it back in as bit 31 so no precision is lost.
 		;
-_I32ShiftRight:
+_I32ShiftRight: 							; enter with carry = the bit to bring in at the top
 		lda 	FMulGuard 					; the old 0.5-ulp guard drops to the 0.25-ulp slot
-		sta 	FMulGuard2
+		sta 	FMulGuard2 					; (none of these touch the carry)
 		lda 	NSMantissa0,x 				; the bit about to fall off the bottom is the new
 		and 	#1 							; guard bit (0.5 ulp - the shift count only grows,
 		sta 	FMulGuard 					; so each dropped bit outranks the last)
-		jsr 	FloatShiftRight 			; shift S[X] right
+		jsr 	FloatRotateRight 			; shift S[X] right, carry becoming bit 31
 		iny 								; increment shift count
 		bra 	_I32MShiftUpper 			; n2 is doubled by default.
 		;
 _I32MNoAdd:
 		bit 	NSMantissa3+1,x				; if we can't shift S[X+1] left, shift everything right
-		bvs 	_I32ShiftRight 				; instead.
+		bpl 	_I32MDouble 				; instead. Bit 31 now, and with a clear carry because
+		clc 								; there is no overflow bit to bring back in here.
+		bra 	_I32ShiftRight
 
+_I32MDouble:
 		inx
 		jsr 	FloatShiftLeft 				; shift additive S[X+1] left
 		dex
@@ -1095,16 +1151,16 @@ _I32MShiftUpper:
 
 _I32MExit:
 		;
-		;		Round to nearest. The multiply keeps the top 31 bits exactly - guard/guard2 hold
+		;		Round to nearest. The multiply keeps the top 32 bits exactly - guard/guard2 hold
 		;		the 0.5- and 0.25-ulp bits that fell off the bottom. But FloatNormalise runs next
-		;		and, when bit 30 is clear, shifts the mantissa left one place, which would move the
+		;		and, when bit 31 is clear, shifts the mantissa left one place, which would move the
 		;		rounding point. So do that one normalise here first, folding the guard bit in as the
 		;		real low bit it is, and let guard2 become the bit we round on.
 		;
-		bit 	NSMantissa3,x 				; bit 30 already set -> normalised, round on guard
-		bvs 	_I32MRound
-		lda 	NSMantissa3,x 				; bit 30 clear but bit 29 set -> exactly one left shift
-		and 	#$20 						; is pending, so fold the guard in below. Neither set
+		bit 	NSMantissa3,x 				; bit 31 already set -> normalised, round on guard
+		bmi 	_I32MRound
+		lda 	NSMantissa3,x 				; bit 31 clear but bit 30 set -> exactly one left shift
+		and 	#$40 						; is pending, so fold the guard in below. Neither set
 		beq 	_I32MRound 					; means the value is too small to have dropped a bit
 		lda 	FMulGuard 					; (exact, guard 0) - leave the whole normalise to
 		cmp 	#1 							; FloatNormalise. carry := guard (0 or 1)
@@ -1119,16 +1175,21 @@ _I32MRound:
 		lda 	FMulGuard 					; round to nearest: if the dropped 0.5-ulp bit was
 		beq 	_I32MRounded 				; set, add one to the mantissa (round half up)
 		inc 	NSMantissa0,x 				; propagate the carry up the 32 bit mantissa
-		bne 	_I32MChkTop
+		bne 	_I32MRounded
 		inc 	NSMantissa1,x
-		bne 	_I32MChkTop
+		bne 	_I32MRounded
 		inc 	NSMantissa2,x
-		bne 	_I32MChkTop
+		bne 	_I32MRounded
 		inc 	NSMantissa3,x
-_I32MChkTop:
-		bit 	NSMantissa3,x 				; rounding up 2^31-1 carries into bit 31; shift it
-		bpl 	_I32MRounded 				; back into [2^30,2^31) and bump the shift count
-		jsr 	FloatShiftRight
+		bne 	_I32MRounded
+		;
+		;		Rounding up $FFFFFFFF wrapped the mantissa to zero, so the true value is 2^32. inc
+		;		leaves no carry to test, but getting here means every byte wrapped, so put the 1
+		;		back as bit 31 and count one more right shift. Bit 31 set is the normalised state
+		;		now, so there is nothing further to fix.
+		;
+		lda 	#$80
+		sta 	NSMantissa3,x
 		iny
 _I32MRounded:
 		jsr 	FloatCalculateSign
@@ -1281,12 +1342,13 @@ FloatNormalise:
 		;		Normalise by byte if the MSB is zero we can normalise it
 		;		(providing bit 7 of 11th byte is not set)
 		;
-_NSNormaliseOptimise:						
+_NSNormaliseOptimise:
 		lda 	NSMantissa3,x 				; upper byte zero ?
 		bne 	_NSNormaliseLoop
-		lda 	NSMantissa2,x 				; byte normalise
-		bmi 	_NSNormaliseLoop 			; can't do it if bit 7 set of 2
-
+		lda 	NSMantissa2,x 				; byte normalise. No "bit 7 of byte 2 set"
+											; guard any more: bit 31 IS the normalised
+											; position now, so moving a byte up is always
+											; safe.
 		sta 	NSMantissa3,x
 		lda 	NSMantissa1,x
 		sta 	NSMantissa2,x
@@ -1302,9 +1364,22 @@ _NSNormaliseOptimise:
 		;
 		;		Normalise by bit
 		;
-_NSNormaliseLoop:		
-		bit 	NSMantissa3,x 				; bit 30 set ?
-		bvs 	_NSNExit 					; exit if so with Z flag clear
+;
+;		Normalise to bit 31, so the mantissa uses all 32 bits: [2^31, 2^32). It used to stop at
+;		bit 30, leaving bit 31 spare as carry headroom for addition, which cost the whole top bit
+;		of precision -- above 2^31 the step was 2, so consecutive integers were indistinguishable
+;		and 2147483648-2147483647 came out 2. X16 BASIC's float carries a full 32-bit mantissa and
+;		answers 1, and matching it is the point. The adders now take their overflow and their
+;		result sign from the CARRY instead of from bit 31.
+;
+;		This also fixes a LOCKUP. Stopping at bit 30 meant a mantissa of $80000000 -- bit 31 set,
+;		bit 30 clear -- was shifted LEFT, losing the only bit it had; the loop never rechecks for
+;		zero, so it span forever. Any value landing in [2^31, 3*2^30) hung the machine, which is
+;		what  PRINT 2^31+1-2^31  did. Testing bit 31 exits on those immediately.
+;
+_NSNormaliseLoop:
+		lda 	NSMantissa3,x 				; bit 31 set ?
+		bmi 	_NSNExit 					; exit if so with Z flag clear
 		jsr 	FloatShiftLeft 				; shift mantissa left
 		dec 	NSExponent,x 				; adjust exponent
 		bra 	_NSNormaliseLoop
@@ -1388,10 +1463,11 @@ FloatInt32Add:
 		jsr		FloatAddTopTwoStack
 		rts
 		;
-_DiffSigns:		
+_DiffSigns:
 		jsr 	FloatSubTopTwoStack 		; do a physical subtraction
-		bit 	NSMantissa3,x 				; result is +ve, okay
-		bpl 	_AddExit 	
+		bcs 	_AddExit 					; no borrow, so the result is +ve and we are done.
+											; This reads the BORROW, not bit 31, because the
+											; mantissa uses all 32 bits now -- see FloatNormalise.
 		lda 	NSStatus+1,x 				; sign is that of 11th value
 		sta 	NSStatus,x
 		jsr 	FloatNegateMantissa 		; negate the mantissa and exit
@@ -1933,9 +2009,10 @@ _FSPLPHaveChunk:
 ;			                    iff  mantissa <  214748364
 ;			                    or   mantissa == 214748364 and digit <= 7
 ;
-;		214748364 is $0CCCCCCC, and 214748364 x 10 + 7 is exactly $7FFFFFFF, the largest integer
-;		the mantissa holds. Small numbers fail the very first compare and take the quick path, so
-;		this costs two instructions in the common case.
+;		429496729 is $19999999, and 429496729 x 10 + 5 is exactly $FFFFFFFF, the largest integer
+;		the mantissa holds. (It was $0CCCCCCC/7 for $7FFFFFFF while the mantissa normalised to 31
+;		bits -- see FloatNormalise.) Small numbers fail the very first compare and take the quick
+;		path, so this costs two instructions in the common case.
 ;
 ; ************************************************************************************************
 
@@ -1946,24 +2023,24 @@ ESTAShiftDigitIntoMantissa:
 		lda 	NSExponent,x 				; already a float ? then there is no exact path left.
 		bne 	_ESTASDFloat
 		;
-		lda 	NSMantissa3,x 				; mantissa vs $0CCCCCCC, most significant byte first
-		cmp 	#$0C
+		lda 	NSMantissa3,x 				; mantissa vs $19999999, most significant byte first
+		cmp 	#$19
 		bcc 	_ESTASDExact 				; below : always room
 		bne 	_ESTASDFloat 				; above : never room
 		lda 	NSMantissa2,x
-		cmp 	#$CC
+		cmp 	#$99
 		bcc 	_ESTASDExact
 		bne 	_ESTASDFloat
 		lda 	NSMantissa1,x
-		cmp 	#$CC
+		cmp 	#$99
 		bcc 	_ESTASDExact
 		bne 	_ESTASDFloat
 		lda 	NSMantissa0,x
-		cmp 	#$CC
+		cmp 	#$99
 		bcc 	_ESTASDExact
 		bne 	_ESTASDFloat
-		lda 	digitTemp 					; exactly $0CCCCCCC : room for 0..7, and no more
-		cmp 	#8
+		lda 	digitTemp 					; exactly $19999999 : room for 0..5, and no more
+		cmp 	#6
 		bcs 	_ESTASDFloat
 
 _ESTASDExact: 								; mantissa = mantissa x 10 + digit, exactly
@@ -2619,11 +2696,13 @@ FloatRotateLeft:
 ;
 ; ************************************************************************************************
 
-FloatShiftRight:		
-		lsr 	NSMantissa3,x
-		ror		NSMantissa2,x
-		ror		NSMantissa1,x
-		ror		NSMantissa0,x
+FloatShiftRight:
+		clc 								; shift a zero into bit 31 (lsr, as it always did)
+FloatRotateRight: 							; ... or enter here to bring the CARRY in as bit 31,
+		ror 	NSMantissa3,x 				; which is what an addition that carried out of the
+		ror		NSMantissa2,x 				; top needs: the 33rd bit is in the carry, and this
+		ror		NSMantissa1,x 				; puts it back where it belongs. Mirrors
+		ror		NSMantissa0,x 				; FloatShiftLeft/FloatRotateLeft above.
 		rts
 
 ; ************************************************************************************************

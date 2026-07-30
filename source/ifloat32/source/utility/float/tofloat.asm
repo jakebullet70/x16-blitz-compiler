@@ -517,9 +517,10 @@ _FSPLPHaveChunk:
 ;			                    iff  mantissa <  214748364
 ;			                    or   mantissa == 214748364 and digit <= 7
 ;
-;		214748364 is $0CCCCCCC, and 214748364 x 10 + 7 is exactly $7FFFFFFF, the largest integer
-;		the mantissa holds. Small numbers fail the very first compare and take the quick path, so
-;		this costs two instructions in the common case.
+;		429496729 is $19999999, and 429496729 x 10 + 5 is exactly $FFFFFFFF, the largest integer
+;		the mantissa holds. (It was $0CCCCCCC/7 for $7FFFFFFF while the mantissa normalised to 31
+;		bits -- see FloatNormalise.) Small numbers fail the very first compare and take the quick
+;		path, so this costs two instructions in the common case.
 ;
 ; ************************************************************************************************
 
@@ -530,24 +531,24 @@ ESTAShiftDigitIntoMantissa:
 		lda 	NSExponent,x 				; already a float ? then there is no exact path left.
 		bne 	_ESTASDFloat
 		;
-		lda 	NSMantissa3,x 				; mantissa vs $0CCCCCCC, most significant byte first
-		cmp 	#$0C
+		lda 	NSMantissa3,x 				; mantissa vs $19999999, most significant byte first
+		cmp 	#$19
 		bcc 	_ESTASDExact 				; below : always room
 		bne 	_ESTASDFloat 				; above : never room
 		lda 	NSMantissa2,x
-		cmp 	#$CC
+		cmp 	#$99
 		bcc 	_ESTASDExact
 		bne 	_ESTASDFloat
 		lda 	NSMantissa1,x
-		cmp 	#$CC
+		cmp 	#$99
 		bcc 	_ESTASDExact
 		bne 	_ESTASDFloat
 		lda 	NSMantissa0,x
-		cmp 	#$CC
+		cmp 	#$99
 		bcc 	_ESTASDExact
 		bne 	_ESTASDFloat
-		lda 	digitTemp 					; exactly $0CCCCCCC : room for 0..7, and no more
-		cmp 	#8
+		lda 	digitTemp 					; exactly $19999999 : room for 0..5, and no more
+		cmp 	#6
 		bcs 	_ESTASDFloat
 
 _ESTASDExact: 								; mantissa = mantissa x 10 + digit, exactly

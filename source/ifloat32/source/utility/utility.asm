@@ -110,11 +110,13 @@ FloatRotateLeft:
 ;
 ; ************************************************************************************************
 
-FloatShiftRight:		
-		lsr 	NSMantissa3,x
-		ror		NSMantissa2,x
-		ror		NSMantissa1,x
-		ror		NSMantissa0,x
+FloatShiftRight:
+		clc 								; shift a zero into bit 31 (lsr, as it always did)
+FloatRotateRight: 							; ... or enter here to bring the CARRY in as bit 31,
+		ror 	NSMantissa3,x 				; which is what an addition that carried out of the
+		ror		NSMantissa2,x 				; top needs: the 33rd bit is in the carry, and this
+		ror		NSMantissa1,x 				; puts it back where it belongs. Mirrors
+		ror		NSMantissa0,x 				; FloatShiftLeft/FloatRotateLeft above.
 		rts
 
 ; ************************************************************************************************

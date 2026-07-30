@@ -57,7 +57,7 @@ _I32MLoop:
 		lda 	NSMantissa0+2,x 			; low byte of the multiplier all zero ?
 		bne 	_I32MByBit
 		bit 	NSMantissa3+1,x 			; and the multiplicand cannot be doubled ?
-		bvc 	_I32MByBit
+		bpl 	_I32MByBit 					; (bit 31, not bit 30 -- see FloatNormalise)
 
 		lda 	NSMantissa1+2,x 			; multiplier >>= 8
 		sta 	NSMantissa0+2,x
@@ -95,26 +95,29 @@ _I32MByBit:
 		;
 		jsr 	FloatAddTopTwoStack 		; if so add S[X+1] to S[X+0]
 		;
-		lda 	NSMantissa3,x 				; has MantissaA overflowed ?
-		bpl 	_I32MNoAdd
+		bcc 	_I32MNoAdd 					; has MantissaA overflowed ? That is the CARRY now,
+											; bit 31 being a value bit -- see FloatNormalise.
 		;
-		;		Overflow. Shift result right, increment the shift count, keeping the
-		; 		result in 31 bits - now we lose some precision though.
+		;		Overflow. Shift result right, keeping the 33rd bit: it is in the carry, and
+		;		FloatRotateRight brings it back in as bit 31 so no precision is lost.
 		;
-_I32ShiftRight:
+_I32ShiftRight: 							; enter with carry = the bit to bring in at the top
 		lda 	FMulGuard 					; the old 0.5-ulp guard drops to the 0.25-ulp slot
-		sta 	FMulGuard2
+		sta 	FMulGuard2 					; (none of these touch the carry)
 		lda 	NSMantissa0,x 				; the bit about to fall off the bottom is the new
 		and 	#1 							; guard bit (0.5 ulp - the shift count only grows,
 		sta 	FMulGuard 					; so each dropped bit outranks the last)
-		jsr 	FloatShiftRight 			; shift S[X] right
+		jsr 	FloatRotateRight 			; shift S[X] right, carry becoming bit 31
 		iny 								; increment shift count
 		bra 	_I32MShiftUpper 			; n2 is doubled by default.
 		;
 _I32MNoAdd:
 		bit 	NSMantissa3+1,x				; if we can't shift S[X+1] left, shift everything right
-		bvs 	_I32ShiftRight 				; instead.
+		bpl 	_I32MDouble 				; instead. Bit 31 now, and with a clear carry because
+		clc 								; there is no overflow bit to bring back in here.
+		bra 	_I32ShiftRight
 
+_I32MDouble:
 		inx
 		jsr 	FloatShiftLeft 				; shift additive S[X+1] left
 		dex
@@ -130,16 +133,16 @@ _I32MShiftUpper:
 
 _I32MExit:
 		;
-		;		Round to nearest. The multiply keeps the top 31 bits exactly - guard/guard2 hold
+		;		Round to nearest. The multiply keeps the top 32 bits exactly - guard/guard2 hold
 		;		the 0.5- and 0.25-ulp bits that fell off the bottom. But FloatNormalise runs next
-		;		and, when bit 30 is clear, shifts the mantissa left one place, which would move the
+		;		and, when bit 31 is clear, shifts the mantissa left one place, which would move the
 		;		rounding point. So do that one normalise here first, folding the guard bit in as the
 		;		real low bit it is, and let guard2 become the bit we round on.
 		;
-		bit 	NSMantissa3,x 				; bit 30 already set -> normalised, round on guard
-		bvs 	_I32MRound
-		lda 	NSMantissa3,x 				; bit 30 clear but bit 29 set -> exactly one left shift
-		and 	#$20 						; is pending, so fold the guard in below. Neither set
+		bit 	NSMantissa3,x 				; bit 31 already set -> normalised, round on guard
+		bmi 	_I32MRound
+		lda 	NSMantissa3,x 				; bit 31 clear but bit 30 set -> exactly one left shift
+		and 	#$40 						; is pending, so fold the guard in below. Neither set
 		beq 	_I32MRound 					; means the value is too small to have dropped a bit
 		lda 	FMulGuard 					; (exact, guard 0) - leave the whole normalise to
 		cmp 	#1 							; FloatNormalise. carry := guard (0 or 1)
@@ -154,16 +157,21 @@ _I32MRound:
 		lda 	FMulGuard 					; round to nearest: if the dropped 0.5-ulp bit was
 		beq 	_I32MRounded 				; set, add one to the mantissa (round half up)
 		inc 	NSMantissa0,x 				; propagate the carry up the 32 bit mantissa
-		bne 	_I32MChkTop
+		bne 	_I32MRounded
 		inc 	NSMantissa1,x
-		bne 	_I32MChkTop
+		bne 	_I32MRounded
 		inc 	NSMantissa2,x
-		bne 	_I32MChkTop
+		bne 	_I32MRounded
 		inc 	NSMantissa3,x
-_I32MChkTop:
-		bit 	NSMantissa3,x 				; rounding up 2^31-1 carries into bit 31; shift it
-		bpl 	_I32MRounded 				; back into [2^30,2^31) and bump the shift count
-		jsr 	FloatShiftRight
+		bne 	_I32MRounded
+		;
+		;		Rounding up $FFFFFFFF wrapped the mantissa to zero, so the true value is 2^32. inc
+		;		leaves no carry to test, but getting here means every byte wrapped, so put the 1
+		;		back as bit 31 and count one more right shift. Bit 31 set is the normalised state
+		;		now, so there is nothing further to fix.
+		;
+		lda 	#$80
+		sta 	NSMantissa3,x
 		iny
 _I32MRounded:
 		jsr 	FloatCalculateSign
