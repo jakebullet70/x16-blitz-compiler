@@ -1904,8 +1904,15 @@ _FBFFound:
 		sta 	(objPtr),y
 		bra 	_FBNext
 
+;
+;		Report the line number that could not be found. The operand is at offsets 1 (low) and
+;		2 (high) -- the same place _FBFixGotoGosub reads it from and _FBFFound patches it. Do
+;		not use the ldy #2/iny idiom from GetNextLine: that reads a *source* line record,
+;		where the line number follows a 2 byte link, and applying it here reported
+;		(next opcode << 8) | line high -- a meaningless number.
+;
 _FBFFail:
-		ldy 	#2
+		ldy 	#1
 		lda 	(objPtr),y
 		sta 	currentLineNumber
 		iny

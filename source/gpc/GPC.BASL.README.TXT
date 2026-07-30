@@ -51,10 +51,20 @@ THE DEV LOOP
 
 THE BUILD NUMBER
 ----------------
-VERSION$ = "0.9.<n>" (one whole string) near the top of GPC.BASL is a
-daily-work build counter. EVERY build bumps it (0.9.110 -> 0.9.111 -> ...)
-so the banner always shows the exact build you are on. It is not the release
-version -- real releases will get their own V-number (e.g. V1.0.x) and do not
-track this counter.
+Not here. GPC.BASL used to carry VERSION$ = "0.9.<n>" and bump it on every
+front-end build, but the front end is not the part you need to identify --
+the ENGINE is, because the engine does the compiling. The old counter moved
+when GPC.BASL was rebuilt (almost never) and stood still when the compiler
+changed, so it could not answer "am I running my fix?".
+
+It now lives in source/application/buildnum.txt, is bumped by
+source/application/scripts/bumpbuild.py on EVERY engine build, and
+GPC.BLITZ.BIN prints it itself:
+
+    GPC SQUEALING... V0.9.113
+
+It is a daily-work counter, not the release version -- real releases will get
+their own V-number (e.g. V1.0.x) and do not track it. release.sh reads the
+same file to name gpc-release-<n>.zip.
 
 The retired Prog8 front end (GPC.P8, bump-build.ps1) is in old-archive/.

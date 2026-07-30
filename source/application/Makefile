@@ -28,8 +28,16 @@ libraries:
 #		what it would have done anyway -- but it is also the template a caller copies, so it
 #		is worth having one sitting next to the compiler.
 #
+#
+#		bumpbuild.py must run BEFORE build.py: it generates source/generated/version.asm, and
+#		build.py is what sweeps source/ into _library.asm. The other way round and the engine
+#		links last build's number. No --bump here on purpose: this target runs several times per
+#		build, so the increment lives once in ../Makefile's `libraries`. This call only
+#		regenerates version.asm, which is idempotent.
+#
 prelim:
 	make -B -C ..$(S)common-source
+	$(PYTHON) scripts$(S)bumpbuild.py
 	$(PYTHON) $(CSCRIPTS)build.py
 	$(PYTHON) $(BINDIR)tokenise.zip $(BASICSRC) SOURCE.PRG
 	printf 'SOURCE.PRG\nOBJECT.PRG\n\n' >GPC.INPUT

@@ -78,6 +78,13 @@ release.zip
 # the one that ships is testing/GPC.INPUT.
 source/application/GPC.INPUT
 
+# The engine's build stamp. buildnum.txt IS tracked -- it is the counter, and the single
+# source of truth that release.sh reads. version.asm is generated from it by
+# scripts/bumpbuild.py on every engine build, so committing it would only duplicate the
+# number and churn the diff. bumpbuild.py creates the directory as well as the file (git
+# cannot track an empty one), and it runs before build.py, so a fresh clone still builds.
+source/application/source/generated/
+
 # ---------------------------------------------------------------------------
 # testing/ is now the shipping release directory (moved here from release/) AND
 # the scratch area for batch-testing user BASIC programs. The release artifacts

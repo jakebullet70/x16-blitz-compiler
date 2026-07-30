@@ -4,7 +4,7 @@
 #		Name:		build_basl.py
 #		Purpose:	Build testing/GPC.PRG from testing/GPC.BASL by running BASLOAD headless.
 #				With args "BASL PRG" it instead tokenises that one extra tool the same way
-#				(no version bump, no source mirror) -- used to freshen GPC.ERR.PRG on a release.
+#				(no source mirror) -- used to freshen GPC.ERR.PRG on a release.
 #
 # ************************************************************************************************
 # ************************************************************************************************
@@ -21,13 +21,15 @@
 #		so the committed copy always matches what was last built. On a fresh checkout with no
 #		testing/GPC.BASL, the committed mirror is used to seed it.
 #
-#		BUILD NUMBER: every front-end build first bumps  VERSION$ = "0.9.<n>" -> "0.9.<n+1>"  in
-#		the master, so the banner always shows the exact build you are on. It is a daily-work
-#		counter tracked in testing/ (mirrored to source/), NOT the release version.
+#		BUILD NUMBER: none here. It belongs to the ENGINE now -- source/application/buildnum.txt,
+#		bumped by source/application/scripts/bumpbuild.py on every engine build and printed by
+#		GPC.BLITZ.BIN next to "GPC SQUEALING...". A front-end counter could not answer the only
+#		question a build number is read for ("which compiler am I running?"), because it moved
+#		when the front end was rebuilt and stood still when the compiler changed.
 #
 #		EXTRA TOOLS: run  build_basl.py GPC.ERR.BASL GPC.ERR.PRG  to tokenise a companion tool the
-#		same headless way. These live only in testing/ (no source/ mirror) and carry no VERSION$,
-#		so this mode just tokenises -- no bump, no mirror. It skips when the source is absent, and
+#		same headless way. These live only in testing/ (no source/ mirror), so this mode just
+#		tokenises -- no mirror. It skips when the source is absent, and
 #		when the PRG is already up to date (BASLOAD writes 2 nondeterministic trailing bytes past
 #		the program's end marker, so re-tokenising an unchanged source would only churn those). The
 #		Makefile's "release" target uses it to freshen GPC.ERR.PRG when its source has changed.
@@ -39,7 +41,7 @@
 #
 # ************************************************************************************************
 
-import os, re, sys, time, subprocess
+import os, sys, time, subprocess
 
 HERE    = os.path.dirname(os.path.abspath(__file__))
 ROOT    = os.path.abspath(os.path.join(HERE, "..", ".."))
@@ -61,24 +63,13 @@ def die(msg):
     sys.exit(1)
 
 
-def bump_version(path):
-    """Increment the last dotted component of  VERSION$ = "a.b.n"  in the BASL master, in place,
-    preserving the rest of the line and the file's exact line endings. Returns the new version.
-    This is the daily-work build counter (tracked in testing/), NOT the release version."""
-    with open(path, "r", encoding="utf-8", newline="") as f:
-        text = f.read()
-    m = re.search(r'(VERSION\$\s*=\s*")([0-9]+(?:\.[0-9]+)*)(")', text)
-    if not m:
-        die('cannot find  VERSION$ = "..."  in %s -- cannot bump the build number' % path)
-    parts = m.group(2).split(".")
-    if not parts[-1].isdigit():
-        die('VERSION$ = "%s": last component is not numeric -- cannot bump' % m.group(2))
-    parts[-1] = str(int(parts[-1]) + 1)
-    newver = ".".join(parts)
-    text = text[:m.start(2)] + newver + text[m.end(2):]
-    with open(path, "w", encoding="utf-8", newline="") as f:
-        f.write(text)
-    return newver
+#
+#   There is deliberately no bump_version() here any more. The build number moved to the ENGINE
+#   (source/application/buildnum.txt, printed by GPC.BLITZ.BIN and bumped by its own
+#   scripts/bumpbuild.py). Bumping it here was actively misleading: it moved when the front end
+#   was rebuilt, which is almost never, and stayed put when the compiler changed -- so it could
+#   not answer "which engine am I running?", the only thing anyone reads a build number for.
+#
 
 
 def tokenise(basl_name, prg_name, also_clean=()):
@@ -137,17 +128,15 @@ def tokenise(basl_name, prg_name, also_clean=()):
 
 
 def build_front_end():
-    """The GPC.BASL flow: seed the master from the mirror if missing, bump the build number,
-    tokenise to GPC.PRG, then mirror the master back to source/gpc/GPC.BASL."""
+    """The GPC.BASL flow: seed the master from the mirror if missing, tokenise to GPC.PRG, then
+    mirror the master back to source/gpc/GPC.BASL. The build number is the engine's job now --
+    see source/application/scripts/bumpbuild.py."""
     if not os.path.exists(MASTER):
         if not os.path.exists(MIRROR):
             die("no GPC.BASL in testing/ or source/gpc/ -- nothing to build")
         with open(MIRROR, "rb") as a, open(MASTER, "wb") as b:
             b.write(a.read())
         print("  build_basl: seeded testing/GPC.BASL from source/gpc/GPC.BASL")
-
-    newver = bump_version(MASTER)
-    print("  build_basl: bumped VERSION$ -> %s" % newver)
 
     data = tokenise(BASL, PRG, also_clean=(SYM,))
 

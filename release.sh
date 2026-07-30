@@ -13,8 +13,9 @@
 #     make -C source/gpc release       GPC.PRG + the GPC.ERR helper, tokenised via BASLOAD
 #
 #  The zip lands in release/ -- the release drop folder, kept apart from the daily testing/
-#  build cycle -- named gpc-release-<n>.zip (n = the build number, last part of VERSION$). It is a
-#  git-ignored build artifact, the way the old testing/blitz.zip was -- do not commit it.
+#  build cycle -- named gpc-release-<n>.zip (n = the engine build number, last part of
+#  source/application/buildnum.txt). It is a git-ignored build artifact, the way the old
+#  testing/blitz.zip was -- do not commit it.
 # ***************************************************************************
 set -e
 cd "$(dirname "$0")"
@@ -34,20 +35,23 @@ echo "== packaging release zip =="
 # zip(1) is not on a stock Windows box, so package through Python's stdlib -- the
 # same reason the rest of this tree's zipping goes through Python (see mkzip history).
 python - <<'PY'
-import os, re, zipfile
+import os, zipfile
 
 root    = os.getcwd()
 testing = os.path.join(root, "testing")
 
-# The version lives in ONE place: the VERSION$ variable in GPC.BASL, e.g.  VERSION$ = "0.9.110".
-# Read it from the testing/ copy -- that is the master, and the exact GPC.BASL that goes into the
-# zip (see source/gpc/GPC.BASL.README.TXT). Show it whole ("v0.9.110"); the last dotted component
-# is the build number used in the zip name (gpc-release-110.zip -- the established naming).
-basl = open(os.path.join(testing, "GPC.BASL"), encoding="utf-8").read()
-m    = re.search(r'VERSION\$\s*=\s*"([0-9.]+)"', basl)
-if not m:
-    raise SystemExit('release: cannot find  VERSION$ = "..."  in testing/GPC.BASL')
-version = m.group(1)              # e.g. "0.9.110"
+# The version lives in ONE place: source/application/buildnum.txt, e.g. "0.9.110". That is the
+# ENGINE's build stamp -- bumped by source/application/scripts/bumpbuild.py on every engine build
+# and printed by GPC.BLITZ.BIN itself. It used to be VERSION$ in testing/GPC.BASL, which tracked
+# the front end instead and so never moved when the compiler changed. Show it whole ("v0.9.110");
+# the last dotted component is the build number used in the zip name (gpc-release-110.zip -- the
+# established naming).
+stamp = os.path.join(root, "source", "application", "buildnum.txt")
+if not os.path.isfile(stamp):
+    raise SystemExit("release: cannot find source/application/buildnum.txt -- no engine version")
+version = open(stamp, encoding="utf-8").read().strip()   # e.g. "0.9.110"
+if not version.split(".")[-1].isdigit():
+    raise SystemExit('release: buildnum.txt = "%s": last component is not a number' % version)
 num     = version.split(".")[-1]  # e.g. "110" -- the build number, for the zip name
 ver     = "v" + version           # e.g. "v0.9.110"
 

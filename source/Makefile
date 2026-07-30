@@ -21,7 +21,14 @@ endif
 
 all: libraries release
 
-libraries:	
+#
+#		The engine's build number is bumped HERE, once, and nowhere else. application/ is built
+#		twice by this file alone (`libraries` below, then `release`), and build.sh runs `make
+#		release` again after `make libs`, so bumping inside the application's own prelim counted
+#		a single build as three. Every other entry just regenerates version.asm from this number.
+#
+libraries:
+	$(PYTHON) application$(S)scripts$(S)bumpbuild.py --bump
 	make $(MAKEOPTS) -C tools
 	make $(MAKEOPTS) -C common-source
 	make $(MAKEOPTS) -C ifloat32
