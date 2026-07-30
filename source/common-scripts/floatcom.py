@@ -42,7 +42,13 @@ class FPCompiler(object):
 		if m is not None:
 			self.compileConst(int(s))
 			return
-		m = re.match("^\\-?\\d*\\.\\d*$",s)
+		#
+		#	Accept an exponent as well as plain decimals, so a test can state a constant at full
+		#	precision (repr) instead of padding decimal places. A small value like 1.2e-06 needs
+		#	sixteen decimal places to carry the same significant digits, and short-changing it
+		#	made the CONSTANT the least accurate thing in the comparison -- see test_binary.py.
+		#
+		m = re.match("^\\-?\\d*\\.?\\d+([eE][-+]?\\d+)?$",s)
 		if m is not None:
 			self.compileConst(float(s))
 			return
