@@ -19,6 +19,23 @@ from c64tokens import *
 # *******************************************************************************************
 
 class Tokeniser(object):
+	#
+	#		Tokens that are NOT spelled out as text and must never be matched from source.
+	#
+	#		$FF is the only one: it is the PETSCII CHARACTER for pi, not a keyword. The C64 keyword
+	#		tokens stop at GO ($CB), and the ROM's own tokeniser never turns the letters P and I
+	#		into $FF -- typing "PI=3" gives a VARIABLE called PI, and stock X16 BASIC accepts that
+	#		quite happily. Matching the text here turned every such variable into an assignment to
+	#		pi, which IS a syntax error, so any program with a variable named PI was silently
+	#		corrupted on the way in. Proof: the same source typed at the emulator ran fine, and
+	#		tokenised by this tool gave "?SYNTAX ERROR IN 20" on the same ROM.
+	#
+	#		The name has to stay in the token table -- the compiler's unary.def looks pi up by it,
+	#		and a program that really wants pi carries the $FF character -- so skip it here rather
+	#		than removing it there.
+	#
+	NOT_SPELLED_AS_TEXT = { 0xFF }
+
 	def __init__(self):
 		self.tokens = C64TokenStore()
 		self.longest = max([len(s) for s in self.tokens.getAllTokens()])
@@ -50,6 +67,8 @@ class Tokeniser(object):
 			#
 			for l in range(self.longest,1,-1):
 				token = self.tokens.getID(s[:l])
+				if token in self.NOT_SPELLED_AS_TEXT:
+					continue
 				if token is not None and len(self.tokens.getToken(token)) == l:
 					if token >= 0x100:
 						self.data.append(token >> 8)

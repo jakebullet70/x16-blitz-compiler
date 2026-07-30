@@ -103,11 +103,25 @@ _CBIDone:
 ;
 ;		Z clear when the channel has run out. Bit 6 of the KERNAL status is end of file.
 ;
+;		Channel 0 is the screen editor and it NEVER runs out -- the user can always type another
+;		line. READST is no help there either: the KERNAL does not update it for keyboard input, so
+;		it still holds whatever the last SERIAL operation left, and a LOAD leaves bit 6 SET. Every
+;		compiled program has just been LOADed, so ST is 64 before the program's first statement --
+;		and testing it made the very first LINPUT report end of file and hand back an empty string
+;		WITHOUT WAITING. The MD5 program printed "ENTER FILENAME:" and then hashed nothing at all.
+;
+;		So only ask the KERNAL about real files, and take channel 0 as never at end of file.
+;
 ; ************************************************************************************************
 
 LinputAtEndOfFile:
+		lda 	currentChannel
+		beq 	_LAEOFOpen 					; channel 0 : the keyboard, never at end of file
 		jsr 	X16_READST
 		and 	#$40
+		rts
+_LAEOFOpen:
+		lda 	#0 							; Z set = still open, carry on reading
 		rts
 
 ; ************************************************************************************************
