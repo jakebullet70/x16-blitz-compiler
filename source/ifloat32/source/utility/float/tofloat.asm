@@ -33,6 +33,21 @@ ESTA_Exp = 5 								; accumulating the exponent digits.
 ESTA_TokenPlus = $AA 						; = C64_PLUS
 ESTA_TokenMinus = $AB 						; = C64_MINUS
 
+;
+;		The most decimal PLACES a literal may carry. This used to be 10, and counting places
+;		rather than significant digits is what made it too small: the four leading zeros of
+;		.000123456789 used up four of them, so a nine digit number was over a ten digit limit.
+;		X16 BASIC takes it and prints 1.23456789E-04.
+;
+;		29 is what the exponent arithmetic allows, not a guess. ENConstructFinal scales the
+;		fraction by (E exponent - decimalCount), formed in a SIGNED byte, and ESTAAddExponentDigit
+;		saturates the E exponent at 99. So the worst case is -99 - decimalCount, and -99 - 29 is
+;		exactly -128: one more place would wrap a huge negative power round to a positive one.
+;
+;		A literal needing more places than this is down around 1e-29 and should use E notation.
+;
+ESTA_MaxDecimals = 29
+
 ; ************************************************************************************************
 ;
 ;		Encode Number. If CS, then start a new number. Returns CS if the number is okay,
@@ -158,6 +173,13 @@ _ENFirstDP:
 		;		Not restarting. Figure out what to do next
 		;
 		; --------------------------------------------------------------------
+;
+;		The two states furthest down the file are reached through jmp trampolines placed right
+;		here, not by branching all the way. The handlers below have grown past 128 bytes between
+;		them, and a plain branch chain fails to assemble the moment any one of them gains a line
+;		-- which it did, over one byte. Keeping the trampolines local means the dispatch never
+;		cares how big the handlers get.
+;
 _ENNoRestart:
 		pha 								; save digit or DP on stack.
 		lda 	encodeState 				; get current state
@@ -168,10 +190,14 @@ _ENNoRestart:
 		cmp 	#ESTA_Decimal
 		beq 	_ESTADecimalState
 		cmp 	#ESTA_ExpSign
-		beq 	_ESTAExpSignState
+		beq 	_ESTAToExpSign
 		cmp 	#ESTA_Exp
-		beq 	_ESTAExpState
+		beq 	_ESTAToExp
 		.debug 								; should not happen !
+_ESTAToExpSign:
+		jmp 	_ESTAExpSignState
+_ESTAToExp:
+		jmp 	_ESTAExpState
 
 		; --------------------------------------------------------------------
 		;
@@ -248,19 +274,31 @@ _ESTADNotPoint:
 		cmp 	#"E" 						; exponent, e.g. 9.2E5
 		beq 	_ESTASwitchExponent
 		;
+		;
+		;		A digit past the limit is still PART OF THE NUMBER -- it just cannot change the
+		;		value -- so consume it and carry on. Failing here did not merely truncate the
+		;		literal: it returned CC, which tells the caller the character was never part of the
+		;		number at all, so the parse stopped dead and ENConstructFinal never ran. The
+		;		fraction was left sitting unscaled in S[X+1] and the literal came out as its
+		;		integer part alone. PRINT .00012345678 printed 0, with no error anywhere.
+		;
+		pha 								; hold the digit while the count is checked
+		lda 	decimalCount
+		cmp 	#ESTA_MaxDecimals
+		bcs 	_ESTADTooDeep
+		;
+		pla
 		inx 								; put digit into fractional part of X+1
 		jsr 	ESTAShiftDigitIntoMantissa
 		dex
 		;
 		inc 	decimalCount 				; bump the count of decimals
-		;
-		lda 	decimalCount 				; too many decimal digits.
-		cmp 	#11
-		beq 	_ESTADSFail
 		sec
 		rts
-_ESTADSFail:
-		clc
+;
+_ESTADTooDeep: 								; too far down to matter: drop the digit, but it is
+		pla 								; still ours, so accept it and keep the number going
+		sec
 		rts
 
 		; --------------------------------------------------------------------
