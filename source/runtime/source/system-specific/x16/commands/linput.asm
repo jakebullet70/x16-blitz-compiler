@@ -62,6 +62,7 @@ _CLILoop:
 		bra 	_CLILoop
 _CLIDone:
 		jsr 	LinputCloseChannel
+		jsr 	LinputEchoNewLine 			; the keyboard's line ends by moving down a line
 		plx
 		jsr 	LinputResult
 		ply
@@ -138,6 +139,29 @@ LinputOpenChannel:
 
 LinputCloseChannel:
 		jmp 	X16_CLRCHN
+
+; ************************************************************************************************
+;
+;		A typed line ends by moving to the next one, and it is the KERNAL's own line input that
+;		echoes that -- CHRIN alone does not, it only hands the characters back. So reading a line
+;		with CHRIN leaves the cursor sitting where the typing stopped, and whatever the program
+;		printed next ran on to the same line. Stock BASIC against ours, same program:
+;
+;			ENTER FILENAME: MD5                            stock: the hash goes on the next line
+;			ENTER FILENAME: MD5 24E34541087ABC81D25...     ours: run together
+;
+;		Channel 0 only. A file read must not have a stray CR pushed at it, and there is no cursor
+;		out there to move.
+;
+; ************************************************************************************************
+
+LinputEchoNewLine:
+		lda 	currentChannel
+		bne 	_LENLExit 					; a real file: nothing to echo
+		lda 	#13
+		jmp 	X16_CHROUT
+_LENLExit:
+		rts
 
 ; ************************************************************************************************
 ;
