@@ -2174,6 +2174,14 @@ CommandXFor: ;; [for]
 		jsr 	CopyTOSToOffsetY
 		dex
 
+		;
+		;		Bit 15 of the reference used to mean "int16 index", recorded here at frame
+		;		offset 4 bit 7. NEXT never read that bit -- it wrote a raw float back into the
+		;		two-byte slot, so a negative index came back as its magnitude. The compiler now
+		;		rejects an int16 index outright, as stock X16 BASIC does (?SYNTAX ERROR), so
+		;		this bit is always clear. Kept, with the masking below, so a stale object file
+		;		that still sets it stores a flag nothing acts on rather than a bogus address.
+		;
 		lda 	NSMantissa1,x 				; bit 15 of reference indicates type int16
 		and 	#$80
 		ldy 	#4

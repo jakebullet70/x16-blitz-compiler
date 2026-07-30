@@ -220,6 +220,60 @@ committing.
 
 ## Bugs
 
+### `FOR I%` compiled and then ran wrong — FIXED by rejecting it, as stock does
+
+`FOR` with an integer index compiled here and silently produced wrong values:
+
+```basic
+FOR I%=2 TO -2 STEP -1 : PRINT I%; : NEXT
+```
+
+printed `2 1 0 1 2` — the magnitudes — and left `I%` at `3` rather than `-3`. The trip *count* was
+always right, because `NEXT` compares the float in the frame, so it was a silent wrong answer rather
+than a crash, and no positive-only loop could expose it (magnitude == value there).
+
+Half a feature. The compiler detected `NSSIInt16` and flagged bit 15 of the reference; the runtime's
+`FOR` recorded it at frame offset 4 bit 7 — and **nothing ever read that bit back**. `next.asm` tested
+only bit 6 (the optimised path) and then did an unconditional six-byte `ReadFloatZTemp0Sub` /
+`WriteFloatZTemp0Sub`, so `NEXT` left a raw sign-magnitude iFloat32 in a two-byte slot while every
+later read took those two bytes as two's complement.
+
+**Stock X16 BASIC does not allow an integer loop index at all** — `FOR I%=1 TO 10` is `?SYNTAX ERROR`
+there — so the fix is to reject it rather than finish it. `CommandFOR` masked `NSSTypeMask` ($40)
+alone, which only tests float-vs-string; it now masks `NSSTypeMask|NSSIInt16` ($60). The error defers
+to runtime through the existing `DeferStatementToRuntime` stub, so a program only fails when the line
+is actually reached — which is what the interpreter does too:
+
+| | stock R49 | GPC |
+| --- | --- | --- |
+| `20 FOR I%=2 TO -2 STEP -1` | `?SYNTAX ERROR IN 20` | `SYNTAX ERROR @ $0014` → line 20 |
+
+**Nothing is lost by rejecting it.** Benchmarked compiled over 20,000 iterations (jiffies), an int16
+index is *not* faster than a float one — the earlier claim in the notes that it was "marginally
+slower" was reasoned from the code and is also wrong; it is a wash either way:
+
+| | `FOR I` | `FOR I%` |
+| --- | --- | --- |
+| empty loop, ascending | 65 | 65 |
+| body reads the index | 261 | 257 |
+| descending (never optimised) | 175 | 174 |
+
+And no program written for stock could contain one — a grep of every `.bas`/`.BASL` in `samples/`,
+`testing/` and `source/` found zero. Use `%` to shrink arrays (`DIM A%(n)` really is two bytes an
+element), not to speed up a loop.
+
+Verified against stock: `FOR I=1 TO N% STEP S%`, an `%` inside the body, `DIM A%()`, `STEP 0`, plain
+`K%=-22` and nested loops all still match exactly. The runtime's bit-15/bit-7 plumbing is left in
+place with the masking that already neutralises it, so a stale object file that still sets the bit
+stores a flag nothing acts on rather than a bogus address.
+
+**A latent second defect is now unreachable but still there.** `AllocateBytesForType`
+(`compiler/storage/create.asm`) reads the type from **A**, but its only scalar caller
+`GetReferenceTerm` reaches the call with A = 0 — so its `ldx #2` branch is dead and *every* scalar,
+including `%` and `$`, gets 6 bytes. That over-allocation is the only reason the `FOR I%` bug
+corrupted no memory. If anyone ever corrects that caller, re-check this: int scalars would drop to 2
+bytes and any remaining six-byte write into one would overwrite the next variable.
+
 ### READ/INPUT kept the leading spaces stock BASIC strips — FIXED
 
 Turned up while differentially testing `OPEN` on a missing file. The standard idiom
