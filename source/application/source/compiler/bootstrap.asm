@@ -15,7 +15,8 @@
 ;		BootEntry, which:
 ;
 ;			1. checks the 4-byte magic at RTBASE -- is the shared runtime already resident?
-;			2. if not, LOADs GPC.RT.BIN to its own home ($7300) with secondary address 1;
+;			2. if not, LOADs GPC.RT.nnn.BIN to its own home (RTBASE) with secondary address 1,
+;			   trying the current directory first and then the root of the SD card;
 ;			3. enters the resident runtime at RT_ENTRY, handing it this program's p-code page,
 ;			   workspace start (patched per program) and workspace end.
 ;
@@ -68,27 +69,27 @@ _BBCheck:
 		bra 	_BBEnter 					; WARM -- runtime already up, just enter it
 _BBCold:
 		;
-		;		Cold: LOAD GPC.RT.BIN to its own home. Secondary address 1 makes the KERNAL honour
-		;		the file's own load address ($7300), ignoring the address in X/Y. Logical file 0
-		;		(file 1 has been seen to hang a later OPEN). Loading high never touches $0801 or the
-		;		p-code, so this bootstrap survives its own load.
+		;		Cold: LOAD the runtime to its own home. Try the CURRENT DIRECTORY first, then the
+		;		ROOT of the SD card -- a program run from its own folder finds a runtime sitting
+		;		beside it, and otherwise falls back to one copy kept at the root, so every folder
+		;		on the card does not need its own 11K duplicate. A leading "/" is what addresses
+		;		the root (measured on R49 from inside a subdirectory: "GPC.RT.001.BIN" is not
+		;		found, "/GPC.RT.001.BIN" loads). The two names overlap in one string -- BBNameRoot
+		;		is just BBName with the "/" in front of it.
 		;
-		lda 	#BBNameEnd-BBName 		; SETNAM(length, name)
+		lda 	#BBNameEnd-BBName 			; local: "GPC.RT.001.BIN"
 		ldx 	#<BBName
 		ldy 	#>BBName
-		jsr 	X16_SETNAM
-		lda 	#0 							; SETLFS(logical file 0, device 8, secondary 1)
-		ldx 	#8
-		ldy 	#1
-		jsr 	X16_SETLFS
-		lda 	#0 							; LOAD into system memory
-		ldx 	#<RTBASE 					; load address (ignored under SA=1, but pass the home)
-		ldy 	#>RTBASE
-		jsr 	X16_LOAD
+		jsr 	BBTryLoad
 		bcc 	_BBEnter 					; carry clear = loaded OK
+		lda 	#BBNameEnd-BBNameRoot 		; root: "/GPC.RT.001.BIN"
+		ldx 	#<BBNameRoot
+		ldy 	#>BBNameRoot
+		jsr 	BBTryLoad
+		bcc 	_BBEnter
 		;
-		;		Load failed (GPC.RT.BIN not on the disk). Print a short notice and drop back to
-		;		BASIC READY -- no runtime is up, so there is no runtime error path to take.
+		;		Neither copy is on the disk. Print a short notice and drop back to BASIC READY --
+		;		no runtime is up, so there is no runtime error path to take.
 		;
 		ldx 	#0
 _BBErr:
@@ -114,10 +115,47 @@ BootWS:
 		ldy 	#RTBASE >> 8 				; Y = workspace end page ($73 -- just below the runtime)
 		jmp 	RT_ENTRY 					; RTBASE+4 -> jmp StartRuntime
 
+; ------------------------------------------------------------------------------------------------
+;		Try to LOAD the runtime under the name in A (length) / X,Y (address). Secondary address 1
+;		makes the KERNAL honour the file's own load address (RTBASE), ignoring the address in X/Y.
+;		Logical file 0 (file 1 has been seen to hang a later OPEN). Loading high never touches
+;		$0801 or the p-code, so this bootstrap survives its own load. Returns carry clear on
+;		success, set if the file is not there -- so the caller can just try the next name.
+;
+;		Sits BELOW _BBEnter deliberately: labels beginning with "_" are local to the enclosing
+;		scope in 64tass, and a global label placed between _BBCold and _BBEnter would split that
+;		scope in two, leaving the earlier branches referring to an _BBEnter they can no longer see.
+; ------------------------------------------------------------------------------------------------
+BBTryLoad:
+		jsr 	X16_SETNAM 					; SETNAM(length in A, name in X/Y)
+		lda 	#0 							; SETLFS(logical file 0, device 8, secondary 1)
+		ldx 	#8
+		ldy 	#1
+		jsr 	X16_SETLFS
+		lda 	#0 							; LOAD into system memory
+		ldx 	#<RTBASE 					; load address (ignored under SA=1, but pass the home)
+		ldy 	#>RTBASE
+		jmp 	X16_LOAD 					; its carry is our carry
+
+		;
+		;		Both the magic and the file name carry the ABI ordinal, and both are built from
+		;		RT_ABI (common.inc) rather than spelled out, so this copy cannot drift from the
+		;		runtime's own (runtime/source/main/00rt.header).
+		;
+		.cerror RT_ABI > 9, "RT_ABI > 9: magic byte 4 and the name's 3rd digit are single digits - widen both"
 BBMagic:
-		.text 	"GPC1" 						; MUST match the magic in runtime/source/main/00rt.header
+		.text 	"GPC"						; magic, matched against RTBASE..RTBASE+2
+		.byte 	RT_ABI + '0' 				; ABI ordinal, matched against RTBASE+3
+		;
+		;		One string, two names: the root form is the local form with a "/" in front, so the
+		;		fallback costs a single byte rather than a second copy of the name.
+		;
+BBNameRoot:
+		.text 	"/"
 BBName:
-		.text 	"GPC.RT.BIN"
+		.text 	"GPC.RT.00"
+		.byte 	RT_ABI + '0'
+		.text 	".BIN"
 BBNameEnd:
 BBErrText:
 		.text 	"?RT", 13, 0 				; brief -- a full line would wrap in 40 columns

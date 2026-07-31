@@ -70,27 +70,33 @@ copy of the same runtime.
 The **shared** mode factors that runtime out into a single resident copy. A program compiled with
 line 4 = `shared` (first byte `S`) carries **no embedded runtime**: the compiler streams a 255-byte
 bootstrap at `$0801` followed by the p-code, and the object is just that — bootstrap plus p-code.
-The runtime lives once, on the drive, as a standalone binary **`GPC.RT.BIN`** that loads at `$7300`.
+The runtime lives once, on the drive, as a standalone binary **`GPC.RT.002.BIN`** that loads at
+`$7000`. The `002` is the runtime's ABI ordinal (`RT_ABI` in `common.inc`): a program compiled
+against one ABI asks for that runtime *by name*, so a runtime of a different vintage sitting on the
+card is simply not found rather than loaded and jumped into.
 
-On `RUN`, the bootstrap checks for the magic `GPC1` at `$7300`. If the runtime isn't already
-resident it `LOAD`s `GPC.RT.BIN` once (device 8, secondary 1, so the file's own load address is
-honoured); otherwise it reuses the copy already in memory. It then enters the runtime and runs the
+On `RUN`, the bootstrap checks for the magic `GPC2` at `$7000`. If the runtime isn't already
+resident it `LOAD`s `GPC.RT.002.BIN` once (device 8, secondary 1, so the file's own load address is
+honoured) — first from the current directory, then from the **root of the SD card** (`/GPC.RT.002.BIN`)
+if it isn't alongside the program; otherwise it reuses the copy already in memory. It then enters the runtime and runs the
 p-code. So the first shared program to run pays the load cost, and every shared program after it
 starts instantly and shares the one resident runtime — the payoff for a suite of programs that hand
 off to each other.
 
 Requirements and limits:
 
-- **`GPC.RT.BIN` must be on the drive** alongside the shared objects. It is built by the runtime
-  makefile and ships in `testing/`.
+- **`GPC.RT.002.BIN` must be on the drive** — either alongside the shared objects or in the card's
+  root directory, so a card full of program folders needs only one ~11K copy. It is built by the
+  runtime makefile (`make -C source/runtime gpc-rt`) and ships in `testing/`.
 - Programs mixing shared and self-contained builds are fine; a shared object simply needs the
   resident runtime present when it runs.
 - Very large programs can be rejected with `PROGRAM TOO BIG` (the p-code must leave room for the
   work area below the runtime); in practice the compiler's general memory ceiling is hit first.
 
 The regression test lives in `source/unit-tests/shared-runtime/` — it compiles a program shared,
-checks the object layout, and proves both a cold start (fresh machine loads `GPC.RT.BIN`) and a warm
-start (runtime already resident, and provably reused rather than reloaded).
+checks the object layout, and proves a cold start (fresh machine loads the runtime), the root
+fallback (program run from a subdirectory with no local runtime reaches the one at the root), and a
+warm start (runtime already resident, and provably reused rather than reloaded).
 
 ## Status
 
@@ -115,7 +121,7 @@ start (runtime already resident, and provably reused rather than reloaded).
 | `source/application` | packages the release |
 | `source/gpc` | the interactive front end `GPC.PRG`, tokenised from BASLOAD source `GPC.BASL` by `build_basl.py` (no Java/Prog8) |
 | `bin/` | `x16emu/` (test emulator + ROM) and `box16/` (debugger) |
-| `testing/` | the built compiler, the shared runtime `GPC.RT.BIN`, and sample programs, ready to run (also the scratch `prg-batch/`/`archive/` test inputs) |
+| `testing/` | the built compiler, the shared runtime `GPC.RT.002.BIN`, and sample programs, ready to run (also the scratch `prg-batch/`/`archive/` test inputs) |
 | `documents/` | build include (`common.make`), notes, and reference PDFs |
 | `x16emu.bat` / `box16.bat` | project-root launchers that boot the emulators with `testing/` as the drive |
 

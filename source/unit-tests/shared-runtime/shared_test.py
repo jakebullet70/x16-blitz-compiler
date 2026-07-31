@@ -10,18 +10,18 @@
 #
 #		The other unit-tests drive the compiler NATIVELY (StartCompiler + the test API, quitting
 #		at $FFFF for a RAM-dump compare). SHARED mode is a DISK-FLOW feature -- GPC.BLITZ.BIN reads
-#		GPC.INPUT, streams a bootstrap + p-code, and the bootstrap loads GPC.RT.BIN at run time --
+#		GPC.INPUT, streams a bootstrap + p-code, and the bootstrap loads GPC.RT.nnn.BIN at run time --
 #		so it needs a different harness. This one compiles a program in SHARED mode, checks the
 #		object's byte layout, then runs it twice in the emulator to prove both paths:
 #
-#			COLD  a fresh machine (-zeroram, no magic at $7300) must LOAD GPC.RT.BIN, then run.
+#			COLD  a fresh machine (-zeroram, no magic at RTBASE) must LOAD the runtime, then run.
 #			WARM  with the runtime already resident AND its disk file scratched, the program must
 #			      still run -- proving it reused the resident copy instead of reloading (a reload
 #			      would ?RT-fail on the now-missing file).
 #
 #		Prerequisites (build them first -- see the Makefile's "build" target):
 #			testing/GPC.BLITZ.BIN   the compiler engine      (make libs)
-#			testing/GPC.RT.BIN      the resident runtime      (make -C source/runtime gpc-rt)
+#			testing/GPC.RT.nnn.BIN  the resident runtime      (make -C source/runtime gpc-rt)
 #
 #		The emulator is launched with SDL_VIDEODRIVER=dummy so it never steals the desktop's
 #		keyboard focus, and each run is terminated by PID -- never by image name, because other
@@ -38,21 +38,30 @@ EMU      = os.path.join(ROOT, "bin", "x16emu", "x16emu.exe")
 ROM      = os.path.join(ROOT, "bin", "x16emu", "rom.bin")
 TOKENISE = os.path.join(ROOT, "bin", "tokenise.zip")
 
-# ABI constants -- must match common-source (RTBASE, PCODE_PAGE, MIN_WS_PAGES) and the runtime's
-# FrameStackPages. Kept here as literals so the test fails loudly if the ABI moves under it.
-RTBASE            = 0x7300
+# ABI constants -- must match common-source (RTBASE, RT_ABI, PCODE_PAGE, MIN_WS_PAGES) and the
+# runtime's FrameStackPages. Kept here as literals so the test fails loudly if the ABI moves under
+# it: that is the point, not an oversight. When you bump RT_ABI, update these to match.
+RTBASE            = 0x7000
+RT_ABI            = 2
 PCODE_PAGE        = 0x09
 FRAME_STACK_PAGES = 16
 MIN_WS_PAGES      = 16
+
+# Built and looked for under the ABI-versioned name; the magic carries the same ordinal.
+RT_NAME  = "GPC.RT.%03d.BIN" % RT_ABI
+RT_MAGIC = b"GPC%d" % RT_ABI
 
 # Files this test creates in testing/ (the emulator's drive). All prefixed RT_ and cleaned up.
 SRC_BAS   = "RT_SRC.BAS"
 SRC_PRG   = "RT_SRC.PRG"
 OBJ_PRG   = "RT_OBJ.PRG"
 WARM_DRV  = "RT_WARM.TXT"
+ROOT_DRV  = "RT_ROOT.TXT"
+SUBDIR    = "RT_SUB"
 RT_BACKUP = os.path.join(TESTING, "RT_RTBAK.BIN")
 GPC_INPUT = os.path.join(TESTING, "GPC.INPUT")
-SCRATCH   = [SRC_BAS, SRC_PRG, OBJ_PRG, WARM_DRV, "RT_COMPILE.LOG", "RT_COLD.LOG", "RT_WARM.LOG"]
+SCRATCH   = [SRC_BAS, SRC_PRG, OBJ_PRG, WARM_DRV, ROOT_DRV,
+             "RT_COMPILE.LOG", "RT_COLD.LOG", "RT_WARM.LOG", "RT_ROOT.LOG"]
 
 # GPC.INPUT is a tracked working file; the compile step rewrites it, so snapshot and restore it so
 # the test leaves the tree exactly as it found it.
@@ -77,6 +86,8 @@ def cleanup():
     if os.path.exists(RT_BACKUP):
         try: os.remove(RT_BACKUP)
         except OSError: pass
+    import shutil
+    shutil.rmtree(os.path.join(TESTING, SUBDIR), ignore_errors=True)
     if _gpc_input_saved is not None:
         with open(GPC_INPUT, "wb") as f:
             f.write(_gpc_input_saved)
@@ -151,10 +162,10 @@ def verify_layout(path, marker):
         die("bootstrap is %d bytes, expected 255" % len(boot))
     if (0x0801 + 255) != 0x0900:
         die("p-code does not start at $0900")
-    for magic in (b"GPC1", b"GPC.RT.BIN", b"?RT"):
+    for magic in (RT_MAGIC, RT_NAME.encode(), b"?RT"):
         if magic not in boot:
             die("bootstrap missing %r" % magic)
-    # the A/X/Y handoff: LDA #$09 / LDX #WS / LDY #$73 / JMP $7304
+    # the A/X/Y handoff: LDA #PCODE_PAGE / LDX #WS / LDY #>RTBASE / JMP RTBASE+4
     m = boot.find(bytes([0xA9, PCODE_PAGE]))
     if m < 0:
         die("no LDA #PCODE_PAGE in bootstrap")
@@ -180,7 +191,7 @@ def verify_layout(path, marker):
 
 
 # ------------------------------------------------------------------------------------------------
-#		Step 2 -- COLD path: fresh RAM, the bootstrap must load GPC.RT.BIN itself.
+#		Step 2 -- COLD path: fresh RAM, the bootstrap must load the runtime itself.
 # ------------------------------------------------------------------------------------------------
 
 def cold_run(marker):
@@ -188,8 +199,44 @@ def cold_run(marker):
     if marker not in log:
         die("COLD: program marker %r never printed (runtime did not come up)" % marker)
     if b"?RT" in log:
-        die("COLD: ?RT -- GPC.RT.BIN failed to load")
-    print("  ok: COLD -- fresh machine loaded GPC.RT.BIN and ran (%s)" % marker.decode())
+        die("COLD: ?RT -- %s failed to load" % RT_NAME)
+    print("  ok: COLD -- fresh machine loaded %s and ran (%s)" % (RT_NAME, marker.decode()))
+
+
+# ------------------------------------------------------------------------------------------------
+#		Step 2b -- ROOT fallback: run the program from a SUBDIRECTORY that has no runtime in it.
+#		The bootstrap's first LOAD (the bare name) must miss, and its second (the name with a "/"
+#		in front, which is what addresses the SD card root on the X16) must find the one copy kept
+#		at the root. That is the whole point of the fallback -- one runtime per card, not one per
+#		folder. -zeroram so this is a genuine cold start with no resident magic to short-circuit it.
+# ------------------------------------------------------------------------------------------------
+
+def root_run(marker):
+    import shutil
+    subdir = os.path.join(TESTING, SUBDIR)
+    os.makedirs(subdir, exist_ok=True)
+    shutil.copyfile(os.path.join(TESTING, OBJ_PRG), os.path.join(subdir, OBJ_PRG))
+    if os.path.exists(os.path.join(subdir, RT_NAME)):
+        die("ROOT: %s is in the subdirectory -- the test would prove nothing" % RT_NAME)
+    if not os.path.exists(os.path.join(TESTING, RT_NAME)):
+        die("ROOT: %s missing from the root before test" % RT_NAME)
+
+    drv = ('OPEN15,8,15,"CD:%s"\n'            # CD is not a BASIC keyword; go through the DOS channel
+           'CLOSE15\n'
+           'LOAD"%s"\n'                       # load the program FROM the subdirectory...
+           'RUN\n' % (SUBDIR, OBJ_PRG))       # ...it must reach the runtime at the root
+    with open(os.path.join(TESTING, ROOT_DRV), "w", newline="\n") as f:
+        f.write(drv)
+    try:
+        log = run_emu(["-zeroram", "-pastewarp", "-echo", "-bas", ROOT_DRV], "RT_ROOT.LOG", timeout=10)
+    finally:
+        shutil.rmtree(subdir, ignore_errors=True)
+    if b"?RT" in log:
+        die("ROOT: ?RT -- the root fallback did not find /%s" % RT_NAME)
+    if marker not in log:
+        die("ROOT: program marker %r never printed" % marker)
+    print("  ok: ROOT -- ran from %s/ with no local runtime, loaded /%s (%s)"
+          % (SUBDIR, RT_NAME, marker.decode()))
 
 
 # ------------------------------------------------------------------------------------------------
@@ -198,16 +245,16 @@ def cold_run(marker):
 # ------------------------------------------------------------------------------------------------
 
 def warm_run(marker):
-    rt = os.path.join(TESTING, "GPC.RT.BIN")
+    rt = os.path.join(TESTING, RT_NAME)
     if not os.path.exists(rt):
-        die("WARM: GPC.RT.BIN missing before test")
+        die("WARM: %s missing before test" % RT_NAME)
     import shutil
     shutil.copyfile(rt, RT_BACKUP)
-    drv = ('LOAD"GPC.RT.BIN",8,1\n'          # make the runtime resident at $7300 (magic set)
-           'OPEN15,8,15,"S:GPC.RT.BIN"\n'    # scratch it from the disk...
+    drv = ('LOAD"%s",8,1\n'                   # make the runtime resident at RTBASE (magic set)
+           'OPEN15,8,15,"S:%s"\n'             # scratch it from the disk...
            'CLOSE15\n'
            'LOAD"%s"\n'                       # ...load the shared program...
-           'RUN\n' % OBJ_PRG)                 # ...and run it: it MUST use the resident runtime
+           'RUN\n' % (RT_NAME, RT_NAME, OBJ_PRG))   # ...run it: MUST use the resident copy
     with open(os.path.join(TESTING, WARM_DRV), "w", newline="\n") as f:
         f.write(drv)
     try:
@@ -217,7 +264,7 @@ def warm_run(marker):
         if not os.path.exists(rt) and os.path.exists(RT_BACKUP):
             shutil.copyfile(RT_BACKUP, rt)     # always restore the runtime
     if not deleted:
-        die("WARM: DOS scratch did not remove GPC.RT.BIN -- test would be inconclusive")
+        die("WARM: DOS scratch did not remove %s -- test would be inconclusive" % RT_NAME)
     if marker not in log:
         die("WARM: program marker %r never printed" % marker)
     if b"?RT" in log:
@@ -229,7 +276,7 @@ def warm_run(marker):
 def main():
     for f, what in ((EMU, "x16emu"), (ROM, "rom.bin"), (TOKENISE, "tokenise.zip"),
                     (os.path.join(TESTING, "GPC.BLITZ.BIN"), "GPC.BLITZ.BIN"),
-                    (os.path.join(TESTING, "GPC.RT.BIN"), "GPC.RT.BIN")):
+                    (os.path.join(TESTING, RT_NAME), RT_NAME)):
         if not os.path.exists(f):
             die("prerequisite not found: %s (%s) -- build it first (see the Makefile)" % (what, f))
     global _gpc_input_saved
@@ -238,6 +285,7 @@ def main():
     print("SHARED (resident-runtime) mode regression test")
     compile_shared(COLD_MARK)
     cold_run(COLD_MARK)
+    root_run(COLD_MARK)
     compile_shared(WARM_MARK)
     warm_run(WARM_MARK)
     cleanup()

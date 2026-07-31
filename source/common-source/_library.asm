@@ -184,8 +184,8 @@ C64_MOD                  = $cede ; $cede mod
 ;
 ;		Where to assemble the runnable code. Happy now , Dave ?
 ;
-;		Weak so the standalone resident-runtime build (GPC.RT.BIN) can override it to RTBASE with
-;		-D CodeStart=$7300 on the command line; every other build keeps $801.
+;		Weak so the standalone resident-runtime build (GPC.RT.nnn.BIN) can override it to RTBASE
+;		with -D CodeStart on the command line; every other build keeps $801.
 ;
 		.weak
 CodeStart = $801
@@ -199,17 +199,40 @@ ZeroPageMandatory = $22
 ;
 MemoryStorage = $400
 ;
-;		Resident-runtime (GPC.RT.BIN) ABI -- see application/source/compiler/bootstrap.asm and
+;		Resident-runtime (GPC.RT.nnn.BIN) ABI -- see application/source/compiler/bootstrap.asm and
 ;		runtime/source/main/00rt.header. RTBASE is the fixed home the standalone runtime is linked
 ;		at and loaded to; a shared-mode program's bootstrap checks the magic there, loads it if
 ;		absent, and enters at RT_ENTRY. RTBASE is PINNED (baked into every shared program's
 ;		bootstrap), so it is an ABI constant, not auto-computed; zzrt.footer guards it against the
 ;		runtime outgrowing $9F00.
 ;
-RTBASE = $7300 								; resident runtime home ($7300..$9EFF, ~11K)
+;
+;		RTBASE moved $7300 -> $7000 on 31st July 2026 (RT_ABI 1 -> 2). The runtime had outgrown the
+;		$9F00 I/O page by 447 bytes and zzrt.footer's guard had been failing the gpc-rt link for
+;		some time -- shared mode could not be built at all. Three pages down frees 768 bytes and
+;		leaves ~320 spare, at the cost of the same 768 bytes of per-program workspace (~3% of the
+;		~26K a shared program gets). If it happens again, lower this and bump RT_ABI together.
+;
+RTBASE = $7000 								; resident runtime home ($7000..$9EFF, ~11.7K)
 RT_ENTRY = RTBASE+4 						; 4-byte magic at RTBASE, then jmp StartRuntime
 PCODE_PAGE = $09 							; shared-mode p-code base page ($0900, page-aligned)
 MIN_WS_PAGES = 16 							; smallest workspace a shared program keeps (4K)
+;
+;		RT_ABI is the runtime's ABI ordinal, and it is the ONE place it is written down. It ends up
+;		in three places that must agree, so none of them may hard-code it:
+;
+;			- the 4-byte magic at RTBASE ("GPC" + the digit), which the bootstrap compares to
+;			  decide "is the runtime already resident?";
+;			- the file name the runtime is BUILT as, GPC.RT.nnn.BIN (runtime/Makefile, via
+;			  scripts/rtname.py, which parses the number back out of this line);
+;			- the file name a compiled shared-mode program LOOKS FOR (bootstrap.asm).
+;
+;		Bump it whenever the runtime layout or entry ABI changes. Versioning the file name is what
+;		makes the bump mean something: a program compiled against ABI n asks for GPC.RT.00n.BIN by
+;		name, so an older or newer runtime sitting on the disk is simply not found, instead of
+;		being loaded and jumped into. Programs and runtimes of different vintages can coexist.
+;
+RT_ABI = 2 									; runtime ABI ordinal -> "GPC2" magic, GPC.RT.002.BIN
 
 ; ************************************************************************************************
 ;

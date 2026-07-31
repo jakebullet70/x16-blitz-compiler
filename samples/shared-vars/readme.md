@@ -43,7 +43,7 @@ program's runtime "this is a chain — skip your memory clear", so the data surv
 ## The shared runtime
 
 Both programs are compiled in **shared-runtime mode**. Instead of each binary embedding its own copy
-of the ~11 KB runtime, they share **one** resident copy: the first program to run loads `GPC.RT.BIN`
+of the ~11 KB runtime, they share **one** resident copy: the first program to run loads `GPC.RT.002.BIN`
 (about 11 KB) once, and every chained program reuses it. The compiled programs themselves are then
 tiny — in this sample about **0.5 KB each** — which is exactly what you want when several programs
 chain together: one runtime in memory, not one per program.
@@ -61,7 +61,8 @@ overwrites its `.PRG` in place.
 
 ## Build and run
 
-Both programs must be compiled in **shared** mode, and `GPC.RT.BIN` must be on the drive at run time.
+Both programs must be compiled in **shared** mode, and `GPC.RT.002.BIN` must be on the drive at
+run time -- either beside them or in the SD card's root directory.
 
 1. Tokenise each BASLOAD source to a `.PRG`. From the ROM prompt, `BASLOAD "PRG1.BASL"` (and again for
    `PRG2.BASL`) writes `PRG1.PRG` / `PRG2.PRG` via the source's own `#SAVEAS`. The tokenised `.PRG`
@@ -81,7 +82,7 @@ Both programs must be compiled in **shared** mode, and `GPC.RT.BIN` must be on t
    This produces `C.PRG1.PRG` and `C.PRG2.PRG`.
 
 3. `PRG1` chains with `LOAD "C.PRG2.PRG"`, so the compiled second program **must** be named
-   `C.PRG2.PRG` (rename it if your compile step named it something else). Make sure `GPC.RT.BIN`,
+   `C.PRG2.PRG` (rename it if your compile step named it something else). Make sure `GPC.RT.002.BIN`,
    `C.PRG1.PRG` and `C.PRG2.PRG` are all on the same drive.
 
 4. Run `C.PRG1.PRG`. Press a key when prompted; it chains to `C.PRG2.PRG`, which prints the variables

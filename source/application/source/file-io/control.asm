@@ -254,7 +254,7 @@ ObjectFile: 								; line 2 : where to write it
 OptionsText: 								; line 3 : the debug map file name, or empty for none
 		.fill 	CFLineSize 					; (WriteMapFile keys off its first byte)
 ModeText: 									; line 4 : compile mode -- first byte 'S' (SHARED) selects
-		.fill 	CFLineSize 					; the resident runtime (GPC.RT.BIN); empty/anything else
+		.fill 	CFLineSize 					; the resident runtime (GPC.RT.nnn.BIN); empty/anything else
 											; = the default self-contained (embedded) runtime.
 cfLine: 									; ReadControlFile scratch: current line, 0..3
 		.fill 	1

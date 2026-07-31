@@ -15,7 +15,8 @@
 #		own (source/application/buildnum.txt).
 #
 #			make -C source/gpc			build testing/GPC.PRG from GPC.BASL
-#			make -C source/gpc release	build, plus re-tokenise the GPC.ERR helper (GPC.ERR.PRG)
+#			make -C source/gpc release	build, re-tokenise the GPC.ERR helper, build the shared
+#										runtime, and compile GPC.ERR against it (C.GPC.ERR.PRG)
 #			make -C source/gpc run		build, then launch the front end in the emulator
 #
 # *******************************************************************************************
@@ -46,8 +47,21 @@ build:
 #		two args just tokenises (no mirror), and skips if the source is absent.
 #		Everything lands in testing/ (RELEASEDIR).
 #
+#		GPC.ERR is then COMPILED, in SHARED mode, to C.GPC.ERR.PRG -- the helper you reach for
+#		after a crash should not itself be the slowest thing on the disk. SHARED because the
+#		resident runtime is already there for compiled programs, so the tool costs ~1.6K rather
+#		than carrying its own ~12K copy. The interpreted GPC.ERR.PRG still ships beside it: it is
+#		the compile input, and it is the one that still works if the runtime is missing or is a
+#		different ABI -- which is exactly the situation you may be diagnosing.
+#
+#		The runtime is built here too. Nothing else in the tree builds gpc-rt, which is how its
+#		$9F00 size guard managed to fail unnoticed for weeks; a release that ships a shared-mode
+#		tool must ship the runtime that tool needs.
+#
 release: build
 	$(PYTHON) build_basl.py GPC.ERR.BASL GPC.ERR.PRG
+	make $(MAKEOPTS) -C ../runtime gpc-rt
+	$(PYTHON) compile_shared.py GPC.ERR.PRG C.GPC.ERR.PRG M.GPC.ERR
 
 #
 #		Launch the freshly built front end. It chain-loads GPC.BLITZ.BIN, which must sit beside
