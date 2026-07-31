@@ -16,7 +16,8 @@
 #
 #			make -C source/gpc			build testing/GPC.PRG from GPC.BASL
 #			make -C source/gpc release	build, re-tokenise the GPC.ERR helper, build the shared
-#										runtime, and compile GPC.ERR against it (C.GPC.ERR.PRG)
+#										runtime, and compile GPC.ERR against it (C.GPC.ERR.PRG,
+#										which release.sh ships as plain GPC.ERR.PRG)
 #			make -C source/gpc run		build, then launch the front end in the emulator
 #
 # *******************************************************************************************
@@ -50,9 +51,10 @@ build:
 #		GPC.ERR is then COMPILED, in SHARED mode, to C.GPC.ERR.PRG -- the helper you reach for
 #		after a crash should not itself be the slowest thing on the disk. SHARED because the
 #		resident runtime is already there for compiled programs, so the tool costs ~1.6K rather
-#		than carrying its own ~12K copy. The interpreted GPC.ERR.PRG still ships beside it: it is
-#		the compile input, and it is the one that still works if the runtime is missing or is a
-#		different ABI -- which is exactly the situation you may be diagnosing.
+#		than carrying its own ~12K copy. Both names exist HERE because one is the compiler's
+#		input and the other its output; the release ships only the compiled one, renamed to
+#		plain GPC.ERR.PRG (see release.sh) so a user has one name to remember, not two.
+#		If the runtime is missing, SRC/GPC.ERR.BASL rebuilds the interpreted version.
 #
 #		The runtime is built here too. Nothing else in the tree builds gpc-rt, which is how its
 #		$9F00 size guard managed to fail unnoticed for weeks; a release that ships a shared-mode

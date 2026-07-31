@@ -67,7 +67,7 @@ give it the map file, then paste the whole error line — it accepts `DIVIDE BY 
 `$0030`, or `0030`:
 
 ```text
-LOAD "C.GPC.ERR.PRG",8 : RUN
+LOAD "GPC.ERR.PRG",8 : RUN
 MAP FILE (E.G. M.MYPROG): M.SOURCE
 ERROR ADDRESS: DIVIDE BY ZERO @ $0030
 $0030 IS ON BASIC LINE 12
@@ -79,15 +79,15 @@ an address in the implicit-`DIM` prologue reports `IS IN COMPILER SETUP CODE, NO
 than blaming the nearest real line, and an address below the first entry reports `IS BEFORE THE
 FIRST MAPPED LINE`. A bare RETURN at either prompt quits.
 
-Two copies ship, and which you want depends on what has gone wrong:
+The shipped `GPC.ERR.PRG` is **compiled**, in `shared` mode — so it needs `GPC.RT.<build>.BIN`
+beside it or at the card root, which the release puts there anyway. In the source tree the same file
+is called `C.GPC.ERR.PRG`, because the compiler's input there is the interpreted `GPC.ERR.PRG` and
+the two need distinct names; the release drops the `C.` prefix so there is only one name to know.
 
-| | |
-| --- | --- |
-| `C.GPC.ERR.PRG` | compiled, `shared` mode — needs the runtime beside it or at the card root |
-| `GPC.ERR.PRG` | interpreted — slower, but works with no runtime present at all |
-
-Reach for the interpreted one when the runtime is missing or is a different ABI, since that may be
-the very thing you are diagnosing. Both are built from the same `GPC.ERR.BASL`, shipped under `SRC/`.
+If the runtime is missing or is a different ABI — which may be the very thing you are diagnosing —
+rebuild the interpreted version instead: `BASLOAD "SRC/GPC.ERR.BASL"`. It is slower but needs no
+runtime at all. Note that its `#SAVEAS` writes `GPC.ERR.PRG`, overwriting the compiled helper, so
+re-extract from the zip when you want the fast one back.
 
 **A runtime address is a p-code offset, not a line number, and the two look alike.** A compile-time
 error already names its line in decimal (`SYNTAX ERROR @ 120` — that *is* line 120, and GPC.ERR is
@@ -103,22 +103,26 @@ copy of the same runtime.
 The **shared** mode factors that runtime out into a single resident copy. A program compiled with
 line 4 = `shared` (first byte `S`) carries **no embedded runtime**: the compiler streams a 255-byte
 bootstrap at `$0801` followed by the p-code, and the object is just that — bootstrap plus p-code.
-The runtime lives once, on the drive, as a standalone binary **`GPC.RT.002.BIN`** that loads at
-`$7000`. The `002` is the runtime's ABI ordinal (`RT_ABI` in `common.inc`): a program compiled
-against one ABI asks for that runtime *by name*, so a runtime of a different vintage sitting on the
-card is simply not found rather than loaded and jumped into.
+The runtime lives once, on the drive, as a standalone binary **`GPC.RT.<build>.BIN`** that loads at
+`$7000` — `GPC.RT.112.BIN` for engine build 112, the number `GPC.BLITZ.BIN` prints at startup. The
+name carries the build, so a compiled program asks for the exact runtime it was built against *by
+name*: one of a different vintage sitting on the card is simply not found, rather than loaded and
+jumped into. **The build number bumps on every engine build, so shared programs must be recompiled
+whenever the engine is** — the pairing is deliberately exact.
 
-On `RUN`, the bootstrap checks for the magic `GPC2` at `$7000`. If the runtime isn't already
-resident it `LOAD`s `GPC.RT.002.BIN` once (device 8, secondary 1, so the file's own load address is
-honoured) — first from the current directory, then from the **root of the SD card** (`/GPC.RT.002.BIN`)
-if it isn't alongside the program; otherwise it reuses the copy already in memory. It then enters the runtime and runs the
+On `RUN`, the bootstrap checks for the magic `GPC2` at `$7000`. That magic is the *ABI* ordinal
+(`RT_ABI` in `common.inc`), not the build number: it answers only "is a runtime resident that I can
+safely enter?", so a resident runtime from another build of the same ABI is reused. If none is
+resident it `LOAD`s `GPC.RT.<build>.BIN` once (device 8, secondary 1, so the file's own load address
+is honoured) — first from the current directory, then from the **root of the SD card**
+(`/GPC.RT.<build>.BIN`) if it isn't alongside the program. It then enters the runtime and runs the
 p-code. So the first shared program to run pays the load cost, and every shared program after it
 starts instantly and shares the one resident runtime — the payoff for a suite of programs that hand
 off to each other.
 
 Requirements and limits:
 
-- **`GPC.RT.002.BIN` must be on the drive** — either alongside the shared objects or in the card's
+- **`GPC.RT.<build>.BIN` must be on the drive** — either alongside the shared objects or in the card's
   root directory, so a card full of program folders needs only one ~11K copy. It is built by the
   runtime makefile (`make -C source/runtime gpc-rt`) and ships in `testing/`.
 - Programs mixing shared and self-contained builds are fine; a shared object simply needs the
@@ -154,7 +158,7 @@ warm start (runtime already resident, and provably reused rather than reloaded).
 | `source/application` | packages the release |
 | `source/gpc` | the interactive front end `GPC.PRG`, tokenised from BASLOAD source `GPC.BASL` by `build_basl.py` (no Java/Prog8) |
 | `bin/` | `x16emu/` (test emulator + ROM) and `box16/` (debugger) |
-| `testing/` | the built compiler, the shared runtime `GPC.RT.002.BIN`, and sample programs, ready to run (also the scratch `prg-batch/`/`archive/` test inputs) |
+| `testing/` | the built compiler, the shared runtime `GPC.RT.<build>.BIN`, and sample programs, ready to run (also the scratch `prg-batch/`/`archive/` test inputs) |
 | `documents/` | build include (`common.make`), notes, and reference PDFs |
 | `x16emu.bat` / `box16.bat` | project-root launchers that boot the emulators with `testing/` as the drive |
 

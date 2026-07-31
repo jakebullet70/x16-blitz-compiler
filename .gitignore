@@ -1,6 +1,11 @@
 # Per-machine toolchain paths (TASS / PYTHON overrides)
 documents/local.make
 
+# Per-machine Claude Code state: settings.local.json holds this box's tool
+# permissions, session-todo.json is scratch. Neither belongs to the project.
+.claude/settings.local.json
+.claude/session-todo.json
+
 # Emulator memory dumps (x16emu writes dump*.bin, Box16 writes dump*.txt)
 dump*.bin
 dump*.txt

@@ -218,21 +218,20 @@ RT_ENTRY = RTBASE+4 						; 4-byte magic at RTBASE, then jmp StartRuntime
 PCODE_PAGE = $09 							; shared-mode p-code base page ($0900, page-aligned)
 MIN_WS_PAGES = 16 							; smallest workspace a shared program keeps (4K)
 ;
-;		RT_ABI is the runtime's ABI ordinal, and it is the ONE place it is written down. It ends up
-;		in three places that must agree, so none of them may hard-code it:
+;		RT_ABI is the runtime's ABI ordinal, and it is the ONE place it is written down. It drives
+;		the 4-byte magic at RTBASE ("GPC" + the digit), which the bootstrap compares to answer a
+;		single question: is a runtime already resident, and is it one I can safely enter? So bump
+;		it whenever the runtime layout or entry contract changes -- and only then. A resident
+;		runtime from a DIFFERENT engine build but the same ABI is deliberately still reused.
 ;
-;			- the 4-byte magic at RTBASE ("GPC" + the digit), which the bootstrap compares to
-;			  decide "is the runtime already resident?";
-;			- the file name the runtime is BUILT as, GPC.RT.nnn.BIN (runtime/Makefile, via
-;			  scripts/rtname.py, which parses the number back out of this line);
-;			- the file name a compiled shared-mode program LOOKS FOR (bootstrap.asm).
+;		The runtime's FILE NAME does not come from here. It carries the engine's BUILD number
+;		(source/application/buildnum.txt) -- see scripts/rtname.py, which names the built file,
+;		and bootstrap.asm, which formats the same number into the name a compiled program looks
+;		for. That is a different question: which runtime file is mine? It pins a program to the
+;		exact runtime it was built against, and since the build number bumps on every engine
+;		build, shared programs must be recompiled whenever the engine is rebuilt.
 ;
-;		Bump it whenever the runtime layout or entry ABI changes. Versioning the file name is what
-;		makes the bump mean something: a program compiled against ABI n asks for GPC.RT.00n.BIN by
-;		name, so an older or newer runtime sitting on the disk is simply not found, instead of
-;		being loaded and jumped into. Programs and runtimes of different vintages can coexist.
-;
-RT_ABI = 2 									; runtime ABI ordinal -> "GPC2" magic, GPC.RT.002.BIN
+RT_ABI = 2 									; runtime ABI ordinal -> "GPC2" magic (NOT the file name)
 
 ; ************************************************************************************************
 ;

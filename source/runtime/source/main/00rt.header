@@ -2,7 +2,7 @@
 ; ************************************************************************************************
 ;
 ;		Name:		00rt.header
-;		Purpose:	Entry header for the standalone resident runtime, GPC.RT.nnn.BIN
+;		Purpose:	Entry header for the standalone resident runtime, GPC.RT.<build>.BIN
 ;		Created:	17th July 2026
 ;		Reviewed: 	No
 ;
@@ -11,16 +11,18 @@
 ;
 ;		This is linked FIRST in the "gpc-rt" make target (in front of runtime/common/ifloat32/
 ;		polynomials), with -D CodeStart set to RTBASE, so its first byte lands there and the whole
-;		image assembles up from there. The result, GPC.RT.nnn.BIN, is a headerless-to-BASIC raw PRG
-;		(load address = RTBASE, no SYS stub) that a shared-mode program's bootstrap loads there
-;		with secondary address 1 and enters via RT_ENTRY.
+;		image assembles up from there. The result is a headerless-to-BASIC raw PRG (load address =
+;		RTBASE, no SYS stub) that a shared-mode program's bootstrap loads there with secondary
+;		address 1 and enters via RT_ENTRY. scripts/rtname.py installs it as GPC.RT.<build>.BIN,
+;		named from the ENGINE BUILD NUMBER -- so build the engine first and the runtime after, or
+;		you produce a runtime no compiled program asks for.
 ;
 ;		Layout at RTBASE:
-;			RTBASE+0 : "GPC" + digit    resident magic + ABI ordinal -- the bootstrap tests these 4
-;			                          bytes to decide "runtime already resident?"; bump the digit
-;			                          whenever the runtime layout/ABI changes so an old program
-;			                          reloads the matching runtime instead of jumping into a
-;			                          mismatched one.
+;			RTBASE+0 : "GPC" + digit    resident magic + ABI ordinal. NOT the build number in the
+;			                          file name -- this answers only "runtime already resident and
+;			                          safe to enter?", so a resident runtime from another build of
+;			                          the same ABI is deliberately reused. Bump the digit (RT_ABI
+;			                          in common.inc) whenever the layout or entry contract changes.
 ;			RTBASE+4 : jmp StartRuntime RT_ENTRY -- a stable trampoline, so a program enters at a
 ;			                          fixed address regardless of where StartRuntime floats to.
 ;
@@ -35,7 +37,9 @@
 RTHeader:
 		.cerror RTHeader != RTBASE, "runtime header not at RTBASE - check -D CodeStart vs RTBASE"
 		;
-		;		Resident magic + ABI ordinal (RTBASE..RTBASE+3). The bootstrap compares all four
+		;		Resident magic + ABI ordinal (RTBASE..RTBASE+3). This is the ABI ordinal, NOT the
+		;		build number that names the file: it decides whether an already-resident runtime
+		;		can be entered, so it moves only on a layout/entry change. The bootstrap compares all four
 		;		bytes, so this and its copy in bootstrap.asm must agree -- both are now built from
 		;		RT_ABI (common.inc) rather than spelled out, so they cannot drift apart.
 		;

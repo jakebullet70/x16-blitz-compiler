@@ -69,21 +69,27 @@ out = os.path.join(release_dir, "gpc-release-%s.zip" % num)
 # Everything else in testing/ (samples like DIR.BASL, compiled demos, scratch) is left out.
 #   GPC.PRG        the front end you launch on the X16
 #   GPC.BLITZ.BIN  the compiler engine GPC.PRG chain-loads
-#   GPC.RT.nnn.BIN the shared runtime, loaded once in "shared" compile mode. nnn is its ABI
-#                  ordinal, read from RT_ABI rather than spelled out -- a hard-coded name here
-#                  is exactly what broke this script when the runtime was first versioned.
-#   C.GPC.ERR.PRG  the error-address-to-line helper, compiled against the shared runtime
-#   GPC.ERR.PRG    the same helper, interpreted -- the one that still works when the runtime
-#                  is absent or a different ABI, which may be what you are diagnosing
+#   GPC.RT.nnn.BIN the shared runtime, loaded once in "shared" compile mode. nnn is the ENGINE
+#                  BUILD NUMBER, read from rtname.py rather than spelled out -- a hard-coded
+#                  name here is exactly what broke this script when the runtime was versioned.
+#   GPC.ERR.PRG    the error-address-to-line helper -- the COMPILED build. In the tree it is
+#                  C.GPC.ERR.PRG (the "C." prefix distinguishes compiler output from the
+#                  GPC.ERR.PRG that is its input); the release drops the prefix, because a
+#                  user should not have to know which of two spellings is the fast one. The
+#                  interpreted build is NOT shipped -- it exists in the tree only as the
+#                  compile input, and SRC/GPC.ERR.BASL regenerates it if it is ever needed.
 #   SRC/*.BASL     the BASLOAD sources (NOT needed to run; see SRC/README.TXT)
 # GPC.INPUT (the control-file template) is deliberately NOT shipped: GPC.PRG drives
 # the compile interactively, and the file is per-user state (git-ignored in testing/).
-# The runtime's file name carries its ABI ordinal; import the one definition of it.
+# The runtime's file name carries the engine build number; import the one definition of it.
 sys.path.insert(0, os.path.join(root, "source", "runtime", "scripts"))
 from rtname import rt_filename                      # noqa: E402
 
 RUNTIME = ("GPC.PRG", "GPC.BLITZ.BIN", rt_filename())
-TOOLS   = ("C.GPC.ERR.PRG", "GPC.ERR.PRG")  # companion tools -- also shipped at the root
+# Companion tools, shipped at the root as (name in testing/, name in the zip). The compiled
+# helper is built as C.GPC.ERR.PRG and ships as plain GPC.ERR.PRG -- so it must NOT be listed
+# with an interpreted GPC.ERR.PRG as well, or the two collide on one name in the archive.
+TOOLS   = (("C.GPC.ERR.PRG", "GPC.ERR.PRG"),)
 SRCBASL = ("GPC.BASL", "GPC.ERR.BASL")     # ALL BASLOAD source -- goes under SRC/
 DOCS    = ("README.md", "LICENSE")
 
@@ -100,8 +106,9 @@ SRC_README = (
     "It is here for reference only -- you do NOT need anything in this folder to\n"
     "run GPC. The ready-to-run programs are in the parent folder.\n"
     "\n"
-    "To compile, run GPC.PRG (with GPC.BLITZ.BIN and GPC.RT.BIN beside it). To\n"
-    "turn a runtime error's \"@ $XXXX\" into a source line, run GPC.ERR.PRG.\n"
+    "To compile, run GPC.PRG (with GPC.BLITZ.BIN and the GPC.RT.nnn.BIN runtime\n"
+    "beside it). To turn a runtime error's \"@ $XXXX\" into a source line, run\n"
+    "GPC.ERR.PRG.\n"
     "The .BASL sources are never loaded at run time.\n"
     "\n"
     "BASLOAD is built into every R49 X16 ROM. To rebuild a PRG from its source,\n"
@@ -109,6 +116,12 @@ SRC_README = (
     "\n"
     '    BASLOAD "GPC.BASL"        (writes GPC.PRG)\n'
     '    BASLOAD "GPC.ERR.BASL"    (writes GPC.ERR.PRG)\n'
+    "\n"
+    "CAREFUL with the second one. The shipped GPC.ERR.PRG is the COMPILED helper;\n"
+    "BASLOAD writes the plain interpreted version over that same name, so you would\n"
+    "silently swap the fast tool for a slow one. It still works -- and it is in fact\n"
+    "the version to use if the GPC.RT.nnn.BIN runtime is missing, since the compiled\n"
+    "one needs it -- but re-extract from the zip to get the compiled helper back.\n"
 )
 
 names = []
@@ -119,12 +132,12 @@ with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
             raise SystemExit("release: missing required file testing/%s -- build first" % name)
         z.write(full, name)
         names.append(name)
-    for name in TOOLS:
-        full = os.path.join(testing, name)
+    for built, shipped in TOOLS:
+        full = os.path.join(testing, built)
         if not os.path.isfile(full):
-            raise SystemExit("release: missing tool testing/%s -- build first" % name)
-        z.write(full, name)
-        names.append(name)
+            raise SystemExit("release: missing tool testing/%s -- build first" % built)
+        z.write(full, shipped)
+        names.append(shipped)
     for name in SRCBASL:
         full = os.path.join(testing, name)
         if not os.path.isfile(full):

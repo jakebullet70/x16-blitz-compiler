@@ -47,8 +47,13 @@ PCODE_PAGE        = 0x09
 FRAME_STACK_PAGES = 16
 MIN_WS_PAGES      = 16
 
-# Built and looked for under the ABI-versioned name; the magic carries the same ordinal.
-RT_NAME  = "GPC.RT.%03d.BIN" % RT_ABI
+# The magic carries the ABI ordinal; the FILE NAME carries the engine build number, and is read
+# from the same stamp rtname.py and bootstrap.asm use -- NOT pinned here, because it changes on
+# every engine build and a literal would fail on every build rather than only on a real ABI move.
+sys.path.insert(0, os.path.join(ROOT, "source", "runtime", "scripts"))
+from rtname import rt_filename                                          # noqa: E402
+
+RT_NAME  = rt_filename()
 RT_MAGIC = b"GPC%d" % RT_ABI
 
 # Files this test creates in testing/ (the emulator's drive). All prefixed RT_ and cleaned up.

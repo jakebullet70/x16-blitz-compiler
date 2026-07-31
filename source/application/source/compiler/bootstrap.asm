@@ -138,24 +138,38 @@ BBTryLoad:
 		jmp 	X16_LOAD 					; its carry is our carry
 
 		;
-		;		Both the magic and the file name carry the ABI ordinal, and both are built from
-		;		RT_ABI (common.inc) rather than spelled out, so this copy cannot drift from the
-		;		runtime's own (runtime/source/main/00rt.header).
+		;		TWO different numbers here, deliberately, because they answer two questions:
 		;
-		.cerror RT_ABI > 9, "RT_ABI > 9: magic byte 4 and the name's 3rd digit are single digits - widen both"
+		;		  the MAGIC carries RT_ABI -- "is a runtime already resident, and is it one I can
+		;		  enter?" That is an ABI-compatibility question, so it moves only when the layout
+		;		  or entry contract changes, and a resident runtime from any build of the same ABI
+		;		  is safely reused.
+		;
+		;		  the FILE NAME carries the engine's BUILD number -- "which runtime file is mine?"
+		;		  That pins a compiled program to the exact runtime it was built against.
+		;
+		;		Both come from a single definition (RT_ABI in common.inc, BuildNumber generated
+		;		into version.asm by bumpbuild.py) rather than being spelled out here, so this copy
+		;		cannot drift from the runtime's own or from what rtname.py builds.
+		;
+		;		NOTE the build number bumps on EVERY engine build, so the name changes every
+		;		build: a program compiled against build N wants GPC.RT.<N>.BIN specifically and
+		;		will ?RT against a later one. That is the point -- exact pairing -- but it does
+		;		mean shared programs must be recompiled whenever the engine is rebuilt.
+		;
+		.cerror RT_ABI > 9, "RT_ABI > 9: the magic's 4th byte is a single ASCII digit - widen it here and in 00rt.header"
 BBMagic:
 		.text 	"GPC"						; magic, matched against RTBASE..RTBASE+2
 		.byte 	RT_ABI + '0' 				; ABI ordinal, matched against RTBASE+3
 		;
 		;		One string, two names: the root form is the local form with a "/" in front, so the
-		;		fallback costs a single byte rather than a second copy of the name.
+		;		fallback costs a single byte rather than a second copy of the name. The name is
+		;		formatted, not spelled out, so a build number of any width still comes out right.
 		;
 BBNameRoot:
 		.text 	"/"
 BBName:
-		.text 	"GPC.RT.00"
-		.byte 	RT_ABI + '0'
-		.text 	".BIN"
+		.text 	format("GPC.RT.%03d.BIN", BuildNumber)
 BBNameEnd:
 BBErrText:
 		.text 	"?RT", 13, 0 				; brief -- a full line would wrap in 40 columns

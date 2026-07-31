@@ -2,52 +2,60 @@
 # *******************************************************************************************
 #
 #		Name : 		rtname.py
-#		Purpose :	Install the built resident runtime under its ABI-versioned name.
+#		Purpose :	Install the built resident runtime under its build-numbered name.
 #		Date :		31st July 2026
 #
 # *******************************************************************************************
 # *******************************************************************************************
 #
-#		The standalone runtime ships as GPC.RT.nnn.BIN, where nnn is the ABI ordinal RT_ABI.
-#		RT_ABI is defined once, in common-source/source/common.inc, and read back here rather
-#		than repeated in the makefile -- three things have to agree on that number (the magic
-#		at RTBASE, the name the runtime is BUILT as, and the name a compiled program LOOKS
-#		FOR), and a copy in a makefile is the one the assembler could never catch drifting.
+#		The standalone runtime ships as GPC.RT.nnn.BIN, where nnn is the ENGINE BUILD NUMBER --
+#		the last component of source/application/buildnum.txt, the same stamp GPC.BLITZ.BIN
+#		prints. That pins a compiled program to the exact runtime it was built against:
+#		bootstrap.asm formats the identical number into the name it looks for (via BuildNumber
+#		in the generated version.asm), so the two cannot disagree unless the runtime is built
+#		from a different stamp than the engine.
 #
-#		Usage:	rtname.py <built.prg> <dest-dir>	copy, named from RT_ABI
+#		ORDER MATTERS. The build number bumps on every "make libs", so build the engine FIRST
+#		and the runtime after -- which is what release.sh and source/gpc's release target do.
+#		Building gpc-rt against a stamp the engine was not built from produces a runtime no
+#		compiled program asks for.
+#
+#		This is NOT the ABI ordinal. RT_ABI (common.inc) still carries that, in the 4-byte
+#		magic at RTBASE, and answers the different question of whether an already-resident
+#		runtime can be entered.
+#
+#		Usage:	rtname.py <built.prg> <dest-dir>	copy, named from the build number
 #				rtname.py --name					print just the file name
 #
 # *******************************************************************************************
 
 import os
-import re
 import shutil
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-INC = os.path.normpath(os.path.join(HERE, "..", "..", "common-source", "source", "common.inc"))
+STAMP = os.path.normpath(os.path.join(HERE, "..", "..", "application", "buildnum.txt"))
 
 
-def rt_abi():
-	"""Pull RT_ABI out of common.inc. Deliberately strict: a silent default here would
-	   build a runtime under a name no program looks for."""
+def build_number():
+	"""Last component of buildnum.txt, as a number. Deliberately strict: a silent default
+	   here would build a runtime under a name no compiled program looks for."""
 	try:
-		with open(INC) as f:
-			text = f.read()
+		with open(STAMP) as f:
+			version = f.read().strip()
 	except OSError as e:
-		sys.exit("rtname.py: cannot read %s (%s)" % (INC, e))
+		sys.exit("rtname.py: cannot read %s (%s)" % (STAMP, e))
 
-	m = re.search(r"^\s*RT_ABI\s*=\s*(\d+)", text, re.MULTILINE)
-	if not m:
-		sys.exit("rtname.py: no 'RT_ABI = <n>' line in %s" % INC)
-	value = int(m.group(1))
-	if value > 999:
-		sys.exit("rtname.py: RT_ABI = %d does not fit the three digits of GPC.RT.nnn.BIN" % value)
-	return value
+	last = version.split(".")[-1]
+	if not last.isdigit():
+		sys.exit('rtname.py: buildnum.txt = "%s": last component is not a number' % version)
+	return int(last)
 
 
 def rt_filename():
-	return "GPC.RT.%03d.BIN" % rt_abi()
+	#	%03d, so 112 -> "112" and a small number still reads as GPC.RT.007.BIN. Wider
+	#	build numbers simply make a wider name; bootstrap.asm formats it the same way.
+	return "GPC.RT.%03d.BIN" % build_number()
 
 
 def main():
@@ -68,6 +76,6 @@ def main():
 
 
 #	Guarded so release.sh can import rt_filename() instead of hard-coding the name a
-#	fourth time -- the whole point of RT_ABI is that nothing spells the number out.
+#	fourth time -- the whole point is that nothing spells the number out.
 if __name__ == "__main__":
 	main()
