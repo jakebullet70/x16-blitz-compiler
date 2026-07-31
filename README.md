@@ -13,8 +13,46 @@ Forked from Paul Robson's original: <https://github.com/paulscottrobson/blitz-co
 
 ## Compiling a program
 
-The compiler engine is **`GPC.BLITZ.BIN`**. It reads its job from a control file, **`GPC.INPUT`**,
-of up to four text lines:
+### Run `GPC.PRG`
+
+`GPC.PRG` is the front end, and it is all you need. Put it on the drive beside the engine
+`GPC.BLITZ.BIN`, load it, and answer four questions:
+
+```text
+LOAD "GPC.PRG",8 : RUN
+
+GPC... A BLITZ INSPIRED X16 COMPILER
+           V0.9 - SUMMER 2026
+
+INPUT  FILE: DIR.PRG
+OUTPUT FILE:
+MAKE A DEBUG MAP? YES
+SHARED RUNTIME? NO
+```
+
+| Prompt | A bare RETURN means |
+| --- | --- |
+| `INPUT  FILE:` | **quit** (`BYE, EXITING`) — the one prompt where RETURN backs out |
+| `OUTPUT FILE:` | `C.` + the source name, so `DIR.PRG` → `C.DIR.PRG` |
+| `MAKE A DEBUG MAP?` | no. `Y` names the map `M.` + source (`M.DIR.PRG`) — see [below](#the-debug-map-line-3) |
+| `SHARED RUNTIME?` | no, the default self-contained build. `Y` selects the [shared runtime](#the-shared-runtime-line-4--shared) |
+
+Both yes/no prompts take `Y` or `N` in either case. The source must already exist — a name that is
+not on the drive stops with `INPUT FILE NOT FOUND` before anything is written or deleted.
+
+It then scratches last time's object and map (CMDR-DOS will not overwrite a file, so a leftover
+object would fail the save), writes your answers to `GPC.INPUT`, and chain-loads the engine, which
+prints its own version and compiles.
+
+On success `C.DIR.PRG` is a standalone program you can `LOAD"C.DIR.PRG"` / `RUN`. `LIST` it and it
+identifies itself — the BASIC stub reads `SYS 2069 : REM GPC!`. On failure the compiler prints the
+error and the offending line, e.g. `SYNTAX ERROR @ 610` or `NOT IMPLEMENTED @ 2400`.
+
+### Scripted — write `GPC.INPUT` yourself
+
+Writing that control file is the *only* thing `GPC.PRG` does. The engine **`GPC.BLITZ.BIN`** takes
+its whole job from **`GPC.INPUT`** and asks nothing, so writing the file directly is what lets one
+program drive another — it is how this repo's own test harness compiles. Up to four text lines:
 
 | Line | Contents | |
 | --- | --- | --- |
@@ -23,6 +61,15 @@ of up to four text lines:
 | 3 | a debug map to write (see below), or empty for none | optional |
 | 4 | the compile **mode** — `shared` (first byte `S`) selects the shared runtime; empty/anything else = the default self-contained build | optional |
 
+```text
+DIR.PRG
+C.DIR.PRG
+M.DIR.PRG
+shared
+```
+
+Then run the engine — it carries its own BASIC stub, so `LOAD"GPC.BLITZ.BIN",8 : RUN` is enough.
+
 A line ends at a CR, an LF, or any control byte, and blank lines are skipped — so a `GPC.INPUT`
 typed on a CRLF host drives the X16 compiler unchanged. An empty line 3 (no map) still holds its
 slot, so line 4 is read as the mode either way. Names may be lowercase; the compiler folds
@@ -30,18 +77,10 @@ them to the uppercase PETSCII the KERNAL wants in a filename. With the source or
 the compiler prints `NO GPC.INPUT FILE` and stops, rather than guess at what to build. Line 4 is
 optional and is not checked — omit it for the default build.
 
-### Driving it — two ways
-
-**Interactively, with `GPC.PRG`.** The front end asks the questions — input file, output file, map,
-and **shared runtime?** — writes `GPC.INPUT`, and chain-loads the engine. A bare RETURN at the output
-prompt names the object `C.` + source (`DIR.PRG` → `C.DIR.PRG`); answer the map question and the map
-is named `M.` + source. Answer *yes* to "shared runtime?" and it writes `shared` as line 4:
-
-**Scripted, by writing `GPC.INPUT` yourself** and running the engine directly — this is what lets
-one program drive another:
-
-On success `OBJECT.PRG` is a standalone program you can `LOAD"OBJECT.PRG"` / `RUN`. `LIST` it and it
-identifies itself — the BASIC stub reads `SYS 2069 : REM GPC!`. On failure the compiler prints the error and the offending line, e.g. `SYNTAX ERROR @ 610` or `NOT IMPLEMENTED @ 2400`.
+**Delete a previous object and map yourself.** The engine opens the object with `,S,W` and no `@:`
+overwrite prefix, and CMDR-DOS refuses to overwrite — so a leftover file from the last run fails the
+save. `GPC.PRG` scratches them for you; driving the engine directly, you have to do it yourself —
+`OPEN15,8,15,"S:C.DIR.PRG"` on the X16, or an ordinary file delete if you are scripting an emulator.
 
 ### The debug map (line 3)
 
