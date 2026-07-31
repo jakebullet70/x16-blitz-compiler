@@ -220,6 +220,46 @@ committing.
 
 ## Bugs
 
+### `AND`/`OR` leaked the top half of an out-of-range operand — FIXED
+
+`AND` and `OR` are 16-bit operations here, as they are in stock — but `AndOrCommon` reached
+`GetInteger16Bit` directly, and that only ever touches `Mantissa0/1`. `Mantissa2/3` kept the top half
+of the left operand and rode straight through into the result:
+
+| | GPC (was) | as hex | truth |
+| --- | --- | --- | --- |
+| `4294967295 AND 0` | `4294901760` | `$FFFF0000` | `0` |
+| `2147483647 AND 0` | `2147418112` | `$7FFF0000` | `0` |
+| `70000 AND -1` | `70000` | `$00011170` | `70000` is out of range |
+| `65535 AND 0` | `0` | `$00000000` | correct, by luck — nothing above 16 bits |
+
+**Stock does not compute a wrong answer here, it refuses.** Measured against R49: an operand outside
+`-32768..32767` raises `?ILLEGAL QUANTITY ERROR`, so masking the high bytes off would have been the
+wrong repair. `AndOrGet16` now truncates to an integer and range checks before converting, raising
+`OUT OF RANGE` (GPC's spelling of the same refusal — what `MID$` and `SQR` already raise). The check
+must happen on the **magnitude, before the two's complement conversion**: afterwards `-32768` and
+`-40000` both leave a high byte with bit 7 set and cannot be told apart.
+
+Verified case by case against stock — every value stock accepts, GPC accepts with the same result;
+every value stock rejects, GPC now rejects:
+
+| | stock R49 | GPC |
+| --- | --- | --- |
+| `32767 AND -1` | `32767` | `32767` |
+| `-32768 AND -1` | `-32768` | `-32768` |
+| `3.7 AND -1` | `3` | `3` |
+| `32768 AND -1` | `?ILLEGAL QUANTITY` | `OUT OF RANGE` |
+| `65535 AND -1` | `?ILLEGAL QUANTITY` | `OUT OF RANGE` |
+| `65536 AND -1` | `?ILLEGAL QUANTITY` | `OUT OF RANGE` |
+| `-32769 AND -1` | `?ILLEGAL QUANTITY` | `OUT OF RANGE` |
+| `70000 AND -1` | `?ILLEGAL QUANTITY` | `OUT OF RANGE` |
+| `-1 OR 32768` | `?ILLEGAL QUANTITY` | `OUT OF RANGE` |
+
+**Why no suite caught it, and why MD5 did not.** `testing/MD5` needs 32-bit bitwise ops and gets them
+by splitting every value into 16-bit halves — `FNUW(FNSW(XH) AND FNSW(YH))` at line 3320 — so it
+never hands `AND` anything above 16 bits and never touched the broken path. That is worth remembering
+before assuming MD5's green tick covers the bitwise operators: it covers exactly the 16-bit case.
+
 ### `FOR I%` compiled and then ran wrong — FIXED by rejecting it, as stock does
 
 `FOR` with an integer index compiled here and silently produced wrong values:
@@ -510,20 +550,34 @@ stopped that working, and both are now fixed:
 The arithmetic was **fine all along**, which is why (2) went unnoticed for so long: the values were
 right, only `PRINT` lied about them.
 
-### The one that is left: the float ops truncate, and truncation is biased
+### The float ops truncated, and truncation is biased — FIXED, re-measured 2026-07-31
 
-`PRINT 1E15` gives `9.99999999E+14`, where stock BASIC gives `1E+15`. Everything else matches stock
-exactly — `3E+09`, `2.19667941E+09`, `2.14748365E+09`, `5E+09`, `1E+10`. The drift only shows on large
-powers of ten, and it **grows with the exponent**, which is the tell:
+**The drift below is gone.** Re-measured against stock R49 after both rounding fixes landed, every
+literal in the table now prints exactly as stock does:
 
-| literal | Blitz | stock |
-|---|---|---|
-| `1E15` | `9.99999999E+14` | `1E+15` |
-| `1E20` | `9.99999998E+19` | `1E+20` |
-| `1E30` | `9.99999997E+29` | `1E+30` |
-| `1E38` | `9.99999996E+37` | `1E+38` |
+| literal | Blitz (was) | Blitz (now) | stock |
+|---|---|---|---|
+| `1E15` | `9.99999999E+14` | `1E+15` | `1E+15` |
+| `1E20` | `9.99999998E+19` | `1E+20` | `1E+20` |
+| `1E30` | `9.99999997E+29` | `1E+30` | `1E+30` |
+| `1E38` | `9.99999996E+37` | `1E+38` | `1E+38` |
 
-This is **not** a printer bug. `FloatMultiplyShort` and `Int32ShiftDivide` both **truncate** — they
+The controls (`3E+09`, `1E+10`, `2.19667941E+09`, `SQR(2)`, `1/3`, `.5`, `-.5`) still match too. What
+follows is the original diagnosis, kept because it explains *why* the two rounding fixes below were
+the right ones — not because any of it is still outstanding.
+
+Three genuine divergences remain, and they are **not** this drift:
+
+- **`LOG(1)` gives `3.2277181E-10`, stock gives `0`.** A logarithm of exactly 1 must be exactly 0;
+  this is the polynomial, not the rounding. The most concrete of the three.
+- **`EXP(2)` gives `7.38905609`, stock `7.3890561`** (true value `7.389056099`) — one in the 9th
+  significant digit, again polynomial accuracy.
+- **`999999999.4` prints `999999999`, stock prints `1E+09`.** Stock's 40-bit format cannot hold the
+  `.4`, rounds up to `1000000000`, and switches to E notation past 9 digits; we hold it and print the
+  correctly-rounded 9 digits. Ours is the more accurate answer, so this belongs with the deliberate
+  "integers below 2^31 print in full" deviation rather than with the bugs.
+
+The original diagnosis follows. This was **not** a printer bug. `FloatMultiplyShort` and `Int32ShiftDivide` both **truncate** — they
 never round to nearest — so every operation lands slightly LOW, and because the error always points
 the same way it accumulates instead of cancelling. `FloatScalePower10` applies a power of ten a
 tableful (10^9) at a time, so `1E38` is four chained multiplies and comes out about four ulp light.
@@ -709,7 +763,7 @@ Measured while building `samples/shared-vars/`, worth keeping:
   worth chasing: can an array descriptor be made to survive the chain like a scalar does?
 - **Both programs must first-touch the shared variables in the same order** — the compiler assigns
   addresses by first appearance, so a differing order silently misaligns them.
-- SHARED-mode compiled programs are tiny (~0.5K each here) because they share one `GPC.RT.BIN` (~11K).
+- SHARED-mode compiled programs are tiny (~0.5K each here) because they share one `GPC.RT.nnn.BIN` (~11K).
 
 ### Shared-runtime, THREE programs sharing variables — TODO
 
