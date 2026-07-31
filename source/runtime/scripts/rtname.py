@@ -67,4 +67,7 @@ def main():
 	print("runtime installed as %s" % rt_filename())
 
 
-main()
+#	Guarded so release.sh can import rt_filename() instead of hard-coding the name a
+#	fourth time -- the whole point of RT_ABI is that nothing spells the number out.
+if __name__ == "__main__":
+	main()

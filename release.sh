@@ -9,8 +9,8 @@
 #  The full build runs:
 #     make libs                        the libraries + the compiler engine GPC.BLITZ.BIN
 #     make release                     stage the engine + samples into testing/
-#     make -C source/runtime gpc-rt    the shared runtime GPC.RT.BIN (into testing/)
-#     make -C source/gpc release       GPC.PRG + the GPC.ERR helper, tokenised via BASLOAD
+#     make -C source/runtime gpc-rt    the shared runtime GPC.RT.nnn.BIN (into testing/)
+#     make -C source/gpc release       GPC.PRG + GPC.ERR (tokenised, then compiled SHARED)
 #
 #  The zip lands in release/ -- the release drop folder, kept apart from the daily testing/
 #  build cycle -- named gpc-release-<n>.zip (n = the engine build number, last part of
@@ -25,9 +25,9 @@ if [ "$1" != "zip" ]; then
     make libs
     echo "== make release =="
     make release
-    echo "== make -C source/runtime gpc-rt  (GPC.RT.BIN shared runtime) =="
+    echo "== make -C source/runtime gpc-rt  (GPC.RT.nnn.BIN shared runtime) =="
     make -C source/runtime gpc-rt
-    echo "== make -C source/gpc release  (GPC.PRG + GPC.ERR, tokenised via BASLOAD) =="
+    echo "== make -C source/gpc release  (GPC.PRG + GPC.ERR, tokenised and compiled) =="
     make -C source/gpc release
 fi
 
@@ -35,7 +35,7 @@ echo "== packaging release zip =="
 # zip(1) is not on a stock Windows box, so package through Python's stdlib -- the
 # same reason the rest of this tree's zipping goes through Python (see mkzip history).
 python - <<'PY'
-import os, zipfile
+import os, sys, zipfile
 
 root    = os.getcwd()
 testing = os.path.join(root, "testing")
@@ -69,13 +69,21 @@ out = os.path.join(release_dir, "gpc-release-%s.zip" % num)
 # Everything else in testing/ (samples like DIR.BASL, compiled demos, scratch) is left out.
 #   GPC.PRG        the front end you launch on the X16
 #   GPC.BLITZ.BIN  the compiler engine GPC.PRG chain-loads
-#   GPC.RT.BIN     the shared runtime, loaded once in "shared" compile mode
-#   GPC.ERR.PRG    the error-address-to-line helper (companion tool)
+#   GPC.RT.nnn.BIN the shared runtime, loaded once in "shared" compile mode. nnn is its ABI
+#                  ordinal, read from RT_ABI rather than spelled out -- a hard-coded name here
+#                  is exactly what broke this script when the runtime was first versioned.
+#   C.GPC.ERR.PRG  the error-address-to-line helper, compiled against the shared runtime
+#   GPC.ERR.PRG    the same helper, interpreted -- the one that still works when the runtime
+#                  is absent or a different ABI, which may be what you are diagnosing
 #   SRC/*.BASL     the BASLOAD sources (NOT needed to run; see SRC/README.TXT)
 # GPC.INPUT (the control-file template) is deliberately NOT shipped: GPC.PRG drives
 # the compile interactively, and the file is per-user state (git-ignored in testing/).
-RUNTIME = ("GPC.PRG", "GPC.BLITZ.BIN", "GPC.RT.BIN")
-TOOLS   = ("GPC.ERR.PRG",)                 # companion tools -- also shipped at the root
+# The runtime's file name carries its ABI ordinal; import the one definition of it.
+sys.path.insert(0, os.path.join(root, "source", "runtime", "scripts"))
+from rtname import rt_filename                      # noqa: E402
+
+RUNTIME = ("GPC.PRG", "GPC.BLITZ.BIN", rt_filename())
+TOOLS   = ("C.GPC.ERR.PRG", "GPC.ERR.PRG")  # companion tools -- also shipped at the root
 SRCBASL = ("GPC.BASL", "GPC.ERR.BASL")     # ALL BASLOAD source -- goes under SRC/
 DOCS    = ("README.md", "LICENSE")
 
