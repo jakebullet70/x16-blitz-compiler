@@ -566,10 +566,23 @@ The controls (`3E+09`, `1E+10`, `2.19667941E+09`, `SQR(2)`, `1/3`, `.5`, `-.5`) 
 follows is the original diagnosis, kept because it explains *why* the two rounding fixes below were
 the right ones — not because any of it is still outstanding.
 
-Three genuine divergences remain, and they are **not** this drift:
+Of the three divergences that remained after it, one is fixed and two are left:
 
-- **`LOG(1)` gives `3.2277181E-10`, stock gives `0`.** A logarithm of exactly 1 must be exactly 0;
-  this is the polynomial, not the rounding. The most concrete of the three.
+- **`LOG(1)` gave `3.2277181E-10` where stock gives `0` — FIXED.** `FloatLogarithm` computes
+  `log(f) + k*log(2)`; at exactly 1 those are `-log(2)` and `+log(2)`, so the answer is the
+  difference of two nearly equal numbers and is only as exact as the polynomial is at the very END
+  of its fitted interval (`f = 0.5, k = 1`). It was not. Every other logarithm measured already
+  agreed with stock, so `log.asm` special-cases the single value rather than disturbing the
+  polynomial: normalised, 1.0 is the only value with mantissa `$80000000` and exponent `-31`, so
+  the test is an exact identity. **Deliberately not `FloatCompare`** — that ignores the low 12 bits
+  of the difference ("almost equal", ~1 part in 500,000), so it would also swallow everything just
+  either side of 1 and return 0 for logarithms that are genuinely non-zero. Verified: `LOG(1)` is
+  now `0`, `LOG(2)`/`LOG(10)`/`LOG(.5)`/`LOG(100)`/`LOG(1000)` still match stock exactly, and
+  `LOG(1.0001)`, `LOG(.9999)`, `LOG(1.000001)` still return non-zero.
+
+  Logs *near* 1 differ from stock in the last digits either way (`LOG(1.000001)`: stock
+  `1.00043122E-06`, ours `9.9930152E-07`, true `9.99999E-07` — ours is marginally closer). That is
+  inherent cancellation in `log(1+e)`, present in both implementations, and untouched by the fix.
 - **`EXP(2)` gives `7.38905609`, stock `7.3890561`** (true value `7.389056099`) — one in the 9th
   significant digit, again polynomial accuracy.
 - **`999999999.4` prints `999999999`, stock prints `1E+09`.** Stock's 40-bit format cannot hold the

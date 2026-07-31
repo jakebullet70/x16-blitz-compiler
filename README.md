@@ -60,6 +60,39 @@ To place one, find the largest offset in the map that is `<=` the reported value
 To get a tokenised `SOURCE.PRG` from a text listing without a running X16, use the host
 tokeniser (`bin/tokenise.zip`, stdlib Python) — the test harness does exactly this.
 
+### GPC.ERR — turning `@ $XXXX` back into a line number
+
+Doing that lookup by hand gets old, so the release ships a helper that does it on the X16. Run it,
+give it the map file, then paste the whole error line — it accepts `DIVIDE BY ZERO @ $0030`, or just
+`$0030`, or `0030`:
+
+```text
+LOAD "C.GPC.ERR.PRG",8 : RUN
+MAP FILE (E.G. M.MYPROG): M.SOURCE
+ERROR ADDRESS: DIVIDE BY ZERO @ $0030
+$0030 IS ON BASIC LINE 12
+```
+
+It distinguishes an exact hit (`IS ON BASIC LINE 12`, the address is a line's first byte) from a
+landing inside a line (`IS ON/NEAR BASIC LINE 12`), and it recognises the two synthetic entries —
+an address in the implicit-`DIM` prologue reports `IS IN COMPILER SETUP CODE, NOT A LINE` rather
+than blaming the nearest real line, and an address below the first entry reports `IS BEFORE THE
+FIRST MAPPED LINE`. A bare RETURN at either prompt quits.
+
+Two copies ship, and which you want depends on what has gone wrong:
+
+| | |
+| --- | --- |
+| `C.GPC.ERR.PRG` | compiled, `shared` mode — needs the runtime beside it or at the card root |
+| `GPC.ERR.PRG` | interpreted — slower, but works with no runtime present at all |
+
+Reach for the interpreted one when the runtime is missing or is a different ABI, since that may be
+the very thing you are diagnosing. Both are built from the same `GPC.ERR.BASL`, shipped under `SRC/`.
+
+**A runtime address is a p-code offset, not a line number, and the two look alike.** A compile-time
+error already names its line in decimal (`SYNTAX ERROR @ 120` — that *is* line 120, and GPC.ERR is
+the wrong tool for it). Only the `$` hex form needs decoding.
+
 ### The shared runtime (line 4 = `shared`)
 
 By default every object is **self-contained**: the ~11 KB runtime is copied in ahead of the

@@ -740,6 +740,39 @@ FloatLogarithm:
 		beq 	_ULRange
 		jsr 	FloatNormalise 				; put into FP mode.
 
+		;
+		;		LOG(1) has to be EXACTLY 0, and the general path below cannot deliver that. It
+		;		computes log(f) + k*log(2); for x=1 those are -log(2) and +log(2), so the answer
+		;		is the difference of two nearly equal numbers and comes out only as exactly as
+		;		the polynomial is exact at the very END of its fitted interval (f = 0.5, k = 1).
+		;		It was not: LOG(1) returned 3.2277181E-10 where stock X16 BASIC gives 0. Every
+		;		other logarithm measured against stock already agreed, so special-case the one
+		;		value rather than disturb the polynomial.
+		;
+		;		Normalised, the mantissa sits in [2^31,2^32), so 1.0 is the ONLY value with
+		;		mantissa $80000000 and exponent -31 -- this is an exact identity test.
+		;
+		;		Deliberately NOT FloatCompare: that ignores the low 12 bits of the difference
+		;		(compare.asm calls it "almost equal", 1 part in ~500,000), so it would also
+		;		swallow everything just either side of 1 and return 0 for logarithms that are
+		;		genuinely non-zero -- trading a wrong answer at one point for wrong answers
+		;		across a whole neighbourhood.
+		;
+		lda 	NSMantissa0,x
+		ora 	NSMantissa1,x
+		ora 	NSMantissa2,x
+		bne 	_ULNotOne
+		lda 	NSMantissa3,x
+		cmp 	#$80
+		bne 	_ULNotOne
+		lda 	NSExponent,x
+		cmp 	#(-31) & $FF
+		bne 	_ULNotOne
+		jsr 	FloatSetZero 				; LOG(1) = 0, exactly. Clears the sign too.
+		clc
+		rts
+_ULNotOne:
+
 		lda 	NSExponent,x 				; get power
 		pha
 
