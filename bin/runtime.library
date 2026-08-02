@@ -562,6 +562,13 @@ StartRuntime:
 		sec
 		sbc 	#FrameStackPages
 		sta 	stackFloorHigh
+		;
+		;		Same argument for the stack pointer itself, and for the same reason it is here and
+		;		not in ClearMemory: a chained program must start with an EMPTY stack of its OWN.
+		;		The chain carries variables, never frames -- it re-enters through the ROM's RUN, so
+		;		the loader's frames are gone whatever this says. See ResetRuntimeStack in clr.asm.
+		;
+		jsr 	ResetRuntimeStack
 
 		tsx 								; save the stack.
 		stx 	Runtime6502SP 
@@ -770,6 +777,8 @@ breakCount: 								; counter so don't check break every instruction.
 ;
 ;		Date			Notes
 ;		==== 			=====
+;		02/08/26		Reset runtimeStackPtr on both paths, chain included; ClearMemory is skipped
+;						on a chain and took the stack reset with it.
 ;
 ; ************************************************************************************************
 ; ************************************************************************************************
@@ -1552,16 +1561,41 @@ _ClearLoop1:
 		;
 		;		Initialise stack space.
 		;
-		lda 	storeStartHigh 							; stack at end of start memory.
-		dec 	a
+		jsr 	ResetRuntimeStack
+		ply
+		rts
+
+; ************************************************************************************************
+;
+;					Put the FOR/GOSUB stack back at the top of its gap, empty
+;
+; ************************************************************************************************
+;
+;		Two callers, and the second one is the point of factoring this out.
+;
+;		ClearMemory does it because CLR is meant to throw the call stack away. But ClearMemory is
+;		SKIPPED on a LOAD chain -- deliberately, so the loaded program inherits the variables --
+;		and this went with it, so a chained program ran on the LOADER's stack pointer.
+;
+;		A chain cannot carry a call stack. The new program is entered through the ROM's RUN and
+;		starts at its first line, so every frame the loader had is meaningless. Worse, the pointer
+;		is derived from the LOADER's storeStartHigh: a small loader chaining to a bigger program
+;		leaves it pointing inside the new program's OBJECT CODE, and each GOSUB wrote a frame over
+;		it. That was silent until the frame-stack floor guard landed in build 114, which turned it
+;		into an immediate OUT OF MEMORY on the first GOSUB -- louder, but still wrong.
+;
+;		StartRuntime therefore calls this on BOTH paths, before the chain test.
+;
+; ************************************************************************************************
+
+ResetRuntimeStack:
+		lda 	storeStartHigh 							; the stack sits just below the workspace
+		dec 	a 										; and grows DOWN through the frame-stack gap
 		sta 	runtimeStackPtr+1
 		lda 	#$FF
 		sta 	runtimeStackPtr
-
-		lda 	#$FF 									; duff marker in case we try to remove it.
-		sta 	(runtimeStackPtr)
-		ply
-		rts
+		sta 	(runtimeStackPtr) 						; A is still $FF -- the duff marker that stops
+		rts 									 		; StackFindFrame walking off an empty stack
 
 		.send 	code
 		
@@ -1573,6 +1607,9 @@ _ClearLoop1:
 ;
 ;		Date			Notes
 ;		==== 			=====
+;		02/08/26		Stack reset factored out as ResetRuntimeStack, so StartRuntime can do it on
+;						the LOAD-chain path too -- a chained program was running on the loader's
+;						stack pointer.
 ;		02/08/26		String ceiling moved to the top of the workspace; it was a quarter down,
 ;						reserving space for a stack that lives below the workspace instead.
 ;

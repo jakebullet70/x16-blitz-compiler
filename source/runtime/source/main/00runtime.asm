@@ -50,6 +50,13 @@ StartRuntime:
 		sec
 		sbc 	#FrameStackPages
 		sta 	stackFloorHigh
+		;
+		;		Same argument for the stack pointer itself, and for the same reason it is here and
+		;		not in ClearMemory: a chained program must start with an EMPTY stack of its OWN.
+		;		The chain carries variables, never frames -- it re-enters through the ROM's RUN, so
+		;		the loader's frames are gone whatever this says. See ResetRuntimeStack in clr.asm.
+		;
+		jsr 	ResetRuntimeStack
 
 		tsx 								; save the stack.
 		stx 	Runtime6502SP 
@@ -258,5 +265,7 @@ breakCount: 								; counter so don't check break every instruction.
 ;
 ;		Date			Notes
 ;		==== 			=====
+;		02/08/26		Reset runtimeStackPtr on both paths, chain included; ClearMemory is skipped
+;						on a chain and took the stack reset with it.
 ;
 ; ************************************************************************************************
