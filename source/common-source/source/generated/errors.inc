@@ -55,3 +55,6 @@ error_channel .macro
 error_break .macro
 	jmp	ErrorV_break
 	.endm
+error_toobig .macro
+	jmp	ErrorV_toobig
+	.endm

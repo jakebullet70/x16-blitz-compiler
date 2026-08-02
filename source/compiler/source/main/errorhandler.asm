@@ -18,6 +18,16 @@ CompilerErrorHandler:
 		sta 	zTemp0
 		sty 	zTemp0+1
 		;
+		;		Belt and braces for the banked work tables: an error raised from inside a storage
+		;		window would otherwise leave the compiler's RAM bank selected, and everything from
+		;		here on -- PrintCharacter, ExitCompiler, the caller -- expects the caller's. Every
+		;		window closes itself on its own escape path, so this should never be the thing
+		;		that saves us; it costs six bytes to stop being one bug away from a very confusing
+		;		one. Zero before any window has run, which is the default bank anyway.
+		;
+		lda 	storageSavedBank
+		sta 	CompilerRAMBankReg
+		;
 		;		Defer-to-runtime: while a statement compiles (deferErrors armed) a SYNTAX error
 		;		does not abort -- roll the statement back and let DeferStatementToRuntime drop a
 		;		runtime throw-stub in its place. Identified by the message pointer: ErrorV_syntax's

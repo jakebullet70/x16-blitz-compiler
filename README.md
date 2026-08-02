@@ -132,6 +132,26 @@ re-extract from the zip when you want the fast one back.
 error already names its line in decimal (`SYNTAX ERROR @ 120` — that *is* line 120, and GPC.ERR is
 the wrong tool for it). Only the `$` hex form needs decoding.
 
+### How big a program can it compile?
+
+**About 1,300 BASIC lines.** The limit is on the *p-code*, not the source, and it is a hard number:
+
+| | max p-code |
+| --- | --- |
+| default (self-contained) | **18,432 bytes** |
+| `shared` | **18,176 bytes** |
+
+P-code runs about two thirds the size of the tokenised `.PRG` and averages ~14 bytes per BASIC
+line, so a 27 KB tokenised source is roughly the ceiling. What binds is not the compiler's buffer
+(19,456 bytes) but the *run* side: the object, a 4K FOR/GOSUB frame stack and a 4K minimum
+workspace all have to fit below `$9F00`.
+
+Go over and the compiler stops with **`PROGRAM TOO BIG`**, naming the line the budget ran out on.
+It is worth saying plainly that this used to be silent: past 12,032 bytes the object code grew into
+the compiler's own variable table and every variable reference after that point quietly became a
+*new* variable, so the compile said `OK` and the tail of the program misbehaved. If you have a
+large program that was built with an engine older than build 114, recompile it.
+
 ### The shared runtime (line 4 = `shared`)
 
 By default every object is **self-contained**: the ~11 KB runtime is copied in ahead of the
@@ -143,11 +163,12 @@ The **shared** mode factors that runtime out into a single resident copy. A prog
 line 4 = `shared` (first byte `S`) carries **no embedded runtime**: the compiler streams a 255-byte
 bootstrap at `$0801` followed by the p-code, and the object is just that — bootstrap plus p-code.
 The runtime lives once, on the drive, as a standalone binary **`GPC.RT.<build>.BIN`** that loads at
-`$7000` — `GPC.RT.112.BIN` for engine build 112, the number `GPC.BLITZ.BIN` prints at startup. The
+`$7000` — `GPC.RT.114.BIN` for engine build 114, the number `GPC.BLITZ.BIN` prints at startup. The
 name carries the build, so a compiled program asks for the exact runtime it was built against *by
 name*: one of a different vintage sitting on the card is simply not found, rather than loaded and
 jumped into. **The build number bumps on every engine build, so shared programs must be recompiled
-whenever the engine is** — the pairing is deliberately exact.
+whenever the engine is** — the pairing is deliberately exact. A release ships exactly one runtime,
+the one matching the `GPC.BLITZ.BIN` beside it.
 
 On `RUN`, the bootstrap checks for the magic `GPC2` at `$7000`. That magic is the *ABI* ordinal
 (`RT_ABI` in `common.inc`), not the build number: it answers only "is a runtime resident that I can
@@ -166,8 +187,10 @@ Requirements and limits:
   runtime makefile (`make -C source/runtime gpc-rt`) and ships in `testing/`.
 - Programs mixing shared and self-contained builds are fine; a shared object simply needs the
   resident runtime present when it runs.
-- Very large programs can be rejected with `PROGRAM TOO BIG` (the p-code must leave room for the
-  work area below the runtime); in practice the compiler's general memory ceiling is hit first.
+- Shared mode's ceiling is slightly *lower* than the default build's — 18,176 bytes of p-code
+  against 18,432 — because the p-code and its work area both have to fit below `RTBASE` at
+  `$7000`. Either way the compiler stops with `PROGRAM TOO BIG` rather than overrunning; see
+  [How big a program can it compile?](#how-big-a-program-can-it-compile).
 
 The regression test lives in `source/unit-tests/shared-runtime/` — it compiles a program shared,
 checks the object layout, and proves a cold start (fresh machine loads the runtime), the root
@@ -199,27 +222,40 @@ warm start (runtime already resident, and provably reused rather than reloaded).
 | `bin/` | `x16emu/` (test emulator + ROM) and `box16/` (debugger) |
 | `testing/` | the built compiler, the shared runtime `GPC.RT.<build>.BIN`, and sample programs, ready to run (also the scratch `prg-batch/`/`archive/` test inputs) |
 | `documents/` | build include (`common.make`), notes, and reference PDFs |
+| `docs/` | [`BUILDING.md`](docs/BUILDING.md), the build-and-test walkthrough |
+| `samples/` | complete example programs with their sources and documentation |
 | `x16emu.bat` / `box16.bat` | project-root launchers that boot the emulators with `testing/` as the drive |
 
 ## Runtime footprint
 
 By default every compiled program carries the same support runtime — the P-code VM, all command handlers,
-and the math libraries — copied in ahead of its own code. It measures **~11 KB** (10,956 bytes): `runtime.library`
-7.3K (the VM plus all 158 handlers), `ifloat32` 2.3K, `polynomials` 0.9K, then the error vectors and the
-BASIC stub. (A program can instead **share** one resident copy of this runtime — see
+and the math libraries — copied in ahead of its own code. Measured at build 114 it is **11,775 bytes**
+(`$0801`–`$3600`, then padded to the page boundary at `ObjectBase`):
+
+| Component | Span | Bytes |
+| --- | --- | ---: |
+| `runtime` — the VM plus all the command handlers | `$082D`–`$25DA` | 7,597 |
+| `common` — error vectors, the BASIC stub, shared tables | `$25FB`–`$279F` | 420 |
+| `ifloat32` — 32-bit float and integer math | `$27AD`–`$31EB` | 2,622 |
+| `polynomials` — `SIN`, `COS`, `LOG`, … | `$31F4`–`$3600` | 1,036 |
+
+(A program can instead **share** one resident copy of this runtime — see
 [the shared runtime](#the-shared-runtime-line-4--shared) — so its object is just a bootstrap plus p-code.)
 
+Because that is a fixed cost, small programs are almost all runtime: the sample `DIR.PRG` compiles to
+12,278 bytes of which only **245** are its own p-code.
+
 For comparison, the vintage **C64 Blitz!** runtime (in `demo-c64/`) is roughly **half** ours — its compiled `DIR`
-is 6.2 KB against our 11 KB build of the same program, an estimated ~5.8 KB of runtime. The difference
+is 6.2 KB against our 12.0 KB build of the same program, an estimated ~5.8 KB of runtime. The difference
 is two design choices, not overhead: (Note: Blitz for the Commodore 128 is about the same size as GPC)
 
 - **Our own floating point.** We bundle a 32-bit float + transcendental library (`ifloat32` +
-  `polynomials`, ~3.2K) by design (a 32-bit format, not the ROM's 40-bit); C64 Blitz calls the C64 ROM's
+  `polynomials`, 3.6K) by design (a 32-bit format, not the ROM's 40-bit); C64 Blitz calls the C64 ROM's
 40-bit BASIC floats instead.
 - **X16 hardware.** ~2K of handlers for `SPRITE`, `MOVSPR`, VERA graphics, `TILE`, `MOUSE`, FM/PSG sound,
   `BLOAD`/`BSAVE` — none of which exist as C64 BASIC V2 keywords.
 
-Those two (~5.2K) account for essentially the whole gap. [`TODO.md`](TODO.md#shrinking-the-runtime) covers
+Those two (~5.6K) account for essentially the whole gap. [`TODO.md`](TODO.md#shrinking-the-runtime) covers
 how a program that uses less could ship less.
 
 ## Building
@@ -230,10 +266,30 @@ forces `SHELL := sh` accordingly. Per-machine tool paths go in an untracked
 `documents/local.make`.
 
 ```sh
-make libs        # build the five bin/*.library files and the compiler
-make release     # package testing/ (the compiler + samples)
-make latest      # download & install the matching x16emu + ROM into bin/x16emu/
+./release.sh     # full build, then package release/gpc-release-<n>.zip
 ```
+
+That is the one to use. It runs the four steps in the order that keeps them consistent:
+
+```sh
+make libs                       # the bin/*.library files + the engine GPC.BLITZ.BIN
+                                # (this also BUMPS source/application/buildnum.txt)
+make release                    # stage the engine, GPC.INPUT and the samples into testing/
+make -C source/runtime gpc-rt   # the shared runtime, testing/GPC.RT.<build>.BIN
+make -C source/gpc release      # GPC.PRG, then GPC.ERR re-tokenised and compiled SHARED
+                                # against the runtime just built
+```
+
+Order matters more than it looks: `GPC.ERR` is compiled in shared mode, so it names the runtime it
+was built against *inside itself*. Rebuild the engine without rebuilding `GPC.ERR` and the shipped
+helper goes looking for a `GPC.RT.<old>.BIN` that is no longer there.
+
+`make latest` downloads and installs the matching x16emu + ROM into `bin/x16emu/`.
+
+**[`docs/BUILDING.md`](docs/BUILDING.md) is the full walkthrough** — prerequisites and exact
+Windows tool paths, what each target produces, how to read a test result (the suites do not print
+`PASS`), the memory map, which emulator to use for what, and a troubleshooting table. Start there
+if a build fails.
 
 ## Emulators
 
@@ -251,11 +307,18 @@ playtest `$9F27`-reading programs under x16emu.
 ## Testing
 
 ```sh
-make -C source/unit-tests/compiler-runtime    # randomised compile-and-run regression suites
+export SDL_VIDEODRIVER=dummy                             # headless; otherwise it steals focus
+
+make -C source/ifloat32 run                              # 32-bit float library
+make -C source/polynomials run                           # log/exp/trig
+make -C source/unit-tests/compiler-runtime all           # six randomised compile-and-run suites
+python source/unit-tests/shared-runtime/shared_test.py   # shared mode, cold + root + warm
 ```
 
-A suite **passes when the emulator exits** (the compiled test reaches a `jmp $FFFF`) and
-**fails by looping forever**, so always run under a timeout.
+A suite **passes when the emulator exits** (the compiled test reaches a `jmp $FFFF`, and the
+emulator says so on stdout) and **fails by looping forever**, so always run under a timeout — and
+give the `variables` and `arrays` suites several minutes each before concluding anything, because
+the replay step is not warped. Details in [`docs/BUILDING.md`](docs/BUILDING.md#3-test-it).
 
 ## License
 

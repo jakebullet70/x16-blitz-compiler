@@ -35,6 +35,21 @@ StartRuntime:
 		stx 	storeStartHigh 				; save from-to address.
 		sty 	storeEndHigh
 		stx 	variableStartPage
+		;
+		;		The frame stack grows DOWN from storeStartHigh-1:$FF (clr.asm) into the gap the
+		;		compiler leaves below the workspace for it -- FrameStackPages, spent by object.asm
+		;		in both embedded and shared modes. Nothing policed the bottom of that gap, so a
+		;		runaway recursion carried straight on into the object code, overwrote the program
+		;		and then executed what it had written. Work the floor out once, here.
+		;
+		;		Here and not in ClearMemory: a LOAD chain skips ClearMemory (see below) to keep the
+		;		previous program's variables, but it still arrives through this entry point, and it
+		;		still has a stack that can overflow.
+		;
+		txa
+		sec
+		sbc 	#FrameStackPages
+		sta 	stackFloorHigh
 
 		tsx 								; save the stack.
 		stx 	Runtime6502SP 
@@ -218,8 +233,12 @@ loadChainSig: 								; LOAD arms this before chaining; StartRuntime disarms it
 
 storeStartHigh:								; p-code run space.
 		.fill 	1
-storeEndHigh:		
+storeEndHigh:
 		.fill 	1
+
+stackFloorHigh: 							; lowest page the FOR/GOSUB frame stack may occupy;
+		.fill 	1 							; storeStartHigh - FrameStackPages, tested by
+											; StackOpenFrame (stack/frames.asm)
 
 variableStartPage: 							; variable start high
 		.fill 	1		

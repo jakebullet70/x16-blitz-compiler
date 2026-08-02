@@ -32,9 +32,13 @@ runtimeStackPtr: 							; runtime stack pointer
 
 		.section storage
 
-stringLowMemory:
-		.fill 	2		
-stringHighMemory:
+;
+;		stringLowMemory used to sit here. Nothing ever wrote it -- only fre.asm read it -- so it
+;		was two bytes of permanent zero, and FRE() returned an address instead of a count. The
+;		low end of the free gap is availableMemory (support/allocate.asm); there is no second
+;		copy of it now, deliberately.
+;
+stringHighMemory: 							; string heap ceiling; allocations grow DOWN from here
 		.fill 	2
 
 		.send 	storage

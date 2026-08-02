@@ -54,6 +54,19 @@ RT_ENTRY = RTBASE+4 						; 4-byte magic at RTBASE, then jmp StartRuntime
 PCODE_PAGE = $09 							; shared-mode p-code base page ($0900, page-aligned)
 MIN_WS_PAGES = 16 							; smallest workspace a shared program keeps (4K)
 ;
+;		Pages left free between the end of the object code and the start of the workspace, for
+;		the runtime (FOR/GOSUB) frame stack. clr.asm puts runtimeStackPtr at storeStartHigh-1:$FF
+;		and grows it DOWNWARD, so without a gap here a deep call chain walks back into the code.
+;
+;		BOTH ends need this number and they must agree, which is why it lives here rather than
+;		with either of them. The COMPILER spends it -- object.asm adds it when it works out where
+;		a program's workspace starts, in both embedded and shared modes. The RUNTIME polices it --
+;		StartRuntime turns storeStartHigh minus this into the floor StackOpenFrame refuses to go
+;		below. Change it in one place and a program compiled by the old engine, running under a
+;		new runtime, gets a floor that is not where its gap is.
+;
+FrameStackPages = 16 						; 4K, ~250 frames
+;
 ;		RT_ABI is the runtime's ABI ordinal, and it is the ONE place it is written down. It drives
 ;		the 4-byte magic at RTBASE ("GPC" + the digit), which the bootstrap compares to answer a
 ;		single question: is a runtime already resident, and is it one I can safely enter? So bump

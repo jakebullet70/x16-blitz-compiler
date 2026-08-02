@@ -12,8 +12,13 @@
 
 		.section code
 
-StartWorkSpace = $8000
-EndWorkspace = $9F00
+;
+;		Match the shipping configuration (application/source/compiler/start.asm): the compiler's
+;		two work tables live in BANKED RAM, reached through storage_access/storage_release. Left
+;		at $8000/$9F00 the harness would still pass while exercising a layout nothing ships.
+;
+StartWorkSpace = $A000
+EndWorkspace = $C000
 
 WrapperBoot:	
 		ldx 	#APIDesc & $FF

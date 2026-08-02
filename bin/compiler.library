@@ -161,12 +161,94 @@ keyword .macro
 ;
 ; ************************************************************************************************
 ; ************************************************************************************************
+;
+;		These two macros bracket every access to the compiler's two work tables -- the variable
+;		name list and the line-number table (see storage/reset.asm for the layout). They were
+;		EMPTY, which meant the tables had to live in ordinary low RAM, sharing it with the
+;		object code being emitted. They did, at $8000-$9F00, and the object code grew up into
+;		them: past 12,032 bytes of p-code the head of the variable list was overwritten,
+;		FindVariable then missed on every lookup, and each reference to an existing variable
+;		created a new one. No error -- the compiler printed OK and emitted a program in which
+;		the same name on two lines was two different variables.
+;
+;		Filling them in is what lets the tables move to BANKED RAM at $A000-$BFFF, which both
+;		gives them a window of their own (8K, slightly more than the 7,936 bytes they had) and
+;		hands the whole of $5100-$9EFF back to the object code -- 19,968 bytes instead of 12,032.
+;		See ObjectCeiling / CompilerWorkspaceStart in application/source/compiler/start.asm.
+;
+;		Rules these macros must obey, because of where they are used:
+;
+;		* Preserve A, X, Y AND the flags. STRFindLine (storage/mark_line.asm) opens its window
+;		  as its very first instruction with the line number live in A and Y; FindVariable
+;		  closes one with the variable's address live in A, X and Y; and STRFindLine closes over
+;		  a php/plp pair carrying the found/not-found carry. Hence the php/pha ... pla/plp
+;		  wrapper -- the macros are stack-neutral, so the pha/pla pairs already in that code
+;		  still line up.
+;
+;		* Restore the CALLER's bank, not a hardcoded 0. The compiler is entered from GPC.PRG and
+;		  has no business assuming what was selected.
+;
+;		* Never hold the bank across a KERNAL call. Bank 0 is the KERNAL's (its FAT32 buffers
+;		  live there), so any window that wants to do file I/O has to close first. Every window
+;		  in the tree is a short run of loads and stores with no jsr into the KERNAL --
+;		  WriteMapFile (application/source/compiler/object.asm) is the one that reads the table
+;		  and writes a file, and it already pulls each entry out through zTemp0 BEFORE it starts
+;		  emitting bytes, so the window closes before the first IOWriteByte.
+;
+;		* No nesting. Verified: none of the windows contains another, and the only jsr inside
+;		  any of them is STRFindLine's local _STRPrevLine.
+;
+; ************************************************************************************************
+
+;
+;		$0000 is the X16's RAM bank register (the runtime calls the same address SelectRAMBank;
+;		it is spelled out again here because the compiler library also builds on its own, without
+;		the runtime's includes -- and defining the same name twice would clash when the
+;		application assembles both).
+;
+CompilerRAMBankReg	= $0000
+
+;
+;		RAM BANK ALLOCATION AT COMPILE TIME. Everything below lives at $A000-$BFFF and is told
+;		apart ONLY by this register, so the numbers matter:
+;
+;			0	the KERNAL's (FAT32 buffers and friends). Never ours.
+;			1	the NATIVE TEST HARNESS's p-code buffer. source/compiler/testing/api/api.asm
+;				does "lda #1 / sta 0" in _TAResetOut and then writes the object from $A000 up.
+;			2	these tables.
+;
+;		This was bank 1 for one build, and the compiler-runtime `variables` and `arrays` suites
+;		hung: the harness's object code and the variable name list were overwriting each other,
+;		same addresses, same bank. Nothing detected it -- both were doing exactly what they had
+;		been told. Every X16 has these banks (the 512K minimum is 64 of them). If you add a
+;		third banked user, add it to this list first.
+;
+CompilerStorageBank	= 2
 
 storage_access .macro
+		php
+		pha
+		lda 	CompilerRAMBankReg 			; remember whatever the caller had selected
+		sta 	storageSavedBank
+		lda 	#CompilerStorageBank
+		sta 	CompilerRAMBankReg
+		pla
+		plp
 		.endm
 
 storage_release .macro
+		php
+		pha
+		lda 	storageSavedBank
+		sta 	CompilerRAMBankReg
+		pla
+		plp
 		.endm
+
+		.section storage
+storageSavedBank: 							; caller's RAM bank, saved across a storage window
+		.fill 	1
+		.send 	storage
 
 ; ************************************************************************************************
 ;
@@ -176,6 +258,7 @@ storage_release .macro
 ;
 ;		Date			Notes
 ;		==== 			=====
+;		02/08/26		Implemented (were no-ops); tables moved to banked RAM $A000-$BFFF.
 ;
 ; ************************************************************************************************
 ; ************************************************************************************************
@@ -959,6 +1042,30 @@ PushFloatCommand:
 CreateVariableRecord:
 		pha
 
+		;
+		;		Room for another 6-byte record plus the end marker before we run into the
+		;		line-number table coming the other way? STRMarkLine makes the mirror-image test.
+		;		Neither existed, so the two tables quietly overwrote each other on a big program.
+		;
+		;		X and Y hold the variable NAME here and are read further down, so this may only
+		;		use A -- hence the scratch byte rather than the obvious tay.
+		;
+		clc
+		lda 	variableListEnd
+		adc 	#7
+		sta 	storageScratch
+		lda 	variableListEnd+1
+		adc 	#0
+		cmp 	lineNumberTable+1
+		bcc 	_CVRoom
+		bne 	_CVTooBig
+		lda 	storageScratch
+		cmp 	lineNumberTable
+		bcc 	_CVRoom
+_CVTooBig:
+		.error_toobig
+_CVRoom:
+
 		.storage_access
 
 		lda 	freeVariableMemory 		; push current free address on stack.
@@ -1416,6 +1523,16 @@ CompilerErrorHandler:
 		ply
 		sta 	zTemp0
 		sty 	zTemp0+1
+		;
+		;		Belt and braces for the banked work tables: an error raised from inside a storage
+		;		window would otherwise leave the compiler's RAM bank selected, and everything from
+		;		here on -- PrintCharacter, ExitCompiler, the caller -- expects the caller's. Every
+		;		window closes itself on its own escape path, so this should never be the thing
+		;		that saves us; it costs six bytes to stop being one bug away from a very confusing
+		;		one. Zero before any window has run, which is the default bank anyway.
+		;
+		lda 	storageSavedBank
+		sta 	CompilerRAMBankReg
 		;
 		;		Defer-to-runtime: while a statement compiles (deferErrors armed) a SYNTAX error
 		;		does not abort -- roll the statement back and let DeferStatementToRuntime drop a
@@ -3992,6 +4109,24 @@ STRMarkLine:
 		sta 	lineNumberTable+1
 		sta 	zTemp0+1
 
+		;
+		;		The two tables share one window and grow towards each other -- this one down from
+		;		CompilerWorkspaceEnd, the variable name list up from CompilerWorkspaceStart. They
+		;		used to be free to pass through each other in silence, which corrupts both. Stop
+		;		on the touch. (A is free here: the caller's value is on the stack until the pla
+		;		below, and ExitCompiler restores SP, so raising with it still pushed is fine.)
+		;
+		lda 	lineNumberTable+1
+		cmp 	variableListEnd+1
+		bcc 	_SMLTooBig
+		bne 	_SMLRoom
+		lda 	lineNumberTable
+		cmp 	variableListEnd
+		bcs 	_SMLRoom
+_SMLTooBig:
+		.error_toobig
+_SMLRoom:
+
 		.storage_access
 		pla
 		sta 	(zTemp0) 					; line # save it in +0,+1
@@ -4042,7 +4177,8 @@ _STRNext: 									; next table entry.
 		lda 	(zTemp1),y
 		cmp 	#$FF
 		bne 	_STRSearch
-		.error_internal
+		.storage_release 					; the only escape from inside a storage window -- close
+		.error_internal 					; it, or the error handler runs with the wrong RAM bank
 
 _STRFound:
 		lda 	(zTemp1) 					; set A = 0 if the same, 0 if different.
@@ -4849,7 +4985,16 @@ STRReset:
 
 		.storage_access 					; clear the head of the work area list.
 
-		lda 	variableListEnd
+		;
+		;		This read the LOW byte of variableListEnd (just zeroed two lines above) into the
+		;		HIGH byte of zTemp0, so it wrote its terminator to $0000 -- on the X16 that is the
+		;		RAM BANK register, not the table -- and left the real head at compilerStartHigh:$00
+		;		holding whatever was there. It only ever appeared to work because the head happens
+		;		to be zero on a cold boot; a second compile in the same session inherited the first
+		;		compile's list. FindVariable walks from the head, so a non-zero byte there sends it
+		;		off through garbage records.
+		;
+		lda 	variableListEnd+1
 		sta 	zTemp0+1
 		stz 	zTemp0
 		lda 	#0
@@ -4866,7 +5011,9 @@ lineNumberTable:							; line number table, works down.
 variableListEnd:							; known variables, works up.
 		.fill 	2	
 freeVariableMemory: 						; next free memory slot
-		.fill 	2			
+		.fill 	2
+storageScratch: 							; one byte of working space for the table-collision
+		.fill 	1 							; test in CreateVariableRecord (X and Y are busy there)
 		.send storage
 
 ; ************************************************************************************************

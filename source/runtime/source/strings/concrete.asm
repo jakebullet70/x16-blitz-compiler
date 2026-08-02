@@ -56,6 +56,34 @@ _SCNoMinimum:
 		sta 	stringHighMemory+1
 		sta 	zsTemp+1
 		;
+		;		zsTemp is the base of the new block. Nothing checked it had anywhere to go.
+		;
+		;		This pointer only ever travels DOWN, and on the ASSIGNMENT path -- which is every
+		;		A$=... in the language -- StringInitialise's out-of-memory test is never reached,
+		;		because that only runs when something allocates a TEMPORARY (STR$, CHR$, concat).
+		;		So the heap walked out of the bottom of the workspace, through the arrays, the
+		;		scalars and the FOR/GOSUB stack, and into the p-code, and the program then executed
+		;		its own string data. Measured 2026-08-02: a loop assigning a 36-character literal
+		;		into a string array BRKed into the machine-language monitor on the 405th pass, with
+		;		no error of any kind. It did the same on the pristine engine, 101 passes earlier.
+		;
+		;		availableMemory is the top of the array area (allocate.asm, dim.asm) -- the other
+		;		end of the same free gap, and the mirror image of the test DIMWriteByte already
+		;		makes when the arrays grow up towards us. Landing exactly on it is legal; the next
+		;		temporary is what then reports the gap is gone, via StringInitialise's 512-byte
+		;		margin.
+		;
+		;		Only A is used, so X (the numeric stack) and the returned YA are untouched, and the
+		;		cost is a compare on each assignment that allocates.
+		;
+		cmp 	availableMemory+1
+		bcc 	_SCNoMemory
+		bne 	_SCRoom
+		lda 	zsTemp
+		cmp 	availableMemory
+		bcc 	_SCNoMemory
+_SCRoom:
+		;
 		lda 	zTemp1 						; set max length.
 		sta 	(zsTemp)
 		ldy 	#1 							; clear control byte.
@@ -65,6 +93,9 @@ _SCNoMinimum:
 		lda 	zsTemp 						; new empty string in YA.
 		ldy 	zsTemp+1
 		rts
+
+_SCNoMemory:
+		.error_memory
 
 		.send code
 
@@ -82,5 +113,7 @@ _SCNoMinimum:
 ;
 ;		Date			Notes
 ;		==== 			=====
+;		02/08/26		String heap now bounds-checked against availableMemory; the assignment path
+;						had no out-of-memory test at all.
 ;
 ; ************************************************************************************************

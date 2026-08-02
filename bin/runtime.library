@@ -35,9 +35,13 @@ runtimeStackPtr: 							; runtime stack pointer
 
 		.section storage
 
-stringLowMemory:
-		.fill 	2		
-stringHighMemory:
+;
+;		stringLowMemory used to sit here. Nothing ever wrote it -- only fre.asm read it -- so it
+;		was two bytes of permanent zero, and FRE() returned an address instead of a count. The
+;		low end of the free gap is availableMemory (support/allocate.asm); there is no second
+;		copy of it now, deliberately.
+;
+stringHighMemory: 							; string heap ceiling; allocations grow DOWN from here
 		.fill 	2
 
 		.send 	storage
@@ -543,6 +547,21 @@ StartRuntime:
 		stx 	storeStartHigh 				; save from-to address.
 		sty 	storeEndHigh
 		stx 	variableStartPage
+		;
+		;		The frame stack grows DOWN from storeStartHigh-1:$FF (clr.asm) into the gap the
+		;		compiler leaves below the workspace for it -- FrameStackPages, spent by object.asm
+		;		in both embedded and shared modes. Nothing policed the bottom of that gap, so a
+		;		runaway recursion carried straight on into the object code, overwrote the program
+		;		and then executed what it had written. Work the floor out once, here.
+		;
+		;		Here and not in ClearMemory: a LOAD chain skips ClearMemory (see below) to keep the
+		;		previous program's variables, but it still arrives through this entry point, and it
+		;		still has a stack that can overflow.
+		;
+		txa
+		sec
+		sbc 	#FrameStackPages
+		sta 	stackFloorHigh
 
 		tsx 								; save the stack.
 		stx 	Runtime6502SP 
@@ -726,8 +745,12 @@ loadChainSig: 								; LOAD arms this before chaining; StartRuntime disarms it
 
 storeStartHigh:								; p-code run space.
 		.fill 	1
-storeEndHigh:		
+storeEndHigh:
 		.fill 	1
+
+stackFloorHigh: 							; lowest page the FOR/GOSUB frame stack may occupy;
+		.fill 	1 							; storeStartHigh - FrameStackPages, tested by
+											; StackOpenFrame (stack/frames.asm)
 
 variableStartPage: 							; variable start high
 		.fill 	1		
@@ -1505,17 +1528,23 @@ _ClearLoop1:
 		;
 		;		Initialise string storage space.
 		;
-		sec 											; stack space = number of pages in total / 4
+		;		This used to put the ceiling a QUARTER of the workspace below the top, under the
+		;		comment "stack space = number of pages in total / 4". There is no stack up there.
+		;		The runtime (FOR/GOSUB) stack is set up ten lines below this one, growing DOWN
+		;		from storeStartHigh-1:$FF, and the compiler reserves FrameStackPages for it BELOW
+		;		the workspace (see application/source/compiler/object.asm). So the top quarter
+		;		was reserved for nothing -- and unreachable, because strings only ever grow down
+		;		from this ceiling and arrays only ever grow up towards it. Measured on
+		;		samples/FSIM16_V1: workspace $7900-$9F00, ceiling $9600, and the highest byte the
+		;		program ever touched was $95FA. 2,304 of its 9,728 bytes, for nothing.
+		;
+		;		The ceiling is exclusive, so taking it right to the top is safe: StringConcrete
+		;		subtracts the whole block size from it BEFORE writing a byte, and StringAllocTemp
+		;		starts 512 below it, so the highest address either can touch is one less than
+		;		this. storeEndHigh is already "the page after the last usable one" (00runtime.asm
+		;		is handed $9F, and $9F00 is I/O), which is exactly what that needs.
+		;
 		lda 	storeEndHigh
-		sbc		storeStartHigh
-		lsr 	a 	
-		lsr 	a
-		bne 	_NotEmpty 								; at least 1 !
-		lda 	#1
-_NotEmpty:
-		sec 											; subtract from high to give string high memory
-		eor 	#$FF
-		adc 	storeEndHigh
 		sta 	stringHighMemory+1
 		stz 	stringHighMemory
 
@@ -1544,6 +1573,8 @@ _NotEmpty:
 ;
 ;		Date			Notes
 ;		==== 			=====
+;		02/08/26		String ceiling moved to the top of the workspace; it was a quarter down,
+;						reserving space for a stack that lives below the workspace instead.
 ;
 ; ************************************************************************************************
 ; ************************************************************************************************
@@ -1685,6 +1716,34 @@ _SCNoMinimum:
 		sta 	stringHighMemory+1
 		sta 	zsTemp+1
 		;
+		;		zsTemp is the base of the new block. Nothing checked it had anywhere to go.
+		;
+		;		This pointer only ever travels DOWN, and on the ASSIGNMENT path -- which is every
+		;		A$=... in the language -- StringInitialise's out-of-memory test is never reached,
+		;		because that only runs when something allocates a TEMPORARY (STR$, CHR$, concat).
+		;		So the heap walked out of the bottom of the workspace, through the arrays, the
+		;		scalars and the FOR/GOSUB stack, and into the p-code, and the program then executed
+		;		its own string data. Measured 2026-08-02: a loop assigning a 36-character literal
+		;		into a string array BRKed into the machine-language monitor on the 405th pass, with
+		;		no error of any kind. It did the same on the pristine engine, 101 passes earlier.
+		;
+		;		availableMemory is the top of the array area (allocate.asm, dim.asm) -- the other
+		;		end of the same free gap, and the mirror image of the test DIMWriteByte already
+		;		makes when the arrays grow up towards us. Landing exactly on it is legal; the next
+		;		temporary is what then reports the gap is gone, via StringInitialise's 512-byte
+		;		margin.
+		;
+		;		Only A is used, so X (the numeric stack) and the returned YA are untouched, and the
+		;		cost is a compare on each assignment that allocates.
+		;
+		cmp 	availableMemory+1
+		bcc 	_SCNoMemory
+		bne 	_SCRoom
+		lda 	zsTemp
+		cmp 	availableMemory
+		bcc 	_SCNoMemory
+_SCRoom:
+		;
 		lda 	zTemp1 						; set max length.
 		sta 	(zsTemp)
 		ldy 	#1 							; clear control byte.
@@ -1694,6 +1753,9 @@ _SCNoMinimum:
 		lda 	zsTemp 						; new empty string in YA.
 		ldy 	zsTemp+1
 		rts
+
+_SCNoMemory:
+		.error_memory
 
 		.send code
 
@@ -1711,6 +1773,8 @@ _SCNoMinimum:
 ;
 ;		Date			Notes
 ;		==== 			=====
+;		02/08/26		String heap now bounds-checked against availableMemory; the assignment path
+;						had no out-of-memory test at all.
 ;
 ; ************************************************************************************************
 ; ************************************************************************************************
@@ -2378,9 +2442,26 @@ StackOpenFrame:
 		sbc 	#0
 		sta 	runtimeStackPtr+1
 		;
+		;		...and refuse if that was one frame too many. Nothing tested this before: the
+		;		stack simply carried on down out of the gap the compiler left for it and into the
+		;		object code, so the program overwrote itself and then ran what it had written.
+		;
+		;		stackFloorHigh (00runtime.asm) is storeStartHigh - FrameStackPages, so it is page
+		;		aligned; a frame is at most 31 bytes, so testing the high byte AFTER the subtraction
+		;		is exact -- the new frame either starts inside the gap or it does not, and it cannot
+		;		straddle. A is already the new high byte, so this costs six cycles a GOSUB.
+		;
+		;		OUT OF MEMORY, because that is what stock BASIC reports for too many nested GOSUBs.
+		;
+		cmp 	stackFloorHigh
+		bcc 	_SOFOverflow
+		;
 		pla 								; put frame marker at +0
 		sta 	(runtimeStackPtr)
 		rts
+
+_SOFOverflow:
+		.error_memory
 
 ; ************************************************************************************************
 ;
@@ -2446,6 +2527,8 @@ requiredFrame:
 ;
 ;		Date			Notes
 ;		==== 			=====
+;		02/08/26		StackOpenFrame now refuses to grow the frame stack below stackFloorHigh; it
+;						used to run on into the object code.
 ;		22/06/23 		Added StackFindFrame which looks for a frame of this type and throws
 ;						non matchers.
 ;
@@ -2470,18 +2553,41 @@ requiredFrame:
 ;
 ; ************************************************************************************************
 
+;
+;		Free memory is the gap in the middle of the workspace: arrays grow UP from
+;		availableMemory (support/allocate.asm, moved by dim.asm) and the string heap grows DOWN
+;		from stringHighMemory (strings/concrete.asm). Whatever is between them is what a program
+;		can still spend, and it is what the two out-of-memory tests measure against each other.
+;
+;		This used to subtract stringLowMemory, which was declared in data.inc, read here, and
+;		WRITTEN NOWHERE -- so it was always zero and FRE returned the ADDRESS of the string
+;		ceiling rather than a count. On a compiled samples/FSIM16_V1 that is 40704 where the
+;		answer is about 5900. stringLowMemory has been deleted rather than maintained: it would
+;		only have been a second copy of availableMemory, and two things that must agree is how
+;		this codebase keeps hurting itself.
+;
+;		Measured against the ROM, 2026-08-02 (x16emu r49): stock X16 FRE returns a POSITIVE byte
+;		count with no C64-style wrap above 32767 -- a 7-line program reported 38537 -- and the
+;		argument is ignored, FRE(1) = FRE(0). A positive count is therefore right; the number
+;		itself cannot match stock, because GPC has no BASIC program text in the way and lays its
+;		scalars out at a fixed offset instead of allocating them from the same pool.
+;
+;		The two ends cannot cross, so this cannot underflow: DIMWriteByte refuses to let the
+;		arrays reach the string ceiling's page, and StringConcrete refuses to bring the ceiling
+;		below availableMemory. Equal is legal and returns 0.
+;
 UnaryFre:	;; [fre]
 		.entercmd
 
 		jsr 	FloatSetZero 				; zero the result (32 bit integer)
 		sec
-		lda 	stringHighMemory 			; calculate the free memory.
-		sbc 	stringLowMemory
+		lda 	stringHighMemory 			; free = string floor - top of the arrays
+		sbc 	availableMemory
 		sta		NSMantissa0,x
 		lda 	stringHighMemory+1
-		sbc 	stringLowMemory+1
+		sbc 	availableMemory+1
 		sta		NSMantissa1,x
-		
+
 		.exitcmd
 
 		.send 	code
@@ -2494,6 +2600,8 @@ UnaryFre:	;; [fre]
 ;
 ;		Date			Notes
 ;		==== 			=====
+;		02/08/26		Subtract availableMemory, not the never-written stringLowMemory. FRE was
+;						returning the string ceiling's address instead of a byte count.
 ;
 ; ************************************************************************************************
 ; ************************************************************************************************
@@ -5300,9 +5408,36 @@ _PNLoop:
 		inx
 		lda	 	decimalBuffer,x
 		bne 	_PNLoop
-		lda 	#$1D 						; trailing CRSR-RIGHT, as stock BASIC does -- it looks
-		jsr 	VectorPrintCharacter 		; like a space on screen but writes $1D not $20 to a
-											; file (PRINT#) or through CMD, which is what stock does
+		;
+		;		Trailing separator after a number, and stock picks it by DEVICE -- which is the
+		;		bit this used to miss. It emitted $1D unconditionally, with a comment asserting
+		;		that was what stock did; half right, and the confident half is the expensive
+		;		half. Both halves measured with the project's differential oracle (same PRG,
+		;		same ROM, once interpreted and once compiled):
+		;
+		;		  to the SCREEN   PRINT "HELLO";I;"X"          -> 'HELLO 1',$1D,'X'
+		;		  to a FILE       PRINT#1,"A";123;"B"          -> 'A 123 B'   ($20)
+		;
+		;		They are not interchangeable even on screen: $1D steps over a cell and leaves
+		;		what was there, $20 blanks it. Anything that redraws a field in place -- e.g.
+		;		samples/FSIM16_V1's HUD -- depends on the difference. And to a file, to CMD or
+		;		to a printer, $1D is a control code where stock writes a space, which is how
+		;		that sample's FLIGHT.LOG came out different compiled than interpreted.
+		;
+		;		Channel 0 is the screen (SetDefaultChannel in print.asm). Only A may be used
+		;		here: Y carries the p-code pointer across .exitcmd, and X is the decimalBuffer
+		;		index the caller still needs.
+		;
+		;		The LEADING sign space comes out of FloatToString and was always right.
+		;
+		lda 	currentChannel
+		beq 	_PNScreenSeparator
+		lda 	#$20 						; file / printer / anything not the screen
+		bra 	_PNEmitSeparator
+_PNScreenSeparator:
+		lda 	#$1D 						; screen: CRSR-RIGHT, preserving the cell it skips
+_PNEmitSeparator:
+		jsr 	VectorPrintCharacter
 		plx
 		.exitcmd
 

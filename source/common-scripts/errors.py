@@ -30,6 +30,7 @@ errors = """
 	memory 		  : out of memory
 	channel 	  : input/output error
 	break 		  : break pressed
+	toobig 		  : program too big
 	
 """.strip().split("\n")
 

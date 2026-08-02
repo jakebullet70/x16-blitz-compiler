@@ -22,6 +22,30 @@
 CreateVariableRecord:
 		pha
 
+		;
+		;		Room for another 6-byte record plus the end marker before we run into the
+		;		line-number table coming the other way? STRMarkLine makes the mirror-image test.
+		;		Neither existed, so the two tables quietly overwrote each other on a big program.
+		;
+		;		X and Y hold the variable NAME here and are read further down, so this may only
+		;		use A -- hence the scratch byte rather than the obvious tay.
+		;
+		clc
+		lda 	variableListEnd
+		adc 	#7
+		sta 	storageScratch
+		lda 	variableListEnd+1
+		adc 	#0
+		cmp 	lineNumberTable+1
+		bcc 	_CVRoom
+		bne 	_CVTooBig
+		lda 	storageScratch
+		cmp 	lineNumberTable
+		bcc 	_CVRoom
+_CVTooBig:
+		.error_toobig
+_CVRoom:
+
 		.storage_access
 
 		lda 	freeVariableMemory 		; push current free address on stack.

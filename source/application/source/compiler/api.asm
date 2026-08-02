@@ -78,13 +78,29 @@ _CACloseOut:
 ; ************************************************************************************************
 
 _CAWriteByte:
+		;
+		;		The object buffer has a CEILING and this is the only place that can enforce it.
+		;		Without this test the p-code just kept going past the end of usable low RAM,
+		;		over whatever was there, and the compile still said OK -- see the note on
+		;		ObjectCeiling in start.asm for what that cost. Refusing to emit a byte we have
+		;		nowhere to put is the whole fix; PROGRAM TOO BIG is reported against the source
+		;		line being compiled, so the message says where the budget ran out.
+		;
+		;		The ceiling is page aligned, so comparing the high byte is exact.
+		;
+		lda 	objPtr+1
+		cmp 	#ObjectCeiling >> 8
+		bcs 	_CAWBTooBig
 		txa
 		sta 	(objPtr)
 		inc 	objPtr
 		bne 	_HWOWBNoCarry
 		inc 	objPtr+1
-_HWOWBNoCarry:		
+_HWOWBNoCarry:
 		rts
+
+_CAWBTooBig:
+		.error_toobig
 
 ; ************************************************************************************************
 ;

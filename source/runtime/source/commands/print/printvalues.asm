@@ -31,9 +31,36 @@ _PNLoop:
 		inx
 		lda	 	decimalBuffer,x
 		bne 	_PNLoop
-		lda 	#$1D 						; trailing CRSR-RIGHT, as stock BASIC does -- it looks
-		jsr 	VectorPrintCharacter 		; like a space on screen but writes $1D not $20 to a
-											; file (PRINT#) or through CMD, which is what stock does
+		;
+		;		Trailing separator after a number, and stock picks it by DEVICE -- which is the
+		;		bit this used to miss. It emitted $1D unconditionally, with a comment asserting
+		;		that was what stock did; half right, and the confident half is the expensive
+		;		half. Both halves measured with the project's differential oracle (same PRG,
+		;		same ROM, once interpreted and once compiled):
+		;
+		;		  to the SCREEN   PRINT "HELLO";I;"X"          -> 'HELLO 1',$1D,'X'
+		;		  to a FILE       PRINT#1,"A";123;"B"          -> 'A 123 B'   ($20)
+		;
+		;		They are not interchangeable even on screen: $1D steps over a cell and leaves
+		;		what was there, $20 blanks it. Anything that redraws a field in place -- e.g.
+		;		samples/FSIM16_V1's HUD -- depends on the difference. And to a file, to CMD or
+		;		to a printer, $1D is a control code where stock writes a space, which is how
+		;		that sample's FLIGHT.LOG came out different compiled than interpreted.
+		;
+		;		Channel 0 is the screen (SetDefaultChannel in print.asm). Only A may be used
+		;		here: Y carries the p-code pointer across .exitcmd, and X is the decimalBuffer
+		;		index the caller still needs.
+		;
+		;		The LEADING sign space comes out of FloatToString and was always right.
+		;
+		lda 	currentChannel
+		beq 	_PNScreenSeparator
+		lda 	#$20 						; file / printer / anything not the screen
+		bra 	_PNEmitSeparator
+_PNScreenSeparator:
+		lda 	#$1D 						; screen: CRSR-RIGHT, preserving the cell it skips
+_PNEmitSeparator:
+		jsr 	VectorPrintCharacter
 		plx
 		.exitcmd
 

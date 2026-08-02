@@ -56,4 +56,7 @@ ErrorV_channel:
 ErrorV_break:
 	jsr	CallErrorHandler
 	.text	"BREAK PRESSED",0
+ErrorV_toobig:
+	jsr	CallErrorHandler
+	.text	"PROGRAM TOO BIG",0
 	.send code

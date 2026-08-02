@@ -19,11 +19,10 @@
 ; ************************************************************************************************
 
 ;
-;		Pages left free below the workspace for the runtime (GOSUB/FOR) stack. clr.asm puts
-;		runtimeStackPtr at storeStartHigh-1:$FF and grows it DOWNWARD, so without a gap here
-;		a deep call chain would walk straight back into the object code.
+;		FrameStackPages -- the gap left below the workspace for the runtime (GOSUB/FOR) stack --
+;		was defined here. It now lives in common-source/source/common.inc, because the runtime
+;		needs the same number to know where the bottom of that gap is (StackOpenFrame).
 ;
-FrameStackPages = 16 						; 4K, ~250 frames
 
 ; ************************************************************************************************
 ;
@@ -73,11 +72,29 @@ _WOCWholePages:
 		;
 		;		newWorkspacePage = ObjectBase + pages(object code) + the frame stack gap.
 		;
+		;		...and then check the program can actually RUN, which the embedded path never
+		;		did -- only the SHARED path had the equivalent test. That was survivable while
+		;		the compiler itself capped p-code at 12,032 bytes; with the object buffer now
+		;		reaching $9EFF it is not, because a program can be compiled successfully and
+		;		still leave no room above itself for variables, arrays and strings. It would
+		;		load, start, and then fail in some unrelated-looking way at run time.
+		;
+		;		The workspace runs from newWorkspacePage to $9F00, so require MIN_WS_PAGES (4K)
+		;		of it, and reject a page count that overflowed a byte on the way -- the same two
+		;		tests, in the same order, as _WOCShared.
+		;
 		clc
 		lda 	#ObjectBase >> 8
 		adc 	zTemp1+1
+		bcs 	_WOCTooBig
 		adc 	#FrameStackPages
+		bcs 	_WOCTooBig
 		sta 	newWorkspacePage
+		cmp 	#(ObjectCeiling >> 8) - MIN_WS_PAGES + 1
+		bcc 	_WOCFits
+_WOCTooBig:
+		jmp 	_WOCSBig 					; shared with the SHARED path: prints PROGRAM TOO BIG,
+_WOCFits: 									; returns carry set, caller skips the map file and OK
 
 		ldy 	#ObjectFile >> 8
 		ldx 	#ObjectFile & $FF
@@ -319,6 +336,13 @@ _WMFWriteEntry:
 		sta 	zTemp0
 		lda 	mapWalk+1
 		sta 	zTemp0+1
+		;
+		;		The table is in banked RAM now, so page it in for the four reads and page it back
+		;		out again before any file I/O -- the KERNAL owns bank 0. That the entry is fully
+		;		unpacked into mapValue/mapOff before the first IOWriteByte was already true (see
+		;		the note above); it is now load-bearing rather than merely tidy.
+		;
+		.storage_access
 		ldy 	#0 							; line number -> mapValue (consumed by the decimal print)
 		lda 	(zTemp0),y
 		sta 	mapValue
@@ -334,6 +358,7 @@ _WMFWriteEntry:
 		lda 	(zTemp0),y
 		sbc 	#FreeMemory >> 8
 		sta 	mapOff+1
+		.storage_release
 		lda 	mapOff+1 					; hex offset, high byte then low.
 		jsr 	_WMFHexByte
 		lda 	mapOff

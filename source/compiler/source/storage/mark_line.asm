@@ -30,6 +30,24 @@ STRMarkLine:
 		sta 	lineNumberTable+1
 		sta 	zTemp0+1
 
+		;
+		;		The two tables share one window and grow towards each other -- this one down from
+		;		CompilerWorkspaceEnd, the variable name list up from CompilerWorkspaceStart. They
+		;		used to be free to pass through each other in silence, which corrupts both. Stop
+		;		on the touch. (A is free here: the caller's value is on the stack until the pla
+		;		below, and ExitCompiler restores SP, so raising with it still pushed is fine.)
+		;
+		lda 	lineNumberTable+1
+		cmp 	variableListEnd+1
+		bcc 	_SMLTooBig
+		bne 	_SMLRoom
+		lda 	lineNumberTable
+		cmp 	variableListEnd
+		bcs 	_SMLRoom
+_SMLTooBig:
+		.error_toobig
+_SMLRoom:
+
 		.storage_access
 		pla
 		sta 	(zTemp0) 					; line # save it in +0,+1
@@ -80,7 +98,8 @@ _STRNext: 									; next table entry.
 		lda 	(zTemp1),y
 		cmp 	#$FF
 		bne 	_STRSearch
-		.error_internal
+		.storage_release 					; the only escape from inside a storage window -- close
+		.error_internal 					; it, or the error handler runs with the wrong RAM bank
 
 _STRFound:
 		lda 	(zTemp1) 					; set A = 0 if the same, 0 if different.

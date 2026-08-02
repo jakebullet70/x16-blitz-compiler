@@ -81,13 +81,29 @@ _CACloseOut:
 ; ************************************************************************************************
 
 _CAWriteByte:
+		;
+		;		The object buffer has a CEILING and this is the only place that can enforce it.
+		;		Without this test the p-code just kept going past the end of usable low RAM,
+		;		over whatever was there, and the compile still said OK -- see the note on
+		;		ObjectCeiling in start.asm for what that cost. Refusing to emit a byte we have
+		;		nowhere to put is the whole fix; PROGRAM TOO BIG is reported against the source
+		;		line being compiled, so the message says where the budget ran out.
+		;
+		;		The ceiling is page aligned, so comparing the high byte is exact.
+		;
+		lda 	objPtr+1
+		cmp 	#ObjectCeiling >> 8
+		bcs 	_CAWBTooBig
 		txa
 		sta 	(objPtr)
 		inc 	objPtr
 		bne 	_HWOWBNoCarry
 		inc 	objPtr+1
-_HWOWBNoCarry:		
+_HWOWBNoCarry:
 		rts
+
+_CAWBTooBig:
+		.error_toobig
 
 ; ************************************************************************************************
 ;
@@ -652,11 +668,10 @@ cfJustCR: 									; ReadControlFile scratch: nonzero if the last byte was a CR
 ; ************************************************************************************************
 
 ;
-;		Pages left free below the workspace for the runtime (GOSUB/FOR) stack. clr.asm puts
-;		runtimeStackPtr at storeStartHigh-1:$FF and grows it DOWNWARD, so without a gap here
-;		a deep call chain would walk straight back into the object code.
+;		FrameStackPages -- the gap left below the workspace for the runtime (GOSUB/FOR) stack --
+;		was defined here. It now lives in common-source/source/common.inc, because the runtime
+;		needs the same number to know where the bottom of that gap is (StackOpenFrame).
 ;
-FrameStackPages = 16 						; 4K, ~250 frames
 
 ; ************************************************************************************************
 ;
@@ -706,11 +721,29 @@ _WOCWholePages:
 		;
 		;		newWorkspacePage = ObjectBase + pages(object code) + the frame stack gap.
 		;
+		;		...and then check the program can actually RUN, which the embedded path never
+		;		did -- only the SHARED path had the equivalent test. That was survivable while
+		;		the compiler itself capped p-code at 12,032 bytes; with the object buffer now
+		;		reaching $9EFF it is not, because a program can be compiled successfully and
+		;		still leave no room above itself for variables, arrays and strings. It would
+		;		load, start, and then fail in some unrelated-looking way at run time.
+		;
+		;		The workspace runs from newWorkspacePage to $9F00, so require MIN_WS_PAGES (4K)
+		;		of it, and reject a page count that overflowed a byte on the way -- the same two
+		;		tests, in the same order, as _WOCShared.
+		;
 		clc
 		lda 	#ObjectBase >> 8
 		adc 	zTemp1+1
+		bcs 	_WOCTooBig
 		adc 	#FrameStackPages
+		bcs 	_WOCTooBig
 		sta 	newWorkspacePage
+		cmp 	#(ObjectCeiling >> 8) - MIN_WS_PAGES + 1
+		bcc 	_WOCFits
+_WOCTooBig:
+		jmp 	_WOCSBig 					; shared with the SHARED path: prints PROGRAM TOO BIG,
+_WOCFits: 									; returns carry set, caller skips the map file and OK
 
 		ldy 	#ObjectFile >> 8
 		ldx 	#ObjectFile & $FF
@@ -952,6 +985,13 @@ _WMFWriteEntry:
 		sta 	zTemp0
 		lda 	mapWalk+1
 		sta 	zTemp0+1
+		;
+		;		The table is in banked RAM now, so page it in for the four reads and page it back
+		;		out again before any file I/O -- the KERNAL owns bank 0. That the entry is fully
+		;		unpacked into mapValue/mapOff before the first IOWriteByte was already true (see
+		;		the note above); it is now load-bearing rather than merely tidy.
+		;
+		.storage_access
 		ldy 	#0 							; line number -> mapValue (consumed by the decimal print)
 		lda 	(zTemp0),y
 		sta 	mapValue
@@ -967,6 +1007,7 @@ _WMFWriteEntry:
 		lda 	(zTemp0),y
 		sbc 	#FreeMemory >> 8
 		sta 	mapOff+1
+		.storage_release
 		lda 	mapOff+1 					; hex offset, high byte then low.
 		jsr 	_WMFHexByte
 		lda 	mapOff
@@ -1267,10 +1308,38 @@ _CCNoControlFile: 							; a compiler that guesses at what it was asked to
 ;
 ; ************************************************************************************************
 
+; ************************************************************************************************
+;
+;		THE TWO LIMITS THAT BOUND A COMPILE.  They are separate, and conflating them is what
+;		made large programs miscompile in silence.
+;
+;		ObjectCeiling  is how far the OBJECT CODE may grow. It is written by _CAWriteByte
+;		               (api.asm) from FreeMemory upwards, and $9F00 is simply where usable low
+;		               RAM stops -- the I/O page. Capacity = ObjectCeiling - FreeMemory.
+;
+;		CompilerWorkspace{Start,End}  is where the compiler keeps its two TABLES: the variable
+;		               name list growing UP from Start, the line-number table growing DOWN from
+;		               End (reset.asm). This lives in BANKED RAM at $A000-$BFFF, reached through
+;		               the storage_access/storage_release macros, so it does not compete with the
+;		               object code for low memory.
+;
+;		Before this was split, the workspace started at $8000 and the object code was allowed to
+;		run into it unchecked: at exactly $8000-$5100 = 12,032 bytes of p-code the object code
+;		began overwriting the head of the variable name list, FindVariable then failed for EVERY
+;		variable, and CreateVariableRecord handed each reference a fresh slot. The compiler
+;		printed OK and emitted an object in which "X" on one line and "X" on the next were
+;		different variables. samples/FSIM16_V1 (12,766 bytes of p-code) tripped it by 734 bytes.
+;
+; ************************************************************************************************
+
+ObjectCeiling           = $9F00 			; object code may occupy FreeMemory..ObjectCeiling-1
+CompilerWorkspaceStart  = $A000 			; banked RAM: variable name table, grows up
+CompilerWorkspaceEnd    = $C000 			; banked RAM: line number table, grows down
+
 APIDesc:
 		.word 	CompilerAPI 				; the compiler API Implementeation
-		.byte 	$80 						; start of workspace for compiler $8000
-		.byte 	$9F							; end of workspace for compiler $9F00
+		.byte 	CompilerWorkspaceStart >> 8 	; start of workspace for compiler
+		.byte 	CompilerWorkspaceEnd >> 8 		; end of workspace for compiler
 
 ;
 ;		The source and object file names used to be two .text constants here. They are now the
@@ -1295,10 +1364,10 @@ APIDesc:
 ;
 ;	This file is automatically generated by scripts/bumpbuild.py
 ;
-BuildNumber = 113
+BuildNumber = 114
 		.section code
 VersionText:
-		.text	'V0.9.113',13,0
+		.text	'V0.9.114',13,0
 		.send code
 ; ************************************************************************************************
 ; ************************************************************************************************
