@@ -1,0 +1,11 @@
+{
+    "manifest_version": "1.0.0",
+    "name": "X16 Flight Simulator",
+    "author": "Xiphod",
+    "app_version": "1.0.0",
+    "license": "GPL v3",
+    "start_prg": "FSIM16.PRG",
+    "resources": [
+        "FSIM16.PRG"		
+    ]
+}
