@@ -83,7 +83,8 @@ compiles at roughly **14 bytes of p-code per line**. BASL menus (~60–100 lines
 |---|---|---:|
 | 1 | Loops — **all shipped**; `GP.UNTIL` **CUT**, measured at only 4-6% | 0 |
 | 2 | `GP.CALL` + 4 value words — **SHIPPED** | 108 |
-| 3 | Strings ×7 | 397 |
+| 3a | `GP.FIND` 115 B + `GP.STRPTR` 12 B — **SHIPPED** | 127 |
+| 3 | Strings — `GP.FIND`+`GP.STRPTR` **SHIPPED (127 B)**, 5 to go | 270 |
 | 4 | `GP.SORT` | 156 |
 | 5 | Stash / restore | 290 |
 | 6 | Drawing ×4 | 309 |

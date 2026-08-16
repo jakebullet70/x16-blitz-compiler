@@ -43,4 +43,17 @@
 #TOKEN GP.Y 52857
 #TOKEN GP.C 52856
 
+## Strings. GP.FIND is the search GPC otherwise has no form of at all (no
+## INSTR, nothing). GP.STRPTR returns the address of [ActLen][Data] -- length
+## AT that address, first character at +1, and the block's capacity at -2. With
+## GP.CALL that lets machine code fill a BASIC string in place and set its
+## length, which stock BASIC cannot do at all.
+##
+## Splitting that address for GP.CALL, do NOT use "P AND 255": AND is 16-bit
+## SIGNED and the string heap lives above 32767, so it raises OUT OF RANGE.
+## Use  H = INT(P/256) : L = P - H*256  instead.
+
+#TOKEN GP.FIND 52855
+#TOKEN GP.STRPTR 52854
+
 #ENDIF

@@ -80,15 +80,15 @@
 ;
 ;	ON     # T X:CommandON N
 ;
-	.byte	$09,$91,$00,$e1,179,$03,CommandON & $FF,CommandON >> 8,$06
+	.byte	$09,$91,$00,$e1,181,$03,CommandON & $FF,CommandON >> 8,$06
 ;
 ;	SYS    # T N
 ;
-	.byte	$07,$9e,$00,$e2,41941 & $FF,41941 >> 8,$06
+	.byte	$07,$9e,$00,$e2,41943 & $FF,41943 >> 8,$06
 ;
 ;	POKE    #,# T N
 ;
-	.byte	$07,$97,$00,$ea,$e1,183,$06
+	.byte	$07,$97,$00,$ea,$e1,185,$06
 ;
 ;	RETURN    T N
 ;
@@ -96,15 +96,15 @@
 ;
 ;	STOP    T N
 ;
-	.byte	$07,$90,$00,$20,41685 & $FF,41685 >> 8,$06
+	.byte	$07,$90,$00,$20,41687 & $FF,41687 >> 8,$06
 ;
 ;	END    T N
 ;
-	.byte	$07,$80,$00,$20,33493 & $FF,33493 >> 8,$06
+	.byte	$07,$80,$00,$20,33495 & $FF,33495 >> 8,$06
 ;
 ;	CLR    X:CommandClrCompile T N
 ;
-	.byte	$0a,$9c,$00,$03,CommandClrCompile & $FF,CommandClrCompile >> 8,$20,32981 & $FF,32981 >> 8,$06
+	.byte	$0a,$9c,$00,$03,CommandClrCompile & $FF,CommandClrCompile >> 8,$20,32983 & $FF,32983 >> 8,$06
 ;
 ;	GP.DO    X:OptionalNumberCompile T N
 ;
@@ -118,6 +118,6 @@
 ;
 	.byte	$07,$ce,$7d,$03,CommandExitDoCompile & $FF,CommandExitDoCompile >> 8,$06
 ;
-;	GP.CALL   # X:OptionalRegisterCompile X:OptionalRegisterCompile X:OptionalRegisterCompile X:OptionalRegisterCompile T N
+;	GP.CALL   # X:OptionalZeroCompile X:OptionalZeroCompile X:OptionalZeroCompile X:OptionalZeroCompile T N
 ;
-	.byte	$13,$ce,$7c,$e3,OptionalRegisterCompile & $FF,OptionalRegisterCompile >> 8,$03,OptionalRegisterCompile & $FF,OptionalRegisterCompile >> 8,$03,OptionalRegisterCompile & $FF,OptionalRegisterCompile >> 8,$03,OptionalRegisterCompile & $FF,OptionalRegisterCompile >> 8,$20,33749 & $FF,33749 >> 8,$06
+	.byte	$13,$ce,$7c,$e3,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$20,33751 & $FF,33751 >> 8,$06

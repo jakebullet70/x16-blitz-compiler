@@ -81,6 +81,8 @@ C64_RIGHTDOLLAR          = $c9 ; $c9 right$
 C64_MIDDOLLAR            = $ca ; $ca mid$
 C64_GO                   = $cb ; $cb go
 C64_PI                   = $ff ; $ff pi
+C64_GPCMD_STRPTR         = $ce76 ; $ce76 gp.strptr
+C64_GPCMD_FIND           = $ce77 ; $ce77 gp.find
 C64_GPCMD_C              = $ce78 ; $ce78 gp.c
 C64_GPCMD_Y              = $ce79 ; $ce79 gp.y
 C64_GPCMD_X              = $ce7a ; $ce7a gp.x
@@ -279,12 +281,15 @@ FrameStackPages = 16 						; 4K, ~250 frames
 ;		existing opcode keeps its ID. The bump is still required in the other direction: an object
 ;		using $DF would dispatch off the end of an ABI 4 runtime's vector table.
 ;
+;		6 -> 7 on 16th August 2026: GP.FIND and GP.STRPTR. "gpstring.asm" sorts after "gpcall.asm",
+;		so the two new unshifted markers shifted every opcode above them again.
+;
 ;		5 -> 6 on 16th August 2026: GP.CALL and the GP.A/GP.X/GP.Y/GP.C value words. This one IS a
 ;		renumbering -- "gpcall.asm" sorts mid-list in the commands directory, so the four unshifted
 ;		markers shifted every opcode above them, and the shifted gp.call did the same to the
 ;		shifted range.
 ;
-RT_ABI = 6 									; runtime ABI ordinal -> "GPC6" magic (NOT the file name)
+RT_ABI = 7 									; runtime ABI ordinal -> "GPC7" magic (NOT the file name)
 
 ; ************************************************************************************************
 ;
@@ -444,9 +449,9 @@ error_toobig .macro
 PCD_STARTBINARY = $80
 PCD_ENDBINARY = $8d
 PCD_STARTCOMMAND = $8d
-PCD_ENDCOMMAND = $d5
-PCD_STARTSYSTEM = $d5
-PCD_ENDSYSTEM = $e4
+PCD_ENDCOMMAND = $d7
+PCD_STARTSYSTEM = $d7
+PCD_ENDSYSTEM = $e6
 
 PCD_PLUS             = $80 ; +
 PCD_MINUS            = $81 ; -
@@ -480,142 +485,144 @@ PCD_GPCMD_A          = $9c ; gp.a
 PCD_GPCMD_X          = $9d ; gp.x
 PCD_GPCMD_Y          = $9e ; gp.y
 PCD_GPCMD_C          = $9f ; gp.c
-PCD_PSET             = $a0 ; pset
-PCD_LINE             = $a1 ; line
-PCD_RECT             = $a2 ; rect
-PCD_FRAME            = $a3 ; frame
-PCD_OVAL             = $a4 ; oval
-PCD_RING             = $a5 ; ring
-PCD_CHAR             = $a6 ; char
-PCD_HEXDOLLAR        = $a7 ; hex$
-PCD_INPUT            = $a8 ; input
-PCD_INPUTDOLLAR      = $a9 ; input$
-PCD_INPUTCMD_START   = $aa ; input.start
-PCD_LEN              = $ab ; len
-PCD_FCMD_CMP         = $ac ; f.cmp
-PCD_INTCMD_DIV       = $ad ; int.div
-PCD_MOD              = $ae ; mod
-PCD_NEGATE           = $af ; negate
-PCD_NEWCMD_LINE      = $b0 ; new.line
-PCD_NEXT             = $b1 ; next
-PCD_NOT              = $b2 ; not
-PCD_ON               = $b3 ; on
-PCD_MOREON           = $b4 ; moreon
-PCD_PEEK             = $b5 ; peek
-PCD_PI               = $b6 ; pi
-PCD_POKE             = $b7 ; poke
-PCD_POS              = $b8 ; pos
-PCD_GETCHANNEL       = $b9 ; getchannel
-PCD_SETCHANNEL       = $ba ; setchannel
-PCD_PRINTCMD_N       = $bb ; print.n
-PCD_PRINTCMD_S       = $bc ; print.s
-PCD_READ             = $bd ; read
-PCD_READDOLLAR       = $be ; read$
-PCD_RND              = $bf ; rnd
-PCD_CONCAT           = $c0 ; concat
-PCD_SGN              = $c1 ; sgn
-PCD_PRINTCMD_TAB     = $c2 ; print.tab
-PCD_PRINTCMD_POS     = $c3 ; print.pos
-PCD_PRINTCMD_SPC     = $c4 ; print.spc
-PCD_STRDOLLAR        = $c5 ; str$
-PCD_LEFTDOLLAR       = $c6 ; left$
-PCD_RIGHTDOLLAR      = $c7 ; right$
-PCD_MIDDOLLAR        = $c8 ; mid$
-PCD_SWAP             = $c9 ; swap
-PCD_TI               = $ca ; ti
-PCD_TIDOLLAR         = $cb ; ti$
-PCD_USR              = $cc ; usr
-PCD_VAL              = $cd ; val
-PCD_CLOSE            = $ce ; close
-PCD_EXIT             = $cf ; exit
-PCD_DEBUG            = $d0 ; debug
-PCD_OPEN             = $d1 ; open
-PCD_SCREEN           = $d2 ; screen
-PCD_VPOKE            = $d3 ; vpoke
-PCD_VPEEK            = $d4 ; vpeek
-PCD_CMD_SHIFT        = $d5 ; .shift
-PCD_CMD_BYTE         = $d6 ; .byte
-PCD_CMD_WORD         = $d7 ; .word
-PCD_CMD_FLOAT        = $d8 ; .float
-PCD_CMD_STRING       = $d9 ; .string
-PCD_CMD_DATA         = $da ; .data
-PCD_CMD_GOTO         = $db ; .goto
-PCD_CMD_GOSUB        = $dc ; .gosub
-PCD_CMD_GOTOCMD_Z    = $dd ; .goto.z
-PCD_CMD_GOTOCMD_NZ   = $de ; .goto.nz
-PCD_CMD_VARSPACE     = $df ; .varspace
-PCD_CMD_RESTORE      = $e0 ; .restore
-PCD_CMD_FNGOSUB      = $e1 ; .fngosub
-PCD_CMD_DEFERROR     = $e2 ; .deferror
-PCD_CMD_EXITDO       = $e3 ; .exitdo
-PCD_CLR              = $d580 ; clr
-PCD_DIM              = $d581 ; dim
-PCD_END              = $d582 ; end
-PCD_GPCMD_CALL       = $d583 ; gp.call
-PCD_JOY              = $d584 ; joy
-PCD_INT              = $d585 ; int
-PCD_SQR              = $d586 ; sqr
-PCD_LOG              = $d587 ; log
-PCD_EXP              = $d588 ; exp
-PCD_COS              = $d589 ; cos
-PCD_SIN              = $d58a ; sin
-PCD_TAN              = $d58b ; tan
-PCD_ATN              = $d58c ; atn
-PCD_LINPUT           = $d58d ; linput
-PCD_BINPUT           = $d58e ; binput
-PCD_LOAD             = $d58f ; load
-PCD_BLOAD            = $d590 ; bload
-PCD_BVLOAD           = $d591 ; bvload
-PCD_VLOAD            = $d592 ; vload
-PCD_BSAVE            = $d593 ; bsave
-PCD_BVERIFY          = $d594 ; bverify
-PCD_POWEROFF         = $d595 ; poweroff
-PCD_RESET            = $d596 ; reset
-PCD_REBOOT           = $d597 ; reboot
-PCD_MOUSE            = $d598 ; mouse
-PCD_MB               = $d599 ; mb
-PCD_MX               = $d59a ; mx
-PCD_MY               = $d59b ; my
-PCD_MWHEEL           = $d59c ; mwheel
-PCD_RPTDOLLAR        = $d59d ; rpt$
-PCD_SPRITE           = $d59e ; sprite
-PCD_SPRMEM           = $d59f ; sprmem
-PCD_MOVSPR           = $d5a0 ; movspr
-PCD_ST               = $d5a1 ; st
-PCD_STOP             = $d5a2 ; stop
-PCD_SYS              = $d5a3 ; sys
-PCD_TDATA            = $d5a4 ; tdata
-PCD_TATTR            = $d5a5 ; tattr
-PCD_TILE             = $d5a6 ; tile
-PCD_TICMD_WRITE      = $d5a7 ; ti.write
-PCD_TIDOLLARCMD_WRITE = $d5a8 ; ti$.write
-PCD_WAIT             = $d5a9 ; wait
-PCD_I2CPOKE          = $d5aa ; i2cpoke
-PCD_I2CPEEK          = $d5ab ; i2cpeek
-PCD_BANK             = $d5ac ; bank
-PCD_SLEEP            = $d5ad ; sleep
-PCD_FMINIT           = $d5ae ; fminit
-PCD_FMNOTE           = $d5af ; fmnote
-PCD_FMDRUM           = $d5b0 ; fmdrum
-PCD_FMINST           = $d5b1 ; fminst
-PCD_FMVIB            = $d5b2 ; fmvib
-PCD_FMFREQ           = $d5b3 ; fmfreq
-PCD_FMVOL            = $d5b4 ; fmvol
-PCD_FMPAN            = $d5b5 ; fmpan
-PCD_FMPLAY           = $d5b6 ; fmplay
-PCD_FMCHORD          = $d5b7 ; fmchord
-PCD_FMPOKE           = $d5b8 ; fmpoke
-PCD_PSGINIT          = $d5b9 ; psginit
-PCD_PSGNOTE          = $d5ba ; psgnote
-PCD_PSGVOL           = $d5bb ; psgvol
-PCD_PSGWAV           = $d5bc ; psgwav
-PCD_PSGFREQ          = $d5bd ; psgfreq
-PCD_PSGPAN           = $d5be ; psgpan
-PCD_PSGPLAY          = $d5bf ; psgplay
-PCD_PSGCHORD         = $d5c0 ; psgchord
-PCD_CLS              = $d5c1 ; cls
-PCD_LOCATE           = $d5c2 ; locate
-PCD_COLOR            = $d5c3 ; color
+PCD_GPCMD_FIND       = $a0 ; gp.find
+PCD_GPCMD_STRPTR     = $a1 ; gp.strptr
+PCD_PSET             = $a2 ; pset
+PCD_LINE             = $a3 ; line
+PCD_RECT             = $a4 ; rect
+PCD_FRAME            = $a5 ; frame
+PCD_OVAL             = $a6 ; oval
+PCD_RING             = $a7 ; ring
+PCD_CHAR             = $a8 ; char
+PCD_HEXDOLLAR        = $a9 ; hex$
+PCD_INPUT            = $aa ; input
+PCD_INPUTDOLLAR      = $ab ; input$
+PCD_INPUTCMD_START   = $ac ; input.start
+PCD_LEN              = $ad ; len
+PCD_FCMD_CMP         = $ae ; f.cmp
+PCD_INTCMD_DIV       = $af ; int.div
+PCD_MOD              = $b0 ; mod
+PCD_NEGATE           = $b1 ; negate
+PCD_NEWCMD_LINE      = $b2 ; new.line
+PCD_NEXT             = $b3 ; next
+PCD_NOT              = $b4 ; not
+PCD_ON               = $b5 ; on
+PCD_MOREON           = $b6 ; moreon
+PCD_PEEK             = $b7 ; peek
+PCD_PI               = $b8 ; pi
+PCD_POKE             = $b9 ; poke
+PCD_POS              = $ba ; pos
+PCD_GETCHANNEL       = $bb ; getchannel
+PCD_SETCHANNEL       = $bc ; setchannel
+PCD_PRINTCMD_N       = $bd ; print.n
+PCD_PRINTCMD_S       = $be ; print.s
+PCD_READ             = $bf ; read
+PCD_READDOLLAR       = $c0 ; read$
+PCD_RND              = $c1 ; rnd
+PCD_CONCAT           = $c2 ; concat
+PCD_SGN              = $c3 ; sgn
+PCD_PRINTCMD_TAB     = $c4 ; print.tab
+PCD_PRINTCMD_POS     = $c5 ; print.pos
+PCD_PRINTCMD_SPC     = $c6 ; print.spc
+PCD_STRDOLLAR        = $c7 ; str$
+PCD_LEFTDOLLAR       = $c8 ; left$
+PCD_RIGHTDOLLAR      = $c9 ; right$
+PCD_MIDDOLLAR        = $ca ; mid$
+PCD_SWAP             = $cb ; swap
+PCD_TI               = $cc ; ti
+PCD_TIDOLLAR         = $cd ; ti$
+PCD_USR              = $ce ; usr
+PCD_VAL              = $cf ; val
+PCD_CLOSE            = $d0 ; close
+PCD_EXIT             = $d1 ; exit
+PCD_DEBUG            = $d2 ; debug
+PCD_OPEN             = $d3 ; open
+PCD_SCREEN           = $d4 ; screen
+PCD_VPOKE            = $d5 ; vpoke
+PCD_VPEEK            = $d6 ; vpeek
+PCD_CMD_SHIFT        = $d7 ; .shift
+PCD_CMD_BYTE         = $d8 ; .byte
+PCD_CMD_WORD         = $d9 ; .word
+PCD_CMD_FLOAT        = $da ; .float
+PCD_CMD_STRING       = $db ; .string
+PCD_CMD_DATA         = $dc ; .data
+PCD_CMD_GOTO         = $dd ; .goto
+PCD_CMD_GOSUB        = $de ; .gosub
+PCD_CMD_GOTOCMD_Z    = $df ; .goto.z
+PCD_CMD_GOTOCMD_NZ   = $e0 ; .goto.nz
+PCD_CMD_VARSPACE     = $e1 ; .varspace
+PCD_CMD_RESTORE      = $e2 ; .restore
+PCD_CMD_FNGOSUB      = $e3 ; .fngosub
+PCD_CMD_DEFERROR     = $e4 ; .deferror
+PCD_CMD_EXITDO       = $e5 ; .exitdo
+PCD_CLR              = $d780 ; clr
+PCD_DIM              = $d781 ; dim
+PCD_END              = $d782 ; end
+PCD_GPCMD_CALL       = $d783 ; gp.call
+PCD_JOY              = $d784 ; joy
+PCD_INT              = $d785 ; int
+PCD_SQR              = $d786 ; sqr
+PCD_LOG              = $d787 ; log
+PCD_EXP              = $d788 ; exp
+PCD_COS              = $d789 ; cos
+PCD_SIN              = $d78a ; sin
+PCD_TAN              = $d78b ; tan
+PCD_ATN              = $d78c ; atn
+PCD_LINPUT           = $d78d ; linput
+PCD_BINPUT           = $d78e ; binput
+PCD_LOAD             = $d78f ; load
+PCD_BLOAD            = $d790 ; bload
+PCD_BVLOAD           = $d791 ; bvload
+PCD_VLOAD            = $d792 ; vload
+PCD_BSAVE            = $d793 ; bsave
+PCD_BVERIFY          = $d794 ; bverify
+PCD_POWEROFF         = $d795 ; poweroff
+PCD_RESET            = $d796 ; reset
+PCD_REBOOT           = $d797 ; reboot
+PCD_MOUSE            = $d798 ; mouse
+PCD_MB               = $d799 ; mb
+PCD_MX               = $d79a ; mx
+PCD_MY               = $d79b ; my
+PCD_MWHEEL           = $d79c ; mwheel
+PCD_RPTDOLLAR        = $d79d ; rpt$
+PCD_SPRITE           = $d79e ; sprite
+PCD_SPRMEM           = $d79f ; sprmem
+PCD_MOVSPR           = $d7a0 ; movspr
+PCD_ST               = $d7a1 ; st
+PCD_STOP             = $d7a2 ; stop
+PCD_SYS              = $d7a3 ; sys
+PCD_TDATA            = $d7a4 ; tdata
+PCD_TATTR            = $d7a5 ; tattr
+PCD_TILE             = $d7a6 ; tile
+PCD_TICMD_WRITE      = $d7a7 ; ti.write
+PCD_TIDOLLARCMD_WRITE = $d7a8 ; ti$.write
+PCD_WAIT             = $d7a9 ; wait
+PCD_I2CPOKE          = $d7aa ; i2cpoke
+PCD_I2CPEEK          = $d7ab ; i2cpeek
+PCD_BANK             = $d7ac ; bank
+PCD_SLEEP            = $d7ad ; sleep
+PCD_FMINIT           = $d7ae ; fminit
+PCD_FMNOTE           = $d7af ; fmnote
+PCD_FMDRUM           = $d7b0 ; fmdrum
+PCD_FMINST           = $d7b1 ; fminst
+PCD_FMVIB            = $d7b2 ; fmvib
+PCD_FMFREQ           = $d7b3 ; fmfreq
+PCD_FMVOL            = $d7b4 ; fmvol
+PCD_FMPAN            = $d7b5 ; fmpan
+PCD_FMPLAY           = $d7b6 ; fmplay
+PCD_FMCHORD          = $d7b7 ; fmchord
+PCD_FMPOKE           = $d7b8 ; fmpoke
+PCD_PSGINIT          = $d7b9 ; psginit
+PCD_PSGNOTE          = $d7ba ; psgnote
+PCD_PSGVOL           = $d7bb ; psgvol
+PCD_PSGWAV           = $d7bc ; psgwav
+PCD_PSGFREQ          = $d7bd ; psgfreq
+PCD_PSGPAN           = $d7be ; psgpan
+PCD_PSGPLAY          = $d7bf ; psgplay
+PCD_PSGCHORD         = $d7c0 ; psgchord
+PCD_CLS              = $d7c1 ; cls
+PCD_LOCATE           = $d7c2 ; locate
+PCD_COLOR            = $d7c3 ; color
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;
@@ -825,19 +832,19 @@ _MOFENoCarry:
 ;
 .section code
 MOFSizeTable:
-	.byte	1         	; $d5 .shift
-	.byte	1         	; $d6 .byte
-	.byte	2         	; $d7 .word
-	.byte	6         	; $d8 .float
-	.byte	255       	; $d9 .string
-	.byte	255       	; $da .data
-	.byte	2         	; $db .goto
-	.byte	2         	; $dc .gosub
-	.byte	2         	; $dd .goto.z
-	.byte	2         	; $de .goto.nz
-	.byte	2         	; $df .varspace
-	.byte	2         	; $e0 .restore
-	.byte	2         	; $e1 .fngosub
-	.byte	0         	; $e2 .deferror
-	.byte	2         	; $e3 .exitdo
+	.byte	1         	; $d7 .shift
+	.byte	1         	; $d8 .byte
+	.byte	2         	; $d9 .word
+	.byte	6         	; $da .float
+	.byte	255       	; $db .string
+	.byte	255       	; $dc .data
+	.byte	2         	; $dd .goto
+	.byte	2         	; $de .gosub
+	.byte	2         	; $df .goto.z
+	.byte	2         	; $e0 .goto.nz
+	.byte	2         	; $e1 .varspace
+	.byte	2         	; $e2 .restore
+	.byte	2         	; $e3 .fngosub
+	.byte	0         	; $e4 .deferror
+	.byte	2         	; $e5 .exitdo
 .send code

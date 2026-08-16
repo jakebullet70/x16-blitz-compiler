@@ -52,7 +52,7 @@ MidFailType:
 
 ; ************************************************************************************************
 ;
-;		As OptionalParameterCompile, but defaulting to ZERO -- for GP.CALL's A/X/Y/C arguments.
+;		As OptionalParameterCompile, but defaulting to ZERO -- GP.CALL's registers, GP.FIND's start.
 ;
 ;		No sentinel is involved and none is needed: an unspecified register genuinely IS zero, so
 ;		the runtime never has to test for "omitted" and carries no code to do it. Zero also fits
@@ -62,7 +62,7 @@ MidFailType:
 ;
 ; ************************************************************************************************
 
-OptionalRegisterCompile:
+OptionalZeroCompile:
 		jsr 	LookNextNonSpace 			; what follows.
 		cmp 	#","
 		bne 	_ORCDefault

@@ -107,12 +107,15 @@ FrameStackPages = 16 						; 4K, ~250 frames
 ;		existing opcode keeps its ID. The bump is still required in the other direction: an object
 ;		using $DF would dispatch off the end of an ABI 4 runtime's vector table.
 ;
+;		6 -> 7 on 16th August 2026: GP.FIND and GP.STRPTR. "gpstring.asm" sorts after "gpcall.asm",
+;		so the two new unshifted markers shifted every opcode above them again.
+;
 ;		5 -> 6 on 16th August 2026: GP.CALL and the GP.A/GP.X/GP.Y/GP.C value words. This one IS a
 ;		renumbering -- "gpcall.asm" sorts mid-list in the commands directory, so the four unshifted
 ;		markers shifted every opcode above them, and the shifted gp.call did the same to the
 ;		shifted range.
 ;
-RT_ABI = 6 									; runtime ABI ordinal -> "GPC6" magic (NOT the file name)
+RT_ABI = 7 									; runtime ABI ordinal -> "GPC7" magic (NOT the file name)
 
 ; ************************************************************************************************
 ;

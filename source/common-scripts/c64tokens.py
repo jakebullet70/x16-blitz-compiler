@@ -133,7 +133,8 @@ class C64TokenStore(object):
 	def getGP(self):
 		return """
 				52863:GP.DO|52862:GP.LOOP|52861:GP.EXITDO|52860:GP.CALL|
-				52859:GP.A|52858:GP.X|52857:GP.Y|52856:GP.C"""
+				52859:GP.A|52858:GP.X|52857:GP.Y|52856:GP.C|
+				52855:GP.FIND|52854:GP.STRPTR"""
 
 
 if __name__ == "__main__":

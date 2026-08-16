@@ -73,6 +73,6 @@ GP.EXITDO 		X:CommandExitDoCompile N
 #		tokens, NOT variables: nothing lets the runtime write a variable by name, and X16's own
 #		ST/MX/MY are tokens for exactly the same reason.
 #
-GP.CALL 		# X:OptionalRegisterCompile X:OptionalRegisterCompile X:OptionalRegisterCompile X:OptionalRegisterCompile T N
+GP.CALL 		# X:OptionalZeroCompile X:OptionalZeroCompile X:OptionalZeroCompile X:OptionalZeroCompile T N
 
 
