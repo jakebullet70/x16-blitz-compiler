@@ -14,9 +14,33 @@
 
 ; ************************************************************************************************
 ;
-;						<i1> <i2> <i3> <icount> ARRAY <address>
+;						<i1> ARRAY1 <address>						one subscript
+;						<i1> <i2> <i3> <icount> ARRAY <address>		two or more
+;
+;		Two entry points onto the same index walk. The compiler knows how many subscripts were
+;		written, so for the single-subscript reference -- which is very nearly all of them -- it
+;		emits ARRAY1 and leaves the count word off the stack entirely. That saves a p-code
+;		dispatch to push the count and the GetInteger8Bit here to read it back.
+;
+;		In both cases the array's base address is pushed LAST and so is on top; the subscripts
+;		are below it, and the first of them is the slot the resulting address is written back to.
 ;
 ; ************************************************************************************************
+
+ArrayConvert1: ;; [array1]
+		.entercmd
+		phy
+		lda 	NSMantissa0,x 				; base address -> zTemp1, as below
+		sta 	zTemp1
+		lda 	NSMantissa1,x
+		clc
+		adc 	variableStartPage
+		sta 	zTemp1+1
+		lda 	#1 							; exactly one subscript, and no count word was pushed
+		sta 	zTemp2
+		dex 								; so the single subscript sits directly below the base
+		phx 								; and is the slot that will be replaced
+		bra 	ACIndexLoop
 
 ArrayConvert: ;; [array]
 		.entercmd
@@ -28,27 +52,35 @@ ArrayConvert: ;; [array]
 		sta 	zTemp1
 		lda 	NSMantissa1,x
 		clc
-		adc 	variableStartPage		
+		adc 	variableStartPage
 		sta 	zTemp1+1
 		;
-		;		Set up for following, firstly get the number of levels to zTemp2, and point the 
+		;		Set up for following, firstly get the number of levels to zTemp2, and point the
 		;		stack to the first level.
 		;
 		dex 								; count of indices to follow -> zTemp2
-		jsr 	GetInteger8Bit 
+		jsr 	GetInteger8Bit
 		sta 	zTemp2 						; subtract from stack.
 
 		txa
 		sec
 		sbc 	zTemp2
-		tax 
-		phx 								; stack points at the first index, which will be replaced.		
+		tax
+		phx 								; stack points at the first index, which will be replaced.
 		;
-		;		The loop for following down the indices
+		;		The loop for following down the indices. A global label, not the _-prefixed local
+		;		it was: 64tass scopes a _ label to the enclosing global one, and ArrayConvert1
+		;		above needs to branch in here from its own scope.
 		;
-_ACIndexLoop:		
-		jsr 	FloatIntegerPart 			; integer array index
-		jsr 	GetInteger16Bit 			; get the index => zTemp0
+ACIndexLoop:
+		;
+		;		GetInteger16Bit opens with .floatinteger, which IS jsr FloatIntegerPart, so the
+		;		explicit call that used to stand here ran it twice on every index of every array
+		;		access in the program. The second call could only ever take the do-nothing path:
+		;		the first leaves NSExponent zero, which is the test FloatIntegerPart exits on. So
+		;		it bought nothing and cost jsr+pha+lda+beq+pla+rts = 26 cycles an index.
+		;
+		jsr 	GetInteger16Bit 			; truncate to integer and fetch the index => zTemp0
 		ldy 	#1 							; compare against the index count.
 		lda 	zTemp0
 		cmp 	(zTemp1)
@@ -85,7 +117,7 @@ _ACIndexLoop:
 		adc 	variableStartPage
 		sta 	zTemp1+1
 		inx 								; next index
-		bra 	_ACIndexLoop
+		bra 	ACIndexLoop
 		;
 		;		Reached the innermost level.
 		;

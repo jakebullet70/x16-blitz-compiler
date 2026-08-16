@@ -130,10 +130,41 @@ _WCSAfter:
 ;
 ; ************************************************************************************************
 
+;		Compile an index group and push the count word after it. DIM wants this form: the
+;		runtime's PCD_DIM always reads a count, however many dimensions were written.
+;
 OutputIndexGroup:
+		jsr 	OutputIndexGroupNC 			; the indices themselves
+		lda 	IndexCount
+		jsr 	PushIntegerA 				; compile the dimension count.
+		rts
+
+; ************************************************************************************************
+;
+;		The same thing WITHOUT the trailing count word, leaving the tally in IndexCount for the
+;		caller to act on. An array REFERENCE uses this: with one index -- which is very nearly
+;		all of them -- it emits the fused PCD_ARRAY1 instead, and that keyword knows the count is
+;		one, so pushing a word for the runtime to read straight back is pure cost. See
+;		GetReferenceTerm in refterm.asm.
+;
+; ************************************************************************************************
+
+OutputIndexGroupNC:
 		stz 	IndexCount 					; count of number of indices.
 _OIGNext:
+		;
+		;		IndexCount is a single global, and CompileExpressionAt0 can recurse right back
+		;		into here: A(B(I)) compiles B(I) as the outer subscript, and that inner reference
+		;		zeroed this counter and counted its own indices into it. The outer then resumed
+		;		from the INNER's tally, so A(B(I)) emitted a two-index access against a
+		;		one-dimensional array and died at runtime with BAD ARRAY INDEX. Nested subscripts
+		;		are ordinary BASIC, so save the tally across the descent.
+		;
+		lda 	IndexCount
+		pha
 		jsr 	CompileExpressionAt0 		; get a dimension
+		plx 								; restore our own count -- X is free here, and A is
+		stx 	IndexCount 					; the expression type the next lines test
 		and 	#NSSTypeMask 				; check it is numeric
 		cmp 	#NSSIFloat
 		bne 	_OIGType
@@ -145,8 +176,6 @@ _OIGNext:
 		bra 	_OIGNext 					; get next dimension
 _OIGCheckEnd:
 		jsr 	CheckNextRParen 			; check and consume )
-		lda 	IndexCount
-		jsr 	PushIntegerA 				; compile the dimension count.
 		rts
 
 _OIGType:
@@ -157,6 +186,10 @@ _OIGType:
 		.section storage
 IndexCount:
 		.fill 	1
+refIndexCount: 								; GetReferenceTerm's copy of IndexCount, taken the moment
+		.fill 	1 							; the subscripts are compiled and read back after
+											; GetSetVariable to pick the array keyword. Held apart
+											; from IndexCount so nothing between the two can matter.
 clrCheckpoint: 								; variable-allocation high-water at the last compiled CLR;
 		.fill 	2 							; an array whose slot lies below this may be legally re-DIMmed.
 		.send storage

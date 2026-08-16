@@ -43,7 +43,19 @@ _GRTKnown:
 		pha 								; save that flag, and the name/address, over OutputIndexGroup
 		phx
 		phy
-		jsr 	OutputIndexGroup 			; create an index group; IndexCount = the dimension count
+		;
+		;		The NC form: subscripts only, no count word after them. How many there were comes
+		;		back in IndexCount, and only a reference with two or more needs that count pushed
+		;		-- the single-subscript case, which is very nearly all of them, uses the fused
+		;		PCD_ARRAY1 below and that keyword already knows the count is one.
+		;
+		jsr 	OutputIndexGroupNC 			; compile the subscripts; IndexCount = how many
+		lda 	IndexCount 					; take our own copy now: GetSetVariable and
+		sta 	refIndexCount 				; RegisterImplicitArray both run before we read it back
+		cmp 	#2
+		bcc 	_GRTNoCountWord 			; one subscript -> the fused keyword needs no count
+		jsr 	PushIntegerA 				; two or more -> PCD_ARRAY reads a count word
+_GRTNoCountWord:
 		ply 								; restore name/address into YX
 		plx
 		pla 								; and the create flag
@@ -58,8 +70,19 @@ _GRTResolved:
 		lda 	#NSSIFloat+NSSIInt16 		; pretend it is an int16 reference.
 		clc
 		jsr 	GetSetVariable 				; load the address of the array structure.
-		.keyword PCD_ARRAY 					; convert that to an offset.
-
+		;
+		;		One subscript takes the fused keyword. It saves the count word -- a whole p-code
+		;		dispatch to push it, and a GetInteger8Bit in the runtime to read it back -- on an
+		;		access whose count the compiler knew all along.
+		;
+		lda 	refIndexCount
+		cmp 	#1
+		bne 	_GRTManyIndices
+		.keyword PCD_ARRAY1 				; convert that to an offset, count implicitly 1
+		bra 	_GRTIndexed
+_GRTManyIndices:
+		.keyword PCD_ARRAY 					; convert that to an offset, count read off the stack
+_GRTIndexed:
 		pla 								; and the type data into A
 		and 	#NSSTypeMask+NSSIInt16
 		ora 	#$80 						; with the array flag set.

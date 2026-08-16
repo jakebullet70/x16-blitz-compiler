@@ -95,18 +95,38 @@ _SRAfterClear:
 		;
 		;		Main Run Loop
 		;
-		ldy 	#0	
-NextCommand:
-		lda  	breakCount 					; only check every 16 instructions.
-		adc 	#16
-		sta 	breakCount
-		bcc 	_NXNoCheck
+		bra 	NXStartLoop 				; step over the out-of-line break check below
+		;
+		;		The Ctrl+C poll, lifted out of the dispatch path. It runs once every 16 p-code
+		;		words; the counter test in front of it runs on EVERY word, which makes it the
+		;		hottest four instructions in the runtime. It used to be
+		;
+		;			lda breakCount / adc #16 / sta breakCount / bcc		= 13 cycles
+		;
+		;		and is now dec/beq = 8, for the same one-in-16 rate. Five cycles a p-code word,
+		;		on every keyword of every program. breakCount needs no initialising: whatever it
+		;		holds at entry, the first poll lands within 256 words and every one after that is
+		;		on the 16 re-armed here.
+		;
+		;		These three are deliberately GLOBAL labels, not the _-prefixed locals used
+		;		elsewhere in this file: 64tass scopes a _ label to the enclosing global one, so
+		;		a check sitting above NextCommand cannot branch to a local defined below it.
+		;
+NXBreakCheck:
 		phx
 		phy 								; check Ctrl+C
 		jsr 	XCheckStop
 		ply
 		plx
-_NXNoCheck:
+		lda 	#16 						; re-arm the counter for the next 16 words
+		sta 	breakCount
+		bra 	NXDispatch
+NXStartLoop:
+		ldy 	#0
+NextCommand:
+		dec 	breakCount 					; only check every 16 instructions.
+		beq 	NXBreakCheck
+NXDispatch:
 		lda 	(codePtr),y 				; get next
 		bmi 	NXCommand 					; -if -ve command
 		iny

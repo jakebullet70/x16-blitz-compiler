@@ -80,7 +80,13 @@ FrameStackPages = 16 						; 4K, ~250 frames
 ;		exact runtime it was built against, and since the build number bumps on every engine
 ;		build, shared programs must be recompiled whenever the engine is rebuilt.
 ;
-RT_ABI = 2 									; runtime ABI ordinal -> "GPC2" magic (NOT the file name)
+;		2 -> 3 on 16th August 2026: PCD_ARRAY1 joined the table, and p-code IDs are handed out in
+;		the order the ;; [name] markers are scanned, so every opcode after "array1" shifted up by
+;		one. A resident runtime of the same ABI is deliberately reused across engine builds --
+;		and with renumbered opcodes that would dispatch most of the table to the wrong handler.
+;		This is the guard that stops it.
+;
+RT_ABI = 3 									; runtime ABI ordinal -> "GPC3" magic (NOT the file name)
 
 ; ************************************************************************************************
 ;

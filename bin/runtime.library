@@ -607,18 +607,38 @@ _SRAfterClear:
 		;
 		;		Main Run Loop
 		;
-		ldy 	#0	
-NextCommand:
-		lda  	breakCount 					; only check every 16 instructions.
-		adc 	#16
-		sta 	breakCount
-		bcc 	_NXNoCheck
+		bra 	NXStartLoop 				; step over the out-of-line break check below
+		;
+		;		The Ctrl+C poll, lifted out of the dispatch path. It runs once every 16 p-code
+		;		words; the counter test in front of it runs on EVERY word, which makes it the
+		;		hottest four instructions in the runtime. It used to be
+		;
+		;			lda breakCount / adc #16 / sta breakCount / bcc		= 13 cycles
+		;
+		;		and is now dec/beq = 8, for the same one-in-16 rate. Five cycles a p-code word,
+		;		on every keyword of every program. breakCount needs no initialising: whatever it
+		;		holds at entry, the first poll lands within 256 words and every one after that is
+		;		on the 16 re-armed here.
+		;
+		;		These three are deliberately GLOBAL labels, not the _-prefixed locals used
+		;		elsewhere in this file: 64tass scopes a _ label to the enclosing global one, so
+		;		a check sitting above NextCommand cannot branch to a local defined below it.
+		;
+NXBreakCheck:
 		phx
 		phy 								; check Ctrl+C
 		jsr 	XCheckStop
 		ply
 		plx
-_NXNoCheck:
+		lda 	#16 						; re-arm the counter for the next 16 words
+		sta 	breakCount
+		bra 	NXDispatch
+NXStartLoop:
+		ldy 	#0
+NextCommand:
+		dec 	breakCount 					; only check every 16 instructions.
+		beq 	NXBreakCheck
+NXDispatch:
 		lda 	(codePtr),y 				; get next
 		bmi 	NXCommand 					; -if -ve command
 		iny
@@ -1007,9 +1027,33 @@ _AOGRange:
 
 ; ************************************************************************************************
 ;
-;						<i1> <i2> <i3> <icount> ARRAY <address>
+;						<i1> ARRAY1 <address>						one subscript
+;						<i1> <i2> <i3> <icount> ARRAY <address>		two or more
+;
+;		Two entry points onto the same index walk. The compiler knows how many subscripts were
+;		written, so for the single-subscript reference -- which is very nearly all of them -- it
+;		emits ARRAY1 and leaves the count word off the stack entirely. That saves a p-code
+;		dispatch to push the count and the GetInteger8Bit here to read it back.
+;
+;		In both cases the array's base address is pushed LAST and so is on top; the subscripts
+;		are below it, and the first of them is the slot the resulting address is written back to.
 ;
 ; ************************************************************************************************
+
+ArrayConvert1: ;; [array1]
+		.entercmd
+		phy
+		lda 	NSMantissa0,x 				; base address -> zTemp1, as below
+		sta 	zTemp1
+		lda 	NSMantissa1,x
+		clc
+		adc 	variableStartPage
+		sta 	zTemp1+1
+		lda 	#1 							; exactly one subscript, and no count word was pushed
+		sta 	zTemp2
+		dex 								; so the single subscript sits directly below the base
+		phx 								; and is the slot that will be replaced
+		bra 	ACIndexLoop
 
 ArrayConvert: ;; [array]
 		.entercmd
@@ -1021,27 +1065,35 @@ ArrayConvert: ;; [array]
 		sta 	zTemp1
 		lda 	NSMantissa1,x
 		clc
-		adc 	variableStartPage		
+		adc 	variableStartPage
 		sta 	zTemp1+1
 		;
-		;		Set up for following, firstly get the number of levels to zTemp2, and point the 
+		;		Set up for following, firstly get the number of levels to zTemp2, and point the
 		;		stack to the first level.
 		;
 		dex 								; count of indices to follow -> zTemp2
-		jsr 	GetInteger8Bit 
+		jsr 	GetInteger8Bit
 		sta 	zTemp2 						; subtract from stack.
 
 		txa
 		sec
 		sbc 	zTemp2
-		tax 
-		phx 								; stack points at the first index, which will be replaced.		
+		tax
+		phx 								; stack points at the first index, which will be replaced.
 		;
-		;		The loop for following down the indices
+		;		The loop for following down the indices. A global label, not the _-prefixed local
+		;		it was: 64tass scopes a _ label to the enclosing global one, and ArrayConvert1
+		;		above needs to branch in here from its own scope.
 		;
-_ACIndexLoop:		
-		jsr 	FloatIntegerPart 			; integer array index
-		jsr 	GetInteger16Bit 			; get the index => zTemp0
+ACIndexLoop:
+		;
+		;		GetInteger16Bit opens with .floatinteger, which IS jsr FloatIntegerPart, so the
+		;		explicit call that used to stand here ran it twice on every index of every array
+		;		access in the program. The second call could only ever take the do-nothing path:
+		;		the first leaves NSExponent zero, which is the test FloatIntegerPart exits on. So
+		;		it bought nothing and cost jsr+pha+lda+beq+pla+rts = 26 cycles an index.
+		;
+		jsr 	GetInteger16Bit 			; truncate to integer and fetch the index => zTemp0
 		ldy 	#1 							; compare against the index count.
 		lda 	zTemp0
 		cmp 	(zTemp1)
@@ -1078,7 +1130,7 @@ _ACIndexLoop:
 		adc 	variableStartPage
 		sta 	zTemp1+1
 		inx 								; next index
-		bra 	_ACIndexLoop
+		bra 	ACIndexLoop
 		;
 		;		Reached the innermost level.
 		;
@@ -8262,154 +8314,155 @@ VectorTable:
 	.word	LinkCompareNotEqual      ; $8b <>
 	.word	LinkCompareLessEqual     ; $8c <=
 	.word	AbsoluteTOS              ; $8d abs
-	.word	ArrayConvert             ; $8e array
-	.word	UnaryAsc                 ; $8f asc
-	.word	CommandAssert            ; $90 assert
-	.word	Unary16Bin               ; $91 bin$
-	.word	PrintCharacterX          ; $92 print.chr
-	.word	UnaryChr                 ; $93 chr$
-	.word	CompareStrings           ; $94 s.cmp
-	.word	CommandXFor              ; $95 for
-	.word	UnaryFre                 ; $96 fre
-	.word	CommandXGet              ; $97 get
-	.word	CommandReturn            ; $98 return
-	.word	Command_PSET             ; $99 pset
-	.word	Command_LINE             ; $9a line
-	.word	Command_RECT             ; $9b rect
-	.word	Command_FRAME            ; $9c frame
-	.word	Command_OVAL             ; $9d oval
-	.word	Command_RING             ; $9e ring
-	.word	Command_CHAR             ; $9f char
-	.word	Unary16Hex               ; $a0 hex$
-	.word	CommandXInput            ; $a1 input
-	.word	CommandInputString       ; $a2 input$
-	.word	CommandInputReset        ; $a3 input.start
-	.word	UnaryLen                 ; $a4 len
-	.word	LinkFloatCompare         ; $a5 f.cmp
-	.word	LinkDivideInt32          ; $a6 int.div
-	.word	UnaryMOD                 ; $a7 mod
-	.word	NegateTOS                ; $a8 negate
-	.word	CommandNewLine           ; $a9 new.line
-	.word	CommandXNext             ; $aa next
-	.word	NotTOS                   ; $ab not
-	.word	CommandXOn               ; $ac on
-	.word	CommandMoreOn            ; $ad moreon
-	.word	UnaryPeek                ; $ae peek
-	.word	UnaryPI                  ; $af pi
-	.word	CommandPOKE              ; $b0 poke
-	.word	UnaryPos                 ; $b1 pos
-	.word	GetChannel               ; $b2 getchannel
-	.word	SetChannel               ; $b3 setchannel
-	.word	PrintNumber              ; $b4 print.n
-	.word	PrintString              ; $b5 print.s
-	.word	CommandXRead             ; $b6 read
-	.word	CommandReadString        ; $b7 read$
-	.word	UnaryRND                 ; $b8 rnd
-	.word	StringConcatenate        ; $b9 concat
-	.word	SignTOS                  ; $ba sgn
-	.word	PrintTab                 ; $bb print.tab
-	.word	PrintPos                 ; $bc print.pos
-	.word	PrintSpace               ; $bd print.spc
-	.word	Unary_Str                ; $be str$
-	.word	Unary_Left               ; $bf left$
-	.word	Unary_Right              ; $c0 right$
-	.word	Unary_Mid                ; $c1 mid$
-	.word	CommandSwap              ; $c2 swap
-	.word	TimeTOS                  ; $c3 ti
-	.word	TimeString               ; $c4 ti$
-	.word	UnaryUsr                 ; $c5 usr
-	.word	ValUnary                 ; $c6 val
-	.word	CommandClose             ; $c7 close
-	.word	CommandExit              ; $c8 exit
-	.word	CommandDebug             ; $c9 debug
-	.word	CommandXOpen             ; $ca open
-	.word	CommandScreen            ; $cb screen
-	.word	CommandVPOKE             ; $cc vpoke
-	.word	CommandVPEEK             ; $cd vpeek
-	.word	CommandShift             ; $ce .shift
-	.word	PushByteCommand          ; $cf .byte
-	.word	PushWordCommand          ; $d0 .word
-	.word	CommandPushN             ; $d1 .float
-	.word	CommandPushS             ; $d2 .string
-	.word	CommandXData             ; $d3 .data
-	.word	CommandXGoto             ; $d4 .goto
-	.word	CommandXGosub            ; $d5 .gosub
-	.word	CommandGotoZ             ; $d6 .goto.z
-	.word	CommandGotoNZ            ; $d7 .goto.nz
-	.word	CommandVarSpace          ; $d8 .varspace
-	.word	CommandRestoreX          ; $d9 .restore
-	.word	CommandXFnGosub          ; $da .fngosub
-	.word	CommandDeferredError     ; $db .deferror
+	.word	ArrayConvert1            ; $8e array1
+	.word	ArrayConvert             ; $8f array
+	.word	UnaryAsc                 ; $90 asc
+	.word	CommandAssert            ; $91 assert
+	.word	Unary16Bin               ; $92 bin$
+	.word	PrintCharacterX          ; $93 print.chr
+	.word	UnaryChr                 ; $94 chr$
+	.word	CompareStrings           ; $95 s.cmp
+	.word	CommandXFor              ; $96 for
+	.word	UnaryFre                 ; $97 fre
+	.word	CommandXGet              ; $98 get
+	.word	CommandReturn            ; $99 return
+	.word	Command_PSET             ; $9a pset
+	.word	Command_LINE             ; $9b line
+	.word	Command_RECT             ; $9c rect
+	.word	Command_FRAME            ; $9d frame
+	.word	Command_OVAL             ; $9e oval
+	.word	Command_RING             ; $9f ring
+	.word	Command_CHAR             ; $a0 char
+	.word	Unary16Hex               ; $a1 hex$
+	.word	CommandXInput            ; $a2 input
+	.word	CommandInputString       ; $a3 input$
+	.word	CommandInputReset        ; $a4 input.start
+	.word	UnaryLen                 ; $a5 len
+	.word	LinkFloatCompare         ; $a6 f.cmp
+	.word	LinkDivideInt32          ; $a7 int.div
+	.word	UnaryMOD                 ; $a8 mod
+	.word	NegateTOS                ; $a9 negate
+	.word	CommandNewLine           ; $aa new.line
+	.word	CommandXNext             ; $ab next
+	.word	NotTOS                   ; $ac not
+	.word	CommandXOn               ; $ad on
+	.word	CommandMoreOn            ; $ae moreon
+	.word	UnaryPeek                ; $af peek
+	.word	UnaryPI                  ; $b0 pi
+	.word	CommandPOKE              ; $b1 poke
+	.word	UnaryPos                 ; $b2 pos
+	.word	GetChannel               ; $b3 getchannel
+	.word	SetChannel               ; $b4 setchannel
+	.word	PrintNumber              ; $b5 print.n
+	.word	PrintString              ; $b6 print.s
+	.word	CommandXRead             ; $b7 read
+	.word	CommandReadString        ; $b8 read$
+	.word	UnaryRND                 ; $b9 rnd
+	.word	StringConcatenate        ; $ba concat
+	.word	SignTOS                  ; $bb sgn
+	.word	PrintTab                 ; $bc print.tab
+	.word	PrintPos                 ; $bd print.pos
+	.word	PrintSpace               ; $be print.spc
+	.word	Unary_Str                ; $bf str$
+	.word	Unary_Left               ; $c0 left$
+	.word	Unary_Right              ; $c1 right$
+	.word	Unary_Mid                ; $c2 mid$
+	.word	CommandSwap              ; $c3 swap
+	.word	TimeTOS                  ; $c4 ti
+	.word	TimeString               ; $c5 ti$
+	.word	UnaryUsr                 ; $c6 usr
+	.word	ValUnary                 ; $c7 val
+	.word	CommandClose             ; $c8 close
+	.word	CommandExit              ; $c9 exit
+	.word	CommandDebug             ; $ca debug
+	.word	CommandXOpen             ; $cb open
+	.word	CommandScreen            ; $cc screen
+	.word	CommandVPOKE             ; $cd vpoke
+	.word	CommandVPEEK             ; $ce vpeek
+	.word	CommandShift             ; $cf .shift
+	.word	PushByteCommand          ; $d0 .byte
+	.word	PushWordCommand          ; $d1 .word
+	.word	CommandPushN             ; $d2 .float
+	.word	CommandPushS             ; $d3 .string
+	.word	CommandXData             ; $d4 .data
+	.word	CommandXGoto             ; $d5 .goto
+	.word	CommandXGosub            ; $d6 .gosub
+	.word	CommandGotoZ             ; $d7 .goto.z
+	.word	CommandGotoNZ            ; $d8 .goto.nz
+	.word	CommandVarSpace          ; $d9 .varspace
+	.word	CommandRestoreX          ; $da .restore
+	.word	CommandXFnGosub          ; $db .fngosub
+	.word	CommandDeferredError     ; $dc .deferror
 
 
 ShiftVectorTable:
-	.word	CommandClr               ; $ce80 clr
-	.word	CommandXDIM              ; $ce81 dim
-	.word	CommandEnd               ; $ce82 end
-	.word	UnaryJoy                 ; $ce83 joy
-	.word	LinkFloatIntegerPartDown ; $ce84 int
-	.word	LinkFloatSquareRoot      ; $ce85 sqr
-	.word	LinkFloatLogarithm       ; $ce86 log
-	.word	LinkFloatExponent        ; $ce87 exp
-	.word	LinkFloatCosine          ; $ce88 cos
-	.word	LinkFloatSine            ; $ce89 sin
-	.word	LinkFloatTangent         ; $ce8a tan
-	.word	LinkFloatArcTan          ; $ce8b atn
-	.word	CommandXLinput           ; $ce8c linput
-	.word	CommandXBinput           ; $ce8d binput
-	.word	Command_LOAD             ; $ce8e load
-	.word	Command_BLOAD            ; $ce8f bload
-	.word	Command_BVLOAD           ; $ce90 bvload
-	.word	Command_VLOAD            ; $ce91 vload
-	.word	Command_BSAVE            ; $ce92 bsave
-	.word	Command_BVERIFY          ; $ce93 bverify
-	.word	X16CommandPowerOff       ; $ce94 poweroff
-	.word	X16CommandReset          ; $ce95 reset
-	.word	X16CommandReboot         ; $ce96 reboot
-	.word	XCommandMouse            ; $ce97 mouse
-	.word	XUnaryMB                 ; $ce98 mb
-	.word	XUnaryMX                 ; $ce99 mx
-	.word	XUnaryMY                 ; $ce9a my
-	.word	XUnaryMWheel             ; $ce9b mwheel
-	.word	UnaryRPT                 ; $ce9c rpt$
-	.word	Command_SPRITE           ; $ce9d sprite
-	.word	Command_SPRMEM           ; $ce9e sprmem
-	.word	Command_MOVSPR           ; $ce9f movspr
-	.word	UnaryST                  ; $cea0 st
-	.word	CommandStop              ; $cea1 stop
-	.word	CommandSYS               ; $cea2 sys
-	.word	UnaryTDATA               ; $cea3 tdata
-	.word	UnaryTATTR               ; $cea4 tattr
-	.word	Command_TILE             ; $cea5 tile
-	.word	CommandTIWriteN          ; $cea6 ti.write
-	.word	CommandTIWriteS          ; $cea7 ti$.write
-	.word	CommandXWAIT             ; $cea8 wait
-	.word	X16I2CPoke               ; $cea9 i2cpoke
-	.word	X16I2CPeek               ; $ceaa i2cpeek
-	.word	CommandBank              ; $ceab bank
-	.word	XCommandSleep            ; $ceac sleep
-	.word	X16_Audio_FMINIT         ; $cead fminit
-	.word	X16_Audio_FMNOTE         ; $ceae fmnote
-	.word	X16_Audio_FMDRUM         ; $ceaf fmdrum
-	.word	X16_Audio_FMINST         ; $ceb0 fminst
-	.word	X16_Audio_FMVIB          ; $ceb1 fmvib
-	.word	X16_Audio_FMFREQ         ; $ceb2 fmfreq
-	.word	X16_Audio_FMVOL          ; $ceb3 fmvol
-	.word	X16_Audio_FMPAN          ; $ceb4 fmpan
-	.word	X16_Audio_FMPLAY         ; $ceb5 fmplay
-	.word	X16_Audio_FMCHORD        ; $ceb6 fmchord
-	.word	X16_Audio_FMPOKE         ; $ceb7 fmpoke
-	.word	X16_Audio_PSGINIT        ; $ceb8 psginit
-	.word	X16_Audio_PSGNOTE        ; $ceb9 psgnote
-	.word	X16_Audio_PSGVOL         ; $ceba psgvol
-	.word	X16_Audio_PSGWAV         ; $cebb psgwav
-	.word	X16_Audio_PSGFREQ        ; $cebc psgfreq
-	.word	X16_Audio_PSGPAN         ; $cebd psgpan
-	.word	X16_Audio_PSGPLAY        ; $cebe psgplay
-	.word	X16_Audio_PSGCHORD       ; $cebf psgchord
-	.word	CommandCls               ; $cec0 cls
-	.word	CommandLocate            ; $cec1 locate
-	.word	CommandColor             ; $cec2 color
+	.word	CommandClr               ; $cf80 clr
+	.word	CommandXDIM              ; $cf81 dim
+	.word	CommandEnd               ; $cf82 end
+	.word	UnaryJoy                 ; $cf83 joy
+	.word	LinkFloatIntegerPartDown ; $cf84 int
+	.word	LinkFloatSquareRoot      ; $cf85 sqr
+	.word	LinkFloatLogarithm       ; $cf86 log
+	.word	LinkFloatExponent        ; $cf87 exp
+	.word	LinkFloatCosine          ; $cf88 cos
+	.word	LinkFloatSine            ; $cf89 sin
+	.word	LinkFloatTangent         ; $cf8a tan
+	.word	LinkFloatArcTan          ; $cf8b atn
+	.word	CommandXLinput           ; $cf8c linput
+	.word	CommandXBinput           ; $cf8d binput
+	.word	Command_LOAD             ; $cf8e load
+	.word	Command_BLOAD            ; $cf8f bload
+	.word	Command_BVLOAD           ; $cf90 bvload
+	.word	Command_VLOAD            ; $cf91 vload
+	.word	Command_BSAVE            ; $cf92 bsave
+	.word	Command_BVERIFY          ; $cf93 bverify
+	.word	X16CommandPowerOff       ; $cf94 poweroff
+	.word	X16CommandReset          ; $cf95 reset
+	.word	X16CommandReboot         ; $cf96 reboot
+	.word	XCommandMouse            ; $cf97 mouse
+	.word	XUnaryMB                 ; $cf98 mb
+	.word	XUnaryMX                 ; $cf99 mx
+	.word	XUnaryMY                 ; $cf9a my
+	.word	XUnaryMWheel             ; $cf9b mwheel
+	.word	UnaryRPT                 ; $cf9c rpt$
+	.word	Command_SPRITE           ; $cf9d sprite
+	.word	Command_SPRMEM           ; $cf9e sprmem
+	.word	Command_MOVSPR           ; $cf9f movspr
+	.word	UnaryST                  ; $cfa0 st
+	.word	CommandStop              ; $cfa1 stop
+	.word	CommandSYS               ; $cfa2 sys
+	.word	UnaryTDATA               ; $cfa3 tdata
+	.word	UnaryTATTR               ; $cfa4 tattr
+	.word	Command_TILE             ; $cfa5 tile
+	.word	CommandTIWriteN          ; $cfa6 ti.write
+	.word	CommandTIWriteS          ; $cfa7 ti$.write
+	.word	CommandXWAIT             ; $cfa8 wait
+	.word	X16I2CPoke               ; $cfa9 i2cpoke
+	.word	X16I2CPeek               ; $cfaa i2cpeek
+	.word	CommandBank              ; $cfab bank
+	.word	XCommandSleep            ; $cfac sleep
+	.word	X16_Audio_FMINIT         ; $cfad fminit
+	.word	X16_Audio_FMNOTE         ; $cfae fmnote
+	.word	X16_Audio_FMDRUM         ; $cfaf fmdrum
+	.word	X16_Audio_FMINST         ; $cfb0 fminst
+	.word	X16_Audio_FMVIB          ; $cfb1 fmvib
+	.word	X16_Audio_FMFREQ         ; $cfb2 fmfreq
+	.word	X16_Audio_FMVOL          ; $cfb3 fmvol
+	.word	X16_Audio_FMPAN          ; $cfb4 fmpan
+	.word	X16_Audio_FMPLAY         ; $cfb5 fmplay
+	.word	X16_Audio_FMCHORD        ; $cfb6 fmchord
+	.word	X16_Audio_FMPOKE         ; $cfb7 fmpoke
+	.word	X16_Audio_PSGINIT        ; $cfb8 psginit
+	.word	X16_Audio_PSGNOTE        ; $cfb9 psgnote
+	.word	X16_Audio_PSGVOL         ; $cfba psgvol
+	.word	X16_Audio_PSGWAV         ; $cfbb psgwav
+	.word	X16_Audio_PSGFREQ        ; $cfbc psgfreq
+	.word	X16_Audio_PSGPAN         ; $cfbd psgpan
+	.word	X16_Audio_PSGPLAY        ; $cfbe psgplay
+	.word	X16_Audio_PSGCHORD       ; $cfbf psgchord
+	.word	CommandCls               ; $cfc0 cls
+	.word	CommandLocate            ; $cfc1 locate
+	.word	CommandColor             ; $cfc2 color
 	.send code
 ; ************************************************************************************************
 ; ************************************************************************************************

@@ -80,28 +80,28 @@
 ;
 ;	ON     # T X:CommandON N
 ;
-	.byte	$09,$91,$00,$e1,172,$03,CommandON & $FF,CommandON >> 8,$06
+	.byte	$09,$91,$00,$e1,173,$03,CommandON & $FF,CommandON >> 8,$06
 ;
 ;	SYS    # T N
 ;
-	.byte	$07,$9e,$00,$e2,41678 & $FF,41678 >> 8,$06
+	.byte	$07,$9e,$00,$e2,41679 & $FF,41679 >> 8,$06
 ;
 ;	POKE    #,# T N
 ;
-	.byte	$07,$97,$00,$ea,$e1,176,$06
+	.byte	$07,$97,$00,$ea,$e1,177,$06
 ;
 ;	RETURN    T N
 ;
-	.byte	$06,$8e,$00,$10,152,$06
+	.byte	$06,$8e,$00,$10,153,$06
 ;
 ;	STOP    T N
 ;
-	.byte	$07,$90,$00,$20,41422 & $FF,41422 >> 8,$06
+	.byte	$07,$90,$00,$20,41423 & $FF,41423 >> 8,$06
 ;
 ;	END    T N
 ;
-	.byte	$07,$80,$00,$20,33486 & $FF,33486 >> 8,$06
+	.byte	$07,$80,$00,$20,33487 & $FF,33487 >> 8,$06
 ;
 ;	CLR    X:CommandClrCompile T N
 ;
-	.byte	$0a,$9c,$00,$03,CommandClrCompile & $FF,CommandClrCompile >> 8,$20,32974 & $FF,32974 >> 8,$06
+	.byte	$0a,$9c,$00,$03,CommandClrCompile & $FF,CommandClrCompile >> 8,$20,32975 & $FF,32975 >> 8,$06
