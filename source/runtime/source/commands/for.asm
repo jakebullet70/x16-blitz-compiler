@@ -20,8 +20,24 @@
 
 CommandXFor: ;; [for]
 		.entercmd
+		;
+		;		Stock BASIC REUSES the frame of an open FOR with the same index variable rather
+		;		than opening a second one. Opening unconditionally leaked 19 bytes of frame stack
+		;		every time a loop was abandoned and re-entered, so
+		;
+		;			20 FOR I=1 TO 5 : C=C+1 : IF C<500 THEN 20
+		;
+		;		runs forever interpreted but died compiled with OUT OF MEMORY after ~215 passes.
+		;		Search first, as FNDFOR does. Only worth looking if the top frame is a FOR at all,
+		;		because the search stops at the first frame that is not one.
+		;
+		lda 	(runtimeStackPtr)
+		cmp 	#FRAME_FOR
+		bne 	_CFNoReuse
+		jsr 	ReuseForFrame
+_CFNoReuse:
 		lda 	#FRAME_FOR 					; open frame
-		jsr 	StackOpenFrame 			
+		jsr 	StackOpenFrame
 		jsr 	StackSaveCurrentPosition 	; normalise to Y=0 and save position.
 
 		ldy 	#7 							; copy step out
@@ -133,6 +149,71 @@ CopyTOSToOffsetY:
 
 ; ************************************************************************************************
 ;
+;		Throw any open FOR frame using the same index variable as the FOR about to be opened,
+;		along with every frame stacked above it, so the new frame reuses its space.
+;
+;		Walks a COPY of the stack pointer and only commits on a match, so a search that finds
+;		nothing leaves the stack untouched. Stops at the first frame that is not a FOR, exactly
+;		as the 6502 ROM does -- which is what makes an intervening GOSUB shield a subroutine's
+;		FOR I from the caller's. The $FF stack-empty marker is not FRAME_FOR, so it stops there
+;		too and needs no test of its own.
+;
+;		Y holds the code pointer offset on entry to a command, and StackOpenFrame's OUT OF
+;		MEMORY reports codePtr+Y, so Y is saved and restored -- see blitz-error-codeptr-y.
+;
+; ************************************************************************************************
+
+ReuseForFrame:
+		phy
+		dex 								; <reference> <terminal> <step>, so the index
+		dex 								; variable reference is two below TOS.
+		lda 	NSMantissa0,x
+		sta 	zTemp2
+		lda 	NSMantissa1,x
+		and 	#$7F 						; frame offset 6 holds it with the type bit thrown.
+		sta 	zTemp2+1
+		inx
+		inx
+		;
+		lda 	runtimeStackPtr 			; walk a copy
+		sta 	zTemp1
+		lda 	runtimeStackPtr+1
+		sta 	zTemp1+1
+_RFFLoop:
+		lda 	(zTemp1) 					; still a FOR frame ?
+		cmp 	#FRAME_FOR
+		bne 	_RFFExit
+		ldy 	#5 							; same index variable ?
+		lda 	(zTemp1),y
+		cmp 	zTemp2
+		bne 	_RFFNext
+		iny
+		lda 	(zTemp1),y
+		cmp 	zTemp2+1
+		beq 	_RFFFound
+_RFFNext:
+		clc 								; step over the frame and try the next.
+		lda 	zTemp1
+		adc 	#FRAME_FOR & $1F
+		sta 	zTemp1
+		bcc 	_RFFLoop
+		inc 	zTemp1+1
+		bra 	_RFFLoop
+
+_RFFFound:
+		clc 								; discard it and everything above it.
+		lda 	zTemp1
+		adc 	#FRAME_FOR & $1F
+		sta 	runtimeStackPtr
+		lda 	zTemp1+1
+		adc 	#0
+		sta 	runtimeStackPtr+1
+_RFFExit:
+		ply
+		rts
+
+; ************************************************************************************************
+;
 ;		0	FOR Marker 				[1]
 ;		1 	Page/Position for loop 	[3]
 ;		4 	Control 				[1] 	Integer/Int16:7 ; optimised:6
@@ -152,5 +233,9 @@ CopyTOSToOffsetY:
 ;
 ;		Date			Notes
 ;		==== 			=====
+;		16/08/26		FOR now reuses the frame of an open FOR with the same index variable, as
+;						stock BASIC's FNDFOR does. Opening unconditionally leaked 19 bytes of
+;						frame stack per abandoned loop, so a program that ran forever interpreted
+;						died compiled with OUT OF MEMORY after ~215 passes.
 ;
 ; ************************************************************************************************
