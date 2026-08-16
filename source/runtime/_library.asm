@@ -4855,10 +4855,27 @@ CommandNewLine: ;; [new.line]
 
 CommandXNext: ;; [next]
 		.entercmd
-_CNRetry:		
-		lda 	#FRAME_FOR 					; find the FOR 
+_CNRetry:
+		;
+		;		A well-nested loop has its FOR frame ALREADY ON TOP, so StackFindFrame spends
+		;		34 cycles an iteration finding what is under its nose: jsr, sta requiredFrame,
+		;		load, two compares, rts. Ten cycles of guard skip it.
+		;
+		;		Behaviourally identical, not a shortcut with a caveat: requiredFrame is written
+		;		and read ONLY inside StackFindFrame (nothing else in the runtime touches it), so
+		;		not writing it is unobservable; A is dead here (FixUpY preserves it and the next
+		;		instruction is an lda); and Y is untouched, because this is the 65C02's zp
+		;		INDIRECT mode, not indirect-indexed. Any other byte on top -- a $E4 GOSUB frame,
+		;		or the $FF fail marker that raises NEXT WITHOUT FOR -- falls through to the
+		;		general path exactly as before, so error addresses do not move.
+		;
+		lda 	(runtimeStackPtr) 			; FOR frame already on top?
+		cmp 	#FRAME_FOR
+		beq 	_CNFrameOnTop 				; yes -- skip the search
+		lda 	#FRAME_FOR 					; find the FOR
 		jsr 	StackFindFrame
-		jsr 	FixUpY 						; so we can use Y		
+_CNFrameOnTop:
+		jsr 	FixUpY 						; so we can use Y
 		;
 		;		Index variable check ?
 		;

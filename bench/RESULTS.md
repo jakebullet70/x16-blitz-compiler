@@ -11,14 +11,14 @@ cross-validates the whole comparison. (A note in the GPC repo claims the 60 Hz t
 
 | benchmark | stock | compiled | **speedup** | GPC | C64 Blitz |
 |---|---:|---:|---:|---:|---:|
-| 01_forloop   | 285 | 110 | **2.59×** | 1.4× | 1.3× |
-| 02_floatmath | 572 | 364 | **1.57×** | 1.9× | 2.8× |
-| 03_nested    | 772 | 203 | **3.80×** | 1.4× | 2.8× |
-| 04_sieve     | 318 |  66 | **4.82×** | 1.0× | 3.1× |
-| 05_string    | 216 |  54 | **4.00×** | 1.4× | 4.1× |
-| 06_peek      | 178 |  52 | **3.42×** | 1.5× | 2.6× |
-| 07_intmath   | 669 | 186 | **3.60×** | 1.4× | 2.7× |
-| **GEOMEAN**  |     |     | **3.23×** | 1.41× | 2.65× |
+| 01_forloop   | 285 | 104 | **2.74×** | 1.4× | 1.3× |
+| 02_floatmath | 572 | 363 | **1.58×** | 1.9× | 2.8× |
+| 03_nested    | 772 | 199 | **3.88×** | 1.4× | 2.8× |
+| 04_sieve     | 318 |  65 | **4.89×** | 1.0× | 3.1× |
+| 05_string    | 216 |  53 | **4.08×** | 1.4× | 4.1× |
+| 06_peek      | 178 |  51 | **3.49×** | 1.5× | 2.6× |
+| 07_intmath   | 669 | 182 | **3.68×** | 1.4× | 2.7× |
+| **GEOMEAN**  |     |     | **3.30×** | 1.41× | 2.65× |
 
 *GPC* = the abandoned sibling P-code compiler (`../X16-GPCompiler/bench/RESULTS.md`).
 *C64 Blitz* = the original Skyles compiler on a real C64, compiled-vs-uncompiled — the yardstick.
@@ -158,6 +158,40 @@ Ranked by cycles saved × breadth, and against the measured shares above:
    than the fused opcode above and should be judged on its own merits, not as a loop optimisation.
 
 Immediately usable without any of the above: **put multiple statements on one line** — 8.6% measured.
+
+### First cut taken: the frame-search guard (24.5 cycles)
+
+Recommendation 1's cheapest component, landed on its own because it needs no new opcode and no
+`RT_ABI` bump. A well-nested loop has its `FOR` frame **already on top**, so `StackFindFrame` spent
+34 cycles an iteration — `jsr`, `sta requiredFrame`, a load, two compares, `rts` — finding what was
+under its nose. `CommandXNext` now checks the top byte inline first and skips the call.
+
+Behaviourally identical rather than a shortcut with a caveat: `requiredFrame` is written and read
+**only** inside `StackFindFrame`; `A` is dead at that point (`FixUpY` preserves it and the next
+instruction is an `lda`); and `Y` is untouched, because `lda (runtimeStackPtr)` is the 65C02's zp
+*indirect* mode, not indirect-indexed. Any other byte on top — a `$E4` GOSUB frame, or the `$FF`
+fail marker — falls through to the general path exactly as before.
+
+**Predicted 24 cycles, measured 24.5**, and constant across ascending, descending and bodied loops,
+which is what a change in the shared entry path should look like. `L1_empty` 486.7 → **462.2**;
+`NEXT` itself is now **396.3**. `L8_goto`, the one program with no `FOR`/`NEXT`, is identical to the
+jiffy — the control behaved.
+
+Verified beyond the benchmarks, because this is the routine whose edge cases have bitten before:
+
+| | stock | compiled | |
+|---|---|---|---|
+| `FOR X=0 TO -1` | `BODY= 1  X= 1` | `BODY= 1  X= 1` | match |
+| `FOR X=0 TO -1 STEP 0` | `BODY= 3  X=-1` | `BODY= 3  X=-1` | match |
+
+The first is post-test semantics (the body always runs once — `FOR`/`NEXT` tests at `NEXT`), the
+second the zero-step idiom this file's own `next.asm` comment documents. `NEXT` with no `FOR` still
+raises `STRUCTURE IMBALANCE @ $0012`, which the debug map places inside line 20 — the `NEXT` itself,
+not the following line. All six randomised `compiler-runtime` suites pass (12 clean emulator exits).
+
+**Still on the table**, and both larger: the fused `FOR`/`NEXT` opcode proper (the loop-back offset
+as an immediate, removing `StackLoadCurrentPosition` and the index/path tests — needs an `RT_ABI`
+bump), and `new.line` at 65.9 cycles a line.
 
 ## ⚠ `02_floatmath` — a real regression, and it is NOT from the work above
 
