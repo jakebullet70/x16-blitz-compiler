@@ -52,5 +52,27 @@ END 			T N
 #		token, was the only missing piece. Token only, no operands, like RETURN/STOP/END.
 #
 CLR 			X:CommandClrCompile T N
+#
+#		GP.BASIC counted loop -- GP.DO <count> ... GP.LOOP, modelled on prog8's "repeat" and
+#		named after CBM BASIC 7.0's DO/LOOP. Both are pure table entries: no compiler routine
+#		exists for either, because neither has anything to compile beyond its argument.
+#
+#		GP.DO reuses OptionalNumberCompile (the bare-SLEEP helper) verbatim: it pushes 0 when
+#		the count is omitted, and a count of 0 is exactly what the runtime reads as "forever".
+#
+GP.DO 			X:OptionalNumberCompile T N
+GP.LOOP 		T N
+#
+#		GP.EXITDO has no "T": .exitdo is a SYSTEM token carrying a two byte branch offset, and the
+#		table cannot reserve operand space. CommandExitDoCompile writes token and placeholder both.
+#
+GP.EXITDO 		X:CommandExitDoCompile N
+#
+#		GP.CALL <addr> [,a] [,x] [,y] [,c] -- call machine code with the registers set. Results
+#		come back through the GP.A/GP.X/GP.Y/GP.C value words (x16_unary.def), which are ordinary
+#		tokens, NOT variables: nothing lets the runtime write a variable by name, and X16's own
+#		ST/MX/MY are tokens for exactly the same reason.
+#
+GP.CALL 		# X:OptionalRegisterCompile X:OptionalRegisterCompile X:OptionalRegisterCompile X:OptionalRegisterCompile T N
 
 

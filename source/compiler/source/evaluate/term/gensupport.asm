@@ -50,6 +50,35 @@ MidFailType:
 ;
 ; ************************************************************************************************
 
+; ************************************************************************************************
+;
+;		As OptionalParameterCompile, but defaulting to ZERO -- for GP.CALL's A/X/Y/C arguments.
+;
+;		No sentinel is involved and none is needed: an unspecified register genuinely IS zero, so
+;		the runtime never has to test for "omitted" and carries no code to do it. Zero also fits
+;		the one byte short constant path, so an omitted argument costs LESS here than a supplied
+;		one -- the opposite of OptionalParameterCompile, whose 255 default cannot fit and emits a
+;		two byte .byte instruction every time.
+;
+; ************************************************************************************************
+
+OptionalRegisterCompile:
+		jsr 	LookNextNonSpace 			; what follows.
+		cmp 	#","
+		bne 	_ORCDefault
+		jsr 	GetNext 					; consume ,
+		jsr 	CompileExpressionAt0
+		and 	#NSSTypeMask
+		cmp 	#NSSIFloat
+		bne 	MidFailType 				; which must be numeric
+		clc
+		rts
+_ORCDefault:
+		lda 	#0
+		jsr 	PushIntegerA
+		clc
+		rts
+
 OptionalColourCompile:
 		jsr 	LookNextNonSpace 			; what follows.
 		cmp 	#","

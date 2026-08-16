@@ -37,11 +37,19 @@ _FBLoop:
 		beq 	_FBFixVarSpace
 		cmp 	#PCD_CMD_RESTORE 			; patch restore.
 		beq 	_FBFixRestore
-_FBNext:		
+		cmp 	#PCD_CMD_EXITDO 			; GP.EXITDO: resolve against its own GP.LOOP.
+		beq 	_FBExitDoFar
+_FBNext:
 		jsr 	MoveObjectForward 			; move forward in object code.
 		bcc 	_FBLoop 					; not finished
 _FBExit:
 		rts
+;
+;		The GP.EXITDO handler lives at the very end of this file, deliberately: dropping it inline
+;		pushed the branches around it out of range. Hence this trampoline.
+;
+_FBExitDoFar:
+		jmp 	_FBFixExitDo
 ;
 ;		Found an FN call (.fngosub). Its operand is already the ABSOLUTE code position of the FN
 ;		body, not a source line number, so skip STRFindLine: load the address into YA and join the
@@ -120,7 +128,90 @@ _FBFixVarSpace:
 		sta 	(objPtr),y
 		bra 	_FBNext
 
+;
+;		Found GP.EXITDO. Its target is whatever follows the GP.LOOP that closes the GP.DO it sits
+;		inside, which is not known when the command is compiled -- and this compiler has no
+;		back-patching machinery at all (IF sidesteps the problem entirely by branching to "current
+;		line + 1" and letting STRFindLine resolve it). So resolve it HERE instead, where the whole
+;		object is laid out and randomly addressable through objPtr.
+;
+;		Scan FORWARD from the .exitdo counting nesting: every GP.DO seen is a loop that must close
+;		before ours, so it raises the depth; every GP.LOOP lowers it, and the one found at depth
+;		zero is ours. That is a structural match on the emitted code, so it cannot be fooled by
+;		line numbering or by an inner loop, and it needs no compile-time state whatsoever.
+;
+;		MoveObjectForward is what makes the walk safe: it steps by real instruction size, so an
+;		operand byte that happens to equal a GP.DO or GP.LOOP token is never read as one.
+;
+_FBFixExitDo:
+		lda 	objPtr 						; remember where the .exitdo is, to come back and patch
+		sta 	_FBExitSave
+		lda 	objPtr+1
+		sta 	_FBExitSave+1
+		stz 	_FBExitDepth
+_FBEDScan:
+		jsr 	MoveObjectForward
+		bcs 	_FBEDNoLoop 				; ran off the end without finding one
+		lda 	(objPtr)
+		cmp 	#PCD_GPCMD_LOOP
+		beq 	_FBEDLoop
+		cmp 	#PCD_GPCMD_DO
+		bne 	_FBEDScan
+		inc 	_FBExitDepth 				; a nested GP.DO -- its GP.LOOP is not ours
+		bra 	_FBEDScan
+_FBEDLoop:
+		lda 	_FBExitDepth
+		beq 	_FBEDFound 					; depth zero, so this GP.LOOP closes OUR loop
+		dec 	_FBExitDepth
+		bra 	_FBEDScan
+;
+;		Found it. The target is the instruction AFTER the GP.LOOP -- one more step forward. If that
+;		step hits the end of the object the target is the end marker, which is exactly where the
+;		loop would have fallen through to anyway, so the carry is deliberately ignored here.
+;
+_FBEDFound:
+		jsr 	MoveObjectForward
+		lda 	objPtr
+		sta 	_FBExitTarget
+		lda 	objPtr+1
+		sta 	_FBExitTarget+1
+		;
+		lda 	_FBExitSave 				; back to the .exitdo: STRMakeOffset works from objPtr
+		sta 	objPtr
+		lda 	_FBExitSave+1
+		sta 	objPtr+1
+		;
+		lda 	_FBExitTarget 				; target in YA, exactly as the GOTO path passes it
+		ldy 	_FBExitTarget+1
+		jsr 	STRMakeOffset
+		phy
+		ldy 	#1
+		sta 	(objPtr),y
+		iny
+		pla
+		sta 	(objPtr),y
+		jmp 	_FBNext
+;
+;		A GP.EXITDO with no GP.LOOP after it at its own nesting depth is not in a loop at all. This
+;		is the compile-time half of the check; StackFindFrame's structure error is the runtime half.
+;
+_FBEDNoLoop:
+		lda 	_FBExitSave 				; put objPtr back so nothing downstream sees the walk
+		sta 	objPtr
+		lda 	_FBExitSave+1
+		sta 	objPtr+1
+		.error_structure
+
 		.send code
+
+		.section storage
+_FBExitSave:								; where the .exitdo being resolved lives
+		.fill 	2
+_FBExitTarget:								; where its branch should land
+		.fill 	2
+_FBExitDepth:								; nested GP.DOs still to be closed before ours
+		.fill 	1
+		.send 	storage
 
 ; ************************************************************************************************
 ;

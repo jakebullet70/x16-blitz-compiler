@@ -1,0 +1,63 @@
+## ***********************************************************************
+## **
+## **  MLCALL.EXP.BL -- GP.CALL and GP.A / GP.X / GP.Y / GP.C
+## **
+## **  Replaces the POKE/SYS/PEEK dance:
+## **
+## **      POKE $30C,65 : POKE $30D,0 : SYS ADDR : A = PEEK($30C)
+## **      GP.CALL ADDR,65,0 : A = GP.A
+## **
+## **  Build:  copy GPC-BASIC/GP.INC.BL and this file into testing/, then
+## **            python source/gpc/build_basl.py MLCALL.EXP.BL MLCALL.PRG
+## **          and compile MLCALL.PRG with GPC.BLITZ.BIN.
+## **
+## ***********************************************************************
+#INCLUDE "GP.INC.BL"
+#SAVEAS "@:MLCALL.PRG"
+
+## ---- Where the machine code goes.
+##
+## BANKED RAM. $A000-$BFFF is the X16's window onto whichever 8K bank is
+## selected by POKE 0,n. Do NOT use $0400-$07FF: stock BASIC leaves that free
+## for the user, but a COMPILED GPC program keeps runtime state there -- string
+## heap top, store/stack limits, the variable page -- and machine code POKEd
+## over it corrupts the program with no error at all.
+
+#DEFINE ML.BANK 1
+#DEFINE ML.INCS 40960
+#DEFINE ML.CARRY 40976
+
+POKE 0, ML.BANK
+
+## $A000  INC A / INX / INY / SEC / RTS   -- bumps all three, returns carry set
+POKE ML.INCS+0, 26
+POKE ML.INCS+1, 232
+POKE ML.INCS+2, 200
+POKE ML.INCS+3, 56
+POKE ML.INCS+4, 96
+
+## $A010  LDA #0 / ROL A / RTS            -- returns the carry it was CALLED with
+POKE ML.CARRY+0, 169
+POKE ML.CARRY+1, 0
+POKE ML.CARRY+2, 42
+POKE ML.CARRY+3, 96
+
+## ---- 1. registers in, registers out.
+
+GP.CALL ML.INCS, 10, 20, 30
+PRINT "A,X,Y IN 10,20,30 -> "; GP.A; GP.X; GP.Y; " CARRY "; GP.C
+
+## ---- 2. every argument is optional and defaults to ZERO, so a bare call is
+## ---- 0,0,0 with carry clear. Omitting costs LESS code than supplying, because
+## ---- 0 fits the compiler's one-byte short constant.
+
+GP.CALL ML.INCS
+PRINT "BARE CALL       -> "; GP.A; GP.X; GP.Y
+
+## ---- 3. carry goes IN as the fifth argument. It is set with LSR, not PLP, so
+## ---- the interrupt-disable and decimal flags of the caller are left alone.
+
+GP.CALL ML.CARRY, 0, 0, 0, 1
+PRINT "CARRY IN 1      -> "; GP.A
+GP.CALL ML.CARRY, 0, 0, 0, 0
+PRINT "CARRY IN 0      -> "; GP.A

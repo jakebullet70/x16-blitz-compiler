@@ -1639,6 +1639,60 @@ _EHDisplayLine:
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;
+;		Name:		exitdo.asm
+;		Purpose:	GP.EXITDO command
+;		Created:	16th August 2026
+;		Reviewed: 	No
+;		Author : 	Steven De George SR
+;
+; ************************************************************************************************
+; ************************************************************************************************
+
+		.section code
+
+; ************************************************************************************************
+;
+;		GP.EXITDO -- leave the innermost GP.DO ... GP.LOOP early.
+;
+;		This cannot go in the command table as a plain "T", because .exitdo is a SYSTEM token and
+;		system tokens carry an inline operand the table has no way to reserve. So the token and a
+;		two byte placeholder are written here, and FixBranches resolves the placeholder into a
+;		branch offset by scanning forward for the matching GP.LOOP.
+;
+;		The placeholder value is never read -- FixBranches overwrites both bytes unconditionally,
+;		and errors out if there is no matching GP.LOOP rather than leaving them.
+;
+;		MUST return carry CLEAR. A .def helper that returns carry set makes the generator silently
+;		drop every token after it, with no error and no clue -- see the compiled OPEN15,8,15 hang.
+;
+; ************************************************************************************************
+
+CommandExitDoCompile:
+		lda 	#PCD_CMD_EXITDO
+		jsr 	WriteCodeByte
+		lda 	#0 							; branch offset placeholder, patched by FixBranches
+		jsr 	WriteCodeByte
+		lda 	#0
+		jsr 	WriteCodeByte
+		clc
+		rts
+
+		.send code
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;		16/08/26		Written.
+;
+; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
 ;		Name:		expression.asm
 ;		Purpose:	Expression evaluator
 ;		Created:	16th April 2023
@@ -2039,11 +2093,19 @@ _FBLoop:
 		beq 	_FBFixVarSpace
 		cmp 	#PCD_CMD_RESTORE 			; patch restore.
 		beq 	_FBFixRestore
-_FBNext:		
+		cmp 	#PCD_CMD_EXITDO 			; GP.EXITDO: resolve against its own GP.LOOP.
+		beq 	_FBExitDoFar
+_FBNext:
 		jsr 	MoveObjectForward 			; move forward in object code.
 		bcc 	_FBLoop 					; not finished
 _FBExit:
 		rts
+;
+;		The GP.EXITDO handler lives at the very end of this file, deliberately: dropping it inline
+;		pushed the branches around it out of range. Hence this trampoline.
+;
+_FBExitDoFar:
+		jmp 	_FBFixExitDo
 ;
 ;		Found an FN call (.fngosub). Its operand is already the ABSOLUTE code position of the FN
 ;		body, not a source line number, so skip STRFindLine: load the address into YA and join the
@@ -2122,7 +2184,90 @@ _FBFixVarSpace:
 		sta 	(objPtr),y
 		bra 	_FBNext
 
+;
+;		Found GP.EXITDO. Its target is whatever follows the GP.LOOP that closes the GP.DO it sits
+;		inside, which is not known when the command is compiled -- and this compiler has no
+;		back-patching machinery at all (IF sidesteps the problem entirely by branching to "current
+;		line + 1" and letting STRFindLine resolve it). So resolve it HERE instead, where the whole
+;		object is laid out and randomly addressable through objPtr.
+;
+;		Scan FORWARD from the .exitdo counting nesting: every GP.DO seen is a loop that must close
+;		before ours, so it raises the depth; every GP.LOOP lowers it, and the one found at depth
+;		zero is ours. That is a structural match on the emitted code, so it cannot be fooled by
+;		line numbering or by an inner loop, and it needs no compile-time state whatsoever.
+;
+;		MoveObjectForward is what makes the walk safe: it steps by real instruction size, so an
+;		operand byte that happens to equal a GP.DO or GP.LOOP token is never read as one.
+;
+_FBFixExitDo:
+		lda 	objPtr 						; remember where the .exitdo is, to come back and patch
+		sta 	_FBExitSave
+		lda 	objPtr+1
+		sta 	_FBExitSave+1
+		stz 	_FBExitDepth
+_FBEDScan:
+		jsr 	MoveObjectForward
+		bcs 	_FBEDNoLoop 				; ran off the end without finding one
+		lda 	(objPtr)
+		cmp 	#PCD_GPCMD_LOOP
+		beq 	_FBEDLoop
+		cmp 	#PCD_GPCMD_DO
+		bne 	_FBEDScan
+		inc 	_FBExitDepth 				; a nested GP.DO -- its GP.LOOP is not ours
+		bra 	_FBEDScan
+_FBEDLoop:
+		lda 	_FBExitDepth
+		beq 	_FBEDFound 					; depth zero, so this GP.LOOP closes OUR loop
+		dec 	_FBExitDepth
+		bra 	_FBEDScan
+;
+;		Found it. The target is the instruction AFTER the GP.LOOP -- one more step forward. If that
+;		step hits the end of the object the target is the end marker, which is exactly where the
+;		loop would have fallen through to anyway, so the carry is deliberately ignored here.
+;
+_FBEDFound:
+		jsr 	MoveObjectForward
+		lda 	objPtr
+		sta 	_FBExitTarget
+		lda 	objPtr+1
+		sta 	_FBExitTarget+1
+		;
+		lda 	_FBExitSave 				; back to the .exitdo: STRMakeOffset works from objPtr
+		sta 	objPtr
+		lda 	_FBExitSave+1
+		sta 	objPtr+1
+		;
+		lda 	_FBExitTarget 				; target in YA, exactly as the GOTO path passes it
+		ldy 	_FBExitTarget+1
+		jsr 	STRMakeOffset
+		phy
+		ldy 	#1
+		sta 	(objPtr),y
+		iny
+		pla
+		sta 	(objPtr),y
+		jmp 	_FBNext
+;
+;		A GP.EXITDO with no GP.LOOP after it at its own nesting depth is not in a loop at all. This
+;		is the compile-time half of the check; StackFindFrame's structure error is the runtime half.
+;
+_FBEDNoLoop:
+		lda 	_FBExitSave 				; put objPtr back so nothing downstream sees the walk
+		sta 	objPtr
+		lda 	_FBExitSave+1
+		sta 	objPtr+1
+		.error_structure
+
 		.send code
+
+		.section storage
+_FBExitSave:								; where the .exitdo being resolved lives
+		.fill 	2
+_FBExitTarget:								; where its branch should land
+		.fill 	2
+_FBExitDepth:								; nested GP.DOs still to be closed before ours
+		.fill 	1
+		.send 	storage
 
 ; ************************************************************************************************
 ;
@@ -2443,31 +2588,47 @@ CommandTables:
 ;
 ;	ON     # T X:CommandON N
 ;
-	.byte	$09,$91,$00,$e1,173,$03,CommandON & $FF,CommandON >> 8,$06
+	.byte	$09,$91,$00,$e1,179,$03,CommandON & $FF,CommandON >> 8,$06
 ;
 ;	SYS    # T N
 ;
-	.byte	$07,$9e,$00,$e2,41679 & $FF,41679 >> 8,$06
+	.byte	$07,$9e,$00,$e2,41941 & $FF,41941 >> 8,$06
 ;
 ;	POKE    #,# T N
 ;
-	.byte	$07,$97,$00,$ea,$e1,177,$06
+	.byte	$07,$97,$00,$ea,$e1,183,$06
 ;
 ;	RETURN    T N
 ;
-	.byte	$06,$8e,$00,$10,153,$06
+	.byte	$06,$8e,$00,$10,155,$06
 ;
 ;	STOP    T N
 ;
-	.byte	$07,$90,$00,$20,41423 & $FF,41423 >> 8,$06
+	.byte	$07,$90,$00,$20,41685 & $FF,41685 >> 8,$06
 ;
 ;	END    T N
 ;
-	.byte	$07,$80,$00,$20,33487 & $FF,33487 >> 8,$06
+	.byte	$07,$80,$00,$20,33493 & $FF,33493 >> 8,$06
 ;
 ;	CLR    X:CommandClrCompile T N
 ;
-	.byte	$0a,$9c,$00,$03,CommandClrCompile & $FF,CommandClrCompile >> 8,$20,32975 & $FF,32975 >> 8,$06
+	.byte	$0a,$9c,$00,$03,CommandClrCompile & $FF,CommandClrCompile >> 8,$20,32981 & $FF,32981 >> 8,$06
+;
+;	GP.DO    X:OptionalNumberCompile T N
+;
+	.byte	$09,$ce,$7f,$03,OptionalNumberCompile & $FF,OptionalNumberCompile >> 8,$10,150,$06
+;
+;	GP.LOOP   T N
+;
+	.byte	$06,$ce,$7e,$10,151,$06
+;
+;	GP.EXITDO   X:CommandExitDoCompile N
+;
+	.byte	$07,$ce,$7d,$03,CommandExitDoCompile & $FF,CommandExitDoCompile >> 8,$06
+;
+;	GP.CALL   # X:OptionalRegisterCompile X:OptionalRegisterCompile X:OptionalRegisterCompile X:OptionalRegisterCompile T N
+;
+	.byte	$13,$ce,$7c,$e3,OptionalRegisterCompile & $FF,OptionalRegisterCompile >> 8,$03,OptionalRegisterCompile & $FF,OptionalRegisterCompile >> 8,$03,OptionalRegisterCompile & $FF,OptionalRegisterCompile >> 8,$03,OptionalRegisterCompile & $FF,OptionalRegisterCompile >> 8,$20,33749 & $FF,33749 >> 8,$06
 ;
 ;	This file is automatically generated.
 ;
@@ -2478,127 +2639,127 @@ CommandTables:
 ;
 ;	OPEN    #,# X:CommandOPEN T N
 ;
-	.byte	$0a,$9f,$00,$ea,$e3,CommandOPEN & $FF,CommandOPEN >> 8,$10,203,$06
+	.byte	$0a,$9f,$00,$ea,$e3,CommandOPEN & $FF,CommandOPEN >> 8,$10,209,$06
 ;
 ;	CLOSE    # T N
 ;
-	.byte	$06,$a0,$00,$e1,200,$06
+	.byte	$06,$a0,$00,$e1,206,$06
 ;
 ;	CLS    T N
 ;
-	.byte	$07,$ce,$90,$20,49359 & $FF,49359 >> 8,$06
+	.byte	$07,$ce,$90,$20,49621 & $FF,49621 >> 8,$06
 ;
 ;	LOCATE    # X:OptionalParameterCompile T N
 ;
-	.byte	$0a,$ce,$92,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,49615 & $FF,49615 >> 8,$06
+	.byte	$0a,$ce,$92,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,49877 & $FF,49877 >> 8,$06
 ;
 ;	COLOR    # X:OptionalParameterCompile T N
 ;
-	.byte	$0a,$ce,$8d,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,49871 & $FF,49871 >> 8,$06
+	.byte	$0a,$ce,$8d,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,50133 & $FF,50133 >> 8,$06
 ;
 ;	SCREEN    # T N
 ;
-	.byte	$06,$ce,$86,$e1,204,$06
+	.byte	$06,$ce,$86,$e1,210,$06
 ;
 ;	VPOKE    #,#,# T N
 ;
-	.byte	$08,$ce,$84,$ea,$ea,$e1,205,$06
+	.byte	$08,$ce,$84,$ea,$ea,$e1,211,$06
 ;
 ;	SLEEP    X:OptionalNumberCompile T N
 ;
-	.byte	$0a,$ce,$af,$03,OptionalNumberCompile & $FF,OptionalNumberCompile >> 8,$20,44239 & $FF,44239 >> 8,$06
+	.byte	$0a,$ce,$af,$03,OptionalNumberCompile & $FF,OptionalNumberCompile >> 8,$20,44501 & $FF,44501 >> 8,$06
 ;
 ;	MOUSE    # T N
 ;
-	.byte	$07,$ce,$8c,$e2,38863 & $FF,38863 >> 8,$06
+	.byte	$07,$ce,$8c,$e2,39125 & $FF,39125 >> 8,$06
 ;
 ;	I2CPOKE   #,#,# T N
 ;
-	.byte	$09,$ce,$ae,$ea,$ea,$e2,43471 & $FF,43471 >> 8,$06
+	.byte	$09,$ce,$ae,$ea,$ea,$e2,43733 & $FF,43733 >> 8,$06
 ;
 ;	POWEROFF   T N
 ;
-	.byte	$07,$ce,$ad,$20,38095 & $FF,38095 >> 8,$06
+	.byte	$07,$ce,$ad,$20,38357 & $FF,38357 >> 8,$06
 ;
 ;	RESET    T N
 ;
-	.byte	$07,$ce,$8f,$20,38351 & $FF,38351 >> 8,$06
+	.byte	$07,$ce,$8f,$20,38613 & $FF,38613 >> 8,$06
 ;
 ;	REBOOT    T N
 ;
-	.byte	$07,$ce,$ac,$20,38607 & $FF,38607 >> 8,$06
+	.byte	$07,$ce,$ac,$20,38869 & $FF,38869 >> 8,$06
 ;
 ;	PSET    #,#,# T N
 ;
-	.byte	$08,$ce,$87,$ea,$ea,$e1,154,$06
+	.byte	$08,$ce,$87,$ea,$ea,$e1,160,$06
 ;
 ;	LINE    #,#,#,# X:OptionalColourCompile T N
 ;
-	.byte	$0c,$ce,$88,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,155,$06
+	.byte	$0c,$ce,$88,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,161,$06
 ;
 ;	RECT    #,#,#,# X:OptionalColourCompile T N
 ;
-	.byte	$0c,$ce,$8a,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,156,$06
+	.byte	$0c,$ce,$8a,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,162,$06
 ;
 ;	FRAME    #,#,#,# X:OptionalColourCompile T N
 ;
-	.byte	$0c,$ce,$89,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,157,$06
+	.byte	$0c,$ce,$89,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,163,$06
 ;
 ;	OVAL    #,#,#,# X:OptionalColourCompile T N
 ;
-	.byte	$0c,$ce,$bf,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,158,$06
+	.byte	$0c,$ce,$bf,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,164,$06
 ;
 ;	RING    #,#,#,# X:OptionalColourCompile T N
 ;
-	.byte	$0c,$ce,$c0,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,159,$06
+	.byte	$0c,$ce,$c0,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,165,$06
 ;
 ;	CHAR    #,#,#,$ T N
 ;
-	.byte	$09,$ce,$8b,$ea,$ea,$ea,$f1,160,$06
+	.byte	$09,$ce,$8b,$ea,$ea,$ea,$f1,166,$06
 ;
 ;	SPRITE    #,# X:OptionalParameterCompile X:OptionalParameterCompile X:OptionalParameterCompile X:OptionalParameterCompile X:OptionalParameterCompile T N
 ;
-	.byte	$17,$ce,$bb,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,40399 & $FF,40399 >> 8,$06
+	.byte	$17,$ce,$bb,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,40661 & $FF,40661 >> 8,$06
 ;
 ;	SPRMEM    #,#,# X:OptionalParameterCompile T N
 ;
-	.byte	$0c,$ce,$bc,$ea,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,40655 & $FF,40655 >> 8,$06
+	.byte	$0c,$ce,$bc,$ea,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,40917 & $FF,40917 >> 8,$06
 ;
 ;	MOVSPR    #,#,# T N
 ;
-	.byte	$09,$ce,$bd,$ea,$ea,$e2,40911 & $FF,40911 >> 8,$06
+	.byte	$09,$ce,$bd,$ea,$ea,$e2,41173 & $FF,41173 >> 8,$06
 ;
 ;	TILE    #,#,# X:OptionalParameterCompile T N
 ;
-	.byte	$0c,$ce,$b9,$ea,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,42447 & $FF,42447 >> 8,$06
+	.byte	$0c,$ce,$b9,$ea,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,42709 & $FF,42709 >> 8,$06
 ;
 ;	BANK    # X:OptionalParameterCompile T N
 ;
-	.byte	$0a,$ce,$98,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,43983 & $FF,43983 >> 8,$06
+	.byte	$0a,$ce,$98,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,44245 & $FF,44245 >> 8,$06
 ;
 ;	BLOAD    $,#,#,# T N
 ;
-	.byte	$0a,$ce,$95,$fa,$ea,$ea,$e2,36815 & $FF,36815 >> 8,$06
+	.byte	$0a,$ce,$95,$fa,$ea,$ea,$e2,37077 & $FF,37077 >> 8,$06
 ;
 ;	BVLOAD    $,#,#,# T N
 ;
-	.byte	$0a,$ce,$96,$fa,$ea,$ea,$e2,37071 & $FF,37071 >> 8,$06
+	.byte	$0a,$ce,$96,$fa,$ea,$ea,$e2,37333 & $FF,37333 >> 8,$06
 ;
 ;	VLOAD    $,#,#,# T N
 ;
-	.byte	$0a,$ce,$85,$fa,$ea,$ea,$e2,37327 & $FF,37327 >> 8,$06
+	.byte	$0a,$ce,$85,$fa,$ea,$ea,$e2,37589 & $FF,37589 >> 8,$06
 ;
 ;	BSAVE    $,#,#,#,# T N
 ;
-	.byte	$0b,$ce,$b0,$fa,$ea,$ea,$ea,$e2,37583 & $FF,37583 >> 8,$06
+	.byte	$0b,$ce,$b0,$fa,$ea,$ea,$ea,$e2,37845 & $FF,37845 >> 8,$06
 ;
 ;	BVERIFY   $,#,#,# T N
 ;
-	.byte	$0a,$ce,$97,$fa,$ea,$ea,$e2,37839 & $FF,37839 >> 8,$06
+	.byte	$0a,$ce,$97,$fa,$ea,$ea,$e2,38101 & $FF,38101 >> 8,$06
 ;
 ;	LOAD    $ T N
 ;
-	.byte	$07,$93,$00,$f2,36559 & $FF,36559 >> 8,$06
+	.byte	$07,$93,$00,$f2,36821 & $FF,36821 >> 8,$06
 ;
 ;	LINPUT    X:CommandLINPUT N
 ;
@@ -2617,79 +2778,79 @@ CommandTables:
 ;
 ;	FMINIT       T N
 ;
-	.byte	$07,$ce,$99,$20,44495 & $FF,44495 >> 8,$06
+	.byte	$07,$ce,$99,$20,44757 & $FF,44757 >> 8,$06
 ;
 ;	FMNOTE      #,# T N
 ;
-	.byte	$08,$ce,$9a,$ea,$e2,44751 & $FF,44751 >> 8,$06
+	.byte	$08,$ce,$9a,$ea,$e2,45013 & $FF,45013 >> 8,$06
 ;
 ;	FMDRUM      #,# T N
 ;
-	.byte	$08,$ce,$9b,$ea,$e2,45007 & $FF,45007 >> 8,$06
+	.byte	$08,$ce,$9b,$ea,$e2,45269 & $FF,45269 >> 8,$06
 ;
 ;	FMINST      #,# T N
 ;
-	.byte	$08,$ce,$9c,$ea,$e2,45263 & $FF,45263 >> 8,$06
+	.byte	$08,$ce,$9c,$ea,$e2,45525 & $FF,45525 >> 8,$06
 ;
 ;	FMVIB       #,# T N
 ;
-	.byte	$08,$ce,$9d,$ea,$e2,45519 & $FF,45519 >> 8,$06
+	.byte	$08,$ce,$9d,$ea,$e2,45781 & $FF,45781 >> 8,$06
 ;
 ;	FMFREQ      #,# T N
 ;
-	.byte	$08,$ce,$9e,$ea,$e2,45775 & $FF,45775 >> 8,$06
+	.byte	$08,$ce,$9e,$ea,$e2,46037 & $FF,46037 >> 8,$06
 ;
 ;	FMVOL       #,# T N
 ;
-	.byte	$08,$ce,$9f,$ea,$e2,46031 & $FF,46031 >> 8,$06
+	.byte	$08,$ce,$9f,$ea,$e2,46293 & $FF,46293 >> 8,$06
 ;
 ;	FMPAN       #,# T N
 ;
-	.byte	$08,$ce,$a0,$ea,$e2,46287 & $FF,46287 >> 8,$06
+	.byte	$08,$ce,$a0,$ea,$e2,46549 & $FF,46549 >> 8,$06
 ;
 ;	FMPLAY      #,$ T N
 ;
-	.byte	$08,$ce,$a1,$ea,$f2,46543 & $FF,46543 >> 8,$06
+	.byte	$08,$ce,$a1,$ea,$f2,46805 & $FF,46805 >> 8,$06
 ;
 ;	FMCHORD     #,$ T N
 ;
-	.byte	$08,$ce,$a2,$ea,$f2,46799 & $FF,46799 >> 8,$06
+	.byte	$08,$ce,$a2,$ea,$f2,47061 & $FF,47061 >> 8,$06
 ;
 ;	FMPOKE      #,# T N
 ;
-	.byte	$08,$ce,$a3,$ea,$e2,47055 & $FF,47055 >> 8,$06
+	.byte	$08,$ce,$a3,$ea,$e2,47317 & $FF,47317 >> 8,$06
 ;
 ;	PSGINIT      T N
 ;
-	.byte	$07,$ce,$a4,$20,47311 & $FF,47311 >> 8,$06
+	.byte	$07,$ce,$a4,$20,47573 & $FF,47573 >> 8,$06
 ;
 ;	PSGNOTE     #,# T N
 ;
-	.byte	$08,$ce,$a5,$ea,$e2,47567 & $FF,47567 >> 8,$06
+	.byte	$08,$ce,$a5,$ea,$e2,47829 & $FF,47829 >> 8,$06
 ;
 ;	PSGVOL      #,# T N
 ;
-	.byte	$08,$ce,$a6,$ea,$e2,47823 & $FF,47823 >> 8,$06
+	.byte	$08,$ce,$a6,$ea,$e2,48085 & $FF,48085 >> 8,$06
 ;
 ;	PSGWAV      #,# T N
 ;
-	.byte	$08,$ce,$a7,$ea,$e2,48079 & $FF,48079 >> 8,$06
+	.byte	$08,$ce,$a7,$ea,$e2,48341 & $FF,48341 >> 8,$06
 ;
 ;	PSGFREQ     #,# T N
 ;
-	.byte	$08,$ce,$a8,$ea,$e2,48335 & $FF,48335 >> 8,$06
+	.byte	$08,$ce,$a8,$ea,$e2,48597 & $FF,48597 >> 8,$06
 ;
 ;	PSGPAN      #,# T N
 ;
-	.byte	$08,$ce,$a9,$ea,$e2,48591 & $FF,48591 >> 8,$06
+	.byte	$08,$ce,$a9,$ea,$e2,48853 & $FF,48853 >> 8,$06
 ;
 ;	PSGPLAY     #,$ T N
 ;
-	.byte	$08,$ce,$aa,$ea,$f2,48847 & $FF,48847 >> 8,$06
+	.byte	$08,$ce,$aa,$ea,$f2,49109 & $FF,49109 >> 8,$06
 ;
 ;	PSGCHORD    #,$ T N
 ;
-	.byte	$08,$ce,$ab,$ea,$f2,49103 & $FF,49103 >> 8,$06
+	.byte	$08,$ce,$ab,$ea,$f2,49365 & $FF,49365 >> 8,$06
 		.byte 	0
 
 UnaryTables:
@@ -2699,11 +2860,11 @@ UnaryTables:
 ;
 ;	SGN    (#) T N
 ;
-	.byte	$07,$b4,$00,$8e,$91,187,$06
+	.byte	$07,$b4,$00,$8e,$91,193,$06
 ;
 ;	INT    (#) T N
 ;
-	.byte	$08,$b5,$00,$8e,$92,33999 & $FF,33999 >> 8,$06
+	.byte	$08,$b5,$00,$8e,$92,34261 & $FF,34261 >> 8,$06
 ;
 ;	ABS    (#) T N
 ;
@@ -2711,63 +2872,63 @@ UnaryTables:
 ;
 ;	USR    (#) T N
 ;
-	.byte	$07,$b7,$00,$8e,$91,198,$06
+	.byte	$07,$b7,$00,$8e,$91,204,$06
 ;
 ;	FRE    (#) T N
 ;
-	.byte	$07,$b8,$00,$8e,$91,151,$06
+	.byte	$07,$b8,$00,$8e,$91,153,$06
 ;
 ;	POS    (#) T N
 ;
-	.byte	$07,$b9,$00,$8e,$91,178,$06
+	.byte	$07,$b9,$00,$8e,$91,184,$06
 ;
 ;	SQR    (#) T N
 ;
-	.byte	$08,$ba,$00,$8e,$92,34255 & $FF,34255 >> 8,$06
+	.byte	$08,$ba,$00,$8e,$92,34517 & $FF,34517 >> 8,$06
 ;
 ;	RND    (#) T N
 ;
-	.byte	$07,$bb,$00,$8e,$91,185,$06
+	.byte	$07,$bb,$00,$8e,$91,191,$06
 ;
 ;	LOG    (#) T N
 ;
-	.byte	$08,$bc,$00,$8e,$92,34511 & $FF,34511 >> 8,$06
+	.byte	$08,$bc,$00,$8e,$92,34773 & $FF,34773 >> 8,$06
 ;
 ;	EXP    (#) T N
 ;
-	.byte	$08,$bd,$00,$8e,$92,34767 & $FF,34767 >> 8,$06
+	.byte	$08,$bd,$00,$8e,$92,35029 & $FF,35029 >> 8,$06
 ;
 ;	COS    (#) T N
 ;
-	.byte	$08,$be,$00,$8e,$92,35023 & $FF,35023 >> 8,$06
+	.byte	$08,$be,$00,$8e,$92,35285 & $FF,35285 >> 8,$06
 ;
 ;	SIN    (#) T N
 ;
-	.byte	$08,$bf,$00,$8e,$92,35279 & $FF,35279 >> 8,$06
+	.byte	$08,$bf,$00,$8e,$92,35541 & $FF,35541 >> 8,$06
 ;
 ;	TAN    (#) T N
 ;
-	.byte	$08,$c0,$00,$8e,$92,35535 & $FF,35535 >> 8,$06
+	.byte	$08,$c0,$00,$8e,$92,35797 & $FF,35797 >> 8,$06
 ;
 ;	ATN    (#) T N
 ;
-	.byte	$08,$c1,$00,$8e,$92,35791 & $FF,35791 >> 8,$06
+	.byte	$08,$c1,$00,$8e,$92,36053 & $FF,36053 >> 8,$06
 ;
 ;	PEEK    (#) T N
 ;
-	.byte	$07,$c2,$00,$8e,$91,175,$06
+	.byte	$07,$c2,$00,$8e,$91,181,$06
 ;
 ;	LEN    ($) T N
 ;
-	.byte	$07,$c3,$00,$8f,$91,165,$06
+	.byte	$07,$c3,$00,$8f,$91,171,$06
 ;
 ;	STR$    (#) T S
 ;
-	.byte	$07,$c4,$00,$8e,$91,191,$07
+	.byte	$07,$c4,$00,$8e,$91,197,$07
 ;
 ;	VAL    ($) T N
 ;
-	.byte	$07,$c5,$00,$8f,$91,199,$06
+	.byte	$07,$c5,$00,$8f,$91,205,$06
 ;
 ;	ASC    ($) T N
 ;
@@ -2779,15 +2940,15 @@ UnaryTables:
 ;
 ;	LEFT$   ($,#) T S
 ;
-	.byte	$08,$c8,$00,$8f,$ae,$91,192,$07
+	.byte	$08,$c8,$00,$8f,$ae,$91,198,$07
 ;
 ;	RIGHT$    ($,#) T S
 ;
-	.byte	$08,$c9,$00,$8f,$ae,$91,193,$07
+	.byte	$08,$c9,$00,$8f,$ae,$91,199,$07
 ;
 ;	MID$   ($,# X:OptionalParameterCompile ) T S
 ;
-	.byte	$0b,$ca,$00,$8f,$ae,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$91,194,$07
+	.byte	$0b,$ca,$00,$8f,$ae,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$91,200,$07
 ;
 ;	NOT    X:NotUnaryCompile N
 ;
@@ -2799,7 +2960,7 @@ UnaryTables:
 ;
 ;	PI     T N
 ;
-	.byte	$06,$ff,$00,$10,176,$06
+	.byte	$06,$ff,$00,$10,182,$06
 ;
 ;	This file is automatically generated.
 ;
@@ -2810,51 +2971,67 @@ UnaryTables:
 ;
 ;	HEX$     (#) T S
 ;
-	.byte	$07,$ce,$d5,$8e,$91,161,$07
+	.byte	$07,$ce,$d5,$8e,$91,167,$07
 ;
 ;	VPEEK    (#,#) T N
 ;
-	.byte	$08,$ce,$d0,$8e,$ae,$91,206,$06
+	.byte	$08,$ce,$d0,$8e,$ae,$91,212,$06
 ;
 ;	JOY    (#) T N
 ;
-	.byte	$08,$ce,$d4,$8e,$92,33743 & $FF,33743 >> 8,$06
+	.byte	$08,$ce,$d4,$8e,$92,34005 & $FF,34005 >> 8,$06
 ;
 ;	MB     T N
 ;
-	.byte	$07,$ce,$d3,$20,39119 & $FF,39119 >> 8,$06
+	.byte	$07,$ce,$d3,$20,39381 & $FF,39381 >> 8,$06
 ;
 ;	MX     T N
 ;
-	.byte	$07,$ce,$d1,$20,39375 & $FF,39375 >> 8,$06
+	.byte	$07,$ce,$d1,$20,39637 & $FF,39637 >> 8,$06
 ;
 ;	MY     T N
 ;
-	.byte	$07,$ce,$d2,$20,39631 & $FF,39631 >> 8,$06
+	.byte	$07,$ce,$d2,$20,39893 & $FF,39893 >> 8,$06
 ;
 ;	MWHEEL    T N
 ;
-	.byte	$07,$ce,$db,$20,39887 & $FF,39887 >> 8,$06
+	.byte	$07,$ce,$db,$20,40149 & $FF,40149 >> 8,$06
 ;
 ;	I2CPEEK   (#,#) T N
 ;
-	.byte	$09,$ce,$d7,$8e,$ae,$92,43727 & $FF,43727 >> 8,$06
+	.byte	$09,$ce,$d7,$8e,$ae,$92,43989 & $FF,43989 >> 8,$06
 ;
 ;	MOD    (#,#) T N
 ;
-	.byte	$08,$ce,$de,$8e,$ae,$91,168,$06
+	.byte	$08,$ce,$de,$8e,$ae,$91,174,$06
 ;
 ;	TDATA    (#,#) T N
 ;
-	.byte	$09,$ce,$dc,$8e,$ae,$92,41935 & $FF,41935 >> 8,$06
+	.byte	$09,$ce,$dc,$8e,$ae,$92,42197 & $FF,42197 >> 8,$06
 ;
 ;	TATTR    (#,#) T N
 ;
-	.byte	$09,$ce,$dd,$8e,$ae,$92,42191 & $FF,42191 >> 8,$06
+	.byte	$09,$ce,$dd,$8e,$ae,$92,42453 & $FF,42453 >> 8,$06
 ;
 ;	RPT$    (#,#) T S
 ;
-	.byte	$09,$ce,$da,$8e,$ae,$92,40143 & $FF,40143 >> 8,$07
+	.byte	$09,$ce,$da,$8e,$ae,$92,40405 & $FF,40405 >> 8,$07
+;
+;	GP.A    T N
+;
+	.byte	$06,$ce,$7b,$10,156,$06
+;
+;	GP.X    T N
+;
+	.byte	$06,$ce,$7a,$10,157,$06
+;
+;	GP.Y    T N
+;
+	.byte	$06,$ce,$79,$10,158,$06
+;
+;	GP.C    T N
+;
+	.byte	$06,$ce,$78,$10,159,$06
 ;
 ;	POINTER   X:UnsupportedCompile N
 ;
@@ -3278,6 +3455,35 @@ MidFailType:
 ;		high byte as "leave the current draw colour", and every explicit 0..255 still works.
 ;
 ; ************************************************************************************************
+
+; ************************************************************************************************
+;
+;		As OptionalParameterCompile, but defaulting to ZERO -- for GP.CALL's A/X/Y/C arguments.
+;
+;		No sentinel is involved and none is needed: an unspecified register genuinely IS zero, so
+;		the runtime never has to test for "omitted" and carries no code to do it. Zero also fits
+;		the one byte short constant path, so an omitted argument costs LESS here than a supplied
+;		one -- the opposite of OptionalParameterCompile, whose 255 default cannot fit and emits a
+;		two byte .byte instruction every time.
+;
+; ************************************************************************************************
+
+OptionalRegisterCompile:
+		jsr 	LookNextNonSpace 			; what follows.
+		cmp 	#","
+		bne 	_ORCDefault
+		jsr 	GetNext 					; consume ,
+		jsr 	CompileExpressionAt0
+		and 	#NSSTypeMask
+		cmp 	#NSSIFloat
+		bne 	MidFailType 				; which must be numeric
+		clc
+		rts
+_ORCDefault:
+		lda 	#0
+		jsr 	PushIntegerA
+		clc
+		rts
 
 OptionalColourCompile:
 		jsr 	LookNextNonSpace 			; what follows.

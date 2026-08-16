@@ -68,6 +68,15 @@ class PCode(object):
 											# runtime. The compiler drops it in place of a statement
 											# it could not parse (defer-to-runtime), so unreachable
 											# garbage compiles and only errors if actually executed.
+		self.extra(".exitdo",2) 			# GP.EXITDO: close the innermost GP.DO frame and branch
+											# past its GP.LOOP. A SYSTEM token, not a command token,
+											# because only these carry an inline operand -- the
+											# 2 here is what tells MoveObjectForward to step over
+											# the branch offset. FixBranches fills that offset in.
+											#
+											# APPENDED, never inserted: every system token's ID is
+											# its position in this list, so adding one anywhere else
+											# renumbers the rest and invalidates every object file.
 		self.define("PCD_ENDSYSTEM")
 		self.endCommands = self.currentID	
 

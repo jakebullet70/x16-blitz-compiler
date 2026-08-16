@@ -49,7 +49,19 @@ MemoryStorage = $400
 ;		leaves ~320 spare, at the cost of the same 768 bytes of per-program workspace (~3% of the
 ;		~26K a shared program gets). If it happens again, lower this and bump RT_ABI together.
 ;
-RTBASE = $7000 								; resident runtime home ($7000..$9EFF, ~11.7K)
+;
+;		AND AGAIN on 16th August 2026, exactly as warned above. The runtime had crept to $9EFF --
+;		ONE byte under the ceiling -- so the ~200 bytes added by ReuseForFrame, GP.EXITDO and
+;		GP.CALL overflowed it.
+;
+;		EIGHT pages down this time, not the three that just proved too timid. Every move of RTBASE
+;		costs an RT_ABI bump (a resident runtime is keyed on the ordinal, and one built at another
+;		base is not interchangeable), so the cheap moment to take the room is while a bump is
+;		already happening -- RT_ABI was going 5 -> 6 for GP.CALL's opcodes regardless. Four pages
+;		would have left 940 bytes, which does NOT cover the ~1,545 GP.BASIC still has to add;
+;		eight leaves ~1,960 and ends the matter. Cost is 2K of the ~26K a shared program gets.
+;
+RTBASE = $6800 								; resident runtime home ($6800..$9EFF, ~13.7K)
 RT_ENTRY = RTBASE+4 						; 4-byte magic at RTBASE, then jmp StartRuntime
 PCODE_PAGE = $09 							; shared-mode p-code base page ($0900, page-aligned)
 MIN_WS_PAGES = 16 							; smallest workspace a shared program keeps (4K)
@@ -86,7 +98,21 @@ FrameStackPages = 16 						; 4K, ~250 frames
 ;		and with renumbered opcodes that would dispatch most of the table to the wrong handler.
 ;		This is the guard that stops it.
 ;
-RT_ABI = 3 									; runtime ABI ordinal -> "GPC3" magic (NOT the file name)
+;		3 -> 4 on 16th August 2026: GP.DO / GP.LOOP joined the table. Same mechanism as the 2 -> 3
+;		bump above -- "do.asm" sorts ahead of "for.asm" in the commands directory, so the two new
+;		markers landed at $96/$97 and shifted every opcode from "for" upward by two.
+;
+;		4 -> 5 on 16th August 2026: GP.EXITDO joined the table as the system token ".exitdo". This
+;		one is NOT a renumbering -- it was appended after ".deferror" precisely so that every
+;		existing opcode keeps its ID. The bump is still required in the other direction: an object
+;		using $DF would dispatch off the end of an ABI 4 runtime's vector table.
+;
+;		5 -> 6 on 16th August 2026: GP.CALL and the GP.A/GP.X/GP.Y/GP.C value words. This one IS a
+;		renumbering -- "gpcall.asm" sorts mid-list in the commands directory, so the four unshifted
+;		markers shifted every opcode above them, and the shifted gp.call did the same to the
+;		shifted range.
+;
+RT_ABI = 6 									; runtime ABI ordinal -> "GPC6" magic (NOT the file name)
 
 ; ************************************************************************************************
 ;

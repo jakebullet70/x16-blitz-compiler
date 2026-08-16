@@ -23,6 +23,15 @@ TDATA 			(#,#) T N
 TATTR 			(#,#) T N
 RPT$ 			(#,#) T S
 
+# 	GP.CALL's results. No-argument value words, exactly like MB/MX/MY above and like X16's own
+# 	ST -- they are TOKENS, not variables, because nothing lets the runtime write a variable by
+# 	name. They read SYS's $030C-$030F, so they also read back what a plain SYS left.
+
+GP.A 			T N
+GP.X 			T N
+GP.Y 			T N
+GP.C 			T N
+
 # 	POINTER and STRPTR return the RAM address of a variable's value in stock BASIC. Their
 # 	whole purpose is to expose the *interpreter's* internal variable/string layout, which the
 # 	compiled runtime does not replicate (strings here are [MaxLen][Control][ActLen][Data], not

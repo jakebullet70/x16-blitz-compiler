@@ -1,0 +1,46 @@
+## ***********************************************************************
+## **
+## **  GP.INC.BL -- the GP.BASIC keyword definitions for BASLOAD.
+## **
+## **  #INCLUDE "GP.INC.BL" at the top of any BASL source that uses GP
+## **  keywords. BASLOAD only knows the ROM's keywords; this teaches it
+## **  the GP tokens so GP.DO parses instead of raising a syntax error.
+## **  The host-side tokeniser (bin/tokenise.zip) does not need this file
+## **  -- it learns the same tokens from c64tokens.py at build time.
+## **
+## **  THE TOKEN VALUES ARE THE ABI. They mirror getGP() in
+## **  source/common-scripts/c64tokens.py exactly: $CE7F down, one per
+## **  keyword, allocated DOWNWARD and never renumbered. When a keyword
+## **  is added there, add it here in the same change.
+## **
+## **  A PRG containing these tokens is compile-only: the ROM cannot
+## **  LIST or RUN it, because nothing in BASIC is behind $CE7x.
+## **
+## ***********************************************************************
+#IFNDEF GP.DEFS
+#DEFINE GP.DEFS 1
+
+## Loops -- GP.DO <count> ... GP.LOOP, count 0 or omitted = forever.
+## GP.EXITDO leaves the innermost GP.DO early, closing its frame, so it
+## is the leak-free exit; jumping out with GOTO abandons the frame.
+
+#TOKEN GP.DO 52863
+#TOKEN GP.LOOP 52862
+#TOKEN GP.EXITDO 52861
+
+## Machine code. GP.CALL sets the registers from its arguments (all optional,
+## all defaulting to 0) and the four value words read the results back. They
+## share SYS's $030C-$030F, so they also read what a plain SYS left behind.
+##
+## WARNING: put the machine code in BANKED RAM ($A000-$BFFF), NOT $0400-$07FF.
+## Stock X16 BASIC leaves $0400 free for the user; a COMPILED GPC program does
+## not -- that page holds runtime state (stringHighMemory, storeStartHigh,
+## variableStartPage ...) and POKEing code over it corrupts the program silently.
+
+#TOKEN GP.CALL 52860
+#TOKEN GP.A 52859
+#TOKEN GP.X 52858
+#TOKEN GP.Y 52857
+#TOKEN GP.C 52856
+
+#ENDIF

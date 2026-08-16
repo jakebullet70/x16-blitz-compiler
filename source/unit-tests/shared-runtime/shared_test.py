@@ -41,8 +41,15 @@ TOKENISE = os.path.join(ROOT, "bin", "tokenise.zip")
 # ABI constants -- must match common-source (RTBASE, RT_ABI, PCODE_PAGE, MIN_WS_PAGES) and the
 # runtime's FrameStackPages. Kept here as literals so the test fails loudly if the ABI moves under
 # it: that is the point, not an oversight. When you bump RT_ABI, update these to match.
-RTBASE            = 0x7000
-RT_ABI            = 2
+#
+#		RT_ABI was left at 2 through the 2->3 (PCD_ARRAY1) and 3->4 (GP.DO/GP.LOOP) bumps, so this
+#		suite was failing on the magic long before the 4->5 bump that caught it. It went unnoticed
+#		because the suite is not in the default build AND cannot run until someone has done a
+#		separate "make -C source/runtime gpc-rt" -- so a red suite looks the same as an unbuilt
+#		one. If it fails on the magic again, check that first before suspecting the bootstrap.
+#
+RTBASE            = 0x6800
+RT_ABI            = 6
 PCODE_PAGE        = 0x09
 FRAME_STACK_PAGES = 16
 MIN_WS_PAGES      = 16

@@ -24,6 +24,7 @@ class C64TokenStore(object):
 		self.tokenToID = {}
 		self.append(self.get())
 		self.append(self.getX16())
+		self.append(self.getGP())
 
 	def append(self,src):
 		src = src.replace(" ","").replace("\t","").replace("\n","")
@@ -42,6 +43,14 @@ class C64TokenStore(object):
 		s = s.replace("+","PLUS").replace("-","MINUS").replace("*","TIMES").replace("/","DIVIDE").replace("^","POWER")
 		s = s.replace("(","LB").replace(">","GREATER").replace("<","LESS").replace("=","EQUAL").replace("$","DOLLAR")
 		s = s.replace("#","HASH").replace("","").replace("","").replace("","").replace("","")
+		#
+		#		GP keywords are dotted (GP.DO), and the C64 dump is assembled as
+		#		common-source/source/generated/c64tokens.inc -- a dot would be an illegal symbol
+		#		character there. "CMD_" is the same substitution pcode.py already applies to its
+		#		own dotted names, so PCD_ and C64_ spell a dotted keyword identically. Idempotent
+		#		for every pre-GP token: nothing in get() or getX16() contains a dot.
+		#
+		s = s.replace(".","CMD_")
 		#s = s.replace("","").replace("","").replace("","").replace("","").replace("","")
 		return s 
 
@@ -100,6 +109,31 @@ class C64TokenStore(object):
 		s = s.replace("\n","").replace(" ","").replace("\t","").split("|")
 		vpeek = s.index("VPEEK")
 		return "|".join(["{0}:{1}".format(i+0xCE80+(0 if i < vpeek else 0x50-vpeek),s[i]) for i in range(0,len(s))])
+
+	#
+	#		GP.BASIC keywords -- our own extension set, NOT anything the X16 ROM knows.
+	#
+	#		Allocated from $CE7F DOWNWARD, and that direction is the whole point. getX16() above
+	#		numbers the ROM's statements upward from $CE80 and re-anchors its functions at a fixed
+	#		$CED0, so the ROM's own scheme can never reach below $CE80 however much it grows. That
+	#		makes $CE01-$CE7F 127 slots a future ROM revision structurally cannot collide with --
+	#		unlike the tempting gaps ABOVE the keywords ($CEC2-$CECF, $CEDF-$CEFF), which is
+	#		exactly where it does grow.
+	#
+	#		$CE00 is excluded: a zero second byte means "unshifted" in the compiler's table format.
+	#
+	#		Unlike getX16() these are written out EXPLICITLY as id:NAME rather than computed from
+	#		list position, so adding one can never renumber the others. Do not convert this to a
+	#		positional list, and do not append GP names to getX16() -- that would renumber real ROM
+	#		keywords.
+	#
+	#		The cost of using one: a PRG containing a $CE7x byte cannot be LISTed or RUN by the
+	#		ROM, because there is no handler behind it. Programs using GP keywords are compile-only.
+	#
+	def getGP(self):
+		return """
+				52863:GP.DO|52862:GP.LOOP|52861:GP.EXITDO|52860:GP.CALL|
+				52859:GP.A|52858:GP.X|52857:GP.Y|52856:GP.C"""
 
 
 if __name__ == "__main__":

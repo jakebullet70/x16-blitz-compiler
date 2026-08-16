@@ -1,0 +1,56 @@
+## ***********************************************************************
+## **
+## **  LOOPS.EXP.BL -- GP.DO / GP.LOOP / GP.EXITDO
+## **
+## **  Build:  copy GPC-BASIC/GP.INC.BL and this file into testing/, then
+## **            python source/gpc/build_basl.py LOOPS.EXP.BL LOOPS.PRG
+## **          and compile LOOPS.PRG with GPC.BLITZ.BIN.
+## **
+## **  Compile-only: the ROM cannot RUN a PRG containing GP tokens.
+## **
+## ***********************************************************************
+#INCLUDE "GP.INC.BL"
+#SAVEAS "@:LOOPS.PRG"
+
+## ---- 1. counted loop.  GP.DO n runs the body exactly n times.
+
+TOTAL = 0
+GP.DO 5
+  TOTAL = TOTAL + 1
+GP.LOOP
+PRINT "COUNTED  5 ->"; TOTAL
+
+## ---- 2. early exit.  GP.EXITDO leaves the innermost loop AND closes its
+## ---- frame, which is what makes it different from jumping out with GOTO:
+## ---- an abandoned frame is never reclaimed until something unwinds it.
+
+COUNT = 0
+GP.DO 100
+  COUNT = COUNT + 1
+  IF COUNT = 5 THEN GP.EXITDO
+GP.LOOP
+PRINT "EXIT AT 5 ->"; COUNT
+
+## ---- 3. nested.  GP.EXITDO leaves only the INNER loop; the outer one
+## ---- carries on, so this totals 2 + 2 + 2.
+
+SUM = 0
+GP.DO 3
+  INNER = 0
+  GP.DO 10
+    INNER = INNER + 1
+    IF INNER = 2 THEN GP.EXITDO
+  GP.LOOP
+  SUM = SUM + INNER
+GP.LOOP
+PRINT "NESTED   6 ->"; SUM
+
+## ---- 4. forever.  A bare GP.DO (or GP.DO 0) never counts down, so the
+## ---- only way out is GP.EXITDO -- which is the point of having it.
+
+TICK = 0
+GP.DO
+  TICK = TICK + 1
+  IF TICK = 9 THEN GP.EXITDO
+GP.LOOP
+PRINT "FOREVER  9 ->"; TICK

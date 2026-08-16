@@ -77,6 +77,13 @@ stringHighMemory: 							; string heap ceiling; allocations grow DOWN from here
 
 FRAME_GOSUB = $E4 							; Gosub has 4 bytes
 FRAME_FOR = $C0+19 							; For has 19 bytes
+FRAME_LOOP = $A0+6 							; GP.DO has 6 bytes
+
+;
+;		Identifiers are the UPPER 3 BITS, so there are only eight and three are now spoken for:
+;		7 GOSUB, 6 FOR, 5 GP.DO. $FF is the stack-empty fail marker StackFindFrame stops on --
+;		it is id 7 size 31, which no real frame can be, so it can never be mistaken for a GOSUB.
+;
 
 ; ************************************************************************************************
 ;
@@ -2192,6 +2199,172 @@ dimType:									; type bits being checked for.
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;
+;		Name:		do.asm
+;		Purpose:	GP.DO / GP.LOOP counted loop
+;		Created:	16th August 2026
+;		Reviewed: 	No
+;		Author : 	Steven De George SR
+;
+; ************************************************************************************************
+; ************************************************************************************************
+
+		.section 	code
+
+; ************************************************************************************************
+;
+;								<Count> GP.DO ... GP.LOOP
+;
+;		A counted loop with NO loop variable, modelled on prog8's "repeat" and named after CBM
+;		BASIC 7.0's DO/LOOP. That missing variable is the entire point: FOR/NEXT spends most of
+;		its time on the index -- decoding an operand address, reading six iFloat32 bytes,
+;		comparing against a terminal value and writing six bytes back -- and none of that exists
+;		here. The counter lives in the frame itself and is a plain 16 bit decrement.
+;
+;		Everything it needs was already in the image and is already linked for FOR/NEXT/GOSUB:
+;		GetInteger16Bit, StackOpenFrame, StackSaveCurrentPosition, StackLoadCurrentPosition,
+;		StackCloseFrame and StackFindFrame. This file adds glue, not machinery, which is why the
+;		whole construct costs well under a tenth of what FOR alone does.
+;
+; ************************************************************************************************
+
+CommandXDo: ;; [gp.do]
+		.entercmd
+		lda 	#FRAME_LOOP 				; open the frame FIRST.
+		jsr 	StackOpenFrame
+		jsr 	StackSaveCurrentPosition 	; normalise to Y=0 and save the loop-back position.
+		;
+		;		Order matters and is not stylistic: StackOpenFrame uses zTemp0 as scratch for the
+		;		frame size, so fetching the count before opening the frame would have it
+		;		overwritten. GetInteger16Bit is therefore called last, and its result is consumed
+		;		immediately.
+		;
+		jsr 	GetInteger16Bit 			; count => zTemp0, truncated to 16 bits
+		ldy 	#4
+		lda 	zTemp0
+		sta 	(runtimeStackPtr),y
+		iny
+		lda 	zTemp0+1
+		sta 	(runtimeStackPtr),y
+		dex 								; throw the count
+		ldy 	#0
+		.exitcmd
+
+; ************************************************************************************************
+;
+;									GP.LOOP : end of a GP.DO
+;
+; ************************************************************************************************
+
+CommandXLoop: ;; [gp.loop]
+		.entercmd
+		;
+		;		Same guard as NEXT: a well nested loop has its own frame already on top, so
+		;		StackFindFrame would spend ~34 cycles finding what is under its nose. Any other
+		;		byte -- a FOR or GOSUB frame, or the $FF fail marker that raises the structure
+		;		error -- falls through to the general path exactly as before.
+		;
+		lda 	(runtimeStackPtr) 			; loop frame already on top ?
+		cmp 	#FRAME_LOOP
+		beq 	_CLOnTop
+		lda 	#FRAME_LOOP
+		jsr 	StackFindFrame
+_CLOnTop:
+		;
+		;		MUST come before Y is touched, exactly as NEXT does it. On entry Y is the offset
+		;		into the current code page, and the frame accesses below overwrite it -- so
+		;		without this the position is simply lost. The loop-back path happens to survive
+		;		(StackLoadCurrentPosition reloads codePtr AND zeroes Y), but the exit path's
+		;		"ldy #0" would then resume at the START of the page rather than after GP.LOOP,
+		;		and the VM runs off into whatever follows. That is a BRK into the monitor with no
+		;		error message, which is exactly how this first showed up.
+		;
+		jsr 	FixUpY 						; normalise codePtr so Y is free to use
+		;
+		;		Decrement the 16 bit counter, exit when it REACHES zero. Post-tested, so the body
+		;		has already run once by the time we get here and a count of n gives exactly n
+		;		passes.
+		;
+		;		A counter of zero ON ENTRY therefore cannot be a counted loop winding down -- we
+		;		close the frame the moment a decrement produces zero, so zero is never left behind
+		;		on a live loop. That makes it unambiguous, and it is what a bare GP.DO compiles to
+		;		(OptionalNumberCompile pushes 0 for an omitted argument): ZERO MEANS FOREVER, and
+		;		it loops back without touching the counter at all.
+		;
+		ldy 	#4
+		lda 	(runtimeStackPtr),y 		; counter low
+		bne 	_CLDecLow 					; non-zero, so no borrow needed
+		iny
+		lda 	(runtimeStackPtr),y 		; counter high
+		beq 	_CLBack 					; $0000 => loop forever
+		dec 	a 							; borrow from the high byte
+		sta 	(runtimeStackPtr),y
+		dey
+		lda 	#0 							; low was zero, so it becomes $FF below
+_CLDecLow:
+		dec 	a
+		sta 	(runtimeStackPtr),y 		; Y is 4 on both paths
+		bne 	_CLBack 					; low non-zero => counter cannot be zero
+		ldy 	#5
+		lda 	(runtimeStackPtr),y
+		bne 	_CLBack 					; high non-zero => still running
+		;
+		jsr 	StackCloseFrame 			; counter hit zero, drop the frame and fall through
+		ldy 	#0
+		.exitcmd
+_CLBack:
+		jsr 	StackLoadCurrentPosition 	; back to the top of the body (sets Y = 0)
+		.exitcmd
+
+; ************************************************************************************************
+;
+;							GP.EXITDO : leave the innermost GP.DO early
+;
+;		The whole command is three instructions because both halves already exist. StackFindFrame
+;		lands on the innermost GP.DO frame and DISCARDS everything stacked above it on the way, so
+;		a FOR abandoned inside the loop is cleaned up for free -- and if there is no loop at all it
+;		stops on the $FF marker and raises the structure error, which is the runtime backstop for
+;		an EXITDO the compiler somehow let through. Y is the code pointer offset here and neither
+;		StackFindFrame nor StackCloseFrame touches it (both use 65C02 zp INDIRECT, not
+;		indirect-indexed), so the error address stays meaningful and PerformGOTO still finds its
+;		operand where it expects it.
+;
+;		The operand is a branch offset with exactly the shape of a .goto's, filled in by
+;		FixBranches, so the jump itself is literally the GOTO code.
+;
+; ************************************************************************************************
+
+CommandXExitDo: ;; [.exitdo]
+		.entercmd
+		lda 	#FRAME_LOOP 				; innermost GP.DO frame, discarding anything above it
+		jsr 	StackFindFrame
+		jsr 	StackCloseFrame 			; drop it -- we are leaving the loop for good
+		jmp 	PerformGOTO 				; and branch past the matching GP.LOOP
+
+; ************************************************************************************************
+;
+;		0	GP.DO Marker 			[1]
+;		1 	(unused)				[1]		so +2/+3 line up with FRAME_FOR, which is what
+;		2 	Position for loop 		[2]		StackSave/LoadCurrentPosition hard-code
+;		4	Counter, 16 bit 		[2]		$0000 = loop forever
+;
+; ************************************************************************************************
+
+		.send 	code
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;		16/08/26		Written.
+;
+; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
 ;		Name:		end.asm
 ;		Purpose:	END command
 ;		Created:	19th April 2023
@@ -2364,8 +2537,24 @@ _EHNotHex:
 
 CommandXFor: ;; [for]
 		.entercmd
+		;
+		;		Stock BASIC REUSES the frame of an open FOR with the same index variable rather
+		;		than opening a second one. Opening unconditionally leaked 19 bytes of frame stack
+		;		every time a loop was abandoned and re-entered, so
+		;
+		;			20 FOR I=1 TO 5 : C=C+1 : IF C<500 THEN 20
+		;
+		;		runs forever interpreted but died compiled with OUT OF MEMORY after ~215 passes.
+		;		Search first, as FNDFOR does. Only worth looking if the top frame is a FOR at all,
+		;		because the search stops at the first frame that is not one.
+		;
+		lda 	(runtimeStackPtr)
+		cmp 	#FRAME_FOR
+		bne 	_CFNoReuse
+		jsr 	ReuseForFrame
+_CFNoReuse:
 		lda 	#FRAME_FOR 					; open frame
-		jsr 	StackOpenFrame 			
+		jsr 	StackOpenFrame
 		jsr 	StackSaveCurrentPosition 	; normalise to Y=0 and save position.
 
 		ldy 	#7 							; copy step out
@@ -2477,6 +2666,71 @@ CopyTOSToOffsetY:
 
 ; ************************************************************************************************
 ;
+;		Throw any open FOR frame using the same index variable as the FOR about to be opened,
+;		along with every frame stacked above it, so the new frame reuses its space.
+;
+;		Walks a COPY of the stack pointer and only commits on a match, so a search that finds
+;		nothing leaves the stack untouched. Stops at the first frame that is not a FOR, exactly
+;		as the 6502 ROM does -- which is what makes an intervening GOSUB shield a subroutine's
+;		FOR I from the caller's. The $FF stack-empty marker is not FRAME_FOR, so it stops there
+;		too and needs no test of its own.
+;
+;		Y holds the code pointer offset on entry to a command, and StackOpenFrame's OUT OF
+;		MEMORY reports codePtr+Y, so Y is saved and restored -- see blitz-error-codeptr-y.
+;
+; ************************************************************************************************
+
+ReuseForFrame:
+		phy
+		dex 								; <reference> <terminal> <step>, so the index
+		dex 								; variable reference is two below TOS.
+		lda 	NSMantissa0,x
+		sta 	zTemp2
+		lda 	NSMantissa1,x
+		and 	#$7F 						; frame offset 6 holds it with the type bit thrown.
+		sta 	zTemp2+1
+		inx
+		inx
+		;
+		lda 	runtimeStackPtr 			; walk a copy
+		sta 	zTemp1
+		lda 	runtimeStackPtr+1
+		sta 	zTemp1+1
+_RFFLoop:
+		lda 	(zTemp1) 					; still a FOR frame ?
+		cmp 	#FRAME_FOR
+		bne 	_RFFExit
+		ldy 	#5 							; same index variable ?
+		lda 	(zTemp1),y
+		cmp 	zTemp2
+		bne 	_RFFNext
+		iny
+		lda 	(zTemp1),y
+		cmp 	zTemp2+1
+		beq 	_RFFFound
+_RFFNext:
+		clc 								; step over the frame and try the next.
+		lda 	zTemp1
+		adc 	#FRAME_FOR & $1F
+		sta 	zTemp1
+		bcc 	_RFFLoop
+		inc 	zTemp1+1
+		bra 	_RFFLoop
+
+_RFFFound:
+		clc 								; discard it and everything above it.
+		lda 	zTemp1
+		adc 	#FRAME_FOR & $1F
+		sta 	runtimeStackPtr
+		lda 	zTemp1+1
+		adc 	#0
+		sta 	runtimeStackPtr+1
+_RFFExit:
+		ply
+		rts
+
+; ************************************************************************************************
+;
 ;		0	FOR Marker 				[1]
 ;		1 	Page/Position for loop 	[3]
 ;		4 	Control 				[1] 	Integer/Int16:7 ; optimised:6
@@ -2496,6 +2750,10 @@ CopyTOSToOffsetY:
 ;
 ;		Date			Notes
 ;		==== 			=====
+;		16/08/26		FOR now reuses the frame of an open FOR with the same index variable, as
+;						stock BASIC's FNDFOR does. Opening unconditionally leaked 19 bytes of
+;						frame stack per abandoned loop, so a program that ran forever interpreted
+;						died compiled with OUT OF MEMORY after ~215 passes.
 ;
 ; ************************************************************************************************
 ; ************************************************************************************************
@@ -2881,6 +3139,142 @@ CommandGotoNZ: ;; [.goto.nz]
 ;
 ;		Date			Notes
 ;		==== 			=====
+;
+; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		Name:		gpcall.asm
+;		Purpose:	GP.CALL and the register readers GP.A / GP.X / GP.Y / GP.C
+;		Created:	16th August 2026
+;		Reviewed: 	No
+;		Author : 	Steven De George SR
+;
+; ************************************************************************************************
+; ************************************************************************************************
+
+		.section 	code
+
+; ************************************************************************************************
+;
+;						<Addr> <A> <X> <Y> <C> GP.CALL
+;
+;		Call machine code with the registers set from arguments, and read the results back with
+;		GP.A / GP.X / GP.Y / GP.C. What it removes is the POKE/SYS/PEEK dance:
+;
+;			POKE $30C,65 : POKE $30D,0 : SYS 49152 : A=PEEK($30C)      becomes
+;			GP.CALL 49152,65,0 : A=GP.A
+;
+;		It shares SYS's storage at $030C-$030F deliberately, so the two interoperate and PEEK
+;		still reads what either of them left behind.
+;
+;		A, X, Y and C are all optional and DEFAULT TO ZERO. Zero needs no sentinel -- there is
+;		nothing here that has to test for "omitted", because an unspecified register genuinely is
+;		0 -- and 0 compiles to a one byte short constant, so omitting costs less than supplying.
+;		Contrast GP.STASH's geometry, where 255 had to be a real sentinel.
+;
+;		CARRY IN is set with LSR rather than PLP. SYS pushes a whole status byte and PLPs it,
+;		which also writes I and D -- clearing the interrupt disable inside a routine that had set
+;		it. LSR moves bit 0 of the argument into carry and touches nothing else, and LDA/LDX/LDY
+;		do not affect carry, so the registers can be loaded afterwards without disturbing it.
+;
+; ************************************************************************************************
+
+CommandGPCall: ;; [!gp.call]
+		.entercmd
+		phy 								; Y is the code pointer offset -- needed after the call
+		;
+		;		Arguments were pushed left to right, so TOS is the LAST of them.
+		;
+		lda 	NSMantissa0,x 				; C -- parked in SYS_Reg_S, which the result overwrites
+		sta 	SYS_Reg_S
+		dex
+		lda 	NSMantissa0,x 				; Y
+		sta 	SYS_Reg_Y
+		dex
+		lda 	NSMantissa0,x 				; X
+		sta 	SYS_Reg_X
+		dex
+		lda 	NSMantissa0,x 				; A
+		sta 	SYS_Reg_A
+		dex
+		;
+		jsr 	FloatIntegerPart 			; the address itself
+		lda 	NSMantissa0,x
+		sta 	zTemp0
+		lda 	NSMantissa1,x
+		sta 	zTemp0+1
+		dex 								; drop the address
+		phx 								; the float stack pointer is X, and X is an argument
+		;
+		lda 	SYS_Reg_S 					; carry from bit 0, leaving I and D alone
+		lsr 	a
+		ldx 	SYS_Reg_X 					; LD* do not affect carry
+		ldy 	SYS_Reg_Y
+		lda 	SYS_Reg_A
+		jsr 	_CGCCall
+		;
+		php 								; results, status included, for GP.C
+		sta 	SYS_Reg_A
+		stx 	SYS_Reg_X
+		sty 	SYS_Reg_Y
+		pla
+		sta 	SYS_Reg_S
+		;
+		plx
+		ply
+		.exitcmd
+
+_CGCCall:
+		jmp 	(zTemp0)
+
+; ************************************************************************************************
+;
+;					GP.A / GP.X / GP.Y / GP.C -- read back what GP.CALL returned
+;
+;		Value words taking no argument, exactly as ST/MX/MY are, so they push a value rather than
+;		consuming one -- hence the INX. Left UNSHIFTED on purpose: these are read inside loops
+;		where 41 cycles against 58 and one byte against two is the whole point of having them
+;		instead of PEEK. GP.CALL itself is shifted, like SYS, because a machine code call dwarfs
+;		its own dispatch.
+;
+; ************************************************************************************************
+
+UnaryGPA: ;; [gp.a]
+		.entercmd
+		lda 	SYS_Reg_A
+GPRegPush:
+		inx 								; reads as a value, so it pushes one
+		jsr 	FloatSetByte
+		.exitcmd
+
+UnaryGPX: ;; [gp.x]
+		.entercmd
+		lda 	SYS_Reg_X
+		bra 	GPRegPush
+
+UnaryGPY: ;; [gp.y]
+		.entercmd
+		lda 	SYS_Reg_Y
+		bra 	GPRegPush
+
+UnaryGPC: ;; [gp.c]
+		.entercmd
+		lda 	SYS_Reg_S 					; carry is bit 0 of the status byte
+		and 	#1
+		bra 	GPRegPush
+
+		.send 	code
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;		16/08/26		Written.
 ;
 ; ************************************************************************************************
 ; ************************************************************************************************
@@ -8339,147 +8733,155 @@ VectorTable:
 	.word	PrintCharacterX          ; $93 print.chr
 	.word	UnaryChr                 ; $94 chr$
 	.word	CompareStrings           ; $95 s.cmp
-	.word	CommandXFor              ; $96 for
-	.word	UnaryFre                 ; $97 fre
-	.word	CommandXGet              ; $98 get
-	.word	CommandReturn            ; $99 return
-	.word	Command_PSET             ; $9a pset
-	.word	Command_LINE             ; $9b line
-	.word	Command_RECT             ; $9c rect
-	.word	Command_FRAME            ; $9d frame
-	.word	Command_OVAL             ; $9e oval
-	.word	Command_RING             ; $9f ring
-	.word	Command_CHAR             ; $a0 char
-	.word	Unary16Hex               ; $a1 hex$
-	.word	CommandXInput            ; $a2 input
-	.word	CommandInputString       ; $a3 input$
-	.word	CommandInputReset        ; $a4 input.start
-	.word	UnaryLen                 ; $a5 len
-	.word	LinkFloatCompare         ; $a6 f.cmp
-	.word	LinkDivideInt32          ; $a7 int.div
-	.word	UnaryMOD                 ; $a8 mod
-	.word	NegateTOS                ; $a9 negate
-	.word	CommandNewLine           ; $aa new.line
-	.word	CommandXNext             ; $ab next
-	.word	NotTOS                   ; $ac not
-	.word	CommandXOn               ; $ad on
-	.word	CommandMoreOn            ; $ae moreon
-	.word	UnaryPeek                ; $af peek
-	.word	UnaryPI                  ; $b0 pi
-	.word	CommandPOKE              ; $b1 poke
-	.word	UnaryPos                 ; $b2 pos
-	.word	GetChannel               ; $b3 getchannel
-	.word	SetChannel               ; $b4 setchannel
-	.word	PrintNumber              ; $b5 print.n
-	.word	PrintString              ; $b6 print.s
-	.word	CommandXRead             ; $b7 read
-	.word	CommandReadString        ; $b8 read$
-	.word	UnaryRND                 ; $b9 rnd
-	.word	StringConcatenate        ; $ba concat
-	.word	SignTOS                  ; $bb sgn
-	.word	PrintTab                 ; $bc print.tab
-	.word	PrintPos                 ; $bd print.pos
-	.word	PrintSpace               ; $be print.spc
-	.word	Unary_Str                ; $bf str$
-	.word	Unary_Left               ; $c0 left$
-	.word	Unary_Right              ; $c1 right$
-	.word	Unary_Mid                ; $c2 mid$
-	.word	CommandSwap              ; $c3 swap
-	.word	TimeTOS                  ; $c4 ti
-	.word	TimeString               ; $c5 ti$
-	.word	UnaryUsr                 ; $c6 usr
-	.word	ValUnary                 ; $c7 val
-	.word	CommandClose             ; $c8 close
-	.word	CommandExit              ; $c9 exit
-	.word	CommandDebug             ; $ca debug
-	.word	CommandXOpen             ; $cb open
-	.word	CommandScreen            ; $cc screen
-	.word	CommandVPOKE             ; $cd vpoke
-	.word	CommandVPEEK             ; $ce vpeek
-	.word	CommandShift             ; $cf .shift
-	.word	PushByteCommand          ; $d0 .byte
-	.word	PushWordCommand          ; $d1 .word
-	.word	CommandPushN             ; $d2 .float
-	.word	CommandPushS             ; $d3 .string
-	.word	CommandXData             ; $d4 .data
-	.word	CommandXGoto             ; $d5 .goto
-	.word	CommandXGosub            ; $d6 .gosub
-	.word	CommandGotoZ             ; $d7 .goto.z
-	.word	CommandGotoNZ            ; $d8 .goto.nz
-	.word	CommandVarSpace          ; $d9 .varspace
-	.word	CommandRestoreX          ; $da .restore
-	.word	CommandXFnGosub          ; $db .fngosub
-	.word	CommandDeferredError     ; $dc .deferror
+	.word	CommandXDo               ; $96 gp.do
+	.word	CommandXLoop             ; $97 gp.loop
+	.word	CommandXFor              ; $98 for
+	.word	UnaryFre                 ; $99 fre
+	.word	CommandXGet              ; $9a get
+	.word	CommandReturn            ; $9b return
+	.word	UnaryGPA                 ; $9c gp.a
+	.word	UnaryGPX                 ; $9d gp.x
+	.word	UnaryGPY                 ; $9e gp.y
+	.word	UnaryGPC                 ; $9f gp.c
+	.word	Command_PSET             ; $a0 pset
+	.word	Command_LINE             ; $a1 line
+	.word	Command_RECT             ; $a2 rect
+	.word	Command_FRAME            ; $a3 frame
+	.word	Command_OVAL             ; $a4 oval
+	.word	Command_RING             ; $a5 ring
+	.word	Command_CHAR             ; $a6 char
+	.word	Unary16Hex               ; $a7 hex$
+	.word	CommandXInput            ; $a8 input
+	.word	CommandInputString       ; $a9 input$
+	.word	CommandInputReset        ; $aa input.start
+	.word	UnaryLen                 ; $ab len
+	.word	LinkFloatCompare         ; $ac f.cmp
+	.word	LinkDivideInt32          ; $ad int.div
+	.word	UnaryMOD                 ; $ae mod
+	.word	NegateTOS                ; $af negate
+	.word	CommandNewLine           ; $b0 new.line
+	.word	CommandXNext             ; $b1 next
+	.word	NotTOS                   ; $b2 not
+	.word	CommandXOn               ; $b3 on
+	.word	CommandMoreOn            ; $b4 moreon
+	.word	UnaryPeek                ; $b5 peek
+	.word	UnaryPI                  ; $b6 pi
+	.word	CommandPOKE              ; $b7 poke
+	.word	UnaryPos                 ; $b8 pos
+	.word	GetChannel               ; $b9 getchannel
+	.word	SetChannel               ; $ba setchannel
+	.word	PrintNumber              ; $bb print.n
+	.word	PrintString              ; $bc print.s
+	.word	CommandXRead             ; $bd read
+	.word	CommandReadString        ; $be read$
+	.word	UnaryRND                 ; $bf rnd
+	.word	StringConcatenate        ; $c0 concat
+	.word	SignTOS                  ; $c1 sgn
+	.word	PrintTab                 ; $c2 print.tab
+	.word	PrintPos                 ; $c3 print.pos
+	.word	PrintSpace               ; $c4 print.spc
+	.word	Unary_Str                ; $c5 str$
+	.word	Unary_Left               ; $c6 left$
+	.word	Unary_Right              ; $c7 right$
+	.word	Unary_Mid                ; $c8 mid$
+	.word	CommandSwap              ; $c9 swap
+	.word	TimeTOS                  ; $ca ti
+	.word	TimeString               ; $cb ti$
+	.word	UnaryUsr                 ; $cc usr
+	.word	ValUnary                 ; $cd val
+	.word	CommandClose             ; $ce close
+	.word	CommandExit              ; $cf exit
+	.word	CommandDebug             ; $d0 debug
+	.word	CommandXOpen             ; $d1 open
+	.word	CommandScreen            ; $d2 screen
+	.word	CommandVPOKE             ; $d3 vpoke
+	.word	CommandVPEEK             ; $d4 vpeek
+	.word	CommandShift             ; $d5 .shift
+	.word	PushByteCommand          ; $d6 .byte
+	.word	PushWordCommand          ; $d7 .word
+	.word	CommandPushN             ; $d8 .float
+	.word	CommandPushS             ; $d9 .string
+	.word	CommandXData             ; $da .data
+	.word	CommandXGoto             ; $db .goto
+	.word	CommandXGosub            ; $dc .gosub
+	.word	CommandGotoZ             ; $dd .goto.z
+	.word	CommandGotoNZ            ; $de .goto.nz
+	.word	CommandVarSpace          ; $df .varspace
+	.word	CommandRestoreX          ; $e0 .restore
+	.word	CommandXFnGosub          ; $e1 .fngosub
+	.word	CommandDeferredError     ; $e2 .deferror
+	.word	CommandXExitDo           ; $e3 .exitdo
 
 
 ShiftVectorTable:
-	.word	CommandClr               ; $cf80 clr
-	.word	CommandXDIM              ; $cf81 dim
-	.word	CommandEnd               ; $cf82 end
-	.word	UnaryJoy                 ; $cf83 joy
-	.word	LinkFloatIntegerPartDown ; $cf84 int
-	.word	LinkFloatSquareRoot      ; $cf85 sqr
-	.word	LinkFloatLogarithm       ; $cf86 log
-	.word	LinkFloatExponent        ; $cf87 exp
-	.word	LinkFloatCosine          ; $cf88 cos
-	.word	LinkFloatSine            ; $cf89 sin
-	.word	LinkFloatTangent         ; $cf8a tan
-	.word	LinkFloatArcTan          ; $cf8b atn
-	.word	CommandXLinput           ; $cf8c linput
-	.word	CommandXBinput           ; $cf8d binput
-	.word	Command_LOAD             ; $cf8e load
-	.word	Command_BLOAD            ; $cf8f bload
-	.word	Command_BVLOAD           ; $cf90 bvload
-	.word	Command_VLOAD            ; $cf91 vload
-	.word	Command_BSAVE            ; $cf92 bsave
-	.word	Command_BVERIFY          ; $cf93 bverify
-	.word	X16CommandPowerOff       ; $cf94 poweroff
-	.word	X16CommandReset          ; $cf95 reset
-	.word	X16CommandReboot         ; $cf96 reboot
-	.word	XCommandMouse            ; $cf97 mouse
-	.word	XUnaryMB                 ; $cf98 mb
-	.word	XUnaryMX                 ; $cf99 mx
-	.word	XUnaryMY                 ; $cf9a my
-	.word	XUnaryMWheel             ; $cf9b mwheel
-	.word	UnaryRPT                 ; $cf9c rpt$
-	.word	Command_SPRITE           ; $cf9d sprite
-	.word	Command_SPRMEM           ; $cf9e sprmem
-	.word	Command_MOVSPR           ; $cf9f movspr
-	.word	UnaryST                  ; $cfa0 st
-	.word	CommandStop              ; $cfa1 stop
-	.word	CommandSYS               ; $cfa2 sys
-	.word	UnaryTDATA               ; $cfa3 tdata
-	.word	UnaryTATTR               ; $cfa4 tattr
-	.word	Command_TILE             ; $cfa5 tile
-	.word	CommandTIWriteN          ; $cfa6 ti.write
-	.word	CommandTIWriteS          ; $cfa7 ti$.write
-	.word	CommandXWAIT             ; $cfa8 wait
-	.word	X16I2CPoke               ; $cfa9 i2cpoke
-	.word	X16I2CPeek               ; $cfaa i2cpeek
-	.word	CommandBank              ; $cfab bank
-	.word	XCommandSleep            ; $cfac sleep
-	.word	X16_Audio_FMINIT         ; $cfad fminit
-	.word	X16_Audio_FMNOTE         ; $cfae fmnote
-	.word	X16_Audio_FMDRUM         ; $cfaf fmdrum
-	.word	X16_Audio_FMINST         ; $cfb0 fminst
-	.word	X16_Audio_FMVIB          ; $cfb1 fmvib
-	.word	X16_Audio_FMFREQ         ; $cfb2 fmfreq
-	.word	X16_Audio_FMVOL          ; $cfb3 fmvol
-	.word	X16_Audio_FMPAN          ; $cfb4 fmpan
-	.word	X16_Audio_FMPLAY         ; $cfb5 fmplay
-	.word	X16_Audio_FMCHORD        ; $cfb6 fmchord
-	.word	X16_Audio_FMPOKE         ; $cfb7 fmpoke
-	.word	X16_Audio_PSGINIT        ; $cfb8 psginit
-	.word	X16_Audio_PSGNOTE        ; $cfb9 psgnote
-	.word	X16_Audio_PSGVOL         ; $cfba psgvol
-	.word	X16_Audio_PSGWAV         ; $cfbb psgwav
-	.word	X16_Audio_PSGFREQ        ; $cfbc psgfreq
-	.word	X16_Audio_PSGPAN         ; $cfbd psgpan
-	.word	X16_Audio_PSGPLAY        ; $cfbe psgplay
-	.word	X16_Audio_PSGCHORD       ; $cfbf psgchord
-	.word	CommandCls               ; $cfc0 cls
-	.word	CommandLocate            ; $cfc1 locate
-	.word	CommandColor             ; $cfc2 color
+	.word	CommandClr               ; $d580 clr
+	.word	CommandXDIM              ; $d581 dim
+	.word	CommandEnd               ; $d582 end
+	.word	CommandGPCall            ; $d583 gp.call
+	.word	UnaryJoy                 ; $d584 joy
+	.word	LinkFloatIntegerPartDown ; $d585 int
+	.word	LinkFloatSquareRoot      ; $d586 sqr
+	.word	LinkFloatLogarithm       ; $d587 log
+	.word	LinkFloatExponent        ; $d588 exp
+	.word	LinkFloatCosine          ; $d589 cos
+	.word	LinkFloatSine            ; $d58a sin
+	.word	LinkFloatTangent         ; $d58b tan
+	.word	LinkFloatArcTan          ; $d58c atn
+	.word	CommandXLinput           ; $d58d linput
+	.word	CommandXBinput           ; $d58e binput
+	.word	Command_LOAD             ; $d58f load
+	.word	Command_BLOAD            ; $d590 bload
+	.word	Command_BVLOAD           ; $d591 bvload
+	.word	Command_VLOAD            ; $d592 vload
+	.word	Command_BSAVE            ; $d593 bsave
+	.word	Command_BVERIFY          ; $d594 bverify
+	.word	X16CommandPowerOff       ; $d595 poweroff
+	.word	X16CommandReset          ; $d596 reset
+	.word	X16CommandReboot         ; $d597 reboot
+	.word	XCommandMouse            ; $d598 mouse
+	.word	XUnaryMB                 ; $d599 mb
+	.word	XUnaryMX                 ; $d59a mx
+	.word	XUnaryMY                 ; $d59b my
+	.word	XUnaryMWheel             ; $d59c mwheel
+	.word	UnaryRPT                 ; $d59d rpt$
+	.word	Command_SPRITE           ; $d59e sprite
+	.word	Command_SPRMEM           ; $d59f sprmem
+	.word	Command_MOVSPR           ; $d5a0 movspr
+	.word	UnaryST                  ; $d5a1 st
+	.word	CommandStop              ; $d5a2 stop
+	.word	CommandSYS               ; $d5a3 sys
+	.word	UnaryTDATA               ; $d5a4 tdata
+	.word	UnaryTATTR               ; $d5a5 tattr
+	.word	Command_TILE             ; $d5a6 tile
+	.word	CommandTIWriteN          ; $d5a7 ti.write
+	.word	CommandTIWriteS          ; $d5a8 ti$.write
+	.word	CommandXWAIT             ; $d5a9 wait
+	.word	X16I2CPoke               ; $d5aa i2cpoke
+	.word	X16I2CPeek               ; $d5ab i2cpeek
+	.word	CommandBank              ; $d5ac bank
+	.word	XCommandSleep            ; $d5ad sleep
+	.word	X16_Audio_FMINIT         ; $d5ae fminit
+	.word	X16_Audio_FMNOTE         ; $d5af fmnote
+	.word	X16_Audio_FMDRUM         ; $d5b0 fmdrum
+	.word	X16_Audio_FMINST         ; $d5b1 fminst
+	.word	X16_Audio_FMVIB          ; $d5b2 fmvib
+	.word	X16_Audio_FMFREQ         ; $d5b3 fmfreq
+	.word	X16_Audio_FMVOL          ; $d5b4 fmvol
+	.word	X16_Audio_FMPAN          ; $d5b5 fmpan
+	.word	X16_Audio_FMPLAY         ; $d5b6 fmplay
+	.word	X16_Audio_FMCHORD        ; $d5b7 fmchord
+	.word	X16_Audio_FMPOKE         ; $d5b8 fmpoke
+	.word	X16_Audio_PSGINIT        ; $d5b9 psginit
+	.word	X16_Audio_PSGNOTE        ; $d5ba psgnote
+	.word	X16_Audio_PSGVOL         ; $d5bb psgvol
+	.word	X16_Audio_PSGWAV         ; $d5bc psgwav
+	.word	X16_Audio_PSGFREQ        ; $d5bd psgfreq
+	.word	X16_Audio_PSGPAN         ; $d5be psgpan
+	.word	X16_Audio_PSGPLAY        ; $d5bf psgplay
+	.word	X16_Audio_PSGCHORD       ; $d5c0 psgchord
+	.word	CommandCls               ; $d5c1 cls
+	.word	CommandLocate            ; $d5c2 locate
+	.word	CommandColor             ; $d5c3 color
 	.send code
 ; ************************************************************************************************
 ; ************************************************************************************************
