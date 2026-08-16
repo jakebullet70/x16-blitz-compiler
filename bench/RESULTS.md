@@ -73,6 +73,92 @@ neither line nor cause. Fixed by saving the tally across the descent. **The rand
 suite could not see it**: every subscript it generated was a bare literal. It now routes a third of
 them through an index array whose element *k* is *k*, so `A(NX%(3))` appears alongside `A(3)`.
 
+## Where the loop cycles actually go (2026-08-16)
+
+A cycle-attribution pass over the ~487-cycle empty loop iteration, to answer one question with data
+rather than argument: **is a dedicated fast/integer loop variable worth building?**
+
+Harness: `bench/loop/run-loop-profile.py`, compiled-only (this profiles the VM, so the stock column
+is irrelevant). Every variant runs the **same 60,000 iterations**, so each pair differs in exactly
+one thing and the difference is that thing's cost. `TI` read inside the emulator, as ever. At 8 MHz
+and 60,000 iterations one jiffy is 2.22 cycles/iteration — twice the resolution the 30,000-iteration
+`01_forloop` gives.
+
+| program | cycles/iter | isolates |
+|---|---:|---|
+| `L0_null` | 0.0 | harness overhead — confirms the method has no floor |
+| `L1_empty` | **486.7** | `FOR`/`NEXT`, empty body |
+| `L2_one` | 937.8 | one `K=I` |
+| `L3_two` | 1388.9 | two — marginal +451.1, **exactly linear** |
+| `L4_four` | 2291.1 | four — marginal +902.2 = 2 × 451.1, **still exactly linear** |
+| `L5_const` | 817.8 | `K=1` (store, no variable load) |
+| `L6_desc` | 1215.6 | descending loop — `NEXT` off its integer fast path |
+| `L7_step1` | 486.7 | explicit `STEP 1` — identical, fast path holds |
+| `L8_goto` | 1706.7 | hand-rolled `I=I+1 : IF I<N THEN` loop |
+| `L9_4inline` | 2093.3 | the same four statements on **one** line |
+| `LA_fltassign` | 937.8 | `K=J`, float scalar |
+| `LB_intassign` | 895.6 | `K%=J%`, integer scalar |
+
+**Attribution**
+
+| component | cycles |
+|---|---:|
+| `NEXT` itself (486.7 − one line marker) | **420.8** |
+| one assignment statement, `K=I` (451.1 − one line marker) | **385.2** |
+| — of which the variable *load* alone | 120.0 |
+| — `K=1`, store with no load | 265.2 |
+| one extra **source line** | **65.9** |
+| `NEXT` without the integer fast path (descending) | +728.9 |
+| 2-byte integer scalar vs 6-byte float scalar | **−42.2 (9.4%)** |
+
+The static cycle counts through `00runtime.asm` → `.vaddress` → `ReadFloatZTemp0Sub` agree: they
+predict the load-vs-constant difference at 122 against a measured **120**, the statement at 354
+against 385, and the line marker at 51 against 66. Consistently 10–20% low in absolute terms, never
+wrong in shape — so the *share* each component takes is trustworthy. Of the 385-cycle assignment,
+roughly 190 is the two 6-byte iFloat32 copies, 70 the `.vaddress` operand decode, 85 the two p-code
+dispatches, and 50 `jsr`/`rts` plus `entercmd`/`exitcmd` glue.
+
+### Three findings
+
+**1. `FOR`/`NEXT` is not the problem — it is already the fast path.** A hand-rolled `IF`/`GOTO` loop
+costs **1706.7** against `FOR`/`NEXT`'s 486.7: the dedicated loop construct is **3.5× better** than
+doing it by hand. And its integer fast path is already earning 728.9 cycles an iteration over the
+float path. `STEP 1` written explicitly costs exactly nothing.
+
+**2. A faster integer variable is NOT the lever — measured, not reasoned.** The integer scalar path
+already exists end to end: `GetSetVariable` emits opcodes 80–95 for `%` variables and the runtime has
+`ReadIntegerCommand`/`WriteIntegerCommand` wired into `ReadWriteVectors`, moving **2 bytes instead of
+6**. It is worth **9.4%**. Byte count is not where the time goes — dispatch, `.vaddress`, and
+converting to and from the iFloat32 stack format are, and `ReadIntegerZTemp0Sub` still pays four
+`stz`s and sign handling to produce a stack value. **A zero-page integer register file would inherit
+every one of those costs** unless it also brought integer-native arithmetic and comparison opcodes —
+i.e. a second ALU path through the whole VM, not a storage change.
+
+**3. Every source line costs 65.9 cycles**, and that is actionable today with no VM change at all.
+`PCD_NEWCMD_LINE` is emitted once per line by `MainCompileLoop`; `CommandNewLine` itself is four
+instructions (`plx` / `stz stringInitialised` / `ldx #$FF` / `jmp NextCommand`), so nearly all of the
+65.9 is the dispatch to reach it. Putting four statements on one line instead of four
+(`L4_four` → `L9_4inline`) is **2291.1 → 2093.3, 8.6% faster for free**.
+
+### Recommendation
+
+Ranked by cycles saved × breadth, and against the measured shares above:
+
+1. **Fuse the integer `FOR`/`NEXT`.** `NEXT` is 420.8 cycles and the single biggest line item in any
+   small loop. Three of its per-iteration costs are subroutine calls that a fused opcode can fold:
+   `StackFindFrame` (~40), the unconditional `jsr FixUpY` (~42), and `StackLoadCurrentPosition`
+   (~42) — ~124 cycles, ~25%, before touching the four-byte terminal compare. No source changes, so
+   every existing program benefits. This is the `PCD_ARRAY1` play, which is the one that has already
+   worked here.
+2. **Attack `new.line`.** 65.9 cycles on *every line of every program*, for a handler that does two
+   stores. Either fold it into the preceding opcode, or let the compiler skip emitting it where it
+   can prove the line needs neither the string-system reset nor the stack reset.
+3. **Do not build `R0`–`R7` as scoped.** Finding 2 is the evidence: the storage change alone buys
+   9.4%. It only pays with integer-native arithmetic throughout the VM, which is a far larger project
+   than the fused opcode above and should be judged on its own merits, not as a loop optimisation.
+
+Immediately usable without any of the above: **put multiple statements on one line** — 8.6% measured.
+
 ## ⚠ `02_floatmath` — a real regression, and it is NOT from the work above
 
 The 2026-07-13 table recorded **331**. It reads **366 today at HEAD**, before any of the changes
