@@ -112,6 +112,18 @@ testing/archive/
 # which writes it into testing/ named for whatever engine build is checked out.
 testing/GPC.RT.*.BIN
 
+# The GP.BASIC library is MASTERED in GPC-BASIC/ (see its README). BASLOAD resolves
+# #INCLUDE by bare filename off the emulator's drive, and testing/ IS that drive, so
+# building an example means copying the master here first. Those copies -- and the
+# PRGs BASLOAD writes from them -- are staging and build output, not sources. Tracking
+# them would put two copies of every library file in the repo, free to drift apart.
+testing/GP.INC.BL
+testing/STRHELP.INC.BL
+testing/*.EXP.BL
+testing/ARRAYS.PRG
+testing/SPLITT.PRG
+testing/STRINGS.PRG
+
 # testing/MD5 is the Commodore BASIC MD5 program, tracked: it is the fixture for the
 # md5 regression test (source/unit-tests/md5), which compiles it, runs it BOTH compiled
 # and interpreted, and fails if the two digests differ. The object, the map and the
