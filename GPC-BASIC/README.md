@@ -31,6 +31,7 @@ Current contents:
 | `APPHELP.INC.BL` | `APPHELP.STARTUP`/`RESTORE` (leave the user's screen as you found it) and panels saved to disk |
 | `MENU.EXP.BL` | `GP.MENU` + `GP.SEL`, with the theme and app helpers — a whole small application |
 | `SELECT.EXP.BL` | `GP.SELECT` / `GP.CASE` / `GP.ELSE` / `GP.ENDSEL`, and where it beats `ON x GOSUB` |
+| `BMXVIEW.EXP.BL` | a BMX bitmap viewer — `GP.STRPTR` + `GP.CALL MACPTR` streaming straight into VERA |
 
 ### Names — BASL is safe, a hand-written `.bas` is not
 

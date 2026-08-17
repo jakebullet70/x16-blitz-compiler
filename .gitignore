@@ -129,6 +129,15 @@ testing/STRINGS.PRG
 testing/SCREEN.PRG
 testing/MENU.PRG
 testing/SELECT.PRG
+testing/BMXVIEW.PRG
+testing/BMXTST.PRG
+
+# demo/ is build output for menu-demo.bat and bmx-demo.bat: compiled objects
+# plus BMX images copied out of samples/. Every byte of it is regenerable and
+# the images are already tracked in samples/BMXVIEWER/SAMPLES, so tracking it
+# would put half a megabyte of duplicates in the repo. The two .bat files at
+# the root ARE tracked, and say how to rebuild what they run.
+demo/
 
 # testing/MD5 is the Commodore BASIC MD5 program, tracked: it is the fixture for the
 # md5 regression test (source/unit-tests/md5), which compiles it, runs it BOTH compiled
