@@ -117,13 +117,17 @@ testing/GPC.RT.*.BIN
 # building an example means copying the master here first. Those copies -- and the
 # PRGs BASLOAD writes from them -- are staging and build output, not sources. Tracking
 # them would put two copies of every library file in the repo, free to drift apart.
-testing/GP.INC.BL
-testing/STRHELP.INC.BL
+#   The GPC-BASIC masters are staged into testing/ to be built and are NOT tracked
+#   there. Globbed rather than listed one by one: naming them individually is how
+#   THEME.INC.BL and APPHELP.INC.BL got committed by accident, which is the same
+#   class of mistake 15208f3 had to back out.
+testing/*.INC.BL
 testing/*.EXP.BL
 testing/ARRAYS.PRG
 testing/SPLITT.PRG
 testing/STRINGS.PRG
 testing/SCREEN.PRG
+testing/MENU.PRG
 
 # testing/MD5 is the Commodore BASIC MD5 program, tracked: it is the fixture for the
 # md5 regression test (source/unit-tests/md5), which compiles it, runs it BOTH compiled
