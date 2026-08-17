@@ -36,10 +36,10 @@ NOT 			X:NotUnaryCompile N
 FN 				X:FNCompile N
 PI 				T N
 
-# 	GP.BASIC strings. GP.FIND is the gap that matters -- GPC has no string search at all. Its
+# 	GP.BASIC strings. GP.INSTR is the gap that matters -- GPC has no string search at all. Its
 # 	start position reuses OptionalZeroCompile, since 0 is not a legal 1-based position and so
 # 	needs no sentinel. GP.STRPTR is a retype, not a computation: read_string.asm already pushes
 # 	the block address + 2, which is exactly what it returns.
 
-GP.FIND 		($,$ X:OptionalZeroCompile) T N
+GP.INSTR 		($,$ X:OptionalZeroCompile) T N
 GP.STRPTR 		($) T N

@@ -3305,7 +3305,7 @@ UnaryGPC: ;; [gp.c]
 
 ; ************************************************************************************************
 ;
-;						GP.FIND(haystack$, needle$ [,start]) -> position, 0 if absent
+;						GP.INSTR(haystack$, needle$ [,start]) -> position, 0 if absent
 ;
 ;		The gap this fills: GPC has no string search of any kind -- no INSTR, nothing. Done in
 ;		BASIC it is a MID$ loop, which allocates a temporary string per character compared.
@@ -3320,15 +3320,15 @@ UnaryGPC: ;; [gp.c]
 ;
 ; ************************************************************************************************
 
-UnaryGPFind: ;; [gp.find]
+UnaryGPInstr: ;; [gp.instr]
 		.entercmd
 		phy 								; Y is the code pointer offset
 		;
 		jsr 	FloatIntegerPart 			; <start>, the last argument pushed
 		lda 	NSMantissa0,x
-		bne 	_GFHaveStart
+		bne 	_GIHaveStart
 		lda 	#1 							; 0 (or omitted) means from the beginning
-_GFHaveStart:
+_GIHaveStart:
 		sta 	gpsIndex 					; 1-based for the moment
 		dex
 		;
@@ -3347,54 +3347,75 @@ _GFHaveStart:
 		sta 	gpsHayLen
 		lda 	(zTemp1)
 		sta 	gpsNeedLen
-		beq 	_GFNotFound 				; an empty needle never matches
+		beq 	_GINotFound 				; an empty needle never matches
 		;
 		dec 	gpsIndex 					; 0-based from here, and slide the pointer to it
 		clc
 		lda 	zTemp2
 		adc 	gpsIndex
 		sta 	zTemp2
-		bcc 	_GFOuter
+		bcc 	_GIOuter
 		inc 	zTemp2+1
 		;
 		;		Does the needle still fit in what is left? Carry out means the sum passed 255,
 		;		which cannot fit either.
 		;
-_GFOuter:
+_GIOuter:
 		clc
 		lda 	gpsIndex
 		adc 	gpsNeedLen
-		bcs 	_GFNotFound
+		bcs 	_GINotFound
 		cmp 	gpsHayLen
-		beq 	_GFTry 						; an exact fit is still a fit
-		bcs 	_GFNotFound
-_GFTry:
+		beq 	_GITry 						; an exact fit is still a fit
+		bcs 	_GINotFound
+_GITry:
 		ldy 	gpsNeedLen 					; compare backwards, 1 is the first data byte
-_GFInner:
+_GIInner:
 		lda 	(zTemp1),y
 		cmp 	(zTemp2),y
-		bne 	_GFAdvance
+		bne 	_GIAdvance
 		dey
-		bne 	_GFInner
+		bne 	_GIInner
 		;
 		inc 	gpsIndex 					; matched -- report it 1-based
 		lda 	gpsIndex
-		bra 	_GFResult
+		bra 	_GIResult
 
-_GFAdvance:
+_GIAdvance:
 		inc 	gpsIndex
 		inc 	zTemp2
-		bne 	_GFOuter
+		bne 	_GIOuter
 		inc 	zTemp2+1
-		bra 	_GFOuter
+		bra 	_GIOuter
 
-_GFNotFound:
+_GINotFound:
 		lda 	#0
-_GFResult:
+_GIResult:
 		ply
 		jsr 	FloatSetByte 				; X already addresses the result slot
 		.exitcmd
 
+; ************************************************************************************************
+;
+;					GP.INSTRREV(haystack$, needle$ [,start]) -> position, 0 if absent
+;
+;		The LAST occurrence rather than the first: the extension in a filename, the last space to
+;		break a line at. Named and shaped after FreeBASIC's INSTRREV (VB spells it InStrRev), which
+;		is a separate function rather than PowerBASIC's negative-start-on-INSTR, because
+;		GP.INSTR(f$,".",-1) does not read as "find the last one" to anyone who has not used
+;		PowerBASIC specifically.
+;
+;		START is where a match may START, and caps the search from above; 0 or omitted means from
+;		the end, which is FreeBASIC's -1 default written in this table's usual way.
+;
+;		It shares the inner compare with GP.INSTR and differs only in the outer walk, which runs
+;		DOWNWARD from the last index a match could possibly start at. That last index is computed
+;		once, which is why -- unlike the forward scan -- there is no "does it still fit" test in
+;		the loop: everything at or below it fits by construction.
+;
+;		SHIFTED. It walks a whole string, so the 17 extra cycles of a shifted dispatch amortise,
+;		and searching backwards is the rarer direction. GP.INSTR keeps the unshifted slot.
+;
 ; ************************************************************************************************
 ;
 ;								GP.STRPTR(a$) -> address of [ActLen][Data]
@@ -3419,6 +3440,195 @@ UnaryGPStrPtr: ;; [gp.strptr]
 		stz 	NSExponent,x
 		stz 	NSStatus,x 					; NSSIFloat is $00 -- string bit cleared, now a number
 		.exitcmd
+
+; ************************************************************************************************
+;
+;				GP.TRIM a$ / GP.UPPER a$ / GP.LOWER a$ -- modify in place
+;
+;		All three take a string VARIABLE, enforced at compile time by StringVariableCompile, so
+;		none of them checks anything here: a literal cannot reach them, and a literal is the one
+;		thing that would matter, because CommandPushS points literals into the p-code itself.
+;
+;		They are SHIFTED. Each walks a whole string, so the 17 extra cycles of a shifted dispatch
+;		amortise over its length -- about 5% on a 20 character string -- and the unshifted slots
+;		are the scarce ones. GP.A and friends are the opposite case and stayed unshifted.
+;
+;		WHY THERE IS NO GP.PAD HERE. It was written, it worked, and it was removed on 16/08/26.
+;		These three all SHRINK or rewrite a string in place, which needs nothing but the block.
+;		Padding GROWS one -- and a handler only ever receives the block address, never the
+;		variable slot, so it cannot repoint the variable at a bigger block. That capped GP.PAD at
+;		the capacity the string was born with (StringConcrete: length+50%, min 10), so padding
+;		"HI" to a 20 column field -- the entire point of the command -- raised OUT OF RANGE.
+;		Padding is now STRHELP.PAD in GPC-BASIC/STRHELP.INC.BL, one line of BASL built on RPT$,
+;		where an ordinary assignment reallocates for free. See that file's header.
+;
+; ************************************************************************************************
+
+;
+;		Shared entry: TOS is the string. zTemp0 = its block, A = current length, Z set if empty.
+;
+GPStringAddress:
+		lda 	NSMantissa0,x
+		sta 	zTemp0
+		lda 	NSMantissa1,x
+		sta 	zTemp0+1
+		dex 								; consume it -- these are statements, not functions
+		lda 	(zTemp0)
+		rts
+
+; ************************************************************************************************
+;
+;		GP.UPPER / GP.LOWER. ASCII range only: 97-122 -> 65-90 and back, which is a bit 5 flip
+;		once the range is known. Nothing outside that range is touched, so PETSCII graphics
+;		characters and digits pass through untouched rather than being mangled.
+;
+; ************************************************************************************************
+
+CommandGPUpper: ;; [!gp.upper]
+		.entercmd
+		phy
+		jsr 	GPStringAddress
+		beq 	_GUExit
+		tay
+_GULoop:
+		lda 	(zTemp0),y
+		cmp 	#'a'
+		bcc 	_GUNext
+		cmp 	#'z'+1
+		bcs 	_GUNext
+		and 	#$DF 						; clear bit 5
+		sta 	(zTemp0),y
+_GUNext:
+		dey
+		bne 	_GULoop
+_GUExit:
+		ply
+		.exitcmd
+
+CommandGPLower: ;; [!gp.lower]
+		.entercmd
+		phy
+		jsr 	GPStringAddress
+		beq 	_GLExit
+		tay
+_GLLoop:
+		lda 	(zTemp0),y
+		cmp 	#'A'
+		bcc 	_GLNext
+		cmp 	#'Z'+1
+		bcs 	_GLNext
+		ora 	#$20 						; set bit 5
+		sta 	(zTemp0),y
+_GLNext:
+		dey
+		bne 	_GLLoop
+_GLExit:
+		ply
+		.exitcmd
+
+; ************************************************************************************************
+;
+;		GP.TRIM strips spaces from BOTH ends, GP.RTRIM from the trailing end only, GP.LTRIM from
+;		the leading end only. The two ends are not the same problem and that is why the split is
+;		free: trailing is nearly so (move the length byte and the characters stay put), while
+;		leading has to SLIDE the whole string down, which needs a second pointer because X is the
+;		number stack pointer and can never be borrowed as an index.
+;
+;		Two helpers, three thin entry points. GP.TRIM is right-then-left, in that order
+;		deliberately -- right first shortens the string the left pass has to walk, and if it
+;		empties it the left pass falls straight out.
+;
+; ************************************************************************************************
+
+CommandGPTrim: ;; [!gp.trim]
+		.entercmd
+		phy
+		jsr 	GPStringAddress
+		jsr 	GPTrimRight
+		jsr 	GPTrimLeft
+		ply
+		.exitcmd
+
+CommandGPRTrim: ;; [!gp.rtrim]
+		.entercmd
+		phy
+		jsr 	GPStringAddress
+		jsr 	GPTrimRight
+		ply
+		.exitcmd
+
+CommandGPLTrim: ;; [!gp.ltrim]
+		.entercmd
+		phy
+		jsr 	GPStringAddress
+		jsr 	GPTrimLeft
+		ply
+		.exitcmd
+
+;
+;		Trailing spaces: walk back from the end and write the new length. Nothing moves. Y
+;		falling to zero IS the all-spaces answer, no special case needed.
+;
+GPTrimRight:
+		lda 	(zTemp0)
+		beq 	_GTRExit 					; already empty
+		tay
+_GTRLoop:
+		lda 	(zTemp0),y
+		cmp 	#' '
+		bne 	_GTRSet 					; Y is the last non-space
+		dey
+		bne 	_GTRLoop
+_GTRSet:
+		tya
+		sta 	(zTemp0)
+_GTRExit:
+		rts
+
+;
+;		Leading spaces: find the first non-space, then slide everything from it down to offset 1.
+;		gpsNeedLen counts DOWN as spaces are skipped, so when the scan stops it already holds the
+;		kept length -- no subtraction, and reaching zero is exactly the all-spaces case.
+;
+GPTrimLeft:
+		lda 	(zTemp0)
+		beq 	_GTLExit 					; already empty
+		sta 	gpsNeedLen
+		ldy 	#1
+_GTLScan:
+		lda 	(zTemp0),y
+		cmp 	#' '
+		bne 	_GTLFound
+		iny
+		dec 	gpsNeedLen
+		bne 	_GTLScan
+		lda 	#0 							; all spaces (A holds a space here, so reload it)
+		sta 	(zTemp0)
+		rts
+_GTLFound:
+		cpy 	#1 							; nothing to slide if it already starts at 1
+		beq 	_GTLSetLength
+		;
+		tya 								; zTemp1 = zTemp0 + (first - 1), so (zTemp1),1 is the
+		dec 	a 							; first character being kept
+		clc
+		adc 	zTemp0
+		sta 	zTemp1
+		lda 	zTemp0+1
+		adc 	#0
+		sta 	zTemp1+1
+		ldy 	#0
+_GTLMove:
+		iny
+		lda 	(zTemp1),y
+		sta 	(zTemp0),y
+		cpy 	gpsNeedLen
+		bne 	_GTLMove
+_GTLSetLength:
+		lda 	gpsNeedLen
+		sta 	(zTemp0)
+_GTLExit:
+		rts
 
 		.send 	code
 
@@ -8908,7 +9118,7 @@ VectorTable:
 	.word	UnaryGPX                 ; $9d gp.x
 	.word	UnaryGPY                 ; $9e gp.y
 	.word	UnaryGPC                 ; $9f gp.c
-	.word	UnaryGPFind              ; $a0 gp.find
+	.word	UnaryGPInstr             ; $a0 gp.instr
 	.word	UnaryGPStrPtr            ; $a1 gp.strptr
 	.word	Command_PSET             ; $a2 pset
 	.word	Command_LINE             ; $a3 line
@@ -8985,70 +9195,75 @@ ShiftVectorTable:
 	.word	CommandXDIM              ; $d781 dim
 	.word	CommandEnd               ; $d782 end
 	.word	CommandGPCall            ; $d783 gp.call
-	.word	UnaryJoy                 ; $d784 joy
-	.word	LinkFloatIntegerPartDown ; $d785 int
-	.word	LinkFloatSquareRoot      ; $d786 sqr
-	.word	LinkFloatLogarithm       ; $d787 log
-	.word	LinkFloatExponent        ; $d788 exp
-	.word	LinkFloatCosine          ; $d789 cos
-	.word	LinkFloatSine            ; $d78a sin
-	.word	LinkFloatTangent         ; $d78b tan
-	.word	LinkFloatArcTan          ; $d78c atn
-	.word	CommandXLinput           ; $d78d linput
-	.word	CommandXBinput           ; $d78e binput
-	.word	Command_LOAD             ; $d78f load
-	.word	Command_BLOAD            ; $d790 bload
-	.word	Command_BVLOAD           ; $d791 bvload
-	.word	Command_VLOAD            ; $d792 vload
-	.word	Command_BSAVE            ; $d793 bsave
-	.word	Command_BVERIFY          ; $d794 bverify
-	.word	X16CommandPowerOff       ; $d795 poweroff
-	.word	X16CommandReset          ; $d796 reset
-	.word	X16CommandReboot         ; $d797 reboot
-	.word	XCommandMouse            ; $d798 mouse
-	.word	XUnaryMB                 ; $d799 mb
-	.word	XUnaryMX                 ; $d79a mx
-	.word	XUnaryMY                 ; $d79b my
-	.word	XUnaryMWheel             ; $d79c mwheel
-	.word	UnaryRPT                 ; $d79d rpt$
-	.word	Command_SPRITE           ; $d79e sprite
-	.word	Command_SPRMEM           ; $d79f sprmem
-	.word	Command_MOVSPR           ; $d7a0 movspr
-	.word	UnaryST                  ; $d7a1 st
-	.word	CommandStop              ; $d7a2 stop
-	.word	CommandSYS               ; $d7a3 sys
-	.word	UnaryTDATA               ; $d7a4 tdata
-	.word	UnaryTATTR               ; $d7a5 tattr
-	.word	Command_TILE             ; $d7a6 tile
-	.word	CommandTIWriteN          ; $d7a7 ti.write
-	.word	CommandTIWriteS          ; $d7a8 ti$.write
-	.word	CommandXWAIT             ; $d7a9 wait
-	.word	X16I2CPoke               ; $d7aa i2cpoke
-	.word	X16I2CPeek               ; $d7ab i2cpeek
-	.word	CommandBank              ; $d7ac bank
-	.word	XCommandSleep            ; $d7ad sleep
-	.word	X16_Audio_FMINIT         ; $d7ae fminit
-	.word	X16_Audio_FMNOTE         ; $d7af fmnote
-	.word	X16_Audio_FMDRUM         ; $d7b0 fmdrum
-	.word	X16_Audio_FMINST         ; $d7b1 fminst
-	.word	X16_Audio_FMVIB          ; $d7b2 fmvib
-	.word	X16_Audio_FMFREQ         ; $d7b3 fmfreq
-	.word	X16_Audio_FMVOL          ; $d7b4 fmvol
-	.word	X16_Audio_FMPAN          ; $d7b5 fmpan
-	.word	X16_Audio_FMPLAY         ; $d7b6 fmplay
-	.word	X16_Audio_FMCHORD        ; $d7b7 fmchord
-	.word	X16_Audio_FMPOKE         ; $d7b8 fmpoke
-	.word	X16_Audio_PSGINIT        ; $d7b9 psginit
-	.word	X16_Audio_PSGNOTE        ; $d7ba psgnote
-	.word	X16_Audio_PSGVOL         ; $d7bb psgvol
-	.word	X16_Audio_PSGWAV         ; $d7bc psgwav
-	.word	X16_Audio_PSGFREQ        ; $d7bd psgfreq
-	.word	X16_Audio_PSGPAN         ; $d7be psgpan
-	.word	X16_Audio_PSGPLAY        ; $d7bf psgplay
-	.word	X16_Audio_PSGCHORD       ; $d7c0 psgchord
-	.word	CommandCls               ; $d7c1 cls
-	.word	CommandLocate            ; $d7c2 locate
-	.word	CommandColor             ; $d7c3 color
+	.word	CommandGPUpper           ; $d784 gp.upper
+	.word	CommandGPLower           ; $d785 gp.lower
+	.word	CommandGPTrim            ; $d786 gp.trim
+	.word	CommandGPRTrim           ; $d787 gp.rtrim
+	.word	CommandGPLTrim           ; $d788 gp.ltrim
+	.word	UnaryJoy                 ; $d789 joy
+	.word	LinkFloatIntegerPartDown ; $d78a int
+	.word	LinkFloatSquareRoot      ; $d78b sqr
+	.word	LinkFloatLogarithm       ; $d78c log
+	.word	LinkFloatExponent        ; $d78d exp
+	.word	LinkFloatCosine          ; $d78e cos
+	.word	LinkFloatSine            ; $d78f sin
+	.word	LinkFloatTangent         ; $d790 tan
+	.word	LinkFloatArcTan          ; $d791 atn
+	.word	CommandXLinput           ; $d792 linput
+	.word	CommandXBinput           ; $d793 binput
+	.word	Command_LOAD             ; $d794 load
+	.word	Command_BLOAD            ; $d795 bload
+	.word	Command_BVLOAD           ; $d796 bvload
+	.word	Command_VLOAD            ; $d797 vload
+	.word	Command_BSAVE            ; $d798 bsave
+	.word	Command_BVERIFY          ; $d799 bverify
+	.word	X16CommandPowerOff       ; $d79a poweroff
+	.word	X16CommandReset          ; $d79b reset
+	.word	X16CommandReboot         ; $d79c reboot
+	.word	XCommandMouse            ; $d79d mouse
+	.word	XUnaryMB                 ; $d79e mb
+	.word	XUnaryMX                 ; $d79f mx
+	.word	XUnaryMY                 ; $d7a0 my
+	.word	XUnaryMWheel             ; $d7a1 mwheel
+	.word	UnaryRPT                 ; $d7a2 rpt$
+	.word	Command_SPRITE           ; $d7a3 sprite
+	.word	Command_SPRMEM           ; $d7a4 sprmem
+	.word	Command_MOVSPR           ; $d7a5 movspr
+	.word	UnaryST                  ; $d7a6 st
+	.word	CommandStop              ; $d7a7 stop
+	.word	CommandSYS               ; $d7a8 sys
+	.word	UnaryTDATA               ; $d7a9 tdata
+	.word	UnaryTATTR               ; $d7aa tattr
+	.word	Command_TILE             ; $d7ab tile
+	.word	CommandTIWriteN          ; $d7ac ti.write
+	.word	CommandTIWriteS          ; $d7ad ti$.write
+	.word	CommandXWAIT             ; $d7ae wait
+	.word	X16I2CPoke               ; $d7af i2cpoke
+	.word	X16I2CPeek               ; $d7b0 i2cpeek
+	.word	CommandBank              ; $d7b1 bank
+	.word	XCommandSleep            ; $d7b2 sleep
+	.word	X16_Audio_FMINIT         ; $d7b3 fminit
+	.word	X16_Audio_FMNOTE         ; $d7b4 fmnote
+	.word	X16_Audio_FMDRUM         ; $d7b5 fmdrum
+	.word	X16_Audio_FMINST         ; $d7b6 fminst
+	.word	X16_Audio_FMVIB          ; $d7b7 fmvib
+	.word	X16_Audio_FMFREQ         ; $d7b8 fmfreq
+	.word	X16_Audio_FMVOL          ; $d7b9 fmvol
+	.word	X16_Audio_FMPAN          ; $d7ba fmpan
+	.word	X16_Audio_FMPLAY         ; $d7bb fmplay
+	.word	X16_Audio_FMCHORD        ; $d7bc fmchord
+	.word	X16_Audio_FMPOKE         ; $d7bd fmpoke
+	.word	X16_Audio_PSGINIT        ; $d7be psginit
+	.word	X16_Audio_PSGNOTE        ; $d7bf psgnote
+	.word	X16_Audio_PSGVOL         ; $d7c0 psgvol
+	.word	X16_Audio_PSGWAV         ; $d7c1 psgwav
+	.word	X16_Audio_PSGFREQ        ; $d7c2 psgfreq
+	.word	X16_Audio_PSGPAN         ; $d7c3 psgpan
+	.word	X16_Audio_PSGPLAY        ; $d7c4 psgplay
+	.word	X16_Audio_PSGCHORD       ; $d7c5 psgchord
+	.word	CommandCls               ; $d7c6 cls
+	.word	CommandLocate            ; $d7c7 locate
+	.word	CommandColor             ; $d7c8 color
 	.send code
 ; ************************************************************************************************
 ; ************************************************************************************************

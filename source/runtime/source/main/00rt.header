@@ -43,9 +43,15 @@ RTHeader:
 		;		bytes, so this and its copy in bootstrap.asm must agree -- both are now built from
 		;		RT_ABI (common.inc) rather than spelled out, so they cannot drift apart.
 		;
-		.cerror RT_ABI > 9, "RT_ABI > 9: magic byte 4 is one ASCII digit - widen it here AND in bootstrap.asm"
-		.text 	"GPC"						; magic (RTBASE..RTBASE+2)
-		.byte 	RT_ABI + '0' 				; ABI ordinal as one digit (RTBASE+3)
+		;		The ordinal is TWO ASCII digits as of 17th August 2026 (RT_ABI 10). It was one, and
+		;		"GPC" + digit ran out at 9 -- a fifth byte would have written over the RT_ENTRY jmp
+		;		at RTBASE+4, which is why both ends carried a .cerror rather than silently growing.
+		;		Dropping the "C" keeps the magic exactly 4 bytes and buys room to ABI 99.
+		;
+		.cerror RT_ABI > 99, "RT_ABI > 99: the magic's last two bytes are ASCII digits - widen it here AND in bootstrap.asm"
+		.text 	"GP"						; magic (RTBASE..RTBASE+1)
+		.byte 	(RT_ABI / 10) + '0' 		; ABI ordinal as two digits (RTBASE+2..RTBASE+3)
+		.byte 	(RT_ABI - (RT_ABI / 10) * 10) + '0'
 RTEntryVec: 								; == RT_ENTRY (RTBASE+4)
 		jmp 	StartRuntime 				; stable trampoline into the (floating) real entry
 

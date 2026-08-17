@@ -1,0 +1,123 @@
+## ***********************************************************************
+## **
+## **  STRHELP.INC.BL -- string helpers that belong in BASIC, not ASM.
+## **
+## **  Modelled on prog8's strings module: one dotted namespace
+## **  (STRHELP.*), one routine per job, include only what is used.
+## **  Unlike GP.INC.BL this file contains CODE -- call the routines
+## **  with GOSUB. It is position independent (the module jumps over
+## **  itself), so #INCLUDE it anywhere, the top of the program included.
+## **
+## **  prog8 passes arguments in registers; BASL has none, so the module
+## **  owns named parameter variables instead. Spell them out in full --
+## **  BASLOAD crunches every identifier down to a short BASIC variable,
+## **  so a readable name costs nothing at runtime:
+## **
+## **      STRHELP.STR$    the string, in and out
+## **      STRHELP.WIDTH   the field width  (PADR / PADL / PADC)
+## **      STRHELP.DELIM$  the separator    (SPLIT)
+## **      STRHELP.MAX     field array size (SPLIT, 0 means 10)
+## **
+## **  Clobbered (prog8 would say "clobbers"):
+## **      STRHELP.GAP     STRHELP.HALF          by the pad routines
+## **      STRHELP.REST$   STRHELP.AT            by SPLIT
+## **      STRHELP.LIM     STRHELP.N             by SPLIT
+## **
+## **  Usage:
+## **      STRHELP.STR$ = NAME$ : STRHELP.WIDTH = 20
+## **      GOSUB STRHELP.PADR
+## **      NAME$ = STRHELP.STR$
+## **
+## **  All three pad routines leave a string that is already at or past
+## **  the width ALONE. They pad; they never truncate. Use GP.RTRIM to go
+## **  the other way. Width is 1..255 and the padded result must fit a
+## **  BASIC string, i.e. 255 characters -- not checked, as in prog8,
+## **  because checking costs more than the mistake does.
+## **
+## ***********************************************************************
+#IFNDEF STRHELP.DEFS
+#DEFINE STRHELP.DEFS 1
+
+GOTO STRHELP.SKIP
+
+## STRHELP.PADR -- pad on the RIGHT to STRHELP.WIDTH: left justify, the
+## text-in-a-column case.
+##
+## This was GP.PAD in ASM and moved here ON PURPOSE, not to save space: an
+## in-place ASM handler only ever receives the string's block, never the
+## variable slot, so it cannot GROW a string past the capacity it was born
+## with (length+50%, minimum 10) -- padding "HI" to a 20 column field
+## raised OUT OF RANGE, and padding to a field is the entire point of the
+## command. Plain BASIC assignment reallocates, so here it cannot happen.
+
+STRHELP.PADR:
+    IF LEN(STRHELP.STR$) < STRHELP.WIDTH THEN STRHELP.STR$ = STRHELP.STR$ + RPT$(32, STRHELP.WIDTH - LEN(STRHELP.STR$))
+    RETURN
+
+## STRHELP.PADL -- pad on the LEFT to STRHELP.WIDTH: right justify, the
+## numbers-in-a-column case.
+
+STRHELP.PADL:
+    IF LEN(STRHELP.STR$) < STRHELP.WIDTH THEN STRHELP.STR$ = RPT$(32, STRHELP.WIDTH - LEN(STRHELP.STR$)) + STRHELP.STR$
+    RETURN
+
+## STRHELP.PADC -- pad BOTH sides to STRHELP.WIDTH: centre, for headings
+## and menu titles. An odd gap puts the extra space on the RIGHT.
+##
+## The two guards are not defensive padding, they are load bearing: RPT$
+## raises ILLEGAL QUANTITY on a count of ZERO rather than returning an
+## empty string, so a gap of 1 (half = 0) would fail on the left call.
+## The right hand call is always safe -- after the left pad the remaining
+## gap is at least 1 whenever the total gap was.
+
+STRHELP.PADC:
+    STRHELP.GAP = STRHELP.WIDTH - LEN(STRHELP.STR$)
+    IF STRHELP.GAP < 1 THEN RETURN
+    STRHELP.HALF = INT(STRHELP.GAP / 2)
+    IF STRHELP.HALF > 0 THEN STRHELP.STR$ = RPT$(32, STRHELP.HALF) + STRHELP.STR$
+    STRHELP.STR$ = STRHELP.STR$ + RPT$(32, STRHELP.WIDTH - LEN(STRHELP.STR$))
+    RETURN
+
+## STRHELP.SPLIT -- cut STRHELP.STR$ into fields on STRHELP.DELIM$.
+##
+##   in    STRHELP.STR$    the string (READ ONLY -- unlike the pad routines
+##                         this one does not modify it)
+##         STRHELP.DELIM$  the separator, one character or several
+##         STRHELP.MAX     how many fields the array holds; 0 means 10
+##   out   STRHELP.N       how many fields were produced, always >= 1
+##         STRHELP.FIELD$  the fields, 1..STRHELP.N
+##   clobbers  STRHELP.REST$  STRHELP.AT  STRHELP.LIM
+##
+## This is the one prog8 would NOT write in assembly and neither do we: it
+## is composition, not bulk data. GP.INSTR does the searching, which is the
+## only part that would otherwise be slow -- the character-at-a-time MID$
+## loop it replaces allocates a temporary string per character compared.
+##
+## STRHELP.FIELD$ is NOT dimensioned here on purpose. Leave it alone and
+## GPC's implicit DIM gives you 0..10; DIM it yourself BEFORE the first
+## call if you want more, and set STRHELP.MAX to match. DIMming an array
+## GPC has already auto-dimensioned is an error, so it is one or the other.
+##
+## Reaching the limit is not an error and loses nothing: the last field
+## gets the whole unsplit remainder, delimiters and all.
+##
+## Empty fields are preserved, which is what makes it safe for data rows --
+## "A,,C" is three fields and "A," is two, the second empty. Splitting an
+## empty string gives one empty field, never zero fields.
+
+STRHELP.SPLIT:
+    STRHELP.N = 0
+    STRHELP.LIM = STRHELP.MAX
+    IF STRHELP.LIM < 1 THEN STRHELP.LIM = 10
+    STRHELP.REST$ = STRHELP.STR$
+STRHELP.SPLIT.NEXT:
+    STRHELP.N = STRHELP.N + 1
+    IF STRHELP.N >= STRHELP.LIM THEN STRHELP.FIELD$(STRHELP.N) = STRHELP.REST$ : RETURN
+    STRHELP.AT = GP.INSTR(STRHELP.REST$, STRHELP.DELIM$)
+    IF STRHELP.AT = 0 THEN STRHELP.FIELD$(STRHELP.N) = STRHELP.REST$ : RETURN
+    STRHELP.FIELD$(STRHELP.N) = LEFT$(STRHELP.REST$, STRHELP.AT - 1)
+    STRHELP.REST$ = MID$(STRHELP.REST$, STRHELP.AT + LEN(STRHELP.DELIM$))
+    GOTO STRHELP.SPLIT.NEXT
+
+STRHELP.SKIP:
+#ENDIF

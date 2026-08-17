@@ -107,15 +107,31 @@ FrameStackPages = 16 						; 4K, ~250 frames
 ;		existing opcode keeps its ID. The bump is still required in the other direction: an object
 ;		using $DF would dispatch off the end of an ABI 4 runtime's vector table.
 ;
-;		6 -> 7 on 16th August 2026: GP.FIND and GP.STRPTR. "gpstring.asm" sorts after "gpcall.asm",
-;		so the two new unshifted markers shifted every opcode above them again.
-;
 ;		5 -> 6 on 16th August 2026: GP.CALL and the GP.A/GP.X/GP.Y/GP.C value words. This one IS a
 ;		renumbering -- "gpcall.asm" sorts mid-list in the commands directory, so the four unshifted
 ;		markers shifted every opcode above them, and the shifted gp.call did the same to the
 ;		shifted range.
 ;
-RT_ABI = 7 									; runtime ABI ordinal -> "GPC7" magic (NOT the file name)
+;		6 -> 7 on 16th August 2026: GP.FIND and GP.STRPTR. "gpstring.asm" sorts after "gpcall.asm",
+;		so the two new unshifted markers shifted every opcode above them again.
+;
+;		7 -> 8 on 16th August 2026: GP.TRIM / GP.UPPER / GP.LOWER / GP.PAD joined gpstring.asm.
+;
+;		8 -> 9 on 16th August 2026: GP.PAD REMOVED again -- see gpstring.asm for why. Dropping a
+;		marker renumbers exactly as adding one does, so every shifted opcode above gp.pad moved
+;		back down. ABI 8 was never committed, so this bump is belt and braces rather than
+;		necessity -- but GPC.RT.*.BIN files built during the day are still lying about on this
+;		machine carrying the "GPC8" magic and the OLD opcode map, and the bootstrap would accept
+;		one for a new ABI 8 object without a word. That is the silent-mismatch class this ordinal
+;		exists to prevent, so it gets spent rather than argued with. Rebuild the resident runtime.
+;
+;		9 -> 10 on 17th August 2026: the magic at RTBASE widened from "GPC"+one digit to "GP"+TWO
+;		digits. It is still exactly 4 bytes (a 5th would have overwritten the RT_ENTRY jmp at
+;		RTBASE+4, which is what the .cerror in 00rt.header and bootstrap.asm was guarding), and it
+;		now has room to ABI 99. GP.INSTRREV was added and then removed again under this same
+;		ordinal; neither state was committed, so 10 means the two-digit magic and nothing else.
+;
+RT_ABI = 10 								; runtime ABI ordinal -> "GPC10" magic (NOT the file name)
 
 ; ************************************************************************************************
 ;

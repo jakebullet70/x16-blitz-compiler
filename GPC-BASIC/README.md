@@ -15,7 +15,9 @@ Flat folder, **UPPERCASE** names, role carried in the extension:
 
 Uppercase because these files live on the X16's drive, where BASLOAD reads them.
 
-Current contents: `GP.INC.BL` (the keyword tokens), `LOOPS.EXP.BL` (`GP.DO`/`GP.LOOP`/`GP.EXITDO`).
+Current contents: `GP.INC.BL` (the keyword tokens), `STRHELP.INC.BL` (string helpers in BASL —
+`STRHELP.PADR`/`STRHELP.PADL`; unlike `GP.INC.BL` it contains *code*, called with `GOSUB`),
+`LOOPS.EXP.BL` (`GP.DO`/`GP.LOOP`/`GP.EXITDO`), `MLCALL.EXP.BL` (`GP.CALL`).
 
 ## Why the includes exist at all
 

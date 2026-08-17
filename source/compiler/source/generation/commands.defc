@@ -84,7 +84,7 @@
 ;
 ;	SYS    # T N
 ;
-	.byte	$07,$9e,$00,$e2,41943 & $FF,41943 >> 8,$06
+	.byte	$07,$9e,$00,$e2,43223 & $FF,43223 >> 8,$06
 ;
 ;	POKE    #,# T N
 ;
@@ -96,7 +96,7 @@
 ;
 ;	STOP    T N
 ;
-	.byte	$07,$90,$00,$20,41687 & $FF,41687 >> 8,$06
+	.byte	$07,$90,$00,$20,42967 & $FF,42967 >> 8,$06
 ;
 ;	END    T N
 ;
@@ -121,3 +121,23 @@
 ;	GP.CALL   # X:OptionalZeroCompile X:OptionalZeroCompile X:OptionalZeroCompile X:OptionalZeroCompile T N
 ;
 	.byte	$13,$ce,$7c,$e3,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$20,33751 & $FF,33751 >> 8,$06
+;
+;	GP.TRIM   X:StringVariableCompile T N
+;
+	.byte	$0a,$ce,$75,$03,StringVariableCompile & $FF,StringVariableCompile >> 8,$20,34519 & $FF,34519 >> 8,$06
+;
+;	GP.LTRIM   X:StringVariableCompile T N
+;
+	.byte	$0a,$ce,$74,$03,StringVariableCompile & $FF,StringVariableCompile >> 8,$20,35031 & $FF,35031 >> 8,$06
+;
+;	GP.RTRIM   X:StringVariableCompile T N
+;
+	.byte	$0a,$ce,$71,$03,StringVariableCompile & $FF,StringVariableCompile >> 8,$20,34775 & $FF,34775 >> 8,$06
+;
+;	GP.UPPER   X:StringVariableCompile T N
+;
+	.byte	$0a,$ce,$73,$03,StringVariableCompile & $FF,StringVariableCompile >> 8,$20,34007 & $FF,34007 >> 8,$06
+;
+;	GP.LOWER   X:StringVariableCompile T N
+;
+	.byte	$0a,$ce,$72,$03,StringVariableCompile & $FF,StringVariableCompile >> 8,$20,34263 & $FF,34263 >> 8,$06

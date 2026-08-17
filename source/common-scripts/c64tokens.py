@@ -134,7 +134,17 @@ class C64TokenStore(object):
 		return """
 				52863:GP.DO|52862:GP.LOOP|52861:GP.EXITDO|52860:GP.CALL|
 				52859:GP.A|52858:GP.X|52857:GP.Y|52856:GP.C|
-				52855:GP.FIND|52854:GP.STRPTR"""
+				52855:GP.INSTR|52854:GP.STRPTR|
+				52853:GP.TRIM|52852:GP.LTRIM|52851:GP.UPPER|52850:GP.LOWER|
+				52849:GP.RTRIM"""
+
+	#
+	#		52852 was GP.PAD for a few hours on 16th August 2026, removed before it ever shipped --
+	#		padding GROWS a string, an in-place handler only ever has the block and not the
+	#		variable slot, so it could never reallocate. It is STRHELP.PAD in BASL now
+	#		(GPC-BASIC/STRHELP.INC.BL). GP.LTRIM took the slot the same day; nothing tokenised
+	#		with GP.PAD ever left the scratchpad, so there is no stale PRG to mis-read it.
+	#
 
 
 if __name__ == "__main__":

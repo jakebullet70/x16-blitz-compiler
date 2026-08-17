@@ -42,17 +42,7 @@ MidFailType:
 
 ; ************************************************************************************************
 ;
-;		As OptionalParameterCompile, but for a trailing COLOUR argument (RECT/LINE/FRAME/OVAL/
-;		RING). A palette index is 0..255, so 255 is a real colour and cannot double as the
-;		"omitted" sentinel the way it can for sprite fields. The default is 256 instead -- out of
-;		range for an 8-bit colour -- so the runtime (GraphicsColourOptional) reads a non-zero
-;		high byte as "leave the current draw colour", and every explicit 0..255 still works.
-;
-; ************************************************************************************************
-
-; ************************************************************************************************
-;
-;		As OptionalParameterCompile, but defaulting to ZERO -- GP.CALL's registers, GP.FIND's start.
+;		As OptionalParameterCompile, but defaulting to ZERO -- GP.CALL's registers, GP.INSTR's start.
 ;
 ;		No sentinel is involved and none is needed: an unspecified register genuinely IS zero, so
 ;		the runtime never has to test for "omitted" and carries no code to do it. Zero also fits
@@ -78,6 +68,16 @@ _ORCDefault:
 		jsr 	PushIntegerA
 		clc
 		rts
+
+; ************************************************************************************************
+;
+;		As OptionalParameterCompile, but for a trailing COLOUR argument (RECT/LINE/FRAME/OVAL/
+;		RING). A palette index is 0..255, so 255 is a real colour and cannot double as the
+;		"omitted" sentinel the way it can for sprite fields. The default is 256 instead -- out of
+;		range for an 8-bit colour -- so the runtime (GraphicsColourOptional) reads a non-zero
+;		high byte as "leave the current draw colour", and every explicit 0..255 still works.
+;
+; ************************************************************************************************
 
 OptionalColourCompile:
 		jsr 	LookNextNonSpace 			; what follows.
@@ -159,6 +159,44 @@ NotUnaryCompile:
 		lda 	#PCD_NOT 					; and NOT it.
 		jsr 	WriteCodeByte		
 		rts
+
+; ************************************************************************************************
+;
+;		A STRING VARIABLE, for the in-place statements GP.TRIM / GP.PAD / GP.UPPER / GP.LOWER.
+;
+;		These modify the string block the value points at, so handing them anything that is not a
+;		variable is a live hazard rather than a nuisance: a LITERAL is pushed by CommandPushS
+;		pointing INTO THE P-CODE, so GP.UPPER "abc" would rewrite the running program, and a
+;		temporary (GP.UPPER A$+B$) would edit a block about to be reclaimed. Both would appear to
+;		work. So require a plain variable at compile time, exactly as FOR requires one for its
+;		index, and it cannot be expressed at all.
+;
+;		GetReferenceTerm locates (or creates) it and hands back the address in YX and the type in
+;		A; GetSetVariable with carry CLEAR then emits the read, so the runtime handler gets the
+;		block address on the stack and needs no checking of its own. Array elements are fine and
+;		deliberately allowed -- GetReferenceTerm resolves those too.
+;
+; ************************************************************************************************
+
+StringVariableCompile:
+		jsr 	GetNextNonSpace 			; a variable starts with a letter; a quote or a digit
+		jsr 	CharIsAlpha 				; cannot, which is what rejects literals outright
+		bcc 	_SVCFail
+		jsr 	GetReferenceTerm 			; locate it -- address in YX, type in A
+		pha
+		and 	#NSSTypeMask 				; and it has to be a string
+		cmp 	#NSSString
+		bne 	_SVCFailPull
+		pla
+		clc 								; carry clear = read, so the VALUE is pushed
+		jsr 	GetSetVariable
+		clc
+		rts
+
+_SVCFailPull:
+		pla
+_SVCFail:
+		.error_syntax
 
 		.send code
 

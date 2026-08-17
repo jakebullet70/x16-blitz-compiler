@@ -157,10 +157,11 @@ BBTryLoad:
 		;		will ?RT against a later one. That is the point -- exact pairing -- but it does
 		;		mean shared programs must be recompiled whenever the engine is rebuilt.
 		;
-		.cerror RT_ABI > 9, "RT_ABI > 9: the magic's 4th byte is a single ASCII digit - widen it here and in 00rt.header"
+		.cerror RT_ABI > 99, "RT_ABI > 99: the magic's last two bytes are ASCII digits - widen it here and in 00rt.header"
 BBMagic:
-		.text 	"GPC"						; magic, matched against RTBASE..RTBASE+2
-		.byte 	RT_ABI + '0' 				; ABI ordinal, matched against RTBASE+3
+		.text 	"GP"						; magic, matched against RTBASE..RTBASE+1
+		.byte 	(RT_ABI / 10) + '0' 		; ABI ordinal, two digits, matched against RTBASE+2..3
+		.byte 	(RT_ABI - (RT_ABI / 10) * 10) + '0'
 		;
 		;		One string, two names: the root form is the local form with a "/" in front, so the
 		;		fallback costs a single byte rather than a second copy of the name. The name is

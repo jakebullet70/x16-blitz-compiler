@@ -74,5 +74,17 @@ GP.EXITDO 		X:CommandExitDoCompile N
 #		ST/MX/MY are tokens for exactly the same reason.
 #
 GP.CALL 		# X:OptionalZeroCompile X:OptionalZeroCompile X:OptionalZeroCompile X:OptionalZeroCompile T N
-
-
+#
+#		GP.BASIC in-place string statements. StringVariableCompile both VALIDATES (a plain string
+#		variable, never a literal or a temporary) and emits the read, so the runtime gets the
+#		block address and checks nothing.
+#
+#		These three all shrink or rewrite in place. There is deliberately NO GP.PAD: growing a
+#		string needs the variable slot, not the block, and a handler never gets it -- so padding
+#		lives in BASL as STRHELP.PAD (GPC-BASIC/STRHELP.INC.BL), where assignment reallocates.
+#
+GP.TRIM 		X:StringVariableCompile T N
+GP.LTRIM 		X:StringVariableCompile T N
+GP.RTRIM 		X:StringVariableCompile T N
+GP.UPPER 		X:StringVariableCompile T N
+GP.LOWER 		X:StringVariableCompile T N

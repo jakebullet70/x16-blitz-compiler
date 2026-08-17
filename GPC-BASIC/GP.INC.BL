@@ -43,7 +43,7 @@
 #TOKEN GP.Y 52857
 #TOKEN GP.C 52856
 
-## Strings. GP.FIND is the search GPC otherwise has no form of at all (no
+## Strings. GP.INSTR is the search GPC otherwise has no form of at all (no
 ## INSTR, nothing). GP.STRPTR returns the address of [ActLen][Data] -- length
 ## AT that address, first character at +1, and the block's capacity at -2. With
 ## GP.CALL that lets machine code fill a BASIC string in place and set its
@@ -53,7 +53,24 @@
 ## SIGNED and the string heap lives above 32767, so it raises OUT OF RANGE.
 ## Use  H = INT(P/256) : L = P - H*256  instead.
 
-#TOKEN GP.FIND 52855
+#TOKEN GP.INSTR 52855
 #TOKEN GP.STRPTR 52854
+
+
+## In-place string statements. Each takes a STRING VARIABLE (never a literal
+## or an expression -- the compiler rejects those) and modifies it where it
+## sits. GP.TRIM strips spaces from both ends, GP.LTRIM from the left only,
+## GP.RTRIM from the right only. GP.UPPER / GP.LOWER convert case, A-Z only,
+## leaving digits, punctuation and PETSCII graphics untouched.
+##
+## There is NO GP.PAD: padding GROWS a string, and these commands cannot grow
+## one past the capacity it was born with. Use STRHELP.PAD from
+## "STRHELP.INC.BL" instead -- plain BASIC assignment, which reallocates.
+
+#TOKEN GP.TRIM 52853
+#TOKEN GP.LTRIM 52852
+#TOKEN GP.UPPER 52851
+#TOKEN GP.LOWER 52850
+#TOKEN GP.RTRIM 52849
 
 #ENDIF

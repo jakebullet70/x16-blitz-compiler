@@ -83,8 +83,8 @@ compiles at roughly **14 bytes of p-code per line**. BASL menus (~60–100 lines
 |---|---|---:|
 | 1 | Loops — **all shipped**; `GP.UNTIL` **CUT**, measured at only 4-6% | 0 |
 | 2 | `GP.CALL` + 4 value words — **SHIPPED** | 108 |
-| 3a | `GP.FIND` 115 B + `GP.STRPTR` 12 B — **SHIPPED** | 127 |
-| 3 | Strings — `GP.FIND`+`GP.STRPTR` **SHIPPED (127 B)**, 5 to go | 270 |
+| 3a | `GP.INSTR` 115 B + `GP.STRPTR` 12 B — **SHIPPED** | 127 |
+| 3 | Strings — 7 of 8 **SHIPPED** (`GP.INSTR`, `GP.STRPTR`, `GP.TRIM`/`LTRIM`/`RTRIM`, `GP.UPPER`/`LOWER`); `GP.COMP` to go, `GP.PAD` moved to BASL | ~330 |
 | 4 | `GP.SORT` | 156 |
 | 5 | Stash / restore | 290 |
 | 6 | Drawing ×4 | 309 |
@@ -314,15 +314,48 @@ registers load afterwards without disturbing it.
 (`GP.TRIM$` produced an empty 6-byte PRG). So anything *returning* a string must be a **statement that
 modifies its variable in place**; numeric returns can be functions.
 
-| Command | Form | Kind |
-|---|---|---|
-| `GP.FIND` | `GP.FIND(hay$, needle$ [,start])` | function → position, 0 if absent |
-| `GP.STRPTR` | `GP.STRPTR(a$)` | function → address |
-| `GP.COMP` | `GP.COMP(a$, b$)` | function → case-insensitive compare |
-| `GP.TRIM` | `GP.TRIM a$` | statement, in place |
-| `GP.PAD` | `GP.PAD a$, width` | statement, in place |
-| `GP.UPPER` | `GP.UPPER a$` | statement, in place |
-| `GP.LOWER` | `GP.LOWER a$` | statement, in place |
+| Command | Form | Kind | |
+|---|---|---|---|
+| `GP.INSTR` | `GP.INSTR(hay$, needle$ [,start])` | function → position, 0 if absent | **shipped** |
+| `GP.STRPTR` | `GP.STRPTR(a$)` | function → address | **shipped** |
+| `GP.COMP` | `GP.COMP(a$, b$)` | function → case-insensitive compare | to do |
+| `GP.TRIM` | `GP.TRIM a$` | statement, in place, both ends | **shipped** |
+| `GP.LTRIM` | `GP.LTRIM a$` | statement, in place, leading spaces | **shipped** |
+| `GP.RTRIM` | `GP.RTRIM a$` | statement, in place, trailing spaces | **shipped** |
+| `GP.UPPER` | `GP.UPPER a$` | statement, in place | **shipped** |
+| `GP.LOWER` | `GP.LOWER a$` | statement, in place | **shipped** |
+
+**Named `GP.INSTR`, not `GP.FIND`** (17/08/26). Same function, but every BASIC programmer already
+knows what INSTR does, and X16 BASIC has no `INSTR` of its own to collide with. The optional third
+argument is what turns it from "find the first" into "walk every occurrence".
+
+**`GP.PAD` was built, shipped for a few hours, and REMOVED (17/08/26).** It is the one command in
+this section that cannot work in ASM, and the reason generalises: an in-place handler receives the
+string's **block address**, never the **variable slot**, so it can shrink or rewrite a string but can
+never *grow* one past the capacity it was born with (`StringConcrete`: length+50%, minimum 10). That
+capped it at ~10 characters for a short string, so `GP.PAD NAME$,20` — a plain column heading, the
+entire point of the command — raised `OUT OF RANGE`. Padding is now **`STRHELP.PADR` / `PADL` / `PADC`
+in BASL** (`GPC-BASIC/STRHELP.INC.BL`), where ordinary assignment reallocates and the problem does
+not exist. Its token (52852/`$CE74`) went to `GP.LTRIM`.
+
+**The rule that falls out of it, for every future in-place string command: shrink and rewrite are
+free, grow is impossible.** `GP.TRIM`/`GP.LTRIM`/`GP.RTRIM`/`GP.UPPER`/`GP.LOWER` are all on the
+right side of that line, which is why all five are ~40 bytes each and none of them checks anything.
+
+**Ideas worth taking from prog8's `strings.p8`** (surveyed 17/08/26, 33 `asmsub`s), which is also
+where this library's module shape comes from — namespace, parameters declared in the header,
+preconditions documented rather than checked, include-what-you-use:
+
+| prog8 | worth it? |
+|---|---|
+| `rfind` — search from the RIGHT | **yes** — GPC cannot do this at all; ~20 B as a `GP.INSTR` variant. Last `.` in a filename, last space for word-wrap |
+| `pattern_match` — glob `*` and `?` | **yes, the standout** — hard in BASIC, ~77 lines of asm there; file filters, search boxes |
+| `compare_nocase` | already `GP.COMP` above — prog8 confirms it earns a slot |
+| `length`/`left`/`right`/`slice`/`copy`/`append` | no — GPC has `LEN`/`LEFT$`/`MID$`/`+` already |
+| `isdigit`/`isletter`/`isspace`… | no — one-line `ASC()` comparisons in BASIC, no bulk data, no inner loop |
+
+Note prog8 has **no pad/ljust/rjust at all** — nothing to copy for padding, which is its own argument
+that padding does not belong in ASM.
 
 **`GP.STRPTR` returns pointer+2** — the address of `[ActLen][Data]`. Deliberately **not** X16's shape
 (X16's `STRPTR` returns the first character, and GPC rejects it outright because the CBM
@@ -340,7 +373,7 @@ its length — something X16 BASIC has no answer for.
 **Caveat:** a string literal is pushed by `CommandPushS` pointing **into the p-code itself**, so an
 address from `GP.STRPTR` on a literal is read-only.
 
-**Split stays in BASL** — it composes from `GP.FIND` + `MID$` and does not earn ASM bytes.
+**Split stays in BASL** — it composes from `GP.INSTR` + `MID$` and does not earn ASM bytes.
 
 ### §4 Sorting — 1 token
 

@@ -81,8 +81,13 @@ C64_RIGHTDOLLAR          = $c9 ; $c9 right$
 C64_MIDDOLLAR            = $ca ; $ca mid$
 C64_GO                   = $cb ; $cb go
 C64_PI                   = $ff ; $ff pi
+C64_GPCMD_RTRIM          = $ce71 ; $ce71 gp.rtrim
+C64_GPCMD_LOWER          = $ce72 ; $ce72 gp.lower
+C64_GPCMD_UPPER          = $ce73 ; $ce73 gp.upper
+C64_GPCMD_LTRIM          = $ce74 ; $ce74 gp.ltrim
+C64_GPCMD_TRIM           = $ce75 ; $ce75 gp.trim
 C64_GPCMD_STRPTR         = $ce76 ; $ce76 gp.strptr
-C64_GPCMD_FIND           = $ce77 ; $ce77 gp.find
+C64_GPCMD_INSTR          = $ce77 ; $ce77 gp.instr
 C64_GPCMD_C              = $ce78 ; $ce78 gp.c
 C64_GPCMD_Y              = $ce79 ; $ce79 gp.y
 C64_GPCMD_X              = $ce7a ; $ce7a gp.x
@@ -281,15 +286,31 @@ FrameStackPages = 16 						; 4K, ~250 frames
 ;		existing opcode keeps its ID. The bump is still required in the other direction: an object
 ;		using $DF would dispatch off the end of an ABI 4 runtime's vector table.
 ;
-;		6 -> 7 on 16th August 2026: GP.FIND and GP.STRPTR. "gpstring.asm" sorts after "gpcall.asm",
-;		so the two new unshifted markers shifted every opcode above them again.
-;
 ;		5 -> 6 on 16th August 2026: GP.CALL and the GP.A/GP.X/GP.Y/GP.C value words. This one IS a
 ;		renumbering -- "gpcall.asm" sorts mid-list in the commands directory, so the four unshifted
 ;		markers shifted every opcode above them, and the shifted gp.call did the same to the
 ;		shifted range.
 ;
-RT_ABI = 7 									; runtime ABI ordinal -> "GPC7" magic (NOT the file name)
+;		6 -> 7 on 16th August 2026: GP.FIND and GP.STRPTR. "gpstring.asm" sorts after "gpcall.asm",
+;		so the two new unshifted markers shifted every opcode above them again.
+;
+;		7 -> 8 on 16th August 2026: GP.TRIM / GP.UPPER / GP.LOWER / GP.PAD joined gpstring.asm.
+;
+;		8 -> 9 on 16th August 2026: GP.PAD REMOVED again -- see gpstring.asm for why. Dropping a
+;		marker renumbers exactly as adding one does, so every shifted opcode above gp.pad moved
+;		back down. ABI 8 was never committed, so this bump is belt and braces rather than
+;		necessity -- but GPC.RT.*.BIN files built during the day are still lying about on this
+;		machine carrying the "GPC8" magic and the OLD opcode map, and the bootstrap would accept
+;		one for a new ABI 8 object without a word. That is the silent-mismatch class this ordinal
+;		exists to prevent, so it gets spent rather than argued with. Rebuild the resident runtime.
+;
+;		9 -> 10 on 17th August 2026: the magic at RTBASE widened from "GPC"+one digit to "GP"+TWO
+;		digits. It is still exactly 4 bytes (a 5th would have overwritten the RT_ENTRY jmp at
+;		RTBASE+4, which is what the .cerror in 00rt.header and bootstrap.asm was guarding), and it
+;		now has room to ABI 99. GP.INSTRREV was added and then removed again under this same
+;		ordinal; neither state was committed, so 10 means the two-digit magic and nothing else.
+;
+RT_ABI = 10 								; runtime ABI ordinal -> "GPC10" magic (NOT the file name)
 
 ; ************************************************************************************************
 ;
@@ -485,7 +506,7 @@ PCD_GPCMD_A          = $9c ; gp.a
 PCD_GPCMD_X          = $9d ; gp.x
 PCD_GPCMD_Y          = $9e ; gp.y
 PCD_GPCMD_C          = $9f ; gp.c
-PCD_GPCMD_FIND       = $a0 ; gp.find
+PCD_GPCMD_INSTR      = $a0 ; gp.instr
 PCD_GPCMD_STRPTR     = $a1 ; gp.strptr
 PCD_PSET             = $a2 ; pset
 PCD_LINE             = $a3 ; line
@@ -559,70 +580,75 @@ PCD_CLR              = $d780 ; clr
 PCD_DIM              = $d781 ; dim
 PCD_END              = $d782 ; end
 PCD_GPCMD_CALL       = $d783 ; gp.call
-PCD_JOY              = $d784 ; joy
-PCD_INT              = $d785 ; int
-PCD_SQR              = $d786 ; sqr
-PCD_LOG              = $d787 ; log
-PCD_EXP              = $d788 ; exp
-PCD_COS              = $d789 ; cos
-PCD_SIN              = $d78a ; sin
-PCD_TAN              = $d78b ; tan
-PCD_ATN              = $d78c ; atn
-PCD_LINPUT           = $d78d ; linput
-PCD_BINPUT           = $d78e ; binput
-PCD_LOAD             = $d78f ; load
-PCD_BLOAD            = $d790 ; bload
-PCD_BVLOAD           = $d791 ; bvload
-PCD_VLOAD            = $d792 ; vload
-PCD_BSAVE            = $d793 ; bsave
-PCD_BVERIFY          = $d794 ; bverify
-PCD_POWEROFF         = $d795 ; poweroff
-PCD_RESET            = $d796 ; reset
-PCD_REBOOT           = $d797 ; reboot
-PCD_MOUSE            = $d798 ; mouse
-PCD_MB               = $d799 ; mb
-PCD_MX               = $d79a ; mx
-PCD_MY               = $d79b ; my
-PCD_MWHEEL           = $d79c ; mwheel
-PCD_RPTDOLLAR        = $d79d ; rpt$
-PCD_SPRITE           = $d79e ; sprite
-PCD_SPRMEM           = $d79f ; sprmem
-PCD_MOVSPR           = $d7a0 ; movspr
-PCD_ST               = $d7a1 ; st
-PCD_STOP             = $d7a2 ; stop
-PCD_SYS              = $d7a3 ; sys
-PCD_TDATA            = $d7a4 ; tdata
-PCD_TATTR            = $d7a5 ; tattr
-PCD_TILE             = $d7a6 ; tile
-PCD_TICMD_WRITE      = $d7a7 ; ti.write
-PCD_TIDOLLARCMD_WRITE = $d7a8 ; ti$.write
-PCD_WAIT             = $d7a9 ; wait
-PCD_I2CPOKE          = $d7aa ; i2cpoke
-PCD_I2CPEEK          = $d7ab ; i2cpeek
-PCD_BANK             = $d7ac ; bank
-PCD_SLEEP            = $d7ad ; sleep
-PCD_FMINIT           = $d7ae ; fminit
-PCD_FMNOTE           = $d7af ; fmnote
-PCD_FMDRUM           = $d7b0 ; fmdrum
-PCD_FMINST           = $d7b1 ; fminst
-PCD_FMVIB            = $d7b2 ; fmvib
-PCD_FMFREQ           = $d7b3 ; fmfreq
-PCD_FMVOL            = $d7b4 ; fmvol
-PCD_FMPAN            = $d7b5 ; fmpan
-PCD_FMPLAY           = $d7b6 ; fmplay
-PCD_FMCHORD          = $d7b7 ; fmchord
-PCD_FMPOKE           = $d7b8 ; fmpoke
-PCD_PSGINIT          = $d7b9 ; psginit
-PCD_PSGNOTE          = $d7ba ; psgnote
-PCD_PSGVOL           = $d7bb ; psgvol
-PCD_PSGWAV           = $d7bc ; psgwav
-PCD_PSGFREQ          = $d7bd ; psgfreq
-PCD_PSGPAN           = $d7be ; psgpan
-PCD_PSGPLAY          = $d7bf ; psgplay
-PCD_PSGCHORD         = $d7c0 ; psgchord
-PCD_CLS              = $d7c1 ; cls
-PCD_LOCATE           = $d7c2 ; locate
-PCD_COLOR            = $d7c3 ; color
+PCD_GPCMD_UPPER      = $d784 ; gp.upper
+PCD_GPCMD_LOWER      = $d785 ; gp.lower
+PCD_GPCMD_TRIM       = $d786 ; gp.trim
+PCD_GPCMD_RTRIM      = $d787 ; gp.rtrim
+PCD_GPCMD_LTRIM      = $d788 ; gp.ltrim
+PCD_JOY              = $d789 ; joy
+PCD_INT              = $d78a ; int
+PCD_SQR              = $d78b ; sqr
+PCD_LOG              = $d78c ; log
+PCD_EXP              = $d78d ; exp
+PCD_COS              = $d78e ; cos
+PCD_SIN              = $d78f ; sin
+PCD_TAN              = $d790 ; tan
+PCD_ATN              = $d791 ; atn
+PCD_LINPUT           = $d792 ; linput
+PCD_BINPUT           = $d793 ; binput
+PCD_LOAD             = $d794 ; load
+PCD_BLOAD            = $d795 ; bload
+PCD_BVLOAD           = $d796 ; bvload
+PCD_VLOAD            = $d797 ; vload
+PCD_BSAVE            = $d798 ; bsave
+PCD_BVERIFY          = $d799 ; bverify
+PCD_POWEROFF         = $d79a ; poweroff
+PCD_RESET            = $d79b ; reset
+PCD_REBOOT           = $d79c ; reboot
+PCD_MOUSE            = $d79d ; mouse
+PCD_MB               = $d79e ; mb
+PCD_MX               = $d79f ; mx
+PCD_MY               = $d7a0 ; my
+PCD_MWHEEL           = $d7a1 ; mwheel
+PCD_RPTDOLLAR        = $d7a2 ; rpt$
+PCD_SPRITE           = $d7a3 ; sprite
+PCD_SPRMEM           = $d7a4 ; sprmem
+PCD_MOVSPR           = $d7a5 ; movspr
+PCD_ST               = $d7a6 ; st
+PCD_STOP             = $d7a7 ; stop
+PCD_SYS              = $d7a8 ; sys
+PCD_TDATA            = $d7a9 ; tdata
+PCD_TATTR            = $d7aa ; tattr
+PCD_TILE             = $d7ab ; tile
+PCD_TICMD_WRITE      = $d7ac ; ti.write
+PCD_TIDOLLARCMD_WRITE = $d7ad ; ti$.write
+PCD_WAIT             = $d7ae ; wait
+PCD_I2CPOKE          = $d7af ; i2cpoke
+PCD_I2CPEEK          = $d7b0 ; i2cpeek
+PCD_BANK             = $d7b1 ; bank
+PCD_SLEEP            = $d7b2 ; sleep
+PCD_FMINIT           = $d7b3 ; fminit
+PCD_FMNOTE           = $d7b4 ; fmnote
+PCD_FMDRUM           = $d7b5 ; fmdrum
+PCD_FMINST           = $d7b6 ; fminst
+PCD_FMVIB            = $d7b7 ; fmvib
+PCD_FMFREQ           = $d7b8 ; fmfreq
+PCD_FMVOL            = $d7b9 ; fmvol
+PCD_FMPAN            = $d7ba ; fmpan
+PCD_FMPLAY           = $d7bb ; fmplay
+PCD_FMCHORD          = $d7bc ; fmchord
+PCD_FMPOKE           = $d7bd ; fmpoke
+PCD_PSGINIT          = $d7be ; psginit
+PCD_PSGNOTE          = $d7bf ; psgnote
+PCD_PSGVOL           = $d7c0 ; psgvol
+PCD_PSGWAV           = $d7c1 ; psgwav
+PCD_PSGFREQ          = $d7c2 ; psgfreq
+PCD_PSGPAN           = $d7c3 ; psgpan
+PCD_PSGPLAY          = $d7c4 ; psgplay
+PCD_PSGCHORD         = $d7c5 ; psgchord
+PCD_CLS              = $d7c6 ; cls
+PCD_LOCATE           = $d7c7 ; locate
+PCD_COLOR            = $d7c8 ; color
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;
