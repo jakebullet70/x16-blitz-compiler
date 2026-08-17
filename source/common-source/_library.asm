@@ -243,7 +243,21 @@ MemoryStorage = $400
 ;		would have left 940 bytes, which does NOT cover the ~1,545 GP.BASIC still has to add;
 ;		eight leaves ~1,960 and ends the matter. Cost is 2K of the ~26K a shared program gets.
 ;
-RTBASE = $6800 								; resident runtime home ($6800..$9EFF, ~13.7K)
+; ************************************************************************************************
+;
+;		AND A THIRD TIME on 17th August 2026: $6800 -> $6400, four pages, BEFORE hitting the wall
+;		rather than after. The runtime had 1,061 bytes left under the ceiling and the rest of
+;		GP.BASIC (stash/restore, drawing, the menu loop) projects to ~1,400 -- measured, not
+;		guessed: the estimates in GP-BASIC.TIERS.md have run 1.62x over on average, with GP.SORT
+;		at 2.55x and GP.ARRPTR at 3.27x.
+;
+;		Four pages, not the two that would just cover the projection, for the reason written twice
+;		above: three pages "proved too timid" and the note then said take the room while a bump is
+;		already free. Leaves ~690 bytes of margin after everything planned. Costs 1K of the ~26K a
+;		shared program gets, about 4%.
+;
+; ************************************************************************************************
+RTBASE = $6400 								; resident runtime home ($6400..$9EFF, ~14.7K)
 RT_ENTRY = RTBASE+4 						; 4-byte magic at RTBASE, then jmp StartRuntime
 PCODE_PAGE = $09 							; shared-mode p-code base page ($0900, page-aligned)
 MIN_WS_PAGES = 16 							; smallest workspace a shared program keeps (4K)
@@ -321,7 +335,11 @@ FrameStackPages = 16 						; 4K, ~250 frames
 ;
 ;		12 -> 13 on 17th August 2026: GP.ARRPTR joined gpsort.asm, a shifted marker.
 ;
-RT_ABI = 13 								; runtime ABI ordinal -> "GP13" magic (NOT the file name)
+;		13 -> 14 on 17th August 2026: RTBASE moved $6800 -> $6400. Every move of the base costs a
+;		bump -- a resident runtime linked at another address is not interchangeable, and the base is
+;		baked into every shared program's bootstrap.
+;
+RT_ABI = 14 								; runtime ABI ordinal -> "GP14" magic (NOT the file name)
 
 ; ************************************************************************************************
 ;

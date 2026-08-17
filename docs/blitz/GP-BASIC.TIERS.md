@@ -93,6 +93,28 @@ compiles at roughly **14 bytes of p-code per line**. BASL menus (~60–100 lines
 | 9 | `GP.MENU` interaction loop | 266 |
 | | **Total still to build** | **~1,418** |
 
+#### Measured overrun, 17th August 2026 — read this before trusting an estimate below
+
+The estimates in this table have run **1.62x over** on average. Actuals:
+
+| item | estimated | actual | |
+|---|---:|---:|---:|
+| `GP.CALL` + 4 value words | 76 | 108 | x1.42 |
+| `GP.INSTR` + `GP.STRPTR` | 127 | 127 | x1.00 |
+| in-place strings x5 | 200 | 220 | x1.10 |
+| `GP.COMP` | 40 | 90 | x2.25 |
+| `GP.SORT` | 156 | 398 | x2.55 |
+| `GP.ARRPTR` | 15 | 49 | x3.27 |
+| **total** | **614** | **992** | **x1.62** |
+
+The pattern is not random: the two worst overruns are the two commands that had to VALIDATE
+something (array header, element type, null pointers) and RETYPE a result. The estimates costed the
+algorithm and forgot the guards. **Cost the guards.**
+
+Applying 1.62x, tiers 5, 6 and 9 come to **~1,400 bytes, not 865**. That is why RTBASE moved to
+`$6400` on the same day, before starting tier 5 rather than after hitting the ceiling in tier 6:
+headroom went 1,061 -> **2,085**, leaving ~690 bytes of margin once everything planned is built.
+
 Anchors for the estimates: `GP.DO` 29 B, `GP.LOOP` 57 B, `CommandSYS` 54 B, `CommandPOKE` 24 B,
 `CommandXFor` 107 B, GPC's 7 graphics primitives 280 B total (all from `source/application/build/code.lbl`);
 VTUI `save_rect`/`rest_rect` ~60–70 B each, `fill_box` ~25 B, `border` ~50 B.

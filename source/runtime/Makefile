@@ -31,7 +31,7 @@ build: prelim
 #
 #		The standalone resident runtime, GPC.RT.nnn.BIN. Same libraries as the test build, but
 #		fronted by 00rt.header (magic + entry vector at RTBASE) and closed by zzrt.footer (the
-#		$9F00 size guard), re-based to RTBASE via -D CodeStart (26624 = $6800 -- decimal dodges
+#		$9F00 size guard), re-based to RTBASE via -D CodeStart (25600 = $6400 -- decimal dodges
 #		Make's $; keep it in step with RTBASE in common.inc). The result is loaded once and
 #		shared by every program compiled in "resident
 #		runtime" mode (GPC.INPUT 4th line = SHARED). Written straight into testing/ so it sits
@@ -43,7 +43,7 @@ build: prelim
 #		recipe would be the one nothing checks. Bump RT_ABI and all three move together.
 #
 gpc-rt: prelim
-	$(ASM) -D CodeStart=26624 source$(S)main$(S)00rt.header $(BINDIR)runtime.library $(BINDIR)common.library $(BINDIR)ifloat32.library $(BINDIR)polynomials.library source$(S)main$(S)zzrt.footer
+	$(ASM) -D CodeStart=25600 source$(S)main$(S)00rt.header $(BINDIR)runtime.library $(BINDIR)common.library $(BINDIR)ifloat32.library $(BINDIR)polynomials.library source$(S)main$(S)zzrt.footer
 	$(PYTHON) scripts$(S)rtname.py build$(S)code.prg $(RELEASEDIR)
 
 checkall: prelim
