@@ -44,3 +44,9 @@ PI 				T N
 GP.INSTR 		($,$ X:OptionalZeroCompile) T N
 GP.COMP 		($,$) T N
 GP.STRPTR 		($) T N
+#
+# 	GP.ARRPTR(a()) -- the address of element zero, for machine code reached by GP.CALL. The
+# 	empty parentheses are required and a subscript inside them is a syntax error; the helper
+# 	insists on the ")" immediately, so add index*stride yourself.
+#
+GP.ARRPTR 		(X:AnyArrayCompile) T N

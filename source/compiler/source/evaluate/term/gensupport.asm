@@ -215,39 +215,55 @@ _SVCFail:
 ;
 ; ************************************************************************************************
 
+;		AnyArrayCompile is the same thing with the element-type check dropped -- GP.ARRPTR wants
+;		the address of a FLOAT array just as much as a string one. Deliberately duplicated rather
+;		than factored behind a flag: compiler code is not copied into the object, so the dozen
+;		bytes are free, and a shared routine would need the flag in storage to survive the jsrs.
+
+AnyArrayCompile:
+		jsr 	GetNextNonSpace 			; a variable starts with a letter
+		jsr 	CharIsAlpha
+		bcc 	SACFail
+		jsr 	ExtractVariableName 		; name in YX, type bits in X, "(" consumed if present
+		cpx 	#0
+		bpl 	SACFail 					; no "(" at all, so it is a scalar, not an array
+		bra 	SACParens
+
 StringArrayCompile:
 		jsr 	GetNextNonSpace 			; a variable starts with a letter
 		jsr 	CharIsAlpha
-		bcc 	_SACFail
+		bcc 	SACFail
 		jsr 	ExtractVariableName 		; name in YX, type bits in X, "(" consumed if present
 		cpx 	#0
-		bpl 	_SACFail 					; no "(" at all, so it is a scalar, not an array
+		bpl 	SACFail 					; no "(" at all, so it is a scalar, not an array
 		txa
 		and 	#NSSTypeMask
 		cmp 	#NSSString
-		bne 	_SACFail 					; and it has to be a string array
+		bne 	SACFail 					; and it has to be a string array
+SACParens:
 		;
 		phy 								; hold the name over the ")" check
 		phx
 		jsr 	GetNextNonSpace
 		cmp 	#")"
-		bne 	_SACFailPull 				; empty parentheses only -- no subscript belongs here
+		bne 	SACFailPull 				; empty parentheses only -- no subscript belongs here
 		plx
 		ply
 		;
 		jsr 	FindVariable 				; CS: exists, YX = its slot. CC: never mentioned.
-		bcc 	_SACFail
+		bcc 	SACFail
 		lda 	#NSSIFloat+NSSIInt16 		; read the slot as an int16, which pushes the array's
 		clc 								; base address without indexing into it
 		jsr 	GetSetVariable
 		clc
 		rts
 
-_SACFailPull:
+SACFailPull:
 		plx
 		ply
-_SACFail:
-		.error_syntax
+SACFail: 									; global, not _SACFail: 64tass scopes a _ label
+		.error_syntax 						; to the enclosing global one, and BOTH entry
+											; points above need to reach it
 
 		.send code
 

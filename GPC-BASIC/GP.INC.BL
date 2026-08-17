@@ -89,4 +89,17 @@
 
 #TOKEN GP.SORT 52847
 
+## GP.ARRPTR(a()) -- the address of element ZERO of an array, so machine
+## code called with GP.CALL can work on it in bulk: fill, checksum, min/max,
+## sprite batching. The header is already skipped. STRIDE IS YOURS to add:
+## 2 bytes per element for a string array (each element is a POINTER to the
+## string's block, so follow it and see GP.STRPTR for the layout), 6 for a
+## numeric one. Multi-dimensional arrays are rejected.
+##
+## Empty parentheses required; GP.ARRPTR(A(3)) is a syntax error, add 3*2
+## or 3*6 yourself. Same splitting rule as GP.STRPTR -- the address is
+## usually above 32767, so H = INT(P/256) : L = P - H*256, never P AND 255.
+
+#TOKEN GP.ARRPTR 52846
+
 #ENDIF

@@ -78,6 +78,7 @@ C64_RIGHTDOLLAR          = $c9 ; $c9 right$
 C64_MIDDOLLAR            = $ca ; $ca mid$
 C64_GO                   = $cb ; $cb go
 C64_PI                   = $ff ; $ff pi
+C64_GPCMD_ARRPTR         = $ce6e ; $ce6e gp.arrptr
 C64_GPCMD_SORT           = $ce6f ; $ce6f gp.sort
 C64_GPCMD_COMP           = $ce70 ; $ce70 gp.comp
 C64_GPCMD_RTRIM          = $ce71 ; $ce71 gp.rtrim

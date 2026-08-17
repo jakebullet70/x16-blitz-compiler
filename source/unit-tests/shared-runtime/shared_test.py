@@ -49,7 +49,7 @@ TOKENISE = os.path.join(ROOT, "bin", "tokenise.zip")
 #		one. If it fails on the magic again, check that first before suspecting the bootstrap.
 #
 RTBASE            = 0x6800
-RT_ABI            = 12
+RT_ABI            = 13
 PCODE_PAGE        = 0x09
 FRAME_STACK_PAGES = 16
 MIN_WS_PAGES      = 16

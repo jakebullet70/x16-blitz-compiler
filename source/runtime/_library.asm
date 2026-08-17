@@ -3607,6 +3607,67 @@ _GSFNo:
 		pla
 		rts
 
+; ************************************************************************************************
+;
+;						GP.ARRPTR(a()) -> the address of element ZERO
+;
+;		The escape hatch. GP.SORT is the built-in for a job common enough to be worth doing
+;		properly in assembly; this is for the jobs too specific to ever be keywords -- sprite
+;		batching, array fill, checksum, min/max -- which can now be written once as machine code
+;		and driven with GP.CALL instead of each having to become its own keyword or not exist.
+;
+;		It is StringArrayCompile's path with the element-type check dropped (a float array is
+;		just as valid a target) and the value RETURNED rather than consumed.
+;
+;		Returns base + variableStartPage*256 + 3, skipping the 3-byte header, so the answer is
+;		element zero and not the count word. Stride is the caller's business: 2 bytes for a
+;		string (a pointer to its block) and 6 for a number.
+;
+;		Multi-dimensional arrays are REJECTED, exactly as GP.SORT rejects them and for the same
+;		reason -- the elements are not a flat run, they are pointers to sub-levels, so an address
+;		into one would be used as data and corrupt silently.
+;
+;		A subscript inside the parentheses is a syntax error by construction: AnyArrayCompile
+;		demands the ")" immediately. GP.ARRPTR(A(3)) does not compile -- add 3*stride yourself.
+;
+;		SAME WARNING AS GP.STRPTR: the address routinely exceeds 32767, and BASIC's AND is 16-bit
+;		SIGNED, so splitting it with "P AND 255" raises OUT OF RANGE. Use
+;		H = INT(P/256) : L = P - H*256.
+;
+; ************************************************************************************************
+
+UnaryGPArrPtr: ;; [!gp.arrptr]
+		.entercmd
+		phy
+		lda 	NSMantissa0,x 				; the base arrives as an offset, as GP.SORT receives it
+		sta 	zTemp0
+		lda 	NSMantissa1,x
+		clc
+		adc 	variableStartPage
+		sta 	zTemp0+1
+		;
+		ldy 	#2 							; bit 7 of the type byte = sub-arrays below this level
+		lda 	(zTemp0),y
+		bmi 	_GAPBad
+		;
+		clc 								; step over the 3-byte header to element zero
+		lda 	zTemp0
+		adc 	#3
+		sta 	NSMantissa0,x
+		lda 	zTemp0+1
+		adc 	#0
+		sta 	NSMantissa1,x
+		stz 	NSMantissa2,x 				; and retype it from an int16 reference to a plain
+		stz 	NSMantissa3,x 				; number, exactly as GP.STRPTR does
+		stz 	NSExponent,x
+		stz 	NSStatus,x 					; NSSIFloat is $00, so this also clears the sign
+		ply
+		.exitcmd
+
+_GAPBad:
+		ply 								; code pointer back before raising, or the address in
+		.error_index 						; the message is a fixed meaningless one
+
 		.send 	code
 
 		.section storage
@@ -9671,76 +9732,77 @@ ShiftVectorTable:
 	.word	CommandEnd               ; $d782 end
 	.word	CommandGPCall            ; $d783 gp.call
 	.word	CommandGPSort            ; $d784 gp.sort
-	.word	UnaryGPComp              ; $d785 gp.comp
-	.word	CommandGPUpper           ; $d786 gp.upper
-	.word	CommandGPLower           ; $d787 gp.lower
-	.word	CommandGPTrim            ; $d788 gp.trim
-	.word	CommandGPRTrim           ; $d789 gp.rtrim
-	.word	CommandGPLTrim           ; $d78a gp.ltrim
-	.word	UnaryJoy                 ; $d78b joy
-	.word	LinkFloatIntegerPartDown ; $d78c int
-	.word	LinkFloatSquareRoot      ; $d78d sqr
-	.word	LinkFloatLogarithm       ; $d78e log
-	.word	LinkFloatExponent        ; $d78f exp
-	.word	LinkFloatCosine          ; $d790 cos
-	.word	LinkFloatSine            ; $d791 sin
-	.word	LinkFloatTangent         ; $d792 tan
-	.word	LinkFloatArcTan          ; $d793 atn
-	.word	CommandXLinput           ; $d794 linput
-	.word	CommandXBinput           ; $d795 binput
-	.word	Command_LOAD             ; $d796 load
-	.word	Command_BLOAD            ; $d797 bload
-	.word	Command_BVLOAD           ; $d798 bvload
-	.word	Command_VLOAD            ; $d799 vload
-	.word	Command_BSAVE            ; $d79a bsave
-	.word	Command_BVERIFY          ; $d79b bverify
-	.word	X16CommandPowerOff       ; $d79c poweroff
-	.word	X16CommandReset          ; $d79d reset
-	.word	X16CommandReboot         ; $d79e reboot
-	.word	XCommandMouse            ; $d79f mouse
-	.word	XUnaryMB                 ; $d7a0 mb
-	.word	XUnaryMX                 ; $d7a1 mx
-	.word	XUnaryMY                 ; $d7a2 my
-	.word	XUnaryMWheel             ; $d7a3 mwheel
-	.word	UnaryRPT                 ; $d7a4 rpt$
-	.word	Command_SPRITE           ; $d7a5 sprite
-	.word	Command_SPRMEM           ; $d7a6 sprmem
-	.word	Command_MOVSPR           ; $d7a7 movspr
-	.word	UnaryST                  ; $d7a8 st
-	.word	CommandStop              ; $d7a9 stop
-	.word	CommandSYS               ; $d7aa sys
-	.word	UnaryTDATA               ; $d7ab tdata
-	.word	UnaryTATTR               ; $d7ac tattr
-	.word	Command_TILE             ; $d7ad tile
-	.word	CommandTIWriteN          ; $d7ae ti.write
-	.word	CommandTIWriteS          ; $d7af ti$.write
-	.word	CommandXWAIT             ; $d7b0 wait
-	.word	X16I2CPoke               ; $d7b1 i2cpoke
-	.word	X16I2CPeek               ; $d7b2 i2cpeek
-	.word	CommandBank              ; $d7b3 bank
-	.word	XCommandSleep            ; $d7b4 sleep
-	.word	X16_Audio_FMINIT         ; $d7b5 fminit
-	.word	X16_Audio_FMNOTE         ; $d7b6 fmnote
-	.word	X16_Audio_FMDRUM         ; $d7b7 fmdrum
-	.word	X16_Audio_FMINST         ; $d7b8 fminst
-	.word	X16_Audio_FMVIB          ; $d7b9 fmvib
-	.word	X16_Audio_FMFREQ         ; $d7ba fmfreq
-	.word	X16_Audio_FMVOL          ; $d7bb fmvol
-	.word	X16_Audio_FMPAN          ; $d7bc fmpan
-	.word	X16_Audio_FMPLAY         ; $d7bd fmplay
-	.word	X16_Audio_FMCHORD        ; $d7be fmchord
-	.word	X16_Audio_FMPOKE         ; $d7bf fmpoke
-	.word	X16_Audio_PSGINIT        ; $d7c0 psginit
-	.word	X16_Audio_PSGNOTE        ; $d7c1 psgnote
-	.word	X16_Audio_PSGVOL         ; $d7c2 psgvol
-	.word	X16_Audio_PSGWAV         ; $d7c3 psgwav
-	.word	X16_Audio_PSGFREQ        ; $d7c4 psgfreq
-	.word	X16_Audio_PSGPAN         ; $d7c5 psgpan
-	.word	X16_Audio_PSGPLAY        ; $d7c6 psgplay
-	.word	X16_Audio_PSGCHORD       ; $d7c7 psgchord
-	.word	CommandCls               ; $d7c8 cls
-	.word	CommandLocate            ; $d7c9 locate
-	.word	CommandColor             ; $d7ca color
+	.word	UnaryGPArrPtr            ; $d785 gp.arrptr
+	.word	UnaryGPComp              ; $d786 gp.comp
+	.word	CommandGPUpper           ; $d787 gp.upper
+	.word	CommandGPLower           ; $d788 gp.lower
+	.word	CommandGPTrim            ; $d789 gp.trim
+	.word	CommandGPRTrim           ; $d78a gp.rtrim
+	.word	CommandGPLTrim           ; $d78b gp.ltrim
+	.word	UnaryJoy                 ; $d78c joy
+	.word	LinkFloatIntegerPartDown ; $d78d int
+	.word	LinkFloatSquareRoot      ; $d78e sqr
+	.word	LinkFloatLogarithm       ; $d78f log
+	.word	LinkFloatExponent        ; $d790 exp
+	.word	LinkFloatCosine          ; $d791 cos
+	.word	LinkFloatSine            ; $d792 sin
+	.word	LinkFloatTangent         ; $d793 tan
+	.word	LinkFloatArcTan          ; $d794 atn
+	.word	CommandXLinput           ; $d795 linput
+	.word	CommandXBinput           ; $d796 binput
+	.word	Command_LOAD             ; $d797 load
+	.word	Command_BLOAD            ; $d798 bload
+	.word	Command_BVLOAD           ; $d799 bvload
+	.word	Command_VLOAD            ; $d79a vload
+	.word	Command_BSAVE            ; $d79b bsave
+	.word	Command_BVERIFY          ; $d79c bverify
+	.word	X16CommandPowerOff       ; $d79d poweroff
+	.word	X16CommandReset          ; $d79e reset
+	.word	X16CommandReboot         ; $d79f reboot
+	.word	XCommandMouse            ; $d7a0 mouse
+	.word	XUnaryMB                 ; $d7a1 mb
+	.word	XUnaryMX                 ; $d7a2 mx
+	.word	XUnaryMY                 ; $d7a3 my
+	.word	XUnaryMWheel             ; $d7a4 mwheel
+	.word	UnaryRPT                 ; $d7a5 rpt$
+	.word	Command_SPRITE           ; $d7a6 sprite
+	.word	Command_SPRMEM           ; $d7a7 sprmem
+	.word	Command_MOVSPR           ; $d7a8 movspr
+	.word	UnaryST                  ; $d7a9 st
+	.word	CommandStop              ; $d7aa stop
+	.word	CommandSYS               ; $d7ab sys
+	.word	UnaryTDATA               ; $d7ac tdata
+	.word	UnaryTATTR               ; $d7ad tattr
+	.word	Command_TILE             ; $d7ae tile
+	.word	CommandTIWriteN          ; $d7af ti.write
+	.word	CommandTIWriteS          ; $d7b0 ti$.write
+	.word	CommandXWAIT             ; $d7b1 wait
+	.word	X16I2CPoke               ; $d7b2 i2cpoke
+	.word	X16I2CPeek               ; $d7b3 i2cpeek
+	.word	CommandBank              ; $d7b4 bank
+	.word	XCommandSleep            ; $d7b5 sleep
+	.word	X16_Audio_FMINIT         ; $d7b6 fminit
+	.word	X16_Audio_FMNOTE         ; $d7b7 fmnote
+	.word	X16_Audio_FMDRUM         ; $d7b8 fmdrum
+	.word	X16_Audio_FMINST         ; $d7b9 fminst
+	.word	X16_Audio_FMVIB          ; $d7ba fmvib
+	.word	X16_Audio_FMFREQ         ; $d7bb fmfreq
+	.word	X16_Audio_FMVOL          ; $d7bc fmvol
+	.word	X16_Audio_FMPAN          ; $d7bd fmpan
+	.word	X16_Audio_FMPLAY         ; $d7be fmplay
+	.word	X16_Audio_FMCHORD        ; $d7bf fmchord
+	.word	X16_Audio_FMPOKE         ; $d7c0 fmpoke
+	.word	X16_Audio_PSGINIT        ; $d7c1 psginit
+	.word	X16_Audio_PSGNOTE        ; $d7c2 psgnote
+	.word	X16_Audio_PSGVOL         ; $d7c3 psgvol
+	.word	X16_Audio_PSGWAV         ; $d7c4 psgwav
+	.word	X16_Audio_PSGFREQ        ; $d7c5 psgfreq
+	.word	X16_Audio_PSGPAN         ; $d7c6 psgpan
+	.word	X16_Audio_PSGPLAY        ; $d7c7 psgplay
+	.word	X16_Audio_PSGCHORD       ; $d7c8 psgchord
+	.word	CommandCls               ; $d7c9 cls
+	.word	CommandLocate            ; $d7ca locate
+	.word	CommandColor             ; $d7cb color
 	.send code
 ; ************************************************************************************************
 ; ************************************************************************************************

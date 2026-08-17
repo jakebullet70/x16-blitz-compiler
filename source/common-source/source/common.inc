@@ -137,7 +137,9 @@ FrameStackPages = 16 						; 4K, ~250 frames
 ;		11 -> 12 on 17th August 2026: GP.SORT, in its own gpsort.asm. That file sorts between
 ;		"gpstring.asm" and "gpcall.asm" in the commands directory, so it renumbered from there up.
 ;
-RT_ABI = 12 								; runtime ABI ordinal -> "GP12" magic (NOT the file name)
+;		12 -> 13 on 17th August 2026: GP.ARRPTR joined gpsort.asm, a shifted marker.
+;
+RT_ABI = 13 								; runtime ABI ordinal -> "GP13" magic (NOT the file name)
 
 ; ************************************************************************************************
 ;

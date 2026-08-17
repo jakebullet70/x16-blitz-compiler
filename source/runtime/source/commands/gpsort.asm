@@ -328,6 +328,67 @@ _GSFNo:
 		pla
 		rts
 
+; ************************************************************************************************
+;
+;						GP.ARRPTR(a()) -> the address of element ZERO
+;
+;		The escape hatch. GP.SORT is the built-in for a job common enough to be worth doing
+;		properly in assembly; this is for the jobs too specific to ever be keywords -- sprite
+;		batching, array fill, checksum, min/max -- which can now be written once as machine code
+;		and driven with GP.CALL instead of each having to become its own keyword or not exist.
+;
+;		It is StringArrayCompile's path with the element-type check dropped (a float array is
+;		just as valid a target) and the value RETURNED rather than consumed.
+;
+;		Returns base + variableStartPage*256 + 3, skipping the 3-byte header, so the answer is
+;		element zero and not the count word. Stride is the caller's business: 2 bytes for a
+;		string (a pointer to its block) and 6 for a number.
+;
+;		Multi-dimensional arrays are REJECTED, exactly as GP.SORT rejects them and for the same
+;		reason -- the elements are not a flat run, they are pointers to sub-levels, so an address
+;		into one would be used as data and corrupt silently.
+;
+;		A subscript inside the parentheses is a syntax error by construction: AnyArrayCompile
+;		demands the ")" immediately. GP.ARRPTR(A(3)) does not compile -- add 3*stride yourself.
+;
+;		SAME WARNING AS GP.STRPTR: the address routinely exceeds 32767, and BASIC's AND is 16-bit
+;		SIGNED, so splitting it with "P AND 255" raises OUT OF RANGE. Use
+;		H = INT(P/256) : L = P - H*256.
+;
+; ************************************************************************************************
+
+UnaryGPArrPtr: ;; [!gp.arrptr]
+		.entercmd
+		phy
+		lda 	NSMantissa0,x 				; the base arrives as an offset, as GP.SORT receives it
+		sta 	zTemp0
+		lda 	NSMantissa1,x
+		clc
+		adc 	variableStartPage
+		sta 	zTemp0+1
+		;
+		ldy 	#2 							; bit 7 of the type byte = sub-arrays below this level
+		lda 	(zTemp0),y
+		bmi 	_GAPBad
+		;
+		clc 								; step over the 3-byte header to element zero
+		lda 	zTemp0
+		adc 	#3
+		sta 	NSMantissa0,x
+		lda 	zTemp0+1
+		adc 	#0
+		sta 	NSMantissa1,x
+		stz 	NSMantissa2,x 				; and retype it from an int16 reference to a plain
+		stz 	NSMantissa3,x 				; number, exactly as GP.STRPTR does
+		stz 	NSExponent,x
+		stz 	NSStatus,x 					; NSSIFloat is $00, so this also clears the sign
+		ply
+		.exitcmd
+
+_GAPBad:
+		ply 								; code pointer back before raising, or the address in
+		.error_index 						; the message is a fixed meaningless one
+
 		.send 	code
 
 		.section storage
