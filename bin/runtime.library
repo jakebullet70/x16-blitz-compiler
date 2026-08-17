@@ -78,11 +78,13 @@ stringHighMemory: 							; string heap ceiling; allocations grow DOWN from here
 FRAME_GOSUB = $E4 							; Gosub has 4 bytes
 FRAME_FOR = $C0+19 							; For has 19 bytes
 FRAME_LOOP = $A0+6 							; GP.DO has 6 bytes
+FRAME_SELECT = $80+7 						; GP.SELECT has 7 bytes
 
 ;
-;		Identifiers are the UPPER 3 BITS, so there are only eight and three are now spoken for:
-;		7 GOSUB, 6 FOR, 5 GP.DO. $FF is the stack-empty fail marker StackFindFrame stops on --
-;		it is id 7 size 31, which no real frame can be, so it can never be mistaken for a GOSUB.
+;		Identifiers are the UPPER 3 BITS, so there are only eight and four are now spoken for:
+;		7 GOSUB, 6 FOR, 5 GP.DO, 4 GP.SELECT. $FF is the stack-empty fail marker StackFindFrame
+;		stops on -- it is id 7 size 31, which no real frame can be, so it can never be mistaken
+;		for a GOSUB.
 ;
 
 ; ************************************************************************************************
@@ -3090,7 +3092,13 @@ CommandReturn: ;; [return]
 ;
 ; ************************************************************************************************
 
+;
+;		.caseend is the branch that closes a GP.CASE body, and it is a .goto in every respect
+;		except how FixBranches works out where it goes -- exactly the relationship .fngosub has
+;		with .gosub. Two markers on one body, so it costs a vector slot and not a byte more.
+;
 CommandXGoto: ;; [.goto]
+CommandXCaseEnd: ;; [.caseend]
 		.entercmd
 		;
 		;		Come here to actually do the GOTO.
@@ -3118,7 +3126,12 @@ PerformGOTO:
 ;
 ; ************************************************************************************************
 
+;
+;		.casenext -- a GP.CASE test that came out false -- is likewise a .goto.z: pop the result,
+;		branch on zero. Only its target differs.
+;
 CommandGotoZ: ;; [.goto.z]
+CommandXCaseNext: ;; [.casenext]
 		.entercmd
 		jsr 	FloatIsZero
 		dex 
@@ -8839,6 +8852,172 @@ _BCCExit:
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;
+;		Name:		select.asm
+;		Purpose:	GP.SELECT / GP.CASE / GP.ELSE / GP.ENDSEL
+;		Created:	17th August 2026
+;		Reviewed: 	No
+;		Author : 	Steven De George SR
+;
+; ************************************************************************************************
+; ************************************************************************************************
+
+		.section 	code
+
+; ************************************************************************************************
+;
+;			GP.SELECT <expr> / GP.CASE <expr>[,<expr>...] / GP.ELSE / GP.ENDSEL
+;
+;		A multi-way branch on one value, modelled on prog8's "when". It is NOT a replacement for
+;		ON x GOTO/GOSUB, which is a real skip table and stays the right answer for a dense 1..n
+;		index; this is for the SPARSE selector -- key codes out of GET, state machines - where
+;		ON cannot go.
+;
+;		THE SELECTOR LIVES IN A STACK FRAME, not on the number stack, and that is forced rather
+;		than chosen: new.line resets the number stack pointer to $FF at every source line, so a
+;		value left on it by GP.SELECT would be gone by the time the first GP.CASE on the next
+;		line looked for it. A frame also gets the nesting and the cleanup for free -- GP.ENDSEL
+;		finds its own frame through StackFindFrame, which discards anything a case body left
+;		open above it, and GP.EXITDO's StackFindFrame discards a select the same way.
+;
+;		GP.CASE is "push the selector", and it is emitted ONCE PER ALTERNATIVE, so
+;
+;			GP.CASE 13,17
+;
+;		compiles to  gp.case 13 f.cmp =  gp.case 17 f.cmp =  or  .casenext
+;
+;		which is why there is no separate marker keyword and no stack-duplicate opcode: the fetch
+;		IS the marker. FixBranches lands .casenext on the FIRST gp.case of the next alternative,
+;		and the extra ones inside an alternative all sit before its .casenext, so the scan never
+;		sees them.
+;
+; ************************************************************************************************
+
+selpush	.macro 								; number stack -> frame
+		lda 	\1,x
+		sta 	(runtimeStackPtr),y
+		iny
+		.endm
+
+selpull	.macro 								; frame -> number stack
+		lda 	(runtimeStackPtr),y
+		sta 	\1,x
+		iny
+		.endm
+
+; ************************************************************************************************
+;
+;								GP.SELECT : open the frame
+;
+; ************************************************************************************************
+
+CommandXSelect: ;; [gp.select]
+		.entercmd
+		lda 	#FRAME_SELECT 				; StackOpenFrame can raise OUT OF MEMORY, and Y is
+		jsr 	StackOpenFrame 				; still the code offset here, so it reports honestly
+		;
+		phy 								; Y becomes the frame index from here on
+		ldy 	#1
+		.selpush NSMantissa0
+		.selpush NSMantissa1
+		.selpush NSMantissa2
+		.selpush NSMantissa3
+		.selpush NSExponent
+		.selpush NSStatus
+		ply
+		dex 								; the selector is in the frame now, not on the stack
+		.exitcmd
+
+; ************************************************************************************************
+;
+;						GP.CASE : push a copy of the selector to test against
+;
+; ************************************************************************************************
+
+CommandXCase: ;; [gp.case]
+		.entercmd
+		jsr 	SelectFindFrame 			; before phy, so a structure error reports honestly
+		phy
+		inx
+		ldy 	#1
+		.selpull NSMantissa0
+		.selpull NSMantissa1
+		.selpull NSMantissa2
+		.selpull NSMantissa3
+		.selpull NSExponent
+		.selpull NSStatus
+		ply
+		.exitcmd
+
+; ************************************************************************************************
+;
+;		GP.ELSE : nothing to do at all. It exists as a token because FixBranches needs somewhere
+;		for the last GP.CASE's .casenext to land, and because the case bodies above it branch to
+;		the GP.ENDSEL rather than falling through it.
+;
+; ************************************************************************************************
+
+CommandXElse: ;; [gp.else]
+		.entercmd
+		.exitcmd
+
+; ************************************************************************************************
+;
+;		GP.ENDSEL : drop the selector's frame. Reached three ways -- fallen out of the last case
+;		body, branched to by a .caseend, or branched to by the .casenext of a select with nothing
+;		matching and no GP.ELSE. All three want exactly this, which is why it is the target of
+;		every branch rather than the instruction after it.
+;
+; ************************************************************************************************
+
+CommandXEndSelect: ;; [gp.endsel]
+		.entercmd
+		jsr 	SelectFindFrame
+		jsr 	StackCloseFrame
+		.exitcmd
+
+; ************************************************************************************************
+;
+;		Same guard NEXT and GP.LOOP use: a well nested select has its own frame on top, so
+;		StackFindFrame would spend its time finding what is under its nose. Any other byte -- an
+;		abandoned FOR opened inside a case body, or the $FF stack-empty marker that raises the
+;		structure error for a GP.CASE with no GP.SELECT -- falls through to the general path,
+;		which discards the strays on the way down.
+;
+; ************************************************************************************************
+
+SelectFindFrame:
+		lda 	(runtimeStackPtr)
+		cmp 	#FRAME_SELECT
+		beq 	_SelFrameHere
+		lda 	#FRAME_SELECT
+		jmp 	StackFindFrame
+_SelFrameHere:
+		rts
+
+; ************************************************************************************************
+;
+;		0	GP.SELECT Marker 		[1]
+;		1 	Selector 				[6]		mantissa 0-3, exponent, status -- one whole number
+;											stack entry, copied out and back verbatim
+;
+; ************************************************************************************************
+
+		.send 	code
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;		17/08/26		Written.
+;
+; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
 ;		Name:		setup.asm
 ;		Purpose:	Set up Runtime Hardware specific stuff.
 ;		Created:	8th May 2023
@@ -10764,127 +10943,133 @@ VectorTable:
 	.word	CommandReadString        ; $c0 read$
 	.word	UnaryRND                 ; $c1 rnd
 	.word	StringConcatenate        ; $c2 concat
-	.word	SignTOS                  ; $c3 sgn
-	.word	PrintTab                 ; $c4 print.tab
-	.word	PrintPos                 ; $c5 print.pos
-	.word	PrintSpace               ; $c6 print.spc
-	.word	Unary_Str                ; $c7 str$
-	.word	Unary_Left               ; $c8 left$
-	.word	Unary_Right              ; $c9 right$
-	.word	Unary_Mid                ; $ca mid$
-	.word	CommandSwap              ; $cb swap
-	.word	TimeTOS                  ; $cc ti
-	.word	TimeString               ; $cd ti$
-	.word	UnaryUsr                 ; $ce usr
-	.word	ValUnary                 ; $cf val
-	.word	CommandClose             ; $d0 close
-	.word	CommandExit              ; $d1 exit
-	.word	CommandDebug             ; $d2 debug
-	.word	CommandXOpen             ; $d3 open
-	.word	CommandScreen            ; $d4 screen
-	.word	CommandVPOKE             ; $d5 vpoke
-	.word	CommandVPEEK             ; $d6 vpeek
-	.word	CommandShift             ; $d7 .shift
-	.word	PushByteCommand          ; $d8 .byte
-	.word	PushWordCommand          ; $d9 .word
-	.word	CommandPushN             ; $da .float
-	.word	CommandPushS             ; $db .string
-	.word	CommandXData             ; $dc .data
-	.word	CommandXGoto             ; $dd .goto
-	.word	CommandXGosub            ; $de .gosub
-	.word	CommandGotoZ             ; $df .goto.z
-	.word	CommandGotoNZ            ; $e0 .goto.nz
-	.word	CommandVarSpace          ; $e1 .varspace
-	.word	CommandRestoreX          ; $e2 .restore
-	.word	CommandXFnGosub          ; $e3 .fngosub
-	.word	CommandDeferredError     ; $e4 .deferror
-	.word	CommandXExitDo           ; $e5 .exitdo
+	.word	CommandXSelect           ; $c3 gp.select
+	.word	CommandXCase             ; $c4 gp.case
+	.word	CommandXElse             ; $c5 gp.else
+	.word	CommandXEndSelect        ; $c6 gp.endsel
+	.word	SignTOS                  ; $c7 sgn
+	.word	PrintTab                 ; $c8 print.tab
+	.word	PrintPos                 ; $c9 print.pos
+	.word	PrintSpace               ; $ca print.spc
+	.word	Unary_Str                ; $cb str$
+	.word	Unary_Left               ; $cc left$
+	.word	Unary_Right              ; $cd right$
+	.word	Unary_Mid                ; $ce mid$
+	.word	CommandSwap              ; $cf swap
+	.word	TimeTOS                  ; $d0 ti
+	.word	TimeString               ; $d1 ti$
+	.word	UnaryUsr                 ; $d2 usr
+	.word	ValUnary                 ; $d3 val
+	.word	CommandClose             ; $d4 close
+	.word	CommandExit              ; $d5 exit
+	.word	CommandDebug             ; $d6 debug
+	.word	CommandXOpen             ; $d7 open
+	.word	CommandScreen            ; $d8 screen
+	.word	CommandVPOKE             ; $d9 vpoke
+	.word	CommandVPEEK             ; $da vpeek
+	.word	CommandShift             ; $db .shift
+	.word	PushByteCommand          ; $dc .byte
+	.word	PushWordCommand          ; $dd .word
+	.word	CommandPushN             ; $de .float
+	.word	CommandPushS             ; $df .string
+	.word	CommandXData             ; $e0 .data
+	.word	CommandXGoto             ; $e1 .goto
+	.word	CommandXGosub            ; $e2 .gosub
+	.word	CommandGotoZ             ; $e3 .goto.z
+	.word	CommandGotoNZ            ; $e4 .goto.nz
+	.word	CommandVarSpace          ; $e5 .varspace
+	.word	CommandRestoreX          ; $e6 .restore
+	.word	CommandXFnGosub          ; $e7 .fngosub
+	.word	CommandDeferredError     ; $e8 .deferror
+	.word	CommandXExitDo           ; $e9 .exitdo
+	.word	CommandXCaseNext         ; $ea .casenext
+	.word	CommandXCaseEnd          ; $eb .caseend
 
 
 ShiftVectorTable:
-	.word	CommandClr               ; $d780 clr
-	.word	CommandXDIM              ; $d781 dim
-	.word	CommandEnd               ; $d782 end
-	.word	CommandGPCall            ; $d783 gp.call
-	.word	CommandGPBox             ; $d784 gp.box
-	.word	CommandGPFill            ; $d785 gp.fill
-	.word	CommandGPPrintAt         ; $d786 gp.printat
-	.word	CommandGPMenu            ; $d787 gp.menu
-	.word	UnaryGPSel               ; $d788 gp.sel
-	.word	CommandGPSort            ; $d789 gp.sort
-	.word	UnaryGPArrPtr            ; $d78a gp.arrptr
-	.word	CommandGPStash           ; $d78b gp.stash
-	.word	CommandGPRestore         ; $d78c gp.restr
-	.word	UnaryGPComp              ; $d78d gp.comp
-	.word	CommandGPUpper           ; $d78e gp.upper
-	.word	CommandGPLower           ; $d78f gp.lower
-	.word	CommandGPTrim            ; $d790 gp.trim
-	.word	CommandGPRTrim           ; $d791 gp.rtrim
-	.word	CommandGPLTrim           ; $d792 gp.ltrim
-	.word	UnaryJoy                 ; $d793 joy
-	.word	LinkFloatIntegerPartDown ; $d794 int
-	.word	LinkFloatSquareRoot      ; $d795 sqr
-	.word	LinkFloatLogarithm       ; $d796 log
-	.word	LinkFloatExponent        ; $d797 exp
-	.word	LinkFloatCosine          ; $d798 cos
-	.word	LinkFloatSine            ; $d799 sin
-	.word	LinkFloatTangent         ; $d79a tan
-	.word	LinkFloatArcTan          ; $d79b atn
-	.word	CommandXLinput           ; $d79c linput
-	.word	CommandXBinput           ; $d79d binput
-	.word	Command_LOAD             ; $d79e load
-	.word	Command_BLOAD            ; $d79f bload
-	.word	Command_BVLOAD           ; $d7a0 bvload
-	.word	Command_VLOAD            ; $d7a1 vload
-	.word	Command_BSAVE            ; $d7a2 bsave
-	.word	Command_BVERIFY          ; $d7a3 bverify
-	.word	X16CommandPowerOff       ; $d7a4 poweroff
-	.word	X16CommandReset          ; $d7a5 reset
-	.word	X16CommandReboot         ; $d7a6 reboot
-	.word	XCommandMouse            ; $d7a7 mouse
-	.word	XUnaryMB                 ; $d7a8 mb
-	.word	XUnaryMX                 ; $d7a9 mx
-	.word	XUnaryMY                 ; $d7aa my
-	.word	XUnaryMWheel             ; $d7ab mwheel
-	.word	UnaryRPT                 ; $d7ac rpt$
-	.word	Command_SPRITE           ; $d7ad sprite
-	.word	Command_SPRMEM           ; $d7ae sprmem
-	.word	Command_MOVSPR           ; $d7af movspr
-	.word	UnaryST                  ; $d7b0 st
-	.word	CommandStop              ; $d7b1 stop
-	.word	CommandSYS               ; $d7b2 sys
-	.word	UnaryTDATA               ; $d7b3 tdata
-	.word	UnaryTATTR               ; $d7b4 tattr
-	.word	Command_TILE             ; $d7b5 tile
-	.word	CommandTIWriteN          ; $d7b6 ti.write
-	.word	CommandTIWriteS          ; $d7b7 ti$.write
-	.word	CommandXWAIT             ; $d7b8 wait
-	.word	X16I2CPoke               ; $d7b9 i2cpoke
-	.word	X16I2CPeek               ; $d7ba i2cpeek
-	.word	CommandBank              ; $d7bb bank
-	.word	XCommandSleep            ; $d7bc sleep
-	.word	X16_Audio_FMINIT         ; $d7bd fminit
-	.word	X16_Audio_FMNOTE         ; $d7be fmnote
-	.word	X16_Audio_FMDRUM         ; $d7bf fmdrum
-	.word	X16_Audio_FMINST         ; $d7c0 fminst
-	.word	X16_Audio_FMVIB          ; $d7c1 fmvib
-	.word	X16_Audio_FMFREQ         ; $d7c2 fmfreq
-	.word	X16_Audio_FMVOL          ; $d7c3 fmvol
-	.word	X16_Audio_FMPAN          ; $d7c4 fmpan
-	.word	X16_Audio_FMPLAY         ; $d7c5 fmplay
-	.word	X16_Audio_FMCHORD        ; $d7c6 fmchord
-	.word	X16_Audio_FMPOKE         ; $d7c7 fmpoke
-	.word	X16_Audio_PSGINIT        ; $d7c8 psginit
-	.word	X16_Audio_PSGNOTE        ; $d7c9 psgnote
-	.word	X16_Audio_PSGVOL         ; $d7ca psgvol
-	.word	X16_Audio_PSGWAV         ; $d7cb psgwav
-	.word	X16_Audio_PSGFREQ        ; $d7cc psgfreq
-	.word	X16_Audio_PSGPAN         ; $d7cd psgpan
-	.word	X16_Audio_PSGPLAY        ; $d7ce psgplay
-	.word	X16_Audio_PSGCHORD       ; $d7cf psgchord
-	.word	CommandCls               ; $d7d0 cls
-	.word	CommandLocate            ; $d7d1 locate
-	.word	CommandColor             ; $d7d2 color
+	.word	CommandClr               ; $db80 clr
+	.word	CommandXDIM              ; $db81 dim
+	.word	CommandEnd               ; $db82 end
+	.word	CommandGPCall            ; $db83 gp.call
+	.word	CommandGPBox             ; $db84 gp.box
+	.word	CommandGPFill            ; $db85 gp.fill
+	.word	CommandGPPrintAt         ; $db86 gp.printat
+	.word	CommandGPMenu            ; $db87 gp.menu
+	.word	UnaryGPSel               ; $db88 gp.sel
+	.word	CommandGPSort            ; $db89 gp.sort
+	.word	UnaryGPArrPtr            ; $db8a gp.arrptr
+	.word	CommandGPStash           ; $db8b gp.stash
+	.word	CommandGPRestore         ; $db8c gp.restr
+	.word	UnaryGPComp              ; $db8d gp.comp
+	.word	CommandGPUpper           ; $db8e gp.upper
+	.word	CommandGPLower           ; $db8f gp.lower
+	.word	CommandGPTrim            ; $db90 gp.trim
+	.word	CommandGPRTrim           ; $db91 gp.rtrim
+	.word	CommandGPLTrim           ; $db92 gp.ltrim
+	.word	UnaryJoy                 ; $db93 joy
+	.word	LinkFloatIntegerPartDown ; $db94 int
+	.word	LinkFloatSquareRoot      ; $db95 sqr
+	.word	LinkFloatLogarithm       ; $db96 log
+	.word	LinkFloatExponent        ; $db97 exp
+	.word	LinkFloatCosine          ; $db98 cos
+	.word	LinkFloatSine            ; $db99 sin
+	.word	LinkFloatTangent         ; $db9a tan
+	.word	LinkFloatArcTan          ; $db9b atn
+	.word	CommandXLinput           ; $db9c linput
+	.word	CommandXBinput           ; $db9d binput
+	.word	Command_LOAD             ; $db9e load
+	.word	Command_BLOAD            ; $db9f bload
+	.word	Command_BVLOAD           ; $dba0 bvload
+	.word	Command_VLOAD            ; $dba1 vload
+	.word	Command_BSAVE            ; $dba2 bsave
+	.word	Command_BVERIFY          ; $dba3 bverify
+	.word	X16CommandPowerOff       ; $dba4 poweroff
+	.word	X16CommandReset          ; $dba5 reset
+	.word	X16CommandReboot         ; $dba6 reboot
+	.word	XCommandMouse            ; $dba7 mouse
+	.word	XUnaryMB                 ; $dba8 mb
+	.word	XUnaryMX                 ; $dba9 mx
+	.word	XUnaryMY                 ; $dbaa my
+	.word	XUnaryMWheel             ; $dbab mwheel
+	.word	UnaryRPT                 ; $dbac rpt$
+	.word	Command_SPRITE           ; $dbad sprite
+	.word	Command_SPRMEM           ; $dbae sprmem
+	.word	Command_MOVSPR           ; $dbaf movspr
+	.word	UnaryST                  ; $dbb0 st
+	.word	CommandStop              ; $dbb1 stop
+	.word	CommandSYS               ; $dbb2 sys
+	.word	UnaryTDATA               ; $dbb3 tdata
+	.word	UnaryTATTR               ; $dbb4 tattr
+	.word	Command_TILE             ; $dbb5 tile
+	.word	CommandTIWriteN          ; $dbb6 ti.write
+	.word	CommandTIWriteS          ; $dbb7 ti$.write
+	.word	CommandXWAIT             ; $dbb8 wait
+	.word	X16I2CPoke               ; $dbb9 i2cpoke
+	.word	X16I2CPeek               ; $dbba i2cpeek
+	.word	CommandBank              ; $dbbb bank
+	.word	XCommandSleep            ; $dbbc sleep
+	.word	X16_Audio_FMINIT         ; $dbbd fminit
+	.word	X16_Audio_FMNOTE         ; $dbbe fmnote
+	.word	X16_Audio_FMDRUM         ; $dbbf fmdrum
+	.word	X16_Audio_FMINST         ; $dbc0 fminst
+	.word	X16_Audio_FMVIB          ; $dbc1 fmvib
+	.word	X16_Audio_FMFREQ         ; $dbc2 fmfreq
+	.word	X16_Audio_FMVOL          ; $dbc3 fmvol
+	.word	X16_Audio_FMPAN          ; $dbc4 fmpan
+	.word	X16_Audio_FMPLAY         ; $dbc5 fmplay
+	.word	X16_Audio_FMCHORD        ; $dbc6 fmchord
+	.word	X16_Audio_FMPOKE         ; $dbc7 fmpoke
+	.word	X16_Audio_PSGINIT        ; $dbc8 psginit
+	.word	X16_Audio_PSGNOTE        ; $dbc9 psgnote
+	.word	X16_Audio_PSGVOL         ; $dbca psgvol
+	.word	X16_Audio_PSGWAV         ; $dbcb psgwav
+	.word	X16_Audio_PSGFREQ        ; $dbcc psgfreq
+	.word	X16_Audio_PSGPAN         ; $dbcd psgpan
+	.word	X16_Audio_PSGPLAY        ; $dbce psgplay
+	.word	X16_Audio_PSGCHORD       ; $dbcf psgchord
+	.word	CommandCls               ; $dbd0 cls
+	.word	CommandLocate            ; $dbd1 locate
+	.word	CommandColor             ; $dbd2 color
 	.send code
 ; ************************************************************************************************
 ; ************************************************************************************************

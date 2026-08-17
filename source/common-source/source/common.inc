@@ -167,7 +167,14 @@ FrameStackPages = 16 						; 4K, ~250 frames
 ;		"gpdraw" and "gpsort", so the two new shifted markers were inserted rather than appended
 ;		and everything from gp.sort upwards moved by two.
 ;
-RT_ABI = 17 								; runtime ABI ordinal -> "GP17" magic (NOT the file name)
+;		17 -> 18 on 17th August 2026: GP.SELECT / GP.CASE / GP.ELSE / GP.ENDSEL, in commands/
+;		select.asm. This is the biggest renumbering since GP.CALL: four UNSHIFTED markers, and
+;		"select.asm" sorts mid-list in the commands directory, so every unshifted opcode above
+;		them moved by four -- which moved PCD_STARTSYSTEM, so the whole system-token block and
+;		with it the shifted base ($D780 -> $DB80) moved too. Two system tokens (.casenext,
+;		.caseend) were appended after .exitdo on top of that.
+;
+RT_ABI = 18 								; runtime ABI ordinal -> "GP18" magic (NOT the file name)
 
 ; ************************************************************************************************
 ;

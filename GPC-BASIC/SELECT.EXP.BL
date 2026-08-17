@@ -1,0 +1,85 @@
+## ***********************************************************************
+## **
+## **  SELECT.EXP.BL -- GP.SELECT / GP.CASE / GP.ELSE / GP.ENDSEL
+## **
+## **  Build:  copy GPC-BASIC/GP.INC.BL and this file into testing/, then
+## **            python source/gpc/build_basl.py SELECT.EXP.BL SELECT.PRG
+## **          and compile SELECT.PRG with GPC.BLITZ.BIN.
+## **
+## **  Compile-only: the ROM cannot RUN a PRG containing GP tokens.
+## **
+## ***********************************************************************
+#INCLUDE "GP.INC.BL"
+#SAVEAS "@:SELECT.PRG"
+
+## ---- 1. the shape.  The selector is evaluated ONCE; each GP.CASE is
+## ---- tried in the order written, and the first one that matches wins --
+## ---- nothing below it runs, so there is no "break" to forget.
+
+FOR CLASSIFY.N = 0 TO 8
+  GOSUB CLASSIFY
+NEXT
+
+## ---- 2. what it is NOT for.  ON x GOTO/GOSUB is a real skip table and
+## ---- stays the right answer for a dense 1..n index. This is for the
+## ---- SPARSE selector -- key codes, state machines - where ON cannot go.
+## ---- Cursor up is 145 and cursor down 17: nothing indexes those.
+
+PRINT
+PRINT "PRESS A CURSOR KEY, RETURN, OR A LETTER"
+KEY.CHAR = 0
+GP.DO
+  GET KEY.PRESSED$
+  IF KEY.PRESSED$ <> "" THEN KEY.CHAR = ASC(KEY.PRESSED$) : GP.EXITDO
+GP.LOOP
+
+GP.SELECT KEY.CHAR
+GP.CASE 17
+  PRINT "DOWN"
+GP.CASE 145
+  PRINT "UP"
+GP.CASE 13
+  PRINT "RETURN"
+GP.CASE 29, 157
+  PRINT "LEFT OR RIGHT"
+GP.ELSE
+  PRINT "CHARACTER"; KEY.CHAR
+GP.ENDSEL
+
+## ---- 3. GP.ELSE is optional.  Nothing matching and no GP.ELSE is not an
+## ---- error -- the whole select is simply skipped, which is what makes it
+## ---- usable as a filter.
+
+GP.SELECT KEY.CHAR
+GP.CASE 3
+  PRINT "STOP WAS PRESSED"
+GP.ENDSEL
+
+PRINT "STILL RUNNING"
+END
+
+## ***********************************************************************
+## **  Case values are ordinary EXPRESSIONS here, not the compile-time
+## **  constants prog8 restricts its "when" to -- SPLIT.POINT below is a
+## **  variable. Selects nest freely.
+## **
+## **  Do NOT jump out of a select with GOTO: GP.ENDSEL is what releases
+## **  the selector, and skipping it leaves the frame open. GP.EXITDO out
+## **  of a loop containing one is fine, it cleans up on the way.
+## ***********************************************************************
+
+CLASSIFY:
+  SPLIT.POINT = 6
+  GP.SELECT CLASSIFY.N
+  GP.CASE 0
+    PRINT "0 ZERO"
+  GP.CASE 1, 3, 5
+    PRINT CLASSIFY.N; "ODD AND SMALL"
+  GP.CASE 2, 4
+    PRINT CLASSIFY.N; "EVEN AND SMALL"
+  GP.CASE SPLIT.POINT, SPLIT.POINT + 1
+    PRINT CLASSIFY.N; "AT THE SPLIT"
+  GP.ELSE
+    PRINT CLASSIFY.N; "BIG"
+  GP.ENDSEL
+  RETURN

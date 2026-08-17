@@ -30,6 +30,7 @@ Current contents:
 | `THEME.INC.BL` | colour roles, light and dark. Data, not code — no tokens, no runtime bytes |
 | `APPHELP.INC.BL` | `APPHELP.STARTUP`/`RESTORE` (leave the user's screen as you found it) and panels saved to disk |
 | `MENU.EXP.BL` | `GP.MENU` + `GP.SEL`, with the theme and app helpers — a whole small application |
+| `SELECT.EXP.BL` | `GP.SELECT` / `GP.CASE` / `GP.ELSE` / `GP.ENDSEL`, and where it beats `ON x GOSUB` |
 
 ### Names — BASL is safe, a hand-written `.bas` is not
 

@@ -42,12 +42,18 @@ string, moving 2 KB of screen. That is the whole list.
 |---|---|
 | Target | ~1.5 KB (1,536 B) for the whole set |
 | Planned, still to build | **nothing** — the ASM side is complete |
-| Shipped, measured | **2,235 B** across tiers 1-9 |
-| **All-in** | **2,235 B — about 700 B over the original target** |
-| Why that is accepted | RTBASE moved to `$6400` on 17th August; the runtime ends `$9B5E` with **929 B** still free |
+| Shipped, measured | **2,362 B** across tiers 1-10 |
+| **All-in** | **2,362 B — about 830 B over the original target** |
+| Why that is accepted | RTBASE moved to `$6400` on 17th August; the runtime ends `$9BDD` with **803 B** still free |
 | Fixed cost per keyword | **6 B** (2 vector slot + 4 glue) before any code |
-| Free `GP.*` BASIC tokens | 119 of 127 (`$CE01`–`$CE7F`) |
-| Free p-code opcodes | 27 unshifted (41 cycles), 60 shifted (58 cycles, +1 byte per call) |
+| Free `GP.*` BASIC tokens | 115 of 127 (`$CE01`–`$CE7F`) |
+| Free p-code opcodes | **20 unshifted** (41 cycles), 60 shifted (58 cycles, +1 byte per call) |
+
+**The unshifted count is now the tightest of the three.** A shifted opcode is fine for an ordinary
+command, but a **system token** (one carrying an inline operand) and anything `FixBranches` scans for
+**must** be sub-256 — `MOFSizeTable` covers only `PCD_STARTSYSTEM`..`PCD_ENDSYSTEM`, and the scan is an
+8-bit compare. `GP.SELECT` spent six of them. Every future block construct with a forward branch
+spends from the same 20.
 
 **Compiler-side code is free against this budget.** The 1.5 KB is the *runtime*, which is copied
 verbatim into every object. Anything in the compiler half of `GPC.BLITZ.BIN` — `GP.EXITDO`'s whole
@@ -91,7 +97,8 @@ compiles at roughly **14 bytes of p-code per line**. BASL menus (~60–100 lines
 | 7 | Input — **BASL** | 0 |
 | 8 | Colour / theme — **BASL** | 0 |
 | 9 | `GP.MENU` + `GP.SEL` — **SHIPPED** | 377 |
-| | **Built — the ASM side is COMPLETE** | **2,235** |
+| 10 | `GP.SELECT` / `GP.CASE` / `GP.ELSE` / `GP.ENDSEL` — **SHIPPED** | 127 |
+| | **Built** | **2,362** |
 
 #### Measured overrun, 17th August 2026 — read this before trusting an estimate below
 
@@ -108,7 +115,12 @@ The estimates in this table have run **1.62x over** on average. Actuals:
 | stash / restore | 290 | 368 | x1.27 |
 | drawing x3 | 250 | 440 | x1.76 |
 | `GP.MENU` + `GP.SEL` | 266 | 377 | x1.42 |
-| **total** | **1,420** | **2,177** | **x1.53** |
+| `GP.SELECT` x4 | 85 | 127 | x1.49 |
+| **total** | **1,505** | **2,304** | **x1.53** |
+
+`GP.SELECT` is the first estimate made *with* this table in hand — 56 B raw, scaled by the 1.53
+overrun to ~85 — and it came in at 127, x1.49 on the raw figure. The multiplier predicts better than
+the raw estimate does; keep using it.
 
 The pattern is not random: the two worst overruns are the two commands that had to VALIDATE
 something (array header, element type, null pointers) and RETYPE a result. The estimates costed the
@@ -142,6 +154,7 @@ VTUI `save_rect`/`rest_rect` ~60–70 B each, `fill_box` ~25 B, `border` ~50 B.
 | 5 | **Screen stash / restore** — **DONE** | ASM |
 | 6 | **Boxes, fills, positioned text** — **DONE**; menus, dialogs and the colour theme build on them | ASM, then BASL |
 | 7 | **Drop what the program does not use** | compiler |
+| 10 | **`GP.SELECT`** — multi-way branch, prog8 `when` style — **DONE** | ASM + compiler |
 
 ### Tier 1's deadline was wrong — corrected 16th August 2026
 
@@ -700,6 +713,84 @@ highlighted), `4` NO WRAP (stop at the ends).
 *Verified on R49*, all eleven cases: two-downs-and-RETURN with the highlight correctly removed
 afterwards, hotkey by upper and lower case, ESC, wrap at both ends, no-wrap at both ends, all three
 flags, an empty hotkey string, and zero rows returning 0 without waiting for a key.
+
+### §10 `GP.SELECT` — SHIPPED 17th August 2026, 127 B, RT_ABI 18
+
+A multi-way branch on one value, modelled on prog8's `when`. Four keywords:
+
+```basic
+GP.SELECT K
+GP.CASE 13
+    ...
+GP.CASE 17, 145
+    ...
+GP.ELSE
+    ...
+GP.ENDSEL
+```
+
+**It does not replace `ON x GOTO/GOSUB`,** which is a real skip table and stays the right answer for
+a dense `1..n` index — prog8's own documentation says the same about its `when`. This is for the
+**sparse** selector: key codes out of `GET`, state machines, anything `ON` cannot index.
+
+**Case values are ordinary expressions, not the compile-time constants prog8 restricts itself to.**
+That is not generosity, it falls out of the design: the selector is re-fetched for every alternative,
+so each test is just an expression compiled the ordinary way. Numeric only — a string selector would
+need `s.cmp` instead of `f.cmp`, and the type is not known when each `GP.CASE` is compiled.
+
+**The selector lives in a stack frame (`FRAME_SELECT`, id 4, 7 bytes), not on the number stack, and
+that was forced rather than chosen.** `new.line` resets the number stack pointer to `$FF` at every
+source line, so a value left there by `GP.SELECT` would be gone by the time the first `GP.CASE` on
+the next line looked for it. The frame pays for itself twice over: nesting works with no extra
+machinery, `GP.ENDSEL`'s `StackFindFrame` discards anything a case body left open, and `GP.EXITDO`
+out of an enclosing `GP.DO` discards the select the same way.
+
+**`GP.CASE` *is* the value fetch, emitted once per alternative** — which is why there is no separate
+marker keyword and no stack-duplicate opcode. `GP.CASE 13,17` compiles to
+
+```
+gp.case 13 f.cmp =   gp.case 17 f.cmp =   or   .casenext
+```
+
+A comma list is an `or` of tests: one byte per extra alternative, against three for a branch each.
+`FixBranches` lands a `.casenext` on the **first** `gp.case` of the next alternative, and the extra
+ones inside an alternative all sit behind its `.casenext`, so the scan never sees them.
+
+**The two branches reuse the `.goto` handlers outright.** `.casenext` is `.goto.z` and `.caseend` is
+`.goto`; only how `FixBranches` resolves them differs, exactly as `.fngosub` differs from `.gosub`.
+Two extra `;; [...]` markers on the existing labels, so they cost two vector slots and not one byte
+of code. Resolution is `_FBFixExitDo`'s forward scan with the nesting counted on
+`gp.select`/`gp.endsel` instead of `GP.DO`/`GP.LOOP`, and **both land ON the target token** — a
+`.caseend` must *execute* the `GP.ENDSEL` or the frame is never closed.
+
+**The `.caseend` closing a case body is written at the start of the alternative that FOLLOWS it**,
+because that is the first moment the compiler knows the body has ended; there is no back-patching
+here. One byte of compiler state (`SelectFirstCase`) suppresses it in front of the first
+alternative, and that one byte is enough for any depth of nesting — an inner `GP.SELECT` sets it,
+the inner first alternative clears it, and the outer select's next alternative sees it clear again.
+`GP.ENDSEL` deliberately writes no `.caseend` of its own: the last body falls straight into it.
+
+| | |
+|---|---|
+| Runtime | **127 B** measured — 112 B of code (`gp.select` 44, `gp.case` 42, `gp.else` 4, `gp.endsel` 10, frame finder 12; the two branches 0) plus 12 B of vector slots |
+| Compiler | ~200 B and free against the budget — none of it is copied into an object |
+| Tokens spent | 4 BASIC keywords (`$CE63`–`$CE66`), **6 sub-256 opcodes** — 4 unshifted commands + 2 system |
+| Sub-256 opcodes left | **20** (`$EC`–`$FF`) |
+| Runtime after | ends `$9BDD`, **803 B** free below `$9F00` |
+
+**20 sub-256 slots is the number to watch.** System tokens *must* live there — `MOFSizeTable` covers
+only `PCD_STARTSYSTEM`..`PCD_ENDSYSTEM` — and so must any token `FixBranches` scans for, because that
+scan is an 8-bit compare. Every future operand-carrying construct spends from the same 20.
+
+**Not built, deliberately:** prog8's `50 to 60 step 2` ranges (they multiply the compare chain, and
+prog8's own docs warn that long lists perform poorly), and a string selector.
+
+*Verified on R49*: first / middle / last alternative, a comma list, `GP.ELSE` taken, **nothing
+matching with no `GP.ELSE`** falling clean through, a select nested inside a case body of another,
+expression case values, `GP.EXITDO` out of a `GP.DO` with a live select frame inside it, and a
+1,000-pass balance run with the **whole loop on one source line** so `new.line` never resets the
+number stack — a leak of one slot per pass would have corrupted within about thirty. Both error
+paths too: no `GP.ENDSEL` gives `STRUCTURE IMBALANCE`, a string selector gives `TYPE MISMATCH`.
 
 ### §9 Menus — the original plan
 

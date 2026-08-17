@@ -175,4 +175,37 @@
 #TOKEN GP.MENU 52840
 #TOKEN GP.SEL 52839
 
+##
+## GP.SELECT <expr>            evaluate once, then test it against each alternative
+## GP.CASE <expr> [,<expr>..]  run the body below if any of them matches
+## GP.ELSE                     run the body below if nothing above matched
+## GP.ENDSEL                   close the select -- REQUIRED, it frees the selector
+##
+##   GP.SELECT K
+##   GP.CASE 13
+##     PRINT "RETURN"
+##   GP.CASE 17, 145
+##     PRINT "CURSOR"
+##   GP.ELSE
+##     PRINT "SOMETHING ELSE"
+##   GP.ENDSEL
+##
+## This is NOT a replacement for ON x GOTO/GOSUB, which is a real skip
+## table and still the right answer for a dense 1..n index. It is for
+## the SPARSE selector -- key codes, state machines - where ON cannot go.
+##
+## Case values are ordinary numeric expressions, not just constants, and
+## are compared in the order written; the first match wins and nothing
+## below it runs. Nothing matching with no GP.ELSE is not an error, the
+## whole select is simply skipped. Selects may be nested.
+##
+## Do not GOTO out of a select: GP.ENDSEL is what releases the selector,
+## and jumping past it leaves the frame open. GP.EXITDO out of a loop
+## that contains one is fine -- that cleans up on its way.
+
+#TOKEN GP.SELECT 52838
+#TOKEN GP.CASE 52837
+#TOKEN GP.ELSE 52836
+#TOKEN GP.ENDSEL 52835
+
 #ENDIF

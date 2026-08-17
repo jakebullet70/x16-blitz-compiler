@@ -77,6 +77,13 @@ class PCode(object):
 											# APPENDED, never inserted: every system token's ID is
 											# its position in this list, so adding one anywhere else
 											# renumbers the rest and invalidates every object file.
+		self.extra(".casenext",2) 			# GP.CASE whose test came out false: on to the next
+											# alternative, or to the GP.ENDSEL if there is none.
+											# Runs the .goto.z handler; only FixBranches tells
+											# them apart.
+		self.extra(".caseend",2) 			# End of a GP.CASE body: out to the GP.ENDSEL, which
+											# is what closes the selector's frame. Runs the .goto
+											# handler. Appended, for the reason directly above.
 		self.define("PCD_ENDSYSTEM")
 		self.endCommands = self.currentID	
 

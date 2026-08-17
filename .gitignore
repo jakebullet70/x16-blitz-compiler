@@ -128,6 +128,7 @@ testing/SPLITT.PRG
 testing/STRINGS.PRG
 testing/SCREEN.PRG
 testing/MENU.PRG
+testing/SELECT.PRG
 
 # testing/MD5 is the Commodore BASIC MD5 program, tracked: it is the fixture for the
 # md5 regression test (source/unit-tests/md5), which compiles it, runs it BOTH compiled

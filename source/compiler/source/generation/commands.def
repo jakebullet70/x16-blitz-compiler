@@ -68,6 +68,16 @@ GP.LOOP 		T N
 #
 GP.EXITDO 		X:CommandExitDoCompile N
 #
+#		GP.BASIC multi-way branch, modelled on prog8's "when". Like GP.EXITDO, none of these can
+#		carry a "T": three write a system token with an inline branch offset, and GP.CASE writes
+#		a variable number of tokens depending on how many alternatives it is given, so each
+#		routine writes everything itself.
+#
+GP.SELECT 		X:CommandSelectCompile N
+GP.CASE 		X:CommandCaseCompile N
+GP.ELSE 		X:CommandElseCompile N
+GP.ENDSEL 		X:CommandEndSelectCompile N
+#
 #		GP.CALL <addr> [,a] [,x] [,y] [,c] -- call machine code with the registers set. Results
 #		come back through the GP.A/GP.X/GP.Y/GP.C value words (x16_unary.def), which are ordinary
 #		tokens, NOT variables: nothing lets the runtime write a variable by name, and X16's own
