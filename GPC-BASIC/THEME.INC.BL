@@ -79,9 +79,9 @@ THEME.LOAD.DARK:
     THEME.CLR(THEME.WARN)   = 0 * 16 + 8
     RETURN
 
-## THEME.SET -- make THEME.ROLE the colour PRINT uses.
+## THEME.SET -- make THEME.ATTR the colour PRINT uses.
 ##
-##   in   THEME.ROLE   a packed attribute, e.g. THEME.CLR(THEME.TEXT)
+##   in   THEME.ATTR   a packed attribute, e.g. THEME.CLR(THEME.TEXT)
 ##
 ## Splits it for COLOR, which takes foreground and background separately.
 ## INT(x/16), not a shift, and AND 15 is safe here only because a packed
@@ -89,17 +89,17 @@ THEME.LOAD.DARK:
 ## RANGE above 32767. See GP.STRPTR for where that actually bites.
 
 THEME.SET:
-    COLOR THEME.ROLE AND 15, INT(THEME.ROLE / 16)
+    COLOR THEME.ATTR AND 15, INT(THEME.ATTR / 16)
     RETURN
 
 ## THEME.HI -- the inverse of a packed attribute, which is what GP.MENU
 ## does to highlight a row. Handy when you want to pre-draw a row already
 ## looking selected, so it matches what GP.MENU will produce.
 ##
-##   in   THEME.ROLE   packed attribute      out  THEME.INV
+##   in   THEME.ATTR   packed attribute      out  THEME.INV
 
 THEME.HI:
-    THEME.INV = (THEME.ROLE AND 15) * 16 + INT(THEME.ROLE / 16)
+    THEME.INV = (THEME.ATTR AND 15) * 16 + INT(THEME.ATTR / 16)
     RETURN
 
 THEME.SKIP:
