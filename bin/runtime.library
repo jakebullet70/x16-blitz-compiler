@@ -3377,16 +3377,24 @@ _GSBigEnough:
 		inc 	gpsArray+1
 _GSHaveBase:
 		;
-		;		gap = count / 2, then halve each pass until it reaches zero.
+		;		The gap sequence is a fixed TABLE, not the halving one Shell published in 1959.
+		;		Halving is the weakest of the known sequences -- worst case n^2 -- and 132/57/23/
+		;		10/4/1 is Ciura's, empirically the best for arrays this size at roughly n^1.25.
+		;		Taken from prog8's sorting.p8, which uses exactly these six.
 		;
-		lda 	gpsCount
-		lsr 	a
-		sta 	gpsGap
+		;		Gaps larger than the array need no special case: the outer loop starts i AT the
+		;		gap and exits immediately when that is already past the end.
+		;
+		stz 	gpsGapIdx
 _GSGapLoop:
-		lda 	gpsGap
-		bne 	_GSGapOk
+		ldy 	gpsGapIdx
+		cpy 	#GPSortGapEnd-GPSortGaps
+		bcc 	_GSGapOk
 		jmp 	_GSDone
 _GSGapOk:
+		inc 	gpsGapIdx
+		lda 	GPSortGaps,y
+		sta 	gpsGap
 		;
 		;		for i = gap to count-1
 		;
@@ -3466,8 +3474,7 @@ _GSPlace:
 		jmp 	_GSOuter 					; the inner loop is longer than a bra can reach back
 
 _GSNextGap:
-		lsr 	gpsGap 						; halve the gap and go round again
-		jmp 	_GSGapLoop
+		jmp 	_GSGapLoop 					; on to the next gap in the table
 
 _GSDone:
 		ply
@@ -3486,15 +3493,26 @@ _GSTooBig:
 ;
 ; ************************************************************************************************
 
+GPSortGaps:
+		.byte 	132, 57, 23, 10, 4, 1
+GPSortGapEnd:
+
 GPSortElementY:
 		tya
-		asl 	a 							; two bytes an element
+		asl 	a 							; index * 2 -- and the carry OUT of this is bit 8 of the
+		sta 	zTemp0 						; result, which must be kept. From element 128 upward
+		lda 	#0 							; the doubled index no longer fits a byte, and throwing
+		rol 	a 							; that bit away puts every such element 256 bytes low.
 		clc
+		adc 	gpsArray+1
+		sta 	zTemp0+1
+		clc
+		lda 	zTemp0
 		adc 	gpsArray
 		sta 	zTemp0
-		lda 	gpsArray+1
-		adc 	#0
-		sta 	zTemp0+1
+		bcc 	_GSEYDone
+		inc 	zTemp0+1
+_GSEYDone:
 		ldy 	#0
 		rts
 
@@ -3599,6 +3617,8 @@ gpsTemp: 									; the element being placed this pass
 gpsCount: 									; how many elements
 		.fill 	1
 gpsGap: 									; current shell sort gap
+		.fill 	1
+gpsGapIdx: 									; how far into GPSortGaps we are
 		.fill 	1
 gpsI: 										; outer index
 		.fill 	1
