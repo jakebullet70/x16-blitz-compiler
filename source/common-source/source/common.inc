@@ -157,7 +157,9 @@ FrameStackPages = 16 						; 4K, ~250 frames
 ;		bump -- a resident runtime linked at another address is not interchangeable, and the base is
 ;		baked into every shared program's bootstrap.
 ;
-RT_ABI = 14 								; runtime ABI ordinal -> "GP14" magic (NOT the file name)
+;		14 -> 15 on 17th August 2026: GP.STASH / GP.RESTR joined the x16 commands directory.
+;
+RT_ABI = 15 								; runtime ABI ordinal -> "GP15" magic (NOT the file name)
 
 ; ************************************************************************************************
 ;

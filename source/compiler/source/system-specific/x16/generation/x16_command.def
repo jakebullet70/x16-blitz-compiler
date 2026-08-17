@@ -91,3 +91,12 @@ LOAD 			$ T N
 LINPUT 			X:CommandLINPUT N
 LINPUT# 		C:CommandLINPUTStream N
 BINPUT# 		C:CommandBINPUTStream N
+
+# 	GP.BASIC screen stash. Rectangle to a banked RAM bank and back. Geometry is REQUIRED on the
+# 	stash -- a full 80x60 screen is 9,600 bytes and does not fit an 8K bank, so there is no
+# 	sensible full-screen default to offer. GP.RESTR reads it back out of the 4-byte header, and
+# 	its optional x,y default to 255 (OptionalParameterCompile) because 0 is a legal coordinate
+# 	and could not have served as the sentinel.
+
+GP.STASH 		#,#,#,#,# T N
+GP.RESTR 		# X:OptionalParameterCompile X:OptionalParameterCompile T N

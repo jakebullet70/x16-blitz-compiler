@@ -102,4 +102,17 @@
 
 #TOKEN GP.ARRPTR 52846
 
+## Screen stash. GP.STASH bank,x,y,w,h copies a text rectangle into a
+## banked RAM bank; GP.RESTR bank puts it back where it came from, and
+## GP.RESTR bank,x,y pastes it somewhere else. The stash carries a 4-byte
+## header (w,h,x,y) so the restore needs only the bank.
+##
+## A BANK IS 8K and a cell is 2 bytes, so at most 4094 cells fit -- a full
+## 80x60 screen is 9,600 bytes and will NOT fit. Stash panels, not screens.
+## The limit is checked per row, before the write that would cross out of
+## the bank, so too large is an error and never a corrupted next bank.
+
+#TOKEN GP.STASH 52845
+#TOKEN GP.RESTR 52844
+
 #ENDIF
