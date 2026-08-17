@@ -163,7 +163,9 @@ The **shared** mode factors that runtime out into a single resident copy. A prog
 line 4 = `shared` (first byte `S`) carries **no embedded runtime**: the compiler streams a 255-byte
 bootstrap at `$0801` followed by the p-code, and the object is just that — bootstrap plus p-code.
 The runtime lives once, on the drive, as a standalone binary **`GPC.RT.<build>.BIN`** that loads at
-`$7000` — `GPC.RT.114.BIN` for engine build 114, the number `GPC.BLITZ.BIN` prints at startup. The
+`RTBASE` (`$6800`) — `GPC.RT.152.BIN` for engine build 152, the number `GPC.BLITZ.BIN` prints at
+startup. It is **not tracked in the repo**, precisely because the name changes on every engine
+build; produce the one matching your checkout with `make -C source/runtime gpc-rt`. The
 name carries the build, so a compiled program asks for the exact runtime it was built against *by
 name*: one of a different vintage sitting on the card is simply not found, rather than loaded and
 jumped into. **The build number bumps on every engine build, so shared programs must be recompiled

@@ -1,0 +1,68 @@
+## SPLITT -- exercise STRHELP.SPLIT
+#INCLUDE "GP.INC.BL"
+#INCLUDE "STRHELP.INC.BL"
+#SAVEAS "@:SPLITT.PRG"
+
+STRHELP.DELIM$ = ","
+
+STRHELP.STR$ = "ALPHA,BETA,GAMMA"
+GOSUB STRHELP.SPLIT
+PRINT "S1 N="; STRHELP.N;
+FOR I = 1 TO STRHELP.N : PRINT " ["; STRHELP.FIELD$(I); "]"; : NEXT
+PRINT
+
+## empty fields must survive
+STRHELP.STR$ = "A,,C"
+GOSUB STRHELP.SPLIT
+PRINT "S2 N="; STRHELP.N;
+FOR I = 1 TO STRHELP.N : PRINT " ["; STRHELP.FIELD$(I); "]"; : NEXT
+PRINT
+
+## trailing delimiter -> two fields, second empty
+STRHELP.STR$ = "A,"
+GOSUB STRHELP.SPLIT
+PRINT "S3 N="; STRHELP.N; " ["; STRHELP.FIELD$(1); "]["; STRHELP.FIELD$(2); "]"
+
+## leading delimiter
+STRHELP.STR$ = ",A"
+GOSUB STRHELP.SPLIT
+PRINT "S4 N="; STRHELP.N; " ["; STRHELP.FIELD$(1); "]["; STRHELP.FIELD$(2); "]"
+
+## no delimiter at all -> one field, the whole string
+STRHELP.STR$ = "SOLO"
+GOSUB STRHELP.SPLIT
+PRINT "S5 N="; STRHELP.N; " ["; STRHELP.FIELD$(1); "]"
+
+## empty input -> one empty field
+STRHELP.STR$ = ""
+GOSUB STRHELP.SPLIT
+PRINT "S6 N="; STRHELP.N; " ["; STRHELP.FIELD$(1); "]"
+
+## multi-character delimiter
+STRHELP.DELIM$ = "::"
+STRHELP.STR$ = "X::Y::Z"
+GOSUB STRHELP.SPLIT
+PRINT "S7 N="; STRHELP.N;
+FOR I = 1 TO STRHELP.N : PRINT " ["; STRHELP.FIELD$(I); "]"; : NEXT
+PRINT
+
+## hitting the limit -- remainder lands in the last field, nothing lost
+STRHELP.DELIM$ = ","
+STRHELP.MAX = 3
+STRHELP.STR$ = "1,2,3,4,5"
+GOSUB STRHELP.SPLIT
+PRINT "S8 N="; STRHELP.N;
+FOR I = 1 TO STRHELP.N : PRINT " ["; STRHELP.FIELD$(I); "]"; : NEXT
+PRINT
+STRHELP.MAX = 0
+
+## the real use: parse a row, then pad the fields into columns
+STRHELP.STR$ = "AMMO,7,READY"
+GOSUB STRHELP.SPLIT
+FOR I = 1 TO STRHELP.N
+  STRHELP.STR$ = STRHELP.FIELD$(I) : STRHELP.WIDTH = 8
+  GOSUB STRHELP.PADR
+  PRINT "["; STRHELP.STR$; "]";
+NEXT
+PRINT
+POWEROFF

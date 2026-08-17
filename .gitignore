@@ -101,6 +101,17 @@ source/application/source/generated/
 testing/prg-batch/
 testing/archive/
 
+# The resident runtime, GPC.RT.<build>.BIN. NOT tracked, and it cannot usefully be:
+# the file name carries the ENGINE BUILD NUMBER (scripts/rtname.py), which bumps on
+# every single engine build, so tracking it means a new binary in the tree each time
+# and a pile of stale ones nobody asks for -- ten had accumulated by 17th Aug 2026,
+# two of them tracked since 2nd Aug and eleven ABI bumps out of date. A stale one is
+# worse than none: it carries a magic the bootstrap may accept and an opcode map that
+# no longer matches. Build the current one with
+#     make -C source/runtime gpc-rt
+# which writes it into testing/ named for whatever engine build is checked out.
+testing/GPC.RT.*.BIN
+
 # testing/MD5 is the Commodore BASIC MD5 program, tracked: it is the fixture for the
 # md5 regression test (source/unit-tests/md5), which compiles it, runs it BOTH compiled
 # and interpreted, and fails if the two digests differ. The object, the map and the
