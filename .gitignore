@@ -131,6 +131,7 @@ testing/MENU.PRG
 testing/SELECT.PRG
 testing/BMXVIEW.PRG
 testing/BMXTST.PRG
+testing/THMTST.PRG
 
 # demo/ is build output for menu-demo.bat and bmx-demo.bat: compiled objects
 # plus BMX images copied out of samples/. Every byte of it is regenerable and
