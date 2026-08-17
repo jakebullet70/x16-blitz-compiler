@@ -484,6 +484,32 @@ Note the counter-intuitive part: **omitting the optional arguments costs more th
 (`GP.STASH 1` = 10 bytes vs `GP.STASH 1,5,5,20,10` = 6), because `OptionalParameterCompile` defaults
 to 255, which will not fit a short constant.
 
+#### Screen addressing — MEASURED on R49, 17th August 2026
+
+Probed from a running program rather than assumed, because two things here are easy to get wrong.
+
+| | |
+|---|---|
+| `VERAL1MapBase` (`$9F35`) | 216, and the register holds bits **16:9** — so the map is at `216*512` = **`$1B000`** |
+| `VERAL1Config` (`$9F34`) | `$60`. Bits **5:4** = map width = `10` = **128 tiles**; bits 7:6 = height = 64 |
+| Row stride | 128 tiles x 2 bytes = **256 bytes**, confirmed: "ABC" on row 0 read back as screen codes 1,2,3 and "DEF" at **+256** read back as 4,5 |
+| +160 (80 cols x 2) | garbage — the stride is **not** the visible width |
+
+So **cell (x,y) is at `mapbase + y*256 + x*2`**, and because the stride is exactly 256 the row step is
+`inc VRAMMed0` — 6 cycles, no re-address. That is the property the whole tier leans on.
+
+**Two traps, both hit while probing:**
+
+1. **`$1B000` does not fit 16 bits.** `VPEEK`/`VPOKE` take a **bank** and a 16-bit offset, so the map
+   is bank **1**, offset `$B000`. Reading `VPEEK(0,110592)` silently returns the wrong memory — it
+   gave 186/80/129 for "ABC" instead of 1/2/3, and looked like a stride problem rather than a bank one.
+2. **`MB` is an X16 keyword** (mouse button, `x16_unary.def`). `MB=PEEK(...)` is a SYNTAX ERROR, not an
+   assignment. The same collision trap the BASL naming rules exist to dodge.
+
+**The 256 stride is conditional on map width 128.** It is the default, but a program that changes
+`VERAL1Config` changes the stride (64/128/256/512 tiles = 128/256/512/1024 bytes). The handler must
+either read those two bits and shift accordingly, or reject a non-default width -- **not assume it**.
+
 **Files.** The stash is **byte-identical to the file**, as dotBASIC's `.TBS` screens are:
 
 - `GP.STASH` publishes the end address in **`GP.END`**, so `BSAVE "F",8,bank,$A000,GP.END` works with
