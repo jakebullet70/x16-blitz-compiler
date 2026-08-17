@@ -3335,6 +3335,12 @@ CommandGPSort: ;; [!gp.sort]
 		;		can never be the pointer in a (ptr),y. The header reads below therefore go through
 		;		zTemp0, which is the same copy GPSortElementY rebuilds for every element anyway.
 		;
+		;		NOTE: UnaryGPArrPtr below repeats this same three-step opening -- offset plus
+		;		variableStartPage, reject bit 7 of the type byte, skip the 3 byte header. It is NOT
+		;		shared, because the two error paths differ (this one has pushed Y and must restore
+		;		it before raising, which a jsr'd helper cannot do) and factoring the remainder nets
+		;		about thirteen bytes. IF THE ARRAY LAYOUT EVER CHANGES, BOTH MUST CHANGE.
+		;
 		lda 	NSMantissa0,x
 		sta 	gpsArray
 		sta 	zTemp0
@@ -3637,8 +3643,8 @@ _GSFNo:
 ; ************************************************************************************************
 
 UnaryGPArrPtr: ;; [!gp.arrptr]
-		.entercmd
-		phy
+		.entercmd 							; the opening here is deliberately the same three steps
+		phy 								; CommandGPSort uses -- see the note there before editing
 		lda 	NSMantissa0,x 				; the base arrives as an offset, as GP.SORT receives it
 		sta 	zTemp0
 		lda 	NSMantissa1,x
