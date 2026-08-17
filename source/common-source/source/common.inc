@@ -159,7 +159,11 @@ FrameStackPages = 16 						; 4K, ~250 frames
 ;
 ;		14 -> 15 on 17th August 2026: GP.STASH / GP.RESTR joined the x16 commands directory.
 ;
-RT_ABI = 15 								; runtime ABI ordinal -> "GP15" magic (NOT the file name)
+;		15 -> 16 on 17th August 2026: GP.BOX / GP.FILL / GP.PRINTAT, in gpdraw.asm. That leafname
+;		sorts BEFORE gpsort.asm and gpstash.asm, so the three new shifted markers were inserted
+;		below theirs rather than appended, and everything from gp.sort upwards moved by three.
+;
+RT_ABI = 16 								; runtime ABI ordinal -> "GP16" magic (NOT the file name)
 
 ; ************************************************************************************************
 ;

@@ -451,6 +451,15 @@ X16_UDTIM=$FFEA
 X16_UNLSN=$FFAE
 X16_UNTLK=$FFAB
 
+;
+;		Not a jump table entry -- a KERNAL VARIABLE. $0376 (kernal.sym calls it ".color") holds the
+;		current text colour packed as (background << 4) | foreground, which is byte for byte the
+;		VERA attribute format, so it can be written straight into a text cell with no repacking.
+;		GPC keeps no colour state of its own: CommandColor emits PETSCII control codes and the
+;		KERNAL maintains this. Measured on R49 -- COLOR 5,2 leaves $25 here.
+;
+X16_TextColour=$0376
+
 ; ************************************************************************************************
 ;
 ;									Changes and Updates
@@ -3280,6 +3289,419 @@ UnaryGPC: ;; [gp.c]
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;
+;		Name:		gpdraw.asm
+;		Purpose:	GP.BOX / GP.FILL / GP.PRINTAT -- direct-to-VERA text drawing
+;		Created:	17th August 2026
+;		Reviewed: 	No
+;		Author : 	Steven De George SR
+;
+; ************************************************************************************************
+; ************************************************************************************************
+
+		.section 	code
+
+; ************************************************************************************************
+;
+;			GP.BOX x,y,w,h [,style] [,col]      GP.FILL x,y,w,h,char [,col]
+;			GP.PRINTAT x,y,text$ [,col]
+;
+;		The fast path for text-mode UI. These are not a restatement of LOCATE and PRINT -- they
+;		write STRAIGHT INTO VERA. GPC's own character output makes TWO KERNAL calls for every
+;		single character (x16_printchar.asm: CLRCHN to select the channel, then BSOUT, and BSOUT
+;		itself carries scroll checks, quote mode and cursor handling). Here a cell is two stores
+;		to VRAMData0, with the auto-increment walking the row.
+;
+;		THE TWO WORLDS ARE SEPARATE AND THAT IS DELIBERATE. Nothing here calls the KERNAL, so
+;		nothing here moves the KERNAL cursor: a plain PRINT after a GP.PRINTAT resumes where the
+;		KERNAL still thinks the cursor is, NOT after the text just drawn. Mixing them will
+;		surprise someone at least once, which is why it is said here and in GP.INC.BL.
+;
+;		THE OPTIONAL COLOUR DEFAULTS TO WHAT "COLOR" LAST SET. The KERNAL keeps the current text
+;		colour in $0376 packed as (background << 4) | foreground -- which is byte for byte the
+;		VERA attribute format, so the default costs one LDA and no repacking. Measured, not
+;		assumed: COLOR 5,2 leaves $0376 = $25. GPC keeps no colour state of its own (CommandColor
+;		emits PETSCII control codes and lets the KERNAL do the bookkeeping), so this really is
+;		"the colour PRINT would have used", not a second, separate notion of colour.
+;
+;		The sentinel is 256, not 255, because $FF is a legal attribute (light grey on light grey).
+;		OptionalColourCompile already pushes 256 for exactly that reason -- see the note on its
+;		definition, and note that TILE gets this wrong and cannot write attribute $FF at all.
+;
+;		CHARACTERS ARE PETSCII, converted here. A screen code is not what a BASIC programmer has:
+;		they have CHR$ and ASC, and no conversion exists anywhere else in GPC. One consequence is
+;		worth knowing: pet2scr cannot reach screen codes $A0-$BF, the reverse-video glyphs, because
+;		PETSCII expresses reverse with a control code rather than a character. That is not a loss
+;		for a UI -- highlighting a menu row is a matter of swapping the ATTRIBUTE, which the colour
+;		argument does directly.
+;
+;		NOTHING HERE CLIPS. x, y, w and h are bytes and are used as given, so a rectangle running
+;		off the right edge wraps into the next row and one running off the bottom writes past the
+;		end of the map. Zero width or height IS caught, because that is the one a program reaches
+;		by accident (a computed size) and it would otherwise count down through 256 cells.
+;
+; ************************************************************************************************
+
+;
+;		Offsets into a border style's 8 bytes. This is VTUIlib's order, kept verbatim so the table
+;		below is a checkable lift rather than a transcription: corners first as top-right,
+;		top-left, bottom-right, bottom-left, then the four edges.
+;
+GPD_TR = 0
+GPD_TL = 1
+GPD_BR = 2
+GPD_BL = 3
+GPD_TOP = 4
+GPD_BOTTOM = 5
+GPD_LEFT = 6
+GPD_RIGHT = 7
+
+GPD_STYLES = 6
+
+; ************************************************************************************************
+;
+;								GP.BOX x,y,w,h [,style] [,col]
+;
+; ************************************************************************************************
+
+CommandGPBox: ;; [!gp.box]
+		.entercmd
+		phy
+		ldx 	#5 							; every argument is numeric here
+_CGBInteger:
+		.floatinteger
+		dex
+		bpl 	_CGBInteger 				; leaves X = $FF, so X is free scratch from here on
+		;
+		jsr 	GPDrawGeometry
+		beq 	_CGBExit
+		lda 	gpdW 						; a box needs two columns and two rows to have two
+		cmp 	#2 							; corners; anything less has no drawing to do that
+		bcc 	_CGBExit 					; would not be a lie about what was asked for
+		lda 	gpdH
+		cmp 	#2
+		bcc 	_CGBExit
+		;
+		ldx 	#5
+		jsr 	GPDrawColour
+		;
+		lda 	NSMantissa0+4 				; the style, as an offset into the glyph table
+		cmp 	#GPD_STYLES
+		bcs 	_CGBBadStyle
+		asl 	a
+		asl 	a
+		asl 	a
+		tax 								; and X holds it for the whole of the drawing below,
+		 									; because TileSetAddress leaves X alone
+		;
+		jsr 	GPDrawAddress 				; the top row: corner, edge run, corner
+		lda 	GPDrawBorder+GPD_TL,x
+		jsr 	GPDrawPutCell
+		lda 	GPDrawBorder+GPD_TOP,x
+		jsr 	GPDrawRun
+		lda 	GPDrawBorder+GPD_TR,x
+		jsr 	GPDrawPutCell
+		;
+		lda 	gpdH 						; the sides: two cells a row, so they are addressed
+		sec 								; individually rather than walked
+		sbc 	#2
+		sta 	gpdCount
+		beq 	_CGBBottom
+_CGBSide:
+		inc 	gpdY
+		jsr 	GPDrawAddress
+		lda 	GPDrawBorder+GPD_LEFT,x
+		jsr 	GPDrawPutCell
+		lda 	gpdX
+		clc
+		adc 	gpdW
+		dec 	a 							; x + w - 1, the far column
+		jsr 	GPDrawAddressA
+		lda 	GPDrawBorder+GPD_RIGHT,x
+		jsr 	GPDrawPutCell
+		dec 	gpdCount
+		bne 	_CGBSide
+_CGBBottom:
+		inc 	gpdY
+		jsr 	GPDrawAddress
+		lda 	GPDrawBorder+GPD_BL,x
+		jsr 	GPDrawPutCell
+		lda 	GPDrawBorder+GPD_BOTTOM,x
+		jsr 	GPDrawRun
+		lda 	GPDrawBorder+GPD_BR,x
+		jsr 	GPDrawPutCell
+_CGBExit:
+		ply
+		ldx 	#$FF
+		.exitcmd
+
+_CGBBadStyle:
+		ply
+		.error_range
+
+; ************************************************************************************************
+;
+;								GP.FILL x,y,w,h,char [,col]
+;
+; ************************************************************************************************
+
+CommandGPFill: ;; [!gp.fill]
+		.entercmd
+		phy
+		ldx 	#5
+_CGFInteger:
+		.floatinteger
+		dex
+		bpl 	_CGFInteger
+		;
+		jsr 	GPDrawGeometry
+		beq 	_CGFExit
+		ldx 	#5
+		jsr 	GPDrawColour
+		lda 	NSMantissa0+4 				; the character is converted ONCE, not per cell
+		jsr 	GPDrawPet2Scr
+		sta 	gpdChar
+_CGFRow:
+		jsr 	GPDrawAddress 				; one address per row; the increment does the rest
+		ldy 	gpdW
+		lda 	gpdChar 					; GPDrawPutCell hands A back, so it is loaded once
+_CGFCell:
+		jsr 	GPDrawPutCell
+		dey
+		bne 	_CGFCell
+		inc 	gpdY
+		dec 	gpdH
+		bne 	_CGFRow
+_CGFExit:
+		ply
+		ldx 	#$FF
+		.exitcmd
+
+; ************************************************************************************************
+;
+;								GP.PRINTAT x,y,text$ [,col]
+;
+; ************************************************************************************************
+
+CommandGPPrintAt: ;; [!gp.printat]
+		.entercmd
+		phy
+		ldx 	#1 							; x and y. Slot 2 is the STRING and must not be run
+_CGPInteger: 								; through FloatIntegerPart at all
+		.floatinteger
+		dex
+		bpl 	_CGPInteger
+		ldx 	#3
+		.floatinteger 						; the optional colour, past the string
+		;
+		lda 	NSMantissa0+0
+		sta 	gpdX
+		lda 	NSMantissa0+1
+		sta 	gpdY
+		ldx 	#3
+		jsr 	GPDrawColour
+		;
+		lda 	NSMantissa0+2 				; the stack carries the address of [length][data]
+		sta 	zTemp0
+		lda 	NSMantissa1+2
+		sta 	zTemp0+1
+		lda 	(zTemp0)
+		beq 	_CGPExit 					; an empty string draws nothing
+		sta 	gpdCount
+		;
+		jsr 	GPDrawAddress 				; addressed once for the whole string
+_CGPChar:
+		inc 	zTemp0 						; pre-bumped, so the length byte is stepped over
+		bne 	_CGPNoCarry
+		inc 	zTemp0+1
+_CGPNoCarry:
+		lda 	(zTemp0)
+		jsr 	GPDrawPet2Scr
+		jsr 	GPDrawPutCell
+		dec 	gpdCount
+		bne 	_CGPChar
+_CGPExit:
+		ply
+		ldx 	#$FF
+		.exitcmd
+
+; ************************************************************************************************
+;
+;		x, y, w and h out of stack slots 0..3. Returns Z SET when there is nothing to draw --
+;		either dimension zero -- which every caller tests, because a zero count would otherwise
+;		count down through 256 cells and scribble over a whole screen.
+;
+; ************************************************************************************************
+
+GPDrawGeometry:
+		lda 	NSMantissa0+0
+		sta 	gpdX
+		lda 	NSMantissa0+1
+		sta 	gpdY
+		lda 	NSMantissa0+2
+		sta 	gpdW
+		lda 	NSMantissa0+3
+		sta 	gpdH
+		beq 	_GDGNone 					; h = 0, and Z is already set
+		lda 	gpdW 						; otherwise the answer is whether w is zero
+_GDGNone:
+		rts
+
+; ************************************************************************************************
+;
+;		The optional colour, out of the stack slot named by X. A non-zero HIGH byte is the 256
+;		that OptionalColourCompile pushes for "omitted", which no real attribute can produce.
+;
+; ************************************************************************************************
+
+GPDrawColour:
+		lda 	NSMantissa1,x
+		beq 	_GDCGiven
+		lda 	X16_TextColour 				; what COLOR last set, already in attribute packing
+		sta 	gpdCol
+		rts
+_GDCGiven:
+		lda 	NSMantissa0,x
+		sta 	gpdCol
+		rts
+
+; ************************************************************************************************
+;
+;		Point VERA at column A (GPDrawAddressA) or at gpdX (GPDrawAddress) of row gpdY, with the
+;		auto-increment set so that consecutive accesses walk character, attribute, character...
+;		TileSetAddress is the primitive TILE uses; it derives the map base and the row stride from
+;		VERA rather than assuming them, and it does not touch X.
+;
+; ************************************************************************************************
+
+GPDrawAddress:
+		lda 	gpdX
+GPDrawAddressA:
+		sta 	tileX
+		stz 	tileX+1
+		lda 	gpdY
+		sta 	tileY
+		stz 	tileY+1
+		jmp 	TileSetAddress
+
+; ************************************************************************************************
+;
+;		Write the screen code in A and the current colour at the VERA address, and step on to the
+;		next cell. A is preserved, so a caller can repeat one glyph without reloading it.
+;
+; ************************************************************************************************
+
+GPDrawPutCell:
+		sta 	VRAMData0
+		pha
+		lda 	gpdCol
+		sta 	VRAMData0
+		pla
+		rts
+
+;
+;		The glyph in A, w-2 times: the run BETWEEN two corners. Only called after the w >= 2
+;		check, so the double decrement cannot underflow.
+;
+GPDrawRun:
+		ldy 	gpdW
+		dey
+		dey
+		beq 	_GDRDone 					; w = 2 is two corners and no edge at all
+_GDRLoop:
+		jsr 	GPDrawPutCell
+		dey
+		bne 	_GDRLoop
+_GDRDone:
+		rts
+
+; ************************************************************************************************
+;
+;		PETSCII in A to a screen code in A. Y is used; X is not.
+;
+;		The whole conversion is one add from a table indexed by the top three bits, which is how
+;		prog8 does it and is far smaller than the chain of compares it replaces. $FF is the one
+;		value the table cannot express -- pi is screen code $5E, and the arithmetic gives $7F --
+;		so it is tested for. CHR$(222) is the same character and needs no special case.
+;
+; ************************************************************************************************
+
+GPDrawPet2Scr:
+		cmp 	#$FF
+		beq 	_GP2SPi
+		pha
+		lsr 	a
+		lsr 	a
+		lsr 	a
+		lsr 	a
+		lsr 	a
+		tay
+		pla
+		clc
+		adc 	GPDrawP2SOffset,y
+		rts
+_GP2SPi:
+		lda 	#$5E
+		rts
+
+;
+;		Added, not subtracted: every entry is the 8-bit offset from the PETSCII range to the
+;		screen code range, so $C0 here means "minus $40".
+;
+GPDrawP2SOffset:
+		.byte 	$80,$00,$C0,$E0,$40,$C0,$80,$80
+
+; ************************************************************************************************
+;
+;		The six border styles, eight SCREEN CODES each, lifted byte for byte from VTUIlib (public
+;		domain). Order per GPD_* above: TR, TL, BR, BL, top, bottom, left, right.
+;
+;		Verified against the ROM charset rather than taken on trust -- rendering the bitmaps out
+;		of rom.bin is what settled the slot order, e.g. style 4's $77 is two filled rows at the
+;		TOP of the cell and its $74 two filled columns at the LEFT, which no other reading fits.
+;
+; ************************************************************************************************
+
+GPDrawBorder:
+		.byte 	$A0,$A0,$A0,$A0,$A0,$A0,$A0,$A0 	; 0  solid block
+		.byte 	$66,$66,$66,$66,$66,$66,$66,$66 	; 1  chequered dither
+		.byte 	$6E,$70,$7D,$6D,$40,$40,$42,$42 	; 2  single line
+		.byte 	$49,$55,$4B,$4A,$40,$40,$42,$42 	; 3  single line, rounded corners
+		.byte 	$50,$4F,$7A,$4C,$77,$6F,$74,$6A 	; 4  thick line
+		.byte 	$5F,$69,$E9,$DF,$77,$6F,$74,$6A 	; 5  thick line, shaded corners
+
+		.send 	code
+
+		.section storage
+gpdX:
+		.fill 	1
+gpdY: 										; counts UP as the rows are drawn
+		.fill 	1
+gpdW:
+		.fill 	1
+gpdH: 										; counts DOWN as the rows are drawn
+		.fill 	1
+gpdChar: 									; GP.FILL's glyph, already a screen code
+		.fill 	1
+gpdCol: 									; the attribute written beside every character
+		.fill 	1
+gpdCount: 									; side rows for GP.BOX, characters for GP.PRINTAT
+		.fill 	1
+		.send 	storage
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;		17/08/26		Written.
+;
+; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
 ;		Name:		gpsort.asm
 ;		Purpose:	GP.SORT -- shell sort a string array in place
 ;		Created:	17th August 2026
@@ -3741,14 +4163,15 @@ gpsChar: 									; folded right-hand character
 ;		Worth assembly by the rule in the plan: it is bulk data. A 40x10 panel is 800 bytes, and
 ;		the BASIC equivalent is 400 VPEEK/VPOKE pairs.
 ;
-;		THE ADDRESSING IS MEASURED, not assumed -- see GP-BASIC.TIERS.md §5. The text map base
-;		comes from VERAL1MapBase, which holds bits 16:9, so base = value*512 ($1B000 by default).
-;		The map is 128 tiles wide, giving a row stride of exactly 256 bytes, which is why stepping
-;		a row is a single inc of the middle address byte rather than a re-address.
+;		THE ADDRESSING IS TileSetAddress, tiles.asm -- the same primitive TILE, TDATA and TATTR
+;		use. It reads the map base from VERAL1MapBase and the row stride from VERAL1Config bits
+;		5:4 on every call, so ANY map width works, and it accumulates in 24 bits because a
+;		256 x 256 map of two byte entries is the whole 128K of VRAM.
 ;
-;		That stride is the one assumption here and it is CHECKED, not trusted: VERAL1Config bits
-;		5:4 must say 128 tiles. A program that changes the map width gets an error rather than a
-;		scrambled screen.
+;		This started out hand-rolled, with a check that the map was 128 tiles wide so a row step
+;		could be a single inc of the middle address byte. That check was a restriction dressed up
+;		as a guard: TileSetAddress had the general answer all along and is SMALLER than the
+;		special case was.
 ;
 ;		THE STASH IS SELF-DESCRIBING. Four header bytes go in first -- w, h, x, y -- so GP.RESTR
 ;		needs only the bank. That fixes the flaw dotBASIC admits to in its own .CUT/.PASTE, which
@@ -3805,8 +4228,8 @@ CommandGPRestore: ;; [!gp.restr]
 		.entercmd
 		phy
 		;
-		;		<y> and <x> are optional and default to 255, which cannot be a real coordinate --
-		;		the map is 128 tiles wide, so 0 could not have doubled as the sentinel here.
+		;		<y> and <x> are optional and default to 255. 0 could not have doubled as the
+		;		sentinel here, because 0 is a perfectly good place to paste a rectangle.
 		;
 		jsr 	FloatIntegerPart
 		lda 	NSMantissa0,x
@@ -3898,7 +4321,7 @@ GPStashGeometry:
 		bcs 	_GSGBad 					; inner loop can count it in Y, and 128*2 is 0 in a byte
 		 									; -- which silently made every size guard below see a
 		 									; zero-width row and pass. Same boundary that bit
-		 									; GPSortElementY. 127 columns is the whole map anyway.
+		 									; GPSortElementY. 127 columns is wider than a screen.
 		lda 	gssH
 		beq 	_GSGBad
 		cmp 	#65
@@ -3911,51 +4334,32 @@ _GSGBad:
 		jmp 	GPStashRange
 
 ;
-;		Select the bank, and check the screen is the layout this code knows how to walk. The
-;		previous bank is saved and put back at the end -- a command that silently repointed
-;		$A000 would be a trap of exactly the kind this codebase already has too many of.
+;		Select the bank. The previous bank is saved and put back at the end -- a command that
+;		silently repointed $A000 would be a trap of exactly the kind this codebase already has
+;		too many of.
 ;
 GPStashBankIn:
 		lda 	GPS_BANKREG
 		sta 	gssOldBank
 		lda 	gssBank
 		sta 	GPS_BANKREG
-		;
-		lda 	VERAL1Config 				; bits 5:4 are the map width: 2 = 128 tiles, which is
-		and 	#$30 						; what makes the row stride exactly 256 bytes
-		cmp 	#$20
-		bne 	_GSBIBad
-		;
-		lda 	VERAL1MapBase 				; the register holds bits 16:9, so base = value*512:
-		asl 	a 							; the middle byte is value*2 and the carry out is the
-		sta 	gssMapMed 					; VRAM bank bit
-		lda 	#0
-		rol 	a
-		ora 	#VRAMIncrement1 			; walk the row without re-addressing
-		sta 	gssMapHi
 		rts
-_GSBIBad:
-		jmp 	GPStashIndex
 
 ; ************************************************************************************************
 ;
-;		Point VERA at (gssX, gssY + the row counter). The low byte is x*2 and cannot carry --
-;		x is at most 128 -- and the middle byte is the map's plus the row, which cannot carry
-;		either, because 64 rows past $B0 is $F0.
+;		Point VERA at (gssX, gssY), with the auto-increment set so the row walks itself. Any map
+;		width, because TileSetAddress derives the stride rather than assuming it.
 ;
 ; ************************************************************************************************
 
 GPStashSetVera:
 		lda 	gssX
-		asl 	a
-		sta 	VRAMLow0
-		clc
-		lda 	gssMapMed
-		adc 	gssY
-		sta 	VRAMMed0
-		lda 	gssMapHi
-		sta 	VRAMHigh0
-		rts
+		sta 	tileX
+		stz 	tileX+1
+		lda 	gssY
+		sta 	tileY
+		stz 	tileY+1
+		jmp 	TileSetAddress 				; X is untouched by it, which is what matters here
 
 ;
 ;		Advance to the next screen row and the next slot in the bank. Returns Z set when the
@@ -4005,12 +4409,6 @@ GPStashRange:
 		ply
 		.error_range
 
-GPStashIndex:
-		lda 	gssOldBank
-		sta 	GPS_BANKREG
-		ply
-		.error_index
-
 		.send 	code
 
 		.section storage
@@ -4028,10 +4426,6 @@ gssH: 										; counts DOWN as the rows are done
 		.fill 	1
 gssW2: 										; the row width in bytes, w*2
 		.fill 	1
-gssMapMed: 									; the text map's middle address byte
-		.fill 	1
-gssMapHi: 									; its bank bit, with the auto-increment already set
-		.fill 	1
 		.send 	storage
 
 ; ************************************************************************************************
@@ -4043,6 +4437,7 @@ gssMapHi: 									; its bank bit, with the auto-increment already set
 ;		Date			Notes
 ;		==== 			=====
 ;		17/08/26		Written.
+;		17/08/26		Re-based on TileSetAddress: any map width, and smaller.
 ;
 ; ************************************************************************************************
 ; ************************************************************************************************
@@ -10066,80 +10461,83 @@ ShiftVectorTable:
 	.word	CommandXDIM              ; $d781 dim
 	.word	CommandEnd               ; $d782 end
 	.word	CommandGPCall            ; $d783 gp.call
-	.word	CommandGPSort            ; $d784 gp.sort
-	.word	UnaryGPArrPtr            ; $d785 gp.arrptr
-	.word	CommandGPStash           ; $d786 gp.stash
-	.word	CommandGPRestore         ; $d787 gp.restr
-	.word	UnaryGPComp              ; $d788 gp.comp
-	.word	CommandGPUpper           ; $d789 gp.upper
-	.word	CommandGPLower           ; $d78a gp.lower
-	.word	CommandGPTrim            ; $d78b gp.trim
-	.word	CommandGPRTrim           ; $d78c gp.rtrim
-	.word	CommandGPLTrim           ; $d78d gp.ltrim
-	.word	UnaryJoy                 ; $d78e joy
-	.word	LinkFloatIntegerPartDown ; $d78f int
-	.word	LinkFloatSquareRoot      ; $d790 sqr
-	.word	LinkFloatLogarithm       ; $d791 log
-	.word	LinkFloatExponent        ; $d792 exp
-	.word	LinkFloatCosine          ; $d793 cos
-	.word	LinkFloatSine            ; $d794 sin
-	.word	LinkFloatTangent         ; $d795 tan
-	.word	LinkFloatArcTan          ; $d796 atn
-	.word	CommandXLinput           ; $d797 linput
-	.word	CommandXBinput           ; $d798 binput
-	.word	Command_LOAD             ; $d799 load
-	.word	Command_BLOAD            ; $d79a bload
-	.word	Command_BVLOAD           ; $d79b bvload
-	.word	Command_VLOAD            ; $d79c vload
-	.word	Command_BSAVE            ; $d79d bsave
-	.word	Command_BVERIFY          ; $d79e bverify
-	.word	X16CommandPowerOff       ; $d79f poweroff
-	.word	X16CommandReset          ; $d7a0 reset
-	.word	X16CommandReboot         ; $d7a1 reboot
-	.word	XCommandMouse            ; $d7a2 mouse
-	.word	XUnaryMB                 ; $d7a3 mb
-	.word	XUnaryMX                 ; $d7a4 mx
-	.word	XUnaryMY                 ; $d7a5 my
-	.word	XUnaryMWheel             ; $d7a6 mwheel
-	.word	UnaryRPT                 ; $d7a7 rpt$
-	.word	Command_SPRITE           ; $d7a8 sprite
-	.word	Command_SPRMEM           ; $d7a9 sprmem
-	.word	Command_MOVSPR           ; $d7aa movspr
-	.word	UnaryST                  ; $d7ab st
-	.word	CommandStop              ; $d7ac stop
-	.word	CommandSYS               ; $d7ad sys
-	.word	UnaryTDATA               ; $d7ae tdata
-	.word	UnaryTATTR               ; $d7af tattr
-	.word	Command_TILE             ; $d7b0 tile
-	.word	CommandTIWriteN          ; $d7b1 ti.write
-	.word	CommandTIWriteS          ; $d7b2 ti$.write
-	.word	CommandXWAIT             ; $d7b3 wait
-	.word	X16I2CPoke               ; $d7b4 i2cpoke
-	.word	X16I2CPeek               ; $d7b5 i2cpeek
-	.word	CommandBank              ; $d7b6 bank
-	.word	XCommandSleep            ; $d7b7 sleep
-	.word	X16_Audio_FMINIT         ; $d7b8 fminit
-	.word	X16_Audio_FMNOTE         ; $d7b9 fmnote
-	.word	X16_Audio_FMDRUM         ; $d7ba fmdrum
-	.word	X16_Audio_FMINST         ; $d7bb fminst
-	.word	X16_Audio_FMVIB          ; $d7bc fmvib
-	.word	X16_Audio_FMFREQ         ; $d7bd fmfreq
-	.word	X16_Audio_FMVOL          ; $d7be fmvol
-	.word	X16_Audio_FMPAN          ; $d7bf fmpan
-	.word	X16_Audio_FMPLAY         ; $d7c0 fmplay
-	.word	X16_Audio_FMCHORD        ; $d7c1 fmchord
-	.word	X16_Audio_FMPOKE         ; $d7c2 fmpoke
-	.word	X16_Audio_PSGINIT        ; $d7c3 psginit
-	.word	X16_Audio_PSGNOTE        ; $d7c4 psgnote
-	.word	X16_Audio_PSGVOL         ; $d7c5 psgvol
-	.word	X16_Audio_PSGWAV         ; $d7c6 psgwav
-	.word	X16_Audio_PSGFREQ        ; $d7c7 psgfreq
-	.word	X16_Audio_PSGPAN         ; $d7c8 psgpan
-	.word	X16_Audio_PSGPLAY        ; $d7c9 psgplay
-	.word	X16_Audio_PSGCHORD       ; $d7ca psgchord
-	.word	CommandCls               ; $d7cb cls
-	.word	CommandLocate            ; $d7cc locate
-	.word	CommandColor             ; $d7cd color
+	.word	CommandGPBox             ; $d784 gp.box
+	.word	CommandGPFill            ; $d785 gp.fill
+	.word	CommandGPPrintAt         ; $d786 gp.printat
+	.word	CommandGPSort            ; $d787 gp.sort
+	.word	UnaryGPArrPtr            ; $d788 gp.arrptr
+	.word	CommandGPStash           ; $d789 gp.stash
+	.word	CommandGPRestore         ; $d78a gp.restr
+	.word	UnaryGPComp              ; $d78b gp.comp
+	.word	CommandGPUpper           ; $d78c gp.upper
+	.word	CommandGPLower           ; $d78d gp.lower
+	.word	CommandGPTrim            ; $d78e gp.trim
+	.word	CommandGPRTrim           ; $d78f gp.rtrim
+	.word	CommandGPLTrim           ; $d790 gp.ltrim
+	.word	UnaryJoy                 ; $d791 joy
+	.word	LinkFloatIntegerPartDown ; $d792 int
+	.word	LinkFloatSquareRoot      ; $d793 sqr
+	.word	LinkFloatLogarithm       ; $d794 log
+	.word	LinkFloatExponent        ; $d795 exp
+	.word	LinkFloatCosine          ; $d796 cos
+	.word	LinkFloatSine            ; $d797 sin
+	.word	LinkFloatTangent         ; $d798 tan
+	.word	LinkFloatArcTan          ; $d799 atn
+	.word	CommandXLinput           ; $d79a linput
+	.word	CommandXBinput           ; $d79b binput
+	.word	Command_LOAD             ; $d79c load
+	.word	Command_BLOAD            ; $d79d bload
+	.word	Command_BVLOAD           ; $d79e bvload
+	.word	Command_VLOAD            ; $d79f vload
+	.word	Command_BSAVE            ; $d7a0 bsave
+	.word	Command_BVERIFY          ; $d7a1 bverify
+	.word	X16CommandPowerOff       ; $d7a2 poweroff
+	.word	X16CommandReset          ; $d7a3 reset
+	.word	X16CommandReboot         ; $d7a4 reboot
+	.word	XCommandMouse            ; $d7a5 mouse
+	.word	XUnaryMB                 ; $d7a6 mb
+	.word	XUnaryMX                 ; $d7a7 mx
+	.word	XUnaryMY                 ; $d7a8 my
+	.word	XUnaryMWheel             ; $d7a9 mwheel
+	.word	UnaryRPT                 ; $d7aa rpt$
+	.word	Command_SPRITE           ; $d7ab sprite
+	.word	Command_SPRMEM           ; $d7ac sprmem
+	.word	Command_MOVSPR           ; $d7ad movspr
+	.word	UnaryST                  ; $d7ae st
+	.word	CommandStop              ; $d7af stop
+	.word	CommandSYS               ; $d7b0 sys
+	.word	UnaryTDATA               ; $d7b1 tdata
+	.word	UnaryTATTR               ; $d7b2 tattr
+	.word	Command_TILE             ; $d7b3 tile
+	.word	CommandTIWriteN          ; $d7b4 ti.write
+	.word	CommandTIWriteS          ; $d7b5 ti$.write
+	.word	CommandXWAIT             ; $d7b6 wait
+	.word	X16I2CPoke               ; $d7b7 i2cpoke
+	.word	X16I2CPeek               ; $d7b8 i2cpeek
+	.word	CommandBank              ; $d7b9 bank
+	.word	XCommandSleep            ; $d7ba sleep
+	.word	X16_Audio_FMINIT         ; $d7bb fminit
+	.word	X16_Audio_FMNOTE         ; $d7bc fmnote
+	.word	X16_Audio_FMDRUM         ; $d7bd fmdrum
+	.word	X16_Audio_FMINST         ; $d7be fminst
+	.word	X16_Audio_FMVIB          ; $d7bf fmvib
+	.word	X16_Audio_FMFREQ         ; $d7c0 fmfreq
+	.word	X16_Audio_FMVOL          ; $d7c1 fmvol
+	.word	X16_Audio_FMPAN          ; $d7c2 fmpan
+	.word	X16_Audio_FMPLAY         ; $d7c3 fmplay
+	.word	X16_Audio_FMCHORD        ; $d7c4 fmchord
+	.word	X16_Audio_FMPOKE         ; $d7c5 fmpoke
+	.word	X16_Audio_PSGINIT        ; $d7c6 psginit
+	.word	X16_Audio_PSGNOTE        ; $d7c7 psgnote
+	.word	X16_Audio_PSGVOL         ; $d7c8 psgvol
+	.word	X16_Audio_PSGWAV         ; $d7c9 psgwav
+	.word	X16_Audio_PSGFREQ        ; $d7ca psgfreq
+	.word	X16_Audio_PSGPAN         ; $d7cb psgpan
+	.word	X16_Audio_PSGPLAY        ; $d7cc psgplay
+	.word	X16_Audio_PSGCHORD       ; $d7cd psgchord
+	.word	CommandCls               ; $d7ce cls
+	.word	CommandLocate            ; $d7cf locate
+	.word	CommandColor             ; $d7d0 color
 	.send code
 ; ************************************************************************************************
 ; ************************************************************************************************

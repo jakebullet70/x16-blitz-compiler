@@ -23,14 +23,15 @@
 ;		Worth assembly by the rule in the plan: it is bulk data. A 40x10 panel is 800 bytes, and
 ;		the BASIC equivalent is 400 VPEEK/VPOKE pairs.
 ;
-;		THE ADDRESSING IS MEASURED, not assumed -- see GP-BASIC.TIERS.md §5. The text map base
-;		comes from VERAL1MapBase, which holds bits 16:9, so base = value*512 ($1B000 by default).
-;		The map is 128 tiles wide, giving a row stride of exactly 256 bytes, which is why stepping
-;		a row is a single inc of the middle address byte rather than a re-address.
+;		THE ADDRESSING IS TileSetAddress, tiles.asm -- the same primitive TILE, TDATA and TATTR
+;		use. It reads the map base from VERAL1MapBase and the row stride from VERAL1Config bits
+;		5:4 on every call, so ANY map width works, and it accumulates in 24 bits because a
+;		256 x 256 map of two byte entries is the whole 128K of VRAM.
 ;
-;		That stride is the one assumption here and it is CHECKED, not trusted: VERAL1Config bits
-;		5:4 must say 128 tiles. A program that changes the map width gets an error rather than a
-;		scrambled screen.
+;		This started out hand-rolled, with a check that the map was 128 tiles wide so a row step
+;		could be a single inc of the middle address byte. That check was a restriction dressed up
+;		as a guard: TileSetAddress had the general answer all along and is SMALLER than the
+;		special case was.
 ;
 ;		THE STASH IS SELF-DESCRIBING. Four header bytes go in first -- w, h, x, y -- so GP.RESTR
 ;		needs only the bank. That fixes the flaw dotBASIC admits to in its own .CUT/.PASTE, which
@@ -87,8 +88,8 @@ CommandGPRestore: ;; [!gp.restr]
 		.entercmd
 		phy
 		;
-		;		<y> and <x> are optional and default to 255, which cannot be a real coordinate --
-		;		the map is 128 tiles wide, so 0 could not have doubled as the sentinel here.
+		;		<y> and <x> are optional and default to 255. 0 could not have doubled as the
+		;		sentinel here, because 0 is a perfectly good place to paste a rectangle.
 		;
 		jsr 	FloatIntegerPart
 		lda 	NSMantissa0,x
@@ -180,7 +181,7 @@ GPStashGeometry:
 		bcs 	_GSGBad 					; inner loop can count it in Y, and 128*2 is 0 in a byte
 		 									; -- which silently made every size guard below see a
 		 									; zero-width row and pass. Same boundary that bit
-		 									; GPSortElementY. 127 columns is the whole map anyway.
+		 									; GPSortElementY. 127 columns is wider than a screen.
 		lda 	gssH
 		beq 	_GSGBad
 		cmp 	#65
@@ -193,51 +194,32 @@ _GSGBad:
 		jmp 	GPStashRange
 
 ;
-;		Select the bank, and check the screen is the layout this code knows how to walk. The
-;		previous bank is saved and put back at the end -- a command that silently repointed
-;		$A000 would be a trap of exactly the kind this codebase already has too many of.
+;		Select the bank. The previous bank is saved and put back at the end -- a command that
+;		silently repointed $A000 would be a trap of exactly the kind this codebase already has
+;		too many of.
 ;
 GPStashBankIn:
 		lda 	GPS_BANKREG
 		sta 	gssOldBank
 		lda 	gssBank
 		sta 	GPS_BANKREG
-		;
-		lda 	VERAL1Config 				; bits 5:4 are the map width: 2 = 128 tiles, which is
-		and 	#$30 						; what makes the row stride exactly 256 bytes
-		cmp 	#$20
-		bne 	_GSBIBad
-		;
-		lda 	VERAL1MapBase 				; the register holds bits 16:9, so base = value*512:
-		asl 	a 							; the middle byte is value*2 and the carry out is the
-		sta 	gssMapMed 					; VRAM bank bit
-		lda 	#0
-		rol 	a
-		ora 	#VRAMIncrement1 			; walk the row without re-addressing
-		sta 	gssMapHi
 		rts
-_GSBIBad:
-		jmp 	GPStashIndex
 
 ; ************************************************************************************************
 ;
-;		Point VERA at (gssX, gssY + the row counter). The low byte is x*2 and cannot carry --
-;		x is at most 128 -- and the middle byte is the map's plus the row, which cannot carry
-;		either, because 64 rows past $B0 is $F0.
+;		Point VERA at (gssX, gssY), with the auto-increment set so the row walks itself. Any map
+;		width, because TileSetAddress derives the stride rather than assuming it.
 ;
 ; ************************************************************************************************
 
 GPStashSetVera:
 		lda 	gssX
-		asl 	a
-		sta 	VRAMLow0
-		clc
-		lda 	gssMapMed
-		adc 	gssY
-		sta 	VRAMMed0
-		lda 	gssMapHi
-		sta 	VRAMHigh0
-		rts
+		sta 	tileX
+		stz 	tileX+1
+		lda 	gssY
+		sta 	tileY
+		stz 	tileY+1
+		jmp 	TileSetAddress 				; X is untouched by it, which is what matters here
 
 ;
 ;		Advance to the next screen row and the next slot in the bank. Returns Z set when the
@@ -287,12 +269,6 @@ GPStashRange:
 		ply
 		.error_range
 
-GPStashIndex:
-		lda 	gssOldBank
-		sta 	GPS_BANKREG
-		ply
-		.error_index
-
 		.send 	code
 
 		.section storage
@@ -310,10 +286,6 @@ gssH: 										; counts DOWN as the rows are done
 		.fill 	1
 gssW2: 										; the row width in bytes, w*2
 		.fill 	1
-gssMapMed: 									; the text map's middle address byte
-		.fill 	1
-gssMapHi: 									; its bank bit, with the auto-increment already set
-		.fill 	1
 		.send 	storage
 
 ; ************************************************************************************************
@@ -325,5 +297,6 @@ gssMapHi: 									; its bank bit, with the auto-increment already set
 ;		Date			Notes
 ;		==== 			=====
 ;		17/08/26		Written.
+;		17/08/26		Re-based on TileSetAddress: any map width, and smaller.
 ;
 ; ************************************************************************************************

@@ -115,4 +115,36 @@
 #TOKEN GP.STASH 52845
 #TOKEN GP.RESTR 52844
 
+## Text drawing, written STRAIGHT INTO VERA -- no KERNAL, which is why it is
+## several times faster than PRINT (GPC's character output makes two KERNAL
+## calls per character, and BSOUT carries scroll, quote mode and cursor work).
+##
+##   GP.BOX x,y,w,h [,style] [,col]     frame only, styles 0-5:
+##                                      0 solid  1 dither  2 single line
+##                                      3 rounded  4 thick  5 thick shaded
+##   GP.FILL x,y,w,h,char [,col]        char is PETSCII, e.g. ASC(" ")
+##   GP.PRINTAT x,y,text$ [,col]
+##
+## THE COLOUR IS OPTIONAL AND DEFAULTS TO WHAT "COLOR" LAST SET -- the same
+## colour a PRINT would have used. Supplied, it is one byte packed exactly as
+## the X16 packs it: background * 16 + foreground. 255 is a REAL colour here
+## (light grey on light grey), not a "leave it alone" marker.
+##
+## The two optionals on GP.BOX cannot be skipped over: write the style if you
+## want the colour. GP.BOX X,Y,W,H,,7 is a syntax error, GP.BOX X,Y,W,H,0,7
+## is what you meant.
+##
+## WARNING -- THESE DO NOT MOVE THE CURSOR PRINT USES. Nothing here calls the
+## KERNAL, so a plain PRINT after a GP.PRINTAT carries on from wherever the
+## KERNAL still thinks the cursor is, NOT after the text just drawn. Use
+## LOCATE before PRINT, or stay in one world or the other.
+##
+## Nothing is clipped. Off the right edge wraps to the next row; off the
+## bottom writes past the end of the screen map. Zero width or height draws
+## nothing, which is the one case a computed size reaches by accident.
+
+#TOKEN GP.BOX 52843
+#TOKEN GP.FILL 52842
+#TOKEN GP.PRINTAT 52841
+
 #ENDIF

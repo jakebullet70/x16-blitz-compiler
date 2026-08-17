@@ -117,6 +117,15 @@ X16_UDTIM=$FFEA
 X16_UNLSN=$FFAE
 X16_UNTLK=$FFAB
 
+;
+;		Not a jump table entry -- a KERNAL VARIABLE. $0376 (kernal.sym calls it ".color") holds the
+;		current text colour packed as (background << 4) | foreground, which is byte for byte the
+;		VERA attribute format, so it can be written straight into a text cell with no repacking.
+;		GPC keeps no colour state of its own: CommandColor emits PETSCII control codes and the
+;		KERNAL maintains this. Measured on R49 -- COLOR 5,2 leaves $25 here.
+;
+X16_TextColour=$0376
+
 ; ************************************************************************************************
 ;
 ;									Changes and Updates

@@ -15,9 +15,23 @@ Flat folder, **UPPERCASE** names, role carried in the extension:
 
 Uppercase because these files live on the X16's drive, where BASLOAD reads them.
 
-Current contents: `GP.INC.BL` (the keyword tokens), `STRHELP.INC.BL` (string helpers in BASL —
-`STRHELP.PADR`/`STRHELP.PADL`; unlike `GP.INC.BL` it contains *code*, called with `GOSUB`),
-`LOOPS.EXP.BL` (`GP.DO`/`GP.LOOP`/`GP.EXITDO`), `MLCALL.EXP.BL` (`GP.CALL`).
+Current contents:
+
+| File | Covers |
+|---|---|
+| `GP.INC.BL` | the keyword tokens — every BASL source using `GP.*` must `#INCLUDE` it |
+| `STRHELP.INC.BL` | string helpers in BASL (`STRHELP.PADR`/`PADL`/`PADC`/`SPLIT`). Unlike `GP.INC.BL` it contains *code*, called with `GOSUB` |
+| `LOOPS.EXP.BL` | `GP.DO` / `GP.LOOP` / `GP.EXITDO` |
+| `MLCALL.EXP.BL` | `GP.CALL` and the `GP.A`/`GP.X`/`GP.Y`/`GP.C` value words |
+| `STRINGS.EXP.BL` | `GP.INSTR`, `GP.STRPTR`, `GP.TRIM`/`LTRIM`/`RTRIM`, `GP.UPPER`/`LOWER` |
+| `SPLITT.EXP.BL` | `STRHELP.SPLIT`, the BASL tokeniser |
+| `ARRAYS.EXP.BL` | `GP.SORT`, `GP.COMP`, `GP.ARRPTR` |
+| `SCREEN.EXP.BL` | `GP.BOX`, `GP.FILL`, `GP.PRINTAT`, `GP.STASH`/`GP.RESTR` |
+
+**Only two characters of a BASIC variable name are significant**, so `R30` and `R31` are the same
+variable and `BASE` is the same variable as `BA` — a silent wrong answer, not an error. The dotted
+names these examples use (`PANEL.COL`, `SEARCH.AT`) are long enough to read and cannot collide by
+accident. It is the same discipline that dodges the keyword-collision trap (`POS`, `MB`, `ST`).
 
 ## Why the includes exist at all
 

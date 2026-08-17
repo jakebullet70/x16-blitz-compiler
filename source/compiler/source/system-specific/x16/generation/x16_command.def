@@ -100,3 +100,15 @@ BINPUT# 		C:CommandBINPUTStream N
 
 GP.STASH 		#,#,#,#,# T N
 GP.RESTR 		# X:OptionalParameterCompile X:OptionalParameterCompile T N
+
+# 	GP.BASIC text drawing, straight into VERA. The trailing colour is OptionalColourCompile on all
+# 	three -- 255 is a LEGAL attribute (light grey on light grey), so the sentinel has to be 256,
+# 	exactly as it does for RECT and LINE. Omitted means "whatever COLOR last set", read out of the
+# 	KERNAL's $0376, which is already in attribute packing.
+#
+# 	GP.BOX's style is OptionalZeroCompile, so a bare GP.BOX is style 0 and costs a one-byte push.
+# 	The two optionals cannot be skipped over: GP.BOX x,y,w,h,,7 is a syntax error, write the 0.
+
+GP.BOX 			#,#,#,# X:OptionalZeroCompile X:OptionalColourCompile T N
+GP.FILL 		#,#,#,#,# X:OptionalColourCompile T N
+GP.PRINTAT 		#,#,$ X:OptionalColourCompile T N

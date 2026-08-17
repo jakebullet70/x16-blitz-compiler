@@ -41,9 +41,10 @@ string, moving 2 KB of screen. That is the whole list.
 | | |
 |---|---|
 | Target | ~1.5 KB (1,536 B) for the whole set |
-| Planned, still to build | ~1,418 B (`GP.CALL` built, `GP.UNTIL` cut) |
-| Already shipped, measured | **205 B** — `GP.DO` 29 + `GP.LOOP` 57 + `GP.EXITDO` 11 + `GP.CALL` group 108 |
-| **All-in** | **~1,623 B — about 87 B over target** |
+| Planned, still to build | ~415 B (`GP.MENU` only) |
+| Already shipped, measured | **1,858 B** — tiers 1-6 complete |
+| **All-in** | **~2,273 B — about 740 B over the original target** |
+| Why that is accepted | RTBASE moved to `$6400` on 17th August; the runtime ends `$99E5` with **1,306 B** free |
 | Fixed cost per keyword | **6 B** (2 vector slot + 4 glue) before any code |
 | Free `GP.*` BASIC tokens | 119 of 127 (`$CE01`–`$CE7F`) |
 | Free p-code opcodes | 27 unshifted (41 cycles), 60 shifted (58 cycles, +1 byte per call) |
@@ -83,15 +84,15 @@ compiles at roughly **14 bytes of p-code per line**. BASL menus (~60–100 lines
 |---|---|---:|
 | 1 | Loops — **all shipped**; `GP.UNTIL` **CUT**, measured at only 4-6% | 0 |
 | 2 | `GP.CALL` + 4 value words — **SHIPPED** | 108 |
-| 3a | `GP.INSTR` 115 B + `GP.STRPTR` 12 B — **SHIPPED** | 127 |
-| 3 | Strings — 7 of 8 **SHIPPED** (`GP.INSTR`, `GP.STRPTR`, `GP.TRIM`/`LTRIM`/`RTRIM`, `GP.UPPER`/`LOWER`); `GP.COMP` to go, `GP.PAD` moved to BASL | ~330 |
-| 4 | `GP.SORT` | 156 |
-| 5 | Stash / restore | 290 |
-| 6 | Drawing ×4 | 309 |
+| 3 | Strings — all 8 **SHIPPED**: `GP.INSTR` 115 + `GP.STRPTR` 12 + in-place x5 220 + `GP.COMP` 90; `GP.PAD` moved to BASL | 437 |
+| 4 | `GP.SORT` + `GP.ARRPTR` — **SHIPPED** | 447 |
+| 5 | Stash / restore — **SHIPPED** (368, then 329 after the `TileSetAddress` re-base) | 329 |
+| 6 | Drawing ×3 (`GP.LOCATE` **CUT**) — **SHIPPED** | 440 |
 | 7 | Input — **BASL** | 0 |
 | 8 | Colour / theme — **BASL** | 0 |
-| 9 | `GP.MENU` interaction loop | 266 |
-| | **Total still to build** | **~1,418** |
+| 9 | `GP.MENU` interaction loop — the only ASM left | ~415 |
+| | **Built so far** | **1,858** |
+| | **Still to build** | **~415** |
 
 #### Measured overrun, 17th August 2026 — read this before trusting an estimate below
 
@@ -105,7 +106,9 @@ The estimates in this table have run **1.62x over** on average. Actuals:
 | `GP.COMP` | 40 | 90 | x2.25 |
 | `GP.SORT` | 156 | 398 | x2.55 |
 | `GP.ARRPTR` | 15 | 49 | x3.27 |
-| **total** | **614** | **992** | **x1.62** |
+| stash / restore | 290 | 368 | x1.27 |
+| drawing x3 | 250 | 440 | x1.76 |
+| **total** | **1,154** | **1,800** | **x1.56** |
 
 The pattern is not random: the two worst overruns are the two commands that had to VALIDATE
 something (array header, element type, null pointers) and RETYPE a result. The estimates costed the
@@ -114,6 +117,13 @@ algorithm and forgot the guards. **Cost the guards.**
 Applying 1.62x, tiers 5, 6 and 9 come to **~1,400 bytes, not 865**. That is why RTBASE moved to
 `$6400` on the same day, before starting tier 5 rather than after hitting the ceiling in tier 6:
 headroom went 1,061 -> **2,085**, leaving ~690 bytes of margin once everything planned is built.
+
+**That projection has now been checked against two more tiers and it held.** Tiers 5 and 6 came in at
+1.27x and 1.76x, and the multiplier over everything built is **1.56x** — close enough that the same
+arithmetic can be trusted for tier 9. After tier 6 the runtime ends **`$99E5`** with **1,306 bytes**
+of headroom; `GP.MENU` at 266 x 1.56 is ~415, which leaves ~890 spare. **No further RTBASE move is
+needed.** (Tier 6 also gave 39 bytes back by re-basing `gpstash.asm` on `TileSetAddress`, so the net
+cost of the tier was ~400, not 440.)
 
 Anchors for the estimates: `GP.DO` 29 B, `GP.LOOP` 57 B, `CommandSYS` 54 B, `CommandPOKE` 24 B,
 `CommandXFor` 107 B, GPC's 7 graphics primitives 280 B total (all from `source/application/build/code.lbl`);
@@ -129,8 +139,8 @@ VTUI `save_rect`/`rest_rect` ~60–70 B each, `fill_box` ~25 B, `border` ~50 B.
 | 2 | `GP.CALL` and the register value words — **DONE** | ASM |
 | 3 | **Strings** — find, trim/pad, case, compare, `GP.STRPTR` | ASM |
 | 4 | **Sort** for string arrays | ASM |
-| 5 | **Screen stash / restore** | ASM |
-| 6 | **Menus, boxes, dialogs, colour theme** | BASL on ASM primitives |
+| 5 | **Screen stash / restore** — **DONE** | ASM |
+| 6 | **Boxes, fills, positioned text** — **DONE**; menus, dialogs and the colour theme build on them | ASM, then BASL |
 | 7 | **Drop what the program does not use** | compiler |
 
 ### Tier 1's deadline was wrong — corrected 16th August 2026
@@ -510,6 +520,16 @@ So **cell (x,y) is at `mapbase + y*256 + x*2`**, and because the stride is exact
 `VERAL1Config` changes the stride (64/128/256/512 tiles = 128/256/512/1024 bytes). The handler must
 either read those two bits and shift accordingly, or reject a non-default width -- **not assume it**.
 
+> **Resolved 17th August 2026: neither. Use `TileSetAddress`.**
+> `source/runtime/source/system-specific/x16/commands/tiles.asm:73` has done the general thing since
+> `TILE` shipped: it derives the shift (6..9) from `VERAL1Config` bits 5:4, accumulates in **24 bits**
+> because a 256x256 map of two-byte entries is the whole 128 KB of VRAM, adds the map base from
+> `VERAL1MapBase`, and leaves X alone. Both `gpstash.asm` and `gpdraw.asm` call it.
+>
+> `GP.STASH` shipped first with the hand-rolled version and the map-width **check** — a restriction
+> dressed up as a guard. Re-basing it on `TileSetAddress` **removed 39 bytes of code and 2 of storage**
+> *and* removed the restriction. Look for the existing primitive before writing the special case.
+
 **Files.** The stash is **byte-identical to the file**, as dotBASIC's `.TBS` screens are:
 
 - `GP.STASH` publishes the end address in **`GP.END`**, so `BSAVE "F",8,bank,$A000,GP.END` works with
@@ -520,14 +540,82 @@ either read those two bits and shift accordingly, or reject a non-default width 
   filename — fixing the flaw dotBASIC admits to, that `.CUT`/`.PASTE` *"requires correctly
   re-describing the width and height of each cut"*.
 
-### §6 Screen drawing — 4 tokens *(adapted from VTUIlib)*
+### §6 Screen drawing — 3 tokens *(adapted from VTUIlib)*
+
+#### `GP.LOCATE` is CUT — 17th August 2026
+
+It was in the plan as VTUI's `gotoxy`. It should not have been, for two independent reasons:
+
+1. **Nothing would consume it.** VTUI's `gotoxy` sets an internal cursor that later VTUI calls read.
+   Our `GP.PRINTAT` takes its own `x,y`, and there is no `GP.PRINT` — so the cursor `GP.LOCATE` set
+   would be written and never read.
+2. **Stock `LOCATE` already exists and is implemented** — `CommandLocate`, vector `$d7cc`,
+   `x16_command.def:17`. It moves the KERNAL cursor, which is the one `PRINT` uses. Shipping
+   `GP.LOCATE` alongside it means two commands with the same name-shape and *different,
+   non-interacting cursors*.
+
+**And `GP.PRINT` is not the fix.** A `GP.PRINT` continuing from a GP cursor needs line wrap,
+scrolling and persistent cursor state — that is re-implementing `PRINT`, and the scroll alone is
+substantial. For what this tier is for (menus, boxes, status lines) the position is always known,
+so `GP.PRINTAT` covers it.
+
+#### SHIPPED 17th August 2026 — 440 B, RT_ABI 16
 
 | Command | Form | Notes |
 |---|---|---|
-| `GP.BOX` | `GP.BOX x,y,w,h [,style]` | VTUI `border`; 6 built-in styles, glyph table in ASM |
-| `GP.FILL` | `GP.FILL x,y,w,h,char,col` | VTUI `fill_box` |
-| `GP.LOCATE` | `GP.LOCATE x,y` | VTUI `gotoxy` — direct VERA, not KERNAL `PLOT` |
-| `GP.PRINTAT` | `GP.PRINTAT 10,10,"print me"` | VTUI `gotoxy` + `print_str` + `pet2scr` |
+| `GP.BOX` | `GP.BOX x,y,w,h [,style] [,col]` | frame only; 6 styles, glyph table in ASM. 144 B |
+| `GP.FILL` | `GP.FILL x,y,w,h,char [,col]` | 57 B |
+| `GP.PRINTAT` | `GP.PRINTAT x,y,text$ [,col]` | 73 B |
+
+Plus **166 B of shared helpers** the three split: geometry 26, colour 17, addressing 21, put-cell 12,
+edge run 14, `pet2scr` 20 + its 8-byte table, and the 48-byte border table. Storage 7 B, vectors 6 B.
+
+**The optional colour defaults to what `COLOR` last set, and that costs one instruction.** The KERNAL
+keeps the current text colour at **`$0376`** (`kernal.sym`: `.color`) packed as
+`(background << 4) | foreground` — **byte for byte the VERA attribute format**, so an omitted colour is
+`LDA $0376` with no repacking. Measured, not assumed: `COLOR 5,2` leaves `$25` there, and it survives
+the compiled path (GPC's `CommandColor` emits PETSCII control codes and lets the KERNAL keep the
+books, so GPC has **no colour state of its own** — this really is "the colour `PRINT` would use").
+
+The sentinel is **256**, so `OptionalColourCompile`, not `OptionalParameterCompile`: `$FF` is a legal
+attribute (light grey on light grey). `TILE` gets this wrong and cannot write attribute `$FF` at all.
+
+**Characters are PETSCII and are converted here.** No PETSCII→screen-code conversion existed anywhere
+in GPC before this (repo-wide grep; `CHAR` hands bytes to `GRAPH_put_char`, `PRINT` to `BSOUT` —
+neither has a screen-code notion). `GPDrawPet2Scr` is prog8's shape: one add from an 8-entry table
+indexed by the top three bits, `$80,$00,$C0,$E0,$40,$C0,$80,$80`, plus a test for `$FF` (π is screen
+code `$5E`; the arithmetic gives `$7F`. `CHR$(222)` is the same character and needs no special case).
+
+*Known limit, and it is not a loss:* `pet2scr` cannot reach screen codes **`$A0-$BF`**, the reverse-video
+glyphs, because PETSCII expresses reverse with a control code rather than a character. Highlighting a
+menu row is a matter of swapping the **attribute**, which the colour argument does directly.
+
+**The border glyphs are VTUI's bytes, verified against the ROM charset rather than taken on trust.**
+No VTUI ASM source exists on this box (all copies of `VTUI1.2.BIN` are md5 `81fdd876…`), so the table
+was disassembled and then each glyph's 8x8 bitmap rendered out of `rom.bin` to settle the slot order:
+**b0=TR, b1=TL, b2=BR, b3=BL, b4=top, b5=bottom, b6=left, b7=right**. Style 4's `$77` is two filled
+rows at the *top* of the cell and its `$74` two filled columns at the *left* — no other reading fits.
+(The ROM holds only 128 glyphs per set; `$80`–`$FF` are generated by inverting `$00`–`$7F`, which is
+why a naive dump shows `$A0` as blank.)
+
+| style | look | TL | TR | BL | BR |
+|---|---|---|---|---|---|
+| 0 | solid block | `$A0` | `$A0` | `$A0` | `$A0` |
+| 1 | chequered dither | `$66` | `$66` | `$66` | `$66` |
+| 2 | single line | `$70` | `$6E` | `$6D` | `$7D` |
+| 3 | single line, rounded | `$55` | `$49` | `$4A` | `$4B` |
+| 4 | thick line | `$4F` | `$50` | `$4C` | `$7A` |
+| 5 | thick, shaded corners | `$69` | `$5F` | `$DF` | `$E9` |
+
+**Nothing clips.** `x`, `y`, `w`, `h` are bytes used as given: off the right edge wraps into the next
+row, off the bottom writes past the end of the map. **Zero width or height is caught** — that is the
+one a program reaches by accident, from a computed size, and it would otherwise count down through
+256 cells. `GP.BOX` also needs `w >= 2` and `h >= 2` to have two corners, and no-ops below that.
+Style `>= 6` is `OUT OF RANGE`.
+
+*Verified on R49:* fill glyph/colour/bounds, omitted colour resolving to `$25` after `COLOR 5,2`,
+`'A'`→1 / `'B'`→2, `176`→`$70` / `192`→`$40` / `255`→`$5E` / `160`→`$60`, all four sides and all six
+styles of a box, and every zero/degenerate case a no-op.
 
 **These are not restating `LOCATE`/`PRINT` — they are the fast path, and the margin is large.**
 `source/runtime/source/system-specific/x16/interface/x16_printchar.asm:23` shows GPC's per-character
