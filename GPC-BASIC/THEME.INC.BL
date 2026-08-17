@@ -10,14 +10,14 @@
 ## **  so "switch to dark" is reloading an array, not invoking a command.
 ## **
 ## **  #DEFINE substitutes at TRANSLATION time (BASLOAD.MD:313), so
-## **  THEME.C(THEME.TITLE) compiles to THEME.C(2) -- the name costs
+## **  THEME.CLR(THEME.TITLE) compiles to THEME.CLR(2) -- the name costs
 ## **  nothing at all: no variable, no lookup, and the index is a one byte
 ## **  short constant.
 ## **
 ## **  Usage:
 ## **      THEME.DARK = 1 : GOSUB THEME.LOAD
-## **      GP.BOX 4,2,30,8, 2, THEME.C(THEME.BORDER)
-## **      GP.PRINTAT 6,3, "TITLE", THEME.C(THEME.TITLE)
+## **      GP.BOX 4,2,30,8, 2, THEME.CLR(THEME.BORDER)
+## **      GP.PRINTAT 6,3, "TITLE", THEME.CLR(THEME.TITLE)
 ## **
 ## **  THE VALUES ARE PACKED ATTRIBUTES -- background * 16 + foreground --
 ## **  because that is exactly what GP.BOX, GP.FILL and GP.PRINTAT take,
@@ -46,9 +46,9 @@
 
 GOTO THEME.SKIP
 
-## THEME.LOAD -- fill THEME.C from THEME.DARK (0 light, non-zero dark).
+## THEME.LOAD -- fill THEME.CLR from THEME.DARK (0 light, non-zero dark).
 ##
-## THEME.C is deliberately DIMmed here rather than left to GPC's implicit
+## THEME.CLR is deliberately DIMmed here rather than left to GPC's implicit
 ## DIM: an implicit array is 0..10, and DIMming one GPC has already
 ## auto-dimensioned is an error -- so the module has to own it outright.
 ##
@@ -57,31 +57,31 @@ GOTO THEME.SKIP
 ## caller's own READs. The same reason STRHELP.PET2SCR is a compare chain.
 
 THEME.LOAD:
-    IF THEME.READY = 0 THEN DIM THEME.C(THEME.SLOTS) : THEME.READY = 1
+    IF THEME.READY = 0 THEN DIM THEME.CLR(THEME.SLOTS) : THEME.READY = 1
     IF THEME.DARK <> 0 THEN GOTO THEME.LOAD.DARK
 
-    THEME.C(THEME.PAGE)   = 6 * 16 + 6
-    THEME.C(THEME.TEXT)   = 6 * 16 + 1
-    THEME.C(THEME.TITLE)  = 6 * 16 + 7
-    THEME.C(THEME.BORDER) = 6 * 16 + 14
-    THEME.C(THEME.HILITE) = 1 * 16 + 6
-    THEME.C(THEME.DIMMED) = 6 * 16 + 12
-    THEME.C(THEME.WARN)   = 6 * 16 + 2
+    THEME.CLR(THEME.PAGE)   = 6 * 16 + 6
+    THEME.CLR(THEME.TEXT)   = 6 * 16 + 1
+    THEME.CLR(THEME.TITLE)  = 6 * 16 + 7
+    THEME.CLR(THEME.BORDER) = 6 * 16 + 14
+    THEME.CLR(THEME.HILITE) = 1 * 16 + 6
+    THEME.CLR(THEME.DIMMED) = 6 * 16 + 12
+    THEME.CLR(THEME.WARN)   = 6 * 16 + 2
     RETURN
 
 THEME.LOAD.DARK:
-    THEME.C(THEME.PAGE)   = 0 * 16 + 0
-    THEME.C(THEME.TEXT)   = 0 * 16 + 15
-    THEME.C(THEME.TITLE)  = 0 * 16 + 1
-    THEME.C(THEME.BORDER) = 0 * 16 + 11
-    THEME.C(THEME.HILITE) = 15 * 16 + 0
-    THEME.C(THEME.DIMMED) = 0 * 16 + 12
-    THEME.C(THEME.WARN)   = 0 * 16 + 8
+    THEME.CLR(THEME.PAGE)   = 0 * 16 + 0
+    THEME.CLR(THEME.TEXT)   = 0 * 16 + 15
+    THEME.CLR(THEME.TITLE)  = 0 * 16 + 1
+    THEME.CLR(THEME.BORDER) = 0 * 16 + 11
+    THEME.CLR(THEME.HILITE) = 15 * 16 + 0
+    THEME.CLR(THEME.DIMMED) = 0 * 16 + 12
+    THEME.CLR(THEME.WARN)   = 0 * 16 + 8
     RETURN
 
 ## THEME.SET -- make THEME.ROLE the colour PRINT uses.
 ##
-##   in   THEME.ROLE   a packed attribute, e.g. THEME.C(THEME.TEXT)
+##   in   THEME.ROLE   a packed attribute, e.g. THEME.CLR(THEME.TEXT)
 ##
 ## Splits it for COLOR, which takes foreground and background separately.
 ## INT(x/16), not a shift, and AND 15 is safe here only because a packed
