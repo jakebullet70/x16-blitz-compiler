@@ -17,11 +17,13 @@
 ## **      STRHELP.WIDTH   the field width  (PADR / PADL / PADC)
 ## **      STRHELP.DELIM$  the separator    (SPLIT)
 ## **      STRHELP.MAX     field array size (SPLIT, 0 means 10)
+## **      STRHELP.PET     a PETSCII code   (PET2SCR)
 ## **
 ## **  Clobbered (prog8 would say "clobbers"):
 ## **      STRHELP.GAP     STRHELP.HALF          by the pad routines
 ## **      STRHELP.REST$   STRHELP.AT            by SPLIT
 ## **      STRHELP.LIM     STRHELP.N             by SPLIT
+## **      STRHELP.SCR     the result            of PET2SCR
 ## **
 ## **  Usage:
 ## **      STRHELP.STR$ = NAME$ : STRHELP.WIDTH = 20
@@ -118,6 +120,47 @@ STRHELP.SPLIT.NEXT:
     STRHELP.FIELD$(STRHELP.N) = LEFT$(STRHELP.REST$, STRHELP.AT - 1)
     STRHELP.REST$ = MID$(STRHELP.REST$, STRHELP.AT + LEN(STRHELP.DELIM$))
     GOTO STRHELP.SPLIT.NEXT
+
+## STRHELP.PET2SCR -- a PETSCII code to the SCREEN code the tile map holds.
+##
+##   in    STRHELP.PET     0..255, what ASC() gives you
+##   out   STRHELP.SCR     the screen code TILE, TDATA and VPOKE want
+##   clobbers  nothing
+##
+## GP.PRINTAT and GP.FILL already do this internally, so you only need it
+## when writing the map yourself -- TILE X,Y,STRHELP.SCR, or a VPOKE into
+## the map for a whole row at once.
+##
+## IT IS IN BASIC ON PURPOSE, and not because of the byte count. The ASM
+## GPDrawPet2Scr sits at no fixed address: the resident runtime pins exactly
+## two things, the magic at RTBASE and the entry jmp at RTBASE+4, and
+## everything else floats from build to build. A GP.CALL to an address read
+## out of code.lbl today works until the next build and then quietly writes
+## somewhere else. Nine lines here cost the runtime nothing and cannot rot.
+##
+## The compare chain is VTUI's own shape rather than the ASM's 8-entry offset
+## table, because a table here would need a DATA statement -- and READ walks
+## every DATA in the whole program in order, so a library owning one would
+## silently derail the caller's own READs.
+##
+## $FF is the one value the arithmetic gets wrong: pi is screen code 94, not
+## 127. CHR$(222) is the same character and needs no special case.
+##
+## No conversion reaches screen codes 160..191, the reverse-video glyphs --
+## PETSCII says "reverse" with a control code, not a character. Swap the
+## colour attribute instead, which is what highlighting actually wants.
+
+STRHELP.PET2SCR:
+    STRHELP.SCR = STRHELP.PET
+    IF STRHELP.PET = 255 THEN STRHELP.SCR = 94 : RETURN
+    IF STRHELP.PET < 32 THEN STRHELP.SCR = STRHELP.PET + 128 : RETURN
+    IF STRHELP.PET < 64 THEN RETURN
+    IF STRHELP.PET < 96 THEN STRHELP.SCR = STRHELP.PET - 64 : RETURN
+    IF STRHELP.PET < 128 THEN STRHELP.SCR = STRHELP.PET - 32 : RETURN
+    IF STRHELP.PET < 160 THEN STRHELP.SCR = STRHELP.PET + 64 : RETURN
+    IF STRHELP.PET < 192 THEN STRHELP.SCR = STRHELP.PET - 64 : RETURN
+    STRHELP.SCR = STRHELP.PET - 128
+    RETURN
 
 STRHELP.SKIP:
 #ENDIF

@@ -28,10 +28,19 @@ Current contents:
 | `ARRAYS.EXP.BL` | `GP.SORT`, `GP.COMP`, `GP.ARRPTR` |
 | `SCREEN.EXP.BL` | `GP.BOX`, `GP.FILL`, `GP.PRINTAT`, `GP.STASH`/`GP.RESTR` |
 
-**Only two characters of a BASIC variable name are significant**, so `R30` and `R31` are the same
-variable and `BASE` is the same variable as `BA` — a silent wrong answer, not an error. The dotted
-names these examples use (`PANEL.COL`, `SEARCH.AT`) are long enough to read and cannot collide by
-accident. It is the same discipline that dodges the keyword-collision trap (`POS`, `MB`, `ST`).
+### Names — BASL is safe, a hand-written `.bas` is not
+
+**BASLOAD gives 64 significant characters; the built-in BASIC gives TWO** (`BASLOAD.MD:57`). So in a
+BASL source `PANEL.COL` and `PANEL.ROW` are genuinely different variables, and the readable names
+these examples use cost nothing.
+
+Write the same test as a `.bas` for the host tokeniser and the two-character rule is back: `R30`,
+`R31` and `R32` are all `R3`, and `BASE` is the same variable as `BA`. That is a **silent wrong
+answer, not an error** — it cost two test cycles while building tier 6, both times looking exactly
+like a compiler bug. Give raw `.bas` variables distinct first-two characters, or write BASL.
+
+Dotted names also dodge the keyword-collision trap (`POS`, `MB`, `ST`, `CHAR`), which BASL does *not*
+save you from — a reserved word cannot be an identifier at all.
 
 ## Why the includes exist at all
 

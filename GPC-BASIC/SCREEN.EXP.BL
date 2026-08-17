@@ -17,10 +17,12 @@
 #INCLUDE "GP.INC.BL"
 #SAVEAS "@:SCREEN.PRG"
 
-## NOTE ON NAMES: only TWO characters of a variable name are significant, so
-## R30 and R31 are the SAME variable, and BASE is the same variable as BA.
-## That is a silent wrong answer, not an error. Dotted names (BOX.TOP,
-## PANEL.ROW) are long enough to read and cannot collide by accident.
+## NOTE ON NAMES: BASLOAD gives 64 significant characters, so PANEL.COL and
+## PANEL.ROW below really are different variables. The BUILT-IN BASIC gives
+## only TWO -- so if you rewrite any of this as a plain .bas for the host
+## tokeniser, R30 and R31 become the same variable and BASE becomes the same
+## variable as BA, silently and with no error. That is a reason to write
+## BASL, not a reason to use short names here.
 
 ## ***********************************************************************
 ## **  1. GP.FILL and GP.BOX.  These write STRAIGHT INTO VERA and never
