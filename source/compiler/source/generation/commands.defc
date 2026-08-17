@@ -84,7 +84,7 @@
 ;
 ;	SYS    # T N
 ;
-	.byte	$07,$9e,$00,$e2,45271 & $FF,45271 >> 8,$06
+	.byte	$07,$9e,$00,$e2,45783 & $FF,45783 >> 8,$06
 ;
 ;	POKE    #,# T N
 ;
@@ -96,7 +96,7 @@
 ;
 ;	STOP    T N
 ;
-	.byte	$07,$90,$00,$20,45015 & $FF,45015 >> 8,$06
+	.byte	$07,$90,$00,$20,45527 & $FF,45527 >> 8,$06
 ;
 ;	END    T N
 ;
@@ -124,24 +124,24 @@
 ;
 ;	GP.TRIM   X:StringVariableCompile T N
 ;
-	.byte	$0a,$ce,$75,$03,StringVariableCompile & $FF,StringVariableCompile >> 8,$20,36567 & $FF,36567 >> 8,$06
+	.byte	$0a,$ce,$75,$03,StringVariableCompile & $FF,StringVariableCompile >> 8,$20,37079 & $FF,37079 >> 8,$06
 ;
 ;	GP.LTRIM   X:StringVariableCompile T N
 ;
-	.byte	$0a,$ce,$74,$03,StringVariableCompile & $FF,StringVariableCompile >> 8,$20,37079 & $FF,37079 >> 8,$06
+	.byte	$0a,$ce,$74,$03,StringVariableCompile & $FF,StringVariableCompile >> 8,$20,37591 & $FF,37591 >> 8,$06
 ;
 ;	GP.RTRIM   X:StringVariableCompile T N
 ;
-	.byte	$0a,$ce,$71,$03,StringVariableCompile & $FF,StringVariableCompile >> 8,$20,36823 & $FF,36823 >> 8,$06
+	.byte	$0a,$ce,$71,$03,StringVariableCompile & $FF,StringVariableCompile >> 8,$20,37335 & $FF,37335 >> 8,$06
 ;
 ;	GP.UPPER   X:StringVariableCompile T N
 ;
-	.byte	$0a,$ce,$73,$03,StringVariableCompile & $FF,StringVariableCompile >> 8,$20,36055 & $FF,36055 >> 8,$06
+	.byte	$0a,$ce,$73,$03,StringVariableCompile & $FF,StringVariableCompile >> 8,$20,36567 & $FF,36567 >> 8,$06
 ;
 ;	GP.LOWER   X:StringVariableCompile T N
 ;
-	.byte	$0a,$ce,$72,$03,StringVariableCompile & $FF,StringVariableCompile >> 8,$20,36311 & $FF,36311 >> 8,$06
+	.byte	$0a,$ce,$72,$03,StringVariableCompile & $FF,StringVariableCompile >> 8,$20,36823 & $FF,36823 >> 8,$06
 ;
 ;	GP.SORT   X:StringArrayCompile X:OptionalZeroCompile X:OptionalZeroCompile T N
 ;
-	.byte	$10,$ce,$6f,$03,StringArrayCompile & $FF,StringArrayCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$20,34775 & $FF,34775 >> 8,$06
+	.byte	$10,$ce,$6f,$03,StringArrayCompile & $FF,StringArrayCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$20,35287 & $FF,35287 >> 8,$06

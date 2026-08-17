@@ -3702,6 +3702,351 @@ gpdCount: 									; side rows for GP.BOX, characters for GP.PRINTAT
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;
+;		Name:		gpmenu.asm
+;		Purpose:	GP.MENU -- the menu interaction loop, and GP.SEL which reads its answer
+;		Created:	17th August 2026
+;		Reviewed: 	No
+;		Author : 	Steven De George SR
+;
+; ************************************************************************************************
+; ************************************************************************************************
+
+		.section 	code
+
+; ************************************************************************************************
+;
+;						GP.MENU x,y,w,n,hotkeys$ [,flags]     ->  GP.SEL
+;
+;		BASL DRAWS THE MENU, THIS DRIVES IT. That split is the whole reason a menu costs one token
+;		here where dotBASIC spent six: a menu waits on a HUMAN, so the speed argument that puts
+;		sorting and screen copying in assembly does not apply to laying one out. What does not
+;		belong in BASIC is the fiddly half -- reading keys, matching hotkeys, moving the highlight
+;		without a flicker -- and that is exactly what this is.
+;
+;		So the caller has already drawn n rows, each w cells wide, the first at (x,y). This
+;		highlights one, moves it with the cursor keys, and returns which row was chosen in GP.SEL:
+;		1..n for a choice, and 0 for cancelled.
+;
+;		THE HIGHLIGHT IS A NIBBLE SWAP, and that is why the command takes no colours. A text cell's
+;		attribute is (background << 4) | foreground, so exchanging the two nibbles is inverse video
+;		-- whatever the caller drew, in whatever colours, highlights correctly and un-highlights
+;		back to exactly what was there. A swap is its own inverse, so ONE routine does both, and
+;		there is no "normal colour" to pass in, remember, or get wrong.
+;
+;		It also means the menu never repaints the text, only the attribute bytes, so moving the
+;		highlight cannot disturb what BASL drew.
+;
+;		READ-MODIFY-WRITE OF A CELL NEEDS INCREMENT ZERO. VERA steps the address on every data
+;		access, read included, so with the usual increment of 1 the write-back would land on the
+;		next byte. TileSetAddress leaves increment 1, so the increment field is cleared before the
+;		loop and the address stepped by hand -- two bytes a cell, because only the attribute is
+;		being touched.
+;
+;		Keys: cursor up and down move, RETURN chooses, ESC and STOP cancel, and any other key is
+;		tried against the hotkey string. A hotkey chooses its row immediately -- it does not merely
+;		move the highlight there, which is what makes hotkeys worth having.
+;
+;		Hotkeys are matched WITHOUT CASE, through the same GPFoldUpper that GP.COMP and GP.SORT
+;		use. hotkeys$ is one character per row in order; a shorter string simply means the later
+;		rows have none, and an empty string means the menu is cursor-driven only.
+;
+; ************************************************************************************************
+
+GPM_MUSTSEL  = 1 							; ESC does not cancel: only a real choice leaves
+GPM_KEEPMARK = 2 							; leave the chosen row highlighted on the way out
+GPM_NOWRAP   = 4 							; stop at the ends instead of wrapping round
+
+GPM_DOWN  = $11 							; PETSCII cursor down / up, as GETIN reports them
+GPM_UP    = $91
+GPM_ENTER = $0D
+GPM_ESC   = $1B
+GPM_STOP  = $03
+
+CommandGPMenu: ;; [!gp.menu]
+		.entercmd
+		phy
+		ldx 	#3 							; x, y, w and n. Slot 4 is the hotkey STRING and must
+_CGMInteger: 								; not be run through FloatIntegerPart at all
+		.floatinteger
+		dex
+		bpl 	_CGMInteger
+		ldx 	#5
+		.floatinteger 						; the flags, past the string
+		;
+		lda 	NSMantissa0+0
+		sta 	gpmX
+		lda 	NSMantissa0+1
+		sta 	gpmY
+		lda 	NSMantissa0+2
+		sta 	gpmW
+		lda 	NSMantissa0+3
+		sta 	gpmN
+		lda 	NSMantissa0+5
+		sta 	gpmFlags
+		;
+		stz 	gpmSel 						; 0 is the cancelled answer, and it is also what a
+		lda 	gpmN 						; menu with no rows or no width returns -- without
+		beq 	_CGMNothing 				; touching the screen or waiting for a key
+		lda 	gpmW
+		bne 	_CGMHaveMenu
+_CGMNothing:
+		jmp 	_CGMDone 					; the exit is past the whole loop, out of branch range
+_CGMHaveMenu:
+		;
+		lda 	NSMantissa0+4 				; the hotkey string stays addressed for the whole
+		sta 	zTemp1 						; loop: [length][data], as everything else here
+		lda 	NSMantissa1+4
+		sta 	zTemp1+1
+		;
+		inc 	gpmSel 						; start on the first row, showing where we are
+		jsr 	GPMenuHighlight
+
+_CGMKey:
+		ldx 	#0 							; channel 0 is the keyboard. GETIN hands back 0 when
+		jsr 	XGetCharacterFromChannel 	; nothing is waiting, so this is the wait.
+		cmp 	#0
+		beq 	_CGMKey
+		sta 	gpmKey
+		;
+		cmp 	#GPM_DOWN
+		beq 	_CGMDown
+		cmp 	#GPM_UP
+		beq 	_CGMUp
+		cmp 	#GPM_ENTER
+		beq 	_CGMChooseVia 				; these three leave via a trampoline: the handlers sit
+		cmp 	#GPM_ESC 					; past the movement block, out of branch range, which
+		beq 	_CGMCancelVia 				; 64tass catches rather than mis-assembling
+		cmp 	#GPM_STOP
+		beq 	_CGMCancelVia
+		jmp 	_CGMHotkey
+_CGMChooseVia:
+		jmp 	_CGMChoose
+_CGMCancelVia:
+		jmp 	_CGMCancel
+
+; ************************************************************************************************
+;
+;		Moving. The old row is un-highlighted first (the same call that highlighted it), the
+;		selection moved, and the new row highlighted -- so only two rows are ever touched.
+;
+; ************************************************************************************************
+
+_CGMDown:
+		jsr 	GPMenuHighlight
+		lda 	gpmSel
+		cmp 	gpmN
+		bcs 	_CGMDownEnd 				; already on the last row
+		inc 	gpmSel
+		bra 	_CGMShow
+_CGMDownEnd:
+		jsr 	GPMenuMayWrap
+		bcc 	_CGMShow 					; NOWRAP: stay where we are, still highlighted
+		lda 	#1
+		sta 	gpmSel
+		bra 	_CGMShow
+
+_CGMUp:
+		jsr 	GPMenuHighlight
+		lda 	gpmSel
+		cmp 	#2
+		bcc 	_CGMUpEnd 					; already on the first row
+		dec 	gpmSel
+		bra 	_CGMShow
+_CGMUpEnd:
+		jsr 	GPMenuMayWrap
+		bcc 	_CGMShow
+		lda 	gpmN
+		sta 	gpmSel
+_CGMShow:
+		jsr 	GPMenuHighlight
+		jmp 	_CGMKey
+
+; ************************************************************************************************
+;
+;		Leaving. A choice keeps gpmSel; a cancel zeroes it. Either way the highlight comes off
+;		unless the caller asked to keep it, which is how a menu leaves its answer visible.
+;
+; ************************************************************************************************
+
+_CGMCancel:
+		lda 	gpmFlags
+		and 	#GPM_MUSTSEL
+		beq 	_CGMDoCancel
+		jmp 	_CGMKey 					; MUST SELECT: escape is simply not an answer
+_CGMDoCancel:
+		jsr 	GPMenuHighlight
+		stz 	gpmSel
+		bra 	_CGMDone
+
+_CGMChoose:
+		lda 	gpmFlags
+		and 	#GPM_KEEPMARK
+		bne 	_CGMDone
+		jsr 	GPMenuHighlight
+_CGMDone:
+		ply
+		ldx 	#$FF
+		.exitcmd
+
+; ************************************************************************************************
+;
+;		Anything else is tried as a hotkey. The scan stops at n even if the string is longer, so a
+;		stray extra character cannot select a row that does not exist.
+;
+; ************************************************************************************************
+
+_CGMHotkey:
+		lda 	gpmKey
+		jsr 	GPFoldUpper 				; the same fold GP.COMP and GP.SORT use
+		sta 	gpmKey
+		lda 	(zTemp1) 					; how many hotkeys were given
+		beq 	_CGMKeyAgain 				; none at all: cursor keys only
+		cmp 	gpmN
+		bcc 	_CGMHaveLimit
+		lda 	gpmN
+_CGMHaveLimit:
+		sta 	gpmLimit
+		ldy 	#0
+_CGMScan:
+		iny
+		lda 	(zTemp1),y
+		jsr 	GPFoldUpper
+		cmp 	gpmKey
+		beq 	_CGMHit
+		cpy 	gpmLimit
+		bne 	_CGMScan
+_CGMKeyAgain:
+		jmp 	_CGMKey 					; no match: the key meant nothing, keep waiting
+
+_CGMHit:
+		sty 	gpmLimit 					; hold the row: BOTH calls below use Y and gpmTemp,
+		jsr 	GPMenuHighlight 			; and gpmLimit is the one byte neither touches
+		lda 	gpmLimit
+		sta 	gpmSel
+		jsr 	GPMenuHighlight 			; show the choice on its way past
+		jmp 	_CGMChoose 					; a hotkey CHOOSES, it does not just move
+
+; ************************************************************************************************
+;
+;		GP.SEL -- the row GP.MENU returned, 1..n, or 0 if it was cancelled. A value word rather
+;		than a variable, exactly like GP.A and X16's own ST/MX/MY: nothing in the runtime can
+;		write a BASIC variable by name.
+;
+; ************************************************************************************************
+
+UnaryGPSel: ;; [!gp.sel]
+		.entercmd
+		lda 	gpmSel
+		jmp 	GPRegPush 					; inx, FloatSetByte, and out -- shared with GP.A
+
+; ************************************************************************************************
+;
+;		Carry SET if the selection is allowed to wrap round the ends.
+;
+; ************************************************************************************************
+
+GPMenuMayWrap:
+		lda 	gpmFlags
+		and 	#GPM_NOWRAP
+		beq 	_GMMWYes
+		clc
+		rts
+_GMMWYes:
+		sec
+		rts
+
+; ************************************************************************************************
+;
+;		Swap the attribute nibbles of row gpmSel's w cells: foreground and background trade
+;		places, which is inverse video. Called once to highlight and again to un-highlight --
+;		a nibble swap is its own inverse, so there is only ever one routine and one state.
+;
+; ************************************************************************************************
+
+GPMenuHighlight:
+		lda 	gpmX
+		sta 	tileX
+		stz 	tileX+1
+		clc
+		lda 	gpmY 						; row 1 is gpmY itself, so the offset is gpmSel-1
+		adc 	gpmSel
+		sta 	tileY
+		dec 	tileY
+		stz 	tileY+1
+		jsr 	TileSetAddress
+		;
+		lda 	VRAMHigh0 					; increment ZERO: a read and a write must hit the same
+		and 	#VRAMBank1 					; byte, and VERA steps the address on reads too
+		sta 	VRAMHigh0
+		inc 	VRAMLow0 					; the attribute is the second byte of the cell
+		bne 	_GMHRow
+		inc 	VRAMMed0
+_GMHRow:
+		ldy 	gpmW
+_GMHCell:
+		lda 	VRAMData0
+		pha
+		asl 	a 							; low nibble up
+		asl 	a
+		asl 	a
+		asl 	a
+		sta 	gpmTemp
+		pla
+		lsr 	a 							; high nibble down
+		lsr 	a
+		lsr 	a
+		lsr 	a
+		ora 	gpmTemp
+		sta 	VRAMData0
+		;
+		clc 								; on to the next CELL, which is two bytes
+		lda 	VRAMLow0
+		adc 	#2
+		sta 	VRAMLow0
+		bcc 	_GMHNext
+		inc 	VRAMMed0
+_GMHNext:
+		dey
+		bne 	_GMHCell
+		rts
+
+		.send 	code
+
+		.section storage
+gpmX:
+		.fill 	1
+gpmY: 										; the row the FIRST entry sits on
+		.fill 	1
+gpmW: 										; how many cells wide the highlight is
+		.fill 	1
+gpmN: 										; how many entries
+		.fill 	1
+gpmSel: 									; 1..n while running, and the answer on the way out
+		.fill 	1
+gpmFlags:
+		.fill 	1
+gpmKey: 									; the key just read, folded once it reaches the hotkeys
+		.fill 	1
+gpmTemp: 									; the nibble being moved -- clobbered by every highlight
+		.fill 	1
+gpmLimit: 									; hotkey scan limit, then the row a hotkey hit
+		.fill 	1
+		.send 	storage
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;		17/08/26		Written.
+;
+; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
 ;		Name:		gpsort.asm
 ;		Purpose:	GP.SORT -- shell sort a string array in place
 ;		Created:	17th August 2026
@@ -10464,80 +10809,82 @@ ShiftVectorTable:
 	.word	CommandGPBox             ; $d784 gp.box
 	.word	CommandGPFill            ; $d785 gp.fill
 	.word	CommandGPPrintAt         ; $d786 gp.printat
-	.word	CommandGPSort            ; $d787 gp.sort
-	.word	UnaryGPArrPtr            ; $d788 gp.arrptr
-	.word	CommandGPStash           ; $d789 gp.stash
-	.word	CommandGPRestore         ; $d78a gp.restr
-	.word	UnaryGPComp              ; $d78b gp.comp
-	.word	CommandGPUpper           ; $d78c gp.upper
-	.word	CommandGPLower           ; $d78d gp.lower
-	.word	CommandGPTrim            ; $d78e gp.trim
-	.word	CommandGPRTrim           ; $d78f gp.rtrim
-	.word	CommandGPLTrim           ; $d790 gp.ltrim
-	.word	UnaryJoy                 ; $d791 joy
-	.word	LinkFloatIntegerPartDown ; $d792 int
-	.word	LinkFloatSquareRoot      ; $d793 sqr
-	.word	LinkFloatLogarithm       ; $d794 log
-	.word	LinkFloatExponent        ; $d795 exp
-	.word	LinkFloatCosine          ; $d796 cos
-	.word	LinkFloatSine            ; $d797 sin
-	.word	LinkFloatTangent         ; $d798 tan
-	.word	LinkFloatArcTan          ; $d799 atn
-	.word	CommandXLinput           ; $d79a linput
-	.word	CommandXBinput           ; $d79b binput
-	.word	Command_LOAD             ; $d79c load
-	.word	Command_BLOAD            ; $d79d bload
-	.word	Command_BVLOAD           ; $d79e bvload
-	.word	Command_VLOAD            ; $d79f vload
-	.word	Command_BSAVE            ; $d7a0 bsave
-	.word	Command_BVERIFY          ; $d7a1 bverify
-	.word	X16CommandPowerOff       ; $d7a2 poweroff
-	.word	X16CommandReset          ; $d7a3 reset
-	.word	X16CommandReboot         ; $d7a4 reboot
-	.word	XCommandMouse            ; $d7a5 mouse
-	.word	XUnaryMB                 ; $d7a6 mb
-	.word	XUnaryMX                 ; $d7a7 mx
-	.word	XUnaryMY                 ; $d7a8 my
-	.word	XUnaryMWheel             ; $d7a9 mwheel
-	.word	UnaryRPT                 ; $d7aa rpt$
-	.word	Command_SPRITE           ; $d7ab sprite
-	.word	Command_SPRMEM           ; $d7ac sprmem
-	.word	Command_MOVSPR           ; $d7ad movspr
-	.word	UnaryST                  ; $d7ae st
-	.word	CommandStop              ; $d7af stop
-	.word	CommandSYS               ; $d7b0 sys
-	.word	UnaryTDATA               ; $d7b1 tdata
-	.word	UnaryTATTR               ; $d7b2 tattr
-	.word	Command_TILE             ; $d7b3 tile
-	.word	CommandTIWriteN          ; $d7b4 ti.write
-	.word	CommandTIWriteS          ; $d7b5 ti$.write
-	.word	CommandXWAIT             ; $d7b6 wait
-	.word	X16I2CPoke               ; $d7b7 i2cpoke
-	.word	X16I2CPeek               ; $d7b8 i2cpeek
-	.word	CommandBank              ; $d7b9 bank
-	.word	XCommandSleep            ; $d7ba sleep
-	.word	X16_Audio_FMINIT         ; $d7bb fminit
-	.word	X16_Audio_FMNOTE         ; $d7bc fmnote
-	.word	X16_Audio_FMDRUM         ; $d7bd fmdrum
-	.word	X16_Audio_FMINST         ; $d7be fminst
-	.word	X16_Audio_FMVIB          ; $d7bf fmvib
-	.word	X16_Audio_FMFREQ         ; $d7c0 fmfreq
-	.word	X16_Audio_FMVOL          ; $d7c1 fmvol
-	.word	X16_Audio_FMPAN          ; $d7c2 fmpan
-	.word	X16_Audio_FMPLAY         ; $d7c3 fmplay
-	.word	X16_Audio_FMCHORD        ; $d7c4 fmchord
-	.word	X16_Audio_FMPOKE         ; $d7c5 fmpoke
-	.word	X16_Audio_PSGINIT        ; $d7c6 psginit
-	.word	X16_Audio_PSGNOTE        ; $d7c7 psgnote
-	.word	X16_Audio_PSGVOL         ; $d7c8 psgvol
-	.word	X16_Audio_PSGWAV         ; $d7c9 psgwav
-	.word	X16_Audio_PSGFREQ        ; $d7ca psgfreq
-	.word	X16_Audio_PSGPAN         ; $d7cb psgpan
-	.word	X16_Audio_PSGPLAY        ; $d7cc psgplay
-	.word	X16_Audio_PSGCHORD       ; $d7cd psgchord
-	.word	CommandCls               ; $d7ce cls
-	.word	CommandLocate            ; $d7cf locate
-	.word	CommandColor             ; $d7d0 color
+	.word	CommandGPMenu            ; $d787 gp.menu
+	.word	UnaryGPSel               ; $d788 gp.sel
+	.word	CommandGPSort            ; $d789 gp.sort
+	.word	UnaryGPArrPtr            ; $d78a gp.arrptr
+	.word	CommandGPStash           ; $d78b gp.stash
+	.word	CommandGPRestore         ; $d78c gp.restr
+	.word	UnaryGPComp              ; $d78d gp.comp
+	.word	CommandGPUpper           ; $d78e gp.upper
+	.word	CommandGPLower           ; $d78f gp.lower
+	.word	CommandGPTrim            ; $d790 gp.trim
+	.word	CommandGPRTrim           ; $d791 gp.rtrim
+	.word	CommandGPLTrim           ; $d792 gp.ltrim
+	.word	UnaryJoy                 ; $d793 joy
+	.word	LinkFloatIntegerPartDown ; $d794 int
+	.word	LinkFloatSquareRoot      ; $d795 sqr
+	.word	LinkFloatLogarithm       ; $d796 log
+	.word	LinkFloatExponent        ; $d797 exp
+	.word	LinkFloatCosine          ; $d798 cos
+	.word	LinkFloatSine            ; $d799 sin
+	.word	LinkFloatTangent         ; $d79a tan
+	.word	LinkFloatArcTan          ; $d79b atn
+	.word	CommandXLinput           ; $d79c linput
+	.word	CommandXBinput           ; $d79d binput
+	.word	Command_LOAD             ; $d79e load
+	.word	Command_BLOAD            ; $d79f bload
+	.word	Command_BVLOAD           ; $d7a0 bvload
+	.word	Command_VLOAD            ; $d7a1 vload
+	.word	Command_BSAVE            ; $d7a2 bsave
+	.word	Command_BVERIFY          ; $d7a3 bverify
+	.word	X16CommandPowerOff       ; $d7a4 poweroff
+	.word	X16CommandReset          ; $d7a5 reset
+	.word	X16CommandReboot         ; $d7a6 reboot
+	.word	XCommandMouse            ; $d7a7 mouse
+	.word	XUnaryMB                 ; $d7a8 mb
+	.word	XUnaryMX                 ; $d7a9 mx
+	.word	XUnaryMY                 ; $d7aa my
+	.word	XUnaryMWheel             ; $d7ab mwheel
+	.word	UnaryRPT                 ; $d7ac rpt$
+	.word	Command_SPRITE           ; $d7ad sprite
+	.word	Command_SPRMEM           ; $d7ae sprmem
+	.word	Command_MOVSPR           ; $d7af movspr
+	.word	UnaryST                  ; $d7b0 st
+	.word	CommandStop              ; $d7b1 stop
+	.word	CommandSYS               ; $d7b2 sys
+	.word	UnaryTDATA               ; $d7b3 tdata
+	.word	UnaryTATTR               ; $d7b4 tattr
+	.word	Command_TILE             ; $d7b5 tile
+	.word	CommandTIWriteN          ; $d7b6 ti.write
+	.word	CommandTIWriteS          ; $d7b7 ti$.write
+	.word	CommandXWAIT             ; $d7b8 wait
+	.word	X16I2CPoke               ; $d7b9 i2cpoke
+	.word	X16I2CPeek               ; $d7ba i2cpeek
+	.word	CommandBank              ; $d7bb bank
+	.word	XCommandSleep            ; $d7bc sleep
+	.word	X16_Audio_FMINIT         ; $d7bd fminit
+	.word	X16_Audio_FMNOTE         ; $d7be fmnote
+	.word	X16_Audio_FMDRUM         ; $d7bf fmdrum
+	.word	X16_Audio_FMINST         ; $d7c0 fminst
+	.word	X16_Audio_FMVIB          ; $d7c1 fmvib
+	.word	X16_Audio_FMFREQ         ; $d7c2 fmfreq
+	.word	X16_Audio_FMVOL          ; $d7c3 fmvol
+	.word	X16_Audio_FMPAN          ; $d7c4 fmpan
+	.word	X16_Audio_FMPLAY         ; $d7c5 fmplay
+	.word	X16_Audio_FMCHORD        ; $d7c6 fmchord
+	.word	X16_Audio_FMPOKE         ; $d7c7 fmpoke
+	.word	X16_Audio_PSGINIT        ; $d7c8 psginit
+	.word	X16_Audio_PSGNOTE        ; $d7c9 psgnote
+	.word	X16_Audio_PSGVOL         ; $d7ca psgvol
+	.word	X16_Audio_PSGWAV         ; $d7cb psgwav
+	.word	X16_Audio_PSGFREQ        ; $d7cc psgfreq
+	.word	X16_Audio_PSGPAN         ; $d7cd psgpan
+	.word	X16_Audio_PSGPLAY        ; $d7ce psgplay
+	.word	X16_Audio_PSGCHORD       ; $d7cf psgchord
+	.word	CommandCls               ; $d7d0 cls
+	.word	CommandLocate            ; $d7d1 locate
+	.word	CommandColor             ; $d7d2 color
 	.send code
 ; ************************************************************************************************
 ; ************************************************************************************************

@@ -40,3 +40,6 @@ GP.C 			T N
 
 POINTER 		X:UnsupportedCompile N
 STRPTR 			X:UnsupportedCompile N
+# 	GP.MENU's answer: 1..n for a choice, 0 for cancelled. Same shape as GP.A above.
+
+GP.SEL 			T N

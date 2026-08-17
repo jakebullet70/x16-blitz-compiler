@@ -163,7 +163,11 @@ FrameStackPages = 16 						; 4K, ~250 frames
 ;		sorts BEFORE gpsort.asm and gpstash.asm, so the three new shifted markers were inserted
 ;		below theirs rather than appended, and everything from gp.sort upwards moved by three.
 ;
-RT_ABI = 16 								; runtime ABI ordinal -> "GP16" magic (NOT the file name)
+;		16 -> 17 on 17th August 2026: GP.MENU / GP.SEL, in gpmenu.asm. "gpmenu" sorts between
+;		"gpdraw" and "gpsort", so the two new shifted markers were inserted rather than appended
+;		and everything from gp.sort upwards moved by two.
+;
+RT_ABI = 17 								; runtime ABI ordinal -> "GP17" magic (NOT the file name)
 
 ; ************************************************************************************************
 ;

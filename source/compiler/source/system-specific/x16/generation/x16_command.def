@@ -112,3 +112,11 @@ GP.RESTR 		# X:OptionalParameterCompile X:OptionalParameterCompile T N
 GP.BOX 			#,#,#,# X:OptionalZeroCompile X:OptionalColourCompile T N
 GP.FILL 		#,#,#,#,# X:OptionalColourCompile T N
 GP.PRINTAT 		#,#,$ X:OptionalColourCompile T N
+
+# 	GP.MENU drives a menu BASL has already drawn: n rows, each w wide, the first at x,y. The
+# 	hotkey string is one character per row and may be shorter than n (or empty). flags is
+# 	OptionalZeroCompile, so a bare GP.MENU is flags 0 and costs a one-byte push. The answer
+# 	comes back through GP.SEL (x16_unary.def), a value word, because nothing in the runtime can
+# 	write a BASIC variable by name.
+
+GP.MENU 		#,#,#,#,$ X:OptionalZeroCompile T N

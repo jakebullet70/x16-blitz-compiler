@@ -41,10 +41,10 @@ string, moving 2 KB of screen. That is the whole list.
 | | |
 |---|---|
 | Target | ~1.5 KB (1,536 B) for the whole set |
-| Planned, still to build | ~415 B (`GP.MENU` only) |
-| Already shipped, measured | **1,858 B** — tiers 1-6 complete |
-| **All-in** | **~2,273 B — about 740 B over the original target** |
-| Why that is accepted | RTBASE moved to `$6400` on 17th August; the runtime ends `$99E5` with **1,306 B** free |
+| Planned, still to build | **nothing** — the ASM side is complete |
+| Shipped, measured | **2,235 B** across tiers 1-9 |
+| **All-in** | **2,235 B — about 700 B over the original target** |
+| Why that is accepted | RTBASE moved to `$6400` on 17th August; the runtime ends `$9B5E` with **929 B** still free |
 | Fixed cost per keyword | **6 B** (2 vector slot + 4 glue) before any code |
 | Free `GP.*` BASIC tokens | 119 of 127 (`$CE01`–`$CE7F`) |
 | Free p-code opcodes | 27 unshifted (41 cycles), 60 shifted (58 cycles, +1 byte per call) |
@@ -90,9 +90,8 @@ compiles at roughly **14 bytes of p-code per line**. BASL menus (~60–100 lines
 | 6 | Drawing ×3 (`GP.LOCATE` **CUT**) — **SHIPPED** | 440 |
 | 7 | Input — **BASL** | 0 |
 | 8 | Colour / theme — **BASL** | 0 |
-| 9 | `GP.MENU` interaction loop — the only ASM left | ~415 |
-| | **Built so far** | **1,858** |
-| | **Still to build** | **~415** |
+| 9 | `GP.MENU` + `GP.SEL` — **SHIPPED** | 377 |
+| | **Built — the ASM side is COMPLETE** | **2,235** |
 
 #### Measured overrun, 17th August 2026 — read this before trusting an estimate below
 
@@ -108,7 +107,8 @@ The estimates in this table have run **1.62x over** on average. Actuals:
 | `GP.ARRPTR` | 15 | 49 | x3.27 |
 | stash / restore | 290 | 368 | x1.27 |
 | drawing x3 | 250 | 440 | x1.76 |
-| **total** | **1,154** | **1,800** | **x1.56** |
+| `GP.MENU` + `GP.SEL` | 266 | 377 | x1.42 |
+| **total** | **1,420** | **2,177** | **x1.53** |
 
 The pattern is not random: the two worst overruns are the two commands that had to VALIDATE
 something (array header, element type, null pointers) and RETYPE a result. The estimates costed the
@@ -673,7 +673,35 @@ not just colours: menu flags become `GP.MENU x,y,w,n,hk$, MENU_MUSTSELECT+MENU_H
 **Constraint:** a `#DEFINE` name may not collide with a BASIC reserved word, variable or label — so
 constants need a prefix distinct from variables in the library's naming discipline.
 
-### §9 Menus — 1 token + BASL
+### §9 Menus — SHIPPED 17th August 2026, 377 B, RT_ABI 17
+
+`GP.MENU x,y,w,n,hotkeys$ [,flags]` drives a menu BASL has already drawn, and the row chosen comes
+back in **`GP.SEL`** (1..n, or 0 for cancelled) — a value word, because nothing in the runtime can
+write a BASIC variable by name.
+
+**IT TAKES NO COLOURS, and that is the design.** The highlight is a **swap of the cell's own attribute
+nibbles**: an attribute is `(bg << 4) | fg`, so exchanging the halves is inverse video. Whatever the
+caller drew, in whatever colours, highlights correctly and un-highlights back to exactly what was
+there — and because a nibble swap **is its own inverse**, one routine does both and there is no
+"normal colour" to pass, store or get wrong. Only attribute bytes are touched, never the text, so
+moving the highlight cannot disturb the drawing.
+
+**Read-modify-write of a cell needs increment ZERO.** VERA steps the address on reads as well as
+writes, so with the usual increment of 1 the write-back lands on the next byte. `TileSetAddress`
+leaves increment 1, so the field is cleared and the address stepped by hand, two bytes a cell.
+
+Keys: cursor up/down move, RETURN chooses, ESC and STOP cancel, anything else is tried as a hotkey —
+matched **without case** through the same `GPFoldUpper` that `GP.COMP` and `GP.SORT` use. A hotkey
+**chooses** its row rather than merely moving to it, which is what makes hotkeys worth having.
+
+Flags (added together): `1` MUST SELECT (ESC does not cancel), `2` KEEP MARK (leave the chosen row
+highlighted), `4` NO WRAP (stop at the ends).
+
+*Verified on R49*, all eleven cases: two-downs-and-RETURN with the highlight correctly removed
+afterwards, hotkey by upper and lower case, ESC, wrap at both ends, no-wrap at both ends, all three
+flags, an empty hotkey string, and zero rows returning 0 without waiting for a key.
+
+### §9 Menus — the original plan
 
 **Split as dotBASIC effectively did: BASL draws, ASM interacts.**
 
@@ -759,6 +787,27 @@ commands, not as a live decision.
 ---
 
 ## 7. Verification
+
+### Driving a compiled program's keyboard — `-bas` paste is NOT enough
+
+Measured 17th August 2026 while testing `GP.MENU`, after three runs hung and looked like a bug in the
+cursor-up path.
+
+**x16emu's `-bas` paste STOPS DEAD at `$91`** (cursor up). Not "drops the key" — *stops*: nothing
+after it is ever delivered, so the program waits forever. `$11` (cursor down), `$0D`, `$1B`, `$43` and
+`$64` all paste fine, so the tell is the high bit. A test whose keys are all under `$80` will pass and
+tell you nothing about the rest.
+
+**The fix is to inject keys through the KERNAL instead**, which is exact, ordered and needs no paste:
+
+```basic
+POKE 1,0 : GP.CALL $F09F,145 : POKE 1,4     : REM kbdbuf_put, cursor up
+```
+
+`kbdbuf_put` is at `$F09F` inside the **banked** ROM window, and compiled GPC code runs with ROM bank
+4 (BASIC) selected — hence the `POKE 1,0` around it. Verified: injecting `65` then `GET` returns "A".
+The queue at `$A800`/`$A80A` that `kernal.sym` calls `keyd`/`ndx` is **not** what `GETIN` reads —
+poking it directly reads back fine and changes nothing.
 
 - **Compile-and-run each new keyword headlessly. Omit `-echo` on the compile step** — it deadlocks the
   emulator on a full stdout pipe and silently truncates the object to a byte-exact prefix that BRKs

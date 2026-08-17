@@ -1,0 +1,101 @@
+## ***********************************************************************
+## **
+## **  MENU.EXP.BL -- a whole small application, in the shape the GP set
+## **  was designed for.
+## **
+## **  GP.MENU     the interaction loop, in assembly
+## **  THEME.*     colour roles, in BASIC data
+## **  APPHELP.*   leave the user's screen as you found it
+## **  GP.STASH    a dialog over the display, and the display back
+## **
+## **  Build:  copy GP.INC.BL, THEME.INC.BL, APPHELP.INC.BL and this file
+## **          into testing/, then
+## **            python source/gpc/build_basl.py MENU.EXP.BL MENU.PRG
+## **          and compile MENU.PRG with GPC.BLITZ.BIN.
+## **
+## **  THE SPLIT IS THE POINT. Every line of layout below is BASIC, and it
+## **  is BASIC because a menu waits on a HUMAN -- the speed argument that
+## **  puts sorting and screen copying in assembly does not apply. What is
+## **  in assembly is the part BASIC is bad at: reading keys, matching
+## **  hotkeys, and moving a highlight without flicker.
+## **
+## ***********************************************************************
+#INCLUDE "GP.INC.BL"
+#INCLUDE "THEME.INC.BL"
+#INCLUDE "APPHELP.INC.BL"
+#SAVEAS "@:MENU.PRG"
+
+## #DEFINE substitutes at translation time, so these cost nothing at all --
+## no variable, no lookup, and each compiles to a short constant.
+
+#DEFINE MENU.LEFT 8
+#DEFINE MENU.TOP 6
+#DEFINE MENU.WIDE 24
+#DEFINE MENU.COUNT 4
+
+## ---- Remember the user's screen BEFORE changing anything, and lay the
+## ---- application out from what it reports. The X16 boots 80x60 but
+## ---- SCREEN 0 is 40x30, and someone who prefers larger text is running
+## ---- one -- so nothing below assumes a size.
+
+GOSUB APPHELP.STARTUP
+
+THEME.DARK = 0
+GOSUB THEME.LOAD
+
+DIM MENU.ITEM$(MENU.COUNT)
+MENU.ITEM$(1) = " NEW GAME"
+MENU.ITEM$(2) = " LOAD"
+MENU.ITEM$(3) = " OPTIONS"
+MENU.ITEM$(4) = " QUIT"
+
+## ---- The main loop. GP.MENU returns 0 when the user pressed ESC; here
+## ---- there is nothing to back out to, so it just redraws.
+
+MENU.MAIN:
+    GOSUB MENU.DRAW
+    GP.MENU MENU.LEFT, MENU.TOP, MENU.WIDE, MENU.COUNT, "NLOQ"
+    MENU.PICK = GP.SEL
+    IF MENU.PICK = 0 THEN GOTO MENU.MAIN
+    IF MENU.PICK = MENU.COUNT THEN GOTO MENU.QUIT
+    GOSUB MENU.DIALOG
+    GOTO MENU.MAIN
+
+MENU.QUIT:
+    GOSUB APPHELP.RESTORE
+    PRINT "BYE"
+    END
+
+## ---- Drawing. Note there is no colour arithmetic anywhere: every colour
+## ---- is a NAMED ROLE, so re-skinning the whole application is
+## ---- THEME.DARK = 1 and nothing else.
+
+MENU.DRAW:
+    GP.FILL 0, 0, APPHELP.COLS, APPHELP.ROWS, ASC(" "), THEME.C(THEME.PAGE)
+    GP.FILL 0, 0, APPHELP.COLS, 1, ASC(" "), THEME.C(THEME.TITLE)
+    GP.PRINTAT 2, 0, "GP.BASIC DEMONSTRATION", THEME.C(THEME.TITLE)
+    GP.BOX MENU.LEFT - 1, MENU.TOP - 1, MENU.WIDE + 2, MENU.COUNT + 2, 2, THEME.C(THEME.BORDER)
+    GP.FILL MENU.LEFT, MENU.TOP, MENU.WIDE, MENU.COUNT, ASC(" "), THEME.C(THEME.TEXT)
+    FOR MENU.I = 1 TO MENU.COUNT
+        GP.PRINTAT MENU.LEFT, MENU.TOP + MENU.I - 1, MENU.ITEM$(MENU.I), THEME.C(THEME.TEXT)
+    NEXT
+    GP.PRINTAT 2, APPHELP.ROWS - 1, "CURSOR KEYS, RETURN, OR N L O Q", THEME.C(THEME.DIMMED)
+    RETURN
+
+## ---- A dialog over the display. GP.STASH copies what is underneath into
+## ---- a RAM bank and GP.RESTR puts it back, so the application never has
+## ---- to redraw itself -- which is the entire reason the pair exists.
+## ---- The stash carries its own w, h, x and y, so the restore is told
+## ---- nothing but the bank.
+
+MENU.DIALOG:
+    GP.STASH 1, 20, 10, 36, 5
+    GP.FILL 20, 10, 36, 5, ASC(" "), THEME.C(THEME.WARN)
+    GP.BOX 20, 10, 36, 5, 4, THEME.C(THEME.WARN)
+    GP.PRINTAT 22, 12, "CHOSE" + MENU.ITEM$(MENU.PICK), THEME.C(THEME.WARN)
+    GP.PRINTAT 22, 13, "PRESS ANY KEY", THEME.C(THEME.WARN)
+MENU.DIALOG.WAIT:
+    GET MENU.KEY$
+    IF MENU.KEY$ = "" THEN GOTO MENU.DIALOG.WAIT
+    GP.RESTR 1
+    RETURN

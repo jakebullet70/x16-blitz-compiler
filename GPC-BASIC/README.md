@@ -27,6 +27,9 @@ Current contents:
 | `SPLITT.EXP.BL` | `STRHELP.SPLIT`, the BASL tokeniser |
 | `ARRAYS.EXP.BL` | `GP.SORT`, `GP.COMP`, `GP.ARRPTR` |
 | `SCREEN.EXP.BL` | `GP.BOX`, `GP.FILL`, `GP.PRINTAT`, `GP.STASH`/`GP.RESTR` |
+| `THEME.INC.BL` | colour roles, light and dark. Data, not code — no tokens, no runtime bytes |
+| `APPHELP.INC.BL` | `APPHELP.STARTUP`/`RESTORE` (leave the user's screen as you found it) and panels saved to disk |
+| `MENU.EXP.BL` | `GP.MENU` + `GP.SEL`, with the theme and app helpers — a whole small application |
 
 ### Names — BASL is safe, a hand-written `.bas` is not
 

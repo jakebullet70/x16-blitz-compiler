@@ -147,4 +147,32 @@
 #TOKEN GP.FILL 52842
 #TOKEN GP.PRINTAT 52841
 
+## GP.MENU x,y,w,n,hotkeys$ [,flags]   ->   GP.SEL
+##
+## BASL DRAWS THE MENU, THIS DRIVES IT. Draw n rows yourself, each w cells
+## wide, the first at x,y -- with GP.FILL and GP.PRINTAT, or however you
+## like. GP.MENU then highlights one, moves it with the cursor keys, and
+## returns the row chosen in GP.SEL: 1..n for a choice, 0 for cancelled.
+##
+##   cursor up / down   move          RETURN   choose
+##   ESC or STOP        cancel        a hotkey chooses its row AT ONCE
+##
+## hotkeys$ is one character per row, in order, matched WITHOUT case. It
+## may be shorter than n (the later rows simply have none) or "" for a
+## cursor-driven menu.
+##
+## IT TAKES NO COLOURS, because the highlight is a swap of the cell's own
+## attribute nibbles -- foreground and background trade places. Whatever
+## you drew, in whatever colours, highlights correctly and un-highlights
+## back to exactly what was there. Only the attribute bytes are touched,
+## never the text, so moving the highlight cannot disturb your drawing.
+##
+## flags, added together:
+##    1  MUST SELECT   ESC does not cancel; only a real choice leaves
+##    2  KEEP MARK     leave the chosen row highlighted on the way out
+##    4  NO WRAP       stop at the ends instead of wrapping round
+
+#TOKEN GP.MENU 52840
+#TOKEN GP.SEL 52839
+
 #ENDIF
