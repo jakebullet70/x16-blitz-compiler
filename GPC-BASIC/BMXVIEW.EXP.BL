@@ -1,297 +1,67 @@
 ## ***********************************************************************
 ## **
-## **  BMXVIEW.EXP.BL -- load and show a BMX bitmap.
+## **  BMXVIEW.EXP.BL -- a BMX bitmap viewer, in about thirty lines.
 ## **
-## **  BMX is the X16's own bitmap format (MooingLemur's). The reference
-## **  viewer is samples/BMXVIEWER/BMXVIEWER.BAS, written for interpreted
-## **  BASIC; this is the same job in GP.BASIC, and it is shorter for two
-## **  specific reasons:
+## **  All the work is in BMX.INC.BL; this is only the part that talks to a
+## **  person. It uses the two-step form -- BMX.OPEN, look at the header,
+## **  then SCREEN and BMX.PAINT -- so a file that turns out not to be a BMX
+## **  is reported on the text screen the user is already looking at, rather
+## **  than after the display has been torn down to show it.
 ## **
-## **    GP.STRPTR   the reference has to POINTER() a string and then PEEK
-## **                the CBM descriptor to find the bytes. GPC rejects
-## **                POINTER outright -- its strings are not laid out that
-## **                way -- and GP.STRPTR hands back the address directly.
+## **  BMX is the X16's own bitmap format. The reference viewer is
+## **  samples/BMXVIEWER/BMXVIEWER.BAS, written for interpreted BASIC; the
+## **  GP.BASIC version is shorter for two specific reasons, both of them in
+## **  BMX.INC.BL: GP.STRPTR replaces POINTER() plus a PEEK of the CBM
+## **  string descriptor, and GP.CALL replaces staging A/X/Y/C through
+## **  $030C..$030F and SYSing.
 ## **
-## **    GP.CALL     the reference POKEs $030C..$030F to stage A/X/Y/C and
-## **                then SYSes. GP.CALL takes them as arguments and gives
-## **                the results back in GP.A / GP.X / GP.Y / GP.C, which
-## **                is exactly the shape MACPTR wants.
-## **
-## **  It also drops the framebuffer API entirely: an image narrower than
-## **  320 is placed by setting the VERA address per row, which centres any
-## **  size for free and needs no cursor calls at all.
-## **
-## **  Build:  copy GP.INC.BL, APPHELP.INC.BL and this file into testing/,
-## **          then
+## **  Build:  copy GP.INC.BL, APPHELP.INC.BL, BMX.INC.BL and this file
+## **          into testing/, then
 ## **            python source/gpc/build_basl.py BMXVIEW.EXP.BL BMXVIEW.PRG
 ## **          and compile BMXVIEW.PRG with GPC.BLITZ.BIN. Put some .BMX
 ## **          files on the same drive -- samples/BMXVIEWER/SAMPLES has 30.
 ## **
-## **  8 bits per pixel only, uncompressed only. Those are the files
-## **  SCREEN $80 can show without a decompressor.
-## **
 ## ***********************************************************************
 #INCLUDE "GP.INC.BL"
 #INCLUDE "APPHELP.INC.BL"
+#INCLUDE "BMX.INC.BL"
 #SAVEAS "@:BMXVIEW.PRG"
 
-## KERNAL entries. MACPTR is the fast block reader: it moves up to .A bytes
-## from the open channel to the address in .X/.Y and reports how many it
-## actually moved back in .X/.Y. WITH CARRY SET the address is NOT stepped,
-## which is what lets it fire a whole row straight at a VERA data port.
+#DEFINE VIEW.MODE 128
 
-#DEFINE BMXK.MACPTR $FF44
-#DEFINE BMXK.CHKIN $FFC6
-#DEFINE BMXK.CLRCHN $FFCC
-
-#DEFINE BMXK.VCTRL $9F25
-#DEFINE BMXK.VLO $9F20
-#DEFINE BMXK.VMID $9F21
-#DEFINE BMXK.VHI $9F22
-
-## $9F23 is VERA data port 0, split into the two bytes GP.CALL wants.
-#DEFINE BMXK.PORTLO 35
-#DEFINE BMXK.PORTHI 159
-
-## SCREEN 128 is $80, 320x240 at 256 colours.
-#DEFINE BMXK.MODE 128
-#DEFINE BMXK.LFN 4
+## ---- Remember the screen the user had, so quitting puts it back rather
+## ---- than leaving them at a READY in whatever the last picture used.
 
 GOSUB APPHELP.STARTUP
 
-## The palette lives at VRAM $1FA00, and that is 129536 -- too big for
-## #DEFINE, which takes an INT16 (BASLOAD.MD:313). So it is an ordinary
-## variable. Every VRAM address past $FFFF has the same problem, which is
-## also why BMX.SPLIT below does its masking with arithmetic.
-
-BMX.PALBASE = 129536
-
-## The header buffer. GP.STRPTR returns the address of [ActLen][Data], so
-## the bytes themselves start one later -- and because the block is real
-## RAM the KERNAL can write into it. That is the whole trick: no PEEKing a
-## descriptor, and no fixed scratch address to collide with anything.
-##
-## $0400 would have been the obvious scratch buffer and is NOT free: a
-## compiled GPC program keeps runtime state there, and it corrupts quietly.
-
-BMX.HEADER$ = RPT$(32, 32)
-BMX.PTR = GP.STRPTR(BMX.HEADER$) + 1
-BMX.SCRATCH$ = RPT$(32, 255)
-BMX.SCRATCH = GP.STRPTR(BMX.SCRATCH$) + 1
-
-BMX.MAIN:
+VIEW.MAIN:
     PRINT
     INPUT "BMX FILE (RETURN ALONE TO STOP)";BMX.FILE$
-    IF BMX.FILE$ = "" THEN GOTO BMX.QUIT
+    IF BMX.FILE$ = "" THEN GOTO VIEW.QUIT
     GP.UPPER BMX.FILE$
     IF GP.INSTR(BMX.FILE$, ".") = 0 THEN BMX.FILE$ = BMX.FILE$ + ".BMX"
-    GOSUB BMX.LOAD
-    IF BMX.ERROR$ <> "" THEN GOTO BMX.COMPLAIN
-    GOSUB BMX.WAIT
-    GOTO BMX.MAIN
 
-BMX.COMPLAIN:
+    GOSUB BMX.OPEN
+    IF BMX.ERROR$ <> "" THEN GOTO VIEW.COMPLAIN
+
+    PRINT BMX.WIDTH;"X";BMX.HEIGHT;BMX.PALUSED;"COLOURS"
+    SCREEN VIEW.MODE
+    GOSUB BMX.PAINT
+    GOSUB VIEW.ANYKEY
+    SCREEN APPHELP.MODE
+    IF BMX.ERROR$ <> "" THEN GOTO VIEW.COMPLAIN
+    GOTO VIEW.MAIN
+
+VIEW.COMPLAIN:
     PRINT BMX.ERROR$
-    GOTO BMX.MAIN
+    GOTO VIEW.MAIN
 
-BMX.QUIT:
+VIEW.QUIT:
     GOSUB APPHELP.RESTORE
     PRINT "BYE"
     END
 
-## ***********************************************************************
-## **  BMX.LOAD -- open, validate, and paint.
-## **
-## **    in   BMX.FILE$     out  BMX.ERROR$   empty if it worked
-## **
-## **  The file is read strictly in order -- 32 byte header, palette, image
-## **  -- which is why nothing here ever seeks: the channel is already
-## **  standing exactly where the next thing starts.
-## ***********************************************************************
-
-BMX.LOAD:
-    BMX.ERROR$ = ""
-    BMX.INGFX = 0
-    OPEN BMXK.LFN, 8, 4, BMX.FILE$ + ",S,R"
-    GP.CALL BMXK.CHKIN, 0, BMXK.LFN, 0, 0
-
-    BMX.ADDR = BMX.PTR
-    GOSUB BMX.SPLIT
-    GP.CALL BMXK.MACPTR, 32, BMX.LO, BMX.HI, 0
-    BMX.STEP = GP.X + GP.Y * 256
-    IF BMX.STEP < 32 THEN BMX.ERROR$ = "CANNOT READ " + BMX.FILE$
-    IF BMX.ERROR$ <> "" THEN GOTO BMX.LOAD.END
-
-    GOSUB BMX.PARSE
-    IF BMX.ERROR$ <> "" THEN GOTO BMX.LOAD.END
-
-    SCREEN BMXK.MODE
-    BMX.INGFX = 1
-
-## ---- The palette, straight from the file into VRAM. BMX stores only the
-## ---- entries it uses, starting at the index it names, so a picture can
-## ---- share the screen with something already using the low colours.
-
-    BMX.ADDR = BMX.PALBASE + BMX.PALFIRST * 2
-    GOSUB BMX.VERA
-    BMX.COUNT = BMX.PALUSED * 2
-    GOSUB BMX.STREAM
-    IF BMX.ERROR$ <> "" THEN GOTO BMX.LOAD.END
-
-## ---- The header names where the image data starts. Normally that is
-## ---- right after the palette, but honour it rather than assume it.
-
-    BMX.SKIP = BMX.DATAOFF - 32 - BMX.PALUSED * 2
-    IF BMX.SKIP > 0 THEN GOSUB BMX.DISCARD
-
-## ---- The image, one row at a time. Setting the VERA address per row
-## ---- costs 240 pokes for a full screen and buys centring of any size,
-## ---- with no framebuffer cursor calls and no special case for 320 wide.
-
-    BMX.X0 = INT((320 - BMX.WIDTH) / 2)
-    IF BMX.X0 < 0 THEN BMX.X0 = 0
-    BMX.Y0 = INT((240 - BMX.HEIGHT) / 2)
-    IF BMX.Y0 < 0 THEN BMX.Y0 = 0
-    BMX.ROWS = BMX.HEIGHT
-    IF BMX.ROWS > 240 THEN BMX.ROWS = 240
-
-    FOR BMX.ROW = 0 TO BMX.ROWS - 1
-        BMX.ADDR = (BMX.Y0 + BMX.ROW) * 320 + BMX.X0
-        GOSUB BMX.VERA
-        BMX.COUNT = BMX.WIDTH
-        GOSUB BMX.STREAM
-        IF BMX.ERROR$ <> "" THEN GOTO BMX.LOAD.END
-    NEXT
-
-BMX.LOAD.END:
-    GP.CALL BMXK.CLRCHN
-    CLOSE BMXK.LFN
-    BMX.UNDO = 0
-    IF BMX.ERROR$ <> "" THEN BMX.UNDO = BMX.INGFX
-    IF BMX.UNDO = 1 THEN SCREEN APPHELP.MODE
-    RETURN
-
-## ***********************************************************************
-## **  BMX.PARSE -- the 32 byte header, read straight out of the string.
-## **
-## **   0-2  "BMX"          6-7  width         12-13 image data offset
-## **     3  version        8-9  height           14 compression
-## **     4  bits per pixel  10  palette entries used, 0 meaning 256
-## **     5  VERA depth reg   11  first palette index
-## ***********************************************************************
-
-BMX.PARSE:
-    BMX.VERSION = PEEK(BMX.PTR + 3)
-    BMX.DEPTH = PEEK(BMX.PTR + 4)
-    BMX.WIDTH = PEEK(BMX.PTR + 6) + PEEK(BMX.PTR + 7) * 256
-    BMX.HEIGHT = PEEK(BMX.PTR + 8) + PEEK(BMX.PTR + 9) * 256
-    BMX.PALUSED = PEEK(BMX.PTR + 10)
-    IF BMX.PALUSED = 0 THEN BMX.PALUSED = 256
-    BMX.PALFIRST = PEEK(BMX.PTR + 11)
-    BMX.DATAOFF = PEEK(BMX.PTR + 12) + PEEK(BMX.PTR + 13) * 256
-    BMX.PACKED = PEEK(BMX.PTR + 14)
-
-    BMX.BAD = 0
-    IF PEEK(BMX.PTR) <> 66 THEN BMX.BAD = 1
-    IF PEEK(BMX.PTR + 1) <> 77 THEN BMX.BAD = 1
-    IF PEEK(BMX.PTR + 2) <> 88 THEN BMX.BAD = 1
-    IF BMX.BAD = 1 THEN BMX.ERROR$ = BMX.FILE$ + " IS NOT A BMX FILE"
-    IF BMX.BAD = 1 THEN RETURN
-
-    IF BMX.VERSION <> 1 THEN BMX.ERROR$ = "BMX VERSION" + STR$(BMX.VERSION) + " IS NOT SUPPORTED"
-    IF BMX.ERROR$ <> "" THEN RETURN
-
-## ---- Bit depth is a SPARSE selector -- 1, 2, 4, 8 and nothing else --
-## ---- which is what GP.SELECT is for. ON x GOSUB cannot index it, and a
-## ---- chain of IFs would re-read the variable every time. The 8 case is
-## ---- deliberately empty: a match falls straight out of the select.
-
-    GP.SELECT BMX.DEPTH
-    GP.CASE 8
-    GP.CASE 1, 2, 4
-        BMX.ERROR$ = STR$(BMX.DEPTH) + " BIT IMAGES NEED ANOTHER SCREEN MODE"
-    GP.ELSE
-        BMX.ERROR$ = "BAD BIT DEPTH IN THE HEADER"
-    GP.ENDSEL
-    IF BMX.ERROR$ <> "" THEN RETURN
-
-    IF BMX.PACKED <> 0 THEN BMX.ERROR$ = "LZSA COMPRESSED FILES ARE NOT SUPPORTED"
-    RETURN
-
-## ***********************************************************************
-## **  BMX.SPLIT -- a 17 bit VRAM (or 16 bit RAM) address into bytes.
-## **
-## **    in  BMX.ADDR    out  BMX.LO  BMX.HI  BMX.BANK
-## **
-## **  Arithmetic, not AND: AND is 16 bit SIGNED in GPC, so a VRAM address
-## **  above 32767 -- which every row past the top eighth of the screen is
-## **  -- would raise OUT OF RANGE rather than mask.
-## ***********************************************************************
-
-BMX.SPLIT:
-    BMX.BANK = INT(BMX.ADDR / 65536)
-    BMX.REST = BMX.ADDR - BMX.BANK * 65536
-    BMX.HI = INT(BMX.REST / 256)
-    BMX.LO = BMX.REST - BMX.HI * 256
-    RETURN
-
-## ---- Point VERA data port 0 at BMX.ADDR, stepping by one. The high byte
-## ---- carries the increment in its top nibble, so 16 is "add 1 per byte"
-## ---- and the bank bit rides in bit 0.
-
-BMX.VERA:
-    GOSUB BMX.SPLIT
-    POKE BMXK.VCTRL, 0
-    POKE BMXK.VLO, BMX.LO
-    POKE BMXK.VMID, BMX.HI
-    POKE BMXK.VHI, BMX.BANK + 16
-    RETURN
-
-## ***********************************************************************
-## **  BMX.STREAM -- BMX.COUNT bytes from the channel into VERA.
-## **
-## **  Carry SET on the GP.CALL is the whole point: MACPTR then leaves its
-## **  target address alone, so every byte lands on the same data port and
-## **  VERA does the stepping. This is the loop that makes the difference
-## **  between a viewer that paints instantly and one you watch fill in.
-## **
-## **  A zero-length transfer means the file ran out. Without that test the
-## **  loop would spin for ever on a truncated file.
-## ***********************************************************************
-
-BMX.STREAM:
-    BMX.GOT = 0
-BMX.STREAM.MORE:
-    BMX.CHUNK = BMX.COUNT - BMX.GOT
-    IF BMX.CHUNK > 255 THEN BMX.CHUNK = 255
-    GP.CALL BMXK.MACPTR, BMX.CHUNK, BMXK.PORTLO, BMXK.PORTHI, 1
-    BMX.STEP = GP.X + GP.Y * 256
-    IF BMX.STEP = 0 THEN BMX.ERROR$ = BMX.FILE$ + " ENDED EARLY"
-    IF BMX.ERROR$ <> "" THEN RETURN
-    BMX.GOT = BMX.GOT + BMX.STEP
-    IF BMX.GOT < BMX.COUNT THEN GOTO BMX.STREAM.MORE
-    RETURN
-
-## ---- Throw away BMX.SKIP bytes. Carry CLEAR this time, so MACPTR walks
-## ---- the scratch string's storage rather than hammering one address.
-
-BMX.DISCARD:
-    BMX.ADDR = BMX.SCRATCH
-    GOSUB BMX.SPLIT
-BMX.DISCARD.MORE:
-    BMX.CHUNK = BMX.SKIP
-    IF BMX.CHUNK > 255 THEN BMX.CHUNK = 255
-    GP.CALL BMXK.MACPTR, BMX.CHUNK, BMX.LO, BMX.HI, 0
-    BMX.STEP = GP.X + GP.Y * 256
-    IF BMX.STEP = 0 THEN RETURN
-    BMX.SKIP = BMX.SKIP - BMX.STEP
-    IF BMX.SKIP > 0 THEN GOTO BMX.DISCARD.MORE
-    RETURN
-
-## ---- Hold the picture until a key, then back to text.
-
-BMX.WAIT:
-    GET BMX.KEY$
-    IF BMX.KEY$ = "" THEN GOTO BMX.WAIT
-    SCREEN APPHELP.MODE
+VIEW.ANYKEY:
+    GET VIEW.KEY$
+    IF VIEW.KEY$ = "" THEN GOTO VIEW.ANYKEY
     RETURN

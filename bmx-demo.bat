@@ -8,11 +8,11 @@ rem  screen mode and colour back.
 rem
 rem      CAT1   TREE1   XMASCARD   SNOWMAN   PIZZACAT   ROBOCAT
 rem
-rem  Source: GPC-BASIC\BMXVIEW.EXP.BL  (+ GP.INC.BL, APPHELP.INC.BL)
+rem  Source: GPC-BASIC\BMXVIEW.EXP.BL, on GPC-BASIC\BMX.INC.BL
 rem
 rem  demo\ is BUILD OUTPUT and is not in git. To make it:
-rem    1. copy GP.INC.BL, APPHELP.INC.BL and BMXVIEW.EXP.BL from GPC-BASIC\
-rem       into testing\
+rem    1. copy GP.INC.BL, APPHELP.INC.BL, BMX.INC.BL and BMXVIEW.EXP.BL
+rem       from GPC-BASIC\ into testing\
 rem    2. python source\gpc\build_basl.py BMXVIEW.EXP.BL BMXVIEW.PRG
 rem    3. compile testing\BMXVIEW.PRG with GPC.BLITZ.BIN, and put the object
 rem       in demo\ as C.BMXVIEW.PRG
