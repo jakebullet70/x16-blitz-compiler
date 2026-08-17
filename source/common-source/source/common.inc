@@ -134,7 +134,10 @@ FrameStackPages = 16 						; 4K, ~250 frames
 ;		10 -> 11 on 17th August 2026: GP.COMP joined gpstring.asm -- a shifted marker, so every
 ;		shifted opcode above it moved up one.
 ;
-RT_ABI = 11 								; runtime ABI ordinal -> "GP11" magic (NOT the file name)
+;		11 -> 12 on 17th August 2026: GP.SORT, in its own gpsort.asm. That file sorts between
+;		"gpstring.asm" and "gpcall.asm" in the commands directory, so it renumbered from there up.
+;
+RT_ABI = 12 								; runtime ABI ordinal -> "GP12" magic (NOT the file name)
 
 ; ************************************************************************************************
 ;

@@ -198,6 +198,57 @@ _SVCFailPull:
 _SVCFail:
 		.error_syntax
 
+; ************************************************************************************************
+;
+;		A STRING ARRAY, written with EMPTY parentheses -- GP.SORT A$(). Pushes the array's BASE
+;		address and nothing else.
+;
+;		The parentheses are required and are not decoration: in BASIC A$ and A$() are different
+;		variables, so accepting the bare name would find the SCALAR and silently sort nothing at
+;		all. ExtractVariableName already sets NSSArray when it sees the "(" and consumes it, so
+;		all that is left here is to insist on the ")".
+;
+;		Deliberately does NOT emit PCD_ARRAY1 -- that is the keyword that turns a base address
+;		plus subscripts into an ELEMENT address, and the whole point here is to hand the runtime
+;		the array itself. Pushing the base is the same idiom GetReferenceTerm uses just before it
+;		emits that keyword: pretend the slot is an int16 and read it.
+;
+; ************************************************************************************************
+
+StringArrayCompile:
+		jsr 	GetNextNonSpace 			; a variable starts with a letter
+		jsr 	CharIsAlpha
+		bcc 	_SACFail
+		jsr 	ExtractVariableName 		; name in YX, type bits in X, "(" consumed if present
+		cpx 	#0
+		bpl 	_SACFail 					; no "(" at all, so it is a scalar, not an array
+		txa
+		and 	#NSSTypeMask
+		cmp 	#NSSString
+		bne 	_SACFail 					; and it has to be a string array
+		;
+		phy 								; hold the name over the ")" check
+		phx
+		jsr 	GetNextNonSpace
+		cmp 	#")"
+		bne 	_SACFailPull 				; empty parentheses only -- no subscript belongs here
+		plx
+		ply
+		;
+		jsr 	FindVariable 				; CS: exists, YX = its slot. CC: never mentioned.
+		bcc 	_SACFail
+		lda 	#NSSIFloat+NSSIInt16 		; read the slot as an int16, which pushes the array's
+		clc 								; base address without indexing into it
+		jsr 	GetSetVariable
+		clc
+		rts
+
+_SACFailPull:
+		plx
+		ply
+_SACFail:
+		.error_syntax
+
 		.send code
 
 ; ************************************************************************************************

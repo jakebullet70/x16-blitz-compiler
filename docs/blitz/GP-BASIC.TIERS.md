@@ -379,10 +379,61 @@ address from `GP.STRPTR` on a literal is read-only.
 
 | Command | Form |
 |---|---|
-| `GP.SORT` | `GP.SORT a$ [,dir] [,case]` |
+| `GP.SORT` | `GP.SORT a$() [,dir] [,case]` |
 
 **Shell sort**, in place, 2-byte pointer swaps. No recursion, no stack use, no worst-case blowup;
-~n^1.3 on real data. Comparison reuses `strings/compare.asm`.
+~n^1.3 on real data.
+
+#### Design settled 17th August 2026 — read this before writing the code
+
+Everything below was verified against the source, not assumed.
+
+**Syntax is `GP.SORT A$()`, with the empty parentheses REQUIRED.** They are not decoration: in
+BASIC `A$` and `A$()` are different variables, so without the parens the compiler would find the
+scalar and silently sort nothing. `ExtractVariableName` (`variables/getname.asm:66`) already sets
+`NSSArray` in the returned type and **consumes the `(`**, so the helper only has to check that bit
+and then require the `)`. VB spells it the same way.
+
+**The compile helper pushes the array's BASE address and stops there** — it must NOT emit
+`PCD_ARRAY1`, which is what turns a base plus subscripts into an element address. The idiom is
+already in `variables/refterm.asm:70`:
+
+```asm
+lda     #NSSIFloat+NSSIInt16        ; pretend it is an int16 reference
+clc
+jsr     GetSetVariable              ; pushes the array's base address
+```
+
+**Array block layout** (`commands/dim.asm`, confirmed against `memory/array.asm`):
+
+| offset | |
+|---|---|
+| +0,+1 | element count — this is `DIM n` **plus one** |
+| +2 | type byte; **bit 7 set = this level has sub-arrays** |
+| +3.. | the elements, **2 bytes** each for a string (6 for a float) |
+
+The base address arrives as an **offset**, so the handler must add `variableStartPage` to the high
+byte exactly as `ArrayConvert1` does.
+
+**Three things the handler must reject or handle, all real:**
+
+1. **Multi-dimensional arrays** — bit 7 of the type byte. Sorting one is meaningless; raise
+   `.error_index` rather than scrambling it.
+2. **Non-string arrays** — the element size is 6, not 2, so the pointer arithmetic would be wrong
+   in a way that corrupts memory silently. The compile helper catches this, but check anyway.
+3. **Null elements.** A never-assigned string element is `$0000`, and `ReadStringZTemp0Sub`
+   substitutes a static empty string for it (`memory/read_string.asm:47`). The comparator MUST do
+   the same — treat a zero pointer as length 0 — or a `DIM A$(20)` with five entries used walks
+   off into low memory. **This is the trap in this command.**
+
+**Element count is capped at 255** and anything larger raises `.error_range`. A 16-bit index would
+grow every address calculation in the inner loop for a case no BASIC program on this machine has;
+the cap is documented, not silent.
+
+**The comparator is NOT `strings/compare.asm` as this document previously said** — that one is a
+p-code handler reading its operands off the number stack, and the sort needs a plain subroutine
+taking two block pointers. It shares the *shape* of `CompareStrings` and the case-folding of
+`GP.COMP`, so `,case` selects between folding and not by pointing at one of two comparators.
 
 ### §5 Screen stash / restore — 2 tokens
 

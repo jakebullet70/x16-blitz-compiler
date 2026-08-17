@@ -88,3 +88,9 @@ GP.LTRIM 		X:StringVariableCompile T N
 GP.RTRIM 		X:StringVariableCompile T N
 GP.UPPER 		X:StringVariableCompile T N
 GP.LOWER 		X:StringVariableCompile T N
+#
+#		GP.SORT a$() [,descending] [,foldcase] -- shell sort in place, swapping the 2 byte element
+#		pointers. The parentheses are REQUIRED: A$ and A$() are different variables, so without them
+#		the compiler would find the scalar and sort nothing.
+#
+GP.SORT 		X:StringArrayCompile X:OptionalZeroCompile X:OptionalZeroCompile T N

@@ -80,4 +80,13 @@
 
 #TOKEN GP.COMP 52848
 
+## GP.SORT a$() [,descending] [,foldcase] -- shell sort the array in place.
+## The EMPTY PARENTHESES ARE REQUIRED: in BASIC A$ and A$() are different
+## variables, so without them the compiler finds the scalar and sorts
+## nothing. Both options default to 0 (ascending, case-sensitive) and any
+## non-zero value turns them on. Maximum 254 as the DIM bound (255 items).
+## Never-assigned elements count as empty strings and sort to the front.
+
+#TOKEN GP.SORT 52847
+
 #ENDIF
