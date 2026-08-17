@@ -31,6 +31,8 @@ Current contents:
 | `APPHELP.INC.BL` | `APPHELP.STARTUP`/`RESTORE` (leave the user's screen as you found it) and panels saved to disk |
 | `MENU.EXP.BL` | `GP.MENU` + `GP.SEL`, with the theme and app helpers — a whole small application |
 | `SELECT.EXP.BL` | `GP.SELECT` / `GP.CASE` / `GP.ELSE` / `GP.ENDSEL`, and where it beats `ON x GOSUB` |
+| `INPHELP.INC.BL` | a positioned, length-limited entry field — what `INPUT`/`LINPUT` cannot do on a drawn screen |
+| `FORM.EXP.BL` | three fields you can move between: `INPHELP` with the theme and app helpers |
 | `BMX.INC.BL` | load a BMX bitmap into VERA — `GP.STRPTR` + `GP.CALL MACPTR` streaming straight at the data port |
 | `BMXVIEW.EXP.BL` | the viewer built on it: prompt, header, picture |
 

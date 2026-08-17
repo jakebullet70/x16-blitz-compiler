@@ -94,7 +94,7 @@ compiles at roughly **14 bytes of p-code per line**. BASL menus (~60–100 lines
 | 4 | `GP.SORT` + `GP.ARRPTR` — **SHIPPED** | 447 |
 | 5 | Stash / restore — **SHIPPED** (368, then 329 after the `TileSetAddress` re-base) | 329 |
 | 6 | Drawing ×3 (`GP.LOCATE` **CUT**) — **SHIPPED** | 440 |
-| 7 | Input — **BASL** | 0 |
+| 7 | Input — **SHIPPED as `INPHELP.INC.BL`**, BASL | 0 |
 | 8 | Colour / theme — **BASL** | 0 |
 | 9 | `GP.MENU` + `GP.SEL` — **SHIPPED** | 377 |
 | 10 | `GP.SELECT` / `GP.CASE` / `GP.ELSE` / `GP.ENDSEL` — **SHIPPED** | 127 |
@@ -659,10 +659,39 @@ stores to `VERA_DATA0`. This is the single biggest speed win in the drawing sect
 *Moved to BASL:* `GP.CENTER` — arithmetic plus `GP.PRINTAT`, one line.
 *Not doing:* `GP.STRING` — X16's `RPT$` covers it.
 
-### §7 Input — BASL, 0 tokens
+### §7 Input — SHIPPED 17th August 2026 as `INPHELP.INC.BL`. BASL, 0 tokens, 0 runtime bytes
 
-Positioned, length-limited entry built in BASL from `GET` + `GP.BOX` + `GP.FILL` (−166 B).
-`INPUT`/`LINPUT` already exist, and only programs that want a form pay for it.
+Positioned, length-limited entry built in BASL from `GET` + `GP.FILL` + `GP.PRINTAT` (−166 B against
+doing it in assembly). `INPUT`/`LINPUT` already exist, and only programs that want a form pay for it.
+
+**What `INPUT` cannot do, and why the field exists at all:** `INPUT` and `LINPUT` own the bottom of
+the screen, scroll it, echo in whatever colour is current, and accept any length. On a drawn screen
+all four are fatal. A field stays where it is put, in the attribute it is given, and stops at the
+width allowed.
+
+`INPHELP.GET` edits a string in place; `INPHELP.ASK` puts a label in front of one. Both hand back
+**the key that ended the field** in `INPHELP.KEY`, which is what makes a multi-field form possible:
+RETURN, cursor up, cursor down and TAB all leave with the text kept, ESC and STOP put back what was
+there. So a form is a loop over fields, not a sequence of prompts — and the user can go back and fix
+the first field without starting again.
+
+Two details worth keeping:
+
+**The cursor blinks off `TI`, not a delay loop.** `GET` returns immediately with `""` when nothing is
+pressed, so the wait polls the jiffy clock; a delay loop would swallow keys pressed during it. When
+the field is full there is no cell after the text to put a cursor in, so it inverts the **last
+character** rather than blanking it — "full" without losing anything off the display.
+
+**Nothing in the key handler jumps out of the `GP.SELECT`.** `GP.ENDSEL` is what releases the
+selector's frame, so a `GOTO` past it would leak one on every keystroke. A flag tested after
+`GP.ENDSEL` costs one comparison and cannot leak. This is the pattern to copy anywhere a select sits
+inside a loop.
+
+*Verified on R49*, six cases: type / rub out / type, ESC restoring the previous value, a full field
+refusing more, the mask showing asterisks while holding the real string, a PETSCII control code
+refused, and cursor-down leaving the field with the text kept and the key reported. `FORM.EXP.BL` was
+then driven end to end through all three of its fields. Keys were injected with `kbdbuf_put`, because
+`-bas` paste cannot drive a program sitting in a `GET` loop.
 
 ### §8 Colour / theme — BASL data, 0 tokens, 0 ASM
 

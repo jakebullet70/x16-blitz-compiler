@@ -1,0 +1,112 @@
+## ***********************************************************************
+## **
+## **  FORM.EXP.BL -- three fields you can move between, INPHELP style.
+## **
+## **  The whole point of INPHELP over INPUT is on show here: the fields sit
+## **  inside a drawn panel, in theme colours, at fixed widths, and none of
+## **  them scrolls the screen. INPUT could not draw this at all -- it owns
+## **  the bottom line, echoes in whatever colour is current, and takes as
+## **  many characters as you care to type.
+## **
+## **  A FORM IS A LOOP, not a sequence of prompts. INPHELP.GET hands back
+## **  the key that ended the field, so cursor up and down move the focus
+## **  and RETURN accepts the lot -- which also means the user can go back
+## **  and fix the first field without starting again.
+## **
+## **  Build:  copy GP.INC.BL, THEME.INC.BL, APPHELP.INC.BL, INPHELP.INC.BL
+## **          and this file into testing/, then
+## **            python source/gpc/build_basl.py FORM.EXP.BL FORM.PRG
+## **          and compile FORM.PRG with GPC.BLITZ.BIN.
+## **
+## ***********************************************************************
+#INCLUDE "GP.INC.BL"
+#INCLUDE "THEME.INC.BL"
+#INCLUDE "APPHELP.INC.BL"
+#INCLUDE "INPHELP.INC.BL"
+#SAVEAS "@:FORM.PRG"
+
+#DEFINE FORM.LEFT 8
+#DEFINE FORM.TOP 5
+#DEFINE FORM.WIDE 40
+#DEFINE FORM.FIELDS 3
+#DEFINE FORM.COL 22
+
+GOSUB APPHELP.STARTUP
+THEME.DARK = 0
+GOSUB THEME.LOAD
+
+DIM FORM.LABEL$(FORM.FIELDS)
+DIM FORM.VALUE$(FORM.FIELDS)
+DIM FORM.WIDTH(FORM.FIELDS)
+DIM FORM.HIDE(FORM.FIELDS)
+
+FORM.LABEL$(1) = "CALL SIGN"       : FORM.WIDTH(1) = 12 : FORM.HIDE(1) = 0
+FORM.LABEL$(2) = "LANDING PAD"     : FORM.WIDTH(2) =  4 : FORM.HIDE(2) = 0
+FORM.LABEL$(3) = "ACCESS CODE"     : FORM.WIDTH(3) =  8 : FORM.HIDE(3) = 1
+
+GOSUB FORM.DRAW
+
+## ---- The loop. FORM.AT is the focused field; the key that ended the last
+## ---- one decides where it goes next.
+
+FORM.AT = 1
+FORM.LOOP:
+    INPHELP.X = FORM.COL
+    INPHELP.Y = FORM.TOP + FORM.AT
+    INPHELP.LEN = FORM.WIDTH(FORM.AT)
+    INPHELP.ATTR = THEME.CLR(THEME.HILITE)
+    INPHELP.MASK = FORM.HIDE(FORM.AT)
+    INPHELP.TEXT$ = FORM.VALUE$(FORM.AT)
+    GOSUB INPHELP.GET
+    FORM.VALUE$(FORM.AT) = INPHELP.TEXT$
+
+    ## put the field back in the ordinary colour, so only the focused one
+    ## is highlighted
+    INPHELP.ATTR = THEME.CLR(THEME.TEXT)
+    GOSUB INPHELP.RENDER
+    GP.FILL INPHELP.X, INPHELP.Y, INPHELP.LEN, 1, 32, INPHELP.ATTR
+    IF INPHELP.SHOW$ <> "" THEN GP.PRINTAT INPHELP.X, INPHELP.Y, INPHELP.SHOW$, INPHELP.ATTR
+
+    GP.SELECT INPHELP.KEY
+        GP.CASE 27, 3
+            FORM.QUIT = 1
+        GP.CASE 145
+            FORM.AT = FORM.AT - 1
+        GP.CASE 13, 17, 9
+            FORM.AT = FORM.AT + 1
+    GP.ENDSEL
+
+    IF FORM.QUIT = 1 THEN GOTO FORM.CANCELLED
+    IF FORM.AT < 1 THEN FORM.AT = FORM.FIELDS
+    IF FORM.AT > FORM.FIELDS THEN GOTO FORM.ACCEPTED
+    GOTO FORM.LOOP
+
+FORM.ACCEPTED:
+    GOSUB APPHELP.RESTORE
+    PRINT "SIGN  ";FORM.VALUE$(1)
+    PRINT "PAD   ";FORM.VALUE$(2)
+    PRINT "CODE  ";LEN(FORM.VALUE$(3));"CHARACTERS, NOT SHOWN"
+    END
+
+FORM.CANCELLED:
+    GOSUB APPHELP.RESTORE
+    PRINT "CANCELLED"
+    END
+
+## ---- Everything below is drawing, and it is all BASIC, because a form
+## ---- waits on a person. Nothing here would be faster in assembly.
+
+FORM.DRAW:
+    GP.FILL 0, 0, APPHELP.COLS, APPHELP.ROWS, 32, THEME.CLR(THEME.PAGE)
+    GP.FILL 0, 0, APPHELP.COLS, 1, 32, THEME.CLR(THEME.TITLE)
+    GP.PRINTAT 2, 0, "FLIGHT AUTHORISATION", THEME.CLR(THEME.TITLE)
+
+    GP.BOX FORM.LEFT, FORM.TOP, FORM.WIDE, FORM.FIELDS + 2, 2, THEME.CLR(THEME.BORDER)
+    GP.FILL FORM.LEFT + 1, FORM.TOP + 1, FORM.WIDE - 2, FORM.FIELDS, 32, THEME.CLR(THEME.TEXT)
+
+    FOR FORM.I = 1 TO FORM.FIELDS
+        GP.PRINTAT FORM.LEFT + 2, FORM.TOP + FORM.I, FORM.LABEL$(FORM.I), THEME.CLR(THEME.TEXT)
+    NEXT
+
+    GP.PRINTAT 2, APPHELP.ROWS - 1, "CURSOR UP AND DOWN MOVE, RETURN ACCEPTS, ESC CANCELS", THEME.CLR(THEME.DIMMED)
+    RETURN
