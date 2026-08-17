@@ -73,4 +73,11 @@
 #TOKEN GP.LOWER 52850
 #TOKEN GP.RTRIM 52849
 
+## GP.COMP(a$,b$) compares WITHOUT case: -1 if a$ sorts before b$, 0 if they
+## match, 1 if after. Length breaks a tie, so "abc" sorts before "ABCD".
+## Use it for a case-blind equality test -- IF GP.COMP(A$,B$) = 0 -- which
+## plain "=" cannot do, and as the comparator when ordering names.
+
+#TOKEN GP.COMP 52848
+
 #ENDIF

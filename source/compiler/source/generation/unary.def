@@ -42,4 +42,5 @@ PI 				T N
 # 	the block address + 2, which is exactly what it returns.
 
 GP.INSTR 		($,$ X:OptionalZeroCompile) T N
+GP.COMP 		($,$) T N
 GP.STRPTR 		($) T N

@@ -3418,6 +3418,109 @@ _GIResult:
 ;
 ; ************************************************************************************************
 ;
+;					GP.COMP(a$, b$) -> -1, 0 or 1, comparing WITHOUT case
+;
+;		-1 if a$ sorts before b$, 0 if they match, 1 if a$ sorts after. Same shape as prog8's
+;		compare_nocase and as strcmp everywhere else, and -1/0/1 is the natural set in BASIC
+;		rather than the 255 the internal comparator hands back, because BASIC's own TRUE is -1.
+;		SGN builds its result the same way: FloatSetByte, then stamp the sign into NSStatus.
+;
+;		This is a copy of CompareStrings (strings/compare.asm, the s.cmp opcode behind = < >) with
+;		two changes: both characters are folded to upper case before the compare, and the result
+;		is signed. Not shared with it -- the fold is in the inner loop, so hoisting it into
+;		compare.asm would put a test on the hot path of every string comparison in every program
+;		to save about forty bytes here.
+;
+;		(Do not write a marker in square brackets after a double semicolon in a comment, even in
+;		prose: common-scripts/pcode.py scans for exactly that and will read it as a real opcode
+;		declaration. It fails the build with "Bad line", which is how this note came to exist.)
+;
+;		LENGTH still breaks a tie, unfolded, and case never enters into that: "abc" vs "ABCD"
+;		compares equal for three characters and then the shorter one sorts first.
+;
+;		SHIFTED. It walks a whole string, like the trims.
+;
+; ************************************************************************************************
+
+UnaryGPComp: ;; [!gp.comp]
+		.entercmd
+		dex
+		;
+		lda 	NSMantissa0,x 				; a$ -> zTemp0
+		sta 	zTemp0
+		lda 	NSMantissa1,x
+		sta 	zTemp0+1
+		lda 	NSMantissa0+1,x 			; b$ -> zTemp1
+		sta 	zTemp1
+		lda 	NSMantissa1+1,x
+		sta 	zTemp1+1
+		;
+		phx 								; X is the number stack pointer, and the count below
+		phy 								; needs a register -- so borrow it and put it back
+		;
+		lda 	(zTemp0) 					; compare min(len(a$),len(b$)) characters
+		cmp 	(zTemp1)
+		bcc 	_GCShorter
+		lda 	(zTemp1)
+_GCShorter:
+		tax
+		beq 	_GCEqualSoFar 				; one of them is empty, so length decides
+		ldy 	#0
+_GCLoop:
+		iny
+		lda 	(zTemp1),y 					; fold b$'s character into scratch first, so that A
+		jsr 	GPFoldUpper 				; still holds a$'s when the compare happens and the
+		sta 	gpsNeedLen 					; carry means what it does in CompareStrings
+		lda 	(zTemp0),y
+		jsr 	GPFoldUpper
+		cmp 	gpsNeedLen
+		bne 	_GCDiffer
+		dex
+		bne 	_GCLoop
+_GCEqualSoFar:
+		sec 								; every common character matched, so the shorter
+		lda 	(zTemp0) 					; string sorts first -- lengths decide, unfolded
+		sbc 	(zTemp1)
+		beq 	_GCSame
+_GCDiffer:
+		bcs 	_GCAfter
+		;
+		ply 								; a$ sorts BEFORE b$
+		plx
+		lda 	#1
+		jsr 	FloatSetByte
+		lda 	NSStatus,x 					; ... made negative, exactly as SGN does it
+		ora 	#$80
+		sta 	NSStatus,x
+		.exitcmd
+_GCAfter:
+		ply 								; a$ sorts AFTER b$
+		plx
+		lda 	#1
+		jsr 	FloatSetByte
+		.exitcmd
+_GCSame:
+		ply
+		plx
+		lda 	#0
+		jsr 	FloatSetByte
+		.exitcmd
+
+;
+;		A -> upper case if it is a lower case letter, untouched otherwise. Clobbers A only, so
+;		PETSCII graphics, digits and punctuation all pass straight through.
+;
+GPFoldUpper:
+		cmp 	#'a'
+		bcc 	_GFUOut
+		cmp 	#'z'+1
+		bcs 	_GFUOut
+		and 	#$DF
+_GFUOut:
+		rts
+
+; ************************************************************************************************
+;
 ;								GP.STRPTR(a$) -> address of [ActLen][Data]
 ;
 ;		The address is ALREADY what the number stack carries, so this is a retype and nothing
@@ -9195,75 +9298,76 @@ ShiftVectorTable:
 	.word	CommandXDIM              ; $d781 dim
 	.word	CommandEnd               ; $d782 end
 	.word	CommandGPCall            ; $d783 gp.call
-	.word	CommandGPUpper           ; $d784 gp.upper
-	.word	CommandGPLower           ; $d785 gp.lower
-	.word	CommandGPTrim            ; $d786 gp.trim
-	.word	CommandGPRTrim           ; $d787 gp.rtrim
-	.word	CommandGPLTrim           ; $d788 gp.ltrim
-	.word	UnaryJoy                 ; $d789 joy
-	.word	LinkFloatIntegerPartDown ; $d78a int
-	.word	LinkFloatSquareRoot      ; $d78b sqr
-	.word	LinkFloatLogarithm       ; $d78c log
-	.word	LinkFloatExponent        ; $d78d exp
-	.word	LinkFloatCosine          ; $d78e cos
-	.word	LinkFloatSine            ; $d78f sin
-	.word	LinkFloatTangent         ; $d790 tan
-	.word	LinkFloatArcTan          ; $d791 atn
-	.word	CommandXLinput           ; $d792 linput
-	.word	CommandXBinput           ; $d793 binput
-	.word	Command_LOAD             ; $d794 load
-	.word	Command_BLOAD            ; $d795 bload
-	.word	Command_BVLOAD           ; $d796 bvload
-	.word	Command_VLOAD            ; $d797 vload
-	.word	Command_BSAVE            ; $d798 bsave
-	.word	Command_BVERIFY          ; $d799 bverify
-	.word	X16CommandPowerOff       ; $d79a poweroff
-	.word	X16CommandReset          ; $d79b reset
-	.word	X16CommandReboot         ; $d79c reboot
-	.word	XCommandMouse            ; $d79d mouse
-	.word	XUnaryMB                 ; $d79e mb
-	.word	XUnaryMX                 ; $d79f mx
-	.word	XUnaryMY                 ; $d7a0 my
-	.word	XUnaryMWheel             ; $d7a1 mwheel
-	.word	UnaryRPT                 ; $d7a2 rpt$
-	.word	Command_SPRITE           ; $d7a3 sprite
-	.word	Command_SPRMEM           ; $d7a4 sprmem
-	.word	Command_MOVSPR           ; $d7a5 movspr
-	.word	UnaryST                  ; $d7a6 st
-	.word	CommandStop              ; $d7a7 stop
-	.word	CommandSYS               ; $d7a8 sys
-	.word	UnaryTDATA               ; $d7a9 tdata
-	.word	UnaryTATTR               ; $d7aa tattr
-	.word	Command_TILE             ; $d7ab tile
-	.word	CommandTIWriteN          ; $d7ac ti.write
-	.word	CommandTIWriteS          ; $d7ad ti$.write
-	.word	CommandXWAIT             ; $d7ae wait
-	.word	X16I2CPoke               ; $d7af i2cpoke
-	.word	X16I2CPeek               ; $d7b0 i2cpeek
-	.word	CommandBank              ; $d7b1 bank
-	.word	XCommandSleep            ; $d7b2 sleep
-	.word	X16_Audio_FMINIT         ; $d7b3 fminit
-	.word	X16_Audio_FMNOTE         ; $d7b4 fmnote
-	.word	X16_Audio_FMDRUM         ; $d7b5 fmdrum
-	.word	X16_Audio_FMINST         ; $d7b6 fminst
-	.word	X16_Audio_FMVIB          ; $d7b7 fmvib
-	.word	X16_Audio_FMFREQ         ; $d7b8 fmfreq
-	.word	X16_Audio_FMVOL          ; $d7b9 fmvol
-	.word	X16_Audio_FMPAN          ; $d7ba fmpan
-	.word	X16_Audio_FMPLAY         ; $d7bb fmplay
-	.word	X16_Audio_FMCHORD        ; $d7bc fmchord
-	.word	X16_Audio_FMPOKE         ; $d7bd fmpoke
-	.word	X16_Audio_PSGINIT        ; $d7be psginit
-	.word	X16_Audio_PSGNOTE        ; $d7bf psgnote
-	.word	X16_Audio_PSGVOL         ; $d7c0 psgvol
-	.word	X16_Audio_PSGWAV         ; $d7c1 psgwav
-	.word	X16_Audio_PSGFREQ        ; $d7c2 psgfreq
-	.word	X16_Audio_PSGPAN         ; $d7c3 psgpan
-	.word	X16_Audio_PSGPLAY        ; $d7c4 psgplay
-	.word	X16_Audio_PSGCHORD       ; $d7c5 psgchord
-	.word	CommandCls               ; $d7c6 cls
-	.word	CommandLocate            ; $d7c7 locate
-	.word	CommandColor             ; $d7c8 color
+	.word	UnaryGPComp              ; $d784 gp.comp
+	.word	CommandGPUpper           ; $d785 gp.upper
+	.word	CommandGPLower           ; $d786 gp.lower
+	.word	CommandGPTrim            ; $d787 gp.trim
+	.word	CommandGPRTrim           ; $d788 gp.rtrim
+	.word	CommandGPLTrim           ; $d789 gp.ltrim
+	.word	UnaryJoy                 ; $d78a joy
+	.word	LinkFloatIntegerPartDown ; $d78b int
+	.word	LinkFloatSquareRoot      ; $d78c sqr
+	.word	LinkFloatLogarithm       ; $d78d log
+	.word	LinkFloatExponent        ; $d78e exp
+	.word	LinkFloatCosine          ; $d78f cos
+	.word	LinkFloatSine            ; $d790 sin
+	.word	LinkFloatTangent         ; $d791 tan
+	.word	LinkFloatArcTan          ; $d792 atn
+	.word	CommandXLinput           ; $d793 linput
+	.word	CommandXBinput           ; $d794 binput
+	.word	Command_LOAD             ; $d795 load
+	.word	Command_BLOAD            ; $d796 bload
+	.word	Command_BVLOAD           ; $d797 bvload
+	.word	Command_VLOAD            ; $d798 vload
+	.word	Command_BSAVE            ; $d799 bsave
+	.word	Command_BVERIFY          ; $d79a bverify
+	.word	X16CommandPowerOff       ; $d79b poweroff
+	.word	X16CommandReset          ; $d79c reset
+	.word	X16CommandReboot         ; $d79d reboot
+	.word	XCommandMouse            ; $d79e mouse
+	.word	XUnaryMB                 ; $d79f mb
+	.word	XUnaryMX                 ; $d7a0 mx
+	.word	XUnaryMY                 ; $d7a1 my
+	.word	XUnaryMWheel             ; $d7a2 mwheel
+	.word	UnaryRPT                 ; $d7a3 rpt$
+	.word	Command_SPRITE           ; $d7a4 sprite
+	.word	Command_SPRMEM           ; $d7a5 sprmem
+	.word	Command_MOVSPR           ; $d7a6 movspr
+	.word	UnaryST                  ; $d7a7 st
+	.word	CommandStop              ; $d7a8 stop
+	.word	CommandSYS               ; $d7a9 sys
+	.word	UnaryTDATA               ; $d7aa tdata
+	.word	UnaryTATTR               ; $d7ab tattr
+	.word	Command_TILE             ; $d7ac tile
+	.word	CommandTIWriteN          ; $d7ad ti.write
+	.word	CommandTIWriteS          ; $d7ae ti$.write
+	.word	CommandXWAIT             ; $d7af wait
+	.word	X16I2CPoke               ; $d7b0 i2cpoke
+	.word	X16I2CPeek               ; $d7b1 i2cpeek
+	.word	CommandBank              ; $d7b2 bank
+	.word	XCommandSleep            ; $d7b3 sleep
+	.word	X16_Audio_FMINIT         ; $d7b4 fminit
+	.word	X16_Audio_FMNOTE         ; $d7b5 fmnote
+	.word	X16_Audio_FMDRUM         ; $d7b6 fmdrum
+	.word	X16_Audio_FMINST         ; $d7b7 fminst
+	.word	X16_Audio_FMVIB          ; $d7b8 fmvib
+	.word	X16_Audio_FMFREQ         ; $d7b9 fmfreq
+	.word	X16_Audio_FMVOL          ; $d7ba fmvol
+	.word	X16_Audio_FMPAN          ; $d7bb fmpan
+	.word	X16_Audio_FMPLAY         ; $d7bc fmplay
+	.word	X16_Audio_FMCHORD        ; $d7bd fmchord
+	.word	X16_Audio_FMPOKE         ; $d7be fmpoke
+	.word	X16_Audio_PSGINIT        ; $d7bf psginit
+	.word	X16_Audio_PSGNOTE        ; $d7c0 psgnote
+	.word	X16_Audio_PSGVOL         ; $d7c1 psgvol
+	.word	X16_Audio_PSGWAV         ; $d7c2 psgwav
+	.word	X16_Audio_PSGFREQ        ; $d7c3 psgfreq
+	.word	X16_Audio_PSGPAN         ; $d7c4 psgpan
+	.word	X16_Audio_PSGPLAY        ; $d7c5 psgplay
+	.word	X16_Audio_PSGCHORD       ; $d7c6 psgchord
+	.word	CommandCls               ; $d7c7 cls
+	.word	CommandLocate            ; $d7c8 locate
+	.word	CommandColor             ; $d7c9 color
 	.send code
 ; ************************************************************************************************
 ; ************************************************************************************************

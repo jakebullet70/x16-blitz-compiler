@@ -131,7 +131,10 @@ FrameStackPages = 16 						; 4K, ~250 frames
 ;		now has room to ABI 99. GP.INSTRREV was added and then removed again under this same
 ;		ordinal; neither state was committed, so 10 means the two-digit magic and nothing else.
 ;
-RT_ABI = 10 								; runtime ABI ordinal -> "GPC10" magic (NOT the file name)
+;		10 -> 11 on 17th August 2026: GP.COMP joined gpstring.asm -- a shifted marker, so every
+;		shifted opcode above it moved up one.
+;
+RT_ABI = 11 								; runtime ABI ordinal -> "GP11" magic (NOT the file name)
 
 ; ************************************************************************************************
 ;

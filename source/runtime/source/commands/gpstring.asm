@@ -139,6 +139,109 @@ _GIResult:
 ;
 ; ************************************************************************************************
 ;
+;					GP.COMP(a$, b$) -> -1, 0 or 1, comparing WITHOUT case
+;
+;		-1 if a$ sorts before b$, 0 if they match, 1 if a$ sorts after. Same shape as prog8's
+;		compare_nocase and as strcmp everywhere else, and -1/0/1 is the natural set in BASIC
+;		rather than the 255 the internal comparator hands back, because BASIC's own TRUE is -1.
+;		SGN builds its result the same way: FloatSetByte, then stamp the sign into NSStatus.
+;
+;		This is a copy of CompareStrings (strings/compare.asm, the s.cmp opcode behind = < >) with
+;		two changes: both characters are folded to upper case before the compare, and the result
+;		is signed. Not shared with it -- the fold is in the inner loop, so hoisting it into
+;		compare.asm would put a test on the hot path of every string comparison in every program
+;		to save about forty bytes here.
+;
+;		(Do not write a marker in square brackets after a double semicolon in a comment, even in
+;		prose: common-scripts/pcode.py scans for exactly that and will read it as a real opcode
+;		declaration. It fails the build with "Bad line", which is how this note came to exist.)
+;
+;		LENGTH still breaks a tie, unfolded, and case never enters into that: "abc" vs "ABCD"
+;		compares equal for three characters and then the shorter one sorts first.
+;
+;		SHIFTED. It walks a whole string, like the trims.
+;
+; ************************************************************************************************
+
+UnaryGPComp: ;; [!gp.comp]
+		.entercmd
+		dex
+		;
+		lda 	NSMantissa0,x 				; a$ -> zTemp0
+		sta 	zTemp0
+		lda 	NSMantissa1,x
+		sta 	zTemp0+1
+		lda 	NSMantissa0+1,x 			; b$ -> zTemp1
+		sta 	zTemp1
+		lda 	NSMantissa1+1,x
+		sta 	zTemp1+1
+		;
+		phx 								; X is the number stack pointer, and the count below
+		phy 								; needs a register -- so borrow it and put it back
+		;
+		lda 	(zTemp0) 					; compare min(len(a$),len(b$)) characters
+		cmp 	(zTemp1)
+		bcc 	_GCShorter
+		lda 	(zTemp1)
+_GCShorter:
+		tax
+		beq 	_GCEqualSoFar 				; one of them is empty, so length decides
+		ldy 	#0
+_GCLoop:
+		iny
+		lda 	(zTemp1),y 					; fold b$'s character into scratch first, so that A
+		jsr 	GPFoldUpper 				; still holds a$'s when the compare happens and the
+		sta 	gpsNeedLen 					; carry means what it does in CompareStrings
+		lda 	(zTemp0),y
+		jsr 	GPFoldUpper
+		cmp 	gpsNeedLen
+		bne 	_GCDiffer
+		dex
+		bne 	_GCLoop
+_GCEqualSoFar:
+		sec 								; every common character matched, so the shorter
+		lda 	(zTemp0) 					; string sorts first -- lengths decide, unfolded
+		sbc 	(zTemp1)
+		beq 	_GCSame
+_GCDiffer:
+		bcs 	_GCAfter
+		;
+		ply 								; a$ sorts BEFORE b$
+		plx
+		lda 	#1
+		jsr 	FloatSetByte
+		lda 	NSStatus,x 					; ... made negative, exactly as SGN does it
+		ora 	#$80
+		sta 	NSStatus,x
+		.exitcmd
+_GCAfter:
+		ply 								; a$ sorts AFTER b$
+		plx
+		lda 	#1
+		jsr 	FloatSetByte
+		.exitcmd
+_GCSame:
+		ply
+		plx
+		lda 	#0
+		jsr 	FloatSetByte
+		.exitcmd
+
+;
+;		A -> upper case if it is a lower case letter, untouched otherwise. Clobbers A only, so
+;		PETSCII graphics, digits and punctuation all pass straight through.
+;
+GPFoldUpper:
+		cmp 	#'a'
+		bcc 	_GFUOut
+		cmp 	#'z'+1
+		bcs 	_GFUOut
+		and 	#$DF
+_GFUOut:
+		rts
+
+; ************************************************************************************************
+;
 ;								GP.STRPTR(a$) -> address of [ActLen][Data]
 ;
 ;		The address is ALREADY what the number stack carries, so this is a retype and nothing
