@@ -110,14 +110,15 @@ DOCS    = ("README.md", "LICENSE")
 # from testing/ -- testing/ holds only the staged copies of whatever was last built there, and
 # they are git-ignored precisely so they cannot be mistaken for the masters.
 #
-# Its two reference docs travel WITH it rather than in a docs folder of their own: someone who
+# Its two reference docs LIVE in GPC-BASIC/ rather than in a docs folder of their own, so the repo
+# and the zip have the same shape and a relative link works in both. They used to be copied in from
+# docs/blitz/ here, which meant README.md's own links were correct in the repo and broken for every
+# release user -- and the release user is the one who cannot go and find the file. Someone who
 # extracts this zip to write a program needs the manual beside the includes it describes, and a
 # doc one directory away from the thing it documents is a doc nobody opens. The build-plan docs
 # (GP-BASIC.TIERS.md, GP-BASIC.PLAN.md) are deliberately NOT shipped -- they are the argument
 # for how the library was built, not instructions for using it.
 GPBASIC_DIR  = os.path.join(root, "GPC-BASIC")
-GPBASIC_DOCS = (os.path.join(root, "docs", "blitz", "GP-BASIC.md"),
-                os.path.join(root, "docs", "blitz", "GP-BASIC.GLOBALS.md"))
 
 # The note that ships inside SRC/, explaining the folder is source and not required to run.
 SRC_README = (
@@ -183,11 +184,13 @@ with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         if os.path.isfile(full):
             z.write(full, "GPC-BASIC/" + name)
             names.append("GPC-BASIC/" + name)
-    for full in GPBASIC_DOCS:
-        if not os.path.isfile(full):
-            raise SystemExit("release: missing %s -- the library ships with its manual" % full)
-        z.write(full, "GPC-BASIC/" + os.path.basename(full))
-        names.append("GPC-BASIC/" + os.path.basename(full))
+
+    # The manual and the global register are files in GPC-BASIC/ like any other, so the loop above
+    # already took them -- but check, because shipping the library with no documentation is the
+    # kind of omission that looks like a complete release.
+    for must in ("GPC-BASIC/GP-BASIC.md", "GPC-BASIC/GP-BASIC.GLOBALS.md", "GPC-BASIC/README.md"):
+        if must not in names:
+            raise SystemExit("release: %s is missing -- the library ships with its documentation" % must)
 
     for doc in DOCS:
         full = os.path.join(root, doc)

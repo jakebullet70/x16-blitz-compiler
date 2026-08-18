@@ -11,9 +11,9 @@ an odd choice of verb.
 |---|---|
 | what a command does and how to write it | §3 and §4, here |
 | what names are already taken before you invent one | §5 here, then [GP-BASIC.GLOBALS.md](GP-BASIC.GLOBALS.md) for the full register |
-| why a thing was built the way it was | [GP-BASIC.TIERS.md](GP-BASIC.TIERS.md) (the build plan, with measurements) |
-| the original design argument | [GP-BASIC.PLAN.md](GP-BASIC.PLAN.md) |
-| the files themselves | [../../GPC-BASIC/](../../GPC-BASIC/) and its `README.md` |
+| why a thing was built the way it was | `docs/blitz/GP-BASIC.TIERS.md` — the build plan and every measurement, in the source repository |
+| the original design argument | `docs/blitz/GP-BASIC.PLAN.md`, in the source repository |
+| the files themselves | beside this one, listed in [README.md](README.md) |
 
 ---
 
@@ -21,15 +21,17 @@ an odd choice of verb.
 
 Two halves, and the split is deliberate.
 
-**The keywords** — 29 of them, `GP.DO` through `GP.ENDSEL` — are compiled into p-code and handled by
+**The keywords** — 27 of them, `GP.DO` through `GP.ENDSEL` — are compiled into p-code and handled by
 assembly in the runtime. They exist because BASIC is bad at what they do: searching a string a
-character at a time, sorting an array, pushing bytes at VERA. **2,362 bytes** of runtime, and the
-runtime is copied verbatim into every object, so those bytes are spent by every compiled program
-whether it uses them or not.
+character at a time, sorting an array, pushing bytes at VERA. **1,970 bytes** of assembly, which
+page alignment rounds to the **2,048** a program actually pays.
 
-**The library** — seven `.INC.BL` and `.EXP.BL` files in [`GPC-BASIC/`](../../GPC-BASIC/) — is
-ordinary BASL, called with `GOSUB`. Panels, themes, entry fields, BMX loading. **Zero runtime bytes**:
-only a program that `#INCLUDE`s one pays for it.
+Those bytes are spent only by a program that uses at least one GP keyword. One that uses none has
+the whole block left out of its object, and gets the 2,048 back as workspace as well.
+
+**The library** — seven `.INC.BL` modules and thirteen `.EXP.BL` examples, beside this file — is
+ordinary BASL, called with `GOSUB`. Menus, panels, themes, entry fields, BMX loading. **Zero runtime
+bytes**: only a program that `#INCLUDE`s one pays for it, and it pays in its own p-code.
 
 > **The rule that decides which side a thing goes on:** assembly gets what runs in a loop or moves
 > bulk data. Everything else is BASIC. `INPHELP.GET` waits on a *human*, so the speed argument that
@@ -50,18 +52,25 @@ Every BASL source that uses a `GP.` keyword must declare the tokens:
 host-side tokeniser for hand-written `.bas` needs nothing — it learns the same tokens from
 `c64tokens.py` at build time.)
 
-### Building
+### Where the library lives
 
-BASLOAD resolves `#INCLUDE` **by bare filename off the emulator's drive**, and `testing/` is that
-drive. `GPC-BASIC/` is the master; you build from a copy:
+Keep `GPC-BASIC/` as a folder beside your own sources and include from it by path:
 
-```bash
-cp GPC-BASIC/GP.INC.BL GPC-BASIC/MYPROG.BL testing/
-python source/gpc/build_basl.py MYPROG.BL MYPROG.PRG    # BASL source -> tokenised PRG
-# then compile MYPROG.PRG with GPC.BLITZ.BIN
+```basic
+#INCLUDE "/GPC-BASIC/GP.INC.BL"
 ```
 
-Do not point a program at `GPC-BASIC/...` — that path does not exist from the X16's side.
+**`#INCLUDE` takes a path, not just a bare filename** — verified on R49, both absolute
+(`/GPC-BASIC/GP.INC.BL`) and relative (`GPC-BASIC/GP.INC.BL`). Prefer the leading slash: it is
+absolute from the drive root, so it still resolves when your own program sits in a subdirectory.
+`../` and `//` are not understood by the X16's filesystem, so a path goes down from somewhere,
+never up.
+
+Earlier versions of this manual said the include had to be a bare filename and told you to copy the
+library next to every program. That was wrong, and it meant twenty-odd files in your working folder
+for no reason.
+
+Then it is BASLOAD and GPC as usual: `BASLOAD "MYPROG.BL"`, then compile the PRG with `GPC.PRG`.
 
 ### A `.PRG` with GP tokens is compile-only
 
@@ -72,7 +81,8 @@ program. That is expected, not a fault. Compile it and run the object.
 
 ## 3. Command reference
 
-29 keywords, tokens `$CE7F` down to `$CE63`, allocated downward and **never renumbered** — the token
+27 keywords, tokens `$CE7F` down to `$CE63`, allocated downward and **never renumbered** — `$CE67`
+and `$CE68` are holes, freed when `GP.SEL` and `GP.MENU` were withdrawn, and are not reused. The token
 values are the ABI.
 
 ### At a glance
@@ -116,7 +126,7 @@ GP.DO
 GP.LOOP
 ```
 
-Example: [`LOOPS.EXP.BL`](../../GPC-BASIC/LOOPS.EXP.BL)
+Example: [`LOOPS.EXP.BL`](LOOPS.EXP.BL)
 
 ---
 
@@ -162,7 +172,7 @@ GP.ENDSEL
 An empty case body — the `8` above — is the cheapest possible "this one is fine": the match falls
 straight out of the select.
 
-Example: [`SELECT.EXP.BL`](../../GPC-BASIC/SELECT.EXP.BL)
+Example: [`SELECT.EXP.BL`](SELECT.EXP.BL)
 
 ---
 
@@ -189,7 +199,7 @@ COLS = GP.X : ROWS = GP.Y
 > (`stringHighMemory`, `storeStartHigh`, `variableStartPage`), and POKEing code over it corrupts the
 > program silently.
 
-Example: [`MLCALL.EXP.BL`](../../GPC-BASIC/MLCALL.EXP.BL)
+Example: [`MLCALL.EXP.BL`](MLCALL.EXP.BL)
 
 ---
 
@@ -231,7 +241,7 @@ its length — something stock BASIC cannot do at all.
 > ```
 > This applies to `GP.ARRPTR` and to every VRAM address past the top eighth of the screen too.
 
-Example: [`STRINGS.EXP.BL`](../../GPC-BASIC/STRINGS.EXP.BL)
+Example: [`STRINGS.EXP.BL`](STRINGS.EXP.BL)
 
 ---
 
@@ -255,7 +265,7 @@ for a string array (each element is a *pointer* to the string's block — follow
 `GP.STRPTR` for the layout), 6 for a numeric one. Multi-dimensional arrays are rejected, and
 `GP.ARRPTR(A(3))` is a syntax error — add `3*2` or `3*6` yourself.
 
-Example: [`ARRAYS.EXP.BL`](../../GPC-BASIC/ARRAYS.EXP.BL)
+Example: [`ARRAYS.EXP.BL`](ARRAYS.EXP.BL)
 
 ---
 
@@ -304,7 +314,7 @@ not a "leave it alone" marker.
 of the screen map. Zero width or height draws nothing, which is the case a computed size reaches by
 accident.
 
-Example: [`SCREEN.EXP.BL`](../../GPC-BASIC/SCREEN.EXP.BL)
+Example: [`SCREEN.EXP.BL`](SCREEN.EXP.BL)
 
 ---
 
@@ -361,7 +371,7 @@ foreground and background trade places. Whatever you drew, in whatever colours, 
 and un-highlights back to exactly what was there. Only the attribute bytes are touched, never the
 text, so moving the highlight cannot disturb your drawing.
 
-Example: [`MENU.EXP.BL`](../../GPC-BASIC/MENU.EXP.BL)
+Example: [`MENU.EXP.BL`](MENU.EXP.BL)
 
 ---
 
@@ -423,7 +433,7 @@ or the other. **This is the opposite of `THEME.CLR`** — worth keeping straight
 `PET2SCR` converts a PETSCII code to the screen code the tile map holds, for `TILE`, `TDATA` and
 `VPOKE`. `GP.PRINTAT` and `GP.FILL` already do it internally.
 
-Examples: [`SPLITT.EXP.BL`](../../GPC-BASIC/SPLITT.EXP.BL)
+Examples: [`SPLITT.EXP.BL`](SPLITT.EXP.BL)
 
 ### 4.3 `APPHELP.INC.BL` — start politely, leave it as you found it
 
@@ -486,7 +496,7 @@ full, further characters are refused and the cursor **inverts the last character
 sitting off the end. The cursor blinks off `TI` rather than a delay loop, because a delay loop would
 swallow keys pressed during it.
 
-Example: [`FORM.EXP.BL`](../../GPC-BASIC/FORM.EXP.BL) — three fields, one masked, in a themed panel.
+Example: [`FORM.EXP.BL`](FORM.EXP.BL) — three fields, one masked, in a themed panel.
 
 ### 4.5 `BMX.INC.BL` — a BMX bitmap into VERA
 
@@ -525,7 +535,7 @@ GOSUB BMX.PAINT
 **8 bits per pixel, uncompressed**, which is what `SCREEN 128` shows without a decompressor. Anything
 else is reported, not attempted. The image is centred; larger than 320×240 is clipped.
 
-Example: [`BMXVIEW.EXP.BL`](../../GPC-BASIC/BMXVIEW.EXP.BL)
+Example: [`BMXVIEW.EXP.BL`](BMXVIEW.EXP.BL)
 
 ---
 
@@ -623,31 +633,3 @@ Dotted names also dodge the keyword-collision trap: `GP.MENU`, `THEME.CLR`, `INP
 `INPHELP.RETURN` all contain reserved words and all work, because BASLOAD matches the whole
 identifier. An **undotted** one does not — `POS`, `MB`, `ST`, `LEN`, `CHAR` cannot be variables at
 all. That is the main reason the library is dotted throughout.
-
----
-
-## 7. Where everything lives
-
-| | |
-|---|---|
-| `GPC-BASIC/*.INC.BL` | the library — includes, `GOSUB`-called |
-| `GPC-BASIC/*.EXP.BL` | one runnable example per feature |
-| `GPC-BASIC/GP.INC.BL` | the `#TOKEN` declarations. **Mandatory** in any BASL source using `GP.*` |
-| `source/common-scripts/c64tokens.py` | `getGP()` — the token values `GP.INC.BL` mirrors |
-| `source/compiler/source/generation/commands.def`, `unary.def` | the generator table: argument shapes |
-| `source/compiler/source/system-specific/x16/generation/` | the X16-only ones — stash, drawing, menu |
-| `source/runtime/source/commands/` | the assembly handlers |
-| `docs/blitz/GP-BASIC.TIERS.md` | the build plan, budgets, and every measurement |
-| `docs/blitz/GP-BASIC.GLOBALS.md` | the full global-name register |
-| `docs/blitz/GP-BASIC.PLAN.md` | the original design argument |
-
-### The drift hazard
-
-`GP.INC.BL` **restates** the token values from `getGP()`. Adding a keyword in one place and not the
-other produces a BASLOAD syntax error — loud, but a wasted session. Add to both in the same change.
-
-### Cost, as it stands
-
-**2,362 bytes** of runtime for all 29 keywords, runtime ending `$9BDD` with **803 bytes free** below
-`$9F00`, and **20 sub-256 opcodes left**. That last number is the real constraint: every future
-construct with a forward branch must spend from it.

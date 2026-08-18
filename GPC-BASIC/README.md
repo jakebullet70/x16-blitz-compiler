@@ -1,97 +1,105 @@
 # GPC-BASIC
 
-The GP.BASIC library: the BASLOAD includes and the example programs for GPC's `GP.*` keyword
-extension.
+The GP.BASIC library — the `GP.*` command set and the BASIC modules built on it, with a runnable
+example for each.
 
-**Start at [docs/blitz/GP-BASIC.md](../docs/blitz/GP-BASIC.md)** — the manual: every command, every
+**Start at [GP-BASIC.md](GP-BASIC.md)** — the manual: every command, every
 routine, every variable name they take, and the traps collected in one table.
+[GP-BASIC.GLOBALS.md](GP-BASIC.GLOBALS.md) lists every global each module owns, which
+matters because BASL has one flat namespace: a collision is a wrong answer, not an error.
 
-| Also | |
-|---|---|
-| [GP-BASIC.GLOBALS.md](../docs/blitz/GP-BASIC.GLOBALS.md) | the full per-module global register. BASL has one flat namespace, so a collision is a wrong answer rather than an error |
-| [GP-BASIC.TIERS.md](../docs/blitz/GP-BASIC.TIERS.md) | the build plan, budgets and measurements |
-| [GP-BASIC.PLAN.md](../docs/blitz/GP-BASIC.PLAN.md) | the original design argument |
+## Using it
 
-## Naming
+Keep this folder as `GPC-BASIC/` beside your own sources and `#INCLUDE` what you need by path:
 
-Flat folder, **UPPERCASE** names, role carried in the extension:
+```basic
+#INCLUDE "/GPC-BASIC/GP.INC.BL"
+#INCLUDE "/GPC-BASIC/THEME.INC.BL"
+#INCLUDE "/GPC-BASIC/MENUHELP.INC.BL"
+```
 
-| Pattern | Role |
-|---|---|
-| `XXX.INC.BL` | include — `#TOKEN`/`#DEFINE` declarations, `#INCLUDE`d by other sources |
-| `XXX.EXP.BL` | example — a runnable program, one feature each |
+BASLOAD takes a path, not just a bare filename — **verified on R49**, both `/GPC-BASIC/GP.INC.BL`
+from the root and the relative `GPC-BASIC/GP.INC.BL`. Prefer the leading slash: it is absolute, so
+it keeps working when your program is itself in a subdirectory. (`../` and `//` are *not* understood
+by the X16's filesystem, so a path has to go down from somewhere, not up.)
 
-Uppercase because these files live on the X16's drive, where BASLOAD reads them.
+`GP.INC.BL` comes first and is not optional: it is what makes `GP.DO`, `GP.BOX` and the rest mean
+anything to BASLOAD. Without it a line saying `GP.DO 5` is just a syntax error.
 
-Current contents:
+Then it is BASLOAD and GPC as usual: `BASLOAD "MYPROG.BL"` to turn the source into a program, and
+`GPC.PRG` to compile that.
 
-| File | Covers |
-|---|---|
-| `GP.INC.BL` | the keyword tokens — every BASL source using `GP.*` must `#INCLUDE` it |
-| `STRHELP.INC.BL` | string helpers in BASL (`STRHELP.PADR`/`PADL`/`PADC`/`SPLIT`). Unlike `GP.INC.BL` it contains *code*, called with `GOSUB` |
-| `LOOPS.EXP.BL` | `GP.DO` / `GP.LOOP` / `GP.EXITDO` |
-| `MLCALL.EXP.BL` | `GP.CALL` and the `GP.A`/`GP.X`/`GP.Y`/`GP.C` value words |
-| `STRINGS.EXP.BL` | `GP.INSTR`, `GP.STRPTR`, `GP.TRIM`/`LTRIM`/`RTRIM`, `GP.UPPER`/`LOWER` |
-| `SPLITT.EXP.BL` | `STRHELP.SPLIT`, the BASL tokeniser |
-| `ARRAYS.EXP.BL` | `GP.SORT`, `GP.COMP`, `GP.ARRPTR` |
-| `SCREEN.EXP.BL` | `GP.BOX`, `GP.FILL`, `GP.PRINTAT`, `GP.STASH`/`GP.RESTR` |
-| `THEME.INC.BL` | colour roles, light and dark. Data, not code — no tokens, no runtime bytes |
-| `APPHELP.INC.BL` | `APPHELP.STARTUP`/`RESTORE` (leave the user's screen as you found it) and panels saved to disk |
-| `MENU.EXP.BL` | `GP.MENU` + `GP.SEL`, with the theme and app helpers — a whole small application |
-| `SELECT.EXP.BL` | `GP.SELECT` / `GP.CASE` / `GP.ELSE` / `GP.ENDSEL`, and where it beats `ON x GOSUB` |
-| `INPHELP.INC.BL` | a positioned, length-limited entry field — what `INPUT`/`LINPUT` cannot do on a drawn screen |
-| `FORM.EXP.BL` | three fields you can move between: `INPHELP` with the theme and app helpers |
-| `BMX.INC.BL` | load a BMX bitmap into VERA — `GP.STRPTR` + `GP.CALL MACPTR` streaming straight at the data port |
-| `BMXVIEW.EXP.BL` | the viewer built on it: prompt, header, picture |
+## Two layers, and the difference matters
 
-### Names — BASL is safe, a hand-written `.bas` is not
+| | | costs |
+| --- | --- | --- |
+| **Core** | `GP.*` commands the **compiler** knows. Machine code in the runtime | runtime bytes, in every program that uses any of them |
+| **Extensions** | `XXX.INC.BL` modules written in **BASIC**, called with `GOSUB` | nothing unless you `#INCLUDE` them |
 
-**BASLOAD gives 64 significant characters; the built-in BASIC gives TWO** (`BASLOAD.MD:57`). So in a
-BASL source `PANEL.COL` and `PANEL.ROW` are genuinely different variables, and the readable names
-these examples use cost nothing.
+A thing belongs in the core when it is a bulk move or a tight loop — something BASIC is genuinely
+bad at. It belongs in an extension when it waits on a human, or is layout, or is data. `GP.MENU`
+and `GP.SEL` **used to be core keywords and are now the `MENUHELP` extension**, because a menu
+spends all its time waiting for a keypress: the assembly bought nothing a person could see, and cost
+every GPB program 473 bytes whether it had a menu or not.
 
-Write the same test as a `.bas` for the host tokeniser and the two-character rule is back: `R30`,
-`R31` and `R32` are all `R3`, and `BASE` is the same variable as `BA`. That is a **silent wrong
-answer, not an error** — it cost two test cycles while building tier 6, both times looking exactly
-like a compiler bug. Give raw `.bas` variables distinct first-two characters, or write BASL.
+Examples are `XXX.EXP.BL` — runnable programs, one subject each. Uppercase names throughout,
+because these files live on the X16's drive.
 
-Dotted names also dodge the keyword-collision trap (`POS`, `MB`, `ST`, `CHAR`), which BASL does *not*
-save you from — a reserved word cannot be an identifier at all.
+### Core — the `GP.*` command set
 
-## Why the includes exist at all
+All of it needs `#INCLUDE "GP.INC.BL"`, and nothing else.
 
-**Two tokenisers have to learn every GP keyword, and only one of them does it by itself.**
+| Group | Commands | Example |
+| --- | --- | --- |
+| Loops | `GP.DO` `GP.LOOP` `GP.EXITDO` | `LOOPS.EXP.BL` |
+| Multi-way branch | `GP.SELECT` `GP.CASE` `GP.ELSE` `GP.ENDSEL` | `SELECT.EXP.BL` |
+| Strings | `GP.INSTR` `GP.STRPTR` `GP.COMP` `GP.TRIM` `GP.LTRIM` `GP.RTRIM` `GP.UPPER` `GP.LOWER` | `STRINGS.EXP.BL` |
+| Arrays | `GP.SORT` `GP.ARRPTR` | `ARRAYS.EXP.BL` |
+| Drawing | `GP.BOX` `GP.FILL` `GP.PRINTAT` | `SCREEN.EXP.BL` |
+| Screen save | `GP.STASH` `GP.RESTR` — a rectangle to a RAM bank and back | `SCREEN.EXP.BL` |
+| Machine code | `GP.CALL` and the `GP.A` `GP.X` `GP.Y` `GP.C` value words | `MLCALL.EXP.BL` |
 
-| | learns GP keywords from | needs `GP.INC.BL` ? |
-|---|---|---|
-| `bin/tokenise.zip` (host, for `.bas`) | `source/common-scripts/c64tokens.py`, at build time | no |
-| BASLOAD (on the X16, for BASL sources) | nothing — it knows only ROM keywords | **yes** |
+### Extensions — BASIC modules you `#INCLUDE`
 
-So a BASL source saying `GP.DO 5` is a syntax error until `#INCLUDE "GP.INC.BL"` has declared the
-token. That include is the *only* thing standing between BASL sources and the GP keyword set.
+| Module | What it gives you | Example |
+| --- | --- | --- |
+| `STRHELP.INC.BL` | padding and splitting: `STRHELP.PADR`/`PADL`/`PADC`/`SPLIT` | `SPLITT.EXP.BL` |
+| `THEME.INC.BL` | named colour roles, light and dark, so re-skinning is one variable | `MENU.EXP.BL` |
+| `APPHELP.INC.BL` | leave the screen as you found it, and **panels to and from disk** | `MENU.EXP.BL` |
+| `INPHELP.INC.BL` | a positioned, length-limited entry field — what `INPUT` cannot do on a drawn screen | `FORM.EXP.BL` |
+| `MENUHELP.INC.BL` | a vertical menu: cursor keys, RETURN, ESC, hotkeys, SNES pad | `MENUDEMO.EXP.BL` |
+| `BMX.INC.BL` | a BMX bitmap straight into VERA | `BMXVIEW.EXP.BL` |
 
-## Staging — read this before moving files
+**Panels are the file half of `GP.STASH`.** The core saves a rectangle to a RAM bank; there is no
+`GP.` command that writes one to disk, and there does not need to be, because a bank is already
+`BSAVE`-able. `APPHELP.PANEL.SAVE` stashes and `BSAVE`s, `APPHELP.PANEL.LOAD` `BLOAD`s and restores
+it where it came from, and `APPHELP.PANEL.PUT` drops it somewhere else. Three `GOSUB`s, no keywords.
 
-The copies here are the **masters**. BASLOAD resolves `#INCLUDE "GP.INC.BL"` by **bare filename off
-the emulator's drive**, and `testing/` is that drive, so to build anything:
+### The rest of the examples
 
-- edit the master here
-- copy `GP.INC.BL` and the source you are building into `testing/`
-- `python source/gpc/build_basl.py XXX.EXP.BL XXX.PRG`, then compile the PRG with `GPC.BLITZ.BIN`
+| File | Shows |
+| --- | --- |
+| `MENU.EXP.BL` | a whole small application — menu, theme, dialog over a stashed screen |
+| `MENUTST.EXP.BL` | the menu's regression test, 14 cases |
+| `BMXSPD.EXP.BL` | how long a BMX paint really takes, full width against centred |
 
-Do not point a program at `GPC-BASIC/...` — that path does not exist from the X16's side.
+## Naming — BASL is safe, a hand-written `.bas` is not
 
-## The drift hazard
+**BASLOAD gives 64 significant characters; the built-in BASIC gives TWO.** So in a BASL source
+`PANEL.COL` and `PANEL.ROW` are genuinely different variables, and the readable names these examples
+use cost nothing.
 
-`GP.INC.BL` restates the token values from `getGP()` in `source/common-scripts/c64tokens.py`. Adding a
-keyword in one place and not the other produces a **BASLOAD syntax error** — loud, but a wasted
-debugging session. Generating this file from `c64tokens.py` at build time would remove the hazard, and
-is worth doing before the keyword list grows past a handful.
+Write the same test as a plain `.bas` and the two-character rule is back: `R30`, `R31` and `R32` are
+all `R3`, and `BASE` is the same variable as `BA`. That is a **silent wrong answer, not an error** —
+it cost two test cycles while building the drawing commands, both times looking exactly like a
+compiler bug. Give raw `.bas` variables distinct first-two characters, or write BASL.
 
-Token values are decimal because `#TOKEN <name> <int16>` takes an int16 (`testing/MSEDIT/BASLOAD.MD`).
-They are allocated **downward from `$CE7F`** and never renumbered.
+Dotted names also dodge the reserved-word trap (`POS`, `MB`, `ST`, `CHAR`), which BASL does *not*
+save you from: a reserved word cannot be an identifier at all.
 
-## Note on the tokens
+---
 
-A `.PRG` containing a `$CE7x` byte is **compile-only**: the ROM cannot `LIST` or `RUN` it, because
-there is no BASIC handler behind those tokens. That is expected, not a fault.
+*Working on the compiler rather than with it? The library's internals — how the keyword
+declarations are kept in step with the compiler, and how the examples are built from the
+development tree — are under "Maintaining the library" in `docs/blitz/GP-BASIC.TIERS.md`, which is
+in the source repository and does not ship with the release.*

@@ -42,9 +42,9 @@ string, moving 2 KB of screen. That is the whole list.
 |---|---|
 | Target | ~1.5 KB (1,536 B) for the whole set |
 | Planned, still to build | **nothing** — the ASM side is complete |
-| Shipped, measured | **2,362 B** across tiers 1-10 |
-| **All-in** | **2,362 B — about 830 B over the original target** |
-| Why that is accepted | RTBASE moved to `$6400` on 17th August; the runtime ends `$9BDD` with **803 B** still free |
+| Shipped, measured | **1,970 B** across tiers 1-10, page-aligned to the **2,048** a program pays |
+| **All-in** | **1,970 B — about 440 B over the original target** |
+| Why that is accepted | the runtime ends `RTTop $9CB2` with **590 B** still free below `$9F00` |
 | Fixed cost per keyword | **6 B** (2 vector slot + 4 glue) before any code |
 | Free `GP.*` BASIC tokens | 115 of 127 (`$CE01`–`$CE7F`) |
 | Free p-code opcodes | **20 unshifted** (41 cycles), 60 shifted (58 cycles, +1 byte per call) |
@@ -98,7 +98,7 @@ compiles at roughly **14 bytes of p-code per line**. BASL menus (~60–100 lines
 | 8 | Colour / theme — **BASL** | 0 |
 | 9 | `GP.MENU` + `GP.SEL` — **SHIPPED** | 377 |
 | 10 | `GP.SELECT` / `GP.CASE` / `GP.ELSE` / `GP.ENDSEL` — **SHIPPED** | 127 |
-| | **Built** | **2,362** |
+| | **Built** | **1,970** |
 
 #### Measured overrun, 17th August 2026 — read this before trusting an estimate below
 
@@ -1027,7 +1027,7 @@ the inner first alternative clears it, and the outer select's next alternative s
 | Compiler | ~200 B and free against the budget — none of it is copied into an object |
 | Tokens spent | 4 BASIC keywords (`$CE63`–`$CE66`), **6 sub-256 opcodes** — 4 unshifted commands + 2 system |
 | Sub-256 opcodes left | **20** (`$EC`–`$FF`) |
-| Runtime after | ends `$9BDD`, **803 B** free below `$9F00` |
+| Runtime after | ends `$9CB2`, **590 B** free below `$9F00` (as measured 18th August, after the menu removal) |
 
 **20 sub-256 slots is the number to watch.** System tokens *must* live there — `MOFSizeTable` covers
 only `PCD_STARTSYSTEM`..`PCD_ENDSYSTEM` — and so must any token `FixBranches` scans for, because that
@@ -1080,8 +1080,10 @@ does not** — it runs on the X16 and knows only the ROM's keywords, so a BASL s
 is a syntax error until the tokens are declared to it.
 
 `GPC-BASIC/GP.INC.BL` is that declaration, `#INCLUDE`d at the top of any BASL source using GP
-keywords. It is **staged flat into `testing/`** to be built, because BASLOAD resolves `#INCLUDE` by
-bare filename off the emulator's drive:
+keywords. It is **staged flat into `testing/`** to be built, because `testing/` is the emulator's drive and
+that is the shortest thing to type. `#INCLUDE` does take a path, so a user keeps the library in a
+`GPC-BASIC/` folder instead of copying it about; the flat staging is a convenience of this tree,
+not a restriction of BASLOAD:
 
 ```
 #IFNDEF GP.DEFS
@@ -1233,3 +1235,54 @@ Mitigating factors for what remains, both real:
 | Zero-page overlap with VTUI | No conflict — GPC owns `$22–$7B`, VTUI sits below in the KERNAL block. Porting onto `zTemp0/1/2` regardless |
 | Optional-argument sentinel | Keep 255. The constraint is *illegality* for that parameter, not size — `OptionalColourCompile` already had to pay 3 bytes to escape a collision |
 | `#DEFINE` value substitution | Confirmed working. Named constants are free everywhere in the BASL library |
+
+---
+
+## Maintaining the library
+
+*Moved out of `GPC-BASIC/README.md`, which is for people WRITING GPB programs. None of this is
+their problem.*
+
+### Why `GP.INC.BL` has to exist
+
+Two tokenisers have to learn every GP keyword, and only one of them does it by itself.
+
+| | learns GP keywords from | needs `GP.INC.BL`? |
+| --- | --- | --- |
+| `bin/tokenise.zip` (host, for `.bas`) | `source/common-scripts/c64tokens.py`, at build time | no |
+| BASLOAD (on the X16, for BASL sources) | nothing — it knows only ROM keywords | **yes** |
+
+So a BASL source saying `GP.DO 5` is a syntax error until `#INCLUDE "GP.INC.BL"` has declared the
+token. That include is the only thing standing between BASL sources and the GP keyword set.
+
+### The drift hazard
+
+`GP.INC.BL` restates the token values from `getGP()` in `source/common-scripts/c64tokens.py`. Adding
+or removing a keyword in one place and not the other produces a **BASLOAD syntax error** — loud, but
+a wasted debugging session. Generating this file from `c64tokens.py` at build time would remove the
+hazard and is worth doing before the keyword list grows further.
+
+Token values are decimal because `#TOKEN <name> <int16>` takes an int16
+(`testing/MSEDIT/BASLOAD.MD`). They are allocated **downward from `$CE7F`** and never renumbered —
+`GP.MENU` (52840) and `GP.SEL` (52839) were freed by the menu removal and are NOT to be reused.
+
+A `.PRG` containing a `$CE7x` byte is **compile-only**: the ROM cannot `LIST` or `RUN` it, because
+there is no BASIC handler behind those tokens. Expected, not a fault.
+
+### Building an example from the development tree
+
+`testing/` is the emulator's drive and `GPC-BASIC/` holds the masters, so a build stages the files
+across. (`#INCLUDE` accepts a path — `/GPC-BASIC/GP.INC.BL` works, verified on R49 — so this flat
+staging is a habit of this tree, not something BASLOAD forces.) So:
+
+- edit the master in `GPC-BASIC/`
+- copy it and every module it includes into `testing/`
+- `python source/gpc/build_basl.py XXX.EXP.BL XXX.PRG`, then compile the PRG with `GPC.BLITZ.BIN`
+
+`testing/*.INC.BL` and `testing/*.EXP.BL` are gitignored precisely because they are staging copies;
+committing one puts a second copy of a library file in the repo, free to drift from the master.
+
+**Check the byte count `build_basl.py` prints.** A BASLOAD error still reports `OK` and writes a
+**6-byte PRG** — an empty program, which then compiles into an object that runs off into the
+monitor. A real one is thousands of bytes.
+
