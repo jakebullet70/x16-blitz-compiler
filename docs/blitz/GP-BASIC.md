@@ -1,0 +1,627 @@
+# GP.BASIC — the manual
+
+The complete reference for GPC's `GP.*` keyword extension and the BASL library built on it:
+**every command, every routine, every variable name they take.**
+
+| If you want | Read |
+|---|---|
+| what a command does and how to write it | §3 and §4, here |
+| what names are already taken before you invent one | §5 here, then [GP-BASIC.GLOBALS.md](GP-BASIC.GLOBALS.md) for the full register |
+| why a thing was built the way it was | [GP-BASIC.TIERS.md](GP-BASIC.TIERS.md) (the build plan, with measurements) |
+| the original design argument | [GP-BASIC.PLAN.md](GP-BASIC.PLAN.md) |
+| the files themselves | [../../GPC-BASIC/](../../GPC-BASIC/) and its `README.md` |
+
+---
+
+## 1. What GP.BASIC is
+
+Two halves, and the split is deliberate.
+
+**The keywords** — 29 of them, `GP.DO` through `GP.ENDSEL` — are compiled into p-code and handled by
+assembly in the runtime. They exist because BASIC is bad at what they do: searching a string a
+character at a time, sorting an array, pushing bytes at VERA. **2,362 bytes** of runtime, and the
+runtime is copied verbatim into every object, so those bytes are spent by every compiled program
+whether it uses them or not.
+
+**The library** — seven `.INC.BL` and `.EXP.BL` files in [`GPC-BASIC/`](../../GPC-BASIC/) — is
+ordinary BASL, called with `GOSUB`. Panels, themes, entry fields, BMX loading. **Zero runtime bytes**:
+only a program that `#INCLUDE`s one pays for it.
+
+> **The rule that decides which side a thing goes on:** assembly gets what runs in a loop or moves
+> bulk data. Everything else is BASIC. `INPHELP.GET` waits on a *human*, so the speed argument that
+> puts sorting in assembly does not apply to it — and it saved 166 bytes of runtime for every program
+> ever compiled.
+
+---
+
+## 2. Using it
+
+Every BASL source that uses a `GP.` keyword must declare the tokens:
+
+```basic
+#INCLUDE "GP.INC.BL"
+```
+
+**BASLOAD knows only the ROM's keywords.** Without that line `GP.DO 5` is a syntax error. (The
+host-side tokeniser for hand-written `.bas` needs nothing — it learns the same tokens from
+`c64tokens.py` at build time.)
+
+### Building
+
+BASLOAD resolves `#INCLUDE` **by bare filename off the emulator's drive**, and `testing/` is that
+drive. `GPC-BASIC/` is the master; you build from a copy:
+
+```bash
+cp GPC-BASIC/GP.INC.BL GPC-BASIC/MYPROG.BL testing/
+python source/gpc/build_basl.py MYPROG.BL MYPROG.PRG    # BASL source -> tokenised PRG
+# then compile MYPROG.PRG with GPC.BLITZ.BIN
+```
+
+Do not point a program at `GPC-BASIC/...` — that path does not exist from the X16's side.
+
+### A `.PRG` with GP tokens is compile-only
+
+A `$CE7x` byte has no BASIC handler behind it, so the ROM cannot `LIST` or `RUN` the tokenised
+program. That is expected, not a fault. Compile it and run the object.
+
+---
+
+## 3. Command reference
+
+29 keywords, tokens `$CE7F` down to `$CE63`, allocated downward and **never renumbered** — the token
+values are the ABI.
+
+### At a glance
+
+| | Keywords |
+|---|---|
+| **Loops** | `GP.DO` `GP.LOOP` `GP.EXITDO` |
+| **Multi-way branch** | `GP.SELECT` `GP.CASE` `GP.ELSE` `GP.ENDSEL` |
+| **Machine code** | `GP.CALL` `GP.A` `GP.X` `GP.Y` `GP.C` |
+| **Strings** | `GP.INSTR` `GP.STRPTR` `GP.TRIM` `GP.LTRIM` `GP.RTRIM` `GP.UPPER` `GP.LOWER` `GP.COMP` |
+| **Arrays** | `GP.SORT` `GP.ARRPTR` |
+| **Screen** | `GP.STASH` `GP.RESTR` `GP.BOX` `GP.FILL` `GP.PRINTAT` |
+| **Menu** | `GP.MENU` `GP.SEL` |
+
+Square brackets below mean optional. **Optionals cannot be skipped over** — `GP.BOX X,Y,W,H,,7` is a
+syntax error; write the style you are defaulting.
+
+---
+
+### 3.1 Loops
+
+```
+GP.DO [count]
+    ...
+GP.LOOP
+```
+
+Counted loop, modelled on prog8's `repeat`. **Count 0 or omitted loops forever.** Nesting works.
+
+```
+GP.EXITDO
+```
+
+Leave the innermost `GP.DO` early, closing its stack frame on the way. **This is the leak-free exit** —
+a `GOTO` out of a `GP.DO` abandons the frame, and the frames do not get reclaimed.
+
+```basic
+GP.DO
+  TICK = TICK + 1
+  IF TICK = 9 THEN GP.EXITDO
+GP.LOOP
+```
+
+Example: [`LOOPS.EXP.BL`](../../GPC-BASIC/LOOPS.EXP.BL)
+
+---
+
+### 3.2 Multi-way branch
+
+```
+GP.SELECT <expr>
+GP.CASE <expr> [,<expr> ...]
+    ...
+GP.ELSE
+    ...
+GP.ENDSEL
+```
+
+The selector is evaluated **once**; each `GP.CASE` compares against it in the order written, and the
+first match wins. `GP.ELSE` is optional. **Nothing matching with no `GP.ELSE` is not an error** — the
+whole select is simply skipped.
+
+Case values are ordinary numeric **expressions**, not just constants — which is a step past prog8's
+`when`, whose choices must be compile-time integers.
+
+**`GP.ENDSEL` is required**: it is what releases the selector's stack frame.
+
+> **Do not `GOTO` out of a select.** Jumping past `GP.ENDSEL` leaves the frame open, and in a loop that
+> leaks one per pass. Set a flag and test it after `GP.ENDSEL` — one comparison, and it cannot leak.
+> `INPHELP.GET` does exactly this and the comment there says why. `GP.EXITDO` out of a loop that
+> *contains* a select is fine; it cleans up on the way.
+
+**This does not replace `ON x GOTO/GOSUB`**, which is a real skip table and remains the right answer
+for a dense `1..n` index. `GP.SELECT` is for the **sparse** selector — key codes, state machines,
+bit depths — where `ON` cannot go.
+
+```basic
+GP.SELECT BMX.DEPTH
+    GP.CASE 8
+    GP.CASE 1, 2, 4
+        BMX.ERROR$ = "NEEDS ANOTHER SCREEN MODE"
+    GP.ELSE
+        BMX.ERROR$ = "BAD BIT DEPTH"
+GP.ENDSEL
+```
+
+An empty case body — the `8` above — is the cheapest possible "this one is fine": the match falls
+straight out of the select.
+
+Example: [`SELECT.EXP.BL`](../../GPC-BASIC/SELECT.EXP.BL)
+
+---
+
+### 3.3 Machine code
+
+```
+GP.CALL address [,a] [,x] [,y] [,carry]
+GP.A   GP.X   GP.Y   GP.C
+```
+
+Calls machine code with the registers set. **All four arguments are optional and default to 0.** The
+four value words read the results back afterwards.
+
+They are **keywords, not variables** — `X = GP.A` reads, `GP.A = 5` is a syntax error. They share
+`SYS`'s `$030C`–`$030F`, so they also read what a plain `SYS` left behind.
+
+```basic
+GP.CALL $FF5F, 0, 0, 0, 1          ' KERNAL screen_mode, carry set = report
+COLS = GP.X : ROWS = GP.Y
+```
+
+> **Put your machine code in banked RAM (`$A000`–`$BFFF`), not `$0400`.** Stock X16 BASIC leaves
+> `$0400` free for the user; **a compiled GPC program does not** — that page holds runtime state
+> (`stringHighMemory`, `storeStartHigh`, `variableStartPage`), and POKEing code over it corrupts the
+> program silently.
+
+Example: [`MLCALL.EXP.BL`](../../GPC-BASIC/MLCALL.EXP.BL)
+
+---
+
+### 3.4 Strings
+
+| Form | Does |
+|---|---|
+| `GP.INSTR(hay$, needle$ [,start])` | position of `needle$`, 1-based; **0 = not found**. `start` is where to begin |
+| `GP.COMP(a$, b$)` | compare **ignoring case**: −1 before, 0 same, 1 after |
+| `GP.STRPTR(a$)` | address of the string's `[ActLen][Data]` block |
+| `GP.TRIM a$` | strip spaces from **both** ends, in place |
+| `GP.LTRIM a$` | from the left only |
+| `GP.RTRIM a$` | from the right only |
+| `GP.UPPER a$` | A–Z to upper, in place |
+| `GP.LOWER a$` | A–Z to lower, in place |
+
+`GP.INSTR` is the gap that matters: **GPC has no string search of any kind** without it.
+
+`GP.COMP` gives you a case-blind equality test — `IF GP.COMP(A$,B$) = 0` — which plain `=` cannot do,
+and the comparator for ordering names. Length breaks a tie, so `"abc"` sorts before `"ABCD"`.
+
+**The five in-place statements take a string VARIABLE**, never a literal or an expression; the
+compiler rejects those. Case conversion leaves digits, punctuation and PETSCII graphics untouched.
+
+**There is no `GP.PAD`.** Padding *grows* a string, and an in-place handler receives only the string's
+block, never the variable slot — so it can never reallocate past the capacity the string was born
+with. Use `STRHELP.PADR` / `PADL` / `PADC` (§4.2), which are plain BASIC assignment and reallocate.
+
+#### `GP.STRPTR` and the address-splitting trap
+
+The address is of `[ActLen][Data]`: **length at that address, first character at +1**, and the
+block's capacity at −2. With `GP.CALL` that lets machine code fill a BASIC string in place and set
+its length — something stock BASIC cannot do at all.
+
+> **Splitting the address, do NOT write `P AND 255`.** `AND` is **16-bit signed** in GPC and the string
+> heap lives above 32767, so it raises `OUT OF RANGE` rather than masking. Write:
+> ```basic
+> H = INT(P / 256) : L = P - H * 256
+> ```
+> This applies to `GP.ARRPTR` and to every VRAM address past the top eighth of the screen too.
+
+Example: [`STRINGS.EXP.BL`](../../GPC-BASIC/STRINGS.EXP.BL)
+
+---
+
+### 3.5 Arrays
+
+```
+GP.SORT a$() [,descending] [,foldcase]
+GP.ARRPTR(a())
+```
+
+Shell sort in place. Both options default to 0 (ascending, case-sensitive); any non-zero turns them
+on. **Maximum `DIM` bound 254** (255 items). Never-assigned elements count as empty strings and sort
+to the front.
+
+> **The empty parentheses are required.** In BASIC `A$` and `A$()` are different variables, so
+> `GP.SORT A$` finds the scalar and sorts nothing.
+
+`GP.ARRPTR` returns the address of **element zero** — the header is already skipped — so machine code
+reached by `GP.CALL` can work on the array in bulk. **Stride is yours to add:** 2 bytes per element
+for a string array (each element is a *pointer* to the string's block — follow it, and see
+`GP.STRPTR` for the layout), 6 for a numeric one. Multi-dimensional arrays are rejected, and
+`GP.ARRPTR(A(3))` is a syntax error — add `3*2` or `3*6` yourself.
+
+Example: [`ARRAYS.EXP.BL`](../../GPC-BASIC/ARRAYS.EXP.BL)
+
+---
+
+### 3.6 Screen — stash and restore
+
+```
+GP.STASH bank, x, y, w, h
+GP.RESTR bank [,x ,y]
+```
+
+Copies a text rectangle into a banked RAM bank and back. The stash carries a **4-byte header**
+(w, h, x, y), so the restore needs only the bank — `GP.RESTR bank` puts it back where it came from,
+and `GP.RESTR bank,x,y` pastes it somewhere else. That makes a saved panel a reusable stamp.
+
+> **A bank is 8K and a cell is 2 bytes, so at most 4094 cells fit.** A full 80×60 screen is 9,600
+> bytes and will **not**. Stash panels, not screens. The limit is checked per row, before the write
+> that would cross out of the bank — too large is an error, never a corrupted next bank.
+
+---
+
+### 3.7 Screen — drawing
+
+```
+GP.BOX x, y, w, h [,style] [,col]
+GP.FILL x, y, w, h, char [,col]
+GP.PRINTAT x, y, text$ [,col]
+```
+
+Written **straight into VERA** — no KERNAL, which is why it is several times faster than `PRINT`
+(GPC's character output makes two KERNAL calls per character, and `BSOUT` carries scroll, quote mode
+and cursor work).
+
+`GP.BOX` draws the frame only. Styles: **0** solid, **1** dither, **2** single line, **3** rounded,
+**4** thick, **5** thick shaded. `char` in `GP.FILL` is PETSCII, e.g. `ASC(" ")`.
+
+**The colour is optional and defaults to whatever `COLOR` last set** — the same colour a `PRINT`
+would have used, read out of the KERNAL's `$0376`. Supplied, it is one byte packed exactly as the X16
+packs it: `background * 16 + foreground`. **255 is a real colour here** (light grey on light grey),
+not a "leave it alone" marker.
+
+> **These do not move the cursor `PRINT` uses.** Nothing here calls the KERNAL, so a plain `PRINT`
+> after a `GP.PRINTAT` carries on from wherever the KERNAL still thinks the cursor is — *not* after
+> the text just drawn. Use `LOCATE` before `PRINT`, or stay in one world or the other.
+
+**Nothing is clipped.** Off the right edge wraps to the next row; off the bottom writes past the end
+of the screen map. Zero width or height draws nothing, which is the case a computed size reaches by
+accident.
+
+Example: [`SCREEN.EXP.BL`](../../GPC-BASIC/SCREEN.EXP.BL)
+
+---
+
+### 3.8 Menu
+
+```
+GP.MENU x, y, w, n, hotkeys$ [,flags]     ->  GP.SEL
+```
+
+**BASL draws the menu; this drives it.** Draw `n` rows yourself, each `w` cells wide, the first at
+`x,y` — with `GP.FILL` and `GP.PRINTAT`, or however you like. `GP.MENU` then highlights one, moves it
+with the cursor keys, and returns the row chosen in `GP.SEL`: **1..n for a choice, 0 for cancelled**.
+
+| Key | |
+|---|---|
+| cursor up / down | move |
+| RETURN | choose |
+| ESC or STOP | cancel |
+| a hotkey | chooses its row at once |
+
+`hotkeys$` is one character per row, in order, matched **without case**. It may be shorter than `n`
+(the later rows simply have none) or `""` for a cursor-driven menu.
+
+| flags, added together | |
+|---:|---|
+| 1 | **must select** — ESC does not cancel |
+| 2 | **keep mark** — leave the chosen row highlighted on the way out |
+| 4 | **no wrap** — stop at the ends instead of wrapping round |
+
+**It takes no colours**, because the highlight is a swap of the cell's own attribute nibbles —
+foreground and background trade places. Whatever you drew, in whatever colours, highlights correctly
+and un-highlights back to exactly what was there. Only the attribute bytes are touched, never the
+text, so moving the highlight cannot disturb your drawing.
+
+Example: [`MENU.EXP.BL`](../../GPC-BASIC/MENU.EXP.BL)
+
+---
+
+## 4. Module reference — the BASL library
+
+Called with `GOSUB`. Arguments go in named variables first, results come back in named variables
+after. **Every one of these files is position-independent** (each jumps over itself), so `#INCLUDE`
+it anywhere, the top of the program included.
+
+### 4.1 `THEME.INC.BL` — named colour roles
+
+| Routine | in | out |
+|---|---|---|
+| `THEME.LOAD` | `THEME.DARK` (0 light, non-zero dark) | fills `THEME.CLR()` |
+| `THEME.SET` | `THEME.ATTR` | issues `COLOR` — makes it the colour `PRINT` uses |
+| `THEME.HI` | `THEME.ATTR` | `THEME.INV`, the inverse attribute |
+
+Roles, for indexing `THEME.CLR()`: `THEME.PAGE` `THEME.TEXT` `THEME.TITLE` `THEME.BORDER`
+`THEME.HILITE` `THEME.DIMMED` `THEME.WARN`, and `THEME.SLOTS` = 7.
+
+```basic
+THEME.DARK = 1 : GOSUB THEME.LOAD
+GP.BOX 4,2,30,8, 2, THEME.CLR(THEME.BORDER)
+GP.PRINTAT 6,3, "TITLE", THEME.CLR(THEME.TITLE)
+```
+
+The values are **packed attributes** — `background * 16 + foreground` — because that is exactly what
+`GP.BOX`, `GP.FILL` and `GP.PRINTAT` take. For `COLOR`, which wants the halves separately, use
+`THEME.SET`.
+
+`#DEFINE` substitutes at translation time, so `THEME.CLR(THEME.TITLE)` compiles to `THEME.CLR(2)` —
+the readable name costs no variable, no lookup, and a one-byte constant index.
+
+**`THEME.CLR` is `DIM`med by the module. Do not `DIM` it yourself.**
+
+### 4.2 `STRHELP.INC.BL` — string helpers
+
+| Routine | in | out |
+|---|---|---|
+| `STRHELP.PADR` | `STRHELP.STR$` `STRHELP.WIDTH` | `STRHELP.STR$` left-justified |
+| `STRHELP.PADL` | same | right-justified |
+| `STRHELP.PADC` | same | centred (odd gap goes right) |
+| `STRHELP.SPLIT` | `STRHELP.STR$` `STRHELP.DELIM$` `STRHELP.MAX` | `STRHELP.N`, `STRHELP.FIELD$(1..N)` |
+| `STRHELP.PET2SCR` | `STRHELP.PET` | `STRHELP.SCR` |
+
+All three pad routines **leave a string already at or past the width alone. They pad; they never
+truncate** — use `GP.RTRIM` to go the other way.
+
+`SPLIT` reads `STRHELP.STR$` without modifying it. `STRHELP.MAX` of 0 means 10. **Empty fields are
+preserved**, which is what makes it safe for data rows: `"A,,C"` is three fields, `"A,"` is two.
+Splitting an empty string gives one empty field, never zero. Reaching the limit is not an error and
+loses nothing — the last field gets the whole unsplit remainder, delimiters and all.
+
+**`STRHELP.FIELD$` is the one array the library deliberately does NOT `DIM`.** Left alone, GPC's
+implicit `DIM` gives 0..10. Want more, `DIM` it yourself **before the first call** and set
+`STRHELP.MAX` to match. `DIM`ming an array GPC has already auto-dimensioned is an error, so it is one
+or the other. **This is the opposite of `THEME.CLR`** — worth keeping straight.
+
+`PET2SCR` converts a PETSCII code to the screen code the tile map holds, for `TILE`, `TDATA` and
+`VPOKE`. `GP.PRINTAT` and `GP.FILL` already do it internally.
+
+Examples: [`SPLITT.EXP.BL`](../../GPC-BASIC/SPLITT.EXP.BL)
+
+### 4.3 `APPHELP.INC.BL` — start politely, leave it as you found it
+
+| Routine | in | out |
+|---|---|---|
+| `APPHELP.STARTUP` | — | `APPHELP.MODE` `APPHELP.COLS` `APPHELP.ROWS` `APPHELP.COLOUR` |
+| `APPHELP.RESTORE` | those | screen mode and colour put back |
+| `APPHELP.PANEL.SAVE` | `APPHELP.FILE$` `.BANK` `.X` `.Y` `.W` `.H` [`.DEV`] | a file |
+| `APPHELP.PANEL.LOAD` | `APPHELP.FILE$` `.BANK` | back where it came from |
+| `APPHELP.PANEL.PUT` | `APPHELP.FILE$` `.BANK` `.X` `.Y` | pasted somewhere else |
+
+```basic
+GOSUB APPHELP.STARTUP
+' ... the application, laid out with APPHELP.COLS / APPHELP.ROWS ...
+GOSUB APPHELP.RESTORE : END
+```
+
+**Call `STARTUP` first, before any `SCREEN` or `COLOR` of your own** — it records the state as it
+finds it, so anything you change beforehand is what gets restored.
+
+**Lay out from `APPHELP.COLS` / `APPHELP.ROWS` rather than assuming 80×60.** The X16 boots 80×60 but
+`SCREEN 0` is 40×30, and someone who prefers larger text is running one.
+
+`APPHELP.DEV` defaults to 8. The panel file is **self-describing** — `GP.STASH`'s 4-byte header goes
+in it — so loading needs nothing but the name.
+
+### 4.4 `INPHELP.INC.BL` — a positioned entry field
+
+| Routine | in | out |
+|---|---|---|
+| `INPHELP.GET` | `INPHELP.X` `.Y` `.LEN` `.ATTR` `.TEXT$` `.MASK` | `INPHELP.TEXT$` `INPHELP.KEY` |
+| `INPHELP.ASK` | the same plus `INPHELP.LABEL$` | the same; `INPHELP.X` restored |
+
+```basic
+INPHELP.X = 10 : INPHELP.Y = 6
+INPHELP.LEN = 20
+INPHELP.ATTR = THEME.CLR(THEME.TEXT)
+INPHELP.TEXT$ = ""
+GOSUB INPHELP.GET
+IF INPHELP.KEY = 27 THEN GOTO CANCELLED
+```
+
+**This is what `INPUT` and `LINPUT` cannot do.** Both own the whole bottom of the screen, scroll it,
+echo in whatever colour is current, and accept any length — all four fatal on a drawn screen. A field
+stays where you put it, in the colour you give it, and stops at the width you allow.
+
+`INPHELP.KEY` is the key that ended it, and it is what makes a **multi-field form** possible:
+
+| | |
+|---:|---|
+| 13 | RETURN — finished |
+| 27 / 3 | ESC / STOP — cancelled, and `INPHELP.TEXT$` is put back to what it was |
+| 17 / 145 / 9 | cursor down / up / TAB — left the field, **text kept** |
+
+So a form is a loop over fields, not a sequence of prompts, and the user can go back and fix the
+first one without starting again.
+
+`INPHELP.MASK` non-zero shows asterisks while holding the real string. The field never scrolls: when
+full, further characters are refused and the cursor **inverts the last character** rather than
+sitting off the end. The cursor blinks off `TI` rather than a delay loop, because a delay loop would
+swallow keys pressed during it.
+
+Example: [`FORM.EXP.BL`](../../GPC-BASIC/FORM.EXP.BL) — three fields, one masked, in a themed panel.
+
+### 4.5 `BMX.INC.BL` — a BMX bitmap into VERA
+
+| Routine | in | out |
+|---|---|---|
+| `BMX.OPEN` | `BMX.FILE$` | `BMX.ERROR$`, and the header — `BMX.WIDTH` `.HEIGHT` `.DEPTH` `.VERSION` `.PALUSED` `.PALFIRST` `.DATAOFF` `.PACKED` |
+| `BMX.PAINT` | an open file | palette and pixels in VRAM, file closed |
+| `BMX.SHOW` | `BMX.FILE$` | both of the above |
+| `BMX.CLOSE` | — | abandons a file opened by `BMX.OPEN` |
+
+`BMX.ERROR$` empty means it worked.
+
+```basic
+BMX.FILE$ = "TITLE.BMX"
+SCREEN 128
+GOSUB BMX.SHOW
+IF BMX.ERROR$ <> "" THEN PRINT BMX.ERROR$
+```
+
+The careful form, when you want the size before committing to a screen mode, or want to report a bad
+file without the display already torn down:
+
+```basic
+BMX.FILE$ = F$
+GOSUB BMX.OPEN
+IF BMX.ERROR$ <> "" THEN GOTO COMPLAIN
+' ... BMX.WIDTH, BMX.HEIGHT, BMX.PALUSED readable here ...
+SCREEN 128
+GOSUB BMX.PAINT
+```
+
+> **Set the screen mode BEFORE `BMX.PAINT`, not after.** `SCREEN` reloads the default palette, so a
+> mode change after painting throws the image's colours away — right pixels, wrong colours, which
+> reads as a corrupt file rather than a mistake.
+
+**8 bits per pixel, uncompressed**, which is what `SCREEN 128` shows without a decompressor. Anything
+else is reported, not attempted. The image is centred; larger than 320×240 is clipped.
+
+Example: [`BMXVIEW.EXP.BL`](../../GPC-BASIC/BMXVIEW.EXP.BL)
+
+---
+
+## 5. Variables
+
+**BASL has one flat namespace and nothing else.** No locals, no scoping, no parameters. Every
+variable in every `#INCLUDE`d module is visible to your program and vice versa, and nothing warns
+you: **a collision is a wrong answer, not an error.**
+
+> **One module, one dotted prefix, and nothing writes outside its own.**
+
+### Prefixes already taken
+
+| Prefix | Owner |
+|---|---|
+| `GP.` | keywords, **not variables** — see below |
+| `STRHELP.` | `STRHELP.INC.BL` |
+| `THEME.` | `THEME.INC.BL` |
+| `APPHELP.` | `APPHELP.INC.BL` |
+| `INPHELP.` | `INPHELP.INC.BL` |
+| `BMX.` / `BMXK.` | `BMX.INC.BL` (variables / its KERNAL constants) |
+
+Pick anything else for your own program — `GAME.`, `MAP.`, `AIRLIFT.`. **A prefix costs nothing at
+runtime**, because BASLOAD crunches every identifier down to a short BASIC variable: a long readable
+name and a two-letter one compile to exactly the same thing.
+
+**Do not reuse a taken prefix even for something the module has not defined.** `THEME.MINE` looks
+free today; it is one library update away from not being.
+
+### `GP.*` is keywords, not variables
+
+`GP.INC.BL` defines **no variables at all** — 29 `#TOKEN` lines and nothing else.
+
+```basic
+GP.A = 5          ' SYNTAX ERROR — GP.A is a keyword
+X = GP.A          ' correct
+```
+
+The value words are `GP.A` `GP.X` `GP.Y` `GP.C` (registers after `GP.CALL`) and `GP.SEL` (the row
+`GP.MENU` returned). They are tokens rather than variables for a hard reason: **nothing in the runtime
+can write a BASIC variable by name**, so a command that hands a value back has to hand it back
+through a keyword. X16's own `ST`, `MX` and `MY` exist for the same reason.
+
+### Nothing here is re-entrant
+
+A module's parameters **are** its globals; there is nowhere else to put them. So `INPHELP.GET` cannot
+be called from inside itself, `BMX.OPEN` cannot nest, and a `GOSUB` from inside a module into code
+that calls the same module corrupts it silently. In practice this only bites if you write a callback
+— copy the values you care about into your own variables first. `THEME.*` is the exception:
+`THEME.LOAD` only writes.
+
+### Labels are global too
+
+Every `NAME:` is a jump target in the same flat space, internal ones included —
+`BMX.STREAM.MORE`, `INPHELP.REDRAW`, `THEME.LOAD.DARK`. Each module also has a skip label it jumps
+over itself with (`THEME.SKIP`, `APPHELP.SKIP`, `STRHELP.SKIP`, `BMX.MODULE.END`,
+`INPHELP.MODULE.END`). **Do not branch to one.**
+
+**BASLOAD refuses a name used as both a label and a variable** (`BASLOAD.MD:319`) — which is why
+`BMX`'s skip label is `BMX.MODULE.END` and not `BMX.SKIP`: that name was already the byte-skip
+counter.
+
+**→ The complete per-module in / out / internal register is [GP-BASIC.GLOBALS.md](GP-BASIC.GLOBALS.md),
+with a script in §7 for re-checking it after a change.**
+
+---
+
+## 6. The traps, collected
+
+Every one of these has cost a debugging session at least once.
+
+| Trap | What happens | Do this |
+|---|---|---|
+| `P AND 255` on a heap or VRAM address | `AND` is **16-bit signed**; above 32767 it raises `OUT OF RANGE` instead of masking | `H = INT(P/256) : L = P - H*256` |
+| `$0400` for machine code | stock BASIC leaves it free, **a compiled GPC program does not** — runtime state lives there, and it corrupts silently | banked RAM, `$A000`–`$BFFF` |
+| `PRINT` after `GP.PRINTAT` | GP drawing never calls the KERNAL, so the cursor is wherever it was | `LOCATE` first, or stay in one world |
+| `GOTO` out of a `GP.SELECT` | `GP.ENDSEL` releases the frame; jumping past it leaks one per pass | a flag, tested after `GP.ENDSEL` |
+| `GOTO` out of a `GP.DO` | abandons the loop frame | `GP.EXITDO` |
+| `GP.SORT A$` | `A$` and `A$()` are different variables — it sorts the scalar, i.e. nothing | `GP.SORT A$()` |
+| `GP.BOX X,Y,W,H,,7` | optionals cannot be skipped over | `GP.BOX X,Y,W,H,0,7` |
+| `SCREEN` after `BMX.PAINT` | reloads the default palette and throws the image's colours away | set the mode first |
+| `DIM THEME.CLR(...)` | the module owns it; re-`DIM`ing is an error | leave it alone |
+| `STRHELP.FIELD$` wanted bigger | auto-`DIM`ed at 0..10 on first use, and you cannot `DIM` it after | `DIM` it **before** the first call, set `STRHELP.MAX` |
+| `#DEFINE X 129536` | `#DEFINE` takes an **INT16** — `ERROR: INVALID PARAMETER` | an ordinary variable |
+| `RPT$(c, 0)` | raises `ILLEGAL QUANTITY` — it does not return `""` | guard the zero case |
+| a `GP.` keyword in a hand-written `.bas` | the ROM cannot `LIST` or `RUN` a `$CE7x` token | expected — compile it |
+| readable names in a hand-written `.bas` | **the built-in BASIC gives TWO significant characters** — `THEME.CLR` and `THEME.COUNT` become one variable, silently | write BASL, or give every variable a distinct first two characters |
+
+The last one is worth its own sentence. **Inside BASL you are safe** — 64 significant characters, so
+`PANEL.COL` and `PANEL.ROW` are genuinely different variables and the readable names cost nothing.
+Write the same test as a raw `.bas` for the host tokeniser and the two-character rule is back. It
+cost two test cycles during tier 6, both times looking exactly like a compiler bug.
+
+Dotted names also dodge the keyword-collision trap: `GP.MENU`, `THEME.CLR`, `INPHELP.LEN` and
+`INPHELP.RETURN` all contain reserved words and all work, because BASLOAD matches the whole
+identifier. An **undotted** one does not — `POS`, `MB`, `ST`, `LEN`, `CHAR` cannot be variables at
+all. That is the main reason the library is dotted throughout.
+
+---
+
+## 7. Where everything lives
+
+| | |
+|---|---|
+| `GPC-BASIC/*.INC.BL` | the library — includes, `GOSUB`-called |
+| `GPC-BASIC/*.EXP.BL` | one runnable example per feature |
+| `GPC-BASIC/GP.INC.BL` | the `#TOKEN` declarations. **Mandatory** in any BASL source using `GP.*` |
+| `source/common-scripts/c64tokens.py` | `getGP()` — the token values `GP.INC.BL` mirrors |
+| `source/compiler/source/generation/commands.def`, `unary.def` | the generator table: argument shapes |
+| `source/compiler/source/system-specific/x16/generation/` | the X16-only ones — stash, drawing, menu |
+| `source/runtime/source/commands/` | the assembly handlers |
+| `docs/blitz/GP-BASIC.TIERS.md` | the build plan, budgets, and every measurement |
+| `docs/blitz/GP-BASIC.GLOBALS.md` | the full global-name register |
+| `docs/blitz/GP-BASIC.PLAN.md` | the original design argument |
+
+### The drift hazard
+
+`GP.INC.BL` **restates** the token values from `getGP()`. Adding a keyword in one place and not the
+other produces a BASLOAD syntax error — loud, but a wasted session. Add to both in the same change.
+
+### Cost, as it stands
+
+**2,362 bytes** of runtime for all 29 keywords, runtime ending `$9BDD` with **803 bytes free** below
+`$9F00`, and **20 sub-256 opcodes left**. That last number is the real constraint: every future
+construct with a forward branch must spend from it.

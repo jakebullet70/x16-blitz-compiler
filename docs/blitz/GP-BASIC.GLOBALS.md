@@ -6,6 +6,9 @@ is visible to the modules. Nothing warns you: a collision is a wrong answer, not
 
 This document is the register of what is already taken. Read it before naming anything.
 
+The manual — commands, routines and the traps — is [GP-BASIC.md](GP-BASIC.md); this is its §5 in
+full.
+
 The rule the library follows, and that you should follow too:
 
 > **One module, one dotted prefix, and nothing writes outside its own.**

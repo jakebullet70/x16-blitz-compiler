@@ -1,13 +1,16 @@
 # GPC-BASIC
 
 The GP.BASIC library: the BASLOAD includes and the example programs for GPC's `GP.*` keyword
-extension. The design lives in [docs/blitz/GP-BASIC.TIERS.md](../docs/blitz/GP-BASIC.TIERS.md)
-(build plan) and [docs/blitz/GP-BASIC.PLAN.md](../docs/blitz/GP-BASIC.PLAN.md) (background).
+extension.
 
-**Before naming a variable in a program that includes any of this, read
-[docs/blitz/GP-BASIC.GLOBALS.md](../docs/blitz/GP-BASIC.GLOBALS.md)** — BASL has one flat namespace,
-so every module's variables are visible to your program and a collision is a wrong answer rather
-than an error.
+**Start at [docs/blitz/GP-BASIC.md](../docs/blitz/GP-BASIC.md)** — the manual: every command, every
+routine, every variable name they take, and the traps collected in one table.
+
+| Also | |
+|---|---|
+| [GP-BASIC.GLOBALS.md](../docs/blitz/GP-BASIC.GLOBALS.md) | the full per-module global register. BASL has one flat namespace, so a collision is a wrong answer rather than an error |
+| [GP-BASIC.TIERS.md](../docs/blitz/GP-BASIC.TIERS.md) | the build plan, budgets and measurements |
+| [GP-BASIC.PLAN.md](../docs/blitz/GP-BASIC.PLAN.md) | the original design argument |
 
 ## Naming
 

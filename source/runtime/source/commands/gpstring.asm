@@ -120,6 +120,12 @@ _GIResult:
 ;
 ;					GP.INSTRREV(haystack$, needle$ [,start]) -> position, 0 if absent
 ;
+;		*** NOT BUILT. *** This block is a design note, not documentation of shipped code: there is
+;		no handler below it, no ";; [...]" marker, and no token in getGP(). It is written in the
+;		present tense like the entries either side of it, which is exactly how it would come to be
+;		mistaken for a keyword that exists -- so it says so here. Everything below is what it WOULD
+;		do if built.
+;
 ;		The LAST occurrence rather than the first: the extension in a filename, the last space to
 ;		break a line at. Named and shaped after FreeBASIC's INSTRREV (VB spells it InStrRev), which
 ;		is a separate function rather than PowerBASIC's negative-start-on-INSTR, because
