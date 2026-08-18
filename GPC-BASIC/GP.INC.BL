@@ -171,6 +171,12 @@
 ##    1  MUST SELECT   ESC does not cancel; only a real choice leaves
 ##    2  KEEP MARK     leave the chosen row highlighted on the way out
 ##    4  NO WRAP       stop at the ends instead of wrapping round
+##    8  GAMEPAD       the SNES pad in PORT 1 drives it too: up/down move,
+##                     B or Start choose. Cancel stays on the keyboard.
+##                     PORT 1, not port 0 -- port 0 IS the keyboard, which
+##                     this already reads, so both would move it twice per
+##                     press. One step per press, no auto-repeat. Costs
+##                     nothing with no pad plugged in.
 
 #TOKEN GP.MENU 52840
 #TOKEN GP.SEL 52839

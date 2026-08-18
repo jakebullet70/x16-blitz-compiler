@@ -51,10 +51,14 @@ MENU.ITEM$(4) = " QUIT"
 
 ## ---- The main loop. GP.MENU returns 0 when the user pressed ESC; here
 ## ---- there is nothing to back out to, so it just redraws.
+## ----
+## ---- Flag 8 adds the gamepad in port 1 -- up/down move, B or Start
+## ---- chooses. It costs nothing when no pad is plugged in, so there is
+## ---- no reason for a menu not to accept one.
 
 MENU.MAIN:
     GOSUB MENU.DRAW
-    GP.MENU MENU.LEFT, MENU.TOP, MENU.WIDE, MENU.COUNT, "NLOQ"
+    GP.MENU MENU.LEFT, MENU.TOP, MENU.WIDE, MENU.COUNT, "NLOQ", 8
     MENU.PICK = GP.SEL
     IF MENU.PICK = 0 THEN GOTO MENU.MAIN
     IF MENU.PICK = MENU.COUNT THEN GOTO MENU.QUIT
