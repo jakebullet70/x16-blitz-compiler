@@ -71,6 +71,38 @@ class Builder(object):
 		return self.asmFiles
 	def getDEFFiles(self):
 		return self.defFiles
-		
+
+# *******************************************************************************************
+#
+#		Every .asm the RUNTIME contributes, across BOTH trees, in one canonical order.
+#
+#		The runtime is now assembled from two source trees. runtime/ is the interpreter; the GP
+#		handlers live apart in gp-runtime/ so they can be linked LAST and sit at the tail of the
+#		image, where a future pass can truncate them out of an object that references none of
+#		them (docs/blitz/GP-BASIC.TIERS.md, tier 7). Handlers are reachable only through their
+#		VectorTable slot, so nothing below them ever calls in.
+#
+#		THIS EXISTS SO THE TWO SCANNERS CANNOT DISAGREE. pcode.py assigns a command's opcode by
+#		its POSITION in this list and vectors.py fills the slot at that position from the marker
+#		it finds -- so a file visible to one and not the other silently points an opcode at
+#		"Unimplemented", which is a running program doing the wrong thing, not a build failure.
+#
+#		The combined list is re-sorted with the SAME key, so the split changed no opcode at all:
+#		the key is leafname-first, gpcall.asm still sorts between gosub.asm and gpsort.asm no
+#		matter which tree holds it. That is deliberate -- moving the files was meant to change
+#		the layout and nothing else, and it is checkable (diff the generated pcodetokens.inc).
+#		Keep leafnames unique across both trees and it stays true.
+#
+# *******************************************************************************************
+
+def getRuntimeASMFiles(sourceDir = ".."):
+	trees = [Builder(sourceDir+os.sep+"runtime"),Builder(sourceDir+os.sep+"gp-runtime")]
+	files = []
+	for t in trees:
+		files += t.getASMFiles()
+	files.sort(key = trees[0].sortKey)
+	return files
+
+
 if __name__ == "__main__":
  	Builder().createFile()

@@ -31,9 +31,9 @@ libraries:
 #
 #		bumpbuild.py must run BEFORE build.py: it generates source/generated/version.asm, and
 #		build.py is what sweeps source/ into _library.asm. The other way round and the engine
-#		links last build's number. No --bump here on purpose: this target runs several times per
-#		build, so the increment lives once in ../Makefile's `libraries`. This call only
-#		regenerates version.asm, which is idempotent.
+#		links the previous version.asm. It reads both stamps -- buildnum.txt for the printed
+#		version, rtbuild.txt for the GPC.RT.nnn.BIN name -- and increments neither, so running
+#		it several times per build (which this tree does) is harmless.
 #
 prelim:
 	make -B -C ..$(S)common-source
@@ -44,7 +44,11 @@ prelim:
 
 #
 #		This order matters. 00main.header contains the BASIC header followed by the runtime components
-# 		(runtime.library ... polynomials.library).
+# 		(runtime.library ... gp.library).
+#
+#		gp.library is LAST of the runtime components, immediately before 10object.divider: the GP
+#		handlers are then the tail of the embedded runtime, which is the only place they can ever
+#		be truncated out of an object that uses none of them (../gp-runtime/Makefile explains).
 #
 #		At the end, eventually, the finished compiled code will be copied over the compiler and library
 #		code for this application to make more space available.
@@ -52,6 +56,7 @@ prelim:
 build: prelim
 	$(ASM) 	source$(S)main$(S)00main.header \
 			$(BINDIR)runtime.library $(BINDIR)common.library $(BINDIR)ifloat32.library $(BINDIR)polynomials.library \
+			$(BINDIR)gp.library \
 			source$(S)main$(S)10object.divider \
 			$(BINDIR)compiler.library \
 			_library.asm \

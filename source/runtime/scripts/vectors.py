@@ -13,8 +13,13 @@ import os,re,sys
 from pcode import *
 from build import * 
 
+#
+#		Both runtime trees, not just this one: the GP handlers live in ../gp-runtime so they can be
+#		linked last (see getRuntimeASMFiles). Scanning only "." here would leave every GP opcode
+#		pointing at Unimplemented -- and silently, because a missing marker is not an error below.
+#
 vectors = {}
-for f in Builder().getASMFiles():
+for f in getRuntimeASMFiles():
 	for s in open(f).readlines():
 		if s.find(";;") >= 0:
 			m = re.match("^(.*?)\\:\\s*\\;\\;\\s*\\[(.*)\\]\\s*$",s)

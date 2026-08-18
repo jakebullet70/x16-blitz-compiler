@@ -28,8 +28,8 @@ class PCode(object):
 		self.addShiftedTokens()
 
 	def doCommands(self):
-		self.define("PCD_STARTCOMMAND")		
-		for f in Builder("../runtime").getASMFiles():
+		self.define("PCD_STARTCOMMAND")
+		for f in getRuntimeASMFiles():			# runtime/ AND gp-runtime/, one canonical order
 			for s in open(f).readlines():
 				if s.find(";;") >= 0:
 					m = re.match("^(.*?)\\:\\s*\\;\\;\\s*\\[(.*)\\]\\s*$",s)
