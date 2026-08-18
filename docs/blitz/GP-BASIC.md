@@ -333,6 +333,28 @@ with the cursor keys, and returns the row chosen in `GP.SEL`: **1..n for a choic
 | 1 | **must select** — ESC does not cancel |
 | 2 | **keep mark** — leave the chosen row highlighted on the way out |
 | 4 | **no wrap** — stop at the ends instead of wrapping round |
+| 8 | **gamepad** — drive it from the SNES pad in **port 1** as well as the keyboard |
+
+### The gamepad flag
+
+With flag 8, up and down move the highlight and **B or Start** chooses. Cancel stays on the
+keyboard — ESC and STOP have no pad equivalent that would not be a guess, and a *must select* menu
+has no cancel anyway.
+
+**Port 1, the physical pad — not port 0.** Port 0 is the keyboard presented as a joystick, and
+`GP.MENU` already reads the keyboard directly, so reading both would move the highlight *twice*
+for one press of a cursor key. Port 0 is also the unreliable half of the pair: it reports "absent"
+on roughly half of all reads (measured in AlienAirlift — 2,060 negative against 2,057 valid over
+14 seconds).
+
+**One step per press, no auto-repeat.** The wait loop spins as fast as the CPU allows, so the pad
+is edge-triggered; holding a direction moves once. A menu is short, and a wrong guess at a repeat
+rate is worse than no repeat. A button still held from whatever *opened* the menu is not read as a
+fresh press either, so a menu cannot answer itself on the way in.
+
+With no pad plugged in the flag costs nothing and changes nothing — the pad is consulted only when
+the keyboard is quiet, and an absent pad reads as "nothing held". In the emulator a real pad needs
+`-joy1`, which binds physical hardware and does **not** map the keyboard.
 
 **It takes no colours**, because the highlight is a swap of the cell's own attribute nibbles —
 foreground and background trade places. Whatever you drew, in whatever colours, highlights correctly

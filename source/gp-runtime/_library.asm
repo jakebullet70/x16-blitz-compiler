@@ -827,6 +827,7 @@ gpdCount: 									; side rows for GP.BOX, characters for GP.PRINTAT
 GPM_MUSTSEL  = 1 							; ESC does not cancel: only a real choice leaves
 GPM_KEEPMARK = 2 							; leave the chosen row highlighted on the way out
 GPM_NOWRAP   = 4 							; stop at the ends instead of wrapping round
+GPM_GAMEPAD  = 8 							; also drive it from the SNES pad in port 1
 
 GPM_DOWN  = $11 							; PETSCII cursor down / up, as GETIN reports them
 GPM_UP    = $91
@@ -872,12 +873,26 @@ _CGMHaveMenu:
 		;
 		inc 	gpmSel 						; start on the first row, showing where we are
 		jsr 	GPMenuHighlight
+		;
+		;		Seed the pad edge detector with what is held RIGHT NOW, so a button still down from
+		;		whatever opened this menu is not read as a fresh press and does not choose row 1 on
+		;		the way in. Costs one read; the alternative is a menu that answers itself.
+		;
+		jsr 	GPMenuPadRead
+		sta 	gpmPadLast
 
 _CGMKey:
 		ldx 	#0 							; channel 0 is the keyboard. GETIN hands back 0 when
 		jsr 	XGetCharacterFromChannel 	; nothing is waiting, so this is the wait.
 		cmp 	#0
+		bne 	_CGMHaveKey
+		lda 	gpmFlags 					; keyboard quiet -- ask the pad, if this menu wants it
+		and 	#GPM_GAMEPAD
 		beq 	_CGMKey
+		jsr 	GPMenuPadKey 				; 0, or one of the same codes GETIN would have given
+		cmp 	#0
+		beq 	_CGMKey
+_CGMHaveKey:
 		sta 	gpmKey
 		;
 		cmp 	#GPM_DOWN
@@ -1017,7 +1032,85 @@ UnaryGPSel: ;; [!gp.sel]
 ;
 ; ************************************************************************************************
 
+; ************************************************************************************************
+;
+;		The SNES pad in PORT 1, turned into the key codes the loop above already understands, so
+;		the whole rest of the menu -- movement, wrapping, MUSTSEL, hotkeys -- is untouched by this.
+;
+;		PORT 1, NOT PORT 0, and that is the entire reason this is not a two-line change. Port 0 is
+;		the KEYBOARD presented as a joystick, and the loop above already reads the keyboard through
+;		GETIN: reading both would move the highlight twice for one press of the cursor key. Port 0
+;		also reports "absent" on roughly half of all reads (measured in AlienAirlift: 2060 negative
+;		against 2057 valid over 14 seconds), so it is not even the reliable half of the pair.
+;
+;		EDGE TRIGGERED, one step per press. This loop spins as fast as the CPU allows, so a level
+;		test would run the highlight from top to bottom in a frame. There is deliberately no auto
+;		repeat: a menu is short, and a wrong guess at the repeat rate is worse than none.
+;
+;		No joystick_scan call. The KERNAL scans in its own IRQ -- AlienAirlift reads a real pad
+;		through JOY() with no scan of its own and works -- and calling it from a spin loop would
+;		re-clock the pad far faster than the protocol expects.
+;
+;		Cancel stays on the keyboard. ESC and STOP have no obvious pad equivalent that is not a
+;		guess, and MUSTSEL menus have no cancel at all.
+;
+; ************************************************************************************************
+
+;
+;		Bit layout after the inversion, as measured in AlienAirlift and matching the KERNAL's
+;		byte 0: $80 B, $10 Start, $08 up, $04 down, $02 left, $01 right. Left and right mean
+;		nothing to a vertical menu and are ignored rather than mapped to something invented.
+;
+GPMenuPadKey:
+		jsr 	GPMenuPadRead 				; A = buttons held, active HIGH, 0 if no pad
+		sta 	gpmPadNow
+		lda 	gpmPadLast 					; newly pressed = held now AND NOT held last time
+		eor 	#$FF
+		and 	gpmPadNow
+		tax 								; X = the new presses, and only they act
+		lda 	gpmPadNow
+		sta 	gpmPadLast
+		;
+		txa
+		and 	#$08 						; up
+		beq 	_GPMKNotUp
+		lda 	#GPM_UP
+		rts
+_GPMKNotUp:
+		txa
+		and 	#$04 						; down
+		beq 	_GPMKNotDown
+		lda 	#GPM_DOWN
+		rts
+_GPMKNotDown:
+		txa
+		and 	#$90 						; B or Start both choose -- whichever a player reaches for
+		beq 	_GPMKNone
+		lda 	#GPM_ENTER
+		rts
+_GPMKNone:
+		lda 	#0
+		rts
+
+GPMenuPadRead:
+		phx
+		phy
+		lda 	#1 							; SNES port 1
+		jsr 	X16_joystick_get
+		cpy 	#0 							; Y nonzero = no pad there. Report nothing held rather than
+		bne 	_GPMPNone 					; letting $FF read as every direction at once
+		eor 	#$FF 						; the pad is active LOW throughout -- invert to active high
+		ply
+		plx
+		rts
+_GPMPNone:
+		lda 	#0
+		ply
+		plx
+		rts
+
 GPMenuMayWrap:
+
 		lda 	gpmFlags
 		and 	#GPM_NOWRAP
 		beq 	_GMMWYes
@@ -1102,6 +1195,10 @@ gpmKey: 									; the key just read, folded once it reaches the hotkeys
 gpmTemp: 									; the nibble being moved -- clobbered by every highlight
 		.fill 	1
 gpmLimit: 									; hotkey scan limit, then the row a hotkey hit
+		.fill 	1
+gpmPadLast: 								; pad buttons held at the last read, for the edge test
+		.fill 	1
+gpmPadNow: 									; ... and held at this one
 		.fill 	1
 		.send 	storage
 
