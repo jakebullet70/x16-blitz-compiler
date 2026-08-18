@@ -111,6 +111,10 @@ testing/archive/
 # no longer matches. Build the current one with
 #     make -C source/runtime gpc-rt
 # which writes it into testing/ named for whatever engine build is checked out.
+#   Two files now, and the names swapped at RT_ABI 20: GPB.RT is the FULL image (handlers
+#   AND core, loading at RTGPBASE) and GPC.RT is the core alone. GPC.RC is the name the full
+#   one used to have; kept here so an old one lying about in a working tree stays ignored.
+testing/GPB.RT.*.BIN
 testing/GPC.RT.*.BIN
 testing/GPC.RC.*.BIN
 
@@ -130,6 +134,8 @@ testing/SPLITT.PRG
 testing/STRINGS.PRG
 testing/SCREEN.PRG
 testing/MENU.PRG
+testing/MENUTST.PRG
+testing/MENUDEMO.PRG
 testing/SELECT.PRG
 testing/BMXVIEW.PRG
 testing/BMXTST.PRG
@@ -171,6 +177,12 @@ testing/C.DIR.PRG
 # a working file, not shipped content. Untracked 2026-07-19.
 testing/GPC.INPUT
 /testing/XFMGR
+
+# Compiled objects and the engine's compile log. GPC writes <name>.OBJ beside the source
+# whenever anything here is compiled -- by the harnesses, by hand, or by the demos -- and
+# every one of them is regenerable from the tracked .BASL/.PRG plus a build.
+testing/*.OBJ
+testing/GPCCOMP.LOG
 
 # Claude Code local settings (personal, not team config)
 .claude/settings.local.json

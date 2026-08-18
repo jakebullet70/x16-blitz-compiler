@@ -880,6 +880,91 @@ highlighted), `4` NO WRAP (stop at the ends).
 afterwards, hotkey by upper and lower case, ESC, wrap at both ends, no-wrap at both ends, all three
 flags, an empty hotkey string, and zero rows returning 0 without waiting for a key.
 
+### §9 Menus — DONE 18th August 2026. `gpmenu.asm` deleted, `MENUHELP.INC.BL` in its place
+
+**Why.** Flag `8` (drive the menu from the SNES pad as well as the keyboard) is the point this
+turned. Gamepad tracking is edge detection over two saved button words, and it landed inside a
+handler that was already the largest single GP block. The ASM menu now costs more than the thing
+it saves, and every further behaviour — more pad buttons, a second column, scrolling — adds to a
+block that every GPB program carries.
+
+**The decision.** Delete `gpmenu.asm`. Rebuild the menu as a BASL module (a sibling of
+`INPHELP.INC.BL`, which is the precedent: tier 7's input shipped as BASL and cost 0 runtime
+bytes), written in **ordinary GPB commands** — `GP.PRINTAT` for the rows, `GP.FILL`/`GP.BOX` for
+the frame, `GP.SELECT` for the key dispatch, the existing pad reads for flag 8.
+
+**One primitive is missing, and it is the reason the menu was ASM in the first place: `GP.ATTR`.**
+The highlight is a *recolour of a run of cells without touching the characters* — read-modify-write
+of the attribute byte only. Nothing in the GPB set can do that today: `GP.FILL` writes character
+*and* colour, so it would erase the text it is highlighting. `GPMenuHighlight` exists purely
+because that primitive is absent. So the trade is:
+
+| out | in |
+| --- | --- |
+| `gpmenu.asm`, **462 B** of code + **11 B** of storage (`gpmX`..`gpmPadNow`) | `GP.ATTR`, one small rect handler in `gpdraw.asm` |
+| `GP.MENU` + `GP.SEL` tokens | a BASL module, 0 runtime bytes |
+
+**Measured, 18th August 2026, off a clean `make libs`.** `gpmenu.asm` runs `$3986`
+(`CommandGPMenu`) to `$3B54` (`CommandGPSort`) = **462 bytes**, plus 11 bytes of `.section storage`.
+After page alignment the block `$3700..$4100` (2,560 B) would end near `$3EB2` and align to
+`$3F00`, so `ObjectBase` falls **512 bytes**: the object shrinks by 512 and the workspace gains
+512. In shared mode the same 512 comes off the GPB half, raising `RTGPBASE` $6400 -> $6600.
+
+**Shipped, `RT_ABI` 19 -> 20.** `MENUHELP.INC.BL` with `MENUTST.EXP.BL` beside it: 14 cases, all
+green on R49 headless -- selection, both hotkey cases, ESC, wrap and no-wrap at both ends, MUSTSEL,
+KEEPMARK, empty hotkeys, zero rows, the GAMEPAD flag with no pad, and the `HIATTR = 0` default.
+`MENU.EXP.BL` was moved onto it. The p-code cost per program was deliberately not measured: it is
+the cost of a menu.
+
+**`RTGPBASE` moved $6400 -> $6600 as well**, or shared mode would have kept the 512 bytes as
+padding -- the block is a fixed boundary, so it does not shrink by itself. `GPC.RT.120.BIN` is
+14,002 bytes against 14,516, and a shared GPB program's workspace gains the same 512. The file
+NAMES do not change: the name carries the build number, the magic (now `GP20`/`GB20`) carries the
+ABI.
+
+**The pad read is `JOY`, not `GP.CALL`.** The first version called `joystick_get` at $FF56 by hand
+and inverted the bytes itself. `JOY(n)` is a GPC built-in that already does all three things --
+the KERNAL call, the no-hardware test, and the inversion -- so the module needs no machine code
+interface at all. It returns negative for no pad, and the low byte comes out by division because
+`AND` is 16-bit signed.
+
+**Two things the removal broke, both found by the suites, both now fixed:**
+
+- **`md5` went red.** Deleting the `GP.MENU` and `GP.SEL` entries from `x16_command.def` and
+  `x16_unary.def` with a script that walked backwards to a `#` block boundary took out far more
+  than it should have -- `GP.BOX`, `GP.FILL`, `GP.PRINTAT`, and in the unary file the WHOLE list:
+  `BIN$`, `HEX$`, `VPEEK`, `JOY`, `MOD`, `RPT$`, `GP.A/X/Y/C`, `POINTER`, `STRPTR`. MD5 uses
+  `HEX$`, so it died with a runtime `SYNTAX ERROR` on `X$ = HEX$(F) + X$`. **The lesson is that
+  the 74 renumbered opcodes were a red herring the whole time** -- compiler and runtime both
+  regenerate from the same table and never disagreed. Read the `git diff` of a scripted edit
+  before building on top of it.
+- **`shared-runtime` was ALREADY red** and had been since the 18->19 two-file split, exactly as
+  its own comment predicted it would be. Two stale literals (`RTBASE` still $6400, `RT_ABI` still
+  18) and a handoff check that read X and Y as immediates when the split had made them absolute
+  loads from data at the end of the template. Fixed and green.
+
+**`GP.ATTR` WAS PROPOSED AND THEN DROPPED — reprinting the row is fast enough.** Counted off the
+instruction streams: the nibble swap in `GPMenuHighlight` is **59 cycles a cell** (read-modify-write
+with increment 0, address stepped by hand), while `GPDrawPutCell` is **31** and `GP.PRINTAT`'s whole
+per-character loop including `GPDrawPet2Scr` is **94**. The swap is *slower per cell* than a plain
+write; it only wins by touching half as many cells. Moving the highlight one row on a 30-wide menu:
+
+| | cycles | at 8 MHz |
+| --- | --- | --- |
+| nibble swap, two rows | ~3,540 | 0.44 ms |
+| `GP.FILL` + `GP.PRINTAT`, two rows | ~8,100 | 1.0 ms |
+
+Call it 2-3 ms once the four p-code dispatches and their argument evaluation are counted, against a
+16.7 ms frame and a keyboard repeat measured in tens of milliseconds. Invisible.
+
+**The swap only ever existed because the ASM menu did not know the text it was highlighting.** A BASL
+menu owns the item array, so it can simply redraw, and no new handler is added — which keeps the
+462 B a clean saving instead of handing part of it straight back.
+
+**Use `GP.FILL` for the row background, then `GP.PRINTAT` over it.** Not a padded string: building
+`LEFT$(item$+"        ",w)` every keypress churns the string heap for nothing. Two commands a row,
+no allocation.
+
 ### §10 `GP.SELECT` — SHIPPED 17th August 2026, 127 B, RT_ABI 18
 
 A multi-way branch on one value, modelled on prog8's `when`. Four keywords:

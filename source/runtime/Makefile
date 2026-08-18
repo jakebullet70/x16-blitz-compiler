@@ -37,15 +37,15 @@ build: prelim
 #
 #		The standalone resident runtime. TWO FILES, sliced by rtname.py from this ONE image:
 #
-#			GPC.RT.nnn.BIN	loads at RTGPBASE ($6400) -- GPB handlers AND core
-#			GPC.RC.nnn.BIN	loads at RTBASE   ($6E00) -- core only, for a program using no GPB
+#			GPB.RT.nnn.BIN	loads at RTGPBASE ($6600) -- GPB handlers AND core
+#			GPC.RT.nnn.BIN	loads at RTBASE   ($6E00) -- core only, for a program using no GPB
 #
 #		Hence the link ORDER, which is the whole point of this recipe: gp.library goes FIRST
 #		here, at the bottom -- the opposite of every other link line in the tree, where it goes
 #		last. The core has to sit at one fixed address whichever file was loaded, so the
 #		optional half must be the low one. See common.inc.
 #
-#		-D CodeStart is RTGPBASE, not RTBASE (25600 = $6400 -- decimal dodges Make's $; keep
+#		-D CodeStart is RTGPBASE, not RTBASE (26112 = $6600 -- decimal dodges Make's $; keep
 #		it in step with RTGPBASE in common.inc). 05rtcore.divider pads the gap and stamps
 #		RTGPMAGIC; zzrt.footer still guards the top against $9F00. Written straight into
 #		testing/ so both sit beside the compiled programs on the emulator's disk.
@@ -60,7 +60,7 @@ build: prelim
 #		down at RTBASE; the file name says WHICH runtime, the magic says whether it FITS.
 #
 gpc-rt: prelim
-	$(ASM) -D CodeStart=25600 source$(S)main$(S)00rtgp.header $(BINDIR)gp.library \
+	$(ASM) -D CodeStart=26112 source$(S)main$(S)00rtgp.header $(BINDIR)gp.library \
 		source$(S)main$(S)05rtcore.divider source$(S)main$(S)00rt.header \
 		$(BINDIR)runtime.library $(BINDIR)common.library $(BINDIR)ifloat32.library $(BINDIR)polynomials.library \
 		source$(S)main$(S)zzrt.footer

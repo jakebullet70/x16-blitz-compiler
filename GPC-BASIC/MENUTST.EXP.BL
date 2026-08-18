@@ -1,0 +1,160 @@
+## MENUHELP regression. Keys go in through kbdbuf_put, because -bas paste
+## cannot drive a program that sits in a GET loop -- the same harness
+## INPTST.EXP.BL uses.
+##
+## What is checked here is the LOGIC -- which row a key lands on, what
+## cancels, what wraps. The drawing is not: MENUHELP.ROW does nothing but
+## call GP.FILL and GP.PRINTAT, which are shipped and verified, so reading
+## the attribute back out of VERA would be testing tier 6 all over again.
+#INCLUDE "GP.INC.BL"
+#INCLUDE "MENUHELP.INC.BL"
+#SAVEAS "@:MENUTST.PRG"
+
+#DEFINE KBDBUF.PUT $F09F
+
+#DEFINE NORMAL 6 * 16 + 1
+#DEFINE BRIGHT 1 * 16 + 6
+
+CLS
+COLOR 1,0
+
+DIM MENUHELP.ITEM$(4)
+MENUHELP.ITEM$(1) = " NEW GAME"
+MENUHELP.ITEM$(2) = " LOAD"
+MENUHELP.ITEM$(3) = " OPTIONS"
+MENUHELP.ITEM$(4) = " QUIT"
+
+MENUHELP.X = 8 : MENUHELP.Y = 6 : MENUHELP.WIDTH = 24 : MENUHELP.COUNT = 4
+MENUHELP.ATTR = NORMAL
+MENUHELP.HIATTR = BRIGHT
+MENUHELP.HOT$ = "NLOQ"
+
+## ---- 1. two downs and RETURN, and the highlight is GONE afterwards
+MENUHELP.FLAGS = 0 : MENUHELP.SEL = 0
+KEY.CODE = 17 : GOSUB KEY.SEND
+KEY.CODE = 17 : GOSUB KEY.SEND
+KEY.CODE = 13 : GOSUB KEY.SEND
+GOSUB MENUHELP.RUN
+TEST.A = MENUHELP.SEL : TEST.AK = MENUHELP.KEY
+
+## ---- 2. hotkey, upper case. It CHOOSES, it does not merely move
+MENUHELP.SEL = 0
+KEY.CODE = 79 : GOSUB KEY.SEND
+GOSUB MENUHELP.RUN
+TEST.B = MENUHELP.SEL : TEST.BK = MENUHELP.KEY
+
+## ---- 3. hotkey, lower case -- matched without case
+MENUHELP.SEL = 0
+KEY.CODE = 113 : GOSUB KEY.SEND
+GOSUB MENUHELP.RUN
+TEST.C = MENUHELP.SEL
+
+## ---- 4. ESC cancels
+MENUHELP.SEL = 0
+KEY.CODE = 27 : GOSUB KEY.SEND
+GOSUB MENUHELP.RUN
+TEST.D = MENUHELP.SEL : TEST.DK = MENUHELP.KEY
+
+## ---- 5. wrap off the top, 1 -> 4
+MENUHELP.SEL = 0
+KEY.CODE = 145 : GOSUB KEY.SEND
+KEY.CODE = 13 : GOSUB KEY.SEND
+GOSUB MENUHELP.RUN
+TEST.E = MENUHELP.SEL
+
+## ---- 6. wrap off the bottom, 4 -> 1
+MENUHELP.SEL = 4
+KEY.CODE = 17 : GOSUB KEY.SEND
+KEY.CODE = 13 : GOSUB KEY.SEND
+GOSUB MENUHELP.RUN
+TEST.F = MENUHELP.SEL
+
+## ---- 7. NOWRAP holds at the top
+MENUHELP.FLAGS = MENUHELP.NOWRAP
+MENUHELP.SEL = 1
+KEY.CODE = 145 : GOSUB KEY.SEND
+KEY.CODE = 13 : GOSUB KEY.SEND
+GOSUB MENUHELP.RUN
+TEST.G = MENUHELP.SEL
+
+## ---- 8. NOWRAP holds at the bottom
+MENUHELP.SEL = 4
+KEY.CODE = 17 : GOSUB KEY.SEND
+KEY.CODE = 13 : GOSUB KEY.SEND
+GOSUB MENUHELP.RUN
+TEST.H = MENUHELP.SEL
+
+## ---- 9. MUSTSEL swallows ESC, so the RETURN after it is what lands
+MENUHELP.FLAGS = MENUHELP.MUSTSEL
+MENUHELP.SEL = 2
+KEY.CODE = 27 : GOSUB KEY.SEND
+KEY.CODE = 13 : GOSUB KEY.SEND
+GOSUB MENUHELP.RUN
+TEST.I = MENUHELP.SEL
+
+## ---- 10. KEEPMARK leaves the chosen row highlighted on the way out
+MENUHELP.FLAGS = MENUHELP.KEEPMARK
+MENUHELP.SEL = 3
+KEY.CODE = 13 : GOSUB KEY.SEND
+GOSUB MENUHELP.RUN
+TEST.J = MENUHELP.SEL
+
+## ---- 11. no hotkeys at all: an unknown key must be ignored, not crash
+MENUHELP.FLAGS = 0
+MENUHELP.HOT$ = ""
+MENUHELP.SEL = 1
+KEY.CODE = 88 : GOSUB KEY.SEND
+KEY.CODE = 13 : GOSUB KEY.SEND
+GOSUB MENUHELP.RUN
+TEST.K = MENUHELP.SEL
+
+## ---- 12. zero rows returns 0 and does NOT wait for a key
+MENUHELP.COUNT = 0
+MENUHELP.SEL = 2
+GOSUB MENUHELP.RUN
+TEST.L = MENUHELP.SEL
+
+## ---- 13. the GAMEPAD flag with no pad plugged in must not eat the
+## ---- keyboard, and must not hang in the poll
+MENUHELP.COUNT = 4
+MENUHELP.HOT$ = "NLOQ"
+MENUHELP.FLAGS = MENUHELP.GAMEPAD
+MENUHELP.SEL = 0
+KEY.CODE = 17 : GOSUB KEY.SEND
+KEY.CODE = 13 : GOSUB KEY.SEND
+GOSUB MENUHELP.RUN
+TEST.M = MENUHELP.SEL
+
+## ---- 14. the default highlight: MENUHELP.HIATTR = 0 inverts MENUHELP.ATTR,
+## ---- which is what the assembly GP.MENU always did
+MENUHELP.FLAGS = MENUHELP.KEEPMARK
+MENUHELP.HIATTR = 0
+MENUHELP.SEL = 1
+KEY.CODE = 13 : GOSUB KEY.SEND
+GOSUB MENUHELP.RUN
+TEST.N = MENUHELP.SEL
+
+CLS
+PRINT "A";TEST.A;TEST.AK;" EXPECT 3 13"
+PRINT "B";TEST.B;TEST.BK;" EXPECT 3 79"
+PRINT "C";TEST.C;" EXPECT 4"
+PRINT "D";TEST.D;TEST.DK;" EXPECT 0 27"
+PRINT "E";TEST.E;" EXPECT 4"
+PRINT "F";TEST.F;" EXPECT 1"
+PRINT "G";TEST.G;" EXPECT 1"
+PRINT "H";TEST.H;" EXPECT 4"
+PRINT "I";TEST.I;" EXPECT 2"
+PRINT "J";TEST.J;" EXPECT 3"
+PRINT "K";TEST.K;" EXPECT 1"
+PRINT "L";TEST.L;" EXPECT 0"
+PRINT "M";TEST.M;" EXPECT 2"
+PRINT "N";TEST.N;" EXPECT 1"
+PRINT "@DONE@"
+POWEROFF
+
+## ---- A key straight into the KERNAL's own buffer. kbdbuf_put lives in
+## ---- ROM bank 0 and compiled code runs in bank 4, hence the two POKEs.
+
+KEY.SEND:
+    POKE 1,0 : GP.CALL KBDBUF.PUT, KEY.CODE : POKE 1,4
+    RETURN

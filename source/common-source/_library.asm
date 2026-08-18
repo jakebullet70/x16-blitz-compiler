@@ -85,8 +85,6 @@ C64_GPCMD_ENDSEL         = $ce63 ; $ce63 gp.endsel
 C64_GPCMD_ELSE           = $ce64 ; $ce64 gp.else
 C64_GPCMD_CASE           = $ce65 ; $ce65 gp.case
 C64_GPCMD_SELECT         = $ce66 ; $ce66 gp.select
-C64_GPCMD_SEL            = $ce67 ; $ce67 gp.sel
-C64_GPCMD_MENU           = $ce68 ; $ce68 gp.menu
 C64_GPCMD_PRINTAT        = $ce69 ; $ce69 gp.printat
 C64_GPCMD_FILL           = $ce6a ; $ce6a gp.fill
 C64_GPCMD_BOX            = $ce6b ; $ce6b gp.box
@@ -276,7 +274,7 @@ MemoryStorage = $400
 ;		The GPB block is now linked at the BOTTOM of the shared image and the interpreter core
 ;		above it, at a base that does not move:
 ;
-;			RTGPBASE  $6400   [ GPB handlers ..................... ][ GP magic ]
+;			RTGPBASE  $6600   [ GPB handlers ..................... ][ GP magic ]
 ;			RTBASE    $6E00   [ magic ][ jmp StartRuntime ][ core ... ] up to ~$9D00
 ;
 ;		ONE assembly still, and one vector table -- the two FILES rtname.py installs are slices
@@ -303,7 +301,7 @@ MemoryStorage = $400
 ;		the handlers gone and reloads them.
 ;
 ; ************************************************************************************************
-RTGPBASE = $6400 							; GPB handler block + load address of the FULL file
+RTGPBASE = $6600 							; GPB handler block + load address of the FULL file
 RTBASE = $6E00 								; interpreter core home -- the base that never moves
 RT_ENTRY = RTBASE+4 						; 4-byte magic at RTBASE, then jmp StartRuntime
 RTGPMAGIC = RTBASE-4 						; 4-byte "handlers are loaded too" magic
@@ -404,7 +402,7 @@ FrameStackPages = 16 						; 4K, ~250 frames
 ;		with it the shifted base ($D780 -> $DB80) moved too. Two system tokens (.casenext,
 ;		.caseend) were appended after .exitdo on top of that.
 ;
-RT_ABI = 19 								; runtime ABI ordinal -> "GP19" magic (NOT the file name)
+RT_ABI = 20 								; runtime ABI ordinal -> "GP20" magic (NOT the file name)
 
 ; ************************************************************************************************
 ;
@@ -683,82 +681,80 @@ PCD_GPCMD_CALL       = $db83 ; gp.call
 PCD_GPCMD_BOX        = $db84 ; gp.box
 PCD_GPCMD_FILL       = $db85 ; gp.fill
 PCD_GPCMD_PRINTAT    = $db86 ; gp.printat
-PCD_GPCMD_MENU       = $db87 ; gp.menu
-PCD_GPCMD_SEL        = $db88 ; gp.sel
-PCD_GPCMD_SORT       = $db89 ; gp.sort
-PCD_GPCMD_ARRPTR     = $db8a ; gp.arrptr
-PCD_GPCMD_STASH      = $db8b ; gp.stash
-PCD_GPCMD_RESTR      = $db8c ; gp.restr
-PCD_GPCMD_COMP       = $db8d ; gp.comp
-PCD_GPCMD_UPPER      = $db8e ; gp.upper
-PCD_GPCMD_LOWER      = $db8f ; gp.lower
-PCD_GPCMD_TRIM       = $db90 ; gp.trim
-PCD_GPCMD_RTRIM      = $db91 ; gp.rtrim
-PCD_GPCMD_LTRIM      = $db92 ; gp.ltrim
-PCD_JOY              = $db93 ; joy
-PCD_INT              = $db94 ; int
-PCD_SQR              = $db95 ; sqr
-PCD_LOG              = $db96 ; log
-PCD_EXP              = $db97 ; exp
-PCD_COS              = $db98 ; cos
-PCD_SIN              = $db99 ; sin
-PCD_TAN              = $db9a ; tan
-PCD_ATN              = $db9b ; atn
-PCD_LINPUT           = $db9c ; linput
-PCD_BINPUT           = $db9d ; binput
-PCD_LOAD             = $db9e ; load
-PCD_BLOAD            = $db9f ; bload
-PCD_BVLOAD           = $dba0 ; bvload
-PCD_VLOAD            = $dba1 ; vload
-PCD_BSAVE            = $dba2 ; bsave
-PCD_BVERIFY          = $dba3 ; bverify
-PCD_POWEROFF         = $dba4 ; poweroff
-PCD_RESET            = $dba5 ; reset
-PCD_REBOOT           = $dba6 ; reboot
-PCD_MOUSE            = $dba7 ; mouse
-PCD_MB               = $dba8 ; mb
-PCD_MX               = $dba9 ; mx
-PCD_MY               = $dbaa ; my
-PCD_MWHEEL           = $dbab ; mwheel
-PCD_RPTDOLLAR        = $dbac ; rpt$
-PCD_SPRITE           = $dbad ; sprite
-PCD_SPRMEM           = $dbae ; sprmem
-PCD_MOVSPR           = $dbaf ; movspr
-PCD_ST               = $dbb0 ; st
-PCD_STOP             = $dbb1 ; stop
-PCD_SYS              = $dbb2 ; sys
-PCD_TDATA            = $dbb3 ; tdata
-PCD_TATTR            = $dbb4 ; tattr
-PCD_TILE             = $dbb5 ; tile
-PCD_TICMD_WRITE      = $dbb6 ; ti.write
-PCD_TIDOLLARCMD_WRITE = $dbb7 ; ti$.write
-PCD_WAIT             = $dbb8 ; wait
-PCD_I2CPOKE          = $dbb9 ; i2cpoke
-PCD_I2CPEEK          = $dbba ; i2cpeek
-PCD_BANK             = $dbbb ; bank
-PCD_SLEEP            = $dbbc ; sleep
-PCD_FMINIT           = $dbbd ; fminit
-PCD_FMNOTE           = $dbbe ; fmnote
-PCD_FMDRUM           = $dbbf ; fmdrum
-PCD_FMINST           = $dbc0 ; fminst
-PCD_FMVIB            = $dbc1 ; fmvib
-PCD_FMFREQ           = $dbc2 ; fmfreq
-PCD_FMVOL            = $dbc3 ; fmvol
-PCD_FMPAN            = $dbc4 ; fmpan
-PCD_FMPLAY           = $dbc5 ; fmplay
-PCD_FMCHORD          = $dbc6 ; fmchord
-PCD_FMPOKE           = $dbc7 ; fmpoke
-PCD_PSGINIT          = $dbc8 ; psginit
-PCD_PSGNOTE          = $dbc9 ; psgnote
-PCD_PSGVOL           = $dbca ; psgvol
-PCD_PSGWAV           = $dbcb ; psgwav
-PCD_PSGFREQ          = $dbcc ; psgfreq
-PCD_PSGPAN           = $dbcd ; psgpan
-PCD_PSGPLAY          = $dbce ; psgplay
-PCD_PSGCHORD         = $dbcf ; psgchord
-PCD_CLS              = $dbd0 ; cls
-PCD_LOCATE           = $dbd1 ; locate
-PCD_COLOR            = $dbd2 ; color
+PCD_GPCMD_SORT       = $db87 ; gp.sort
+PCD_GPCMD_ARRPTR     = $db88 ; gp.arrptr
+PCD_GPCMD_STASH      = $db89 ; gp.stash
+PCD_GPCMD_RESTR      = $db8a ; gp.restr
+PCD_GPCMD_COMP       = $db8b ; gp.comp
+PCD_GPCMD_UPPER      = $db8c ; gp.upper
+PCD_GPCMD_LOWER      = $db8d ; gp.lower
+PCD_GPCMD_TRIM       = $db8e ; gp.trim
+PCD_GPCMD_RTRIM      = $db8f ; gp.rtrim
+PCD_GPCMD_LTRIM      = $db90 ; gp.ltrim
+PCD_JOY              = $db91 ; joy
+PCD_INT              = $db92 ; int
+PCD_SQR              = $db93 ; sqr
+PCD_LOG              = $db94 ; log
+PCD_EXP              = $db95 ; exp
+PCD_COS              = $db96 ; cos
+PCD_SIN              = $db97 ; sin
+PCD_TAN              = $db98 ; tan
+PCD_ATN              = $db99 ; atn
+PCD_LINPUT           = $db9a ; linput
+PCD_BINPUT           = $db9b ; binput
+PCD_LOAD             = $db9c ; load
+PCD_BLOAD            = $db9d ; bload
+PCD_BVLOAD           = $db9e ; bvload
+PCD_VLOAD            = $db9f ; vload
+PCD_BSAVE            = $dba0 ; bsave
+PCD_BVERIFY          = $dba1 ; bverify
+PCD_POWEROFF         = $dba2 ; poweroff
+PCD_RESET            = $dba3 ; reset
+PCD_REBOOT           = $dba4 ; reboot
+PCD_MOUSE            = $dba5 ; mouse
+PCD_MB               = $dba6 ; mb
+PCD_MX               = $dba7 ; mx
+PCD_MY               = $dba8 ; my
+PCD_MWHEEL           = $dba9 ; mwheel
+PCD_RPTDOLLAR        = $dbaa ; rpt$
+PCD_SPRITE           = $dbab ; sprite
+PCD_SPRMEM           = $dbac ; sprmem
+PCD_MOVSPR           = $dbad ; movspr
+PCD_ST               = $dbae ; st
+PCD_STOP             = $dbaf ; stop
+PCD_SYS              = $dbb0 ; sys
+PCD_TDATA            = $dbb1 ; tdata
+PCD_TATTR            = $dbb2 ; tattr
+PCD_TILE             = $dbb3 ; tile
+PCD_TICMD_WRITE      = $dbb4 ; ti.write
+PCD_TIDOLLARCMD_WRITE = $dbb5 ; ti$.write
+PCD_WAIT             = $dbb6 ; wait
+PCD_I2CPOKE          = $dbb7 ; i2cpoke
+PCD_I2CPEEK          = $dbb8 ; i2cpeek
+PCD_BANK             = $dbb9 ; bank
+PCD_SLEEP            = $dbba ; sleep
+PCD_FMINIT           = $dbbb ; fminit
+PCD_FMNOTE           = $dbbc ; fmnote
+PCD_FMDRUM           = $dbbd ; fmdrum
+PCD_FMINST           = $dbbe ; fminst
+PCD_FMVIB            = $dbbf ; fmvib
+PCD_FMFREQ           = $dbc0 ; fmfreq
+PCD_FMVOL            = $dbc1 ; fmvol
+PCD_FMPAN            = $dbc2 ; fmpan
+PCD_FMPLAY           = $dbc3 ; fmplay
+PCD_FMCHORD          = $dbc4 ; fmchord
+PCD_FMPOKE           = $dbc5 ; fmpoke
+PCD_PSGINIT          = $dbc6 ; psginit
+PCD_PSGNOTE          = $dbc7 ; psgnote
+PCD_PSGVOL           = $dbc8 ; psgvol
+PCD_PSGWAV           = $dbc9 ; psgwav
+PCD_PSGFREQ          = $dbca ; psgfreq
+PCD_PSGPAN           = $dbcb ; psgpan
+PCD_PSGPLAY          = $dbcc ; psgplay
+PCD_PSGCHORD         = $dbcd ; psgchord
+PCD_CLS              = $dbce ; cls
+PCD_LOCATE           = $dbcf ; locate
+PCD_COLOR            = $dbd0 ; color
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;

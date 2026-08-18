@@ -48,8 +48,14 @@ TOKENISE = os.path.join(ROOT, "bin", "tokenise.zip")
 #		separate "make -C source/runtime gpc-rt" -- so a red suite looks the same as an unbuilt
 #		one. If it fails on the magic again, check that first before suspecting the bootstrap.
 #
-RTBASE            = 0x6400
-RT_ABI            = 18
+#		IT HAPPENED AGAIN, exactly as predicted. RTBASE stayed 0x6400 and RT_ABI stayed 18 through
+#		the 18->19 two-file split, which BOTH moved RTBASE to 0x6E00 (0x6400 became RTGPBASE, the
+#		low half) and bumped the magic. The suite had been red from that commit until the 19->20
+#		menu removal, and nobody saw it for the reason written above. Three literals now, not two.
+#
+RTBASE            = 0x6E00
+RTGPBASE          = 0x6600
+RT_ABI            = 20
 PCODE_PAGE        = 0x09
 FRAME_STACK_PAGES = 16
 MIN_WS_PAGES      = 16
@@ -177,15 +183,30 @@ def verify_layout(path, marker):
     for magic in (RT_MAGIC, RT_NAME.encode(), b"?RT"):
         if magic not in boot:
             die("bootstrap missing %r" % magic)
-    # the A/X/Y handoff: LDA #PCODE_PAGE / LDX #WS / LDY #>RTBASE / JMP RTBASE+4
+    # The A/X/Y handoff:
+    #
+    #     LDA #PCODE_PAGE / LDX BBWSStart / LDY BBWSEnd / JMP RT_ENTRY
+    #
+    # X AND Y ARE ABSOLUTE LOADS, NOT IMMEDIATES, and that is deliberate: a global label between
+    # a "_" local branch and its target splits the local scope in 64tass and the branch stops
+    # resolving, so the two per-program bytes are DATA at the end of the template and are patched
+    # there. This check read them as immediates until the 18->19 split and had been red since.
     m = boot.find(bytes([0xA9, PCODE_PAGE]))
     if m < 0:
         die("no LDA #PCODE_PAGE in bootstrap")
-    seg = boot[m:m + 9]
-    a, x, y = seg[1], seg[3], seg[5]
-    jmp = seg[7] | (seg[8] << 8)
-    if seg[0] != 0xA9 or seg[2] != 0xA2 or seg[4] != 0xA0 or seg[6] != 0x4C:
+    seg = boot[m:m + 10]
+    if seg[0] != 0xA9 or seg[2] != 0xAE or seg[5] != 0xAC or seg[8] != 0x4C:
         die("handoff opcodes wrong: %s" % seg.hex(" "))
+    a   = seg[1]
+    jmp = boot[m + 9] | (boot[m + 10] << 8) if m + 10 < len(boot) else 0
+    #   follow the two absolute addresses into the template to read what was patched in
+    def peek(addr):
+        off = addr - 0x0801
+        if not 0 <= off < len(boot):
+            die("handoff operand $%04X is outside the bootstrap" % addr)
+        return boot[off]
+    x = peek(seg[3] | (seg[4] << 8))
+    y = peek(seg[6] | (seg[7] << 8))
     if a != PCODE_PAGE:                 die("handoff A=$%02X, expected $%02X" % (a, PCODE_PAGE))
     if y != (RTBASE >> 8):              die("handoff Y=$%02X, expected $%02X" % (y, RTBASE >> 8))
     if jmp != RTBASE + 4:              die("handoff JMP $%04X, expected $%04X" % (jmp, RTBASE + 4))

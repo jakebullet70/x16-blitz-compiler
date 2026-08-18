@@ -83,7 +83,7 @@ MemoryStorage = $400
 ;		The GPB block is now linked at the BOTTOM of the shared image and the interpreter core
 ;		above it, at a base that does not move:
 ;
-;			RTGPBASE  $6400   [ GPB handlers ..................... ][ GP magic ]
+;			RTGPBASE  $6600   [ GPB handlers ..................... ][ GP magic ]
 ;			RTBASE    $6E00   [ magic ][ jmp StartRuntime ][ core ... ] up to ~$9D00
 ;
 ;		ONE assembly still, and one vector table -- the two FILES rtname.py installs are slices
@@ -110,7 +110,7 @@ MemoryStorage = $400
 ;		the handlers gone and reloads them.
 ;
 ; ************************************************************************************************
-RTGPBASE = $6400 							; GPB handler block + load address of the FULL file
+RTGPBASE = $6600 							; GPB handler block + load address of the FULL file
 RTBASE = $6E00 								; interpreter core home -- the base that never moves
 RT_ENTRY = RTBASE+4 						; 4-byte magic at RTBASE, then jmp StartRuntime
 RTGPMAGIC = RTBASE-4 						; 4-byte "handlers are loaded too" magic
@@ -211,7 +211,7 @@ FrameStackPages = 16 						; 4K, ~250 frames
 ;		with it the shifted base ($D780 -> $DB80) moved too. Two system tokens (.casenext,
 ;		.caseend) were appended after .exitdo on top of that.
 ;
-RT_ABI = 19 								; runtime ABI ordinal -> "GP19" magic (NOT the file name)
+RT_ABI = 20 								; runtime ABI ordinal -> "GP20" magic (NOT the file name)
 
 ; ************************************************************************************************
 ;

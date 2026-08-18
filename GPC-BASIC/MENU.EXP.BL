@@ -3,26 +3,29 @@
 ## **  MENU.EXP.BL -- a whole small application, in the shape the GP set
 ## **  was designed for.
 ## **
-## **  GP.MENU     the interaction loop, in assembly
+## **  MENUHELP.*  the menu itself, in BASIC
 ## **  THEME.*     colour roles, in BASIC data
 ## **  APPHELP.*   leave the user's screen as you found it
 ## **  GP.STASH    a dialog over the display, and the display back
 ## **
-## **  Build:  copy GP.INC.BL, THEME.INC.BL, APPHELP.INC.BL and this file
+## **  Build:  copy GP.INC.BL, THEME.INC.BL, APPHELP.INC.BL,
+## **          MENUHELP.INC.BL and this file
 ## **          into testing/, then
 ## **            python source/gpc/build_basl.py MENU.EXP.BL MENU.PRG
 ## **          and compile MENU.PRG with GPC.BLITZ.BIN.
 ## **
-## **  THE SPLIT IS THE POINT. Every line of layout below is BASIC, and it
-## **  is BASIC because a menu waits on a HUMAN -- the speed argument that
-## **  puts sorting and screen copying in assembly does not apply. What is
-## **  in assembly is the part BASIC is bad at: reading keys, matching
-## **  hotkeys, and moving a highlight without flicker.
+## **  THE SPLIT IS THE POINT, and the menu has now moved across it. All
+## **  of this is BASIC, because a menu waits on a HUMAN -- the speed
+## **  argument that puts sorting and screen copying in assembly does not
+## **  apply. What stays in assembly is what BASIC is genuinely bad at:
+## **  GP.FILL and GP.PRINTAT push cells at VERA, and the menu simply
+## **  calls them.
 ## **
 ## ***********************************************************************
 #INCLUDE "GP.INC.BL"
 #INCLUDE "THEME.INC.BL"
 #INCLUDE "APPHELP.INC.BL"
+#INCLUDE "MENUHELP.INC.BL"
 #SAVEAS "@:MENU.PRG"
 
 ## #DEFINE substitutes at translation time, so these cost nothing at all --
@@ -43,23 +46,26 @@ GOSUB APPHELP.STARTUP
 THEME.DARK = 0
 GOSUB THEME.LOAD
 
-DIM MENU.ITEM$(MENU.COUNT)
-MENU.ITEM$(1) = " NEW GAME"
-MENU.ITEM$(2) = " LOAD"
-MENU.ITEM$(3) = " OPTIONS"
-MENU.ITEM$(4) = " QUIT"
+DIM MENUHELP.ITEM$(MENU.COUNT)
+MENUHELP.ITEM$(1) = " NEW GAME"
+MENUHELP.ITEM$(2) = " LOAD"
+MENUHELP.ITEM$(3) = " OPTIONS"
+MENUHELP.ITEM$(4) = " QUIT"
 
-## ---- The main loop. GP.MENU returns 0 when the user pressed ESC; here
+MENUHELP.X = MENU.LEFT : MENUHELP.Y = MENU.TOP
+MENUHELP.WIDTH = MENU.WIDE : MENUHELP.COUNT = MENU.COUNT
+MENUHELP.ATTR = THEME.CLR(THEME.TEXT)
+MENUHELP.HIATTR = THEME.CLR(THEME.HILITE)
+MENUHELP.HOT$ = "NLOQ"
+MENUHELP.FLAGS = MENUHELP.GAMEPAD
+
+## ---- The main loop. MENUHELP.SEL is 0 when the user pressed ESC; here
 ## ---- there is nothing to back out to, so it just redraws.
-## ----
-## ---- Flag 8 adds the gamepad in port 1 -- up/down move, B or Start
-## ---- chooses. It costs nothing when no pad is plugged in, so there is
-## ---- no reason for a menu not to accept one.
 
 MENU.MAIN:
     GOSUB MENU.DRAW
-    GP.MENU MENU.LEFT, MENU.TOP, MENU.WIDE, MENU.COUNT, "NLOQ", 8
-    MENU.PICK = GP.SEL
+    GOSUB MENUHELP.RUN
+    MENU.PICK = MENUHELP.SEL
     IF MENU.PICK = 0 THEN GOTO MENU.MAIN
     IF MENU.PICK = MENU.COUNT THEN GOTO MENU.QUIT
     GOSUB MENU.DIALOG
@@ -79,10 +85,6 @@ MENU.DRAW:
     GP.FILL 0, 0, APPHELP.COLS, 1, ASC(" "), THEME.CLR(THEME.TITLE)
     GP.PRINTAT 2, 0, "GP.BASIC DEMONSTRATION", THEME.CLR(THEME.TITLE)
     GP.BOX MENU.LEFT - 1, MENU.TOP - 1, MENU.WIDE + 2, MENU.COUNT + 2, 2, THEME.CLR(THEME.BORDER)
-    GP.FILL MENU.LEFT, MENU.TOP, MENU.WIDE, MENU.COUNT, ASC(" "), THEME.CLR(THEME.TEXT)
-    FOR MENU.I = 1 TO MENU.COUNT
-        GP.PRINTAT MENU.LEFT, MENU.TOP + MENU.I - 1, MENU.ITEM$(MENU.I), THEME.CLR(THEME.TEXT)
-    NEXT
     GP.PRINTAT 2, APPHELP.ROWS - 1, "CURSOR KEYS, RETURN, OR N L O Q", THEME.CLR(THEME.DIMMED)
     RETURN
 
@@ -96,7 +98,7 @@ MENU.DIALOG:
     GP.STASH 1, 20, 10, 36, 5
     GP.FILL 20, 10, 36, 5, ASC(" "), THEME.CLR(THEME.WARN)
     GP.BOX 20, 10, 36, 5, 4, THEME.CLR(THEME.WARN)
-    GP.PRINTAT 22, 12, "CHOSE" + MENU.ITEM$(MENU.PICK), THEME.CLR(THEME.WARN)
+    GP.PRINTAT 22, 12, "CHOSE" + MENUHELP.ITEM$(MENU.PICK), THEME.CLR(THEME.WARN)
     GP.PRINTAT 22, 13, "PRESS ANY KEY", THEME.CLR(THEME.WARN)
 MENU.DIALOG.WAIT:
     GET MENU.KEY$

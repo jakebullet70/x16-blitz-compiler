@@ -9,7 +9,7 @@
 #  The full build runs:
 #     make libs                        the libraries + the compiler engine GPC.BLITZ.BIN
 #     make release                     stage the engine + samples into testing/
-#     make -C source/runtime gpc-rt    both shared runtimes, GPC.RT/RC.nnn.BIN (into testing/)
+#     make -C source/runtime gpc-rt    both shared runtimes, GPB/GPC.RT.nnn.BIN (into testing/)
 #     make -C source/gpc release       GPC.PRG + GPC.ERR (tokenised, then compiled SHARED)
 #
 #  The zip lands in release/ -- the release drop folder, kept apart from the daily testing/
@@ -25,7 +25,7 @@ if [ "$1" != "zip" ]; then
     make libs
     echo "== make release =="
     make release
-    echo "== make -C source/runtime gpc-rt  (GPC.RT/RC.nnn.BIN shared runtimes) =="
+    echo "== make -C source/runtime gpc-rt  (GPB/GPC.RT.nnn.BIN shared runtimes) =="
     make -C source/runtime gpc-rt
     echo "== make -C source/gpc release  (GPC.PRG + GPC.ERR, tokenised and compiled) =="
     make -C source/gpc release
@@ -51,7 +51,7 @@ testing = os.path.join(root, "testing")
 # "gpc-release-0.zip" and the second would have silently overwritten the first.
 #
 # The runtime build number is a DIFFERENT stamp (rtbuild.txt) and appears only in the
-# GPC.RT.nnn.BIN file name, via rt_filename() below.
+# GPB.RT.nnn.BIN file name, via rt_filename() below.
 stamp = os.path.join(root, "source", "application", "buildnum.txt")
 if not os.path.isfile(stamp):
     raise SystemExit("release: cannot find source/application/buildnum.txt -- no engine version")
@@ -75,8 +75,8 @@ out = os.path.join(release_dir, "gpc-release-%s.zip" % num)
 # Everything else in testing/ (samples like DIR.BASL, compiled demos, scratch) is left out.
 #   GPC.PRG        the front end you launch on the X16
 #   GPC.BLITZ.BIN  the compiler engine GPC.PRG chain-loads
-#   GPC.RT.nnn.BIN the shared runtime WITH the GPB handlers, and
-#   GPC.RC.nnn.BIN the same runtime WITHOUT them -- a program compiled in "shared" mode asks
+#   GPB.RT.nnn.BIN the shared runtime WITH the GPB handlers, and
+#   GPC.RT.nnn.BIN the same runtime WITHOUT them -- a program compiled in "shared" mode asks
 #                  for whichever it needs, and BOTH must ship: which one a given program wants
 #                  is decided at compile time, so a release carrying only one silently works
 #                  for half the programs built against it. nnn is the RUNTIME
@@ -146,7 +146,7 @@ SRC_README = (
     "CAREFUL with the second one. The shipped GPC.ERR.PRG is the COMPILED helper;\n"
     "BASLOAD writes the plain interpreted version over that same name, so you would\n"
     "silently swap the fast tool for a slow one. It still works -- and it is in fact\n"
-    "the version to use if the GPC.RT.nnn.BIN runtime is missing, since the compiled\n"
+    "the version to use if the runtime is missing, since the compiled\n"
     "one needs it -- but re-extract from the zip to get the compiled helper back.\n"
 )
 

@@ -15,7 +15,7 @@
 ;		BootEntry, which:
 ;
 ;			1. checks the 4-byte magic at RTBASE -- is the shared runtime already resident?
-;			2. if not, LOADs GPC.RT.nnn.BIN to its own home (RTBASE) with secondary address 1,
+;			2. if not, LOADs GPB/GPC.RT.nnn.BIN to its own home with secondary address 1,
 ;			   trying the current directory first and then the root of the SD card;
 ;			3. enters the resident runtime at RT_ENTRY, handing it this program's p-code page,
 ;			   workspace start (patched per program) and workspace end.
@@ -258,12 +258,12 @@ BBGPMagic:
 BBFullRoot:
 		.text 	"/"
 BBFull:
-		.text 	format("GPC.RT.%03d.BIN", BuildNumber) 	; handlers AND core, loads at RTGPBASE
+		.text 	format("GPB.RT.%03d.BIN", BuildNumber) 	; handlers AND core, loads at RTGPBASE
 BBFullEnd:
 BBCoreRoot:
 		.text 	"/"
 BBCore:
-		.text 	format("GPC.RC.%03d.BIN", BuildNumber) 	; core only, loads at RTBASE
+		.text 	format("GPC.RT.%03d.BIN", BuildNumber) 	; core only, loads at RTBASE
 BBCoreEnd:
 BBErrText:
 		.text 	"?RT", 13, 0 				; brief -- a full line would wrap in 40 columns

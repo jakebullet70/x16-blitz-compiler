@@ -8,14 +8,14 @@
 # *******************************************************************************************
 # *******************************************************************************************
 #
-#		The standalone runtime ships as GPC.RT.nnn.BIN, where nnn is the RUNTIME BUILD NUMBER --
+#		The standalone runtime ships as GPB/GPC.RT.nnn.BIN, where nnn is the RUNTIME BUILD NUMBER --
 #		source/application/rtbuild.txt. bootstrap.asm formats the identical number into the name
 #		every compiled program looks for (via BuildNumber in the generated version.asm), so the
 #		two cannot disagree unless the runtime is built from a different stamp than the engine.
 #
 #		THE NUMBER IS PINNED AND DOES NOT BUMP. It used to be the last component of
 #		buildnum.txt and incremented on every "make libs", which meant a differently-named
-#		GPC.RT file after every rebuild and a shared-mode program that could no longer find its
+#		runtime file after every rebuild and a shared-mode program that could no longer find its
 #		runtime. A consumer compiling in shared mode needs the name to hold still, so it now
 #		moves only when someone edits rtbuild.txt -- and every shared-mode program must be
 #		recompiled when it does, because the name is baked into each object.
@@ -53,15 +53,19 @@ def build_number():
 
 
 def rt_filename():
-	#	%03d, so 112 -> "112" and a small number still reads as GPC.RT.007.BIN. Wider
-	#	build numbers simply make a wider name; bootstrap.asm formats it the same way.
-	return "GPC.RT.%03d.BIN" % build_number()
+	"""The FULL runtime: the GPB handlers AND the core, loading at RTGPBASE.
+
+	   GPB, not GPC, because that is what the extra half of it IS -- the GPB keyword handlers.
+	   The plain GPC name below is the plain runtime. %03d, so 112 -> "112" and a small build
+	   number still reads as GPB.RT.007.BIN; bootstrap.asm formats it the same way, and both
+	   names are the same width so its length bytes do not care which is which."""
+	return "GPB.RT.%03d.BIN" % build_number()
 
 
 def rc_filename():
-	"""The CORE-ONLY runtime, for a shared program that uses no GPB keyword. RT -> RC is the
-	   only difference, so the two names are the same width and sort together in a directory."""
-	return "GPC.RC.%03d.BIN" % build_number()
+	"""The CORE-ONLY runtime, for a shared program that uses no GPB keyword. Same width as the
+	   GPB name above, and the two sort together in a directory."""
+	return "GPC.RT.%03d.BIN" % build_number()
 
 
 #	RTGPBASE and RTBASE are read out of common.inc rather than repeated here. Getting either

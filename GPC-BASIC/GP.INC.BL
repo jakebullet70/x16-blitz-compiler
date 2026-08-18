@@ -147,39 +147,28 @@
 #TOKEN GP.FILL 52842
 #TOKEN GP.PRINTAT 52841
 
-## GP.MENU x,y,w,n,hotkeys$ [,flags]   ->   GP.SEL
+## GP.MENU AND GP.SEL ARE GONE, replaced by "MENUHELP.INC.BL" -- a menu
+## written in ordinary GPB commands. It was 462 bytes of assembly plus 11
+## of storage, carried by every program that used any GPB keyword at all,
+## and adding gamepad support to it was what made the cost stop being
+## worth it. The BASL module does the same job -- cursor keys, RETURN, ESC,
+## case-blind hotkeys that choose their row, must-select / keep-mark /
+## no-wrap, and the SNES pad -- for no runtime bytes, and only the programs
+## that want a menu pay for it.
 ##
-## BASL DRAWS THE MENU, THIS DRIVES IT. Draw n rows yourself, each w cells
-## wide, the first at x,y -- with GP.FILL and GP.PRINTAT, or however you
-## like. GP.MENU then highlights one, moves it with the cursor keys, and
-## returns the row chosen in GP.SEL: 1..n for a choice, 0 for cancelled.
+##      #INCLUDE "MENUHELP.INC.BL"
+##      MENUHELP.X = 8 : MENUHELP.Y = 6
+##      MENUHELP.WIDTH = 24 : MENUHELP.COUNT = 4
+##      MENUHELP.ITEM$(1) = " NEW GAME"        ... and so on
+##      MENUHELP.ATTR = THEME.CLR(THEME.TEXT)
+##      MENUHELP.HIATTR = THEME.CLR(THEME.HILITE)
+##      MENUHELP.HOT$ = "NLOQ"
+##      GOSUB MENUHELP.RUN                     answer in MENUHELP.SEL
 ##
-##   cursor up / down   move          RETURN   choose
-##   ESC or STOP        cancel        a hotkey chooses its row AT ONCE
-##
-## hotkeys$ is one character per row, in order, matched WITHOUT case. It
-## may be shorter than n (the later rows simply have none) or "" for a
-## cursor-driven menu.
-##
-## IT TAKES NO COLOURS, because the highlight is a swap of the cell's own
-## attribute nibbles -- foreground and background trade places. Whatever
-## you drew, in whatever colours, highlights correctly and un-highlights
-## back to exactly what was there. Only the attribute bytes are touched,
-## never the text, so moving the highlight cannot disturb your drawing.
-##
-## flags, added together:
-##    1  MUST SELECT   ESC does not cancel; only a real choice leaves
-##    2  KEEP MARK     leave the chosen row highlighted on the way out
-##    4  NO WRAP       stop at the ends instead of wrapping round
-##    8  GAMEPAD       the SNES pad in PORT 1 drives it too: up/down move,
-##                     B or Start choose. Cancel stays on the keyboard.
-##                     PORT 1, not port 0 -- port 0 IS the keyboard, which
-##                     this already reads, so both would move it twice per
-##                     press. One step per press, no auto-repeat. Costs
-##                     nothing with no pad plugged in.
-
-#TOKEN GP.MENU 52840
-#TOKEN GP.SEL 52839
+## The one behaviour that did NOT survive is the colourless highlight. The
+## assembly swapped the cell's attribute nibbles, so it needed no colours
+## at all; the module prints the row again, so it wants one -- and
+## MENUHELP.HIATTR = 0 asks for that same inversion back.
 
 ##
 ## GP.SELECT <expr>            evaluate once, then test it against each alternative
