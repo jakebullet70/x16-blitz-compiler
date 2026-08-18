@@ -4,6 +4,11 @@ The GP.BASIC library: the BASLOAD includes and the example programs for GPC's `G
 extension. The design lives in [docs/blitz/GP-BASIC.TIERS.md](../docs/blitz/GP-BASIC.TIERS.md)
 (build plan) and [docs/blitz/GP-BASIC.PLAN.md](../docs/blitz/GP-BASIC.PLAN.md) (background).
 
+**Before naming a variable in a program that includes any of this, read
+[docs/blitz/GP-BASIC.GLOBALS.md](../docs/blitz/GP-BASIC.GLOBALS.md)** — BASL has one flat namespace,
+so every module's variables are visible to your program and a collision is a wrong answer rather
+than an error.
+
 ## Naming
 
 Flat folder, **UPPERCASE** names, role carried in the extension:
