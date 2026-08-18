@@ -33,7 +33,9 @@ CompileCode:
 		jsr 	$FFD2 						; caller can tell a compile that worked from one that
 		lda 	#"K" 						; stopped on an error, so it stays.
 		jsr 	$FFD2
-		rts
+		lda 	#' '
+		jsr 	$FFD2
+		jmp 	PrintMemoryReport 			; ... and what it cost -- see compiler/memreport.asm
 
 _CCRejected: 								; WriteObjectCode set carry (e.g. PROGRAM TOO BIG); it has
 		rts 								; already printed why, so stop -- no map file, no OK.

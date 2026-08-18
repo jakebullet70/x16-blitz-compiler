@@ -52,6 +52,20 @@ WriteObjectCode:
 		jmp 	_WOCShared 					; jmp, not a branch -- the embedded path is >127 bytes
 _WOCEmbedded:
 		jsr 	PatchOutCompile 			; makes it run the runtime on reload
+		jsr 	ScanGPUsage 				; does anything reach a handler above GPBase ?
+		;
+		;		The cut. A program using no GP.BASIC keyword takes the runtime as $0801..GPBase
+		;		and puts its object code there; one that uses any takes the whole thing,
+		;		$0801..ObjectBase, exactly as before. Both labels are page aligned, so a single
+		;		page number says which -- and it is used THREE times below (the copy terminator,
+		;		the RunCodePage patch and the workspace base), so it is settled once, here.
+		;
+		lda 	#GPBase >> 8
+		ldx 	gpUsed
+		beq 	_WOCCutSet
+		lda 	#ObjectBase >> 8
+_WOCCutSet:
+		sta 	runtimeEndPage
 		;
 		;		zTemp1 = length of the object code.
 		;
@@ -84,7 +98,7 @@ _WOCWholePages:
 		;		tests, in the same order, as _WOCShared.
 		;
 		clc
-		lda 	#ObjectBase >> 8
+		lda 	runtimeEndPage 				; where the object code will actually land
 		adc 	zTemp1+1
 		bcs 	_WOCTooBig
 		adc 	#FrameStackPages
@@ -116,7 +130,7 @@ _WOCRuntime:
 		lda 	zTemp0
 		cmp 	#(RunCodePage+1) & $FF
 		bne 	_WOCNotCodePage
-		lda 	#ObjectBase >> 8 			; object code moves down to here
+		lda 	runtimeEndPage 				; object code moves down to here
 		bra 	_WOCEmit
 _WOCNotCodePage:
 		lda 	zTemp0+1 					; the workspace page operand ?
@@ -135,11 +149,10 @@ _WOCEmit:
 		bne 	_WOCSkip1
 		inc 	zTemp0+1
 _WOCSkip1:
-		lda 	zTemp0+1 					; until we reach ObjectBase (page aligned)
-		cmp 	#ObjectBase >> 8
+		lda 	zTemp0+1 					; until we reach the cut (both candidates are page
+		cmp 	runtimeEndPage 				; aligned, so the low byte is always zero there)
 		bne 	_WOCRuntime
 		lda 	zTemp0
-		cmp 	#ObjectBase & $FF
 		bne 	_WOCRuntime
 		;
 		;		Part two : the object code itself, which lands at ObjectBase on reload.
@@ -192,15 +205,47 @@ _WOCSWhole:
 		;		WS_START = PCODE_PAGE + pages(p-code) + the frame-stack gap. Reject if that leaves
 		;		fewer than MIN_WS_PAGES below RTBASE, or if the page count itself overflowed a byte.
 		;
+		jsr 	ScanGPUsage 				; the shared runtime is two files now -- see below
+		;
+		;		The workspace ends where the resident runtime starts, and that is no longer one
+		;		address: a program using no GPB keyword loads the CORE-ONLY file at RTBASE and keeps
+		;		everything below it, one using GPB loads the full file at RTGPBASE and stops there.
+		;		2,560 bytes between them, so it is worth knowing which.
+		;
+		lda 	#RTBASE >> 8
+		ldx 	gpUsed
+		beq 	_WOCSCeiling
+		lda 	#RTGPBASE >> 8
+_WOCSCeiling:
+		sta 	sharedCeilPage
 		clc
 		lda 	#PCODE_PAGE
 		adc 	zTemp1+1
-		bcs 	_WOCSBig
+		bcs 	_WOCSBigFar
 		adc 	#FrameStackPages
-		bcs 	_WOCSBig
+		bcs 	_WOCSBigFar
 		sta 	newWorkspacePage 			; reuse this byte to carry WS_START
-		cmp 	#(RTBASE >> 8) - MIN_WS_PAGES + 1
-		bcs 	_WOCSBig
+		;
+		;		Reject unless MIN_WS_PAGES still fit below the ceiling. Computed as a THRESHOLD and
+		;		compared, rather than subtracting the ceiling from the start page: the subtraction
+		;		underflows when the p-code has already run past the ceiling, and an underflow reads as
+		;		a small positive gap -- i.e. it accepts exactly the programs it exists to reject.
+		;
+		lda 	sharedCeilPage
+		sec
+		sbc 	#MIN_WS_PAGES - 1 			; the highest start page that still leaves a workspace
+		sta 	zTemp1 						; (the low byte is spent -- only zTemp1+1 is still live)
+		lda 	newWorkspacePage
+		cmp 	zTemp1
+		bcs 	_WOCSBigFar
+		bra 	_WOCSFits
+;
+;		_WOCSBig is at the far end of this file, out of branch range from here -- the same
+;		trampoline FixBranches needs for its GP.EXITDO handler, for the same reason.
+;
+_WOCSBigFar:
+		jmp 	_WOCSBig
+_WOCSFits:
 		;
 		;		Header: a normal PRG loading at $0801 -- the bootstrap sits there.
 		;
@@ -212,20 +257,46 @@ _WOCSWhole:
 		lda 	#8
 		jsr 	IOWriteByte
 		;
-		;		Part one: the bootstrap, ProgramBootstrap..ProgramBootstrapEnd, patching the single
-		;		WS_START operand byte as it streams past.
+		;		Part one: the bootstrap, ProgramBootstrap..ProgramBootstrapEnd, patching three operand
+		;		bytes as they stream past. Build the table first -- the addresses are constants but all
+		;		three VALUES are per-program, so it cannot be static data.
 		;
+		.set16 	BootPatchTable, ProgramBootstrap+BootWSPatchOffset
+		lda 	newWorkspacePage 			; where this program's workspace starts
+		sta 	BootPatchTable+2
+		.set16 	BootPatchTable+3, ProgramBootstrap+BootWSEndPatchOffset
+		lda 	sharedCeilPage 				; ... and where it ends: RTBASE or RTGPBASE
+		sta 	BootPatchTable+5
+		.set16 	BootPatchTable+6, ProgramBootstrap+BootGPPatchOffset
+		lda 	gpUsed 						; ... and whether the handlers have to come with it
+		beq 	_WOCSFlag
+		lda 	#1 							; normalise: the bootstrap tests it with BEQ
+_WOCSFlag:
+		sta 	BootPatchTable+8
 		.set16 	zTemp0,ProgramBootstrap
 _WOCSBoot:
+		;
+		;		THREE patched bytes now, not one, so the loop asks a table rather than growing a third
+		;		copy of the same compare. Each entry is (address lo, hi, value): workspace START page,
+		;		workspace END page -- which is the runtime base this program will use -- and the flag
+		;		saying whether it needs the GPB handlers at all.
+		;
+		ldx 	#0
+_WOCSBootPatch:
 		lda 	zTemp0
-		cmp 	#<(ProgramBootstrap+BootWSPatchOffset)
-		bne 	_WOCSBootPlain
+		cmp 	BootPatchTable,x
+		bne 	_WOCSBootNext
 		lda 	zTemp0+1
-		cmp 	#>(ProgramBootstrap+BootWSPatchOffset)
-		bne 	_WOCSBootPlain
-		lda 	newWorkspacePage 			; substitute the WS_START operand
+		cmp 	BootPatchTable+1,x
+		bne 	_WOCSBootNext
+		lda 	BootPatchTable+2,x 			; the byte to substitute
 		bra 	_WOCSBootEmit
-_WOCSBootPlain:
+_WOCSBootNext:
+		inx
+		inx
+		inx
+		cpx 	#BootPatchEnd-BootPatchTable
+		bne 	_WOCSBootPatch
 		lda 	(zTemp0)
 _WOCSBootEmit:
 		jsr 	IOWriteByte
@@ -434,6 +505,13 @@ _WMFPow10L:
 _WMFPow10H:
 		.byte 	>10000, >1000, >100, >10
 
+BootPatchTable: 							; three (addr lo, addr hi, value) triples, built per program
+		.fill 	9 							; by the shared path just above -- see the note there.
+BootPatchEnd:
+sharedCeilPage: 							; page the shared workspace stops at: RTBASE normally,
+		.fill 	1 							; RTGPBASE when the GPB handlers sit below it.
+runtimeEndPage: 							; first page ABOVE the runtime as written out: GPBase if the
+		.fill 	1 							; GP block was dropped, ObjectBase if it was kept.
 newWorkspacePage: 							; first page of workspace in the saved file. In the code
 		.fill 	1 							; section, not storage -- see the note in
 											; file-io/read.asm.

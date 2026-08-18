@@ -3,6 +3,10 @@
 The complete reference for GPC's `GP.*` keyword extension and the BASL library built on it:
 **every command, every routine, every variable name they take.**
 
+`GP` is **Greased Piglet** — GPC is the Greased Piglet Compiler, GP.BASIC (GPB) the Greased
+Piglet BASIC, and `GPC SQUEALING...` on the compiler's first line is the same joke rather than
+an odd choice of verb.
+
 | If you want | Read |
 |---|---|
 | what a command does and how to write it | §3 and §4, here |

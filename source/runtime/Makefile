@@ -25,30 +25,50 @@ prelim:
 	$(PYTHON) $(CSCRIPTS)build.py
 	$(CCOPY) _library.asm $(BINDIR)runtime.library
 
+#
+#		gp.library is LAST in every link below, which is the whole reason it is a separate
+#		library: the GP handlers then sit contiguously at the tail of the image instead of
+#		scattered through it. ../gp-runtime/Makefile has the argument in full. It must already
+#		be built -- ../Makefile enters gp-runtime before this directory.
+#
 build: prelim
-	$(ASM) testing$(S)testing.asm $(BINDIR)runtime.library $(BINDIR)common.library $(BINDIR)ifloat32.library  $(BINDIR)polynomials.library testing$(S)testend.asm
+	$(ASM) testing$(S)testing.asm $(BINDIR)runtime.library $(BINDIR)common.library $(BINDIR)ifloat32.library  $(BINDIR)polynomials.library $(BINDIR)gp.library testing$(S)testend.asm
 
 #
-#		The standalone resident runtime, GPC.RT.nnn.BIN. Same libraries as the test build, but
-#		fronted by 00rt.header (magic + entry vector at RTBASE) and closed by zzrt.footer (the
-#		$9F00 size guard), re-based to RTBASE via -D CodeStart (25600 = $6400 -- decimal dodges
-#		Make's $; keep it in step with RTBASE in common.inc). The result is loaded once and
-#		shared by every program compiled in "resident
-#		runtime" mode (GPC.INPUT 4th line = SHARED). Written straight into testing/ so it sits
-#		beside the compiled programs on the emulator's disk.
+#		The standalone resident runtime. TWO FILES, sliced by rtname.py from this ONE image:
 #
-#		nnn is the ABI ordinal RT_ABI, and the name is built by rtname.py reading it back out of
-#		common-source/source/common.inc -- NOT spelled out here. The same number is assembled into
-#		the runtime's magic and into the name every compiled program looks for, so a copy in this
-#		recipe would be the one nothing checks. Bump RT_ABI and all three move together.
+#			GPC.RT.nnn.BIN	loads at RTGPBASE ($6400) -- GPB handlers AND core
+#			GPC.RC.nnn.BIN	loads at RTBASE   ($6E00) -- core only, for a program using no GPB
+#
+#		Hence the link ORDER, which is the whole point of this recipe: gp.library goes FIRST
+#		here, at the bottom -- the opposite of every other link line in the tree, where it goes
+#		last. The core has to sit at one fixed address whichever file was loaded, so the
+#		optional half must be the low one. See common.inc.
+#
+#		-D CodeStart is RTGPBASE, not RTBASE (25600 = $6400 -- decimal dodges Make's $; keep
+#		it in step with RTGPBASE in common.inc). 05rtcore.divider pads the gap and stamps
+#		RTGPMAGIC; zzrt.footer still guards the top against $9F00. Written straight into
+#		testing/ so both sit beside the compiled programs on the emulator's disk.
+#
+#		nnn is the RUNTIME BUILD NUMBER, source/application/rtbuild.txt, and the name is built by
+#		rtname.py reading that file -- NOT spelled out here. The same number reaches bootstrap.asm
+#		as BuildNumber (via the generated version.asm) and so becomes the name every compiled
+#		program looks for; a copy in this recipe would be the one nothing checks. It is pinned and
+#		edited by hand, because moving it orphans every already-compiled shared-mode program.
+#
+#		This is NOT the ABI ordinal. RT_ABI (common.inc) is that, in the magic 00rt.header lays
+#		down at RTBASE; the file name says WHICH runtime, the magic says whether it FITS.
 #
 gpc-rt: prelim
-	$(ASM) -D CodeStart=25600 source$(S)main$(S)00rt.header $(BINDIR)runtime.library $(BINDIR)common.library $(BINDIR)ifloat32.library $(BINDIR)polynomials.library source$(S)main$(S)zzrt.footer
+	$(ASM) -D CodeStart=25600 source$(S)main$(S)00rtgp.header $(BINDIR)gp.library \
+		source$(S)main$(S)05rtcore.divider source$(S)main$(S)00rt.header \
+		$(BINDIR)runtime.library $(BINDIR)common.library $(BINDIR)ifloat32.library $(BINDIR)polynomials.library \
+		source$(S)main$(S)zzrt.footer
 	$(PYTHON) scripts$(S)rtname.py build$(S)code.prg $(RELEASEDIR)
 
 checkall: prelim
 	$(ASM) testing$(S)testing.asm $(BINDIR)common.library $(BINDIR)ifloat32.library $(BINDIR)polynomials.library \
-													$(BINDIR)compiler.library $(BINDIR)runtime.library testing$(S)testend.asm
+													$(BINDIR)compiler.library $(BINDIR)runtime.library $(BINDIR)gp.library testing$(S)testend.asm
 
 run: build
 	$(EXECUTE) 

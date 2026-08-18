@@ -1,0 +1,58 @@
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		Name:		05rtcore.divider
+;		Purpose:	Close the GPB block, stamp its magic, open the interpreter core at RTBASE.
+;		Created:	18th August 2026
+;
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		Linked in the "gpc-rt" target between gp.library and 00rt.header. Everything before it is
+;		the OPTIONAL half of the shared runtime (the GPB handlers, loaded at RTGPBASE); everything
+;		after it is the core, which must begin exactly at RTBASE because every shared program's
+;		bootstrap enters at RT_ENTRY and no program knows which file brought the runtime up.
+;
+;		Two guards, and they fail in opposite directions:
+;
+;		  the .cerror catches the GPB block GROWING past RTBASE, which would push the core up and
+;		  silently break the entry contract for every already-compiled shared program. Bump the
+;		  handlers apart from the core -- lower RTGPBASE, bump RT_ABI -- rather than letting them
+;		  meet.
+;
+;		  the .fill catches it SHRINKING: the pad is computed, so the core stays put no matter
+;		  what the handlers do. That is the whole reason the boundary is a fixed constant and not
+;		  simply wherever gp.library happened to end.
+;
+;		RTGPMAGIC goes in the last four bytes before RTBASE, deliberately -- see common.inc. The
+;		core magic answers "is a runtime resident?"; this one answers the different question "and
+;		were the handlers loaded with it?", which a core-only load leaves false.
+;
+;		Same non-.asm naming reason as 00rt.header: build.py globs .asm/.inc into _library.asm and
+;		this must be linked explicitly, exactly once, in the middle.
+;
+; ************************************************************************************************
+
+		.section code
+
+		.cerror * > RTGPMAGIC, "GPB handler block has grown into the runtime core - lower RTGPBASE and bump RT_ABI"
+		.fill 	RTGPMAGIC - *, 0 			; pad out so the core lands exactly on RTBASE
+
+		.cerror RT_ABI > 99, "RT_ABI > 99: the magic's last two bytes are ASCII digits - widen it here too"
+RTGPHeader:
+		.text 	"GB"						; "GPB handlers present" (RTGPMAGIC..+1)
+		.byte 	(RT_ABI / 10) + '0' 		; same ABI ordinal as the core magic, two digits
+		.byte 	(RT_ABI - (RT_ABI / 10) * 10) + '0'
+
+		.send code
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;
+; ************************************************************************************************

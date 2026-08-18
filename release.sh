@@ -9,7 +9,7 @@
 #  The full build runs:
 #     make libs                        the libraries + the compiler engine GPC.BLITZ.BIN
 #     make release                     stage the engine + samples into testing/
-#     make -C source/runtime gpc-rt    the shared runtime GPC.RT.nnn.BIN (into testing/)
+#     make -C source/runtime gpc-rt    both shared runtimes, GPC.RT/RC.nnn.BIN (into testing/)
 #     make -C source/gpc release       GPC.PRG + GPC.ERR (tokenised, then compiled SHARED)
 #
 #  The zip lands in release/ -- the release drop folder, kept apart from the daily testing/
@@ -25,7 +25,7 @@ if [ "$1" != "zip" ]; then
     make libs
     echo "== make release =="
     make release
-    echo "== make -C source/runtime gpc-rt  (GPC.RT.nnn.BIN shared runtime) =="
+    echo "== make -C source/runtime gpc-rt  (GPC.RT/RC.nnn.BIN shared runtimes) =="
     make -C source/runtime gpc-rt
     echo "== make -C source/gpc release  (GPC.PRG + GPC.ERR, tokenised and compiled) =="
     make -C source/gpc release
@@ -40,20 +40,26 @@ import os, sys, zipfile
 root    = os.getcwd()
 testing = os.path.join(root, "testing")
 
-# The version lives in ONE place: source/application/buildnum.txt, e.g. "0.9.110". That is the
-# ENGINE's build stamp -- bumped by source/application/scripts/bumpbuild.py on every engine build
-# and printed by GPC.BLITZ.BIN itself. It used to be VERSION$ in testing/GPC.BASL, which tracked
-# the front end instead and so never moved when the compiler changed. Show it whole ("v0.9.110");
-# the last dotted component is the build number used in the zip name (gpc-release-110.zip -- the
-# established naming).
+# The PRODUCT VERSION lives in ONE place: source/application/buildnum.txt, e.g. "1.0.0". It is
+# what GPC.BLITZ.BIN prints (as V1.0.0) and what names this zip, and it is edited by hand when a
+# release is cut -- nothing bumps it. It used to be VERSION$ in testing/GPC.BASL, which tracked
+# the front end instead and so never moved when the compiler changed.
+#
+# The zip is named from the WHOLE version (gpc-release-1.0.0.zip), not from its last component.
+# It used to be the last component alone, back when that component was an ever-increasing build
+# number and unique on its own. It no longer is: 1.0.0 and 2.0.0 would both have produced
+# "gpc-release-0.zip" and the second would have silently overwritten the first.
+#
+# The runtime build number is a DIFFERENT stamp (rtbuild.txt) and appears only in the
+# GPC.RT.nnn.BIN file name, via rt_filename() below.
 stamp = os.path.join(root, "source", "application", "buildnum.txt")
 if not os.path.isfile(stamp):
     raise SystemExit("release: cannot find source/application/buildnum.txt -- no engine version")
-version = open(stamp, encoding="utf-8").read().strip()   # e.g. "0.9.110"
-if not version.split(".")[-1].isdigit():
-    raise SystemExit('release: buildnum.txt = "%s": last component is not a number' % version)
-num     = version.split(".")[-1]  # e.g. "110" -- the build number, for the zip name
-ver     = "v" + version           # e.g. "v0.9.110"
+version = open(stamp, encoding="utf-8").read().strip()   # e.g. "1.0.0"
+if not version:
+    raise SystemExit("release: buildnum.txt is empty -- no engine version")
+num     = version                 # e.g. "1.0.0" -- the whole version, for the zip name
+ver     = "v" + version           # e.g. "v1.0.0"
 
 # Output goes into the release/ drop folder (separate from the daily testing/ build cycle),
 # named with the current gpc-release-<n>.zip convention. Create the folder if missing.
@@ -69,7 +75,11 @@ out = os.path.join(release_dir, "gpc-release-%s.zip" % num)
 # Everything else in testing/ (samples like DIR.BASL, compiled demos, scratch) is left out.
 #   GPC.PRG        the front end you launch on the X16
 #   GPC.BLITZ.BIN  the compiler engine GPC.PRG chain-loads
-#   GPC.RT.nnn.BIN the shared runtime, loaded once in "shared" compile mode. nnn is the ENGINE
+#   GPC.RT.nnn.BIN the shared runtime WITH the GPB handlers, and
+#   GPC.RC.nnn.BIN the same runtime WITHOUT them -- a program compiled in "shared" mode asks
+#                  for whichever it needs, and BOTH must ship: which one a given program wants
+#                  is decided at compile time, so a release carrying only one silently works
+#                  for half the programs built against it. nnn is the RUNTIME
 #                  BUILD NUMBER, read from rtname.py rather than spelled out -- a hard-coded
 #                  name here is exactly what broke this script when the runtime was versioned.
 #   GPC.ERR.PRG    the error-address-to-line helper -- the COMPILED build. In the tree it is
@@ -79,19 +89,35 @@ out = os.path.join(release_dir, "gpc-release-%s.zip" % num)
 #                  interpreted build is NOT shipped -- it exists in the tree only as the
 #                  compile input, and SRC/GPC.ERR.BASL regenerates it if it is ever needed.
 #   SRC/*.BASL     the BASLOAD sources (NOT needed to run; see SRC/README.TXT)
+#   GPC-BASIC/     the GP.BASIC library -- the .INC.BL includes every BASL source using GP
+#                  keywords needs, the .EXP.BL examples, and its manual (GP-BASIC.md) and
+#                  global-name register (GP-BASIC.GLOBALS.md) alongside them
 # GPC.INPUT (the control-file template) is deliberately NOT shipped: GPC.PRG drives
 # the compile interactively, and the file is per-user state (git-ignored in testing/).
 # The runtime's file name carries the engine build number; import the one definition of it.
 sys.path.insert(0, os.path.join(root, "source", "runtime", "scripts"))
-from rtname import rt_filename                      # noqa: E402
+from rtname import rt_filename, rc_filename         # noqa: E402
 
-RUNTIME = ("GPC.PRG", "GPC.BLITZ.BIN", rt_filename())
+RUNTIME = ("GPC.PRG", "GPC.BLITZ.BIN", rt_filename(), rc_filename())
 # Companion tools, shipped at the root as (name in testing/, name in the zip). The compiled
 # helper is built as C.GPC.ERR.PRG and ships as plain GPC.ERR.PRG -- so it must NOT be listed
 # with an interpreted GPC.ERR.PRG as well, or the two collide on one name in the archive.
 TOOLS   = (("C.GPC.ERR.PRG", "GPC.ERR.PRG"),)
 SRCBASL = ("GPC.BASL", "GPC.ERR.BASL")     # ALL BASLOAD source -- goes under SRC/
 DOCS    = ("README.md", "LICENSE")
+
+# The GP.BASIC library ships whole, under GPC-BASIC/, straight from the repo master rather than
+# from testing/ -- testing/ holds only the staged copies of whatever was last built there, and
+# they are git-ignored precisely so they cannot be mistaken for the masters.
+#
+# Its two reference docs travel WITH it rather than in a docs folder of their own: someone who
+# extracts this zip to write a program needs the manual beside the includes it describes, and a
+# doc one directory away from the thing it documents is a doc nobody opens. The build-plan docs
+# (GP-BASIC.TIERS.md, GP-BASIC.PLAN.md) are deliberately NOT shipped -- they are the argument
+# for how the library was built, not instructions for using it.
+GPBASIC_DIR  = os.path.join(root, "GPC-BASIC")
+GPBASIC_DOCS = (os.path.join(root, "docs", "blitz", "GP-BASIC.md"),
+                os.path.join(root, "docs", "blitz", "GP-BASIC.GLOBALS.md"))
 
 # The note that ships inside SRC/, explaining the folder is source and not required to run.
 SRC_README = (
@@ -146,6 +172,23 @@ with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         names.append("SRC/" + name)
     z.writestr("SRC/README.TXT", SRC_README.replace("\n", "\r\n"))
     names.append("SRC/README.TXT")
+
+    # The GP.BASIC library, whole. Sorted so the archive listing is stable between builds, and
+    # a hard failure if the folder is missing -- a release quietly shipping without the library
+    # would look complete and leave every #INCLUDE unresolvable.
+    if not os.path.isdir(GPBASIC_DIR):
+        raise SystemExit("release: GPC-BASIC/ is missing -- the GP.BASIC library ships with the release")
+    for name in sorted(os.listdir(GPBASIC_DIR)):
+        full = os.path.join(GPBASIC_DIR, name)
+        if os.path.isfile(full):
+            z.write(full, "GPC-BASIC/" + name)
+            names.append("GPC-BASIC/" + name)
+    for full in GPBASIC_DOCS:
+        if not os.path.isfile(full):
+            raise SystemExit("release: missing %s -- the library ships with its manual" % full)
+        z.write(full, "GPC-BASIC/" + os.path.basename(full))
+        names.append("GPC-BASIC/" + os.path.basename(full))
+
     for doc in DOCS:
         full = os.path.join(root, doc)
         if os.path.isfile(full):

@@ -75,8 +75,45 @@ MemoryStorage = $400
 ;		shared program gets, about 4%.
 ;
 ; ************************************************************************************************
-RTBASE = $6400 								; resident runtime home ($6400..$9EFF, ~14.7K)
+; ************************************************************************************************
+;
+;		SPLIT IN TWO on 18th August 2026 (RT_ABI 18 -> 19), so a shared program that uses no GPB
+;		keyword does not have to keep the GPB handlers out of its workspace.
+;
+;		The GPB block is now linked at the BOTTOM of the shared image and the interpreter core
+;		above it, at a base that does not move:
+;
+;			RTGPBASE  $6400   [ GPB handlers ..................... ][ GP magic ]
+;			RTBASE    $6E00   [ magic ][ jmp StartRuntime ][ core ... ] up to ~$9D00
+;
+;		ONE assembly still, and one vector table -- the two FILES rtname.py installs are slices
+;		of the same image, so the core's bytes are identical in both and there is no second
+;		build to keep in step:
+;
+;			GPC.RT.nnn.BIN   loads at RTGPBASE -- GPB handlers AND core
+;			GPC.RC.nnn.BIN   loads at RTBASE   -- core only
+;
+;		A program's workspace then ends at RTBASE if it uses no GPB keyword and at RTGPBASE if it
+;		does, which is 2,560 bytes back for the first kind and no change at all for the second.
+;
+;		WHY THE CORE IS ON TOP and not the other way round: the core has to sit at ONE address
+;		whichever file was loaded, or a program could not enter a runtime the previous program
+;		brought up. Only the OPTIONAL half can be the half that moves the boundary, so the
+;		optional half has to be the low one.
+;
+;		RTGPMAGIC is how a GPB program tells the two apart. The core magic at RTBASE says "a
+;		runtime is up"; it cannot also say "and the handlers are with it", because a core-only
+;		load leaves the core magic looking exactly the same. So the GPB half carries its own
+;		magic in the four bytes immediately below RTBASE, and a GPB program checks both. It sits
+;		THERE rather than at RTGPBASE so a core-only program's workspace -- which runs up to
+;		RTBASE -- overwrites it as a matter of course, and the next GPB program correctly finds
+;		the handlers gone and reloads them.
+;
+; ************************************************************************************************
+RTGPBASE = $6400 							; GPB handler block + load address of the FULL file
+RTBASE = $6E00 								; interpreter core home -- the base that never moves
 RT_ENTRY = RTBASE+4 						; 4-byte magic at RTBASE, then jmp StartRuntime
+RTGPMAGIC = RTBASE-4 						; 4-byte "handlers are loaded too" magic
 PCODE_PAGE = $09 							; shared-mode p-code base page ($0900, page-aligned)
 MIN_WS_PAGES = 16 							; smallest workspace a shared program keeps (4K)
 ;
@@ -174,7 +211,7 @@ FrameStackPages = 16 						; 4K, ~250 frames
 ;		with it the shifted base ($D780 -> $DB80) moved too. Two system tokens (.casenext,
 ;		.caseend) were appended after .exitdo on top of that.
 ;
-RT_ABI = 18 								; runtime ABI ordinal -> "GP18" magic (NOT the file name)
+RT_ABI = 19 								; runtime ABI ordinal -> "GP19" magic (NOT the file name)
 
 ; ************************************************************************************************
 ;

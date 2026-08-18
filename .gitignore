@@ -101,9 +101,10 @@ source/application/source/generated/
 testing/prg-batch/
 testing/archive/
 
-# The resident runtime, GPC.RT.<build>.BIN. NOT tracked, and it cannot usefully be:
-# the file name carries the ENGINE BUILD NUMBER (scripts/rtname.py), which bumps on
-# every single engine build, so tracking it means a new binary in the tree each time
+# The resident runtimes, GPC.RT.<build>.BIN (with the GPB handlers) and
+# GPC.RC.<build>.BIN (without them -- both are slices of one build, see common.inc).
+# NOT tracked, and they cannot usefully be: the file name carries the RUNTIME BUILD
+# NUMBER (scripts/rtname.py), so tracking them means new binaries in the tree
 # and a pile of stale ones nobody asks for -- ten had accumulated by 17th Aug 2026,
 # two of them tracked since 2nd Aug and eleven ABI bumps out of date. A stale one is
 # worse than none: it carries a magic the bootstrap may accept and an opcode map that
@@ -111,6 +112,7 @@ testing/archive/
 #     make -C source/runtime gpc-rt
 # which writes it into testing/ named for whatever engine build is checked out.
 testing/GPC.RT.*.BIN
+testing/GPC.RC.*.BIN
 
 # The GP.BASIC library is MASTERED in GPC-BASIC/ (see its README). BASLOAD resolves
 # #INCLUDE by bare filename off the emulator's drive, and testing/ IS that drive, so

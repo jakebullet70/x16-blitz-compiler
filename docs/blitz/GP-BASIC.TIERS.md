@@ -153,7 +153,7 @@ VTUI `save_rect`/`rest_rect` ~60–70 B each, `fill_box` ~25 B, `border` ~50 B.
 | 4 | **Sort** for string arrays | ASM |
 | 5 | **Screen stash / restore** — **DONE** | ASM |
 | 6 | **Boxes, fills, positioned text** — **DONE**; menus, dialogs and the colour theme build on them | ASM, then BASL |
-| 7 | **Drop what the program does not use** | compiler |
+| 7 | **Drop what the program does not use** — **DONE** 18th August 2026, both halves | compiler |
 | 10 | **`GP.SELECT`** — multi-way branch, prog8 `when` style — **DONE** | ASM + compiler |
 
 ### Tier 1's deadline was wrong — corrected 16th August 2026
@@ -174,6 +174,143 @@ link lines, and teaching `pcode.py` and `vectors.py` to scan it.
 That cost is **fixed build plumbing, not per-handler**: moving three handlers costs what moving eight
 costs. So it does not compound, there is no deadline, and it is deferred until tier 7 actually needs
 it. The original reasoning is kept below because the *facts* in it are still true.
+
+### Tier 7, first half — DONE 18th August 2026. `gp.library`
+
+Built once the ASM side was declared finished, which is the cheapest moment for it: nothing else was
+going to move, so the renumbering risk was at its lowest.
+
+**What was done.** Eight files — `do.asm`, `select.asm`, `gpcall.asm`, `gpsort.asm`, `gpstring.asm`,
+`gpdraw.asm`, `gpmenu.asm`, `gpstash.asm` — moved out of `source/runtime/source/` into a new
+`source/gp-runtime/` tree, built into `bin/gp.library` and linked **last** in all four link lines
+(the runtime test build, `gpc-rt`, `checkall`, and the application's embedded runtime, where it sits
+immediately before `10object.divider`). `build.py` gained `getRuntimeASMFiles()`, which returns both
+trees in one canonical order; `pcode.py` and `vectors.py` both call it, so they cannot disagree about
+which files exist.
+
+**Result, measured.** GP code is now one contiguous block, **$92B6 to RTTop $9BDD — 2,343 bytes** —
+with nothing else in it. Runtime end address and total size are unchanged (14,303 bytes both ways).
+
+**No `RT_ABI` bump, and that was checked rather than assumed.** `getRuntimeASMFiles()` re-sorts the
+combined list with the same leafname-first key, so every file kept its scan position and every opcode
+kept its number: `pcodetokens.inc`, `pcodeconstraw.py` and `pcodesize.asm` all diffed **byte-identical**
+against the pre-move build, and the vector table has zero `Unimplemented` slots. Layout moved; the ABI
+did not. RT_ABI stays 18.
+
+**The truncation itself followed the same day — see the section below.**
+
+**Two traps, both hit.** The `gp-runtime/Makefile` targets had to be marked `.PHONY`: a `build/`
+directory beside the Makefile made `make` decide `build` was already made, print "Nothing to be done",
+and link on against a `gp.library` that was never written — surfacing two directories away as thirty
+"not defined symbol" errors. And `pcode.py` scans *comments* for a marker, so prose describing one
+(in `gpstring.asm`'s NOT-BUILT `GP.INSTRREV` note) failed the build with "Bad line".
+
+
+### Tier 7, second half — DONE 18th August 2026. The cut
+
+A program that uses no GP.BASIC keyword now has the block left out of its object.
+
+**Measured, on the same non-GP program.** Runtime written out drops from 14,591 to **12,031 bytes**
+— `$0801..GPBase` instead of `$0801..ObjectBase` — and because the object code then lands at
+`GPBase`, the workspace starts 2,560 bytes lower too. Free space for variables, strings and arrays
+goes from 19,200 to **21,760 bytes**. The file shrinks and the program gets more RAM; it is the same
+2,560 bytes counted once, in two places. A program that *does* use GP pays nothing extra: `ObjectBase`
+did not move, because the alignment padding the block already carried absorbed `GPBase`'s own.
+
+**How it decides, and why not the obvious way.** `compiler/gpscan.asm` walks the finished p-code with
+`MoveObjectForward` and, for each opcode, reads that opcode's `VectorTable` slot and compares the
+handler address against `GPBase`. Two rejected alternatives, both worse:
+
+- **A token-number range check** would have needed the GP opcodes renumbered contiguously — an
+  `RT_ABI` bump and a forced recompile of every shared-mode program. They are scattered:
+  `$96,$97`, `$9C–$A1`, `$C3–$C6`, `$DB83–$DB92`.
+- **Hooking token emission** in the generator would have missed five keywords. `GP.EXITDO` and the
+  four `GP.SELECT` commands carry inline branch offsets, so they cannot use the `T` action at all and
+  emit through hand-written `X:` helpers instead. Scanning the finished code has one site and no way
+  to miss anything — verified with a `GP.SELECT`-only program, which reports `GP IN` and runs.
+
+Asking by *address* also means the answer follows the code: move a handler into or out of
+`gp-runtime/` and nothing here needs updating.
+
+**The assumption was checked, not assumed.** Every instruction below `GPBase` was scanned for an
+operand landing inside the block: **zero hits**. `VectorTable` is the only way in, exactly as claimed
+when the layout was split.
+
+**`GPBase` lives inside `gp.library`, not in a divider file** (`gp-runtime/source/00gpbase.asm`), so
+every link line that pulls the library in gets the symbol. A divider would have had to be added to
+four of them, and the forgotten one fails as an undefined symbol somewhere unrelated. The leading
+zeros in the name are load bearing: build.py's leafname sort is the link order.
+
+**Still only pays in embedded mode.** In shared mode the runtime is one file loaded once, and the
+space a smaller one would free sits *above* `RTTop`, which is already unreachable — the workspace
+stops at `RTBASE`. Recovering it would mean a second runtime at a different base, i.e. two
+incompatible resident runtimes, which is the one thing shared mode exists to avoid.
+
+**Traps hit.** `pcode.py` scans *comments* for a command marker, so a comment in the new file
+*describing* one failed the build with "Bad line" — the same trap the first half hit, in the same
+way. And the `$FF` end-of-code marker had to be tested before the vector lookup: it indexes 127
+entries into a 109-entry table, which reads whatever follows and can report GP usage that is not
+there.
+
+**Not built: the graduated cut.** The cut is one line, so a program using only `GP.DO` still carries
+`gpdraw`, `gpmenu` and `gpstash`. Several page-aligned labels inside `gp-runtime` with the compiler
+tracking the highest block used would fix that, but it needs the GP files ordered by tier rather
+than by leafname, which renumbers GP opcodes and costs an `RT_ABI` bump.
+
+### Tier 7, shared mode too — DONE 18th August 2026. Two runtime files
+
+The truncation above only helped **embedded** programs, and the note under it said shared mode
+could not be helped without "a second, incompatible runtime". It can, and it does not have to be
+a second build.
+
+**What changed.** The GPB block moved to the **bottom** of the shared image and the interpreter
+core sits above it at a base that never moves:
+
+```
+RTGPBASE $6400   [ GPB handlers ................ ][ GB19 ]
+RTBASE   $6E00   [ GP19 ][ jmp StartRuntime ][ core ... ]  RTTop $9CB6
+```
+
+`rtname.py` then installs **two files sliced from that one image** — `GPC.RT.nnn.BIN` loading at
+`$6400` (handlers and core, 14,518 B) and `GPC.RC.nnn.BIN` loading at `$6E00` (core only,
+11,958 B). One assembly, one vector table, one copy of the core's bytes, so the two cannot drift.
+
+**Measured.** A shared program using no GPB keyword goes from **18,432 to 20,992 bytes** free —
+its workspace now ends at `RTBASE` instead of `RTGPBASE`. A GPB program is unchanged at 18,944.
+
+**Why the core is the half on top.** The core must be at one address whichever file was loaded,
+or a program could not enter a runtime the previous program brought up. Only the *optional* half
+can move the boundary, so the optional half has to be the low one.
+
+**Two magics, because one cannot answer both questions.** The core magic at `RTBASE` says "a
+runtime is up"; it cannot also say "and the handlers came with it", because a core-only load
+leaves it looking identical. So the GPB half carries `GB<abi>` in the four bytes below `RTBASE`,
+and a GPB program checks both.
+
+**The trap that took the longest to see.** A core-only program's workspace runs *over* the
+handlers, so it must wipe that second magic — **unconditionally, warm path included**. Wiping it
+only when the core file is loaded is not enough: the ordinary sequence is a GPB program bringing
+the full runtime up, a core-only program entering it warm and quietly eating the handlers, then a
+third program wanting them. Nothing is loaded in the middle of that. Nor is it safe to let the
+workspace overwrite the magic by chance — it sits in the top four bytes of that space, so whether
+it is actually written depends on how much memory the program happens to use. Verified both ways
+with a program that PEEKs the four bytes: `0 0 0 0` after a core-only run, `71 66 49 57` (`GB19`)
+after a GPB one.
+
+**Cost: `RT_ABI` 18 → 19, so every shared-mode program must be recompiled.** Chosen deliberately
+over the alternative (a genuinely separate second runtime build, which would have kept ABI 18 and
+needed a stub library, a second bootstrap and two images to keep in step).
+
+**Embedded still wins on memory** — 21,760 against 20,992 — because shared also spends 255 bytes
+on the bootstrap and strands the gap above `RTTop`. Shared mode is for one runtime across a suite
+of chained programs, not for RAM.
+
+**Two build traps.** A global label between a `_`-local branch and its target splits the local
+scope in 64tass and the branch stops resolving — which is why the three per-program bytes are
+**data at the end of the template, not immediates in the code**. And the shared reject test must
+compare against a computed *threshold*, not subtract the ceiling from the start page: the
+subtraction underflows for exactly the oversized programs it exists to catch, and an underflow
+reads as a comfortable gap.
 
 **The original argument:**
 

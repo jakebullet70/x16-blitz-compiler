@@ -245,7 +245,27 @@ _BBCheck:
 		bne 	_BBCold
 		dex
 		bpl 	_BBCheck
-		bra 	_BBEnter 					; WARM -- runtime already up, just enter it
+		;
+		;		The core is up. If this program uses no GPB keyword that is the whole question, but if
+		;		it does it must ALSO find the handlers, and a core-only load leaves the core magic
+		;		looking exactly the same. So check the second magic below RTBASE as well. Getting this
+		;		wrong is not a crash here -- it is a jump into a workspace at the first GPB keyword.
+		;
+		;		The three per-program bytes are DATA at the end of this template, not immediates in the
+		;		code. They have to be: a global label between a "_" branch and its target splits the
+		;		local scope in two and the branch stops resolving -- the same trap BBTryLoad's own note
+		;		describes, and it cost a build here.
+		;
+		lda 	BBNeedGP 					; 0 = no GPB keyword, 1 = uses them
+		beq 	_BBEnter 					; WARM -- core is all this program needs
+		ldx 	#3
+_BBCheckGP:
+		lda 	RTGPMAGIC,x
+		cmp 	BBGPMagic,x
+		bne 	_BBCold
+		dex
+		bpl 	_BBCheckGP
+		bra 	_BBEnter 					; WARM -- handlers are up too
 _BBCold:
 		;
 		;		Cold: LOAD the runtime to its own home. Try the CURRENT DIRECTORY first, then the
@@ -256,15 +276,21 @@ _BBCold:
 		;		found, "/GPC.RT.001.BIN" loads). The two names overlap in one string -- BBNameRoot
 		;		is just BBName with the "/" in front of it.
 		;
-		lda 	#BBNameEnd-BBName 			; local: "GPC.RT.001.BIN"
-		ldx 	#<BBName
-		ldy 	#>BBName
-		jsr 	BBTryLoad
+		;
+		;		Which file: the FULL one (handlers + core, loads at RTGPBASE) if this program uses a
+		;		GPB keyword, the CORE-ONLY one (loads at RTBASE) if it does not. Loading the full one
+		;		always restores both magics, so a program that wanted handlers and found none simply
+		;		loads over whatever core was there.
+		;
+		ldy 	#0 							; which triple: 0 = core only, 3 = full
+		lda 	BBNeedGP 					; the same flag the warm check reads
+		beq 	_BBPickName
+		ldy 	#3
+_BBPickName:
+		sty 	BBNameIdx
+		jsr 	BBLoadLocal
 		bcc 	_BBEnter 					; carry clear = loaded OK
-		lda 	#BBNameEnd-BBNameRoot 		; root: "/GPC.RT.001.BIN"
-		ldx 	#<BBNameRoot
-		ldy 	#>BBNameRoot
-		jsr 	BBTryLoad
+		jsr 	BBLoadRoot 					; else the copy at the root of the card
 		bcc 	_BBEnter
 		;
 		;		Neither copy is on the disk. Print a short notice and drop back to BASIC READY --
@@ -288,10 +314,39 @@ _BBErrDone:
 ;		to BASIC, exactly as an embedded program does.
 ; ------------------------------------------------------------------------------------------------
 _BBEnter:
+		;
+		;		A core-only program is about to use the memory the GPB handlers occupy -- its workspace
+		;		runs all the way up to RTBASE -- so it must first say so, by wiping RTGPMAGIC.
+		;
+		;		UNCONDITIONALLY, warm path included, and that is the whole point. It is not enough to
+		;		wipe it when the core file is LOADED: the common sequence is a GPB program bringing the
+		;		full runtime up, then a core-only program entering it warm and quietly overwriting the
+		;		handlers, then a third program wanting them. Nothing was loaded in the middle of that,
+		;		so a load-time wipe would never fire and the third program would enter handlers that
+		;		had been eaten.
+		;
+		;		Nor is it safe to let the workspace overwrite the magic by chance: it sits in the top
+		;		four bytes of that space, so whether it actually gets written depends on how much RAM
+		;		the program uses. Handlers destroyed with the magic left standing is exactly the lie
+		;		this check exists to prevent, so it is done on purpose rather than hoped for.
+		;
+		;		Cost is that the next GPB program always reloads. That is correct, not wasteful -- the
+		;		handlers really were thrown away.
+		;
+		lda 	BBNeedGP
+		bne 	_BBGo 						; a GPB program keeps them, and its workspace stops below them
+		ldx 	#3
+		lda 	#0
+_BBZap:
+		sta 	RTGPMAGIC,x
+		dex
+		bpl 	_BBZap
+_BBGo:
 		lda 	#PCODE_PAGE 				; A = p-code base page ($09), page-aligned for codePtr
-BootWS:
-		ldx 	#$FF 						; X = workspace start page -- PATCHED by WriteObjectCode
-		ldy 	#RTBASE >> 8 				; Y = workspace end page ($73 -- just below the runtime)
+		ldx 	BBWSStart 					; X = workspace start page
+		ldy 	BBWSEnd 					; Y = workspace end page -- RTBASE>>8 for a program with no GPB
+											; keyword, RTGPBASE>>8 for one with the handlers below it. That
+											; difference is the whole point of the split: 2,560 bytes.
 		jmp 	RT_ENTRY 					; RTBASE+4 -> jmp StartRuntime
 
 ; ------------------------------------------------------------------------------------------------
@@ -305,6 +360,35 @@ BootWS:
 ;		scope in 64tass, and a global label placed between _BBCold and _BBEnter would split that
 ;		scope in two, leaving the earlier branches referring to an _BBEnter they can no longer see.
 ; ------------------------------------------------------------------------------------------------
+;
+;		The four names live in ONE table of (length, lo, hi) triples -- local core, local full,
+;		root core, root full -- so picking the file costs one patched byte instead of four copies
+;		of the load sequence. X selects local (0) or root (6); BBNameSel adds 0 for core-only or
+;		3 for full.
+;
+BBLoadLocal:
+		ldx 	#0
+		bra 	BBLoadX
+BBLoadRoot:
+		ldx 	#6
+BBLoadX:
+		txa
+		clc
+		adc 	BBNameIdx 					; 0 = core only, 3 = full -- set by the cold path above
+		tax
+		ldy 	BBNameTab+2,x 				; Y = name address high
+		lda 	BBNameTab+1,x 				; stash the low byte while A is needed for the length
+		pha
+		lda 	BBNameTab,x 				; A = name length
+		plx 								; X = name address low
+		bra 	BBTryLoad 					; A/X/Y are now exactly what SETNAM wants
+
+BBNameTab:
+			.byte 	BBCoreEnd-BBCore, <BBCore, >BBCore 					; 0  local, core only
+			.byte 	BBFullEnd-BBFull, <BBFull, >BBFull 					; 3  local, full
+			.byte 	BBCoreEnd-BBCoreRoot, <BBCoreRoot, >BBCoreRoot 	; 6  root, core only
+			.byte 	BBFullEnd-BBFullRoot, <BBFullRoot, >BBFullRoot 	; 9  root, full
+
 BBTryLoad:
 		jsr 	X16_SETNAM 					; SETNAM(length in A, name in X/Y)
 		lda 	#0 							; SETLFS(logical file 0, device 8, secondary 1)
@@ -331,35 +415,58 @@ BBTryLoad:
 		;		into version.asm by bumpbuild.py) rather than being spelled out here, so this copy
 		;		cannot drift from the runtime's own or from what rtname.py builds.
 		;
-		;		NOTE the build number bumps on EVERY engine build, so the name changes every
-		;		build: a program compiled against build N wants GPC.RT.<N>.BIN specifically and
-		;		will ?RT against a later one. That is the point -- exact pairing -- but it does
-		;		mean shared programs must be recompiled whenever the engine is rebuilt.
+		;		NOTE the runtime build number is PINNED (rtbuild.txt), not bumped per build -- it
+		;		used to bump every time, which renamed the file out from under every already
+		;		compiled shared program. Move it only to force a re-pairing, and recompile them
+		;		all when you do.
 		;
 		.cerror RT_ABI > 99, "RT_ABI > 99: the magic's last two bytes are ASCII digits - widen it here and in 00rt.header"
 BBMagic:
-		.text 	"GP"						; magic, matched against RTBASE..RTBASE+1
+		.text 	"GP"						; core magic, matched against RTBASE..RTBASE+1
 		.byte 	(RT_ABI / 10) + '0' 		; ABI ordinal, two digits, matched against RTBASE+2..3
+		.byte 	(RT_ABI - (RT_ABI / 10) * 10) + '0'
+BBGPMagic:
+		.text 	"GB"						; "handlers loaded too", matched against RTGPMAGIC..+1
+		.byte 	(RT_ABI / 10) + '0' 		; same ordinal -- the two halves are one image and one ABI
 		.byte 	(RT_ABI - (RT_ABI / 10) * 10) + '0'
 		;
 		;		One string, two names: the root form is the local form with a "/" in front, so the
 		;		fallback costs a single byte rather than a second copy of the name. The name is
 		;		formatted, not spelled out, so a build number of any width still comes out right.
 		;
-BBNameRoot:
+BBFullRoot:
 		.text 	"/"
-BBName:
-		.text 	format("GPC.RT.%03d.BIN", BuildNumber)
-BBNameEnd:
+BBFull:
+		.text 	format("GPC.RT.%03d.BIN", BuildNumber) 	; handlers AND core, loads at RTGPBASE
+BBFullEnd:
+BBCoreRoot:
+		.text 	"/"
+BBCore:
+		.text 	format("GPC.RC.%03d.BIN", BuildNumber) 	; core only, loads at RTBASE
+BBCoreEnd:
 BBErrText:
 		.text 	"?RT", 13, 0 				; brief -- a full line would wrap in 40 columns
+
+;		The per-program bytes. DATA, not immediates -- see the note at the warm check. The first
+;		three are written by WriteObjectCode as the template streams past; BBNameIdx is working
+;		state the bootstrap sets itself.
+BBWSStart:
+		.byte 	$FF 						; workspace start page -- PATCHED
+BBWSEnd:
+		.byte 	$FF 						; workspace end page (RTBASE or RTGPBASE) -- PATCHED
+BBNeedGP:
+		.byte 	$FF 						; 0 = no GPB keyword, 1 = uses them -- PATCHED
+BBNameIdx:
+		.byte 	0 							; which name triple (0 or 3), chosen at run time
 
 		.fill 	$0900 - *, 0 				; pad through $08FF so the p-code starts exactly at $0900
 
 		.here
 ProgramBootstrapEnd: 						; PHYSICAL end -- (End - Start) == 255 bytes ($0801..$08FF)
 
-BootWSPatchOffset = BootWS + 1 - $0801 		; offset of the WS_START operand within the streamed bytes
+BootWSPatchOffset = BBWSStart - $0801 		; offsets of the three per-program bytes within the
+BootWSEndPatchOffset = BBWSEnd - $0801 		; streamed template -- object.asm builds its patch
+BootGPPatchOffset = BBNeedGP - $0801 		; table from these three and nothing else.
 
 		.send code
 
@@ -651,6 +758,336 @@ cfJustCR: 									; ReadControlFile scratch: nonzero if the last byte was a CR
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;
+;		Name:		gpscan.asm
+;		Purpose:	Decide whether the compiled program uses any GP.BASIC handler.
+;		Created:	18th August 2026
+;
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		The GP handlers are the last thing in the runtime image, from GPBase to ObjectBase. If
+;		the program never reaches any of them the whole block can be left out of the object --
+;		see WriteObjectCode. This decides which.
+;
+;		IT ASKS THE QUESTION BY ADDRESS, NOT BY NAME OR BY TOKEN NUMBER. For each opcode in the
+;		finished p-code it reads that opcode's VectorTable slot and compares the handler address
+;		against GPBase. That is precisely the property being relied on -- "does this instruction
+;		jump into the bytes I am about to discard?" -- so it cannot drift: move a handler into
+;		or out of gp-runtime/ and this follows it with no list to update. A token-number range
+;		check would have needed the GP opcodes renumbered contiguously (an RT_ABI bump and a
+;		forced recompile of every shared-mode program), and a "keyword starts with GP." check
+;		would have been a naming convention pretending to be an invariant.
+;
+;		IT SCANS THE P-CODE RATHER THAN HOOKING THE EMITTER, which is what makes it total.
+;		Tokens reach the object from two places -- the generator's T action for most keywords,
+;		and hand-written X: helpers for the five that carry inline branch offsets (GP.EXITDO and
+;		the four GP.SELECT commands, which cannot use T at all). Hooking emission means hooking
+;		both, and means the next hand-written GP command silently opts itself out of the check.
+;		Reading the finished code has one site and no way to miss anything.
+;
+;		MoveObjectForward is what makes the walk safe: it steps by real instruction size, so an
+;		operand byte that happens to equal a GP opcode is never read as one. Same reason
+;		FixBranches uses it.
+;
+;		WHY IT LIVES IN THE APPLICATION and not beside FixBranches in compiler.library: it
+;		references VectorTable and GPBase, which are runtime symbols. compiler.library is linked
+;		WITHOUT the runtime by source/unit-tests/compiler-runtime, and putting this there would
+;		have broken that build with two undefined symbols.
+;
+; ************************************************************************************************
+
+		.section code
+
+; ************************************************************************************************
+;
+;		Set gpUsed nonzero if the object code at FreeMemory..objPtr reaches any handler at or
+;		above GPBase. Preserves objPtr.
+;
+; ************************************************************************************************
+
+ScanGPUsage:
+		stz 	gpUsed
+		lda 	objPtr 						; the walk destroys objPtr, and WriteObjectCode still
+		sta 	gpScanEnd 					; needs it as the end of the object code
+		lda 	objPtr+1
+		sta 	gpScanEnd+1
+		.set16 	objPtr,FreeMemory
+_GPSLoop:
+		lda 	(objPtr) 					; the opcode
+		cmp 	#$FF 						; the end marker, and it must be tested BEFORE the vector
+		beq 	_GPSDone 					; lookup: $FF indexes 127 entries past a 109 entry table
+		cmp 	#PCD_ENDSYSTEM+1 			; nothing above the last system token is a real opcode
+		bcs 	_GPSNext 					; (defensive -- the walk should never produce one)
+		cmp 	#PCD_STARTSYSTEM 			; $DB is .shift -- a two byte token, the one that
+		beq 	_GPSShifted 				; matters is the byte after it
+		cmp 	#PCD_STARTBINARY 			; below $80 is a variable or literal reference, which
+		bcc 	_GPSNext 					; has no vector slot at all
+		ldx 	#0 							; VectorTable, indexed from $80
+		bra 	_GPSCheck
+_GPSShifted:
+		ldy 	#1
+		lda 	(objPtr),y 					; the shifted token
+		ldx 	#1 							; ShiftVectorTable, indexed from $80 likewise
+_GPSCheck:
+		jsr 	_GPSHandlerHigh 			; A = high byte of this opcode's handler address
+		cmp 	#GPBase >> 8
+		bcc 	_GPSNext 					; below the cut, so it survives the truncation
+		lda 	#1
+		sta 	gpUsed
+		bra 	_GPSDone 					; one is enough -- nothing later can un-use it
+_GPSNext:
+		jsr 	MoveObjectForward
+		bcc 	_GPSLoop
+_GPSDone:
+		lda 	gpScanEnd 					; put objPtr back
+		sta 	objPtr
+		lda 	gpScanEnd+1
+		sta 	objPtr+1
+		rts
+
+;
+;		A = token ($80..$FF), X = 0 for VectorTable / 1 for ShiftVectorTable. Returns the HIGH
+;		byte of the handler address in A, which is all the comparison needs -- GPBase is page
+;		aligned, so a high-byte compare is exact rather than approximate.
+;
+_GPSHandlerHigh:
+		asl 	a 							; (token-$80)*2, and the -$80 falls out of the shift:
+		tay 								; $80..$FF doubled is $100..$1FE, and the carry out is
+		cpx 	#0 							; the +$100 we would otherwise subtract back off
+		bne 	_GPSHShifted
+		lda 	VectorTable+1,y
+		rts
+_GPSHShifted:
+		lda 	ShiftVectorTable+1,y
+		rts
+
+gpUsed: 									; nonzero if any GP handler is reachable. Code section,
+		.fill 	1 							; not storage -- it belongs to the compiler and is
+gpScanEnd: 									; thrown away with it, so it costs a compiled program
+		.fill 	2 							; nothing. See the note in file-io/read.asm.
+
+		.send code
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;
+; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		Name:		memreport.asm
+;		Purpose:	Report what the compiled program costs and what it has left.
+;		Created:	18th August 2026
+;
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		One line, printed after OK:
+;
+;			CODE 1234 FREE 20480 RT 12031 GP OUT
+;			CODE 1234 FREE 19200 RT SHARED
+;
+;		CODE	the p-code, FreeMemory..objPtr. What the program IS.
+;		FREE	what is left above it for variables, strings and arrays -- workspace start up to
+;				$9F00 embedded, or up to RTBASE in shared mode where the resident runtime sits on
+;				top. This is the number that actually runs out, and nothing printed it before:
+;				PROGRAM TOO BIG was the only feedback, and it arrives only once it is too late.
+;				It EXCLUDES the 4K frame stack gap, which is reserved, not available.
+;		RT		the runtime bytes carried in the object, or SHARED when there are none because
+;				the program loads GPC.RT.nnn.BIN instead.
+;		GP		embedded only -- OUT if the GP.BASIC handler block was dropped (gpscan.asm), IN
+;				if some keyword reached it and the whole runtime had to go in.
+;
+;		All three are computed here rather than stashed by WriteObjectCode: objPtr,
+;		newWorkspacePage and runtimeEndPage all survive it unchanged, and WriteMapFile touches
+;		none of them, so there is nothing to preserve and no second copy to fall out of step.
+;
+; ************************************************************************************************
+
+		.section code
+
+PrintMemoryReport:
+		;
+		;		CODE -- the p-code length.
+		;
+		ldx 	#CodeText & $FF
+		ldy 	#CodeText >> 8
+		jsr 	PrintMessage
+		sec
+		lda 	objPtr
+		sbc 	#FreeMemory & $FF
+		sta 	reportValue
+		lda 	objPtr+1
+		sbc 	#FreeMemory >> 8
+		sta 	reportValue+1
+		jsr 	PrintDecimal
+		;
+		;		FREE -- workspace start up to the ceiling, which differs by mode. Both ends are
+		;		page numbers, so the difference is the high byte of the answer and the low byte
+		;		is always zero.
+		;
+		ldx 	#FreeText & $FF
+		ldy 	#FreeText >> 8
+		jsr 	PrintMessage
+		lda 	#ObjectCeiling >> 8 		; embedded: the object grows up to the I/O page
+		ldx 	ModeText
+		cpx 	#'S'
+		bne 	_PMRCeiling
+		lda 	sharedCeilPage 				; shared: whichever runtime file this program will load --
+_PMRCeiling:								; RTBASE for the core only, RTGPBASE with the handlers
+		sec
+		sbc 	newWorkspacePage
+		sta 	reportValue+1
+		stz 	reportValue
+		jsr 	PrintDecimal
+		;
+		;		RT -- embedded runtime bytes, $0801 to the cut, or SHARED.
+		;
+		ldx 	#RTText & $FF
+		ldy 	#RTText >> 8
+		jsr 	PrintMessage
+		lda 	ModeText
+		cmp 	#'S'
+		bne 	_PMREmbedded
+		ldx 	#SharedText & $FF 			; "SHARED" then which of the two files it wants
+		ldy 	#SharedText >> 8
+		jsr 	PrintMessage
+		ldx 	#CoreText & $FF
+		ldy 	#CoreText >> 8
+		lda 	gpUsed
+		beq 	_PMRWhich
+		ldx 	#FullText & $FF
+		ldy 	#FullText >> 8
+_PMRWhich:
+		jsr 	PrintMessage
+		bra 	_PMRDone
+_PMREmbedded:
+		sec
+		lda 	#0 							; the runtime as written: cut - StartBasicProgram
+		sbc 	#StartBasicProgram & $FF
+		sta 	reportValue
+		lda 	runtimeEndPage
+		sbc 	#StartBasicProgram >> 8
+		sta 	reportValue+1
+		jsr 	PrintDecimal
+		;
+		;		GP -- and only here, because in shared mode the handlers are in the resident
+		;		runtime whatever this program does, so there is nothing to report.
+		;
+		ldx 	#GPOutText & $FF
+		ldy 	#GPOutText >> 8
+		lda 	gpUsed
+		beq 	_PMRGP
+		ldx 	#GPInText & $FF
+		ldy 	#GPInText >> 8
+_PMRGP:
+		jsr 	PrintMessage
+_PMRDone:
+		lda 	#13
+		jmp 	$FFD2
+
+; ************************************************************************************************
+;
+;		reportValue (16 bit) to the screen as decimal, leading zeros suppressed but always at
+;		least one digit. Subtract each power of ten as many times as it goes; the count is the
+;		digit. Same method as _WMFDecimal, which writes to the map FILE through IOWriteByte --
+;		this one goes to CHROUT. They are kept apart rather than sharing an indirect output
+;		vector: two tiny routines are easier to be sure of than one with a mode.
+;
+; ************************************************************************************************
+
+PrintDecimal:
+		stz 	reportLead 					; 0 while we are still dropping leading zeros
+		ldx 	#0
+_PDPow:
+		ldy 	#48 						; '0' + number of subtractions = the digit
+_PDSub:
+		sec
+		lda 	reportValue
+		sbc 	_PDPow10L,x
+		sta 	reportTemp
+		lda 	reportValue+1
+		sbc 	_PDPow10H,x
+		bcc 	_PDUnder 					; borrow -> this power no longer goes
+		sta 	reportValue+1
+		lda 	reportTemp
+		sta 	reportValue
+		iny
+		bra 	_PDSub
+_PDUnder:
+		cpy 	#48 						; a zero digit ...
+		bne 	_PDEmit
+		lda 	reportLead 					; ... is dropped while still leading
+		beq 	_PDNext
+_PDEmit:
+		lda 	#1
+		sta 	reportLead
+		phx
+		tya
+		jsr 	$FFD2 						; CHROUT makes no promise about X
+		plx
+_PDNext:
+		inx
+		cpx 	#4 							; 10000, 1000, 100, 10
+		bne 	_PDPow
+		lda 	reportValue 				; the units digit is always written
+		ora 	#48
+		jmp 	$FFD2
+
+_PDPow10L:
+		.byte 	<10000, <1000, <100, <10
+_PDPow10H:
+		.byte 	>10000, >1000, >100, >10
+
+;
+;		Uppercase throughout: the X16 boots in PETSCII upper/graphics, where lowercase bytes
+;		come out as graphics glyphs. Same reason bumpbuild.py emits 'V' not 'v'.
+;
+CodeText:
+		.text 	"CODE ",0
+FreeText:
+		.text 	" FREE ",0
+RTText:
+		.text 	" RT ",0
+SharedText:
+		.text 	"SHARED",0
+CoreText: 									; which resident runtime file this program will ask for
+		.text 	" RC",0 					; GPC.RC.nnn.BIN -- core only, no GPB handlers
+FullText:
+		.text 	" RT",0 					; GPC.RT.nnn.BIN -- handlers and core
+GPOutText:
+		.text 	" GP OUT",0
+GPInText:
+		.text 	" GP IN",0
+
+reportValue: 								; code section, not storage -- these belong to the
+		.fill 	2 							; compiler and are thrown away when the object is
+reportTemp: 								; written, so they cost a compiled program nothing.
+		.fill 	2 							; See the note in file-io/read.asm.
+reportLead:
+		.fill 	1
+
+		.send code
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;
+; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
 ;		Name:		object.asm
 ;		Purpose:	Write object code out.
 ;		Created:	9th October 2023
@@ -702,6 +1139,20 @@ WriteObjectCode:
 		jmp 	_WOCShared 					; jmp, not a branch -- the embedded path is >127 bytes
 _WOCEmbedded:
 		jsr 	PatchOutCompile 			; makes it run the runtime on reload
+		jsr 	ScanGPUsage 				; does anything reach a handler above GPBase ?
+		;
+		;		The cut. A program using no GP.BASIC keyword takes the runtime as $0801..GPBase
+		;		and puts its object code there; one that uses any takes the whole thing,
+		;		$0801..ObjectBase, exactly as before. Both labels are page aligned, so a single
+		;		page number says which -- and it is used THREE times below (the copy terminator,
+		;		the RunCodePage patch and the workspace base), so it is settled once, here.
+		;
+		lda 	#GPBase >> 8
+		ldx 	gpUsed
+		beq 	_WOCCutSet
+		lda 	#ObjectBase >> 8
+_WOCCutSet:
+		sta 	runtimeEndPage
 		;
 		;		zTemp1 = length of the object code.
 		;
@@ -734,7 +1185,7 @@ _WOCWholePages:
 		;		tests, in the same order, as _WOCShared.
 		;
 		clc
-		lda 	#ObjectBase >> 8
+		lda 	runtimeEndPage 				; where the object code will actually land
 		adc 	zTemp1+1
 		bcs 	_WOCTooBig
 		adc 	#FrameStackPages
@@ -766,7 +1217,7 @@ _WOCRuntime:
 		lda 	zTemp0
 		cmp 	#(RunCodePage+1) & $FF
 		bne 	_WOCNotCodePage
-		lda 	#ObjectBase >> 8 			; object code moves down to here
+		lda 	runtimeEndPage 				; object code moves down to here
 		bra 	_WOCEmit
 _WOCNotCodePage:
 		lda 	zTemp0+1 					; the workspace page operand ?
@@ -785,11 +1236,10 @@ _WOCEmit:
 		bne 	_WOCSkip1
 		inc 	zTemp0+1
 _WOCSkip1:
-		lda 	zTemp0+1 					; until we reach ObjectBase (page aligned)
-		cmp 	#ObjectBase >> 8
+		lda 	zTemp0+1 					; until we reach the cut (both candidates are page
+		cmp 	runtimeEndPage 				; aligned, so the low byte is always zero there)
 		bne 	_WOCRuntime
 		lda 	zTemp0
-		cmp 	#ObjectBase & $FF
 		bne 	_WOCRuntime
 		;
 		;		Part two : the object code itself, which lands at ObjectBase on reload.
@@ -842,15 +1292,47 @@ _WOCSWhole:
 		;		WS_START = PCODE_PAGE + pages(p-code) + the frame-stack gap. Reject if that leaves
 		;		fewer than MIN_WS_PAGES below RTBASE, or if the page count itself overflowed a byte.
 		;
+		jsr 	ScanGPUsage 				; the shared runtime is two files now -- see below
+		;
+		;		The workspace ends where the resident runtime starts, and that is no longer one
+		;		address: a program using no GPB keyword loads the CORE-ONLY file at RTBASE and keeps
+		;		everything below it, one using GPB loads the full file at RTGPBASE and stops there.
+		;		2,560 bytes between them, so it is worth knowing which.
+		;
+		lda 	#RTBASE >> 8
+		ldx 	gpUsed
+		beq 	_WOCSCeiling
+		lda 	#RTGPBASE >> 8
+_WOCSCeiling:
+		sta 	sharedCeilPage
 		clc
 		lda 	#PCODE_PAGE
 		adc 	zTemp1+1
-		bcs 	_WOCSBig
+		bcs 	_WOCSBigFar
 		adc 	#FrameStackPages
-		bcs 	_WOCSBig
+		bcs 	_WOCSBigFar
 		sta 	newWorkspacePage 			; reuse this byte to carry WS_START
-		cmp 	#(RTBASE >> 8) - MIN_WS_PAGES + 1
-		bcs 	_WOCSBig
+		;
+		;		Reject unless MIN_WS_PAGES still fit below the ceiling. Computed as a THRESHOLD and
+		;		compared, rather than subtracting the ceiling from the start page: the subtraction
+		;		underflows when the p-code has already run past the ceiling, and an underflow reads as
+		;		a small positive gap -- i.e. it accepts exactly the programs it exists to reject.
+		;
+		lda 	sharedCeilPage
+		sec
+		sbc 	#MIN_WS_PAGES - 1 			; the highest start page that still leaves a workspace
+		sta 	zTemp1 						; (the low byte is spent -- only zTemp1+1 is still live)
+		lda 	newWorkspacePage
+		cmp 	zTemp1
+		bcs 	_WOCSBigFar
+		bra 	_WOCSFits
+;
+;		_WOCSBig is at the far end of this file, out of branch range from here -- the same
+;		trampoline FixBranches needs for its GP.EXITDO handler, for the same reason.
+;
+_WOCSBigFar:
+		jmp 	_WOCSBig
+_WOCSFits:
 		;
 		;		Header: a normal PRG loading at $0801 -- the bootstrap sits there.
 		;
@@ -862,20 +1344,46 @@ _WOCSWhole:
 		lda 	#8
 		jsr 	IOWriteByte
 		;
-		;		Part one: the bootstrap, ProgramBootstrap..ProgramBootstrapEnd, patching the single
-		;		WS_START operand byte as it streams past.
+		;		Part one: the bootstrap, ProgramBootstrap..ProgramBootstrapEnd, patching three operand
+		;		bytes as they stream past. Build the table first -- the addresses are constants but all
+		;		three VALUES are per-program, so it cannot be static data.
 		;
+		.set16 	BootPatchTable, ProgramBootstrap+BootWSPatchOffset
+		lda 	newWorkspacePage 			; where this program's workspace starts
+		sta 	BootPatchTable+2
+		.set16 	BootPatchTable+3, ProgramBootstrap+BootWSEndPatchOffset
+		lda 	sharedCeilPage 				; ... and where it ends: RTBASE or RTGPBASE
+		sta 	BootPatchTable+5
+		.set16 	BootPatchTable+6, ProgramBootstrap+BootGPPatchOffset
+		lda 	gpUsed 						; ... and whether the handlers have to come with it
+		beq 	_WOCSFlag
+		lda 	#1 							; normalise: the bootstrap tests it with BEQ
+_WOCSFlag:
+		sta 	BootPatchTable+8
 		.set16 	zTemp0,ProgramBootstrap
 _WOCSBoot:
+		;
+		;		THREE patched bytes now, not one, so the loop asks a table rather than growing a third
+		;		copy of the same compare. Each entry is (address lo, hi, value): workspace START page,
+		;		workspace END page -- which is the runtime base this program will use -- and the flag
+		;		saying whether it needs the GPB handlers at all.
+		;
+		ldx 	#0
+_WOCSBootPatch:
 		lda 	zTemp0
-		cmp 	#<(ProgramBootstrap+BootWSPatchOffset)
-		bne 	_WOCSBootPlain
+		cmp 	BootPatchTable,x
+		bne 	_WOCSBootNext
 		lda 	zTemp0+1
-		cmp 	#>(ProgramBootstrap+BootWSPatchOffset)
-		bne 	_WOCSBootPlain
-		lda 	newWorkspacePage 			; substitute the WS_START operand
+		cmp 	BootPatchTable+1,x
+		bne 	_WOCSBootNext
+		lda 	BootPatchTable+2,x 			; the byte to substitute
 		bra 	_WOCSBootEmit
-_WOCSBootPlain:
+_WOCSBootNext:
+		inx
+		inx
+		inx
+		cpx 	#BootPatchEnd-BootPatchTable
+		bne 	_WOCSBootPatch
 		lda 	(zTemp0)
 _WOCSBootEmit:
 		jsr 	IOWriteByte
@@ -1084,6 +1592,13 @@ _WMFPow10L:
 _WMFPow10H:
 		.byte 	>10000, >1000, >100, >10
 
+BootPatchTable: 							; three (addr lo, addr hi, value) triples, built per program
+		.fill 	9 							; by the shared path just above -- see the note there.
+BootPatchEnd:
+sharedCeilPage: 							; page the shared workspace stops at: RTBASE normally,
+		.fill 	1 							; RTGPBASE when the GPB handlers sit below it.
+runtimeEndPage: 							; first page ABOVE the runtime as written out: GPBase if the
+		.fill 	1 							; GP block was dropped, ObjectBase if it was kept.
 newWorkspacePage: 							; first page of workspace in the saved file. In the code
 		.fill 	1 							; section, not storage -- see the note in
 											; file-io/read.asm.
@@ -1295,7 +1810,9 @@ CompileCode:
 		jsr 	$FFD2 						; caller can tell a compile that worked from one that
 		lda 	#"K" 						; stopped on an error, so it stays.
 		jsr 	$FFD2
-		rts
+		lda 	#' '
+		jsr 	$FFD2
+		jmp 	PrintMemoryReport 			; ... and what it cost -- see compiler/memreport.asm
 
 _CCRejected: 								; WriteObjectCode set carry (e.g. PROGRAM TOO BIG); it has
 		rts 								; already printed why, so stop -- no map file, no OK.
@@ -1365,10 +1882,10 @@ APIDesc:
 ;
 ;	This file is automatically generated by scripts/bumpbuild.py
 ;
-BuildNumber = 161
+BuildNumber = 120
 		.section code
 VersionText:
-		.text	'V0.9.161',13,0
+		.text	'V1.0.0',13,0
 		.send code
 ; ************************************************************************************************
 ; ************************************************************************************************

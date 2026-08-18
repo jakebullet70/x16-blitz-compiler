@@ -1,0 +1,41 @@
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		Name:		00rtgp.header
+;		Purpose:	First byte of the shared runtime image -- opens the GPB handler block.
+;		Created:	18th August 2026
+;
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		Linked FIRST in the "gpc-rt" target, with -D CodeStart set to RTGPBASE, so the image
+;		assembles up from there. It carries no magic of its own: RTGPMAGIC lives at the TOP of
+;		this block, immediately below RTBASE (05rtcore.divider), because that is the address a
+;		core-only program's workspace runs over and therefore the address that tells the truth
+;		about whether the handlers are still there.
+;
+;		So this file exists only to be the anchor -- it fixes the load address of the full file
+;		and gives the block a name. gp.library's own 00gpbase.asm follows it and aligns GPBase to
+;		a page, which is free here because RTGPBASE already is one.
+;
+;		Same non-.asm naming reason as 00rt.header.
+;
+; ************************************************************************************************
+
+		.section code
+
+RTGPHeaderStart:
+		.cerror RTGPHeaderStart != RTGPBASE, "GPB block not at RTGPBASE - check -D CodeStart vs RTGPBASE"
+
+		.send code
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;
+; ************************************************************************************************
