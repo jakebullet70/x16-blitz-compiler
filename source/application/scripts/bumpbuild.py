@@ -2,34 +2,41 @@
 # *******************************************************************************************
 #
 #		Name : 		bumpbuild.py
-#		Purpose :	Bump the engine's build number, generate source/generated/version.asm
+#		Purpose :	Generate source/generated/version.asm from the two version stamps
 #		Date :		30th July 2026
 #
 # *******************************************************************************************
 # *******************************************************************************************
 #
-#		The build number belongs to the ENGINE (GPC.BLITZ.BIN), because the engine is the part
-#		that actually compiles and therefore the part you need to identify. It used to live in
-#		the front end -- VERSION$ in GPC.BASL -- and bumped only when the FRONT END was
-#		rebuilt, so it never moved when the compiler itself changed. That made it useless for
-#		the one question a build number exists to answer: "am I running my fix?"
+#		TWO STAMPS, because they answer two different questions.
 #
-#		buildnum.txt holds the whole version, MAJOR.MINOR.BUILD. The last component bumps on
-#		every engine build; change MAJOR.MINOR by hand when cutting a release. release.sh
-#		reads the same file to name the release zip, so there is still exactly one source of
-#		truth -- it has just moved from the front end to the engine.
+#			buildnum.txt   the PRODUCT VERSION, e.g. "1.0.0". Printed by GPC.BLITZ.BIN as
+#			               V1.0.0 and used by release.sh to name the release zip. Changed by
+#			               hand when a release is cut, and by nothing else.
 #
-#		TWO MODES, because the number must advance exactly once per build:
+#			rtbuild.txt    the RUNTIME BUILD NUMBER, e.g. 120. This is the nnn in
+#			               GPC.RT.nnn.BIN -- the shared runtime's file name, which
+#			               bootstrap.asm formats from the BuildNumber symbol below and
+#			               rtname.py formats from the same file. STATIC, on purpose.
 #
-#			bumpbuild.py --bump	 increment buildnum.txt, then write version.asm
-#			bumpbuild.py		 write version.asm from buildnum.txt (no increment)
+#		WHY THEY ARE SEPARATE, AND WHY NOTHING BUMPS ANY MORE. The build number used to be the
+#		last component of buildnum.txt and incremented on EVERY engine build. That answered
+#		"am I running my fix?" nicely, and broke the shared runtime: the runtime's file name
+#		carries the number, so every rebuild produced a differently-named GPC.RT file and every
+#		program compiled against the old name stopped finding its runtime. A project consuming
+#		GPC in shared mode -- which is what the game does -- needs that name to hold still.
 #
-#		source/application is built more than once per build -- source/Makefile enters it from
-#		both `libraries` and `release`, and build.sh then runs `make release` again on top -- so
-#		bumping in the application's own prelim counted one build as three. The bump therefore
-#		happens once, at the top of source/Makefile's `libraries`; every other entry only
-#		regenerates version.asm, which is idempotent. A release ships the number it was built
-#		with rather than inventing a new one.
+#		So the number is pinned and edited deliberately. Move it only when a shared-mode
+#		program must be forced to pick up a new runtime, and remember that every such program
+#		has to be recompiled: the name is baked into each object by bootstrap.asm.
+#
+#		This is NOT the ABI ordinal. RT_ABI (common.inc) is that, in the 4-byte magic at
+#		RTBASE, and answers the different question of whether an already-resident runtime can
+#		safely be entered. The file name says WHICH runtime; the magic says whether it FITS.
+#
+#		--bump is still accepted and does nothing but say so, because release.sh and
+#		source/Makefile have carried the flag through several revisions and a hard error here
+#		would fail a build over a no-op.
 #
 # *******************************************************************************************
 
@@ -37,7 +44,8 @@ import os, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 APP = os.path.dirname(HERE)								# source/application
-STAMP = os.path.join(APP, "buildnum.txt")
+STAMP = os.path.join(APP, "buildnum.txt")				# product version, e.g. 1.0.0
+RTSTAMP = os.path.join(APP, "rtbuild.txt")				# runtime build number, e.g. 120
 GENDIR = os.path.join(APP, "source", "generated")
 OUT = os.path.join(GENDIR, "version.asm")
 
@@ -46,21 +54,24 @@ def die(msg):
 	sys.exit("  bumpbuild: FAIL -- " + msg)
 
 
+def read(path, what):
+	if not os.path.isfile(path):
+		die("%s is missing -- it holds the %s and is tracked in git" % (path, what))
+	return open(path, encoding="utf-8").read().strip()
+
+
 def main():
-	if not os.path.isfile(STAMP):
-		die("%s is missing -- it holds the engine version and is tracked in git" % STAMP)
+	version = read(STAMP, "product version")
+	build = read(RTSTAMP, "runtime build number")
 
-	version = open(STAMP, encoding="utf-8").read().strip()
-	parts = version.split(".")
-	if not parts[-1].isdigit():
-		die('buildnum.txt = "%s": last component is not a number -- cannot use it' % version)
+	if not build.isdigit():
+		die('rtbuild.txt = "%s": not a number -- it names GPC.RT.nnn.BIN' % build)
+	build = int(build)
+	if not 0 <= build <= 999:
+		die("rtbuild.txt = %d: bootstrap.asm formats it as %%03d, so it must be 0..999" % build)
 
-	bump = "--bump" in sys.argv[1:]
-	if bump:
-		parts[-1] = str(int(parts[-1]) + 1)
-		version = ".".join(parts)
-		with open(STAMP, "w", encoding="utf-8", newline="\n") as h:
-			h.write(version + "\n")
+	if "--bump" in sys.argv[1:]:
+		print("  bumpbuild: --bump ignored -- both stamps are edited by hand now (see header)")
 
 	#
 	#		Create the directory rather than tracking it: git cannot track an empty one, and a
@@ -73,15 +84,8 @@ def main():
 	#		Uppercase 'V' deliberately: the X16 screen boots in PETSCII upper/graphics, where
 	#		lowercase bytes come out as graphics glyphs rather than letters.
 	#
+	#		BuildNumber is emitted outside the code section: it is a symbol, not bytes.
 	#
-	#		BuildNumber is the last dotted component as a NUMBER, not text. bootstrap.asm
-	#		formats it into the resident runtime's file name (GPC.RT.<build>.BIN), so the
-	#		name a compiled program looks for and the name rtname.py builds the runtime as
-	#		both come from this one stamp. It is emitted outside the code section: it is a
-	#		symbol, not bytes.
-	#
-	build = int(parts[-1])
-
 	with open(OUT, "w", encoding="utf-8", newline="\n") as h:
 		h.write(";\n;\tThis file is automatically generated by scripts/bumpbuild.py\n;\n")
 		h.write("BuildNumber = %d\n" % build)
@@ -90,7 +94,7 @@ def main():
 		h.write("\t\t.text\t'V%s',13,0\n" % version)
 		h.write("\t\t.send code\n")
 
-	print("  bumpbuild: engine build %s%s" % (version, " (bumped)" if bump else ""))
+	print("  bumpbuild: GPC V%s, runtime build %03d (GPC.RT.%03d.BIN)" % (version, build, build))
 
 
 main()
