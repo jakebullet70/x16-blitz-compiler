@@ -1,0 +1,36 @@
+## BMX paint speed, both paths through BMX.PAINT.
+##
+##   A   CANDLE.BMX    320x240 -- full width, takes the ONE BLOCK path
+##   B   BEARDGUY.BMX  240x240 -- narrower, so it is centred a row at a
+##                     time, and this is the check that that path still
+##                     works and still centres
+##
+## A was 93 jiffies before the block path and is 19 after.
+#INCLUDE "GP.INC.BL"
+#INCLUDE "BMX.INC.BL"
+#SAVEAS "@:BMXSPD.PRG"
+
+#DEFINE SCRMODE $FF5F
+
+BMX.FILE$ = "CANDLE.BMX"
+GP.CALL SCRMODE, 128, 0, 0, 0
+TA = TI
+GOSUB BMX.SHOW
+TAA = TI - TA
+EA$ = BMX.ERROR$
+WA = BMX.WIDTH
+
+BMX.FILE$ = "BEARDGUY.BMX"
+GP.CALL SCRMODE, 128, 0, 0, 0
+TB = TI
+GOSUB BMX.SHOW
+TBB = TI - TB
+EB$ = BMX.ERROR$
+WB = BMX.WIDTH
+XB = BMX.X0
+
+GP.CALL SCRMODE, 0, 0, 0, 0
+PRINT "A CANDLE   W";WA;" ONE BLOCK ";TAA;" JIFFIES [";EA$;"]"
+PRINT "B BEARDGUY W";WB;" X0";XB;" ROWS ";TBB;" JIFFIES [";EB$;"]"
+PRINT "@DONE@"
+POWEROFF

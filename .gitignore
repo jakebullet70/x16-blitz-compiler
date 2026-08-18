@@ -134,6 +134,7 @@ testing/SPLITT.PRG
 testing/STRINGS.PRG
 testing/SCREEN.PRG
 testing/MENU.PRG
+testing/BMXSPD.PRG
 testing/MENUTST.PRG
 testing/MENUDEMO.PRG
 testing/SELECT.PRG
@@ -162,10 +163,18 @@ testing/MD5FIX.DAT
 testing/MD5DRV.TXT
 testing/MD5*.LOG
 
-# testing/samples/ is a build artifact: the root-level samples/ tree is the tracked
+# testing/samples/
+
+# BMX images staged into testing/ by hand to run a viewer or the paint benchmark.
+# The masters are in samples/BMXVIEWER/SAMPLES; these are copies.
+testing/*.BMX is a build artifact: the root-level samples/ tree is the tracked
 # master, mirrored here by `make samples` so the samples are runnable in the emulator
 # and ship in the release zip. Ignore the mirror; edit samples/ instead.
 testing/samples/
+
+# BMX images staged into testing/ by hand to run a viewer or the paint benchmark.
+# The masters are in samples/BMXVIEWER/SAMPLES; these are copies.
+testing/*.BMX
 
 # The packaged release zip -- built by release.sh / release.bat into the release/ drop
 # folder as gpc-release-<n>.zip. Build artifact (matches in any folder), not committed.

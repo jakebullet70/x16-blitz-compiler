@@ -125,9 +125,13 @@ BMX.OPEN:
 ## **
 ## **  The screen mode must ALREADY be set (see the note at the top).
 ## **
-## **  The image goes in a row at a time, which costs four pokes a row for
-## **  a full screen and buys centring of any size -- no framebuffer cursor
-## **  calls, and no special case for 320 wide.
+## **  A FULL WIDTH image goes in as ONE block -- the framebuffer is linear,
+## **  so 320 wide rows at x=0 are contiguous however tall the picture is.
+## **  Anything narrower goes in a row at a time, four pokes a row, which is
+## **  what buys centring of any size with no framebuffer cursor calls.
+## **
+## **  That split is worth five times the speed on a full screen: 19 jiffies
+## **  against 93 for a 320x240x8 file. See the note at the branch below.
 ## ***********************************************************************
 
 BMX.PAINT:
@@ -150,6 +154,34 @@ BMX.PAINT:
     BMX.ROWS = BMX.HEIGHT
     IF BMX.ROWS > 240 THEN BMX.ROWS = 240
 
+## ---- A FULL WIDTH IMAGE IS ONE BLOCK, and taking it as one is worth five
+## ---- times the speed. The 320x240x8 framebuffer is linear -- row n is at
+## ---- exactly n*320 -- so rows that are 320 wide and start at x=0 run
+## ---- together with no gap, whatever y they start at. Set the address
+## ---- once and stream the lot.
+## ----
+## ---- MEASURED on CANDLE.BMX, 320x240x8, 76,800 bytes: 93 jiffies row by
+## ---- row against 19 as one block. The bytes are not the cost -- 0.32s of
+## ---- that is MACPTR actually moving them, and the other 1.23s was 240
+## ---- times (a float multiply, BMX.SPLIT's two divides, four POKEs) plus
+## ---- the second MACPTR call every row, because 320 is 255 + 65 and the
+## ---- tail call moves a quarter of a chunk for a whole call's overhead.
+## ----
+## ---- Narrower or centred images still go a row at a time. That path is
+## ---- unchanged and is what buys centring of any size.
+
+    BMX.ONEBLOCK = 0
+    IF BMX.WIDTH = 320 THEN BMX.ONEBLOCK = 1
+    IF BMX.X0 <> 0 THEN BMX.ONEBLOCK = 0
+    IF BMX.ONEBLOCK = 0 THEN GOTO BMX.PAINT.ROWS
+
+    BMX.ADDR = BMX.Y0 * 320
+    GOSUB BMX.VERA
+    BMX.COUNT = BMX.WIDTH * BMX.ROWS
+    GOSUB BMX.STREAM
+    GOTO BMX.PAINT.END
+
+BMX.PAINT.ROWS:
     FOR BMX.ROW = 0 TO BMX.ROWS - 1
         BMX.ADDR = (BMX.Y0 + BMX.ROW) * 320 + BMX.X0
         GOSUB BMX.VERA
