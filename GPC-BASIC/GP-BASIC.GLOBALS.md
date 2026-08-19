@@ -176,6 +176,11 @@ internal, and a `GOSUB` to one will do something, just not something useful.
 `MENUHELP.WAIT`, `.KEYED`, `.SETTLE`, `.WRAPTOP`, `.WRAPBOT`, `.CANCEL`, `.HOTKEY`, `.PADKEY`,
 `.PADREAD` and the three `FOLD` helpers are not.
 
+`STRHELP` has two of its own, both loop continuations rather than entry points:
+**`STRHELP.SPLIT.NEXT`** and **`STRHELP.REPLACE.NEXT`**. Enter either one directly and you resume a
+loop whose accumulators were never initialised. The callable names are `STRHELP.PADR`, `PADL`,
+`PADC`, `SPLIT`, `REPLACE` and `PET2SCR`.
+
 Each module also has a skip label it jumps over itself with — `THEME.SKIP`, `APPHELP.SKIP`,
 `STRHELP.SKIP`, `BMX.MODULE.END`, `INPHELP.MODULE.END`, `MENUHELP.MODULE.END`. Those exist so an
 include can sit anywhere in the file, the top included. **Do not branch to one.**

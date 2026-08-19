@@ -35,9 +35,12 @@ Then it is BASLOAD and GPC as usual: `BASLOAD "MYPROG.BL"` to turn the source in
 | --- | --- | --- |
 | **Core** | `GP.*` commands the **compiler** knows. Machine code in the runtime | runtime bytes, in every program that uses any of them |
 | **Extensions** | `XXX.INC.BL` modules written in **BASIC**, called with `GOSUB` | nothing unless you `#INCLUDE` them |
+| **Composite** | `GP.*` commands the compiler knows that have **no machine code at all** — it expands them into commands that already exist | **nothing**, ever |
 
 A thing belongs in the core when it is a bulk move or a tight loop — something BASIC is genuinely
-bad at. It belongs in an extension when it waits on a human, or is layout, or is data. `GP.MENU`
+bad at. It belongs in an extension when it waits on a human, or is layout, or is data. It is a
+composite when it is only a **rename** of something the compiler can already say — those are free,
+so use them without thinking about it. `GP.MENU`
 and `GP.SEL` **used to be core keywords and are now the `MENUHELP` extension**, because a menu
 spends all its time waiting for a keypress: the assembly bought nothing a person could see, and cost
 every GPB program 473 bytes whether it had a menu or not.
@@ -54,6 +57,8 @@ All of it needs `#INCLUDE "GP.INC.BL"`, and nothing else.
 | Loops | `GP.DO` `GP.LOOP` `GP.EXITDO` | `LOOPS.EXP.BL` |
 | Multi-way branch | `GP.SELECT` `GP.CASE` `GP.ELSE` `GP.ENDSEL` | `SELECT.EXP.BL` |
 | Strings | `GP.INSTR` `GP.STRPTR` `GP.COMP` `GP.TRIM` `GP.LTRIM` `GP.RTRIM` `GP.UPPER` `GP.LOWER` | `STRINGS.EXP.BL` |
+| Strings, composite | `GP.CONTAINS` `GP.ISEMPTY` — free | `STRINGS.EXP.BL` |
+| Addresses, composite | `GP.HIBYTE` `GP.LOBYTE` — free; split an address for `GP.CALL` | `ARRAYS.EXP.BL` |
 | Arrays | `GP.SORT` `GP.ARRPTR` | `ARRAYS.EXP.BL` |
 | Drawing | `GP.BOX` `GP.FILL` `GP.PRINTAT` | `SCREEN.EXP.BL` |
 | Screen save | `GP.STASH` `GP.RESTR` — a rectangle to a RAM bank and back | `SCREEN.EXP.BL` |
@@ -63,7 +68,7 @@ All of it needs `#INCLUDE "GP.INC.BL"`, and nothing else.
 
 | Module | What it gives you | Example |
 | --- | --- | --- |
-| `STRHELP.INC.BL` | padding and splitting: `STRHELP.PADR`/`PADL`/`PADC`/`SPLIT` | `SPLITT.EXP.BL` |
+| `STRHELP.INC.BL` | strings: `PADR`/`PADL`/`PADC` pad, `SPLIT` on a delimiter, `REPLACE` every occurrence, `PET2SCR` | `SPLITT.EXP.BL` `STRINGS.EXP.BL` |
 | `THEME.INC.BL` | named colour roles, light and dark, so re-skinning is one variable | `MENU.EXP.BL` |
 | `APPHELP.INC.BL` | leave the screen as you found it, and **panels to and from disk** | `MENU.EXP.BL` |
 | `INPHELP.INC.BL` | a positioned, length-limited entry field — what `INPUT` cannot do on a drawn screen | `FORM.EXP.BL` |

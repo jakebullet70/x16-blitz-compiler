@@ -557,6 +557,13 @@ address from `GP.STRPTR` on a literal is read-only.
 
 **Split stays in BASL** — it composes from `GP.INSTR` + `MID$` and does not earn ASM bytes.
 
+**Replace stays in BASL too, and for a second reason on top of that one** (19/08/26, shipped as
+`STRHELP.REPLACE`). It composes the same way — `GP.INSTR` + `LEFT$` + `MID$` + `+` — but it also
+lands on the wrong side of the rule above: a replacement longer than what it replaces **grows** the
+string, and an in-place ASM handler can never grow one. It is `GP.PAD`'s problem exactly, so it was
+never a candidate for a keyword. Building a new string rather than editing in place is what makes
+`"A"` → `"AA"` terminate as well, since nothing already emitted is ever re-scanned.
+
 ### §4 Sorting — 1 token
 
 | Command | Form |
