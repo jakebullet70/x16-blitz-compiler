@@ -1,0 +1,128 @@
+## BMX.KEEP / BMX.RESTORE -- does the palette really go into spare VRAM
+## and come back, and does it get there in ONE KERNAL call?
+##
+## BMX.PAINT writes the picture's colours over the machine's, and nothing
+## on the X16 puts them back by itself -- neither SCREEN nor screen_mode
+## restores a palette. So BMX.PAINT stashes all 256 entries first and
+## BMX.RESTORE writes them back, both as a single memory_copy: VERA's two
+## address ports aimed at the palette and at the stash, source $9F23 and
+## target $9F24, neither stepped by the KERNAL because both are in
+## $9F00-$9FFF. The KERNAL chapter names that use outright; this is the
+## check that the machine agrees.
+##
+## FIVE THINGS, and the middle ones are the point:
+##
+##   A  the stash HOLDS the palette, byte for byte and IN ORDER. A source
+##      that got stepped would read I/O space; a target VERA did not walk
+##      would leave 512 copies of one byte. Comparing element by element
+##      catches both, where a checksum might not.
+##   B  THE SCRIBBLE TOOK. Every byte is overwritten with 255 minus
+##      itself, which cannot equal the original for any byte value, so the
+##      disturbed count must be 512 exactly. Without this, two copies that
+##      both quietly did nothing would leave the before and after
+##      palettes agreeing and the test would pass having proved nothing.
+##   C  the restore is byte exact, all 512.
+##   D  a second BMX.RESTORE is harmless -- a caller that does not know
+##      whether its picture ever loaded must be able to call it anyway.
+##   E  the REAL path: a genuine picture through BMX.SHOW, which calls
+##      BMX.KEEP itself, then one BMX.RESTORE. A..D drive the two halves
+##      by hand; this drives nothing but a filename, which is the whole
+##      claim being made for the interface.
+##
+## Measured 2026-08-19: PASS on all five. The stash took 512 of 512 in
+## order, the scribble disturbed 512, the restore was exact, and painting
+## BEARDGUY.BMX moved a majority of the palette which one call put back.
+#INCLUDE "GP.INC.BL"
+#INCLUDE "BMX.INC.BL"
+#SAVEAS "@:BMXPAL.PRG"
+
+#DEFINE SCRMODE $FF5F
+
+## The whole palette: 256 entries of 2 bytes at VRAM $1:FA00.
+#DEFINE PALBYTES 512
+#DEFINE PALBASE $FA00
+
+## BMX.STASH's default, $13000, as the offset VPEEK wants in bank 1.
+#DEFINE STASHOFF $3000
+
+DIM WAS%(PALBYTES), GOT%(PALBYTES)
+NDX = 0 : BAD = 0 : HIT = 0 : PICHIT = 0 : PICBAD = 0
+
+## ---- A. the palette as the ROM left it, then keep it
+
+FOR NDX = 0 TO PALBYTES - 1
+    WAS%(NDX) = VPEEK(1, PALBASE + NDX)
+NEXT
+
+TK = TI
+GOSUB BMX.KEEP
+TKK = TI - TK
+EK$ = BMX.ERROR$
+
+BAD = 0
+FOR NDX = 0 TO PALBYTES - 1
+    GOT%(NDX) = VPEEK(1, STASHOFF + NDX)
+    IF GOT%(NDX) <> WAS%(NDX) THEN BAD = BAD + 1
+NEXT
+STASHBAD = BAD
+
+## ---- B. scribble, and prove the scribble landed
+
+FOR NDX = 0 TO PALBYTES - 1
+    VPOKE 1, PALBASE + NDX, 255 - WAS%(NDX)
+NEXT
+
+HIT = 0
+FOR NDX = 0 TO PALBYTES - 1
+    IF VPEEK(1, PALBASE + NDX) <> WAS%(NDX) THEN HIT = HIT + 1
+NEXT
+
+## ---- C. put it back
+
+TR = TI
+GOSUB BMX.RESTORE
+TRR = TI - TR
+
+BAD = 0
+FOR NDX = 0 TO PALBYTES - 1
+    IF VPEEK(1, PALBASE + NDX) <> WAS%(NDX) THEN BAD = BAD + 1
+NEXT
+PUTBAD = BAD
+
+## ---- D. a second restore must do nothing at all
+
+GOSUB BMX.RESTORE
+BAD = 0
+FOR NDX = 0 TO PALBYTES - 1
+    IF VPEEK(1, PALBASE + NDX) <> WAS%(NDX) THEN BAD = BAD + 1
+NEXT
+TWICEBAD = BAD
+
+## ---- E. the real path, through BMX.SHOW
+
+GP.CALL SCRMODE, 128, 0, 0, 0
+BMX.FILE$ = "BEARDGUY.BMX"
+GOSUB BMX.SHOW
+EP$ = BMX.ERROR$
+
+PICHIT = 0
+FOR NDX = 0 TO PALBYTES - 1
+    IF VPEEK(1, PALBASE + NDX) <> WAS%(NDX) THEN PICHIT = PICHIT + 1
+NEXT
+
+GOSUB BMX.RESTORE
+PICBAD = 0
+FOR NDX = 0 TO PALBYTES - 1
+    IF VPEEK(1, PALBASE + NDX) <> WAS%(NDX) THEN PICBAD = PICBAD + 1
+NEXT
+
+GP.CALL SCRMODE, 0, 0, 0, 0
+PRINT "A STASH WRONG ";STASHBAD;" EXPECT 0   [";EK$;"]"
+PRINT "B SCRIBBLE HIT";HIT;" EXPECT";PALBYTES
+PRINT "C RESTORE BAD ";PUTBAD;" EXPECT 0"
+PRINT "D TWICE BAD   ";TWICEBAD;" EXPECT 0"
+PRINT "E PICTURE MOVED";PICHIT;" EXPECT >0  [";EP$;"]"
+PRINT "  AFTER RESTORE";PICBAD;" EXPECT 0"
+PRINT "  KEEP";TKK;" JIFFIES  RESTORE";TRR;" JIFFIES"
+PRINT "@DONE@"
+POWEROFF

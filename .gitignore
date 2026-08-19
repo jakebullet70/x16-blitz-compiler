@@ -135,6 +135,7 @@ testing/STRINGS.PRG
 testing/SCREEN.PRG
 testing/MENU.PRG
 testing/BMXSPD.PRG
+testing/BMXPAL.PRG
 testing/MENUTST.PRG
 testing/MENUDEMO.PRG
 testing/SELECT.PRG

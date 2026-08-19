@@ -6,6 +6,7 @@
 ## **      BMX.PAINT   palette and pixels into VRAM, then close
 ## **      BMX.SHOW    both, for when you already trust the file
 ## **      BMX.CLOSE   abandon a file opened by BMX.OPEN
+## **      BMX.RESTORE put the machine's own palette back
 ## **
 ## **  Usage, the short way -- a title screen:
 ## **
@@ -33,6 +34,46 @@
 ## **  8 bits per pixel, uncompressed. That is what SCREEN 128 can show
 ## **  without a decompressor. Anything else is reported, not attempted.
 ## **
+## **  THE PALETTE IS BORROWED, NOT TAKEN. BMX.PAINT writes the picture's
+## **  colours over the machine's, and nothing else on the X16 puts them
+## **  back -- neither SCREEN nor the KERNAL's screen_mode restores the
+## **  palette, which is measured, not assumed. So BMX.PAINT stashes all
+## **  256 entries in spare VRAM first, and BMX.RESTORE writes them back:
+## **
+## **      BMX.FILE$ = "TITLE.BMX"
+## **      SCREEN 128
+## **      GOSUB BMX.SHOW
+## **      ... the title screen ...
+## **      GOSUB BMX.RESTORE
+## **
+## **  A caller that owns the machine can simply never call it. One that
+## **  hands the machine back -- to BASIC, or to the next program in a
+## **  chain -- calls it and is done, and never learns where the palette
+## **  lives or how many entries the picture claimed. That is the point:
+## **  the range comes from the file's own header, so it is knowledge this
+## **  file already has and the caller would otherwise have to copy by hand.
+## **
+## **  BOTH HALVES ARE ONE KERNAL CALL, not a loop. memory_copy leaves an
+## **  address in $9F00-$9FFF unstepped, so with VERA's TWO address ports
+## **  pointed at the palette and at the stash, source $9F23 and target
+## **  $9F24 copy inside VRAM while VERA walks both ends itself. The KERNAL
+## **  chapter names this exact use. 512 bytes, twice a run, unmeasurable.
+## **
+## **  BMX.STASH IS SPARE VRAM AND THE DEFAULT ASSUMES A TITLE SCREEN --
+## **  $13000, just above the 320x240 framebuffer. That region is free in
+## **  the mode this file paints into, but a caller with tiles, sprites or
+## **  a second bitmap up there must move it or switch it off:
+## **
+## **      BMX.STASH = -1     keep nothing; BMX.RESTORE becomes a no-op
+## **
+## **  Minus one and not zero, because zero is what the variable holds
+## **  before anyone has touched it, and BMX.INIT has to be able to tell
+## **  "not set" from "set to off" -- it runs at the first BMX.OPEN, long
+## **  after a caller would have written the line.
+## **
+## **  It is checked, not trusted: a stash inside the bitmap or running
+## **  into the PSG registers at $1F9C0 is reported and nothing is painted.
+## **
 ## **  WHY THIS IS NOT A KEYWORD. It is one KERNAL call in a loop and some
 ## **  arithmetic -- no bulk data handling that BASIC would be bad at, since
 ## **  MACPTR moves the bytes -- so by the rule the whole GP set is built on
@@ -55,13 +96,25 @@
 #DEFINE BMXK.CHKIN $FFC6
 #DEFINE BMXK.CLRCHN $FFCC
 
+## memory_copy. Source and target both live in $9F00-$9FFF here, so neither
+## is stepped and both ends are VERA data ports -- see BMX.PALCOPY.
+#DEFINE BMXK.MEMCOPY $FEE7
+
 #DEFINE BMXK.VCTRL $9F25
 #DEFINE BMXK.VLO $9F20
 #DEFINE BMXK.VMID $9F21
 #DEFINE BMXK.VHI $9F22
 
-## $9F23 is VERA data port 0, split into the two bytes GP.CALL wants.
+## $9F23 and $9F24 are VERA data ports 0 and 1, split into the bytes the
+## 16 bit ABI registers want. Two ports is what makes a VRAM to VRAM copy
+## one call instead of a loop.
+##
+## PORTLO.B, AND NOT THE OBVIOUS NAME ENDING IN A ONE: a #DEFINE name may
+## not contain a digit ANYWHERE, and BASLOAD rejects the whole FILE rather
+## than the line -- ERROR: INVALID PARAMETER, naming the #DEFINE. It is the
+## same rule that stops VERA's own register names being used here.
 #DEFINE BMXK.PORTLO 35
+#DEFINE BMXK.PORTLO.B 36
 #DEFINE BMXK.PORTHI 159
 
 ## The logical file number. Change it here if it collides with yours.
@@ -83,10 +136,23 @@ GOTO BMX.MODULE.END
 ## **  BMX.PALBASE is VRAM $1FA00, and it is a variable rather than a
 ## **  #DEFINE because #DEFINE takes an INT16 (BASLOAD.MD:313) and 129536
 ## **  does not fit. Every VRAM address past $FFFF has the same problem.
+## **  BMX.STASH is $13000 and is a variable for that reason too -- and
+## **  because a caller with its own data up there has to be able to move
+## **  it. See the note at the top of the file.
 ## ***********************************************************************
 
 BMX.INIT:
     BMX.PALBASE = 129536
+    BMX.KEPT = 0
+
+## ---- ONLY IF THE CALLER HAS NOT ALREADY SET IT. BMX.INIT runs on demand,
+## ---- at the first BMX.OPEN, which is AFTER the caller's own setup -- so
+## ---- assigning the default unconditionally would quietly undo a stash
+## ---- address that had been set the obvious way, at the top of a program.
+## ---- Zero therefore means "never set" and cannot also mean "switched
+## ---- off"; -1 is what says keep nothing.
+
+    IF BMX.STASH = 0 THEN BMX.STASH = 77824
     BMX.HEADER$ = RPT$(32, 32)
     BMX.PTR = GP.STRPTR(BMX.HEADER$) + 1
     BMX.SCRATCH$ = RPT$(32, 255)
@@ -135,6 +201,9 @@ BMX.OPEN:
 ## ***********************************************************************
 
 BMX.PAINT:
+    GOSUB BMX.KEEP
+    IF BMX.ERROR$ <> "" THEN GOTO BMX.PAINT.END
+
     BMX.ADDR = BMX.PALBASE + BMX.PALFIRST * 2
     GOSUB BMX.VERA
     BMX.COUNT = BMX.PALUSED * 2
@@ -207,6 +276,92 @@ BMX.SHOW:
 
 BMX.CLOSE:
     GP.CALL BMXK.CLRCHN : CLOSE BMXK.LFN : RETURN
+
+## ***********************************************************************
+## **  BMX.KEEP -- the machine's palette into spare VRAM. Called by
+## **  BMX.PAINT, so a caller never has to remember it.
+## **
+## **  ALL 256 ENTRIES, not the range the picture claims. Taking the lot
+## **  costs the same single KERNAL call and makes the stash independent
+## **  of the file: paint a second picture with a different BMX.PALFIRST
+## **  and one BMX.RESTORE still puts back exactly what the machine had.
+## **  Snapshotting only the claimed range would leave the first picture's
+## **  leftovers behind, and the caller would have no way to know.
+## **
+## **  ONCE PER RUN. The guard is what makes a slideshow correct -- the
+## **  original palette is kept, not the previous picture's.
+## ***********************************************************************
+
+BMX.KEEP:
+    IF BMX.PTR = 0 THEN GOSUB BMX.INIT
+    IF BMX.KEPT = 1 THEN RETURN
+    IF BMX.STASH < 0 THEN RETURN : REM switched off by the caller; nothing kept, nothing to put back
+
+## ---- Checked, not trusted. The default is free in the mode this file
+## ---- paints into, but the caller can move it and a bad address would be
+## ---- silent: below the framebuffer top it would be painted over by the
+## ---- picture itself, and $1F9C0 up is the PSG, where a 512 byte write
+## ---- is audible rather than merely wrong.
+
+    IF BMX.STASH < 76800 THEN BMX.ERROR$ = "BMX.STASH IS INSIDE THE BITMAP"
+    IF BMX.STASH > 128960 THEN BMX.ERROR$ = "BMX.STASH RUNS INTO THE PSG REGISTERS"
+    IF BMX.ERROR$ <> "" THEN RETURN
+
+    BMX.SRC = BMX.PALBASE : BMX.DST = BMX.STASH
+    GOSUB BMX.PALCOPY
+    BMX.KEPT = 1
+    RETURN
+
+## ***********************************************************************
+## **  BMX.RESTORE -- the machine's palette back, and the stash released.
+## **
+## **  Safe to call at any time: nothing kept means nothing to do, so a
+## **  program whose picture failed to load can call it unconditionally on
+## **  the way out and does not have to remember whether it got that far.
+## ***********************************************************************
+
+BMX.RESTORE:
+    IF BMX.KEPT = 0 THEN RETURN
+    BMX.SRC = BMX.STASH : BMX.DST = BMX.PALBASE
+    GOSUB BMX.PALCOPY
+    BMX.KEPT = 0
+    RETURN
+
+## ***********************************************************************
+## **  BMX.PALCOPY -- 512 bytes from BMX.SRC to BMX.DST, inside VRAM.
+## **
+## **  VERA has TWO address ports and they step independently, so pointing
+## **  one at each end turns a copy into a single memory_copy: both r0 and
+## **  r1 land in $9F00-$9FFF, where the KERNAL does not increment, and
+## **  VERA walks both addresses itself. The KERNAL chapter names this use
+## **  exactly -- "copying data inside VERA (source $9F23, destination
+## **  $9F24)". A VPEEK/VPOKE loop would be some five jiffies each way; the
+## **  loop overhead, not the bytes, is what that would have paid for.
+## **
+## **  Poking $02..$07 direct is safe from a compiled program: r0..r15 live
+## **  at $02..$21 and GPC's own zero page starts at $22.
+## ***********************************************************************
+
+BMX.PALCOPY:
+    BMX.ADDR = BMX.SRC
+    GOSUB BMX.VERA : REM data port 0 -> the source, stepping by one
+
+    BMX.ADDR = BMX.DST
+    GOSUB BMX.SPLIT
+    POKE BMXK.VCTRL, 1 : REM VERA CTRL bit 0, ADDRSEL = 1: $9F20-$9F22 are port 1's now
+    POKE BMXK.VLO, BMX.LO : REM ADDR1_L
+    POKE BMXK.VMID, BMX.HI : REM ADDR1_M
+    POKE BMXK.VHI, BMX.BANK + 16 : REM ADDR1_H: bank in bit 0, increment 1 in the top nibble
+    POKE BMXK.VCTRL, 0 : REM ADDRSEL back to 0, so the streaming path finds port 0 selected
+
+    POKE 2, BMXK.PORTLO : REM r0L = $9F23, VERA DATA0 -- the source, and NOT stepped
+    POKE 3, BMXK.PORTHI : REM r0H
+    POKE 4, BMXK.PORTLO.B : REM r1L = $9F24, VERA DATA1 -- the target, and NOT stepped
+    POKE 5, BMXK.PORTHI : REM r1H
+    POKE 6, 0 : REM r2L = byte count low: 512, the whole 256 entry palette
+    POKE 7, 2 : REM r2H
+    GP.CALL BMXK.MEMCOPY : REM r2 is destroyed, r0 and r1 are not
+    RETURN
 
 ## ***********************************************************************
 ## **  BMX.PARSE -- the 32 byte header, read straight out of the string.
