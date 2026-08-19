@@ -80,8 +80,9 @@ it where it came from, and `APPHELP.PANEL.PUT` drops it somewhere else. Three `G
 | File | Shows |
 | --- | --- |
 | `MENU.EXP.BL` | a whole small application — menu, theme, dialog over a stashed screen |
-| `MENUTST.EXP.BL` | the menu's regression test, 14 cases |
+| `MENUTST.EXP.BL` | the menu's regression test, 21 cases |
 | `BMXSPD.EXP.BL` | how long a BMX paint really takes, full width against centred |
+| `BMXPAL.EXP.BL` | that the picture's palette is borrowed and given back, not taken |
 
 ## Naming — BASL is safe, a hand-written `.bas` is not
 

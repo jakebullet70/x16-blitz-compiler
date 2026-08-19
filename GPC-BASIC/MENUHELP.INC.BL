@@ -27,6 +27,7 @@
 ## **      MENUHELP.ATTR = THEME.CLR(THEME.TEXT)
 ## **      MENUHELP.HIATTR = THEME.CLR(THEME.HILITE)
 ## **      MENUHELP.HOT$ = "NLOQ"
+## **      MENUHELP.HOTATTR = THEME.CLR(THEME.TITLE)
 ## **      MENUHELP.FLAGS = MENUHELP.GAMEPAD
 ## **      GOSUB MENUHELP.RUN
 ## **      IF MENUHELP.SEL = 0 THEN <cancelled>
@@ -48,6 +49,21 @@
 ## **                          WITHOUT case, and a hotkey CHOOSES its row
 ## **                          rather than moving to it -- which is what
 ## **                          makes hotkeys worth having
+## **        MENUHELP.HOTATTR  paint the hotkey LETTER in this attribute, so
+## **                          the shortcut is visible in the row instead of
+## **                          being a secret. 0 is off, and off is the
+## **                          default, so no existing menu changes.
+## **                          The letter is found in the row's own text --
+## **                          the first match for that row's HOT$
+## **                          character, without case -- so nothing extra
+## **                          is passed in and " START" with hotkey S
+## **                          needs no markup. A row whose text does not
+## **                          contain its hotkey is simply left alone.
+## **                          ONLY ROWS IN THE NORMAL ATTRIBUTE ARE
+## **                          TINTED: on the selected row the highlight IS
+## **                          the message, and a second colour inside the
+## **                          bar is noise. It also means this never has to
+## **                          guess how to invert a caller's HIATTR.
 ## **        MENUHELP.FLAGS    added together, see below
 ## **        MENUHELP.SEL      the row to start on; 0 starts at 1
 ## **
@@ -353,6 +369,62 @@ MENUHELP.ROW:
     IF MENUHELP.DRAWTEXT$ = "" THEN RETURN
     IF LEN(MENUHELP.DRAWTEXT$) > MENUHELP.WIDTH THEN MENUHELP.DRAWTEXT$ = LEFT$(MENUHELP.DRAWTEXT$, MENUHELP.WIDTH)
     GP.PRINTAT MENUHELP.X, MENUHELP.DRAWY, MENUHELP.DRAWTEXT$, MENUHELP.DRAWATTR
+
+## ---- The hotkey letter, in its own attribute, over the top of the row
+## ---- just printed. One cell, and only when the caller asked for it -- a
+## ---- menu that sets no HOTATTR pays a single compare per row.
+## ----
+## ---- The highlighted row is skipped: it is drawn in an attribute that is
+## ---- not MENUHELP.ATTR, which is exactly the test below. See the note in
+## ---- the interface block for why that is a decision and not an omission.
+
+    IF MENUHELP.HOTATTR = 0 THEN RETURN
+    IF MENUHELP.DRAWATTR <> MENUHELP.ATTR THEN RETURN
+    GOSUB MENUHELP.HOTFIND
+    IF MENUHELP.HOTAT = 0 THEN RETURN
+    GP.PRINTAT MENUHELP.X + MENUHELP.HOTAT - 1, MENUHELP.DRAWY, MID$(MENUHELP.DRAWTEXT$, MENUHELP.HOTAT, 1), MENUHELP.HOTATTR
+    RETURN
+
+## ***********************************************************************
+## **  MENUHELP.HOTFIND -- where this row's hotkey letter sits in its text.
+## **
+## **   in   MENUHELP.DRAWROW  MENUHELP.DRAWTEXT$
+## **   out  MENUHELP.HOTAT    1 based position, or 0 for "do not tint"
+## **
+## **  Zero is returned for every ordinary reason a tint should not happen:
+## **  no hotkey string, no hotkey for THIS row, or a row whose text simply
+## **  does not contain its own hotkey. That last one is a caller's choice,
+## **  not an error -- " QUIT" with hotkey X is still a working hotkey.
+## **
+## **  ITS OWN SCAN VARIABLES, not the ones MENUHELP.HOTKEY uses. The two
+## **  never run at once today -- a keypress is fully resolved before any
+## **  row is redrawn -- but sharing a loop counter across two routines is
+## **  a trap set for whoever changes that order later.
+## ***********************************************************************
+
+MENUHELP.HOTFIND:
+    MENUHELP.HOTAT = 0
+    IF MENUHELP.HOT$ = "" THEN RETURN
+    IF MENUHELP.DRAWROW > LEN(MENUHELP.HOT$) THEN RETURN
+    MENUHELP.HOTWANT = ASC(MID$(MENUHELP.HOT$, MENUHELP.DRAWROW, 1))
+    IF MENUHELP.HOTWANT > 96 THEN GOSUB MENUHELP.FOLDHOTWANT
+    FOR MENUHELP.HOTSCAN = 1 TO LEN(MENUHELP.DRAWTEXT$)
+        MENUHELP.HOTHERE = ASC(MID$(MENUHELP.DRAWTEXT$, MENUHELP.HOTSCAN, 1))
+        IF MENUHELP.HOTHERE > 96 THEN GOSUB MENUHELP.FOLDHOTHERE
+        IF MENUHELP.HOTHERE = MENUHELP.HOTWANT AND MENUHELP.HOTAT = 0 THEN MENUHELP.HOTAT = MENUHELP.HOTSCAN
+    NEXT
+    RETURN
+
+## ---- Guarded subroutines and not one ANDed line, for the reason given at
+## ---- MENUHELP.FOLDWANT: AND sits below the comparisons in the precedence
+## ---- table, so the single line version would be right by luck.
+
+MENUHELP.FOLDHOTWANT:
+    IF MENUHELP.HOTWANT < 123 THEN MENUHELP.HOTWANT = MENUHELP.HOTWANT - 32
+    RETURN
+
+MENUHELP.FOLDHOTHERE:
+    IF MENUHELP.HOTHERE < 123 THEN MENUHELP.HOTHERE = MENUHELP.HOTHERE - 32
     RETURN
 
 MENUHELP.MODULE.END:

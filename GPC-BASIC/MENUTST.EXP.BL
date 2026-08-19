@@ -134,6 +134,47 @@ KEY.CODE = 13 : GOSUB KEY.SEND
 GOSUB MENUHELP.RUN
 TEST.N = MENUHELP.SEL
 
+## ---- 15..21. MENUHELP.HOTFIND -- WHERE the hotkey letter sits in a row.
+## ---- Logic, like everything else here: the position it returns, never the
+## ---- attribute it ends up painted in. MENUHELP.ROW does nothing with that
+## ---- position but call GP.PRINTAT, which is shipped and verified.
+## ----
+## ---- HOTFIND reads MENUHELP.HOT$, MENUHELP.DRAWROW and MENUHELP.DRAWTEXT$
+## ---- and answers in MENUHELP.HOTAT, so it can be driven directly without
+## ---- a menu on the screen at all.
+MENUHELP.HOT$ = "NLOQ"
+
+## the ordinary case: the letter is the first character after the lead space
+MENUHELP.DRAWROW = 1 : MENUHELP.DRAWTEXT$ = " NEW GAME" : GOSUB MENUHELP.HOTFIND
+TEST.O = MENUHELP.HOTAT
+
+## not the first letter of the row -- O of OPTIONS is at 2, but row 3's
+## hotkey is O and the row before it has an O in "LOAD" nowhere near it
+MENUHELP.DRAWROW = 3 : MENUHELP.DRAWTEXT$ = " OPTIONS" : GOSUB MENUHELP.HOTFIND
+TEST.P = MENUHELP.HOTAT
+
+## FIRST match wins, so a letter repeated later does not move it
+MENUHELP.DRAWROW = 2 : MENUHELP.DRAWTEXT$ = " LEVEL SELECT" : GOSUB MENUHELP.HOTFIND
+TEST.Q = MENUHELP.HOTAT
+
+## matched WITHOUT case, both ways round
+MENUHELP.DRAWROW = 4 : MENUHELP.DRAWTEXT$ = " quit" : GOSUB MENUHELP.HOTFIND
+TEST.R = MENUHELP.HOTAT
+
+## a row whose text does not contain its own hotkey: 0, and that is a
+## caller's choice rather than an error -- the hotkey still WORKS
+MENUHELP.DRAWROW = 1 : MENUHELP.DRAWTEXT$ = " START" : GOSUB MENUHELP.HOTFIND
+TEST.S = MENUHELP.HOTAT
+
+## a row past the end of HOT$ has no hotkey to find
+MENUHELP.DRAWROW = 9 : MENUHELP.DRAWTEXT$ = " NEW GAME" : GOSUB MENUHELP.HOTFIND
+TEST.T = MENUHELP.HOTAT
+
+## no hotkeys at all
+MENUHELP.HOT$ = ""
+MENUHELP.DRAWROW = 1 : MENUHELP.DRAWTEXT$ = " NEW GAME" : GOSUB MENUHELP.HOTFIND
+TEST.U = MENUHELP.HOTAT
+
 CLS
 PRINT "A";TEST.A;TEST.AK;" EXPECT 3 13"
 PRINT "B";TEST.B;TEST.BK;" EXPECT 3 79"
@@ -149,6 +190,13 @@ PRINT "K";TEST.K;" EXPECT 1"
 PRINT "L";TEST.L;" EXPECT 0"
 PRINT "M";TEST.M;" EXPECT 2"
 PRINT "N";TEST.N;" EXPECT 1"
+PRINT "O";TEST.O;" EXPECT 2"
+PRINT "P";TEST.P;" EXPECT 2"
+PRINT "Q";TEST.Q;" EXPECT 2"
+PRINT "R";TEST.R;" EXPECT 2"
+PRINT "S";TEST.S;" EXPECT 0"
+PRINT "T";TEST.T;" EXPECT 0"
+PRINT "U";TEST.U;" EXPECT 0"
 PRINT "@DONE@"
 POWEROFF
 
