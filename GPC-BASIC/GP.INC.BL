@@ -51,7 +51,9 @@
 ##
 ## Splitting that address for GP.CALL, do NOT use "P AND 255": AND is 16-bit
 ## SIGNED and the string heap lives above 32767, so it raises OUT OF RANGE.
-## Use  H = INT(P/256) : L = P - H*256  instead.
+## Use GP.LOBYTE(P) and GP.HIBYTE(P) -- see their entry at the end of this
+## file. (The old advice, H = INT(P/256) : L = P - H*256, is still correct,
+## just longer and easier to get wrong.)
 
 #TOKEN GP.INSTR 52855
 #TOKEN GP.STRPTR 52854
@@ -98,7 +100,7 @@
 ##
 ## Empty parentheses required; GP.ARRPTR(A(3)) is a syntax error, add 3*2
 ## or 3*6 yourself. Same splitting rule as GP.STRPTR -- the address is
-## usually above 32767, so H = INT(P/256) : L = P - H*256, never P AND 255.
+## usually above 32767, so GP.LOBYTE / GP.HIBYTE, never P AND 255.
 
 #TOKEN GP.ARRPTR 52846
 
@@ -202,5 +204,47 @@
 #TOKEN GP.CASE 52837
 #TOKEN GP.ELSE 52836
 #TOKEN GP.ENDSEL 52835
+
+## GP.CONTAINS(a$,b$) is -1 if b$ occurs anywhere in a$, 0 if it does not.
+## CASE SENSITIVE -- it compares raw bytes. It is the readable spelling of the
+## yes/no question; use GP.INSTR when you want the POSITION instead of a flag,
+## and GP.COMP for a case-blind test.
+##
+## An EMPTY needle is 0, not -1: GP.INSTR reports "not found" for a zero length
+## needle, and this is built on it.
+##
+## COMPOSITE -- it has no runtime code of its own. The compiler expands it into
+## GP.INSTR(a$,b$)<>0 and the object is byte for byte identical to writing that
+## out by hand. So it costs nothing to use, and nothing to have.
+
+#TOKEN GP.CONTAINS 52834
+
+## GP.HIBYTE(n) / GP.LOBYTE(n) split an address into the two bytes a 6502
+## actually takes: HIBYTE is INT(n/256), the 256 byte page, and LOBYTE is
+## MOD(n,256), the offset within it. Everything that eats an address one byte
+## at a time wants them -- GP.CALL's registers, VERA's $9F20/$9F21 -- and
+## GP.STRPTR / GP.ARRPTR exist to hand an address over in the first place.
+##
+##   P = GP.STRPTR(A$)
+##   GP.CALL $A000, GP.LOBYTE(P), GP.HIBYTE(P)
+##
+## USE THESE RATHER THAN THE LONG FORM ABOVE. "N AND 255" is the spelling that
+## looks right and is a live bug -- AND is 16 bit SIGNED and these addresses
+## are above 32767, so it raises OUT OF RANGE instead of masking. GP.LOBYTE is
+## built on MOD, which is not on that path.
+##
+## Range 0 to 65535. COMPOSITE, like GP.CONTAINS -- no runtime code at all.
+
+#TOKEN GP.HIBYTE 52833
+#TOKEN GP.LOBYTE 52832
+
+## GP.ISEMPTY(a$) is -1 when a$ has zero length, 0 otherwise. A string of
+## SPACES is not empty -- GP.TRIM it first if that is what you meant.
+##
+## It is for READABILITY and nothing else. It compiles to the same four bytes
+## as LEN(A$)=0, and IF A$="" costs about the same again, so do not choose
+## between the three on size. COMPOSITE -- no runtime code.
+
+#TOKEN GP.ISEMPTY 52831
 
 #ENDIF

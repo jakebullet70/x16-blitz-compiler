@@ -50,3 +50,27 @@ GP.STRPTR 		($) T N
 # 	insists on the ")" immediately, so add index*stride yourself.
 #
 GP.ARRPTR 		(X:AnyArrayCompile) T N
+#
+# 	GP.CONTAINS(a$,b$) -- the first COMPOSITE keyword: it has NO "T", so it emits no p-code of its
+# 	own and there is no handler for it anywhere in the runtime. GPContainsCompile lowers it into
+# 	gp.instr / f.cmp / <>, all of which already exist, so the object code is byte for byte what
+# 	GP.INSTR(a$,b$)<>0 produces and the resident runtime does not grow by a single byte.
+#
+GP.CONTAINS 	($,$) X:GPContainsCompile N
+#
+# 	GP.HIBYTE(n) / GP.LOBYTE(n) -- split an address into the two bytes a 6502 actually takes.
+# 	Composite, like GP.CONTAINS: INT(n/256) and MOD(n,256), no runtime code. They exist because
+# 	the OBVIOUS spelling of the low byte, "n AND 255", is a live bug here -- AND is 16 bit SIGNED
+# 	and every address worth splitting (the string heap, VRAM) is above 32767, so it raises OUT OF
+# 	RANGE instead of masking. MOD goes through Int32Divide on the full mantissa and does not.
+#
+GP.HIBYTE 		(#) X:GPHiByteCompile N
+GP.LOBYTE 		(#) X:GPLoByteCompile N
+#
+# 	GP.ISEMPTY(a$) -- composite, LEN(a$)=0. READABILITY ONLY, and the comment says so because the
+# 	obvious guess is wrong: it compiles to the same four bytes as LEN(a$)=0, and IF a$="" costs
+# 	about the same again -- CommandPushS points a literal INTO the p-code, so an empty string
+# 	literal allocates nothing. Nobody should choose between the three on size. This one simply
+# 	states the question instead of leaving the reader to infer it from the shape of a test.
+#
+GP.ISEMPTY 		($) X:GPIsEmptyCompile N

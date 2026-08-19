@@ -121,3 +121,19 @@
 ;	GP.ARRPTR   (X:AnyArrayCompile) T N
 ;
 	.byte	$0a,$ce,$6e,$83,AnyArrayCompile & $FF,AnyArrayCompile >> 8,$92,35035 & $FF,35035 >> 8,$06
+;
+;	GP.CONTAINS  ($,$) X:GPContainsCompile N
+;
+	.byte	$09,$ce,$62,$8f,$af,$93,GPContainsCompile & $FF,GPContainsCompile >> 8,$06
+;
+;	GP.HIBYTE   (#) X:GPHiByteCompile N
+;
+	.byte	$08,$ce,$61,$8e,$93,GPHiByteCompile & $FF,GPHiByteCompile >> 8,$06
+;
+;	GP.LOBYTE   (#) X:GPLoByteCompile N
+;
+	.byte	$08,$ce,$60,$8e,$93,GPLoByteCompile & $FF,GPLoByteCompile >> 8,$06
+;
+;	GP.ISEMPTY   ($) X:GPIsEmptyCompile N
+;
+	.byte	$08,$ce,$5f,$8f,$93,GPIsEmptyCompile & $FF,GPIsEmptyCompile >> 8,$06

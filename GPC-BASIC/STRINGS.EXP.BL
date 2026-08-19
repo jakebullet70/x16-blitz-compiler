@@ -3,9 +3,12 @@
 ## **  STRINGS.EXP.BL -- the GP.BASIC string set.
 ## **
 ## **  GP.INSTR / GP.STRPTR          functions
+## **  GP.CONTAINS / GP.ISEMPTY      composite -- no runtime code
+## **  GP.HIBYTE / GP.LOBYTE         composite -- splitting an address
 ## **  GP.TRIM / GP.LTRIM / GP.RTRIM in-place statements
 ## **  GP.UPPER / GP.LOWER           in-place statements
 ## **  STRHELP.PADR / PADL / PADC     BASL, from STRHELP.INC.BL
+## **  STRHELP.REPLACE               BASL, from STRHELP.INC.BL
 ## **
 ## **  Build:  copy GPC-BASIC/GP.INC.BL, GPC-BASIC/STRHELP.INC.BL and this
 ## **          file into testing/, then
@@ -41,6 +44,34 @@ GP.DO
   HIT = HIT + 1
 GP.LOOP
 
+## ---- 1b. GP.CONTAINS is the yes/no spelling of that question, for when
+## ---- you do not care WHERE. GP.ISEMPTY is LEN(a$)=0 with the question
+## ---- written down. Both are COMPOSITE: the compiler expands them into
+## ---- keywords that already exist, so they add NO runtime code at all
+## ---- and the object is identical to writing the long form out.
+
+PRINT "CONTAINS RAIN  ->"; GP.CONTAINS(TEXT$, "RAIN")
+PRINT "  same as      ->"; GP.INSTR(TEXT$, "RAIN") <> 0
+PRINT "CONTAINS ZEBRA ->"; GP.CONTAINS(TEXT$, "ZEBRA")
+
+## ---- CASE SENSITIVE, because GP.INSTR compares raw bytes. GP.COMP is
+## ---- the case-folding one, and it compares whole strings rather than
+## ---- searching. An EMPTY needle is 0, not -1.
+
+IF GP.CONTAINS(TEXT$, "SPAIN") THEN PRINT "  FOUND SPAIN"
+IF NOT GP.CONTAINS(TEXT$, "PORTUGAL") THEN PRINT "  NO PORTUGAL"
+
+NOTHING$ = ""
+SPACES$ = "   "
+PRINT "ISEMPTY EMPTY  ->"; GP.ISEMPTY(NOTHING$)
+PRINT "ISEMPTY SPACES ->"; GP.ISEMPTY(SPACES$)
+
+## ---- A STRING OF SPACES IS NOT EMPTY. GP.TRIM it first if that is
+## ---- what you meant -- which is the next section.
+
+GP.TRIM SPACES$
+PRINT "  after TRIM   ->"; GP.ISEMPTY(SPACES$)
+
 ## ---- 2. the three trims.  GP.TRIM does both ends, GP.LTRIM the left
 ## ---- (leading spaces), GP.RTRIM the right (trailing spaces).  All three
 ## ---- work in place, so they take a string VARIABLE, never a literal.
@@ -75,6 +106,32 @@ STRHELP.STR$ = "TITLE" : STRHELP.WIDTH = 12
 GOSUB STRHELP.PADC
 PRINT "PADC  ["; STRHELP.STR$; "]"
 
+## ---- 4b. STRHELP.REPLACE swaps EVERY occurrence. The replacement may
+## ---- be shorter, longer, or "" to delete. Case sensitive, like
+## ---- GP.INSTR underneath it.
+
+STRHELP.STR$ = "PATH/TO/FILE" : STRHELP.FIND$ = "/" : STRHELP.REPL$ = "."
+GOSUB STRHELP.REPLACE
+PRINT "REPLACE  ["; STRHELP.STR$; "]"
+
+STRHELP.STR$ = "A,B,C" : STRHELP.FIND$ = "," : STRHELP.REPL$ = ""
+GOSUB STRHELP.REPLACE
+PRINT "DELETE   ["; STRHELP.STR$; "]"
+
+## ---- SAFE WHEN THE REPLACEMENT CONTAINS THE NEEDLE. "A" -> "AA" would
+## ---- never terminate if the output were re-scanned; this one builds a
+## ---- new string and never looks at what it has already emitted.
+
+STRHELP.STR$ = "AAA" : STRHELP.FIND$ = "A" : STRHELP.REPL$ = "AA"
+GOSUB STRHELP.REPLACE
+PRINT "GROWING  ["; STRHELP.STR$; "]"
+
+## ---- An EMPTY needle leaves the string alone rather than hanging.
+
+STRHELP.STR$ = "UNTOUCHED" : STRHELP.FIND$ = "" : STRHELP.REPL$ = "X"
+GOSUB STRHELP.REPLACE
+PRINT "EMPTY    ["; STRHELP.STR$; "]"
+
 ## ---- 5. GP.STRPTR hands the address of [ActLen][Data] to machine code:
 ## ---- length AT that address, first character at +1, capacity at -2.
 ## ---- With GP.CALL that lets ML fill a BASIC string and set its length.
@@ -84,3 +141,22 @@ PTR = GP.STRPTR(SAMPLE$)
 PRINT "LEN VIA PTR  ->"; PEEK(PTR)
 PRINT "CAPACITY     ->"; PEEK(PTR - 2)
 PRINT "FIRST CHAR   ->"; CHR$(PEEK(PTR + 1))
+
+## ---- 6. GP.CALL takes 8 bit registers and that address is 16 bits, so
+## ---- it has to be split. GP.HIBYTE is the 256 byte page, GP.LOBYTE the
+## ---- offset within it:
+## ----
+## ----     GP.CALL $A000, GP.LOBYTE(PTR), GP.HIBYTE(PTR)
+## ----
+## ---- DO NOT WRITE "PTR AND 255". AND is 16 bit SIGNED here and the
+## ---- string heap always lives above 32767, so it raises OUT OF RANGE
+## ---- instead of masking. GP.LOBYTE is built on MOD, which is not on
+## ---- that path. Both are composite, so neither costs runtime bytes.
+
+PRINT "PTR          ->"; PTR
+PRINT "SPLIT     HI ->"; GP.HIBYTE(PTR); " LO"; GP.LOBYTE(PTR)
+
+## ---- The long form is exactly what they compile to:
+
+PTR.HI = INT(PTR / 256)
+PRINT "SAME AS   HI ->"; PTR.HI; " LO"; PTR - PTR.HI * 256

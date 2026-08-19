@@ -85,15 +85,18 @@ program. That is expected, not a fault. Compile it and run the object.
 and `$CE68` are holes, freed when `GP.SEL` and `GP.MENU` were withdrawn, and are not reused. The token
 values are the ABI.
 
-### At a glance — the whole library, both halves
+### At a glance — the whole library, and what each part costs
 
-Everything GP.BASIC gives you, and **which half it comes from**. The rest of §3 is the ASM keywords;
+Everything GP.BASIC gives you, and **where it comes from**. The rest of §3 is the keywords;
 the BASIC modules are written up in §4.
 
 - **ASM** — a keyword the compiler knows, run by machine code in the runtime. Costs runtime bytes,
   and a program that uses one GP keyword pays for the whole block. Written in §3.
 - **BASIC** — a `.INC.BL` module of ordinary BASL, called with `GOSUB`. Costs **nothing** unless you
   `#INCLUDE` it, and then only its own p-code. Written in §4.
+- **COMPOSITE** — a keyword the compiler knows that has **no machine code of its own**. The compiler
+  expands it into keywords that already exist, so it reads like a keyword and costs the runtime
+  nothing at all. Written in §3 alongside the ASM ones.
 
 | | | |
 |---|---|---|
@@ -101,6 +104,8 @@ the BASIC modules are written up in §4.
 | **Multi-way branch** | ASM | `GP.SELECT` `GP.CASE` `GP.ELSE` `GP.ENDSEL` |
 | **Machine code** | ASM | `GP.CALL` `GP.A` `GP.X` `GP.Y` `GP.C` |
 | **Strings** | ASM | `GP.INSTR` `GP.STRPTR` `GP.TRIM` `GP.LTRIM` `GP.RTRIM` `GP.UPPER` `GP.LOWER` `GP.COMP` |
+| **Strings** | COMPOSITE | `GP.CONTAINS` `GP.ISEMPTY` — free, see §3.4 |
+| **Addresses** | COMPOSITE | `GP.HIBYTE` `GP.LOBYTE` — free, see §3.3 |
 | **Arrays** | ASM | `GP.SORT` `GP.ARRPTR` |
 | **Screen** | ASM | `GP.STASH` `GP.RESTR` `GP.BOX` `GP.FILL` `GP.PRINTAT` |
 | **Colour roles** | BASIC | `THEME.INC.BL` — `THEME.LOAD`, `THEME.CLR()` · §4.1 |
@@ -111,7 +116,8 @@ the BASIC modules are written up in §4.
 | **Menus** | BASIC | `MENUHELP.INC.BL` — `MENUHELP.RUN`, `MENUHELP.DRAW` · §4.6 |
 
 **The rule that decides the side** is in §1: assembly gets what runs in a tight loop or moves bulk
-data, BASIC gets everything else. A menu waits on a human, so it is BASIC — it used to be the
+data, BASIC gets everything else — and anything that is only a *rename* of keywords already present
+gets neither, and becomes a composite. A menu waits on a human, so it is BASIC — it used to be the
 `GP.MENU` keyword and cost every GPB program 462 bytes whether it had a menu or not.
 
 ---
@@ -216,6 +222,31 @@ COLS = GP.X : ROWS = GP.Y
 > (`stringHighMemory`, `storeStartHigh`, `variableStartPage`), and POKEing code over it corrupts the
 > program silently.
 
+#### Splitting an address — `GP.HIBYTE` / `GP.LOBYTE`
+
+| Form | Does |
+|---|---|
+| `GP.HIBYTE(n)` | `INT(n / 256)` — which 256-byte page. **Composite** |
+| `GP.LOBYTE(n)` | `MOD(n, 256)` — the offset within it. **Composite** |
+
+A 6502 address is sixteen bits, and everything that consumes one takes eight at a time — `GP.CALL`'s
+registers, VERA's `$9F20`/`$9F21`. So every address that leaves BASIC for machine code gets split,
+and `GP.STRPTR` / `GP.ARRPTR` exist in order to hand one over:
+
+```basic
+P = GP.STRPTR(A$)
+GP.CALL $A000, GP.LOBYTE(P), GP.HIBYTE(P)
+```
+
+> **This is the reason they are keywords rather than something you write out.** The spelling that
+> looks right — `P AND 255` — is a **live bug** in GPC: `AND` is 16-bit *signed*, and every address
+> worth splitting is above 32767 (the string heap always is), so it raises `OUT OF RANGE` instead of
+> masking. `GP.LOBYTE` is built on `MOD`, which runs through the full 32-bit divide and is not on
+> that path.
+
+Range is 0–65535, which is every address on the machine. Both are **composite** — they add no
+runtime code, and compile to exactly `INT(n/256)` and `MOD(n,256)`.
+
 Example: [`MLCALL.EXP.BL`](MLCALL.EXP.BL)
 
 ---
@@ -225,6 +256,8 @@ Example: [`MLCALL.EXP.BL`](MLCALL.EXP.BL)
 | Form | Does |
 |---|---|
 | `GP.INSTR(hay$, needle$ [,start])` | position of `needle$`, 1-based; **0 = not found**. `start` is where to begin |
+| `GP.CONTAINS(hay$, needle$)` | −1 if `needle$` occurs anywhere in `hay$`, 0 if not. **Composite** — see below |
+| `GP.ISEMPTY(a$)` | −1 if `a$` has zero length, 0 if not. **Composite** |
 | `GP.COMP(a$, b$)` | compare **ignoring case**: −1 before, 0 same, 1 after |
 | `GP.STRPTR(a$)` | address of the string's `[ActLen][Data]` block |
 | `GP.TRIM a$` | strip spaces from **both** ends, in place |
@@ -234,6 +267,24 @@ Example: [`MLCALL.EXP.BL`](MLCALL.EXP.BL)
 | `GP.LOWER a$` | A–Z to lower, in place |
 
 `GP.INSTR` is the gap that matters: **GPC has no string search of any kind** without it.
+
+`GP.CONTAINS` is the yes/no spelling of the same question, for when you do not care *where*:
+`IF GP.CONTAINS(F$, ".BAS")`. It is **case sensitive** — it compares raw bytes, like `GP.INSTR` —
+so reach for `GP.COMP` when you need case-blind. An **empty needle is 0**, not −1, because
+`GP.INSTR` reports "not found" for one and this is built on it.
+
+> **`GP.CONTAINS` is the library's first COMPOSITE keyword: it adds no runtime code at all.**
+> The compiler expands it into `GP.INSTR(hay$, needle$) <> 0`, and the compiled object is
+> byte-for-byte identical to writing that out by hand (verified by compiling both). So it costs
+> nothing to use *and* nothing to have — unlike every other `GP.` keyword, whose machine code is
+> linked into every GPB program whether you call it or not. If you ever want the position rather
+> than a flag, write the `GP.INSTR` out; you are not paying twice for the two spellings.
+
+`GP.ISEMPTY(a$)` is `LEN(a$) = 0` with the question written down instead of implied. **A string of
+spaces is not empty** — `GP.TRIM` it first if that is what you meant. It is for readability only:
+it compiles to the same four bytes as `LEN(a$)=0`, and `IF a$=""` costs about the same again
+(a literal points *into* the p-code, so even the empty string allocates nothing). Do not pick
+between the three on size.
 
 `GP.COMP` gives you a case-blind equality test — `IF GP.COMP(A$,B$) = 0` — which plain `=` cannot do,
 and the comparator for ordering names. Length breaks a tie, so `"abc"` sorts before `"ABCD"`.
@@ -254,9 +305,11 @@ its length — something stock BASIC cannot do at all.
 > **Splitting the address, do NOT write `P AND 255`.** `AND` is **16-bit signed** in GPC and the string
 > heap lives above 32767, so it raises `OUT OF RANGE` rather than masking. Write:
 > ```basic
-> H = INT(P / 256) : L = P - H * 256
+> GP.CALL $A000, GP.LOBYTE(P), GP.HIBYTE(P)
 > ```
-> This applies to `GP.ARRPTR` and to every VRAM address past the top eighth of the screen too.
+> — see §3.3. The longhand `H = INT(P / 256) : L = P - H * 256` is still correct and is what the
+> keywords compile to. This applies to `GP.ARRPTR` and to every VRAM address past the top eighth
+> of the screen too.
 
 Example: [`STRINGS.EXP.BL`](STRINGS.EXP.BL)
 
@@ -376,6 +429,7 @@ the readable name costs no variable, no lookup, and a one-byte constant index.
 | `STRHELP.PADL` | same | right-justified |
 | `STRHELP.PADC` | same | centred (odd gap goes right) |
 | `STRHELP.SPLIT` | `STRHELP.STR$` `STRHELP.DELIM$` `STRHELP.MAX` | `STRHELP.N`, `STRHELP.FIELD$(1..N)` |
+| `STRHELP.REPLACE` | `STRHELP.STR$` `STRHELP.FIND$` `STRHELP.REPL$` | `STRHELP.STR$`, every occurrence replaced |
 | `STRHELP.PET2SCR` | `STRHELP.PET` | `STRHELP.SCR` |
 
 All three pad routines **leave a string already at or past the width alone. They pad; they never
@@ -390,6 +444,17 @@ loses nothing — the last field gets the whole unsplit remainder, delimiters an
 implicit `DIM` gives 0..10. Want more, `DIM` it yourself **before the first call** and set
 `STRHELP.MAX` to match. `DIM`ming an array GPC has already auto-dimensioned is an error, so it is one
 or the other. **This is the opposite of `THEME.CLR`** — worth keeping straight.
+
+`REPLACE` swaps **every** occurrence of `STRHELP.FIND$` for `STRHELP.REPL$`, modifying
+`STRHELP.STR$` in place. The replacement may be shorter, longer, or `""` to delete. **Case
+sensitive**, because `GP.INSTR` compares raw bytes.
+
+> **It is safe when the replacement contains the thing being replaced** — `"A"` → `"AA"`
+> terminates and gives you twice the As, where a naive in-place version loops forever. The routine
+> builds a new string and never re-scans what it has already emitted. An **empty `STRHELP.FIND$`
+> leaves the string alone** rather than hanging; that falls out of `GP.INSTR` reporting "not
+> found" for a zero-length needle, so no guard is needed. Like the pad routines it is **not length
+> checked** — a longer replacement can push the result past 255 characters.
 
 `PET2SCR` converts a PETSCII code to the screen code the tile map holds, for `TILE`, `TDATA` and
 `VPOKE`. `GP.PRINTAT` and `GP.FILL` already do it internally.
@@ -694,7 +759,7 @@ over itself with (`THEME.SKIP`, `APPHELP.SKIP`, `STRHELP.SKIP`, `BMX.MODULE.END`
 counter.
 
 **→ The complete per-module in / out / internal register is [GP-BASIC.GLOBALS.md](GP-BASIC.GLOBALS.md),
-with a script in §7 for re-checking it after a change.**
+with a script in §7 *of that file* for re-checking it after a change.**
 
 ---
 

@@ -107,6 +107,118 @@ gathered in directory order, so a new file renumbers every opcode after it — `
 `for.asm` and shifted everything from `for` upward by two. `RT_ABI` went 3 → 4 for exactly this.
 See [common.inc](../../source/common-source/source/common.inc).
 
+## 3b. COMPOSITE keywords — a keyword with no runtime code (2026-08-19)
+
+**Shipped: `GP.CONTAINS(a$,b$)` 52834, `GP.HIBYTE(n)` 52833, `GP.LOBYTE(n)` 52832,
+`GP.ISEMPTY(a$)` 52831.** The first `GP.`
+keywords with no machine code anywhere in the runtime, and the pattern is worth having written down
+because the next one is nearly free.
+
+`GP.HIBYTE`/`GP.LOBYTE` are the ones that earn their place. The tree wrote the address split out by
+hand in four places (`ARRAYS.EXP.BL`, `BMX.INC.BL`, `MENUHELP.INC.BL`, `GP.INC.BL`), each with a
+warning comment nailed beside it, because the obvious `P AND 255` raises `OUT OF RANGE` — `AND` is
+16-bit signed and every address worth splitting is above 32767. **`MOD` is not on that path**: it
+goes through `Int32Divide` on the full mantissa. Measured 2026-08-19: `MOD(1000000,256)` = 64 and
+`MOD(40693,256)` = 245, agreeing with the subtraction form. `MOD` is also the only spelling that
+*fits* — `n - INT(n/256)*256` uses `n` twice and a composite has no `DUP`.
+
+`GP.ISEMPTY` is the other kind: **readability only, and the doc comments say so**, because the
+obvious assumption is that a keyword must be faster than the expression it replaces. It is not —
+it compiles to the same four bytes as `LEN(a$)=0`, and `IF a$=""` costs about the same again
+(`CommandPushS` points a literal *into* the p-code, so an empty string literal allocates nothing).
+A composite is never faster than what it expands to; it can only be clearer. Say that in the entry
+or someone will reach for it as an optimisation.
+
+### The mechanism
+
+A keyword's entry in `unary.def` / `commands.def` is a tiny program the compiler runs while parsing.
+`X:Label` calls a compiler subroutine; `T` emits the keyword's own p-code token. **It is the ABSENCE
+of `T`, not the presence of `X:`, that makes a keyword composite.** Without a `T` the keyword emits
+nothing of its own, and its `X:` routine writes a sequence of tokens that *already exist* instead.
+
+Say that out loud because `GP.TRIM` looks like a counter-example and is not:
+
+```
+GP.TRIM       X:StringVariableCompile T N      <- ASM. The X: is an ARGUMENT PARSER; the T emits
+                                                  gp.trim, and gpstring.asm answers it.
+GP.CONTAINS   ($,$) X:GPContainsCompile N      <- COMPOSITE. No T. Nothing answers it, because
+                                                  nothing is emitted for anything to answer.
+NOT / FN                                       <- the shape to copy: X: with no T, both predate this.
+```
+
+The prior art for hand-emitting a sequence is `CompileCaseTest` in `compiler/source/commands/
+select.asm`, which writes `f.cmp` then `=` for `GP.CASE`.
+
+### What it costs
+
+Nothing, and that is the point. `GP.CONTAINS` lowers to `<a$> <b$> 0 gp.instr 0 f.cmp <>` — five
+bytes past its arguments, all of them opcodes that were already there. **Measured 2026-08-19: the
+object compiled from `GP.CONTAINS(A$,B$)` is byte-for-byte identical to the object compiled from
+`GP.INSTR(A$,B$)<>0`** (14140 bytes each). `pcodetokens.inc`, `vectors.asm` and all of `gp-runtime/`
+were untouched by the change, and `RT_ABI` stayed at 20 — so nothing already compiled needed
+rebuilding.
+
+### The checklist
+
+Four files, and **none of them are runtime files**:
+
+1. `getGP()` in `common-scripts/c64tokens.py` — the token, explicit `id:NAME`, next free downward.
+2. `GPC-BASIC/GP.INC.BL` — the matching `#TOKEN` line. This is the ABI mirror.
+3. `unary.def` or `commands.def` — the declaration, **with no `T`**.
+4. A helper in `compiler/source/evaluate/term/gpcomposite.asm`.
+
+Explicitly NOT touched: `pcode.py`, `pcodetokens.inc`, `vectors.py`, `gp-runtime/`, `RT_ABI`.
+
+**The helper must end `clc` / `rts`.** `GeneratorExecute` reads carry as "keep going"; return with it
+set and every table element after the `X:` is silently dropped — including the `N` that types the
+result. No error is raised. This is the same trap that ate the tokens after a `.def` helper in the
+compiled `OPEN15,8,15` hang.
+
+### What can be one, and what cannot
+
+Only a keyword that is a **rearrangement of things that already exist** and uses **each argument
+exactly once**. The p-code stack has `SWAP` but no `DUP`, so an argument needed twice cannot be had,
+and nothing needing a branch or a loop can be expressed at all.
+
+Three things were considered for this batch and rejected, so they do not get re-argued:
+
+- **`GP.STARTSWITH`** — dropped as not worth a keyword. `GP.INSTR(a$,b$)=1` already says it, and
+  unlike `GP.CONTAINS` the shorter spelling is not much shorter.
+- **`GP.ENDSWITH`** — **not expressible.** `RIGHT$(a$,LEN(b$))=b$` uses `b$` twice. Adding a stack
+  primitive was investigated: `DUP` does **not** help (after `dup len`, `b$` is wedged mid-stack
+  where `RIGHT$` cannot reach it), `OVER` *would* work as `<a$> <b$> swap over len right$ s.cmp =`
+  — but that is ~20 runtime bytes plus an `RT_ABI` bump, it buys nothing else without `ROT` as
+  well, and the result still allocates a temp string per call via `RIGHT$`. A purpose-built handler
+  would be smaller at the call site and faster. Left out; write `RIGHT$(F$,4)=".BAS"` by hand.
+
+**On adding `DUP`/`OVER`/`ROT` to make the rest expressible (asked 2026-08-19).** All of
+`GP.ENDSWITH`, `GP.SQ`, `GP.FRAC`, `GP.MIN`/`GP.MAX`, `GP.CLAMP`, `GP.BETWEEN` *do* become
+expressible with them. They do not all become worth it, and the split is sharp:
+
+| | expansion | opcodes | needs |
+|---|---|---|---|
+| `GP.SQ(x)` | `dup *` | 2 | DUP |
+| `GP.FRAC(x)` | `dup int -` | 3 | DUP |
+| `GP.ENDSWITH(a$,b$)` | `swap over len right$ s.cmp =` | 6 | OVER |
+| `GP.MIN`/`GP.MAX` | `(a+b±ABS(a-b))/2` | ~11 | OVER+ROT |
+| `GP.BETWEEN(x,lo,hi)` | `(x>=lo) AND (x<=hi)` | ~12 | DUP+ROT |
+| `GP.CLAMP` | nests two MINs | ~20 | DUP+OVER+ROT |
+
+The three clean ones need only **DUP and OVER** (~40 bytes). **ROT's only customers are the bad
+ones** — `MIN`/`MAX` drag in `ABS` and a float *divide* where a handler just compares. So if this is
+ever revisited: add DUP+OVER, skip ROT, and give `MIN`/`MAX`/`CLAMP` real handlers or nothing.
+
+One rule that would come with it: **`DUP` on a string copies the ADDRESS, not the string**, so two
+stack slots would point at one block. Safe for reading (`len`, `s.cmp`); a hazard only if an
+in-place op saw one, which `StringVariableCompile` prevents by construction today.
+- **Case-insensitive contains** — **not expressible.** `gp.instr` compares raw bytes and `GP.UPPER`
+  is an in-place *statement*, so it cannot appear in an expression. The cheap real version is a 4th
+  optional `nocase` argument on `GP.INSTR` selecting a duplicated fold loop (~35 bytes, reusing
+  `GPFoldUpper`) — which would also give `GP.INSTR(a$,b$,start,1)` for free. **Deferred**, and note
+  it forces `RT_ABI` 20 → 21 for a reason that is easy to miss: no marker is added and nothing is
+  renumbered, but `gp.instr` would go from popping 3 arguments to popping 4, so anything compiled
+  against the old runtime would corrupt the stack silently.
+
 ## 4. BASLOAD `#TOKEN` — measured facts (spikes, 2026-08-16)
 
 BASLOAD (in every R49 ROM) is how GP source becomes a tokenised PRG, so it decides what a GP keyword

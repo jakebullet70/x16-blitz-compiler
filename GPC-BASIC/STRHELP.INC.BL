@@ -17,12 +17,15 @@
 ## **      STRHELP.WIDTH   the field width  (PADR / PADL / PADC)
 ## **      STRHELP.DELIM$  the separator    (SPLIT)
 ## **      STRHELP.MAX     field array size (SPLIT, 0 means 10)
+## **      STRHELP.FIND$   what to look for (REPLACE)
+## **      STRHELP.REPL$   what to put back (REPLACE)
 ## **      STRHELP.PET     a PETSCII code   (PET2SCR)
 ## **
 ## **  Clobbered (prog8 would say "clobbers"):
 ## **      STRHELP.GAP     STRHELP.HALF          by the pad routines
-## **      STRHELP.REST$   STRHELP.AT            by SPLIT
+## **      STRHELP.REST$   STRHELP.AT            by SPLIT and REPLACE
 ## **      STRHELP.LIM     STRHELP.N             by SPLIT
+## **      STRHELP.OUT$                          by REPLACE
 ## **      STRHELP.SCR     the result            of PET2SCR
 ## **
 ## **  Usage:
@@ -120,6 +123,49 @@ STRHELP.SPLIT.NEXT:
     STRHELP.FIELD$(STRHELP.N) = LEFT$(STRHELP.REST$, STRHELP.AT - 1)
     STRHELP.REST$ = MID$(STRHELP.REST$, STRHELP.AT + LEN(STRHELP.DELIM$))
     GOTO STRHELP.SPLIT.NEXT
+
+## STRHELP.REPLACE -- replace EVERY occurrence of STRHELP.FIND$ in
+## STRHELP.STR$ with STRHELP.REPL$.
+##
+##   in    STRHELP.STR$    the string, MODIFIED IN PLACE like the pad
+##                         routines (SPLIT is the odd one out there)
+##         STRHELP.FIND$   what to look for. Case SENSITIVE, because
+##                         GP.INSTR compares raw bytes
+##         STRHELP.REPL$   what to put in its place. May be shorter,
+##                         longer, or "" to DELETE every occurrence
+##   clobbers  STRHELP.OUT$  STRHELP.REST$  STRHELP.AT
+##
+## Composition, not bulk data, so it belongs here rather than in the
+## runtime -- same call as SPLIT makes. GP.INSTR does the searching, which
+## is the only part that would otherwise be slow.
+##
+## IT BUILDS A NEW STRING RATHER THAN EDITING IN PLACE, and that is what
+## makes it safe when the replacement CONTAINS the thing being replaced.
+## Replacing "A" with "AA" would never terminate if the output were
+## re-scanned; here everything already emitted has moved into STRHELP.OUT$
+## and only STRHELP.REST$ -- which shrinks by at least LEN(FIND$) every
+## pass -- is ever searched again. In place is also not available to us for
+## the usual reason: a replacement that is longer GROWS the string, and
+## only BASIC assignment can reallocate.
+##
+## An EMPTY STRHELP.FIND$ leaves the string alone rather than looping
+## forever. That falls out of GP.INSTR reporting "not found" for a zero
+## length needle, so the first pass takes the exit branch -- there is no
+## guard here doing it, and none is needed.
+##
+## NOT LENGTH CHECKED, as with the pad routines: a longer replacement can
+## push the result past the 255 character limit a BASIC string has, and
+## checking costs more than the mistake does.
+
+STRHELP.REPLACE:
+    STRHELP.OUT$ = ""
+    STRHELP.REST$ = STRHELP.STR$
+STRHELP.REPLACE.NEXT:
+    STRHELP.AT = GP.INSTR(STRHELP.REST$, STRHELP.FIND$)
+    IF STRHELP.AT = 0 THEN STRHELP.STR$ = STRHELP.OUT$ + STRHELP.REST$ : RETURN
+    STRHELP.OUT$ = STRHELP.OUT$ + LEFT$(STRHELP.REST$, STRHELP.AT - 1) + STRHELP.REPL$
+    STRHELP.REST$ = MID$(STRHELP.REST$, STRHELP.AT + LEN(STRHELP.FIND$))
+    GOTO STRHELP.REPLACE.NEXT
 
 ## STRHELP.PET2SCR -- a PETSCII code to the SCREEN code the tile map holds.
 ##

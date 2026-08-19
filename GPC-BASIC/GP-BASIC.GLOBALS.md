@@ -39,7 +39,7 @@ free today; it is one library update away from not being.
 
 ## 2. `GP.*` is keywords, not variables — and the difference bites
 
-`GP.INC.BL` defines **no variables at all**. It is 27 `#TOKEN` lines and nothing else. Everything
+`GP.INC.BL` defines **no variables at all**. It is 31 `#TOKEN` lines and nothing else. Everything
 spelled `GP.something` is a BASIC *keyword*, so:
 
 ```basic
@@ -90,9 +90,9 @@ the X16 boots there but `SCREEN 0` is 40×30, and someone who prefers larger tex
 
 | | |
 |---|---|
-| in | `STRHELP.STR$` — the string, in and out<br>`STRHELP.WIDTH` — field width, the pad routines<br>`STRHELP.DELIM$` `STRHELP.MAX` — `SPLIT` (`MAX` 0 means 10)<br>`STRHELP.PET` — a PETSCII code, `PET2SCR` |
-| out | `STRHELP.STR$` — padded in place<br>`STRHELP.N` — how many fields `SPLIT` found, always ≥ 1<br>`STRHELP.FIELD$(1..N)` — the fields themselves<br>`STRHELP.SCR` — the screen code from `PET2SCR` |
-| internal | `STRHELP.GAP` `STRHELP.HALF` `STRHELP.REST$` `STRHELP.AT` `STRHELP.LIM` |
+| in | `STRHELP.STR$` — the string, in and out<br>`STRHELP.WIDTH` — field width, the pad routines<br>`STRHELP.DELIM$` `STRHELP.MAX` — `SPLIT` (`MAX` 0 means 10)<br>`STRHELP.FIND$` `STRHELP.REPL$` — `REPLACE`<br>`STRHELP.PET` — a PETSCII code, `PET2SCR` |
+| out | `STRHELP.STR$` — padded, or replaced, in place<br>`STRHELP.N` — how many fields `SPLIT` found, always ≥ 1<br>`STRHELP.FIELD$(1..N)` — the fields themselves<br>`STRHELP.SCR` — the screen code from `PET2SCR` |
+| internal | `STRHELP.GAP` `STRHELP.HALF` `STRHELP.REST$` `STRHELP.AT` `STRHELP.LIM` `STRHELP.OUT$` |
 
 **`STRHELP.FIELD$` is the one array the library deliberately does NOT `DIM`.** Left alone, GPC's
 implicit `DIM` gives you 0..10. If you want more, `DIM` it yourself **before the first call** and set
