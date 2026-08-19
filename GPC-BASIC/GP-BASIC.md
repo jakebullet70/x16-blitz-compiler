@@ -109,11 +109,11 @@ the BASIC modules are written up in §4.
 | **Arrays** | ASM | `GP.SORT` `GP.ARRPTR` |
 | **Screen** | ASM | `GP.STASH` `GP.RESTR` `GP.BOX` `GP.FILL` `GP.PRINTAT` |
 | **Colour roles** | BASIC | `THEME.INC.BL` — `THEME.LOAD`, `THEME.CLR()` · §4.1 |
-| **String helpers** | BASIC | `STRHELP.INC.BL` — `PADR` `PADL` `PADC` `SPLIT` · §4.2 |
+| **String helpers** | BASIC | `STRHELP.INC.BL` — `PADR` `PADL` `PADC` `SPLIT` `REPLACE` `PET2SCR` · §4.2 |
 | **Screen etiquette, panels** | BASIC | `APPHELP.INC.BL` — `STARTUP` `RESTORE` `PANEL.SAVE/LOAD/PUT` · §4.3 |
 | **Entry fields** | BASIC | `INPHELP.INC.BL` — `INPHELP.GET`, `INPHELP.ASK` · §4.4 |
 | **Bitmaps** | BASIC | `BMX.INC.BL` — `BMX.SHOW`, `BMX.RESTORE` · §4.5 |
-| **Menus** | BASIC | `MENUHELP.INC.BL` — `MENUHELP.RUN`, `MENUHELP.DRAW` · §4.6 |
+| **Menus** | BASIC | `MENUHELP.INC.BL` — `RUN` `DRAW` `ROW` `HOTFIND` · §4.6 |
 
 **The rule that decides the side** is in §1: assembly gets what runs in a tight loop or moves bulk
 data, BASIC gets everything else — and anything that is only a *rename* of keywords already present
@@ -599,6 +599,7 @@ Examples: [`BMXVIEW.EXP.BL`](BMXVIEW.EXP.BL), and [`BMXPAL.EXP.BL`](BMXPAL.EXP.B
 | `MENUHELP.RUN` | the variables below | `MENUHELP.SEL` `MENUHELP.KEY` |
 | `MENUHELP.DRAW` | the same | draws the menu without driving it |
 | `MENUHELP.ROW` | `MENUHELP.DRAWROW` `MENUHELP.DRAWATTR` | one row, in the attribute you name |
+| `MENUHELP.HOTFIND` | `MENUHELP.DRAWROW` `MENUHELP.DRAWTEXT$` | `MENUHELP.HOTAT` — where that row's hotkey letter sits, 1-based, or **0 for "do not tint"** |
 
 **This replaces the `GP.MENU` and `GP.SEL` keywords**, withdrawn at RT_ABI 20. They were 462 bytes of
 assembly plus 11 of storage, in a block every GPB program carried whether it had a menu or not. The
