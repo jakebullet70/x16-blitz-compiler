@@ -32,18 +32,31 @@
 ## run. GP.ASM and GP.ENDASM are real keywords rather than REMs precisely so
 ## that the block is still THERE to be found empty: GPC then says BLOCK
 ## MISMATCH, instead of compiling a program that silently contains no code.
-
-#REM 1
+##
+## SO EVERY BLOCK BELOW IS BRACKETED BY ITS OWN PAIR:
+##
+##     #REM 1
+##     GP.ASM
+##     REM ...
+##     GP.ENDASM
+##     #REM 0
+##
+## One switch on at the top of the file would work just as well -- #REM takes
+## effect from the line it is on and stays in force until it is changed again --
+## but pairing it with the block says what the switch is FOR, keeps ordinary
+## REMs written elsewhere out of the tokenised PRG, and is the shape to copy.
 
 ## ---- 1. Assembly, in the program, with nothing to set up first.
 
 PRINT "1. ";
+#REM 1
 GP.ASM
 REM LDA #72               ; H
 REM JSR $FFD2             ; KERNAL CHROUT
 REM LDA #73               ; I
 REM JSR $FFD2
 GP.ENDASM
+#REM 0
 PRINT
 
 ## ---- 2. {VAR} -- READING AND WRITING BASIC'S OWN VARIABLES.
@@ -70,12 +83,14 @@ PRINT
 N% = 65
 M% = 0
 PRINT "2. ";
+#REM 1
 GP.ASM
 REM LDA {N%}               ; N% is A% by the time BASLOAD is done with it
 REM CLC
 REM ADC #1
 REM STA {M%}               ; M% = N% + 1, in BASIC'S OWN SLOT
 GP.ENDASM
+#REM 0
 PRINT "N=";N%;" M=";M%
 
 ## ---- 3. Labels and branches.
@@ -89,6 +104,7 @@ PRINT "N=";N%;" M=";M%
 ## at run time.
 
 PRINT "3. ";
+#REM 1
 GP.ASM
 REM LDX #5
 REM LOOP: LDA #42         ; *
@@ -96,12 +112,14 @@ REM JSR $FFD2
 REM DEX
 REM BNE LOOP
 GP.ENDASM
+#REM 0
 PRINT
 
 ## ---- 4. JMP and JSR take a label too, and those are real addresses -- the
 ## ---- compiler fills them in once it knows where the program will run.
 
 PRINT "4. ";
+#REM 1
 GP.ASM
 REM JMP OVER
 REM LDA #88               ; X -- jumped over, never printed
@@ -111,6 +129,7 @@ REM JSR $FFD2
 REM LDA #75               ; K
 REM JSR $FFD2
 GP.ENDASM
+#REM 0
 PRINT
 
 ## ---- 5. There is no expression syntax. {N%}+1 and LABEL+2 are not things.
@@ -136,8 +155,6 @@ PRINT
 ## BBR/BBS/RMB/SMB are the only instructions missing. They are Rockwell
 ## additions with a four character mnemonic ending in a bit number, and nothing
 ## on this machine uses them.
-
-#REM 0
 
 PRINT "DONE"
 
