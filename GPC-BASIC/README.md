@@ -55,7 +55,8 @@ All of it needs `#INCLUDE "GP.INC.BL"`, and nothing else.
 | Group | Commands | Example |
 | --- | --- | --- |
 | Loops | `GP.DO` `GP.LOOP` `GP.EXITDO` | `LOOPS.EXP.BL` |
-| Multi-way branch | `GP.SELECT` `GP.CASE` `GP.ELSE` `GP.ENDSEL` | `SELECT.EXP.BL` |
+| Block IF | `GP.IF` `GP.ELSEIF` `GP.ELSE` `GP.ENDIF` | `IF.EXP.BL` |
+| Multi-way branch | `GP.SELECT` `GP.CASE` `GP.OTHER` `GP.ENDSEL` | `SELECT.EXP.BL` |
 | Strings | `GP.INSTR` `GP.STRPTR` `GP.COMP` `GP.TRIM` `GP.LTRIM` `GP.RTRIM` `GP.UPPER` `GP.LOWER` | `STRINGS.EXP.BL` |
 | Strings, composite | `GP.CONTAINS` `GP.ISEMPTY` — free | `STRINGS.EXP.BL` |
 | Addresses, composite | `GP.HIBYTE` `GP.LOBYTE` — free; split an address for `GP.CALL` | `ARRAYS.EXP.BL` |

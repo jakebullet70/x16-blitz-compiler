@@ -101,7 +101,8 @@ the BASIC modules are written up in §4.
 | | | |
 |---|---|---|
 | **Loops** | ASM | `GP.DO` `GP.LOOP` `GP.EXITDO` |
-| **Multi-way branch** | ASM | `GP.SELECT` `GP.CASE` `GP.ELSE` `GP.ENDSEL` |
+| **Multi-way branch** | ASM | `GP.SELECT` `GP.CASE` `GP.OTHER` `GP.ENDSEL` |
+| **Block IF** | ASM | `GP.IF` `GP.ELSEIF` `GP.ELSE` `GP.ENDIF` — see §3.8 |
 | **Machine code** | ASM | `GP.CALL` `GP.A` `GP.X` `GP.Y` `GP.C` |
 | **Strings** | ASM | `GP.INSTR` `GP.STRPTR` `GP.TRIM` `GP.LTRIM` `GP.RTRIM` `GP.UPPER` `GP.LOWER` `GP.COMP` |
 | **Strings** | COMPOSITE | `GP.CONTAINS` `GP.ISEMPTY` — free, see §3.4 |
@@ -159,13 +160,13 @@ Example: [`LOOPS.EXP.BL`](LOOPS.EXP.BL)
 GP.SELECT <expr>
 GP.CASE <expr> [,<expr> ...]
     ...
-GP.ELSE
+GP.OTHER
     ...
 GP.ENDSEL
 ```
 
 The selector is evaluated **once**; each `GP.CASE` compares against it in the order written, and the
-first match wins. `GP.ELSE` is optional. **Nothing matching with no `GP.ELSE` is not an error** — the
+first match wins. `GP.OTHER` is optional. **Nothing matching with no `GP.OTHER` is not an error** — the
 whole select is simply skipped.
 
 Case values are ordinary numeric **expressions**, not just constants — which is a step past prog8's
@@ -187,7 +188,7 @@ GP.SELECT BMX.DEPTH
     GP.CASE 8
     GP.CASE 1, 2, 4
         BMX.ERROR$ = "NEEDS ANOTHER SCREEN MODE"
-    GP.ELSE
+    GP.OTHER
         BMX.ERROR$ = "BAD BIT DEPTH"
 GP.ENDSEL
 ```
@@ -386,6 +387,60 @@ accident.
 
 Example: [`SCREEN.EXP.BL`](SCREEN.EXP.BL)
 
+
+---
+
+### 3.8 Block IF
+
+```
+GP.IF <expr> THEN
+    ...
+GP.ELSEIF <expr> THEN
+    ...
+GP.ELSE
+    ...
+GP.ENDIF
+```
+
+**Every one of the four is alone on its line, and `THEN` is required.** There is no one-line form:
+`GP.IF X > 5 THEN PRINT` is a syntax error, not a short IF. That is deliberate — a mandatory `THEN`
+invites the one-line reading, and allowing it would mean a block that silently swallowed every line
+down to the next `GP.ENDIF`. Stock `IF ... THEN` is untouched and remains the right answer for a
+one-liner.
+
+`GP.ELSEIF` may repeat as often as you like; `GP.ELSE` is optional. The first true condition wins and
+nothing below it runs, so there is no "break" to forget. **Nothing matching with no `GP.ELSE` is not
+an error** — the whole block is simply skipped. Conditions are numeric expressions, as everywhere
+else.
+
+**This is not a worse `GP.SELECT`, it is the other half.** A select fetches **one** value and compares
+it against each alternative, which is what you want for a sparse key code or a state machine. A block
+IF tests something **different** in every branch — ranges, compound conditions, a string in one arm
+and a number in the next. Neither replaces the other.
+
+> **`GP.ENDIF` is required**, but unlike `GP.ENDSEL` it does no work — there is no frame to release,
+> because the condition is evaluated and consumed on the same line it is written. **So a `GOTO` out of
+> a `GP.IF` is safe**, where one out of a select leaks the selector's frame. Leaving the `GP.ENDIF`
+> off stops the compile with `STRUCTURE IMBALANCE` rather than guessing where you meant the block to
+> end.
+
+```basic
+GP.IF N < 0 THEN
+    PRINT "NEGATIVE"
+GP.ELSEIF N = 0 THEN
+    PRINT "ZERO"
+GP.ELSE
+    PRINT "POSITIVE"
+GP.ENDIF
+```
+
+IFs nest freely — inside each other, inside a `GP.CASE` body, and inside a `GP.DO` loop.
+
+**It costs 14 bytes of runtime, and none of them are code.** All four of its p-code opcodes reuse a
+handler that already existed: the two branches are the `.goto.z` and `.goto` handlers under different
+names, and the two markers share one four-byte no-op. See §11 of `docs/blitz/GP-BASIC.TIERS.md`.
+
+Example: [`IF.EXP.BL`](IF.EXP.BL)
 
 ---
 

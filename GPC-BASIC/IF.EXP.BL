@@ -1,0 +1,84 @@
+## ***********************************************************************
+## **
+## **  IF.EXP.BL -- GP.IF / GP.ELSEIF / GP.ELSE / GP.ENDIF
+## **
+## **  Build:  copy GPC-BASIC/GP.INC.BL and this file into testing/, then
+## **            python source/gpc/build_basl.py IF.EXP.BL IF.PRG
+## **          and compile IF.PRG with GPC.BLITZ.BIN.
+## **
+## **  Compile-only: the ROM cannot RUN a PRG containing GP tokens.
+## **
+## ***********************************************************************
+#INCLUDE "GP.INC.BL"
+#SAVEAS "@:IF.PRG"
+
+## ---- 1. the shape.  All four keywords are ALONE ON THEIR OWN LINE and
+## ---- THEN is REQUIRED.  There is no one-line form -- GP.IF X THEN PRINT
+## ---- is a syntax error, not a short IF.  Stock IF ... THEN is untouched
+## ---- and is still the right answer for a one-liner.
+
+FOR IF.N = -2 TO 2
+  GOSUB DESCRIBE
+NEXT
+
+## ---- 2. GP.ELSEIF repeats as often as you like and GP.ELSE is optional.
+## ---- The first condition that is true wins; nothing below it runs, so
+## ---- there is no "break" to forget.
+
+IF.SCORE = 75
+GP.IF IF.SCORE >= 90 THEN
+  PRINT "GRADE A"
+GP.ELSEIF IF.SCORE >= 80 THEN
+  PRINT "GRADE B"
+GP.ELSEIF IF.SCORE >= 70 THEN
+  PRINT "GRADE C"
+GP.ELSE
+  PRINT "GRADE F"
+GP.ENDIF
+
+## ---- 3. no GP.ELSE at all -- a plain guard.  Nothing matching is not an
+## ---- error, the whole block is simply skipped.
+
+GP.IF IF.SCORE < 0 THEN
+  PRINT "IMPOSSIBLE"
+GP.ENDIF
+
+## ---- 4. why this is not GP.SELECT.  A select fetches ONE value and
+## ---- compares it against each alternative; here every branch may test
+## ---- something completely different, including a string.
+
+IF.A$ = "HELLO"
+GP.IF LEN(IF.A$) = 0 THEN
+  PRINT "EMPTY"
+GP.ELSEIF LEFT$(IF.A$,1) = "H" THEN
+  PRINT "STARTS WITH H"
+GP.ELSE
+  PRINT "SOMETHING ELSE"
+GP.ENDIF
+
+PRINT "STILL RUNNING"
+END
+
+## ***********************************************************************
+## **  IFs nest freely -- inside each other, inside a GP.CASE body, and
+## **  inside a GP.DO loop.
+## **
+## **  Unlike GP.SELECT there is NO frame to release, so a GOTO out of a
+## **  GP.IF is safe: GP.ENDIF only marks where the block ends, it does no
+## **  work.  It is still REQUIRED -- without it the compile stops with
+## **  STRUCTURE IMBALANCE rather than guessing where the block ended.
+## ***********************************************************************
+
+DESCRIBE:
+  GP.IF IF.N < 0 THEN
+    PRINT IF.N; "NEGATIVE"
+  GP.ELSEIF IF.N = 0 THEN
+    PRINT IF.N; "ZERO"
+  GP.ELSE
+    GP.IF IF.N = 1 THEN
+      PRINT IF.N; "POSITIVE, AND ONE"
+    GP.ELSE
+      PRINT IF.N; "POSITIVE"
+    GP.ENDIF
+  GP.ENDIF
+  RETURN
