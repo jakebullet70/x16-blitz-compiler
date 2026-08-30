@@ -766,6 +766,55 @@ Related: the same survey found `GP.SELECT` and an `GP.IF`/`GP.ELSEIF` chain with
 other on INPHELP's real seven-way dispatch (~75 B against ~78 B), so the two constructs are a
 readability choice, not a size one.
 
+
+## Growing the object buffer — the compiler into banked RAM
+
+**Own branch. Not a GP.ASM job** — GP.ASM only made an existing problem visible enough to measure.
+
+The compiler builds the p-code in low RAM between `FreeMemory` and `ObjectCeiling` (`$9F00`), and
+`FreeMemory` is `.align 256` immediately after the compiler's last byte. So **every byte of compiler
+comes straight off the largest program it can compile**, one for one. Today that buffer is
+**12,800 bytes** (`$6D00`-`$9F00`); it was 15,616 before GP.ASM and 19,968 when
+`source/compiler/source/system-specific/x16/x16_storage.inc` was written.
+
+**The buffer is what binds, and it has been for a while.** The run side allows more:
+`newWorkspacePage = runtimeEndPage + pages(p-code) + FrameStackPages` has to stay under
+`ObjectCeiling - MIN_WS_PAGES`, which permits **18,432 bytes GP OUT / 16,384 GP IN**. So a program
+can be too big to *compile* while being perfectly able to *run*. (`README.md` still says the buffer
+does not bind — it is wrong, and has been since before this entry.)
+
+Closing the gap for a GP-OUT program means putting `FreeMemory` at `$5700`, i.e. **freeing 5,632
+bytes — 22 pages — of compiler low RAM.**
+
+**The mechanism already exists and has already been used once for exactly this.** `x16_storage.inc`
+moved the variable-name and line-number tables to `$A000-$BFFF` in RAM bank 2 and handed
+`$5100-$9EFF` back to the object code. Its header carries the rules any new banked user must obey,
+and they are the whole difficulty:
+
+- preserve A, X, Y **and** the flags across a window;
+- restore the **caller's** bank, never a hardcoded 0;
+- **never hold a bank across a KERNAL call** — bank 0 is the KERNAL's;
+- **no nesting**, verified by inspection rather than enforced by anything.
+
+Data is easy under those rules; **code is not**, and code is where the 5,632 bytes are. A banked
+routine has to be reachable from low RAM, must not open a window inside one already open, and must
+close before any file I/O. That is a whole-compiler audit, not a local change — which is why this is
+its own branch with its own test pass.
+
+Bank allocation is documented in that same header and must be updated first: 0 KERNAL, 1 the native
+test harness, 2 the storage tables, **3 GP.ASM's blob pool and fixup list**. 4 up are free.
+
+
+**A known 626-byte candidate, deliberately left behind.** GP.ASM's opcode tables
+(`source/compiler/source/generated/gpasmtable.asm`) are read-only and would sit happily in bank 3
+beside the pool — but unlike the pool they have to *get* there, and the only route is the
+init-overlay: stage them above `FreeMemory`, copy into the bank before the first object byte is
+written, and let the object buffer overwrite the staging area. That cannot be done where they are,
+because `build.py` sweeps them into `compiler.library`, which links **before** `zzfree.footer` where
+`FreeMemory` is declared. Moving them means splitting the table out of the compiler library and
+into the application's footer, plus a load-order contract that nothing enforces — for two pages.
+It belongs in this project, not in GP.ASM's.
+Worth doing. A compiler that refuses programs the runtime would happily run is the wrong way round.
 ## Wanted
 
 ### Name the output after the source — DONE, but by the caller

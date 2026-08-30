@@ -1,7 +1,14 @@
 # GP.ASM — inline 65C02 assembly in GP-BASIC (research)
 
-> **Status: research only. Nothing implemented; no code in this tree has been
-> changed.** Started and written 2026-08-30, incrementally, because the previous
+> **Status: IMPLEMENTED, on branch `feature/gp-asm`.** This document was written
+> as research, before any code existed, and it is kept as the reasoning behind
+> what was built — not as a description of it. Where the two differ, the tree is
+> right. What shipped: §18's option A (the `SYS` composite with blobs pooled past
+> the `$FF` end marker), §17's REM-bodied block, §19.1's `#INCLUDE`. Verified on
+> R49 at **RT 12031 / GP OUT** — zero runtime bytes. Labels, branches and `{VAR}`
+> are not built yet. See `TODO.md` and the commit messages for the build itself.
+
+> **Originally written as research only.** Started and written 2026-08-30, incrementally, because the previous
 > GP-BASIC design session was lost before it was written down (see the banner on
 > `GP-BASIC.PLAN.md`). Every claim says where it came from, and measurements are
 > labelled as measurements.

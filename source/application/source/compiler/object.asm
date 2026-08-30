@@ -192,6 +192,14 @@ _WOCDone:
 
 _WOCShared:
 		;
+		;		Resolve the GP.ASM blob addresses FIRST. Shared p-code always lands at $0900
+		;		whatever ScanGPUsage decides, so this does not have to wait for it -- and it
+		;		MUST NOT, because AsmPatchBlobs uses zTemp1 and the page count computed just
+		;		below lives there until it is read back further down.
+		;
+		lda 	#(PCODE_PAGE - (FreeMemory >> 8)) & $FF
+		jsr 	AsmPatchBlobs
+		;
 		;		p-code length -> whole pages (same as the embedded path)
 		;
 		sec
@@ -210,8 +218,6 @@ _WOCSWhole:
 		;		fewer than MIN_WS_PAGES below RTBASE, or if the page count itself overflowed a byte.
 		;
 		jsr 	ScanGPUsage 				; the shared runtime is two files now -- see below
-		lda 	#(PCODE_PAGE - (FreeMemory >> 8)) & $FF	; shared p-code always lands at $0900
-		jsr 	AsmPatchBlobs
 		;
 		;		The workspace ends where the resident runtime starts, and that is no longer one
 		;		address: a program using no GPB keyword loads the CORE-ONLY file at RTBASE and keeps

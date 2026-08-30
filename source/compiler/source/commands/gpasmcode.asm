@@ -44,8 +44,26 @@
 ;
 ; ************************************************************************************************
 
-ASM_POOL_SIZE = 1024 						; total assembled bytes across the whole program
+;
+;		THE POOL AND THE FIXUP LIST LIVE IN BANKED RAM, at $A000-$BFFF in bank 3, bracketed by
+;		the .asm_access / .asm_release macros in system-specific/x16/x16_storage.inc -- which is
+;		also where the bank allocation is written down, and where the rules a window has to obey
+;		are set out. The compiler's own name and line tables took the same route to bank 2.
+;
+;		They are here because low RAM is not free: FreeMemory is page aligned immediately after
+;		the compiler's last byte, so every byte of compiler comes one for one off the object
+;		buffer -- which is to say off the largest program the thing can compile. A pool in low
+;		RAM cost 1,024 bytes of that AND capped total assembly at 1,024 bytes. In the bank it
+;		costs nothing and the cap is nearly eight times larger.
+;
+;		See TODO.md, "Growing the object buffer", for the rest of that story: the buffer binds
+;		before the run side does, and has since well before GP.ASM existed.
+;
 ASM_MAX_BLOCKS = 32 						; GP.ASM blocks in one program
+
+AsmFixups     = $A000 						; per block: p-code operand address, blob pool offset
+AsmPool       = AsmFixups + 4*ASM_MAX_BLOCKS 	; every blob in the program, back to back
+ASM_POOL_SIZE = $C000 - AsmPool 			; ...to the top of the window
 
 ;
 ;		Operand syntax classes -- what the text LOOKED like, before the mnemonic gets a say in
@@ -91,13 +109,6 @@ AsmCloseBlock:
 		lda 	AsmFixupCount 				; room for another block ?
 		cmp 	#ASM_MAX_BLOCKS
 		bcs 	_ACBTooMany
-		asl 	a 							; 4 bytes per fixup
-		asl 	a
-		tax
-		lda 	AsmBlobStart 				; where this blob starts in the pool
-		sta 	AsmFixups+2,x
-		lda 	AsmBlobStart+1
-		sta 	AsmFixups+3,x
 
 		lda 	#PCD_CMD_WORD 				; .word <blob address>
 		jsr 	WriteCodeByte
@@ -105,19 +116,41 @@ AsmCloseBlock:
 		;		Capture where the operand lands BEFORE writing it -- objPtr is the write cursor,
 		;		so this IS the address of the low byte, in the buffer, right now. Absolute and
 		;		not an offset, because FreeMemory is an application symbol and this library is
-		;		also built on its own. WriteCodeByte preserves X, so the fixup index survives
-		;		the calls around it.
+		;		also built on its own.
+		;
+		;		Built in low RAM first and banked in one go at the end: the record cannot be
+		;		assembled straight into the window, because WriteCodeByte sits in the middle of
+		;		it and can leave through the error handler, which prints in bank 0.
 		;
 		lda 	objPtr
-		sta 	AsmFixups+0,x
+		sta 	AsmNewFixup+0
 		lda 	objPtr+1
-		sta 	AsmFixups+1,x
+		sta 	AsmNewFixup+1
+		lda 	AsmBlobStart 				; where this blob starts in the pool
+		sta 	AsmNewFixup+2
+		lda 	AsmBlobStart+1
+		sta 	AsmNewFixup+3
 		lda 	#0 							; two placeholders, overwritten by AsmPatchBlobs
 		jsr 	WriteCodeByte
 		lda 	#0
 		jsr 	WriteCodeByte
 
 		.keyword PCD_SYS 					; $DD $B0 -- call it
+
+		lda 	AsmFixupCount 				; 4 bytes per fixup
+		asl 	a
+		asl 	a
+		tax
+		ldy 	#0
+		.asm_access
+_ACBStore:
+		lda 	AsmNewFixup,y
+		sta 	AsmFixups,x
+		inx
+		iny
+		cpy 	#4
+		bne 	_ACBStore
+		.asm_release
 		inc 	AsmFixupCount
 		rts
 
@@ -147,7 +180,9 @@ _APWSpace:
 		adc 	AsmPoolLen+1
 		sta 	zTemp2+1
 		pla
+		.asm_access
 		sta 	(zTemp2)
+		.asm_release
 		inc 	AsmPoolLen
 		bne 	_APWDone
 		inc 	AsmPoolLen+1
@@ -184,7 +219,11 @@ _AFPLoop:
 		lda 	AsmCopyIdx+1
 		sbc 	AsmPoolLen+1
 		bcs 	_AFPDone
-		lda 	(zTemp2)
+		.asm_access 						; one byte at a time, and the window CLOSES before
+		lda 	(zTemp2) 					; WriteCodeByte -- its ObjectCeiling test can raise
+		sta 	AsmByte 					; PROGRAM TOO BIG and leave through the error
+		.asm_release 						; handler, which prints, in bank 0
+		lda 	AsmByte
 		jsr 	WriteCodeByte 				; uses objPtr only, leaves zTemp2 alone
 		inc 	zTemp2
 		bne 	_AFPNoCarry
@@ -211,8 +250,16 @@ _AFPDone:
 AsmPatchBlobs:
 		sta 	AsmPageDelta
 		lda 	AsmFixupCount
-		beq 	_APBDone
+		bne 	_APBGo
+		rts
+_APBGo:
 		stz 	AsmFixIdx
+		;
+		;		One window around the whole loop. Everything it WRITES is the object buffer,
+		;		which is low RAM and not banked, and there is no jsr in here at all -- so none
+		;		of the nesting or KERNAL rules can be broken by it.
+		;
+		.asm_access
 _APBLoop:
 		lda 	AsmFixIdx
 		asl 	a
@@ -248,7 +295,7 @@ _APBLoop:
 		lda 	AsmFixIdx
 		cmp 	AsmFixupCount
 		bcc 	_APBLoop
-_APBDone:
+		.asm_release
 		rts
 
 ; ************************************************************************************************
@@ -618,7 +665,8 @@ _ASMCandidate:
 		lda 	AsmModeChoice,x
 		cmp 	#$FF
 		beq 	_ASMNoMode
-		bpl 	_ASMTry 					; no byte-only flag
+		cmp 	#$80 						; top bit = "only if the operand fits in a byte"
+		bcc 	_ASMTry
 		and 	#$7F
 		ldx 	AsmIsByte
 		beq 	_ASMNextCandidate 			; byte-only candidate, and this operand is not one
@@ -759,16 +807,16 @@ AsmModeLen:
 ;
 ; ************************************************************************************************
 
-AsmPool:
-		.fill 	ASM_POOL_SIZE 			; every blob in the program, back to back
 AsmPoolLen:
 		.fill 	2
 AsmPoolBase:
 		.fill 	2 						; where the pool landed within the object
 AsmBlobStart:
 		.fill 	2 						; pool offset of the blob being assembled
-AsmFixups:
-		.fill 	4*ASM_MAX_BLOCKS 		; per block: p-code operand offset, blob pool offset
+AsmNewFixup:
+		.fill 	4 						; one fixup record, built here before it is banked
+AsmByte:
+		.fill 	1 						; one pool byte, carried out of the window
 AsmFixupCount:
 		.fill 	1
 AsmFixIdx:

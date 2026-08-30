@@ -64,6 +64,7 @@ CompilerRAMBankReg	= $0000
 ;			1	the NATIVE TEST HARNESS's p-code buffer. source/compiler/testing/api/api.asm
 ;				does "lda #1 / sta 0" in _TAResetOut and then writes the object from $A000 up.
 ;			2	these tables.
+;			3	GP.ASM's blob pool and fixup list (see the second pair of macros below).
 ;
 ;		This was bank 1 for one build, and the compiler-runtime `variables` and `arrays` suites
 ;		hung: the harness's object code and the variable name list were overwriting each other,
@@ -109,3 +110,45 @@ storageSavedBank: 							; caller's RAM bank, saved across a storage window
 ;		02/08/26		Implemented (were no-ops); tables moved to banked RAM $A000-$BFFF.
 ;
 ; ************************************************************************************************
+
+; ************************************************************************************************
+;
+;		The same thing again for GP.ASM's blob pool and its fixup list (commands/gpasmcode.asm).
+;		A SECOND window, not a second user of the first: these are written all through a compile
+;		while the storage tables are not, and keeping them apart means neither can be corrupted
+;		by a bug in the other's bookkeeping.
+;
+;		Same rules as above, and the same reasoning. In particular the windows here are never
+;		nested inside a storage window -- nothing in the assembler touches a variable name or a
+;		line number -- and none of them holds the bank across a KERNAL call. AsmFlushPool is the
+;		one that could be tempted to: it reads the pool and writes it to the object, so it opens
+;		and closes ONCE PER BYTE rather than holding the window across WriteCodeByte, whose
+;		ObjectCeiling check can raise PROGRAM TOO BIG and leave through the error handler --
+;		which prints, through the KERNAL, in bank 0.
+;
+AsmStorageBank	= 3
+
+asm_access .macro
+		php
+		pha
+		lda 	CompilerRAMBankReg 			; remember whatever the caller had selected
+		sta 	asmSavedBank
+		lda 	#AsmStorageBank
+		sta 	CompilerRAMBankReg
+		pla
+		plp
+		.endm
+
+asm_release .macro
+		php
+		pha
+		lda 	asmSavedBank
+		sta 	CompilerRAMBankReg
+		pla
+		plp
+		.endm
+
+		.section storage
+asmSavedBank: 								; caller's RAM bank, saved across an assembler window
+		.fill 	1
+		.send 	storage
