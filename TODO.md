@@ -768,42 +768,50 @@ readability choice, not a size one.
 
 
 
-## GP.ASM `{VAR}` under BASLOAD
+## GP.ASM `{VAR}` under BASLOAD — DONE, by reading `#SYMFILE`
 
-`{VAR}` reaches a BASIC variable from inside a `GP.ASM` block, and it works — **but not through
-BASLOAD**, which is the workflow everything in `GPC-BASIC/` uses. Verified both ways on R49:
-through `bin/tokenise.zip` an assembly block reads and writes BASIC's own variables correctly;
-through BASLOAD it compiles clean and changes nothing.
+`{VAR}` reaches a BASIC variable from inside a `GP.ASM` block, and it now does so under BASLOAD,
+which is the workflow everything in `GPC-BASIC/` uses.
 
-**BASLOAD renames variables and does not rename REM text with them.** It crunches `N%` to `A%` in
-the code — that is how it offers 64 significant characters on a two character BASIC — while the REM
-carrying `LDA {N%}` is stored byte for byte, which is the very property that lets an assembly body
-survive tokenisation at all (`ORA`, `AND`, `EOR` and `ROR` are keywords everywhere else). The two
-halves of the feature want opposite things from the same tool.
+**The problem was that BASLOAD renames variables and does not rename REM text with them.** It
+crunches `N%` to `A%` in the code — that is how it offers 64 significant characters on a two
+character BASIC — while the REM carrying `LDA {N%}` is stored byte for byte, which is the very
+property that lets an assembly body survive tokenisation at all. The two halves of the feature
+wanted opposite things from the same tool.
 
-There is **no BASLOAD option to turn crunching off**; `#SYMFILE` only records the mapping.
+**`#SYMFILE` is BASLOAD's own record of the mapping, and the compiler reads it.** The source says
 
-For now the compiler **refuses** a `{VAR}` it cannot find rather than creating one BASIC never
-reads — a named error on the right line instead of a block that runs, stores, and changes nothing
-anyone can see. That is damage control, not a fix. Three ways out, none of them started:
+```
+#SYMFILE "@:PROG.SYM"
+```
 
-1. **Read the symbol file.** `#SYMFILE "@:PROG.SYM"` writes source-name to crunched-name for every
-   variable. The compiler could read it and translate `{VAR}` on the way through. Compile-time
-   work, so free by the rule this feature is built on — but it needs a fourth `GPC.INPUT` line, and
-   a `#SYMFILE` the programmer must not forget, which is a silent failure of its own unless the
-   absence of the file is itself an error whenever a `{VAR}` appears.
+at the top, named to match the PRG — compiling `PROG.PRG` reads `PROG.SYM`, the convention
+`source/gpc/build_basl.py` already followed. Nothing in the syntax changed: `{N%}` is still written
+the way the variable was written.
 
-2. **Name the variables where BASLOAD can see them.** `GP.ASM N%, M%` puts them in real code, which
-   BASLOAD crunches like any other reference, and the body refers to them positionally — `{1}`,
-   `{2}`. Correct by construction and needs no extra file; the cost is that the body no longer
-   reads as the assembly you would have written by hand, which was the whole point of the REM form.
+- `BLC_SYMLOOKUP` (api.inc) is the seventh compiler-to-application call.
+  `source/application/source/compiler/symfile.asm` does the scanning, because the file name is
+  derived from `GPC.INPUT`'s source line and that is an application symbol — the same reason
+  `ScanGPUsage` lives there. The two buffers are the compiler's, which the application can see
+  because it links the compiler library; the other direction is what breaks the standalone build.
+- **The sigil is not in the symbol file** — `PR$` is filed as `PR`, because BASLOAD crunches the
+  identifier and the `$` or `%` rides along separately. So one entry serves `N`, `N$` and `N%`, and
+  the compiler re-attaches the type itself.
+- **The LABELS section is skipped.** Its lines have the same shape but its values are BASIC line
+  numbers, so a label could otherwise answer for a variable of the same name.
+- **A missing symbol file is detected by the banner, not by the open.** CMDR-DOS opens a file that
+  is not there quite happily and only reports it on the first read, so a missing file arrived
+  looking exactly like an empty one and was reported as "the name is not in it". Every symbol file
+  starts `BASLOAD n.n.n SYMBOL FILE`; that is what is checked.
+- Both errors are compiler-only text, in compiler space rather than the shared error table — that
+  table is in `common.library`, below `GPBase`, and is copied into every compiled program, so a
+  message there would cost every program bytes for a diagnostic only the compiler can print.
 
-3. **Leave it host-tokeniser only** and say so. `{VAR}` then works for hand-written `.bas` sources
-   and is unavailable to the BASL library — which is backwards, since BASL is where the real
-   programs are.
+Verified on R49 three ways: a BASL program whose `COUNTER%`/`RESULT%` BASLOAD crunched to `A`/`A0`
+compiles and prints `COUNTER= 65 / RESULT = 66`; deleting the symbol file gives
+`NO SYMBOL FILE FOR {} @ 5` and no object; and a `{VAR}` naming a variable BASIC never used gives
+`UNKNOWN VARIABLE IN {} @ 3` and no object.
 
-(1) keeps the syntax and pays in plumbing; (2) keeps the plumbing and pays in syntax. Worth deciding
-before `{VAR}` is documented as a feature anyone should rely on.
 ## Growing the object buffer — DONE, by moving the runtime out of RAM
 
 **12,800 -> 23,296 bytes.** `FreeMemory` `$6D00` -> `$4400`. The compiler is no longer what limits

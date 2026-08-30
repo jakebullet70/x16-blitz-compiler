@@ -282,12 +282,18 @@
 ##                     its data -- an element is two steps, as it is
 ##                     through GP.ARRPTR
 ##
-## >> {VAR} DOES NOT WORK THROUGH BASLOAD. BASLOAD renames variables --
-## >> N% becomes A% -- and does not rename REM text with them, so the
-## >> name in the braces is no longer the name BASIC uses. GPC refuses a
-## >> {VAR} it cannot find rather than creating one nothing reads, so you
-## >> get an error and not a wrong answer. It works when the source is
-## >> tokenised by the host tokeniser instead. See ASM.EXP.BL.
+## >> {VAR} NEEDS #SYMFILE. BASLOAD renames variables -- N% becomes A% --
+## >> and does not rename REM text with them, so the name in the braces
+## >> is not the name the code uses. #SYMFILE is BASLOAD's own record of
+## >> that mapping and the compiler reads it, so put
+## >>
+## >>   #SYMFILE "@:PROG.SYM"
+## >>
+## >> at the top, named to match the PRG: PROG.PRG reads PROG.SYM. Miss
+## >> it and the compile stops with NO SYMBOL FILE FOR {} on the line.
+## >>
+## >> {VAR} never CREATES a variable, so assign it in BASIC first, even
+## >> M% = 0, or you get UNKNOWN VARIABLE IN {}. See ASM.EXP.BL.
 ##
 ## NO EXPRESSIONS: {N%}+1 and LABEL+2 are not understood. Use an index
 ## register. Zero page or absolute is chosen by the OPERAND -- $34 is

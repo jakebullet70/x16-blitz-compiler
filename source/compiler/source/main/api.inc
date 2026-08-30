@@ -46,6 +46,17 @@ BLC_WRITEOUT = 5
 ;		Print character X to display / stream for errors & information
 ;
 BLC_PRINTCHAR = 6
+;
+;		Translate AsmSymName (the name as written inside a GP.ASM {VAR}) through BASLOAD's
+;		#SYMFILE, leaving the crunched name in AsmSymCrunched. CC = found. CS = failed, with
+;		A = 0 when the symbol file itself is missing and A = 1 when the name is not in it.
+;
+;		HERE RATHER THAN IN THE COMPILER LIBRARY because the file name is derived from
+;		GPC.INPUT's source line, which is an application symbol -- the same reason ScanGPUsage
+;		lives on that side. The two buffers are the compiler's, because the application links
+;		the compiler library and so can see them, and not the other way round.
+;
+BLC_SYMLOOKUP = 7
 
 ; ************************************************************************************************
 ;

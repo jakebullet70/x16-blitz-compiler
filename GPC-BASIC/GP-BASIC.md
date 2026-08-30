@@ -517,15 +517,29 @@ thing: `LDA {N%}` reads it, `STA {N%}` writes it, in the slot BASIC itself uses.
 | `{N}` `{N%}` `{N$}` | the scalar's slot |
 | `{N()}` | the **array's** slot, which holds the base address of its data — an element is two steps, as through `GP.ARRPTR` |
 
-> **`{VAR}` does not work through BASLOAD, and this is the one trap in the feature.** BASLOAD
-> renames variables — `N%` becomes `A%`, which is how it gives you 64 significant characters on a
-> two-character BASIC — and it does *not* rename REM text with them. So the code says `A%` while
-> the REM still says `{N%}`, and they are no longer the same variable.
+> **`{VAR}` needs `#SYMFILE`, and that is the one thing to remember.** BASLOAD renames variables —
+> `N%` becomes `A%`, which is how it gives you 64 significant characters on a two-character BASIC —
+> and it does *not* rename REM text with them. So the code says `A%` while the REM still says
+> `{N%}`. `#SYMFILE` is BASLOAD's own record of that mapping, and the compiler reads it:
 >
-> GPC **refuses** a `{VAR}` naming a variable it cannot find, rather than creating one BASIC never
-> reads. You get an error on the line instead of a block that runs, stores, and changes nothing you
-> can see. It works as written when the source goes through the **host** tokeniser, which renames
-> nothing. See `TODO.md`, "GP.ASM `{VAR}` under BASLOAD".
+> ```
+> #SYMFILE "@:PROG.SYM"
+> ```
+>
+> at the top of the source, named to match the PRG — compiling `PROG.PRG` reads `PROG.SYM`. Nothing
+> else changes: `{N%}` is still written the way you wrote the variable.
+>
+> Two errors, both at compile time and both naming the line:
+>
+> | | means |
+> |---|---|
+> | `NO SYMBOL FILE FOR {}` | no `#SYMFILE`, or it is not beside the PRG under the matching name |
+> | `UNKNOWN VARIABLE IN {}` | the name is not a variable of this program |
+>
+> `{VAR}` never *creates* a variable, which is the opposite of what an ordinary BASIC reference
+> does — so **assign it once in BASIC first**, even `M% = 0`. A name that missed would otherwise
+> hand back a slot BASIC never reads, and the block would run, store, and change nothing you can
+> see.
 
 #### What is not there
 

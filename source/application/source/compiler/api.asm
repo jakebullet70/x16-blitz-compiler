@@ -33,7 +33,20 @@ CompilerAPI:
 		beq 	_CAWriteByte
 		cmp 	#BLC_PRINTCHAR
 		beq 	_CAPrintScreen
+		cmp 	#BLC_SYMLOOKUP
+		beq 	_CASymLookup
 		.debug
+
+; ************************************************************************************************
+;
+;		Translate a GP.ASM {VAR} name through BASLOAD's #SYMFILE. Here rather than in the
+;		compiler library because the file name comes from GPC.INPUT's source line, which is an
+;		application symbol -- the same reason ScanGPUsage is on this side.
+;
+; ************************************************************************************************
+
+_CASymLookup:
+		jmp 	SymbolLookup
 
 ; ************************************************************************************************
 ;

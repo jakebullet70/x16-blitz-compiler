@@ -49,6 +49,17 @@ BLC_WRITEOUT = 5
 ;		Print character X to display / stream for errors & information
 ;
 BLC_PRINTCHAR = 6
+;
+;		Translate AsmSymName (the name as written inside a GP.ASM {VAR}) through BASLOAD's
+;		#SYMFILE, leaving the crunched name in AsmSymCrunched. CC = found. CS = failed, with
+;		A = 0 when the symbol file itself is missing and A = 1 when the name is not in it.
+;
+;		HERE RATHER THAN IN THE COMPILER LIBRARY because the file name is derived from
+;		GPC.INPUT's source line, which is an application symbol -- the same reason ScanGPUsage
+;		lives on that side. The two buffers are the compiler's, because the application links
+;		the compiler library and so can see them, and not the other way round.
+;
+BLC_SYMLOOKUP = 7
 
 ; ************************************************************************************************
 ;
@@ -4590,6 +4601,9 @@ ASM_MAX_BLOCKS = 32 						; GP.ASM blocks in one program
 ASM_MAX_FIXUPS = 96 						; blob calls + label references + {VAR} references
 ASM_MAX_LABELS = 16 						; labels in ONE block -- they do not cross GP.ENDASM
 ASM_MAX_LOCALS = 32 						; label references in one block, awaiting resolution
+ASM_SYM_MAX    = 64 						; longest name {VAR} can carry -- BASLOAD's own limit
+											; on significant characters, so a name it accepted
+											; always fits here
 
 ;
 ;		A fixup is five bytes: kind, target, value. All three kinds write a 16 bit address
@@ -5810,58 +5824,139 @@ AsmPoolPoke:
 ; ************************************************************************************************
 
 AsmParseBrace:
+		;
+		;		{VAR} is the ADDRESS OF A BASIC VARIABLE'S SLOT, so LDA {N%} reads it and
+		;		STA {N%} writes it, in BASIC's own storage.
+		;
+		;		THE NAME IN THE REM IS NOT THE NAME IN THE CODE. BASLOAD crunches every
+		;		identifier -- N% becomes A%, which is how it offers 64 character names on a two
+		;		character BASIC -- and it stores REM text byte for byte, which is the very
+		;		property that lets an assembly body survive tokenisation at all. The two halves
+		;		of this feature want opposite things from the same tool, so {N%} in a REM names
+		;		a variable the compiled code no longer calls N%.
+		;
+		;		BASLOAD's own #SYMFILE is the bridge: it records source name -> crunched name
+		;		for every variable, and this translates through it. So the name is collected as
+		;		WRITTEN rather than handed to ExtractVariableName, which would pack the wrong
+		;		one.
+		;
 		jsr 	GetNext 					; consume the {
+		stz 	AsmSymType
+		ldy 	#0
 		;
-		;		GetNext, not LookNext: ExtractVariableName wants the first character ALREADY
-		;		CONSUMED and in A -- MainCompileLoop reaches it through GetNextNonSpace. Leave
-		;		it unconsumed and the same character is read again as the SECOND one, so {A%}
-		;		becomes the name AA%, which misses in the table and quietly creates a second
-		;		variable that BASIC never sees.
+		;		The name as written. Alphanumeric, first character alphabetic, and it may be
+		;		the full 64 BASLOAD allows rather than the two this BASIC keeps -- the crunched
+		;		name is what has to fit, and one or two characters is what BASLOAD produces.
 		;
-		jsr 	GetNextNonSpace
-		jsr 	ExtractVariableName 		; XY = packed name, X carries the type bits
-		cpx 	#0
-		bpl 	_APBScalar
+		jsr 	LookNext
+		jsr 	CharIsAlpha
+		bcs 	_APBNameChar
 		;
-		;		An array. ExtractVariableName has already eaten the "(", so the ")" is ours.
+		;		The syntax exit is HERE, at the top, because both of its callers are: the far
+		;		end of this routine is out of branch range from either.
 		;
-		phy
-		phx
+_APBBadName:
+		jmp 	AsmBadSyntax
+_APBNameChar:
+		jsr 	LookNext
+		jsr 	CharIsAlpha
+		bcs 	_APBNameTake
+		jsr 	CharIsDigit
+		bcc 	_APBNameDone
+_APBNameTake:
+		cpy 	#ASM_SYM_MAX
+		bcs 	_APBBadName 				; longer than the symbol file can hold
+		cmp 	#'a'						; fold ASCII lowercase -- BASLOAD writes its symbol
+		bcc 	_APBNameStore 				; file in upper case whatever the source looked like
+		cmp 	#'z'+1
+		bcs 	_APBNameStore
+		sec
+		sbc 	#'a'-'A'
+_APBNameStore:
+		sta 	AsmSymName,y
+		iny
+		jsr 	GetNext 					; consume it
+		bra 	_APBNameChar
+_APBNameDone:
+		lda 	#0
+		sta 	AsmSymName,y 				; the lookup wants it terminated
+		;
+		;		$ and % are the type, ( makes it an array -- the same three the compiler packs
+		;		into the name itself, and the symbol file records none of them: BASLOAD crunches
+		;		the IDENTIFIER and the sigil rides along separately, so PR$ is filed as PR.
+		;
+		jsr 	LookNext
+		cmp 	#'$'
+		bne 	_APBNotString
+		lda 	#NSSString
+		bra 	_APBHaveType
+_APBNotString:
+		cmp 	#'%'
+		bne 	_APBCheckArray
+		lda 	#NSSIInt16
+_APBHaveType:
+		sta 	AsmSymType
+		jsr 	GetNext 					; consume the sigil
+_APBCheckArray:
+		jsr 	LookNext
+		cmp 	#'('
+		bne 	_APBLookup
+		lda 	AsmSymType
+		ora 	#NSSArray
+		sta 	AsmSymType
+		jsr 	GetNext 					; consume the (
 		lda 	#')'
-		jsr 	AsmExpect
-		plx
-		ply
-		jsr 	FindVariable
-		bcc 	_APBUnknown
-		bra 	_APBAddress
+		jsr 	AsmExpect 					; and require the ) -- {N()} names the array itself
+_APBLookup:
+		lda 	#BLC_SYMLOOKUP 				; AsmSymName -> AsmSymCrunched, application side
+		jsr 	CallAPIHandler
+		bcs 	_APBSymFailed
 		;
-		;		A scalar. IT MUST ALREADY EXIST -- {VAR} never creates one, and that is the
-		;		opposite of what an ordinary BASIC reference does.
+		;		Pack the crunched name exactly as ExtractVariableName packs a source one: X is
+		;		the first character reduced to 5 bits with the type bits ORed in, Y the second
+		;		reduced to 6, and a one character name leaves Y zero. BASLOAD produces one or
+		;		two characters, which is precisely what this BASIC can hold -- the 64 character
+		;		names live only in the symbol file.
 		;
-		;		Because BASLOAD RENAMES VARIABLES and does not rename REM text with them. It
-		;		crunches N% to A% in the code -- that is how it offers 64 character names on a
-		;		two character BASIC -- while the REM holding {N%} is kept byte for byte, which
-		;		is the very property that makes an assembly body survive at all. So a {VAR}
-		;		naming a variable BASIC no longer calls by that name would MISS, and creating
-		;		it here would hand back a fresh slot that BASIC never reads or writes: an
-		;		assembly block that runs, stores, and changes nothing anyone can see.
-		;
-		;		Refusing is not a fix -- see TODO.md -- but it turns the worst kind of failure
-		;		this project has into one that names the line it is on.
-		;
-_APBScalar:
-		phx
-		jsr 	FindVariable
-		bcc 	_APBUnknown
-		pla
-_APBAddress:
+		lda 	AsmSymCrunched
+		and 	#31
+		ora 	AsmSymType
+		tax
+		ldy 	#0
+		lda 	AsmSymCrunched+1
+		beq 	_APBPacked
+		and 	#63
+		tay
+_APBPacked:
+		jsr 	FindVariable 				; and it MUST already exist -- {VAR} never creates
+		bcc 	_APBUnknown 				; one, see the note below
 		stx 	AsmValue
 		sty 	AsmValue+1
 		lda 	#'}'
 		jmp 	AsmExpect
 
+;
+;		THREE FAILURES, AND THEY ARE DELIBERATELY NOT THE SAME MESSAGE, because they need three
+;		different fixes. The text sits here in compiler space rather than in the shared error
+;		table: that table is in common.library, which links BELOW GPBase and is therefore
+;		copied into every compiled program, so a message there would cost every program bytes
+;		for a diagnostic only the compiler can ever print. Up here it costs nothing.
+;
+;		{VAR} never CREATES a variable, which is the opposite of what an ordinary BASIC
+;		reference does. A name that misses would otherwise hand back a fresh slot BASIC never
+;		reads or writes: an assembly block that runs, stores, and changes nothing anyone can
+;		see. That is the worst kind of failure this project has, and it is worth an error.
+;
+_APBSymFailed:
+		cmp 	#0
+		bne 	_APBUnknown
+		jsr 	CallErrorHandler
+		.text 	"NO SYMBOL FILE FOR {}", 0
+
 _APBUnknown:
-		jmp 	AsmBadSyntax
+		jsr 	CallErrorHandler
+		.text 	"UNKNOWN VARIABLE IN {}", 0
+
 
 ; ************************************************************************************************
 ;
@@ -5933,6 +6028,18 @@ AsmWorkspacePage: 						; where the variables land -- newWorkspacePage
 		.fill 	1
 AsmName:
 		.fill 	ASM_NAME_LEN 			; the identifier just read
+;
+;		{VAR}'s two names. AsmSymName is what the REM says, AsmSymCrunched what BASLOAD renamed
+;		it to. THE APPLICATION WRITES THE SECOND ONE (BLC_SYMLOOKUP): it can see these because
+;		it links the compiler library, which is the direction that works -- compiler code
+;		naming an application symbol is what breaks the standalone build.
+;
+AsmSymName:
+		.fill 	ASM_SYM_MAX+1 			; the name as written, folded to upper case, terminated
+AsmSymCrunched:
+		.fill 	4 						; one or two characters and a terminator
+AsmSymType:
+		.fill 	1 						; NSSString / NSSIInt16, plus NSSArray for {N()}
 AsmLineStart:
 		.fill 	2 						; srcPtr before it, to wind back a mnemonic
 AsmLabelCount:

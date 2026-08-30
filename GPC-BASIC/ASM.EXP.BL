@@ -18,6 +18,7 @@
 ## **
 ## ***********************************************************************
 #INCLUDE "GPB.INC.BL"
+#SYMFILE "@:ASM.SYM"
 #SAVEAS "@:ASM.PRG"
 
 ## ---- #REM 1 IS REQUIRED, and it is the one thing that catches people out.
@@ -45,34 +46,37 @@ REM JSR $FFD2
 GP.ENDASM
 PRINT
 
-## ---- 2. {VAR} -- AND WHY IT IS NOT USED IN THIS FILE.
+## ---- 2. {VAR} -- READING AND WRITING BASIC'S OWN VARIABLES.
 ##
-## {VAR} means THE ADDRESS OF THE VARIABLE'S SLOT, which is what makes reading
-## and writing the same thing:
+## {VAR} is THE ADDRESS OF THE VARIABLE'S SLOT, which is what makes reading and
+## writing the same thing.
 ##
-##     N% = 65
-##     GP.ASM
-##     REM LDA {N%}
-##     REM CLC
-##     REM ADC #1
-##     REM STA {M%}          M% = N% + 1, in BASIC's own slot
-##     GP.ENDASM
+## IT NEEDS #SYMFILE, and this file has one at the top. BASLOAD RENAMES
+## VARIABLES -- it crunches N% to A% in the code, which is how it offers 64
+## character names on a two character BASIC -- but it keeps REM text byte for
+## byte, which is the very property that lets an assembly body survive at all.
+## So the code says A% and the REM still says {N%}. #SYMFILE writes that
+## mapping down and the compiler follows it.
 ##
-## THAT DOES NOT WORK THROUGH BASLOAD, and this file is a BASLOAD file.
+## The symbol file must sit beside the PRG under the matching name: ASM.PRG
+## reads ASM.SYM, which is what the #SYMFILE line above arranges. Miss it and
+## the compile stops with NO SYMBOL FILE FOR {} on the line, rather than
+## building a program that stores into a slot BASIC never reads.
 ##
-## BASLOAD RENAMES VARIABLES -- it crunches N% to A% in the code, which is how
-## it offers 64 character names on a two character BASIC -- but it keeps REM
-## text byte for byte, which is the very property that lets an assembly body
-## survive at all. So the code says A% and the REM still says {N%}, and they
-## are no longer the same variable.
-##
-## GPC therefore REFUSES a {VAR} naming a variable it cannot find, rather than
-## creating one BASIC never reads. You get SYNTAX ERROR on the line, instead of
-## a block that runs, stores, and changes nothing you can see.
-##
-## It works as written above when the source is tokenised by the HOST
-## tokeniser (bin/tokenise.zip), which does not rename anything. See TODO.md,
-## "GP.ASM {VAR} under BASLOAD", for what it would take to have both.
+## M% IS ASSIGNED FIRST ON PURPOSE. {VAR} never CREATES a variable -- the
+## opposite of what an ordinary BASIC reference does -- so a name BASIC has
+## never used is UNKNOWN VARIABLE IN {} rather than a fresh slot nothing reads.
+
+N% = 65
+M% = 0
+PRINT "2. ";
+GP.ASM
+REM LDA {N%}               ; N% is A% by the time BASLOAD is done with it
+REM CLC
+REM ADC #1
+REM STA {M%}               ; M% = N% + 1, in BASIC'S OWN SLOT
+GP.ENDASM
+PRINT "N=";N%;" M=";M%
 
 ## ---- 3. Labels and branches.
 ##
