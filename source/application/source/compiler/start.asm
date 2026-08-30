@@ -22,8 +22,8 @@ CompileCode:
 		jsr 	ReadControlFile 			; GPC.INPUT says what to compile and where to put it
 		bcs 	_CCNoControlFile 			; and without it there is nothing to be done
 		jsr 	PrintWorking 				; which is all the compiler now says for itself
-		jsr 	IODeleteObject 				; and clear any object from a PREVIOUS run, so a compile
-							; that stops on an error leaves nothing runnable behind
+		jsr 	IODeleteOutputs 			; and clear the object AND map from a PREVIOUS run, so a
+								; compile that stops on an error leaves nothing behind
 
 		ldx 	#APIDesc & $FF
 		ldy 	#APIDesc >> 8
