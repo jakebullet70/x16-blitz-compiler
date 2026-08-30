@@ -56,15 +56,18 @@ source/unit-tests/compiler-runtime/examples/*.bas
 source/unit-tests/compiler-runtime/CODE.BIN
 
 # ---------------------------------------------------------------------------
-# source/gpc front end. GPC.BASL (BASLOAD source) is tokenised into testing/GPC.PRG by
-# build_basl.py driving the emulator -- both GPC.BASL and GPC.PRG SHIP and are tracked in
-# testing/. Ignore only the tokenise scratch (a one-line driver, an echo log) and the
-# #SYMFILE debug map. The retired Prog8 front end sits in source/gpc/old-archive/: its .P8
+# source/gpc front end. GPC.BASL (BASLOAD source) is tokenised into testing/GPC.SRC.PRG by
+# build_basl.py driving the emulator, and GPC.BIN then COMPILES that into testing/GPC.PRG --
+# GPC.BASL is written in GP.BASIC, so the tokenised form is compile-only and only the compiled
+# GPC.PRG can be run. GPC.BASL and GPC.PRG SHIP and are tracked in testing/; the intermediate
+# and its #SYMFILE do not. Ignore those, plus the tokenise scratch (a one-line driver, an
+# echo log). The retired Prog8 front end sits in source/gpc/old-archive/: its .P8
 # source and bump script are kept (tracked), but not its binary or build scratch.
 # ---------------------------------------------------------------------------
 testing/GPCBLD.BAS
 testing/GPCBLD.LOG
-testing/GPC.SYM
+testing/GPC.SRC.PRG
+testing/GPC.SRC.SYM
 testing/GPC.ERR.SYM
 
 # GPC-BASIC/GPB.INC.BL is copied into testing/ by source/gpc/Makefile, because BASLOAD

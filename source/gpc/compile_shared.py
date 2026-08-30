@@ -2,7 +2,8 @@
 # *******************************************************************************************
 #
 #		Name : 		compile_shared.py
-#		Purpose :	Compile a tokenised PRG with GPC.BIN, headlessly, in SHARED mode.
+#		Purpose :	Compile a tokenised PRG with GPC.BIN, headlessly. SHARED by
+#				default, EMBEDDED with --embedded.
 #		Date :		31st July 2026
 #
 # *******************************************************************************************
@@ -21,7 +22,12 @@
 #		GPC.INPUT is a tracked working file, so it is snapshotted and restored: a build must not
 #		leave the tree different from how it found it.
 #
-#			compile_shared.py <source.prg> <object.prg> [map]
+#			compile_shared.py [--embedded] <source.prg> <object.prg> [map]
+#
+#		Both programs the build compiles -- GPC.PRG and GPC.ERR -- are SHARED, so they use
+#		the resident runtime rather than carrying a ~12K copy each. GPC.PRG needs the GPB
+#		one (GP.DO and GP.LOOP have handlers); source/gpc/Makefile builds gpc-rt before it
+#		compiles either. --embedded is here for a program that has to stand alone.
 #
 # *******************************************************************************************
 
@@ -46,7 +52,7 @@ def die(msg):
 	sys.exit("compile_shared.py: " + msg)
 
 
-def compile_one(source, obj, mapfile=""):
+def compile_one(source, obj, mapfile="", shared=True):
 	for need in (EMU, ROM, os.path.join(TESTING, ENGINE), os.path.join(TESTING, source)):
 		if not os.path.exists(need):
 			die("missing %s" % need)
@@ -58,8 +64,17 @@ def compile_one(source, obj, mapfile=""):
 			saved = f.read()
 
 	try:
+		#
+		#		Four CR-terminated lines -- source, object, map, mode -- and an EMBEDDED build
+		#		writes only THREE. That is not a shortcut: GPC.BASL omits the line rather than
+		#		writing an empty one ("GP.IF SH=1 THEN PRINT#1,SHARED"), so a three-line file
+		#		is exactly what the engine is handed in the interactive case.
+		#
+		control = "%s\n%s\n%s\n" % (source, obj, mapfile)
+		if shared:
+			control += "SHARED\n"
 		with open(GPC_INPUT, "w", newline="\n") as f:
-			f.write("%s\n%s\n%s\nSHARED\n" % (source, obj, mapfile))
+			f.write(control)
 		for stale in (obj, mapfile):
 			if stale:
 				p = os.path.join(TESTING, stale)
@@ -100,14 +115,20 @@ def compile_one(source, obj, mapfile=""):
 
 	if not os.path.exists(objpath):
 		die("%s did not compile %s -- see testing/GPCCOMP.LOG" % (ENGINE, source))
-	print("  compiled %s -> %s (%d bytes, SHARED)" % (source, obj, os.path.getsize(objpath)))
+	print("  compiled %s -> %s (%d bytes, %s)"
+		  % (source, obj, os.path.getsize(objpath), "SHARED" if shared else "EMBEDDED"))
 	os.remove(os.path.join(TESTING, "GPCCOMP.LOG"))
 
 
 def main():
-	if len(sys.argv) not in (3, 4):
-		die("usage: compile_shared.py <source.prg> <object.prg> [map]")
-	compile_one(sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) == 4 else "")
+	args = sys.argv[1:]
+	shared = True
+	if args and args[0] == "--embedded":
+		shared = False
+		args = args[1:]
+	if len(args) not in (2, 3):
+		die("usage: compile_shared.py [--embedded] <source.prg> <object.prg> [map]")
+	compile_one(args[0], args[1], args[2] if len(args) == 3 else "", shared)
 
 
 main()

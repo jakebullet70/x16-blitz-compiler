@@ -85,20 +85,25 @@ make libs                       # the five bin/*.library files + testing/GPC.BIN
                                 # NB: this BUMPS source/application/buildnum.txt
 make release                    # stage the engine, GPC.INPUT and the samples into testing/
 make -C source/runtime gpc-rt   # the shared runtime, testing/GPC.RT.<build>.BIN
-make -C source/gpc release      # GPC.PRG, then re-tokenise GPC.ERR and compile it SHARED
-                                # against the runtime you just built
+make -C source/gpc release      # GPC.PRG and GPC.ERR: both tokenised, then compiled SHARED
+                                # (builds gpc-rt itself -- the line above is now optional)
 ```
 
 `testing/` **is** the build: it is what you copy to an SD card or point the emulator at. The zip
 `release.sh` writes is a *subset* of it — the four files needed to run, the two `.BASL` sources
 under `SRC/`, and the docs. Samples and scratch files stay behind.
 
-Two of those targets need the **emulator** rather than the assembler: the front end is BASLOAD
-source, tokenised by booting x16emu headless, and `GPC.ERR` is compiled by running the compiler
-itself. Neither needs Java or prog8.
+Two of those targets need the **emulator** rather than the assembler, and the front end needs it
+**twice**: `GPC.BASL` is written in GP.BASIC, so x16emu boots once for BASLOAD to tokenise it into
+`GPC.SRC.PRG` and again for `GPC.BIN` to compile that into `GPC.PRG`. `GPC.ERR` is built the same
+way. Neither needs Java or prog8.
 
-`make -C source/gpc` on its own builds only `GPC.PRG` — it is the `release` target that also
-handles `GPC.ERR`.
+`GPC.SRC.PRG` is compile-only — nothing in BASIC sits behind the GP tokens, so the ROM can neither
+`LIST` nor `RUN` it. Only the compiled `GPC.PRG` can be launched, and being shared it needs
+`GPB.RT.<n>.BIN` (the runtime **with** the GP handlers) beside it or it prints `?RT` and stops.
+
+`make -C source/gpc` on its own builds `GPC.PRG` and the runtime it needs — it is the `release`
+target that also handles `GPC.ERR`.
 
 Then try it:
 
@@ -113,7 +118,8 @@ Then try it:
 | `bin/*.library` | `make libs` | assembler libraries, not distributables |
 | `testing/GPC.BIN` | `make libs` | the compiler engine; reads `GPC.INPUT` |
 | `testing/GPC.IMG.<n>.BIN` | `make libs` | the runtime the engine streams into every self-contained object — **it cannot compile without this** |
-| `testing/GPC.PRG` | `make -C source/gpc` | the front end you actually launch |
+| `testing/GPC.SRC.PRG` | `make -C source/gpc` | BASLOAD's output — compiler **input**, cannot be run |
+| `testing/GPC.PRG` | `make -C source/gpc` | the front end you actually launch, compiled from the above |
 | `testing/GPC.RT.<n>.BIN` | `make -C source/runtime gpc-rt` | shared runtime, SHARED mode only |
 
 The engine build number in `source/application/buildnum.txt` **auto-increments on every

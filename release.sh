@@ -73,7 +73,10 @@ out = os.path.join(release_dir, "gpc-release-%s.zip" % num)
 #   * ALL BASLOAD source under SRC/ -- reference only, NOT needed to run (with a note)
 #   * the top-level docs
 # Everything else in testing/ (samples like DIR.BASL, compiled demos, scratch) is left out.
-#   GPC.PRG        the front end you launch on the X16
+#   GPC.PRG        the front end you launch on the X16 -- a COMPILED program, like the
+#                  helper below, because GPC.BASL is written in GP.BASIC. BASLOAD
+#                  tokenises it to GPC.SRC.PRG (compile-only, not shipped) and GPC.BIN
+#                  compiles that into this. SHARED, so it needs GPB.RT.nnn.BIN.
 #   GPC.BIN        the compiler engine GPC.PRG chain-loads
 #   GPC.IMG.nnn.BIN the runtime every self-contained object carries, streamed into it as the
 #                  object is written. GPC.BIN CANNOT COMPILE WITHOUT IT -- the runtime used to
@@ -91,8 +94,9 @@ out = os.path.join(release_dir, "gpc-release-%s.zip" % num)
 #                  C.GPC.ERR.PRG (the "C." prefix distinguishes compiler output from the
 #                  GPC.ERR.PRG that is its input); the release drops the prefix, because a
 #                  user should not have to know which of two spellings is the fast one. The
-#                  interpreted build is NOT shipped -- it exists in the tree only as the
-#                  compile input, and SRC/GPC.ERR.BASL regenerates it if it is ever needed.
+#                  tokenised build is NOT shipped -- it exists in the tree only as the
+#                  compile input, and could not be run in any case: GPC.ERR.BASL uses GP
+#                  tokens, so BASLOAD's output is compile-only, same as the front end's.
 #   SRC/*.BASL     the BASLOAD sources (NOT needed to run; see SRC/README.TXT)
 #   GPC-BASIC/     the GP.BASIC library -- the .INC.BL includes every BASL source using GP
 #                  keywords needs, the .EXP.BL examples, and its manual (GP-BASIC.md) and
@@ -136,28 +140,36 @@ SRC_README = (
     "\n"
     "This folder holds the BASLOAD source of the GPC tools:\n"
     "\n"
-    "    GPC.BASL       the compiler front end  ->  GPC.PRG\n"
-    "    GPC.ERR.BASL   the error-line helper   ->  GPC.ERR.PRG\n"
+    "    GPC.BASL       the compiler front end\n"
+    "    GPC.ERR.BASL   the error-line helper\n"
     "\n"
     "It is here for reference only -- you do NOT need anything in this folder to\n"
     "run GPC. The ready-to-run programs are in the parent folder.\n"
     "\n"
-    "To compile, run GPC.PRG (with GPC.BIN and the GPC.RT.nnn.BIN runtime\n"
-    "beside it). To turn a runtime error's \"@ $XXXX\" into a source line, run\n"
-    "GPC.ERR.PRG.\n"
-    "The .BASL sources are never loaded at run time.\n"
+    "To compile, run GPC.PRG, with GPC.BIN, the GPC.IMG.nnn.BIN image and the\n"
+    "GPB.RT.nnn.BIN runtime beside it. To turn a runtime error's \"@ $XXXX\" into a\n"
+    "source line, run GPC.ERR.PRG. The .BASL sources are never loaded at run time.\n"
     "\n"
-    "BASLOAD is built into every R49 X16 ROM. To rebuild a PRG from its source,\n"
-    "load the source with BASLOAD -- its own #SAVEAS writes the PRG back out:\n"
+    "BOTH TOOLS ARE WRITTEN IN GP.BASIC, so rebuilding either is a TWO step job and\n"
+    "BASLOAD on its own is not enough. BASLOAD (built into every R49 ROM) does the\n"
+    "first step -- its own #SAVEAS writes the tokenised program out:\n"
     "\n"
-    '    BASLOAD "GPC.BASL"        (writes GPC.PRG)\n'
-    '    BASLOAD "GPC.ERR.BASL"    (writes GPC.ERR.PRG)\n'
+    '    BASLOAD "GPC.BASL"        writes GPC.SRC.PRG\n'
+    '    BASLOAD "GPC.ERR.BASL"    writes GPC.ERR.PRG\n'
     "\n"
-    "CAREFUL with the second one. The shipped GPC.ERR.PRG is the COMPILED helper;\n"
-    "BASLOAD writes the plain interpreted version over that same name, so you would\n"
-    "silently swap the fast tool for a slow one. It still works -- and it is in fact\n"
-    "the version to use if the runtime is missing, since the compiled\n"
-    "one needs it -- but re-extract from the zip to get the compiled helper back.\n"
+    "What it writes CANNOT BE RUN. Nothing in BASIC sits behind the GP tokens, so\n"
+    "the ROM can neither LIST nor RUN those files -- they are compiler INPUT. The\n"
+    "second step is to compile them, and the shipped GPC.PRG and GPC.ERR.PRG\n"
+    "already are.\n"
+    "\n"
+    "CAREFUL with the second line. It writes over the shipped COMPILED helper with\n"
+    "a file the ROM cannot run, so re-extract from the zip to get the tool back.\n"
+    "The first line is safe: GPC.SRC.PRG is a name nothing else uses.\n"
+    "\n"
+    "AND IF GPC.PRG ITSELF IS EVER THE BROKEN THING, you do not need a front end to\n"
+    "compile. GPC.BIN reads a file called GPC.INPUT straight off the drive: write\n"
+    "the source name, the object name and a blank line into it with any editor and\n"
+    "RUN GPC.BIN. Driving the compiler is all the front end ever does.\n"
 )
 
 names = []

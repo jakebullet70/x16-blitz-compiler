@@ -9,12 +9,12 @@
 #
 #		The front end is written in BASLOAD source (GPC.BASL). BASLOAD is an X16 ROM utility, so
 #		there is no host tokeniser: build_basl.py boots the bundled emulator, runs BASLOAD on
-#		GPC.BASL, and the source's own  #SAVEAS "@:GPC.PRG"  writes the tokenised program straight
+#		GPC.BASL, and the source's own  #SAVEAS "@:GPC.SRC.PRG"  writes the tokenised program
 #		into testing/. This replaced the old Prog8/Java build (kept in old-archive/) -- no Java,
 #		no prog8c.jar. There is no build number here: it belongs to the engine, which prints its
 #		own (source/application/buildnum.txt).
 #
-#			make -C source/gpc			build testing/GPC.PRG from GPC.BASL
+#			make -C source/gpc			GPC.BASL -> GPC.SRC.PRG -> testing/GPC.PRG
 #			make -C source/gpc release	build, re-tokenise the GPC.ERR helper, build the shared
 #										runtime, and compile GPC.ERR against it (C.GPC.ERR.PRG,
 #										which release.sh ships as plain GPC.ERR.PRG)
@@ -36,11 +36,27 @@ endif
 all: build
 
 #
-#		Tokenise GPC.BASL -> testing/GPC.PRG headlessly. build_basl.py also stages GPC.BASL into
-#		testing/ (the emulator drive), so both the source and the PRG ship from there.
+#		The front end is a TWO STEP build, because GPC.BASL is written in GP.BASIC:
+#		BASLOAD tokenises it to GPC.SRC.PRG, which the ROM cannot RUN (nothing in BASIC
+#		is behind $CE7x), and GPC.BIN compiles that into GPC.PRG, which is the front end
+#		you launch. GPC.PRG therefore still means what it always meant.
+#
+#		SHARED, like GPC.ERR: the front end carries no runtime of its own and uses the
+#		resident GPB.RT.nnn.BIN -- the GPB one, WITH the handlers, because GP.DO/GP.LOOP
+#		need them. So gpc-rt is built HERE, before the compile: a shared front end that
+#		cannot find its runtime does not start, and `make run` would hit that first.
+#
+#		GPB.INC.BL is staged FIRST. BASLOAD resolves an #INCLUDE off the DRIVE, and both
+#		GPC.BASL and GPC.ERR.BASL now include it, so it has to be sitting in testing/
+#		before either tokenise -- not just in GPC-BASIC/. Copied rather than duplicated:
+#		GPC-BASIC/ is the master, this is a build artifact, and .gitignore says so.
+#		build_basl.py also stages GPC.BASL into testing/, so the source ships from there.
 #
 build:
+	$(CCOPY) ..$(S)..$(S)GPC-BASIC$(S)GPB.INC.BL $(RELEASEDIR)GPB.INC.BL
 	$(PYTHON) build_basl.py
+	make $(MAKEOPTS) -C ../runtime gpc-rt
+	$(PYTHON) compile_shared.py GPC.SRC.PRG GPC.PRG
 
 #
 #		release = the front-end build, plus a fresh tokenise of the GPC.ERR companion tool
@@ -56,20 +72,16 @@ build:
 #		plain GPC.ERR.PRG (see release.sh) so a user has one name to remember, not two.
 #		If the runtime is missing, SRC/GPC.ERR.BASL rebuilds the interpreted version.
 #
-#		The runtime is built here too. Nothing else in the tree builds gpc-rt, which is how its
-#		$9F00 size guard managed to fail unnoticed for weeks; a release that ships a shared-mode
-#		tool must ship the runtime that tool needs.
+#		The runtime is built by `build` above now, because the FRONT END is shared too.
+#		Nothing else in the tree builds gpc-rt, which is how its $9F00 size guard managed
+#		to fail unnoticed for weeks; a release that ships shared-mode programs must ship
+#		the runtime they need.
 #
 #
-#		GPB.INC.BL first: GPC.ERR.BASL now #INCLUDEs it, and BASLOAD resolves an #INCLUDE off
-#		the DRIVE -- so the file has to be sitting in testing/ before the tokenise, not just
-#		in GPC-BASIC/. Copied rather than duplicated: GPC-BASIC/ is the master, this is a
-#		build artifact, and .gitignore says so. Same arrangement as testing/samples.
+#		GPB.INC.BL is already staged by `build` above, which both sources now need.
 #
 release: build
-	$(CCOPY) ..$(S)..$(S)GPC-BASIC$(S)GPB.INC.BL $(RELEASEDIR)GPB.INC.BL
 	$(PYTHON) build_basl.py GPC.ERR.BASL GPC.ERR.PRG
-	make $(MAKEOPTS) -C ../runtime gpc-rt
 	$(PYTHON) compile_shared.py GPC.ERR.PRG C.GPC.ERR.PRG M.GPC.ERR
 
 #

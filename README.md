@@ -15,8 +15,12 @@ Forked from Paul Robson's original: <https://github.com/paulscottrobson/blitz-co
 
 ### Run `GPC.PRG`
 
-`GPC.PRG` is the front end, and it is all you need. Put it on the drive beside the engine
-`GPC.BIN` and its runtime image `GPC.IMG.<n>.BIN`, load it, and answer four questions:
+`GPC.PRG` is the front end. Put it on the drive beside the engine `GPC.BIN`, its runtime image
+`GPC.IMG.<n>.BIN` and the shared runtime `GPB.RT.<n>.BIN`, load it, and answer four questions:
+
+> The front end is itself a compiled GP.BASIC program, built in shared mode, which is why
+> `GPB.RT.<n>.BIN` has to be there — without it you get `?RT` and nothing else. The release zip
+> ships all of them.
 
 ```text
 LOAD "GPC.PRG",8 : RUN
@@ -232,7 +236,7 @@ warm start (runtime already resident, and provably reused rather than reloaded).
 | `source/tools` | host-side helpers (tokeniser, detokeniser) |
 | `source/unit-tests` | the randomised compiler-runtime regression suites |
 | `source/application` | packages the release |
-| `source/gpc` | the interactive front end `GPC.PRG`, tokenised from BASLOAD source `GPC.BASL` by `build_basl.py` (no Java/Prog8) |
+| `source/gpc` | the interactive front end `GPC.PRG` — BASLOAD source `GPC.BASL`, written in GP.BASIC, tokenised by `build_basl.py` and then compiled by `compile_shared.py` (no Java/Prog8) |
 | `bin/` | `x16emu/` (test emulator + ROM) and `box16/` (debugger) |
 | `testing/` | the built compiler, the shared runtime `GPC.RT.<build>.BIN`, and sample programs, ready to run (also the scratch `prg-batch/`/`archive/` test inputs) |
 | `documents/` | build include (`common.make`), notes, and reference PDFs |
@@ -290,8 +294,9 @@ make libs                       # the bin/*.library files + the engine GPC.BIN
                                 # (this also BUMPS source/application/buildnum.txt)
 make release                    # stage the engine, GPC.INPUT and the samples into testing/
 make -C source/runtime gpc-rt   # the shared runtime, testing/GPC.RT.<build>.BIN
-make -C source/gpc release      # GPC.PRG, then GPC.ERR re-tokenised and compiled SHARED
-                                # against the runtime just built
+make -C source/gpc release      # GPC.PRG and GPC.ERR: both tokenised, then compiled SHARED
+                                # (this target builds gpc-rt itself, so the line above it is
+                                #  only needed if you want the runtime on its own)
 ```
 
 Order matters more than it looks: `GPC.ERR` is compiled in shared mode, so it names the runtime it

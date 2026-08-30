@@ -2,7 +2,8 @@
 # ************************************************************************************************
 #
 #		Name:		build_basl.py
-#		Purpose:	Build testing/GPC.PRG from testing/GPC.BASL by running BASLOAD headless.
+#		Purpose:	Tokenise testing/GPC.BASL to testing/GPC.SRC.PRG by running BASLOAD
+#				headless. GPC.SRC.PRG is then COMPILED into GPC.PRG -- see the Makefile.
 #				With args "BASL PRG" it instead tokenises that one extra tool the same way
 #				(no source mirror) -- used to freshen GPC.ERR.PRG on a release.
 #
@@ -52,8 +53,8 @@ ROM     = os.path.join(ROOT, "bin", "x16emu", "rom.bin")
 MASTER = os.path.join(TESTING, "GPC.BASL")  # the master you edit + interactively BASLOAD-test
 MIRROR = os.path.join(HERE, "GPC.BASL")     # committed mirror in the source tree, kept in sync
 BASL   = "GPC.BASL"                          # its name on the emulator drive (= testing/)
-PRG    = "GPC.PRG"                           # #SAVEAS "@:GPC.PRG" writes this
-SYM    = "GPC.SYM"                           # #SYMFILE "@:GPC.SYM" writes this
+PRG    = "GPC.SRC.PRG"                       # #SAVEAS "@:GPC.SRC.PRG" writes this
+SYM    = "GPC.SRC.SYM"                       # #SYMFILE "@:GPC.SRC.SYM" writes this
 DRIVER = "GPCBLD.BAS"                        # scratch: the one line we "type" at BASIC
 LOG    = "GPCBLD.LOG"                        # scratch: the emulator echo log
 
@@ -128,7 +129,7 @@ def tokenise(basl_name, prg_name, also_clean=()):
 
 
 def build_front_end():
-    """The GPC.BASL flow: seed the master from the mirror if missing, tokenise to GPC.PRG, then
+    """The GPC.BASL flow: seed the master from the mirror if missing, tokenise to GPC.SRC.PRG, then
     mirror the master back to source/gpc/GPC.BASL. The build number is the engine's job now --
     see source/application/scripts/bumpbuild.py."""
     if not os.path.exists(MASTER):
