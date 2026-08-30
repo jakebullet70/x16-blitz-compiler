@@ -7,14 +7,14 @@
 ## **  GP.PRINTAT  statement, text at a position
 ## **  GP.STASH / GP.RESTR   save a rectangle and put it back
 ## **
-## **  Build:  copy GPC-BASIC/GP.INC.BL and this file into testing/, then
+## **  Build:  copy GPC-BASIC/GPB.INC.BL and this file into testing/, then
 ## **            python source/gpc/build_basl.py SCREEN.EXP.BL SCREEN.PRG
 ## **          and compile SCREEN.PRG with GPC.BIN.
 ## **
 ## **  Compile-only: the ROM cannot RUN a PRG containing GP tokens.
 ## **
 ## ***********************************************************************
-#INCLUDE "GP.INC.BL"
+#INCLUDE "GPB.INC.BL"
 #SAVEAS "@:SCREEN.PRG"
 
 ## NOTE ON NAMES: BASLOAD gives 64 significant characters, so PANEL.COL and

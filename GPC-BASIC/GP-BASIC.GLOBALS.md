@@ -19,7 +19,7 @@ The rule the library follows, and that you should follow too:
 
 | Prefix | Owner | What it is |
 |---|---|---|
-| `GP.` | `GP.INC.BL` | **keywords, not variables** — see §2, this one is different |
+| `GP.` | `GPB.INC.BL` | **keywords, not variables** — see §2, this one is different |
 | `STRHELP.` | `STRHELP.INC.BL` | string helpers |
 | `THEME.` | `THEME.INC.BL` | colour roles |
 | `APPHELP.` | `APPHELP.INC.BL` | screen save/restore, panels to disk |
@@ -39,7 +39,7 @@ free today; it is one library update away from not being.
 
 ## 2. `GP.*` is keywords, not variables — and the difference bites
 
-`GP.INC.BL` defines **no variables at all**. It is 31 `#TOKEN` lines and nothing else. Everything
+`GPB.INC.BL` defines **no variables at all**. It is 31 `#TOKEN` lines and nothing else. Everything
 spelled `GP.something` is a BASIC *keyword*, so:
 
 ```basic
@@ -52,7 +52,7 @@ whole list of them. They are tokens rather than variables for a hard reason: **n
 runtime can write a BASIC variable by name**, so a command that needs to hand a value back has to
 hand it back through a keyword. X16's own `ST`, `MX` and `MY` exist for the same reason.
 
-The full keyword list lives in `GPC-BASIC/GP.INC.BL`, and the token numbers mirror `getGP()` in
+The full keyword list lives in `GPC-BASIC/GPB.INC.BL`, and the token numbers mirror `getGP()` in
 `source/common-scripts/c64tokens.py`.
 
 ---

@@ -32,7 +32,7 @@
 ## Measured 2026-08-19: PASS on all five. The stash took 512 of 512 in
 ## order, the scribble disturbed 512, the restore was exact, and painting
 ## BEARDGUY.BMX moved a majority of the palette which one call put back.
-#INCLUDE "GP.INC.BL"
+#INCLUDE "GPB.INC.BL"
 #INCLUDE "BMX.INC.BL"
 #SAVEAS "@:BMXPAL.PRG"
 

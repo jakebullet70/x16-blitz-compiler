@@ -157,7 +157,7 @@ A = GP.A : X = GP.X : Y = GP.Y : C = GP.C
 
 Tokens `52860..52856` (`$CE7C..$CE78`), declared in
 `source/common-scripts/c64tokens.py` `getGP()` and mirrored in
-`GPC-BASIC/GP.INC.BL`. The worked example is `GPC-BASIC/MLCALL.EXP.BL`.
+`GPC-BASIC/GPB.INC.BL`. The worked example is `GPC-BASIC/MLCALL.EXP.BL`.
 
 Two facts recorded there that this feature inherits:
 
@@ -166,7 +166,7 @@ Two facts recorded there that this feature inherits:
 - carry is set with `LSR`, **not `PLP`**, so the caller's interrupt-disable and
   decimal flags survive.
 
-And the warning that matters most, from both `GP.INC.BL` and `MLCALL.EXP.BL`:
+And the warning that matters most, from both `GPB.INC.BL` and `MLCALL.EXP.BL`:
 
 > **Put machine code in BANKED RAM (`$A000-$BFFF`), NOT `$0400-$07FF`.** Stock
 > X16 BASIC leaves `$0400` free for the user; a **compiled GPC program does
@@ -198,8 +198,8 @@ under whichever ones it must support:
 
 | tokeniser | where it runs | how it learns `GP.*` |
 | --- | --- | --- |
-| **BASLOAD** | inside the X16 ROM — the build boots the bundled emulator headless and "types" `BASLOAD "X.BASL"` (`source/gpc/build_basl.py`) | `#TOKEN GP.DO 52863` lines in `GPC-BASIC/GP.INC.BL` |
-| **host-side** `bin/tokenise.zip` | on the PC | reads `c64tokens.py` at build time (per `GP.INC.BL`'s header) |
+| **BASLOAD** | inside the X16 ROM — the build boots the bundled emulator headless and "types" `BASLOAD "X.BASL"` (`source/gpc/build_basl.py`) | `#TOKEN GP.DO 52863` lines in `GPC-BASIC/GPB.INC.BL` |
+| **host-side** `bin/tokenise.zip` | on the PC | reads `c64tokens.py` at build time (per `GPB.INC.BL`'s header) |
 
 Note `build_basl.py`'s header states plainly: *"BASLOAD is an X16 ROM utility,
 so there is no host-side tokeniser for it"* — the host-side tokeniser is a
@@ -293,7 +293,7 @@ Two incidental findings from the same run, both worth keeping:
   ($CE7B) swallowed the prefix** and left `SM` as bare characters. Longest-match
   would fix it once `GP.ASM` is a real table entry (6 chars beats 4), but it is
   a live reminder that any new `GP.A*` keyword collides with `GP.A` until it is
-  registered in **both** `c64tokens.py` and `GP.INC.BL`.
+  registered in **both** `c64tokens.py` and `GPB.INC.BL`.
 
 ## 3. Sharing variables — how a BASIC variable is actually addressed
 
@@ -517,7 +517,7 @@ END ASM
    the ROM (`GP-BASIC.PLAN.md` §2), which argues for `GP.ASM` / `GP.ENDASM`.
 3. **`GP.ASM` collides with the existing `GP.A` token** until registered —
    measured in §2.4, where `GP.ASM` tokenised as `<CE>{SM`. Registering it in
-   `c64tokens.py` **and** `GP.INC.BL` fixes it by longest match.
+   `c64tokens.py` **and** `GPB.INC.BL` fixes it by longest match.
 
 A block form also has to survive the compiler's statement loop, which is
 line-at-a-time (`MainCompileLoop` reads one line, then splits on `:`), so
@@ -531,7 +531,7 @@ Not a plan — a scale estimate, so the questions below can be answered knowingl
 
 | piece | where |
 | --- | --- |
-| `GP.ASM` / `GP.ENDASM` tokens | `source/common-scripts/c64tokens.py` `getGP()` **and** `GPC-BASIC/GP.INC.BL` — same change, the token values are the ABI |
+| `GP.ASM` / `GP.ENDASM` tokens | `source/common-scripts/c64tokens.py` `getGP()` **and** `GPC-BASIC/GPB.INC.BL` — same change, the token values are the ABI |
 | table entry | `source/compiler/source/generation/commands.def`, an `X:` routine |
 | text capture | new compiler routine, modelled on `commands/data.asm` |
 | the assembler | new, and the largest piece — mnemonics, addressing modes, labels, two passes |
@@ -837,7 +837,7 @@ not as a plan — no implementation order is proposed here.
 - `{A$}` and `{A()}` have established meanings already implemented by
   `GP.STRPTR` and `GP.ARRPTR` (§9).
 - Syntax is `GP.ASM "..."` with quoted lines; `GP.ASM` / `GP.ENDASM` must be
-  registered in **both** `c64tokens.py` and `GP.INC.BL`, or `GP.A` swallows the
+  registered in **both** `c64tokens.py` and `GPB.INC.BL`, or `GP.A` swallows the
   prefix (§2.4).
 
 **The two real costs:**
@@ -1403,7 +1403,7 @@ GP.ASM "LDA {A}"  -> <CE>{SM "LDA {A}"   quoted text still verbatim
 
 - `GP.ASM` **still collides with `GP.A`** (`<CE>{SM`) until registered.
 - **New:** `GP.ENDASM` tokenises as `GP.<80>ASM` — `END` is matched as a keyword.
-  So *both* names must be registered in `c64tokens.py` and `GP.INC.BL`, not just
+  So *both* names must be registered in `c64tokens.py` and `GPB.INC.BL`, not just
   the opener.
 
 GP token space: `GP.IF/ELSEIF/ELSE/ENDIF` took 52830-52827, so **the next free id

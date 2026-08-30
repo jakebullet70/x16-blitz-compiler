@@ -7,12 +7,12 @@
 ## **      POKE $30C,65 : POKE $30D,0 : SYS ADDR : A = PEEK($30C)
 ## **      GP.CALL ADDR,65,0 : A = GP.A
 ## **
-## **  Build:  copy GPC-BASIC/GP.INC.BL and this file into testing/, then
+## **  Build:  copy GPC-BASIC/GPB.INC.BL and this file into testing/, then
 ## **            python source/gpc/build_basl.py MLCALL.EXP.BL MLCALL.PRG
 ## **          and compile MLCALL.PRG with GPC.BIN.
 ## **
 ## ***********************************************************************
-#INCLUDE "GP.INC.BL"
+#INCLUDE "GPB.INC.BL"
 #SAVEAS "@:MLCALL.PRG"
 
 ## ---- Where the machine code goes.

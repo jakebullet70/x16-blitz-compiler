@@ -13,13 +13,13 @@
 ## **  and RETURN accepts the lot -- which also means the user can go back
 ## **  and fix the first field without starting again.
 ## **
-## **  Build:  copy GP.INC.BL, THEME.INC.BL, APPHELP.INC.BL, INPHELP.INC.BL
+## **  Build:  copy GPB.INC.BL, THEME.INC.BL, APPHELP.INC.BL, INPHELP.INC.BL
 ## **          and this file into testing/, then
 ## **            python source/gpc/build_basl.py FORM.EXP.BL FORM.PRG
 ## **          and compile FORM.PRG with GPC.BIN.
 ## **
 ## ***********************************************************************
-#INCLUDE "GP.INC.BL"
+#INCLUDE "GPB.INC.BL"
 #INCLUDE "THEME.INC.BL"
 #INCLUDE "APPHELP.INC.BL"
 #INCLUDE "INPHELP.INC.BL"

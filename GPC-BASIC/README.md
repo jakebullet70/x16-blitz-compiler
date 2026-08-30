@@ -13,17 +13,17 @@ matters because BASL has one flat namespace: a collision is a wrong answer, not 
 Keep this folder as `GPC-BASIC/` beside your own sources and `#INCLUDE` what you need by path:
 
 ```basic
-#INCLUDE "/GPC-BASIC/GP.INC.BL"
+#INCLUDE "/GPC-BASIC/GPB.INC.BL"
 #INCLUDE "/GPC-BASIC/THEME.INC.BL"
 #INCLUDE "/GPC-BASIC/MENUHELP.INC.BL"
 ```
 
-BASLOAD takes a path, not just a bare filename — **verified on R49**, both `/GPC-BASIC/GP.INC.BL`
-from the root and the relative `GPC-BASIC/GP.INC.BL`. Prefer the leading slash: it is absolute, so
+BASLOAD takes a path, not just a bare filename — **verified on R49**, both `/GPC-BASIC/GPB.INC.BL`
+from the root and the relative `GPC-BASIC/GPB.INC.BL`. Prefer the leading slash: it is absolute, so
 it keeps working when your program is itself in a subdirectory. (`../` and `//` are *not* understood
 by the X16's filesystem, so a path has to go down from somewhere, not up.)
 
-`GP.INC.BL` comes first and is not optional: it is what makes `GP.DO`, `GP.BOX` and the rest mean
+`GPB.INC.BL` comes first and is not optional: it is what makes `GP.DO`, `GP.BOX` and the rest mean
 anything to BASLOAD. Without it a line saying `GP.DO 5` is just a syntax error.
 
 Then it is BASLOAD and GPC as usual: `BASLOAD "MYPROG.BL"` to turn the source into a program, and
@@ -50,7 +50,7 @@ because these files live on the X16's drive.
 
 ### Core — the `GP.*` command set
 
-All of it needs `#INCLUDE "GP.INC.BL"`, and nothing else.
+All of it needs `#INCLUDE "GPB.INC.BL"`, and nothing else.
 
 | Group | Commands | Example |
 | --- | --- | --- |

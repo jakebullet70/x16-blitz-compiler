@@ -6,7 +6,7 @@
 ##                     works and still centres
 ##
 ## A was 93 jiffies before the block path and is 19 after.
-#INCLUDE "GP.INC.BL"
+#INCLUDE "GPB.INC.BL"
 #INCLUDE "BMX.INC.BL"
 #SAVEAS "@:BMXSPD.PRG"
 

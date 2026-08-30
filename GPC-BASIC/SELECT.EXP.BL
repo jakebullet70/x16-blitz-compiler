@@ -2,14 +2,14 @@
 ## **
 ## **  SELECT.EXP.BL -- GP.SELECT / GP.CASE / GP.OTHER / GP.ENDSEL
 ## **
-## **  Build:  copy GPC-BASIC/GP.INC.BL and this file into testing/, then
+## **  Build:  copy GPC-BASIC/GPB.INC.BL and this file into testing/, then
 ## **            python source/gpc/build_basl.py SELECT.EXP.BL SELECT.PRG
 ## **          and compile SELECT.PRG with GPC.BIN.
 ## **
 ## **  Compile-only: the ROM cannot RUN a PRG containing GP tokens.
 ## **
 ## ***********************************************************************
-#INCLUDE "GP.INC.BL"
+#INCLUDE "GPB.INC.BL"
 #SAVEAS "@:SELECT.PRG"
 
 ## ---- 1. the shape.  The selector is evaluated ONCE; each GP.CASE is

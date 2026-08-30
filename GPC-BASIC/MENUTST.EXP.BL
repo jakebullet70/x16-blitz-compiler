@@ -6,7 +6,7 @@
 ## cancels, what wraps. The drawing is not: MENUHELP.ROW does nothing but
 ## call GP.FILL and GP.PRINTAT, which are shipped and verified, so reading
 ## the attribute back out of VERA would be testing tier 6 all over again.
-#INCLUDE "GP.INC.BL"
+#INCLUDE "GPB.INC.BL"
 #INCLUDE "MENUHELP.INC.BL"
 #SAVEAS "@:MENUTST.PRG"
 

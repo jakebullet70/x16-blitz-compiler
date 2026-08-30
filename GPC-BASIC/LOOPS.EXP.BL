@@ -2,14 +2,14 @@
 ## **
 ## **  LOOPS.EXP.BL -- GP.DO / GP.LOOP / GP.EXITDO
 ## **
-## **  Build:  copy GPC-BASIC/GP.INC.BL and this file into testing/, then
+## **  Build:  copy GPC-BASIC/GPB.INC.BL and this file into testing/, then
 ## **            python source/gpc/build_basl.py LOOPS.EXP.BL LOOPS.PRG
 ## **          and compile LOOPS.PRG with GPC.BIN.
 ## **
 ## **  Compile-only: the ROM cannot RUN a PRG containing GP tokens.
 ## **
 ## ***********************************************************************
-#INCLUDE "GP.INC.BL"
+#INCLUDE "GPB.INC.BL"
 #SAVEAS "@:LOOPS.PRG"
 
 ## ---- 1. counted loop.  GP.DO n runs the body exactly n times.

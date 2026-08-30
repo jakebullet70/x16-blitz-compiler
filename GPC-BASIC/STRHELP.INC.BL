@@ -4,7 +4,7 @@
 ## **
 ## **  Modelled on prog8's strings module: one dotted namespace
 ## **  (STRHELP.*), one routine per job, include only what is used.
-## **  Unlike GP.INC.BL this file contains CODE -- call the routines
+## **  Unlike GPB.INC.BL this file contains CODE -- call the routines
 ## **  with GOSUB. It is position independent (the module jumps over
 ## **  itself), so #INCLUDE it anywhere, the top of the program included.
 ## **

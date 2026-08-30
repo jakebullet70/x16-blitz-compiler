@@ -115,7 +115,7 @@ keywords with no machine code anywhere in the runtime, and the pattern is worth 
 because the next one is nearly free.
 
 `GP.HIBYTE`/`GP.LOBYTE` are the ones that earn their place. The tree wrote the address split out by
-hand in four places (`ARRAYS.EXP.BL`, `BMX.INC.BL`, `MENUHELP.INC.BL`, `GP.INC.BL`), each with a
+hand in four places (`ARRAYS.EXP.BL`, `BMX.INC.BL`, `MENUHELP.INC.BL`, `GPB.INC.BL`), each with a
 warning comment nailed beside it, because the obvious `P AND 255` raises `OUT OF RANGE` — `AND` is
 16-bit signed and every address worth splitting is above 32767. **`MOD` is not on that path**: it
 goes through `Int32Divide` on the full mantissa. Measured 2026-08-19: `MOD(1000000,256)` = 64 and
@@ -163,7 +163,7 @@ rebuilding.
 Four files, and **none of them are runtime files**:
 
 1. `getGP()` in `common-scripts/c64tokens.py` — the token, explicit `id:NAME`, next free downward.
-2. `GPC-BASIC/GP.INC.BL` — the matching `#TOKEN` line. This is the ABI mirror.
+2. `GPC-BASIC/GPB.INC.BL` — the matching `#TOKEN` line. This is the ABI mirror.
 3. `unary.def` or `commands.def` — the declaration, **with no `T`**.
 4. A helper in `compiler/source/evaluate/term/gpcomposite.asm`.
 

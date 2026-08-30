@@ -969,25 +969,6 @@ untouched. (`LINPUT` programs such as `testing/MD5` are unaffected — no drain 
   the assembler had already succeeded, which reads like a build break but is not one. It is copied
   only if present now. Same class as the five blockers that once made this repo unbuildable anywhere:
   a recipe asserting on a file nothing guarantees.
-- **Rename `GPC-BASIC/GP.INC.BL` to `GPB.INC.BL`.** Asked for 2026-08-30. A flat rename with a long
-  tail: **78 references across 37 files**, and the ones that bite are not the prose ones.
-  `source/gpc/Makefile:70` copies the file into `testing/` and `.gitignore:74` excludes that copy —
-  both name it literally, and `testing/GPC.ERR.BASL` `#INCLUDE`s it, so the error-message build
-  breaks the moment the copy changes name and the old `testing/GP.INC.BL` is left behind untracked
-  and stale, which is exactly the drift that `.gitignore` comment warns about. `bmx-demo.bat` and
-  `menu-demo.bat` name it in their copy lists. Sixteen `.EXP.BL` files in `GPC-BASIC/` open with
-  `#INCLUDE "GP.INC.BL"` and most repeat the name in their header comment. `bin/compiler.library` and
-  `bin/gp.library` are generated, so fix their sources instead (`source/compiler/_library.asm`,
-  `source/gp-runtime/_library.asm`, `gpcomposite.asm`, `gpdraw.asm`). Docs: `GP-BASIC.md`,
-  `GP-BASIC.GLOBALS.md`, `GPC-BASIC/README.md`, and `GP-BASIC.TIERS.md` / `.PLAN.md` /
-  `.ASM.RESEARCH.md` under `docs/blitz/`.
-  **It breaks every existing user source**, since `#INCLUDE "GP.INC.BL"` is the first line of all of
-  them — so it wants a release note, not a quiet commit. Possible softener: leave `GP.INC.BL` behind
-  for one version as a shim that `#INCLUDE`s the new name. That costs nothing in the object, because
-  `#TOKEN` lines emit no code — **but whether BASLOAD honours an `#INCLUDE` inside an `#INCLUDE` is
-  unverified**, and the whole idea dies if it does not. Check that first; the alternative shim is a
-  duplicate copy of the 31 `#TOKEN` lines, which reintroduces the drift the single master exists to
-  prevent.
 
 ## Notes that are easy to lose
 

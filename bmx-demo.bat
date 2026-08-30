@@ -11,7 +11,7 @@ rem
 rem  Source: GPC-BASIC\BMXVIEW.EXP.BL, on GPC-BASIC\BMX.INC.BL
 rem
 rem  demo\ is BUILD OUTPUT and is not in git. To make it:
-rem    1. copy GP.INC.BL, APPHELP.INC.BL, BMX.INC.BL and BMXVIEW.EXP.BL
+rem    1. copy GPB.INC.BL, APPHELP.INC.BL, BMX.INC.BL and BMXVIEW.EXP.BL
 rem       from GPC-BASIC\ into testing\
 rem    2. python source\gpc\build_basl.py BMXVIEW.EXP.BL BMXVIEW.PRG
 rem    3. compile testing\BMXVIEW.PRG with GPC.BIN, and put the object

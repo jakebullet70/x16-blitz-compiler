@@ -1,8 +1,8 @@
 ## ***********************************************************************
 ## **
-## **  GP.INC.BL -- the GP.BASIC keyword definitions for BASLOAD.
+## **  GPB.INC.BL -- the GP.BASIC keyword definitions for BASLOAD.
 ## **
-## **  #INCLUDE "GP.INC.BL" at the top of any BASL source that uses GP
+## **  #INCLUDE "GPB.INC.BL" at the top of any BASL source that uses GP
 ## **  keywords. BASLOAD only knows the ROM's keywords; this teaches it
 ## **  the GP tokens so GP.DO parses instead of raising a syntax error.
 ## **  The host-side tokeniser (bin/tokenise.zip) does not need this file

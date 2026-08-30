@@ -45,7 +45,7 @@ bytes**: only a program that `#INCLUDE`s one pays for it, and it pays in its own
 Every BASL source that uses a `GP.` keyword must declare the tokens:
 
 ```basic
-#INCLUDE "GP.INC.BL"
+#INCLUDE "GPB.INC.BL"
 ```
 
 **BASLOAD knows only the ROM's keywords.** Without that line `GP.DO 5` is a syntax error. (The
@@ -57,11 +57,11 @@ host-side tokeniser for hand-written `.bas` needs nothing — it learns the same
 Keep `GPC-BASIC/` as a folder beside your own sources and include from it by path:
 
 ```basic
-#INCLUDE "/GPC-BASIC/GP.INC.BL"
+#INCLUDE "/GPC-BASIC/GPB.INC.BL"
 ```
 
 **`#INCLUDE` takes a path, not just a bare filename** — verified on R49, both absolute
-(`/GPC-BASIC/GP.INC.BL`) and relative (`GPC-BASIC/GP.INC.BL`). Prefer the leading slash: it is
+(`/GPC-BASIC/GPB.INC.BL`) and relative (`GPC-BASIC/GPB.INC.BL`). Prefer the leading slash: it is
 absolute from the drive root, so it still resolves when your own program sits in a subdirectory.
 `../` and `//` are not understood by the X16's filesystem, so a path goes down from somewhere,
 never up.
@@ -893,7 +893,7 @@ free today; it is one library update away from not being.
 
 ### `GP.*` is keywords, not variables
 
-`GP.INC.BL` defines **no variables at all** — 27 `#TOKEN` lines and nothing else.
+`GPB.INC.BL` defines **no variables at all** — 27 `#TOKEN` lines and nothing else.
 
 ```basic
 GP.A = 5          ' SYNTAX ERROR — GP.A is a keyword

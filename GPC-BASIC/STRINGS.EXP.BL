@@ -10,7 +10,7 @@
 ## **  STRHELP.PADR / PADL / PADC     BASL, from STRHELP.INC.BL
 ## **  STRHELP.REPLACE               BASL, from STRHELP.INC.BL
 ## **
-## **  Build:  copy GPC-BASIC/GP.INC.BL, GPC-BASIC/STRHELP.INC.BL and this
+## **  Build:  copy GPC-BASIC/GPB.INC.BL, GPC-BASIC/STRHELP.INC.BL and this
 ## **          file into testing/, then
 ## **            python source/gpc/build_basl.py STRINGS.EXP.BL STRINGS.PRG
 ## **          and compile STRINGS.PRG with GPC.BIN.
@@ -18,7 +18,7 @@
 ## **  Compile-only: the ROM cannot RUN a PRG containing GP tokens.
 ## **
 ## ***********************************************************************
-#INCLUDE "GP.INC.BL"
+#INCLUDE "GPB.INC.BL"
 #INCLUDE "STRHELP.INC.BL"
 #SAVEAS "@:STRINGS.PRG"
 

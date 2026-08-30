@@ -452,7 +452,7 @@ this runs in a post-pass, the reported line is the last line compiled, not the o
 Verified: exit at a condition (`R1= 5`); nested, inner-only exit (`R1= 6`); 2,000 loop entries each
 exited via `GP.EXITDO`, bounded, proving the frame really is closed; plain `GP.DO`/`GP.LOOP`
 unaffected; and the no-loop case rejected at compile time. Also end-to-end from BASLOAD source through
-`GP.INC.BL` → `GPC` → running object.
+`GPB.INC.BL` → `GPC` → running object.
 
 ### §2 Machine code interface — 5 tokens. **SHIPPED, 108 B**
 
@@ -1169,18 +1169,18 @@ Eight behaviours in one argument, and **no global runtime state**.
 
 `GP.A` `GP.X` `GP.Y` `GP.C` (from `GP.CALL`) · `GP.END` (from `GP.STASH`) · `GP.SEL` `GP.N` (menus)
 
-### `GPC-BASIC/GP.INC.BL` — the BASLOAD side, and why it is mandatory
+### `GPC-BASIC/GPB.INC.BL` — the BASLOAD side, and why it is mandatory
 
 The library lives in **`GPC-BASIC/`** at the repo root — flat, names UPPERCASE, role carried in the
 extension: **`XXX.INC.BL`** for a BASL include, **`XXX.EXP.BL`** for an example program. Today that is
-`GP.INC.BL` and `LOOPS.EXP.BL`.
+`GPB.INC.BL` and `LOOPS.EXP.BL`.
 
 **Two tokenisers have to learn every GP keyword, not one.** The host-side `bin/tokenise.zip` learns
 them from `c64tokens.py` at build time, so `.bas` files work the moment a keyword is added. **BASLOAD
 does not** — it runs on the X16 and knows only the ROM's keywords, so a BASL source using `GP.DO`
 is a syntax error until the tokens are declared to it.
 
-`GPC-BASIC/GP.INC.BL` is that declaration, `#INCLUDE`d at the top of any BASL source using GP
+`GPC-BASIC/GPB.INC.BL` is that declaration, `#INCLUDE`d at the top of any BASL source using GP
 keywords. It is **staged flat into `testing/`** to be built, because `testing/` is the emulator's drive and
 that is the shortest thing to type. `#INCLUDE` does take a path, so a user keeps the library in a
 `GPC-BASIC/` folder instead of copying it about; the flat staging is a convenience of this tree,
@@ -1344,21 +1344,21 @@ Mitigating factors for what remains, both real:
 *Moved out of `GPC-BASIC/README.md`, which is for people WRITING GPB programs. None of this is
 their problem.*
 
-### Why `GP.INC.BL` has to exist
+### Why `GPB.INC.BL` has to exist
 
 Two tokenisers have to learn every GP keyword, and only one of them does it by itself.
 
-| | learns GP keywords from | needs `GP.INC.BL`? |
+| | learns GP keywords from | needs `GPB.INC.BL`? |
 | --- | --- | --- |
 | `bin/tokenise.zip` (host, for `.bas`) | `source/common-scripts/c64tokens.py`, at build time | no |
 | BASLOAD (on the X16, for BASL sources) | nothing — it knows only ROM keywords | **yes** |
 
-So a BASL source saying `GP.DO 5` is a syntax error until `#INCLUDE "GP.INC.BL"` has declared the
+So a BASL source saying `GP.DO 5` is a syntax error until `#INCLUDE "GPB.INC.BL"` has declared the
 token. That include is the only thing standing between BASL sources and the GP keyword set.
 
 ### The drift hazard
 
-`GP.INC.BL` restates the token values from `getGP()` in `source/common-scripts/c64tokens.py`. Adding
+`GPB.INC.BL` restates the token values from `getGP()` in `source/common-scripts/c64tokens.py`. Adding
 or removing a keyword in one place and not the other produces a **BASLOAD syntax error** — loud, but
 a wasted debugging session. Generating this file from `c64tokens.py` at build time would remove the
 hazard and is worth doing before the keyword list grows further.
@@ -1373,7 +1373,7 @@ there is no BASIC handler behind those tokens. Expected, not a fault.
 ### Building an example from the development tree
 
 `testing/` is the emulator's drive and `GPC-BASIC/` holds the masters, so a build stages the files
-across. (`#INCLUDE` accepts a path — `/GPC-BASIC/GP.INC.BL` works, verified on R49 — so this flat
+across. (`#INCLUDE` accepts a path — `/GPC-BASIC/GPB.INC.BL` works, verified on R49 — so this flat
 staging is a habit of this tree, not something BASLOAD forces.) So:
 
 - edit the master in `GPC-BASIC/`

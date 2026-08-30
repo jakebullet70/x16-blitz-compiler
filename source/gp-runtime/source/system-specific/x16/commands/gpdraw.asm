@@ -26,7 +26,7 @@
 ;		THE TWO WORLDS ARE SEPARATE AND THAT IS DELIBERATE. Nothing here calls the KERNAL, so
 ;		nothing here moves the KERNAL cursor: a plain PRINT after a GP.PRINTAT resumes where the
 ;		KERNAL still thinks the cursor is, NOT after the text just drawn. Mixing them will
-;		surprise someone at least once, which is why it is said here and in GP.INC.BL.
+;		surprise someone at least once, which is why it is said here and in GPB.INC.BL.
 ;
 ;		THE OPTIONAL COLOUR DEFAULTS TO WHAT "COLOR" LAST SET. The KERNAL keeps the current text
 ;		colour in $0376 packed as (background << 4) | foreground -- which is byte for byte the

@@ -2,14 +2,14 @@
 ## **
 ## **  IF.EXP.BL -- GP.IF / GP.ELSEIF / GP.ELSE / GP.ENDIF
 ## **
-## **  Build:  copy GPC-BASIC/GP.INC.BL and this file into testing/, then
+## **  Build:  copy GPC-BASIC/GPB.INC.BL and this file into testing/, then
 ## **            python source/gpc/build_basl.py IF.EXP.BL IF.PRG
 ## **          and compile IF.PRG with GPC.BIN.
 ## **
 ## **  Compile-only: the ROM cannot RUN a PRG containing GP tokens.
 ## **
 ## ***********************************************************************
-#INCLUDE "GP.INC.BL"
+#INCLUDE "GPB.INC.BL"
 #SAVEAS "@:IF.PRG"
 
 ## ---- 1. the shape.  All four keywords are ALONE ON THEIR OWN LINE and

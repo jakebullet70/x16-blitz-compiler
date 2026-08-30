@@ -15,14 +15,14 @@
 ## **  string descriptor, and GP.CALL replaces staging A/X/Y/C through
 ## **  $030C..$030F and SYSing.
 ## **
-## **  Build:  copy GP.INC.BL, APPHELP.INC.BL, BMX.INC.BL and this file
+## **  Build:  copy GPB.INC.BL, APPHELP.INC.BL, BMX.INC.BL and this file
 ## **          into testing/, then
 ## **            python source/gpc/build_basl.py BMXVIEW.EXP.BL BMXVIEW.PRG
 ## **          and compile BMXVIEW.PRG with GPC.BIN. Put some .BMX
 ## **          files on the same drive -- samples/BMXVIEWER/SAMPLES has 30.
 ## **
 ## ***********************************************************************
-#INCLUDE "GP.INC.BL"
+#INCLUDE "GPB.INC.BL"
 #INCLUDE "APPHELP.INC.BL"
 #INCLUDE "BMX.INC.BL"
 #SAVEAS "@:BMXVIEW.PRG"

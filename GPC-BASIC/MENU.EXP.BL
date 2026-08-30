@@ -8,7 +8,7 @@
 ## **  APPHELP.*   leave the user's screen as you found it
 ## **  GP.STASH    a dialog over the display, and the display back
 ## **
-## **  Build:  copy GP.INC.BL, THEME.INC.BL, APPHELP.INC.BL,
+## **  Build:  copy GPB.INC.BL, THEME.INC.BL, APPHELP.INC.BL,
 ## **          MENUHELP.INC.BL and this file
 ## **          into testing/, then
 ## **            python source/gpc/build_basl.py MENU.EXP.BL MENU.PRG
@@ -22,7 +22,7 @@
 ## **  calls them.
 ## **
 ## ***********************************************************************
-#INCLUDE "GP.INC.BL"
+#INCLUDE "GPB.INC.BL"
 #INCLUDE "THEME.INC.BL"
 #INCLUDE "APPHELP.INC.BL"
 #INCLUDE "MENUHELP.INC.BL"
