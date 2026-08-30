@@ -60,7 +60,14 @@ build:
 #		$9F00 size guard managed to fail unnoticed for weeks; a release that ships a shared-mode
 #		tool must ship the runtime that tool needs.
 #
+#
+#		GP.INC.BL first: GPC.ERR.BASL now #INCLUDEs it, and BASLOAD resolves an #INCLUDE off
+#		the DRIVE -- so the file has to be sitting in testing/ before the tokenise, not just
+#		in GPC-BASIC/. Copied rather than duplicated: GPC-BASIC/ is the master, this is a
+#		build artifact, and .gitignore says so. Same arrangement as testing/samples.
+#
 release: build
+	$(CCOPY) ..$(S)..$(S)GPC-BASIC$(S)GP.INC.BL $(RELEASEDIR)GP.INC.BL
 	$(PYTHON) build_basl.py GPC.ERR.BASL GPC.ERR.PRG
 	make $(MAKEOPTS) -C ../runtime gpc-rt
 	$(PYTHON) compile_shared.py GPC.ERR.PRG C.GPC.ERR.PRG M.GPC.ERR
