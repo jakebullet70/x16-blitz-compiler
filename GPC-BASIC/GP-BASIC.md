@@ -517,6 +517,11 @@ thing: `LDA {N%}` reads it, `STA {N%}` writes it, in the slot BASIC itself uses.
 | `{N}` `{N%}` `{N$}` | the scalar's slot |
 | `{N()}` | the **array's** slot, which holds the base address of its data — an element is two steps, as through `GP.ARRPTR` |
 
+The name is letters, digits and **dots**, starting with a letter — so `{DOC.GOT.OFF}` works, and the
+dotted names the library and the samples use everywhere are reachable from assembly. Underscore is
+not: BASLOAD allows it in a name, this does not, and `{A_B}` reads the name as `A`. Up to 64
+characters, the same as BASLOAD.
+
 > **`{VAR}` needs `#SYMFILE`, and that is the one thing to remember.** BASLOAD renames variables —
 > `N%` becomes `A%`, which is how it gives you 64 significant characters on a two-character BASIC —
 > and it does *not* rename REM text with them. So the code says `A%` while the REM still says

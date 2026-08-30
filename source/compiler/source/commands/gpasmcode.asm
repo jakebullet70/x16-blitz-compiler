@@ -1306,9 +1306,22 @@ AsmParseBrace:
 		stz 	AsmSymType
 		ldy 	#0
 		;
-		;		The name as written. Alphanumeric, first character alphabetic, and it may be
-		;		the full 64 BASLOAD allows rather than the two this BASIC keeps -- the crunched
-		;		name is what has to fit, and one or two characters is what BASLOAD produces.
+		;		The name as written. First character alphabetic, then letters, digits and DOTS,
+		;		and it may be the full 64 BASLOAD allows rather than the two this BASIC keeps --
+		;		the crunched name is what has to fit, and one or two characters is what BASLOAD
+		;		produces.
+		;
+		;		THE DOT IS NOT A DETAIL. A dotted name is how a BASL program says DOC.GOT.OFF
+		;		without tripping BASLOAD's keyword trap -- its scanner takes the maximal run
+		;		before a sigil, and if that whole run is a keyword it tokenises AS the keyword,
+		;		so FN$ and ON$ break where DOC.FILE.NAME$ is safe. It is the house style through
+		;		the library and the samples, and #SYMFILE records the dotted name verbatim. Left
+		;		out, {DOC.GOT.OFF} read the name as DOC, missed, and reported UNKNOWN VARIABLE
+		;		IN {} -- true, but with nothing pointing at the dot that caused it.
+		;
+		;		Underscore is the other character BASLOAD allows in a name and is deliberately
+		;		NOT here: what byte it arrives as through PETSCII was never measured, and a
+		;		wrong guess would quietly take some other character into a name.
 		;
 		jsr 	LookNext
 		jsr 	CharIsAlpha
@@ -1324,7 +1337,9 @@ _APBNameChar:
 		jsr 	CharIsAlpha
 		bcs 	_APBNameTake
 		jsr 	CharIsDigit
-		bcc 	_APBNameDone
+		bcs 	_APBNameTake
+		cmp 	#'.' 						; a dot is part of the name, not the end of it
+		bne 	_APBNameDone
 _APBNameTake:
 		cpy 	#ASM_SYM_MAX
 		bcs 	_APBBadName 				; longer than the symbol file can hold
