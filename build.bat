@@ -28,7 +28,7 @@ set "BUILDARG=%*"
 if /i "%~1"=="run" set "BUILDARG="
 
 rem --- run the build under bash (PATH set inside so make + 64tass resolve) ---
-"%BASH%" -lc "cd \"$(cygpath -u '%~dp0')\" && export PATH=\"/c/Users/Admin/AppData/Local/Microsoft/WinGet/Links:/c/8bitProgramming/64tass-1.60:$PATH\" && ./build.sh %BUILDARG%"
+"%BASH%" -lc "cd \"$(cygpath -u '%~dp0')\" && export PATH=\"/c/8bitProgramming/make-4.4.1/bin:/c/8bitProgramming/64tass-1.60:/c/Users/Admin/AppData/Local/Programs/Python/Python313:$PATH\" && ./build.sh %BUILDARG%"
 if errorlevel 1 exit /b %ERRORLEVEL%
 
 rem --- if "run" was requested, launch the emulator on the freshly built PRG ----

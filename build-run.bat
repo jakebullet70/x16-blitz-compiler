@@ -4,7 +4,7 @@ rem  build-run.bat -- self-contained: build EVERYTHING, then run the emulator.
 rem
 rem  Builds the libraries + compiler engine (make libs), packages the release
 rem  (make release), builds the GPC.PRG front end (make -C source/gpc release),
-rem  then launches x16emu on GPC.PRG (which chain-loads GPC.BLITZ.BIN).
+rem  then launches x16emu on GPC.PRG (which chain-loads GPC.BIN).
 rem
 rem  The build recipes are all POSIX, so the make part is driven through Git
 rem  Bash. The emulator is launched from this batch file (not nested in bash)
@@ -24,7 +24,7 @@ if not exist "%BASH%" (
 
 rem --- build everything under bash (PATH set inside so make + 64tass resolve)-
 echo == Building (libs, release, GPC.PRG) ==
-"%BASH%" -lc "cd \"$(cygpath -u '%~dp0')\" && export PATH=\"/c/Users/Admin/AppData/Local/Microsoft/WinGet/Links:/c/8bitProgramming/64tass-1.60:$PATH\" && set -e && make libs && make release && make -C source/gpc release"
+"%BASH%" -lc "cd \"$(cygpath -u '%~dp0')\" && export PATH=\"/c/8bitProgramming/make-4.4.1/bin:/c/8bitProgramming/64tass-1.60:/c/Users/Admin/AppData/Local/Programs/Python/Python313:$PATH\" && set -e && make libs && make release && make -C source/gpc release"
 if errorlevel 1 (
     echo == BUILD FAILED -- not launching emulator ==
     exit /b %ERRORLEVEL%
