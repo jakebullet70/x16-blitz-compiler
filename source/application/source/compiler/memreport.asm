@@ -89,11 +89,11 @@ _PMRWhich:
 		bra 	_PMRDone
 _PMREmbedded:
 		sec
-		lda 	#0 							; the runtime as written: cut - StartBasicProgram
-		sbc 	#StartBasicProgram & $FF
-		sta 	reportValue
-		lda 	runtimeEndPage
-		sbc 	#StartBasicProgram >> 8
+		lda 	#0 							; the runtime as written: cut - RTIMG_LOAD. The label
+		sbc 	#RTIMG_LOAD & $FF 			; used to be StartBasicProgram, which lives in the
+		sta 	reportValue 				; runtime image and so is no longer linked here --
+		lda 	runtimeEndPage 				; genrtimage.py hands the address across instead.
+		sbc 	#RTIMG_LOAD >> 8
 		sta 	reportValue+1
 		jsr 	PrintDecimal
 		;

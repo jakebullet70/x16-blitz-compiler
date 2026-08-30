@@ -770,13 +770,20 @@ cfJustCR: 									; ReadControlFile scratch: nonzero if the last byte was a CR
 ;		see WriteObjectCode. This decides which.
 ;
 ;		IT ASKS THE QUESTION BY ADDRESS, NOT BY NAME OR BY TOKEN NUMBER. For each opcode in the
-;		finished p-code it reads that opcode's VectorTable slot and compares the handler address
-;		against GPBase. That is precisely the property being relied on -- "does this instruction
-;		jump into the bytes I am about to discard?" -- so it cannot drift: move a handler into
-;		or out of gp-runtime/ and this follows it with no list to update. A token-number range
-;		check would have needed the GP opcodes renumbered contiguously (an RT_ABI bump and a
-;		forced recompile of every shared-mode program), and a "keyword starts with GP." check
-;		would have been a naming convention pretending to be an invariant.
+;		finished p-code it asks whether that opcode's handler lives at or above GPBase. That is
+;		precisely the property being relied on -- "does this instruction jump into the bytes I
+;		am about to discard?" -- so it cannot drift: move a handler into or out of gp-runtime/
+;		and this follows it with no list to update. A token-number range check would have needed
+;		the GP opcodes renumbered contiguously (an RT_ABI bump and a forced recompile of every
+;		shared-mode program), and a "keyword starts with GP." check would have been a naming
+;		convention pretending to be an invariant.
+;
+;		IT READS A BITMAP RATHER THAN THE VECTOR TABLE, and that is the only thing that changed
+;		when the runtime became a separate file. It used to do the comparison itself --
+;		"lda VectorTable+1,y : cmp #GPBase >> 8" -- which needed the runtime's table resident,
+;		and the runtime is on disk now. But it never wanted the address, only one bit of it, so
+;		genrtimage.py does the comparison against the image's own linked table at build time and
+;		emits GPUsageBits. Same question, same answer, asked of 32 bytes instead of 386.
 ;
 ;		IT SCANS THE P-CODE RATHER THAN HOOKING THE EMITTER, which is what makes it total.
 ;		Tokens reach the object from two places -- the generator's T action for most keywords,
@@ -788,11 +795,6 @@ cfJustCR: 									; ReadControlFile scratch: nonzero if the last byte was a CR
 ;		MoveObjectForward is what makes the walk safe: it steps by real instruction size, so an
 ;		operand byte that happens to equal a GP opcode is never read as one. Same reason
 ;		FixBranches uses it.
-;
-;		WHY IT LIVES IN THE APPLICATION and not beside FixBranches in compiler.library: it
-;		references VectorTable and GPBase, which are runtime symbols. compiler.library is linked
-;		WITHOUT the runtime by source/unit-tests/compiler-runtime, and putting this there would
-;		have broken that build with two undefined symbols.
 ;
 ; ************************************************************************************************
 
@@ -814,24 +816,23 @@ ScanGPUsage:
 		.set16 	objPtr,FreeMemory
 _GPSLoop:
 		lda 	(objPtr) 					; the opcode
-		cmp 	#$FF 						; the end marker, and it must be tested BEFORE the vector
-		beq 	_GPSDone 					; lookup: $FF indexes 127 entries past a 109 entry table
+		cmp 	#$FF 						; the end marker, and it must be tested BEFORE the
+		beq 	_GPSDone 					; lookup: $FF is not an opcode at all
 		cmp 	#PCD_ENDSYSTEM+1 			; nothing above the last system token is a real opcode
 		bcs 	_GPSNext 					; (defensive -- the walk should never produce one)
-		cmp 	#PCD_STARTSYSTEM 			; $DB is .shift -- a two byte token, the one that
+		cmp 	#PCD_STARTSYSTEM 			; the .shift prefix -- a two byte token, the one that
 		beq 	_GPSShifted 				; matters is the byte after it
 		cmp 	#PCD_STARTBINARY 			; below $80 is a variable or literal reference, which
 		bcc 	_GPSNext 					; has no vector slot at all
-		ldx 	#0 							; VectorTable, indexed from $80
+		ldx 	#0 							; VectorTable half of the map
 		bra 	_GPSCheck
 _GPSShifted:
 		ldy 	#1
 		lda 	(objPtr),y 					; the shifted token
-		ldx 	#1 							; ShiftVectorTable, indexed from $80 likewise
+		ldx 	#1 							; ShiftVectorTable half likewise
 _GPSCheck:
-		jsr 	_GPSHandlerHigh 			; A = high byte of this opcode's handler address
-		cmp 	#GPBase >> 8
-		bcc 	_GPSNext 					; below the cut, so it survives the truncation
+		jsr 	_GPSUsesGP 					; carry set if this opcode's handler is above the cut
+		bcc 	_GPSNext
 		lda 	#1
 		sta 	gpUsed
 		bra 	_GPSDone 					; one is enough -- nothing later can un-use it
@@ -846,25 +847,47 @@ _GPSDone:
 		rts
 
 ;
-;		A = token ($80..$FF), X = 0 for VectorTable / 1 for ShiftVectorTable. Returns the HIGH
-;		byte of the handler address in A, which is all the comparison needs -- GPBase is page
-;		aligned, so a high-byte compare is exact rather than approximate.
+;		A = token ($80..$FF), X = 0 for the plain table / 1 for the shifted one. Returns carry
+;		set if that opcode's handler is at or above GPBase.
 ;
-_GPSHandlerHigh:
-		asl 	a 							; (token-$80)*2, and the -$80 falls out of the shift:
-		tay 								; $80..$FF doubled is $100..$1FE, and the carry out is
-		cpx 	#0 							; the +$100 we would otherwise subtract back off
-		bne 	_GPSHShifted
-		lda 	VectorTable+1,y
-		rts
-_GPSHShifted:
-		lda 	ShiftVectorTable+1,y
+;		GPUsageBits is 32 bytes: 16 for the plain vectors, then 16 for the shifted, one bit per
+;		opcode, bit set meaning "above the cut". The index is the token with bit 7 cleared,
+;		which is exactly what the tables themselves are indexed by.
+;
+_GPSUsesGP:
+		pha
+		and 	#$7F 						; opcode index, 0..127
+		lsr 	a
+		lsr 	a
+		lsr 	a 							; -> which byte of the map, 0..15
+		cpx 	#0
+		beq 	_GPSUPlain
+		clc
+		adc 	#16 						; the shifted half is the second 16 bytes
+_GPSUPlain:
+		tay
+		lda 	GPUsageBits,y
+		sta 	gpBits
+		pla
+		and 	#$07 						; -> which bit of that byte
+		tax
+		lda 	gpBits
+_GPSUShift:
+		cpx 	#0
+		beq 	_GPSUTest
+		lsr 	a
+		dex
+		bra 	_GPSUShift
+_GPSUTest:
+		lsr 	a 							; the wanted bit falls into the carry
 		rts
 
 gpUsed: 									; nonzero if any GP handler is reachable. Code section,
 		.fill 	1 							; not storage -- it belongs to the compiler and is
 gpScanEnd: 									; thrown away with it, so it costs a compiled program
 		.fill 	2 							; nothing. See the note in file-io/read.asm.
+gpBits:
+		.fill 	1
 
 		.send code
 
@@ -876,6 +899,8 @@ gpScanEnd: 									; thrown away with it, so it costs a compiled program
 ;
 ;		Date			Notes
 ;		==== 			=====
+;		30/08/26		Vector table read replaced by the generated GPUsageBits bitmap, so the
+;						runtime image no longer has to be resident to answer the question.
 ;
 ; ************************************************************************************************
 ; ************************************************************************************************
@@ -969,11 +994,11 @@ _PMRWhich:
 		bra 	_PMRDone
 _PMREmbedded:
 		sec
-		lda 	#0 							; the runtime as written: cut - StartBasicProgram
-		sbc 	#StartBasicProgram & $FF
-		sta 	reportValue
-		lda 	runtimeEndPage
-		sbc 	#StartBasicProgram >> 8
+		lda 	#0 							; the runtime as written: cut - RTIMG_LOAD. The label
+		sbc 	#RTIMG_LOAD & $FF 			; used to be StartBasicProgram, which lives in the
+		sta 	reportValue 				; runtime image and so is no longer linked here --
+		lda 	runtimeEndPage 				; genrtimage.py hands the address across instead.
+		sbc 	#RTIMG_LOAD >> 8
 		sta 	reportValue+1
 		jsr 	PrintDecimal
 		;
@@ -1138,7 +1163,6 @@ WriteObjectCode:
 		bne 	_WOCEmbedded 				; (see the shared branch below and compiler/bootstrap.asm).
 		jmp 	_WOCShared 					; jmp, not a branch -- the embedded path is >127 bytes
 _WOCEmbedded:
-		jsr 	PatchOutCompile 			; makes it run the runtime on reload
 		jsr 	ScanGPUsage 				; does anything reach a handler above GPBase ?
 		;
 		;		The cut. A program using no GP.BASIC keyword takes the runtime as $0801..GPBase
@@ -1200,50 +1224,128 @@ _WOCFits: 									; returns carry set, caller skips the map file and OK
 		jsr 	PatchAsmFixups 				; GP.ASM: blob calls, label targets and {VAR}, all of
 											; which needed newWorkspacePage as well as the run base
 
+		;
+		;		THE RUNTIME IMAGE IS OPENED FIRST, before the object file is created. It is the
+		;		one thing here that can fail for a reason outside this program, and a compile
+		;		that dies after creating OBJECT.PRG leaves a truncated file that looks like a
+		;		program. IODeleteOutputs has already removed the old one, so failing here leaves
+		;		no object at all -- the only state that cannot be mistaken for a good one.
+		;
+		ldx 	#RTImageFileText & $FF
+		ldy 	#RTImageFileText >> 8
+		jsr 	IOOpenImage
+		bcc 	_WOCImgOpened
+		;
+		;		Both failure paths are at the far end of this file, out of branch range from
+		;		here -- the same trampoline _WOCSBigFar needs, for the same reason.
+		;
+_WOCImgNoneFar:
+		jmp 	_WOCNoImage
+_WOCImgBadFar:
+		jmp 	_WOCBadImage
+_WOCImgOpened:
+		jsr 	IOImageIn
+		jsr 	IOReadByte 					; the image's own two byte load address, which is
+		bcs 	_WOCImgBadFar 				; not part of the runtime and must not be copied
+		cmp 	#RTIMG_LOAD & $FF
+		bne 	_WOCImgBadFar
+		jsr 	IOReadByte
+		bcs 	_WOCImgBadFar
+		cmp 	#RTIMG_LOAD >> 8
+		bne 	_WOCImgBadFar
+
 		ldy 	#ObjectFile >> 8
 		ldx 	#ObjectFile & $FF
 		jsr 	IOOpenWrite 				; open write
 
-		lda 	#1 							; write out the load address $0801
+		lda 	#RTIMG_LOAD & $FF 			; write out the load address $0801
 		jsr 	IOWriteByte
-		lda 	#8
+		lda 	#RTIMG_LOAD >> 8
 		jsr 	IOWriteByte
 		;
-		;		Part one : the runtime, $0801 up to ObjectBase, patching the two immediates
-		;		in StartCode on the way past.
+		;		Part one : the runtime, $0801 up to the cut, streamed from GPC.IMG.nnn.BIN and
+		;		patched as it goes past. A PAGE AT A TIME, not a byte at a time: both files are
+		;		open together and the KERNAL has one input channel and one output channel, so
+		;		every switch between them is a CHKIN/CHKOUT pair. Per byte that is 28,000 of
+		;		them; per page it is 94.
 		;
-		.set16 	zTemp0,StartBasicProgram
-_WOCRuntime:
-		lda 	zTemp0+1 					; the code page operand ?
-		cmp 	#(RunCodePage+1) >> 8
-		bne 	_WOCNotCodePage
-		lda 	zTemp0
-		cmp 	#(RunCodePage+1) & $FF
-		bne 	_WOCNotCodePage
+		;		imgCount is the size of the chunk in hand, with ZERO MEANING 256 -- which is
+		;		what makes "cpy imgCount / bne" run a full page when the counter wraps back to
+		;		its start. Only the last chunk is ever short.
+		;
+		sec 								; imgLeft = (runtimeEndPage:00) - RTIMG_LOAD
+		lda 	#0
+		sbc 	#RTIMG_LOAD & $FF
+		sta 	imgLeft
+		lda 	runtimeEndPage
+		sbc 	#RTIMG_LOAD >> 8
+		sta 	imgLeft+1
+		stz 	imgPage
+_WOCImgChunk:
+		lda 	#0 							; a whole page, unless less than one is left
+		ldx 	imgLeft+1
+		bne 	_WOCImgHaveN
+		lda 	imgLeft
+_WOCImgHaveN:
+		sta 	imgCount
+
+		jsr 	IOImageIn 					; read the chunk in
+		ldy 	#0
+_WOCImgRead:
+		jsr 	IOReadByte
+		bcs 	_WOCImgBadFar 				; the image is shorter than ObjectBase says
+		sta 	imageBuffer,y
+		iny
+		cpy 	imgCount
+		bne 	_WOCImgRead
+		;
+		;		The two immediates. Chunks start on page boundaries of the STREAM (the load
+		;		address was consumed before the first one), so "is this offset in this chunk"
+		;		is a page compare and the offset within it is the low byte. Both live in the
+		;		first page in practice; the test does not assume it.
+		;
+		lda 	imgPage
+		cmp 	#RTIMG_CODEPOFS >> 8
+		bne 	_WOCImgNoCode
+		ldy 	#RTIMG_CODEPOFS & $FF
 		lda 	runtimeEndPage 				; object code moves down to here
-		bra 	_WOCEmit
-_WOCNotCodePage:
-		lda 	zTemp0+1 					; the workspace page operand ?
-		cmp 	#(RunWorkspacePage+1) >> 8
-		bne 	_WOCPlain
-		lda 	zTemp0
-		cmp 	#(RunWorkspacePage+1) & $FF
-		bne 	_WOCPlain
+		sta 	imageBuffer,y
+_WOCImgNoCode:
+		lda 	imgPage
+		cmp 	#RTIMG_WSPAGEOFS >> 8
+		bne 	_WOCImgNoWS
+		ldy 	#RTIMG_WSPAGEOFS & $FF
 		lda 	newWorkspacePage 			; so the workspace can start much lower
-		bra 	_WOCEmit
-_WOCPlain:
-		lda 	(zTemp0)
-_WOCEmit:
+		sta 	imageBuffer,y
+_WOCImgNoWS:
+		jsr 	IOObjectOut 				; and write it out
+		ldy 	#0
+_WOCImgWrite:
+		lda 	imageBuffer,y
 		jsr 	IOWriteByte
-		inc 	zTemp0
-		bne 	_WOCSkip1
-		inc 	zTemp0+1
-_WOCSkip1:
-		lda 	zTemp0+1 					; until we reach the cut (both candidates are page
-		cmp 	runtimeEndPage 				; aligned, so the low byte is always zero there)
-		bne 	_WOCRuntime
-		lda 	zTemp0
-		bne 	_WOCRuntime
+		iny
+		cpy 	imgCount
+		bne 	_WOCImgWrite
+
+		inc 	imgPage
+		lda 	imgCount 					; imgLeft -= imgCount, remembering the zero
+		bne 	_WOCImgSubN
+		dec 	imgLeft+1 					; a whole page
+		bra 	_WOCImgMore
+_WOCImgSubN:
+		sec
+		lda 	imgLeft
+		sbc 	imgCount
+		sta 	imgLeft
+		bcs 	_WOCImgMore
+		dec 	imgLeft+1
+_WOCImgMore:
+		lda 	imgLeft
+		ora 	imgLeft+1
+		bne 	_WOCImgChunk
+
+		jsr 	IOCloseImage 				; CLRCHNs, so the object file has to be reselected
+		jsr 	IOObjectOut
 		;
 		;		Part two : the object code itself, which lands at ObjectBase on reload.
 		;
@@ -1426,12 +1528,35 @@ _WOCSCodeDone:
 _WOCSBig:
 		ldx 	#ProgramTooBigText & $FF
 		ldy 	#ProgramTooBigText >> 8
+		bra 	_WOCFail
+
+;
+;		The runtime image is missing, or is not the file its name claims. Either way there is
+;		no object: the image is opened before OBJECT.PRG is created precisely so that this
+;		leaves nothing behind. The name carries the runtime build number, so "missing" is also
+;		what a stale image from an older release looks like -- which is the point of numbering
+;		it rather than trusting a fixed name to be the right one.
+;
+_WOCBadImage: 								; missing, wrong load address, or shorter than
+_WOCNoImage: 								; ObjectBase says it should be
+		jsr 	IOCloseImage 				; CLOSE on a logical file that was never opened is
+											; harmless, and the OPEN may have half-registered it.
+											; Leaving it would fail the NEXT compile's open, and
+											; re-RUNning the compiler is now the only way to
+											; retry -- PatchOutCompile used to make a second RUN
+											; run the program instead.
+		ldx 	#NoRuntimeImageText & $FF
+		ldy 	#NoRuntimeImageText >> 8
+_WOCFail:
 		jsr 	PrintMessage
 		sec 								; rejected -- CompileCode skips the map file and the OK
 		rts
 
 ProgramTooBigText:
 		.text 	"PROGRAM TOO BIG", 13, 0
+
+NoRuntimeImageText:
+		.text 	"NO RUNTIME IMAGE", 13, 0
 
 ; ************************************************************************************************
 ;
@@ -1603,6 +1728,12 @@ sharedCeilPage: 							; page the shared workspace stops at: RTBASE normally,
 		.fill 	1 							; RTGPBASE when the GPB handlers sit below it.
 runtimeEndPage: 							; first page ABOVE the runtime as written out: GPBase if the
 		.fill 	1 							; GP block was dropped, ObjectBase if it was kept.
+imgLeft: 									; bytes of the runtime image still to copy, and which
+		.fill 	2 							; page of the stream the chunk in hand came from --
+imgPage: 									; the patch test is a page compare, see part one.
+		.fill 	1
+imgCount: 									; size of the chunk in hand, ZERO MEANING 256.
+		.fill 	1
 newWorkspacePage: 							; first page of workspace in the saved file. In the code
 		.fill 	1 							; section, not storage -- see the note in
 											; file-io/read.asm.
@@ -1646,6 +1777,15 @@ PatchAsmFixupsShared:
 		sta 	AsmWorkspacePage
 		jmp 	AsmPatchAll
 
+;
+;		One page of the runtime image, in transit from GPC.IMG.nnn.BIN to OBJECT.PRG. It is in
+;		the code section, so it is compiler space and costs a compiled program nothing -- and
+;		it buys back 9,818 bytes of low RAM that used to hold the whole image, so it is the
+;		cheapest 256 bytes in the build.
+;
+imageBuffer:
+		.fill 	256
+
 		.send code
 
 ; ************************************************************************************************
@@ -1685,6 +1825,54 @@ IOOpenRead:
 		ldx	 	#3 							; use file 3 for reading
 		jsr 	$FFC6 						; CHKIN
 		rts
+
+; ************************************************************************************************
+;
+;			 Open the runtime image for read -- YX = ASCIIZ name, carry set if it failed
+;
+;		ON ITS OWN LOGICAL FILE, because it is read while OBJECT.PRG is open for write and
+;		everything else here uses file 3 for both. The channel is NOT selected here: the
+;		streamer alternates CHKIN/CHKOUT a page at a time, so whichever it set would be wrong
+;		by the time the first byte moved.
+;
+; ************************************************************************************************
+
+IO_IMAGE_FILE = 4
+
+IOOpenImage:
+		lda 	#IO_IMAGE_FILE
+		sta 	ioFileNo
+		lda 	#'R'
+		jsr 	IOSetFileName 				; carry comes back from OPEN
+		ldy 	#3 							; put the default back for every other caller
+		sty 	ioFileNo 					; (sty leaves the carry alone)
+		rts
+
+; ************************************************************************************************
+;
+;						Select the image for input / the object file for output
+;
+; ************************************************************************************************
+
+IOImageIn:
+		ldx 	#IO_IMAGE_FILE
+		jmp 	$FFC6 						; CHKIN
+
+IOObjectOut:
+		ldx 	#3
+		jmp 	$FFC9 						; CHKOUT
+
+; ************************************************************************************************
+;
+;									  Close the runtime image
+;
+; ************************************************************************************************
+
+IOCloseImage:
+		lda 	#IO_IMAGE_FILE
+		jsr 	$FFC3 						; CLOSE
+		jmp 	$FFCC 						; CLRCHN -- the object file stays OPEN but stops being
+											; the selected output, so IOObjectOut before writing.
 
 ; ************************************************************************************************
 ;
@@ -1768,9 +1956,9 @@ _IOSSetName:
 
 	    jsr 	$FFBD          				; call SETNAM
 
-    	lda 	#3 							; set LFS to 3,8,3
-		ldx 	#8
-		ldy 	#3
+    	lda 	ioFileNo 					; set LFS to n,8,n -- n is 3 for everything except
+		ldx 	#8 							; the runtime image, which has to be open for READ at
+		ldy 	ioFileNo 					; the same time the object file is open for WRITE.
 		jsr 	$FFBA		
 
 		jsr 	$FFC0 						; OPEN
@@ -1793,6 +1981,10 @@ _IOSSetName:
 ;		code is written. It costs a compiled program nothing.
 ;
 ; ************************************************************************************************
+
+ioFileNo: 									; the logical file IOSetFileName opens on. Code
+		.byte 	3 							; section, like everything else here -- it is the
+											; compiler's, and the compiler is thrown away.
 
 IONameBuffer:
 		.fill 	CFLineSize+8 				; the longest line GPC.INPUT can hold, plus ",S,R"
@@ -1930,6 +2122,8 @@ BuildNumber = 120
 		.section code
 VersionText:
 		.text	'V1.0.0',13,0
+RTImageFileText:
+		.text	'GPC.IMG.120.BIN',0
 		.send code
 ; ************************************************************************************************
 ; ************************************************************************************************

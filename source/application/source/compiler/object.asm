@@ -51,7 +51,6 @@ WriteObjectCode:
 		bne 	_WOCEmbedded 				; (see the shared branch below and compiler/bootstrap.asm).
 		jmp 	_WOCShared 					; jmp, not a branch -- the embedded path is >127 bytes
 _WOCEmbedded:
-		jsr 	PatchOutCompile 			; makes it run the runtime on reload
 		jsr 	ScanGPUsage 				; does anything reach a handler above GPBase ?
 		;
 		;		The cut. A program using no GP.BASIC keyword takes the runtime as $0801..GPBase
@@ -113,50 +112,128 @@ _WOCFits: 									; returns carry set, caller skips the map file and OK
 		jsr 	PatchAsmFixups 				; GP.ASM: blob calls, label targets and {VAR}, all of
 											; which needed newWorkspacePage as well as the run base
 
+		;
+		;		THE RUNTIME IMAGE IS OPENED FIRST, before the object file is created. It is the
+		;		one thing here that can fail for a reason outside this program, and a compile
+		;		that dies after creating OBJECT.PRG leaves a truncated file that looks like a
+		;		program. IODeleteOutputs has already removed the old one, so failing here leaves
+		;		no object at all -- the only state that cannot be mistaken for a good one.
+		;
+		ldx 	#RTImageFileText & $FF
+		ldy 	#RTImageFileText >> 8
+		jsr 	IOOpenImage
+		bcc 	_WOCImgOpened
+		;
+		;		Both failure paths are at the far end of this file, out of branch range from
+		;		here -- the same trampoline _WOCSBigFar needs, for the same reason.
+		;
+_WOCImgNoneFar:
+		jmp 	_WOCNoImage
+_WOCImgBadFar:
+		jmp 	_WOCBadImage
+_WOCImgOpened:
+		jsr 	IOImageIn
+		jsr 	IOReadByte 					; the image's own two byte load address, which is
+		bcs 	_WOCImgBadFar 				; not part of the runtime and must not be copied
+		cmp 	#RTIMG_LOAD & $FF
+		bne 	_WOCImgBadFar
+		jsr 	IOReadByte
+		bcs 	_WOCImgBadFar
+		cmp 	#RTIMG_LOAD >> 8
+		bne 	_WOCImgBadFar
+
 		ldy 	#ObjectFile >> 8
 		ldx 	#ObjectFile & $FF
 		jsr 	IOOpenWrite 				; open write
 
-		lda 	#1 							; write out the load address $0801
+		lda 	#RTIMG_LOAD & $FF 			; write out the load address $0801
 		jsr 	IOWriteByte
-		lda 	#8
+		lda 	#RTIMG_LOAD >> 8
 		jsr 	IOWriteByte
 		;
-		;		Part one : the runtime, $0801 up to ObjectBase, patching the two immediates
-		;		in StartCode on the way past.
+		;		Part one : the runtime, $0801 up to the cut, streamed from GPC.IMG.nnn.BIN and
+		;		patched as it goes past. A PAGE AT A TIME, not a byte at a time: both files are
+		;		open together and the KERNAL has one input channel and one output channel, so
+		;		every switch between them is a CHKIN/CHKOUT pair. Per byte that is 28,000 of
+		;		them; per page it is 94.
 		;
-		.set16 	zTemp0,StartBasicProgram
-_WOCRuntime:
-		lda 	zTemp0+1 					; the code page operand ?
-		cmp 	#(RunCodePage+1) >> 8
-		bne 	_WOCNotCodePage
-		lda 	zTemp0
-		cmp 	#(RunCodePage+1) & $FF
-		bne 	_WOCNotCodePage
+		;		imgCount is the size of the chunk in hand, with ZERO MEANING 256 -- which is
+		;		what makes "cpy imgCount / bne" run a full page when the counter wraps back to
+		;		its start. Only the last chunk is ever short.
+		;
+		sec 								; imgLeft = (runtimeEndPage:00) - RTIMG_LOAD
+		lda 	#0
+		sbc 	#RTIMG_LOAD & $FF
+		sta 	imgLeft
+		lda 	runtimeEndPage
+		sbc 	#RTIMG_LOAD >> 8
+		sta 	imgLeft+1
+		stz 	imgPage
+_WOCImgChunk:
+		lda 	#0 							; a whole page, unless less than one is left
+		ldx 	imgLeft+1
+		bne 	_WOCImgHaveN
+		lda 	imgLeft
+_WOCImgHaveN:
+		sta 	imgCount
+
+		jsr 	IOImageIn 					; read the chunk in
+		ldy 	#0
+_WOCImgRead:
+		jsr 	IOReadByte
+		bcs 	_WOCImgBadFar 				; the image is shorter than ObjectBase says
+		sta 	imageBuffer,y
+		iny
+		cpy 	imgCount
+		bne 	_WOCImgRead
+		;
+		;		The two immediates. Chunks start on page boundaries of the STREAM (the load
+		;		address was consumed before the first one), so "is this offset in this chunk"
+		;		is a page compare and the offset within it is the low byte. Both live in the
+		;		first page in practice; the test does not assume it.
+		;
+		lda 	imgPage
+		cmp 	#RTIMG_CODEPOFS >> 8
+		bne 	_WOCImgNoCode
+		ldy 	#RTIMG_CODEPOFS & $FF
 		lda 	runtimeEndPage 				; object code moves down to here
-		bra 	_WOCEmit
-_WOCNotCodePage:
-		lda 	zTemp0+1 					; the workspace page operand ?
-		cmp 	#(RunWorkspacePage+1) >> 8
-		bne 	_WOCPlain
-		lda 	zTemp0
-		cmp 	#(RunWorkspacePage+1) & $FF
-		bne 	_WOCPlain
+		sta 	imageBuffer,y
+_WOCImgNoCode:
+		lda 	imgPage
+		cmp 	#RTIMG_WSPAGEOFS >> 8
+		bne 	_WOCImgNoWS
+		ldy 	#RTIMG_WSPAGEOFS & $FF
 		lda 	newWorkspacePage 			; so the workspace can start much lower
-		bra 	_WOCEmit
-_WOCPlain:
-		lda 	(zTemp0)
-_WOCEmit:
+		sta 	imageBuffer,y
+_WOCImgNoWS:
+		jsr 	IOObjectOut 				; and write it out
+		ldy 	#0
+_WOCImgWrite:
+		lda 	imageBuffer,y
 		jsr 	IOWriteByte
-		inc 	zTemp0
-		bne 	_WOCSkip1
-		inc 	zTemp0+1
-_WOCSkip1:
-		lda 	zTemp0+1 					; until we reach the cut (both candidates are page
-		cmp 	runtimeEndPage 				; aligned, so the low byte is always zero there)
-		bne 	_WOCRuntime
-		lda 	zTemp0
-		bne 	_WOCRuntime
+		iny
+		cpy 	imgCount
+		bne 	_WOCImgWrite
+
+		inc 	imgPage
+		lda 	imgCount 					; imgLeft -= imgCount, remembering the zero
+		bne 	_WOCImgSubN
+		dec 	imgLeft+1 					; a whole page
+		bra 	_WOCImgMore
+_WOCImgSubN:
+		sec
+		lda 	imgLeft
+		sbc 	imgCount
+		sta 	imgLeft
+		bcs 	_WOCImgMore
+		dec 	imgLeft+1
+_WOCImgMore:
+		lda 	imgLeft
+		ora 	imgLeft+1
+		bne 	_WOCImgChunk
+
+		jsr 	IOCloseImage 				; CLRCHNs, so the object file has to be reselected
+		jsr 	IOObjectOut
 		;
 		;		Part two : the object code itself, which lands at ObjectBase on reload.
 		;
@@ -339,12 +416,35 @@ _WOCSCodeDone:
 _WOCSBig:
 		ldx 	#ProgramTooBigText & $FF
 		ldy 	#ProgramTooBigText >> 8
+		bra 	_WOCFail
+
+;
+;		The runtime image is missing, or is not the file its name claims. Either way there is
+;		no object: the image is opened before OBJECT.PRG is created precisely so that this
+;		leaves nothing behind. The name carries the runtime build number, so "missing" is also
+;		what a stale image from an older release looks like -- which is the point of numbering
+;		it rather than trusting a fixed name to be the right one.
+;
+_WOCBadImage: 								; missing, wrong load address, or shorter than
+_WOCNoImage: 								; ObjectBase says it should be
+		jsr 	IOCloseImage 				; CLOSE on a logical file that was never opened is
+											; harmless, and the OPEN may have half-registered it.
+											; Leaving it would fail the NEXT compile's open, and
+											; re-RUNning the compiler is now the only way to
+											; retry -- PatchOutCompile used to make a second RUN
+											; run the program instead.
+		ldx 	#NoRuntimeImageText & $FF
+		ldy 	#NoRuntimeImageText >> 8
+_WOCFail:
 		jsr 	PrintMessage
 		sec 								; rejected -- CompileCode skips the map file and the OK
 		rts
 
 ProgramTooBigText:
 		.text 	"PROGRAM TOO BIG", 13, 0
+
+NoRuntimeImageText:
+		.text 	"NO RUNTIME IMAGE", 13, 0
 
 ; ************************************************************************************************
 ;
@@ -516,6 +616,12 @@ sharedCeilPage: 							; page the shared workspace stops at: RTBASE normally,
 		.fill 	1 							; RTGPBASE when the GPB handlers sit below it.
 runtimeEndPage: 							; first page ABOVE the runtime as written out: GPBase if the
 		.fill 	1 							; GP block was dropped, ObjectBase if it was kept.
+imgLeft: 									; bytes of the runtime image still to copy, and which
+		.fill 	2 							; page of the stream the chunk in hand came from --
+imgPage: 									; the patch test is a page compare, see part one.
+		.fill 	1
+imgCount: 									; size of the chunk in hand, ZERO MEANING 256.
+		.fill 	1
 newWorkspacePage: 							; first page of workspace in the saved file. In the code
 		.fill 	1 							; section, not storage -- see the note in
 											; file-io/read.asm.
@@ -558,6 +664,15 @@ PatchAsmFixupsShared:
 		lda 	newWorkspacePage 			; _WOCShared carries WS_START in this byte
 		sta 	AsmWorkspacePage
 		jmp 	AsmPatchAll
+
+;
+;		One page of the runtime image, in transit from GPC.IMG.nnn.BIN to OBJECT.PRG. It is in
+;		the code section, so it is compiler space and costs a compiled program nothing -- and
+;		it buys back 9,818 bytes of low RAM that used to hold the whole image, so it is the
+;		cheapest 256 bytes in the build.
+;
+imageBuffer:
+		.fill 	256
 
 		.send code
 

@@ -1,0 +1,80 @@
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		Name:		00rtimage.header
+;		Purpose:	$0801 entry for the RUNTIME IMAGE -- the file a compiled program carries.
+;		Created:	30th August 2026
+;
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		This is the head of GPC.IMG.nnn.BIN: BASIC stub, then straight into the runtime. It is
+;		never executed by the compiler -- the compiler streams this file into OBJECT.PRG and
+;		OBJECT.PRG is what runs it.
+;
+;		It is 00main.header's other half. That file used to be both entries at once: it started
+;		"jmp CompileCode", and PatchOutCompile overwrote those three bytes with NOPs in RAM just
+;		before WriteObjectCode copied them to disk, so the saved program fell through into the
+;		runtime instead of into the compiler. With the two images now linked separately there is
+;		nothing to patch out -- the NOPs are simply assembled here, and PatchOutCompile is gone.
+;
+;		The two immediates ARE still patched, but into the byte stream rather than into RAM:
+;		genrtimage.py records their offsets from $0801 and object.asm substitutes as the bytes
+;		go past. They are assembled as zero to make an unpatched image obvious rather than
+;		plausible.
+;
+;		LAYOUT IS LOAD-BEARING. $0815 is where the BASIC stub SYSes to, in this file and in
+;		00main.header alike, so the stub must stay byte-identical between the two.
+;
+; ************************************************************************************************
+
+		.section code
+
+; ************************************************************************************************
+;
+;								Run program from here
+;
+; ************************************************************************************************
+
+StartBasicProgram:
+		.word 	$0813 						; offset to next.
+		.word 	10 							; line #
+		.byte 	$9E 						; token for 'SYS'
+		.text 	' 2069'						; space, $0815 in decimal
+		.byte 	$3A 						; ':' statement separator
+		.byte 	$8F 						; token for 'REM'
+		.text 	' GPC!'						; compiler signature -- shows on LIST
+		.byte  	0 							; end of line
+		.word 	0 							; end of program
+
+; ************************************************************************************************
+;
+;								We actually enter here (SYS 2069)
+;
+; ************************************************************************************************
+
+StartCode: 									; three bytes, matching the "jmp CompileCode" that
+		nop 								; 00main.header has at this address. There is nothing
+		nop 								; to compile in a saved program, so it falls through.
+		nop
+
+RunCodePage:
+		lda 	#0 							; page of the object code to run.      (operand +1)
+RunWorkspacePage:
+		ldx 	#0 							; first page of workspace.             (operand +1)
+		ldy 	#$9F 						; byte after the last page ($9F00 is I/O).
+		jmp 	StartRuntime 				; and go do it !
+
+		.send code
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;		30/08/26		Split out of 00main.header when the runtime became a separate file.
+;
+; ************************************************************************************************

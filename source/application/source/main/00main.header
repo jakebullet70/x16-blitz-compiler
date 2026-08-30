@@ -2,12 +2,34 @@
 ; ************************************************************************************************
 ;
 ;		Name:		00main.header
-;		Purpose:	Main program, compile application
+;		Purpose:	$0801 entry for the COMPILER.
 ;		Created:	9th October 2023
 ;		Reviewed: 	No
 ;		Author:		Paul Robson (paul@robsons.org.uk)
 ;
 ; ************************************************************************************************
+; ************************************************************************************************
+;
+;		GPC.BLITZ.BIN starts here, and does one thing: compile. It used to be the head of a
+;		single image that was compiler AND runtime -- $0801 runtime, ObjectBase compiler,
+;		FreeMemory object buffer -- which meant 14,079 bytes of runtime sat in low RAM for the
+;		whole compile so that WriteObjectCode could copy them into the output. Every one of
+;		those bytes came off the object buffer, i.e. off the largest program that could be
+;		built. The runtime is GPC.IMG.nnn.BIN now (00rtimage.header), streamed from disk, and
+;		this image is the compiler alone.
+;
+;		So StartCode, RunCodePage, RunWorkspacePage and PatchOutCompile have all gone to
+;		00rtimage.header, where they belong: they were only ever the SAVED program's entry, and
+;		the saved program no longer gets them from here.
+;
+;		The one thing that has to stay in step is that the BASIC stub is byte-identical in both
+;		files, because both SYS 2069 -- $0815 -- to whatever follows it.
+;
+;		Losing PatchOutCompile also retires the "RUN a second time" path, which ran the freshly
+;		compiled object out of the compiler's own memory. It cannot work without a resident
+;		runtime, it was a dev convenience only (a saved OBJECT.PRG was never affected), and
+;		TODO.md had it parked as a cleanup with a size ceiling of its own.
+;
 ; ************************************************************************************************
 
 		.section code
@@ -21,7 +43,7 @@
 StartBasicProgram:
 		.word 	$0813 						; offset to next.
 		.word 	10 							; line #
-		.byte 	$9E 						; token for 'SYS'		
+		.byte 	$9E 						; token for 'SYS'
 		.text 	' 2069'						; space, $0815 in decimal
 		.byte 	$3A 						; ':' statement separator
 		.byte 	$8F 						; token for 'REM'
@@ -32,41 +54,12 @@ StartBasicProgram:
 ; ************************************************************************************************
 ;
 ;								We actually enter here (SYS 2069)
-;		
-; ************************************************************************************************
-
-;
-;		The two immediates below are the defaults used when the compiled code is run
-;		straight out of the compiler's memory (RUN a second time), where the object code
-;		is still sitting up at FreeMemory.
-;
-;		WriteObjectCode patches BOTH of them as it streams the bytes into OBJECT.PRG, so
-;		that the saved file instead runs its object code from ObjectBase -- i.e. on top of
-;		the compiler, which the saved file has no use for. It patches the file, not RAM, so
-;		running from memory keeps working.
-;
-StartCode: 									; this is patched out, so we drop through
-		jmp 	CompileCode 				; to starting the runtime in the saved code.
-
-RunCodePage:
-		lda 	#FreeMemory >> 8 			; address of object code to run. (operand +1)
-RunWorkspacePage:
-		ldx 	#$80 						; first page of workspace. (operand +1)
-		ldy 	#$9F 						; byte after the last page ($9F00 is I/O).
-		jmp 	StartRuntime 				; and go do it !
-
-; ************************************************************************************************
-;
-;				Calling this makes StartCode fall through into the runtime.
 ;
 ; ************************************************************************************************
 
-PatchOutCompile:
-		lda 	#$EA 						; $EA is NOP 65C02
-		sta 	StartCode 					; patch out "JMP COMPILECODE"
-		sta 	StartCode+1
-		sta 	StartCode+2
-		rts
+StartCode:
+		jmp 	CompileCode 				; three bytes, matching the NOPs 00rtimage.header
+											; assembles at this address.
 
 		.send code
 
@@ -79,5 +72,7 @@ PatchOutCompile:
 ;
 ;		Date			Notes
 ;		==== 			=====
+;		30/08/26		Runtime split into its own file; the saved program's entry moved to
+;						00rtimage.header and PatchOutCompile retired with it.
 ;
 ; ************************************************************************************************

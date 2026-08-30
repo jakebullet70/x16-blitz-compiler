@@ -25,7 +25,20 @@
 
 		.section code
 
-		.align 	256 						; object code must start on a page boundary
+;
+;		THE PADDING IS EMITTED EXPLICITLY, and it has to be. This used to be a bare ".align
+;		256", which worked only because compiler.library was linked immediately after it: 64tass
+;		emits alignment fill to place the bytes that FOLLOW, and trims the output at the last
+;		byte written. With the compiler now in its own link there is nothing after this, so the
+;		alignment produced no bytes at all and the image came out 78 bytes short of ObjectBase.
+;
+;		Those 78 bytes are never executed -- but a compiled program's p-code starts at
+;		ObjectBase, so the runtime part of the file has to be exactly ObjectBase-$0801 long or
+;		everything after it lands at the wrong address.
+;
+		.fill 	(256 - (* & $FF)) & $FF, $00 	; to the next page boundary -- WITH a fill
+											; value, or 64tass reserves the space without
+											; writing any bytes into the output file
 ObjectBase:
 
 		.send code

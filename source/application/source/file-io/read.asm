@@ -28,6 +28,54 @@ IOOpenRead:
 
 ; ************************************************************************************************
 ;
+;			 Open the runtime image for read -- YX = ASCIIZ name, carry set if it failed
+;
+;		ON ITS OWN LOGICAL FILE, because it is read while OBJECT.PRG is open for write and
+;		everything else here uses file 3 for both. The channel is NOT selected here: the
+;		streamer alternates CHKIN/CHKOUT a page at a time, so whichever it set would be wrong
+;		by the time the first byte moved.
+;
+; ************************************************************************************************
+
+IO_IMAGE_FILE = 4
+
+IOOpenImage:
+		lda 	#IO_IMAGE_FILE
+		sta 	ioFileNo
+		lda 	#'R'
+		jsr 	IOSetFileName 				; carry comes back from OPEN
+		ldy 	#3 							; put the default back for every other caller
+		sty 	ioFileNo 					; (sty leaves the carry alone)
+		rts
+
+; ************************************************************************************************
+;
+;						Select the image for input / the object file for output
+;
+; ************************************************************************************************
+
+IOImageIn:
+		ldx 	#IO_IMAGE_FILE
+		jmp 	$FFC6 						; CHKIN
+
+IOObjectOut:
+		ldx 	#3
+		jmp 	$FFC9 						; CHKOUT
+
+; ************************************************************************************************
+;
+;									  Close the runtime image
+;
+; ************************************************************************************************
+
+IOCloseImage:
+		lda 	#IO_IMAGE_FILE
+		jsr 	$FFC3 						; CLOSE
+		jmp 	$FFCC 						; CLRCHN -- the object file stays OPEN but stops being
+											; the selected output, so IOObjectOut before writing.
+
+; ************************************************************************************************
+;
 ;									Read A from input file
 ;
 ;			    If read,  A=Byte and Carry Clear, else A = Error and Carry Set
@@ -108,9 +156,9 @@ _IOSSetName:
 
 	    jsr 	$FFBD          				; call SETNAM
 
-    	lda 	#3 							; set LFS to 3,8,3
-		ldx 	#8
-		ldy 	#3
+    	lda 	ioFileNo 					; set LFS to n,8,n -- n is 3 for everything except
+		ldx 	#8 							; the runtime image, which has to be open for READ at
+		ldy 	ioFileNo 					; the same time the object file is open for WRITE.
 		jsr 	$FFBA		
 
 		jsr 	$FFC0 						; OPEN
@@ -133,6 +181,10 @@ _IOSSetName:
 ;		code is written. It costs a compiled program nothing.
 ;
 ; ************************************************************************************************
+
+ioFileNo: 									; the logical file IOSetFileName opens on. Code
+		.byte 	3 							; section, like everything else here -- it is the
+											; compiler's, and the compiler is thrown away.
 
 IONameBuffer:
 		.fill 	CFLineSize+8 				; the longest line GPC.INPUT can hold, plus ",S,R"

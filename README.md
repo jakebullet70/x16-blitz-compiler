@@ -134,17 +134,25 @@ the wrong tool for it). Only the `$` hex form needs decoding.
 
 ### How big a program can it compile?
 
-**About 1,300 BASIC lines.** The limit is on the *p-code*, not the source, and it is a hard number:
+**About 1,300 BASIC lines.** The limit is on the *p-code*, not the source, and it is a hard number
+that depends on which runtime the object carries:
 
 | | max p-code |
 | --- | --- |
-| default (self-contained) | **18,432 bytes** |
-| `shared` | **18,176 bytes** |
+| default (self-contained), no `GP.` keyword | **18,432 bytes** |
+| `shared`, no `GP.` keyword | **17,664 bytes** |
+| default (self-contained), using `GP.` | **16,384 bytes** |
+| `shared`, using `GP.` | **15,616 bytes** |
 
 P-code runs about two thirds the size of the tokenised `.PRG` and averages ~14 bytes per BASIC
-line, so a 27 KB tokenised source is roughly the ceiling. What binds is not the compiler's buffer
-(19,456 bytes) but the *run* side: the object, a 4K FOR/GOSUB frame stack and a 4K minimum
-workspace all have to fit below `$9F00`.
+line, so a 27 KB tokenised source is roughly the ceiling. What binds is the *run* side: the object,
+a 4K FOR/GOSUB frame stack and a 4K minimum workspace all have to fit below `$9F00`, and a program
+using any `GP.` keyword carries 2,048 more bytes of runtime to leave room for.
+
+The compiler's own build buffer is **23,296 bytes**, comfortably above all four, so it is not what
+stops you. That was not true until the runtime moved out of the compiler's memory and into
+`GPC.IMG.nnn.BIN`: the buffer was 12,800 bytes, and there was a band of programs that would have
+run perfectly but could not be built.
 
 Go over and the compiler stops with **`PROGRAM TOO BIG`**, naming the line the budget ran out on.
 It is worth saying plainly that this used to be silent: past 12,032 bytes the object code grew into

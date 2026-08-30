@@ -92,9 +92,19 @@ def main():
 		h.write("\t\t.section code\n")
 		h.write("VersionText:\n")
 		h.write("\t\t.text\t'V%s',13,0\n" % version)
+		#
+		#		The runtime image the compiler streams into every embedded object. Numbered
+		#		from the SAME stamp as the shared runtime, and for the same reason: under a
+		#		fixed name a stale image would still be found, and would produce a program
+		#		that loads and then misbehaves. Numbered, a stale one is simply not there and
+		#		WriteObjectCode says NO RUNTIME IMAGE rather than writing a broken object.
+		#
+		h.write("RTImageFileText:\n")
+		h.write("\t\t.text\t'GPC.IMG.%03d.BIN',0\n" % build)
 		h.write("\t\t.send code\n")
 
-	print("  bumpbuild: GPC V%s, runtime build %03d (GPC.RT.%03d.BIN)" % (version, build, build))
+	print("  bumpbuild: GPC V%s, runtime build %03d (GPC.RT.%03d.BIN, GPC.IMG.%03d.BIN)"
+		  % (version, build, build, build))
 
 
 main()

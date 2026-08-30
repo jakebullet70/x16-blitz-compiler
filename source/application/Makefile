@@ -43,21 +43,45 @@ prelim:
 	printf 'SOURCE.PRG\nOBJECT.PRG\n\n' >GPC.INPUT
 
 #
-#		This order matters. 00main.header contains the BASIC header followed by the runtime components
-# 		(runtime.library ... gp.library).
+#		TWO LINKS, and they are two because the runtime is no longer resident while compiling.
 #
-#		gp.library is LAST of the runtime components, immediately before 10object.divider: the GP
-#		handlers are then the tail of the embedded runtime, which is the only place they can ever
-#		be truncated out of an object that uses none of them (../gp-runtime/Makefile explains).
+#		It used to be one image -- $0801 runtime, ObjectBase compiler, FreeMemory object buffer
+#		-- which kept 14,079 bytes of runtime in low RAM for the whole compile purely so that
+#		WriteObjectCode could copy them into the output file. Every one of those bytes came off
+#		the object buffer, i.e. off the largest program the compiler could build: 12,800, when
+#		the run side would happily take 18,432. Now the runtime is GPC.IMG.nnn.BIN, streamed
+#		from disk at write time, and the compiler has low RAM largely to itself.
 #
-#		At the end, eventually, the finished compiled code will be copied over the compiler and library
-#		code for this application to make more space available.
+#		LINK ONE is that image, and its order is the old one: 00rtimage.header, the runtime
+#		components, then 10object.divider. gp.library stays LAST of the components -- the GP
+#		handlers are then the tail of the image, which is the only place they can ever be
+#		truncated out of an object that uses none of them (../gp-runtime/Makefile explains).
+#
+#		genrtimage.py then hands four facts across to link two: GPBase, ObjectBase, the two
+#		patch offsets, and the GP-usage bitmap that replaced ScanGPUsage's VectorTable read. It
+#		also installs the image under its build-numbered name.
+#
+#		LINK TWO is the compiler. It takes common.library and ifloat32.library because the
+#		compiler calls into both (errors, MoveObjectForward, constant folding) -- and NOT
+#		runtime.library, polynomials.library or gp.library, into which it makes no call at all.
+#		source/unit-tests/compiler-runtime has linked exactly this subset for as long as it has
+#		existed, so the shape is not new.
+#
+#		$(ASM) always writes build/code.*, so link one's outputs are copied aside before link
+#		two overwrites them.
 #
 build: prelim
-	$(ASM) 	source$(S)main$(S)00main.header \
+	$(ASM) 	source$(S)main$(S)00rtimage.header \
 			$(BINDIR)runtime.library $(BINDIR)common.library $(BINDIR)ifloat32.library $(BINDIR)polynomials.library \
 			$(BINDIR)gp.library \
-			source$(S)main$(S)10object.divider \
+			source$(S)main$(S)10object.divider
+	$(CCOPY) build$(S)code.prg build$(S)rtimage.prg
+	$(CCOPY) build$(S)code.lbl build$(S)rtimage.lbl
+	$(PYTHON) scripts$(S)genrtimage.py build$(S)rtimage.lbl build$(S)rtimage.prg rtimage.gen.asm $(RELEASEDIR)
+	$(ASM) 	source$(S)main$(S)00main.header \
+			$(BINDIR)common.library $(BINDIR)ifloat32.library \
+			$(SRCDIR)runtime$(S)source$(S)system-specific$(S)x16$(S)addresses$(S)x16_include.inc \
+			rtimage.gen.asm \
 			$(BINDIR)compiler.library \
 			_library.asm \
 			source$(S)main$(S)zzfree.footer

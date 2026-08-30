@@ -804,54 +804,56 @@ anyone can see. That is damage control, not a fix. Three ways out, none of them 
 
 (1) keeps the syntax and pays in plumbing; (2) keeps the plumbing and pays in syntax. Worth deciding
 before `{VAR}` is documented as a feature anyone should rely on.
-## Growing the object buffer — the compiler into banked RAM
+## Growing the object buffer — DONE, by moving the runtime out of RAM
 
-**Own branch. Not a GP.ASM job** — GP.ASM only made an existing problem visible enough to measure.
+**12,800 -> 23,296 bytes.** `FreeMemory` `$6D00` -> `$4400`. The compiler is no longer what limits
+program size in any mode: every run-side ceiling (18,432 embedded GP OUT, 17,664 shared GP OUT,
+16,384 embedded GP IN, 15,616 shared GP IN) is now below the buffer, where all four used to be
+above it.
 
-The compiler builds the p-code in low RAM between `FreeMemory` and `ObjectCeiling` (`$9F00`), and
-`FreeMemory` is `.align 256` immediately after the compiler's last byte. So **every byte of compiler
-comes straight off the largest program it can compile**, one for one. Today that buffer is
-**12,800 bytes** (`$6D00`-`$9F00`); it was 15,616 before GP.ASM and 19,968 when
-`source/compiler/source/system-specific/x16/x16_storage.inc` was written.
+**The fix was not the banked-RAM plan this section used to describe.** That plan wanted 22 pages of
+*compiler* moved to `$A000-$BFFF`, and its own conclusion was that the bytes are in code, and code
+in banks is a whole-compiler audit. The measurement that killed it also replaced it: of the 14,079
+bytes of runtime sitting in low RAM through every compile, the compiler *calls* nothing at all in
+`runtime.library`, `polynomials.library` or `gp.library` — 10,892 bytes — and referenced them in
+exactly **two instructions**, both `gpscan.asm` reading `VectorTable`. The runtime was in RAM only
+so that `WriteObjectCode` could copy it into the output file.
 
-**The buffer is what binds, and it has been for a while.** The run side allows more:
-`newWorkspacePage = runtimeEndPage + pages(p-code) + FrameStackPages` has to stay under
-`ObjectCeiling - MIN_WS_PAGES`, which permits **18,432 bytes GP OUT / 16,384 GP IN**. So a program
-can be too big to *compile* while being perfectly able to *run*. (`README.md` still says the buffer
-does not bind — it is wrong, and has been since before this entry.)
+So it is a file now. `GPC.IMG.nnn.BIN`, linked at `$0801` by its own pass over the same libraries in
+the same order, streamed into `OBJECT.PRG` a page at a time at write time. What changed:
 
-Closing the gap for a GP-OUT program means putting `FreeMemory` at `$5700`, i.e. **freeing 5,632
-bytes — 22 pages — of compiler low RAM.**
+- **Two links** (`source/application/Makefile`). Link one is the image; link two is the compiler,
+  taking only `common.library` and `ifloat32.library` — the subset
+  `source/unit-tests/compiler-runtime` has linked for years.
+- **`genrtimage.py`** is the only thing that crosses between them: `GPBase`, `ObjectBase`, the two
+  patch offsets, and `GPUsageBits`.
+- **`ScanGPUsage` reads a 32-byte bitmap** instead of the runtime's 386-byte vector tables. It never
+  wanted the handler address, only "is it above `GPBase`", which is one bit — computed at build time
+  against the image's own linked table, so the question is still asked by address and still follows a
+  handler that moves into or out of `gp-runtime/`.
+- **`PatchOutCompile` and the in-memory "RUN a second time" path are gone.** They cannot work without
+  a resident runtime. That path was a dev convenience with a size ceiling of its own and was already
+  parked here as a cleanup; it is now deleted rather than fixed.
+- **The image is build-numbered** from the same `rtbuild.txt` stamp as the shared runtime, for the
+  same reason: under a fixed name a stale image is still *found*, and produces a program that loads
+  and then misbehaves. Numbered, a stale one is absent and the compile stops with `NO RUNTIME IMAGE`
+  before `OBJECT.PRG` is created.
+- **`10object.divider` fills its own alignment.** A bare `.align 256` emitted nothing once the
+  compiler stopped following it — 64tass writes alignment fill only to place the bytes after it — so
+  the image came out 78 bytes short and every byte of p-code would have landed at the wrong address.
 
-**The mechanism already exists and has already been used once for exactly this.** `x16_storage.inc`
-moved the variable-name and line-number tables to `$A000-$BFFF` in RAM bank 2 and handed
-`$5100-$9EFF` back to the object code. Its header carries the rules any new banked user must obey,
-and they are the whole difficulty:
+**Verified**, not just built: the runtime half of a compiled `OBJECT.PRG` is byte-identical to the
+image for all 12,031 bytes of the GP OUT cut, with the only differences the two patched immediates
+(`$00` -> `$37` code page, `$00` -> `$48` workspace), and the object runs.
 
-- preserve A, X, Y **and** the flags across a window;
-- restore the **caller's** bank, never a hardcoded 0;
-- **never hold a bank across a KERNAL call** — bank 0 is the KERNAL's;
-- **no nesting**, verified by inspection rather than enforced by anything.
+**Left on the table, and no longer needed.** `gendata.asm` is 1,320 bytes of pure table and GP.ASM's
+opcode tables are 626 — both clean candidates for bank 3 beside GP.ASM's pool, worth 7 more pages.
+There is now 4,864 bytes of low-RAM headroom between the buffer and the highest run-side ceiling, so
+this is future-proofing rather than a fix. The bank rules, if it is ever wanted, are in
+`source/compiler/source/system-specific/x16/x16_storage.inc`: preserve A/X/Y and flags, restore the
+caller's bank, never hold a bank across a KERNAL call, no nesting. Allocation: 0 KERNAL, 1 the native
+test harness, 2 the storage tables, 3 GP.ASM's blob pool and fixup list. 4 up are free.
 
-Data is easy under those rules; **code is not**, and code is where the 5,632 bytes are. A banked
-routine has to be reachable from low RAM, must not open a window inside one already open, and must
-close before any file I/O. That is a whole-compiler audit, not a local change — which is why this is
-its own branch with its own test pass.
-
-Bank allocation is documented in that same header and must be updated first: 0 KERNAL, 1 the native
-test harness, 2 the storage tables, **3 GP.ASM's blob pool and fixup list**. 4 up are free.
-
-
-**A known 626-byte candidate, deliberately left behind.** GP.ASM's opcode tables
-(`source/compiler/source/generated/gpasmtable.asm`) are read-only and would sit happily in bank 3
-beside the pool — but unlike the pool they have to *get* there, and the only route is the
-init-overlay: stage them above `FreeMemory`, copy into the bank before the first object byte is
-written, and let the object buffer overwrite the staging area. That cannot be done where they are,
-because `build.py` sweeps them into `compiler.library`, which links **before** `zzfree.footer` where
-`FreeMemory` is declared. Moving them means splitting the table out of the compiler library and
-into the application's footer, plus a load-order contract that nothing enforces — for two pages.
-It belongs in this project, not in GP.ASM's.
-Worth doing. A compiler that refuses programs the runtime would happily run is the wrong way round.
 ## Wanted
 
 ### Name the output after the source — DONE, but by the caller
@@ -975,6 +977,25 @@ untouched. (`LINPUT` programs such as `testing/MD5` are unaffected — no drain 
   the assembler had already succeeded, which reads like a build break but is not one. It is copied
   only if present now. Same class as the five blockers that once made this repo unbuildable anywhere:
   a recipe asserting on a file nothing guarantees.
+- **Rename `GPC-BASIC/GP.INC.BL` to `GPB.INC.BL`.** Asked for 2026-08-30. A flat rename with a long
+  tail: **78 references across 37 files**, and the ones that bite are not the prose ones.
+  `source/gpc/Makefile:70` copies the file into `testing/` and `.gitignore:74` excludes that copy —
+  both name it literally, and `testing/GPC.ERR.BASL` `#INCLUDE`s it, so the error-message build
+  breaks the moment the copy changes name and the old `testing/GP.INC.BL` is left behind untracked
+  and stale, which is exactly the drift that `.gitignore` comment warns about. `bmx-demo.bat` and
+  `menu-demo.bat` name it in their copy lists. Sixteen `.EXP.BL` files in `GPC-BASIC/` open with
+  `#INCLUDE "GP.INC.BL"` and most repeat the name in their header comment. `bin/compiler.library` and
+  `bin/gp.library` are generated, so fix their sources instead (`source/compiler/_library.asm`,
+  `source/gp-runtime/_library.asm`, `gpcomposite.asm`, `gpdraw.asm`). Docs: `GP-BASIC.md`,
+  `GP-BASIC.GLOBALS.md`, `GPC-BASIC/README.md`, and `GP-BASIC.TIERS.md` / `.PLAN.md` /
+  `.ASM.RESEARCH.md` under `docs/blitz/`.
+  **It breaks every existing user source**, since `#INCLUDE "GP.INC.BL"` is the first line of all of
+  them — so it wants a release note, not a quiet commit. Possible softener: leave `GP.INC.BL` behind
+  for one version as a shim that `#INCLUDE`s the new name. That costs nothing in the object, because
+  `#TOKEN` lines emit no code — **but whether BASLOAD honours an `#INCLUDE` inside an `#INCLUDE` is
+  unverified**, and the whole idea dies if it does not. Check that first; the alternative shim is a
+  duplicate copy of the 31 `#TOKEN` lines, which reintroduces the drift the single master exists to
+  prevent.
 
 ## Notes that are easy to lose
 
