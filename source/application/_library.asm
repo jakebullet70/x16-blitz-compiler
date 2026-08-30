@@ -719,6 +719,78 @@ _PCLExit:
 ;
 ; ************************************************************************************************
 
+
+; ************************************************************************************************
+;
+;		IS THE SOURCE ACTUALLY A TOKENISED BASIC PROGRAM?
+;
+;		The compiler reads its input as tokenised BASIC: two bytes of load address, then a
+;		chain of [link][line#][tokens] records. Handed anything else it does not notice. It
+;		takes the first two bytes as the load address, follows whatever the next two happen to
+;		be as a link pointer, and walks off through the file -- which surfaces as a hang or a
+;		disk error, saying nothing at all about the real problem.
+;
+;		AND IT IS AN EASY FILE TO GET WRONG, because the two spellings differ by one
+;		extension: DIR.BASL is BASLOAD SOURCE, plain text, and DIR.PRG is what BASLOAD makes
+;		of it. Only the second one can be compiled.
+;
+;		The test is the load address. An X16 BASIC program starts at $0801 -- BASIC has
+;		nowhere else to put one -- so the first two bytes read $01 $08 or this is not a
+;		program. That is the same invariant source/gpc/build_basl.py checks on the way out
+;		of BASLOAD, so the two ends of the build agree on what a program is.
+;
+;		A FILE THAT WILL NOT GIVE UP TWO BYTES IS A SEPARATE ANSWER. CMDR-DOS opens a file
+;		that is not there quite happily and only admits it on the first read (compiler/
+;		symfile.asm learned this the same way), so 'missing' and 'empty' both arrive here as
+;		a read that fails immediately -- and both are worth telling apart from a file that is
+;		present but is not a program.
+;
+;		CC = go ahead. CS = the message is already printed, do not compile.
+;
+; ************************************************************************************************
+
+ValidateSourceFile:
+		ldy 	#SourceFile >> 8
+		ldx 	#SourceFile & $FF
+		jsr 	IOOpenRead
+
+		;
+		;		BOTH BYTES ARE READ BEFORE EITHER IS COMPARED, and that ordering is the whole
+		;		difference between the two messages below. IOReadByte tests ST BEFORE it reads,
+		;		so on a file that is not there the FIRST call still comes back carry clear with a
+		;		zero byte -- the status only appears on the second. Comparing after the first read
+		;		therefore called every missing file 'not a program', which is true but unhelpful.
+		;
+		;		X carries the low byte across: IOReadByte saves and restores it (phx/plx).
+		;
+		jsr 	IOReadByte 				; low byte of the load address
+		bcs 	_VSFUnreadable
+		tax 						; stash it -- IOReadByte preserves X
+		jsr 	IOReadByte 				; and the high byte
+		bcs 	_VSFUnreadable
+		cmp 	#$08
+		bne 	_VSFNotProgram
+		cpx 	#$01
+		bne 	_VSFNotProgram
+		jsr 	IOReadClose 				; $0801, so it is a program. Close it again --
+		clc 						; the compiler opens the source for itself, from
+		rts 						; the top (api.asm, _CAOpenIn).
+
+
+_VSFUnreadable:
+		jsr 	IOReadClose
+		ldx 	#NoSourceText & $FF
+		ldy 	#NoSourceText >> 8
+		bra 	_VSFFail
+_VSFNotProgram:
+		jsr 	IOReadClose
+		ldx 	#NotProgramText & $FF
+		ldy 	#NotProgramText >> 8
+_VSFFail:
+		jsr 	PrintMessage
+		sec
+		rts
+
 ControlFile:
 		.text 	'GPC.INPUT',0
 WorkingText: 								; no CR: VersionText finishes the line, so the engine's
@@ -729,6 +801,10 @@ OutText: 									; the CR ends the source line and starts the object's
 		.text 	13,'OUT: ',0
 NoControlText:
 		.text 	'NO GPC.INPUT FILE',13,0
+NoSourceText:
+		.text 	'SOURCE NOT FOUND OR EMPTY',13,0
+NotProgramText:
+		.text 	'NOT A BASIC PRG FILE',13,0
 
 ; ************************************************************************************************
 ;
@@ -2040,6 +2116,11 @@ CompileCode:
 		jsr 	PrintWorking 				; which is all the compiler now says for itself
 		jsr 	IODeleteOutputs 			; and clear the object AND map from a PREVIOUS run, so a
 								; compile that stops on an error leaves nothing behind
+		jsr 	ValidateSourceFile 			; and REFUSE ANYTHING THAT IS NOT A TOKENISED PRG.
+		bcs 	_CCStopped 				; AFTER the delete, so a refused compile leaves nothing
+								; behind either, and after PrintWorking, so the message
+								; lands under the IN:/OUT: lines that name the file.
+								; It has already said which of the two reasons it was.
 
 		ldx 	#APIDesc & $FF
 		ldy 	#APIDesc >> 8

@@ -24,6 +24,11 @@ CompileCode:
 		jsr 	PrintWorking 				; which is all the compiler now says for itself
 		jsr 	IODeleteOutputs 			; and clear the object AND map from a PREVIOUS run, so a
 								; compile that stops on an error leaves nothing behind
+		jsr 	ValidateSourceFile 			; and REFUSE ANYTHING THAT IS NOT A TOKENISED PRG.
+		bcs 	_CCStopped 				; AFTER the delete, so a refused compile leaves nothing
+								; behind either, and after PrintWorking, so the message
+								; lands under the IN:/OUT: lines that name the file.
+								; It has already said which of the two reasons it was.
 
 		ldx 	#APIDesc & $FF
 		ldy 	#APIDesc >> 8
