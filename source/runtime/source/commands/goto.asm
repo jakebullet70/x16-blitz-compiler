@@ -22,10 +22,12 @@
 ;
 ;		.caseend is the branch that closes a GP.CASE body, and it is a .goto in every respect
 ;		except how FixBranches works out where it goes -- exactly the relationship .fngosub has
-;		with .gosub. Two markers on one body, so it costs a vector slot and not a byte more.
+;		with .gosub. .ifelse -- the jump out of a GP.IF body, and over a GP.ELSEIF test -- is the
+;		same again. Three markers on one body, so each costs a vector slot and not a byte more.
 ;
 CommandXGoto: ;; [.goto]
 CommandXCaseEnd: ;; [.caseend]
+CommandXIfElse: ;; [.ifelse]
 		.entercmd
 		;
 		;		Come here to actually do the GOTO.
@@ -55,10 +57,12 @@ PerformGOTO:
 
 ;
 ;		.casenext -- a GP.CASE test that came out false -- is likewise a .goto.z: pop the result,
-;		branch on zero. Only its target differs.
+;		branch on zero. So is .ifnext, a GP.IF or GP.ELSEIF test that came out false. Only their
+;		targets differ, and only FixBranches knows that.
 ;
 CommandGotoZ: ;; [.goto.z]
 CommandXCaseNext: ;; [.casenext]
+CommandXIfNext: ;; [.ifnext]
 		.entercmd
 		jsr 	FloatIsZero
 		dex 
@@ -76,6 +80,27 @@ CommandGotoNZ: ;; [.goto.nz]
 		bne 	PerformGOTO
 		iny
 		iny
+		.exitcmd
+
+; ************************************************************************************************
+;
+;							GP.IF / GP.ENDIF -- markers, not code
+;
+;		Neither does anything at runtime. They exist so FixBranches has something to count nesting
+;		on (gp.if) and somewhere for a false test to land (gp.endif) -- the same job gp.other does
+;		for GP.SELECT, and for the same reason: a block IF needs no stack frame, so there is
+;		nothing for either of them to open or close.
+;
+;		DELIBERATELY IN THE CORE, not gp-runtime. ScanGPUsage decides whether an object carries
+;		the 2K GP handler block by comparing each emitted opcode's HANDLER ADDRESS against GPBase,
+;		so aliasing these to CommandXOther in gp-runtime/select.asm would drag the whole block into
+;		any program whose only GP.BASIC keyword is an IF. Four bytes here buys that back.
+;
+; ************************************************************************************************
+
+CommandXIfMark: ;; [gp.if]
+CommandXEndIf: ;; [gp.endif]
+		.entercmd
 		.exitcmd
 
 		.send 	code

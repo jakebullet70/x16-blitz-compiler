@@ -43,6 +43,10 @@ _FBLoop:
 		beq 	_FBCaseNextFar
 		cmp 	#PCD_CMD_CASEEND 			; end of a case body: out to the GP.ENDSEL.
 		beq 	_FBCaseEndFar
+		cmp 	#PCD_CMD_IFNEXT 			; GP.IF / GP.ELSEIF test false: the next alternative.
+		beq 	_FBIfNextFar
+		cmp 	#PCD_CMD_IFELSE 			; end of an IF body: out to the GP.ENDIF.
+		beq 	_FBIfElseFar
 _FBNext:
 		jsr 	MoveObjectForward 			; move forward in object code.
 		bcc 	_FBLoop 					; not finished
@@ -58,6 +62,10 @@ _FBCaseNextFar:
 		jmp 	_FBFixCaseNext
 _FBCaseEndFar:
 		jmp 	_FBFixCaseEnd
+_FBIfNextFar:
+		jmp 	_FBFixIfNext
+_FBIfElseFar:
+		jmp 	_FBFixIfElse
 ;
 ;		Found an FN call (.fngosub). Its operand is already the ABSOLUTE code position of the FN
 ;		body, not a source line number, so skip STRFindLine: load the address into YA and join the
@@ -217,11 +225,11 @@ _FBEDNoLoop:
 ;		back-patching -- so it is resolved here, where the whole object is laid out and randomly
 ;		addressable through objPtr.
 ;
-;			.casenext 	a GP.CASE test came out false  ->  the next GP.CASE or GP.ELSE, or the
-;						GP.ENDSEL if this was the last alternative and there is no GP.ELSE.
+;			.casenext 	a GP.CASE test came out false  ->  the next GP.CASE or GP.OTHER, or the
+;						GP.ENDSEL if this was the last alternative and there is no GP.OTHER.
 ;			.caseend 	a case body has finished       ->  the GP.ENDSEL, always.
 ;
-;		One scanner does both; they differ only in whether a GP.CASE / GP.ELSE at depth zero is a
+;		One scanner does both; they differ only in whether a GP.CASE / GP.OTHER at depth zero is a
 ;		landing place or just more code to step over. Nesting is counted on GP.SELECT / GP.ENDSEL
 ;		exactly as GP.EXITDO counts GP.DO / GP.LOOP, so a whole select inside a case body is
 ;		invisible to the scan -- and MoveObjectForward is again what makes that safe, because it
@@ -231,7 +239,7 @@ _FBEDNoLoop:
 ;		selector's stack frame is never closed.
 ;
 _FBFixCaseNext:
-		lda 	#$FF 						; stop at a GP.CASE / GP.ELSE as well as the GP.ENDSEL
+		lda 	#$FF 						; stop at a GP.CASE / GP.OTHER as well as the GP.ENDSEL
 		bra 	_FBCaseScan
 _FBFixCaseEnd:
 		lda 	#0 							; only the GP.ENDSEL will do
@@ -256,7 +264,7 @@ _FBCSScan:
 		bpl 	_FBCSScan
 		cmp 	#PCD_GPCMD_CASE 			; the FIRST gp.case of the next alternative -- the
 		beq 	_FBCSFound 					; extra ones a comma list emits are all behind us
-		cmp 	#PCD_GPCMD_ELSE
+		cmp 	#PCD_GPCMD_OTHER
 		bne 	_FBCSScan
 _FBCSFound:
 		jmp 	_FBEDTarget 				; objPtr is the target; share the patching tail
@@ -271,6 +279,63 @@ _FBCSEndSel:
 _FBCSNoEnd:
 		jmp 	_FBEDNoLoop 				; same restore-and-raise as an EXITDO with no GP.LOOP
 
+;
+;		GP.IF's two forward branches, and the same scanner shape a third time. Depth is counted
+;		on gp.if against gp.endif -- NOT on .ifnext -- because GP.ELSEIF emits .ifelse and then
+;		its OWN <cond> .ifnext, which would inflate the depth of a scan already in flight and
+;		send it straight past its own gp.endif. GP.ELSEIF writes no gp.if, so it is invisible
+;		here, which is exactly what a continuation of the chain should be.
+;
+;			.ifnext		a test came out false  ->  ONE PAST the next .ifelse (the start of the
+;						next GP.ELSEIF test, or of the GP.ELSE body), or the gp.endif if this
+;						was the last alternative.
+;			.ifelse		a body has finished    ->  the gp.endif, always.
+;
+;		A .ifnext lands ONE PAST its .ifelse, not on it: landing on it would run the jump out
+;		of the body it was trying to enter. A .ifelse lands ON the gp.endif, which is free --
+;		unlike GP.ENDSEL there is no frame to close, gp.endif simply does nothing.
+;
+_FBFixIfNext:
+		lda 	#$FF 						; stop at an .ifelse as well as the gp.endif
+		bra 	_FBIfScan
+_FBFixIfElse:
+		lda 	#0 							; only the gp.endif will do
+_FBIfScan:
+		sta 	_FBIfStop
+		lda 	objPtr 						; remember the branch, to come back and patch it
+		sta 	_FBExitSave
+		lda 	objPtr+1
+		sta 	_FBExitSave+1
+		stz 	_FBExitDepth
+_FBISScan:
+		jsr 	MoveObjectForward
+		bcs 	_FBISNoEnd 					; ran off the end: the GP.IF was never closed
+		lda 	(objPtr)
+		cmp 	#PCD_GPCMD_IF
+		beq 	_FBISNested
+		cmp 	#PCD_GPCMD_ENDIF
+		beq 	_FBISEndIf
+		ldy 	_FBExitDepth 				; everything below only counts at our own depth
+		bne 	_FBISScan
+		bit 	_FBIfStop 					; an .ifelse walks straight past the other .ifelses
+		bpl 	_FBISScan
+		cmp 	#PCD_CMD_IFELSE
+		bne 	_FBISScan
+		jsr 	MoveObjectForward 			; ONE PAST it. Carry is deliberately ignored, exactly
+		jmp 	_FBEDTarget 				; as _FBEDFound ignores it: the end marker is the target
+_FBISNested:
+		inc 	_FBExitDepth 				; an IF inside a body -- not ours
+		bra 	_FBISScan
+_FBISEndIf:
+		lda 	_FBExitDepth
+		beq 	_FBISFound 					; depth zero, so this gp.endif closes OUR if
+		dec 	_FBExitDepth
+		bra 	_FBISScan
+_FBISFound:
+		jmp 	_FBEDTarget 				; objPtr is the target; share the patching tail
+_FBISNoEnd:
+		jmp 	_FBEDNoLoop 				; same restore-and-raise as a GP.IF with no GP.ENDIF
+
 		.send code
 
 		.section storage
@@ -280,7 +345,9 @@ _FBExitTarget:								; where its branch should land
 		.fill 	2
 _FBExitDepth:								; nested GP.DOs still to be closed before ours
 		.fill 	1
-_FBCaseStop:								; $FF if a GP.CASE / GP.ELSE ends the scan too
+_FBCaseStop:								; $FF if a GP.CASE / GP.OTHER ends the scan too
+		.fill 	1
+_FBIfStop:								; $FF if an .ifelse ends the scan too
 		.fill 	1
 		.send 	storage
 

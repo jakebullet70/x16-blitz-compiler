@@ -75,8 +75,20 @@ GP.EXITDO 		X:CommandExitDoCompile N
 #
 GP.SELECT 		X:CommandSelectCompile N
 GP.CASE 		X:CommandCaseCompile N
-GP.ELSE 		X:CommandElseCompile N
+GP.OTHER 		X:CommandOtherCompile N
 GP.ENDSEL 		X:CommandEndSelectCompile N
+
+#
+#		GP.BASIC block IF -- GP.IF <expr> THEN / GP.ELSEIF <expr> THEN / GP.ELSE / GP.ENDIF,
+#		each ALONE ON ITS LINE; the THEN is required and nothing may follow it. Like GP.SELECT
+#		none of these can carry a "T": two write a SYSTEM token with an inline branch offset,
+#		and the other two are markers written by hand beside them. No stack frame -- see
+#		commands/gpif.asm for why, and for why GP.ELSEIF is what forces gp.if to exist.
+#
+GP.IF 			X:CommandIfCompile N
+GP.ELSEIF 		X:CommandElseIfCompile N
+GP.ELSE 		X:CommandElseCompile N
+GP.ENDIF 		X:CommandEndIfCompile N
 #
 #		GP.CALL <addr> [,a] [,x] [,y] [,c] -- call machine code with the registers set. Results
 #		come back through the GP.A/GP.X/GP.Y/GP.C value words (x16_unary.def), which are ordinary

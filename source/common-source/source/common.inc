@@ -211,7 +211,16 @@ FrameStackPages = 16 						; 4K, ~250 frames
 ;		with it the shifted base ($D780 -> $DB80) moved too. Two system tokens (.casenext,
 ;		.caseend) were appended after .exitdo on top of that.
 ;
-RT_ABI = 20 								; runtime ABI ordinal -> "GP20" magic (NOT the file name)
+;		20 -> 21 on 30th August 2026: GP.IF / GP.ELSEIF / GP.ELSE / GP.ENDIF, and GP.SELECT's
+;		GP.ELSE renamed GP.OTHER to free the spelling. Two UNSHIFTED markers (gp.if, gp.endif)
+;		go in commands/goto.asm -- deliberately the CORE, not gp-runtime, so ScanGPUsage does
+;		not drag the 2K GP block into a program whose only GP keyword is an IF. "goto.asm"
+;		sorts early, so every unshifted opcode above it moved by two, which moved
+;		PCD_STARTSYSTEM and with it the shifted base ($DB80 -> $DD80). Two system tokens
+;		(.ifnext, .ifelse) were appended after .caseend on top of that. The gp.else -> gp.other
+;		rename moved nothing: same position, same id.
+;
+RT_ABI = 21 								; runtime ABI ordinal -> "GP21" magic (NOT the file name)
 
 ; ************************************************************************************************
 ;

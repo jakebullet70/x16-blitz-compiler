@@ -2,7 +2,7 @@
 ; ************************************************************************************************
 ;
 ;		Name:		select.asm
-;		Purpose:	GP.SELECT / GP.CASE / GP.ELSE / GP.ENDSEL
+;		Purpose:	GP.SELECT / GP.CASE / GP.OTHER / GP.ENDSEL
 ;		Created:	17th August 2026
 ;		Reviewed: 	No
 ;		Author : 	Steven De George SR
@@ -16,7 +16,7 @@
 ;
 ;		GP.SELECT <expr>
 ;		GP.CASE <expr> [,<expr> ...]
-;		GP.ELSE
+;		GP.OTHER
 ;		GP.ENDSEL
 ;
 ;		None of these can be table entries: three of the four write a SYSTEM token with an inline
@@ -24,13 +24,13 @@
 ;		different number of them depending on how many alternatives it is given. So each writes
 ;		its own tokens here, exactly as GP.EXITDO does.
 ;
-;		Lowering, for GP.SELECT K / GP.CASE 13,17 / GP.ELSE / GP.ENDSEL:
+;		Lowering, for GP.SELECT K / GP.CASE 13,17 / GP.OTHER / GP.ENDSEL:
 ;
 ;			<K> gp.select                       selector into a stack frame
 ;			gp.case 13 f.cmp = gp.case 17 f.cmp = or  .casenext -> next alternative
 ;			<body>
 ;			.caseend -> gp.endsel               written by whatever alternative comes NEXT
-;			gp.else
+;			gp.other
 ;			<body>
 ;			gp.endsel                           closes the frame; every branch lands ON it
 ;
@@ -98,9 +98,9 @@ CompileCaseTest:
 		lda 	#PCD_EQUAL
 		jmp 	WriteCodeByte
 
-CommandElseCompile:
+CommandOtherCompile:
 		jsr 	CompileCaseEnd
-		lda 	#PCD_GPCMD_ELSE
+		lda 	#PCD_GPCMD_OTHER
 		jsr 	WriteCodeByte
 		clc
 		rts

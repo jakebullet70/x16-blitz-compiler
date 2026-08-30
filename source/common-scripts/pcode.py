@@ -84,6 +84,13 @@ class PCode(object):
 		self.extra(".caseend",2) 			# End of a GP.CASE body: out to the GP.ENDSEL, which
 											# is what closes the selector's frame. Runs the .goto
 											# handler. Appended, for the reason directly above.
+		self.extra(".ifnext",2) 			# GP.IF / GP.ELSEIF whose test came out false: on to the
+										# next GP.ELSEIF / GP.ELSE, or the GP.ENDIF if there is
+										# none. Runs the .goto.z handler; only FixBranches
+										# tells them apart. APPENDED, never inserted.
+		self.extra(".ifelse",2) 			# End of a GP.IF / GP.ELSEIF body, and the jump over a
+										# GP.ELSEIF test: out to the GP.ENDIF. Runs the .goto
+										# handler. Appended, for the reason directly above.
 		self.define("PCD_ENDSYSTEM")
 		self.endCommands = self.currentID	
 

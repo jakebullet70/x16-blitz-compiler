@@ -727,6 +727,45 @@ p-code for those opcodes and pick the trimmed image, and the generated `vectors.
 Bounded work, ~**1.4 KB** off a non-trig/non-`VAL` program, and it builds the conditional-runtime
 machinery the two larger items above both need.
 
+### `GP.SELECT`'s frame is dead weight for a variable selector
+
+Noted 30th August 2026 while costing a block `GP.IF`; nothing here is urgent, it is the first move if
+opcode or GPB pressure ever does bite.
+
+`GP.SELECT` costs **127 B** — 112 of code (`gp.select` 44, `gp.case` 42, `gp.else` 4, `gp.endsel` 10,
+`SelectFindFrame` 12) plus 12 of vector slots. **98 of those 127** (`gp.select` + `gp.case` + the
+finder) exist for one property: the selector is evaluated **once**, into `FRAME_SELECT`, because
+`new.line` resets the number stack at every source line and a value left there would be gone by the
+first `GP.CASE`.
+
+**Every `GP.SELECT` in the tree selects on a plain variable**, so not one of them needs it:
+`BMX.DEPTH` ([BMX.INC.BL:401](../GPC-BASIC/BMX.INC.BL)), `INPHELP.CODE`, `MENUHELP.CODE`,
+`INPHELP.KEY` (`FORM.EXP.BL`), `KEY.CHAR` and `CLASSIFY.N` (`SELECT.EXP.BL`). Re-reading a variable
+per alternative gives the identical result and is, if anything, cheaper than `gp.case`'s six-byte
+frame copy plus `SelectFindFrame`.
+
+**Deleting the keyword outright frees no program bytes, which is why it stays.** The 112 B of code is
+in the GPB block — **1,970 B used of a page-aligned 2,048** — and the 12 B of vector slots are in the
+core, which already carries **40 B of padding** below `GPBase`. Removing all of it leaves both
+boundaries exactly where they are. Inside the GPB block bytes are *headroom*, not program size, until
+they cross a page: 1,970 − 98 = 1,872, still above the 1,792 that would give a page back.
+
+Two steps, and they buy different things:
+
+1. **A compile-time fast path.** When the selector parses as a plain numeric variable, emit the
+   variable reference directly at each alternative instead of `gp.select`/`gp.case`, and skip the
+   frame entirely. Compiler-side, so free against the runtime budget, and it keeps
+   `GP.SELECT RND(1)*3` correct on the general path. **This buys speed, not bytes** — both paths
+   still have to exist. (Watch the p-code: a variable reference is ~3 B against `gp.case`'s 1, so a
+   long alternative list may come out slightly *larger*. Measure before believing it is free.)
+2. **Restricting the selector to a variable** — the general path deleted, a volatile selector spelled
+   `T = RND(1)*3 : GP.SELECT T` by hand. Only then do the **98 B** and **2 sub-256 opcodes** actually
+   come back, and even then as GPB headroom (78 → 176 B) rather than program size.
+
+Related: the same survey found `GP.SELECT` and an `GP.IF`/`GP.ELSEIF` chain within ~3 bytes of each
+other on INPHELP's real seven-way dispatch (~75 B against ~78 B), so the two constructs are a
+readability choice, not a size one.
+
 ## Wanted
 
 ### Name the output after the source — DONE, but by the caller

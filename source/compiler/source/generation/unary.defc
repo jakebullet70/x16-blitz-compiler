@@ -4,11 +4,11 @@
 ;
 ;	SGN    (#) T N
 ;
-	.byte	$07,$b4,$00,$8e,$91,199,$06
+	.byte	$07,$b4,$00,$8e,$91,201,$06
 ;
 ;	INT    (#) T N
 ;
-	.byte	$08,$b5,$00,$8e,$92,37595 & $FF,37595 >> 8,$06
+	.byte	$08,$b5,$00,$8e,$92,37597 & $FF,37597 >> 8,$06
 ;
 ;	ABS    (#) T N
 ;
@@ -16,7 +16,7 @@
 ;
 ;	USR    (#) T N
 ;
-	.byte	$07,$b7,$00,$8e,$91,210,$06
+	.byte	$07,$b7,$00,$8e,$91,212,$06
 ;
 ;	FRE    (#) T N
 ;
@@ -24,55 +24,55 @@
 ;
 ;	POS    (#) T N
 ;
-	.byte	$07,$b9,$00,$8e,$91,186,$06
+	.byte	$07,$b9,$00,$8e,$91,188,$06
 ;
 ;	SQR    (#) T N
 ;
-	.byte	$08,$ba,$00,$8e,$92,37851 & $FF,37851 >> 8,$06
+	.byte	$08,$ba,$00,$8e,$92,37853 & $FF,37853 >> 8,$06
 ;
 ;	RND    (#) T N
 ;
-	.byte	$07,$bb,$00,$8e,$91,193,$06
+	.byte	$07,$bb,$00,$8e,$91,195,$06
 ;
 ;	LOG    (#) T N
 ;
-	.byte	$08,$bc,$00,$8e,$92,38107 & $FF,38107 >> 8,$06
+	.byte	$08,$bc,$00,$8e,$92,38109 & $FF,38109 >> 8,$06
 ;
 ;	EXP    (#) T N
 ;
-	.byte	$08,$bd,$00,$8e,$92,38363 & $FF,38363 >> 8,$06
+	.byte	$08,$bd,$00,$8e,$92,38365 & $FF,38365 >> 8,$06
 ;
 ;	COS    (#) T N
 ;
-	.byte	$08,$be,$00,$8e,$92,38619 & $FF,38619 >> 8,$06
+	.byte	$08,$be,$00,$8e,$92,38621 & $FF,38621 >> 8,$06
 ;
 ;	SIN    (#) T N
 ;
-	.byte	$08,$bf,$00,$8e,$92,38875 & $FF,38875 >> 8,$06
+	.byte	$08,$bf,$00,$8e,$92,38877 & $FF,38877 >> 8,$06
 ;
 ;	TAN    (#) T N
 ;
-	.byte	$08,$c0,$00,$8e,$92,39131 & $FF,39131 >> 8,$06
+	.byte	$08,$c0,$00,$8e,$92,39133 & $FF,39133 >> 8,$06
 ;
 ;	ATN    (#) T N
 ;
-	.byte	$08,$c1,$00,$8e,$92,39387 & $FF,39387 >> 8,$06
+	.byte	$08,$c1,$00,$8e,$92,39389 & $FF,39389 >> 8,$06
 ;
 ;	PEEK    (#) T N
 ;
-	.byte	$07,$c2,$00,$8e,$91,183,$06
+	.byte	$07,$c2,$00,$8e,$91,185,$06
 ;
 ;	LEN    ($) T N
 ;
-	.byte	$07,$c3,$00,$8f,$91,173,$06
+	.byte	$07,$c3,$00,$8f,$91,175,$06
 ;
 ;	STR$    (#) T S
 ;
-	.byte	$07,$c4,$00,$8e,$91,203,$07
+	.byte	$07,$c4,$00,$8e,$91,205,$07
 ;
 ;	VAL    ($) T N
 ;
-	.byte	$07,$c5,$00,$8f,$91,211,$06
+	.byte	$07,$c5,$00,$8f,$91,213,$06
 ;
 ;	ASC    ($) T N
 ;
@@ -84,15 +84,15 @@
 ;
 ;	LEFT$   ($,#) T S
 ;
-	.byte	$08,$c8,$00,$8f,$ae,$91,204,$07
+	.byte	$08,$c8,$00,$8f,$ae,$91,206,$07
 ;
 ;	RIGHT$    ($,#) T S
 ;
-	.byte	$08,$c9,$00,$8f,$ae,$91,205,$07
+	.byte	$08,$c9,$00,$8f,$ae,$91,207,$07
 ;
 ;	MID$   ($,# X:OptionalParameterCompile ) T S
 ;
-	.byte	$0b,$ca,$00,$8f,$ae,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$91,206,$07
+	.byte	$0b,$ca,$00,$8f,$ae,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$91,208,$07
 ;
 ;	NOT    X:NotUnaryCompile N
 ;
@@ -104,23 +104,23 @@
 ;
 ;	PI     T N
 ;
-	.byte	$06,$ff,$00,$10,184,$06
+	.byte	$06,$ff,$00,$10,186,$06
 ;
 ;	GP.INSTR   ($,$ X:OptionalZeroCompile) T N
 ;
-	.byte	$0b,$ce,$77,$8f,$af,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$91,160,$06
+	.byte	$0b,$ce,$77,$8f,$af,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$91,162,$06
 ;
 ;	GP.COMP   ($,$) T N
 ;
-	.byte	$09,$ce,$70,$8f,$af,$92,35803 & $FF,35803 >> 8,$06
+	.byte	$09,$ce,$70,$8f,$af,$92,35805 & $FF,35805 >> 8,$06
 ;
 ;	GP.STRPTR   ($) T N
 ;
-	.byte	$07,$ce,$76,$8f,$91,161,$06
+	.byte	$07,$ce,$76,$8f,$91,163,$06
 ;
 ;	GP.ARRPTR   (X:AnyArrayCompile) T N
 ;
-	.byte	$0a,$ce,$6e,$83,AnyArrayCompile & $FF,AnyArrayCompile >> 8,$92,35035 & $FF,35035 >> 8,$06
+	.byte	$0a,$ce,$6e,$83,AnyArrayCompile & $FF,AnyArrayCompile >> 8,$92,35037 & $FF,35037 >> 8,$06
 ;
 ;	GP.CONTAINS  ($,$) X:GPContainsCompile N
 ;

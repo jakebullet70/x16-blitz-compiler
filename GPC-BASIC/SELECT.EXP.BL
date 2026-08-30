@@ -1,6 +1,6 @@
 ## ***********************************************************************
 ## **
-## **  SELECT.EXP.BL -- GP.SELECT / GP.CASE / GP.ELSE / GP.ENDSEL
+## **  SELECT.EXP.BL -- GP.SELECT / GP.CASE / GP.OTHER / GP.ENDSEL
 ## **
 ## **  Build:  copy GPC-BASIC/GP.INC.BL and this file into testing/, then
 ## **            python source/gpc/build_basl.py SELECT.EXP.BL SELECT.PRG
@@ -42,11 +42,11 @@ GP.CASE 13
   PRINT "RETURN"
 GP.CASE 29, 157
   PRINT "LEFT OR RIGHT"
-GP.ELSE
+GP.OTHER
   PRINT "CHARACTER"; KEY.CHAR
 GP.ENDSEL
 
-## ---- 3. GP.ELSE is optional.  Nothing matching and no GP.ELSE is not an
+## ---- 3. GP.OTHER is optional.  Nothing matching and no GP.OTHER is not an
 ## ---- error -- the whole select is simply skipped, which is what makes it
 ## ---- usable as a filter.
 
@@ -79,7 +79,7 @@ CLASSIFY:
     PRINT CLASSIFY.N; "EVEN AND SMALL"
   GP.CASE SPLIT.POINT, SPLIT.POINT + 1
     PRINT CLASSIFY.N; "AT THE SPLIT"
-  GP.ELSE
+  GP.OTHER
     PRINT CLASSIFY.N; "BIG"
   GP.ENDSEL
   RETURN

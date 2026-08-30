@@ -2099,6 +2099,10 @@ _FBLoop:
 		beq 	_FBCaseNextFar
 		cmp 	#PCD_CMD_CASEEND 			; end of a case body: out to the GP.ENDSEL.
 		beq 	_FBCaseEndFar
+		cmp 	#PCD_CMD_IFNEXT 			; GP.IF / GP.ELSEIF test false: the next alternative.
+		beq 	_FBIfNextFar
+		cmp 	#PCD_CMD_IFELSE 			; end of an IF body: out to the GP.ENDIF.
+		beq 	_FBIfElseFar
 _FBNext:
 		jsr 	MoveObjectForward 			; move forward in object code.
 		bcc 	_FBLoop 					; not finished
@@ -2114,6 +2118,10 @@ _FBCaseNextFar:
 		jmp 	_FBFixCaseNext
 _FBCaseEndFar:
 		jmp 	_FBFixCaseEnd
+_FBIfNextFar:
+		jmp 	_FBFixIfNext
+_FBIfElseFar:
+		jmp 	_FBFixIfElse
 ;
 ;		Found an FN call (.fngosub). Its operand is already the ABSOLUTE code position of the FN
 ;		body, not a source line number, so skip STRFindLine: load the address into YA and join the
@@ -2273,11 +2281,11 @@ _FBEDNoLoop:
 ;		back-patching -- so it is resolved here, where the whole object is laid out and randomly
 ;		addressable through objPtr.
 ;
-;			.casenext 	a GP.CASE test came out false  ->  the next GP.CASE or GP.ELSE, or the
-;						GP.ENDSEL if this was the last alternative and there is no GP.ELSE.
+;			.casenext 	a GP.CASE test came out false  ->  the next GP.CASE or GP.OTHER, or the
+;						GP.ENDSEL if this was the last alternative and there is no GP.OTHER.
 ;			.caseend 	a case body has finished       ->  the GP.ENDSEL, always.
 ;
-;		One scanner does both; they differ only in whether a GP.CASE / GP.ELSE at depth zero is a
+;		One scanner does both; they differ only in whether a GP.CASE / GP.OTHER at depth zero is a
 ;		landing place or just more code to step over. Nesting is counted on GP.SELECT / GP.ENDSEL
 ;		exactly as GP.EXITDO counts GP.DO / GP.LOOP, so a whole select inside a case body is
 ;		invisible to the scan -- and MoveObjectForward is again what makes that safe, because it
@@ -2287,7 +2295,7 @@ _FBEDNoLoop:
 ;		selector's stack frame is never closed.
 ;
 _FBFixCaseNext:
-		lda 	#$FF 						; stop at a GP.CASE / GP.ELSE as well as the GP.ENDSEL
+		lda 	#$FF 						; stop at a GP.CASE / GP.OTHER as well as the GP.ENDSEL
 		bra 	_FBCaseScan
 _FBFixCaseEnd:
 		lda 	#0 							; only the GP.ENDSEL will do
@@ -2312,7 +2320,7 @@ _FBCSScan:
 		bpl 	_FBCSScan
 		cmp 	#PCD_GPCMD_CASE 			; the FIRST gp.case of the next alternative -- the
 		beq 	_FBCSFound 					; extra ones a comma list emits are all behind us
-		cmp 	#PCD_GPCMD_ELSE
+		cmp 	#PCD_GPCMD_OTHER
 		bne 	_FBCSScan
 _FBCSFound:
 		jmp 	_FBEDTarget 				; objPtr is the target; share the patching tail
@@ -2327,6 +2335,63 @@ _FBCSEndSel:
 _FBCSNoEnd:
 		jmp 	_FBEDNoLoop 				; same restore-and-raise as an EXITDO with no GP.LOOP
 
+;
+;		GP.IF's two forward branches, and the same scanner shape a third time. Depth is counted
+;		on gp.if against gp.endif -- NOT on .ifnext -- because GP.ELSEIF emits .ifelse and then
+;		its OWN <cond> .ifnext, which would inflate the depth of a scan already in flight and
+;		send it straight past its own gp.endif. GP.ELSEIF writes no gp.if, so it is invisible
+;		here, which is exactly what a continuation of the chain should be.
+;
+;			.ifnext		a test came out false  ->  ONE PAST the next .ifelse (the start of the
+;						next GP.ELSEIF test, or of the GP.ELSE body), or the gp.endif if this
+;						was the last alternative.
+;			.ifelse		a body has finished    ->  the gp.endif, always.
+;
+;		A .ifnext lands ONE PAST its .ifelse, not on it: landing on it would run the jump out
+;		of the body it was trying to enter. A .ifelse lands ON the gp.endif, which is free --
+;		unlike GP.ENDSEL there is no frame to close, gp.endif simply does nothing.
+;
+_FBFixIfNext:
+		lda 	#$FF 						; stop at an .ifelse as well as the gp.endif
+		bra 	_FBIfScan
+_FBFixIfElse:
+		lda 	#0 							; only the gp.endif will do
+_FBIfScan:
+		sta 	_FBIfStop
+		lda 	objPtr 						; remember the branch, to come back and patch it
+		sta 	_FBExitSave
+		lda 	objPtr+1
+		sta 	_FBExitSave+1
+		stz 	_FBExitDepth
+_FBISScan:
+		jsr 	MoveObjectForward
+		bcs 	_FBISNoEnd 					; ran off the end: the GP.IF was never closed
+		lda 	(objPtr)
+		cmp 	#PCD_GPCMD_IF
+		beq 	_FBISNested
+		cmp 	#PCD_GPCMD_ENDIF
+		beq 	_FBISEndIf
+		ldy 	_FBExitDepth 				; everything below only counts at our own depth
+		bne 	_FBISScan
+		bit 	_FBIfStop 					; an .ifelse walks straight past the other .ifelses
+		bpl 	_FBISScan
+		cmp 	#PCD_CMD_IFELSE
+		bne 	_FBISScan
+		jsr 	MoveObjectForward 			; ONE PAST it. Carry is deliberately ignored, exactly
+		jmp 	_FBEDTarget 				; as _FBEDFound ignores it: the end marker is the target
+_FBISNested:
+		inc 	_FBExitDepth 				; an IF inside a body -- not ours
+		bra 	_FBISScan
+_FBISEndIf:
+		lda 	_FBExitDepth
+		beq 	_FBISFound 					; depth zero, so this gp.endif closes OUR if
+		dec 	_FBExitDepth
+		bra 	_FBISScan
+_FBISFound:
+		jmp 	_FBEDTarget 				; objPtr is the target; share the patching tail
+_FBISNoEnd:
+		jmp 	_FBEDNoLoop 				; same restore-and-raise as a GP.IF with no GP.ENDIF
+
 		.send code
 
 		.section storage
@@ -2336,7 +2401,9 @@ _FBExitTarget:								; where its branch should land
 		.fill 	2
 _FBExitDepth:								; nested GP.DOs still to be closed before ours
 		.fill 	1
-_FBCaseStop:								; $FF if a GP.CASE / GP.ELSE ends the scan too
+_FBCaseStop:								; $FF if a GP.CASE / GP.OTHER ends the scan too
+		.fill 	1
+_FBIfStop:								; $FF if an .ifelse ends the scan too
 		.fill 	1
 		.send 	storage
 
@@ -2659,15 +2726,15 @@ CommandTables:
 ;
 ;	ON     # T X:CommandON N
 ;
-	.byte	$09,$91,$00,$e1,181,$03,CommandON & $FF,CommandON >> 8,$06
+	.byte	$09,$91,$00,$e1,183,$03,CommandON & $FF,CommandON >> 8,$06
 ;
 ;	SYS    # T N
 ;
-	.byte	$07,$9e,$00,$e2,45275 & $FF,45275 >> 8,$06
+	.byte	$07,$9e,$00,$e2,45277 & $FF,45277 >> 8,$06
 ;
 ;	POKE    #,# T N
 ;
-	.byte	$07,$97,$00,$ea,$e1,185,$06
+	.byte	$07,$97,$00,$ea,$e1,187,$06
 ;
 ;	RETURN    T N
 ;
@@ -2675,15 +2742,15 @@ CommandTables:
 ;
 ;	STOP    T N
 ;
-	.byte	$07,$90,$00,$20,45019 & $FF,45019 >> 8,$06
+	.byte	$07,$90,$00,$20,45021 & $FF,45021 >> 8,$06
 ;
 ;	END    T N
 ;
-	.byte	$07,$80,$00,$20,33499 & $FF,33499 >> 8,$06
+	.byte	$07,$80,$00,$20,33501 & $FF,33501 >> 8,$06
 ;
 ;	CLR    X:CommandClrCompile T N
 ;
-	.byte	$0a,$9c,$00,$03,CommandClrCompile & $FF,CommandClrCompile >> 8,$20,32987 & $FF,32987 >> 8,$06
+	.byte	$0a,$9c,$00,$03,CommandClrCompile & $FF,CommandClrCompile >> 8,$20,32989 & $FF,32989 >> 8,$06
 ;
 ;	GP.DO    X:OptionalNumberCompile T N
 ;
@@ -2705,41 +2772,57 @@ CommandTables:
 ;
 	.byte	$07,$ce,$65,$03,CommandCaseCompile & $FF,CommandCaseCompile >> 8,$06
 ;
-;	GP.ELSE   X:CommandElseCompile N
+;	GP.OTHER   X:CommandOtherCompile N
 ;
-	.byte	$07,$ce,$64,$03,CommandElseCompile & $FF,CommandElseCompile >> 8,$06
+	.byte	$07,$ce,$64,$03,CommandOtherCompile & $FF,CommandOtherCompile >> 8,$06
 ;
 ;	GP.ENDSEL   X:CommandEndSelectCompile N
 ;
 	.byte	$07,$ce,$63,$03,CommandEndSelectCompile & $FF,CommandEndSelectCompile >> 8,$06
 ;
+;	GP.IF    X:CommandIfCompile N
+;
+	.byte	$07,$ce,$5e,$03,CommandIfCompile & $FF,CommandIfCompile >> 8,$06
+;
+;	GP.ELSEIF   X:CommandElseIfCompile N
+;
+	.byte	$07,$ce,$5d,$03,CommandElseIfCompile & $FF,CommandElseIfCompile >> 8,$06
+;
+;	GP.ELSE   X:CommandElseCompile N
+;
+	.byte	$07,$ce,$5c,$03,CommandElseCompile & $FF,CommandElseCompile >> 8,$06
+;
+;	GP.ENDIF   X:CommandEndIfCompile N
+;
+	.byte	$07,$ce,$5b,$03,CommandEndIfCompile & $FF,CommandEndIfCompile >> 8,$06
+;
 ;	GP.CALL   # X:OptionalZeroCompile X:OptionalZeroCompile X:OptionalZeroCompile X:OptionalZeroCompile T N
 ;
-	.byte	$13,$ce,$7c,$e3,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$20,33755 & $FF,33755 >> 8,$06
+	.byte	$13,$ce,$7c,$e3,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$20,33757 & $FF,33757 >> 8,$06
 ;
 ;	GP.TRIM   X:StringVariableCompile T N
 ;
-	.byte	$0a,$ce,$75,$03,StringVariableCompile & $FF,StringVariableCompile >> 8,$20,36571 & $FF,36571 >> 8,$06
+	.byte	$0a,$ce,$75,$03,StringVariableCompile & $FF,StringVariableCompile >> 8,$20,36573 & $FF,36573 >> 8,$06
 ;
 ;	GP.LTRIM   X:StringVariableCompile T N
 ;
-	.byte	$0a,$ce,$74,$03,StringVariableCompile & $FF,StringVariableCompile >> 8,$20,37083 & $FF,37083 >> 8,$06
+	.byte	$0a,$ce,$74,$03,StringVariableCompile & $FF,StringVariableCompile >> 8,$20,37085 & $FF,37085 >> 8,$06
 ;
 ;	GP.RTRIM   X:StringVariableCompile T N
 ;
-	.byte	$0a,$ce,$71,$03,StringVariableCompile & $FF,StringVariableCompile >> 8,$20,36827 & $FF,36827 >> 8,$06
+	.byte	$0a,$ce,$71,$03,StringVariableCompile & $FF,StringVariableCompile >> 8,$20,36829 & $FF,36829 >> 8,$06
 ;
 ;	GP.UPPER   X:StringVariableCompile T N
 ;
-	.byte	$0a,$ce,$73,$03,StringVariableCompile & $FF,StringVariableCompile >> 8,$20,36059 & $FF,36059 >> 8,$06
+	.byte	$0a,$ce,$73,$03,StringVariableCompile & $FF,StringVariableCompile >> 8,$20,36061 & $FF,36061 >> 8,$06
 ;
 ;	GP.LOWER   X:StringVariableCompile T N
 ;
-	.byte	$0a,$ce,$72,$03,StringVariableCompile & $FF,StringVariableCompile >> 8,$20,36315 & $FF,36315 >> 8,$06
+	.byte	$0a,$ce,$72,$03,StringVariableCompile & $FF,StringVariableCompile >> 8,$20,36317 & $FF,36317 >> 8,$06
 ;
 ;	GP.SORT   X:StringArrayCompile X:OptionalZeroCompile X:OptionalZeroCompile T N
 ;
-	.byte	$10,$ce,$6f,$03,StringArrayCompile & $FF,StringArrayCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$20,34779 & $FF,34779 >> 8,$06
+	.byte	$10,$ce,$6f,$03,StringArrayCompile & $FF,StringArrayCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$20,34781 & $FF,34781 >> 8,$06
 ;
 ;	This file is automatically generated.
 ;
@@ -2750,127 +2833,127 @@ CommandTables:
 ;
 ;	OPEN    #,# X:CommandOPEN T N
 ;
-	.byte	$0a,$9f,$00,$ea,$e3,CommandOPEN & $FF,CommandOPEN >> 8,$10,215,$06
+	.byte	$0a,$9f,$00,$ea,$e3,CommandOPEN & $FF,CommandOPEN >> 8,$10,217,$06
 ;
 ;	CLOSE    # T N
 ;
-	.byte	$06,$a0,$00,$e1,212,$06
+	.byte	$06,$a0,$00,$e1,214,$06
 ;
 ;	CLS    T N
 ;
-	.byte	$07,$ce,$90,$20,52955 & $FF,52955 >> 8,$06
+	.byte	$07,$ce,$90,$20,52957 & $FF,52957 >> 8,$06
 ;
 ;	LOCATE    # X:OptionalParameterCompile T N
 ;
-	.byte	$0a,$ce,$92,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,53211 & $FF,53211 >> 8,$06
+	.byte	$0a,$ce,$92,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,53213 & $FF,53213 >> 8,$06
 ;
 ;	COLOR    # X:OptionalParameterCompile T N
 ;
-	.byte	$0a,$ce,$8d,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,53467 & $FF,53467 >> 8,$06
+	.byte	$0a,$ce,$8d,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,53469 & $FF,53469 >> 8,$06
 ;
 ;	SCREEN    # T N
 ;
-	.byte	$06,$ce,$86,$e1,216,$06
+	.byte	$06,$ce,$86,$e1,218,$06
 ;
 ;	VPOKE    #,#,# T N
 ;
-	.byte	$08,$ce,$84,$ea,$ea,$e1,217,$06
+	.byte	$08,$ce,$84,$ea,$ea,$e1,219,$06
 ;
 ;	SLEEP    X:OptionalNumberCompile T N
 ;
-	.byte	$0a,$ce,$af,$03,OptionalNumberCompile & $FF,OptionalNumberCompile >> 8,$20,47835 & $FF,47835 >> 8,$06
+	.byte	$0a,$ce,$af,$03,OptionalNumberCompile & $FF,OptionalNumberCompile >> 8,$20,47837 & $FF,47837 >> 8,$06
 ;
 ;	MOUSE    # T N
 ;
-	.byte	$07,$ce,$8c,$e2,42459 & $FF,42459 >> 8,$06
+	.byte	$07,$ce,$8c,$e2,42461 & $FF,42461 >> 8,$06
 ;
 ;	I2CPOKE   #,#,# T N
 ;
-	.byte	$09,$ce,$ae,$ea,$ea,$e2,47067 & $FF,47067 >> 8,$06
+	.byte	$09,$ce,$ae,$ea,$ea,$e2,47069 & $FF,47069 >> 8,$06
 ;
 ;	POWEROFF   T N
 ;
-	.byte	$07,$ce,$ad,$20,41691 & $FF,41691 >> 8,$06
+	.byte	$07,$ce,$ad,$20,41693 & $FF,41693 >> 8,$06
 ;
 ;	RESET    T N
 ;
-	.byte	$07,$ce,$8f,$20,41947 & $FF,41947 >> 8,$06
+	.byte	$07,$ce,$8f,$20,41949 & $FF,41949 >> 8,$06
 ;
 ;	REBOOT    T N
 ;
-	.byte	$07,$ce,$ac,$20,42203 & $FF,42203 >> 8,$06
+	.byte	$07,$ce,$ac,$20,42205 & $FF,42205 >> 8,$06
 ;
 ;	PSET    #,#,# T N
 ;
-	.byte	$08,$ce,$87,$ea,$ea,$e1,162,$06
+	.byte	$08,$ce,$87,$ea,$ea,$e1,164,$06
 ;
 ;	LINE    #,#,#,# X:OptionalColourCompile T N
 ;
-	.byte	$0c,$ce,$88,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,163,$06
+	.byte	$0c,$ce,$88,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,165,$06
 ;
 ;	RECT    #,#,#,# X:OptionalColourCompile T N
 ;
-	.byte	$0c,$ce,$8a,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,164,$06
+	.byte	$0c,$ce,$8a,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,166,$06
 ;
 ;	FRAME    #,#,#,# X:OptionalColourCompile T N
 ;
-	.byte	$0c,$ce,$89,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,165,$06
+	.byte	$0c,$ce,$89,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,167,$06
 ;
 ;	OVAL    #,#,#,# X:OptionalColourCompile T N
 ;
-	.byte	$0c,$ce,$bf,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,166,$06
+	.byte	$0c,$ce,$bf,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,168,$06
 ;
 ;	RING    #,#,#,# X:OptionalColourCompile T N
 ;
-	.byte	$0c,$ce,$c0,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,167,$06
+	.byte	$0c,$ce,$c0,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,169,$06
 ;
 ;	CHAR    #,#,#,$ T N
 ;
-	.byte	$09,$ce,$8b,$ea,$ea,$ea,$f1,168,$06
+	.byte	$09,$ce,$8b,$ea,$ea,$ea,$f1,170,$06
 ;
 ;	SPRITE    #,# X:OptionalParameterCompile X:OptionalParameterCompile X:OptionalParameterCompile X:OptionalParameterCompile X:OptionalParameterCompile T N
 ;
-	.byte	$17,$ce,$bb,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,43995 & $FF,43995 >> 8,$06
+	.byte	$17,$ce,$bb,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,43997 & $FF,43997 >> 8,$06
 ;
 ;	SPRMEM    #,#,# X:OptionalParameterCompile T N
 ;
-	.byte	$0c,$ce,$bc,$ea,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,44251 & $FF,44251 >> 8,$06
+	.byte	$0c,$ce,$bc,$ea,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,44253 & $FF,44253 >> 8,$06
 ;
 ;	MOVSPR    #,#,# T N
 ;
-	.byte	$09,$ce,$bd,$ea,$ea,$e2,44507 & $FF,44507 >> 8,$06
+	.byte	$09,$ce,$bd,$ea,$ea,$e2,44509 & $FF,44509 >> 8,$06
 ;
 ;	TILE    #,#,# X:OptionalParameterCompile T N
 ;
-	.byte	$0c,$ce,$b9,$ea,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,46043 & $FF,46043 >> 8,$06
+	.byte	$0c,$ce,$b9,$ea,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,46045 & $FF,46045 >> 8,$06
 ;
 ;	BANK    # X:OptionalParameterCompile T N
 ;
-	.byte	$0a,$ce,$98,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,47579 & $FF,47579 >> 8,$06
+	.byte	$0a,$ce,$98,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,47581 & $FF,47581 >> 8,$06
 ;
 ;	BLOAD    $,#,#,# T N
 ;
-	.byte	$0a,$ce,$95,$fa,$ea,$ea,$e2,40411 & $FF,40411 >> 8,$06
+	.byte	$0a,$ce,$95,$fa,$ea,$ea,$e2,40413 & $FF,40413 >> 8,$06
 ;
 ;	BVLOAD    $,#,#,# T N
 ;
-	.byte	$0a,$ce,$96,$fa,$ea,$ea,$e2,40667 & $FF,40667 >> 8,$06
+	.byte	$0a,$ce,$96,$fa,$ea,$ea,$e2,40669 & $FF,40669 >> 8,$06
 ;
 ;	VLOAD    $,#,#,# T N
 ;
-	.byte	$0a,$ce,$85,$fa,$ea,$ea,$e2,40923 & $FF,40923 >> 8,$06
+	.byte	$0a,$ce,$85,$fa,$ea,$ea,$e2,40925 & $FF,40925 >> 8,$06
 ;
 ;	BSAVE    $,#,#,#,# T N
 ;
-	.byte	$0b,$ce,$b0,$fa,$ea,$ea,$ea,$e2,41179 & $FF,41179 >> 8,$06
+	.byte	$0b,$ce,$b0,$fa,$ea,$ea,$ea,$e2,41181 & $FF,41181 >> 8,$06
 ;
 ;	BVERIFY   $,#,#,# T N
 ;
-	.byte	$0a,$ce,$97,$fa,$ea,$ea,$e2,41435 & $FF,41435 >> 8,$06
+	.byte	$0a,$ce,$97,$fa,$ea,$ea,$e2,41437 & $FF,41437 >> 8,$06
 ;
 ;	LOAD    $ T N
 ;
-	.byte	$07,$93,$00,$f2,40155 & $FF,40155 >> 8,$06
+	.byte	$07,$93,$00,$f2,40157 & $FF,40157 >> 8,$06
 ;
 ;	LINPUT    X:CommandLINPUT N
 ;
@@ -2886,102 +2969,102 @@ CommandTables:
 ;
 ;	GP.STASH   #,#,#,#,# T N
 ;
-	.byte	$0b,$ce,$6d,$ea,$ea,$ea,$ea,$e2,35291 & $FF,35291 >> 8,$06
+	.byte	$0b,$ce,$6d,$ea,$ea,$ea,$ea,$e2,35293 & $FF,35293 >> 8,$06
 ;
 ;	GP.RESTR   # X:OptionalParameterCompile X:OptionalParameterCompile T N
 ;
-	.byte	$0d,$ce,$6c,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,35547 & $FF,35547 >> 8,$06
+	.byte	$0d,$ce,$6c,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,35549 & $FF,35549 >> 8,$06
 ;
 ;	GP.BOX    #,#,#,# X:OptionalZeroCompile X:OptionalColourCompile T N
 ;
-	.byte	$10,$ce,$6b,$ea,$ea,$ea,$e3,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$20,34011 & $FF,34011 >> 8,$06
+	.byte	$10,$ce,$6b,$ea,$ea,$ea,$e3,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$20,34013 & $FF,34013 >> 8,$06
 ;
 ;	GP.FILL   #,#,#,#,# X:OptionalColourCompile T N
 ;
-	.byte	$0e,$ce,$6a,$ea,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$20,34267 & $FF,34267 >> 8,$06
+	.byte	$0e,$ce,$6a,$ea,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$20,34269 & $FF,34269 >> 8,$06
 ;
 ;	GP.PRINTAT   #,#,$ X:OptionalColourCompile T N
 ;
-	.byte	$0c,$ce,$69,$ea,$ea,$f3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$20,34523 & $FF,34523 >> 8,$06
+	.byte	$0c,$ce,$69,$ea,$ea,$f3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$20,34525 & $FF,34525 >> 8,$06
 ;
 ;	This file is automatically generated.
 ;
 ;
 ;	FMINIT       T N
 ;
-	.byte	$07,$ce,$99,$20,48091 & $FF,48091 >> 8,$06
+	.byte	$07,$ce,$99,$20,48093 & $FF,48093 >> 8,$06
 ;
 ;	FMNOTE      #,# T N
 ;
-	.byte	$08,$ce,$9a,$ea,$e2,48347 & $FF,48347 >> 8,$06
+	.byte	$08,$ce,$9a,$ea,$e2,48349 & $FF,48349 >> 8,$06
 ;
 ;	FMDRUM      #,# T N
 ;
-	.byte	$08,$ce,$9b,$ea,$e2,48603 & $FF,48603 >> 8,$06
+	.byte	$08,$ce,$9b,$ea,$e2,48605 & $FF,48605 >> 8,$06
 ;
 ;	FMINST      #,# T N
 ;
-	.byte	$08,$ce,$9c,$ea,$e2,48859 & $FF,48859 >> 8,$06
+	.byte	$08,$ce,$9c,$ea,$e2,48861 & $FF,48861 >> 8,$06
 ;
 ;	FMVIB       #,# T N
 ;
-	.byte	$08,$ce,$9d,$ea,$e2,49115 & $FF,49115 >> 8,$06
+	.byte	$08,$ce,$9d,$ea,$e2,49117 & $FF,49117 >> 8,$06
 ;
 ;	FMFREQ      #,# T N
 ;
-	.byte	$08,$ce,$9e,$ea,$e2,49371 & $FF,49371 >> 8,$06
+	.byte	$08,$ce,$9e,$ea,$e2,49373 & $FF,49373 >> 8,$06
 ;
 ;	FMVOL       #,# T N
 ;
-	.byte	$08,$ce,$9f,$ea,$e2,49627 & $FF,49627 >> 8,$06
+	.byte	$08,$ce,$9f,$ea,$e2,49629 & $FF,49629 >> 8,$06
 ;
 ;	FMPAN       #,# T N
 ;
-	.byte	$08,$ce,$a0,$ea,$e2,49883 & $FF,49883 >> 8,$06
+	.byte	$08,$ce,$a0,$ea,$e2,49885 & $FF,49885 >> 8,$06
 ;
 ;	FMPLAY      #,$ T N
 ;
-	.byte	$08,$ce,$a1,$ea,$f2,50139 & $FF,50139 >> 8,$06
+	.byte	$08,$ce,$a1,$ea,$f2,50141 & $FF,50141 >> 8,$06
 ;
 ;	FMCHORD     #,$ T N
 ;
-	.byte	$08,$ce,$a2,$ea,$f2,50395 & $FF,50395 >> 8,$06
+	.byte	$08,$ce,$a2,$ea,$f2,50397 & $FF,50397 >> 8,$06
 ;
 ;	FMPOKE      #,# T N
 ;
-	.byte	$08,$ce,$a3,$ea,$e2,50651 & $FF,50651 >> 8,$06
+	.byte	$08,$ce,$a3,$ea,$e2,50653 & $FF,50653 >> 8,$06
 ;
 ;	PSGINIT      T N
 ;
-	.byte	$07,$ce,$a4,$20,50907 & $FF,50907 >> 8,$06
+	.byte	$07,$ce,$a4,$20,50909 & $FF,50909 >> 8,$06
 ;
 ;	PSGNOTE     #,# T N
 ;
-	.byte	$08,$ce,$a5,$ea,$e2,51163 & $FF,51163 >> 8,$06
+	.byte	$08,$ce,$a5,$ea,$e2,51165 & $FF,51165 >> 8,$06
 ;
 ;	PSGVOL      #,# T N
 ;
-	.byte	$08,$ce,$a6,$ea,$e2,51419 & $FF,51419 >> 8,$06
+	.byte	$08,$ce,$a6,$ea,$e2,51421 & $FF,51421 >> 8,$06
 ;
 ;	PSGWAV      #,# T N
 ;
-	.byte	$08,$ce,$a7,$ea,$e2,51675 & $FF,51675 >> 8,$06
+	.byte	$08,$ce,$a7,$ea,$e2,51677 & $FF,51677 >> 8,$06
 ;
 ;	PSGFREQ     #,# T N
 ;
-	.byte	$08,$ce,$a8,$ea,$e2,51931 & $FF,51931 >> 8,$06
+	.byte	$08,$ce,$a8,$ea,$e2,51933 & $FF,51933 >> 8,$06
 ;
 ;	PSGPAN      #,# T N
 ;
-	.byte	$08,$ce,$a9,$ea,$e2,52187 & $FF,52187 >> 8,$06
+	.byte	$08,$ce,$a9,$ea,$e2,52189 & $FF,52189 >> 8,$06
 ;
 ;	PSGPLAY     #,$ T N
 ;
-	.byte	$08,$ce,$aa,$ea,$f2,52443 & $FF,52443 >> 8,$06
+	.byte	$08,$ce,$aa,$ea,$f2,52445 & $FF,52445 >> 8,$06
 ;
 ;	PSGCHORD    #,$ T N
 ;
-	.byte	$08,$ce,$ab,$ea,$f2,52699 & $FF,52699 >> 8,$06
+	.byte	$08,$ce,$ab,$ea,$f2,52701 & $FF,52701 >> 8,$06
 		.byte 	0
 
 UnaryTables:
@@ -2991,11 +3074,11 @@ UnaryTables:
 ;
 ;	SGN    (#) T N
 ;
-	.byte	$07,$b4,$00,$8e,$91,199,$06
+	.byte	$07,$b4,$00,$8e,$91,201,$06
 ;
 ;	INT    (#) T N
 ;
-	.byte	$08,$b5,$00,$8e,$92,37595 & $FF,37595 >> 8,$06
+	.byte	$08,$b5,$00,$8e,$92,37597 & $FF,37597 >> 8,$06
 ;
 ;	ABS    (#) T N
 ;
@@ -3003,7 +3086,7 @@ UnaryTables:
 ;
 ;	USR    (#) T N
 ;
-	.byte	$07,$b7,$00,$8e,$91,210,$06
+	.byte	$07,$b7,$00,$8e,$91,212,$06
 ;
 ;	FRE    (#) T N
 ;
@@ -3011,55 +3094,55 @@ UnaryTables:
 ;
 ;	POS    (#) T N
 ;
-	.byte	$07,$b9,$00,$8e,$91,186,$06
+	.byte	$07,$b9,$00,$8e,$91,188,$06
 ;
 ;	SQR    (#) T N
 ;
-	.byte	$08,$ba,$00,$8e,$92,37851 & $FF,37851 >> 8,$06
+	.byte	$08,$ba,$00,$8e,$92,37853 & $FF,37853 >> 8,$06
 ;
 ;	RND    (#) T N
 ;
-	.byte	$07,$bb,$00,$8e,$91,193,$06
+	.byte	$07,$bb,$00,$8e,$91,195,$06
 ;
 ;	LOG    (#) T N
 ;
-	.byte	$08,$bc,$00,$8e,$92,38107 & $FF,38107 >> 8,$06
+	.byte	$08,$bc,$00,$8e,$92,38109 & $FF,38109 >> 8,$06
 ;
 ;	EXP    (#) T N
 ;
-	.byte	$08,$bd,$00,$8e,$92,38363 & $FF,38363 >> 8,$06
+	.byte	$08,$bd,$00,$8e,$92,38365 & $FF,38365 >> 8,$06
 ;
 ;	COS    (#) T N
 ;
-	.byte	$08,$be,$00,$8e,$92,38619 & $FF,38619 >> 8,$06
+	.byte	$08,$be,$00,$8e,$92,38621 & $FF,38621 >> 8,$06
 ;
 ;	SIN    (#) T N
 ;
-	.byte	$08,$bf,$00,$8e,$92,38875 & $FF,38875 >> 8,$06
+	.byte	$08,$bf,$00,$8e,$92,38877 & $FF,38877 >> 8,$06
 ;
 ;	TAN    (#) T N
 ;
-	.byte	$08,$c0,$00,$8e,$92,39131 & $FF,39131 >> 8,$06
+	.byte	$08,$c0,$00,$8e,$92,39133 & $FF,39133 >> 8,$06
 ;
 ;	ATN    (#) T N
 ;
-	.byte	$08,$c1,$00,$8e,$92,39387 & $FF,39387 >> 8,$06
+	.byte	$08,$c1,$00,$8e,$92,39389 & $FF,39389 >> 8,$06
 ;
 ;	PEEK    (#) T N
 ;
-	.byte	$07,$c2,$00,$8e,$91,183,$06
+	.byte	$07,$c2,$00,$8e,$91,185,$06
 ;
 ;	LEN    ($) T N
 ;
-	.byte	$07,$c3,$00,$8f,$91,173,$06
+	.byte	$07,$c3,$00,$8f,$91,175,$06
 ;
 ;	STR$    (#) T S
 ;
-	.byte	$07,$c4,$00,$8e,$91,203,$07
+	.byte	$07,$c4,$00,$8e,$91,205,$07
 ;
 ;	VAL    ($) T N
 ;
-	.byte	$07,$c5,$00,$8f,$91,211,$06
+	.byte	$07,$c5,$00,$8f,$91,213,$06
 ;
 ;	ASC    ($) T N
 ;
@@ -3071,15 +3154,15 @@ UnaryTables:
 ;
 ;	LEFT$   ($,#) T S
 ;
-	.byte	$08,$c8,$00,$8f,$ae,$91,204,$07
+	.byte	$08,$c8,$00,$8f,$ae,$91,206,$07
 ;
 ;	RIGHT$    ($,#) T S
 ;
-	.byte	$08,$c9,$00,$8f,$ae,$91,205,$07
+	.byte	$08,$c9,$00,$8f,$ae,$91,207,$07
 ;
 ;	MID$   ($,# X:OptionalParameterCompile ) T S
 ;
-	.byte	$0b,$ca,$00,$8f,$ae,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$91,206,$07
+	.byte	$0b,$ca,$00,$8f,$ae,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$91,208,$07
 ;
 ;	NOT    X:NotUnaryCompile N
 ;
@@ -3091,23 +3174,23 @@ UnaryTables:
 ;
 ;	PI     T N
 ;
-	.byte	$06,$ff,$00,$10,184,$06
+	.byte	$06,$ff,$00,$10,186,$06
 ;
 ;	GP.INSTR   ($,$ X:OptionalZeroCompile) T N
 ;
-	.byte	$0b,$ce,$77,$8f,$af,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$91,160,$06
+	.byte	$0b,$ce,$77,$8f,$af,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$91,162,$06
 ;
 ;	GP.COMP   ($,$) T N
 ;
-	.byte	$09,$ce,$70,$8f,$af,$92,35803 & $FF,35803 >> 8,$06
+	.byte	$09,$ce,$70,$8f,$af,$92,35805 & $FF,35805 >> 8,$06
 ;
 ;	GP.STRPTR   ($) T N
 ;
-	.byte	$07,$ce,$76,$8f,$91,161,$06
+	.byte	$07,$ce,$76,$8f,$91,163,$06
 ;
 ;	GP.ARRPTR   (X:AnyArrayCompile) T N
 ;
-	.byte	$0a,$ce,$6e,$83,AnyArrayCompile & $FF,AnyArrayCompile >> 8,$92,35035 & $FF,35035 >> 8,$06
+	.byte	$0a,$ce,$6e,$83,AnyArrayCompile & $FF,AnyArrayCompile >> 8,$92,35037 & $FF,35037 >> 8,$06
 ;
 ;	GP.CONTAINS  ($,$) X:GPContainsCompile N
 ;
@@ -3134,67 +3217,67 @@ UnaryTables:
 ;
 ;	HEX$     (#) T S
 ;
-	.byte	$07,$ce,$d5,$8e,$91,169,$07
+	.byte	$07,$ce,$d5,$8e,$91,171,$07
 ;
 ;	VPEEK    (#,#) T N
 ;
-	.byte	$08,$ce,$d0,$8e,$ae,$91,218,$06
+	.byte	$08,$ce,$d0,$8e,$ae,$91,220,$06
 ;
 ;	JOY    (#) T N
 ;
-	.byte	$08,$ce,$d4,$8e,$92,37339 & $FF,37339 >> 8,$06
+	.byte	$08,$ce,$d4,$8e,$92,37341 & $FF,37341 >> 8,$06
 ;
 ;	MB     T N
 ;
-	.byte	$07,$ce,$d3,$20,42715 & $FF,42715 >> 8,$06
+	.byte	$07,$ce,$d3,$20,42717 & $FF,42717 >> 8,$06
 ;
 ;	MX     T N
 ;
-	.byte	$07,$ce,$d1,$20,42971 & $FF,42971 >> 8,$06
+	.byte	$07,$ce,$d1,$20,42973 & $FF,42973 >> 8,$06
 ;
 ;	MY     T N
 ;
-	.byte	$07,$ce,$d2,$20,43227 & $FF,43227 >> 8,$06
+	.byte	$07,$ce,$d2,$20,43229 & $FF,43229 >> 8,$06
 ;
 ;	MWHEEL    T N
 ;
-	.byte	$07,$ce,$db,$20,43483 & $FF,43483 >> 8,$06
+	.byte	$07,$ce,$db,$20,43485 & $FF,43485 >> 8,$06
 ;
 ;	I2CPEEK   (#,#) T N
 ;
-	.byte	$09,$ce,$d7,$8e,$ae,$92,47323 & $FF,47323 >> 8,$06
+	.byte	$09,$ce,$d7,$8e,$ae,$92,47325 & $FF,47325 >> 8,$06
 ;
 ;	MOD    (#,#) T N
 ;
-	.byte	$08,$ce,$de,$8e,$ae,$91,176,$06
+	.byte	$08,$ce,$de,$8e,$ae,$91,178,$06
 ;
 ;	TDATA    (#,#) T N
 ;
-	.byte	$09,$ce,$dc,$8e,$ae,$92,45531 & $FF,45531 >> 8,$06
+	.byte	$09,$ce,$dc,$8e,$ae,$92,45533 & $FF,45533 >> 8,$06
 ;
 ;	TATTR    (#,#) T N
 ;
-	.byte	$09,$ce,$dd,$8e,$ae,$92,45787 & $FF,45787 >> 8,$06
+	.byte	$09,$ce,$dd,$8e,$ae,$92,45789 & $FF,45789 >> 8,$06
 ;
 ;	RPT$    (#,#) T S
 ;
-	.byte	$09,$ce,$da,$8e,$ae,$92,43739 & $FF,43739 >> 8,$07
+	.byte	$09,$ce,$da,$8e,$ae,$92,43741 & $FF,43741 >> 8,$07
 ;
 ;	GP.A    T N
 ;
-	.byte	$06,$ce,$7b,$10,156,$06
+	.byte	$06,$ce,$7b,$10,158,$06
 ;
 ;	GP.X    T N
 ;
-	.byte	$06,$ce,$7a,$10,157,$06
+	.byte	$06,$ce,$7a,$10,159,$06
 ;
 ;	GP.Y    T N
 ;
-	.byte	$06,$ce,$79,$10,158,$06
+	.byte	$06,$ce,$79,$10,160,$06
 ;
 ;	GP.C    T N
 ;
-	.byte	$06,$ce,$78,$10,159,$06
+	.byte	$06,$ce,$78,$10,161,$06
 ;
 ;	POINTER   X:UnsupportedCompile N
 ;
@@ -4423,6 +4506,162 @@ GPIsEmptyCompile:
 ;		Date			Notes
 ;		==== 			=====
 ;		19/08/26		Written.
+;
+; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		Name:		gpif.asm
+;		Purpose:	GP.IF / GP.ELSEIF / GP.ELSE / GP.ENDIF
+;		Created:	30th August 2026
+;		Reviewed: 	No
+;		Author : 	Steven De George SR
+;
+; ************************************************************************************************
+; ************************************************************************************************
+
+		.section code
+
+; ************************************************************************************************
+;
+;		GP.IF <expr> THEN
+;		GP.ELSEIF <expr> THEN
+;		GP.ELSE
+;		GP.ENDIF
+;
+;		A block IF. Each keyword is ALONE ON ITS LINE -- there is no single line form, and the
+;		THEN is required, so "GP.IF X > 5 THEN PRINT" is rejected rather than quietly opening a
+;		block that swallows every line until the next GP.ENDIF.
+;
+;		Lowering, for GP.IF a / GP.ELSEIF b / GP.ELSE / GP.ENDIF:
+;
+;			<a> gp.if .ifnext -> one past the .ifelse below
+;			<body>
+;			.ifelse -> gp.endif       <b> .ifnext -> one past the next .ifelse
+;			<body>
+;			.ifelse -> gp.endif
+;			<body>
+;			gp.endif                  a marker, nothing more; there is no frame to close
+;
+;		NO STACK FRAME, unlike GP.SELECT. The frame there is forced by new.line resetting the
+;		number stack at every source line, because the selector has to survive to the next line.
+;		A condition is evaluated and consumed by its .ifnext on the SAME line, so there is
+;		nothing to preserve -- which is why the whole construct costs 12 runtime bytes and none
+;		of them are code. .ifnext runs the .goto.z handler and .ifelse runs the .goto handler;
+;		only FixBranches tells them from .casenext and .caseend.
+;
+;		GP.ELSEIF IS WHAT FORCES gp.if TO EXIST. Without it FixBranches could count nesting on
+;		.ifnext against gp.endif, one to one, and the marker would not be needed. But GP.ELSEIF
+;		emits .ifelse and then its OWN <cond> .ifnext, which would inflate the depth of a scan
+;		already in flight and send it past its own gp.endif. So depth is counted on a marker
+;		GP.ELSEIF does not emit -- and note below that it deliberately writes no gp.if.
+;
+;		ALL FOUR DISARM deferErrors FIRST. A statement that fails with a SYNTAX error while the
+;		deferral is armed is rolled back and replaced with a runtime throw-stub -- which for a
+;		block opener means its gp.if vanishes while the GP.ENDIF on a later line still compiles
+;		and still emits. The block is left with a closer and no opener, and an ENCLOSING IF's
+;		scan then counts one extra close and resolves its branches to the wrong place, silently.
+;		Three bytes of stz buys a hard, correctly-named error instead.
+;
+;		All four MUST return carry CLEAR. A .def helper returning carry set makes the generator
+;		silently drop every table element after it, with no error and no clue.
+;
+; ************************************************************************************************
+
+CommandIfCompile:
+		stz 	deferErrors 				; a block opener must never defer -- see the header
+		jsr 	CompileExpressionAt0 		; the condition
+		and 	#NSSTypeMask
+		cmp 	#NSSIFloat
+		bne 	IfFailType
+		jsr 	IfRequireThenEOL
+		lda 	#PCD_GPCMD_IF 				; the marker FixBranches counts nesting on
+		jsr 	WriteCodeByte
+		lda 	#PCD_CMD_IFNEXT 			; false -> the next alternative, or the gp.endif
+		jsr 	WriteCodeByte
+		jmp 	IfWritePlaceholder
+
+;
+;		GP.ELSEIF is a closer and an opener in one: the .ifelse leaves the body above, then the
+;		test opens the next. It writes NO gp.if -- an ELSEIF does not deepen the nesting, it
+;		continues the chain the GP.IF started, and the scans depend on that.
+;
+CommandElseIfCompile:
+		stz 	deferErrors
+		lda 	#PCD_CMD_IFELSE 			; out of the body above, to the gp.endif
+		jsr 	WriteCodeByte
+		jsr 	IfWritePlaceholder
+		jsr 	CompileExpressionAt0
+		and 	#NSSTypeMask
+		cmp 	#NSSIFloat
+		bne 	IfFailType
+		jsr 	IfRequireThenEOL
+		lda 	#PCD_CMD_IFNEXT
+		jsr 	WriteCodeByte
+		jmp 	IfWritePlaceholder
+
+CommandElseCompile:
+		stz 	deferErrors
+		lda 	#PCD_CMD_IFELSE
+		jsr 	WriteCodeByte
+		jsr 	IfWritePlaceholder
+		jmp 	IfRequireEOL
+
+;
+;		GP.ENDIF is a marker and nothing else. Every .ifnext that ran out of alternatives lands
+;		ON it and every .ifelse lands ON it, which costs nothing because it does nothing.
+;
+CommandEndIfCompile:
+		stz 	deferErrors
+		lda 	#PCD_GPCMD_ENDIF
+		jsr 	WriteCodeByte
+		jmp 	IfRequireEOL
+
+;
+;		THEN is a ROM keyword ($a7), so BASLOAD tokenises it with no GP keyword slot spent and it
+;		emits no p-code of its own. Requiring it costs the five bytes CommandIF already spends.
+;
+IfRequireThenEOL:
+		lda 	#C64_THEN
+		jsr 	CheckNextA
+;
+;		Nothing may follow. This is the check that makes the single line form illegal rather than
+;		merely undefined, and with deferErrors already disarmed it aborts the compile instead of
+;		becoming a throw-stub.
+;
+IfRequireEOL:
+		jsr 	LookNextNonSpace
+		beq 	_IREDone
+		.error_syntax
+_IREDone:
+		rts
+
+;
+;		Two placeholder bytes. The value is never read: FixBranches overwrites both
+;		unconditionally, and errors out rather than leaving them if it cannot resolve the branch.
+;
+IfWritePlaceholder:
+		lda 	#0
+		jsr 	WriteCodeByte
+		lda 	#0
+		jsr 	WriteCodeByte
+		clc
+		rts
+
+IfFailType:
+		.error_type
+
+		.send code
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;		30/08/26		Written.
 ;
 ; ************************************************************************************************
 ; ************************************************************************************************
@@ -5789,7 +6028,7 @@ _CRDefault:
 ; ************************************************************************************************
 ;
 ;		Name:		select.asm
-;		Purpose:	GP.SELECT / GP.CASE / GP.ELSE / GP.ENDSEL
+;		Purpose:	GP.SELECT / GP.CASE / GP.OTHER / GP.ENDSEL
 ;		Created:	17th August 2026
 ;		Reviewed: 	No
 ;		Author : 	Steven De George SR
@@ -5803,7 +6042,7 @@ _CRDefault:
 ;
 ;		GP.SELECT <expr>
 ;		GP.CASE <expr> [,<expr> ...]
-;		GP.ELSE
+;		GP.OTHER
 ;		GP.ENDSEL
 ;
 ;		None of these can be table entries: three of the four write a SYSTEM token with an inline
@@ -5811,13 +6050,13 @@ _CRDefault:
 ;		different number of them depending on how many alternatives it is given. So each writes
 ;		its own tokens here, exactly as GP.EXITDO does.
 ;
-;		Lowering, for GP.SELECT K / GP.CASE 13,17 / GP.ELSE / GP.ENDSEL:
+;		Lowering, for GP.SELECT K / GP.CASE 13,17 / GP.OTHER / GP.ENDSEL:
 ;
 ;			<K> gp.select                       selector into a stack frame
 ;			gp.case 13 f.cmp = gp.case 17 f.cmp = or  .casenext -> next alternative
 ;			<body>
 ;			.caseend -> gp.endsel               written by whatever alternative comes NEXT
-;			gp.else
+;			gp.other
 ;			<body>
 ;			gp.endsel                           closes the frame; every branch lands ON it
 ;
@@ -5885,9 +6124,9 @@ CompileCaseTest:
 		lda 	#PCD_EQUAL
 		jmp 	WriteCodeByte
 
-CommandElseCompile:
+CommandOtherCompile:
 		jsr 	CompileCaseEnd
-		lda 	#PCD_GPCMD_ELSE
+		lda 	#PCD_GPCMD_OTHER
 		jsr 	WriteCodeByte
 		clc
 		rts

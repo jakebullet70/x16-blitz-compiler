@@ -97,8 +97,14 @@ compiles at roughly **14 bytes of p-code per line**. BASL menus (~60–100 lines
 | 7 | Input — **SHIPPED as `INPHELP.INC.BL`**, BASL | 0 |
 | 8 | Colour / theme — **BASL** | 0 |
 | 9 | `GP.MENU` + `GP.SEL` — **SHIPPED** | 377 |
-| 10 | `GP.SELECT` / `GP.CASE` / `GP.ELSE` / `GP.ENDSEL` — **SHIPPED** | 127 |
+| 10 | `GP.SELECT` / `GP.CASE` / `GP.OTHER` / `GP.ENDSEL` — **SHIPPED** | 127 |
+| 11 | `GP.IF` / `GP.ELSEIF` / `GP.ELSE` / `GP.ENDIF` — **SHIPPED**, and **none of it is in the GP block** — 14 B of vector slots, shared NOP and `MOFSizeTable` in the CORE | 0 |
 | | **Built** | **1,970** |
+
+**Tier 11 is the first that costs this budget nothing.** Its four opcodes all reuse a handler
+that already existed, and the 14 bytes they do cost land below `GPBase` — in the core, so that a
+program whose only GP keyword is an `IF` still gets the GP block cut. Measured: such a program
+compiles `RT 12031` / `GP OUT`. See §11.
 
 #### Measured overrun, 17th August 2026 — read this before trusting an estimate below
 
@@ -1049,6 +1055,82 @@ expression case values, `GP.EXITDO` out of a `GP.DO` with a live select frame in
 1,000-pass balance run with the **whole loop on one source line** so `new.line` never resets the
 number stack — a leak of one slot per pass would have corrupted within about thirty. Both error
 paths too: no `GP.ENDSEL` gives `STRUCTURE IMBALANCE`, a string selector gives `TYPE MISMATCH`.
+
+### §11 `GP.IF` — SHIPPED 30th August 2026, 14 B, RT_ABI 21
+
+A block IF. Four keywords, each **alone on its line**; `THEN` is required and nothing may follow it.
+
+```basic
+GP.IF N < 0 THEN
+    ...
+GP.ELSEIF N = 0 THEN
+    ...
+GP.ELSE
+    ...
+GP.ENDIF
+```
+
+**There is no single line form and that is deliberate** — a mandatory `THEN` invites
+`GP.IF X > 5 THEN PRINT`, which would otherwise open a block that silently swallows every line
+until the next `GP.ENDIF`. It is a syntax error instead. Stock `IF ... THEN` is untouched.
+
+**No stack frame, unlike `GP.SELECT`** — which is the whole reason this is 14 bytes against that
+one's 127. The frame there is forced by `new.line` resetting the number stack at every source line,
+because the selector has to survive to the next line. A condition is evaluated and consumed by its
+`.ifnext` on the *same* line, so 98 of `GP.SELECT`'s bytes (`gp.select` 44, `gp.case` 42, the frame
+finder 12) simply have no counterpart here. The knock-on: a `GOTO` out of a `GP.IF` is safe, where
+one out of a select leaks the frame until something finds it.
+
+**All four opcodes reuse a handler that was already there.** `.ifnext` is `.goto.z` and `.ifelse` is
+`.goto`, exactly as `.casenext` and `.caseend` are — extra `;; [...]` markers on the existing labels
+in `commands/goto.asm`, so they cost a vector slot and not a byte of code. `gp.if` and `gp.endif`
+share one 4-byte `plx`/`jmp NextCommand`.
+
+**That NOP is in the CORE, not `gp-runtime/`, and it has to be.** `ScanGPUsage` decides whether an
+object carries the ~2 KB GP handler block by comparing each emitted opcode's *handler address*
+against `GPBase`. Aliasing the markers to `CommandXOther` over in `gp-runtime/select.asm` would have
+been free, and would have dragged the whole block into any program whose only GP keyword is an `IF`.
+Verified: the test program compiles with `RT 12031` and `GP OUT`, against `RT 14079` / `GP IN` for a
+`GP.SELECT` program.
+
+**`GP.ELSEIF` is what forces `gp.if` to exist.** Without it `FixBranches` could count nesting on
+`.ifnext` against `gp.endif`, one to one, and the feature would be 3 opcodes and 12 bytes. But
+`GP.ELSEIF` emits `.ifelse` and then its OWN `<cond> .ifnext`, which inflates the depth of a scan
+already in flight and sends it past its own `gp.endif`. So depth is counted on a marker `GP.ELSEIF`
+does not emit. It writes no `gp.if`: an ELSEIF continues the chain, it does not deepen it.
+
+**`GP.SELECT`'s `GP.ELSE` was renamed `GP.OTHER`** to free the spelling. The keyword id stayed at
+`52836` and only the name moved, so an already-tokenised PRG still reads its select-else as a
+select-else; the new `GP.ELSE` took a fresh `52828`. Handing `52836` to the new keyword instead would
+have silently re-pointed every shipped select.
+
+**All four compiler helpers disarm `deferErrors` first.** A statement failing with a SYNTAX error
+while the deferral is armed is rolled back and replaced with a throw-stub — which for a block opener
+means its `gp.if` vanishes while the `GP.ENDIF` on a later line still compiles and still emits,
+leaving an enclosing IF's scan to count one extra close and resolve its branches wrongly, with no
+diagnostic. Three bytes of `stz` buys a hard, correctly-named error. **The same trap applies to
+`GP.SELECT` and is not fixed there.**
+
+| | |
+|---|---|
+| Runtime | **14 B measured** — 8 B of vector slots, the 4 B shared NOP, 2 B of `MOFSizeTable`. **Zero bytes of handler code.** Note `MOFSizeTable` IS in the copied image (`common.library` links before `10object.divider`), which is why this is 14 and not 12 |
+| Compiler | `GPC.BLITZ.BIN` 22,498 → **22,731 (+233 B)**, free against this budget — but it crossed a page, so `FreeMemory` went `$6000` → `$6100` and the object buffer lost 256 B (16,128 → **15,872**) |
+| Program size | **unchanged.** `GPBase $3700` and `ObjectBase $3f00` both held; a non-GP program is still 12,031 B and a GP one 14,079 B. The 14 bytes were absorbed by page padding that every program already pays |
+| Core cushion | **40 B → 26 B** below `GPBase`. This is the number to watch, not the 590: cross `$3700` and every compiled program grows a whole page |
+| Tokens spent | 4 BASIC keywords (`$CE5B`–`$CE5E`), **4 sub-256 opcodes** — 2 unshifted markers + 2 system |
+| Sub-256 opcodes left | **16** (`$F0`–`$FF`) |
+
+*Verified on R49*: first branch, a middle `GP.ELSEIF`, `GP.ELSE`, a four-long ELSEIF chain, no-`GP.ELSE`
+falling clean through, no-`GP.ELSE` taken, an IF nested in a then-body, an IF nested in an else-body, a
+`GP.IF` inside a `GP.CASE` body, and a `GP.SELECT` inside a `GP.IF` body — one program printing
+`ABCDEFGHIJKL|` with a distinct wrong-branch marker on every path not taken. Both rejections too:
+`GP.IF 1 THEN PRINT` and a missing `THEN` each fail the compile with no object written.
+
+**Known gap, PRE-EXISTING and shared:** a `GP.IF` with no `GP.ENDIF` is detected — `_FBEDNoLoop`
+restores `objPtr` and raises — but the compiler then writes the truncated object out and reports `OK`
+anyway. **`GP.SELECT` with no `GP.ENDSEL` and `GP.EXITDO` with no `GP.LOOP` do exactly the same on
+this build**, so the "no `GP.ENDSEL` gives STRUCTURE IMBALANCE" line in §10 is optimistic. One fix in
+the shared error path would cover all three; not attempted here.
 
 ### §9 Menus — the original plan
 

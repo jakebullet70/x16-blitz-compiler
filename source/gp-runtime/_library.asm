@@ -2003,7 +2003,7 @@ gpsIndex: 									; how far into the haystack the compare has reached
 ; ************************************************************************************************
 ;
 ;		Name:		select.asm
-;		Purpose:	GP.SELECT / GP.CASE / GP.ELSE / GP.ENDSEL
+;		Purpose:	GP.SELECT / GP.CASE / GP.OTHER / GP.ENDSEL
 ;		Created:	17th August 2026
 ;		Reviewed: 	No
 ;		Author : 	Steven De George SR
@@ -2015,7 +2015,7 @@ gpsIndex: 									; how far into the haystack the compare has reached
 
 ; ************************************************************************************************
 ;
-;			GP.SELECT <expr> / GP.CASE <expr>[,<expr>...] / GP.ELSE / GP.ENDSEL
+;			GP.SELECT <expr> / GP.CASE <expr>[,<expr>...] / GP.OTHER / GP.ENDSEL
 ;
 ;		A multi-way branch on one value, modelled on prog8's "when". It is NOT a replacement for
 ;		ON x GOTO/GOSUB, which is a real skip table and stays the right answer for a dense 1..n
@@ -2100,13 +2100,13 @@ CommandXCase: ;; [gp.case]
 
 ; ************************************************************************************************
 ;
-;		GP.ELSE : nothing to do at all. It exists as a token because FixBranches needs somewhere
+;		GP.OTHER : nothing to do at all. It exists as a token because FixBranches needs somewhere
 ;		for the last GP.CASE's .casenext to land, and because the case bodies above it branch to
 ;		the GP.ENDSEL rather than falling through it.
 ;
 ; ************************************************************************************************
 
-CommandXElse: ;; [gp.else]
+CommandXOther: ;; [gp.other]
 		.entercmd
 		.exitcmd
 
@@ -2114,7 +2114,7 @@ CommandXElse: ;; [gp.else]
 ;
 ;		GP.ENDSEL : drop the selector's frame. Reached three ways -- fallen out of the last case
 ;		body, branched to by a .caseend, or branched to by the .casenext of a select with nothing
-;		matching and no GP.ELSE. All three want exactly this, which is why it is the target of
+;		matching and no GP.OTHER. All three want exactly this, which is why it is the target of
 ;		every branch rather than the instruction after it.
 ;
 ; ************************************************************************************************
