@@ -16,7 +16,7 @@ Forked from Paul Robson's original: <https://github.com/paulscottrobson/blitz-co
 ### Run `GPC.PRG`
 
 `GPC.PRG` is the front end, and it is all you need. Put it on the drive beside the engine
-`GPC.BLITZ.BIN`, load it, and answer four questions:
+`GPC.BIN` and its runtime image `GPC.IMG.<n>.BIN`, load it, and answer four questions:
 
 ```text
 LOAD "GPC.PRG",8 : RUN
@@ -50,7 +50,7 @@ error and the offending line, e.g. `SYNTAX ERROR @ 610` or `NOT IMPLEMENTED @ 24
 
 ### Scripted — write `GPC.INPUT` yourself
 
-Writing that control file is the *only* thing `GPC.PRG` does. The engine **`GPC.BLITZ.BIN`** takes
+Writing that control file is the *only* thing `GPC.PRG` does. The engine **`GPC.BIN`** takes
 its whole job from **`GPC.INPUT`** and asks nothing, so writing the file directly is what lets one
 program drive another — it is how this repo's own test harness compiles. Up to four text lines:
 
@@ -68,7 +68,11 @@ M.DIR.PRG
 shared
 ```
 
-Then run the engine — it carries its own BASIC stub, so `LOAD"GPC.BLITZ.BIN",8 : RUN` is enough.
+Then run the engine — it carries its own BASIC stub, so `LOAD"GPC.BIN",8 : RUN` is enough.
+`GPC.IMG.<n>.BIN` has to be on the drive too: it is the runtime the engine copies into every
+self-contained object, and without it the compile stops with `NO RUNTIME IMAGE` rather than
+writing a program that cannot run. `<n>` is the runtime build number, so the engine will not
+pick up an image from a different release by mistake.
 
 A line ends at a CR, an LF, or any control byte, and blank lines are skipped — so a `GPC.INPUT`
 typed on a CRLF host drives the X16 compiler unchanged. An empty line 3 (no map) still holds its
@@ -171,14 +175,14 @@ The **shared** mode factors that runtime out into a single resident copy. A prog
 line 4 = `shared` (first byte `S`) carries **no embedded runtime**: the compiler streams a 255-byte
 bootstrap at `$0801` followed by the p-code, and the object is just that — bootstrap plus p-code.
 The runtime lives once, on the drive, as a standalone binary **`GPC.RT.<build>.BIN`** that loads at
-`RTBASE` (`$6800`) — `GPC.RT.152.BIN` for engine build 152, the number `GPC.BLITZ.BIN` prints at
+`RTBASE` (`$6800`) — `GPC.RT.152.BIN` for engine build 152, the number `GPC.BIN` prints at
 startup. It is **not tracked in the repo**, precisely because the name changes on every engine
 build; produce the one matching your checkout with `make -C source/runtime gpc-rt`. The
 name carries the build, so a compiled program asks for the exact runtime it was built against *by
 name*: one of a different vintage sitting on the card is simply not found, rather than loaded and
 jumped into. **The build number bumps on every engine build, so shared programs must be recompiled
 whenever the engine is** — the pairing is deliberately exact. A release ships exactly one runtime,
-the one matching the `GPC.BLITZ.BIN` beside it.
+the one matching the `GPC.BIN` beside it.
 
 On `RUN`, the bootstrap checks for the magic `GPC2` at `$7000`. That magic is the *ABI* ordinal
 (`RT_ABI` in `common.inc`), not the build number: it answers only "is a runtime resident that I can
@@ -282,7 +286,7 @@ forces `SHELL := sh` accordingly. Per-machine tool paths go in an untracked
 That is the one to use. It runs the four steps in the order that keeps them consistent:
 
 ```sh
-make libs                       # the bin/*.library files + the engine GPC.BLITZ.BIN
+make libs                       # the bin/*.library files + the engine GPC.BIN
                                 # (this also BUMPS source/application/buildnum.txt)
 make release                    # stage the engine, GPC.INPUT and the samples into testing/
 make -C source/runtime gpc-rt   # the shared runtime, testing/GPC.RT.<build>.BIN

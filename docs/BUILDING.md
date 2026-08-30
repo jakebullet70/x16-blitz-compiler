@@ -81,7 +81,7 @@ the steps in the order that avoids it, and refuses to package if any required fi
 ### The steps, if you want them one at a time
 
 ```sh
-make libs                       # the five bin/*.library files + testing/GPC.BLITZ.BIN (engine)
+make libs                       # the five bin/*.library files + testing/GPC.BIN (engine)
                                 # NB: this BUMPS source/application/buildnum.txt
 make release                    # stage the engine, GPC.INPUT and the samples into testing/
 make -C source/runtime gpc-rt   # the shared runtime, testing/GPC.RT.<build>.BIN
@@ -111,13 +111,14 @@ Then try it:
 | Artifact | Built by | Notes |
 |---|---|---|
 | `bin/*.library` | `make libs` | assembler libraries, not distributables |
-| `testing/GPC.BLITZ.BIN` | `make libs` | the compiler engine; reads `GPC.INPUT` |
+| `testing/GPC.BIN` | `make libs` | the compiler engine; reads `GPC.INPUT` |
+| `testing/GPC.IMG.<n>.BIN` | `make libs` | the runtime the engine streams into every self-contained object — **it cannot compile without this** |
 | `testing/GPC.PRG` | `make -C source/gpc` | the front end you actually launch |
 | `testing/GPC.RT.<n>.BIN` | `make -C source/runtime gpc-rt` | shared runtime, SHARED mode only |
 
 The engine build number in `source/application/buildnum.txt` **auto-increments on every
 `make libs`**. That is expected; it is a daily-work counter, not a release version, and it is what
-`GPC.BLITZ.BIN` prints next to `GPC SQUEALING...` so you can tell which engine you are running.
+`GPC.BIN` prints next to `GPC SQUEALING...` so you can tell which engine you are running.
 
 ---
 

@@ -28,7 +28,7 @@ HERE  = os.path.dirname(os.path.abspath(__file__))
 ROOT  = os.path.abspath(os.path.join(HERE, "..", ".."))
 EMU   = os.path.join(ROOT, "bin", "x16emu", "x16emu.exe")
 ROM   = os.path.join(ROOT, "bin", "x16emu", "rom.bin")
-BLITZ = os.path.join(ROOT, "source", "application", "GPC.BLITZ.BIN")
+BLITZ = os.path.join(ROOT, "source", "application", "GPC.BIN")
 TOKEN = os.path.join(ROOT, "bin", "tokenise.zip")
 
 ITERATIONS = 60000
@@ -87,7 +87,7 @@ def measure(src):
 
         obj = os.path.join(work, "OBJECT.PRG")
         run([EMU, "-rom", ROM, "-sound", "none", "-zeroram", "-fsroot", work,
-             "-prg", "GPC.BLITZ.BIN", "-run", "-warp"], work, 120, until=obj)
+             "-prg", "GPC.BIN", "-run", "-warp"], work, 120, until=obj)
         if not os.path.exists(obj):
             return None, "COMPILE-ERR"
 
@@ -103,7 +103,7 @@ def measure(src):
 
 def main():
     for f, what in ((EMU, "x16emu.exe"), (ROM, "rom.bin"),
-                    (BLITZ, "GPC.BLITZ.BIN"), (TOKEN, "tokenise.zip")):
+                    (BLITZ, "GPC.BIN"), (TOKEN, "tokenise.zip")):
         if not os.path.exists(f):
             sys.exit("missing %s (%s)" % (what, f))
 

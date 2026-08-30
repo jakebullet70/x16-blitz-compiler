@@ -14,7 +14,7 @@
 ## **
 ## **  Build:  copy GPC-BASIC/GP.INC.BL and this file into testing/, then
 ## **            python source/gpc/build_basl.py ASM.EXP.BL ASM.PRG
-## **          and compile ASM.PRG with GPC.BLITZ.BIN.
+## **          and compile ASM.PRG with GPC.BIN.
 ## **
 ## ***********************************************************************
 #INCLUDE "GP.INC.BL"

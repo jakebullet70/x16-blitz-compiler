@@ -2,7 +2,7 @@
 # *******************************************************************************************
 #
 #		Name : 		compile_shared.py
-#		Purpose :	Compile a tokenised PRG with GPC.BLITZ.BIN, headlessly, in SHARED mode.
+#		Purpose :	Compile a tokenised PRG with GPC.BIN, headlessly, in SHARED mode.
 #		Date :		31st July 2026
 #
 # *******************************************************************************************
@@ -15,7 +15,7 @@
 #
 #		There is no host-side compiler: GPC is a native X16 program. So, like build_basl.py,
 #		this boots the bundled emulator and drives the real thing. GPC.PRG (the front end) is
-#		INTERACTIVE, so it is the wrong thing to script -- run the ENGINE, GPC.BLITZ.BIN, which
+#		INTERACTIVE, so it is the wrong thing to script -- run the ENGINE, GPC.BIN, which
 #		reads its four-line GPC.INPUT (source, object, map, mode) straight off the drive.
 #
 #		GPC.INPUT is a tracked working file, so it is snapshotted and restored: a build must not
@@ -37,7 +37,7 @@ EMUDIR    = os.path.join(ROOT, "bin", "x16emu")
 EMU       = os.path.join(EMUDIR, "x16emu.exe" if os.name == "nt" else "x16emu")
 ROM       = os.path.join(EMUDIR, "rom.bin")
 GPC_INPUT = os.path.join(TESTING, "GPC.INPUT")
-ENGINE    = "GPC.BLITZ.BIN"
+ENGINE    = "GPC.BIN"
 
 TIMEOUT = 180			# generous: the engine compiles on an emulated 8 MHz 65C02
 

@@ -7,7 +7,7 @@
 #     release.sh zip      package only -- zip the CURRENT testing/ build, no rebuild
 #
 #  The full build runs:
-#     make libs                        the libraries + the compiler engine GPC.BLITZ.BIN
+#     make libs                        the libraries + the compiler engine GPC.BIN
 #     make release                     stage the engine + samples into testing/
 #     make -C source/runtime gpc-rt    both shared runtimes, GPB/GPC.RT.nnn.BIN (into testing/)
 #     make -C source/gpc release       GPC.PRG + GPC.ERR (tokenised, then compiled SHARED)
@@ -41,7 +41,7 @@ root    = os.getcwd()
 testing = os.path.join(root, "testing")
 
 # The PRODUCT VERSION lives in ONE place: source/application/buildnum.txt, e.g. "1.0.0". It is
-# what GPC.BLITZ.BIN prints (as V1.0.0) and what names this zip, and it is edited by hand when a
+# what GPC.BIN prints (as V1.0.0) and what names this zip, and it is edited by hand when a
 # release is cut -- nothing bumps it. It used to be VERSION$ in testing/GPC.BASL, which tracked
 # the front end instead and so never moved when the compiler changed.
 #
@@ -74,7 +74,12 @@ out = os.path.join(release_dir, "gpc-release-%s.zip" % num)
 #   * the top-level docs
 # Everything else in testing/ (samples like DIR.BASL, compiled demos, scratch) is left out.
 #   GPC.PRG        the front end you launch on the X16
-#   GPC.BLITZ.BIN  the compiler engine GPC.PRG chain-loads
+#   GPC.BIN        the compiler engine GPC.PRG chain-loads
+#   GPC.IMG.nnn.BIN the runtime every self-contained object carries, streamed into it as the
+#                  object is written. GPC.BIN CANNOT COMPILE WITHOUT IT -- the runtime used to
+#                  live inside the engine and moved out so that the object buffer could have
+#                  the low RAM. Build-numbered like the shared runtimes, and for the same
+#                  reason: a stale one under a fixed name would still be found.
 #   GPB.RT.nnn.BIN the shared runtime WITH the GPB handlers, and
 #   GPC.RT.nnn.BIN the same runtime WITHOUT them -- a program compiled in "shared" mode asks
 #                  for whichever it needs, and BOTH must ship: which one a given program wants
@@ -98,7 +103,11 @@ out = os.path.join(release_dir, "gpc-release-%s.zip" % num)
 sys.path.insert(0, os.path.join(root, "source", "runtime", "scripts"))
 from rtname import rt_filename, rc_filename         # noqa: E402
 
-RUNTIME = ("GPC.PRG", "GPC.BLITZ.BIN", rt_filename(), rc_filename())
+# ...and the runtime IMAGE's name likewise, from the script that builds it.
+sys.path.insert(0, os.path.join(root, "source", "application", "scripts"))
+from genrtimage import imageName                    # noqa: E402
+
+RUNTIME = ("GPC.PRG", "GPC.BIN", imageName(), rt_filename(), rc_filename())
 # Companion tools, shipped at the root as (name in testing/, name in the zip). The compiled
 # helper is built as C.GPC.ERR.PRG and ships as plain GPC.ERR.PRG -- so it must NOT be listed
 # with an interpreted GPC.ERR.PRG as well, or the two collide on one name in the archive.
@@ -133,7 +142,7 @@ SRC_README = (
     "It is here for reference only -- you do NOT need anything in this folder to\n"
     "run GPC. The ready-to-run programs are in the parent folder.\n"
     "\n"
-    "To compile, run GPC.PRG (with GPC.BLITZ.BIN and the GPC.RT.nnn.BIN runtime\n"
+    "To compile, run GPC.PRG (with GPC.BIN and the GPC.RT.nnn.BIN runtime\n"
     "beside it). To turn a runtime error's \"@ $XXXX\" into a source line, run\n"
     "GPC.ERR.PRG.\n"
     "The .BASL sources are never loaded at run time.\n"

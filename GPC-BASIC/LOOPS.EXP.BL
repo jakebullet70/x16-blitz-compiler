@@ -4,7 +4,7 @@
 ## **
 ## **  Build:  copy GPC-BASIC/GP.INC.BL and this file into testing/, then
 ## **            python source/gpc/build_basl.py LOOPS.EXP.BL LOOPS.PRG
-## **          and compile LOOPS.PRG with GPC.BLITZ.BIN.
+## **          and compile LOOPS.PRG with GPC.BIN.
 ## **
 ## **  Compile-only: the ROM cannot RUN a PRG containing GP tokens.
 ## **

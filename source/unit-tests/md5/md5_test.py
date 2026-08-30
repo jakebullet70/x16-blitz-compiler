@@ -103,7 +103,7 @@ def run_emu(extra_args, logname, timeout, until=None):
 
 
 def compile_md5():
-    """GPC.BLITZ.BIN reads GPC.INPUT: source, object, map, mode."""
+    """GPC.BIN reads GPC.INPUT: source, object, map, mode."""
     global _gpc_input_saved
     gi = os.path.join(TESTING, "GPC.INPUT")
     if os.path.exists(gi) and _gpc_input_saved is None:
@@ -115,7 +115,7 @@ def compile_md5():
         p = os.path.join(TESTING, f)
         if os.path.exists(p):
             os.remove(p)
-    run_emu(["-prg", "GPC.BLITZ.BIN", "-run"], "MDB.LOG".replace("MDB", "MD5B"), 90, until=b"OK")
+    run_emu(["-prg", "GPC.BIN", "-run"], "MDB.LOG".replace("MDB", "MD5B"), 90, until=b"OK")
     if not os.path.exists(os.path.join(TESTING, OBJECT)):
         die("compile produced no " + OBJECT)
 
@@ -138,7 +138,7 @@ def hash_with(program, logname):
 def main():
     for f, what in ((EMU, "emulator"), (ROM, "ROM"),
                     (os.path.join(TESTING, SOURCE), "testing/" + SOURCE),
-                    (os.path.join(TESTING, "GPC.BLITZ.BIN"), "testing/GPC.BLITZ.BIN")):
+                    (os.path.join(TESTING, "GPC.BIN"), "testing/GPC.BIN")):
         if not os.path.exists(f):
             die("missing %s: %s" % (what, f))
 

@@ -453,7 +453,7 @@ program keeps runtime state there (`stringHighMemory`, `storeStartHigh`,
 
 ## 5. Where the assembler itself runs — the biggest cost question
 
-**The compiler is a 65C02 program that runs on the X16.** `GPC.BLITZ.BIN` is
+**The compiler is a 65C02 program that runs on the X16.** `GPC.BIN` is
 **22,498 bytes** today. A 65C02 assembler is not a small thing to add to it:
 mnemonic table, addressing-mode resolution, a symbol table for labels, forward
 references, and a second pass — all on a machine where the compiler already has
@@ -479,7 +479,7 @@ no host-side BASLOAD — so where such a preprocessor would sit in that pipeline
 needs thought.
 
 A middle option **(c)**: the assembler is a separate X16-side tool, or a
-`GP.*`-aware pass, rather than being welded into `GPC.BLITZ.BIN`.
+`GP.*`-aware pass, rather than being welded into `GPC.BIN`.
 
 ## 6. Syntax, given the tokeniser measurements
 
@@ -551,7 +551,7 @@ every opcode after it — `RT_ABI` went 3 to 4 for exactly this", and a bumped
 > **SUPERSEDED by §Q2.** Q1/Q2/Q4/Q8 were answered on 2026-08-30 (§D), and Q9
 > is answered by §10. Kept so the superseded numbering still resolves.
 
-1. **Where does the assembler run?** §5 (a) in `GPC.BLITZ.BIN` on the X16,
+1. **Where does the assembler run?** §5 (a) in `GPC.BIN` on the X16,
    (b) a host preprocessor, or (c) a separate tool. This is the single biggest
    fork; everything else is downstream of it.
 2. **Is quoted assembly acceptable?** Bare `lda {A}` is not safe (§2.3). Is
@@ -585,7 +585,7 @@ These answer the corresponding questions in §Q. Everything else in §Q is still
 
 | # | Decision | Consequence |
 | --- | --- | --- |
-| Q1 | **The assembler runs at compile time, on the X16** — inside `GPC.BLITZ.BIN`. Not a host preprocessor. | The largest piece of work, in the tightest space. §5(a). Budget analysis in §8. |
+| Q1 | **The assembler runs at compile time, on the X16** — inside `GPC.BIN`. Not a host preprocessor. | The largest piece of work, in the tightest space. §5(a). Budget analysis in §8. |
 | Q2 | **Quoted, one instruction per line** — `"LDA {A}"`. | Safe under both tokenisers with no tokeniser work. §2.4. |
 | Q4 | **`{VAR}` must reach strings and arrays**, not just numeric scalars. | The hardest variable case. Layouts in §9. |
 | Q8 | **Assembled bytes go in the p-code**, unless relocation into banked RAM proves better. | Relocation must be answered, not assumed. §10. |
@@ -600,7 +600,7 @@ are not mistaken for decided:
 
 ## 8. The budget for an on-X16 assembler — measured
 
-Decision Q1 puts the assembler inside `GPC.BLITZ.BIN`, so the question "how much
+Decision Q1 puts the assembler inside `GPC.BIN`, so the question "how much
 room is there?" stops being rhetorical. Measured from
 `source/application/build/code.lbl` and `source/application/source/compiler/start.asm`:
 
@@ -619,7 +619,7 @@ banked RAM $A000-$C000 : the compiler's TABLES
 - **The compiler's own code is 8,448 bytes** (`ObjectBase $3F00` to
   `FreeMemory $6000`).
 - **The object buffer is 16,128 bytes** (`$9F00 - $6000`).
-- `GPC.BLITZ.BIN` is 22,498 bytes on disk, which is `$0801 + 22,496 = $5FE1` —
+- `GPC.BIN` is 22,498 bytes on disk, which is `$0801 + 22,496 = $5FE1` —
   consistent with `FreeMemory = $6000`, so these labels are current, not stale.
 
 ### 8.1 Every byte added to the compiler comes straight off the program ceiling
@@ -1303,7 +1303,7 @@ scratching fixes.
 | **GP block slack** | 78 B | **78 B — unchanged** | §14.4 still stands (figure corrected in §18.1) |
 | **core cushion** (`$0801..$3700`) | ~40 B | **26 B** (last core byte ends `$36E6`) | **new, and it binds** — see §18.1 |
 | `RT_ABI` | 18 | **21** | |
-| `GPC.BLITZ.BIN` | 22,498 | 22,832 | compile-time only |
+| `GPC.BIN` | 22,498 | 22,832 | compile-time only |
 
 The GP block slack is **untouched** because GP.IF deliberately kept its handler
 out of the GP block — which is the finding below.

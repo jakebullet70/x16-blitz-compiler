@@ -12,7 +12,7 @@
 ## **          MENUHELP.INC.BL and this file
 ## **          into testing/, then
 ## **            python source/gpc/build_basl.py MENU.EXP.BL MENU.PRG
-## **          and compile MENU.PRG with GPC.BLITZ.BIN.
+## **          and compile MENU.PRG with GPC.BIN.
 ## **
 ## **  THE SPLIT IS THE POINT, and the menu has now moved across it. All
 ## **  of this is BASIC, because a menu waits on a HUMAN -- the speed

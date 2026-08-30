@@ -59,6 +59,6 @@ you keep BASIC source.**
    C.PRG2BASLOAD.PRG
    ```
 
-   then run the engine (`GPC.BLITZ.BIN`), or drive it interactively with `GPC.PRG`.
+   then run the engine (`GPC.BIN`), or drive it interactively with `GPC.PRG`.
 3. Run `C.PRG2BASLOAD.PRG` and hand it a tokenised program to convert. Time a big one both ways
    (`C.` versus the plain tokenised BASIC) and you should see roughly the 6.7× above.

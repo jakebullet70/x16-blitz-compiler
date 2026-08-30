@@ -197,4 +197,7 @@ def main():
 			 sum(bin(b).count("1") for b in bits), plainCount + shiftCount, installed))
 
 
-main()
+#	Guarded so release.sh can import imageName() instead of spelling the build number
+#	out a third time -- the same reason rtname.py is guarded.
+if __name__ == "__main__":
+	main()

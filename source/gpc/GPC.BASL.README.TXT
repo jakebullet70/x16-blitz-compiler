@@ -59,7 +59,7 @@ changed, so it could not answer "am I running my fix?".
 
 It now lives in source/application/buildnum.txt, is bumped by
 source/application/scripts/bumpbuild.py on EVERY engine build, and
-GPC.BLITZ.BIN prints it itself:
+GPC.BIN prints it itself:
 
     GPC SQUEALING... V0.9.113
 

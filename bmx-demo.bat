@@ -14,7 +14,7 @@ rem  demo\ is BUILD OUTPUT and is not in git. To make it:
 rem    1. copy GP.INC.BL, APPHELP.INC.BL, BMX.INC.BL and BMXVIEW.EXP.BL
 rem       from GPC-BASIC\ into testing\
 rem    2. python source\gpc\build_basl.py BMXVIEW.EXP.BL BMXVIEW.PRG
-rem    3. compile testing\BMXVIEW.PRG with GPC.BLITZ.BIN, and put the object
+rem    3. compile testing\BMXVIEW.PRG with GPC.BIN, and put the object
 rem       in demo\ as C.BMXVIEW.PRG
 rem    4. copy any .BMX files you want into demo\ -- samples\BMXVIEWER\SAMPLES
 rem       has about thirty

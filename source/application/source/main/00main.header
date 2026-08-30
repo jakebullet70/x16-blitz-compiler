@@ -10,7 +10,7 @@
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;
-;		GPC.BLITZ.BIN starts here, and does one thing: compile. It used to be the head of a
+;		GPC.BIN starts here, and does one thing: compile. It used to be the head of a
 ;		single image that was compiler AND runtime -- $0801 runtime, ObjectBase compiler,
 ;		FreeMemory object buffer -- which meant 14,079 bytes of runtime sat in low RAM for the
 ;		whole compile so that WriteObjectCode could copy them into the output. Every one of

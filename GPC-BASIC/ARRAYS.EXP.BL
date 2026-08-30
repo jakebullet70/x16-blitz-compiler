@@ -9,7 +9,7 @@
 ## **
 ## **  Build:  copy GPC-BASIC/GP.INC.BL and this file into testing/, then
 ## **            python source/gpc/build_basl.py ARRAYS.EXP.BL ARRAYS.PRG
-## **          and compile ARRAYS.PRG with GPC.BLITZ.BIN.
+## **          and compile ARRAYS.PRG with GPC.BIN.
 ## **
 ## **  Compile-only: the ROM cannot RUN a PRG containing GP tokens.
 ## **

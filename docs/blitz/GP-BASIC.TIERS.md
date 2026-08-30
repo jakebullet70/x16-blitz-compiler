@@ -56,7 +56,7 @@ command, but a **system token** (one carrying an inline operand) and anything `F
 spends from the same 20.
 
 **Compiler-side code is free against this budget.** The 1.5 KB is the *runtime*, which is copied
-verbatim into every object. Anything in the compiler half of `GPC.BLITZ.BIN` — `GP.EXITDO`'s whole
+verbatim into every object. Anything in the compiler half of `GPC.BIN` — `GP.EXITDO`'s whole
 resolver, for instance — never reaches an object at all. When a feature can be moved from runtime to
 compile time, it costs nothing here.
 
@@ -1114,7 +1114,7 @@ diagnostic. Three bytes of `stz` buys a hard, correctly-named error. **The same 
 | | |
 |---|---|
 | Runtime | **14 B measured** — 8 B of vector slots, the 4 B shared NOP, 2 B of `MOFSizeTable`. **Zero bytes of handler code.** Note `MOFSizeTable` IS in the copied image (`common.library` links before `10object.divider`), which is why this is 14 and not 12 |
-| Compiler | `GPC.BLITZ.BIN` 22,498 → **22,731 (+233 B)**, free against this budget — but it crossed a page, so `FreeMemory` went `$6000` → `$6100` and the object buffer lost 256 B (16,128 → **15,872**) |
+| Compiler | `GPC.BIN` 22,498 → **22,731 (+233 B)**, free against this budget — but it crossed a page, so `FreeMemory` went `$6000` → `$6100` and the object buffer lost 256 B (16,128 → **15,872**) |
 | Program size | **unchanged.** `GPBase $3700` and `ObjectBase $3f00` both held; a non-GP program is still 12,031 B and a GP one 14,079 B. The 14 bytes were absorbed by page padding that every program already pays |
 | Core cushion | **40 B → 26 B** below `GPBase`. This is the number to watch, not the 590: cross `$3700` and every compiled program grows a whole page |
 | Tokens spent | 4 BASIC keywords (`$CE5B`–`$CE5E`), **4 sub-256 opcodes** — 2 unshifted markers + 2 system |
@@ -1378,7 +1378,7 @@ staging is a habit of this tree, not something BASLOAD forces.) So:
 
 - edit the master in `GPC-BASIC/`
 - copy it and every module it includes into `testing/`
-- `python source/gpc/build_basl.py XXX.EXP.BL XXX.PRG`, then compile the PRG with `GPC.BLITZ.BIN`
+- `python source/gpc/build_basl.py XXX.EXP.BL XXX.PRG`, then compile the PRG with `GPC.BIN`
 
 `testing/*.INC.BL` and `testing/*.EXP.BL` are gitignored precisely because they are staging copies;
 committing one puts a second copy of a library file in the repo, free to drift from the master.

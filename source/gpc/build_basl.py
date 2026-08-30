@@ -23,7 +23,7 @@
 #
 #		BUILD NUMBER: none here. It belongs to the ENGINE now -- source/application/buildnum.txt,
 #		bumped by source/application/scripts/bumpbuild.py on every engine build and printed by
-#		GPC.BLITZ.BIN next to "GPC SQUEALING...". A front-end counter could not answer the only
+#		GPC.BIN next to "GPC SQUEALING...". A front-end counter could not answer the only
 #		question a build number is read for ("which compiler am I running?"), because it moved
 #		when the front end was rebuilt and stood still when the compiler changed.
 #
@@ -65,7 +65,7 @@ def die(msg):
 
 #
 #   There is deliberately no bump_version() here any more. The build number moved to the ENGINE
-#   (source/application/buildnum.txt, printed by GPC.BLITZ.BIN and bumped by its own
+#   (source/application/buildnum.txt, printed by GPC.BIN and bumped by its own
 #   scripts/bumpbuild.py). Bumping it here was actively misleading: it moved when the front end
 #   was rebuilt, which is almost never, and stayed put when the compiler changed -- so it could
 #   not answer "which engine am I running?", the only thing anyone reads a build number for.

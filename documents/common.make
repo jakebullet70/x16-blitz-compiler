@@ -76,7 +76,7 @@ ASM = $(TASS) -q -c -Wall -o build$(S)code.prg -L build$(S)code.lst -l build$(S)
 #
 #		Box16 is NOT used for the tests: the test .prg files are raw machine code at $0801
 #		with no BASIC stub, and given "-prg x.prg,801 -run" x16emu SYSes to the load address
-#		whereas Box16 issues RUN, which just yields ?SYNTAX ERROR. GPC.BLITZ.BIN does carry a
+#		whereas Box16 issues RUN, which just yields ?SYNTAX ERROR. GPC.BIN does carry a
 #		BASIC SYS stub, so Box16 runs it fine -- hence it drives the interactive targets.
 #
 EMUDIR = $(BINDIR)x16emu$(S)
@@ -88,7 +88,7 @@ DEBUGGER = $(BOXDIR)Box16$(APPSTEM) -rom $(BOXDIR)rom.bin -scale 2 -zeroram
 #
 EXECUTE = $(CDEL) dump*.bin dump*.txt ; $(EMULATOR) -prg build$(S)code.prg,801 -run
 EXEBASIC = $(CDEL) dump*.bin dump*.txt ; $(DEBUGGER) -prg build$(S)code.prg -run
-COMBASIC = $(DEBUGGER) -prg $(ROOTDIR)source$(S)application$(S)GPC.BLITZ.BIN -run
+COMBASIC = $(DEBUGGER) -prg $(ROOTDIR)source$(S)application$(S)GPC.BIN -run
 FAST = -warp
 MAKEOPTS = --no-print-directory
 #

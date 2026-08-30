@@ -846,14 +846,6 @@ the same order, streamed into `OBJECT.PRG` a page at a time at write time. What 
 image for all 12,031 bytes of the GP OUT cut, with the only differences the two patched immediates
 (`$00` -> `$37` code page, `$00` -> `$48` workspace), and the object runs.
 
-**Left on the table, and no longer needed.** `gendata.asm` is 1,320 bytes of pure table and GP.ASM's
-opcode tables are 626 — both clean candidates for bank 3 beside GP.ASM's pool, worth 7 more pages.
-There is now 4,864 bytes of low-RAM headroom between the buffer and the highest run-side ceiling, so
-this is future-proofing rather than a fix. The bank rules, if it is ever wanted, are in
-`source/compiler/source/system-specific/x16/x16_storage.inc`: preserve A/X/Y and flags, restore the
-caller's bank, never hold a bank across a KERNAL call, no nesting. Allocation: 0 KERNAL, 1 the native
-test harness, 2 the storage tables, 3 GP.ASM's blob pool and fixup list. 4 up are free.
-
 ## Wanted
 
 ### Name the output after the source — DONE, but by the caller

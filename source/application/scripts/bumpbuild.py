@@ -10,7 +10,7 @@
 #
 #		TWO STAMPS, because they answer two different questions.
 #
-#			buildnum.txt   the PRODUCT VERSION, e.g. "1.0.0". Printed by GPC.BLITZ.BIN as
+#			buildnum.txt   the PRODUCT VERSION, e.g. "1.0.0". Printed by GPC.BIN as
 #			               V1.0.0 and used by release.sh to name the release zip. Changed by
 #			               hand when a release is cut, and by nothing else.
 #

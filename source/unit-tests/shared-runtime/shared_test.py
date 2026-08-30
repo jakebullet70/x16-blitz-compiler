@@ -9,7 +9,7 @@
 # ************************************************************************************************
 #
 #		The other unit-tests drive the compiler NATIVELY (StartCompiler + the test API, quitting
-#		at $FFFF for a RAM-dump compare). SHARED mode is a DISK-FLOW feature -- GPC.BLITZ.BIN reads
+#		at $FFFF for a RAM-dump compare). SHARED mode is a DISK-FLOW feature -- GPC.BIN reads
 #		GPC.INPUT, streams a bootstrap + p-code, and the bootstrap loads GPC.RT.nnn.BIN at run time --
 #		so it needs a different harness. This one compiles a program in SHARED mode, checks the
 #		object's byte layout, then runs it twice in the emulator to prove both paths:
@@ -20,7 +20,7 @@
 #			      would ?RT-fail on the now-missing file).
 #
 #		Prerequisites (build them first -- see the Makefile's "build" target):
-#			testing/GPC.BLITZ.BIN   the compiler engine      (make libs)
+#			testing/GPC.BIN   the compiler engine      (make libs)
 #			testing/GPC.RT.nnn.BIN  the resident runtime      (make -C source/runtime gpc-rt)
 #
 #		The emulator is launched with SDL_VIDEODRIVER=dummy so it never steals the desktop's
@@ -162,7 +162,7 @@ def compile_shared(marker):
         f.write("%s\n%s\n\nSHARED\n" % (SRC_PRG, OBJ_PRG))
     obj = os.path.join(TESTING, OBJ_PRG)
     if os.path.exists(obj): os.remove(obj)
-    run_emu(["-prg", "GPC.BLITZ.BIN", "-run"], "RT_COMPILE.LOG", timeout=30, until_file=OBJ_PRG)
+    run_emu(["-prg", "GPC.BIN", "-run"], "RT_COMPILE.LOG", timeout=30, until_file=OBJ_PRG)
     if not os.path.exists(obj):
         die("SHARED compile produced no object (%s)" % OBJ_PRG)
     verify_layout(obj, marker)
@@ -308,7 +308,7 @@ def warm_run(marker):
 
 def main():
     for f, what in ((EMU, "x16emu"), (ROM, "rom.bin"), (TOKENISE, "tokenise.zip"),
-                    (os.path.join(TESTING, "GPC.BLITZ.BIN"), "GPC.BLITZ.BIN"),
+                    (os.path.join(TESTING, "GPC.BIN"), "GPC.BIN"),
                     (os.path.join(TESTING, RT_NAME), RT_NAME)):
         if not os.path.exists(f):
             die("prerequisite not found: %s (%s) -- build it first (see the Makefile)" % (what, f))

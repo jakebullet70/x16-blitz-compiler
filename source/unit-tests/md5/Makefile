@@ -17,7 +17,7 @@ endif
 all: md5
 
 #
-#		Run the test. It needs testing/GPC.BLITZ.BIN (make libs) and testing/MD5, which is
+#		Run the test. It needs testing/GPC.BIN (make libs) and testing/MD5, which is
 #		tracked. Everything else it makes and removes itself.
 #
 #		This one is slower than the other unit tests -- it runs a real BASIC program twice, once

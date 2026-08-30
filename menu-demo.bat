@@ -13,7 +13,7 @@ rem  demo\ is BUILD OUTPUT and is not in git. To make it:
 rem    1. copy GP.INC.BL, THEME.INC.BL, APPHELP.INC.BL and MENU.EXP.BL from
 rem       GPC-BASIC\ into testing\
 rem    2. python source\gpc\build_basl.py MENU.EXP.BL MENU.PRG
-rem    3. compile testing\MENU.PRG with GPC.BLITZ.BIN, and put the object in
+rem    3. compile testing\MENU.PRG with GPC.BIN, and put the object in
 rem       demo\ as C.MENU.PRG
 rem ---------------------------------------------------------------------------
 setlocal

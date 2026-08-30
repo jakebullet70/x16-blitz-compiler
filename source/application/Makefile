@@ -85,12 +85,12 @@ build: prelim
 			$(BINDIR)compiler.library \
 			_library.asm \
 			source$(S)main$(S)zzfree.footer
-	$(CCOPY) build$(S)code.prg GPC.BLITZ.BIN
+	$(CCOPY) build$(S)code.prg GPC.BIN
 
 release:  build
 	$(CDEL) OBJECT.PRG
 	$(CCOPY) *.PRG $(RELEASEDIR)
-	$(CCOPY) GPC.BLITZ.BIN $(RELEASEDIR)
+	$(CCOPY) GPC.BIN $(RELEASEDIR)
 	$(CCOPY) GPC.INPUT $(RELEASEDIR)
 	$(CCOPY) build$(S)*.bas $(RELEASEDIR)
 	$(CCOPY) $(BINDIR)tokenise.zip $(RELEASEDIR)
@@ -108,7 +108,7 @@ release:  build
 run: build	
 	$(CDEL) OBJECT.PRG
 	$(EXEBASIC)
-	$(CCOPY) GPC.BLITZ.BIN $(BINDIR)
+	$(CCOPY) GPC.BIN $(BINDIR)
 	
 x16:
 	$(EMULATOR)

@@ -9,7 +9,7 @@
 ## **
 ## **  Build:  copy GPC-BASIC/GP.INC.BL and this file into testing/, then
 ## **            python source/gpc/build_basl.py MLCALL.EXP.BL MLCALL.PRG
-## **          and compile MLCALL.PRG with GPC.BLITZ.BIN.
+## **          and compile MLCALL.PRG with GPC.BIN.
 ## **
 ## ***********************************************************************
 #INCLUDE "GP.INC.BL"

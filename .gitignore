@@ -210,7 +210,7 @@ testing/GPCCOMP.LOG
 # bitmap the compiler link needs).
 #
 # THE IMAGE ITSELF IS TRACKED, unlike the resident runtimes above, and for one reason:
-# testing/GPC.BLITZ.BIN is tracked, and since the runtime moved out of it that compiler cannot
+# testing/GPC.BIN is tracked, and since the runtime moved out of it that compiler cannot
 # produce a working program without this file beside it. The stale-binary argument that keeps
 # GPB/GPC.RT.*.BIN out does not bite here -- the build number is pinned now (scripts/bumpbuild.py)
 # and this is one file overwritten in place, not a new one per build. If rtbuild.txt is ever

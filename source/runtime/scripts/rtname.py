@@ -20,7 +20,7 @@
 #		moves only when someone edits rtbuild.txt -- and every shared-mode program must be
 #		recompiled when it does, because the name is baked into each object.
 #
-#		This is NOT the product version (buildnum.txt, e.g. 1.0.0, what GPC.BLITZ.BIN prints),
+#		This is NOT the product version (buildnum.txt, e.g. 1.0.0, what GPC.BIN prints),
 #		and it is NOT the ABI ordinal. RT_ABI (common.inc) carries that, in the 4-byte magic at
 #		RTBASE, and answers the different question of whether an already-resident runtime can
 #		be entered. The file name says WHICH runtime; the magic says whether it FITS.

@@ -9,12 +9,12 @@
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;
-;		GPC.BLITZ.BIN is driven by GPC.INPUT, a four line control file -- source, object, a third
+;		GPC.BIN is driven by GPC.INPUT, a four line control file -- source, object, a third
 ;		line that names a debug map file (line#->offset, for reading runtime errors) or is empty
 ;		for none, and a fourth line that is "shared" to use the shared runtime (GPC.RT.BIN) or
 ;		empty for the default self-contained runtime. That is what lets a program drive it, but it
 ;		is a poor thing to ask a person to write by hand. So this asks the questions, writes the
-;		file, and hands the machine over to the GPC.BLITZ.BIN file.
+;		file, and hands the machine over to the GPC.BIN file.
 ;
 ;		%option no_sysinit is not decoration. Prog8's normal startup calls sys.init_system(),
 ;		which resets the screen mode, the charset and the colours. This program is a prompt and
@@ -256,7 +256,7 @@ main {
 	;
 	;		Hand the machine over to the compiler.
 	;
-	;		GPC.BLITZ.BIN loads at $0801, which is exactly where THIS program is sitting, so we cannot
+	;		GPC.BIN loads at $0801, which is exactly where THIS program is sitting, so we cannot
 	;		load it ourselves: the KERNAL's LOAD would overwrite the code that called it and
 	;		return into the wreckage. So we do not load it at all. We leave the LOAD command on
 	;		the screen, put the cursor back on it, drop CR + RUN into the keyboard buffer, and
@@ -264,7 +264,7 @@ main {
 	;		-- by which time we are long gone and $0801 is free.
 	;
 	;		The keyboard buffer is only ten bytes, which is why the LOAD line goes on the screen
-	;		rather than into the buffer: LOAD"GPC.BLITZ.BIN" alone would not fit.
+	;		rather than into the buffer: LOAD"GPC.BIN" alone would not fit.
 	;
 	;		The rows are counted, and the count matters. After we exit, BASIC prints CR, "READY.",
 	;		CR -- which walks the cursor down two rows from wherever we left it. So we leave the

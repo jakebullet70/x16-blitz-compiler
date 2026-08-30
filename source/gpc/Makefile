@@ -73,7 +73,7 @@ release: build
 	$(PYTHON) compile_shared.py GPC.ERR.PRG C.GPC.ERR.PRG M.GPC.ERR
 
 #
-#		Launch the freshly built front end. It chain-loads GPC.BLITZ.BIN, which must sit beside
+#		Launch the freshly built front end. It chain-loads GPC.BIN, which must sit beside
 #		it on the drive -- so point the emulator's filesystem root at testing/.
 #
 run: build
