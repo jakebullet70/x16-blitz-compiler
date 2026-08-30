@@ -1133,7 +1133,12 @@ does a `GP.IF` with no `GP.ENDIF` — `STRUCTURE IMBALANCE`, no object, no `OK`.
 has always been "On Exit CC if okay". So `WriteObjectCode` ran anyway, wrote out the object truncated
 at the branch it could not fix, and printed `OK`. One `bcs` fixes it, and it fixes all three
 constructs at once: `GP.IF` with no `GP.ENDIF`, `GP.SELECT` with no `GP.ENDSEL`, and `GP.EXITDO` with
-no `GP.LOOP` now each report and write nothing. Verified both ways on R49.
+no `GP.LOOP` now each report and write nothing. And `CompileCode` now scratches the object file
+(`S0:<name>` on the DOS command channel) BEFORE compiling, so a failed compile cannot leave the
+previous run's object sitting there looking current — a stale object is indistinguishable from a
+fresh one at the filesystem level, and it runs. Guarded against a `GPC.INPUT` naming the same file
+for both, which would otherwise destroy the source before the compile read a byte of it. Verified
+every way on R49.
 
 The line number a structure error reports is the last line *compiled*, not the line of the unclosed
 opener — `FixBranches` walks the object, which no longer carries one. `_FBFFail` sets
