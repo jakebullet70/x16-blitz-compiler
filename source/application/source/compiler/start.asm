@@ -26,8 +26,16 @@ CompileCode:
 		ldx 	#APIDesc & $FF
 		ldy 	#APIDesc >> 8
 		jsr 	StartCompiler
+		bcs 	_CCStopped 					; THE COMPILE ITSELF FAILED. StartCompiler documents CC = okay
+									; and CompilerErrorHandler has already printed the message and the
+									; line, so there is nothing to add -- but this carry used to be
+									; DROPPED, and WriteObjectCode ran anyway. A structure error out of
+									; FixBranches (GP.IF with no GP.ENDIF, GP.SELECT with no GP.ENDSEL,
+									; GP.EXITDO with no GP.LOOP) therefore wrote out the half-resolved
+									; object -- truncated at the branch it could not fix, because
+									; _FBEDNoLoop restores objPtr to it -- and then printed OK.
 		jsr 	WriteObjectCode
-		bcs 	_CCRejected 				; shared-mode reject (PROGRAM TOO BIG) -- already reported
+		bcs 	_CCStopped 					; shared-mode reject (PROGRAM TOO BIG) -- also already reported
 		jsr 	WriteMapFile 				; and the line#->offset map, if GPC.INPUT asked for one
 		lda 	#"O" 						; the only other thing it prints, and the only way a
 		jsr 	$FFD2 						; caller can tell a compile that worked from one that
@@ -37,8 +45,8 @@ CompileCode:
 		jsr 	$FFD2
 		jmp 	PrintMemoryReport 			; ... and what it cost -- see compiler/memreport.asm
 
-_CCRejected: 								; WriteObjectCode set carry (e.g. PROGRAM TOO BIG); it has
-		rts 								; already printed why, so stop -- no map file, no OK.
+_CCStopped: 								; either half set carry and has already said why, so stop
+		rts 								; here: no object, no map file, and above all no OK.
 
 _CCNoControlFile: 							; a compiler that guesses at what it was asked to
 		jmp 	PrintNoControlFile 			; build is worse than one that refuses

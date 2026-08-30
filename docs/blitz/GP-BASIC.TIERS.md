@@ -1124,13 +1124,20 @@ diagnostic. Three bytes of `stz` buys a hard, correctly-named error. **The same 
 falling clean through, no-`GP.ELSE` taken, an IF nested in a then-body, an IF nested in an else-body, a
 `GP.IF` inside a `GP.CASE` body, and a `GP.SELECT` inside a `GP.IF` body — one program printing
 `ABCDEFGHIJKL|` with a distinct wrong-branch marker on every path not taken. Both rejections too:
-`GP.IF 1 THEN PRINT` and a missing `THEN` each fail the compile with no object written.
+`GP.IF 1 THEN PRINT` and a missing `THEN` each fail the compile with no object written, and so now
+does a `GP.IF` with no `GP.ENDIF` — `STRUCTURE IMBALANCE`, no object, no `OK`.
 
-**Known gap, PRE-EXISTING and shared:** a `GP.IF` with no `GP.ENDIF` is detected — `_FBEDNoLoop`
-restores `objPtr` and raises — but the compiler then writes the truncated object out and reports `OK`
-anyway. **`GP.SELECT` with no `GP.ENDSEL` and `GP.EXITDO` with no `GP.LOOP` do exactly the same on
-this build**, so the "no `GP.ENDSEL` gives STRUCTURE IMBALANCE" line in §10 is optimistic. One fix in
-the shared error path would cover all three; not attempted here.
+**A missing closer used to compile clean, and that is fixed here.** `FixBranches` always detected it
+— `_FBEDNoLoop` restores `objPtr` and raises `STRUCTURE IMBALANCE` — but `CompileCode` in
+`application/source/compiler/start.asm` **dropped the carry `StartCompiler` returns**, whose contract
+has always been "On Exit CC if okay". So `WriteObjectCode` ran anyway, wrote out the object truncated
+at the branch it could not fix, and printed `OK`. One `bcs` fixes it, and it fixes all three
+constructs at once: `GP.IF` with no `GP.ENDIF`, `GP.SELECT` with no `GP.ENDSEL`, and `GP.EXITDO` with
+no `GP.LOOP` now each report and write nothing. Verified both ways on R49.
+
+The line number a structure error reports is the last line *compiled*, not the line of the unclosed
+opener — `FixBranches` walks the object, which no longer carries one. `_FBFFail` sets
+`currentLineNumber` by hand for the same reason; there is nothing equivalent to set here. Left as is.
 
 ### §9 Menus — the original plan
 
