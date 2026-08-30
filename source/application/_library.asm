@@ -1153,10 +1153,6 @@ _WOCEmbedded:
 		lda 	#ObjectBase >> 8
 _WOCCutSet:
 		sta 	runtimeEndPage
-		sec 								; page delta: where it will run, less where it sits now
-		sbc 	#FreeMemory >> 8
-		jsr 	AsmPatchBlobs 				; resolve every GP.ASM .word operand now that the
-											; run base is finally known
 		;
 		;		zTemp1 = length of the object code.
 		;
@@ -1200,6 +1196,9 @@ _WOCWholePages:
 _WOCTooBig:
 		jmp 	_WOCSBig 					; shared with the SHARED path: prints PROGRAM TOO BIG,
 _WOCFits: 									; returns carry set, caller skips the map file and OK
+
+		jsr 	PatchAsmFixups 				; GP.ASM: blob calls, label targets and {VAR}, all of
+											; which needed newWorkspacePage as well as the run base
 
 		ldy 	#ObjectFile >> 8
 		ldx 	#ObjectFile & $FF
@@ -1279,14 +1278,6 @@ _WOCDone:
 
 _WOCShared:
 		;
-		;		Resolve the GP.ASM blob addresses FIRST. Shared p-code always lands at $0900
-		;		whatever ScanGPUsage decides, so this does not have to wait for it -- and it
-		;		MUST NOT, because AsmPatchBlobs uses zTemp1 and the page count computed just
-		;		below lives there until it is read back further down.
-		;
-		lda 	#(PCODE_PAGE - (FreeMemory >> 8)) & $FF
-		jsr 	AsmPatchBlobs
-		;
 		;		p-code length -> whole pages (same as the embedded path)
 		;
 		sec
@@ -1345,6 +1336,7 @@ _WOCSCeiling:
 _WOCSBigFar:
 		jmp 	_WOCSBig
 _WOCSFits:
+		jsr 	PatchAsmFixupsShared 		; GP.ASM, as the embedded path -- see _WOCFits
 		;
 		;		Header: a normal PRG loading at $0801 -- the bootstrap sits there.
 		;
@@ -1624,6 +1616,36 @@ mapTemp:
 		.fill 	2
 mapLead:
 		.fill 	1
+
+; ************************************************************************************************
+;
+;		GP.ASM's fixups need BOTH bases, and neither is settled until the two paths above have
+;		got this far: where the object will RUN, and where the workspace will start. Patching
+;		this late is free -- nothing here changes the object's length, and the buffer is not
+;		streamed out until below.
+;
+;		FreeMemory and newWorkspacePage are application symbols and the assembler lives in the
+;		compiler library, which also builds on its own, so the arithmetic has to happen on this
+;		side of the line. Both ends are page aligned, so a byte each says all of it.
+;
+; ************************************************************************************************
+
+PatchAsmFixups:
+		sec 								; embedded: it runs at runtimeEndPage, it sits at
+		lda 	runtimeEndPage 				; FreeMemory, and the difference is what every blob
+		sbc 	#FreeMemory >> 8 			; address and label target has to move by
+		sta 	AsmPageDelta
+		lda 	newWorkspacePage
+		sta 	AsmWorkspacePage
+		jmp 	AsmPatchAll
+
+PatchAsmFixupsShared:
+		lda 	#(PCODE_PAGE - (FreeMemory >> 8)) & $FF
+		sta 	AsmPageDelta 				; shared p-code always lands at $0900
+		lda 	newWorkspacePage 			; _WOCShared carries WS_START in this byte
+		sta 	AsmWorkspacePage
+		jmp 	AsmPatchAll
+
 		.send code
 
 ; ************************************************************************************************

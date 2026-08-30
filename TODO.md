@@ -767,6 +767,43 @@ other on INPHELP's real seven-way dispatch (~75 B against ~78 B), so the two con
 readability choice, not a size one.
 
 
+
+## GP.ASM `{VAR}` under BASLOAD
+
+`{VAR}` reaches a BASIC variable from inside a `GP.ASM` block, and it works — **but not through
+BASLOAD**, which is the workflow everything in `GPC-BASIC/` uses. Verified both ways on R49:
+through `bin/tokenise.zip` an assembly block reads and writes BASIC's own variables correctly;
+through BASLOAD it compiles clean and changes nothing.
+
+**BASLOAD renames variables and does not rename REM text with them.** It crunches `N%` to `A%` in
+the code — that is how it offers 64 significant characters on a two character BASIC — while the REM
+carrying `LDA {N%}` is stored byte for byte, which is the very property that lets an assembly body
+survive tokenisation at all (`ORA`, `AND`, `EOR` and `ROR` are keywords everywhere else). The two
+halves of the feature want opposite things from the same tool.
+
+There is **no BASLOAD option to turn crunching off**; `#SYMFILE` only records the mapping.
+
+For now the compiler **refuses** a `{VAR}` it cannot find rather than creating one BASIC never
+reads — a named error on the right line instead of a block that runs, stores, and changes nothing
+anyone can see. That is damage control, not a fix. Three ways out, none of them started:
+
+1. **Read the symbol file.** `#SYMFILE "@:PROG.SYM"` writes source-name to crunched-name for every
+   variable. The compiler could read it and translate `{VAR}` on the way through. Compile-time
+   work, so free by the rule this feature is built on — but it needs a fourth `GPC.INPUT` line, and
+   a `#SYMFILE` the programmer must not forget, which is a silent failure of its own unless the
+   absence of the file is itself an error whenever a `{VAR}` appears.
+
+2. **Name the variables where BASLOAD can see them.** `GP.ASM N%, M%` puts them in real code, which
+   BASLOAD crunches like any other reference, and the body refers to them positionally — `{1}`,
+   `{2}`. Correct by construction and needs no extra file; the cost is that the body no longer
+   reads as the assembly you would have written by hand, which was the whole point of the REM form.
+
+3. **Leave it host-tokeniser only** and say so. `{VAR}` then works for hand-written `.bas` sources
+   and is unavailable to the BASL library — which is backwards, since BASL is where the real
+   programs are.
+
+(1) keeps the syntax and pays in plumbing; (2) keeps the plumbing and pays in syntax. Worth deciding
+before `{VAR}` is documented as a feature anyone should rely on.
 ## Growing the object buffer — the compiler into banked RAM
 
 **Own branch. Not a GP.ASM job** — GP.ASM only made an existing problem visible enough to measure.

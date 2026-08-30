@@ -4587,10 +4587,49 @@ AsmBodyLines: 								; REM lines seen in the block so far, capped at 255.
 ;		before the run side does, and has since well before GP.ASM existed.
 ;
 ASM_MAX_BLOCKS = 32 						; GP.ASM blocks in one program
+ASM_MAX_FIXUPS = 96 						; blob calls + label references + {VAR} references
+ASM_MAX_LABELS = 16 						; labels in ONE block -- they do not cross GP.ENDASM
+ASM_MAX_LOCALS = 32 						; label references in one block, awaiting resolution
 
-AsmFixups     = $A000 						; per block: p-code operand address, blob pool offset
-AsmPool       = AsmFixups + 4*ASM_MAX_BLOCKS 	; every blob in the program, back to back
+;
+;		A fixup is five bytes: kind, target, value. All three kinds write a 16 bit address
+;		that cannot be known until WriteObjectCode, and they differ only in where it goes and
+;		what it is made of:
+;
+;			0	a blob call.       target = the .word operand, ADDRESSED ABSOLUTELY because it
+;			                       is in the p-code, which is already in the buffer.
+;			                       value = the blob's pool offset.
+;			1	JMP/JSR a label.   target = a POOL OFFSET (the pool is not placed yet).
+;			                       value = the label's pool offset.
+;			2	{VAR}.             target = a pool offset. value = the variable slot's offset
+;			                       within the workspace.
+;
+;		0 and 1 resolve against where the object will RUN, 2 against where the workspace will
+;		be -- which is why WriteObjectCode has to hand over both.
+;
+AFIX_CALL  = 0
+AFIX_LABEL = 1
+AFIX_VAR   = 2
+
+;
+;		Three parallel arrays rather than one array of records, and deliberately: a record
+;		index would be count*5, which passes 255 well before the table is full and would need
+;		a sixteen bit pointer at every touch. Indexed this way every subscript is count or
+;		count*2 and stays in X.
+;
+AsmFixKind    = $A000 						; 1 each
+AsmFixTarget  = AsmFixKind   + ASM_MAX_FIXUPS 	; 2 each
+AsmFixValue   = AsmFixTarget + 2*ASM_MAX_FIXUPS ; 2 each
+AsmLabels     = AsmFixValue  + 2*ASM_MAX_FIXUPS ; 8 each: 6 of name, then the pool offset
+AsmLocals     = AsmLabels    + 8*ASM_MAX_LABELS ; 4 each: pool offset, label index, kind
+AsmPool       = AsmLocals    + 4*ASM_MAX_LOCALS ; every blob in the program, back to back
 ASM_POOL_SIZE = $C000 - AsmPool 			; ...to the top of the window
+
+ASM_NAME_LEN = 6 							; significant characters in a label
+ASM_UNDEF = $FFFF 							; a label that has been named but not yet placed
+
+ALOC_REL = 0 								; a branch: one byte, resolved inside the block
+ALOC_ABS = 1 								; JMP/JSR: two bytes, handed on as an AFIX_LABEL
 
 ;
 ;		Operand syntax classes -- what the text LOOKED like, before the mnemonic gets a say in
@@ -4616,7 +4655,9 @@ AsmOpenBlock:
 		sta 	AsmBlobStart
 		lda 	AsmPoolLen+1
 		sta 	AsmBlobStart+1
-		rts
+		stz 	AsmLabelCount 				; labels are per block: a name used in two blocks
+		stz 	AsmLocalCount 				; is two different labels, and neither can be
+		rts 								; branched to from the other
 
 ; ************************************************************************************************
 ;
@@ -4632,10 +4673,7 @@ AsmOpenBlock:
 AsmCloseBlock:
 		lda 	#$60 						; RTS
 		jsr 	AsmPoolWrite
-
-		lda 	AsmFixupCount 				; room for another block ?
-		cmp 	#ASM_MAX_BLOCKS
-		bcs 	_ACBTooMany
+		jsr 	AsmResolveLocals 			; every branch and label reference in this block
 
 		lda 	#PCD_CMD_WORD 				; .word <blob address>
 		jsr 	WriteCodeByte
@@ -4649,39 +4687,54 @@ AsmCloseBlock:
 		;		assembled straight into the window, because WriteCodeByte sits in the middle of
 		;		it and can leave through the error handler, which prints in bank 0.
 		;
+		lda 	#AFIX_CALL
+		sta 	AsmNewKind
 		lda 	objPtr
-		sta 	AsmNewFixup+0
+		sta 	AsmNewTarget
 		lda 	objPtr+1
-		sta 	AsmNewFixup+1
+		sta 	AsmNewTarget+1
 		lda 	AsmBlobStart 				; where this blob starts in the pool
-		sta 	AsmNewFixup+2
+		sta 	AsmNewValue
 		lda 	AsmBlobStart+1
-		sta 	AsmNewFixup+3
-		lda 	#0 							; two placeholders, overwritten by AsmPatchBlobs
+		sta 	AsmNewValue+1
+		lda 	#0 							; two placeholders, overwritten by AsmPatchAll
 		jsr 	WriteCodeByte
 		lda 	#0
 		jsr 	WriteCodeByte
 
 		.keyword PCD_SYS 					; $DD $B0 -- call it
+		jmp 	AsmAddFixup
 
-		lda 	AsmFixupCount 				; 4 bytes per fixup
-		asl 	a
-		asl 	a
+; ************************************************************************************************
+;
+;		Add the fixup described by AsmNewKind / AsmNewTarget / AsmNewValue.
+;
+; ************************************************************************************************
+
+AsmAddFixup:
+		lda 	AsmFixupCount
+		cmp 	#ASM_MAX_FIXUPS
+		bcs 	_AAFTooMany
+		asl 	a 							; the two-byte arrays index by count*2
 		tax
-		ldy 	#0
+		lda 	AsmFixupCount
+		tay 								; ...and the kind array by count
 		.asm_access
-_ACBStore:
-		lda 	AsmNewFixup,y
-		sta 	AsmFixups,x
-		inx
-		iny
-		cpy 	#4
-		bne 	_ACBStore
+		lda 	AsmNewKind
+		sta 	AsmFixKind,y
+		lda 	AsmNewTarget
+		sta 	AsmFixTarget,x
+		lda 	AsmNewTarget+1
+		sta 	AsmFixTarget+1,x
+		lda 	AsmNewValue
+		sta 	AsmFixValue,x
+		lda 	AsmNewValue+1
+		sta 	AsmFixValue+1,x
 		.asm_release
 		inc 	AsmFixupCount
 		rts
 
-_ACBTooMany:
+_AAFTooMany:
 		.error_memory
 
 ; ************************************************************************************************
@@ -4765,53 +4818,83 @@ _AFPDone:
 
 ; ************************************************************************************************
 ;
-;		Resolve every .word operand now that the object's run base is known.
+;		Resolve every fixup, now that both bases are finally known. The caller sets:
 ;
-;		A = the PAGE DELTA between where the object sits in the buffer now and where it will
-;		sit when the program runs, i.e. runtimeEndPage - (FreeMemory >> 8) embedded, or
-;		PCODE_PAGE - (FreeMemory >> 8) shared. The caller works that out because FreeMemory is
-;		an application symbol; both ends are page aligned, so one byte says all of it.
+;		AsmWorkspacePage  where the variables will be -- newWorkspacePage.
+;		AsmPageDelta      the difference between where the object sits in the buffer NOW and
+;		                  where it will sit when the program runs: runtimeEndPage minus
+;		                  FreeMemory >> 8 embedded, PCODE_PAGE minus FreeMemory >> 8 shared.
+;		                  The caller works it out because FreeMemory is an application symbol,
+;		                  and both ends are page aligned so one byte says all of it.
+;
+;		This runs LATE -- after WriteObjectCode has settled newWorkspacePage -- and it has to,
+;		because {VAR} needs it. Nothing here changes the object's length, so running late is
+;		free: the buffer is untouched until it is streamed out.
 ;
 ; ************************************************************************************************
 
-AsmPatchBlobs:
-		sta 	AsmPageDelta
+AsmPatchAll:
 		lda 	AsmFixupCount
-		bne 	_APBGo
+		bne 	_APAGo
 		rts
-_APBGo:
+_APAGo:
 		stz 	AsmFixIdx
-		;
-		;		One window around the whole loop. Everything it WRITES is the object buffer,
-		;		which is low RAM and not banked, and there is no jsr in here at all -- so none
-		;		of the nesting or KERNAL rules can be broken by it.
-		;
-		.asm_access
-_APBLoop:
+_APALoop:
 		lda 	AsmFixIdx
 		asl 	a
-		asl 	a
-		tax
+		tax 								; the two-byte arrays
+		ldy 	AsmFixIdx 					; ...and the kind array
+		.asm_access
+		lda 	AsmFixKind,y
+		sta 	AsmKind
+		lda 	AsmFixTarget,x
+		sta 	zTemp1
+		lda 	AsmFixTarget+1,x
+		sta 	zTemp1+1
+		lda 	AsmFixValue,x
+		sta 	zTemp0
+		lda 	AsmFixValue+1,x
+		sta 	zTemp0+1
+		.asm_release
 		;
-		;		run address = (where the blob sits in the buffer) + the page delta
+		;		THE VALUE. A blob address and a label are both somewhere in the pool, so both
+		;		are (where the pool sits in the buffer) + offset + the page delta. A {VAR} is
+		;		an offset into the workspace instead, and the workspace has its own base.
 		;
+		lda 	AsmKind
+		cmp 	#AFIX_VAR
+		beq 	_APAVariable
 		clc
 		lda 	AsmPoolBase
-		adc 	AsmFixups+2,x
+		adc 	zTemp0
 		sta 	zTemp0
 		lda 	AsmPoolBase+1
-		adc 	AsmFixups+3,x
+		adc 	zTemp0+1
 		clc
 		adc 	AsmPageDelta
 		sta 	zTemp0+1
+		bra 	_APATarget
+_APAVariable:
+		clc
+		lda 	zTemp0+1
+		adc 	AsmWorkspacePage
+		sta 	zTemp0+1
 		;
-		;		...written straight into the operand, whose address was recorded as it was
-		;		emitted. The buffer has not moved since.
+		;		THE TARGET. A blob call patches the p-code, which is already in the buffer, so
+		;		its address was recorded absolutely as it was emitted. The other two patch the
+		;		pool, which had not been placed when they were recorded, so they hold offsets.
 		;
-		lda 	AsmFixups+0,x
+_APATarget:
+		lda 	AsmKind
+		beq 	_APAStore
+		clc
+		lda 	zTemp1
+		adc 	AsmPoolBase
 		sta 	zTemp1
-		lda 	AsmFixups+1,x
+		lda 	zTemp1+1
+		adc 	AsmPoolBase+1
 		sta 	zTemp1+1
+_APAStore:
 		lda 	zTemp0
 		sta 	(zTemp1)
 		ldy 	#1
@@ -4821,8 +4904,9 @@ _APBLoop:
 		inc 	AsmFixIdx
 		lda 	AsmFixIdx
 		cmp 	AsmFixupCount
-		bcc 	_APBLoop
-		.asm_release
+		bcs 	_APADone 					; the loop body is past branch range, so it is
+		jmp 	_APALoop 					; inverted around a jmp
+_APADone:
 		rts
 
 ; ************************************************************************************************
@@ -4836,6 +4920,35 @@ AsmAssembleLine:
 		beq 	_AALNothing 				; a bare REM assembles to nothing
 		cmp 	#';' 						; ...and so does a comment
 		beq 	_AALNothing
+		;
+		;		A label definition and a mnemonic both start with letters, and they are only
+		;		told apart by the colon after one of them. So read the identifier, look, and
+		;		WIND srcPtr BACK if it turns out to have been a mnemonic -- which is cheaper
+		;		and clearer than trying to assemble from the copy we just took.
+		;
+		jsr 	CharIsAlpha
+		bcc 	_AALInstruction
+		lda 	srcPtr
+		sta 	AsmLineStart
+		lda 	srcPtr+1
+		sta 	AsmLineStart+1
+		jsr 	AsmReadIdentifier
+		jsr 	LookNextNonSpace
+		cmp 	#':'
+		beq 	_AALLabel
+		lda 	AsmLineStart 				; not a label after all
+		sta 	srcPtr
+		lda 	AsmLineStart+1
+		sta 	srcPtr+1
+		bra 	_AALInstruction
+_AALLabel:
+		jsr 	GetNext 					; consume the colon
+		jsr 	AsmDefineLabel
+		jsr 	LookNextNonSpace 			; an instruction may follow it on the same line
+		beq 	_AALNothing
+		cmp 	#';'
+		beq 	_AALNothing
+_AALInstruction:
 		jsr 	AsmReadMnemonic
 		jsr 	AsmParseOperand
 		jsr 	AsmSelectMode
@@ -4899,7 +5012,9 @@ AsmParseOperand:
 		stz 	AsmValue
 		stz 	AsmValue+1
 		stz 	AsmIsByte
-		lda 	#ASYN_NONE
+		stz 	AsmIsLabel 					; AsmParseValue clears these too, but an operand
+		stz 	AsmIsVar 					; that never reaches it must not inherit the last
+		lda 	#ASYN_NONE 					; instruction's
 		sta 	AsmSyntax
 
 		jsr 	LookNextNonSpace
@@ -5045,10 +5160,34 @@ AsmParseValue:
 		stz 	AsmValue
 		stz 	AsmValue+1
 		stz 	AsmDigits
+		stz 	AsmIsLabel
+		stz 	AsmIsVar
 		jsr 	LookNextNonSpace
 		cmp 	#'$'
 		beq 	_APVHex
+		cmp 	#'{' 						; {VAR} -- a BASIC variable's slot
+		beq 	_APVVariable
+		jsr 	CharIsAlpha 				; a name is a label reference
+		bcs 	_APVLabel
 		jmp 	_APVDecimal
+
+;
+;		A label. It may not exist yet -- a forward branch is the whole reason labels are worth
+;		having -- so this only reserves an index, and AsmResolveLocals settles it at GP.ENDASM.
+;
+_APVLabel:
+		jsr 	AsmReadIdentifier
+		jsr 	AsmFindOrAddLabel 			; -> A = index
+		sta 	AsmLabelRef
+		inc 	AsmIsLabel
+		stz 	AsmIsByte 					; a label is always a 16 bit target
+		rts
+
+_APVVariable:
+		jsr 	AsmParseBrace
+		inc 	AsmIsVar
+		stz 	AsmIsByte 					; a slot address is always 16 bit
+		rts
 _APVHex:
 		jsr 	GetNext 					; consume the $
 _APVHexLoop:
@@ -5263,32 +5402,466 @@ _AFMEFound:
 ; ************************************************************************************************
 
 AsmEmitInstruction:
-		lda 	AsmMode
-		cmp 	#AMODE_REL
-		beq 	AsmNoBranchesYet
 		lda 	AsmOpcode
 		jsr 	AsmPoolWrite
 		ldx 	AsmMode
 		lda 	AsmModeLen,x
 		beq 	_AEIDone 					; implied, no operand at all
-		pha
-		lda 	AsmValue
-		jsr 	AsmPoolWrite
-		pla
+		sta 	AsmOperandLen
+		;
+		;		Where the operand is about to land. Everything deferred -- a branch, a label,
+		;		a {VAR} -- is recorded against this.
+		;
+		lda 	AsmPoolLen
+		sta 	AsmOperandAt
+		lda 	AsmPoolLen+1
+		sta 	AsmOperandAt+1
+
+		lda 	AsmMode
+		cmp 	#AMODE_REL
+		beq 	_AEIBranch
+		;
+		;		A label or a {VAR} is a 16 bit address and will not go in a one byte operand.
+		;		LDA #LOOP would have to mean one half of an address we do not know yet.
+		;
+		lda 	AsmIsLabel
+		ora 	AsmIsVar
+		beq 	_AEIPlain
+		lda 	AsmOperandLen
 		cmp 	#2
-		bcc 	_AEIDone
+		bcc 	_AEINotAddress
+
+_AEIPlain:
+		lda 	AsmValue 					; the operand itself, zero where it is deferred
+		jsr 	AsmPoolWrite
+		lda 	AsmOperandLen
+		cmp 	#2
+		bcc 	_AEIDeferred
 		lda 	AsmValue+1
 		jsr 	AsmPoolWrite
+
+_AEIDeferred:
+		lda 	AsmIsVar 					; {VAR}: the slot offset is known NOW, only the
+		beq 	_AEIMaybeLabel 				; workspace base is not, so this is a fixup already
+		lda 	#AFIX_VAR
+		sta 	AsmNewKind
+		lda 	AsmOperandAt
+		sta 	AsmNewTarget
+		lda 	AsmOperandAt+1
+		sta 	AsmNewTarget+1
+		lda 	AsmValue
+		sta 	AsmNewValue
+		lda 	AsmValue+1
+		sta 	AsmNewValue+1
+		jmp 	AsmAddFixup
+
+_AEIMaybeLabel:
+		lda 	AsmIsLabel 					; a label may not be placed yet -- hold it locally
+		beq 	_AEIDone 					; and let AsmResolveLocals deal with it
+		lda 	#ALOC_ABS
+		jmp 	AsmAddLocal
 _AEIDone:
 		rts
 
 ;
-;		A branch needs a label to aim at, and labels are not in yet. The displacement cannot be
-;		computed from an absolute address either, because the blob's own run address is not known
-;		until WriteObjectCode. Say so plainly rather than assemble something wrong.
+;		A branch. The displacement is inside the blob, so it does NOT depend on where the blob
+;		ends up -- but the label may be further down the block, so it still waits for GP.ENDASM.
+;		A branch to a bare number is refused: it would have to be an absolute address, and the
+;		displacement to one cannot be worked out until the blob has a run address, which is far
+;		too late to report a branch being out of range.
 ;
-AsmNoBranchesYet:
-		.error_unimplemented
+_AEIBranch:
+		lda 	AsmIsLabel
+		beq 	_AEINotAddress
+		lda 	#0 							; the placeholder displacement
+		jsr 	AsmPoolWrite
+		lda 	#ALOC_REL
+		jmp 	AsmAddLocal
+
+_AEINotAddress:
+		jmp 	AsmBadSyntax
+
+; ************************************************************************************************
+;
+;		Read an identifier into AsmName, folded to upper case, space padded to ASM_NAME_LEN.
+;		Longer names are still CONSUMED, just not stored -- so LONGNAME1 and LONGNAME2 are the
+;		same label, which is the same rule BASIC itself applies to variables, and better than
+;		leaving the tail of the name to be parsed as an operand.
+;
+; ************************************************************************************************
+
+AsmReadIdentifier:
+		ldx 	#0
+_ARILoop:
+		jsr 	LookNext
+		cmp 	#'a'
+		bcc 	_ARINoFold
+		cmp 	#'z'+1
+		bcs 	_ARINoFold
+		sec
+		sbc 	#'a'-'A'
+_ARINoFold:
+		pha
+		jsr 	CharIsAlpha
+		bcs 	_ARIKeep
+		pla
+		pha
+		jsr 	CharIsDigit
+		bcc 	_ARIEnd
+_ARIKeep:
+		pla
+		cpx 	#ASM_NAME_LEN
+		bcs 	_ARISkip
+		sta 	AsmName,x
+		inx
+_ARISkip:
+		jsr 	GetNext 					; consume it either way
+		bra 	_ARILoop
+_ARIEnd:
+		pla
+_ARIPad:
+		cpx 	#ASM_NAME_LEN
+		bcs 	_ARIDone
+		lda 	#' '
+		sta 	AsmName,x
+		inx
+		bra 	_ARIPad
+_ARIDone:
+		rts
+
+; ************************************************************************************************
+;
+;		Find AsmName in this block's label table, adding it undefined if it is not there yet.
+;		Returns its index in A. A forward branch names a label before it exists, which is the
+;		whole point of having them.
+;
+; ************************************************************************************************
+
+AsmFindOrAddLabel:
+		stz 	AsmLabelIdx
+_AFALSearch:
+		lda 	AsmLabelIdx
+		cmp 	AsmLabelCount
+		bcs 	_AFALAdd
+		asl 	a 							; 8 bytes per label
+		asl 	a
+		asl 	a
+		tax
+		ldy 	#0
+		.asm_access
+_AFALCompare:
+		lda 	AsmLabels,x
+		cmp 	AsmName,y
+		bne 	_AFALNoMatch
+		inx
+		iny
+		cpy 	#ASM_NAME_LEN
+		bne 	_AFALCompare
+		.asm_release
+		lda 	AsmLabelIdx
+		rts
+_AFALNoMatch:
+		.asm_release
+		inc 	AsmLabelIdx
+		bra 	_AFALSearch
+
+_AFALAdd:
+		lda 	AsmLabelCount
+		cmp 	#ASM_MAX_LABELS
+		bcs 	_AFALTooMany
+		asl 	a
+		asl 	a
+		asl 	a
+		tax
+		ldy 	#0
+		.asm_access
+_AFALStore:
+		lda 	AsmName,y
+		sta 	AsmLabels,x
+		inx
+		iny
+		cpy 	#ASM_NAME_LEN
+		bne 	_AFALStore
+		lda 	#ASM_UNDEF & $FF 			; named, not yet placed
+		sta 	AsmLabels,x
+		lda 	#ASM_UNDEF >> 8
+		sta 	AsmLabels+1,x
+		.asm_release
+		lda 	AsmLabelCount
+		inc 	AsmLabelCount
+		rts
+
+_AFALTooMany:
+		.error_memory
+
+; ************************************************************************************************
+;
+;		Place AsmName here. Defining one twice is refused: the second definition would silently
+;		win for references above it and lose for references below.
+;
+; ************************************************************************************************
+
+AsmDefineLabel:
+		jsr 	AsmFindOrAddLabel
+		asl 	a
+		asl 	a
+		asl 	a
+		clc
+		adc 	#ASM_NAME_LEN 				; past the name, to the offset
+		tax
+		.asm_access
+		lda 	AsmLabels+1,x 				; a real pool offset never reaches $FF00
+		cmp 	#ASM_UNDEF >> 8
+		bne 	_ADLDuplicate
+		lda 	AsmPoolLen
+		sta 	AsmLabels,x
+		lda 	AsmPoolLen+1
+		sta 	AsmLabels+1,x
+		.asm_release
+		rts
+_ADLDuplicate:
+		.asm_release
+		jmp 	AsmBadSyntax
+
+; ************************************************************************************************
+;
+;		Remember that the operand just emitted refers to label AsmLabelRef, in the manner A
+;		(ALOC_REL or ALOC_ABS). AsmResolveLocals settles it at GP.ENDASM.
+;
+; ************************************************************************************************
+
+AsmAddLocal:
+		sta 	AsmScratch
+		lda 	AsmLocalCount
+		cmp 	#ASM_MAX_LOCALS
+		bcs 	_ADLCTooMany
+		asl 	a 							; 4 bytes per local
+		asl 	a
+		tax
+		.asm_access
+		lda 	AsmOperandAt
+		sta 	AsmLocals,x
+		lda 	AsmOperandAt+1
+		sta 	AsmLocals+1,x
+		lda 	AsmLabelRef
+		sta 	AsmLocals+2,x
+		lda 	AsmScratch
+		sta 	AsmLocals+3,x
+		.asm_release
+		inc 	AsmLocalCount
+		rts
+
+_ADLCTooMany:
+		.error_memory
+
+; ************************************************************************************************
+;
+;		Settle every label reference in the block. Branches are finished here and now -- the
+;		displacement is between two points in the same blob, so it does not care where the blob
+;		ends up. JMP and JSR want a real address, so they become fixups and wait.
+;
+; ************************************************************************************************
+
+AsmResolveLocals:
+		lda 	AsmLocalCount
+		bne 	_ARLGo
+		rts
+_ARLGo:
+		stz 	AsmLocalIdx
+_ARLLoop:
+		lda 	AsmLocalIdx
+		asl 	a
+		asl 	a
+		tax
+		.asm_access
+		lda 	AsmLocals,x
+		sta 	AsmOperandAt
+		lda 	AsmLocals+1,x
+		sta 	AsmOperandAt+1
+		lda 	AsmLocals+2,x
+		sta 	AsmScratch 					; the label
+		lda 	AsmLocals+3,x
+		sta 	AsmScratch+1 				; how it was referred to
+		.asm_release
+
+		lda 	AsmScratch 					; where that label ended up
+		asl 	a
+		asl 	a
+		asl 	a
+		clc
+		adc 	#ASM_NAME_LEN
+		tax
+		.asm_access
+		lda 	AsmLabels,x
+		sta 	AsmValue
+		lda 	AsmLabels+1,x
+		sta 	AsmValue+1
+		.asm_release
+		lda 	AsmValue+1
+		cmp 	#ASM_UNDEF >> 8
+		beq 	_ARLUndefined 				; referred to, never placed
+
+		lda 	AsmScratch+1
+		cmp 	#ALOC_REL
+		beq 	_ARLBranch
+		;
+		;		JMP / JSR a label: an address in the pool, so it waits for the pool to be placed
+		;
+		lda 	#AFIX_LABEL
+		sta 	AsmNewKind
+		lda 	AsmOperandAt
+		sta 	AsmNewTarget
+		lda 	AsmOperandAt+1
+		sta 	AsmNewTarget+1
+		lda 	AsmValue
+		sta 	AsmNewValue
+		lda 	AsmValue+1
+		sta 	AsmNewValue+1
+		jsr 	AsmAddFixup
+		bra 	_ARLNext
+		;
+		;		A branch: displacement = label - (the byte after the operand)
+		;
+_ARLBranch:
+		sec
+		lda 	AsmValue
+		sbc 	AsmOperandAt
+		sta 	AsmValue
+		lda 	AsmValue+1
+		sbc 	AsmOperandAt+1
+		sta 	AsmValue+1
+		sec
+		lda 	AsmValue
+		sbc 	#1
+		sta 	AsmValue
+		lda 	AsmValue+1
+		sbc 	#0
+		sta 	AsmValue+1
+		;
+		;		...and it has to fit in a signed byte, which is the one thing about branches
+		;		that catches people out. Caught HERE, with the line still known, rather than at
+		;		WriteObjectCode where nothing could say which branch was wrong.
+		;
+		lda 	AsmValue+1
+		beq 	_ARLForward 				; 0 high -> low must be 0..127
+		cmp 	#$FF
+		bne 	_ARLTooFar
+		lda 	AsmValue 					; $FF high -> low must be 128..255
+		bpl 	_ARLTooFar
+		bra 	_ARLPoke
+_ARLForward:
+		lda 	AsmValue
+		bmi 	_ARLTooFar
+_ARLPoke:
+		lda 	AsmValue
+		ldx 	AsmOperandAt
+		ldy 	AsmOperandAt+1
+		jsr 	AsmPoolPoke
+_ARLNext:
+		inc 	AsmLocalIdx
+		lda 	AsmLocalIdx
+		cmp 	AsmLocalCount
+		bcs 	_ARLDone 					; as above, out of branch range
+		jmp 	_ARLLoop
+_ARLDone:
+		rts
+
+_ARLUndefined:
+		jmp 	AsmBadSyntax
+_ARLTooFar:
+		.error_range
+
+; ************************************************************************************************
+;
+;		Write A into the pool at offset YX.
+;
+; ************************************************************************************************
+
+AsmPoolPoke:
+		pha
+		clc
+		txa
+		adc 	#AsmPool & $FF
+		sta 	zTemp2
+		tya
+		adc 	#AsmPool >> 8
+		sta 	zTemp2+1
+		pla
+		.asm_access
+		sta 	(zTemp2)
+		.asm_release
+		rts
+
+; ************************************************************************************************
+;
+;		{VAR} -- the ADDRESS OF THE VARIABLE'S SLOT in the workspace, for every kind of variable.
+;		Not its value, and not, for a string or an array, the bytes it points at: the slot. That
+;		is the one rule that holds for all of them, and it is what makes read and write the same
+;		thing -- LDA {A} reads the first byte of A, STA {A} writes it.
+;
+;			{A}   {A%}  {A$}   the scalar's slot, created if the program has not used it yet,
+;			                   exactly as an ordinary reference to it would
+;			{A()}              the ARRAY's slot, which holds the base address of its data --
+;			                   so reaching an element is two steps, as it is for GP.ARRPTR
+;
+;		An array is never created here. An undimensioned one has no slot to point at yet, and
+;		guessing a shape for it from inside an assembly block would be worse than refusing.
+;
+; ************************************************************************************************
+
+AsmParseBrace:
+		jsr 	GetNext 					; consume the {
+		;
+		;		GetNext, not LookNext: ExtractVariableName wants the first character ALREADY
+		;		CONSUMED and in A -- MainCompileLoop reaches it through GetNextNonSpace. Leave
+		;		it unconsumed and the same character is read again as the SECOND one, so {A%}
+		;		becomes the name AA%, which misses in the table and quietly creates a second
+		;		variable that BASIC never sees.
+		;
+		jsr 	GetNextNonSpace
+		jsr 	ExtractVariableName 		; XY = packed name, X carries the type bits
+		cpx 	#0
+		bpl 	_APBScalar
+		;
+		;		An array. ExtractVariableName has already eaten the "(", so the ")" is ours.
+		;
+		phy
+		phx
+		lda 	#')'
+		jsr 	AsmExpect
+		plx
+		ply
+		jsr 	FindVariable
+		bcc 	_APBUnknown
+		bra 	_APBAddress
+		;
+		;		A scalar. IT MUST ALREADY EXIST -- {VAR} never creates one, and that is the
+		;		opposite of what an ordinary BASIC reference does.
+		;
+		;		Because BASLOAD RENAMES VARIABLES and does not rename REM text with them. It
+		;		crunches N% to A% in the code -- that is how it offers 64 character names on a
+		;		two character BASIC -- while the REM holding {N%} is kept byte for byte, which
+		;		is the very property that makes an assembly body survive at all. So a {VAR}
+		;		naming a variable BASIC no longer calls by that name would MISS, and creating
+		;		it here would hand back a fresh slot that BASIC never reads or writes: an
+		;		assembly block that runs, stores, and changes nothing anyone can see.
+		;
+		;		Refusing is not a fix -- see TODO.md -- but it turns the worst kind of failure
+		;		this project has into one that names the line it is on.
+		;
+_APBScalar:
+		phx
+		jsr 	FindVariable
+		bcc 	_APBUnknown
+		pla
+_APBAddress:
+		stx 	AsmValue
+		sty 	AsmValue+1
+		lda 	#'}'
+		jmp 	AsmExpect
+
+_APBUnknown:
+		jmp 	AsmBadSyntax
 
 ; ************************************************************************************************
 ;
@@ -5340,15 +5913,45 @@ AsmPoolBase:
 		.fill 	2 						; where the pool landed within the object
 AsmBlobStart:
 		.fill 	2 						; pool offset of the blob being assembled
-AsmNewFixup:
-		.fill 	4 						; one fixup record, built here before it is banked
+AsmNewKind: 							; one fixup, built here before it is banked
+		.fill 	1
+AsmNewTarget:
+		.fill 	2
+AsmNewValue:
+		.fill 	2
 AsmByte:
 		.fill 	1 						; one pool byte, carried out of the window
+AsmKind:
+		.fill 	1 						; the fixup being resolved
 AsmFixupCount:
 		.fill 	1
 AsmFixIdx:
 		.fill 	1
 AsmPageDelta:
+		.fill 	1
+AsmWorkspacePage: 						; where the variables land -- newWorkspacePage
+		.fill 	1
+AsmName:
+		.fill 	ASM_NAME_LEN 			; the identifier just read
+AsmLineStart:
+		.fill 	2 						; srcPtr before it, to wind back a mnemonic
+AsmLabelCount:
+		.fill 	1
+AsmLabelIdx:
+		.fill 	1
+AsmLabelRef: 							; the label this operand refers to
+		.fill 	1
+AsmLocalCount:
+		.fill 	1
+AsmLocalIdx:
+		.fill 	1
+AsmIsLabel:
+		.fill 	1
+AsmIsVar:
+		.fill 	1
+AsmOperandAt: 							; pool offset of the operand being emitted
+		.fill 	2
+AsmOperandLen:
 		.fill 	1
 AsmCopyIdx:
 		.fill 	2

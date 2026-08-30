@@ -104,6 +104,7 @@ the BASIC modules are written up in §4.
 | **Multi-way branch** | ASM | `GP.SELECT` `GP.CASE` `GP.OTHER` `GP.ENDSEL` |
 | **Block IF** | ASM | `GP.IF` `GP.ELSEIF` `GP.ELSE` `GP.ENDIF` — see §3.8 |
 | **Machine code** | ASM | `GP.CALL` `GP.A` `GP.X` `GP.Y` `GP.C` |
+| **Inline assembly** | COMPOSITE | `GP.ASM` `GP.ENDASM` — free, and stays GP OUT, see §3.9 |
 | **Strings** | ASM | `GP.INSTR` `GP.STRPTR` `GP.TRIM` `GP.LTRIM` `GP.RTRIM` `GP.UPPER` `GP.LOWER` `GP.COMP` |
 | **Strings** | COMPOSITE | `GP.CONTAINS` `GP.ISEMPTY` — free, see §3.4 |
 | **Addresses** | COMPOSITE | `GP.HIBYTE` `GP.LOBYTE` — free, see §3.3 |
@@ -249,6 +250,10 @@ Range is 0–65535, which is every address on the machine. Both are **composite*
 runtime code, and compile to exactly `INT(n/256)` and `MOD(n,256)`.
 
 Example: [`MLCALL.EXP.BL`](MLCALL.EXP.BL)
+
+> **For anything longer than a few bytes, write it as assembly instead — §3.9.** `GP.ASM`
+> assembles into the program, so there is no bank to reserve, no POKE loop, and no comment to
+> keep in step with a list of numbers.
 
 ---
 
@@ -441,6 +446,111 @@ handler that already existed: the two branches are the `.goto.z` and `.goto` han
 names, and the two markers share one four-byte no-op. See §11 of `docs/blitz/GP-BASIC.TIERS.md`.
 
 Example: [`IF.EXP.BL`](IF.EXP.BL)
+
+---
+
+### 3.9 Inline assembly
+
+```
+GP.ASM
+REM <instruction>
+...
+GP.ENDASM
+```
+
+65C02 assembly, assembled by GPC at compile time, with the bytes going **into the program**. It is
+what `GP.CALL` needed a POKE loop and a spare RAM bank for:
+
+```basic
+POKE ML+0,26 : POKE ML+1,232 : POKE ML+2,200 : GP.CALL ML,10,20,30
+```
+```basic
+GP.ASM
+REM inc a
+REM inx
+REM iny
+GP.ENDASM
+```
+
+**It costs no runtime bytes.** A block is five bytes of p-code plus your instructions, and every
+handler it uses is already in every compiled program — so a program whose only GP.BASIC keyword is
+`GP.ASM` still compiles **GP OUT**, without the 2 KB GP block. Measured: `RT 12031`, the same as a
+program using no GP keyword at all.
+
+#### `#REM 1` is required
+
+> The body rides in REM statements, because **BASLOAD stores REM text byte for byte**. Outside a
+> REM, `ORA`, `AND`, `EOR` and `ROR` are BASIC keywords and the text is destroyed; inside one it
+> arrives intact, braces and all. Lower case is fine — it is upshifted for you.
+>
+> **`#REM 0` is BASLOAD's default**, and with it the body is stripped before the compiler runs.
+> That is why `GP.ASM` and `GP.ENDASM` are real keywords and not REMs: the block is still there to
+> be found *empty*, and GPC says `BLOCK MISMATCH` instead of compiling a program that silently
+> contains no code. Turn REMs back off after `GP.ENDASM`.
+
+#### Labels and branches
+
+A label is `name:`, alone on a line or in front of an instruction; six characters are significant.
+Labels belong to their block — the same name in two blocks is two different labels, and neither can
+branch to the other.
+
+```basic
+GP.ASM
+REM ldx #5
+REM loop: lda #42
+REM jsr $ffd2
+REM dex
+REM bne loop
+GP.ENDASM
+```
+
+`BNE`/`BEQ`/`BRA` and the rest take a label, and so do `JMP` and `JSR`. **A branch further than 127
+bytes is `OUT OF RANGE` at compile time**, on the line it is on — not a wrong address at run time.
+
+#### `{VAR}` — a BASIC variable's slot
+
+`{VAR}` is the **address of the variable's slot**, which is what makes reading and writing the same
+thing: `LDA {N%}` reads it, `STA {N%}` writes it, in the slot BASIC itself uses.
+
+| Form | Is |
+|---|---|
+| `{N}` `{N%}` `{N$}` | the scalar's slot |
+| `{N()}` | the **array's** slot, which holds the base address of its data — an element is two steps, as through `GP.ARRPTR` |
+
+> **`{VAR}` does not work through BASLOAD, and this is the one trap in the feature.** BASLOAD
+> renames variables — `N%` becomes `A%`, which is how it gives you 64 significant characters on a
+> two-character BASIC — and it does *not* rename REM text with them. So the code says `A%` while
+> the REM still says `{N%}`, and they are no longer the same variable.
+>
+> GPC **refuses** a `{VAR}` naming a variable it cannot find, rather than creating one BASIC never
+> reads. You get an error on the line instead of a block that runs, stores, and changes nothing you
+> can see. It works as written when the source goes through the **host** tokeniser, which renames
+> nothing. See `TODO.md`, "GP.ASM `{VAR}` under BASLOAD".
+
+#### What is not there
+
+No expressions — `{N%}+1` and `LABEL+2` are not understood; use an index register, which is what
+the 6502 wants anyway. Zero page or absolute is decided by the **operand**: `$34` is zero page,
+`$0034` is absolute, a decimal under 256 is zero page. Every 65C02 addressing mode is available,
+including the two the NMOS 6502 lacks — `LDA ($34)` and `JMP ($1234,X)` — except `BBR`/`BBS`/
+`RMB`/`SMB`.
+
+Registers come back through `GP.A` / `GP.X` / `GP.Y` / `GP.C` exactly as they do from `GP.CALL`,
+because a block goes through the same `$030C`–`$030F` slots — **but those four are GP block
+keywords, so reading one costs the 2 KB the block otherwise saves you.** `{VAR}` does not.
+
+A body can come from a file, which is the same thing spelt differently — `#INCLUDE` splices it in
+verbatim, and BASLOAD's own `REM #nn-mm` attribution means an error inside names the file:
+
+```basic
+#REM 1
+GP.ASM
+#INCLUDE "MACPTR.ASM"
+GP.ENDASM
+#REM 0
+```
+
+Example: [`ASM.EXP.BL`](ASM.EXP.BL)
 
 ---
 

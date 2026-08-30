@@ -1,0 +1,140 @@
+## ***********************************************************************
+## **
+## **  ASM.EXP.BL -- GP.ASM / GP.ENDASM, inline 65C02 assembly
+## **
+## **  Everything MLCALL.EXP.BL does by POKEing bytes into a bank, written
+## **  as assembly instead -- and reaching BASIC's own variables directly:
+## **
+## **      POKE ML.INCS+0,26 : POKE ML.INCS+1,232 : GP.CALL ML.INCS,10
+## **      GP.ASM / REM INC A / REM INX / GP.ENDASM
+## **
+## **  The assembled bytes go INTO THE PROGRAM. Nothing to POKE, no bank to
+## **  reserve, nothing to keep in step with a comment saying what the
+## **  numbers used to mean.
+## **
+## **  Build:  copy GPC-BASIC/GP.INC.BL and this file into testing/, then
+## **            python source/gpc/build_basl.py ASM.EXP.BL ASM.PRG
+## **          and compile ASM.PRG with GPC.BLITZ.BIN.
+## **
+## ***********************************************************************
+#INCLUDE "GP.INC.BL"
+#SAVEAS "@:ASM.PRG"
+
+## ---- #REM 1 IS REQUIRED, and it is the one thing that catches people out.
+##
+## The body of a block rides in REM statements, because BASLOAD stores remark
+## text byte for byte -- ORA, AND, EOR and ROR reach the compiler intact, where
+## outside a REM they are tokenised into keywords and the text is destroyed.
+## Braces survive too, which is what makes {VAR} possible at all.
+##
+## BASLOAD's default is #REM 0, which strips them before the compiler is ever
+## run. GP.ASM and GP.ENDASM are real keywords rather than REMs precisely so
+## that the block is still THERE to be found empty: GPC then says BLOCK
+## MISMATCH, instead of compiling a program that silently contains no code.
+
+#REM 1
+
+## ---- 1. Assembly, in the program, with nothing to set up first.
+
+PRINT "1. ";
+GP.ASM
+REM LDA #72               ; H
+REM JSR $FFD2             ; KERNAL CHROUT
+REM LDA #73               ; I
+REM JSR $FFD2
+GP.ENDASM
+PRINT
+
+## ---- 2. {VAR} -- AND WHY IT IS NOT USED IN THIS FILE.
+##
+## {VAR} means THE ADDRESS OF THE VARIABLE'S SLOT, which is what makes reading
+## and writing the same thing:
+##
+##     N% = 65
+##     GP.ASM
+##     REM LDA {N%}
+##     REM CLC
+##     REM ADC #1
+##     REM STA {M%}          M% = N% + 1, in BASIC's own slot
+##     GP.ENDASM
+##
+## THAT DOES NOT WORK THROUGH BASLOAD, and this file is a BASLOAD file.
+##
+## BASLOAD RENAMES VARIABLES -- it crunches N% to A% in the code, which is how
+## it offers 64 character names on a two character BASIC -- but it keeps REM
+## text byte for byte, which is the very property that lets an assembly body
+## survive at all. So the code says A% and the REM still says {N%}, and they
+## are no longer the same variable.
+##
+## GPC therefore REFUSES a {VAR} naming a variable it cannot find, rather than
+## creating one BASIC never reads. You get SYNTAX ERROR on the line, instead of
+## a block that runs, stores, and changes nothing you can see.
+##
+## It works as written above when the source is tokenised by the HOST
+## tokeniser (bin/tokenise.zip), which does not rename anything. See TODO.md,
+## "GP.ASM {VAR} under BASLOAD", for what it would take to have both.
+
+## ---- 3. Labels and branches.
+##
+## A label is NAME: on a line of its own or in front of an instruction. Six
+## characters are significant. Labels belong to their block -- the same name in
+## two blocks is two different labels, and neither can branch to the other.
+##
+## Branches are checked HERE, while the line number is still known: a branch
+## further than 127 bytes is OUT OF RANGE at compile time, not a wrong address
+## at run time.
+
+PRINT "3. ";
+GP.ASM
+REM LDX #5
+REM LOOP: LDA #42         ; *
+REM JSR $FFD2
+REM DEX
+REM BNE LOOP
+GP.ENDASM
+PRINT
+
+## ---- 4. JMP and JSR take a label too, and those are real addresses -- the
+## ---- compiler fills them in once it knows where the program will run.
+
+PRINT "4. ";
+GP.ASM
+REM JMP OVER
+REM LDA #88               ; X -- jumped over, never printed
+REM JSR $FFD2
+REM OVER: LDA #79         ; O
+REM JSR $FFD2
+REM LDA #75               ; K
+REM JSR $FFD2
+GP.ENDASM
+PRINT
+
+## ---- 5. There is no expression syntax. {N%}+1 and LABEL+2 are not things.
+##
+## Reach the byte after an address with an index register instead, which is
+## what the 6502 wants anyway:
+##
+##     LDX #1
+##     LDA {N%},X           the HIGH byte of an int16
+##
+## ---- 6. Zero page or absolute is decided by THE OPERAND, not by the
+## ---- instruction and not by you:
+##
+##       LDA $34          zero page      A5 34
+##       LDA $0034        absolute       AD 34 00
+##       LDA 52           zero page      A5 34     -- decimal under 256
+##       LDA 300          absolute       AD 2C 01
+##
+## so write $0034 when you mean the long form. Every 65C02 addressing mode is
+## available, including the two the NMOS 6502 lacks -- LDA ($34) with no index,
+## and JMP ($1234,X).
+##
+## BBR/BBS/RMB/SMB are the only instructions missing. They are Rockwell
+## additions with a four character mnemonic ending in a bit number, and nothing
+## on this machine uses them.
+
+#REM 0
+
+PRINT "DONE"
+
+END

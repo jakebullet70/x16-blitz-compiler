@@ -244,26 +244,55 @@
 ##
 ##   #REM 1
 ##   GP.ASM
-##   REM lda {A}
-##   REM ldx #$23
-##   REM ldy #$9F
-##   REM sec
-##   REM jsr {MACPTR}
-##   REM stx {XR}
-##   REM sty {YR}
+##   REM lda #72
+##   REM jsr $ffd2
+##   REM ldx #5
+##   REM loop: dex
+##   REM bne loop
 ##   GP.ENDASM
 ##   #REM 0
 ##
 ## The body rides in REM statements, one instruction per line, because
 ## BASLOAD stores REM text BYTE FOR BYTE -- ORA, AND, EOR and ROR all
 ## survive there, and outside a REM they are tokenised into keywords and
-## destroyed. Braces survive too, which is what makes {VAR} possible.
+## destroyed. Lower case is fine; it is upshifted for you.
 ##
 ## #REM 1 IS REQUIRED, and #REM 0 is BASLOAD's default. With REM output
 ## off the body is stripped before the compiler ever sees it, so the two
 ## delimiters are real keywords rather than REMs: an empty GP.ASM block
-## is then a named error instead of a program that silently contains no
-## code at all. Turn REMs back off after GP.ENDASM.
+## is then a named error (BLOCK MISMATCH) instead of a program that
+## silently contains no code at all. Turn REMs back off after GP.ENDASM.
+##
+## COSTS NOTHING AT RUN TIME. A block is five bytes of p-code plus the
+## instructions themselves, and it reuses handlers that are already in
+## every program -- so a program whose only GP.BASIC keyword is GP.ASM
+## does NOT pull in the 2K GP runtime block.
+##
+## LABELS.  name: on its own line or in front of an instruction. Six
+## characters are significant. Labels belong to their block: the same
+## name in two blocks is two different labels. BNE/BEQ/BRA and the rest
+## take one, and a branch further than 127 bytes is OUT OF RANGE at
+## COMPILE time, on the line it is on. JMP and JSR take one too.
+##
+## {VAR} is the ADDRESS OF A BASIC VARIABLE'S SLOT -- so LDA {N%} reads
+## it and STA {N%} writes it, in the slot BASIC itself uses:
+##
+##   {N}  {N%}  {N$}   the scalar's slot
+##   {N()}             the ARRAY's slot, which holds the base address of
+##                     its data -- an element is two steps, as it is
+##                     through GP.ARRPTR
+##
+## >> {VAR} DOES NOT WORK THROUGH BASLOAD. BASLOAD renames variables --
+## >> N% becomes A% -- and does not rename REM text with them, so the
+## >> name in the braces is no longer the name BASIC uses. GPC refuses a
+## >> {VAR} it cannot find rather than creating one nothing reads, so you
+## >> get an error and not a wrong answer. It works when the source is
+## >> tokenised by the host tokeniser instead. See ASM.EXP.BL.
+##
+## NO EXPRESSIONS: {N%}+1 and LABEL+2 are not understood. Use an index
+## register. Zero page or absolute is chosen by the OPERAND -- $34 is
+## zero page, $0034 is absolute -- and every 65C02 mode is available
+## except BBR/BBS/RMB/SMB.
 ##
 ## Bodies may also come from a file, which is the same thing spelt
 ## differently -- #INCLUDE splices it in verbatim:
@@ -273,7 +302,6 @@
 ##   #INCLUDE "MACPTR.ASM"
 ##   GP.ENDASM
 ##   #REM 0
-
 #TOKEN GP.ASM 52826
 #TOKEN GP.ENDASM 52825
 

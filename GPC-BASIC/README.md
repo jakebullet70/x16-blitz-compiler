@@ -64,6 +64,7 @@ All of it needs `#INCLUDE "GP.INC.BL"`, and nothing else.
 | Drawing | `GP.BOX` `GP.FILL` `GP.PRINTAT` | `SCREEN.EXP.BL` |
 | Screen save | `GP.STASH` `GP.RESTR` — a rectangle to a RAM bank and back | `SCREEN.EXP.BL` |
 | Machine code | `GP.CALL` and the `GP.A` `GP.X` `GP.Y` `GP.C` value words | `MLCALL.EXP.BL` |
+| Inline assembly | `GP.ASM` `GP.ENDASM` — 65C02 assembled into the program, with labels and `{VAR}` | `ASM.EXP.BL` |
 
 ### Extensions — BASIC modules you `#INCLUDE`
 
@@ -89,6 +90,7 @@ it where it came from, and `APPHELP.PANEL.PUT` drops it somewhere else. Three `G
 | `MENUTST.EXP.BL` | the menu's regression test, 21 cases |
 | `BMXSPD.EXP.BL` | how long a BMX paint really takes, full width against centred |
 | `BMXPAL.EXP.BL` | that the picture's palette is borrowed and given back, not taken |
+| `ASM.EXP.BL` | inline assembly: labels, branches, and why `{VAR}` and BASLOAD disagree |
 
 ## Naming — BASL is safe, a hand-written `.bas` is not
 
