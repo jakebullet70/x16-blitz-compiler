@@ -66,6 +66,10 @@ _WOCEmbedded:
 		lda 	#ObjectBase >> 8
 _WOCCutSet:
 		sta 	runtimeEndPage
+		sec 								; page delta: where it will run, less where it sits now
+		sbc 	#FreeMemory >> 8
+		jsr 	AsmPatchBlobs 				; resolve every GP.ASM .word operand now that the
+											; run base is finally known
 		;
 		;		zTemp1 = length of the object code.
 		;
@@ -206,6 +210,8 @@ _WOCSWhole:
 		;		fewer than MIN_WS_PAGES below RTBASE, or if the page count itself overflowed a byte.
 		;
 		jsr 	ScanGPUsage 				; the shared runtime is two files now -- see below
+		lda 	#(PCODE_PAGE - (FreeMemory >> 8)) & $FF	; shared p-code always lands at $0900
+		jsr 	AsmPatchBlobs
 		;
 		;		The workspace ends where the resident runtime starts, and that is no longer one
 		;		address: a program using no GPB keyword loads the CORE-ONLY file at RTBASE and keeps

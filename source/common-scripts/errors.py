@@ -21,7 +21,7 @@ errors = """
 	line 		  : unknown line number
 	internal	  : internal error
 	divzero 	  : divide by zero
-	structure 	  : structure imbalance
+	structure 	  : block mismatch
 	stop 		  : program stopped
 	data		  : out of data
 	undeclared	  : unknown array

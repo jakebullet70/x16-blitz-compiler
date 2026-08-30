@@ -150,6 +150,14 @@
 ;
 	.byte	$07,$ce,$5b,$03,CommandEndIfCompile & $FF,CommandEndIfCompile >> 8,$06
 ;
+;	GP.ASM    X:CommandAsmCompile N
+;
+	.byte	$07,$ce,$5a,$03,CommandAsmCompile & $FF,CommandAsmCompile >> 8,$06
+;
+;	GP.ENDASM   X:CommandEndAsmCompile N
+;
+	.byte	$07,$ce,$59,$03,CommandEndAsmCompile & $FF,CommandEndAsmCompile >> 8,$06
+;
 ;	GP.CALL   # X:OptionalZeroCompile X:OptionalZeroCompile X:OptionalZeroCompile X:OptionalZeroCompile T N
 ;
 	.byte	$13,$ce,$7c,$e3,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$20,33757 & $FF,33757 >> 8,$06

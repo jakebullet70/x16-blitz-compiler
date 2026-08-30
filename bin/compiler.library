@@ -796,6 +796,8 @@ SaveCodeAndExit:
 		lda 	#$FF 						; add end marker
 		jsr 	WriteCodeByte
 		jsr 	FixBranches 				; fix up GOTO/GOSUB etc.
+		jsr 	AsmFlushPool 				; append the GP.ASM blob pool AFTER the $FF end marker,
+											; where nothing walks -- see commands/gpasmcode.asm
 
 		lda 	#BLC_CLOSEOUT 				; close output store 
 		jsr 	CallAPIHandler
@@ -2796,6 +2798,14 @@ CommandTables:
 ;
 	.byte	$07,$ce,$5b,$03,CommandEndIfCompile & $FF,CommandEndIfCompile >> 8,$06
 ;
+;	GP.ASM    X:CommandAsmCompile N
+;
+	.byte	$07,$ce,$5a,$03,CommandAsmCompile & $FF,CommandAsmCompile >> 8,$06
+;
+;	GP.ENDASM   X:CommandEndAsmCompile N
+;
+	.byte	$07,$ce,$59,$03,CommandEndAsmCompile & $FF,CommandEndAsmCompile >> 8,$06
+;
 ;	GP.CALL   # X:OptionalZeroCompile X:OptionalZeroCompile X:OptionalZeroCompile X:OptionalZeroCompile T N
 ;
 	.byte	$13,$ce,$7c,$e3,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$20,33757 & $FF,33757 >> 8,$06
@@ -4331,6 +4341,1249 @@ _CBCSyntax:
 ;		==== 			=====
 ;
 ; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		Name:		gpasm.asm
+;		Purpose:	GP.ASM / GP.ENDASM -- inline 65C02 assembly
+;		Created:	30th August 2026
+;		Reviewed: 	No
+;		Author : 	Steven De George SR
+;
+; ************************************************************************************************
+; ************************************************************************************************
+
+		.section code
+
+; ************************************************************************************************
+;
+;		GP.ASM
+;		REM <instruction>
+;		...
+;		GP.ENDASM
+;
+;		Inline assembly, assembled HERE, at compile time, on the X16. Both delimiters are alone
+;		on their line and the body rides in REM statements, one instruction each.
+;
+;		WHY THE BODY IS REMS. BASLOAD stores remark text byte for byte, so ORA, AND, EOR and ROR
+;		reach us intact -- outside a REM they are tokenised into keywords and the text is
+;		destroyed. Braces survive too, which is what makes {VAR} possible later. Measured, not
+;		assumed: see docs/blitz/GP-BASIC.ASM.RESEARCH.md section 17.
+;
+;		WHY THE DELIMITERS ARE NOT REMS. #REM 0 is BASLOAD's default, and with it the body is
+;		stripped before the compiler is ever run. Real keywords mean we still see an empty block
+;		and can refuse it; REM delimiters would leave NOTHING to detect and the program would
+;		compile clean and simply not contain the code. That is why AsmBodyLines is counted.
+;
+;		THIS STATEMENT READS ITS OWN SOURCE LINES. MainCompileLoop has no swallow-until-terminator
+;		mode, so the block does its own BLC_READIN/ProcessNewLine walk. ProcessNewLine keeps
+;		currentLineNumber up to date as it goes, so an error inside the block still names the line
+;		it is on. The swallowed lines deliberately do NOT get an STRMarkLine or a new.line: the
+;		whole block is one statement and there is nothing inside it to branch to.
+;
+;		Errors are .error_structure, reusing an existing message rather than adding a clearer one.
+;		errors.asm is in common-source, which links BELOW GPBase and is therefore copied into
+;		every compiled object -- a new message would cost its own text in bytes in every program
+;		that never uses GP.ASM. See the runtime-only cost rule in the research document.
+;
+;		Must return carry CLEAR. A .def helper returning carry set makes the generator silently
+;		drop every table element after it, with no error and no clue.
+;
+; ************************************************************************************************
+
+;
+;		The low byte of GP.ENDASM's keyword id (52825 = $CE59). GP keywords are two bytes, $CE
+;		then this. Written as the id so it tracks c64tokens.py rather than a bare $59.
+;
+GP_TOKEN_ENDASM = 52825 & $FF
+
+CommandAsmCompile:
+		stz 	deferErrors 				; a block opener must never defer -- a rolled back
+											; opener leaves its closer behind and corrupts the
+											; nesting of any block enclosing it, silently.
+		stz 	AsmBodyLines
+		jsr 	AsmOpenBlock 				; remember where this blob starts in the pool
+		jsr 	AsmRequireEOL 				; GP.ASM is alone on its line
+
+_CACNextLine:
+		lda 	#BLC_READIN 				; pull the next source line ourselves
+		jsr 	CallAPIHandler
+		bcc 	_CACNoEnd 					; source ran out with the block still open
+		jsr 	ProcessNewLine 				; srcPtr and currentLineNumber for the line just read
+
+		jsr 	GetNextNonSpace 			; first thing on it
+		beq 	_CACNextLine 				; blank line inside the block, ignore it
+		cmp 	#C64_REM
+		beq 	_CACBody
+		cmp 	#$CE 						; the GP keyword prefix ?
+		bne 	_CACNotAsm
+		jsr 	GetNext 					; which GP keyword
+		cmp 	#GP_TOKEN_ENDASM
+		beq 	_CACClose
+_CACNotAsm: 								; anything else in here is not assembly
+		.error_structure
+
+_CACBody:
+		jsr 	AsmAssembleLine 			; assemble it into the pool
+		inc 	AsmBodyLines 				; a body line -- the block is not empty
+		bne 	_CACNextLine 				; (255 lines wraps to 0; the emptiness test only
+		dec 	AsmBodyLines 				;  cares about zero, so stick at 255)
+		bra 	_CACNextLine
+
+;
+;		GP.ENDASM. An empty block is the #REM 0 case: the body was stripped by the tokeniser and
+;		the program would otherwise compile clean and contain no code at all.
+;
+_CACClose:
+		lda 	AsmBodyLines
+		beq 	_CACNotAsm 					; empty block -- almost always a missing #REM 1
+		jsr 	AsmCloseBlock 				; cap the blob and emit the call to it
+		jmp 	AsmRequireEOL
+
+_CACNoEnd: 									; GP.ASM with no GP.ENDASM
+		.error_structure
+
+;
+;		A GP.ENDASM reached by the main compile loop had no GP.ASM to close -- CommandAsmCompile
+;		consumes its own, so this is only ever reached by a stray one.
+;
+CommandEndAsmCompile:
+		stz 	deferErrors
+		.error_structure
+
+;
+;		Nothing may follow either delimiter. With deferErrors already disarmed this aborts the
+;		compile rather than quietly becoming a runtime throw-stub.
+;
+AsmRequireEOL:
+		jsr 	LookNextNonSpace
+		bne 	_ARENotEOL
+		clc 								; .def helpers MUST return carry clear
+		rts
+_ARENotEOL:
+		.error_syntax
+
+		.send code
+
+		.section storage
+AsmBodyLines: 								; REM lines seen in the block so far, capped at 255.
+		.fill 	1 							; Zero at GP.ENDASM means #REM 1 was never turned on.
+		.send storage
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;		30/08/26		Written. Block structure only -- the body is recognised and counted,
+;						but not yet assembled and nothing is emitted for it.
+;
+; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		Name:		gpasmcode.asm
+;		Purpose:	The GP.ASM assembler, and the lowering it emits.
+;		Created:	30th August 2026
+;		Reviewed: 	No
+;		Author : 	Steven De George SR
+;
+; ************************************************************************************************
+; ************************************************************************************************
+
+		.section code
+
+; ************************************************************************************************
+;
+;		THE LOWERING, AND WHY IT COSTS NO RUNTIME BYTES.
+;
+;		A block assembles to five bytes of p-code and nothing else:
+;
+;			$DF lo hi		.word  <- the blob's absolute run address
+;			$DD $B0			.shift + sys
+;
+;		SYS already IS the primitive this feature needs -- it saves X and Y, marshals the
+;		registers through $030C-$030F, calls through an indirect and comes back. Its handler,
+;		and .word's, are both far below GPBase, so a program whose only GP.BASIC keyword is
+;		GP.ASM never drags in the 2K GP runtime block. Measured: such a program compiles
+;		GP OUT at RT 12031, exactly what a program with no GP keyword at all costs.
+;
+;		THE BLOBS THEMSELVES GO IN A POOL APPENDED AFTER THE $FF END MARKER. Nothing walks
+;		there: MoveObjectForward returns carry set on $FF, and FixBranches, ScanGPUsage and
+;		ReadLookNext all stop on it. So the pool needs no length byte, no carrier opcode and
+;		no framing -- and therefore has none of the 127-byte-per-block cap a carried payload
+;		would have had.
+;
+;		The price is the ONE genuinely new thing here: .word's operand is an ABSOLUTE address,
+;		the first position-dependent operand in this p-code. Branches are offsets, .string is
+;		codePtr relative and .varspace is workspace relative; this is not. It cannot be
+;		computed while the statement compiles either, because the object's run base is not
+;		known until ScanGPUsage has decided whether the GP block is cut. So each one is
+;		recorded as a fixup and patched into the object buffer inside WriteObjectCode, where
+;		runtimeEndPage (or PCODE_PAGE, shared) is finally known. All of that is compiler work,
+;		which costs a compiled program nothing.
+;
+; ************************************************************************************************
+
+ASM_POOL_SIZE = 1024 						; total assembled bytes across the whole program
+ASM_MAX_BLOCKS = 32 						; GP.ASM blocks in one program
+
+;
+;		Operand syntax classes -- what the text LOOKED like, before the mnemonic gets a say in
+;		which addressing mode that turns into.
+;
+ASYN_NONE = 0 								; nothing, or a bare A
+ASYN_IMM  = 1 								; #n
+ASYN_ABS  = 2 								; n
+ASYN_ABSX = 3 								; n,X
+ASYN_ABSY = 4 								; n,Y
+ASYN_IND  = 5 								; (n)
+ASYN_INDX = 6 								; (n,X)
+ASYN_INDY = 7 								; (n),Y
+
+; ************************************************************************************************
+;
+;		Start a block: remember where in the pool its blob begins.
+;
+; ************************************************************************************************
+
+AsmOpenBlock:
+		lda 	AsmPoolLen
+		sta 	AsmBlobStart
+		lda 	AsmPoolLen+1
+		sta 	AsmBlobStart+1
+		rts
+
+; ************************************************************************************************
+;
+;		Close a block: cap the blob with an RTS and emit the five bytes of p-code that call it.
+;
+;		THE RTS IS ALWAYS APPENDED, even when the last instruction was already one. SYS enters
+;		the blob with a JSR, so a blob that falls off its own end returns to wherever the stack
+;		happens to point and takes the machine with it. One byte to make that impossible is the
+;		right trade; a blob ending in JMP just carries an unreachable RTS after it.
+;
+; ************************************************************************************************
+
+AsmCloseBlock:
+		lda 	#$60 						; RTS
+		jsr 	AsmPoolWrite
+
+		lda 	AsmFixupCount 				; room for another block ?
+		cmp 	#ASM_MAX_BLOCKS
+		bcs 	_ACBTooMany
+		asl 	a 							; 4 bytes per fixup
+		asl 	a
+		tax
+		lda 	AsmBlobStart 				; where this blob starts in the pool
+		sta 	AsmFixups+2,x
+		lda 	AsmBlobStart+1
+		sta 	AsmFixups+3,x
+
+		lda 	#PCD_CMD_WORD 				; .word <blob address>
+		jsr 	WriteCodeByte
+		;
+		;		Capture where the operand lands BEFORE writing it -- objPtr is the write cursor,
+		;		so this IS the address of the low byte, in the buffer, right now. Absolute and
+		;		not an offset, because FreeMemory is an application symbol and this library is
+		;		also built on its own. WriteCodeByte preserves X, so the fixup index survives
+		;		the calls around it.
+		;
+		lda 	objPtr
+		sta 	AsmFixups+0,x
+		lda 	objPtr+1
+		sta 	AsmFixups+1,x
+		lda 	#0 							; two placeholders, overwritten by AsmPatchBlobs
+		jsr 	WriteCodeByte
+		lda 	#0
+		jsr 	WriteCodeByte
+
+		.keyword PCD_SYS 					; $DD $B0 -- call it
+		inc 	AsmFixupCount
+		rts
+
+_ACBTooMany:
+		.error_memory
+
+; ************************************************************************************************
+;
+;		Append A to the blob pool.
+;
+; ************************************************************************************************
+
+AsmPoolWrite:
+		pha
+		lda 	AsmPoolLen+1 				; full ?
+		cmp 	#ASM_POOL_SIZE >> 8
+		bcc 	_APWSpace
+		lda 	AsmPoolLen
+		cmp 	#ASM_POOL_SIZE & $FF
+		bcs 	_APWFull
+_APWSpace:
+		clc
+		lda 	#AsmPool & $FF
+		adc 	AsmPoolLen
+		sta 	zTemp2
+		lda 	#AsmPool >> 8
+		adc 	AsmPoolLen+1
+		sta 	zTemp2+1
+		pla
+		sta 	(zTemp2)
+		inc 	AsmPoolLen
+		bne 	_APWDone
+		inc 	AsmPoolLen+1
+_APWDone:
+		rts
+_APWFull:
+		pla
+		.error_memory
+
+; ************************************************************************************************
+;
+;		Append the whole pool to the object, AFTER the $FF end marker and after FixBranches has
+;		walked the p-code. Records where it landed so the fixups can be resolved later.
+;
+; ************************************************************************************************
+
+AsmFlushPool:
+		lda 	AsmPoolLen 					; no GP.ASM in this program at all
+		ora 	AsmPoolLen+1
+		bne 	_AFPGo
+		rts
+_AFPGo:
+		lda 	objPtr 						; where the pool starts, in the buffer
+		sta 	AsmPoolBase
+		lda 	objPtr+1
+		sta 	AsmPoolBase+1
+
+		.set16 	zTemp2,AsmPool
+		stz 	AsmCopyIdx
+		stz 	AsmCopyIdx+1
+_AFPLoop:
+		lda 	AsmCopyIdx 					; copied everything ?
+		cmp 	AsmPoolLen
+		lda 	AsmCopyIdx+1
+		sbc 	AsmPoolLen+1
+		bcs 	_AFPDone
+		lda 	(zTemp2)
+		jsr 	WriteCodeByte 				; uses objPtr only, leaves zTemp2 alone
+		inc 	zTemp2
+		bne 	_AFPNoCarry
+		inc 	zTemp2+1
+_AFPNoCarry:
+		inc 	AsmCopyIdx
+		bne 	_AFPLoop
+		inc 	AsmCopyIdx+1
+		bra 	_AFPLoop
+_AFPDone:
+		rts
+
+; ************************************************************************************************
+;
+;		Resolve every .word operand now that the object's run base is known.
+;
+;		A = the PAGE DELTA between where the object sits in the buffer now and where it will
+;		sit when the program runs, i.e. runtimeEndPage - (FreeMemory >> 8) embedded, or
+;		PCODE_PAGE - (FreeMemory >> 8) shared. The caller works that out because FreeMemory is
+;		an application symbol; both ends are page aligned, so one byte says all of it.
+;
+; ************************************************************************************************
+
+AsmPatchBlobs:
+		sta 	AsmPageDelta
+		lda 	AsmFixupCount
+		beq 	_APBDone
+		stz 	AsmFixIdx
+_APBLoop:
+		lda 	AsmFixIdx
+		asl 	a
+		asl 	a
+		tax
+		;
+		;		run address = (where the blob sits in the buffer) + the page delta
+		;
+		clc
+		lda 	AsmPoolBase
+		adc 	AsmFixups+2,x
+		sta 	zTemp0
+		lda 	AsmPoolBase+1
+		adc 	AsmFixups+3,x
+		clc
+		adc 	AsmPageDelta
+		sta 	zTemp0+1
+		;
+		;		...written straight into the operand, whose address was recorded as it was
+		;		emitted. The buffer has not moved since.
+		;
+		lda 	AsmFixups+0,x
+		sta 	zTemp1
+		lda 	AsmFixups+1,x
+		sta 	zTemp1+1
+		lda 	zTemp0
+		sta 	(zTemp1)
+		ldy 	#1
+		lda 	zTemp0+1
+		sta 	(zTemp1),y
+
+		inc 	AsmFixIdx
+		lda 	AsmFixIdx
+		cmp 	AsmFixupCount
+		bcc 	_APBLoop
+_APBDone:
+		rts
+
+; ************************************************************************************************
+;
+;		Assemble one REM body line. srcPtr is just past the REM token.
+;
+; ************************************************************************************************
+
+AsmAssembleLine:
+		jsr 	LookNextNonSpace 			; first real character on the line
+		beq 	_AALNothing 				; a bare REM assembles to nothing
+		cmp 	#';' 						; ...and so does a comment
+		beq 	_AALNothing
+		jsr 	AsmReadMnemonic
+		jsr 	AsmParseOperand
+		jsr 	AsmSelectMode
+		jsr 	AsmEmitInstruction
+		jsr 	LookNextNonSpace 			; nothing may follow but a comment
+		beq 	_AALNothing
+		cmp 	#';'
+		beq 	_AALNothing
+		jmp 	AsmBadSyntax
+_AALNothing:
+		rts
+
+; ************************************************************************************************
+;
+;		Three letters into fifteen bits, A=1..Z=26, exactly as genasm.py packs the table.
+;
+; ************************************************************************************************
+
+AsmReadMnemonic:
+		stz 	AsmPacked
+		stz 	AsmPacked+1
+		ldx 	#3
+_ARMChar:
+		jsr 	GetNext
+		cmp 	#'a' 						; fold lower case -- BASLOAD upshifts, the host
+		bcc 	_ARMNoFold 					; tokeniser does not
+		cmp 	#'z'+1
+		bcs 	_ARMNoFold
+		sec
+		sbc 	#'a'-'A'
+_ARMNoFold:
+		jsr 	CharIsAlpha
+		bcc 	AsmBadSyntax
+		sec
+		sbc 	#'A'-1 						; A=1..Z=26, so a zero packed word can terminate
+		pha
+		ldy 	#5 							; packed = packed << 5
+_ARMShift:
+		asl 	AsmPacked
+		rol 	AsmPacked+1
+		dey
+		bne 	_ARMShift
+		pla 								; ...| this letter
+		ora 	AsmPacked
+		sta 	AsmPacked
+		dex
+		bne 	_ARMChar
+		rts
+
+AsmBadSyntax:
+		.error_syntax
+
+; ************************************************************************************************
+;
+;		Work out what the operand LOOKS like, and its value. Which addressing mode that becomes
+;		is AsmSelectMode's job, because it depends on the mnemonic.
+;
+; ************************************************************************************************
+
+AsmParseOperand:
+		stz 	AsmValue
+		stz 	AsmValue+1
+		stz 	AsmIsByte
+		lda 	#ASYN_NONE
+		sta 	AsmSyntax
+
+		jsr 	LookNextNonSpace
+		beq 	_APODone 					; implied
+		cmp 	#';'
+		beq 	_APODone 					; implied, with a comment after it
+		cmp 	#'#'
+		beq 	_APOImmediate
+		cmp 	#'('
+		beq 	_APOIndirect
+		cmp 	#'A' 						; a bare A is the accumulator, i.e. implied
+		bne 	_APOAbsolute
+		jsr 	GetNext 					; consume it and see what follows
+		jsr 	LookNextNonSpace
+		beq 	_APODone
+		cmp 	#';'
+		beq 	_APODone
+		jmp 	AsmBadSyntax 				; A followed by anything else is not a form we have
+_APODone:
+		rts
+
+_APOImmediate:
+		jsr 	GetNext 					; consume the #
+		jsr 	AsmParseValue
+		lda 	#ASYN_IMM
+		sta 	AsmSyntax
+		rts
+
+;
+;		Absolute, or one of the two indexed forms.
+;
+_APOAbsolute:
+		jsr 	AsmParseValue
+		lda 	#ASYN_ABS
+		sta 	AsmSyntax
+		jsr 	LookNextNonSpace
+		cmp 	#','
+		bne 	_APODone
+		jsr 	GetNext 					; consume the comma
+		jsr 	AsmReadIndexRegister 		; X -> carry clear, Y -> carry set
+		lda 	#ASYN_ABSX
+		bcc 	_APOAbsIndexed
+		lda 	#ASYN_ABSY
+_APOAbsIndexed:
+		sta 	AsmSyntax
+		rts
+
+;
+;		(n) / (n,X) / (n),Y
+;
+_APOIndirect:
+		jsr 	GetNext 					; consume the (
+		jsr 	AsmParseValue
+		jsr 	LookNextNonSpace
+		cmp 	#','
+		beq 	_APOIndX
+		;
+		;		(n), and then possibly ,Y
+		;
+		lda 	#')'
+		jsr 	AsmExpect
+		lda 	#ASYN_IND
+		sta 	AsmSyntax
+		jsr 	LookNextNonSpace
+		cmp 	#','
+		bne 	_APODone
+		jsr 	GetNext
+		jsr 	AsmReadIndexRegister
+		bcc 	_APOBadIndex 				; (n),X does not exist
+		lda 	#ASYN_INDY
+		sta 	AsmSyntax
+		rts
+;
+;		(n,X)
+;
+_APOIndX:
+		jsr 	GetNext 					; consume the comma
+		jsr 	AsmReadIndexRegister
+		bcs 	_APOBadIndex 				; (n,Y) does not exist
+		lda 	#')'
+		jsr 	AsmExpect
+		lda 	#ASYN_INDX
+		sta 	AsmSyntax
+		rts
+
+_APOBadIndex:
+		jmp 	AsmBadSyntax
+
+; ************************************************************************************************
+;
+;		Read an index register: carry clear for X, carry set for Y, anything else is a syntax
+;		error.
+;
+; ************************************************************************************************
+
+AsmReadIndexRegister:
+		jsr 	LookNextNonSpace
+		jsr 	GetNext
+		cmp 	#'x'
+		beq 	_ARIRX
+		cmp 	#'X'
+		beq 	_ARIRX
+		cmp 	#'y'
+		beq 	_ARIRY
+		cmp 	#'Y'
+		bne 	_ARIRBad
+_ARIRY:
+		sec
+		rts
+_ARIRX:
+		clc
+		rts
+_ARIRBad:
+		jmp 	AsmBadSyntax
+
+; ************************************************************************************************
+;
+;		Require the next non-space character to be A.
+;
+; ************************************************************************************************
+
+AsmExpect:
+		pha
+		jsr 	LookNextNonSpace
+		jsr 	GetNext
+		sta 	AsmScratch
+		pla
+		cmp 	AsmScratch
+		bne 	_AEBad
+		rts
+_AEBad:
+		jmp 	AsmBadSyntax
+
+; ************************************************************************************************
+;
+;		A number: $hex or decimal. AsmIsByte says whether it will fit in one byte, which is what
+;		picks zero page over absolute -- for hex that is the DIGIT COUNT, so $0080 is absolute
+;		and $80 is zero page, and for decimal it is simply the magnitude.
+;
+; ************************************************************************************************
+
+AsmParseValue:
+		stz 	AsmValue
+		stz 	AsmValue+1
+		stz 	AsmDigits
+		jsr 	LookNextNonSpace
+		cmp 	#'$'
+		beq 	_APVHex
+		jmp 	_APVDecimal
+_APVHex:
+		jsr 	GetNext 					; consume the $
+_APVHexLoop:
+		jsr 	LookNext
+		jsr 	ConvertHexStyle 			; 0-35, carry set if it converted at all
+		bcc 	_APVHexEnd
+		cmp 	#16 						; G-Z are not hex digits
+		bcs 	_APVHexEnd
+		pha
+		jsr 	GetNext 					; consume the digit
+		ldy 	#4 							; value = value << 4
+_APVHexShift:
+		asl 	AsmValue
+		rol 	AsmValue+1
+		dey
+		bne 	_APVHexShift
+		pla 								; ...| this digit
+		ora 	AsmValue
+		sta 	AsmValue
+		inc 	AsmDigits
+		bra 	_APVHexLoop
+_APVHexEnd:
+		lda 	AsmDigits
+		beq 	_APVBad 					; a bare $
+		cmp 	#3 							; one or two digits -> a byte
+		bcs 	_APVNotByte
+		bra 	_APVIsByte
+
+_APVBad:
+		jmp 	AsmBadSyntax
+
+_APVDecimal:
+		jsr 	LookNext
+		jsr 	CharIsDigit
+		bcc 	_APVBad
+_APVDecLoop:
+		jsr 	LookNext
+		jsr 	CharIsDigit
+		bcc 	_APVDecEnd
+		jsr 	GetNext
+		sec
+		sbc 	#'0'
+		pha
+		jsr 	AsmValueTimesTen
+		pla
+		clc
+		adc 	AsmValue
+		sta 	AsmValue
+		bcc 	_APVDecLoop
+		inc 	AsmValue+1
+		bra 	_APVDecLoop
+_APVDecEnd:
+		lda 	AsmValue+1 					; under 256 -> a byte
+		bne 	_APVNotByte
+_APVIsByte:
+		lda 	#1
+		sta 	AsmIsByte
+		rts
+_APVNotByte:
+		stz 	AsmIsByte
+		rts
+
+;
+;		AsmValue = AsmValue * 10, as *8 + *2.
+;
+AsmValueTimesTen:
+		lda 	AsmValue
+		sta 	AsmScratch
+		lda 	AsmValue+1
+		sta 	AsmScratch+1
+		asl 	AsmValue 					; value *2
+		rol 	AsmValue+1
+		asl 	AsmScratch 					; scratch = original *2
+		rol 	AsmScratch+1
+		asl 	AsmValue 					; value *4
+		rol 	AsmValue+1
+		asl 	AsmValue 					; value *8
+		rol 	AsmValue+1
+		clc
+		lda 	AsmValue
+		adc 	AsmScratch
+		sta 	AsmValue
+		lda 	AsmValue+1
+		adc 	AsmScratch+1
+		sta 	AsmValue+1
+		rts
+
+; ************************************************************************************************
+;
+;		Turn (mnemonic, syntax class) into an opcode. The mnemonic decides which of the candidate
+;		modes for that syntax actually exists -- LDA $12 is zero page because LDA has one, JSR $12
+;		is absolute because JSR does not.
+;
+; ************************************************************************************************
+
+AsmSelectMode:
+		.set16 	zTemp2,AsmMnemonicTable
+_ASMFind:
+		lda 	(zTemp2) 					; end of table ?
+		ldy 	#1
+		ora 	(zTemp2),y
+		beq 	_ASMUnknown
+		lda 	(zTemp2)
+		cmp 	AsmPacked
+		bne 	_ASMNext
+		lda 	(zTemp2),y
+		cmp 	AsmPacked+1
+		beq 	_ASMFound
+_ASMNext:
+		clc
+		lda 	zTemp2
+		adc 	#4
+		sta 	zTemp2
+		bcc 	_ASMFind
+		inc 	zTemp2+1
+		bra 	_ASMFind
+
+_ASMUnknown:
+		jmp 	AsmBadSyntax
+
+_ASMFound:
+		ldy 	#2
+		lda 	(zTemp2),y
+		sta 	AsmEntryFirst
+		iny
+		lda 	(zTemp2),y
+		sta 	AsmEntryCount
+		;
+		;		Try this syntax class's candidate modes in order. The top bit marks a candidate
+		;		that is only allowed when the operand fits in a byte.
+		;
+		lda 	AsmSyntax
+		asl 	a 							; three candidates each
+		clc
+		adc 	AsmSyntax
+		sta 	AsmChoiceIdx
+		lda 	#3
+		sta 	AsmChoiceLeft
+_ASMCandidate:
+		ldx 	AsmChoiceIdx
+		lda 	AsmModeChoice,x
+		cmp 	#$FF
+		beq 	_ASMNoMode
+		bpl 	_ASMTry 					; no byte-only flag
+		and 	#$7F
+		ldx 	AsmIsByte
+		beq 	_ASMNextCandidate 			; byte-only candidate, and this operand is not one
+_ASMTry:
+		jsr 	AsmFindModeEntry 			; carry set, A = opcode, if the mnemonic has it
+		bcs 	_ASMGotIt
+_ASMNextCandidate:
+		inc 	AsmChoiceIdx
+		dec 	AsmChoiceLeft
+		bne 	_ASMCandidate
+_ASMNoMode:
+		jmp 	AsmBadSyntax
+_ASMGotIt:
+		sta 	AsmOpcode
+		rts
+
+; ************************************************************************************************
+;
+;		Does this mnemonic have addressing mode A ? Carry set and A = its opcode if so, with
+;		AsmMode left holding the mode. Carry clear if not. Destroys X and Y.
+;
+; ************************************************************************************************
+
+AsmFindModeEntry:
+		sta 	AsmScratch 					; the mode we want
+		lda 	AsmEntryFirst 				; byte offset = index * 2, which can pass 255
+		asl 	a
+		sta 	zTemp0
+		lda 	#0
+		rol 	a
+		sta 	zTemp0+1
+		clc
+		lda 	zTemp0
+		adc 	#AsmModeTable & $FF
+		sta 	zTemp0
+		lda 	zTemp0+1
+		adc 	#AsmModeTable >> 8
+		sta 	zTemp0+1
+		ldx 	AsmEntryCount
+_AFMELoop:
+		lda 	(zTemp0)
+		cmp 	AsmScratch
+		beq 	_AFMEFound
+		clc
+		lda 	zTemp0
+		adc 	#2
+		sta 	zTemp0
+		bcc 	_AFMENoCarry
+		inc 	zTemp0+1
+_AFMENoCarry:
+		dex
+		bne 	_AFMELoop
+		clc
+		rts
+_AFMEFound:
+		lda 	AsmScratch
+		sta 	AsmMode
+		ldy 	#1
+		lda 	(zTemp0),y 					; the opcode
+		sec
+		rts
+
+; ************************************************************************************************
+;
+;		Emit the opcode and however many operand bytes its mode takes.
+;
+; ************************************************************************************************
+
+AsmEmitInstruction:
+		lda 	AsmMode
+		cmp 	#AMODE_REL
+		beq 	AsmNoBranchesYet
+		lda 	AsmOpcode
+		jsr 	AsmPoolWrite
+		ldx 	AsmMode
+		lda 	AsmModeLen,x
+		beq 	_AEIDone 					; implied, no operand at all
+		pha
+		lda 	AsmValue
+		jsr 	AsmPoolWrite
+		pla
+		cmp 	#2
+		bcc 	_AEIDone
+		lda 	AsmValue+1
+		jsr 	AsmPoolWrite
+_AEIDone:
+		rts
+
+;
+;		A branch needs a label to aim at, and labels are not in yet. The displacement cannot be
+;		computed from an absolute address either, because the blob's own run address is not known
+;		until WriteObjectCode. Say so plainly rather than assemble something wrong.
+;
+AsmNoBranchesYet:
+		.error_unimplemented
+
+; ************************************************************************************************
+;
+;		Candidate addressing modes per syntax class, three each, $FF for none. The top bit marks
+;		a candidate that only applies when the operand fits in a byte.
+;
+; ************************************************************************************************
+
+AsmModeChoice:
+		.byte 	AMODE_IMP,$FF,$FF 						; ASYN_NONE
+		.byte 	AMODE_IMM,$FF,$FF 						; ASYN_IMM
+		.byte 	AMODE_REL,AMODE_ZP|$80,AMODE_ABS 		; ASYN_ABS
+		.byte 	AMODE_ZPX|$80,AMODE_ABX,$FF 			; ASYN_ABSX
+		.byte 	AMODE_ZPY|$80,AMODE_ABY,$FF 			; ASYN_ABSY
+		.byte 	AMODE_IZP|$80,AMODE_IND,$FF 			; ASYN_IND
+		.byte 	AMODE_IZX|$80,AMODE_IAX,$FF 			; ASYN_INDX
+		.byte 	AMODE_IZY,$FF,$FF 						; ASYN_INDY
+
+;
+;		Operand bytes per addressing mode.
+;
+AsmModeLen:
+		.byte 	0 						; IMP
+		.byte 	1 						; IMM
+		.byte 	1 						; ZP
+		.byte 	1 						; ZPX
+		.byte 	1 						; ZPY
+		.byte 	2 						; ABS
+		.byte 	2 						; ABX
+		.byte 	2 						; ABY
+		.byte 	2 						; IND
+		.byte 	1 						; IZX
+		.byte 	1 						; IZY
+		.byte 	1 						; IZP
+		.byte 	2 						; IAX
+		.byte 	1 						; REL
+
+; ************************************************************************************************
+;
+;		All of this is compiler space -- above ObjectBase, thrown away when the object is
+;		written. storage is the 1K hole below the code and is already full, so none of it can
+;		go there; see the note in application/source/file-io/read.asm.
+;
+; ************************************************************************************************
+
+AsmPool:
+		.fill 	ASM_POOL_SIZE 			; every blob in the program, back to back
+AsmPoolLen:
+		.fill 	2
+AsmPoolBase:
+		.fill 	2 						; where the pool landed within the object
+AsmBlobStart:
+		.fill 	2 						; pool offset of the blob being assembled
+AsmFixups:
+		.fill 	4*ASM_MAX_BLOCKS 		; per block: p-code operand offset, blob pool offset
+AsmFixupCount:
+		.fill 	1
+AsmFixIdx:
+		.fill 	1
+AsmPageDelta:
+		.fill 	1
+AsmCopyIdx:
+		.fill 	2
+AsmPacked:
+		.fill 	2 						; the mnemonic being assembled
+AsmSyntax:
+		.fill 	1
+AsmValue:
+		.fill 	2
+AsmIsByte:
+		.fill 	1
+AsmDigits:
+		.fill 	1
+AsmMode:
+		.fill 	1
+AsmOpcode:
+		.fill 	1
+AsmEntryFirst:
+		.fill 	1
+AsmEntryCount:
+		.fill 	1
+AsmChoiceIdx:
+		.fill 	1
+AsmChoiceLeft:
+		.fill 	1
+AsmScratch:
+		.fill 	2
+
+		.send code
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;		30/08/26		Written. Numeric operands and all thirteen non-branch addressing modes;
+;						branches and {VAR} are not in yet.
+;
+; ************************************************************************************************
+;
+;	This file is automatically generated by scripts/genasm.py -- do not edit.
+;
+;	65C02 opcode tables for GP.ASM. Compiler space only: everything here lives
+;	above ObjectBase and is thrown away when the object code is written.
+;
+AMODE_IMP = 0
+AMODE_IMM = 1
+AMODE_ZP  = 2
+AMODE_ZPX = 3
+AMODE_ZPY = 4
+AMODE_ABS = 5
+AMODE_ABX = 6
+AMODE_ABY = 7
+AMODE_IND = 8
+AMODE_IZX = 9
+AMODE_IZY = 10
+AMODE_IZP = 11
+AMODE_IAX = 12
+AMODE_REL = 13
+AMODE_COUNT = 14
+
+		.section code
+
+;
+;	One entry per mnemonic, 4 bytes: packed name lo/hi, first mode entry, count.
+;	Terminated by a zero packed name. 66 mnemonics.
+;
+AsmMnemonicTable:
+		.byte	$83,$04,0,9		; ADC
+		.byte	$c4,$05,9,9		; AND
+		.byte	$6c,$06,18,5		; ASL
+		.byte	$63,$08,23,1		; BCC
+		.byte	$73,$08,24,1		; BCS
+		.byte	$b1,$08,25,1		; BEQ
+		.byte	$34,$09,26,5		; BIT
+		.byte	$a9,$09,31,1		; BMI
+		.byte	$c5,$09,32,1		; BNE
+		.byte	$0c,$0a,33,1		; BPL
+		.byte	$41,$0a,34,1		; BRA
+		.byte	$4b,$0a,35,1		; BRK
+		.byte	$c3,$0a,36,1		; BVC
+		.byte	$d3,$0a,37,1		; BVS
+		.byte	$83,$0d,38,1		; CLC
+		.byte	$84,$0d,39,1		; CLD
+		.byte	$89,$0d,40,1		; CLI
+		.byte	$96,$0d,41,1		; CLV
+		.byte	$b0,$0d,42,9		; CMP
+		.byte	$18,$0e,51,3		; CPX
+		.byte	$19,$0e,54,3		; CPY
+		.byte	$a3,$10,57,5		; DEC
+		.byte	$b8,$10,62,1		; DEX
+		.byte	$b9,$10,63,1		; DEY
+		.byte	$f2,$15,64,9		; EOR
+		.byte	$c3,$25,73,5		; INC
+		.byte	$d8,$25,78,1		; INX
+		.byte	$d9,$25,79,1		; INY
+		.byte	$b0,$29,80,3		; JMP
+		.byte	$72,$2a,83,1		; JSR
+		.byte	$81,$30,84,9		; LDA
+		.byte	$98,$30,93,5		; LDX
+		.byte	$99,$30,98,5		; LDY
+		.byte	$72,$32,103,5		; LSR
+		.byte	$f0,$39,108,1		; NOP
+		.byte	$41,$3e,109,9		; ORA
+		.byte	$01,$41,118,1		; PHA
+		.byte	$10,$41,119,1		; PHP
+		.byte	$18,$41,120,1		; PHX
+		.byte	$19,$41,121,1		; PHY
+		.byte	$81,$41,122,1		; PLA
+		.byte	$90,$41,123,1		; PLP
+		.byte	$98,$41,124,1		; PLX
+		.byte	$99,$41,125,1		; PLY
+		.byte	$ec,$49,126,5		; ROL
+		.byte	$f2,$49,131,5		; ROR
+		.byte	$89,$4a,136,1		; RTI
+		.byte	$93,$4a,137,1		; RTS
+		.byte	$43,$4c,138,9		; SBC
+		.byte	$a3,$4c,147,1		; SEC
+		.byte	$a4,$4c,148,1		; SED
+		.byte	$a9,$4c,149,1		; SEI
+		.byte	$81,$4e,150,8		; STA
+		.byte	$90,$4e,158,1		; STP
+		.byte	$98,$4e,159,3		; STX
+		.byte	$99,$4e,162,3		; STY
+		.byte	$9a,$4e,165,4		; STZ
+		.byte	$38,$50,169,1		; TAX
+		.byte	$39,$50,170,1		; TAY
+		.byte	$42,$52,171,2		; TRB
+		.byte	$62,$52,173,2		; TSB
+		.byte	$78,$52,175,1		; TSX
+		.byte	$01,$53,176,1		; TXA
+		.byte	$13,$53,177,1		; TXS
+		.byte	$21,$53,178,1		; TYA
+		.byte	$29,$5c,179,1		; WAI
+		.byte	$00,$00				; end of table
+
+;
+;	One entry per addressing mode of every mnemonic, 2 bytes: mode, opcode.
+;	180 entries.
+;
+AsmModeTable:
+		.byte	AMODE_IMM,$69
+		.byte	AMODE_ZP,$65
+		.byte	AMODE_ZPX,$75
+		.byte	AMODE_ABS,$6d
+		.byte	AMODE_ABX,$7d
+		.byte	AMODE_ABY,$79
+		.byte	AMODE_IZX,$61
+		.byte	AMODE_IZY,$71
+		.byte	AMODE_IZP,$72
+		.byte	AMODE_IMM,$29
+		.byte	AMODE_ZP,$25
+		.byte	AMODE_ZPX,$35
+		.byte	AMODE_ABS,$2d
+		.byte	AMODE_ABX,$3d
+		.byte	AMODE_ABY,$39
+		.byte	AMODE_IZX,$21
+		.byte	AMODE_IZY,$31
+		.byte	AMODE_IZP,$32
+		.byte	AMODE_IMP,$0a
+		.byte	AMODE_ZP,$06
+		.byte	AMODE_ZPX,$16
+		.byte	AMODE_ABS,$0e
+		.byte	AMODE_ABX,$1e
+		.byte	AMODE_REL,$90
+		.byte	AMODE_REL,$b0
+		.byte	AMODE_REL,$f0
+		.byte	AMODE_IMM,$89
+		.byte	AMODE_ZP,$24
+		.byte	AMODE_ZPX,$34
+		.byte	AMODE_ABS,$2c
+		.byte	AMODE_ABX,$3c
+		.byte	AMODE_REL,$30
+		.byte	AMODE_REL,$d0
+		.byte	AMODE_REL,$10
+		.byte	AMODE_REL,$80
+		.byte	AMODE_IMP,$00
+		.byte	AMODE_REL,$50
+		.byte	AMODE_REL,$70
+		.byte	AMODE_IMP,$18
+		.byte	AMODE_IMP,$d8
+		.byte	AMODE_IMP,$58
+		.byte	AMODE_IMP,$b8
+		.byte	AMODE_IMM,$c9
+		.byte	AMODE_ZP,$c5
+		.byte	AMODE_ZPX,$d5
+		.byte	AMODE_ABS,$cd
+		.byte	AMODE_ABX,$dd
+		.byte	AMODE_ABY,$d9
+		.byte	AMODE_IZX,$c1
+		.byte	AMODE_IZY,$d1
+		.byte	AMODE_IZP,$d2
+		.byte	AMODE_IMM,$e0
+		.byte	AMODE_ZP,$e4
+		.byte	AMODE_ABS,$ec
+		.byte	AMODE_IMM,$c0
+		.byte	AMODE_ZP,$c4
+		.byte	AMODE_ABS,$cc
+		.byte	AMODE_IMP,$3a
+		.byte	AMODE_ZP,$c6
+		.byte	AMODE_ZPX,$d6
+		.byte	AMODE_ABS,$ce
+		.byte	AMODE_ABX,$de
+		.byte	AMODE_IMP,$ca
+		.byte	AMODE_IMP,$88
+		.byte	AMODE_IMM,$49
+		.byte	AMODE_ZP,$45
+		.byte	AMODE_ZPX,$55
+		.byte	AMODE_ABS,$4d
+		.byte	AMODE_ABX,$5d
+		.byte	AMODE_ABY,$59
+		.byte	AMODE_IZX,$41
+		.byte	AMODE_IZY,$51
+		.byte	AMODE_IZP,$52
+		.byte	AMODE_IMP,$1a
+		.byte	AMODE_ZP,$e6
+		.byte	AMODE_ZPX,$f6
+		.byte	AMODE_ABS,$ee
+		.byte	AMODE_ABX,$fe
+		.byte	AMODE_IMP,$e8
+		.byte	AMODE_IMP,$c8
+		.byte	AMODE_ABS,$4c
+		.byte	AMODE_IND,$6c
+		.byte	AMODE_IAX,$7c
+		.byte	AMODE_ABS,$20
+		.byte	AMODE_IMM,$a9
+		.byte	AMODE_ZP,$a5
+		.byte	AMODE_ZPX,$b5
+		.byte	AMODE_ABS,$ad
+		.byte	AMODE_ABX,$bd
+		.byte	AMODE_ABY,$b9
+		.byte	AMODE_IZX,$a1
+		.byte	AMODE_IZY,$b1
+		.byte	AMODE_IZP,$b2
+		.byte	AMODE_IMM,$a2
+		.byte	AMODE_ZP,$a6
+		.byte	AMODE_ZPY,$b6
+		.byte	AMODE_ABS,$ae
+		.byte	AMODE_ABY,$be
+		.byte	AMODE_IMM,$a0
+		.byte	AMODE_ZP,$a4
+		.byte	AMODE_ZPX,$b4
+		.byte	AMODE_ABS,$ac
+		.byte	AMODE_ABX,$bc
+		.byte	AMODE_IMP,$4a
+		.byte	AMODE_ZP,$46
+		.byte	AMODE_ZPX,$56
+		.byte	AMODE_ABS,$4e
+		.byte	AMODE_ABX,$5e
+		.byte	AMODE_IMP,$ea
+		.byte	AMODE_IMM,$09
+		.byte	AMODE_ZP,$05
+		.byte	AMODE_ZPX,$15
+		.byte	AMODE_ABS,$0d
+		.byte	AMODE_ABX,$1d
+		.byte	AMODE_ABY,$19
+		.byte	AMODE_IZX,$01
+		.byte	AMODE_IZY,$11
+		.byte	AMODE_IZP,$12
+		.byte	AMODE_IMP,$48
+		.byte	AMODE_IMP,$08
+		.byte	AMODE_IMP,$da
+		.byte	AMODE_IMP,$5a
+		.byte	AMODE_IMP,$68
+		.byte	AMODE_IMP,$28
+		.byte	AMODE_IMP,$fa
+		.byte	AMODE_IMP,$7a
+		.byte	AMODE_IMP,$2a
+		.byte	AMODE_ZP,$26
+		.byte	AMODE_ZPX,$36
+		.byte	AMODE_ABS,$2e
+		.byte	AMODE_ABX,$3e
+		.byte	AMODE_IMP,$6a
+		.byte	AMODE_ZP,$66
+		.byte	AMODE_ZPX,$76
+		.byte	AMODE_ABS,$6e
+		.byte	AMODE_ABX,$7e
+		.byte	AMODE_IMP,$40
+		.byte	AMODE_IMP,$60
+		.byte	AMODE_IMM,$e9
+		.byte	AMODE_ZP,$e5
+		.byte	AMODE_ZPX,$f5
+		.byte	AMODE_ABS,$ed
+		.byte	AMODE_ABX,$fd
+		.byte	AMODE_ABY,$f9
+		.byte	AMODE_IZX,$e1
+		.byte	AMODE_IZY,$f1
+		.byte	AMODE_IZP,$f2
+		.byte	AMODE_IMP,$38
+		.byte	AMODE_IMP,$f8
+		.byte	AMODE_IMP,$78
+		.byte	AMODE_ZP,$85
+		.byte	AMODE_ZPX,$95
+		.byte	AMODE_ABS,$8d
+		.byte	AMODE_ABX,$9d
+		.byte	AMODE_ABY,$99
+		.byte	AMODE_IZX,$81
+		.byte	AMODE_IZY,$91
+		.byte	AMODE_IZP,$92
+		.byte	AMODE_IMP,$db
+		.byte	AMODE_ZP,$86
+		.byte	AMODE_ZPY,$96
+		.byte	AMODE_ABS,$8e
+		.byte	AMODE_ZP,$84
+		.byte	AMODE_ZPX,$94
+		.byte	AMODE_ABS,$8c
+		.byte	AMODE_ZP,$64
+		.byte	AMODE_ZPX,$74
+		.byte	AMODE_ABS,$9c
+		.byte	AMODE_ABX,$9e
+		.byte	AMODE_IMP,$aa
+		.byte	AMODE_IMP,$a8
+		.byte	AMODE_ZP,$14
+		.byte	AMODE_ABS,$1c
+		.byte	AMODE_ZP,$04
+		.byte	AMODE_ABS,$0c
+		.byte	AMODE_IMP,$ba
+		.byte	AMODE_IMP,$8a
+		.byte	AMODE_IMP,$9a
+		.byte	AMODE_IMP,$98
+		.byte	AMODE_IMP,$cb
+
+		.send code
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;

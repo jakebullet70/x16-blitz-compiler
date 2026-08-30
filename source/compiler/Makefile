@@ -24,6 +24,7 @@ prelim: tokenise
 	make -C ../common-source
 	$(PYTHON) scripts$(S)genx16.py
 	$(PYTHON) scripts$(S)gencom.py 
+	$(PYTHON) scripts$(S)genasm.py
 	$(PYTHON) $(CSCRIPTS)build.py
 	$(CCOPY) _library.asm $(BINDIR)compiler.library
 

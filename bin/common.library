@@ -81,6 +81,8 @@ C64_RIGHTDOLLAR          = $c9 ; $c9 right$
 C64_MIDDOLLAR            = $ca ; $ca mid$
 C64_GO                   = $cb ; $cb go
 C64_PI                   = $ff ; $ff pi
+C64_GPCMD_ENDASM         = $ce59 ; $ce59 gp.endasm
+C64_GPCMD_ASM            = $ce5a ; $ce5a gp.asm
 C64_GPCMD_ENDIF          = $ce5b ; $ce5b gp.endif
 C64_GPCMD_ELSE           = $ce5c ; $ce5c gp.else
 C64_GPCMD_ELSEIF         = $ce5d ; $ce5d gp.elseif
@@ -860,7 +862,7 @@ ErrorV_divzero:
 	.text	"DIVIDE BY ZERO",0
 ErrorV_structure:
 	jsr	CallErrorHandler
-	.text	"STRUCTURE IMBALANCE",0
+	.text	"BLOCK MISMATCH",0
 ErrorV_stop:
 	jsr	CallErrorHandler
 	.text	"PROGRAM STOPPED",0

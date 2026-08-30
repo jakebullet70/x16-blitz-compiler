@@ -31,7 +31,7 @@ ErrorV_divzero:
 	.text	"DIVIDE BY ZERO",0
 ErrorV_structure:
 	jsr	CallErrorHandler
-	.text	"STRUCTURE IMBALANCE",0
+	.text	"BLOCK MISMATCH",0
 ErrorV_stop:
 	jsr	CallErrorHandler
 	.text	"PROGRAM STOPPED",0

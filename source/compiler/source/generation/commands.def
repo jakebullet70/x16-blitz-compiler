@@ -89,6 +89,20 @@ GP.IF 			X:CommandIfCompile N
 GP.ELSEIF 		X:CommandElseIfCompile N
 GP.ELSE 		X:CommandElseCompile N
 GP.ENDIF 		X:CommandEndIfCompile N
+
+#
+#		GP.ASM / GP.ENDASM -- inline 65C02 assembly. The body rides in REM statements, one
+#		instruction per line, and is assembled at compile time. GP.ASM reads its own source
+#		lines through to the GP.ENDASM, so GP.ENDASM's entry here is only ever reached by a
+#		stray one and exists to name that as an error rather than let it fall through to a
+#		syntax error that says nothing.
+#
+#		No "T" on either: neither writes a keyword token: the block lowers onto opcodes that
+#		already exist and whose handlers are all below GPBase, so a program whose only
+#		GP.BASIC keyword is GP.ASM stays GP OUT and pays nothing for the GP runtime block.
+#
+GP.ASM 			X:CommandAsmCompile N
+GP.ENDASM 		X:CommandEndAsmCompile N
 #
 #		GP.CALL <addr> [,a] [,x] [,y] [,c] -- call machine code with the registers set. Results
 #		come back through the GP.A/GP.X/GP.Y/GP.C value words (x16_unary.def), which are ordinary

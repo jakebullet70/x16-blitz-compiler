@@ -196,6 +196,8 @@ SaveCodeAndExit:
 		lda 	#$FF 						; add end marker
 		jsr 	WriteCodeByte
 		jsr 	FixBranches 				; fix up GOTO/GOSUB etc.
+		jsr 	AsmFlushPool 				; append the GP.ASM blob pool AFTER the $FF end marker,
+											; where nothing walks -- see commands/gpasmcode.asm
 
 		lda 	#BLC_CLOSEOUT 				; close output store 
 		jsr 	CallAPIHandler
