@@ -109,6 +109,11 @@ OK CODE 8572 FREE 11776 RT 14079 GP-BASIC IN
   BASIC library modules, so they are paid for in the p-code of the program that includes them and
   nowhere else. `APPHELP.STARTUP`/`RESTORE` lean on `GP.CALL`/`GP.A`/`GP.X`/`GP.Y`, which are GP block
   keywords — already bought and paid for by the `GP.SELECT` above, so they add nothing to `RT`.
+- **Driving `MENUHELP` properly gave 5 bytes back** — 9650 → **9645**. The hand-rolled loop over
+  `MENUHELP.ROW` was not only wrong, it was bigger than `GOSUB MENUHELP.DRAW`.
+- **The dropdown geometry assertion costs 68 bytes** — 9645 → **9713**, and it is compiled into
+  every build because `ED.SELFCHECK` is, exactly like the rest of the self-check above. Worth it:
+  it is the check that would have caught a panel of the wrong height on the day it was written.
 
 ## How it renders
 
@@ -226,9 +231,32 @@ writing CR where the fixture had LF.
 
 ## The menus, and the flag that makes the GP drawing commands usable
 
-The dropdown is drawn by `MENUHELP.ROW` — `GP.FILL` for the row, `GP.PRINTAT` for the text — inside a
-`GP.BOX` frame. Neither worked at first, and the reason is the same re-ordered font that makes the
-renderers free.
+The dropdown is drawn by `MENUHELP.DRAW` — `GP.FILL` for each row, `GP.PRINTAT` for its text —
+inside a `GP.BOX` frame. Neither worked at first, for two quite separate reasons: the re-ordered
+font, below, and a caller that was not really calling the library at all.
+
+### Use the whole interface, or you are guessing at it
+
+`ED.DRAW.DROPDOWN` first set `MENUHELP.X`, `.Y` and `.WIDTH` — three fields of nine — and then
+hand-rolled its own `FOR` loop poking `.DRAWROW` and `.DRAWATTR` into **`MENUHELP.ROW`, the module's
+lowest entry point**, leaving `.COUNT`, `.ATTR` and `.HIATTR` at zero. It drew a panel of the wrong
+height with rows missing, and the library got the blame for a session.
+
+It was never the library. `GPC-BASIC/MENUDEMO.EXP.BL` is MENUHELP's own example; built headlessly
+with `MENUHELP.RUN` swapped for `MENUHELP.DRAW` and the tile map read back out of VERA, it renders
+five items in five rows with the frame exactly where it belongs. **The difference between MENUDEMO's
+nine assignments and this sample's three was the whole bug**, and it was visible in a side-by-side
+read of the two files long before any emulator was involved.
+
+`MENUHELP.ROW` reads `MENUHELP.ATTR` itself — it is the test at the routine's tail that decides
+whether a row gets its hotkey tinted — so a caller that never sets it is not calling the routine,
+it is guessing at it. Setting the documented inputs and calling `MENUHELP.DRAW` is also **5 bytes
+smaller** than the hand-rolled loop: `OK CODE 9650` → `9645`. The shipping build is `9713`,
+the extra 68 being the `DDROWS` assertion below.
+
+The self-check was green throughout, which is its own lesson: it asserted **one** `VPEEK` of the
+panel, and one sampled cell cannot see a wrong height or a skipped row. It now walks the whole
+shape — frame row, every item row, frame row — as `DDROWS`.
 
 **`GP.PRINTAT` converts PETSCII to a screen code before writing.** Against an ASCII-ordered font that
 is one conversion too many: measured, `GP.PRINTAT 0,5,"Ab"` wrote tiles `1` and `66`, which render as

@@ -285,9 +285,11 @@ ED.INIT:
   REM The SAME entry point again, but with CARRY SET, which makes screen_mode REPORT
   REM instead of set: mode in A, columns in X, rows in Y. That replaces $FFED entirely,
   REM so the whole routine now speaks to one KERNAL address rather than three. It has to
-  REM be asked AFTER the mode is set, because what we want is the size of the mode we
-  REM just chose -- APPHELP.COLS/ROWS hold the size the USER had, which is what ED.QUIT
-  REM gives back.
+  REM be asked AFTER the mode is set, and it is NOT the size APPHELP.STARTUP already
+  REM recorded. That one is the mode the USER had -- measured 80x60 -- and it is kept
+  REM untouched so ED.QUIT can give it back. This one is the mode the editor just chose,
+  REM 80x30, which is what every renderer below has to lay itself out in. Two different
+  REM sizes, both needed, so both are asked for.
   GP.CALL APPHELP.SCRMODE, 0, 0, 0, 1
   SCREEN.COLS = GP.X
   SCREEN.ROWS = GP.Y
@@ -1011,20 +1013,39 @@ ED.DRAW.DROPDOWN:
   REM invisible. What is wanted is the panel's own BACKGROUND colour, so the border
   REM reads as the edge of the panel, and that is PAGE's high nibble.
   ED.DD.FRAME = INT(THEME.CLR(THEME.PAGE) / 16)
-  GP.BOX ED.DD.BX, 1, ED.DD.W + 2, ED.DD.N + 2, 0, ED.DD.FRAME
+  REM EVERY Y HERE IS A MAP ROW, NOT A SCREEN ROW, and that is the whole reason this
+  REM looked wrong. The text layer is hardware-scrolled with VERA's L1_VSCROLL, so screen
+  REM row R lives at MAP row R + ED.MAP.TOP -- which is why ED.PUT.FIELD, ED.RENDER.ROW
+  REM and the caret all add it. GP.BOX, GP.FILL and GP.PRINTAT know nothing about the
+  REM editor's scroll: they write at map row = whatever Y they are given. So the offset
+  REM has to be added HERE, or the whole panel is drawn ED.MAP.TOP rows away from the
+  REM menu bar it hangs from -- invisible at the top of the document, and further adrift
+  REM the further down you have scrolled.
+  GP.BOX ED.DD.BX, 1 + ED.MAP.TOP, ED.DD.W + 2, ED.DD.N + 2, 0, ED.DD.FRAME
 
+  REM DRIVEN THE WAY MENUDEMO.EXP.BL DRIVES IT, which is the whole interface and not
+  REM three fields of it. This used to set X, Y and WIDTH only and then hand-roll a loop
+  REM over MENUHELP.ROW -- the module's LOWEST entry point -- leaving COUNT, ATTR and
+  REM HIATTR at zero. MENUHELP.ROW reads MENUHELP.ATTR itself (it is the test that
+  REM decides whether a row gets its hotkey tinted), so a caller that never sets it is
+  REM not calling the routine, it is guessing at it. Set the documented inputs and let
+  REM MENUHELP.DRAW walk the rows, exactly as MENUHELP.RUN does.
   MENUHELP.X = ED.DD.COL
-  MENUHELP.Y = 2
+  MENUHELP.Y = 2 + ED.MAP.TOP : REM a map row, as above
   MENUHELP.WIDTH = ED.DD.W
-  FOR ED.DD.I = 0 TO ED.DD.N - 1
-    MENUHELP.ITEM$(ED.DD.I + 1) = " " + MENU.ITEM$(MENU.ACTIVE * 8 + ED.DD.I)
+  MENUHELP.COUNT = ED.DD.N
+  MENUHELP.ATTR = THEME.CLR(THEME.PAGE)
+  MENUHELP.HIATTR = THEME.CLR(THEME.TITLE)
+  MENUHELP.HOTATTR = 0 : REM no hotkey tint: ALT+letter opens a MENU, not an item
+  REM MENUHELP.ITEM$ is 1 based and MENU.SEL is 0 based, because the menu bar indexes
+  REM its flat MENU.ITEM$ table from 0. Convert once, here, rather than at each use.
+  FOR ED.DD.I = 1 TO ED.DD.N
+    MENUHELP.ITEM$(ED.DD.I) = " " + MENU.ITEM$(MENU.ACTIVE * 8 + ED.DD.I - 1)
   NEXT ED.DD.I
-  FOR ED.DD.I = 0 TO ED.DD.N - 1
-    MENUHELP.DRAWROW = ED.DD.I + 1
-    MENUHELP.DRAWATTR = THEME.CLR(THEME.PAGE)
-    IF ED.DD.I = MENU.SEL THEN MENUHELP.DRAWATTR = THEME.CLR(THEME.TITLE)
-    GOSUB MENUHELP.ROW
-  NEXT ED.DD.I
+  GOSUB MENUHELP.DRAW
+  MENUHELP.DRAWROW = MENU.SEL + 1
+  MENUHELP.DRAWATTR = MENUHELP.HIATTR
+  GOSUB MENUHELP.ROW
   RETURN
 
 ED.RENDER.STATUS:
@@ -1134,6 +1155,19 @@ ED.SELFCHECK:
   PRINT "MB CH=";VPEEK(1, 45058);" AT=";VPEEK(1, 45059)
   MENU.ACTIVE = 0 : MENU.SEL = 0 : GOSUB ED.DRAW.DROPDOWN
   PRINT "DD CH=";VPEEK(1, 45572);" AT=";VPEEK(1, 45573) : REM row 2 now: the frame took row 1
+  REM DROPDOWN GEOMETRY, and ONE SAMPLED CELL IS NOT A TEST OF IT. The panel shipped with
+  REM the wrong HEIGHT and rows missing, and the line above was green throughout, because
+  REM the one cell it looks at happened to be right. Walk the whole panel instead: the
+  REM frame row, every item row, and the frame row under them, reading the first LETTER of
+  REM each item. File is New Open Save "Save As" Exit, so column MENU.COL(0) -- the item
+  REM text starts a cell left of it, at MENUHELP.X, because every item is " "+name -- down rows
+  REM 1..7 must read 160 78 79 83 83 69 160 -- $A0 frame, N O S S E, $A0 frame. A short
+  REM panel, a skipped row or a frame in the wrong place all move at least one of those.
+  ED.DDS$ = ""
+  FOR ED.QR = 1 TO MENU.ITEMS(0) + 2
+    ED.DDS$ = ED.DDS$ + STR$(VPEEK(1, 45056 + ED.QR * 256 + MENU.COL(0) * 2))
+  NEXT ED.QR
+  PRINT "DDROWS";ED.DDS$
   ED.MSG$ = "HELLO" : GOSUB ED.INFO.MSG
   ED.SR = SCREEN.ROWS - 1
   PRINT "MSG CH=";VPEEK(1, 45056 + ED.SR * 256 + 2);" AT=";VPEEK(1, 45056 + ED.SR * 256 + 3)
