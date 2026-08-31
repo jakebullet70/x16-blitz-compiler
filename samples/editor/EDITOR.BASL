@@ -2,6 +2,7 @@
 #AUTONUM 1
 #REM 0
 #SYMFILE "@:EDITOR.SYM"
+#DEFINE ED.KBDBUF $F09F
 #INCLUDE "GPB.INC.BL"
 #INCLUDE "THEME.INC.BL"
 #INCLUDE "APPHELP.INC.BL"
@@ -51,37 +52,6 @@ IF DEBUG.MODE = 1 THEN GOSUB ED.SELFCHECK : END
 
 REM ---- main loop ----
 REM
-REM GP.SELECT, not a ladder of IFs. The selector is evaluated ONCE and each GP.CASE
-REM is compared against it in the order written, so the key code is read once instead
-REM of eighteen times, and the dispatch reads as the table it always was.
-REM
-REM NOT ON x GOSUB, which is the other multi-way branch and is a real skip table: it
-REM wants a dense 1..n index, and these codes are 2, 4, 13, 17, 19, 20, 25, 27, 29,
-REM 130, 134, 137, 145, 148, 157. A skip table over that span is 158 entries to hold
-REM fifteen destinations. Sparse selectors are exactly what GP.SELECT is for.
-REM
-REM ONE LINE A CASE. GP.CASE takes its body on the same line after a colon, so the
-REM table reads as a table instead of as thirty-two lines of alternating keyword and
-REM GOSUB. Two statements after the colon is fine, as GP.CASE 27 shows.
-REM
-REM Nothing jumps out of the select, and nothing jumps out of the loop. Neither has to
-REM any more -- a GOTO leaving a GP.SELECT or GP.DO now closes the frames it skips,
-REM because the compiler puts an .unwind in front of it with the count FixBranches
-REM worked out. Neither is needed here: every case falls through to GP.ENDSEL, and the
-REM loop goes round on GP.LOOP rather than on a GOTO, so there is nothing to unwind.
-REM
-REM THE TWO RANGES STAY OUTSIDE IT, in ED.KEY.RANGE off GP.OTHER: GP.CASE takes a
-REM list of expressions, not a range, and these two cover 31 and 95 codes between
-REM them. Nothing is lost by demoting them -- see the note on ED.KEY.RANGE.
-REM THE LOOP IS GP.DO WITH NO COUNT, which is the forever loop. It replaces a label and
-REM two GOTOs -- one to poll GET, one to go round again -- and ED.LOOP is gone with them,
-REM so there is no longer a label here for anything to jump back into. The GET poll folds
-REM into the guard: no key is just an iteration that does nothing.
-REM
-REM The one GOTO that still leaves all this is ED.CMD.EXIT's GOTO ED.QUIT, and it is
-REM lexically BELOW GP.LOOP -- reached by GOSUB, not nested inside it -- so FixBranches
-REM sees equal block depth and emits no .unwind. It does not need one: ED.QUIT ENDs, and
-REM the frame stack ends with the program.
 GP.DO
   GET ED.KEY$
   GP.IF ED.KEY$ <> "" THEN 
@@ -90,11 +60,7 @@ GP.DO
   GP.ENDIF
 GP.LOOP
 
-REM The dispatch is a routine rather than the body of the loop for one reason: the
-REM loop waits on GET, and nothing headless can push a key into GET. Split here and
-REM the self-check drives the real dispatch by setting ED.KEY and calling it, which
-REM is how the table below is tested at all -- including 400 passes in a row, which
-REM is what would catch a leaked selector frame.
+
 ED.DISPATCH.KEY:
   GP.SELECT ED.KEY
     GP.CASE 27  
@@ -118,20 +84,14 @@ ED.DISPATCH.KEY:
   GP.ENDSEL
   RETURN
 
-REM The two keys that are a RANGE rather than a code: Commodore+letter opens a menu
-REM by its initial, and a printable character is typed into the document.
-REM
-REM These used to sit at the front of the IF ladder, and the order mattered there.
-REM It does not any more, and it did not need to: no single-code case above falls
-REM inside 161..191 or 32..126, so nothing above could ever have shadowed them and
-REM nothing here can shadow anything above. Reached only when no case matched.
 ED.KEY.RANGE:
   IF ED.KEY >= 161 AND ED.KEY <= 191 THEN GOSUB ED.ALT.MENU : RETURN
-REM The keyboard hands back ASCII, because ED.INIT declares ISO encoding -- see the
-REM note beside the $0372 poke there. Before that this had to case-swap every letter,
-REM since PETSCII gives $41-$5A for LOWER case and $C1-$DA for upper.
+  REM The keyboard hands back ASCII, because ED.INIT declares ISO encoding -- see the
+  REM note beside the $0372 poke there. Before that this had to case-swap every letter,
+  REM since PETSCII gives $41-$5A for LOWER case and $C1-$DA for upper.
   IF ED.KEY >= 32 AND ED.KEY <= 126 THEN GOSUB ED.DO.INSERT
   RETURN
+
 
 ED.QUIT:
   POKE 40761, 0 : POKE 40762, 0 : REM undo any hardware VSCROLL before returning to BASIC
@@ -149,6 +109,8 @@ ED.QUIT:
   PRINT CHR$(147);
   PRINT "BYE."
   END
+
+
 
 REM ============================================================================
 REM ASCII-ORDER CHARSET (ED.PETFONT)
@@ -192,6 +154,7 @@ ED.PETFONT:
   ED.FS = 1   : ED.FD = 97  : ED.FN = 26 : GOSUB ED.FCOPY
   RETURN
 
+
 REM Copy ED.FN glyphs, 8 bytes each, from screen code ED.FS to code ED.FD.
 REM
 REM GP.DO takes its count once, up front, so the limit is not re-evaluated every pass
@@ -209,12 +172,6 @@ ED.FCOPY:
 
 REM ============================================================================
 REM THEME -- every colour in one place, as named roles
-REM
-REM The attributes were literals scattered through the chrome (97 here, 240 there,
-REM 33 for an error) and there was no way to restyle without hunting them down. They
-REM are now the seven roles THEME.INC.BL defines, in THEME.CLR(), and the names cost
-REM NOTHING: #DEFINE substitutes at translation time, so THEME.CLR(THEME.TITLE)
-REM compiles to THEME.CLR(2) -- no variable, no lookup, a one-byte constant index.
 REM
 REM These are the editor's own values, not THEME.LOAD's. The library's default palette
 REM is a blue-page app look; this is DETOK's, and it is what the sample has always
@@ -253,6 +210,8 @@ ED.THEME.DARK:
   THEME.CLR(THEME.DIMMED) =  0 * 16 + 12
   THEME.CLR(THEME.WARN)   =  2 * 16 + 1
   RETURN
+
+
 REM ============================================================================
 REM SETUP
 REM ============================================================================
@@ -291,19 +250,15 @@ ED.INIT:
   REM 80x30, which is what every renderer below has to lay itself out in. Two different
   REM sizes, both needed, so both are asked for.
   GP.CALL APPHELP.SCRMODE, 0, 0, 0, 1
-  SCREEN.COLS = GP.X
-  SCREEN.ROWS = GP.Y
+  SCREEN.COLS = GP.X : SCREEN.ROWS = GP.Y
   IF SCREEN.COLS < 20 THEN SCREEN.COLS = 80
   IF SCREEN.ROWS < 8 THEN SCREEN.ROWS = 60
-  ED.TEXT.WIDTH = SCREEN.COLS
+  ED.TEXT.WIDTH  = SCREEN.COLS
   ED.TEXT.BOTTOM = SCREEN.ROWS - 2
-  ED.TEXT.ROWS = SCREEN.ROWS - 2
-  ED.ATTR.TEXT = THEME.CLR(THEME.TEXT)
-  ED.ATTR.CARET = THEME.CLR(THEME.HILITE)
-  ED.QUIET = 0
-  ED.SIM.MODE = 0
-  ED.EXIT.FLAG = 0
-  ED.LAST.MSG$ = ""
+  ED.TEXT.ROWS   = SCREEN.ROWS - 2
+  ED.ATTR.TEXT   = THEME.CLR(THEME.TEXT)
+  ED.ATTR.CARET  = THEME.CLR(THEME.HILITE)
+  ED.QUIET = 0 : ED.SIM.MODE = 0 : ED.EXIT.FLAG = 0 : ED.LAST.MSG$ = ""
   REM ---- hardware vertical scroll setup (see ED.DO.SCROLL) ----
   REM The text-map layer is scrolled by VERA's L1_VSCROLL ($9F39/$9F3A, in map pixels,
   REM 8 per text row) so a 1-line move repaints 3 rows instead of the whole screen. Every
@@ -333,6 +288,7 @@ ED.OPEN.DONE:
   GOSUB ED.LOAD.LIVE
   RETURN
 
+
 REM ---- menu tables (data-driven) ----
 ED.MENU.SETUP:
   MENU.COUNT = 3
@@ -359,6 +315,8 @@ ED.MENU.SETUP:
   NEXT MENU.I
   RETURN
 
+
+
 REM ============================================================================
 REM LIVE LINE
 REM ============================================================================
@@ -367,14 +325,18 @@ ED.LOAD.LIVE:
   ED.CUR.LINE$ = LINE.TEXT$
   ED.CUR.DIRTY = 0
   RETURN
+
 ED.COMMIT.LIVE:
   IF ED.CUR.DIRTY = 0 THEN RETURN
   LINE.TEXT$ = ED.CUR.LINE$ : LINE.INDEX = ED.CUR.ROW : GOSUB DOC.STORE
   ED.CUR.DIRTY = 0
   RETURN
+
 ED.CLAMP.COL:
   IF ED.CUR.COL > LEN(ED.CUR.LINE$) THEN ED.CUR.COL = LEN(ED.CUR.LINE$)
   RETURN
+
+
 
 REM ============================================================================
 REM CURSOR MOVEMENT
@@ -387,6 +349,7 @@ ED.MOVE.LEFT:
   ED.CUR.COL = LEN(ED.CUR.LINE$)
   GOSUB ED.CARET.REFRESH
   RETURN
+
 ED.MOVE.RIGHT:
   IF ED.CUR.COL < LEN(ED.CUR.LINE$) THEN ED.CUR.COL = ED.CUR.COL + 1 : GOSUB ED.CARET.REFRESH : RETURN
   IF ED.CUR.ROW >= LINE.COUNT - 1 THEN RETURN
@@ -394,30 +357,36 @@ ED.MOVE.RIGHT:
   ED.CUR.ROW = ED.CUR.ROW + 1 : GOSUB ED.LOAD.LIVE
   ED.CUR.COL = 0 : GOSUB ED.CARET.REFRESH
   RETURN
+
 ED.MOVE.UP:
   IF ED.CUR.ROW = 0 THEN RETURN
   GOSUB ED.COMMIT.LIVE
   ED.CUR.ROW = ED.CUR.ROW - 1 : GOSUB ED.LOAD.LIVE : GOSUB ED.CLAMP.COL
   GOSUB ED.CARET.REFRESH
   RETURN
+
 ED.MOVE.DOWN:
   IF ED.CUR.ROW >= LINE.COUNT - 1 THEN RETURN
   GOSUB ED.COMMIT.LIVE
   ED.CUR.ROW = ED.CUR.ROW + 1 : GOSUB ED.LOAD.LIVE : GOSUB ED.CLAMP.COL
   GOSUB ED.CARET.REFRESH
   RETURN
+
 ED.MOVE.HOME:
   ED.CUR.COL = 0 : GOSUB ED.CARET.REFRESH
   RETURN
+
 ED.MOVE.END:
   ED.CUR.COL = LEN(ED.CUR.LINE$) : GOSUB ED.CARET.REFRESH
   RETURN
+
 ED.MOVE.PAGEUP:
   GOSUB ED.COMMIT.LIVE
   ED.CUR.ROW = ED.CUR.ROW - ED.TEXT.ROWS
   IF ED.CUR.ROW < 0 THEN ED.CUR.ROW = 0
   GOSUB ED.LOAD.LIVE : GOSUB ED.CLAMP.COL : GOSUB ED.CARET.REFRESH
   RETURN
+
 ED.MOVE.PAGEDOWN:
   GOSUB ED.COMMIT.LIVE
   ED.CUR.ROW = ED.CUR.ROW + ED.TEXT.ROWS
@@ -449,6 +418,7 @@ ED.DO.BACKSPACE:
   ED.CUR.DIRTY = 1 : ED.DOC.DIRTY = 1
   GOSUB ED.REFRESH.INTRA
   RETURN
+
 ED.BS.JOIN:
   IF ED.CUR.ROW = 0 THEN RETURN
   LINE.INDEX = ED.CUR.ROW - 1 : GOSUB DOC.LOAD
@@ -505,23 +475,39 @@ ED.ALT.MENU:
   NEXT MENU.I
   RETURN
 
+REM The menu's own key loop, in the same shape as the main loop and ED.DISPATCH.KEY:
+REM GP.DO to wait, GP.SELECT to dispatch. It replaces a label with six GOTOs back to it,
+REM two of which went FORWARD into ED.MENU.SELECT and ED.MENU.CANCEL and relied on THEIR
+REM RETURN to leave ED.OPEN.MENUBAR -- so the two ways out of the menu were not visible
+REM from the loop that owned them, and there was no single exit to put anything on.
+REM
+REM GP.EXITDO leaves from inside a GP.CASE, which is allowed and is not the thing to
+REM avoid: it closes the frames it passes on the way out, selector included. What is not
+REM allowed is GOTO out of a select, because GP.ENDSEL is what releases that frame.
 ED.OPEN.MENUBAR:
   MENU.SEL = 0 : GOSUB ED.RENDER.MENUBAR : GOSUB ED.DRAW.DROPDOWN
-ED.MENU.LOOP:
-  GET ED.KEY$ : IF ED.KEY$ = "" THEN GOTO ED.MENU.LOOP
-  ED.KEY = ASC(ED.KEY$)
-  IF ED.KEY = 145 THEN GOSUB ED.MENU.UP : GOTO ED.MENU.LOOP
-  IF ED.KEY = 17 THEN GOSUB ED.MENU.DOWN : GOTO ED.MENU.LOOP
-  IF ED.KEY = 157 THEN GOSUB ED.MENU.LEFT : GOTO ED.MENU.LOOP
-  IF ED.KEY = 29 THEN GOSUB ED.MENU.RIGHT : GOTO ED.MENU.LOOP
-  IF ED.KEY = 13 THEN GOTO ED.MENU.SELECT
-  IF ED.KEY = 27 THEN GOTO ED.MENU.CANCEL
-  GOTO ED.MENU.LOOP
+  GP.DO
+    GET ED.KEY$
+    GP.IF ED.KEY$ <> "" THEN
+      ED.KEY = ASC(ED.KEY$)
+      GP.SELECT ED.KEY
+        GP.CASE 145 : GOSUB ED.MENU.UP
+        GP.CASE 17  : GOSUB ED.MENU.DOWN
+        GP.CASE 157 : GOSUB ED.MENU.LEFT
+        GP.CASE 29  : GOSUB ED.MENU.RIGHT
+        GP.CASE 13  : GOSUB ED.MENU.SELECT : GP.EXITDO
+        GP.CASE 27  : GOSUB ED.MENU.CANCEL : GP.EXITDO
+      GP.ENDSEL
+    GP.ENDIF
+  GP.LOOP
+  RETURN
+
 ED.MENU.SELECT:
   MENU.CHOICE.MENU = MENU.ACTIVE : MENU.CHOICE.ITEM = MENU.SEL
   MENU.ACTIVE = 0 - 1
   GOSUB ED.RENDER.ALL : GOSUB ED.MENU.DISPATCH
   RETURN
+
 ED.MENU.CANCEL:
   MENU.ACTIVE = 0 - 1
   GOSUB ED.RENDER.ALL
@@ -532,17 +518,20 @@ ED.MENU.UP:
   IF MENU.SEL < 0 THEN MENU.SEL = MENU.ITEMS(MENU.ACTIVE) - 1
   GOSUB ED.DRAW.DROPDOWN
   RETURN
+
 ED.MENU.DOWN:
   MENU.SEL = MENU.SEL + 1
   IF MENU.SEL >= MENU.ITEMS(MENU.ACTIVE) THEN MENU.SEL = 0
   GOSUB ED.DRAW.DROPDOWN
   RETURN
+
 ED.MENU.LEFT:
   MENU.ACTIVE = MENU.ACTIVE - 1
   IF MENU.ACTIVE < 0 THEN MENU.ACTIVE = MENU.COUNT - 1
   MENU.SEL = 0
   GOSUB ED.RENDER.ALL : GOSUB ED.DRAW.DROPDOWN
   RETURN
+
 ED.MENU.RIGHT:
   MENU.ACTIVE = MENU.ACTIVE + 1
   IF MENU.ACTIVE >= MENU.COUNT THEN MENU.ACTIVE = 0
@@ -555,12 +544,16 @@ ED.MENU.DISPATCH:
   IF MENU.CHOICE.MENU = 1 THEN GOSUB ED.DISP.SEARCH : RETURN
   IF MENU.CHOICE.MENU = 2 THEN GOSUB ED.CMD.ABOUT : RETURN
   RETURN
+
 ED.DISP.FILE:
   ON MENU.CHOICE.ITEM + 1 GOSUB ED.CMD.NEW, ED.CMD.OPEN, ED.CMD.SAVE, ED.CMD.SAVEAS, ED.CMD.EXIT
   RETURN
+
 ED.DISP.SEARCH:
   ON MENU.CHOICE.ITEM + 1 GOSUB ED.CMD.FIND, ED.CMD.GOTO
   RETURN
+
+
 
 REM ============================================================================
 REM COMMANDS
@@ -579,6 +572,7 @@ ED.OPEN.FILE:
   IF LINE.COUNT = 0 THEN LINE.TEXT$ = "" : LINE.INDEX = 0 : GOSUB DOC.STORE : LINE.COUNT = 1
   GOSUB ED.OPEN.DONE : GOSUB ED.REFRESH.FULL
   RETURN
+
 ED.CMD.OPEN:
   GOSUB ED.CONFIRM.DISCARD
   IF ED.DISCARD.OK = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
@@ -592,11 +586,13 @@ ED.SAVE.FILE:
   GOSUB ED.COMMIT.LIVE : GOSUB DOC.SAVEFILE
   ED.DOC.DIRTY = 0
   RETURN
+
 ED.CMD.SAVE:
   IF DOC.FILE.NAME$ = "UNTITLED" THEN GOSUB ED.CMD.SAVEAS : RETURN
   GOSUB ED.SAVE.FILE : GOSUB ED.REFRESH.FULL
   ED.MSG$ = "Saved " + DOC.FILE.NAME$ : GOSUB ED.INFO.MSG
   RETURN
+
 ED.CMD.SAVEAS:
   ED.PROMPT.MSG$ = "Save as: " : GOSUB ED.PROMPT
   IF ED.PROMPT.OK = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
@@ -604,6 +600,7 @@ ED.CMD.SAVEAS:
   GOSUB ED.SAVE.FILE : GOSUB ED.REFRESH.FULL
   ED.MSG$ = "Saved " + DOC.FILE.NAME$ : GOSUB ED.INFO.MSG
   RETURN
+
 ED.CMD.EXIT:
   IF ED.DOC.DIRTY = 0 THEN GOTO ED.CMD.EXIT.GO
   ED.PROMPT.MSG$ = "Discard changes? (Y/N) " : GOSUB ED.PROMPT.YN
@@ -614,6 +611,7 @@ ED.CMD.EXIT.GO:
 ED.CMD.ABOUT:
   ED.MSG$ = "GPC EDIT -- a simple X16 text editor" : GOSUB ED.INFO.MSG
   RETURN
+
 ED.CONFIRM.DISCARD:
   ED.DISCARD.OK = 1
   IF ED.DOC.DIRTY = 0 THEN RETURN
@@ -668,6 +666,7 @@ ED.FN.HIT:
   GOSUB ED.REFRESH.FULL
   ED.MSG$ = "Found: " + ED.FIND$ : GOSUB ED.INFO.MSG
   RETURN
+
 ED.FN.NONE:
   ED.MSG$ = "Not found: " + ED.FIND$ : GOSUB ED.ERR.MSG
   RETURN
@@ -700,6 +699,8 @@ ED.FOLD:
   NEXT ED.FOLD.I
   RETURN
 
+
+
 REM ============================================================================
 REM PROMPTS (cyan line input; sim hook for the headless self-check)
 REM ============================================================================
@@ -729,6 +730,9 @@ ED.YN.WAIT:
   IF ED.KEY = 78 OR ED.KEY = 110 OR ED.KEY = 27 THEN ED.YN = 0 : RETURN
   GOTO ED.YN.WAIT
 
+
+
+
 REM ============================================================================
 REM MESSAGES
 REM ============================================================================
@@ -738,12 +742,14 @@ ED.INFO.MSG:
   ED.PS.ROW = SCREEN.ROWS - 1 : ED.PS.COL = 0 : ED.PS.WIDTH = SCREEN.COLS
   ED.PS$ = " " + ED.MSG$ : ED.PS.ATTR = THEME.CLR(THEME.TITLE) : GOSUB ED.PUT.FIELD
   RETURN
+
 ED.ERR.MSG:
   ED.LAST.MSG$ = ED.MSG$
   IF ED.QUIET = 1 THEN RETURN
   ED.PS.ROW = SCREEN.ROWS - 1 : ED.PS.COL = 0 : ED.PS.WIDTH = SCREEN.COLS
   ED.PS$ = " " + ED.MSG$ : ED.PS.ATTR = THEME.CLR(THEME.WARN) : GOSUB ED.PUT.FIELD
   RETURN
+
 
 REM ============================================================================
 REM RENDERING
@@ -763,6 +769,7 @@ ED.REFRESH.INTRA:
   GOSUB ED.PLACE.CARET
   GOSUB ED.RENDER.STATUS
   RETURN
+
 REM Cheap cursor move (no content change): restore the old caret cell, and if the view
 REM did not scroll just invert the new cell + repaint the status line. Touches ~2 cells
 REM instead of the whole screen. Only an actual scroll falls back to a full repaint.
@@ -800,6 +807,7 @@ ED.DO.SCROLL:
   IF ED.VDELTA = 0 - 1 THEN GOSUB ED.HW.SCROLL.UP : RETURN
   GOSUB ED.RENDER.ALL
   RETURN
+
 REM scroll down one line: content slides up, a new line appears at the bottom text row.
 ED.HW.SCROLL.DOWN:
   ED.MAP.TOP = ED.MAP.TOP + 1
@@ -810,6 +818,7 @@ ED.HW.SCROLL.DOWN:
   GOSUB ED.RENDER.STATUS
   GOSUB ED.PLACE.CARET
   RETURN
+
 REM scroll up one line: content slides down, a new line appears at the top text row (1).
 ED.HW.SCROLL.UP:
   ED.MAP.TOP = ED.MAP.TOP - 1
@@ -820,6 +829,7 @@ ED.HW.SCROLL.UP:
   GOSUB ED.RENDER.STATUS
   GOSUB ED.PLACE.CARET
   RETURN
+
 ED.SET.VSCROLL:
   ED.VSP = ED.MAP.TOP * 8
   POKE 40761, ED.VSP - INT(ED.VSP / 256) * 256 : REM $9F39 L1 VSCROLL (7:0)
@@ -878,73 +888,73 @@ ED.ROW.LIVE:
   IF ED.VIS > 0 THEN ED.ASM.VIS% = ED.VIS
   ED.ASM.OFS% = 3 + ED.LEFT.COL : REM past [MaxLen][control][ActLen] to the text
 ED.ROW.STREAM:
-#REM 1
-GP.ASM
-REM ; ---- VERA: address, +4 increment, FX cache write on, both attribute slots ----
-REM LDA {ED.ASM.BASE%}
-REM STA $9F20
-REM LDX #1
-REM LDA {ED.ASM.BASE%},X
-REM STA $9F21
-REM LDA #49                  ; bank 1, address increment +4 = two cells a flush
-REM STA $9F22
-REM LDA #4                   ; DCSEL 2
-REM STA $9F25
-REM LDA #64                  ; FX_CTRL: cache write enable
-REM STA $9F29
-REM LDA #12                  ; DCSEL 6 -- the cache itself
-REM STA $9F25
-REM LDA {ED.ASM.ATTR%}
-REM STA $9F2A                ; attr0
-REM STA $9F2C                ; attr1
-REM ; ---- aim the two fetches at the source, whichever kind of source it is ----
-REM ; There is no expression syntax, so the address goes INTO the operand of the LDA
-REM ; that reads it: STA RGA,X with X=1 patches the low byte, X=2 the high one.
-REM LDA {ED.ASM.MODE%}
-REM BNE RSTR
-REM LDA {ED.ASM.SRC%}        ; the banked store: already a plain address
-REM LDX #1
-REM STA RGA,X
-REM STA RGB,X
-REM LDA {ED.ASM.SRC%},X
-REM BRA RHI
-REM RSTR: CLC                ; ED.CUR.LINE$: the slot holds the block address...
-REM LDA {ED.CUR.LINE$}
-REM ADC {ED.ASM.OFS%}        ; ...and the text starts 3 bytes into the block
-REM LDX #1
-REM STA RGA,X
-REM STA RGB,X
-REM LDA {ED.CUR.LINE$},X
-REM ADC #0
-REM RHI: LDX #2
-REM STA RGA,X
-REM STA RGB,X
-REM ; ---- two cells a pass: char0, char1, one flush ----
-REM LDY #0
-REM RLP: CPY {ED.ASM.VIS%}
-REM BCS RSP1
-REM RGA: LDA $FFFF,Y         ; operand patched above
-REM BRA RPUT1
-REM RSP1: LDA #32
-REM RPUT1: STA $9F29
-REM INY
-REM CPY {ED.ASM.VIS%}
-REM BCS RSP2
-REM RGB: LDA $FFFF,Y         ; operand patched above
-REM BRA RPUT2
-REM RSP2: LDA #32
-REM RPUT2: STA $9F2B
-REM STZ $9F23                ; flush the cache: two cells written
-REM INY
-REM CPY {ED.ASM.WIDTH%}
-REM BCC RLP
-REM ; ---- FX off and DCSEL back to 0, so ordinary VERA writes work again ----
-REM LDA #4
-REM STA $9F25
-REM STZ $9F29
-REM STZ $9F25
-GP.ENDASM
-#REM 0
+  #REM 1
+  GP.ASM
+  REM ; ---- VERA: address, +4 increment, FX cache write on, both attribute slots ----
+  REM LDA {ED.ASM.BASE%}
+  REM STA $9F20
+  REM LDX #1
+  REM LDA {ED.ASM.BASE%},X
+  REM STA $9F21
+  REM LDA #49                  ; bank 1, address increment +4 = two cells a flush
+  REM STA $9F22
+  REM LDA #4                   ; DCSEL 2
+  REM STA $9F25
+  REM LDA #64                  ; FX_CTRL: cache write enable
+  REM STA $9F29
+  REM LDA #12                  ; DCSEL 6 -- the cache itself
+  REM STA $9F25
+  REM LDA {ED.ASM.ATTR%}
+  REM STA $9F2A                ; attr0
+  REM STA $9F2C                ; attr1
+  REM ; ---- aim the two fetches at the source, whichever kind of source it is ----
+  REM ; There is no expression syntax, so the address goes INTO the operand of the LDA
+  REM ; that reads it: STA RGA,X with X=1 patches the low byte, X=2 the high one.
+  REM LDA {ED.ASM.MODE%}
+  REM BNE RSTR
+  REM LDA {ED.ASM.SRC%}        ; the banked store: already a plain address
+  REM LDX #1
+  REM STA RGA,X
+  REM STA RGB,X
+  REM LDA {ED.ASM.SRC%},X
+  REM BRA RHI
+  REM RSTR: CLC                ; ED.CUR.LINE$: the slot holds the block address...
+  REM LDA {ED.CUR.LINE$}
+  REM ADC {ED.ASM.OFS%}        ; ...and the text starts 3 bytes into the block
+  REM LDX #1
+  REM STA RGA,X
+  REM STA RGB,X
+  REM LDA {ED.CUR.LINE$},X
+  REM ADC #0
+  REM RHI: LDX #2
+  REM STA RGA,X
+  REM STA RGB,X
+  REM ; ---- two cells a pass: char0, char1, one flush ----
+  REM LDY #0
+  REM RLP: CPY {ED.ASM.VIS%}
+  REM BCS RSP1
+  REM RGA: LDA $FFFF,Y         ; operand patched above
+  REM BRA RPUT1
+  REM RSP1: LDA #32
+  REM RPUT1: STA $9F29
+  REM INY
+  REM CPY {ED.ASM.VIS%}
+  REM BCS RSP2
+  REM RGB: LDA $FFFF,Y         ; operand patched above
+  REM BRA RPUT2
+  REM RSP2: LDA #32
+  REM RPUT2: STA $9F2B
+  REM STZ $9F23                ; flush the cache: two cells written
+  REM INY
+  REM CPY {ED.ASM.WIDTH%}
+  REM BCC RLP
+  REM ; ---- FX off and DCSEL back to 0, so ordinary VERA writes work again ----
+  REM LDA #4
+  REM STA $9F25
+  REM STZ $9F29
+  REM STZ $9F25
+  GP.ENDASM
+  #REM 0
   RETURN
 
 REM Caret = one inverted attribute cell. Remember the exact cell so a plain cursor move
@@ -959,11 +969,13 @@ ED.PLACE.CARET:
   VPOKE 1, ED.CARET.ADDR, ED.ATTR.CARET
   ED.CARET.VALID = 1
   RETURN
+
 ED.UNCARET:
   IF ED.CARET.VALID = 0 THEN RETURN
   VPOKE 1, ED.CARET.ADDR, ED.ATTR.TEXT
   ED.CARET.VALID = 0
   RETURN
+
 
 REM ---- menu bar (VERA row 0). Attr = bg*16+fg: white-on-blue bar = 97,
 REM ---- yellow accelerator = 103, active title (blue-on-white) = 22. ----
@@ -978,12 +990,16 @@ ED.RENDER.MENUBAR:
   ED.NCOL = SCREEN.COLS - LEN(ED.NAME$) - 1
   IF ED.NCOL > 1 THEN ED.PS.ROW = 0 : ED.PS.COL = ED.NCOL - 1 : ED.PS.WIDTH = LEN(ED.NAME$) : ED.PS$ = ED.NAME$ : ED.PS.ATTR = THEME.CLR(THEME.TITLE) : GOSUB ED.PUT.FIELD
   RETURN
+
+
 ED.DRAW.MENU.TITLE:
   ED.MT.COL = MENU.COL(MENU.I) - 1 : ED.MT$ = MENU.NAME$(MENU.I)
   IF MENU.I = MENU.ACTIVE THEN ED.PS.ROW = 0 : ED.PS.COL = ED.MT.COL : ED.PS.WIDTH = LEN(ED.MT$) : ED.PS$ = ED.MT$ : ED.PS.ATTR = THEME.CLR(THEME.HILITE) : GOSUB ED.PUT.FIELD : RETURN
   ED.PS.ROW = 0 : ED.PS.COL = ED.MT.COL : ED.PS.WIDTH = 1 : ED.PS$ = LEFT$(ED.MT$, 1) : ED.PS.ATTR = THEME.CLR(THEME.BORDER) : GOSUB ED.PUT.FIELD
   ED.PS.COL = ED.MT.COL + 1 : ED.PS.WIDTH = LEN(ED.MT$) - 1 : ED.PS$ = MID$(ED.MT$, 2, 20) : ED.PS.ATTR = THEME.CLR(THEME.TITLE) : GOSUB ED.PUT.FIELD
   RETURN
+
+
 
 REM ---- dropdown (VERA rows 1..). normal item = black-on-grey 240,
 REM ---- selected = white-on-blue 97. ----
@@ -1007,12 +1023,10 @@ ED.DRAW.DROPDOWN:
 
   ED.DD.BX = ED.DD.COL - 1
   IF ED.DD.BX < 0 THEN ED.DD.BX = 0
-  REM $A0 is a reverse space, so the cell is ENTIRELY foreground -- the background
-  REM nibble never shows. Painting it in THEME.PAGE therefore drew the frame in PAGE's
-  REM FOREGROUND, which is black, on a black text area: a frame that was there and
-  REM invisible. What is wanted is the panel's own BACKGROUND colour, so the border
-  REM reads as the edge of the panel, and that is PAGE's high nibble.
-  ED.DD.FRAME = INT(THEME.CLR(THEME.PAGE) / 16)
+  REM The frame is $A0, a REVERSE space, so only the attribute's LOW nibble shows -- and
+  REM THEME.TEXT's low nibble is the document's own foreground, white. That reads against
+  REM both the light grey panel and the black text area, which is what the two earlier
+  REM tries (PAGE whole, then PAGE's high nibble) each failed to do.
   REM EVERY Y HERE IS A MAP ROW, NOT A SCREEN ROW, and that is the whole reason this
   REM looked wrong. The text layer is hardware-scrolled with VERA's L1_VSCROLL, so screen
   REM row R lives at MAP row R + ED.MAP.TOP -- which is why ED.PUT.FIELD, ED.RENDER.ROW
@@ -1021,7 +1035,7 @@ ED.DRAW.DROPDOWN:
   REM has to be added HERE, or the whole panel is drawn ED.MAP.TOP rows away from the
   REM menu bar it hangs from -- invisible at the top of the document, and further adrift
   REM the further down you have scrolled.
-  GP.BOX ED.DD.BX, 1 + ED.MAP.TOP, ED.DD.W + 2, ED.DD.N + 2, 0, ED.DD.FRAME
+  GP.BOX ED.DD.BX, 1 + ED.MAP.TOP, ED.DD.W + 2, ED.DD.N + 2, 0, THEME.CLR(THEME.TEXT)
 
   REM DRIVEN THE WAY MENUDEMO.EXP.BL DRIVES IT, which is the whole interface and not
   REM three fields of it. This used to set X, Y and WIDTH only and then hand-roll a loop
@@ -1032,10 +1046,9 @@ ED.DRAW.DROPDOWN:
   REM MENUHELP.DRAW walk the rows, exactly as MENUHELP.RUN does.
   MENUHELP.X = ED.DD.COL
   MENUHELP.Y = 2 + ED.MAP.TOP : REM a map row, as above
-  MENUHELP.WIDTH = ED.DD.W
-  MENUHELP.COUNT = ED.DD.N
-  MENUHELP.ATTR = THEME.CLR(THEME.PAGE)
-  MENUHELP.HIATTR = THEME.CLR(THEME.TITLE)
+  MENUHELP.WIDTH = ED.DD.W : MENUHELP.COUNT = ED.DD.N
+  MENUHELP.ATTR    = THEME.CLR(THEME.PAGE)
+  MENUHELP.HIATTR  = THEME.CLR(THEME.TITLE)
   MENUHELP.HOTATTR = 0 : REM no hotkey tint: ALT+letter opens a MENU, not an item
   REM MENUHELP.ITEM$ is 1 based and MENU.SEL is 0 based, because the menu bar indexes
   REM its flat MENU.ITEM$ table from 0. Convert once, here, rather than at each use.
@@ -1043,8 +1056,7 @@ ED.DRAW.DROPDOWN:
     MENUHELP.ITEM$(ED.DD.I) = " " + MENU.ITEM$(MENU.ACTIVE * 8 + ED.DD.I - 1)
   NEXT ED.DD.I
   GOSUB MENUHELP.DRAW
-  MENUHELP.DRAWROW = MENU.SEL + 1
-  MENUHELP.DRAWATTR = MENUHELP.HIATTR
+  MENUHELP.DRAWROW = MENU.SEL + 1 : MENUHELP.DRAWATTR = MENUHELP.HIATTR
   GOSUB MENUHELP.ROW
   RETURN
 
@@ -1077,41 +1089,41 @@ ED.PUT.FIELD:
   ED.ASM.ATTR% = ED.PS.ATTR
   ED.ASM.WIDTH% = ED.PS.WIDTH
   ED.ASM.VIS% = LEN(ED.PS$)
-#REM 1
-GP.ASM
-REM ; ---- VERA: address, +1 increment, ordinary (non-FX) writes ----
-REM LDA {ED.ASM.BASE%}
-REM STA $9F20
-REM LDX #1
-REM LDA {ED.ASM.BASE%},X
-REM STA $9F21
-REM LDA #17                  ; bank 1, address increment +1
-REM STA $9F22
-REM ; ---- aim the fetch at ED.PS$'s text, 3 bytes into its block ----
-REM CLC
-REM LDA {ED.PS$}
-REM ADC #3
-REM LDX #1
-REM STA FGA,X
-REM LDA {ED.PS$},X
-REM ADC #0
-REM LDX #2
-REM STA FGA,X
-REM ; ---- one cell a pass: char then attribute, both to DATA0 ----
-REM LDY #0
-REM FLP: CPY {ED.ASM.VIS%}
-REM BCS FSP
-REM FGA: LDA $FFFF,Y         ; operand patched above
-REM BRA FPUT
-REM FSP: LDA #32
-REM FPUT: STA $9F23          ; char -- VERA steps to the attribute byte
-REM LDA {ED.ASM.ATTR%}
-REM STA $9F23                ; attr -- VERA steps to the next cell
-REM INY
-REM CPY {ED.ASM.WIDTH%}
-REM BCC FLP
-GP.ENDASM
-#REM 0
+  #REM 1
+  GP.ASM
+  REM ; ---- VERA: address, +1 increment, ordinary (non-FX) writes ----
+  REM LDA {ED.ASM.BASE%}
+  REM STA $9F20
+  REM LDX #1
+  REM LDA {ED.ASM.BASE%},X
+  REM STA $9F21
+  REM LDA #17                  ; bank 1, address increment +1
+  REM STA $9F22
+  REM ; ---- aim the fetch at ED.PS$'s text, 3 bytes into its block ----
+  REM CLC
+  REM LDA {ED.PS$}
+  REM ADC #3
+  REM LDX #1
+  REM STA FGA,X
+  REM LDA {ED.PS$},X
+  REM ADC #0
+  REM LDX #2
+  REM STA FGA,X
+  REM ; ---- one cell a pass: char then attribute, both to DATA0 ----
+  REM LDY #0
+  REM FLP: CPY {ED.ASM.VIS%}
+  REM BCS FSP
+  REM FGA: LDA $FFFF,Y         ; operand patched above
+  REM BRA FPUT
+  REM FSP: LDA #32
+  REM FPUT: STA $9F23          ; char -- VERA steps to the attribute byte
+  REM LDA {ED.ASM.ATTR%}
+  REM STA $9F23                ; attr -- VERA steps to the next cell
+  REM INY
+  REM CPY {ED.ASM.WIDTH%}
+  REM BCC FLP
+  GP.ENDASM
+  #REM 0
   RETURN
 
 REM ============================================================================
@@ -1261,6 +1273,29 @@ ED.SELFCHECK:
     ED.KEY = 145 : GOSUB ED.DISPATCH.KEY
   NEXT ED.T
   PRINT "KEY 400 SELECTS ROW=";ED.CUR.ROW;" COL=";ED.CUR.COL
+
+  REM ---- the MENU's loop, 600 opens. The 400 above exercise ED.DISPATCH.KEY; this is
+  REM ---- the other GP.SELECT, the one inside ED.OPEN.MENUBAR, and it is left by
+  REM ---- GP.EXITDO from INSIDE a case. That is the construct that leaks silently if it
+  REM ---- is wrong -- nothing looks different on screen, the frame stack just fills.
+  REM ---- 600 is chosen against the 4 KB stack: a leaked GOSUB + GP.DO + GP.SELECT is
+  REM ---- 17 bytes and would blow it after ~240, and even the selector's 7 bytes alone
+  REM ---- overflow before 600. So a leak here CANNOT reach the PRINT below.
+  REM ----
+  REM ---- The keys go in through the KERNAL's kbdbuf_put, because ED.OPEN.MENUBAR waits
+  REM ---- on GET and nothing headless can satisfy that otherwise -- the same harness
+  REM ---- MENUTST.EXP.BL uses to drive MENUHELP. 27 cancels; 13 chooses, and MENU.ACTIVE
+  REM ---- 2 is Help, whose one item is About, so the choosing path runs a real
+  REM ---- ED.MENU.DISPATCH without going near a file.
+  ED.QUIET = 1
+  FOR ED.QI = 1 TO 600
+    MENU.ACTIVE = 2 : MENU.SEL = 0
+    ED.QK = 27
+    IF ED.QI - INT(ED.QI / 2) * 2 = 0 THEN ED.QK = 13
+    POKE 1, 0 : GP.CALL ED.KBDBUF, ED.QK : POKE 1, 4
+    GOSUB ED.OPEN.MENUBAR
+  NEXT ED.QI
+  PRINT "MENU 600 OPENS MSG=";ED.LAST.MSG$
 
   PRINT "M4 OK"
   RETURN

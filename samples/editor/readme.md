@@ -111,9 +111,18 @@ OK CODE 8572 FREE 11776 RT 14079 GP-BASIC IN
   keywords — already bought and paid for by the `GP.SELECT` above, so they add nothing to `RT`.
 - **Driving `MENUHELP` properly gave 5 bytes back** — 9650 → **9645**. The hand-rolled loop over
   `MENUHELP.ROW` was not only wrong, it was bigger than `GOSUB MENUHELP.DRAW`.
-- **The dropdown geometry assertion costs 68 bytes** — 9645 → **9713**, and it is compiled into
-  every build because `ED.SELFCHECK` is, exactly like the rest of the self-check above. Worth it:
-  it is the check that would have caught a panel of the wrong height on the day it was written.
+- **The two new assertions cost 168 bytes** — 9645 → 9713 for `DDROWS`, and → **9813** for the 600
+  menu opens. Compiled into every build because `ED.SELFCHECK` is, exactly like the rest of the
+  self-check above. Worth it: between them they are the checks that would have caught a panel of
+  the wrong height, and a frame leak that nothing on screen would ever show.
+- **`ED.MENU.LOOP` became `GP.DO` + `GP.SELECT`**, the same shape as the main loop and its dispatch.
+  It replaced a label with six `GOTO`s back to it, two of which jumped *forward* into
+  `ED.MENU.SELECT` and `ED.MENU.CANCEL` and leaned on **their** `RETURN` to leave
+  `ED.OPEN.MENUBAR` — so the two ways out of the menu were invisible from the loop that owned them.
+  Both are now `GP.EXITDO` from inside a `GP.CASE`, which is allowed and *does* close the selector's
+  frame on the way past. That last part is measured, not taken on trust: `MENU 600 OPENS` drives
+  `ED.OPEN.MENUBAR` six hundred times through `kbdbuf_put`, and a leak of even the selector's
+  7 bytes alone would overflow the 4 KB frame stack before it finished.
 
 ## How it renders
 
@@ -257,6 +266,14 @@ the extra 68 being the `DDROWS` assertion below.
 The self-check was green throughout, which is its own lesson: it asserted **one** `VPEEK` of the
 panel, and one sampled cell cannot see a wrong height or a skipped row. It now walks the whole
 shape — frame row, every item row, frame row — as `DDROWS`.
+
+### The frame colour is picked, not derived
+
+`GP.BOX` style 0 borders with `$A0`, a **reverse** space, so the cell is entirely *foreground*: only
+the low nibble of the attribute is ever seen. Deriving that nibble from `THEME.PAGE` collided twice
+— its foreground is black, on the black document; its background is the panel's own grey, on the
+panel. The frame is `THEME.CLR(THEME.TEXT)`, whose low nibble is the document's own white, and that
+reads against both.
 
 **`GP.PRINTAT` converts PETSCII to a screen code before writing.** Against an ASCII-ordered font that
 is one conversion too many: measured, `GP.PRINTAT 0,5,"Ab"` wrote tiles `1` and `66`, which render as
