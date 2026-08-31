@@ -1,56 +1,56 @@
-# GPC EDIT -- a Markdown editor for the Commander X16
+# «–√ ≈ƒ…‘ -- A ÕARKDOWN EDITOR FOR THE √OMMANDER ÿ16
 
-This file is the bullet-list fixture the self-check searches, and it is also
-- the second bullet, which find-next has to land on
-- a third, so the list reads as a list
-- a fourth, for the same reason
+‘HIS FILE IS THE BULLET-LIST FIXTURE THE SELF-CHECK SEARCHES, AND IT IS ALSO
+- THE SECOND BULLET, WHICH FIND-NEXT HAS TO LAND ON
+- A THIRD, SO THE LIST READS AS A LIST
+- A FOURTH, FOR THE SAME REASON
 
-You are looking at it in GPC EDIT itself: this is the file the editor opens
-when it starts, so the first thing you see is real text in a real document
-rather than an empty screen.
+ŸOU ARE LOOKING AT IT IN «–√ ≈ƒ…‘ ITSELF: THIS IS THE FILE THE EDITOR OPENS
+WHEN IT STARTS, SO THE FIRST THING YOU SEE IS REAL TEXT IN A REAL DOCUMENT
+RATHER THAN AN EMPTY SCREEN.
 
-## Keys
+## ÀEYS
 
-  Arrows        move the caret; the view scrolls when you reach an edge
-  Home / End    start and end of the line
-  PgUp / PgDn   a screen at a time
-  RETURN        split the line here
-  BACKSPACE     delete left, joining lines at column one
-  DEL           delete right, joining the next line at end of line
-  INS           toggle insert / overwrite (the status line says which)
-  ESC           open the menu bar; ESC again closes it
-  F2            save
-  F3            find again
+  ¡RROWS        MOVE THE CARET; THE VIEW SCROLLS WHEN YOU REACH AN EDGE
+  »OME / ≈ND    START AND END OF THE LINE
+  –G’P / –GƒN   A SCREEN AT A TIME
+  “≈‘’“Œ        SPLIT THE LINE HERE
+  ¬¡√À”–¡√≈     DELETE LEFT, JOINING LINES AT COLUMN ONE
+  ƒ≈Ã           DELETE RIGHT, JOINING THE NEXT LINE AT END OF LINE
+  …Œ”           TOGGLE INSERT / OVERWRITE (THE STATUS LINE SAYS WHICH)
+  ≈”√           OPEN THE MENU BAR; ≈”√ AGAIN CLOSES IT
+  ∆2            SAVE
+  ∆3            FIND AGAIN
 
-## Menus
+## ÕENUS
 
-  File          New, Open, Save, Save As, Exit
-  Search        Find, Go to line
-  Help          About
+  ∆ILE          ŒEW, œPEN, ”AVE, ”AVE ¡S, ≈XIT
+  ”EARCH        ∆IND, «O TO LINE
+  »ELP          ¡BOUT
 
-A menu opens with ESC or by its highlighted letter. Inside one, the arrow keys
-move, RETURN chooses and ESC backs out. A file with unsaved changes is marked
-with a star in the title bar, and anything that would throw those changes away
-asks first.
+¡ MENU OPENS WITH ≈”√ OR BY ITS HIGHLIGHTED LETTER. …NSIDE ONE, THE ARROW KEYS
+MOVE, “≈‘’“Œ CHOOSES AND ≈”√ BACKS OUT. ¡ FILE WITH UNSAVED CHANGES IS MARKED
+WITH A STAR IN THE TITLE BAR, AND ANYTHING THAT WOULD THROW THOSE CHANGES AWAY
+ASKS FIRST.
 
-## What this is for
+## ◊HAT THIS IS FOR
 
-GPC EDIT is a sample. It is a genuinely useful program, and it is here because
-it leans on the one thing an interpreted BASIC is worst at: repainting a whole
-screen of text quickly. Every cell you see -- the text, the bars, the menus,
-the caret -- is written straight into the VERA text map. No PRINT, no LOCATE.
+«–√ ≈ƒ…‘ IS A SAMPLE. …T IS A GENUINELY USEFUL PROGRAM, AND IT IS HERE BECAUSE
+IT LEANS ON THE ONE THING AN INTERPRETED ¬¡”…√ IS WORST AT: REPAINTING A WHOLE
+SCREEN OF TEXT QUICKLY. ≈VERY CELL YOU SEE -- THE TEXT, THE BARS, THE MENUS,
+THE CARET -- IS WRITTEN STRAIGHT INTO THE ÷≈“¡ TEXT MAP. ŒO –“…Œ‘, NO Ãœ√¡‘≈.
 
-The row renderer and the field renderer are both inline 65C02 assembly, written
-in GP.ASM blocks inside the BASIC source and assembled into the program by the
-compiler. That is the whole speed story: the VERA path was always the fast one,
-and the loop around it was what cost. Read EDITOR.BASL to see it -- the assembly
-sits where the FOR loop used to, a few lines further down the same routine.
+‘HE ROW RENDERER AND THE FIELD RENDERER ARE BOTH INLINE 65√02 ASSEMBLY, WRITTEN
+IN «–.¡”Õ BLOCKS INSIDE THE ¬¡”…√ SOURCE AND ASSEMBLED INTO THE PROGRAM BY THE
+COMPILER. ‘HAT IS THE WHOLE SPEED STORY: THE ÷≈“¡ PATH WAS ALWAYS THE FAST ONE,
+AND THE LOOP AROUND IT WAS WHAT COST. “EAD ≈ƒ…‘œ“.¬¡”Ã TO SEE IT -- THE ASSEMBLY
+SITS WHERE THE ∆œ“ LOOP USED TO, A FEW LINES FURTHER DOWN THE SAME ROUTINE.
 
-## Try it
+## ‘RY IT
 
-Type into this paragraph and watch the status line count the column. Press F3
-and search for a word. Go to a line with the Search menu. Then open EDITOR.BASL
-in the editor and read the renderer while the renderer is drawing it.
+‘YPE INTO THIS PARAGRAPH AND WATCH THE STATUS LINE COUNT THE COLUMN. –RESS ∆3
+AND SEARCH FOR A WORD. «O TO A LINE WITH THE ”EARCH MENU. ‘HEN OPEN ≈ƒ…‘œ“.¬¡”Ã
+IN THE EDITOR AND READ THE RENDERER WHILE THE RENDERER IS DRAWING IT.
 
-Nothing here is precious -- it is a fixture. Save over it, cut it about, or
-open one of your own files instead.
+ŒOTHING HERE IS PRECIOUS -- IT IS A FIXTURE. ”AVE OVER IT, CUT IT ABOUT, OR
+OPEN ONE OF YOUR OWN FILES INSTEAD.

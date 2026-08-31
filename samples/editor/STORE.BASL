@@ -125,7 +125,15 @@ DOC.READ.LOOP:
   DOC.CH = ASC(DOC.CH$)
   IF DOC.CH = 10 AND DOC.PREV.CH = 13 THEN DOC.PREV.CH = 10 : GOTO DOC.READ.CHECK
   IF DOC.CH = 13 OR DOC.CH = 10 THEN GOSUB DOC.PUSH.LINE : DOC.PREV.CH = DOC.CH : GOTO DOC.READ.CHECK
-  IF LEN(LINE.TEXT$) < 250 THEN LINE.TEXT$ = LINE.TEXT$ + DOC.CH$
+  REM PETSCII ON DISK -> ASCII IN MEMORY. Everything above this line is ASCII: BASLOAD
+  REM writes the program's own string literals through as the ASCII bytes that were in
+  REM the source, and ED.PETFONT orders the VRAM charset to match, so the document has
+  REM to be ASCII too or find will not match its own needles. The two encodings differ
+  REM only by a case swap. CR and LF are the same byte in both, so the line splitting
+  REM above is untouched by this.
+  IF DOC.CH >= 65 AND DOC.CH <= 90 THEN DOC.CH = DOC.CH + 32
+  IF DOC.CH >= 193 AND DOC.CH <= 218 THEN DOC.CH = DOC.CH - 128
+  IF LEN(LINE.TEXT$) < 250 THEN LINE.TEXT$ = LINE.TEXT$ + CHR$(DOC.CH)
   DOC.PREV.CH = DOC.CH
 DOC.READ.CHECK:
   IF DOC.STATUS = 0 THEN GOTO DOC.READ.LOOP
@@ -177,7 +185,24 @@ DOC.SAVEFILE:
   OPEN 2, 8, 2, DOC.OPEN.NAME$
   FOR DOC.SAVE.INDEX = 0 TO LINE.COUNT - 1
     LINE.INDEX = DOC.SAVE.INDEX : GOSUB DOC.LOAD
-    PRINT#2, LINE.TEXT$
+    GOSUB DOC.TOPETSCII
+    PRINT#2, DOC.OUT$
   NEXT DOC.SAVE.INDEX
   CLOSE 2
+  RETURN
+
+REM ---- ASCII in memory -> PETSCII on disk: the inverse of the swap DOC.LOADFILE does.
+REM Upper case is tested FIRST on purpose: a letter moved up to $C1-$DA is then out of
+REM range of the lower-case test, so nothing is converted twice.
+DOC.TOPETSCII:
+  DOC.OUT$ = ""
+  REM FOR 1 TO 0 runs the body ONCE -- the test is at NEXT -- and ASC("") is 0, so an
+  REM empty line would be written as a single CHR$(0) instead of as nothing.
+  IF LEN(LINE.TEXT$) = 0 THEN RETURN
+  FOR DOC.TI = 1 TO LEN(LINE.TEXT$)
+    DOC.TC = ASC(MID$(LINE.TEXT$, DOC.TI, 1))
+    IF DOC.TC >= 65 AND DOC.TC <= 90 THEN DOC.TC = DOC.TC + 128
+    IF DOC.TC >= 97 AND DOC.TC <= 122 THEN DOC.TC = DOC.TC - 32
+    DOC.OUT$ = DOC.OUT$ + CHR$(DOC.TC)
+  NEXT DOC.TI
   RETURN

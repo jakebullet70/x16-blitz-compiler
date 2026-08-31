@@ -86,7 +86,7 @@ question is closed.
 ### The assembly costs nothing. Something else costs 2 KB.
 
 ```
-OK CODE 7566 FREE 12800 RT 14079 GP-BASIC IN
+OK CODE 7911 FREE 12544 RT 14079 GP-BASIC IN
 ```
 
 - **`GP.ASM` is free, and the p-code got *smaller* for using it** — 7190 bytes before the rewrite,
@@ -101,6 +101,9 @@ OK CODE 7566 FREE 12800 RT 14079 GP-BASIC IN
 - **The self-check is compiled in whether or not it runs.** `DEBUG.MODE` is tested at run time, so
   the ~460 bytes of assertions are in the object either way. That is most of the difference between
   7101 and 7566, and it is the price of the sample being self-testing.
+- **PETSCII cost 345 bytes of p-code and nothing at run time** — 7566 → **7911**. That is the charset
+  re-ordering plus the two conversions at the disk boundary and the one at the keyboard. The
+  renderers did not change by a single byte, so every render figure above still stands as measured.
 
 ## How it renders
 
@@ -126,9 +129,52 @@ load-bearing, and only the third is new:
    ~650 cycles a `POKE` even the eight-register prologue would have cost more than the whole
    native loop.
 
+
+## PETSCII, and where the encoding boundary is
+
+The editor runs on **charset 3, PET upper/lower** — PETSCII glyphs, both cases. That is not free,
+because the renderers write document bytes straight into VERA and **a VERA tile index is a *screen*
+code, not a character code**. Under ISO it never showed: the ISO font happens to be in ASCII order,
+so the index and the character code were the same number and nothing had to be translated.
+
+**So the font moves, not the text.** `ED.PETFONT` re-orders the 2 KB charset in VRAM at `$1:F000` so
+that glyph *N* is the glyph for code *N*. A document byte is then its own tile index again, and
+**both `GP.ASM` blocks are untouched — zero cycles a cell**. Translating inside the renderer instead
+costs `TAX` + `LDA table,X` = 6 cycles on a 31-cycle cell, about 19% of the render, on every
+character of every repaint. (The runtime's own arithmetic `pet2scr` is ~29 cycles and was never in
+the running.)
+
+**It is re-ordered to ASCII, not to PETSCII, and that is the part worth copying.** BASLOAD writes
+string literals through as the bytes that were in the source file, so every literal here — menu
+names, prompts, messages — is ASCII, and no directive changes that. Order the font by PETSCII and
+they all render case-swapped *and* find stops matching its own needles. Hence the rule:
+
+> **PETSCII on disk. ASCII everywhere above it.**
+
+The conversions sit on that boundary and never in a loop over cells: `DOC.LOADFILE` converts per
+character on the way in, `DOC.TOPETSCII` per line on the way out, and `ED.KEY.RANGE` per keystroke —
+`GET` hands back `$41-$5A` for a lower-case letter and `$C1-$DA` for an upper-case one, which is why
+an ASCII `32..126` printable test silently drops every capital.
+
+**In ASCII order the permutation is also tiny.** Charset 3 already holds `$20-$3F` and the capitals
+`$41-$5A` exactly where ASCII wants them, so only 38 glyphs move — chiefly `a-z`, from screen
+`$01-$1A`. Two moves read from a run that another one writes, so `$60` goes before `$40` and
+`$7B-$7F` before `$5B-$5F`; but nothing forms a cycle, so no staging buffer is needed. A
+*PETSCII*-ordered permutation does need one — its block map contains `6←2, 2←0, 0←4, 4←6`.
+
+**One thing the KERNAL forces.** Anything `PRINT`ed after the re-order comes out wrong, because
+CHROUT converts to a screen code first and then indexes a font that is no longer in screen-code
+order. Here that is only `ED.QUIT`, which reloads the stock charset with `POKE 780, 3 : SYS 65378`
+before saying `BYE.` — the `SYS` rather than `CHR$(14)`, which may be a no-op when the charset is
+already selected.
+
+Verified rather than argued: all 256 glyphs re-indexed with **zero** mismatches, read back out of
+VRAM; and a load→save round trip byte-for-byte identical to the original, apart from `PRINT#`
+writing CR where the fixture had LF.
 ## The key dispatch
 
-`ED.LOOP` is the `GET` wait and nothing else; the table lives in `ED.DISPATCH.KEY` as a `GP.SELECT`.
+The main loop is a bare `GP.DO` whose whole body is the `GET` wait; the table lives in
+`ED.DISPATCH.KEY` as a `GP.SELECT`.
 Three things about it are worth reading before copying the shape:
 
 - **`GP.SELECT`, not `ON x GOSUB`.** `ON` is a real skip table and stays right for a dense `1..n`
@@ -194,7 +240,7 @@ interactive prompts) and `PRINT`ing markers a watcher can grep. It ends in `M4 O
 - end to end: a 40-line document, the cursor walked down 35 lines through 8 hardware scrolls, then
   the right document lines confirmed at the map rows VSCROLL is actually displaying.
 
-The key **dispatch** is now tested, which it was not before: `ED.LOOP` is only the `GET` wait, and
+The key **dispatch** is now tested, which it was not before: the main loop is only the `GET` wait, and
 the table it calls is a routine, so the self-check can drive it directly. What is still untested is
 **menu navigation** — that has its own `GET` loop inside `ED.OPEN.MENUBAR`, and key injection into a
 running program is flaky — but the commands it dispatches to are each driven directly above.
@@ -208,3 +254,7 @@ running program is flaky — but the commands it dispatches to are each driven d
 - **A line is capped at 250 characters** on load.
 - Lines are held in banks 4 upward with the pointer table in banks 1–3, so the editor owns those
   banks. Nothing else in a program using this store may.
+- **Files are assumed to be PETSCII on disk.** Opening something authored on the host — which will be
+  ASCII — shows every letter case-swapped. Detecting the encoding on load is the obvious fix, and no
+  byte in `$61-$7A` is a fair PETSCII tell, since in PETSCII that run is graphics. `TEST.MD` ships
+  converted rather than left as the exception.

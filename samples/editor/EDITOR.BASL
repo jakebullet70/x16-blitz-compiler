@@ -27,7 +27,8 @@ REM your instructions, and every handler it uses is in every compiled program
 REM already. The assembly here is free. What is NOT free is GP.SELECT in the key
 REM dispatch: that is a core keyword, and one core keyword pulls in the whole 2 KB
 REM GP block, which is why this compiles GP-BASIC IN. Readability bought with 2,048 bytes,
-REM knowingly -- take the select back out and the program is GP-BASIC OUT again.
+REM knowingly. Now that the block is paid for, the main loop's GP.DO rides in free --
+REM it is taking BOTH back out that would make this GP-BASIC OUT again.
 REM
 REM Colours (like DETOK): blue bars, black text area, white text, cyan prompts,
 REM white-on-red errors.
@@ -59,21 +60,31 @@ REM ONE LINE A CASE. GP.CASE takes its body on the same line after a colon, so t
 REM table reads as a table instead of as thirty-two lines of alternating keyword and
 REM GOSUB. Two statements after the colon is fine, as GP.CASE 27 shows.
 REM
-REM Nothing jumps out of the select. It no longer has to -- a GOTO leaving a GP.SELECT
-REM or GP.DO now closes the frames it skips, because the compiler puts an .unwind in
-REM front of it with the count FixBranches worked out. It is still not needed here:
-REM every case falls through to GP.ENDSEL and the single GOTO back to the top is after
-REM it, which costs nothing at all.
+REM Nothing jumps out of the select, and nothing jumps out of the loop. Neither has to
+REM any more -- a GOTO leaving a GP.SELECT or GP.DO now closes the frames it skips,
+REM because the compiler puts an .unwind in front of it with the count FixBranches
+REM worked out. Neither is needed here: every case falls through to GP.ENDSEL, and the
+REM loop goes round on GP.LOOP rather than on a GOTO, so there is nothing to unwind.
 REM
 REM THE TWO RANGES STAY OUTSIDE IT, in ED.KEY.RANGE off GP.OTHER: GP.CASE takes a
 REM list of expressions, not a range, and these two cover 31 and 95 codes between
 REM them. Nothing is lost by demoting them -- see the note on ED.KEY.RANGE.
-ED.LOOP:
+REM THE LOOP IS GP.DO WITH NO COUNT, which is the forever loop. It replaces a label and
+REM two GOTOs -- one to poll GET, one to go round again -- and ED.LOOP is gone with them,
+REM so there is no longer a label here for anything to jump back into. The GET poll folds
+REM into the guard: no key is just an iteration that does nothing.
+REM
+REM The one GOTO that still leaves all this is ED.CMD.EXIT's GOTO ED.QUIT, and it is
+REM lexically BELOW GP.LOOP -- reached by GOSUB, not nested inside it -- so FixBranches
+REM sees equal block depth and emits no .unwind. It does not need one: ED.QUIT ENDs, and
+REM the frame stack ends with the program.
+GP.DO
   GET ED.KEY$
-  IF ED.KEY$ = "" THEN GOTO ED.LOOP
-  ED.KEY = ASC(ED.KEY$)
-  GOSUB ED.DISPATCH.KEY
-  GOTO ED.LOOP
+  GP.IF ED.KEY$ <> "" THEN 
+    ED.KEY = ASC(ED.KEY$)  
+    GOSUB ED.DISPATCH.KEY
+  GP.ENDIF
+GP.LOOP
 
 REM The dispatch is a routine rather than the body of the loop for one reason: the
 REM loop waits on GET, and nothing headless can push a key into GET. Split here and
@@ -112,14 +123,75 @@ REM inside 161..191 or 32..126, so nothing above could ever have shadowed them a
 REM nothing here can shadow anything above. Reached only when no case matched.
 ED.KEY.RANGE:
   IF ED.KEY >= 161 AND ED.KEY <= 191 THEN GOSUB ED.ALT.MENU : RETURN
+REM THE KEYBOARD SPEAKS PETSCII; the document and every literal speak ASCII, and the two
+REM are case-swapped. GET hands back $41-$5A for a LOWER case letter and $C1-$DA for an
+REM upper case one, so without these two lines an unshifted key would insert a capital
+REM and a shifted one would insert nothing at all -- 193-218 is nowhere near the 32..126
+REM the range test allows. Converting here, once a keystroke, is the cheap place to do
+REM it: the alternative is once a cell, in the renderers, forever.
+  IF ED.KEY >= 65 AND ED.KEY <= 90 THEN ED.KEY = ED.KEY + 32
+  IF ED.KEY >= 193 AND ED.KEY <= 218 THEN ED.KEY = ED.KEY - 128
   IF ED.KEY >= 32 AND ED.KEY <= 126 THEN GOSUB ED.DO.INSERT
   RETURN
 
 ED.QUIT:
   POKE 40761, 0 : POKE 40762, 0 : REM undo any hardware VSCROLL before returning to BASIC
+  REM Put the STOCK charset back before anything is PRINTed. ED.PETFONT leaves the
+  REM font indexed by PETSCII code, and CHROUT converts to a screen code first, so
+  REM every printable character below would otherwise come out as the wrong glyph.
+  POKE 780, 3 : SYS 65378
   PRINT CHR$(147);
   COLOR 1, 0 : PRINT "BYE."
   END
+
+REM ============================================================================
+REM ASCII-ORDER CHARSET (ED.PETFONT)
+REM
+REM THE RENDERERS WRITE DOCUMENT BYTES STRAIGHT INTO VERA, and a VERA tile index is a
+REM SCREEN code, not a character code. Under ISO that never showed: the ISO font happens
+REM to be in ASCII order, so the index and the code were the same number. Charset 3 (PET
+REM upper/lower) gives us PETSCII glyphs with both cases, but it is in SCREEN-code order.
+REM
+REM So give the index its meaning back instead of translating every cell: re-order the
+REM charset in VRAM so glyph N is the glyph for code N. Both GP.ASM renderers then stay
+REM exactly as they are -- no table, no lookup, ZERO cycles a cell. Translating in the
+REM renderer instead would have cost TAX + LDA table,X = 6 cycles on a 31-cycle cell,
+REM about 19%, on every character of every repaint.
+REM
+REM IN ASCII ORDER, NOT PETSCII ORDER, and that distinction is the whole reason this
+REM works. BASLOAD writes string literals through as the bytes that were in the source,
+REM so every literal in this file -- every menu name, prompt and message -- is ASCII.
+REM Ordering the font by PETSCII renders all of them case-swapped AND stops find matching
+REM its own needles, which is exactly what the self-check caught. PETSCII belongs at the
+REM DISK boundary, and STORE.BASL is where it happens.
+REM
+REM ALMOST NOTHING MOVES. In charset 3 the digits and punctuation at $20-$3F and the
+REM capitals at $41-$5A are ALREADY where ASCII wants them, so only 38 glyphs shift:
+REM
+REM   ASCII $40  @     <- screen $00        ASCII $60  `     <- screen $40
+REM   ASCII $5B-$5F    <- screen $1B-$1F    ASCII $61-$7A a-z <- screen $01-$1A
+REM   ASCII $7B-$7F    <- screen $5B-$5F
+REM
+REM Two of those read from a run that another one writes, so order matters: $60 before
+REM $40, and $7B-$7F before $5B-$5F. Nothing forms a CYCLE -- screen $01-$1A and $1B-$1F
+REM are only ever sources, never destinations -- so unlike a PETSCII-ordered permutation
+REM this needs no staging buffer at all.
+REM ============================================================================
+ED.PETFONT:
+  ED.FONT = 61440 : REM $1:F000, the KERNAL's 2 KB charset (VERA bank 1)
+  ED.FS = 64  : ED.FD = 96  : ED.FN = 1  : GOSUB ED.FCOPY
+  ED.FS = 91  : ED.FD = 123 : ED.FN = 5  : GOSUB ED.FCOPY
+  ED.FS = 0   : ED.FD = 64  : ED.FN = 1  : GOSUB ED.FCOPY
+  ED.FS = 27  : ED.FD = 91  : ED.FN = 5  : GOSUB ED.FCOPY
+  ED.FS = 1   : ED.FD = 97  : ED.FN = 26 : GOSUB ED.FCOPY
+  RETURN
+
+REM Copy ED.FN glyphs, 8 bytes each, from screen code ED.FS to code ED.FD.
+ED.FCOPY:
+  FOR ED.FI = 0 TO ED.FN * 8 - 1
+    VPOKE 1, ED.FONT + ED.FD * 8 + ED.FI, VPEEK(1, ED.FONT + ED.FS * 8 + ED.FI)
+  NEXT ED.FI
+  RETURN
 
 REM ============================================================================
 REM SETUP
@@ -127,8 +199,9 @@ REM ============================================================================
 ED.INIT:
   POKE 780, ED.SCREEN.MODE : POKE 783, 0
   SYS 65375        : REM $FF5F screen_mode -> set ED.SCREEN.MODE (also clears screen)
-  PRINT CHR$(15);  : REM ISO mode: VERA tile index = ASCII code, both cases show
+  POKE 780, 3 : SYS 65378 : REM $FF62 screen_set_charset -> 3, PET upper/lower
   PRINT CHR$(147);
+  GOSUB ED.PETFONT : REM ...then re-index it so a VERA tile index IS a character code
   POKE 783, 0
   SYS 65517        : REM $FFED SCREEN -> columns in X ($030D), rows in Y ($030E)
   SCREEN.COLS = PEEK(781)
@@ -525,9 +598,13 @@ ED.SF.LOOP:
   ED.SI = ED.SI + 1
   GOTO ED.SF.LOOP
 
-REM uppercase ED.FOLD.IN$ -> ED.FOLD.OUT$ (ASCII a-z only)
+REM Uppercase ED.FOLD.IN$ -> ED.FOLD.OUT$. ASCII, because ASCII is what the document
+REM and the literals are -- PETSCII lives only on disk, and STORE.BASL converts at that
+REM boundary. ASCII lower case is $61-$7A (97-122).
 ED.FOLD:
   ED.FOLD.OUT$ = ""
+  REM Same FOR 1 TO 0 trap as DOC.TOPETSCII: an empty needle would fold to CHR$(0).
+  IF LEN(ED.FOLD.IN$) = 0 THEN RETURN
   FOR ED.FOLD.I = 1 TO LEN(ED.FOLD.IN$)
     ED.FOLD.CH = ASC(MID$(ED.FOLD.IN$, ED.FOLD.I, 1))
     IF ED.FOLD.CH >= 97 AND ED.FOLD.CH <= 122 THEN ED.FOLD.CH = ED.FOLD.CH - 32

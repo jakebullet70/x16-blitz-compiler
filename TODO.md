@@ -947,6 +947,38 @@ finished 2026-08-30, when `GP.ASM` made the answer buildable.
   `AsmParseBrace` now takes `.` as a name character. Underscore, the other character BASLOAD allows,
   is deliberately still out: what byte it arrives as through PETSCII was never measured.
 
+### Editor sample: PETSCII — DONE, and the encoding boundary is at the disk
+
+`samples/editor/` moved off ISO onto **charset 3, PET upper/lower**, on 2026-08-31. The rule:
+**PETSCII on disk, ASCII everywhere above it.**
+
+The renderers write document bytes straight into VERA, where a tile index is a *screen* code, so
+`ED.PETFONT` re-orders the 2 KB charset at VRAM `$1:F000` — glyph *N* becomes the glyph for code
+*N* — and a byte is its own tile index again, exactly as ISO gave for free. Both `GP.ASM` blocks are
+untouched and still cost **zero cycles a cell**; translating in the renderer would have been
+`TAX` + `LDA table,X` = 6 cycles on 31, about 19% of the render, forever.
+
+**Re-ordered to ASCII, not to PETSCII, and getting that backwards is the trap.** BASLOAD writes
+string literals through as the source's own bytes, so every literal in `EDITOR.BASL` is ASCII and no
+directive changes it. A PETSCII-ordered font renders all of them case-swapped *and* stops find
+matching its own needles — which is exactly what the self-check reported (`Not found: bullet`, with
+`62 75 6C 6C 65 74` in the PRG against `42 55 4C 4C 45 54` in the file). In ASCII order the
+permutation is also far smaller: `$20-$3F` and the capitals `$41-$5A` are already in place, so only
+38 glyphs move and, unlike the PETSCII map, there is no cycle and no staging buffer.
+
+Conversions live at the boundary, never per cell: `DOC.LOADFILE` per character, `DOC.TOPETSCII` per
+line at save, `ED.KEY.RANGE` per keystroke (`GET` returns `$41-$5A` lower, `$C1-$DA` upper — the old
+`32..126` printable test dropped every capital).
+
+Verified: 256/256 glyphs re-indexed with zero mismatches, and a load→save round trip is byte-for-byte
+identical to the original apart from `PRINT#` writing CR where the fixture had LF.
+
+**Still open — reading files that are ASCII on disk.** The editor now assumes disk files are PETSCII.
+Opening something authored on the host shows every letter case-swapped. Detecting encoding on load
+(no byte in `$61-$7A` is a decent PETSCII tell, since that run is graphics) or offering it as a
+command would fix it. `TEST.MD` was converted in place; `git show HEAD~1:samples/editor/TEST.MD` is
+the ASCII original and the swap is its own inverse.
+
 ### Shared-runtime, THREE programs sharing variables — TODO
 
 Extend the two-program `samples/shared-vars/` to **three** programs A→B→C that accumulate state (A sets,
