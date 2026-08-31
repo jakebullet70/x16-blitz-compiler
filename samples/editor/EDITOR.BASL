@@ -3,6 +3,12 @@
 #REM 0
 #SYMFILE "@:EDITOR.SYM"
 #DEFINE ED.KBDBUF $F09F
+## kbdbuf_get_modifiers. Bit 1 is Alt (the Commodore key). This is the documented way to
+## see a modifier the character code cannot carry -- the KERNAL reference names Ctrl+Esc
+## and Alt+F1 as the cases it exists for -- and it is how ALT+letter reaches the menus in
+## ISO mode, where the driver no longer sends PETSCII Commodore+letter codes at all.
+#DEFINE ED.KBDMOD $FEC0
+#DEFINE ED.MOD.ALT 2
 ## The single-line box. These are the codes handed to GP.FILL, NOT where the glyphs live:
 ## GP.FILL converts PETSCII to a screen code on the way in, and for $80-$9F that adds $40.
 ## So a glyph asked for as $80 is fetched from tile $C0, and ED.PETFONT parks it there --
@@ -69,12 +75,16 @@ GP.DO
   GET ED.KEY$
   GP.IF ED.KEY$ <> "" THEN 
     ED.KEY = ASC(ED.KEY$)  
+    GOSUB ED.READ.MODS
     GOSUB ED.DISPATCH.KEY
   GP.ENDIF
 GP.LOOP
 
 
 ED.DISPATCH.KEY:
+  REM ALT is a MODIFIER on whatever key arrived, not a key of its own, so it is tested
+  REM before the selector rather than sitting in it as a code.
+  IF ED.MODS.ALT <> 0 THEN GOSUB ED.ALT.MENU : RETURN
   GP.SELECT ED.KEY
     GP.CASE 27  
       MENU.ACTIVE = 0 
@@ -97,8 +107,17 @@ ED.DISPATCH.KEY:
   GP.ENDSEL
   RETURN
 
+REM Asked with the keystroke, while the key is still down. Banked to 0 the way MENUTST
+REM banks for kbdbuf_put: $FEC0 is below the $FF00 jump table, so it is not mirrored
+REM across ROM banks and the call has to be made with the KERNAL paged in.
+ED.READ.MODS:
+  POKE 1, 0 : GP.CALL ED.KBDMOD : POKE 1, 4
+  ED.MODS = GP.A
+  ED.MODS.ALT = 0
+  IF (ED.MODS AND ED.MOD.ALT) <> 0 THEN ED.MODS.ALT = 1
+  RETURN
+
 ED.KEY.RANGE:
-  IF ED.KEY >= 161 AND ED.KEY <= 191 THEN GOSUB ED.ALT.MENU : RETURN
   REM The keyboard hands back ASCII, because ED.INIT declares ISO encoding -- see the
   REM note beside the $0372 poke there. Before that this had to case-swap every letter,
   REM since PETSCII gives $41-$5A for LOWER case and $C1-$DA for upper.
@@ -108,6 +127,7 @@ ED.KEY.RANGE:
 
 ED.QUIT:
   POKE 40761, 0 : POKE 40762, 0 : REM undo any hardware VSCROLL before returning to BASIC
+  GOSUB ED.ALTKEYS.OFF : REM and the keyboard layout, which outlives the program
   REM APPHELP.RESTORE puts back the screen mode, the CHARSET and the text colour the
   REM user had when the editor started -- the state APPHELP.STARTUP recorded before we
   REM touched any of it. Leaving someone in 80x30 white-on-blue because that is what
@@ -311,6 +331,67 @@ ED.INIT:
   IF ED.MAP.MAXTOP >= 4 THEN ED.HW.OK = 1
   MENU.ACTIVE = 0 - 1
   GOSUB ED.MENU.SETUP
+  GOSUB ED.ALTKEYS
+  RETURN
+
+REM ============================================================================
+REM ALT+letter, by making the LAYOUT produce the letter
+REM
+REM In ISO mode the ALT table does not hand back the letter. Measured on the machine:
+REM ALT+S arrives as 223, which is eszett, and ALT+F arrives as NOTHING AT ALL because
+REM its slot in that table is empty. So the character can never say which key was hit --
+REM and for F there is not even a keystroke to look at. kbdbuf_get_modifiers tells us ALT
+REM was down (ED.READ.MODS) but it cannot tell us what it was down WITH.
+REM
+REM The layout itself is writable, so write it. The tables live in banked RAM at $A000 on
+REM RAM bank 0: eleven of 128 bytes, byte 0 an ID, bytes 1..127 the code each KEYNUM
+REM produces. ID $80 is ISO with no modifier, $C6 is ISO+Alt. Find each menu's initial in
+REM the plain table -- the index it sits at IS that key's keynum -- and write the upper
+REM case letter into the same index of the ALT table.
+REM
+REM FOUND BY SEARCH, NOT BY A HARDCODED KEYNUM, so this holds for whatever layout is
+REM loaded rather than only for ABC/X16, and it follows the menu names: rename a menu and
+REM its accelerator moves with it. Every byte overwritten is saved and put back by
+REM ED.ALTKEYS.OFF, because the layout tables outlive the program.
+REM BANK 0, NOT POKE 0. GPC's PEEK/POKE save the RAM bank, switch to the one the BANK
+REM statement named, access, and switch BACK -- see x16_peekpoke.asm -- so a POKE to the
+REM bank register at $00 is undone by the same POKE that made it, every time. STORE.BASL
+REM says it plainly at the top: "the runtime's PEEK/POKE honour the last BANK statement".
+REM The document layer sets BANK before each of its own accesses and its banks start at 1,
+REM so borrowing bank 0 here disturbs nothing.
+ED.ALTKEYS:
+  ED.NALT = 0
+  BANK 0
+  ED.TPLAIN = 0 : ED.TALT = 0
+  FOR ED.TI = 0 TO 10
+    ED.TB = 40960 + 128 * ED.TI
+    IF PEEK(ED.TB) = 128 THEN ED.TPLAIN = ED.TB
+    IF PEEK(ED.TB) = 198 THEN ED.TALT = ED.TB
+  NEXT ED.TI
+  IF ED.TPLAIN = 0 THEN RETURN
+  IF ED.TALT = 0 THEN RETURN
+  FOR MENU.I = 0 TO MENU.COUNT - 1
+    ED.WANT = ASC(LEFT$(MENU.NAME$(MENU.I), 1))
+    FOR ED.KI = 1 TO 127
+      IF PEEK(ED.TPLAIN + ED.KI) = ED.WANT + 32 THEN GOSUB ED.ALTKEY.SET
+    NEXT ED.KI
+  NEXT MENU.I
+  RETURN
+
+ED.ALTKEY.SET:
+  ED.ALTK(ED.NALT) = ED.TALT + ED.KI
+  ED.ALTV(ED.NALT) = PEEK(ED.TALT + ED.KI)
+  POKE ED.TALT + ED.KI, ED.WANT
+  ED.NALT = ED.NALT + 1
+  RETURN
+
+ED.ALTKEYS.OFF:
+  IF ED.NALT = 0 THEN RETURN
+  BANK 0
+  FOR ED.AI = 0 TO ED.NALT - 1
+    POKE ED.ALTK(ED.AI), ED.ALTV(ED.AI)
+  NEXT ED.AI
+  ED.NALT = 0
   RETURN
 
 ED.OPEN.DONE:
@@ -328,6 +409,7 @@ ED.MENU.SETUP:
   DIM MENU.COL(3) : DIM MENU.WIDTH(3)
   DIM MENU.ITEM$(24) : REM flat: menu * 8 + item
   DIM MENUHELP.ITEM$(8) : REM MENUHELP leaves its item array to the caller
+  DIM ED.ALTK(8) : DIM ED.ALTV(8) : REM layout bytes ED.ALTKEYS overwrites, to put back
   MENU.NAME$(0) = "File" : MENU.ITEMS(0) = 5
   MENU.ITEM$(0) = "New" : MENU.ITEM$(1) = "Open..." : MENU.ITEM$(2) = "Save"
   MENU.ITEM$(3) = "Save As..." : MENU.ITEM$(4) = "Exit"
@@ -502,10 +584,24 @@ REM ============================================================================
 REM MENUS
 REM ============================================================================
 ED.ALT.MENU:
-  ED.ALT.CH = ED.KEY - 96 : REM Commodore+letter graphics code -> A..Z (161->65)
+  REM Whatever letter the driver sent with ALT down, folded to upper. This no longer
+  REM decodes a PETSCII Commodore code, because in ISO mode there is not one to decode --
+  REM ED.READ.MODS has already asked the KERNAL whether ALT was actually held.
+  ED.ALT.CH = ED.KEY
+  IF ED.ALT.CH >= 97 AND ED.ALT.CH <= 122 THEN ED.ALT.CH = ED.ALT.CH - 32
   FOR MENU.I = 0 TO MENU.COUNT - 1
-    IF ASC(LEFT$(MENU.NAME$(MENU.I), 1)) = ED.ALT.CH THEN MENU.ACTIVE = MENU.I : GOSUB ED.OPEN.MENUBAR : RETURN
+    GP.IF ASC(LEFT$(MENU.NAME$(MENU.I), 1)) = ED.ALT.CH THEN 
+      MENU.ACTIVE = MENU.I 
+      GOSUB ED.OPEN.MENUBAR  
+      RETURN
+    GP.ENDIF
   NEXT MENU.I
+  REM No menu with that initial. SAY WHAT ARRIVED, because ALT+letter is the one path
+  REM nothing headless can drive -- kbdbuf_put fills the buffer but sets no modifiers --
+  REM so the machine reporting its own key and modifier bytes is the only instrument
+  REM there is. A silent no-op here would just look like ALT being broken again.
+  ED.MSG$ = "ALT: key=" + MID$(STR$(ED.KEY), 2) + " mods=" + MID$(STR$(ED.MODS), 2)
+  GOSUB ED.INFO.MSG
   RETURN
 
 REM The menu's own key loop, in the same shape as the main loop and ED.DISPATCH.KEY:
@@ -1229,6 +1325,16 @@ ED.SELFCHECK:
   REM ---- verify chrome (char+attr) + text render + the O(1) caret ----
   ED.QUIET = 0
   PRINT "DIM ";SCREEN.COLS;"x";SCREEN.ROWS
+  REM ---- what ED.ALTKEYS actually found in the layout. ALT+letter is the one path no
+  REM ---- headless test can PRESS, but everything it depends on is readable right here:
+  REM ---- which tables exist, which two were picked, and how many keys got rewritten.
+  PRINT "ALTKEYS N=";ED.NALT;" PLAIN=";ED.TPLAIN;" ALT=";ED.TALT
+  ED.IDS$ = ""
+  BANK 0
+  FOR ED.TI = 0 TO 10
+    ED.IDS$ = ED.IDS$ + STR$(PEEK(40960 + 128 * ED.TI))
+  NEXT ED.TI
+  PRINT "TABLE IDS";ED.IDS$
   MENU.ACTIVE = 0 - 1 : GOSUB ED.RENDER.MENUBAR
   PRINT "MB CH=";VPEEK(1, 45058);" AT=";VPEEK(1, 45059)
   MENU.ACTIVE = 0 : MENU.SEL = 0 : GOSUB ED.DRAW.DROPDOWN
