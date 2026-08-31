@@ -36,9 +36,22 @@
 ## **                                         -- left the field, text kept
 ## **
 ## **  So a form is a loop: call the field, look at INPHELP.KEY, and move
-## **  the focus. DEL rubs out. The field never scrolls: when it is full,
-## **  further characters are refused, and the cursor sits on the last one
-## **  rather than off the end.
+## **  the focus. The field never scrolls: when it is full, further
+## **  characters are refused, and the cursor sits on the last one rather
+## **  than off the end.
+## **
+## **  THE CARET MOVES. Cursor LEFT and RIGHT walk it through the text,
+## **  HOME and END jump to the ends, typing INSERTS where it stands and
+## **  DEL rubs out what is before it. It starts after the last character,
+## **  which is where it used to be permanently -- so a caller that never
+## **  presses an arrow sees exactly the old append-and-rub-out field.
+## **
+## **  Those four keys were not merely unimplemented before, they were
+## **  actively refused: 29 for being under 32, and 157 for sitting in the
+## **  PETSCII control range that INPHELP.TYPED rejects. They did nothing,
+## **  which was safe and useless.
+## **
+## **   also out  INPHELP.POS   where the caret ended up, 0..LEN(TEXT$)
 ## **
 ## **  WHY THIS IS NOT A KEYWORD. It is a wait on a HUMAN, so the speed
 ## **  argument that puts sorting and screen copying in assembly does not
@@ -68,6 +81,16 @@
 #DEFINE INPHELP.UP 145
 #DEFINE INPHELP.TAB 9
 
+## The keys that move the CARET inside the field, as opposed to leaving
+## it. Left and right were previously refused by INPHELP.TYPED -- 29 for
+## being under 32, 157 for being in the PETSCII control range -- so they
+## did nothing at all, and there was nothing for them to do: the text was
+## built by appending and could only be cut from the end.
+#DEFINE INPHELP.LEFT 157
+#DEFINE INPHELP.RIGHT 29
+#DEFINE INPHELP.HOME 19
+#DEFINE INPHELP.END 4
+
 ## Jiffies between cursor flips. 60 to the second, so 15 is four a second --
 ## fast enough to read as alive, slow enough not to strobe.
 #DEFINE INPHELP.BLINK 15
@@ -81,6 +104,7 @@ GOTO INPHELP.MODULE.END
 INPHELP.GET:
     INPHELP.INV = (INPHELP.ATTR AND 15) * 16 + INT(INPHELP.ATTR / 16)
     INPHELP.WAS$ = INPHELP.TEXT$
+    INPHELP.POS = LEN(INPHELP.TEXT$)
     INPHELP.DONE = 0 : INPHELP.KEY = 0
     INPHELP.LIT = 1  : INPHELP.TICK = TI
 
@@ -118,11 +142,20 @@ INPHELP.KEYED:
             INPHELP.DONE = 1
         GP.CASE INPHELP.ESCAPE, INPHELP.STOP
             INPHELP.TEXT$ = INPHELP.WAS$
+            INPHELP.POS = LEN(INPHELP.TEXT$)
             INPHELP.DONE = 1
         GP.CASE INPHELP.DOWN, INPHELP.UP, INPHELP.TAB
             INPHELP.DONE = 1
+        GP.CASE INPHELP.LEFT
+            IF INPHELP.POS > 0 THEN INPHELP.POS = INPHELP.POS - 1
+        GP.CASE INPHELP.RIGHT
+            IF INPHELP.POS < LEN(INPHELP.TEXT$) THEN INPHELP.POS = INPHELP.POS + 1
+        GP.CASE INPHELP.HOME
+            INPHELP.POS = 0
+        GP.CASE INPHELP.END
+            INPHELP.POS = LEN(INPHELP.TEXT$)
         GP.CASE INPHELP.DELETE
-            IF LEN(INPHELP.TEXT$) > 0 THEN INPHELP.TEXT$ = LEFT$(INPHELP.TEXT$, LEN(INPHELP.TEXT$) - 1)
+            GOSUB INPHELP.RUBOUT
         GP.OTHER
             GOSUB INPHELP.TYPED
     GP.ENDSEL
@@ -170,7 +203,29 @@ INPHELP.TYPED:
     IF INPHELP.CODE > 127 THEN INPHELP.BAR = 1
     IF INPHELP.CODE > 159 THEN INPHELP.BAR = 0
     IF INPHELP.BAR = 1 THEN RETURN
-    INPHELP.TEXT$ = INPHELP.TEXT$ + INPHELP.K$
+
+## ---- INSERTED AT THE CARET, not appended. With the caret at the end --
+## ---- where it starts, and where it stays unless someone moves it --
+## ---- LEFT$ is the whole string and MID$ past the end is "", so this is
+## ---- the old append with two joins nobody asked for. That is the price
+## ---- of the caret, and it is paid per keystroke, on a human's timescale.
+    INPHELP.TEXT$ = LEFT$(INPHELP.TEXT$, INPHELP.POS) + INPHELP.K$ + MID$(INPHELP.TEXT$, INPHELP.POS + 1)
+    INPHELP.POS = INPHELP.POS + 1
+    RETURN
+
+## ***********************************************************************
+## **  INPHELP.RUBOUT -- DEL takes the character BEFORE the caret.
+## **
+## **  Which is what DEL has always meant, and what the old code did by
+## **  accident: with the caret at the end, "before the caret" IS "off the
+## **  end". At the start of the field there is nothing before it, so DEL
+## **  is ignored rather than wrapping round to eat the last character.
+## ***********************************************************************
+
+INPHELP.RUBOUT:
+    IF INPHELP.POS = 0 THEN RETURN
+    INPHELP.TEXT$ = LEFT$(INPHELP.TEXT$, INPHELP.POS - 1) + MID$(INPHELP.TEXT$, INPHELP.POS + 1)
+    INPHELP.POS = INPHELP.POS - 1
     RETURN
 
 ## ---- What the field displays, which is not always what it holds.
@@ -195,10 +250,17 @@ INPHELP.RENDER:
 
 INPHELP.CURSOR:
     INPHELP.FILLED = LEN(INPHELP.SHOW$)
-    INPHELP.CX = INPHELP.X + INPHELP.FILLED
+    INPHELP.CP = INPHELP.POS
+    IF INPHELP.CP > INPHELP.FILLED THEN INPHELP.CP = INPHELP.FILLED
+    INPHELP.CX = INPHELP.X + INPHELP.CP
     INPHELP.CELL$ = " "
-    IF INPHELP.FILLED >= INPHELP.LEN THEN INPHELP.CX = INPHELP.X + INPHELP.LEN - 1
-    IF INPHELP.FILLED >= INPHELP.LEN THEN INPHELP.CELL$ = RIGHT$(INPHELP.SHOW$, 1)
+
+## ---- ON a character, the cursor IS that character, drawn inverse on the
+## ---- lit half of the blink and normal on the other -- so the blink puts
+## ---- back exactly what it covered and nothing has to be remembered.
+    IF INPHELP.CP < INPHELP.FILLED THEN INPHELP.CELL$ = MID$(INPHELP.SHOW$, INPHELP.CP + 1, 1)
+    IF INPHELP.CP >= INPHELP.LEN THEN INPHELP.CX = INPHELP.X + INPHELP.LEN - 1
+    IF INPHELP.CP >= INPHELP.LEN THEN INPHELP.CELL$ = RIGHT$(INPHELP.SHOW$, 1)
     INPHELP.CA = INPHELP.ATTR
     IF INPHELP.LIT = 1 THEN INPHELP.CA = INPHELP.INV
     GP.PRINTAT INPHELP.CX, INPHELP.Y, INPHELP.CELL$, INPHELP.CA
