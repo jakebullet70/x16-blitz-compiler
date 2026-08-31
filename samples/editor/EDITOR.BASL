@@ -244,7 +244,7 @@ ED.THEME:
   THEME.DARK = ED.DARK
   GOSUB THEME.LOAD
   IF ED.DARK <> 0 THEN GOTO ED.THEME.DARK
-  THEME.CLR(THEME.PAGE)   = 15 * 16 + 0 : REM black on light grey -- dropdown panel
+  THEME.CLR(THEME.PAGE)   = 15 * 16 + 0 : REM black on light grey -- unused: the dropdown is TEXT
   THEME.CLR(THEME.TEXT)   =  0 * 16 + 1 : REM white on black -- the document
   THEME.CLR(THEME.TITLE)  =  6 * 16 + 1 : REM white on blue -- bars and messages
   THEME.CLR(THEME.BORDER) =  6 * 16 + 7 : REM yellow on blue -- the hotkey letter
@@ -1160,7 +1160,7 @@ REM THE FRAME IS GP.BOX STYLE 0, and the style is not a free choice. Styles 2 to
 REM with line glyphs from screen codes $40-$7F, and that is exactly the run ED.PETFONT
 REM overwrites with ASCII lower case -- a single-line box comes out as "p @ @ ... B".
 REM Style 0 borders with $A0 alone, which sits outside that run and survives untouched.
-REM $A0 is a reverse space, so it paints in the FOREGROUND colour: THEME.PAGE gives a
+REM $A0 is a reverse space, so it paints in the FOREGROUND colour: THEME.TEXT gives a
 REM black edge around the light grey panel.
 ED.DRAW.DROPDOWN:
   ED.DD.N = MENU.ITEMS(MENU.ACTIVE)
@@ -1209,7 +1209,11 @@ ED.DRAW.DROPDOWN:
   MENUHELP.X = ED.DD.COL
   MENUHELP.Y = 2 + ED.MAP.TOP : REM a map row, as above
   MENUHELP.WIDTH = ED.DD.W : MENUHELP.COUNT = ED.DD.N
-  MENUHELP.ATTR    = THEME.CLR(THEME.PAGE)
+  REM The panel is the DOCUMENT's own attribute, not a page colour of its own: white on
+  REM black, the same as the text behind it, so the dropdown reads as a framed hole in the
+  REM document rather than a grey card laid on top. The frame is that attribute too, and
+  REM only the selected row breaks it -- which is the whole point of a highlight bar.
+  MENUHELP.ATTR    = THEME.CLR(THEME.TEXT)
   MENUHELP.HIATTR  = THEME.CLR(THEME.TITLE)
   MENUHELP.HOTATTR = 0 : REM no hotkey tint: ALT+letter opens a MENU, not an item
   REM MENUHELP.ITEM$ is 1 based and MENU.SEL is 0 based, because the menu bar indexes

@@ -134,9 +134,9 @@ FILE: EDITOR.BASL
  001128 ED.RENDER.MENUBAR                                   =801;
  001141 ED.DRAW.MENU.TITLE                                  =811;
  001165 ED.DRAW.DROPDOWN                                    =816;
- 001225 ED.RENDER.STATUS                                    =846;
- 001248 ED.PUT.FIELD                                        =854;
- 001294 ED.SELFCHECK                                        =893;
+ 001229 ED.RENDER.STATUS                                    =846;
+ 001252 ED.PUT.FIELD                                        =854;
+ 001298 ED.SELFCHECK                                        =893;
 
 FILE: STORE.BASL
 
@@ -365,19 +365,19 @@ FILE: EDITOR.BASL
  001185 ED.DD.BY                                            =EZ;
  001186 ED.DD.RX                                            =F;
  001187 ED.DD.FC                                            =F0;
- 001217 ED.DD.I                                             =F1;
- 001226 ED.MARK                                             =F2;
- 001228 ED.MODE                                             =F3;
- 001230 ED.BAR                                              =F4;
- 001332 ED.IDS                                              =F5;
- 001350 ED.DDS                                              =F6;
- 001351 ED.QR                                               =F7;
- 001356 ED.SR                                               =F8;
- 001394 ED.T                                                =F9;
- 001404 ED.MR                                               =FA;
- 001407 ED.BL                                               =FB;
- 001463 ED.QI                                               =FC;
- 001465 ED.QK                                               =FD;
+ 001221 ED.DD.I                                             =F1;
+ 001230 ED.MARK                                             =F2;
+ 001232 ED.MODE                                             =F3;
+ 001234 ED.BAR                                              =F4;
+ 001336 ED.IDS                                              =F5;
+ 001354 ED.DDS                                              =F6;
+ 001355 ED.QR                                               =F7;
+ 001360 ED.SR                                               =F8;
+ 001398 ED.T                                                =F9;
+ 001408 ED.MR                                               =FA;
+ 001411 ED.BL                                               =FB;
+ 001467 ED.QI                                               =FC;
+ 001469 ED.QK                                               =FD;
 
 FILE: STORE.BASL
 
