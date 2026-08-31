@@ -5,7 +5,7 @@
 > what was built — not as a description of it. Where the two differ, the tree is
 > right. What shipped: §18's option A (the `SYS` composite with blobs pooled past
 > the `$FF` end marker), §17's REM-bodied block, §19.1's `#INCLUDE`. Verified on
-> R49 at **RT 12031 / GP OUT** — zero runtime bytes. Labels, branches and `{VAR}`
+> R49 at **RT 12031 / GP-BASIC OUT** — zero runtime bytes. Labels, branches and `{VAR}`
 > are not built yet. See `TODO.md` and the commit messages for the build itself.
 
 > **Originally written as research only.** Started and written 2026-08-30, incrementally, because the previous
@@ -1315,7 +1315,7 @@ The commit message states it directly:
 > *"That NOP is in the CORE, not gp-runtime, and it has to be: ScanGPUsage
 > decides whether an object carries the ~2K GP block by comparing each opcode's
 > handler address against GPBase. Measured — a GP.IF program compiles RT 12031 /
-> GP OUT, against RT 14079 / GP IN for a GP.SELECT one."*
+> GP-BASIC OUT, against RT 14079 / GP-BASIC IN for a GP.SELECT one."*
 
 `14,079 - 12,031 = 2,048`. So **where a handler is linked decides whether the
 program drags in the whole GP block.**
@@ -1326,7 +1326,7 @@ determinism). **That assumption is now expensive.** The two placements:
 
 | placement | handler budget | cost to a program using ASM **and other GP keywords** | cost to a program using **ASM only** |
 | --- | --- | --- | --- |
-| **`gp-runtime/`** (GP block) | **78 B slack** — comfortable | **0** | **+2,048** (it becomes GP IN) |
+| **`gp-runtime/`** (GP block) | **78 B slack** — comfortable | **0** | **+2,048** (it becomes GP-BASIC IN) |
 | **core** (below `GPBase`) | **26 B cushion** — very tight | 0 | **0** |
 
 A core handler that overruns the 26-byte cushion pushes `GPBase` to `$3800` and
@@ -1352,7 +1352,7 @@ nothing existing performs an indirect jump into the p-code stream.
 §10.2 argued the object's base is forced to `ObjectBase $3F00` because *"a program
 containing `GP.ASM` uses a GP keyword by definition"*. **That is only true if the
 handler is linked into `gp-runtime/`.** With a core handler (15.2), an ASM-only
-program is GP OUT and the base is `GPBase $3700`.
+program is GP-BASIC OUT and the base is `GPBase $3700`.
 
 Either way the base is one of two known page values, and — critically — **`gpUsed`
 is not known while the statement is being compiled**; `ScanGPUsage` runs inside
@@ -1516,7 +1516,7 @@ through an indirect. That is the entire runtime side of the feature.
 | — | `GPBase` **`$3700`** | — |
 
 Every one is far below `GPBase`. **A lowering built only from these opcodes
-leaves the program GP OUT**, so `ScanGPUsage` cuts the 2,048-byte block.
+leaves the program GP-BASIC OUT**, so `ScanGPUsage` cuts the 2,048-byte block.
 
 ### 16.2 The lowering
 
@@ -1880,7 +1880,7 @@ CommandXData: ...                                 ; its plx restores X; its tail
 - 17 handler + 2 `VectorTable` + 1 `MOFSizeTable` = **20 core bytes**, inside the
   26-byte pad. `GPBase` and `ObjectBase` do not move, the runtime slice stays
   exactly `$0801..$3700` (12,031) or `$0801..$3F00` (14,079), and an ASM-only
-  program stays **GP OUT**.
+  program stays **GP-BASIC OUT**.
 
 **Cost: 0 runtime bytes. Per block: N + 2** — cheaper than A's N + 5.
 
@@ -1913,7 +1913,7 @@ Its honest costs, all flagged by the agents:
 - **Second cut point (0/2).** Both verifiers refuted it on the same ground: it
   **does not meet the brief.** It moves `runtimeEndPage` `$3700 -> $3800`, giving
   an ASM-only program a third "GP LOW" state at 12,287 bytes — **+256 twice
-  over**, not GP OUT. Mechanically cheap, but disproportionate for one keyword.
+  over**, not GP-BASIC OUT. Mechanically cheap, but disproportionate for one keyword.
 - **No new opcode at all (not viable).** Clears the 2,048-byte question easily,
   then dies on the `READ`/`.data` collision with no way to carry the blob.
 

@@ -196,9 +196,16 @@
 ## below it runs. Nothing matching with no GP.OTHER is not an error, the
 ## whole select is simply skipped. Selects may be nested.
 ##
-## Do not GOTO out of a select: GP.ENDSEL is what releases the selector,
-## and jumping past it leaves the frame open. GP.EXITDO out of a loop
-## that contains one is fine -- that cleans up on its way.
+## A case body may go on the SAME LINE after a colon, which is what makes a
+## sparse dispatch read as a table:
+##
+##   GP.CASE 157 : GOSUB MOVE.LEFT
+##   GP.CASE 29  : GOSUB MOVE.RIGHT
+##
+## GOTO out of a select is safe. It used to leak the selector's frame --
+## GP.ENDSEL is what releases it -- but the compiler now puts an .unwind in
+## front of any GOTO leaving a block and FixBranches fills in the count. No
+## runtime bytes. The same holds for GP.DO.
 
 #TOKEN GP.SELECT 52838
 #TOKEN GP.CASE 52837

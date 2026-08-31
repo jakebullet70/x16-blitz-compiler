@@ -65,6 +65,9 @@ StartCompiler:
 		;		we don't yet know if the program has any. VARSPACE has already run, so the array
 		;		allocator (availableMemory) is set up by the time the prologue executes.
 		;
+		stz 	blockDepth 					; GP.DO / GP.SELECT nesting -- the storage section is
+											; uninitialised RAM, and a non-zero start makes every
+											; GOTO emit an .unwind it does not need
 		stz 	implicitDimCount
 		stz 	implicitDimFirstSet
 		stz 	clrCheckpoint 				; no CLR compiled yet -> no array is re-DIMmable

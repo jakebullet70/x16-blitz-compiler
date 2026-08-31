@@ -22,4 +22,5 @@ MOFSizeTable:
 	.byte	2         	; $ed .caseend
 	.byte	2         	; $ee .ifnext
 	.byte	2         	; $ef .ifelse
+	.byte	1         	; $f0 .unwind
 .send code

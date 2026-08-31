@@ -220,7 +220,7 @@ FrameStackPages = 16 						; 4K, ~250 frames
 ;		(.ifnext, .ifelse) were appended after .caseend on top of that. The gp.else -> gp.other
 ;		rename moved nothing: same position, same id.
 ;
-RT_ABI = 21 								; runtime ABI ordinal -> "GP21" magic (NOT the file name)
+RT_ABI = 22 								; runtime ABI ordinal -> "GP22" magic (NOT the file name)
 
 ; ************************************************************************************************
 ;

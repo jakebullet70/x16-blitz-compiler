@@ -25,7 +25,7 @@
 ;		registers through $030C-$030F, calls through an indirect and comes back. Its handler,
 ;		and .word's, are both far below GPBase, so a program whose only GP.BASIC keyword is
 ;		GP.ASM never drags in the 2K GP runtime block. Measured: such a program compiles
-;		GP OUT at RT 12031, exactly what a program with no GP keyword at all costs.
+;		GP-BASIC OUT at RT 12031, exactly what a program with no GP keyword at all costs.
 ;
 ;		THE BLOBS THEMSELVES GO IN A POOL APPENDED AFTER THE $FF END MARKER. Nothing walks
 ;		there: MoveObjectForward returns carry set on $FF, and FixBranches, ScanGPUsage and

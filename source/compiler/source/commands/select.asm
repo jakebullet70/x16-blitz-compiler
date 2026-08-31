@@ -61,8 +61,7 @@ CommandSelectCompile:
 		;
 		lda 	#$FF
 		sta 	SelectFirstCase
-		clc
-		rts
+		jmp 	BlockDepthUp 				; a frame is open from here: see goto.asm
 
 CommandCaseCompile:
 		jsr 	CompileCaseEnd 				; close the previous case body, if there was one
@@ -115,8 +114,7 @@ CommandEndSelectCompile:
 		stz 	SelectFirstCase
 		lda 	#PCD_GPCMD_ENDSEL
 		jsr 	WriteCodeByte
-		clc
-		rts
+		jmp 	BlockDepthDown 				; the frame closes here: see goto.asm
 
 ;
 ;		The branch out of a finished case body. Written at the START of the alternative that

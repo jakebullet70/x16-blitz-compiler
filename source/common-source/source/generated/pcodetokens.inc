@@ -6,7 +6,7 @@ PCD_ENDBINARY = $8d
 PCD_STARTCOMMAND = $8d
 PCD_ENDCOMMAND = $dd
 PCD_STARTSYSTEM = $dd
-PCD_ENDSYSTEM = $f0
+PCD_ENDSYSTEM = $f1
 
 PCD_PLUS             = $80 ; +
 PCD_MINUS            = $81 ; -
@@ -120,6 +120,7 @@ PCD_CMD_CASENEXT     = $ec ; .casenext
 PCD_CMD_CASEEND      = $ed ; .caseend
 PCD_CMD_IFNEXT       = $ee ; .ifnext
 PCD_CMD_IFELSE       = $ef ; .ifelse
+PCD_CMD_UNWIND       = $f0 ; .unwind
 PCD_CLR              = $dd80 ; clr
 PCD_DIM              = $dd81 ; dim
 PCD_END              = $dd82 ; end

@@ -106,13 +106,13 @@
 ;
 	.byte	$0a,$9c,$00,$03,CommandClrCompile & $FF,CommandClrCompile >> 8,$20,32989 & $FF,32989 >> 8,$06
 ;
-;	GP.DO    X:OptionalNumberCompile T N
+;	GP.DO    X:OptionalNumberCompile T X:BlockDepthUp N
 ;
-	.byte	$09,$ce,$7f,$03,OptionalNumberCompile & $FF,OptionalNumberCompile >> 8,$10,150,$06
+	.byte	$0c,$ce,$7f,$03,OptionalNumberCompile & $FF,OptionalNumberCompile >> 8,$10,150,$03,BlockDepthUp & $FF,BlockDepthUp >> 8,$06
 ;
-;	GP.LOOP   T N
+;	GP.LOOP   T X:BlockDepthDown N
 ;
-	.byte	$06,$ce,$7e,$10,151,$06
+	.byte	$09,$ce,$7e,$10,151,$03,BlockDepthDown & $FF,BlockDepthDown >> 8,$06
 ;
 ;	GP.EXITDO   X:CommandExitDoCompile N
 ;

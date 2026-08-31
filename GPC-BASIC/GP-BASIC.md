@@ -104,7 +104,7 @@ the BASIC modules are written up in §4.
 | **Multi-way branch** | ASM | `GP.SELECT` `GP.CASE` `GP.OTHER` `GP.ENDSEL` |
 | **Block IF** | ASM | `GP.IF` `GP.ELSEIF` `GP.ELSE` `GP.ENDIF` — see §3.8 |
 | **Machine code** | ASM | `GP.CALL` `GP.A` `GP.X` `GP.Y` `GP.C` |
-| **Inline assembly** | COMPOSITE | `GP.ASM` `GP.ENDASM` — free, and stays GP OUT, see §3.9 |
+| **Inline assembly** | COMPOSITE | `GP.ASM` `GP.ENDASM` — free, and stays GP-BASIC OUT, see §3.9 |
 | **Strings** | ASM | `GP.INSTR` `GP.STRPTR` `GP.TRIM` `GP.LTRIM` `GP.RTRIM` `GP.UPPER` `GP.LOWER` `GP.COMP` |
 | **Strings** | COMPOSITE | `GP.CONTAINS` `GP.ISEMPTY` — free, see §3.4 |
 | **Addresses** | COMPOSITE | `GP.HIBYTE` `GP.LOBYTE` — free, see §3.3 |
@@ -175,10 +175,29 @@ Case values are ordinary numeric **expressions**, not just constants — which i
 
 **`GP.ENDSEL` is required**: it is what releases the selector's stack frame.
 
-> **Do not `GOTO` out of a select.** Jumping past `GP.ENDSEL` leaves the frame open, and in a loop that
-> leaks one per pass. Set a flag and test it after `GP.ENDSEL` — one comparison, and it cannot leak.
-> `INPHELP.GET` does exactly this and the comment there says why. `GP.EXITDO` out of a loop that
-> *contains* a select is fine; it cleans up on the way.
+**A case body takes its statements on the same line**, after a colon, which is what makes a sparse
+dispatch read as the table it is:
+
+```basic
+GP.SELECT ED.KEY
+  GP.CASE 157 : GOSUB ED.MOVE.LEFT
+  GP.CASE 29  : GOSUB ED.MOVE.RIGHT
+  GP.CASE 27  : MENU.ACTIVE = 0 : GOSUB ED.OPEN.MENUBAR
+  GP.OTHER    : GOSUB ED.KEY.RANGE
+GP.ENDSEL
+```
+
+More than one statement after the colon is fine, and so is `GP.OTHER`. The body may still go on the
+following lines instead — both forms are the same code.
+
+> **`GOTO` out of a select is safe.** It used to leak the selector's frame, one per pass through a
+> loop, because `GP.ENDSEL` is what releases it. The compiler now puts an `.unwind` in front of any
+> `GOTO` that leaves a block, and `FixBranches` fills in how many frames it closes — it knows the
+> block depth at the `GOTO` and at its target. The same applies to `GP.DO`, and to leaving both at
+> once. It costs **no runtime bytes** and two p-code bytes at the `GOTO` itself.
+>
+> One thing it does not cover, because nothing could: a `GOTO` **sideways**, out of one block and
+> into a different one at the same depth. The count comes out zero and no frame is closed.
 
 **This does not replace `ON x GOTO/GOSUB`**, which is a real skip table and remains the right answer
 for a dense `1..n` index. `GP.SELECT` is for the **sparse** selector — key codes, state machines,
@@ -474,7 +493,7 @@ GP.ENDASM
 
 **It costs no runtime bytes.** A block is five bytes of p-code plus your instructions, and every
 handler it uses is already in every compiled program — so a program whose only GP.BASIC keyword is
-`GP.ASM` still compiles **GP OUT**, without the 2 KB GP block. Measured: `RT 12031`, the same as a
+`GP.ASM` still compiles **GP-BASIC OUT**, without the 2 KB GP block. Measured: `RT 12031`, the same as a
 program using no GP keyword at all.
 
 #### `#REM 1` is required

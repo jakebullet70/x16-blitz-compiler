@@ -1004,7 +1004,7 @@ gpBits:
 ;
 ;		One line, printed after OK:
 ;
-;			CODE 1234 FREE 20480 RT 12031 GP OUT
+;			CODE 1234 FREE 20480 RT 12031 GP-BASIC OUT
 ;			CODE 1234 FREE 19200 RT SHARED
 ;
 ;		CODE	the p-code, FreeMemory..objPtr. What the program IS.
@@ -1015,8 +1015,10 @@ gpBits:
 ;				It EXCLUDES the 4K frame stack gap, which is reserved, not available.
 ;		RT		the runtime bytes carried in the object, or SHARED when there are none because
 ;				the program loads GPC.RT.nnn.BIN instead.
-;		GP		embedded only -- OUT if the GP.BASIC handler block was dropped (gpscan.asm), IN
-;				if some keyword reached it and the whole runtime had to go in.
+;		GP-BASIC  embedded only -- OUT if the GP.BASIC handler block was dropped (gpscan.asm),
+;				IN if some keyword reached it and the whole runtime had to go in. Named for the
+;				language, not abbreviated to "GP": the block it is reporting on is the GP.BASIC
+;				one, and the line is read by people who know the language by that name.
 ;
 ;		All three are computed here rather than stashed by WriteObjectCode: objPtr,
 ;		newWorkspacePage and runtimeEndPage all survive it unchanged, and WriteMapFile touches
@@ -1176,9 +1178,9 @@ CoreText: 									; which resident runtime file this program will ask for
 FullText:
 		.text 	" RT",0 					; GPC.RT.nnn.BIN -- handlers and core
 GPOutText:
-		.text 	" GP OUT",0
+		.text 	" GP-BASIC OUT",0
 GPInText:
-		.text 	" GP IN",0
+		.text 	" GP-BASIC IN",0
 
 reportValue: 								; code section, not storage -- these belong to the
 		.fill 	2 							; compiler and are thrown away when the object is

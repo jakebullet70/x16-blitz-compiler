@@ -115,6 +115,7 @@ VectorTable:
 	.word	CommandXCaseEnd          ; $ed .caseend
 	.word	CommandXIfNext           ; $ee .ifnext
 	.word	CommandXIfElse           ; $ef .ifelse
+	.word	CommandXUnwind           ; $f0 .unwind
 
 
 ShiftVectorTable:

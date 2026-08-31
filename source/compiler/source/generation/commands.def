@@ -60,8 +60,8 @@ CLR 			X:CommandClrCompile T N
 #		GP.DO reuses OptionalNumberCompile (the bare-SLEEP helper) verbatim: it pushes 0 when
 #		the count is omitted, and a count of 0 is exactly what the runtime reads as "forever".
 #
-GP.DO 			X:OptionalNumberCompile T N
-GP.LOOP 		T N
+GP.DO 			X:OptionalNumberCompile T X:BlockDepthUp N
+GP.LOOP 		T X:BlockDepthDown N
 #
 #		GP.EXITDO has no "T": .exitdo is a SYSTEM token carrying a two byte branch offset, and the
 #		table cannot reserve operand space. CommandExitDoCompile writes token and placeholder both.

@@ -91,6 +91,11 @@ class PCode(object):
 		self.extra(".ifelse",2) 			# End of a GP.IF / GP.ELSEIF body, and the jump over a
 										# GP.ELSEIF test: out to the GP.ENDIF. Runs the .goto
 										# handler. Appended, for the reason directly above.
+		self.extra(".unwind",1) 			# Close the innermost <n> block frames, so a GOTO can
+											# leave a GP.DO / GP.SELECT without leaking the frame
+											# GP.LOOP / GP.ENDSEL would have released. The 1 is
+											# the count byte FixBranches patches. Appended, for
+											# the reason directly above.
 		self.define("PCD_ENDSYSTEM")
 		self.endCommands = self.currentID	
 

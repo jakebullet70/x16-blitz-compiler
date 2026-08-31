@@ -1,0 +1,116 @@
+## ***********************************************************************
+## **
+## **  UNWIND.EXP.BL -- a GOTO may leave a GP.SELECT or a GP.DO
+## **
+## **  GP.ENDSEL and GP.LOOP are what release a block's stack frame, so a
+## **  GOTO that jumps past them used to leak one -- and in a loop, one per
+## **  pass, until the 4K frame stack ran out. It does not any more: the
+## **  compiler puts an .unwind in front of any GOTO that leaves a block and
+## **  FixBranches fills in how many frames it closes.
+## **
+## **  This is the regression test as much as the example, and the counts are
+## **  chosen so it FAILS if the unwind ever stops working. A GP.SELECT frame
+## **  is 7 bytes against a 4K stack, so ~585 leaks is OUT OF MEMORY: test 1
+## **  leaks one every third pass over 1200, test 4 leaks two per pass over
+## **  800. Getting to the end is the proof.
+## **
+## **  Build:  copy GPC-BASIC/GPB.INC.BL and this file into testing/, then
+## **            python source/gpc/build_basl.py UNWIND.EXP.BL UNWIND.PRG
+## **          and compile UNWIND.PRG with GPC.BIN.
+## **
+## **  Compile-only: the ROM cannot RUN a PRG containing GP tokens.
+## **
+## ***********************************************************************
+#INCLUDE "GPB.INC.BL"
+#SAVEAS "@:UNWIND.PRG"
+#AUTONUM 1
+#REM 0
+
+REM ---- 1. GOTO out of a case body, 1200 times ----
+UT.N = 0
+UT.HIT = 0
+UT.OTH = 0
+UT.LOOP:
+  UT.N = UT.N + 1
+GP.SELECT UT.N - INT(UT.N / 3) * 3
+GP.CASE 0
+  GOTO UT.BACK
+GP.CASE 1
+  UT.HIT = UT.HIT + 1
+GP.OTHER
+  UT.OTH = UT.OTH + 1
+GP.ENDSEL
+UT.BACK:
+  IF UT.N < 1200 THEN GOTO UT.LOOP
+PRINT "SELECT N=";UT.N;" HIT=";UT.HIT;" OTH=";UT.OTH
+
+REM ---- 2. GOTO out of a GP.DO body, 1200 times ----
+UT.M = 0
+UT.DLOOP:
+  UT.M = UT.M + 1
+GP.DO 5
+  GOTO UT.DBACK
+GP.LOOP
+UT.DBACK:
+  IF UT.M < 1200 THEN GOTO UT.DLOOP
+PRINT "DO M=";UT.M
+
+REM ---- 3. a GOTO that stays INSIDE its block must not close anything ----
+REM      If it did, GP.ENDSEL would find no frame and raise BLOCK MISMATCH.
+UT.IN = 0
+GP.SELECT 1
+GP.CASE 1
+  GOTO UT.SAME
+UT.SAME:
+  UT.IN = 99
+GP.ENDSEL
+PRINT "INSIDE IN=";UT.IN
+
+REM ---- 4. nested: a GOTO leaving a select inside a GP.DO leaves BOTH ----
+UT.K = 0
+UT.NLOOP:
+  UT.K = UT.K + 1
+GP.DO 5
+GP.SELECT 7
+GP.CASE 7
+  GOTO UT.NBACK
+GP.ENDSEL
+GP.LOOP
+UT.NBACK:
+  IF UT.K < 800 THEN GOTO UT.NLOOP
+PRINT "NESTED K=";UT.K
+
+REM ---- 5. the frame stack must still be healthy afterwards ----
+REM      A leak would have died above; this proves the stack is not merely
+REM      un-full but actually usable to its normal depth.
+UT.SUM = 0
+FOR UT.I = 1 TO 20
+  GOSUB UT.SUB
+NEXT UT.I
+PRINT "STACK SUM=";UT.SUM
+
+REM ---- 6. one-line GP.CASE: does "GP.CASE n : <statement>" work today? ----
+UT.ONE = 0
+UT.KEY = 29
+GP.SELECT UT.KEY
+  GP.CASE 157 : GOSUB UT.LEFT
+  GP.CASE 29 : GOSUB UT.RIGHT
+  GP.OTHER : GOSUB UT.NONE
+GP.ENDSEL
+PRINT "ONELINE ONE=";UT.ONE;" (want 2)"
+
+PRINT "UNWIND OK"
+END
+
+UT.SUB:
+  UT.SUM = UT.SUM + 1
+  RETURN
+UT.LEFT:
+  UT.ONE = 1
+  RETURN
+UT.RIGHT:
+  UT.ONE = 2
+  RETURN
+UT.NONE:
+  UT.ONE = 3
+  RETURN

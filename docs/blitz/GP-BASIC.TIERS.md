@@ -104,7 +104,7 @@ compiles at roughly **14 bytes of p-code per line**. BASL menus (~60–100 lines
 **Tier 11 is the first that costs this budget nothing.** Its four opcodes all reuse a handler
 that already existed, and the 14 bytes they do cost land below `GPBase` — in the core, so that a
 program whose only GP keyword is an `IF` still gets the GP block cut. Measured: such a program
-compiles `RT 12031` / `GP OUT`. See §11.
+compiles `RT 12031` / `GP-BASIC OUT`. See §11.
 
 #### Measured overrun, 17th August 2026 — read this before trusting an estimate below
 
@@ -233,7 +233,7 @@ handler address against `GPBase`. Two rejected alternatives, both worse:
 - **Hooking token emission** in the generator would have missed five keywords. `GP.EXITDO` and the
   four `GP.SELECT` commands carry inline branch offsets, so they cannot use the `T` action at all and
   emit through hand-written `X:` helpers instead. Scanning the finished code has one site and no way
-  to miss anything — verified with a `GP.SELECT`-only program, which reports `GP IN` and runs.
+  to miss anything — verified with a `GP.SELECT`-only program, which reports `GP-BASIC IN` and runs.
 
 Asking by *address* also means the answer follows the code: move a handler into or out of
 `gp-runtime/` and nothing here needs updating.
@@ -1090,7 +1090,7 @@ share one 4-byte `plx`/`jmp NextCommand`.
 object carries the ~2 KB GP handler block by comparing each emitted opcode's *handler address*
 against `GPBase`. Aliasing the markers to `CommandXOther` over in `gp-runtime/select.asm` would have
 been free, and would have dragged the whole block into any program whose only GP keyword is an `IF`.
-Verified: the test program compiles with `RT 12031` and `GP OUT`, against `RT 14079` / `GP IN` for a
+Verified: the test program compiles with `RT 12031` and `GP-BASIC OUT`, against `RT 14079` / `GP-BASIC IN` for a
 `GP.SELECT` program.
 
 **`GP.ELSEIF` is what forces `gp.if` to exist.** Without it `FixBranches` could count nesting on

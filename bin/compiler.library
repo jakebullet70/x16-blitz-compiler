@@ -719,6 +719,9 @@ StartCompiler:
 		;		we don't yet know if the program has any. VARSPACE has already run, so the array
 		;		allocator (availableMemory) is set up by the time the prologue executes.
 		;
+		stz 	blockDepth 					; GP.DO / GP.SELECT nesting -- the storage section is
+											; uninitialised RAM, and a non-zero start makes every
+											; GOTO emit an .unwind it does not need
 		stz 	implicitDimCount
 		stz 	implicitDimFirstSet
 		stz 	clrCheckpoint 				; no CLR compiled yet -> no array is re-DIMmable
@@ -2133,6 +2136,7 @@ _IVNotFound:
 FixBranches:
 		lda 	#BLC_RESETOUT				; back to the start of the *object* code.
 		jsr 	CallAPIHandler
+		stz 	_FBBlockDepth
 _FBLoop:
 		lda 	(objPtr) 					; get the next one.
 		cmp 	#PCD_CMD_GOTO 				; found GOTO or GOSUB, patch up.
@@ -2146,7 +2150,7 @@ _FBLoop:
 		cmp 	#PCD_CMD_GOTOCMD_Z 
 		beq 	_FBFixGotoGosub
 		cmp 	#PCD_CMD_VARSPACE
-		beq 	_FBFixVarSpace
+		beq 	_FBVarSpaceFar
 		cmp 	#PCD_CMD_RESTORE 			; patch restore.
 		beq 	_FBFixRestore
 		cmp 	#PCD_CMD_EXITDO 			; GP.EXITDO: resolve against its own GP.LOOP.
@@ -2159,11 +2163,38 @@ _FBLoop:
 		beq 	_FBIfNextFar
 		cmp 	#PCD_CMD_IFELSE 			; end of an IF body: out to the GP.ENDIF.
 		beq 	_FBIfElseFar
+		cmp 	#PCD_CMD_UNWIND 			; a GOTO leaving blocks: how many frames it closes.
+		beq 	_FBUnwindFar
 _FBNext:
+		;
+		;		Block depth, counted as the walk passes the openers and closers -- the same
+		;		structural count the branch scanners below do locally, kept running here so the
+		;		.unwind resolver can ask "how deep am I?" without a second walk. GP.IF is not
+		;		counted: it opens no stack frame, so there is nothing to unwind out of it.
+		;
+		lda 	(objPtr)
+		cmp 	#PCD_GPCMD_DO
+		beq 	_FBDepthUp
+		cmp 	#PCD_GPCMD_SELECT
+		beq 	_FBDepthUp
+		cmp 	#PCD_GPCMD_LOOP
+		beq 	_FBDepthDown
+		cmp 	#PCD_GPCMD_ENDSEL
+		bne 	_FBStep
+_FBDepthDown:
+		dec 	_FBBlockDepth
+		bra 	_FBStep
+_FBDepthUp:
+		inc 	_FBBlockDepth
+_FBStep:
 		jsr 	MoveObjectForward 			; move forward in object code.
 		bcc 	_FBLoop 					; not finished
 _FBExit:
 		rts
+_FBUnwindFar:
+		jmp 	_FBFixUnwind
+_FBVarSpaceFar: 							; the dispatch grew when the depth count went into
+		jmp 	_FBFixVarSpace 				; _FBNext, and this was the branch it pushed over
 ;
 ;		The GP.EXITDO handler lives at the very end of this file, deliberately: dropping it inline
 ;		pushed the branches around it out of range. Hence this trampoline.
@@ -2254,7 +2285,7 @@ _FBFixVarSpace:
 		iny
 		lda 	freeVariableMemory+1
 		sta 	(objPtr),y
-		bra 	_FBNext
+		jmp 	_FBNext 					; jmp, not bra: _FBNext is out of branch range now
 
 ;
 ;		Found GP.EXITDO. Its target is whatever follows the GP.LOOP that closes the GP.DO it sits
@@ -2448,7 +2479,121 @@ _FBISFound:
 _FBISNoEnd:
 		jmp 	_FBEDNoLoop 				; same restore-and-raise as a GP.IF with no GP.ENDIF
 
+
+; ************************************************************************************************
+;
+;		.unwind -- the number of block frames the GOTO after it has to close on its way out.
+;
+;		GP.LOOP and GP.ENDSEL are what release a GP.DO's and a GP.SELECT's stack frame, so a GOTO
+;		that jumps past them leaks one. The compiler puts an .unwind in front of every GOTO it
+;		compiles inside a block; this works out the count, and zero is a perfectly good answer.
+;
+;		THE GOTO IS THE VERY NEXT OPCODE AND STILL HOLDS ITS SOURCE LINE NUMBER -- the walk
+;		patches in object order, so the .unwind is reached first. STRFindLine turns that line
+;		into the target's address, and a walk from the top of the object counts the block depth
+;		there. The depth HERE is the running count the main loop keeps. The difference is how
+;		many blocks the jump leaves.
+;
+;		Both numbers come from the emitted code, so nothing rests on compile-time bookkeeping
+;		being right -- the same reason GP.EXITDO and the GP.SELECT branches are resolved here
+;		and not when they were written.
+;
+;		A jump SIDEWAYS -- out of one block into another at the same depth -- computes zero and
+;		closes nothing. That is not worth code to detect: the frame it lands in belongs to a
+;		block whose own GP.LOOP or GP.ENDSEL will release it.
+;
+; ************************************************************************************************
+
+_FBFixUnwind:
+		lda 	objPtr 						; remember the .unwind, to come back and patch it
+		sta 	_FBExitSave
+		lda 	objPtr+1
+		sta 	_FBExitSave+1
+		;
+		jsr 	MoveObjectForward 			; the GOTO this .unwind belongs to
+		ldy 	#1
+		lda 	(objPtr),y 					; its line number, not yet an offset
+		pha
+		iny
+		lda 	(objPtr),y
+		tay
+		pla
+		jsr 	STRFindLine 				; -> YA, where that line starts
+		bcs 	_FBUNoLine 					; no such line -- let the GOTO itself report it
+		sta 	_FBUnwindTo
+		sty 	_FBUnwindTo+1
+		;
+		;		Count the depth at the target, by walking to it from the top of the object.
+		;		BLC_RESETOUT is how FixBranches itself rewinds; it only sets objPtr, so it is
+		;		safe to ask for a second time. (The compiler library cannot name FreeMemory --
+		;		it is an application symbol, and this half also builds standalone.)
+		;
+		stz 	_FBUnwindDepth
+		lda 	#BLC_RESETOUT
+		jsr 	CallAPIHandler
+_FBUWalk:
+		lda 	objPtr+1 					; reached the target ?
+		cmp 	_FBUnwindTo+1
+		bne 	_FBUWNot
+		lda 	objPtr
+		cmp 	_FBUnwindTo
+		beq 	_FBUWDone
+_FBUWNot:
+		lda 	(objPtr)
+		cmp 	#PCD_GPCMD_DO
+		beq 	_FBUWUp
+		cmp 	#PCD_GPCMD_SELECT
+		beq 	_FBUWUp
+		cmp 	#PCD_GPCMD_LOOP
+		beq 	_FBUWDown
+		cmp 	#PCD_GPCMD_ENDSEL
+		bne 	_FBUWStep
+_FBUWDown:
+		dec 	_FBUnwindDepth
+		bra 	_FBUWStep
+_FBUWUp:
+		inc 	_FBUnwindDepth
+_FBUWStep:
+		jsr 	MoveObjectForward
+		bcc 	_FBUWalk 					; running off the end lands here too, with the depth
+_FBUWDone: 									; it had reached, which is the right answer for a
+		sec 								; target that IS the end marker
+		lda 	_FBBlockDepth
+		sbc 	_FBUnwindDepth
+		bcs 	_FBUStore
+		lda 	#0 							; the target is deeper than we are: nothing to close
+_FBUStore:
+		pha
+		lda 	_FBExitSave 				; back to the .unwind, and patch its count
+		sta 	objPtr
+		lda 	_FBExitSave+1
+		sta 	objPtr+1
+		pla
+		ldy 	#1
+		sta 	(objPtr),y
+		jmp 	_FBNext
+;
+;		The line does not exist. Leave the count at zero and put objPtr back on the .unwind: the
+;		GOTO is the next thing the walk reaches, and reporting the missing line is its job, with
+;		its operand and its error message.
+;
+_FBUNoLine:
+		lda 	_FBExitSave
+		sta 	objPtr
+		lda 	_FBExitSave+1
+		sta 	objPtr+1
+		jmp 	_FBNext
+
 		.send code
+
+		.section storage
+_FBBlockDepth: 								; GP.DO / GP.SELECT nesting at the opcode being walked
+		.fill 	1
+_FBUnwindDepth: 							; ...and the same count at a GOTO's target
+		.fill 	1
+_FBUnwindTo: 								; that target's address
+		.fill 	2
+		.send 	storage
 
 		.section storage
 _FBExitSave:								; where the .exitdo being resolved lives
@@ -2808,13 +2953,13 @@ CommandTables:
 ;
 	.byte	$0a,$9c,$00,$03,CommandClrCompile & $FF,CommandClrCompile >> 8,$20,32989 & $FF,32989 >> 8,$06
 ;
-;	GP.DO    X:OptionalNumberCompile T N
+;	GP.DO    X:OptionalNumberCompile T X:BlockDepthUp N
 ;
-	.byte	$09,$ce,$7f,$03,OptionalNumberCompile & $FF,OptionalNumberCompile >> 8,$10,150,$06
+	.byte	$0c,$ce,$7f,$03,OptionalNumberCompile & $FF,OptionalNumberCompile >> 8,$10,150,$03,BlockDepthUp & $FF,BlockDepthUp >> 8,$06
 ;
-;	GP.LOOP   T N
+;	GP.LOOP   T X:BlockDepthDown N
 ;
-	.byte	$06,$ce,$7e,$10,151,$06
+	.byte	$09,$ce,$7e,$10,151,$03,BlockDepthDown & $FF,BlockDepthDown >> 8,$06
 ;
 ;	GP.EXITDO   X:CommandExitDoCompile N
 ;
@@ -4357,8 +4502,54 @@ CommandGOAlt:
 ; ************************************************************************************************
 
 CommandGOTO: 
+		;
+		;		A GOTO that is lexically inside a GP.DO or a GP.SELECT has to close those blocks'
+		;		stack frames on its way out, because GP.LOOP and GP.ENDSEL -- the things that
+		;		normally release them -- are exactly what it is jumping past. So it is prefixed
+		;		with an .unwind whose count FixBranches fills in: it knows the block depth here
+		;		and at the target, and the difference is how many blocks the jump leaves.
+		;
+		;		ONLY WHEN THE DEPTH IS NON-ZERO, and that matters more than it looks. The .unwind
+		;		handler lives above GPBase, so emitting one unconditionally would mark EVERY
+		;		program as using the GP block -- 2,048 bytes onto a program that never wrote a
+		;		GP keyword. A program that is inside a GP.DO or GP.SELECT already carries it.
+		;
+		lda 	blockDepth
+		beq 	_CGNoUnwind
+		lda 	#PCD_CMD_UNWIND
+		jsr 	WriteCodeByte
+		lda 	#0 							; count placeholder, patched by FixBranches
+		jsr 	WriteCodeByte
+_CGNoUnwind:
 		lda 	#PCD_CMD_GOTO
 		jsr 	CompileBranchCommand
+		rts
+
+; ************************************************************************************************
+;
+;		Block nesting, counted at compile time purely so CommandGOTO above can ask "am I inside
+;		one?". Nothing else needs it -- FixBranches works structurally, off the emitted code, and
+;		deliberately keeps no compile-time state. GP.IF is NOT counted: it opens no stack frame
+;		(its four opcodes are markers and reused goto handlers), so there is nothing to unwind.
+;
+;		Underflow is not guarded here. A stray GP.LOOP or GP.ENDSEL is caught structurally --
+;		FixBranches raises BLOCK MISMATCH -- and a depth that went briefly negative would only
+;		make a GOTO emit an .unwind it did not need, whose count FixBranches then computes as
+;		zero anyway.
+;
+; ************************************************************************************************
+
+BlockDepthUp: 								;; called from commands.def for GP.DO
+		inc 	blockDepth
+		clc 								; .def helpers MUST return carry clear
+		rts
+
+BlockDepthDown: 							;; and for GP.LOOP
+		lda 	blockDepth
+		beq 	_BDDFloor
+		dec 	blockDepth
+_BDDFloor:
+		clc
 		rts
 
 ; ************************************************************************************************
@@ -4384,6 +4575,10 @@ _CBCSyntax:
 
 		.send code
 
+		.section storage
+blockDepth: 								; GP.DO / GP.SELECT nesting at the statement being
+		.fill 	1 						; compiled. Reset by the compiler's own start-up.
+		.send 	storage
 
 ; ************************************************************************************************
 ;
@@ -4563,7 +4758,7 @@ AsmBodyLines: 								; REM lines seen in the block so far, capped at 255.
 ;		registers through $030C-$030F, calls through an indirect and comes back. Its handler,
 ;		and .word's, are both far below GPBase, so a program whose only GP.BASIC keyword is
 ;		GP.ASM never drags in the 2K GP runtime block. Measured: such a program compiles
-;		GP OUT at RT 12031, exactly what a program with no GP keyword at all costs.
+;		GP-BASIC OUT at RT 12031, exactly what a program with no GP keyword at all costs.
 ;
 ;		THE BLOBS THEMSELVES GO IN A POOL APPENDED AFTER THE $FF END MARKER. Nothing walks
 ;		there: MoveObjectForward returns carry set on $FF, and FixBranches, ScanGPUsage and
@@ -8156,8 +8351,7 @@ CommandSelectCompile:
 		;
 		lda 	#$FF
 		sta 	SelectFirstCase
-		clc
-		rts
+		jmp 	BlockDepthUp 				; a frame is open from here: see goto.asm
 
 CommandCaseCompile:
 		jsr 	CompileCaseEnd 				; close the previous case body, if there was one
@@ -8210,8 +8404,7 @@ CommandEndSelectCompile:
 		stz 	SelectFirstCase
 		lda 	#PCD_GPCMD_ENDSEL
 		jsr 	WriteCodeByte
-		clc
-		rts
+		jmp 	BlockDepthDown 				; the frame closes here: see goto.asm
 
 ;
 ;		The branch out of a finished case body. Written at the START of the alternative that

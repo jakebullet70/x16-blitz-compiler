@@ -91,6 +91,7 @@ it where it came from, and `APPHELP.PANEL.PUT` drops it somewhere else. Three `G
 | `BMXSPD.EXP.BL` | how long a BMX paint really takes, full width against centred |
 | `BMXPAL.EXP.BL` | that the picture's palette is borrowed and given back, not taken |
 | `ASM.EXP.BL` | inline assembly: labels, branches, and `{VAR}` reaching BASIC's own variables through `#SYMFILE` |
+| `UNWIND.EXP.BL` | that a `GOTO` may leave a `GP.SELECT` or `GP.DO` without leaking its frame — and the counts that prove it |
 
 ## Naming — BASL is safe, a hand-written `.bas` is not
 
