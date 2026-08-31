@@ -34,6 +34,13 @@
 ## they read when their colour argument is left off.
 #DEFINE APPHELP.COLREG $0376
 
+## The KERNAL's screen_set_charset, and the byte that says which one is up.
+## $FF62 only SETS -- there is no "get charset" call -- but $0372 holds the
+## number outright: it reads 2 at boot (PET upper/graphics) and reads back
+## exactly what was last set, 1..7. Probed, because it is not documented.
+#DEFINE APPHELP.SETCHR $FF62
+#DEFINE APPHELP.CHRREG $0372
+
 ## Where a RAM bank appears, and the size of GP.STASH's self-describing
 ## header (w, h, x, y).
 #DEFINE APPHELP.WINDOW $A000
@@ -44,6 +51,7 @@ GOTO APPHELP.SKIP
 ## APPHELP.STARTUP -- remember what the user had, and report the size.
 ##
 ##   out  APPHELP.MODE    the screen mode, for APPHELP.RESTORE
+##        APPHELP.CHARSET the charset number, likewise
 ##        APPHELP.COLS    columns, e.g. 80
 ##        APPHELP.ROWS    rows, e.g. 60
 ##        APPHELP.COLOUR  the packed text colour
@@ -62,6 +70,7 @@ APPHELP.STARTUP:
     APPHELP.COLS = GP.X
     APPHELP.ROWS = GP.Y
     APPHELP.COLOUR = PEEK(APPHELP.COLREG)
+    APPHELP.CHARSET = PEEK(APPHELP.CHRREG)
     RETURN
 
 ## APPHELP.RESTORE -- the screen as it was, for whatever runs next.
@@ -78,6 +87,7 @@ APPHELP.STARTUP:
 
 APPHELP.RESTORE:
     GP.CALL APPHELP.SCRMODE, APPHELP.MODE, 0, 0, 0
+    GP.CALL APPHELP.SETCHR, APPHELP.CHARSET, 0, 0, 0
     COLOR APPHELP.COLOUR AND 15, INT(APPHELP.COLOUR / 16)
     RETURN
 

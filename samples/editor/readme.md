@@ -86,7 +86,7 @@ question is closed.
 
 ### The assembly costs nothing. Something else costs 2 KB.
 
-```
+OK CODE 8579 FREE 11776 RT 14079 GP-BASIC IN
 OK CODE 8572 FREE 11776 RT 14079 GP-BASIC IN
 ```
 
@@ -105,7 +105,7 @@ OK CODE 8572 FREE 11776 RT 14079 GP-BASIC IN
 - **PETSCII cost 345 bytes of p-code and nothing at run time** — 7566 → **7911**. That is the charset
   re-ordering plus the two conversions at the disk boundary and the one at the keyboard. The
   renderers did not change by a single byte, so every render figure above still stands as measured.
-- **`APPHELP` and `THEME` cost 661 bytes of p-code and no runtime bytes** — 7911 → **8572**. Both are
+- **`APPHELP` and `THEME` cost 668 bytes of p-code and no runtime bytes** — 7911 → **8579**. Both are
   BASIC library modules, so they are paid for in the p-code of the program that includes them and
   nowhere else. `APPHELP.STARTUP`/`RESTORE` lean on `GP.CALL`/`GP.A`/`GP.X`/`GP.Y`, which are GP block
   keywords — already bought and paid for by the `GP.SELECT` above, so they add nothing to `RT`.
@@ -184,11 +184,19 @@ than hand-rolled here.
 **Give the screen back.** `APPHELP.STARTUP` is the *first* thing `ED.INIT` does — before any screen
 mode or colour of the editor's own — because it records the state as it finds it, so anything changed
 beforehand is what the user would be left with. `ED.QUIT` calls `APPHELP.RESTORE`, which puts back the
-mode and the text colour. The editor runs 80x30, and someone who prefers 40x30 gets 40x30 back.
+mode, the **charset** and the text colour. The editor runs 80x30, and someone who prefers 40x30 gets
+40x30 back.
 
-The one thing `APPHELP` cannot know about is the charset, because re-ordering it was this sample's
-idea. `ED.QUIT` reloads the stock font itself, *before* `RESTORE` and before any `PRINT` — see the
-PETSCII section above for why anything printed against a re-ordered font comes out wrong.
+**The charset had to be taught to `APPHELP`**, and it is worth knowing why it was missing. `$FF62`
+only *sets* a charset — there is no "get" call — so it looked unrecoverable. It is not: **`$0372`
+holds the charset number outright**, reading `2` at boot and reading back exactly what was last set,
+1 to 7. That is probed, not documented. Without it `ED.QUIT` hardcoded charset 3, so anyone who
+started the editor in upper case — which is the machine's default — was dropped into lower case on
+the way out.
+
+Restoring the charset does double duty here: it is what the user chose, *and* re-uploading it is what
+undoes `ED.PETFONT`'s re-ordering, so the `BYE.` prints in the right glyphs. Nothing may be `PRINT`ed
+before that line — see the PETSCII section above for why.
 
 **Colours are named roles, not literals.** They used to be numbers scattered through the chrome — `97`
 here, `240` there, `33` for an error — with no way to restyle short of hunting them all down. They are

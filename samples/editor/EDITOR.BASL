@@ -139,14 +139,16 @@ REM it: the alternative is once a cell, in the renderers, forever.
 
 ED.QUIT:
   POKE 40761, 0 : POKE 40762, 0 : REM undo any hardware VSCROLL before returning to BASIC
-  REM Put the STOCK charset back before anything is PRINTed. ED.PETFONT leaves the
-  REM font indexed by character code, and CHROUT converts to a SCREEN code first, so
-  REM every printable character below would otherwise come out as the wrong glyph.
-  POKE 780, 3 : SYS 65378
-  REM APPHELP.RESTORE puts back the screen mode AND the text colour the user had when
-  REM the editor started -- the state APPHELP.STARTUP recorded before we touched any of
-  REM it. Leaving someone in 80x30 white-on-blue because that is what suited us is the
-  REM rudeness the whole APPHELP module exists to stop.
+  REM APPHELP.RESTORE puts back the screen mode, the CHARSET and the text colour the
+  REM user had when the editor started -- the state APPHELP.STARTUP recorded before we
+  REM touched any of it. Leaving someone in 80x30 white-on-blue because that is what
+  REM suited us is the rudeness the whole APPHELP module exists to stop.
+  REM
+  REM THE CHARSET MATTERS TWICE OVER HERE. It is what the user chose -- the machine
+  REM boots on 2, upper/graphics, and this used to hardcode 3, so anyone who started in
+  REM upper case was dropped back into lower case on the way out. And re-uploading it is
+  REM also what undoes ED.PETFONT's re-ordering, so the PRINT below comes out in the
+  REM right glyphs. Nothing may be PRINTed before this line.
   GOSUB APPHELP.RESTORE
   PRINT CHR$(147);
   PRINT "BYE."
