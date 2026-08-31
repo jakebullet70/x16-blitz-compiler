@@ -409,6 +409,24 @@ not a "leave it alone" marker.
 of the screen map. Zero width or height draws nothing, which is the case a computed size reaches by
 accident.
 
+#### ISO mode is handled for you
+
+In ISO mode — `PRINT CHR$(15)`, or a user pressing Ctrl+O — the VERA tile index **is** the character
+code, so translating PETSCII to a screen code is not merely wasted work but wrong: `A` would go in as
+`$01`. `GP.PRINTAT` reads the KERNAL's own ISO flag (bit 6 of `$0372`) per character and skips the
+translation when it is set, so **a program that switches charset is simply correct, with no source
+change and nothing to declare**. It costs 7 cycles a cell in PETSCII mode and *saves* 34 in ISO.
+
+`GP.FILL` needs nothing: it converts its one character before the loop, and `$20` is a fixed point of
+the translation, so a space fill — which is what padding and blanking are — is right in both modes.
+
+> **`GP.BOX` is the exception.** Its border glyphs are PETSCII screen codes, and ISO-8859-15 has no
+> box-drawing characters at all, so a box drawn in ISO mode comes out as letters. No translation can
+> fix that — there is nothing to translate *to*. Draw frames with `GP.FILL`, or switch back to
+> PETSCII for the frame.
+
+`ISO.EXP.BL` pins all of this, reading the cells back with `VPEEK` rather than trusting the display.
+
 Example: [`SCREEN.EXP.BL`](SCREEN.EXP.BL)
 
 

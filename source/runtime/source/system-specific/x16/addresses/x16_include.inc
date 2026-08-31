@@ -126,6 +126,28 @@ X16_UNTLK=$FFAB
 ;
 X16_TextColour=$0376
 
+;
+;		Also not a jump table entry, and four bytes below the one above -- the same KVAR2 block of
+;		CBM-heritage editor variables, so the two stand or fall together. kernal/cbm/editor.s calls
+;		it ".mode" and documents it as
+;
+;			bit7=1: charset locked, bit6=1: ISO, bits3-0: current charset
+;
+;		so BIT $0372 / BVS is the whole ISO test: bit 6 lands in V, and BIT leaves A, X and Y alone,
+;		which is what makes it affordable inside a character loop. isoon is "lda mode / ora #$40",
+;		isooff is "and #$ff-$40".
+;
+;		THERE IS NO ENTRY POINT FOR THIS. screen_set_charset ($FF62) only sets, and extapi $05
+;		iso_cursor_char gets the cursor GLYPH, not the mode; the whole jump table and all twenty
+;		extapi calls were checked. Reading the variable is the only way to find out.
+;
+;		WHY ANY OF IT MATTERS. In ISO mode the VERA tile index IS the character code, so the
+;		PETSCII-to-screen-code translation GP.PRINTAT does per character is not merely wasted, it
+;		is wrong -- 'A' ($41) would be written as $01. See gpdraw.asm.
+;
+X16_EditorMode=$0372
+X16_EditorModeISO=$40 						; the bit, for BIT/BVS or an explicit AND
+
 ; ************************************************************************************************
 ;
 ;									Changes and Updates

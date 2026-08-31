@@ -552,6 +552,29 @@ _CGFExit:
 ;
 ;								GP.PRINTAT x,y,text$ [,col]
 ;
+;		IT FOLLOWS THE SCREEN INTO ISO MODE, per character, for five bytes and no keyword.
+;
+;		In ISO mode (PRINT CHR$(15), or the user pressing Ctrl+O) the VERA tile index IS the
+;		character code, so translating PETSCII to a screen code is not merely wasted work, it is
+;		WRONG: 'A' would go in as $01 and the string would come out as garbage. That made every
+;		drawn interface -- INPHELP's fields, MENUHELP's bars -- unusable in ISO mode, which is
+;		exactly the mode a program wants when it needs both letter cases.
+;
+;		BIT X16_EditorMode puts the KERNAL's own ISO bit into V and leaves A, X and Y untouched,
+;		so the test costs 4 cycles and no register in the middle of a character loop. Asking the
+;		KERNAL rather than being told means there is nothing to declare and nothing to get wrong:
+;		no keyword, no argument threaded through every caller, no mode variable to leave stale.
+;		Every existing program that switches charset is simply correct now, unchanged.
+;
+;		The bill is +7 cycles a cell in PETSCII mode, 94 -> 101, against 41 SAVED in ISO mode
+;		(94 -> 60) because the whole GPDrawPet2Scr call goes away. Hoisting the test above the
+;		loop would buy back the 7 for about eight more bytes of a block with 36 free; it is not
+;		worth it at seven cycles on a command that draws chrome, not inner loops.
+;
+;		GP.FILL needs none of this. It converts its ONE character before the loop, and $20 is a
+;		fixed point of the offset table ($20>>5 = 1, offset $00), so a space fill -- which is what
+;		padding and blanking are, and all the library does -- is already right in both modes.
+;
 ; ************************************************************************************************
 
 CommandGPPrintAt: ;; [!gp.printat]
@@ -587,7 +610,10 @@ _CGPChar:
 		inc 	zTemp0+1
 _CGPNoCarry:
 		lda 	(zTemp0)
+		bit 	X16_EditorMode 				; bit 6 -> V. BIT leaves A alone, which is the point:
+		bvs 	_CGPRaw 					; in ISO mode the byte already IS the tile index
 		jsr 	GPDrawPet2Scr
+_CGPRaw:
 		jsr 	GPDrawPutCell
 		dec 	gpdCount
 		bne 	_CGPChar

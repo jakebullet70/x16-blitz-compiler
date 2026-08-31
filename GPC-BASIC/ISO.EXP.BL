@@ -1,0 +1,83 @@
+#SAVEAS "@:ISO.PRG"
+#AUTONUM 1
+#REM 0
+#INCLUDE "GPB.INC.BL"
+
+REM ============================================================================
+REM ISO.EXP.BL -- GP.PRINTAT follows the screen into ISO mode.
+REM
+REM In ISO mode (PRINT CHR$(15), or a user pressing Ctrl+O) the VERA tile index
+REM IS the character code, so the PETSCII-to-screen-code translation GP.PRINTAT
+REM does per character is not merely wasted, it is WRONG: "A" ($41) would be
+REM written as $01 and the string would come out as garbage. That made every
+REM drawn interface -- INPHELP's fields, MENUHELP's bars -- unusable in exactly
+REM the mode a program wants when it needs both letter cases.
+REM
+REM The runtime asks the KERNAL rather than being told: bit 6 of $0372 is the ISO
+REM flag, and BIT/BVS tests it in four cycles without touching a register. There
+REM is nothing to declare, so every program that switches charset is simply right.
+REM
+REM THE CELLS ARE READ BACK WITH VPEEK. This asserts the bytes that landed on the
+REM screen, not merely that nothing crashed -- a test that only looked at the
+REM display would have passed before the fix too, on a machine set to PETSCII.
+REM
+REM Drawn at rows 25/26 and reported from row 0, so the report cannot scroll over
+REM what it is about to read.
+REM ============================================================================
+
+REM $1B000 is VERA's text matrix; a row is 256 bytes and a cell 2 (char, attr).
+ISO.ROWP = 45056 + 25 * 256
+ISO.ROWI = 45056 + 26 * 256
+
+REM ---- 1. PETSCII mode, which is where the machine starts ----
+ISO.MODE0 = PEEK(882)
+GP.PRINTAT 0, 25, "ABC", 1
+ISO.P0 = VPEEK(1, ISO.ROWP)
+ISO.P1 = VPEEK(1, ISO.ROWP + 2)
+ISO.P2 = VPEEK(1, ISO.ROWP + 4)
+
+REM ---- 2. ISO mode. CHR$(15) sets bit 6 of $0372, which is what the runtime reads
+PRINT CHR$(15);
+ISO.MODE1 = PEEK(882)
+GP.PRINTAT 0, 26, "ABC", 1
+ISO.I0 = VPEEK(1, ISO.ROWI)
+ISO.I1 = VPEEK(1, ISO.ROWI + 2)
+ISO.I2 = VPEEK(1, ISO.ROWI + 4)
+
+REM ---- 3. lower case, the whole reason a program asks for ISO at all ----
+GP.PRINTAT 10, 26, "abc", 1
+ISO.L0 = VPEEK(1, ISO.ROWI + 20)
+ISO.L1 = VPEEK(1, ISO.ROWI + 22)
+
+REM ---- 4. GP.FILL needed no change and this pins that. It converts its ONE
+REM      character before the loop, and $20 is a fixed point of the offset table
+REM      ($20>>5 = 1, offset $00), so a space fill is right in both modes.
+GP.FILL 40, 26, 4, 1, 32, 1
+ISO.F0 = VPEEK(1, ISO.ROWI + 80)
+
+REM ---- 5. back to PETSCII: the switch must be reversible, not one-way ----
+PRINT CHR$(143);
+ISO.MODE2 = PEEK(882)
+GP.PRINTAT 20, 25, "ABC", 1
+ISO.R0 = VPEEK(1, ISO.ROWP + 40)
+
+PRINT
+PRINT "MODE  PET=";ISO.MODE0;" ISO=";ISO.MODE1;" BACK=";ISO.MODE2
+PRINT "PETSCII ";ISO.P0;ISO.P1;ISO.P2;" (WANT 1 2 3)"
+PRINT "ISO     ";ISO.I0;ISO.I1;ISO.I2;" (WANT 65 66 67)"
+PRINT "LOWER   ";ISO.L0;ISO.L1;" (WANT 97 98)"
+PRINT "FILL    ";ISO.F0;" (WANT 32)"
+PRINT "REVERT  ";ISO.R0;" (WANT 1)"
+
+REM MODE reads 2 in PETSCII (charset 2, unlocked) and 65 in ISO -- $40 for the
+REM ISO bit plus charset 1. That is editor.s's documented packing:
+REM   bit7=1 charset locked, bit6=1 ISO, bits3-0 current charset.
+ISO.BAD = 0
+IF ISO.P0 <> 1 OR ISO.P1 <> 2 OR ISO.P2 <> 3 THEN ISO.BAD = 1
+IF ISO.I0 <> 65 OR ISO.I1 <> 66 OR ISO.I2 <> 67 THEN ISO.BAD = 1
+IF ISO.L0 <> 97 OR ISO.L1 <> 98 THEN ISO.BAD = 1
+IF ISO.F0 <> 32 THEN ISO.BAD = 1
+IF ISO.R0 <> 1 THEN ISO.BAD = 1
+IF ISO.BAD = 1 THEN PRINT "ISO FAIL" : END
+PRINT "ISO OK"
+END
