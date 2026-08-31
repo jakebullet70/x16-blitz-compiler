@@ -11,12 +11,13 @@ source. That is the point of the sample, and the numbers below are what it bough
 
 | File | What it is |
 | --- | --- |
-| `EDITOR.BASL` | the editor — screen setup, menu bar, render, key loop, editing, find, go-to-line |
+| `EDITOR.BASL` | the editor — startup/restore, theme, menu bar, render, key loop, editing, find |
 | `STORE.BASL` | `#INCLUDE`d storage: a banked bump allocator and a 3-byte-per-line pointer table |
 | `EDITOR.PRG` | the tokenised program — the input you feed to the compiler |
 | `EDITOR.SYM` | **BASLOAD's symbol file, and it is not optional** — see below |
 | `TEST.MD` | the document the editor opens, and the fixture the self-check searches |
 | `EDBENCH.BASL` | the benchmark: BASIC renderer against assembly renderer, in one program |
+| `GPC-BASIC/` | the library it `#INCLUDE`s, shipped beside it: `GPB` `THEME` `APPHELP` and the rest |
 
 > **`EDITOR.SYM` ships for a reason.** `{VAR}` reaches a BASIC variable through BASLOAD's own
 > `#SYMFILE` record, because BASLOAD renames every variable (`ED.ASM.VIS%` becomes something like
@@ -86,7 +87,7 @@ question is closed.
 ### The assembly costs nothing. Something else costs 2 KB.
 
 ```
-OK CODE 7911 FREE 12544 RT 14079 GP-BASIC IN
+OK CODE 8572 FREE 11776 RT 14079 GP-BASIC IN
 ```
 
 - **`GP.ASM` is free, and the p-code got *smaller* for using it** — 7190 bytes before the rewrite,
@@ -104,6 +105,10 @@ OK CODE 7911 FREE 12544 RT 14079 GP-BASIC IN
 - **PETSCII cost 345 bytes of p-code and nothing at run time** — 7566 → **7911**. That is the charset
   re-ordering plus the two conversions at the disk boundary and the one at the keyboard. The
   renderers did not change by a single byte, so every render figure above still stands as measured.
+- **`APPHELP` and `THEME` cost 661 bytes of p-code and no runtime bytes** — 7911 → **8572**. Both are
+  BASIC library modules, so they are paid for in the p-code of the program that includes them and
+  nowhere else. `APPHELP.STARTUP`/`RESTORE` lean on `GP.CALL`/`GP.A`/`GP.X`/`GP.Y`, which are GP block
+  keywords — already bought and paid for by the `GP.SELECT` above, so they add nothing to `RT`.
 
 ## How it renders
 
@@ -170,6 +175,45 @@ already selected.
 
 Verified rather than argued: all 256 glyphs re-indexed with **zero** mismatches, read back out of
 VRAM; and a load→save round trip byte-for-byte identical to the original, apart from `PRINT#`
+
+## Startup, restore, and theming
+
+Two things an application on somebody else's machine owes them, both from the shipped library rather
+than hand-rolled here.
+
+**Give the screen back.** `APPHELP.STARTUP` is the *first* thing `ED.INIT` does — before any screen
+mode or colour of the editor's own — because it records the state as it finds it, so anything changed
+beforehand is what the user would be left with. `ED.QUIT` calls `APPHELP.RESTORE`, which puts back the
+mode and the text colour. The editor runs 80x30, and someone who prefers 40x30 gets 40x30 back.
+
+The one thing `APPHELP` cannot know about is the charset, because re-ordering it was this sample's
+idea. `ED.QUIT` reloads the stock font itself, *before* `RESTORE` and before any `PRINT` — see the
+PETSCII section above for why anything printed against a re-ordered font comes out wrong.
+
+**Colours are named roles, not literals.** They used to be numbers scattered through the chrome — `97`
+here, `240` there, `33` for an error — with no way to restyle short of hunting them all down. They are
+now the seven roles `THEME.INC.BL` defines, held in `THEME.CLR()`:
+
+| role | is | role | is |
+|---|---|---|---|
+| `PAGE` | the dropdown panel | `TITLE` | menu bar, status bar, messages |
+| `TEXT` | the document | `BORDER` | the hotkey letter in a menu title |
+| `HILITE` | caret, active title | `DIMMED` | prompts |
+| `WARN` | errors | | |
+
+**The names are free.** `#DEFINE` substitutes at translation time, so `THEME.CLR(THEME.TITLE)`
+compiles to `THEME.CLR(2)` — no variable, no lookup, a one-byte constant index. An attribute is
+`background * 16 + foreground`, which is what VERA's colour byte and every GP drawing command already
+take.
+
+`ED.THEME` sets the editor's *own* palette rather than using `THEME.LOAD`'s. The library default is a
+blue-page application look; this is DETOK's, which is what the sample has always drawn. **The roles
+are what is shared, not the colours** — which is the entire point of having roles. Flip `ED.DARK` at
+the top of the file for the dark variant.
+
+One trap worth knowing: `ED.THEME` calls `THEME.LOAD` and then overwrites the slots, rather than
+doing its own `DIM`. **GPC rejects a second `DIM` of the same array even when only one of them can
+ever run** — `ARRAY REDEFINED`, at compile time.
 writing CR where the fixture had LF.
 ## The key dispatch
 

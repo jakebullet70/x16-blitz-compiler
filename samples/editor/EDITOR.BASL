@@ -3,6 +3,8 @@
 #REM 0
 #SYMFILE "@:EDITOR.SYM"
 #INCLUDE "GPB.INC.BL"
+#INCLUDE "THEME.INC.BL"
+#INCLUDE "APPHELP.INC.BL"
 
 REM ============================================================================
 REM EDITOR.BASL -- GPC EDIT, an MS-DOS-EDIT-styled text / Markdown editor for the
@@ -36,6 +38,7 @@ REM ============================================================================
 
 DEBUG.MODE = 0 : REM 1 = run the self-check to the log and stop. 0 = interactive.
 ED.SCREEN.MODE = 1 : REM 1 = 80x30, 3 = 40x30 (see KERNAL screen_mode $FF5F)
+ED.DARK = 0 : REM 0 = the DETOK light palette, 1 = the dark one (see ED.THEME)
 
 GOSUB ED.INIT
 DOC.FILE.NAME$ = "TEST.MD"
@@ -137,11 +140,16 @@ REM it: the alternative is once a cell, in the renderers, forever.
 ED.QUIT:
   POKE 40761, 0 : POKE 40762, 0 : REM undo any hardware VSCROLL before returning to BASIC
   REM Put the STOCK charset back before anything is PRINTed. ED.PETFONT leaves the
-  REM font indexed by PETSCII code, and CHROUT converts to a screen code first, so
+  REM font indexed by character code, and CHROUT converts to a SCREEN code first, so
   REM every printable character below would otherwise come out as the wrong glyph.
   POKE 780, 3 : SYS 65378
+  REM APPHELP.RESTORE puts back the screen mode AND the text colour the user had when
+  REM the editor started -- the state APPHELP.STARTUP recorded before we touched any of
+  REM it. Leaving someone in 80x30 white-on-blue because that is what suited us is the
+  REM rudeness the whole APPHELP module exists to stop.
+  GOSUB APPHELP.RESTORE
   PRINT CHR$(147);
-  COLOR 1, 0 : PRINT "BYE."
+  PRINT "BYE."
   END
 
 REM ============================================================================
@@ -194,9 +202,60 @@ ED.FCOPY:
   RETURN
 
 REM ============================================================================
+REM THEME -- every colour in one place, as named roles
+REM
+REM The attributes were literals scattered through the chrome (97 here, 240 there,
+REM 33 for an error) and there was no way to restyle without hunting them down. They
+REM are now the seven roles THEME.INC.BL defines, in THEME.CLR(), and the names cost
+REM NOTHING: #DEFINE substitutes at translation time, so THEME.CLR(THEME.TITLE)
+REM compiles to THEME.CLR(2) -- no variable, no lookup, a one-byte constant index.
+REM
+REM These are the editor's own values, not THEME.LOAD's. The library's default palette
+REM is a blue-page app look; this is DETOK's, and it is what the sample has always
+REM drawn. The roles are what is shared, not the colours -- which is the point of
+REM having roles at all.
+REM
+REM   PAGE    dropdown panel        TITLE   menu bar, status bar, messages
+REM   TEXT    the document          BORDER  the hotkey letter in a menu title
+REM   HILITE  caret, active title   DIMMED  prompts        WARN  errors
+REM
+REM An attribute is background * 16 + foreground, which is what VERA's colour byte and
+REM every GP drawing command already take.
+REM ============================================================================
+ED.THEME:
+  REM THEME.LOAD owns the DIM -- GPC rejects a second DIM of the same array even when
+  REM only one of them can ever run (ARRAY REDEFINED), so this calls the library rather
+  REM than repeating it, and then overwrites the slots with the editor's own values.
+  THEME.DARK = ED.DARK
+  GOSUB THEME.LOAD
+  IF ED.DARK <> 0 THEN GOTO ED.THEME.DARK
+  THEME.CLR(THEME.PAGE)   = 15 * 16 + 0 : REM black on light grey -- dropdown panel
+  THEME.CLR(THEME.TEXT)   =  0 * 16 + 1 : REM white on black -- the document
+  THEME.CLR(THEME.TITLE)  =  6 * 16 + 1 : REM white on blue -- bars and messages
+  THEME.CLR(THEME.BORDER) =  6 * 16 + 7 : REM yellow on blue -- the hotkey letter
+  THEME.CLR(THEME.HILITE) =  1 * 16 + 0 : REM black on white -- caret, active title
+  THEME.CLR(THEME.DIMMED) =  0 * 16 + 3 : REM cyan on black -- prompts
+  THEME.CLR(THEME.WARN)   =  2 * 16 + 1 : REM white on red -- errors
+  RETURN
+
+ED.THEME.DARK:
+  THEME.CLR(THEME.PAGE)   = 11 * 16 + 15
+  THEME.CLR(THEME.TEXT)   =  0 * 16 + 15
+  THEME.CLR(THEME.TITLE)  = 11 * 16 + 1
+  THEME.CLR(THEME.BORDER) = 11 * 16 + 7
+  THEME.CLR(THEME.HILITE) = 15 * 16 + 0
+  THEME.CLR(THEME.DIMMED) =  0 * 16 + 12
+  THEME.CLR(THEME.WARN)   =  2 * 16 + 1
+  RETURN
+REM ============================================================================
 REM SETUP
 REM ============================================================================
 ED.INIT:
+  REM FIRST, before any screen mode or colour of our own: APPHELP.STARTUP records the
+  REM state as it FINDS it, and ED.QUIT hands exactly that back. Anything changed before
+  REM this line is what the user would be left with instead.
+  GOSUB APPHELP.STARTUP
+  GOSUB ED.THEME
   POKE 780, ED.SCREEN.MODE : POKE 783, 0
   SYS 65375        : REM $FF5F screen_mode -> set ED.SCREEN.MODE (also clears screen)
   POKE 780, 3 : SYS 65378 : REM $FF62 screen_set_charset -> 3, PET upper/lower
@@ -211,8 +270,8 @@ ED.INIT:
   ED.TEXT.WIDTH = SCREEN.COLS
   ED.TEXT.BOTTOM = SCREEN.ROWS - 2
   ED.TEXT.ROWS = SCREEN.ROWS - 2
-  ED.ATTR.TEXT = 1   : REM white on black
-  ED.ATTR.CARET = 16 : REM black on white
+  ED.ATTR.TEXT = THEME.CLR(THEME.TEXT)
+  ED.ATTR.CARET = THEME.CLR(THEME.HILITE)
   ED.QUIET = 0
   ED.SIM.MODE = 0
   ED.EXIT.FLAG = 0
@@ -620,7 +679,7 @@ ED.PROMPT:
   ED.INPUT$ = ""
 ED.PROMPT.LOOP:
   ED.PS.ROW = SCREEN.ROWS - 1 : ED.PS.COL = 0 : ED.PS.WIDTH = SCREEN.COLS
-  ED.PS$ = " " + ED.PROMPT.MSG$ + ED.INPUT$ : ED.PS.ATTR = 3 : GOSUB ED.PUT.FIELD
+  ED.PS$ = " " + ED.PROMPT.MSG$ + ED.INPUT$ : ED.PS.ATTR = THEME.CLR(THEME.DIMMED) : GOSUB ED.PUT.FIELD
 ED.PROMPT.WAIT:
   GET ED.KEY$ : IF ED.KEY$ = "" THEN GOTO ED.PROMPT.WAIT
   ED.KEY = ASC(ED.KEY$)
@@ -633,7 +692,7 @@ ED.PROMPT.WAIT:
 ED.PROMPT.YN:
   IF ED.SIM.MODE = 1 THEN ED.YN = ED.SIM.YN : RETURN
   ED.PS.ROW = SCREEN.ROWS - 1 : ED.PS.COL = 0 : ED.PS.WIDTH = SCREEN.COLS
-  ED.PS$ = " " + ED.PROMPT.MSG$ : ED.PS.ATTR = 3 : GOSUB ED.PUT.FIELD
+  ED.PS$ = " " + ED.PROMPT.MSG$ : ED.PS.ATTR = THEME.CLR(THEME.DIMMED) : GOSUB ED.PUT.FIELD
 ED.YN.WAIT:
   GET ED.KEY$ : IF ED.KEY$ = "" THEN GOTO ED.YN.WAIT
   ED.KEY = ASC(ED.KEY$)
@@ -648,13 +707,13 @@ ED.INFO.MSG:
   ED.LAST.MSG$ = ED.MSG$
   IF ED.QUIET = 1 THEN RETURN
   ED.PS.ROW = SCREEN.ROWS - 1 : ED.PS.COL = 0 : ED.PS.WIDTH = SCREEN.COLS
-  ED.PS$ = " " + ED.MSG$ : ED.PS.ATTR = 97 : GOSUB ED.PUT.FIELD
+  ED.PS$ = " " + ED.MSG$ : ED.PS.ATTR = THEME.CLR(THEME.TITLE) : GOSUB ED.PUT.FIELD
   RETURN
 ED.ERR.MSG:
   ED.LAST.MSG$ = ED.MSG$
   IF ED.QUIET = 1 THEN RETURN
   ED.PS.ROW = SCREEN.ROWS - 1 : ED.PS.COL = 0 : ED.PS.WIDTH = SCREEN.COLS
-  ED.PS$ = " " + ED.MSG$ : ED.PS.ATTR = 33 : GOSUB ED.PUT.FIELD
+  ED.PS$ = " " + ED.MSG$ : ED.PS.ATTR = THEME.CLR(THEME.WARN) : GOSUB ED.PUT.FIELD
   RETURN
 
 REM ============================================================================
@@ -881,20 +940,20 @@ REM ---- menu bar (VERA row 0). Attr = bg*16+fg: white-on-blue bar = 97,
 REM ---- yellow accelerator = 103, active title (blue-on-white) = 22. ----
 ED.RENDER.MENUBAR:
   ED.PS.ROW = 0 : ED.PS.COL = 0 : ED.PS.WIDTH = SCREEN.COLS
-  ED.PS$ = "" : ED.PS.ATTR = 97 : GOSUB ED.PUT.FIELD
+  ED.PS$ = "" : ED.PS.ATTR = THEME.CLR(THEME.TITLE) : GOSUB ED.PUT.FIELD
   FOR MENU.I = 0 TO MENU.COUNT - 1
     GOSUB ED.DRAW.MENU.TITLE
   NEXT MENU.I
   ED.NAME$ = DOC.FILE.NAME$
   IF ED.DOC.DIRTY = 1 THEN ED.NAME$ = ED.NAME$ + " *"
   ED.NCOL = SCREEN.COLS - LEN(ED.NAME$) - 1
-  IF ED.NCOL > 1 THEN ED.PS.ROW = 0 : ED.PS.COL = ED.NCOL - 1 : ED.PS.WIDTH = LEN(ED.NAME$) : ED.PS$ = ED.NAME$ : ED.PS.ATTR = 97 : GOSUB ED.PUT.FIELD
+  IF ED.NCOL > 1 THEN ED.PS.ROW = 0 : ED.PS.COL = ED.NCOL - 1 : ED.PS.WIDTH = LEN(ED.NAME$) : ED.PS$ = ED.NAME$ : ED.PS.ATTR = THEME.CLR(THEME.TITLE) : GOSUB ED.PUT.FIELD
   RETURN
 ED.DRAW.MENU.TITLE:
   ED.MT.COL = MENU.COL(MENU.I) - 1 : ED.MT$ = MENU.NAME$(MENU.I)
-  IF MENU.I = MENU.ACTIVE THEN ED.PS.ROW = 0 : ED.PS.COL = ED.MT.COL : ED.PS.WIDTH = LEN(ED.MT$) : ED.PS$ = ED.MT$ : ED.PS.ATTR = 22 : GOSUB ED.PUT.FIELD : RETURN
-  ED.PS.ROW = 0 : ED.PS.COL = ED.MT.COL : ED.PS.WIDTH = 1 : ED.PS$ = LEFT$(ED.MT$, 1) : ED.PS.ATTR = 103 : GOSUB ED.PUT.FIELD
-  ED.PS.COL = ED.MT.COL + 1 : ED.PS.WIDTH = LEN(ED.MT$) - 1 : ED.PS$ = MID$(ED.MT$, 2, 20) : ED.PS.ATTR = 97 : GOSUB ED.PUT.FIELD
+  IF MENU.I = MENU.ACTIVE THEN ED.PS.ROW = 0 : ED.PS.COL = ED.MT.COL : ED.PS.WIDTH = LEN(ED.MT$) : ED.PS$ = ED.MT$ : ED.PS.ATTR = THEME.CLR(THEME.HILITE) : GOSUB ED.PUT.FIELD : RETURN
+  ED.PS.ROW = 0 : ED.PS.COL = ED.MT.COL : ED.PS.WIDTH = 1 : ED.PS$ = LEFT$(ED.MT$, 1) : ED.PS.ATTR = THEME.CLR(THEME.BORDER) : GOSUB ED.PUT.FIELD
+  ED.PS.COL = ED.MT.COL + 1 : ED.PS.WIDTH = LEN(ED.MT$) - 1 : ED.PS$ = MID$(ED.MT$, 2, 20) : ED.PS.ATTR = THEME.CLR(THEME.TITLE) : GOSUB ED.PUT.FIELD
   RETURN
 
 REM ---- dropdown (VERA rows 1..). normal item = black-on-grey 240,
@@ -906,8 +965,8 @@ ED.DRAW.DROPDOWN:
   FOR ED.DD.I = 0 TO ED.DD.N - 1
     ED.PS.ROW = 1 + ED.DD.I : ED.PS.COL = ED.DD.COL : ED.PS.WIDTH = ED.DD.W
     ED.PS$ = " " + MENU.ITEM$(MENU.ACTIVE * 8 + ED.DD.I)
-    ED.PS.ATTR = 240
-    IF ED.DD.I = MENU.SEL THEN ED.PS.ATTR = 97
+    ED.PS.ATTR = THEME.CLR(THEME.PAGE)
+    IF ED.DD.I = MENU.SEL THEN ED.PS.ATTR = THEME.CLR(THEME.TITLE)
     GOSUB ED.PUT.FIELD
   NEXT ED.DD.I
   RETURN
@@ -919,7 +978,7 @@ ED.RENDER.STATUS:
   IF ED.INSERT.MODE = 0 THEN ED.MODE$ = "OVR"
   ED.BAR$ = ED.MARK$ + "L" + MID$(STR$(ED.CUR.ROW + 1), 2) + " C" + MID$(STR$(ED.CUR.COL + 1), 2) + "  " + ED.MODE$ + "  LINES=" + MID$(STR$(LINE.COUNT), 2) + "   ESC=MENU  F2=SAVE  F3=FIND"
   ED.PS.ROW = SCREEN.ROWS - 1 : ED.PS.COL = 0 : ED.PS.WIDTH = SCREEN.COLS
-  ED.PS$ = ED.BAR$ : ED.PS.ATTR = 97 : GOSUB ED.PUT.FIELD
+  ED.PS$ = ED.BAR$ : ED.PS.ATTR = THEME.CLR(THEME.TITLE) : GOSUB ED.PUT.FIELD
   RETURN
 
 REM ---- write ED.PS$ into the VERA text map at 0-based (ED.PS.ROW, ED.PS.COL),
