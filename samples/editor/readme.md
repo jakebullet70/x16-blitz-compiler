@@ -86,7 +86,7 @@ question is closed.
 
 ### The assembly costs nothing. Something else costs 2 KB.
 
-OK CODE 8579 FREE 11776 RT 14079 GP-BASIC IN
+OK CODE 9644 FREE 10752 RT 14079 GP-BASIC IN
 OK CODE 8572 FREE 11776 RT 14079 GP-BASIC IN
 ```
 
@@ -105,7 +105,7 @@ OK CODE 8572 FREE 11776 RT 14079 GP-BASIC IN
 - **PETSCII cost 345 bytes of p-code and nothing at run time** — 7566 → **7911**. That is the charset
   re-ordering plus the two conversions at the disk boundary and the one at the keyboard. The
   renderers did not change by a single byte, so every render figure above still stands as measured.
-- **`APPHELP` and `THEME` cost 668 bytes of p-code and no runtime bytes** — 7911 → **8579**. Both are
+- **`APPHELP` and `THEME` cost 1733 bytes of p-code and no runtime bytes** — 7911 → **9644**, THEME, APPHELP and MENUHELP together. Both are
   BASIC library modules, so they are paid for in the p-code of the program that includes them and
   nowhere else. `APPHELP.STARTUP`/`RESTORE` lean on `GP.CALL`/`GP.A`/`GP.X`/`GP.Y`, which are GP block
   keywords — already bought and paid for by the `GP.SELECT` above, so they add nothing to `RT`.
@@ -223,6 +223,34 @@ One trap worth knowing: `ED.THEME` calls `THEME.LOAD` and then overwrites the sl
 doing its own `DIM`. **GPC rejects a second `DIM` of the same array even when only one of them can
 ever run** — `ARRAY REDEFINED`, at compile time.
 writing CR where the fixture had LF.
+
+## The menus, and the flag that makes the GP drawing commands usable
+
+The dropdown is drawn by `MENUHELP.ROW` — `GP.FILL` for the row, `GP.PRINTAT` for the text — inside a
+`GP.BOX` frame. Neither worked at first, and the reason is the same re-ordered font that makes the
+renderers free.
+
+**`GP.PRINTAT` converts PETSCII to a screen code before writing.** Against an ASCII-ordered font that
+is one conversion too many: measured, `GP.PRINTAT 0,5,"Ab"` wrote tiles `1` and `66`, which render as
+`aB`. Every letter in the wrong case.
+
+**The fix is to stop lying to the system.** Bit 6 of `$0372` means "text is ASCII, not PETSCII", and
+after `ED.PETFONT` that is simply true, so `ED.INIT` sets it. With the flag on, the same call writes
+`65` and `98` — the raw bytes. It is poked directly rather than via `CHR$(15)`, because `CHR$(15)`
+would also upload the ISO font and throw away the PETSCII glyphs that are the point.
+
+Three things follow from the flag, and all three are wanted: the **keyboard** returns ASCII, so
+`ED.KEY.RANGE` no longer case-swaps a keystroke; `CHR$()` and `PRINT` stop translating, so KERNAL
+output lands on the right glyphs; and the GP drawing commands work.
+
+**The box style is not a free choice.** Styles 2 to 4 border with line glyphs from screen codes
+`$40-$7F`, which is precisely the run `ED.PETFONT` overwrites with ASCII lower case — a single-line
+box comes out as `p @ @ ... B`, measured. **Style 0 borders with `$A0` alone**, which sits outside that
+run and survives untouched. `$A0` is a reverse space, so it paints in the *foreground* colour, which
+is why `THEME.PAGE` gives a black edge around the light grey panel.
+
+That is the same limitation the GP-BASIC manual already records for `GP.BOX` in ISO mode, arrived at
+from the other direction.
 ## The key dispatch
 
 The main loop is a bare `GP.DO` whose whole body is the `GET` wait; the table lives in

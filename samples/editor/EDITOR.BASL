@@ -5,6 +5,7 @@
 #INCLUDE "GPB.INC.BL"
 #INCLUDE "THEME.INC.BL"
 #INCLUDE "APPHELP.INC.BL"
+#INCLUDE "MENUHELP.INC.BL"
 
 REM ============================================================================
 REM EDITOR.BASL -- GPC EDIT, an MS-DOS-EDIT-styled text / Markdown editor for the
@@ -126,14 +127,9 @@ REM inside 161..191 or 32..126, so nothing above could ever have shadowed them a
 REM nothing here can shadow anything above. Reached only when no case matched.
 ED.KEY.RANGE:
   IF ED.KEY >= 161 AND ED.KEY <= 191 THEN GOSUB ED.ALT.MENU : RETURN
-REM THE KEYBOARD SPEAKS PETSCII; the document and every literal speak ASCII, and the two
-REM are case-swapped. GET hands back $41-$5A for a LOWER case letter and $C1-$DA for an
-REM upper case one, so without these two lines an unshifted key would insert a capital
-REM and a shifted one would insert nothing at all -- 193-218 is nowhere near the 32..126
-REM the range test allows. Converting here, once a keystroke, is the cheap place to do
-REM it: the alternative is once a cell, in the renderers, forever.
-  IF ED.KEY >= 65 AND ED.KEY <= 90 THEN ED.KEY = ED.KEY + 32
-  IF ED.KEY >= 193 AND ED.KEY <= 218 THEN ED.KEY = ED.KEY - 128
+REM The keyboard hands back ASCII, because ED.INIT declares ISO encoding -- see the
+REM note beside the $0372 poke there. Before that this had to case-swap every letter,
+REM since PETSCII gives $41-$5A for LOWER case and $C1-$DA for upper.
   IF ED.KEY >= 32 AND ED.KEY <= 126 THEN GOSUB ED.DO.INSERT
   RETURN
 
@@ -263,6 +259,16 @@ ED.INIT:
   POKE 780, 3 : SYS 65378 : REM $FF62 screen_set_charset -> 3, PET upper/lower
   PRINT CHR$(147);
   GOSUB ED.PETFONT : REM ...then re-index it so a VERA tile index IS a character code
+  REM ...and DECLARE that, by setting bit 6 of $0372. The flag means "text is ASCII,
+  REM not PETSCII", which is exactly what the re-ordered font now expects, so it is a
+  REM statement of fact rather than a trick. Poked directly and not via CHR$(15),
+  REM because CHR$(15) would also upload the ISO font and throw away the PETSCII glyphs
+  REM that are the whole point. Three things follow, and all three are wanted:
+  REM   the KEYBOARD returns ASCII, so nothing has to case-swap a keystroke;
+  REM   CHR$()/PRINT stop translating, so KERNAL output lands on the right glyphs;
+  REM   GP.PRINTAT skips its PETSCII-to-screen step, which is what lets the GP drawing
+  REM   commands -- and MENUHELP, which is built on them -- work at all here.
+  POKE 882, PEEK(882) OR 64
   POKE 783, 0
   SYS 65517        : REM $FFED SCREEN -> columns in X ($030D), rows in Y ($030E)
   SCREEN.COLS = PEEK(781)
@@ -313,6 +319,7 @@ ED.MENU.SETUP:
   DIM MENU.NAME$(3) : DIM MENU.ITEMS(3)
   DIM MENU.COL(3) : DIM MENU.WIDTH(3)
   DIM MENU.ITEM$(24) : REM flat: menu * 8 + item
+  DIM MENUHELP.ITEM$(8) : REM MENUHELP leaves its item array to the caller
   MENU.NAME$(0) = "File" : MENU.ITEMS(0) = 5
   MENU.ITEM$(0) = "New" : MENU.ITEM$(1) = "Open..." : MENU.ITEM$(2) = "Save"
   MENU.ITEM$(3) = "Save As..." : MENU.ITEM$(4) = "Exit"
@@ -960,16 +967,39 @@ ED.DRAW.MENU.TITLE:
 
 REM ---- dropdown (VERA rows 1..). normal item = black-on-grey 240,
 REM ---- selected = white-on-blue 97. ----
+REM ED.DRAW.DROPDOWN -- the panel, now with a frame and drawn by the library.
+REM
+REM MENUHELP.ROW draws one row: GP.FILL for the background, GP.PRINTAT for the text.
+REM Both are GP drawing commands, so both need the ISO flag ED.INIT sets -- without it
+REM GP.PRINTAT would convert ASCII text as though it were PETSCII and every letter
+REM would come out in the wrong case.
+REM
+REM THE FRAME IS GP.BOX STYLE 0, and the style is not a free choice. Styles 2 to 4 draw
+REM with line glyphs from screen codes $40-$7F, and that is exactly the run ED.PETFONT
+REM overwrites with ASCII lower case -- a single-line box comes out as "p @ @ ... B".
+REM Style 0 borders with $A0 alone, which sits outside that run and survives untouched.
+REM $A0 is a reverse space, so it paints in the FOREGROUND colour: THEME.PAGE gives a
+REM black edge around the light grey panel.
 ED.DRAW.DROPDOWN:
   ED.DD.N = MENU.ITEMS(MENU.ACTIVE)
   ED.DD.COL = MENU.COL(MENU.ACTIVE) - 1
   ED.DD.W = MENU.WIDTH(MENU.ACTIVE)
+
+  ED.DD.BX = ED.DD.COL - 1
+  IF ED.DD.BX < 0 THEN ED.DD.BX = 0
+  GP.BOX ED.DD.BX, 1, ED.DD.W + 2, ED.DD.N + 2, 0, THEME.CLR(THEME.PAGE)
+
+  MENUHELP.X = ED.DD.COL
+  MENUHELP.Y = 2
+  MENUHELP.WIDTH = ED.DD.W
   FOR ED.DD.I = 0 TO ED.DD.N - 1
-    ED.PS.ROW = 1 + ED.DD.I : ED.PS.COL = ED.DD.COL : ED.PS.WIDTH = ED.DD.W
-    ED.PS$ = " " + MENU.ITEM$(MENU.ACTIVE * 8 + ED.DD.I)
-    ED.PS.ATTR = THEME.CLR(THEME.PAGE)
-    IF ED.DD.I = MENU.SEL THEN ED.PS.ATTR = THEME.CLR(THEME.TITLE)
-    GOSUB ED.PUT.FIELD
+    MENUHELP.ITEM$(ED.DD.I + 1) = " " + MENU.ITEM$(MENU.ACTIVE * 8 + ED.DD.I)
+  NEXT ED.DD.I
+  FOR ED.DD.I = 0 TO ED.DD.N - 1
+    MENUHELP.DRAWROW = ED.DD.I + 1
+    MENUHELP.DRAWATTR = THEME.CLR(THEME.PAGE)
+    IF ED.DD.I = MENU.SEL THEN MENUHELP.DRAWATTR = THEME.CLR(THEME.TITLE)
+    GOSUB MENUHELP.ROW
   NEXT ED.DD.I
   RETURN
 
@@ -1079,7 +1109,7 @@ ED.SELFCHECK:
   MENU.ACTIVE = 0 - 1 : GOSUB ED.RENDER.MENUBAR
   PRINT "MB CH=";VPEEK(1, 45058);" AT=";VPEEK(1, 45059)
   MENU.ACTIVE = 0 : MENU.SEL = 0 : GOSUB ED.DRAW.DROPDOWN
-  PRINT "DD CH=";VPEEK(1, 45316);" AT=";VPEEK(1, 45317)
+  PRINT "DD CH=";VPEEK(1, 45572);" AT=";VPEEK(1, 45573) : REM row 2 now: the frame took row 1
   ED.MSG$ = "HELLO" : GOSUB ED.INFO.MSG
   ED.SR = SCREEN.ROWS - 1
   PRINT "MSG CH=";VPEEK(1, 45056 + ED.SR * 256 + 2);" AT=";VPEEK(1, 45056 + ED.SR * 256 + 3)
