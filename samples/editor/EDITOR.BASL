@@ -262,9 +262,14 @@ ED.INIT:
   REM this line is what the user would be left with instead.
   GOSUB APPHELP.STARTUP
   GOSUB ED.THEME
-  POKE 780, ED.SCREEN.MODE : POKE 783, 0
-  SYS 65375        : REM $FF5F screen_mode -> set ED.SCREEN.MODE (also clears screen)
-  POKE 780, 3 : SYS 65378 : REM $FF62 screen_set_charset -> 3, PET upper/lower
+  REM GP.CALL, not SYS. SYS can only pass registers through the POKE 780..783 slots and
+  REM hand results back the same way, so a KERNAL call was four statements and three
+  REM magic addresses. GP.CALL takes A, X, Y and CARRY as arguments and returns them as
+  REM GP.A / GP.X / GP.Y, which is the difference between reading a call and decoding
+  REM one. It costs nothing here: GP.CALL and GP.X are GP block keywords, and the block
+  REM is already bought and paid for by the GP.SELECT in the key dispatch.
+  GP.CALL APPHELP.SCRMODE, ED.SCREEN.MODE, 0, 0, 0 : REM carry CLEAR sets the mode
+  GP.CALL APPHELP.SETCHR, 3, 0, 0, 0 : REM charset 3, PET upper/lower
   PRINT CHR$(147);
   GOSUB ED.PETFONT : REM ...then re-index it so a VERA tile index IS a character code
   REM ...and DECLARE that, by setting bit 6 of $0372. The flag means "text is ASCII,
@@ -277,10 +282,15 @@ ED.INIT:
   REM   GP.PRINTAT skips its PETSCII-to-screen step, which is what lets the GP drawing
   REM   commands -- and MENUHELP, which is built on them -- work at all here.
   POKE 882, PEEK(882) OR 64
-  POKE 783, 0
-  SYS 65517        : REM $FFED SCREEN -> columns in X ($030D), rows in Y ($030E)
-  SCREEN.COLS = PEEK(781)
-  SCREEN.ROWS = PEEK(782)
+  REM The SAME entry point again, but with CARRY SET, which makes screen_mode REPORT
+  REM instead of set: mode in A, columns in X, rows in Y. That replaces $FFED entirely,
+  REM so the whole routine now speaks to one KERNAL address rather than three. It has to
+  REM be asked AFTER the mode is set, because what we want is the size of the mode we
+  REM just chose -- APPHELP.COLS/ROWS hold the size the USER had, which is what ED.QUIT
+  REM gives back.
+  GP.CALL APPHELP.SCRMODE, 0, 0, 0, 1
+  SCREEN.COLS = GP.X
+  SCREEN.ROWS = GP.Y
   IF SCREEN.COLS < 20 THEN SCREEN.COLS = 80
   IF SCREEN.ROWS < 8 THEN SCREEN.ROWS = 60
   ED.TEXT.WIDTH = SCREEN.COLS
