@@ -815,8 +815,8 @@ compiles and prints `COUNTER= 65 / RESULT = 66`; deleting the symbol file gives
 ## Growing the object buffer — DONE, by moving the runtime out of RAM
 
 **12,800 -> 23,296 bytes.** `FreeMemory` `$6D00` -> `$4400`. The compiler is no longer what limits
-program size in any mode: every run-side ceiling (18,432 embedded GP OUT, 17,664 shared GP OUT,
-16,384 embedded GP IN, 15,616 shared GP IN) is now below the buffer, where all four used to be
+program size in any mode: every run-side ceiling (18,432 embedded GP-BASIC OUT, 17,664 shared GP-BASIC OUT,
+16,384 embedded GP-BASIC IN, 15,616 shared GP-BASIC IN) is now below the buffer, where all four used to be
 above it.
 
 **The fix was not the banked-RAM plan this section used to describe.** That plan wanted 22 pages of
@@ -851,7 +851,7 @@ the same order, streamed into `OBJECT.PRG` a page at a time at write time. What 
   the image came out 78 bytes short and every byte of p-code would have landed at the wrong address.
 
 **Verified**, not just built: the runtime half of a compiled `OBJECT.PRG` is byte-identical to the
-image for all 12,031 bytes of the GP OUT cut, with the only differences the two patched immediates
+image for all 12,031 bytes of the GP-BASIC OUT cut, with the only differences the two patched immediates
 (`$00` -> `$37` code page, `$00` -> `$48` workspace), and the object runs.
 
 ## Wanted
@@ -879,7 +879,7 @@ A `samples/` tree of real programs that show off what the compiler buys you, one
 with its own `readme.md`. `make samples` mirrors the whole tree into `testing/samples/` (the emulator
 drive and the root of the release zip), so every sample is runnable in the emulator and ships in the
 release; `samples/` is the tracked master and `testing/samples/` is a wiped-and-recopied build
-artifact. Two exist:
+artifact. Three exist:
 
 - **`samples/prg2basload/`** — the X16 ROM BASLOAD detokenizer written as BASLOAD source, whose own
   header measures the win: the 919-line, 17,883-byte paint program converts in 12:22 interpreted and
@@ -887,6 +887,10 @@ artifact. Two exist:
   number rather than asserting "it's faster".
 - **`samples/shared-vars/`** — two programs (`PRG1`/`PRG2`) chained by `LOAD`, sharing variables across
   the chain, compiled in SHARED mode. Built and verified 2026-07-21 (see the findings below).
+- **`samples/editor/`** — GPC EDIT, an MS-DOS-EDIT-styled text/Markdown editor whose two renderers are
+  inline `GP.ASM`. The speed number it names: a text row 2320 → **18.8** jiffies/1000 renders, a chrome
+  field 2538 → **23.3** — a full-screen repaint from ~1.2 s to ~10 ms. Unshelved and shipped 2026-08-30
+  (see the findings below).
 
 ### Shared-vars sample — findings from building it (verified in emu, R49)
 
@@ -904,6 +908,44 @@ Measured while building `samples/shared-vars/`, worth keeping:
 - **Both programs must first-touch the shared variables in the same order** — the compiler assigns
   addresses by first appearance, so a differing order silently misaligns them.
 - SHARED-mode compiled programs are tiny (~0.5K each here) because they share one `GPC.RT.nnn.BIN` (~11K).
+
+### Editor sample — DONE, and it closed the prog8 render question
+
+`samples/editor/` (`EDITOR.BASL` + `STORE.BASL`, readme with the measurements). Shelved on branch
+`editor-sample` on 2026-07-21 because the perf question driving it was unanswered; unshelved and
+finished 2026-08-30, when `GP.ASM` made the answer buildable.
+
+- **It compiled on the current engine untouched.** The shelved source needed no porting — the whole
+  cost of bringing it forward was a real `TEST.MD` fixture (the committed one was a stray copy of
+  `GPC.BASL`, so the self-check's find assertions were passing over a document with no "bullet" and no
+  "markdown" in it) and the move to `samples/`.
+- **M5 shipped** — relocated to `samples/editor/`, real sample `.md`, `readme.md` naming the numbers,
+  picked up by `make samples`, self-check green (`M4 OK`).
+- **The speed fix is `GP.ASM`, not the block-blit command this entry used to recommend.** The old
+  recommendation was a native built-in that streams a row buffer to `DATA0`, chosen to dodge inline
+  ASM's authoring and ABI hazards. `GP.ASM` shipped first and dodges them by itself, so the block-blit
+  command is **not needed** — and it would have cost runtime bytes in every program, which `GP.ASM`
+  does not. Measured with both versions in one program (`EDBENCH.BASL`, real speed, loop floor
+  subtracted, cells read back and blanked between variants): text row **2320 → 18.8** jiffies/1000
+  (123×, ~31 cycles/cell), chrome field **2538 → 23.3** (109×). P-code went *down*, 7190 → 7101
+  bytes, and on the assembly alone the program was still `GP-BASIC OUT`.
+- **The key dispatch is `GP.SELECT`, and that is what made it `GP-BASIC IN`.** `ED.DISPATCH.KEY` replaced
+  an eighteen-deep `IF` ladder; the select is **9 bytes** of p-code, but one core keyword pulls in
+  the whole 2 KB GP block — `RT 12031 → 14079`, object 19,134 → 21,647, max p-code 18,432 → 16,384.
+  A readability trade, taken deliberately. The two ranged keys (Commodore+letter, printable) live in
+  `ED.KEY.RANGE` off `GP.OTHER`, because `GP.CASE` takes a list of expressions and not a range.
+  Nothing jumps out of the select: `GP.ENDSEL` releases the selector frame, and the self-check runs
+  400 consecutive dispatches to prove none leaks.
+- **It is now faster than the editor it was losing to.** prog8's `x16-MSEDIT` real render loop is 67
+  jiffies/1000 rows; this is 18.8 — **3.6× faster** — and within 1.4× of the hand-assembled raw-write
+  floor of 13, which does no bounds check and no space padding. The cause was settled earlier and is
+  written up in `docs/blitz/inline-asm-feasibility.md`: same VERA path both sides, the gap was pure
+  codegen.
+- **What it cost the compiler: six bytes.** `{VAR}` took letters and digits only, so `{DOC.GOT.OFF}`
+  read the name as `DOC` and reported `UNKNOWN VARIABLE IN {}` with nothing pointing at the dot —
+  and dotted names are the house style precisely because they dodge BASLOAD's keyword trap.
+  `AsmParseBrace` now takes `.` as a name character. Underscore, the other character BASLOAD allows,
+  is deliberately still out: what byte it arrives as through PETSCII was never measured.
 
 ### Shared-runtime, THREE programs sharing variables — TODO
 

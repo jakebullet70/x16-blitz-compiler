@@ -1,0 +1,254 @@
+#SAVEAS "@:EDBENCH.PRG"
+#SYMFILE "@:EDBENCH.SYM"
+#AUTONUM 1
+#REM 0
+#INCLUDE "GPB.INC.BL"
+
+REM ============================================================================
+REM EDBENCH.BASL -- the editor's row and field renderers, BASIC against GP.ASM,
+REM in ONE program so the two differ in exactly one thing.
+REM
+REM Timed off TI (jiffies, 1/60 s) read INSIDE the machine, and it MUST be run at
+REM real speed -- the emulator's -warp decouples the jiffy IRQ from the CPU and
+REM the numbers come out meaningless. Each variant renders the same 79-character
+REM line into the same screen row, so the only difference is how the cells get
+REM there. The empty rep loop is measured at both rep counts and subtracted, so
+REM what is reported is the render and not the FOR/NEXT around it.
+REM ============================================================================
+
+BM.SLOW = 1000    : REM reps for the BASIC variants
+BM.FAST = 10000   : REM reps for the assembly variants, which need the resolution
+
+BM.WIDTH = 80
+BM.ATTR = 1
+BM.ROW = 5
+BM.LEFT = 0
+
+REM ---- one 79-character line in bank 4, length-prefixed, exactly as STORE.BASL
+REM ---- lays a document line out: [len][chars] ----
+BANK 4
+BM.BASE = 40960
+POKE BM.BASE, 79
+FOR BM.I = 1 TO 79
+  POKE BM.BASE + BM.I, 65 + BM.I - INT(BM.I / 26) * 26
+NEXT BM.I
+
+REM the variables the assembly reads. {VAR} never creates one, and the compiler
+REM reads the program in order, so every name a block uses is assigned up here.
+ED.ASM.BASE% = 0
+ED.ASM.ATTR% = 0
+ED.ASM.WIDTH% = 0
+ED.ASM.VIS% = 0
+ED.ASM.SRC% = 0
+ED.ASM.MODE% = 0
+ED.ASM.OFS% = 0
+BM.FIELD$ = ""
+
+PRINT CHR$(147);
+PRINT "EDBENCH -- REAL SPEED ONLY"
+
+REM ============================================================================
+REM floors: the rep loop on its own, at both counts
+REM ============================================================================
+BM.T = TI
+FOR BM.R = 1 TO BM.SLOW
+NEXT BM.R
+BM.F1 = TI - BM.T
+
+BM.T = TI
+FOR BM.R = 1 TO BM.FAST
+NEXT BM.R
+BM.F2 = TI - BM.T
+
+REM ============================================================================
+REM A -- the BASIC row renderer this replaced: VERA FX cache write, two cells a
+REM      flush, driven by a FOR loop and two POKEs a cell.
+REM ============================================================================
+BM.T = TI
+FOR BM.R = 1 TO BM.SLOW
+  ED.ROW.BASE = 45056 + BM.ROW * 256
+  POKE 40736, ED.ROW.BASE - INT(ED.ROW.BASE / 256) * 256
+  POKE 40737, INT(ED.ROW.BASE / 256)
+  POKE 40738, 49
+  POKE 40741, 4 : POKE 40745, 64
+  POKE 40741, 12 : POKE 40746, BM.ATTR : POKE 40748, BM.ATTR
+  ED.VIS = PEEK(BM.BASE) - BM.LEFT
+  ED.SRC = BM.BASE + 1 + BM.LEFT
+  FOR ED.COL = 0 TO BM.WIDTH - 2 STEP 2
+    ED.CHAR = 32 : IF ED.COL < ED.VIS THEN ED.CHAR = PEEK(ED.SRC + ED.COL)
+    ED.CHAR2 = 32 : IF ED.COL + 1 < ED.VIS THEN ED.CHAR2 = PEEK(ED.SRC + ED.COL + 1)
+    POKE 40745, ED.CHAR : POKE 40747, ED.CHAR2 : POKE 40739, 0
+  NEXT ED.COL
+  POKE 40741, 4 : POKE 40745, 0 : POKE 40741, 0
+NEXT BM.R
+BM.A = TI - BM.T - BM.F1
+BM.CELL = 45056 + BM.ROW * 256
+BM.VA0 = VPEEK(1, BM.CELL) : BM.VA1 = VPEEK(1, BM.CELL + 1) : BM.VA2 = VPEEK(1, BM.CELL + 156)
+GOSUB BM.BLANK
+
+REM ============================================================================
+REM B -- the same row, same VERA path, as one GP.ASM block
+REM ============================================================================
+ED.ASM.ATTR% = BM.ATTR
+ED.ASM.WIDTH% = BM.WIDTH
+ED.ASM.MODE% = 0
+ED.ASM.BASE% = 45056 + BM.ROW * 256
+ED.ASM.VIS% = 79
+ED.ASM.SRC% = BM.BASE + 1 + BM.LEFT
+BM.T = TI
+FOR BM.R = 1 TO BM.FAST
+#REM 1
+GP.ASM
+REM LDA {ED.ASM.BASE%}
+REM STA $9F20
+REM LDX #1
+REM LDA {ED.ASM.BASE%},X
+REM STA $9F21
+REM LDA #49
+REM STA $9F22
+REM LDA #4
+REM STA $9F25
+REM LDA #64
+REM STA $9F29
+REM LDA #12
+REM STA $9F25
+REM LDA {ED.ASM.ATTR%}
+REM STA $9F2A
+REM STA $9F2C
+REM LDA {ED.ASM.MODE%}
+REM BNE RSTR
+REM LDA {ED.ASM.SRC%}
+REM LDX #1
+REM STA RGA,X
+REM STA RGB,X
+REM LDA {ED.ASM.SRC%},X
+REM BRA RHI
+REM RSTR: CLC
+REM LDA {BM.FIELD$}
+REM ADC {ED.ASM.OFS%}
+REM LDX #1
+REM STA RGA,X
+REM STA RGB,X
+REM LDA {BM.FIELD$},X
+REM ADC #0
+REM RHI: LDX #2
+REM STA RGA,X
+REM STA RGB,X
+REM LDY #0
+REM RLP: CPY {ED.ASM.VIS%}
+REM BCS RSP1
+REM RGA: LDA $FFFF,Y
+REM BRA RPUT1
+REM RSP1: LDA #32
+REM RPUT1: STA $9F29
+REM INY
+REM CPY {ED.ASM.VIS%}
+REM BCS RSP2
+REM RGB: LDA $FFFF,Y
+REM BRA RPUT2
+REM RSP2: LDA #32
+REM RPUT2: STA $9F2B
+REM STZ $9F23
+REM INY
+REM CPY {ED.ASM.WIDTH%}
+REM BCC RLP
+REM LDA #4
+REM STA $9F25
+REM STZ $9F29
+REM STZ $9F25
+GP.ENDASM
+#REM 0
+NEXT BM.R
+BM.B = TI - BM.T - BM.F2
+BM.VB0 = VPEEK(1, BM.CELL) : BM.VB1 = VPEEK(1, BM.CELL + 1) : BM.VB2 = VPEEK(1, BM.CELL + 156)
+GOSUB BM.BLANK
+
+REM ============================================================================
+REM C -- the BASIC field renderer this replaced: +1 auto-increment, char and
+REM      attribute streamed to DATA0, one MID$ and two POKEs a cell.
+REM ============================================================================
+BM.FIELD$ = "THE STATUS BAR, WHICH IS REDRAWN ON EVERY SINGLE KEYSTROKE."
+BM.T = TI
+FOR BM.R = 1 TO BM.SLOW
+  ED.PS.BASE = 45056 + BM.ROW * 256
+  ED.PS.HI = INT(ED.PS.BASE / 256)
+  POKE 40736, ED.PS.BASE - ED.PS.HI * 256
+  POKE 40737, ED.PS.HI
+  POKE 40738, 17
+  ED.PS.LEN = LEN(BM.FIELD$)
+  FOR ED.PS.I = 0 TO BM.WIDTH - 1
+    ED.PS.CH = 32
+    IF ED.PS.I < ED.PS.LEN THEN ED.PS.CH = ASC(MID$(BM.FIELD$, ED.PS.I + 1, 1))
+    POKE 40739, ED.PS.CH
+    POKE 40739, BM.ATTR
+  NEXT ED.PS.I
+NEXT BM.R
+BM.C = TI - BM.T - BM.F1
+BM.VC0 = VPEEK(1, BM.CELL) : BM.VC1 = VPEEK(1, BM.CELL + 1) : BM.VC2 = VPEEK(1, BM.CELL + 156)
+GOSUB BM.BLANK
+
+REM ============================================================================
+REM D -- the same field as one GP.ASM block, reading the BASIC string directly
+REM ============================================================================
+ED.ASM.BASE% = 45056 + BM.ROW * 256
+ED.ASM.ATTR% = BM.ATTR
+ED.ASM.WIDTH% = BM.WIDTH
+ED.ASM.VIS% = LEN(BM.FIELD$)
+BM.T = TI
+FOR BM.R = 1 TO BM.FAST
+#REM 1
+GP.ASM
+REM LDA {ED.ASM.BASE%}
+REM STA $9F20
+REM LDX #1
+REM LDA {ED.ASM.BASE%},X
+REM STA $9F21
+REM LDA #17
+REM STA $9F22
+REM CLC
+REM LDA {BM.FIELD$}
+REM ADC #3
+REM LDX #1
+REM STA FGA,X
+REM LDA {BM.FIELD$},X
+REM ADC #0
+REM LDX #2
+REM STA FGA,X
+REM LDY #0
+REM FLP: CPY {ED.ASM.VIS%}
+REM BCS FSP
+REM FGA: LDA $FFFF,Y
+REM BRA FPUT
+REM FSP: LDA #32
+REM FPUT: STA $9F23
+REM LDA {ED.ASM.ATTR%}
+REM STA $9F23
+REM INY
+REM CPY {ED.ASM.WIDTH%}
+REM BCC FLP
+GP.ENDASM
+#REM 0
+NEXT BM.R
+BM.D = TI - BM.T - BM.F2
+BM.VD0 = VPEEK(1, BM.CELL) : BM.VD1 = VPEEK(1, BM.CELL + 1) : BM.VD2 = VPEEK(1, BM.CELL + 156)
+
+REM ============================================================================
+REM report -- everything normalised to jiffies per 1000 renders of one 80-cell row
+REM ============================================================================
+PRINT
+PRINT "FLOORS  ";BM.F1;"/";BM.SLOW;"   ";BM.F2;"/";BM.FAST
+PRINT "ROW   BASIC =";BM.A;" ASM =";BM.B / 10
+PRINT "FIELD BASIC =";BM.C;" ASM =";BM.D / 10
+PRINT "VERIFY ROW   BASIC=";BM.VA0;BM.VA1;BM.VA2;" ASM=";BM.VB0;BM.VB1;BM.VB2
+PRINT "VERIFY FIELD BASIC=";BM.VC0;BM.VC1;BM.VC2;" ASM=";BM.VD0;BM.VD1;BM.VD2
+PRINT "BENCH DONE"
+END
+
+REM wipe the row so the next variant has to write it itself -- a render that was
+REM elided, or that stopped short, then reads back as zero rather than as the
+REM previous variant's output.
+BM.BLANK:
+  FOR BM.J = 0 TO BM.WIDTH * 2 - 1
+    VPOKE 1, BM.CELL + BM.J, 0
+  NEXT BM.J
+  RETURN
