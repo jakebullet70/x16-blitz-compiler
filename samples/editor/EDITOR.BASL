@@ -3,6 +3,19 @@
 #REM 0
 #SYMFILE "@:EDITOR.SYM"
 #DEFINE ED.KBDBUF $F09F
+## The single-line box. These are the codes handed to GP.FILL, NOT where the glyphs live:
+## GP.FILL converts PETSCII to a screen code on the way in, and for $80-$9F that adds $40.
+## So a glyph asked for as $80 is fetched from tile $C0, and ED.PETFONT parks it there --
+## ED.GL.x + 64. Measured, not assumed: passing $80 with the glyph at $80 put tile 192 on
+## the screen, which is what gave this away. The runtime's own comment on GP.FILL calls its
+## glyph "already a screen code", which is true of the variable it ends up in, not the
+## argument you hand it.
+#DEFINE ED.GL.H 128
+#DEFINE ED.GL.V 129
+#DEFINE ED.GL.TL 130
+#DEFINE ED.GL.TR 131
+#DEFINE ED.GL.BL 132
+#DEFINE ED.GL.BR 133
 #INCLUDE "GPB.INC.BL"
 #INCLUDE "THEME.INC.BL"
 #INCLUDE "APPHELP.INC.BL"
@@ -147,6 +160,25 @@ REM this needs no staging buffer at all.
 REM ============================================================================
 ED.PETFONT:
   ED.FONT = 61440 : REM $1:F000, the KERNAL's 2 KB charset (VERA bank 1)
+  REM ---- THE SINGLE-LINE BOX, RESCUED BEFORE THE RE-ORDER RUNS OVER IT ----
+  REM Charset 3 keeps its box drawing at $40 - $7D, which is most of what the re-order
+  REM below overwrites with ASCII letters, so by the time it finishes the only line
+  REM glyphs left in the whole font are a horizontal at $60 and a vertical at $7D -- both
+  REM survivors by accident, both sitting on ` and }, and NO CORNERS AT ALL. That is why
+  REM GP.BOX style 2 draws "p @ B" here and why style 0's solid $A0 was the only one that
+  REM worked: $80-$FF is the one region the re-order never touches.
+  REM
+  REM So the six are copied up there FIRST, into $C0-$C5 -- the tiles GP.FILL actually
+  REM reaches when it is handed $80-$85, see the note by the #DEFINEs. Nothing else uses
+  REM that region: the document is ASCII, so no cell above $7F is ever written except by
+  REM the frame. Being ahead of every other copy is what keeps each source pristine.
+  ED.FS = 64  : ED.FD = ED.GL.H + 64  : ED.FN = 1 : GOSUB ED.FCOPY : REM $40 horizontal
+  ED.FS = 93  : ED.FD = ED.GL.V + 64  : ED.FN = 1 : GOSUB ED.FCOPY : REM $5D vertical
+  ED.FS = 112 : ED.FD = ED.GL.TL + 64 : ED.FN = 1 : GOSUB ED.FCOPY : REM $70 top left
+  ED.FS = 110 : ED.FD = ED.GL.TR + 64 : ED.FN = 1 : GOSUB ED.FCOPY : REM $6E top right
+  ED.FS = 109 : ED.FD = ED.GL.BL + 64 : ED.FN = 1 : GOSUB ED.FCOPY : REM $6D bottom left
+  ED.FS = 125 : ED.FD = ED.GL.BR + 64 : ED.FN = 1 : GOSUB ED.FCOPY : REM $7D bottom right
+  REM ---- and now the ASCII re-order itself ----
   ED.FS = 64  : ED.FD = 96  : ED.FN = 1  : GOSUB ED.FCOPY
   ED.FS = 91  : ED.FD = 123 : ED.FN = 5  : GOSUB ED.FCOPY
   ED.FS = 0   : ED.FD = 64  : ED.FN = 1  : GOSUB ED.FCOPY
@@ -442,6 +474,7 @@ ED.DO.DELETE:
   ED.CUR.DIRTY = 0 : ED.DOC.DIRTY = 1
   GOSUB ED.REFRESH.FULL
   RETURN
+  
 ED.DEL.CHAR:
   ED.CUR.LINE$ = LEFT$(ED.CUR.LINE$, ED.CUR.COL) + MID$(ED.CUR.LINE$, ED.CUR.COL + 2, 250)
   ED.CUR.DIRTY = 1 : ED.DOC.DIRTY = 1
@@ -497,9 +530,26 @@ ED.OPEN.MENUBAR:
         GP.CASE 29  : GOSUB ED.MENU.RIGHT
         GP.CASE 13  : GOSUB ED.MENU.SELECT : GP.EXITDO
         GP.CASE 27  : GOSUB ED.MENU.CANCEL : GP.EXITDO
+        GP.OTHER    : GOSUB ED.MENU.LETTER
       GP.ENDSEL
     GP.ENDIF
   GP.LOOP
+  RETURN
+
+REM A letter while the bar is open jumps to that menu and opens it. THIS IS NOW THE WAY
+REM IN, because ALT+letter is not one any more: ED.INIT declares ISO encoding, and in ISO
+REM mode the keyboard driver returns ISO-8859-15, not PETSCII. ALT+letter there produces
+REM the accented and symbol characters the US layout maps -- ALT+S is ss, ALT+D is eth --
+REM and F and H are not mapped at all. The 161..191 test in ED.KEY.RANGE was reading the
+REM PETSCII Commodore+letter codes, which the driver no longer sends.
+REM
+REM Folded to upper without case, so f and F both reach File.
+ED.MENU.LETTER:
+  ED.ML.CH = ED.KEY
+  IF ED.ML.CH >= 97 AND ED.ML.CH <= 122 THEN ED.ML.CH = ED.ML.CH - 32
+  FOR MENU.I = 0 TO MENU.COUNT - 1
+    IF ASC(LEFT$(MENU.NAME$(MENU.I), 1)) = ED.ML.CH THEN MENU.ACTIVE = MENU.I : MENU.SEL = 0 : GOSUB ED.RENDER.ALL : GOSUB ED.DRAW.DROPDOWN
+  NEXT MENU.I
   RETURN
 
 ED.MENU.SELECT:
@@ -1035,7 +1085,23 @@ ED.DRAW.DROPDOWN:
   REM has to be added HERE, or the whole panel is drawn ED.MAP.TOP rows away from the
   REM menu bar it hangs from -- invisible at the top of the document, and further adrift
   REM the further down you have scrolled.
-  GP.BOX ED.DD.BX, 1 + ED.MAP.TOP, ED.DD.W + 2, ED.DD.N + 2, 0, THEME.CLR(THEME.TEXT)
+  ED.DD.FW = ED.DD.W + 2 : ED.DD.FH = ED.DD.N + 2
+  ED.DD.TY = 1 + ED.MAP.TOP : ED.DD.BY = ED.DD.TY + ED.DD.FH - 1
+  ED.DD.RX = ED.DD.BX + ED.DD.FW - 1
+  ED.DD.FC = THEME.CLR(THEME.TEXT)
+  REM GP.FILL, not GP.BOX. GP.BOX picks its glyphs from a table in the RUNTIME, so it can
+  REM only ever draw the six styles that table holds -- and five of the six are built from
+  REM screen codes this font no longer has. GP.FILL takes the glyph as an argument, and
+  REM takes it as a SCREEN CODE with no conversion, which is exactly what is wanted here.
+  REM Eight calls: two horizontal runs, two vertical runs, four single-cell corners.
+  GP.FILL ED.DD.BX + 1, ED.DD.TY, ED.DD.FW - 2, 1, ED.GL.H, ED.DD.FC
+  GP.FILL ED.DD.BX + 1, ED.DD.BY, ED.DD.FW - 2, 1, ED.GL.H, ED.DD.FC
+  GP.FILL ED.DD.BX, ED.DD.TY + 1, 1, ED.DD.FH - 2, ED.GL.V, ED.DD.FC
+  GP.FILL ED.DD.RX, ED.DD.TY + 1, 1, ED.DD.FH - 2, ED.GL.V, ED.DD.FC
+  GP.FILL ED.DD.BX, ED.DD.TY, 1, 1, ED.GL.TL, ED.DD.FC
+  GP.FILL ED.DD.RX, ED.DD.TY, 1, 1, ED.GL.TR, ED.DD.FC
+  GP.FILL ED.DD.BX, ED.DD.BY, 1, 1, ED.GL.BL, ED.DD.FC
+  GP.FILL ED.DD.RX, ED.DD.BY, 1, 1, ED.GL.BR, ED.DD.FC
 
   REM DRIVEN THE WAY MENUDEMO.EXP.BL DRIVES IT, which is the whole interface and not
   REM three fields of it. This used to set X, Y and WIDTH only and then hand-roll a loop
@@ -1065,7 +1131,7 @@ ED.RENDER.STATUS:
   IF ED.DOC.DIRTY = 1 THEN ED.MARK$ = " * "
   ED.MODE$ = "INS"
   IF ED.INSERT.MODE = 0 THEN ED.MODE$ = "OVR"
-  ED.BAR$ = ED.MARK$ + "L" + MID$(STR$(ED.CUR.ROW + 1), 2) + " C" + MID$(STR$(ED.CUR.COL + 1), 2) + "  " + ED.MODE$ + "  LINES=" + MID$(STR$(LINE.COUNT), 2) + "   ESC=MENU  F2=SAVE  F3=FIND"
+  ED.BAR$ = ED.MARK$ + "L" + MID$(STR$(ED.CUR.ROW + 1), 2) + " C" + MID$(STR$(ED.CUR.COL + 1), 2) + "  " + ED.MODE$ + "  LINES=" + MID$(STR$(LINE.COUNT), 2) + "   ESC=MENU (F/S/H)  F2=SAVE  F3=FIND"
   ED.PS.ROW = SCREEN.ROWS - 1 : ED.PS.COL = 0 : ED.PS.WIDTH = SCREEN.COLS
   ED.PS$ = ED.BAR$ : ED.PS.ATTR = THEME.CLR(THEME.TITLE) : GOSUB ED.PUT.FIELD
   RETURN
@@ -1173,7 +1239,7 @@ ED.SELFCHECK:
   REM frame row, every item row, and the frame row under them, reading the first LETTER of
   REM each item. File is New Open Save "Save As" Exit, so column MENU.COL(0) -- the item
   REM text starts a cell left of it, at MENUHELP.X, because every item is " "+name -- down rows
-  REM 1..7 must read 160 78 79 83 83 69 160 -- $A0 frame, N O S S E, $A0 frame. A short
+  REM 1..7 must read 192 78 79 83 83 69 192 -- the horizontal, N O S S E, horizontal. A short
   REM panel, a skipped row or a frame in the wrong place all move at least one of those.
   ED.DDS$ = ""
   FOR ED.QR = 1 TO MENU.ITEMS(0) + 2
@@ -1296,6 +1362,17 @@ ED.SELFCHECK:
     GOSUB ED.OPEN.MENUBAR
   NEXT ED.QI
   PRINT "MENU 600 OPENS MSG=";ED.LAST.MSG$
+
+  REM ---- a LETTER opens its menu. ALT+letter cannot do this any more (ISO mode sends
+  REM ---- ISO-8859-15, not the PETSCII Commodore codes ED.KEY.RANGE tests for), so this
+  REM ---- is the only way in and it needs a test. Open on File, press H, press RETURN:
+  REM ---- the letter must have moved the bar to Help, so MENU.CHOICE.MENU is 2. Without
+  REM ---- it the H is swallowed and RETURN chooses File's first item, and this reads 0.
+  ED.DOC.DIRTY = 0 : MENU.ACTIVE = 0 : MENU.SEL = 0
+  ED.QK = 72 : POKE 1, 0 : GP.CALL ED.KBDBUF, ED.QK : POKE 1, 4
+  ED.QK = 13 : POKE 1, 0 : GP.CALL ED.KBDBUF, ED.QK : POKE 1, 4
+  GOSUB ED.OPEN.MENUBAR
+  PRINT "MENU LETTER H -> ";MENU.CHOICE.MENU;" (want 2)"
 
   PRINT "M4 OK"
   RETURN
