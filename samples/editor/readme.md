@@ -247,7 +247,7 @@ output lands on the right glyphs; and the GP drawing commands work.
 `$40-$7F`, which is precisely the run `ED.PETFONT` overwrites with ASCII lower case — a single-line
 box comes out as `p @ @ ... B`, measured. **Style 0 borders with `$A0` alone**, which sits outside that
 run and survives untouched. `$A0` is a reverse space, so it paints in the *foreground* colour, which
-is why `THEME.PAGE` gives a black edge around the light grey panel.
+is why the frame is drawn in `THEME.PAGE`s *background* nibble: painting it in `THEME.PAGE` itself put a black frame on a black text area, present and invisible.
 
 That is the same limitation the GP-BASIC manual already records for `GP.BOX` in ISO mode, arrived at
 from the other direction.

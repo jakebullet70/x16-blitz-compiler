@@ -193,10 +193,18 @@ ED.PETFONT:
   RETURN
 
 REM Copy ED.FN glyphs, 8 bytes each, from screen code ED.FS to code ED.FD.
+REM
+REM GP.DO takes its count once, up front, so the limit is not re-evaluated every pass
+REM the way a FOR's TO expression is. The count is put in a variable first because
+REM GP.DO 0 loops FOREVER -- every caller here passes 1, 5 or 26, but a zero reaching
+REM it would hang rather than do nothing, which is the opposite of what FOR does.
 ED.FCOPY:
-  FOR ED.FI = 0 TO ED.FN * 8 - 1
+  ED.FCOUNT = ED.FN * 8
+  ED.FI = 0
+  GP.DO ED.FCOUNT
     VPOKE 1, ED.FONT + ED.FD * 8 + ED.FI, VPEEK(1, ED.FONT + ED.FS * 8 + ED.FI)
-  NEXT ED.FI
+    ED.FI = ED.FI + 1
+  GP.LOOP
   RETURN
 
 REM ============================================================================
@@ -987,7 +995,13 @@ ED.DRAW.DROPDOWN:
 
   ED.DD.BX = ED.DD.COL - 1
   IF ED.DD.BX < 0 THEN ED.DD.BX = 0
-  GP.BOX ED.DD.BX, 1, ED.DD.W + 2, ED.DD.N + 2, 0, THEME.CLR(THEME.PAGE)
+  REM $A0 is a reverse space, so the cell is ENTIRELY foreground -- the background
+  REM nibble never shows. Painting it in THEME.PAGE therefore drew the frame in PAGE's
+  REM FOREGROUND, which is black, on a black text area: a frame that was there and
+  REM invisible. What is wanted is the panel's own BACKGROUND colour, so the border
+  REM reads as the edge of the panel, and that is PAGE's high nibble.
+  ED.DD.FRAME = INT(THEME.CLR(THEME.PAGE) / 16)
+  GP.BOX ED.DD.BX, 1, ED.DD.W + 2, ED.DD.N + 2, 0, ED.DD.FRAME
 
   MENUHELP.X = ED.DD.COL
   MENUHELP.Y = 2

@@ -36,8 +36,11 @@
 
 ## The KERNAL's screen_set_charset, and the byte that says which one is up.
 ## $FF62 only SETS -- there is no "get charset" call -- but $0372 holds the
-## number outright: it reads 2 at boot (PET upper/graphics) and reads back
-## exactly what was last set, 1..7. Probed, because it is not documented.
+## number in its low bits AND flags in the high ones -- bit 6 is ISO. It reads
+## 2 at boot (PET upper/graphics) and reads back
+## exactly what was last set. Probed, because it is not documented -- including
+## that screen_set_charset does NOT clear bit 6, so restoring the charset alone
+## leaves a machine that thinks it is in ISO mode. The whole byte goes back.
 #DEFINE APPHELP.SETCHR $FF62
 #DEFINE APPHELP.CHRREG $0372
 
@@ -87,7 +90,8 @@ APPHELP.STARTUP:
 
 APPHELP.RESTORE:
     GP.CALL APPHELP.SCRMODE, APPHELP.MODE, 0, 0, 0
-    GP.CALL APPHELP.SETCHR, APPHELP.CHARSET, 0, 0, 0
+    GP.CALL APPHELP.SETCHR, APPHELP.CHARSET AND 63, 0, 0, 0
+    POKE APPHELP.CHRREG, APPHELP.CHARSET
     COLOR APPHELP.COLOUR AND 15, INT(APPHELP.COLOUR / 16)
     RETURN
 
