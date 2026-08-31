@@ -1,0 +1,208 @@
+## ***********************************************************************
+## **
+## **  INPHELP.INC.BL -- a positioned, length-limited entry field.
+## **
+## **      INPHELP.GET     edit a string in a field at x, y
+## **      INPHELP.ASK     a label, then a field after it
+## **
+## **  This is what INPUT and LINPUT cannot do. Both of those own the whole
+## **  bottom of the screen, scroll it, echo in whatever colour is current,
+## **  and accept any length -- which makes them unusable on a drawn screen.
+## **  A field stays where you put it, in the colour you give it, and stops
+## **  at the width you allow.
+## **
+## **  Usage:
+## **      INPHELP.X = 10 : INPHELP.Y = 6
+## **      INPHELP.LEN = 20
+## **      INPHELP.ATTR = THEME.CLR(THEME.TEXT)
+## **      INPHELP.TEXT$ = ""
+## **      GOSUB INPHELP.GET
+## **      IF INPHELP.KEY = 27 THEN <cancelled>
+## **
+## **   in   INPHELP.X  INPHELP.Y     top left of the field
+## **        INPHELP.LEN               how many characters fit
+## **        INPHELP.ATTR              packed attribute, background * 16 + fg
+## **        INPHELP.TEXT$             the starting value, edited in place
+## **        INPHELP.MASK              non-zero shows asterisks
+## **        INPHELP.LABEL$            INPHELP.ASK only
+## **
+## **   out  INPHELP.TEXT$             what was typed. ESC restores what it
+## **                                  was when you called, so a cancelled
+## **                                  field is not a silently emptied one
+## **        INPHELP.KEY               the key that ended it:
+## **                                     13  RETURN, finished
+## **                                     27  ESC, cancelled (3 is STOP)
+## **                                     17  cursor down / 145 up / 9 TAB
+## **                                         -- left the field, text kept
+## **
+## **  So a form is a loop: call the field, look at INPHELP.KEY, and move
+## **  the focus. DEL rubs out. The field never scrolls: when it is full,
+## **  further characters are refused, and the cursor sits on the last one
+## **  rather than off the end.
+## **
+## **  WHY THIS IS NOT A KEYWORD. It is a wait on a HUMAN, so the speed
+## **  argument that puts sorting and screen copying in assembly does not
+## **  apply -- the same reason GP.MENU owns only its interaction loop and
+## **  BASIC draws the menu. What it costs in bytes, only programs that
+## **  want a form pay.
+## **
+## **  The whole INPHELP.* name space belongs to this file.
+## **
+## ***********************************************************************
+#IFNDEF INPHELP.DEFS
+#DEFINE INPHELP.DEFS 1
+
+#DEFINE INPHELP.RETURN 13
+#DEFINE INPHELP.DELETE 20
+#DEFINE INPHELP.ESCAPE 27
+#DEFINE INPHELP.STOP 3
+#DEFINE INPHELP.SPACE 32
+#DEFINE INPHELP.STAR 42
+
+## The keys that LEAVE a field without cancelling it, so a caller with
+## more than one field can move between them. The text is kept -- only ESC
+## puts it back -- and the key comes out in INPHELP.KEY, which is how the
+## caller knows which way to go. Without these a form would need RETURN to
+## mean both "next field" and "done", and it could never go back up.
+#DEFINE INPHELP.DOWN 17
+#DEFINE INPHELP.UP 145
+#DEFINE INPHELP.TAB 9
+
+## Jiffies between cursor flips. 60 to the second, so 15 is four a second --
+## fast enough to read as alive, slow enough not to strobe.
+#DEFINE INPHELP.BLINK 15
+
+GOTO INPHELP.MODULE.END
+
+## ***********************************************************************
+## **  INPHELP.GET -- the field.
+## ***********************************************************************
+
+INPHELP.GET:
+    INPHELP.INV = (INPHELP.ATTR AND 15) * 16 + INT(INPHELP.ATTR / 16)
+    INPHELP.WAS$ = INPHELP.TEXT$
+    INPHELP.DONE = 0 : INPHELP.KEY = 0
+    INPHELP.LIT = 1  : INPHELP.TICK = TI
+
+INPHELP.REDRAW:
+    GOSUB INPHELP.RENDER
+    GP.FILL INPHELP.X, INPHELP.Y, INPHELP.LEN, 1, INPHELP.SPACE, INPHELP.ATTR
+    IF INPHELP.SHOW$ <> "" THEN GP.PRINTAT INPHELP.X, INPHELP.Y, INPHELP.SHOW$, INPHELP.ATTR
+    GOSUB INPHELP.CURSOR
+
+## ---- Wait. GET returns immediately with "" when nothing is pressed, so
+## ---- the blink runs off TI rather than a delay loop -- a delay loop
+## ---- would swallow keys pressed during it.
+
+INPHELP.WAIT:
+    GET INPHELP.K$
+    IF INPHELP.K$ <> "" THEN GOTO INPHELP.KEYED
+    IF TI < INPHELP.TICK THEN GOTO INPHELP.WAIT
+    INPHELP.TICK = TI + INPHELP.BLINK
+    INPHELP.LIT = 1 - INPHELP.LIT
+    GOSUB INPHELP.CURSOR : GOTO INPHELP.WAIT
+
+## ---- One key. This is the sparse selector GP.SELECT exists for: seven
+## ---- control codes scattered across 256, which ON x GOSUB cannot index
+## ---- and a chain of IFs would re-read the variable for.
+## ----
+## ---- NOTE THE FLAG. Nothing here does GOTO out of the select, because
+## ---- GP.ENDSEL is what releases the selector's frame and jumping past it
+## ---- would leak one on every keystroke. Setting INPHELP.DONE and testing
+## ---- it after GP.ENDSEL costs one comparison and cannot leak.
+
+INPHELP.KEYED:
+    INPHELP.CODE = ASC(INPHELP.K$)
+    GP.SELECT INPHELP.CODE
+        GP.CASE INPHELP.RETURN
+            INPHELP.DONE = 1
+        GP.CASE INPHELP.ESCAPE, INPHELP.STOP
+            INPHELP.TEXT$ = INPHELP.WAS$
+            INPHELP.DONE = 1
+        GP.CASE INPHELP.DOWN, INPHELP.UP, INPHELP.TAB
+            INPHELP.DONE = 1
+        GP.CASE INPHELP.DELETE
+            IF LEN(INPHELP.TEXT$) > 0 THEN INPHELP.TEXT$ = LEFT$(INPHELP.TEXT$, LEN(INPHELP.TEXT$) - 1)
+        GP.OTHER
+            GOSUB INPHELP.TYPED
+    GP.ENDSEL
+    INPHELP.KEY = INPHELP.CODE
+    IF INPHELP.DONE = 0 THEN GOTO INPHELP.REDRAW
+
+## ---- Leave it looking settled: redraw once with no cursor, so a finished
+## ---- field does not sit there blinking at a user who has moved on.
+
+    INPHELP.LIT = 0
+    GOSUB INPHELP.RENDER
+    GP.FILL INPHELP.X, INPHELP.Y, INPHELP.LEN, 1, INPHELP.SPACE, INPHELP.ATTR
+    IF INPHELP.SHOW$ <> "" THEN GP.PRINTAT INPHELP.X, INPHELP.Y, INPHELP.SHOW$, INPHELP.ATTR
+    RETURN
+
+## ---- A label, then a field starting after it. INPHELP.X is put back on
+## ---- the way out, so calling this twice in a loop does not walk the
+## ---- field across the screen.
+
+INPHELP.ASK:
+    INPHELP.HOME = INPHELP.X
+    GP.PRINTAT INPHELP.X, INPHELP.Y, INPHELP.LABEL$, INPHELP.ATTR
+    INPHELP.X = INPHELP.X + LEN(INPHELP.LABEL$)
+    GOSUB INPHELP.GET
+    INPHELP.X = INPHELP.HOME
+    RETURN
+
+## ***********************************************************************
+## **  INPHELP.TYPED -- accept a printable character, if there is room.
+## **
+## **  Written as separate IFs rather than one ANDed condition on purpose:
+## **  AND sits BELOW the comparisons in the precedence table, so a single
+## **  line would be reading correctly by luck rather than by design, and it
+## **  is the kind of thing that only shows up on the one code it gets
+## **  wrong. $80-$9F are the PETSCII control codes -- colours, cursor
+## **  moves, reverse on and off -- and putting one in a string means it
+## **  takes effect on the way out, which is why they are refused here.
+## ***********************************************************************
+
+INPHELP.TYPED:
+    IF LEN(INPHELP.TEXT$) >= INPHELP.LEN THEN RETURN
+    IF INPHELP.CODE < 32 THEN RETURN
+    IF INPHELP.CODE = 127 THEN RETURN
+    INPHELP.BAR = 0
+    IF INPHELP.CODE > 127 THEN INPHELP.BAR = 1
+    IF INPHELP.CODE > 159 THEN INPHELP.BAR = 0
+    IF INPHELP.BAR = 1 THEN RETURN
+    INPHELP.TEXT$ = INPHELP.TEXT$ + INPHELP.K$
+    RETURN
+
+## ---- What the field displays, which is not always what it holds.
+## ---- RPT$ raises an error on a count of zero, hence the guard.
+
+INPHELP.RENDER:
+    INPHELP.SHOW$ = INPHELP.TEXT$
+    IF INPHELP.MASK = 0 THEN RETURN
+    INPHELP.SHOW$ = ""
+    IF LEN(INPHELP.TEXT$) > 0 THEN INPHELP.SHOW$ = RPT$(INPHELP.STAR, LEN(INPHELP.TEXT$))
+    RETURN
+
+## ***********************************************************************
+## **  INPHELP.CURSOR -- one cell, drawn twice a blink.
+## **
+## **  With room left it is an inverse space after the text. With the field
+## **  full there is no cell after the text, so it inverts the LAST
+## **  CHARACTER instead of blanking it -- printing the character back in
+## **  the inverse attribute, which says "full" without losing anything off
+## **  the display.
+## ***********************************************************************
+
+INPHELP.CURSOR:
+    INPHELP.FILLED = LEN(INPHELP.SHOW$)
+    INPHELP.CX = INPHELP.X + INPHELP.FILLED
+    INPHELP.CELL$ = " "
+    IF INPHELP.FILLED >= INPHELP.LEN THEN INPHELP.CX = INPHELP.X + INPHELP.LEN - 1
+    IF INPHELP.FILLED >= INPHELP.LEN THEN INPHELP.CELL$ = RIGHT$(INPHELP.SHOW$, 1)
+    INPHELP.CA = INPHELP.ATTR
+    IF INPHELP.LIT = 1 THEN INPHELP.CA = INPHELP.INV
+    GP.PRINTAT INPHELP.CX, INPHELP.Y, INPHELP.CELL$, INPHELP.CA
+    RETURN
+
+INPHELP.MODULE.END:
+#ENDIF
