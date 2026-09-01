@@ -63,9 +63,9 @@ END
 ## **  constants prog8 restricts its "when" to -- SPLIT.POINT below is a
 ## **  variable. Selects nest freely.
 ## **
-## **  Do NOT jump out of a select with GOTO: GP.ENDSEL is what releases
-## **  the selector, and skipping it leaves the frame open. GP.EXITDO out
-## **  of a loop containing one is fine, it cleans up on the way.
+## **  GOTO out of a select is safe: a select keeps nothing alive, so a
+## **  jump that skips GP.ENDSEL abandons nothing. (GP.DO is different --
+## **  it has a real loop frame -- but that too is unwound for you.)
 ## ***********************************************************************
 
 CLASSIFY:

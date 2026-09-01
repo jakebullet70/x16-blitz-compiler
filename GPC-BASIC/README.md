@@ -57,12 +57,11 @@ All of it needs `#INCLUDE "GPB.INC.BL"`, and nothing else.
 | Loops | `GP.DO` `GP.LOOP` `GP.EXITDO` | `LOOPS.EXP.BL` |
 | Block IF | `GP.IF` `GP.ELSEIF` `GP.ELSE` `GP.ENDIF` | `IF.EXP.BL` |
 | Multi-way branch | `GP.SELECT` `GP.CASE` `GP.OTHER` `GP.ENDSEL` | `SELECT.EXP.BL` |
-| Strings | `GP.INSTR` `GP.STRPTR` `GP.COMP` `GP.TRIM` `GP.LTRIM` `GP.RTRIM` `GP.UPPER` `GP.LOWER` | `STRINGS.EXP.BL` |
+| Strings | `GP.INSTR` `GP.STRPTR` `GP.COMP` | `STRINGS.EXP.BL` |
 | Strings, composite | `GP.CONTAINS` `GP.ISEMPTY` — free | `STRINGS.EXP.BL` |
 | Addresses, composite | `GP.HIBYTE` `GP.LOBYTE` — free; split an address for `GP.CALL` | `ARRAYS.EXP.BL` |
-| Arrays | `GP.SORT` `GP.ARRPTR` | `ARRAYS.EXP.BL` |
-| Drawing | `GP.BOX` `GP.FILL` `GP.PRINTAT` | `SCREEN.EXP.BL` |
-| Screen save | `GP.STASH` `GP.RESTR` — a rectangle to a RAM bank and back | `SCREEN.EXP.BL` |
+| Arrays | `GP.ARRPTR` — the address of element zero, which is how a BASL module reaches an array | `ARRAYS.EXP.BL` |
+| Drawing | `GP.BOX` `GP.FILL` `GP.CHAR` `GP.PRINTAT` | `SCREEN.EXP.BL` |
 | Machine code | `GP.CALL` and the `GP.A` `GP.X` `GP.Y` `GP.C` value words | `MLCALL.EXP.BL` |
 | Inline assembly | `GP.ASM` `GP.ENDASM` — 65C02 assembled into the program, with labels and `{VAR}` | `ASM.EXP.BL` |
 
@@ -75,12 +74,26 @@ All of it needs `#INCLUDE "GPB.INC.BL"`, and nothing else.
 | `APPHELP.INC.BL` | leave the screen as you found it, and **panels to and from disk** | `MENU.EXP.BL` |
 | `INPHELP.INC.BL` | a positioned, length-limited entry field — what `INPUT` cannot do on a drawn screen | `FORM.EXP.BL` |
 | `MENUHELP.INC.BL` | a vertical menu: cursor keys, RETURN, ESC, hotkeys, SNES pad | `MENUDEMO.EXP.BL` |
+| `MENUBAR.INC.BL` | the other axis — a horizontal bar, per-item widths taken from the text | — |
+| `STASH.INC.BL` | a text rectangle to a RAM bank and back, in `GP.ASM` | — |
+| `STASHFILE.INC.BL` | the same rectangle through a **file**, so a panel outlives the program | — |
+| `SORT.INC.BL` | shell sort a string array in place, in `GP.ASM` | `ARRAYS.EXP.BL` |
+| `STRCASE.INC.BL` | case and trim, in place, in `GP.ASM` — was `GP.UPPER` and the trims | `STRINGS.EXP.BL` |
 | `BMX.INC.BL` | a BMX bitmap straight into VERA | `BMXVIEW.EXP.BL` |
 
-**Panels are the file half of `GP.STASH`.** The core saves a rectangle to a RAM bank; there is no
-`GP.` command that writes one to disk, and there does not need to be, because a bank is already
-`BSAVE`-able. `APPHELP.PANEL.SAVE` stashes and `BSAVE`s, `APPHELP.PANEL.LOAD` `BLOAD`s and restores
-it where it came from, and `APPHELP.PANEL.PUT` drops it somewhere else. Three `GOSUB`s, no keywords.
+**Five of those modules used to be keywords.** `GP.MENU`, `GP.STASH`/`GP.RESTR`, `GP.SORT` and the
+five in-place string statements were
+all in the GP runtime block, which is **all or nothing**: every byte of it is written into the object
+*and* taken off the bottom of the workspace, for any program that uses one GP keyword. A sort nobody
+calls and a stash nobody uses were being paid for by every GP program in the tree. Written in
+`GP.ASM` and `#INCLUDE`d instead they cost their own bytes, in the programs that ask for them, and
+nothing at all in the ones that do not — and the block has come down from 2,048 bytes to 1,280 as
+they left, and $4000 -> $3c00 all told.
+
+**`STASHFILE.INC.BL` is the file half of `STASH.INC.BL`,** and a separate file on purpose: a BASL
+module has no dead code elimination, so everything it holds is compiled into every program that
+includes it, called or not. `STASH.FILE.SAVE` stashes and `BSAVE`s, `STASH.FILE.LOAD` `BLOAD`s and
+restores it where it came from, and `STASH.FILE.PUT` drops it somewhere else.
 
 ### The rest of the examples
 

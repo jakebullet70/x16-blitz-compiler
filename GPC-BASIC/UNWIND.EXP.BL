@@ -2,17 +2,21 @@
 ## **
 ## **  UNWIND.EXP.BL -- a GOTO may leave a GP.SELECT or a GP.DO
 ## **
-## **  GP.ENDSEL and GP.LOOP are what release a block's stack frame, so a
-## **  GOTO that jumps past them used to leak one -- and in a loop, one per
-## **  pass, until the 4K frame stack ran out. It does not any more: the
-## **  compiler puts an .unwind in front of any GOTO that leaves a block and
-## **  FixBranches fills in how many frames it closes.
+## **  GP.DO is the only block that opens a stack frame now, and GP.LOOP is
+## **  what releases it -- so a GOTO that jumps past one used to leak it,
+## **  one per pass, until the 4K frame stack ran out. It does not any more:
+## **  the compiler puts an .unwind in front of any GOTO that leaves a loop
+## **  and FixBranches fills in how many frames it closes. A select keeps
+## **  NOTHING alive (since 01/09/26 the selector is a plain variable that
+## **  each GP.CASE re-reads), so a GOTO out of one has nothing to leak and
+## **  needs no unwinding at all.
 ## **
-## **  This is the regression test as much as the example, and the counts are
-## **  chosen so it FAILS if the unwind ever stops working. A GP.SELECT frame
-## **  is 7 bytes against a 4K stack, so ~585 leaks is OUT OF MEMORY: test 1
-## **  leaks one every third pass over 1200, test 4 leaks two per pass over
-## **  800. Getting to the end is the proof.
+## **  This is the regression test as much as the example, and the counts
+## **  are chosen so it FAILS if either half ever stops working. The select
+## **  legs (1, 3) run 1200 GOTOs out of and inside case bodies and must
+## **  disturb nothing; the GP.DO legs (2, 4) leak a real loop frame per
+## **  pass if the unwind breaks, and 800+ leaks against a 4K stack is
+## **  OUT OF MEMORY. Getting to the end is the proof.
 ## **
 ## **  Build:  copy GPC-BASIC/GPB.INC.BL and this file into testing/, then
 ## **            python source/gpc/build_basl.py UNWIND.EXP.BL UNWIND.PRG
@@ -32,7 +36,8 @@ UT.HIT = 0
 UT.OTH = 0
 UT.LOOP:
   UT.N = UT.N + 1
-GP.SELECT UT.N - INT(UT.N / 3) * 3
+  UT.SEL = UT.N - INT(UT.N / 3) * 3
+GP.SELECT UT.SEL
 GP.CASE 0
   GOTO UT.BACK
 GP.CASE 1
@@ -58,7 +63,8 @@ PRINT "DO M=";UT.M
 REM ---- 3. a GOTO that stays INSIDE its block must not close anything ----
 REM      If it did, GP.ENDSEL would find no frame and raise BLOCK MISMATCH.
 UT.IN = 0
-GP.SELECT 1
+UT.SEL = 1
+GP.SELECT UT.SEL
 GP.CASE 1
   GOTO UT.SAME
 UT.SAME:
@@ -70,8 +76,9 @@ REM ---- 4. nested: a GOTO leaving a select inside a GP.DO leaves BOTH ----
 UT.K = 0
 UT.NLOOP:
   UT.K = UT.K + 1
+UT.SEL = 7
 GP.DO 5
-GP.SELECT 7
+GP.SELECT UT.SEL
 GP.CASE 7
   GOTO UT.NBACK
 GP.ENDSEL

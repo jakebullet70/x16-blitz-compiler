@@ -65,7 +65,8 @@ StartCompiler:
 		;		we don't yet know if the program has any. VARSPACE has already run, so the array
 		;		allocator (availableMemory) is set up by the time the prologue executes.
 		;
-		stz 	blockDepth 					; GP.DO / GP.SELECT nesting -- the storage section is
+		stz 	SelectDepth 				; open GP.SELECTs, for the selector-variable stack
+		stz 	blockDepth 					; GP.DO nesting -- the storage section is
 											; uninitialised RAM, and a non-zero start makes every
 											; GOTO emit an .unwind it does not need
 		stz 	implicitDimCount

@@ -225,6 +225,107 @@ CommandXExitDo: ;; [.exitdo]
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;
+;		Name:		gparrptr.asm
+;		Purpose:	GP.ARRPTR -- the address of an array's element zero
+;		Created:	17th August 2026
+;		Reviewed: 	No
+;		Author : 	Steven De George SR
+;
+;		This was gpsort.asm, and GP.SORT was the bulk of it. The sort left the GP block on
+;		1st September 2026 and is GPC-BASIC/SORT.INC.BL now -- the same shell sort, the same
+;		Ciura gaps, written in GP.ASM -- because the block is all or nothing and 408 of its
+;		bytes were a sort that most programs never call. What is left is the 49 bytes that
+;		hand an array's address over, which is what the module is built on: a BASL subroutine
+;		cannot be passed an array.
+;
+; ************************************************************************************************
+; ************************************************************************************************
+
+		.section 	code
+
+; ************************************************************************************************
+;
+;						GP.ARRPTR(a()) -> the address of element ZERO
+;
+;		The escape hatch. It is for the jobs too specific to ever be keywords -- sprite
+;		batching, array fill, checksum, min/max -- which can be written once as machine code
+;		and driven with GP.CALL, or with a GP.ASM block, instead of each having to become its
+;		own keyword or not exist. GP.SORT is now the first and largest example of exactly that.
+;
+;		It is AnyArrayCompile's path with the value RETURNED rather than consumed.
+;
+;		Returns base + variableStartPage*256 + 3, skipping the 3-byte header, so the answer is
+;		element zero and not the count word. THE HEADER IS STILL THERE and is worth knowing
+;		about: count low, count high, then the type byte, at -3, -2 and -1. SORT.INC.BL reads
+;		its element count and rejects a float array from exactly those three bytes.
+;
+;		Stride is the caller's business: 2 bytes for a string (a pointer to its block) and 6
+;		for a number.
+;
+;		Multi-dimensional arrays are REJECTED, because the elements are not a flat run -- they
+;		are pointers to sub-levels, so an address into one would be used as data and corrupt
+;		silently.
+;
+;		A subscript inside the parentheses is a syntax error by construction: AnyArrayCompile
+;		demands the ")" immediately. GP.ARRPTR(A(3)) does not compile -- add 3*stride yourself.
+;
+;		SAME WARNING AS GP.STRPTR: the address routinely exceeds 32767, and BASIC's AND is 16-bit
+;		SIGNED, so splitting it with "P AND 255" raises OUT OF RANGE. Use GP.HIBYTE / GP.LOBYTE,
+;		or the long form H = INT(P/256) : L = P - H*256.
+;
+; ************************************************************************************************
+
+UnaryGPArrPtr: ;; [!gp.arrptr]
+		.entercmd
+		phy
+		lda 	NSMantissa0,x 				; the base arrives as an OFFSET, so the high byte
+		sta 	zTemp0 						; needs variableStartPage adding to make it real
+		lda 	NSMantissa1,x
+		clc
+		adc 	variableStartPage
+		sta 	zTemp0+1
+		;
+		ldy 	#2 							; bit 7 of the type byte = sub-arrays below this level
+		lda 	(zTemp0),y
+		bmi 	_GAPBad
+		;
+		clc 								; step over the 3-byte header to element zero
+		lda 	zTemp0
+		adc 	#3
+		sta 	NSMantissa0,x
+		lda 	zTemp0+1
+		adc 	#0
+		sta 	NSMantissa1,x
+		stz 	NSMantissa2,x 				; and retype it from an int16 reference to a plain
+		stz 	NSMantissa3,x 				; number, exactly as GP.STRPTR does
+		stz 	NSExponent,x
+		stz 	NSStatus,x 					; NSSIFloat is $00, so this also clears the sign
+		ply
+		.exitcmd
+
+_GAPBad:
+		ply 								; code pointer back before raising, or the address in
+		.error_index 						; the message is a fixed meaningless one
+
+		.send 	code
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;		17/08/26		Written, as gpsort.asm.
+;		01/09/26		GP.SORT moved out of the block into GPC-BASIC/SORT.INC.BL. The file is
+;						renamed for what is left of it, and the 15 bytes of gps* storage that
+;						sat below $0801 went with the sort.
+;
+; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
 ;		Name:		gpcall.asm
 ;		Purpose:	GP.CALL and the register readers GP.A / GP.X / GP.Y / GP.C
 ;		Created:	16th August 2026
@@ -427,7 +528,16 @@ GPD_BOTTOM = 5
 GPD_LEFT = 6
 GPD_RIGHT = 7
 
-GPD_STYLES = 6
+GPD_STYLES = 4
+
+;
+;		Style GPD_CUSTOM is the caller's own eight glyphs, and it is the entry immediately
+;		AFTER the table -- so the drawing code below indexes it exactly as it indexes a
+;		built-in one, and not a line of it changed. That adjacency is the whole trick: the
+;		alternative was a second set of reads, or a pointer held in zero page across
+;		TileSetAddress.
+;
+GPD_CUSTOM = 4
 
 ; ************************************************************************************************
 ;
@@ -456,9 +566,12 @@ _CGBInteger:
 		ldx 	#5
 		jsr 	GPDrawColour
 		;
+		lda 	NSMantissa1+4 				; A STYLE OF 256 OR MORE IS AN ADDRESS, not a style
+		bne 	_CGBCustom 					; -- there are only four, so the high byte is free
 		lda 	NSMantissa0+4 				; the style, as an offset into the glyph table
 		cmp 	#GPD_STYLES
 		bcs 	_CGBBadStyle
+_CGBIndex:
 		asl 	a
 		asl 	a
 		asl 	a
@@ -509,6 +622,30 @@ _CGBExit:
 _CGBBadStyle:
 		ply
 		.error_range
+
+;
+;		The caller's eight glyphs, copied into the entry past the table and then drawn as if
+;		they had always been there. zTemp0 is free at this point -- GPDrawGeometry and
+;		GPDrawColour are done with it, and nothing that uses it is called until GPDrawAddress
+;		below, by which time this is finished.
+;
+;		THE BYTES ARE SCREEN CODES, in the table's own order, and NOT PETSCII: the table is
+;		read straight to the cell with no pet2scr, so a custom set has to match it. GP.FILL
+;		converts and this does not, which is a real difference and is documented in
+;		GPB.INC.BL where a caller will meet it.
+;
+_CGBCustom:
+		sta 	zTemp0+1
+		lda 	NSMantissa0+4
+		sta 	zTemp0
+		ldy 	#7
+_CGBCustomCopy:
+		lda 	(zTemp0),y
+		sta 	GPDrawCustom,y
+		dey
+		bpl 	_CGBCustomCopy
+		lda 	#GPD_CUSTOM
+		bra 	_CGBIndex
 
 ; ************************************************************************************************
 ;
@@ -761,11 +898,15 @@ GPDrawP2SOffset:
 
 GPDrawBorder:
 		.byte 	$A0,$A0,$A0,$A0,$A0,$A0,$A0,$A0 	; 0  solid block
-		.byte 	$66,$66,$66,$66,$66,$66,$66,$66 	; 1  chequered dither
-		.byte 	$6E,$70,$7D,$6D,$40,$40,$42,$42 	; 2  single line
-		.byte 	$49,$55,$4B,$4A,$40,$40,$42,$42 	; 3  single line, rounded corners
-		.byte 	$50,$4F,$7A,$4C,$77,$6F,$74,$6A 	; 4  thick line
-		.byte 	$5F,$69,$E9,$DF,$77,$6F,$74,$6A 	; 5  thick line, shaded corners
+		.byte 	$6E,$70,$7D,$6D,$40,$40,$42,$42 	; 1  single line
+		.byte 	$49,$55,$4B,$4A,$40,$40,$42,$42 	; 2  single line, rounded corners
+		.byte 	$50,$4F,$7A,$4C,$77,$6F,$74,$6A 	; 3  thick line
+;
+;		Style 4: the CALLER'S eight, copied in by _CGBCustom. It must stay immediately after
+;		the table -- that is what lets style 4 be indexed like any other.
+;
+GPDrawCustom:
+		.fill 	8
 
 		.send 	code
 
@@ -795,747 +936,6 @@ gpdCount: 									; side rows for GP.BOX, characters for GP.PRINTAT
 ;		Date			Notes
 ;		==== 			=====
 ;		17/08/26		Written.
-;
-; ************************************************************************************************
-; ************************************************************************************************
-; ************************************************************************************************
-;
-;		Name:		gpsort.asm
-;		Purpose:	GP.SORT -- shell sort a string array in place
-;		Created:	17th August 2026
-;		Reviewed: 	No
-;		Author : 	Steven De George SR
-;
-; ************************************************************************************************
-; ************************************************************************************************
-
-		.section 	code
-
-; ************************************************************************************************
-;
-;					GP.SORT a$() [,descending] [,foldcase]  -- sort in place
-;
-;		The reason this is worth assembly when GP.INSTR's helpers were not: it moves POINTERS.
-;		A string variable or array element holds a 2-byte address of its [MaxLen][Ctrl][Len][Data]
-;		block, so exchanging two elements is a 2-byte swap whatever the strings are -- no
-;		temporary, no copying, no heap traffic, O(1) per swap regardless of length. The same sort
-;		in BASIC would allocate a temporary string per comparison AND per swap.
-;
-;		SHELL SORT with halving gaps. Chosen over the alternatives for what it does NOT need:
-;		no recursion and no stack (quicksort needs both, and the frame stack here is a fixed 4K),
-;		no worst case blow-up on already-sorted input, and no scratch array (merge sort needs one,
-;		and there is nowhere to put it). About n^1.3 on real data against bubble sort's n^2.
-;
-;		<descending> and <foldcase> are optional and default to 0 = ascending, case-sensitive.
-;		Both are compared against zero only, so any non-zero value means "yes".
-;
-;		LIMIT: 255 elements. Beyond that .error_range, because a 16-bit index would grow every
-;		address calculation in the inner loop to serve a case that does not arise on this machine.
-;		Note DIM A$(255) is 256 elements and so is one too many -- DIM A$(254) is the largest.
-;
-; ************************************************************************************************
-
-CommandGPSort: ;; [!gp.sort]
-		.entercmd
-		phy 								; Y is the code pointer offset
-		;
-		jsr 	FloatIntegerPart 			; <foldcase>, pushed last
-		lda 	NSMantissa0,x
-		sta 	gpsFold
-		dex
-		jsr 	FloatIntegerPart 			; <descending>
-		lda 	NSMantissa0,x
-		sta 	gpsDesc
-		dex
-		;
-		;		The array base arrives as an OFFSET, exactly as ArrayConvert1 receives it, so the
-		;		high byte needs variableStartPage adding to make it a real address.
-		;
-		;		gpsArray lives in MemoryStorage, NOT zero page, so it can be READ absolutely but
-		;		can never be the pointer in a (ptr),y. The header reads below therefore go through
-		;		zTemp0, which is the same copy GPSortElementY rebuilds for every element anyway.
-		;
-		;		NOTE: UnaryGPArrPtr below repeats this same three-step opening -- offset plus
-		;		variableStartPage, reject bit 7 of the type byte, skip the 3 byte header. It is NOT
-		;		shared, because the two error paths differ (this one has pushed Y and must restore
-		;		it before raising, which a jsr'd helper cannot do) and factoring the remainder nets
-		;		about thirteen bytes. IF THE ARRAY LAYOUT EVER CHANGES, BOTH MUST CHANGE.
-		;
-		lda 	NSMantissa0,x
-		sta 	gpsArray
-		sta 	zTemp0
-		lda 	NSMantissa1,x
-		clc
-		adc 	variableStartPage
-		sta 	gpsArray+1
-		sta 	zTemp0+1
-		dex 								; consumed -- this is a statement, not a function
-		;
-		ldy 	#2 							; the type byte
-		lda 	(zTemp0),y
-		bmi 	_GSBadArrayNear 			; bit 7 = this level holds sub-arrays, so 2-D or worse
-		and 	#NSSTypeMask
-		cmp 	#NSSString
-		bne 	_GSBadArrayNear 			; a float array's elements are 6 bytes, not 2
-		;
-		ldy 	#1 							; count high byte
-		lda 	(zTemp0),y
-		beq 	_GSCountOk
-_GSTooBigNear:
-		jmp 	_GSTooBig 					; 256 or more elements
-_GSBadArrayNear:
-		jmp 	_GSBadArray 				; both errors are a long way below, so trampoline
-_GSCountOk:
-		lda 	(zTemp0)
-		sta 	gpsCount
-		cmp 	#2
-		bcs 	_GSBigEnough
-		jmp 	_GSDone 					; 0 or 1 elements is already sorted
-_GSBigEnough:
-		;
-		;		Step the base past the 3-byte header so element i is at gpsArray + i*2.
-		;
-		clc
-		lda 	gpsArray
-		adc 	#3
-		sta 	gpsArray
-		bcc 	_GSHaveBase
-		inc 	gpsArray+1
-_GSHaveBase:
-		;
-		;		The gap sequence is a fixed TABLE, not the halving one Shell published in 1959.
-		;		Halving is the weakest of the known sequences -- worst case n^2 -- and 132/57/23/
-		;		10/4/1 is Ciura's, empirically the best for arrays this size at roughly n^1.25.
-		;		Taken from prog8's sorting.p8, which uses exactly these six.
-		;
-		;		Gaps larger than the array need no special case: the outer loop starts i AT the
-		;		gap and exits immediately when that is already past the end.
-		;
-		stz 	gpsGapIdx
-_GSGapLoop:
-		ldy 	gpsGapIdx
-		cpy 	#GPSortGapEnd-GPSortGaps
-		bcc 	_GSGapOk
-		jmp 	_GSDone
-_GSGapOk:
-		inc 	gpsGapIdx
-		lda 	GPSortGaps,y
-		sta 	gpsGap
-		;
-		;		for i = gap to count-1
-		;
-		sta 	gpsI
-_GSOuter:
-		lda 	gpsI
-		cmp 	gpsCount
-		bcs 	_GSNextGap
-		;
-		;		temp = a[i], j = i
-		;
-		ldy 	gpsI
-		jsr 	GPSortElementY 				; -> zTemp0 = &a[i]
-		lda 	(zTemp0)
-		sta 	gpsTemp
-		ldy 	#1
-		lda 	(zTemp0),y
-		sta 	gpsTemp+1
-		lda 	gpsI
-		sta 	gpsJ
-		;
-		;		while j >= gap and a[j-gap] sorts after temp:  a[j] = a[j-gap] ; j -= gap
-		;
-_GSInner:
-		lda 	gpsJ
-		cmp 	gpsGap
-		bcc 	_GSPlace 					; j < gap, so there is nothing below to compare
-		sec
-		sbc 	gpsGap
-		tay 								; Y = j - gap
-		jsr 	GPSortElementY 				; -> zTemp0 = &a[j-gap]
-		;
-		lda 	(zTemp0) 					; that element -> zTemp1, the left operand
-		sta 	zTemp1
-		ldy 	#1
-		lda 	(zTemp0),y
-		sta 	zTemp1+1
-		lda 	gpsTemp 					; temp -> zTemp2, the right operand
-		sta 	zTemp2
-		lda 	gpsTemp+1
-		sta 	zTemp2+1
-		jsr 	GPSortCompare 				; A = $FF, 0 or 1
-		;
-		ldy 	gpsDesc 					; descending flips the sense of the answer. Test it in
-		beq 	_GSTestOrder 				; Y -- A holds the result and must survive
-		eor 	#$FF 						; negate: 1 <-> $FF, 0 unchanged
-		inc 	a
-_GSTestOrder:
-		cmp 	#1 							; "sorts after" is the only case that shifts
-		bne 	_GSPlace
-		;
-		;		Shift a[j-gap] up into a[j], then step j down by gap.
-		;
-		ldy 	gpsJ
-		jsr 	GPSortElementY 				; -> zTemp0 = &a[j]
-		lda 	zTemp1
-		sta 	(zTemp0)
-		ldy 	#1
-		lda 	zTemp1+1
-		sta 	(zTemp0),y
-		;
-		lda 	gpsJ
-		sec
-		sbc 	gpsGap
-		sta 	gpsJ
-		bra 	_GSInner
-_GSPlace:
-		ldy 	gpsJ 						; a[j] = temp
-		jsr 	GPSortElementY
-		lda 	gpsTemp
-		sta 	(zTemp0)
-		ldy 	#1
-		lda 	gpsTemp+1
-		sta 	(zTemp0),y
-		;
-		inc 	gpsI
-		jmp 	_GSOuter 					; the inner loop is longer than a bra can reach back
-
-_GSNextGap:
-		jmp 	_GSGapLoop 					; on to the next gap in the table
-
-_GSDone:
-		ply
-		.exitcmd
-
-_GSBadArray:
-		ply 								; restore the code pointer BEFORE raising, or the
-		.error_index 						; "@ $xxxx" is a fixed meaningless address
-_GSTooBig:
-		ply
-		.error_range
-
-; ************************************************************************************************
-;
-;		zTemp0 = the address of element Y (Y = index, 0..254). Clobbers A and Y.
-;
-; ************************************************************************************************
-
-GPSortGaps:
-		.byte 	132, 57, 23, 10, 4, 1
-GPSortGapEnd:
-
-GPSortElementY:
-		tya
-		asl 	a 							; index * 2 -- and the carry OUT of this is bit 8 of the
-		sta 	zTemp0 						; result, which must be kept. From element 128 upward
-		lda 	#0 							; the doubled index no longer fits a byte, and throwing
-		rol 	a 							; that bit away puts every such element 256 bytes low.
-		clc
-		adc 	gpsArray+1
-		sta 	zTemp0+1
-		clc
-		lda 	zTemp0
-		adc 	gpsArray
-		sta 	zTemp0
-		bcc 	_GSEYDone
-		inc 	zTemp0+1
-_GSEYDone:
-		ldy 	#0
-		rts
-
-; ************************************************************************************************
-;
-;		Compare the string blocks at zTemp1 and zTemp2, returning $FF / 0 / 1 in A as
-;		CompareStrings does. Folds case when gpsFold is non-zero.
-;
-;		A NULL POINTER IS AN EMPTY STRING, and that is the trap this whole command turns on. A
-;		never-assigned element is $0000 -- ReadStringZTemp0Sub hands out a static empty string for
-;		exactly that case -- so without this a DIM A$(20) with five entries filled would compare
-;		against whatever happens to live at address 2 and scribble the array into sorted order
-;		based on it.
-;
-;		The blocks are [MaxLen][Ctrl][Len][Data], so the length is at +2 and the text starts at +3.
-;
-; ************************************************************************************************
-
-GPSortCompare:
-		lda 	zTemp1+1 					; left length, or zero if the pointer is null
-		beq 	_GSCLeftNull
-		ldy 	#2
-		lda 	(zTemp1),y
-		bra 	_GSCHaveLeft
-_GSCLeftNull:
-		lda 	#0
-_GSCHaveLeft:
-		sta 	gpsLenL
-		;
-		lda 	zTemp2+1 					; right length
-		beq 	_GSCRightNull
-		ldy 	#2
-		lda 	(zTemp2),y
-		bra 	_GSCHaveRight
-_GSCRightNull:
-		lda 	#0
-_GSCHaveRight:
-		sta 	gpsLenR
-		;
-		cmp 	gpsLenL 					; compare min(lenL,lenR) characters
-		bcs 	_GSCUseLeft
-		bra 	_GSCHaveCount
-_GSCUseLeft:
-		lda 	gpsLenL
-_GSCHaveCount:
-		sta 	gpsRun
-		beq 	_GSCLengths 				; one of them is empty, so length decides
-		;
-		ldy 	#2 							; +3 is the first character, so pre-increment from 2
-_GSCLoop:
-		iny
-		lda 	(zTemp2),y 					; right character first, so A holds the LEFT one at
-		jsr 	GPSortFold 					; the compare and the carry means what it does in
-		sta 	gpsChar 					; CompareStrings
-		lda 	(zTemp1),y
-		jsr 	GPSortFold
-		cmp 	gpsChar
-		bne 	_GSCDiffer
-		dec 	gpsRun
-		bne 	_GSCLoop
-_GSCLengths:
-		sec
-		lda 	gpsLenL
-		sbc 	gpsLenR
-		beq 	_GSCSame
-_GSCDiffer:
-		lda 	#$FF
-		bcc 	_GSCExit
-		lda 	#$01
-_GSCExit:
-		rts
-_GSCSame:
-		lda 	#0
-		rts
-
-;
-;		A -> upper case if gpsFold says so and it is a lower case letter.
-;
-GPSortFold:
-		pha 								; Y is the string index and X is the number stack
-		lda 	gpsFold 					; pointer, so the flag can only be tested through A
-		beq 	_GSFNo
-		pla
-		cmp 	#'a'
-		bcc 	_GSFOut
-		cmp 	#'z'+1
-		bcs 	_GSFOut
-		and 	#$DF
-_GSFOut:
-		rts
-_GSFNo:
-		pla
-		rts
-
-; ************************************************************************************************
-;
-;						GP.ARRPTR(a()) -> the address of element ZERO
-;
-;		The escape hatch. GP.SORT is the built-in for a job common enough to be worth doing
-;		properly in assembly; this is for the jobs too specific to ever be keywords -- sprite
-;		batching, array fill, checksum, min/max -- which can now be written once as machine code
-;		and driven with GP.CALL instead of each having to become its own keyword or not exist.
-;
-;		It is StringArrayCompile's path with the element-type check dropped (a float array is
-;		just as valid a target) and the value RETURNED rather than consumed.
-;
-;		Returns base + variableStartPage*256 + 3, skipping the 3-byte header, so the answer is
-;		element zero and not the count word. Stride is the caller's business: 2 bytes for a
-;		string (a pointer to its block) and 6 for a number.
-;
-;		Multi-dimensional arrays are REJECTED, exactly as GP.SORT rejects them and for the same
-;		reason -- the elements are not a flat run, they are pointers to sub-levels, so an address
-;		into one would be used as data and corrupt silently.
-;
-;		A subscript inside the parentheses is a syntax error by construction: AnyArrayCompile
-;		demands the ")" immediately. GP.ARRPTR(A(3)) does not compile -- add 3*stride yourself.
-;
-;		SAME WARNING AS GP.STRPTR: the address routinely exceeds 32767, and BASIC's AND is 16-bit
-;		SIGNED, so splitting it with "P AND 255" raises OUT OF RANGE. Use
-;		H = INT(P/256) : L = P - H*256.
-;
-; ************************************************************************************************
-
-UnaryGPArrPtr: ;; [!gp.arrptr]
-		.entercmd 							; the opening here is deliberately the same three steps
-		phy 								; CommandGPSort uses -- see the note there before editing
-		lda 	NSMantissa0,x 				; the base arrives as an offset, as GP.SORT receives it
-		sta 	zTemp0
-		lda 	NSMantissa1,x
-		clc
-		adc 	variableStartPage
-		sta 	zTemp0+1
-		;
-		ldy 	#2 							; bit 7 of the type byte = sub-arrays below this level
-		lda 	(zTemp0),y
-		bmi 	_GAPBad
-		;
-		clc 								; step over the 3-byte header to element zero
-		lda 	zTemp0
-		adc 	#3
-		sta 	NSMantissa0,x
-		lda 	zTemp0+1
-		adc 	#0
-		sta 	NSMantissa1,x
-		stz 	NSMantissa2,x 				; and retype it from an int16 reference to a plain
-		stz 	NSMantissa3,x 				; number, exactly as GP.STRPTR does
-		stz 	NSExponent,x
-		stz 	NSStatus,x 					; NSSIFloat is $00, so this also clears the sign
-		ply
-		.exitcmd
-
-_GAPBad:
-		ply 								; code pointer back before raising, or the address in
-		.error_index 						; the message is a fixed meaningless one
-
-		.send 	code
-
-		.section storage
-gpsArray:									; base of the element data (header already skipped)
-		.fill 	2
-gpsTemp: 									; the element being placed this pass
-		.fill 	2
-gpsCount: 									; how many elements
-		.fill 	1
-gpsGap: 									; current shell sort gap
-		.fill 	1
-gpsGapIdx: 									; how far into GPSortGaps we are
-		.fill 	1
-gpsI: 										; outer index
-		.fill 	1
-gpsJ: 										; inner index
-		.fill 	1
-gpsDesc: 									; non-zero = descending
-		.fill 	1
-gpsFold: 									; non-zero = ignore case
-		.fill 	1
-gpsLenL:									; the two lengths being compared
-		.fill 	1
-gpsLenR:
-		.fill 	1
-gpsRun: 									; characters still to compare
-		.fill 	1
-gpsChar: 									; folded right-hand character
-		.fill 	1
-		.send 	storage
-
-; ************************************************************************************************
-;
-;									Changes and Updates
-;
-; ************************************************************************************************
-;
-;		Date			Notes
-;		==== 			=====
-;		17/08/26		Written.
-;
-; ************************************************************************************************
-; ************************************************************************************************
-; ************************************************************************************************
-;
-;		Name:		gpstash.asm
-;		Purpose:	GP.STASH / GP.RESTR -- save and restore a text rectangle
-;		Created:	17th August 2026
-;		Reviewed: 	No
-;		Author : 	Steven De George SR
-;
-; ************************************************************************************************
-; ************************************************************************************************
-
-		.section 	code
-
-; ************************************************************************************************
-;
-;				GP.STASH bank,x,y,w,h        GP.RESTR bank [,x,y]
-;
-;		Copy a rectangle of the text screen into a banked RAM bank, and put it back. The use is
-;		the one every text UI needs: draw a menu or a dialogue over the screen, then restore what
-;		was underneath without redrawing the program's own display.
-;
-;		Worth assembly by the rule in the plan: it is bulk data. A 40x10 panel is 800 bytes, and
-;		the BASIC equivalent is 400 VPEEK/VPOKE pairs.
-;
-;		THE ADDRESSING IS TileSetAddress, tiles.asm -- the same primitive TILE, TDATA and TATTR
-;		use. It reads the map base from VERAL1MapBase and the row stride from VERAL1Config bits
-;		5:4 on every call, so ANY map width works, and it accumulates in 24 bits because a
-;		256 x 256 map of two byte entries is the whole 128K of VRAM.
-;
-;		This started out hand-rolled, with a check that the map was 128 tiles wide so a row step
-;		could be a single inc of the middle address byte. That check was a restriction dressed up
-;		as a guard: TileSetAddress had the general answer all along and is SMALLER than the
-;		special case was.
-;
-;		THE STASH IS SELF-DESCRIBING. Four header bytes go in first -- w, h, x, y -- so GP.RESTR
-;		needs only the bank. That fixes the flaw dotBASIC admits to in its own .CUT/.PASTE, which
-;		"requires correctly re-describing the width and height of each cut". Supplying x,y to
-;		GP.RESTR pastes the rectangle somewhere else instead, which is copy-and-paste for free.
-;
-;		A BANK IS 8192 BYTES and a cell is two of them, so the most that fits is 4094 cells --
-;		a full 80x60 screen is 9,600 bytes and does NOT fit. The limit is enforced per row, before
-;		the write that would cross $C000, so an over-large rectangle is an error and never a
-;		corruption of the next bank.
-;
-; ************************************************************************************************
-
-GPS_BANKREG = 0 							; the X16 RAM bank select register
-GPS_WINDOW  = $A000 						; where the selected bank appears
-GPS_WINDEND = $C000
-
-CommandGPStash: ;; [!gp.stash]
-		.entercmd
-		phy
-		jsr 	GPStashArgs 				; h,w,y,x,bank off the stack, VERA set up
-		;
-		lda 	gssW 						; the header describes the stash, so GP.RESTR needs
-		sta 	GPS_WINDOW 					; only the bank
-		lda 	gssH
-		sta 	GPS_WINDOW+1
-		lda 	gssX
-		sta 	GPS_WINDOW+2
-		lda 	gssY
-		sta 	GPS_WINDOW+3
-		;
-		lda 	#<(GPS_WINDOW+4) 			; data follows the header
-		sta 	zTemp0
-		lda 	#>(GPS_WINDOW+4)
-		sta 	zTemp0+1
-		;
-_GSTRow:
-		jsr 	GPStashRowFits 				; would this row cross out of the bank ?
-		jsr 	GPStashSetVera 				; point VERA at the start of the row
-		ldy 	#0
-_GSTByte:
-		lda 	VRAMData0 					; the address auto-increments, so this walks the row
-		sta 	(zTemp0),y
-		iny
-		cpy 	gssW2
-		bne 	_GSTByte
-		jsr 	GPStashNextRow
-		bne 	_GSTRow
-		jmp 	GPStashDone
-
-; ************************************************************************************************
-
-CommandGPRestore: ;; [!gp.restr]
-		.entercmd
-		phy
-		;
-		;		<y> and <x> are optional and default to 255. 0 could not have doubled as the
-		;		sentinel here, because 0 is a perfectly good place to paste a rectangle.
-		;
-		jsr 	FloatIntegerPart
-		lda 	NSMantissa0,x
-		sta 	gssY
-		dex
-		jsr 	FloatIntegerPart
-		lda 	NSMantissa0,x
-		sta 	gssX
-		dex
-		jsr 	FloatIntegerPart
-		lda 	NSMantissa0,x
-		sta 	gssBank
-		dex
-		;
-		jsr 	GPStashBankIn 				; select the bank and check the screen layout
-		;
-		lda 	GPS_WINDOW 					; geometry comes from the header
-		sta 	gssW
-		lda 	GPS_WINDOW+1
-		sta 	gssH
-		lda 	gssX 						; unless the caller named a destination
-		cmp 	#255
-		bne 	_GSRHaveXY
-		lda 	GPS_WINDOW+2
-		sta 	gssX
-		lda 	GPS_WINDOW+3
-		sta 	gssY
-_GSRHaveXY:
-		jsr 	GPStashGeometry 			; validate w/h and work out the row width
-		;
-		lda 	#<(GPS_WINDOW+4)
-		sta 	zTemp0
-		lda 	#>(GPS_WINDOW+4)
-		sta 	zTemp0+1
-		;
-_GSRRow:
-		jsr 	GPStashRowFits
-		jsr 	GPStashSetVera
-		ldy 	#0
-_GSRByte:
-		lda 	(zTemp0),y 					; the only difference from the stash loop is the
-		sta 	VRAMData0 					; direction of this pair
-		iny
-		cpy 	gssW2
-		bne 	_GSRByte
-		jsr 	GPStashNextRow
-		bne 	_GSRRow
-		jmp 	GPStashDone
-
-; ************************************************************************************************
-;
-;		Read h,w,y,x,bank off the stack (h was pushed last), select the bank, and validate.
-;
-; ************************************************************************************************
-
-GPStashArgs:
-		jsr 	FloatIntegerPart
-		lda 	NSMantissa0,x
-		sta 	gssH
-		dex
-		jsr 	FloatIntegerPart
-		lda 	NSMantissa0,x
-		sta 	gssW
-		dex
-		jsr 	FloatIntegerPart
-		lda 	NSMantissa0,x
-		sta 	gssY
-		dex
-		jsr 	FloatIntegerPart
-		lda 	NSMantissa0,x
-		sta 	gssX
-		dex
-		jsr 	FloatIntegerPart
-		lda 	NSMantissa0,x
-		sta 	gssBank
-		dex
-		jsr 	GPStashBankIn
-		;		fall through to the geometry check
-
-;
-;		w and h must be usable, and w*2 MUST fit a byte -- the inner loop counts it in Y, and the
-;		row-fits check adds it to a pointer. w = 128 doubles to zero and defeats both, which is
-;		exactly how an over-large rectangle got through the first time this was tested.
-;
-GPStashGeometry:
-		lda 	gssW
-		beq 	_GSGBad
-		cmp 	#128 						; 127 is the limit, NOT 128: w*2 has to fit a byte so the
-		bcs 	_GSGBad 					; inner loop can count it in Y, and 128*2 is 0 in a byte
-		 									; -- which silently made every size guard below see a
-		 									; zero-width row and pass. Same boundary that bit
-		 									; GPSortElementY. 127 columns is wider than a screen.
-		lda 	gssH
-		beq 	_GSGBad
-		cmp 	#65
-		bcs 	_GSGBad
-		lda 	gssW 						; the row width in BYTES, two per cell
-		asl 	a
-		sta 	gssW2
-		rts
-_GSGBad:
-		jmp 	GPStashRange
-
-;
-;		Select the bank. The previous bank is saved and put back at the end -- a command that
-;		silently repointed $A000 would be a trap of exactly the kind this codebase already has
-;		too many of.
-;
-GPStashBankIn:
-		lda 	GPS_BANKREG
-		sta 	gssOldBank
-		lda 	gssBank
-		sta 	GPS_BANKREG
-		rts
-
-; ************************************************************************************************
-;
-;		Point VERA at (gssX, gssY), with the auto-increment set so the row walks itself. Any map
-;		width, because TileSetAddress derives the stride rather than assuming it.
-;
-; ************************************************************************************************
-
-GPStashSetVera:
-		lda 	gssX
-		sta 	tileX
-		stz 	tileX+1
-		lda 	gssY
-		sta 	tileY
-		stz 	tileY+1
-		jmp 	TileSetAddress 				; X is untouched by it, which is what matters here
-
-;
-;		Advance to the next screen row and the next slot in the bank. Returns Z set when the
-;		last row has been done.
-;
-GPStashNextRow:
-		inc 	gssY
-		clc
-		lda 	zTemp0
-		adc 	gssW2
-		sta 	zTemp0
-		bcc 	_GSNRNoCarry
-		inc 	zTemp0+1
-_GSNRNoCarry:
-		dec 	gssH
-		rts
-
-;
-;		Would the row about to be copied run past the end of the bank window? Checked BEFORE the
-;		write rather than after, so an over-large rectangle is an error and never a corruption of
-;		whatever the next bank holds.
-;
-GPStashRowFits:
-		clc
-		lda 	zTemp0
-		adc 	gssW2
-		lda 	zTemp0+1
-		adc 	#0
-		cmp 	#>GPS_WINDEND
-		bcs 	_GSRFBad
-		rts
-_GSRFBad:
-		jmp 	GPStashRange
-
-;
-;		Shared exit: put the caller's bank back, restore the code pointer, and leave.
-;
-GPStashDone:
-		lda 	gssOldBank
-		sta 	GPS_BANKREG
-		ply
-		.exitcmd
-
-GPStashRange:
-		lda 	gssOldBank 					; the bank must go back even on the error path, or the
-		sta 	GPS_BANKREG 				; program continues with $A000 pointing somewhere else
-		ply
-		.error_range
-
-		.send 	code
-
-		.section storage
-gssBank: 									; the bank being written to or read from
-		.fill 	1
-gssOldBank: 								; whatever was selected before, put back on the way out
-		.fill 	1
-gssX:
-		.fill 	1
-gssY:
-		.fill 	1
-gssW:
-		.fill 	1
-gssH: 										; counts DOWN as the rows are done
-		.fill 	1
-gssW2: 										; the row width in bytes, w*2
-		.fill 	1
-		.send 	storage
-
-; ************************************************************************************************
-;
-;									Changes and Updates
-;
-; ************************************************************************************************
-;
-;		Date			Notes
-;		==== 			=====
-;		17/08/26		Written.
-;		17/08/26		Re-based on TileSetAddress: any map width, and smaller.
 ;
 ; ************************************************************************************************
 ; ************************************************************************************************
@@ -1813,195 +1213,37 @@ UnaryGPStrPtr: ;; [gp.strptr]
 		stz 	NSExponent,x
 		stz 	NSStatus,x 					; NSSIFloat is $00 -- string bit cleared, now a number
 		.exitcmd
-
 ; ************************************************************************************************
 ;
-;				GP.TRIM a$ / GP.UPPER a$ / GP.LOWER a$ -- modify in place
+;		GP.UPPER / GP.LOWER / GP.TRIM / GP.LTRIM / GP.RTRIM WERE HERE, and are
+;		GPC-BASIC/STRCASE.INC.BL now -- written in GP.ASM, one blob with a mode byte tested once
+;		at entry. So was their shared GPStringAddress. 188 bytes, removed 1st September 2026.
 ;
-;		All three take a string VARIABLE, enforced at compile time by StringVariableCompile, so
-;		none of them checks anything here: a literal cannot reach them, and a literal is the one
-;		thing that would matter, because CommandPushS points literals into the p-code itself.
+;		The reason is the block, not the code: it is ALL OR NOTHING -- every byte written into
+;		the object AND taken off the bottom of the workspace, for any program that uses one GP
+;		keyword -- and outside their own example file these five had exactly ONE caller in the
+;		whole tree. ObjectBase $3d00 -> $3c00, which is 512 bytes back for every GP program.
 ;
-;		They are SHIFTED. Each walks a whole string, so the 17 extra cycles of a shifted dispatch
-;		amortise over its length -- about 5% on a 20 character string -- and the unshifted slots
-;		are the scarce ones. GP.A and friends are the opposite case and stayed unshifted.
+;		GP.STRPTR STAYED, and is now load-bearing rather than a curiosity: a BASL subroutine
+;		cannot be passed a variable, so the module takes the block ADDRESS and rewrites it where
+;		it lies. Copying the caller's string in and out instead would be two allocations and two
+;		copies per call, which is the exact heap traffic these were assembly to avoid.
 ;
-;		WHY THERE IS NO GP.PAD HERE. It was written, it worked, and it was removed on 16/08/26.
-;		These three all SHRINK or rewrite a string in place, which needs nothing but the block.
-;		Padding GROWS one -- and a handler only ever receives the block address, never the
+;		WHAT THE MOVE GIVES UP: StringVariableCompile enforced a string VARIABLE at the call
+;		site, so a literal could never reach a handler. A GOSUB has no equivalent, and
+;		GP.STRPTR("text") is the address of the literal inside the p-code -- upper-casing that
+;		edits the program. The module's header says so; the compiler can no longer say it.
+;
+;		WHY THERE WAS NO GP.PAD AMONG THEM. It was written, it worked, and it was removed on
+;		16/08/26. These five all SHRINK or rewrite a string in place, which needs nothing but the
+;		block. Padding GROWS one -- and a handler only ever receives the block address, never the
 ;		variable slot, so it cannot repoint the variable at a bigger block. That capped GP.PAD at
 ;		the capacity the string was born with (StringConcrete: length+50%, min 10), so padding
 ;		"HI" to a 20 column field -- the entire point of the command -- raised OUT OF RANGE.
-;		Padding is now STRHELP.PAD in GPC-BASIC/STRHELP.INC.BL, one line of BASL built on RPT$,
-;		where an ordinary assignment reallocates for free. See that file's header.
+;		Padding is STRHELP.PAD in GPC-BASIC/STRHELP.INC.BL, one line of BASL built on RPT$,
+;		where an ordinary assignment reallocates for free.
 ;
 ; ************************************************************************************************
-
-;
-;		Shared entry: TOS is the string. zTemp0 = its block, A = current length, Z set if empty.
-;
-GPStringAddress:
-		lda 	NSMantissa0,x
-		sta 	zTemp0
-		lda 	NSMantissa1,x
-		sta 	zTemp0+1
-		dex 								; consume it -- these are statements, not functions
-		lda 	(zTemp0)
-		rts
-
-; ************************************************************************************************
-;
-;		GP.UPPER / GP.LOWER. ASCII range only: 97-122 -> 65-90 and back, which is a bit 5 flip
-;		once the range is known. Nothing outside that range is touched, so PETSCII graphics
-;		characters and digits pass through untouched rather than being mangled.
-;
-; ************************************************************************************************
-
-CommandGPUpper: ;; [!gp.upper]
-		.entercmd
-		phy
-		jsr 	GPStringAddress
-		beq 	_GUExit
-		tay
-_GULoop:
-		lda 	(zTemp0),y
-		cmp 	#'a'
-		bcc 	_GUNext
-		cmp 	#'z'+1
-		bcs 	_GUNext
-		and 	#$DF 						; clear bit 5
-		sta 	(zTemp0),y
-_GUNext:
-		dey
-		bne 	_GULoop
-_GUExit:
-		ply
-		.exitcmd
-
-CommandGPLower: ;; [!gp.lower]
-		.entercmd
-		phy
-		jsr 	GPStringAddress
-		beq 	_GLExit
-		tay
-_GLLoop:
-		lda 	(zTemp0),y
-		cmp 	#'A'
-		bcc 	_GLNext
-		cmp 	#'Z'+1
-		bcs 	_GLNext
-		ora 	#$20 						; set bit 5
-		sta 	(zTemp0),y
-_GLNext:
-		dey
-		bne 	_GLLoop
-_GLExit:
-		ply
-		.exitcmd
-
-; ************************************************************************************************
-;
-;		GP.TRIM strips spaces from BOTH ends, GP.RTRIM from the trailing end only, GP.LTRIM from
-;		the leading end only. The two ends are not the same problem and that is why the split is
-;		free: trailing is nearly so (move the length byte and the characters stay put), while
-;		leading has to SLIDE the whole string down, which needs a second pointer because X is the
-;		number stack pointer and can never be borrowed as an index.
-;
-;		Two helpers, three thin entry points. GP.TRIM is right-then-left, in that order
-;		deliberately -- right first shortens the string the left pass has to walk, and if it
-;		empties it the left pass falls straight out.
-;
-; ************************************************************************************************
-
-CommandGPTrim: ;; [!gp.trim]
-		.entercmd
-		phy
-		jsr 	GPStringAddress
-		jsr 	GPTrimRight
-		jsr 	GPTrimLeft
-		ply
-		.exitcmd
-
-CommandGPRTrim: ;; [!gp.rtrim]
-		.entercmd
-		phy
-		jsr 	GPStringAddress
-		jsr 	GPTrimRight
-		ply
-		.exitcmd
-
-CommandGPLTrim: ;; [!gp.ltrim]
-		.entercmd
-		phy
-		jsr 	GPStringAddress
-		jsr 	GPTrimLeft
-		ply
-		.exitcmd
-
-;
-;		Trailing spaces: walk back from the end and write the new length. Nothing moves. Y
-;		falling to zero IS the all-spaces answer, no special case needed.
-;
-GPTrimRight:
-		lda 	(zTemp0)
-		beq 	_GTRExit 					; already empty
-		tay
-_GTRLoop:
-		lda 	(zTemp0),y
-		cmp 	#' '
-		bne 	_GTRSet 					; Y is the last non-space
-		dey
-		bne 	_GTRLoop
-_GTRSet:
-		tya
-		sta 	(zTemp0)
-_GTRExit:
-		rts
-
-;
-;		Leading spaces: find the first non-space, then slide everything from it down to offset 1.
-;		gpsNeedLen counts DOWN as spaces are skipped, so when the scan stops it already holds the
-;		kept length -- no subtraction, and reaching zero is exactly the all-spaces case.
-;
-GPTrimLeft:
-		lda 	(zTemp0)
-		beq 	_GTLExit 					; already empty
-		sta 	gpsNeedLen
-		ldy 	#1
-_GTLScan:
-		lda 	(zTemp0),y
-		cmp 	#' '
-		bne 	_GTLFound
-		iny
-		dec 	gpsNeedLen
-		bne 	_GTLScan
-		lda 	#0 							; all spaces (A holds a space here, so reload it)
-		sta 	(zTemp0)
-		rts
-_GTLFound:
-		cpy 	#1 							; nothing to slide if it already starts at 1
-		beq 	_GTLSetLength
-		;
-		tya 								; zTemp1 = zTemp0 + (first - 1), so (zTemp1),1 is the
-		dec 	a 							; first character being kept
-		clc
-		adc 	zTemp0
-		sta 	zTemp1
-		lda 	zTemp0+1
-		adc 	#0
-		sta 	zTemp1+1
-		ldy 	#0
-_GTLMove:
-		iny
-		lda 	(zTemp1),y
-		sta 	(zTemp0),y
-		cpy 	gpsNeedLen
-		bne 	_GTLMove
-_GTLSetLength:
-		lda 	gpsNeedLen
-		sta 	(zTemp0)
-_GTLExit:
-		rts
 
 		.send 	code
 
@@ -2023,172 +1265,6 @@ gpsIndex: 									; how far into the haystack the compare has reached
 ;		Date			Notes
 ;		==== 			=====
 ;		16/08/26		Written.
-;
-; ************************************************************************************************
-; ************************************************************************************************
-; ************************************************************************************************
-;
-;		Name:		select.asm
-;		Purpose:	GP.SELECT / GP.CASE / GP.OTHER / GP.ENDSEL
-;		Created:	17th August 2026
-;		Reviewed: 	No
-;		Author : 	Steven De George SR
-;
-; ************************************************************************************************
-; ************************************************************************************************
-
-		.section 	code
-
-; ************************************************************************************************
-;
-;			GP.SELECT <expr> / GP.CASE <expr>[,<expr>...] / GP.OTHER / GP.ENDSEL
-;
-;		A multi-way branch on one value, modelled on prog8's "when". It is NOT a replacement for
-;		ON x GOTO/GOSUB, which is a real skip table and stays the right answer for a dense 1..n
-;		index; this is for the SPARSE selector -- key codes out of GET, state machines - where
-;		ON cannot go.
-;
-;		THE SELECTOR LIVES IN A STACK FRAME, not on the number stack, and that is forced rather
-;		than chosen: new.line resets the number stack pointer to $FF at every source line, so a
-;		value left on it by GP.SELECT would be gone by the time the first GP.CASE on the next
-;		line looked for it. A frame also gets the nesting and the cleanup for free -- GP.ENDSEL
-;		finds its own frame through StackFindFrame, which discards anything a case body left
-;		open above it, and GP.EXITDO's StackFindFrame discards a select the same way.
-;
-;		GP.CASE is "push the selector", and it is emitted ONCE PER ALTERNATIVE, so
-;
-;			GP.CASE 13,17
-;
-;		compiles to  gp.case 13 f.cmp =  gp.case 17 f.cmp =  or  .casenext
-;
-;		which is why there is no separate marker keyword and no stack-duplicate opcode: the fetch
-;		IS the marker. FixBranches lands .casenext on the FIRST gp.case of the next alternative,
-;		and the extra ones inside an alternative all sit before its .casenext, so the scan never
-;		sees them.
-;
-; ************************************************************************************************
-
-selpush	.macro 								; number stack -> frame
-		lda 	\1,x
-		sta 	(runtimeStackPtr),y
-		iny
-		.endm
-
-selpull	.macro 								; frame -> number stack
-		lda 	(runtimeStackPtr),y
-		sta 	\1,x
-		iny
-		.endm
-
-; ************************************************************************************************
-;
-;								GP.SELECT : open the frame
-;
-; ************************************************************************************************
-
-CommandXSelect: ;; [gp.select]
-		.entercmd
-		lda 	#FRAME_SELECT 				; StackOpenFrame can raise OUT OF MEMORY, and Y is
-		jsr 	StackOpenFrame 				; still the code offset here, so it reports honestly
-		;
-		phy 								; Y becomes the frame index from here on
-		ldy 	#1
-		.selpush NSMantissa0
-		.selpush NSMantissa1
-		.selpush NSMantissa2
-		.selpush NSMantissa3
-		.selpush NSExponent
-		.selpush NSStatus
-		ply
-		dex 								; the selector is in the frame now, not on the stack
-		.exitcmd
-
-; ************************************************************************************************
-;
-;						GP.CASE : push a copy of the selector to test against
-;
-; ************************************************************************************************
-
-CommandXCase: ;; [gp.case]
-		.entercmd
-		jsr 	SelectFindFrame 			; before phy, so a structure error reports honestly
-		phy
-		inx
-		ldy 	#1
-		.selpull NSMantissa0
-		.selpull NSMantissa1
-		.selpull NSMantissa2
-		.selpull NSMantissa3
-		.selpull NSExponent
-		.selpull NSStatus
-		ply
-		.exitcmd
-
-; ************************************************************************************************
-;
-;		GP.OTHER : nothing to do at all. It exists as a token because FixBranches needs somewhere
-;		for the last GP.CASE's .casenext to land, and because the case bodies above it branch to
-;		the GP.ENDSEL rather than falling through it.
-;
-; ************************************************************************************************
-
-CommandXOther: ;; [gp.other]
-		.entercmd
-		.exitcmd
-
-; ************************************************************************************************
-;
-;		GP.ENDSEL : drop the selector's frame. Reached three ways -- fallen out of the last case
-;		body, branched to by a .caseend, or branched to by the .casenext of a select with nothing
-;		matching and no GP.OTHER. All three want exactly this, which is why it is the target of
-;		every branch rather than the instruction after it.
-;
-; ************************************************************************************************
-
-CommandXEndSelect: ;; [gp.endsel]
-		.entercmd
-		jsr 	SelectFindFrame
-		jsr 	StackCloseFrame
-		.exitcmd
-
-; ************************************************************************************************
-;
-;		Same guard NEXT and GP.LOOP use: a well nested select has its own frame on top, so
-;		StackFindFrame would spend its time finding what is under its nose. Any other byte -- an
-;		abandoned FOR opened inside a case body, or the $FF stack-empty marker that raises the
-;		structure error for a GP.CASE with no GP.SELECT -- falls through to the general path,
-;		which discards the strays on the way down.
-;
-; ************************************************************************************************
-
-SelectFindFrame:
-		lda 	(runtimeStackPtr)
-		cmp 	#FRAME_SELECT
-		beq 	_SelFrameHere
-		lda 	#FRAME_SELECT
-		jmp 	StackFindFrame
-_SelFrameHere:
-		rts
-
-; ************************************************************************************************
-;
-;		0	GP.SELECT Marker 		[1]
-;		1 	Selector 				[6]		mantissa 0-3, exponent, status -- one whole number
-;											stack entry, copied out and back verbatim
-;
-; ************************************************************************************************
-
-		.send 	code
-
-; ************************************************************************************************
-;
-;									Changes and Updates
-;
-; ************************************************************************************************
-;
-;		Date			Notes
-;		==== 			=====
-;		17/08/26		Written.
 ;
 ; ************************************************************************************************
 ; ************************************************************************************************
@@ -2227,13 +1303,19 @@ _SelFrameHere:
 ;		workspace. Stopping is silent on purpose: FixBranches has already raised BLOCK MISMATCH
 ;		for the structural errors it can see, and there is nothing useful to report from here.
 ;
-;		WHY A SEPARATE OPCODE RATHER THAN gp.endsel. gp.endsel does exactly the right thing to a
-;		select frame, and emitting one before the GOTO would have cost nothing at all -- but
-;		FixBranches counts select nesting ON gp.select/gp.endsel (_FBCaseScan), so an extra one
-;		inside a case body captures that body's own .caseend and sends it to the wrong place. The
-;		unwind has to be a token the scanners do not count. It costs one vector slot, two bytes,
-;		in every compiled program; the handler itself is above GPBase and so is free to any
-;		program that has a GP block already -- and one with a GP.DO or GP.SELECT in it does.
+;		ONLY GP.DO OPENS A BLOCK FRAME NOW. GP.SELECT did until 1st September 2026, when its
+;		selector was restricted to a plain variable and the frame that kept an expression alive
+;		became unnecessary -- so a GOTO leaving a select has nothing to close, and neither the
+;		compiler nor FixBranches counts one any more. The two lines that recognised a select
+;		frame here went with it.
+;
+;		WHY A SEPARATE OPCODE RATHER THAN gp.loop. gp.loop does the right thing to a loop frame
+;		and emitting one before the GOTO would have cost nothing -- but FixBranches counts loop
+;		nesting on gp.do/gp.loop, so an extra one inside a loop body captures that body's own
+;		structure and sends its branches to the wrong place. The unwind has to be a token the
+;		scanners do not count. It costs one vector slot, two bytes, in every compiled program;
+;		the handler is above GPBase and so is free to any program that has a GP block already --
+;		and one with a GP.DO in it does.
 ;
 ; ************************************************************************************************
 
@@ -2254,12 +1336,9 @@ _CXULoop:
 		cmp 	#$FF 						; the stack-empty marker -- go no further
 		beq 	_CXUDone
 		and 	#$E0 						; the id is the upper 3 bits (frames.inc)
-		cmp 	#FRAME_LOOP & $E0
-		beq 	_CXUBlock
-		cmp 	#FRAME_SELECT & $E0
-		bne 	_CXUStray 					; a FOR or GOSUB frame: close it, but it is not a block
-_CXUBlock:
-		dec 	unwindLeft
+		cmp 	#FRAME_LOOP & $E0 			; GP.DO is the only block frame there is now --
+		bne 	_CXUStray 					; GP.SELECT stopped opening one on 01/09/26, and a
+		dec 	unwindLeft 					; FOR or GOSUB frame is closed but never counted
 _CXUStray:
 		jsr 	StackCloseFrame
 		lda 	unwindLeft

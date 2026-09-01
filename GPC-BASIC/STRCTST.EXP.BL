@@ -1,0 +1,143 @@
+## ***********************************************************************
+## **  STRCTST.EXP.BL -- STRCASE.INC.BL, seventeen cases.
+## **
+## **  THE FIRST RUN OF THIS FILE USED GP.UPPER / GP.LOWER / GP.TRIM /
+## **  GP.LTRIM / GP.RTRIM AS THE ORACLE, keyword against module, and every
+## **  case matched. Those keywords are gone now -- that is what the module
+## **  is for -- so what is left is the written-out expected answer for the
+## **  same seventeen fixtures.
+## **
+## **  Both the TEXT and the LENGTH are compared. They are not the same
+## **  test: every one of these routines rewrites the length byte, and a
+## **  string whose length says 9 but whose block still holds "both ends  "
+## **  prints correctly and is still wrong.
+## ***********************************************************************
+#SAVEAS "@:STRCTST.PRG"
+#SYMFILE "@:STRCTST.SYM"
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "STRCASE.INC.BL"
+
+T.FAILS = 0
+
+## =======================================================================
+## 0. CONTROL -- assignment COPIES rather than sharing a block. If it
+##    shared, T.GOT$ below would be the same block as T.SRC$ and half
+##    these cases would compare a string against itself.
+## =======================================================================
+T.A$ = "hello" : T.B$ = T.A$
+STRCASE.PTR = GP.STRPTR(T.A$) : STRCASE.MODE = STRCASE.UPPER
+GOSUB STRCASE.GO
+T.BAD = 0
+IF T.A$ <> "HELLO" THEN T.BAD = T.BAD + 1
+IF T.B$ <> "hello" THEN T.BAD = T.BAD + 10
+T.WANT$ = "HELLO/hello" : T.GOT$ = T.A$ + "/" + T.B$
+T.NAME$ = "CONTROL" : GOSUB T.REPORT
+
+## =======================================================================
+## 1..5  the five operations.
+## =======================================================================
+T.SRC$ = "Hello, World! 123 @#" : T.OP = STRCASE.UPPER
+T.WANT$ = "HELLO, WORLD! 123 @#" : T.NAME$ = "UPPER" : GOSUB T.RUN
+
+T.SRC$ = "Hello, World! 123 @#" : T.OP = STRCASE.LOWER
+T.WANT$ = "hello, world! 123 @#" : T.NAME$ = "LOWER" : GOSUB T.RUN
+
+T.SRC$ = "   both ends   " : T.OP = STRCASE.TRIM
+T.WANT$ = "both ends" : T.NAME$ = "TRIM" : GOSUB T.RUN
+
+T.SRC$ = "   leading only" : T.OP = STRCASE.LTRIM
+T.WANT$ = "leading only" : T.NAME$ = "LTRIM" : GOSUB T.RUN
+
+T.SRC$ = "trailing only   " : T.OP = STRCASE.RTRIM
+T.WANT$ = "trailing only" : T.NAME$ = "RTRIM" : GOSUB T.RUN
+
+## ---- and each trim leaves the OTHER end alone ----
+T.SRC$ = "   both ends   " : T.OP = STRCASE.LTRIM
+T.WANT$ = "both ends   " : T.NAME$ = "LTRIM.ONLY" : GOSUB T.RUN
+
+T.SRC$ = "   both ends   " : T.OP = STRCASE.RTRIM
+T.WANT$ = "   both ends" : T.NAME$ = "RTRIM.ONLY" : GOSUB T.RUN
+
+## =======================================================================
+## 8..14  the edges. Empty, all spaces, nothing to do, one character --
+##        none of which the routines treat as a special case, which is
+##        exactly why they are worth a fixture each.
+## =======================================================================
+T.SRC$ = "" : T.OP = STRCASE.TRIM
+T.WANT$ = "" : T.NAME$ = "EMPTY.TRIM" : GOSUB T.RUN
+
+T.SRC$ = "" : T.OP = STRCASE.UPPER
+T.WANT$ = "" : T.NAME$ = "EMPTY.UPPER" : GOSUB T.RUN
+
+T.SRC$ = "     " : T.OP = STRCASE.TRIM
+T.WANT$ = "" : T.NAME$ = "ALLSPACE" : GOSUB T.RUN
+
+T.SRC$ = "     " : T.OP = STRCASE.LTRIM
+T.WANT$ = "" : T.NAME$ = "ALLSPACE.L" : GOSUB T.RUN
+
+T.SRC$ = "     " : T.OP = STRCASE.RTRIM
+T.WANT$ = "" : T.NAME$ = "ALLSPACE.R" : GOSUB T.RUN
+
+T.SRC$ = " " : T.OP = STRCASE.TRIM
+T.WANT$ = "" : T.NAME$ = "ONE.SPACE" : GOSUB T.RUN
+
+T.SRC$ = "nothing to trim" : T.OP = STRCASE.TRIM
+T.WANT$ = "nothing to trim" : T.NAME$ = "NOOP.TRIM" : GOSUB T.RUN
+
+T.SRC$ = "x" : T.OP = STRCASE.UPPER
+T.WANT$ = "X" : T.NAME$ = "ONE.CHAR" : GOSUB T.RUN
+
+## ---- a SINGLE leading space is the CPY #1 boundary in the slide ----
+T.SRC$ = " one space in front" : T.OP = STRCASE.LTRIM
+T.WANT$ = "one space in front" : T.NAME$ = "LTRIM.ONE" : GOSUB T.RUN
+
+## =======================================================================
+## 17..18  LONG. 200 characters walks Y from 200 down, and the slide moves
+##         190 bytes -- neither of which a twenty character fixture goes
+##         anywhere near.
+## =======================================================================
+T.SRC$ = RPT$(97, 200) : T.OP = STRCASE.UPPER
+T.WANT$ = RPT$(65, 200) : T.NAME$ = "LONG.UPPER" : GOSUB T.RUN
+
+T.SRC$ = RPT$(32, 10) + RPT$(98, 190) : T.OP = STRCASE.LTRIM
+T.WANT$ = RPT$(98, 190) : T.NAME$ = "LONG.LTRIM" : GOSUB T.RUN
+
+## =======================================================================
+## 19. NEIGHBOURS. The module writes through a pointer, so a wrong length
+##     or an off-by-one walks into whatever the heap put next door.
+## =======================================================================
+T.GUARD1$ = "AAAAAAAAAA"
+T.SUBJ$ = "   middle   "
+T.GUARD2$ = "ZZZZZZZZZZ"
+STRCASE.PTR = GP.STRPTR(T.SUBJ$) : STRCASE.MODE = STRCASE.TRIM
+GOSUB STRCASE.GO
+T.BAD = 0
+IF T.SUBJ$ <> "middle" THEN T.BAD = T.BAD + 1
+IF T.GUARD1$ <> "AAAAAAAAAA" THEN T.BAD = T.BAD + 10
+IF T.GUARD2$ <> "ZZZZZZZZZZ" THEN T.BAD = T.BAD + 100
+T.WANT$ = "middle" : T.GOT$ = T.SUBJ$
+T.NAME$ = "NEIGHBOURS" : GOSUB T.REPORT
+
+PRINT "FAILS "; T.FAILS
+PRINT "DONE"
+END
+
+## ***********************************************************************
+## **  helpers
+## ***********************************************************************
+
+## ---- T.SRC$ through the module, against T.WANT$ ----
+T.RUN:
+    T.GOT$ = T.SRC$
+    STRCASE.PTR = GP.STRPTR(T.GOT$) : STRCASE.MODE = T.OP
+    GOSUB STRCASE.GO
+    T.BAD = 0
+    IF LEN(T.WANT$) <> LEN(T.GOT$) THEN T.BAD = T.BAD + 10
+    IF T.WANT$ <> T.GOT$ THEN T.BAD = T.BAD + 1
+    GOSUB T.REPORT
+    RETURN
+
+T.REPORT:
+    IF T.BAD = 0 THEN PRINT "PASS "; T.NAME$
+    IF T.BAD <> 0 THEN PRINT "FAIL "; T.NAME$; " BAD "; T.BAD; " WANT["; T.WANT$; "] GOT["; T.GOT$; "]" : T.FAILS = T.FAILS + 1
+    RETURN

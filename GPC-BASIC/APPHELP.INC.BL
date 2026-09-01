@@ -5,7 +5,6 @@
 ## **
 ## **      APPHELP.STARTUP     remember the screen the user had
 ## **      APPHELP.RESTORE     put it back, on the way out
-## **      APPHELP.PANEL.SAVE  a screen rectangle to a file
 ## **      APPHELP.PANEL.LOAD  and back again, where it came from
 ## **      APPHELP.PANEL.PUT   or somewhere else
 ## **
@@ -46,8 +45,6 @@
 
 ## Where a RAM bank appears, and the size of GP.STASH's self-describing
 ## header (w, h, x, y).
-#DEFINE APPHELP.WINDOW $A000
-#DEFINE APPHELP.HEADER 4
 
 GOTO APPHELP.SKIP
 
@@ -95,59 +92,13 @@ APPHELP.RESTORE:
     COLOR APPHELP.COLOUR AND 15, INT(APPHELP.COLOUR / 16)
     RETURN
 
-## APPHELP.PANEL.SAVE -- a screen rectangle to a file.
+## THE PANEL ROUTINES MOVED TO STASH.INC.BL on 2026-09-01, as
+## STASH.FILE.SAVE, STASH.FILE.LOAD and STASH.FILE.PUT. They were
+## APPHELP.PANEL.SAVE / .LOAD / .PUT, and they were built on GP.STASH and
+## GP.RESTR -- which are gone, moved out of the GP runtime block into
+## GP.ASM for the 329 bytes they cost every program that used any GP
+## keyword at all. Keeping a BSAVE wrapper here would have meant APPHELP
+## dragging the whole block in behind it.
 ##
-##   in   APPHELP.FILE$   the name
-##        APPHELP.BANK    a RAM bank to stage it through
-##        APPHELP.X APPHELP.Y APPHELP.W APPHELP.H
-##
-## GP.STASH already writes a self-describing block -- four header bytes
-## (w, h, x, y) then the cells -- so the FILE is self-describing too, and
-## loading it back needs nothing but the name. That is the flaw dotBASIC
-## admits to in its own .CUT/.PASTE, which "requires correctly
-## re-describing the width and height of each cut".
-##
-## This is why there is no GP.END keyword. The plan reserved one so BSAVE
-## could be told where the stash ended; the length is w * h * 2 + 4, which
-## BASIC can work out for itself, so the token was never spent.
-##
-## BSAVE's end address is EXCLUSIVE, as the KERNAL's save always has been,
-## so this writes exactly the header and the cells and no padding.
-##
-## A bank is 8K and a cell is two bytes, so at most 4094 cells fit. GP.STASH
-## checks that per row, before the write that would cross out of the bank.
-
-APPHELP.PANEL.SAVE:
-    IF APPHELP.DEV = 0 THEN APPHELP.DEV = 8
-    GP.STASH APPHELP.BANK, APPHELP.X, APPHELP.Y, APPHELP.W, APPHELP.H
-    APPHELP.LAST = APPHELP.WINDOW + APPHELP.HEADER + APPHELP.W * APPHELP.H * 2
-    BSAVE APPHELP.FILE$, APPHELP.DEV, APPHELP.BANK, APPHELP.WINDOW, APPHELP.LAST
-    RETURN
-
-## APPHELP.PANEL.LOAD -- put a saved rectangle back where it came from.
-##
-##   in   APPHELP.FILE$   APPHELP.BANK
-##
-## No geometry: it is in the file's own header.
-
-APPHELP.PANEL.LOAD:
-    IF APPHELP.DEV = 0 THEN APPHELP.DEV = 8
-    BLOAD APPHELP.FILE$, APPHELP.DEV, APPHELP.BANK, APPHELP.WINDOW
-    GP.RESTR APPHELP.BANK
-    RETURN
-
-## APPHELP.PANEL.PUT -- the same, pasted somewhere else.
-##
-##   in   APPHELP.FILE$   APPHELP.BANK   APPHELP.X   APPHELP.Y
-##
-## Which makes a saved panel a reusable sprite for the text screen: draw
-## it once, save it, stamp it wherever you like afterwards.
-
-APPHELP.PANEL.PUT:
-    IF APPHELP.DEV = 0 THEN APPHELP.DEV = 8
-    BLOAD APPHELP.FILE$, APPHELP.DEV, APPHELP.BANK, APPHELP.WINDOW
-    GP.RESTR APPHELP.BANK, APPHELP.X, APPHELP.Y
-    RETURN
-
 APPHELP.SKIP:
 #ENDIF

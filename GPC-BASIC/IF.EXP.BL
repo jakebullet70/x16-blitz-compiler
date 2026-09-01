@@ -63,9 +63,9 @@ END
 ## **  IFs nest freely -- inside each other, inside a GP.CASE body, and
 ## **  inside a GP.DO loop.
 ## **
-## **  Unlike GP.SELECT there is NO frame to release, so a GOTO out of a
-## **  GP.IF is safe: GP.ENDIF only marks where the block ends, it does no
-## **  work.  It is still REQUIRED -- without it the compile stops with
+## **  There is NO frame to release (GP.SELECT is the same these days), so
+## **  a GOTO out of a GP.IF is safe: GP.ENDIF only marks where the block
+## **  ends, it does no work.  It is still REQUIRED -- without it the compile stops with
 ## **  STRUCTURE IMBALANCE rather than guessing where the block ended.
 ## ***********************************************************************
 

@@ -1,0 +1,81 @@
+## ***********************************************************************
+## **
+## **  STASHFILE.INC.BL -- a saved text rectangle, through a file.
+## **
+## **      STASH.FILE.SAVE   a rectangle of the screen, out to a file
+## **      STASH.FILE.LOAD   a saved file, back where it came from
+## **      STASH.FILE.PUT    a saved file, pasted somewhere else
+## **
+## **  REQUIRES, and does not #INCLUDE for you:
+## **      GPB.INC.BL      GP.ASM
+## **      STASH.INC.BL    which does the actual copying
+## **  and, like it, a #SYMFILE in your program. See that file's header.
+## **
+## **  Usage:
+## **      STASH.BANK = 8 : STASH.FILE$ = "PANEL.BIN"
+## **      STASH.X = 10 : STASH.Y = 4 : STASH.W = 30 : STASH.H = 8
+## **      GOSUB STASH.FILE.SAVE
+## **      ...
+## **      GOSUB STASH.FILE.LOAD
+## **
+## **   in   STASH.FILE$    the name
+## **        STASH.DEV      the device. 0 means 8, the usual drive
+## **        STASH.BANK     the bank to stage through
+## **        and, for SAVE, the geometry STASH.SAVE wants
+## **
+## **  A SEPARATE FILE FROM STASH.INC.BL ON PURPOSE. A BASL module has no
+## **  dead code elimination -- every routine it holds is compiled into
+## **  every program that includes it, called or not -- and these three are
+## **  127 bytes. A dialog that saves the screen to a bank and puts it back
+## **  never goes near a disk, and should not pay for one.
+## **
+## **  THE FILE IS SELF-DESCRIBING BECAUSE THE STASH IS. The four header
+## **  bytes go out with the cells, so loading one back needs nothing but
+## **  the name -- which is the flaw dotBASIC admits to in its own
+## **  .CUT/.PASTE, "requires correctly re-describing the width and height
+## **  of each cut".
+## **
+## **  BSAVE's end address is EXCLUSIVE, as the KERNAL's save always has
+## **  been, so this writes the header and the cells and no padding. The
+## **  length is w * h * 2 + 4, which BASIC works out for itself -- and
+## **  that is why no GP.END keyword was ever spent on telling BSAVE where
+## **  a stash ended.
+## **
+## **  These were APPHELP.PANEL.SAVE / .LOAD / .PUT. They lived there
+## **  because the stash was a GP keyword and APPHELP was where the screen
+## **  helpers went; now that the stash is STASH.INC.BL, so are they, and
+## **  APPHELP no longer drags the GP block in behind a BSAVE.
+## **
+## **  The STASH.FILE.* names belong to this file; the rest of STASH.* is
+## **  STASH.INC.BL's.
+## **
+## ***********************************************************************
+#IFNDEF STASHFILE.DEFS
+#DEFINE STASHFILE.DEFS 1
+
+GOTO STASHFILE.MODULE.END
+
+STASH.FILE.SAVE:
+    IF STASH.DEV = 0 THEN STASH.DEV = 8
+    GOSUB STASH.SAVE : IF STASH.OK = 0 THEN RETURN
+    STASH.LAST = STASH.WINDOW + STASH.HEADER + STASH.W * STASH.H * 2
+    BSAVE STASH.FILE$, STASH.DEV, STASH.BANK, STASH.WINDOW, STASH.LAST
+    RETURN
+
+STASH.FILE.LOAD:
+    IF STASH.DEV = 0 THEN STASH.DEV = 8
+    BLOAD STASH.FILE$, STASH.DEV, STASH.BANK, STASH.WINDOW
+    STASH.MOVE = 0 : GOSUB STASH.RESTORE : RETURN
+
+## ---- the same file stamped anywhere, which makes a saved panel a sprite
+## ---- for the text screen: draw it once, save it, put it wherever. MOVE is
+## ---- cleared again on the way out, because it is an input a caller sets
+## ---- once and would otherwise leak into the next restore.
+
+STASH.FILE.PUT:
+    IF STASH.DEV = 0 THEN STASH.DEV = 8
+    BLOAD STASH.FILE$, STASH.DEV, STASH.BANK, STASH.WINDOW
+    STASH.MOVE = 1 : GOSUB STASH.RESTORE : STASH.MOVE = 0 : RETURN
+
+STASHFILE.MODULE.END:
+#ENDIF

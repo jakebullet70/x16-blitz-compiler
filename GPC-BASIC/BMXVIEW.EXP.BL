@@ -15,17 +15,22 @@
 ## **  string descriptor, and GP.CALL replaces staging A/X/Y/C through
 ## **  $030C..$030F and SYSing.
 ## **
-## **  Build:  copy GPB.INC.BL, APPHELP.INC.BL, BMX.INC.BL and this file
-## **          into testing/, then
+## **  Build:  copy GPB.INC.BL, APPHELP.INC.BL, BMX.INC.BL, STRCASE.INC.BL
+## **          and this file into testing/, then
 ## **            python source/gpc/build_basl.py BMXVIEW.EXP.BL BMXVIEW.PRG
 ## **          and compile BMXVIEW.PRG with GPC.BIN. Put some .BMX
 ## **          files on the same drive -- samples/BMXVIEWER/SAMPLES has 30.
 ## **
 ## ***********************************************************************
+## STRCASE.INC.BL reaches BASIC's variables through {VAR}, so this program
+## needs a #SYMFILE -- BASLOAD's own record of the names it crunched. Both
+## directives go BEFORE the #INCLUDEs; a #SYMFILE after one is refused.
+#SAVEAS "@:BMXVIEW.PRG"
+#SYMFILE "@:BMXVIEW.SYM"
 #INCLUDE "GPB.INC.BL"
+#INCLUDE "STRCASE.INC.BL"
 #INCLUDE "APPHELP.INC.BL"
 #INCLUDE "BMX.INC.BL"
-#SAVEAS "@:BMXVIEW.PRG"
 
 #DEFINE VIEW.MODE 128
 
@@ -38,7 +43,12 @@ VIEW.MAIN:
     PRINT
     INPUT "BMX FILE (RETURN ALONE TO STOP)";BMX.FILE$
     IF GP.ISEMPTY(BMX.FILE$) THEN GOTO VIEW.QUIT
-    GP.UPPER BMX.FILE$
+## ---- GP.UPPER was a keyword and is STRCASE.INC.BL now. It rewrites the
+## ---- string where it lies, through the address GP.STRPTR hands over, so
+## ---- this is still no copy and no allocation -- only two lines instead
+## ---- of one, because a BASL routine cannot be passed a variable.
+    STRCASE.PTR = GP.STRPTR(BMX.FILE$) : STRCASE.MODE = STRCASE.UPPER
+    GOSUB STRCASE.GO
     IF NOT GP.CONTAINS(BMX.FILE$, ".") THEN BMX.FILE$ = BMX.FILE$ + ".BMX"
 
     GOSUB BMX.OPEN

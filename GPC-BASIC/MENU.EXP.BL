@@ -6,7 +6,7 @@
 ## **  MENUHELP.*  the menu itself, in BASIC
 ## **  THEME.*     colour roles, in BASIC data
 ## **  APPHELP.*   leave the user's screen as you found it
-## **  GP.STASH    a dialog over the display, and the display back
+## **  STASH.INC.BL  a dialog over the display, and the display back
 ## **
 ## **  Build:  copy GPB.INC.BL, THEME.INC.BL, APPHELP.INC.BL,
 ## **          MENUHELP.INC.BL and this file
@@ -22,10 +22,15 @@
 ## **  calls them.
 ## **
 ## ***********************************************************************
+## STASH.INC.BL reaches BASIC's variables from assembly through {VAR}, and
+## that needs BASLOAD's record of the crunched names. Without this line the
+## compile stops with "NO SYMBOL FILE FOR {}".
+#SYMFILE "@:MENU.SYM"
 #INCLUDE "GPB.INC.BL"
 #INCLUDE "THEME.INC.BL"
 #INCLUDE "APPHELP.INC.BL"
 #INCLUDE "MENUHELP.INC.BL"
+#INCLUDE "STASH.INC.BL"
 #SAVEAS "@:MENU.PRG"
 
 ## #DEFINE substitutes at translation time, so these cost nothing at all --
@@ -84,24 +89,29 @@ MENU.DRAW:
     GP.FILL 0, 0, APPHELP.COLS, APPHELP.ROWS, ASC(" "), THEME.CLR(THEME.PAGE)
     GP.FILL 0, 0, APPHELP.COLS, 1, ASC(" "), THEME.CLR(THEME.TITLE)
     GP.PRINTAT 2, 0, "GP.BASIC DEMONSTRATION", THEME.CLR(THEME.TITLE)
-    GP.BOX MENU.LEFT - 1, MENU.TOP - 1, MENU.WIDE + 2, MENU.COUNT + 2, 2, THEME.CLR(THEME.BORDER)
+    GP.BOX MENU.LEFT - 1, MENU.TOP - 1, MENU.WIDE + 2, MENU.COUNT + 2, 1, THEME.CLR(THEME.BORDER)
     GP.PRINTAT 2, APPHELP.ROWS - 1, "CURSOR KEYS, RETURN, OR N L O Q", THEME.CLR(THEME.DIMMED)
     RETURN
 
-## ---- A dialog over the display. GP.STASH copies what is underneath into
-## ---- a RAM bank and GP.RESTR puts it back, so the application never has
-## ---- to redraw itself -- which is the entire reason the pair exists.
-## ---- The stash carries its own w, h, x and y, so the restore is told
-## ---- nothing but the bank.
+## ---- A dialog over the display. STASH.SAVE copies what is underneath
+## ---- into a RAM bank and STASH.RESTORE puts it back, so the application
+## ---- never has to redraw itself -- which is the entire reason the pair
+## ---- exists. The stash carries its own w, h, x and y, so the restore is
+## ---- told nothing but the bank.
+## ----
+## ---- This was GP.STASH / GP.RESTR until 2026-09-01, when they moved out
+## ---- of the GP runtime block and into GP.ASM (GPC-BASIC/STASH.INC.BL).
 
 MENU.DIALOG:
-    GP.STASH 1, 20, 10, 36, 5
+    STASH.BANK = 1
+    STASH.X = 20 : STASH.Y = 10 : STASH.W = 36 : STASH.H = 5
+    GOSUB STASH.SAVE
     GP.FILL 20, 10, 36, 5, ASC(" "), THEME.CLR(THEME.WARN)
-    GP.BOX 20, 10, 36, 5, 4, THEME.CLR(THEME.WARN)
+    GP.BOX 20, 10, 36, 5, 3, THEME.CLR(THEME.WARN)
     GP.PRINTAT 22, 12, "CHOSE" + MENUHELP.ITEM$(MENU.PICK), THEME.CLR(THEME.WARN)
     GP.PRINTAT 22, 13, "PRESS ANY KEY", THEME.CLR(THEME.WARN)
 MENU.DIALOG.WAIT:
     GET MENU.KEY$
     IF MENU.KEY$ = "" THEN GOTO MENU.DIALOG.WAIT
-    GP.RESTR 1
+    GOSUB STASH.RESTORE
     RETURN

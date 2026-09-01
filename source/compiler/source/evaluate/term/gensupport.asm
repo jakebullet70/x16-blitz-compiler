@@ -71,6 +71,29 @@ _ORCDefault:
 
 ; ************************************************************************************************
 ;
+;		Push the constant 1, unconditionally, consuming nothing. It is a generator action rather
+;		than an argument: a COMPOSITE keyword uses it to supply an argument the programmer did
+;		not write, so that one keyword can run another's handler.
+;
+;		GP.CHAR x,y,char is the whole reason it exists -- it is GP.FILL x,y,1,1,char, and these
+;		are the 1s. The alternative was a GP.CHAR handler in the GP runtime block, and that block
+;		is all-or-nothing with 29 bytes left in it, so anything real would have crossed a page
+;		and charged every program using ANY GP keyword 256 bytes -- twice, once in the object and
+;		once off the bottom of its workspace.
+;
+;		It lives here, above ObjectBase, where compiler code is thrown away when the object is
+;		written. These eight bytes cost a compiled program nothing at all.
+;
+; ************************************************************************************************
+
+PushOneCompile:
+		lda 	#1
+		jsr 	PushIntegerA
+		clc
+		rts
+
+; ************************************************************************************************
+;
 ;		As OptionalParameterCompile, but for a trailing COLOUR argument (RECT/LINE/FRAME/OVAL/
 ;		RING). A palette index is 0..255, so 255 is a real colour and cannot double as the
 ;		"omitted" sentinel the way it can for sprite fields. The default is 256 instead -- out of
@@ -162,63 +185,46 @@ NotUnaryCompile:
 
 ; ************************************************************************************************
 ;
-;		A STRING VARIABLE, for the in-place statements GP.TRIM / GP.PAD / GP.UPPER / GP.LOWER.
+;		StringVariableCompile WAS HERE, and went with GP.UPPER / GP.LOWER / GP.TRIM / GP.LTRIM /
+;		GP.RTRIM on 1st September 2026 -- its only callers. They are GPC-BASIC/STRCASE.INC.BL now.
 ;
-;		These modify the string block the value points at, so handing them anything that is not a
-;		variable is a live hazard rather than a nuisance: a LITERAL is pushed by CommandPushS
-;		pointing INTO THE P-CODE, so GP.UPPER "abc" would rewrite the running program, and a
-;		temporary (GP.UPPER A$+B$) would edit a block about to be reclaimed. Both would appear to
-;		work. So require a plain variable at compile time, exactly as FOR requires one for its
-;		index, and it cannot be expressed at all.
+;		What it did is worth recording, because nothing replaces it. Those five modify the string
+;		block the value points at, so handing them anything that is not a variable was a live
+;		hazard rather than a nuisance: a LITERAL is pushed by CommandPushS pointing INTO THE
+;		P-CODE, so GP.UPPER "abc" would rewrite the running program, and a temporary
+;		(GP.UPPER A$+B$) would edit a block about to be reclaimed. Both would appear to work. So
+;		it required a plain variable at COMPILE time, exactly as FOR requires one for its index,
+;		and the hazard could not be expressed at all.
 ;
-;		GetReferenceTerm locates (or creates) it and hands back the address in YX and the type in
-;		A; GetSetVariable with carry CLEAR then emits the read, so the runtime handler gets the
-;		block address on the stack and needs no checking of its own. Array elements are fine and
-;		deliberately allowed -- GetReferenceTerm resolves those too.
+;		A GOSUB has no call site for the compiler to check, so STRCASE.INC.BL cannot have that
+;		guarantee -- it takes a GP.STRPTR address and has no way to know where the address came
+;		from. Its header says "do not pass a literal" in as many words. That is the one thing
+;		moving those five out of the block genuinely gave up, and it should not be forgotten
+;		merely because it is now a paragraph instead of a routine.
 ;
 ; ************************************************************************************************
 
-StringVariableCompile:
-		jsr 	GetNextNonSpace 			; a variable starts with a letter; a quote or a digit
-		jsr 	CharIsAlpha 				; cannot, which is what rejects literals outright
-		bcc 	_SVCFail
-		jsr 	GetReferenceTerm 			; locate it -- address in YX, type in A
-		pha
-		and 	#NSSTypeMask 				; and it has to be a string
-		cmp 	#NSSString
-		bne 	_SVCFailPull
-		pla
-		clc 								; carry clear = read, so the VALUE is pushed
-		jsr 	GetSetVariable
-		clc
-		rts
-
-_SVCFailPull:
-		pla
-_SVCFail:
-		.error_syntax
-
 ; ************************************************************************************************
 ;
-;		A STRING ARRAY, written with EMPTY parentheses -- GP.SORT A$(). Pushes the array's BASE
+;		AN ARRAY, written with EMPTY parentheses -- GP.ARRPTR(A$()). Pushes the array's BASE
 ;		address and nothing else.
 ;
 ;		The parentheses are required and are not decoration: in BASIC A$ and A$() are different
-;		variables, so accepting the bare name would find the SCALAR and silently sort nothing at
-;		all. ExtractVariableName already sets NSSArray when it sees the "(" and consumes it, so
-;		all that is left here is to insist on the ")".
+;		variables, so accepting the bare name would find the SCALAR and silently hand back the
+;		wrong thing. ExtractVariableName already sets NSSArray when it sees the "(" and consumes
+;		it, so all that is left here is to insist on the ")".
 ;
 ;		Deliberately does NOT emit PCD_ARRAY1 -- that is the keyword that turns a base address
 ;		plus subscripts into an ELEMENT address, and the whole point here is to hand the runtime
 ;		the array itself. Pushing the base is the same idiom GetReferenceTerm uses just before it
 ;		emits that keyword: pretend the slot is an int16 and read it.
 ;
+;		THE ELEMENT TYPE IS NOT CHECKED, and that is deliberate: GP.ARRPTR wants the address of a
+;		float array just as much as a string one. There was a StringArrayCompile beside this, the
+;		same routine with the type test added, and it went with GP.SORT on 1st September 2026 --
+;		the type check moved into GPC-BASIC/SORT.INC.BL, which reads the array header itself.
+;
 ; ************************************************************************************************
-
-;		AnyArrayCompile is the same thing with the element-type check dropped -- GP.ARRPTR wants
-;		the address of a FLOAT array just as much as a string one. Deliberately duplicated rather
-;		than factored behind a flag: compiler code is not copied into the object, so the dozen
-;		bytes are free, and a shared routine would need the flag in storage to survive the jsrs.
 
 AnyArrayCompile:
 		jsr 	GetNextNonSpace 			; a variable starts with a letter
@@ -227,20 +233,6 @@ AnyArrayCompile:
 		jsr 	ExtractVariableName 		; name in YX, type bits in X, "(" consumed if present
 		cpx 	#0
 		bpl 	SACFail 					; no "(" at all, so it is a scalar, not an array
-		bra 	SACParens
-
-StringArrayCompile:
-		jsr 	GetNextNonSpace 			; a variable starts with a letter
-		jsr 	CharIsAlpha
-		bcc 	SACFail
-		jsr 	ExtractVariableName 		; name in YX, type bits in X, "(" consumed if present
-		cpx 	#0
-		bpl 	SACFail 					; no "(" at all, so it is a scalar, not an array
-		txa
-		and 	#NSSTypeMask
-		cmp 	#NSSString
-		bne 	SACFail 					; and it has to be a string array
-SACParens:
 		;
 		phy 								; hold the name over the ")" check
 		phx

@@ -59,10 +59,28 @@
 ;		See TODO.md, "Growing the object buffer", for the rest of that story: the buffer binds
 ;		before the run side does, and has since well before GP.ASM existed.
 ;
+;
+;		THE FOUR LIMITS BELOW ARE AT THEIR ARCHITECTURAL MAXIMUM and cannot be raised further
+;		without widening an index. Every subscript here is count, count*2, count*4 or count*8
+;		held in X, so the last entry of each table has to end at or below 255: fixups index
+;		count*2 (127 max), locals count*4 (63 max), labels count*8 (31 max). The "cmp #MAX /
+;		bcs too many" tests reject the count that would overflow, so the constants are one
+;		past those.
+;
+;		THEY WERE 96 / 16 / 32 UNTIL SORT.INC.BL, which is the first real routine written in
+;		GP.ASM rather than a straight-line renderer: 25 labels and 31 references to them, so
+;		it failed to assemble with OUT OF MEMORY at the label table. Sixteen labels was never
+;		a considered figure -- it was enough for the two loops in samples/editor and no more.
+;
+;		THE 416 BYTES THEY COST COME OFF THE POOL, which is the total inline assembly one
+;		program may hold: 7,456 bytes -> 7,040. That is the right trade. The pool has never
+;		been close to full -- the editor's two renderers together are about 250 bytes -- while
+;		the label cap was hit by the first routine that had a subroutine in it.
+;
 ASM_MAX_BLOCKS = 32 						; GP.ASM blocks in one program
-ASM_MAX_FIXUPS = 96 						; blob calls + label references + {VAR} references
-ASM_MAX_LABELS = 16 						; labels in ONE block -- they do not cross GP.ENDASM
-ASM_MAX_LOCALS = 32 						; label references in one block, awaiting resolution
+ASM_MAX_FIXUPS = 128 						; blob calls + label references + {VAR} references
+ASM_MAX_LABELS = 32 						; labels in ONE block -- they do not cross GP.ENDASM
+ASM_MAX_LOCALS = 64 						; label references in one block, awaiting resolution
 ASM_SYM_MAX    = 64 						; longest name {VAR} can carry -- BASLOAD's own limit
 											; on significant characters, so a name it accepted
 											; always fits here

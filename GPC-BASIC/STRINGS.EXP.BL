@@ -5,22 +5,26 @@
 ## **  GP.INSTR / GP.STRPTR          functions
 ## **  GP.CONTAINS / GP.ISEMPTY      composite -- no runtime code
 ## **  GP.HIBYTE / GP.LOBYTE         composite -- splitting an address
-## **  GP.TRIM / GP.LTRIM / GP.RTRIM in-place statements
-## **  GP.UPPER / GP.LOWER           in-place statements
+## **  STRCASE.GO                    BASL+ASM, from STRCASE.INC.BL:
+## **                                  TRIM / LTRIM / RTRIM / UPPER / LOWER
 ## **  STRHELP.PADR / PADL / PADC     BASL, from STRHELP.INC.BL
 ## **  STRHELP.REPLACE               BASL, from STRHELP.INC.BL
 ## **
-## **  Build:  copy GPC-BASIC/GPB.INC.BL, GPC-BASIC/STRHELP.INC.BL and this
-## **          file into testing/, then
+## **  Build:  copy GPC-BASIC/GPB.INC.BL, GPC-BASIC/STRHELP.INC.BL,
+## **          GPC-BASIC/STRCASE.INC.BL and this file into testing/, then
 ## **            python source/gpc/build_basl.py STRINGS.EXP.BL STRINGS.PRG
 ## **          and compile STRINGS.PRG with GPC.BIN.
 ## **
 ## **  Compile-only: the ROM cannot RUN a PRG containing GP tokens.
 ## **
 ## ***********************************************************************
+## STRCASE.INC.BL reaches BASIC's variables through {VAR}, so this program
+## needs a #SYMFILE. Both directives go BEFORE the #INCLUDEs.
+#SAVEAS "@:STRINGS.PRG"
+#SYMFILE "@:STRINGS.SYM"
 #INCLUDE "GPB.INC.BL"
 #INCLUDE "STRHELP.INC.BL"
-#SAVEAS "@:STRINGS.PRG"
+#INCLUDE "STRCASE.INC.BL"
 
 ## NOTE ON NAMES: the search cursor below is HIT, not POS -- POS is a BASIC
 ## keyword ($B9) and BASLOAD tokenises it as one, so "POS = 1" compiles to
@@ -66,26 +70,52 @@ SPACES$ = "   "
 PRINT "ISEMPTY EMPTY  ->"; GP.ISEMPTY(NOTHING$)
 PRINT "ISEMPTY SPACES ->"; GP.ISEMPTY(SPACES$)
 
-## ---- A STRING OF SPACES IS NOT EMPTY. GP.TRIM it first if that is
-## ---- what you meant -- which is the next section.
+## ---- A STRING OF SPACES IS NOT EMPTY. Trim it first if that is what you
+## ---- meant -- which is the next section.
 
-GP.TRIM SPACES$
+STRCASE.PTR = GP.STRPTR(SPACES$) : STRCASE.MODE = STRCASE.TRIM
+GOSUB STRCASE.GO
 PRINT "  after TRIM   ->"; GP.ISEMPTY(SPACES$)
 
-## ---- 2. the three trims.  GP.TRIM does both ends, GP.LTRIM the left
-## ---- (leading spaces), GP.RTRIM the right (trailing spaces).  All three
-## ---- work in place, so they take a string VARIABLE, never a literal.
+## ---- 2. the trims.  TRIM does both ends, LTRIM the left (leading
+## ---- spaces), RTRIM the right (trailing spaces).
+## ----
+## ---- THESE WERE KEYWORDS -- GP.TRIM, GP.LTRIM, GP.RTRIM, GP.UPPER,
+## ---- GP.LOWER -- and are STRCASE.INC.BL now, GP.ASM driven by
+## ---- GP.STRPTR. They were 188 bytes of the GP runtime block, which is
+## ---- all or nothing, in every GP program whether it touched a string or
+## ---- not. Now only this one pays.
+## ----
+## ---- The string still goes in as an ADDRESS and is still rewritten
+## ---- where it lies, so nothing is copied and nothing is allocated. Set
+## ---- BOTH inputs every time: STRCASE.MODE is an ordinary variable, so a
+## ---- call that forgets it repeats whatever the last one did.
+## ----
+## ---- PASS A VARIABLE, NEVER A LITERAL. GP.STRPTR("  both  ") is the
+## ---- address of that text inside the P-CODE, and trimming it would edit
+## ---- the program. The keyword form could not be misused this way -- the
+## ---- compiler insisted on a variable -- and a GOSUB cannot.
 
-BOTH$ = "  both  " : GP.TRIM  BOTH$ : PRINT "TRIM  ["; BOTH$; "]"
-LEAD$ = "  left  " : GP.LTRIM LEAD$ : PRINT "LTRIM ["; LEAD$; "]"
-TRAIL$ = "  right  " : GP.RTRIM TRAIL$ : PRINT "RTRIM ["; TRAIL$; "]"
+BOTH$ = "  both  "
+STRCASE.PTR = GP.STRPTR(BOTH$) : STRCASE.MODE = STRCASE.TRIM : GOSUB STRCASE.GO
+PRINT "TRIM  ["; BOTH$; "]"
+
+LEAD$ = "  left  "
+STRCASE.PTR = GP.STRPTR(LEAD$) : STRCASE.MODE = STRCASE.LTRIM : GOSUB STRCASE.GO
+PRINT "LTRIM ["; LEAD$; "]"
+
+TRAIL$ = "  right  "
+STRCASE.PTR = GP.STRPTR(TRAIL$) : STRCASE.MODE = STRCASE.RTRIM : GOSUB STRCASE.GO
+PRINT "RTRIM ["; TRAIL$; "]"
 
 ## ---- 3. case.  A-Z only: digits, punctuation and PETSCII graphics are
 ## ---- left exactly as they were.
 
 WORD$ = "Mixed Case 42!"
-GP.UPPER WORD$ : PRINT "UPPER ["; WORD$; "]"
-GP.LOWER WORD$ : PRINT "LOWER ["; WORD$; "]"
+STRCASE.PTR = GP.STRPTR(WORD$) : STRCASE.MODE = STRCASE.UPPER : GOSUB STRCASE.GO
+PRINT "UPPER ["; WORD$; "]"
+STRCASE.PTR = GP.STRPTR(WORD$) : STRCASE.MODE = STRCASE.LOWER : GOSUB STRCASE.GO
+PRINT "LOWER ["; WORD$; "]"
 
 ## ---- 4. padding lives in BASL, not in the runtime.  PAD is left
 ## ---- justify, PADL right justify, PADC centre.  An in-place ASM

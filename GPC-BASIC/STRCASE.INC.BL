@@ -1,0 +1,246 @@
+## ***********************************************************************
+## **
+## **  STRCASE.INC.BL -- case and trim, rewriting a string IN PLACE.
+## **
+## **      STRCASE.GO      do STRCASE.MODE to the string at STRCASE.PTR
+## **
+## **  Usage:
+## **      #SYMFILE "@:MYPROG.SYM"          <- and it is NOT optional
+## **      #INCLUDE "STRCASE.INC.BL"
+## **
+## **      STRCASE.PTR = GP.STRPTR(LINE$)
+## **      STRCASE.MODE = STRCASE.RTRIM
+## **      GOSUB STRCASE.GO
+## **
+## **   in   STRCASE.PTR    GP.STRPTR of the string to work on
+## **        STRCASE.MODE   one of the five constants below
+## **
+## **  There is no output: the string itself is what changed.
+## **
+## **      STRCASE.UPPER   a-z -> A-Z, everything else untouched
+## **      STRCASE.LOWER   A-Z -> a-z, everything else untouched
+## **      STRCASE.TRIM    spaces off BOTH ends
+## **      STRCASE.LTRIM   spaces off the LEADING end
+## **      STRCASE.RTRIM   spaces off the TRAILING end
+## **
+## **  These were GP.UPPER, GP.LOWER, GP.TRIM, GP.LTRIM and GP.RTRIM. They
+## **  were 176 bytes of the GP runtime block, which is ALL OR NOTHING --
+## **  every byte written into the object AND taken off the bottom of the
+## **  workspace, for any program that uses one GP keyword -- and outside
+## **  their own example file they had exactly one caller in the whole
+## **  tree. Moving them took ObjectBase $3d00 -> $3c00: 512 bytes back for
+## **  every GP program, sorting, drawing or otherwise.
+## **
+## **  THE ARGUMENT IS AN ADDRESS, AND THAT IS THE WHOLE POINT. A BASL
+## **  subroutine cannot be passed a variable, and the obvious workaround
+## **  -- copy the caller's string in, work on the copy, copy it back -- is
+## **  two allocations and two copies per call, which is exactly the heap
+## **  traffic these were written in assembly to avoid. GP.STRPTR hands
+## **  over the block instead and the assembly rewrites it where it lies,
+## **  so nothing is allocated and nothing moves. That is also why
+## **  GP.STRPTR stays a keyword: it is the only thing that turns a
+## **  variable into something a module can reach.
+## **
+## **  DO NOT PASS A LITERAL. GP.STRPTR("hello") is the address of the
+## **  string inside the P-CODE, so upper-casing it edits the program
+## **  rather than a variable, and the edit survives to the next time that
+## **  line runs. The keywords could not be misused this way -- the
+## **  compiler enforced a string VARIABLE at the call site
+## **  (StringVariableCompile) -- and a GOSUB has no equivalent, so this is
+## **  the one thing the move genuinely gives up. Pass a variable.
+## **
+## **  STRCASE.MODE IS STICKY. It is an ordinary variable, not an argument,
+## **  so a call that forgets to set it silently does whatever the previous
+## **  one did. Set both inputs on every call. SORT.DESCEND and STASH.MOVE
+## **  behave the same way and say so for the same reason.
+## **
+## **  ONE BLOB, FIVE MODES, and that is a size decision: each operation
+## **  needs the same four instructions to get the pointer into zero page
+## **  first, and five separate blocks would write them five times for
+## **  about fifty bytes. The mode is tested ONCE, at entry -- never inside
+## **  a loop, where the byte count is the whole cost. An unrecognised mode
+## **  does TRIM.
+## **
+## **  A ZERO LENGTH STRING IS NOT A SPECIAL CASE anywhere below, and an
+## **  all-spaces string is not either: the trims count down and reaching
+## **  zero IS the answer, so both fall out of the ordinary path.
+## **
+## **  YOUR PROGRAM MUST HAVE A #SYMFILE, BEFORE THE #INCLUDEs. The
+## **  assembly reaches BASIC's variables through {VAR} and BASLOAD
+## **  crunches every name before the compiler sees it; without BASLOAD's
+## **  own record of that mapping the compile stops with "NO SYMBOL FILE
+## **  FOR {}", which names the cause but not the file that caused it.
+## **
+## **  THE BLOCK IS WRAPPED IN #REM 1 / #REM 0, and without that there is
+## **  no assembly at all -- BASLOAD's default is #REM 0, the body rides in
+## **  REM statements, and the block would reach the compiler EMPTY. That
+## **  is refused as "block mismatch" rather than compiled into a program
+## **  that quietly contains none of the code. The #REM 0 afterwards puts
+## **  BASLOAD back to its default, not to whatever the caller had.
+## **
+## **  The whole STRCASE.* name space belongs to this file.
+## **
+## ***********************************************************************
+#IFNDEF STRCASE.DEFS
+#DEFINE STRCASE.DEFS 1
+
+## The five operations. Constants rather than five entry labels: the mode
+## has to be set either way, and this costs the caller nothing while
+## saving the module five wrapper lines.
+#DEFINE STRCASE.UPPER 0
+#DEFINE STRCASE.LOWER 1
+#DEFINE STRCASE.TRIM 2
+#DEFINE STRCASE.LTRIM 3
+#DEFINE STRCASE.RTRIM 4
+
+GOTO STRCASE.MODULE.END
+
+## ***********************************************************************
+## **  STRCASE.GO -- the whole module.
+## **
+## **  The BASIC here does nothing but hand the two inputs to the assembly
+## **  in the form it can read. STRCASE.ADDR% and STRCASE.OP% exist
+## **  because {VAR} needs a 16-bit integer slot, and they are named apart
+## **  from STRCASE.PTR / STRCASE.MODE on purpose: BASLOAD's symbol file
+## **  does NOT record the sigil, so X and X% would be one entry, and two
+## **  variables sharing a name is a trap not worth setting.
+## **
+## **  STRCASE.KEEP% is the assembly's own counter -- the runtime kept it
+## **  in gpsNeedLen, below $0801. ITS HIGH BYTE IS SET HERE AND NEVER
+## **  AGAIN: the assembly writes only the low one, so it has to start at
+## **  zero and stay there.
+## ***********************************************************************
+
+STRCASE.GO:
+    STRCASE.KEEP% = 0
+    STRCASE.ADDR% = STRCASE.PTR
+    STRCASE.OP% = STRCASE.MODE
+    #REM 1
+    GP.ASM
+    REM CLD                      ; SYS enters with the caller's flags
+    REM LDA {STRCASE.ADDR%}      ; zTemp0 -> the length byte, text from +1
+    REM STA $2C
+    REM LDX #1
+    REM LDA {STRCASE.ADDR%},X
+    REM STA $2D
+    REM ; ---- one test, at entry, never inside a loop ----
+    REM LDA {STRCASE.OP%}
+    REM BNE SCD1
+    REM JMP SCUP
+    REM SCD1: CMP #1
+    REM BNE SCD2
+    REM JMP SCLO
+    REM SCD2: CMP #3
+    REM BNE SCD3
+    REM JMP SCTL
+    REM SCD3: CMP #4
+    REM BNE SCD4
+    REM JMP SCTR
+    REM ; ---- TRIM, and anything unrecognised. RIGHT FIRST, deliberately:
+    REM ; ---- it shortens the string the left pass has to walk, and if it
+    REM ; ---- empties it the left pass falls straight out.
+    REM SCD4: JSR SCTR
+    REM JMP SCTL                 ; tail call -- its RTS leaves the blob
+    REM ;
+    REM ; --------------------------------------------------------------
+    REM ; UPPER. a-z only, which is a bit 5 clear once the range is known,
+    REM ; so PETSCII graphics and digits pass through untouched. Y counts
+    REM ; DOWN from the length, so offset 0 -- the length byte itself --
+    REM ; is never written, and a zero length string exits at once.
+    REM ; --------------------------------------------------------------
+    REM SCUP: LDA ($2C)
+    REM BEQ SCUPX
+    REM TAY
+    REM SCUPL: LDA ($2C),Y
+    REM CMP #97                  ; lower case a
+    REM BCC SCUPN
+    REM CMP #123                 ; one past lower case z
+    REM BCS SCUPN
+    REM AND #$DF                 ; clear bit 5
+    REM STA ($2C),Y
+    REM SCUPN: DEY
+    REM BNE SCUPL
+    REM SCUPX: RTS
+    REM ;
+    REM ; --------------------------------------------------------------
+    REM ; LOWER. The same walk with the range and the bit the other way.
+    REM ; Written out rather than shared with the mode byte, because
+    REM ; sharing would test it once per CHARACTER.
+    REM ; --------------------------------------------------------------
+    REM SCLO: LDA ($2C)
+    REM BEQ SCLOX
+    REM TAY
+    REM SCLOL: LDA ($2C),Y
+    REM CMP #65                  ; upper case A
+    REM BCC SCLON
+    REM CMP #91                  ; one past upper case Z
+    REM BCS SCLON
+    REM ORA #$20                 ; set bit 5
+    REM STA ($2C),Y
+    REM SCLON: DEY
+    REM BNE SCLOL
+    REM SCLOX: RTS
+    REM ;
+    REM ; --------------------------------------------------------------
+    REM ; TRAILING spaces. Walk back from the end and write the new
+    REM ; length. NOTHING MOVES -- which is why the two ends are separate
+    REM ; routines and why splitting them was free. Y falling to zero IS
+    REM ; the all-spaces answer, no special case needed.
+    REM ; --------------------------------------------------------------
+    REM SCTR: LDA ($2C)
+    REM BEQ SCTRX                ; already empty
+    REM TAY
+    REM SCTRL: LDA ($2C),Y
+    REM CMP #32
+    REM BNE SCTRS                ; Y is the last non-space
+    REM DEY
+    REM BNE SCTRL
+    REM SCTRS: TYA
+    REM STA ($2C)
+    REM SCTRX: RTS
+    REM ;
+    REM ; --------------------------------------------------------------
+    REM ; LEADING spaces. Find the first non-space, then SLIDE everything
+    REM ; from it down to offset 1. STRCASE.KEEP% counts down as spaces
+    REM ; are skipped, so when the scan stops it already holds the kept
+    REM ; length -- no subtraction, and reaching zero is exactly the
+    REM ; all-spaces case.
+    REM ; --------------------------------------------------------------
+    REM SCTL: LDA ($2C)
+    REM BEQ SCTLX                ; already empty
+    REM STA {STRCASE.KEEP%}
+    REM LDY #1
+    REM SCTLS: LDA ($2C),Y
+    REM CMP #32
+    REM BNE SCTLF
+    REM INY
+    REM DEC {STRCASE.KEEP%}
+    REM BNE SCTLS
+    REM LDA #0                   ; all spaces
+    REM STA ($2C)
+    REM RTS
+    REM SCTLF: CPY #1            ; nothing to slide if it already starts at 1
+    REM BEQ SCTLSET
+    REM TYA                      ; zTemp1 = zTemp0 + (first - 1), so (zTemp1),1
+    REM DEC                      ; is the first character being kept
+    REM CLC
+    REM ADC $2C
+    REM STA $2E
+    REM LDA $2D
+    REM ADC #0
+    REM STA $2F
+    REM LDY #0
+    REM SCTLM: INY
+    REM LDA ($2E),Y
+    REM STA ($2C),Y
+    REM CPY {STRCASE.KEEP%}
+    REM BNE SCTLM
+    REM SCTLSET: LDA {STRCASE.KEEP%}
+    REM STA ($2C)
+    REM SCTLX: RTS
+    GP.ENDASM
+    #REM 0
+    RETURN
+
+STRCASE.MODULE.END:
+#ENDIF

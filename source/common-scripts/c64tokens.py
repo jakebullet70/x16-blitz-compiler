@@ -135,14 +135,27 @@ class C64TokenStore(object):
 				52863:GP.DO|52862:GP.LOOP|52861:GP.EXITDO|52860:GP.CALL|
 				52859:GP.A|52858:GP.X|52857:GP.Y|52856:GP.C|
 				52855:GP.INSTR|52854:GP.STRPTR|
-				52853:GP.TRIM|52852:GP.LTRIM|52851:GP.UPPER|52850:GP.LOWER|
-				52849:GP.RTRIM|52848:GP.COMP|52847:GP.SORT|52846:GP.ARRPTR|52845:GP.STASH|52844:GP.RESTR|
+				52848:GP.COMP|52846:GP.ARRPTR|
 				52843:GP.BOX|52842:GP.FILL|52841:GP.PRINTAT|
 				52838:GP.SELECT|52837:GP.CASE|52836:GP.OTHER|52835:GP.ENDSEL|
 				52834:GP.CONTAINS|52833:GP.HIBYTE|52832:GP.LOBYTE|52831:GP.ISEMPTY|
 				52830:GP.IF|52829:GP.ELSEIF|52828:GP.ELSE|52827:GP.ENDIF|
-				52826:GP.ASM|52825:GP.ENDASM"""
+				52826:GP.ASM|52825:GP.ENDASM|
+				52824:GP.CHAR"""
 
+	#
+	#		52853/52852/52851/52850/52849 were GP.TRIM, GP.LTRIM, GP.UPPER, GP.LOWER and GP.RTRIM,
+	#		retired 1st September 2026 to GPC-BASIC/STRCASE.INC.BL. 188 bytes of the block including
+	#		their shared GPStringAddress, and outside their own example file they had one caller in
+	#		the tree. GP.COMP and GP.INSTR stayed: both are FUNCTIONS, and a module cannot be one --
+	#		GP.COMP(A$,B$) inside an IF would have become three lines and an out-variable.
+	#
+	#		52847 was GP.SORT, retired 1st September 2026. It is GPC-BASIC/SORT.INC.BL now: the
+	#		same shell sort, the same Ciura gaps, written in GP.ASM so that only the programs
+	#		that sort pay for it. 408 bytes of the GP block, carried by every program that never
+	#		sorted anything. GP.ARRPTR at 52846 stays -- the module is built ON it, because a
+	#		BASL subroutine cannot be handed an array and something has to turn one into an
+	#		address.
 	#
 	#		52852 was GP.PAD for a few hours on 16th August 2026, removed before it ever shipped --
 	#		padding GROWS a string, an in-place handler only ever has the block and not the

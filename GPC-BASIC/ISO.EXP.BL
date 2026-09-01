@@ -4,7 +4,7 @@
 #INCLUDE "GPB.INC.BL"
 
 REM ============================================================================
-REM ISO.EXP.BL -- GP.PRINTAT follows the screen into ISO mode.
+REM ISO.EXP.BL -- GP.PRINTAT and GP.BOX in ISO mode.
 REM
 REM In ISO mode (PRINT CHR$(15), or a user pressing Ctrl+O) the VERA tile index
 REM IS the character code, so the PETSCII-to-screen-code translation GP.PRINTAT
@@ -55,7 +55,28 @@ REM      ($20>>5 = 1, offset $00), so a space fill is right in both modes.
 GP.FILL 40, 26, 4, 1, 32, 1
 ISO.F0 = VPEEK(1, ISO.ROWI + 80)
 
-REM ---- 5. back to PETSCII: the switch must be reversible, not one-way ----
+REM ---- 5. GP.BOX IN ISO MODE, with the caller's own glyphs.
+REM
+REM GP.BOX does no translation at ALL -- its glyphs go straight to VERA as tile
+REM indices -- so the four built-in styles are PETSCII screen codes and come out
+REM as letters in ISO mode. That used to be the end of the story ("draw frames
+REM with GP.FILL, or switch back"). It is not any more: a style of 256 or more
+REM is an ADDRESS of eight glyphs of your own, and in ISO mode a tile index IS a
+REM character code, so ASCII + - | are a perfectly good frame and need no
+REM runtime support whatsoever.
+REM
+REM The eight bytes, in this order: TR, TL, BR, BL, TOP, BOTTOM, LEFT, RIGHT.
+REM GP.STRPTR hands over a string's block and the text starts at +1, so a plain
+REM string literal is the cheapest way to carry them.
+
+ISO.GLYPH$ = "++++--||"
+ISO.GP = GP.STRPTR(ISO.GLYPH$) + 1
+GP.BOX 50, 26, 4, 3, ISO.GP, 1
+ISO.B0 = VPEEK(1, ISO.ROWI + 100)
+ISO.B1 = VPEEK(1, ISO.ROWI + 102)
+ISO.B2 = VPEEK(1, 45056 + 27 * 256 + 100)
+
+REM ---- 6. back to PETSCII: the switch must be reversible, not one-way ----
 PRINT CHR$(143);
 ISO.MODE2 = PEEK(882)
 GP.PRINTAT 20, 25, "ABC", 1
@@ -68,6 +89,7 @@ PRINT "ISO     ";ISO.I0;ISO.I1;ISO.I2;" (WANT 65 66 67)"
 PRINT "LOWER   ";ISO.L0;ISO.L1;" (WANT 97 98)"
 PRINT "FILL    ";ISO.F0;" (WANT 32)"
 PRINT "REVERT  ";ISO.R0;" (WANT 1)"
+PRINT "ISO BOX ";ISO.B0;ISO.B1;ISO.B2;" (WANT 43 45 124)"
 
 REM MODE reads 2 in PETSCII (charset 2, unlocked) and 65 in ISO -- $40 for the
 REM ISO bit plus charset 1. That is editor.s's documented packing:
@@ -78,6 +100,10 @@ IF ISO.I0 <> 65 OR ISO.I1 <> 66 OR ISO.I2 <> 67 THEN ISO.BAD = 1
 IF ISO.L0 <> 97 OR ISO.L1 <> 98 THEN ISO.BAD = 1
 IF ISO.F0 <> 32 THEN ISO.BAD = 1
 IF ISO.R0 <> 1 THEN ISO.BAD = 1
+REM 43 is "+", 45 is "-", 124 is "|" -- the corner, the top edge and the side,
+REM read back as the ASCII codes they were handed. In PETSCII mode the same
+REM three cells would hold screen codes and none of these would match.
+IF ISO.B0 <> 43 OR ISO.B1 <> 45 OR ISO.B2 <> 124 THEN ISO.BAD = 1
 IF ISO.BAD = 1 THEN PRINT "ISO FAIL" : END
 PRINT "ISO OK"
 END

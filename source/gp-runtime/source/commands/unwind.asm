@@ -34,13 +34,19 @@
 ;		workspace. Stopping is silent on purpose: FixBranches has already raised BLOCK MISMATCH
 ;		for the structural errors it can see, and there is nothing useful to report from here.
 ;
-;		WHY A SEPARATE OPCODE RATHER THAN gp.endsel. gp.endsel does exactly the right thing to a
-;		select frame, and emitting one before the GOTO would have cost nothing at all -- but
-;		FixBranches counts select nesting ON gp.select/gp.endsel (_FBCaseScan), so an extra one
-;		inside a case body captures that body's own .caseend and sends it to the wrong place. The
-;		unwind has to be a token the scanners do not count. It costs one vector slot, two bytes,
-;		in every compiled program; the handler itself is above GPBase and so is free to any
-;		program that has a GP block already -- and one with a GP.DO or GP.SELECT in it does.
+;		ONLY GP.DO OPENS A BLOCK FRAME NOW. GP.SELECT did until 1st September 2026, when its
+;		selector was restricted to a plain variable and the frame that kept an expression alive
+;		became unnecessary -- so a GOTO leaving a select has nothing to close, and neither the
+;		compiler nor FixBranches counts one any more. The two lines that recognised a select
+;		frame here went with it.
+;
+;		WHY A SEPARATE OPCODE RATHER THAN gp.loop. gp.loop does the right thing to a loop frame
+;		and emitting one before the GOTO would have cost nothing -- but FixBranches counts loop
+;		nesting on gp.do/gp.loop, so an extra one inside a loop body captures that body's own
+;		structure and sends its branches to the wrong place. The unwind has to be a token the
+;		scanners do not count. It costs one vector slot, two bytes, in every compiled program;
+;		the handler is above GPBase and so is free to any program that has a GP block already --
+;		and one with a GP.DO in it does.
 ;
 ; ************************************************************************************************
 
@@ -61,12 +67,9 @@ _CXULoop:
 		cmp 	#$FF 						; the stack-empty marker -- go no further
 		beq 	_CXUDone
 		and 	#$E0 						; the id is the upper 3 bits (frames.inc)
-		cmp 	#FRAME_LOOP & $E0
-		beq 	_CXUBlock
-		cmp 	#FRAME_SELECT & $E0
-		bne 	_CXUStray 					; a FOR or GOSUB frame: close it, but it is not a block
-_CXUBlock:
-		dec 	unwindLeft
+		cmp 	#FRAME_LOOP & $E0 			; GP.DO is the only block frame there is now --
+		bne 	_CXUStray 					; GP.SELECT stopped opening one on 01/09/26, and a
+		dec 	unwindLeft 					; FOR or GOSUB frame is closed but never counted
 _CXUStray:
 		jsr 	StackCloseFrame
 		lda 	unwindLeft

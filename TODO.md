@@ -191,32 +191,23 @@ These drive the editor, the monitor, the DOS shell or the BASIC program text —
 compiled binary. Same reasoning retires `LIST` `NEW` `RUN` `CONT` `CLR` from the base set. (`HBLOAD` and
 `BANNER` have no manual entry at all; `BASLOAD` is a development-time loader.)
 
-## Undecided (2)
+## `POINTER` / `STRPTR` — CLOSED, not undecided
 
-`POINTER` `STRPTR` — they hand back the address of a BASIC variable or string. Blitz lays variables out
-its own way at compile time, so these would either mean something different or nothing. The original
-author rejected them outright; leaving them parked rather than deciding in the abstract.
+Both hand back the address of a BASIC variable or string, and Blitz lays variables out its own way at
+compile time. `testing/POINTER.PRG` makes the mismatch concrete: it treats the result as a CBM
+`[len, ptr-lo, ptr-hi]` descriptor and walks it, and Blitz stores `[MaxLen][Control][ActLen][Data]` —
+a different shape — so that walk reads garbage whatever address is returned. **There is no address
+Blitz can hand back that makes an existing descriptor-walking program behave.**
 
-They are not silently dropped: both tokens are *recognised* by `x16_unary.def` (so tokenised BASIC that
-uses them still loads and round-trips) but routed to `UnsupportedCompile` in `gensupport.asm`, which
-raises `NOT IMPLEMENTED @ <line>`. That is a deliberate fail-loud choice — emitting *some* address would
-compile and then read the wrong memory, so the compiler stops at the reference rather than misbehave
-silently.
+Both tokens are *recognised* by `x16_unary.def`, so tokenised BASIC using them still loads and
+round-trips, and both route to `UnsupportedCompile`, which raises `NOT IMPLEMENTED @ <line>`. That is
+the answer, and it is a deliberate fail-loud one: emitting *some* address would compile and then read
+the wrong memory.
 
-**The layout mismatch is the whole obstacle, and `testing/POINTER.PRG` makes it concrete.** That program
-does `X%=POINTER(A$)` and then treats `X%` as a CBM `[len, ptr-lo, ptr-hi]` descriptor — `PEEK(X%)` for
-the length, `PEEK(X%+1/+2)` for the data pointer — walks the bytes, and `POKE Y+3,90` to mutate the
-string in place. Every one of those offsets is baked to the *interpreter's* descriptor. Blitz stores a
-string as `[MaxLen][Control][ActLen][Data]`, a different four-field shape, so that descriptor walk reads
-garbage under Blitz no matter what address `POINTER` returned. This is what "mean something different or
-nothing" looks like in practice: there is no address Blitz can hand back that makes an existing
-descriptor-walking program like `POINTER.PRG` behave.
-
-If it is ever revisited, `STRPTR` returning the address of Blitz's `Data` field is the only variant with
-clean, non-misleading semantics (it points at the actual characters, so `POKE`-style mutation works);
-`POINTER` returning the address of the four-byte control block would necessarily mean something no stock
-C64/C128 program expects. Scope either against the real string-block layout in the runtime before
-committing.
+**And the need they were parked against is met.** `GP.STRPTR` returns Blitz's own block address with
+the layout documented, which is the only variant with clean semantics — and it is now load-bearing:
+`STRCASE.INC.BL` is built on it, as `SORT.INC.BL` is on `GP.ARRPTR`. Nothing is waiting on a decision
+here.
 
 ## Bugs
 
@@ -664,11 +655,22 @@ Diminishing returns; only worth revisiting if float-heavy code matters more than
 
 ## Shrinking the runtime
 
-The runtime is copied **verbatim** into every compiled program — one pre-linked image, `$0801` up to
-`ObjectBase` (`$3300`), measured at **10,956 bytes**: `runtime.library` 7,288 (the VM plus all 158
-command handlers), `ifloat32` 2,349, `polynomials` 860, `common` 415, the BASIC stub 44. There is no
-per-program dead-code elimination — `10 PRINT"HI"` ships the sprite engine, the disk loader and the
+The runtime is copied **verbatim** into every compiled program — one pre-linked image — and there is
+no per-program dead-code elimination: `10 PRINT"HI"` ships the sprite engine, the disk loader and the
 transcendental library it never calls.
+
+**Re-anchored 1st September 2026.** The figures below were measured when `ObjectBase` was `$3300` and
+the GP block did not exist; the argument is unchanged but every number had drifted. Current:
+
+| | |
+|---|---:|
+| core runtime, `$0801`–`GPBase $3700` | **12,031** (`RT` of a GP OUT program) |
+| GP block, `$3700`–`ObjectBase $3b00` | **1,024** (1,010 used, 14 free) |
+| whole image, GP IN | **13,055** |
+
+The original breakdown, at 10,956 bytes total: `runtime.library` 7,288 (the VM plus all 158 command
+handlers), `ifloat32` 2,349, `polynomials` 860, `common` 415, the BASIC stub 44. The core has grown
+about 1,075 bytes since — proportions, not the split, are what to reason from.
 
 For scale: the vintage **C64 Blitz!** runtime is roughly **half** ours — its compiled `C/DIR` is
 6,244 B against our own 10,992 B build of the same program (0.57× whole-program), and subtracting the
@@ -727,7 +729,7 @@ p-code for those opcodes and pick the trimmed image, and the generated `vectors.
 Bounded work, ~**1.4 KB** off a non-trig/non-`VAL` program, and it builds the conditional-runtime
 machinery the two larger items above both need.
 
-### `GP.SELECT`'s frame is dead weight for a variable selector
+### DONE 01/09/26 — `GP.SELECT`'s frame is dead weight for a variable selector
 
 Noted 30th August 2026 while costing a block `GP.IF`; nothing here is urgent, it is the first move if
 opcode or GPB pressure ever does bite.
@@ -744,11 +746,40 @@ first `GP.CASE`.
 per alternative gives the identical result and is, if anything, cheaper than `gp.case`'s six-byte
 frame copy plus `SelectFindFrame`.
 
-**Deleting the keyword outright frees no program bytes, which is why it stays.** The 112 B of code is
-in the GPB block — **1,970 B used of a page-aligned 2,048** — and the 12 B of vector slots are in the
-core, which already carries **40 B of padding** below `GPBase`. Removing all of it leaves both
-boundaries exactly where they are. Inside the GPB block bytes are *headroom*, not program size, until
-they cross a page: 1,970 − 98 = 1,872, still above the 1,792 that would give a page back.
+**THAT VERDICT IS REVERSED AS OF 1st SEPTEMBER 2026, and only because the boundary moved.** It was:
+*deleting the keyword frees no program bytes, which is why it stays* — 1,970 B used of a page-aligned
+2,048, so 1,970 − 98 = 1,872, still above the 1,792 that would give a page back. Bytes inside the
+block are headroom, not program size, until they cross a page.
+
+The block is **1,108 B used of a page-aligned 1,280** now, after the stash, the sort and the in-place
+string statements left it. **1,108 − 98 = 1,010, which is under 1,024** — so removing the general path
+drops `ObjectBase` `$3c00` → `$3b00` and hands back **512 bytes to every GP program**, object and
+workspace floor both.
+
+Nothing about the code changed; check which side of a page a change lands on before costing it, because
+that is the whole answer. (The 12 B of vector slots are still in the core, which carries ~40 B of
+padding below `GPBase`, and still move nothing.)
+
+**SHIPPED 1st September 2026, as option 2 below.** The selector is a plain numeric scalar
+(`compiler/commands/select.asm` refuses an expression or an array element and says why), all four
+keywords are markers aliased to `CommandXIfMark` in the core, `gp-runtime/commands/select.asm` is
+deleted, and only `GP.DO` opens a stack frame any more — `.unwind` and the FixBranches depth walks
+count loops alone. `ObjectBase` `$3c00` → `$3b00`, image 13,311 → 13,055, and a program whose only
+GP keyword is a select is now **GP-BASIC OUT** at `RT 12031`, exactly as `GP.IF` already was.
+Verified: SELR/SELP/SELQ/SELS/SELBUG/SELN probes, `UNWIND.EXP.BL` (its three selectors now assign
+to `UT.SEL` first), `SORT.EXP.BL` 8/8, `STRCTST` 20/20, `ISO.EXP.BL`.
+
+**The first attempt was reverted on FALSE evidence, and the day went to finding that out.** The
+headless harness's `readable()` filter kept only printable runs of 4+ characters — built to keep
+object bytes out of a compile log, applied to RUN output — so every probe that printed a 2-character
+verdict (`B1`, `A0`…) looked like it printed nothing, in exactly the programs whose long-printing
+twins passed. The “miscompile” chased for hours did not exist; the p-code dump that proved every
+branch correct was what finally pointed back at the harness. Rule: when output LOOKS missing, read
+the raw log before reading the compiler.
+
+`GP.DO`'s frame is not the same case and is not a candidate: it holds the loop counter and the return
+position, which a counted loop genuinely needs. Only `GP.SELECT`'s is dead weight, and only when the
+selector is a plain variable.
 
 Two steps, and they buy different things:
 
@@ -767,6 +798,24 @@ other on INPHELP's real seven-way dispatch (~75 B against ~78 B), so the two con
 readability choice, not a size one.
 
 
+
+## `BMX.INC.BL` wants the `GP.ASM` treatment
+
+**The BMX loader is the last big BASL routine still doing per-byte work in BASIC**, and it is the
+one place left where that is measurable to a user: a bitmap is 320×240 at 8bpp, so the paint loop is
+counted in tens of thousands of iterations rather than the hundreds a menu or a dialog costs.
+Everything else that mattered has already moved — `samples/editor`'s two renderers went to `GP.ASM`
+and came back **123× and 109×** faster, and the p-code got *smaller* because the `FOR` loops removed
+were bigger than the assembly that replaced them.
+
+The shape is known and is the same one `STASH.INC.BL` and `SORT.INC.BL` use: BASIC works out the
+address of a row or a run and the assembly moves the bytes. BMX is a better fit than either, because
+the destination is VERA's auto-incrementing data port — a fixed address — so the inner loop is a
+`LDA`/`STA` pair with no pointer arithmetic in it at all, and the `FX` 32-bit cache write the editor
+uses to flush four bytes per store applies directly.
+
+Not started. Worth measuring `BMXSPD.EXP.BL` before and after, since that sample exists precisely to
+say how long a paint really takes.
 
 ## GP.ASM `{VAR}` under BASLOAD — DONE, by reading `#SYMFILE`
 
