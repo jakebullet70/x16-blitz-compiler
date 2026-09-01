@@ -984,6 +984,93 @@ image for all 12,031 bytes of the GP-BASIC OUT cut, with the only differences th
 
 ## Wanted
 
+### RETURN in the editor is slow, and it is the line table, not the repaint
+
+Reported as "inserting a blank line scrolls slowly -- do ten and it takes a second or two".
+**Measured, and it is not the scrolling.** Jiffies at real speed (`--nowarp`; TI is meaningless
+under warp), 100-line document, ten repetitions each:
+
+| | total | each |
+|---|---|---|
+| `ED.RENDER.ALL` | 102 | 10.2 j (170 ms) |
+| `DOC.INSERT.SLOT`, inserting at row 1 | **447** | **44.7 j (745 ms)** |
+| `DOC.STORE` | 8 | 0.8 j |
+| whole `ED.DO.ENTER` at the top of the document | 599 | 59.9 j (1.0 s) |
+| whole `ED.DO.ENTER` near the end | 258 | 25.8 j (430 ms) |
+
+So **75% of a RETURN is the line-table shift** and 17% is the full repaint. The near-end row is the
+proof: the same keystroke costs less than half as much when there are fewer slots above the end to
+move, which is the signature of the shift and not of the drawing.
+
+**Why it costs that much.** `DOC.INSERT.SLOT` moves a 3-byte table entry per pass, and each pass is
+`DOC.SLOT.READ` + `DOC.SLOT.WRITE`: two `GOSUB`s, two runs of `DOC.SLOT.LOCATE` (an `INT` divide and
+two multiplies each), two `BANK` statements, and six banked `PEEK`/`POKE` — and the runtime saves and
+restores the RAM bank around every one of those accesses. Call it 20-odd p-code statements to move
+three bytes, times one per line below the cursor.
+
+**The fix is GP.ASM**, and it is the same argument that already won for the two renderers: this is a
+`memmove` inside one 8K window, about 20 cycles an entry native against thousands interpreted. The
+editor already carries inline assembly and `#SYMFILE`, so nothing new is needed. Both
+`DOC.INSERT.SLOT` and `DOC.DELETE.SLOT` want it -- BACKSPACE at column 0 joins lines and pays the
+same cost. Mind the segment boundary: the table spans banks 1..3 at 2048 entries each, so a shift
+crossing one is two moves, not one.
+
+**Second, smaller:** `ED.DO.ENTER` calls `ED.REFRESH.FULL`, which repaints every text row. An insert
+cannot dirty anything ABOVE the cursor row, so repainting from `ED.CUR.ROW` down would halve the
+drawing on average and cost nothing near the bottom of a file. Worth doing after the shift, and only
+then -- at 17% it is not what anyone is feeling.
+
+### `PROGRAM TOO BIG` at an `EDITOR.PRG` of 27,753 bytes — measure the wall
+
+Found while instrumenting the above: adding a timing routine to `samples/editor/EDITOR.BASL` took the
+tokenised `EDITOR.PRG` from 26,899 to 27,753 bytes and the compile died with `PROGRAM TOO BIG @ 1644`.
+It is NOT the object buffer -- that build's object would have been near 16 KB, and the editor
+compiles at `OK CODE 15166 FREE 6144`, so roughly 21.3 KB is available and 71% was in use.
+
+So the wall is on the SOURCE the compiler can hold, somewhere in 26,899..27,753, and the editor
+sample sits under 900 bytes below it. **Find the exact figure and report it as a maximum program
+size**; a build-side wall that stops a program the machine could run is a bug, not a limit.
+
+### `GUI.INC.BL` wants a listbox, single and multi select
+
+A fourth dialog beside `GUI.YN`, `GUI.MENU` and `GUI.TEXT`: a scrolling list, with a multi-select
+mode that returns a set rather than one row.
+
+**`GUI.MENU` is not it and should not be stretched into it.** That is `MENUHELP.RUN` in a frame: it
+draws every row it is given, so the list has to fit the screen, and it returns one `GUI.SEL`. A
+listbox is the two things it does not do — a WINDOW onto a list longer than the box, and more than
+one answer.
+
+**What is already in place**, and worth building on rather than around:
+
+- The box itself. `GUI.OPEN` / `GUI.CLOSE` measure, place, stash and restore, and `GUI.OPEN` is
+  public exactly so a fourth kind of dialog is built on it. `GUI.BODY.ROWS` / `GUI.BODY.WIDTH` in,
+  `GUI.INNER.*` out; the height is the caller's choice, which is what makes a window possible.
+- `MENUHELP.ROW` draws one row at `MENUHELP.DRAWROW` in `MENUHELP.DRAWATTR` — the primitive, below
+  `MENUHELP.DRAW`, and it is how the editor's dropdown paints its highlight. A listbox is that
+  primitive over a slice of the array, which means the drawing is already written.
+- `MENUHELP.KEYEXIT` hands back a key the menu has no use for. SPACE toggling a selection is
+  exactly that shape, and it is how the editor's bar takes LEFT and RIGHT.
+
+**The two real questions**, neither of which the existing modules answer:
+
+1. **Where the marks live.** `MENUHELP.ITEM$` is the caller's array by contract — the module refuses
+   to guess a bound — so the marks want a parallel `GUI.MARK()` the caller DIMs, or a returned
+   string of flags. A string means no second DIM and no bound to guess, and 250 items is a
+   plausible ceiling for a dialog. Decide before writing the interface, not after.
+2. **Whether the scroll is the listbox's or MENUHELP's.** Drawing a window means either passing
+   `MENUHELP` a slice each repaint (cheap, and keeps `MENUHELP` unchanged) or teaching it a top-row
+   input (one number, but it changes a shipped module every caller depends on). Prefer the slice
+   until something needs otherwise.
+
+Cost is BASL, not runtime: nothing here needs a keyword. Watch the size of the module anyway --
+`GUI.INC.BL` is 479 lines and every caller pays for all of it, so if the listbox is large it may
+want to be `GUILIST.INC.BL` beside it rather than inside it.
+
+**Test it the way the GUI checks in `samples/editor/EDITOR.BASL` are tested**: keys through
+`kbdbuf_put`, and read the map back with `VPEEK` before printing anything. And walk every row of the
+panel, not one sampled cell — that lesson has already cost a shipped dropdown with rows missing.
+
 ### Comment density — the samples and GUI are done, the library is not
 
 **The rule, in the user's words:** *"code needs to be written so it flows and the programmer can
