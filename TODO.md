@@ -261,6 +261,35 @@ grepping for the retired keywords find it. `SCREEN.EXP.BL` had been broken the s
 `testing/GPB.INC.BL` and `testing/samples/editor/GPC-BASIC/` still define and use all eight retired
 tokens. That is a working directory, so it may simply want refreshing from `GPC-BASIC/`.
 
+### `GP.FILL` converts its glyph in ISO mode, where converting is wrong — open
+
+`GP.PRINTAT` tests bit 6 of `X16_EditorMode` (`$0372`) and skips `GPDrawPet2Scr` when it is set,
+because in ISO mode the byte already *is* the tile index. **`GP.FILL` does not test it.** It converts
+unconditionally, once, before its loop.
+
+The runtime's own comment excuses that: `$20` is a fixed point of the offset table, so a space fill —
+padding and blanking, which is all the library does — is right in both modes. That held until
+`GUI.FRAME` filled non-space glyphs, and then the editor had to park its six frame tiles at `$C0-$C5`
+and ask for them 64 lower to cancel a conversion nobody wanted. The bias was real, undocumented
+anywhere a caller would meet it, and cost a day to find. `GUI.FRAME` is a `GP.BOX` now, so the last
+live case is gone — but the trap is still armed for the next caller who fills anything but a space.
+
+**The fix is the same five bytes `GP.PRINTAT` pays**, and cheaper here: the test goes *above* the
+loop, next to the single existing `jsr GPDrawPet2Scr`, so it costs nothing per cell.
+
+    lda     NSMantissa0+4
+    bit     X16_EditorMode          ; bit 6 -> V, and BIT leaves A alone
+    bvs     _CGFRaw                 ; in ISO mode the byte already IS the tile index
+    jsr     GPDrawPet2Scr
+    _CGFRaw:
+    sta     gpdChar
+
+Not done yet only because of where the bytes land: `GP.FILL` is in the GP block, which is
+all-or-nothing and page-aligned, so five bytes are free if they fit the current alignment slack and
+cost **512** (object + workspace floor) if they push `ObjectBase` up a page. Measure the slack first.
+Sweep for non-space `GP.FILL` callers when it goes in — at the time of writing the only ones are
+`SCREEN.EXP.BL` (160, 166), which does not set the flag and so is correct either way.
+
 ### `AND`/`OR` leaked the top half of an out-of-range operand — FIXED
 
 `AND` and `OR` are 16-bit operations here, as they are in stock — but `AndOrCommon` reached
