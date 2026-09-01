@@ -984,6 +984,68 @@ image for all 12,031 bytes of the GP-BASIC OUT cut, with the only differences th
 
 ## Wanted
 
+### Comment density — the samples and GUI are done, the library is not
+
+**The rule, in the user's words:** *"code needs to be written so it flows and the programmer can
+follow it. When there are lots of REMs it might look good to an employer counting lines, but to me
+it means the code is not flowing, the vars are not named right. Go lighter on the REMs, keep adding
+them but more concise, just a note or two."*
+
+**What that means in practice**, from the three files done so far:
+
+- **Keep** what the code cannot say: a hardware fact (`$0372` bit 6 and why it is poked and not
+  `CHR$(15)`'d), an ordering constraint (two font copies where one reads what the other writes;
+  first-match-wins in a hint line), a trap (`GP.DO 0` loops forever; a block's test is at the
+  bottom, so a width of 0 writes one cell).
+- **Keep** the interface. A library module's parameter table and per-routine in/out block are what
+  a caller opens the file to read, and they are not what the complaint was about — `GUI.INC.BL`
+  cut only 31% for that reason, against the editor's 40%.
+- **Cut** the paragraph that narrates the line beneath it, the eulogy for a routine that was
+  deleted, and the argument for a decision already made and already visible in the code.
+
+**A comment left too long is usually also a comment left WRONG.** Every file done so far had stale
+blocks, and the length is what hid them: `EDITOR.BASL` still explained the `+64` glyph bias in three
+places after `GUI.FRAME` removed it (one of them in the self-check, giving a stale reason for a
+correct expectation), and carried a note saying the dropdown's frame was `GP.BOX` style 0 with
+another forty lines on saying it was eight `GP.FILL`s — it is neither. `GUI.INC.BL` still documented
+`GUI.GLYPH`'s six as `GP.FILL` arguments needing the 64 bias. **Read for staleness while trimming;
+that is where the value is, not in the line count.**
+
+**Method that made this safe**, and worth reusing: do it as a script of exact comment-block
+replacements rather than a rewrite, then prove the code did not move —
+
+    grep -v -E '^[[:space:]]*(##|REM([[:space:]]|$))' <old> vs <new>   # must be identical
+    ... then rebuild and check the object is byte-identical
+
+Both editor rebuilds landed on `OK CODE 15166 FREE 6144 RT 13055`, `EDITOR.PRG` 26,899 bytes, so the
+trims are provably free. Watch two things: `EDBENCH.BASL`'s `REM`s are the **GP.ASM source itself**
+(under `#REM 1`) and must not be touched, and `GUI.INC.BL` has **two copies** — `GPC-BASIC/` and
+`samples/editor/GPC-BASIC/` — that have to stay identical.
+
+**DONE:** `samples/editor/EDITOR.BASL` 709 → 423 prose lines, `samples/editor/STORE.BASL`,
+`GPC-BASIC/GUI.INC.BL` 372 → 256. `EDBENCH.BASL` inspected and correctly left alone.
+
+**LEFT**, comment lines / total, worst first:
+
+| file | lines | comment | |
+|---|---|---|---|
+| `STRCASE.INC.BL` | 246 | 222 | 90% |
+| `SORT.INC.BL` | 382 | 341 | 89% |
+| `GPB.INC.BL` | 438 | 376 | 85% |
+| `STASH.INC.BL` | 273 | 197 | 72% |
+| `STRHELP.INC.BL` | 210 | 147 | 70% |
+| `STASHFILE.INC.BL` | 81 | 56 | 69% |
+| `APPHELP.INC.BL` | 104 | 71 | 68% |
+| `MENUHELP.INC.BL` | 454 | 248 | 54% |
+| `BMX.INC.BL` | 481 | 248 | 51% |
+| `THEME.INC.BL` | 106 | 54 | 50% |
+| `MENUBAR.INC.BL` | 322 | 164 | 50% |
+| `INPHELP.INC.BL` | 279 | 142 | 50% |
+
+The top three are near-pure documentation — `GPB.INC.BL` is the GP keyword reference — so expect
+them to cut like `GUI.INC.BL` did rather than like the editor. The twelve `.EXP.BL` examples have
+not been measured yet.
+
 ### Name the output after the source — DONE, but by the caller
 
 The ask was for Blitz to derive the output name from the input, so that compiling `DIR.PRG` produced
