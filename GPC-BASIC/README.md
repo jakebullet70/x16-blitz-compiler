@@ -61,7 +61,7 @@ All of it needs `#INCLUDE "GPB.INC.BL"`, and nothing else.
 | Strings, composite | `GP.CONTAINS` `GP.ISEMPTY` — free | `STRINGS.EXP.BL` |
 | Addresses, composite | `GP.HIBYTE` `GP.LOBYTE` — free; split an address for `GP.CALL` | `ARRAYS.EXP.BL` |
 | Arrays | `GP.SORT` `GP.ARRPTR` | `ARRAYS.EXP.BL` |
-| Drawing | `GP.BOX` `GP.FILL` `GP.PRINTAT` | `SCREEN.EXP.BL` |
+| Drawing | `GP.BOX` `GP.FILL` `GP.CHAR` `GP.PRINTAT` | `SCREEN.EXP.BL` |
 | Screen save | `GP.STASH` `GP.RESTR` — a rectangle to a RAM bank and back | `SCREEN.EXP.BL` |
 | Machine code | `GP.CALL` and the `GP.A` `GP.X` `GP.Y` `GP.C` value words | `MLCALL.EXP.BL` |
 | Inline assembly | `GP.ASM` `GP.ENDASM` — 65C02 assembled into the program, with labels and `{VAR}` | `ASM.EXP.BL` |

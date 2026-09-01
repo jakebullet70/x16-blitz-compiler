@@ -1,0 +1,273 @@
+## ***********************************************************************
+## **
+## **  STASH.INC.BL -- save a text rectangle, and put it back.
+## **
+## **      STASH.SAVE      copy a rectangle of the screen into a RAM bank
+## **      STASH.RESTORE   copy it back, where it was or somewhere else
+## **
+## **  For the same rectangle through a FILE -- save it, load it back,
+## **  stamp it somewhere else -- see STASHFILE.INC.BL, which is built
+## **  on this and is a separate file so that a program wanting only the
+## **  bank does not carry the disk half. A BASL module has no dead code
+## **  elimination: everything it holds is compiled into every program
+## **  that includes it, used or not, and those three routines are 127
+## **  bytes.
+## **
+## **  This is what GP.STASH and GP.RESTR were, moved out of the GP runtime
+## **  block and into GP.ASM. The reason is arithmetic, not taste: the
+## **  block is ALL OR NOTHING -- 2,048 bytes written into the object and
+## **  the same again off the bottom of the workspace, for any program that
+## **  uses one GP keyword -- and save/restore was 329 of those bytes,
+## **  carried by every program that never stashed anything. Here it costs
+## **  its own bytes, in the programs that ask for it, and nothing at all
+## **  in the ones that do not. GP.MENU went the same way in August and
+## **  became MENUHELP.INC.BL.
+## **
+## **  YOUR PROGRAM MUST HAVE A #SYMFILE, AND IT IS NOT OPTIONAL. The
+## **  assembly below reaches BASIC's variables through {VAR}, and BASLOAD
+## **  crunches every name before the compiler ever sees it -- STASH.VADDR%
+## **  is some two-letter name by then. #SYMFILE is BASLOAD's own record of
+## **  that mapping and the compiler reads it back. Without one the compile
+## **  stops with "NO SYMBOL FILE FOR {}", which names the cause but not the
+## **  file that caused it. Name it to match the PRG:
+## **
+## **      #SAVEAS "@:MYPROG.PRG"
+## **      #SYMFILE "@:MYPROG.SYM"
+## **      #INCLUDE "GPB.INC.BL"
+## **      #INCLUDE "STASH.INC.BL"
+## **
+## **  Both directives go BEFORE the includes.
+## **
+## **  Usage:
+## **      STASH.BANK = 8
+## **      STASH.X = 10 : STASH.Y = 4 : STASH.W = 30 : STASH.H = 8
+## **      GOSUB STASH.SAVE
+## **      ... draw over it ...
+## **      GOSUB STASH.RESTORE
+## **
+## **   in   STASH.BANK     the RAM bank to keep the cells in. 1..255, and
+## **                       it is yours: this writes the whole of it
+## **        STASH.X  STASH.Y     top left, in CELLS
+## **        STASH.W  STASH.H     size, in cells
+## **
+## **   out  STASH.OK       1 if it fitted and was saved, 0 if not
+## **
+## **  RESTORE NEEDS ONLY THE BANK. Four header bytes go in first -- w, h,
+## **  x, y -- so the rectangle describes itself and a caller cannot put it
+## **  back at the wrong size. Set STASH.X and STASH.Y and STASH.MOVE = 1
+## **  before STASH.RESTORE to paste it somewhere else instead, which is
+## **  copy-and-paste for nothing.
+## **
+## **  A BANK IS 8,192 BYTES AND A CELL IS TWO, so 4,094 cells is the most
+## **  that fits -- 63x63, far larger than any dialog, and NOT a whole
+## **  80x60 screen (9,600 bytes). Too big is refused before the first
+## **  write, with STASH.OK = 0, rather than run on into the next bank.
+## **
+## **  WHY THE SPLIT IS WHERE IT IS. The address of a row is worked out in
+## **  BASIC, once per row; the 160 bytes of the row are copied in
+## **  assembly. A dialog is eight rows, so the BASIC costs eight passes
+## **  and the assembly does the 1,280 bytes -- and the assembly needs no
+## **  zero page at all, which matters because there is none to have: a
+## **  GP.ASM blob runs with the interpreter live and codePtr, zTemp0,
+## **  NSStatus and the mantissas must survive it. The destination address
+## **  goes into the OPERAND of the instruction that uses it, which is the
+## **  idiom samples/editor's renderers are built on.
+## **
+## **  EACH BLOCK IS WRAPPED IN #REM 1 / #REM 0, and without that there is
+## **  no assembly at all. BASLOAD's default is #REM 0 -- strip remarks --
+## **  and a GP.ASM body rides in REM statements, so the block reaches the
+## **  compiler EMPTY and is refused as "block mismatch". That refusal is
+## **  deliberate (gpasm.asm says so): the alternative is a program that
+## **  compiles clean and quietly contains none of the code. The #REM 0
+## **  after each block puts BASLOAD back to its default, not to whatever
+## **  the caller had -- if your program runs with #REM 1 throughout, set
+## **  it again after including this file.
+## **
+## **  The whole STASH.* name space belongs to this file.
+## **
+## ***********************************************************************
+#IFNDEF STASH.DEFS
+#DEFINE STASH.DEFS 1
+
+## VERA's layer-1 registers, and the banked RAM window.
+##
+## HEX, NOT DECIMAL, AND NO DIGIT INSIDE THE NAME. Both are BASLOAD rules
+## and both report the same "INVALID PARAMETER" at the #DEFINE line:
+##
+##   #DEFINE takes a SIGNED int16, so 40756 is out of range where $9F34 --
+##   the same number -- is accepted. Anything at or above 32768 must be hex.
+##
+##   These were STASH.L1.CONFIG and STASH.L1.MAPBASE, after VERA's own
+##   register names, and that was rejected too. ED.GL.H in samples/editor
+##   shows a two-dot name is fine, so it is the DIGIT in the L1 segment.
+##
+## The VERA addresses the copy loop itself uses -- $9F20..$9F23 -- are
+## written out in the assembly rather than defined here, because #DEFINE
+## substitutes into BASIC source and the assembly reads its own REM text.
+#DEFINE STASH.LCONFIG $9F34
+#DEFINE STASH.LMAPBASE $9F35
+
+## The banked window, and the header that makes a stash self-describing.
+#DEFINE STASH.WINDOW $A000
+#DEFINE STASH.HEADER 4
+#DEFINE STASH.MAXBYTES 8188
+
+GOTO STASH.MODULE.END
+
+## ***********************************************************************
+## **  STASH.SAVE -- the screen into the bank.
+## ***********************************************************************
+
+STASH.SAVE:
+    STASH.MODE = 0 : GOSUB STASH.SETUP
+    IF STASH.OK = 0 THEN RETURN
+
+## ---- the header first, so RESTORE needs only the bank ----
+    BANK STASH.BANK : POKE STASH.WINDOW, STASH.W : POKE STASH.WINDOW + 1, STASH.H
+    POKE STASH.WINDOW + 2, STASH.X : POKE STASH.WINDOW + 3, STASH.Y
+    GOSUB STASH.WALK
+    RETURN
+
+## ***********************************************************************
+## **  STASH.RESTORE -- the bank back onto the screen.
+## **
+## **  Reads the size out of the header, so the only input is the bank.
+## **  STASH.MOVE = 1 uses the caller's STASH.X / STASH.Y instead of the
+## **  saved ones, which pastes the rectangle somewhere else.
+## ***********************************************************************
+
+STASH.RESTORE:
+    BANK STASH.BANK
+    STASH.W = PEEK(STASH.WINDOW) :  STASH.H = PEEK(STASH.WINDOW + 1)
+    IF STASH.MOVE <> 0 THEN GOTO STASH.RESTORE.GO
+    STASH.X = PEEK(STASH.WINDOW + 2) : STASH.Y = PEEK(STASH.WINDOW + 3)
+STASH.RESTORE.GO:
+    STASH.MODE = 1  : GOSUB STASH.SETUP : IF STASH.OK = 0 THEN RETURN
+    BANK STASH.BANK : GOSUB STASH.WALK
+    RETURN
+
+## ***********************************************************************
+## **  STASH.SETUP -- the map's shape, and whether the rectangle fits.
+## **
+## **  ASKED OF VERA, NOT ASSUMED. L1_MAPBASE holds bits 16:9 of the map
+## **  address and L1_CONFIG bits 5:4 hold the map WIDTH as 32 << n, so any
+## **  mode and any map size works -- and a program that changed mode
+## **  between the save and the restore is not quietly writing somewhere
+## **  else. It is two PEEKs on a path that is about to move a kilobyte.
+## ***********************************************************************
+
+STASH.SETUP:
+    STASH.OK = 0
+    IF STASH.W < 1 THEN RETURN
+    IF STASH.H < 1 THEN RETURN
+## ---- 128 CELLS TO A ROW. The copy loop counts a row in Y, so a row is at
+## ---- most 256 bytes. W = 128 is exactly that and works -- Y runs 1..255,0
+## ---- and stops -- but 129 would count the low byte of 258 and copy two
+## ---- cells. Refused here rather than corrupted there. No text mode is
+## ---- this wide; a 256-tile map is.
+    IF STASH.W > 128 THEN RETURN
+    STASH.BYTES = STASH.W * 2
+    IF STASH.BYTES * STASH.H + STASH.HEADER > STASH.MAXBYTES THEN RETURN
+    STASH.MAPW = 32 * 2 ^ INT((PEEK(STASH.LCONFIG) AND 48) / 16)
+    STASH.BASE = PEEK(STASH.LMAPBASE) * 512 : STASH.STRIDE = STASH.MAPW * 2 : STASH.OK = 1
+    RETURN
+
+## ***********************************************************************
+## **  STASH.WALK -- one row at a time.
+## **
+## **  The address arithmetic is here, in BASIC, and the 160 bytes of the
+## **  row are in the assembly below. Splitting it this way is what keeps
+## **  the assembly free of any pointer it would need zero page for: it is
+## **  handed a 16-bit VERA address, a 17th bit, a destination and a count,
+## **  and it copies.
+## **
+## **  VERA's address is 17 bits. The high one rides in bit 0 of ADDRH,
+## **  with the auto-increment in the top nibble -- 16 is "+1 per access",
+## **  which walks a row of char, attr, char, attr for us.
+## ***********************************************************************
+
+STASH.WALK:
+    STASH.DEST% = STASH.WINDOW + STASH.HEADER : STASH.NBYTES% = STASH.BYTES
+    FOR STASH.ROW = 0 TO STASH.H - 1
+        STASH.AT = STASH.BASE + (STASH.Y + STASH.ROW) * STASH.STRIDE + STASH.X * 2
+        STASH.HI = INT(STASH.AT / 65536) : STASH.VADDR% = STASH.AT - STASH.HI * 65536
+        STASH.VCTRL% = 16 + STASH.HI
+        IF STASH.MODE = 0 THEN GOSUB STASH.ROW.IN
+        IF STASH.MODE <> 0 THEN GOSUB STASH.ROW.OUT
+        STASH.DEST% = STASH.DEST% + STASH.BYTES
+    NEXT STASH.ROW
+    RETURN
+
+## ***********************************************************************
+## **  STASH.ROW.IN -- one row, VERA to the bank window.
+## **
+## **  No zero page, and that is the whole design. The source is VERA's
+## **  data port, a fixed address that auto-increments; the destination is
+## **  absolute,Y with the base written INTO the operand of the STA that
+## **  uses it -- STA DST,X with X=1 patches the low byte and X=2 the high
+## **  one. A row is at most 160 bytes, so Y indexes the whole of it.
+## ***********************************************************************
+
+STASH.ROW.IN:
+    #REM 1
+    GP.ASM
+    REM LDA {STASH.VADDR%}
+    REM STA $9F20
+    REM LDX #1
+    REM LDA {STASH.VADDR%},X
+    REM STA $9F21
+    REM LDA {STASH.VCTRL%}       ; +1 increment, and bit 16 of the address
+    REM STA $9F22
+    REM ; ---- the destination goes into the operand of the store below ----
+    REM LDA {STASH.DEST%}
+    REM LDX #1
+    REM STA SIDST,X
+    REM LDA {STASH.DEST%},X
+    REM LDX #2
+    REM STA SIDST,X
+    REM LDY #0
+    REM SILP: LDA $9F23
+    REM SIDST: STA $FFFF,Y       ; operand patched above
+    REM INY
+    REM CPY {STASH.NBYTES%}
+    REM BNE SILP
+    GP.ENDASM
+    #REM 0
+    RETURN
+
+## ***********************************************************************
+## **  STASH.ROW.OUT -- one row, the bank window back to VERA.
+## **
+## **  The same loop with the ends swapped. It is written out rather than
+## **  shared with a flag because a flag would be tested once per BYTE, in
+## **  the one loop where the byte count is the whole cost.
+## ***********************************************************************
+
+STASH.ROW.OUT:
+    #REM 1
+    GP.ASM
+    REM LDA {STASH.VADDR%}
+    REM STA $9F20
+    REM LDX #1
+    REM LDA {STASH.VADDR%},X
+    REM STA $9F21
+    REM LDA {STASH.VCTRL%}
+    REM STA $9F22
+    REM LDA {STASH.DEST%}
+    REM LDX #1
+    REM STA SOSRC,X
+    REM LDA {STASH.DEST%},X
+    REM LDX #2
+    REM STA SOSRC,X
+    REM LDY #0
+    REM SOSRC: LDA $FFFF,Y       ; operand patched above, and the loop top
+    REM STA $9F23
+    REM INY
+    REM CPY {STASH.NBYTES%}
+    REM BNE SOSRC
+    GP.ENDASM
+    #REM 0
+    RETURN
+
+STASH.MODULE.END:
+#ENDIF

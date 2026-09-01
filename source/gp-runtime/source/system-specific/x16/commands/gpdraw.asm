@@ -67,7 +67,16 @@ GPD_BOTTOM = 5
 GPD_LEFT = 6
 GPD_RIGHT = 7
 
-GPD_STYLES = 6
+GPD_STYLES = 4
+
+;
+;		Style GPD_CUSTOM is the caller's own eight glyphs, and it is the entry immediately
+;		AFTER the table -- so the drawing code below indexes it exactly as it indexes a
+;		built-in one, and not a line of it changed. That adjacency is the whole trick: the
+;		alternative was a second set of reads, or a pointer held in zero page across
+;		TileSetAddress.
+;
+GPD_CUSTOM = 4
 
 ; ************************************************************************************************
 ;
@@ -96,9 +105,12 @@ _CGBInteger:
 		ldx 	#5
 		jsr 	GPDrawColour
 		;
+		lda 	NSMantissa1+4 				; A STYLE OF 256 OR MORE IS AN ADDRESS, not a style
+		bne 	_CGBCustom 					; -- there are only four, so the high byte is free
 		lda 	NSMantissa0+4 				; the style, as an offset into the glyph table
 		cmp 	#GPD_STYLES
 		bcs 	_CGBBadStyle
+_CGBIndex:
 		asl 	a
 		asl 	a
 		asl 	a
@@ -149,6 +161,30 @@ _CGBExit:
 _CGBBadStyle:
 		ply
 		.error_range
+
+;
+;		The caller's eight glyphs, copied into the entry past the table and then drawn as if
+;		they had always been there. zTemp0 is free at this point -- GPDrawGeometry and
+;		GPDrawColour are done with it, and nothing that uses it is called until GPDrawAddress
+;		below, by which time this is finished.
+;
+;		THE BYTES ARE SCREEN CODES, in the table's own order, and NOT PETSCII: the table is
+;		read straight to the cell with no pet2scr, so a custom set has to match it. GP.FILL
+;		converts and this does not, which is a real difference and is documented in
+;		GPB.INC.BL where a caller will meet it.
+;
+_CGBCustom:
+		sta 	zTemp0+1
+		lda 	NSMantissa0+4
+		sta 	zTemp0
+		ldy 	#7
+_CGBCustomCopy:
+		lda 	(zTemp0),y
+		sta 	GPDrawCustom,y
+		dey
+		bpl 	_CGBCustomCopy
+		lda 	#GPD_CUSTOM
+		bra 	_CGBIndex
 
 ; ************************************************************************************************
 ;
@@ -401,11 +437,15 @@ GPDrawP2SOffset:
 
 GPDrawBorder:
 		.byte 	$A0,$A0,$A0,$A0,$A0,$A0,$A0,$A0 	; 0  solid block
-		.byte 	$66,$66,$66,$66,$66,$66,$66,$66 	; 1  chequered dither
-		.byte 	$6E,$70,$7D,$6D,$40,$40,$42,$42 	; 2  single line
-		.byte 	$49,$55,$4B,$4A,$40,$40,$42,$42 	; 3  single line, rounded corners
-		.byte 	$50,$4F,$7A,$4C,$77,$6F,$74,$6A 	; 4  thick line
-		.byte 	$5F,$69,$E9,$DF,$77,$6F,$74,$6A 	; 5  thick line, shaded corners
+		.byte 	$6E,$70,$7D,$6D,$40,$40,$42,$42 	; 1  single line
+		.byte 	$49,$55,$4B,$4A,$40,$40,$42,$42 	; 2  single line, rounded corners
+		.byte 	$50,$4F,$7A,$4C,$77,$6F,$74,$6A 	; 3  thick line
+;
+;		Style 4: the CALLER'S eight, copied in by _CGBCustom. It must stay immediately after
+;		the table -- that is what lets style 4 be indexed like any other.
+;
+GPDrawCustom:
+		.fill 	8
 
 		.send 	code
 

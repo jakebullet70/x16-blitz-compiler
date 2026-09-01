@@ -92,14 +92,8 @@ LINPUT 			X:CommandLINPUT N
 LINPUT# 		C:CommandLINPUTStream N
 BINPUT# 		C:CommandBINPUTStream N
 
-# 	GP.BASIC screen stash. Rectangle to a banked RAM bank and back. Geometry is REQUIRED on the
-# 	stash -- a full 80x60 screen is 9,600 bytes and does not fit an 8K bank, so there is no
-# 	sensible full-screen default to offer. GP.RESTR reads it back out of the 4-byte header, and
-# 	its optional x,y default to 255 (OptionalParameterCompile) because 0 is a legal coordinate
-# 	and could not have served as the sentinel.
-
-GP.STASH 		#,#,#,#,# T N
-GP.RESTR 		# X:OptionalParameterCompile X:OptionalParameterCompile T N
+#	GP.STASH and GP.RESTR were here. They are GPC-BASIC/STASH.INC.BL now, written in
+#	GP.ASM -- 329 bytes off a 2,048-byte block that every GP program pays for whole.
 
 # 	GP.BASIC text drawing, straight into VERA. The trailing colour is OptionalColourCompile on all
 # 	three -- 255 is a LEGAL attribute (light grey on light grey), so the sentinel has to be 256,
@@ -112,3 +106,21 @@ GP.RESTR 		# X:OptionalParameterCompile X:OptionalParameterCompile T N
 GP.BOX 			#,#,#,# X:OptionalZeroCompile X:OptionalColourCompile T N
 GP.FILL 		#,#,#,#,# X:OptionalColourCompile T N
 GP.PRINTAT 		#,#,$ X:OptionalColourCompile T N
+
+#	GP.CHAR x,y,char [,col] -- ONE cell, in GP.PRINTAT's shape, running GP.FILL's handler.
+#
+#	It writes no p-code of its own. The two PushOneCompile actions supply the width and height
+#	the programmer did not type, and "T:GP.FILL" -- the alt-token action gencom.py had carried a
+#	TODO for -- emits GP.FILL's token instead of a token of its own. So there is no new opcode,
+#	no new vector slot, and NOTHING ADDED TO THE GP RUNTIME BLOCK, which is all-or-nothing and
+#	had 29 bytes left ($3EE1 to ObjectCodePreHeader at $3EFE). A handler would have crossed the
+#	page and cost every GP program 256 bytes in the object and 256 more off its workspace floor.
+#
+#	The price is two bytes of object code per call site: constants 0-63 are single-byte opcodes,
+#	so the pair of 1s is two bytes, against the five a GP.FILL call site spends writing them.
+#
+#	The char is a NUMBER, like GP.FILL's, not a one-character string. That is what makes the
+#	alias possible at all, and it is the only spelling that survives a mode change: GP.FILL
+#	converts PETSCII to a screen code unconditionally, while GP.PRINTAT passes the byte through
+#	untouched in ISO mode (gpdraw.asm, "bit X16_EditorMode"). Same number, same glyph, either way.
+GP.CHAR 		#,# X:PushOneCompile X:PushOneCompile ,# X:OptionalColourCompile T:GP.FILL N

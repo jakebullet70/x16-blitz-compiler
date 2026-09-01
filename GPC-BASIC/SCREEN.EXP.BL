@@ -40,7 +40,7 @@ COLOR 1,0
 
 PANEL.COL = 6 * 16 + 1
 GP.FILL 4, 2, 32, 9, ASC(" "), PANEL.COL
-GP.BOX 4, 2, 32, 9, 2, PANEL.COL
+GP.BOX 4, 2, 32, 9, 1, PANEL.COL
 GP.PRINTAT 6, 3, "GP.BASIC SCREEN DEMO", PANEL.COL
 
 ## ---- The character is PETSCII, converted here. ASC() and CHR$() give you
@@ -54,7 +54,7 @@ GP.FILL 6, 6, 28, 1, 166, 2 * 16 + 15
 ## ----   0 solid   1 dither   2 single line
 ## ----   3 single line, rounded corners   4 thick   5 thick, shaded
 
-FOR STYLE.N = 0 TO 5
+FOR STYLE.N = 0 TO 3
   GP.BOX 6 + STYLE.N * 5, 8, 4, 3, STYLE.N, PANEL.COL
   GP.PRINTAT 7 + STYLE.N * 5, 9, CHR$(48 + STYLE.N), PANEL.COL
 NEXT
@@ -103,7 +103,7 @@ GP.FILL 0, 20, PANEL.W, 4, ASC("X")
 GP.STASH 1, 4, 2, 32, 9
 
 GP.FILL 8, 4, 24, 5, ASC(" "), 2 * 16 + 1
-GP.BOX 8, 4, 24, 5, 4, 2 * 16 + 1
+GP.BOX 8, 4, 24, 5, 3, 2 * 16 + 1
 GP.PRINTAT 10, 6, "A DIALOG OVER THE PANEL", 2 * 16 + 1
 
 ## ---- Anything at all to pause, then put the panel back exactly as it was.

@@ -71,6 +71,29 @@ _ORCDefault:
 
 ; ************************************************************************************************
 ;
+;		Push the constant 1, unconditionally, consuming nothing. It is a generator action rather
+;		than an argument: a COMPOSITE keyword uses it to supply an argument the programmer did
+;		not write, so that one keyword can run another's handler.
+;
+;		GP.CHAR x,y,char is the whole reason it exists -- it is GP.FILL x,y,1,1,char, and these
+;		are the 1s. The alternative was a GP.CHAR handler in the GP runtime block, and that block
+;		is all-or-nothing with 29 bytes left in it, so anything real would have crossed a page
+;		and charged every program using ANY GP keyword 256 bytes -- twice, once in the object and
+;		once off the bottom of its workspace.
+;
+;		It lives here, above ObjectBase, where compiler code is thrown away when the object is
+;		written. These eight bytes cost a compiled program nothing at all.
+;
+; ************************************************************************************************
+
+PushOneCompile:
+		lda 	#1
+		jsr 	PushIntegerA
+		clc
+		rts
+
+; ************************************************************************************************
+;
 ;		As OptionalParameterCompile, but for a trailing COLOUR argument (RECT/LINE/FRAME/OVAL/
 ;		RING). A palette index is 0..255, so 255 is a real colour and cannot double as the
 ;		"omitted" sentinel the way it can for sprite fields. The default is 256 instead -- out of

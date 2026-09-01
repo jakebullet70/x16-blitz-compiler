@@ -94,8 +94,18 @@ class GenCompiler(object):
 	def compile(self,s):
 		cmd = s[0].upper()
 		s = s[1:]
-		if cmd == "T":	 									# T token
-			assert not s.startswith(":"),"TODO Alt token" 	# not implemented alt token yet.
+		if cmd == "T":	 									# T token, or T:name for another's
+			#
+			#	T:<name> emits the p-code of a DIFFERENT keyword, which is how a composite
+			#	keyword is spelled: GP.CHAR parses its own arguments, pushes the constants
+			#	GP.FILL wants for width and height, and then runs GP.FILL's handler. No new
+			#	opcode, no new vector slot, and nothing added to the GP runtime block --
+			#	which matters, because that block is all-or-nothing and nearly full.
+			#
+			m = re.match(r"^\:([a-zA-Z0-9\.\$\#]+)\s*(.*)$",s)
+			if m is not None:
+				self.compilePCodeToken(m.group(1))
+				return m.group(2)
 			self.compilePCodeToken(self.token)				# compile equivalent P-Code
 
 		elif cmd == "X" or cmd == "C":						# X execute, C channelexecute
