@@ -111,22 +111,17 @@ GP.ENDASM 		X:CommandEndAsmCompile N
 #
 GP.CALL 		# X:OptionalZeroCompile X:OptionalZeroCompile X:OptionalZeroCompile X:OptionalZeroCompile T N
 #
-#		GP.BASIC in-place string statements. StringVariableCompile both VALIDATES (a plain string
-#		variable, never a literal or a temporary) and emits the read, so the runtime gets the
-#		block address and checks nothing.
+#		GP.TRIM / GP.LTRIM / GP.RTRIM / GP.UPPER / GP.LOWER were here, and are
+#		GPC-BASIC/STRCASE.INC.BL now -- GP.ASM, driven by GP.STRPTR. They were 188 bytes of the
+#		block, with one caller in the tree outside their own example. X:StringVariableCompile
+#		went with them; the guarantee it gave -- a literal can never reach the handler -- is the
+#		one thing the move gives up, because a GOSUB has no call site for the compiler to check.
 #
-#		These three all shrink or rewrite in place. There is deliberately NO GP.PAD: growing a
-#		string needs the variable slot, not the block, and a handler never gets it -- so padding
-#		lives in BASL as STRHELP.PAD (GPC-BASIC/STRHELP.INC.BL), where assignment reallocates.
 #
-GP.TRIM 		X:StringVariableCompile T N
-GP.LTRIM 		X:StringVariableCompile T N
-GP.RTRIM 		X:StringVariableCompile T N
-GP.UPPER 		X:StringVariableCompile T N
-GP.LOWER 		X:StringVariableCompile T N
+#		GP.SORT was here. It is GPC-BASIC/SORT.INC.BL now, written in GP.ASM, because the GP block
+#		is all or nothing and 408 of its bytes were a sort that most programs never call. The
+#		module is the same shell sort with the same Ciura gaps and is checked element for element
+#		against what this keyword used to produce (GPC-BASIC/SORTTST.EXP.BL).
 #
-#		GP.SORT a$() [,descending] [,foldcase] -- shell sort in place, swapping the 2 byte element
-#		pointers. The parentheses are REQUIRED: A$ and A$() are different variables, so without them
-#		the compiler would find the scalar and sort nothing.
-#
-GP.SORT 		X:StringArrayCompile X:OptionalZeroCompile X:OptionalZeroCompile T N
+#		It was the only caller of X:StringArrayCompile, which has gone with it. X:AnyArrayCompile
+#		in unary.def is the survivor of that pair and is what GP.ARRPTR uses.

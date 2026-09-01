@@ -84,7 +84,7 @@
 ;
 ;	SYS    # T N
 ;
-	.byte	$07,$9e,$00,$e2,44765 & $FF,44765 >> 8,$06
+	.byte	$07,$9e,$00,$e2,43229 & $FF,43229 >> 8,$06
 ;
 ;	POKE    #,# T N
 ;
@@ -96,7 +96,7 @@
 ;
 ;	STOP    T N
 ;
-	.byte	$07,$90,$00,$20,44509 & $FF,44509 >> 8,$06
+	.byte	$07,$90,$00,$20,42973 & $FF,42973 >> 8,$06
 ;
 ;	END    T N
 ;
@@ -160,28 +160,4 @@
 ;
 ;	GP.CALL   # X:OptionalZeroCompile X:OptionalZeroCompile X:OptionalZeroCompile X:OptionalZeroCompile T N
 ;
-	.byte	$13,$ce,$7c,$e3,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$20,33757 & $FF,33757 >> 8,$06
-;
-;	GP.TRIM   X:StringVariableCompile T N
-;
-	.byte	$0a,$ce,$75,$03,StringVariableCompile & $FF,StringVariableCompile >> 8,$20,36061 & $FF,36061 >> 8,$06
-;
-;	GP.LTRIM   X:StringVariableCompile T N
-;
-	.byte	$0a,$ce,$74,$03,StringVariableCompile & $FF,StringVariableCompile >> 8,$20,36573 & $FF,36573 >> 8,$06
-;
-;	GP.RTRIM   X:StringVariableCompile T N
-;
-	.byte	$0a,$ce,$71,$03,StringVariableCompile & $FF,StringVariableCompile >> 8,$20,36317 & $FF,36317 >> 8,$06
-;
-;	GP.UPPER   X:StringVariableCompile T N
-;
-	.byte	$0a,$ce,$73,$03,StringVariableCompile & $FF,StringVariableCompile >> 8,$20,35549 & $FF,35549 >> 8,$06
-;
-;	GP.LOWER   X:StringVariableCompile T N
-;
-	.byte	$0a,$ce,$72,$03,StringVariableCompile & $FF,StringVariableCompile >> 8,$20,35805 & $FF,35805 >> 8,$06
-;
-;	GP.SORT   X:StringArrayCompile X:OptionalZeroCompile X:OptionalZeroCompile T N
-;
-	.byte	$10,$ce,$6f,$03,StringArrayCompile & $FF,StringArrayCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$20,34781 & $FF,34781 >> 8,$06
+	.byte	$13,$ce,$7c,$e3,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$20,34013 & $FF,34013 >> 8,$06

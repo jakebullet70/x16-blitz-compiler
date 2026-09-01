@@ -2,24 +2,36 @@
 ## **
 ## **  ARRAYS.EXP.BL -- the GP.BASIC array set.
 ## **
-## **  GP.SORT     statement, shell sort a string array in place
+## **  SORT.RUN    SORT.INC.BL, shell sort a string array in place
 ## **  GP.COMP     function, case-insensitive compare
 ## **  GP.ARRPTR   function, the address of element zero
 ## **  GP.HIBYTE / GP.LOBYTE  composite, splitting that address
 ## **
-## **  Build:  copy GPC-BASIC/GPB.INC.BL and this file into testing/, then
+## **  GP.SORT WAS A KEYWORD AND IS NOT ANY MORE. It is SORT.INC.BL, the
+## **  same shell sort written in GP.ASM, because the GP runtime block is
+## **  all or nothing and 408 of its bytes were a sort most programs never
+## **  call. That is why this file now needs a #SYMFILE: the module reaches
+## **  BASIC's variables through {VAR} and the compiler needs BASLOAD's
+## **  record of the crunched names to resolve them.
+## **
+## **  Build:  copy GPC-BASIC/GPB.INC.BL, GPC-BASIC/SORT.INC.BL and this
+## **          file into testing/, then
 ## **            python source/gpc/build_basl.py ARRAYS.EXP.BL ARRAYS.PRG
 ## **          and compile ARRAYS.PRG with GPC.BIN.
 ## **
 ## **  Compile-only: the ROM cannot RUN a PRG containing GP tokens.
 ## **
 ## ***********************************************************************
-#INCLUDE "GPB.INC.BL"
 #SAVEAS "@:ARRAYS.PRG"
+#SYMFILE "@:ARRAYS.SYM"
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "SORT.INC.BL"
 
-## ---- 1. GP.SORT. The EMPTY PARENTHESES ARE REQUIRED. In BASIC A$ and
-## ---- A$() are different variables, so without them the compiler finds
-## ---- the scalar and sorts nothing at all -- which looks like it worked.
+## ---- 1. SORT.RUN. The array goes in as an ADDRESS, from GP.ARRPTR, and
+## ---- the EMPTY PARENTHESES THERE ARE REQUIRED: in BASIC A$ and A$() are
+## ---- different variables, so without them the compiler finds the scalar.
+## ---- A BASL subroutine cannot be handed an array, which is why the
+## ---- address is the interface and GP.ARRPTR stayed a keyword.
 
 DIM FRUIT$(5)
 FRUIT$(0) = "PEAR"
@@ -29,19 +41,23 @@ FRUIT$(3) = "FIG"
 FRUIT$(4) = "DATE"
 FRUIT$(5) = "CHERRY"
 
-GP.SORT FRUIT$()
+SORT.PTR = GP.ARRPTR(FRUIT$()) : SORT.DESCEND = 0 : SORT.NOCASE = 0
+GOSUB SORT.RUN
 PRINT "ASCENDING  ";
 FOR I = 0 TO 5 : PRINT FRUIT$(I); " "; : NEXT
 PRINT
 
-## ---- Second argument non-zero reverses it.
+## ---- SORT.DESCEND non-zero reverses it. The flags are sticky -- they are
+## ---- ordinary variables, not arguments -- so set both every time rather
+## ---- than inheriting whatever the last call left behind.
 
-GP.SORT FRUIT$(), 1
+SORT.PTR = GP.ARRPTR(FRUIT$()) : SORT.DESCEND = 1 : SORT.NOCASE = 0
+GOSUB SORT.RUN
 PRINT "DESCENDING ";
 FOR I = 0 TO 5 : PRINT FRUIT$(I); " "; : NEXT
 PRINT
 
-## ---- Third argument non-zero ignores case. Without it every upper case
+## ---- SORT.NOCASE non-zero ignores case. Without it every upper case
 ## ---- letter sorts before every lower case one, because that is what the
 ## ---- PETSCII codes say.
 
@@ -51,28 +67,30 @@ NAME$(1) = "Bravo"
 NAME$(2) = "alpha"
 NAME$(3) = "Charlie"
 
-GP.SORT NAME$()
+SORT.PTR = GP.ARRPTR(NAME$()) : SORT.DESCEND = 0 : SORT.NOCASE = 0
+GOSUB SORT.RUN
 PRINT "CASE SENSITIVE ";
 FOR I = 0 TO 3 : PRINT NAME$(I); " "; : NEXT
 PRINT
 
-GP.SORT NAME$(), 0, 1
+SORT.PTR = GP.ARRPTR(NAME$()) : SORT.DESCEND = 0 : SORT.NOCASE = 1
+GOSUB SORT.RUN
 PRINT "CASE FOLDED    ";
 FOR I = 0 TO 3 : PRINT NAME$(I); " "; : NEXT
 PRINT
 
 ## ---- Elements never assigned are empty strings and sort to the front.
-## ---- They are NOT garbage -- GP.SORT reads a zero pointer as "", the
+## ---- They are NOT garbage -- the sort reads a zero pointer as "", the
 ## ---- same substitution the runtime makes everywhere else.
 
 DIM SPARSE$(4)
 SPARSE$(0) = "ZULU"
 SPARSE$(1) = "ALPHA"
-GP.SORT SPARSE$()
+SORT.PTR = GP.ARRPTR(SPARSE$()) : SORT.DESCEND = 0 : SORT.NOCASE = 0
+GOSUB SORT.RUN
 PRINT "WITH EMPTIES   ";
 FOR I = 0 TO 4 : PRINT "["; SPARSE$(I); "]"; : NEXT
 PRINT
-
 ## ---- 2. GP.COMP -- the equality test plain "=" cannot express. Returns
 ## ---- -1 if the first sorts before the second, 0 if they match, 1 after.
 

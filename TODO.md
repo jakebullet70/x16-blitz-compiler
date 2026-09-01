@@ -768,6 +768,24 @@ readability choice, not a size one.
 
 
 
+## `BMX.INC.BL` wants the `GP.ASM` treatment
+
+**The BMX loader is the last big BASL routine still doing per-byte work in BASIC**, and it is the
+one place left where that is measurable to a user: a bitmap is 320×240 at 8bpp, so the paint loop is
+counted in tens of thousands of iterations rather than the hundreds a menu or a dialog costs.
+Everything else that mattered has already moved — `samples/editor`'s two renderers went to `GP.ASM`
+and came back **123× and 109×** faster, and the p-code got *smaller* because the `FOR` loops removed
+were bigger than the assembly that replaced them.
+
+The shape is known and is the same one `STASH.INC.BL` and `SORT.INC.BL` use: BASIC works out the
+address of a row or a run and the assembly moves the bytes. BMX is a better fit than either, because
+the destination is VERA's auto-incrementing data port — a fixed address — so the inner loop is a
+`LDA`/`STA` pair with no pointer arithmetic in it at all, and the `FX` 32-bit cache write the editor
+uses to flush four bytes per store applies directly.
+
+Not started. Worth measuring `BMXSPD.EXP.BL` before and after, since that sample exists precisely to
+say how long a paint really takes.
+
 ## GP.ASM `{VAR}` under BASLOAD — DONE, by reading `#SYMFILE`
 
 `{VAR}` reaches a BASIC variable from inside a `GP.ASM` block, and it now does so under BASLOAD,

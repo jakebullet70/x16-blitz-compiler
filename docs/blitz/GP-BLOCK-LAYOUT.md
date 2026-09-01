@@ -1,11 +1,67 @@
 # The GP block: what is in it, what it costs, and what a cut line could save
 
-**Findings only — nothing here is built.** Measured 2026-09-01 from
+**Re-measured 1st September 2026, AFTER the stash and the sort left the block.** The survey below
+was written when the block was 2,048 bytes; §0 records what actually happened next, and the rest of
+the document is the original finding with its numbers marked. Everything is read from
 `source/runtime/build/code.lst`, the linked runtime image this tree last produced.
 
 ---
 
-## 1. The block today
+## 0. What changed, and what is left
+
+| | then | now |
+|---|---:|---:|
+| `ObjectBase` | `$3f00` | **`$3c00`** |
+| block size | 2,048 | **1,280** |
+| code ends at | `$3EE1` | **`$3B54`** |
+| free | 29 | **172** |
+| runtime image (`RT`) | 14,079 | **13,311** |
+
+Three of the groups §3 called out as least used have gone, and none of them by finding a cheaper way
+to write the code — **by finding it did not belong in the block at all**:
+
+- **`GP.STASH` / `GP.RESTR`, 329 bytes** -> `GPC-BASIC/STASH.INC.BL`, `GP.ASM`. `$3f00` -> `$3e00`.
+- **`GP.SORT`, 408 bytes** -> `GPC-BASIC/SORT.INC.BL`, `GP.ASM`. `$3e00` -> `$3d00`. `GP.ARRPTR`
+  stayed (49 bytes), because the module is built on it: a BASL subroutine cannot be handed an array.
+  The file it was in is `gparrptr.asm` now.
+- **`GP.UPPER` / `GP.LOWER` / `GP.TRIM` / `GP.LTRIM` / `GP.RTRIM`, 188 bytes** including their
+  shared `GPStringAddress` -> `GPC-BASIC/STRCASE.INC.BL`, `GP.ASM`, one blob with the mode tested
+  once at entry. `$3d00` -> `$3c00`. `GP.STRPTR` stayed and is what the module is built on, for the
+  same reason `GP.ARRPTR` did.
+
+Each page is charged twice — object *and* workspace floor — so that is **1,536 bytes back for every
+GP program in the tree**, whether or not it sorts, stashes or touches a string, and no keyword was
+lost: all three are still available as an `#INCLUDE`, in the programs that actually want them.
+
+**The pattern is now explicit enough to state as a rule.** A group can leave the block when its
+argument can be reduced to an ADDRESS a BASL routine can be handed — `GP.ARRPTR` for the sort,
+`GP.STRPTR` for the strings — and when what it does is a STATEMENT rather than a function. Those two
+keywords are therefore load-bearing and should be the last things anyone tries to remove, not the
+first: each is small, and each is the hinge that let a much larger group out.
+
+Conversely: **`GP.INSTR`, `GP.COMP` and `GP.STRPTR` stay because they are functions.** A module
+cannot be one, so `IF GP.COMP(A$,B$) = 0` would become three lines and an out-variable. That is the
+boundary of this technique, not a gap in it.
+
+### The next 84 bytes are worth 512
+
+Code ends at **`$3B54`**, which is **84 bytes** past `$3B00`, and `ObjectBase` rounds up to a page —
+so 84 bytes saved anywhere in the block hands back another 512. The 172 bytes of slack above the cut
+are doing nothing; the 84 below it are worth more than all of them. Check which side of a page a
+change lands on before costing it: the answer flips. Candidates, none costed:
+
+- **`GP.SELECT`'s general path, 98 bytes**, which `TODO.md` has costed in full — and rejected,
+  *because* it freed no program bytes at the boundary of the day. It clears this one on its own.
+- **`GP.A` / `GP.X` / `GP.Y` / `GP.C`, 31 bytes**, which are `PEEK($030C..$030F)` and could be
+  composites for zero runtime bytes. `gpcall.asm` left them unshifted deliberately — 41 cycles
+  against `PEEK`'s 58, in loops — so this is a speed decision to re-open, not free.
+- **`GP.ARRPTR` (49) and `GP.STRPTR` (24)** — see the rule above. Removing either means finding
+  another way to hand a module an address first; `{A$()}` in the `GP.ASM` brace parser is the
+  proposal on file, and would be compiler-side and free at runtime.
+
+---
+
+## 1. The block as it was (2,048 bytes) — the original survey
 
 `GPBase = $3700`, `ObjectBase = $3f00` (`source/application/rtimage.gen.asm`). **2,048 bytes**,
 and it is charged **twice**: `WriteObjectCode` writes `$0801..ObjectBase` instead of
@@ -28,9 +84,9 @@ Code ends at **`$3EE1`**. `ObjectCodePreHeader` sits at `$3EFE`. **29 bytes free
 | control flow | `do.asm` `select.asm` `unwind.asm` | **252** | `GP.DO` `GP.LOOP` `GP.EXITDO` `GP.SELECT` `GP.CASE` `GP.OTHER` `GP.ENDSEL`, and a `GOTO` out of a block |
 | machine-code call | `gpcall.asm` | **108** | `GP.CALL` `GP.A` `GP.X` `GP.Y` `GP.C` |
 | drawing | `gpdraw.asm` | **445** | `GP.BOX` `GP.FILL` `GP.PRINTAT` (+ the shared `GPDraw*` helpers and the 48-byte border table) |
-| screen stash | `gpstash.asm` | **329** | `GP.STASH` `GP.RESTR` |
-| strings | `gpstring.asm` | **426** | `GP.INSTR` `GP.COMP` `GP.STRPTR` `GP.UPPER` `GP.LOWER` `GP.TRIM` `GP.RTRIM` `GP.LTRIM` |
-| sort | `gpsort.asm` | **457** | `GP.SORT` `GP.ARRPTR` |
+| screen stash | `gpstash.asm` | **329** | `GP.STASH` `GP.RESTR` — **GONE, now `STASH.INC.BL`** |
+| strings | `gpstring.asm` | **426** | `GP.INSTR` `GP.COMP` `GP.STRPTR`, and the five in-place statements — **GONE, now `STRCASE.INC.BL`** |
+| sort | `gpsort.asm` | **457** | `GP.SORT` — **GONE, now `SORT.INC.BL`** — and `GP.ARRPTR`, which stayed |
 | | free | 29 | |
 
 `GP.IF` / `GP.ELSEIF` / `GP.ELSE` / `GP.ENDIF` have **no handler in the block** — they compile to
@@ -42,7 +98,8 @@ whose only block construct is `GP.IF` is GP OUT and pays nothing.
 ## 3. The finding
 
 **Sort and stash are 786 bytes — 38% of the block — and are the two least-used keywords in the
-set.** Strings add another 426. Meanwhile **control flow, the group nearly every GP program pulls
+set.** *(Both have since left it entirely; see §0. That turned out to be a better answer than any
+cut line, because it needed no change to `gpscan.asm` at all.)* Strings add another 426. Meanwhile **control flow, the group nearly every GP program pulls
 the block in for, is the smallest at 252 bytes — and it is split across both ends**:
 
 ```

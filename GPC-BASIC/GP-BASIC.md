@@ -105,11 +105,12 @@ the BASIC modules are written up in §4.
 | **Block IF** | ASM | `GP.IF` `GP.ELSEIF` `GP.ELSE` `GP.ENDIF` — see §3.8 |
 | **Machine code** | ASM | `GP.CALL` `GP.A` `GP.X` `GP.Y` `GP.C` |
 | **Inline assembly** | COMPOSITE | `GP.ASM` `GP.ENDASM` — free, and stays GP-BASIC OUT, see §3.9 |
-| **Strings** | ASM | `GP.INSTR` `GP.STRPTR` `GP.TRIM` `GP.LTRIM` `GP.RTRIM` `GP.UPPER` `GP.LOWER` `GP.COMP` |
+| **Strings** | ASM | `GP.INSTR` `GP.STRPTR` `GP.COMP` |
 | **Strings** | COMPOSITE | `GP.CONTAINS` `GP.ISEMPTY` — free, see §3.4 |
 | **Addresses** | COMPOSITE | `GP.HIBYTE` `GP.LOBYTE` — free, see §3.3 |
-| **Arrays** | ASM | `GP.SORT` `GP.ARRPTR` |
-| **Screen** | ASM | `GP.STASH` `GP.RESTR` `GP.BOX` `GP.FILL` `GP.PRINTAT` |
+| **Arrays** | ASM | `GP.ARRPTR` |
+| **Screen** | ASM | `GP.BOX` `GP.FILL` `GP.PRINTAT` |
+| **Screen** | COMPOSITE | `GP.CHAR` — free, one cell in `GP.PRINTAT`'s shape running `GP.FILL`'s handler |
 | **Colour roles** | BASIC | `THEME.INC.BL` — `THEME.LOAD`, `THEME.CLR()` · §4.1 |
 | **String helpers** | BASIC | `STRHELP.INC.BL` — `PADR` `PADL` `PADC` `SPLIT` `REPLACE` `PET2SCR` · §4.2 |
 | **Screen etiquette, panels** | BASIC | `APPHELP.INC.BL` — `STARTUP` `RESTORE` `PANEL.SAVE/LOAD/PUT` · §4.3 |
@@ -285,11 +286,11 @@ Example: [`MLCALL.EXP.BL`](MLCALL.EXP.BL)
 | `GP.ISEMPTY(a$)` | −1 if `a$` has zero length, 0 if not. **Composite** |
 | `GP.COMP(a$, b$)` | compare **ignoring case**: −1 before, 0 same, 1 after |
 | `GP.STRPTR(a$)` | address of the string's `[ActLen][Data]` block |
-| `GP.TRIM a$` | strip spaces from **both** ends, in place |
-| `GP.LTRIM a$` | from the left only |
-| `GP.RTRIM a$` | from the right only |
-| `GP.UPPER a$` | A–Z to upper, in place |
-| `GP.LOWER a$` | A–Z to lower, in place |
+
+> **The five in-place statements were here and are now `STRCASE.INC.BL`** (§4.8) — `GP.TRIM`,
+> `GP.LTRIM`, `GP.RTRIM`, `GP.UPPER`, `GP.LOWER`. They were 188 bytes of the GP block, which is all
+> or nothing, and outside their own example file they had one caller in the whole tree. `GP.STRPTR`
+> stayed and is what the module is built on.
 
 `GP.INSTR` is the gap that matters: **GPC has no string search of any kind** without it.
 
@@ -306,7 +307,7 @@ so reach for `GP.COMP` when you need case-blind. An **empty needle is 0**, not �
 > than a flag, write the `GP.INSTR` out; you are not paying twice for the two spellings.
 
 `GP.ISEMPTY(a$)` is `LEN(a$) = 0` with the question written down instead of implied. **A string of
-spaces is not empty** — `GP.TRIM` it first if that is what you meant. It is for readability only:
+spaces is not empty** — `STRCASE.TRIM` it first if that is what you meant. It is for readability only:
 it compiles to the same four bytes as `LEN(a$)=0`, and `IF a$=""` costs about the same again
 (a literal points *into* the p-code, so even the empty string allocates nothing). Do not pick
 between the three on size.
@@ -343,16 +344,13 @@ Example: [`STRINGS.EXP.BL`](STRINGS.EXP.BL)
 ### 3.5 Arrays
 
 ```
-GP.SORT a$() [,descending] [,foldcase]
 GP.ARRPTR(a())
 ```
 
-Shell sort in place. Both options default to 0 (ascending, case-sensitive); any non-zero turns them
-on. **Maximum `DIM` bound 254** (255 items). Never-assigned elements count as empty strings and sort
-to the front.
-
-> **The empty parentheses are required.** In BASIC `A$` and `A$()` are different variables, so
-> `GP.SORT A$` finds the scalar and sorts nothing.
+> **`GP.SORT` was here and is now `SORT.INC.BL`** (§4.7) — the same shell sort with the same gap
+> sequence, written in `GP.ASM`. It was 408 bytes of the GP block, which is all or nothing, carried
+> by every program that never sorted anything. `GP.ARRPTR` stayed, because the module is built on
+> it: a BASL subroutine cannot be handed an array, so an address is the only interface there is.
 
 `GP.ARRPTR` returns the address of **element zero** — the header is already skipped — so machine code
 reached by `GP.CALL` can work on the array in bulk. **Stride is yours to add:** 2 bytes per element
@@ -366,18 +364,23 @@ Example: [`ARRAYS.EXP.BL`](ARRAYS.EXP.BL)
 
 ### 3.6 Screen — stash and restore
 
+**`GP.STASH` and `GP.RESTR` were here and are now `STASH.INC.BL`,** written in `GP.ASM`. Same
+rectangle, same self-describing 4-byte header, same 4,094-cell ceiling — a bank is 8K and a cell is
+two bytes, so a full 80×60 screen at 9,600 bytes still does not fit. They were 329 bytes of the GP
+block, which is all or nothing, carried by every program that never stashed anything.
+
 ```
-GP.STASH bank, x, y, w, h
-GP.RESTR bank [,x ,y]
+#SYMFILE "@:MYPROG.SYM"
+#INCLUDE "STASH.INC.BL"
+STASH.BANK = 8 : STASH.X = 10 : STASH.Y = 4 : STASH.W = 30 : STASH.H = 8
+GOSUB STASH.SAVE
+...
+GOSUB STASH.RESTORE
 ```
 
-Copies a text rectangle into a banked RAM bank and back. The stash carries a **4-byte header**
-(w, h, x, y), so the restore needs only the bank — `GP.RESTR bank` puts it back where it came from,
-and `GP.RESTR bank,x,y` pastes it somewhere else. That makes a saved panel a reusable stamp.
-
-> **A bank is 8K and a cell is 2 bytes, so at most 4094 cells fit.** A full 80×60 screen is 9,600
-> bytes and will **not**. Stash panels, not screens. The limit is checked per row, before the write
-> that would cross out of the bank — too large is an error, never a corrupted next bank.
+`STASHFILE.INC.BL` is the same rectangle through a **file**, and a separate module because a BASL
+module has no dead code elimination: everything it holds is compiled into every program that
+includes it, called or not.
 
 ---
 
@@ -654,7 +657,7 @@ the readable name costs no variable, no lookup, and a one-byte constant index.
 | `STRHELP.PET2SCR` | `STRHELP.PET` | `STRHELP.SCR` |
 
 All three pad routines **leave a string already at or past the width alone. They pad; they never
-truncate** — use `GP.RTRIM` to go the other way.
+truncate** — use `STRCASE.RTRIM` (§4.8) to go the other way.
 
 `SPLIT` reads `STRHELP.STR$` without modifying it. `STRHELP.MAX` of 0 means 10. **Empty fields are
 preserved**, which is what makes it safe for data rows: `"A,,C"` is three fields, `"A,"` is two.
@@ -704,8 +707,9 @@ finds it, so anything you change beforehand is what gets restored.
 **Lay out from `APPHELP.COLS` / `APPHELP.ROWS` rather than assuming 80×60.** The X16 boots 80×60 but
 `SCREEN 0` is 40×30, and someone who prefers larger text is running one.
 
-`APPHELP.DEV` defaults to 8. The panel file is **self-describing** — `GP.STASH`'s 4-byte header goes
-in it — so loading needs nothing but the name.
+`APPHELP.DEV` defaults to 8. The panel routines themselves moved to `STASHFILE.INC.BL`; the panel
+file is **self-describing** — the stash's 4-byte header goes in it — so loading needs nothing but
+the name.
 
 ### 4.4 `INPHELP.INC.BL` — a positioned entry field
 
@@ -920,6 +924,106 @@ whole small application, and [`MENUTST.EXP.BL`](MENUTST.EXP.BL) for the 21-case 
 
 ---
 
+### 4.7 `SORT.INC.BL` — shell sort a string array
+
+| Routine | in | out |
+|---|---|---|
+| `SORT.RUN` | `SORT.PTR` `SORT.DESCEND` `SORT.NOCASE` | `SORT.OK` `SORT.COUNT` |
+
+```
+#SYMFILE "@:MYPROG.SYM"
+#INCLUDE "SORT.INC.BL"
+
+SORT.PTR = GP.ARRPTR(NAME$())
+SORT.DESCEND = 0 : SORT.NOCASE = 0
+GOSUB SORT.RUN
+```
+
+**This was `GP.SORT`.** Same shell sort, same Ciura gap sequence — 132, 57, 23, 10, 4, 1 — moving the
+2-byte element *pointers* rather than string data, so a swap is a swap whatever the strings are: no
+temporary, no copying, no heap traffic. That is what made it worth assembly in the first place and
+none of it changed when it left the block.
+
+> **The array goes in as an address, and that is not a style choice.** A BASL subroutine cannot be
+> handed an array, so `GP.ARRPTR` — which stayed a keyword for exactly this — turns one into an
+> address the module can work through. The empty parentheses in `GP.ARRPTR(A$())` are required: `A$`
+> and `A$()` are different variables.
+
+`SORT.OK` is 0 if it refused: more than 255 elements (so **`DIM A$(254)` is the largest**, since
+`DIM A$(255)` is 256 of them), or an array whose elements are not strings. The element count and the
+type are read back out of the array's own header, three bytes below what `GP.ARRPTR` returns, so a
+wrong count cannot be passed in.
+
+**Never-assigned elements are empty strings, not garbage.** A `DIM A$(20)` with five entries filled
+sorts its fifteen empties to the front; a null pointer is read as `""`, the same substitution the
+runtime makes everywhere else.
+
+`SORT.DESCEND` and `SORT.NOCASE` are ordinary variables, not arguments, so they are **sticky** — set
+both on every call rather than inheriting what the last one left behind.
+
+**Your program must have a `#SYMFILE`,** and it goes *before* the `#INCLUDE`s. The assembly reaches
+BASIC's variables through `{VAR}` and BASLOAD crunches every name before the compiler sees it;
+without the mapping the compile stops with `NO SYMBOL FILE FOR {}`.
+
+Example: [`ARRAYS.EXP.BL`](ARRAYS.EXP.BL). Regression test:
+[`SORTTST.EXP.BL`](SORTTST.EXP.BL), eight cases including a 200-element array — element 128 is where
+the doubled index stops fitting in a byte, and every case is checked for **content** as well as
+order, because a sort that reads the wrong element leaves the array beautifully sorted with the same
+string in it twice.
+
+---
+
+### 4.8 `STRCASE.INC.BL` — case and trim, in place
+
+| Routine | in | out |
+|---|---|---|
+| `STRCASE.GO` | `STRCASE.PTR` `STRCASE.MODE` | *(the string itself)* |
+
+```
+#SYMFILE "@:MYPROG.SYM"
+#INCLUDE "STRCASE.INC.BL"
+
+STRCASE.PTR = GP.STRPTR(LINE$)
+STRCASE.MODE = STRCASE.RTRIM
+GOSUB STRCASE.GO
+```
+
+| mode | does |
+|---|---|
+| `STRCASE.UPPER` | a–z → A–Z, everything else untouched |
+| `STRCASE.LOWER` | A–Z → a–z, everything else untouched |
+| `STRCASE.TRIM` | spaces off **both** ends |
+| `STRCASE.LTRIM` | spaces off the **leading** end |
+| `STRCASE.RTRIM` | spaces off the **trailing** end |
+
+**These were `GP.UPPER`, `GP.LOWER`, `GP.TRIM`, `GP.LTRIM` and `GP.RTRIM`,** and the code is the
+same code. One blob with the mode tested **once**, at entry — never inside a loop, where the byte
+count is the whole cost.
+
+> **The argument is an address, and that is the point.** A BASL subroutine cannot be passed a
+> variable, and the obvious workaround — copy the caller's string in, work on it, copy it back — is
+> two allocations and two copies per call, which is exactly the heap traffic these were written in
+> assembly to avoid. `GP.STRPTR` hands over the block and the assembly rewrites it where it lies.
+
+> **Do not pass a literal.** `GP.STRPTR("hello")` is the address of that text inside the *p-code*,
+> so upper-casing it edits the running program, and the edit survives to the next time that line
+> runs. The keywords could not be misused this way — the compiler required a string *variable* at
+> the call site — and a `GOSUB` has no equivalent. This is the one thing the move gives up.
+
+`STRCASE.MODE` is **sticky**: it is an ordinary variable, not an argument, so a call that forgets to
+set it silently repeats the last operation. Set both inputs every time, as with `SORT.DESCEND` and
+`STASH.MOVE`.
+
+There is still no pad here — padding *grows* a string, and nothing working on the block alone can
+grow one past the capacity it was born with. That is `STRHELP.PADR` (§4.2).
+
+Example: [`STRINGS.EXP.BL`](STRINGS.EXP.BL). Regression test:
+[`STRCTST.EXP.BL`](STRCTST.EXP.BL), twenty cases — empty, all-spaces, a single space, one
+character, a single leading space (the boundary in the slide), 200 characters, and guard strings
+either side to catch an off-by-one writing into the neighbouring block.
+
+---
+
 ## 5. Variables
 
 **BASL has one flat namespace and nothing else.** No locals, no scoping, no parameters. Every
@@ -996,7 +1100,8 @@ Every one of these has cost a debugging session at least once.
 | `PRINT` after `GP.PRINTAT` | GP drawing never calls the KERNAL, so the cursor is wherever it was | `LOCATE` first, or stay in one world |
 | `GOTO` out of a `GP.SELECT` | `GP.ENDSEL` releases the frame; jumping past it leaks one per pass | a flag, tested after `GP.ENDSEL` |
 | `GOTO` out of a `GP.DO` | abandons the loop frame | `GP.EXITDO` |
-| `GP.SORT A$` | `A$` and `A$()` are different variables — it sorts the scalar, i.e. nothing | `GP.SORT A$()` |
+| `GP.ARRPTR(A$)` | `A$` and `A$()` are different variables — it finds the scalar | `GP.ARRPTR(A$())` |
+| `SORT.INC.BL` with no `#SYMFILE` | `{VAR}` cannot resolve a crunched name — `NO SYMBOL FILE FOR {}` | `#SYMFILE "@:PROG.SYM"`, before the `#INCLUDE`s |
 | `GP.BOX X,Y,W,H,,7` | optionals cannot be skipped over | `GP.BOX X,Y,W,H,0,7` |
 | `SCREEN` after `BMX.PAINT` | reloads the default palette and throws the image's colours away | set the mode first |
 | `DIM THEME.CLR(...)` | the module owns it; re-`DIM`ing is an error | leave it alone |

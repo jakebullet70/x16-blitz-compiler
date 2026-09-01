@@ -59,21 +59,28 @@
 #TOKEN GP.STRPTR 52854
 
 
-## In-place string statements. Each takes a STRING VARIABLE (never a literal
-## or an expression -- the compiler rejects those) and modifies it where it
-## sits. GP.TRIM strips spaces from both ends, GP.LTRIM from the left only,
-## GP.RTRIM from the right only. GP.UPPER / GP.LOWER convert case, A-Z only,
-## leaving digits, punctuation and PETSCII graphics untouched.
+## THE IN-PLACE STRING STATEMENTS ARE GONE -- GP.TRIM, GP.LTRIM, GP.RTRIM,
+## GP.UPPER and GP.LOWER are STRCASE.INC.BL now, written in GP.ASM. They were
+## 188 bytes of the GP runtime block, which is all or nothing: every byte goes
+## into the object AND comes off the bottom of the workspace, for any program
+## that uses one GP keyword. Outside their own example they had one caller in
+## the whole tree.
 ##
-## There is NO GP.PAD: padding GROWS a string, and these commands cannot grow
-## one past the capacity it was born with. Use STRHELP.PAD from
-## "STRHELP.INC.BL" instead -- plain BASIC assignment, which reallocates.
-
-#TOKEN GP.TRIM 52853
-#TOKEN GP.LTRIM 52852
-#TOKEN GP.UPPER 52851
-#TOKEN GP.LOWER 52850
-#TOKEN GP.RTRIM 52849
+##      #SYMFILE "@:MYPROG.SYM"          <- and it is not optional
+##      #INCLUDE "STRCASE.INC.BL"
+##      STRCASE.PTR = GP.STRPTR(LINE$)
+##      STRCASE.MODE = STRCASE.RTRIM
+##      GOSUB STRCASE.GO
+##
+## GP.STRPTR above stays, and is what the module is built on: a BASL routine
+## cannot be passed a variable, so it takes the block address and rewrites it
+## where it lies -- no copy in, no copy out. THE ONE THING LOST is that the
+## compiler used to reject a literal at the call site; GP.STRPTR("text") is an
+## address inside the p-code, and upper-casing that edits the program.
+##
+## There is still NO GP.PAD, for the same reason there never was: padding
+## GROWS a string, and nothing that works on the block alone can grow one past
+## the capacity it was born with. Use STRHELP.PAD from "STRHELP.INC.BL".
 
 ## GP.COMP(a$,b$) compares WITHOUT case: -1 if a$ sorts before b$, 0 if they
 ## match, 1 if after. Length breaks a tie, so "abc" sorts before "ABCD".
@@ -82,14 +89,21 @@
 
 #TOKEN GP.COMP 52848
 
-## GP.SORT a$() [,descending] [,foldcase] -- shell sort the array in place.
-## The EMPTY PARENTHESES ARE REQUIRED: in BASIC A$ and A$() are different
-## variables, so without them the compiler finds the scalar and sorts
-## nothing. Both options default to 0 (ascending, case-sensitive) and any
-## non-zero value turns them on. Maximum 254 as the DIM bound (255 items).
-## Never-assigned elements count as empty strings and sort to the front.
-
-#TOKEN GP.SORT 52847
+## GP.SORT IS GONE, replaced by SORT.INC.BL -- the same shell sort with the
+## same Ciura gaps, written in GP.ASM. It was 408 bytes of the GP runtime
+## block, which is all or nothing: every byte of it goes into the object
+## AND comes off the bottom of the workspace, for any program that uses one
+## GP keyword, whether or not it ever sorted anything. In the module it
+## costs its own bytes, in the programs that ask for it.
+##
+##      #SYMFILE "@:MYPROG.SYM"          <- and it is not optional
+##      #INCLUDE "SORT.INC.BL"
+##      SORT.PTR = GP.ARRPTR(NAME$())
+##      SORT.DESCEND = 0 : SORT.NOCASE = 0
+##      GOSUB SORT.RUN
+##
+## GP.ARRPTR below STAYS, and the module is built on it: a BASL subroutine
+## cannot be handed an array, so something has to turn one into an address.
 
 ## GP.ARRPTR(a()) -- the address of element ZERO of an array, so machine
 ## code called with GP.CALL can work on it in bulk: fill, checksum, min/max,
@@ -393,7 +407,7 @@
 #TOKEN GP.LOBYTE 52832
 
 ## GP.ISEMPTY(a$) is -1 when a$ has zero length, 0 otherwise. A string of
-## SPACES is not empty -- GP.TRIM it first if that is what you meant.
+## SPACES is not empty -- STRCASE.TRIM it first if that is what you meant.
 ##
 ## It is for READABILITY and nothing else. It compiles to the same four bytes
 ## as LEN(A$)=0, and IF A$="" costs about the same again, so do not choose

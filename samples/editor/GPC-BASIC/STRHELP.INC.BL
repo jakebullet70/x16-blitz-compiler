@@ -34,10 +34,10 @@
 ## **      NAME$ = STRHELP.STR$
 ## **
 ## **  All three pad routines leave a string that is already at or past
-## **  the width ALONE. They pad; they never truncate. Use GP.RTRIM to go
-## **  the other way. Width is 1..255 and the padded result must fit a
-## **  BASIC string, i.e. 255 characters -- not checked, as in prog8,
-## **  because checking costs more than the mistake does.
+## **  the width ALONE. They pad; they never truncate. Use STRCASE.RTRIM
+## **  (STRCASE.INC.BL) to go the other way. Width is 1..255 and the
+## **  padded result must fit a BASIC string, i.e. 255 characters -- not
+## **  checked, as in prog8, because checking costs more than the mistake.
 ## **
 ## ***********************************************************************
 #IFNDEF STRHELP.DEFS

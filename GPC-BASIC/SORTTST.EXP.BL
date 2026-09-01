@@ -1,0 +1,199 @@
+## ***********************************************************************
+## **  SORTTST.EXP.BL -- SORT.INC.BL, checked two ways at once.
+## **
+## **  GP.SORT WAS THE ORACLE FOR THE FIRST RUN OF THIS and is not here any
+## **  more: the module replaced it, and this file is what proves the
+## **  module without it. Every case is checked BOTH for order and for
+## **  CONTENT -- a checksum over the elements, taken before and after,
+## **  which must not move. Order alone is not enough: an address routine
+## **  that reads the wrong element leaves the array beautifully sorted
+## **  with the same string in it twice.
+## **
+## **  ORDER IS TESTED WITH BASIC'S OWN COMPARISONS, not against a written
+## **  out expected answer, because shell sort is not stable and which of
+## **  two equal keys lands first is not a promise the module makes. The
+## **  case folded pass is checked with GP.COMP, which is the same
+## **  case-blind comparison the assembly does.
+## **
+## **  T200 IS THE ONE THAT MATTERS MOST. Element 128 is where the doubled
+## **  index stops fitting in a byte, and an address routine that drops
+## **  that carry reads every element from there on 256 bytes low. Twenty
+## **  names would never have found it.
+## ***********************************************************************
+#SAVEAS "@:SORTTST.PRG"
+#SYMFILE "@:SORTTST.SYM"
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "SORT.INC.BL"
+
+T.FAILS = 0
+
+DIM T.SRC$(19) : DIM T.B$(19)
+DIM T.D$(199)
+
+T.SRC$(0) = "PEAR"   : T.SRC$(1) = "APPLE"  : T.SRC$(2) = "FIG"
+T.SRC$(3) = "DATE"   : T.SRC$(4) = "plum"   : T.SRC$(5) = "CHERRY"
+T.SRC$(6) = "apple"  : T.SRC$(7) = "KIWI"   : T.SRC$(8) = "LIME"
+T.SRC$(9) = "MANGO"  : T.SRC$(10) = "OLIVE" : T.SRC$(11) = "PEACH"
+T.SRC$(12) = "grape" : T.SRC$(13) = "LEMON" : T.SRC$(14) = "BERRY"
+T.SRC$(15) = "MELON" : T.SRC$(16) = "NUT"   : T.SRC$(17) = "OAT"
+T.SRC$(18) = "RICE"  : T.SRC$(19) = "ZERO"
+
+## =======================================================================
+## 1. ASCENDING, case sensitive.
+## =======================================================================
+GOSUB T.REFILL
+SORT.PTR = GP.ARRPTR(T.B$()) : SORT.DESCEND = 0 : SORT.NOCASE = 0
+GOSUB SORT.RUN
+PRINT "OK "; SORT.OK; " COUNT "; SORT.COUNT
+T.BAD = 0
+FOR T.I = 1 TO 19
+    IF T.B$(T.I - 1) > T.B$(T.I) THEN T.BAD = T.BAD + 1
+NEXT T.I
+T.NAME$ = "ASC" : GOSUB T.CHECK20
+
+## =======================================================================
+## 2. DESCENDING.
+## =======================================================================
+GOSUB T.REFILL
+SORT.PTR = GP.ARRPTR(T.B$()) : SORT.DESCEND = 1 : SORT.NOCASE = 0
+GOSUB SORT.RUN
+T.BAD = 0
+FOR T.I = 1 TO 19
+    IF T.B$(T.I - 1) < T.B$(T.I) THEN T.BAD = T.BAD + 1
+NEXT T.I
+T.NAME$ = "DESC" : GOSUB T.CHECK20
+
+## =======================================================================
+## 3. CASE FOLDED, ascending. GP.COMP is the case-blind comparison, which
+##    is what the assembly is doing character by character.
+## =======================================================================
+GOSUB T.REFILL
+SORT.PTR = GP.ARRPTR(T.B$()) : SORT.DESCEND = 0 : SORT.NOCASE = 1
+GOSUB SORT.RUN
+T.BAD = 0
+FOR T.I = 1 TO 19
+    IF GP.COMP(T.B$(T.I - 1), T.B$(T.I)) > 0 THEN T.BAD = T.BAD + 1
+NEXT T.I
+T.NAME$ = "FOLD" : GOSUB T.CHECK20
+
+## =======================================================================
+## 4. EMPTIES. Only four of twenty are ever assigned; the other sixteen
+##    are null pointers, which the sort must read as "" and put at the
+##    front rather than follow.
+## =======================================================================
+DIM T.F$(19)
+T.F$(3) = "ZULU" : T.F$(9) = "ALPHA" : T.F$(0) = "MIKE" : T.F$(19) = "BRAVO"
+SORT.PTR = GP.ARRPTR(T.F$()) : SORT.DESCEND = 0 : SORT.NOCASE = 0
+GOSUB SORT.RUN
+T.BAD = 0
+FOR T.I = 0 TO 15
+    IF T.F$(T.I) <> "" THEN T.BAD = T.BAD + 1
+NEXT T.I
+IF T.F$(16) <> "ALPHA" THEN T.BAD = T.BAD + 1
+IF T.F$(17) <> "BRAVO" THEN T.BAD = T.BAD + 1
+IF T.F$(18) <> "MIKE" THEN T.BAD = T.BAD + 1
+IF T.F$(19) <> "ZULU" THEN T.BAD = T.BAD + 1
+T.NAME$ = "EMPTY" : GOSUB T.REPORT
+
+## =======================================================================
+## 5. TWO HUNDRED ELEMENTS -- past index 128, where the address carry is.
+##    The keys are generated so the order is not one the fill could have
+##    left behind, and the trailing index makes every one of them unique.
+## =======================================================================
+T.SEED = 1 : T.BEFORE = 0
+FOR T.I = 0 TO 199
+    T.SEED = T.SEED * 37 + 11
+    T.SEED = T.SEED - INT(T.SEED / 251) * 251
+    T.K$ = CHR$(65 + T.SEED - INT(T.SEED / 26) * 26)
+    T.K$ = T.K$ + CHR$(65 + INT(T.SEED / 26) - INT(T.SEED / 234) * 9)
+    T.K$ = T.K$ + RIGHT$("000" + STR$(T.I), 3)
+    T.D$(T.I) = T.K$
+    T.WORD$ = T.K$ : GOSUB T.HASH : T.BEFORE = T.BEFORE + T.HASH.OUT
+NEXT T.I
+SORT.PTR = GP.ARRPTR(T.D$()) : SORT.DESCEND = 0 : SORT.NOCASE = 0
+GOSUB SORT.RUN
+PRINT "BIG OK "; SORT.OK; " COUNT "; SORT.COUNT
+T.BAD = 0 : T.AFTER = 0
+FOR T.I = 0 TO 199
+    T.WORD$ = T.D$(T.I) : GOSUB T.HASH : T.AFTER = T.AFTER + T.HASH.OUT
+NEXT T.I
+FOR T.I = 1 TO 199
+    IF T.D$(T.I - 1) > T.D$(T.I) THEN T.BAD = T.BAD + 1
+NEXT T.I
+IF T.BEFORE <> T.AFTER THEN T.BAD = T.BAD + 1000
+T.NAME$ = "T200" : GOSUB T.REPORT
+PRINT "  FIRST "; T.D$(0); " AT128 "; T.D$(128); " LAST "; T.D$(199)
+PRINT "  SUM BEFORE "; T.BEFORE; " AFTER "; T.AFTER
+
+## =======================================================================
+## 6. TWO ELEMENTS, and ONE. The smallest cases the gap loop can see.
+## =======================================================================
+DIM T.G$(1)
+T.G$(0) = "BETA" : T.G$(1) = "ALPHA"
+SORT.PTR = GP.ARRPTR(T.G$()) : SORT.DESCEND = 0 : SORT.NOCASE = 0
+GOSUB SORT.RUN
+T.BAD = 0
+IF T.G$(0) <> "ALPHA" THEN T.BAD = 1
+IF T.G$(1) <> "BETA" THEN T.BAD = T.BAD + 1
+T.NAME$ = "TWO" : GOSUB T.REPORT
+
+DIM T.H$(0)
+T.H$(0) = "SOLO"
+SORT.PTR = GP.ARRPTR(T.H$()) : GOSUB SORT.RUN
+T.BAD = 0
+IF T.H$(0) <> "SOLO" THEN T.BAD = 1
+IF SORT.OK <> 1 THEN T.BAD = T.BAD + 1
+T.NAME$ = "ONE" : GOSUB T.REPORT
+
+## =======================================================================
+## 7. A FLOAT ARRAY IS REFUSED, rather than sorted as if its six byte
+##    elements were 2 byte pointers.
+## =======================================================================
+DIM T.NUM(9)
+T.NUM(0) = 5
+SORT.PTR = GP.ARRPTR(T.NUM()) : GOSUB SORT.RUN
+T.BAD = 0
+IF SORT.OK <> 0 THEN T.BAD = 1
+T.NAME$ = "NOTSTR" : GOSUB T.REPORT
+
+PRINT "FAILS "; T.FAILS
+PRINT "DONE"
+END
+
+## ***********************************************************************
+## **  helpers
+## ***********************************************************************
+
+## ---- order has already been counted into T.BAD; add the content check ----
+T.CHECK20:
+    T.AFTER = 0
+    FOR T.I = 0 TO 19
+        T.WORD$ = T.B$(T.I) : GOSUB T.HASH : T.AFTER = T.AFTER + T.HASH.OUT
+    NEXT T.I
+    IF T.BEFORE <> T.AFTER THEN T.BAD = T.BAD + 1000
+    GOSUB T.REPORT
+    PRINT "  ["; T.B$(0); "]["; T.B$(1); "]["; T.B$(18); "]["; T.B$(19); "]"
+    RETURN
+
+T.REPORT:
+    IF T.BAD = 0 THEN PRINT "PASS "; T.NAME$
+    IF T.BAD <> 0 THEN PRINT "FAIL "; T.NAME$; " BAD "; T.BAD : T.FAILS = T.FAILS + 1
+    RETURN
+
+## ---- position weighted so an anagram or a swapped pair still differs ----
+T.HASH:
+    T.HASH.OUT = LEN(T.WORD$) * 7
+    IF LEN(T.WORD$) < 1 THEN RETURN
+    FOR T.HI = 1 TO LEN(T.WORD$)
+        T.HASH.OUT = T.HASH.OUT + ASC(MID$(T.WORD$, T.HI, 1)) * T.HI
+    NEXT T.HI
+    RETURN
+
+## ---- the twenty words back into T.B$, unsorted, and their checksum ----
+T.REFILL:
+    T.BEFORE = 0
+    FOR T.I = 0 TO 19
+        T.B$(T.I) = T.SRC$(T.I)
+        T.WORD$ = T.SRC$(T.I) : GOSUB T.HASH : T.BEFORE = T.BEFORE + T.HASH.OUT
+    NEXT T.I
+    RETURN

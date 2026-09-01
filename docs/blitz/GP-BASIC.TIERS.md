@@ -90,16 +90,30 @@ compiles at roughly **14 bytes of p-code per line**. BASL menus (~60–100 lines
 |---|---|---:|
 | 1 | Loops — **all shipped**; `GP.UNTIL` **CUT**, measured at only 4-6% | 0 |
 | 2 | `GP.CALL` + 4 value words — **SHIPPED** | 108 |
-| 3 | Strings — all 8 **SHIPPED**: `GP.INSTR` 115 + `GP.STRPTR` 12 + in-place x5 220 + `GP.COMP` 90; `GP.PAD` moved to BASL | 437 |
-| 4 | `GP.SORT` + `GP.ARRPTR` — **SHIPPED** | 447 |
-| 5 | Stash / restore — **SHIPPED** (368, then 329 after the `TileSetAddress` re-base) | 329 |
+| 3 | Strings — `GP.INSTR` 115 + `GP.STRPTR` 12 + `GP.COMP` 111. The in-place five (188 with their shared helper) **MOVED OUT** to `STRCASE.INC.BL` on 1st Sep 2026; `GP.PAD` was BASL from the start | 238 |
+| 4 | `GP.ARRPTR` — built and still in the block. `GP.SORT` was built, then **MOVED OUT** to `SORT.INC.BL` on 1st Sep 2026, taking 408 of the 457 with it | 49 |
+| 5 | Stash / restore — built (368, then 329 after the `TileSetAddress` re-base), then **MOVED OUT** to `STASH.INC.BL` on 1st Sep 2026 | 0 |
 | 6 | Drawing ×3 (`GP.LOCATE` **CUT**) — **SHIPPED** | 440 |
 | 7 | Input — **SHIPPED as `INPHELP.INC.BL`**, BASL | 0 |
 | 8 | Colour / theme — **BASL** | 0 |
-| 9 | `GP.MENU` + `GP.SEL` — **SHIPPED** | 377 |
+| 9 | `GP.MENU` + `GP.SEL` — built, then **MOVED OUT** to `MENUHELP.INC.BL` in August 2026 | 0 |
 | 10 | `GP.SELECT` / `GP.CASE` / `GP.OTHER` / `GP.ENDSEL` — **SHIPPED** | 127 |
 | 11 | `GP.IF` / `GP.ELSEIF` / `GP.ELSE` / `GP.ENDIF` — **SHIPPED**, and **none of it is in the GP block** — 14 B of vector slots, shared NOP and `MOFSizeTable` in the CORE | 0 |
 | | **Built** | **1,970** |
+| | **Still in the block, 1st September 2026** | **1,024** |
+
+**Four of the tiers left again**, and that is the number worth watching rather than the total ever
+built. The GP block is all or nothing — every byte written into the object *and* taken off the
+bottom of the workspace, for one GP keyword — so a feature nobody calls is not free, it is a tax on
+every GP program in the tree. `GP.MENU`, then the stash, then the sort each turned out to be
+writable in BASL or `GP.ASM` at no loss, and each came out. `ObjectBase` has gone $4000 -> $3f00 ->
+$3e00 -> $3d00 -> **$3c00** as they did, which is 2,048 bytes off the machine, doubled.
+
+The fourth was the in-place string statements -- `GP.TRIM`, `GP.LTRIM`, `GP.RTRIM`, `GP.UPPER`,
+`GP.LOWER`, 188 bytes with their shared `GPStringAddress`. Outside their own example file they had
+**one caller in the whole tree**. `GP.INSTR`, `GP.STRPTR` and `GP.COMP` stayed: all three are
+FUNCTIONS, and a module cannot be one -- `IF GP.COMP(A$,B$) = 0` would have become three lines and
+an out-variable.
 
 **Tier 11 is the first that costs this budget nothing.** Its four opcodes all reuse a handler
 that already existed, and the 14 bytes they do cost land below `GPBase` — in the core, so that a
@@ -116,7 +130,7 @@ The estimates in this table have run **1.62x over** on average. Actuals:
 | `GP.INSTR` + `GP.STRPTR` | 127 | 127 | x1.00 |
 | in-place strings x5 | 200 | 220 | x1.10 |
 | `GP.COMP` | 40 | 90 | x2.25 |
-| `GP.SORT` | 156 | 398 | x2.55 |
+| `GP.SORT` | 156 | 398 | x2.55 |   <!-- 408 with its share of the shared helpers -->
 | `GP.ARRPTR` | 15 | 49 | x3.27 |
 | stash / restore | 290 | 368 | x1.27 |
 | drawing x3 | 250 | 440 | x1.76 |
@@ -506,12 +520,12 @@ modifies its variable in place**; numeric returns can be functions.
 |---|---|---|---|
 | `GP.INSTR` | `GP.INSTR(hay$, needle$ [,start])` | function → position, 0 if absent | **shipped** |
 | `GP.STRPTR` | `GP.STRPTR(a$)` | function → address | **shipped** |
-| `GP.COMP` | `GP.COMP(a$, b$)` | function → case-insensitive compare | to do |
-| `GP.TRIM` | `GP.TRIM a$` | statement, in place, both ends | **shipped** |
-| `GP.LTRIM` | `GP.LTRIM a$` | statement, in place, leading spaces | **shipped** |
-| `GP.RTRIM` | `GP.RTRIM a$` | statement, in place, trailing spaces | **shipped** |
-| `GP.UPPER` | `GP.UPPER a$` | statement, in place | **shipped** |
-| `GP.LOWER` | `GP.LOWER a$` | statement, in place | **shipped** |
+| `GP.COMP` | `GP.COMP(a$, b$)` | function → case-insensitive compare | **shipped** |
+| `GP.TRIM` | `GP.TRIM a$` | statement, in place, both ends | built, **moved out 01/09/26** |
+| `GP.LTRIM` | `GP.LTRIM a$` | statement, in place, leading spaces | built, **moved out 01/09/26** |
+| `GP.RTRIM` | `GP.RTRIM a$` | statement, in place, trailing spaces | built, **moved out 01/09/26** |
+| `GP.UPPER` | `GP.UPPER a$` | statement, in place | built, **moved out 01/09/26** |
+| `GP.LOWER` | `GP.LOWER a$` | statement, in place | built, **moved out 01/09/26** |
 
 **Named `GP.INSTR`, not `GP.FIND`** (17/08/26). Same function, but every BASIC programmer already
 knows what INSTR does, and X16 BASIC has no `INSTR` of its own to collide with. The optional third
