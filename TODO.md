@@ -1167,29 +1167,23 @@ trims are provably free. Watch two things: `EDBENCH.BASL`'s `REM`s are the **GP.
 (under `#REM 1`) and must not be touched, and `GUI.INC.BL` has **two copies** — `GPC-BASIC/` and
 `samples/editor/GPC-BASIC/` — that have to stay identical.
 
-**DONE:** `samples/editor/EDITOR.BASL` 709 → 423 prose lines, `samples/editor/STORE.BASL`,
-`GPC-BASIC/GUI.INC.BL` 372 → 256. `EDBENCH.BASL` inspected and correctly left alone.
+**DONE, all of it.** `samples/editor/EDITOR.BASL` 709 -> 423 prose lines, `STORE.BASL`, and all
+thirteen `GPC-BASIC/*.INC.BL`: **2,195 -> 1,753 prose lines**, code verified identical file by file
+and the editor rebuilding to the same `OK CODE 15166 FREE 6144 RT 13055` with `EDITOR.PRG` the same
+26,899 bytes. `EDBENCH.BASL` inspected and correctly left alone -- its `REM`s are GP.ASM source.
 
-**LEFT**, comment lines / total, worst first:
+Per file, prose lines before -> after: `GPB` 376 -> 286, `GUI` 372 -> 256, `MENUHELP` 248 -> 173,
+`BMX` 248 -> 194, `SORT` 174 -> 134, `MENUBAR` 164 -> 131, `STASH` 158 -> 123, `STRHELP` 147 -> 118,
+`INPHELP` 142 -> 109, `STRCASE` 101 -> 80, `APPHELP` 71 -> 59, `STASHFILE` 56 -> 45, `THEME` 54 -> 45.
 
-| file | lines | comment | |
-|---|---|---|---|
-| `STRCASE.INC.BL` | 246 | 222 | 90% |
-| `SORT.INC.BL` | 382 | 341 | 89% |
-| `GPB.INC.BL` | 438 | 376 | 85% |
-| `STASH.INC.BL` | 273 | 197 | 72% |
-| `STRHELP.INC.BL` | 210 | 147 | 70% |
-| `STASHFILE.INC.BL` | 81 | 56 | 69% |
-| `APPHELP.INC.BL` | 104 | 71 | 68% |
-| `MENUHELP.INC.BL` | 454 | 248 | 54% |
-| `BMX.INC.BL` | 481 | 248 | 51% |
-| `THEME.INC.BL` | 106 | 54 | 50% |
-| `MENUBAR.INC.BL` | 322 | 164 | 50% |
-| `INPHELP.INC.BL` | 279 | 142 | 50% |
+**A LIBRARY CUTS LESS THAN A SAMPLE, and that is right rather than a shortfall.** The editor lost
+40%; the modules lost 20-30%, because a module's parameter table and per-routine in/out blocks are
+what a caller opens the file to read. `GPB.INC.BL` is the extreme -- 286 prose lines against 33 of
+code -- and that is a keyword reference doing its job. What came out of it was the same "X is gone,
+it was N bytes of the all-or-nothing block" lecture written four times over, for `GP.SORT`,
+`GP.STASH`, `GP.MENU` and the string statements.
 
-The top three are near-pure documentation — `GPB.INC.BL` is the GP keyword reference — so expect
-them to cut like `GUI.INC.BL` did rather than like the editor. The twelve `.EXP.BL` examples have
-not been measured yet.
+**LEFT:** the twelve `.EXP.BL` examples, not yet measured.
 
 ### Name the output after the source — DONE, but by the caller
 

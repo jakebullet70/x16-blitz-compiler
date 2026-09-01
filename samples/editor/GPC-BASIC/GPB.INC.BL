@@ -28,14 +28,13 @@
 #TOKEN GP.LOOP 52862
 #TOKEN GP.EXITDO 52861
 
-## Machine code. GP.CALL sets the registers from its arguments (all optional,
-## all defaulting to 0) and the four value words read the results back. They
-## share SYS's $030C-$030F, so they also read what a plain SYS left behind.
+## Machine code. GP.CALL sets the registers from its arguments (all optional, all
+## defaulting to 0) and the four value words read the results back, out of SYS's own
+## $030C-$030F -- so they also read what a plain SYS left behind.
 ##
-## WARNING: put the machine code in BANKED RAM ($A000-$BFFF), NOT $0400-$07FF.
-## Stock X16 BASIC leaves $0400 free for the user; a COMPILED GPC program does
-## not -- that page holds runtime state (stringHighMemory, storeStartHigh,
-## variableStartPage ...) and POKEing code over it corrupts the program silently.
+## WARNING: PUT THE CODE IN BANKED RAM ($A000-$BFFF), NOT $0400-$07FF. Stock BASIC
+## leaves $0400 free for the user; a COMPILED program keeps runtime state there, and
+## POKEing code over it corrupts the program silently.
 
 #TOKEN GP.CALL 52860
 #TOKEN GP.A 52859
@@ -43,28 +42,21 @@
 #TOKEN GP.Y 52857
 #TOKEN GP.C 52856
 
-## Strings. GP.INSTR is the search GPC otherwise has no form of at all (no
-## INSTR, nothing). GP.STRPTR returns the address of [ActLen][Data] -- length
-## AT that address, first character at +1, and the block's capacity at -2. With
-## GP.CALL that lets machine code fill a BASIC string in place and set its
-## length, which stock BASIC cannot do at all.
+## Strings. GP.INSTR is the search GPC otherwise has no form of at all. GP.STRPTR
+## returns the address of [ActLen][Data] -- length AT that address, first character at
+## +1, capacity at -2 -- so machine code can fill a BASIC string in place and set its
+## length, which stock BASIC cannot do.
 ##
-## Splitting that address for GP.CALL, do NOT use "P AND 255": AND is 16-bit
-## SIGNED and the string heap lives above 32767, so it raises OUT OF RANGE.
-## Use GP.LOBYTE(P) and GP.HIBYTE(P) -- see their entry at the end of this
-## file. (The old advice, H = INT(P/256) : L = P - H*256, is still correct,
-## just longer and easier to get wrong.)
+## Splitting that address, do NOT use "P AND 255": AND is 16-bit SIGNED and the string
+## heap lives above 32767, so it raises OUT OF RANGE. Use GP.LOBYTE / GP.HIBYTE.
 
 #TOKEN GP.INSTR 52855
 #TOKEN GP.STRPTR 52854
 
 
-## THE IN-PLACE STRING STATEMENTS ARE GONE -- GP.TRIM, GP.LTRIM, GP.RTRIM,
-## GP.UPPER and GP.LOWER are STRCASE.INC.BL now, written in GP.ASM. They were
-## 188 bytes of the GP runtime block, which is all or nothing: every byte goes
-## into the object AND comes off the bottom of the workspace, for any program
-## that uses one GP keyword. Outside their own example they had one caller in
-## the whole tree.
+## GP.TRIM, GP.LTRIM, GP.RTRIM, GP.UPPER and GP.LOWER ARE GONE -- STRCASE.INC.BL now,
+## in GP.ASM, built on GP.STRPTR above: it takes the block address and rewrites it
+## where it lies, no copy either way.
 ##
 ##      #SYMFILE "@:MYPROG.SYM"          <- and it is not optional
 ##      #INCLUDE "STRCASE.INC.BL"
@@ -72,15 +64,11 @@
 ##      STRCASE.MODE = STRCASE.RTRIM
 ##      GOSUB STRCASE.GO
 ##
-## GP.STRPTR above stays, and is what the module is built on: a BASL routine
-## cannot be passed a variable, so it takes the block address and rewrites it
-## where it lies -- no copy in, no copy out. THE ONE THING LOST is that the
-## compiler used to reject a literal at the call site; GP.STRPTR("text") is an
-## address inside the p-code, and upper-casing that edits the program.
-##
-## There is still NO GP.PAD, for the same reason there never was: padding
-## GROWS a string, and nothing that works on the block alone can grow one past
-## the capacity it was born with. Use STRHELP.PAD from "STRHELP.INC.BL".
+## ONE THING WAS LOST: the compiler used to reject a literal at the call site.
+## GP.STRPTR("text") is an address inside the p-code, and upper-casing it edits the
+## program. And there is still NO GP.PAD, for the reason there never was one -- padding
+## GROWS a string, and nothing working on the block alone can pass the capacity it was
+## born with. Use STRHELP.PAD.
 
 ## GP.COMP(a$,b$) compares WITHOUT case: -1 if a$ sorts before b$, 0 if they
 ## match, 1 if after. Length breaks a tie, so "abc" sorts before "ABCD".
@@ -89,47 +77,33 @@
 
 #TOKEN GP.COMP 52848
 
-## GP.SORT IS GONE, replaced by SORT.INC.BL -- the same shell sort with the
-## same Ciura gaps, written in GP.ASM. It was 408 bytes of the GP runtime
-## block, which is all or nothing: every byte of it goes into the object
-## AND comes off the bottom of the workspace, for any program that uses one
-## GP keyword, whether or not it ever sorted anything. In the module it
-## costs its own bytes, in the programs that ask for it.
+## GP.SORT IS GONE -- SORT.INC.BL, the same shell sort with the same Ciura gaps, in
+## GP.ASM. Built on GP.ARRPTR below, which stays: a BASL subroutine cannot be handed an
+## array, so something has to turn one into an address.
 ##
 ##      #SYMFILE "@:MYPROG.SYM"          <- and it is not optional
 ##      #INCLUDE "SORT.INC.BL"
 ##      SORT.PTR = GP.ARRPTR(NAME$())
 ##      SORT.DESCEND = 0 : SORT.NOCASE = 0
 ##      GOSUB SORT.RUN
-##
-## GP.ARRPTR below STAYS, and the module is built on it: a BASL subroutine
-## cannot be handed an array, so something has to turn one into an address.
 
-## GP.ARRPTR(a()) -- the address of element ZERO of an array, so machine
-## code called with GP.CALL can work on it in bulk: fill, checksum, min/max,
-## sprite batching. The header is already skipped. STRIDE IS YOURS to add:
-## 2 bytes per element for a string array (each element is a POINTER to the
-## string's block, so follow it and see GP.STRPTR for the layout), 6 for a
-## numeric one. Multi-dimensional arrays are rejected.
+## GP.ARRPTR(a()) -- the address of element ZERO, header already skipped, so machine
+## code can work on an array in bulk. STRIDE IS YOURS TO ADD: 2 bytes an element for a
+## string array (each element POINTS at the string's block), 6 for a numeric one.
+## Multi-dimensional arrays are rejected.
 ##
-## Empty parentheses required; GP.ARRPTR(A(3)) is a syntax error, add 3*2
-## or 3*6 yourself. Same splitting rule as GP.STRPTR -- the address is
-## usually above 32767, so GP.LOBYTE / GP.HIBYTE, never P AND 255.
+## Empty parentheses required -- GP.ARRPTR(A(3)) is a syntax error, add 3*2 or 3*6
+## yourself. Split the address with GP.LOBYTE / GP.HIBYTE, never P AND 255.
 
 #TOKEN GP.ARRPTR 52846
 
-## GP.STASH AND GP.RESTR ARE GONE, replaced by STASH.INC.BL -- a screen
-## save/restore written in GP.ASM. They were 329 bytes of the 2,048-byte
-## GP block, and that block is all-or-nothing: every program using any GP
-## keyword carried them, in the object AND off the bottom of its
-## workspace, whether or not it ever stashed anything. The module does
-## the same job -- a self-describing header, restore-anywhere, the
-## 4,094-cell bank limit -- and only the programs that want it pay.
-## Tokens 52845 and 52844 are retired, not reused.
+## GP.STASH AND GP.RESTR ARE GONE -- STASH.INC.BL, in GP.ASM, doing the same job: a
+## self-describing header, restore-anywhere, the 4,094-cell bank limit. Tokens 52845
+## and 52844 are retired, not reused.
 
-## Text drawing, written STRAIGHT INTO VERA -- no KERNAL, which is why it is
-## several times faster than PRINT (GPC's character output makes two KERNAL
-## calls per character, and BSOUT carries scroll, quote mode and cursor work).
+## Text drawing, written STRAIGHT INTO VERA -- no KERNAL, which is why it is several
+## times faster than PRINT, whose every character is two KERNAL calls carrying scroll,
+## quote mode and cursor work.
 ##
 ##   GP.BOX x,y,w,h [,style] [,col]     frame only, styles 0-3:
 ##                                      0 solid  1 single line
@@ -139,93 +113,60 @@
 ##   GP.CHAR x,y,char [,col]            ONE cell -- GP.FILL of a 1x1 box
 ##   GP.PRINTAT x,y,text$ [,col]
 ##
-## THE COLOUR IS OPTIONAL AND DEFAULTS TO WHAT "COLOR" LAST SET -- the same
-## colour a PRINT would have used. Supplied, it is one byte packed exactly as
-## the X16 packs it: background * 16 + foreground. 255 is a REAL colour here
-## (light grey on light grey), not a "leave it alone" marker.
+## THE COLOUR IS OPTIONAL and defaults to what COLOR last set -- the colour a PRINT
+## would have used. Supplied, it is background * 16 + foreground, as the X16 packs it.
+## 255 is a REAL colour (light grey on light grey), not a "leave it alone" marker.
 ##
-## The two optionals on GP.BOX cannot be skipped over: write the style if you
-## want the colour. GP.BOX X,Y,W,H,,7 is a syntax error, GP.BOX X,Y,W,H,0,7
-## is what you meant.
+## GP.BOX's two optionals cannot be skipped over: GP.BOX X,Y,W,H,,7 is a syntax error,
+## GP.BOX X,Y,W,H,0,7 is what you meant.
 ##
-## A STYLE OF 256 OR MORE IS AN ADDRESS -- your own eight glyphs, and there
-## are only four styles so the high byte is free to mean this. The eight
-## bytes are, in order: top right, top left, bottom right, bottom left, top
-## edge, bottom edge, left edge, right edge.
-##
-## THIS IS ALSO HOW YOU DRAW A BOX IN ISO MODE. GP.BOX does no translation
-## at all -- the glyphs go straight to VERA as tile indices -- so the four
-## built-in styles are PETSCII screen codes and come out as letters when
-## the screen is in ISO. There is nothing to translate to, because
-## ISO-8859-15 has no box-drawing characters; but a tile index IS a
-## character code in that mode, so hand it ASCII and it is right:
-##
-##     ISO.GLYPH$ = "++++--||"
-##     GP.BOX 50, 26, 4, 3, GP.STRPTR(ISO.GLYPH$) + 1, 1
-##
-## GP.STRPTR gives the block and the text starts at +1, so a string literal
-## is the cheapest way to carry the eight bytes. See ISO.EXP.BL, which
-## reads the cells back and asserts 43, 45, 124.
+## A STYLE OF 256 OR MORE IS AN ADDRESS -- your own eight glyphs, in the order top
+## right, top left, bottom right, bottom left, top edge, bottom edge, left, right.
 ##
 ##   B$ = CHR$(110)+CHR$(112)+CHR$(125)+CHR$(109)+CHR$(64)+CHR$(64)+CHR$(66)+CHR$(66)
 ##   GP.BOX 4, 2, 30, 8, GP.STRPTR(B$) + 1, COL
 ##
-## NOTE THE + 1. GP.STRPTR points at [ActLen][Data] -- the length byte --
-## and the glyphs are the DATA. Leave it off and the box is drawn with the
-## string length as its top-right corner.
+## NOTE THE + 1: GP.STRPTR points at the LENGTH byte and the glyphs are the data. Leave
+## it off and the box is drawn with the string length as its top-right corner.
 ##
-## THEY ARE SCREEN CODES, NOT PETSCII, and that differs from GP.FILL on
-## purpose: GP.BOX's built-in table is written straight to the cell without
-## conversion, so a custom set has to be in the same alphabet as the table
-## it stands in for. GP.FILL converts what you hand it; this does not.
+## THEY ARE SCREEN CODES, NOT PETSCII, and that differs from GP.FILL on purpose: the
+## built-in table goes straight to the cell unconverted, so a custom set has to be in
+## the same alphabet. GP.FILL converts what you hand it; this does not.
 ##
-## This is what a program with a RE-ORDERED FONT needs. GP.BOX's table names
-## screen codes that such a program has moved, so styles 1 to 3 come out as
-## letters -- see samples/editor, which had to draw its frames with eight
-## GP.FILLs for exactly this reason.
+## WHICH IS ALSO HOW TO DRAW A BOX IN ISO MODE, where the built-in styles come out as
+## letters and there is nothing to translate to -- ISO-8859-15 has no box-drawing
+## characters. But a tile index IS a character code there, so hand it ASCII:
 ##
-## STYLES 1 AND 5 WERE DELETED on 2026-09-01 -- the chequered dither and the
-## thick shaded corners -- and the rest renumbered down. Nothing outside
-## this tree had them.
+##     ISO.GLYPH$ = "++++--||"
+##     GP.BOX 50, 26, 4, 3, GP.STRPTR(ISO.GLYPH$) + 1, 1
 ##
-## WARNING -- THESE DO NOT MOVE THE CURSOR PRINT USES. Nothing here calls the
-## KERNAL, so a plain PRINT after a GP.PRINTAT carries on from wherever the
-## KERNAL still thinks the cursor is, NOT after the text just drawn. Use
-## LOCATE before PRINT, or stay in one world or the other.
+## See ISO.EXP.BL, which reads the cells back and asserts 43, 45, 124. A program with a
+## RE-ORDERED FONT needs the same escape, samples/editor being the one in this tree.
 ##
-## Nothing is clipped. Off the right edge wraps to the next row; off the
-## bottom writes past the end of the screen map. Zero width or height draws
-## nothing, which is the one case a computed size reaches by accident.
+## WARNING -- THESE DO NOT MOVE THE CURSOR PRINT USES. Nothing here calls the KERNAL, so
+## a PRINT after a GP.PRINTAT carries on from wherever the KERNAL still thinks the cursor
+## is. Use LOCATE first, or stay in one world or the other.
+##
+## Nothing is clipped: off the right edge wraps, off the bottom writes past the end of
+## the map. Zero width or height draws nothing, which is the case a computed size
+## reaches by accident.
 
-## GP.CHAR IS NOT A NEW COMMAND, it is GP.FILL with the width and height
-## written for you. The compiler pushes the two 1s and emits GP.FILL's own
-## token, so the GP runtime block does not grow by a byte -- and that block
-## is all-or-nothing and had 29 bytes left, so a real handler would have
-## crossed a page and cost every GP program 256 bytes twice over.
-##
-## The char is a NUMBER, as GP.FILL's is, not a one-character string. That
-## is what lets it be free, and it is also the only spelling that means the
-## same thing in ISO mode and out: GP.FILL converts PETSCII to a screen code
-## unconditionally, while GP.PRINTAT passes bytes through untouched when the
-## screen is in ISO mode. Same argument, same cell, either way.
-##
-## What it replaces at a call site:
+## GP.CHAR IS NOT A NEW COMMAND -- it is GP.FILL with the 1s written for you. The
+## compiler pushes them and emits GP.FILL's own token, so the runtime block does not
+## grow by a byte.
 ##
 ##   GP.FILL X, Y, 1, 1, ED.GL.TL, C      ->   GP.CHAR X, Y, ED.GL.TL, C
+##
+## The char is a NUMBER, as GP.FILL's is, not a one-character string.
 ##
 #TOKEN GP.BOX 52843
 #TOKEN GP.FILL 52842
 #TOKEN GP.CHAR 52824
 #TOKEN GP.PRINTAT 52841
 
-## GP.MENU AND GP.SEL ARE GONE, replaced by "MENUHELP.INC.BL" -- a menu
-## written in ordinary GPB commands. It was 462 bytes of assembly plus 11
-## of storage, carried by every program that used any GPB keyword at all,
-## and adding gamepad support to it was what made the cost stop being
-## worth it. The BASL module does the same job -- cursor keys, RETURN, ESC,
-## case-blind hotkeys that choose their row, must-select / keep-mark /
-## no-wrap, and the SNES pad -- for no runtime bytes, and only the programs
-## that want a menu pay for it.
+## GP.MENU AND GP.SEL ARE GONE -- MENUHELP.INC.BL, written in ordinary GPB commands and
+## doing the same job: cursor keys, RETURN, ESC, case-blind hotkeys that choose their
+## row, must-select / keep-mark / no-wrap, and the SNES pad. For no runtime bytes.
 ##
 ##      #INCLUDE "MENUHELP.INC.BL"
 ##      MENUHELP.X = 8 : MENUHELP.Y = 6
@@ -236,10 +177,9 @@
 ##      MENUHELP.HOT$ = "NLOQ"
 ##      GOSUB MENUHELP.RUN                     answer in MENUHELP.SEL
 ##
-## The one behaviour that did NOT survive is the colourless highlight. The
-## assembly swapped the cell's attribute nibbles, so it needed no colours
-## at all; the module prints the row again, so it wants one -- and
-## MENUHELP.HIATTR = 0 asks for that same inversion back.
+## The one behaviour that did NOT survive is the colourless highlight: the assembly
+## swapped the cell's attribute nibbles, the module prints the row again and so wants a
+## colour. MENUHELP.HIATTR = 0 asks for that inversion back.
 
 ##
 ## GP.SELECT <var>             a plain numeric variable, re-read at each alternative
@@ -256,31 +196,26 @@
 ##     PRINT "SOMETHING ELSE"
 ##   GP.ENDSEL
 ##
-## This is NOT a replacement for ON x GOTO/GOSUB, which is a real skip
-## table and still the right answer for a dense 1..n index. It is for
-## the SPARSE selector -- key codes, state machines - where ON cannot go.
+## NOT a replacement for ON x GOTO/GOSUB, which is a real skip table and still right for
+## a dense 1..n index. This is for the SPARSE selector -- key codes, state machines.
 ##
-## Case values are ordinary numeric expressions, not just constants, and
-## are compared in the order written; the first match wins and nothing
-## below it runs. Nothing matching with no GP.OTHER is not an error, the
-## whole select is simply skipped. Selects may be nested.
+## Case values are ordinary numeric expressions, compared in the order written; the
+## first match wins. Nothing matching with no GP.OTHER is not an error. Selects nest.
 ##
-## The SELECTOR is stricter: a plain numeric variable, not an expression,
-## a constant or an array element. Write those to a scalar first --
-## T = RND(1)*3 : GP.SELECT T. In return the whole construct compiles to
-## core opcodes, so a program whose only GP keyword is a select does not
+## THE SELECTOR IS STRICTER: a plain numeric variable, not an expression, a constant or
+## an array element -- write those to a scalar first. In return the whole construct
+## compiles to core opcodes, so a program whose only GP keyword is a select does not
 ## carry the GP runtime block at all, exactly like GP.IF.
 ##
-## A case body may go on the SAME LINE after a colon, which is what makes a
-## sparse dispatch read as a table:
+## A case body may share the line after a colon, which is what makes a sparse dispatch
+## read as a table:
 ##
 ##   GP.CASE 157 : GOSUB MOVE.LEFT
 ##   GP.CASE 29  : GOSUB MOVE.RIGHT
 ##
-## GOTO out of a select is safe, trivially: a select keeps nothing alive,
-## so there is nothing to leak. GP.DO still opens a loop frame, and a GOTO
-## leaving one is covered -- the compiler puts an .unwind in front of it
-## and FixBranches fills in the count. No runtime bytes.
+## GOTO out of a select is safe -- it keeps nothing alive. GP.DO does open a frame, and
+## a GOTO leaving one is covered: the compiler puts an .unwind in front of it and
+## FixBranches fills in the count, for no runtime bytes.
 
 #TOKEN GP.SELECT 52838
 #TOKEN GP.CASE 52837
@@ -301,21 +236,16 @@
 ##     PRINT "POSITIVE"
 ##   GP.ENDIF
 ##
-## A BLOCK if, and the block form is the only form: each of the four
-## keywords must be ALONE ON ITS LINE. THEN is required and nothing may
-## follow it -- GP.IF X > 5 THEN PRINT is a syntax error, not a one line
-## IF. Stock IF ... THEN is untouched and still there for that.
+## A BLOCK if, and the block form is the only form: each keyword ALONE ON ITS LINE, THEN
+## required with nothing after it. GP.IF X > 5 THEN PRINT is a syntax error -- stock
+## IF ... THEN is untouched and still there for that.
 ##
-## GP.ELSEIF may repeat as often as you like and GP.ELSE is optional;
-## nothing matching with no GP.ELSE is not an error, the whole IF is
-## simply skipped. IFs may be nested, and may be nested inside a
-## GP.SELECT case body or a GP.DO loop.
+## GP.ELSEIF may repeat, GP.ELSE is optional, nothing matching is not an error. IFs nest,
+## including inside a GP.SELECT case body or a GP.DO loop.
 ##
-## There is NO frame to release (GP.SELECT is the same), so a GOTO out of
-## a GP.IF is safe -- GP.ENDIF exists only to mark where the block ends.
-## The cost is 12 bytes of runtime for the whole construct, because
-## every one of its four opcodes reuses a handler that was already
-## there. Conditions are numeric, as everywhere else.
+## No frame to release, so a GOTO out is safe; GP.ENDIF only marks where the block ends.
+## 12 bytes of runtime for the whole construct, because all four opcodes reuse handlers
+## that were already there.
 
 #TOKEN GP.IF 52830
 #TOKEN GP.ELSEIF 52829
@@ -334,27 +264,22 @@
 ##   GP.ENDASM
 ##   #REM 0
 ##
-## The body rides in REM statements, one instruction per line, because
-## BASLOAD stores REM text BYTE FOR BYTE -- ORA, AND, EOR and ROR all
-## survive there, and outside a REM they are tokenised into keywords and
-## destroyed. Lower case is fine; it is upshifted for you.
+## The body rides in REM statements, one instruction a line, because BASLOAD stores REM
+## text BYTE FOR BYTE -- ORA, AND, EOR and ROR survive there and are tokenised into
+## keywords anywhere else. Lower case is upshifted for you.
 ##
-## #REM 1 IS REQUIRED, and #REM 0 is BASLOAD's default. With REM output
-## off the body is stripped before the compiler ever sees it, so the two
-## delimiters are real keywords rather than REMs: an empty GP.ASM block
-## is then a named error (BLOCK MISMATCH) instead of a program that
-## silently contains no code at all. Turn REMs back off after GP.ENDASM.
+## #REM 1 IS REQUIRED (BASLOAD's default is 0, which strips the body before the compiler
+## sees it). The two delimiters are real keywords rather than REMs, so an empty block is
+## a named error -- BLOCK MISMATCH -- and not a program silently containing no code.
+## Turn REMs back off after GP.ENDASM.
 ##
-## COSTS NOTHING AT RUN TIME. A block is five bytes of p-code plus the
-## instructions themselves, and it reuses handlers that are already in
-## every program -- so a program whose only GP.BASIC keyword is GP.ASM
+## COSTS NOTHING AT RUN TIME: five bytes of p-code plus the instructions, reusing
+## handlers every program already has. A program whose only GP.BASIC keyword is GP.ASM
 ## does NOT pull in the 2K GP runtime block.
 ##
-## LABELS.  name: on its own line or in front of an instruction. Six
-## characters are significant. Labels belong to their block: the same
-## name in two blocks is two different labels. BNE/BEQ/BRA and the rest
-## take one, and a branch further than 127 bytes is OUT OF RANGE at
-## COMPILE time, on the line it is on. JMP and JSR take one too.
+## LABELS. name: on its own line or in front of an instruction, six characters
+## significant, and belonging to their block -- the same name in two blocks is two
+## labels. A branch further than 127 bytes is OUT OF RANGE at COMPILE time, on its line.
 ##
 ## {VAR} is the ADDRESS OF A BASIC VARIABLE'S SLOT -- so LDA {N%} reads
 ## it and STA {N%} writes it, in the slot BASIC itself uses:
@@ -364,23 +289,19 @@
 ##                     its data -- an element is two steps, as it is
 ##                     through GP.ARRPTR
 ##
-## >> {VAR} NEEDS #SYMFILE. BASLOAD renames variables -- N% becomes A% --
-## >> and does not rename REM text with them, so the name in the braces
-## >> is not the name the code uses. #SYMFILE is BASLOAD's own record of
-## >> that mapping and the compiler reads it, so put
+## >> {VAR} NEEDS #SYMFILE. BASLOAD renames variables -- N% becomes A% -- and does not
+## >> rename REM text with them, so the name in the braces is not the name the code
+## >> uses. #SYMFILE is BASLOAD's record of that mapping, and the compiler reads it:
 ## >>
-## >>   #SYMFILE "@:PROG.SYM"
+## >>   #SYMFILE "@:PROG.SYM"        named to match the PRG -- PROG.PRG reads PROG.SYM
 ## >>
-## >> at the top, named to match the PRG: PROG.PRG reads PROG.SYM. Miss
-## >> it and the compile stops with NO SYMBOL FILE FOR {} on the line.
-## >>
-## >> {VAR} never CREATES a variable, so assign it in BASIC first, even
-## >> M% = 0, or you get UNKNOWN VARIABLE IN {}. See ASM.EXP.BL.
+## >> Miss it and the compile stops with NO SYMBOL FILE FOR {}. And {VAR} never CREATES
+## >> a variable, so assign it in BASIC first, even M% = 0, or you get UNKNOWN VARIABLE
+## >> IN {}. See ASM.EXP.BL.
 ##
-## NO EXPRESSIONS: {N%}+1 and LABEL+2 are not understood. Use an index
-## register. Zero page or absolute is chosen by the OPERAND -- $34 is
-## zero page, $0034 is absolute -- and every 65C02 mode is available
-## except BBR/BBS/RMB/SMB.
+## NO EXPRESSIONS: {N%}+1 and LABEL+2 are not understood -- use an index register. Zero
+## page or absolute is chosen by the OPERAND ($34 against $0034), and every 65C02 mode
+## is available except BBR/BBS/RMB/SMB.
 ##
 ## Bodies may also come from a file, which is the same thing spelt
 ## differently -- #INCLUDE splices it in verbatim:
@@ -393,45 +314,34 @@
 #TOKEN GP.ASM 52826
 #TOKEN GP.ENDASM 52825
 
-## GP.CONTAINS(a$,b$) is -1 if b$ occurs anywhere in a$, 0 if it does not.
-## CASE SENSITIVE -- it compares raw bytes. It is the readable spelling of the
-## yes/no question; use GP.INSTR when you want the POSITION instead of a flag,
-## and GP.COMP for a case-blind test.
+## GP.CONTAINS(a$,b$) is -1 if b$ occurs anywhere in a$, 0 if not. CASE SENSITIVE. Use
+## GP.INSTR for the POSITION instead of a flag, GP.COMP for a case-blind test.
 ##
-## An EMPTY needle is 0, not -1: GP.INSTR reports "not found" for a zero length
-## needle, and this is built on it.
-##
-## COMPOSITE -- it has no runtime code of its own. The compiler expands it into
-## GP.INSTR(a$,b$)<>0 and the object is byte for byte identical to writing that
-## out by hand. So it costs nothing to use, and nothing to have.
+## An EMPTY needle is 0, not -1 -- GP.INSTR reports "not found" for one, and this is
+## built on it. COMPOSITE: the compiler expands it to GP.INSTR(a$,b$)<>0, so the object
+## is identical to writing that by hand and the keyword costs nothing to have.
 
 #TOKEN GP.CONTAINS 52834
 
-## GP.HIBYTE(n) / GP.LOBYTE(n) split an address into the two bytes a 6502
-## actually takes: HIBYTE is INT(n/256), the 256 byte page, and LOBYTE is
-## MOD(n,256), the offset within it. Everything that eats an address one byte
-## at a time wants them -- GP.CALL's registers, VERA's $9F20/$9F21 -- and
-## GP.STRPTR / GP.ARRPTR exist to hand an address over in the first place.
+## GP.HIBYTE(n) / GP.LOBYTE(n) split an address into the two bytes a 6502 takes.
+## Everything that eats an address a byte at a time wants them -- GP.CALL's registers,
+## VERA's $9F20/$9F21.
 ##
 ##   P = GP.STRPTR(A$)
 ##   GP.CALL $A000, GP.LOBYTE(P), GP.HIBYTE(P)
 ##
-## USE THESE RATHER THAN THE LONG FORM ABOVE. "N AND 255" is the spelling that
-## looks right and is a live bug -- AND is 16 bit SIGNED and these addresses
-## are above 32767, so it raises OUT OF RANGE instead of masking. GP.LOBYTE is
-## built on MOD, which is not on that path.
-##
-## Range 0 to 65535. COMPOSITE, like GP.CONTAINS -- no runtime code at all.
+## USE THESE, NOT "N AND 255", which is the spelling that looks right and is a live bug:
+## AND is 16-bit SIGNED and these addresses are above 32767, so it raises OUT OF RANGE
+## instead of masking. Range 0 to 65535, and COMPOSITE -- no runtime code at all.
 
 #TOKEN GP.HIBYTE 52833
 #TOKEN GP.LOBYTE 52832
 
-## GP.ISEMPTY(a$) is -1 when a$ has zero length, 0 otherwise. A string of
-## SPACES is not empty -- STRCASE.TRIM it first if that is what you meant.
+## GP.ISEMPTY(a$) is -1 when a$ has zero length, 0 otherwise. A string of SPACES is not
+## empty -- STRCASE.TRIM it first if that is what you meant.
 ##
-## It is for READABILITY and nothing else. It compiles to the same four bytes
-## as LEN(A$)=0, and IF A$="" costs about the same again, so do not choose
-## between the three on size. COMPOSITE -- no runtime code.
+## For READABILITY and nothing else: it is the same four bytes as LEN(A$)=0, and IF
+## A$="" costs about the same, so do not choose between the three on size.
 
 #TOKEN GP.ISEMPTY 52831
 

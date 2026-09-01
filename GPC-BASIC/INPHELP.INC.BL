@@ -5,11 +5,9 @@
 ## **      INPHELP.GET     edit a string in a field at x, y
 ## **      INPHELP.ASK     a label, then a field after it
 ## **
-## **  This is what INPUT and LINPUT cannot do. Both of those own the whole
-## **  bottom of the screen, scroll it, echo in whatever colour is current,
-## **  and accept any length -- which makes them unusable on a drawn screen.
-## **  A field stays where you put it, in the colour you give it, and stops
-## **  at the width you allow.
+## **  What INPUT and LINPUT cannot do: both own the whole bottom of the screen, scroll
+## **  it, echo in whatever colour is current and accept any length. A field stays where
+## **  you put it, in the colour you give it, and stops at the width you allow.
 ## **
 ## **  Usage:
 ## **      INPHELP.X = 10 : INPHELP.Y = 6
@@ -35,29 +33,16 @@
 ## **                                     17  cursor down / 145 up / 9 TAB
 ## **                                         -- left the field, text kept
 ## **
-## **  So a form is a loop: call the field, look at INPHELP.KEY, and move
-## **  the focus. The field never scrolls: when it is full, further
-## **  characters are refused, and the cursor sits on the last one rather
-## **  than off the end.
+## **  So a form is a loop: call the field, look at INPHELP.KEY, move the focus. The
+## **  field never scrolls -- when full, further characters are refused and the cursor
+## **  sits on the last one rather than off the end.
 ## **
-## **  THE CARET MOVES. Cursor LEFT and RIGHT walk it through the text,
-## **  HOME and END jump to the ends, typing INSERTS where it stands and
-## **  DEL rubs out what is before it. It starts after the last character,
-## **  which is where it used to be permanently -- so a caller that never
-## **  presses an arrow sees exactly the old append-and-rub-out field.
-## **
-## **  Those four keys were not merely unimplemented before, they were
-## **  actively refused: 29 for being under 32, and 157 for sitting in the
-## **  PETSCII control range that INPHELP.TYPED rejects. They did nothing,
-## **  which was safe and useless.
+## **  THE CARET MOVES: LEFT and RIGHT walk it, HOME and END jump to the ends, typing
+## **  INSERTS where it stands and DEL rubs out what is before it. It starts after the
+## **  last character, so a caller that never presses an arrow sees exactly the old
+## **  append-and-rub-out field.
 ## **
 ## **   also out  INPHELP.POS   where the caret ended up, 0..LEN(TEXT$)
-## **
-## **  WHY THIS IS NOT A KEYWORD. It is a wait on a HUMAN, so the speed
-## **  argument that puts sorting and screen copying in assembly does not
-## **  apply -- the same reason GP.MENU owns only its interaction loop and
-## **  BASIC draws the menu. What it costs in bytes, only programs that
-## **  want a form pay.
 ## **
 ## **  The whole INPHELP.* name space belongs to this file.
 ## **
@@ -72,27 +57,21 @@
 #DEFINE INPHELP.SPACE 32
 #DEFINE INPHELP.STAR 42
 
-## The keys that LEAVE a field without cancelling it, so a caller with
-## more than one field can move between them. The text is kept -- only ESC
-## puts it back -- and the key comes out in INPHELP.KEY, which is how the
-## caller knows which way to go. Without these a form would need RETURN to
-## mean both "next field" and "done", and it could never go back up.
+## The keys that LEAVE a field without cancelling it, so a form can move between
+## fields. The text is kept -- only ESC puts it back -- and INPHELP.KEY says which way
+## to go. Without these RETURN would have to mean both "next field" and "done", and a
+## form could never go back up.
 #DEFINE INPHELP.DOWN 17
 #DEFINE INPHELP.UP 145
 #DEFINE INPHELP.TAB 9
 
-## The keys that move the CARET inside the field, as opposed to leaving
-## it. Left and right were previously refused by INPHELP.TYPED -- 29 for
-## being under 32, 157 for being in the PETSCII control range -- so they
-## did nothing at all, and there was nothing for them to do: the text was
-## built by appending and could only be cut from the end.
+## The keys that move the CARET inside the field, as opposed to leaving it.
 #DEFINE INPHELP.LEFT 157
 #DEFINE INPHELP.RIGHT 29
 #DEFINE INPHELP.HOME 19
 #DEFINE INPHELP.END 4
 
-## Jiffies between cursor flips. 60 to the second, so 15 is four a second --
-## fast enough to read as alive, slow enough not to strobe.
+## Jiffies between cursor flips: 60 to the second, so 15 is four a second.
 #DEFINE INPHELP.BLINK 15
 
 GOTO INPHELP.MODULE.END
@@ -114,9 +93,8 @@ INPHELP.REDRAW:
     IF INPHELP.SHOW$ <> "" THEN GP.PRINTAT INPHELP.X, INPHELP.Y, INPHELP.SHOW$, INPHELP.ATTR
     GOSUB INPHELP.CURSOR
 
-## ---- Wait. GET returns immediately with "" when nothing is pressed, so
-## ---- the blink runs off TI rather than a delay loop -- a delay loop
-## ---- would swallow keys pressed during it.
+## ---- GET returns immediately with "" when nothing is pressed, so the blink runs off
+## ---- TI rather than a delay loop, which would swallow keys pressed during it.
 
 INPHELP.WAIT:
     GET INPHELP.K$
@@ -126,14 +104,9 @@ INPHELP.WAIT:
     INPHELP.LIT = 1 - INPHELP.LIT
     GOSUB INPHELP.CURSOR : GOTO INPHELP.WAIT
 
-## ---- One key. This is the sparse selector GP.SELECT exists for: seven
-## ---- control codes scattered across 256, which ON x GOSUB cannot index
-## ---- and a chain of IFs would re-read the variable for.
-## ----
-## ---- NOTE THE FLAG. Nothing here does GOTO out of the select, because
-## ---- GP.ENDSEL is what releases the selector's frame and jumping past it
-## ---- would leak one on every keystroke. Setting INPHELP.DONE and testing
-## ---- it after GP.ENDSEL costs one comparison and cannot leak.
+## ---- Seven control codes scattered across 256, which ON x GOSUB cannot index: the
+## ---- sparse selector GP.SELECT exists for. INPHELP.DONE is tested AFTER GP.ENDSEL
+## ---- rather than jumping out of the select -- one comparison, and it cannot leak.
 
 INPHELP.KEYED:
     INPHELP.CODE = ASC(INPHELP.K$)
@@ -162,8 +135,8 @@ INPHELP.KEYED:
     INPHELP.KEY = INPHELP.CODE
     IF INPHELP.DONE = 0 THEN GOTO INPHELP.REDRAW
 
-## ---- Leave it looking settled: redraw once with no cursor, so a finished
-## ---- field does not sit there blinking at a user who has moved on.
+## ---- Redraw once with no cursor, so a finished field is not still blinking at a user
+## ---- who has moved on.
 
     INPHELP.LIT = 0
     GOSUB INPHELP.RENDER
@@ -171,19 +144,13 @@ INPHELP.KEYED:
     IF INPHELP.SHOW$ <> "" THEN GP.PRINTAT INPHELP.X, INPHELP.Y, INPHELP.SHOW$, INPHELP.ATTR
     RETURN
 
-## ---- A label, then a field starting after it. INPHELP.X is put back on
-## ---- the way out, so calling this twice in a loop does not walk the
-## ---- field across the screen.
+## ---- A label, then a field after it. INPHELP.X is put back on the way out, so calling
+## ---- this in a loop does not walk the field across the screen.
 
-## ---- INPHELP.SAVEX, NOT INPHELP.HOME. That name is #DEFINEd as 19, the
-## ---- PETSCII code for the HOME key, so BASLOAD substituted the constant
-## ---- and this line compiled as "19 = INPHELP.X" -- a syntax error, which
-## ---- DEFERS: the compile said OK CODE and INPHELP.ASK would have thrown
-## ---- SYNTAX ERROR at run time the first time anything called it. The
-## ---- read back was wrong too, putting the field at column 19. Nothing in
-## ---- the tree calls ASK (the editor's dialogs go through INPHELP.GET),
-## ---- which is the only reason it was never seen. Found 01/09/26 by
-## ---- scanning objects for the throw-stub.
+## ---- INPHELP.SAVEX, NOT INPHELP.HOME: that name is #DEFINEd as 19, so this line
+## ---- compiled as "19 = INPHELP.X" -- a syntax error, which DEFERS. The compile said
+## ---- OK CODE and ASK would have thrown SYNTAX ERROR the first time it was called.
+## ---- Nothing in the tree calls ASK, which is the only reason it went unseen.
 INPHELP.ASK:
     INPHELP.SAVEX = INPHELP.X
     GP.PRINTAT INPHELP.X, INPHELP.Y, INPHELP.LABEL$, INPHELP.ATTR

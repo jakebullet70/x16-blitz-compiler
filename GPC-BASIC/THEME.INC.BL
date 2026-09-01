@@ -2,27 +2,22 @@
 ## **
 ## **  THEME.INC.BL -- named colour roles, light and dark.
 ## **
-## **  A theme costs NO TOKENS AND NO RUNTIME BYTES, and that is the whole
-## **  point. Theme colours are read by BASIC, for COLOR and for the GP
-## **  drawing commands -- assembly never touches them -- so putting them
-## **  in the runtime would have bought nothing and spent two keywords.
-## **  As data they are also savable and loadable like any other array,
-## **  so "switch to dark" is reloading an array, not invoking a command.
+## **  A theme costs NO TOKENS AND NO RUNTIME BYTES. The colours are read by BASIC, for
+## **  COLOR and the GP drawing commands -- assembly never touches them -- so a runtime
+## **  version would have bought nothing and spent two keywords. As data they also save
+## **  and load like any array, so "switch to dark" is reloading one.
 ## **
-## **  #DEFINE substitutes at TRANSLATION time (BASLOAD.MD:313), so
-## **  THEME.CLR(THEME.TITLE) compiles to THEME.CLR(2) -- the name costs
-## **  nothing at all: no variable, no lookup, and the index is a one byte
-## **  short constant.
+## **  #DEFINE substitutes at TRANSLATION time, so THEME.CLR(THEME.TITLE) compiles to
+## **  THEME.CLR(2): no variable, no lookup, and a one-byte constant index.
 ## **
 ## **  Usage:
 ## **      THEME.DARK = 1 : GOSUB THEME.LOAD
 ## **      GP.BOX 4,2,30,8, 2, THEME.CLR(THEME.BORDER)
 ## **      GP.PRINTAT 6,3, "TITLE", THEME.CLR(THEME.TITLE)
 ## **
-## **  THE VALUES ARE PACKED ATTRIBUTES -- background * 16 + foreground --
-## **  because that is exactly what GP.BOX, GP.FILL and GP.PRINTAT take,
-## **  and it is the same packing the KERNAL keeps at $0376. For COLOR,
-## **  which wants the two halves separately, use THEME.SET.
+## **  THE VALUES ARE PACKED ATTRIBUTES -- background * 16 + foreground -- which is what
+## **  the GP drawing commands take and what the KERNAL keeps at $0376. For COLOR, which
+## **  wants the halves separately, use THEME.SET.
 ## **
 ## ***********************************************************************
 #IFNDEF THEME.DEFS
@@ -48,13 +43,11 @@ GOTO THEME.SKIP
 
 ## THEME.LOAD -- fill THEME.CLR from THEME.DARK (0 light, non-zero dark).
 ##
-## THEME.CLR is deliberately DIMmed here rather than left to GPC's implicit
-## DIM: an implicit array is 0..10, and DIMming one GPC has already
-## auto-dimensioned is an error -- so the module has to own it outright.
+## THEME.CLR is DIMmed here rather than left implicit: an implicit array is 0..10 and
+## DIMming one GPC already auto-dimensioned is an error, so the module owns it outright.
 ##
-## No DATA statement, on purpose. READ walks every DATA in the whole
-## program in order, so a library owning one would silently derail the
-## caller's own READs. The same reason STRHELP.PET2SCR is a compare chain.
+## NO DATA STATEMENT, on purpose: READ walks every DATA in the whole program in order,
+## so a library owning one would silently derail the caller's own READs.
 
 THEME.LOAD:
     IF THEME.READY = 0 THEN DIM THEME.CLR(THEME.SLOTS) : THEME.READY = 1
@@ -83,18 +76,16 @@ THEME.LOAD.DARK:
 ##
 ##   in   THEME.ATTR   a packed attribute, e.g. THEME.CLR(THEME.TEXT)
 ##
-## Splits it for COLOR, which takes foreground and background separately.
-## INT(x/16), not a shift, and AND 15 is safe here only because a packed
-## attribute is 0..255 -- AND is 16 bit SIGNED in GPC, so it raises OUT OF
-## RANGE above 32767. See GP.STRPTR for where that actually bites.
+## Splits it for COLOR, which takes the two halves separately. AND 15 is safe ONLY
+## because a packed attribute is 0..255: AND is 16-bit SIGNED in GPC and raises OUT OF
+## RANGE above 32767.
 
 THEME.SET:
     COLOR THEME.ATTR AND 15, INT(THEME.ATTR / 16)
     RETURN
 
-## THEME.HI -- the inverse of a packed attribute, which is what GP.MENU
-## does to highlight a row. Handy when you want to pre-draw a row already
-## looking selected, so it matches what GP.MENU will produce.
+## THEME.HI -- the inverse of a packed attribute, for pre-drawing a row that should
+## already look selected.
 ##
 ##   in   THEME.ATTR   packed attribute      out  THEME.INV
 

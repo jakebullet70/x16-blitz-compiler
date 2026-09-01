@@ -8,10 +8,9 @@
 ## **      APPHELP.PANEL.LOAD  and back again, where it came from
 ## **      APPHELP.PANEL.PUT   or somewhere else
 ## **
-## **  WHY THIS IS NOT A KEYWORD. Everything here is composition -- one
-## **  KERNAL call and some arithmetic -- and none of it runs in a loop or
-## **  touches bulk data, so by the rule the whole GP set is built on it
-## **  belongs in BASIC. It also means only programs that want it pay.
+## **  NOT A KEYWORD: everything here is one KERNAL call and some arithmetic, none of
+## **  it in a loop or over bulk data, so by the rule the GP set is built on it belongs
+## **  in BASIC -- and only programs that want it pay.
 ## **
 ## **  Usage:
 ## **      GOSUB APPHELP.STARTUP
@@ -22,10 +21,8 @@
 #IFNDEF APPHELP.DEFS
 #DEFINE APPHELP.DEFS 1
 
-## The KERNAL's screen_mode. With CARRY SET it REPORTS: mode in .A, width
-## in .X, height in .Y. With carry clear it SETS the mode in .A. GPC's own
-## SCREEN command is the carry-clear half of exactly this call, which is
-## also the proof the jump table is reachable from compiled code.
+## The KERNAL's screen_mode. CARRY SET REPORTS -- mode in .A, width .X, height .Y;
+## carry clear SETS. GPC's own SCREEN is the carry-clear half of this same call.
 #DEFINE APPHELP.SCRMODE $FF5F
 
 ## The KERNAL's current text colour, packed (background * 16 + foreground)
@@ -33,13 +30,11 @@
 ## they read when their colour argument is left off.
 #DEFINE APPHELP.COLREG $0376
 
-## The KERNAL's screen_set_charset, and the byte that says which one is up.
-## $FF62 only SETS -- there is no "get charset" call -- but $0372 holds the
-## number in its low bits AND flags in the high ones -- bit 6 is ISO. It reads
-## 2 at boot (PET upper/graphics) and reads back
-## exactly what was last set. Probed, because it is not documented -- including
-## that screen_set_charset does NOT clear bit 6, so restoring the charset alone
-## leaves a machine that thinks it is in ISO mode. The whole byte goes back.
+## screen_set_charset, and the byte saying which one is up. $FF62 only SETS -- there is
+## no "get charset" -- but $0372 holds the number in its low bits and flags in the high,
+## bit 6 being ISO. PROBED, NOT DOCUMENTED, including that screen_set_charset does NOT
+## clear bit 6: restoring the charset alone leaves a machine that thinks it is in ISO
+## mode, so the WHOLE BYTE goes back.
 #DEFINE APPHELP.SETCHR $FF62
 #DEFINE APPHELP.CHRREG $0372
 
@@ -56,13 +51,11 @@ GOTO APPHELP.SKIP
 ##        APPHELP.ROWS    rows, e.g. 60
 ##        APPHELP.COLOUR  the packed text colour
 ##
-## Call it FIRST, before any SCREEN or COLOR of your own -- it records the
-## state as it finds it, so anything you change beforehand is what gets
-## restored later.
+## Call it FIRST, before any SCREEN or COLOR of your own: it records the state as it
+## finds it, so anything changed beforehand is what gets restored.
 ##
-## Lay the application out from APPHELP.COLS and APPHELP.ROWS rather than
-## assuming 80x60. The X16 boots 80x60 but SCREEN 0 is 40x30, and a user
-## who prefers the larger text will be running one.
+## Lay out from APPHELP.COLS and APPHELP.ROWS rather than assuming 80x60 -- SCREEN 0 is
+## 40x30, and a user who prefers larger text will be running one.
 
 APPHELP.STARTUP:
     GP.CALL APPHELP.SCRMODE, 0, 0, 0, 1
@@ -75,15 +68,13 @@ APPHELP.STARTUP:
 
 ## APPHELP.RESTORE -- the screen as it was, for whatever runs next.
 ##
-## Setting the mode CLEARS the screen, which is what you want on the way
-## out: the user gets a clean READY rather than the wreckage of a dialog.
-## Restoring the colour afterwards matters more than it looks -- leave it
-## and every later PRINT, including BASIC's own, comes out in whatever the
-## application last set.
+## Setting the mode CLEARS the screen, which is what you want on the way out -- a clean
+## READY rather than the wreckage of a dialog. Restoring the colour matters more than it
+## looks: leave it and every later PRINT, BASIC's own included, comes out in whatever
+## the application last set.
 ##
-## The two halves are split with INT and AND 15. AND is 16 bit SIGNED in
-## GPC, so it is only safe here because a packed attribute is 0..255;
-## above 32767 it raises OUT OF RANGE. See GP.STRPTR for where that bites.
+## AND 15 is safe here only because a packed attribute is 0..255; AND is 16-bit SIGNED
+## in GPC and raises OUT OF RANGE above 32767.
 
 APPHELP.RESTORE:
     GP.CALL APPHELP.SCRMODE, APPHELP.MODE, 0, 0, 0
@@ -92,13 +83,10 @@ APPHELP.RESTORE:
     COLOR APPHELP.COLOUR AND 15, INT(APPHELP.COLOUR / 16)
     RETURN
 
-## THE PANEL ROUTINES MOVED TO STASH.INC.BL on 2026-09-01, as
-## STASH.FILE.SAVE, STASH.FILE.LOAD and STASH.FILE.PUT. They were
-## APPHELP.PANEL.SAVE / .LOAD / .PUT, and they were built on GP.STASH and
-## GP.RESTR -- which are gone, moved out of the GP runtime block into
-## GP.ASM for the 329 bytes they cost every program that used any GP
-## keyword at all. Keeping a BSAVE wrapper here would have meant APPHELP
-## dragging the whole block in behind it.
+## THE PANEL ROUTINES MOVED on 2026-09-01: APPHELP.PANEL.SAVE / .LOAD / .PUT are now
+## STASH.FILE.SAVE / .LOAD / .PUT in STASHFILE.INC.BL. They were built on GP.STASH and
+## GP.RESTR, and keeping a BSAVE wrapper here would have meant APPHELP dragging the
+## whole GP block in behind it.
 ##
 APPHELP.SKIP:
 #ENDIF
