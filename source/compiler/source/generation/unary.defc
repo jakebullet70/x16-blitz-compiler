@@ -24,7 +24,7 @@
 ;
 ;	POS    (#) T N
 ;
-	.byte	$07,$b9,$00,$8e,$91,188,$06
+	.byte	$07,$b9,$00,$8e,$91,192,$06
 ;
 ;	SQR    (#) T N
 ;
@@ -32,7 +32,7 @@
 ;
 ;	RND    (#) T N
 ;
-	.byte	$07,$bb,$00,$8e,$91,195,$06
+	.byte	$07,$bb,$00,$8e,$91,199,$06
 ;
 ;	LOG    (#) T N
 ;
@@ -60,11 +60,11 @@
 ;
 ;	PEEK    (#) T N
 ;
-	.byte	$07,$c2,$00,$8e,$91,185,$06
+	.byte	$07,$c2,$00,$8e,$91,189,$06
 ;
 ;	LEN    ($) T N
 ;
-	.byte	$07,$c3,$00,$8f,$91,175,$06
+	.byte	$07,$c3,$00,$8f,$91,179,$06
 ;
 ;	STR$    (#) T S
 ;
@@ -104,11 +104,11 @@
 ;
 ;	PI     T N
 ;
-	.byte	$06,$ff,$00,$10,186,$06
+	.byte	$06,$ff,$00,$10,190,$06
 ;
 ;	GP.INSTR   ($,$ X:OptionalZeroCompile) T N
 ;
-	.byte	$0b,$ce,$77,$8f,$af,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$91,162,$06
+	.byte	$0b,$ce,$77,$8f,$af,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$91,166,$06
 ;
 ;	GP.COMP   ($,$) T N
 ;
@@ -116,7 +116,7 @@
 ;
 ;	GP.STRPTR   ($) T N
 ;
-	.byte	$07,$ce,$76,$8f,$91,163,$06
+	.byte	$07,$ce,$76,$8f,$91,167,$06
 ;
 ;	GP.ARRPTR   (X:AnyArrayCompile) T N
 ;

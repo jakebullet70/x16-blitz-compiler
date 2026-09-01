@@ -54,17 +54,19 @@ _FBNext:
 		;
 		;		Block depth, counted as the walk passes the openers and closers -- the same
 		;		structural count the branch scanners below do locally, kept running here so the
-		;		.unwind resolver can ask "how deep am I?" without a second walk. GP.IF is not
-		;		counted: it opens no stack frame, so there is nothing to unwind out of it.
+		;		.unwind resolver can ask "how deep am I?" without a second walk.
+		;
+		;		ONLY GP.DO IS COUNTED. GP.IF never was: it opens no stack frame, so there is
+		;		nothing to unwind out of it. GP.SELECT stopped being counted on 1st September
+		;		2026 for exactly the same reason -- its selector became a plain variable that
+		;		each alternative re-reads, so it opens no frame either. gp.select and gp.endsel
+		;		are still SCANNED FOR as structure below (_FBCaseScan needs them to find where
+		;		an alternative ends); they are simply not depth.
 		;
 		lda 	(objPtr)
 		cmp 	#PCD_GPCMD_DO
 		beq 	_FBDepthUp
-		cmp 	#PCD_GPCMD_SELECT
-		beq 	_FBDepthUp
 		cmp 	#PCD_GPCMD_LOOP
-		beq 	_FBDepthDown
-		cmp 	#PCD_GPCMD_ENDSEL
 		bne 	_FBStep
 _FBDepthDown:
 		dec 	_FBBlockDepth
@@ -427,11 +429,7 @@ _FBUWNot:
 		lda 	(objPtr)
 		cmp 	#PCD_GPCMD_DO
 		beq 	_FBUWUp
-		cmp 	#PCD_GPCMD_SELECT
-		beq 	_FBUWUp
 		cmp 	#PCD_GPCMD_LOOP
-		beq 	_FBUWDown
-		cmp 	#PCD_GPCMD_ENDSEL
 		bne 	_FBUWStep
 _FBUWDown:
 		dec 	_FBUnwindDepth

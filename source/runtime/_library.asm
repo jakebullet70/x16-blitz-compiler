@@ -3021,14 +3021,36 @@ CommandGotoNZ: ;; [.goto.nz]
 ;		nothing for either of them to open or close.
 ;
 ;		DELIBERATELY IN THE CORE, not gp-runtime. ScanGPUsage decides whether an object carries
-;		the 2K GP handler block by comparing each emitted opcode's HANDLER ADDRESS against GPBase,
-;		so aliasing these to CommandXOther in gp-runtime/select.asm would drag the whole block into
-;		any program whose only GP.BASIC keyword is an IF. Four bytes here buys that back.
+;		the GP handler block by comparing each emitted opcode's HANDLER ADDRESS against GPBase, so
+;		putting these above it would drag the whole block into any program whose only GP.BASIC
+;		keyword is an IF. Four bytes here buys that back.
+;
+;		ALL FOUR SELECT KEYWORDS JOINED THEM ON 1st SEPTEMBER 2026, which is how the last of the
+;		select machinery left the block. gp.case is a marker like the rest now: the compiler
+;		emits it and then emits a read of the selector variable behind it, where the old handler
+;		pulled that value out of a stack frame. The
+;		selector used to be any expression, kept alive in a stack frame across the source lines
+;		between GP.SELECT and its alternatives; it is now a plain numeric VARIABLE that each
+;		alternative simply re-reads, so there is nothing to keep. See
+;		compiler/source/commands/select.asm for the whole argument.
+;
+;		THE THREE ARE STILL TOKENS, and must be. FixBranches has no symbol table: the emitted
+;		token stream IS the block structure, and it scans for these to resolve .casenext and
+;		.caseend and to count nesting. They cost a vector slot each, which they already had, and
+;		now cost no handler at all.
+;
+;		gp.select carries a marker of its own rather than aliasing gp.if, because the two mean
+;		different things to FixBranches -- gp.if is not counted for nesting and gp.select was.
+;		(It is not counted any more either, but they are still distinct tokens.)
 ;
 ; ************************************************************************************************
 
 CommandXIfMark: ;; [gp.if]
 CommandXEndIf: ;; [gp.endif]
+CommandXSelect: ;; [gp.select]
+CommandXCase: ;; [gp.case]
+CommandXOther: ;; [gp.other]
+CommandXEndSelect: ;; [gp.endsel]
 		.entercmd
 		.exitcmd
 
@@ -8508,49 +8530,49 @@ VectorTable:
 	.word	CommandReturn            ; $9b return
 	.word	CommandXIfMark           ; $9c gp.if
 	.word	CommandXEndIf            ; $9d gp.endif
-	.word	UnaryGPA                 ; $9e gp.a
-	.word	UnaryGPX                 ; $9f gp.x
-	.word	UnaryGPY                 ; $a0 gp.y
-	.word	UnaryGPC                 ; $a1 gp.c
-	.word	UnaryGPInstr             ; $a2 gp.instr
-	.word	UnaryGPStrPtr            ; $a3 gp.strptr
-	.word	Command_PSET             ; $a4 pset
-	.word	Command_LINE             ; $a5 line
-	.word	Command_RECT             ; $a6 rect
-	.word	Command_FRAME            ; $a7 frame
-	.word	Command_OVAL             ; $a8 oval
-	.word	Command_RING             ; $a9 ring
-	.word	Command_CHAR             ; $aa char
-	.word	Unary16Hex               ; $ab hex$
-	.word	CommandXInput            ; $ac input
-	.word	CommandInputString       ; $ad input$
-	.word	CommandInputReset        ; $ae input.start
-	.word	UnaryLen                 ; $af len
-	.word	LinkFloatCompare         ; $b0 f.cmp
-	.word	LinkDivideInt32          ; $b1 int.div
-	.word	UnaryMOD                 ; $b2 mod
-	.word	NegateTOS                ; $b3 negate
-	.word	CommandNewLine           ; $b4 new.line
-	.word	CommandXNext             ; $b5 next
-	.word	NotTOS                   ; $b6 not
-	.word	CommandXOn               ; $b7 on
-	.word	CommandMoreOn            ; $b8 moreon
-	.word	UnaryPeek                ; $b9 peek
-	.word	UnaryPI                  ; $ba pi
-	.word	CommandPOKE              ; $bb poke
-	.word	UnaryPos                 ; $bc pos
-	.word	GetChannel               ; $bd getchannel
-	.word	SetChannel               ; $be setchannel
-	.word	PrintNumber              ; $bf print.n
-	.word	PrintString              ; $c0 print.s
-	.word	CommandXRead             ; $c1 read
-	.word	CommandReadString        ; $c2 read$
-	.word	UnaryRND                 ; $c3 rnd
-	.word	StringConcatenate        ; $c4 concat
-	.word	CommandXSelect           ; $c5 gp.select
-	.word	CommandXCase             ; $c6 gp.case
-	.word	CommandXOther            ; $c7 gp.other
-	.word	CommandXEndSelect        ; $c8 gp.endsel
+	.word	CommandXSelect           ; $9e gp.select
+	.word	CommandXCase             ; $9f gp.case
+	.word	CommandXOther            ; $a0 gp.other
+	.word	CommandXEndSelect        ; $a1 gp.endsel
+	.word	UnaryGPA                 ; $a2 gp.a
+	.word	UnaryGPX                 ; $a3 gp.x
+	.word	UnaryGPY                 ; $a4 gp.y
+	.word	UnaryGPC                 ; $a5 gp.c
+	.word	UnaryGPInstr             ; $a6 gp.instr
+	.word	UnaryGPStrPtr            ; $a7 gp.strptr
+	.word	Command_PSET             ; $a8 pset
+	.word	Command_LINE             ; $a9 line
+	.word	Command_RECT             ; $aa rect
+	.word	Command_FRAME            ; $ab frame
+	.word	Command_OVAL             ; $ac oval
+	.word	Command_RING             ; $ad ring
+	.word	Command_CHAR             ; $ae char
+	.word	Unary16Hex               ; $af hex$
+	.word	CommandXInput            ; $b0 input
+	.word	CommandInputString       ; $b1 input$
+	.word	CommandInputReset        ; $b2 input.start
+	.word	UnaryLen                 ; $b3 len
+	.word	LinkFloatCompare         ; $b4 f.cmp
+	.word	LinkDivideInt32          ; $b5 int.div
+	.word	UnaryMOD                 ; $b6 mod
+	.word	NegateTOS                ; $b7 negate
+	.word	CommandNewLine           ; $b8 new.line
+	.word	CommandXNext             ; $b9 next
+	.word	NotTOS                   ; $ba not
+	.word	CommandXOn               ; $bb on
+	.word	CommandMoreOn            ; $bc moreon
+	.word	UnaryPeek                ; $bd peek
+	.word	UnaryPI                  ; $be pi
+	.word	CommandPOKE              ; $bf poke
+	.word	UnaryPos                 ; $c0 pos
+	.word	GetChannel               ; $c1 getchannel
+	.word	SetChannel               ; $c2 setchannel
+	.word	PrintNumber              ; $c3 print.n
+	.word	PrintString              ; $c4 print.s
+	.word	CommandXRead             ; $c5 read
+	.word	CommandReadString        ; $c6 read$
+	.word	UnaryRND                 ; $c7 rnd
+	.word	StringConcatenate        ; $c8 concat
 	.word	SignTOS                  ; $c9 sgn
 	.word	PrintTab                 ; $ca print.tab
 	.word	PrintPos                 ; $cb print.pos

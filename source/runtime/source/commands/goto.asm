@@ -92,14 +92,36 @@ CommandGotoNZ: ;; [.goto.nz]
 ;		nothing for either of them to open or close.
 ;
 ;		DELIBERATELY IN THE CORE, not gp-runtime. ScanGPUsage decides whether an object carries
-;		the 2K GP handler block by comparing each emitted opcode's HANDLER ADDRESS against GPBase,
-;		so aliasing these to CommandXOther in gp-runtime/select.asm would drag the whole block into
-;		any program whose only GP.BASIC keyword is an IF. Four bytes here buys that back.
+;		the GP handler block by comparing each emitted opcode's HANDLER ADDRESS against GPBase, so
+;		putting these above it would drag the whole block into any program whose only GP.BASIC
+;		keyword is an IF. Four bytes here buys that back.
+;
+;		ALL FOUR SELECT KEYWORDS JOINED THEM ON 1st SEPTEMBER 2026, which is how the last of the
+;		select machinery left the block. gp.case is a marker like the rest now: the compiler
+;		emits it and then emits a read of the selector variable behind it, where the old handler
+;		pulled that value out of a stack frame. The
+;		selector used to be any expression, kept alive in a stack frame across the source lines
+;		between GP.SELECT and its alternatives; it is now a plain numeric VARIABLE that each
+;		alternative simply re-reads, so there is nothing to keep. See
+;		compiler/source/commands/select.asm for the whole argument.
+;
+;		THE THREE ARE STILL TOKENS, and must be. FixBranches has no symbol table: the emitted
+;		token stream IS the block structure, and it scans for these to resolve .casenext and
+;		.caseend and to count nesting. They cost a vector slot each, which they already had, and
+;		now cost no handler at all.
+;
+;		gp.select carries a marker of its own rather than aliasing gp.if, because the two mean
+;		different things to FixBranches -- gp.if is not counted for nesting and gp.select was.
+;		(It is not counted any more either, but they are still distinct tokens.)
 ;
 ; ************************************************************************************************
 
 CommandXIfMark: ;; [gp.if]
 CommandXEndIf: ;; [gp.endif]
+CommandXSelect: ;; [gp.select]
+CommandXCase: ;; [gp.case]
+CommandXOther: ;; [gp.other]
+CommandXEndSelect: ;; [gp.endsel]
 		.entercmd
 		.exitcmd
 

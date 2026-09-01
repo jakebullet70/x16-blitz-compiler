@@ -153,6 +153,20 @@
 ## bytes are, in order: top right, top left, bottom right, bottom left, top
 ## edge, bottom edge, left edge, right edge.
 ##
+## THIS IS ALSO HOW YOU DRAW A BOX IN ISO MODE. GP.BOX does no translation
+## at all -- the glyphs go straight to VERA as tile indices -- so the four
+## built-in styles are PETSCII screen codes and come out as letters when
+## the screen is in ISO. There is nothing to translate to, because
+## ISO-8859-15 has no box-drawing characters; but a tile index IS a
+## character code in that mode, so hand it ASCII and it is right:
+##
+##     ISO.GLYPH$ = "++++--||"
+##     GP.BOX 50, 26, 4, 3, GP.STRPTR(ISO.GLYPH$) + 1, 1
+##
+## GP.STRPTR gives the block and the text starts at +1, so a string literal
+## is the cheapest way to carry the eight bytes. See ISO.EXP.BL, which
+## reads the cells back and asserts 43, 45, 124.
+##
 ##   B$ = CHR$(110)+CHR$(112)+CHR$(125)+CHR$(109)+CHR$(64)+CHR$(64)+CHR$(66)+CHR$(66)
 ##   GP.BOX 4, 2, 30, 8, GP.STRPTR(B$) + 1, COL
 ##
@@ -228,10 +242,10 @@
 ## MENUHELP.HIATTR = 0 asks for that same inversion back.
 
 ##
-## GP.SELECT <expr>            evaluate once, then test it against each alternative
+## GP.SELECT <var>             a plain numeric variable, re-read at each alternative
 ## GP.CASE <expr> [,<expr>..]  run the body below if any of them matches
 ## GP.OTHER                    run the body below if nothing above matched
-## GP.ENDSEL                   close the select -- REQUIRED, it frees the selector
+## GP.ENDSEL                   close the select -- REQUIRED, it ends the block
 ##
 ##   GP.SELECT K
 ##   GP.CASE 13
@@ -251,16 +265,22 @@
 ## below it runs. Nothing matching with no GP.OTHER is not an error, the
 ## whole select is simply skipped. Selects may be nested.
 ##
+## The SELECTOR is stricter: a plain numeric variable, not an expression,
+## a constant or an array element. Write those to a scalar first --
+## T = RND(1)*3 : GP.SELECT T. In return the whole construct compiles to
+## core opcodes, so a program whose only GP keyword is a select does not
+## carry the GP runtime block at all, exactly like GP.IF.
+##
 ## A case body may go on the SAME LINE after a colon, which is what makes a
 ## sparse dispatch read as a table:
 ##
 ##   GP.CASE 157 : GOSUB MOVE.LEFT
 ##   GP.CASE 29  : GOSUB MOVE.RIGHT
 ##
-## GOTO out of a select is safe. It used to leak the selector's frame --
-## GP.ENDSEL is what releases it -- but the compiler now puts an .unwind in
-## front of any GOTO leaving a block and FixBranches fills in the count. No
-## runtime bytes. The same holds for GP.DO.
+## GOTO out of a select is safe, trivially: a select keeps nothing alive,
+## so there is nothing to leak. GP.DO still opens a loop frame, and a GOTO
+## leaving one is covered -- the compiler puts an .unwind in front of it
+## and FixBranches fills in the count. No runtime bytes.
 
 #TOKEN GP.SELECT 52838
 #TOKEN GP.CASE 52837
@@ -291,8 +311,8 @@
 ## simply skipped. IFs may be nested, and may be nested inside a
 ## GP.SELECT case body or a GP.DO loop.
 ##
-## Unlike GP.SELECT there is NO frame to release, so a GOTO out of a
-## GP.IF is safe -- GP.ENDIF exists only to mark where the block ends.
+## There is NO frame to release (GP.SELECT is the same), so a GOTO out of
+## a GP.IF is safe -- GP.ENDIF exists only to mark where the block ends.
 ## The cost is 12 bytes of runtime for the whole construct, because
 ## every one of its four opcodes reuses a handler that was already
 ## there. Conditions are numeric, as everywhere else.

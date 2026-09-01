@@ -80,7 +80,7 @@
 ;
 ;	ON     # T X:CommandON N
 ;
-	.byte	$09,$91,$00,$e1,183,$03,CommandON & $FF,CommandON >> 8,$06
+	.byte	$09,$91,$00,$e1,187,$03,CommandON & $FF,CommandON >> 8,$06
 ;
 ;	SYS    # T N
 ;
@@ -88,7 +88,7 @@
 ;
 ;	POKE    #,# T N
 ;
-	.byte	$07,$97,$00,$ea,$e1,187,$06
+	.byte	$07,$97,$00,$ea,$e1,191,$06
 ;
 ;	RETURN    T N
 ;

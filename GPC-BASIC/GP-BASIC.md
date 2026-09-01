@@ -159,7 +159,7 @@ Example: [`LOOPS.EXP.BL`](LOOPS.EXP.BL)
 ### 3.2 Multi-way branch
 
 ```
-GP.SELECT <expr>
+GP.SELECT <var>
 GP.CASE <expr> [,<expr> ...]
     ...
 GP.OTHER
@@ -167,14 +167,22 @@ GP.OTHER
 GP.ENDSEL
 ```
 
-The selector is evaluated **once**; each `GP.CASE` compares against it in the order written, and the
-first match wins. `GP.OTHER` is optional. **Nothing matching with no `GP.OTHER` is not an error** — the
-whole select is simply skipped.
+The selector is a **plain numeric variable**, re-read at each `GP.CASE`; the tests run in the order
+written and the first match wins. `GP.OTHER` is optional. **Nothing matching with no `GP.OTHER` is not
+an error** — the whole select is simply skipped.
+
+An expression, a constant or an array element is refused at compile time. Assign it to a scalar
+first — `T = RND(1)*3 : GP.SELECT T` — which is also what makes the re-read sound: a scalar is a
+fixed slot, so reading it seven times is the same value seven times. What the restriction buys is
+that the whole construct compiles to core opcodes: **a program whose only GP keyword is a select
+does not carry the GP block at all**, exactly like `GP.IF`.
 
 Case values are ordinary numeric **expressions**, not just constants — which is a step past prog8's
 `when`, whose choices must be compile-time integers.
 
-**`GP.ENDSEL` is required**: it is what releases the selector's stack frame.
+**`GP.ENDSEL` is required** — not for cleanup, of which there is none, but for structure: the
+compiler has no symbol table, the emitted tokens ARE the block, and every case branch resolves by
+scanning forward to it.
 
 **A case body takes its statements on the same line**, after a colon, which is what makes a sparse
 dispatch read as the table it is:
@@ -191,14 +199,13 @@ GP.ENDSEL
 More than one statement after the colon is fine, and so is `GP.OTHER`. The body may still go on the
 following lines instead — both forms are the same code.
 
-> **`GOTO` out of a select is safe.** It used to leak the selector's frame, one per pass through a
-> loop, because `GP.ENDSEL` is what releases it. The compiler now puts an `.unwind` in front of any
-> `GOTO` that leaves a block, and `FixBranches` fills in how many frames it closes — it knows the
-> block depth at the `GOTO` and at its target. The same applies to `GP.DO`, and to leaving both at
-> once. It costs **no runtime bytes** and two p-code bytes at the `GOTO` itself.
+> **`GOTO` out of a select is safe, and trivially so**: a select keeps nothing alive, so there is
+> nothing to leak. `GP.DO` is the one block that still opens a stack frame, and a `GOTO` leaving one
+> is covered too — the compiler puts an `.unwind` in front of it and `FixBranches` fills in how many
+> loop frames it closes. No runtime bytes, two p-code bytes at the `GOTO` itself.
 >
-> One thing it does not cover, because nothing could: a `GOTO` **sideways**, out of one block and
-> into a different one at the same depth. The count comes out zero and no frame is closed.
+> One thing that does not cover, because nothing could: a `GOTO` **sideways**, out of one `GP.DO` and
+> into a different one at the same depth. The count comes out zero and the loop frame survives.
 
 **This does not replace `ON x GOTO/GOSUB`**, which is a real skip table and remains the right answer
 for a dense `1..n` index. `GP.SELECT` is for the **sparse** selector — key codes, state machines,
@@ -423,12 +430,24 @@ change and nothing to declare**. It costs 7 cycles a cell in PETSCII mode and *s
 `GP.FILL` needs nothing: it converts its one character before the loop, and `$20` is a fixed point of
 the translation, so a space fill — which is what padding and blanking are — is right in both modes.
 
-> **`GP.BOX` is the exception.** Its border glyphs are PETSCII screen codes, and ISO-8859-15 has no
-> box-drawing characters at all, so a box drawn in ISO mode comes out as letters. No translation can
-> fix that — there is nothing to translate *to*. Draw frames with `GP.FILL`, or switch back to
-> PETSCII for the frame.
+**`GP.BOX` is the one that needs you to say something, and the custom-glyph form is how.** It does no
+translation *at all* — its glyphs go straight to VERA as tile indices — so the four built-in styles
+are PETSCII screen codes and come out as letters in ISO mode. No translation can fix that; ISO-8859-15
+has no box-drawing characters, so there is nothing to translate *to*. But a style of **256 or more is
+an address** of eight glyphs of your own, and in ISO mode a tile index *is* a character code, so ASCII
+`+ - |` are a perfectly good frame:
 
-`ISO.EXP.BL` pins all of this, reading the cells back with `VPEEK` rather than trusting the display.
+```
+ISO.GLYPH$ = "++++--||"                        ' TR TL BR BL TOP BOTTOM LEFT RIGHT
+GP.BOX 50, 26, 4, 3, GP.STRPTR(ISO.GLYPH$) + 1, 1
+```
+
+`GP.STRPTR` hands over the string's block and the text starts at +1, so a plain string literal is the
+cheapest way to carry the eight bytes. **This costs no runtime bytes** — the pointer form already
+exists, and it is the same mechanism `samples/editor` uses to draw frames from a re-ordered font.
+
+`ISO.EXP.BL` pins all of this, reading the cells back with `VPEEK` rather than trusting the display —
+including the ISO box, whose corner, top edge and side read back as 43, 45 and 124.
 
 Example: [`SCREEN.EXP.BL`](SCREEN.EXP.BL)
 
@@ -966,7 +985,7 @@ BASIC's variables through `{VAR}` and BASLOAD crunches every name before the com
 without the mapping the compile stops with `NO SYMBOL FILE FOR {}`.
 
 Example: [`ARRAYS.EXP.BL`](ARRAYS.EXP.BL). Regression test:
-[`SORTTST.EXP.BL`](SORTTST.EXP.BL), eight cases including a 200-element array — element 128 is where
+[`SORT.EXP.BL`](SORT.EXP.BL), eight cases including a 200-element array — element 128 is where
 the doubled index stops fitting in a byte, and every case is checked for **content** as well as
 order, because a sort that reads the wrong element leaves the array beautifully sorted with the same
 string in it twice.
@@ -1098,8 +1117,7 @@ Every one of these has cost a debugging session at least once.
 | `P AND 255` on a heap or VRAM address | `AND` is **16-bit signed**; above 32767 it raises `OUT OF RANGE` instead of masking | `H = INT(P/256) : L = P - H*256` |
 | `$0400` for machine code | stock BASIC leaves it free, **a compiled GPC program does not** — runtime state lives there, and it corrupts silently | banked RAM, `$A000`–`$BFFF` |
 | `PRINT` after `GP.PRINTAT` | GP drawing never calls the KERNAL, so the cursor is wherever it was | `LOCATE` first, or stay in one world |
-| `GOTO` out of a `GP.SELECT` | `GP.ENDSEL` releases the frame; jumping past it leaks one per pass | a flag, tested after `GP.ENDSEL` |
-| `GOTO` out of a `GP.DO` | abandons the loop frame | `GP.EXITDO` |
+| `GOTO` sideways, one `GP.DO` into another | `.unwind` counts depth difference, so sideways closes nothing and the loop frame leaks | jump out first, or `GP.EXITDO` |
 | `GP.ARRPTR(A$)` | `A$` and `A$()` are different variables — it finds the scalar | `GP.ARRPTR(A$())` |
 | `SORT.INC.BL` with no `#SYMFILE` | `{VAR}` cannot resolve a crunched name — `NO SYMBOL FILE FOR {}` | `#SYMFILE "@:PROG.SYM"`, before the `#INCLUDE`s |
 | `GP.BOX X,Y,W,H,,7` | optionals cannot be skipped over | `GP.BOX X,Y,W,H,0,7` |

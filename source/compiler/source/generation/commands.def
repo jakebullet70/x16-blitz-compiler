@@ -121,7 +121,7 @@ GP.CALL 		# X:OptionalZeroCompile X:OptionalZeroCompile X:OptionalZeroCompile X:
 #		GP.SORT was here. It is GPC-BASIC/SORT.INC.BL now, written in GP.ASM, because the GP block
 #		is all or nothing and 408 of its bytes were a sort that most programs never call. The
 #		module is the same shell sort with the same Ciura gaps and is checked element for element
-#		against what this keyword used to produce (GPC-BASIC/SORTTST.EXP.BL).
+#		against what this keyword used to produce (GPC-BASIC/SORT.EXP.BL).
 #
 #		It was the only caller of X:StringArrayCompile, which has gone with it. X:AnyArrayCompile
 #		in unary.def is the survivor of that pair and is what GP.ARRPTR uses.
