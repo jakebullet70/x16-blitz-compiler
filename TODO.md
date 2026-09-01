@@ -1020,16 +1020,50 @@ cannot dirty anything ABOVE the cursor row, so repainting from `ED.CUR.ROW` down
 drawing on average and cost nothing near the bottom of a file. Worth doing after the shift, and only
 then -- at 17% it is not what anyone is feeling.
 
-### `PROGRAM TOO BIG` at an `EDITOR.PRG` of 27,753 bytes — measure the wall
+### `PROGRAM TOO BIG` fires with 7,106 bytes of the object budget unused — BUG, reproducible
 
-Found while instrumenting the above: adding a timing routine to `samples/editor/EDITOR.BASL` took the
-tokenised `EDITOR.PRG` from 26,899 to 27,753 bytes and the compile died with `PROGRAM TOO BIG @ 1644`.
-It is NOT the object buffer -- that build's object would have been near 16 KB, and the editor
-compiles at `OK CODE 15166 FREE 6144`, so roughly 21.3 KB is available and 71% was in use.
+**The editor is NOT out of memory.** `ObjectCeiling` (`$9F00`) minus `FreeMemory` (`$4800`) is
+**22,272 bytes** of p-code, and `samples/editor` compiles at **15,166** — 32% of the budget is spare.
+`FREE 6144` on the OK line is a different number entirely: `memreport.asm` says it is the RUNTIME
+workspace left for variables, strings and arrays, not compile headroom. Do not read it as headroom.
 
-So the wall is on the SOURCE the compiler can hold, somewhere in 26,899..27,753, and the editor
-sample sits under 900 bytes below it. **Find the exact figure and report it as a maximum program
-size**; a build-side wall that stops a program the machine could run is a bug, not a limit.
+**But adding a page of source to the editor makes the compiler say `PROGRAM TOO BIG` anyway**, and
+that message can only come from one place — `_CAWriteByte` in `api.asm`, when `objPtr` reaches
+`$9F00`. Measured, all against the same `samples/editor/EDITOR.BASL`:
+
+| build | `EDITOR.PRG` | `.SYM` | result |
+|---|---|---|---|
+| as it ships | 26,899 | 36,813 | OK, object **15,166** |
+| self-check replaced by a timing routine | 23,325 | — | OK, object 12,601 |
+| + 35 filler lines, a new variable each | 27,964 | 39,154 | `TOO BIG @ 1602` |
+| + 70 filler lines, a new variable each | 29,050 | 41,428 | `TOO BIG @ 1570` |
+| + 100 filler lines, **no** new variables | 28,205 | 36,945 | `TOO BIG @ 1656` |
+
+**What the table rules out.** It is not the variable name table: the last row adds a hundred lines of
+`ED.FIL = ED.FIL + n`, moves `.SYM` by 132 bytes, and still dies. It is not honest p-code either —
+those hundred lines are worth perhaps 800 bytes of object against 7,106 free, and 35 lines certainly
+cannot emit 7,106. **The wall tracks LINE COUNT, not emitted code.**
+
+**Where to look.** `objPtr` is reaching `$9F00` for some reason other than legitimate emission, so
+either something is writing past the object or the pointer is being moved. The prime suspect is the
+compiler workspace: `CompilerWorkspaceStart..End` is `$A000-$C000`, 8K of BANKED RAM holding the
+variable name list growing UP and the line number table growing DOWN, and the line table is the half
+that scales with line count. `start.asm` records this exact class of failure happening before, when
+the workspace was still in low memory: the tables were overrun, `FindVariable` failed for every
+variable, and **the compiler printed OK and emitted a program in which `X` on one line and `X` on the
+next were different variables** — found by `samples/FSIM16_V1` at 12,766 bytes of p-code. That was
+fixed by moving the workspace to banked RAM; this looks like the same shape wearing a different mask,
+and this time it at least stops rather than lying.
+
+**Why it matters beyond the editor.** A build-side wall that stops a program the machine could
+comfortably run is a bug, and the standing rule is that costs are reported in maximum program size.
+Right now the reported budget (22,272) and the achievable one (~15,500 at ~1,600 lines) differ by a
+third, and nothing tells the user which one they are actually up against.
+
+**Next**: instrument `_CAWriteByte` or dump `objPtr` per line to see whether the object grows
+smoothly and hits the roof or jumps; and check the line number table's size against `$C000` for a
+program of ~1,650 lines. Neither needs a full build to reason about -- the table entry size is in
+`reset.asm`.
 
 ### `GUI.INC.BL` wants a listbox, single and multi select
 
