@@ -241,48 +241,51 @@ GUI.YN.SET:
     GUI.MARK.CH = GUI.NO : GOSUB GUI.YN.MARK
     GUI.ANSWER = 0
 
+## ---- Six keys scattered across 256 and everything else falling through:
+## ---- the sparse selector GP.SELECT exists for, and the same shape
+## ---- MENUHELP.KEYED uses. The comma lists are what earn it -- "yes, or
+## ---- the lower case yes" is ONE alternative and reads as one, where the
+## ---- eight IFs it replaces stated the branch target eight times.
+## ----
+## ---- THE SELECTOR IS A PLAIN VARIABLE, which since 01/09/26 is the only
+## ---- thing GP.SELECT accepts -- and it is why this costs no runtime: all
+## ---- four select keywords are markers with a core handler now, so a
+## ---- select does not drag the GP block into a program that has none.
+## ----
+## ---- NOTHING BELOW DOES GOTO OUT OF THE SELECT. It would be safe today
+## ---- (a select holds no stack frame any more, so there is nothing to
+## ---- leak) but GUI.DONE tested after GP.ENDSEL is one comparison, cannot
+## ---- leak whatever the runtime does later, and is what MENUHELP does.
+
 GUI.YN.WAIT:
     GET GUI.PRESSED$
     IF GUI.PRESSED$ = "" THEN GOTO GUI.YN.WAIT
-    GUI.KEY = ASC(GUI.PRESSED$)
-    IF GUI.KEY = GUI.YES THEN GUI.ANSWER = 1 : GOTO GUI.YN.DONE
-    IF GUI.KEY = GUI.YES.ALT THEN GUI.ANSWER = 1 : GOTO GUI.YN.DONE
-    IF GUI.KEY = GUI.NO THEN GOTO GUI.YN.DONE
-    IF GUI.KEY = GUI.NO.ALT THEN GOTO GUI.YN.DONE
-    IF GUI.KEY = GUI.ESCAPE THEN GOTO GUI.YN.DONE
-    IF GUI.KEY = GUI.STOP THEN GOTO GUI.YN.DONE
+    GUI.KEY = ASC(GUI.PRESSED$) : GUI.DONE = 0
+    GP.SELECT GUI.KEY
+        GP.CASE GUI.YES, GUI.YES.ALT
+            GUI.ANSWER = 1 : GUI.DONE = 1
+        GP.CASE GUI.NO, GUI.NO.ALT, GUI.ESCAPE, GUI.STOP
+            GUI.DONE = 1
 
 ## ---- RETURN accepts, but ONLY in OK/CANCEL. A dialog offering OK has a
 ## ---- default and RETURN is how everyone takes it. A YES/NO question is
 ## ---- being asked precisely because there is no default, so RETURN there
 ## ---- would answer for the user -- and the question is usually the
-## ---- destructive one.
-    IF GUI.OKCANCEL = 0 THEN GOTO GUI.YN.WAIT
-    IF GUI.KEY = GUI.RETURN THEN GUI.ANSWER = 1 : GOTO GUI.YN.DONE
-    GOTO GUI.YN.WAIT
+## ---- destructive one. In YES/NO the key is simply ignored, which is what
+## ---- falling out of the case with GUI.DONE still 0 does.
+        GP.CASE GUI.RETURN
+            IF GUI.OKCANCEL <> 0 THEN GUI.ANSWER = 1 : GUI.DONE = 1
+    GP.ENDSEL
+    IF GUI.DONE = 0 THEN GOTO GUI.YN.WAIT
 
 GUI.YN.DONE:
-    GOSUB GUI.CLOSE
-    RETURN
+    GOSUB GUI.CLOSE : RETURN
 
 ## ***********************************************************************
 ## **  GUI.YN.MARK -- repaint one letter of the hint in the key colour.
 ## **
 ## **   in   GUI.MARK.CH    the character code to look for
 ## **        GUI.HINT.LINE$ GUI.HINT.LEFT GUI.INNER.TOP   the line as it was just printed
-## **
-## **  THE WORD IS THE ANSWER AND THE LETTER IS THE KEY. The line reads
-## **  "YES      NO" and the Y and the N are lit, rather than spelling out
-## **  "Y = YES" -- which says the same thing twice and makes the reader
-## **  parse a legend before answering a question.
-## **
-## **  FOUND BY SEARCH, not by a fixed column, because GUI.HINT$ lets the
-## **  caller write the line -- "YES / NO", "OUI  NON" and "Y/N" all mark
-## **  correctly. The FIRST match wins, which is why the answers are in
-## **  this order: a "NO" before a "YES" would still light its own N and
-## **  Y, but a word containing an earlier Y or N would take the mark.
-## **
-## **  A line with no Y or no N is not an error, it is simply not marked.
 ## ***********************************************************************
 
 GUI.YN.MARK:
@@ -323,18 +326,14 @@ GUI.MENU:
     NEXT GUI.INDEX
     GOSUB GUI.OPEN
     MENUHELP.X = GUI.INNER.LEFT : MENUHELP.Y = GUI.INNER.TOP
-    MENUHELP.WIDTH = GUI.INNER.WIDTH
-    MENUHELP.COUNT = GUI.COUNT
+    MENUHELP.WIDTH = GUI.INNER.WIDTH : MENUHELP.COUNT = GUI.COUNT
     REM GUI.PANEL -- the panel GUI.OPEN just painted, so the unselected rows are the
     REM same colour as the box they sit in. This was THEME.PAGE once, which in the light
     REM palette is blue on blue: correct for the GP.FILL, where only the background is
     REM ever seen, and invisible for anything with letters in it. Every unselected row
     REM was drawn and unreadable, and only the highlight showed.
-    MENUHELP.ATTR = GUI.PANEL
-    MENUHELP.HIATTR = THEME.CLR(THEME.HILITE)
-    MENUHELP.HOTATTR = 0
-    MENUHELP.FLAGS = GUI.FLAGS
-    MENUHELP.SEL = GUI.SEL
+    MENUHELP.ATTR = GUI.PANEL : MENUHELP.HIATTR = THEME.CLR(THEME.HILITE)
+    MENUHELP.HOTATTR = 0 : MENUHELP.FLAGS = GUI.FLAGS : MENUHELP.SEL = GUI.SEL
     GOSUB MENUHELP.RUN
     GUI.SEL = MENUHELP.SEL : GUI.KEY = MENUHELP.KEY
     GOSUB GUI.CLOSE
@@ -381,10 +380,8 @@ GUI.TEXT:
     GUI.FIELD.LEFT = GUI.INNER.LEFT + INT((GUI.INNER.WIDTH - GUI.LEN) / 2)
     IF GUI.FIELD.LEFT < GUI.INNER.LEFT THEN GUI.FIELD.LEFT = GUI.INNER.LEFT
     INPHELP.X = GUI.FIELD.LEFT : INPHELP.Y = GUI.INNER.TOP
-    INPHELP.LEN = GUI.LEN
-    INPHELP.ATTR = THEME.CLR(THEME.HILITE)
-    INPHELP.TEXT$ = GUI.INPUT$
-    INPHELP.MASK = GUI.MASK
+    INPHELP.LEN = GUI.LEN : INPHELP.ATTR = THEME.CLR(THEME.HILITE)
+    INPHELP.TEXT$ = GUI.INPUT$ : INPHELP.MASK = GUI.MASK
 
 ## ---- the two keys that end it, named, and the words themselves picked
 ## ---- out of the dimmed line. Printed at known offsets rather than
@@ -436,8 +433,7 @@ GUI.TEXT.FIELD:
 ## ***********************************************************************
 
 GUI.OPEN:
-    GOSUB GUI.SIZE
-    GOSUB GUI.PLACE.BOX
+    GOSUB GUI.SIZE : GOSUB GUI.PLACE.BOX
 
 ## ---- Save what the box is about to cover. Both reasons to skip it are
 ## ---- ordinary, not errors, and both leave GUI.STASHED at 0: no bank was
@@ -447,8 +443,7 @@ GUI.OPEN:
     IF GUI.BANK = 0 THEN GOTO GUI.OPEN.DRAW
     IF GUI.WIDTH * GUI.HEIGHT > GUI.MAXCELLS THEN GOTO GUI.OPEN.DRAW
     STASH.BANK = GUI.BANK
-    STASH.X = GUI.LEFT : STASH.Y = GUI.TOP
-    STASH.W = GUI.WIDTH : STASH.H = GUI.HEIGHT
+    STASH.X = GUI.LEFT : STASH.Y = GUI.TOP : STASH.W = GUI.WIDTH : STASH.H = GUI.HEIGHT
     GOSUB STASH.SAVE
     GUI.STASHED = STASH.OK
 
@@ -484,45 +479,17 @@ GUI.OPEN.TITLE:
     RETURN
 
 ## ***********************************************************************
-## **  GUI.FRAME -- the border, drawn from the caller's own six glyphs.
+## **  GUI.FRAME -- the border, from the caller's own six glyphs.
 ## **
-## **  GP.BOX PICKS ITS GLYPHS FROM A TABLE IN THE RUNTIME, so it can only
-## **  ever draw the six styles that table holds, at the screen codes the
-## **  stock charset puts them at. A program that re-orders the font --
-## **  samples/editor does, so that a VERA tile index IS a character code --
-## **  moves those glyphs out from under it, and style 2 comes out as
-## **  "p @ B". Nothing GP.BOX can be TOLD fixes that, because the table is
-## **  not the caller's to change. Naming the six glyphs is.
+## **   in   GUI.LEFT GUI.TOP GUI.WIDTH GUI.HEIGHT   the rectangle
+## **        GUI.EDGE.H .. GUI.CORNER.BR             the six glyphs
+## **        GUI.BORDER                              their attribute
+## **   out  GUI.RIGHT GUI.BOTTOM                    the far column and row
 ## **
-## **   in   GUI.LEFT GUI.TOP GUI.WIDTH GUI.HEIGHT   the rectangle: left, top, and size
-## **        GUI.EDGE.H .. GUI.CORNER.BR            the six glyphs
-## **        GUI.BORDER                   the attribute to draw them in
-## **
-## **   and it works out, from the rectangle:
-## **        GUI.RIGHT GUI.BOTTOM              the right column and bottom row,
-## **                                     which four of the eight fills and
-## **                                     both corners on each edge need
-## **
-## **  EIGHT FILLS IS THE FLOOR, not a first draft. Six distinct glyphs at
-## **  eight places: two runs that repeat one glyph, and four corners that
-## **  are one cell each and all different. Nothing merges -- a run drawn
-## **  the full width would put a horizontal where a corner goes and need
-## **  the corner drawn over it anyway, which is the same eight calls in a
-## **  worse order. The only way to draw a frame in ONE call is GP.BOX, and
-## **  GP.BOX is the thing this exists because we cannot use.
-## **
-## **  It is also not eight MORE fills. samples/editor drew exactly these
-## **  eight inline for its dropdown; that code is now this call, so the
-## **  program has one frame drawer where it used to have two.
-## **
-## **  GUI.BORDER IS AN INPUT rather than THEME.BORDER read in here, because
-## **  the dropdown's frame is the document's own text colour -- a routine
-## **  that hard-coded the role could not have been shared with it.
-## **
-## **  A box under 2x2 has no interior and the runs would be handed a
-## **  negative width. Nothing this library builds is that small -- the
-## **  padding alone puts the floor at 6x4 -- but the guard is two tests on
-## **  a path about to do eight fills.
+## **  THE GLYPHS ARE TILE INDICES, not PETSCII: GP.BOX writes a custom set
+## **  straight to the cell. GP.FILL converts, and converts even when the
+## **  $0372 ASCII flag is set -- which is why the eight fills this replaced
+## **  needed their glyphs biased by 64 to land on the right tiles.
 ## ***********************************************************************
 
 GUI.FRAME:
@@ -530,14 +497,23 @@ GUI.FRAME:
     IF GUI.HEIGHT < 2 THEN RETURN
     GUI.RIGHT = GUI.LEFT + GUI.WIDTH - 1
     GUI.BOTTOM = GUI.TOP + GUI.HEIGHT - 1
-    GP.FILL GUI.LEFT + 1, GUI.TOP, GUI.WIDTH - 2, 1, GUI.EDGE.H, GUI.BORDER
-    GP.FILL GUI.LEFT + 1, GUI.BOTTOM, GUI.WIDTH - 2, 1, GUI.EDGE.H, GUI.BORDER
-    GP.FILL GUI.LEFT, GUI.TOP + 1, 1, GUI.HEIGHT - 2, GUI.EDGE.V, GUI.BORDER
-    GP.FILL GUI.RIGHT, GUI.TOP + 1, 1, GUI.HEIGHT - 2, GUI.EDGE.V, GUI.BORDER
-    GP.FILL GUI.LEFT, GUI.TOP, 1, 1, GUI.CORNER.TL, GUI.BORDER
-    GP.FILL GUI.RIGHT, GUI.TOP, 1, 1, GUI.CORNER.TR, GUI.BORDER
-    GP.FILL GUI.LEFT, GUI.BOTTOM, 1, 1, GUI.CORNER.BL, GUI.BORDER
-    GP.FILL GUI.RIGHT, GUI.BOTTOM, 1, 1, GUI.CORNER.BR, GUI.BORDER
+    IF LEN(GUI.GLYPH$) <> 8 THEN GOSUB GUI.GLYPHS
+    GP.BOX GUI.LEFT, GUI.TOP, GUI.WIDTH, GUI.HEIGHT, GP.STRPTR(GUI.GLYPH$) + 1, GUI.BORDER
+    RETURN
+
+## ***********************************************************************
+## **  GUI.GLYPHS -- the six, packed into the eight bytes GP.BOX reads.
+## **
+## **  Its order is TR TL BR BL TOP BOTTOM LEFT RIGHT; top and bottom are
+## **  both GUI.EDGE.H, left and right both GUI.EDGE.V. Cached, because a
+## **  string built per dialog is garbage per dialog -- set GUI.GLYPH$ = ""
+## **  to force a rebuild after changing a glyph. The POINTER is taken
+## **  fresh at every GP.BOX above, since a string moves when BASIC tidies.
+## ***********************************************************************
+
+GUI.GLYPHS:
+    GUI.GLYPH$ = CHR$(GUI.CORNER.TR) + CHR$(GUI.CORNER.TL) + CHR$(GUI.CORNER.BR) + CHR$(GUI.CORNER.BL)
+    GUI.GLYPH$ = GUI.GLYPH$ + CHR$(GUI.EDGE.H) + CHR$(GUI.EDGE.H) + CHR$(GUI.EDGE.V) + CHR$(GUI.EDGE.V)
     RETURN
 
 ## ***********************************************************************
@@ -546,8 +522,7 @@ GUI.FRAME:
 
 GUI.CLOSE:
     IF GUI.STASHED = 0 THEN RETURN
-    STASH.BANK = GUI.BANK : STASH.MOVE = 0
-    GOSUB STASH.RESTORE
+    STASH.BANK = GUI.BANK : STASH.MOVE = 0 : GOSUB STASH.RESTORE
     RETURN
 
 ## ***********************************************************************
@@ -567,8 +542,7 @@ GUI.SIZE:
     IF LEN(GUI.MSG$) > GUI.INNER.WIDTH THEN GUI.INNER.WIDTH = LEN(GUI.MSG$)
     IF LEN(GUI.MSG2$) > GUI.INNER.WIDTH THEN GUI.INNER.WIDTH = LEN(GUI.MSG2$)
     IF LEN(GUI.TITLE$) + 2 > GUI.INNER.WIDTH THEN GUI.INNER.WIDTH = LEN(GUI.TITLE$) + 2
-    GUI.GAP.ROWS = 0
-    IF GUI.HEAD.ROWS > 0 THEN GUI.GAP.ROWS = 1
+    GUI.GAP.ROWS = 0 : IF GUI.HEAD.ROWS > 0 THEN GUI.GAP.ROWS = 1
     GUI.WIDTH = GUI.INNER.WIDTH + GUI.PADX * 2 + 2
     GUI.HEIGHT = GUI.HEAD.ROWS + GUI.GAP.ROWS + GUI.BODY.ROWS + GUI.PADY * 2 + 2
     RETURN

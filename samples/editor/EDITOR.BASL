@@ -9,19 +9,17 @@
 ## ISO mode, where the driver no longer sends PETSCII Commodore+letter codes at all.
 #DEFINE ED.KBDMOD $FEC0
 #DEFINE ED.MOD.ALT 2
-## The single-line box. These are the codes handed to GP.FILL, NOT where the glyphs live:
-## GP.FILL converts PETSCII to a screen code on the way in, and for $80-$9F that adds $40.
-## So a glyph asked for as $80 is fetched from tile $C0, and ED.PETFONT parks it there --
-## ED.GL.x + 64. Measured, not assumed: passing $80 with the glyph at $80 put tile 192 on
-## the screen, which is what gave this away. The runtime's own comment on GP.FILL calls its
-## glyph "already a screen code", which is true of the variable it ends up in, not the
-## argument you hand it.
-#DEFINE ED.GL.H 128
-#DEFINE ED.GL.V 129
-#DEFINE ED.GL.TL 130
-#DEFINE ED.GL.TR 131
-#DEFINE ED.GL.BL 132
-#DEFINE ED.GL.BR 133
+## The single-line box, and these are TILE INDICES: GUI.FRAME draws with GP.BOX, whose
+## custom glyphs go straight to the cell. They were $80-$85 while GP.FILL drew the frame,
+## because GP.FILL converts and for $80-$9F that adds $40 -- so the glyphs had to be parked
+## at $C0-$C5 and asked for 64 lower. The bias is gone; the numbers now say where the
+## glyphs actually are.
+#DEFINE ED.GL.H 192
+#DEFINE ED.GL.V 193
+#DEFINE ED.GL.TL 194
+#DEFINE ED.GL.TR 195
+#DEFINE ED.GL.BL 196
+#DEFINE ED.GL.BR 197
 
 ## The RAM bank GUI.INC.BL saves a dialog's cells into. It is NOT a spare
 ## one lying around -- the document store owns every bank from 1 upward --
@@ -256,16 +254,15 @@ ED.PETFONT:
   REM GP.BOX style 2 draws "p @ B" here and why style 0's solid $A0 was the only one that
   REM worked: $80-$FF is the one region the re-order never touches.
   REM
-  REM So the six are copied up there FIRST, into $C0-$C5 -- the tiles GP.FILL actually
-  REM reaches when it is handed $80-$85, see the note by the #DEFINEs. Nothing else uses
-  REM that region: the document is ASCII, so no cell above $7F is ever written except by
-  REM the frame. Being ahead of every other copy is what keeps each source pristine.
-  ED.FS = 64  : ED.FD = ED.GL.H + 64  : ED.FN = 1 : GOSUB ED.FCOPY : REM $40 horizontal
-  ED.FS = 93  : ED.FD = ED.GL.V + 64  : ED.FN = 1 : GOSUB ED.FCOPY : REM $5D vertical
-  ED.FS = 112 : ED.FD = ED.GL.TL + 64 : ED.FN = 1 : GOSUB ED.FCOPY : REM $70 top left
-  ED.FS = 110 : ED.FD = ED.GL.TR + 64 : ED.FN = 1 : GOSUB ED.FCOPY : REM $6E top right
-  ED.FS = 109 : ED.FD = ED.GL.BL + 64 : ED.FN = 1 : GOSUB ED.FCOPY : REM $6D bottom left
-  ED.FS = 125 : ED.FD = ED.GL.BR + 64 : ED.FN = 1 : GOSUB ED.FCOPY : REM $7D bottom right
+  REM So the six are copied up there FIRST, into $C0-$C5. Nothing else uses that region:
+  REM the document is ASCII, so no cell above $7F is ever written except by the frame.
+  REM Being ahead of every other copy is what keeps each source pristine.
+  ED.FS = 64  : ED.FD = ED.GL.H  : ED.FN = 1 : GOSUB ED.FCOPY : REM $40 horizontal
+  ED.FS = 93  : ED.FD = ED.GL.V  : ED.FN = 1 : GOSUB ED.FCOPY : REM $5D vertical
+  ED.FS = 112 : ED.FD = ED.GL.TL : ED.FN = 1 : GOSUB ED.FCOPY : REM $70 top left
+  ED.FS = 110 : ED.FD = ED.GL.TR : ED.FN = 1 : GOSUB ED.FCOPY : REM $6E top right
+  ED.FS = 109 : ED.FD = ED.GL.BL : ED.FN = 1 : GOSUB ED.FCOPY : REM $6D bottom left
+  ED.FS = 125 : ED.FD = ED.GL.BR : ED.FN = 1 : GOSUB ED.FCOPY : REM $7D bottom right
   REM ---- and now the ASCII re-order itself ----
   ED.FS = 64  : ED.FD = 96  : ED.FN = 1  : GOSUB ED.FCOPY
   ED.FS = 91  : ED.FD = 123 : ED.FN = 5  : GOSUB ED.FCOPY
@@ -1483,6 +1480,20 @@ ED.PUT.FIELD:
   #REM 0
   RETURN
 
+
+REM ============================================================================
+REM ============================================================================
+REM ============================================================================
+REM ============================================================================
+REM ============================================================================
+REM ============================================================================
+REM ============================================================================
+
+
+
+
+
+
 REM ============================================================================
 REM HEADLESS SELF-CHECK (DEBUG.MODE=1): drive menu dispatch + commands.
 REM ============================================================================
@@ -1824,4 +1835,5 @@ ED.GUI.SUM:
   NEXT ED.GR
   RETURN
 
+REM --- this read / writes BANKS (line-pointer table + banked memory)
 #INCLUDE "STORE.BASL"
