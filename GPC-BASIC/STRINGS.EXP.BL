@@ -26,10 +26,9 @@
 #INCLUDE "STRHELP.INC.BL"
 #INCLUDE "STRCASE.INC.BL"
 
-## NOTE ON NAMES: the search cursor below is HIT, not POS -- POS is a BASIC
-## keyword ($B9) and BASLOAD tokenises it as one, so "POS = 1" compiles to
-## nonsense and shows up only as a runtime SYNTAX ERROR at a p-code offset.
-## Dotted names (SEARCH.AT) dodge this too.
+## NOTE ON NAMES: the search cursor below is HIT, not POS -- POS is a BASIC keyword
+## ($B9), so "POS = 1" compiles to nonsense and surfaces only as a runtime SYNTAX ERROR
+## at a p-code offset. A dotted name dodges it too.
 
 ## ---- 1. GP.INSTR is INSTR.  Position of the needle in the haystack,
 ## ---- 1-based, 0 when absent.  The third argument is where to start,
@@ -48,11 +47,9 @@ GP.DO
   HIT = HIT + 1
 GP.LOOP
 
-## ---- 1b. GP.CONTAINS is the yes/no spelling of that question, for when
-## ---- you do not care WHERE. GP.ISEMPTY is LEN(a$)=0 with the question
-## ---- written down. Both are COMPOSITE: the compiler expands them into
-## ---- keywords that already exist, so they add NO runtime code at all
-## ---- and the object is identical to writing the long form out.
+## ---- 1b. GP.CONTAINS is the yes/no spelling of that question; GP.ISEMPTY is LEN(a$)=0
+## ---- written down. Both COMPOSITE -- the compiler expands them into keywords that
+## ---- already exist, so the object is identical to the long form and they cost nothing.
 
 PRINT "CONTAINS RAIN  ->"; GP.CONTAINS(TEXT$, "RAIN")
 PRINT "  same as      ->"; GP.INSTR(TEXT$, "RAIN") <> 0
@@ -80,21 +77,15 @@ PRINT "  after TRIM   ->"; GP.ISEMPTY(SPACES$)
 ## ---- 2. the trims.  TRIM does both ends, LTRIM the left (leading
 ## ---- spaces), RTRIM the right (trailing spaces).
 ## ----
-## ---- THESE WERE KEYWORDS -- GP.TRIM, GP.LTRIM, GP.RTRIM, GP.UPPER,
-## ---- GP.LOWER -- and are STRCASE.INC.BL now, GP.ASM driven by
-## ---- GP.STRPTR. They were 188 bytes of the GP runtime block, which is
-## ---- all or nothing, in every GP program whether it touched a string or
-## ---- not. Now only this one pays.
+## ---- THESE WERE KEYWORDS -- GP.TRIM, GP.LTRIM, GP.RTRIM, GP.UPPER, GP.LOWER -- and
+## ---- are STRCASE.INC.BL now, GP.ASM driven by GP.STRPTR. The string still goes in as
+## ---- an ADDRESS and is rewritten where it lies, so nothing is copied or allocated.
+## ---- Set BOTH inputs every time: STRCASE.MODE is an ordinary variable, so a call that
+## ---- forgets it repeats whatever the last one did.
 ## ----
-## ---- The string still goes in as an ADDRESS and is still rewritten
-## ---- where it lies, so nothing is copied and nothing is allocated. Set
-## ---- BOTH inputs every time: STRCASE.MODE is an ordinary variable, so a
-## ---- call that forgets it repeats whatever the last one did.
-## ----
-## ---- PASS A VARIABLE, NEVER A LITERAL. GP.STRPTR("  both  ") is the
-## ---- address of that text inside the P-CODE, and trimming it would edit
-## ---- the program. The keyword form could not be misused this way -- the
-## ---- compiler insisted on a variable -- and a GOSUB cannot.
+## ---- PASS A VARIABLE, NEVER A LITERAL. GP.STRPTR("  both  ") is the address of that
+## ---- text inside the P-CODE, and trimming it would EDIT THE PROGRAM. The keyword form
+## ---- could not be misused this way -- the compiler insisted on a variable.
 
 BOTH$ = "  both  "
 STRCASE.PTR = GP.STRPTR(BOTH$) : STRCASE.MODE = STRCASE.TRIM : GOSUB STRCASE.GO
@@ -117,12 +108,10 @@ PRINT "UPPER ["; WORD$; "]"
 STRCASE.PTR = GP.STRPTR(WORD$) : STRCASE.MODE = STRCASE.LOWER : GOSUB STRCASE.GO
 PRINT "LOWER ["; WORD$; "]"
 
-## ---- 4. padding lives in BASL, not in the runtime.  PAD is left
-## ---- justify, PADL right justify, PADC centre.  An in-place ASM
-## ---- statement only ever gets the string's block, never the variable
-## ---- slot, so it can never GROW one past the capacity it was born with
-## ---- -- and padding to a field width is exactly growing.  Assignment
-## ---- reallocates, so in BASIC the problem does not exist.
+## ---- 4. padding lives in BASL, not the runtime. PADR left justifies, PADL right,
+## ---- PADC centres. An in-place ASM statement only ever gets the string's BLOCK, never
+## ---- the variable slot, so it can never GROW one past its born capacity -- and
+## ---- padding to a field width is exactly growing. BASIC assignment reallocates.
 
 STRHELP.STR$ = "NAME" : STRHELP.WIDTH = 12
 GOSUB STRHELP.PADR
@@ -172,16 +161,14 @@ PRINT "LEN VIA PTR  ->"; PEEK(PTR)
 PRINT "CAPACITY     ->"; PEEK(PTR - 2)
 PRINT "FIRST CHAR   ->"; CHR$(PEEK(PTR + 1))
 
-## ---- 6. GP.CALL takes 8 bit registers and that address is 16 bits, so
-## ---- it has to be split. GP.HIBYTE is the 256 byte page, GP.LOBYTE the
-## ---- offset within it:
+## ---- 6. GP.CALL takes 8 bit registers and that address is 16 bits, so it has to be
+## ---- split -- GP.HIBYTE the page, GP.LOBYTE the offset within it:
 ## ----
 ## ----     GP.CALL $A000, GP.LOBYTE(PTR), GP.HIBYTE(PTR)
 ## ----
-## ---- DO NOT WRITE "PTR AND 255". AND is 16 bit SIGNED here and the
-## ---- string heap always lives above 32767, so it raises OUT OF RANGE
-## ---- instead of masking. GP.LOBYTE is built on MOD, which is not on
-## ---- that path. Both are composite, so neither costs runtime bytes.
+## ---- DO NOT WRITE "PTR AND 255": AND is 16 bit SIGNED and the string heap always
+## ---- lives above 32767, so it raises OUT OF RANGE instead of masking. Both are
+## ---- composite and cost no runtime bytes.
 
 PRINT "PTR          ->"; PTR
 PRINT "SPLIT     HI ->"; GP.HIBYTE(PTR); " LO"; GP.LOBYTE(PTR)

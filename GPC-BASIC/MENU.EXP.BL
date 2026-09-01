@@ -14,12 +14,10 @@
 ## **            python source/gpc/build_basl.py MENU.EXP.BL MENU.PRG
 ## **          and compile MENU.PRG with GPC.BIN.
 ## **
-## **  THE SPLIT IS THE POINT, and the menu has now moved across it. All
-## **  of this is BASIC, because a menu waits on a HUMAN -- the speed
-## **  argument that puts sorting and screen copying in assembly does not
-## **  apply. What stays in assembly is what BASIC is genuinely bad at:
-## **  GP.FILL and GP.PRINTAT push cells at VERA, and the menu simply
-## **  calls them.
+## **  THE SPLIT IS THE POINT, and the menu has moved across it: this is all BASIC,
+## **  because a menu waits on a HUMAN and the speed argument that puts sorting and
+## **  screen copying in assembly does not apply. What stays in assembly is what BASIC is
+## **  genuinely bad at -- GP.FILL and GP.PRINTAT pushing cells at VERA.
 ## **
 ## ***********************************************************************
 ## STASH.INC.BL reaches BASIC's variables from assembly through {VAR}, and
@@ -41,10 +39,8 @@
 #DEFINE MENU.WIDE 24
 #DEFINE MENU.COUNT 4
 
-## ---- Remember the user's screen BEFORE changing anything, and lay the
-## ---- application out from what it reports. The X16 boots 80x60 but
-## ---- SCREEN 0 is 40x30, and someone who prefers larger text is running
-## ---- one -- so nothing below assumes a size.
+## ---- Remember the user's screen BEFORE changing anything, and lay out from what it
+## ---- reports: the X16 boots 80x60 but SCREEN 0 is 40x30, so nothing below assumes.
 
 GOSUB APPHELP.STARTUP
 
@@ -93,14 +89,11 @@ MENU.DRAW:
     GP.PRINTAT 2, APPHELP.ROWS - 1, "CURSOR KEYS, RETURN, OR N L O Q", THEME.CLR(THEME.DIMMED)
     RETURN
 
-## ---- A dialog over the display. STASH.SAVE copies what is underneath
-## ---- into a RAM bank and STASH.RESTORE puts it back, so the application
-## ---- never has to redraw itself -- which is the entire reason the pair
-## ---- exists. The stash carries its own w, h, x and y, so the restore is
-## ---- told nothing but the bank.
-## ----
-## ---- This was GP.STASH / GP.RESTR until 2026-09-01, when they moved out
-## ---- of the GP runtime block and into GP.ASM (GPC-BASIC/STASH.INC.BL).
+## ---- A dialog over the display. STASH.SAVE copies what is underneath into a RAM bank
+## ---- and STASH.RESTORE puts it back, so the application never redraws itself -- the
+## ---- entire reason the pair exists. The stash carries its own w, h, x and y, so the
+## ---- restore is told nothing but the bank. This was GP.STASH / GP.RESTR until
+## ---- 2026-09-01, when they moved into GP.ASM as GPC-BASIC/STASH.INC.BL.
 
 MENU.DIALOG:
     STASH.BANK = 1

@@ -23,28 +23,17 @@
 
 ## ---- #REM 1 IS REQUIRED, and it is the one thing that catches people out.
 ##
-## The body of a block rides in REM statements, because BASLOAD stores remark
-## text byte for byte -- ORA, AND, EOR and ROR reach the compiler intact, where
-## outside a REM they are tokenised into keywords and the text is destroyed.
-## Braces survive too, which is what makes {VAR} possible at all.
+## The body rides in REM statements because BASLOAD stores remark text byte for byte --
+## ORA, AND, EOR and ROR reach the compiler intact, where outside a REM they tokenise
+## into keywords. Braces survive too, which is what makes {VAR} possible.
 ##
-## BASLOAD's default is #REM 0, which strips them before the compiler is ever
-## run. GP.ASM and GP.ENDASM are real keywords rather than REMs precisely so
-## that the block is still THERE to be found empty: GPC then says BLOCK
-## MISMATCH, instead of compiling a program that silently contains no code.
+## BASLOAD's default is #REM 0, which strips them first. GP.ASM and GP.ENDASM are real
+## keywords rather than REMs precisely so the block is still THERE to be found empty:
+## GPC says BLOCK MISMATCH instead of compiling a program that contains no code.
 ##
-## SO EVERY BLOCK BELOW IS BRACKETED BY ITS OWN PAIR:
-##
-##     #REM 1
-##     GP.ASM
-##     REM ...
-##     GP.ENDASM
-##     #REM 0
-##
-## One switch on at the top of the file would work just as well -- #REM takes
-## effect from the line it is on and stays in force until it is changed again --
-## but pairing it with the block says what the switch is FOR, keeps ordinary
-## REMs written elsewhere out of the tokenised PRG, and is the shape to copy.
+## Every block below is bracketed by its own pair. One switch at the top of the file
+## would work as well, but pairing it says what the switch is FOR and keeps ordinary
+## REMs out of the tokenised PRG.
 
 ## ---- 1. Assembly, in the program, with nothing to set up first.
 
@@ -61,24 +50,17 @@ PRINT
 
 ## ---- 2. {VAR} -- READING AND WRITING BASIC'S OWN VARIABLES.
 ##
-## {VAR} is THE ADDRESS OF THE VARIABLE'S SLOT, which is what makes reading and
-## writing the same thing.
+## {VAR} is THE ADDRESS OF THE VARIABLE'S SLOT, which is what makes reading and writing
+## the same thing.
 ##
-## IT NEEDS #SYMFILE, and this file has one at the top. BASLOAD RENAMES
-## VARIABLES -- it crunches N% to A% in the code, which is how it offers 64
-## character names on a two character BASIC -- but it keeps REM text byte for
-## byte, which is the very property that lets an assembly body survive at all.
-## So the code says A% and the REM still says {N%}. #SYMFILE writes that
-## mapping down and the compiler follows it.
+## IT NEEDS #SYMFILE. BASLOAD crunches N% to A% in the CODE -- that is how it offers 64
+## character names on a two character BASIC -- but keeps REM text byte for byte, the
+## very property that lets an assembly body survive. So the code says A% and the REM
+## still says {N%}; #SYMFILE writes that mapping down. Name it to match the PRG, ASM.PRG
+## reading ASM.SYM, or the compile stops with NO SYMBOL FILE FOR {}.
 ##
-## The symbol file must sit beside the PRG under the matching name: ASM.PRG
-## reads ASM.SYM, which is what the #SYMFILE line above arranges. Miss it and
-## the compile stops with NO SYMBOL FILE FOR {} on the line, rather than
-## building a program that stores into a slot BASIC never reads.
-##
-## M% IS ASSIGNED FIRST ON PURPOSE. {VAR} never CREATES a variable -- the
-## opposite of what an ordinary BASIC reference does -- so a name BASIC has
-## never used is UNKNOWN VARIABLE IN {} rather than a fresh slot nothing reads.
+## M% IS ASSIGNED FIRST ON PURPOSE: {VAR} never CREATES a variable, the opposite of an
+## ordinary BASIC reference, so an unused name is UNKNOWN VARIABLE IN {}.
 
 N% = 65
 M% = 0
@@ -95,13 +77,10 @@ PRINT "N=";N%;" M=";M%
 
 ## ---- 3. Labels and branches.
 ##
-## A label is NAME: on a line of its own or in front of an instruction. Six
-## characters are significant. Labels belong to their block -- the same name in
-## two blocks is two different labels, and neither can branch to the other.
-##
-## Branches are checked HERE, while the line number is still known: a branch
-## further than 127 bytes is OUT OF RANGE at compile time, not a wrong address
-## at run time.
+## NAME: on its own line or in front of an instruction, six characters significant, and
+## belonging to its block -- the same name in two blocks is two labels, neither able to
+## branch to the other. A branch further than 127 bytes is OUT OF RANGE at COMPILE time,
+## while the line number is still known.
 
 PRINT "3. ";
 #REM 1
@@ -134,8 +113,7 @@ PRINT
 
 ## ---- 5. There is no expression syntax. {N%}+1 and LABEL+2 are not things.
 ##
-## Reach the byte after an address with an index register instead, which is
-## what the 6502 wants anyway:
+## Use an index register instead, which is what the 6502 wants anyway:
 ##
 ##     LDX #1
 ##     LDA {N%},X           the HIGH byte of an int16
@@ -148,13 +126,9 @@ PRINT
 ##       LDA 52           zero page      A5 34     -- decimal under 256
 ##       LDA 300          absolute       AD 2C 01
 ##
-## so write $0034 when you mean the long form. Every 65C02 addressing mode is
-## available, including the two the NMOS 6502 lacks -- LDA ($34) with no index,
-## and JMP ($1234,X).
-##
-## BBR/BBS/RMB/SMB are the only instructions missing. They are Rockwell
-## additions with a four character mnemonic ending in a bit number, and nothing
-## on this machine uses them.
+## so write $0034 when you mean the long form. Every 65C02 mode is available, including
+## the two the NMOS 6502 lacks -- LDA ($34) unindexed, and JMP ($1234,X). Only
+## BBR/BBS/RMB/SMB are missing, being Rockwell additions nothing here uses.
 
 PRINT "DONE"
 

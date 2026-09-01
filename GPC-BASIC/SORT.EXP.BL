@@ -5,36 +5,21 @@
 ## **  Run it and read the last two lines: "FAILS 0" and "DONE". Anything
 ## **  else names the case that broke.
 ## **
-## **  ------------------------------------------------------------------
-## **  HOW TO READ THIS FILE
-## **  ------------------------------------------------------------------
-## **
-## **  A BASL subroutine cannot be passed arguments. So every helper here
-## **  reads named variables that the caller sets first, and the shape of
-## **  each case is always the same three steps:
+## **  HOW TO READ IT. A BASL subroutine takes no arguments, so every helper reads named
+## **  variables the caller sets first, and each case is the same three steps:
 ## **
 ## **      GOSUB T.LOAD.WORDS         <- put known, UNSORTED data in
 ## **      ... sort it ...
 ## **      GOSUB T.CHECK.WORDS        <- assert what came out
 ## **
-## **  T.LOAD.WORDS EXISTS BECAUSE THE SORT IS IN PLACE. Cases 1, 2 and 3
-## **  all sort the SAME array, T.WORD$. Without reloading it between them,
-## **  case 2 would be sorting case 1's already-sorted output and case 3
-## **  would be sorting case 2's -- so two of the three would prove almost
-## **  nothing. Reloading is not tidiness, it is what makes them tests.
+## **  T.LOAD.WORDS EXISTS BECAUSE THE SORT IS IN PLACE: cases 1, 2 and 3 all sort
+## **  T.WORD$, so without reloading, case 2 would be sorting case 1's answer. It also
+## **  checksums the words on the way in, and T.CHECK.WORDS checksums them again --
+## **  because ORDER ALONE IS NOT ENOUGH. A sort that reads the wrong element leaves the
+## **  array beautifully ordered with one string twice and another gone. The checksum is
+## **  position weighted, so a swapped pair differs from an unswapped one.
 ## **
-## **  It also takes the CHECKSUM of the words as it loads them, into
-## **  T.SUM.BEFORE. T.CHECK.WORDS takes the same checksum afterwards and
-## **  the two must match. That is the second half of every assertion here
-## **  and it is not decoration: ORDER ALONE IS NOT ENOUGH. A sort that
-## **  reads the wrong element leaves the array beautifully ordered with
-## **  one string appearing twice and another gone, and only a content
-## **  check catches it. The checksum is position weighted so a swapped
-## **  pair differs from an unswapped one.
-## **
-## **  ------------------------------------------------------------------
-## **  THE VARIABLES, ALL OF THEM
-## **  ------------------------------------------------------------------
+## **  THE VARIABLES:
 ## **
 ## **      T.SOURCE$()    the twenty words, never modified -- the master
 ## **      T.WORD$()      the working copy, which is what gets sorted
@@ -46,18 +31,11 @@
 ## **      T.CASE$        its name, for the PASS/FAIL line
 ## **      T.FAILS        how many cases have failed so far
 ## **
-## **  ------------------------------------------------------------------
-## **  WHY THE ANSWERS ARE NOT WRITTEN OUT
-## **  ------------------------------------------------------------------
-## **
-## **  Shell sort is not stable, so which of two EQUAL keys lands first is
-## **  not a promise the module makes and must not be a test. So order is
-## **  checked with BASIC's own comparisons, and the case folded pass with
-## **  GP.COMP -- the same case-blind comparison the assembly does.
-## **
-## **  The first run of this file used GP.SORT itself as the oracle,
-## **  keyword against module, and every case matched before the keyword
-## **  was deleted.
+## **  THE ANSWERS ARE NOT WRITTEN OUT, because shell sort is not stable: which of two
+## **  EQUAL keys lands first is not a promise the module makes and must not be a test.
+## **  Order is checked with BASIC's own comparisons, and the folded pass with GP.COMP.
+## **  The first run of this file used GP.SORT itself as the oracle, keyword against
+## **  module, and every case matched before the keyword was deleted.
 ## **
 ## **  Build:  copy GPB.INC.BL, SORT.INC.BL and this file into testing/,
 ## **          then
@@ -75,9 +53,8 @@ T.FAILS = 0
 DIM T.SOURCE$(19) : DIM T.WORD$(19)
 DIM T.BIG$(199)
 
-## ---- Mixed case on purpose: cases 1 and 2 are case SENSITIVE, so every
-## ---- lower case word must sort after every upper case one, and case 3
-## ---- proves folding changes exactly that.
+## ---- Mixed case on purpose: cases 1 and 2 are case SENSITIVE, so every lower case word
+## ---- must sort after every upper case one, and case 3 proves folding changes that.
 T.SOURCE$(0) = "PEAR"   : T.SOURCE$(1) = "APPLE"  : T.SOURCE$(2) = "FIG"
 T.SOURCE$(3) = "DATE"   : T.SOURCE$(4) = "plum"   : T.SOURCE$(5) = "CHERRY"
 T.SOURCE$(6) = "apple"  : T.SOURCE$(7) = "KIWI"   : T.SOURCE$(8) = "LIME"
@@ -116,12 +93,9 @@ T.CASE$ = "CASE FOLDED" : T.ORDER = 0 : T.FOLD = 1
 GOSUB T.CHECK.WORDS
 
 ## =======================================================================
-## 4. EMPTIES. Only four of twenty are ever assigned; the other sixteen
-##    are null pointers, which the sort must read as "" and put at the
-##    front rather than follow to whatever lives at address 2.
-##
-##    Its own array, because the point is elements that were NEVER
-##    written -- T.LOAD.WORDS would fill all twenty.
+## 4. EMPTIES. Four of twenty are assigned; the other sixteen are null pointers, which
+##    the sort must read as "" and put at the front rather than follow to whatever lives
+##    at address 2. Its own array, because the point is elements NEVER written.
 ## =======================================================================
 DIM T.SPARSE$(19)
 T.SPARSE$(3) = "ZULU" : T.SPARSE$(9) = "ALPHA"
@@ -139,14 +113,10 @@ IF T.SPARSE$(19) <> "ZULU" THEN T.BAD = T.BAD + 1
 T.CASE$ = "EMPTIES" : GOSUB T.REPORT
 
 ## =======================================================================
-## 5. TWO HUNDRED ELEMENTS. THIS IS THE ONE THAT MATTERS MOST.
-##
-##    Element 128 is where the doubled index stops fitting in a byte, and
-##    an address routine that drops that carry reads every element from
-##    there on 256 bytes low. Twenty words would never find it.
-##
-##    The keys are generated so their order is not one the fill could
-##    have left behind, and the trailing index makes each one unique.
+## 5. TWO HUNDRED ELEMENTS. THIS IS THE ONE THAT MATTERS MOST: element 128 is where the
+##    doubled index stops fitting in a byte, and an address routine that drops that carry
+##    reads every element from there on 256 bytes low. Twenty words would never find it.
+##    The keys are generated so their order is not one the fill could have left behind.
 ## =======================================================================
 T.SEED = 1 : T.SUM.BEFORE = 0
 FOR T.I = 0 TO 199
@@ -213,12 +183,8 @@ PRINT "DONE"
 END
 
 ## ***********************************************************************
-## **  T.LOAD.WORDS -- the twenty words into T.WORD$, UNSORTED, and their
-## **  checksum into T.SUM.BEFORE.
-## **
-## **  Call it before every case that sorts T.WORD$. The sort works in
-## **  place, so without this the next case would be sorting the last
-## **  case's answer.
+## **  T.LOAD.WORDS -- the twenty words into T.WORD$, UNSORTED, and their checksum into
+## **  T.SUM.BEFORE. Call it before every case that sorts T.WORD$.
 ## ***********************************************************************
 
 T.LOAD.WORDS:
@@ -279,9 +245,8 @@ T.REPORT:
 ## ***********************************************************************
 ## **  T.CHECKSUM -- T.TEXT$ in, T.SUM out.
 ## **
-## **  Position weighted, so "AB" and "BA" differ. A plain sum of the
-## **  character codes would not, and two elements swapped is exactly the
-## **  kind of damage this is here to catch.
+## **  Position weighted, so "AB" and "BA" differ -- a plain sum of the codes would not,
+## **  and two elements swapped is exactly the damage this is here to catch.
 ## ***********************************************************************
 
 T.CHECKSUM:

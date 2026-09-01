@@ -7,12 +7,10 @@
 ## **  GP.ARRPTR   function, the address of element zero
 ## **  GP.HIBYTE / GP.LOBYTE  composite, splitting that address
 ## **
-## **  GP.SORT WAS A KEYWORD AND IS NOT ANY MORE. It is SORT.INC.BL, the
-## **  same shell sort written in GP.ASM, because the GP runtime block is
-## **  all or nothing and 408 of its bytes were a sort most programs never
-## **  call. That is why this file now needs a #SYMFILE: the module reaches
-## **  BASIC's variables through {VAR} and the compiler needs BASLOAD's
-## **  record of the crunched names to resolve them.
+## **  GP.SORT WAS A KEYWORD AND IS NOT ANY MORE -- it is SORT.INC.BL, the same shell
+## **  sort in GP.ASM. That is why this file needs a #SYMFILE: the module reaches BASIC's
+## **  variables through {VAR}, and the compiler resolves those from BASLOAD's record of
+## **  the crunched names.
 ## **
 ## **  Build:  copy GPC-BASIC/GPB.INC.BL, GPC-BASIC/SORT.INC.BL and this
 ## **          file into testing/, then
@@ -27,11 +25,10 @@
 #INCLUDE "GPB.INC.BL"
 #INCLUDE "SORT.INC.BL"
 
-## ---- 1. SORT.RUN. The array goes in as an ADDRESS, from GP.ARRPTR, and
-## ---- the EMPTY PARENTHESES THERE ARE REQUIRED: in BASIC A$ and A$() are
-## ---- different variables, so without them the compiler finds the scalar.
-## ---- A BASL subroutine cannot be handed an array, which is why the
-## ---- address is the interface and GP.ARRPTR stayed a keyword.
+## ---- 1. SORT.RUN. The array goes in as an ADDRESS from GP.ARRPTR, and THE EMPTY
+## ---- PARENTHESES ARE REQUIRED: A$ and A$() are different variables, so without them
+## ---- the compiler finds the scalar. A BASL subroutine cannot be handed an array, which
+## ---- is why the address is the interface and GP.ARRPTR stayed a keyword.
 
 DIM FRUIT$(5)
 FRUIT$(0) = "PEAR"
@@ -79,9 +76,8 @@ PRINT "CASE FOLDED    ";
 FOR I = 0 TO 3 : PRINT NAME$(I); " "; : NEXT
 PRINT
 
-## ---- Elements never assigned are empty strings and sort to the front.
-## ---- They are NOT garbage -- the sort reads a zero pointer as "", the
-## ---- same substitution the runtime makes everywhere else.
+## ---- Elements never assigned are empty strings and sort to the front. NOT garbage:
+## ---- the sort reads a zero pointer as "", as the runtime does everywhere else.
 
 DIM SPARSE$(4)
 SPARSE$(0) = "ZULU"
@@ -107,12 +103,9 @@ PRINT "GP.COMP ABD/ABC ->"; GP.COMP("ABD", "ABC")
 ARRAY.PTR = GP.ARRPTR(FRUIT$())
 PRINT "ARRPTR ->"; ARRAY.PTR
 
-## ---- Splitting it for GP.CALL. GP.HIBYTE is the 256 byte page and
-## ---- GP.LOBYTE the offset within it, which is the pair every 8 bit
-## ---- register wants. Do NOT write "P AND 255": AND is 16 bit SIGNED
-## ---- and this address is normally above 32767, so it raises OUT OF
-## ---- RANGE rather than masking. GP.LOBYTE is built on MOD, which is
-## ---- not on that path.
+## ---- Splitting it for GP.CALL: GP.HIBYTE the page, GP.LOBYTE the offset within it. Do
+## ---- NOT write "P AND 255" -- AND is 16 bit SIGNED and this address is normally above
+## ---- 32767, so it raises OUT OF RANGE rather than masking.
 
 PRINT "SPLIT   HI"; GP.HIBYTE(ARRAY.PTR); " LO"; GP.LOBYTE(ARRAY.PTR)
 
@@ -123,9 +116,8 @@ ADDR.HI = INT(ARRAY.PTR / 256)
 ADDR.LO = ARRAY.PTR - ADDR.HI * 256
 PRINT "SAME AS HI"; ADDR.HI; " LO"; ADDR.LO
 
-## ---- Each element is a POINTER to that string's block. Follow one and
-## ---- the layout is GP.STRPTR's: length AT the address, text from +1.
-## ---- (The block itself starts 2 earlier, so length sits at block+2.)
+## ---- Each element is a POINTER to that string's block, laid out as GP.STRPTR's:
+## ---- length AT the address, text from +1, the block itself starting 2 earlier.
 
 BLOCK = PEEK(ARRAY.PTR) + PEEK(ARRAY.PTR + 1) * 256
 PRINT "ELEMENT 0 LEN"; PEEK(BLOCK + 2); " FIRST "; CHR$(PEEK(BLOCK + 3))

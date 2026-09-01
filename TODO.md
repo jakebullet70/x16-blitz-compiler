@@ -1183,7 +1183,22 @@ code -- and that is a keyword reference doing its job. What came out of it was t
 it was N bytes of the all-or-nothing block" lecture written four times over, for `GP.SORT`,
 `GP.STASH`, `GP.MENU` and the string statements.
 
-**LEFT:** the twelve `.EXP.BL` examples, not yet measured.
+**AND THE EXAMPLES**, 948 -> 847 prose lines across 21 `.EXP.BL` files. A smaller cut than the
+library's, and honestly so: most were already under one comment line per line of code, because an
+example's comments largely ARE the example. The work was concentrated in `SORT` 137 -> 102,
+`ASM` 98 -> 72, `STRINGS` 87 -> 74, `SCREEN` 78 -> 66, `ARRAYS` 57 -> 49 and `MENU` 46 -> 39, and
+what came out of them was the same "X was a keyword and is not any more" paragraph the library
+carried, plus a `#REM 1` explanation that already lives in `GPB.INC.BL`.
+
+**Two stale lines found and fixed in `SCREEN.EXP.BL`**, which is the real return on the pass: it
+still advertised "one of SIX styles" and listed the old numbering -- `0 solid 1 dither 2 single line
+3 rounded 4 thick 5 thick shaded` -- after styles 1 and 5 were deleted on 2026-09-01 and the rest
+renumbered. **The demo loop below it already said `FOR STYLE.N = 0 TO 3`**, so the code had been
+fixed and the comment had not. A sweep of every example for retired keywords and stale style numbers
+found nothing else: the remaining `GP.SORT` / `GP.UPPER` / `GP.MENU` mentions are all correctly
+phrased as history.
+
+**The whole item is now DONE** -- editor, library and examples.
 
 ### Name the output after the source — DONE, but by the caller
 

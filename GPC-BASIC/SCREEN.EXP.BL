@@ -2,7 +2,7 @@
 ## **
 ## **  SCREEN.EXP.BL -- the GP.BASIC text drawing set.
 ## **
-## **  GP.BOX      statement, a frame in one of six styles
+## **  GP.BOX      statement, a frame in one of four styles
 ## **  GP.FILL     statement, a rectangle of one character
 ## **  GP.PRINTAT  statement, text at a position
 ## **  STASH.INC.BL          save a rectangle and put it back -- a module
@@ -24,18 +24,13 @@
 #INCLUDE "GPB.INC.BL"
 #INCLUDE "STASH.INC.BL"
 
-## NOTE ON NAMES: BASLOAD gives 64 significant characters, so PANEL.COL and
-## PANEL.ROW below really are different variables. The BUILT-IN BASIC gives
-## only TWO -- so if you rewrite any of this as a plain .bas for the host
-## tokeniser, R30 and R31 become the same variable and BASE becomes the same
-## variable as BA, silently and with no error. That is a reason to write
-## BASL, not a reason to use short names here.
+## NOTE ON NAMES: BASLOAD gives 64 significant characters, so PANEL.COL and PANEL.ROW
+## really are different variables. The BUILT-IN BASIC gives TWO -- rewrite this as a
+## plain .bas and R30 and R31 become one variable, silently. A reason to write BASL.
 
 ## ***********************************************************************
-## **  1. GP.FILL and GP.BOX.  These write STRAIGHT INTO VERA and never
-## **  call the KERNAL, which is why they are several times faster than
-## **  the PRINT they replace -- GPC's character output makes two KERNAL
-## **  calls per character before BSOUT does any scroll or cursor work.
+## **  1. GP.FILL and GP.BOX. These write STRAIGHT INTO VERA and never call the KERNAL,
+## **  which is why they are several times faster than the PRINT they replace.
 ## ***********************************************************************
 
 CLS
@@ -57,20 +52,18 @@ GP.PRINTAT 6, 3, "GP.BASIC SCREEN DEMO", PANEL.COL
 GP.FILL 6, 5, 28, 1, 160, 2 * 16 + 15
 GP.FILL 6, 6, 28, 1, 166, 2 * 16 + 15
 
-## ---- All six border styles.
-## ----   0 solid   1 dither   2 single line
-## ----   3 single line, rounded corners   4 thick   5 thick, shaded
+## ---- All four border styles. The chequered dither and the shaded thick corners were
+## ---- deleted on 2026-09-01 and the rest renumbered down, so this is 0 to 3 now:
+## ----   0 solid   1 single line   2 rounded corners   3 thick
 
 FOR STYLE.N = 0 TO 3
   GP.BOX 6 + STYLE.N * 5, 8, 4, 3, STYLE.N, PANEL.COL
   GP.PRINTAT 7 + STYLE.N * 5, 9, CHR$(48 + STYLE.N), PANEL.COL
 NEXT
 
-## ---- THE COLOUR IS OPTIONAL, and omitting it means "whatever COLOR last
-## ---- set" -- the same colour a PRINT would have used. It is one byte out
-## ---- of the KERNAL, so there is no second notion of colour to keep in
-## ---- step. Note that 255 is a REAL colour here (light grey on light
-## ---- grey), not a marker meaning "leave it alone".
+## ---- THE COLOUR IS OPTIONAL, and omitting it means "whatever COLOR last set" -- read
+## ---- from the KERNAL, so there is no second notion of colour to keep in step. 255 is
+## ---- a REAL colour (light grey on light grey), not a "leave it alone" marker.
 
 COLOR 5, 0
 GP.PRINTAT 4, 12, "NO COLOUR ARGUMENT - FOLLOWS COLOR"
@@ -103,18 +96,13 @@ GP.FILL 0, 20, PANEL.W, 4, ASC("X")
 ## ***********************************************************************
 ## **  3. STASH.INC.BL -- draw over the screen and put it back.
 ## **
-## **  THIS WAS GP.STASH AND GP.RESTR until 1st September 2026, when the
-## **  pair moved out of the GP runtime block and into GP.ASM. The block is
-## **  all-or-nothing -- every program using any GP keyword carried all of
-## **  it, in the object AND off the bottom of the workspace -- and the
-## **  stash was 329 of those bytes, paid by every program that never
-## **  saved a rectangle. As a module it costs its own bytes, once, in the
-## **  programs that ask for it.
+## **  THIS WAS GP.STASH AND GP.RESTR until 1st September 2026, when the pair left the
+## **  all-or-nothing GP block for GP.ASM -- 329 bytes paid by every program that never
+## **  saved a rectangle.
 ## **
-## **  The stash still carries a 4-byte header (w, h, x, y), so the restore
-## **  still needs only the bank. A bank is 8K and a cell is 2 bytes, so at
-## **  most 4094 cells fit: stash panels, not whole screens -- and unlike
-## **  the keyword, STASH.SAVE says so, in STASH.OK.
+## **  It still carries a 4-byte header (w, h, x, y), so the restore needs only the bank.
+## **  A bank is 8K and a cell 2 bytes, so 4094 cells fit: stash panels, not whole
+## **  screens -- and unlike the keyword, STASH.SAVE says so in STASH.OK.
 ## ***********************************************************************
 
 STASH.BANK = 1
