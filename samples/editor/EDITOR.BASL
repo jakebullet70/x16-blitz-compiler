@@ -3,17 +3,12 @@
 #REM 0
 #SYMFILE "@:EDITOR.SYM"
 #DEFINE ED.KBDBUF $F09F
-## kbdbuf_get_modifiers. Bit 1 is Alt (the Commodore key). This is the documented way to
-## see a modifier the character code cannot carry -- the KERNAL reference names Ctrl+Esc
-## and Alt+F1 as the cases it exists for -- and it is how ALT+letter reaches the menus in
-## ISO mode, where the driver no longer sends PETSCII Commodore+letter codes at all.
+## kbdbuf_get_modifiers. Bit 1 is Alt. A character code cannot carry a modifier, and in
+## ISO mode the driver sends no Commodore+letter codes at all, so this is how ALT is seen.
 #DEFINE ED.KBDMOD $FEC0
 #DEFINE ED.MOD.ALT 2
-## The single-line box, and these are TILE INDICES: GUI.FRAME draws with GP.BOX, whose
-## custom glyphs go straight to the cell. They were $80-$85 while GP.FILL drew the frame,
-## because GP.FILL converts and for $80-$9F that adds $40 -- so the glyphs had to be parked
-## at $C0-$C5 and asked for 64 lower. The bias is gone; the numbers now say where the
-## glyphs actually are.
+## The single-line box, as TILE INDICES: GUI.FRAME draws it with GP.BOX, whose custom
+## glyphs reach the cell unconverted. ED.PETFONT is what parks them here.
 #DEFINE ED.GL.H 192
 #DEFINE ED.GL.V 193
 #DEFINE ED.GL.TL 194
@@ -21,22 +16,16 @@
 #DEFINE ED.GL.BL 196
 #DEFINE ED.GL.BR 197
 
-## The RAM bank GUI.INC.BL saves a dialog's cells into. It is NOT a spare
-## one lying around -- the document store owns every bank from 1 upward --
-## so STORE.BASL now starts its content arena at 5 and this is the bank it
-## gave up. 8K holds 4094 cells and the largest dialog here is well under
-## 40x10, so one bank is one dialog with room to spare.
+## The RAM bank GUI.INC.BL saves a dialog's cells into. Not a spare one lying around:
+## the document store gave it up and starts its own arena at 5 instead.
 #DEFINE ED.GUI.BANK 4
 
 #INCLUDE "GPB.INC.BL"
 #INCLUDE "THEME.INC.BL"
 #INCLUDE "APPHELP.INC.BL"
-REM STASH.INC.BL is what GUI.OPEN saves the covered cells with. It was GP.STASH and
-REM GP.RESTR until 01/09/26, when the pair left the GP runtime block for GP.ASM -- 329
-REM bytes that every program using any GP keyword was carrying whether it stashed
-REM anything or not. The #SYMFILE above is there for this: the module reaches BASIC's
-REM variables from inside assembly through {VAR}, and BASLOAD has crunched every name
-REM by then.
+REM STASH.INC.BL saves the cells a dialog covers -- GP.STASH and GP.RESTR until they left
+REM the GP block on 01/09/26. The #SYMFILE above is for it: it reaches BASIC's variables
+REM from assembly through {VAR}, and by then BASLOAD has crunched every name.
 #INCLUDE "STASH.INC.BL"
 #INCLUDE "MENUHELP.INC.BL"
 #INCLUDE "MENUBAR.INC.BL"
@@ -47,27 +36,18 @@ REM ============================================================================
 REM EDITOR.BASL -- GPC EDIT, an MS-DOS-EDIT-styled text / Markdown editor for the
 REM Commander X16, written in BASLOAD and compiled by GPC.
 REM
-REM NOTHING GOES THROUGH THE KERNAL. Every cell on the screen -- the text area
-REM AND the chrome: menu bar, dropdowns, status bar, prompts, messages -- is
-REM written straight into VERA's text map. LOCATE / COLOR / PRINT were taken out:
-REM CHROUT is a fixed ROM cost that compiling cannot touch, and padding a bar a
-REM space at a time was O(n^2). The document lives in banked RAM through the DOC.*
-REM storage layer in STORE.BASL, #INCLUDEd at the bottom.
+REM NOTHING GOES THROUGH THE KERNAL. Every cell -- text area and chrome alike -- is
+REM written straight into VERA's text map. CHROUT is a fixed ROM cost compiling cannot
+REM touch, and padding a bar a space at a time was O(n^2). The document lives in banked
+REM RAM behind the DOC.* layer in STORE.BASL, #INCLUDEd at the bottom.
 REM
-REM THE TWO RENDERERS ARE INLINE ASSEMBLY. ED.RENDER.ROW draws a row of text and
-REM ED.PUT.FIELD draws every piece of chrome, and both are one GP.ASM block each:
-REM 65C02 assembled into the program at compile time, reaching BASIC's own
-REM variables through {VAR}. That is the whole speed story, and it is measured --
-REM EDBENCH.BASL runs the BASIC version and the assembly version of both against
-REM each other in one program. See readme.md for the numbers.
+REM THE TWO RENDERERS ARE INLINE ASSEMBLY. ED.RENDER.ROW draws text, ED.PUT.FIELD draws
+REM chrome, and each is one GP.ASM block reaching BASIC's variables through {VAR}. That
+REM is the whole speed story; EDBENCH.BASL measures both against their BASIC versions.
 REM
-REM GP.ASM ITSELF COSTS NO RUNTIME BYTES -- a block is five bytes of p-code plus
-REM your instructions, and every handler it uses is in every compiled program
-REM already. The assembly here is free. What is NOT free is GP.SELECT in the key
-REM dispatch: that is a core keyword, and one core keyword pulls in the whole 2 KB
-REM GP block, which is why this compiles GP-BASIC IN. Readability bought with 2,048 bytes,
-REM knowingly. Now that the block is paid for, the main loop's GP.DO rides in free --
-REM it is taking BOTH back out that would make this GP-BASIC OUT again.
+REM GP.ASM COSTS NO RUNTIME BYTES. What does is GP.SELECT in the key dispatch: one core
+REM keyword pulls in the whole 2 KB GP block, which is why this compiles GP-BASIC IN --
+REM readability bought knowingly. The main loop's GP.DO then rides in free.
 REM
 REM Colours (like DETOK): blue bars, black text area, white text, cyan prompts,
 REM white-on-red errors.
@@ -98,8 +78,8 @@ GP.LOOP
 
 
 ED.DISPATCH.KEY:
-  REM ALT is a MODIFIER on whatever key arrived, not a key of its own, so it is tested
-  REM before the selector rather than sitting in it as a code.
+  REM ALT modifies whatever key arrived rather than being one, so it is tested before the
+  REM selector rather than sitting in it as a code.
   IF ED.MODS.ALT <> 0 THEN GOSUB ED.ALT.MENU : RETURN
   GP.SELECT ED.KEY
     GP.CASE 27  
@@ -123,9 +103,8 @@ ED.DISPATCH.KEY:
   GP.ENDSEL
   RETURN
 
-REM Asked with the keystroke, while the key is still down. Banked to 0 the way MENUTST
-REM banks for kbdbuf_put: $FEC0 is below the $FF00 jump table, so it is not mirrored
-REM across ROM banks and the call has to be made with the KERNAL paged in.
+REM Asked while the key is still down. $FEC0 is below the $FF00 jump table, so it is not
+REM mirrored across ROM banks and the call needs the KERNAL paged in.
 ED.READ.MODS:
   POKE 1, 0 : GP.CALL ED.KBDMOD : POKE 1, 4
   ED.MODS = GP.A
@@ -134,9 +113,8 @@ ED.READ.MODS:
   RETURN
 
 ED.KEY.RANGE:
-  REM The keyboard hands back ASCII, because ED.INIT declares ISO encoding -- see the
-  REM note beside the $0372 poke there. Before that this had to case-swap every letter,
-  REM since PETSCII gives $41-$5A for LOWER case and $C1-$DA for upper.
+  REM ASCII, because ED.INIT declares ISO encoding -- see the $0372 poke there. Under
+  REM PETSCII this had to case-swap every letter.
   IF ED.KEY >= 32 AND ED.KEY <= 126 THEN GOSUB ED.DO.INSERT
   RETURN
 
@@ -144,16 +122,10 @@ ED.KEY.RANGE:
 ED.QUIT:
   POKE 40761, 0 : POKE 40762, 0 : REM undo any hardware VSCROLL before returning to BASIC
   GOSUB ED.ALTKEYS.OFF : REM and the keyboard layout, which outlives the program
-  REM APPHELP.RESTORE puts back the screen mode, the CHARSET and the text colour the
-  REM user had when the editor started -- the state APPHELP.STARTUP recorded before we
-  REM touched any of it. Leaving someone in 80x30 white-on-blue because that is what
-  REM suited us is the rudeness the whole APPHELP module exists to stop.
-  REM
-  REM THE CHARSET MATTERS TWICE OVER HERE. It is what the user chose -- the machine
-  REM boots on 2, upper/graphics, and this used to hardcode 3, so anyone who started in
-  REM upper case was dropped back into lower case on the way out. And re-uploading it is
-  REM also what undoes ED.PETFONT's re-ordering, so the PRINT below comes out in the
-  REM right glyphs. Nothing may be PRINTed before this line.
+  REM APPHELP.RESTORE hands back the mode, charset and colour APPHELP.STARTUP found -- the
+  REM user's, not a hardcoded 3, so someone who started in upper case is not dropped into
+  REM lower. Re-uploading the charset is also what undoes ED.PETFONT's re-ordering, so
+  REM NOTHING MAY BE PRINTED BEFORE THIS LINE or it comes out in the wrong glyphs.
   GOSUB APPHELP.RESTORE
   PRINT CHR$(147);
   PRINT "BYE."
@@ -164,64 +136,45 @@ ED.QUIT:
 REM ============================================================================
 REM ASCII-ORDER CHARSET (ED.PETFONT)
 REM
-REM THE RENDERERS WRITE DOCUMENT BYTES STRAIGHT INTO VERA, and a VERA tile index is a
-REM SCREEN code, not a character code. Under ISO that never showed: the ISO font happens
-REM to be in ASCII order, so the index and the code were the same number. Charset 3 (PET
-REM upper/lower) gives us PETSCII glyphs with both cases, but it is in SCREEN-code order.
+REM THE RENDERERS WRITE DOCUMENT BYTES STRAIGHT INTO VERA, and a tile index is a SCREEN
+REM code, not a character code. Charset 3 gives PETSCII glyphs in both cases but is in
+REM screen-code order, so re-order it in VRAM instead: glyph N becomes the glyph for code
+REM N, and both renderers stay as they are -- no table, no lookup, zero cycles a cell.
+REM Translating in the renderer would have cost 6 cycles on a 31-cycle cell.
 REM
-REM So give the index its meaning back instead of translating every cell: re-order the
-REM charset in VRAM so glyph N is the glyph for code N. Both GP.ASM renderers then stay
-REM exactly as they are -- no table, no lookup, ZERO cycles a cell. Translating in the
-REM renderer instead would have cost TAX + LDA table,X = 6 cycles on a 31-cycle cell,
-REM about 19%, on every character of every repaint.
+REM ASCII ORDER, NOT PETSCII, and that is the whole reason it works: BASLOAD writes string
+REM literals through as the source bytes, so every name, prompt and message here is ASCII.
+REM PETSCII order case-swaps all of them and stops find matching its own needles -- which
+REM the self-check caught. PETSCII belongs at the DISK boundary, in STORE.BASL.
 REM
-REM IN ASCII ORDER, NOT PETSCII ORDER, and that distinction is the whole reason this
-REM works. BASLOAD writes string literals through as the bytes that were in the source,
-REM so every literal in this file -- every menu name, prompt and message -- is ASCII.
-REM Ordering the font by PETSCII renders all of them case-swapped AND stops find matching
-REM its own needles, which is exactly what the self-check caught. PETSCII belongs at the
-REM DISK boundary, and STORE.BASL is where it happens.
-REM
-REM ALMOST NOTHING MOVES. In charset 3 the digits and punctuation at $20-$3F and the
-REM capitals at $41-$5A are ALREADY where ASCII wants them, so only 38 glyphs shift:
+REM ALMOST NOTHING MOVES: $20-$3F and $41-$5A are already where ASCII wants them, so only
+REM 38 glyphs shift.
 REM
 REM   ASCII $40  @     <- screen $00        ASCII $60  `     <- screen $40
 REM   ASCII $5B-$5F    <- screen $1B-$1F    ASCII $61-$7A a-z <- screen $01-$1A
 REM   ASCII $7B-$7F    <- screen $5B-$5F
 REM
-REM Two of those read from a run that another one writes, so order matters: $60 before
-REM $40, and $7B-$7F before $5B-$5F. Nothing forms a CYCLE -- screen $01-$1A and $1B-$1F
-REM are only ever sources, never destinations -- so unlike a PETSCII-ordered permutation
-REM this needs no staging buffer at all.
+REM Two of those read from a run another one writes, so ORDER MATTERS: $60 before $40, and
+REM $7B-$7F before $5B-$5F. Nothing forms a cycle, so no staging buffer is needed.
 REM ============================================================================
 REM ============================================================================
 REM GUI.INC.BL SETUP
 REM ============================================================================
-REM Done ONCE, and it is four facts about this program that the library cannot
-REM work out for itself.
+REM Done ONCE: four facts about this program the library cannot work out for itself.
 REM
-REM GUI.GLYPH IS THE WHOLE REASON THE DIALOGS WORK HERE. GP.BOX takes its border
-REM glyphs from a table in the RUNTIME, at the screen codes the stock charset puts
-REM them at -- and ED.PETFONT has just moved every one of them. Style 2 would draw
-REM "p @ B", the same way it did in the dropdown before that was rewritten as eight
-REM GP.FILLs. GUI.FRAME is those eight fills, in the library, and this is where it
-REM is told which glyphs to use: the six ED.PETFONT rescued into $C0-$C5, named as
-REM GP.FILL arguments (ED.GL.x, i.e. tile - $40 -- see the note at the top).
-REM
-REM MUST RUN AFTER ED.PETFONT. Before it, ED.GL.x names glyphs that are not there
-REM yet; the values would be the same and the frame would be garbage.
+REM GUI.GLYPH IS WHY THE DIALOGS WORK HERE. GP.BOX's built-in styles come from a runtime
+REM table at the screen codes the STOCK charset uses, and ED.PETFONT has just moved every
+REM one of them -- style 2 would draw "p @ B". GUI.FRAME takes the six glyphs named here
+REM instead, the ones ED.PETFONT rescued into $C0-$C5, and hands them to GP.BOX as a
+REM custom set. MUST RUN AFTER ED.PETFONT, or it names glyphs that are not there yet.
 ED.GUI.SETUP:
   GUI.BANK = ED.GUI.BANK
   GUI.ROW.OFFSET = 0
 
-  REM THE COLOURS, because this program's theme roles do not mean what the library
-  REM assumes. GUI paints its panel with THEME.TEXT and its frame with THEME.BORDER,
-  REM which is right for a program using the roles as named. ED.THEME re-points them:
-  REM BORDER is the hotkey letter (yellow on blue) and PAGE is a light grey it says
-  REM itself it never uses. Left alone, a dialog came up as a grey slab with a blue
-  REM edge in the middle of a black editor. Both go to THEME.TEXT -- the document's
-  REM own white on black, and the same attribute ED.DRAW.DROPDOWN frames with, so a
-  REM dialog and a dropdown are visibly the same program.
+  REM THE COLOURS, because ED.THEME re-points the roles the library assumes: BORDER is the
+  REM hotkey letter here, and PAGE a grey it never uses. Left alone a dialog came up as a
+  REM grey slab with a blue edge in a black editor. Both go to THEME.TEXT, the document's
+  REM own white on black and what the dropdown frames with, so the two match.
   GUI.PANEL.IN = THEME.CLR(THEME.TEXT)
   GUI.BORDER.IN = THEME.CLR(THEME.TEXT)
 
@@ -231,15 +184,10 @@ ED.GUI.SETUP:
   GUI.CORNER.BL = ED.GL.BL : GUI.CORNER.BR = ED.GL.BR
   RETURN
 
-REM Where a dialog goes, asked FRESH at every call, because the answer moves.
-REM
-REM The document is scrolled by VERA, not by repainting: ED.DO.SCROLL bumps
-REM L1_VSCROLL and ED.MAP.TOP is the map row now showing as screen row 0. Every
-REM GP drawing command in this program addresses the MAP -- that is why the
-REM dropdown draws at "2 + ED.MAP.TOP" -- and GUI.INC.BL centres against the
-REM SCREEN, which is the right thing for a program that does not scroll. One
-REM number reconciles them, and it is only right for as long as the view stays
-REM put, so it is set here rather than in ED.GUI.SETUP.
+REM Where a dialog goes, asked FRESH at every call because the answer moves. The document
+REM is scrolled by VERA, so ED.MAP.TOP is the map row showing as screen row 0; every GP
+REM command here addresses the MAP and GUI.INC.BL centres against the SCREEN. This one
+REM number reconciles them, and only while the view stays put -- hence not in ED.GUI.SETUP.
 ED.GUI.WHERE:
   GUI.ROW.OFFSET = ED.MAP.TOP
   RETURN
@@ -247,16 +195,11 @@ ED.GUI.WHERE:
 ED.PETFONT:
   ED.FONT = 61440 : REM $1:F000, the KERNAL's 2 KB charset (VERA bank 1)
   REM ---- THE SINGLE-LINE BOX, RESCUED BEFORE THE RE-ORDER RUNS OVER IT ----
-  REM Charset 3 keeps its box drawing at $40 - $7D, which is most of what the re-order
-  REM below overwrites with ASCII letters, so by the time it finishes the only line
-  REM glyphs left in the whole font are a horizontal at $60 and a vertical at $7D -- both
-  REM survivors by accident, both sitting on ` and }, and NO CORNERS AT ALL. That is why
-  REM GP.BOX style 2 draws "p @ B" here and why style 0's solid $A0 was the only one that
-  REM worked: $80-$FF is the one region the re-order never touches.
-  REM
-  REM So the six are copied up there FIRST, into $C0-$C5. Nothing else uses that region:
-  REM the document is ASCII, so no cell above $7F is ever written except by the frame.
-  REM Being ahead of every other copy is what keeps each source pristine.
+  REM Charset 3 keeps its box drawing at $40-$7D, which is most of what the re-order below
+  REM buries under ASCII letters -- no corners survive at all, which is why GP.BOX's own
+  REM styles draw "p @ B" here. So copy the six up into $C0-$C5 FIRST, the one region the
+  REM re-order never touches and nothing else writes. Being ahead of every other copy is
+  REM what keeps each source pristine.
   ED.FS = 64  : ED.FD = ED.GL.H  : ED.FN = 1 : GOSUB ED.FCOPY : REM $40 horizontal
   ED.FS = 93  : ED.FD = ED.GL.V  : ED.FN = 1 : GOSUB ED.FCOPY : REM $5D vertical
   ED.FS = 112 : ED.FD = ED.GL.TL : ED.FN = 1 : GOSUB ED.FCOPY : REM $70 top left
@@ -272,12 +215,9 @@ ED.PETFONT:
   RETURN
 
 
-REM Copy ED.FN glyphs, 8 bytes each, from screen code ED.FS to code ED.FD.
-REM
-REM GP.DO takes its count once, up front, so the limit is not re-evaluated every pass
-REM the way a FOR's TO expression is. The count is put in a variable first because
-REM GP.DO 0 loops FOREVER -- every caller here passes 1, 5 or 26, but a zero reaching
-REM it would hang rather than do nothing, which is the opposite of what FOR does.
+REM Copy ED.FN glyphs, 8 bytes each, from screen code ED.FS to code ED.FD. GP.DO takes its
+REM count once up front rather than re-evaluating a FOR's TO every pass -- but GP.DO 0
+REM loops FOREVER, so a zero count would hang here rather than do nothing.
 ED.FCOPY:
   ED.FCOUNT = ED.FN * 8
   ED.FI = 0
@@ -290,22 +230,19 @@ ED.FCOPY:
 REM ============================================================================
 REM THEME -- every colour in one place, as named roles
 REM
-REM These are the editor's own values, not THEME.LOAD's. The library's default palette
-REM is a blue-page app look; this is DETOK's, and it is what the sample has always
-REM drawn. The roles are what is shared, not the colours -- which is the point of
-REM having roles at all.
+REM The editor's own values, not THEME.LOAD's: the library's palette is a blue-page app
+REM look and this is DETOK's. The ROLES are what is shared, not the colours.
 REM
 REM   PAGE    dropdown panel        TITLE   menu bar, status bar, messages
 REM   TEXT    the document          BORDER  the hotkey letter in a menu title
 REM   HILITE  caret, active title   DIMMED  prompts        WARN  errors
 REM
-REM An attribute is background * 16 + foreground, which is what VERA's colour byte and
-REM every GP drawing command already take.
+REM An attribute is background * 16 + foreground, which is what VERA and every GP command
+REM already take.
 REM ============================================================================
 ED.THEME:
-  REM THEME.LOAD owns the DIM -- GPC rejects a second DIM of the same array even when
-  REM only one of them can ever run (ARRAY REDEFINED), so this calls the library rather
-  REM than repeating it, and then overwrites the slots with the editor's own values.
+  REM THEME.LOAD owns the DIM: GPC rejects a second DIM of the same array even when only
+  REM one can run (ARRAY REDEFINED), so call it and then overwrite the slots.
   THEME.DARK = ED.DARK
   GOSUB THEME.LOAD
   IF ED.DARK <> 0 THEN GOTO ED.THEME.DARK
@@ -333,40 +270,28 @@ REM ============================================================================
 REM SETUP
 REM ============================================================================
 ED.INIT:
-  REM FIRST, before any screen mode or colour of our own: APPHELP.STARTUP records the
-  REM state as it FINDS it, and ED.QUIT hands exactly that back. Anything changed before
-  REM this line is what the user would be left with instead.
+  REM FIRST, before any mode or colour of our own: APPHELP.STARTUP records the state as it
+  REM FINDS it and ED.QUIT hands that back. Anything changed above this line is lost.
   GOSUB APPHELP.STARTUP
   GOSUB ED.THEME
-  REM GP.CALL, not SYS. SYS can only pass registers through the POKE 780..783 slots and
-  REM hand results back the same way, so a KERNAL call was four statements and three
-  REM magic addresses. GP.CALL takes A, X, Y and CARRY as arguments and returns them as
-  REM GP.A / GP.X / GP.Y, which is the difference between reading a call and decoding
-  REM one. It costs nothing here: GP.CALL and GP.X are GP block keywords, and the block
-  REM is already bought and paid for by the GP.SELECT in the key dispatch.
+  REM GP.CALL, not SYS: A, X, Y and CARRY as arguments, results in GP.A / GP.X / GP.Y,
+  REM against SYS's four statements through the POKE 780..783 slots. Free here -- the GP
+  REM block is already paid for by the GP.SELECT in the key dispatch.
   GP.CALL APPHELP.SCRMODE, ED.SCREEN.MODE, 0, 0, 0 : REM carry CLEAR sets the mode
   GP.CALL APPHELP.SETCHR, 3, 0, 0, 0 : REM charset 3, PET upper/lower
   PRINT CHR$(147);
   GOSUB ED.PETFONT : REM ...then re-index it so a VERA tile index IS a character code
-  REM ...and DECLARE that, by setting bit 6 of $0372. The flag means "text is ASCII,
-  REM not PETSCII", which is exactly what the re-ordered font now expects, so it is a
-  REM statement of fact rather than a trick. Poked directly and not via CHR$(15),
-  REM because CHR$(15) would also upload the ISO font and throw away the PETSCII glyphs
-  REM that are the whole point. Three things follow, and all three are wanted:
-  REM   the KEYBOARD returns ASCII, so nothing has to case-swap a keystroke;
-  REM   CHR$()/PRINT stop translating, so KERNAL output lands on the right glyphs;
-  REM   GP.PRINTAT skips its PETSCII-to-screen step, which is what lets the GP drawing
-  REM   commands -- and MENUHELP, which is built on them -- work at all here.
+  REM ...and DECLARE it, with bit 6 of $0372: "text is ASCII", which is now simply true of
+  REM the re-ordered font. POKED, NOT CHR$(15) -- CHR$(15) would upload the ISO font too
+  REM and throw the PETSCII glyphs away. Three things follow, all wanted: the keyboard
+  REM returns ASCII, PRINT stops translating, and GP.PRINTAT skips its PETSCII step, which
+  REM is what lets the GP commands (and MENUHELP, built on them) work here at all.
   POKE 882, PEEK(882) OR 64
   GOSUB ED.GUI.SETUP : REM ...and tell GUI.INC.BL where the frame glyphs ended up
-  REM The SAME entry point again, but with CARRY SET, which makes screen_mode REPORT
-  REM instead of set: mode in A, columns in X, rows in Y. That replaces $FFED entirely,
-  REM so the whole routine now speaks to one KERNAL address rather than three. It has to
-  REM be asked AFTER the mode is set, and it is NOT the size APPHELP.STARTUP already
-  REM recorded. That one is the mode the USER had -- measured 80x60 -- and it is kept
-  REM untouched so ED.QUIT can give it back. This one is the mode the editor just chose,
-  REM 80x30, which is what every renderer below has to lay itself out in. Two different
-  REM sizes, both needed, so both are asked for.
+  REM The same entry point with CARRY SET, which makes screen_mode REPORT instead: mode in
+  REM A, columns in X, rows in Y, replacing $FFED. Asked AFTER the mode is set, and NOT the
+  REM size APPHELP.STARTUP holds -- that one is the user's 80x60, kept for ED.QUIT to give
+  REM back. This is the 80x30 the editor just chose and every renderer lays out in.
   GP.CALL APPHELP.SCRMODE, 0, 0, 0, 1
   SCREEN.COLS = GP.X : SCREEN.ROWS = GP.Y
   IF SCREEN.COLS < 20 THEN SCREEN.COLS = 80
@@ -378,12 +303,11 @@ ED.INIT:
   ED.ATTR.CARET  = THEME.CLR(THEME.HILITE)
   ED.QUIET = 0 : ED.SIM.MODE = 0 : ED.EXIT.FLAG = 0 : ED.LAST.MSG$ = ""
   REM ---- hardware vertical scroll setup (see ED.DO.SCROLL) ----
-  REM The text-map layer is scrolled by VERA's L1_VSCROLL ($9F39/$9F3A, in map pixels,
-  REM 8 per text row) so a 1-line move repaints 3 rows instead of the whole screen. Every
-  REM screen row is drawn at map row (screen_row + ED.MAP.TOP); ED.MAP.TOP = VSCROLL/8.
-  REM Read the map height from L1_CONFIG bits 7:6 (32<<n) and keep ED.MAP.TOP in
-  REM [0, MAP.H - SCREEN.ROWS] so the visible window never crosses the map's bottom edge
-  REM -- that means we never rely on VERA's vertical wrap; at the bound we rewind + repaint.
+  REM VERA's L1_VSCROLL ($9F39/$9F3A, map pixels, 8 a text row) scrolls the layer, so a
+  REM one-line move repaints 3 rows and not the screen. Screen row R is map row
+  REM R + ED.MAP.TOP, and ED.MAP.TOP = VSCROLL/8. Map height comes from L1_CONFIG bits 7:6
+  REM (32<<n); ED.MAP.TOP is kept inside [0, MAP.H - SCREEN.ROWS] so the window never
+  REM crosses the map's edge -- no reliance on VERA's wrap, we rewind and repaint instead.
   ED.MAP.TOP = 0
   POKE 40761, 0 : POKE 40762, 0
   ED.MAP.CFG = PEEK(40756)
@@ -403,28 +327,23 @@ ED.INIT:
 REM ============================================================================
 REM ALT+letter, by making the LAYOUT produce the letter
 REM
-REM In ISO mode the ALT table does not hand back the letter. Measured on the machine:
-REM ALT+S arrives as 223, which is eszett, and ALT+F arrives as NOTHING AT ALL because
-REM its slot in that table is empty. So the character can never say which key was hit --
-REM and for F there is not even a keystroke to look at. kbdbuf_get_modifiers tells us ALT
-REM was down (ED.READ.MODS) but it cannot tell us what it was down WITH.
+REM In ISO mode the ALT table does not hand back the letter. Measured: ALT+S arrives as
+REM 223 (eszett) and ALT+F arrives as NOTHING AT ALL, its slot being empty -- so the
+REM character can never say which key was hit. kbdbuf_get_modifiers says ALT was down but
+REM not what it was down WITH.
 REM
-REM The layout itself is writable, so write it. The tables live in banked RAM at $A000 on
-REM RAM bank 0: eleven of 128 bytes, byte 0 an ID, bytes 1..127 the code each KEYNUM
-REM produces. ID $80 is ISO with no modifier, $C6 is ISO+Alt. Find each menu's initial in
-REM the plain table -- the index it sits at IS that key's keynum -- and write the upper
-REM case letter into the same index of the ALT table.
+REM The layout is writable, so write it. Eleven 128-byte tables live at $A000 on RAM bank
+REM 0: byte 0 an ID, bytes 1..127 the code each KEYNUM produces, ID $80 plain ISO and $C6
+REM ISO+Alt. Find a menu's initial in the plain table -- the index IS that key's keynum --
+REM and write the upper case letter at the same index of the ALT table.
 REM
-REM FOUND BY SEARCH, NOT BY A HARDCODED KEYNUM, so this holds for whatever layout is
-REM loaded rather than only for ABC/X16, and it follows the menu names: rename a menu and
-REM its accelerator moves with it. Every byte overwritten is saved and put back by
-REM ED.ALTKEYS.OFF, because the layout tables outlive the program.
-REM BANK 0, NOT POKE 0. GPC's PEEK/POKE save the RAM bank, switch to the one the BANK
-REM statement named, access, and switch BACK -- see x16_peekpoke.asm -- so a POKE to the
-REM bank register at $00 is undone by the same POKE that made it, every time. STORE.BASL
-REM says it plainly at the top: "the runtime's PEEK/POKE honour the last BANK statement".
-REM The document layer sets BANK before each of its own accesses and its banks start at 1,
-REM so borrowing bank 0 here disturbs nothing.
+REM FOUND BY SEARCH, NOT A HARDCODED KEYNUM, so it holds for whatever layout is loaded and
+REM follows the menu names: rename a menu and its accelerator moves with it. Every byte is
+REM saved and put back by ED.ALTKEYS.OFF -- the tables outlive the program.
+REM
+REM BANK 0, NOT POKE 0: PEEK/POKE restore the bank around every access, so a POKE to the
+REM bank register is undone by the same POKE that made it. The document layer's banks
+REM start at 1, so borrowing 0 here disturbs nothing.
 ED.ALTKEYS:
   ED.NALT = 0
   BANK 0
@@ -469,15 +388,9 @@ ED.OPEN.DONE:
 
 
 REM ---- menu tables (data-driven) ----
-REM THE BAR'S LAYOUT IS MENUBAR.INC.BL'S NOW, and the MENU.COL table that used to hold it
-REM is gone. That table was this program computing, and then remembering, what
-REM MENUBAR.COLUMN works out from the item text on demand -- a running sum of the widths
-REM to the left. MENUBAR.WHERE hands back the same answer as MENUBAR.SELX, which is what
-REM ED.DRAW.DROPDOWN now hangs the panel from.
-REM
-REM MENU.WIDTH STAYS. That is the DROPDOWN's width, the longest item plus two, and it is
-REM this program's business: a vertical panel has a column width, and the bar above it
-REM does not.
+REM The bar's layout is MENUBAR.INC.BL's: MENUBAR.WHERE works out a title's column from the
+REM item text on demand, which is what ED.DRAW.DROPDOWN hangs the panel from. MENU.WIDTH
+REM stays because it is the DROPDOWN's width, and a bar has no column width.
 ED.MENU.SETUP:
   MENU.COUNT = 3
   DIM MENU.NAME$(3) : DIM MENU.ITEMS(3)
@@ -503,18 +416,14 @@ ED.MENU.SETUP:
   RETURN
 
 
-REM ---- the bar's items, into the array MENUBAR reads.
+REM ---- the bar's items, into the array MENUBAR reads ----
+REM MENUBAR and MENUHELP share MENUHELP.ITEM$ on purpose, so it holds whichever of the two
+REM is being drawn and this routine and ED.DRAW.DROPDOWN each load their own first. Cheap;
+REM keeping two copies in step would not be.
 REM
-REM MENUBAR AND MENUHELP SHARE MENUHELP.ITEM$ ON PURPOSE -- a program with a bar and a
-REM dropdown wants one convention, not two -- so the array holds whichever of the two is
-REM being drawn, and this routine and ED.DRAW.DROPDOWN each load their own before use.
-REM Loading it is cheap; keeping two copies in step would not be.
-REM
-REM AN ITEM IS " NAME ", and the spaces are the layout. MENUBAR makes each item exactly as
-REM wide as its text, so the air around a title has to be IN the title -- which is also
-REM what gives the highlight its margin. With MENUBAR.X = 0 and no gap that puts File at
-REM column 1, Search at 7 and Help at 15, which is cell for cell where the hand-rolled bar
-REM put them.
+REM AN ITEM IS " NAME " AND THE SPACES ARE THE LAYOUT -- MENUBAR makes each item exactly as
+REM wide as its text, so the air around a title, and the highlight's margin, has to be in
+REM the title itself.
 ED.MENU.BAR.ITEMS:
   FOR MENU.I = 0 TO MENU.COUNT - 1
     MENUHELP.ITEM$(MENU.I + 1) = " " + MENU.NAME$(MENU.I) + " "
@@ -683,9 +592,8 @@ REM ============================================================================
 REM MENUS
 REM ============================================================================
 ED.ALT.MENU:
-  REM Whatever letter the driver sent with ALT down, folded to upper. This no longer
-  REM decodes a PETSCII Commodore code, because in ISO mode there is not one to decode --
-  REM ED.READ.MODS has already asked the KERNAL whether ALT was actually held.
+  REM Whatever letter arrived with ALT down, folded to upper. No PETSCII Commodore code to
+  REM decode in ISO mode -- ED.READ.MODS has already asked the KERNAL about the modifier.
   ED.ALT.CH = ED.KEY
   IF ED.ALT.CH >= 97 AND ED.ALT.CH <= 122 THEN ED.ALT.CH = ED.ALT.CH - 32
   FOR MENU.I = 0 TO MENU.COUNT - 1
@@ -695,36 +603,28 @@ ED.ALT.MENU:
       RETURN
     GP.ENDIF
   NEXT MENU.I
-  REM No menu with that initial. SAY WHAT ARRIVED, because ALT+letter is the one path
-  REM nothing headless can drive -- kbdbuf_put fills the buffer but sets no modifiers --
-  REM so the machine reporting its own key and modifier bytes is the only instrument
-  REM there is. A silent no-op here would just look like ALT being broken again.
+  REM No menu with that initial. SAY WHAT ARRIVED: ALT+letter is the one path nothing
+  REM headless can drive (kbdbuf_put sets no modifiers), so the machine reporting its own
+  REM key and modifier bytes is the only instrument there is.
   ED.MSG$ = "ALT: key=" + MID$(STR$(ED.KEY), 2) + " mods=" + MID$(STR$(ED.MODS), 2)
   GOSUB ED.INFO.MSG
   RETURN
 
-REM THE DROPDOWN'S KEY LOOP IS MENUHELP.RUN'S NOW. This used to be a GP.DO / GP.SELECT
-REM here, waiting on GET and dispatching six keys itself -- which is precisely the loop
-REM MENUHELP already owns, written a second time so that the two lines the editor needed
-REM on top of it could exist.
+REM THE DROPDOWN'S KEY LOOP IS MENUHELP.RUN'S. What the editor needs on top of it is that
+REM this is a dropdown UNDER A BAR: LEFT and RIGHT walk the bar with the panel still open,
+REM and a letter jumps to that menu. A vertical menu rightly ignores all three, and used to
+REM swallow them.
 REM
-REM WHAT THE EDITOR NEEDED, and why it could not just call MENUHELP.RUN before today: this
-REM is a dropdown UNDER A BAR, so LEFT and RIGHT have to walk the bar with the panel still
-REM open, and a letter has to jump to the menu with that initial. A vertical menu ignores
-REM all three -- correctly, they mean nothing on its axis -- and swallowed them.
+REM MENUHELP.KEYEXIT is the answer, and it is a library change rather than a workaround
+REM here: a key the menu has no use for ends it with MENUHELP.KEY set and MENUHELP.SEL
+REM untouched, and the caller says what it meant. It mirrors MENUBAR.DOWNEXIT, so a bar and
+REM its dropdown drive each other with neither module knowing the other is there.
 REM
-REM MENUHELP.KEYEXIT is the answer, and it is a library change, not a workaround here: a
-REM key the menu has no use for ends it with MENUHELP.KEY set and MENUHELP.SEL untouched,
-REM and the caller says what it meant. It is the mirror of MENUBAR.DOWNEXIT, which lets a
-REM bar hand DOWN to whoever is going to open the panel. Between the two, a bar and its
-REM dropdown drive each other and neither module knows the other is there.
+REM So the loop below is about the BAR, not about keys: one label, and every path either
+REM returns to it having moved which menu is open, or returns.
 REM
-REM SO THE LOOP HERE IS ABOUT THE BAR, not about keys. One label, and every path either
-REM comes back to it having moved which menu is open, or returns.
-REM
-REM MENU.ACTIVE and MENU.SEL are 0 based, because MENU.ITEM$ is a flat table indexed
-REM MENU.ACTIVE * 8 + MENU.SEL. MENUBAR.SEL and MENUHELP.SEL are 1 based. Converted at the
-REM boundary, in both directions, and nowhere else.
+REM MENU.ACTIVE and MENU.SEL are 0 based (MENU.ITEM$ is flat, MENU.ACTIVE * 8 + MENU.SEL);
+REM MENUBAR.SEL and MENUHELP.SEL are 1 based. Converted at the boundary and nowhere else.
 ED.OPEN.MENUBAR:
   MENU.SEL = 0
   GOSUB ED.RENDER.MENUBAR
@@ -739,27 +639,17 @@ ED.MENU.OPEN:
   IF MENUHELP.SEL = 0 THEN GOSUB ED.MENU.CANCEL : RETURN
   MENU.SEL = MENUHELP.SEL - 1
   IF MENUHELP.KEY = 13 THEN GOSUB ED.MENU.SELECT : RETURN
-  REM ED.RENDER.MENUBAR IS NOT IN THIS LOOP, and that is the point. It lays a band across
-  REM the whole row, draws every title and re-prints the document name -- eighty cells to
-  REM move a highlight two. The movers below repaint the TWO titles that changed instead,
-  REM which is what MENUBAR.RUN's own MENUBAR.SETTLE does when it is driving the bar.
+  REM ED.RENDER.MENUBAR IS NOT IN THIS LOOP, and that is the point: it bands the whole row
+  REM and re-prints the document name, eighty cells to move a highlight two. The movers
+  REM below repaint the two titles that changed, as MENUBAR.SETTLE does.
   IF MENUHELP.KEY = 157 THEN GOSUB ED.MENU.LEFT : GOTO ED.MENU.OPEN
   IF MENUHELP.KEY = 29 THEN GOSUB ED.MENU.RIGHT : GOTO ED.MENU.OPEN
   ED.KEY = MENUHELP.KEY : GOSUB ED.MENU.LETTER
   GOTO ED.MENU.OPEN
 
-REM A letter while the bar is open jumps to that menu and opens it. THIS IS NOW THE WAY
-REM IN, because ALT+letter is not one any more: ED.INIT declares ISO encoding, and in ISO
-REM mode the keyboard driver returns ISO-8859-15, not PETSCII. ALT+letter there produces
-REM the accented and symbol characters the US layout maps -- ALT+S is ss, ALT+D is eth --
-REM and F and H are not mapped at all. The 161..191 test in ED.KEY.RANGE was reading the
-REM PETSCII Commodore+letter codes, which the driver no longer sends.
-REM
-REM Folded to upper without case, so f and F both reach File.
-REM A letter jumps to the menu with that initial. NO REDRAW HERE any more -- ED.MENU.OPEN
-REM does it on the way round -- so this only has to erase the panel that is about to move.
-REM A letter matching nothing leaves everything alone and the loop redraws what was already
-REM there, which is what "ignored" should look like.
+REM A letter while the bar is open jumps to that menu, folded to upper so f and F both
+REM reach File. NO REDRAW HERE -- ED.MENU.OPEN does it on the way round -- so this only
+REM erases the panel about to move, and a letter matching nothing leaves everything alone.
 ED.MENU.LETTER:
   ED.ML.CH = ED.KEY
   IF ED.ML.CH >= 97 AND ED.ML.CH <= 122 THEN ED.ML.CH = ED.ML.CH - 32
@@ -767,9 +657,8 @@ ED.MENU.LETTER:
   FOR MENU.I = 0 TO MENU.COUNT - 1
     IF ASC(LEFT$(MENU.NAME$(MENU.I), 1)) = ED.ML.CH THEN ED.ML.HIT = MENU.I
   NEXT MENU.I
-  REM Nothing to do is the common case -- every key that is not an arrow or RETURN arrives
-  REM here -- so it must not repaint. It used to move the menu INSIDE the search loop,
-  REM which meant a full screen redraw per matching letter and none of the erase below.
+  REM Nothing to do is the common case -- every key that is not an arrow or RETURN lands
+  REM here -- so it must not repaint.
   IF ED.ML.HIT < 0 THEN RETURN
   IF ED.ML.HIT = MENU.ACTIVE THEN RETURN
   GOSUB ED.ERASE.DROPDOWN
@@ -789,15 +678,12 @@ ED.MENU.CANCEL:
   GOSUB ED.RENDER.ALL
   RETURN
 
-REM ED.MENU.UP and ED.MENU.DOWN are GONE: moving the highlight inside the panel is
-REM MENUHELP.RUN's job and always was, and this program was doing it a second time from
-REM outside. Only the two that cross the panel's axis are left, and they exist because
-REM MENUHELP hands those keys back rather than guessing what a bar wants.
+REM Only the two keys that cross the panel's axis are here; moving the highlight INSIDE it
+REM is MENUHELP.RUN's job.
 REM
-REM ED.RENDER.ALL erases the panel that is about to move; ED.MENU.OPEN draws the new one.
-REM ERASE BEFORE MOVING. ED.ERASE.DROPDOWN works from the ED.DD.* geometry the LAST
-REM ED.DRAW.DROPDOWN left behind, which is the panel actually on screen -- so it has to run
-REM while MENU.ACTIVE still names that panel.
+REM ERASE BEFORE MOVING. ED.ERASE.DROPDOWN works from the ED.DD.* geometry the last
+REM ED.DRAW.DROPDOWN left behind -- the panel actually on screen -- so it has to run while
+REM MENU.ACTIVE still names that panel.
 ED.MENU.LEFT:
   GOSUB ED.ERASE.DROPDOWN
   ED.MENU.WAS = MENU.ACTIVE
@@ -817,11 +703,9 @@ ED.MENU.RIGHT:
   RETURN
 
 REM ---- the two titles that changed, and nothing else ----
-REM
-REM ED.MENU.BAR.ITEMS first because ED.DRAW.DROPDOWN has since pointed MENUHELP.X, .Y,
-REM .WIDTH, .ATTR and .HIATTR at the PANEL. MENUBAR.ITEM and MENUBAR.MARK both reach
-REM MENUHELP.ROW through those, so drawing a title with the panel's numbers still loaded
-REM would paint it at the panel's column, in the panel's colours.
+REM ED.MENU.BAR.ITEMS first, because ED.DRAW.DROPDOWN has since pointed MENUHELP.X, .Y,
+REM .WIDTH, .ATTR and .HIATTR at the PANEL -- and MENUBAR.ITEM and MENUBAR.MARK both reach
+REM MENUHELP.ROW through those.
 ED.MENU.BAR.MOVE:
   GOSUB ED.MENU.BAR.ITEMS
   MENUBAR.DRAWN = ED.MENU.WAS + 1 : MENUBAR.PAINT = MENUHELP.ATTR : GOSUB MENUBAR.ITEM
@@ -829,10 +713,8 @@ ED.MENU.BAR.MOVE:
   RETURN
 
 REM ---- put the document back where the panel was, and no further ----
-REM
-REM ED.RENDER.ALL was doing this: every text row, the status bar, the caret AND the whole
-REM menu bar, to take down a seven row panel. The panel starts at screen row 1 and is
-REM ED.DD.FH rows tall, so those are the only rows that can be dirty.
+REM The panel starts at screen row 1 and is ED.DD.FH rows tall, so those are the only rows
+REM that can be dirty. ED.RENDER.ALL was repainting the screen to take down seven rows.
 ED.ERASE.DROPDOWN:
   ED.DDE.LAST = ED.DD.FH
   IF ED.DDE.LAST > ED.TEXT.BOTTOM THEN ED.DDE.LAST = ED.TEXT.BOTTOM
@@ -1008,30 +890,24 @@ ED.FOLD:
 REM ============================================================================
 REM PROMPTS (cyan line input; sim hook for the headless self-check)
 REM ============================================================================
-REM BOTH OF THESE USED TO BE HAND-ROLLED ON THE BOTTOM ROW, and both are now the
-REM library. What went with them: a key loop that could only append and rub out from
-REM the end, a Y/N reader that spelled its own answers into the prompt string, and
-REM two lots of geometry. What arrived with them: a caret that moves, a field that
-REM cannot be typed past, and a box that puts back the cells it covered instead of
-REM leaving the caller to repaint.
-REM
-REM THE INTERFACE HERE DID NOT CHANGE. ED.PROMPT.MSG$ in, ED.INPUT$ + ED.PROMPT.OK
-REM or ED.YN out -- so all six call sites are untouched, and so is the ED.SIM.MODE
-REM short circuit the self-check drives them through.
+REM Both were hand-rolled on the bottom row once and are now GUI.INC.BL, which brought a
+REM caret that moves, a field that cannot be typed past, and a box that puts back the cells
+REM it covered. The interface did not change -- ED.PROMPT.MSG$ in, ED.INPUT$ + ED.PROMPT.OK
+REM or ED.YN out -- so all six call sites and the ED.SIM.MODE short circuit are untouched.
 
 ED.PROMPT:
   IF ED.SIM.MODE = 1 THEN ED.INPUT$ = ED.SIM.INPUT$ : ED.PROMPT.OK = 1 : RETURN
   GOSUB ED.GUI.WHERE
   GUI.TITLE$ = "" : GUI.MSG2$ = "" : GUI.MASK = 0
   GUI.MSG$ = ED.PROMPT.MSG$
-  REM Wide enough for a path, and the box sizes itself around it. The old field ran
-  REM to 60 because it had the whole screen width; a centred dialog does not.
+  REM Wide enough for a path, and the box sizes itself around it. The old bottom-row field
+  REM ran to 60 because it had the whole screen; a centred dialog does not.
   GUI.LEN = 40
   GUI.INPUT$ = ""
   GOSUB GUI.TEXT
   ED.INPUT$ = GUI.INPUT$ : ED.PROMPT.OK = GUI.OK
-  REM A cancel hands back "", as it always did. GUI.TEXT restores what was passed
-  REM IN, which here is "" anyway -- this is belt and braces, and it is one store.
+  REM A cancel hands back "", as it always did. GUI.TEXT restores what was passed in, which
+  REM here is "" anyway, so this is belt and braces at the cost of one store.
   IF ED.PROMPT.OK = 0 THEN ED.INPUT$ = ""
   RETURN
 
@@ -1084,9 +960,8 @@ ED.REFRESH.INTRA:
   GOSUB ED.RENDER.STATUS
   RETURN
 
-REM Cheap cursor move (no content change): restore the old caret cell, and if the view
-REM did not scroll just invert the new cell + repaint the status line. Touches ~2 cells
-REM instead of the whole screen. Only an actual scroll falls back to a full repaint.
+REM Cheap cursor move: restore the old caret cell, invert the new one, repaint the status
+REM line -- about 2 cells, not a screen. Only an actual scroll falls back to a full repaint.
 ED.CARET.REFRESH:
   IF ED.QUIET = 1 THEN RETURN
   GOSUB ED.UNCARET
@@ -1107,13 +982,10 @@ ED.ENSURE.VISIBLE:
   IF ED.HSCROLLED = 1 THEN ED.SCROLLED = 1
   RETURN
 
-REM A view change (ED.SCROLLED=1) is served by hardware VERA VSCROLL when it is a single
-REM text-row vertical move with no horizontal scroll: bump L1_VSCROLL by one text row and
-REM repaint only the menu bar (it must stay put on screen while the map slides under it),
-REM the one newly-exposed text row, and the status bar -- 3 rows, not ~28. Everything else
-REM (a multi-line jump from PageUp/Down/GoTo/Find, or any horizontal scroll) is a full
-REM repaint at the current map offset. The newly-exposed row is always the current row in
-REM a cursor-move scroll, so ED.RENDER.ROW streams it live from ED.CUR.LINE$.
+REM A one-row vertical move with no horizontal scroll is served by VERA: bump L1_VSCROLL a
+REM row and repaint the menu bar (it must stay put while the map slides under it), the one
+REM newly-exposed text row, and the status bar -- 3 rows, not ~28. Anything else -- a
+REM multi-line jump, any horizontal scroll -- is a full repaint at the current map offset.
 ED.DO.SCROLL:
   IF ED.HW.OK = 0 THEN GOSUB ED.RENDER.ALL : RETURN
   IF ED.HSCROLLED = 1 THEN GOSUB ED.RENDER.ALL : RETURN
@@ -1162,18 +1034,14 @@ ED.RENDER.ALL:
 
 REM Rows render through ONE inline-assembly block: VERA setup, the cell loop, teardown.
 REM
-REM WHY IT IS ASSEMBLY. The VERA path here was already the fast one and the loop around it
-REM was still the whole cost: two POKEs a cell, each a push-address / push-value / dispatch
-REM / bank-save-restore through the p-code VM -- about 800 cycles a cell against the ~20 the
-REM same compare-load-store takes native. That is the gap this block closes, and it closes
-REM it without leaving BASIC: GP.ASM assembles into the program and costs no runtime bytes.
-REM (The editor is GP-BASIC IN, but not because of this -- see the note at the top of the file.)
+REM WHY ASSEMBLY. The VERA path was already the fast one; the loop around it was the cost --
+REM two POKEs a cell, each a push / dispatch / bank-save-restore through the p-code VM, about
+REM 800 cycles a cell against the ~20 the same compare-load-store takes native.
 REM
-REM THE VERA METHOD IS UNCHANGED -- it was never the problem. FX 32-bit cache write, so one
-REM DATA0 write flushes 4 VRAM bytes = 2 text cells [char,attr,char,attr]. Every cell in a
-REM row carries the same attribute, so it is loaded into the cache's two attr slots ONCE and
-REM the loop writes only the two char slots plus one flush. Address increment is +4 so DATA0
-REM walks two cells per flush, and ED.TEXT.WIDTH is even.
+REM THE VERA METHOD IS UNCHANGED. FX 32-bit cache write: one DATA0 write flushes 4 VRAM
+REM bytes = 2 cells [char,attr,char,attr]. Every cell in a row shares an attribute, so the
+REM two attr slots are loaded ONCE and the loop writes only the two char slots plus a flush.
+REM Increment +4 walks two cells a flush, and ED.TEXT.WIDTH is even.
 REM
 REM FX regs: $9F25 CTRL bits 6:1 = DCSEL; DCSEL 2 -> FX_CTRL $9F29 bit 6 cache-write-enable;
 REM DCSEL 6 -> FX_CACHE L/M/H/U $9F29-2C = [char0, attr0, char1, attr1].
@@ -1271,8 +1139,8 @@ ED.ROW.STREAM:
   #REM 0
   RETURN
 
-REM Caret = one inverted attribute cell. Remember the exact cell so a plain cursor move
-REM can restore it (ED.UNCARET) instead of repainting the whole screen.
+REM Caret = one inverted attribute cell, remembered so a cursor move can restore it
+REM (ED.UNCARET) instead of repainting the screen.
 ED.PLACE.CARET:
   ED.CARET.SROW = ED.CUR.ROW - ED.TOP.LINE + 1
   ED.CARET.SCOL = ED.CUR.COL - ED.LEFT.COL
@@ -1293,18 +1161,15 @@ ED.UNCARET:
 
 REM ---- menu bar (VERA row 0). Attr = bg*16+fg: white-on-blue bar = 97,
 REM ---- yellow accelerator = 103, active title (blue-on-white) = 22. ----
-REM DRAWN BY MENUBAR.INC.BL. What is left here is the two things that are the EDITOR's
-REM and not a menu's: the full width band the titles sit on, and the document name at the
-REM right hand end.
+REM DRAWN BY MENUBAR.INC.BL. What is left here is the two things that belong to the EDITOR
+REM and not to a menu: the full width band, and the document name at the right hand end.
 REM
-REM MENUBAR.Y IS A MAP ROW. GP.FILL and GP.PRINTAT, which MENUBAR reaches through
-REM MENUHELP.ROW, write at map row = whatever Y they are given, and the text layer is
-REM hardware scrolled -- so screen row 0 is map row ED.MAP.TOP. ED.MENU.BAR.ITEMS sets it.
-REM Same correction ED.PUT.FIELD, ED.RENDER.ROW, the caret and the dropdown all make.
+REM MENUBAR.Y IS A MAP ROW, set by ED.MENU.BAR.ITEMS -- the GP commands write at map row =
+REM whatever Y they are given, and the layer is hardware scrolled, so screen row 0 is map
+REM row ED.MAP.TOP. The same correction ED.PUT.FIELD, ED.RENDER.ROW and the caret make.
 REM
-REM MENUBAR.MARK, not a second painting pass: MENUBAR.DRAW lays every title down in the
-REM normal attribute and MARK puts the highlight on MENUBAR.SEL. With no menu open there
-REM is nothing to mark, which is what MENU.ACTIVE < 0 means.
+REM MENUBAR.DRAW lays every title down in the normal attribute and MENUBAR.MARK puts the
+REM highlight on one; with no menu open there is nothing to mark, which is MENU.ACTIVE < 0.
 ED.RENDER.MENUBAR:
   ED.PS.ROW = 0 : ED.PS.COL = 0 : ED.PS.WIDTH = SCREEN.COLS
   ED.PS$ = "" : ED.PS.ATTR = THEME.CLR(THEME.TITLE) : GOSUB ED.PUT.FIELD
@@ -1318,36 +1183,23 @@ ED.RENDER.MENUBAR:
   RETURN
 
 
-REM ED.DRAW.MENU.TITLE has gone the same way as MENU.COL. It painted one title in two
-REM pieces to get the accelerator letter in its own colour, and that is MENUHELP.ROW's
-REM hotkey tint -- MENU.HOT$ names the letters, MENUHELP.HOTATTR is the colour, and the
-REM highlighted title is left alone by the same rule it always was.
+REM The accelerator letter's colour is MENUHELP.ROW's hotkey tint: MENU.HOT$ names the
+REM letters and MENUHELP.HOTATTR is the colour, so no title is painted in two pieces here.
 
 
 
-REM ---- dropdown (VERA rows 1..). normal item = black-on-grey 240,
-REM ---- selected = white-on-blue 97. ----
-REM ED.DRAW.DROPDOWN -- the panel, now with a frame and drawn by the library.
+REM ---- dropdown (VERA rows 1..) ----
+REM MENUHELP.ROW draws one row: GP.FILL for the background, GP.PRINTAT for the text. Both
+REM need the ISO flag ED.INIT sets, or GP.PRINTAT converts ASCII as though it were PETSCII
+REM and every letter comes out case-swapped.
 REM
-REM MENUHELP.ROW draws one row: GP.FILL for the background, GP.PRINTAT for the text.
-REM Both are GP drawing commands, so both need the ISO flag ED.INIT sets -- without it
-REM GP.PRINTAT would convert ASCII text as though it were PETSCII and every letter
-REM would come out in the wrong case.
-REM
-REM THE FRAME IS GP.BOX STYLE 0, and the style is not a free choice. Styles 2 to 4 draw
-REM with line glyphs from screen codes $40-$7F, and that is exactly the run ED.PETFONT
-REM overwrites with ASCII lower case -- a single-line box comes out as "p @ @ ... B".
-REM Style 0 borders with $A0 alone, which sits outside that run and survives untouched.
-REM $A0 is a reverse space, so it paints in the FOREGROUND colour: THEME.TEXT gives a
-REM black edge around the light grey panel.
-REM WHERE IT HANGS FROM IS MENUBAR'S ANSWER NOW. MENUBAR.WHERE walks the item text to
-REM the left of MENUBAR.SEL and leaves the column in MENUBAR.SELX -- the same running sum
-REM the deleted MENU.COL table used to hold. The panel starts one cell IN from the item's
-REM left edge, which is what lines the item text up under the title text: both are a
+REM WHERE IT HANGS FROM IS MENUBAR'S ANSWER: MENUBAR.WHERE walks the item text left of
+REM MENUBAR.SEL and leaves the column in MENUBAR.SELX. The panel starts one cell IN from
+REM the item's left edge, which lines the item text up under the title text -- both are a
 REM leading space wide.
 REM
-REM ED.MENU.BAR.ITEMS first, because MENUBAR.COLUMN measures MENUHELP.ITEM$ and this
-REM routine is about to fill that same array with the dropdown's items.
+REM ED.MENU.BAR.ITEMS first, because MENUBAR.WHERE measures MENUHELP.ITEM$ and this routine
+REM is about to fill that same array with the dropdown's items.
 ED.DRAW.DROPDOWN:
   ED.DD.N = MENU.ITEMS(MENU.ACTIVE)
   GOSUB ED.MENU.BAR.ITEMS
@@ -1357,55 +1209,38 @@ ED.DRAW.DROPDOWN:
 
   ED.DD.BX = ED.DD.COL - 1
   IF ED.DD.BX < 0 THEN ED.DD.BX = 0
-  REM The frame is $A0, a REVERSE space, so only the attribute's LOW nibble shows -- and
-  REM THEME.TEXT's low nibble is the document's own foreground, white. That reads against
-  REM both the light grey panel and the black text area, which is what the two earlier
-  REM tries (PAGE whole, then PAGE's high nibble) each failed to do.
-  REM EVERY Y HERE IS A MAP ROW, NOT A SCREEN ROW, and that is the whole reason this
-  REM looked wrong. The text layer is hardware-scrolled with VERA's L1_VSCROLL, so screen
-  REM row R lives at MAP row R + ED.MAP.TOP -- which is why ED.PUT.FIELD, ED.RENDER.ROW
-  REM and the caret all add it. GP.BOX, GP.FILL and GP.PRINTAT know nothing about the
-  REM editor's scroll: they write at map row = whatever Y they are given. So the offset
-  REM has to be added HERE, or the whole panel is drawn ED.MAP.TOP rows away from the
-  REM menu bar it hangs from -- invisible at the top of the document, and further adrift
-  REM the further down you have scrolled.
+  REM EVERY Y HERE IS A MAP ROW, NOT A SCREEN ROW. The GP commands know nothing about the
+  REM editor's hardware scroll -- they write at map row = whatever Y they are given -- so
+  REM the offset is added here, or the panel lands ED.MAP.TOP rows from the bar it hangs
+  REM from: invisible at the top of the document and further adrift the further you scroll.
   ED.DD.FW = ED.DD.W + 2 : ED.DD.FH = ED.DD.N + 2
   ED.DD.TY = 1 + ED.MAP.TOP : ED.DD.BY = ED.DD.TY + ED.DD.FH - 1
   ED.DD.RX = ED.DD.BX + ED.DD.FW - 1
   ED.DD.FC = THEME.CLR(THEME.TEXT)
-  REM GUI.FRAME, not GP.BOX, and no longer eight GP.FILLs written out here. GP.BOX
-  REM picks its glyphs from a table in the RUNTIME, so it can only ever draw the six
-  REM styles that table holds -- and five of the six are built from screen codes this
-  REM font no longer has. The eight fills that replaced it now live in GUI.INC.BL,
-  REM told the same six glyphs by ED.GUI.SETUP, so the program has ONE frame drawer
-  REM where it had a library's and a copy. ED.DD.RX and ED.DD.BY are computed above
-  REM exactly as GUI.FRAME computes GUI.RIGHT and GUI.BOTTOM, so it is the same rectangle
-  REM either way. Setting GUI.BORDER here does not disturb a later dialog: GUI.OPEN
-  REM settles it again from GUI.BORDER.IN on every call.
+  REM GUI.FRAME, so the dropdown and the dialogs share one frame drawer -- and it is the
+  REM only one that can draw a box here, since GP.BOX's built-in styles are built from
+  REM screen codes this font no longer has. Setting GUI.BORDER does not disturb a later
+  REM dialog: GUI.OPEN settles it from GUI.BORDER.IN on every call.
   GUI.LEFT = ED.DD.BX : GUI.TOP = ED.DD.TY
   GUI.WIDTH = ED.DD.FW  : GUI.HEIGHT = ED.DD.FH
   GUI.BORDER = ED.DD.FC
   GOSUB GUI.FRAME
 
-  REM DRIVEN THE WAY MENUDEMO.EXP.BL DRIVES IT, which is the whole interface and not
-  REM three fields of it. This used to set X, Y and WIDTH only and then hand-roll a loop
-  REM over MENUHELP.ROW -- the module's LOWEST entry point -- leaving COUNT, ATTR and
-  REM HIATTR at zero. MENUHELP.ROW reads MENUHELP.ATTR itself (it is the test that
-  REM decides whether a row gets its hotkey tinted), so a caller that never sets it is
-  REM not calling the routine, it is guessing at it. Set the documented inputs and let
-  REM MENUHELP.DRAW walk the rows, exactly as MENUHELP.RUN does.
+  REM THE WHOLE INTERFACE, the way MENUDEMO.EXP.BL drives it -- not three fields and a
+  REM hand-rolled loop over MENUHELP.ROW. ROW reads MENUHELP.ATTR itself, so a caller that
+  REM leaves COUNT, ATTR and HIATTR at zero is guessing at the routine rather than calling
+  REM it. Set the documented inputs and let MENUHELP.DRAW walk the rows.
   MENUHELP.X = ED.DD.COL
   MENUHELP.Y = 2 + ED.MAP.TOP : REM a map row, as above
   MENUHELP.WIDTH = ED.DD.W : MENUHELP.COUNT = ED.DD.N
-  REM The panel is the DOCUMENT's own attribute, not a page colour of its own: white on
-  REM black, the same as the text behind it, so the dropdown reads as a framed hole in the
-  REM document rather than a grey card laid on top. The frame is that attribute too, and
-  REM only the selected row breaks it -- which is the whole point of a highlight bar.
+  REM The DOCUMENT's own attribute, not a page colour of its own, so the panel reads as a
+  REM framed hole in the document rather than a card laid on it. Only the selected row
+  REM breaks it, which is the point of a highlight bar.
   MENUHELP.ATTR    = THEME.CLR(THEME.TEXT)
   MENUHELP.HIATTR  = THEME.CLR(THEME.TITLE)
   MENUHELP.HOTATTR = 0 : REM no hotkey tint: ALT+letter opens a MENU, not an item
-  REM MENUHELP.ITEM$ is 1 based and MENU.SEL is 0 based, because the menu bar indexes
-  REM its flat MENU.ITEM$ table from 0. Convert once, here, rather than at each use.
+  REM MENUHELP.ITEM$ is 1 based, MENU.SEL 0 based off the flat MENU.ITEM$ table. Converted
+  REM once here rather than at each use.
   FOR ED.DD.I = 1 TO ED.DD.N
     MENUHELP.ITEM$(ED.DD.I) = " " + MENU.ITEM$(MENU.ACTIVE * 8 + ED.DD.I - 1)
   NEXT ED.DD.I
@@ -1424,19 +1259,16 @@ ED.RENDER.STATUS:
   ED.PS$ = ED.BAR$ : ED.PS.ATTR = THEME.CLR(THEME.TITLE) : GOSUB ED.PUT.FIELD
   RETURN
 
-REM ---- write ED.PS$ into the VERA text map at 0-based (ED.PS.ROW, ED.PS.COL),
-REM attribute byte ED.PS.ATTR (= bg*16 + fg), padding with spaces out to ED.PS.WIDTH
-REM cells and truncating past it. No KERNAL PRINT, no O(n^2) padding.
+REM ---- write ED.PS$ into the VERA text map at 0-based (ED.PS.ROW, ED.PS.COL), attribute
+REM ED.PS.ATTR, padded with spaces to ED.PS.WIDTH and truncated past it ----
 REM
-REM VERA AUTO-INCREMENT: the start address and a "+1" step are programmed ONCE, then
-REM char,attr,char,attr,... stream to DATA0 ($9F23). Within a cell the char and attr
-REM bytes are adjacent and consecutive cells follow, so +1 walks the whole field -- no
-REM per-cell address arithmetic and no re-programming the address 160 times a row.
+REM VERA AUTO-INCREMENT: the address and a +1 step are programmed ONCE, then
+REM char,attr,char,attr streams to DATA0. Char and attr are adjacent and cells follow each
+REM other, so +1 walks the whole field with no per-cell address arithmetic.
 REM
-REM Assembly for the same reason ED.RENDER.ROW is: this draws all the chrome, and it
-REM runs on every keystroke (the status line) and every menu move. A width below 1
-REM writes nothing, which is what the FOR loop it replaced did -- the block's test is
-REM at the BOTTOM, so without the guard a width of 0 would write one cell.
+REM Assembly for ED.RENDER.ROW's reason: this draws all the chrome, on every keystroke.
+REM The width guard matters because the block's test is at the BOTTOM -- without it a
+REM width of 0 would write one cell, where the FOR loop it replaced wrote none.
 ED.PUT.FIELD:
   IF ED.PS.WIDTH < 1 THEN RETURN
   ED.ASM.BASE% = 45056 + (ED.PS.ROW + ED.MAP.TOP) * 256 + ED.PS.COL * 2
@@ -1531,9 +1363,9 @@ ED.SELFCHECK:
   REM ---- verify chrome (char+attr) + text render + the O(1) caret ----
   ED.QUIET = 0
   PRINT "DIM ";SCREEN.COLS;"x";SCREEN.ROWS
-  REM ---- what ED.ALTKEYS actually found in the layout. ALT+letter is the one path no
-  REM ---- headless test can PRESS, but everything it depends on is readable right here:
-  REM ---- which tables exist, which two were picked, and how many keys got rewritten.
+  REM ---- what ED.ALTKEYS found. ALT+letter is the one path no headless test can PRESS,
+  REM ---- but everything it depends on is readable: which tables exist, which two were
+  REM ---- picked, and how many keys got rewritten.
   PRINT "ALTKEYS N=";ED.NALT;" PLAIN=";ED.TPLAIN;" ALT=";ED.TALT
   ED.IDS$ = ""
   BANK 0
@@ -1545,14 +1377,12 @@ ED.SELFCHECK:
   PRINT "MB CH=";VPEEK(1, 45058);" AT=";VPEEK(1, 45059)
   MENU.ACTIVE = 0 : MENU.SEL = 0 : GOSUB ED.DRAW.DROPDOWN
   PRINT "DD CH=";VPEEK(1, 45572);" AT=";VPEEK(1, 45573) : REM row 2 now: the frame took row 1
-  REM DROPDOWN GEOMETRY, and ONE SAMPLED CELL IS NOT A TEST OF IT. The panel shipped with
-  REM the wrong HEIGHT and rows missing, and the line above was green throughout, because
-  REM the one cell it looks at happened to be right. Walk the whole panel instead: the
-  REM frame row, every item row, and the frame row under them, reading the first LETTER of
-  REM each item. File is New Open Save "Save As" Exit, so column ED.DD.COL + 1 -- the item
-  REM text starts a cell left of it, at MENUHELP.X, because every item is " "+name -- down rows
-  REM 1..7 must read 192 78 79 83 83 69 192 -- the horizontal, N O S S E, horizontal. A short
-  REM panel, a skipped row or a frame in the wrong place all move at least one of those.
+  REM DROPDOWN GEOMETRY, and ONE SAMPLED CELL IS NOT A TEST OF IT: the panel once shipped
+  REM with the wrong height and rows missing while the line above stayed green, because the
+  REM cell it looks at happened to be right. So walk the whole panel -- frame row, every
+  REM item row, frame row -- reading each item's first LETTER at column ED.DD.COL + 1.
+  REM File is New Open Save "Save As" Exit, so rows 1..7 must read 192 78 79 83 83 69 192.
+  REM A short panel, a skipped row or a misplaced frame moves at least one of those.
   ED.DDS$ = ""
   FOR ED.QR = 1 TO MENU.ITEMS(0) + 2
     ED.DDS$ = ED.DDS$ + STR$(VPEEK(1, 45056 + ED.QR * 256 + (ED.DD.COL + 1) * 2))
@@ -1561,8 +1391,8 @@ ED.SELFCHECK:
   ED.MSG$ = "HELLO" : GOSUB ED.INFO.MSG
   ED.SR = SCREEN.ROWS - 1
   PRINT "MSG CH=";VPEEK(1, 45056 + ED.SR * 256 + 2);" AT=";VPEEK(1, 45056 + ED.SR * 256 + 3)
-  REM REAL repaint path: open a file (full RENDER.ALL), drop the caret, sample clean cells.
-  REM Every text cell must be char + ED.ATTR.TEXT(1) -- content rows AND blank rows.
+  REM REAL repaint path: open a file, drop the caret, sample clean cells. Every text cell
+  REM must be char + ED.ATTR.TEXT(1), on content rows and blank rows alike.
   DOC.FILE.NAME$ = "TEST.MD" : GOSUB ED.OPEN.FILE
   GOSUB ED.UNCARET
   PRINT "TR CH=";VPEEK(1, 45312);" AT=";VPEEK(1, 45313)
@@ -1616,9 +1446,8 @@ ED.SELFCHECK:
   ED.QUIET = 1 : MENU.ACTIVE = 0 - 1
 
   REM ---- key dispatch: drive the REAL GP.SELECT table with real key codes ----
-  REM ED.QUIET is already 1, so the model runs and the render does not -- the render
-  REM is verified above. 27 (menu) and 137 (save) are left out on purpose: one blocks
-  REM on GET and the other writes a file.
+  REM ED.QUIET is 1, so the model runs and the render does not -- the render is checked
+  REM above. 27 and 137 are left out: one blocks on GET, the other writes a file.
   ED.CUR.ROW = 10 : ED.CUR.COL = 0 : ED.TOP.LINE = 0 : ED.LEFT.COL = 0
   GOSUB ED.LOAD.LIVE
   ED.KEY = 17 : GOSUB ED.DISPATCH.KEY
@@ -1643,28 +1472,23 @@ ED.SELFCHECK:
   ED.KEY = 1 : GOSUB ED.DISPATCH.KEY
   PRINT "KEY UNBOUND ROW=";ED.CUR.ROW;" COL=";ED.CUR.COL;" LINE=";ED.CUR.LINE$
 
-  REM 400 selects back to back. GP.ENDSEL is what releases the selector's frame, so
-  REM a case that jumped out instead of falling through would leak one per pass and
-  REM this is where it would show -- the frame stack is finite.
+  REM 400 selects back to back: GP.ENDSEL releases the selector's frame, so a case that
+  REM jumped out instead of falling through would leak one a pass and show up here.
   FOR ED.T = 1 TO 200
     ED.KEY = 17 : GOSUB ED.DISPATCH.KEY
     ED.KEY = 145 : GOSUB ED.DISPATCH.KEY
   NEXT ED.T
   PRINT "KEY 400 SELECTS ROW=";ED.CUR.ROW;" COL=";ED.CUR.COL
 
-  REM ---- the MENU's loop, 600 opens. The 400 above exercise ED.DISPATCH.KEY; this is
-  REM ---- the other one, and since the dropdown's loop moved into the library it is
-  REM ---- MENUHELP.RUN's select being driven 600 times -- through ED.MENU.OPEN, which
-  REM ---- re-enters it once per keystroke it hands back rather than once per open.
-  REM ---- 600 is chosen against the 4 KB stack: a leaked GOSUB and GP.DO is 17 bytes and
-  REM ---- would blow it after ~240. So a leak here CANNOT reach the PRINT below, which
-  REM ---- is the point of the count -- what leaks is invisible on screen.
+  REM ---- the MENU's loop, 600 opens: MENUHELP.RUN's select driven through ED.MENU.OPEN,
+  REM ---- which re-enters it once per keystroke handed back rather than once per open.
+  REM ---- 600 is chosen against the 4 KB stack -- a leaked GOSUB and GP.DO is 17 bytes and
+  REM ---- would blow it after ~240, so a leak CANNOT reach the PRINT below. That is the
+  REM ---- point of the count: what leaks is invisible on screen.
   REM ----
-  REM ---- The keys go in through the KERNAL's kbdbuf_put, because ED.OPEN.MENUBAR waits
-  REM ---- on GET and nothing headless can satisfy that otherwise -- the same harness
-  REM ---- MENUTST.EXP.BL uses to drive MENUHELP. 27 cancels; 13 chooses, and MENU.ACTIVE
-  REM ---- 2 is Help, whose one item is About, so the choosing path runs a real
-  REM ---- ED.MENU.DISPATCH without going near a file.
+  REM ---- Keys go in through kbdbuf_put, because ED.OPEN.MENUBAR waits on GET. 27 cancels;
+  REM ---- 13 chooses, and MENU.ACTIVE 2 is Help, whose one item is About -- so the choosing
+  REM ---- path runs a real ED.MENU.DISPATCH without going near a file.
   ED.QUIET = 1
   FOR ED.QI = 1 TO 600
     MENU.ACTIVE = 2 : MENU.SEL = 0
@@ -1675,11 +1499,9 @@ ED.SELFCHECK:
   NEXT ED.QI
   PRINT "MENU 600 OPENS MSG=";ED.LAST.MSG$
 
-  REM ---- a LETTER opens its menu. ALT+letter cannot do this any more (ISO mode sends
-  REM ---- ISO-8859-15, not the PETSCII Commodore codes ED.KEY.RANGE tests for), so this
-  REM ---- is the only way in and it needs a test. Open on File, press H, press RETURN:
-  REM ---- the letter must have moved the bar to Help, so MENU.CHOICE.MENU is 2. Without
-  REM ---- it the H is swallowed and RETURN chooses File's first item, and this reads 0.
+  REM ---- a LETTER opens its menu, and since ISO mode killed ALT+letter it is the only way
+  REM ---- in. Open on File, press H, press RETURN: MENU.CHOICE.MENU must be 2. If the H is
+  REM ---- swallowed, RETURN chooses File's first item and this reads 0.
   ED.DOC.DIRTY = 0 : MENU.ACTIVE = 0 : MENU.SEL = 0
   ED.QK = 72 : POKE 1, 0 : GP.CALL ED.KBDBUF, ED.QK : POKE 1, 4
   ED.QK = 13 : POKE 1, 0 : GP.CALL ED.KBDBUF, ED.QK : POKE 1, 4
@@ -1689,23 +1511,20 @@ ED.SELFCHECK:
   REM ============================================================================
   REM ---- GUI.INC.BL, driven for real ----
   REM
-  REM Nothing above this line touches a dialog: ED.PROMPT and ED.PROMPT.YN both
-  REM short-circuit on ED.SIM.MODE, which is exactly what makes the rest of the
-  REM self-check fast and exactly what makes it blind to the library. So SIM goes
-  REM OFF here and the keys go in through kbdbuf_put, the same way the 600 menu
-  REM opens above are driven. These are the four things that could be wrong, and
-  REM none of them shows up as a compile error:
+  REM Nothing above this line touches a dialog -- ED.PROMPT and ED.PROMPT.YN short-circuit
+  REM on ED.SIM.MODE, which is what makes the rest fast and what makes it blind to the
+  REM library. So SIM goes OFF and the keys go in through kbdbuf_put. Four things could be
+  REM wrong here and none of them is a compile error:
   REM
-  REM   the frame drawn from GP.BOX's table instead of ours -- a box of letters;
-  REM   the box centred on the SCREEN while we draw on a SCROLLED map -- a box
-  REM     somewhere else entirely, and correct-looking in a screenshot at rest;
+  REM   the frame drawn from GP.BOX's own table -- a box of letters;
+  REM   the box centred on the SCREEN while we draw on a SCROLLED map -- and it still looks
+  REM     right in a screenshot at rest;
   REM   the covered cells not put back -- a hole in the document;
   REM   the caret not moving -- typing that lands in the wrong order.
   ED.QUIET = 1 : ED.SIM.MODE = 0
-  REM LONG lines, deliberately. The centred box lands around column 32, and the
-  REM "L0".."L39" the tests above use are three characters wide -- so the rectangle it
-  REM covers is blank document, and a restore that did nothing whatever would score an
-  REM identical sum. Fill the width and the check has something to fail on.
+  REM LONG lines, deliberately: the centred box lands around column 32, and the "L0".."L39"
+  REM used above are three characters wide -- so it would cover blank document and a
+  REM restore that did nothing would score the same sum. Fill the width instead.
   GOSUB DOC.INIT
   FOR ED.T = 0 TO 39
     LINE.TEXT$ = MID$(STR$(ED.T), 2) + " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -1716,17 +1535,14 @@ ED.SELFCHECK:
   ED.QUIET = 0 : GOSUB ED.LOAD.LIVE : GOSUB ED.RENDER.ALL
 
   REM ---- the frame. Open a box by hand, read its corner and its edges, close it.
-  REM ---- ED.PETFONT parked the six line glyphs at $C0-$C5 = 192..197, and GP.FILL
-  REM ---- adds $40 to what it is given, so ED.GL.H(128) must show as tile 192,
-  REM ---- ED.GL.V(129) as 193 and ED.GL.TL(130) as 194. Anything in the 64..125
-  REM ---- range means GP.BOX drew it, and GP.BOX's glyphs are letters here.
-  REM ---- READ THE MAP BEFORE PRINTING ANYTHING. PRINT goes through the KERNAL,
-  REM ---- which SCROLLS the text map -- the same map every GP drawing command and
-  REM ---- every VPEEK below addresses. A PRINT between the draw and the read moves
-  REM ---- the picture out from under the read, and the first version of this test
-  REM ---- did exactly that: adding one more PRINT line shifted the answer by one
-  REM ---- row, which is how it was caught. So: repaint, draw, read into strings,
-  REM ---- close, and only then say anything.
+  REM ---- ED.PETFONT parked the six line glyphs at 192..197, which is what ED.GL.x now
+  REM ---- names, so those are the tiles that must come back. Anything in 64..125 means
+  REM ---- GP.BOX drew one of its built-in styles, and those glyphs are letters here.
+  REM ----
+  REM ---- READ THE MAP BEFORE PRINTING ANYTHING: PRINT goes through the KERNAL, which
+  REM ---- SCROLLS the same map every VPEEK below addresses. The first version of this test
+  REM ---- printed between the draw and the read, and one extra PRINT line shifted the
+  REM ---- answer by a row. So repaint, draw, read into strings, close, then speak.
   GOSUB ED.RENDER.ALL
   GOSUB ED.GUI.WHERE
   GUI.TITLE$ = "" : GUI.MSG$ = "FRAME" : GUI.MSG2$ = ""
@@ -1747,21 +1563,20 @@ ED.SELFCHECK:
   PRINT "GUI LEFTCOL";ED.DDS2$
   PRINT "GUI LEFTWANT 194 193 x5 196"
 
-  REM ---- the restore. Sum the char codes over the whole rectangle the box covers,
-  REM ---- open and close a second box of the same size, and sum again. ONE SAMPLED
-  REM ---- CELL IS NOT A TEST OF A PANEL -- that lesson cost a shipped dropdown with
-  REM ---- rows missing -- so this walks every cell the dialog could have eaten. The
-  REM ---- repaint first is what makes it mean anything: on a screen the PRINTs above
-  REM ---- have scrolled to blank, "before" and "after" are equal whatever happens.
+  REM ---- the restore. Sum the chars over the whole rectangle, open and close a second box
+  REM ---- of the same size, sum again -- every cell the dialog could have eaten, because
+  REM ---- one sampled cell is not a test of a panel. The repaint first is what makes it
+  REM ---- mean anything: on a screen the PRINTs above have scrolled to blank, before and
+  REM ---- after are equal whatever happens.
   GOSUB ED.RENDER.ALL
   GOSUB ED.GUI.SUM : ED.GWAS = ED.GSUM
   GOSUB GUI.OPEN : GOSUB GUI.CLOSE
   GOSUB ED.GUI.SUM : ED.GNOW = ED.GSUM
   PRINT "GUI RESTORE WAS=";ED.GWAS;" NOW=";ED.GNOW;" (want equal, and not 3584)"
 
-  REM ---- the scrolled map. VSCROLL down four rows and the box must follow it: same
-  REM ---- centred row, plus ED.MAP.TOP. Without GUI.ROW.OFFSET this comes back unchanged
-  REM ---- and the dialog is drawn four rows off the top of what the user can see.
+  REM ---- the scrolled map. VSCROLL down four rows and the box must follow: the same
+  REM ---- centred row plus ED.MAP.TOP. Without GUI.ROW.OFFSET it comes back unchanged, and
+  REM ---- the dialog is four rows off the top of what the user can see.
   ED.GBY = GUI.TOP
   ED.MAP.TOP = 4 : GOSUB ED.SET.VSCROLL : GOSUB ED.RENDER.ALL
   GOSUB ED.GUI.WHERE
@@ -1769,8 +1584,7 @@ ED.SELFCHECK:
   PRINT "GUI SCROLLED Y=";GUI.TOP;" WAS=";ED.GBY;" MAPTOP=";ED.MAP.TOP;" (want WAS+4)"
   ED.MAP.TOP = 0 : GOSUB ED.SET.VSCROLL : GOSUB ED.RENDER.ALL
 
-  REM ---- GUI.YN, answered with a keystroke, through the editor's own wrapper. The
-  REM ---- wrapper is what every call site uses, so testing it tests them all.
+  REM ---- GUI.YN through the editor's own wrapper, which is what every call site uses.
   ED.PROMPT.MSG$ = "Discard changes?"
   ED.QK = 89 : GOSUB ED.PUSHKEY
   GOSUB ED.PROMPT.YN
@@ -1779,10 +1593,8 @@ ED.SELFCHECK:
   GOSUB ED.PROMPT.YN
   PRINT "GUI YN ESC ->";ED.YN;" (want 0)"
 
-  REM ---- GUI.TEXT, and with it the caret. Type A B C, press LEFT, type X: the X
-  REM ---- lands BETWEEN B and C, which the old append-only field could not do. If
-  REM ---- the arrow were still being swallowed this would read ABCX, and if it were
-  REM ---- leaving the field it would read ABC with OK=0.
+  REM ---- GUI.TEXT, and with it the caret. Type A B C, LEFT, X: the X must land BETWEEN B
+  REM ---- and C. A swallowed arrow reads ABCX; one that left the field reads ABC, OK=0.
   ED.PROMPT.MSG$ = "Open file: "
   ED.QK = 65 : GOSUB ED.PUSHKEY
   ED.QK = 66 : GOSUB ED.PUSHKEY
@@ -1799,8 +1611,7 @@ ED.SELFCHECK:
   GOSUB ED.PROMPT
   PRINT "GUI TEXT ESC ->";ED.INPUT$;"/ OK=";ED.PROMPT.OK;" (want / 0)"
 
-  REM ---- GUI.MENU, over the SAME MENUHELP.ITEM$ the menu bar uses. Start on row 1,
-  REM ---- press down, press RETURN: row 2, key 13.
+  REM ---- GUI.MENU, over the same MENUHELP.ITEM$ the bar uses. Row 1, down, RETURN: 2, 13.
   MENUHELP.ITEM$(1) = " ONE" : MENUHELP.ITEM$(2) = " TWO"
   GUI.COUNT = 2 : GUI.SEL = 1 : GUI.FLAGS = 0
   GUI.TITLE$ = "PICK" : GUI.MSG$ = "" : GUI.MSG2$ = ""
@@ -1815,17 +1626,14 @@ ED.SELFCHECK:
   RETURN
 
 REM ---- one key into the KERNAL's buffer, so a GET loop can be driven headlessly ----
-REM POKE 1 is the ROM/RAM bank byte: 0 pages the KERNAL in for the JSR and 4 puts BASIC
-REM back. The same three statements appear inline above; they became a routine when the
-REM GUI checks needed six keys in a row.
+REM POKE 1 is the ROM/RAM bank byte: 0 pages the KERNAL in for the JSR, 4 puts BASIC back.
 ED.PUSHKEY:
   POKE 1, 0 : GP.CALL ED.KBDBUF, ED.QK : POKE 1, 4
   RETURN
 
 REM ---- add up every character cell the dialog box covers ----
-REM Chars only, not attributes: a restore that put the text back in the wrong colour
-REM would be a different bug and is not what this is watching for. GUI.LEFT/BY/W/H are
-REM whatever the last GUI.OPEN worked out, which is the rectangle in question.
+REM Chars only: a restore that put the text back in the wrong colour is a different bug.
+REM The rectangle is whatever the last GUI.OPEN worked out.
 ED.GUI.SUM:
   ED.GSUM = 0
   FOR ED.GR = 0 TO GUI.HEIGHT - 1
