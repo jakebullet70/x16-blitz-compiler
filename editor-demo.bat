@@ -15,13 +15,16 @@ rem  on screen to move around in. NOTE THAT SAVES LAND IN samples\editor -- the
 rem  editor's drive is that directory, so File>Save overwrites the real TEST.MD.
 rem  git restore samples/editor/TEST.MD puts it back.
 rem
-rem  Source: samples\editor\EDITOR.BASL + STORE.BASL, on GPB, THEME, APPHELP
-rem  and MENUHELP from GPC-BASIC\.
+rem  Source: samples\editor\EDITOR.BASL + STORE.BASL, on GPB, THEME, APPHELP,
+rem  STASH, MENUHELP, MENUBAR, INPHELP and GUI -- all shipped in
+rem  samples\editor\GPC-BASIC\ beside the sample, so a rebuild needs nothing
+rem  from GPC-BASIC\. MENUBAR draws and measures the bar; MENUHELP drives the
+rem  dropdown; STASH is what GUI.OPEN saves the covered cells with.
 rem
 rem  C.EDITOR.PRG is the COMPILED object and is checked in beside the source.
 rem  To rebuild it:
-rem    1. copy GPB.INC.BL, THEME.INC.BL, APPHELP.INC.BL and MENUHELP.INC.BL
-rem       from GPC-BASIC\ in beside EDITOR.BASL
+rem    1. copy the .INC.BL files up out of samples\editor\GPC-BASIC\
+rem       so they sit beside EDITOR.BASL (all eight of them)
 rem    2. python source\gpc\build_basl.py EDITOR.BASL EDITOR.PRG
 rem    3. compile EDITOR.PRG with GPC.BIN, and keep the object as C.EDITOR.PRG
 rem ---------------------------------------------------------------------------

@@ -730,8 +730,9 @@ REM MENU.ACTIVE * 8 + MENU.SEL. MENUBAR.SEL and MENUHELP.SEL are 1 based. Conver
 REM boundary, in both directions, and nowhere else.
 ED.OPEN.MENUBAR:
   MENU.SEL = 0
+  GOSUB ED.RENDER.MENUBAR
 ED.MENU.OPEN:
-  GOSUB ED.RENDER.MENUBAR : GOSUB ED.DRAW.DROPDOWN
+  GOSUB ED.DRAW.DROPDOWN
   MENUHELP.SEL = MENU.SEL + 1
   MENUHELP.FLAGS = MENUHELP.KEYEXIT
   REM No hotkeys ON THE ITEMS: a letter here means a MENU, and it is handed back below.
@@ -741,6 +742,10 @@ ED.MENU.OPEN:
   IF MENUHELP.SEL = 0 THEN GOSUB ED.MENU.CANCEL : RETURN
   MENU.SEL = MENUHELP.SEL - 1
   IF MENUHELP.KEY = 13 THEN GOSUB ED.MENU.SELECT : RETURN
+  REM ED.RENDER.MENUBAR IS NOT IN THIS LOOP, and that is the point. It lays a band across
+  REM the whole row, draws every title and re-prints the document name -- eighty cells to
+  REM move a highlight two. The movers below repaint the TWO titles that changed instead,
+  REM which is what MENUBAR.RUN's own MENUBAR.SETTLE does when it is driving the bar.
   IF MENUHELP.KEY = 157 THEN GOSUB ED.MENU.LEFT : GOTO ED.MENU.OPEN
   IF MENUHELP.KEY = 29 THEN GOSUB ED.MENU.RIGHT : GOTO ED.MENU.OPEN
   ED.KEY = MENUHELP.KEY : GOSUB ED.MENU.LETTER
@@ -761,9 +766,19 @@ REM there, which is what "ignored" should look like.
 ED.MENU.LETTER:
   ED.ML.CH = ED.KEY
   IF ED.ML.CH >= 97 AND ED.ML.CH <= 122 THEN ED.ML.CH = ED.ML.CH - 32
+  ED.ML.HIT = 0 - 1
   FOR MENU.I = 0 TO MENU.COUNT - 1
-    IF ASC(LEFT$(MENU.NAME$(MENU.I), 1)) = ED.ML.CH THEN MENU.ACTIVE = MENU.I : MENU.SEL = 0 : GOSUB ED.RENDER.ALL
+    IF ASC(LEFT$(MENU.NAME$(MENU.I), 1)) = ED.ML.CH THEN ED.ML.HIT = MENU.I
   NEXT MENU.I
+  REM Nothing to do is the common case -- every key that is not an arrow or RETURN arrives
+  REM here -- so it must not repaint. It used to move the menu INSIDE the search loop,
+  REM which meant a full screen redraw per matching letter and none of the erase below.
+  IF ED.ML.HIT < 0 THEN RETURN
+  IF ED.ML.HIT = MENU.ACTIVE THEN RETURN
+  GOSUB ED.ERASE.DROPDOWN
+  ED.MENU.WAS = MENU.ACTIVE
+  MENU.ACTIVE = ED.ML.HIT : MENU.SEL = 0
+  GOSUB ED.MENU.BAR.MOVE
   RETURN
 
 ED.MENU.SELECT:
@@ -783,18 +798,52 @@ REM outside. Only the two that cross the panel's axis are left, and they exist b
 REM MENUHELP hands those keys back rather than guessing what a bar wants.
 REM
 REM ED.RENDER.ALL erases the panel that is about to move; ED.MENU.OPEN draws the new one.
+REM ERASE BEFORE MOVING. ED.ERASE.DROPDOWN works from the ED.DD.* geometry the LAST
+REM ED.DRAW.DROPDOWN left behind, which is the panel actually on screen -- so it has to run
+REM while MENU.ACTIVE still names that panel.
 ED.MENU.LEFT:
+  GOSUB ED.ERASE.DROPDOWN
+  ED.MENU.WAS = MENU.ACTIVE
   MENU.ACTIVE = MENU.ACTIVE - 1
   IF MENU.ACTIVE < 0 THEN MENU.ACTIVE = MENU.COUNT - 1
   MENU.SEL = 0
-  GOSUB ED.RENDER.ALL
+  GOSUB ED.MENU.BAR.MOVE
   RETURN
 
 ED.MENU.RIGHT:
+  GOSUB ED.ERASE.DROPDOWN
+  ED.MENU.WAS = MENU.ACTIVE
   MENU.ACTIVE = MENU.ACTIVE + 1
   IF MENU.ACTIVE >= MENU.COUNT THEN MENU.ACTIVE = 0
   MENU.SEL = 0
-  GOSUB ED.RENDER.ALL
+  GOSUB ED.MENU.BAR.MOVE
+  RETURN
+
+REM ---- the two titles that changed, and nothing else ----
+REM
+REM ED.MENU.BAR.ITEMS first because ED.DRAW.DROPDOWN has since pointed MENUHELP.X, .Y,
+REM .WIDTH, .ATTR and .HIATTR at the PANEL. MENUBAR.ITEM and MENUBAR.MARK both reach
+REM MENUHELP.ROW through those, so drawing a title with the panel's numbers still loaded
+REM would paint it at the panel's column, in the panel's colours.
+ED.MENU.BAR.MOVE:
+  GOSUB ED.MENU.BAR.ITEMS
+  MENUBAR.DRAWN = ED.MENU.WAS + 1 : MENUBAR.PAINT = MENUHELP.ATTR : GOSUB MENUBAR.ITEM
+  MENUBAR.SEL = MENU.ACTIVE + 1 : GOSUB MENUBAR.MARK
+  RETURN
+
+REM ---- put the document back where the panel was, and no further ----
+REM
+REM ED.RENDER.ALL was doing this: every text row, the status bar, the caret AND the whole
+REM menu bar, to take down a seven row panel. The panel starts at screen row 1 and is
+REM ED.DD.FH rows tall, so those are the only rows that can be dirty.
+ED.ERASE.DROPDOWN:
+  ED.DDE.LAST = ED.DD.FH
+  IF ED.DDE.LAST > ED.TEXT.BOTTOM THEN ED.DDE.LAST = ED.TEXT.BOTTOM
+  IF ED.DDE.LAST < 1 THEN RETURN
+  FOR ED.SCREEN.ROW = 1 TO ED.DDE.LAST
+    ED.DOC.LINE = ED.TOP.LINE + ED.SCREEN.ROW - 1
+    GOSUB ED.RENDER.ROW
+  NEXT ED.SCREEN.ROW
   RETURN
 
 ED.MENU.DISPATCH:
