@@ -22,10 +22,20 @@
 #DEFINE ED.GL.TR 131
 #DEFINE ED.GL.BL 132
 #DEFINE ED.GL.BR 133
+
+## The RAM bank GUI.INC.BL saves a dialog's cells into. It is NOT a spare
+## one lying around -- the document store owns every bank from 1 upward --
+## so STORE.BASL now starts its content arena at 5 and this is the bank it
+## gave up. 8K holds 4094 cells and the largest dialog here is well under
+## 40x10, so one bank is one dialog with room to spare.
+#DEFINE ED.GUI.BANK 4
+
 #INCLUDE "GPB.INC.BL"
 #INCLUDE "THEME.INC.BL"
 #INCLUDE "APPHELP.INC.BL"
 #INCLUDE "MENUHELP.INC.BL"
+#INCLUDE "INPHELP.INC.BL"
+#INCLUDE "GUI.INC.BL"
 
 REM ============================================================================
 REM EDITOR.BASL -- GPC EDIT, an MS-DOS-EDIT-styled text / Markdown editor for the
@@ -178,6 +188,56 @@ REM $40, and $7B-$7F before $5B-$5F. Nothing forms a CYCLE -- screen $01-$1A and
 REM are only ever sources, never destinations -- so unlike a PETSCII-ordered permutation
 REM this needs no staging buffer at all.
 REM ============================================================================
+REM ============================================================================
+REM GUI.INC.BL SETUP
+REM ============================================================================
+REM Done ONCE, and it is four facts about this program that the library cannot
+REM work out for itself.
+REM
+REM GUI.GLYPH IS THE WHOLE REASON THE DIALOGS WORK HERE. GP.BOX takes its border
+REM glyphs from a table in the RUNTIME, at the screen codes the stock charset puts
+REM them at -- and ED.PETFONT has just moved every one of them. Style 2 would draw
+REM "p @ B", the same way it did in the dropdown before that was rewritten as eight
+REM GP.FILLs. GUI.FRAME is those eight fills, in the library, and this is where it
+REM is told which glyphs to use: the six ED.PETFONT rescued into $C0-$C5, named as
+REM GP.FILL arguments (ED.GL.x, i.e. tile - $40 -- see the note at the top).
+REM
+REM MUST RUN AFTER ED.PETFONT. Before it, ED.GL.x names glyphs that are not there
+REM yet; the values would be the same and the frame would be garbage.
+ED.GUI.SETUP:
+  GUI.BANK = ED.GUI.BANK
+  GUI.ROW.OFFSET = 0
+
+  REM THE COLOURS, because this program's theme roles do not mean what the library
+  REM assumes. GUI paints its panel with THEME.TEXT and its frame with THEME.BORDER,
+  REM which is right for a program using the roles as named. ED.THEME re-points them:
+  REM BORDER is the hotkey letter (yellow on blue) and PAGE is a light grey it says
+  REM itself it never uses. Left alone, a dialog came up as a grey slab with a blue
+  REM edge in the middle of a black editor. Both go to THEME.TEXT -- the document's
+  REM own white on black, and the same attribute ED.DRAW.DROPDOWN frames with, so a
+  REM dialog and a dropdown are visibly the same program.
+  GUI.PANEL.IN = THEME.CLR(THEME.TEXT)
+  GUI.BORDER.IN = THEME.CLR(THEME.TEXT)
+
+  GUI.GLYPH = 1
+  GUI.EDGE.H    = ED.GL.H  : GUI.EDGE.V    = ED.GL.V
+  GUI.CORNER.TL = ED.GL.TL : GUI.CORNER.TR = ED.GL.TR
+  GUI.CORNER.BL = ED.GL.BL : GUI.CORNER.BR = ED.GL.BR
+  RETURN
+
+REM Where a dialog goes, asked FRESH at every call, because the answer moves.
+REM
+REM The document is scrolled by VERA, not by repainting: ED.DO.SCROLL bumps
+REM L1_VSCROLL and ED.MAP.TOP is the map row now showing as screen row 0. Every
+REM GP drawing command in this program addresses the MAP -- that is why the
+REM dropdown draws at "2 + ED.MAP.TOP" -- and GUI.INC.BL centres against the
+REM SCREEN, which is the right thing for a program that does not scroll. One
+REM number reconciles them, and it is only right for as long as the view stays
+REM put, so it is set here rather than in ED.GUI.SETUP.
+ED.GUI.WHERE:
+  GUI.ROW.OFFSET = ED.MAP.TOP
+  RETURN
+
 ED.PETFONT:
   ED.FONT = 61440 : REM $1:F000, the KERNAL's 2 KB charset (VERA bank 1)
   REM ---- THE SINGLE-LINE BOX, RESCUED BEFORE THE RE-ORDER RUNS OVER IT ----
@@ -293,6 +353,7 @@ ED.INIT:
   REM   GP.PRINTAT skips its PETSCII-to-screen step, which is what lets the GP drawing
   REM   commands -- and MENUHELP, which is built on them -- work at all here.
   POKE 882, PEEK(882) OR 64
+  GOSUB ED.GUI.SETUP : REM ...and tell GUI.INC.BL where the frame glyphs ended up
   REM The SAME entry point again, but with CARRY SET, which makes screen_mode REPORT
   REM instead of set: mode in A, columns in X, rows in Y. That replaces $FFED entirely,
   REM so the whole routine now speaks to one KERNAL address rather than three. It has to
@@ -749,7 +810,7 @@ ED.CMD.SAVEAS:
 
 ED.CMD.EXIT:
   IF ED.DOC.DIRTY = 0 THEN GOTO ED.CMD.EXIT.GO
-  ED.PROMPT.MSG$ = "Discard changes? (Y/N) " : GOSUB ED.PROMPT.YN
+  ED.PROMPT.MSG$ = "Discard changes?" : GOSUB ED.PROMPT.YN
   IF ED.YN = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
 ED.CMD.EXIT.GO:
   IF ED.SIM.MODE = 1 THEN ED.EXIT.FLAG = 1 : RETURN
@@ -761,7 +822,7 @@ ED.CMD.ABOUT:
 ED.CONFIRM.DISCARD:
   ED.DISCARD.OK = 1
   IF ED.DOC.DIRTY = 0 THEN RETURN
-  ED.PROMPT.MSG$ = "Discard changes? (Y/N) " : GOSUB ED.PROMPT.YN
+  ED.PROMPT.MSG$ = "Discard changes?" : GOSUB ED.PROMPT.YN
   ED.DISCARD.OK = ED.YN
   RETURN
 
@@ -850,31 +911,41 @@ ED.FOLD:
 REM ============================================================================
 REM PROMPTS (cyan line input; sim hook for the headless self-check)
 REM ============================================================================
+REM BOTH OF THESE USED TO BE HAND-ROLLED ON THE BOTTOM ROW, and both are now the
+REM library. What went with them: a key loop that could only append and rub out from
+REM the end, a Y/N reader that spelled its own answers into the prompt string, and
+REM two lots of geometry. What arrived with them: a caret that moves, a field that
+REM cannot be typed past, and a box that puts back the cells it covered instead of
+REM leaving the caller to repaint.
+REM
+REM THE INTERFACE HERE DID NOT CHANGE. ED.PROMPT.MSG$ in, ED.INPUT$ + ED.PROMPT.OK
+REM or ED.YN out -- so all six call sites are untouched, and so is the ED.SIM.MODE
+REM short circuit the self-check drives them through.
+
 ED.PROMPT:
   IF ED.SIM.MODE = 1 THEN ED.INPUT$ = ED.SIM.INPUT$ : ED.PROMPT.OK = 1 : RETURN
-  ED.INPUT$ = ""
-ED.PROMPT.LOOP:
-  ED.PS.ROW = SCREEN.ROWS - 1 : ED.PS.COL = 0 : ED.PS.WIDTH = SCREEN.COLS
-  ED.PS$ = " " + ED.PROMPT.MSG$ + ED.INPUT$ : ED.PS.ATTR = THEME.CLR(THEME.DIMMED) : GOSUB ED.PUT.FIELD
-ED.PROMPT.WAIT:
-  GET ED.KEY$ : IF ED.KEY$ = "" THEN GOTO ED.PROMPT.WAIT
-  ED.KEY = ASC(ED.KEY$)
-  IF ED.KEY = 13 THEN ED.PROMPT.OK = 1 : RETURN
-  IF ED.KEY = 27 THEN ED.PROMPT.OK = 0 : ED.INPUT$ = "" : RETURN
-  IF ED.KEY = 20 AND LEN(ED.INPUT$) > 0 THEN ED.INPUT$ = LEFT$(ED.INPUT$, LEN(ED.INPUT$) - 1) : GOTO ED.PROMPT.LOOP
-  IF ED.KEY >= 32 AND ED.KEY <= 126 AND LEN(ED.INPUT$) < 60 THEN ED.INPUT$ = ED.INPUT$ + ED.KEY$ : GOTO ED.PROMPT.LOOP
-  GOTO ED.PROMPT.WAIT
+  GOSUB ED.GUI.WHERE
+  GUI.TITLE$ = "" : GUI.MSG2$ = "" : GUI.MASK = 0
+  GUI.MSG$ = ED.PROMPT.MSG$
+  REM Wide enough for a path, and the box sizes itself around it. The old field ran
+  REM to 60 because it had the whole screen width; a centred dialog does not.
+  GUI.LEN = 40
+  GUI.INPUT$ = ""
+  GOSUB GUI.TEXT
+  ED.INPUT$ = GUI.INPUT$ : ED.PROMPT.OK = GUI.OK
+  REM A cancel hands back "", as it always did. GUI.TEXT restores what was passed
+  REM IN, which here is "" anyway -- this is belt and braces, and it is one store.
+  IF ED.PROMPT.OK = 0 THEN ED.INPUT$ = ""
+  RETURN
 
 ED.PROMPT.YN:
   IF ED.SIM.MODE = 1 THEN ED.YN = ED.SIM.YN : RETURN
-  ED.PS.ROW = SCREEN.ROWS - 1 : ED.PS.COL = 0 : ED.PS.WIDTH = SCREEN.COLS
-  ED.PS$ = " " + ED.PROMPT.MSG$ : ED.PS.ATTR = THEME.CLR(THEME.DIMMED) : GOSUB ED.PUT.FIELD
-ED.YN.WAIT:
-  GET ED.KEY$ : IF ED.KEY$ = "" THEN GOTO ED.YN.WAIT
-  ED.KEY = ASC(ED.KEY$)
-  IF ED.KEY = 89 OR ED.KEY = 121 THEN ED.YN = 1 : RETURN
-  IF ED.KEY = 78 OR ED.KEY = 110 OR ED.KEY = 27 THEN ED.YN = 0 : RETURN
-  GOTO ED.YN.WAIT
+  GOSUB ED.GUI.WHERE
+  GUI.TITLE$ = "" : GUI.MSG2$ = "" : GUI.OKCANCEL = 0 : GUI.HINT$ = ""
+  GUI.MSG$ = ED.PROMPT.MSG$
+  GOSUB GUI.YN
+  ED.YN = GUI.ANSWER
+  RETURN
 
 
 
@@ -1185,19 +1256,19 @@ ED.DRAW.DROPDOWN:
   ED.DD.TY = 1 + ED.MAP.TOP : ED.DD.BY = ED.DD.TY + ED.DD.FH - 1
   ED.DD.RX = ED.DD.BX + ED.DD.FW - 1
   ED.DD.FC = THEME.CLR(THEME.TEXT)
-  REM GP.FILL, not GP.BOX. GP.BOX picks its glyphs from a table in the RUNTIME, so it can
-  REM only ever draw the six styles that table holds -- and five of the six are built from
-  REM screen codes this font no longer has. GP.FILL takes the glyph as an argument, and
-  REM takes it as a SCREEN CODE with no conversion, which is exactly what is wanted here.
-  REM Eight calls: two horizontal runs, two vertical runs, four single-cell corners.
-  GP.FILL ED.DD.BX + 1, ED.DD.TY, ED.DD.FW - 2, 1, ED.GL.H, ED.DD.FC
-  GP.FILL ED.DD.BX + 1, ED.DD.BY, ED.DD.FW - 2, 1, ED.GL.H, ED.DD.FC
-  GP.FILL ED.DD.BX, ED.DD.TY + 1, 1, ED.DD.FH - 2, ED.GL.V, ED.DD.FC
-  GP.FILL ED.DD.RX, ED.DD.TY + 1, 1, ED.DD.FH - 2, ED.GL.V, ED.DD.FC
-  GP.FILL ED.DD.BX, ED.DD.TY, 1, 1, ED.GL.TL, ED.DD.FC
-  GP.FILL ED.DD.RX, ED.DD.TY, 1, 1, ED.GL.TR, ED.DD.FC
-  GP.FILL ED.DD.BX, ED.DD.BY, 1, 1, ED.GL.BL, ED.DD.FC
-  GP.FILL ED.DD.RX, ED.DD.BY, 1, 1, ED.GL.BR, ED.DD.FC
+  REM GUI.FRAME, not GP.BOX, and no longer eight GP.FILLs written out here. GP.BOX
+  REM picks its glyphs from a table in the RUNTIME, so it can only ever draw the six
+  REM styles that table holds -- and five of the six are built from screen codes this
+  REM font no longer has. The eight fills that replaced it now live in GUI.INC.BL,
+  REM told the same six glyphs by ED.GUI.SETUP, so the program has ONE frame drawer
+  REM where it had a library's and a copy. ED.DD.RX and ED.DD.BY are computed above
+  REM exactly as GUI.FRAME computes GUI.RIGHT and GUI.BOTTOM, so it is the same rectangle
+  REM either way. Setting GUI.BORDER here does not disturb a later dialog: GUI.OPEN
+  REM settles it again from GUI.BORDER.IN on every call.
+  GUI.LEFT = ED.DD.BX : GUI.TOP = ED.DD.TY
+  GUI.WIDTH = ED.DD.FW  : GUI.HEIGHT = ED.DD.FH
+  GUI.BORDER = ED.DD.FC
+  GOSUB GUI.FRAME
 
   REM DRIVEN THE WAY MENUDEMO.EXP.BL DRIVES IT, which is the whole interface and not
   REM three fields of it. This used to set X, Y and WIDTH only and then hand-roll a loop
@@ -1484,7 +1555,153 @@ ED.SELFCHECK:
   GOSUB ED.OPEN.MENUBAR
   PRINT "MENU LETTER H -> ";MENU.CHOICE.MENU;" (want 2)"
 
+  REM ============================================================================
+  REM ---- GUI.INC.BL, driven for real ----
+  REM
+  REM Nothing above this line touches a dialog: ED.PROMPT and ED.PROMPT.YN both
+  REM short-circuit on ED.SIM.MODE, which is exactly what makes the rest of the
+  REM self-check fast and exactly what makes it blind to the library. So SIM goes
+  REM OFF here and the keys go in through kbdbuf_put, the same way the 600 menu
+  REM opens above are driven. These are the four things that could be wrong, and
+  REM none of them shows up as a compile error:
+  REM
+  REM   the frame drawn from GP.BOX's table instead of ours -- a box of letters;
+  REM   the box centred on the SCREEN while we draw on a SCROLLED map -- a box
+  REM     somewhere else entirely, and correct-looking in a screenshot at rest;
+  REM   the covered cells not put back -- a hole in the document;
+  REM   the caret not moving -- typing that lands in the wrong order.
+  ED.QUIET = 1 : ED.SIM.MODE = 0
+  REM LONG lines, deliberately. The centred box lands around column 32, and the
+  REM "L0".."L39" the tests above use are three characters wide -- so the rectangle it
+  REM covers is blank document, and a restore that did nothing whatever would score an
+  REM identical sum. Fill the width and the check has something to fail on.
+  GOSUB DOC.INIT
+  FOR ED.T = 0 TO 39
+    LINE.TEXT$ = MID$(STR$(ED.T), 2) + " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    GOSUB DOC.PUSH.LINE
+  NEXT ED.T
+  ED.TOP.LINE = 0 : ED.LEFT.COL = 0 : ED.CUR.ROW = 0 : ED.CUR.COL = 0
+  ED.MAP.TOP = 0 : GOSUB ED.SET.VSCROLL
+  ED.QUIET = 0 : GOSUB ED.LOAD.LIVE : GOSUB ED.RENDER.ALL
+
+  REM ---- the frame. Open a box by hand, read its corner and its edges, close it.
+  REM ---- ED.PETFONT parked the six line glyphs at $C0-$C5 = 192..197, and GP.FILL
+  REM ---- adds $40 to what it is given, so ED.GL.H(128) must show as tile 192,
+  REM ---- ED.GL.V(129) as 193 and ED.GL.TL(130) as 194. Anything in the 64..125
+  REM ---- range means GP.BOX drew it, and GP.BOX's glyphs are letters here.
+  REM ---- READ THE MAP BEFORE PRINTING ANYTHING. PRINT goes through the KERNAL,
+  REM ---- which SCROLLS the text map -- the same map every GP drawing command and
+  REM ---- every VPEEK below addresses. A PRINT between the draw and the read moves
+  REM ---- the picture out from under the read, and the first version of this test
+  REM ---- did exactly that: adding one more PRINT line shifted the answer by one
+  REM ---- row, which is how it was caught. So: repaint, draw, read into strings,
+  REM ---- close, and only then say anything.
+  GOSUB ED.RENDER.ALL
+  GOSUB ED.GUI.WHERE
+  GUI.TITLE$ = "" : GUI.MSG$ = "FRAME" : GUI.MSG2$ = ""
+  GUI.BODY.ROWS = 1 : GUI.BODY.WIDTH = 10
+  GOSUB GUI.OPEN
+  ED.DDS$ = ""
+  FOR ED.GX = 0 TO GUI.WIDTH - 1
+    ED.DDS$ = ED.DDS$ + STR$(VPEEK(1, 45056 + GUI.TOP * 256 + (GUI.LEFT + ED.GX) * 2))
+  NEXT ED.GX
+  ED.DDS2$ = ""
+  FOR ED.GR = 0 TO GUI.HEIGHT - 1
+    ED.DDS2$ = ED.DDS2$ + STR$(VPEEK(1, 45056 + (GUI.TOP + ED.GR) * 256 + GUI.LEFT * 2))
+  NEXT ED.GR
+  GOSUB GUI.CLOSE
+  PRINT "GUI BOX X=";GUI.LEFT;" Y=";GUI.TOP;" W=";GUI.WIDTH;" H=";GUI.HEIGHT;" STASH=";GUI.STASHED
+  PRINT "GUI TOPROW";ED.DDS$
+  PRINT "GUI TOPWANT 194 192 x14 195"
+  PRINT "GUI LEFTCOL";ED.DDS2$
+  PRINT "GUI LEFTWANT 194 193 x5 196"
+
+  REM ---- the restore. Sum the char codes over the whole rectangle the box covers,
+  REM ---- open and close a second box of the same size, and sum again. ONE SAMPLED
+  REM ---- CELL IS NOT A TEST OF A PANEL -- that lesson cost a shipped dropdown with
+  REM ---- rows missing -- so this walks every cell the dialog could have eaten. The
+  REM ---- repaint first is what makes it mean anything: on a screen the PRINTs above
+  REM ---- have scrolled to blank, "before" and "after" are equal whatever happens.
+  GOSUB ED.RENDER.ALL
+  GOSUB ED.GUI.SUM : ED.GWAS = ED.GSUM
+  GOSUB GUI.OPEN : GOSUB GUI.CLOSE
+  GOSUB ED.GUI.SUM : ED.GNOW = ED.GSUM
+  PRINT "GUI RESTORE WAS=";ED.GWAS;" NOW=";ED.GNOW;" (want equal, and not 3584)"
+
+  REM ---- the scrolled map. VSCROLL down four rows and the box must follow it: same
+  REM ---- centred row, plus ED.MAP.TOP. Without GUI.ROW.OFFSET this comes back unchanged
+  REM ---- and the dialog is drawn four rows off the top of what the user can see.
+  ED.GBY = GUI.TOP
+  ED.MAP.TOP = 4 : GOSUB ED.SET.VSCROLL : GOSUB ED.RENDER.ALL
+  GOSUB ED.GUI.WHERE
+  GOSUB GUI.OPEN : GOSUB GUI.CLOSE
+  PRINT "GUI SCROLLED Y=";GUI.TOP;" WAS=";ED.GBY;" MAPTOP=";ED.MAP.TOP;" (want WAS+4)"
+  ED.MAP.TOP = 0 : GOSUB ED.SET.VSCROLL : GOSUB ED.RENDER.ALL
+
+  REM ---- GUI.YN, answered with a keystroke, through the editor's own wrapper. The
+  REM ---- wrapper is what every call site uses, so testing it tests them all.
+  ED.PROMPT.MSG$ = "Discard changes?"
+  ED.QK = 89 : GOSUB ED.PUSHKEY
+  GOSUB ED.PROMPT.YN
+  PRINT "GUI YN Y ->";ED.YN;" (want 1)"
+  ED.QK = 27 : GOSUB ED.PUSHKEY
+  GOSUB ED.PROMPT.YN
+  PRINT "GUI YN ESC ->";ED.YN;" (want 0)"
+
+  REM ---- GUI.TEXT, and with it the caret. Type A B C, press LEFT, type X: the X
+  REM ---- lands BETWEEN B and C, which the old append-only field could not do. If
+  REM ---- the arrow were still being swallowed this would read ABCX, and if it were
+  REM ---- leaving the field it would read ABC with OK=0.
+  ED.PROMPT.MSG$ = "Open file: "
+  ED.QK = 65 : GOSUB ED.PUSHKEY
+  ED.QK = 66 : GOSUB ED.PUSHKEY
+  ED.QK = 67 : GOSUB ED.PUSHKEY
+  ED.QK = 157 : GOSUB ED.PUSHKEY
+  ED.QK = 88 : GOSUB ED.PUSHKEY
+  ED.QK = 13 : GOSUB ED.PUSHKEY
+  GOSUB ED.PROMPT
+  PRINT "GUI TEXT ->";ED.INPUT$;" OK=";ED.PROMPT.OK;" (want ABXC 1)"
+
+  REM ---- and ESC still throws the typing away rather than returning it
+  ED.QK = 90 : GOSUB ED.PUSHKEY
+  ED.QK = 27 : GOSUB ED.PUSHKEY
+  GOSUB ED.PROMPT
+  PRINT "GUI TEXT ESC ->";ED.INPUT$;"/ OK=";ED.PROMPT.OK;" (want / 0)"
+
+  REM ---- GUI.MENU, over the SAME MENUHELP.ITEM$ the menu bar uses. Start on row 1,
+  REM ---- press down, press RETURN: row 2, key 13.
+  MENUHELP.ITEM$(1) = " ONE" : MENUHELP.ITEM$(2) = " TWO"
+  GUI.COUNT = 2 : GUI.SEL = 1 : GUI.FLAGS = 0
+  GUI.TITLE$ = "PICK" : GUI.MSG$ = "" : GUI.MSG2$ = ""
+  GOSUB ED.GUI.WHERE
+  ED.QK = 17 : GOSUB ED.PUSHKEY
+  ED.QK = 13 : GOSUB ED.PUSHKEY
+  GOSUB GUI.MENU
+  PRINT "GUI MENU SEL=";GUI.SEL;" KEY=";GUI.KEY;" (want 2 13)"
+  ED.SIM.MODE = 1
+
   PRINT "M4 OK"
+  RETURN
+
+REM ---- one key into the KERNAL's buffer, so a GET loop can be driven headlessly ----
+REM POKE 1 is the ROM/RAM bank byte: 0 pages the KERNAL in for the JSR and 4 puts BASIC
+REM back. The same three statements appear inline above; they became a routine when the
+REM GUI checks needed six keys in a row.
+ED.PUSHKEY:
+  POKE 1, 0 : GP.CALL ED.KBDBUF, ED.QK : POKE 1, 4
+  RETURN
+
+REM ---- add up every character cell the dialog box covers ----
+REM Chars only, not attributes: a restore that put the text back in the wrong colour
+REM would be a different bug and is not what this is watching for. GUI.LEFT/BY/W/H are
+REM whatever the last GUI.OPEN worked out, which is the rectangle in question.
+ED.GUI.SUM:
+  ED.GSUM = 0
+  FOR ED.GR = 0 TO GUI.HEIGHT - 1
+    FOR ED.GX = 0 TO GUI.WIDTH - 1
+      ED.GSUM = ED.GSUM + VPEEK(1, 45056 + (GUI.TOP + ED.GR) * 256 + (GUI.LEFT + ED.GX) * 2)
+    NEXT ED.GX
+  NEXT ED.GR
   RETURN
 
 #INCLUDE "STORE.BASL"
