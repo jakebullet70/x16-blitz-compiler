@@ -240,8 +240,21 @@ grepping for the retired keywords find it. `SCREEN.EXP.BL` had been broken the s
    deferral is only safe for a statement whose failure is contained.
 2. **Something has to compile the examples.** Twelve `.EXP.BL` files and eight `.INC.BL` modules are
    the documentation, and none of them is built by `make`. A target that tokenises and compiles each
-   one headlessly and greps for `OK CODE` would have caught `SCREEN.EXP.BL` the day it broke — the
-   harness already exists in `scratchpad/edbuild.py`.
+   one headlessly would have caught `SCREEN.EXP.BL` the day it broke — the harness already exists in
+   `scratchpad/edbuild.py`. **`OK CODE` is not the test to apply**, which is the whole point of this
+   entry; the test is item 3.
+
+3. **DONE — `source/common-scripts/deferscan.py`.** Walks a compiled object's p-code by real
+   instruction size and reports every `.deferror` (token 234) with its source line, read out of the
+   `M.<name>` debug map. A naive byte search cannot do this: `$EA` occurs inside `.word` operands and
+   strings, so the walk has to step properly, and it fails loudly rather than guessing if it ever
+   desynchronises. Exit 1 means it found something.
+
+       python source/common-scripts/deferscan.py C.EDITOR.PRG 15095 M.EDITOR
+
+   Validated against a known-bad object (the editor before the `GP.STASH` fix: three hits, one of
+   them the `$0B82` that actually fired) and known-good ones. Running it over every example is what
+   the `make` target in item 2 should do.
 
 **Until then: after retiring ANY keyword, grep the whole tree for it — `GPC-BASIC`, `samples`, AND
 `testing`.** Known stale right now: `testing/GPC.ERR.BASL` calls `GP.LTRIM` and `GP.UPPER`, and
