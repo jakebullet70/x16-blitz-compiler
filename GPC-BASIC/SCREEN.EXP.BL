@@ -5,7 +5,8 @@
 ## **  GP.BOX      statement, a frame in one of six styles
 ## **  GP.FILL     statement, a rectangle of one character
 ## **  GP.PRINTAT  statement, text at a position
-## **  GP.STASH / GP.RESTR   save a rectangle and put it back
+## **  STASH.INC.BL          save a rectangle and put it back -- a module
+## **                        now, not the GP.STASH / GP.RESTR keywords
 ## **
 ## **  Build:  copy GPC-BASIC/GPB.INC.BL and this file into testing/, then
 ## **            python source/gpc/build_basl.py SCREEN.EXP.BL SCREEN.PRG
@@ -14,8 +15,14 @@
 ## **  Compile-only: the ROM cannot RUN a PRG containing GP tokens.
 ## **
 ## ***********************************************************************
-#INCLUDE "GPB.INC.BL"
+## THE TWO DIRECTIVES COME FIRST. STASH.INC.BL reaches BASIC's variables
+## from inside GP.ASM through {VAR}, and the compiler resolves those out of
+## BASLOAD's #SYMFILE -- which has to be declared before the #INCLUDEs that
+## need it, or the compile stops with NO SYMBOL FILE FOR {}.
 #SAVEAS "@:SCREEN.PRG"
+#SYMFILE "@:SCREEN.SYM"
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "STASH.INC.BL"
 
 ## NOTE ON NAMES: BASLOAD gives 64 significant characters, so PANEL.COL and
 ## PANEL.ROW below really are different variables. The BUILT-IN BASIC gives
@@ -94,13 +101,25 @@ PANEL.W = 0
 GP.FILL 0, 20, PANEL.W, 4, ASC("X")
 
 ## ***********************************************************************
-## **  3. GP.STASH and GP.RESTR -- draw over the screen and put it back.
-## **  The stash carries a 4-byte header (w, h, x, y), so the restore
-## **  needs only the bank. A bank is 8K and a cell is 2 bytes, so at most
-## **  4094 cells fit: stash panels, not whole screens.
+## **  3. STASH.INC.BL -- draw over the screen and put it back.
+## **
+## **  THIS WAS GP.STASH AND GP.RESTR until 1st September 2026, when the
+## **  pair moved out of the GP runtime block and into GP.ASM. The block is
+## **  all-or-nothing -- every program using any GP keyword carried all of
+## **  it, in the object AND off the bottom of the workspace -- and the
+## **  stash was 329 of those bytes, paid by every program that never
+## **  saved a rectangle. As a module it costs its own bytes, once, in the
+## **  programs that ask for it.
+## **
+## **  The stash still carries a 4-byte header (w, h, x, y), so the restore
+## **  still needs only the bank. A bank is 8K and a cell is 2 bytes, so at
+## **  most 4094 cells fit: stash panels, not whole screens -- and unlike
+## **  the keyword, STASH.SAVE says so, in STASH.OK.
 ## ***********************************************************************
 
-GP.STASH 1, 4, 2, 32, 9
+STASH.BANK = 1
+STASH.X = 4 : STASH.Y = 2 : STASH.W = 32 : STASH.H = 9
+GOSUB STASH.SAVE
 
 GP.FILL 8, 4, 24, 5, ASC(" "), 2 * 16 + 1
 GP.BOX 8, 4, 24, 5, 3, 2 * 16 + 1
@@ -110,12 +129,15 @@ GP.PRINTAT 10, 6, "A DIALOG OVER THE PANEL", 2 * 16 + 1
 
 FOR PAUSE.N = 1 TO 4000 : NEXT
 
-GP.RESTR 1
+STASH.BANK = 1 : STASH.MOVE = 0
+GOSUB STASH.RESTORE
 
-## ---- GP.RESTR bank,x,y pastes it somewhere ELSE instead, which is
-## ---- copy-and-paste for nothing extra.
+## ---- STASH.MOVE = 1 with a new STASH.X and STASH.Y pastes it somewhere
+## ---- ELSE instead, which is copy-and-paste for nothing extra.
 
-GP.RESTR 1, 44, 8
+STASH.BANK = 1 : STASH.MOVE = 1
+STASH.X = 44 : STASH.Y = 8
+GOSUB STASH.RESTORE
 
 LOCATE 1, 22
 PRINT "DONE"

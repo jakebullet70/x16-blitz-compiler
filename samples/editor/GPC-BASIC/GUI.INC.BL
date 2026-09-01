@@ -19,12 +19,28 @@
 ## **  that reimplemented a menu would be a second menu to fix.
 ## **
 ## **  REQUIRES, and does not #INCLUDE for you, in this order:
-## **      GPB.INC.BL        GP.BOX, GP.FILL, GP.PRINTAT, GP.STASH, GP.CALL
+## **      GPB.INC.BL        GP.BOX, GP.FILL, GP.PRINTAT, GP.CALL
+## **      STASH.INC.BL      saving the cells the box covers, and putting
+## **                        them back -- and with it a #SYMFILE in your
+## **                        program, which that file's header explains
 ## **      THEME.INC.BL      the colour roles, and GOSUB THEME.LOAD first
 ## **      MENUHELP.INC.BL   GUI.MENU only
 ## **      INPHELP.INC.BL    GUI.TEXT only
 ## **  Leave one out and you only pay for what you left in -- but you must
 ## **  include what you call.
+## **
+## **  STASH.INC.BL REPLACED GP.STASH AND GP.RESTR ON 1st SEPTEMBER 2026.
+## **  The two keywords did exactly this and were 329 bytes of the GP
+## **  runtime block, which is all-or-nothing: every program using any GP
+## **  keyword carried them, twice over -- once in the object and once off
+## **  the bottom of the workspace. They are a BASL module now, so a dialog
+## **  pays for them and a program with no dialogs does not.
+## **
+## **  IT IS NOT A DROP-IN, AND THE DIFFERENCE IS WORTH HAVING: STASH.SAVE
+## **  reports STASH.OK, where GP.STASH reported nothing at all. GUI.STASHED
+## **  is that answer now rather than an optimistic 1, so a rectangle the
+## **  bank could not hold leaves the dialog drawn and the restore skipped
+## **  -- which is what GUI.MAXCELLS was guessing at from the outside.
 ## **
 ## **  Usage, the whole of it:
 ## **      THEME.DARK = 0 : GOSUB THEME.LOAD
@@ -430,8 +446,11 @@ GUI.OPEN:
     GUI.STASHED = 0
     IF GUI.BANK = 0 THEN GOTO GUI.OPEN.DRAW
     IF GUI.WIDTH * GUI.HEIGHT > GUI.MAXCELLS THEN GOTO GUI.OPEN.DRAW
-    GP.STASH GUI.BANK, GUI.LEFT, GUI.TOP, GUI.WIDTH, GUI.HEIGHT
-    GUI.STASHED = 1
+    STASH.BANK = GUI.BANK
+    STASH.X = GUI.LEFT : STASH.Y = GUI.TOP
+    STASH.W = GUI.WIDTH : STASH.H = GUI.HEIGHT
+    GOSUB STASH.SAVE
+    GUI.STASHED = STASH.OK
 
 ## ---- Fill THEN frame. The fill is what makes the box opaque -- without
 ## ---- it the frame is a rectangle drawn over whatever was underneath,
@@ -526,7 +545,9 @@ GUI.FRAME:
 ## ***********************************************************************
 
 GUI.CLOSE:
-    IF GUI.STASHED <> 0 THEN GP.RESTR GUI.BANK
+    IF GUI.STASHED = 0 THEN RETURN
+    STASH.BANK = GUI.BANK : STASH.MOVE = 0
+    GOSUB STASH.RESTORE
     RETURN
 
 ## ***********************************************************************

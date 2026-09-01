@@ -33,7 +33,15 @@
 #INCLUDE "GPB.INC.BL"
 #INCLUDE "THEME.INC.BL"
 #INCLUDE "APPHELP.INC.BL"
+REM STASH.INC.BL is what GUI.OPEN saves the covered cells with. It was GP.STASH and
+REM GP.RESTR until 01/09/26, when the pair left the GP runtime block for GP.ASM -- 329
+REM bytes that every program using any GP keyword was carrying whether it stashed
+REM anything or not. The #SYMFILE above is there for this: the module reaches BASIC's
+REM variables from inside assembly through {VAR}, and BASLOAD has crunched every name
+REM by then.
+#INCLUDE "STASH.INC.BL"
 #INCLUDE "MENUHELP.INC.BL"
+#INCLUDE "MENUBAR.INC.BL"
 #INCLUDE "INPHELP.INC.BL"
 #INCLUDE "GUI.INC.BL"
 
@@ -464,10 +472,19 @@ ED.OPEN.DONE:
 
 
 REM ---- menu tables (data-driven) ----
+REM THE BAR'S LAYOUT IS MENUBAR.INC.BL'S NOW, and the MENU.COL table that used to hold it
+REM is gone. That table was this program computing, and then remembering, what
+REM MENUBAR.COLUMN works out from the item text on demand -- a running sum of the widths
+REM to the left. MENUBAR.WHERE hands back the same answer as MENUBAR.SELX, which is what
+REM ED.DRAW.DROPDOWN now hangs the panel from.
+REM
+REM MENU.WIDTH STAYS. That is the DROPDOWN's width, the longest item plus two, and it is
+REM this program's business: a vertical panel has a column width, and the bar above it
+REM does not.
 ED.MENU.SETUP:
   MENU.COUNT = 3
   DIM MENU.NAME$(3) : DIM MENU.ITEMS(3)
-  DIM MENU.COL(3) : DIM MENU.WIDTH(3)
+  DIM MENU.WIDTH(3)
   DIM MENU.ITEM$(24) : REM flat: menu * 8 + item
   DIM MENUHELP.ITEM$(8) : REM MENUHELP leaves its item array to the caller
   DIM ED.ALTK(8) : DIM ED.ALTV(8) : REM layout bytes ED.ALTKEYS overwrites, to put back
@@ -478,16 +495,40 @@ ED.MENU.SETUP:
   MENU.ITEM$(8) = "Find..." : MENU.ITEM$(9) = "Go to Line..."
   MENU.NAME$(2) = "Help" : MENU.ITEMS(2) = 1
   MENU.ITEM$(16) = "About"
-  MENU.NEXT.COL = 2
+  MENU.HOT$ = "FSH" : REM the initials, for the bar's accelerator tint and its hotkeys
   FOR MENU.I = 0 TO MENU.COUNT - 1
-    MENU.COL(MENU.I) = MENU.NEXT.COL
-    MENU.NEXT.COL = MENU.NEXT.COL + LEN(MENU.NAME$(MENU.I)) + 2
     MENU.W = LEN(MENU.NAME$(MENU.I))
     FOR MENU.J = 0 TO MENU.ITEMS(MENU.I) - 1
       IF LEN(MENU.ITEM$(MENU.I * 8 + MENU.J)) > MENU.W THEN MENU.W = LEN(MENU.ITEM$(MENU.I * 8 + MENU.J))
     NEXT MENU.J
     MENU.WIDTH(MENU.I) = MENU.W + 2
   NEXT MENU.I
+  RETURN
+
+
+REM ---- the bar's items, into the array MENUBAR reads.
+REM
+REM MENUBAR AND MENUHELP SHARE MENUHELP.ITEM$ ON PURPOSE -- a program with a bar and a
+REM dropdown wants one convention, not two -- so the array holds whichever of the two is
+REM being drawn, and this routine and ED.DRAW.DROPDOWN each load their own before use.
+REM Loading it is cheap; keeping two copies in step would not be.
+REM
+REM AN ITEM IS " NAME ", and the spaces are the layout. MENUBAR makes each item exactly as
+REM wide as its text, so the air around a title has to be IN the title -- which is also
+REM what gives the highlight its margin. With MENUBAR.X = 0 and no gap that puts File at
+REM column 1, Search at 7 and Help at 15, which is cell for cell where the hand-rolled bar
+REM put them.
+ED.MENU.BAR.ITEMS:
+  FOR MENU.I = 0 TO MENU.COUNT - 1
+    MENUHELP.ITEM$(MENU.I + 1) = " " + MENU.NAME$(MENU.I) + " "
+  NEXT MENU.I
+  MENUHELP.COUNT = MENU.COUNT
+  MENUHELP.X = 0 : MENUHELP.Y = 0
+  MENUHELP.ATTR = THEME.CLR(THEME.TITLE)
+  MENUHELP.HIATTR = THEME.CLR(THEME.HILITE)
+  MENUHELP.HOT$ = MENU.HOT$
+  MENUHELP.HOTATTR = THEME.CLR(THEME.BORDER)
+  MENUBAR.X = 0 : MENUBAR.Y = ED.MAP.TOP : MENUBAR.GAP = 0
   RETURN
 
 
@@ -665,33 +706,45 @@ ED.ALT.MENU:
   GOSUB ED.INFO.MSG
   RETURN
 
-REM The menu's own key loop, in the same shape as the main loop and ED.DISPATCH.KEY:
-REM GP.DO to wait, GP.SELECT to dispatch. It replaces a label with six GOTOs back to it,
-REM two of which went FORWARD into ED.MENU.SELECT and ED.MENU.CANCEL and relied on THEIR
-REM RETURN to leave ED.OPEN.MENUBAR -- so the two ways out of the menu were not visible
-REM from the loop that owned them, and there was no single exit to put anything on.
+REM THE DROPDOWN'S KEY LOOP IS MENUHELP.RUN'S NOW. This used to be a GP.DO / GP.SELECT
+REM here, waiting on GET and dispatching six keys itself -- which is precisely the loop
+REM MENUHELP already owns, written a second time so that the two lines the editor needed
+REM on top of it could exist.
 REM
-REM GP.EXITDO leaves from inside a GP.CASE, which is allowed and is not the thing to
-REM avoid: it closes the frames it passes on the way out, selector included. What is not
-REM allowed is GOTO out of a select, because GP.ENDSEL is what releases that frame.
+REM WHAT THE EDITOR NEEDED, and why it could not just call MENUHELP.RUN before today: this
+REM is a dropdown UNDER A BAR, so LEFT and RIGHT have to walk the bar with the panel still
+REM open, and a letter has to jump to the menu with that initial. A vertical menu ignores
+REM all three -- correctly, they mean nothing on its axis -- and swallowed them.
+REM
+REM MENUHELP.KEYEXIT is the answer, and it is a library change, not a workaround here: a
+REM key the menu has no use for ends it with MENUHELP.KEY set and MENUHELP.SEL untouched,
+REM and the caller says what it meant. It is the mirror of MENUBAR.DOWNEXIT, which lets a
+REM bar hand DOWN to whoever is going to open the panel. Between the two, a bar and its
+REM dropdown drive each other and neither module knows the other is there.
+REM
+REM SO THE LOOP HERE IS ABOUT THE BAR, not about keys. One label, and every path either
+REM comes back to it having moved which menu is open, or returns.
+REM
+REM MENU.ACTIVE and MENU.SEL are 0 based, because MENU.ITEM$ is a flat table indexed
+REM MENU.ACTIVE * 8 + MENU.SEL. MENUBAR.SEL and MENUHELP.SEL are 1 based. Converted at the
+REM boundary, in both directions, and nowhere else.
 ED.OPEN.MENUBAR:
-  MENU.SEL = 0 : GOSUB ED.RENDER.MENUBAR : GOSUB ED.DRAW.DROPDOWN
-  GP.DO
-    GET ED.KEY$
-    GP.IF ED.KEY$ <> "" THEN
-      ED.KEY = ASC(ED.KEY$)
-      GP.SELECT ED.KEY
-        GP.CASE 145 : GOSUB ED.MENU.UP
-        GP.CASE 17  : GOSUB ED.MENU.DOWN
-        GP.CASE 157 : GOSUB ED.MENU.LEFT
-        GP.CASE 29  : GOSUB ED.MENU.RIGHT
-        GP.CASE 13  : GOSUB ED.MENU.SELECT : GP.EXITDO
-        GP.CASE 27  : GOSUB ED.MENU.CANCEL : GP.EXITDO
-        GP.OTHER    : GOSUB ED.MENU.LETTER
-      GP.ENDSEL
-    GP.ENDIF
-  GP.LOOP
-  RETURN
+  MENU.SEL = 0
+ED.MENU.OPEN:
+  GOSUB ED.RENDER.MENUBAR : GOSUB ED.DRAW.DROPDOWN
+  MENUHELP.SEL = MENU.SEL + 1
+  MENUHELP.FLAGS = MENUHELP.KEYEXIT
+  REM No hotkeys ON THE ITEMS: a letter here means a MENU, and it is handed back below.
+  REM ED.DRAW.DROPDOWN has already set HOTATTR to 0 for the same reason.
+  MENUHELP.HOT$ = ""
+  GOSUB MENUHELP.RUN
+  IF MENUHELP.SEL = 0 THEN GOSUB ED.MENU.CANCEL : RETURN
+  MENU.SEL = MENUHELP.SEL - 1
+  IF MENUHELP.KEY = 13 THEN GOSUB ED.MENU.SELECT : RETURN
+  IF MENUHELP.KEY = 157 THEN GOSUB ED.MENU.LEFT : GOTO ED.MENU.OPEN
+  IF MENUHELP.KEY = 29 THEN GOSUB ED.MENU.RIGHT : GOTO ED.MENU.OPEN
+  ED.KEY = MENUHELP.KEY : GOSUB ED.MENU.LETTER
+  GOTO ED.MENU.OPEN
 
 REM A letter while the bar is open jumps to that menu and opens it. THIS IS NOW THE WAY
 REM IN, because ALT+letter is not one any more: ED.INIT declares ISO encoding, and in ISO
@@ -701,11 +754,15 @@ REM and F and H are not mapped at all. The 161..191 test in ED.KEY.RANGE was rea
 REM PETSCII Commodore+letter codes, which the driver no longer sends.
 REM
 REM Folded to upper without case, so f and F both reach File.
+REM A letter jumps to the menu with that initial. NO REDRAW HERE any more -- ED.MENU.OPEN
+REM does it on the way round -- so this only has to erase the panel that is about to move.
+REM A letter matching nothing leaves everything alone and the loop redraws what was already
+REM there, which is what "ignored" should look like.
 ED.MENU.LETTER:
   ED.ML.CH = ED.KEY
   IF ED.ML.CH >= 97 AND ED.ML.CH <= 122 THEN ED.ML.CH = ED.ML.CH - 32
   FOR MENU.I = 0 TO MENU.COUNT - 1
-    IF ASC(LEFT$(MENU.NAME$(MENU.I), 1)) = ED.ML.CH THEN MENU.ACTIVE = MENU.I : MENU.SEL = 0 : GOSUB ED.RENDER.ALL : GOSUB ED.DRAW.DROPDOWN
+    IF ASC(LEFT$(MENU.NAME$(MENU.I), 1)) = ED.ML.CH THEN MENU.ACTIVE = MENU.I : MENU.SEL = 0 : GOSUB ED.RENDER.ALL
   NEXT MENU.I
   RETURN
 
@@ -720,30 +777,24 @@ ED.MENU.CANCEL:
   GOSUB ED.RENDER.ALL
   RETURN
 
-ED.MENU.UP:
-  MENU.SEL = MENU.SEL - 1
-  IF MENU.SEL < 0 THEN MENU.SEL = MENU.ITEMS(MENU.ACTIVE) - 1
-  GOSUB ED.DRAW.DROPDOWN
-  RETURN
-
-ED.MENU.DOWN:
-  MENU.SEL = MENU.SEL + 1
-  IF MENU.SEL >= MENU.ITEMS(MENU.ACTIVE) THEN MENU.SEL = 0
-  GOSUB ED.DRAW.DROPDOWN
-  RETURN
-
+REM ED.MENU.UP and ED.MENU.DOWN are GONE: moving the highlight inside the panel is
+REM MENUHELP.RUN's job and always was, and this program was doing it a second time from
+REM outside. Only the two that cross the panel's axis are left, and they exist because
+REM MENUHELP hands those keys back rather than guessing what a bar wants.
+REM
+REM ED.RENDER.ALL erases the panel that is about to move; ED.MENU.OPEN draws the new one.
 ED.MENU.LEFT:
   MENU.ACTIVE = MENU.ACTIVE - 1
   IF MENU.ACTIVE < 0 THEN MENU.ACTIVE = MENU.COUNT - 1
   MENU.SEL = 0
-  GOSUB ED.RENDER.ALL : GOSUB ED.DRAW.DROPDOWN
+  GOSUB ED.RENDER.ALL
   RETURN
 
 ED.MENU.RIGHT:
   MENU.ACTIVE = MENU.ACTIVE + 1
   IF MENU.ACTIVE >= MENU.COUNT THEN MENU.ACTIVE = 0
   MENU.SEL = 0
-  GOSUB ED.RENDER.ALL : GOSUB ED.DRAW.DROPDOWN
+  GOSUB ED.RENDER.ALL
   RETURN
 
 ED.MENU.DISPATCH:
@@ -1196,12 +1247,24 @@ ED.UNCARET:
 
 REM ---- menu bar (VERA row 0). Attr = bg*16+fg: white-on-blue bar = 97,
 REM ---- yellow accelerator = 103, active title (blue-on-white) = 22. ----
+REM DRAWN BY MENUBAR.INC.BL. What is left here is the two things that are the EDITOR's
+REM and not a menu's: the full width band the titles sit on, and the document name at the
+REM right hand end.
+REM
+REM MENUBAR.Y IS A MAP ROW. GP.FILL and GP.PRINTAT, which MENUBAR reaches through
+REM MENUHELP.ROW, write at map row = whatever Y they are given, and the text layer is
+REM hardware scrolled -- so screen row 0 is map row ED.MAP.TOP. ED.MENU.BAR.ITEMS sets it.
+REM Same correction ED.PUT.FIELD, ED.RENDER.ROW, the caret and the dropdown all make.
+REM
+REM MENUBAR.MARK, not a second painting pass: MENUBAR.DRAW lays every title down in the
+REM normal attribute and MARK puts the highlight on MENUBAR.SEL. With no menu open there
+REM is nothing to mark, which is what MENU.ACTIVE < 0 means.
 ED.RENDER.MENUBAR:
   ED.PS.ROW = 0 : ED.PS.COL = 0 : ED.PS.WIDTH = SCREEN.COLS
   ED.PS$ = "" : ED.PS.ATTR = THEME.CLR(THEME.TITLE) : GOSUB ED.PUT.FIELD
-  FOR MENU.I = 0 TO MENU.COUNT - 1
-    GOSUB ED.DRAW.MENU.TITLE
-  NEXT MENU.I
+  GOSUB ED.MENU.BAR.ITEMS
+  GOSUB MENUBAR.DRAW
+  IF MENU.ACTIVE >= 0 THEN MENUBAR.SEL = MENU.ACTIVE + 1 : GOSUB MENUBAR.MARK
   ED.NAME$ = DOC.FILE.NAME$
   IF ED.DOC.DIRTY = 1 THEN ED.NAME$ = ED.NAME$ + " *"
   ED.NCOL = SCREEN.COLS - LEN(ED.NAME$) - 1
@@ -1209,12 +1272,10 @@ ED.RENDER.MENUBAR:
   RETURN
 
 
-ED.DRAW.MENU.TITLE:
-  ED.MT.COL = MENU.COL(MENU.I) - 1 : ED.MT$ = MENU.NAME$(MENU.I)
-  IF MENU.I = MENU.ACTIVE THEN ED.PS.ROW = 0 : ED.PS.COL = ED.MT.COL : ED.PS.WIDTH = LEN(ED.MT$) : ED.PS$ = ED.MT$ : ED.PS.ATTR = THEME.CLR(THEME.HILITE) : GOSUB ED.PUT.FIELD : RETURN
-  ED.PS.ROW = 0 : ED.PS.COL = ED.MT.COL : ED.PS.WIDTH = 1 : ED.PS$ = LEFT$(ED.MT$, 1) : ED.PS.ATTR = THEME.CLR(THEME.BORDER) : GOSUB ED.PUT.FIELD
-  ED.PS.COL = ED.MT.COL + 1 : ED.PS.WIDTH = LEN(ED.MT$) - 1 : ED.PS$ = MID$(ED.MT$, 2, 20) : ED.PS.ATTR = THEME.CLR(THEME.TITLE) : GOSUB ED.PUT.FIELD
-  RETURN
+REM ED.DRAW.MENU.TITLE has gone the same way as MENU.COL. It painted one title in two
+REM pieces to get the accelerator letter in its own colour, and that is MENUHELP.ROW's
+REM hotkey tint -- MENU.HOT$ names the letters, MENUHELP.HOTATTR is the colour, and the
+REM highlighted title is left alone by the same rule it always was.
 
 
 
@@ -1233,9 +1294,19 @@ REM overwrites with ASCII lower case -- a single-line box comes out as "p @ @ ..
 REM Style 0 borders with $A0 alone, which sits outside that run and survives untouched.
 REM $A0 is a reverse space, so it paints in the FOREGROUND colour: THEME.TEXT gives a
 REM black edge around the light grey panel.
+REM WHERE IT HANGS FROM IS MENUBAR'S ANSWER NOW. MENUBAR.WHERE walks the item text to
+REM the left of MENUBAR.SEL and leaves the column in MENUBAR.SELX -- the same running sum
+REM the deleted MENU.COL table used to hold. The panel starts one cell IN from the item's
+REM left edge, which is what lines the item text up under the title text: both are a
+REM leading space wide.
+REM
+REM ED.MENU.BAR.ITEMS first, because MENUBAR.COLUMN measures MENUHELP.ITEM$ and this
+REM routine is about to fill that same array with the dropdown's items.
 ED.DRAW.DROPDOWN:
   ED.DD.N = MENU.ITEMS(MENU.ACTIVE)
-  ED.DD.COL = MENU.COL(MENU.ACTIVE) - 1
+  GOSUB ED.MENU.BAR.ITEMS
+  MENUBAR.SEL = MENU.ACTIVE + 1 : GOSUB MENUBAR.WHERE
+  ED.DD.COL = MENUBAR.SELX + 1
   ED.DD.W = MENU.WIDTH(MENU.ACTIVE)
 
   ED.DD.BX = ED.DD.COL - 1
@@ -1418,13 +1489,13 @@ ED.SELFCHECK:
   REM the wrong HEIGHT and rows missing, and the line above was green throughout, because
   REM the one cell it looks at happened to be right. Walk the whole panel instead: the
   REM frame row, every item row, and the frame row under them, reading the first LETTER of
-  REM each item. File is New Open Save "Save As" Exit, so column MENU.COL(0) -- the item
+  REM each item. File is New Open Save "Save As" Exit, so column ED.DD.COL + 1 -- the item
   REM text starts a cell left of it, at MENUHELP.X, because every item is " "+name -- down rows
   REM 1..7 must read 192 78 79 83 83 69 192 -- the horizontal, N O S S E, horizontal. A short
   REM panel, a skipped row or a frame in the wrong place all move at least one of those.
   ED.DDS$ = ""
   FOR ED.QR = 1 TO MENU.ITEMS(0) + 2
-    ED.DDS$ = ED.DDS$ + STR$(VPEEK(1, 45056 + ED.QR * 256 + MENU.COL(0) * 2))
+    ED.DDS$ = ED.DDS$ + STR$(VPEEK(1, 45056 + ED.QR * 256 + (ED.DD.COL + 1) * 2))
   NEXT ED.QR
   PRINT "DDROWS";ED.DDS$
   ED.MSG$ = "HELLO" : GOSUB ED.INFO.MSG
@@ -1522,12 +1593,12 @@ ED.SELFCHECK:
   PRINT "KEY 400 SELECTS ROW=";ED.CUR.ROW;" COL=";ED.CUR.COL
 
   REM ---- the MENU's loop, 600 opens. The 400 above exercise ED.DISPATCH.KEY; this is
-  REM ---- the other GP.SELECT, the one inside ED.OPEN.MENUBAR, and it is left by
-  REM ---- GP.EXITDO from INSIDE a case. That is the construct that leaks silently if it
-  REM ---- is wrong -- nothing looks different on screen, the frame stack just fills.
-  REM ---- 600 is chosen against the 4 KB stack: a leaked GOSUB + GP.DO + GP.SELECT is
-  REM ---- 17 bytes and would blow it after ~240, and even the selector's 7 bytes alone
-  REM ---- overflow before 600. So a leak here CANNOT reach the PRINT below.
+  REM ---- the other one, and since the dropdown's loop moved into the library it is
+  REM ---- MENUHELP.RUN's select being driven 600 times -- through ED.MENU.OPEN, which
+  REM ---- re-enters it once per keystroke it hands back rather than once per open.
+  REM ---- 600 is chosen against the 4 KB stack: a leaked GOSUB and GP.DO is 17 bytes and
+  REM ---- would blow it after ~240. So a leak here CANNOT reach the PRINT below, which
+  REM ---- is the point of the count -- what leaks is invisible on screen.
   REM ----
   REM ---- The keys go in through the KERNAL's kbdbuf_put, because ED.OPEN.MENUBAR waits
   REM ---- on GET and nothing headless can satisfy that otherwise -- the same harness

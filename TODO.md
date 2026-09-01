@@ -211,6 +211,43 @@ here.
 
 ## Bugs
 
+### A RETIRED KEYWORD COMPILES CLEAN AND EXPLODES AT RUN TIME — open, and it bit twice
+
+Retiring a keyword is now routine — `GP.SORT`, the five in-place string statements, `GP.STASH` and
+`GP.RESTR` have all left the block for `GP.ASM` modules. **Every caller left behind compiles without
+a word of complaint and throws `SYNTAX ERROR` at run time, at whatever moment it is first reached.**
+
+`errorhandler.asm` arms `deferErrors` while a statement compiles, and a SYNTAX error does not abort:
+the statement is rolled back and replaced with a runtime throw-stub. That is right for a mistyped
+line in a program you are editing. It is exactly wrong for a keyword that no longer exists, because
+there is nothing to retype — the source is *stale*, the whole file is affected, and the compile that
+should have said so says `OK CODE` instead.
+
+**It cost two hours on 1st September 2026 and it was not even a new bug both times.** Merging
+`feature/shrink-gp-block` into the editor branch left `GUI.INC.BL` calling `GP.STASH` / `GP.RESTR`
+(the file lives only on the editor branch, so the shrink work never saw it) and the editor's
+self-check died with `SYNTAX ERROR @ $0ED9` — an address, no line, no name, in a section that had
+nothing to do with the stash. Building the *previous* compiler in a worktree and running the *same*
+source through it was what proved the compiler had changed under the source, and only then did
+grepping for the retired keywords find it. `SCREEN.EXP.BL` had been broken the same way since
+`15d90eb` and nobody noticed, because nothing rebuilds an example.
+
+**Two things to do, and the first is cheap:**
+
+1. **A keyword the compiler does not know must ABORT, not defer.** An unrecognised GP token has no
+   handler; that is a structural fact about the program, not a typo, and `.error_structure` already
+   aborts hard. Same rule as [[gpb-block-openers-must-not-defer]], which is the other half of this:
+   deferral is only safe for a statement whose failure is contained.
+2. **Something has to compile the examples.** Twelve `.EXP.BL` files and eight `.INC.BL` modules are
+   the documentation, and none of them is built by `make`. A target that tokenises and compiles each
+   one headlessly and greps for `OK CODE` would have caught `SCREEN.EXP.BL` the day it broke — the
+   harness already exists in `scratchpad/edbuild.py`.
+
+**Until then: after retiring ANY keyword, grep the whole tree for it — `GPC-BASIC`, `samples`, AND
+`testing`.** Known stale right now: `testing/GPC.ERR.BASL` calls `GP.LTRIM` and `GP.UPPER`, and
+`testing/GPB.INC.BL` and `testing/samples/editor/GPC-BASIC/` still define and use all eight retired
+tokens. That is a working directory, so it may simply want refreshing from `GPC-BASIC/`.
+
 ### `AND`/`OR` leaked the top half of an out-of-range operand — FIXED
 
 `AND` and `OR` are 16-bit operations here, as they are in stock — but `AndOrCommon` reached

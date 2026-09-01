@@ -1,0 +1,322 @@
+## ***********************************************************************
+## **
+## **  MENUBAR.INC.BL -- a horizontal menu, in BASIC.
+## **
+## **      MENUBAR.RUN     draw it, drive it, return the item chosen
+## **      MENUBAR.DRAW    draw it without driving it
+## **      MENUBAR.ITEM    one item, in whichever attribute you name
+## **
+## **  MENUHELP.INC.BL is a VERTICAL menu and says so: every row is
+## **  MENUHELP.WIDTH cells, rows step down by one, and left and right are
+## **  deliberately ignored because they "mean nothing to a vertical menu".
+## **  This is the other axis. Items sit side by side, each as wide as its
+## **  own text, and left and right are what move.
+## **
+## **  REQUIRES, and does not #INCLUDE for you:
+## **      GPB.INC.BL        GP.FILL, GP.PRINTAT
+## **      MENUHELP.INC.BL   MENUHELP.ROW draws the items and tints the
+## **                        hotkeys; this file owns the layout and the keys
+## **
+## **  A SEPARATE FILE, NOT A FLAG ON MENUHELP. A BASL module has no dead
+## **  code elimination -- every routine it holds is compiled into every
+## **  program that includes it, called or not -- so a horizontal path
+## **  inside MENUHELP would be carried by every vertical menu ever
+## **  written. STASHFILE.INC.BL was split from STASH.INC.BL for the same
+## **  reason, and this is that rule applied before the cost is paid rather
+## **  than after.
+## **
+## **  IT SHARES MENUHELP'S ARRAY AND COLOURS. The items are still in
+## **  MENUHELP.ITEM$, the attributes are still MENUHELP.ATTR / HIATTR /
+## **  HOTATTR and the hotkeys still MENUHELP.HOT$, because a program with
+## **  a bar and a dropdown wants one convention, not two -- and because
+## **  copying an array between two name spaces on every call would be the
+## **  worst of both.
+## **
+## **  Usage:
+## **      MENUHELP.ITEM$(1) = " FILE "     ... and so on
+## **      MENUHELP.COUNT = 3
+## **      MENUHELP.ATTR = THEME.CLR(THEME.TITLE)
+## **      MENUHELP.HIATTR = THEME.CLR(THEME.HILITE)
+## **      MENUBAR.X = 0 : MENUBAR.Y = 0
+## **      GOSUB MENUBAR.RUN
+## **      IF MENUBAR.SEL = 0 THEN <cancelled>
+## **
+## **   in   MENUBAR.X  MENUBAR.Y   where the bar starts
+## **        MENUBAR.GAP            cells BETWEEN items. 0 is the default,
+## **                               because the space belongs in the item
+## **                               text -- " FILE " is how you get a
+## **                               highlight with air in it, exactly as a
+## **                               vertical menu's " NEW GAME" does
+## **        MENUBAR.FLAGS          added together, see below
+## **        MENUBAR.SEL            the item to start on; 0 starts at 1
+## **        and MENUHELP.COUNT, MENUHELP.ITEM$(), MENUHELP.ATTR,
+## **        MENUHELP.HIATTR, MENUHELP.HOT$, MENUHELP.HOTATTR
+## **
+## **   out  MENUBAR.SEL     1..COUNT, or 0 if cancelled
+## **        MENUBAR.KEY     what ended it: 13 chose, 27 cancelled, 17 or
+## **                        145 if the cross-axis flags are on, or the
+## **                        hotkey itself
+## **        MENUBAR.SELX    the COLUMN the chosen item starts at, and
+## **        MENUBAR.SELW    how wide it is -- so a caller can drop a panel
+## **                        under it without working the layout out again
+## **
+## **  THE WIDTH OF AN ITEM IS THE LENGTH OF ITS TEXT. There is no column
+## **  width and no MENUBAR.WIDTH: a bar reading "FILE SEARCH HELP" whose
+## **  items were all as wide as the longest would be a row of buttons, not
+## **  a menu bar. That is the one real difference from MENUHELP, and it is
+## **  why this could not have been a flag.
+## **
+## **  UP AND DOWN ARE OPTIONAL EXITS, off by default. A menu bar over
+## **  dropdowns wants DOWN to end the bar so the caller can open the panel
+## **  and come back -- MENUBAR.KEY says which key did it, and MENUBAR.SEL
+## **  and MENUBAR.SELX say where. A bar that is a bar and nothing else
+## **  wants them ignored, and gets that by not setting the flag. Neither
+## **  is the general case, so neither is the default behaviour: the flag
+## **  is off, and off means "an arrow across the grain does nothing".
+## **
+## **  The whole MENUBAR.* name space belongs to this file.
+## **
+## ***********************************************************************
+#IFNDEF MENUBAR.DEFS
+#DEFINE MENUBAR.DEFS 1
+
+## Flags. The first three are MENUHELP's, meaning the same things on this
+## axis: MUSTSEL takes ESC away, KEEPMARK leaves the chosen item
+## highlighted, NOWRAP stops at the ends instead of rolling round. GAMEPAD
+## adds the SNES pad in port 1 -- LEFT and RIGHT here, where the vertical
+## menu reads UP and DOWN.
+##
+## DOWNEXIT and UPEXIT are this file's own, and are the cross-axis exits
+## described above.
+
+#DEFINE MENUBAR.MUSTSEL 1
+#DEFINE MENUBAR.KEEPMARK 2
+#DEFINE MENUBAR.NOWRAP 4
+#DEFINE MENUBAR.GAMEPAD 8
+#DEFINE MENUBAR.DOWNEXIT 16
+#DEFINE MENUBAR.UPEXIT 32
+
+## PETSCII, as GET reports it. LEFT and RIGHT are the movement keys here;
+## UP and DOWN are the optional exits.
+
+#DEFINE MENUBAR.LEFT 157
+#DEFINE MENUBAR.RIGHT 29
+#DEFINE MENUBAR.UP 145
+#DEFINE MENUBAR.DOWN 17
+#DEFINE MENUBAR.ENTER 13
+#DEFINE MENUBAR.ESCAPE 27
+#DEFINE MENUBAR.STOP 3
+
+## SNES port 1, active high, same bits MENUHELP names -- but this menu
+## reads the ones that menu ignores.
+##   $80 B   $10 START   $08 UP   $04 DOWN   $02 LEFT   $01 RIGHT
+
+#DEFINE MENUBAR.PORT 1
+#DEFINE MENUBAR.PAD.LEFT 2
+#DEFINE MENUBAR.PAD.RIGHT 1
+#DEFINE MENUBAR.PAD.B 128
+#DEFINE MENUBAR.PAD.START 16
+
+GOTO MENUBAR.MODULE.END
+
+## ***********************************************************************
+## **  MENUBAR.RUN -- the whole thing.
+## ***********************************************************************
+
+MENUBAR.RUN:
+    IF MENUBAR.SEL < 1 THEN MENUBAR.SEL = 1
+    IF MENUBAR.SEL > MENUHELP.COUNT THEN MENUBAR.SEL = MENUHELP.COUNT
+    MENUBAR.KEY = 0 : GOSUB MENUBAR.DRAW : GOSUB MENUBAR.MARK
+
+MENUBAR.WAIT:
+    GET MENUBAR.IN$
+    IF MENUBAR.IN$ <> "" THEN MENUBAR.CODE = ASC(MENUBAR.IN$) : GOTO MENUBAR.KEYED
+    IF (MENUBAR.FLAGS AND MENUBAR.GAMEPAD) = 0 THEN GOTO MENUBAR.WAIT
+    GOSUB MENUBAR.PADKEY : IF MENUBAR.CODE = 0 THEN GOTO MENUBAR.WAIT
+
+## ---- One key. MENUBAR.WAS is what the highlight has to be lifted off,
+## ---- and it is taken BEFORE anything can move: the two redraws at
+## ---- MENUBAR.SETTLE are the whole cost of a keystroke, and doing them
+## ---- from a stale index is how a menu grows a second highlight.
+
+MENUBAR.KEYED:
+    MENUBAR.WAS = MENUBAR.SEL
+    IF MENUBAR.CODE = MENUBAR.LEFT THEN MENUBAR.SEL = MENUBAR.SEL - 1 : GOTO MENUBAR.SETTLE
+    IF MENUBAR.CODE = MENUBAR.RIGHT THEN MENUBAR.SEL = MENUBAR.SEL + 1 : GOTO MENUBAR.SETTLE
+    IF MENUBAR.CODE = MENUBAR.ENTER THEN GOTO MENUBAR.CHOSE
+    IF MENUBAR.CODE = MENUBAR.ESCAPE THEN GOTO MENUBAR.CANCEL
+    IF MENUBAR.CODE = MENUBAR.STOP THEN GOTO MENUBAR.CANCEL
+
+## ---- the cross-axis exits, and only if asked for ----
+    IF MENUBAR.CODE = MENUBAR.DOWN AND (MENUBAR.FLAGS AND MENUBAR.DOWNEXIT) <> 0 THEN GOTO MENUBAR.CHOSE
+    IF MENUBAR.CODE = MENUBAR.UP AND (MENUBAR.FLAGS AND MENUBAR.UPEXIT) <> 0 THEN GOTO MENUBAR.CHOSE
+
+    GOSUB MENUBAR.HOTKEY
+    IF MENUBAR.HIT > 0 THEN MENUBAR.SEL = MENUBAR.HIT : GOTO MENUBAR.CHOSE
+    GOTO MENUBAR.WAIT
+
+## ---- moved: wrap or stop, then lift the old highlight and lay the new ----
+
+MENUBAR.SETTLE:
+    IF MENUBAR.SEL < 1 THEN GOTO MENUBAR.WRAPLEFT
+    IF MENUBAR.SEL > MENUHELP.COUNT THEN GOTO MENUBAR.WRAPRIGHT
+MENUBAR.SETTLE.GO:
+    IF MENUBAR.SEL = MENUBAR.WAS THEN GOTO MENUBAR.WAIT
+    MENUBAR.DRAWN = MENUBAR.WAS : MENUBAR.PAINT = MENUHELP.ATTR : GOSUB MENUBAR.ITEM
+    GOSUB MENUBAR.MARK : GOTO MENUBAR.WAIT
+
+MENUBAR.WRAPLEFT:
+    MENUBAR.SEL = MENUHELP.COUNT
+    IF (MENUBAR.FLAGS AND MENUBAR.NOWRAP) <> 0 THEN MENUBAR.SEL = 1
+    GOTO MENUBAR.SETTLE.GO
+
+MENUBAR.WRAPRIGHT:
+    MENUBAR.SEL = 1 : IF (MENUBAR.FLAGS AND MENUBAR.NOWRAP) <> 0 THEN MENUBAR.SEL = MENUHELP.COUNT
+    GOTO MENUBAR.SETTLE.GO
+
+## ---- ESC. MUSTSEL is for a bar with nothing behind it to go back to ----
+
+MENUBAR.CANCEL:
+    IF (MENUBAR.FLAGS AND MENUBAR.MUSTSEL) <> 0 THEN GOTO MENUBAR.WAIT
+    MENUBAR.KEY = MENUBAR.CODE : MENUBAR.DRAWN = MENUBAR.SEL : MENUBAR.PAINT = MENUHELP.ATTR : GOSUB MENUBAR.ITEM
+    MENUBAR.SEL = 0 : RETURN
+
+## ---- chosen, by RETURN, by a hotkey, or by a cross-axis arrow. The
+## ---- highlight comes off unless KEEPMARK asked for it to stay, and
+## ---- MENUBAR.SELX / SELW are left pointing at the item either way.
+
+MENUBAR.CHOSE:
+    MENUBAR.KEY = MENUBAR.CODE : GOSUB MENUBAR.WHERE
+    IF (MENUBAR.FLAGS AND MENUBAR.KEEPMARK) <> 0 THEN RETURN
+    MENUBAR.DRAWN = MENUBAR.SEL : MENUBAR.PAINT = MENUHELP.ATTR : GOSUB MENUBAR.ITEM
+    RETURN
+
+## ***********************************************************************
+## **  MENUBAR.HOTKEY -- a letter that chooses its item.
+## **
+## **   out  MENUBAR.HIT   the item, or 0
+## **
+## **  Matched without case, and it CHOOSES rather than moving to -- which
+## **  is MENUHELP's rule and the thing that makes a hotkey worth having.
+## ***********************************************************************
+
+MENUBAR.HOTKEY:
+    MENUBAR.HIT = 0 : IF MENUHELP.HOT$ = "" THEN RETURN
+    MENUBAR.WANT = MENUBAR.CODE
+    IF MENUBAR.WANT > 96 AND MENUBAR.WANT < 123 THEN MENUBAR.WANT = MENUBAR.WANT - 32
+    FOR MENUBAR.HK = 1 TO LEN(MENUHELP.HOT$)
+        IF MENUBAR.HK > MENUHELP.COUNT THEN GOTO MENUBAR.HOTDONE
+        MENUBAR.HC = ASC(MID$(MENUHELP.HOT$, MENUBAR.HK, 1))
+        IF MENUBAR.HC > 96 AND MENUBAR.HC < 123 THEN MENUBAR.HC = MENUBAR.HC - 32
+        IF MENUBAR.HC = MENUBAR.WANT THEN MENUBAR.HIT = MENUBAR.HK
+    NEXT MENUBAR.HK
+MENUBAR.HOTDONE:
+    RETURN
+
+## ***********************************************************************
+## **  MENUBAR.PADKEY -- the SNES pad, as a key code.
+## **
+## **  LEFT and RIGHT where the vertical menu reads UP and DOWN, B for
+## **  RETURN and START for ESC. It WAITS FOR THE RELEASE, because a pad
+## **  is read as a level and not an event: without it one press walks the
+## **  whole bar.
+## ***********************************************************************
+
+MENUBAR.PADKEY:
+    MENUBAR.CODE = 0 : GOSUB MENUBAR.PADREAD
+    IF MENUBAR.PAD = 0 THEN RETURN
+    IF (MENUBAR.PAD AND MENUBAR.PAD.LEFT) <> 0 THEN MENUBAR.CODE = MENUBAR.LEFT
+    IF (MENUBAR.PAD AND MENUBAR.PAD.RIGHT) <> 0 THEN MENUBAR.CODE = MENUBAR.RIGHT
+    IF (MENUBAR.PAD AND MENUBAR.PAD.B) <> 0 THEN MENUBAR.CODE = MENUBAR.ENTER
+    IF (MENUBAR.PAD AND MENUBAR.PAD.START) <> 0 THEN MENUBAR.CODE = MENUBAR.ESCAPE
+    IF MENUBAR.CODE = 0 THEN RETURN
+MENUBAR.PADRELEASE:
+    GOSUB MENUBAR.PADREAD : IF MENUBAR.PAD <> 0 THEN GOTO MENUBAR.PADRELEASE
+    RETURN
+
+MENUBAR.PADREAD:
+    MENUBAR.PAD = JOY(MENUBAR.PORT) AND 255 : RETURN
+
+## ***********************************************************************
+## **  MENUBAR.DRAW -- every item, unhighlighted.
+## ***********************************************************************
+
+MENUBAR.DRAW:
+    FOR MENUBAR.EACH = 1 TO MENUHELP.COUNT
+        MENUBAR.DRAWN = MENUBAR.EACH : MENUBAR.PAINT = MENUHELP.ATTR
+        GOSUB MENUBAR.ITEM
+    NEXT MENUBAR.EACH
+    RETURN
+
+## ---- the highlight, on whatever MENUBAR.SEL now is. HIATTR of 0 means
+## ---- "invert ATTR", which is what MENUHELP does and what GP.MENU always
+## ---- did before it.
+
+MENUBAR.MARK:
+    MENUBAR.PAINT = MENUHELP.HIATTR
+    IF MENUBAR.PAINT = 0 THEN MENUBAR.PAINT = (MENUHELP.ATTR AND 15) * 16 + INT(MENUHELP.ATTR / 16)
+    MENUBAR.DRAWN = MENUBAR.SEL
+    GOSUB MENUBAR.ITEM : RETURN
+
+## ***********************************************************************
+## **  MENUBAR.ITEM -- one item, at its own column and its own width.
+## **
+## **   in   MENUBAR.DRAWN   the item, 1..COUNT
+## **        MENUBAR.PAINT   the attribute
+## **
+## **  IT AIMS MENUHELP.ROW SIDEWAYS rather than repeating it. That routine
+## **  fills the highlight, cuts text that would run past the edge, and
+## **  tints the hotkey letter -- none of which is about which way a menu
+## **  runs. The one thing in it that IS vertical is its first line,
+## **  DRAWY = Y + DRAWROW - 1, so this sets MENUHELP.Y such that the sum
+## **  lands on the bar's row. That is a deliberate use of its arithmetic,
+## **  not a trick played on it: change that line in MENUHELP and this
+## **  breaks loudly, on the first draw, in the obvious place.
+## ***********************************************************************
+
+MENUBAR.ITEM:
+    MENUBAR.FIND = MENUBAR.DRAWN : GOSUB MENUBAR.COLUMN
+    MENUHELP.X = MENUBAR.AT : MENUHELP.WIDTH = MENUBAR.WIDE : MENUHELP.Y = MENUBAR.Y - MENUBAR.DRAWN + 1
+    MENUHELP.DRAWROW = MENUBAR.DRAWN : MENUHELP.DRAWATTR = MENUBAR.PAINT
+    GOSUB MENUHELP.ROW : RETURN
+
+## ***********************************************************************
+## **  MENUBAR.COLUMN -- where item MENUBAR.FIND starts, and how wide.
+## **
+## **   in   MENUBAR.FIND    the item, 1..COUNT
+## **   out  MENUBAR.AT      its column
+## **        MENUBAR.WIDE    its width, which is the length of its text
+## **
+## **  Walked from the left every time rather than cached in an array.
+## **  That is O(n) per item and O(n squared) for a whole bar, which for
+## **  the eight or ten items a bar ever has is a few dozen additions on a
+## **  path that is about to wait for a human. An array would have to be
+## **  DIMmed by the caller -- MENUHELP.ITEM$'s own problem, and not one
+## **  worth having twice.
+## ***********************************************************************
+
+MENUBAR.COLUMN:
+    MENUBAR.AT = MENUBAR.X : MENUBAR.WIDE = LEN(MENUHELP.ITEM$(MENUBAR.FIND))
+
+## ---- THE GUARD IS NOT OPTIONAL. "FOR 1 TO 0" RUNS ONCE in this BASIC --
+## ---- the test is at the NEXT, so the body has already happened. Without
+## ---- this line item 1 sums item 1's own width and starts where item 2
+## ---- should, which draws a bar with the first two entries on top of each
+## ---- other. Measured: item 1 came back at column 8 instead of 2.
+    IF MENUBAR.FIND < 2 THEN RETURN
+
+    FOR MENUBAR.CI = 1 TO MENUBAR.FIND - 1
+        MENUBAR.AT = MENUBAR.AT + LEN(MENUHELP.ITEM$(MENUBAR.CI)) + MENUBAR.GAP
+    NEXT MENUBAR.CI
+    RETURN
+
+## ---- where the chosen item sits, for a caller about to open something
+## ---- underneath it. Set on the way out of MENUBAR.CHOSE, so it survives
+## ---- the highlight being lifted.
+
+MENUBAR.WHERE:
+    MENUBAR.FIND = MENUBAR.SEL : GOSUB MENUBAR.COLUMN
+    MENUBAR.SELX = MENUBAR.AT : MENUBAR.SELW = MENUBAR.WIDE : RETURN
+
+MENUBAR.MODULE.END:
+#ENDIF

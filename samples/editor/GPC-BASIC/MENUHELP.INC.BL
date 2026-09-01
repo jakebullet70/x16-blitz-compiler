@@ -67,9 +67,12 @@
 ## **        MENUHELP.FLAGS    added together, see below
 ## **        MENUHELP.SEL      the row to start on; 0 starts at 1
 ## **
-## **   out  MENUHELP.SEL      1..COUNT, or 0 if cancelled
+## **   out  MENUHELP.SEL      1..COUNT, or 0 if cancelled -- and, if
+## **                          KEYEXIT is on, whatever row was highlighted
+## **                          when a key it does not own arrived
 ## **        MENUHELP.KEY      the key code that ended it: 13 chose, 27
-## **                          cancelled, or the hotkey itself
+## **                          cancelled, the hotkey itself, or under
+## **                          KEYEXIT the key being handed back
 ## **
 ## **  THE CALLER OWNS THE DIM, deliberately. A module cannot be handed an
 ## **  array in BASIC, so it has to name one -- and if it DIMmed that array
@@ -94,11 +97,25 @@
 ## ends instead of rolling round, which suits a list that reads as a range.
 ## GAMEPAD adds the SNES pad in port 1 to the keyboard; it does not replace
 ## it, so a program never has to ask which the user has.
+##
+## KEYEXIT hands a key this menu has no use for back to the caller instead
+## of swallowing it. A vertical menu ignores LEFT and RIGHT because they
+## mean nothing on its axis -- but a caller that has put one UNDER A MENU
+## BAR wants exactly those, to walk the bar with the panel still open, and
+## only the caller knows that. So the key ends the menu with MENUHELP.KEY
+## set and MENUHELP.SEL left ALONE, and the caller decides what it meant.
+## MENUBAR.DOWNEXIT is the same idea pointing the other way, and this is
+## its other half: between them a bar and its dropdown drive each other
+## without either module knowing the other exists.
+##
+## Off by default, because ignoring those keys is the right answer for a
+## menu that is only a menu.
 
 #DEFINE MENUHELP.MUSTSEL 1
 #DEFINE MENUHELP.KEEPMARK 2
 #DEFINE MENUHELP.NOWRAP 4
 #DEFINE MENUHELP.GAMEPAD 8
+#DEFINE MENUHELP.KEYEXIT 64
 
 ## PETSCII, as GET reports it.
 
@@ -185,6 +202,7 @@ MENUHELP.KEYED:
             GOSUB MENUHELP.CANCEL
         GP.OTHER
             GOSUB MENUHELP.HOTKEY
+            IF MENUHELP.DONE = 0 THEN GOSUB MENUHELP.KEYBACK
     GP.ENDSEL
 
 ## ---- Move the highlight only if it actually moved. Two rows redrawn, and
@@ -238,6 +256,20 @@ MENUHELP.WRAPBOT:
 MENUHELP.CANCEL:
     IF (MENUHELP.FLAGS AND MENUHELP.MUSTSEL) <> 0 THEN RETURN
     MENUHELP.SEL = 0 : MENUHELP.DONE = 1 : RETURN
+
+## ---- KEYEXIT: a key this menu has no use for ends it, and MENUHELP.KEY
+## ---- says which. MENUHELP.SEL is left ALONE -- that is the whole
+## ---- difference from ESC, which returns 0, and it is what lets a caller
+## ---- tell "the user went elsewhere, from row 3" from "the user
+## ---- cancelled". Reached only when the hotkeys did not claim the key.
+## ----
+## ---- A guarded subroutine and not one ANDed condition, for the reason
+## ---- given at MENUHELP.FOLDWANT: AND sits below the comparisons in the
+## ---- precedence table.
+
+MENUHELP.KEYBACK:
+    IF (MENUHELP.FLAGS AND MENUHELP.KEYEXIT) <> 0 THEN MENUHELP.DONE = 1
+    RETURN
 
 ## ***********************************************************************
 ## **  MENUHELP.HOTKEY -- anything that was not a cursor key.
