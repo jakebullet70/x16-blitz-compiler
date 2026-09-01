@@ -1,0 +1,293 @@
+## ***********************************************************************
+## **
+## **  SORT.EXP.BL -- the regression test for SORT.INC.BL.
+## **
+## **  Run it and read the last two lines: "FAILS 0" and "DONE". Anything
+## **  else names the case that broke.
+## **
+## **  ------------------------------------------------------------------
+## **  HOW TO READ THIS FILE
+## **  ------------------------------------------------------------------
+## **
+## **  A BASL subroutine cannot be passed arguments. So every helper here
+## **  reads named variables that the caller sets first, and the shape of
+## **  each case is always the same three steps:
+## **
+## **      GOSUB T.LOAD.WORDS         <- put known, UNSORTED data in
+## **      ... sort it ...
+## **      GOSUB T.CHECK.WORDS        <- assert what came out
+## **
+## **  T.LOAD.WORDS EXISTS BECAUSE THE SORT IS IN PLACE. Cases 1, 2 and 3
+## **  all sort the SAME array, T.WORD$. Without reloading it between them,
+## **  case 2 would be sorting case 1's already-sorted output and case 3
+## **  would be sorting case 2's -- so two of the three would prove almost
+## **  nothing. Reloading is not tidiness, it is what makes them tests.
+## **
+## **  It also takes the CHECKSUM of the words as it loads them, into
+## **  T.SUM.BEFORE. T.CHECK.WORDS takes the same checksum afterwards and
+## **  the two must match. That is the second half of every assertion here
+## **  and it is not decoration: ORDER ALONE IS NOT ENOUGH. A sort that
+## **  reads the wrong element leaves the array beautifully ordered with
+## **  one string appearing twice and another gone, and only a content
+## **  check catches it. The checksum is position weighted so a swapped
+## **  pair differs from an unswapped one.
+## **
+## **  ------------------------------------------------------------------
+## **  THE VARIABLES, ALL OF THEM
+## **  ------------------------------------------------------------------
+## **
+## **      T.SOURCE$()    the twenty words, never modified -- the master
+## **      T.WORD$()      the working copy, which is what gets sorted
+## **      T.SUM.BEFORE   checksum of T.WORD$ as loaded
+## **      T.SUM.AFTER    checksum of T.WORD$ after sorting
+## **      T.ORDER        0 ascending, 1 descending  (set before T.CHECK.WORDS)
+## **      T.FOLD         0 case sensitive, 1 case blind
+## **      T.BAD          how many things were wrong in the case just run
+## **      T.CASE$        its name, for the PASS/FAIL line
+## **      T.FAILS        how many cases have failed so far
+## **
+## **  ------------------------------------------------------------------
+## **  WHY THE ANSWERS ARE NOT WRITTEN OUT
+## **  ------------------------------------------------------------------
+## **
+## **  Shell sort is not stable, so which of two EQUAL keys lands first is
+## **  not a promise the module makes and must not be a test. So order is
+## **  checked with BASIC's own comparisons, and the case folded pass with
+## **  GP.COMP -- the same case-blind comparison the assembly does.
+## **
+## **  The first run of this file used GP.SORT itself as the oracle,
+## **  keyword against module, and every case matched before the keyword
+## **  was deleted.
+## **
+## **  Build:  copy GPB.INC.BL, SORT.INC.BL and this file into testing/,
+## **          then
+## **            python source/gpc/build_basl.py SORT.EXP.BL SORT.PRG
+## **          and compile SORT.PRG with GPC.BIN.
+## **
+## ***********************************************************************
+#SAVEAS "@:SORT.PRG"
+#SYMFILE "@:SORT.SYM"
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "SORT.INC.BL"
+
+T.FAILS = 0
+
+DIM T.SOURCE$(19) : DIM T.WORD$(19)
+DIM T.BIG$(199)
+
+## ---- Mixed case on purpose: cases 1 and 2 are case SENSITIVE, so every
+## ---- lower case word must sort after every upper case one, and case 3
+## ---- proves folding changes exactly that.
+T.SOURCE$(0) = "PEAR"   : T.SOURCE$(1) = "APPLE"  : T.SOURCE$(2) = "FIG"
+T.SOURCE$(3) = "DATE"   : T.SOURCE$(4) = "plum"   : T.SOURCE$(5) = "CHERRY"
+T.SOURCE$(6) = "apple"  : T.SOURCE$(7) = "KIWI"   : T.SOURCE$(8) = "LIME"
+T.SOURCE$(9) = "MANGO"  : T.SOURCE$(10) = "OLIVE" : T.SOURCE$(11) = "PEACH"
+T.SOURCE$(12) = "grape" : T.SOURCE$(13) = "LEMON" : T.SOURCE$(14) = "BERRY"
+T.SOURCE$(15) = "MELON" : T.SOURCE$(16) = "NUT"   : T.SOURCE$(17) = "OAT"
+T.SOURCE$(18) = "RICE"  : T.SOURCE$(19) = "ZERO"
+
+## =======================================================================
+## 1. ASCENDING, case sensitive.
+## =======================================================================
+GOSUB T.LOAD.WORDS
+SORT.PTR = GP.ARRPTR(T.WORD$()) : SORT.DESCEND = 0 : SORT.NOCASE = 0
+GOSUB SORT.RUN
+PRINT "OK "; SORT.OK; " COUNT "; SORT.COUNT
+T.CASE$ = "ASCENDING" : T.ORDER = 0 : T.FOLD = 0
+GOSUB T.CHECK.WORDS
+
+## =======================================================================
+## 2. DESCENDING. Same array, which is why case 1 does not leak into it.
+## =======================================================================
+GOSUB T.LOAD.WORDS
+SORT.PTR = GP.ARRPTR(T.WORD$()) : SORT.DESCEND = 1 : SORT.NOCASE = 0
+GOSUB SORT.RUN
+T.CASE$ = "DESCENDING" : T.ORDER = 1 : T.FOLD = 0
+GOSUB T.CHECK.WORDS
+
+## =======================================================================
+## 3. CASE FOLDED, ascending. Checked with GP.COMP, which is the same
+##    case-blind comparison the assembly does character by character.
+## =======================================================================
+GOSUB T.LOAD.WORDS
+SORT.PTR = GP.ARRPTR(T.WORD$()) : SORT.DESCEND = 0 : SORT.NOCASE = 1
+GOSUB SORT.RUN
+T.CASE$ = "CASE FOLDED" : T.ORDER = 0 : T.FOLD = 1
+GOSUB T.CHECK.WORDS
+
+## =======================================================================
+## 4. EMPTIES. Only four of twenty are ever assigned; the other sixteen
+##    are null pointers, which the sort must read as "" and put at the
+##    front rather than follow to whatever lives at address 2.
+##
+##    Its own array, because the point is elements that were NEVER
+##    written -- T.LOAD.WORDS would fill all twenty.
+## =======================================================================
+DIM T.SPARSE$(19)
+T.SPARSE$(3) = "ZULU" : T.SPARSE$(9) = "ALPHA"
+T.SPARSE$(0) = "MIKE" : T.SPARSE$(19) = "BRAVO"
+SORT.PTR = GP.ARRPTR(T.SPARSE$()) : SORT.DESCEND = 0 : SORT.NOCASE = 0
+GOSUB SORT.RUN
+T.BAD = 0
+FOR T.I = 0 TO 15
+    IF T.SPARSE$(T.I) <> "" THEN T.BAD = T.BAD + 1
+NEXT T.I
+IF T.SPARSE$(16) <> "ALPHA" THEN T.BAD = T.BAD + 1
+IF T.SPARSE$(17) <> "BRAVO" THEN T.BAD = T.BAD + 1
+IF T.SPARSE$(18) <> "MIKE" THEN T.BAD = T.BAD + 1
+IF T.SPARSE$(19) <> "ZULU" THEN T.BAD = T.BAD + 1
+T.CASE$ = "EMPTIES" : GOSUB T.REPORT
+
+## =======================================================================
+## 5. TWO HUNDRED ELEMENTS. THIS IS THE ONE THAT MATTERS MOST.
+##
+##    Element 128 is where the doubled index stops fitting in a byte, and
+##    an address routine that drops that carry reads every element from
+##    there on 256 bytes low. Twenty words would never find it.
+##
+##    The keys are generated so their order is not one the fill could
+##    have left behind, and the trailing index makes each one unique.
+## =======================================================================
+T.SEED = 1 : T.SUM.BEFORE = 0
+FOR T.I = 0 TO 199
+    T.SEED = T.SEED * 37 + 11
+    T.SEED = T.SEED - INT(T.SEED / 251) * 251
+    T.KEY$ = CHR$(65 + T.SEED - INT(T.SEED / 26) * 26)
+    T.KEY$ = T.KEY$ + CHR$(65 + INT(T.SEED / 26) - INT(T.SEED / 234) * 9)
+    T.KEY$ = T.KEY$ + RIGHT$("000" + STR$(T.I), 3)
+    T.BIG$(T.I) = T.KEY$
+    T.TEXT$ = T.KEY$ : GOSUB T.CHECKSUM : T.SUM.BEFORE = T.SUM.BEFORE + T.SUM
+NEXT T.I
+
+SORT.PTR = GP.ARRPTR(T.BIG$()) : SORT.DESCEND = 0 : SORT.NOCASE = 0
+GOSUB SORT.RUN
+PRINT "BIG OK "; SORT.OK; " COUNT "; SORT.COUNT
+
+T.SUM.AFTER = 0
+FOR T.I = 0 TO 199
+    T.TEXT$ = T.BIG$(T.I) : GOSUB T.CHECKSUM : T.SUM.AFTER = T.SUM.AFTER + T.SUM
+NEXT T.I
+T.BAD = 0
+FOR T.I = 1 TO 199
+    IF T.BIG$(T.I - 1) > T.BIG$(T.I) THEN T.BAD = T.BAD + 1
+NEXT T.I
+IF T.SUM.BEFORE <> T.SUM.AFTER THEN T.BAD = T.BAD + 1000
+T.CASE$ = "200 ELEMENTS" : GOSUB T.REPORT
+PRINT "  FIRST "; T.BIG$(0); " AT128 "; T.BIG$(128); " LAST "; T.BIG$(199)
+PRINT "  SUM BEFORE "; T.SUM.BEFORE; " AFTER "; T.SUM.AFTER
+
+## =======================================================================
+## 6. TWO ELEMENTS, and ONE. The smallest arrays the gap loop can see --
+##    with one element it returns before the first pass.
+## =======================================================================
+DIM T.PAIR$(1)
+T.PAIR$(0) = "BETA" : T.PAIR$(1) = "ALPHA"
+SORT.PTR = GP.ARRPTR(T.PAIR$()) : SORT.DESCEND = 0 : SORT.NOCASE = 0
+GOSUB SORT.RUN
+T.BAD = 0
+IF T.PAIR$(0) <> "ALPHA" THEN T.BAD = T.BAD + 1
+IF T.PAIR$(1) <> "BETA" THEN T.BAD = T.BAD + 1
+T.CASE$ = "TWO ELEMENTS" : GOSUB T.REPORT
+
+DIM T.ONE$(0)
+T.ONE$(0) = "SOLO"
+SORT.PTR = GP.ARRPTR(T.ONE$()) : GOSUB SORT.RUN
+T.BAD = 0
+IF T.ONE$(0) <> "SOLO" THEN T.BAD = T.BAD + 1
+IF SORT.OK <> 1 THEN T.BAD = T.BAD + 1
+T.CASE$ = "ONE ELEMENT" : GOSUB T.REPORT
+
+## =======================================================================
+## 7. A FLOAT ARRAY IS REFUSED, rather than sorted as if its six byte
+##    elements were 2 byte pointers. SORT.OK = 0 is the whole assertion.
+## =======================================================================
+DIM T.NUMBER(9)
+T.NUMBER(0) = 5
+SORT.PTR = GP.ARRPTR(T.NUMBER()) : GOSUB SORT.RUN
+T.BAD = 0
+IF SORT.OK <> 0 THEN T.BAD = T.BAD + 1
+T.CASE$ = "NOT A STRING ARRAY" : GOSUB T.REPORT
+
+PRINT "FAILS "; T.FAILS
+PRINT "DONE"
+END
+
+## ***********************************************************************
+## **  T.LOAD.WORDS -- the twenty words into T.WORD$, UNSORTED, and their
+## **  checksum into T.SUM.BEFORE.
+## **
+## **  Call it before every case that sorts T.WORD$. The sort works in
+## **  place, so without this the next case would be sorting the last
+## **  case's answer.
+## ***********************************************************************
+
+T.LOAD.WORDS:
+    T.SUM.BEFORE = 0
+    FOR T.I = 0 TO 19
+        T.WORD$(T.I) = T.SOURCE$(T.I)
+        T.TEXT$ = T.SOURCE$(T.I) : GOSUB T.CHECKSUM
+        T.SUM.BEFORE = T.SUM.BEFORE + T.SUM
+    NEXT T.I
+    RETURN
+
+## ***********************************************************************
+## **  T.CHECK.WORDS -- assert T.WORD$ is in order AND still holds the
+## **  same twenty words.
+## **
+## **   in   T.ORDER   0 wanted ascending, 1 wanted descending
+## **        T.FOLD    1 to compare case-blind, with GP.COMP
+## **        T.CASE$   the name to print
+## ***********************************************************************
+
+T.CHECK.WORDS:
+    T.BAD = 0
+    FOR T.I = 1 TO 19
+        IF T.FOLD = 1 THEN GOSUB T.CHECK.FOLDED
+        IF T.FOLD = 0 AND T.ORDER = 0 THEN IF T.WORD$(T.I - 1) > T.WORD$(T.I) THEN T.BAD = T.BAD + 1
+        IF T.FOLD = 0 AND T.ORDER = 1 THEN IF T.WORD$(T.I - 1) < T.WORD$(T.I) THEN T.BAD = T.BAD + 1
+    NEXT T.I
+
+## ---- and that it is still the same twenty words, not nineteen and a
+## ---- duplicate. See the header: order alone would not notice.
+    T.SUM.AFTER = 0
+    FOR T.I = 0 TO 19
+        T.TEXT$ = T.WORD$(T.I) : GOSUB T.CHECKSUM
+        T.SUM.AFTER = T.SUM.AFTER + T.SUM
+    NEXT T.I
+    IF T.SUM.BEFORE <> T.SUM.AFTER THEN T.BAD = T.BAD + 1000
+
+    GOSUB T.REPORT
+    PRINT "  ["; T.WORD$(0); "]["; T.WORD$(1); "]["; T.WORD$(18); "]["; T.WORD$(19); "]"
+    RETURN
+
+## ---- one folded comparison, split out only because the line above it
+## ---- would otherwise carry three nested IFs
+T.CHECK.FOLDED:
+    IF GP.COMP(T.WORD$(T.I - 1), T.WORD$(T.I)) > 0 THEN T.BAD = T.BAD + 1
+    RETURN
+
+## ***********************************************************************
+## **  T.REPORT -- one PASS or FAIL line.
+## **   in   T.BAD    0 = passed;  T.CASE$  the name
+## ***********************************************************************
+
+T.REPORT:
+    IF T.BAD = 0 THEN PRINT "PASS "; T.CASE$
+    IF T.BAD <> 0 THEN PRINT "FAIL "; T.CASE$; " BAD "; T.BAD : T.FAILS = T.FAILS + 1
+    RETURN
+
+## ***********************************************************************
+## **  T.CHECKSUM -- T.TEXT$ in, T.SUM out.
+## **
+## **  Position weighted, so "AB" and "BA" differ. A plain sum of the
+## **  character codes would not, and two elements swapped is exactly the
+## **  kind of damage this is here to catch.
+## ***********************************************************************
+
+T.CHECKSUM:
+    T.SUM = LEN(T.TEXT$) * 7
+    IF LEN(T.TEXT$) < 1 THEN RETURN
+    FOR T.CI = 1 TO LEN(T.TEXT$)
+        T.SUM = T.SUM + ASC(MID$(T.TEXT$, T.CI, 1)) * T.CI
+    NEXT T.CI
+    RETURN
