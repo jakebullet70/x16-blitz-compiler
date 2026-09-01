@@ -23,9 +23,15 @@ CreateVariableRecord:
 		pha
 
 		;
-		;		Room for another 6-byte record plus the end marker before we run into the
-		;		line-number table coming the other way? STRMarkLine makes the mirror-image test.
+		;		Room for another 6-byte record plus the end marker before the list runs off the
+		;		top of its window? STRMarkLine makes the mirror-image test on the line table.
 		;		Neither existed, so the two tables quietly overwrote each other on a big program.
+		;
+		;		THIS USED TO TEST AGAINST lineNumberTable, because the two tables shared one 8K
+		;		bank and grew towards each other -- so a program with many lines ran the variable
+		;		list out of room and vice versa. They have a bank each now (x16_storage.inc), so
+		;		the limit is this table's own window end and nothing the line table does can move
+		;		it. That is 1,365 records.
 		;
 		;		X and Y hold the variable NAME here and are read further down, so this may only
 		;		use A -- hence the scratch byte rather than the obvious tay.
@@ -36,17 +42,16 @@ CreateVariableRecord:
 		sta 	storageScratch
 		lda 	variableListEnd+1
 		adc 	#0
-		cmp 	lineNumberTable+1
-		bcc 	_CVRoom
-		bne 	_CVTooBig
+		cmp 	compilerEndHigh 			; end + 7 must be <= CompilerWorkspaceEnd, so on the
+		bcc 	_CVRoom 					; high byte matching, the low byte has to be exactly 0
+		bne 	_CVTooBig 					; -- the record ends flush with the top of the bank.
 		lda 	storageScratch
-		cmp 	lineNumberTable
-		bcc 	_CVRoom
+		beq 	_CVRoom
 _CVTooBig:
 		.error_toobig
 _CVRoom:
 
-		.storage_access
+		.varstore_access
 
 		lda 	freeVariableMemory 		; push current free address on stack.
 		pha
@@ -86,7 +91,7 @@ _CVRoom:
 		bcc 	_CVNoCarry2
 		inc 	variableListEnd+1
 _CVNoCarry2:		
-		.storage_release
+		.varstore_release
 		ply 							
 		plx
 		pla
@@ -99,7 +104,7 @@ _CVNoCarry2:
 ; ************************************************************************************************
 
 SetVariableRecordToCodePosition:
-		.storage_access
+		.varstore_access
 		pha
 		phy
 		ldy 	#3 							; store the position LOW-then-HIGH, the same address
@@ -110,7 +115,7 @@ SetVariableRecordToCodePosition:
 		sta 	(zTemp0),y 					; jumped to a garbage address. FNCompile is the only reader.
 		ply
 		pla
-		.storage_release
+		.varstore_release
 		rts
 
 ; ************************************************************************************************

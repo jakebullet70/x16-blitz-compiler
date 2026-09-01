@@ -28,7 +28,7 @@ STRReset:
 		sta 	lineNumberTable+1
 		stz 	lineNumberTable
 
-		.storage_access 					; clear the head of the work area list.
+		.varstore_access 				; clear the head of the work area list.
 
 		;
 		;		This read the LOW byte of variableListEnd (just zeroed two lines above) into the
@@ -45,7 +45,7 @@ STRReset:
 		lda 	#0
 		sta 	(zTemp0)
 
-		.storage_release
+		.varstore_release
 		.set16 freeVariableMemory,0 		; clear the free variable memory record.
 		rts
 		.send code

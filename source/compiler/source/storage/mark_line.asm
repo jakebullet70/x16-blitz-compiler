@@ -31,20 +31,21 @@ STRMarkLine:
 		sta 	zTemp0+1
 
 		;
-		;		The two tables share one window and grow towards each other -- this one down from
-		;		CompilerWorkspaceEnd, the variable name list up from CompilerWorkspaceStart. They
-		;		used to be free to pass through each other in silence, which corrupts both. Stop
-		;		on the touch. (A is free here: the caller's value is on the stack until the pla
-		;		below, and ExitCompiler restores SP, so raising with it still pushed is fine.)
+		;		Still inside the window? This table grows DOWN from CompilerWorkspaceEnd, and
+		;		without a test it was free to walk out of the bottom of the bank in silence.
+		;		(A is free here: the caller's value is on the stack until the pla below, and
+		;		ExitCompiler restores SP, so raising with it still pushed is fine.)
 		;
-		lda 	lineNumberTable+1
-		cmp 	variableListEnd+1
-		bcc 	_SMLTooBig
-		bne 	_SMLRoom
-		lda 	lineNumberTable
-		cmp 	variableListEnd
-		bcs 	_SMLRoom
-_SMLTooBig:
+		;		THIS USED TO TEST AGAINST variableListEnd. Both tables lived in one 8K bank and
+		;		grew towards each other, so the real limit was the SUM of the two -- and
+		;		samples/editor had reached 7,981 of 8,192 with 1,461 lines and 356 variables.
+		;		Fifty-two more lines and this test fired PROGRAM TOO BIG with a THIRD of the
+		;		object budget unused. One bank each (x16_storage.inc) makes the limit this
+		;		table's own window, which is 2,048 lines.
+		;
+		lda 	lineNumberTable+1 			; the entry is 4 bytes AT the pointer and the window
+		cmp 	compilerStartHigh 			; starts on a page boundary, so the high byte is the
+		bcs 	_SMLRoom 					; whole test -- any offset within that page is inside.
 		.error_toobig
 _SMLRoom:
 

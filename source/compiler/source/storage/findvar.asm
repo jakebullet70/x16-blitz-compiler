@@ -76,7 +76,7 @@ _IVStandard:
 		sta 	zTemp0+1
 		stz 	zTemp0
 
-		.storage_access
+		.varstore_access
 _IVCheckLoop:
 		lda 	(zTemp0) 					; finished ?
 		beq  	_IVNotFound 				; if so, return with CC.
@@ -108,12 +108,12 @@ _IVFound:
 		iny
 		lda 	(zTemp0),y
 		ply
-		.storage_release
+		.varstore_release
 		sec
 		rts
 
 _IVNotFound:
-		.storage_release
+		.varstore_release
 		ldx 	zTemp1 						; get variable name back
 		ldy 	zTemp1+1
 		clc

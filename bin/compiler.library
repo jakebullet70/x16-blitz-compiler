@@ -226,8 +226,18 @@ CompilerRAMBankReg	= $0000
 ;			0	the KERNAL's (FAT32 buffers and friends). Never ours.
 ;			1	the NATIVE TEST HARNESS's p-code buffer. source/compiler/testing/api/api.asm
 ;				does "lda #1 / sta 0" in _TAResetOut and then writes the object from $A000 up.
-;			2	these tables.
+;			2	the LINE NUMBER TABLE.
 ;			3	GP.ASM's blob pool and fixup list (see the second pair of macros below).
+;			4	the VARIABLE NAME LIST.
+;
+;		BANKS 2 AND 4 WERE ONE BANK, and that was the wall. The two tables shared 8K, growing
+;		towards each other, and samples/editor had used 7,981 bytes of it -- 1,461 line entries
+;		at 4 bytes plus 356 variable records at 6 -- leaving 211. Fifty-two more lines of source
+;		and the tables touched, and the compiler said PROGRAM TOO BIG with 7,106 bytes of the
+;		OBJECT budget still free. Same message, wrong limit: three sites raise it (STRMarkLine,
+;		CreateVariableRecord and _CAWriteByte) and only the last one is about the object. A bank
+;		each takes the tables to 2,048 lines and 1,365 variables, so the limit a program meets
+;		is the object ceiling -- the one that is really there.
 ;
 ;		This was bank 1 for one build, and the compiler-runtime `variables` and `arrays` suites
 ;		hung: the harness's object code and the variable name list were overwriting each other,
@@ -235,7 +245,8 @@ CompilerRAMBankReg	= $0000
 ;		been told. Every X16 has these banks (the 512K minimum is 64 of them). If you add a
 ;		third banked user, add it to this list first.
 ;
-CompilerStorageBank	= 2
+CompilerStorageBank	= 2 					; line number table, grows DOWN from $C000
+CompilerVarBank		= 4 					; variable name list, grows UP from $A000
 
 storage_access .macro
 		php
@@ -262,6 +273,38 @@ storageSavedBank: 							; caller's RAM bank, saved across a storage window
 		.fill 	1
 		.send 	storage
 
+;
+;		The same again for the VARIABLE NAME LIST, which is now a different bank. Same rules.
+;		The two windows are never nested -- nothing that walks the variable list touches a line
+;		number, or the other way about -- but the separate saved-bank byte means nesting would
+;		still restore correctly rather than quietly leave the wrong bank selected.
+;
+
+varstore_access .macro
+		php
+		pha
+		lda 	CompilerRAMBankReg 			; remember whatever the caller had selected
+		sta 	varSavedBank
+		lda 	#CompilerVarBank
+		sta 	CompilerRAMBankReg
+		pla
+		plp
+		.endm
+
+varstore_release .macro
+		php
+		pha
+		lda 	varSavedBank
+		sta 	CompilerRAMBankReg
+		pla
+		plp
+		.endm
+
+		.section storage
+varSavedBank: 								; caller's RAM bank, saved across a variable window
+		.fill 	1
+		.send 	storage
+
 ; ************************************************************************************************
 ;
 ;									Changes and Updates
@@ -271,6 +314,8 @@ storageSavedBank: 							; caller's RAM bank, saved across a storage window
 ;		Date			Notes
 ;		==== 			=====
 ;		02/08/26		Implemented (were no-ops); tables moved to banked RAM $A000-$BFFF.
+;		01/09/26		Split: the line table keeps bank 2, the variable list moves to bank 4,
+;						so neither table bounds the other.
 ;
 ; ************************************************************************************************
 
@@ -1103,9 +1148,15 @@ CreateVariableRecord:
 		pha
 
 		;
-		;		Room for another 6-byte record plus the end marker before we run into the
-		;		line-number table coming the other way? STRMarkLine makes the mirror-image test.
+		;		Room for another 6-byte record plus the end marker before the list runs off the
+		;		top of its window? STRMarkLine makes the mirror-image test on the line table.
 		;		Neither existed, so the two tables quietly overwrote each other on a big program.
+		;
+		;		THIS USED TO TEST AGAINST lineNumberTable, because the two tables shared one 8K
+		;		bank and grew towards each other -- so a program with many lines ran the variable
+		;		list out of room and vice versa. They have a bank each now (x16_storage.inc), so
+		;		the limit is this table's own window end and nothing the line table does can move
+		;		it. That is 1,365 records.
 		;
 		;		X and Y hold the variable NAME here and are read further down, so this may only
 		;		use A -- hence the scratch byte rather than the obvious tay.
@@ -1116,17 +1167,16 @@ CreateVariableRecord:
 		sta 	storageScratch
 		lda 	variableListEnd+1
 		adc 	#0
-		cmp 	lineNumberTable+1
-		bcc 	_CVRoom
-		bne 	_CVTooBig
+		cmp 	compilerEndHigh 			; end + 7 must be <= CompilerWorkspaceEnd, so on the
+		bcc 	_CVRoom 					; high byte matching, the low byte has to be exactly 0
+		bne 	_CVTooBig 					; -- the record ends flush with the top of the bank.
 		lda 	storageScratch
-		cmp 	lineNumberTable
-		bcc 	_CVRoom
+		beq 	_CVRoom
 _CVTooBig:
 		.error_toobig
 _CVRoom:
 
-		.storage_access
+		.varstore_access
 
 		lda 	freeVariableMemory 		; push current free address on stack.
 		pha
@@ -1166,7 +1216,7 @@ _CVRoom:
 		bcc 	_CVNoCarry2
 		inc 	variableListEnd+1
 _CVNoCarry2:		
-		.storage_release
+		.varstore_release
 		ply 							
 		plx
 		pla
@@ -1179,7 +1229,7 @@ _CVNoCarry2:
 ; ************************************************************************************************
 
 SetVariableRecordToCodePosition:
-		.storage_access
+		.varstore_access
 		pha
 		phy
 		ldy 	#3 							; store the position LOW-then-HIGH, the same address
@@ -1190,7 +1240,7 @@ SetVariableRecordToCodePosition:
 		sta 	(zTemp0),y 					; jumped to a garbage address. FNCompile is the only reader.
 		ply
 		pla
-		.storage_release
+		.varstore_release
 		rts
 
 ; ************************************************************************************************
@@ -2059,7 +2109,7 @@ _IVStandard:
 		sta 	zTemp0+1
 		stz 	zTemp0
 
-		.storage_access
+		.varstore_access
 _IVCheckLoop:
 		lda 	(zTemp0) 					; finished ?
 		beq  	_IVNotFound 				; if so, return with CC.
@@ -2091,12 +2141,12 @@ _IVFound:
 		iny
 		lda 	(zTemp0),y
 		ply
-		.storage_release
+		.varstore_release
 		sec
 		rts
 
 _IVNotFound:
-		.storage_release
+		.varstore_release
 		ldx 	zTemp1 						; get variable name back
 		ldy 	zTemp1+1
 		clc
@@ -7278,20 +7328,21 @@ STRMarkLine:
 		sta 	zTemp0+1
 
 		;
-		;		The two tables share one window and grow towards each other -- this one down from
-		;		CompilerWorkspaceEnd, the variable name list up from CompilerWorkspaceStart. They
-		;		used to be free to pass through each other in silence, which corrupts both. Stop
-		;		on the touch. (A is free here: the caller's value is on the stack until the pla
-		;		below, and ExitCompiler restores SP, so raising with it still pushed is fine.)
+		;		Still inside the window? This table grows DOWN from CompilerWorkspaceEnd, and
+		;		without a test it was free to walk out of the bottom of the bank in silence.
+		;		(A is free here: the caller's value is on the stack until the pla below, and
+		;		ExitCompiler restores SP, so raising with it still pushed is fine.)
 		;
-		lda 	lineNumberTable+1
-		cmp 	variableListEnd+1
-		bcc 	_SMLTooBig
-		bne 	_SMLRoom
-		lda 	lineNumberTable
-		cmp 	variableListEnd
-		bcs 	_SMLRoom
-_SMLTooBig:
+		;		THIS USED TO TEST AGAINST variableListEnd. Both tables lived in one 8K bank and
+		;		grew towards each other, so the real limit was the SUM of the two -- and
+		;		samples/editor had reached 7,981 of 8,192 with 1,461 lines and 356 variables.
+		;		Fifty-two more lines and this test fired PROGRAM TOO BIG with a THIRD of the
+		;		object budget unused. One bank each (x16_storage.inc) makes the limit this
+		;		table's own window, which is 2,048 lines.
+		;
+		lda 	lineNumberTable+1 			; the entry is 4 bytes AT the pointer and the window
+		cmp 	compilerStartHigh 			; starts on a page boundary, so the high byte is the
+		bcs 	_SMLRoom 					; whole test -- any offset within that page is inside.
 		.error_toobig
 _SMLRoom:
 
@@ -8174,7 +8225,7 @@ STRReset:
 		sta 	lineNumberTable+1
 		stz 	lineNumberTable
 
-		.storage_access 					; clear the head of the work area list.
+		.varstore_access 				; clear the head of the work area list.
 
 		;
 		;		This read the LOW byte of variableListEnd (just zeroed two lines above) into the
@@ -8191,7 +8242,7 @@ STRReset:
 		lda 	#0
 		sta 	(zTemp0)
 
-		.storage_release
+		.varstore_release
 		.set16 freeVariableMemory,0 		; clear the free variable memory record.
 		rts
 		.send code

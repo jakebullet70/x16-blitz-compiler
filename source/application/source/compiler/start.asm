@@ -79,6 +79,12 @@ _CCNoControlFile: 							; a compiler that guesses at what it was asked to
 ;		               the storage_access/storage_release macros, so it does not compete with the
 ;		               object code for low memory.
 ;
+;		THEY ARE A BANK EACH, so Start..End bounds them SEPARATELY rather than jointly -- 2,048
+;		lines and 1,365 variables, not 8K shared. Sharing one bank made the real limit the sum of
+;		the two, and samples/editor had reached 7,981 of 8,192 (1,461 lines, 356 variables): fifty
+;		more lines of source raised PROGRAM TOO BIG with a third of the OBJECT budget unused. The
+;		message was right, the limit behind it was the wrong one. See x16_storage.inc.
+;
 ;		Before this was split, the workspace started at $8000 and the object code was allowed to
 ;		run into it unchecked: at exactly $8000-$5100 = 12,032 bytes of p-code the object code
 ;		began overwriting the head of the variable name list, FindVariable then failed for EVERY

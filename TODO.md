@@ -947,6 +947,12 @@ program size in any mode: every run-side ceiling (18,432 embedded GP-BASIC OUT, 
 16,384 embedded GP-BASIC IN, 15,616 shared GP-BASIC IN) is now below the buffer, where all four used to be
 above it.
 
+> **The four ceilings above have drifted and the buffer figure with them.** `FreeMemory` is `$4800`
+> now, so the buffer is 22,272; and embedded GP-BASIC IN measures **17,408**, not 16,384 -- confirmed
+> by a build landing on `OK CODE 17406 FREE 4096`, `FREE` being exactly `MIN_WS_PAGES`. The
+> conclusion of this section is unaffected (the buffer is still above every run-side ceiling, which
+> is the point), but quote the measured numbers in "THE REAL MAXIMUM PROGRAM SIZE" below, not these.
+
 **The fix was not the banked-RAM plan this section used to describe.** That plan wanted 22 pages of
 *compiler* moved to `$A000-$BFFF`, and its own conclusion was that the bytes are in code, and code
 in banks is a whole-compiler audit. The measurement that killed it also replaced it: of the 14,079
@@ -1044,50 +1050,76 @@ replacing the bodies of `DOC.INSERT.SLOT` and `DOC.DELETE.SLOT` and leaving thei
   self-check replaced by a timing routine, run `--nowarp` because TI is meaningless under warp.
   Ten inserts at row 1 of a 100-line document currently cost 447 jiffies; that is the number to beat.
 
-### `PROGRAM TOO BIG` fires with 7,106 bytes of the object budget unused — BUG, reproducible
+### `PROGRAM TOO BIG` was the compiler's own workspace, not the program — FIXED
 
-**The editor is NOT out of memory.** `ObjectCeiling` (`$9F00`) minus `FreeMemory` (`$4800`) is
-**22,272 bytes** of p-code, and `samples/editor` compiles at **15,166** — 32% of the budget is spare.
-`FREE 6144` on the OK line is a different number entirely: `memreport.asm` says it is the RUNTIME
-workspace left for variables, strings and arrays, not compile headroom. Do not read it as headroom.
+**It was never the object buffer.** The message has THREE raise sites, not one, and only the last is
+about the object: `STRMarkLine` (the line-number table), `CreateVariableRecord` (the variable name
+list) and `_CAWriteByte` (`objPtr` reaching `ObjectCeiling`). The two tables shared ONE 8K bank at
+`$A000-$BFFF` and grew towards each other, so the real limit was the SUM of the two -- and
+`samples/editor` had quietly reached **7,981 of 8,192 bytes**, 97.4% of it:
 
-**But adding a page of source to the editor makes the compiler say `PROGRAM TOO BIG` anyway**, and
-that message can only come from one place — `_CAWriteByte` in `api.asm`, when `objPtr` reaches
-`$9F00`. Measured, all against the same `samples/editor/EDITOR.BASL`:
+| | | |
+|---|---:|---:|
+| line-number table | 1,461 entries x 4 | 5,844 |
+| variable name list | 356 records x 6, + terminator | 2,137 |
+| | **used** | **7,981** |
+| | **left** | **211** |
 
-| build | `EDITOR.PRG` | `.SYM` | result |
-|---|---|---|---|
-| as it ships | 26,899 | 36,813 | OK, object **15,166** |
-| self-check replaced by a timing routine | 23,325 | — | OK, object 12,601 |
-| + 35 filler lines, a new variable each | 27,964 | 39,154 | `TOO BIG @ 1602` |
-| + 70 filler lines, a new variable each | 29,050 | 41,428 | `TOO BIG @ 1570` |
-| + 100 filler lines, **no** new variables | 28,205 | 36,945 | `TOO BIG @ 1656` |
+Two hundred and eleven bytes is **fifty-two more lines of source**, which is why a page of filler
+tipped it over while a third of the object budget sat unused. Reproduced before the fix at 120 extra
+lines declaring no new variables: `PROGRAM TOO BIG @ 1647`.
 
-**What the table rules out.** It is not the variable name table: the last row adds a hundred lines of
-`ED.FIL = ED.FIL + n`, moves `.SYM` by 132 bytes, and still dies. It is not honest p-code either —
-those hundred lines are worth perhaps 800 bytes of object against 7,106 free, and 35 lines certainly
-cannot emit 7,106. **The wall tracks LINE COUNT, not emitted code.**
+**The fix is a bank each** (`x16_storage.inc`): the line table keeps bank 2, the variable list moves
+to bank 4, and each bounds itself against its own window instead of against the other table. That is
+**2,048 lines and 1,365 variables**, and neither can starve the other. `varstore_access` /
+`varstore_release` are the second window pair; the split is clean because no routine touches both
+tables -- `mark_line.asm` and `WriteMapFile` are the line table, `create.asm`, `findvar.asm` and
+`reset.asm` are the variable list.
 
-**Where to look.** `objPtr` is reaching `$9F00` for some reason other than legitimate emission, so
-either something is writing past the object or the pointer is being moved. The prime suspect is the
-compiler workspace: `CompilerWorkspaceStart..End` is `$A000-$C000`, 8K of BANKED RAM holding the
-variable name list growing UP and the line number table growing DOWN, and the line table is the half
-that scales with line count. `start.asm` records this exact class of failure happening before, when
-the workspace was still in low memory: the tables were overrun, `FindVariable` failed for every
-variable, and **the compiler printed OK and emitted a program in which `X` on one line and `X` on the
-next were different variables** — found by `samples/FSIM16_V1` at 12,766 bytes of p-code. That was
-fixed by moving the workspace to banked RAM; this looks like the same shape wearing a different mask,
-and this time it at least stops rather than lying.
+Verified: the 120-line build that used to fail now gives `OK CODE 16366 FREE 5120`, and the unpadded
+editor compiles **byte for byte identical** to the pre-fix object (`OK CODE 15166 FREE 6144`,
+`C.EDITOR.PRG` 28,223). All six compiler-runtime suites still pass -- they matter here because the
+native test harness owns bank 1, and putting a table in that bank once broke `variables` and `arrays`
+silently. `GPC.BIN` came out 13 bytes SMALLER; both bounds tests got simpler.
 
-**Why it matters beyond the editor.** A build-side wall that stops a program the machine could
-comfortably run is a bug, and the standing rule is that costs are reported in maximum program size.
-Right now the reported budget (22,272) and the achievable one (~15,500 at ~1,600 lines) differ by a
-third, and nothing tells the user which one they are actually up against.
+### THE REAL MAXIMUM PROGRAM SIZE IS 17,408 BYTES OF P-CODE, and 22,272 was wrong
 
-**Next**: instrument `_CAWriteByte` or dump `objPtr` per line to see whether the object grows
-smoothly and hits the roof or jumps; and check the line number table's size against `$C000` for a
-program of ~1,650 lines. Neither needs a full build to reason about -- the table entry size is in
-`reset.asm`.
+Chasing the above turned up a number this file has been stating incorrectly. `ObjectCeiling -
+FreeMemory` = 22,272 is where the compiler BUILDS the object; it is not what a program may be. At
+write time `WriteObjectCode` computes
+
+    newWorkspacePage = ObjectBase + pages(object) + FrameStackPages
+
+and rejects anything leaving less than `MIN_WS_PAGES`. With `ObjectBase` `$3b00`, `FrameStackPages`
+16 (4K) and `MIN_WS_PAGES` 16 (4K), everything from `$3b00` to `$9F00` -- 25,600 bytes -- is object
+plus frame stack plus workspace, so the object may be at most **68 pages, 17,408 bytes**. That path
+prints `PROGRAM TOO BIG` with **no `@ line`**, because the compile already finished.
+
+Measured, not derived -- filler lines added to `samples/editor`, ten bytes of p-code each:
+
+| filler lines | object | `FREE` | result |
+|---:|---:|---:|---|
+| 0 | 15,166 | 6,144 | OK |
+| 120 | 16,366 | 5,120 | OK |
+| **224** | **17,406** | **4,096** | **OK -- the last one that fits** |
+| 585 | (21,016) | — | `PROGRAM TOO BIG`, no line: the write-time check |
+| 600 | — | — | `PROGRAM TOO BIG @ 2186` -- entry 2,048, the line table |
+
+**So `FREE` IS the headroom after all, once you know what it is headroom for.** It is the runtime
+workspace, and a program is refused when it would fall below 4,096. The editor's `FREE 6144` means
+**2,048 more bytes of p-code, about 200 more editor-shaped lines** -- and that, not the line table
+and not 22,272, is the number to quote.
+
+**Which limit now binds.** For editor-density code (10.4 bytes of p-code per line) the object wall
+arrives at ~1,675 lines and the line table not until 2,048, so **the object budget binds first,
+which is the correct outcome** -- the wall a program meets is now a real one about the program's own
+size. Sparse code (many short lines) still meets the line table at 2,048 first.
+
+**What could be done next, if the ceiling ever needs raising**, in increasing order of work: drop
+`MIN_WS_PAGES` for a program that provably needs little workspace (it is a policy, not a hardware
+limit); shrink the 4K frame stack, which is ~250 frames; or the runtime-shrinking items above, since
+every byte off the runtime is a byte `ObjectBase` moves down. None is urgent -- the editor has room
+for another 200 lines and the honest number is now reported.
 
 ### `GUI.INC.BL` wants a listbox, single and multi select
 
@@ -1129,7 +1161,7 @@ want to be `GUILIST.INC.BL` beside it rather than inside it.
 `kbdbuf_put`, and read the map back with `VPEEK` before printing anything. And walk every row of the
 panel, not one sampled cell — that lesson has already cost a shipped dropdown with rows missing.
 
-### Comment density — the samples and GUI are done, the library is not
+### Comment density — DONE, editor, library and examples
 
 **The rule, in the user's words:** *"code needs to be written so it flows and the programmer can
 follow it. When there are lots of REMs it might look good to an employer counting lines, but to me

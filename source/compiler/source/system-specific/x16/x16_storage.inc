@@ -63,8 +63,18 @@ CompilerRAMBankReg	= $0000
 ;			0	the KERNAL's (FAT32 buffers and friends). Never ours.
 ;			1	the NATIVE TEST HARNESS's p-code buffer. source/compiler/testing/api/api.asm
 ;				does "lda #1 / sta 0" in _TAResetOut and then writes the object from $A000 up.
-;			2	these tables.
+;			2	the LINE NUMBER TABLE.
 ;			3	GP.ASM's blob pool and fixup list (see the second pair of macros below).
+;			4	the VARIABLE NAME LIST.
+;
+;		BANKS 2 AND 4 WERE ONE BANK, and that was the wall. The two tables shared 8K, growing
+;		towards each other, and samples/editor had used 7,981 bytes of it -- 1,461 line entries
+;		at 4 bytes plus 356 variable records at 6 -- leaving 211. Fifty-two more lines of source
+;		and the tables touched, and the compiler said PROGRAM TOO BIG with 7,106 bytes of the
+;		OBJECT budget still free. Same message, wrong limit: three sites raise it (STRMarkLine,
+;		CreateVariableRecord and _CAWriteByte) and only the last one is about the object. A bank
+;		each takes the tables to 2,048 lines and 1,365 variables, so the limit a program meets
+;		is the object ceiling -- the one that is really there.
 ;
 ;		This was bank 1 for one build, and the compiler-runtime `variables` and `arrays` suites
 ;		hung: the harness's object code and the variable name list were overwriting each other,
@@ -72,7 +82,8 @@ CompilerRAMBankReg	= $0000
 ;		been told. Every X16 has these banks (the 512K minimum is 64 of them). If you add a
 ;		third banked user, add it to this list first.
 ;
-CompilerStorageBank	= 2
+CompilerStorageBank	= 2 					; line number table, grows DOWN from $C000
+CompilerVarBank		= 4 					; variable name list, grows UP from $A000
 
 storage_access .macro
 		php
@@ -99,6 +110,38 @@ storageSavedBank: 							; caller's RAM bank, saved across a storage window
 		.fill 	1
 		.send 	storage
 
+;
+;		The same again for the VARIABLE NAME LIST, which is now a different bank. Same rules.
+;		The two windows are never nested -- nothing that walks the variable list touches a line
+;		number, or the other way about -- but the separate saved-bank byte means nesting would
+;		still restore correctly rather than quietly leave the wrong bank selected.
+;
+
+varstore_access .macro
+		php
+		pha
+		lda 	CompilerRAMBankReg 			; remember whatever the caller had selected
+		sta 	varSavedBank
+		lda 	#CompilerVarBank
+		sta 	CompilerRAMBankReg
+		pla
+		plp
+		.endm
+
+varstore_release .macro
+		php
+		pha
+		lda 	varSavedBank
+		sta 	CompilerRAMBankReg
+		pla
+		plp
+		.endm
+
+		.section storage
+varSavedBank: 								; caller's RAM bank, saved across a variable window
+		.fill 	1
+		.send 	storage
+
 ; ************************************************************************************************
 ;
 ;									Changes and Updates
@@ -108,6 +151,8 @@ storageSavedBank: 							; caller's RAM bank, saved across a storage window
 ;		Date			Notes
 ;		==== 			=====
 ;		02/08/26		Implemented (were no-ops); tables moved to banked RAM $A000-$BFFF.
+;		01/09/26		Split: the line table keeps bank 2, the variable list moves to bank 4,
+;						so neither table bounds the other.
 ;
 ; ************************************************************************************************
 
