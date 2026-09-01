@@ -1020,6 +1020,30 @@ cannot dirty anything ABOVE the cursor row, so repainting from `ED.CUR.ROW` down
 drawing on average and cost nothing near the bottom of a file. Worth doing after the shift, and only
 then -- at 17% it is not what anyone is feeling.
 
+**THE WORK, when it is picked up.** One `GP.ASM` block per direction, in `samples/editor/STORE.BASL`,
+replacing the bodies of `DOC.INSERT.SLOT` and `DOC.DELETE.SLOT` and leaving their interfaces alone --
+`LINE.INDEX` in, `LINE.COUNT` maintained, every caller untouched.
+
+- **Both, not just insert.** BACKSPACE at column 0 joins two lines and pays the identical cost
+  through `DOC.DELETE.SLOT`; so does DEL at end of line. Fixing one and not the other leaves half
+  the complaint in place.
+- **What the block does:** a 3-byte-per-entry `memmove` inside the `$A000` window. Insert copies
+  DOWNWARD from the top so it does not eat its own source; delete copies UPWARD. That direction rule
+  is the whole correctness argument and the BASIC version already gets it right -- read it first.
+- **The segment boundary is the trap.** The table lives in banks `DOC.TABLE.BASE.BANK`..+2 at
+  `DOC.TABLE.PER.BANK` (2048) entries each, so a shift that crosses one is TWO moves with a `BANK`
+  between them, not one. `DOC.SLOT.LOCATE` is where that arithmetic already lives. A document under
+  2048 lines never crosses, which means a naive block will pass every casual test and corrupt the
+  first long file it meets -- so test at the boundary deliberately.
+- **`{VAR}` needs the `#SYMFILE`**, which `EDITOR.BASL` already declares above its includes. Names
+  are crunched by then, and `STORE.BASL` is `#INCLUDE`d at the bottom of the same program, so the
+  block can reach `LINE.COUNT`, `LINE.INDEX` and the `DOC.*` variables directly.
+- **Free in runtime bytes:** a `GP.ASM` block is five bytes of p-code plus the instructions, and
+  every handler it uses is in every compiled program already.
+- **Measure it the same way it was measured:** the harness is a copy of `EDITOR.BASL` with the
+  self-check replaced by a timing routine, run `--nowarp` because TI is meaningless under warp.
+  Ten inserts at row 1 of a 100-line document currently cost 447 jiffies; that is the number to beat.
+
 ### `PROGRAM TOO BIG` fires with 7,106 bytes of the object budget unused — BUG, reproducible
 
 **The editor is NOT out of memory.** `ObjectCeiling` (`$9F00`) minus `FreeMemory` (`$4800`) is
