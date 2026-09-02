@@ -257,9 +257,14 @@ grepping for the retired keywords find it. `SCREEN.EXP.BL` had been broken the s
    the `make` target in item 2 should do.
 
 **Until then: after retiring ANY keyword, grep the whole tree for it — `GPC-BASIC`, `samples`, AND
-`testing`.** Known stale right now: `testing/GPC.ERR.BASL` calls `GP.LTRIM` and `GP.UPPER`, and
-`testing/GPB.INC.BL` and `testing/samples/editor/GPC-BASIC/` still define and use all eight retired
-tokens. That is a working directory, so it may simply want refreshing from `GPC-BASIC/`.
+`testing`.** **Re-checked 2026-09-02 and the tracked tree is CLEAN**: every remaining mention of a
+retired token in `testing/GPC.ERR.BASL`, `testing/GPB.INC.BL` and `testing/STRCASE.INC.BL` is inside
+a comment, not a statement -- `GPC.ERR.BASL` moved to `STRCASE.INC.BL` in `51bff2c`. The stale copies
+under `testing/samples/editor/GPC-BASIC/` are UNTRACKED build output (`make samples` wipes and
+re-copies that whole tree from `samples/`), so they are a local leftover, not a repo problem. Sweep
+excluding comment lines or it reads as broken when it is not:
+
+    grep -vE '^\s*(##|REM(\s|$))' <file> | grep -E 'GP\.(SORT|STASH|RESTR|UPPER|LOWER|L?TRIM)'
 
 ### `GP.FILL` converts its glyph in ISO mode, where converting is wrong — open
 
