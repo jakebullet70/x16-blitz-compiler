@@ -1154,13 +1154,40 @@ Two independent bugs, both found by chasing the "unexplained" intermittency to g
    self-check went from 5-in-12 failing at random addresses to **12/12 clean, deterministic**, at
    FREE 5,120 -- less room than any row of the table below.
 
-**Still open, and now deterministic:** stage a real `TEST.MD` in the work directory and the
-self-check dies 8/8 at `LINEINPUT.WAIT`, ~600 bytes short -- a real document's live line-scale
-strings plus the whole gauntlet genuinely do not fit in FREE 5,120. Every earlier "green" run in
-this file's history ran document-less without knowing it (the harness never staged TEST.MD, and
-FIND1 printing "Not found: bullet" was the tell nobody read). Next levers, measured not guessed:
-the 1.5x expansion factor in `StringConcrete` over-allocates ~38 bytes per line-scale string, and
-the FIND-test residue (`ED.HAY$`, `ED.FOLD.OUT$`, needle copies) stays live through the GUI block.
+**CLOSED 2026-09-02, and the "next lever" guess above named the right suspect.** The
+document-present self-check now runs to `M4 OK`, and every assertion the old build reached is
+byte-identical -- the finds, `HWD MB= 70`, `GUI RESTORE 4378`. Document-less is identical to its
+own green baseline too.
+
+**The 579 bytes were the SEARCH, measured with `FRE` probes rather than guessed.** The descent
+through the self-check was: entry 1,489 free, after loading `TEST.MD` **1,489** (the rebuilt
+loader allocates nothing at all), after the FIND tests **910**. `ED.FIND.NEXT` folded the needle
+AND EVERY LINE IT SCANNED into new strings -- `ED.FOLD.IN$`, `ED.FOLD.OUT$`, `ED.HAY$` -- then
+walked each line with `MID$` per position, which allocates on every comparison. Three ~250 byte
+blocks stayed owned for the rest of the run.
+
+**Why "assign it back to empty" would not have helped, and this is the general lesson.** A Blitz
+string variable OWNS its block and the capacity never shrinks; `A$ = ""` keeps the block and sets
+the length to 0. The scavenger only reclaims a block a string OUTGREW, so a working buffer that
+has once seen a 250-character line is spoken for until the program ends. **In this runtime the fix
+for a big temporary is not to free it -- it is to never build it.**
+
+`GP.INSTR` was there the whole time and takes a 1-based start of its own, so the search needed no
+copy: the fold is `GP.ASM` in place through `GP.STRPTR` (`ED.UPPER`), and the scan is one
+`GP.INSTR` per line. `ED.STRFIND` and `ED.FOLD` are gone. A find now costs **81 bytes, not 579**,
+the editor is **16,057 bytes against 16,116** -- smaller as well as correct -- and `FREE` is back
+to 5,120.
+
+**The loader was rebuilt in the same pass** (`LINPUT#` plus one `GP.ASM` copy-and-translate),
+which is why probe B costs nothing: **10.5x faster, 365 -> 35 jiffies for a 2,432 byte file**,
+with `LOADBEN.BASL` timing old against new in one program. Two traps worth keeping:
+`LINPUT#` on a channel whose `OPEN` found nothing returns `CHR$(0)` with `ST = 66` FOR EVER --
+bit 1 is a read error, clean EOF is 64 -- and a `{VAR}` in a `GP.ASM` block needs a variable the
+compiler has ALREADY made, so one first assigned further down the file is `UNKNOWN VARIABLE IN {}`.
+
+**Method note, since it cost the day:** two rounds of plausible code changes bought 18 bytes; one
+`FRE` probe run found the 579 in two minutes. Probe first.
+
 
 The original diagnosis, kept because its numbers and its method lesson still stand:
 
@@ -1336,6 +1363,41 @@ want to be `GUILIST.INC.BL` beside it rather than inside it.
 **Test it the way the GUI checks in `samples/editor/EDITOR.BASL` are tested**: keys through
 `kbdbuf_put`, and read the map back with `VPEEK` before printing anything. And walk every row of the
 panel, not one sampled cell — that lesson has already cost a shipped dropdown with rows missing.
+
+### The editor wants LINE NUMBERS down the left
+
+A gutter of right-aligned line numbers, and it is mostly a geometry change rather than a drawing
+one.
+
+**What moves.** `ED.TEXT.WIDTH` is `SCREEN.COLS` today and the row renderer writes from map column
+0; a gutter makes the text start at `ED.GUT.W` and the width `SCREEN.COLS - ED.GUT.W`. Everything
+that turns a document position into a cell adds the same offset: `ED.ASM.BASE%` in `ED.RENDER.ROW`
+and `ED.CARET.ADDR` in `ED.PLACE.CARET` (`ED.CARET.SCOL * 2 + 1` today). Nothing else -- the
+horizontal scroll already works in `ED.TEXT.WIDTH`, so it follows for free.
+
+**The gutter belongs on LAYER 0, with the document.** It scrolls with the text, which is the whole
+distinction the layer split draws: layer 1 is what stays put. So it cannot use `ED.PUT.FIELD`,
+which writes layer 1 at a screen row. It is painted per row -- in `ED.RENDER.ROW`, and in the
+one-row paints `ED.HW.SCROLL.DOWN` / `.UP` do after a hardware scroll.
+
+**Do not build a string per row.** `STR.PADL` (`STRINGS.INC.BL`) is the obvious first cut for
+right-aligning `STR$(n)`, but the render path runs per keystroke and a string per row per repaint
+is an allocation per keystroke -- the cost the string-heap work was chasing. Writing the digits
+straight into the map, in the `GP.ASM` block that already draws the row, is the version that
+survives a scroll benchmark. Measure with `EDBENCH.BASL`.
+
+**Two decisions worth making up front.** Whether the width is FIXED (4 columns, say, and the text
+never re-lays-out) or grows with `LINE.COUNT` -- the growing one repaints the whole screen at 999
+-> 1000 and shifts the caret while someone is typing. And whether it is a toggle: a View item on
+the menu bar, or a `#DEFINE` and no runtime cost at all.
+
+**Cost.** BASL, no keyword. But the doc-present self-check is still ~600 bytes short of the
+workspace ceiling, so this lands on a program that does not currently fit with a document open --
+check the size before, not after.
+
+Test it the way the rest of the editor is tested: `VPEEK` bank **0** for the gutter (the document
+is layer 0 now), read cells into strings before printing anything, and walk the whole column
+rather than sampling one cell.
 
 ### Comment density — DONE, editor, library and examples
 
