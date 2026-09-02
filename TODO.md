@@ -1111,6 +1111,71 @@ limit); shrink the 4K frame stack, which is ~250 frames; or the runtime-shrinkin
 every byte off the runtime is a byte `ObjectBase` moves down. None is urgent -- the editor has room
 for another 200 lines and the honest number is now reported.
 
+### Save As accepts a BLANK name, and the editor then writes to nothing
+
+Reported 2026-09-02. `ED.CMD.SAVEAS` (`samples/editor/EDITOR.BASL`) takes whatever `ED.PROMPT` hands
+back and assigns it straight to `DOC.FILE.NAME$`:
+
+    ED.PROMPT.MSG$ = "Save as: " : GOSUB ED.PROMPT
+    IF ED.PROMPT.OK = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
+    DOC.FILE.NAME$ = ED.INPUT$
+
+`ED.PROMPT.OK` only distinguishes RETURN from ESC -- **an empty field with RETURN is OK = 1**. So
+`DOC.SAVEFILE` builds `"@:" + "" + ",S,W"` and opens `@:,S,W`. `ED.CMD.OPEN` has the identical hole
+one routine above it.
+
+**The fix is a length test, and it belongs beside the OK test** so both call sites get it:
+
+    IF LEN(ED.INPUT$) = 0 THEN ED.MSG$ = "No name given" : GOSUB ED.ERR.MSG : GOSUB ED.REFRESH.FULL : RETURN
+
+Worth trimming leading and trailing spaces too -- `INPHELP` returns the field as typed, and a name of
+one space is as useless as none while looking like a real answer. `ED.CMD.SAVE` also routes to
+`ED.CMD.SAVEAS` when the name is still `"UNTITLED"`, so this is the path a first save takes.
+
+### An INTERMITTENT `OUT OF MEMORY` in the editor's self-check — unexplained, open
+
+Found 2026-09-02 while trying to stop `ED.RENDER.ALL` repainting the menu bar on every insert. **The
+same binary passes and fails at random**: three runs of one unchanged `C.EDITOR.PRG` gave pass /
+`OUT OF MEMORY @ $0E53` / pass. `$0E53` decodes to the first opcode of `ED.CMD.SAVE`, and
+`OUT OF MEMORY` has four raisers -- `DIM`, the frame stack (`frames.asm`), and both string
+allocators.
+
+**Counts so far**, one binary per row, `-warp`, same work directory:
+
+| build | runs | failures |
+|---|---:|---:|
+| before the repaint change (`mv`) | 4 | 0 |
+| repaint routine compiled but never called (`rbx`) | 3 | 0 |
+| repaint change live (`rb`) | 4 | **2** |
+
+That points at the change, but small samples and an intermittent fault are exactly the combination
+that makes a bisect measure noise -- **two variants that each removed half of the new routine both
+"passed", and so did a version with two extra PRINTs, which proves nothing.** The change is reverted
+and NOT committed until this is understood.
+
+**Where to look first.** `ED.CMD.SAVE` writes a real file to the emulator's host filesystem, which is
+the one genuinely non-deterministic thing in the run, and the save path is also where the blank-name
+bug above lives. Run the same binary twenty times before believing any verdict here, and prefer a
+counted loop over a single run for anything in this area.
+
+### The menu bar repaints on every insert -- still wanted
+
+`ED.RENDER.ALL` opens with `GOSUB ED.RENDER.MENUBAR`, which blanks the whole top row with a
+full-width `ED.PUT.FIELD` and then draws the items back over it. That blank-then-draw is visible as a
+flicker on every RETURN and every BACKSPACE-join, both of which go through `ED.REFRESH.FULL`.
+
+**The bar cannot change on an edit** except when the dirty star first appears, so the shape of the fix
+is a partial repaint from the cursor row down, plus a guard that redraws the bar only when
+`ED.DOC.DIRTY` differs from what the bar last showed. Only three call sites are edit paths
+(`ED.BS.JOIN`, `ED.DO.DELETE`, `ED.DO.ENTER`); every other `ED.REFRESH.FULL` is a dialog or a
+filename change, where repainting the bar is the point.
+
+**A scroll must still take the full path.** `ED.DO.SCROLL`'s hardware path repaints ONE newly exposed
+row, which is right for a cursor move and wrong for an insert -- an insert changes every row below it.
+
+This was written and then reverted, because it correlates with the intermittent failure above. Settle
+that first.
+
 ### A separate CRUNCHER utility for BASL source — and the C64 world is full of prior art
 
 Asked 2026-09-02, and it is worth doing because **a line costs exactly one byte of p-code.**
