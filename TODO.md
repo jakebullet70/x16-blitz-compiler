@@ -1140,18 +1140,25 @@ same binary passes and fails at random**: three runs of one unchanged `C.EDITOR.
 `OUT OF MEMORY` has four raisers -- `DIM`, the frame stack (`frames.asm`), and both string
 allocators.
 
-**Counts so far**, one binary per row, `-warp`, same work directory:
+**Counted properly, 20 runs of each unchanged binary** (`scratchpad/flake.py` -- it stops each run
+the moment the self-check declares itself, which is what makes 20 runs affordable where a fixed
+90-second timeout made 4 expensive):
 
 | build | runs | failures |
 |---|---:|---:|
-| before the repaint change (`mv`) | 4 | 0 |
+| before the repaint change (`mv`) | 24 | **0** |
 | repaint routine compiled but never called (`rbx`) | 3 | 0 |
-| repaint change live (`rb`) | 4 | **2** |
+| repaint change live (`rb`) | 24 | **4** |
 
-That points at the change, but small samples and an intermittent fault are exactly the combination
-that makes a bisect measure noise -- **two variants that each removed half of the new routine both
-"passed", and so did a version with two extra PRINTs, which proves nothing.** The change is reverted
-and NOT committed until this is understood.
+**So it is real and it is the change** -- about one run in six, against zero in twenty-four for the
+baseline. Every failure lands on the SAME address, which argues for one repeatable mechanism with a
+probabilistic trigger rather than random corruption. The change is reverted and NOT committed until
+it is understood.
+
+**And note what the first pass got wrong**, because it is the lesson: with four runs and a 1-in-6
+fault, a bisect measures noise. Two variants that each removed half the new routine both "passed",
+and so did one with two extra PRINTs -- four clean results pointing four ways, every one of them
+meaningless. **Count the runs before believing a verdict in this area.**
 
 **Where to look first.** `ED.CMD.SAVE` writes a real file to the emulator's host filesystem, which is
 the one genuinely non-deterministic thing in the run, and the save path is also where the blank-name
