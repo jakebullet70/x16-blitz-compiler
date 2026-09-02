@@ -30,27 +30,27 @@ FILE: STASH.INC.BL
  000211 STASH.ROW.OUT                                       =93;
  000237 STASH.MODULE.END                                    =115;
 
-FILE: MENUHELP.INC.BL
+FILE: MENUVERT.INC.BL
 
- 000116 MENUHELP.RUN                                        =116;
- 000136 MENUHELP.WAIT                                       =125;
- 000148 MENUHELP.KEYED                                      =130;
- 000178 MENUHELP.SETTLE                                     =154;
- 000197 MENUHELP.WRAPTOP                                    =161;
- 000202 MENUHELP.WRAPBOT                                    =164;
- 000210 MENUHELP.CANCEL                                     =167;
- 000218 MENUHELP.KEYBACK                                    =169;
- 000232 MENUHELP.HOTKEY                                     =171;
- 000249 MENUHELP.FOLDWANT                                   =182;
- 000253 MENUHELP.FOLDHC                                     =184;
- 000267 MENUHELP.PADKEY                                     =186;
- 000288 MENUHELP.PADREAD                                    =195;
- 000301 MENUHELP.DRAW                                       =199;
- 000322 MENUHELP.ROW                                        =204;
- 000355 MENUHELP.HOTFIND                                    =216;
- 000370 MENUHELP.FOLDHOTWANT                                =227;
- 000374 MENUHELP.FOLDHOTHERE                                =229;
- 000378 MENUHELP.MODULE.END                                 =231;
+ 000116 MENUVERT.RUN                                        =116;
+ 000136 MENUVERT.WAIT                                       =125;
+ 000148 MENUVERT.KEYED                                      =130;
+ 000178 MENUVERT.SETTLE                                     =154;
+ 000197 MENUVERT.WRAPTOP                                    =161;
+ 000202 MENUVERT.WRAPBOT                                    =164;
+ 000210 MENUVERT.CANCEL                                     =167;
+ 000218 MENUVERT.KEYBACK                                    =169;
+ 000232 MENUVERT.HOTKEY                                     =171;
+ 000249 MENUVERT.FOLDWANT                                   =182;
+ 000253 MENUVERT.FOLDHC                                     =184;
+ 000267 MENUVERT.PADKEY                                     =186;
+ 000288 MENUVERT.PADREAD                                    =195;
+ 000301 MENUVERT.DRAW                                       =199;
+ 000322 MENUVERT.ROW                                        =204;
+ 000355 MENUVERT.HOTFIND                                    =216;
+ 000370 MENUVERT.FOLDHOTWANT                                =227;
+ 000374 MENUVERT.FOLDHOTHERE                                =229;
+ 000378 MENUVERT.MODULE.END                                 =231;
 
 FILE: MENUBAR.INC.BL
 
@@ -75,18 +75,18 @@ FILE: MENUBAR.INC.BL
  000284 MENUBAR.WHERE                                       =306;
  000288 MENUBAR.MODULE.END                                  =308;
 
-FILE: INPHELP.INC.BL
+FILE: LINEINPUT.INC.BL
 
- 000083 INPHELP.GET                                         =309;
- 000090 INPHELP.REDRAW                                      =314;
- 000099 INPHELP.WAIT                                        =318;
- 000111 INPHELP.KEYED                                       =324;
- 000154 INPHELP.ASK                                         =354;
- 000174 INPHELP.TYPED                                       =360;
- 000201 INPHELP.RUBOUT                                      =370;
- 000210 INPHELP.RENDER                                      =374;
- 000227 INPHELP.CURSOR                                      =379;
- 000245 INPHELP.MODULE.END                                  =391;
+ 000083 LINEINPUT.GET                                       =309;
+ 000090 LINEINPUT.REDRAW                                    =314;
+ 000099 LINEINPUT.WAIT                                      =318;
+ 000111 LINEINPUT.KEYED                                     =324;
+ 000154 LINEINPUT.ASK                                       =354;
+ 000174 LINEINPUT.TYPED                                     =360;
+ 000201 LINEINPUT.RUBOUT                                    =370;
+ 000210 LINEINPUT.RENDER                                    =374;
+ 000227 LINEINPUT.CURSOR                                    =379;
+ 000245 LINEINPUT.MODULE.END                                =391;
 
 FILE: GUI.INC.BL
 
@@ -284,42 +284,42 @@ FILE: STASH.INC.BL
  000160 STASH.VADDR                                         =AQ;
  000161 STASH.VCTRL                                         =AR;
 
-FILE: MENUHELP.INC.BL
+FILE: MENUVERT.INC.BL
 
- 000117 MENUHELP.KEY                                        =AS;
- 000118 MENUHELP.COUNT                                      =AT;
- 000118 MENUHELP.SEL                                        =AU;
- 000122 MENUHELP.HIGHLIGHT                                  =AV;
- 000122 MENUHELP.HIATTR                                     =AW;
- 000123 MENUHELP.ATTR                                       =AX;
- 000128 MENUHELP.PADHELD                                    =AY;
- 000129 MENUHELP.DRAWROW                                    =AZ;
- 000129 MENUHELP.DRAWATTR                                   =B;
- 000137 MENUHELP.INCHAR                                     =B0;
- 000138 MENUHELP.CODE                                       =B1;
- 000139 MENUHELP.FLAGS                                      =B2;
- 000149 MENUHELP.DONE                                       =B3;
- 000150 MENUHELP.PREVSEL                                    =B4;
- 000233 MENUHELP.HOT                                        =B5;
- 000234 MENUHELP.HOTLAST                                    =B6;
- 000236 MENUHELP.WANTCODE                                   =B7;
- 000238 MENUHELP.SCAN                                       =B8;
- 000239 MENUHELP.HOTCODE                                    =B9;
- 000270 MENUHELP.PADNEW                                     =BA;
- 000270 MENUHELP.PADNOW                                     =BB;
- 000289 MENUHELP.PADRAW                                     =BC;
- 000302 MENUHELP.EACH                                       =BD;
- 000323 MENUHELP.DRAWY                                      =BE;
- 000323 MENUHELP.Y                                          =BF;
- 000324 MENUHELP.X                                          =BG;
- 000324 MENUHELP.WIDTH                                      =BH;
- 000325 MENUHELP.DRAWTEXT                                   =BI;
- 000325 MENUHELP.ITEM                                       =BJ;
- 000334 MENUHELP.HOTATTR                                    =BK;
- 000337 MENUHELP.HOTAT                                      =BL;
- 000359 MENUHELP.HOTWANT                                    =BM;
- 000361 MENUHELP.HOTSCAN                                    =BN;
- 000362 MENUHELP.HOTHERE                                    =BO;
+ 000117 MENUVERT.KEY                                        =AS;
+ 000118 MENUVERT.COUNT                                      =AT;
+ 000118 MENUVERT.SEL                                        =AU;
+ 000122 MENUVERT.HIGHLIGHT                                  =AV;
+ 000122 MENUVERT.HIATTR                                     =AW;
+ 000123 MENUVERT.ATTR                                       =AX;
+ 000128 MENUVERT.PADHELD                                    =AY;
+ 000129 MENUVERT.DRAWROW                                    =AZ;
+ 000129 MENUVERT.DRAWATTR                                   =B;
+ 000137 MENUVERT.INCHAR                                     =B0;
+ 000138 MENUVERT.CODE                                       =B1;
+ 000139 MENUVERT.FLAGS                                      =B2;
+ 000149 MENUVERT.DONE                                       =B3;
+ 000150 MENUVERT.PREVSEL                                    =B4;
+ 000233 MENUVERT.HOT                                        =B5;
+ 000234 MENUVERT.HOTLAST                                    =B6;
+ 000236 MENUVERT.WANTCODE                                   =B7;
+ 000238 MENUVERT.SCAN                                       =B8;
+ 000239 MENUVERT.HOTCODE                                    =B9;
+ 000270 MENUVERT.PADNEW                                     =BA;
+ 000270 MENUVERT.PADNOW                                     =BB;
+ 000289 MENUVERT.PADRAW                                     =BC;
+ 000302 MENUVERT.EACH                                       =BD;
+ 000323 MENUVERT.DRAWY                                      =BE;
+ 000323 MENUVERT.Y                                          =BF;
+ 000324 MENUVERT.X                                          =BG;
+ 000324 MENUVERT.WIDTH                                      =BH;
+ 000325 MENUVERT.DRAWTEXT                                   =BI;
+ 000325 MENUVERT.ITEM                                       =BJ;
+ 000334 MENUVERT.HOTATTR                                    =BK;
+ 000337 MENUVERT.HOTAT                                      =BL;
+ 000359 MENUVERT.HOTWANT                                    =BM;
+ 000361 MENUVERT.HOTSCAN                                    =BN;
+ 000362 MENUVERT.HOTHERE                                    =BO;
 
 FILE: MENUBAR.INC.BL
 
@@ -347,32 +347,32 @@ FILE: MENUBAR.INC.BL
  000286 MENUBAR.SELX                                        =C9;
  000286 MENUBAR.SELW                                        =CA;
 
-FILE: INPHELP.INC.BL
+FILE: LINEINPUT.INC.BL
 
- 000084 INPHELP.INV                                         =CB;
- 000084 INPHELP.ATTR                                        =CC;
- 000085 INPHELP.WAS                                         =CD;
- 000085 INPHELP.TEXT                                        =CE;
- 000086 INPHELP.POS                                         =CF;
- 000087 INPHELP.DONE                                        =CG;
- 000087 INPHELP.KEY                                         =CH;
- 000088 INPHELP.LIT                                         =CI;
- 000088 INPHELP.TICK                                        =CJ;
- 000092 INPHELP.X                                           =CK;
- 000092 INPHELP.Y                                           =CL;
- 000092 INPHELP.LEN                                         =CM;
- 000093 INPHELP.SHOW                                        =CN;
- 000100 INPHELP.K                                           =CO;
- 000112 INPHELP.CODE                                        =CP;
- 000155 INPHELP.SAVEX                                       =CQ;
- 000156 INPHELP.LABEL                                       =CR;
- 000178 INPHELP.BAR                                         =CS;
- 000212 INPHELP.MASK                                        =CT;
- 000228 INPHELP.FILLED                                      =CU;
- 000229 INPHELP.CP                                          =CV;
- 000231 INPHELP.CX                                          =CW;
- 000232 INPHELP.CELL                                        =CX;
- 000240 INPHELP.CA                                          =CY;
+ 000084 LINEINPUT.INV                                       =CB;
+ 000084 LINEINPUT.ATTR                                      =CC;
+ 000085 LINEINPUT.WAS                                       =CD;
+ 000085 LINEINPUT.TEXT                                      =CE;
+ 000086 LINEINPUT.POS                                       =CF;
+ 000087 LINEINPUT.DONE                                      =CG;
+ 000087 LINEINPUT.KEY                                       =CH;
+ 000088 LINEINPUT.LIT                                       =CI;
+ 000088 LINEINPUT.TICK                                      =CJ;
+ 000092 LINEINPUT.X                                         =CK;
+ 000092 LINEINPUT.Y                                         =CL;
+ 000092 LINEINPUT.LEN                                       =CM;
+ 000093 LINEINPUT.SHOW                                      =CN;
+ 000100 LINEINPUT.K                                         =CO;
+ 000112 LINEINPUT.CODE                                      =CP;
+ 000155 LINEINPUT.SAVEX                                     =CQ;
+ 000156 LINEINPUT.LABEL                                     =CR;
+ 000178 LINEINPUT.BAR                                       =CS;
+ 000212 LINEINPUT.MASK                                      =CT;
+ 000228 LINEINPUT.FILLED                                    =CU;
+ 000229 LINEINPUT.CP                                        =CV;
+ 000231 LINEINPUT.CX                                        =CW;
+ 000232 LINEINPUT.CELL                                      =CX;
+ 000240 LINEINPUT.CA                                        =CY;
 
 FILE: GUI.INC.BL
 

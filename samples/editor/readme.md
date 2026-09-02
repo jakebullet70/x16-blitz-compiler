@@ -105,12 +105,12 @@ OK CODE 8572 FREE 11776 RT 14079 GP-BASIC IN
 - **PETSCII cost 345 bytes of p-code and nothing at run time** — 7566 → **7911**. That is the charset
   re-ordering plus the two conversions at the disk boundary and the one at the keyboard. The
   renderers did not change by a single byte, so every render figure above still stands as measured.
-- **`APPHELP` and `THEME` cost 1733 bytes of p-code and no runtime bytes** — 7911 → **9644**, THEME, APPHELP and MENUHELP together. Both are
+- **`APPHELP` and `THEME` cost 1733 bytes of p-code and no runtime bytes** — 7911 → **9644**, THEME, APPHELP and MENUVERT together. Both are
   BASIC library modules, so they are paid for in the p-code of the program that includes them and
   nowhere else. `APPHELP.STARTUP`/`RESTORE` lean on `GP.CALL`/`GP.A`/`GP.X`/`GP.Y`, which are GP block
   keywords — already bought and paid for by the `GP.SELECT` above, so they add nothing to `RT`.
-- **Driving `MENUHELP` properly gave 5 bytes back** — 9650 → **9645**. The hand-rolled loop over
-  `MENUHELP.ROW` was not only wrong, it was bigger than `GOSUB MENUHELP.DRAW`.
+- **Driving `MENUVERT` properly gave 5 bytes back** — 9650 → **9645**. The hand-rolled loop over
+  `MENUVERT.ROW` was not only wrong, it was bigger than `GOSUB MENUVERT.DRAW`.
 - **The two new assertions cost 168 bytes** — 9645 → 9713 for `DDROWS`, and → **9813** for the 600
   menu opens. Compiled into every build because `ED.SELFCHECK` is, exactly like the rest of the
   self-check above. Worth it: between them they are the checks that would have caught a panel of
@@ -240,26 +240,26 @@ writing CR where the fixture had LF.
 
 ## The menus, and the flag that makes the GP drawing commands usable
 
-The dropdown is drawn by `MENUHELP.DRAW` — `GP.FILL` for each row, `GP.PRINTAT` for its text —
+The dropdown is drawn by `MENUVERT.DRAW` — `GP.FILL` for each row, `GP.PRINTAT` for its text —
 inside a `GP.BOX` frame. Neither worked at first, for two quite separate reasons: the re-ordered
 font, below, and a caller that was not really calling the library at all.
 
 ### Use the whole interface, or you are guessing at it
 
-`ED.DRAW.DROPDOWN` first set `MENUHELP.X`, `.Y` and `.WIDTH` — three fields of nine — and then
-hand-rolled its own `FOR` loop poking `.DRAWROW` and `.DRAWATTR` into **`MENUHELP.ROW`, the module's
+`ED.DRAW.DROPDOWN` first set `MENUVERT.X`, `.Y` and `.WIDTH` — three fields of nine — and then
+hand-rolled its own `FOR` loop poking `.DRAWROW` and `.DRAWATTR` into **`MENUVERT.ROW`, the module's
 lowest entry point**, leaving `.COUNT`, `.ATTR` and `.HIATTR` at zero. It drew a panel of the wrong
 height with rows missing, and the library got the blame for a session.
 
-It was never the library. `GPC-BASIC/MENUDEMO.EXP.BL` is MENUHELP's own example; built headlessly
-with `MENUHELP.RUN` swapped for `MENUHELP.DRAW` and the tile map read back out of VERA, it renders
+It was never the library. `GPC-BASIC/MENUDEMO.EXP.BL` is MENUVERT's own example; built headlessly
+with `MENUVERT.RUN` swapped for `MENUVERT.DRAW` and the tile map read back out of VERA, it renders
 five items in five rows with the frame exactly where it belongs. **The difference between MENUDEMO's
 nine assignments and this sample's three was the whole bug**, and it was visible in a side-by-side
 read of the two files long before any emulator was involved.
 
-`MENUHELP.ROW` reads `MENUHELP.ATTR` itself — it is the test at the routine's tail that decides
+`MENUVERT.ROW` reads `MENUVERT.ATTR` itself — it is the test at the routine's tail that decides
 whether a row gets its hotkey tinted — so a caller that never sets it is not calling the routine,
-it is guessing at it. Setting the documented inputs and calling `MENUHELP.DRAW` is also **5 bytes
+it is guessing at it. Setting the documented inputs and calling `MENUVERT.DRAW` is also **5 bytes
 smaller** than the hand-rolled loop: `OK CODE 9650` → `9645`. The shipping build is `9713`,
 the extra 68 being the `DDROWS` assertion below.
 

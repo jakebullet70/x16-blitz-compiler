@@ -233,7 +233,7 @@ _CGFExit:
 ;		In ISO mode (PRINT CHR$(15), or the user pressing Ctrl+O) the VERA tile index IS the
 ;		character code, so translating PETSCII to a screen code is not merely wasted work, it is
 ;		WRONG: 'A' would go in as $01 and the string would come out as garbage. That made every
-;		drawn interface -- INPHELP's fields, MENUHELP's bars -- unusable in ISO mode, which is
+;		drawn interface -- LINEINPUT's fields, MENUVERT's bars -- unusable in ISO mode, which is
 ;		exactly the mode a program wants when it needs both letter cases.
 ;
 ;		BIT X16_EditorMode puts the KERNAL's own ISO bit into V and leaves A, X and Y untouched,

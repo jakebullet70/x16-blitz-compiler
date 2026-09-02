@@ -99,7 +99,7 @@ GPContainsCompile:
 ;		is a LIVE BUG in GPC: AND is 16 bit SIGNED, and every address worth splitting is above
 ;		32767 -- the string heap always is -- so it raises OUT OF RANGE rather than masking. The
 ;		tree currently writes the long form out by hand in four places, each with a warning comment
-;		nailed beside it (ARRAYS.EXP.BL, BMX.INC.BL, MENUHELP.INC.BL, GPB.INC.BL). A keyword makes
+;		nailed beside it (ARRAYS.EXP.BL, BMX.INC.BL, MENUVERT.INC.BL, GPB.INC.BL). A keyword makes
 ;		the correct form the short one and the wrong form unreachable.
 ;
 ;		MOD rather than the subtraction the docs currently recommend, because MOD uses the whole

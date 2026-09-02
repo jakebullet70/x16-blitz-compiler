@@ -146,7 +146,7 @@ Against real programs in this tree:
 - **`samples/editor`** uses `GP.CALL`, `GP.BOX`, `GP.FILL`, `GP.PRINTAT`, `GP.STASH`, `GP.RESTR`,
   `GP.DO`, `GP.SELECT`, `GP.IF` — stops at the stash tier. **1,536 bytes back**, against a build
   currently reporting `FREE 6400`.
-- **A `MENUHELP` / `GUI.INC.BL` program with `GUI.BANK = 0`** — drawing and control flow only.
+- **A `MENUVERT` / `GUI.INC.BL` program with `GUI.BANK = 0`** — drawing and control flow only.
   **2,048 bytes back.**
 - **A program whose only GP keyword is `GP.SELECT` or `GP.DO`** — **3,584 bytes back**, which is
   most of what a small program has.

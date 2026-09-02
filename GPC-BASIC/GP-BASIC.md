@@ -34,7 +34,7 @@ ordinary BASL, called with `GOSUB`. Menus, panels, themes, entry fields, BMX loa
 bytes**: only a program that `#INCLUDE`s one pays for it, and it pays in its own p-code.
 
 > **The rule that decides which side a thing goes on:** assembly gets what runs in a loop or moves
-> bulk data. Everything else is BASIC. `INPHELP.GET` waits on a *human*, so the speed argument that
+> bulk data. Everything else is BASIC. `LINEINPUT.GET` waits on a *human*, so the speed argument that
 > puts sorting in assembly does not apply to it — and it saved 166 bytes of runtime for every program
 > ever compiled.
 
@@ -114,9 +114,9 @@ the BASIC modules are written up in §4.
 | **Colour roles** | BASIC | `THEME.INC.BL` — `THEME.LOAD`, `THEME.CLR()` · §4.1 |
 | **String helpers** | BASIC | `STRHELP.INC.BL` — `PADR` `PADL` `PADC` `SPLIT` `REPLACE` `PET2SCR` · §4.2 |
 | **Screen etiquette, panels** | BASIC | `APPHELP.INC.BL` — `STARTUP` `RESTORE` `PANEL.SAVE/LOAD/PUT` · §4.3 |
-| **Entry fields** | BASIC | `INPHELP.INC.BL` — `INPHELP.GET`, `INPHELP.ASK` · §4.4 |
+| **Entry fields** | BASIC | `LINEINPUT.INC.BL` — `LINEINPUT.GET`, `LINEINPUT.ASK` · §4.4 |
 | **Bitmaps** | BASIC | `BMX.INC.BL` — `BMX.SHOW`, `BMX.RESTORE` · §4.5 |
-| **Menus** | BASIC | `MENUHELP.INC.BL` — `RUN` `DRAW` `ROW` `HOTFIND` · §4.6 |
+| **Menus** | BASIC | `MENUVERT.INC.BL` — `RUN` `DRAW` `ROW` `HOTFIND` · §4.6 |
 
 **The rule that decides the side** is in §1: assembly gets what runs in a tight loop or moves bulk
 data, BASIC gets everything else — and anything that is only a *rename* of keywords already present
@@ -730,38 +730,38 @@ finds it, so anything you change beforehand is what gets restored.
 file is **self-describing** — the stash's 4-byte header goes in it — so loading needs nothing but
 the name.
 
-### 4.4 `INPHELP.INC.BL` — a positioned entry field
+### 4.4 `LINEINPUT.INC.BL` — a positioned entry field
 
 | Routine | in | out |
 |---|---|---|
-| `INPHELP.GET` | `INPHELP.X` `.Y` `.LEN` `.ATTR` `.TEXT$` `.MASK` | `INPHELP.TEXT$` `INPHELP.KEY` |
-| `INPHELP.ASK` | the same plus `INPHELP.LABEL$` | the same; `INPHELP.X` restored |
+| `LINEINPUT.GET` | `LINEINPUT.X` `.Y` `.LEN` `.ATTR` `.TEXT$` `.MASK` | `LINEINPUT.TEXT$` `LINEINPUT.KEY` |
+| `LINEINPUT.ASK` | the same plus `LINEINPUT.LABEL$` | the same; `LINEINPUT.X` restored |
 
 ```basic
-INPHELP.X = 10 : INPHELP.Y = 6
-INPHELP.LEN = 20
-INPHELP.ATTR = THEME.CLR(THEME.TEXT)
-INPHELP.TEXT$ = ""
-GOSUB INPHELP.GET
-IF INPHELP.KEY = 27 THEN GOTO CANCELLED
+LINEINPUT.X = 10 : LINEINPUT.Y = 6
+LINEINPUT.LEN = 20
+LINEINPUT.ATTR = THEME.CLR(THEME.TEXT)
+LINEINPUT.TEXT$ = ""
+GOSUB LINEINPUT.GET
+IF LINEINPUT.KEY = 27 THEN GOTO CANCELLED
 ```
 
 **This is what `INPUT` and `LINPUT` cannot do.** Both own the whole bottom of the screen, scroll it,
 echo in whatever colour is current, and accept any length — all four fatal on a drawn screen. A field
 stays where you put it, in the colour you give it, and stops at the width you allow.
 
-`INPHELP.KEY` is the key that ended it, and it is what makes a **multi-field form** possible:
+`LINEINPUT.KEY` is the key that ended it, and it is what makes a **multi-field form** possible:
 
 | | |
 |---:|---|
 | 13 | RETURN — finished |
-| 27 / 3 | ESC / STOP — cancelled, and `INPHELP.TEXT$` is put back to what it was |
+| 27 / 3 | ESC / STOP — cancelled, and `LINEINPUT.TEXT$` is put back to what it was |
 | 17 / 145 / 9 | cursor down / up / TAB — left the field, **text kept** |
 
 So a form is a loop over fields, not a sequence of prompts, and the user can go back and fix the
 first one without starting again.
 
-`INPHELP.MASK` non-zero shows asterisks while holding the real string. The field never scrolls: when
+`LINEINPUT.MASK` non-zero shows asterisks while holding the real string. The field never scrolls: when
 full, further characters are refused and the cursor **inverts the last character** rather than
 sitting off the end. The cursor blinks off `TI` rather than a delay loop, because a delay loop would
 swallow keys pressed during it.
@@ -836,14 +836,14 @@ else is reported, not attempted. The image is centred; larger than 320×240 is c
 
 Examples: [`BMXVIEW.EXP.BL`](BMXVIEW.EXP.BL), and [`BMXPAL.EXP.BL`](BMXPAL.EXP.BL) for the palette
 
-### 4.6 `MENUHELP.INC.BL` — a vertical menu
+### 4.6 `MENUVERT.INC.BL` — a vertical menu
 
 | Routine | in | out |
 |---|---|---|
-| `MENUHELP.RUN` | the variables below | `MENUHELP.SEL` `MENUHELP.KEY` |
-| `MENUHELP.DRAW` | the same | draws the menu without driving it |
-| `MENUHELP.ROW` | `MENUHELP.DRAWROW` `MENUHELP.DRAWATTR` | one row, in the attribute you name |
-| `MENUHELP.HOTFIND` | `MENUHELP.DRAWROW` `MENUHELP.DRAWTEXT$` | `MENUHELP.HOTAT` — where that row's hotkey letter sits, 1-based, or **0 for "do not tint"** |
+| `MENUVERT.RUN` | the variables below | `MENUVERT.SEL` `MENUVERT.KEY` |
+| `MENUVERT.DRAW` | the same | draws the menu without driving it |
+| `MENUVERT.ROW` | `MENUVERT.DRAWROW` `MENUVERT.DRAWATTR` | one row, in the attribute you name |
+| `MENUVERT.HOTFIND` | `MENUVERT.DRAWROW` `MENUVERT.DRAWTEXT$` | `MENUVERT.HOTAT` — where that row's hotkey letter sits, 1-based, or **0 for "do not tint"** |
 
 **This replaces the `GP.MENU` and `GP.SEL` keywords**, withdrawn at RT_ABI 20. They were 462 bytes of
 assembly plus 11 of storage, in a block every GPB program carried whether it had a menu or not. The
@@ -858,31 +858,31 @@ a 16.7 ms frame.
 
 | in | |
 |---|---|
-| `MENUHELP.X` `.Y` | top left of the **first row**, not of a frame — draw the border yourself with `GP.BOX`, so the menu owes nothing to one style of border |
-| `MENUHELP.WIDTH` | cells wide. This is the width of the **highlight**, so it is the width of the menu whatever the text happens to do |
-| `MENUHELP.COUNT` | how many rows |
-| `MENUHELP.ITEM$()` | the rows, `1..COUNT` — **the caller owns the `DIM`**, see below |
-| `MENUHELP.ATTR` | packed attribute, `background * 16 + foreground` |
-| `MENUHELP.HIATTR` | the same for the highlighted row. **0 means invert `MENUHELP.ATTR`**, which is what `GP.MENU` always did |
-| `MENUHELP.HOT$` | one character a row, `""` for none |
-| `MENUHELP.HOTATTR` | paint the hotkey letter in this attribute. **0 is off, and off is the default** |
-| `MENUHELP.FLAGS` | added together, below |
-| `MENUHELP.SEL` | the row to start on; 0 starts at 1 |
+| `MENUVERT.X` `.Y` | top left of the **first row**, not of a frame — draw the border yourself with `GP.BOX`, so the menu owes nothing to one style of border |
+| `MENUVERT.WIDTH` | cells wide. This is the width of the **highlight**, so it is the width of the menu whatever the text happens to do |
+| `MENUVERT.COUNT` | how many rows |
+| `MENUVERT.ITEM$()` | the rows, `1..COUNT` — **the caller owns the `DIM`**, see below |
+| `MENUVERT.ATTR` | packed attribute, `background * 16 + foreground` |
+| `MENUVERT.HIATTR` | the same for the highlighted row. **0 means invert `MENUVERT.ATTR`**, which is what `GP.MENU` always did |
+| `MENUVERT.HOT$` | one character a row, `""` for none |
+| `MENUVERT.HOTATTR` | paint the hotkey letter in this attribute. **0 is off, and off is the default** |
+| `MENUVERT.FLAGS` | added together, below |
+| `MENUVERT.SEL` | the row to start on; 0 starts at 1 |
 
 | out | |
 |---|---|
-| `MENUHELP.SEL` | `1..COUNT`, or **0 if cancelled** |
-| `MENUHELP.KEY` | the key that ended it — 13 chose, 27 cancelled, or the hotkey itself |
+| `MENUVERT.SEL` | `1..COUNT`, or **0 if cancelled** |
+| `MENUVERT.KEY` | the key that ended it — 13 chose, 27 cancelled, or the hotkey itself |
 
 ```basic
-MENUHELP.X = 8 : MENUHELP.Y = 6
-MENUHELP.WIDTH = 24 : MENUHELP.COUNT = 4
-MENUHELP.ITEM$(1) = " NEW GAME"           ' ... and so on
-MENUHELP.ATTR = THEME.CLR(THEME.TEXT)
-MENUHELP.HIATTR = THEME.CLR(THEME.HILITE)
-MENUHELP.HOT$ = "NLOQ"
-GOSUB MENUHELP.RUN
-IF MENUHELP.SEL = 0 THEN GOTO CANCELLED
+MENUVERT.X = 8 : MENUVERT.Y = 6
+MENUVERT.WIDTH = 24 : MENUVERT.COUNT = 4
+MENUVERT.ITEM$(1) = " NEW GAME"           ' ... and so on
+MENUVERT.ATTR = THEME.CLR(THEME.TEXT)
+MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
+MENUVERT.HOT$ = "NLOQ"
+GOSUB MENUVERT.RUN
+IF MENUVERT.SEL = 0 THEN GOTO CANCELLED
 ```
 
 | Key | |
@@ -899,15 +899,15 @@ IF MENUHELP.SEL = 0 THEN GOTO CANCELLED
 | 4 | **no wrap** — stop at the ends instead of wrapping round |
 | 8 | **gamepad** — drive it from the SNES pad in port 1 as well as the keyboard |
 
-The constants `MENUHELP.MUSTSEL`, `.KEEPMARK`, `.NOWRAP` and `.GAMEPAD` are defined for you; add
+The constants `MENUVERT.MUSTSEL`, `.KEEPMARK`, `.NOWRAP` and `.GAMEPAD` are defined for you; add
 those rather than writing the numbers.
 
 **A hotkey chooses its row, it does not merely move to it** — which is the entire point of having
-one. `MENUHELP.HOT$` is one character per row in order, matched without case; it may be shorter than
-`MENUHELP.COUNT`, in which case the later rows have none.
+one. `MENUVERT.HOT$` is one character per row in order, matched without case; it may be shorter than
+`MENUVERT.COUNT`, in which case the later rows have none.
 
-**`MENUHELP.HOTATTR` makes the shortcut visible** instead of leaving it a secret. The letter is found
-in the row's own text — the first match for that row's `MENUHELP.HOT$` character, without case — so
+**`MENUVERT.HOTATTR` makes the shortcut visible** instead of leaving it a secret. The letter is found
+in the row's own text — the first match for that row's `MENUVERT.HOT$` character, without case — so
 nothing extra is passed in, and `" START"` with hotkey `S` needs no markup. A row whose text does not
 contain its own hotkey is left alone rather than treated as an error, because the hotkey still works.
 Only rows in the **normal** attribute are tinted: on the selected row the highlight *is* the message,
@@ -915,7 +915,7 @@ and a second colour inside the bar is noise.
 
 > **The caller owns the `DIM`, deliberately.** A module cannot be handed an array in BASIC, so it has
 > to name one — and if it `DIM`med that array itself it would have to guess a bound, then fail on the
-> caller who wanted more. Leave `MENUHELP.ITEM$` undimensioned and GPC's implicit `DIM` gives you
+> caller who wanted more. Leave `MENUVERT.ITEM$` undimensioned and GPC's implicit `DIM` gives you
 > 0..10, a ten-row menu for free; `DIM` it yourself for more. **What you must not do is both.**
 
 #### The gamepad flag
@@ -1059,8 +1059,8 @@ you: **a collision is a wrong answer, not an error.**
 | `STRHELP.` | `STRHELP.INC.BL` |
 | `THEME.` | `THEME.INC.BL` |
 | `APPHELP.` | `APPHELP.INC.BL` |
-| `INPHELP.` | `INPHELP.INC.BL` |
-| `MENUHELP.` | `MENUHELP.INC.BL` |
+| `LINEINPUT.` | `LINEINPUT.INC.BL` |
+| `MENUVERT.` | `MENUVERT.INC.BL` |
 | `BMX.` / `BMXK.` | `BMX.INC.BL` (variables / its KERNAL constants) |
 
 Pick anything else for your own program — `GAME.`, `MAP.`, `AIRLIFT.`. **A prefix costs nothing at
@@ -1086,7 +1086,7 @@ through a keyword. X16's own `ST`, `MX` and `MY` exist for the same reason.
 
 ### Nothing here is re-entrant
 
-A module's parameters **are** its globals; there is nowhere else to put them. So `INPHELP.GET` cannot
+A module's parameters **are** its globals; there is nowhere else to put them. So `LINEINPUT.GET` cannot
 be called from inside itself, `BMX.OPEN` cannot nest, and a `GOSUB` from inside a module into code
 that calls the same module corrupts it silently. In practice this only bites if you write a callback
 — copy the values you care about into your own variables first. `THEME.*` is the exception:
@@ -1095,9 +1095,9 @@ that calls the same module corrupts it silently. In practice this only bites if 
 ### Labels are global too
 
 Every `NAME:` is a jump target in the same flat space, internal ones included —
-`BMX.STREAM.MORE`, `INPHELP.REDRAW`, `THEME.LOAD.DARK`. Each module also has a skip label it jumps
+`BMX.STREAM.MORE`, `LINEINPUT.REDRAW`, `THEME.LOAD.DARK`. Each module also has a skip label it jumps
 over itself with (`THEME.SKIP`, `APPHELP.SKIP`, `STRHELP.SKIP`, `BMX.MODULE.END`,
-`INPHELP.MODULE.END`). **Do not branch to one.**
+`LINEINPUT.MODULE.END`). **Do not branch to one.**
 
 **BASLOAD refuses a name used as both a label and a variable** (`BASLOAD.MD:319`) — which is why
 `BMX`'s skip label is `BMX.MODULE.END` and not `BMX.SKIP`: that name was already the byte-skip
@@ -1134,7 +1134,7 @@ The last one is worth its own sentence. **Inside BASL you are safe** — 64 sign
 Write the same test as a raw `.bas` for the host tokeniser and the two-character rule is back. It
 cost two test cycles during tier 6, both times looking exactly like a compiler bug.
 
-Dotted names also dodge the keyword-collision trap: `MENUHELP.COUNT`, `THEME.CLR`, `INPHELP.LEN` and
-`INPHELP.RETURN` all contain reserved words and all work, because BASLOAD matches the whole
+Dotted names also dodge the keyword-collision trap: `MENUVERT.COUNT`, `THEME.CLR`, `LINEINPUT.LEN` and
+`LINEINPUT.RETURN` all contain reserved words and all work, because BASLOAD matches the whole
 identifier. An **undotted** one does not — `POS`, `MB`, `ST`, `LEN`, `CHAR` cannot be variables at
 all. That is the main reason the library is dotted throughout.

@@ -15,7 +15,7 @@ Keep this folder as `GPC-BASIC/` beside your own sources and `#INCLUDE` what you
 ```basic
 #INCLUDE "/GPC-BASIC/GPB.INC.BL"
 #INCLUDE "/GPC-BASIC/THEME.INC.BL"
-#INCLUDE "/GPC-BASIC/MENUHELP.INC.BL"
+#INCLUDE "/GPC-BASIC/MENUVERT.INC.BL"
 ```
 
 BASLOAD takes a path, not just a bare filename — **verified on R49**, both `/GPC-BASIC/GPB.INC.BL`
@@ -41,7 +41,7 @@ A thing belongs in the core when it is a bulk move or a tight loop — something
 bad at. It belongs in an extension when it waits on a human, or is layout, or is data. It is a
 composite when it is only a **rename** of something the compiler can already say — those are free,
 so use them without thinking about it. `GP.MENU`
-and `GP.SEL` **used to be core keywords and are now the `MENUHELP` extension**, because a menu
+and `GP.SEL` **used to be core keywords and are now the `MENUVERT` extension**, because a menu
 spends all its time waiting for a keypress: the assembly bought nothing a person could see, and cost
 every GPB program 473 bytes whether it had a menu or not.
 
@@ -72,8 +72,8 @@ All of it needs `#INCLUDE "GPB.INC.BL"`, and nothing else.
 | `STRHELP.INC.BL` | strings: `PADR`/`PADL`/`PADC` pad, `SPLIT` on a delimiter, `REPLACE` every occurrence, `PET2SCR` | `SPLITT.EXP.BL` `STRINGS.EXP.BL` |
 | `THEME.INC.BL` | named colour roles, light and dark, so re-skinning is one variable | `MENU.EXP.BL` |
 | `APPHELP.INC.BL` | leave the screen as you found it, and **panels to and from disk** | `MENU.EXP.BL` |
-| `INPHELP.INC.BL` | a positioned, length-limited entry field — what `INPUT` cannot do on a drawn screen | `FORM.EXP.BL` |
-| `MENUHELP.INC.BL` | a vertical menu: cursor keys, RETURN, ESC, hotkeys, SNES pad | `MENUDEMO.EXP.BL` |
+| `LINEINPUT.INC.BL` | a positioned, length-limited entry field — what `INPUT` cannot do on a drawn screen | `FORM.EXP.BL` |
+| `MENUVERT.INC.BL` | a vertical menu: cursor keys, RETURN, ESC, hotkeys, SNES pad | `MENUDEMO.EXP.BL` |
 | `MENUBAR.INC.BL` | the other axis — a horizontal bar, per-item widths taken from the text | — |
 | `STASH.INC.BL` | a text rectangle to a RAM bank and back, in `GP.ASM` | — |
 | `STASHFILE.INC.BL` | the same rectangle through a **file**, so a panel outlives the program | — |

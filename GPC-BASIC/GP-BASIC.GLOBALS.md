@@ -23,8 +23,8 @@ The rule the library follows, and that you should follow too:
 | `STRHELP.` | `STRHELP.INC.BL` | string helpers |
 | `THEME.` | `THEME.INC.BL` | colour roles |
 | `APPHELP.` | `APPHELP.INC.BL` | screen save/restore, panels to disk |
-| `INPHELP.` | `INPHELP.INC.BL` | entry fields |
-| `MENUHELP.` | `MENUHELP.INC.BL` | vertical menus |
+| `LINEINPUT.` | `LINEINPUT.INC.BL` | entry fields |
+| `MENUVERT.` | `MENUVERT.INC.BL` | vertical menus |
 | `BMX.` | `BMX.INC.BL` | BMX bitmap loading |
 | `BMXK.` | `BMX.INC.BL` | its KERNAL/VERA constants, kept apart from its variables |
 
@@ -100,16 +100,16 @@ implicit `DIM` gives you 0..10. If you want more, `DIM` it yourself **before the
 one or the other. This is the opposite of `THEME.CLR`, which the module owns outright; the two are
 worth keeping straight.
 
-### `INPHELP.INC.BL`
+### `LINEINPUT.INC.BL`
 
 | | |
 |---|---|
-| in | `INPHELP.X` `INPHELP.Y` — top left of the field<br>`INPHELP.LEN` — how many characters fit<br>`INPHELP.ATTR` — packed attribute<br>`INPHELP.TEXT$` — the starting value<br>`INPHELP.MASK` — non-zero shows asterisks<br>`INPHELP.LABEL$` — `INPHELP.ASK` only |
-| out | `INPHELP.TEXT$` — what was typed<br>`INPHELP.KEY` — the key that ended it |
-| internal | `INPHELP.SHOW$` `INPHELP.WAS$` `INPHELP.K$` `INPHELP.CELL$` `INPHELP.CODE` `INPHELP.CX` `INPHELP.CA` `INPHELP.INV` `INPHELP.LIT` `INPHELP.TICK` `INPHELP.DONE` `INPHELP.FILLED` `INPHELP.HOME` `INPHELP.BAR` |
-| constants | `INPHELP.RETURN` `INPHELP.DELETE` `INPHELP.ESCAPE` `INPHELP.STOP` `INPHELP.DOWN` `INPHELP.UP` `INPHELP.TAB` `INPHELP.SPACE` `INPHELP.STAR` `INPHELP.BLINK` |
+| in | `LINEINPUT.X` `LINEINPUT.Y` — top left of the field<br>`LINEINPUT.LEN` — how many characters fit<br>`LINEINPUT.ATTR` — packed attribute<br>`LINEINPUT.TEXT$` — the starting value<br>`LINEINPUT.MASK` — non-zero shows asterisks<br>`LINEINPUT.LABEL$` — `LINEINPUT.ASK` only |
+| out | `LINEINPUT.TEXT$` — what was typed<br>`LINEINPUT.KEY` — the key that ended it |
+| internal | `LINEINPUT.SHOW$` `LINEINPUT.WAS$` `LINEINPUT.K$` `LINEINPUT.CELL$` `LINEINPUT.CODE` `LINEINPUT.CX` `LINEINPUT.CA` `LINEINPUT.INV` `LINEINPUT.LIT` `LINEINPUT.TICK` `LINEINPUT.DONE` `LINEINPUT.FILLED` `LINEINPUT.HOME` `LINEINPUT.BAR` |
+| constants | `LINEINPUT.RETURN` `LINEINPUT.DELETE` `LINEINPUT.ESCAPE` `LINEINPUT.STOP` `LINEINPUT.DOWN` `LINEINPUT.UP` `LINEINPUT.TAB` `LINEINPUT.SPACE` `LINEINPUT.STAR` `LINEINPUT.BLINK` |
 
-`INPHELP.SHOW$` is listed internal but is the one exception worth knowing: it holds what the field
+`LINEINPUT.SHOW$` is listed internal but is the one exception worth knowing: it holds what the field
 *displayed*, which is what you want if you are repainting a masked field yourself. `FORM.EXP.BL`
 uses it for exactly that.
 
@@ -131,22 +131,22 @@ yourself would leak a string block and re-allocate.
 rather than `0` switches the stash off: `0` already means "never set". `BMX.KEPT` is the once-per-run
 guard that makes a slideshow restore the *machine's* palette rather than the previous picture's.
 
-### `MENUHELP.INC.BL`
+### `MENUVERT.INC.BL`
 
 | | |
 |---|---|
-| in | `MENUHELP.X` `MENUHELP.Y` — top left of the first row<br>`MENUHELP.WIDTH` — cells wide, which is the width of the highlight<br>`MENUHELP.COUNT` — how many rows<br>`MENUHELP.ITEM$()` — the rows, 1..COUNT; **the caller owns the `DIM`**<br>`MENUHELP.ATTR` — packed attribute<br>`MENUHELP.HIATTR` — the highlighted row; 0 inverts `MENUHELP.ATTR`<br>`MENUHELP.HOT$` — one hotkey character a row<br>`MENUHELP.HOTATTR` — tint for the hotkey letter; 0 is off<br>`MENUHELP.FLAGS` — added together<br>`MENUHELP.SEL` — the row to start on |
-| out | `MENUHELP.SEL` — 1..COUNT, or 0 if cancelled<br>`MENUHELP.KEY` — the key that ended it |
-| internal | `MENUHELP.SCAN` `MENUHELP.EACH` `MENUHELP.DONE` `MENUHELP.CODE` `MENUHELP.INCHAR$` `MENUHELP.PREVSEL` `MENUHELP.HIGHLIGHT` `MENUHELP.DRAWROW` `MENUHELP.DRAWATTR` `MENUHELP.DRAWTEXT$` `MENUHELP.DRAWY` `MENUHELP.HOTCODE` `MENUHELP.HOTLAST` `MENUHELP.WANTCODE` `MENUHELP.HOTAT` `MENUHELP.HOTWANT` `MENUHELP.HOTHERE` `MENUHELP.HOTSCAN` `MENUHELP.PADNOW` `MENUHELP.PADNEW` `MENUHELP.PADHELD` `MENUHELP.PADRAW` |
-| constants | `MENUHELP.MUSTSEL` `MENUHELP.KEEPMARK` `MENUHELP.NOWRAP` `MENUHELP.GAMEPAD` `MENUHELP.UP` `MENUHELP.DOWN` `MENUHELP.ENTER` `MENUHELP.ESCAPE` `MENUHELP.STOP` `MENUHELP.SPACE` `MENUHELP.PORT` `MENUHELP.PAD.UP` `MENUHELP.PAD.DOWN` `MENUHELP.PAD.B` `MENUHELP.PAD.START` |
+| in | `MENUVERT.X` `MENUVERT.Y` — top left of the first row<br>`MENUVERT.WIDTH` — cells wide, which is the width of the highlight<br>`MENUVERT.COUNT` — how many rows<br>`MENUVERT.ITEM$()` — the rows, 1..COUNT; **the caller owns the `DIM`**<br>`MENUVERT.ATTR` — packed attribute<br>`MENUVERT.HIATTR` — the highlighted row; 0 inverts `MENUVERT.ATTR`<br>`MENUVERT.HOT$` — one hotkey character a row<br>`MENUVERT.HOTATTR` — tint for the hotkey letter; 0 is off<br>`MENUVERT.FLAGS` — added together<br>`MENUVERT.SEL` — the row to start on |
+| out | `MENUVERT.SEL` — 1..COUNT, or 0 if cancelled<br>`MENUVERT.KEY` — the key that ended it |
+| internal | `MENUVERT.SCAN` `MENUVERT.EACH` `MENUVERT.DONE` `MENUVERT.CODE` `MENUVERT.INCHAR$` `MENUVERT.PREVSEL` `MENUVERT.HIGHLIGHT` `MENUVERT.DRAWROW` `MENUVERT.DRAWATTR` `MENUVERT.DRAWTEXT$` `MENUVERT.DRAWY` `MENUVERT.HOTCODE` `MENUVERT.HOTLAST` `MENUVERT.WANTCODE` `MENUVERT.HOTAT` `MENUVERT.HOTWANT` `MENUVERT.HOTHERE` `MENUVERT.HOTSCAN` `MENUVERT.PADNOW` `MENUVERT.PADNEW` `MENUVERT.PADHELD` `MENUVERT.PADRAW` |
+| constants | `MENUVERT.MUSTSEL` `MENUVERT.KEEPMARK` `MENUVERT.NOWRAP` `MENUVERT.GAMEPAD` `MENUVERT.UP` `MENUVERT.DOWN` `MENUVERT.ENTER` `MENUVERT.ESCAPE` `MENUVERT.STOP` `MENUVERT.SPACE` `MENUVERT.PORT` `MENUVERT.PAD.UP` `MENUVERT.PAD.DOWN` `MENUVERT.PAD.B` `MENUVERT.PAD.START` |
 
-**`MENUHELP.SEL` is both an input and an output** — it is the row to start on going in and the row
+**`MENUVERT.SEL` is both an input and an output** — it is the row to start on going in and the row
 chosen coming out, so a menu reopened without clearing it reopens where it was. That is usually what
 you want; set it to 0 when it is not.
 
-`MENUHELP.DRAWROW`, `MENUHELP.DRAWATTR` and `MENUHELP.DRAWTEXT$` are listed internal but are the
-documented arguments to `MENUHELP.ROW`, which is public: they are internal to `MENUHELP.RUN`, not to
-you. `MENUHELP.HOTFIND` reads the first two and answers in `MENUHELP.HOTAT`.
+`MENUVERT.DRAWROW`, `MENUVERT.DRAWATTR` and `MENUVERT.DRAWTEXT$` are listed internal but are the
+documented arguments to `MENUVERT.ROW`, which is public: they are internal to `MENUVERT.RUN`, not to
+you. `MENUVERT.HOTFIND` reads the first two and answers in `MENUVERT.HOTAT`.
 
 ---
 
@@ -154,7 +154,7 @@ you. `MENUHELP.HOTFIND` reads the first two and answers in `MENUHELP.HOTAT`.
 
 A module's parameters *are* its globals. There is nowhere else to put them. So:
 
-- **You cannot call `INPHELP.GET` from inside `INPHELP.GET`** — no callback out of a field.
+- **You cannot call `LINEINPUT.GET` from inside `LINEINPUT.GET`** — no callback out of a field.
 - **You cannot nest `BMX.OPEN`** — one file at a time, and `BMXK.LFN` says so too.
 - **A `GOSUB` from inside a module into code that calls the same module will corrupt it silently.**
 
@@ -168,12 +168,12 @@ into your own variables first.
 ## 5. Labels are global too
 
 Every `NAME:` in every module is a jump target in one flat space, including the ones you were never
-meant to call. `BMX.STREAM.MORE`, `INPHELP.REDRAW`, `THEME.LOAD.DARK` and most of `MENUHELP.*` are
+meant to call. `BMX.STREAM.MORE`, `LINEINPUT.REDRAW`, `THEME.LOAD.DARK` and most of `MENUVERT.*` are
 internal, and a `GOSUB` to one will do something, just not something useful.
 
-`MENUHELP` is the module with the most of them, because driving a menu is mostly branching:
-**`MENUHELP.RUN`, `MENUHELP.DRAW`, `MENUHELP.ROW` and `MENUHELP.HOTFIND` are the four you may call.**
-`MENUHELP.WAIT`, `.KEYED`, `.SETTLE`, `.WRAPTOP`, `.WRAPBOT`, `.CANCEL`, `.HOTKEY`, `.PADKEY`,
+`MENUVERT` is the module with the most of them, because driving a menu is mostly branching:
+**`MENUVERT.RUN`, `MENUVERT.DRAW`, `MENUVERT.ROW` and `MENUVERT.HOTFIND` are the four you may call.**
+`MENUVERT.WAIT`, `.KEYED`, `.SETTLE`, `.WRAPTOP`, `.WRAPBOT`, `.CANCEL`, `.HOTKEY`, `.PADKEY`,
 `.PADREAD` and the three `FOLD` helpers are not.
 
 `STRHELP` has two of its own, both loop continuations rather than entry points:
@@ -182,7 +182,7 @@ loop whose accumulators were never initialised. The callable names are `STRHELP.
 `PADC`, `SPLIT`, `REPLACE` and `PET2SCR`.
 
 Each module also has a skip label it jumps over itself with — `THEME.SKIP`, `APPHELP.SKIP`,
-`STRHELP.SKIP`, `BMX.MODULE.END`, `INPHELP.MODULE.END`, `MENUHELP.MODULE.END`. Those exist so an
+`STRHELP.SKIP`, `BMX.MODULE.END`, `LINEINPUT.MODULE.END`, `MENUVERT.MODULE.END`. Those exist so an
 include can sit anywhere in the file, the top included. **Do not branch to one.**
 
 One trap found the hard way, worth repeating: **BASLOAD refuses a name used as both a label and a
@@ -197,8 +197,8 @@ be `BMX.MODULE.END` — a name is either a label or a variable, never both.
 `ERROR: INVALID PARAMETER`, not a warning — which is why `BMX.PALBASE` (VRAM `$1FA00`, 129536) is an
 ordinary variable and not a `#DEFINE`. Every VRAM address past `$FFFF` has the same problem.
 
-**A dotted name whose tail is a reserved word is fine.** `MENUHELP.COUNT`, `THEME.CLR`,
-`INPHELP.LEN` and `INPHELP.RETURN` all contain keywords and all work, because BASLOAD matches the whole identifier. An
+**A dotted name whose tail is a reserved word is fine.** `MENUVERT.COUNT`, `THEME.CLR`,
+`LINEINPUT.LEN` and `LINEINPUT.RETURN` all contain keywords and all work, because BASLOAD matches the whole identifier. An
 *undotted* one does not: `POS`, `MB`, `ST`, `LEN` and `CHAR` cannot be variables at all. This is the
 main reason the library is dotted throughout.
 

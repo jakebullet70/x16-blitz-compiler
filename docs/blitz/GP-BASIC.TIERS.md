@@ -94,9 +94,9 @@ compiles at roughly **14 bytes of p-code per line**. BASL menus (~60–100 lines
 | 4 | `GP.ARRPTR` — built and still in the block. `GP.SORT` was built, then **MOVED OUT** to `SORT.INC.BL` on 1st Sep 2026, taking 408 of the 457 with it | 49 |
 | 5 | Stash / restore — built (368, then 329 after the `TileSetAddress` re-base), then **MOVED OUT** to `STASH.INC.BL` on 1st Sep 2026 | 0 |
 | 6 | Drawing ×3 (`GP.LOCATE` **CUT**) — **SHIPPED** | 440 |
-| 7 | Input — **SHIPPED as `INPHELP.INC.BL`**, BASL | 0 |
+| 7 | Input — **SHIPPED as `LINEINPUT.INC.BL`**, BASL | 0 |
 | 8 | Colour / theme — **BASL** | 0 |
-| 9 | `GP.MENU` + `GP.SEL` — built, then **MOVED OUT** to `MENUHELP.INC.BL` in August 2026 | 0 |
+| 9 | `GP.MENU` + `GP.SEL` — built, then **MOVED OUT** to `MENUVERT.INC.BL` in August 2026 | 0 |
 | 10 | `GP.SELECT` / `GP.CASE` / `GP.OTHER` / `GP.ENDSEL` — **SHIPPED** | 127 |
 | 11 | `GP.IF` / `GP.ELSEIF` / `GP.ELSE` / `GP.ENDIF` — **SHIPPED**, and **none of it is in the GP block** — 14 B of vector slots, shared NOP and `MOFSizeTable` in the CORE | 0 |
 | | **Built** | **1,970** |
@@ -823,7 +823,7 @@ stores to `VERA_DATA0`. This is the single biggest speed win in the drawing sect
 *Moved to BASL:* `GP.CENTER` — arithmetic plus `GP.PRINTAT`, one line.
 *Not doing:* `GP.STRING` — X16's `RPT$` covers it.
 
-### §7 Input — SHIPPED 17th August 2026 as `INPHELP.INC.BL`. BASL, 0 tokens, 0 runtime bytes
+### §7 Input — SHIPPED 17th August 2026 as `LINEINPUT.INC.BL`. BASL, 0 tokens, 0 runtime bytes
 
 Positioned, length-limited entry built in BASL from `GET` + `GP.FILL` + `GP.PRINTAT` (−166 B against
 doing it in assembly). `INPUT`/`LINPUT` already exist, and only programs that want a form pay for it.
@@ -833,8 +833,8 @@ the screen, scroll it, echo in whatever colour is current, and accept any length
 all four are fatal. A field stays where it is put, in the attribute it is given, and stops at the
 width allowed.
 
-`INPHELP.GET` edits a string in place; `INPHELP.ASK` puts a label in front of one. Both hand back
-**the key that ended the field** in `INPHELP.KEY`, which is what makes a multi-field form possible:
+`LINEINPUT.GET` edits a string in place; `LINEINPUT.ASK` puts a label in front of one. Both hand back
+**the key that ended the field** in `LINEINPUT.KEY`, which is what makes a multi-field form possible:
 RETURN, cursor up, cursor down and TAB all leave with the text kept, ESC and STOP put back what was
 there. So a form is a loop over fields, not a sequence of prompts — and the user can go back and fix
 the first field without starting again.
@@ -907,7 +907,7 @@ highlighted), `4` NO WRAP (stop at the ends).
 afterwards, hotkey by upper and lower case, ESC, wrap at both ends, no-wrap at both ends, all three
 flags, an empty hotkey string, and zero rows returning 0 without waiting for a key.
 
-### §9 Menus — DONE 18th August 2026. `gpmenu.asm` deleted, `MENUHELP.INC.BL` in its place
+### §9 Menus — DONE 18th August 2026. `gpmenu.asm` deleted, `MENUVERT.INC.BL` in its place
 
 **Why.** Flag `8` (drive the menu from the SNES pad as well as the keyboard) is the point this
 turned. Gamepad tracking is edge detection over two saved button words, and it landed inside a
@@ -916,7 +916,7 @@ it saves, and every further behaviour — more pad buttons, a second column, scr
 block that every GPB program carries.
 
 **The decision.** Delete `gpmenu.asm`. Rebuild the menu as a BASL module (a sibling of
-`INPHELP.INC.BL`, which is the precedent: tier 7's input shipped as BASL and cost 0 runtime
+`LINEINPUT.INC.BL`, which is the precedent: tier 7's input shipped as BASL and cost 0 runtime
 bytes), written in **ordinary GPB commands** — `GP.PRINTAT` for the rows, `GP.FILL`/`GP.BOX` for
 the frame, `GP.SELECT` for the key dispatch, the existing pad reads for flag 8.
 
@@ -937,7 +937,7 @@ After page alignment the block `$3700..$4100` (2,560 B) would end near `$3EB2` a
 `$3F00`, so `ObjectBase` falls **512 bytes**: the object shrinks by 512 and the workspace gains
 512. In shared mode the same 512 comes off the GPB half, raising `RTGPBASE` $6400 -> $6600.
 
-**Shipped, `RT_ABI` 19 -> 20.** `MENUHELP.INC.BL` with `MENUTST.EXP.BL` beside it: 14 cases, all
+**Shipped, `RT_ABI` 19 -> 20.** `MENUVERT.INC.BL` with `MENUTST.EXP.BL` beside it: 14 cases, all
 green on R49 headless -- selection, both hotkey cases, ESC, wrap and no-wrap at both ends, MUSTSEL,
 KEEPMARK, empty hotkeys, zero rows, the GAMEPAD flag with no pad, and the `HIATTR = 0` default.
 `MENU.EXP.BL` was moved onto it. The p-code cost per program was deliberately not measured: it is

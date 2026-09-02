@@ -825,8 +825,8 @@ finder) exist for one property: the selector is evaluated **once**, into `FRAME_
 first `GP.CASE`.
 
 **Every `GP.SELECT` in the tree selects on a plain variable**, so not one of them needs it:
-`BMX.DEPTH` ([BMX.INC.BL:401](../GPC-BASIC/BMX.INC.BL)), `INPHELP.CODE`, `MENUHELP.CODE`,
-`INPHELP.KEY` (`FORM.EXP.BL`), `KEY.CHAR` and `CLASSIFY.N` (`SELECT.EXP.BL`). Re-reading a variable
+`BMX.DEPTH` ([BMX.INC.BL:401](../GPC-BASIC/BMX.INC.BL)), `LINEINPUT.CODE`, `MENUVERT.CODE`,
+`LINEINPUT.KEY` (`FORM.EXP.BL`), `KEY.CHAR` and `CLASSIFY.N` (`SELECT.EXP.BL`). Re-reading a variable
 per alternative gives the identical result and is, if anything, cheaper than `gp.case`'s six-byte
 frame copy plus `SelectFindFrame`.
 
@@ -878,7 +878,7 @@ Two steps, and they buy different things:
    come back, and even then as GPB headroom (78 → 176 B) rather than program size.
 
 Related: the same survey found `GP.SELECT` and an `GP.IF`/`GP.ELSEIF` chain within ~3 bytes of each
-other on INPHELP's real seven-way dispatch (~75 B against ~78 B), so the two constructs are a
+other on LINEINPUT's real seven-way dispatch (~75 B against ~78 B), so the two constructs are a
 readability choice, not a size one.
 
 
@@ -1128,7 +1128,7 @@ one routine above it.
 
     IF LEN(ED.INPUT$) = 0 THEN ED.MSG$ = "No name given" : GOSUB ED.ERR.MSG : GOSUB ED.REFRESH.FULL : RETURN
 
-Worth trimming leading and trailing spaces too -- `INPHELP` returns the field as typed, and a name of
+Worth trimming leading and trailing spaces too -- `LINEINPUT` returns the field as typed, and a name of
 one space is as useless as none while looking like a real answer. `ED.CMD.SAVE` also routes to
 `ED.CMD.SAVEAS` when the name is still `"UNTITLED"`, so this is the path a first save takes.
 
@@ -1270,7 +1270,7 @@ nested GOSUBs, so the failure mode needs no new spelling.
 A fourth dialog beside `GUI.YN`, `GUI.MENU` and `GUI.TEXT`: a scrolling list, with a multi-select
 mode that returns a set rather than one row.
 
-**`GUI.MENU` is not it and should not be stretched into it.** That is `MENUHELP.RUN` in a frame: it
+**`GUI.MENU` is not it and should not be stretched into it.** That is `MENUVERT.RUN` in a frame: it
 draws every row it is given, so the list has to fit the screen, and it returns one `GUI.SEL`. A
 listbox is the two things it does not do — a WINDOW onto a list longer than the box, and more than
 one answer.
@@ -1280,20 +1280,20 @@ one answer.
 - The box itself. `GUI.OPEN` / `GUI.CLOSE` measure, place, stash and restore, and `GUI.OPEN` is
   public exactly so a fourth kind of dialog is built on it. `GUI.BODY.ROWS` / `GUI.BODY.WIDTH` in,
   `GUI.INNER.*` out; the height is the caller's choice, which is what makes a window possible.
-- `MENUHELP.ROW` draws one row at `MENUHELP.DRAWROW` in `MENUHELP.DRAWATTR` — the primitive, below
-  `MENUHELP.DRAW`, and it is how the editor's dropdown paints its highlight. A listbox is that
+- `MENUVERT.ROW` draws one row at `MENUVERT.DRAWROW` in `MENUVERT.DRAWATTR` — the primitive, below
+  `MENUVERT.DRAW`, and it is how the editor's dropdown paints its highlight. A listbox is that
   primitive over a slice of the array, which means the drawing is already written.
-- `MENUHELP.KEYEXIT` hands back a key the menu has no use for. SPACE toggling a selection is
+- `MENUVERT.KEYEXIT` hands back a key the menu has no use for. SPACE toggling a selection is
   exactly that shape, and it is how the editor's bar takes LEFT and RIGHT.
 
 **The two real questions**, neither of which the existing modules answer:
 
-1. **Where the marks live.** `MENUHELP.ITEM$` is the caller's array by contract — the module refuses
+1. **Where the marks live.** `MENUVERT.ITEM$` is the caller's array by contract — the module refuses
    to guess a bound — so the marks want a parallel `GUI.MARK()` the caller DIMs, or a returned
    string of flags. A string means no second DIM and no bound to guess, and 250 items is a
    plausible ceiling for a dialog. Decide before writing the interface, not after.
-2. **Whether the scroll is the listbox's or MENUHELP's.** Drawing a window means either passing
-   `MENUHELP` a slice each repaint (cheap, and keeps `MENUHELP` unchanged) or teaching it a top-row
+2. **Whether the scroll is the listbox's or MENUVERT's.** Drawing a window means either passing
+   `MENUVERT` a slice each repaint (cheap, and keeps `MENUVERT` unchanged) or teaching it a top-row
    input (one number, but it changes a shipped module every caller depends on). Prefer the slice
    until something needs otherwise.
 
@@ -1348,9 +1348,9 @@ thirteen `GPC-BASIC/*.INC.BL`: **2,195 -> 1,753 prose lines**, code verified ide
 and the editor rebuilding to the same `OK CODE 15166 FREE 6144 RT 13055` with `EDITOR.PRG` the same
 26,899 bytes. `EDBENCH.BASL` inspected and correctly left alone -- its `REM`s are GP.ASM source.
 
-Per file, prose lines before -> after: `GPB` 376 -> 286, `GUI` 372 -> 256, `MENUHELP` 248 -> 173,
+Per file, prose lines before -> after: `GPB` 376 -> 286, `GUI` 372 -> 256, `MENUVERT` 248 -> 173,
 `BMX` 248 -> 194, `SORT` 174 -> 134, `MENUBAR` 164 -> 131, `STASH` 158 -> 123, `STRHELP` 147 -> 118,
-`INPHELP` 142 -> 109, `STRCASE` 101 -> 80, `APPHELP` 71 -> 59, `STASHFILE` 56 -> 45, `THEME` 54 -> 45.
+`LINEINPUT` 142 -> 109, `STRCASE` 101 -> 80, `APPHELP` 71 -> 59, `STASHFILE` 56 -> 45, `THEME` 54 -> 45.
 
 **A LIBRARY CUTS LESS THAN A SAMPLE, and that is right rather than a shortfall.** The editor lost
 40%; the modules lost 20-30%, because a module's parameter table and per-routine in/out blocks are

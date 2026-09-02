@@ -1,19 +1,19 @@
 ## ***********************************************************************
 ## **
-## **  FORM.EXP.BL -- three fields you can move between, INPHELP style.
+## **  FORM.EXP.BL -- three fields you can move between, LINEINPUT style.
 ## **
-## **  The whole point of INPHELP over INPUT is on show here: the fields sit
+## **  The whole point of LINEINPUT over INPUT is on show here: the fields sit
 ## **  inside a drawn panel, in theme colours, at fixed widths, and none of
 ## **  them scrolls the screen. INPUT could not draw this at all -- it owns
 ## **  the bottom line, echoes in whatever colour is current, and takes as
 ## **  many characters as you care to type.
 ## **
-## **  A FORM IS A LOOP, not a sequence of prompts. INPHELP.GET hands back
+## **  A FORM IS A LOOP, not a sequence of prompts. LINEINPUT.GET hands back
 ## **  the key that ended the field, so cursor up and down move the focus
 ## **  and RETURN accepts the lot -- which also means the user can go back
 ## **  and fix the first field without starting again.
 ## **
-## **  Build:  copy GPB.INC.BL, THEME.INC.BL, APPHELP.INC.BL, INPHELP.INC.BL
+## **  Build:  copy GPB.INC.BL, THEME.INC.BL, APPHELP.INC.BL, LINEINPUT.INC.BL
 ## **          and this file into testing/, then
 ## **            python source/gpc/build_basl.py FORM.EXP.BL FORM.PRG
 ## **          and compile FORM.PRG with GPC.BIN.
@@ -22,7 +22,7 @@
 #INCLUDE "GPB.INC.BL"
 #INCLUDE "THEME.INC.BL"
 #INCLUDE "APPHELP.INC.BL"
-#INCLUDE "INPHELP.INC.BL"
+#INCLUDE "LINEINPUT.INC.BL"
 #SAVEAS "@:FORM.PRG"
 
 #DEFINE FORM.LEFT 8
@@ -51,23 +51,23 @@ GOSUB FORM.DRAW
 
 FORM.AT = 1
 FORM.LOOP:
-    INPHELP.X = FORM.COL
-    INPHELP.Y = FORM.TOP + FORM.AT
-    INPHELP.LEN = FORM.WIDTH(FORM.AT)
-    INPHELP.ATTR = THEME.CLR(THEME.HILITE)
-    INPHELP.MASK = FORM.HIDE(FORM.AT)
-    INPHELP.TEXT$ = FORM.VALUE$(FORM.AT)
-    GOSUB INPHELP.GET
-    FORM.VALUE$(FORM.AT) = INPHELP.TEXT$
+    LINEINPUT.X = FORM.COL
+    LINEINPUT.Y = FORM.TOP + FORM.AT
+    LINEINPUT.LEN = FORM.WIDTH(FORM.AT)
+    LINEINPUT.ATTR = THEME.CLR(THEME.HILITE)
+    LINEINPUT.MASK = FORM.HIDE(FORM.AT)
+    LINEINPUT.TEXT$ = FORM.VALUE$(FORM.AT)
+    GOSUB LINEINPUT.GET
+    FORM.VALUE$(FORM.AT) = LINEINPUT.TEXT$
 
     ## put the field back in the ordinary colour, so only the focused one
     ## is highlighted
-    INPHELP.ATTR = THEME.CLR(THEME.TEXT)
-    GOSUB INPHELP.RENDER
-    GP.FILL INPHELP.X, INPHELP.Y, INPHELP.LEN, 1, 32, INPHELP.ATTR
-    IF INPHELP.SHOW$ <> "" THEN GP.PRINTAT INPHELP.X, INPHELP.Y, INPHELP.SHOW$, INPHELP.ATTR
+    LINEINPUT.ATTR = THEME.CLR(THEME.TEXT)
+    GOSUB LINEINPUT.RENDER
+    GP.FILL LINEINPUT.X, LINEINPUT.Y, LINEINPUT.LEN, 1, 32, LINEINPUT.ATTR
+    IF LINEINPUT.SHOW$ <> "" THEN GP.PRINTAT LINEINPUT.X, LINEINPUT.Y, LINEINPUT.SHOW$, LINEINPUT.ATTR
 
-    GP.SELECT INPHELP.KEY
+    GP.SELECT LINEINPUT.KEY
         GP.CASE 27, 3
             FORM.QUIT = 1
         GP.CASE 145

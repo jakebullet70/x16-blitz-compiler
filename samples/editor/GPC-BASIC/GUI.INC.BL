@@ -9,7 +9,7 @@
 ## **  What they share is the BOX: measure it against the text, centre it, save
 ## **  what it covers, draw a frame, give the pixels back on the way out. That is
 ## **  GUI.OPEN and GUI.CLOSE, and the three entry points are thin. GUI.MENU is
-## **  MENUHELP.RUN inside a frame and GUI.TEXT is INPHELP.GET inside one, so
+## **  MENUVERT.RUN inside a frame and GUI.TEXT is LINEINPUT.GET inside one, so
 ## **  only GUI.YN -- four keys -- reads the keyboard itself.
 ## **
 ## **  REQUIRES, and does not #INCLUDE for you, in this order:
@@ -17,8 +17,8 @@
 ## **      STASH.INC.BL      saves the cells the box covers -- and wants a
 ## **                        #SYMFILE in your program, see its own header
 ## **      THEME.INC.BL      the colour roles, and GOSUB THEME.LOAD first
-## **      MENUHELP.INC.BL   GUI.MENU only
-## **      INPHELP.INC.BL    GUI.TEXT only
+## **      MENUVERT.INC.BL   GUI.MENU only
+## **      LINEINPUT.INC.BL    GUI.TEXT only
 ## **
 ## **  Usage, the whole of it:
 ## **      THEME.DARK = 0 : GOSUB THEME.LOAD
@@ -210,20 +210,20 @@ GUI.YN.MARK:
 ## **  GUI.MENU -- a question, and a row chosen from a list.
 ## **
 ## **   in   GUI.COUNT          how many rows
-## **        MENUHELP.ITEM$()    the rows, 1..GUI.COUNT
+## **        MENUVERT.ITEM$()    the rows, 1..GUI.COUNT
 ## **        GUI.SEL             the row to start on, 0 for the first
-## **        GUI.FLAGS           passed to MENUHELP.FLAGS -- MUSTSEL,
+## **        GUI.FLAGS           passed to MENUVERT.FLAGS -- MUSTSEL,
 ## **                            NOWRAP, GAMEPAD. KEEPMARK is meaningless
 ## **                            here because the box does not survive
 ## **
 ## **   out  GUI.SEL             1..GUI.COUNT, or 0 if cancelled
 ## **        GUI.KEY             13 chose, 27 cancelled
 ## **
-## **  THE ROWS GO IN MENUHELP.ITEM$ AND THE CALLER DIMS IT -- MENUHELP's own
+## **  THE ROWS GO IN MENUVERT.ITEM$ AND THE CALLER DIMS IT -- MENUVERT's own
 ## **  contract. A second array here would copy every row on every call and still
-## **  have to guess a bound, which is the thing MENUHELP refuses to do.
+## **  have to guess a bound, which is the thing MENUVERT refuses to do.
 ## **
-## **  Items are NOT indented here: MENUHELP prints them at the left edge of the
+## **  Items are NOT indented here: MENUVERT prints them at the left edge of the
 ## **  highlight, so a leading space in the item is what insets the bar.
 ## ***********************************************************************
 
@@ -231,18 +231,18 @@ GUI.MENU:
     GUI.BODY.ROWS = GUI.COUNT
     GUI.BODY.WIDTH = 0
     FOR GUI.INDEX = 1 TO GUI.COUNT
-        IF LEN(MENUHELP.ITEM$(GUI.INDEX)) > GUI.BODY.WIDTH THEN GUI.BODY.WIDTH = LEN(MENUHELP.ITEM$(GUI.INDEX))
+        IF LEN(MENUVERT.ITEM$(GUI.INDEX)) > GUI.BODY.WIDTH THEN GUI.BODY.WIDTH = LEN(MENUVERT.ITEM$(GUI.INDEX))
     NEXT GUI.INDEX
     GOSUB GUI.OPEN
-    MENUHELP.X = GUI.INNER.LEFT : MENUHELP.Y = GUI.INNER.TOP
-    MENUHELP.WIDTH = GUI.INNER.WIDTH : MENUHELP.COUNT = GUI.COUNT
+    MENUVERT.X = GUI.INNER.LEFT : MENUVERT.Y = GUI.INNER.TOP
+    MENUVERT.WIDTH = GUI.INNER.WIDTH : MENUVERT.COUNT = GUI.COUNT
     REM GUI.PANEL, the panel GUI.OPEN just painted, so unselected rows are the colour of
     REM the box they sit in. THEME.PAGE was blue on blue in the light palette -- fine for a
     REM GP.FILL, where only the background shows, invisible for anything with letters.
-    MENUHELP.ATTR = GUI.PANEL : MENUHELP.HIATTR = THEME.CLR(THEME.HILITE)
-    MENUHELP.HOTATTR = 0 : MENUHELP.FLAGS = GUI.FLAGS : MENUHELP.SEL = GUI.SEL
-    GOSUB MENUHELP.RUN
-    GUI.SEL = MENUHELP.SEL : GUI.KEY = MENUHELP.KEY
+    MENUVERT.ATTR = GUI.PANEL : MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
+    MENUVERT.HOTATTR = 0 : MENUVERT.FLAGS = GUI.FLAGS : MENUVERT.SEL = GUI.SEL
+    GOSUB MENUVERT.RUN
+    GUI.SEL = MENUVERT.SEL : GUI.KEY = MENUVERT.KEY
     GOSUB GUI.CLOSE
     RETURN
 
@@ -260,7 +260,7 @@ GUI.MENU:
 ## **  THE RESULT IS GUI.INPUT$, NOT GUI.TEXT$: GUI.TEXT is this routine's label,
 ## **  and a string of the same name beside it reads fine and compiles into
 ## **  something else. The field is drawn in THEME.HILITE so it is visibly a place
-## **  to type, and INPHELP restores the old text on ESC.
+## **  to type, and LINEINPUT restores the old text on ESC.
 ## **
 ## **  THE HINT LINE IS FIXED HERE, unlike GUI.YN's: its two key names are painted
 ## **  at known offsets, so a caller's string would highlight the wrong words.
@@ -280,9 +280,9 @@ GUI.TEXT:
 ## ---- the field, centred over the inner width like the hint under it
     GUI.FIELD.LEFT = GUI.INNER.LEFT + INT((GUI.INNER.WIDTH - GUI.LEN) / 2)
     IF GUI.FIELD.LEFT < GUI.INNER.LEFT THEN GUI.FIELD.LEFT = GUI.INNER.LEFT
-    INPHELP.X = GUI.FIELD.LEFT : INPHELP.Y = GUI.INNER.TOP
-    INPHELP.LEN = GUI.LEN : INPHELP.ATTR = THEME.CLR(THEME.HILITE)
-    INPHELP.TEXT$ = GUI.INPUT$ : INPHELP.MASK = GUI.MASK
+    LINEINPUT.X = GUI.FIELD.LEFT : LINEINPUT.Y = GUI.INNER.TOP
+    LINEINPUT.LEN = GUI.LEN : LINEINPUT.ATTR = THEME.CLR(THEME.HILITE)
+    LINEINPUT.TEXT$ = GUI.INPUT$ : LINEINPUT.MASK = GUI.MASK
 
 ## ---- the two key names picked out of the dimmed line, at known offsets rather
 ## ---- than searched for, because unlike GUI.YN's hint this text is fixed.
@@ -292,22 +292,22 @@ GUI.TEXT:
     GP.PRINTAT GUI.HINT.LEFT, GUI.INNER.TOP + 2, "ENTER", THEME.CLR(THEME.TITLE)
     GP.PRINTAT GUI.HINT.LEFT + 14, GUI.INNER.TOP + 2, "ESC", THEME.CLR(THEME.TITLE)
 
-## ---- UP, DOWN AND TAB LEAVE AN INPHELP FIELD WITHOUT CANCELLING IT -- that is
+## ---- UP, DOWN AND TAB LEAVE AN LINEINPUT FIELD WITHOUT CANCELLING IT -- that is
 ## ---- how a form moves between fields. With one field they came back as "not
 ## ---- RETURN", read as a cancel, and an arrow key silently threw the typing
 ## ---- away. Re-enter the field instead: only the two named keys end this.
 GUI.TEXT.FIELD:
-    GOSUB INPHELP.GET
-    IF INPHELP.KEY = INPHELP.DOWN THEN GOTO GUI.TEXT.FIELD
-    IF INPHELP.KEY = INPHELP.UP THEN GOTO GUI.TEXT.FIELD
-    IF INPHELP.KEY = INPHELP.TAB THEN GOTO GUI.TEXT.FIELD
+    GOSUB LINEINPUT.GET
+    IF LINEINPUT.KEY = LINEINPUT.DOWN THEN GOTO GUI.TEXT.FIELD
+    IF LINEINPUT.KEY = LINEINPUT.UP THEN GOTO GUI.TEXT.FIELD
+    IF LINEINPUT.KEY = LINEINPUT.TAB THEN GOTO GUI.TEXT.FIELD
 
-    GUI.INPUT$ = INPHELP.TEXT$
-    GUI.KEY = INPHELP.KEY
+    GUI.INPUT$ = LINEINPUT.TEXT$
+    GUI.KEY = LINEINPUT.KEY
     GUI.OK = 0
     IF GUI.KEY = GUI.RETURN THEN GUI.OK = 1
 
-## ---- A cancel gives back what was passed IN. INPHELP restores to the value at
+## ---- A cancel gives back what was passed IN. LINEINPUT restores to the value at
 ## ---- ITS last call, which after an arrow key is not the same thing.
     IF GUI.OK = 0 THEN GUI.INPUT$ = GUI.WAS$
     GOSUB GUI.CLOSE
@@ -349,7 +349,7 @@ GUI.OPEN.DRAW:
     GUI.BOX.STYLE = GUI.STYLE
     IF GUI.BOX.STYLE = 0 THEN GUI.BOX.STYLE = GUI.LINEBOX
 ## ---- What the caller asked for, or the theme, settled ONCE here so the fill,
-## ---- the frame, the message lines and MENUHELP's rows all read one answer.
+## ---- the frame, the message lines and MENUVERT's rows all read one answer.
     GUI.PANEL = GUI.PANEL.IN
     IF GUI.PANEL = 0 THEN GUI.PANEL = THEME.CLR(THEME.TEXT)
     GUI.BORDER = GUI.BORDER.IN

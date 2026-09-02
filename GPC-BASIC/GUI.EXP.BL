@@ -13,8 +13,8 @@
 #INCLUDE "GPB.INC.BL"
 #INCLUDE "THEME.INC.BL"
 #INCLUDE "APPHELP.INC.BL"
-#INCLUDE "MENUHELP.INC.BL"
-#INCLUDE "INPHELP.INC.BL"
+#INCLUDE "MENUVERT.INC.BL"
+#INCLUDE "LINEINPUT.INC.BL"
 #INCLUDE "GUI.INC.BL"
 #SAVEAS "@:GUI.PRG"
 
@@ -26,7 +26,7 @@ GOSUB APPHELP.STARTUP
 THEME.DARK = 0 : GOSUB THEME.LOAD
 GUI.BANK = DEMO.BANK
 
-DIM MENUHELP.ITEM$(4)
+DIM MENUVERT.ITEM$(4)
 
 GOSUB DEMO.PAGE
 
@@ -64,13 +64,13 @@ DEMO.NAME$ = GUI.INPUT$ : DEMO.OK = GUI.OK
 
 ## ---- 3. GUI.MENU -- a question and a list ---------------------------
 ##
-## The rows carry their own leading space: MENUHELP prints at the left
+## The rows carry their own leading space: MENUVERT prints at the left
 ## edge of the highlight, so the inset is the caller's to choose.
 
-MENUHELP.ITEM$(1) = " SAVE AND QUIT"
-MENUHELP.ITEM$(2) = " QUIT ANYWAY"
-MENUHELP.ITEM$(3) = " BACK TO WORK"
-MENUHELP.ITEM$(4) = " ABOUT THIS DEMO"
+MENUVERT.ITEM$(1) = " SAVE AND QUIT"
+MENUVERT.ITEM$(2) = " QUIT ANYWAY"
+MENUVERT.ITEM$(3) = " BACK TO WORK"
+MENUVERT.ITEM$(4) = " ABOUT THIS DEMO"
 GUI.COUNT = 4
 GUI.TITLE$ = "WHAT NOW"
 ## No message. A list of choices under a title that asks the question does
@@ -96,7 +96,7 @@ IF DEMO.OK = 1 THEN DEMO.LINE$ = "TEXT GAVE " + DEMO.NAME$ + "            "
 GP.PRINTAT 4, 21, DEMO.LINE$, THEME.CLR(THEME.WARN)
 
 DEMO.LINE$ = "MENU CANCELLED                    "
-IF DEMO.SEL > 0 THEN DEMO.LINE$ = "MENU CHOSE" + MENUHELP.ITEM$(DEMO.SEL) + "          "
+IF DEMO.SEL > 0 THEN DEMO.LINE$ = "MENU CHOSE" + MENUVERT.ITEM$(DEMO.SEL) + "          "
 GP.PRINTAT 4, 22, DEMO.LINE$, THEME.CLR(THEME.WARN)
 
 DEMO.LINE$ = "OK/CANCEL ANSWERED CANCEL"

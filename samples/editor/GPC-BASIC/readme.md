@@ -6,7 +6,7 @@ root's [`GPC-BASIC/`](../../../GPC-BASIC/). Nothing in this folder is edited.
 ## The rule
 
 **Fix the master first, then re-copy.** If the editor needs a change to `THEME.INC.BL`,
-`MENUHELP.INC.BL`, `INPHELP.INC.BL` or any other module, the change goes into
+`MENUVERT.INC.BL`, `LINEINPUT.INC.BL` or any other module, the change goes into
 `/GPC-BASIC/<file>` and comes back here with a copy. A change made here and not there is
 lost the next time anyone re-copies, and — worse — the two versions look interchangeable
 while behaving differently.
@@ -40,8 +40,8 @@ not a sample. The rule above is what keeps that from costing anything.
 | --- | --- |
 | `GPB.INC.BL` | yes — the `#TOKEN` definitions every GP.BASIC keyword needs |
 | `THEME.INC.BL` | yes — named colour roles, light and dark |
-| `MENUHELP.INC.BL` | yes — the menu bar and dropdowns |
-| `INPHELP.INC.BL` | yes — positioned, length-limited entry fields |
+| `MENUVERT.INC.BL` | yes — the menu bar and dropdowns |
+| `LINEINPUT.INC.BL` | yes — positioned, length-limited entry fields |
 | `APPHELP.INC.BL` | yes — start up politely, restore the screen on the way out |
 | `STRHELP.INC.BL` | yes — string helpers the modules above lean on |
 | `BMX.INC.BL` | **no** — image loading, copied only to keep this a whole-library mirror |

@@ -164,22 +164,22 @@
 #TOKEN GP.CHAR 52824
 #TOKEN GP.PRINTAT 52841
 
-## GP.MENU AND GP.SEL ARE GONE -- MENUHELP.INC.BL, written in ordinary GPB commands and
+## GP.MENU AND GP.SEL ARE GONE -- MENUVERT.INC.BL, written in ordinary GPB commands and
 ## doing the same job: cursor keys, RETURN, ESC, case-blind hotkeys that choose their
 ## row, must-select / keep-mark / no-wrap, and the SNES pad. For no runtime bytes.
 ##
-##      #INCLUDE "MENUHELP.INC.BL"
-##      MENUHELP.X = 8 : MENUHELP.Y = 6
-##      MENUHELP.WIDTH = 24 : MENUHELP.COUNT = 4
-##      MENUHELP.ITEM$(1) = " NEW GAME"        ... and so on
-##      MENUHELP.ATTR = THEME.CLR(THEME.TEXT)
-##      MENUHELP.HIATTR = THEME.CLR(THEME.HILITE)
-##      MENUHELP.HOT$ = "NLOQ"
-##      GOSUB MENUHELP.RUN                     answer in MENUHELP.SEL
+##      #INCLUDE "MENUVERT.INC.BL"
+##      MENUVERT.X = 8 : MENUVERT.Y = 6
+##      MENUVERT.WIDTH = 24 : MENUVERT.COUNT = 4
+##      MENUVERT.ITEM$(1) = " NEW GAME"        ... and so on
+##      MENUVERT.ATTR = THEME.CLR(THEME.TEXT)
+##      MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
+##      MENUVERT.HOT$ = "NLOQ"
+##      GOSUB MENUVERT.RUN                     answer in MENUVERT.SEL
 ##
 ## The one behaviour that did NOT survive is the colourless highlight: the assembly
 ## swapped the cell's attribute nibbles, the module prints the row again and so wants a
-## colour. MENUHELP.HIATTR = 0 asks for that inversion back.
+## colour. MENUVERT.HIATTR = 0 asks for that inversion back.
 
 ##
 ## GP.SELECT <var>             a plain numeric variable, re-read at each alternative

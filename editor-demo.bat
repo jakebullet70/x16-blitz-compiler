@@ -16,9 +16,9 @@ rem  editor's drive is that directory, so File>Save overwrites the real TEST.MD.
 rem  git restore samples/editor/TEST.MD puts it back.
 rem
 rem  Source: samples\editor\EDITOR.BASL + STORE.BASL, on GPB, THEME, APPHELP,
-rem  STASH, MENUHELP, MENUBAR, INPHELP and GUI -- all shipped in
+rem  STASH, MENUVERT, MENUBAR, LINEINPUT and GUI -- all shipped in
 rem  samples\editor\GPC-BASIC\ beside the sample, so a rebuild needs nothing
-rem  from GPC-BASIC\. MENUBAR draws and measures the bar; MENUHELP drives the
+rem  from GPC-BASIC\. MENUBAR draws and measures the bar; MENUVERT drives the
 rem  dropdown; STASH is what GUI.OPEN saves the covered cells with.
 rem
 rem  C.EDITOR.PRG is the COMPILED object and is checked in beside the source.

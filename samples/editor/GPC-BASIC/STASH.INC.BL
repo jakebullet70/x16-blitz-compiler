@@ -11,7 +11,7 @@
 ## **
 ## **  This is what GP.STASH and GP.RESTR were, moved out of the all-or-nothing GP block
 ## **  into GP.ASM: 329 bytes carried by every program that never stashed anything.
-## **  GP.MENU went the same way in August and became MENUHELP.INC.BL.
+## **  GP.MENU went the same way in August and became MENUVERT.INC.BL.
 ## **
 ## **  YOUR PROGRAM MUST HAVE A #SYMFILE. The assembly reaches BASIC's variables through
 ## **  {VAR} and BASLOAD crunches every name first -- STASH.VADDR% is some two-letter
