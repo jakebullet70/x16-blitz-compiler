@@ -42,6 +42,10 @@ DOC.INIT:
   DOC.CUR.PTR = DOC.WIN.START
   DOC.HIGH.BANK = DOC.FIRST.BANK
   LINE.COUNT = 0
+  REM Off unless DOC.LOADFILE turns it on. Set HERE, textually above the GP.ASM block in
+  REM DOC.STORE.CHARS, because {VAR} needs a slot the compiler has already made -- a
+  REM variable first assigned further down the file is UNKNOWN VARIABLE IN {} at the block.
+  DOC.CP.SWAP% = 0
   RETURN
 
 REM ---- reserve DOC.ALLOC.SIZE bytes -> DOC.RESULT.BANK, DOC.RESULT.OFF ----
@@ -92,10 +96,61 @@ DOC.STORE:
   DOC.PUT.BANK = DOC.RESULT.BANK : DOC.PUT.OFF = DOC.RESULT.OFF
   GOSUB DOC.SLOT.WRITE
   RETURN
+
+REM ---- the line's characters, main RAM -> the bank window, in ONE machine-code pass ----
+REM This was POKE ASC(MID$(LINE.TEXT$, i, 1)) per character: a one-character string
+REM ALLOCATED per byte of every line stored -- on the load path, and on every keystroke
+REM that commits a line. Y walks DOWN from the length to 1, so offset 0 (the length byte,
+REM already written) is left alone and the loop needs no counter of its own.
+REM
+REM DOC.CP.SWAP% turns on the PETSCII -> ASCII conversion the LOADER needs and nothing
+REM else does -- an edited line is already ASCII. It is read into X once, before the loop,
+REM and the eight lines from CPX are what DOC.TOASCII used to be, a whole BASIC routine.
 DOC.STORE.CHARS:
-  FOR DOC.CHAR.INDEX = 1 TO DOC.LEN
-    POKE DOC.RESULT.OFF + DOC.CHAR.INDEX, ASC(MID$(LINE.TEXT$, DOC.CHAR.INDEX, 1))
-  NEXT DOC.CHAR.INDEX
+  DOC.CP.BANK% = DOC.RESULT.BANK
+  DOC.CP.SRC% = GP.STRPTR(LINE.TEXT$)
+  DOC.CP.DST% = DOC.RESULT.OFF
+  DOC.CP.LEN% = DOC.LEN
+  #REM 1
+  GP.ASM
+  REM LDA {DOC.CP.BANK%}
+  REM STA $00
+  REM LDA {DOC.CP.SRC%}
+  REM LDX #1
+  REM STA CPS,X
+  REM LDA {DOC.CP.SRC%},X
+  REM LDX #2
+  REM STA CPS,X
+  REM LDA {DOC.CP.DST%}
+  REM LDX #1
+  REM STA CPD,X
+  REM LDA {DOC.CP.DST%},X
+  REM LDX #2
+  REM STA CPD,X
+  REM LDX {DOC.CP.SWAP%}
+  REM LDY {DOC.CP.LEN%}
+  REM CPS: LDA $FFFF,Y
+  REM CPX #0
+  REM BEQ CPW
+  REM CMP #$C1
+  REM BCC CPLO
+  REM CMP #$DB
+  REM BCS CPW
+  REM SEC
+  REM SBC #$80
+  REM BRA CPW
+  REM CPLO: CMP #$41
+  REM BCC CPW
+  REM CMP #$5B
+  REM BCS CPW
+  REM CLC
+  REM ADC #$20
+  REM CPW:
+  REM CPD: STA $FFFF,Y
+  REM DEY
+  REM BNE CPS
+  GP.ENDASM
+  #REM 0
   RETURN
 
 REM ---- load line LINE.INDEX into LINE.TEXT$ ----
@@ -118,32 +173,41 @@ DOC.LOAD.CHARS:
   RETURN
 
 REM ---- load text file DOC.FILE.NAME$ into the store (fills table, sets count) ----
-REM Splits on CR, LF or CRLF; caps a line at 250 chars.
+REM LINPUT# reads a whole line in ASSEMBLY, stopping at the CR and consuming it: one
+REM string per line, where GET# cost an ASC, six tests and a heap allocation per BYTE.
+REM
+REM ENDINGS. The editor writes CR. A CRLF file leaves the LF at the head of the NEXT
+REM line, which is stripped here; a file with LF endings and no CR would arrive as
+REM 255-byte chunks, and nothing this editor writes looks like that.
+REM
+REM AT END OF FILE the KERNAL sets ST as it hands over the LAST byte, so the read that
+REM sets it still carries a real line. DOC.RAW separates the two things an empty result
+REM can mean there: 0 bytes is a CR of its own -- a blank last line, and it is kept --
+REM while a stray LF is the tail of the line already pushed, and is not.
 DOC.LOADFILE:
   GOSUB DOC.INIT
   DOC.OPEN.NAME$ = DOC.FILE.NAME$ + ",S,R"
   OPEN 2, 8, 2, DOC.OPEN.NAME$
-  LINE.TEXT$ = "" : DOC.PREV.CH = 0
+  DOC.CP.SWAP% = 1 : REM these lines arrive in PETSCII, and only these
 DOC.READ.LOOP:
-  GET#2, DOC.CH$
-  DOC.STATUS = ST
-  IF LEN(DOC.CH$) = 0 THEN GOTO DOC.READ.CHECK
-  DOC.CH = ASC(DOC.CH$)
-  IF DOC.CH = 10 AND DOC.PREV.CH = 13 THEN DOC.PREV.CH = 10 : GOTO DOC.READ.CHECK
-  IF DOC.CH = 13 OR DOC.CH = 10 THEN GOSUB DOC.PUSH.LINE : DOC.PREV.CH = DOC.CH : GOTO DOC.READ.CHECK
-  REM PETSCII ON DISK -> ASCII IN MEMORY. Everything above this line is ASCII -- BASLOAD
-  REM passes string literals through as source bytes and ED.PETFONT orders the charset to
-  REM match -- so the document must be ASCII too, or find will not match its own needles.
-  REM The two differ only by a case swap, and CR and LF are the same byte in both.
-  IF DOC.CH >= 65 AND DOC.CH <= 90 THEN DOC.CH = DOC.CH + 32
-  IF DOC.CH >= 193 AND DOC.CH <= 218 THEN DOC.CH = DOC.CH - 128
-  IF LEN(LINE.TEXT$) < 250 THEN LINE.TEXT$ = LINE.TEXT$ + CHR$(DOC.CH)
-  DOC.PREV.CH = DOC.CH
-DOC.READ.CHECK:
-  IF DOC.STATUS = 0 THEN GOTO DOC.READ.LOOP
-  IF LEN(LINE.TEXT$) > 0 THEN GOSUB DOC.PUSH.LINE
+  LINPUT# 2, LINE.TEXT$
+  DOC.STATUS = ST : DOC.RAW = LEN(LINE.TEXT$)
+  REM BIT 1 OF ST IS A READ ERROR, and an OPEN that found no file still opens: every
+  REM LINPUT# on that channel hands back CHR$(0) with ST = 66, for ever. Nothing there
+  REM is a line, and pushing one gave a "blank" document whose single line was a NUL.
+  REM Clean end of file is 64, so bit 1 alone tells the two apart.
+  IF (DOC.STATUS AND 2) <> 0 THEN GOTO DOC.READ.DONE
+  IF ASC(LINE.TEXT$) = 10 THEN LINE.TEXT$ = MID$(LINE.TEXT$, 2, 250)
+  IF LEN(LINE.TEXT$) > 250 THEN LINE.TEXT$ = LEFT$(LINE.TEXT$, 250)
+  REM the swap is DOC.STORE.CHARS' job now, in the same pass as the copy
+  IF DOC.STATUS = 0 THEN GOSUB DOC.PUSH.LINE : GOTO DOC.READ.LOOP
+  IF LEN(LINE.TEXT$) > 0 THEN GOSUB DOC.PUSH.LINE : GOTO DOC.READ.DONE
+  IF DOC.RAW = 0 AND LINE.COUNT > 0 THEN GOSUB DOC.PUSH.LINE
+DOC.READ.DONE:
+  DOC.CP.SWAP% = 0
   CLOSE 2
   RETURN
+
 DOC.PUSH.LINE:
   LINE.INDEX = LINE.COUNT : GOSUB DOC.STORE : LINE.COUNT = LINE.COUNT + 1
   LINE.TEXT$ = ""

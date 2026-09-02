@@ -1,0 +1,76 @@
+#SAVEAS "@:LOADBEN.PRG"
+#AUTONUM 1
+#REM 0
+#SYMFILE "@:LOADBEN.SYM"
+#INCLUDE "GPB.INC.BL"
+
+REM ============================================================================
+REM LOADBEN -- the byte-at-a-time GET# loader against the LINPUT# one, on the SAME
+REM file in the SAME program, so the comparison owes nothing to two builds.
+REM BEN.OLD.LOADFILE is DOC.LOADFILE as it stood before 2026-09-02, verbatim.
+REM
+REM RUN THIS AT REAL SPEED (--nowarp). TI is meaningless under warp.
+REM ============================================================================
+
+BEN.REPS = 5
+DOC.FILE.NAME$ = "TEST.MD"
+PRINT "LOADBEN reps=";BEN.REPS
+
+BEN.T = TI
+FOR BEN.R = 1 TO BEN.REPS
+  GOSUB BEN.OLD.LOADFILE
+NEXT BEN.R
+BEN.O = TI - BEN.T
+BEN.OL = LINE.COUNT : GOSUB BEN.SUM : BEN.OS = BEN.CK
+PRINT "OLD ";BEN.O;" lines=";BEN.OL;" sum=";BEN.OS
+
+BEN.T = TI
+FOR BEN.R = 1 TO BEN.REPS
+  GOSUB DOC.LOADFILE
+NEXT BEN.R
+BEN.N = TI - BEN.T
+BEN.NL = LINE.COUNT : GOSUB BEN.SUM : BEN.NS = BEN.CK
+PRINT "NEW ";BEN.N;" lines=";BEN.NL;" sum=";BEN.NS
+
+PRINT "DIFF LINES=";BEN.OL - BEN.NL;" SUM=";BEN.OS - BEN.NS;" (want 0 0)"
+PRINT "LOADBEN END"
+END
+
+REM Every character of every line, weighted by position, so a dropped line, an
+REM off-by-one or a missed case swap all move the number.
+BEN.SUM:
+  BEN.CK = 0
+  FOR BEN.I = 0 TO LINE.COUNT - 1
+    LINE.INDEX = BEN.I : GOSUB DOC.LOAD
+    IF LEN(LINE.TEXT$) = 0 THEN GOTO BEN.SUM.NEXT
+    FOR BEN.J = 1 TO LEN(LINE.TEXT$)
+      BEN.CK = BEN.CK + ASC(MID$(LINE.TEXT$, BEN.J, 1)) * BEN.J
+    NEXT BEN.J
+BEN.SUM.NEXT:
+  NEXT BEN.I
+  RETURN
+
+REM ---- the old loader, kept only so the two can be timed side by side ----
+BEN.OLD.LOADFILE:
+  GOSUB DOC.INIT
+  DOC.OPEN.NAME$ = DOC.FILE.NAME$ + ",S,R"
+  OPEN 2, 8, 2, DOC.OPEN.NAME$
+  LINE.TEXT$ = "" : DOC.PREV.CH = 0
+BEN.READ.LOOP:
+  GET#2, DOC.CH$
+  DOC.STATUS = ST
+  IF LEN(DOC.CH$) = 0 THEN GOTO BEN.READ.CHECK
+  DOC.CH = ASC(DOC.CH$)
+  IF DOC.CH = 10 AND DOC.PREV.CH = 13 THEN DOC.PREV.CH = 10 : GOTO BEN.READ.CHECK
+  IF DOC.CH = 13 OR DOC.CH = 10 THEN GOSUB DOC.PUSH.LINE : DOC.PREV.CH = DOC.CH : GOTO BEN.READ.CHECK
+  IF DOC.CH >= 65 AND DOC.CH <= 90 THEN DOC.CH = DOC.CH + 32
+  IF DOC.CH >= 193 AND DOC.CH <= 218 THEN DOC.CH = DOC.CH - 128
+  IF LEN(LINE.TEXT$) < 250 THEN LINE.TEXT$ = LINE.TEXT$ + CHR$(DOC.CH)
+  DOC.PREV.CH = DOC.CH
+BEN.READ.CHECK:
+  IF DOC.STATUS = 0 THEN GOTO BEN.READ.LOOP
+  IF LEN(LINE.TEXT$) > 0 THEN GOSUB DOC.PUSH.LINE
+  CLOSE 2
+  RETURN
+
+#INCLUDE "STORE.BASL"
