@@ -1,0 +1,96 @@
+#SAVEAS "@:SLOTTST.PRG"
+#AUTONUM 1
+#REM 0
+#SYMFILE "@:SLOTTST.SYM"
+#INCLUDE "GPB.INC.BL"
+
+REM ============================================================================
+REM SLOTTST -- correctness of DOC.INSERT.SLOT / DOC.DELETE.SLOT after they moved
+REM to GP.ASM. Every slot is checked, not a sample, and the sizes are chosen to
+REM CROSS THE 2048-ENTRY SEGMENT BOUNDARY, which is the one thing a naive block
+REM gets wrong and no short document can catch.
+REM
+REM No content records: the shift moves TABLE entries, so each slot is written
+REM with a recognisable (bank 5, offset = its own index) and read back. That
+REM makes a 2100-line fixture cost 2100 stores rather than 2100 allocations.
+REM ============================================================================
+
+TST.N = 2100
+TST.FAILED = 0
+GOSUB DOC.INIT
+
+PRINT "SLOTTST: N=";TST.N;" per-bank=";DOC.TABLE.PER.BANK
+
+TST.CASE$ = "insert at 5" : TST.AT = 5 : GOSUB TST.INSERT
+TST.CASE$ = "insert at 0" : TST.AT = 0 : GOSUB TST.INSERT
+TST.CASE$ = "insert at 2040 (crosses)" : TST.AT = 2040 : GOSUB TST.INSERT
+TST.CASE$ = "insert at 2047 (last of bank)" : TST.AT = 2047 : GOSUB TST.INSERT
+TST.CASE$ = "insert at 2048 (first of bank)" : TST.AT = 2048 : GOSUB TST.INSERT
+TST.CASE$ = "insert at N-1" : TST.AT = TST.N - 1 : GOSUB TST.INSERT
+
+TST.CASE$ = "delete at 5" : TST.AT = 5 : GOSUB TST.DELETE
+TST.CASE$ = "delete at 0" : TST.AT = 0 : GOSUB TST.DELETE
+TST.CASE$ = "delete at 2040 (crosses)" : TST.AT = 2040 : GOSUB TST.DELETE
+TST.CASE$ = "delete at 2047 (last of bank)" : TST.AT = 2047 : GOSUB TST.DELETE
+TST.CASE$ = "delete at 2048 (first of bank)" : TST.AT = 2048 : GOSUB TST.DELETE
+TST.CASE$ = "delete at N-2" : TST.AT = TST.N - 2 : GOSUB TST.DELETE
+
+IF TST.FAILED = 0 THEN PRINT "SLOTTST ALL PASS"
+IF TST.FAILED <> 0 THEN PRINT "SLOTTST FAILURES=";TST.FAILED
+PRINT "SLOTTST END"
+END
+
+REM ---- fill every slot with offset = its own index ----
+TST.FILL:
+  FOR TST.I = 0 TO TST.N - 1
+    LINE.INDEX = TST.I : DOC.PUT.BANK = 5 : DOC.PUT.OFF = TST.I
+    GOSUB DOC.SLOT.WRITE
+  NEXT TST.I
+  LINE.COUNT = TST.N
+  RETURN
+
+REM ---- insert at TST.AT, then every slot must hold what the shift implies ----
+REM below TST.AT the old value; TST.AT itself is stale by design (the caller
+REM overwrites it with DOC.STORE); above it, the value from one slot lower.
+TST.INSERT:
+  GOSUB TST.FILL
+  LINE.INDEX = TST.AT : GOSUB DOC.INSERT.SLOT
+  TST.BAD = 0
+  IF LINE.COUNT <> TST.N + 1 THEN TST.BAD = 1 : PRINT "  COUNT=";LINE.COUNT;" want";TST.N+1
+  FOR TST.I = 0 TO TST.N
+    IF TST.I = TST.AT THEN GOTO TST.INS.NEXT
+    TST.WANT = TST.I : IF TST.I > TST.AT THEN TST.WANT = TST.I - 1
+    LINE.INDEX = TST.I : GOSUB DOC.SLOT.READ
+    IF DOC.GOT.OFF <> TST.WANT THEN GOSUB TST.MISMATCH
+TST.INS.NEXT:
+  NEXT TST.I
+  GOSUB TST.VERDICT
+  RETURN
+
+REM ---- delete at TST.AT: below it unchanged, at and above pulled down one ----
+TST.DELETE:
+  GOSUB TST.FILL
+  LINE.INDEX = TST.AT : GOSUB DOC.DELETE.SLOT
+  TST.BAD = 0
+  IF LINE.COUNT <> TST.N - 1 THEN TST.BAD = 1 : PRINT "  COUNT=";LINE.COUNT;" want";TST.N-1
+  FOR TST.I = 0 TO TST.N - 2
+    TST.WANT = TST.I : IF TST.I >= TST.AT THEN TST.WANT = TST.I + 1
+    LINE.INDEX = TST.I : GOSUB DOC.SLOT.READ
+    IF DOC.GOT.OFF <> TST.WANT THEN GOSUB TST.MISMATCH
+  NEXT TST.I
+  GOSUB TST.VERDICT
+  RETURN
+
+REM Only the first three of a case are printed -- a broken shift misses hundreds
+REM and the log is unreadable, while the first three say where it went wrong.
+TST.MISMATCH:
+  TST.BAD = TST.BAD + 1
+  IF TST.BAD <= 3 THEN PRINT "  slot";TST.I;" =";DOC.GOT.OFF;" want";TST.WANT
+  RETURN
+
+TST.VERDICT:
+  IF TST.BAD = 0 THEN PRINT "PASS ";TST.CASE$
+  IF TST.BAD <> 0 THEN PRINT "FAIL ";TST.CASE$;" bad=";TST.BAD : TST.FAILED = TST.FAILED + 1
+  RETURN
+
+#INCLUDE "STORE.BASL"

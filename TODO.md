@@ -995,65 +995,50 @@ image for all 12,031 bytes of the GP-BASIC OUT cut, with the only differences th
 
 ## Wanted
 
-### RETURN in the editor is slow, and it is the line table, not the repaint
+### RETURN in the editor was slow — FIXED, the table shift is GP.ASM now
 
-Reported as "inserting a blank line scrolls slowly -- do ten and it takes a second or two".
-**Measured, and it is not the scrolling.** Jiffies at real speed (`--nowarp`; TI is meaningless
-under warp), 100-line document, ten repetitions each:
+Reported as "inserting a blank line scrolls slowly -- do ten and it takes a second or two", and it
+was never the scrolling: **75% of a RETURN was the line-table shift**, 17% the full repaint.
 
-| | total | each |
-|---|---|---|
-| `ED.RENDER.ALL` | 102 | 10.2 j (170 ms) |
-| `DOC.INSERT.SLOT`, inserting at row 1 | **447** | **44.7 j (745 ms)** |
-| `DOC.STORE` | 8 | 0.8 j |
-| whole `ED.DO.ENTER` at the top of the document | 599 | 59.9 j (1.0 s) |
-| whole `ED.DO.ENTER` near the end | 258 | 25.8 j (430 ms) |
+**Old against new, in ONE program on ONE fixture** (`samples/editor/SLOTBEN.BASL` -- it carries a
+verbatim copy of the pre-2026-09-02 loops, so the comparison owes nothing to two builds). 100 lines,
+insert/delete at index 1, ten repetitions, real speed (`--nowarp`; TI is meaningless under warp):
 
-So **75% of a RETURN is the line-table shift** and 17% is the full repaint. The near-end row is the
-proof: the same keystroke costs less than half as much when there are fewer slots above the end to
-move, which is the signature of the shift and not of the drawing.
+| | old | new | |
+|---|---:|---:|---:|
+| `DOC.INSERT.SLOT` | **435** | **5** | 87x |
+| `DOC.DELETE.SLOT` | **396** | **5** | 79x |
 
-**Why it costs that much.** `DOC.INSERT.SLOT` moves a 3-byte table entry per pass, and each pass is
-`DOC.SLOT.READ` + `DOC.SLOT.WRITE`: two `GOSUB`s, two runs of `DOC.SLOT.LOCATE` (an `INT` divide and
-two multiplies each), two `BANK` statements, and six banked `PEEK`/`POKE` — and the runtime saves and
-restores the RAM bank around every one of those accesses. Call it 20-odd p-code statements to move
-three bytes, times one per line below the cursor.
+The old insert measures 435 against the 447 recorded when the problem was first found, which is the
+harness agreeing with itself a day later. Ten RETURNs go from ~599 jiffies to ~160 -- a second down
+to a quarter of one.
 
-**The fix is GP.ASM**, and it is the same argument that already won for the two renderers: this is a
-`memmove` inside one 8K window, about 20 cycles an entry native against thousands interpreted. The
-editor already carries inline assembly and `#SYMFILE`, so nothing new is needed. Both
-`DOC.INSERT.SLOT` and `DOC.DELETE.SLOT` want it -- BACKSPACE at column 0 joins lines and pays the
-same cost. Mind the segment boundary: the table spans banks 1..3 at 2048 entries each, so a shift
-crossing one is two moves, not one.
+**How it is built.** BASIC works out WHICH BYTES MOVE and one of two `GP.ASM` blocks moves them.
+The shift is +/- one entry so source and destination overlap, and **direction is the whole
+correctness argument**: insert copies from the top down so it cannot eat its own source, delete from
+the bottom up. Chunking preserves it -- insert takes chunks from the top, delete from the bottom.
+The blocks patch their own operands (`STA MDS,X`) rather than holding pointers in zero page, which
+is the idiom `EDITOR.BASL`'s two renderers already use and costs no assumption about where the
+runtime keeps `zTemp0`.
 
-**Second, smaller:** `ED.DO.ENTER` calls `ED.REFRESH.FULL`, which repaints every text row. An insert
-cannot dirty anything ABOVE the cursor row, so repainting from `ED.CUR.ROW` down would halve the
-drawing on average and cost nothing near the bottom of a file. Worth doing after the shift, and only
-then -- at 17% it is not what anyone is feeling.
+**The segment boundary, which is the trap the old note warned about.** The table is banks 1..3 at
+2048 entries, and one bank is selected for a whole copy, so the single entry whose destination is in
+the NEXT bank cannot go through the block. Those go the old way, and there are at most two in any
+shift. `samples/editor/SLOTTST.BASL` is the test: a 2,100-entry fixture, **every slot checked, not a
+sample**, across twelve cases -- insert and delete at 5, 0, 2040, 2047, 2048 and the last index.
+All twelve pass. A document under 2048 lines never crosses, which is exactly why a naive block
+passes every casual test and then corrupts the first long file it meets.
 
-**THE WORK, when it is picked up.** One `GP.ASM` block per direction, in `samples/editor/STORE.BASL`,
-replacing the bodies of `DOC.INSERT.SLOT` and `DOC.DELETE.SLOT` and leaving their interfaces alone --
-`LINE.INDEX` in, `LINE.COUNT` maintained, every caller untouched.
+**What it cost: 481 bytes** -- object 15,086 -> 15,567, `FREE` 6,400 -> 5,888. Unlike the renderers,
+which came out SMALLER because the `FOR` loops they replaced were bigger than the assembly, this
+one adds the segment-and-chunk arithmetic that did not exist before. There is still 1,792 bytes of
+headroom (`FREE - 4096`). If it is ever wanted back, giving the blocks a 16-bit counter would delete
+both BASIC chunk loops for maybe twenty bytes of assembly.
 
-- **Both, not just insert.** BACKSPACE at column 0 joins two lines and pays the identical cost
-  through `DOC.DELETE.SLOT`; so does DEL at end of line. Fixing one and not the other leaves half
-  the complaint in place.
-- **What the block does:** a 3-byte-per-entry `memmove` inside the `$A000` window. Insert copies
-  DOWNWARD from the top so it does not eat its own source; delete copies UPWARD. That direction rule
-  is the whole correctness argument and the BASIC version already gets it right -- read it first.
-- **The segment boundary is the trap.** The table lives in banks `DOC.TABLE.BASE.BANK`..+2 at
-  `DOC.TABLE.PER.BANK` (2048) entries each, so a shift that crosses one is TWO moves with a `BANK`
-  between them, not one. `DOC.SLOT.LOCATE` is where that arithmetic already lives. A document under
-  2048 lines never crosses, which means a naive block will pass every casual test and corrupt the
-  first long file it meets -- so test at the boundary deliberately.
-- **`{VAR}` needs the `#SYMFILE`**, which `EDITOR.BASL` already declares above its includes. Names
-  are crunched by then, and `STORE.BASL` is `#INCLUDE`d at the bottom of the same program, so the
-  block can reach `LINE.COUNT`, `LINE.INDEX` and the `DOC.*` variables directly.
-- **Free in runtime bytes:** a `GP.ASM` block is five bytes of p-code plus the instructions, and
-  every handler it uses is in every compiled program already.
-- **Measure it the same way it was measured:** the harness is a copy of `EDITOR.BASL` with the
-  self-check replaced by a timing routine, run `--nowarp` because TI is meaningless under warp.
-  Ten inserts at row 1 of a 100-line document currently cost 447 jiffies; that is the number to beat.
+**THE REPAINT IS NOW THE DOMINANT COST**, which it was not before: `ED.RENDER.ALL` is ~102 jiffies
+of the ~160 a RETURN now takes. An insert cannot dirty anything ABOVE the cursor row, so repainting
+from `ED.CUR.ROW` down would roughly halve it and cost nothing near the bottom of a file. That is
+the next move here, and only now is it worth making.
 
 ### `PROGRAM TOO BIG` was the compiler's own workspace, not the program — FIXED
 
@@ -1125,6 +1110,78 @@ size. Sparse code (many short lines) still meets the line table at 2,048 first.
 limit); shrink the 4K frame stack, which is ~250 frames; or the runtime-shrinking items above, since
 every byte off the runtime is a byte `ObjectBase` moves down. None is urgent -- the editor has room
 for another 200 lines and the honest number is now reported.
+
+### A separate CRUNCHER utility for BASL source — and the C64 world is full of prior art
+
+Asked 2026-09-02, and it is worth doing because **a line costs exactly one byte of p-code.**
+Measured, not guessed: hand-compacting `samples/editor/EDITOR.BASL` on 2026-09-02 joined **80**
+lines and the object went **15,166 -> 15,086** -- 80 lines, 80 bytes, one for one. It also crossed a
+page boundary, so `FREE` went 6,144 -> 6,400 and the program gained a whole page of workspace for
+nothing.
+
+**Most of what a classic C64 cruncher does, BASLOAD already does**, so do not rebuild it: BASLOAD
+strips `REM`s and renames every variable to a two-character name (`A`, `A0`, ... `JP` in the
+editor's `.SYM`) at tokenise time. Removing spaces buys nothing either -- they are gone in the
+token stream. **Line joining is the one transform left that pays**, plus dead-label removal.
+
+**The three rules it must not break**, all of which the hand pass had to respect:
+
+1. **Everything after `THEN` is conditional.** Appending a statement to a line that ends in an `IF`
+   silently makes it conditional. This is THE trap -- it compiles, it runs, and it is wrong only
+   sometimes. A line ending in `IF ... THEN` can be joined *to*, never *appended to*.
+2. **A label is a jump target.** In BASL a label names a line, so a line carrying one cannot be
+   folded into its predecessor -- and `GP.CASE` bodies inside a `GP.SELECT` have the same shape.
+3. **The line-length limit**, and BASLOAD's own limits on a source line.
+
+**The verification that made the hand pass safe, and it should be the utility's self-test**:
+flatten both files to a STATEMENT SEQUENCE (split on `:` outside string literals, drop comments and
+blanks) and separately to the list of THEN CLAUSES, then diff both. Identical on both means no
+statement moved and nothing changed conditionality. On the editor: 1,345 statements and 113 THEN
+clauses, both sequences identical -- then a build, and the headless self-check (`DEBUG.MODE = 1`).
+`scratchpad/flat.py` is the throwaway that did it and is worth keeping as the starting point.
+
+**Prior art**: the C64 library has dozens of BASIC crunchers to read for edge cases before writing
+one. They are worth mining for the traps rather than the algorithm, which is easy -- what they know
+that we do not is which transforms bite.
+
+**Keep it OUT of the compiler.** It is a source-to-source pass, it is host-side Python like
+`deferscan.py` and `PRG2BASLOAD`, and it must be optional: crunched source is materially harder to
+read, and this repo's own rule is that code should flow.
+
+### A per-program FRAME STACK SIZE — the biggest lever left on max program size
+
+Asked 2026-09-02: can the 4K frame stack be a compiler option? **Yes, and it is worth more than
+anything else on this list** -- 4K is 16 of the 68 pages a program gets, so dropping it to 1K takes
+the ceiling from **17,408 to 20,480**, more than the ~1.4 KB the cheap runtime-trim step buys.
+
+**It cannot be a constant only the compiler knows**, and `common.inc` already says why beside
+`FrameStackPages`: both ends need the number and they must agree. The compiler SPENDS the gap
+(`object.asm` adds it when working out where the workspace starts, in BOTH the embedded and shared
+paths) and the runtime POLICES it -- `StartRuntime` computes `stackFloorHigh = storeStartHigh -
+FrameStackPages` and `StackOpenFrame` refuses to open a frame below it, six cycles a GOSUB. Make it
+a per-program option with the runtime still assembled at 16 and a program with a smaller gap gets a
+floor BELOW its own gap: the check passes, recursion carries on into the object code, and the
+program overwrites itself and runs what it wrote. That is the exact failure the floor was added to
+catch.
+
+**So the runtime has to be TOLD the number, not built with it:**
+
+- `StartRuntime` already takes the workspace page in X per program. Turn `sbc #FrameStackPages`
+  into a patched byte alongside `RunCodePage`/`RunWorkspacePage` -- one extra runtime byte, or none
+  if it lands in zero page.
+- **Embedded mode is free**: every object carries its own copy of the runtime image, so patching is
+  per-program by construction.
+- **Shared mode is the work.** One resident runtime at `RTBASE` serves many chained p-code
+  programs, so the value must ride in WITH the program rather than be patched into the resident
+  image -- and `_WOCShared` spends `FrameStackPages` the same way, so both halves move together.
+- **Bump `RT_ABI`.** The entry contract changes, and a stale resident runtime paired with a new
+  program is precisely the mismatch above.
+
+**How small is safe?** A frame is GOSUB 4 bytes, `GP.DO` 6, `GP.SELECT` 7, `FOR` 19 -- so 4K is
+~215 nested FORs or ~1,000 GOSUBs, and 1K is still ~62 FORs deep. `samples/editor` nests nowhere
+near that. Default should stay 16; the option is for a program that has measured its own depth.
+`OUT OF MEMORY` is already the error when it is exceeded, which is what stock reports for too many
+nested GOSUBs, so the failure mode needs no new spelling.
 
 ### `GUI.INC.BL` wants a listbox, single and multi select
 

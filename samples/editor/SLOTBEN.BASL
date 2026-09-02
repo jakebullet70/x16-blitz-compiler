@@ -1,0 +1,94 @@
+#SAVEAS "@:SLOTBEN.PRG"
+#AUTONUM 1
+#REM 0
+#SYMFILE "@:SLOTBEN.SYM"
+#INCLUDE "GPB.INC.BL"
+
+REM ============================================================================
+REM SLOTBEN -- the old BASIC table shift against the new GP.ASM one, in the SAME
+REM program on the SAME fixture, so the comparison owes nothing to two builds.
+REM BEN.OLD.* below is the loop as it was before 2026-09-02, copied verbatim.
+REM
+REM RUN THIS AT REAL SPEED (--nowarp). TI is meaningless under warp.
+REM 100 lines, insert/delete at index 1, ten repetitions -- the shape of the
+REM original measurement, whose insert number was 447 jiffies.
+REM ============================================================================
+
+BEN.N = 100
+BEN.REPS = 10
+GOSUB DOC.INIT
+PRINT "SLOTBEN: lines=";BEN.N;" reps=";BEN.REPS
+
+GOSUB BEN.FILL
+BEN.T = TI
+FOR BEN.R = 1 TO BEN.REPS
+  LINE.INDEX = 1 : GOSUB BEN.OLD.INSERT
+NEXT BEN.R
+BEN.OI = TI - BEN.T
+PRINT "OLD insert  ";BEN.OI
+
+GOSUB BEN.FILL
+BEN.T = TI
+FOR BEN.R = 1 TO BEN.REPS
+  LINE.INDEX = 1 : GOSUB DOC.INSERT.SLOT
+NEXT BEN.R
+BEN.NI = TI - BEN.T
+PRINT "NEW insert  ";BEN.NI
+
+GOSUB BEN.FILL
+BEN.T = TI
+FOR BEN.R = 1 TO BEN.REPS
+  LINE.INDEX = 1 : GOSUB BEN.OLD.DELETE
+NEXT BEN.R
+BEN.OD = TI - BEN.T
+PRINT "OLD delete  ";BEN.OD
+
+GOSUB BEN.FILL
+BEN.T = TI
+FOR BEN.R = 1 TO BEN.REPS
+  LINE.INDEX = 1 : GOSUB DOC.DELETE.SLOT
+NEXT BEN.R
+BEN.ND = TI - BEN.T
+PRINT "NEW delete  ";BEN.ND
+
+PRINT "SLOTBEN END"
+END
+
+BEN.FILL:
+  FOR BEN.I = 0 TO BEN.N - 1
+    LINE.INDEX = BEN.I : DOC.PUT.BANK = 5 : DOC.PUT.OFF = BEN.I
+    GOSUB DOC.SLOT.WRITE
+  NEXT BEN.I
+  LINE.COUNT = BEN.N
+  RETURN
+
+REM ---- the pre-2026-09-02 routines, verbatim ----
+BEN.OLD.INSERT:
+  DOC.INS.AT = LINE.INDEX
+  DOC.SHIFT.J = LINE.COUNT - 1
+BEN.OI.LOOP:
+  IF DOC.SHIFT.J < DOC.INS.AT THEN GOTO BEN.OI.DONE
+  LINE.INDEX = DOC.SHIFT.J : GOSUB DOC.SLOT.READ
+  DOC.PUT.BANK = DOC.GOT.BANK : DOC.PUT.OFF = DOC.GOT.OFF
+  LINE.INDEX = DOC.SHIFT.J + 1 : GOSUB DOC.SLOT.WRITE
+  DOC.SHIFT.J = DOC.SHIFT.J - 1
+  GOTO BEN.OI.LOOP
+BEN.OI.DONE:
+  LINE.COUNT = LINE.COUNT + 1
+  RETURN
+
+BEN.OLD.DELETE:
+  DOC.DEL.AT = LINE.INDEX
+  DOC.SHIFT.J = DOC.DEL.AT + 1
+BEN.OD.LOOP:
+  IF DOC.SHIFT.J > LINE.COUNT - 1 THEN GOTO BEN.OD.DONE
+  LINE.INDEX = DOC.SHIFT.J : GOSUB DOC.SLOT.READ
+  DOC.PUT.BANK = DOC.GOT.BANK : DOC.PUT.OFF = DOC.GOT.OFF
+  LINE.INDEX = DOC.SHIFT.J - 1 : GOSUB DOC.SLOT.WRITE
+  DOC.SHIFT.J = DOC.SHIFT.J + 1
+  GOTO BEN.OD.LOOP
+BEN.OD.DONE:
+  LINE.COUNT = LINE.COUNT - 1
+  RETURN
+
+#INCLUDE "STORE.BASL"

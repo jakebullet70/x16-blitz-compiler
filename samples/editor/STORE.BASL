@@ -144,17 +144,60 @@ DOC.PUSH.LINE:
   LINE.TEXT$ = ""
   RETURN
 
+REM ============================================================================
+REM THE TABLE SHIFT -- a memmove, in assembly, because it is 75% of a RETURN
+REM ============================================================================
+REM Both of these used to walk the table one entry at a time in BASIC: per entry a
+REM DOC.SLOT.READ and a DOC.SLOT.WRITE, so two GOSUBs, two DOC.SLOT.LOCATEs (an INT
+REM divide and two multiplies each), two BANKs and six banked PEEK/POKEs -- about
+REM twenty statements to move three bytes. Ten RETURNs at the top of a 100-line
+REM document cost 447 jiffies of the 599 the whole keystroke took.
+REM
+REM Now BASIC works out WHICH BYTES MOVE and the assembly moves them. The shift is
+REM +/- one entry, so source and destination overlap and DIRECTION IS THE WHOLE
+REM CORRECTNESS ARGUMENT: an insert copies from the TOP DOWN so it cannot eat its own
+REM source, a delete copies from the BOTTOM UP. Chunking preserves that -- insert
+REM takes its chunks from the top, delete from the bottom.
+REM
+REM THE SEGMENT BOUNDARY IS THE TRAP. The table is banks 1..3 at 2048 entries each, so
+REM an entry at the top of a bank moves into the NEXT bank and the block cannot do it:
+REM one bank is selected for the whole copy. Those single entries go the old way, and
+REM there are at most two of them in a whole shift. A document under 2048 lines never
+REM crosses one, which is exactly why a naive block passes every casual test and then
+REM corrupts the first long file it meets.
+
 REM ---- open a slot at LINE.INDEX (shift entries up), count++ ----
 REM The caller then DOC.STOREs the new line's content at that index.
 DOC.INSERT.SLOT:
   DOC.INS.AT = LINE.INDEX
-  DOC.SHIFT.J = LINE.COUNT - 1
+  DOC.SH.J = LINE.COUNT - 1
 DOC.INS.LOOP:
-  IF DOC.SHIFT.J < DOC.INS.AT THEN GOTO DOC.INS.DONE
-  LINE.INDEX = DOC.SHIFT.J : GOSUB DOC.SLOT.READ
+  IF DOC.SH.J < DOC.INS.AT THEN GOTO DOC.INS.DONE
+  DOC.SH.SEG = INT(DOC.SH.J / DOC.TABLE.PER.BANK)
+  IF DOC.SH.SEG <> INT((DOC.SH.J + 1) / DOC.TABLE.PER.BANK) THEN GOTO DOC.INS.CROSS
+  DOC.SH.LO = DOC.SH.SEG * DOC.TABLE.PER.BANK
+  IF DOC.SH.LO < DOC.INS.AT THEN DOC.SH.LO = DOC.INS.AT
+  DOC.MV.BANK% = DOC.TABLE.BASE.BANK + DOC.SH.SEG
+  DOC.SH.ADDR = DOC.WIN.START + (DOC.SH.LO - DOC.SH.SEG * DOC.TABLE.PER.BANK) * 3
+  DOC.SH.P = (DOC.SH.J - DOC.SH.LO + 1) * 3
+DOC.INS.CHUNK:
+  IF DOC.SH.P < 1 THEN GOTO DOC.INS.RUNDONE
+  DOC.SH.K = DOC.SH.P : IF DOC.SH.K > 255 THEN DOC.SH.K = 255
+  DOC.MV.SRC% = DOC.SH.ADDR + DOC.SH.P - DOC.SH.K
+  DOC.MV.DST% = DOC.SH.ADDR + DOC.SH.P - DOC.SH.K + 3
+  DOC.MV.LEN% = DOC.SH.K
+  GOSUB DOC.MV.DOWN
+  DOC.SH.P = DOC.SH.P - DOC.SH.K
+  GOTO DOC.INS.CHUNK
+DOC.INS.RUNDONE:
+  DOC.SH.J = DOC.SH.LO - 1
+  GOTO DOC.INS.LOOP
+REM The one entry whose destination is in the next bank. Two banks, so the old road.
+DOC.INS.CROSS:
+  LINE.INDEX = DOC.SH.J : GOSUB DOC.SLOT.READ
   DOC.PUT.BANK = DOC.GOT.BANK : DOC.PUT.OFF = DOC.GOT.OFF
-  LINE.INDEX = DOC.SHIFT.J + 1 : GOSUB DOC.SLOT.WRITE
-  DOC.SHIFT.J = DOC.SHIFT.J - 1
+  LINE.INDEX = DOC.SH.J + 1 : GOSUB DOC.SLOT.WRITE
+  DOC.SH.J = DOC.SH.J - 1
   GOTO DOC.INS.LOOP
 DOC.INS.DONE:
   LINE.COUNT = LINE.COUNT + 1
@@ -164,16 +207,101 @@ REM ---- remove the slot at LINE.INDEX (shift entries down), count-- ----
 REM The removed line's content record just leaks until the next save/compaction.
 DOC.DELETE.SLOT:
   DOC.DEL.AT = LINE.INDEX
-  DOC.SHIFT.J = DOC.DEL.AT + 1
+  DOC.SH.J = DOC.DEL.AT + 1
 DOC.DEL.LOOP:
-  IF DOC.SHIFT.J > LINE.COUNT - 1 THEN GOTO DOC.DEL.DONE
-  LINE.INDEX = DOC.SHIFT.J : GOSUB DOC.SLOT.READ
+  IF DOC.SH.J > LINE.COUNT - 1 THEN GOTO DOC.DEL.DONE
+  DOC.SH.SEG = INT(DOC.SH.J / DOC.TABLE.PER.BANK)
+  IF DOC.SH.SEG <> INT((DOC.SH.J - 1) / DOC.TABLE.PER.BANK) THEN GOTO DOC.DEL.CROSS
+  DOC.SH.HI = DOC.SH.SEG * DOC.TABLE.PER.BANK + DOC.TABLE.PER.BANK - 1
+  IF DOC.SH.HI > LINE.COUNT - 1 THEN DOC.SH.HI = LINE.COUNT - 1
+  DOC.MV.BANK% = DOC.TABLE.BASE.BANK + DOC.SH.SEG
+  DOC.SH.ADDR = DOC.WIN.START + (DOC.SH.J - 1 - DOC.SH.SEG * DOC.TABLE.PER.BANK) * 3
+  DOC.SH.N = (DOC.SH.HI - DOC.SH.J + 1) * 3
+  DOC.SH.P = 0
+DOC.DEL.CHUNK:
+  IF DOC.SH.P >= DOC.SH.N THEN GOTO DOC.DEL.RUNDONE
+  DOC.SH.K = DOC.SH.N - DOC.SH.P : IF DOC.SH.K > 255 THEN DOC.SH.K = 255
+  DOC.MV.DST% = DOC.SH.ADDR + DOC.SH.P
+  DOC.MV.SRC% = DOC.SH.ADDR + DOC.SH.P + 3
+  DOC.MV.LEN% = DOC.SH.K
+  GOSUB DOC.MV.UP
+  DOC.SH.P = DOC.SH.P + DOC.SH.K
+  GOTO DOC.DEL.CHUNK
+DOC.DEL.RUNDONE:
+  DOC.SH.J = DOC.SH.HI + 1
+  GOTO DOC.DEL.LOOP
+REM The one entry whose destination is in the previous bank.
+DOC.DEL.CROSS:
+  LINE.INDEX = DOC.SH.J : GOSUB DOC.SLOT.READ
   DOC.PUT.BANK = DOC.GOT.BANK : DOC.PUT.OFF = DOC.GOT.OFF
-  LINE.INDEX = DOC.SHIFT.J - 1 : GOSUB DOC.SLOT.WRITE
-  DOC.SHIFT.J = DOC.SHIFT.J + 1
+  LINE.INDEX = DOC.SH.J - 1 : GOSUB DOC.SLOT.WRITE
+  DOC.SH.J = DOC.SH.J + 1
   GOTO DOC.DEL.LOOP
 DOC.DEL.DONE:
   LINE.COUNT = LINE.COUNT - 1
+  RETURN
+
+REM ---- move DOC.MV.LEN% bytes (1..255) in bank DOC.MV.BANK%, DESCENDING ----
+REM For the insert: DOC.MV.DST% is DOC.MV.SRC% + 3 and the two overlap, so the last
+REM byte has to move first. $00 is the RAM bank register; the block owns the bank for
+REM its own accesses only -- PEEK and POKE re-select theirs around every access.
+REM The two operands are patched rather than held in zero page, which is the idiom
+REM EDITOR.BASL's renderers already use and costs no assumption about the runtime's
+REM zero page.
+DOC.MV.DOWN:
+  #REM 1
+  GP.ASM
+  REM LDA {DOC.MV.BANK%}
+  REM STA $00
+  REM LDA {DOC.MV.SRC%}
+  REM LDX #1
+  REM STA MDS,X
+  REM LDA {DOC.MV.SRC%},X
+  REM LDX #2
+  REM STA MDS,X
+  REM LDA {DOC.MV.DST%}
+  REM LDX #1
+  REM STA MDD,X
+  REM LDA {DOC.MV.DST%},X
+  REM LDX #2
+  REM STA MDD,X
+  REM LDY {DOC.MV.LEN%}
+  REM MDL: DEY
+  REM MDS: LDA $FFFF,Y
+  REM MDD: STA $FFFF,Y
+  REM CPY #0
+  REM BNE MDL
+  GP.ENDASM
+  #REM 0
+  RETURN
+
+REM ---- move DOC.MV.LEN% bytes (1..255) in bank DOC.MV.BANK%, ASCENDING ----
+REM For the delete: DOC.MV.SRC% is DOC.MV.DST% + 3, so the first byte moves first.
+DOC.MV.UP:
+  #REM 1
+  GP.ASM
+  REM LDA {DOC.MV.BANK%}
+  REM STA $00
+  REM LDA {DOC.MV.SRC%}
+  REM LDX #1
+  REM STA MUS,X
+  REM LDA {DOC.MV.SRC%},X
+  REM LDX #2
+  REM STA MUS,X
+  REM LDA {DOC.MV.DST%}
+  REM LDX #1
+  REM STA MUD,X
+  REM LDA {DOC.MV.DST%},X
+  REM LDX #2
+  REM STA MUD,X
+  REM LDY #0
+  REM MUS: LDA $FFFF,Y
+  REM MUD: STA $FFFF,Y
+  REM INY
+  REM CPY {DOC.MV.LEN%}
+  REM BCC MUS
+  GP.ENDASM
+  #REM 0
   RETURN
 
 REM ---- write the whole document to DOC.FILE.NAME$ (CR line endings) ----
