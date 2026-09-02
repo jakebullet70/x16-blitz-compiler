@@ -835,16 +835,27 @@ ED.CMD.GOTO:
   RETURN
 
 REM ---- forward, wrapping, case-insensitive substring search for ED.FIND$ ----
+REM A CASE-BLIND SEARCH THAT ALLOCATES NOTHING. This used to fold the needle and every
+REM line into NEW strings -- ED.FOLD.IN$, ED.FOLD.OUT$, ED.HAY$ -- and then walk the line
+REM with MID$ per position, which allocates on every comparison. Three ~250 byte blocks
+REM stayed owned for the rest of the run: a single search cost 579 bytes of the workspace,
+REM measured, and that is what the dialogs later ran out of.
+REM
+REM Now the fold happens IN PLACE through GP.STRPTR and the search is GP.INSTR, which takes
+REM a 1-based start of its own. LINE.TEXT$ is the scratch copy DOC.LOAD already makes and
+REM upper-casing it harms nothing -- the document itself lives in the bank, untouched.
 ED.FIND.NEXT:
   IF LEN(ED.FIND$) = 0 THEN RETURN
-  ED.FOLD.IN$ = ED.FIND$ : GOSUB ED.FOLD : ED.NEEDLE$ = ED.FOLD.OUT$
+  REM The needle is folded on a COPY: ED.FIND$ is what both messages below print back.
+  ED.NEEDLE$ = ED.FIND$
+  ED.UP.PTR% = GP.STRPTR(ED.NEEDLE$) : ED.UP.LEN% = LEN(ED.NEEDLE$) : GOSUB ED.UPPER
   GOSUB ED.COMMIT.LIVE
   ED.FR = ED.CUR.ROW : ED.FROM = ED.CUR.COL + 2 : ED.SCANNED = 0
 ED.FN.LOOP:
   IF ED.SCANNED > LINE.COUNT THEN GOTO ED.FN.NONE
   LINE.INDEX = ED.FR : GOSUB DOC.LOAD
-  ED.FOLD.IN$ = LINE.TEXT$ : GOSUB ED.FOLD : ED.HAY$ = ED.FOLD.OUT$
-  GOSUB ED.STRFIND
+  ED.UP.PTR% = GP.STRPTR(LINE.TEXT$) : ED.UP.LEN% = LEN(LINE.TEXT$) : GOSUB ED.UPPER
+  ED.FOUND.AT = GP.INSTR(LINE.TEXT$, ED.NEEDLE$, ED.FROM)
   IF ED.FOUND.AT > 0 THEN GOTO ED.FN.HIT
   ED.FR = ED.FR + 1
   IF ED.FR > LINE.COUNT - 1 THEN ED.FR = 0
@@ -860,30 +871,35 @@ ED.FN.NONE:
   ED.MSG$ = "Not found: " + ED.FIND$ : GOSUB ED.ERR.MSG
   RETURN
 
-REM find ED.NEEDLE$ in ED.HAY$ from 1-based ED.FROM -> ED.FOUND.AT (0 = miss)
-ED.STRFIND:
-  ED.FOUND.AT = 0 : ED.NLEN = LEN(ED.NEEDLE$)
-  IF ED.NLEN = 0 THEN RETURN
-  ED.HLEN = LEN(ED.HAY$) : ED.SI = ED.FROM
-  IF ED.SI < 1 THEN ED.SI = 1
-ED.SF.LOOP:
-  IF ED.SI + ED.NLEN - 1 > ED.HLEN THEN RETURN
-  IF MID$(ED.HAY$, ED.SI, ED.NLEN) = ED.NEEDLE$ THEN ED.FOUND.AT = ED.SI : RETURN
-  ED.SI = ED.SI + 1
-  GOTO ED.SF.LOOP
-
-REM Uppercase ED.FOLD.IN$ -> ED.FOLD.OUT$. ASCII, because ASCII is what the document
-REM and the literals are -- PETSCII lives only on disk, and STORE.BASL converts at that
-REM boundary. ASCII lower case is $61-$7A (97-122).
-ED.FOLD:
-  ED.FOLD.OUT$ = ""
-  REM Same FOR 1 TO 0 trap as DOC.TOPETSCII: an empty needle would fold to CHR$(0).
-  IF LEN(ED.FOLD.IN$) = 0 THEN RETURN
-  FOR ED.FOLD.I = 1 TO LEN(ED.FOLD.IN$)
-    ED.FOLD.CH = ASC(MID$(ED.FOLD.IN$, ED.FOLD.I, 1))
-    IF ED.FOLD.CH >= 97 AND ED.FOLD.CH <= 122 THEN ED.FOLD.CH = ED.FOLD.CH - 32
-    ED.FOLD.OUT$ = ED.FOLD.OUT$ + CHR$(ED.FOLD.CH)
-  NEXT ED.FOLD.I
+REM Upper-case ED.UP.LEN% characters at ED.UP.PTR%, IN PLACE. ASCII lower case is $61-$7A,
+REM and ASCII is what the document and the literals are -- PETSCII lives only on disk.
+REM Y counts DOWN from the length, so offset 0 (the length byte) is never touched. A zero
+REM length must not reach the loop at all: DEY would wrap and rewrite 255 bytes of heap.
+ED.UPPER:
+  IF ED.UP.LEN% = 0 THEN RETURN
+  #REM 1
+  GP.ASM
+  REM LDA {ED.UP.PTR%}
+  REM LDX #1
+  REM STA UPS,X
+  REM STA UPD,X
+  REM LDA {ED.UP.PTR%},X
+  REM LDX #2
+  REM STA UPS,X
+  REM STA UPD,X
+  REM LDY {ED.UP.LEN%}
+  REM UPS: LDA $FFFF,Y
+  REM CMP #$61
+  REM BCC UPN
+  REM CMP #$7B
+  REM BCS UPN
+  REM SEC
+  REM SBC #$20
+  REM UPD: STA $FFFF,Y
+  REM UPN: DEY
+  REM BNE UPS
+  GP.ENDASM
+  #REM 0
   RETURN
 
 
