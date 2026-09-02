@@ -20,6 +20,10 @@
 ## the document store gave it up and starts its own arena at 5 instead.
 #DEFINE ED.GUI.BANK 4
 
+REM Index 0 is transparent BY HARDWARE, and the chrome now has the document behind it. So
+REM black needs an index that is not 0. Five is free in both themes, in either nibble.
+#DEFINE ED.BLK 5
+
 #INCLUDE "GPB.INC.BL"
 #INCLUDE "THEME.INC.BL"
 #INCLUDE "APPSYS.INC.BL"
@@ -62,6 +66,7 @@ DOC.FILE.NAME$ = "TEST.MD"
 GOSUB DOC.LOADFILE
 GOSUB ED.OPEN.DONE
 GOSUB ED.RENDER.ALL
+GOSUB ED.L0.ON
 
 IF DEBUG.MODE = 1 THEN GOSUB ED.SELFCHECK : END
 
@@ -118,6 +123,9 @@ ED.KEY.RANGE:
 
 ED.QUIT:
   POKE 40761, 0 : POKE 40762, 0 : REM undo any hardware VSCROLL before returning to BASIC
+  REM layer 0 off again, and palette 5 back to whatever it was
+  POKE 40754, 0 : POKE 40755, 0 : POKE 40741, 0 : POKE 40745, PEEK(40745) AND 239
+  VPOKE 1, 64010, ED.PAL5.LO : VPOKE 1, 64011, ED.PAL5.HI
   GOSUB ED.ALTKEYS.OFF : REM and the keyboard layout, which outlives the program
   REM APPSYS.RESTORE hands back the mode, charset and colour APPSYS.STARTUP found -- the
   REM user's, not a hardcoded 3, so someone who started in upper case is not dropped into
@@ -179,14 +187,7 @@ ED.GUI.SETUP:
   GUI.EDGE.H    = ED.GL.H  : GUI.EDGE.V    = ED.GL.V
   GUI.CORNER.TL = ED.GL.TL : GUI.CORNER.TR = ED.GL.TR
   GUI.CORNER.BL = ED.GL.BL : GUI.CORNER.BR = ED.GL.BR
-  RETURN
-
-REM Where a dialog goes, asked FRESH at every call because the answer moves. The document
-REM is scrolled by VERA, so ED.MAP.TOP is the map row showing as screen row 0; every GP
-REM command here addresses the MAP and GUI.INC.BL centres against the SCREEN. This one
-REM number reconciles them, and only while the view stays put -- hence not in ED.GUI.SETUP.
-ED.GUI.WHERE:
-  GUI.ROW.OFFSET = ED.MAP.TOP
+  GUI.ROW.OFFSET = 0 : REM layer 1 does not scroll: a screen row IS a map row
   RETURN
 
 ED.PETFONT:
@@ -243,22 +244,22 @@ ED.THEME:
   THEME.DARK = ED.DARK
   GOSUB THEME.LOAD
   IF ED.DARK <> 0 THEN GOTO ED.THEME.DARK
-  THEME.CLR(THEME.PAGE)   = 15 * 16 + 0 : REM black on light grey -- unused: the dropdown is TEXT
-  THEME.CLR(THEME.TEXT)   =  0 * 16 + 1 : REM white on black -- the document
+  THEME.CLR(THEME.PAGE)   = 15 * 16 + ED.BLK : REM black on light grey -- unused: the dropdown is TEXT
+  THEME.CLR(THEME.TEXT)   = ED.BLK * 16 + 1 : REM white on black -- the document
   THEME.CLR(THEME.TITLE)  =  6 * 16 + 1 : REM white on blue -- bars and messages
   THEME.CLR(THEME.BORDER) =  6 * 16 + 7 : REM yellow on blue -- the hotkey letter
-  THEME.CLR(THEME.HILITE) =  1 * 16 + 0 : REM black on white -- caret, active title
-  THEME.CLR(THEME.DIMMED) =  0 * 16 + 3 : REM cyan on black -- prompts
+  THEME.CLR(THEME.HILITE) =  1 * 16 + ED.BLK : REM black on white -- caret, active title
+  THEME.CLR(THEME.DIMMED) = ED.BLK * 16 + 3 : REM cyan on black -- prompts
   THEME.CLR(THEME.WARN)   =  2 * 16 + 1 : REM white on red -- errors
   RETURN
 
 ED.THEME.DARK:
   THEME.CLR(THEME.PAGE)   = 11 * 16 + 15
-  THEME.CLR(THEME.TEXT)   =  0 * 16 + 15
+  THEME.CLR(THEME.TEXT)   = ED.BLK * 16 + 15
   THEME.CLR(THEME.TITLE)  = 11 * 16 + 1
   THEME.CLR(THEME.BORDER) = 11 * 16 + 7
-  THEME.CLR(THEME.HILITE) = 15 * 16 + 0
-  THEME.CLR(THEME.DIMMED) =  0 * 16 + 12
+  THEME.CLR(THEME.HILITE) = 15 * 16 + ED.BLK
+  THEME.CLR(THEME.DIMMED) = ED.BLK * 16 + 12
   THEME.CLR(THEME.WARN)   =  2 * 16 + 1
   RETURN
 
@@ -306,14 +307,43 @@ ED.INIT:
   REM (32<<n); ED.MAP.TOP is kept inside [0, MAP.H - SCREEN.ROWS] so the window never
   REM crosses the map's edge -- no reliance on VERA's wrap, we rewind and repaint instead.
   ED.MAP.TOP = 0
-  POKE 40761, 0 : POKE 40762, 0
+  POKE 40761, 0 : POKE 40762, 0 : REM L1 never scrolls again -- see ED.LAYERS
   ED.MAP.CFG = PEEK(40756) : ED.MAP.HB = INT(ED.MAP.CFG / 64) : ED.MAP.H = 32
   IF ED.MAP.HB = 1 THEN ED.MAP.H = 64
   IF ED.MAP.HB = 2 THEN ED.MAP.H = 128
   IF ED.MAP.HB = 3 THEN ED.MAP.H = 256
   ED.MAP.MAXTOP = ED.MAP.H - SCREEN.ROWS
   ED.HW.OK = 0 : IF ED.MAP.MAXTOP >= 4 THEN ED.HW.OK = 1
+  GOSUB ED.LAYERS
   MENU.ACTIVE = 0 - 1 : GOSUB ED.MENU.SETUP : GOSUB ED.ALTKEYS
+  RETURN
+
+REM VSCROLL moves a whole LAYER, so with one layer the bars slid with the document and had
+REM to be redrawn at their new map row every line. Layer 0 takes the document and scrolls
+REM alone; layer 1 keeps the bars, the dropdown and the dialogs at fixed SCREEN rows. The
+REM seam was already there: every GP command addresses layer 1 only, and the document is
+REM drawn by assembly that takes its address from a variable.
+ED.LAYERS:
+  POKE 40741, 0 : REM DCSEL 0, or $9F29 is an FX register instead of DC_VIDEO
+  ED.PAL5.LO = VPEEK(1, 64010) : ED.PAL5.HI = VPEEK(1, 64011)
+  VPOKE 1, 64010, 0 : VPOKE 1, 64011, 0 : REM palette 5 = $000, an opaque black
+  REM L0: config and tilebase copied from L1, map at $00000, and the only scroll left.
+  POKE 40749, PEEK(40756) : POKE 40750, 0 : POKE 40751, PEEK(40758)
+  POKE 40754, 0 : POKE 40755, 0
+  GOSUB ED.CLEAR.OVERLAY
+  RETURN
+
+REM Layer 0 is switched on AFTER the first full render, not here, and it is never cleared:
+REM VRAM comes up with whatever was in it, but a row is always painted before it can be
+REM seen -- ED.RENDER.ALL paints the whole window, and a scroll paints the row it exposes.
+REM The map rows under the bars are never visible at all; the bars are opaque.
+ED.L0.ON:
+  POKE 40741, 0 : POKE 40745, PEEK(40745) OR 16 : REM DC_VIDEO bit 4
+  RETURN
+
+REM Layer 1's text region back to transparent. Attribute 0 is the transparent one.
+ED.CLEAR.OVERLAY:
+  GP.FILL 0, 1, SCREEN.COLS, ED.TEXT.ROWS, 32, 0
   RETURN
 
 REM ============================================================================
@@ -430,7 +460,7 @@ ED.MENU.BAR.ITEMS:
   MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
   MENUVERT.HOT$ = MENU.HOT$
   MENUVERT.HOTATTR = THEME.CLR(THEME.BORDER)
-  MENUBAR.X = 0 : MENUBAR.Y = ED.MAP.TOP : MENUBAR.GAP = 0
+  MENUBAR.X = 0 : MENUBAR.Y = 0 : MENUBAR.GAP = 0
   RETURN
 
 
@@ -652,11 +682,17 @@ ED.MENU.LETTER:
 
 ED.MENU.SELECT:
   MENU.CHOICE.MENU = MENU.ACTIVE : MENU.CHOICE.ITEM = MENU.SEL
-  MENU.ACTIVE = 0 - 1 : GOSUB ED.RENDER.ALL : GOSUB ED.MENU.DISPATCH
+  MENU.ACTIVE = 0 - 1 : GOSUB ED.MENU.CLOSE : GOSUB ED.MENU.DISPATCH
   RETURN
 
 ED.MENU.CANCEL:
-  MENU.ACTIVE = 0 - 1 : GOSUB ED.RENDER.ALL
+  MENU.ACTIVE = 0 - 1 : GOSUB ED.MENU.CLOSE
+  RETURN
+
+REM Putting the document back is taking the panel away: it never covered anything the
+REM hardware cares about. Two rows of chrome instead of a 28-row repaint.
+ED.MENU.CLOSE:
+  GOSUB ED.ERASE.DROPDOWN : GOSUB ED.RENDER.MENUBAR : GOSUB ED.PLACE.CARET
   RETURN
 
 REM Only the two keys that cross the panel's axis are here; moving the highlight INSIDE it
@@ -690,23 +726,20 @@ ED.MENU.BAR.MOVE:
   MENUBAR.SEL = MENU.ACTIVE + 1 : GOSUB MENUBAR.MARK
   RETURN
 
-REM ---- put the document back where the panel was, and no further ----
-REM The panel starts at screen row 1 and is ED.DD.FH rows tall, so those are the only rows
-REM that can be dirty. ED.RENDER.ALL was repainting the screen to take down seven rows.
+REM ---- take the panel away, which is all "putting the document back" means now ----
+REM The document is on layer 0 and was never covered, so this clears the panel's OWN
+REM rectangle on the overlay -- rows 1..ED.DD.FH at the columns it occupied -- back to
+REM transparent. Erasing by repainting document rows stopped working the moment they moved
+REM to layer 0: the panel is on the other layer, and three of them piled up on screen.
 ED.ERASE.DROPDOWN:
   ED.DDE.LAST = ED.DD.FH
   IF ED.DDE.LAST > ED.TEXT.BOTTOM THEN ED.DDE.LAST = ED.TEXT.BOTTOM
   IF ED.DDE.LAST < 1 THEN RETURN
-  FOR ED.SCREEN.ROW = 1 TO ED.DDE.LAST
-    ED.DOC.LINE = ED.TOP.LINE + ED.SCREEN.ROW - 1
-    GOSUB ED.RENDER.ROW
-  NEXT ED.SCREEN.ROW
+  GP.FILL ED.DD.BX, 1, ED.DD.FW, ED.DDE.LAST, 32, 0
   RETURN
 
 ED.MENU.DISPATCH:
-  IF MENU.CHOICE.MENU = 0 THEN GOSUB ED.DISP.FILE : RETURN
-  IF MENU.CHOICE.MENU = 1 THEN GOSUB ED.DISP.SEARCH : RETURN
-  IF MENU.CHOICE.MENU = 2 THEN GOSUB ED.CMD.ABOUT : RETURN
+  ON MENU.CHOICE.MENU + 1 GOSUB ED.DISP.FILE, ED.DISP.SEARCH, ED.CMD.ABOUT
   RETURN
 
 ED.DISP.FILE:
@@ -865,7 +898,7 @@ REM or ED.YN out -- so all six call sites and the ED.SIM.MODE short circuit are 
 
 ED.PROMPT:
   IF ED.SIM.MODE = 1 THEN ED.INPUT$ = ED.SIM.INPUT$ : ED.PROMPT.OK = 1 : RETURN
-  GOSUB ED.GUI.WHERE : GUI.TITLE$ = "" : GUI.MSG2$ = "" : GUI.MASK = 0
+  GUI.TITLE$ = "" : GUI.MSG2$ = "" : GUI.MASK = 0
   GUI.MSG$ = ED.PROMPT.MSG$
   REM Wide enough for a path, and the box sizes itself around it. The old bottom-row field
   REM ran to 60 because it had the whole screen; a centred dialog does not.
@@ -878,7 +911,6 @@ ED.PROMPT:
 
 ED.PROMPT.YN:
   IF ED.SIM.MODE = 1 THEN ED.YN = ED.SIM.YN : RETURN
-  GOSUB ED.GUI.WHERE
   GUI.TITLE$ = "" : GUI.MSG2$ = "" : GUI.OKCANCEL = 0 : GUI.HINT$ = ""
   GUI.MSG$ = ED.PROMPT.MSG$
   GOSUB GUI.YN
@@ -939,10 +971,9 @@ ED.ENSURE.VISIBLE:
   IF ED.HSCROLLED = 1 THEN ED.SCROLLED = 1
   RETURN
 
-REM A one-row vertical move with no horizontal scroll is served by VERA: bump L1_VSCROLL a
-REM row and repaint the menu bar (it must stay put while the map slides under it), the one
-REM newly-exposed text row, and the status bar -- 3 rows, not ~28. Anything else -- a
-REM multi-line jump, any horizontal scroll -- is a full repaint at the current map offset.
+REM A one-row move is served by VERA: bump L0_VSCROLL and paint the ONE newly-exposed row.
+REM The bars are on layer 1 and did not move. Anything else -- a multi-line jump, any
+REM horizontal scroll -- is a full repaint at the current map offset.
 ED.DO.SCROLL:
   IF ED.HW.OK = 0 THEN GOSUB ED.RENDER.ALL : RETURN
   IF ED.HSCROLLED = 1 THEN GOSUB ED.RENDER.ALL : RETURN
@@ -955,7 +986,7 @@ REM scroll down one line: content slides up, a new line appears at the bottom te
 ED.HW.SCROLL.DOWN:
   ED.MAP.TOP = ED.MAP.TOP + 1
   IF ED.MAP.TOP > ED.MAP.MAXTOP THEN ED.MAP.TOP = 0 : GOSUB ED.SET.VSCROLL : GOSUB ED.RENDER.ALL : RETURN
-  GOSUB ED.SET.VSCROLL : GOSUB ED.RENDER.MENUBAR
+  GOSUB ED.SET.VSCROLL
   ED.SCREEN.ROW = ED.TEXT.BOTTOM : ED.DOC.LINE = ED.TOP.LINE + ED.SCREEN.ROW - 1 : GOSUB ED.RENDER.ROW
   GOSUB ED.RENDER.STATUS : GOSUB ED.PLACE.CARET
   RETURN
@@ -964,15 +995,15 @@ REM scroll up one line: content slides down, a new line appears at the top text 
 ED.HW.SCROLL.UP:
   ED.MAP.TOP = ED.MAP.TOP - 1
   IF ED.MAP.TOP < 0 THEN ED.MAP.TOP = ED.MAP.MAXTOP : GOSUB ED.SET.VSCROLL : GOSUB ED.RENDER.ALL : RETURN
-  GOSUB ED.SET.VSCROLL : GOSUB ED.RENDER.MENUBAR
+  GOSUB ED.SET.VSCROLL
   ED.SCREEN.ROW = 1 : ED.DOC.LINE = ED.TOP.LINE + ED.SCREEN.ROW - 1 : GOSUB ED.RENDER.ROW
   GOSUB ED.RENDER.STATUS : GOSUB ED.PLACE.CARET
   RETURN
 
 ED.SET.VSCROLL:
   ED.VSP = ED.MAP.TOP * 8
-  POKE 40761, ED.VSP - INT(ED.VSP / 256) * 256 : REM $9F39 L1 VSCROLL (7:0)
-  POKE 40762, INT(ED.VSP / 256)                : REM $9F3A L1 VSCROLL (11:8)
+  POKE 40754, ED.VSP - INT(ED.VSP / 256) * 256 : REM $9F32 L0 VSCROLL (7:0)
+  POKE 40755, INT(ED.VSP / 256)                : REM $9F33 L0 VSCROLL (11:8)
   RETURN
 
 ED.RENDER.ALL:
@@ -1004,7 +1035,7 @@ REM   the edited line  MODE 1, read out of ED.CUR.LINE$ itself, past its 3-byte 
 REM   past the end     MODE 0 with ED.ASM.VIS% = 0 -- every cell is a space, and the source
 REM                    address is never dereferenced, so what it holds does not matter
 ED.RENDER.ROW:
-  ED.ASM.BASE% = 45056 + (ED.SCREEN.ROW + ED.MAP.TOP) * 256
+  ED.ASM.BASE% = (ED.SCREEN.ROW + ED.MAP.TOP) * 256 : REM layer 0's map, VRAM $00000
   ED.ASM.ATTR% = ED.ATTR.TEXT : ED.ASM.WIDTH% = ED.TEXT.WIDTH : ED.ASM.MODE% = 0 : ED.ASM.VIS% = 0
   IF ED.DOC.LINE >= LINE.COUNT THEN GOTO ED.ROW.STREAM
   IF ED.DOC.LINE = ED.CUR.ROW THEN GOTO ED.ROW.LIVE
@@ -1027,7 +1058,7 @@ ED.ROW.STREAM:
   REM LDX #1
   REM LDA {ED.ASM.BASE%},X
   REM STA $9F21
-  REM LDA #49                  ; bank 1, address increment +4 = two cells a flush
+  REM LDA #48                  ; bank 0 (layer 0's map), increment +4 = two cells a flush
   REM STA $9F22
   REM LDA #4                   ; DCSEL 2
   REM STA $9F25
@@ -1096,46 +1127,31 @@ ED.PLACE.CARET:
   ED.CARET.VALID = 0
   IF ED.CARET.SROW < 1 OR ED.CARET.SROW > ED.TEXT.BOTTOM THEN RETURN
   IF ED.CARET.SCOL < 0 OR ED.CARET.SCOL >= ED.TEXT.WIDTH THEN RETURN
-  ED.CARET.ADDR = 45056 + (ED.CARET.SROW + ED.MAP.TOP) * 256 + ED.CARET.SCOL * 2 + 1
-  VPOKE 1, ED.CARET.ADDR, ED.ATTR.CARET : ED.CARET.VALID = 1
+  ED.CARET.ADDR = (ED.CARET.SROW + ED.MAP.TOP) * 256 + ED.CARET.SCOL * 2 + 1
+  VPOKE 0, ED.CARET.ADDR, ED.ATTR.CARET : ED.CARET.VALID = 1
   RETURN
 
 ED.UNCARET:
   IF ED.CARET.VALID = 0 THEN RETURN
-  VPOKE 1, ED.CARET.ADDR, ED.ATTR.TEXT : ED.CARET.VALID = 0
+  VPOKE 0, ED.CARET.ADDR, ED.ATTR.TEXT : ED.CARET.VALID = 0
   RETURN
 
 
-REM ---- menu bar (VERA row 0). Attr = bg*16+fg: white-on-blue bar = 97,
-REM ---- yellow accelerator = 103, active title (blue-on-white) = 22. ----
-REM DRAWN BY MENUBAR.INC.BL. What is left here is the two things that belong to the EDITOR
-REM and not to a menu: the full width band, and the document name at the right hand end.
+REM ---- menu bar (layer 1, screen row 0). Attr = bg*16+fg. ----
+REM MENUBAR.INC.BL draws the titles; the editor's own two things are the full width band
+REM and the document name at the right.
 REM
-REM MENUBAR.Y IS A MAP ROW, set by ED.MENU.BAR.ITEMS -- the GP commands write at map row =
-REM whatever Y they are given, and the layer is hardware scrolled, so screen row 0 is map
-REM row ED.MAP.TOP. The same correction ED.PUT.FIELD, ED.RENDER.ROW and the caret make.
-REM
-REM MENUBAR.DRAW lays every title down in the normal attribute and MENUBAR.MARK puts the
-REM highlight on one; with no menu open there is nothing to mark, which is MENU.ACTIVE < 0.
-REM DRAWN ONLY WHEN IT WOULD COME OUT DIFFERENT. The body below blanks the whole row
-REM with a full-width ED.PUT.FIELD and then draws the items back over it, so every call
-REM is a visible flicker -- and ED.RENDER.ALL called it on every insert and every delete,
-REM where the bar cannot have changed. Now an edit repaints it exactly ONCE, when the
-REM dirty star first appears, and never again.
-REM
-REM The three tests are everything the bar's appearance depends on that is a NUMBER:
-REM the star, which item is highlighted, and the map row it is drawn at (the bar has to
-REM be redrawn where the hardware scroll has moved it to). The FILENAME is the fourth,
-REM and it is a string -- compared with a flag instead of by building a key string,
+REM DRAWN ONLY WHEN IT WOULD COME OUT DIFFERENT -- the body blanks the whole row and draws
+REM the items back over it, which flickers. The two tests are the star and which title is
+REM highlighted; the FILENAME is a string, so it uses a flag rather than a key string,
 REM because a string built per keystroke is an allocation per keystroke.
 ED.RENDER.MENUBAR:
   IF ED.MB.FORCE = 1 THEN GOTO ED.MB.DRAW
   IF ED.DOC.DIRTY <> ED.MB.D THEN GOTO ED.MB.DRAW
   IF MENU.ACTIVE <> ED.MB.M THEN GOTO ED.MB.DRAW
-  IF ED.MAP.TOP <> ED.MB.T THEN GOTO ED.MB.DRAW
   RETURN
 ED.MB.DRAW:
-  ED.MB.FORCE = 0 : ED.MB.D = ED.DOC.DIRTY : ED.MB.M = MENU.ACTIVE : ED.MB.T = ED.MAP.TOP
+  ED.MB.FORCE = 0 : ED.MB.D = ED.DOC.DIRTY : ED.MB.M = MENU.ACTIVE
   ED.PS.ROW = 0 : ED.PS.COL = 0 : ED.PS.WIDTH = SCREEN.COLS
   ED.PS$ = "" : ED.PS.ATTR = THEME.CLR(THEME.TITLE) : GOSUB ED.PUT.FIELD
   GOSUB ED.MENU.BAR.ITEMS : GOSUB MENUBAR.DRAW
@@ -1175,7 +1191,7 @@ ED.DRAW.DROPDOWN:
   REM the offset is added here, or the panel lands ED.MAP.TOP rows from the bar it hangs
   REM from: invisible at the top of the document and further adrift the further you scroll.
   ED.DD.FW = ED.DD.W + 2 : ED.DD.FH = ED.DD.N + 2
-  ED.DD.TY = 1 + ED.MAP.TOP : ED.DD.BY = ED.DD.TY + ED.DD.FH - 1
+  ED.DD.TY = 1 : ED.DD.BY = ED.DD.TY + ED.DD.FH - 1
   ED.DD.RX = ED.DD.BX + ED.DD.FW - 1 : ED.DD.FC = THEME.CLR(THEME.TEXT)
   REM GUI.FRAME, so the dropdown and the dialogs share one frame drawer -- and it is the
   REM only one that can draw a box here, since GP.BOX's built-in styles are built from
@@ -1190,7 +1206,7 @@ ED.DRAW.DROPDOWN:
   REM leaves COUNT, ATTR and HIATTR at zero is guessing at the routine rather than calling
   REM it. Set the documented inputs and let MENUVERT.DRAW walk the rows.
   MENUVERT.X = ED.DD.COL
-  MENUVERT.Y = 2 + ED.MAP.TOP : REM a map row, as above
+  MENUVERT.Y = 2 : REM layer 1, a screen row
   MENUVERT.WIDTH = ED.DD.W : MENUVERT.COUNT = ED.DD.N
   REM The DOCUMENT's own attribute, not a page colour of its own, so the panel reads as a
   REM framed hole in the document rather than a card laid on it. Only the selected row
@@ -1232,7 +1248,7 @@ REM The width guard matters because the block's test is at the BOTTOM -- without
 REM width of 0 would write one cell, where the FOR loop it replaced wrote none.
 ED.PUT.FIELD:
   IF ED.PS.WIDTH < 1 THEN RETURN
-  ED.ASM.BASE% = 45056 + (ED.PS.ROW + ED.MAP.TOP) * 256 + ED.PS.COL * 2
+  ED.ASM.BASE% = 45056 + ED.PS.ROW * 256 + ED.PS.COL * 2 : REM layer 1, a SCREEN row
   ED.ASM.ATTR% = ED.PS.ATTR : ED.ASM.WIDTH% = ED.PS.WIDTH : ED.ASM.VIS% = LEN(ED.PS$)
   #REM 1
   GP.ASM
@@ -1322,6 +1338,14 @@ ED.SELFCHECK:
   REM ---- verify chrome (char+attr) + text render + the O(1) caret ----
   ED.QUIET = 0
   PRINT "DIM ";SCREEN.COLS;"x";SCREEN.ROWS
+  REM NO THEME COLOUR MAY USE INDEX 0, in either nibble: the chrome is on a layer with the
+  REM document behind it, and 0 is transparent whichever nibble it sits in. A foreground of
+  REM 0 let the document show through the letters of the active title.
+  ED.Z = 0
+  FOR ED.QR = 0 TO THEME.SLOTS - 1
+    IF MOD(THEME.CLR(ED.QR), 16) = 0 OR INT(THEME.CLR(ED.QR) / 16) = 0 THEN ED.Z = ED.Z + 1
+  NEXT ED.QR
+  PRINT "THEMEZERO";ED.Z
   REM ---- what ED.ALTKEYS found. ALT+letter is the one path no headless test can PRESS,
   REM ---- but everything it depends on is readable: which tables exist, which two were
   REM ---- picked, and how many keys got rewritten.
@@ -1359,39 +1383,47 @@ ED.SELFCHECK:
   ED.DDT$ = ED.DDT$ + STR$(VPEEK(1, 45056 + 5 * 256 + (ED.DD.COL + 2) * 2 + 1))
   ED.DDT$ = ED.DDT$ + STR$(VPEEK(1, 45056 + 5 * 256 + (ED.DD.COL + 6) * 2 + 1))
   PRINT "DDTINT";ED.DDT$;" HOT=";MENUVERT.HOTATTR;" PLAIN=";MENUVERT.ATTR
-  PRINT "DDTINT WANT HI HOT PLAIN PLAIN HOT"
+  PRINT "DDTINT W= HI HOT PL PL HOT"
+  REM WALKING THE BAR MUST TAKE THE OLD PANEL DOWN, and once it did not: erasing repainted
+  REM document rows, and those had moved to layer 0, so File, Search and Help stacked up on
+  REM screen together. A cell inside File's panel, after stepping right: 32 and 0.
+  ED.EX = ED.DD.BX + 1
+  GOSUB ED.MENU.RIGHT
+  PRINT "DDGONE";VPEEK(1, 45824 + ED.EX * 2);VPEEK(1, 45825 + ED.EX * 2)
+  GOSUB ED.CLEAR.OVERLAY
   ED.MSG$ = "HELLO" : GOSUB ED.INFO.MSG
   ED.SR = SCREEN.ROWS - 1
   PRINT "MSG CH=";VPEEK(1, 45056 + ED.SR * 256 + 2);" AT=";VPEEK(1, 45056 + ED.SR * 256 + 3)
-  REM REAL repaint path: open a file, drop the caret, sample clean cells. Every text cell
-  REM must be char + ED.ATTR.TEXT(1), on content rows and blank rows alike.
+  REM REAL repaint path: open a file, drop the caret, sample clean cells. THE DOCUMENT IS
+  REM LAYER 0 -- VPEEK bank 0, and the map starts at VRAM 0, so there is no 45056 here.
+  REM Every text cell must be char + ED.ATTR.TEXT, on content rows and blank rows alike.
   DOC.FILE.NAME$ = "TEST.MD" : GOSUB ED.OPEN.FILE
   GOSUB ED.UNCARET
-  PRINT "TR CH=";VPEEK(1, 45312);" AT=";VPEEK(1, 45313)
-  PRINT "TR2 CH=";VPEEK(1, 45568);" AT=";VPEEK(1, 45569)
-  PRINT "A10 AT=";VPEEK(1, 45056 + 10 * 256 + 41)
-  PRINT "A20 AT=";VPEEK(1, 45056 + 20 * 256 + 61)
+  PRINT "TR CH=";VPEEK(0, 256);" AT=";VPEEK(0, 257)
+  PRINT "A10 AT=";VPEEK(0, 10 * 256 + 41)
+  REM ...and layer 1 over the document must be TRANSPARENT, or none of it would show: 32/0.
+  PRINT "A20 AT=";VPEEK(0, 20 * 256 + 61);" OVL=";VPEEK(1, 47696);VPEEK(1, 47697)
   REM caret place/restore (the O(1) cursor-move primitive)
   ED.CUR.ROW = 0 : ED.CUR.COL = 0 : ED.TOP.LINE = 0 : ED.LEFT.COL = 0
-  GOSUB ED.PLACE.CARET : PRINT "CARET AT=";VPEEK(1, 45313)
-  GOSUB ED.UNCARET : PRINT "UNCARET AT=";VPEEK(1, 45313)
+  GOSUB ED.PLACE.CARET : PRINT "CARET AT=";VPEEK(0, 257)
+  GOSUB ED.UNCARET : PRINT "UNCARET AT=";VPEEK(0, 257)
 
   REM ---- hardware VSCROLL: register writes + map-offset render + rewind bound ----
   PRINT "MAPH=";ED.MAP.H;" MAXTOP=";ED.MAP.MAXTOP;" HWOK=";ED.HW.OK
   ED.TOP.LINE = 1 : ED.LEFT.COL = 0 : ED.CUR.ROW = 1 : ED.CUR.COL = 0
   ED.MAP.TOP = 0 : GOSUB ED.SET.VSCROLL
   GOSUB ED.HW.SCROLL.DOWN
-  REM after +1: VSCROLL = 8, MAP.TOP = 1, menu bar re-drawn at map row 1 ('F' = 70)
-  PRINT "HWD TOP=";ED.MAP.TOP;" VSL=";PEEK(40761);" VSH=";PEEK(40762)
-  PRINT "HWD MB=";VPEEK(1, 45056 + ED.MAP.TOP * 256 + 2)
+  REM after +1: L0 VSCROLL = 8, MAP.TOP = 1 -- and THE BAR HAS NOT MOVED. That is the whole
+  REM point of the split, so it is asserted at the one address it must always be: layer 1,
+  REM screen row 0, where 'F' is 70. L1's own VSCROLL must read 0 forever.
+  PRINT "HWD TOP=";ED.MAP.TOP;" VSL=";PEEK(40754);" VSH=";PEEK(40755)
+  PRINT "HWD MB=";VPEEK(1, 45058);" L1VS=";PEEK(40761)
   GOSUB ED.HW.SCROLL.UP
-  REM back to 0: VSCROLL = 0, menu bar at map row 0 ('F' = 70)
-  PRINT "HWU TOP=";ED.MAP.TOP;" VSL=";PEEK(40761)
-  PRINT "HWU MB=";VPEEK(1, 45058)
+  PRINT "HWU TOP=";ED.MAP.TOP;" VSL=";PEEK(40754)
   REM at the bottom bound a +1 scroll rewinds to 0 (never crosses the map edge)
   ED.MAP.TOP = ED.MAP.MAXTOP : GOSUB ED.SET.VSCROLL
   GOSUB ED.HW.SCROLL.DOWN
-  PRINT "HWREW TOP=";ED.MAP.TOP;" VSL=";PEEK(40761)
+  PRINT "HWREW TOP=";ED.MAP.TOP;" VSL=";PEEK(40754)
   ED.MAP.TOP = 0 : GOSUB ED.SET.VSCROLL
 
   REM ---- end-to-end: build a tall doc, walk the cursor down through several
@@ -1408,12 +1440,12 @@ ED.SELFCHECK:
   FOR ED.T = 1 TO 35
     GOSUB ED.MOVE.DOWN
   NEXT ED.T
-  PRINT "WALK CUR=";ED.CUR.ROW;" TOP=";ED.TOP.LINE;" MAPTOP=";ED.MAP.TOP;" VSL=";PEEK(40761)
+  PRINT "WALK CUR=";ED.CUR.ROW;" TOP=";ED.TOP.LINE;" MAPTOP=";ED.MAP.TOP;" VSL=";PEEK(40754)
   ED.MR = 1 + ED.MAP.TOP
-  PRINT "WTOP DOC=";ED.TOP.LINE;" MAPCH=";VPEEK(1, 45056 + ED.MR * 256);VPEEK(1, 45056 + ED.MR * 256 + 2)
+  PRINT "WTOP DOC=";ED.TOP.LINE;" MAPCH=";VPEEK(0, ED.MR * 256);VPEEK(0, ED.MR * 256 + 2)
   ED.MR = ED.TEXT.BOTTOM + ED.MAP.TOP
   ED.BL = ED.TOP.LINE + ED.TEXT.BOTTOM - 1
-  PRINT "WBOT DOC=";ED.BL;" MAPCH=";VPEEK(1, 45056 + ED.MR * 256);VPEEK(1, 45056 + ED.MR * 256 + 2)
+  PRINT "WBOT DOC=";ED.BL;" MAPCH=";VPEEK(0, ED.MR * 256);VPEEK(0, ED.MR * 256 + 2)
   ED.MAP.TOP = 0 : GOSUB ED.SET.VSCROLL
   ED.QUIET = 1 : MENU.ACTIVE = 0 - 1
 
@@ -1516,7 +1548,6 @@ ED.SELFCHECK:
   REM ---- printed between the draw and the read, and one extra PRINT line shifted the
   REM ---- answer by a row. So repaint, draw, read into strings, close, then speak.
   GOSUB ED.RENDER.ALL
-  GOSUB ED.GUI.WHERE
   GUI.TITLE$ = "" : GUI.MSG$ = "FRAME" : GUI.MSG2$ = ""
   GUI.BODY.ROWS = 1 : GUI.BODY.WIDTH = 10
   GOSUB GUI.OPEN
@@ -1551,7 +1582,6 @@ ED.SELFCHECK:
   REM ---- the dialog is four rows off the top of what the user can see.
   ED.GBY = GUI.TOP
   ED.MAP.TOP = 4 : GOSUB ED.SET.VSCROLL : GOSUB ED.RENDER.ALL
-  GOSUB ED.GUI.WHERE
   GOSUB GUI.OPEN : GOSUB GUI.CLOSE
   PRINT "GUI SCROLLED Y=";GUI.TOP;" WAS=";ED.GBY;" MAPTOP=";ED.MAP.TOP;" (want WAS+4)"
   ED.MAP.TOP = 0 : GOSUB ED.SET.VSCROLL : GOSUB ED.RENDER.ALL
@@ -1567,12 +1597,19 @@ ED.SELFCHECK:
 
   REM ---- GUI.TEXT, and with it the caret. Type A B C, LEFT, X: the X must land BETWEEN B
   REM ---- and C. A swallowed arrow reads ABCX; one that left the field reads ABC, OK=0.
+  REM ---- The 130 is a PETSCII CONTROL code, and LINEINPUT.TYPED must refuse it: if it
+  REM ---- ever lands in the field this reads five characters instead of four.
   ED.PROMPT.MSG$ = "Open file: "
   ED.QK = 65 : GOSUB ED.PUSHKEY
+  ED.QK = 130 : GOSUB ED.PUSHKEY
   ED.QK = 66 : GOSUB ED.PUSHKEY
   ED.QK = 67 : GOSUB ED.PUSHKEY
   ED.QK = 157 : GOSUB ED.PUSHKEY
   ED.QK = 88 : GOSUB ED.PUSHKEY
+  REM ---- Z then DEL: RUBOUT takes the character BEFORE the caret, so the pair cancels
+  REM ---- out and the answer is still ABXC. DELETE is otherwise never driven.
+  ED.QK = 90 : GOSUB ED.PUSHKEY
+  ED.QK = 20 : GOSUB ED.PUSHKEY
   ED.QK = 13 : GOSUB ED.PUSHKEY
   GOSUB ED.PROMPT
   PRINT "GUI TEXT ->";ED.INPUT$;" OK=";ED.PROMPT.OK;" (want ABXC 1)"
@@ -1587,7 +1624,6 @@ ED.SELFCHECK:
   MENUVERT.ITEM$(1) = " ONE" : MENUVERT.ITEM$(2) = " TWO"
   GUI.COUNT = 2 : GUI.SEL = 1 : GUI.FLAGS = 0
   GUI.TITLE$ = "PICK" : GUI.MSG$ = "" : GUI.MSG2$ = ""
-  GOSUB ED.GUI.WHERE
   ED.QK = 17 : GOSUB ED.PUSHKEY
   ED.QK = 13 : GOSUB ED.PUSHKEY
   GOSUB GUI.MENU
