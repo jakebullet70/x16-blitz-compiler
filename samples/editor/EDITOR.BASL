@@ -24,7 +24,8 @@ REM Index 0 is transparent BY HARDWARE, and the chrome now has the document behi
 REM black needs an index that is not 0. Five is free in both themes, in either nibble.
 #DEFINE ED.BLK 5
 
-REM The line-number gutter: ED.GUT.D digit columns, then blanks out to ED.GUT.W. Everything
+REM The line-number gutter: ED.GUT.D digit columns (the four ED.GD*% the block reads), then
+REM blanks out to ED.GUT.W. Everything
 REM that turns a document position into a cell adds ED.GUT.W -- the row renderer and the
 REM caret, and nothing else: the horizontal scroll already works in ED.TEXT.WIDTH, which
 REM shrinks by the same amount.
@@ -33,6 +34,16 @@ REM ED.GUT.W MUST BE EVEN. ED.ROW.STREAM writes TWO CELLS AT A TIME through VERA
 REM cache, and that write is 4-BYTE ALIGNED: it lands at address AND NOT 3, so a text
 REM column of 5 (byte 10) silently renders at column 4 and eats the gutter's last cell.
 REM Column 0 was always aligned, which is why nothing here ever had to know that.
+REM THREE BUILD MODES, and BASLOAD does NOT nest #IFNDEF, so they are three flat symbols:
+REM   RELEASE (as committed) -- all three defined, and not one byte of test code compiles
+REM   CORE tests   -- comment out ED.RELEASE and ED.NOCORE, set DEBUG.MODE = 1
+REM   OPTIONAL tests -- comment out ED.RELEASE and ED.NOOPT, set DEBUG.MODE = 1
+REM ED.RELEASE alone guards the harness preamble, its tail and its helpers; the section
+REM guards ED.NOCORE and ED.NOOPT sit BESIDE it, never inside it.
+#DEFINE ED.RELEASE 1
+#DEFINE ED.NOCORE 1
+#DEFINE ED.NOOPT 1
+
 #DEFINE ED.GUT.D 4
 #DEFINE ED.GUT.W 6
 
@@ -47,6 +58,9 @@ REM from assembly through {VAR}, and by then BASLOAD has crunched every name.
 #INCLUDE "MENUBAR.INC.BL"
 #INCLUDE "LINEINPUT.INC.BL"
 #INCLUDE "GUI.INC.BL"
+REM STRCASE.INC.BL is the library's in-place case work, and the find path is exactly what
+REM it is for: GP.STRPTR in, the bytes rewritten where they lie, no copy either way.
+#INCLUDE "STRCASE.INC.BL"
 
 REM ============================================================================
 REM EDITOR.BASL -- GPC EDIT, an MS-DOS-EDIT-styled text / Markdown editor for the
@@ -80,7 +94,14 @@ GOSUB ED.OPEN.DONE
 GOSUB ED.RENDER.ALL
 GOSUB ED.L0.ON
 
+REM The self-check is COMPILED OUT of a release build. It is ~350 lines that a user never
+REM runs, and in this compiler every byte of p-code is a byte of the runtime workspace the
+REM program then has to live in -- so carrying the tests made the editor tighter for real
+REM work AND made the tests run in less room than the shipped program has. #DEFINE
+REM ED.RELEASE 1 at the top drops both the call and the block at the end of this file.
+#IFNDEF ED.RELEASE
 IF DEBUG.MODE = 1 THEN GOSUB ED.SELFCHECK : END
+#ENDIF
 
 REM ---- main loop ----
 REM
@@ -311,7 +332,7 @@ ED.INIT:
   ED.TEXT.ROWS   = SCREEN.ROWS - 2
   ED.ATTR.TEXT   = THEME.CLR(THEME.TEXT)
   ED.ATTR.CARET  = THEME.CLR(THEME.HILITE)
-  ED.ATTR.GUT    = THEME.CLR(THEME.DIMMED)
+  ED.ASM.GATTR% = THEME.CLR(THEME.DIMMED) : REM the gutter, read by ED.ROW.STREAM
   ED.QUIET = 0 : ED.SIM.MODE = 0 : ED.EXIT.FLAG = 0 : ED.LAST.MSG$ = ""
   REM ---- hardware vertical scroll setup (see ED.DO.SCROLL) ----
   REM VERA's L1_VSCROLL ($9F39/$9F3A, map pixels, 8 a text row) scrolls the layer, so a
@@ -861,13 +882,13 @@ ED.FIND.NEXT:
   IF LEN(ED.FIND$) = 0 THEN RETURN
   REM The needle is folded on a COPY: ED.FIND$ is what both messages below print back.
   ED.NEEDLE$ = ED.FIND$
-  ED.UP.PTR% = GP.STRPTR(ED.NEEDLE$) : ED.UP.LEN% = LEN(ED.NEEDLE$) : GOSUB ED.UPPER
+  STRCASE.PTR = GP.STRPTR(ED.NEEDLE$) : STRCASE.MODE = STRCASE.UPPER : GOSUB STRCASE.GO
   GOSUB ED.COMMIT.LIVE
   ED.FR = ED.CUR.ROW : ED.FROM = ED.CUR.COL + 2 : ED.SCANNED = 0
 ED.FN.LOOP:
   IF ED.SCANNED > LINE.COUNT THEN GOTO ED.FN.NONE
   LINE.INDEX = ED.FR : GOSUB DOC.LOAD
-  ED.UP.PTR% = GP.STRPTR(LINE.TEXT$) : ED.UP.LEN% = LEN(LINE.TEXT$) : GOSUB ED.UPPER
+  STRCASE.PTR = GP.STRPTR(LINE.TEXT$) : GOSUB STRCASE.GO : REM MODE is sticky, set above
   ED.FOUND.AT = GP.INSTR(LINE.TEXT$, ED.NEEDLE$, ED.FROM)
   IF ED.FOUND.AT > 0 THEN GOTO ED.FN.HIT
   ED.FR = ED.FR + 1
@@ -884,36 +905,6 @@ ED.FN.NONE:
   ED.MSG$ = "Not found: " + ED.FIND$ : GOSUB ED.ERR.MSG
   RETURN
 
-REM Upper-case ED.UP.LEN% characters at ED.UP.PTR%, IN PLACE. ASCII lower case is $61-$7A,
-REM and ASCII is what the document and the literals are -- PETSCII lives only on disk.
-REM Y counts DOWN from the length, so offset 0 (the length byte) is never touched. A zero
-REM length must not reach the loop at all: DEY would wrap and rewrite 255 bytes of heap.
-ED.UPPER:
-  IF ED.UP.LEN% = 0 THEN RETURN
-  #REM 1
-  GP.ASM
-  REM LDA {ED.UP.PTR%}
-  REM LDX #1
-  REM STA UPS,X
-  REM STA UPD,X
-  REM LDA {ED.UP.PTR%},X
-  REM LDX #2
-  REM STA UPS,X
-  REM STA UPD,X
-  REM LDY {ED.UP.LEN%}
-  REM UPS: LDA $FFFF,Y
-  REM CMP #$61
-  REM BCC UPN
-  REM CMP #$7B
-  REM BCS UPN
-  REM SEC
-  REM SBC #$20
-  REM UPD: STA $FFFF,Y
-  REM UPN: DEY
-  REM BNE UPS
-  GP.ENDASM
-  #REM 0
-  RETURN
 
 
 
@@ -1064,8 +1055,19 @@ REM   the edited line  MODE 1, read out of ED.CUR.LINE$ itself, past its 3-byte 
 REM   past the end     MODE 0 with ED.ASM.VIS% = 0 -- every cell is a space, and the source
 REM                    address is never dereferenced, so what it holds does not matter
 ED.RENDER.ROW:
-  GOSUB ED.GUTTER
-  ED.ASM.BASE% = (ED.SCREEN.ROW + ED.MAP.TOP) * 256 + ED.GUT.W * 2 : REM layer 0, past the gutter
+  REM The gutter's four digits, written by the block below in the SAME VERA pass as the
+  REM text -- see ED.ROW.STREAM. Blank past the end of the document, and leading zeros
+  REM blank because a digit that is never computed stays a space. 48 is "0".
+  ED.GD0% = 32 : ED.GD1% = 32 : ED.GD2% = 32 : ED.GD3% = 32
+  IF ED.DOC.LINE >= LINE.COUNT THEN GOTO ED.ROW.GEOM
+  ED.GN = ED.DOC.LINE + 1
+  ED.GT = INT(ED.GN / 10) : ED.GD3% = 48 + ED.GN - ED.GT * 10 : ED.GN = ED.GT
+  IF ED.GN > 0 THEN ED.GT = INT(ED.GN / 10) : ED.GD2% = 48 + ED.GN - ED.GT * 10 : ED.GN = ED.GT
+  IF ED.GN > 0 THEN ED.GT = INT(ED.GN / 10) : ED.GD1% = 48 + ED.GN - ED.GT * 10 : ED.GN = ED.GT
+  IF ED.GN > 0 THEN ED.GD0% = 48 + ED.GN
+ED.ROW.GEOM:
+  ED.ASM.BASE% = (ED.SCREEN.ROW + ED.MAP.TOP) * 256 : REM layer 0, at the GUTTER: the block
+  REM draws that first and the VERA address walks on into the text of its own accord.
   ED.ASM.ATTR% = ED.ATTR.TEXT : ED.ASM.WIDTH% = ED.TEXT.WIDTH : ED.ASM.MODE% = 0 : ED.ASM.VIS% = 0
   IF ED.DOC.LINE >= LINE.COUNT THEN GOTO ED.ROW.STREAM
   IF ED.DOC.LINE = ED.CUR.ROW THEN GOTO ED.ROW.LIVE
@@ -1096,6 +1098,27 @@ ED.ROW.STREAM:
   REM STA $9F29
   REM LDA #12                  ; DCSEL 6 -- the cache itself
   REM STA $9F25
+  REM ; ---- the gutter, in the dim attribute: four digits then two spaces. Three flushes,
+  REM ; ---- so the address walks to the text still 4-byte aligned, and the text column
+  REM ; ---- cannot be odd by construction.
+  REM LDA {ED.ASM.GATTR%}
+  REM STA $9F2A
+  REM STA $9F2C
+  REM LDA {ED.GD0%}
+  REM STA $9F29
+  REM LDA {ED.GD1%}
+  REM STA $9F2B
+  REM STZ $9F23
+  REM LDA {ED.GD2%}
+  REM STA $9F29
+  REM LDA {ED.GD3%}
+  REM STA $9F2B
+  REM STZ $9F23
+  REM LDA #32
+  REM STA $9F29
+  REM STA $9F2B
+  REM STZ $9F23
+  REM ; ---- and now the text attribute, for the rest of the row ----
   REM LDA {ED.ASM.ATTR%}
   REM STA $9F2A                ; attr0
   REM STA $9F2C                ; attr1
@@ -1147,30 +1170,6 @@ ED.ROW.STREAM:
   REM STZ $9F25
   GP.ENDASM
   #REM 0
-  RETURN
-
-REM ---- the line number for ED.SCREEN.ROW / ED.DOC.LINE, layer 0, right aligned ----
-REM DIGITS, NOT A STRING. STR$ would allocate on every row of every repaint, and a block is
-REM never given back -- that is what cost the FIND path 579 bytes and the self-check its
-REM workspace. Four cells written low digit first, blank once the number runs out, then the
-REM separator column. Past the end of the document there is no number, so the whole gutter
-REM is blank -- the same nothing the text area shows there.
-REM
-REM It rides on layer 0 with the document because it SCROLLS WITH THE TEXT: layer 1 is what
-REM stays put, which is why ED.PUT.FIELD cannot draw this.
-ED.GUTTER:
-  ED.GA = (ED.SCREEN.ROW + ED.MAP.TOP) * 256
-  ED.GN = ED.DOC.LINE + 1
-  IF ED.DOC.LINE >= LINE.COUNT THEN ED.GN = 0
-  ED.GX = ED.GUT.D - 1
-ED.GUT.DIGIT:
-  ED.GC = 32
-  IF ED.GN > 0 THEN ED.GT = INT(ED.GN / 10) : ED.GC = 48 + ED.GN - ED.GT * 10 : ED.GN = ED.GT
-  VPOKE 0, ED.GA + ED.GX * 2, ED.GC : VPOKE 0, ED.GA + ED.GX * 2 + 1, ED.ATTR.GUT
-  ED.GX = ED.GX - 1 : IF ED.GX >= 0 THEN GOTO ED.GUT.DIGIT
-  REM the blank columns between the digits and the text: two cells, not a loop
-  VPOKE 0, ED.GA + ED.GUT.D * 2, 32 : VPOKE 0, ED.GA + ED.GUT.D * 2 + 1, ED.ATTR.GUT
-  VPOKE 0, ED.GA + ED.GUT.D * 2 + 2, 32 : VPOKE 0, ED.GA + ED.GUT.D * 2 + 3, ED.ATTR.GUT
   RETURN
 
 REM Caret = one inverted attribute cell, remembered so a cursor move can restore it
@@ -1357,10 +1356,16 @@ REM ============================================================================
 
 REM ============================================================================
 REM HEADLESS SELF-CHECK (DEBUG.MODE=1): drive menu dispatch + commands.
+REM Guarded by ED.RELEASE -- see the note at the call site.
+#IFNDEF ED.RELEASE
 REM ============================================================================
 ED.SELFCHECK:
   ED.QUIET = 1
   ED.SIM.MODE = 1
+  ED.GOFF = ED.GUT.W * 2 : REM every document cell sits this far right of the map row
+#ENDIF
+REM ---- OPTIONAL: goto, find, new/discard ----
+#IFNDEF ED.NOOPT
   DOC.FILE.NAME$ = "TEST.MD" : GOSUB ED.OPEN.FILE
 
   REM go to line 3 (row 2)
@@ -1388,7 +1393,9 @@ ED.SELFCHECK:
   ED.SIM.YN = 1
   GOSUB ED.CMD.NEW
   PRINT "ACCEPT COUNT=";LINE.COUNT;" NAME=";DOC.FILE.NAME$
+#ENDIF
 
+#IFNDEF ED.NOCORE
   REM ---- verify chrome (char+attr) + text render + the O(1) caret ----
   ED.QUIET = 0
   PRINT "DIM ";SCREEN.COLS;"x";SCREEN.ROWS
@@ -1410,6 +1417,11 @@ ED.SELFCHECK:
     ED.IDS$ = ED.IDS$ + STR$(PEEK(40960 + 128 * ED.TI))
   NEXT ED.TI
   PRINT "TABLE IDS";ED.IDS$
+#ENDIF
+
+REM ---- OPTIONAL: menu bar, dropdown, render, gutter, caret ----
+#IFNDEF ED.NOOPT
+  ED.QUIET = 0 : REM set by the CORE half too, and this half can run without it
   MENU.ACTIVE = 0 - 1 : GOSUB ED.RENDER.MENUBAR
   PRINT "MB CH=";VPEEK(1, 45058);" AT=";VPEEK(1, 45059)
   MENU.ACTIVE = 0 : MENU.SEL = 0 : GOSUB ED.DRAW.DROPDOWN
@@ -1453,19 +1465,25 @@ ED.SELFCHECK:
   REM Every text cell must be char + ED.ATTR.TEXT, on content rows and blank rows alike.
   DOC.FILE.NAME$ = "TEST.MD" : GOSUB ED.OPEN.FILE
   GOSUB ED.UNCARET
-  PRINT "TR CH=";VPEEK(0, 256 + ED.GUT.W * 2);" AT=";VPEEK(0, 257 + ED.GUT.W * 2)
+  PRINT "TR CH=";VPEEK(0, 256 + ED.GOFF);" AT=";VPEEK(0, 257 + ED.GOFF)
   REM ---- the gutter. Screen row 1 is document line 1, right aligned in ED.GUT.W - 1
   REM ---- columns with a blank separator, all of it in the DIMMED attribute. Every cell
   REM ---- is read, not one sampled: a gutter with a digit missing looks fine in a sample.
   PRINT "GUT";VPEEK(0, 256);VPEEK(0, 258);VPEEK(0, 260);VPEEK(0, 262);VPEEK(0, 264);VPEEK(0, 266);" (want 32 32 32 49 32 32)"
-  PRINT "A10 AT=";VPEEK(0, 10 * 256 + 41 + ED.GUT.W * 2)
+  PRINT "A10 AT=";VPEEK(0, 10 * 256 + 41 + ED.GOFF)
   REM ...and layer 1 over the document must be TRANSPARENT, or none of it would show: 32/0.
-  PRINT "A20 AT=";VPEEK(0, 20 * 256 + 61 + ED.GUT.W * 2);" OVL=";VPEEK(1, 47696);VPEEK(1, 47697)
+  PRINT "A20 AT=";VPEEK(0, 20 * 256 + 61 + ED.GOFF);" OVL=";VPEEK(1, 47696);VPEEK(1, 47697)
   REM caret place/restore (the O(1) cursor-move primitive)
   ED.CUR.ROW = 0 : ED.CUR.COL = 0 : ED.TOP.LINE = 0 : ED.LEFT.COL = 0
-  GOSUB ED.PLACE.CARET : PRINT "CARET AT=";VPEEK(0, 257 + ED.GUT.W * 2)
-  GOSUB ED.UNCARET : PRINT "UNCARET AT=";VPEEK(0, 257 + ED.GUT.W * 2)
+  GOSUB ED.PLACE.CARET : PRINT "CARET AT=";VPEEK(0, 257 + ED.GOFF)
+  GOSUB ED.UNCARET : PRINT "UNCARET AT=";VPEEK(0, 257 + ED.GOFF)
+#ENDIF
 
+#IFNDEF ED.NOCORE
+  REM The bar is redrawn HERE because the section that used to draw it before these
+  REM assertions is in the optional half now, and the KERNAL PRINTs above scroll over
+  REM layer 1 -- so without this, HWD MB reads a letter out of the test output.
+  ED.MB.FORCE = 1 : MENU.ACTIVE = 0 - 1 : GOSUB ED.RENDER.MENUBAR
   REM ---- hardware VSCROLL: register writes + map-offset render + rewind bound ----
   PRINT "MAPH=";ED.MAP.H;" MAXTOP=";ED.MAP.MAXTOP;" HWOK=";ED.HW.OK
   ED.TOP.LINE = 1 : ED.LEFT.COL = 0 : ED.CUR.ROW = 1 : ED.CUR.COL = 0
@@ -1488,25 +1506,24 @@ ED.SELFCHECK:
   REM      hardware scrolls, then confirm the visible map window holds the right
   REM      document lines at exactly the map rows VSCROLL is displaying. ----
   ED.QUIET = 0
-  GOSUB DOC.INIT
-  FOR ED.T = 0 TO 39
-    LINE.TEXT$ = "L" + MID$(STR$(ED.T), 2) : GOSUB DOC.PUSH.LINE
-  NEXT ED.T
-  ED.TOP.LINE = 0 : ED.LEFT.COL = 0 : ED.CUR.ROW = 0 : ED.CUR.COL = 0
-  ED.MAP.TOP = 0 : GOSUB ED.SET.VSCROLL
-  GOSUB ED.LOAD.LIVE : GOSUB ED.RENDER.ALL
+  GOSUB ED.TESTDOC
   FOR ED.T = 1 TO 35
     GOSUB ED.MOVE.DOWN
   NEXT ED.T
   PRINT "WALK CUR=";ED.CUR.ROW;" TOP=";ED.TOP.LINE;" MAPTOP=";ED.MAP.TOP;" VSL=";PEEK(40754)
   ED.MR = 1 + ED.MAP.TOP
-  PRINT "WTOP DOC=";ED.TOP.LINE;" MAPCH=";VPEEK(0, ED.MR * 256 + ED.GUT.W * 2);VPEEK(0, ED.MR * 256 + 2 + ED.GUT.W * 2)
+  PRINT "WTOP DOC=";ED.TOP.LINE;" MAPCH=";VPEEK(0, ED.MR * 256 + ED.GOFF);VPEEK(0, ED.MR * 256 + 2 + ED.GOFF)
   ED.MR = ED.TEXT.BOTTOM + ED.MAP.TOP
   ED.BL = ED.TOP.LINE + ED.TEXT.BOTTOM - 1
-  PRINT "WBOT DOC=";ED.BL;" MAPCH=";VPEEK(0, ED.MR * 256 + ED.GUT.W * 2);VPEEK(0, ED.MR * 256 + 2 + ED.GUT.W * 2)
+  PRINT "WBOT DOC=";ED.BL;" MAPCH=";VPEEK(0, ED.MR * 256 + ED.GOFF);VPEEK(0, ED.MR * 256 + 2 + ED.GOFF)
   ED.MAP.TOP = 0 : GOSUB ED.SET.VSCROLL
   ED.QUIET = 1 : MENU.ACTIVE = 0 - 1
 
+#ENDIF
+
+REM ---- OPTIONAL: key dispatch, the menu loop, the GUI dialogs ----
+#IFNDEF ED.NOOPT
+  GOSUB ED.TESTDOC : ED.QUIET = 1 : REM the fixture the CORE half also builds
   REM ---- key dispatch: drive the REAL GP.SELECT table with real key codes ----
   REM ED.QUIET is 1, so the model runs and the render does not -- the render is checked
   REM above. 27 and 137 are left out: one blocks on GET, the other writes a file.
@@ -1630,6 +1647,12 @@ ED.SELFCHECK:
   REM ---- mean anything: on a screen the PRINTs above have scrolled to blank, before and
   REM ---- after are equal whatever happens.
   GOSUB ED.RENDER.ALL
+  REM A KNOWN BAND UNDER THE BOX. This summed whatever the KERNAL PRINTs had left on
+  REM layer 1, so its number moved whenever a test printed one more line -- and in a
+  REM build without the earlier sections the rectangle was blank, which made "not 3584"
+  REM pass on nothing at all. Now the content is put there on purpose.
+  ED.PS.ROW = GUI.TOP + 1 : ED.PS.COL = GUI.LEFT : ED.PS.WIDTH = GUI.WIDTH
+  ED.PS$ = "RESTOREME" : ED.PS.ATTR = ED.ATTR.TEXT : GOSUB ED.PUT.FIELD
   GOSUB ED.GUI.SUM : ED.GWAS = ED.GSUM
   GOSUB GUI.OPEN : GOSUB GUI.CLOSE
   GOSUB ED.GUI.SUM : ED.GNOW = ED.GSUM
@@ -1688,10 +1711,26 @@ ED.SELFCHECK:
   PRINT "GUI MENU SEL=";GUI.SEL;" KEY=";GUI.KEY;" (want 2 13)"
   ED.SIM.MODE = 1
 
+#ENDIF
+#IFNDEF ED.RELEASE
   PRINT "M4 OK"
   RETURN
 
 REM ---- one key into the KERNAL's buffer, so a GET loop can be driven headlessly ----
+REM ---- fixture and helpers ----
+REM ED.TESTDOC is used by BOTH halves, so it sits outside the guards.
+ED.TESTDOC:
+  GOSUB DOC.INIT
+  FOR ED.T = 0 TO 39
+    LINE.TEXT$ = "L" + MID$(STR$(ED.T), 2) : GOSUB DOC.PUSH.LINE
+  NEXT ED.T
+  ED.TOP.LINE = 0 : ED.LEFT.COL = 0 : ED.CUR.ROW = 0 : ED.CUR.COL = 0
+  ED.MAP.TOP = 0 : GOSUB ED.SET.VSCROLL
+  GOSUB ED.LOAD.LIVE : GOSUB ED.RENDER.ALL
+  RETURN
+
+REM (no guard of their own: BASLOAD does not nest #IFNDEF, and these sit inside the
+REM  ED.RELEASE block. A core-only build carries them unused, which is ~220 bytes.)
 REM POKE 1 is the ROM/RAM bank byte: 0 pages the KERNAL in for the JSR, 4 puts BASIC back.
 ED.PUSHKEY:
   POKE 1, 0 : GP.CALL ED.KBDBUF, ED.QK : POKE 1, 4
@@ -1708,6 +1747,8 @@ ED.GUI.SUM:
     NEXT ED.GX
   NEXT ED.GR
   RETURN
+
+#ENDIF
 
 REM --- this read / writes BANKS (line-pointer table + banked memory)
 #INCLUDE "STORE.BASL"

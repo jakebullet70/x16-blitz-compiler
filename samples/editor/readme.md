@@ -99,9 +99,12 @@ OK CODE 8572 FREE 11776 RT 14079 GP-BASIC IN
   19,134 → 21,647 bytes, and max p-code down from 18,432 to 16,384. The select itself is **9 bytes**
   of p-code; the block is the price of admission. It is a readability trade, made knowingly — take
   the select out and the editor is `GP-BASIC OUT` again.
-- **The self-check is compiled in whether or not it runs.** `DEBUG.MODE` is tested at run time, so
-  the ~460 bytes of assertions are in the object either way. That is most of the difference between
-  7101 and 7566, and it is the price of the sample being self-testing.
+- **The self-check is NOT compiled into a release build any more, and that was worth 3,615
+  bytes.** It used to be: `DEBUG.MODE` is tested at run time, so every assertion sat in the
+  object either way -- and in this compiler p-code comes out of the same 25,600 bytes as the
+  runtime workspace, so the shipped editor was paying for its own tests twice over. With the
+  harness behind `#IFNDEF` the release build is **12,882 bytes with 8,192 of workspace**,
+  against 16,497 and 4,608 when it carried them.
 - **PETSCII cost 345 bytes of p-code and nothing at run time** — 7566 → **7911**. That is the charset
   re-ordering plus the two conversions at the disk boundary and the one at the keyboard. The
   renderers did not change by a single byte, so every render figure above still stands as measured.
@@ -348,7 +351,22 @@ nonsense.
 
 ## The self-check
 
-Set `DEBUG.MODE = 1` at the top of `EDITOR.BASL` and it runs headless instead of interactively,
+THREE BUILD MODES, chosen by the three `#DEFINE`s at the top of `EDITOR.BASL` -- BASLOAD does
+not nest `#IFNDEF`, so they are flat symbols rather than one switch:
+
+| mode | comment out | `DEBUG.MODE` | code / workspace |
+| --- | --- | --- | --- |
+| release (as committed) | nothing | 0 | 12,882 / 8,192 |
+| core tests | `ED.RELEASE`, `ED.NOCORE` | 1 | 13,749 / 7,424 |
+| optional tests | `ED.RELEASE`, `ED.NOOPT` | 1 | 15,887 / 5,120 |
+
+**The harness is split in two because it no longer fits beside itself.** The core half keeps
+the screen geometry, the theme and ALT-key tables, the hardware VSCROLL and the end-to-end
+walk; the optional half has find, the menu bar and dropdown, the render and gutter checks,
+key dispatch, the 600-open menu stress test and the GUI dialogs. Both end in `M4 OK`, and
+`ED.TESTDOC` -- the 40-line L0..L39 fixture -- sits outside both guards because both need it.
+
+It runs headless instead of interactively,
 driving the model and the dispatch programmatically (an `ED.SIM.*` hook stands in for the
 interactive prompts) and `PRINT`ing markers a watcher can grep. It ends in `M4 OK`. It checks:
 

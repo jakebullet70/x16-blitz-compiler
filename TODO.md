@@ -1628,6 +1628,45 @@ untouched. (`LINPUT` programs such as `testing/MD5` are unaffected — no drain 
 
 ## Build / infrastructure
 
+### A MASTER COMPILER: preprocess, BASLOAD, GPC -- one command
+
+Asked 2026-09-02. Three steps, of which only the middle two exist today and neither is driven by
+anything but a hand-run script:
+
+1. **A preprocessor that decides the `#INCLUDE` list from the source itself** -- pulling a module in
+   when the program uses it, and leaving it out when it does not.
+2. **Run BASLOAD** (tokenise `.BASL` -> `.PRG`), which `source/gpc/build_basl.py` already does.
+3. **Run GPC** on the result, which the headless harness already does.
+
+**Step 1 is the one worth having, and today measured exactly why.** A program pays for every line of
+every module it includes, in p-code AND therefore in workspace -- the workspace is what is left after
+the object code, so **256 bytes of unused library is 256 bytes the running program does not get**.
+Two numbers from the same afternoon: `STRCASE.INC.BL` costs **132 bytes** and the editor uses ONE of
+its five modes; compiling the self-check out of the editor moved it **16,497 -> 12,882 bytes and the
+workspace 4,608 -> 8,192**. Dead code is not free here, it is the scarcest thing there is.
+
+**The scan is reliable because of the house style, which was not designed for this but pays for it.**
+Every module owns a dotted namespace -- `STRCASE.*`, `MENUVERT.*`, `STR.*`, `GUI.*` -- so "is this
+module used" is "does any identifier with its prefix appear outside its own file". Include guards
+(`#IFNDEF x.DEFS`) already make double inclusion harmless, so the preprocessor only ever has to add
+or omit, never de-duplicate. Dependencies are transitive (`GUI` uses `MENUVERT`, `STASH`, `THEME`),
+so iterate to a fixpoint rather than scanning once.
+
+**The bigger prize, and the harder half: per-ROUTINE elimination inside a module.** `STRCASE` is one
+`GP.ASM` body plus five modes; the editor wants `UPPER`. The house layout makes it tractable -- one
+label per routine, a `GOTO x.MODULE.END` skip at the top, parameters documented in the banner -- so a
+scanner can bracket a routine by its label and drop the ones nothing calls. Do the module-level cut
+first; it is most of the win for a fraction of the risk.
+
+**Two things it must not do.** It must not rewrite the user's file (emit a build artifact and leave
+the source alone -- `#SAVEAS` already names the output), and it must not silently drop something
+reached only through a computed `GOSUB`/`ON x GOSUB`. Neither exists in the current libraries, but a
+scanner that assumes it will be wrong eventually, so warn rather than assume.
+
+Related, and the reason it matters: [[program-too-big-fires-early]] and the release-build split in
+`samples/editor/EDITOR.BASL` (`#IFNDEF ED.RELEASE`).
+
+
 - Copy the object code *down* after compiling, rather than leaving it above the compiler and its
   libraries (must stay on a page boundary). **The part that matters is DONE** — a saved `OBJECT.PRG`
   already reclaims the compiler's ~5.5K: `WriteObjectCode` writes runtime + object as two pieces so the
