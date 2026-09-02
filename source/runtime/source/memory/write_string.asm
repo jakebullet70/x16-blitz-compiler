@@ -46,7 +46,7 @@ WriteStringZTemp0Sub:
 		cmp 	(zTemp2) 					; if >= required length then copy
 		bcs 	_WSCopy
 
-		ldy 	#1 							; set the 'available for reclaim' flag
+		ldy 	#1 							; flag the block dead: StringConcrete scavenges
 		lda 	(zTemp1),y
 		ora 	#$80
 		sta 	(zTemp1),y

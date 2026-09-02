@@ -1132,7 +1132,39 @@ Worth trimming leading and trailing spaces too -- `LINEINPUT` returns the field 
 one space is as useless as none while looking like a real answer. `ED.CMD.SAVE` also routes to
 `ED.CMD.SAVEAS` when the name is still `"UNTITLED"`, so this is the path a first save takes.
 
-### The editor's SELF-CHECK runs out of runtime workspace — the real bug, and it is not new
+### The editor's SELF-CHECK runs out of runtime workspace — ROOT CAUSES FOUND AND FIXED
+
+**Resolved 2026-09-02, and the diagnosis below was right about the leak and wrong about the leaker.**
+Two independent bugs, both found by chasing the "unexplained" intermittency to ground:
+
+1. **The runtime never reclaimed a string block.** `write_string.asm` set an "available for
+   reclaim" flag on every block a string outgrew, and no code anywhere read it -- the heap only ever
+   travelled down, so every growing string leaked its whole ladder of old blocks permanently.
+   `StringConcrete` now scavenges: before lowering the ceiling it walks the heap (the blocks tile it
+   exactly, `stringHighMemory` up to `storeEndHigh:00`) and resurrects the first dead block whose
+   max length fits, ceiling untouched. FRE probes show the editor's render path reaching a fixed
+   plateau instead of descending forever. Cost: the ~62 bytes crossed the page cushion below GPBase,
+   so RT went 13,055 -> 13,311 -- **one page off every compiled program's max size.**
+
+2. **The intermittency was never timing in OUR code -- it was a garbage read.** On a document-less
+   boot `LINE.COUNT` is 0 and `ED.LOAD.LIVE` asked `DOC.LOAD` for line 0 anyway. Unguarded, that
+   read a table slot never written, and the PEEK of wherever it pointed was taken as a LENGTH: the
+   emulator randomises RAM, so boot built a 0..255-character garbage string -- a different heap
+   every run. `DOC.LOAD` now returns "" for `LINE.INDEX >= LINE.COUNT`. With the guard in, the
+   self-check went from 5-in-12 failing at random addresses to **12/12 clean, deterministic**, at
+   FREE 5,120 -- less room than any row of the table below.
+
+**Still open, and now deterministic:** stage a real `TEST.MD` in the work directory and the
+self-check dies 8/8 at `LINEINPUT.WAIT`, ~600 bytes short -- a real document's live line-scale
+strings plus the whole gauntlet genuinely do not fit in FREE 5,120. Every earlier "green" run in
+this file's history ran document-less without knowing it (the harness never staged TEST.MD, and
+FIND1 printing "Not found: bullet" was the tell nobody read). Next levers, measured not guessed:
+the 1.5x expansion factor in `StringConcrete` over-allocates ~38 bytes per line-scale string, and
+the FIND-test residue (`ED.HAY$`, `ED.FOLD.OUT$`, needle copies) stays live through the GUI block.
+
+The original diagnosis, kept because its numbers and its method lesson still stand:
+
+### The original write-up — the leak was real, the "workspace" framing was half of it
 
 Found 2026-09-02 while fixing the menu bar flicker below. The self-check fails with
 `OUT OF MEMORY @ $0E53` about **one run in six**, on the same address every time, and **it has

@@ -1826,6 +1826,51 @@ _SCNoOverflow:
 _SCNoMinimum:
 		sta 	zTemp1 						; save max length.
 		;
+		;		BEFORE TAKING THE CEILING DOWN, LOOK FOR A DEAD BLOCK. write_string flags a
+		;		block it outgrows (control bit 7), and until 02/09/26 nothing ever read that
+		;		flag, so every string that grew past its block leaked it for good. Measured on
+		;		samples/editor: startup alone left ~3.5K of corpses in a 5K workspace, and its
+		;		self-check's "intermittent" OUT OF MEMORY was that leak wobbling a page either
+		;		side of the line. First fit, and the max length is KEPT -- a corpse is its size
+		;		however it is reborn. The blocks tile the heap exactly from stringHighMemory up
+		;		to the ceiling, so the walk lands on storeEndHigh:00 or stops sooner, never past.
+		;
+		lda 	stringHighMemory 			; walk from the bottom of the heap.
+		sta 	zsTemp
+		lda 	stringHighMemory+1
+		sta 	zsTemp+1
+_SCRScan:
+		lda 	zsTemp+1 					; ceiling page reached = no corpse fitted.
+		cmp 	storeEndHigh
+		bcs 	_SCRFresh
+		ldy 	#1
+		lda 	(zsTemp),y 					; control byte, bit 7 = dead.
+		bpl 	_SCRNext
+		lda 	(zsTemp) 					; dead: does its max length fit the ask?
+		cmp 	zTemp1
+		bcc 	_SCRNext
+		lda 	#0 							; back to life: clear the control byte;
+		sta 	(zsTemp),y 					; the ceiling is untouched.
+		lda 	zsTemp 						; reborn string in YA.
+		ldy 	zsTemp+1
+		rts
+_SCRNext:
+		lda 	(zsTemp) 					; step over max + 3 (the header).
+		clc
+		adc 	zsTemp
+		sta 	zsTemp
+		bcc 	_SCRNext2
+		inc 	zsTemp+1
+_SCRNext2:
+		lda 	zsTemp
+		clc
+		adc 	#3
+		sta 	zsTemp
+		bcc 	_SCRScan
+		inc 	zsTemp+1
+		bra 	_SCRScan
+_SCRFresh:
+		;
 		sec
 		lda		stringHighMemory 			; subtract max length from high memory.
 		sbc 	zTemp1
@@ -8921,7 +8966,7 @@ WriteStringZTemp0Sub:
 		cmp 	(zTemp2) 					; if >= required length then copy
 		bcs 	_WSCopy
 
-		ldy 	#1 							; set the 'available for reclaim' flag
+		ldy 	#1 							; flag the block dead: StringConcrete scavenges
 		lda 	(zTemp1),y
 		ora 	#$80
 		sta 	(zTemp1),y

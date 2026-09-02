@@ -100,10 +100,15 @@ DOC.STORE.CHARS:
 
 REM ---- load line LINE.INDEX into LINE.TEXT$ ----
 DOC.LOAD:
+  LINE.TEXT$ = ""
+  REM PAST THE END IS EMPTY, and line 0 of a 0-line document is past the end. Unguarded
+  REM this read a table slot never written, and PEEK of wherever it pointed was a LENGTH:
+  REM the emulator randomises RAM, so a document-less boot built a 0..255-char garbage
+  REM string here -- a different heap every run, and the intermittent OOM's other half.
+  IF LINE.INDEX >= LINE.COUNT THEN RETURN
   GOSUB DOC.SLOT.READ
   BANK DOC.GOT.BANK
   DOC.LEN = PEEK(DOC.GOT.OFF)
-  LINE.TEXT$ = ""
   IF DOC.LEN > 0 THEN GOSUB DOC.LOAD.CHARS
   RETURN
 DOC.LOAD.CHARS:
