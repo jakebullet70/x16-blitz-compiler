@@ -1132,56 +1132,66 @@ Worth trimming leading and trailing spaces too -- `INPHELP` returns the field as
 one space is as useless as none while looking like a real answer. `ED.CMD.SAVE` also routes to
 `ED.CMD.SAVEAS` when the name is still `"UNTITLED"`, so this is the path a first save takes.
 
-### An INTERMITTENT `OUT OF MEMORY` in the editor's self-check — unexplained, open
+### The editor's SELF-CHECK runs out of runtime workspace — the real bug, and it is not new
 
-Found 2026-09-02 while trying to stop `ED.RENDER.ALL` repainting the menu bar on every insert. **The
-same binary passes and fails at random**: three runs of one unchanged `C.EDITOR.PRG` gave pass /
-`OUT OF MEMORY @ $0E53` / pass. `$0E53` decodes to the first opcode of `ED.CMD.SAVE`, and
-`OUT OF MEMORY` has four raisers -- `DIM`, the frame stack (`frames.asm`), and both string
-allocators.
+Found 2026-09-02 while fixing the menu bar flicker below. The self-check fails with
+`OUT OF MEMORY @ $0E53` about **one run in six**, on the same address every time, and **it has
+nothing to do with whatever change happened to be in the build.** It tracks `FREE`:
 
-**Counted properly, 20 runs of each unchanged binary** (`scratchpad/flake.py` -- it stops each run
-the moment the self-check declares itself, which is what makes 20 runs affordable where a fixed
-90-second timeout made 4 expensive):
+| build | object | `FREE` | failures |
+|---|---:|---:|---:|
+| baseline | 15,567 | **5,888** | **0 / 24** |
+| a new routine compiled but NEVER CALLED | 15,672 | 5,632 | 3 / 20 |
+| the partial-repaint attempt | 15,672 | 5,632 | 4 / 24 |
+| the menu bar guard that shipped | 15,647 | 5,632 | 3 / 20 |
 
-| build | runs | failures |
-|---|---:|---:|
-| before the repaint change (`mv`) | 24 | **0** |
-| repaint routine compiled but never called (`rbx`) | 3 | 0 |
-| repaint change live (`rb`) | 24 | **4** |
+**The never-called row is the control that settles it**: identical object size, zero behavioural
+difference, same failure rate. Any change that grows the object by ~100 bytes pushes
+`newWorkspacePage` up a page, takes 256 bytes off the runtime workspace, and the self-check --
+which was already within 256 bytes of its limit -- starts failing. `$0E53` is `ED.CMD.SAVE`, which
+builds strings, and `OUT OF MEMORY` is what `stralloc.asm` raises.
 
-**So it is real and it is the change** -- about one run in six, against zero in twenty-four for the
-baseline. Every failure lands on the SAME address, which argues for one repeatable mechanism with a
-probabilistic trigger rather than random corruption. The change is reverted and NOT committed until
-it is understood.
+**The intermittency is the part still unexplained.** A deterministic program should fail
+deterministically. The candidates are the two non-deterministic things in the run: `ED.CMD.SAVE`
+writes a real file to the emulator's host filesystem, and the self-check drives its dialogs by
+pushing keys into the KERNAL's keyboard buffer, which an interrupt services.
 
-**And note what the first pass got wrong**, because it is the lesson: with four runs and a 1-in-6
-fault, a bisect measures noise. Two variants that each removed half the new routine both "passed",
-and so did one with two extra PRINTs -- four clean results pointing four ways, every one of them
-meaningless. **Count the runs before believing a verdict in this area.**
+**What to do**: this is a TEST that fails for lack of memory rather than for a defect, which makes
+every build sitting at `FREE 5632` look broken. Give the self-check room -- it holds several
+document-sized strings alive at once and does not need to -- or accept it and run it twenty times.
 
-**Where to look first.** `ED.CMD.SAVE` writes a real file to the emulator's host filesystem, which is
-the one genuinely non-deterministic thing in the run, and the save path is also where the blank-name
-bug above lives. Run the same binary twenty times before believing any verdict here, and prefer a
-counted loop over a single run for anything in this area.
+**AND THE METHOD LESSON, which cost most of a session.** With a 1-in-6 fault, a three-run check is
+worthless: three clean runs happen 58% of the time. I cleared the never-called control on three runs
+and reported "same size, passes, so it is the logic" as a finding. It was noise, and the opposite of
+the truth. Two more variants and a version with two extra `PRINT`s all "passed" the same way, four
+clean results pointing four directions. **`scratchpad/flake.py` runs a binary N times and tallies,
+stopping each run the moment the self-check declares itself; twenty runs cost about seven minutes.
+Use it before believing anything in this area.**
 
-### The menu bar repaints on every insert -- still wanted
+### The menu bar repainted on every insert — FIXED
 
-`ED.RENDER.ALL` opens with `GOSUB ED.RENDER.MENUBAR`, which blanks the whole top row with a
-full-width `ED.PUT.FIELD` and then draws the items back over it. That blank-then-draw is visible as a
-flicker on every RETURN and every BACKSPACE-join, both of which go through `ED.REFRESH.FULL`.
+`ED.RENDER.ALL` opens with `GOSUB ED.RENDER.MENUBAR`, and that routine blanks the whole top row with
+a full-width `ED.PUT.FIELD` before drawing the items back over it. Three passes over row 0, on every
+RETURN and every BACKSPACE-join, and the blank pass is visible as a flicker.
 
-**The bar cannot change on an edit** except when the dirty star first appears, so the shape of the fix
-is a partial repaint from the cursor row down, plus a guard that redraws the bar only when
-`ED.DOC.DIRTY` differs from what the bar last showed. Only three call sites are edit paths
-(`ED.BS.JOIN`, `ED.DO.DELETE`, `ED.DO.ENTER`); every other `ED.REFRESH.FULL` is a dialog or a
-filename change, where repainting the bar is the point.
+**The bar now draws only when it would come out different.** The guard is inside
+`ED.RENDER.MENUBAR`, so every caller gets it and no call site moved -- which matters, because the
+first attempt at this restructured the refresh paths into an `ED.REFRESH.BELOW` and was much harder
+to be sure of. An edit repaints the bar exactly ONCE, when the dirty star first appears, and never
+again.
 
-**A scroll must still take the full path.** `ED.DO.SCROLL`'s hardware path repaints ONE newly exposed
-row, which is right for a cursor move and wrong for an insert -- an insert changes every row below it.
+Three numeric tests cover everything the bar's appearance depends on: `ED.DOC.DIRTY` (the star),
+`MENU.ACTIVE` (which item is highlighted) and `ED.MAP.TOP` (the hardware scroll moves the row it is
+drawn at). The FILENAME is the fourth and it is a string, so it is handled by an `ED.MB.FORCE` flag
+set at the three places the name changes -- **deliberately not by building a key string**, because a
+string built per keystroke is an allocation per keystroke, and the entry above is what happens when
+this program runs short of string space.
 
-This was written and then reverted, because it correlates with the intermittent failure above. Settle
-that first.
+Cost: 80 bytes, object 15,567 -> 15,647.
+
+**Still worth doing after this**: `ED.DO.ENTER` calls `ED.REFRESH.FULL`, which repaints every text
+row, and an insert cannot dirty anything ABOVE the cursor. Repainting from `ED.CUR.ROW` down would
+roughly halve the ~102 jiffies the repaint costs. Do it as its own change, and count the runs.
 
 ### A separate CRUNCHER utility for BASL source — and the C64 world is full of prior art
 

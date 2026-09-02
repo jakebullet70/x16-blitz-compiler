@@ -714,10 +714,12 @@ ED.CMD.NEW:
   IF ED.DISCARD.OK = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
   GOSUB DOC.INIT
   LINE.TEXT$ = "" : LINE.INDEX = 0 : GOSUB DOC.STORE : LINE.COUNT = 1
-  DOC.FILE.NAME$ = "UNTITLED" : GOSUB ED.OPEN.DONE : GOSUB ED.REFRESH.FULL
+  DOC.FILE.NAME$ = "UNTITLED" : ED.MB.FORCE = 1
+  GOSUB ED.OPEN.DONE : GOSUB ED.REFRESH.FULL
   RETURN
 
 ED.OPEN.FILE:
+  ED.MB.FORCE = 1 : REM the bar carries the name, which the numeric guard cannot see
   GOSUB DOC.LOADFILE
   IF LINE.COUNT = 0 THEN LINE.TEXT$ = "" : LINE.INDEX = 0 : GOSUB DOC.STORE : LINE.COUNT = 1
   GOSUB ED.OPEN.DONE : GOSUB ED.REFRESH.FULL
@@ -745,7 +747,7 @@ ED.CMD.SAVE:
 ED.CMD.SAVEAS:
   ED.PROMPT.MSG$ = "Save as: " : GOSUB ED.PROMPT
   IF ED.PROMPT.OK = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
-  DOC.FILE.NAME$ = ED.INPUT$
+  DOC.FILE.NAME$ = ED.INPUT$ : ED.MB.FORCE = 1
   GOSUB ED.SAVE.FILE : GOSUB ED.REFRESH.FULL
   ED.MSG$ = "Saved " + DOC.FILE.NAME$ : GOSUB ED.INFO.MSG
   RETURN
@@ -1102,7 +1104,25 @@ REM row ED.MAP.TOP. The same correction ED.PUT.FIELD, ED.RENDER.ROW and the care
 REM
 REM MENUBAR.DRAW lays every title down in the normal attribute and MENUBAR.MARK puts the
 REM highlight on one; with no menu open there is nothing to mark, which is MENU.ACTIVE < 0.
+REM DRAWN ONLY WHEN IT WOULD COME OUT DIFFERENT. The body below blanks the whole row
+REM with a full-width ED.PUT.FIELD and then draws the items back over it, so every call
+REM is a visible flicker -- and ED.RENDER.ALL called it on every insert and every delete,
+REM where the bar cannot have changed. Now an edit repaints it exactly ONCE, when the
+REM dirty star first appears, and never again.
+REM
+REM The three tests are everything the bar's appearance depends on that is a NUMBER:
+REM the star, which item is highlighted, and the map row it is drawn at (the bar has to
+REM be redrawn where the hardware scroll has moved it to). The FILENAME is the fourth,
+REM and it is a string -- compared with a flag instead of by building a key string,
+REM because a string built per keystroke is an allocation per keystroke.
 ED.RENDER.MENUBAR:
+  IF ED.MB.FORCE = 1 THEN GOTO ED.MB.DRAW
+  IF ED.DOC.DIRTY <> ED.MB.D THEN GOTO ED.MB.DRAW
+  IF MENU.ACTIVE <> ED.MB.M THEN GOTO ED.MB.DRAW
+  IF ED.MAP.TOP <> ED.MB.T THEN GOTO ED.MB.DRAW
+  RETURN
+ED.MB.DRAW:
+  ED.MB.FORCE = 0 : ED.MB.D = ED.DOC.DIRTY : ED.MB.M = MENU.ACTIVE : ED.MB.T = ED.MAP.TOP
   ED.PS.ROW = 0 : ED.PS.COL = 0 : ED.PS.WIDTH = SCREEN.COLS
   ED.PS$ = "" : ED.PS.ATTR = THEME.CLR(THEME.TITLE) : GOSUB ED.PUT.FIELD
   GOSUB ED.MENU.BAR.ITEMS : GOSUB MENUBAR.DRAW
