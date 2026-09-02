@@ -42,8 +42,8 @@ not a sample. The rule above is what keeps that from costing anything.
 | `THEME.INC.BL` | yes — named colour roles, light and dark |
 | `MENUVERT.INC.BL` | yes — the menu bar and dropdowns |
 | `LINEINPUT.INC.BL` | yes — positioned, length-limited entry fields |
-| `APPHELP.INC.BL` | yes — start up politely, restore the screen on the way out |
-| `STRHELP.INC.BL` | yes — string helpers the modules above lean on |
+| `APPSYS.INC.BL` | yes — start up politely, restore the screen on the way out |
+| `STRINGS.INC.BL` | yes — string helpers the modules above lean on |
 | `BMX.INC.BL` | **no** — image loading, copied only to keep this a whole-library mirror |
 
 `BMX.INC.BL` is 20 KB the editor never touches. It is here so the folder is a complete,

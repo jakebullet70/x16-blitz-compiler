@@ -1,72 +1,72 @@
 ## ***********************************************************************
 ## **
-## **  APPHELP.INC.BL -- start an application politely, and leave it the
+## **  APPSYS.INC.BL -- start an application politely, and leave it the
 ## **  way you found it. Plus panels saved to and loaded from disk.
 ## **
-## **      APPHELP.STARTUP     remember the screen the user had
-## **      APPHELP.RESTORE     put it back, on the way out
-## **      APPHELP.PANEL.LOAD  and back again, where it came from
-## **      APPHELP.PANEL.PUT   or somewhere else
+## **      APPSYS.STARTUP     remember the screen the user had
+## **      APPSYS.RESTORE     put it back, on the way out
+## **      APPSYS.PANEL.LOAD  and back again, where it came from
+## **      APPSYS.PANEL.PUT   or somewhere else
 ## **
 ## **  NOT A KEYWORD: everything here is one KERNAL call and some arithmetic, none of
 ## **  it in a loop or over bulk data, so by the rule the GP set is built on it belongs
 ## **  in BASIC -- and only programs that want it pay.
 ## **
 ## **  Usage:
-## **      GOSUB APPHELP.STARTUP
-## **      ... the application, laid out with APPHELP.COLS / APPHELP.ROWS
-## **      GOSUB APPHELP.RESTORE : END
+## **      GOSUB APPSYS.STARTUP
+## **      ... the application, laid out with APPSYS.COLS / APPSYS.ROWS
+## **      GOSUB APPSYS.RESTORE : END
 ## **
 ## ***********************************************************************
-#IFNDEF APPHELP.DEFS
-#DEFINE APPHELP.DEFS 1
+#IFNDEF APPSYS.DEFS
+#DEFINE APPSYS.DEFS 1
 
 ## The KERNAL's screen_mode. CARRY SET REPORTS -- mode in .A, width .X, height .Y;
 ## carry clear SETS. GPC's own SCREEN is the carry-clear half of this same call.
-#DEFINE APPHELP.SCRMODE $FF5F
+#DEFINE APPSYS.SCRMODE $FF5F
 
 ## The KERNAL's current text colour, packed (background * 16 + foreground)
 ## -- the same packing the GP drawing commands take, and the same byte
 ## they read when their colour argument is left off.
-#DEFINE APPHELP.COLREG $0376
+#DEFINE APPSYS.COLREG $0376
 
 ## screen_set_charset, and the byte saying which one is up. $FF62 only SETS -- there is
 ## no "get charset" -- but $0372 holds the number in its low bits and flags in the high,
 ## bit 6 being ISO. PROBED, NOT DOCUMENTED, including that screen_set_charset does NOT
 ## clear bit 6: restoring the charset alone leaves a machine that thinks it is in ISO
 ## mode, so the WHOLE BYTE goes back.
-#DEFINE APPHELP.SETCHR $FF62
-#DEFINE APPHELP.CHRREG $0372
+#DEFINE APPSYS.SETCHR $FF62
+#DEFINE APPSYS.CHRREG $0372
 
 ## Where a RAM bank appears, and the size of GP.STASH's self-describing
 ## header (w, h, x, y).
 
-GOTO APPHELP.SKIP
+GOTO APPSYS.SKIP
 
-## APPHELP.STARTUP -- remember what the user had, and report the size.
+## APPSYS.STARTUP -- remember what the user had, and report the size.
 ##
-##   out  APPHELP.MODE    the screen mode, for APPHELP.RESTORE
-##        APPHELP.CHARSET the charset number, likewise
-##        APPHELP.COLS    columns, e.g. 80
-##        APPHELP.ROWS    rows, e.g. 60
-##        APPHELP.COLOUR  the packed text colour
+##   out  APPSYS.MODE    the screen mode, for APPSYS.RESTORE
+##        APPSYS.CHARSET the charset number, likewise
+##        APPSYS.COLS    columns, e.g. 80
+##        APPSYS.ROWS    rows, e.g. 60
+##        APPSYS.COLOUR  the packed text colour
 ##
 ## Call it FIRST, before any SCREEN or COLOR of your own: it records the state as it
 ## finds it, so anything changed beforehand is what gets restored.
 ##
-## Lay out from APPHELP.COLS and APPHELP.ROWS rather than assuming 80x60 -- SCREEN 0 is
+## Lay out from APPSYS.COLS and APPSYS.ROWS rather than assuming 80x60 -- SCREEN 0 is
 ## 40x30, and a user who prefers larger text will be running one.
 
-APPHELP.STARTUP:
-    GP.CALL APPHELP.SCRMODE, 0, 0, 0, 1
-    APPHELP.MODE = GP.A
-    APPHELP.COLS = GP.X
-    APPHELP.ROWS = GP.Y
-    APPHELP.COLOUR = PEEK(APPHELP.COLREG)
-    APPHELP.CHARSET = PEEK(APPHELP.CHRREG)
+APPSYS.STARTUP:
+    GP.CALL APPSYS.SCRMODE, 0, 0, 0, 1
+    APPSYS.MODE = GP.A
+    APPSYS.COLS = GP.X
+    APPSYS.ROWS = GP.Y
+    APPSYS.COLOUR = PEEK(APPSYS.COLREG)
+    APPSYS.CHARSET = PEEK(APPSYS.CHRREG)
     RETURN
 
-## APPHELP.RESTORE -- the screen as it was, for whatever runs next.
+## APPSYS.RESTORE -- the screen as it was, for whatever runs next.
 ##
 ## Setting the mode CLEARS the screen, which is what you want on the way out -- a clean
 ## READY rather than the wreckage of a dialog. Restoring the colour matters more than it
@@ -76,17 +76,17 @@ APPHELP.STARTUP:
 ## AND 15 is safe here only because a packed attribute is 0..255; AND is 16-bit SIGNED
 ## in GPC and raises OUT OF RANGE above 32767.
 
-APPHELP.RESTORE:
-    GP.CALL APPHELP.SCRMODE, APPHELP.MODE, 0, 0, 0
-    GP.CALL APPHELP.SETCHR, APPHELP.CHARSET AND 63, 0, 0, 0
-    POKE APPHELP.CHRREG, APPHELP.CHARSET
-    COLOR APPHELP.COLOUR AND 15, INT(APPHELP.COLOUR / 16)
+APPSYS.RESTORE:
+    GP.CALL APPSYS.SCRMODE, APPSYS.MODE, 0, 0, 0
+    GP.CALL APPSYS.SETCHR, APPSYS.CHARSET AND 63, 0, 0, 0
+    POKE APPSYS.CHRREG, APPSYS.CHARSET
+    COLOR APPSYS.COLOUR AND 15, INT(APPSYS.COLOUR / 16)
     RETURN
 
-## THE PANEL ROUTINES MOVED on 2026-09-01: APPHELP.PANEL.SAVE / .LOAD / .PUT are now
+## THE PANEL ROUTINES MOVED on 2026-09-01: APPSYS.PANEL.SAVE / .LOAD / .PUT are now
 ## STASH.FILE.SAVE / .LOAD / .PUT in STASHFILE.INC.BL. They were built on GP.STASH and
-## GP.RESTR, and keeping a BSAVE wrapper here would have meant APPHELP dragging the
+## GP.RESTR, and keeping a BSAVE wrapper here would have meant APPSYS dragging the
 ## whole GP block in behind it.
 ##
-APPHELP.SKIP:
+APPSYS.SKIP:
 #ENDIF

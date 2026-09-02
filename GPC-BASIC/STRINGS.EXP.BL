@@ -7,10 +7,10 @@
 ## **  GP.HIBYTE / GP.LOBYTE         composite -- splitting an address
 ## **  STRCASE.GO                    BASL+ASM, from STRCASE.INC.BL:
 ## **                                  TRIM / LTRIM / RTRIM / UPPER / LOWER
-## **  STRHELP.PADR / PADL / PADC     BASL, from STRHELP.INC.BL
-## **  STRHELP.REPLACE               BASL, from STRHELP.INC.BL
+## **  STR.PADR / PADL / PADC     BASL, from STRINGS.INC.BL
+## **  STR.REPLACE               BASL, from STRINGS.INC.BL
 ## **
-## **  Build:  copy GPC-BASIC/GPB.INC.BL, GPC-BASIC/STRHELP.INC.BL,
+## **  Build:  copy GPC-BASIC/GPB.INC.BL, GPC-BASIC/STRINGS.INC.BL,
 ## **          GPC-BASIC/STRCASE.INC.BL and this file into testing/, then
 ## **            python source/gpc/build_basl.py STRINGS.EXP.BL STRINGS.PRG
 ## **          and compile STRINGS.PRG with GPC.BIN.
@@ -23,7 +23,7 @@
 #SAVEAS "@:STRINGS.PRG"
 #SYMFILE "@:STRINGS.SYM"
 #INCLUDE "GPB.INC.BL"
-#INCLUDE "STRHELP.INC.BL"
+#INCLUDE "STRINGS.INC.BL"
 #INCLUDE "STRCASE.INC.BL"
 
 ## NOTE ON NAMES: the search cursor below is HIT, not POS -- POS is a BASIC keyword
@@ -113,43 +113,43 @@ PRINT "LOWER ["; WORD$; "]"
 ## ---- the variable slot, so it can never GROW one past its born capacity -- and
 ## ---- padding to a field width is exactly growing. BASIC assignment reallocates.
 
-STRHELP.STR$ = "NAME" : STRHELP.WIDTH = 12
-GOSUB STRHELP.PADR
-PRINT "PAD   ["; STRHELP.STR$; "]"
+STR.STR$ = "NAME" : STR.WIDTH = 12
+GOSUB STR.PADR
+PRINT "PAD   ["; STR.STR$; "]"
 
-STRHELP.STR$ = "42" : STRHELP.WIDTH = 12
-GOSUB STRHELP.PADL
-PRINT "PADL  ["; STRHELP.STR$; "]"
+STR.STR$ = "42" : STR.WIDTH = 12
+GOSUB STR.PADL
+PRINT "PADL  ["; STR.STR$; "]"
 
-STRHELP.STR$ = "TITLE" : STRHELP.WIDTH = 12
-GOSUB STRHELP.PADC
-PRINT "PADC  ["; STRHELP.STR$; "]"
+STR.STR$ = "TITLE" : STR.WIDTH = 12
+GOSUB STR.PADC
+PRINT "PADC  ["; STR.STR$; "]"
 
-## ---- 4b. STRHELP.REPLACE swaps EVERY occurrence. The replacement may
+## ---- 4b. STR.REPLACE swaps EVERY occurrence. The replacement may
 ## ---- be shorter, longer, or "" to delete. Case sensitive, like
 ## ---- GP.INSTR underneath it.
 
-STRHELP.STR$ = "PATH/TO/FILE" : STRHELP.FIND$ = "/" : STRHELP.REPL$ = "."
-GOSUB STRHELP.REPLACE
-PRINT "REPLACE  ["; STRHELP.STR$; "]"
+STR.STR$ = "PATH/TO/FILE" : STR.FIND$ = "/" : STR.REPL$ = "."
+GOSUB STR.REPLACE
+PRINT "REPLACE  ["; STR.STR$; "]"
 
-STRHELP.STR$ = "A,B,C" : STRHELP.FIND$ = "," : STRHELP.REPL$ = ""
-GOSUB STRHELP.REPLACE
-PRINT "DELETE   ["; STRHELP.STR$; "]"
+STR.STR$ = "A,B,C" : STR.FIND$ = "," : STR.REPL$ = ""
+GOSUB STR.REPLACE
+PRINT "DELETE   ["; STR.STR$; "]"
 
 ## ---- SAFE WHEN THE REPLACEMENT CONTAINS THE NEEDLE. "A" -> "AA" would
 ## ---- never terminate if the output were re-scanned; this one builds a
 ## ---- new string and never looks at what it has already emitted.
 
-STRHELP.STR$ = "AAA" : STRHELP.FIND$ = "A" : STRHELP.REPL$ = "AA"
-GOSUB STRHELP.REPLACE
-PRINT "GROWING  ["; STRHELP.STR$; "]"
+STR.STR$ = "AAA" : STR.FIND$ = "A" : STR.REPL$ = "AA"
+GOSUB STR.REPLACE
+PRINT "GROWING  ["; STR.STR$; "]"
 
 ## ---- An EMPTY needle leaves the string alone rather than hanging.
 
-STRHELP.STR$ = "UNTOUCHED" : STRHELP.FIND$ = "" : STRHELP.REPL$ = "X"
-GOSUB STRHELP.REPLACE
-PRINT "EMPTY    ["; STRHELP.STR$; "]"
+STR.STR$ = "UNTOUCHED" : STR.FIND$ = "" : STR.REPL$ = "X"
+GOSUB STR.REPLACE
+PRINT "EMPTY    ["; STR.STR$; "]"
 
 ## ---- 5. GP.STRPTR hands the address of [ActLen][Data] to machine code:
 ## ---- length AT that address, first character at +1, capacity at -2.

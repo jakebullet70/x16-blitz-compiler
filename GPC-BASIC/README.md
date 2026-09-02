@@ -69,9 +69,9 @@ All of it needs `#INCLUDE "GPB.INC.BL"`, and nothing else.
 
 | Module | What it gives you | Example |
 | --- | --- | --- |
-| `STRHELP.INC.BL` | strings: `PADR`/`PADL`/`PADC` pad, `SPLIT` on a delimiter, `REPLACE` every occurrence, `PET2SCR` | `SPLITT.EXP.BL` `STRINGS.EXP.BL` |
+| `STRINGS.INC.BL` | strings: `PADR`/`PADL`/`PADC` pad, `SPLIT` on a delimiter, `REPLACE` every occurrence, `PET2SCR` | `SPLITT.EXP.BL` `STRINGS.EXP.BL` |
 | `THEME.INC.BL` | named colour roles, light and dark, so re-skinning is one variable | `MENU.EXP.BL` |
-| `APPHELP.INC.BL` | leave the screen as you found it, and **panels to and from disk** | `MENU.EXP.BL` |
+| `APPSYS.INC.BL` | leave the screen as you found it, and **panels to and from disk** | `MENU.EXP.BL` |
 | `LINEINPUT.INC.BL` | a positioned, length-limited entry field — what `INPUT` cannot do on a drawn screen | `FORM.EXP.BL` |
 | `MENUVERT.INC.BL` | a vertical menu: cursor keys, RETURN, ESC, hotkeys, SNES pad | `MENUDEMO.EXP.BL` |
 | `MENUBAR.INC.BL` | the other axis — a horizontal bar, per-item widths taken from the text | — |

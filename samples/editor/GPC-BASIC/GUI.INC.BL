@@ -85,7 +85,7 @@
 #DEFINE GUI.DEFS 1
 
 ## screen_mode. With carry SET it REPORTS rather than sets: mode in A, columns in
-## X, rows in Y. Named here so GUI does not depend on APPHELP being included.
+## X, rows in Y. Named here so GUI does not depend on APPSYS being included.
 #DEFINE GUI.SCRMODE $FF5F
 
 ## The frame GUI.STYLE 0 means. GP.BOX style 2 is the single line.

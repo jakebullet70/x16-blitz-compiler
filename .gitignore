@@ -159,7 +159,7 @@ testing/GPC.RC.*.BIN
 # them would put two copies of every library file in the repo, free to drift apart.
 #   The GPC-BASIC masters are staged into testing/ to be built and are NOT tracked
 #   there. Globbed rather than listed one by one: naming them individually is how
-#   THEME.INC.BL and APPHELP.INC.BL got committed by accident, which is the same
+#   THEME.INC.BL and APPSYS.INC.BL got committed by accident, which is the same
 #   class of mistake 15208f3 had to back out.
 testing/*.INC.BL
 testing/*.EXP.BL

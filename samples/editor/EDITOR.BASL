@@ -22,7 +22,7 @@
 
 #INCLUDE "GPB.INC.BL"
 #INCLUDE "THEME.INC.BL"
-#INCLUDE "APPHELP.INC.BL"
+#INCLUDE "APPSYS.INC.BL"
 REM STASH.INC.BL saves the cells a dialog covers -- GP.STASH and GP.RESTR until they left
 REM the GP block on 01/09/26. The #SYMFILE above is for it: it reaches BASIC's variables
 REM from assembly through {VAR}, and by then BASLOAD has crunched every name.
@@ -119,11 +119,11 @@ ED.KEY.RANGE:
 ED.QUIT:
   POKE 40761, 0 : POKE 40762, 0 : REM undo any hardware VSCROLL before returning to BASIC
   GOSUB ED.ALTKEYS.OFF : REM and the keyboard layout, which outlives the program
-  REM APPHELP.RESTORE hands back the mode, charset and colour APPHELP.STARTUP found -- the
+  REM APPSYS.RESTORE hands back the mode, charset and colour APPSYS.STARTUP found -- the
   REM user's, not a hardcoded 3, so someone who started in upper case is not dropped into
   REM lower. Re-uploading the charset is also what undoes ED.PETFONT's re-ordering, so
   REM NOTHING MAY BE PRINTED BEFORE THIS LINE or it comes out in the wrong glyphs.
-  GOSUB APPHELP.RESTORE
+  GOSUB APPSYS.RESTORE
   PRINT CHR$(147);
   PRINT "BYE."
   END
@@ -267,15 +267,15 @@ REM ============================================================================
 REM SETUP
 REM ============================================================================
 ED.INIT:
-  REM FIRST, before any mode or colour of our own: APPHELP.STARTUP records the state as it
+  REM FIRST, before any mode or colour of our own: APPSYS.STARTUP records the state as it
   REM FINDS it and ED.QUIT hands that back. Anything changed above this line is lost.
-  GOSUB APPHELP.STARTUP
+  GOSUB APPSYS.STARTUP
   GOSUB ED.THEME
   REM GP.CALL, not SYS: A, X, Y and CARRY as arguments, results in GP.A / GP.X / GP.Y,
   REM against SYS's four statements through the POKE 780..783 slots. Free here -- the GP
   REM block is already paid for by the GP.SELECT in the key dispatch.
-  GP.CALL APPHELP.SCRMODE, ED.SCREEN.MODE, 0, 0, 0 : REM carry CLEAR sets the mode
-  GP.CALL APPHELP.SETCHR, 3, 0, 0, 0 : REM charset 3, PET upper/lower
+  GP.CALL APPSYS.SCRMODE, ED.SCREEN.MODE, 0, 0, 0 : REM carry CLEAR sets the mode
+  GP.CALL APPSYS.SETCHR, 3, 0, 0, 0 : REM charset 3, PET upper/lower
   PRINT CHR$(147);
   GOSUB ED.PETFONT : REM ...then re-index it so a VERA tile index IS a character code
   REM ...and DECLARE it, with bit 6 of $0372: "text is ASCII", which is now simply true of
@@ -287,9 +287,9 @@ ED.INIT:
   GOSUB ED.GUI.SETUP : REM ...and tell GUI.INC.BL where the frame glyphs ended up
   REM The same entry point with CARRY SET, which makes screen_mode REPORT instead: mode in
   REM A, columns in X, rows in Y, replacing $FFED. Asked AFTER the mode is set, and NOT the
-  REM size APPHELP.STARTUP holds -- that one is the user's 80x60, kept for ED.QUIT to give
+  REM size APPSYS.STARTUP holds -- that one is the user's 80x60, kept for ED.QUIT to give
   REM back. This is the 80x30 the editor just chose and every renderer lays out in.
-  GP.CALL APPHELP.SCRMODE, 0, 0, 0, 1
+  GP.CALL APPSYS.SCRMODE, 0, 0, 0, 1
   SCREEN.COLS = GP.X : SCREEN.ROWS = GP.Y
   IF SCREEN.COLS < 20 THEN SCREEN.COLS = 80
   IF SCREEN.ROWS < 8 THEN SCREEN.ROWS = 60

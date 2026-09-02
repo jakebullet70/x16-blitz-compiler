@@ -15,7 +15,7 @@
 ## **  string descriptor, and GP.CALL replaces staging A/X/Y/C through
 ## **  $030C..$030F and SYSing.
 ## **
-## **  Build:  copy GPB.INC.BL, APPHELP.INC.BL, BMX.INC.BL, STRCASE.INC.BL
+## **  Build:  copy GPB.INC.BL, APPSYS.INC.BL, BMX.INC.BL, STRCASE.INC.BL
 ## **          and this file into testing/, then
 ## **            python source/gpc/build_basl.py BMXVIEW.EXP.BL BMXVIEW.PRG
 ## **          and compile BMXVIEW.PRG with GPC.BIN. Put some .BMX
@@ -29,7 +29,7 @@
 #SYMFILE "@:BMXVIEW.SYM"
 #INCLUDE "GPB.INC.BL"
 #INCLUDE "STRCASE.INC.BL"
-#INCLUDE "APPHELP.INC.BL"
+#INCLUDE "APPSYS.INC.BL"
 #INCLUDE "BMX.INC.BL"
 
 #DEFINE VIEW.MODE 128
@@ -37,7 +37,7 @@
 ## ---- Remember the screen the user had, so quitting puts it back rather
 ## ---- than leaving them at a READY in whatever the last picture used.
 
-GOSUB APPHELP.STARTUP
+GOSUB APPSYS.STARTUP
 
 VIEW.MAIN:
     PRINT
@@ -58,7 +58,7 @@ VIEW.MAIN:
     SCREEN VIEW.MODE
     GOSUB BMX.PAINT
     GOSUB VIEW.ANYKEY
-    SCREEN APPHELP.MODE
+    SCREEN APPSYS.MODE
     IF BMX.ERROR$ <> "" THEN GOTO VIEW.COMPLAIN
     GOTO VIEW.MAIN
 
@@ -67,7 +67,7 @@ VIEW.COMPLAIN:
     GOTO VIEW.MAIN
 
 VIEW.QUIT:
-    GOSUB APPHELP.RESTORE
+    GOSUB APPSYS.RESTORE
     PRINT "BYE"
     END
 

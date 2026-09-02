@@ -536,8 +536,8 @@ this section that cannot work in ASM, and the reason generalises: an in-place ha
 string's **block address**, never the **variable slot**, so it can shrink or rewrite a string but can
 never *grow* one past the capacity it was born with (`StringConcrete`: length+50%, minimum 10). That
 capped it at ~10 characters for a short string, so `GP.PAD NAME$,20` — a plain column heading, the
-entire point of the command — raised `OUT OF RANGE`. Padding is now **`STRHELP.PADR` / `PADL` / `PADC`
-in BASL** (`GPC-BASIC/STRHELP.INC.BL`), where ordinary assignment reallocates and the problem does
+entire point of the command — raised `OUT OF RANGE`. Padding is now **`STR.PADR` / `PADL` / `PADC`
+in BASL** (`GPC-BASIC/STRINGS.INC.BL`), where ordinary assignment reallocates and the problem does
 not exist. Its token (52852/`$CE74`) went to `GP.LTRIM`.
 
 **The rule that falls out of it, for every future in-place string command: shrink and rewrite are
@@ -578,7 +578,7 @@ address from `GP.STRPTR` on a literal is read-only.
 **Split stays in BASL** — it composes from `GP.INSTR` + `MID$` and does not earn ASM bytes.
 
 **Replace stays in BASL too, and for a second reason on top of that one** (19/08/26, shipped as
-`STRHELP.REPLACE`). It composes the same way — `GP.INSTR` + `LEFT$` + `MID$` + `+` — but it also
+`STR.REPLACE`). It composes the same way — `GP.INSTR` + `LEFT$` + `MID$` + `+` — but it also
 lands on the wrong side of the rule above: a replacement longer than what it replaces **grows** the
 string, and an in-place ASM handler can never grow one. It is `GP.PAD`'s problem exactly, so it was
 never a candidate for a keyword. Building a new string rather than editing in place is what makes

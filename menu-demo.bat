@@ -7,10 +7,10 @@ rem      RETURN             choose            N L O Q  hotkeys, no case
 rem      ESC                cancel (the demo just redraws)
 rem      QUIT               restores your screen mode and colour, then exits
 rem
-rem  Source: GPC-BASIC\MENU.EXP.BL  (+ THEME.INC.BL, APPHELP.INC.BL)
+rem  Source: GPC-BASIC\MENU.EXP.BL  (+ THEME.INC.BL, APPSYS.INC.BL)
 rem
 rem  demo\ is BUILD OUTPUT and is not in git. To make it:
-rem    1. copy GPB.INC.BL, THEME.INC.BL, APPHELP.INC.BL and MENU.EXP.BL from
+rem    1. copy GPB.INC.BL, THEME.INC.BL, APPSYS.INC.BL and MENU.EXP.BL from
 rem       GPC-BASIC\ into testing\
 rem    2. python source\gpc\build_basl.py MENU.EXP.BL MENU.PRG
 rem    3. compile testing\MENU.PRG with GPC.BIN, and put the object in

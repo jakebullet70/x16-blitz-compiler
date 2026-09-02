@@ -20,9 +20,9 @@ The rule the library follows, and that you should follow too:
 | Prefix | Owner | What it is |
 |---|---|---|
 | `GP.` | `GPB.INC.BL` | **keywords, not variables** — see §2, this one is different |
-| `STRHELP.` | `STRHELP.INC.BL` | string helpers |
+| `STR.` | `STRINGS.INC.BL` | string helpers |
 | `THEME.` | `THEME.INC.BL` | colour roles |
-| `APPHELP.` | `APPHELP.INC.BL` | screen save/restore, panels to disk |
+| `APPSYS.` | `APPSYS.INC.BL` | screen save/restore, panels to disk |
 | `LINEINPUT.` | `LINEINPUT.INC.BL` | entry fields |
 | `MENUVERT.` | `MENUVERT.INC.BL` | vertical menus |
 | `BMX.` | `BMX.INC.BL` | BMX bitmap loading |
@@ -74,29 +74,29 @@ read, do not write, do not rely on).
 `THEME.CLR` is the array this module `DIM`s. **Do not `DIM` it yourself** — the module owns it, and
 `DIM`ming an array GPC has already dimensioned is an error.
 
-### `APPHELP.INC.BL`
+### `APPSYS.INC.BL`
 
 | | |
 |---|---|
-| in | `APPHELP.FILE$` `APPHELP.BANK` `APPHELP.X` `APPHELP.Y` `APPHELP.W` `APPHELP.H` `APPHELP.DEV` — the panel routines |
-| out | `APPHELP.MODE` `APPHELP.COLS` `APPHELP.ROWS` `APPHELP.COLOUR` — set by `APPHELP.STARTUP` |
-| internal | `APPHELP.LAST` |
-| constants | `APPHELP.SCRMODE` `APPHELP.COLREG` `APPHELP.WINDOW` `APPHELP.HEADER` |
+| in | `APPSYS.FILE$` `APPSYS.BANK` `APPSYS.X` `APPSYS.Y` `APPSYS.W` `APPSYS.H` `APPSYS.DEV` — the panel routines |
+| out | `APPSYS.MODE` `APPSYS.COLS` `APPSYS.ROWS` `APPSYS.COLOUR` — set by `APPSYS.STARTUP` |
+| internal | `APPSYS.LAST` |
+| constants | `APPSYS.SCRMODE` `APPSYS.COLREG` `APPSYS.WINDOW` `APPSYS.HEADER` |
 
-`APPHELP.COLS` and `APPHELP.ROWS` are the ones to lay your screen out from. **Do not assume 80×60** —
+`APPSYS.COLS` and `APPSYS.ROWS` are the ones to lay your screen out from. **Do not assume 80×60** —
 the X16 boots there but `SCREEN 0` is 40×30, and someone who prefers larger text is running one.
 
-### `STRHELP.INC.BL`
+### `STRINGS.INC.BL`
 
 | | |
 |---|---|
-| in | `STRHELP.STR$` — the string, in and out<br>`STRHELP.WIDTH` — field width, the pad routines<br>`STRHELP.DELIM$` `STRHELP.MAX` — `SPLIT` (`MAX` 0 means 10)<br>`STRHELP.FIND$` `STRHELP.REPL$` — `REPLACE`<br>`STRHELP.PET` — a PETSCII code, `PET2SCR` |
-| out | `STRHELP.STR$` — padded, or replaced, in place<br>`STRHELP.N` — how many fields `SPLIT` found, always ≥ 1<br>`STRHELP.FIELD$(1..N)` — the fields themselves<br>`STRHELP.SCR` — the screen code from `PET2SCR` |
-| internal | `STRHELP.GAP` `STRHELP.HALF` `STRHELP.REST$` `STRHELP.AT` `STRHELP.LIM` `STRHELP.OUT$` |
+| in | `STR.STR$` — the string, in and out<br>`STR.WIDTH` — field width, the pad routines<br>`STR.DELIM$` `STR.MAX` — `SPLIT` (`MAX` 0 means 10)<br>`STR.FIND$` `STR.REPL$` — `REPLACE`<br>`STR.PET` — a PETSCII code, `PET2SCR` |
+| out | `STR.STR$` — padded, or replaced, in place<br>`STR.N` — how many fields `SPLIT` found, always ≥ 1<br>`STR.FIELD$(1..N)` — the fields themselves<br>`STR.SCR` — the screen code from `PET2SCR` |
+| internal | `STR.GAP` `STR.HALF` `STR.REST$` `STR.AT` `STR.LIM` `STR.OUT$` |
 
-**`STRHELP.FIELD$` is the one array the library deliberately does NOT `DIM`.** Left alone, GPC's
+**`STR.FIELD$` is the one array the library deliberately does NOT `DIM`.** Left alone, GPC's
 implicit `DIM` gives you 0..10. If you want more, `DIM` it yourself **before the first call** and set
-`STRHELP.MAX` to match — `DIM`ming an array GPC has already auto-dimensioned is an error, so it is
+`STR.MAX` to match — `DIM`ming an array GPC has already auto-dimensioned is an error, so it is
 one or the other. This is the opposite of `THEME.CLR`, which the module owns outright; the two are
 worth keeping straight.
 
@@ -176,13 +176,13 @@ internal, and a `GOSUB` to one will do something, just not something useful.
 `MENUVERT.WAIT`, `.KEYED`, `.SETTLE`, `.WRAPTOP`, `.WRAPBOT`, `.CANCEL`, `.HOTKEY`, `.PADKEY`,
 `.PADREAD` and the three `FOLD` helpers are not.
 
-`STRHELP` has two of its own, both loop continuations rather than entry points:
-**`STRHELP.SPLIT.NEXT`** and **`STRHELP.REPLACE.NEXT`**. Enter either one directly and you resume a
-loop whose accumulators were never initialised. The callable names are `STRHELP.PADR`, `PADL`,
+`STRINGS` has two of its own, both loop continuations rather than entry points:
+**`STR.SPLIT.NEXT`** and **`STR.REPLACE.NEXT`**. Enter either one directly and you resume a
+loop whose accumulators were never initialised. The callable names are `STR.PADR`, `PADL`,
 `PADC`, `SPLIT`, `REPLACE` and `PET2SCR`.
 
-Each module also has a skip label it jumps over itself with — `THEME.SKIP`, `APPHELP.SKIP`,
-`STRHELP.SKIP`, `BMX.MODULE.END`, `LINEINPUT.MODULE.END`, `MENUVERT.MODULE.END`. Those exist so an
+Each module also has a skip label it jumps over itself with — `THEME.SKIP`, `APPSYS.SKIP`,
+`STR.SKIP`, `BMX.MODULE.END`, `LINEINPUT.MODULE.END`, `MENUVERT.MODULE.END`. Those exist so an
 include can sit anywhere in the file, the top included. **Do not branch to one.**
 
 One trap found the hard way, worth repeating: **BASLOAD refuses a name used as both a label and a

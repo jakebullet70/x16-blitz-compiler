@@ -112,8 +112,8 @@ the BASIC modules are written up in §4.
 | **Screen** | ASM | `GP.BOX` `GP.FILL` `GP.PRINTAT` |
 | **Screen** | COMPOSITE | `GP.CHAR` — free, one cell in `GP.PRINTAT`'s shape running `GP.FILL`'s handler |
 | **Colour roles** | BASIC | `THEME.INC.BL` — `THEME.LOAD`, `THEME.CLR()` · §4.1 |
-| **String helpers** | BASIC | `STRHELP.INC.BL` — `PADR` `PADL` `PADC` `SPLIT` `REPLACE` `PET2SCR` · §4.2 |
-| **Screen etiquette, panels** | BASIC | `APPHELP.INC.BL` — `STARTUP` `RESTORE` `PANEL.SAVE/LOAD/PUT` · §4.3 |
+| **String helpers** | BASIC | `STRINGS.INC.BL` — `PADR` `PADL` `PADC` `SPLIT` `REPLACE` `PET2SCR` · §4.2 |
+| **Screen etiquette, panels** | BASIC | `APPSYS.INC.BL` — `STARTUP` `RESTORE` `PANEL.SAVE/LOAD/PUT` · §4.3 |
 | **Entry fields** | BASIC | `LINEINPUT.INC.BL` — `LINEINPUT.GET`, `LINEINPUT.ASK` · §4.4 |
 | **Bitmaps** | BASIC | `BMX.INC.BL` — `BMX.SHOW`, `BMX.RESTORE` · §4.5 |
 | **Menus** | BASIC | `MENUVERT.INC.BL` — `RUN` `DRAW` `ROW` `HOTFIND` · §4.6 |
@@ -327,7 +327,7 @@ compiler rejects those. Case conversion leaves digits, punctuation and PETSCII g
 
 **There is no `GP.PAD`.** Padding *grows* a string, and an in-place handler receives only the string's
 block, never the variable slot — so it can never reallocate past the capacity the string was born
-with. Use `STRHELP.PADR` / `PADL` / `PADC` (§4.2), which are plain BASIC assignment and reallocate.
+with. Use `STR.PADR` / `PADL` / `PADC` (§4.2), which are plain BASIC assignment and reallocate.
 
 #### `GP.STRPTR` and the address-splitting trap
 
@@ -664,37 +664,37 @@ the readable name costs no variable, no lookup, and a one-byte constant index.
 
 **`THEME.CLR` is `DIM`med by the module. Do not `DIM` it yourself.**
 
-### 4.2 `STRHELP.INC.BL` — string helpers
+### 4.2 `STRINGS.INC.BL` — string helpers
 
 | Routine | in | out |
 |---|---|---|
-| `STRHELP.PADR` | `STRHELP.STR$` `STRHELP.WIDTH` | `STRHELP.STR$` left-justified |
-| `STRHELP.PADL` | same | right-justified |
-| `STRHELP.PADC` | same | centred (odd gap goes right) |
-| `STRHELP.SPLIT` | `STRHELP.STR$` `STRHELP.DELIM$` `STRHELP.MAX` | `STRHELP.N`, `STRHELP.FIELD$(1..N)` |
-| `STRHELP.REPLACE` | `STRHELP.STR$` `STRHELP.FIND$` `STRHELP.REPL$` | `STRHELP.STR$`, every occurrence replaced |
-| `STRHELP.PET2SCR` | `STRHELP.PET` | `STRHELP.SCR` |
+| `STR.PADR` | `STR.STR$` `STR.WIDTH` | `STR.STR$` left-justified |
+| `STR.PADL` | same | right-justified |
+| `STR.PADC` | same | centred (odd gap goes right) |
+| `STR.SPLIT` | `STR.STR$` `STR.DELIM$` `STR.MAX` | `STR.N`, `STR.FIELD$(1..N)` |
+| `STR.REPLACE` | `STR.STR$` `STR.FIND$` `STR.REPL$` | `STR.STR$`, every occurrence replaced |
+| `STR.PET2SCR` | `STR.PET` | `STR.SCR` |
 
 All three pad routines **leave a string already at or past the width alone. They pad; they never
 truncate** — use `STRCASE.RTRIM` (§4.8) to go the other way.
 
-`SPLIT` reads `STRHELP.STR$` without modifying it. `STRHELP.MAX` of 0 means 10. **Empty fields are
+`SPLIT` reads `STR.STR$` without modifying it. `STR.MAX` of 0 means 10. **Empty fields are
 preserved**, which is what makes it safe for data rows: `"A,,C"` is three fields, `"A,"` is two.
 Splitting an empty string gives one empty field, never zero. Reaching the limit is not an error and
 loses nothing — the last field gets the whole unsplit remainder, delimiters and all.
 
-**`STRHELP.FIELD$` is the one array the library deliberately does NOT `DIM`.** Left alone, GPC's
+**`STR.FIELD$` is the one array the library deliberately does NOT `DIM`.** Left alone, GPC's
 implicit `DIM` gives 0..10. Want more, `DIM` it yourself **before the first call** and set
-`STRHELP.MAX` to match. `DIM`ming an array GPC has already auto-dimensioned is an error, so it is one
+`STR.MAX` to match. `DIM`ming an array GPC has already auto-dimensioned is an error, so it is one
 or the other. **This is the opposite of `THEME.CLR`** — worth keeping straight.
 
-`REPLACE` swaps **every** occurrence of `STRHELP.FIND$` for `STRHELP.REPL$`, modifying
-`STRHELP.STR$` in place. The replacement may be shorter, longer, or `""` to delete. **Case
+`REPLACE` swaps **every** occurrence of `STR.FIND$` for `STR.REPL$`, modifying
+`STR.STR$` in place. The replacement may be shorter, longer, or `""` to delete. **Case
 sensitive**, because `GP.INSTR` compares raw bytes.
 
 > **It is safe when the replacement contains the thing being replaced** — `"A"` → `"AA"`
 > terminates and gives you twice the As, where a naive in-place version loops forever. The routine
-> builds a new string and never re-scans what it has already emitted. An **empty `STRHELP.FIND$`
+> builds a new string and never re-scans what it has already emitted. An **empty `STR.FIND$`
 > leaves the string alone** rather than hanging; that falls out of `GP.INSTR` reporting "not
 > found" for a zero-length needle, so no guard is needed. Like the pad routines it is **not length
 > checked** — a longer replacement can push the result past 255 characters.
@@ -704,29 +704,29 @@ sensitive**, because `GP.INSTR` compares raw bytes.
 
 Examples: [`SPLITT.EXP.BL`](SPLITT.EXP.BL)
 
-### 4.3 `APPHELP.INC.BL` — start politely, leave it as you found it
+### 4.3 `APPSYS.INC.BL` — start politely, leave it as you found it
 
 | Routine | in | out |
 |---|---|---|
-| `APPHELP.STARTUP` | — | `APPHELP.MODE` `APPHELP.COLS` `APPHELP.ROWS` `APPHELP.COLOUR` |
-| `APPHELP.RESTORE` | those | screen mode and colour put back |
-| `APPHELP.PANEL.SAVE` | `APPHELP.FILE$` `.BANK` `.X` `.Y` `.W` `.H` [`.DEV`] | a file |
-| `APPHELP.PANEL.LOAD` | `APPHELP.FILE$` `.BANK` | back where it came from |
-| `APPHELP.PANEL.PUT` | `APPHELP.FILE$` `.BANK` `.X` `.Y` | pasted somewhere else |
+| `APPSYS.STARTUP` | — | `APPSYS.MODE` `APPSYS.COLS` `APPSYS.ROWS` `APPSYS.COLOUR` |
+| `APPSYS.RESTORE` | those | screen mode and colour put back |
+| `APPSYS.PANEL.SAVE` | `APPSYS.FILE$` `.BANK` `.X` `.Y` `.W` `.H` [`.DEV`] | a file |
+| `APPSYS.PANEL.LOAD` | `APPSYS.FILE$` `.BANK` | back where it came from |
+| `APPSYS.PANEL.PUT` | `APPSYS.FILE$` `.BANK` `.X` `.Y` | pasted somewhere else |
 
 ```basic
-GOSUB APPHELP.STARTUP
-' ... the application, laid out with APPHELP.COLS / APPHELP.ROWS ...
-GOSUB APPHELP.RESTORE : END
+GOSUB APPSYS.STARTUP
+' ... the application, laid out with APPSYS.COLS / APPSYS.ROWS ...
+GOSUB APPSYS.RESTORE : END
 ```
 
 **Call `STARTUP` first, before any `SCREEN` or `COLOR` of your own** — it records the state as it
 finds it, so anything you change beforehand is what gets restored.
 
-**Lay out from `APPHELP.COLS` / `APPHELP.ROWS` rather than assuming 80×60.** The X16 boots 80×60 but
+**Lay out from `APPSYS.COLS` / `APPSYS.ROWS` rather than assuming 80×60.** The X16 boots 80×60 but
 `SCREEN 0` is 40×30, and someone who prefers larger text is running one.
 
-`APPHELP.DEV` defaults to 8. The panel routines themselves moved to `STASHFILE.INC.BL`; the panel
+`APPSYS.DEV` defaults to 8. The panel routines themselves moved to `STASHFILE.INC.BL`; the panel
 file is **self-describing** — the stash's 4-byte header goes in it — so loading needs nothing but
 the name.
 
@@ -1034,7 +1034,7 @@ set it silently repeats the last operation. Set both inputs every time, as with 
 `STASH.MOVE`.
 
 There is still no pad here — padding *grows* a string, and nothing working on the block alone can
-grow one past the capacity it was born with. That is `STRHELP.PADR` (§4.2).
+grow one past the capacity it was born with. That is `STR.PADR` (§4.2).
 
 Example: [`STRINGS.EXP.BL`](STRINGS.EXP.BL). Regression test:
 [`STRCTST.EXP.BL`](STRCTST.EXP.BL), twenty cases — empty, all-spaces, a single space, one
@@ -1056,9 +1056,9 @@ you: **a collision is a wrong answer, not an error.**
 | Prefix | Owner |
 |---|---|
 | `GP.` | keywords, **not variables** — see below |
-| `STRHELP.` | `STRHELP.INC.BL` |
+| `STR.` | `STRINGS.INC.BL` |
 | `THEME.` | `THEME.INC.BL` |
-| `APPHELP.` | `APPHELP.INC.BL` |
+| `APPSYS.` | `APPSYS.INC.BL` |
 | `LINEINPUT.` | `LINEINPUT.INC.BL` |
 | `MENUVERT.` | `MENUVERT.INC.BL` |
 | `BMX.` / `BMXK.` | `BMX.INC.BL` (variables / its KERNAL constants) |
@@ -1096,7 +1096,7 @@ that calls the same module corrupts it silently. In practice this only bites if 
 
 Every `NAME:` is a jump target in the same flat space, internal ones included —
 `BMX.STREAM.MORE`, `LINEINPUT.REDRAW`, `THEME.LOAD.DARK`. Each module also has a skip label it jumps
-over itself with (`THEME.SKIP`, `APPHELP.SKIP`, `STRHELP.SKIP`, `BMX.MODULE.END`,
+over itself with (`THEME.SKIP`, `APPSYS.SKIP`, `STR.SKIP`, `BMX.MODULE.END`,
 `LINEINPUT.MODULE.END`). **Do not branch to one.**
 
 **BASLOAD refuses a name used as both a label and a variable** (`BASLOAD.MD:319`) — which is why
@@ -1123,7 +1123,7 @@ Every one of these has cost a debugging session at least once.
 | `GP.BOX X,Y,W,H,,7` | optionals cannot be skipped over | `GP.BOX X,Y,W,H,0,7` |
 | `SCREEN` after `BMX.PAINT` | reloads the default palette and throws the image's colours away | set the mode first |
 | `DIM THEME.CLR(...)` | the module owns it; re-`DIM`ing is an error | leave it alone |
-| `STRHELP.FIELD$` wanted bigger | auto-`DIM`ed at 0..10 on first use, and you cannot `DIM` it after | `DIM` it **before** the first call, set `STRHELP.MAX` |
+| `STR.FIELD$` wanted bigger | auto-`DIM`ed at 0..10 on first use, and you cannot `DIM` it after | `DIM` it **before** the first call, set `STR.MAX` |
 | `#DEFINE X 129536` | `#DEFINE` takes an **INT16** — `ERROR: INVALID PARAMETER` | an ordinary variable |
 | `RPT$(c, 0)` | raises `ILLEGAL QUANTITY` — it does not return `""` | guard the zero case |
 | a `GP.` keyword in a hand-written `.bas` | the ROM cannot `LIST` or `RUN` a `$CE7x` token | expected — compile it |

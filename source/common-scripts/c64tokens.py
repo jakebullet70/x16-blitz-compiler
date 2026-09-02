@@ -159,8 +159,8 @@ class C64TokenStore(object):
 	#
 	#		52852 was GP.PAD for a few hours on 16th August 2026, removed before it ever shipped --
 	#		padding GROWS a string, an in-place handler only ever has the block and not the
-	#		variable slot, so it could never reallocate. It is STRHELP.PAD in BASL now
-	#		(GPC-BASIC/STRHELP.INC.BL). GP.LTRIM took the slot the same day; nothing tokenised
+	#		variable slot, so it could never reallocate. It is STR.PAD in BASL now
+	#		(GPC-BASIC/STRINGS.INC.BL). GP.LTRIM took the slot the same day; nothing tokenised
 	#		with GP.PAD ever left the scratchpad, so there is no stale PRG to mis-read it.
 	#
 

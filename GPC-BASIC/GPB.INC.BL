@@ -68,7 +68,7 @@
 ## GP.STRPTR("text") is an address inside the p-code, and upper-casing it edits the
 ## program. And there is still NO GP.PAD, for the reason there never was one -- padding
 ## GROWS a string, and nothing working on the block alone can pass the capacity it was
-## born with. Use STRHELP.PAD.
+## born with. Use STR.PAD.
 
 ## GP.COMP(a$,b$) compares WITHOUT case: -1 if a$ sorts before b$, 0 if they
 ## match, 1 if after. Length breaks a tie, so "abc" sorts before "ABCD".

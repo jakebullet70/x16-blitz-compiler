@@ -1381,8 +1381,8 @@ and the editor rebuilding to the same `OK CODE 15166 FREE 6144 RT 13055` with `E
 26,899 bytes. `EDBENCH.BASL` inspected and correctly left alone -- its `REM`s are GP.ASM source.
 
 Per file, prose lines before -> after: `GPB` 376 -> 286, `GUI` 372 -> 256, `MENUVERT` 248 -> 173,
-`BMX` 248 -> 194, `SORT` 174 -> 134, `MENUBAR` 164 -> 131, `STASH` 158 -> 123, `STRHELP` 147 -> 118,
-`LINEINPUT` 142 -> 109, `STRCASE` 101 -> 80, `APPHELP` 71 -> 59, `STASHFILE` 56 -> 45, `THEME` 54 -> 45.
+`BMX` 248 -> 194, `SORT` 174 -> 134, `MENUBAR` 164 -> 131, `STASH` 158 -> 123, `STRINGS` 147 -> 118,
+`LINEINPUT` 142 -> 109, `STRCASE` 101 -> 80, `APPSYS` 71 -> 59, `STASHFILE` 56 -> 45, `THEME` 54 -> 45.
 
 **A LIBRARY CUTS LESS THAN A SAMPLE, and that is right rather than a shortfall.** The editor lost
 40%; the modules lost 20-30%, because a module's parameter table and per-routine in/out blocks are

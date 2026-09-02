@@ -15,7 +15,7 @@ rem  on screen to move around in. NOTE THAT SAVES LAND IN samples\editor -- the
 rem  editor's drive is that directory, so File>Save overwrites the real TEST.MD.
 rem  git restore samples/editor/TEST.MD puts it back.
 rem
-rem  Source: samples\editor\EDITOR.BASL + STORE.BASL, on GPB, THEME, APPHELP,
+rem  Source: samples\editor\EDITOR.BASL + STORE.BASL, on GPB, THEME, APPSYS,
 rem  STASH, MENUVERT, MENUBAR, LINEINPUT and GUI -- all shipped in
 rem  samples\editor\GPC-BASIC\ beside the sample, so a rebuild needs nothing
 rem  from GPC-BASIC\. MENUBAR draws and measures the bar; MENUVERT drives the

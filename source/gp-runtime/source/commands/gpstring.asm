@@ -300,7 +300,7 @@ UnaryGPStrPtr: ;; [gp.strptr]
 ;		variable slot, so it cannot repoint the variable at a bigger block. That capped GP.PAD at
 ;		the capacity the string was born with (StringConcrete: length+50%, min 10), so padding
 ;		"HI" to a 20 column field -- the entire point of the command -- raised OUT OF RANGE.
-;		Padding is STRHELP.PAD in GPC-BASIC/STRHELP.INC.BL, one line of BASL built on RPT$,
+;		Padding is STR.PAD in GPC-BASIC/STRINGS.INC.BL, one line of BASL built on RPT$,
 ;		where an ordinary assignment reallocates for free.
 ;
 ; ************************************************************************************************

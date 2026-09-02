@@ -5,10 +5,10 @@
 ## **
 ## **  MENUVERT.*  the menu itself, in BASIC
 ## **  THEME.*     colour roles, in BASIC data
-## **  APPHELP.*   leave the user's screen as you found it
+## **  APPSYS.*   leave the user's screen as you found it
 ## **  STASH.INC.BL  a dialog over the display, and the display back
 ## **
-## **  Build:  copy GPB.INC.BL, THEME.INC.BL, APPHELP.INC.BL,
+## **  Build:  copy GPB.INC.BL, THEME.INC.BL, APPSYS.INC.BL,
 ## **          MENUVERT.INC.BL and this file
 ## **          into testing/, then
 ## **            python source/gpc/build_basl.py MENU.EXP.BL MENU.PRG
@@ -26,7 +26,7 @@
 #SYMFILE "@:MENU.SYM"
 #INCLUDE "GPB.INC.BL"
 #INCLUDE "THEME.INC.BL"
-#INCLUDE "APPHELP.INC.BL"
+#INCLUDE "APPSYS.INC.BL"
 #INCLUDE "MENUVERT.INC.BL"
 #INCLUDE "STASH.INC.BL"
 #SAVEAS "@:MENU.PRG"
@@ -42,7 +42,7 @@
 ## ---- Remember the user's screen BEFORE changing anything, and lay out from what it
 ## ---- reports: the X16 boots 80x60 but SCREEN 0 is 40x30, so nothing below assumes.
 
-GOSUB APPHELP.STARTUP
+GOSUB APPSYS.STARTUP
 
 THEME.DARK = 0
 GOSUB THEME.LOAD
@@ -73,7 +73,7 @@ MENU.MAIN:
     GOTO MENU.MAIN
 
 MENU.QUIT:
-    GOSUB APPHELP.RESTORE
+    GOSUB APPSYS.RESTORE
     PRINT "BYE"
     END
 
@@ -82,11 +82,11 @@ MENU.QUIT:
 ## ---- THEME.DARK = 1 and nothing else.
 
 MENU.DRAW:
-    GP.FILL 0, 0, APPHELP.COLS, APPHELP.ROWS, ASC(" "), THEME.CLR(THEME.PAGE)
-    GP.FILL 0, 0, APPHELP.COLS, 1, ASC(" "), THEME.CLR(THEME.TITLE)
+    GP.FILL 0, 0, APPSYS.COLS, APPSYS.ROWS, ASC(" "), THEME.CLR(THEME.PAGE)
+    GP.FILL 0, 0, APPSYS.COLS, 1, ASC(" "), THEME.CLR(THEME.TITLE)
     GP.PRINTAT 2, 0, "GP.BASIC DEMONSTRATION", THEME.CLR(THEME.TITLE)
     GP.BOX MENU.LEFT - 1, MENU.TOP - 1, MENU.WIDE + 2, MENU.COUNT + 2, 1, THEME.CLR(THEME.BORDER)
-    GP.PRINTAT 2, APPHELP.ROWS - 1, "CURSOR KEYS, RETURN, OR N L O Q", THEME.CLR(THEME.DIMMED)
+    GP.PRINTAT 2, APPSYS.ROWS - 1, "CURSOR KEYS, RETURN, OR N L O Q", THEME.CLR(THEME.DIMMED)
     RETURN
 
 ## ---- A dialog over the display. STASH.SAVE copies what is underneath into a RAM bank

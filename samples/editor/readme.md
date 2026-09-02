@@ -17,7 +17,7 @@ source. That is the point of the sample, and the numbers below are what it bough
 | `EDITOR.SYM` | **BASLOAD's symbol file, and it is not optional** — see below |
 | `TEST.MD` | the document the editor opens, and the fixture the self-check searches |
 | `EDBENCH.BASL` | the benchmark: BASIC renderer against assembly renderer, in one program |
-| `GPC-BASIC/` | the library it `#INCLUDE`s, shipped beside it: `GPB` `THEME` `APPHELP` and the rest |
+| `GPC-BASIC/` | the library it `#INCLUDE`s, shipped beside it: `GPB` `THEME` `APPSYS` and the rest |
 
 > **`EDITOR.SYM` ships for a reason.** `{VAR}` reaches a BASIC variable through BASLOAD's own
 > `#SYMFILE` record, because BASLOAD renames every variable (`ED.ASM.VIS%` becomes something like
@@ -105,9 +105,9 @@ OK CODE 8572 FREE 11776 RT 14079 GP-BASIC IN
 - **PETSCII cost 345 bytes of p-code and nothing at run time** — 7566 → **7911**. That is the charset
   re-ordering plus the two conversions at the disk boundary and the one at the keyboard. The
   renderers did not change by a single byte, so every render figure above still stands as measured.
-- **`APPHELP` and `THEME` cost 1733 bytes of p-code and no runtime bytes** — 7911 → **9644**, THEME, APPHELP and MENUVERT together. Both are
+- **`APPSYS` and `THEME` cost 1733 bytes of p-code and no runtime bytes** — 7911 → **9644**, THEME, APPSYS and MENUVERT together. Both are
   BASIC library modules, so they are paid for in the p-code of the program that includes them and
-  nowhere else. `APPHELP.STARTUP`/`RESTORE` lean on `GP.CALL`/`GP.A`/`GP.X`/`GP.Y`, which are GP block
+  nowhere else. `APPSYS.STARTUP`/`RESTORE` lean on `GP.CALL`/`GP.A`/`GP.X`/`GP.Y`, which are GP block
   keywords — already bought and paid for by the `GP.SELECT` above, so they add nothing to `RT`.
 - **Driving `MENUVERT` properly gave 5 bytes back** — 9650 → **9645**. The hand-rolled loop over
   `MENUVERT.ROW` was not only wrong, it was bigger than `GOSUB MENUVERT.DRAW`.
@@ -195,13 +195,13 @@ VRAM; and a load→save round trip byte-for-byte identical to the original, apar
 Two things an application on somebody else's machine owes them, both from the shipped library rather
 than hand-rolled here.
 
-**Give the screen back.** `APPHELP.STARTUP` is the *first* thing `ED.INIT` does — before any screen
+**Give the screen back.** `APPSYS.STARTUP` is the *first* thing `ED.INIT` does — before any screen
 mode or colour of the editor's own — because it records the state as it finds it, so anything changed
-beforehand is what the user would be left with. `ED.QUIT` calls `APPHELP.RESTORE`, which puts back the
+beforehand is what the user would be left with. `ED.QUIT` calls `APPSYS.RESTORE`, which puts back the
 mode, the **charset** and the text colour. The editor runs 80x30, and someone who prefers 40x30 gets
 40x30 back.
 
-**The charset had to be taught to `APPHELP`**, and it is worth knowing why it was missing. `$FF62`
+**The charset had to be taught to `APPSYS`**, and it is worth knowing why it was missing. `$FF62`
 only *sets* a charset — there is no "get" call — so it looked unrecoverable. It is not: **`$0372`
 holds the charset number outright**, reading `2` at boot and reading back exactly what was last set,
 1 to 7. That is probed, not documented. Without it `ED.QUIT` hardcoded charset 3, so anyone who
