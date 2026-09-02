@@ -6,12 +6,6 @@
 ## **      MENUVERT.DRAW   draw it without driving it
 ## **      MENUVERT.ROW    one row, in whichever attribute you name
 ## **
-## **  THIS REPLACES THE GP.MENU KEYWORD, 462 bytes of assembly in a block every GPB
-## **  program carried. It was assembly because the highlight had to move without the
-## **  runtime knowing what text lay under it, so it swapped attribute nibbles rather
-## **  than redrawing -- and a menu written in BASIC OWNS the item array, so it can
-## **  just print the row again. Redrawing two rows costs about a millisecond against
-## **  the swap's half, on a 16.7ms frame.
 ## **
 ## **  Usage:
 ## **      MENUVERT.X = 8 : MENUVERT.Y = 6
@@ -146,7 +140,7 @@ MENUVERT.WAIT:
 ## ---- one comparison, and it cannot leak whatever the runtime does later.
 
 MENUVERT.KEYED:
-    MENUVERT.DONE = 0
+    MENUVERT.DONE = 0 : MENUVERT.HOTHIT = 0
     MENUVERT.PREVSEL = MENUVERT.SEL
     GP.SELECT MENUVERT.CODE
         GP.CASE MENUVERT.UP
@@ -214,6 +208,11 @@ MENUVERT.CANCEL:
 ## ---- KEYEXIT leaves MENUVERT.SEL ALONE, which is the whole difference from ESC
 ## ---- returning 0: it lets a caller tell "went elsewhere, from row 3" from
 ## ---- "cancelled". Reached only when the hotkeys did not claim the key.
+## ----
+## ---- AND THAT IS WHY MENUVERT.HOTHIT EXISTS. Both exits leave DONE = 1 and KEY = the
+## ---- character, so without it a KEYEXIT caller cannot tell "a hotkey chose row 3" from
+## ---- "a key I must handle came back, and SEL is still 3 from before". 1 means the
+## ---- hotkeys claimed the key and SEL is the row they chose.
 
 MENUVERT.KEYBACK:
     IF (MENUVERT.FLAGS AND MENUVERT.KEYEXIT) <> 0 THEN MENUVERT.DONE = 1
@@ -238,7 +237,7 @@ MENUVERT.HOTKEY:
     FOR MENUVERT.SCAN = 1 TO MENUVERT.HOTLAST
         MENUVERT.HOTCODE = ASC(MID$(MENUVERT.HOT$, MENUVERT.SCAN, 1))
         IF MENUVERT.HOTCODE > 96 THEN GOSUB MENUVERT.FOLDHC
-        IF MENUVERT.HOTCODE = MENUVERT.WANTCODE THEN MENUVERT.SEL = MENUVERT.SCAN : MENUVERT.DONE = 1
+        IF MENUVERT.HOTCODE = MENUVERT.WANTCODE THEN MENUVERT.SEL = MENUVERT.SCAN : MENUVERT.DONE = 1 : MENUVERT.HOTHIT = 1
     NEXT
     RETURN
 
@@ -265,8 +264,7 @@ MENUVERT.FOLDHC:
 ## ***********************************************************************
 
 MENUVERT.PADKEY:
-    MENUVERT.CODE = 0
-    GOSUB MENUVERT.PADREAD
+    MENUVERT.CODE = 0 : GOSUB MENUVERT.PADREAD
     MENUVERT.PADNEW = MENUVERT.PADNOW AND (255 - MENUVERT.PADHELD)
     MENUVERT.PADHELD = MENUVERT.PADNOW
     IF (MENUVERT.PADNEW AND MENUVERT.PAD.UP) <> 0 THEN MENUVERT.CODE = MENUVERT.UP : RETURN
@@ -348,12 +346,16 @@ MENUVERT.ROW:
 ## **  for THIS row, or a row whose text does not contain its own hotkey -- that last
 ## **  being a caller's choice, since " QUIT" with hotkey X still works as a hotkey.
 ## **
+## **  A match at a WORD START wins over an earlier one inside a word: "Save As" with
+## **  hotkey A must light the A of "As", not the a of "Save". No word start, first
+## **  occurrence -- the x of "Exit" still lights.
+## **
 ## **  ITS OWN SCAN VARIABLES, not MENUVERT.HOTKEY's. The two never run at once today,
 ## **  but sharing a loop counter is a trap set for whoever changes that order.
 ## ***********************************************************************
 
 MENUVERT.HOTFIND:
-    MENUVERT.HOTAT = 0
+    MENUVERT.HOTAT = 0 : MENUVERT.HOTANY = 0 : MENUVERT.HOTPREV = 32
     IF MENUVERT.HOT$ = "" THEN RETURN
     IF MENUVERT.DRAWROW > LEN(MENUVERT.HOT$) THEN RETURN
     MENUVERT.HOTWANT = ASC(MID$(MENUVERT.HOT$, MENUVERT.DRAWROW, 1))
@@ -361,8 +363,11 @@ MENUVERT.HOTFIND:
     FOR MENUVERT.HOTSCAN = 1 TO LEN(MENUVERT.DRAWTEXT$)
         MENUVERT.HOTHERE = ASC(MID$(MENUVERT.DRAWTEXT$, MENUVERT.HOTSCAN, 1))
         IF MENUVERT.HOTHERE > 96 THEN GOSUB MENUVERT.FOLDHOTHERE
-        IF MENUVERT.HOTHERE = MENUVERT.HOTWANT AND MENUVERT.HOTAT = 0 THEN MENUVERT.HOTAT = MENUVERT.HOTSCAN
+        IF MENUVERT.HOTHERE = MENUVERT.HOTWANT AND MENUVERT.HOTANY = 0 THEN MENUVERT.HOTANY = MENUVERT.HOTSCAN
+        IF MENUVERT.HOTHERE = MENUVERT.HOTWANT AND MENUVERT.HOTPREV = 32 AND MENUVERT.HOTAT = 0 THEN MENUVERT.HOTAT = MENUVERT.HOTSCAN
+        MENUVERT.HOTPREV = MENUVERT.HOTHERE
     NEXT
+    IF MENUVERT.HOTAT = 0 THEN MENUVERT.HOTAT = MENUVERT.HOTANY
     RETURN
 
 ## ---- Guarded subroutines, not ANDed lines -- see the note at MENUVERT.FOLDWANT.

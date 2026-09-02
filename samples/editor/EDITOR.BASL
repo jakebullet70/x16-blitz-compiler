@@ -382,7 +382,8 @@ REM item text on demand, which is what ED.DRAW.DROPDOWN hangs the panel from. ME
 REM stays because it is the DROPDOWN's width, and a bar has no column width.
 ED.MENU.SETUP:
   MENU.COUNT = 3
-  DIM MENU.NAME$(3) : DIM MENU.ITEMS(3) : DIM MENU.WIDTH(3) : 
+  DIM MENU.NAME$(3) : DIM MENU.ITEMS(3) : DIM MENU.WIDTH(3)
+  DIM MENU.ITEMHOT$(3) : REM one accelerator letter per ITEM, one string per menu
   DIM MENU.ITEM$(24) : REM flat: menu * 8 + item
   DIM MENUVERT.ITEM$(8) : REM MENUVERT leaves its item array to the caller
   DIM ED.ALTK(8) : DIM ED.ALTV(8) : REM layout bytes ED.ALTKEYS overwrites, to put back
@@ -394,6 +395,14 @@ ED.MENU.SETUP:
   MENU.NAME$(2) = "Help" : MENU.ITEMS(2) = 1
   MENU.ITEM$(16) = "About"
   MENU.HOT$ = "FSH" : REM the initials, for the bar's accelerator tint and its hotkeys
+  REM ONE LETTER PER ITEM, IN ITEM ORDER, and it does not have to be the initial: Save
+  REM and Save As... both start with S, so the second takes its A. MENUVERT matches
+  REM without case and tints the letter at a word start where it can find one -- the A
+  REM of "As", not the a of "Save". A letter not in the item at all is still a working
+  REM accelerator; it just does not light up.
+  MENU.ITEMHOT$(0) = "NOSAX" : REM New Open Save saveAs eXit
+  MENU.ITEMHOT$(1) = "FG"    : REM Find, Go to line
+  MENU.ITEMHOT$(2) = "A"     : REM About
   FOR MENU.I = 0 TO MENU.COUNT - 1
     MENU.W = LEN(MENU.NAME$(MENU.I))
     FOR MENU.J = 0 TO MENU.ITEMS(MENU.I) - 1
@@ -604,11 +613,15 @@ ED.OPEN.MENUBAR:
 ED.MENU.OPEN:
   GOSUB ED.DRAW.DROPDOWN : MENUVERT.SEL = MENU.SEL + 1
   MENUVERT.FLAGS = MENUVERT.KEYEXIT
-  REM No hotkeys ON THE ITEMS: a letter here means a MENU, and it is handed back below.
-  REM ED.DRAW.DROPDOWN has already set HOTATTR to 0 for the same reason.
-  MENUVERT.HOT$ = "" : GOSUB MENUVERT.RUN
+  REM A letter is now an ITEM's accelerator first and a MENU's second: MENUVERT gets the
+  REM open menu's letters, and only a key its hotkeys did NOT claim is handed back below
+  REM to ED.MENU.LETTER. MENUVERT.HOTHIT is how the two are told apart -- both exits leave
+  REM KEY holding the character.
+  REM ED.DRAW.DROPDOWN above set MENUVERT.HOT$ to this menu's accelerator letters.
+  GOSUB MENUVERT.RUN
   IF MENUVERT.SEL = 0 THEN GOSUB ED.MENU.CANCEL : RETURN
   MENU.SEL = MENUVERT.SEL - 1
+  IF MENUVERT.HOTHIT = 1 THEN GOSUB ED.MENU.SELECT : RETURN
   IF MENUVERT.KEY = 13 THEN GOSUB ED.MENU.SELECT : RETURN
   REM ED.RENDER.MENUBAR IS NOT IN THIS LOOP, and that is the point: it bands the whole row
   REM and re-prints the document name, eighty cells to move a highlight two. The movers
@@ -1183,7 +1196,13 @@ ED.DRAW.DROPDOWN:
   REM framed hole in the document rather than a card laid on it. Only the selected row
   REM breaks it, which is the point of a highlight bar.
   MENUVERT.ATTR    = THEME.CLR(THEME.TEXT) : MENUVERT.HIATTR  = THEME.CLR(THEME.TITLE)
-  MENUVERT.HOTATTR = 0 : REM no hotkey tint: ALT+letter opens a MENU, not an item
+  REM THE ACCELERATOR LETTERS BELONG TO THE OPEN MENU'S ITEMS, and they must be set BEFORE
+  REM the rows are drawn -- MENUVERT.ROW tints from MENUVERT.HOT$ as it prints each row, so
+  REM setting them at the call to RUN is one draw too late and tints nothing.
+  MENUVERT.HOT$ = MENU.ITEMHOT$(MENU.ACTIVE)
+  REM BORDER's FOREGROUND over the ROW's OWN BACKGROUND. Taking the whole attribute would
+  REM paint one cell of the bar's blue into a black row -- a gap in the row, not a hotkey.
+  MENUVERT.HOTATTR = THEME.CLR(THEME.TEXT) - MOD(THEME.CLR(THEME.TEXT), 16) + MOD(THEME.CLR(THEME.BORDER), 16)
   REM MENUVERT.ITEM$ is 1 based, MENU.SEL 0 based off the flat MENU.ITEM$ table. Converted
   REM once here rather than at each use.
   FOR ED.DD.I = 1 TO ED.DD.N
@@ -1328,6 +1347,19 @@ ED.SELFCHECK:
     ED.DDS$ = ED.DDS$ + STR$(VPEEK(1, 45056 + ED.QR * 256 + (ED.DD.COL + 1) * 2))
   NEXT ED.QR
   PRINT "DDROWS";ED.DDS$
+  REM THE ACCELERATOR TINT, WHICH NO CHARACTER READ CAN SEE -- it is an ATTRIBUTE, so DDROWS
+  REM above is green whether the letters light up or not. Four cells say all of it. Row 1 is
+  REM New AND the highlighted row, which MENUVERT.ROW deliberately leaves alone. Row 2 is
+  REM Open, whose O is its first letter. Row 4 is "Save As...", hotkey A: its S must stay
+  REM plain and the A of "As" -- column +6, not the a of "Save" at +2 -- must be the lit one.
+  ED.DDT$ = ""
+  ED.DDT$ = ED.DDT$ + STR$(VPEEK(1, 45056 + 2 * 256 + (ED.DD.COL + 1) * 2 + 1))
+  ED.DDT$ = ED.DDT$ + STR$(VPEEK(1, 45056 + 3 * 256 + (ED.DD.COL + 1) * 2 + 1))
+  ED.DDT$ = ED.DDT$ + STR$(VPEEK(1, 45056 + 5 * 256 + (ED.DD.COL + 1) * 2 + 1))
+  ED.DDT$ = ED.DDT$ + STR$(VPEEK(1, 45056 + 5 * 256 + (ED.DD.COL + 2) * 2 + 1))
+  ED.DDT$ = ED.DDT$ + STR$(VPEEK(1, 45056 + 5 * 256 + (ED.DD.COL + 6) * 2 + 1))
+  PRINT "DDTINT";ED.DDT$;" HOT=";MENUVERT.HOTATTR;" PLAIN=";MENUVERT.ATTR
+  PRINT "DDTINT WANT HI HOT PLAIN PLAIN HOT"
   ED.MSG$ = "HELLO" : GOSUB ED.INFO.MSG
   ED.SR = SCREEN.ROWS - 1
   PRINT "MSG CH=";VPEEK(1, 45056 + ED.SR * 256 + 2);" AT=";VPEEK(1, 45056 + ED.SR * 256 + 3)
