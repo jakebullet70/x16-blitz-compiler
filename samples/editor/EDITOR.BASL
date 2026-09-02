@@ -24,6 +24,18 @@ REM Index 0 is transparent BY HARDWARE, and the chrome now has the document behi
 REM black needs an index that is not 0. Five is free in both themes, in either nibble.
 #DEFINE ED.BLK 5
 
+REM The line-number gutter: ED.GUT.D digit columns, then blanks out to ED.GUT.W. Everything
+REM that turns a document position into a cell adds ED.GUT.W -- the row renderer and the
+REM caret, and nothing else: the horizontal scroll already works in ED.TEXT.WIDTH, which
+REM shrinks by the same amount.
+REM
+REM ED.GUT.W MUST BE EVEN. ED.ROW.STREAM writes TWO CELLS AT A TIME through VERA's FX
+REM cache, and that write is 4-BYTE ALIGNED: it lands at address AND NOT 3, so a text
+REM column of 5 (byte 10) silently renders at column 4 and eats the gutter's last cell.
+REM Column 0 was always aligned, which is why nothing here ever had to know that.
+#DEFINE ED.GUT.D 4
+#DEFINE ED.GUT.W 6
+
 #INCLUDE "GPB.INC.BL"
 #INCLUDE "THEME.INC.BL"
 #INCLUDE "APPSYS.INC.BL"
@@ -294,11 +306,12 @@ ED.INIT:
   SCREEN.COLS = GP.X : SCREEN.ROWS = GP.Y
   IF SCREEN.COLS < 20 THEN SCREEN.COLS = 80
   IF SCREEN.ROWS < 8 THEN SCREEN.ROWS = 60
-  ED.TEXT.WIDTH  = SCREEN.COLS
+  ED.TEXT.WIDTH  = SCREEN.COLS - ED.GUT.W
   ED.TEXT.BOTTOM = SCREEN.ROWS - 2
   ED.TEXT.ROWS   = SCREEN.ROWS - 2
   ED.ATTR.TEXT   = THEME.CLR(THEME.TEXT)
   ED.ATTR.CARET  = THEME.CLR(THEME.HILITE)
+  ED.ATTR.GUT    = THEME.CLR(THEME.DIMMED)
   ED.QUIET = 0 : ED.SIM.MODE = 0 : ED.EXIT.FLAG = 0 : ED.LAST.MSG$ = ""
   REM ---- hardware vertical scroll setup (see ED.DO.SCROLL) ----
   REM VERA's L1_VSCROLL ($9F39/$9F3A, map pixels, 8 a text row) scrolls the layer, so a
@@ -1051,7 +1064,8 @@ REM   the edited line  MODE 1, read out of ED.CUR.LINE$ itself, past its 3-byte 
 REM   past the end     MODE 0 with ED.ASM.VIS% = 0 -- every cell is a space, and the source
 REM                    address is never dereferenced, so what it holds does not matter
 ED.RENDER.ROW:
-  ED.ASM.BASE% = (ED.SCREEN.ROW + ED.MAP.TOP) * 256 : REM layer 0's map, VRAM $00000
+  GOSUB ED.GUTTER
+  ED.ASM.BASE% = (ED.SCREEN.ROW + ED.MAP.TOP) * 256 + ED.GUT.W * 2 : REM layer 0, past the gutter
   ED.ASM.ATTR% = ED.ATTR.TEXT : ED.ASM.WIDTH% = ED.TEXT.WIDTH : ED.ASM.MODE% = 0 : ED.ASM.VIS% = 0
   IF ED.DOC.LINE >= LINE.COUNT THEN GOTO ED.ROW.STREAM
   IF ED.DOC.LINE = ED.CUR.ROW THEN GOTO ED.ROW.LIVE
@@ -1135,6 +1149,30 @@ ED.ROW.STREAM:
   #REM 0
   RETURN
 
+REM ---- the line number for ED.SCREEN.ROW / ED.DOC.LINE, layer 0, right aligned ----
+REM DIGITS, NOT A STRING. STR$ would allocate on every row of every repaint, and a block is
+REM never given back -- that is what cost the FIND path 579 bytes and the self-check its
+REM workspace. Four cells written low digit first, blank once the number runs out, then the
+REM separator column. Past the end of the document there is no number, so the whole gutter
+REM is blank -- the same nothing the text area shows there.
+REM
+REM It rides on layer 0 with the document because it SCROLLS WITH THE TEXT: layer 1 is what
+REM stays put, which is why ED.PUT.FIELD cannot draw this.
+ED.GUTTER:
+  ED.GA = (ED.SCREEN.ROW + ED.MAP.TOP) * 256
+  ED.GN = ED.DOC.LINE + 1
+  IF ED.DOC.LINE >= LINE.COUNT THEN ED.GN = 0
+  ED.GX = ED.GUT.D - 1
+ED.GUT.DIGIT:
+  ED.GC = 32
+  IF ED.GN > 0 THEN ED.GT = INT(ED.GN / 10) : ED.GC = 48 + ED.GN - ED.GT * 10 : ED.GN = ED.GT
+  VPOKE 0, ED.GA + ED.GX * 2, ED.GC : VPOKE 0, ED.GA + ED.GX * 2 + 1, ED.ATTR.GUT
+  ED.GX = ED.GX - 1 : IF ED.GX >= 0 THEN GOTO ED.GUT.DIGIT
+  REM the blank columns between the digits and the text: two cells, not a loop
+  VPOKE 0, ED.GA + ED.GUT.D * 2, 32 : VPOKE 0, ED.GA + ED.GUT.D * 2 + 1, ED.ATTR.GUT
+  VPOKE 0, ED.GA + ED.GUT.D * 2 + 2, 32 : VPOKE 0, ED.GA + ED.GUT.D * 2 + 3, ED.ATTR.GUT
+  RETURN
+
 REM Caret = one inverted attribute cell, remembered so a cursor move can restore it
 REM (ED.UNCARET) instead of repainting the screen.
 ED.PLACE.CARET:
@@ -1143,7 +1181,7 @@ ED.PLACE.CARET:
   ED.CARET.VALID = 0
   IF ED.CARET.SROW < 1 OR ED.CARET.SROW > ED.TEXT.BOTTOM THEN RETURN
   IF ED.CARET.SCOL < 0 OR ED.CARET.SCOL >= ED.TEXT.WIDTH THEN RETURN
-  ED.CARET.ADDR = (ED.CARET.SROW + ED.MAP.TOP) * 256 + ED.CARET.SCOL * 2 + 1
+  ED.CARET.ADDR = (ED.CARET.SROW + ED.MAP.TOP) * 256 + (ED.CARET.SCOL + ED.GUT.W) * 2 + 1
   VPOKE 0, ED.CARET.ADDR, ED.ATTR.CARET : ED.CARET.VALID = 1
   RETURN
 
@@ -1415,14 +1453,18 @@ ED.SELFCHECK:
   REM Every text cell must be char + ED.ATTR.TEXT, on content rows and blank rows alike.
   DOC.FILE.NAME$ = "TEST.MD" : GOSUB ED.OPEN.FILE
   GOSUB ED.UNCARET
-  PRINT "TR CH=";VPEEK(0, 256);" AT=";VPEEK(0, 257)
-  PRINT "A10 AT=";VPEEK(0, 10 * 256 + 41)
+  PRINT "TR CH=";VPEEK(0, 256 + ED.GUT.W * 2);" AT=";VPEEK(0, 257 + ED.GUT.W * 2)
+  REM ---- the gutter. Screen row 1 is document line 1, right aligned in ED.GUT.W - 1
+  REM ---- columns with a blank separator, all of it in the DIMMED attribute. Every cell
+  REM ---- is read, not one sampled: a gutter with a digit missing looks fine in a sample.
+  PRINT "GUT";VPEEK(0, 256);VPEEK(0, 258);VPEEK(0, 260);VPEEK(0, 262);VPEEK(0, 264);VPEEK(0, 266);" (want 32 32 32 49 32 32)"
+  PRINT "A10 AT=";VPEEK(0, 10 * 256 + 41 + ED.GUT.W * 2)
   REM ...and layer 1 over the document must be TRANSPARENT, or none of it would show: 32/0.
-  PRINT "A20 AT=";VPEEK(0, 20 * 256 + 61);" OVL=";VPEEK(1, 47696);VPEEK(1, 47697)
+  PRINT "A20 AT=";VPEEK(0, 20 * 256 + 61 + ED.GUT.W * 2);" OVL=";VPEEK(1, 47696);VPEEK(1, 47697)
   REM caret place/restore (the O(1) cursor-move primitive)
   ED.CUR.ROW = 0 : ED.CUR.COL = 0 : ED.TOP.LINE = 0 : ED.LEFT.COL = 0
-  GOSUB ED.PLACE.CARET : PRINT "CARET AT=";VPEEK(0, 257)
-  GOSUB ED.UNCARET : PRINT "UNCARET AT=";VPEEK(0, 257)
+  GOSUB ED.PLACE.CARET : PRINT "CARET AT=";VPEEK(0, 257 + ED.GUT.W * 2)
+  GOSUB ED.UNCARET : PRINT "UNCARET AT=";VPEEK(0, 257 + ED.GUT.W * 2)
 
   REM ---- hardware VSCROLL: register writes + map-offset render + rewind bound ----
   PRINT "MAPH=";ED.MAP.H;" MAXTOP=";ED.MAP.MAXTOP;" HWOK=";ED.HW.OK
@@ -1458,10 +1500,10 @@ ED.SELFCHECK:
   NEXT ED.T
   PRINT "WALK CUR=";ED.CUR.ROW;" TOP=";ED.TOP.LINE;" MAPTOP=";ED.MAP.TOP;" VSL=";PEEK(40754)
   ED.MR = 1 + ED.MAP.TOP
-  PRINT "WTOP DOC=";ED.TOP.LINE;" MAPCH=";VPEEK(0, ED.MR * 256);VPEEK(0, ED.MR * 256 + 2)
+  PRINT "WTOP DOC=";ED.TOP.LINE;" MAPCH=";VPEEK(0, ED.MR * 256 + ED.GUT.W * 2);VPEEK(0, ED.MR * 256 + 2 + ED.GUT.W * 2)
   ED.MR = ED.TEXT.BOTTOM + ED.MAP.TOP
   ED.BL = ED.TOP.LINE + ED.TEXT.BOTTOM - 1
-  PRINT "WBOT DOC=";ED.BL;" MAPCH=";VPEEK(0, ED.MR * 256);VPEEK(0, ED.MR * 256 + 2)
+  PRINT "WBOT DOC=";ED.BL;" MAPCH=";VPEEK(0, ED.MR * 256 + ED.GUT.W * 2);VPEEK(0, ED.MR * 256 + 2 + ED.GUT.W * 2)
   ED.MAP.TOP = 0 : GOSUB ED.SET.VSCROLL
   ED.QUIET = 1 : MENU.ACTIVE = 0 - 1
 
