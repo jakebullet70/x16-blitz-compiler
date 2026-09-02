@@ -1364,40 +1364,24 @@ want to be `GUILIST.INC.BL` beside it rather than inside it.
 `kbdbuf_put`, and read the map back with `VPEEK` before printing anything. And walk every row of the
 panel, not one sampled cell — that lesson has already cost a shipped dropdown with rows missing.
 
-### The editor wants LINE NUMBERS down the left
+### The editor has LINE NUMBERS down the left — DONE
 
-A gutter of right-aligned line numbers, and it is mostly a geometry change rather than a drawing
-one.
+Shipped 2026-09-02: four digit columns and two blanks, right aligned, `THEME.DIMMED`, blank past
+the end of the document. On **layer 0**, because it scrolls with the text. Digits are VPOKEd, not
+`STR$`-ed -- a string per row on the scroll path is an allocation per row, and blocks do not come
+back. `ED.GUT.W` is added by exactly two places, the row renderer and the caret; the horizontal
+scroll follows for free because it already works in `ED.TEXT.WIDTH`.
 
-**What moves.** `ED.TEXT.WIDTH` is `SCREEN.COLS` today and the row renderer writes from map column
-0; a gutter makes the text start at `ED.GUT.W` and the width `SCREEN.COLS - ED.GUT.W`. Everything
-that turns a document position into a cell adds the same offset: `ED.ASM.BASE%` in `ED.RENDER.ROW`
-and `ED.CARET.ADDR` in `ED.PLACE.CARET` (`ED.CARET.SCOL * 2 + 1` today). Nothing else -- the
-horizontal scroll already works in `ED.TEXT.WIDTH`, so it follows for free.
+**THE TEXT COLUMN MUST BE EVEN, and this is the finding worth keeping.** `ED.ROW.STREAM` writes two
+cells at a time through VERA's **FX cache, and that write is 4-BYTE ALIGNED** -- it lands at
+`address AND NOT 3`. A 5-column gutter put the text base at byte 10, which rounded down to byte 8:
+the document rendered one column left and ate the gutter's last cell, and the only reason this had
+never bitten is that column 0 is aligned. Anything else that ever wants an odd column out of that
+block -- `ED.PUT.FIELD` included -- has the same trap waiting.
 
-**The gutter belongs on LAYER 0, with the document.** It scrolls with the text, which is the whole
-distinction the layer split draws: layer 1 is what stays put. So it cannot use `ED.PUT.FIELD`,
-which writes layer 1 at a screen row. It is painted per row -- in `ED.RENDER.ROW`, and in the
-one-row paints `ED.HW.SCROLL.DOWN` / `.UP` do after a hardware scroll.
-
-**Do not build a string per row.** `STR.PADL` (`STRINGS.INC.BL`) is the obvious first cut for
-right-aligning `STR$(n)`, but the render path runs per keystroke and a string per row per repaint
-is an allocation per keystroke -- the cost the string-heap work was chasing. Writing the digits
-straight into the map, in the `GP.ASM` block that already draws the row, is the version that
-survives a scroll benchmark. Measure with `EDBENCH.BASL`.
-
-**Two decisions worth making up front.** Whether the width is FIXED (4 columns, say, and the text
-never re-lays-out) or grows with `LINE.COUNT` -- the growing one repaints the whole screen at 999
--> 1000 and shifts the caret while someone is typing. And whether it is a toggle: a View item on
-the menu bar, or a `#DEFINE` and no runtime cost at all.
-
-**Cost.** BASL, no keyword. But the doc-present self-check is still ~600 bytes short of the
-workspace ceiling, so this lands on a program that does not currently fit with a document open --
-check the size before, not after.
-
-Test it the way the rest of the editor is tested: `VPEEK` bank **0** for the gutter (the document
-is layer 0 now), read cells into strings before printing anything, and walk the whole column
-rather than sampling one cell.
+Cost 298 bytes, which is one page of workspace (16,057 -> 16,355, `FREE` 5,120 -> 4,864). **The page
+is recoverable**: fold the gutter into `ED.ROW.STREAM`, which already has VERA pointed at the row,
+instead of a separate routine full of VPOKEs.
 
 ### Comment density — DONE, editor, library and examples
 
