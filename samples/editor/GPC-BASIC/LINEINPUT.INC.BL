@@ -82,10 +82,8 @@ GOTO LINEINPUT.MODULE.END
 
 LINEINPUT.GET:
     LINEINPUT.INV = (LINEINPUT.ATTR AND 15) * 16 + INT(LINEINPUT.ATTR / 16)
-    LINEINPUT.WAS$ = LINEINPUT.TEXT$
-    LINEINPUT.POS = LEN(LINEINPUT.TEXT$)
-    LINEINPUT.DONE = 0 : LINEINPUT.KEY = 0
-    LINEINPUT.LIT = 1  : LINEINPUT.TICK = TI
+    LINEINPUT.WAS$ = LINEINPUT.TEXT$ : LINEINPUT.POS = LEN(LINEINPUT.TEXT$)
+    LINEINPUT.DONE = 0 : LINEINPUT.KEY = 0 : LINEINPUT.LIT = 1  : LINEINPUT.TICK = TI
 
 LINEINPUT.REDRAW:
     GOSUB LINEINPUT.RENDER
@@ -100,8 +98,7 @@ LINEINPUT.WAIT:
     GET LINEINPUT.K$
     IF LINEINPUT.K$ <> "" THEN GOTO LINEINPUT.KEYED
     IF TI < LINEINPUT.TICK THEN GOTO LINEINPUT.WAIT
-    LINEINPUT.TICK = TI + LINEINPUT.BLINK
-    LINEINPUT.LIT = 1 - LINEINPUT.LIT
+    LINEINPUT.TICK = TI + LINEINPUT.BLINK : LINEINPUT.LIT = 1 - LINEINPUT.LIT
     GOSUB LINEINPUT.CURSOR : GOTO LINEINPUT.WAIT
 
 ## ---- Seven control codes scattered across 256, which ON x GOSUB cannot index: the
@@ -111,35 +108,24 @@ LINEINPUT.WAIT:
 LINEINPUT.KEYED:
     LINEINPUT.CODE = ASC(LINEINPUT.K$)
     GP.SELECT LINEINPUT.CODE
-        GP.CASE LINEINPUT.RETURN
-            LINEINPUT.DONE = 1
+        GP.CASE LINEINPUT.RETURN : LINEINPUT.DONE = 1
         GP.CASE LINEINPUT.ESCAPE, LINEINPUT.STOP
-            LINEINPUT.TEXT$ = LINEINPUT.WAS$
-            LINEINPUT.POS = LEN(LINEINPUT.TEXT$)
-            LINEINPUT.DONE = 1
+            LINEINPUT.TEXT$ = LINEINPUT.WAS$ : LINEINPUT.POS = LEN(LINEINPUT.TEXT$) : LINEINPUT.DONE = 1
         GP.CASE LINEINPUT.DOWN, LINEINPUT.UP, LINEINPUT.TAB
             LINEINPUT.DONE = 1
-        GP.CASE LINEINPUT.LEFT
-            IF LINEINPUT.POS > 0 THEN LINEINPUT.POS = LINEINPUT.POS - 1
-        GP.CASE LINEINPUT.RIGHT
-            IF LINEINPUT.POS < LEN(LINEINPUT.TEXT$) THEN LINEINPUT.POS = LINEINPUT.POS + 1
-        GP.CASE LINEINPUT.HOME
-            LINEINPUT.POS = 0
-        GP.CASE LINEINPUT.END
-            LINEINPUT.POS = LEN(LINEINPUT.TEXT$)
-        GP.CASE LINEINPUT.DELETE
-            GOSUB LINEINPUT.RUBOUT
-        GP.OTHER
-            GOSUB LINEINPUT.TYPED
+        GP.CASE LINEINPUT.LEFT   : IF LINEINPUT.POS > 0 THEN LINEINPUT.POS = LINEINPUT.POS - 1
+        GP.CASE LINEINPUT.RIGHT  : IF LINEINPUT.POS < LEN(LINEINPUT.TEXT$) THEN LINEINPUT.POS = LINEINPUT.POS + 1
+        GP.CASE LINEINPUT.HOME   : LINEINPUT.POS = 0
+        GP.CASE LINEINPUT.END    : LINEINPUT.POS = LEN(LINEINPUT.TEXT$)
+        GP.CASE LINEINPUT.DELETE : GOSUB LINEINPUT.RUBOUT
+        GP.OTHER                 : GOSUB LINEINPUT.TYPED
     GP.ENDSEL
-    LINEINPUT.KEY = LINEINPUT.CODE
-    IF LINEINPUT.DONE = 0 THEN GOTO LINEINPUT.REDRAW
+    LINEINPUT.KEY = LINEINPUT.CODE : IF LINEINPUT.DONE = 0 THEN GOTO LINEINPUT.REDRAW
 
 ## ---- Redraw once with no cursor, so a finished field is not still blinking at a user
 ## ---- who has moved on.
 
-    LINEINPUT.LIT = 0
-    GOSUB LINEINPUT.RENDER
+    LINEINPUT.LIT = 0 : GOSUB LINEINPUT.RENDER
     GP.FILL LINEINPUT.X, LINEINPUT.Y, LINEINPUT.LEN, 1, LINEINPUT.SPACE, LINEINPUT.ATTR
     IF LINEINPUT.SHOW$ <> "" THEN GP.PRINTAT LINEINPUT.X, LINEINPUT.Y, LINEINPUT.SHOW$, LINEINPUT.ATTR
     RETURN
@@ -152,33 +138,29 @@ LINEINPUT.KEYED:
 ## ---- OK CODE and ASK would have thrown SYNTAX ERROR the first time it was called.
 ## ---- Nothing in the tree calls ASK, which is the only reason it went unseen.
 LINEINPUT.ASK:
-    LINEINPUT.SAVEX = LINEINPUT.X
-    GP.PRINTAT LINEINPUT.X, LINEINPUT.Y, LINEINPUT.LABEL$, LINEINPUT.ATTR
+    LINEINPUT.SAVEX = LINEINPUT.X : GP.PRINTAT LINEINPUT.X, LINEINPUT.Y, LINEINPUT.LABEL$, LINEINPUT.ATTR
     LINEINPUT.X = LINEINPUT.X + LEN(LINEINPUT.LABEL$)
-    GOSUB LINEINPUT.GET
-    LINEINPUT.X = LINEINPUT.SAVEX
+    GOSUB LINEINPUT.GET : LINEINPUT.X = LINEINPUT.SAVEX
     RETURN
 
 ## ***********************************************************************
 ## **  LINEINPUT.TYPED -- accept a printable character, if there is room.
 ## **
-## **  Written as separate IFs rather than one ANDed condition on purpose:
-## **  AND sits BELOW the comparisons in the precedence table, so a single
-## **  line would be reading correctly by luck rather than by design, and it
-## **  is the kind of thing that only shows up on the one code it gets
-## **  wrong. $80-$9F are the PETSCII control codes -- colours, cursor
-## **  moves, reverse on and off -- and putting one in a string means it
-## **  takes effect on the way out, which is why they are refused here.
+## **  Refused: below 32, DEL, and $80-$9F -- the PETSCII control codes,
+## **  colours and cursor moves and reverse on and off, which would take
+## **  effect on the way OUT if they were let into the string.
+## **
+## **  $80-$9F used to be a flag raised by one IF and lowered by the next,
+## **  written on the belief that AND binds tighter than the comparisons
+## **  around it. It does not: comparisons bind tighter, which is why
+## **  ED.KEY >= 32 AND ED.KEY <= 126 has always worked in the editor. One
+## **  range test says what the flag was spelling out.
 ## ***********************************************************************
 
 LINEINPUT.TYPED:
     IF LEN(LINEINPUT.TEXT$) >= LINEINPUT.LEN THEN RETURN
-    IF LINEINPUT.CODE < 32 THEN RETURN
-    IF LINEINPUT.CODE = 127 THEN RETURN
-    LINEINPUT.BAR = 0
-    IF LINEINPUT.CODE > 127 THEN LINEINPUT.BAR = 1
-    IF LINEINPUT.CODE > 159 THEN LINEINPUT.BAR = 0
-    IF LINEINPUT.BAR = 1 THEN RETURN
+    IF LINEINPUT.CODE < 32 OR LINEINPUT.CODE = 127 THEN RETURN
+    IF LINEINPUT.CODE > 127 AND LINEINPUT.CODE < 160 THEN RETURN
 
 ## ---- INSERTED AT THE CARET, not appended. With the caret at the end --
 ## ---- where it starts, and where it stays unless someone moves it --
@@ -208,10 +190,8 @@ LINEINPUT.RUBOUT:
 ## ---- RPT$ raises an error on a count of zero, hence the guard.
 
 LINEINPUT.RENDER:
-    LINEINPUT.SHOW$ = LINEINPUT.TEXT$
-    IF LINEINPUT.MASK = 0 THEN RETURN
-    LINEINPUT.SHOW$ = ""
-    IF LEN(LINEINPUT.TEXT$) > 0 THEN LINEINPUT.SHOW$ = RPT$(LINEINPUT.STAR, LEN(LINEINPUT.TEXT$))
+    LINEINPUT.SHOW$ = LINEINPUT.TEXT$ : IF LINEINPUT.MASK = 0 THEN RETURN
+    LINEINPUT.SHOW$ = "" : IF LEN(LINEINPUT.TEXT$) > 0 THEN LINEINPUT.SHOW$ = RPT$(LINEINPUT.STAR, LEN(LINEINPUT.TEXT$))
     RETURN
 
 ## ***********************************************************************
@@ -226,10 +206,8 @@ LINEINPUT.RENDER:
 
 LINEINPUT.CURSOR:
     LINEINPUT.FILLED = LEN(LINEINPUT.SHOW$)
-    LINEINPUT.CP = LINEINPUT.POS
-    IF LINEINPUT.CP > LINEINPUT.FILLED THEN LINEINPUT.CP = LINEINPUT.FILLED
-    LINEINPUT.CX = LINEINPUT.X + LINEINPUT.CP
-    LINEINPUT.CELL$ = " "
+    LINEINPUT.CP = LINEINPUT.POS : IF LINEINPUT.CP > LINEINPUT.FILLED THEN LINEINPUT.CP = LINEINPUT.FILLED
+    LINEINPUT.CX = LINEINPUT.X + LINEINPUT.CP : LINEINPUT.CELL$ = " "
 
 ## ---- ON a character, the cursor IS that character, drawn inverse on the
 ## ---- lit half of the blink and normal on the other -- so the blink puts
