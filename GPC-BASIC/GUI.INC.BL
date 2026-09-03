@@ -84,7 +84,10 @@
 ## **  Both requests are 0-means-default: attribute 0 is black on black, legal and
 ## **  no use to anybody, so it is free to spend as "I did not choose".
 ## **
-## **  The whole GUI.* name space belongs to this file.
+## **  The whole GUI.* name space belongs to this file, except GUI.LISTBOX.*,
+## **  which is GUI2.INC.BL -- a listbox is a GUI dialog and reads like one, but
+## **  it is the only one that scrolls and the only one that marks, so it is its
+## **  own #INCLUDE and you pay for it only when you want it.
 ## **
 ## ***********************************************************************
 #IFNDEF GUI.DEFS

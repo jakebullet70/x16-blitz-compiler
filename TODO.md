@@ -1408,7 +1408,9 @@ drawing, keys and dispatch) and `ED-STORE.BASL` has always owned the document st
 
 ### A LISTBOX, single and multi select — DONE 2026-09-03, as `GUI2.INC.BL`
 
-Its own file, not a fourth entry point in `GUI.INC.BL`: a scrolling window and a set of marks are
+**The API is `GUI.LISTBOX.*`, in a file called `GUI2.INC.BL`.** It reads as the GUI dialog it is --
+`GOSUB GUI.LISTBOX` beside `GUI.YN`, `GUI.MENU`, `GUI.TEXT` -- while the #INCLUDE is what you leave
+out when you do not want it. Its own file, not a fourth entry point in `GUI.INC.BL`: a scrolling window and a set of marks are
 wanted by nothing else in the library, so `#INCLUDE "GUI2.INC.BL"` when you want a listbox and pay
 nothing when you do not. It builds on `GUI.OPEN` / `GUI.CLOSE` rather than a copy of them, and
 draws through `MENUVERT.ROW`, which is what the old entry said to do.
@@ -1420,22 +1422,34 @@ draws through `MENUVERT.ROW`, which is what the old entry said to do.
    is the whole safety of it — an unassigned variable is already 0, so the editor's bar, its
    dropdown and `GUI.MENU` are unchanged without touching any of them. A 1-based input would have
    read `ITEM$(R-1)` everywhere it was left unset. `MENUVERT.RUN` does not touch SCROLL, because
-   scrolling needs a key loop that knows the list is longer than COUNT — which is `GUI2.LIST`.
-2. **The marks are a string**, `GUI2.MARKS$`, one character an item. No second array to DIM and no
+   scrolling needs a key loop that knows the list is longer than COUNT — which is `GUI.LISTBOX`.
+2. **The marks are a string**, `GUI.LISTBOX.MARKS$`, one character an item. No second array to DIM and no
    bound to guess, and **`GP.STRPTR` lets SPACE POKE one byte rather than rebuilding the string**,
    so toggling allocates nothing where `LEFT$ + CHR$ + MID$` would leave a dead block per keypress.
    The price is 250 items, which is a string.
 
-**Also decided:** one entry point with `GUI2.MULTI` rather than two labels; no wrap at either end,
-because a list you page through is one you can be lost in; and the window position goes in the
-bottom frame edge as `11-20 OF 47`, which is digits only and so needs no glyph indices from a
-caller with a re-ordered font. **The mark column belongs to `GUI2`, not `MENUVERT`** — the rows are
+**Also decided:** one entry point with `GUI.LISTBOX.MULTI` rather than two labels; no wrap at either end,
+because a list you page through is one you can be lost in; and the bottom frame edge says nothing it
+does not have to -- `2 SELECTED OF 20` in multi, following every SPACE; `20 ITEMS` for a single
+list too long to see at once; blank for one that fits. It was the window position, `11-20 OF 47`,
+until it was pointed out that what you want to know is how many you have picked, not which slice
+of the list you are looking at. Digits and capitals only either way, so no glyph indices are
+needed from a caller with a re-ordered font. **The mark column belongs to `GUI2`, not `MENUVERT`** — the rows are
 indented and MENUVERT owns only the text columns, so the caller's array is never edited to carry a
 marker.
 
+**It answers OK or CANCEL the way the rest of the family does.** A dimmed row under the list reading
+`ENTER = OK    ESC = CANCEL`, with the two key names lit -- `GUI.TEXT`'s hint, its words and its two
+offsets, because a dialog should say this the same way wherever you meet it. Fixed text, not
+`GUI.HINT$`: the names are lit at known offsets rather than searched for, which is the trade
+`GUI.TEXT` makes and `GUI.YN` does not. It costs the body a spacer row and a hint row, the box a
+minimum width of 26, and the screen cut goes from `ROWS - 6` to `ROWS - 8`.
+
 **`GUI2TST.EXP.BL` is the regression**, on the `kbdbuf_put` harness `MENUTST.EXP.BL` uses. 14 cases,
 green first run: paging, HOME/END, both no-wrap ends, ESC, marks surviving a scroll, a marks string
-of the wrong length being replaced rather than indexed past, a one-item list and an empty one.
+of the wrong length being replaced rather than indexed past, a one-item list and an empty one. A
+fifteenth measures the box off a one-item call -- 9 rows and a 26 wide body -- which is how the hint
+rows are checked without reading VRAM.
 
 **Two BASLOAD facts this cost, both now in memory:**
 

@@ -2,8 +2,8 @@
 ## **
 ## **  GUI2.INC.BL -- a listbox, single or multi select.
 ## **
-## **      GUI2.LIST   a WINDOW onto a list longer than the box, and
-## **                  optionally more than one answer
+## **      GUI.LISTBOX   a WINDOW onto a list longer than the box, and
+## **                    optionally more than one answer
 ## **
 ## **  SEPARATE FROM GUI.INC.BL ON PURPOSE. This is the only dialog that needs
 ## **  a scrolling window and a set of marks, and nothing else in the library
@@ -24,35 +24,45 @@
 ## **  Usage:
 ## **      DIM MENUVERT.ITEM$(200)
 ## **      ... fill 1..N ...
-## **      GUI2.COUNT = N : GUI2.ROWS = 8 : GUI2.MULTI = 1
+## **      GUI.LISTBOX.COUNT = N : GUI.LISTBOX.ROWS = 8 : GUI.LISTBOX.MULTI = 1
 ## **      GUI.MSG$ = "PICK FILES" : GUI.BANK = 8
-## **      GOSUB GUI2.LIST
-## **      IF GUI2.SEL = 0 THEN <cancelled>
+## **      GOSUB GUI.LISTBOX
+## **      IF GUI.LISTBOX.SEL = 0 THEN <cancelled>
 ## **
-## **   in   GUI2.COUNT      how many items. 0 or less returns cancelled
-## **        MENUVERT.ITEM$()  the items, 1..COUNT. THE CALLER OWNS THE DIM,
-## **                        for MENUVERT's reason: a module cannot be handed an
-## **                        array, and DIMming one means guessing a bound
-## **        GUI2.ROWS       rows visible at once. 0 takes 10, and it is always
-## **                        cut to COUNT and to what the screen holds
-## **        GUI2.MULTI      0 chooses one row. 1 marks a set with SPACE
-## **        GUI2.MARKS$     multi only, IN as well as out: COUNT characters,
-## **                        "1" marked. Anything else -- "" included -- starts
-## **                        with none marked
-## **        GUI2.SEL        the item to start on. 0 starts at 1
+## **   in   GUI.LISTBOX.COUNT   how many items. 0 or less returns cancelled
+## **        MENUVERT.ITEM$()    the items, 1..COUNT. THE CALLER OWNS THE DIM,
+## **                            for MENUVERT's reason: a module cannot be handed
+## **                            an array, and DIMming one means guessing a bound
+## **        GUI.LISTBOX.ROWS    rows visible at once. 0 takes 10, and it is
+## **                            always cut to COUNT and to what the screen holds
+## **        GUI.LISTBOX.MULTI   0 chooses one row. 1 marks a set with SPACE
+## **        GUI.LISTBOX.MARKS$  multi only, IN as well as out: COUNT characters,
+## **                            "1" marked. Anything else -- "" included --
+## **                            starts with none marked
+## **        GUI.LISTBOX.SEL     the item to start on. 0 starts at 1
 ## **        plus everything GUI.OPEN reads: GUI.MSG$, GUI.MSG2$, GUI.TITLE$,
 ## **        GUI.BANK, GUI.STYLE, GUI.GLYPH, GUI.PLACE and the rest
 ## **
-## **   out  GUI2.SEL        the item under the highlight, 1..COUNT, or 0 if
-## **                        cancelled. In multi that is where the cursor was,
-## **                        not the answer -- the marks are the answer
-## **        GUI2.MARKS$     multi only: COUNT characters, "1" marked
-## **        GUI2.MARKED     multi only: how many are marked
-## **        GUI.KEY         13 accepted, 27 or 3 cancelled
+## **   out  GUI.LISTBOX.SEL     the item under the highlight, 1..COUNT, or 0 if
+## **                            cancelled. In multi that is where the cursor was,
+## **                            not the answer -- the marks are the answer
+## **        GUI.LISTBOX.MARKS$  multi only: COUNT characters, "1" marked
+## **        GUI.LISTBOX.MARKED  multi only: how many are marked
+## **        GUI.KEY             13 accepted, 27 or 3 cancelled
+## **
+## **  THE BOTTOM FRAME EDGE says nothing it does not have to. In multi it is
+## **  "2 SELECTED OF 20" and follows every SPACE; otherwise it is "20 ITEMS" for a
+## **  list too long to see at once, and blank for one that fits.
 ## **
 ## **  KEYS: up and down move, PgUp and PgDn page, HOME and END jump, SPACE
 ## **  toggles a mark in multi, RETURN accepts, ESC and STOP cancel. The codes
 ## **  are the ones samples/editor dispatches on, so they are known good.
+## **
+## **  THE LAST TWO ARE ON THE BOX, in a dimmed row under the list with ENTER and
+## **  ESC picked out -- GUI.TEXT's hint, in GUI.TEXT's words, at GUI.TEXT's two
+## **  offsets, because a dialog that answers OK or CANCEL should say so the same
+## **  way wherever you meet it. It costs the body a spacer row and a hint row,
+## **  and the box a minimum width of 26.
 ## **
 ## **  THE MARKS ARE A STRING AND ARE TOGGLED IN PLACE. GP.STRPTR gives the
 ## **  address of the characters, so SPACE POKEs one byte and allocates nothing
@@ -70,217 +80,266 @@
 ## **  caller's array is never touched to add a marker to it.
 ## **
 ## **  NO #DEFINEs AND NO INCLUDE GUARD IN HERE, ON PURPOSE. BASLOAD rejects a
-## **  DIGIT in a #DEFINE or #IFNDEF name, so a GUI2.* constant cannot exist and
+## **  DIGIT in a #DEFINE or #IFNDEF name, so a GUI.LISTBOX.* constant cannot exist and
 ## **  a GUILIST.* one would be a second name space for one module. The numbers
 ## **  are written where they are used, next to the comment that names them.
 ## **  #INCLUDE this file once.
 ## **
-## **  The whole GUI2.* name space belongs to this file.
+## **  The whole GUI.LISTBOX.* name space belongs to this file.
 ## **
 ## ***********************************************************************
 
-GOTO GUI2.MODULE.END
+GOTO GUI.LISTBOX.MODULE.END
 
 ## ***********************************************************************
-## **  GUI2.LIST -- the whole thing.
+## **  GUI.LISTBOX -- the whole thing.
 ## ***********************************************************************
 
-GUI2.LIST:
+GUI.LISTBOX:
     GUI.KEY = 0
-    IF GUI2.COUNT < 1 THEN GUI2.SEL = 0 : RETURN
+    IF GUI.LISTBOX.COUNT < 1 THEN GUI.LISTBOX.SEL = 0 : RETURN
 
 ## ---- The window: what was asked for, ten rows if nothing was, then cut to the list
 ## ---- and to the screen. The screen cut is what stops a caller asking for 40 rows in a
-## ---- 30 row mode and getting a box GUI.PLACE.BOX has to clamp.
+## ---- 30 row mode and getting a box GUI.PLACE.BOX has to clamp. Eight rows go to the
+## ---- frame, the message, the spacer and the hint, so the list may have the rest.
 
-    GUI2.ROWS.USE = GUI2.ROWS
-    IF GUI2.ROWS.USE < 1 THEN GUI2.ROWS.USE = 10
-    IF GUI2.ROWS.USE > GUI2.COUNT THEN GUI2.ROWS.USE = GUI2.COUNT
+    GUI.LISTBOX.ROWS.USE = GUI.LISTBOX.ROWS
+    IF GUI.LISTBOX.ROWS.USE < 1 THEN GUI.LISTBOX.ROWS.USE = 10
+    IF GUI.LISTBOX.ROWS.USE > GUI.LISTBOX.COUNT THEN GUI.LISTBOX.ROWS.USE = GUI.LISTBOX.COUNT
     GOSUB GUI.SCREEN
-    IF GUI2.ROWS.USE > GUI.SCREEN.ROWS - 6 THEN GUI2.ROWS.USE = GUI.SCREEN.ROWS - 6
-    IF GUI2.ROWS.USE < 1 THEN GUI2.ROWS.USE = 1
+    IF GUI.LISTBOX.ROWS.USE > GUI.SCREEN.ROWS - 8 THEN GUI.LISTBOX.ROWS.USE = GUI.SCREEN.ROWS - 8
+    IF GUI.LISTBOX.ROWS.USE < 1 THEN GUI.LISTBOX.ROWS.USE = 1
 
 ## ---- Measured over the WHOLE list, not the first window: a box that grew when you
 ## ---- scrolled would have to be redrawn, and the frame is stashed.
 
-    GUI2.TEXTW = 0
-    FOR GUI2.I = 1 TO GUI2.COUNT
-        IF LEN(MENUVERT.ITEM$(GUI2.I)) > GUI2.TEXTW THEN GUI2.TEXTW = LEN(MENUVERT.ITEM$(GUI2.I))
-    NEXT GUI2.I
-    GUI2.MARKOFF = 0
-    IF GUI2.MULTI <> 0 THEN GUI2.MARKOFF = 2
+    GUI.LISTBOX.TEXTW = 0
+    FOR GUI.LISTBOX.I = 1 TO GUI.LISTBOX.COUNT
+        IF LEN(MENUVERT.ITEM$(GUI.LISTBOX.I)) > GUI.LISTBOX.TEXTW THEN GUI.LISTBOX.TEXTW = LEN(MENUVERT.ITEM$(GUI.LISTBOX.I))
+    NEXT GUI.LISTBOX.I
+    GUI.LISTBOX.MARKOFF = 0
+    IF GUI.LISTBOX.MULTI <> 0 THEN GUI.LISTBOX.MARKOFF = 2
 
-## ---- The count line lives in the bottom frame edge and only exists when something
-## ---- is actually hidden. Built once, here, so the box can be measured to hold it.
+## ---- The footer, in the bottom frame edge. It says nothing unless it has something
+## ---- to say: how many are marked when marks are the answer, otherwise the size of a
+## ---- list you cannot see the whole of, and nothing at all for a short single list.
 
-## ---- Measured at its WIDEST, which is COUNT in all three places -- "1-10 OF 47" is
-## ---- shorter than "38-47 OF 47", and a box measured on the first would be too narrow
-## ---- for the last. The real text is built in GUI2.REPAINT.
+## ---- Built at its WIDEST here, for measuring only -- COUNT in both places, because a
+## ---- field measured on "2 SELECTED" is too narrow for "20 SELECTED". The text that
+## ---- is actually printed is GUI.LISTBOX.FOOT's.
 
-    GUI2.NOTE$ = ""
-    IF GUI2.COUNT > GUI2.ROWS.USE THEN GUI2.NOTE$ = " " + MID$(STR$(GUI2.COUNT), 2) + "-" + MID$(STR$(GUI2.COUNT), 2) + " OF " + MID$(STR$(GUI2.COUNT), 2) + " "
-    GUI.BODY.WIDTH = GUI2.TEXTW + GUI2.MARKOFF
-    IF LEN(GUI2.NOTE$) + 2 > GUI.BODY.WIDTH THEN GUI.BODY.WIDTH = LEN(GUI2.NOTE$) + 2
-    GUI.BODY.ROWS = GUI2.ROWS.USE
+    GUI.LISTBOX.DIGITS = LEN(MID$(STR$(GUI.LISTBOX.COUNT), 2))
+    GUI.LISTBOX.NOTE$ = ""
+    IF GUI.LISTBOX.COUNT > GUI.LISTBOX.ROWS.USE THEN GUI.LISTBOX.NOTE$ = " " + MID$(STR$(GUI.LISTBOX.COUNT), 2) + " ITEMS "
+    IF GUI.LISTBOX.MULTI <> 0 THEN GUI.LISTBOX.NOTE$ = " " + MID$(STR$(GUI.LISTBOX.COUNT), 2) + " SELECTED OF " + MID$(STR$(GUI.LISTBOX.COUNT), 2) + " "
+    GUI.LISTBOX.NOTEW = LEN(GUI.LISTBOX.NOTE$)
+    GUI.BODY.WIDTH = GUI.LISTBOX.TEXTW + GUI.LISTBOX.MARKOFF
+    IF GUI.LISTBOX.NOTEW + 2 > GUI.BODY.WIDTH THEN GUI.BODY.WIDTH = GUI.LISTBOX.NOTEW + 2
+
+## ---- The hint, and the two rows it costs: one blank between it and the list, then
+## ---- itself. Fixed text, because the two key names are lit at known offsets rather
+## ---- than searched for -- the same trade GUI.TEXT makes, and the same 0 and 14.
+
+    GUI.LISTBOX.HINT$ = "ENTER = OK    ESC = CANCEL"
+    IF LEN(GUI.LISTBOX.HINT$) > GUI.BODY.WIDTH THEN GUI.BODY.WIDTH = LEN(GUI.LISTBOX.HINT$)
+    GUI.BODY.ROWS = GUI.LISTBOX.ROWS.USE + 2
     GOSUB GUI.OPEN
+
+## ---- Drawn once. Nothing repaints below the list, so it stays put for the dialog.
+
+    GUI.LISTBOX.HINT.Y = GUI.INNER.TOP + GUI.LISTBOX.ROWS.USE + 1
+    GUI.LISTBOX.HINT.X = GUI.INNER.LEFT + INT((GUI.INNER.WIDTH - LEN(GUI.LISTBOX.HINT$)) / 2)
+    IF GUI.LISTBOX.HINT.X < GUI.INNER.LEFT THEN GUI.LISTBOX.HINT.X = GUI.INNER.LEFT
+    GP.PRINTAT GUI.LISTBOX.HINT.X, GUI.LISTBOX.HINT.Y, GUI.LISTBOX.HINT$, THEME.CLR(THEME.DIMMED)
+    GP.PRINTAT GUI.LISTBOX.HINT.X, GUI.LISTBOX.HINT.Y, "ENTER", THEME.CLR(THEME.TITLE)
+    GP.PRINTAT GUI.LISTBOX.HINT.X + 14, GUI.LISTBOX.HINT.Y, "ESC", THEME.CLR(THEME.TITLE)
 
 ## ---- MENUVERT owns the TEXT columns only. In multi the mark column sits to their
 ## ---- left and belongs to this file, which is how the caller's array stays untouched.
 
-    MENUVERT.X = GUI.INNER.LEFT + GUI2.MARKOFF : MENUVERT.Y = GUI.INNER.TOP
-    MENUVERT.WIDTH = GUI.INNER.WIDTH - GUI2.MARKOFF
-    MENUVERT.COUNT = GUI2.ROWS.USE
+    MENUVERT.X = GUI.INNER.LEFT + GUI.LISTBOX.MARKOFF : MENUVERT.Y = GUI.INNER.TOP
+    MENUVERT.WIDTH = GUI.INNER.WIDTH - GUI.LISTBOX.MARKOFF
+    MENUVERT.COUNT = GUI.LISTBOX.ROWS.USE
     MENUVERT.ATTR = GUI.PANEL : MENUVERT.HOTATTR = 0 : MENUVERT.HOT$ = ""
-    GUI2.HI = THEME.CLR(THEME.HILITE)
+    GUI.LISTBOX.HI = THEME.CLR(THEME.HILITE)
 
 ## ---- The marks. A string of the wrong length is not an error and not trusted: the
 ## ---- caller may have changed COUNT since, so anything that does not measure up is
 ## ---- replaced with a fresh set of "0" -- 48, and 49 is a mark. One RPT$ allocation,
 ## ---- then never again.
 
-    IF GUI2.MULTI = 0 THEN GOTO GUI2.NOMARKS
-    IF LEN(GUI2.MARKS$) <> GUI2.COUNT THEN GUI2.MARKS$ = RPT$(48, GUI2.COUNT)
-    GUI2.MARKP = GP.STRPTR(GUI2.MARKS$)
-GUI2.NOMARKS:
+    GUI.LISTBOX.MARKED = 0
+    IF GUI.LISTBOX.MULTI = 0 THEN GOTO GUI.LISTBOX.NOMARKS
+    IF LEN(GUI.LISTBOX.MARKS$) <> GUI.LISTBOX.COUNT THEN GUI.LISTBOX.MARKS$ = RPT$(48, GUI.LISTBOX.COUNT)
+    GUI.LISTBOX.MARKP = GP.STRPTR(GUI.LISTBOX.MARKS$)
 
-    IF GUI2.SEL < 1 THEN GUI2.SEL = 1
-    IF GUI2.SEL > GUI2.COUNT THEN GUI2.SEL = GUI2.COUNT
+## ---- Counted here rather than at the end, because the footer shows it while the
+## ---- dialog is open. A caller may hand marks IN, so it is not always 0.
+
+    FOR GUI.LISTBOX.I = 1 TO GUI.LISTBOX.COUNT
+        IF PEEK(GUI.LISTBOX.MARKP + GUI.LISTBOX.I) = 49 THEN GUI.LISTBOX.MARKED = GUI.LISTBOX.MARKED + 1
+    NEXT GUI.LISTBOX.I
+GUI.LISTBOX.NOMARKS:
+
+    IF GUI.LISTBOX.SEL < 1 THEN GUI.LISTBOX.SEL = 1
+    IF GUI.LISTBOX.SEL > GUI.LISTBOX.COUNT THEN GUI.LISTBOX.SEL = GUI.LISTBOX.COUNT
     MENUVERT.SCROLL = 0
-    GOSUB GUI2.FOLLOW
-    GOSUB GUI2.REPAINT
+    GUI.LISTBOX.NOTE.LEFT = GUI.LEFT + INT((GUI.WIDTH - GUI.LISTBOX.NOTEW) / 2)
+    GOSUB GUI.LISTBOX.FOOT
+    GOSUB GUI.LISTBOX.FOLLOW
+    GOSUB GUI.LISTBOX.REPAINT
 
 ## ***********************************************************************
 ## **  The key loop.
 ## ***********************************************************************
 
-GUI2.WAIT:
-    GET GUI2.IN$
-    IF GUI2.IN$ = "" THEN GOTO GUI2.WAIT
-    GUI2.CODE = ASC(GUI2.IN$)
-    GUI2.DONE = 0 : GUI2.PREV = GUI2.SEL : GUI2.PREVSCROLL = MENUVERT.SCROLL
+GUI.LISTBOX.WAIT:
+    GET GUI.LISTBOX.IN$
+    IF GUI.LISTBOX.IN$ = "" THEN GOTO GUI.LISTBOX.WAIT
+    GUI.LISTBOX.CODE = ASC(GUI.LISTBOX.IN$)
+    GUI.LISTBOX.DONE = 0 : GUI.LISTBOX.PREV = GUI.LISTBOX.SEL : GUI.LISTBOX.PREVSCROLL = MENUVERT.SCROLL
 
 ## ---- 145 up, 17 down, 130 PgUp, 2 PgDn, 19 HOME, 4 END. samples/editor dispatches on
 ## ---- exactly these, so they are tested rather than guessed. The rest are GUI's own.
 
-    GP.SELECT GUI2.CODE
+    GP.SELECT GUI.LISTBOX.CODE
         GP.CASE 145
-            GUI2.SEL = GUI2.SEL - 1
+            GUI.LISTBOX.SEL = GUI.LISTBOX.SEL - 1
         GP.CASE 17
-            GUI2.SEL = GUI2.SEL + 1
+            GUI.LISTBOX.SEL = GUI.LISTBOX.SEL + 1
         GP.CASE 130
-            GUI2.SEL = GUI2.SEL - GUI2.ROWS.USE
+            GUI.LISTBOX.SEL = GUI.LISTBOX.SEL - GUI.LISTBOX.ROWS.USE
         GP.CASE 2
-            GUI2.SEL = GUI2.SEL + GUI2.ROWS.USE
+            GUI.LISTBOX.SEL = GUI.LISTBOX.SEL + GUI.LISTBOX.ROWS.USE
         GP.CASE 19
-            GUI2.SEL = 1
+            GUI.LISTBOX.SEL = 1
         GP.CASE 4
-            GUI2.SEL = GUI2.COUNT
+            GUI.LISTBOX.SEL = GUI.LISTBOX.COUNT
         GP.CASE GUI.SPACE
-            IF GUI2.MULTI <> 0 THEN GOSUB GUI2.TOGGLE
+            IF GUI.LISTBOX.MULTI <> 0 THEN GOSUB GUI.LISTBOX.TOGGLE
         GP.CASE GUI.RETURN
-            GUI2.DONE = 1
+            GUI.LISTBOX.DONE = 1
         GP.CASE GUI.ESCAPE, GUI.STOP
-            GUI2.SEL = 0 : GUI2.DONE = 1
+            GUI.LISTBOX.SEL = 0 : GUI.LISTBOX.DONE = 1
     GP.ENDSEL
 
-    IF GUI2.DONE <> 0 THEN GOTO GUI2.FINISH
+    IF GUI.LISTBOX.DONE <> 0 THEN GOTO GUI.LISTBOX.FINISH
 
 ## ---- NO WRAP. A list you can page through is one you can be lost in, and running off
 ## ---- the bottom to the top of a 200 item list is disorienting rather than convenient.
 
-    IF GUI2.SEL < 1 THEN GUI2.SEL = 1
-    IF GUI2.SEL > GUI2.COUNT THEN GUI2.SEL = GUI2.COUNT
-    GOSUB GUI2.FOLLOW
+    IF GUI.LISTBOX.SEL < 1 THEN GUI.LISTBOX.SEL = 1
+    IF GUI.LISTBOX.SEL > GUI.LISTBOX.COUNT THEN GUI.LISTBOX.SEL = GUI.LISTBOX.COUNT
+    GOSUB GUI.LISTBOX.FOLLOW
 
 ## ---- A scroll repaints the window; a move inside it repaints TWO rows. That is the
 ## ---- whole reason the highlight is not just redrawn every keypress.
 
-    IF MENUVERT.SCROLL <> GUI2.PREVSCROLL THEN GOSUB GUI2.REPAINT : GOTO GUI2.WAIT
-    IF GUI2.SEL = GUI2.PREV THEN GOTO GUI2.WAIT
-    GUI2.ROW = GUI2.PREV - MENUVERT.SCROLL : GUI2.ATTR = MENUVERT.ATTR : GOSUB GUI2.PAINT.ROW
-    GUI2.ROW = GUI2.SEL - MENUVERT.SCROLL : GUI2.ATTR = GUI2.HI : GOSUB GUI2.PAINT.ROW
-    GOTO GUI2.WAIT
+    IF MENUVERT.SCROLL <> GUI.LISTBOX.PREVSCROLL THEN GOSUB GUI.LISTBOX.REPAINT : GOTO GUI.LISTBOX.WAIT
+    IF GUI.LISTBOX.SEL = GUI.LISTBOX.PREV THEN GOTO GUI.LISTBOX.WAIT
+    GUI.LISTBOX.ROW = GUI.LISTBOX.PREV - MENUVERT.SCROLL : GUI.LISTBOX.ATTR = MENUVERT.ATTR : GOSUB GUI.LISTBOX.PAINT.ROW
+    GUI.LISTBOX.ROW = GUI.LISTBOX.SEL - MENUVERT.SCROLL : GUI.LISTBOX.ATTR = GUI.LISTBOX.HI : GOSUB GUI.LISTBOX.PAINT.ROW
+    GOTO GUI.LISTBOX.WAIT
 
-GUI2.FINISH:
-    GUI.KEY = GUI2.CODE
-    GUI2.MARKED = 0
-    IF GUI2.MULTI = 0 THEN GOTO GUI2.SHUT
-    FOR GUI2.I = 1 TO GUI2.COUNT
-        IF PEEK(GUI2.MARKP + GUI2.I) = 49 THEN GUI2.MARKED = GUI2.MARKED + 1
-    NEXT GUI2.I
-GUI2.SHUT:
+GUI.LISTBOX.FINISH:
+    GUI.KEY = GUI.LISTBOX.CODE
     GOSUB GUI.CLOSE
     RETURN
 
 ## ***********************************************************************
-## **  GUI2.TOGGLE -- one mark, POKEd where it lies.
+## **  GUI.LISTBOX.TOGGLE -- one mark, POKEd where it lies.
 ## **
-## **  97 - c turns 48 into 49 and 49 into 48. GUI2.MARKP is taken once, at the top:
-## **  a Blitz string owns its block and the block does not move, and nothing here
-## **  ever reassigns GUI2.MARKS$, so the pointer stays good for the whole dialog.
+## **  97 - c turns 48 into 49 and 49 into 48. GUI.LISTBOX.MARKP is taken once, at
+## **  the top: a GPC string owns its block and the block does not move, and nothing
+## **  here ever reassigns GUI.LISTBOX.MARKS$, so the pointer stays good throughout.
 ## ***********************************************************************
 
-GUI2.TOGGLE:
-    POKE GUI2.MARKP + GUI2.SEL, 97 - PEEK(GUI2.MARKP + GUI2.SEL)
-    GUI2.ROW = GUI2.SEL - MENUVERT.SCROLL : GUI2.ATTR = GUI2.HI : GOSUB GUI2.PAINT.ROW
+GUI.LISTBOX.TOGGLE:
+    POKE GUI.LISTBOX.MARKP + GUI.LISTBOX.SEL, 97 - PEEK(GUI.LISTBOX.MARKP + GUI.LISTBOX.SEL)
+
+## ---- Down for the unmark, back up twice for the mark: one PEEK either way, and the
+## ---- count never walks the string again.
+
+    GUI.LISTBOX.MARKED = GUI.LISTBOX.MARKED - 1
+    IF PEEK(GUI.LISTBOX.MARKP + GUI.LISTBOX.SEL) = 49 THEN GUI.LISTBOX.MARKED = GUI.LISTBOX.MARKED + 2
+    GUI.LISTBOX.ROW = GUI.LISTBOX.SEL - MENUVERT.SCROLL : GUI.LISTBOX.ATTR = GUI.LISTBOX.HI : GOSUB GUI.LISTBOX.PAINT.ROW
+    GOSUB GUI.LISTBOX.FOOT
     RETURN
 
 ## ***********************************************************************
-## **  GUI2.FOLLOW -- move the window the least it can to show GUI2.SEL.
+## **  GUI.LISTBOX.FOLLOW -- the window moves the least it can to show the item.
 ## ***********************************************************************
 
-GUI2.FOLLOW:
-    IF GUI2.SEL - MENUVERT.SCROLL < 1 THEN MENUVERT.SCROLL = GUI2.SEL - 1
-    IF GUI2.SEL - MENUVERT.SCROLL > GUI2.ROWS.USE THEN MENUVERT.SCROLL = GUI2.SEL - GUI2.ROWS.USE
-    IF MENUVERT.SCROLL > GUI2.COUNT - GUI2.ROWS.USE THEN MENUVERT.SCROLL = GUI2.COUNT - GUI2.ROWS.USE
+GUI.LISTBOX.FOLLOW:
+    IF GUI.LISTBOX.SEL - MENUVERT.SCROLL < 1 THEN MENUVERT.SCROLL = GUI.LISTBOX.SEL - 1
+    IF GUI.LISTBOX.SEL - MENUVERT.SCROLL > GUI.LISTBOX.ROWS.USE THEN MENUVERT.SCROLL = GUI.LISTBOX.SEL - GUI.LISTBOX.ROWS.USE
+    IF MENUVERT.SCROLL > GUI.LISTBOX.COUNT - GUI.LISTBOX.ROWS.USE THEN MENUVERT.SCROLL = GUI.LISTBOX.COUNT - GUI.LISTBOX.ROWS.USE
     IF MENUVERT.SCROLL < 0 THEN MENUVERT.SCROLL = 0
     RETURN
 
 ## ***********************************************************************
-## **  GUI2.REPAINT -- every visible row, and the count line.
+## **  GUI.LISTBOX.REPAINT -- every visible row. The footer does not scroll.
 ## ***********************************************************************
 
-GUI2.REPAINT:
-    FOR GUI2.EACH = 1 TO GUI2.ROWS.USE
-        GUI2.ROW = GUI2.EACH : GUI2.ATTR = MENUVERT.ATTR
-        IF MENUVERT.SCROLL + GUI2.EACH = GUI2.SEL THEN GUI2.ATTR = GUI2.HI
-        GOSUB GUI2.PAINT.ROW
-    NEXT GUI2.EACH
-    IF GUI2.NOTE$ = "" THEN RETURN
-
-## ---- Rebuilt on every scroll, which is once a keypress at worst and only while the
-## ---- box is open. The two numbers are what is showing, not what is selected.
-
-    GUI2.NOTE$ = " " + MID$(STR$(MENUVERT.SCROLL + 1), 2) + "-" + MID$(STR$(MENUVERT.SCROLL + GUI2.ROWS.USE), 2) + " OF " + MID$(STR$(GUI2.COUNT), 2) + " "
-    GUI2.NOTE.LEFT = GUI.LEFT + INT((GUI.WIDTH - LEN(GUI2.NOTE$)) / 2)
-    GP.PRINTAT GUI2.NOTE.LEFT, GUI.TOP + GUI.HEIGHT - 1, GUI2.NOTE$, GUI.BORDER
+GUI.LISTBOX.REPAINT:
+    FOR GUI.LISTBOX.EACH = 1 TO GUI.LISTBOX.ROWS.USE
+        GUI.LISTBOX.ROW = GUI.LISTBOX.EACH : GUI.LISTBOX.ATTR = MENUVERT.ATTR
+        IF MENUVERT.SCROLL + GUI.LISTBOX.EACH = GUI.LISTBOX.SEL THEN GUI.LISTBOX.ATTR = GUI.LISTBOX.HI
+        GOSUB GUI.LISTBOX.PAINT.ROW
+    NEXT GUI.LISTBOX.EACH
     RETURN
 
 ## ***********************************************************************
-## **  GUI2.PAINT.ROW -- one screen row: the mark cell, then MENUVERT's text.
+## **  GUI.LISTBOX.FOOT -- the bottom frame edge.
 ## **
-## **   in   GUI2.ROW    the SCREEN row, 1..GUI2.ROWS.USE      GUI2.ATTR
+## **  Only the marked count changes while the box is open, so this is called at
+## **  the start and then only from GUI.LISTBOX.TOGGLE.
 ## **
-## **  Guarded rather than trusted: GUI2.TOGGLE and the two-row move both work out a
+## **  THE NUMBER IS PADDED TO THE WIDTH OF COUNT rather than the string centred:
+## **  the field was measured at its widest, and a shorter text drawn centred would
+## **  leave the last character of the longer one on the frame. Two IFs cover 250,
+## **  which is as many items as a marks string holds.
+## ***********************************************************************
+
+GUI.LISTBOX.FOOT:
+    IF GUI.LISTBOX.NOTEW = 0 THEN RETURN
+    GUI.LISTBOX.EDGE$ = GUI.LISTBOX.NOTE$
+    IF GUI.LISTBOX.MULTI = 0 THEN GOTO GUI.LISTBOX.FOOT.DRAW
+    GUI.LISTBOX.NUM$ = MID$(STR$(GUI.LISTBOX.MARKED), 2)
+    IF LEN(GUI.LISTBOX.NUM$) < GUI.LISTBOX.DIGITS THEN GUI.LISTBOX.NUM$ = " " + GUI.LISTBOX.NUM$
+    IF LEN(GUI.LISTBOX.NUM$) < GUI.LISTBOX.DIGITS THEN GUI.LISTBOX.NUM$ = " " + GUI.LISTBOX.NUM$
+    GUI.LISTBOX.EDGE$ = " " + GUI.LISTBOX.NUM$ + " SELECTED OF " + MID$(STR$(GUI.LISTBOX.COUNT), 2) + " "
+GUI.LISTBOX.FOOT.DRAW:
+    GP.PRINTAT GUI.LISTBOX.NOTE.LEFT, GUI.TOP + GUI.HEIGHT - 1, GUI.LISTBOX.EDGE$, GUI.BORDER
+    RETURN
+
+## ***********************************************************************
+## **  GUI.LISTBOX.PAINT.ROW -- one screen row: the mark cell, then MENUVERT's text.
+## **
+## **   in   GUI.LISTBOX.ROW     the SCREEN row, 1..GUI.LISTBOX.ROWS.USE
+## **        GUI.LISTBOX.ATTR    the attribute to draw it in
+## **
+## **  Guarded rather than trusted: GUI.LISTBOX.TOGGLE and the two-row move both work out a
 ## **  screen row by subtracting SCROLL, and a row off the window is a no-op here
 ## **  rather than a GP.PRINTAT into the frame.
 ## ***********************************************************************
 
-GUI2.PAINT.ROW:
-    IF GUI2.ROW < 1 THEN RETURN
-    IF GUI2.ROW > GUI2.ROWS.USE THEN RETURN
-    MENUVERT.DRAWROW = GUI2.ROW : MENUVERT.DRAWATTR = GUI2.ATTR
+GUI.LISTBOX.PAINT.ROW:
+    IF GUI.LISTBOX.ROW < 1 THEN RETURN
+    IF GUI.LISTBOX.ROW > GUI.LISTBOX.ROWS.USE THEN RETURN
+    MENUVERT.DRAWROW = GUI.LISTBOX.ROW : MENUVERT.DRAWATTR = GUI.LISTBOX.ATTR
     GOSUB MENUVERT.ROW
-    IF GUI2.MULTI = 0 THEN RETURN
+    IF GUI.LISTBOX.MULTI = 0 THEN RETURN
 
 ## ---- The mark cell carries the row's own attribute, so the highlight bar reads as one
 ## ---- band across the mark and the text rather than stopping short of it. 42 is "*",
 ## ---- which survives both charsets.
 
-    GUI2.MARKY = MENUVERT.Y + GUI2.ROW - 1
-    GP.FILL GUI.INNER.LEFT, GUI2.MARKY, 2, 1, GUI.SPACE, GUI2.ATTR
-    IF PEEK(GUI2.MARKP + MENUVERT.SCROLL + GUI2.ROW) <> 49 THEN RETURN
-    GP.FILL GUI.INNER.LEFT, GUI2.MARKY, 1, 1, 42, GUI2.ATTR
+    GUI.LISTBOX.MARKY = MENUVERT.Y + GUI.LISTBOX.ROW - 1
+    GP.FILL GUI.INNER.LEFT, GUI.LISTBOX.MARKY, 2, 1, GUI.SPACE, GUI.LISTBOX.ATTR
+    IF PEEK(GUI.LISTBOX.MARKP + MENUVERT.SCROLL + GUI.LISTBOX.ROW) <> 49 THEN RETURN
+    GP.FILL GUI.INNER.LEFT, GUI.LISTBOX.MARKY, 1, 1, 42, GUI.LISTBOX.ATTR
     RETURN
 
-GUI2.MODULE.END:
+GUI.LISTBOX.MODULE.END:

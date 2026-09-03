@@ -1,4 +1,4 @@
-## GUI.EXP.BL -- the three dialogs, over a screen they have to put back.
+## GUI.EXP.BL -- the four dialogs, over a screen they have to put back.
 ##
 ## The page underneath is drawn ONCE, at the start, and never repainted.
 ## That is the demonstration: every dialog saves the cells it covers and
@@ -10,13 +10,22 @@
 ## the machine boots with, GP.PRINTAT turns ASCII lower case into the
 ## graphics half of the font -- see the note in GUI.INC.BL. ISO mode would
 ## fix the letters and break the frame, so a demo of a BOX stays here.
+#SAVEAS "@:GUI.PRG"
+## STASH reaches its saved cells with GP.ASM and a {VAR} operand, and GPC
+## resolves those from the symbol file. It has to come BEFORE the #INCLUDEs --
+## after them BASLOAD stops with SYMFILE NOT ALLOWED.
+#SYMFILE "@:GUI.SYM"
 #INCLUDE "GPB.INC.BL"
 #INCLUDE "THEME.INC.BL"
+## STASH is not optional even though nothing here names it: GUI.OPEN calls
+## STASH.SAVE, and BASLOAD resolves every label in the build, not the ones a
+## path can reach. Without it the tokenise stops at LABEL NOT FOUND.
+#INCLUDE "STASH.INC.BL"
 #INCLUDE "APPSYS.INC.BL"
 #INCLUDE "MENUVERT.INC.BL"
 #INCLUDE "LINEINPUT.INC.BL"
 #INCLUDE "GUI.INC.BL"
-#SAVEAS "@:GUI.PRG"
+#INCLUDE "GUI2.INC.BL"
 
 ## A spare RAM bank for the saved cells. Bank 0 belongs to the KERNAL --
 ## the keyboard layout lives there -- so a program picks anything above it.
@@ -26,7 +35,7 @@ GOSUB APPSYS.STARTUP
 THEME.DARK = 0 : GOSUB THEME.LOAD
 GUI.BANK = DEMO.BANK
 
-DIM MENUVERT.ITEM$(4)
+DIM MENUVERT.ITEM$(20)
 
 GOSUB DEMO.PAGE
 
@@ -82,6 +91,29 @@ GUI.SEL = 1
 GOSUB GUI.MENU
 DEMO.SEL = GUI.SEL
 
+## ---- 4. GUI.LISTBOX -- a list longer than the box it is in -----------
+##
+## The other three show their whole list at once and answer with one row.
+## This one does neither: twenty items seen six at a time, as many marked
+## as you like with SPACE, and the count in the bottom frame edge saying
+## where the window is. It lives in GUI2.INC.BL and is named GUI.LISTBOX
+## because it is a GUI dialog -- the #INCLUDE is what you leave out.
+
+FOR DEMO.R = 1 TO 20
+    MENUVERT.ITEM$(DEMO.R) = " REPORT " + MID$(STR$(DEMO.R), 2) + ".TXT"
+NEXT DEMO.R
+GUI.TITLE$ = "BACKUP"
+GUI.MSG$ = "SPACE MARKS THE ONES TO BACK UP."
+GUI.LISTBOX.COUNT = 20
+GUI.LISTBOX.ROWS = 6
+GUI.LISTBOX.MULTI = 1
+## Empty rather than left over: any string that is not COUNT characters
+## long starts the dialog with nothing marked, which is what we want here.
+GUI.LISTBOX.MARKS$ = ""
+GUI.LISTBOX.SEL = 1
+GOSUB GUI.LISTBOX
+DEMO.MARKED = GUI.LISTBOX.MARKED : DEMO.LSEL = GUI.LISTBOX.SEL
+
 ## ---- what came back, on the page that survived ----------------------
 ##
 ## GP.PRINTAT, not PRINT: PRINT would scroll the very page the dialogs
@@ -103,7 +135,11 @@ DEMO.LINE$ = "OK/CANCEL ANSWERED CANCEL"
 IF DEMO.OKC = 1 THEN DEMO.LINE$ = "OK/CANCEL ANSWERED OK    "
 GP.PRINTAT 4, 23, DEMO.LINE$, THEME.CLR(THEME.WARN)
 
-GP.PRINTAT 4, 24, "ANY KEY TO FINISH.", THEME.CLR(THEME.DIMMED)
+DEMO.LINE$ = "LISTBOX CANCELLED             "
+IF DEMO.LSEL > 0 THEN DEMO.LINE$ = "LISTBOX MARKED " + MID$(STR$(DEMO.MARKED), 2) + " OF 20     "
+GP.PRINTAT 4, 24, DEMO.LINE$, THEME.CLR(THEME.WARN)
+
+GP.PRINTAT 4, 25, "ANY KEY TO FINISH.", THEME.CLR(THEME.DIMMED)
 DEMO.WAIT:
 GET DEMO.K$
 IF DEMO.K$ = "" THEN GOTO DEMO.WAIT
@@ -124,7 +160,7 @@ END
 DEMO.PAGE:
     GP.FILL 0, 0, 80, 30, ASC(" "), THEME.CLR(THEME.PAGE)
     GP.FILL 0, 0, 80, 1, ASC(" "), THEME.CLR(THEME.TITLE)
-    GP.PRINTAT 2, 0, "GUI.INC.BL -- GUI.YN, GUI.TEXT, GUI.MENU", THEME.CLR(THEME.TITLE)
+    GP.PRINTAT 2, 0, "GUI.YN, GUI.TEXT, GUI.MENU, GUI.LISTBOX", THEME.CLR(THEME.TITLE)
     FOR DEMO.R = 2 TO 18
         DEMO.LINE$ = ""
         FOR DEMO.C = 0 TO 8
@@ -133,5 +169,5 @@ DEMO.PAGE:
         GP.PRINTAT 0, DEMO.R, LEFT$(DEMO.LINE$, 78), THEME.CLR(THEME.DIMMED)
     NEXT DEMO.R
     GP.PRINTAT 2, 26, "EACH DIALOG SAVES WHAT IT COVERS.", THEME.CLR(THEME.TEXT)
-    GP.PRINTAT 2, 27, "THE NUMBERED ROWS MUST SURVIVE ALL THREE.", THEME.CLR(THEME.TEXT)
+    GP.PRINTAT 2, 27, "THE NUMBERED ROWS MUST SURVIVE ALL FOUR.", THEME.CLR(THEME.TEXT)
     RETURN

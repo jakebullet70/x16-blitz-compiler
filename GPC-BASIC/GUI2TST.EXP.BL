@@ -3,7 +3,7 @@
 ## drive a program sitting in a GET loop.
 ##
 ## What is checked is the LOGIC: which item the highlight lands on, where the
-## WINDOW ends up, and which marks come back. The drawing is not -- GUI2 draws
+## WINDOW ends up, and which marks come back. The drawing is not -- the listbox draws
 ## through MENUVERT.ROW, GP.FILL and GP.PRINTAT, all shipped and verified.
 ##
 ## GUI.BANK = 0 on purpose: no stash, so nothing here depends on a spare bank
@@ -47,116 +47,128 @@ NEXT T.I
 
 GUI.BANK = 0 : GUI.TITLE$ = "" : GUI.MSG2$ = ""
 GUI.MSG$ = "PICK ONE"
-GUI2.COUNT = 20 : GUI2.ROWS = 5
+GUI.LISTBOX.COUNT = 20 : GUI.LISTBOX.ROWS = 5
 
 ## ---- 1. three downs and RETURN. Item 4, and the window has moved by 0 -- the
 ## ---- highlight is still inside the first five.
-GUI2.MULTI = 0 : GUI2.SEL = 0
+GUI.LISTBOX.MULTI = 0 : GUI.LISTBOX.SEL = 0
 KEY.CODE = K.DOWN : GOSUB KEY.SEND
 KEY.CODE = K.DOWN : GOSUB KEY.SEND
 KEY.CODE = K.DOWN : GOSUB KEY.SEND
 KEY.CODE = K.RETURN : GOSUB KEY.SEND
-GOSUB GUI2.LIST
-T.A = GUI2.SEL : T.AS = MENUVERT.SCROLL : T.AK = GUI.KEY
+GOSUB GUI.LISTBOX
+T.A = GUI.LISTBOX.SEL : T.AS = MENUVERT.SCROLL : T.AK = GUI.KEY
 
 ## ---- 2. one more down than the window holds: item 6, and the window has
 ## ---- scrolled by exactly one. This is the case a non-windowed menu cannot do.
-GUI2.SEL = 1
+GUI.LISTBOX.SEL = 1
 FOR T.I = 1 TO 5
     KEY.CODE = K.DOWN : GOSUB KEY.SEND
 NEXT T.I
 KEY.CODE = K.RETURN : GOSUB KEY.SEND
-GOSUB GUI2.LIST
-T.B = GUI2.SEL : T.BS = MENUVERT.SCROLL
+GOSUB GUI.LISTBOX
+T.B = GUI.LISTBOX.SEL : T.BS = MENUVERT.SCROLL
 
 ## ---- 3. END goes to the last item and pins the window at COUNT - ROWS.
-GUI2.SEL = 1
+GUI.LISTBOX.SEL = 1
 KEY.CODE = K.END : GOSUB KEY.SEND
 KEY.CODE = K.RETURN : GOSUB KEY.SEND
-GOSUB GUI2.LIST
-T.C = GUI2.SEL : T.CS = MENUVERT.SCROLL
+GOSUB GUI.LISTBOX
+T.C = GUI.LISTBOX.SEL : T.CS = MENUVERT.SCROLL
 
 ## ---- 4. HOME comes all the way back, window included.
-GUI2.SEL = 20
+GUI.LISTBOX.SEL = 20
 KEY.CODE = K.HOME : GOSUB KEY.SEND
 KEY.CODE = K.RETURN : GOSUB KEY.SEND
-GOSUB GUI2.LIST
-T.D = GUI2.SEL : T.DS = MENUVERT.SCROLL
+GOSUB GUI.LISTBOX
+T.D = GUI.LISTBOX.SEL : T.DS = MENUVERT.SCROLL
 
 ## ---- 5. PgDn is one window, so 1 -> 6.
-GUI2.SEL = 1
+GUI.LISTBOX.SEL = 1
 KEY.CODE = K.PGDN : GOSUB KEY.SEND
 KEY.CODE = K.RETURN : GOSUB KEY.SEND
-GOSUB GUI2.LIST
-T.E = GUI2.SEL
+GOSUB GUI.LISTBOX
+T.E = GUI.LISTBOX.SEL
 
 ## ---- 6. NO WRAP, both ends. Up at the top stays at the top; PgUp from item 3
 ## ---- clamps rather than running off into negative.
-GUI2.SEL = 1
+GUI.LISTBOX.SEL = 1
 KEY.CODE = K.UP : GOSUB KEY.SEND
 KEY.CODE = K.PGUP : GOSUB KEY.SEND
 KEY.CODE = K.RETURN : GOSUB KEY.SEND
-GOSUB GUI2.LIST
-T.F = GUI2.SEL
+GOSUB GUI.LISTBOX
+T.F = GUI.LISTBOX.SEL
 
-GUI2.SEL = 20
+GUI.LISTBOX.SEL = 20
 KEY.CODE = K.DOWN : GOSUB KEY.SEND
 KEY.CODE = K.PGDN : GOSUB KEY.SEND
 KEY.CODE = K.RETURN : GOSUB KEY.SEND
-GOSUB GUI2.LIST
-T.G = GUI2.SEL
+GOSUB GUI.LISTBOX
+T.G = GUI.LISTBOX.SEL
 
 ## ---- 7. ESC cancels and reports 0, whatever the highlight was on.
-GUI2.SEL = 7
+GUI.LISTBOX.SEL = 7
 KEY.CODE = K.ESC : GOSUB KEY.SEND
-GOSUB GUI2.LIST
-T.H = GUI2.SEL : T.HK = GUI.KEY
+GOSUB GUI.LISTBOX
+T.H = GUI.LISTBOX.SEL : T.HK = GUI.KEY
 
 ## ---- 8. MULTI. Mark item 1, move down twice, mark item 3, accept. Two marks,
 ## ---- and they are the ones asked for -- SEL is where the cursor stopped, not
 ## ---- the answer.
 GUI.MSG$ = "PICK SOME"
-GUI2.MULTI = 1 : GUI2.SEL = 1 : GUI2.MARKS$ = ""
+GUI.LISTBOX.MULTI = 1 : GUI.LISTBOX.SEL = 1 : GUI.LISTBOX.MARKS$ = ""
 KEY.CODE = K.SPACE : GOSUB KEY.SEND
 KEY.CODE = K.DOWN : GOSUB KEY.SEND
 KEY.CODE = K.DOWN : GOSUB KEY.SEND
 KEY.CODE = K.SPACE : GOSUB KEY.SEND
 KEY.CODE = K.RETURN : GOSUB KEY.SEND
-GOSUB GUI2.LIST
-T.J = GUI2.MARKED : T.J1$ = MID$(GUI2.MARKS$, 1, 1) : T.J2$ = MID$(GUI2.MARKS$, 2, 1)
-T.J3$ = MID$(GUI2.MARKS$, 3, 1) : T.JL = LEN(GUI2.MARKS$) : T.JS = GUI2.SEL
+GOSUB GUI.LISTBOX
+T.J = GUI.LISTBOX.MARKED : T.J1$ = MID$(GUI.LISTBOX.MARKS$, 1, 1) : T.J2$ = MID$(GUI.LISTBOX.MARKS$, 2, 1)
+T.J3$ = MID$(GUI.LISTBOX.MARKS$, 3, 1) : T.JL = LEN(GUI.LISTBOX.MARKS$) : T.JS = GUI.LISTBOX.SEL
 
 ## ---- 9. SPACE toggles OFF as well as on, and marks survive a scroll: mark 1,
 ## ---- go to the end and back, unmark 1.
-GUI2.SEL = 1 : GUI2.MARKS$ = ""
+GUI.LISTBOX.SEL = 1 : GUI.LISTBOX.MARKS$ = ""
 KEY.CODE = K.SPACE : GOSUB KEY.SEND
 KEY.CODE = K.END : GOSUB KEY.SEND
 KEY.CODE = K.HOME : GOSUB KEY.SEND
 KEY.CODE = K.SPACE : GOSUB KEY.SEND
 KEY.CODE = K.RETURN : GOSUB KEY.SEND
-GOSUB GUI2.LIST
-T.K = GUI2.MARKED : T.K1$ = MID$(GUI2.MARKS$, 1, 1)
+GOSUB GUI.LISTBOX
+T.K = GUI.LISTBOX.MARKED : T.K1$ = MID$(GUI.LISTBOX.MARKS$, 1, 1)
 
 ## ---- 10. A marks string of the WRONG length is not trusted -- the caller may
 ## ---- have changed COUNT since -- so it is replaced with a fresh empty set
 ## ---- rather than indexed past its end.
-GUI2.SEL = 1 : GUI2.MARKS$ = "111"
+GUI.LISTBOX.SEL = 1 : GUI.LISTBOX.MARKS$ = "111"
 KEY.CODE = K.SPACE : GOSUB KEY.SEND
 KEY.CODE = K.RETURN : GOSUB KEY.SEND
-GOSUB GUI2.LIST
-T.L = GUI2.MARKED : T.LL = LEN(GUI2.MARKS$)
+GOSUB GUI.LISTBOX
+T.L = GUI.LISTBOX.MARKED : T.LL = LEN(GUI.LISTBOX.MARKS$)
+
+## ---- 10b. Marks handed IN are counted before the box is drawn -- the footer shows
+## ---- the number from the first frame, so it cannot wait until RETURN.
+GUI.LISTBOX.SEL = 1 : GUI.LISTBOX.MARKS$ = "11100000000000000000"
+KEY.CODE = K.RETURN : GOSUB KEY.SEND
+GOSUB GUI.LISTBOX
+T.Q = GUI.LISTBOX.MARKED
 
 ## ---- 11. A one item list still works, and the window does not move.
-GUI2.COUNT = 1 : GUI2.MULTI = 0 : GUI2.SEL = 0
+GUI.LISTBOX.COUNT = 1 : GUI.LISTBOX.MULTI = 0 : GUI.LISTBOX.SEL = 0
 KEY.CODE = K.DOWN : GOSUB KEY.SEND
 KEY.CODE = K.RETURN : GOSUB KEY.SEND
-GOSUB GUI2.LIST
-T.M = GUI2.SEL : T.MS = MENUVERT.SCROLL
+GOSUB GUI.LISTBOX
+T.M = GUI.LISTBOX.SEL : T.MS = MENUVERT.SCROLL
+
+## ---- 11b. the box the OK/CANCEL hint asks for, measured off the same call: one
+## ---- list row, a blank, the hint. 1 head + 1 gap + 3 body + 2 pad + 2 frame = 9
+## ---- rows, and a body no narrower than the 26 character hint.
+T.MH = GUI.HEIGHT : T.MW = GUI.INNER.WIDTH
 
 ## ---- 12. An empty list cancels instead of drawing a box with no rows.
-GUI2.COUNT = 0 : GUI2.SEL = 5
-GOSUB GUI2.LIST
-T.N = GUI2.SEL
+GUI.LISTBOX.COUNT = 0 : GUI.LISTBOX.SEL = 5
+GOSUB GUI.LISTBOX
+T.N = GUI.LISTBOX.SEL
 
 CLS
 PRINT "A";T.A;T.AS;T.AK;" EXPECT 4 0 13"
@@ -173,6 +185,8 @@ PRINT "K";T.K;" MARK1 ";T.K1$;" EXPECT 0 0"
 PRINT "L";T.L;T.LL;" EXPECT 1 20"
 PRINT "M";T.M;T.MS;" EXPECT 1 0"
 PRINT "N";T.N;" EXPECT 0"
+PRINT "P";T.MH;T.MW;" EXPECT 9 26"
+PRINT "Q";T.Q;" EXPECT 3"
 PRINT "@DONE@"
 POWEROFF
 
