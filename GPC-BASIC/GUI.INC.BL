@@ -17,8 +17,14 @@
 ## **      STASH.INC.BL      saves the cells the box covers -- and wants a
 ## **                        #SYMFILE in your program, see its own header
 ## **      THEME.INC.BL      the colour roles, and GOSUB THEME.LOAD first
-## **      MENUVERT.INC.BL   GUI.MENU only
-## **      LINEINPUT.INC.BL    GUI.TEXT only
+## **      MENUVERT.INC.BL   drawn on by GUI.MENU
+## **      LINEINPUT.INC.BL  drawn on by GUI.TEXT
+## **
+## **  BOTH ARE REQUIRED EVEN IF YOU ONLY CALL GUI.YN. BASLOAD resolves every
+## **  label in the file, not the ones a path reaches, so leaving either out
+## **  stops the tokenise with LABEL NOT FOUND rather than compiling a smaller
+## **  program. They used to be listed here as "GUI.MENU only" and "GUI.TEXT
+## **  only", which is true of the CALLS and not of the build.
 ## **
 ## **  Usage, the whole of it:
 ## **      THEME.DARK = 0 : GOSUB THEME.LOAD

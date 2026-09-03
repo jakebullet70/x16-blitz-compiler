@@ -1406,45 +1406,47 @@ drawing, keys and dispatch) and `ED-STORE.BASL` has always owned the document st
 - **`ED-VIEW.BASL` is the most delicate**: it holds both `GP.ASM` renderers, and `{VAR}` needs the
   variable slot to already exist, so anything it reads must still be assigned textually earlier.
 
-### `GUI.INC.BL` wants a listbox, single and multi select
+### A LISTBOX, single and multi select — DONE 2026-09-03, as `GUI2.INC.BL`
 
-A fourth dialog beside `GUI.YN`, `GUI.MENU` and `GUI.TEXT`: a scrolling list, with a multi-select
-mode that returns a set rather than one row.
+Its own file, not a fourth entry point in `GUI.INC.BL`: a scrolling window and a set of marks are
+wanted by nothing else in the library, so `#INCLUDE "GUI2.INC.BL"` when you want a listbox and pay
+nothing when you do not. It builds on `GUI.OPEN` / `GUI.CLOSE` rather than a copy of them, and
+draws through `MENUVERT.ROW`, which is what the old entry said to do.
 
-**`GUI.MENU` is not it and should not be stretched into it.** That is `MENUVERT.RUN` in a frame: it
-draws every row it is given, so the list has to fit the screen, and it returns one `GUI.SEL`. A
-listbox is the two things it does not do — a WINDOW onto a list longer than the box, and more than
-one answer.
+**The two open questions, answered:**
 
-**What is already in place**, and worth building on rather than around:
+1. **The window is `MENUVERT.SCROLL`**, a new input on `MENUVERT.INC.BL`: screen row R draws
+   `ITEM$(SCROLL + R)`. **It is an OFFSET defaulting to 0, not a 1-based top-row number**, and that
+   is the whole safety of it — an unassigned variable is already 0, so the editor's bar, its
+   dropdown and `GUI.MENU` are unchanged without touching any of them. A 1-based input would have
+   read `ITEM$(R-1)` everywhere it was left unset. `MENUVERT.RUN` does not touch SCROLL, because
+   scrolling needs a key loop that knows the list is longer than COUNT — which is `GUI2.LIST`.
+2. **The marks are a string**, `GUI2.MARKS$`, one character an item. No second array to DIM and no
+   bound to guess, and **`GP.STRPTR` lets SPACE POKE one byte rather than rebuilding the string**,
+   so toggling allocates nothing where `LEFT$ + CHR$ + MID$` would leave a dead block per keypress.
+   The price is 250 items, which is a string.
 
-- The box itself. `GUI.OPEN` / `GUI.CLOSE` measure, place, stash and restore, and `GUI.OPEN` is
-  public exactly so a fourth kind of dialog is built on it. `GUI.BODY.ROWS` / `GUI.BODY.WIDTH` in,
-  `GUI.INNER.*` out; the height is the caller's choice, which is what makes a window possible.
-- `MENUVERT.ROW` draws one row at `MENUVERT.DRAWROW` in `MENUVERT.DRAWATTR` — the primitive, below
-  `MENUVERT.DRAW`, and it is how the editor's dropdown paints its highlight. A listbox is that
-  primitive over a slice of the array, which means the drawing is already written.
-- `MENUVERT.KEYEXIT` hands back a key the menu has no use for. SPACE toggling a selection is
-  exactly that shape, and it is how the editor's bar takes LEFT and RIGHT.
+**Also decided:** one entry point with `GUI2.MULTI` rather than two labels; no wrap at either end,
+because a list you page through is one you can be lost in; and the window position goes in the
+bottom frame edge as `11-20 OF 47`, which is digits only and so needs no glyph indices from a
+caller with a re-ordered font. **The mark column belongs to `GUI2`, not `MENUVERT`** — the rows are
+indented and MENUVERT owns only the text columns, so the caller's array is never edited to carry a
+marker.
 
-**The two real questions**, neither of which the existing modules answer:
+**`GUI2TST.EXP.BL` is the regression**, on the `kbdbuf_put` harness `MENUTST.EXP.BL` uses. 14 cases,
+green first run: paging, HOME/END, both no-wrap ends, ESC, marks surviving a scroll, a marks string
+of the wrong length being replaced rather than indexed past, a one-item list and an empty one.
 
-1. **Where the marks live.** `MENUVERT.ITEM$` is the caller's array by contract — the module refuses
-   to guess a bound — so the marks want a parallel `GUI.MARK()` the caller DIMs, or a returned
-   string of flags. A string means no second DIM and no bound to guess, and 250 items is a
-   plausible ceiling for a dialog. Decide before writing the interface, not after.
-2. **Whether the scroll is the listbox's or MENUVERT's.** Drawing a window means either passing
-   `MENUVERT` a slice each repaint (cheap, and keeps `MENUVERT` unchanged) or teaching it a top-row
-   input (one number, but it changes a shipped module every caller depends on). Prefer the slice
-   until something needs otherwise.
+**Two BASLOAD facts this cost, both now in memory:**
 
-Cost is BASL, not runtime: nothing here needs a keyword. Watch the size of the module anyway --
-`GUI.INC.BL` is 479 lines and every caller pays for all of it, so if the listbox is large it may
-want to be `GUILIST.INC.BL` beside it rather than inside it.
-
-**Test it the way the GUI checks in `samples/editor/EDITOR.BASL` are tested**: keys through
-`kbdbuf_put`, and read the map back with `VPEEK` before printing anything. And walk every row of the
-panel, not one sampled cell — that lesson has already cost a shipped dropdown with rows missing.
+- **`#DEFINE` and `#IFNDEF` reject a DIGIT in the symbol name** — `INVALID PARAMETER`, and the
+  6-byte PRG that "compiles" to `OK CODE 11`. Variables and labels take digits happily, and
+  BASLOAD's own manual says identifiers may contain them. So `GUI2.INC.BL` keeps `GUI2.*` for
+  everything a caller touches and spells its constants `GUILIST.*`.
+- **An `#INCLUDE` is never optional.** BASLOAD resolves every label in the file, not the ones a path
+  reaches, so `GUI.INC.BL` needs `MENUVERT.INC.BL` **and** `LINEINPUT.INC.BL` present even in a
+  program that only calls `GUI.YN`. Its header said "GUI.MENU only" / "GUI.TEXT only"; that is true
+  of the calls and false of the build, and is corrected.
 
 ### The editor has LINE NUMBERS down the left — DONE
 
@@ -1499,14 +1501,14 @@ replacements rather than a rewrite, then prove the code did not move —
     ... then rebuild and check the object is byte-identical
 
 Both editor rebuilds landed on `OK CODE 15166 FREE 6144 RT 13055`, `EDITOR.PRG` 26,899 bytes, so the
-trims are provably free. Watch two things: `EDBENCH.BASL`'s `REM`s are the **GP.ASM source itself**
+trims are provably free. Watch two things: `BENCHROWS.BASL`'s `REM`s are the **GP.ASM source itself**
 (under `#REM 1`) and must not be touched, and `GUI.INC.BL` has **two copies** — `GPC-BASIC/` and
 `samples/editor/GPC-BASIC/` — that have to stay identical.
 
 **DONE, all of it.** `samples/editor/EDITOR.BASL` 709 -> 423 prose lines, `STORE.BASL`, and all
 thirteen `GPC-BASIC/*.INC.BL`: **2,195 -> 1,753 prose lines**, code verified identical file by file
 and the editor rebuilding to the same `OK CODE 15166 FREE 6144 RT 13055` with `EDITOR.PRG` the same
-26,899 bytes. `EDBENCH.BASL` inspected and correctly left alone -- its `REM`s are GP.ASM source.
+26,899 bytes. `BENCHROWS.BASL` inspected and correctly left alone -- its `REM`s are GP.ASM source.
 
 Per file, prose lines before -> after: `GPB` 376 -> 286, `GUI` 372 -> 256, `MENUVERT` 248 -> 173,
 `BMX` 248 -> 194, `SORT` 174 -> 134, `MENUBAR` 164 -> 131, `STASH` 158 -> 123, `STRINGS` 147 -> 118,
@@ -1605,7 +1607,7 @@ finished 2026-08-30, when `GP.ASM` made the answer buildable.
   recommendation was a native built-in that streams a row buffer to `DATA0`, chosen to dodge inline
   ASM's authoring and ABI hazards. `GP.ASM` shipped first and dodges them by itself, so the block-blit
   command is **not needed** — and it would have cost runtime bytes in every program, which `GP.ASM`
-  does not. Measured with both versions in one program (`EDBENCH.BASL`, real speed, loop floor
+  does not. Measured with both versions in one program (`BENCHROWS.BASL`, real speed, loop floor
   subtracted, cells read back and blanked between variants): text row **2320 → 18.8** jiffies/1000
   (123×, ~31 cycles/cell), chrome field **2538 → 23.3** (109×). P-code went *down*, 7190 → 7101
   bytes, and on the assembly alone the program was still `GP-BASIC OUT`.

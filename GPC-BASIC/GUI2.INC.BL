@@ -1,0 +1,305 @@
+## ***********************************************************************
+## **
+## **  GUI2.INC.BL -- a listbox, single or multi select.
+## **
+## **      GUI2.LIST   a WINDOW onto a list longer than the box, and
+## **                  optionally more than one answer
+## **
+## **  SEPARATE FROM GUI.INC.BL ON PURPOSE. This is the only dialog that needs
+## **  a scrolling window and a set of marks, and nothing else in the library
+## **  wants either. #INCLUDE it when you want a listbox and pay nothing when
+## **  you do not.
+## **
+## **  GUI.MENU is not this and should not be stretched into it: that is
+## **  MENUVERT.RUN in a frame, so the list must fit the screen and it returns
+## **  one row. This is the two things it does not do.
+## **
+## **  REQUIRES, and does not #INCLUDE for you, in this order:
+## **      GPB.INC.BL        GP.FILL, GP.PRINTAT, GP.STRPTR, GP.SELECT
+## **      STASH.INC.BL      via GUI.OPEN -- and wants a #SYMFILE, see its header
+## **      THEME.INC.BL      the colour roles, and GOSUB THEME.LOAD first
+## **      MENUVERT.INC.BL   MENUVERT.ROW draws the rows
+## **      GUI.INC.BL        GUI.OPEN and GUI.CLOSE are the box
+## **
+## **  Usage:
+## **      DIM MENUVERT.ITEM$(200)
+## **      ... fill 1..N ...
+## **      GUI2.COUNT = N : GUI2.ROWS = 8 : GUI2.MULTI = 1
+## **      GUI.MSG$ = "PICK FILES" : GUI.BANK = 8
+## **      GOSUB GUI2.LIST
+## **      IF GUI2.SEL = 0 THEN <cancelled>
+## **
+## **   in   GUI2.COUNT      how many items. 0 or less returns cancelled
+## **        MENUVERT.ITEM$()  the items, 1..COUNT. THE CALLER OWNS THE DIM,
+## **                        for MENUVERT's reason: a module cannot be handed an
+## **                        array, and DIMming one means guessing a bound
+## **        GUI2.ROWS       rows visible at once. 0 takes 10, and it is always
+## **                        cut to COUNT and to what the screen holds
+## **        GUI2.MULTI      0 chooses one row. 1 marks a set with SPACE
+## **        GUI2.MARKS$     multi only, IN as well as out: COUNT characters,
+## **                        "1" marked. Anything else -- "" included -- starts
+## **                        with none marked
+## **        GUI2.SEL        the item to start on. 0 starts at 1
+## **        plus everything GUI.OPEN reads: GUI.MSG$, GUI.MSG2$, GUI.TITLE$,
+## **        GUI.BANK, GUI.STYLE, GUI.GLYPH, GUI.PLACE and the rest
+## **
+## **   out  GUI2.SEL        the item under the highlight, 1..COUNT, or 0 if
+## **                        cancelled. In multi that is where the cursor was,
+## **                        not the answer -- the marks are the answer
+## **        GUI2.MARKS$     multi only: COUNT characters, "1" marked
+## **        GUI2.MARKED     multi only: how many are marked
+## **        GUI.KEY         13 accepted, 27 or 3 cancelled
+## **
+## **  KEYS: up and down move, PgUp and PgDn page, HOME and END jump, SPACE
+## **  toggles a mark in multi, RETURN accepts, ESC and STOP cancel. The codes
+## **  are the ones samples/editor dispatches on, so they are known good.
+## **
+## **  THE MARKS ARE A STRING AND ARE TOGGLED IN PLACE. GP.STRPTR gives the
+## **  address of the characters, so SPACE POKEs one byte and allocates nothing
+## **  -- where LEFT$ + CHR$ + MID$ would build a whole new string per keypress,
+## **  and the old block is dead for good. It also means no second array to DIM
+## **  and no bound to guess. THE PRICE IS 250 ITEMS, which is a string.
+## **
+## **  THE WINDOW IS MENUVERT.SCROLL. Screen row R draws ITEM$(SCROLL + R), so
+## **  the drawing is MENUVERT.ROW unchanged and this file only decides what
+## **  SCROLL is. That input is an offset defaulting to 0 precisely so every
+## **  menu that never heard of it is unaffected.
+## **
+## **  THE MARK COLUMNS ARE THIS FILE'S, NOT MENUVERT'S. In multi the rows are
+## **  indented by GUILIST.MARKW and MENUVERT owns only the text columns, so the
+## **  caller's array is never touched to add a marker to it.
+## **
+## **  THE CONSTANTS BELOW ARE GUILIST.*, NOT GUI2.*, AND THAT IS NOT A TYPO.
+## **  BASLOAD rejects a DIGIT in a #DEFINE or #IFNDEF name -- "INVALID
+## **  PARAMETER", and the tokenise stops -- even though its own manual allows
+## **  digits in identifiers and variables and labels accept them happily. So
+## **  everything a caller touches is GUI2.*, being variables and labels, and
+## **  only the preprocessor constants, which nobody outside this file names,
+## **  had to be spelled without the 2.
+## **
+## **  The whole GUI2.* name space belongs to this file.
+## **
+## ***********************************************************************
+#IFNDEF GUILIST.DEFS
+#DEFINE GUILIST.DEFS 1
+
+## The editor dispatches on exactly these, so they are tested rather than guessed.
+#DEFINE GUILIST.UP 145
+#DEFINE GUILIST.DOWN 17
+#DEFINE GUILIST.HOME 19
+#DEFINE GUILIST.END 4
+#DEFINE GUILIST.PGUP 130
+#DEFINE GUILIST.PGDN 2
+
+## The mark, and the columns it and its gap take. "*" survives both charsets.
+#DEFINE GUILIST.MARKCH 42
+#DEFINE GUILIST.MARKW 2
+
+## Rows when the caller does not say. Ten is a dialog, not a screen.
+#DEFINE GUILIST.DEFROWS 10
+
+## "0" and "1". 97 - c flips between them in one subtract.
+#DEFINE GUILIST.OFF 48
+#DEFINE GUILIST.ON 49
+
+GOTO GUI2.MODULE.END
+
+## ***********************************************************************
+## **  GUI2.LIST -- the whole thing.
+## ***********************************************************************
+
+GUI2.LIST:
+    GUI.KEY = 0
+    IF GUI2.COUNT < 1 THEN GUI2.SEL = 0 : RETURN
+
+## ---- The window: what was asked for, then cut to the list and to the screen. The
+## ---- screen cut is what stops a caller asking for 40 rows in a 30 row mode and
+## ---- getting a box GUI.PLACE.BOX has to clamp.
+
+    GUI2.ROWS.USE = GUI2.ROWS
+    IF GUI2.ROWS.USE < 1 THEN GUI2.ROWS.USE = GUILIST.DEFROWS
+    IF GUI2.ROWS.USE > GUI2.COUNT THEN GUI2.ROWS.USE = GUI2.COUNT
+    GOSUB GUI.SCREEN
+    IF GUI2.ROWS.USE > GUI.SCREEN.ROWS - 6 THEN GUI2.ROWS.USE = GUI.SCREEN.ROWS - 6
+    IF GUI2.ROWS.USE < 1 THEN GUI2.ROWS.USE = 1
+
+## ---- Measured over the WHOLE list, not the first window: a box that grew when you
+## ---- scrolled would have to be redrawn, and the frame is stashed.
+
+    GUI2.TEXTW = 0
+    FOR GUI2.I = 1 TO GUI2.COUNT
+        IF LEN(MENUVERT.ITEM$(GUI2.I)) > GUI2.TEXTW THEN GUI2.TEXTW = LEN(MENUVERT.ITEM$(GUI2.I))
+    NEXT GUI2.I
+    GUI2.MARKOFF = 0
+    IF GUI2.MULTI <> 0 THEN GUI2.MARKOFF = GUILIST.MARKW
+
+## ---- The count line lives in the bottom frame edge and only exists when something
+## ---- is actually hidden. Built once, here, so the box can be measured to hold it.
+
+## ---- Measured at its WIDEST, which is COUNT in all three places -- "1-10 OF 47" is
+## ---- shorter than "38-47 OF 47", and a box measured on the first would be too narrow
+## ---- for the last. The real text is built in GUI2.REPAINT.
+
+    GUI2.NOTE$ = ""
+    IF GUI2.COUNT > GUI2.ROWS.USE THEN GUI2.NOTE$ = " " + MID$(STR$(GUI2.COUNT), 2) + "-" + MID$(STR$(GUI2.COUNT), 2) + " OF " + MID$(STR$(GUI2.COUNT), 2) + " "
+    GUI.BODY.WIDTH = GUI2.TEXTW + GUI2.MARKOFF
+    IF LEN(GUI2.NOTE$) + 2 > GUI.BODY.WIDTH THEN GUI.BODY.WIDTH = LEN(GUI2.NOTE$) + 2
+    GUI.BODY.ROWS = GUI2.ROWS.USE
+    GOSUB GUI.OPEN
+
+## ---- MENUVERT owns the TEXT columns only. In multi the mark column sits to their
+## ---- left and belongs to this file, which is how the caller's array stays untouched.
+
+    MENUVERT.X = GUI.INNER.LEFT + GUI2.MARKOFF : MENUVERT.Y = GUI.INNER.TOP
+    MENUVERT.WIDTH = GUI.INNER.WIDTH - GUI2.MARKOFF
+    MENUVERT.COUNT = GUI2.ROWS.USE
+    MENUVERT.ATTR = GUI.PANEL : MENUVERT.HOTATTR = 0 : MENUVERT.HOT$ = ""
+    GUI2.HI = THEME.CLR(THEME.HILITE)
+
+## ---- The marks. A string of the wrong length is not an error and not trusted: the
+## ---- caller may have changed COUNT since, so anything that does not measure up is
+## ---- replaced with a fresh set of "0". One RPT$ allocation, then never again.
+
+    IF GUI2.MULTI = 0 THEN GOTO GUI2.NOMARKS
+    IF LEN(GUI2.MARKS$) <> GUI2.COUNT THEN GUI2.MARKS$ = RPT$(GUILIST.OFF, GUI2.COUNT)
+    GUI2.MARKP = GP.STRPTR(GUI2.MARKS$)
+GUI2.NOMARKS:
+
+    IF GUI2.SEL < 1 THEN GUI2.SEL = 1
+    IF GUI2.SEL > GUI2.COUNT THEN GUI2.SEL = GUI2.COUNT
+    MENUVERT.SCROLL = 0
+    GOSUB GUI2.FOLLOW
+    GOSUB GUI2.REPAINT
+
+## ***********************************************************************
+## **  The key loop.
+## ***********************************************************************
+
+GUI2.WAIT:
+    GET GUI2.IN$
+    IF GUI2.IN$ = "" THEN GOTO GUI2.WAIT
+    GUI2.CODE = ASC(GUI2.IN$)
+    GUI2.DONE = 0 : GUI2.PREV = GUI2.SEL : GUI2.PREVSCROLL = MENUVERT.SCROLL
+
+    GP.SELECT GUI2.CODE
+        GP.CASE GUILIST.UP
+            GUI2.SEL = GUI2.SEL - 1
+        GP.CASE GUILIST.DOWN
+            GUI2.SEL = GUI2.SEL + 1
+        GP.CASE GUILIST.PGUP
+            GUI2.SEL = GUI2.SEL - GUI2.ROWS.USE
+        GP.CASE GUILIST.PGDN
+            GUI2.SEL = GUI2.SEL + GUI2.ROWS.USE
+        GP.CASE GUILIST.HOME
+            GUI2.SEL = 1
+        GP.CASE GUILIST.END
+            GUI2.SEL = GUI2.COUNT
+        GP.CASE GUI.SPACE
+            IF GUI2.MULTI <> 0 THEN GOSUB GUI2.TOGGLE
+        GP.CASE GUI.RETURN
+            GUI2.DONE = 1
+        GP.CASE GUI.ESCAPE, GUI.STOP
+            GUI2.SEL = 0 : GUI2.DONE = 1
+    GP.ENDSEL
+
+    IF GUI2.DONE <> 0 THEN GOTO GUI2.FINISH
+
+## ---- NO WRAP. A list you can page through is one you can be lost in, and running off
+## ---- the bottom to the top of a 200 item list is disorienting rather than convenient.
+
+    IF GUI2.SEL < 1 THEN GUI2.SEL = 1
+    IF GUI2.SEL > GUI2.COUNT THEN GUI2.SEL = GUI2.COUNT
+    GOSUB GUI2.FOLLOW
+
+## ---- A scroll repaints the window; a move inside it repaints TWO rows. That is the
+## ---- whole reason the highlight is not just redrawn every keypress.
+
+    IF MENUVERT.SCROLL <> GUI2.PREVSCROLL THEN GOSUB GUI2.REPAINT : GOTO GUI2.WAIT
+    IF GUI2.SEL = GUI2.PREV THEN GOTO GUI2.WAIT
+    GUI2.ROW = GUI2.PREV - MENUVERT.SCROLL : GUI2.ATTR = MENUVERT.ATTR : GOSUB GUI2.PAINT.ROW
+    GUI2.ROW = GUI2.SEL - MENUVERT.SCROLL : GUI2.ATTR = GUI2.HI : GOSUB GUI2.PAINT.ROW
+    GOTO GUI2.WAIT
+
+GUI2.FINISH:
+    GUI.KEY = GUI2.CODE
+    GUI2.MARKED = 0
+    IF GUI2.MULTI = 0 THEN GOTO GUI2.SHUT
+    FOR GUI2.I = 1 TO GUI2.COUNT
+        IF PEEK(GUI2.MARKP + GUI2.I) = GUILIST.ON THEN GUI2.MARKED = GUI2.MARKED + 1
+    NEXT GUI2.I
+GUI2.SHUT:
+    GOSUB GUI.CLOSE
+    RETURN
+
+## ***********************************************************************
+## **  GUI2.TOGGLE -- one mark, POKEd where it lies.
+## **
+## **  97 - c turns 48 into 49 and 49 into 48. GUI2.MARKP is taken once, at the top:
+## **  a Blitz string owns its block and the block does not move, and nothing here
+## **  ever reassigns GUI2.MARKS$, so the pointer stays good for the whole dialog.
+## ***********************************************************************
+
+GUI2.TOGGLE:
+    POKE GUI2.MARKP + GUI2.SEL, 97 - PEEK(GUI2.MARKP + GUI2.SEL)
+    GUI2.ROW = GUI2.SEL - MENUVERT.SCROLL : GUI2.ATTR = GUI2.HI : GOSUB GUI2.PAINT.ROW
+    RETURN
+
+## ***********************************************************************
+## **  GUI2.FOLLOW -- move the window the least it can to show GUI2.SEL.
+## ***********************************************************************
+
+GUI2.FOLLOW:
+    IF GUI2.SEL - MENUVERT.SCROLL < 1 THEN MENUVERT.SCROLL = GUI2.SEL - 1
+    IF GUI2.SEL - MENUVERT.SCROLL > GUI2.ROWS.USE THEN MENUVERT.SCROLL = GUI2.SEL - GUI2.ROWS.USE
+    IF MENUVERT.SCROLL > GUI2.COUNT - GUI2.ROWS.USE THEN MENUVERT.SCROLL = GUI2.COUNT - GUI2.ROWS.USE
+    IF MENUVERT.SCROLL < 0 THEN MENUVERT.SCROLL = 0
+    RETURN
+
+## ***********************************************************************
+## **  GUI2.REPAINT -- every visible row, and the count line.
+## ***********************************************************************
+
+GUI2.REPAINT:
+    FOR GUI2.EACH = 1 TO GUI2.ROWS.USE
+        GUI2.ROW = GUI2.EACH : GUI2.ATTR = MENUVERT.ATTR
+        IF MENUVERT.SCROLL + GUI2.EACH = GUI2.SEL THEN GUI2.ATTR = GUI2.HI
+        GOSUB GUI2.PAINT.ROW
+    NEXT GUI2.EACH
+    IF GUI2.NOTE$ = "" THEN RETURN
+
+## ---- Rebuilt on every scroll, which is once a keypress at worst and only while the
+## ---- box is open. The two numbers are what is showing, not what is selected.
+
+    GUI2.NOTE$ = " " + MID$(STR$(MENUVERT.SCROLL + 1), 2) + "-" + MID$(STR$(MENUVERT.SCROLL + GUI2.ROWS.USE), 2) + " OF " + MID$(STR$(GUI2.COUNT), 2) + " "
+    GUI2.NOTE.LEFT = GUI.LEFT + INT((GUI.WIDTH - LEN(GUI2.NOTE$)) / 2)
+    GP.PRINTAT GUI2.NOTE.LEFT, GUI.TOP + GUI.HEIGHT - 1, GUI2.NOTE$, GUI.BORDER
+    RETURN
+
+## ***********************************************************************
+## **  GUI2.PAINT.ROW -- one screen row: the mark cell, then MENUVERT's text.
+## **
+## **   in   GUI2.ROW    the SCREEN row, 1..GUI2.ROWS.USE      GUI2.ATTR
+## **
+## **  Guarded rather than trusted: GUI2.TOGGLE and the two-row move both work out a
+## **  screen row by subtracting SCROLL, and a row off the window is a no-op here
+## **  rather than a GP.PRINTAT into the frame.
+## ***********************************************************************
+
+GUI2.PAINT.ROW:
+    IF GUI2.ROW < 1 THEN RETURN
+    IF GUI2.ROW > GUI2.ROWS.USE THEN RETURN
+    MENUVERT.DRAWROW = GUI2.ROW : MENUVERT.DRAWATTR = GUI2.ATTR
+    GOSUB MENUVERT.ROW
+    IF GUI2.MULTI = 0 THEN RETURN
+
+## ---- The mark cell carries the row's own attribute, so the highlight bar reads as one
+## ---- band across the mark and the text rather than stopping short of it.
+
+    GUI2.MARKY = MENUVERT.Y + GUI2.ROW - 1
+    GP.FILL GUI.INNER.LEFT, GUI2.MARKY, GUILIST.MARKW, 1, GUI.SPACE, GUI2.ATTR
+    IF PEEK(GUI2.MARKP + MENUVERT.SCROLL + GUI2.ROW) <> GUILIST.ON THEN RETURN
+    GP.FILL GUI.INNER.LEFT, GUI2.MARKY, 1, 1, GUILIST.MARKCH, GUI2.ATTR
+    RETURN
+
+GUI2.MODULE.END:
+#ENDIF

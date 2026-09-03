@@ -1,0 +1,184 @@
+## GUI2.INC.BL regression -- the listbox. Keys go in through kbdbuf_put, the
+## harness MENUTST.EXP.BL and INPTST.EXP.BL use, because -bas paste cannot
+## drive a program sitting in a GET loop.
+##
+## What is checked is the LOGIC: which item the highlight lands on, where the
+## WINDOW ends up, and which marks come back. The drawing is not -- GUI2 draws
+## through MENUVERT.ROW, GP.FILL and GP.PRINTAT, all shipped and verified.
+##
+## GUI.BANK = 0 on purpose: no stash, so nothing here depends on a spare bank
+## and GUI.CLOSE has nothing to put back. The boxes stay on screen, which is
+## exactly what you want to look at if a case fails.
+#SAVEAS "@:GUI2TST.PRG"
+#SYMFILE "@:GUI2TST.SYM"
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "THEME.INC.BL"
+#INCLUDE "STASH.INC.BL"
+#INCLUDE "MENUVERT.INC.BL"
+## LINEINPUT is here even though nothing below types anything: GUI.INC.BL calls
+## LINEINPUT.GET from GUI.TEXT, and BASLOAD resolves every label whether the path
+## runs or not -- without it the tokenise stops at LABEL NOT FOUND IN GUI.INC.BL.
+#INCLUDE "LINEINPUT.INC.BL"
+#INCLUDE "GUI.INC.BL"
+#INCLUDE "GUI2.INC.BL"
+
+#DEFINE KBDBUF.PUT $F09F
+
+#DEFINE K.UP 145
+#DEFINE K.DOWN 17
+#DEFINE K.HOME 19
+#DEFINE K.END 4
+#DEFINE K.PGUP 130
+#DEFINE K.PGDN 2
+#DEFINE K.SPACE 32
+#DEFINE K.RETURN 13
+#DEFINE K.ESC 27
+
+CLS
+COLOR 1,0
+THEME.DARK = 0 : GOSUB THEME.LOAD
+
+## ---- twenty items, a five row window: every case below needs a list longer
+## ---- than the box, because that is the thing GUI.MENU cannot do.
+DIM MENUVERT.ITEM$(20)
+FOR T.I = 1 TO 20
+    MENUVERT.ITEM$(T.I) = "ITEM " + MID$(STR$(T.I), 2)
+NEXT T.I
+
+GUI.BANK = 0 : GUI.TITLE$ = "" : GUI.MSG2$ = ""
+GUI.MSG$ = "PICK ONE"
+GUI2.COUNT = 20 : GUI2.ROWS = 5
+
+## ---- 1. three downs and RETURN. Item 4, and the window has moved by 0 -- the
+## ---- highlight is still inside the first five.
+GUI2.MULTI = 0 : GUI2.SEL = 0
+KEY.CODE = K.DOWN : GOSUB KEY.SEND
+KEY.CODE = K.DOWN : GOSUB KEY.SEND
+KEY.CODE = K.DOWN : GOSUB KEY.SEND
+KEY.CODE = K.RETURN : GOSUB KEY.SEND
+GOSUB GUI2.LIST
+T.A = GUI2.SEL : T.AS = MENUVERT.SCROLL : T.AK = GUI.KEY
+
+## ---- 2. one more down than the window holds: item 6, and the window has
+## ---- scrolled by exactly one. This is the case a non-windowed menu cannot do.
+GUI2.SEL = 1
+FOR T.I = 1 TO 5
+    KEY.CODE = K.DOWN : GOSUB KEY.SEND
+NEXT T.I
+KEY.CODE = K.RETURN : GOSUB KEY.SEND
+GOSUB GUI2.LIST
+T.B = GUI2.SEL : T.BS = MENUVERT.SCROLL
+
+## ---- 3. END goes to the last item and pins the window at COUNT - ROWS.
+GUI2.SEL = 1
+KEY.CODE = K.END : GOSUB KEY.SEND
+KEY.CODE = K.RETURN : GOSUB KEY.SEND
+GOSUB GUI2.LIST
+T.C = GUI2.SEL : T.CS = MENUVERT.SCROLL
+
+## ---- 4. HOME comes all the way back, window included.
+GUI2.SEL = 20
+KEY.CODE = K.HOME : GOSUB KEY.SEND
+KEY.CODE = K.RETURN : GOSUB KEY.SEND
+GOSUB GUI2.LIST
+T.D = GUI2.SEL : T.DS = MENUVERT.SCROLL
+
+## ---- 5. PgDn is one window, so 1 -> 6.
+GUI2.SEL = 1
+KEY.CODE = K.PGDN : GOSUB KEY.SEND
+KEY.CODE = K.RETURN : GOSUB KEY.SEND
+GOSUB GUI2.LIST
+T.E = GUI2.SEL
+
+## ---- 6. NO WRAP, both ends. Up at the top stays at the top; PgUp from item 3
+## ---- clamps rather than running off into negative.
+GUI2.SEL = 1
+KEY.CODE = K.UP : GOSUB KEY.SEND
+KEY.CODE = K.PGUP : GOSUB KEY.SEND
+KEY.CODE = K.RETURN : GOSUB KEY.SEND
+GOSUB GUI2.LIST
+T.F = GUI2.SEL
+
+GUI2.SEL = 20
+KEY.CODE = K.DOWN : GOSUB KEY.SEND
+KEY.CODE = K.PGDN : GOSUB KEY.SEND
+KEY.CODE = K.RETURN : GOSUB KEY.SEND
+GOSUB GUI2.LIST
+T.G = GUI2.SEL
+
+## ---- 7. ESC cancels and reports 0, whatever the highlight was on.
+GUI2.SEL = 7
+KEY.CODE = K.ESC : GOSUB KEY.SEND
+GOSUB GUI2.LIST
+T.H = GUI2.SEL : T.HK = GUI.KEY
+
+## ---- 8. MULTI. Mark item 1, move down twice, mark item 3, accept. Two marks,
+## ---- and they are the ones asked for -- SEL is where the cursor stopped, not
+## ---- the answer.
+GUI.MSG$ = "PICK SOME"
+GUI2.MULTI = 1 : GUI2.SEL = 1 : GUI2.MARKS$ = ""
+KEY.CODE = K.SPACE : GOSUB KEY.SEND
+KEY.CODE = K.DOWN : GOSUB KEY.SEND
+KEY.CODE = K.DOWN : GOSUB KEY.SEND
+KEY.CODE = K.SPACE : GOSUB KEY.SEND
+KEY.CODE = K.RETURN : GOSUB KEY.SEND
+GOSUB GUI2.LIST
+T.J = GUI2.MARKED : T.J1$ = MID$(GUI2.MARKS$, 1, 1) : T.J2$ = MID$(GUI2.MARKS$, 2, 1)
+T.J3$ = MID$(GUI2.MARKS$, 3, 1) : T.JL = LEN(GUI2.MARKS$) : T.JS = GUI2.SEL
+
+## ---- 9. SPACE toggles OFF as well as on, and marks survive a scroll: mark 1,
+## ---- go to the end and back, unmark 1.
+GUI2.SEL = 1 : GUI2.MARKS$ = ""
+KEY.CODE = K.SPACE : GOSUB KEY.SEND
+KEY.CODE = K.END : GOSUB KEY.SEND
+KEY.CODE = K.HOME : GOSUB KEY.SEND
+KEY.CODE = K.SPACE : GOSUB KEY.SEND
+KEY.CODE = K.RETURN : GOSUB KEY.SEND
+GOSUB GUI2.LIST
+T.K = GUI2.MARKED : T.K1$ = MID$(GUI2.MARKS$, 1, 1)
+
+## ---- 10. A marks string of the WRONG length is not trusted -- the caller may
+## ---- have changed COUNT since -- so it is replaced with a fresh empty set
+## ---- rather than indexed past its end.
+GUI2.SEL = 1 : GUI2.MARKS$ = "111"
+KEY.CODE = K.SPACE : GOSUB KEY.SEND
+KEY.CODE = K.RETURN : GOSUB KEY.SEND
+GOSUB GUI2.LIST
+T.L = GUI2.MARKED : T.LL = LEN(GUI2.MARKS$)
+
+## ---- 11. A one item list still works, and the window does not move.
+GUI2.COUNT = 1 : GUI2.MULTI = 0 : GUI2.SEL = 0
+KEY.CODE = K.DOWN : GOSUB KEY.SEND
+KEY.CODE = K.RETURN : GOSUB KEY.SEND
+GOSUB GUI2.LIST
+T.M = GUI2.SEL : T.MS = MENUVERT.SCROLL
+
+## ---- 12. An empty list cancels instead of drawing a box with no rows.
+GUI2.COUNT = 0 : GUI2.SEL = 5
+GOSUB GUI2.LIST
+T.N = GUI2.SEL
+
+CLS
+PRINT "A";T.A;T.AS;T.AK;" EXPECT 4 0 13"
+PRINT "B";T.B;T.BS;" EXPECT 6 1"
+PRINT "C";T.C;T.CS;" EXPECT 20 15"
+PRINT "D";T.D;T.DS;" EXPECT 1 0"
+PRINT "E";T.E;" EXPECT 6"
+PRINT "F";T.F;" EXPECT 1"
+PRINT "G";T.G;" EXPECT 20"
+PRINT "H";T.H;T.HK;" EXPECT 0 27"
+PRINT "J";T.J;T.JL;T.JS;" EXPECT 2 20 3"
+PRINT "J MARKS ";T.J1$;T.J2$;T.J3$;" EXPECT 101"
+PRINT "K";T.K;" MARK1 ";T.K1$;" EXPECT 0 0"
+PRINT "L";T.L;T.LL;" EXPECT 1 20"
+PRINT "M";T.M;T.MS;" EXPECT 1 0"
+PRINT "N";T.N;" EXPECT 0"
+PRINT "@DONE@"
+POWEROFF
+
+## ---- A key straight into the KERNAL's own buffer. kbdbuf_put lives in ROM
+## ---- bank 0 and compiled code runs in bank 4, hence the two POKEs.
+
+KEY.SEND:
+    POKE 1,0 : GP.CALL KBDBUF.PUT, KEY.CODE : POKE 1,4
+    RETURN

@@ -41,6 +41,17 @@
 ## **                          never has to guess how to invert a caller's HIATTR
 ## **        MENUVERT.FLAGS    added together, see below
 ## **        MENUVERT.SEL      the row to start on; 0 starts at 1
+## **        MENUVERT.SCROLL   items hidden ABOVE row 1, so screen row R draws
+## **                          ITEM$(SCROLL + R). 0 is "none" and is what an
+## **                          unassigned variable already is, so a menu that
+## **                          never heard of this is unchanged. It is an OFFSET
+## **                          and not a top-row number for exactly that reason:
+## **                          a 1-based input would read ITEM$(R-1) wherever it
+## **                          was left unset. GUI2.INC.BL is what it is for --
+## **                          a window onto a list longer than the box -- and
+## **                          MENUVERT.RUN does not touch it, because scrolling
+## **                          it needs a key loop that knows the list is longer
+## **                          than COUNT
 ## **
 ## **   out  MENUVERT.SEL      1..COUNT, or 0 if cancelled -- and under KEYEXIT,
 ## **                          whatever row was highlighted when the key arrived
@@ -319,8 +330,9 @@ MENUVERT.DRAW:
 
 MENUVERT.ROW:
     MENUVERT.DRAWY = MENUVERT.Y + MENUVERT.DRAWROW - 1
+    MENUVERT.DRAWITEM = MENUVERT.SCROLL + MENUVERT.DRAWROW
     GP.FILL MENUVERT.X, MENUVERT.DRAWY, MENUVERT.WIDTH, 1, MENUVERT.SPACE, MENUVERT.DRAWATTR
-    MENUVERT.DRAWTEXT$ = MENUVERT.ITEM$(MENUVERT.DRAWROW)
+    MENUVERT.DRAWTEXT$ = MENUVERT.ITEM$(MENUVERT.DRAWITEM)
     IF MENUVERT.DRAWTEXT$ = "" THEN RETURN
     IF LEN(MENUVERT.DRAWTEXT$) > MENUVERT.WIDTH THEN MENUVERT.DRAWTEXT$ = LEFT$(MENUVERT.DRAWTEXT$, MENUVERT.WIDTH)
     GP.PRINTAT MENUVERT.X, MENUVERT.DRAWY, MENUVERT.DRAWTEXT$, MENUVERT.DRAWATTR
@@ -357,8 +369,8 @@ MENUVERT.ROW:
 MENUVERT.HOTFIND:
     MENUVERT.HOTAT = 0 : MENUVERT.HOTANY = 0 : MENUVERT.HOTPREV = 32
     IF MENUVERT.HOT$ = "" THEN RETURN
-    IF MENUVERT.DRAWROW > LEN(MENUVERT.HOT$) THEN RETURN
-    MENUVERT.HOTWANT = ASC(MID$(MENUVERT.HOT$, MENUVERT.DRAWROW, 1))
+    IF MENUVERT.DRAWITEM > LEN(MENUVERT.HOT$) THEN RETURN
+    MENUVERT.HOTWANT = ASC(MID$(MENUVERT.HOT$, MENUVERT.DRAWITEM, 1))
     IF MENUVERT.HOTWANT > 96 THEN GOSUB MENUVERT.FOLDHOTWANT
     FOR MENUVERT.HOTSCAN = 1 TO LEN(MENUVERT.DRAWTEXT$)
         MENUVERT.HOTHERE = ASC(MID$(MENUVERT.DRAWTEXT$, MENUVERT.HOTSCAN, 1))
