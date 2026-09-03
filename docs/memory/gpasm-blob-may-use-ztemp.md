@@ -24,8 +24,13 @@ every indirect read has to go into the operand of the instruction that performs 
 changes. With it, a routine that walks pointers (a sort, a linked list, string blocks) is a straight
 transliteration of ordinary 6502.
 
-**What is genuinely NOT free**: `codePtr $22`, `objPtr $24`, the number stack (X) and the
-`NSMantissa*` / `NSStatus` slots. SYS restores X and Y around the call, so those two registers are
+**What is genuinely NOT free**: `codePtr $28`, `objPtr $2A`, the number stack (X) and the
+`NSMantissa*` / `NSStatus` slots. (Corrected 2026-09-04: this note first said `$22`/`$24`, which are
+the *ifloat32* and *application* builds' addresses. **Take zero page from
+`source/application/build/rtimage.lbl`** -- four builds in the tree lay it out differently and only
+the runtime image is what a compiled program runs. There the map is contiguous: codePtr `$28`,
+objPtr `$2A`, zTemp0 `$2C`, zTemp1 `$2E`, zTemp2 `$30`. The three zTemps were right all along, which
+is why SORT worked and the error went unnoticed.) SYS restores X and Y around the call, so those two registers are
 yours; A is loaded from `SYS_Reg_A` on the way in.
 
 **Also: `CLD` first, in any blob that does arithmetic.** SYS enters with the processor status `plp`'d

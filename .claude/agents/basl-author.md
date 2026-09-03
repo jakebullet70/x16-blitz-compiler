@@ -60,9 +60,13 @@ after `BMX.PAINT`. Check it before debugging a keyword.
 
 ## Memory is the real constraint
 
-**P-code and the runtime workspace come out of ONE pot** — `$3b00`..`$9F00`, 25,600 bytes, split
-between object code, the fixed 4 KB frame stack, and whatever is left for variables, arrays and the
-string heap, **in 256-byte pages**. A byte of code is a byte the running program does not get.
+**P-code and the runtime workspace come out of ONE pot** — `ObjectBase`..`$9F00`, split between
+object code, the fixed 4 KB frame stack, and whatever is left for variables, arrays and the string
+heap, **in 256-byte pages**. A byte of code is a byte the running program does not get.
+
+`ObjectBase` is **`$3c00`** as of this writing (`GPBase $3800`), so the pot is 25,344 bytes — but it
+moves with every runtime change, and the memory notes quote three different values from three
+different months. **Read it out of `source/application/rtimage.gen.asm` rather than quoting one.**
 
 **`FREE − 4096` is how much more p-code will fit.** That is the number to quote when costing
 anything. Re-measure before quoting any absolute figure in the memory notes — they drift with every
@@ -84,12 +88,16 @@ the rest of the run** from a workspace with 1,489 free. Rewritten to fold in pla
 `X$ = X$ + CHR$(c)` per byte is one allocation per character, and about **3,760 cycles** each. It is
 the single most expensive shape in this codebase.
 
-### Arrays are small
+### Arrays come out of the same workspace
 
-Numeric arrays live in fixed bump heaps: **~409 float elements** and **512 int (`%`) elements**
-across *all* arrays. A `DIM` that does not fit is **not an error** — the array is marked unusable,
-reads give 0 and stores are silently dropped, so the program runs and computes garbage. Check that
-an array allocated before trusting any result that depends on it.
+There is **no separate array heap**. `DIM` bump-allocates from `availableMemory`, upward, in the
+same pot as everything else, and raises `OUT OF MEMORY` when it meets the string heap coming down
+(`source/runtime/source/commands/dim.asm`, `DIMWriteByte`). So a large `DIM` is charged directly
+against the room the rest of the program has to run in, and a float element is 5 bytes against an
+int's 2 — `DIM A(2000)` is 10 KB of a workspace that may only have 8.
+
+The failure is at least loud. Size arrays against `FRE(0)` at the point they are DIMmed, and prefer
+`%` where the values allow it.
 
 ### Banking strings wins with LENGTH, not count
 

@@ -81,7 +81,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 
 ## Performance
 - [C64 Blitz benchmark yardstick](blitz-c64-benchmark-yardstick.md) — real C64 Blitz ≈2.6× vs stock BASIC; the bar to beat
-- [Array heap capacity](gpc-array-heap-capacity.md) — arrays that don't fit silently invalidate benchmarks; check allocation before trusting a timing
+- [Arrays share the workspace](blitz-arrays-share-the-workspace.md) — no array heap; DIM raises OUT OF MEMORY, and the old 409/512 figures were the dead Prog8 GPC
 - [Array index fast path](gpc-array-index-fastpath.md) — 1-D indexing fast path was worth ~31%; incl. the OOB short-circuit gotcha
 
 ## X16 platform / toolchain
