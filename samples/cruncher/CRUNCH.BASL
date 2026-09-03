@@ -1,0 +1,190 @@
+#SAVEAS "@:CRUNCH.SRC.PRG"
+#SYMFILE "@:CRUNCH.SRC.SYM"
+#INCLUDE "GPB.INC.BL"
+#REM 0
+
+REM ============================================================================
+REM CRUNCH.BASL -- the crunch FRONT END. Asks, writes CRUNCH.INPUT, hands off.
+REM
+REM The same two-part shape as the compiler: GPC.PRG asks and GPC.BIN works, and
+REM the file between them can be written by hand so the engine scripts headlessly.
+REM The prompt helpers below are GPC.BASL's, with FILE.CHECK's $0801 test dropped
+REM -- our input is TEXT, and testing it for a load address would reject every
+REM file we exist to read.
+REM
+REM Labels are CX.*, variables CR.*: BASLOAD files both in one symbol table.
+REM ============================================================================
+
+PRINT : PRINT
+PRINT "CRUNCH... A BASL SOURCE CRUNCHER"
+PRINT "         V0.2 - SUMMER 2026"
+PRINT
+PRINT "BASLOAD ALREADY STRIPS REMS AND SHORTENS"
+PRINT "NAMES. WHAT IT DOES NOT DO IS PUT TWO"
+PRINT "STATEMENTS ON ONE LINE, AND A LINE COSTS"
+PRINT "ONE BYTE OF P-CODE. THAT IS THIS."
+PRINT
+GOSUB CX.CLEARKB
+
+REM ---- SOURCE FILE (BARE RETURN = QUIT) ----
+CR.PR$ = "SOURCE FILE: " : GOSUB CX.READLINE
+GP.IF GP.ISEMPTY(CR.NM$) THEN
+  PRINT : PRINT "BYE, EXITING" : END
+GP.ENDIF
+CR.SRC$ = CR.NM$
+GOSUB CX.FILECHECK
+GP.IF CR.EX = 0 THEN
+  PRINT : PRINT "SOURCE FILE NOT FOUND" : END
+GP.ENDIF
+
+REM ---- OUTPUT EXTENSION (BARE RETURN = CRU) ----
+PRINT
+PRINT "THE ORIGINAL IS NEVER TOUCHED: THE"
+PRINT "CRUNCHED COPY GETS A NEW EXTENSION."
+CR.PR$ = "OUTPUT EXTENSION: " : GOSUB CX.READLINE
+CR.EXT$ = CR.NM$
+GP.IF GP.ISEMPTY(CR.EXT$) THEN
+  CR.EXT$ = "CRU"
+GP.ENDIF
+
+REM ---- THE TRANSFORMS ----
+PRINT
+CR.XF$ = ""
+CR.PR$ = "JOIN LINES? " : GOSUB CX.YESNO
+GP.IF CR.YN = 1 THEN
+  CR.XF$ = "JOIN"
+GP.ENDIF
+
+PRINT "  A SIMPLE GP.IF BLOCK CAN BECOME ONE"
+PRINT "  PLAIN IF..THEN, SAVING TWO LINES."
+CR.PR$ = "COLLAPSE GP.IF BLOCKS? " : GOSUB CX.YESNO
+GP.IF CR.YN = 1 THEN
+  CR.XF$ = CR.XF$ + " COLLAPSE"
+GP.ENDIF
+
+REM A REM ON ITS OWN LINE IS FREE -- BASLOAD never emits one. Only a TRAILING
+REM REM costs anything, about two bytes, and cutting it throws the text away.
+REM So this is asked and defaults to NO.
+PRINT
+PRINT "  A REM ON ITS OWN LINE COSTS NOTHING."
+PRINT "  ONE AFTER CODE COSTS ABOUT TWO BYTES,"
+PRINT "  AND CUTTING IT LOSES WHAT IT SAID."
+CR.PR$ = "STRIP TRAILING REMS? " : GOSUB CX.YESNO
+GP.IF CR.YN = 1 THEN
+  CR.XF$ = CR.XF$ + " REM"
+GP.ENDIF
+
+REM ---- COMMENT LINES: BREAK THE RUN, OR NOT ----
+PRINT
+PRINT "  COMMENTS AND BLANKS COST NOTHING EITHER."
+PRINT "  LETTING THEM BREAK A JOIN RUN KEEPS THEM"
+PRINT "  ABOVE THE CODE THEY DESCRIBE. ON THE"
+PRINT "  EDITOR THAT COSTS 32 LINES OF 481."
+CR.PR$ = "KEEP COMMENTS IN PLACE? " : GOSUB CX.YESNO
+CR.CM$ = "HOIST"
+GP.IF CR.YN = 1 THEN
+  CR.CM$ = "KEEP"
+GP.ENDIF
+
+REM ---- MAX SOURCE LINE ----
+PRINT
+CR.PR$ = "MAX LINE LENGTH: " : GOSUB CX.READLINE
+CR.ML = VAL(CR.NM$)
+GP.IF CR.ML = 0 THEN
+  CR.ML = 250
+GP.ENDIF
+
+REM ---- WRITE CRUNCH.INPUT: EIGHT CR-TERMINATED LINES ----
+OPEN 15,8,15 : PRINT#15,"S:CRUNCH.INPUT" : CLOSE 15
+OPEN 1,8,2,"@:CRUNCH.INPUT,S,W"
+PRINT#1, CR.SRC$
+PRINT#1, "ROOT"
+PRINT#1, "SUFFIX " + CR.EXT$
+PRINT#1, CR.XF$
+PRINT#1, STR$(CR.ML)
+PRINT#1, ""
+PRINT#1, CR.CM$
+PRINT#1, ""
+CLOSE 1
+
+GOSUB CX.CLEARKB
+REM No ",8" here. A compiled LOAD takes the name and nothing else and chain-loads
+REM exactly as stock BASIC does inside a running program.
+LOAD "CRUNCH.BIN"
+END : REM THIS LINE DOES NOT MATTER
+
+
+REM =====================================================================
+REM CX.READLINE: prompt CR.PR$, read a filename into CR.NM$.
+REM   RETURN ends; DEL($14) erases; printable PETSCII kept; control ignored.
+REM =====================================================================
+CX.READLINE:
+  PRINT CR.PR$; : CR.NM$ = ""
+  GP.DO
+    GP.DO
+      GET CR.K$
+      GP.IF CR.K$ <> "" THEN
+        GP.EXITDO
+      GP.ENDIF
+    GP.LOOP
+    CR.K = ASC(CR.K$)
+    GP.IF CR.K = 13 THEN
+      PRINT
+      GP.EXITDO
+    GP.ELSEIF CR.K = 20 THEN
+      GP.IF LEN(CR.NM$) > 0 THEN
+        CR.NM$ = LEFT$(CR.NM$, LEN(CR.NM$) - 1) : PRINT CHR$(20);
+      GP.ENDIF
+    GP.ELSEIF CR.K >= 32 AND (CR.K < 128 OR CR.K >= 160) AND LEN(CR.NM$) < 39 THEN
+      CR.NM$ = CR.NM$ + CR.K$ : PRINT CR.K$;
+    GP.ENDIF
+  GP.LOOP
+  RETURN
+
+REM =====================================================================
+REM CX.YESNO: prompt CR.PR$, set CR.YN. BARE RETURN MEANS YES here, because
+REM every question this front end asks has yes as its useful answer except
+REM the REM one, which is asked with its own warning above it.
+REM =====================================================================
+CX.YESNO:
+  PRINT CR.PR$;
+  GP.DO
+    GET CR.K$
+    GP.IF CR.K$ = "Y" OR CR.K$ = "y" THEN
+      PRINT "YES" : CR.YN = 1
+      GP.EXITDO
+    GP.ELSEIF CR.K$ = "N" OR CR.K$ = "n" THEN
+      PRINT "NO" : CR.YN = 0
+      GP.EXITDO
+    GP.ELSEIF CR.K$ = CHR$(13) THEN
+      PRINT "YES" : CR.YN = 1
+      GP.EXITDO
+    GP.ENDIF
+  GP.LOOP
+  RETURN
+
+REM =====================================================================
+REM CX.FILECHECK: CR.EX = 1 if CR.SRC$ exists, else 0.
+REM   NO LOAD-ADDRESS TEST, unlike GPC.BASL's. The compiler reads tokenised
+REM   BASIC and can say "not a PRG"; this reads TEXT, and the only thing
+REM   worth checking at the prompt is that the drive has the file at all.
+REM =====================================================================
+CX.FILECHECK:
+  CR.EX = 0
+  OPEN 15,8,15
+  OPEN 2,8,3, CR.SRC$ + ",S,R"
+  INPUT#15, CR.EN, CR.EM$, CR.ET, CR.ES
+  CLOSE 2 : CLOSE 15
+  GP.IF CR.EN < 20 THEN
+    CR.EX = 1
+  GP.ENDIF
+  RETURN
+
+CX.CLEARKB:
+  GP.DO
+    GET CR.K$
+    GP.IF GP.ISEMPTY(CR.K$) THEN
+      GP.EXITDO
+    GP.ENDIF
+  GP.LOOP
+  RETURN

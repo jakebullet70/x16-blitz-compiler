@@ -1267,6 +1267,38 @@ roughly halve the ~102 jiffies the repaint costs. Do it as its own change, and c
 
 ### A separate CRUNCHER utility for BASL source — and the C64 world is full of prior art
 
+**BUILT 2026-09-03 as `samples/cruncher/`.** `CRUNCH.PRG` (front end) writes `CRUNCH.INPUT`,
+chain-loads `CRUNCH.BIN` (engine); both GP.BASIC compiled by GPC, EMBEDDED so the sample stands
+alone. **It is X16-NATIVE, not the host-side Python this note asked for** -- the two-program shape
+was wanted instead, and the engine streams (`LINPUT#` in, `PRINT#` out) so a 62K source never
+lands in RAM.
+
+**The measurement held exactly.** `EDITOR.BASL` release: 449 joins and one `GP.IF` collapse,
+**1,571 -> 1,316 BASIC lines and object 26,411 -> 26,189 -- 255 lines, 255 bytes, one for one**
+(the object figure is the `KEEP` build; `HOIST` with REM-stripping reaches 26,156). Both tests
+below pass: the flatten-and-diff gives 1,317 statements and 96 THEN clauses identical, and the
+editor's `DEBUG.MODE = 1` self-check output is BYTE-IDENTICAL crunched against uncrunched.
+
+Three things the note did not predict:
+
+- **Trailing-REM stripping is OFF by default and asked for.** A REM on its own line is free, so
+  only trailing ones cost anything, and cutting one throws the text away.
+- **Comments breaking the join run costs almost nothing.** `KEEP` gets 449 joins to `HOIST`'s 481
+  -- 32 lines -- and keeps every comment above the code it describes. The fear that 42% comment
+  content would block most joins was wrong.
+- **`COLLAPSE` is worth far less than it looks.** `GP.IF` block -> plain `IF` saves two lines, but
+  `EDITOR.BASL` has exactly ONE `GP.IF`; the tree has 93 openers and 85 are in the cruncher
+  itself. The 2 KB prize of dropping the GP block never fires, because every file using `GP.IF`
+  also uses other GP keywords that pull it in anyway.
+
+**Still to build**, and the engine refuses each by name rather than ignoring it: scope `TREE` and
+`LIST`, output `INPLACE` (rename to `.BAK` first -- DOS `R0:new=old` is verified working on the
+emulator's host filesystem) and `DIR`, the `LABELS` transform, the map file, and on-device
+`VERIFY`. **`LABELS` cannot be per-file**: a label defined in `GUI.INC.BL` may be referenced only
+from `EDITOR.BASL`, so the engine must walk the whole `#INCLUDE` tree for the reference set even
+when it rewrites one file. That is what scope `TREE` is for.
+
+
 Asked 2026-09-02, and it is worth doing because **a line costs exactly one byte of p-code.**
 Measured, not guessed: hand-compacting `samples/editor/EDITOR.BASL` on 2026-09-02 joined **80**
 lines and the object went **15,166 -> 15,086** -- 80 lines, 80 bytes, one for one. **A TRAILING

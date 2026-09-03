@@ -1,0 +1,75 @@
+## DEMO.BASL -- deliberately loose source, one statement per line, for the
+## cruncher to pack. Every trap the engine has to survive is in here somewhere.
+#SAVEAS "@:DEMO.PRG"
+#SYMFILE "@:DEMO.SYM"
+#INCLUDE "GPB.INC.BL"
+#REM 0
+
+REM ---- plain run of statements: these should all fold onto one line
+D.A = 1
+D.B = 2
+D.C = 3
+D.TOTAL = D.A + D.B + D.C
+
+REM ---- a string with a colon in it must not read as a statement break
+D.MSG$ = "TIME IS 12:30"
+D.OTHER$ = "A:B:C"
+
+REM ---- THEN inside a string, and inside an identifier, are not THEN
+D.NOTE$ = "SAY THEN AND STOP"
+D.THENX = 7
+D.MORE = D.THENX + 1
+
+REM ---- RULE 1: nothing may be appended after a real THEN
+IF D.TOTAL = 6 THEN PRINT "SIX"
+D.AFTER = 99
+
+REM ---- RULE 2: a label names a line, so it cannot fold upward
+D.BEFORE = 1
+D.TARGET:
+  D.INSIDE = 2
+  D.ALSO = 3
+  RETURN
+
+REM ---- a trailing REM costs p-code; a REM-only line does not
+D.X = 10 : REM this one is cut
+D.Y = 20
+REM this one is free and stays put
+
+REM ---- GP block keywords break the run both ways, for now
+D.K = 1
+GP.IF D.K = 1 THEN
+  D.P = 1
+  D.Q = 2
+GP.ENDIF
+D.R = 3
+
+REM ---- DATA must start its own line
+D.Z = 1
+DATA 10, 20, 30
+D.W = 2
+
+GOSUB D.TARGET
+PRINT "DEMO OK"
+END
+
+REM ---- COLLAPSE: a simple GP.IF block becomes one plain IF
+D.N = 5
+GP.IF D.N = 5 THEN
+  D.HIT = 1
+GP.ENDIF
+
+REM ---- ...but not this one: GP.ELSE means it must stay a block
+GP.IF D.N = 5 THEN
+  D.E = 1
+GP.ELSE
+  D.E = 2
+GP.ENDIF
+
+REM ---- nor this one: a nested block in the body
+GP.IF D.N = 5 THEN
+  GP.IF D.HIT = 1 THEN
+    D.DEEP = 1
+  GP.ENDIF
+GP.ENDIF
+PRINT "COLLAPSE CASES DONE"

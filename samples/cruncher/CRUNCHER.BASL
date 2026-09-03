@@ -1,0 +1,735 @@
+#SAVEAS "@:CRUNCHER.SRC.PRG"
+#SYMFILE "@:CRUNCHER.SRC.SYM"
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "STRCASE.INC.BL"
+#REM 0
+
+REM ============================================================================
+REM CRUNCHER.BASL -- the crunch ENGINE. Reads CRUNCH.INPUT, rewrites BASL source.
+REM
+REM Chain-loaded by CRUNCH.PRG, and runnable on its own: CRUNCH.INPUT can be
+REM written by hand, so every field is validated HERE and not just at the prompt.
+REM
+REM WHAT IT DOES, AND WHY ONLY THIS. BASLOAD is already the cruncher -- it strips
+REM REMs, renames every variable to two characters and drops all whitespace at
+REM tokenise time. What it does NOT do is put two statements on one line, and a
+REM line costs exactly one byte of p-code plus a four-byte line-table entry.
+REM Joining is the whole job. Measured: 80 lines joined in EDITOR.BASL took the
+REM object 15,166 -> 15,086, one byte per line.
+REM
+REM THE THREE RULES IT MUST NOT BREAK
+REM   1. Everything after THEN is conditional. Appending to a line carrying an
+REM      IF..THEN silently makes the appended statement conditional. It compiles,
+REM      it runs, and it is wrong only sometimes. Such a line may be joined TO,
+REM      never appended TO.
+REM   2. A label names a line. A line carrying one cannot fold into its
+REM      predecessor -- and GP.CASE inside a GP.SELECT has the same shape.
+REM   3. The source line limit. BASLOAD stops at #MAXCOLUMN, default 250.
+REM
+REM Labels are CX.*, variables CR.* -- BASLOAD files both in one symbol table and
+REM a label that spells a variable is DUPLICATE SYMBOL.
+REM
+REM NO #AUTONUM. With STRCASE.INC.BL included it resolves label targets against
+REM the wrong step and the compile stops with UNKNOWN LINE NUMBER.
+REM ============================================================================
+
+CR.VER$ = "0.2"
+REM The collapse buffer. A GP.IF block longer than this is left alone, which costs
+REM a collapse and never correctness.
+CR.BUFMAX = 16
+DIM CR.BUF$(CR.BUFMAX)
+CR.IDCH$ = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_."
+REM A line whose FIRST word is one of these cannot be appended to the line above,
+REM and a line whose LAST word is one cannot have anything appended after it.
+CR.BLOCK$ = "|GP.IF|GP.ELSEIF|GP.ELSE|GP.ENDIF|GP.SELECT|GP.CASE|GP.OTHER|GP.ENDSEL|GP.DO|GP.LOOP|GP.ASM|GP.ENDASM|DATA|"
+REM Control leaves the line for good, so anything appended after one is unreachable.
+CR.STOP$ = "|GOTO|RETURN|END|STOP|GP.EXITDO|"
+
+PRINT : PRINT "CRUNCH ENGINE V";CR.VER$
+GOSUB CX.READINPUT
+GP.IF CR.ERR <> 0 THEN
+  PRINT "STOPPED: ";CR.MSG$ : END
+GP.ENDIF
+
+PRINT "IN:  ";CR.ROOT$
+PRINT "OUT: ";CR.DEST$
+GOSUB CX.CRUNCHFILE
+GP.IF CR.ERR <> 0 THEN
+  PRINT "STOPPED: ";CR.MSG$ : END
+GP.ENDIF
+
+PRINT
+PRINT "LINES READ    ";CR.INLINES
+PRINT "LINES WRITTEN ";CR.OUTLINES
+PRINT "LINES JOINED  ";CR.JOINED
+PRINT "REMS STRIPPED ";CR.REMCUT
+PRINT "IFS COLLAPSED ";CR.COLLAPSED
+PRINT "CRUNCH DONE"
+END
+
+
+REM ============================================================================
+REM CX.READINPUT -- the eight fields of CRUNCH.INPUT, and what they must say.
+REM ============================================================================
+CX.READINPUT:
+  CR.ERR = 0 : CR.MSG$ = "" : CR.EOF = 0
+  OPEN 2,8,2,"CRUNCH.INPUT,S,R"
+  GOSUB CX.SNIFF : CLOSE 2
+  OPEN 2,8,2,"CRUNCH.INPUT,S,R"
+  GOSUB CX.GETFLD : CR.ROOT$ = CR.FLD$
+  GOSUB CX.GETFLD : CR.SCOPE$ = CR.FLD$
+  GOSUB CX.GETFLD : CR.OUTM$ = CR.FLD$
+  GOSUB CX.GETFLD : CR.XFORM$ = CR.FLD$
+  GOSUB CX.GETFLD : CR.MAXLEN = VAL(CR.FLD$)
+  GOSUB CX.GETFLD : CR.MAP$ = CR.FLD$
+  GOSUB CX.GETFLD : CR.CMODE$ = CR.FLD$
+  GOSUB CX.GETFLD : CR.VFY$ = CR.FLD$
+  CLOSE 2
+
+  GP.IF GP.ISEMPTY(CR.ROOT$) THEN
+    CR.ERR = 1 : CR.MSG$ = "NO SOURCE FILE NAMED" : RETURN
+  GP.ENDIF
+
+  REM Uppercase the switches so a hand-written CRUNCH.INPUT need not shout.
+  STRCASE.MODE = STRCASE.UPPER
+  STRCASE.PTR = GP.STRPTR(CR.SCOPE$) : GOSUB STRCASE.GO
+  STRCASE.PTR = GP.STRPTR(CR.OUTM$)  : GOSUB STRCASE.GO
+  STRCASE.PTR = GP.STRPTR(CR.XFORM$) : GOSUB STRCASE.GO
+  STRCASE.PTR = GP.STRPTR(CR.CMODE$) : GOSUB STRCASE.GO
+  STRCASE.PTR = GP.STRPTR(CR.VFY$)   : GOSUB STRCASE.GO
+
+  GP.IF GP.ISEMPTY(CR.SCOPE$) THEN
+    CR.SCOPE$ = "ROOT"
+  GP.ENDIF
+  GP.IF CR.SCOPE$ <> "ROOT" THEN
+    CR.ERR = 1 : CR.MSG$ = "ONLY SCOPE ROOT IS BUILT YET" : RETURN
+  GP.ENDIF
+
+  REM ---- output mode: the word, then its argument
+  CR.OUTARG$ = ""
+  CR.SPC = GP.INSTR(CR.OUTM$, " ")
+  GP.IF CR.SPC > 0 THEN
+    CR.OUTARG$ = MID$(CR.OUTM$, CR.SPC + 1, 60)
+    CR.OUTM$ = LEFT$(CR.OUTM$, CR.SPC - 1)
+    STRCASE.PTR = GP.STRPTR(CR.OUTARG$) : STRCASE.MODE = STRCASE.TRIM : GOSUB STRCASE.GO
+  GP.ENDIF
+  GP.IF GP.ISEMPTY(CR.OUTM$) THEN
+    CR.OUTM$ = "SUFFIX"
+  GP.ENDIF
+  GP.IF CR.OUTM$ <> "SUFFIX" THEN
+    CR.ERR = 1 : CR.MSG$ = "ONLY OUTPUT SUFFIX IS BUILT YET" : RETURN
+  GP.ENDIF
+  GP.IF GP.ISEMPTY(CR.OUTARG$) THEN
+    CR.OUTARG$ = "CRU"
+  GP.ENDIF
+  GOSUB CX.OUTNAME
+
+  REM REM IS OFF BY DEFAULT. A REM on its OWN line is free -- BASLOAD never emits
+  REM it -- so the only ones that cost anything are the trailing ones, and cutting
+  REM those throws away what the author wrote. Asked for, never assumed.
+  GP.IF GP.ISEMPTY(CR.XFORM$) THEN
+    CR.XFORM$ = "JOIN COLLAPSE"
+  GP.ENDIF
+  CR.DOJOIN = GP.CONTAINS(CR.XFORM$, "JOIN")
+  CR.DOREM = GP.CONTAINS(CR.XFORM$, "REM")
+  CR.DOCOLL = GP.CONTAINS(CR.XFORM$, "COLLAPSE")
+  GP.IF GP.CONTAINS(CR.XFORM$, "LABELS") THEN
+    CR.ERR = 1 : CR.MSG$ = "TRANSFORM LABELS IS NOT BUILT YET" : RETURN
+  GP.ENDIF
+
+  GP.IF CR.MAXLEN = 0 THEN
+    CR.MAXLEN = 250
+  GP.ENDIF
+  GP.IF CR.MAXLEN < 40 OR CR.MAXLEN > 250 THEN
+    CR.ERR = 1 : CR.MSG$ = "MAX LINE MUST BE 40..250" : RETURN
+  GP.ENDIF
+
+  GP.IF GP.ISEMPTY(CR.CMODE$) THEN
+    CR.CMODE$ = "HOIST"
+  GP.ENDIF
+  GP.IF CR.CMODE$ <> "HOIST" AND CR.CMODE$ <> "KEEP" THEN
+    CR.ERR = 1 : CR.MSG$ = "COMMENT MODE MUST BE HOIST OR KEEP" : RETURN
+  GP.ENDIF
+  RETURN
+
+REM ---- one field off channel 2, tolerating a short file ----
+REM Bit 1 of ST is a read error: an OPEN that found nothing still opens, and
+REM every LINPUT# then hands back CHR$(0) with ST = 66 for ever. Clean EOF is 64.
+CX.GETFLD:
+  CR.FLD$ = ""
+  GP.IF CR.EOF = 1 THEN
+    RETURN
+  GP.ENDIF
+  GOSUB CX.RAWLINE
+  CR.FLD$ = CR.RAW$
+  GP.IF LEN(CR.FLD$) > 0 THEN
+    STRCASE.PTR = GP.STRPTR(CR.FLD$) : STRCASE.MODE = STRCASE.TRIM : GOSUB STRCASE.GO
+  GP.ENDIF
+  RETURN
+
+REM ---- CR.ROOT$ + CR.OUTARG$ -> CR.DEST$, replacing the extension ----
+CX.OUTNAME:
+  CR.DOT = 0 : CR.P = 1
+  GP.DO
+    CR.P = GP.INSTR(CR.ROOT$, ".", CR.P)
+    GP.IF CR.P = 0 THEN
+      GP.EXITDO
+    GP.ENDIF
+    CR.DOT = CR.P : CR.P = CR.P + 1
+  GP.LOOP
+  GP.IF CR.DOT = 0 THEN
+    CR.DEST$ = CR.ROOT$ + "." + CR.OUTARG$
+  GP.ELSE
+    CR.DEST$ = LEFT$(CR.ROOT$, CR.DOT) + CR.OUTARG$
+  GP.ENDIF
+  RETURN
+
+
+REM ============================================================================
+REM CX.CRUNCHFILE -- stream one file, joining as it goes.
+REM
+REM STREAMING, not loading: joining needs one line of lookahead, never the file,
+REM so a 62K source never lands in RAM. Channel 2 reads, channel 3 writes.
+REM ============================================================================
+CX.CRUNCHFILE:
+  CR.INLINES = 0 : CR.OUTLINES = 0 : CR.JOINED = 0 : CR.REMCUT = 0
+  CR.PEND$ = "" : CR.PENDIND$ = "" : CR.PENDOK = 0
+  CR.INASM = 0 : CR.REMON = 0 : CR.EOF = 0
+  CR.RN = 0 : CR.RIDX = 0 : CR.COLLAPSED = 0
+
+  OPEN 15,8,15 : PRINT#15,"S:" + CR.DEST$ : CLOSE 15
+  OPEN 2,8,2, CR.ROOT$ + ",S,R"
+  GOSUB CX.SNIFF : CLOSE 2
+  OPEN 2,8,2, CR.ROOT$ + ",S,R"
+  OPEN 3,8,3, "@:" + CR.DEST$ + ",S,W"
+
+CX.READLOOP:
+  GP.IF CR.RN > 0 THEN
+    REM a block CX.TRYCOLLAPSE looked at and would not take, fed back one line at a time
+    CR.LINE$ = CR.BUF$(CR.RIDX) : CR.RIDX = CR.RIDX + 1 : CR.RN = CR.RN - 1
+  GP.ELSE
+    GOSUB CX.GETLINE
+    GP.IF CR.EOF = 1 AND GP.ISEMPTY(CR.LINE$) THEN
+      GOTO CX.READDONE
+    GP.ENDIF
+    CR.INLINES = CR.INLINES + 1
+  GP.ENDIF
+  GOSUB CX.CLASSIFY
+  GP.IF CR.DOCOLL AND CR.KIND = 3 AND CR.FW$ = "GP.IF" AND CR.REMON = 0 AND CR.INASM = 0 THEN
+    GOSUB CX.TRYCOLLAPSE
+  GP.ENDIF
+  GOSUB CX.EMIT
+  GP.IF CR.RN > 0 THEN
+    GOTO CX.READLOOP
+  GP.ENDIF
+  GP.IF CR.EOF = 0 THEN
+    GOTO CX.READLOOP
+  GP.ENDIF
+
+CX.READDONE:
+  GOSUB CX.FLUSH
+  CLOSE 3 : CLOSE 2
+  RETURN
+
+REM ---- one source line off channel 2, CR trimmed, LF from a CRLF file dropped ----
+CX.GETLINE:
+  GOSUB CX.RAWLINE
+  CR.LINE$ = CR.RAW$
+  RETURN
+
+REM ============================================================================
+REM CX.EMIT -- what to do with the line just classified.
+REM
+REM A comment or blank generates NO tokenised line, so it costs nothing and is
+REM written straight through. In HOIST it does not break a join run either, which
+REM matters: 460 of EDITOR.BASL's 1,414 lines are REM-only and 123 are blank, so
+REM breaking on them would block most of the joins there are.
+REM ============================================================================
+CX.EMIT:
+  GP.IF CR.REMON = 1 OR CR.INASM = 1 THEN
+    GOSUB CX.FLUSH : GOSUB CX.PASSTHRU : GOSUB CX.TRACKASM : RETURN
+  GP.ENDIF
+  GP.IF CR.KIND = 2 THEN
+    GOSUB CX.FLUSH : GOSUB CX.PASSTHRU : GOSUB CX.TRACKASM : RETURN
+  GP.ENDIF
+  GP.IF CR.KIND = 0 OR CR.KIND = 1 THEN
+    GP.IF CR.CMODE$ = "KEEP" THEN
+      GOSUB CX.FLUSH
+    GP.ENDIF
+    GOSUB CX.PASSTHRU : RETURN
+  GP.ENDIF
+
+  REM ---- a code line. Rebuild it: label, then the statements, REM already cut.
+  CR.NEW$ = CR.CODE$
+  GP.IF LEN(CR.LAB$) > 0 THEN
+    CR.NEW$ = CR.LAB$ + ":"
+    GP.IF LEN(CR.CODE$) > 0 THEN
+      CR.NEW$ = CR.NEW$ + " " + CR.CODE$
+    GP.ENDIF
+  GP.ENDIF
+
+  REM A label declaration already ends in its own colon, so joining onto one
+  REM with " : " leaves an empty statement between the two.
+  CR.SEP$ = " : "
+  GP.IF RIGHT$(CR.PEND$, 1) = ":" THEN
+    CR.SEP$ = " "
+  GP.ENDIF
+
+  CR.FITS = 0
+  GP.IF CR.DOJOIN AND LEN(CR.PEND$) > 0 AND CR.PENDOK <> 0 AND CR.CANSTART <> 0 THEN
+    GP.IF LEN(CR.PENDIND$) + LEN(CR.PEND$) + LEN(CR.SEP$) + LEN(CR.NEW$) <= CR.MAXLEN THEN
+      CR.FITS = 1
+    GP.ENDIF
+  GP.ENDIF
+
+  GP.IF CR.FITS = 1 THEN
+    CR.PEND$ = CR.PEND$ + CR.SEP$ + CR.NEW$
+    CR.JOINED = CR.JOINED + 1
+  GP.ELSE
+    GOSUB CX.FLUSH
+    CR.PEND$ = CR.NEW$ : CR.PENDIND$ = CR.IND$
+  GP.ENDIF
+  CR.PENDOK = CR.CANACCEPT
+  GOSUB CX.TRACKASM
+  RETURN
+
+REM ---- GP.ASM..GP.ENDASM and #REM 1..#REM 0 are copied verbatim, both of them ----
+CX.TRACKASM:
+  GP.IF CR.KIND = 2 THEN
+    GP.IF GP.CONTAINS(CR.LINE$, "#REM 1") THEN
+      CR.REMON = 1
+    GP.ENDIF
+    GP.IF GP.CONTAINS(CR.LINE$, "#REM 0") THEN
+      CR.REMON = 0
+    GP.ENDIF
+    RETURN
+  GP.ENDIF
+  GP.IF CR.FW$ = "GP.ASM" THEN
+    CR.INASM = 1
+  GP.ENDIF
+  GP.IF CR.FW$ = "GP.ENDASM" THEN
+    CR.INASM = 0
+  GP.ENDIF
+  RETURN
+
+CX.PASSTHRU:
+  PRINT#3, CR.LINE$; CR.EOL$;
+  CR.OUTLINES = CR.OUTLINES + 1
+  RETURN
+
+CX.FLUSH:
+  GP.IF LEN(CR.PEND$) > 0 THEN
+    PRINT#3, CR.PENDIND$ + CR.PEND$; CR.EOL$;
+    CR.OUTLINES = CR.OUTLINES + 1
+    CR.PEND$ = "" : CR.PENDOK = 0
+  GP.ENDIF
+  RETURN
+
+
+REM ============================================================================
+REM CX.CLASSIFY -- everything the packer needs to know about one line.
+REM
+REM   out  CR.KIND      0 blank, 1 comment, 2 directive, 3 code
+REM        CR.LAB$      the label, or ""        CR.CODE$  the statements
+REM        CR.IND$      leading whitespace      CR.FW$/CR.LW$  first/last keyword
+REM        CR.CANSTART  may fold into the line above
+REM        CR.CANACCEPT may have a line folded onto it
+REM
+REM CR.UP$ IS THE ANALYSIS COPY. Every keyword search runs on an upper-cased
+REM duplicate whose positions map 1:1 to CR.CODE$, so BASLOAD's case-insensitivity
+REM costs nothing and the OUTPUT keeps the case the author wrote.
+REM ============================================================================
+CX.CLASSIFY:
+  CR.KIND = 3 : CR.LAB$ = "" : CR.CODE$ = "" : CR.IND$ = ""
+  CR.FW$ = "" : CR.LW$ = "" : CR.CANSTART = 0 : CR.CANACCEPT = 0
+
+  CR.I = 1
+  GP.DO
+    GP.IF CR.I > LEN(CR.LINE$) THEN
+      GP.EXITDO
+    GP.ENDIF
+    GP.IF MID$(CR.LINE$, CR.I, 1) <> " " THEN
+      GP.EXITDO
+    GP.ENDIF
+    CR.I = CR.I + 1
+  GP.LOOP
+  CR.IND$ = LEFT$(CR.LINE$, CR.I - 1)
+
+  REM Assignment COPIES the block (STRCTST.EXP.BL says so), so trimming this
+  REM in place cannot reach back into CR.LINE$.
+  CR.T$ = CR.LINE$
+  GP.IF LEN(CR.T$) > 0 THEN
+    STRCASE.PTR = GP.STRPTR(CR.T$) : STRCASE.MODE = STRCASE.TRIM : GOSUB STRCASE.GO
+  GP.ENDIF
+  GP.IF GP.ISEMPTY(CR.T$) THEN
+    CR.KIND = 0 : RETURN
+  GP.ENDIF
+  GP.IF LEFT$(CR.T$, 2) = "##" THEN
+    CR.KIND = 1 : RETURN
+  GP.ENDIF
+  GP.IF LEFT$(CR.T$, 1) = "#" THEN
+    CR.KIND = 2 : RETURN
+  GP.ENDIF
+
+  REM ---- a label is an identifier at the start whose very next character is ':'
+  CR.P = 1
+  GP.DO
+    GP.IF CR.P > LEN(CR.T$) THEN
+      GP.EXITDO
+    GP.ENDIF
+    GP.IF GP.INSTR(CR.IDCH$, MID$(CR.T$, CR.P, 1)) = 0 THEN
+      GP.EXITDO
+    GP.ENDIF
+    CR.P = CR.P + 1
+  GP.LOOP
+  GP.IF CR.P > 1 AND MID$(CR.T$, CR.P, 1) = ":" THEN
+    CR.LAB$ = LEFT$(CR.T$, CR.P - 1)
+    CR.CODE$ = MID$(CR.T$, CR.P + 1, 250)
+    GP.IF LEN(CR.CODE$) > 0 THEN
+      STRCASE.PTR = GP.STRPTR(CR.CODE$) : STRCASE.MODE = STRCASE.TRIM : GOSUB STRCASE.GO
+    GP.ENDIF
+  GP.ELSE
+    CR.CODE$ = CR.T$
+  GP.ENDIF
+
+  GOSUB CX.MAKEUP
+  GOSUB CX.CUTREM
+  GP.IF CR.KIND <> 3 THEN
+    RETURN
+  GP.ENDIF
+  GOSUB CX.WALK
+  RETURN
+
+REM ---- CR.UP$: CR.CODE$ upper-cased, same length, same offsets ----
+CX.MAKEUP:
+  CR.UP$ = CR.CODE$
+  GP.IF LEN(CR.UP$) > 0 THEN
+    STRCASE.PTR = GP.STRPTR(CR.UP$) : STRCASE.MODE = STRCASE.UPPER : GOSUB STRCASE.GO
+  GP.ENDIF
+  RETURN
+
+REM ============================================================================
+REM CX.CUTREM -- a REM eats the rest of the LINE, colons included, so the first
+REM one at a statement start ends the code. A REM-only line generates nothing and
+REM is left alone; a TRAILING one costs about two bytes of p-code and is cut.
+REM ============================================================================
+CX.CUTREM:
+  CR.REMPOS = 0 : CR.HASREM = 0
+  CR.SP = 1
+  GP.DO
+    GOSUB CX.WORDAT
+    GP.IF CR.W$ = "REM" THEN
+      CR.REMPOS = CR.SP : GP.EXITDO
+    GP.ENDIF
+    CR.NEEDLE$ = ":" : CR.FROM = CR.SP : GOSUB CX.FINDOUT
+    GP.IF CR.POS = 0 THEN
+      GP.EXITDO
+    GP.ENDIF
+    CR.SP = CR.POS + 1
+  GP.LOOP
+  GP.IF CR.REMPOS = 0 THEN
+    RETURN
+  GP.ENDIF
+  GP.IF CR.REMPOS = 1 AND GP.ISEMPTY(CR.LAB$) THEN
+    REM the whole line is a comment, and a comment on its own line is free
+    CR.KIND = 1 : RETURN
+  GP.ENDIF
+
+  GP.IF CR.DOREM = 0 THEN
+    REM KEPT. A REM swallows the rest of the LINE, colons and all, so nothing may
+    REM follow it -- and the analysis copy stops here or the walker would read the
+    REM comment text as statements and its colons as separators.
+    CR.HASREM = -1
+    CR.UP$ = LEFT$(CR.UP$, CR.REMPOS - 1)
+    RETURN
+  GP.ENDIF
+
+  CR.CODE$ = LEFT$(CR.CODE$, CR.REMPOS - 1)
+  GP.IF LEN(CR.CODE$) > 0 THEN
+    STRCASE.PTR = GP.STRPTR(CR.CODE$) : STRCASE.MODE = STRCASE.RTRIM : GOSUB STRCASE.GO
+  GP.ENDIF
+  GP.IF RIGHT$(CR.CODE$, 1) = ":" THEN
+    CR.CODE$ = LEFT$(CR.CODE$, LEN(CR.CODE$) - 1)
+    STRCASE.PTR = GP.STRPTR(CR.CODE$) : STRCASE.MODE = STRCASE.RTRIM : GOSUB STRCASE.GO
+  GP.ENDIF
+  CR.REMCUT = CR.REMCUT + 1
+  GOSUB CX.MAKEUP
+  GP.IF GP.ISEMPTY(CR.CODE$) AND GP.ISEMPTY(CR.LAB$) THEN
+    CR.KIND = 1
+  GP.ENDIF
+  RETURN
+
+REM ============================================================================
+REM CX.WALK -- first and last keyword, and the THEN test. This is where the two
+REM join properties are decided, and it starts DELIBERATELY CONSERVATIVE: every
+REM GP. block keyword breaks the run both ways. A wrong guess here costs joins,
+REM never correctness, and each one can be relaxed on its own once measured.
+REM ============================================================================
+CX.WALK:
+  CR.SP = 1 : CR.NST = 0
+  GP.DO
+    GOSUB CX.WORDAT
+    CR.NST = CR.NST + 1
+    GP.IF CR.NST = 1 THEN
+      CR.FW$ = CR.W$
+    GP.ENDIF
+    CR.LW$ = CR.W$
+    CR.NEEDLE$ = ":" : CR.FROM = CR.SP : GOSUB CX.FINDOUT
+    GP.IF CR.POS = 0 THEN
+      GP.EXITDO
+    GP.ENDIF
+    CR.SP = CR.POS + 1
+  GP.LOOP
+
+  CR.CANSTART = -1 : CR.CANACCEPT = -1
+  GP.IF LEN(CR.LAB$) > 0 THEN
+    CR.CANSTART = 0
+  GP.ENDIF
+  GP.IF GP.INSTR(CR.BLOCK$, "|" + CR.FW$ + "|") > 0 THEN
+    CR.CANSTART = 0
+  GP.ENDIF
+  GP.IF GP.INSTR(CR.BLOCK$, "|" + CR.LW$ + "|") > 0 THEN
+    CR.CANACCEPT = 0
+  GP.ENDIF
+  GP.IF GP.INSTR(CR.STOP$, "|" + CR.LW$ + "|") > 0 THEN
+    CR.CANACCEPT = 0
+  GP.ENDIF
+  GP.IF CR.HASREM <> 0 THEN
+    CR.CANACCEPT = 0
+  GP.ENDIF
+  REM RULE 1. Anything after THEN is conditional, so nothing may follow it.
+  CR.NEEDLE$ = "THEN" : CR.FROM = 1 : GOSUB CX.FINDWORD
+  GP.IF CR.POS > 0 THEN
+    CR.CANACCEPT = 0
+  GP.ENDIF
+  RETURN
+
+REM ---- CR.W$ = the identifier at CR.SP in CR.UP$, leading spaces skipped ----
+CX.WORDAT:
+  CR.W$ = ""
+  CR.WP = CR.SP
+  GP.DO
+    GP.IF CR.WP > LEN(CR.UP$) THEN
+      RETURN
+    GP.ENDIF
+    GP.IF MID$(CR.UP$, CR.WP, 1) <> " " THEN
+      GP.EXITDO
+    GP.ENDIF
+    CR.WP = CR.WP + 1
+  GP.LOOP
+  CR.WS = CR.WP
+  GP.DO
+    GP.IF CR.WP > LEN(CR.UP$) THEN
+      GP.EXITDO
+    GP.ENDIF
+    GP.IF GP.INSTR(CR.IDCH$, MID$(CR.UP$, CR.WP, 1)) = 0 THEN
+      GP.EXITDO
+    GP.ENDIF
+    CR.WP = CR.WP + 1
+  GP.LOOP
+  GP.IF CR.WP > CR.WS THEN
+    CR.W$ = MID$(CR.UP$, CR.WS, CR.WP - CR.WS)
+  GP.ENDIF
+  RETURN
+
+REM ============================================================================
+REM CX.FINDOUT -- CR.NEEDLE$ in CR.UP$ from CR.FROM, IGNORING string literals.
+REM A colon inside PRINT ":" is not a statement separator, and a line that gets
+REM that wrong joins two halves of one statement together.
+REM ============================================================================
+CX.FINDOUT:
+  CR.FP = CR.FROM
+  GP.DO
+    CR.QA = GP.INSTR(CR.UP$, CHR$(34), CR.FP)
+    CR.POS = GP.INSTR(CR.UP$, CR.NEEDLE$, CR.FP)
+    GP.IF CR.POS = 0 THEN
+      RETURN
+    GP.ENDIF
+    GP.IF CR.QA = 0 OR CR.POS < CR.QA THEN
+      RETURN
+    GP.ENDIF
+    REM the hit is at or past a quote, so step over the whole literal
+    CR.QB = GP.INSTR(CR.UP$, CHR$(34), CR.QA + 1)
+    GP.IF CR.QB = 0 THEN
+      CR.POS = 0 : RETURN
+    GP.ENDIF
+    CR.FP = CR.QB + 1
+  GP.LOOP
+  RETURN
+
+REM ---- CX.FINDOUT, but the hit must be a whole word: ED.THENX is not THEN ----
+CX.FINDWORD:
+  CR.WF = CR.FROM
+  GP.DO
+    CR.FROM = CR.WF : GOSUB CX.FINDOUT
+    GP.IF CR.POS = 0 THEN
+      RETURN
+    GP.ENDIF
+    CR.OK = -1
+    GP.IF CR.POS > 1 THEN
+      GP.IF GP.INSTR(CR.IDCH$, MID$(CR.UP$, CR.POS - 1, 1)) > 0 THEN
+        CR.OK = 0
+      GP.ENDIF
+    GP.ENDIF
+    CR.AF = CR.POS + LEN(CR.NEEDLE$)
+    GP.IF CR.AF <= LEN(CR.UP$) THEN
+      GP.IF GP.INSTR(CR.IDCH$, MID$(CR.UP$, CR.AF, 1)) > 0 THEN
+        CR.OK = 0
+      GP.ENDIF
+    GP.ENDIF
+    GP.IF CR.OK <> 0 THEN
+      RETURN
+    GP.ENDIF
+    CR.WF = CR.POS + 1
+  GP.LOOP
+  RETURN
+
+
+REM ============================================================================
+REM CX.SNIFF -- which line ending does the file on channel 2 use?
+REM
+REM THE REPO USES ALL THREE. EDITOR.BASL and the library are LF, testing/GPC.BASL
+REM is CRLF, and the editor itself writes CR -- BASLOAD takes any of them, so the
+REM cruncher has to as well, and has to write back what it found.
+REM
+REM One probe read with delimiter 10 tells them apart:
+REM   no CR at all      pure LF    -- delimiter 10
+REM   probe ENDS in CR  CRLF       -- delimiter 10, trailing CR stripped
+REM   CR but not at end CR only    -- delimiter 13, the LF never appears
+REM The caller closes and reopens: the probe has eaten the first line.
+REM ============================================================================
+CX.SNIFF:
+  CR.DELIM = 10 : CR.EOL$ = CHR$(10) : CR.CRLF = 0
+  CR.PROBE$ = ""
+  LINPUT# 2, CR.PROBE$, 10
+  CR.C1 = GP.INSTR(CR.PROBE$, CHR$(13))
+  GP.IF CR.C1 = 0 THEN
+    RETURN
+  GP.ENDIF
+  REM WHERE the first CR sits, not just that the probe ends in one. A short
+  REM CR-terminated file comes back WHOLE from a delimiter-10 read and ends in a
+  REM CR like a CRLF line does -- but it has CRs BEFORE the end and CRLF has not.
+  REM CRUNCH.INPUT is exactly that file, and reading it as CRLF found no fields.
+  GP.IF CR.C1 = LEN(CR.PROBE$) THEN
+    CR.CRLF = 1 : CR.EOL$ = CHR$(13) + CHR$(10) : RETURN
+  GP.ENDIF
+  CR.DELIM = 13 : CR.EOL$ = CHR$(13)
+  RETURN
+
+REM ---- one line off channel 2 in whichever ending CX.SNIFF found ----
+CX.RAWLINE:
+  CR.RAW$ = ""
+  LINPUT# 2, CR.RAW$, CR.DELIM : CR.ST = ST
+  GP.IF (CR.ST AND 2) <> 0 THEN
+    CR.RAW$ = "" : CR.EOF = 1 : RETURN
+  GP.ENDIF
+  GP.IF CR.ST <> 0 THEN
+    CR.EOF = 1
+  GP.ENDIF
+  GP.IF CR.CRLF = 1 THEN
+    GP.IF LEN(CR.RAW$) > 0 THEN
+      GP.IF RIGHT$(CR.RAW$, 1) = CHR$(13) THEN
+        CR.RAW$ = LEFT$(CR.RAW$, LEN(CR.RAW$) - 1)
+      GP.ENDIF
+    GP.ENDIF
+  GP.ENDIF
+  RETURN
+
+
+REM ============================================================================
+REM CX.TRYCOLLAPSE -- a GP.IF block with a simple body becomes one plain IF.
+REM
+REM     GP.IF <cond> THEN          becomes      IF <cond> THEN <body>
+REM       <body>
+REM     GP.ENDIF
+REM
+REM Three source lines become one, so two BASIC lines and two bytes of p-code go,
+REM plus two four-byte line-table entries. Single-line GP.IF is deliberately
+REM illegal (the gp-if branch decided THEN mandatory, single-line out), so the
+REM target is plain BASIC IF, not a shorter GP.IF.
+REM
+REM IT REFUSES ON ANYTHING IT DOES NOT FULLY UNDERSTAND, and refusing costs only
+REM the collapse. Out: GP.ELSE or GP.ELSEIF in the block, a nested block opener, a
+REM label, DATA, a THEN of its own in the body, a directive, a comment, a blank, a
+REM block longer than CR.BUFMAX, end of file first, or a line that will not fit.
+REM
+REM The buffer is replayed by the read loop when it refuses, so a block it will not
+REM take is written exactly as it arrived.
+REM ============================================================================
+CX.TRYCOLLAPSE:
+  CR.CN = 0 : CR.RIDX = 0 : CR.RN = 0 : CR.CBAD = 0
+  REM Reading the body overwrites CR.LINE$ and CR.IND$, and a refusal has to hand
+  REM the ORIGINAL opener back to the read loop untouched.
+  CR.SAVE$ = CR.LINE$ : CR.SAVIND$ = CR.IND$
+
+  REM ---- the condition: what sits between GP.IF and the THEN that ends the line
+  CR.NEEDLE$ = "THEN" : CR.FROM = 1 : GOSUB CX.FINDWORD
+  GP.IF CR.POS = 0 THEN
+    RETURN
+  GP.ENDIF
+  CR.COND$ = MID$(CR.CODE$, 6, CR.POS - 6)
+  GP.IF LEN(CR.COND$) > 0 THEN
+    STRCASE.PTR = GP.STRPTR(CR.COND$) : STRCASE.MODE = STRCASE.TRIM : GOSUB STRCASE.GO
+  GP.ENDIF
+  GP.IF GP.ISEMPTY(CR.COND$) THEN
+    RETURN
+  GP.ENDIF
+
+  REM ---- swallow the body, stopping at GP.ENDIF
+  CR.BODY$ = ""
+  GP.DO
+    GP.IF CR.CN >= CR.BUFMAX THEN
+      CR.CBAD = 1 : GP.EXITDO
+    GP.ENDIF
+    GOSUB CX.GETLINE
+    GP.IF CR.EOF = 1 AND GP.ISEMPTY(CR.LINE$) THEN
+      CR.CBAD = 1 : GP.EXITDO
+    GP.ENDIF
+    CR.INLINES = CR.INLINES + 1
+    CR.BUF$(CR.CN) = CR.LINE$ : CR.CN = CR.CN + 1
+    GOSUB CX.CLASSIFY
+    GP.IF CR.FW$ = "GP.ENDIF" AND CR.KIND = 3 AND GP.ISEMPTY(CR.LAB$) THEN
+      GP.EXITDO
+    GP.ENDIF
+    GP.IF CR.KIND <> 3 THEN
+      CR.CBAD = 1 : GP.EXITDO
+    GP.ENDIF
+    GP.IF LEN(CR.LAB$) > 0 OR CR.HASREM <> 0 THEN
+      CR.CBAD = 1 : GP.EXITDO
+    GP.ENDIF
+    GP.IF GP.INSTR(CR.BLOCK$, "|" + CR.FW$ + "|") > 0 THEN
+      CR.CBAD = 1 : GP.EXITDO
+    GP.ENDIF
+    GP.IF GP.INSTR(CR.BLOCK$, "|" + CR.LW$ + "|") > 0 THEN
+      CR.CBAD = 1 : GP.EXITDO
+    GP.ENDIF
+    CR.NEEDLE$ = "THEN" : CR.FROM = 1 : GOSUB CX.FINDWORD
+    GP.IF CR.POS > 0 THEN
+      CR.CBAD = 1 : GP.EXITDO
+    GP.ENDIF
+    GP.IF LEN(CR.BODY$) > 0 THEN
+      CR.BODY$ = CR.BODY$ + " : "
+    GP.ENDIF
+    CR.BODY$ = CR.BODY$ + CR.CODE$
+  GP.LOOP
+
+  GP.IF CR.CBAD = 1 OR GP.ISEMPTY(CR.BODY$) THEN
+    GOSUB CX.REPLAY : RETURN
+  GP.ENDIF
+  CR.NEW2$ = "IF " + CR.COND$ + " THEN " + CR.BODY$
+  GP.IF LEN(CR.SAVIND$) + LEN(CR.NEW2$) > CR.MAXLEN THEN
+    GOSUB CX.REPLAY : RETURN
+  GP.ENDIF
+
+  REM ---- taken. Hand the read loop a plain IF line in place of the whole block.
+  CR.LINE$ = CR.SAVIND$ + CR.NEW2$
+  CR.COLLAPSED = CR.COLLAPSED + 1
+  GOSUB CX.CLASSIFY
+  RETURN
+
+REM ---- hand the block back to the read loop, unchanged, one line at a time ----
+CX.REPLAY:
+  CR.RIDX = 0 : CR.RN = CR.CN
+  CR.LINE$ = CR.SAVE$
+  GOSUB CX.CLASSIFY
+  RETURN
