@@ -1372,6 +1372,59 @@ near that. Default should stay 16; the option is for a program that has measured
 `OUT OF MEMORY` is already the error when it is exceeded, which is what stock reports for too many
 nested GOSUBs, so the failure mode needs no new spelling.
 
+#### Researched 2026-09-03: still the right lever, but MEASURE FIRST -- and not `MIN_WS_PAGES`
+
+**The cheaper lever beside it is worth nothing here, and the ordering at the end of "THE REAL
+MAXIMUM PROGRAM SIZE" above is by WORK, not by VALUE.** `FrameStackPages` and `MIN_WS_PAGES` are
+both 16 pages in the same arithmetic, so twelve pages off either is the same **+3,072 bytes**. But:
+
+- **`MIN_WS_PAGES` is a REFUSAL THRESHOLD, not an allocation.** The compiler reserves nothing; it
+  declines to emit an object leaving less than 4K, and the program gets whatever is left. That is
+  why `FREE` IS the workspace. The workspace is a two-ended heap -- variables and arrays growing UP
+  from `storeStartHigh`, strings growing DOWN from `storeEndHigh` (`clr.asm`, `ClearMemory`) -- and
+  **the editor genuinely uses it**: `FREE 6144`, with a documented history of string-heap `OUT OF
+  MEMORY`. Lowering the floor frees nothing. It removes a guard rail, turning a clean compile-time
+  `PROGRAM TOO BIG` into a run-time `OUT OF MEMORY` further down the road. It is the right lever
+  for a program **big in code and small in data**, which the editor is not.
+- **The frame stack is where the DEAD space is.** Eight deep through dispatch -> command ->
+  `GUI.OPEN` -> `STASH.SAVE`, plus a few nested FORs, is a couple of hundred bytes against 4,096 --
+  roughly **3.8 KB idle**, converted directly into code space.
+
+**MEASURE IT FIRST, BY PAINTING THE GAP.** Nothing measures frame depth today, so every "1 KB is
+plenty" claim here is arithmetic about frame sizes, not observation -- and that is the entire risk
+of the option. A high-water mark would tax every `StackOpenFrame`; **painting does not**. Fill the
+gap with a known byte in `ResetRuntimeStack` (`clr.asm`), which already knows both ends, and report
+the untouched run. One-time cost at start, nothing per GOSUB, and it turns the judgement call into
+a number. Worth having on its own.
+
+**The fourth value needs a channel, because `A`/`X`/`Y` are all spent.** `bootstrap.asm` hands over
+`A` = p-code page, `X` = workspace start, `Y` = workspace end, then `jmp RT_ENTRY`. A fixed byte at
+a known offset from `RTBASE` settles it -- the magic is `RTBASE+0..3` and `jmp StartRuntime` is
+`RTBASE+4..6`, so **`RTBASE+7` is free** -- and the bootstrap can store there before the jump
+without touching the register contract. `StartRuntime` then reads it instead of `sbc
+#FrameStackPages`.
+
+**The `RT_ABI` bump is the SAFETY MECHANISM, not bookkeeping.** It is the only thing stopping a
+small-gap program entering a runtime assembled at 16 and getting `stackFloorHigh` twelve pages
+INSIDE its own object code -- check passes, recursion descends into the program, it overwrites
+itself and executes what it wrote.
+
+**Two numbers to re-measure before quoting either.** `ObjectBase` is **`$3c00`** now, not the
+`$3b00` the arithmetic above uses -- `source/application/rtimage.gen.asm` is regenerated on every
+runtime build and says so. `$9F00 - $3c00` is 99 pages, less 16 + 16, so the ceiling is **67 pages,
+17,152 bytes**, one page below the 17,408 stated above. The measured filler-line table was taken
+before that moved.
+
+**Also missing: a runaway-recursion fixture.** The floor guard has no test. Whatever value the
+option ends up allowing, "a deep enough recursion still reports `OUT OF MEMORY` and does not
+corrupt the object" is the test that matters, and it does not exist yet.
+
+Other files this touches: `common.inc` (the constant), `object.asm` (both `adc #FrameStackPages`
+sites), `control.asm` -- note `CFLineCount = 4` and `ReadControlFile`'s blanking loop depends on
+the four lines being exactly 256 bytes, so a fifth line means reworking it or overloading line 4
+beside the mode -- `GPC.BASL` for the prompt, and `source/unit-tests/shared-runtime/shared_test.py`,
+which hardcodes `FRAME_STACK_PAGES = 16` and checks the handoff opcodes byte by byte.
+
 ### The MENU string arrays live in banked RAM — DONE, and it broke even
 
 Asked 2026-09-02, built 2026-09-03. `ED-MENUS.BASL` (`#INCLUDE`d beside `ED-STORE.BASL`, which was
