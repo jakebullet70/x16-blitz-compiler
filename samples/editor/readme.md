@@ -13,7 +13,7 @@ source. That is the point of the sample, and the numbers below are what it bough
 | --- | --- |
 | `EDITOR.BASL` | the editor — startup/restore, theme, render, key loop, editing, find |
 | `ED-STORE.BASL` | `#INCLUDE`d storage: a banked bump allocator and a 3-byte-per-line pointer table |
-| `ED-MENUS.BASL` | `#INCLUDE`d menus: the same idea at fixed stride — the menu **text** lives in a bank |
+| `ED-MENUS.BASL` | `#INCLUDE`d menus, end to end: data, drawing, keys and dispatch — with the **text** in a bank |
 | `EDITOR.PRG` | the tokenised program — the input you feed to the compiler |
 | `EDITOR.SYM` | **BASLOAD's symbol file, and it is not optional** — see below |
 | `TEST.MD` | the document the editor opens, and the fixture the self-check searches |

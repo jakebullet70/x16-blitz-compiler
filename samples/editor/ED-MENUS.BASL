@@ -165,3 +165,153 @@ ED.DRAW.DROPDOWN:
   GOSUB MENUVERT.DRAW : MENUVERT.DRAWROW = MENU.SEL + 1 : MENUVERT.DRAWATTR = MENUVERT.HIATTR
   GOSUB MENUVERT.ROW
   RETURN
+
+
+REM ---- keys and dispatch: the bar and the open dropdown ----
+REM Everything above draws; everything below decides. ED.CMD.* live in EDITOR.BASL,
+REM reached through the one global symbol table an #INCLUDE gives.
+ED.ALT.MENU:
+  REM Whatever letter arrived with ALT down, folded to upper. No PETSCII Commodore code to
+  REM decode in ISO mode -- ED.READ.MODS has already asked the KERNAL about the modifier.
+  ED.ALT.CH = ED.KEY
+  IF ED.ALT.CH >= 97 AND ED.ALT.CH <= 122 THEN ED.ALT.CH = ED.ALT.CH - 32
+  FOR MENU.I = 0 TO MENU.COUNT - 1
+    GP.IF ASC(MID$(MENU.HOT$, MENU.I + 1, 1)) = ED.ALT.CH THEN 
+      MENU.ACTIVE = MENU.I 
+      GOSUB ED.OPEN.MENUBAR  
+      RETURN
+    GP.ENDIF
+  NEXT MENU.I
+  REM No menu with that initial. SAY WHAT ARRIVED: ALT+letter is the one path nothing
+  REM headless can drive (kbdbuf_put sets no modifiers), so the machine reporting its own
+  REM key and modifier bytes is the only instrument there is.
+  ED.MSG$ = "ALT: key=" + MID$(STR$(ED.KEY), 2) + " mods=" + MID$(STR$(ED.MODS), 2)
+  GOSUB ED.INFO.MSG
+  RETURN
+
+REM THE DROPDOWN'S KEY LOOP IS MENUVERT.RUN'S. What the editor needs on top of it is that
+REM this is a dropdown UNDER A BAR: LEFT and RIGHT walk the bar with the panel still open,
+REM and a letter jumps to that menu. A vertical menu rightly ignores all three, and used to
+REM swallow them.
+REM
+REM MENUVERT.KEYEXIT is the answer, and it is a library change rather than a workaround
+REM here: a key the menu has no use for ends it with MENUVERT.KEY set and MENUVERT.SEL
+REM untouched, and the caller says what it meant. It mirrors MENUBAR.DOWNEXIT, so a bar and
+REM its dropdown drive each other with neither module knowing the other is there.
+REM
+REM So the loop below is about the BAR, not about keys: one label, and every path either
+REM returns to it having moved which menu is open, or returns.
+REM
+REM MENU.ACTIVE and MENU.SEL are 0 based (the item slots are flat, MENU.ACTIVE * 8 + MENU.SEL);
+REM MENUBAR.SEL and MENUVERT.SEL are 1 based. Converted at the boundary and nowhere else.
+ED.OPEN.MENUBAR:
+  MENU.SEL = 0 : GOSUB ED.RENDER.MENUBAR
+ED.MENU.OPEN:
+  GOSUB ED.DRAW.DROPDOWN : MENUVERT.SEL = MENU.SEL + 1
+  MENUVERT.FLAGS = MENUVERT.KEYEXIT
+  REM A letter is now an ITEM's accelerator first and a MENU's second: MENUVERT gets the
+  REM open menu's letters, and only a key its hotkeys did NOT claim is handed back below
+  REM to ED.MENU.LETTER. MENUVERT.HOTHIT is how the two are told apart -- both exits leave
+  REM KEY holding the character.
+  REM ED.DRAW.DROPDOWN above set MENUVERT.HOT$ to this menu's accelerator letters.
+  GOSUB MENUVERT.RUN
+  IF MENUVERT.SEL = 0 THEN GOSUB ED.MENU.CANCEL : RETURN
+  MENU.SEL = MENUVERT.SEL - 1
+  IF MENUVERT.HOTHIT = 1 THEN GOSUB ED.MENU.SELECT : RETURN
+  IF MENUVERT.KEY = 13 THEN GOSUB ED.MENU.SELECT : RETURN
+  REM ED.RENDER.MENUBAR IS NOT IN THIS LOOP, and that is the point: it bands the whole row
+  REM and re-prints the document name, eighty cells to move a highlight two. The movers
+  REM below repaint the two titles that changed, as MENUBAR.SETTLE does.
+  IF MENUVERT.KEY = 157 THEN GOSUB ED.MENU.LEFT : GOTO ED.MENU.OPEN
+  IF MENUVERT.KEY = 29 THEN GOSUB ED.MENU.RIGHT : GOTO ED.MENU.OPEN
+  ED.KEY = MENUVERT.KEY : GOSUB ED.MENU.LETTER
+  GOTO ED.MENU.OPEN
+
+REM A letter while the bar is open jumps to that menu, folded to upper so f and F both
+REM reach File. NO REDRAW HERE -- ED.MENU.OPEN does it on the way round -- so this only
+REM erases the panel about to move, and a letter matching nothing leaves everything alone.
+ED.MENU.LETTER:
+  ED.ML.CH = ED.KEY
+  IF ED.ML.CH >= 97 AND ED.ML.CH <= 122 THEN ED.ML.CH = ED.ML.CH - 32
+  ED.ML.HIT = 0 - 1
+  FOR MENU.I = 0 TO MENU.COUNT - 1
+    IF ASC(MID$(MENU.HOT$, MENU.I + 1, 1)) = ED.ML.CH THEN ED.ML.HIT = MENU.I
+  NEXT MENU.I
+  REM Nothing to do is the common case -- every key that is not an arrow or RETURN lands
+  REM here -- so it must not repaint.
+  IF ED.ML.HIT < 0 THEN RETURN
+  IF ED.ML.HIT = MENU.ACTIVE THEN RETURN
+  GOSUB ED.ERASE.DROPDOWN : ED.MENU.WAS = MENU.ACTIVE
+  MENU.ACTIVE = ED.ML.HIT : MENU.SEL = 0
+  GOSUB ED.MENU.BAR.MOVE
+  RETURN
+
+ED.MENU.SELECT:
+  MENU.CHOICE.MENU = MENU.ACTIVE : MENU.CHOICE.ITEM = MENU.SEL
+  MENU.ACTIVE = 0 - 1 : GOSUB ED.MENU.CLOSE : GOSUB ED.MENU.DISPATCH
+  RETURN
+
+ED.MENU.CANCEL:
+  MENU.ACTIVE = 0 - 1 : GOSUB ED.MENU.CLOSE
+  RETURN
+
+REM Putting the document back is taking the panel away: it never covered anything the
+REM hardware cares about. Two rows of chrome instead of a 28-row repaint.
+ED.MENU.CLOSE:
+  GOSUB ED.ERASE.DROPDOWN : GOSUB ED.RENDER.MENUBAR : GOSUB ED.PLACE.CARET
+  RETURN
+
+REM Only the two keys that cross the panel's axis are here; moving the highlight INSIDE it
+REM is MENUVERT.RUN's job.
+REM
+REM ERASE BEFORE MOVING. ED.ERASE.DROPDOWN works from the ED.DD.* geometry the last
+REM ED.DRAW.DROPDOWN left behind -- the panel actually on screen -- so it has to run while
+REM MENU.ACTIVE still names that panel.
+ED.MENU.LEFT:
+  GOSUB ED.ERASE.DROPDOWN
+  ED.MENU.WAS = MENU.ACTIVE : MENU.ACTIVE = MENU.ACTIVE - 1
+  IF MENU.ACTIVE < 0 THEN MENU.ACTIVE = MENU.COUNT - 1
+  MENU.SEL = 0 : GOSUB ED.MENU.BAR.MOVE
+  RETURN
+
+ED.MENU.RIGHT:
+  GOSUB ED.ERASE.DROPDOWN
+  ED.MENU.WAS = MENU.ACTIVE : MENU.ACTIVE = MENU.ACTIVE + 1
+  IF MENU.ACTIVE >= MENU.COUNT THEN MENU.ACTIVE = 0
+  MENU.SEL = 0
+  GOSUB ED.MENU.BAR.MOVE
+  RETURN
+
+REM ---- the two titles that changed, and nothing else ----
+REM ED.MENU.BAR.ITEMS first, because ED.DRAW.DROPDOWN has since pointed MENUVERT.X, .Y,
+REM .WIDTH, .ATTR and .HIATTR at the PANEL -- and MENUBAR.ITEM and MENUBAR.MARK both reach
+REM MENUVERT.ROW through those.
+ED.MENU.BAR.MOVE:
+  GOSUB ED.MENU.BAR.ITEMS
+  MENUBAR.DRAWN = ED.MENU.WAS + 1 : MENUBAR.PAINT = MENUVERT.ATTR : GOSUB MENUBAR.ITEM
+  MENUBAR.SEL = MENU.ACTIVE + 1 : GOSUB MENUBAR.MARK
+  RETURN
+
+REM ---- take the panel away, which is all "putting the document back" means now ----
+REM The document is on layer 0 and was never covered, so this clears the panel's OWN
+REM rectangle on the overlay -- rows 1..ED.DD.FH at the columns it occupied -- back to
+REM transparent. Erasing by repainting document rows stopped working the moment they moved
+REM to layer 0: the panel is on the other layer, and three of them piled up on screen.
+ED.ERASE.DROPDOWN:
+  ED.DDE.LAST = ED.DD.FH
+  IF ED.DDE.LAST > ED.TEXT.BOTTOM THEN ED.DDE.LAST = ED.TEXT.BOTTOM
+  IF ED.DDE.LAST < 1 THEN RETURN
+  GP.FILL ED.DD.BX, 1, ED.DD.FW, ED.DDE.LAST, 32, 0
+  RETURN
+
+ED.MENU.DISPATCH:
+  ON MENU.CHOICE.MENU + 1 GOSUB ED.DISP.FILE, ED.DISP.SEARCH, ED.CMD.ABOUT
+  RETURN
+
+ED.DISP.FILE:
+  ON MENU.CHOICE.ITEM + 1 GOSUB ED.CMD.NEW, ED.CMD.OPEN, ED.CMD.SAVE, ED.CMD.SAVEAS, ED.CMD.EXIT
+  RETURN
+
+ED.DISP.SEARCH:
+  ON MENU.CHOICE.ITEM + 1 GOSUB ED.CMD.FIND, ED.CMD.GOTO
+  RETURN

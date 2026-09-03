@@ -4,45 +4,33 @@ REM
 REM #INCLUDEd inline by the editor: one global symbol table, so the DOC.* labels are
 REM GOSUBbed from the main program and the API variables below are visible to both.
 REM
-REM No pointers: a "far pointer" is just two numbers (bank, offset). The compiled
-REM runtime's PEEK/POKE honour the last BANK statement, so a banked access is
-REM   BANK <bank> : PEEK/POKE $A000+<offset>
+REM No pointers: a "far pointer" is two numbers (bank, offset), and PEEK/POKE honour
+REM the last BANK statement -- so an access is BANK <bank> : PEEK $A000+<offset>.
 REM
-REM SHARED API VARIABLES (the interface; the main program uses these names):
-REM   LINE.TEXT$      a line's text  (in for DOC.STORE, out for DOC.LOAD)
-REM   LINE.INDEX      line index     (in for DOC.STORE / DOC.LOAD)
-REM   LINE.COUNT      number of lines (maintained on file load; read by editor)
-REM   DOC.FILE.NAME$  file to load   (in for DOC.LOADFILE)
+REM API: LINE.TEXT$ (in for DOC.STORE, out for DOC.LOAD), LINE.INDEX, LINE.COUNT,
+REM DOC.FILE.NAME$ (in for DOC.LOADFILE). Dotted names because BASLOAD tokenises a
+REM whole A-Z0-9_. run as a keyword if that is what it spells -- FN$ and ON$ both break.
 REM
-REM Names avoid keyword prefixes on purpose: BASLOAD grabs the maximal A-Z0-9_. run
-REM before a $, and if that whole run is a keyword it tokenises as one (FN$, ON$ both
-REM break). A dotted name is safe because the run as a whole is not a keyword.
-REM
-REM STORAGE LAYOUT
-REM   Line table : 3 bytes per line [bank][off_lo][off_hi], in banks 1..3
-REM                (2048 entries per bank -> up to 6144 lines). Random access:
-REM                line I lives at bank BASE+INT(I/2048), byte (I mod 2048)*3 of
-REM                the $A000 window -> go-to-line is O(1).
-REM   Content    : a bump allocator over $A000..$BF00 in banks 6.. ; each line
-REM                is stored length-prefixed [len][chars]. Never frees a single
-REM                record; "free all" = DOC.INIT. Reclamation is bulk, at save.
+REM LAYOUT
+REM   Line table : 3 bytes per line [bank][off_lo][off_hi], banks 1..3, 2048 per bank
+REM                -> 6144 lines. Line I is at bank BASE+INT(I/2048), byte (I mod 2048)*3
+REM                of the window, so go-to-line is O(1).
+REM   Content    : bump allocator over $A000..$BF00 in banks 6.., each line [len][chars].
+REM                Never frees one record; "free all" is DOC.INIT, reclamation is at save.
 REM ============================================================================
 
 REM ---- reset the store (empty document) ----
 DOC.INIT:
   DOC.WIN.START = 40960 : REM $A000
   DOC.WIN.END = 48896   : REM $BF00 -- $BF00..$BFFF left as a guard tail
-  DOC.TABLE.PER.BANK = 2048
-  DOC.TABLE.BASE.BANK = 1 : REM line table occupies banks 1..3
+  DOC.TABLE.PER.BANK = 2048 : DOC.TABLE.BASE.BANK = 1 : REM line table occupies banks 1..3
   REM 6, NOT 4 OR 5: bank 4 is lent to GUI.INC.BL for the cells a dialog covers (see
   REM ED.GUI.BANK in EDITOR.BASL) and bank 5 to ED-MENUS.BASL for the menu text. The
   REM arena only grows upward, so giving up the bottom banks is the cheapest reservation
   REM there is: 16K of document out of 250-odd.
   DOC.FIRST.BANK = 6      : REM content arena starts here
-  DOC.CUR.BANK = DOC.FIRST.BANK
-  DOC.CUR.PTR = DOC.WIN.START
-  DOC.HIGH.BANK = DOC.FIRST.BANK
-  LINE.COUNT = 0
+  DOC.CUR.BANK = DOC.FIRST.BANK  : DOC.CUR.PTR = DOC.WIN.START 
+  DOC.HIGH.BANK = DOC.FIRST.BANK : LINE.COUNT = 0
   REM Off unless DOC.LOADFILE turns it on. Set HERE, textually above the GP.ASM block in
   REM DOC.STORE.CHARS, because {VAR} needs a slot the compiler has already made -- a
   REM variable first assigned further down the file is UNKNOWN VARIABLE IN {} at the block.
@@ -52,66 +40,52 @@ DOC.INIT:
 REM ---- reserve DOC.ALLOC.SIZE bytes -> DOC.RESULT.BANK, DOC.RESULT.OFF ----
 DOC.ALLOC:
   IF DOC.CUR.PTR + DOC.ALLOC.SIZE <= DOC.WIN.END THEN GOTO DOC.ALLOC.PLACE
-  DOC.CUR.BANK = DOC.CUR.BANK + 1
-  DOC.CUR.PTR = DOC.WIN.START
+  DOC.CUR.BANK = DOC.CUR.BANK + 1 : DOC.CUR.PTR = DOC.WIN.START
   IF DOC.CUR.BANK > DOC.HIGH.BANK THEN DOC.HIGH.BANK = DOC.CUR.BANK
 DOC.ALLOC.PLACE:
-  DOC.RESULT.BANK = DOC.CUR.BANK
-  DOC.RESULT.OFF = DOC.CUR.PTR
+  DOC.RESULT.BANK = DOC.CUR.BANK : DOC.RESULT.OFF = DOC.CUR.PTR
   DOC.CUR.PTR = DOC.CUR.PTR + DOC.ALLOC.SIZE
   RETURN
 
 REM ---- table slot for LINE.INDEX -> DOC.SLOT.ADDR in bank DOC.SLOT.BANK ----
 DOC.SLOT.LOCATE:
-  DOC.SEGMENT = INT(LINE.INDEX / DOC.TABLE.PER.BANK)
-  DOC.SLOT.BANK = DOC.TABLE.BASE.BANK + DOC.SEGMENT
+  DOC.SEGMENT = INT(LINE.INDEX / DOC.TABLE.PER.BANK) : DOC.SLOT.BANK = DOC.TABLE.BASE.BANK + DOC.SEGMENT
   DOC.SLOT.ADDR = DOC.WIN.START + (LINE.INDEX - DOC.SEGMENT * DOC.TABLE.PER.BANK) * 3
   RETURN
 
 REM ---- write table slot LINE.INDEX = (DOC.PUT.BANK, DOC.PUT.OFF) ----
 DOC.SLOT.WRITE:
-  GOSUB DOC.SLOT.LOCATE
-  BANK DOC.SLOT.BANK
-  POKE DOC.SLOT.ADDR, DOC.PUT.BANK
-  DOC.OFF.HIGH = INT(DOC.PUT.OFF / 256)
+  GOSUB DOC.SLOT.LOCATE : BANK DOC.SLOT.BANK
+  POKE DOC.SLOT.ADDR, DOC.PUT.BANK : DOC.OFF.HIGH = INT(DOC.PUT.OFF / 256)
   POKE DOC.SLOT.ADDR + 1, DOC.PUT.OFF - DOC.OFF.HIGH * 256
   POKE DOC.SLOT.ADDR + 2, DOC.OFF.HIGH
   RETURN
 
 REM ---- read table slot LINE.INDEX -> DOC.GOT.BANK, DOC.GOT.OFF ----
 DOC.SLOT.READ:
-  GOSUB DOC.SLOT.LOCATE
-  BANK DOC.SLOT.BANK
+  GOSUB DOC.SLOT.LOCATE : BANK DOC.SLOT.BANK
   DOC.GOT.BANK = PEEK(DOC.SLOT.ADDR)
   DOC.GOT.OFF = PEEK(DOC.SLOT.ADDR + 2) * 256 + PEEK(DOC.SLOT.ADDR + 1)
   RETURN
 
 REM ---- store LINE.TEXT$ at LINE.INDEX (allocates, copies, updates the table) ----
 DOC.STORE:
-  DOC.LEN = LEN(LINE.TEXT$)
-  DOC.ALLOC.SIZE = DOC.LEN + 1
-  GOSUB DOC.ALLOC
-  BANK DOC.RESULT.BANK
-  POKE DOC.RESULT.OFF, DOC.LEN
+  DOC.LEN = LEN(LINE.TEXT$) : DOC.ALLOC.SIZE = DOC.LEN + 1
+  GOSUB DOC.ALLOC : BANK DOC.RESULT.BANK : POKE DOC.RESULT.OFF, DOC.LEN
   IF DOC.LEN > 0 THEN GOSUB DOC.STORE.CHARS
   DOC.PUT.BANK = DOC.RESULT.BANK : DOC.PUT.OFF = DOC.RESULT.OFF
   GOSUB DOC.SLOT.WRITE
   RETURN
 
 REM ---- the line's characters, main RAM -> the bank window, in ONE machine-code pass ----
-REM This was POKE ASC(MID$(LINE.TEXT$, i, 1)) per character: a one-character string
-REM ALLOCATED per byte of every line stored -- on the load path, and on every keystroke
-REM that commits a line. Y walks DOWN from the length to 1, so offset 0 (the length byte,
-REM already written) is left alone and the loop needs no counter of its own.
-REM
-REM DOC.CP.SWAP% turns on the PETSCII -> ASCII conversion the LOADER needs and nothing
-REM else does -- an edited line is already ASCII. It is read into X once, before the loop,
-REM and the eight lines from CPX are what DOC.TOASCII used to be, a whole BASIC routine.
+REM Was POKE ASC(MID$(...)) per character -- a string allocated per byte, on the load path
+REM and on every committed keystroke. Y walks DOWN from the length, so offset 0 (the length
+REM byte, already written) is left alone and the loop needs no counter. DOC.CP.SWAP% turns
+REM on the PETSCII->ASCII conversion only the LOADER needs; the eight lines from CPX are
+REM what DOC.TOASCII used to be.
 DOC.STORE.CHARS:
-  DOC.CP.BANK% = DOC.RESULT.BANK
-  DOC.CP.SRC% = GP.STRPTR(LINE.TEXT$)
-  DOC.CP.DST% = DOC.RESULT.OFF
-  DOC.CP.LEN% = DOC.LEN
+  DOC.CP.BANK% = DOC.RESULT.BANK : DOC.CP.SRC% = GP.STRPTR(LINE.TEXT$)
+  DOC.CP.DST% = DOC.RESULT.OFF   : DOC.CP.LEN% = DOC.LEN
   #REM 1
   GP.ASM
   REM LDA {DOC.CP.BANK%}
@@ -157,14 +131,11 @@ DOC.STORE.CHARS:
 REM ---- load line LINE.INDEX into LINE.TEXT$ ----
 DOC.LOAD:
   LINE.TEXT$ = ""
-  REM PAST THE END IS EMPTY, and line 0 of a 0-line document is past the end. Unguarded
-  REM this read a table slot never written, and PEEK of wherever it pointed was a LENGTH:
-  REM the emulator randomises RAM, so a document-less boot built a 0..255-char garbage
-  REM string here -- a different heap every run, and the intermittent OOM's other half.
+  REM PAST THE END IS EMPTY, and line 0 of a 0-line document is past the end. Unguarded,
+  REM PEEK of a never-written slot became a LENGTH over randomised RAM: a 0..255-char
+  REM garbage string, different every boot, and the intermittent OOM other half.
   IF LINE.INDEX >= LINE.COUNT THEN RETURN
-  GOSUB DOC.SLOT.READ
-  BANK DOC.GOT.BANK
-  DOC.LEN = PEEK(DOC.GOT.OFF)
+  GOSUB DOC.SLOT.READ : BANK DOC.GOT.BANK : DOC.LEN = PEEK(DOC.GOT.OFF)
   IF DOC.LEN > 0 THEN GOSUB DOC.LOAD.CHARS
   RETURN
 DOC.LOAD.CHARS:
@@ -174,29 +145,22 @@ DOC.LOAD.CHARS:
   RETURN
 
 REM ---- load text file DOC.FILE.NAME$ into the store (fills table, sets count) ----
-REM LINPUT# reads a whole line in ASSEMBLY, stopping at the CR and consuming it: one
-REM string per line, where GET# cost an ASC, six tests and a heap allocation per BYTE.
+REM LINPUT# reads a whole line in assembly, one string per line, where GET# cost an ASC,
+REM six tests and an allocation per BYTE. The editor writes CR; a CRLF file leaves the LF
+REM at the head of the next line, stripped here.
 REM
-REM ENDINGS. The editor writes CR. A CRLF file leaves the LF at the head of the NEXT
-REM line, which is stripped here; a file with LF endings and no CR would arrive as
-REM 255-byte chunks, and nothing this editor writes looks like that.
-REM
-REM AT END OF FILE the KERNAL sets ST as it hands over the LAST byte, so the read that
-REM sets it still carries a real line. DOC.RAW separates the two things an empty result
-REM can mean there: 0 bytes is a CR of its own -- a blank last line, and it is kept --
-REM while a stray LF is the tail of the line already pushed, and is not.
+REM AT END OF FILE the KERNAL sets ST while handing over the LAST byte, so that read still
+REM carries a real line. DOC.RAW tells the two empty results apart: 0 bytes is a CR of its
+REM own -- a blank last line, kept -- while a stray LF is the tail of the line just pushed.
 DOC.LOADFILE:
-  GOSUB DOC.INIT
-  DOC.OPEN.NAME$ = DOC.FILE.NAME$ + ",S,R"
+  GOSUB DOC.INIT : DOC.OPEN.NAME$ = DOC.FILE.NAME$ + ",S,R"
   OPEN 2, 8, 2, DOC.OPEN.NAME$
   DOC.CP.SWAP% = 1 : REM these lines arrive in PETSCII, and only these
 DOC.READ.LOOP:
-  LINPUT# 2, LINE.TEXT$
-  DOC.STATUS = ST : DOC.RAW = LEN(LINE.TEXT$)
-  REM BIT 1 OF ST IS A READ ERROR, and an OPEN that found no file still opens: every
-  REM LINPUT# on that channel hands back CHR$(0) with ST = 66, for ever. Nothing there
-  REM is a line, and pushing one gave a "blank" document whose single line was a NUL.
-  REM Clean end of file is 64, so bit 1 alone tells the two apart.
+  LINPUT# 2, LINE.TEXT$ : DOC.STATUS = ST : DOC.RAW = LEN(LINE.TEXT$)
+  REM BIT 1 OF ST IS A READ ERROR. An OPEN that found no file still opens, and every
+  REM LINPUT# then hands back CHR$(0) with ST = 66 for ever -- a "blank" document whose
+  REM one line was a NUL. Clean EOF is 64, so bit 1 alone separates them.
   IF (DOC.STATUS AND 2) <> 0 THEN GOTO DOC.READ.DONE
   IF ASC(LINE.TEXT$) = 10 THEN LINE.TEXT$ = MID$(LINE.TEXT$, 2, 250)
   IF LEN(LINE.TEXT$) > 250 THEN LINE.TEXT$ = LEFT$(LINE.TEXT$, 250)
@@ -205,8 +169,7 @@ DOC.READ.LOOP:
   IF LEN(LINE.TEXT$) > 0 THEN GOSUB DOC.PUSH.LINE : GOTO DOC.READ.DONE
   IF DOC.RAW = 0 AND LINE.COUNT > 0 THEN GOSUB DOC.PUSH.LINE
 DOC.READ.DONE:
-  DOC.CP.SWAP% = 0
-  CLOSE 2
+  DOC.CP.SWAP% = 0 : CLOSE 2
   RETURN
 
 DOC.PUSH.LINE:
@@ -217,44 +180,36 @@ DOC.PUSH.LINE:
 REM ============================================================================
 REM THE TABLE SHIFT -- a memmove, in assembly, because it is 75% of a RETURN
 REM ============================================================================
-REM Both of these used to walk the table one entry at a time in BASIC: per entry a
-REM DOC.SLOT.READ and a DOC.SLOT.WRITE, so two GOSUBs, two DOC.SLOT.LOCATEs (an INT
-REM divide and two multiplies each), two BANKs and six banked PEEK/POKEs -- about
-REM twenty statements to move three bytes. Ten RETURNs at the top of a 100-line
-REM document cost 447 jiffies of the 599 the whole keystroke took.
+REM These walked the table an entry at a time in BASIC -- about twenty statements to move
+REM three bytes, and ten RETURNs in a 100-line document cost 447 jiffies of 599. Now BASIC
+REM works out WHICH BYTES MOVE and the assembly moves them.
 REM
-REM Now BASIC works out WHICH BYTES MOVE and the assembly moves them. The shift is
-REM +/- one entry, so source and destination overlap and DIRECTION IS THE WHOLE
-REM CORRECTNESS ARGUMENT: an insert copies from the TOP DOWN so it cannot eat its own
-REM source, a delete copies from the BOTTOM UP. Chunking preserves that -- insert
-REM takes its chunks from the top, delete from the bottom.
+REM DIRECTION IS THE WHOLE CORRECTNESS ARGUMENT: the shift is +/- one entry, so source and
+REM destination overlap. Insert copies TOP DOWN, delete BOTTOM UP, and the chunking keeps
+REM that order.
 REM
-REM THE SEGMENT BOUNDARY IS THE TRAP. The table is banks 1..3 at 2048 entries each, so
-REM an entry at the top of a bank moves into the NEXT bank and the block cannot do it:
-REM one bank is selected for the whole copy. Those single entries go the old way, and
-REM there are at most two of them in a whole shift. A document under 2048 lines never
-REM crosses one, which is exactly why a naive block passes every casual test and then
-REM corrupts the first long file it meets.
+REM THE SEGMENT BOUNDARY IS THE TRAP. 2048 entries a bank, and one bank is selected for the
+REM whole copy, so an entry at the top of a bank moves into the NEXT one and the block
+REM cannot do it. Those go the old way, at most two per shift. Under 2048 lines nothing
+REM crosses one -- which is why a naive block passes every casual test, then corrupts the
+REM first long file it meets.
 
 REM ---- open a slot at LINE.INDEX (shift entries up), count++ ----
 REM The caller then DOC.STOREs the new line's content at that index.
 DOC.INSERT.SLOT:
-  DOC.INS.AT = LINE.INDEX
-  DOC.SH.J = LINE.COUNT - 1
+  DOC.INS.AT = LINE.INDEX : DOC.SH.J = LINE.COUNT - 1
 DOC.INS.LOOP:
   IF DOC.SH.J < DOC.INS.AT THEN GOTO DOC.INS.DONE
   DOC.SH.SEG = INT(DOC.SH.J / DOC.TABLE.PER.BANK)
   IF DOC.SH.SEG <> INT((DOC.SH.J + 1) / DOC.TABLE.PER.BANK) THEN GOTO DOC.INS.CROSS
   DOC.SH.LO = DOC.SH.SEG * DOC.TABLE.PER.BANK
   IF DOC.SH.LO < DOC.INS.AT THEN DOC.SH.LO = DOC.INS.AT
-  DOC.MV.BANK% = DOC.TABLE.BASE.BANK + DOC.SH.SEG
-  DOC.SH.ADDR = DOC.WIN.START + (DOC.SH.LO - DOC.SH.SEG * DOC.TABLE.PER.BANK) * 3
+  DOC.MV.BANK% = DOC.TABLE.BASE.BANK + DOC.SH.SEG : DOC.SH.ADDR = DOC.WIN.START + (DOC.SH.LO - DOC.SH.SEG * DOC.TABLE.PER.BANK) * 3
   DOC.SH.P = (DOC.SH.J - DOC.SH.LO + 1) * 3
 DOC.INS.CHUNK:
   IF DOC.SH.P < 1 THEN GOTO DOC.INS.RUNDONE
   DOC.SH.K = DOC.SH.P : IF DOC.SH.K > 255 THEN DOC.SH.K = 255
-  DOC.MV.SRC% = DOC.SH.ADDR + DOC.SH.P - DOC.SH.K
-  DOC.MV.DST% = DOC.SH.ADDR + DOC.SH.P - DOC.SH.K + 3
+  DOC.MV.SRC% = DOC.SH.ADDR + DOC.SH.P - DOC.SH.K : DOC.MV.DST% = DOC.SH.ADDR + DOC.SH.P - DOC.SH.K + 3
   DOC.MV.LEN% = DOC.SH.K
   GOSUB DOC.MV.DOWN
   DOC.SH.P = DOC.SH.P - DOC.SH.K
@@ -276,8 +231,7 @@ DOC.INS.DONE:
 REM ---- remove the slot at LINE.INDEX (shift entries down), count-- ----
 REM The removed line's content record just leaks until the next save/compaction.
 DOC.DELETE.SLOT:
-  DOC.DEL.AT = LINE.INDEX
-  DOC.SH.J = DOC.DEL.AT + 1
+  DOC.DEL.AT = LINE.INDEX : DOC.SH.J = DOC.DEL.AT + 1
 DOC.DEL.LOOP:
   IF DOC.SH.J > LINE.COUNT - 1 THEN GOTO DOC.DEL.DONE
   DOC.SH.SEG = INT(DOC.SH.J / DOC.TABLE.PER.BANK)
@@ -286,16 +240,12 @@ DOC.DEL.LOOP:
   IF DOC.SH.HI > LINE.COUNT - 1 THEN DOC.SH.HI = LINE.COUNT - 1
   DOC.MV.BANK% = DOC.TABLE.BASE.BANK + DOC.SH.SEG
   DOC.SH.ADDR = DOC.WIN.START + (DOC.SH.J - 1 - DOC.SH.SEG * DOC.TABLE.PER.BANK) * 3
-  DOC.SH.N = (DOC.SH.HI - DOC.SH.J + 1) * 3
-  DOC.SH.P = 0
+  DOC.SH.N = (DOC.SH.HI - DOC.SH.J + 1) * 3 :  DOC.SH.P = 0
 DOC.DEL.CHUNK:
   IF DOC.SH.P >= DOC.SH.N THEN GOTO DOC.DEL.RUNDONE
   DOC.SH.K = DOC.SH.N - DOC.SH.P : IF DOC.SH.K > 255 THEN DOC.SH.K = 255
-  DOC.MV.DST% = DOC.SH.ADDR + DOC.SH.P
-  DOC.MV.SRC% = DOC.SH.ADDR + DOC.SH.P + 3
-  DOC.MV.LEN% = DOC.SH.K
-  GOSUB DOC.MV.UP
-  DOC.SH.P = DOC.SH.P + DOC.SH.K
+  DOC.MV.DST% = DOC.SH.ADDR + DOC.SH.P : DOC.MV.SRC% = DOC.SH.ADDR + DOC.SH.P + 3
+  DOC.MV.LEN% = DOC.SH.K :  GOSUB DOC.MV.UP : DOC.SH.P = DOC.SH.P + DOC.SH.K
   GOTO DOC.DEL.CHUNK
 DOC.DEL.RUNDONE:
   DOC.SH.J = DOC.SH.HI + 1
@@ -312,12 +262,9 @@ DOC.DEL.DONE:
   RETURN
 
 REM ---- move DOC.MV.LEN% bytes (1..255) in bank DOC.MV.BANK%, DESCENDING ----
-REM For the insert: DOC.MV.DST% is DOC.MV.SRC% + 3 and the two overlap, so the last
-REM byte has to move first. $00 is the RAM bank register; the block owns the bank for
-REM its own accesses only -- PEEK and POKE re-select theirs around every access.
-REM The two operands are patched rather than held in zero page, which is the idiom
-REM EDITOR.BASL's renderers already use and costs no assumption about the runtime's
-REM zero page.
+REM Insert: DST is SRC + 3 and they overlap, so the last byte moves first. $00 is the RAM
+REM bank register, and the block owns the bank for its own accesses only. Operands are
+REM patched rather than held in zero page, the idiom EDITOR.BASL renderers already use.
 DOC.MV.DOWN:
   #REM 1
   GP.ASM
@@ -382,19 +329,18 @@ DOC.SAVEFILE:
   OPEN 2, 8, 2, DOC.OPEN.NAME$
   FOR DOC.SAVE.INDEX = 0 TO LINE.COUNT - 1
     LINE.INDEX = DOC.SAVE.INDEX : GOSUB DOC.LOAD
-    GOSUB DOC.TOPETSCII
-    PRINT#2, DOC.OUT$
+    GOSUB DOC.TOPETSCII : PRINT#2, DOC.OUT$
   NEXT DOC.SAVE.INDEX
   CLOSE 2
   RETURN
 
-REM ---- ASCII in memory -> PETSCII on disk: the inverse of the swap DOC.LOADFILE does.
-REM Upper case is tested FIRST on purpose: a letter moved up to $C1-$DA is then out of
-REM range of the lower-case test, so nothing is converted twice.
+REM ---- ASCII in memory -> PETSCII on disk, the inverse of the load swap ----
+REM Upper case is tested FIRST: a letter moved to $C1-$DA is then out of range of the
+REM lower-case test, so nothing converts twice.
 DOC.TOPETSCII:
   DOC.OUT$ = ""
-  REM FOR 1 TO 0 runs the body ONCE -- the test is at NEXT -- and ASC("") is 0, so an
-  REM empty line would be written as a single CHR$(0) instead of as nothing.
+  REM FOR 1 TO 0 runs the body ONCE (the test is at NEXT), so an empty line would go out
+  REM as a single CHR$(0) instead of as nothing.
   IF LEN(LINE.TEXT$) = 0 THEN RETURN
   FOR DOC.TI = 1 TO LEN(LINE.TEXT$)
     DOC.TC = ASC(MID$(LINE.TEXT$, DOC.TI, 1))
