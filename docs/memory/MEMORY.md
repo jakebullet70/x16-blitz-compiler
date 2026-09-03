@@ -91,3 +91,4 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [Memory is git-tracked](memory-is-git-tracked.md) — this folder versions with the project, via a junction that must survive renames
 - [Blitz-X16 prior attempt](blitz-x16-prior-attempt.md) — the earlier Prog8 self-hosted compiler (now deleted from disk)
 - [Prog8 PETSCII char literals](prog8-petscii-charlits.md) — legacy; only relevant if Prog8 comes back
+- [STRCASE call overhead, measured](strcase-call-overhead-measured.md) — ~2,570 cycles a call, and 1.3% of the editor line it rides on.
