@@ -1441,8 +1441,10 @@ of the wrong length being replaced rather than indexed past, a one-item list and
 
 - **`#DEFINE` and `#IFNDEF` reject a DIGIT in the symbol name** — `INVALID PARAMETER`, and the
   6-byte PRG that "compiles" to `OK CODE 11`. Variables and labels take digits happily, and
-  BASLOAD's own manual says identifiers may contain them. So `GUI2.INC.BL` keeps `GUI2.*` for
-  everything a caller touches and spells its constants `GUILIST.*`.
+  BASLOAD's own manual says identifiers may contain them. **So `GUI2.INC.BL` has no `#DEFINE`s and
+  no include guard at all**: a `GUI2.*` constant cannot exist, and a second name space for one
+  module is worse than a number written where it is used. The numbers are compile-time text either
+  way, so this costs nothing — `OK CODE 6199` before and after.
 - **An `#INCLUDE` is never optional.** BASLOAD resolves every label in the file, not the ones a path
   reaches, so `GUI.INC.BL` needs `MENUVERT.INC.BL` **and** `LINEINPUT.INC.BL` present even in a
   program that only calls `GUI.YN`. Its header said "GUI.MENU only" / "GUI.TEXT only"; that is true

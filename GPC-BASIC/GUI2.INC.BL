@@ -66,41 +66,18 @@
 ## **  menu that never heard of it is unaffected.
 ## **
 ## **  THE MARK COLUMNS ARE THIS FILE'S, NOT MENUVERT'S. In multi the rows are
-## **  indented by GUILIST.MARKW and MENUVERT owns only the text columns, so the
+## **  indented by two columns and MENUVERT owns only the text columns, so the
 ## **  caller's array is never touched to add a marker to it.
 ## **
-## **  THE CONSTANTS BELOW ARE GUILIST.*, NOT GUI2.*, AND THAT IS NOT A TYPO.
-## **  BASLOAD rejects a DIGIT in a #DEFINE or #IFNDEF name -- "INVALID
-## **  PARAMETER", and the tokenise stops -- even though its own manual allows
-## **  digits in identifiers and variables and labels accept them happily. So
-## **  everything a caller touches is GUI2.*, being variables and labels, and
-## **  only the preprocessor constants, which nobody outside this file names,
-## **  had to be spelled without the 2.
+## **  NO #DEFINEs AND NO INCLUDE GUARD IN HERE, ON PURPOSE. BASLOAD rejects a
+## **  DIGIT in a #DEFINE or #IFNDEF name, so a GUI2.* constant cannot exist and
+## **  a GUILIST.* one would be a second name space for one module. The numbers
+## **  are written where they are used, next to the comment that names them.
+## **  #INCLUDE this file once.
 ## **
 ## **  The whole GUI2.* name space belongs to this file.
 ## **
 ## ***********************************************************************
-#IFNDEF GUILIST.DEFS
-#DEFINE GUILIST.DEFS 1
-
-## The editor dispatches on exactly these, so they are tested rather than guessed.
-#DEFINE GUILIST.UP 145
-#DEFINE GUILIST.DOWN 17
-#DEFINE GUILIST.HOME 19
-#DEFINE GUILIST.END 4
-#DEFINE GUILIST.PGUP 130
-#DEFINE GUILIST.PGDN 2
-
-## The mark, and the columns it and its gap take. "*" survives both charsets.
-#DEFINE GUILIST.MARKCH 42
-#DEFINE GUILIST.MARKW 2
-
-## Rows when the caller does not say. Ten is a dialog, not a screen.
-#DEFINE GUILIST.DEFROWS 10
-
-## "0" and "1". 97 - c flips between them in one subtract.
-#DEFINE GUILIST.OFF 48
-#DEFINE GUILIST.ON 49
 
 GOTO GUI2.MODULE.END
 
@@ -112,12 +89,12 @@ GUI2.LIST:
     GUI.KEY = 0
     IF GUI2.COUNT < 1 THEN GUI2.SEL = 0 : RETURN
 
-## ---- The window: what was asked for, then cut to the list and to the screen. The
-## ---- screen cut is what stops a caller asking for 40 rows in a 30 row mode and
-## ---- getting a box GUI.PLACE.BOX has to clamp.
+## ---- The window: what was asked for, ten rows if nothing was, then cut to the list
+## ---- and to the screen. The screen cut is what stops a caller asking for 40 rows in a
+## ---- 30 row mode and getting a box GUI.PLACE.BOX has to clamp.
 
     GUI2.ROWS.USE = GUI2.ROWS
-    IF GUI2.ROWS.USE < 1 THEN GUI2.ROWS.USE = GUILIST.DEFROWS
+    IF GUI2.ROWS.USE < 1 THEN GUI2.ROWS.USE = 10
     IF GUI2.ROWS.USE > GUI2.COUNT THEN GUI2.ROWS.USE = GUI2.COUNT
     GOSUB GUI.SCREEN
     IF GUI2.ROWS.USE > GUI.SCREEN.ROWS - 6 THEN GUI2.ROWS.USE = GUI.SCREEN.ROWS - 6
@@ -131,7 +108,7 @@ GUI2.LIST:
         IF LEN(MENUVERT.ITEM$(GUI2.I)) > GUI2.TEXTW THEN GUI2.TEXTW = LEN(MENUVERT.ITEM$(GUI2.I))
     NEXT GUI2.I
     GUI2.MARKOFF = 0
-    IF GUI2.MULTI <> 0 THEN GUI2.MARKOFF = GUILIST.MARKW
+    IF GUI2.MULTI <> 0 THEN GUI2.MARKOFF = 2
 
 ## ---- The count line lives in the bottom frame edge and only exists when something
 ## ---- is actually hidden. Built once, here, so the box can be measured to hold it.
@@ -158,10 +135,11 @@ GUI2.LIST:
 
 ## ---- The marks. A string of the wrong length is not an error and not trusted: the
 ## ---- caller may have changed COUNT since, so anything that does not measure up is
-## ---- replaced with a fresh set of "0". One RPT$ allocation, then never again.
+## ---- replaced with a fresh set of "0" -- 48, and 49 is a mark. One RPT$ allocation,
+## ---- then never again.
 
     IF GUI2.MULTI = 0 THEN GOTO GUI2.NOMARKS
-    IF LEN(GUI2.MARKS$) <> GUI2.COUNT THEN GUI2.MARKS$ = RPT$(GUILIST.OFF, GUI2.COUNT)
+    IF LEN(GUI2.MARKS$) <> GUI2.COUNT THEN GUI2.MARKS$ = RPT$(48, GUI2.COUNT)
     GUI2.MARKP = GP.STRPTR(GUI2.MARKS$)
 GUI2.NOMARKS:
 
@@ -181,18 +159,21 @@ GUI2.WAIT:
     GUI2.CODE = ASC(GUI2.IN$)
     GUI2.DONE = 0 : GUI2.PREV = GUI2.SEL : GUI2.PREVSCROLL = MENUVERT.SCROLL
 
+## ---- 145 up, 17 down, 130 PgUp, 2 PgDn, 19 HOME, 4 END. samples/editor dispatches on
+## ---- exactly these, so they are tested rather than guessed. The rest are GUI's own.
+
     GP.SELECT GUI2.CODE
-        GP.CASE GUILIST.UP
+        GP.CASE 145
             GUI2.SEL = GUI2.SEL - 1
-        GP.CASE GUILIST.DOWN
+        GP.CASE 17
             GUI2.SEL = GUI2.SEL + 1
-        GP.CASE GUILIST.PGUP
+        GP.CASE 130
             GUI2.SEL = GUI2.SEL - GUI2.ROWS.USE
-        GP.CASE GUILIST.PGDN
+        GP.CASE 2
             GUI2.SEL = GUI2.SEL + GUI2.ROWS.USE
-        GP.CASE GUILIST.HOME
+        GP.CASE 19
             GUI2.SEL = 1
-        GP.CASE GUILIST.END
+        GP.CASE 4
             GUI2.SEL = GUI2.COUNT
         GP.CASE GUI.SPACE
             IF GUI2.MULTI <> 0 THEN GOSUB GUI2.TOGGLE
@@ -225,7 +206,7 @@ GUI2.FINISH:
     GUI2.MARKED = 0
     IF GUI2.MULTI = 0 THEN GOTO GUI2.SHUT
     FOR GUI2.I = 1 TO GUI2.COUNT
-        IF PEEK(GUI2.MARKP + GUI2.I) = GUILIST.ON THEN GUI2.MARKED = GUI2.MARKED + 1
+        IF PEEK(GUI2.MARKP + GUI2.I) = 49 THEN GUI2.MARKED = GUI2.MARKED + 1
     NEXT GUI2.I
 GUI2.SHUT:
     GOSUB GUI.CLOSE
@@ -293,13 +274,13 @@ GUI2.PAINT.ROW:
     IF GUI2.MULTI = 0 THEN RETURN
 
 ## ---- The mark cell carries the row's own attribute, so the highlight bar reads as one
-## ---- band across the mark and the text rather than stopping short of it.
+## ---- band across the mark and the text rather than stopping short of it. 42 is "*",
+## ---- which survives both charsets.
 
     GUI2.MARKY = MENUVERT.Y + GUI2.ROW - 1
-    GP.FILL GUI.INNER.LEFT, GUI2.MARKY, GUILIST.MARKW, 1, GUI.SPACE, GUI2.ATTR
-    IF PEEK(GUI2.MARKP + MENUVERT.SCROLL + GUI2.ROW) <> GUILIST.ON THEN RETURN
-    GP.FILL GUI.INNER.LEFT, GUI2.MARKY, 1, 1, GUILIST.MARKCH, GUI2.ATTR
+    GP.FILL GUI.INNER.LEFT, GUI2.MARKY, 2, 1, GUI.SPACE, GUI2.ATTR
+    IF PEEK(GUI2.MARKP + MENUVERT.SCROLL + GUI2.ROW) <> 49 THEN RETURN
+    GP.FILL GUI.INNER.LEFT, GUI2.MARKY, 1, 1, 42, GUI2.ATTR
     RETURN
 
 GUI2.MODULE.END:
-#ENDIF
