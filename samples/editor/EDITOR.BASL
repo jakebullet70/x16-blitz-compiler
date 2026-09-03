@@ -69,7 +69,8 @@ REM
 REM NOTHING GOES THROUGH THE KERNAL. Every cell -- text area and chrome alike -- is
 REM written straight into VERA's text map. CHROUT is a fixed ROM cost compiling cannot
 REM touch, and padding a bar a space at a time was O(n^2). The document lives in banked
-REM RAM behind the DOC.* layer in STORE.BASL, #INCLUDEd at the bottom.
+REM RAM behind the DOC.* layer in ED-STORE.BASL, and so does the menu text, behind the
+REM EDM.* layer in ED-MENUS.BASL. Both are #INCLUDEd at the bottom.
 REM
 REM THE TWO RENDERERS ARE INLINE ASSEMBLY. ED.RENDER.ROW draws text, ED.PUT.FIELD draws
 REM chrome, and each is one GP.ASM block reaching BASIC's variables through {VAR}. That
@@ -170,7 +171,6 @@ ED.QUIT:
   END
 
 
-
 REM ============================================================================
 REM ASCII-ORDER CHARSET (ED.PETFONT)
 REM
@@ -183,7 +183,7 @@ REM
 REM ASCII ORDER, NOT PETSCII, and that is the whole reason it works: BASLOAD writes string
 REM literals through as the source bytes, so every name, prompt and message here is ASCII.
 REM PETSCII order case-swaps all of them and stops find matching its own needles -- which
-REM the self-check caught. PETSCII belongs at the DISK boundary, in STORE.BASL.
+REM the self-check caught. PETSCII belongs at the DISK boundary, in ED-STORE.BASL.
 REM
 REM ALMOST NOTHING MOVES: $20-$3F and $41-$5A are already where ASCII wants them, so only
 REM 38 glyphs shift.
@@ -349,6 +349,7 @@ ED.INIT:
   ED.MAP.MAXTOP = ED.MAP.H - SCREEN.ROWS
   ED.HW.OK = 0 : IF ED.MAP.MAXTOP >= 4 THEN ED.HW.OK = 1
   GOSUB ED.LAYERS
+  DIM ED.ALTK(8) : DIM ED.ALTV(8) : REM layout bytes ED.ALTKEYS overwrites, to put back
   MENU.ACTIVE = 0 - 1 : GOSUB ED.MENU.SETUP : GOSUB ED.ALTKEYS
   RETURN
 
@@ -397,6 +398,13 @@ REM FOUND BY SEARCH, NOT A HARDCODED KEYNUM, so it holds for whatever layout is 
 REM follows the menu names: rename a menu and its accelerator moves with it. Every byte is
 REM saved and put back by ED.ALTKEYS.OFF -- the tables outlive the program.
 REM
+REM MENU.HOT$, NOT THE TITLE'S FIRST LETTER. The titles live in bank EDM.BANK now
+REM (ED-MENUS.BASL) and this loop is about to select bank 0 for the keymap, so reading
+REM them here would need the bank back and forth around every PEEK. MENU.HOT$ is a plain
+REM scalar and holds the accelerators already -- and it is the RIGHT answer besides: an
+REM accelerator does not have to be the initial, and where it is not, binding ALT to the
+REM initial bound the wrong key.
+REM
 REM BANK 0, NOT POKE 0: PEEK/POKE restore the bank around every access, so a POKE to the
 REM bank register is undone by the same POKE that made it. The document layer's banks
 REM start at 1, so borrowing 0 here disturbs nothing.
@@ -412,7 +420,7 @@ ED.ALTKEYS:
   IF ED.TPLAIN = 0 THEN RETURN
   IF ED.TALT = 0 THEN RETURN
   FOR MENU.I = 0 TO MENU.COUNT - 1
-    ED.WANT = ASC(LEFT$(MENU.NAME$(MENU.I), 1))
+    ED.WANT = ASC(MID$(MENU.HOT$, MENU.I + 1, 1))
     FOR ED.KI = 1 TO 127
       IF PEEK(ED.TPLAIN + ED.KI) = ED.WANT + 32 THEN GOSUB ED.ALTKEY.SET
     NEXT ED.KI
@@ -440,65 +448,6 @@ ED.OPEN.DONE:
   RETURN
 
 
-REM ---- menu tables (data-driven) ----
-REM The bar's layout is MENUBAR.INC.BL's: MENUBAR.WHERE works out a title's column from the
-REM item text on demand, which is what ED.DRAW.DROPDOWN hangs the panel from. MENU.WIDTH
-REM stays because it is the DROPDOWN's width, and a bar has no column width.
-ED.MENU.SETUP:
-  MENU.COUNT = 3
-  DIM MENU.NAME$(3) : DIM MENU.ITEMS(3) : DIM MENU.WIDTH(3)
-  DIM MENU.ITEMHOT$(3) : REM one accelerator letter per ITEM, one string per menu
-  DIM MENU.ITEM$(24) : REM flat: menu * 8 + item
-  DIM MENUVERT.ITEM$(8) : REM MENUVERT leaves its item array to the caller
-  DIM ED.ALTK(8) : DIM ED.ALTV(8) : REM layout bytes ED.ALTKEYS overwrites, to put back
-  MENU.NAME$(0) = "File" : MENU.ITEMS(0) = 5
-  MENU.ITEM$(0) = "New" : MENU.ITEM$(1) = "Open..." : MENU.ITEM$(2) = "Save"
-  MENU.ITEM$(3) = "Save As..." : MENU.ITEM$(4) = "Exit"
-  MENU.NAME$(1) = "Search" : MENU.ITEMS(1) = 2
-  MENU.ITEM$(8) = "Find..." : MENU.ITEM$(9) = "Go to Line..."
-  MENU.NAME$(2) = "Help" : MENU.ITEMS(2) = 1
-  MENU.ITEM$(16) = "About"
-  MENU.HOT$ = "FSH" : REM the initials, for the bar's accelerator tint and its hotkeys
-  REM ONE LETTER PER ITEM, IN ITEM ORDER, and it does not have to be the initial: Save
-  REM and Save As... both start with S, so the second takes its A. MENUVERT matches
-  REM without case and tints the letter at a word start where it can find one -- the A
-  REM of "As", not the a of "Save". A letter not in the item at all is still a working
-  REM accelerator; it just does not light up.
-  MENU.ITEMHOT$(0) = "NOSAX" : REM New Open Save saveAs eXit
-  MENU.ITEMHOT$(1) = "FG"    : REM Find, Go to line
-  MENU.ITEMHOT$(2) = "A"     : REM About
-  FOR MENU.I = 0 TO MENU.COUNT - 1
-    MENU.W = LEN(MENU.NAME$(MENU.I))
-    FOR MENU.J = 0 TO MENU.ITEMS(MENU.I) - 1
-      IF LEN(MENU.ITEM$(MENU.I * 8 + MENU.J)) > MENU.W THEN MENU.W = LEN(MENU.ITEM$(MENU.I * 8 + MENU.J))
-    NEXT MENU.J
-    MENU.WIDTH(MENU.I) = MENU.W + 2
-  NEXT MENU.I
-  RETURN
-
-
-REM ---- the bar's items, into the array MENUBAR reads ----
-REM MENUBAR and MENUVERT share MENUVERT.ITEM$ on purpose, so it holds whichever of the two
-REM is being drawn and this routine and ED.DRAW.DROPDOWN each load their own first. Cheap;
-REM keeping two copies in step would not be.
-REM
-REM AN ITEM IS " NAME " AND THE SPACES ARE THE LAYOUT -- MENUBAR makes each item exactly as
-REM wide as its text, so the air around a title, and the highlight's margin, has to be in
-REM the title itself.
-ED.MENU.BAR.ITEMS:
-  FOR MENU.I = 0 TO MENU.COUNT - 1
-    MENUVERT.ITEM$(MENU.I + 1) = " " + MENU.NAME$(MENU.I) + " "
-  NEXT MENU.I
-  MENUVERT.COUNT = MENU.COUNT : MENUVERT.X = 0 : MENUVERT.Y = 0
-  MENUVERT.ATTR = THEME.CLR(THEME.TITLE)
-  MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
-  MENUVERT.HOT$ = MENU.HOT$
-  MENUVERT.HOTATTR = THEME.CLR(THEME.BORDER)
-  MENUBAR.X = 0 : MENUBAR.Y = 0 : MENUBAR.GAP = 0
-  RETURN
-
-
-
 REM ============================================================================
 REM LIVE LINE
 REM ============================================================================
@@ -516,7 +465,6 @@ ED.COMMIT.LIVE:
 ED.CLAMP.COL:
   IF ED.CUR.COL > LEN(ED.CUR.LINE$) THEN ED.CUR.COL = LEN(ED.CUR.LINE$)
   RETURN
-
 
 
 REM ============================================================================
@@ -644,7 +592,7 @@ ED.ALT.MENU:
   ED.ALT.CH = ED.KEY
   IF ED.ALT.CH >= 97 AND ED.ALT.CH <= 122 THEN ED.ALT.CH = ED.ALT.CH - 32
   FOR MENU.I = 0 TO MENU.COUNT - 1
-    GP.IF ASC(LEFT$(MENU.NAME$(MENU.I), 1)) = ED.ALT.CH THEN 
+    GP.IF ASC(MID$(MENU.HOT$, MENU.I + 1, 1)) = ED.ALT.CH THEN 
       MENU.ACTIVE = MENU.I 
       GOSUB ED.OPEN.MENUBAR  
       RETURN
@@ -670,7 +618,7 @@ REM
 REM So the loop below is about the BAR, not about keys: one label, and every path either
 REM returns to it having moved which menu is open, or returns.
 REM
-REM MENU.ACTIVE and MENU.SEL are 0 based (MENU.ITEM$ is flat, MENU.ACTIVE * 8 + MENU.SEL);
+REM MENU.ACTIVE and MENU.SEL are 0 based (the item slots are flat, MENU.ACTIVE * 8 + MENU.SEL);
 REM MENUBAR.SEL and MENUVERT.SEL are 1 based. Converted at the boundary and nowhere else.
 ED.OPEN.MENUBAR:
   MENU.SEL = 0 : GOSUB ED.RENDER.MENUBAR
@@ -703,7 +651,7 @@ ED.MENU.LETTER:
   IF ED.ML.CH >= 97 AND ED.ML.CH <= 122 THEN ED.ML.CH = ED.ML.CH - 32
   ED.ML.HIT = 0 - 1
   FOR MENU.I = 0 TO MENU.COUNT - 1
-    IF ASC(LEFT$(MENU.NAME$(MENU.I), 1)) = ED.ML.CH THEN ED.ML.HIT = MENU.I
+    IF ASC(MID$(MENU.HOT$, MENU.I + 1, 1)) = ED.ML.CH THEN ED.ML.HIT = MENU.I
   NEXT MENU.I
   REM Nothing to do is the common case -- every key that is not an arrow or RETURN lands
   REM here -- so it must not repaint.
@@ -783,7 +731,6 @@ ED.DISP.FILE:
 ED.DISP.SEARCH:
   ON MENU.CHOICE.ITEM + 1 GOSUB ED.CMD.FIND, ED.CMD.GOTO
   RETURN
-
 
 
 REM ============================================================================
@@ -906,8 +853,6 @@ ED.FN.NONE:
   RETURN
 
 
-
-
 REM ============================================================================
 REM PROMPTS (cyan line input; sim hook for the headless self-check)
 REM ============================================================================
@@ -936,8 +881,6 @@ ED.PROMPT.YN:
   GOSUB GUI.YN
   ED.YN = GUI.ANSWER
   RETURN
-
-
 
 
 REM ============================================================================
@@ -1215,72 +1158,6 @@ ED.MB.DRAW:
   RETURN
 
 
-REM The accelerator letter's colour is MENUVERT.ROW's hotkey tint: MENU.HOT$ names the
-REM letters and MENUVERT.HOTATTR is the colour, so no title is painted in two pieces here.
-
-
-
-REM ---- dropdown (VERA rows 1..) ----
-REM MENUVERT.ROW draws one row: GP.FILL for the background, GP.PRINTAT for the text. Both
-REM need the ISO flag ED.INIT sets, or GP.PRINTAT converts ASCII as though it were PETSCII
-REM and every letter comes out case-swapped.
-REM
-REM WHERE IT HANGS FROM IS MENUBAR'S ANSWER: MENUBAR.WHERE walks the item text left of
-REM MENUBAR.SEL and leaves the column in MENUBAR.SELX. The panel starts one cell IN from
-REM the item's left edge, which lines the item text up under the title text -- both are a
-REM leading space wide.
-REM
-REM ED.MENU.BAR.ITEMS first, because MENUBAR.WHERE measures MENUVERT.ITEM$ and this routine
-REM is about to fill that same array with the dropdown's items.
-ED.DRAW.DROPDOWN:
-  ED.DD.N = MENU.ITEMS(MENU.ACTIVE)
-  GOSUB ED.MENU.BAR.ITEMS
-  MENUBAR.SEL = MENU.ACTIVE + 1 : GOSUB MENUBAR.WHERE
-  ED.DD.COL = MENUBAR.SELX + 1  : ED.DD.W = MENU.WIDTH(MENU.ACTIVE)
-
-  ED.DD.BX = ED.DD.COL - 1 : IF ED.DD.BX < 0 THEN ED.DD.BX = 0
-  REM EVERY Y HERE IS A MAP ROW, NOT A SCREEN ROW. The GP commands know nothing about the
-  REM editor's hardware scroll -- they write at map row = whatever Y they are given -- so
-  REM the offset is added here, or the panel lands ED.MAP.TOP rows from the bar it hangs
-  REM from: invisible at the top of the document and further adrift the further you scroll.
-  ED.DD.FW = ED.DD.W + 2 : ED.DD.FH = ED.DD.N + 2
-  ED.DD.TY = 1 : ED.DD.BY = ED.DD.TY + ED.DD.FH - 1
-  ED.DD.RX = ED.DD.BX + ED.DD.FW - 1 : ED.DD.FC = THEME.CLR(THEME.TEXT)
-  REM GUI.FRAME, so the dropdown and the dialogs share one frame drawer -- and it is the
-  REM only one that can draw a box here, since GP.BOX's built-in styles are built from
-  REM screen codes this font no longer has. Setting GUI.BORDER does not disturb a later
-  REM dialog: GUI.OPEN settles it from GUI.BORDER.IN on every call.
-  GUI.LEFT = ED.DD.BX : GUI.TOP = ED.DD.TY 
-  GUI.WIDTH = ED.DD.FW  : GUI.HEIGHT = ED.DD.FH : GUI.BORDER = ED.DD.FC
-  GOSUB GUI.FRAME
-
-  REM THE WHOLE INTERFACE, the way MENUDEMO.EXP.BL drives it -- not three fields and a
-  REM hand-rolled loop over MENUVERT.ROW. ROW reads MENUVERT.ATTR itself, so a caller that
-  REM leaves COUNT, ATTR and HIATTR at zero is guessing at the routine rather than calling
-  REM it. Set the documented inputs and let MENUVERT.DRAW walk the rows.
-  MENUVERT.X = ED.DD.COL
-  MENUVERT.Y = 2 : REM layer 1, a screen row
-  MENUVERT.WIDTH = ED.DD.W : MENUVERT.COUNT = ED.DD.N
-  REM The DOCUMENT's own attribute, not a page colour of its own, so the panel reads as a
-  REM framed hole in the document rather than a card laid on it. Only the selected row
-  REM breaks it, which is the point of a highlight bar.
-  MENUVERT.ATTR    = THEME.CLR(THEME.TEXT) : MENUVERT.HIATTR  = THEME.CLR(THEME.TITLE)
-  REM THE ACCELERATOR LETTERS BELONG TO THE OPEN MENU'S ITEMS, and they must be set BEFORE
-  REM the rows are drawn -- MENUVERT.ROW tints from MENUVERT.HOT$ as it prints each row, so
-  REM setting them at the call to RUN is one draw too late and tints nothing.
-  MENUVERT.HOT$ = MENU.ITEMHOT$(MENU.ACTIVE)
-  REM BORDER's FOREGROUND over the ROW's OWN BACKGROUND. Taking the whole attribute would
-  REM paint one cell of the bar's blue into a black row -- a gap in the row, not a hotkey.
-  MENUVERT.HOTATTR = THEME.CLR(THEME.TEXT) - MOD(THEME.CLR(THEME.TEXT), 16) + MOD(THEME.CLR(THEME.BORDER), 16)
-  REM MENUVERT.ITEM$ is 1 based, MENU.SEL 0 based off the flat MENU.ITEM$ table. Converted
-  REM once here rather than at each use.
-  FOR ED.DD.I = 1 TO ED.DD.N
-    MENUVERT.ITEM$(ED.DD.I) = " " + MENU.ITEM$(MENU.ACTIVE * 8 + ED.DD.I - 1)
-  NEXT ED.DD.I
-  GOSUB MENUVERT.DRAW : MENUVERT.DRAWROW = MENU.SEL + 1 : MENUVERT.DRAWATTR = MENUVERT.HIATTR
-  GOSUB MENUVERT.ROW
-  RETURN
-
 ED.RENDER.STATUS:
   ED.MARK$ = "   " : IF ED.DOC.DIRTY   = 1 THEN ED.MARK$ = " * "
   ED.MODE$ = "INS" : IF ED.INSERT.MODE = 0 THEN ED.MODE$ = "OVR"
@@ -1348,10 +1225,6 @@ REM ============================================================================
 REM ============================================================================
 REM ============================================================================
 REM ============================================================================
-
-
-
-
 
 
 REM ============================================================================
@@ -1751,4 +1624,5 @@ ED.GUI.SUM:
 #ENDIF
 
 REM --- this read / writes BANKS (line-pointer table + banked memory)
-#INCLUDE "STORE.BASL"
+#INCLUDE "ED-MENUS.BASL"
+#INCLUDE "ED-STORE.BASL"

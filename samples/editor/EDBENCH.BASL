@@ -24,7 +24,7 @@ BM.ATTR = 1
 BM.ROW = 5
 BM.LEFT = 0
 
-REM ---- one 79-character line in bank 4, length-prefixed, exactly as STORE.BASL
+REM ---- one 79-character line in bank 4, length-prefixed, exactly as ED-STORE.BASL
 REM ---- lays a document line out: [len][chars] ----
 BANK 4
 BM.BASE = 40960

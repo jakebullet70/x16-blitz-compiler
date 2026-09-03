@@ -11,8 +11,9 @@ source. That is the point of the sample, and the numbers below are what it bough
 
 | File | What it is |
 | --- | --- |
-| `EDITOR.BASL` | the editor — startup/restore, theme, menu bar, render, key loop, editing, find |
-| `STORE.BASL` | `#INCLUDE`d storage: a banked bump allocator and a 3-byte-per-line pointer table |
+| `EDITOR.BASL` | the editor — startup/restore, theme, render, key loop, editing, find |
+| `ED-STORE.BASL` | `#INCLUDE`d storage: a banked bump allocator and a 3-byte-per-line pointer table |
+| `ED-MENUS.BASL` | `#INCLUDE`d menus: the same idea at fixed stride — the menu **text** lives in a bank |
 | `EDITOR.PRG` | the tokenised program — the input you feed to the compiler |
 | `EDITOR.SYM` | **BASLOAD's symbol file, and it is not optional** — see below |
 | `TEST.MD` | the document the editor opens, and the fixture the self-check searches |
@@ -328,7 +329,7 @@ holds the block address, and the text starts 3 bytes in (`[MaxLen][control][ActL
 ## Build
 
 BASLOAD resolves `#INCLUDE` off the drive, so the sources and `GPB.INC.BL` have to sit together on
-it. From the repo, copy `EDITOR.BASL`, `STORE.BASL`, `TEST.MD` and `GPC-BASIC/GPB.INC.BL` into
+it. From the repo, copy `EDITOR.BASL`, `ED-STORE.BASL`, `TEST.MD` and `GPC-BASIC/GPB.INC.BL` into
 `testing/` (the emulator's drive), then:
 
 1. **Tokenise.** `BASLOAD "EDITOR.BASL"` at the ROM prompt. The source's own `#SAVEAS` and
@@ -394,9 +395,10 @@ running program is flaky — but the commands it dispatches to are each driven d
   editor.
 - **The store never frees a single record.** Deleting a line leaks its content until the next save;
   reclamation is bulk, by reloading. Fine for a sample, and it is why the allocator is 30 lines.
-- **A line is capped at 250 characters** on load.
-- Lines are held in banks 4 upward with the pointer table in banks 1–3, so the editor owns those
-  banks. Nothing else in a program using this store may.
+- **A line is capped at 250 characters** on load, and a banked menu string at 31.
+- **The editor owns banks 1 upward**: 1–3 the line-pointer table, 4 the cells a dialog covers
+  (`GUI.BANK`), 5 the menu text, 6 and up the document arena. Nothing else in a program using this
+  store may touch them.
 - **Files are assumed to be PETSCII on disk.** Opening something authored on the host — which will be
   ASCII — shows every letter case-swapped. Detecting the encoding on load is the obvious fix, and no
   byte in `$61-$7A` is a fair PETSCII tell, since in PETSCII that run is graphics. `TEST.MD` ships

@@ -1,0 +1,255 @@
+REM ============================================================================
+REM ED-MENUS.BASL -- the editor's menus, with their TEXT in banked RAM.
+REM
+REM #INCLUDEd inline by the editor exactly as ED-STORE.BASL is: one global symbol
+REM table, so these labels are GOSUBbed from the main program and the MENU.* API
+REM variables below are visible to both.
+REM
+REM WHAT THIS DEMONSTRATES
+REM   A Blitz string variable OWNS a block on the string heap, that block is never
+REM   handed back and never shrinks, and the heap shares one 25,600-byte pot with the
+REM   compiled program itself. So every string a program HOLDS is low memory spent for
+REM   the whole run, whether it is being looked at or not.
+REM
+REM   BANKING HELPS STRINGS YOU HOLD. IT CANNOT HELP STRINGS YOU USE. A string value
+REM   is a bare 16-bit pointer with no bank byte in it, so anything about to go through
+REM   LEN, MID$, PRINT or a comparison must be in low RAM at that moment. Menu text is
+REM   the ideal case for the first: written once at startup, read only on the keystroke
+REM   that opens a menu, and never touched by the render path at all.
+REM
+REM   The whole menu layer lives here so the technique reads end to end -- the banked
+REM   table, the data going into it, and the two routines drawing out of it. EDITOR.BASL
+REM   holds no menu text of its own.
+REM
+REM STORAGE LAYOUT -- FIXED STRIDE, AND DELIBERATELY NOT AN ALLOCATOR
+REM   ED-STORE.BASL shows the other shape, a bump allocator with a pointer table, because
+REM   a document line can be any length and there may be thousands. Menus are the
+REM   opposite -- a small fixed set, known at write time -- so a slot is arithmetic and
+REM   nothing else: slot N is at $A000 + N * EDM.STRIDE, holding [len][chars]. No table,
+REM   no free list, no fragmentation, O(1) both ways. Pick the layout that matches what
+REM   you are storing; a bump allocator here would be code earning nothing.
+REM
+REM     slot  0..31   item text, flat: menu * 8 + item
+REM     slot 32..35   the accelerator letters, one string per menu
+REM     slot 36..39   the menu titles
+REM
+REM EVERY ACCESSOR SETS ITS OWN BANK, which is the rule the rest of the editor already
+REM follows -- see ED-STORE.BASL's DOC.SLOT.READ and STASH.INC.BL. PEEK and POKE restore
+REM the bank around each access, so the last BANK statement wins, and a routine assuming
+REM someone else left the right bank selected is a bug waiting for a reorder. ED.ALTKEYS
+REM is the live example: it selects bank 0 to reach the KERNAL keymap, and it must not
+REM call in here between doing so and its PEEKs.
+REM
+REM WHAT IT SAVES HERE, MEASURED, AND IT IS A WASH -- WHICH IS THE LESSON
+REM   FRE(0) either side of ED.MENU.SETUP, release build, before and after the move:
+REM
+REM     low RAM taken by menu setup   473 -> 224 bytes   saved 249
+REM     p-code                      12910 -> 13155       cost  245
+REM     free at that point           5449 -> 5420        NET   -29
+REM
+REM   The 14 strings really were 249 bytes of low memory and really are gone. EDM.PUT,
+REM   EDM.GET and the setup lines cost almost exactly the same again, so at this size the
+REM   technique pays for itself and no more.
+REM
+REM   THE WIN SCALES WITH STRING LENGTH, NOT WITH COUNT. A block is max(10, len * 1.5) + 3,
+REM   so a 4-character menu item costs 13 bytes and moving it saves about 6 net -- but a
+REM   30-character one costs 48 and saves about 41. Menu items are short, which is why this
+REM   example breaks even. Point the same 40 lines at help text, templates, a file list or
+REM   anything else long and held, and it pays from the first few strings.
+REM ============================================================================
+
+REM Bank 5. 1..3 are ED-STORE's line table, 4 is lent to GUI.INC.BL for the cells a dialog
+REM covers, and the document arena starts at 6 -- it only grows upward, so carving a bank
+REM off the bottom is the cheapest reservation there is.
+#DEFINE EDM.BANK 5
+#DEFINE EDM.WIN 40960
+#DEFINE EDM.STRIDE 32
+#DEFINE EDM.ITEM 0
+#DEFINE EDM.HOT 32
+#DEFINE EDM.NAME 36
+
+REM ---- write EDM.TEXT$ into slot EDM.SLOT ----
+REM GP.STRPTR gives the address of the string's [ActLen][Data], so the characters start one
+REM past it and the copy is a flat byte loop -- no MID$ per character, which would allocate
+REM a one-character string for every byte stored. NEVER GP.STRPTR A LITERAL: that points
+REM into the p-code, and writing through it edits the running program.
+EDM.PUT:
+  EDM.ADDR = EDM.WIN + EDM.SLOT * EDM.STRIDE
+  EDM.LEN = LEN(EDM.TEXT$)
+  IF EDM.LEN > EDM.STRIDE - 1 THEN EDM.LEN = EDM.STRIDE - 1
+  EDM.PTR = GP.STRPTR(EDM.TEXT$)
+  BANK EDM.BANK
+  POKE EDM.ADDR, EDM.LEN
+  REM FOR 1 TO 0 RUNS ONCE in this BASIC, so an empty string has to leave before the loop.
+  IF EDM.LEN = 0 THEN RETURN
+  REM The window is banked and the string is not: one BANK covers both halves of the copy,
+  REM because low RAM does not care which bank is selected.
+  FOR EDM.I = 1 TO EDM.LEN
+    POKE EDM.ADDR + EDM.I, PEEK(EDM.PTR + EDM.I)
+  NEXT EDM.I
+  RETURN
+
+REM ---- read slot EDM.SLOT back into EDM.TEXT$ ----
+REM RPT$ makes a string of the right length in one allocation and the bytes are then
+REM overwritten where they lie. Growing it a character at a time would be O(n^2) in
+REM allocation AND would leave a dead block behind on every step.
+EDM.GET:
+  EDM.ADDR = EDM.WIN + EDM.SLOT * EDM.STRIDE
+  BANK EDM.BANK
+  EDM.LEN = PEEK(EDM.ADDR)
+  EDM.TEXT$ = ""
+  IF EDM.LEN = 0 THEN RETURN
+  EDM.TEXT$ = RPT$(32, EDM.LEN)
+  EDM.PTR = GP.STRPTR(EDM.TEXT$)
+  FOR EDM.I = 1 TO EDM.LEN
+    POKE EDM.PTR + EDM.I, PEEK(EDM.ADDR + EDM.I)
+  NEXT EDM.I
+  RETURN
+
+
+REM ---- menu tables (data-driven) ----
+REM The bar's layout is MENUBAR.INC.BL's: MENUBAR.WHERE works out a title's column from the
+REM item text on demand, which is what ED.DRAW.DROPDOWN hangs the panel from. MENU.WIDTH
+REM stays because it is the DROPDOWN's width, and a bar has no column width.
+ED.MENU.SETUP:
+  MENU.COUNT = 3
+  DIM MENU.ITEMS(3) : DIM MENU.WIDTH(3) : REM numbers, so low RAM costs them nothing
+  REM MENUVERT.ITEM$ IS THE ONE MENU ARRAY THAT CANNOT MOVE. MENUVERT reads it directly,
+  REM and a string value is a bare pointer with no bank in it, so whatever the library is
+  REM about to draw has to be in low RAM. It holds one menu's worth at a time; the other
+  REM three arrays are gone, and their text lives in bank EDM.BANK.
+  DIM MENUVERT.ITEM$(8)
+  REM THE TEXT GOES STRAIGHT INTO THE BANK and is never held in a variable again. One
+  REM line per string, because each is one EDM.PUT -- the table is the code.
+  MENU.ITEMS(0) = 5 : MENU.ITEMS(1) = 2 : MENU.ITEMS(2) = 1
+  EDM.SLOT = EDM.NAME +  0 : EDM.TEXT$ = "File"         : GOSUB EDM.PUT
+  EDM.SLOT = EDM.ITEM +  0 : EDM.TEXT$ = "New"          : GOSUB EDM.PUT
+  EDM.SLOT = EDM.ITEM +  1 : EDM.TEXT$ = "Open..."      : GOSUB EDM.PUT
+  EDM.SLOT = EDM.ITEM +  2 : EDM.TEXT$ = "Save"         : GOSUB EDM.PUT
+  EDM.SLOT = EDM.ITEM +  3 : EDM.TEXT$ = "Save As..."   : GOSUB EDM.PUT
+  EDM.SLOT = EDM.ITEM +  4 : EDM.TEXT$ = "Exit"         : GOSUB EDM.PUT
+  EDM.SLOT = EDM.NAME +  1 : EDM.TEXT$ = "Search"       : GOSUB EDM.PUT
+  EDM.SLOT = EDM.ITEM +  8 : EDM.TEXT$ = "Find..."      : GOSUB EDM.PUT
+  EDM.SLOT = EDM.ITEM +  9 : EDM.TEXT$ = "Go to Line...": GOSUB EDM.PUT
+  EDM.SLOT = EDM.NAME +  2 : EDM.TEXT$ = "Help"         : GOSUB EDM.PUT
+  EDM.SLOT = EDM.ITEM + 16 : EDM.TEXT$ = "About"        : GOSUB EDM.PUT
+  REM STAYS IN LOW RAM, AND EARNS IT. It is three bytes, and it is now the ONLY place the
+  REM menu accelerators are read from: the bar tints from it, and ED.ALTKEYS, ED.ALT.MENU
+  REM and ED.MENU.LETTER all scan it rather than fetching a title back out of the bank --
+  REM ED.ALTKEYS in particular has bank 0 selected for the keymap while it does so.
+  MENU.HOT$ = "FSH"
+  REM ONE LETTER PER ITEM, IN ITEM ORDER, and it does not have to be the initial: Save
+  REM and Save As... both start with S, so the second takes its A. MENUVERT matches
+  REM without case and tints the letter at a word start where it can find one -- the A
+  REM of "As", not the a of "Save". A letter not in the item at all is still a working
+  REM accelerator; it just does not light up.
+  EDM.SLOT = EDM.HOT +  0 : EDM.TEXT$ = "NOSAX" : GOSUB EDM.PUT : REM New Open Save saveAs eXit
+  EDM.SLOT = EDM.HOT +  1 : EDM.TEXT$ = "FG"    : GOSUB EDM.PUT : REM Find, Go to line
+  EDM.SLOT = EDM.HOT +  2 : EDM.TEXT$ = "A"     : GOSUB EDM.PUT : REM About
+  REM The widths are measured from the bank, once, and kept as NUMBERS -- which is the
+  REM whole trick: what a banked string is asked for at startup need never be asked again.
+  FOR MENU.I = 0 TO MENU.COUNT - 1
+    EDM.SLOT = EDM.NAME + MENU.I : GOSUB EDM.GET
+    MENU.W = LEN(EDM.TEXT$)
+    FOR MENU.J = 0 TO MENU.ITEMS(MENU.I) - 1
+      EDM.SLOT = EDM.ITEM + MENU.I * 8 + MENU.J : GOSUB EDM.GET
+      IF LEN(EDM.TEXT$) > MENU.W THEN MENU.W = LEN(EDM.TEXT$)
+    NEXT MENU.J
+    MENU.WIDTH(MENU.I) = MENU.W + 2
+  NEXT MENU.I
+  RETURN
+
+
+REM ---- the bar's items, into the array MENUBAR reads ----
+REM MENUBAR and MENUVERT share MENUVERT.ITEM$ on purpose, so it holds whichever of the two
+REM is being drawn and this routine and ED.DRAW.DROPDOWN each load their own first. Cheap;
+REM keeping two copies in step would not be.
+REM
+REM AN ITEM IS " NAME " AND THE SPACES ARE THE LAYOUT -- MENUBAR makes each item exactly as
+REM wide as its text, so the air around a title, and the highlight's margin, has to be in
+REM the title itself.
+ED.MENU.BAR.ITEMS:
+  FOR MENU.I = 0 TO MENU.COUNT - 1
+    EDM.SLOT = EDM.NAME + MENU.I : GOSUB EDM.GET
+    MENUVERT.ITEM$(MENU.I + 1) = " " + EDM.TEXT$ + " "
+  NEXT MENU.I
+  MENUVERT.COUNT = MENU.COUNT : MENUVERT.X = 0 : MENUVERT.Y = 0
+  MENUVERT.ATTR = THEME.CLR(THEME.TITLE)
+  MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
+  MENUVERT.HOT$ = MENU.HOT$
+  MENUVERT.HOTATTR = THEME.CLR(THEME.BORDER)
+  MENUBAR.X = 0 : MENUBAR.Y = 0 : MENUBAR.GAP = 0
+  RETURN
+
+
+REM The accelerator letter's colour is MENUVERT.ROW's hotkey tint: MENU.HOT$ names the
+REM letters and MENUVERT.HOTATTR is the colour, so no title is painted in two pieces here.
+
+
+
+REM ---- dropdown (VERA rows 1..) ----
+REM MENUVERT.ROW draws one row: GP.FILL for the background, GP.PRINTAT for the text. Both
+REM need the ISO flag ED.INIT sets, or GP.PRINTAT converts ASCII as though it were PETSCII
+REM and every letter comes out case-swapped.
+REM
+REM WHERE IT HANGS FROM IS MENUBAR'S ANSWER: MENUBAR.WHERE walks the item text left of
+REM MENUBAR.SEL and leaves the column in MENUBAR.SELX. The panel starts one cell IN from
+REM the item's left edge, which lines the item text up under the title text -- both are a
+REM leading space wide.
+REM
+REM ED.MENU.BAR.ITEMS first, because MENUBAR.WHERE measures MENUVERT.ITEM$ and this routine
+REM is about to fill that same array with the dropdown's items.
+ED.DRAW.DROPDOWN:
+  ED.DD.N = MENU.ITEMS(MENU.ACTIVE)
+  GOSUB ED.MENU.BAR.ITEMS
+  MENUBAR.SEL = MENU.ACTIVE + 1 : GOSUB MENUBAR.WHERE
+  ED.DD.COL = MENUBAR.SELX + 1  : ED.DD.W = MENU.WIDTH(MENU.ACTIVE)
+
+  ED.DD.BX = ED.DD.COL - 1 : IF ED.DD.BX < 0 THEN ED.DD.BX = 0
+  REM EVERY Y HERE IS A MAP ROW, NOT A SCREEN ROW. The GP commands know nothing about the
+  REM editor's hardware scroll -- they write at map row = whatever Y they are given -- so
+  REM the offset is added here, or the panel lands ED.MAP.TOP rows from the bar it hangs
+  REM from: invisible at the top of the document and further adrift the further you scroll.
+  ED.DD.FW = ED.DD.W + 2 : ED.DD.FH = ED.DD.N + 2
+  ED.DD.TY = 1 : ED.DD.BY = ED.DD.TY + ED.DD.FH - 1
+  ED.DD.RX = ED.DD.BX + ED.DD.FW - 1 : ED.DD.FC = THEME.CLR(THEME.TEXT)
+  REM GUI.FRAME, so the dropdown and the dialogs share one frame drawer -- and it is the
+  REM only one that can draw a box here, since GP.BOX's built-in styles are built from
+  REM screen codes this font no longer has. Setting GUI.BORDER does not disturb a later
+  REM dialog: GUI.OPEN settles it from GUI.BORDER.IN on every call.
+  GUI.LEFT = ED.DD.BX : GUI.TOP = ED.DD.TY 
+  GUI.WIDTH = ED.DD.FW  : GUI.HEIGHT = ED.DD.FH : GUI.BORDER = ED.DD.FC
+  GOSUB GUI.FRAME
+
+  REM THE WHOLE INTERFACE, the way MENUDEMO.EXP.BL drives it -- not three fields and a
+  REM hand-rolled loop over MENUVERT.ROW. ROW reads MENUVERT.ATTR itself, so a caller that
+  REM leaves COUNT, ATTR and HIATTR at zero is guessing at the routine rather than calling
+  REM it. Set the documented inputs and let MENUVERT.DRAW walk the rows.
+  MENUVERT.X = ED.DD.COL
+  MENUVERT.Y = 2 : REM layer 1, a screen row
+  MENUVERT.WIDTH = ED.DD.W : MENUVERT.COUNT = ED.DD.N
+  REM The DOCUMENT's own attribute, not a page colour of its own, so the panel reads as a
+  REM framed hole in the document rather than a card laid on it. Only the selected row
+  REM breaks it, which is the point of a highlight bar.
+  MENUVERT.ATTR    = THEME.CLR(THEME.TEXT) : MENUVERT.HIATTR  = THEME.CLR(THEME.TITLE)
+  REM THE ACCELERATOR LETTERS BELONG TO THE OPEN MENU'S ITEMS, and they must be set BEFORE
+  REM the rows are drawn -- MENUVERT.ROW tints from MENUVERT.HOT$ as it prints each row, so
+  REM setting them at the call to RUN is one draw too late and tints nothing.
+  EDM.SLOT = EDM.HOT + MENU.ACTIVE : GOSUB EDM.GET
+  MENUVERT.HOT$ = EDM.TEXT$
+  REM BORDER's FOREGROUND over the ROW's OWN BACKGROUND. Taking the whole attribute would
+  REM paint one cell of the bar's blue into a black row -- a gap in the row, not a hotkey.
+  MENUVERT.HOTATTR = THEME.CLR(THEME.TEXT) - MOD(THEME.CLR(THEME.TEXT), 16) + MOD(THEME.CLR(THEME.BORDER), 16)
+  REM MENUVERT.ITEM$ is 1 based, MENU.SEL 0 based off the flat item slots. Converted once
+  REM here rather than at each use.
+  REM
+  REM THIS IS THE ONLY PLACE THE ITEM TEXT IS EVER FETCHED, and it happens on the keystroke
+  REM that opens the menu -- a few dozen PEEKs, against a panel draw. Hold, do not use.
+  FOR ED.DD.I = 1 TO ED.DD.N
+    EDM.SLOT = EDM.ITEM + MENU.ACTIVE * 8 + ED.DD.I - 1 : GOSUB EDM.GET
+    MENUVERT.ITEM$(ED.DD.I) = " " + EDM.TEXT$
+  NEXT ED.DD.I
+  GOSUB MENUVERT.DRAW : MENUVERT.DRAWROW = MENU.SEL + 1 : MENUVERT.DRAWATTR = MENUVERT.HIATTR
+  GOSUB MENUVERT.ROW
+  RETURN
+

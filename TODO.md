@@ -1324,42 +1324,48 @@ near that. Default should stay 16; the option is for a program that has measured
 `OUT OF MEMORY` is already the error when it is exceeded, which is what stock reports for too many
 nested GOSUBs, so the failure mode needs no new spelling.
 
-### The MENU string arrays want to live in banked RAM
+### The MENU string arrays live in banked RAM — DONE, and it broke even
 
-Asked 2026-09-02: can strings go in a bank to free up low memory? **For strings you HOLD, yes.
-For strings you USE, no** -- and the menus are the clearest case of the first on this list.
+Asked 2026-09-02, built 2026-09-03. `ED-MENUS.BASL` (`#INCLUDE`d beside `ED-STORE.BASL`, which was
+`STORE.BASL` until the same commit) owns the whole menu layer now -- `ED.MENU.SETUP`,
+`ED.MENU.BAR.ITEMS`, `ED.DRAW.DROPDOWN` -- and keeps the title, item and accelerator text in
+**bank 5** at a fixed 32-byte stride: `[len][chars]`, slot N at `$A000 + N * 32`. No allocator and
+no pointer table, deliberately -- `ED-STORE.BASL` already demonstrates that shape, and a small
+fixed set of strings does not need it.
 
-`EDITOR.BASL` DIMs `MENU.ITEM$(24)`, `MENUVERT.ITEM$(8)`, `MENU.NAME$(3)` and `MENU.ITEMHOT$(3)`
--- **42 concrete string blocks, alive for the whole run, read only while a menu is open.** They sit
-in the same `$3b00`..`$9F00` pot as the p-code. Order-of 1 KB on a guessed item length; **not
-measured yet, and that measurement comes first** -- FRE probes at bisecting points, the method that
-found the 579-byte FIND leak after two rounds of edits had missed it.
+**MEASURED, AND IT IS A WASH.** `FRE(0)` either side of `ED.MENU.SETUP`, release build:
 
-**The pattern already exists and needs no runtime bytes.** `samples/editor/STORE.BASL` is it: a far
-pointer is two numbers (bank, offset), a record is `[len][chars]`, `BANK n : PEEK/POKE $A000+off`
-does the access, and `DOC.STORE.CHARS` copies main RAM to the window in one `GP.ASM` pass. Lift
-that into `STRBANK.INC.BL` -- `STRBANK.PUT` (string -> handle) and `STRBANK.GET` (handle ->
-string) -- and it is pure BASL. Bank 4 is already lent to `GUI.INC.BL`, banks 1..3 to the line
-table, 5.. to the content arena; the menus want one more reserved bank.
+| | before | after | |
+| --- | --- | --- | --- |
+| low RAM taken by menu setup | 473 | 224 | **saved 249** |
+| p-code | 12,910 | 13,155 | **cost 245** |
+| free at that point | 5,449 | 5,420 | **net -29** |
 
-**Cost**: a `GET` per menu open instead of an array read. A dropdown opens on a keystroke, so this
-is nowhere near the render path.
+The 14 strings really were 249 bytes of low memory and really are gone; `EDM.PUT`, `EDM.GET` and
+the setup lines cost almost exactly the same again. **The estimate this entry used to carry --
+"order 1 KB" -- was wrong by 4x**, because only 14 of the 42 DIMmed slots were ever populated and
+every one of them is short.
 
-**What is NOT on the table: moving the string heap itself.** Worth writing down so it is not
-re-derived:
+**THE RULE THAT CAME OUT OF IT, and it is the one to apply before banking anything else: the win
+scales with string LENGTH, not with count.** A block is `max(10, len * 1.5) + 3`, so a 4-character
+menu item costs 13 bytes and nets about 6 when moved, while a 30-character one costs 48 and nets
+about 41. Menu items are short, which is why this example only breaks even. Point the same 40 lines
+at help text, templates, a file list -- anything long and held -- and it pays from the first few
+strings.
 
-- A Blitz string value is a **bare 16-bit pointer** to `[ActLen][Data]` (`read_string.asm`), with
-  no bank byte anywhere in the representation, and ~111 sites across the runtime and GP runtime
-  dereference it with `lda (ptr),y`. `GP.STRPTR` hands that raw address out to BASL as well, so
-  `STRCASE`, `SORT`, `STASH` and every user `GP.ASM` blob assume low RAM too.
-- **The blocker is the single 8K window.** `A$ = B$ + C$` needs three blocks live at once and
-  `IF A$ = B$` needs two; in different banks that means staging through a low-RAM buffer as long as
-  the longest string, which hands back most of the saving. The scavenger in `concrete.asm` also
-  walks the heap as one exactly-tiled region.
-- Where there IS free room, for the record: `NSMantissa2`/`NSMantissa3` are explicitly zeroed for
-  strings, so a bank byte on the numeric stack is free. Storage is where it dies -- a string array
-  element is exactly 2 bytes (`dim.asm`, "size is 2 or 6"), so a bank byte is +50% on every string
-  array.
+**Three findings worth keeping:**
+
+- **BASLOAD resolves a hyphenated `#INCLUDE`.** No source filename in the tree had a hyphen before
+  `ED-STORE.BASL` / `ED-MENUS.BASL`, so this was an open risk on the rename. It works.
+- **`MENUVERT.ITEM$` cannot move**, and is the low-RAM staging array the fetch loads into. The
+  library reads it directly, and a string value is a bare pointer with no bank byte in it.
+- **`ED.ALTKEYS` has bank 0 selected for the KERNAL keymap** while it scans, so the three
+  initial-scans stopped reading `MENU.NAME$` and read `MENU.HOT$` instead. That **also fixed a
+  latent bug**: an accelerator does not have to be the title's initial, and where it is not, ALT
+  was bound to the wrong letter.
+
+Verified: release `OK CODE 13127 FREE 7936`; CORE `M4 OK`; OPTIONAL `M4 OK`, with the dropdown
+fetching all five File items out of the bank in order (`DDROWS 192 78 79 83 83 69 192`).
 
 ### `GUI.INC.BL` wants a listbox, single and multi select
 
