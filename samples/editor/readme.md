@@ -17,7 +17,7 @@ source. That is the point of the sample, and the numbers below are what it bough
 | `EDITOR.PRG` | the tokenised program — the input you feed to the compiler |
 | `EDITOR.SYM` | **BASLOAD's symbol file, and it is not optional** — see below |
 | `TEST.MD` | the document the editor opens, and the fixture the self-check searches |
-| `EDBENCH.BASL` | the benchmark: BASIC renderer against assembly renderer, in one program |
+| `BENCHROWS.BASL` | the benchmark: BASIC renderer against assembly renderer, in one program |
 | `GPC-BASIC/` | the library it `#INCLUDE`s, shipped beside it: `GPB` `THEME` `APPSYS` and the rest |
 
 > **`EDITOR.SYM` ships for a reason.** `{VAR}` reaches a BASIC variable through BASLOAD's own
@@ -33,7 +33,7 @@ VERA method was never the problem — the loop around it was.** A `POKE` is a pu
 push-value, dispatch and bank-save-restore through the p-code VM, and at two `POKE`s a cell that is
 most of a full-screen repaint.
 
-`EDBENCH.BASL` measures it. Both versions of both renderers live in **one program**, render the
+`BENCHROWS.BASL` measures it. Both versions of both renderers live in **one program**, render the
 **same** 79-character line into the **same** screen row, and are timed off `TI` inside the machine at
 **real speed** — never `-warp`, which decouples the jiffy IRQ and makes the numbers meaningless. The
 empty rep loop is measured at each rep count and subtracted, so what is reported is the render and
@@ -347,7 +347,7 @@ it. From the repo, copy `EDITOR.BASL`, `ED-STORE.BASL`, `TEST.MD` and `GPC-BASIC
 
 3. **Run.** `LOAD "C.EDITOR.PRG",8 : RUN`. It opens `TEST.MD`.
 
-`EDBENCH.BASL` builds the same way and **must be run at real speed** — under `-warp` its numbers are
+`BENCHROWS.BASL` builds the same way and **must be run at real speed** — under `-warp` its numbers are
 nonsense.
 
 ## The self-check

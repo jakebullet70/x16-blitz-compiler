@@ -1,11 +1,11 @@
-#SAVEAS "@:EDBENCH.PRG"
-#SYMFILE "@:EDBENCH.SYM"
+#SAVEAS "@:BENCHROWS.PRG"
+#SYMFILE "@:BENCHROWS.SYM"
 #AUTONUM 1
 #REM 0
 #INCLUDE "GPB.INC.BL"
 
 REM ============================================================================
-REM EDBENCH.BASL -- the editor's row and field renderers, BASIC against GP.ASM,
+REM BENCHROWS.BASL -- the editor's row and field renderers, BASIC against GP.ASM,
 REM in ONE program so the two differ in exactly one thing.
 REM
 REM Timed off TI (jiffies, 1/60 s) read INSIDE the machine, and it MUST be run at
@@ -45,7 +45,7 @@ ED.ASM.OFS% = 0
 BM.FIELD$ = ""
 
 PRINT CHR$(147);
-PRINT "EDBENCH -- REAL SPEED ONLY"
+PRINT "BENCHROWS -- REAL SPEED ONLY"
 
 REM ============================================================================
 REM floors: the rep loop on its own, at both counts

@@ -74,7 +74,7 @@ REM EDMNU.* layer in ED-MENUS.BASL. Both are #INCLUDEd at the bottom.
 REM
 REM THE TWO RENDERERS ARE INLINE ASSEMBLY. ED.RENDER.ROW draws text, ED.PUT.FIELD draws
 REM chrome, and each is one GP.ASM block reaching BASIC's variables through {VAR}. That
-REM is the whole speed story; EDBENCH.BASL measures both against their BASIC versions.
+REM is the whole speed story; BENCHROWS.BASL measures both against their BASIC versions.
 REM
 REM GP.ASM COSTS NO RUNTIME BYTES. What does is GP.SELECT in the key dispatch: one core
 REM keyword pulls in the whole 2 KB GP block, which is why this compiles GP-BASIC IN --
