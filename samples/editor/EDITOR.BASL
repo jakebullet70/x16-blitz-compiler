@@ -70,7 +70,7 @@ REM NOTHING GOES THROUGH THE KERNAL. Every cell -- text area and chrome alike --
 REM written straight into VERA's text map. CHROUT is a fixed ROM cost compiling cannot
 REM touch, and padding a bar a space at a time was O(n^2). The document lives in banked
 REM RAM behind the DOC.* layer in ED-STORE.BASL, and so does the menu text, behind the
-REM EDM.* layer in ED-MENUS.BASL. Both are #INCLUDEd at the bottom.
+REM EDMNU.* layer in ED-MENUS.BASL. Both are #INCLUDEd at the bottom.
 REM
 REM THE TWO RENDERERS ARE INLINE ASSEMBLY. ED.RENDER.ROW draws text, ED.PUT.FIELD draws
 REM chrome, and each is one GP.ASM block reaching BASIC's variables through {VAR}. That
@@ -398,12 +398,9 @@ REM FOUND BY SEARCH, NOT A HARDCODED KEYNUM, so it holds for whatever layout is 
 REM follows the menu names: rename a menu and its accelerator moves with it. Every byte is
 REM saved and put back by ED.ALTKEYS.OFF -- the tables outlive the program.
 REM
-REM MENU.HOT$, NOT THE TITLE'S FIRST LETTER. The titles live in bank EDM.BANK now
-REM (ED-MENUS.BASL) and this loop is about to select bank 0 for the keymap, so reading
-REM them here would need the bank back and forth around every PEEK. MENU.HOT$ is a plain
-REM scalar and holds the accelerators already -- and it is the RIGHT answer besides: an
-REM accelerator does not have to be the initial, and where it is not, binding ALT to the
-REM initial bound the wrong key.
+REM MENU.HOT$, NOT THE TITLE'S FIRST LETTER: the titles are banked now and this loop
+REM holds bank 0 for the keymap. It is also the right answer -- an accelerator need not
+REM be the initial, and where it is not, binding ALT to the initial bound the wrong key.
 REM
 REM BANK 0, NOT POKE 0: PEEK/POKE restore the bank around every access, so a POKE to the
 REM bank register is undone by the same POKE that made it. The document layer's banks

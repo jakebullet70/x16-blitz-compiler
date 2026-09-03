@@ -1256,7 +1256,10 @@ roughly halve the ~102 jiffies the repaint costs. Do it as its own change, and c
 
 Asked 2026-09-02, and it is worth doing because **a line costs exactly one byte of p-code.**
 Measured, not guessed: hand-compacting `samples/editor/EDITOR.BASL` on 2026-09-02 joined **80**
-lines and the object went **15,166 -> 15,086** -- 80 lines, 80 bytes, one for one. It also crossed a
+lines and the object went **15,166 -> 15,086** -- 80 lines, 80 bytes, one for one. **A TRAILING
+`REM` ON A CODE LINE COSTS P-CODE TOO**, where a REM-only line is free: dropping four of them from
+`ED-MENUS.BASL` on 2026-09-03 took the object 13,127 -> 13,118, so call it ~2 bytes each. Both are
+things a cruncher would take out for nothing. It also crossed a
 page boundary, so `FREE` went 6,144 -> 6,400 and the program gained a whole page of workspace for
 nothing.
 
@@ -1338,11 +1341,12 @@ fixed set of strings does not need it.
 | | before | after | |
 | --- | --- | --- | --- |
 | low RAM taken by menu setup | 473 | 224 | **saved 249** |
-| p-code | 12,910 | 13,155 | **cost 245** |
+| p-code (probe pair) | 12,910 | 13,155 | **cost 245** |
 | free at that point | 5,449 | 5,420 | **net -29** |
 
-The 14 strings really were 249 bytes of low memory and really are gone; `EDM.PUT`, `EDM.GET` and
-the setup lines cost almost exactly the same again. **The estimate this entry used to carry --
+The shipped release is 12,882 -> **13,118**, +236, after the comments were cut back. The 14 strings
+really were 249 bytes of low memory and really are gone; `EDMNU.PUT`, `EDMNU.GET` and the setup
+lines cost almost exactly the same again. **The estimate this entry used to carry --
 "order 1 KB" -- was wrong by 4x**, because only 14 of the 42 DIMmed slots were ever populated and
 every one of them is short.
 
