@@ -1388,7 +1388,8 @@ fetching all five File items out of the bank in order (`DDROWS 192 78 79 83 83 6
 
 Asked 2026-09-03, one of four done. `ED-MENUS.BASL` now owns the menu layer end to end (data,
 drawing, keys and dispatch) and `ED-STORE.BASL` has always owned the document store, which leaves
-`EDITOR.BASL` at **1,476 lines**. The blocks still in it, biggest first:
+`EDITOR.BASL` at **1,415 lines** -- 1,476 until the prose was cut back on 2026-09-03, which took
+62 lines and not one byte, every `REM`-only line being free. The blocks still in it, biggest first:
 
 | block | lines | code | what it is |
 | --- | --- | --- | --- |
