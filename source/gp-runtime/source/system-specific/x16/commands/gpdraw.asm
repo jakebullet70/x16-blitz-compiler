@@ -206,7 +206,10 @@ _CGFInteger:
 		ldx 	#5
 		jsr 	GPDrawColour
 		lda 	NSMantissa0+4 				; the character is converted ONCE, not per cell
+		bit 	X16_EditorMode 				; bit 6 -> V. BIT leaves A alone, which is the point:
+		bvs 	_CGFRaw 					; in ISO mode the byte already IS the tile index
 		jsr 	GPDrawPet2Scr
+_CGFRaw:
 		sta 	gpdChar
 _CGFRow:
 		jsr 	GPDrawAddress 				; one address per row; the increment does the rest
@@ -247,9 +250,13 @@ _CGFExit:
 ;		loop would buy back the 7 for about eight more bytes of a block with 36 free; it is not
 ;		worth it at seven cycles on a command that draws chrome, not inner loops.
 ;
-;		GP.FILL needs none of this. It converts its ONE character before the loop, and $20 is a
-;		fixed point of the offset table ($20>>5 = 1, offset $00), so a space fill -- which is what
-;		padding and blanking are, and all the library does -- is already right in both modes.
+;		GP.FILL MAKES THE SAME TEST, and it is cheaper there: its ONE character is converted
+;		before the loop, so the test goes beside that single jsr and costs nothing per cell.
+;		The old excuse was that $20 is a fixed point of the offset table ($20>>5 = 1, offset
+;		$00), so a space fill -- padding and blanking, all the library itself does -- was right
+;		either way. That held until GUI.FRAME filled non-space glyphs, and the editor had to
+;		park its six frame tiles at $C0-$C5 and ask for them 64 lower to cancel a conversion
+;		nobody wanted. An undocumented bias that cost a day to find is not worth five bytes.
 ;
 ; ************************************************************************************************
 

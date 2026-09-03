@@ -837,9 +837,27 @@ _MCLSameLine:
 		ldx 	#CommandTables & $FF 		; do command tables.
 		ldy 	#CommandTables >> 8
 		jsr 	GeneratorProcess
-		bcc 	_MCLSyntax 				; not compiled -> syntax error (deferred if armed)
+		bcc 	_MCLNoHandler 				; a TOKEN the command tables do not know
 		stz 	deferErrors 				; compiled OK -> disarm the deferral
 		bra 	_MCLSameLine 				; keep trying to compile the line.
+
+		;
+		;		A RETIRED KEYWORD MUST NOT DEFER. Getting here means the first character was a
+		;		TOKEN (>= $80, so the tokeniser knew the word) and no generator claimed it --
+		;		which is a fact about the program, not a typo, because a misspelling arrives as
+		;		ASCII and goes to _MCLCheckAssignment instead. Deferring it wrote a runtime
+		;		throw-stub and said OK CODE, so a source file left calling GP.STASH or GP.SORT
+		;		after they moved to GP.ASM modules compiled clean and threw SYNTAX ERROR at an
+		;		address, whenever it was first reached. That cost two hours on 01/09/26 and it
+		;		was two separate files, one broken since 15d90eb with nobody noticing.
+		;
+		;		NOT IMPLEMENTED rather than SYNTAX, for the reason UnsupportedCompile already
+		;		gives (gensupport.asm): the word is valid BASIC, so blaming the spelling sends
+		;		the reader looking in the wrong place. Only ErrorV_syntax is deferrable, so
+		;		naming a different error is what makes this abort -- see errorhandler.asm.
+		;
+_MCLNoHandler:
+		.error_unimplemented
 
 _MCLSyntax: 								; syntax error.
 		.error_syntax

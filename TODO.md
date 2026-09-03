@@ -211,7 +211,7 @@ here.
 
 ## Bugs
 
-### A RETIRED KEYWORD COMPILES CLEAN AND EXPLODES AT RUN TIME — open, and it bit twice
+### A RETIRED KEYWORD COMPILES CLEAN AND EXPLODES AT RUN TIME — FIXED 2026-09-03
 
 Retiring a keyword is now routine — `GP.SORT`, the five in-place string statements, `GP.STASH` and
 `GP.RESTR` have all left the block for `GP.ASM` modules. **Every caller left behind compiles without
@@ -232,19 +232,24 @@ source through it was what proved the compiler had changed under the source, and
 grepping for the retired keywords find it. `SCREEN.EXP.BL` had been broken the same way since
 `15d90eb` and nobody noticed, because nothing rebuilds an example.
 
-**Two things to do, and the first is cheap:**
+**THE FIX, in `compiler.asm`: a token with no generator raises NOT IMPLEMENTED instead of
+deferring.** Getting to that point means the first character was a TOKEN (>= $80, so the tokeniser
+knew the word) and no generator claimed it. A *misspelling* cannot arrive that way — it is ASCII and
+goes to `_MCLCheckAssignment` — so the two cases were always separable and only ever shared a label.
+The new `_MCLNoHandler` sits beside the old `_MCLSyntax`, which keeps deferring for the genuine-typo
+path. Only `ErrorV_syntax` is deferrable (`errorhandler.asm` matches on the message pointer), so
+**naming a different error is the whole mechanism of the abort**. NOT IMPLEMENTED rather than SYNTAX
+for the reason `UnsupportedCompile` already gives in `gensupport.asm`: the word is valid BASIC, so
+blaming the spelling sends the reader looking in the wrong place. Cost: 3 bytes of compiler.
 
-1. **A keyword the compiler does not know must ABORT, not defer.** An unrecognised GP token has no
-   handler; that is a structural fact about the program, not a typo, and `.error_structure` already
-   aborts hard. Same rule as [[gpb-block-openers-must-not-defer]], which is the other half of this:
-   deferral is only safe for a statement whose failure is contained.
-2. **Something has to compile the examples.** Twelve `.EXP.BL` files and eight `.INC.BL` modules are
-   the documentation, and none of them is built by `make`. A target that tokenises and compiles each
-   one headlessly would have caught `SCREEN.EXP.BL` the day it broke — the harness already exists in
-   `scratchpad/edbuild.py`. **`OK CODE` is not the test to apply**, which is the whole point of this
-   entry; the test is item 3.
+Proved both ways on a four-line program using the retired `GP.SORT` token (`#TOKEN GP.SORT 52847`):
+the pre-fix compiler said `OK CODE 36 FREE 22016` and wrote an object; the fixed one says
+**`NOT IMPLEMENTED @ 2`** and writes nothing. Line 2 is the `GP.SORT`.
 
-3. **DONE — `source/common-scripts/deferscan.py`.** Walks a compiled object's p-code by real
+**Item 2 of the original three — "something has to compile the examples" — is NOT done and has
+moved to its own entry under Build / infrastructure.** It is test coverage, not this defect.
+
+**DONE earlier — `source/common-scripts/deferscan.py`.** Walks a compiled object's p-code by real
    instruction size and reports every `.deferror` (token 234) with its source line, read out of the
    `M.<name>` debug map. A naive byte search cannot do this: `$EA` occurs inside `.word` operands and
    strings, so the walk has to step properly, and it fails loudly rather than guessing if it ever
@@ -266,7 +271,7 @@ excluding comment lines or it reads as broken when it is not:
 
     grep -vE '^\s*(##|REM(\s|$))' <file> | grep -E 'GP\.(SORT|STASH|RESTR|UPPER|LOWER|L?TRIM)'
 
-### `GP.FILL` converts its glyph in ISO mode, where converting is wrong — open
+### `GP.FILL` converted its glyph in ISO mode, where converting is wrong — FIXED 2026-09-03
 
 `GP.PRINTAT` tests bit 6 of `X16_EditorMode` (`$0372`) and skips `GPDrawPet2Scr` when it is set,
 because in ISO mode the byte already *is* the tile index. **`GP.FILL` does not test it.** It converts
@@ -289,11 +294,19 @@ loop, next to the single existing `jsr GPDrawPet2Scr`, so it costs nothing per c
     _CGFRaw:
     sta     gpdChar
 
-Not done yet only because of where the bytes land: `GP.FILL` is in the GP block, which is
-all-or-nothing and page-aligned, so five bytes are free if they fit the current alignment slack and
-cost **512** (object + workspace floor) if they push `ObjectBase` up a page. Measure the slack first.
-Sweep for non-space `GP.FILL` callers when it goes in — at the time of writing the only ones are
-`SCREEN.EXP.BL` (160, 166), which does not set the flag and so is correct either way.
+**Done exactly as written above, and THE FIVE BYTES WERE FREE.** The worry was alignment: `GP.FILL`
+is in the GP block, which is page-aligned and all-or-nothing, so five bytes cost either nothing or
+**512** (object + workspace floor both) depending on which side of `ObjectBase` they land. `genrtimage`
+reports **image 13311 bytes, GPBase $3800, ObjectBase $3c00** both before and after — identical, so
+they fell inside the existing slack. That is the measurement to repeat before the next GP-block
+addition; do not assume the slack is still there.
+
+**The caller sweep came out as predicted.** Every `GP.FILL` in `GPC-BASIC`, `samples` and `testing`
+fills a space — literal `32`, `ASC(" ")`, or one of `GUI.SPACE` / `LINEINPUT.SPACE` /
+`MENUVERT.SPACE`, and all three of those are `#DEFINE`d to 32. $20 is a fixed point of the offset
+table, so none of them can change behaviour. The only non-space fills are `SCREEN.EXP.BL` (160, 166),
+which never sets the ISO flag and so is correct either way. Nothing in the tree was compensating for
+the old bias any more — the editor stopped when `GUI.FRAME` became a `GP.BOX`.
 
 ### `AND`/`OR` leaked the top half of an out-of-range operand — FIXED
 
@@ -1371,6 +1384,28 @@ strings.
 Verified: release `OK CODE 13127 FREE 7936`; CORE `M4 OK`; OPTIONAL `M4 OK`, with the dropdown
 fetching all five File items out of the bank in order (`DDROWS 192 78 79 83 83 69 192`).
 
+### EDITOR.BASL wants three more files split out of it
+
+Asked 2026-09-03, one of four done. `ED-MENUS.BASL` now owns the menu layer end to end (data,
+drawing, keys and dispatch) and `ED-STORE.BASL` has always owned the document store, which leaves
+`EDITOR.BASL` at **1,476 lines**. The blocks still in it, biggest first:
+
+| block | lines | code | what it is |
+| --- | --- | --- | --- |
+| the self-check | 394 | 243 | `ED.SELFCHECK` .. `ED.GUI.SUM` |
+| view / render | 330 | 135 | `ED.REFRESH.FULL` .. `ED.PUT.FIELD` |
+| commands + prompts | 166 | 118 | `ED.CMD.*`, `ED.PROMPT`, the message helpers |
+
+- **`ED-TEST.BASL` is the biggest and the easiest**: 24% of the file, and the only block that is not
+  the product. Zero p-code either way, since release already compiles it out. **The guards must stay
+  FLAT inside the included file** — wrapping the `#INCLUDE` in `#IFNDEF ED.RELEASE` puts the two
+  half-guards inside it, and BASLOAD does not nest `#IFNDEF`: it gives `ENDIF WITHOUT IF` and a
+  6-byte PRG that then "compiles" to `OK CODE 11`, which reads like a compiler result and is not.
+- **`ED-CMDS.BASL` pairs with an open bug** — "Save As accepts a BLANK name" above is in
+  `ED.CMD.SAVEAS`, so the split and the fix are one pass.
+- **`ED-VIEW.BASL` is the most delicate**: it holds both `GP.ASM` renderers, and `{VAR}` needs the
+  variable slot to already exist, so anything it reads must still be assigned textually earlier.
+
 ### `GUI.INC.BL` wants a listbox, single and multi select
 
 A fourth dialog beside `GUI.YN`, `GUI.MENU` and `GUI.TEXT`: a scrolling list, with a multi-select
@@ -1674,6 +1709,20 @@ prompt. `-pastewarp`, and dropping `-warp`, change nothing. To test it headlessl
 untouched. (`LINPUT` programs such as `testing/MD5` are unaffected — no drain loop.)
 
 ## Build / infrastructure
+
+### NOTHING BUILDS THE EXAMPLES, so one was broken for weeks
+
+Split out of the retired-keyword bug on 2026-09-03, because that defect is fixed and this is not.
+Twelve `.EXP.BL` files and eight `.INC.BL` modules are the documentation, and `make` builds none of
+them. `SCREEN.EXP.BL` called `GP.STASH` from `15d90eb` until somebody happened to look; the compiler
+now refuses such a file outright, so a target that merely tokenises and compiles each example
+headlessly would catch the next one the day it lands. The harness exists already in
+`scratchpad/edbuild.py`.
+
+**`OK CODE` is not the whole test** — that was the original point. Run
+`source/common-scripts/deferscan.py` over each object too: it walks the p-code by real instruction
+size and reports every `.deferror` (token 234) with its source line out of the `M.<name>` map, which
+catches a statement that deferred for some *other* reason. Budget roughly 70s an example.
 
 ### A MASTER COMPILER: preprocess, BASLOAD, GPC -- one command
 
