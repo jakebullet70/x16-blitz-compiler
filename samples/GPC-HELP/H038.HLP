@@ -47,10 +47,6 @@
 .      WHAT HAPPENS: #DEFINE takes an INT16 -- ERROR: INVALID PARAMETER
 .      DO THIS: an ordinary variable
 .
-.  RPT$(c, 0)
-.      WHAT HAPPENS: raises ILLEGAL QUANTITY -- it does not return ""
-.      DO THIS: guard the zero case
-.
 .  a GP. keyword in a hand-written .bas
 .      WHAT HAPPENS: the ROM cannot LIST or RUN a $CE7x token
 .      DO THIS: expected -- compile it

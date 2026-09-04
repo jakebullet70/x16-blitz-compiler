@@ -1959,7 +1959,6 @@ Every one of these has cost a debugging session at least once.
 | `SCREEN` after `BMX.PAINT` | reloads the default palette and throws the image's colours away | set the mode first |
 | `STR.FIELD$` wanted bigger | auto-`DIM`ed at 0..10 on first use, and you cannot `DIM` it after | `DIM` it **before** the first call, set `STR.MAX` |
 | `#DEFINE X 129536` | `#DEFINE` takes an **INT16** — `ERROR: INVALID PARAMETER` | an ordinary variable |
-| `RPT$(c, 0)` | raises `ILLEGAL QUANTITY` — it does not return `""` | guard the zero case |
 | a `GP.` keyword in a hand-written `.bas` | the ROM cannot `LIST` or `RUN` a `$CE7x` token | expected — compile it |
 | readable names in a hand-written `.bas` | **the built-in BASIC gives TWO significant characters** — `THEME.CLR` and `THEME.COUNT` become one variable, silently | write BASL, or give every variable a distinct first two characters |
 
