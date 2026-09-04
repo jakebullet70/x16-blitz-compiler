@@ -2,9 +2,8 @@
 .
 =3. COMMAND REFERENCE
 .
-.27 keywords, tokens $CE7F down to $CE63, allocated downward and never
-.renumbered -- $CE67 and $CE68 are holes, freed when GP.SEL and GP.MENU were
-.withdrawn, and are not reused. The token values are the ABI.
+.27 keywords, tokens $CE7F down to $CE63, allocated downward. $CE67 and $CE68
+.are holes. The token values are the ABI.
 .
 =At a glance -- the whole library, and what each part costs
 .
@@ -94,9 +93,8 @@
 .The rule that decides the side is in SEC 1: assembly gets what runs in a
 .tight loop or moves bulk data, BASIC gets everything else -- and anything
 .that is only a rename of keywords already present gets neither, and becomes
-.a composite. A menu waits on a human, so it is BASIC -- it used to be the
-.GP.MENU keyword and cost every GPB program 462 bytes whether it had a menu
-.or not.
+.a composite. A menu waits on a human, so it is BASIC: as a keyword it would
+.cost every GPB program 462 bytes whether it had a menu or not.
 .
 .The keywords, in detail. Square brackets mean optional, and optionals cannot
 .be skipped over -- GP.BOX X,Y,W,H,,7 is a syntax error; write the style you

@@ -38,7 +38,7 @@
 #DEFINE APPSYS.SETCHR $FF62
 #DEFINE APPSYS.CHRREG $0372
 
-## Where a RAM bank appears, and the size of GP.STASH's self-describing
+## Where a RAM bank appears, and the size of a stash's self-describing
 ## header (w, h, x, y).
 
 GOTO APPSYS.SKIP
@@ -83,10 +83,10 @@ APPSYS.RESTORE:
     COLOR APPSYS.COLOUR AND 15, INT(APPSYS.COLOUR / 16)
     RETURN
 
-## THE PANEL ROUTINES MOVED on 2026-09-01: APPSYS.PANEL.SAVE / .LOAD / .PUT are now
-## STASH.FILE.SAVE / .LOAD / .PUT in STASHFILE.INC.BL. They were built on GP.STASH and
-## GP.RESTR, and keeping a BSAVE wrapper here would have meant APPSYS dragging the
-## whole GP block in behind it.
+## A SCREEN RECTANGLE THROUGH A FILE IS STASH.FILE.SAVE / .LOAD / .PUT, in
+## STASHFILE.INC.BL. It is not here because a BSAVE wrapper in APPSYS would drag the
+## whole stash machinery in behind it, and most programs want the screen etiquette
+## without it.
 ##
 APPSYS.SKIP:
 #ENDIF

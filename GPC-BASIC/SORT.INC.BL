@@ -4,27 +4,24 @@
 ## **
 ## **      SORT.RUN        sort the array SORT.PTR points at
 ## **
-## **  This is what GP.SORT was, moved out of the all-or-nothing GP block and into
-## **  GP.ASM -- 408 bytes carried by every program that never sorted anything, now
-## **  costing its own bytes in the programs that ask for it.
+## **  A MODULE, NOT A RUNTIME KEYWORD, so it costs its bytes only in the programs that
+## **  ask for it: as a keyword it would be 408 bytes carried by every program that never
+## **  sorted anything.
 ## **
-## **  THE SAME ALGORITHM AND VERY NEARLY THE SAME CODE: shell sort with Ciura's gaps --
+## **  Shell sort with Ciura's gaps --
 ## **  132, 57, 23, 10, 4, 1 -- moving 2-byte POINTERS, not string data, so a swap is a
 ## **  swap whatever the strings are. No temporary, no copying, no heap traffic, which
 ## **  is what made it worth assembly in the first place.
 ## **
-## **  WHAT DID CHANGE: the gap loop is up here in BASIC, because six iterations do not
-## **  need to be fast and a six byte table inside a blob would have to be stepped over
-## **  to reach the code. The assembly is handed one gap and does one complete pass.
+## **  THE GAP LOOP IS UP HERE IN BASIC, because six iterations do not need to be fast
+## **  and a six byte table inside a blob would have to be stepped over to reach the
+## **  code. The assembly is handed one gap and does one complete pass.
 ## **
-## **  SIZE, MEASURED, AGAINST THE TWO THINGS WORTH COMPARING IT TO:
+## **  SIZE, MEASURED:
 ## **
-## **      408   GP.SORT, the runtime keyword this replaces
 ## **      299   the GP.ASM blob below
 ## **      254   prog8 shellsort_pointers + string_comparator + strcmp_mem
-## **
-## **  SMALLER than what it replaced by 109 bytes, because the gap table and its loop
-## **  moved up into BASIC.
+## **      408   the same sort as a runtime keyword, for comparison
 ## **
 ## **  Against prog8 it is 45 bytes LARGER, and every one is a feature prog8's has not
 ## **  got: case folding (~26 with the two JSRs), the descending flag (8), and reading a

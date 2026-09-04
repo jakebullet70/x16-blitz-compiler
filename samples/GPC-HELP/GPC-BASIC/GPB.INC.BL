@@ -54,9 +54,8 @@
 #TOKEN GP.STRPTR 52854
 
 
-## GP.TRIM, GP.LTRIM, GP.RTRIM, GP.UPPER and GP.LOWER ARE GONE -- STRCASE.INC.BL now,
-## in GP.ASM, built on GP.STRPTR above: it takes the block address and rewrites it
-## where it lies, no copy either way.
+## TRIMMING AND CASE FOLDING ARE STRCASE.INC.BL, in GP.ASM, built on GP.STRPTR above:
+## it takes the block address and rewrites it where it lies, no copy either way.
 ##
 ##      #SYMFILE "@:MYPROG.SYM"          <- and it is not optional
 ##      #INCLUDE "STRCASE.INC.BL"
@@ -64,11 +63,12 @@
 ##      STRCASE.MODE = STRCASE.RTRIM
 ##      GOSUB STRCASE.GO
 ##
-## ONE THING WAS LOST: the compiler used to reject a literal at the call site.
-## GP.STRPTR("text") is an address inside the p-code, and upper-casing it edits the
-## program. And there is still NO GP.PAD, for the reason there never was one -- padding
-## GROWS a string, and nothing working on the block alone can pass the capacity it was
-## born with. Use STR.PAD.
+## NEVER HAND IT A LITERAL. GP.STRPTR("text") is an address inside the p-code, so
+## folding it edits the program itself, and nothing stops you. Fold a variable.
+##
+## THERE IS NO PADDING HERE, and there cannot be: padding GROWS a string, and anything
+## working on the block alone cannot pass the capacity that block was born with. The
+## in-place handlers only ever see the block. Use STR.PAD.
 
 ## GP.COMP(a$,b$) compares WITHOUT case: -1 if a$ sorts before b$, 0 if they
 ## match, 1 if after. Length breaks a tie, so "abc" sorts before "ABCD".
@@ -77,9 +77,9 @@
 
 #TOKEN GP.COMP 52848
 
-## GP.SORT IS GONE -- SORT.INC.BL, the same shell sort with the same Ciura gaps, in
-## GP.ASM. Built on GP.ARRPTR below, which stays: a BASL subroutine cannot be handed an
-## array, so something has to turn one into an address.
+## SORTING IS SORT.INC.BL -- shell sort with Ciura's gaps, in GP.ASM. Built on
+## GP.ARRPTR below: a BASL subroutine cannot be handed an array, so something has to
+## turn one into an address.
 ##
 ##      #SYMFILE "@:MYPROG.SYM"          <- and it is not optional
 ##      #INCLUDE "SORT.INC.BL"
@@ -97,9 +97,9 @@
 
 #TOKEN GP.ARRPTR 52846
 
-## GP.STASH AND GP.RESTR ARE GONE -- STASH.INC.BL, in GP.ASM, doing the same job: a
-## self-describing header, restore-anywhere, the 4,094-cell bank limit. Tokens 52845
-## and 52844 are retired, not reused.
+## SAVING A RECTANGLE OF SCREEN IS STASH.INC.BL, in GP.ASM: a self-describing header,
+## restore-anywhere, and a 4,094-cell bank limit. STASHFILE.INC.BL puts the same
+## rectangle through a file.
 
 ## Text drawing, written STRAIGHT INTO VERA -- no KERNAL, which is why it is several
 ## times faster than PRINT, whose every character is two KERNAL calls carrying scroll,
@@ -164,9 +164,9 @@
 #TOKEN GP.CHAR 52824
 #TOKEN GP.PRINTAT 52841
 
-## GP.MENU AND GP.SEL ARE GONE -- MENUVERT.INC.BL, written in ordinary GPB commands and
-## doing the same job: cursor keys, RETURN, ESC, case-blind hotkeys that choose their
-## row, must-select / keep-mark / no-wrap, and the SNES pad. For no runtime bytes.
+## A VERTICAL MENU IS MENUVERT.INC.BL, written in ordinary GPB commands: cursor keys,
+## RETURN, ESC, case-blind hotkeys that choose their row, must-select / keep-mark /
+## no-wrap, and the SNES pad. For no runtime bytes.
 ##
 ##      #INCLUDE "MENUVERT.INC.BL"
 ##      MENUVERT.X = 8 : MENUVERT.Y = 6
@@ -177,9 +177,9 @@
 ##      MENUVERT.HOT$ = "NLOQ"
 ##      GOSUB MENUVERT.RUN                     answer in MENUVERT.SEL
 ##
-## The one behaviour that did NOT survive is the colourless highlight: the assembly
-## swapped the cell's attribute nibbles, the module prints the row again and so wants a
-## colour. MENUVERT.HIATTR = 0 asks for that inversion back.
+## IT PRINTS THE ROW AGAIN rather than swapping the cell's attribute nibbles, so it
+## wants a colour for the highlight. MENUVERT.HIATTR = 0 asks for a plain inversion
+## instead, for a caller that has no second colour to give it.
 
 ##
 ## GP.SELECT <var>             a plain numeric variable, re-read at each alternative

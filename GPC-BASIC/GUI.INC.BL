@@ -24,8 +24,6 @@
 ## **  BOTH ARE REQUIRED EVEN IF YOU ONLY CALL GUI.YN. BASLOAD resolves every
 ## **  label in the file, not the ones a path reaches, so leaving either out
 ## **  stops the tokenise with LABEL NOT FOUND rather than compiling a smaller
-## **  program. They used to be listed here as "GUI.MENU only" and "GUI.TEXT
-## **  only", which is true of the CALLS and not of the build.
 ## **
 ## **  Usage, the whole of it:
 ## **      THEME.DARK = 0 : GOSUB THEME.LOAD
@@ -227,8 +225,7 @@ GUI.YN.MARK:
 ## **
 ## **  THE ONE DIALOG THAT DOES NOT ASK ANYTHING, and the commonest an
 ## **  application has: "wrote 34 lines", "not found", "there is nothing to
-## **  export". GUI.YN with one answer was the workaround everybody wrote, and
-## **  a one-item GUI.MENU was the other; both read like what they are.
+## **  export".
 ## **
 ## **  RETURN, SPACE, ESC AND STOP ALL CLOSE IT. There is one outcome, so
 ## **  there is nothing for a second key to mean, and a message a user cannot

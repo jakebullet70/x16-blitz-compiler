@@ -14,11 +14,11 @@
 .
 =DESCRIPTION
 .
-.GP.STASH and GP.RESTR were here and are now STASH.INC.BL, written in GP.ASM.
-.Same rectangle, same self-describing 4-byte header, same 4,094-cell ceiling
-.-- a bank is 8K and a cell is two bytes, so a full 80x60 screen at 9,600
-.bytes still does not fit. They were 329 bytes of the GP block, which is all
-.or nothing, carried by every program that never stashed anything.
+.Stashing a rectangle is STASH.INC.BL, written in GP.ASM, not a keyword: a
+.self-describing 4-byte header and a 4,094-cell ceiling -- a bank is 8K and a
+.cell is two bytes, so a full 80x60 screen at 9,600 bytes does not fit. As
+.keywords it would be 329 bytes of the GP block, which is all or nothing,
+.carried by every program that never stashed anything.
 .
 :#SYMFILE "@:MYPROG.SYM"
 :#INCLUDE "STASH.INC.BL"
@@ -34,4 +34,4 @@
 =SEE ALSO
 .
 >57|STASH.INC.BL -- save a text rectangle, and put it back.
->64|STASHFILE.INC.BL -- a saved text rectangle, through a file.
+>65|STASHFILE.INC.BL -- a saved text rectangle, through a file.

@@ -14,11 +14,10 @@
 .
 =DESCRIPTION
 .
-.  | GP.SORT was here and is now SORT.INC.BL (SEC 4.7) -- the same shell sort
-.  | with the same gap sequence, written in GP.ASM. It was 408 bytes of the
-.  | GP block, which is all or nothing, carried by every program that never
-.  | sorted anything. GP.ARRPTR stayed, because the module is built on it: a
-.  | BASL subroutine cannot be handed an array, so an address is the only
+.  | Sorting is SORT.INC.BL (SEC 4.7), not a keyword: 408 bytes of the GP
+.  | block, which is all or nothing, carried by every program that never
+.  | sorted anything. GP.ARRPTR is here because the module is built on it --
+.  | a BASL subroutine cannot be handed an array, so an address is the only
 .  | interface there is.
 .
 .GP.ARRPTR returns the address of element zero -- the header is already

@@ -29,9 +29,7 @@
 .
 .  BASLOAD resolves every label in the file, not the ones a path reaches, so
 .  leaving either out stops the tokenise with LABEL NOT FOUND rather than
-.  compiling a smaller program. They used to be listed here as "GUI.MENU
-.  only" and "GUI.TEXT only", which is true of the CALLS and not of the
-.  build.
+.  compiling a smaller
 .
 .  Usage, the whole of it:
 :      THEME.DARK = 0 : GOSUB THEME.LOAD

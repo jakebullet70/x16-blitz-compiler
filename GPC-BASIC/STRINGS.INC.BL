@@ -43,10 +43,10 @@ GOTO STR.SKIP
 ## STR.PADR -- pad on the RIGHT to STR.WIDTH: left justify, the
 ## text-in-a-column case.
 ##
-## This was GP.PAD in ASM and moved here ON PURPOSE, not to save space: an in-place
-## handler only ever gets the string's BLOCK, never the variable slot, so it cannot GROW
-## one past the capacity it was born with. Padding "HI" to a 20 column field raised OUT
-## OF RANGE -- and padding to a field is the entire point. BASIC assignment reallocates.
+## BASIC, NOT ASM, AND IT HAS TO BE: an in-place handler only ever gets the string's
+## BLOCK, never the variable slot, so it cannot GROW one past the capacity it was born
+## with. Padding "HI" to a 20 column field is exactly that, and it is the entire point.
+## BASIC assignment reallocates; a blob cannot.
 
 STR.PADR:
     IF LEN(STR.STR$) < STR.WIDTH THEN STR.STR$ = STR.STR$ + RPT$(32, STR.WIDTH - LEN(STR.STR$))

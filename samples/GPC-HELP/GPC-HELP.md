@@ -134,9 +134,8 @@ program. That is expected, not a fault. Compile it and run the object.
 
 #### 3. Command reference
 
-27 keywords, tokens `$CE7F` down to `$CE63`, allocated downward and **never renumbered** — `$CE67`
-and `$CE68` are holes, freed when `GP.SEL` and `GP.MENU` were withdrawn, and are not reused. The token
-values are the ABI.
+27 keywords, tokens `$CE7F` down to `$CE63`, allocated downward. `$CE67` and `$CE68` are holes. The
+token values are the ABI.
 
 ##### At a glance — the whole library, and what each part costs
 
@@ -173,8 +172,8 @@ the BASIC modules are written up in §4.
 
 **The rule that decides the side** is in §1: assembly gets what runs in a tight loop or moves bulk
 data, BASIC gets everything else — and anything that is only a *rename* of keywords already present
-gets neither, and becomes a composite. A menu waits on a human, so it is BASIC — it used to be the
-`GP.MENU` keyword and cost every GPB program 462 bytes whether it had a menu or not.
+gets neither, and becomes a composite. A menu waits on a human, so it is BASIC: as a keyword it
+would cost every GPB program 462 bytes whether it had a menu or not.
 
 ---
 
@@ -363,10 +362,9 @@ Example: [`MLCALL.EXP.BL`](MLCALL.EXP.BL)
 | `GP.COMP(a$, b$)` | compare **ignoring case**: −1 before, 0 same, 1 after |
 | `GP.STRPTR(a$)` | address of the string's `[ActLen][Data]` block |
 
-> **The five in-place statements were here and are now `STRCASE.INC.BL`** (§4.8) — `GP.TRIM`,
-> `GP.LTRIM`, `GP.RTRIM`, `GP.UPPER`, `GP.LOWER`. They were 188 bytes of the GP block, which is all
-> or nothing, and outside their own example file they had one caller in the whole tree. `GP.STRPTR`
-> stayed and is what the module is built on.
+> **Trimming and case folding are `STRCASE.INC.BL`** (§4.8), not keywords: 188 bytes in the GP
+> block, which is all or nothing, to serve one caller in the whole tree outside its own example.
+> `GP.STRPTR` is here because that is what the module is built on.
 
 `GP.INSTR` is the gap that matters: **GPC has no string search of any kind** without it.
 
@@ -428,10 +426,10 @@ Example: [`STRINGS.EXP.BL`](STRINGS.EXP.BL)
 GP.ARRPTR(a())
 ```
 
-> **`GP.SORT` was here and is now `SORT.INC.BL`** (§4.7) — the same shell sort with the same gap
-> sequence, written in `GP.ASM`. It was 408 bytes of the GP block, which is all or nothing, carried
-> by every program that never sorted anything. `GP.ARRPTR` stayed, because the module is built on
-> it: a BASL subroutine cannot be handed an array, so an address is the only interface there is.
+> **Sorting is `SORT.INC.BL`** (§4.7), not a keyword: 408 bytes of the GP block, which is all or
+> nothing, carried by every program that never sorted anything. `GP.ARRPTR` is here because the
+> module is built on it — a BASL subroutine cannot be handed an array, so an address is the only
+> interface there is.
 
 `GP.ARRPTR` returns the address of **element zero** — the header is already skipped — so machine code
 reached by `GP.CALL` can work on the array in bulk. **Stride is yours to add:** 2 bytes per element
@@ -450,10 +448,10 @@ Example: [`ARRAYS.EXP.BL`](ARRAYS.EXP.BL)
 
 ##### 3.6 Screen — stash and restore
 
-**`GP.STASH` and `GP.RESTR` were here and are now `STASH.INC.BL`,** written in `GP.ASM`. Same
-rectangle, same self-describing 4-byte header, same 4,094-cell ceiling — a bank is 8K and a cell is
-two bytes, so a full 80×60 screen at 9,600 bytes still does not fit. They were 329 bytes of the GP
-block, which is all or nothing, carried by every program that never stashed anything.
+**Stashing a rectangle is `STASH.INC.BL`,** written in `GP.ASM`, not a keyword: a self-describing
+4-byte header and a 4,094-cell ceiling — a bank is 8K and a cell is two bytes, so a full 80×60
+screen at 9,600 bytes does not fit. As keywords it would be 329 bytes of the GP block, which is all
+or nothing, carried by every program that never stashed anything.
 
 ```
 #SYMFILE "@:MYPROG.SYM"
@@ -973,16 +971,15 @@ Examples: [`BMXVIEW.EXP.BL`](BMXVIEW.EXP.BL), and [`BMXPAL.EXP.BL`](BMXPAL.EXP.B
 | `MENUVERT.ROW` | `MENUVERT.DRAWROW` `MENUVERT.DRAWATTR` | one row, in the attribute you name |
 | `MENUVERT.HOTFIND` | `MENUVERT.DRAWROW` `MENUVERT.DRAWTEXT$` | `MENUVERT.HOTAT` — where that row's hotkey letter sits, 1-based, or **0 for "do not tint"** |
 
-**This replaces the `GP.MENU` and `GP.SEL` keywords**, withdrawn at RT_ABI 20. They were 462 bytes of
-assembly plus 11 of storage, in a block every GPB program carried whether it had a menu or not. The
-assembly existed because the highlight had to move without the runtime knowing what text was
-underneath it, so it swapped the cell's attribute nibbles instead of redrawing. A menu written in
-BASIC **owns the item array**, so it can simply print the row again — and the whole reason for the
-assembly goes with it.
+**A menu is BASIC here, not assembly**, and that saves 462 bytes of assembly plus 11 of storage in
+a block every GPB program would carry whether it had a menu or not. Assembly would be needed only to
+move the highlight without knowing what text was underneath it, by swapping the cell's attribute
+nibbles instead of redrawing. A menu written in BASIC **owns the item array**, so it can simply
+print the row again — and the whole reason for the assembly goes with it.
 
-It is not slower in any way a person can see. The nibble swap was 59 cycles a cell; `GP.FILL` is 31
-and `GP.PRINTAT` 94, so redrawing two rows costs about a millisecond against the swap's half, against
-a 16.7 ms frame.
+It is not slower in any way a person can see: a nibble swap is 59 cycles a cell, `GP.FILL` is 31 and
+`GP.PRINTAT` 94, so redrawing two rows costs about a millisecond against the swap's half, against a
+16.7 ms frame.
 
 | in | |
 |---|---|
@@ -991,7 +988,7 @@ a 16.7 ms frame.
 | `MENUVERT.COUNT` | how many rows |
 | `MENUVERT.ITEM$()` | the rows, `1..COUNT` — **the caller owns the `DIM`**, see below |
 | `MENUVERT.ATTR` | packed attribute, `background * 16 + foreground` |
-| `MENUVERT.HIATTR` | the same for the highlighted row. **0 means invert `MENUVERT.ATTR`**, which is what `GP.MENU` always did |
+| `MENUVERT.HIATTR` | the same for the highlighted row. **0 means invert `MENUVERT.ATTR`** |
 | `MENUVERT.HOT$` | one character a row, `""` for none |
 | `MENUVERT.HOTATTR` | paint the hotkey letter in this attribute. **0 is off, and off is the default** |
 | `MENUVERT.FLAGS` | added together, below |
@@ -1094,10 +1091,9 @@ SORT.DESCEND = 0 : SORT.NOCASE = 0
 GOSUB SORT.RUN
 ```
 
-**This was `GP.SORT`.** Same shell sort, same Ciura gap sequence — 132, 57, 23, 10, 4, 1 — moving the
-2-byte element *pointers* rather than string data, so a swap is a swap whatever the strings are: no
-temporary, no copying, no heap traffic. That is what made it worth assembly in the first place and
-none of it changed when it left the block.
+Shell sort, Ciura's gap sequence — 132, 57, 23, 10, 4, 1 — moving the 2-byte element *pointers*
+rather than string data, so a swap is a swap whatever the strings are: no temporary, no copying, no
+heap traffic. That is what makes it worth assembly.
 
 > **The array goes in as an address, and that is not a style choice.** A BASL subroutine cannot be
 > handed an array, so `GP.ARRPTR` — which stayed a keyword for exactly this — turns one into an
@@ -1156,9 +1152,8 @@ GOSUB STRCASE.GO
 | `STRCASE.LTRIM` | spaces off the **leading** end |
 | `STRCASE.RTRIM` | spaces off the **trailing** end |
 
-**These were `GP.UPPER`, `GP.LOWER`, `GP.TRIM`, `GP.LTRIM` and `GP.RTRIM`,** and the code is the
-same code. One blob with the mode tested **once**, at entry — never inside a loop, where the byte
-count is the whole cost.
+**One blob with the mode tested once**, at entry — never inside a loop, where the byte count is the
+whole cost.
 
 > **The argument is an address, and that is the point.** A BASL subroutine cannot be passed a
 > variable, and the obvious workaround — copy the caller's string in, work on it, copy it back — is
@@ -1216,8 +1211,6 @@ either side to catch an off-by-one writing into the neighbouring block.
   BOTH ARE REQUIRED EVEN IF YOU ONLY CALL GUI.YN. BASLOAD resolves every
   label in the file, not the ones a path reaches, so leaving either out
   stops the tokenise with LABEL NOT FOUND rather than compiling a smaller
-  program. They used to be listed here as "GUI.MENU only" and "GUI.TEXT
-  only", which is true of the CALLS and not of the build.
 
   Usage, the whole of it:
       THEME.DARK = 0 : GOSUB THEME.LOAD
@@ -1464,9 +1457,9 @@ either side to catch an off-by-one writing into the neighbouring block.
   kept separate so a program wanting only the bank does not carry the disk half --
   a BASL module has no dead code elimination, and those three routines are 127 bytes.
 
-  This is what GP.STASH and GP.RESTR were, moved out of the all-or-nothing GP block
-  into GP.ASM: 329 bytes carried by every program that never stashed anything.
-  GP.MENU went the same way in August and became MENUVERT.INC.BL.
+  A MODULE, NOT A RUNTIME KEYWORD, so it costs its bytes only in the programs that
+  ask for it: as a keyword it would be 329 bytes carried by every program that never
+  stashed anything.
 
   YOUR PROGRAM MUST HAVE A #SYMFILE. The assembly reaches BASIC's variables through
   {VAR} and BASLOAD crunches every name first -- STASH.VADDR% is some two-letter
@@ -1517,7 +1510,7 @@ either side to catch an off-by-one writing into the neighbouring block.
   The whole STASH.* name space belongs to this file.
 ```
 
-*See also: STASHFILE.INC.BL -- a saved text rectangle, through a file., 4.6 MENUVERT.INC.BL -- a vertical menu*
+*See also: STASHFILE.INC.BL -- a saved text rectangle, through a file.*
 
 ## STASHFILE.INC.BL -- a saved text rectangle, through a file.
 

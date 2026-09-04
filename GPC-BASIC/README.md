@@ -40,10 +40,9 @@ Then it is BASLOAD and GPC as usual: `BASLOAD "MYPROG.BL"` to turn the source in
 A thing belongs in the core when it is a bulk move or a tight loop — something BASIC is genuinely
 bad at. It belongs in an extension when it waits on a human, or is layout, or is data. It is a
 composite when it is only a **rename** of something the compiler can already say — those are free,
-so use them without thinking about it. `GP.MENU`
-and `GP.SEL` **used to be core keywords and are now the `MENUVERT` extension**, because a menu
-spends all its time waiting for a keypress: the assembly bought nothing a person could see, and cost
-every GPB program 473 bytes whether it had a menu or not.
+so use them without thinking about it. A menu is **the `MENUVERT` extension, not a core keyword**,
+because it spends all its time waiting for a keypress: assembly there buys nothing a person could
+see, and would cost every GPB program 473 bytes whether it had a menu or not.
 
 Examples are `XXX.EXP.BL` — runnable programs, one subject each. Uppercase names throughout,
 because these files live on the X16's drive.
@@ -78,17 +77,16 @@ All of it needs `#INCLUDE "GPB.INC.BL"`, and nothing else.
 | `STASH.INC.BL` | a text rectangle to a RAM bank and back, in `GP.ASM` | — |
 | `STASHFILE.INC.BL` | the same rectangle through a **file**, so a panel outlives the program | — |
 | `SORT.INC.BL` | shell sort a string array in place, in `GP.ASM` | `ARRAYS.EXP.BL` |
-| `STRCASE.INC.BL` | case and trim, in place, in `GP.ASM` — was `GP.UPPER` and the trims | `STRINGS.EXP.BL` |
+| `STRCASE.INC.BL` | case and trim, in place, in `GP.ASM` | `STRINGS.EXP.BL` |
 | `BMX.INC.BL` | a BMX bitmap straight into VERA | `BMXVIEW.EXP.BL` |
 
-**Five of those modules used to be keywords.** `GP.MENU`, `GP.STASH`/`GP.RESTR`, `GP.SORT` and the
-five in-place string statements were
-all in the GP runtime block, which is **all or nothing**: every byte of it is written into the object
-*and* taken off the bottom of the workspace, for any program that uses one GP keyword. A sort nobody
-calls and a stash nobody uses were being paid for by every GP program in the tree. Written in
-`GP.ASM` and `#INCLUDE`d instead they cost their own bytes, in the programs that ask for them, and
-nothing at all in the ones that do not — and the block has come down from 2,048 bytes to 1,280 as
-they left, and $4000 -> $3c00 all told.
+**Five of those modules are deliberately not keywords.** The menu, the stash, the sort and the five
+in-place string statements would all sit in the GP runtime block, which is **all or nothing**: every
+byte of it is written into the object *and* taken off the bottom of the workspace, for any program
+that uses one GP keyword. A sort nobody calls and a stash nobody uses would be paid for by every GP
+program in the tree. Written in `GP.ASM` and `#INCLUDE`d they cost their own bytes, in the programs
+that ask for them, and nothing at all in the ones that do not — which is what keeps the block at
+1,280 bytes rather than 2,048.
 
 **`STASHFILE.INC.BL` is the file half of `STASH.INC.BL`,** and a separate file on purpose: a BASL
 module has no dead code elimination, so everything it holds is compiled into every program that

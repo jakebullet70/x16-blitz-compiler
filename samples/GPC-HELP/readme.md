@@ -234,14 +234,14 @@ It asserts the thing that cannot be checked by looking — that every row in `HE
 the topic `MKHELP.PY` meant it to:
 
 ```
-INDEX ROWS 89                     ROWS WHOSE LENGTH DISAGREES 0
+INDEX ROWS 90                     ROWS WHOSE LENGTH DISAGREES 0
 ROWS WITHOUT A TOPIC OR LENGTH 0  SECTIONS PAST THE END 0
-ROWS OPENED 84                    LINES READ 6381
-ROWS WITH NO TOPIC RECORD 0       CROSS REFERENCES RESOLVED 194
+ROWS OPENED 85                    LINES READ 6441
+ROWS WITH NO TOPIC RECORD 0       CROSS REFERENCES RESOLVED 188
 ```
 
-Every one of the 84 selectable rows opens a file whose line 1 is a topic record, every line count in
-the index matches the file, and all 194 cross references resolve to a row that is a topic. Get any
+Every one of the 85 selectable rows opens a file whose line 1 is a topic record, every line count in
+the index matches the file, and all 188 cross references resolve to a row that is a topic. Get any
 of those wrong by one and **the viewer shows the wrong page rather than failing**, which is the
 failure nobody notices.
 
@@ -256,7 +256,7 @@ not a test double.
 | `HELP.BASL` | the viewer |
 | `HELP.PRG` | compiled, embedded, 22,603 bytes — what `help-demo.bat` runs |
 | `MKHELP.PY` | the content build |
-| `HELP.IDX` | the master index, 89 rows |
+| `HELP.IDX` | the master index, 90 rows |
 | `H001.HLP`…`H038.HLP` | one topic each |
 | `GPC-HELP.md` | the same content, for a PC |
 | `GPC-BASIC/` | the eight modules a rebuild needs, so it needs nothing from the master |

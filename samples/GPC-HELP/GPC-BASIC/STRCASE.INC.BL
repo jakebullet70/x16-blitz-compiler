@@ -23,15 +23,15 @@
 ## **      STRCASE.LTRIM   spaces off the LEADING end
 ## **      STRCASE.RTRIM   spaces off the TRAILING end
 ## **
-## **  These were GP.UPPER, GP.LOWER, GP.TRIM, GP.LTRIM and GP.RTRIM -- 176 bytes of the
-## **  all-or-nothing GP block, with one caller in the whole tree outside their own
-## **  example. Moving them took ObjectBase $3d00 -> $3c00: 512 bytes back for every GP
-## **  program, sorting, drawing or otherwise.
+## **  A MODULE, NOT FIVE KEYWORDS: as keywords they are 176 bytes of the all-or-nothing
+## **  GP block, serving one caller in the whole tree outside their own example. Keeping
+## **  them out holds ObjectBase at $3c00 rather than $3d00 -- 512 bytes of workspace for
+## **  every GP program, sorting, drawing or otherwise.
 ## **
 ## **  THE ARGUMENT IS AN ADDRESS, AND THAT IS THE WHOLE POINT. A BASL subroutine cannot
 ## **  be passed a variable, and the obvious workaround -- copy in, work, copy back -- is
-## **  two allocations and two copies a call, exactly the heap traffic these were written
-## **  in assembly to avoid. GP.STRPTR hands over the block and the assembly rewrites it
+## **  two allocations and two copies a call, exactly the heap traffic assembly is here
+## **  to avoid. GP.STRPTR hands over the block and the assembly rewrites it
 ## **  where it lies. That is also why GP.STRPTR stays a keyword.
 ## **
 ## **  DO NOT PASS A LITERAL. GP.STRPTR("hello") is an address inside the P-CODE, so

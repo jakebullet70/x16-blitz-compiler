@@ -15,11 +15,10 @@
 :SORT.DESCEND = 0 : SORT.NOCASE = 0
 :GOSUB SORT.RUN
 .
-.This was GP.SORT. Same shell sort, same Ciura gap sequence -- 132, 57, 23,
-.10, 4, 1 -- moving the 2-byte element pointers rather than string data, so a
-.swap is a swap whatever the strings are: no temporary, no copying, no heap
-.traffic. That is what made it worth assembly in the first place and none of
-.it changed when it left the block.
+.Shell sort, Ciura's gap sequence -- 132, 57, 23, 10, 4, 1 -- moving the
+.2-byte element pointers rather than string data, so a swap is a swap
+.whatever the strings are: no temporary, no copying, no heap traffic. That is
+.what makes it worth assembly.
 .
 .  | The array goes in as an address, and that is not a style choice. A BASL
 .  | subroutine cannot be handed an array, so GP.ARRPTR -- which stayed a

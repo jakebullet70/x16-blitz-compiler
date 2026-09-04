@@ -78,4 +78,4 @@
 =SEE ALSO
 .
 >33|4.6 MENUVERT.INC.BL -- a vertical menu
->64|STASHFILE.INC.BL -- a saved text rectangle, through a file.
+>65|STASHFILE.INC.BL -- a saved text rectangle, through a file.

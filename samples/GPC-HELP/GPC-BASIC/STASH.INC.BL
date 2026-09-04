@@ -9,9 +9,9 @@
 ## **  kept separate so a program wanting only the bank does not carry the disk half --
 ## **  a BASL module has no dead code elimination, and those three routines are 127 bytes.
 ## **
-## **  This is what GP.STASH and GP.RESTR were, moved out of the all-or-nothing GP block
-## **  into GP.ASM: 329 bytes carried by every program that never stashed anything.
-## **  GP.MENU went the same way in August and became MENUVERT.INC.BL.
+## **  A MODULE, NOT A RUNTIME KEYWORD, so it costs its bytes only in the programs that
+## **  ask for it: as a keyword it would be 329 bytes carried by every program that never
+## **  stashed anything.
 ## **
 ## **  YOUR PROGRAM MUST HAVE A #SYMFILE. The assembly reaches BASIC's variables through
 ## **  {VAR} and BASLOAD crunches every name first -- STASH.VADDR% is some two-letter

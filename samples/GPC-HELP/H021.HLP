@@ -1,5 +1,4 @@
 @4.6 MENUVERT.INC.BL -- a vertical menu (2)
-.its own hotkey is left alone rather than treated as an error, because the
 .hotkey still works. Only rows in the normal attribute are tinted: on the
 .selected row the highlight is the message, and a second colour inside the
 .bar is noise.

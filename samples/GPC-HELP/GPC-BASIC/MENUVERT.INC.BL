@@ -28,7 +28,7 @@
 ## **        MENUVERT.ITEM$()  the rows, 1..COUNT. THE CALLER OWNS THE DIM, below
 ## **        MENUVERT.ATTR     packed attribute, background * 16 + fg
 ## **        MENUVERT.HIATTR   the same for the highlighted row. 0 means "invert
-## **                          MENUVERT.ATTR", which is what GP.MENU always did
+## **                          MENUVERT.ATTR"
 ## **        MENUVERT.HOT$     one character a row, "" for none. Matched WITHOUT case,
 ## **                          and a hotkey CHOOSES its row rather than moving to it
 ## **        MENUVERT.HOTATTR  paint the hotkey LETTER in this attribute, so the
@@ -122,7 +122,7 @@ MENUVERT.RUN:
     MENUVERT.KEY = 0
     IF MENUVERT.COUNT < 1 THEN MENUVERT.SEL = 0 : RETURN
 
-## ---- 0 for the highlight means "invert the normal attribute", as GP.MENU did.
+## ---- 0 for the highlight means "invert the normal attribute".
 
     MENUVERT.HIGHLIGHT = MENUVERT.HIATTR
     IF MENUVERT.HIATTR = 0 THEN MENUVERT.HIGHLIGHT = (MENUVERT.ATTR AND 15) * 16 + INT(MENUVERT.ATTR / 16)

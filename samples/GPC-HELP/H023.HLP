@@ -30,9 +30,8 @@
 .  STRCASE.RTRIM
 .      DOES: spaces off the trailing end
 .
-.These were GP.UPPER, GP.LOWER, GP.TRIM, GP.LTRIM and GP.RTRIM, and the code
-.is the same code. One blob with the mode tested once, at entry -- never
-.inside a loop, where the byte count is the whole cost.
+.One blob with the mode tested once, at entry -- never inside a loop, where
+.the byte count is the whole cost.
 .
 .  | The argument is an address, and that is the point. A BASL subroutine
 .  | cannot be passed a variable, and the obvious workaround -- copy the

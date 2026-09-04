@@ -31,11 +31,10 @@
 .  GP.STRPTR(a$)
 .      DOES: address of the string's [ActLen][Data] block
 .
-.  | The five in-place statements were here and are now STRCASE.INC.BL (SEC
-.  | 4.8) -- GP.TRIM, GP.LTRIM, GP.RTRIM, GP.UPPER, GP.LOWER. They were 188
-.  | bytes of the GP block, which is all or nothing, and outside their own
-.  | example file they had one caller in the whole tree. GP.STRPTR stayed and
-.  | is what the module is built on.
+.  | Trimming and case folding are STRCASE.INC.BL (SEC 4.8), not keywords:
+.  | 188 bytes in the GP block, which is all or nothing, to serve one caller
+.  | in the whole tree outside its own example. GP.STRPTR is here because
+.  | that is what the module is built on.
 .
 .GP.INSTR is the gap that matters: GPC has no string search of any kind
 .without it.

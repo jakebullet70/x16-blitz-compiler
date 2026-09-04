@@ -150,11 +150,10 @@ LINEINPUT.ASK:
 ## **  colours and cursor moves and reverse on and off, which would take
 ## **  effect on the way OUT if they were let into the string.
 ## **
-## **  $80-$9F used to be a flag raised by one IF and lowered by the next,
-## **  written on the belief that AND binds tighter than the comparisons
-## **  around it. It does not: comparisons bind tighter, which is why
-## **  ED.KEY >= 32 AND ED.KEY <= 126 has always worked in the editor. One
-## **  range test says what the flag was spelling out.
+## **  ONE RANGE TEST, NOT A FLAG. Comparisons bind TIGHTER than AND here, so
+## **  K >= 128 AND K <= 159 reads as the range it looks like -- which is why
+## **  ED.KEY >= 32 AND ED.KEY <= 126 works in the editor. Believing it the
+## **  other way round is what makes people reach for a flag they do not need.
 ## ***********************************************************************
 
 LINEINPUT.TYPED:

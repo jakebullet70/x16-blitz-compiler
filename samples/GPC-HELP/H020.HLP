@@ -21,16 +21,16 @@
 .      OUT: MENUVERT.HOTAT -- where that row's hotkey letter sits, 1-based,
 .        or 0 for "do not tint"
 .
-.This replaces the GP.MENU and GP.SEL keywords, withdrawn at RT_ABI 20. They
-.were 462 bytes of assembly plus 11 of storage, in a block every GPB program
-.carried whether it had a menu or not. The assembly existed because the
-.highlight had to move without the runtime knowing what text was underneath
-.it, so it swapped the cell's attribute nibbles instead of redrawing. A menu
-.written in BASIC owns the item array, so it can simply print the row again
-.-- and the whole reason for the assembly goes with it.
+.A menu is BASIC here, not assembly, and that saves 462 bytes of assembly
+.plus 11 of storage in a block every GPB program would carry whether it had a
+.menu or not. Assembly would be needed only to move the highlight without
+.knowing what text was underneath it, by swapping the cell's attribute
+.nibbles instead of redrawing. A menu written in BASIC owns the item array,
+.so it can simply print the row again -- and the whole reason for the
+.assembly goes with it.
 .
-.It is not slower in any way a person can see. The nibble swap was 59 cycles
-.a cell; GP.FILL is 31 and GP.PRINTAT 94, so redrawing two rows costs about a
+.It is not slower in any way a person can see: a nibble swap is 59 cycles a
+.cell, GP.FILL is 31 and GP.PRINTAT 94, so redrawing two rows costs about a
 .millisecond against the swap's half, against a 16.7 ms frame.
 .
 .  MENUVERT.X .Y
@@ -51,8 +51,7 @@
 .      packed attribute, background * 16 + foreground
 .
 .  MENUVERT.HIATTR
-.      the same for the highlighted row. 0 means invert MENUVERT.ATTR, which
-.        is what GP.MENU always did
+.      the same for the highlighted row. 0 means invert MENUVERT.ATTR
 .
 .  MENUVERT.HOT$
 .      one character a row, "" for none
@@ -119,3 +118,4 @@
 .The letter is found in the row's own text -- the first match for that row's
 .MENUVERT.HOT$ character, without case -- so nothing extra is passed in, and
 ." START" with hotkey S needs no markup. A row whose text does not contain
+.its own hotkey is left alone rather than treated as an error, because the
