@@ -2,6 +2,19 @@
 ## **
 ## **  GUI.INC.BL -- four dialogs, in a box that puts the screen back.
 ## **
+## **  ==================================================================
+## **  THIS IS samples/GPC-HELP's OWN COPY AND IT HAS DIVERGED. The answers
+## **  are drawn as BUTTONS -- "< OK >" in the panel's colours reversed --
+## **  where GPC-BASIC/GUI.INC.BL still prints a dimmed hint line with one
+## **  letter lit. It is here rather than in the library so the look can be
+## **  seen running before every dialog in the tree changes; nothing else
+## **  compiles against this file. See samples/GPC-HELP/readme.md.
+## **
+## **  What diverges: GUI.BUTTON / GUI.BUTTON.ROW / GUI.BUTTON.SIZE are new,
+## **  GUI.YN and GUI.TEXT and GUI.SAY draw with them, and GUI.YN no longer
+## **  reads GUI.HINT$ -- its two labels are the answers themselves.
+## **  ==================================================================
+## **
 ## **      GUI.SAY     something to say, and one way out
 ## **      GUI.YN      a question, and a Y or N answer
 ## **      GUI.MENU    a question, and a row chosen from a list
@@ -126,6 +139,10 @@
 #DEFINE GUI.RETURN 13
 #DEFINE GUI.SPACE 32
 
+## Cells BETWEEN two buttons. Four, so the gap is wider than the "< " and
+## " >" on either side of it and the pair reads as two things, not one.
+#DEFINE GUI.BTN.GAP 4
+
 GOTO GUI.MODULE.END
 
 ## ***********************************************************************
@@ -153,22 +170,22 @@ GUI.YN:
 ## ---- a default string rather than in two routines.
     GUI.YES = GUI.UY : GUI.YES.ALT = GUI.LY
     GUI.NO = GUI.UN : GUI.NO.ALT = GUI.LN
-    GUI.HINT.DEFAULT$ = "YES      NO"
+    GUI.BTN.ONE$ = "YES" : GUI.BTN.TWO$ = "NO"
     IF GUI.OKCANCEL = 0 THEN GOTO GUI.YN.SET
     GUI.YES = GUI.UO : GUI.YES.ALT = GUI.LO
     GUI.NO = GUI.UC : GUI.NO.ALT = GUI.LC
-    GUI.HINT.DEFAULT$ = "OK      CANCEL"
+    GUI.BTN.ONE$ = "OK" : GUI.BTN.TWO$ = "CANCEL"
 
 GUI.YN.SET:
-    GUI.HINT.LINE$ = GUI.HINT$
-    IF GUI.HINT.LINE$ = "" THEN GUI.HINT.LINE$ = GUI.HINT.DEFAULT$
-    GUI.BODY.ROWS = 1 : GUI.BODY.WIDTH = LEN(GUI.HINT.LINE$)
+    ## THE LABELS ARE THE ANSWERS, so GUI.HINT$ is not read here any more --
+    ## the library version's "whatever it says, the first Y and first N are
+    ## lit" has nothing to light when the row is two buttons. That is the one
+    ## interface this copy takes away.
+    GOSUB GUI.BUTTON.SIZE
+    GUI.BODY.ROWS = 1 : GUI.BODY.WIDTH = GUI.BTN.TOTAL
     GOSUB GUI.OPEN
-    GUI.HINT.LEFT = GUI.INNER.LEFT + INT((GUI.INNER.WIDTH - LEN(GUI.HINT.LINE$)) / 2)
-    IF GUI.HINT.LEFT < GUI.INNER.LEFT THEN GUI.HINT.LEFT = GUI.INNER.LEFT
-    GP.PRINTAT GUI.HINT.LEFT, GUI.INNER.TOP, GUI.HINT.LINE$, THEME.CLR(THEME.DIMMED)
-    GUI.MARK.CH = GUI.YES : GOSUB GUI.YN.MARK
-    GUI.MARK.CH = GUI.NO : GOSUB GUI.YN.MARK
+    GUI.BTN.Y = GUI.INNER.TOP
+    GOSUB GUI.BUTTON.ROW
     GUI.ANSWER = 0
 
 ## ---- Six keys scattered across 256 with everything else falling through: the
@@ -217,6 +234,71 @@ GUI.YN.MARK:
     RETURN
 
 ## ***********************************************************************
+## **  GUI.BUTTON -- one answer, drawn as a button.
+## **
+## **   in   GUI.BTN.TEXT$   the label, without its brackets
+## **        GUI.BTN.X  GUI.BTN.Y   where the "<" goes
+## **        GUI.BTN.ATTR    what GUI.BUTTON.SIZE worked out
+## **
+## **  "< OK >" AND REVERSED, and both halves of that are doing work. The
+## **  brackets say "button" with no colour at all, which is what a theme that
+## **  paints the panel and the highlight the same way leaves you with; the
+## **  reverse says it again in a way you see before you read. Neither is
+## **  enough alone.
+## **
+## **  THE COLOUR IS THE PANEL'S OWN, SWAPPED -- foreground and background
+## **  traded, not a new theme role. That is what makes it work in every
+## **  palette without THEME.INC.BL growing a slot: whatever the box is
+## **  drawn in, the button is its opposite, so the contrast is the panel's
+## **  contrast and cannot come out invisible.
+## ***********************************************************************
+
+GUI.BUTTON:
+    GP.PRINTAT GUI.BTN.X, GUI.BTN.Y, "< " + GUI.BTN.TEXT$ + " >", GUI.BTN.ATTR
+    RETURN
+
+## ***********************************************************************
+## **  GUI.BUTTON.SIZE -- how wide the row will be, before the box is opened.
+## **
+## **   in   GUI.BTN.ONE$   the first label. GUI.BTN.TWO$ "" for one button
+## **   out  GUI.BTN.TOTAL  cells the row needs, for GUI.BODY.WIDTH
+## **        GUI.BTN.W.ONE  GUI.BTN.W.TWO   the two button widths
+## **
+## **  SEPARATE FROM THE DRAWING because GUI.OPEN has to be told how wide the
+## **  body is BEFORE it measures and centres the box, and the buttons are
+## **  part of the body. Four cells a button: "< ", " >".
+## ***********************************************************************
+
+GUI.BUTTON.SIZE:
+    GUI.BTN.W.ONE = LEN(GUI.BTN.ONE$) + 4
+    GUI.BTN.W.TWO = 0
+    GUI.BTN.TOTAL = GUI.BTN.W.ONE
+    IF GUI.BTN.TWO$ = "" THEN RETURN
+    GUI.BTN.W.TWO = LEN(GUI.BTN.TWO$) + 4
+    GUI.BTN.TOTAL = GUI.BTN.W.ONE + GUI.BTN.GAP + GUI.BTN.W.TWO
+    RETURN
+
+## ***********************************************************************
+## **  GUI.BUTTON.ROW -- the buttons, centred on the body.
+## **
+## **   in   GUI.BTN.ONE$ GUI.BTN.TWO$ and GUI.BUTTON.SIZE's widths
+## **        GUI.BTN.Y     the row to draw on
+## **        GUI.INNER.LEFT GUI.INNER.WIDTH   from GUI.OPEN
+## ***********************************************************************
+
+GUI.BUTTON.ROW:
+    ## The panel, with its two nibbles traded. GUI.PANEL is background * 16 +
+    ## foreground, so this is the same two colours the other way up.
+    GUI.BTN.ATTR = (GUI.PANEL AND 15) * 16 + INT(GUI.PANEL / 16)
+    GUI.BTN.X = GUI.INNER.LEFT + INT((GUI.INNER.WIDTH - GUI.BTN.TOTAL) / 2)
+    IF GUI.BTN.X < GUI.INNER.LEFT THEN GUI.BTN.X = GUI.INNER.LEFT
+    GUI.BTN.TEXT$ = GUI.BTN.ONE$ : GOSUB GUI.BUTTON
+    IF GUI.BTN.TWO$ = "" THEN RETURN
+    GUI.BTN.X = GUI.BTN.X + GUI.BTN.W.ONE + GUI.BTN.GAP
+    GUI.BTN.TEXT$ = GUI.BTN.TWO$ : GOSUB GUI.BUTTON
+    RETURN
+
+## ***********************************************************************
 ## **  GUI.SAY -- something to say, and one way out.
 ## **
 ## **   in   GUI.MSG$ GUI.MSG2$ GUI.TITLE$ and the box inputs
@@ -240,13 +322,14 @@ GUI.YN.MARK:
 ## ***********************************************************************
 
 GUI.SAY:
-    GUI.HINT.LINE$ = GUI.HINT$
-    IF GUI.HINT.LINE$ = "" THEN GUI.HINT.LINE$ = "OK"
-    GUI.BODY.ROWS = 1 : GUI.BODY.WIDTH = LEN(GUI.HINT.LINE$)
+    GUI.BTN.ONE$ = GUI.HINT$
+    IF GUI.BTN.ONE$ = "" THEN GUI.BTN.ONE$ = "OK"
+    GUI.BTN.TWO$ = ""
+    GOSUB GUI.BUTTON.SIZE
+    GUI.BODY.ROWS = 1 : GUI.BODY.WIDTH = GUI.BTN.TOTAL
     GOSUB GUI.OPEN
-    GUI.HINT.LEFT = GUI.INNER.LEFT + INT((GUI.INNER.WIDTH - LEN(GUI.HINT.LINE$)) / 2)
-    IF GUI.HINT.LEFT < GUI.INNER.LEFT THEN GUI.HINT.LEFT = GUI.INNER.LEFT
-    GP.PRINTAT GUI.HINT.LEFT, GUI.INNER.TOP, GUI.HINT.LINE$, THEME.CLR(THEME.TITLE)
+    GUI.BTN.Y = GUI.INNER.TOP
+    GOSUB GUI.BUTTON.ROW
 
 GUI.SAY.WAIT:
     GET GUI.PRESSED$
@@ -324,9 +407,10 @@ GUI.MENU:
 
 GUI.TEXT:
     IF GUI.LEN = 0 THEN GUI.LEN = 20
-    GUI.HINT.LINE$ = "ENTER = OK    ESC = CANCEL"
+    GUI.BTN.ONE$ = "OK" : GUI.BTN.TWO$ = "CANCEL"
+    GOSUB GUI.BUTTON.SIZE
     GUI.BODY.ROWS = 3 : GUI.BODY.WIDTH = GUI.LEN
-    IF LEN(GUI.HINT.LINE$) > GUI.BODY.WIDTH THEN GUI.BODY.WIDTH = LEN(GUI.HINT.LINE$)
+    IF GUI.BTN.TOTAL > GUI.BODY.WIDTH THEN GUI.BODY.WIDTH = GUI.BTN.TOTAL
     GUI.WAS$ = GUI.INPUT$
     GOSUB GUI.OPEN
 
@@ -337,13 +421,12 @@ GUI.TEXT:
     LINEINPUT.LEN = GUI.LEN : LINEINPUT.ATTR = THEME.CLR(THEME.HILITE)
     LINEINPUT.TEXT$ = GUI.INPUT$ : LINEINPUT.MASK = GUI.MASK
 
-## ---- the two key names picked out of the dimmed line, at known offsets rather
-## ---- than searched for, because unlike GUI.YN's hint this text is fixed.
-    GUI.HINT.LEFT = GUI.INNER.LEFT + INT((GUI.INNER.WIDTH - LEN(GUI.HINT.LINE$)) / 2)
-    IF GUI.HINT.LEFT < GUI.INNER.LEFT THEN GUI.HINT.LEFT = GUI.INNER.LEFT
-    GP.PRINTAT GUI.HINT.LEFT, GUI.INNER.TOP + 2, GUI.HINT.LINE$, THEME.CLR(THEME.DIMMED)
-    GP.PRINTAT GUI.HINT.LEFT, GUI.INNER.TOP + 2, "ENTER", THEME.CLR(THEME.TITLE)
-    GP.PRINTAT GUI.HINT.LEFT + 14, GUI.INNER.TOP + 2, "ESC", THEME.CLR(THEME.TITLE)
+## ---- OK and CANCEL as buttons, two rows under the field. The library version
+## ---- prints "ENTER = OK    ESC = CANCEL" dimmed and lights the two key names
+## ---- at fixed offsets; the buttons say the same thing in the same place and
+## ---- leave the keys to be the keys.
+    GUI.BTN.Y = GUI.INNER.TOP + 2
+    GOSUB GUI.BUTTON.ROW
 
 ## ---- UP, DOWN AND TAB LEAVE AN LINEINPUT FIELD WITHOUT CANCELLING IT -- that is
 ## ---- how a form moves between fields. With one field they came back as "not

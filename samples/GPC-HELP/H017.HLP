@@ -1,0 +1,46 @@
+@4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+.
+=4.3 APPSYS.INC.BL -- START POLITELY, LEAVE IT AS YOU FOUND IT
+.
+=DESCRIPTION
+.
+.  APPSYS.STARTUP
+.      IN: --
+.      OUT: APPSYS.MODE APPSYS.COLS APPSYS.ROWS APPSYS.COLOUR
+.
+.  APPSYS.RESTORE
+.      IN: those
+.      OUT: screen mode and colour put back
+.
+.  APPSYS.PANEL.SAVE
+.      IN: APPSYS.FILE$ .BANK .X .Y .W .H [.DEV]
+.      OUT: a file
+.
+.  APPSYS.PANEL.LOAD
+.      IN: APPSYS.FILE$ .BANK
+.      OUT: back where it came from
+.
+.  APPSYS.PANEL.PUT
+.      IN: APPSYS.FILE$ .BANK .X .Y
+.      OUT: pasted somewhere else
+.
+:GOSUB APPSYS.STARTUP
+:' ... the application, laid out with APPSYS.COLS / APPSYS.ROWS ...
+:GOSUB APPSYS.RESTORE : END
+.
+.Call STARTUP first, before any SCREEN or COLOR of your own -- it records the
+.state as it finds it, so anything you change beforehand is what gets
+.restored.
+.
+.Lay out from APPSYS.COLS / APPSYS.ROWS rather than assuming 80x60. The X16
+.boots 80x60 but SCREEN 0 is 40x30, and someone who prefers larger text is
+.running one.
+.
+.APPSYS.DEV defaults to 8. The panel routines themselves moved to
+.STASHFILE.INC.BL; the panel file is self-describing -- the stash's 4-byte
+.header goes in it -- so loading needs nothing but the name.
+.
+=SEE ALSO
+.
+>30|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>64|STASHFILE.INC.BL -- a saved text rectangle, through a file.

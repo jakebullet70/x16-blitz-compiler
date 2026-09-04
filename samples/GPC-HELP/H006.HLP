@@ -1,0 +1,72 @@
+@3.3 Machine code
+.
+=3.3 MACHINE CODE
+.
+=SYNTAX
+.
+:GP.CALL address [,a] [,x] [,y] [,carry]
+:GP.A   GP.X   GP.Y   GP.C
+.
+=WHAT IT COSTS
+.
+.  ASM: GP.CALL GP.A GP.X GP.Y GP.C
+.    ASM -- a keyword, run by machine code in the GP runtime block. A program
+.    using ANY GP keyword pays for the whole block.
+.
+=DESCRIPTION
+.
+.Calls machine code with the registers set. All four arguments are optional
+.and default to 0. The four value words read the results back afterwards.
+.
+.They are keywords, not variables -- X = GP.A reads, GP.A = 5 is a syntax
+.error. They share SYS's $030C-$030F, so they also read what a plain SYS left
+.behind.
+.
+:GP.CALL $FF5F, 0, 0, 0, 1          ' KERNAL screen_mode, carry set = report
+:COLS = GP.X : ROWS = GP.Y
+.
+.  | Put your machine code in banked RAM ($A000-$BFFF), not $0400. Stock X16
+.  | BASIC leaves $0400 free for the user; a compiled GPC program does not --
+.  | that page holds runtime state (stringHighMemory, storeStartHigh,
+.  | variableStartPage), and POKEing code over it corrupts the program
+.  | silently.
+.
+=Splitting an address -- GP.HIBYTE / GP.LOBYTE
+.
+.  GP.HIBYTE(n)
+.      DOES: INT(n / 256) -- which 256-byte page. Composite
+.
+.  GP.LOBYTE(n)
+.      DOES: MOD(n, 256) -- the offset within it. Composite
+.
+.A 6502 address is sixteen bits, and everything that consumes one takes eight
+.at a time -- GP.CALL's registers, VERA's $9F20/$9F21. So every address that
+.leaves BASIC for machine code gets split, and GP.STRPTR / GP.ARRPTR exist in
+.order to hand one over:
+.
+:P = GP.STRPTR(A$)
+:GP.CALL $A000, GP.LOBYTE(P), GP.HIBYTE(P)
+.
+.  | This is the reason they are keywords rather than something you write
+.  | out. The spelling that looks right -- P AND 255 -- is a live bug in GPC:
+.  | AND is 16-bit signed, and every address worth splitting is above 32767
+.  | (the string heap always is), so it raises OUT OF RANGE instead of
+.  | masking. GP.LOBYTE is built on MOD, which runs through the full 32-bit
+.  | divide and is not on that path.
+.
+.Range is 0-65535, which is every address on the machine. Both are composite
+.-- they add no runtime code, and compile to exactly INT(n/256) and
+.MOD(n,256).
+.
+.  | For anything longer than a few bytes, write it as assembly instead --
+.  | SEC 3.9. GP.ASM assembles into the program, so there is no bank to
+.  | reserve, no POKE loop, and no comment to keep in step with a list of
+.  | numbers.
+.
+=EXAMPLE PROGRAM
+.
+.  MLCALL.EXP.BL -- runnable, in the GPC-BASIC folder
+.
+=SEE ALSO
+.
+>20|3.9 Inline assembly

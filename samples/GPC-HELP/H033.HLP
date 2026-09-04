@@ -1,0 +1,88 @@
+@3. The modules (2)
+=BMX.INC.BL
+.
+.  in
+.      BMX.FILE$
+.
+.  out
+.      BMX.ERROR$ -- empty means it worked<br>BMX.WIDTH BMX.HEIGHT BMX.DEPTH
+.        BMX.VERSION BMX.PALUSED BMX.PALFIRST BMX.DATAOFF BMX.PACKED -- the
+.        header, readable after BMX.OPEN
+.
+.  in, optional
+.      BMX.STASH -- where BMX.PAINT keeps the machine's palette; VRAM $13000
+.        by default, -1 to keep nothing
+.
+.  internal
+.      BMX.PTR BMX.HEADER$ BMX.SCRATCH BMX.SCRATCH$ BMX.PALBASE BMX.ADDR
+.        BMX.LO BMX.HI BMX.BANK BMX.REST BMX.COUNT BMX.CHUNK BMX.GOT BMX.STEP
+.        BMX.SKIP BMX.ROW BMX.ROWS BMX.X0 BMX.Y0 BMX.BAD BMX.KEPT BMX.SRC
+.        BMX.DST
+.
+.  constants
+.      BMXK.MACPTR BMXK.CHKIN BMXK.CLRCHN BMXK.MEMCOPY BMXK.VCTRL BMXK.VLO
+.        BMXK.VMID BMXK.VHI BMXK.PORTLO BMXK.PORTLO.B BMXK.PORTHI BMXK.LFN
+.
+.BMX.PTR doubles as the "have I initialised" flag -- it is zero until
+.BMX.INIT has run. Zeroing it yourself would leak a string block and
+.re-allocate.
+.
+.BMX.STASH is the one variable here you may want to set, and it has to be set
+.before the first BMX.OPEN -- BMX.INIT runs then, and fills in the default
+.only if you have not. That is why -1 rather than 0 switches the stash off: 0
+.already means "never set". BMX.KEPT is the once-per-run guard that makes a
+.slideshow restore the machine's palette rather than the previous picture's.
+.
+=MENUVERT.INC.BL
+.
+.  in
+.      MENUVERT.X MENUVERT.Y -- top left of the first row<br>MENUVERT.WIDTH
+.        -- cells wide, which is the width of the highlight<br>MENUVERT.COUNT
+.        -- how many rows<br>MENUVERT.ITEM$() -- the rows, 1..COUNT; the
+.        caller owns the DIM<br>MENUVERT.ATTR -- packed
+.        attribute<br>MENUVERT.HIATTR -- the highlighted row; 0 inverts
+.        MENUVERT.ATTR<br>MENUVERT.HOT$ -- one hotkey character a
+.        row<br>MENUVERT.HOTATTR -- tint for the hotkey letter; 0 is
+.        off<br>MENUVERT.FLAGS -- added together<br>MENUVERT.SEL -- the row
+.        to start on
+.
+.  out
+.      MENUVERT.SEL -- 1..COUNT, or 0 if cancelled<br>MENUVERT.KEY -- the key
+.        that ended it
+.
+.  internal
+.      MENUVERT.SCAN MENUVERT.EACH MENUVERT.DONE MENUVERT.CODE
+.        MENUVERT.INCHAR$ MENUVERT.PREVSEL MENUVERT.HIGHLIGHT
+.        MENUVERT.DRAWROW MENUVERT.DRAWATTR MENUVERT.DRAWTEXT$ MENUVERT.DRAWY
+.        MENUVERT.HOTCODE MENUVERT.HOTLAST MENUVERT.WANTCODE MENUVERT.HOTAT
+.        MENUVERT.HOTWANT MENUVERT.HOTHERE MENUVERT.HOTSCAN MENUVERT.PADNOW
+.        MENUVERT.PADNEW MENUVERT.PADHELD MENUVERT.PADRAW
+.
+.  constants
+.      MENUVERT.MUSTSEL MENUVERT.KEEPMARK MENUVERT.NOWRAP MENUVERT.GAMEPAD
+.        MENUVERT.UP MENUVERT.DOWN MENUVERT.ENTER MENUVERT.ESCAPE
+.        MENUVERT.STOP MENUVERT.SPACE MENUVERT.PORT MENUVERT.PAD.UP
+.        MENUVERT.PAD.DOWN MENUVERT.PAD.B MENUVERT.PAD.START
+.
+.MENUVERT.SEL is both an input and an output -- it is the row to start on
+.going in and the row chosen coming out, so a menu reopened without clearing
+.it reopens where it was. That is usually what you want; set it to 0 when it
+.is not.
+.
+.MENUVERT.DRAWROW, MENUVERT.DRAWATTR and MENUVERT.DRAWTEXT$ are listed
+.internal but are the documented arguments to MENUVERT.ROW, which is public:
+.they are internal to MENUVERT.RUN, not to you. MENUVERT.HOTFIND reads the
+.first two and answers in MENUVERT.HOTAT.
+.
+=EXAMPLE PROGRAM
+.
+.  FORM.EXP.BL -- runnable, in the GPC-BASIC folder
+.
+=SEE ALSO
+.
+>28|4.1 THEME.INC.BL -- named colour roles
+>30|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>29|4.2 STRINGS.INC.BL -- string helpers
+>31|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>32|4.5 BMX.INC.BL -- a BMX bitmap into VERA
+>33|4.6 MENUVERT.INC.BL -- a vertical menu

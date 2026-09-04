@@ -1,0 +1,121 @@
+@4.6 MENUVERT.INC.BL -- a vertical menu
+.
+=4.6 MENUVERT.INC.BL -- A VERTICAL MENU
+.
+=DESCRIPTION
+.
+.  MENUVERT.RUN
+.      IN: the variables below
+.      OUT: MENUVERT.SEL MENUVERT.KEY
+.
+.  MENUVERT.DRAW
+.      IN: the same
+.      OUT: draws the menu without driving it
+.
+.  MENUVERT.ROW
+.      IN: MENUVERT.DRAWROW MENUVERT.DRAWATTR
+.      OUT: one row, in the attribute you name
+.
+.  MENUVERT.HOTFIND
+.      IN: MENUVERT.DRAWROW MENUVERT.DRAWTEXT$
+.      OUT: MENUVERT.HOTAT -- where that row's hotkey letter sits, 1-based,
+.        or 0 for "do not tint"
+.
+.This replaces the GP.MENU and GP.SEL keywords, withdrawn at RT_ABI 20. They
+.were 462 bytes of assembly plus 11 of storage, in a block every GPB program
+.carried whether it had a menu or not. The assembly existed because the
+.highlight had to move without the runtime knowing what text was underneath
+.it, so it swapped the cell's attribute nibbles instead of redrawing. A menu
+.written in BASIC owns the item array, so it can simply print the row again
+.-- and the whole reason for the assembly goes with it.
+.
+.It is not slower in any way a person can see. The nibble swap was 59 cycles
+.a cell; GP.FILL is 31 and GP.PRINTAT 94, so redrawing two rows costs about a
+.millisecond against the swap's half, against a 16.7 ms frame.
+.
+.  MENUVERT.X .Y
+.      top left of the first row, not of a frame -- draw the border yourself
+.        with GP.BOX, so the menu owes nothing to one style of border
+.
+.  MENUVERT.WIDTH
+.      cells wide. This is the width of the highlight, so it is the width of
+.        the menu whatever the text happens to do
+.
+.  MENUVERT.COUNT
+.      how many rows
+.
+.  MENUVERT.ITEM$()
+.      the rows, 1..COUNT -- the caller owns the DIM, see below
+.
+.  MENUVERT.ATTR
+.      packed attribute, background * 16 + foreground
+.
+.  MENUVERT.HIATTR
+.      the same for the highlighted row. 0 means invert MENUVERT.ATTR, which
+.        is what GP.MENU always did
+.
+.  MENUVERT.HOT$
+.      one character a row, "" for none
+.
+.  MENUVERT.HOTATTR
+.      paint the hotkey letter in this attribute. 0 is off, and off is the
+.        default
+.
+.  MENUVERT.FLAGS
+.      added together, below
+.
+.  MENUVERT.SEL
+.      the row to start on; 0 starts at 1
+.
+.  MENUVERT.SEL
+.      1..COUNT, or 0 if cancelled
+.
+.  MENUVERT.KEY
+.      the key that ended it -- 13 chose, 27 cancelled, or the hotkey itself
+.
+:MENUVERT.X = 8 : MENUVERT.Y = 6
+:MENUVERT.WIDTH = 24 : MENUVERT.COUNT = 4
+:MENUVERT.ITEM$(1) = " NEW GAME"           ' ... and so on
+:MENUVERT.ATTR = THEME.CLR(THEME.TEXT)
+:MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
+:MENUVERT.HOT$ = "NLOQ"
+:GOSUB MENUVERT.RUN
+:IF MENUVERT.SEL = 0 THEN GOTO CANCELLED
+.
+.  cursor up / down
+.      move
+.
+.  RETURN
+.      choose
+.
+.  ESC or STOP
+.      cancel
+.
+.  a hotkey
+.      chooses its row at once
+.
+.  1
+.      must select -- ESC does not cancel
+.
+.  2
+.      keep mark -- leave the chosen row highlighted on the way out
+.
+.  4
+.      no wrap -- stop at the ends instead of wrapping round
+.
+.  8
+.      gamepad -- drive it from the SNES pad in port 1 as well as the
+.        keyboard
+.
+.The constants MENUVERT.MUSTSEL, .KEEPMARK, .NOWRAP and .GAMEPAD are defined
+.for you; add those rather than writing the numbers.
+.
+.A hotkey chooses its row, it does not merely move to it -- which is the
+.entire point of having one. MENUVERT.HOT$ is one character per row in order,
+.matched without case; it may be shorter than MENUVERT.COUNT, in which case
+.the later rows have none.
+.
+.MENUVERT.HOTATTR makes the shortcut visible instead of leaving it a secret.
+.The letter is found in the row's own text -- the first match for that row's
+.MENUVERT.HOT$ character, without case -- so nothing extra is passed in, and
+." START" with hotkey S needs no markup. A row whose text does not contain

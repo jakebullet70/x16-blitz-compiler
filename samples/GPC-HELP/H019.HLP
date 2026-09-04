@@ -1,0 +1,93 @@
+@4.5 BMX.INC.BL -- a BMX bitmap into VERA
+.
+=4.5 BMX.INC.BL -- A BMX BITMAP INTO VERA
+.
+=DESCRIPTION
+.
+.  BMX.OPEN
+.      IN: BMX.FILE$
+.      OUT: BMX.ERROR$, and the header -- BMX.WIDTH .HEIGHT .DEPTH .VERSION
+.        .PALUSED .PALFIRST .DATAOFF .PACKED
+.
+.  BMX.PAINT
+.      IN: an open file
+.      OUT: palette and pixels in VRAM, file closed
+.
+.  BMX.SHOW
+.      IN: BMX.FILE$
+.      OUT: both of the above
+.
+.  BMX.CLOSE
+.      IN: --
+.      OUT: abandons a file opened by BMX.OPEN
+.
+.  BMX.RESTORE
+.      IN: --
+.      OUT: puts the machine's own palette back
+.
+.BMX.ERROR$ empty means it worked.
+.
+:BMX.FILE$ = "TITLE.BMX"
+:SCREEN 128
+:GOSUB BMX.SHOW
+:IF BMX.ERROR$ <> "" THEN PRINT BMX.ERROR$
+.
+.The careful form, when you want the size before committing to a screen mode,
+.or want to report a bad file without the display already torn down:
+.
+:BMX.FILE$ = F$
+:GOSUB BMX.OPEN
+:IF BMX.ERROR$ <> "" THEN GOTO COMPLAIN
+:' ... BMX.WIDTH, BMX.HEIGHT, BMX.PALUSED readable here ...
+:SCREEN 128
+:GOSUB BMX.PAINT
+.
+.  | Set the screen mode BEFORE BMX.PAINT, not after. SCREEN reloads the
+.  | default palette, so a mode change after painting throws the image's
+.  | colours away -- right pixels, wrong colours, which reads as a corrupt
+.  | file rather than a mistake.
+.
+.The palette is borrowed, not taken. BMX.PAINT writes the picture's colours
+.over the machine's, and nothing on the X16 puts them back -- not SCREEN, not
+.the KERNAL's screen_mode. So BMX.PAINT stashes all 256 entries in spare VRAM
+.first, and BMX.RESTORE writes them back:
+.
+:BMX.FILE$ = "TITLE.BMX"
+:SCREEN 128
+:GOSUB BMX.SHOW
+:' ... the title screen ...
+:GOSUB BMX.RESTORE
+.
+.A program that owns the machine can simply never call it. One that hands the
+.machine back -- to BASIC, or to the next program in a chain -- calls it and
+.is done. It is safe at any time: nothing kept means nothing to do, so a
+.program whose picture failed to load can still call it on the way out. All
+.256 entries are kept rather than the range the file claims, and kept once
+.per run, which is what makes a slideshow restore what the machine had rather
+.than the previous picture's leftovers.
+.
+.BMX.STASH is where they go -- VRAM $13000 by default, free above the 320x240
+.framebuffer in the mode this module paints into. A caller with tiles,
+.sprites or a second bitmap up there must move it, or switch it off with
+.BMX.STASH = -1. It is checked rather than trusted: a stash inside the bitmap
+.or running into the PSG registers is reported, and nothing is painted.
+.
+.  | -1 and not 0 to switch it off. Zero is what the variable holds before
+.  | anyone has touched it, and BMX.INIT runs at the first BMX.OPEN -- long
+.  | after a caller would have set it -- so 0 has to keep meaning "never
+.  | set".
+.
+.8 bits per pixel, uncompressed, which is what SCREEN 128 shows without a
+.decompressor. Anything else is reported, not attempted. The image is
+.centred; larger than 320x240 is clipped.
+.
+.Examples: BMXVIEW.EXP.BL, and BMXPAL.EXP.BL for the palette
+.
+=EXAMPLE PROGRAM
+.
+.  BMXVIEW.EXP.BL -- runnable, in the GPC-BASIC folder
+.  BMXPAL.EXP.BL -- runnable, in the GPC-BASIC folder
+.
+=SEE ALSO
+.
+>32|4.5 BMX.INC.BL -- a BMX bitmap into VERA

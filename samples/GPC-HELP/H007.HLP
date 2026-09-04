@@ -1,0 +1,102 @@
+@3.4 Strings
+.
+=3.4 STRINGS
+.
+=WHAT IT COSTS
+.
+.  ASM: GP.INSTR GP.STRPTR GP.COMP
+.    ASM -- a keyword, run by machine code in the GP runtime block. A program
+.    using ANY GP keyword pays for the whole block.
+.  COMPOSITE: GP.CONTAINS GP.ISEMPTY
+.    COMPOSITE -- a keyword with no machine code of its own. The compiler
+.    expands it into keywords that already exist, so it costs the runtime
+.    nothing at all.
+.
+=DESCRIPTION
+.
+.  GP.INSTR(hay$, needle$ [,start])
+.      DOES: position of needle$, 1-based; 0 = not found. start is where to
+.        begin
+.
+.  GP.CONTAINS(hay$, needle$)
+.      DOES: -1 if needle$ occurs anywhere in hay$, 0 if not. Composite --
+.        see below
+.
+.  GP.ISEMPTY(a$)
+.      DOES: -1 if a$ has zero length, 0 if not. Composite
+.
+.  GP.COMP(a$, b$)
+.      DOES: compare ignoring case: -1 before, 0 same, 1 after
+.
+.  GP.STRPTR(a$)
+.      DOES: address of the string's [ActLen][Data] block
+.
+.  | The five in-place statements were here and are now STRCASE.INC.BL (SEC
+.  | 4.8) -- GP.TRIM, GP.LTRIM, GP.RTRIM, GP.UPPER, GP.LOWER. They were 188
+.  | bytes of the GP block, which is all or nothing, and outside their own
+.  | example file they had one caller in the whole tree. GP.STRPTR stayed and
+.  | is what the module is built on.
+.
+.GP.INSTR is the gap that matters: GPC has no string search of any kind
+.without it.
+.
+.GP.CONTAINS is the yes/no spelling of the same question, for when you do not
+.care where: IF GP.CONTAINS(F$, ".BAS"). It is case sensitive -- it compares
+.raw bytes, like GP.INSTR -- so reach for GP.COMP when you need case-blind.
+.An empty needle is 0, not -1, because GP.INSTR reports "not found" for one
+.and this is built on it.
+.
+.  | GP.CONTAINS is the library's first COMPOSITE keyword: it adds no runtime
+.  | code at all. The compiler expands it into GP.INSTR(hay$, needle$) <> 0,
+.  | and the compiled object is byte-for-byte identical to writing that out
+.  | by hand (verified by compiling both). So it costs nothing to use and
+.  | nothing to have -- unlike every other GP. keyword, whose machine code is
+.  | linked into every GPB program whether you call it or not. If you ever
+.  | want the position rather than a flag, write the GP.INSTR out; you are
+.  | not paying twice for the two spellings.
+.
+.GP.ISEMPTY(a$) is LEN(a$) = 0 with the question written down instead of
+.implied. A string of spaces is not empty -- STRCASE.TRIM it first if that is
+.what you meant. It is for readability only: it compiles to the same four
+.bytes as LEN(a$)=0, and IF a$="" costs about the same again (a literal
+.points into the p-code, so even the empty string allocates nothing). Do not
+.pick between the three on size.
+.
+.GP.COMP gives you a case-blind equality test -- IF GP.COMP(A$,B$) = 0 --
+.which plain = cannot do, and the comparator for ordering names. Length
+.breaks a tie, so "abc" sorts before "ABCD".
+.
+.The five in-place statements take a string VARIABLE, never a literal or an
+.expression; the compiler rejects those. Case conversion leaves digits,
+.punctuation and PETSCII graphics untouched.
+.
+.There is no GP.PAD. Padding grows a string, and an in-place handler receives
+.only the string's block, never the variable slot -- so it can never
+.reallocate past the capacity the string was born with. Use STR.PADR / PADL /
+.PADC (SEC 4.2), which are plain BASIC assignment and reallocate.
+.
+=GP.STRPTR and the address-splitting trap
+.
+.The address is of [ActLen][Data]: length at that address, first character at
+.+1, and the block's capacity at -2. With GP.CALL that lets machine code fill
+.a BASIC string in place and set its length -- something stock BASIC cannot
+.do at all.
+.
+.  | Splitting the address, do NOT write P AND 255. AND is 16-bit signed in
+.  | GPC and the string heap lives above 32767, so it raises OUT OF RANGE
+.  | rather than masking. Write: basic GP.CALL $A000, GP.LOBYTE(P),
+.  | GP.HIBYTE(P) -- see SEC 3.3. The longhand H = INT(P / 256) : L = P - H *
+.  | 256 is still correct and is what the keywords compile to. This applies
+.  | to GP.ARRPTR and to every VRAM address past the top eighth of the screen
+.  | too.
+.
+=EXAMPLE PROGRAM
+.
+.  STRINGS.EXP.BL -- runnable, in the GPC-BASIC folder
+.
+=SEE ALSO
+.
+>37|4.8 STRCASE.INC.BL -- case and trim, in place
+>29|4.2 STRINGS.INC.BL -- string helpers
+>11|3.3 Machine code
+>37|4.8 STRCASE.INC.BL -- case and trim, in place

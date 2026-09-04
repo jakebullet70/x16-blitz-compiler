@@ -1,0 +1,83 @@
+@3.7 Screen -- drawing
+.
+=3.7 SCREEN -- DRAWING
+.
+=SYNTAX
+.
+:GP.BOX x, y, w, h [,style] [,col]
+:GP.FILL x, y, w, h, char [,col]
+:GP.PRINTAT x, y, text$ [,col]
+.
+=WHAT IT COSTS
+.
+.  ASM: GP.BOX GP.FILL GP.PRINTAT
+.    ASM -- a keyword, run by machine code in the GP runtime block. A program
+.    using ANY GP keyword pays for the whole block.
+.  COMPOSITE: GP.CHAR GP.PRINTAT GP.FILL
+.    COMPOSITE -- a keyword with no machine code of its own. The compiler
+.    expands it into keywords that already exist, so it costs the runtime
+.    nothing at all.
+.
+=DESCRIPTION
+.
+.Written straight into VERA -- no KERNAL, which is why it is several times
+.faster than PRINT (GPC's character output makes two KERNAL calls per
+.character, and BSOUT carries scroll, quote mode and cursor work).
+.
+.GP.BOX draws the frame only. Styles: 0 solid, 1 dither, 2 single line, 3
+.rounded, 4 thick, 5 thick shaded. char in GP.FILL is PETSCII, e.g. ASC(" ").
+.
+.The colour is optional and defaults to whatever COLOR last set -- the same
+.colour a PRINT would have used, read out of the KERNAL's $0376. Supplied, it
+.is one byte packed exactly as the X16 packs it: background * 16 +
+.foreground. 255 is a real colour here (light grey on light grey), not a
+."leave it alone" marker.
+.
+.  | These do not move the cursor PRINT uses. Nothing here calls the KERNAL,
+.  | so a plain PRINT after a GP.PRINTAT carries on from wherever the KERNAL
+.  | still thinks the cursor is -- not after the text just drawn. Use LOCATE
+.  | before PRINT, or stay in one world or the other.
+.
+.Nothing is clipped. Off the right edge wraps to the next row; off the bottom
+.writes past the end of the screen map. Zero width or height draws nothing,
+.which is the case a computed size reaches by accident.
+.
+=ISO mode is handled for you
+.
+.In ISO mode -- PRINT CHR$(15), or a user pressing Ctrl+O -- the VERA tile
+.index is the character code, so translating PETSCII to a screen code is not
+.merely wasted work but wrong: A would go in as $01. GP.PRINTAT reads the
+.KERNAL's own ISO flag (bit 6 of $0372) per character and skips the
+.translation when it is set, so a program that switches charset is simply
+.correct, with no source change and nothing to declare. It costs 7 cycles a
+.cell in PETSCII mode and saves 34 in ISO.
+.
+.GP.FILL needs nothing: it converts its one character before the loop, and
+.$20 is a fixed point of the translation, so a space fill -- which is what
+.padding and blanking are -- is right in both modes.
+.
+.GP.BOX is the one that needs you to say something, and the custom-glyph form
+.is how. It does no translation at all -- its glyphs go straight to VERA as
+.tile indices -- so the four built-in styles are PETSCII screen codes and
+.come out as letters in ISO mode. No translation can fix that; ISO-8859-15
+.has no box-drawing characters, so there is nothing to translate to. But a
+.style of 256 or more is an address of eight glyphs of your own, and in ISO
+.mode a tile index is a character code, so ASCII + - | are a perfectly good
+.frame:
+.
+:ISO.GLYPH$ = "++++--||"                        ' TR TL BR BL TOP BOTTOM LEFT
+:GP.BOX 50, 26, 4, 3, GP.STRPTR(ISO.GLYPH$) + 1, 1
+.
+.GP.STRPTR hands over the string's block and the text starts at +1, so a
+.plain string literal is the cheapest way to carry the eight bytes. This
+.costs no runtime bytes -- the pointer form already exists, and it is the
+.same mechanism samples/editor uses to draw frames from a re-ordered font.
+.
+.ISO.EXP.BL pins all of this, reading the cells back with VPEEK rather than
+.trusting the display -- including the ISO box, whose corner, top edge and
+.side read back as 43, 45 and 124.
+.
+=EXAMPLE PROGRAM
+.
+.  ISO.EXP.BL -- runnable, in the GPC-BASIC folder
+.  SCREEN.EXP.BL -- runnable, in the GPC-BASIC folder

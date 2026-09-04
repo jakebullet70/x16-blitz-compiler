@@ -1,0 +1,111 @@
+@GUI.INC.BL -- four dialogs, in a box that puts the screen back.
+.
+=GUI.INC.BL
+.
+.  four dialogs, in a box that puts the screen back.
+.
+=MODULE HEADER
+.
+:      GUI.SAY     something to say, and one way out
+:      GUI.YN      a question, and a Y or N answer
+:      GUI.MENU    a question, and a row chosen from a list
+:      GUI.TEXT    a question, and a line of typed text
+.
+.  What they share is the BOX: measure it against the text, centre it, save
+.  what it covers, draw a frame, give the pixels back on the way out. That is
+.  GUI.OPEN and GUI.CLOSE, and the three entry points are thin. GUI.MENU is
+.  MENUVERT.RUN inside a frame and GUI.TEXT is LINEINPUT.GET inside one, so
+.  only GUI.YN -- four keys -- reads the keyboard itself.
+.
+.  REQUIRES, and does not #INCLUDE for you, in this order:
+:      GPB.INC.BL        GP.BOX, GP.FILL, GP.PRINTAT, GP.CALL
+:      STASH.INC.BL      saves the cells the box covers -- and wants a
+:                        #SYMFILE in your program, see its own header
+:      THEME.INC.BL      the colour roles, and GOSUB THEME.LOAD first
+:      MENUVERT.INC.BL   drawn on by GUI.MENU
+:      LINEINPUT.INC.BL  drawn on by GUI.TEXT
+.
+=BOTH ARE REQUIRED EVEN IF YOU ONLY CALL GUI.YN
+.
+.  BASLOAD resolves every label in the file, not the ones a path reaches, so
+.  leaving either out stops the tokenise with LABEL NOT FOUND rather than
+.  compiling a smaller program. They used to be listed here as "GUI.MENU
+.  only" and "GUI.TEXT only", which is true of the CALLS and not of the
+.  build.
+.
+.  Usage, the whole of it:
+:      THEME.DARK = 0 : GOSUB THEME.LOAD
+:      GUI.BANK = 8
+:      GUI.MSG$ = "Delete the file?"
+:      GOSUB GUI.YN
+:      IF GUI.ANSWER = 1 THEN <yes>
+.
+:   in   GUI.MSG$        the question. "" for none
+:        GUI.MSG2$       a second line, for detail that does not fit. "" for
+:                        none, and then there is no gap
+:        GUI.TITLE$      a name in the top edge of the frame. "" for none
+:        GUI.BANK        a spare RAM bank to save the covered cells in.
+:                        0 MEANS DO NOT SAVE, and then the box is still on
+:                        the screen when the call returns
+:        GUI.STYLE       0, the default, draws the single line box. 1 to 5
+:                        are GP.BOX's other styles
+:        GUI.PANEL.IN    the panel: the box's background AND the colour the
+:                        message lines are written in. 0 takes THEME.TEXT
+:        GUI.BORDER.IN   the frame's attribute. 0 takes THEME.BORDER
+:        GUI.GLYPH       non-zero frames the box from six glyphs of the
+:                        CALLER'S, and GUI.STYLE is then not consulted.
+:                        They are TILE INDICES: GUI.FRAME hands them to
+:                        GP.BOX as a custom set, which does not convert
+:                            GUI.EDGE.H      the horizontal run
+:                            GUI.EDGE.V      the vertical run
+:                            GUI.CORNER.TL   .TR  .BL  .BR
+:        GUI.PLACE       0 centres the box. Non-zero uses GUI.X, GUI.Y
+:        GUI.X  GUI.Y    top left, when GUI.PLACE says so
+:        GUI.ROW.OFFSET  added to the row the box lands on, however it was
+:                        placed. 0 for almost everybody -- see below
+.
+:   out  GUI.KEY         the key that ended it, whichever call
+:        GUI.LEFT GUI.TOP GUI.WIDTH GUI.HEIGHT   where the box went, and
+:                        how big it turned out
+.
+=GUI.ROW.OFFSET IS FOR HARDWARE SCROLLING
+.
+.  The GP commands address the text MAP, and VERA's L1_VSCROLL decides which
+.  map row shows as screen row 0. A caller scrolling that way sets
+.  GUI.ROW.OFFSET to VSCROLL/8 and is centred against what the user can see.
+.  Everyone else leaves it 0.
+.
+=UPPER CASE, ON THE DEFAULT CHARSET
+.
+.  GP.PRINTAT converts PETSCII and BASLOAD passes literals through as source
+.  bytes, so on charset 2 ASCII lower case lands on the graphics half of the
+.  font -- "Confirm" measured as tiles 3, 79, 78, 70, 73, 82, 77. ISO mode
+.  fixes the text and breaks the frame, GP.BOX's $40-$7D being letters in
+.  that order: so it is upper case with a frame, or mixed case without one,
+.  unless the caller re-orders the font and says where the glyphs went with
+.  GUI.GLYPH. That is what samples/editor does, and the whole reason the
+.  frame is overridable.
+.
+=A BOX OVER 4094 CELLS WILL NOT FIT ONE BANK
+.
+.  and that is not an error: the save is skipped, the dialog still runs, and
+.  GUI.STASHED comes back 0 so the caller knows it must repaint. Same when
+.  GUI.BANK is 0.
+.
+.  .IN IS "WHAT THE CALLER ASKED FOR" -- GUI.PANEL and GUI.BORDER are what
+.  GUI.OPEN settled on, and those are what everything downstream draws with.
+.  Both requests are 0-means-default: attribute 0 is black on black, legal
+.  and no use to anybody, so it is free to spend as "I did not choose".
+.
+.  The whole GUI. name space belongs to this file, except GUI.LISTBOX., which
+.  is GUI2.INC.BL -- a listbox is a GUI dialog and reads like one, but it is
+.  the only one that scrolls and the only one that marks, so it is its own
+.  #INCLUDE and you pay for it only when you want it.
+.
+=SEE ALSO
+.
+>57|STASH.INC.BL -- save a text rectangle, and put it back.
+>28|4.1 THEME.INC.BL -- named colour roles
+>33|4.6 MENUVERT.INC.BL -- a vertical menu
+>31|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>44|GUI2.INC.BL -- a listbox, single or multi select.

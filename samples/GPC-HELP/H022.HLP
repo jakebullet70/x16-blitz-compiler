@@ -1,0 +1,62 @@
+@4.7 SORT.INC.BL -- shell sort a string array
+.
+=4.7 SORT.INC.BL -- SHELL SORT A STRING ARRAY
+.
+=DESCRIPTION
+.
+.  SORT.RUN
+.      IN: SORT.PTR SORT.DESCEND SORT.NOCASE
+.      OUT: SORT.OK SORT.COUNT
+.
+:#SYMFILE "@:MYPROG.SYM"
+:#INCLUDE "SORT.INC.BL"
+:
+:SORT.PTR = GP.ARRPTR(NAME$())
+:SORT.DESCEND = 0 : SORT.NOCASE = 0
+:GOSUB SORT.RUN
+.
+.This was GP.SORT. Same shell sort, same Ciura gap sequence -- 132, 57, 23,
+.10, 4, 1 -- moving the 2-byte element pointers rather than string data, so a
+.swap is a swap whatever the strings are: no temporary, no copying, no heap
+.traffic. That is what made it worth assembly in the first place and none of
+.it changed when it left the block.
+.
+.  | The array goes in as an address, and that is not a style choice. A BASL
+.  | subroutine cannot be handed an array, so GP.ARRPTR -- which stayed a
+.  | keyword for exactly this -- turns one into an address the module can
+.  | work through. The empty parentheses in GP.ARRPTR(A$()) are required: A$
+.  | and A$() are different variables.
+.
+.SORT.OK is 0 if it refused: more than 255 elements (so DIM A$(254) is the
+.largest, since DIM A$(255) is 256 of them), or an array whose elements are
+.not strings. The element count and the type are read back out of the array's
+.own header, three bytes below what GP.ARRPTR returns, so a wrong count
+.cannot be passed in.
+.
+.Never-assigned elements are empty strings, not garbage. A DIM A$(20) with
+.five entries filled sorts its fifteen empties to the front; a null pointer
+.is read as "", the same substitution the runtime makes everywhere else.
+.
+.SORT.DESCEND and SORT.NOCASE are ordinary variables, not arguments, so they
+.are sticky -- set both on every call rather than inheriting what the last
+.one left behind.
+.
+.Your program must have a #SYMFILE, and it goes before the #INCLUDEs. The
+.assembly reaches BASIC's variables through {VAR} and BASLOAD crunches every
+.name before the compiler sees it; without the mapping the compile stops with
+.NO SYMBOL FILE FOR {}.
+.
+.Example: ARRAYS.EXP.BL. Regression test: SORT.EXP.BL, eight cases including
+.a 200-element array -- element 128 is where the doubled index stops fitting
+.in a byte, and every case is checked for content as well as order, because a
+.sort that reads the wrong element leaves the array beautifully sorted with
+.the same string in it twice.
+.
+=EXAMPLE PROGRAM
+.
+.  ARRAYS.EXP.BL -- runnable, in the GPC-BASIC folder
+.  SORT.EXP.BL -- runnable, in the GPC-BASIC folder
+.
+=SEE ALSO
+.
+>36|4.7 SORT.INC.BL -- shell sort a string array

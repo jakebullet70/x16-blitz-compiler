@@ -1,0 +1,43 @@
+@4.1 THEME.INC.BL -- named colour roles
+.
+=4.1 THEME.INC.BL -- NAMED COLOUR ROLES
+.
+=WHAT IT COSTS
+.
+.    BASIC -- a .INC.BL module of ordinary BASL, called with GOSUB. Costs
+.    nothing unless you #INCLUDE it.
+.
+=DESCRIPTION
+.
+.  THEME.LOAD
+.      IN: THEME.DARK (0 light, non-zero dark)
+.      OUT: fills THEME.CLR()
+.
+.  THEME.SET
+.      IN: THEME.ATTR
+.      OUT: issues COLOR -- makes it the colour PRINT uses
+.
+.  THEME.HI
+.      IN: THEME.ATTR
+.      OUT: THEME.INV, the inverse attribute
+.
+.Roles, for indexing THEME.CLR(): THEME.PAGE THEME.TEXT THEME.TITLE
+.THEME.BORDER THEME.HILITE THEME.DIMMED THEME.WARN, and THEME.SLOTS = 7.
+.
+:THEME.DARK = 1 : GOSUB THEME.LOAD
+:GP.BOX 4,2,30,8, 2, THEME.CLR(THEME.BORDER)
+:GP.PRINTAT 6,3, "TITLE", THEME.CLR(THEME.TITLE)
+.
+.The values are packed attributes -- background * 16 + foreground -- because
+.that is exactly what GP.BOX, GP.FILL and GP.PRINTAT take. For COLOR, which
+.wants the halves separately, use THEME.SET.
+.
+.#DEFINE substitutes at translation time, so THEME.CLR(THEME.TITLE) compiles
+.to THEME.CLR(2) -- the readable name costs no variable, no lookup, and a
+.one-byte constant index.
+.
+.THEME.CLR is DIMmed by the module. Do not DIM it yourself.
+.
+=SEE ALSO
+.
+>28|4.1 THEME.INC.BL -- named colour roles

@@ -1,0 +1,57 @@
+@4.4 LINEINPUT.INC.BL -- a positioned entry field
+.
+=4.4 LINEINPUT.INC.BL -- A POSITIONED ENTRY FIELD
+.
+=DESCRIPTION
+.
+.  LINEINPUT.GET
+.      IN: LINEINPUT.X .Y .LEN .ATTR .TEXT$ .MASK
+.      OUT: LINEINPUT.TEXT$ LINEINPUT.KEY
+.
+.  LINEINPUT.ASK
+.      IN: the same plus LINEINPUT.LABEL$
+.      OUT: the same; LINEINPUT.X restored
+.
+:LINEINPUT.X = 10 : LINEINPUT.Y = 6
+:LINEINPUT.LEN = 20
+:LINEINPUT.ATTR = THEME.CLR(THEME.TEXT)
+:LINEINPUT.TEXT$ = ""
+:GOSUB LINEINPUT.GET
+:IF LINEINPUT.KEY = 27 THEN GOTO CANCELLED
+.
+.This is what INPUT and LINPUT cannot do. Both own the whole bottom of the
+.screen, scroll it, echo in whatever colour is current, and accept any length
+.-- all four fatal on a drawn screen. A field stays where you put it, in the
+.colour you give it, and stops at the width you allow.
+.
+.LINEINPUT.KEY is the key that ended it, and it is what makes a multi-field
+.form possible:
+.
+.  13
+.      RETURN -- finished
+.
+.  27 / 3
+.      ESC / STOP -- cancelled, and LINEINPUT.TEXT$ is put back to what it
+.        was
+.
+.  17 / 145 / 9
+.      cursor down / up / TAB -- left the field, text kept
+.
+.So a form is a loop over fields, not a sequence of prompts, and the user can
+.go back and fix the first one without starting again.
+.
+.LINEINPUT.MASK non-zero shows asterisks while holding the real string. The
+.field never scrolls: when full, further characters are refused and the
+.cursor inverts the last character rather than sitting off the end. The
+.cursor blinks off TI rather than a delay loop, because a delay loop would
+.swallow keys pressed during it.
+.
+.Example: FORM.EXP.BL -- three fields, one masked, in a themed panel.
+.
+=EXAMPLE PROGRAM
+.
+.  FORM.EXP.BL -- runnable, in the GPC-BASIC folder
+.
+=SEE ALSO
+.
+>31|4.4 LINEINPUT.INC.BL -- a positioned entry field

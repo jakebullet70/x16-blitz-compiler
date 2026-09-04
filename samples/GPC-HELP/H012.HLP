@@ -1,0 +1,103 @@
+@3.9 Inline assembly
+.
+=3.9 INLINE ASSEMBLY
+.
+=SYNTAX
+.
+:GP.ASM
+:REM <instruction>
+:...
+:GP.ENDASM
+.
+=WHAT IT COSTS
+.
+.  COMPOSITE: GP.ASM GP.ENDASM
+.    COMPOSITE -- a keyword with no machine code of its own. The compiler
+.    expands it into keywords that already exist, so it costs the runtime
+.    nothing at all.
+.
+=DESCRIPTION
+.
+.65C02 assembly, assembled by GPC at compile time, with the bytes going into
+.the program. It is what GP.CALL needed a POKE loop and a spare RAM bank for:
+.
+:POKE ML+0,26 : POKE ML+1,232 : POKE ML+2,200 : GP.CALL ML,10,20,30
+.
+:GP.ASM
+:REM inc a
+:REM inx
+:REM iny
+:GP.ENDASM
+.
+.It costs no runtime bytes. A block is five bytes of p-code plus your
+.instructions, and every handler it uses is already in every compiled program
+.-- so a program whose only GP.BASIC keyword is GP.ASM still compiles
+.GP-BASIC OUT, without the 2 KB GP block. Measured: RT 12031, the same as a
+.program using no GP keyword at all.
+.
+=#REM 1 is required
+.
+.  | The body rides in REM statements, because BASLOAD stores REM text byte
+.  | for byte. Outside a REM, ORA, AND, EOR and ROR are BASIC keywords and
+.  | the text is destroyed; inside one it arrives intact, braces and all.
+.  | Lower case is fine -- it is upshifted for you. #REM 0 is BASLOAD's
+.  | default, and with it the body is stripped before the compiler runs. That
+.  | is why GP.ASM and GP.ENDASM are real keywords and not REMs: the block is
+.  | still there to be found empty, and GPC says BLOCK MISMATCH instead of
+.  | compiling a program that silently contains no code. Turn REMs back off
+.  | after GP.ENDASM.
+.
+=Labels and branches
+.
+.A label is name:, alone on a line or in front of an instruction; six
+.characters are significant. Labels belong to their block -- the same name in
+.two blocks is two different labels, and neither can branch to the other.
+.
+:GP.ASM
+:REM ldx #5
+:REM loop: lda #42
+:REM jsr $ffd2
+:REM dex
+:REM bne loop
+:GP.ENDASM
+.
+.BNE/BEQ/BRA and the rest take a label, and so do JMP and JSR. A branch
+.further than 127 bytes is OUT OF RANGE at compile time, on the line it is on
+.-- not a wrong address at run time.
+.
+={VAR} -- a BASIC variable's slot
+.
+.{VAR} is the address of the variable's slot, which is what makes reading and
+.writing the same thing: LDA {N%} reads it, STA {N%} writes it, in the slot
+.BASIC itself uses.
+.
+.  {N} {N%} {N$}
+.      IS: the scalar's slot
+.
+.  {N()}
+.      IS: the array's slot, which holds the base address of its data -- an
+.        element is two steps, as through GP.ARRPTR
+.
+.The name is letters, digits and dots, starting with a letter -- so
+.{DOC.GOT.OFF} works, and the dotted names the library and the samples use
+.everywhere are reachable from assembly. Underscore is not: BASLOAD allows it
+.in a name, this does not, and {A_B} reads the name as A. Up to 64
+.characters, the same as BASLOAD.
+.
+.  | {VAR} needs #SYMFILE, and that is the one thing to remember. BASLOAD
+.  | renames variables -- N% becomes A%, which is how it gives you 64
+.  | significant characters on a two-character BASIC -- and it does not
+.  | rename REM text with them. So the code says A% while the REM still says
+.  | {N%}. #SYMFILE is BASLOAD's own record of that mapping, and the compiler
+.  | reads it: #SYMFILE "@:PROG.SYM" at the top of the source, named to match
+.  | the PRG -- compiling PROG.PRG reads PROG.SYM. Nothing else changes: {N%}
+.  | is still written the way you wrote the variable. Two errors, both at
+.  | compile time and both naming the line: | | means | |---|---| | NO SYMBOL
+.  | FILE FOR {} | no #SYMFILE, or it is not beside the PRG under the
+.  | matching name | | UNKNOWN VARIABLE IN {} | the name is not a variable of
+.  | this program | {VAR} never creates a variable, which is the opposite of
+.  | what an ordinary BASIC reference does -- so assign it once in BASIC
+.  | first, even M% = 0. A name that missed would otherwise hand back a slot
+.  | BASIC never reads, and the block would run, store, and change nothing
+.  | you can see.
+.

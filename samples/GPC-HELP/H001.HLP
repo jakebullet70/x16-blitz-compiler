@@ -1,0 +1,27 @@
+@1. What GP.BASIC is
+.
+=1. WHAT GP.BASIC IS
+.
+.Two halves, and the split is deliberate.
+.
+.The keywords -- 27 of them, GP.DO through GP.ENDSEL -- are compiled into
+.p-code and handled by assembly in the runtime. They exist because BASIC is
+.bad at what they do: searching a string a character at a time, sorting an
+.array, pushing bytes at VERA. 1,970 bytes of assembly, which page alignment
+.rounds to the 2,048 a program actually pays.
+.
+.Those bytes are spent only by a program that uses at least one GP keyword.
+.One that uses none has the whole block left out of its object, and gets the
+.2,048 back as workspace as well.
+.
+.The library -- seven .INC.BL modules and fourteen .EXP.BL examples, beside
+.this file -- is ordinary BASL, called with GOSUB. Menus, panels, themes,
+.entry fields, BMX loading. Zero runtime bytes: only a program that #INCLUDEs
+.one pays for it, and it pays in its own p-code.
+.
+.  | The rule that decides which side a thing goes on: assembly gets what
+.  | runs in a loop or moves bulk data. Everything else is BASIC.
+.  | LINEINPUT.GET waits on a human, so the speed argument that puts sorting
+.  | in assembly does not apply to it -- and it saved 166 bytes of runtime
+.  | for every program ever compiled.
+.

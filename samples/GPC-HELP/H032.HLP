@@ -1,0 +1,99 @@
+@3. The modules
+.
+=3. THE MODULES
+.
+.Each table is in (set before the GOSUB), out (read after it), and internal
+.(do not read, do not write, do not rely on).
+.
+=THEME.INC.BL
+.
+.  in
+.      THEME.DARK -- 0 light, non-zero dark, read by THEME.LOAD<br>THEME.ATTR
+.        -- a packed attribute, for THEME.SET and THEME.HI
+.
+.  out
+.      THEME.CLR(role) -- the colour array, DIMmed to
+.        THEME.SLOTS<br>THEME.INV -- the inverse attribute, from THEME.HI
+.
+.  internal
+.      THEME.READY
+.
+.  constants
+.      THEME.PAGE THEME.TEXT THEME.TITLE THEME.BORDER THEME.HILITE
+.        THEME.DIMMED THEME.WARN THEME.SLOTS
+.
+.THEME.CLR is the array this module DIMs. Do not DIM it yourself -- the
+.module owns it, and DIMming an array GPC has already dimensioned is an
+.error.
+.
+=APPSYS.INC.BL
+.
+.  in
+.      APPSYS.FILE$ APPSYS.BANK APPSYS.X APPSYS.Y APPSYS.W APPSYS.H
+.        APPSYS.DEV -- the panel routines
+.
+.  out
+.      APPSYS.MODE APPSYS.COLS APPSYS.ROWS APPSYS.COLOUR -- set by
+.        APPSYS.STARTUP
+.
+.  internal
+.      APPSYS.LAST
+.
+.  constants
+.      APPSYS.SCRMODE APPSYS.COLREG APPSYS.WINDOW APPSYS.HEADER
+.
+.APPSYS.COLS and APPSYS.ROWS are the ones to lay your screen out from. Do not
+.assume 80x60 -- the X16 boots there but SCREEN 0 is 40x30, and someone who
+.prefers larger text is running one.
+.
+=STRINGS.INC.BL
+.
+.  in
+.      STR.STR$ -- the string, in and out<br>STR.WIDTH -- field width, the
+.        pad routines<br>STR.DELIM$ STR.MAX -- SPLIT (MAX 0 means
+.        10)<br>STR.FIND$ STR.REPL$ -- REPLACE<br>STR.PET -- a PETSCII code,
+.        PET2SCR
+.
+.  out
+.      STR.STR$ -- padded, or replaced, in place<br>STR.N -- how many fields
+.        SPLIT found, always >= 1<br>STR.FIELD$(1..N) -- the fields
+.        themselves<br>STR.SCR -- the screen code from PET2SCR
+.
+.  internal
+.      STR.GAP STR.HALF STR.REST$ STR.AT STR.LIM STR.OUT$
+.
+.STR.FIELD$ is the one array the library deliberately does NOT DIM. Left
+.alone, GPC's implicit DIM gives you 0..10. If you want more, DIM it yourself
+.before the first call and set STR.MAX to match -- DIMming an array GPC has
+.already auto-dimensioned is an error, so it is one or the other. This is the
+.opposite of THEME.CLR, which the module owns outright; the two are worth
+.keeping straight.
+.
+=LINEINPUT.INC.BL
+.
+.  in
+.      LINEINPUT.X LINEINPUT.Y -- top left of the field<br>LINEINPUT.LEN --
+.        how many characters fit<br>LINEINPUT.ATTR -- packed
+.        attribute<br>LINEINPUT.TEXT$ -- the starting value<br>LINEINPUT.MASK
+.        -- non-zero shows asterisks<br>LINEINPUT.LABEL$ -- LINEINPUT.ASK
+.        only
+.
+.  out
+.      LINEINPUT.TEXT$ -- what was typed<br>LINEINPUT.KEY -- the key that
+.        ended it
+.
+.  internal
+.      LINEINPUT.SHOW$ LINEINPUT.WAS$ LINEINPUT.K$ LINEINPUT.CELL$
+.        LINEINPUT.CODE LINEINPUT.CX LINEINPUT.CA LINEINPUT.INV LINEINPUT.LIT
+.        LINEINPUT.TICK LINEINPUT.DONE LINEINPUT.FILLED LINEINPUT.HOME
+.        LINEINPUT.BAR
+.
+.  constants
+.      LINEINPUT.RETURN LINEINPUT.DELETE LINEINPUT.ESCAPE LINEINPUT.STOP
+.        LINEINPUT.DOWN LINEINPUT.UP LINEINPUT.TAB LINEINPUT.SPACE
+.        LINEINPUT.STAR LINEINPUT.BLINK
+.
+.LINEINPUT.SHOW$ is listed internal but is the one exception worth knowing:
+.it holds what the field displayed, which is what you want if you are
+.repainting a masked field yourself. FORM.EXP.BL uses it for exactly that.
+.

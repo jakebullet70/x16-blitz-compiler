@@ -1,0 +1,54 @@
+@1. The prefixes that are taken
+.
+=1. THE PREFIXES THAT ARE TAKEN
+.
+.  GP.
+.      OWNER: GPB.INC.BL
+.      WHAT IT IS: keywords, not variables -- see SEC 2, this one is
+.        different
+.
+.  STR.
+.      OWNER: STRINGS.INC.BL
+.      WHAT IT IS: string helpers
+.
+.  THEME.
+.      OWNER: THEME.INC.BL
+.      WHAT IT IS: colour roles
+.
+.  APPSYS.
+.      OWNER: APPSYS.INC.BL
+.      WHAT IT IS: screen save/restore, panels to disk
+.
+.  LINEINPUT.
+.      OWNER: LINEINPUT.INC.BL
+.      WHAT IT IS: entry fields
+.
+.  MENUVERT.
+.      OWNER: MENUVERT.INC.BL
+.      WHAT IT IS: vertical menus
+.
+.  BMX.
+.      OWNER: BMX.INC.BL
+.      WHAT IT IS: BMX bitmap loading
+.
+.  BMXK.
+.      OWNER: BMX.INC.BL
+.      WHAT IT IS: its KERNAL/VERA constants, kept apart from its variables
+.
+.Pick anything else for your own program. AIRLIFT., GAME., MAP. -- a prefix
+.costs nothing at runtime because BASLOAD crunches every identifier down to a
+.short BASIC variable, so a long readable name and a two-letter one compile
+.to exactly the same thing.
+.
+.Do not reuse a taken prefix even for something the module has not defined.
+.THEME.MINE looks free today; it is one library update away from not being.
+.
+=SEE ALSO
+.
+>3|2. Using it
+>29|4.2 STRINGS.INC.BL -- string helpers
+>28|4.1 THEME.INC.BL -- named colour roles
+>30|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>31|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>33|4.6 MENUVERT.INC.BL -- a vertical menu
+>32|4.5 BMX.INC.BL -- a BMX bitmap into VERA

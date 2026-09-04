@@ -1,0 +1,928 @@
+#SAVEAS "@:HELP.SRC.PRG"
+#SYMFILE "@:HELP.SRC.SYM"
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "THEME.INC.BL"
+#INCLUDE "STASH.INC.BL"
+#INCLUDE "STRCASE.INC.BL"
+#INCLUDE "APPSYS.INC.BL"
+#INCLUDE "MENUVERT.INC.BL"
+#INCLUDE "LINEINPUT.INC.BL"
+#INCLUDE "GUI.INC.BL"
+
+## ============================================================================
+## HELP.BASL -- GPC-HELP, the GP.BASIC and BASL reference, on the machine.
+##
+## ONE MASTER INDEX, loaded at startup and never read again, and one .HLP file
+## per topic that it opens into. HELP.IDX carries a row per entry -- category
+## header, topic, or a section inside one -- and MKHELP.PY builds all of it
+## from GPC-BASIC/. Nothing here parses markdown, measures a string or wraps a
+## line: that happened on the host once instead of on the X16 every time.
+##
+## THE SCREEN IS THE PAGE BUFFER, and that is the whole memory design. A topic
+## is read straight from its file to the screen and NOT kept, so the only
+## thing resident is the index. Blitz's string heap costs about 1.67 bytes a
+## character -- measured -- and a program carrying this much of the GUI library
+## has around 9 KB of workspace left, so holding a topic as well as the index
+## does not fit. Scrolling therefore re-reads, which costs an OPEN and 27
+## lines: 4 jiffies, measured.
+##
+## ONE FILE PER TOPIC IS WHY THAT IS AFFORDABLE. Packed into five category
+## files a topic was reached by skipping lines, and skipping to line 1000 of a
+## 41 KB file cost 204 jiffies -- 3.4 seconds to turn a page, growing with
+## depth. There is now nothing to skip.
+##
+## THE .HLP LINE FORMAT is a marker character and then the text:
+##      @  the topic record. Line 1 of the file, and its title
+##      =  a section header -- drawn as a full width bar, and the one piece
+##         of highlighting the X16 side has
+##      .  ordinary text, already wrapped
+##      :  code. Dimmed, and this is what "export" writes out
+##      >  a cross reference, ">index row|text"
+##
+## CP437, AND THAT IS THE WHOLE CHARSET STORY. A page of prose in upper case is
+## a page nobody reads, so this wants both cases; a dialog wants a frame. Only
+## one stock charset gives both without work:
+##
+##   PET upper/graphics   the machine's default. Frames, no lower case
+##   PET upper/lower      both cases and frames, but a byte is not its own
+##                        tile index, so every literal comes out case-swapped
+##                        unless the font is re-indexed first -- which is what
+##                        samples/editor does, and it buries the frame glyphs
+##   ISO-8859-15          ASCII order, so both cases free. No line drawing at
+##                        all, so frames fall back to + - |
+##   CP437                ASCII in the low half AND line drawing in the high.
+##
+## So: charset 7, bit 6 of $0372 set so GP.PRINTAT does not translate, and
+## GP.BOX handed the CP437 code points. No font re-ordering anywhere.
+##
+## Labels and variables are both HELP.*: BASL files them in one symbol table,
+## and a label that collides with a variable is DUPLICATE SYMBOL.
+##
+## NO #AUTONUM. With STRCASE.INC.BL included it resolves label targets against
+## the wrong step and the compile stops with UNKNOWN LINE NUMBER.
+## ============================================================================
+
+## HELP.IDX is 89 rows today. The headroom is for the library growing, and
+## running out is not a crash: the rows past the end are dropped. Every row
+## costs its own text on the heap, so this is a memory number, not a limit.
+#DEFINE HELP.MAXIX 160
+
+## Cross references in one topic, and the deepest chain of them ESC can walk
+## back along. Twelve is what MKHELP.PY emits at most.
+#DEFINE HELP.MAXPICK 24
+#DEFINE HELP.MAXBACK 12
+
+## A spare RAM bank for the cells a dialog covers. Bank 0 is the KERNAL's --
+## the keyboard layout lives there -- so anything above it will do.
+#DEFINE HELP.BANK 8
+
+## And a SECOND one, for sliding the text region a row instead of repainting
+## it -- see HELP.PAGE.SHIFT. It cannot be HELP.BANK: that is GUI.BANK, and a
+## dialog open over the page is holding the cells underneath it in there.
+#DEFINE HELP.SBANK 9
+
+#DEFINE HELP.CHAN 2
+
+## 80x30 text. Mode $00 is 80x60 and $01 is 80x30; APPSYS.STARTUP remembers
+## whichever the user had and APPSYS.RESTORE puts it back on the way out.
+#DEFINE HELP.MODE 1
+
+## CP437, the IBM PC set, charset 7 -- ROM R47 and later. It is the only one
+## that gives BOTH halves of what a reference viewer wants: $20-$7E is ASCII
+## exactly, so mixed case needs no conversion and no re-ordered font, and the
+## high half carries real line drawing, which ISO-8859-15 has none of.
+#DEFINE HELP.CHARSET 7
+
+## The KERNAL's charset register. Bit 6 says "the text is ASCII", and it is the
+## bit GP.PRINTAT reads per character to decide whether to translate PETSCII.
+## Setting it is TRUE here, which is what makes this legitimate rather than a
+## trick: CP437's low half really is ASCII.
+##
+## POKED, NOT PRINT CHR$(15). That control code sets the same bit but also
+## uploads the ISO font, which would throw the line drawing away.
+#DEFINE HELP.CHRREG 882
+#DEFINE HELP.ASCIIBIT 64
+
+## The single line box, as CP437 code points. GP.BOX writes its glyphs to VERA
+## as tile indices without converting, and in CP437 a tile index is the code
+## point -- so these arrive as themselves.
+#DEFINE HELP.GL.H 196
+#DEFINE HELP.GL.V 179
+#DEFINE HELP.GL.TL 218
+#DEFINE HELP.GL.TR 191
+#DEFINE HELP.GL.BL 192
+#DEFINE HELP.GL.BR 217
+
+## TWO BUILD MODES, ONE FLAT SYMBOL. Defined, the self-check does not compile
+## at all -- a BASL module has no dead code elimination, so a harness left in
+## is p-code every user carries. Comment this line out to build the headless
+## check instead of the viewer; samples/GPC-HELP/readme.md has the recipe.
+#DEFINE HELP.RELEASE 1
+
+## 145 up, 17 down, 130 PgUp, 2 PgDn, 19 HOME, 4 END. samples/editor
+## dispatches on exactly these, so they are tested rather than guessed.
+#DEFINE HELP.K.UP 145
+#DEFINE HELP.K.DOWN 17
+#DEFINE HELP.K.PGUP 130
+#DEFINE HELP.K.PGDN 2
+#DEFINE HELP.K.HOME 19
+#DEFINE HELP.K.END 4
+
+GOSUB HELP.BOOT
+GP.IF HELP.OK = 0 THEN
+    GOSUB APPSYS.RESTORE
+    PRINT
+    PRINT "GPC-HELP: HELP.IDX WOULD NOT LOAD."
+    PRINT "RUN MKHELP.PY AND PUT HELP.IDX AND THE"
+    PRINT ".HLP FILES BESIDE HELP.PRG."
+    END
+GP.ENDIF
+
+#IFNDEF HELP.RELEASE
+GOSUB HELP.SELFCHECK
+GOSUB APPSYS.RESTORE
+END
+#ENDIF
+
+GOSUB HELP.INDEX
+GOSUB APPSYS.RESTORE
+PRINT
+PRINT "GPC-HELP."
+END
+
+
+## ============================================================================
+## HELP.BOOT -- the screen as we want it, the arrays, and the index
+## ============================================================================
+
+HELP.BOOT:
+    ## FIRST, before any SCREEN of our own: it records the state as it finds it.
+    GOSUB APPSYS.STARTUP
+    SCREEN HELP.MODE
+
+    ## Asked, not assumed -- and asked AFTER the mode change, because
+    ## APPSYS.STARTUP reported the size of the screen the user had.
+    GOSUB GUI.SCREEN
+    HELP.COLS = GUI.SCREEN.COLS : HELP.ROWS = GUI.SCREEN.ROWS
+
+    ## Row 0 is the title, the last row the hint, and the one above it is left
+    ## blank so the text never runs into either.
+    HELP.VIEW = HELP.ROWS - 3
+    IF HELP.VIEW < 4 THEN HELP.VIEW = 4
+
+    THEME.DARK = 1 : GOSUB THEME.LOAD
+
+    ## THE TWO BARS ARE REVERSED. THEME.HI trades an attribute's nibbles, which
+    ## is what turns white-on-black text into a black-on-white BAR -- the same
+    ## thing the buttons in GUI.INC.BL do to the panel colour. Worked out once
+    ## here rather than per draw: they are painted on every page turn.
+    THEME.ATTR = THEME.CLR(THEME.TITLE)  : GOSUB THEME.HI : HELP.BAR.TOP = THEME.INV
+    THEME.ATTR = THEME.CLR(THEME.DIMMED) : GOSUB THEME.HI : HELP.BAR.BOT = THEME.INV
+
+    ## CP437, then declare that the text is ASCII. The order matters:
+    ## screen_set_charset does NOT clear bit 6, so the charset goes first and
+    ## the bit after, and APPSYS.RESTORE hands the whole $0372 byte back.
+    GP.CALL APPSYS.SETCHR, HELP.CHARSET, 0, 0, 0
+    POKE HELP.CHRREG, PEEK(HELP.CHRREG) OR HELP.ASCIIBIT
+
+    ## GP.BOX's four built-in styles are PETSCII screen codes and would draw
+    ## letters here, so the frame is named outright. Nothing has to be rescued
+    ## or re-indexed first -- CP437 already has these glyphs where it has them.
+    GUI.GLYPH = 1
+    GUI.EDGE.H = HELP.GL.H : GUI.EDGE.V = HELP.GL.V
+    GUI.CORNER.TL = HELP.GL.TL : GUI.CORNER.TR = HELP.GL.TR
+    GUI.CORNER.BL = HELP.GL.BL : GUI.CORNER.BR = HELP.GL.BR
+    GUI.BANK = HELP.BANK
+
+    DIM HELP.IX.TEXT$(HELP.MAXIX)
+    DIM HELP.IX.TYPE%(HELP.MAXIX)
+    DIM HELP.IX.TOPIC%(HELP.MAXIX)
+    DIM HELP.IX.SEC%(HELP.MAXIX)
+    DIM HELP.IX.LINES%(HELP.MAXIX)
+    DIM HELP.PICK%(HELP.MAXPICK)
+    DIM HELP.BACK.GO%(HELP.MAXBACK)
+    DIM HELP.BACK.AT%(HELP.MAXBACK)
+    DIM HELP.FLD$(6)
+
+    ## GUI.MENU draws MENUVERT.ITEM$, and the caller owns the DIM because a
+    ## module cannot be handed an array.
+    DIM MENUVERT.ITEM$(HELP.MAXPICK)
+
+    HELP.FIND$ = ""
+    GOSUB HELP.IDXLOAD
+    RETURN
+
+
+## ============================================================================
+## HELP.IDX -- the master index, read once
+## ============================================================================
+
+HELP.IDXLOAD:
+    HELP.OK = 0 : HELP.IX.N = 0
+    OPEN HELP.CHAN, 8, HELP.CHAN, "HELP.IDX,S,R"
+HELP.IDXLOAD.LOOP:
+    LINPUT# HELP.CHAN, HELP.LINE$, 10 : HELP.ST = ST
+    ## BIT 1 OF ST IS A READ ERROR. An OPEN that found no file still opens, and
+    ## every LINPUT# then hands back CHR$(0) with ST = 66, for ever. Clean EOF
+    ## is 64, so bit 1 alone tells "no such file" from "that was the last line".
+    IF (HELP.ST AND 2) <> 0 THEN GOTO HELP.IDXLOAD.DONE
+    GOSUB HELP.STRIP
+    GOSUB HELP.IDXROW
+    ## ONLY BIT 6 ENDS A READ, not "ST is not zero". Once a write channel has
+    ## been opened and closed on this device a good read comes back with ST =
+    ## 128 and the line intact -- measured, and it cost a page that drew its
+    ## title and nothing else. Bit 1 is the error, bit 6 the end; bit 7 is
+    ## neither and must be ignored.
+    IF (HELP.ST AND 64) = 0 THEN GOTO HELP.IDXLOAD.LOOP
+HELP.IDXLOAD.DONE:
+    CLOSE HELP.CHAN
+    IF HELP.IX.N > 0 THEN HELP.OK = 1
+    RETURN
+
+## The files are written with LF and the viewer never cares which ending it
+## meets: read to the LF, drop a CR if one came with it.
+HELP.STRIP:
+    IF LEN(HELP.LINE$) = 0 THEN RETURN
+    IF RIGHT$(HELP.LINE$, 1) = CHR$(13) THEN HELP.LINE$ = LEFT$(HELP.LINE$, LEN(HELP.LINE$) - 1)
+    RETURN
+
+## HELP.LINE$ -> HELP.FLD$(1..5). The fifth field takes everything left,
+## because a title is free to contain the separator and a row is not.
+HELP.SPLIT:
+    HELP.REST$ = HELP.LINE$
+    FOR HELP.FI = 1 TO 4
+        HELP.CUT = GP.INSTR(HELP.REST$, "|")
+        GP.IF HELP.CUT = 0 THEN
+            HELP.FLD$(HELP.FI) = HELP.REST$
+            HELP.REST$ = ""
+        GP.ELSE
+            HELP.FLD$(HELP.FI) = LEFT$(HELP.REST$, HELP.CUT - 1)
+            HELP.REST$ = MID$(HELP.REST$, HELP.CUT + 1)
+        GP.ENDIF
+    NEXT HELP.FI
+    HELP.FLD$(5) = HELP.REST$
+    RETURN
+
+HELP.IDXROW:
+    IF LEN(HELP.LINE$) < 3 THEN RETURN
+    HELP.TAG$ = LEFT$(HELP.LINE$, 1)
+    IF HELP.TAG$ = "#" THEN RETURN
+    IF HELP.TAG$ = "N" THEN RETURN
+    IF HELP.IX.N >= HELP.MAXIX THEN RETURN
+    GOSUB HELP.SPLIT
+    HELP.IX.N = HELP.IX.N + 1
+    HELP.KIND = 0
+    IF HELP.TAG$ = "T" THEN HELP.KIND = 1
+    IF HELP.TAG$ = "S" THEN HELP.KIND = 2
+    HELP.IX.TYPE%(HELP.IX.N) = HELP.KIND
+    HELP.IX.TOPIC%(HELP.IX.N) = VAL(HELP.FLD$(2))
+    HELP.IX.SEC%(HELP.IX.N) = VAL(HELP.FLD$(3))
+    HELP.IX.LINES%(HELP.IX.N) = VAL(HELP.FLD$(4))
+    HELP.IX.TEXT$(HELP.IX.N) = HELP.FLD$(5)
+    RETURN
+
+## Topic 7 is H007.HLP. The number is what the index carries, so no row has to
+## hold a file NAME -- sixty more strings on a heap that has none spare.
+HELP.FILENAME:
+    HELP.NUMV = HELP.TOPICNUM : GOSUB HELP.NUMSTR
+    HELP.NAME$ = "H" + RIGHT$("000" + HELP.NUM$, 3) + ".HLP"
+    RETURN
+
+
+## ============================================================================
+## The master index page
+## ============================================================================
+
+HELP.INDEX:
+    HELP.IX.SEL = 1
+HELP.INDEX.FIRST:
+    ## Row 1 is a category header, and a header is not a destination.
+    IF HELP.IX.TYPE%(HELP.IX.SEL) = 0 THEN HELP.IX.SEL = HELP.IX.SEL + 1 : GOTO HELP.INDEX.FIRST
+    HELP.IX.TOP = 1
+    HELP.FULL = 1
+
+HELP.INDEX.LOOP:
+    GP.IF HELP.FULL <> 0 THEN
+        GOSUB HELP.INDEX.DRAW
+        HELP.FULL = 0
+    GP.ENDIF
+    GOSUB HELP.INDEX.STATUS
+
+    HELP.SEL.WAS = HELP.IX.SEL : HELP.TOP.WAS = HELP.IX.TOP
+    HELP.DONE = 0
+    GOSUB HELP.GETKEY
+
+    GP.SELECT HELP.KEY
+        GP.CASE HELP.K.UP
+            HELP.DIR = -1 : GOSUB HELP.IX.STEP
+        GP.CASE HELP.K.DOWN
+            HELP.DIR = 1 : GOSUB HELP.IX.STEP
+        GP.CASE HELP.K.PGUP
+            HELP.DIR = -1 : GOSUB HELP.IX.PAGE
+        GP.CASE HELP.K.PGDN
+            HELP.DIR = 1 : GOSUB HELP.IX.PAGE
+        GP.CASE HELP.K.HOME
+            HELP.IX.SEL = 1 : HELP.DIR = 1 : GOSUB HELP.IX.SNAP
+        GP.CASE HELP.K.END
+            HELP.IX.SEL = HELP.IX.N : HELP.DIR = -1 : GOSUB HELP.IX.SNAP
+        GP.CASE 47, 70, 102
+            GOSUB HELP.FIND.ASK
+        GP.CASE 78, 110
+            GOSUB HELP.FIND.NEXT
+        GP.CASE 63, 72, 104
+            GOSUB HELP.ABOUT
+        GP.CASE GUI.RETURN
+            GOSUB HELP.OPEN.SEL
+        GP.CASE GUI.ESCAPE, GUI.STOP
+            GOSUB HELP.ASKQUIT
+    GP.ENDSEL
+
+    IF HELP.DONE <> 0 THEN RETURN
+    GOSUB HELP.IX.SHOW
+    ## A scroll repaints the page; a move inside it repaints TWO rows. That is
+    ## the only reason the highlight is not simply redrawn everywhere.
+    GP.IF HELP.IX.TOP <> HELP.TOP.WAS THEN
+        HELP.FULL = 1
+    GP.ELSE
+        HELP.ROWI = HELP.SEL.WAS : GOSUB HELP.INDEX.ROW
+        HELP.ROWI = HELP.IX.SEL : GOSUB HELP.INDEX.ROW
+    GP.ENDIF
+    GOTO HELP.INDEX.LOOP
+
+HELP.INDEX.DRAW:
+    GP.FILL 0, 0, HELP.COLS, HELP.ROWS, 32, THEME.CLR(THEME.PAGE)
+    HELP.TITLE$ = "GPC-HELP    GP.BASIC and BASL, built from the library"
+    GOSUB HELP.TITLEBAR
+    FOR HELP.R = 0 TO HELP.VIEW - 1
+        HELP.ROWI = HELP.IX.TOP + HELP.R
+        GOSUB HELP.INDEX.ROW
+    NEXT HELP.R
+    RETURN
+
+HELP.INDEX.ROW:
+    IF HELP.ROWI < HELP.IX.TOP THEN RETURN
+    IF HELP.ROWI > HELP.IX.TOP + HELP.VIEW - 1 THEN RETURN
+    IF HELP.ROWI > HELP.IX.N THEN RETURN
+    HELP.Y = 1 + HELP.ROWI - HELP.IX.TOP
+    HELP.ATTR = THEME.CLR(THEME.TEXT)
+    IF HELP.IX.TYPE%(HELP.ROWI) = 0 THEN HELP.ATTR = THEME.CLR(THEME.TITLE)
+    IF HELP.IX.TYPE%(HELP.ROWI) = 2 THEN HELP.ATTR = THEME.CLR(THEME.DIMMED)
+    IF HELP.ROWI = HELP.IX.SEL THEN HELP.ATTR = THEME.CLR(THEME.HILITE)
+    GP.FILL 0, HELP.Y, HELP.COLS, 1, 32, HELP.ATTR
+    GP.PRINTAT 1, HELP.Y, HELP.IX.TEXT$(HELP.ROWI), HELP.ATTR
+    RETURN
+
+HELP.INDEX.STATUS:
+    HELP.HINT$ = "ENTER open   / find   N next   ? about   ESC quit"
+    HELP.NUMV = HELP.IX.SEL : GOSUB HELP.NUMSTR
+    HELP.NOTE$ = HELP.NUM$
+    HELP.NUMV = HELP.IX.N : GOSUB HELP.NUMSTR
+    HELP.NOTE$ = HELP.NOTE$ + " of " + HELP.NUM$
+    GOSUB HELP.STATUSBAR
+    RETURN
+
+## One selectable entry in HELP.DIR, stopping at either end.
+HELP.IX.STEP:
+    HELP.J = HELP.IX.SEL + HELP.DIR
+HELP.IX.STEP.SCAN:
+    IF HELP.J < 1 THEN RETURN
+    IF HELP.J > HELP.IX.N THEN RETURN
+    IF HELP.IX.TYPE%(HELP.J) = 0 THEN HELP.J = HELP.J + HELP.DIR : GOTO HELP.IX.STEP.SCAN
+    HELP.IX.SEL = HELP.J
+    RETURN
+
+HELP.IX.PAGE:
+    HELP.J = HELP.IX.SEL + HELP.DIR * (HELP.VIEW - 1)
+    IF HELP.J < 1 THEN HELP.J = 1
+    IF HELP.J > HELP.IX.N THEN HELP.J = HELP.IX.N
+    HELP.IX.SEL = HELP.J
+    GOSUB HELP.IX.SNAP
+    RETURN
+
+## Land on something selectable: try HELP.DIR first, then turn round once.
+HELP.IX.SNAP:
+    HELP.TURNED = 0
+    HELP.J = HELP.IX.SEL
+HELP.IX.SNAP.SCAN:
+    IF HELP.J < 1 THEN GOTO HELP.IX.SNAP.TURN
+    IF HELP.J > HELP.IX.N THEN GOTO HELP.IX.SNAP.TURN
+    IF HELP.IX.TYPE%(HELP.J) <> 0 THEN HELP.IX.SEL = HELP.J : RETURN
+    HELP.J = HELP.J + HELP.DIR
+    GOTO HELP.IX.SNAP.SCAN
+HELP.IX.SNAP.TURN:
+    IF HELP.TURNED <> 0 THEN RETURN
+    HELP.TURNED = 1
+    HELP.DIR = 0 - HELP.DIR
+    HELP.J = HELP.IX.SEL + HELP.DIR
+    GOTO HELP.IX.SNAP.SCAN
+
+HELP.IX.SHOW:
+    IF HELP.IX.SEL < HELP.IX.TOP THEN HELP.IX.TOP = HELP.IX.SEL
+    IF HELP.IX.SEL > HELP.IX.TOP + HELP.VIEW - 1 THEN HELP.IX.TOP = HELP.IX.SEL - HELP.VIEW + 1
+    ## Do not scroll a category heading off the top when the row under it is
+    ## what is selected: the heading is how you know where you are.
+    GP.IF HELP.IX.SEL > 1 AND HELP.IX.TOP = HELP.IX.SEL THEN
+        IF HELP.IX.TYPE%(HELP.IX.SEL - 1) = 0 THEN HELP.IX.TOP = HELP.IX.SEL - 1
+    GP.ENDIF
+    IF HELP.IX.TOP > HELP.IX.N - HELP.VIEW + 1 THEN HELP.IX.TOP = HELP.IX.N - HELP.VIEW + 1
+    IF HELP.IX.TOP < 1 THEN HELP.IX.TOP = 1
+    RETURN
+
+
+## ============================================================================
+## The reader
+## ============================================================================
+
+HELP.OPEN.SEL:
+    HELP.GO = HELP.IX.SEL
+    HELP.BACK.N = 0
+    GOSUB HELP.START.AT
+    GOSUB HELP.TOPIC
+    HELP.FULL = 1
+    RETURN
+
+## Where a row opens its topic. A section row starts on its own header; a
+## topic row starts at the top.
+HELP.START.AT:
+    HELP.PG.FROM = 0
+    IF HELP.IX.SEC%(HELP.GO) > 1 THEN HELP.PG.FROM = HELP.IX.SEC%(HELP.GO) - 1
+    GOSUB HELP.PG.CLAMP
+    RETURN
+
+HELP.PG.CLAMP:
+    HELP.PG.MAX = HELP.IX.LINES%(HELP.GO) - HELP.VIEW
+    IF HELP.PG.FROM > HELP.PG.MAX THEN HELP.PG.FROM = HELP.PG.MAX
+    IF HELP.PG.FROM < 0 THEN HELP.PG.FROM = 0
+    RETURN
+
+## HELP.TOPIC -- show index row HELP.GO, and every row a cross reference in it
+## leads to, until ESC has walked all the way back out.
+##
+## FLAT, NOT NESTED. Following a link is HELP.NAV = 1 and re-entering at the
+## top, so the depth lives in HELP.BACK.* and not on the GOSUB stack -- which
+## also means a chain of links cannot run the frame stack out.
+HELP.TOPIC:
+HELP.TOPIC.ENTER:
+    HELP.REDRAW = 1 : HELP.SHIFT = 0
+HELP.PAGE.LOOP:
+    GP.IF HELP.REDRAW <> 0 THEN
+        GOSUB HELP.PAGE.DRAW
+        HELP.REDRAW = 0
+    GP.ENDIF
+    IF HELP.PG.LINES = 0 THEN RETURN
+    GOSUB HELP.PAGE.STATUS
+
+    HELP.FROM.WAS = HELP.PG.FROM
+    HELP.NAV = 0
+    GOSUB HELP.GETKEY
+
+    GP.SELECT HELP.KEY
+        GP.CASE HELP.K.UP
+            HELP.PG.FROM = HELP.PG.FROM - 1
+        GP.CASE HELP.K.DOWN
+            HELP.PG.FROM = HELP.PG.FROM + 1
+        GP.CASE HELP.K.PGUP
+            HELP.PG.FROM = HELP.PG.FROM - HELP.VIEW + 1
+        GP.CASE HELP.K.PGDN, GUI.SPACE
+            HELP.PG.FROM = HELP.PG.FROM + HELP.VIEW - 1
+        GP.CASE HELP.K.HOME
+            HELP.PG.FROM = 0
+        GP.CASE HELP.K.END
+            HELP.PG.FROM = HELP.IX.LINES%(HELP.GO)
+        GP.CASE 76, 108, GUI.RETURN
+            GOSUB HELP.LINKS
+        GP.CASE 88, 120
+            GOSUB HELP.EXPORT
+        GP.CASE GUI.ESCAPE, GUI.STOP
+            GOSUB HELP.BACK.POP
+    GP.ENDSEL
+
+    IF HELP.NAV = 2 THEN RETURN
+    IF HELP.NAV = 1 THEN GOTO HELP.TOPIC.ENTER
+    GOSUB HELP.PG.CLAMP
+    ## A ONE LINE MOVE SLIDES THE TEXT and paints the single row that is new.
+    ## The clamp runs BEFORE this on purpose: a PgDn that lands one line short
+    ## of the bottom arrives here as a delta of 1 and takes the fast path too.
+    HELP.SHIFT = 0 : HELP.DELTA = HELP.PG.FROM - HELP.FROM.WAS
+    IF HELP.DELTA = 1 THEN HELP.SHIFT = 1
+    IF HELP.DELTA = 0 - 1 THEN HELP.SHIFT = 0 - 1
+    IF HELP.DELTA <> 0 THEN HELP.REDRAW = 1
+    GOTO HELP.PAGE.LOOP
+
+## Read the topic straight to the screen. Nothing is kept but the cross
+## references, which are twelve integers and twelve short strings, and which
+## have to be collected on this pass because there is no other one.
+HELP.PAGE.DRAW:
+    HELP.PG.LINES = 0 : HELP.LINKN = 0 : HELP.ATTOPIC = 0
+    HELP.TOPICNUM = HELP.IX.TOPIC%(HELP.GO)
+    IF HELP.TOPICNUM < 1 THEN RETURN
+    GOSUB HELP.FILENAME
+    HELP.ONLY = 0 - 1
+    GP.IF HELP.SHIFT <> 0 THEN
+        GOSUB HELP.PAGE.SHIFT
+    GP.ELSE
+        GP.FILL 0, 0, HELP.COLS, HELP.ROWS, 32, THEME.CLR(THEME.PAGE)
+    GP.ENDIF
+
+    OPEN HELP.CHAN, 8, HELP.CHAN, HELP.NAME$ + ",S,R"
+    LINPUT# HELP.CHAN, HELP.LINE$, 10 : HELP.ST = ST
+    IF (HELP.ST AND 2) <> 0 THEN GOTO HELP.PAGE.CLOSE
+    GOSUB HELP.STRIP
+    HELP.TITLE$ = HELP.IX.TEXT$(HELP.GO)
+    ## Line 1 being the topic's own record is what the addressing rests on, so
+    ## it is recorded rather than assumed -- the self-check asserts it.
+    IF LEFT$(HELP.LINE$, 1) = "@" THEN HELP.TITLE$ = MID$(HELP.LINE$, 2) : HELP.ATTOPIC = 1
+    GOSUB HELP.TITLEBAR
+    HELP.R = 0
+
+HELP.PAGE.READ:
+    ## The index says how long this topic is, so a file that never signals its
+    ## end cannot spin here. It is a guard, not the terminator -- reading FOUR
+    ## past the count leaves the self-check's length assertion still able to
+    ## fail, which is what would catch the index and the file disagreeing.
+    IF HELP.PG.LINES > HELP.IX.LINES%(HELP.GO) + 4 THEN GOTO HELP.PAGE.CLOSE
+    LINPUT# HELP.CHAN, HELP.LINE$, 10 : HELP.ST = ST
+    IF (HELP.ST AND 2) <> 0 THEN GOTO HELP.PAGE.CLOSE
+    GOSUB HELP.STRIP
+    HELP.PG.LINES = HELP.PG.LINES + 1
+    HELP.MARK$ = LEFT$(HELP.LINE$, 1)
+    HELP.BODY$ = MID$(HELP.LINE$, 2)
+    HELP.KIND = 0
+    IF HELP.MARK$ = "=" THEN HELP.KIND = 1
+    IF HELP.MARK$ = ":" THEN HELP.KIND = 2
+    IF HELP.MARK$ = ">" THEN GOSUB HELP.PAGE.REF
+    GP.IF HELP.PG.LINES > HELP.PG.FROM AND HELP.R < HELP.VIEW THEN
+        HELP.Y = 1 + HELP.R
+        ## HELP.ONLY < 0 is "all of them". Otherwise exactly one row is new and
+        ## the other 26 are already on the screen, slid into place.
+        IF HELP.ONLY < 0 THEN GOSUB HELP.PAGE.ROW
+        IF HELP.ONLY = HELP.R THEN GOSUB HELP.PAGE.ROW
+        HELP.R = HELP.R + 1
+    GP.ENDIF
+    ## Bit 6 is the end. The last line carries data AND the flag, so it is
+    ## drawn first and the loop leaves after it -- see the note in HELP.IDXLOAD
+    ## about why "ST <> 0" is the wrong test.
+    IF (HELP.ST AND 64) = 0 THEN GOTO HELP.PAGE.READ
+
+HELP.PAGE.CLOSE:
+    CLOSE HELP.CHAN
+    RETURN
+
+## Slide the text region one row, rather than repainting all of it.
+##
+## THE BARS ARE OUTSIDE THE RECTANGLE, so they do not move and do not have to
+## be put back: the window is screen rows 1..HELP.VIEW, the title is row 0 and
+## the status line is the last one. 26 of the 27 rows come back already in
+## place, and HELP.ONLY names the one the read pass may draw.
+##
+## What this removes is the whole-screen GP.FILL and 26 of the 27 GP.PRINTATs
+## -- and with them the blank-then-repaint that made a held down cursor key
+## flicker. STASH moves the cells in assembly, a row at a time.
+##
+## STASH REFUSES A RECTANGLE IT CANNOT FIT and says so in STASH.OK, so there is
+## a way back: the full repaint. Slower, never wrong.
+HELP.PAGE.SHIFT:
+    STASH.BANK = HELP.SBANK : STASH.X = 0
+    STASH.W = HELP.COLS : STASH.H = HELP.VIEW - 1
+    ## Scrolling DOWN the text moves UP: rows 2..VIEW are kept, and land at 1.
+    STASH.Y = 1 : IF HELP.SHIFT = 1 THEN STASH.Y = 2
+    GOSUB STASH.SAVE
+    GP.IF STASH.OK = 0 THEN
+        GP.FILL 0, 0, HELP.COLS, HELP.ROWS, 32, THEME.CLR(THEME.PAGE)
+        RETURN
+    GP.ENDIF
+    HELP.ONLY = 0 : STASH.Y = 2
+    GP.IF HELP.SHIFT = 1 THEN
+        HELP.ONLY = HELP.VIEW - 1 : STASH.Y = 1
+    GP.ENDIF
+    STASH.MOVE = 1 : GOSUB STASH.RESTORE : STASH.MOVE = 0
+    ## The row the slide exposed still holds its old text. HELP.PAGE.ROW paints
+    ## over a cleared row -- it does not clear one itself.
+    GP.FILL 0, 1 + HELP.ONLY, HELP.COLS, 1, 32, THEME.CLR(THEME.PAGE)
+    RETURN
+
+## A ">" line is "ordinal|text". The ordinal is a HELP.IDX row, resolved by
+## MKHELP.PY when it laid the index out, so following one costs no searching.
+HELP.PAGE.REF:
+    HELP.KIND = 3
+    HELP.CUT = GP.INSTR(HELP.BODY$, "|")
+    IF HELP.CUT = 0 THEN RETURN
+    HELP.TREF = VAL(LEFT$(HELP.BODY$, HELP.CUT - 1))
+    HELP.BODY$ = MID$(HELP.BODY$, HELP.CUT + 1)
+    IF HELP.TREF < 1 THEN RETURN
+    IF HELP.TREF > HELP.IX.N THEN RETURN
+    IF HELP.LINKN >= HELP.MAXPICK THEN RETURN
+    HELP.LINKN = HELP.LINKN + 1
+    HELP.PICK%(HELP.LINKN) = HELP.TREF
+    MENUVERT.ITEM$(HELP.LINKN) = HELP.BODY$
+    RETURN
+
+HELP.PAGE.ROW:
+    GP.IF HELP.KIND = 1 THEN
+        ## The one line of highlighting the X16 side has: a section header,
+        ## as a bar the width of the screen.
+        GP.FILL 0, HELP.Y, HELP.COLS, 1, 32, THEME.CLR(THEME.TITLE)
+        GP.PRINTAT 2, HELP.Y, HELP.BODY$, THEME.CLR(THEME.TITLE)
+        RETURN
+    GP.ENDIF
+    HELP.ATTR = THEME.CLR(THEME.TEXT)
+    IF HELP.KIND = 2 THEN HELP.ATTR = THEME.CLR(THEME.DIMMED)
+    HELP.OUT$ = HELP.BODY$
+    GP.IF HELP.KIND = 3 THEN
+        HELP.ATTR = THEME.CLR(THEME.WARN)
+        HELP.OUT$ = "-> " + HELP.OUT$
+    GP.ENDIF
+    IF HELP.OUT$ <> "" THEN GP.PRINTAT 2, HELP.Y, HELP.OUT$, HELP.ATTR
+    RETURN
+
+HELP.PAGE.STATUS:
+    HELP.HINT$ = "L links   X export code   ESC back"
+    IF HELP.LINKN = 0 THEN HELP.HINT$ = "X export code   ESC back"
+    HELP.NUMV = HELP.PG.FROM + 1 : GOSUB HELP.NUMSTR
+    HELP.NOTE$ = "line " + HELP.NUM$
+    HELP.NUMV = HELP.PG.LINES : GOSUB HELP.NUMSTR
+    HELP.NOTE$ = HELP.NOTE$ + " of " + HELP.NUM$
+    GOSUB HELP.STATUSBAR
+    RETURN
+
+
+## ============================================================================
+## Cross references, and the way back
+## ============================================================================
+
+HELP.LINKS:
+    IF HELP.LINKN = 0 THEN GOSUB HELP.NOLINKS : RETURN
+    GUI.TITLE$ = "SEE ALSO" : GUI.MSG$ = "Follow" : GUI.MSG2$ = ""
+    GUI.COUNT = HELP.LINKN : GUI.SEL = 1 : GUI.FLAGS = 0
+    GOSUB GUI.MENU
+    HELP.REDRAW = 1
+    IF GUI.SEL < 1 THEN RETURN
+    GOSUB HELP.BACK.PUSH
+    HELP.GO = HELP.PICK%(GUI.SEL)
+    HELP.PG.FROM = 0
+    HELP.NAV = 1
+    RETURN
+
+HELP.BACK.PUSH:
+    IF HELP.BACK.N >= HELP.MAXBACK THEN RETURN
+    HELP.BACK.N = HELP.BACK.N + 1
+    HELP.BACK.GO%(HELP.BACK.N) = HELP.GO
+    HELP.BACK.AT%(HELP.BACK.N) = HELP.PG.FROM
+    RETURN
+
+## ESC. One step back along the links that got here, and the index when there
+## are none left.
+HELP.BACK.POP:
+    IF HELP.BACK.N < 1 THEN HELP.NAV = 2 : RETURN
+    HELP.GO = HELP.BACK.GO%(HELP.BACK.N)
+    HELP.PG.FROM = HELP.BACK.AT%(HELP.BACK.N)
+    HELP.BACK.N = HELP.BACK.N - 1
+    HELP.NAV = 1
+    RETURN
+
+
+## ============================================================================
+## Export -- the code out of a topic, as something BASLOAD can read
+## ============================================================================
+
+HELP.EXPORT:
+    GUI.TITLE$ = "EXPORT" : GUI.MSG2$ = ""
+    GUI.MSG$ = "Write this topic's code to:"
+    GUI.INPUT$ = "EXAMPLE.BL" : GUI.LEN = 24 : GUI.MASK = 0
+    GOSUB GUI.TEXT
+    HELP.REDRAW = 1
+    IF GUI.OK = 0 THEN RETURN
+    HELP.OUTNAME$ = GUI.INPUT$
+    IF HELP.OUTNAME$ = "" THEN RETURN
+
+    ## Channel 2 reads the topic and channel 3 writes the export, so the topic
+    ## is re-read rather than remembered -- the same reason nothing else here
+    ## is remembered either.
+    ## "@:" replaces. The lines are ASCII already: they came off an ASCII file
+    ## and nothing here converted them, which is what BASLOAD reads.
+    HELP.TOPICNUM = HELP.IX.TOPIC%(HELP.GO) : GOSUB HELP.FILENAME
+    HELP.CNT = 0
+    OPEN 3, 8, 3, "@:" + HELP.OUTNAME$ + ",S,W"
+    PRINT# 3, "## " + HELP.TITLE$
+    PRINT# 3, "## exported by GPC-HELP from " + HELP.NAME$
+    PRINT# 3, ""
+    OPEN HELP.CHAN, 8, HELP.CHAN, HELP.NAME$ + ",S,R"
+HELP.EXPORT.LOOP:
+    LINPUT# HELP.CHAN, HELP.LINE$, 10 : HELP.ST = ST
+    IF (HELP.ST AND 2) <> 0 THEN GOTO HELP.EXPORT.DONE
+    GOSUB HELP.STRIP
+    IF LEFT$(HELP.LINE$, 1) = ":" THEN GOSUB HELP.EXPORT.WRITE
+    ## Bit 6 only -- and this loop is exactly where ST = 128 comes from, since
+    ## channel 3 is open for writing while channel 2 is being read.
+    IF (HELP.ST AND 64) = 0 THEN GOTO HELP.EXPORT.LOOP
+HELP.EXPORT.DONE:
+    CLOSE HELP.CHAN
+    CLOSE 3
+
+    HELP.NUMV = HELP.CNT : GOSUB HELP.NUMSTR
+    HELP.MSG.ONE$ = "Wrote " + HELP.NUM$ + " lines to " + HELP.OUTNAME$
+    HELP.MSG.TWO$ = "It is source, not a program: BASLOAD it."
+    IF HELP.CNT = 0 THEN HELP.MSG.TWO$ = "This topic had no code in it."
+    GOSUB HELP.SAY
+    RETURN
+
+HELP.EXPORT.WRITE:
+    HELP.CNT = HELP.CNT + 1
+    PRINT# 3, MID$(HELP.LINE$, 2)
+    RETURN
+
+
+## ============================================================================
+## Find, over the index that is already in memory
+## ============================================================================
+
+HELP.FIND.ASK:
+    GUI.TITLE$ = "FIND" : GUI.MSG2$ = ""
+    GUI.MSG$ = "Find in the index:"
+    GUI.INPUT$ = HELP.FIND$ : GUI.LEN = 30 : GUI.MASK = 0
+    GOSUB GUI.TEXT
+    HELP.FULL = 1
+    IF GUI.OK = 0 THEN RETURN
+    ## THE "" IS WHAT MAKES IT A COPY. Assigning one string variable to another
+    ## can hand over the same block, and STRCASE rewrites the bytes where they
+    ## lie -- so without the concatenation this would upper case GUI.INPUT$
+    ## itself, and the field would show it that way for ever after.
+    HELP.FIND$ = GUI.INPUT$ + ""
+    IF HELP.FIND$ = "" THEN RETURN
+    STRCASE.PTR = GP.STRPTR(HELP.FIND$) : STRCASE.MODE = STRCASE.UPPER
+    GOSUB STRCASE.GO
+    GOSUB HELP.FIND.RUN
+    RETURN
+
+HELP.FIND.NEXT:
+    IF HELP.FIND$ = "" THEN GOSUB HELP.FIND.ASK : RETURN
+    GOSUB HELP.FIND.RUN
+    RETURN
+
+## The first selectable entry AFTER the highlight that contains the needle,
+## wrapping once. Case is folded on a copy, for the reason above.
+HELP.FIND.RUN:
+    HELP.J = HELP.IX.SEL
+    HELP.TRIES = 0
+HELP.FIND.SCAN:
+    HELP.TRIES = HELP.TRIES + 1
+    IF HELP.TRIES > HELP.IX.N THEN GOTO HELP.FIND.MISS
+    HELP.J = HELP.J + 1
+    IF HELP.J > HELP.IX.N THEN HELP.J = 1
+    IF HELP.IX.TYPE%(HELP.J) = 0 THEN GOTO HELP.FIND.SCAN
+    HELP.HAY$ = HELP.IX.TEXT$(HELP.J) + ""
+    STRCASE.PTR = GP.STRPTR(HELP.HAY$) : STRCASE.MODE = STRCASE.UPPER
+    GOSUB STRCASE.GO
+    IF GP.INSTR(HELP.HAY$, HELP.FIND$) = 0 THEN GOTO HELP.FIND.SCAN
+    HELP.IX.SEL = HELP.J
+    GOSUB HELP.IX.SHOW
+    HELP.FULL = 1
+    RETURN
+HELP.FIND.MISS:
+    HELP.MSG.ONE$ = "Not found: " + HELP.FIND$
+    HELP.MSG.TWO$ = ""
+    GOSUB HELP.SAY
+    HELP.FULL = 1
+    RETURN
+
+
+## ============================================================================
+## Small dialogs, and the two bars
+## ============================================================================
+
+HELP.SAY:
+    GUI.TITLE$ = "GPC-HELP"
+    GUI.MSG$ = HELP.MSG.ONE$ : GUI.MSG2$ = HELP.MSG.TWO$
+    ## Sticky, like every input in this library: a GUI.SAY after something that
+    ## set a hint would inherit it.
+    GUI.HINT$ = ""
+    GOSUB GUI.SAY
+    RETURN
+
+HELP.NOLINKS:
+    HELP.MSG.ONE$ = "This topic has no cross references." : HELP.MSG.TWO$ = ""
+    GOSUB HELP.SAY
+    HELP.REDRAW = 1
+    RETURN
+
+HELP.ABOUT:
+    HELP.MSG.ONE$ = "GPC-HELP -- the GP.BASIC and BASL reference."
+    HELP.MSG.TWO$ = "Built from GPC-BASIC by MKHELP.PY. Written in GP.BASIC."
+    GOSUB HELP.SAY
+    HELP.FULL = 1
+    RETURN
+
+HELP.ASKQUIT:
+    GUI.TITLE$ = "GPC-HELP" : GUI.OKCANCEL = 0
+    GUI.MSG$ = "Leave the help viewer?" : GUI.MSG2$ = ""
+    GOSUB GUI.YN
+    HELP.DONE = 0
+    IF GUI.ANSWER = 1 THEN HELP.DONE = 1
+    HELP.FULL = 1
+    RETURN
+
+HELP.TITLEBAR:
+    GP.FILL 0, 0, HELP.COLS, 1, 32, HELP.BAR.TOP
+    GP.PRINTAT 1, 0, HELP.TITLE$, HELP.BAR.TOP
+    RETURN
+
+HELP.STATUSBAR:
+    GP.FILL 0, HELP.ROWS - 1, HELP.COLS, 1, 32, HELP.BAR.BOT
+    GP.PRINTAT 1, HELP.ROWS - 1, HELP.HINT$, HELP.BAR.BOT
+    IF HELP.NOTE$ <> "" THEN GP.PRINTAT HELP.COLS - LEN(HELP.NOTE$) - 1, HELP.ROWS - 1, HELP.NOTE$, HELP.BAR.BOT
+    RETURN
+
+## STR$ leads a positive number with a space, and a status bar is not the
+## place for it.
+HELP.NUMSTR:
+    HELP.NUM$ = STR$(HELP.NUMV)
+    IF LEFT$(HELP.NUM$, 1) = " " THEN HELP.NUM$ = MID$(HELP.NUM$, 2)
+    RETURN
+
+HELP.GETKEY:
+    HELP.KEY = 0
+HELP.GETKEY.WAIT:
+    GET HELP.IN$
+    IF HELP.IN$ = "" THEN GOTO HELP.GETKEY.WAIT
+    HELP.KEY = ASC(HELP.IN$)
+    RETURN
+
+
+## ============================================================================
+## THE HEADLESS SELF-CHECK. Not compiled unless HELP.RELEASE is commented out.
+##
+## It asserts the one thing that cannot be checked by looking: that every row
+## in HELP.IDX still reaches the topic MKHELP.PY meant it to. A row must open a
+## file whose line 1 is a topic record, and the line count in the index must be
+## the number of lines actually there -- get either wrong and the viewer shows
+## the wrong page rather than failing, which is the failure nobody notices.
+##
+## It opens EVERY topic, so a missing .HLP, a truncated one, or a cross
+## reference pointing at a row that is not a topic all come out as a number
+## here rather than as a blank page one day.
+## ============================================================================
+#IFNDEF HELP.RELEASE
+HELP.SELFCHECK:
+    PRINT "SELFCHECK START"
+    PRINT "INDEX ROWS"; HELP.IX.N
+
+    HELP.BAD = 0
+    FOR HELP.J = 1 TO HELP.IX.N
+        GP.IF HELP.IX.TYPE%(HELP.J) > 0 THEN
+            IF HELP.IX.TOPIC%(HELP.J) < 1 THEN HELP.BAD = HELP.BAD + 1
+            IF HELP.IX.LINES%(HELP.J) < 1 THEN HELP.BAD = HELP.BAD + 1
+        GP.ENDIF
+    NEXT HELP.J
+    PRINT "ROWS WITHOUT A TOPIC OR LENGTH"; HELP.BAD
+
+    HELP.OPENED = 0 : HELP.NOTAT = 0 : HELP.WRONGLEN = 0
+    HELP.LINES = 0 : HELP.REFS = 0 : HELP.SECBAD = 0
+    FOR HELP.J = 1 TO HELP.IX.N
+        GP.IF HELP.IX.TYPE%(HELP.J) > 0 THEN
+            HELP.GO = HELP.J : HELP.PG.FROM = 0
+            GOSUB HELP.PAGE.DRAW
+            IF HELP.ATTOPIC = 0 THEN HELP.NOTAT = HELP.NOTAT + 1
+            IF HELP.ATTOPIC = 0 THEN PRINT "NO TOPIC RECORD, ROW"; HELP.J
+            IF HELP.PG.LINES <> HELP.IX.LINES%(HELP.J) THEN HELP.WRONGLEN = HELP.WRONGLEN + 1
+            IF HELP.PG.LINES <> HELP.IX.LINES%(HELP.J) THEN PRINT "LENGTH DISAGREES, ROW"; HELP.J
+            IF HELP.IX.SEC%(HELP.J) > HELP.PG.LINES THEN HELP.SECBAD = HELP.SECBAD + 1
+            HELP.OPENED = HELP.OPENED + 1
+            HELP.LINES = HELP.LINES + HELP.PG.LINES
+            HELP.REFS = HELP.REFS + HELP.LINKN
+        GP.ENDIF
+    NEXT HELP.J
+    PRINT "ROWS OPENED"; HELP.OPENED
+    PRINT "ROWS WITH NO TOPIC RECORD"; HELP.NOTAT
+    PRINT "ROWS WHOSE LENGTH DISAGREES"; HELP.WRONGLEN
+    PRINT "SECTIONS PAST THE END"; HELP.SECBAD
+    PRINT "LINES READ"; HELP.LINES
+    PRINT "CROSS REFERENCES RESOLVED"; HELP.REFS
+
+    ## The search, over the index already in memory.
+    HELP.FIND$ = "strptr"
+    STRCASE.PTR = GP.STRPTR(HELP.FIND$) : STRCASE.MODE = STRCASE.UPPER
+    GOSUB STRCASE.GO
+    HELP.IX.SEL = 1
+    GOSUB HELP.FINDONLY
+    PRINT "FIND STRPTR LANDED ON ROW"; HELP.IX.SEL
+    PRINT "FRE AT THE END"; FRE(0)
+    PRINT "SELFCHECK DONE"
+    RETURN
+
+## The scan half of HELP.FIND.RUN, with no drawing and no dialog on a miss.
+HELP.FINDONLY:
+    HELP.J = HELP.IX.SEL
+    HELP.TRIES = 0
+HELP.FINDONLY.SCAN:
+    HELP.TRIES = HELP.TRIES + 1
+    IF HELP.TRIES > HELP.IX.N THEN HELP.IX.SEL = 0 : RETURN
+    HELP.J = HELP.J + 1
+    IF HELP.J > HELP.IX.N THEN HELP.J = 1
+    IF HELP.IX.TYPE%(HELP.J) = 0 THEN GOTO HELP.FINDONLY.SCAN
+    HELP.HAY$ = HELP.IX.TEXT$(HELP.J) + ""
+    STRCASE.PTR = GP.STRPTR(HELP.HAY$) : STRCASE.MODE = STRCASE.UPPER
+    GOSUB STRCASE.GO
+    IF GP.INSTR(HELP.HAY$, HELP.FIND$) = 0 THEN GOTO HELP.FINDONLY.SCAN
+    HELP.IX.SEL = HELP.J
+    RETURN
+#ENDIF

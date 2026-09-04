@@ -19,6 +19,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [Commit to main directly](commit-to-main-directly.md) — do not branch first; solo repo, no review step
 - [Compiler must not cap program size](compiler-must-not-cap-program-size.md) — standing rule: a build-side wall is a bug, report costs in max program size
 - [No backward compatibility needed](no-backward-compatibility-needed.md) — sole user; token renumbering and forced recompiles cost nothing
+- [Ask before writing asm](ask-before-writing-asm.md) — standing order: no GP.ASM or 64tass without agreeing it first
 - [User runs concurrent agents here](user-runs-concurrent-agents-here.md) — default to read-only research; re-read before any write
 
 ## Build and toolchain

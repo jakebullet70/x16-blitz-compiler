@@ -1,0 +1,38 @@
+@2. Using it
+.
+=2. USING IT
+.
+.Every BASL source that uses a GP. keyword must declare the tokens:
+.
+:#INCLUDE "GPB.INC.BL"
+.
+.BASLOAD knows only the ROM's keywords. Without that line GP.DO 5 is a syntax
+.error. (The host-side tokeniser for hand-written .bas needs nothing -- it
+.learns the same tokens from c64tokens.py at build time.)
+.
+=Where the library lives
+.
+.Keep GPC-BASIC/ as a folder beside your own sources and include from it by
+.path:
+.
+:#INCLUDE "/GPC-BASIC/GPB.INC.BL"
+.
+.#INCLUDE takes a path, not just a bare filename -- verified on R49, both
+.absolute (/GPC-BASIC/GPB.INC.BL) and relative (GPC-BASIC/GPB.INC.BL). Prefer
+.the leading slash: it is absolute from the drive root, so it still resolves
+.when your own program sits in a subdirectory. ../ and // are not understood
+.by the X16's filesystem, so a path goes down from somewhere, never up.
+.
+.Earlier versions of this manual said the include had to be a bare filename
+.and told you to copy the library next to every program. That was wrong, and
+.it meant twenty-odd files in your working folder for no reason.
+.
+.Then it is BASLOAD and GPC as usual: BASLOAD "MYPROG.BL", then compile the
+.PRG with GPC.PRG.
+.
+=A .PRG with GP tokens is compile-only
+.
+.A $CE7x byte has no BASIC handler behind it, so the ROM cannot LIST or RUN
+.the tokenised program. That is expected, not a fault. Compile it and run the
+.object.
+.

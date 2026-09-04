@@ -1,0 +1,20 @@
+@4. Nothing here is re-entrant, and that is not a bug you can work around
+.
+=4. NOTHING HERE IS RE-ENTRANT, AND THAT IS NOT A BUG YOU CAN WORK AROUND
+.
+.A module's parameters are its globals. There is nowhere else to put them.
+.So:
+.
+.  - You cannot call LINEINPUT.GET from inside LINEINPUT.GET -- no callback
+.    out of a field.
+.  - You cannot nest BMX.OPEN -- one file at a time, and BMXK.LFN says so
+.    too.
+.  - A GOSUB from inside a module into code that calls the same module will
+.    corrupt it silently.
+.
+.In practice this only bites if you write a callback. If you need one, copy
+.the values you care about into your own variables first.
+.
+.THEME.* is the exception: THEME.LOAD only writes, so calling it from
+.anywhere is safe.
+.

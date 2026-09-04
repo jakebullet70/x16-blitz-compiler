@@ -1,0 +1,82 @@
+@4.2 STRINGS.INC.BL -- string helpers
+.
+=4.2 STRINGS.INC.BL -- STRING HELPERS
+.
+=WHAT IT COSTS
+.
+.  ASM: GP.INSTR GP.STRPTR GP.COMP
+.    ASM -- a keyword, run by machine code in the GP runtime block. A program
+.    using ANY GP keyword pays for the whole block.
+.  COMPOSITE: GP.CONTAINS GP.ISEMPTY
+.    COMPOSITE -- a keyword with no machine code of its own. The compiler
+.    expands it into keywords that already exist, so it costs the runtime
+.    nothing at all.
+.    BASIC -- a .INC.BL module of ordinary BASL, called with GOSUB. Costs
+.    nothing unless you #INCLUDE it.
+.
+=DESCRIPTION
+.
+.  STR.PADR
+.      IN: STR.STR$ STR.WIDTH
+.      OUT: STR.STR$ left-justified
+.
+.  STR.PADL
+.      IN: same
+.      OUT: right-justified
+.
+.  STR.PADC
+.      IN: same
+.      OUT: centred (odd gap goes right)
+.
+.  STR.SPLIT
+.      IN: STR.STR$ STR.DELIM$ STR.MAX
+.      OUT: STR.N, STR.FIELD$(1..N)
+.
+.  STR.REPLACE
+.      IN: STR.STR$ STR.FIND$ STR.REPL$
+.      OUT: STR.STR$, every occurrence replaced
+.
+.  STR.PET2SCR
+.      IN: STR.PET
+.      OUT: STR.SCR
+.
+.All three pad routines leave a string already at or past the width alone.
+.They pad; they never truncate -- use STRCASE.RTRIM (SEC 4.8) to go the other
+.way.
+.
+.SPLIT reads STR.STR$ without modifying it. STR.MAX of 0 means 10. Empty
+.fields are preserved, which is what makes it safe for data rows: "A,,C" is
+.three fields, "A," is two. Splitting an empty string gives one empty field,
+.never zero. Reaching the limit is not an error and loses nothing -- the last
+.field gets the whole unsplit remainder, delimiters and all.
+.
+.STR.FIELD$ is the one array the library deliberately does NOT DIM. Left
+.alone, GPC's implicit DIM gives 0..10. Want more, DIM it yourself before the
+.first call and set STR.MAX to match. DIMming an array GPC has already
+.auto-dimensioned is an error, so it is one or the other. This is the
+.opposite of THEME.CLR -- worth keeping straight.
+.
+.REPLACE swaps every occurrence of STR.FIND$ for STR.REPL$, modifying
+.STR.STR$ in place. The replacement may be shorter, longer, or "" to delete.
+.Case sensitive, because GP.INSTR compares raw bytes.
+.
+.  | It is safe when the replacement contains the thing being replaced -- "A"
+.  | -> "AA" terminates and gives you twice the As, where a naive in-place
+.  | version loops forever. The routine builds a new string and never
+.  | re-scans what it has already emitted. An empty STR.FIND$ leaves the
+.  | string alone rather than hanging; that falls out of GP.INSTR reporting
+.  | "not found" for a zero-length needle, so no guard is needed. Like the
+.  | pad routines it is not length checked -- a longer replacement can push
+.  | the result past 255 characters.
+.
+.PET2SCR converts a PETSCII code to the screen code the tile map holds, for
+.TILE, TDATA and VPOKE. GP.PRINTAT and GP.FILL already do it internally.
+.
+=EXAMPLE PROGRAM
+.
+.  SPLITT.EXP.BL -- runnable, in the GPC-BASIC folder
+.
+=SEE ALSO
+.
+>37|4.8 STRCASE.INC.BL -- case and trim, in place
+>29|4.2 STRINGS.INC.BL -- string helpers

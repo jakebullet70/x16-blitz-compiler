@@ -1,0 +1,396 @@
+## ***********************************************************************
+## **
+## **  MENUVERT.INC.BL -- a vertical menu, in BASIC.
+## **
+## **      MENUVERT.RUN    draw it, drive it, return the row chosen
+## **      MENUVERT.DRAW   draw it without driving it
+## **      MENUVERT.ROW    one row, in whichever attribute you name
+## **
+## **
+## **  Usage:
+## **      MENUVERT.X = 8 : MENUVERT.Y = 6
+## **      MENUVERT.WIDTH = 24
+## **      MENUVERT.COUNT = 4
+## **      MENUVERT.ITEM$(1) = " NEW GAME"    ... and so on
+## **      MENUVERT.ATTR = THEME.CLR(THEME.TEXT)
+## **      MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
+## **      MENUVERT.HOT$ = "NLOQ"
+## **      MENUVERT.HOTATTR = THEME.CLR(THEME.TITLE)
+## **      MENUVERT.FLAGS = MENUVERT.GAMEPAD
+## **      GOSUB MENUVERT.RUN
+## **      IF MENUVERT.SEL = 0 THEN <cancelled>
+## **
+## **   in   MENUVERT.X        top left of the FIRST ROW, not of a frame. Draw the box
+## **        MENUVERT.Y        yourself, so the menu owes nothing to one border style
+## **        MENUVERT.WIDTH    cells wide -- the width of the HIGHLIGHT, and so of the
+## **                          menu, whatever the text happens to do
+## **        MENUVERT.COUNT    how many rows
+## **        MENUVERT.ITEM$()  the rows, 1..COUNT. THE CALLER OWNS THE DIM, below
+## **        MENUVERT.ATTR     packed attribute, background * 16 + fg
+## **        MENUVERT.HIATTR   the same for the highlighted row. 0 means "invert
+## **                          MENUVERT.ATTR", which is what GP.MENU always did
+## **        MENUVERT.HOT$     one character a row, "" for none. Matched WITHOUT case,
+## **                          and a hotkey CHOOSES its row rather than moving to it
+## **        MENUVERT.HOTATTR  paint the hotkey LETTER in this attribute, so the
+## **                          shortcut is visible instead of secret. 0 is off and is
+## **                          the default. The letter is found in the row's own text,
+## **                          so " START" with hotkey S needs no markup, and a row
+## **                          not containing its hotkey is left alone. ONLY ROWS IN
+## **                          THE NORMAL ATTRIBUTE ARE TINTED -- on the selected row
+## **                          the highlight IS the message, and it also means this
+## **                          never has to guess how to invert a caller's HIATTR
+## **        MENUVERT.FLAGS    added together, see below
+## **        MENUVERT.SEL      the row to start on; 0 starts at 1
+## **        MENUVERT.SCROLL   items hidden ABOVE row 1, so screen row R draws
+## **                          ITEM$(SCROLL + R). 0 is "none" and is what an
+## **                          unassigned variable already is, so a menu that
+## **                          never heard of this is unchanged. It is an OFFSET
+## **                          and not a top-row number for exactly that reason:
+## **                          a 1-based input would read ITEM$(R-1) wherever it
+## **                          was left unset. GUI2.INC.BL is what it is for --
+## **                          a window onto a list longer than the box -- and
+## **                          MENUVERT.RUN does not touch it, because scrolling
+## **                          it needs a key loop that knows the list is longer
+## **                          than COUNT
+## **
+## **   out  MENUVERT.SEL      1..COUNT, or 0 if cancelled -- and under KEYEXIT,
+## **                          whatever row was highlighted when the key arrived
+## **        MENUVERT.KEY      the key that ended it: 13 chose, 27 cancelled, the
+## **                          hotkey itself, or the key KEYEXIT is handing back
+## **
+## **  THE CALLER OWNS THE DIM, deliberately: a module cannot be handed an array, and
+## **  DIMming one itself would mean guessing a bound and failing the caller who wanted
+## **  more. Leave MENUVERT.ITEM$ undimensioned and GPC's implicit DIM gives 0..10 -- a
+## **  ten row menu free. DIM it for more. What you must NOT do is both.
+## **
+## **  The whole MENUVERT.* name space belongs to this file.
+## **
+## ***********************************************************************
+#IFNDEF MENUVERT.DEFS
+#DEFINE MENUVERT.DEFS 1
+
+## Flags. MUSTSEL takes ESC away, for a menu with nothing behind it. KEEPMARK leaves
+## the chosen row highlighted, for a menu that stays up while the choice happens.
+## NOWRAP stops at the ends, which suits a list that reads as a range. GAMEPAD ADDS the
+## SNES pad in port 1 to the keyboard rather than replacing it, so a program never has
+## to ask which the user has.
+##
+## KEYEXIT hands back a key this menu has no use for instead of swallowing it. A
+## vertical menu ignores LEFT and RIGHT because they mean nothing on its axis -- but a
+## caller that has put one UNDER A MENU BAR wants exactly those, and only the caller
+## knows that. The key ends the menu with MENUVERT.KEY set and MENUVERT.SEL left ALONE.
+## MENUBAR.DOWNEXIT is the same idea pointing the other way; between them a bar and its
+## dropdown drive each other with neither module knowing the other exists. Off by
+## default, because swallowing them is right for a menu that is only a menu.
+
+#DEFINE MENUVERT.MUSTSEL 1
+#DEFINE MENUVERT.KEEPMARK 2
+#DEFINE MENUVERT.NOWRAP 4
+#DEFINE MENUVERT.GAMEPAD 8
+#DEFINE MENUVERT.KEYEXIT 64
+
+## PETSCII, as GET reports it.
+
+#DEFINE MENUVERT.DOWN 17
+#DEFINE MENUVERT.UP 145
+#DEFINE MENUVERT.ENTER 13
+#DEFINE MENUVERT.ESCAPE 27
+#DEFINE MENUVERT.STOP 3
+#DEFINE MENUVERT.SPACE 32
+
+## SNES port 1. Port 0 is the keyboard pretending to be a joystick, which would read the
+## cursor keys twice.
+
+#DEFINE MENUVERT.PORT 1
+
+## The bits of JOY's low byte, already active high. Left and right are ignored rather
+## than mapped to something invented.
+##   $80 B   $10 START   $08 UP   $04 DOWN   $02 LEFT   $01 RIGHT
+
+#DEFINE MENUVERT.PAD.UP 8
+#DEFINE MENUVERT.PAD.DOWN 4
+#DEFINE MENUVERT.PAD.B 128
+#DEFINE MENUVERT.PAD.START 16
+
+GOTO MENUVERT.MODULE.END
+
+## ***********************************************************************
+## **  MENUVERT.RUN -- the whole thing.
+## ***********************************************************************
+
+MENUVERT.RUN:
+    MENUVERT.KEY = 0
+    IF MENUVERT.COUNT < 1 THEN MENUVERT.SEL = 0 : RETURN
+
+## ---- 0 for the highlight means "invert the normal attribute", as GP.MENU did.
+
+    MENUVERT.HIGHLIGHT = MENUVERT.HIATTR
+    IF MENUVERT.HIATTR = 0 THEN MENUVERT.HIGHLIGHT = (MENUVERT.ATTR AND 15) * 16 + INT(MENUVERT.ATTR / 16)
+
+    IF MENUVERT.SEL < 1 THEN MENUVERT.SEL = 1
+    IF MENUVERT.SEL > MENUVERT.COUNT THEN MENUVERT.SEL = MENUVERT.COUNT
+
+    MENUVERT.PADHELD = 0 : GOSUB MENUVERT.DRAW
+    MENUVERT.DRAWROW = MENUVERT.SEL : MENUVERT.DRAWATTR = MENUVERT.HIGHLIGHT
+    GOSUB MENUVERT.ROW
+
+## ---- GET returns immediately with "" when nothing is pressed, so the pad is polled in
+## ---- the same loop. The keyboard is read FIRST, so a plugged-in pad never costs a
+## ---- keystroke its response.
+
+MENUVERT.WAIT:
+    GET MENUVERT.INCHAR$
+    IF MENUVERT.INCHAR$ <> "" THEN MENUVERT.CODE = ASC(MENUVERT.INCHAR$) : GOTO MENUVERT.KEYED
+    IF (MENUVERT.FLAGS AND MENUVERT.GAMEPAD) = 0 THEN GOTO MENUVERT.WAIT
+    GOSUB MENUVERT.PADKEY
+    IF MENUVERT.CODE = 0 THEN GOTO MENUVERT.WAIT
+
+## ---- One key: five control codes scattered across 256 with everything else falling
+## ---- through to the hotkeys, which is the sparse selector GP.SELECT exists for.
+## ---- MENUVERT.DONE is tested AFTER GP.ENDSEL rather than jumping out of the select --
+## ---- one comparison, and it cannot leak whatever the runtime does later.
+
+MENUVERT.KEYED:
+    MENUVERT.DONE = 0 : MENUVERT.HOTHIT = 0
+    MENUVERT.PREVSEL = MENUVERT.SEL
+    GP.SELECT MENUVERT.CODE
+        GP.CASE MENUVERT.UP
+            MENUVERT.SEL = MENUVERT.SEL - 1
+            IF MENUVERT.SEL < 1 THEN GOSUB MENUVERT.WRAPTOP
+        GP.CASE MENUVERT.DOWN
+            MENUVERT.SEL = MENUVERT.SEL + 1
+            IF MENUVERT.SEL > MENUVERT.COUNT THEN GOSUB MENUVERT.WRAPBOT
+        GP.CASE MENUVERT.ENTER
+            MENUVERT.DONE = 1
+        GP.CASE MENUVERT.ESCAPE, MENUVERT.STOP
+            GOSUB MENUVERT.CANCEL
+        GP.OTHER
+            GOSUB MENUVERT.HOTKEY
+            IF MENUVERT.DONE = 0 THEN GOSUB MENUVERT.KEYBACK
+    GP.ENDSEL
+
+## ---- Move the highlight only if it actually moved: two rows, and the old one goes back
+## ---- to exactly what MENUVERT.DRAW put there, both coming from MENUVERT.ROW.
+
+    IF MENUVERT.SEL = MENUVERT.PREVSEL THEN GOTO MENUVERT.SETTLE
+    IF MENUVERT.PREVSEL < 1 THEN GOTO MENUVERT.SETTLE
+    MENUVERT.DRAWROW = MENUVERT.PREVSEL : MENUVERT.DRAWATTR = MENUVERT.ATTR
+    GOSUB MENUVERT.ROW
+    IF MENUVERT.SEL < 1 THEN GOTO MENUVERT.SETTLE
+    MENUVERT.DRAWROW = MENUVERT.SEL : MENUVERT.DRAWATTR = MENUVERT.HIGHLIGHT
+    GOSUB MENUVERT.ROW
+
+MENUVERT.SETTLE:
+    IF MENUVERT.DONE = 0 THEN GOTO MENUVERT.WAIT
+    MENUVERT.KEY = MENUVERT.CODE
+
+## ---- Unless KEEPMARK is set the highlight comes off, so a menu that has done its job
+## ---- is not still claiming the user's attention.
+
+    IF (MENUVERT.FLAGS AND MENUVERT.KEEPMARK) <> 0 THEN RETURN
+    IF MENUVERT.SEL < 1 THEN RETURN
+    MENUVERT.DRAWROW = MENUVERT.SEL : MENUVERT.DRAWATTR = MENUVERT.ATTR
+    GOSUB MENUVERT.ROW
+    RETURN
+
+## ***********************************************************************
+## **  The three things the selector's cases needed a subroutine for. Wrapping is one
+## **  because the no-wrap answer is not "stay put" but "go to the end you are at", and
+## **  MENUVERT.SEL has already been stepped past it -- two statements either way.
+## ***********************************************************************
+
+MENUVERT.WRAPTOP:
+    MENUVERT.SEL = MENUVERT.COUNT
+    IF (MENUVERT.FLAGS AND MENUVERT.NOWRAP) <> 0 THEN MENUVERT.SEL = 1
+    RETURN
+
+MENUVERT.WRAPBOT:
+    MENUVERT.SEL = 1
+    IF (MENUVERT.FLAGS AND MENUVERT.NOWRAP) <> 0 THEN MENUVERT.SEL = MENUVERT.COUNT
+    RETURN
+
+## ---- MUSTSEL swallows ESC entirely, without a beep or a flash: a menu that cannot be
+## ---- left says so by not leaving.
+
+MENUVERT.CANCEL:
+    IF (MENUVERT.FLAGS AND MENUVERT.MUSTSEL) <> 0 THEN RETURN
+    MENUVERT.SEL = 0 : MENUVERT.DONE = 1 : RETURN
+
+## ---- KEYEXIT leaves MENUVERT.SEL ALONE, which is the whole difference from ESC
+## ---- returning 0: it lets a caller tell "went elsewhere, from row 3" from
+## ---- "cancelled". Reached only when the hotkeys did not claim the key.
+## ----
+## ---- AND THAT IS WHY MENUVERT.HOTHIT EXISTS. Both exits leave DONE = 1 and KEY = the
+## ---- character, so without it a KEYEXIT caller cannot tell "a hotkey chose row 3" from
+## ---- "a key I must handle came back, and SEL is still 3 from before". 1 means the
+## ---- hotkeys claimed the key and SEL is the row they chose.
+
+MENUVERT.KEYBACK:
+    IF (MENUVERT.FLAGS AND MENUVERT.KEYEXIT) <> 0 THEN MENUVERT.DONE = 1
+    RETURN
+
+## ***********************************************************************
+## **  MENUVERT.HOTKEY -- anything that was not a cursor key.
+## **
+## **  Matched without case by folding both sides to upper -- the same a-z-only fold
+## **  GP.COMP uses, so digits, punctuation and PETSCII graphics can all be hotkeys.
+## **
+## **  The scan stops at MENUVERT.COUNT even when MENUVERT.HOT$ is longer, so a hotkey
+## **  string left over from a longer menu cannot select a row that is not on screen.
+## ***********************************************************************
+
+MENUVERT.HOTKEY:
+    IF MENUVERT.HOT$ = "" THEN RETURN
+    MENUVERT.HOTLAST = LEN(MENUVERT.HOT$)
+    IF MENUVERT.HOTLAST > MENUVERT.COUNT THEN MENUVERT.HOTLAST = MENUVERT.COUNT
+    MENUVERT.WANTCODE = MENUVERT.CODE
+    IF MENUVERT.WANTCODE > 96 THEN GOSUB MENUVERT.FOLDWANT
+    FOR MENUVERT.SCAN = 1 TO MENUVERT.HOTLAST
+        MENUVERT.HOTCODE = ASC(MID$(MENUVERT.HOT$, MENUVERT.SCAN, 1))
+        IF MENUVERT.HOTCODE > 96 THEN GOSUB MENUVERT.FOLDHC
+        IF MENUVERT.HOTCODE = MENUVERT.WANTCODE THEN MENUVERT.SEL = MENUVERT.SCAN : MENUVERT.DONE = 1 : MENUVERT.HOTHIT = 1
+    NEXT
+    RETURN
+
+## ---- A GUARDED SUBROUTINE, NOT ONE ANDed LINE: AND sits BELOW the comparisons in the
+## ---- precedence table, so the single line version would be right by luck. The caller
+## ---- has already established the value is above 96.
+
+MENUVERT.FOLDWANT:
+    IF MENUVERT.WANTCODE < 123 THEN MENUVERT.WANTCODE = MENUVERT.WANTCODE - 32
+    RETURN
+
+MENUVERT.FOLDHC:
+    IF MENUVERT.HOTCODE < 123 THEN MENUVERT.HOTCODE = MENUVERT.HOTCODE - 32
+    RETURN
+
+## ***********************************************************************
+## **  MENUVERT.PADKEY -- the SNES pad as a key code.
+## **
+## **  ONLY NEW PRESSES ACT. Without the edge test a held direction runs the menu round
+## **  and round at the speed of the BASIC loop, far too fast to stop where you meant.
+## **  B and START both choose, whichever a player reaches for.
+## **
+## **  out  MENUVERT.CODE   a PETSCII code, or 0 for nothing new
+## ***********************************************************************
+
+MENUVERT.PADKEY:
+    MENUVERT.CODE = 0 : GOSUB MENUVERT.PADREAD
+    MENUVERT.PADNEW = MENUVERT.PADNOW AND (255 - MENUVERT.PADHELD)
+    MENUVERT.PADHELD = MENUVERT.PADNOW
+    IF (MENUVERT.PADNEW AND MENUVERT.PAD.UP) <> 0 THEN MENUVERT.CODE = MENUVERT.UP : RETURN
+    IF (MENUVERT.PADNEW AND MENUVERT.PAD.DOWN) <> 0 THEN MENUVERT.CODE = MENUVERT.DOWN : RETURN
+    IF (MENUVERT.PADNEW AND MENUVERT.PAD.B) <> 0 THEN MENUVERT.CODE = MENUVERT.ENTER : RETURN
+    IF (MENUVERT.PADNEW AND MENUVERT.PAD.START) <> 0 THEN MENUVERT.CODE = MENUVERT.ENTER
+    RETURN
+
+## ---- JOY IS A GPC BUILT IN and does all of this: joystick_get, the no-hardware test,
+## ---- and inverting both bytes so what comes back is active HIGH.
+## ----
+## ---- NEGATIVE MEANS NO PAD, and it has to be tested: with no pad the raw bytes are
+## ---- $FF, inverted that is 0, and the value would look like a pad with nothing
+## ---- pressed -- right only by accident.
+## ----
+## ---- The low byte is extracted by DIVISION, not "AND 255": AND is 16-bit SIGNED in
+## ---- GPC and both pad bytes together run past 32767.
+
+MENUVERT.PADREAD:
+    MENUVERT.PADNOW = 0 : MENUVERT.PADRAW = JOY(MENUVERT.PORT)
+    IF MENUVERT.PADRAW < 0 THEN RETURN
+    MENUVERT.PADNOW = MENUVERT.PADRAW - INT(MENUVERT.PADRAW / 256) * 256
+    RETURN
+
+## ***********************************************************************
+## **  MENUVERT.DRAW -- every row, unhighlighted.
+## **
+## **  Public, for a caller that put a dialog over the menu without stashing what was
+## **  underneath. ROWS ONLY, never a frame, so calling it again cannot damage a border.
+## ***********************************************************************
+
+MENUVERT.DRAW:
+    FOR MENUVERT.EACH = 1 TO MENUVERT.COUNT
+        MENUVERT.DRAWROW = MENUVERT.EACH : MENUVERT.DRAWATTR = MENUVERT.ATTR
+        GOSUB MENUVERT.ROW
+    NEXT
+    RETURN
+
+## ***********************************************************************
+## **  MENUVERT.ROW -- one row, filled then printed.
+## **
+## **   in   MENUVERT.DRAWROW    the row, 1..N        MENUVERT.DRAWATTR   the attribute
+## **
+## **  THE FILL IS WHAT MAKES THE HIGHLIGHT FULL WIDTH, and why no padded string is
+## **  built: GP.FILL colours all W cells at 31 cycles each, where
+## **  LEFT$(item$ + "        ", W) would allocate a string on every keystroke.
+## **
+## **  Text longer than W is cut, and ONLY then -- the trim costs an allocation. Without
+## **  it the overflow does not stop at the menu's edge; VERA carries on into the next
+## **  cells, which is the next line of the screen.
+## ***********************************************************************
+
+MENUVERT.ROW:
+    MENUVERT.DRAWY = MENUVERT.Y + MENUVERT.DRAWROW - 1
+    MENUVERT.DRAWITEM = MENUVERT.SCROLL + MENUVERT.DRAWROW
+    GP.FILL MENUVERT.X, MENUVERT.DRAWY, MENUVERT.WIDTH, 1, MENUVERT.SPACE, MENUVERT.DRAWATTR
+    MENUVERT.DRAWTEXT$ = MENUVERT.ITEM$(MENUVERT.DRAWITEM)
+    IF MENUVERT.DRAWTEXT$ = "" THEN RETURN
+    IF LEN(MENUVERT.DRAWTEXT$) > MENUVERT.WIDTH THEN MENUVERT.DRAWTEXT$ = LEFT$(MENUVERT.DRAWTEXT$, MENUVERT.WIDTH)
+    GP.PRINTAT MENUVERT.X, MENUVERT.DRAWY, MENUVERT.DRAWTEXT$, MENUVERT.DRAWATTR
+
+## ---- The hotkey letter over the row just printed: one cell, and only when asked for --
+## ---- a menu with no HOTATTR pays one compare a row. The highlighted row is skipped by
+## ---- testing the attribute it was drawn in; see the interface block for why.
+
+    IF MENUVERT.HOTATTR = 0 THEN RETURN
+    IF MENUVERT.DRAWATTR <> MENUVERT.ATTR THEN RETURN
+    GOSUB MENUVERT.HOTFIND
+    IF MENUVERT.HOTAT = 0 THEN RETURN
+    GP.PRINTAT MENUVERT.X + MENUVERT.HOTAT - 1, MENUVERT.DRAWY, MID$(MENUVERT.DRAWTEXT$, MENUVERT.HOTAT, 1), MENUVERT.HOTATTR
+    RETURN
+
+## ***********************************************************************
+## **  MENUVERT.HOTFIND -- where this row's hotkey letter sits in its text.
+## **
+## **   in   MENUVERT.DRAWROW  MENUVERT.DRAWTEXT$
+## **   out  MENUVERT.HOTAT    1 based position, or 0 for "do not tint"
+## **
+## **  Zero for every ordinary reason a tint should not happen: no hotkey string, none
+## **  for THIS row, or a row whose text does not contain its own hotkey -- that last
+## **  being a caller's choice, since " QUIT" with hotkey X still works as a hotkey.
+## **
+## **  A match at a WORD START wins over an earlier one inside a word: "Save As" with
+## **  hotkey A must light the A of "As", not the a of "Save". No word start, first
+## **  occurrence -- the x of "Exit" still lights.
+## **
+## **  ITS OWN SCAN VARIABLES, not MENUVERT.HOTKEY's. The two never run at once today,
+## **  but sharing a loop counter is a trap set for whoever changes that order.
+## ***********************************************************************
+
+MENUVERT.HOTFIND:
+    MENUVERT.HOTAT = 0 : MENUVERT.HOTANY = 0 : MENUVERT.HOTPREV = 32
+    IF MENUVERT.HOT$ = "" THEN RETURN
+    IF MENUVERT.DRAWITEM > LEN(MENUVERT.HOT$) THEN RETURN
+    MENUVERT.HOTWANT = ASC(MID$(MENUVERT.HOT$, MENUVERT.DRAWITEM, 1))
+    IF MENUVERT.HOTWANT > 96 THEN GOSUB MENUVERT.FOLDHOTWANT
+    FOR MENUVERT.HOTSCAN = 1 TO LEN(MENUVERT.DRAWTEXT$)
+        MENUVERT.HOTHERE = ASC(MID$(MENUVERT.DRAWTEXT$, MENUVERT.HOTSCAN, 1))
+        IF MENUVERT.HOTHERE > 96 THEN GOSUB MENUVERT.FOLDHOTHERE
+        IF MENUVERT.HOTHERE = MENUVERT.HOTWANT AND MENUVERT.HOTANY = 0 THEN MENUVERT.HOTANY = MENUVERT.HOTSCAN
+        IF MENUVERT.HOTHERE = MENUVERT.HOTWANT AND MENUVERT.HOTPREV = 32 AND MENUVERT.HOTAT = 0 THEN MENUVERT.HOTAT = MENUVERT.HOTSCAN
+        MENUVERT.HOTPREV = MENUVERT.HOTHERE
+    NEXT
+    IF MENUVERT.HOTAT = 0 THEN MENUVERT.HOTAT = MENUVERT.HOTANY
+    RETURN
+
+## ---- Guarded subroutines, not ANDed lines -- see the note at MENUVERT.FOLDWANT.
+
+MENUVERT.FOLDHOTWANT:
+    IF MENUVERT.HOTWANT < 123 THEN MENUVERT.HOTWANT = MENUVERT.HOTWANT - 32
+    RETURN
+
+MENUVERT.FOLDHOTHERE:
+    IF MENUVERT.HOTHERE < 123 THEN MENUVERT.HOTHERE = MENUVERT.HOTHERE - 32
+    RETURN
+
+MENUVERT.MODULE.END:
+#ENDIF

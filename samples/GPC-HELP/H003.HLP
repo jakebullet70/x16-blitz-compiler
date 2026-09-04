@@ -1,0 +1,118 @@
+@3. Command reference
+.
+=3. COMMAND REFERENCE
+.
+.27 keywords, tokens $CE7F down to $CE63, allocated downward and never
+.renumbered -- $CE67 and $CE68 are holes, freed when GP.SEL and GP.MENU were
+.withdrawn, and are not reused. The token values are the ABI.
+.
+=At a glance -- the whole library, and what each part costs
+.
+.Everything GP.BASIC gives you, and where it comes from. The rest of SEC 3 is
+.the keywords; the BASIC modules are written up in SEC 4.
+.
+.  - ASM -- a keyword the compiler knows, run by machine code in the runtime.
+.    Costs runtime bytes, and a program that uses one GP keyword pays for the
+.    whole block. Written in SEC 3.
+.  - BASIC -- a .INC.BL module of ordinary BASL, called with GOSUB. Costs
+.    nothing unless you #INCLUDE it, and then only its own p-code. Written in
+.    SEC 4.
+.  - COMPOSITE -- a keyword the compiler knows that has no machine code of
+.    its own. The compiler expands it into keywords that already exist, so it
+.    reads like a keyword and costs the runtime nothing at all. Written in
+.    SEC 3 alongside the ASM ones.
+.
+.  Loops
+.      ASM
+.      GP.DO GP.LOOP GP.EXITDO
+.
+.  Multi-way branch
+.      ASM
+.      GP.SELECT GP.CASE GP.OTHER GP.ENDSEL
+.
+.  Block IF
+.      ASM
+.      GP.IF GP.ELSEIF GP.ELSE GP.ENDIF -- see SEC 3.8
+.
+.  Machine code
+.      ASM
+.      GP.CALL GP.A GP.X GP.Y GP.C
+.
+.  Inline assembly
+.      COMPOSITE
+.      GP.ASM GP.ENDASM -- free, and stays GP-BASIC OUT, see SEC 3.9
+.
+.  Strings
+.      ASM
+.      GP.INSTR GP.STRPTR GP.COMP
+.
+.  Strings
+.      COMPOSITE
+.      GP.CONTAINS GP.ISEMPTY -- free, see SEC 3.4
+.
+.  Addresses
+.      COMPOSITE
+.      GP.HIBYTE GP.LOBYTE -- free, see SEC 3.3
+.
+.  Arrays
+.      ASM
+.      GP.ARRPTR
+.
+.  Screen
+.      ASM
+.      GP.BOX GP.FILL GP.PRINTAT
+.
+.  Screen
+.      COMPOSITE
+.      GP.CHAR -- free, one cell in GP.PRINTAT's shape running GP.FILL's
+.        handler
+.
+.  Colour roles
+.      BASIC
+.      THEME.INC.BL -- THEME.LOAD, THEME.CLR() - SEC 4.1
+.
+.  String helpers
+.      BASIC
+.      STRINGS.INC.BL -- PADR PADL PADC SPLIT REPLACE PET2SCR - SEC 4.2
+.
+.  Screen etiquette, panels
+.      BASIC
+.      APPSYS.INC.BL -- STARTUP RESTORE PANEL.SAVE/LOAD/PUT - SEC 4.3
+.
+.  Entry fields
+.      BASIC
+.      LINEINPUT.INC.BL -- LINEINPUT.GET, LINEINPUT.ASK - SEC 4.4
+.
+.  Bitmaps
+.      BASIC
+.      BMX.INC.BL -- BMX.SHOW, BMX.RESTORE - SEC 4.5
+.
+.  Menus
+.      BASIC
+.      MENUVERT.INC.BL -- RUN DRAW ROW HOTFIND - SEC 4.6
+.
+.The rule that decides the side is in SEC 1: assembly gets what runs in a
+.tight loop or moves bulk data, BASIC gets everything else -- and anything
+.that is only a rename of keywords already present gets neither, and becomes
+.a composite. A menu waits on a human, so it is BASIC -- it used to be the
+.GP.MENU keyword and cost every GPB program 462 bytes whether it had a menu
+.or not.
+.
+.The keywords, in detail. Square brackets mean optional, and optionals cannot
+.be skipped over -- GP.BOX X,Y,W,H,,7 is a syntax error; write the style you
+.are defaulting.
+.
+=SEE ALSO
+.
+>27|4. Module reference -- the BASL library
+>19|3.8 Block IF
+>20|3.9 Inline assembly
+>13|3.4 Strings
+>11|3.3 Machine code
+>28|4.1 THEME.INC.BL -- named colour roles
+>29|4.2 STRINGS.INC.BL -- string helpers
+>30|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>31|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>32|4.5 BMX.INC.BL -- a BMX bitmap into VERA
+>33|4.6 MENUVERT.INC.BL -- a vertical menu
+>2|1. What GP.BASIC is

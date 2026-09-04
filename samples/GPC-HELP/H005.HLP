@@ -1,0 +1,81 @@
+@3.2 Multi-way branch
+.
+=3.2 MULTI-WAY BRANCH
+.
+=SYNTAX
+.
+:GP.SELECT <var>
+:GP.CASE <expr> [,<expr> ...]
+:    ...
+:GP.OTHER
+:    ...
+:GP.ENDSEL
+.
+=WHAT IT COSTS
+.
+.  ASM: GP.SELECT GP.CASE GP.OTHER GP.ENDSEL
+.    ASM -- a keyword, run by machine code in the GP runtime block. A program
+.    using ANY GP keyword pays for the whole block.
+.
+=DESCRIPTION
+.
+.The selector is a plain numeric variable, re-read at each GP.CASE; the tests
+.run in the order written and the first match wins. GP.OTHER is optional.
+.Nothing matching with no GP.OTHER is not an error -- the whole select is
+.simply skipped.
+.
+.An expression, a constant or an array element is refused at compile time.
+.Assign it to a scalar first -- T = RND(1)*3 : GP.SELECT T -- which is also
+.what makes the re-read sound: a scalar is a fixed slot, so reading it seven
+.times is the same value seven times. What the restriction buys is that the
+.whole construct compiles to core opcodes: a program whose only GP keyword is
+.a select does not carry the GP block at all, exactly like GP.IF.
+.
+.Case values are ordinary numeric expressions, not just constants -- which is
+.a step past prog8's when, whose choices must be compile-time integers.
+.
+.GP.ENDSEL is required -- not for cleanup, of which there is none, but for
+.structure: the compiler has no symbol table, the emitted tokens ARE the
+.block, and every case branch resolves by scanning forward to it.
+.
+.A case body takes its statements on the same line, after a colon, which is
+.what makes a sparse dispatch read as the table it is:
+.
+:GP.SELECT ED.KEY
+:  GP.CASE 157 : GOSUB ED.MOVE.LEFT
+:  GP.CASE 29  : GOSUB ED.MOVE.RIGHT
+:  GP.CASE 27  : MENU.ACTIVE = 0 : GOSUB ED.OPEN.MENUBAR
+:  GP.OTHER    : GOSUB ED.KEY.RANGE
+:GP.ENDSEL
+.
+.More than one statement after the colon is fine, and so is GP.OTHER. The
+.body may still go on the following lines instead -- both forms are the same
+.code.
+.
+.  | GOTO out of a select is safe, and trivially so: a select keeps nothing
+.  | alive, so there is nothing to leak. GP.DO is the one block that still
+.  | opens a stack frame, and a GOTO leaving one is covered too -- the
+.  | compiler puts an .unwind in front of it and FixBranches fills in how
+.  | many loop frames it closes. No runtime bytes, two p-code bytes at the
+.  | GOTO itself. One thing that does not cover, because nothing could: a
+.  | GOTO sideways, out of one GP.DO and into a different one at the same
+.  | depth. The count comes out zero and the loop frame survives.
+.
+.This does not replace ON x GOTO/GOSUB, which is a real skip table and
+.remains the right answer for a dense 1..n index. GP.SELECT is for the sparse
+.selector -- key codes, state machines, bit depths -- where ON cannot go.
+.
+:GP.SELECT BMX.DEPTH
+:    GP.CASE 8
+:    GP.CASE 1, 2, 4
+:        BMX.ERROR$ = "NEEDS ANOTHER SCREEN MODE"
+:    GP.OTHER
+:        BMX.ERROR$ = "BAD BIT DEPTH"
+:GP.ENDSEL
+.
+.An empty case body -- the 8 above -- is the cheapest possible "this one is
+.fine": the match falls straight out of the select.
+.
+=EXAMPLE PROGRAM
+.
+.  SELECT.EXP.BL -- runnable, in the GPC-BASIC folder

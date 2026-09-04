@@ -1,0 +1,72 @@
+@4.8 STRCASE.INC.BL -- case and trim, in place
+.
+=4.8 STRCASE.INC.BL -- CASE AND TRIM, IN PLACE
+.
+=DESCRIPTION
+.
+.  STRCASE.GO
+.      IN: STRCASE.PTR STRCASE.MODE
+.      OUT: (the string itself)
+.
+:#SYMFILE "@:MYPROG.SYM"
+:#INCLUDE "STRCASE.INC.BL"
+:
+:STRCASE.PTR = GP.STRPTR(LINE$)
+:STRCASE.MODE = STRCASE.RTRIM
+:GOSUB STRCASE.GO
+.
+.  STRCASE.UPPER
+.      DOES: a-z -> A-Z, everything else untouched
+.
+.  STRCASE.LOWER
+.      DOES: A-Z -> a-z, everything else untouched
+.
+.  STRCASE.TRIM
+.      DOES: spaces off both ends
+.
+.  STRCASE.LTRIM
+.      DOES: spaces off the leading end
+.
+.  STRCASE.RTRIM
+.      DOES: spaces off the trailing end
+.
+.These were GP.UPPER, GP.LOWER, GP.TRIM, GP.LTRIM and GP.RTRIM, and the code
+.is the same code. One blob with the mode tested once, at entry -- never
+.inside a loop, where the byte count is the whole cost.
+.
+.  | The argument is an address, and that is the point. A BASL subroutine
+.  | cannot be passed a variable, and the obvious workaround -- copy the
+.  | caller's string in, work on it, copy it back -- is two allocations and
+.  | two copies per call, which is exactly the heap traffic these were
+.  | written in assembly to avoid. GP.STRPTR hands over the block and the
+.  | assembly rewrites it where it lies.
+.
+.  | Do not pass a literal. GP.STRPTR("hello") is the address of that text
+.  | inside the p-code, so upper-casing it edits the running program, and the
+.  | edit survives to the next time that line runs. The keywords could not be
+.  | misused this way -- the compiler required a string variable at the call
+.  | site -- and a GOSUB has no equivalent. This is the one thing the move
+.  | gives up.
+.
+.STRCASE.MODE is sticky: it is an ordinary variable, not an argument, so a
+.call that forgets to set it silently repeats the last operation. Set both
+.inputs every time, as with SORT.DESCEND and STASH.MOVE.
+.
+.There is still no pad here -- padding grows a string, and nothing working on
+.the block alone can grow one past the capacity it was born with. That is
+.STR.PADR (SEC 4.2).
+.
+.Example: STRINGS.EXP.BL. Regression test: STRCTST.EXP.BL, twenty cases --
+.empty, all-spaces, a single space, one character, a single leading space
+.(the boundary in the slide), 200 characters, and guard strings either side
+.to catch an off-by-one writing into the neighbouring block.
+.
+=EXAMPLE PROGRAM
+.
+.  STRINGS.EXP.BL -- runnable, in the GPC-BASIC folder
+.  STRCTST.EXP.BL -- runnable, in the GPC-BASIC folder
+.
+=SEE ALSO
+.
+>29|4.2 STRINGS.INC.BL -- string helpers
+>37|4.8 STRCASE.INC.BL -- case and trim, in place

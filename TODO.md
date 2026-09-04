@@ -1008,6 +1008,113 @@ image for all 12,031 bytes of the GP-BASIC OUT cut, with the only differences th
 
 ## Wanted
 
+### `GUI.INC.BL` message box — DONE, as `GUI.SAY`
+
+`GUI.YN`, `GUI.MENU` and `GUI.TEXT` all ASK something. There was no way to just **say** something
+and wait for an acknowledgement, which is the commonest dialog an application has: "wrote 34 lines
+to EXAMPLE.BL", "not found", "this topic has no code to export". `samples/GPC-HELP` wanted one
+three times and faked it with a one-item `GUI.MENU` whose only row was `   OK   `, which worked and
+read like the workaround it was — and dragged `MENUVERT` in for a dialog with no menu in it.
+
+**Shipped 2026-09-04 as `GUI.SAY`**, taking the `GUI.MSG$` / `GUI.MSG2$` / `GUI.TITLE$` the others
+take and `GUI.HINT$` for the button's label. RETURN, SPACE, ESC and STOP all close it: there is one
+outcome, so there is nothing for a second key to mean.
+
+**Not `GUI.MSG`, because a label and a variable share one namespace** and `GUI.MSG$` is an input —
+`DUPLICATE SYMBOL`, and the `$` does not separate them. `GUI.TEXT`/`GUI.INPUT$` had already been
+through this; the header says so.
+
+### `GUI.SAY` — let the caller name the button
+
+Today the button says `OK`, or whatever bare text is in `GUI.HINT$`. That is right for "wrote 34
+lines" and wrong for everything where the acknowledgement IS the verb: a `< DISMISS >`, a
+`< GOT IT >`, a `< CONTINUE >` at the end of a wizard step.
+
+`GUI.HINT$` already carries it, so the shape is there — what is missing is that **the caller cannot
+say it without also knowing the button convention**. Decide alongside the buttons question below,
+because the two share `GUI.BUTTON.ONE$`:
+
+- keep `GUI.HINT$` as the label and document it as such (no code, just a header and a name that
+  stops reading like a hint line), or
+- give it its own input — `GUI.BTN$`, defaulting to `OK` — and leave `GUI.HINT$` meaning what it
+  means in `GUI.TEXT` and `GUI.MENU`.
+
+The second is cleaner and costs a variable. **The trap is stickiness**: every input in this library
+persists, so a caller that sets a label once sets it for every box afterwards. `GUI.SAY` already
+clears `GUI.HINT$` for exactly this reason and whatever replaces it has to do the same, or the
+"not found" box in `samples/GPC-HELP` ends up saying `< DISMISS >` because something else did.
+
+Worth doing at the same time for `GUI.YN`: `< YES >` / `< NO >` is not always the question, and
+`< SAVE >` / `< DISCARD >` reads better than a hint line explaining which is which.
+
+### Buttons — decide whether the library adopts them
+
+`samples/GPC-HELP/GPC-BASIC/GUI.INC.BL` is a **deliberately diverged copy**: the answers are drawn
+as `< OK >` in the panel's own attribute with the nibbles swapped, where the library still prints a
+dimmed hint line with one letter lit. `GUI.BUTTON`, `GUI.BUTTON.SIZE` and `GUI.BUTTON.ROW` are the
+three routines; `GUI.YN`, `GUI.TEXT` and `GUI.SAY` call them.
+
+It is out here rather than in `GPC-BASIC/` so the look can be seen running before every dialog in
+the tree changes. **The decision to make**: adopt it into the library (which changes
+`samples/editor`, `GUI.EXP.BL` and `MENU.EXP.BL`), put it behind a `GUI.BUTTONS` flag defaulting
+off, or drop it and re-sync the copy.
+
+The colour is worth keeping either way: the button attribute is `GUI.PANEL` with foreground and
+background traded, **not a new `THEME` role**, so it cannot come out invisible in a palette nobody
+tested and `THEME.SLOTS` does not have to grow.
+
+One thing it takes away: `GUI.YN` no longer reads `GUI.HINT$`, because "the first Y and the first N
+in the line are lit as the keys" has nothing to light when the row is two buttons.
+
+### A charset comparison, and what each one costs
+
+`samples/GPC-HELP` went PETSCII → ISO → CP437 in one sitting, because the trade-offs are not
+written down anywhere and each one had to be rediscovered. They should be, once, with a screenshot
+of each:
+
+| | lower case | line drawing | what it costs |
+|---|---|---|---|
+| PET upper/graphics (2) | no | yes | nothing — the machine boots in it |
+| PET upper/lower (3) | yes | yes | a byte is not its own tile index, so every BASLOAD literal is case-swapped unless the font is re-indexed — and the re-order buries the frame glyphs |
+| ISO-8859-15 (1) | yes | **none at all** | one control code, then frames fall back to `+ - \|` |
+| CP437 (7) | yes | yes | `SETCHR 7` plus one `POKE`. **R47 and later only** |
+
+**CP437 looks like the answer for any GP.BASIC program wanting both**, and nothing in the tree used
+it before GPC-HELP. Worth a `CHARSET.EXP.BL` that draws the same box and the same sentence in all
+four and reads the cells back with `VPEEK`, the way `ISO.EXP.BL` already does for one of them — and
+worth a paragraph in `GP-BASIC.md` §3.7, which currently documents the ISO case and stops.
+
+Also unmeasured: whether the **thin** variants (4, 5, 6, 9, 11) are better at 80 columns, and what
+`screen_set_charset` costs in jiffies — it uploads 2 KB to VRAM, so it is not free, and a program
+that switches per dialog would notice.
+
+### How much of the GUI library fits in a bank?
+
+`samples/GPC-HELP` compiles to 22,816 bytes embedded and has **1,620 bytes of workspace left** —
+and it holds nothing but its index; the topic text is read to the screen and dropped precisely
+because there was no room to keep it. The GUI stack is what ate it: measured on this box,
+
+| | object bytes |
+|---|---:|
+| `GPB.INC.BL` alone | 12,331 |
+| `+ THEME + STASH + MENUVERT + LINEINPUT + GUI` | 17,399 |
+| `+ STRCASE + APPSYS` | 17,688 |
+| `+ GUI2` (the listbox) | 19,306 |
+
+So **the GUI stack is ~5,000 bytes of p-code and the listbox another 1,600**, in every program that
+includes them, called or not — a BASL module has no dead code elimination.
+
+The question: can p-code live in a RAM bank and be paged in? A dialog is exactly the right shape
+for it — it runs, it waits for a human, it returns, and nothing else is running while it does. If
+`GOSUB` could reach a routine in a bank, the whole of `GUI` would cost its callers a window and not
+5,000 bytes of workspace.
+
+What to find out first: whether the p-code interpreter's PC can address banked RAM at all, what a
+call across a bank boundary would have to save and restore, and whether the frame stack (`$A000`
+territory itself, 16 pages) can coexist. If the interpreter is hard-wired to low RAM this is a
+runtime change, not a library one — which is the answer worth having before anyone designs it.
+
+
 ### RETURN in the editor was slow — FIXED, the table shift is GP.ASM now
 
 Reported as "inserting a blank line scrolls slowly -- do ten and it takes a second or two", and it
@@ -1656,6 +1763,30 @@ caller in the tree — `source/application/Makefile`, `bench/run-bench.sh`, the 
 
 `GPC.PRG` (`source/gpc/GPC.BASL`, BASLOAD source) is the front end: it asks for the two names, writes
 the file, and hands the machine over to the compiler.
+
+### Two more themes, `x16` and `grey` — TODO
+
+`GPC-BASIC/THEME.INC.BL` ships exactly two palettes, selected by `THEME.DARK` (0 light, non-zero
+dark). Wanted: two more.
+
+- **`x16`** — the machine's own look, the pair the KERNAL sets at power-on. **Read it out of `$0376`
+  on a freshly booted R49 rather than typing what it looks like** — the candidates are `$61` (white
+  on blue) and `$6E` (light blue on blue), and this file's whole point is that the second-hand answer
+  is the one that turns out to be wrong. Note the existing *light* palette is **already blue-backed**
+  (`6*16+6` page, `6*16+1` text), so `x16` is less a new look than the exact one; decide at that
+  point whether `light` should stop being blue.
+- **`grey`** — modelled on **XFMGR**'s panels: a grey page with the border and dimmed roles picked
+  out of 11/12/15 (dk/md/lt grey). Take the numbers off XFMGR itself, not off a memory of it.
+
+Two things fall out of it:
+
+- **`THEME.DARK` stops being the right interface.** A flag cannot select one of four. Rename it
+  `THEME.ID` (0 light, 1 dark, 2 x16, 3 grey) and dispatch on it; every caller in the tree sets
+  `THEME.DARK` today and each one has to move. Nothing here needs backward compatibility.
+- **Each palette is p-code in every program that includes the module**, used or not — seven straight
+  assignments plus a branch, and dead code is not free here (see the module-level elimination item
+  under *A MASTER COMPILER* below). Four palettes roughly doubles `THEME`'s 45 lines. If that reads
+  as too much, the alternative is one indexed table rather than four branches of assignments.
 
 ## Samples
 

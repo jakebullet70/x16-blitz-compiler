@@ -1,0 +1,38 @@
+@3.5 Arrays
+.
+=3.5 ARRAYS
+.
+=SYNTAX
+.
+:GP.ARRPTR(a())
+.
+=WHAT IT COSTS
+.
+.  ASM: GP.ARRPTR
+.    ASM -- a keyword, run by machine code in the GP runtime block. A program
+.    using ANY GP keyword pays for the whole block.
+.
+=DESCRIPTION
+.
+.  | GP.SORT was here and is now SORT.INC.BL (SEC 4.7) -- the same shell sort
+.  | with the same gap sequence, written in GP.ASM. It was 408 bytes of the
+.  | GP block, which is all or nothing, carried by every program that never
+.  | sorted anything. GP.ARRPTR stayed, because the module is built on it: a
+.  | BASL subroutine cannot be handed an array, so an address is the only
+.  | interface there is.
+.
+.GP.ARRPTR returns the address of element zero -- the header is already
+.skipped -- so machine code reached by GP.CALL can work on the array in bulk.
+.Stride is yours to add: 2 bytes per element for a string array (each element
+.is a pointer to the string's block -- follow it, and see GP.STRPTR for the
+.layout), 6 for a numeric one. Multi-dimensional arrays are rejected, and
+.GP.ARRPTR(A(3)) is a syntax error -- add 3*2 or 3*6 yourself.
+.
+=EXAMPLE PROGRAM
+.
+.  ARRAYS.EXP.BL -- runnable, in the GPC-BASIC folder
+.
+=SEE ALSO
+.
+>36|4.7 SORT.INC.BL -- shell sort a string array
+>36|4.7 SORT.INC.BL -- shell sort a string array

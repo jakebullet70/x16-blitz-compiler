@@ -1,0 +1,87 @@
+@6. The traps, collected
+.
+=6. THE TRAPS, COLLECTED
+.
+.Every one of these has cost a debugging session at least once.
+.
+.  P AND 255 on a heap or VRAM address
+.      WHAT HAPPENS: AND is 16-bit signed; above 32767 it raises OUT OF RANGE
+.        instead of masking
+.      DO THIS: H = INT(P/256) : L = P - H*256
+.
+.  $0400 for machine code
+.      WHAT HAPPENS: stock BASIC leaves it free, a compiled GPC program does
+.        not -- runtime state lives there, and it corrupts silently
+.      DO THIS: banked RAM, $A000-$BFFF
+.
+.  PRINT after GP.PRINTAT
+.      WHAT HAPPENS: GP drawing never calls the KERNAL, so the cursor is
+.        wherever it was
+.      DO THIS: LOCATE first, or stay in one world
+.
+.  GOTO sideways, one GP.DO into another
+.      WHAT HAPPENS: .unwind counts depth difference, so sideways closes
+.        nothing and the loop frame leaks
+.      DO THIS: jump out first, or GP.EXITDO
+.
+.  GP.ARRPTR(A$)
+.      WHAT HAPPENS: A$ and A$() are different variables -- it finds the
+.        scalar
+.      DO THIS: GP.ARRPTR(A$())
+.
+.  SORT.INC.BL with no #SYMFILE
+.      WHAT HAPPENS: {VAR} cannot resolve a crunched name -- NO SYMBOL FILE
+.        FOR {}
+.      DO THIS: #SYMFILE "@:PROG.SYM", before the #INCLUDEs
+.
+.  GP.BOX X,Y,W,H,,7
+.      WHAT HAPPENS: optionals cannot be skipped over
+.      DO THIS: GP.BOX X,Y,W,H,0,7
+.
+.  SCREEN after BMX.PAINT
+.      WHAT HAPPENS: reloads the default palette and throws the image's
+.        colours away
+.      DO THIS: set the mode first
+.
+.  DIM THEME.CLR(...)
+.      WHAT HAPPENS: the module owns it; re-DIMing is an error
+.      DO THIS: leave it alone
+.
+.  STR.FIELD$ wanted bigger
+.      WHAT HAPPENS: auto-DIMed at 0..10 on first use, and you cannot DIM it
+.        after
+.      DO THIS: DIM it before the first call, set STR.MAX
+.
+.  #DEFINE X 129536
+.      WHAT HAPPENS: #DEFINE takes an INT16 -- ERROR: INVALID PARAMETER
+.      DO THIS: an ordinary variable
+.
+.  RPT$(c, 0)
+.      WHAT HAPPENS: raises ILLEGAL QUANTITY -- it does not return ""
+.      DO THIS: guard the zero case
+.
+.  a GP. keyword in a hand-written .bas
+.      WHAT HAPPENS: the ROM cannot LIST or RUN a $CE7x token
+.      DO THIS: expected -- compile it
+.
+.  readable names in a hand-written .bas
+.      WHAT HAPPENS: the built-in BASIC gives TWO significant characters --
+.        THEME.CLR and THEME.COUNT become one variable, silently
+.      DO THIS: write BASL, or give every variable a distinct first two
+.        characters
+.
+.The last one is worth its own sentence. Inside BASL you are safe -- 64
+.significant characters, so PANEL.COL and PANEL.ROW are genuinely different
+.variables and the readable names cost nothing. Write the same test as a raw
+..bas for the host tokeniser and the two-character rule is back. It cost two
+.test cycles during tier 6, both times looking exactly like a compiler bug.
+.
+.Dotted names also dodge the keyword-collision trap: MENUVERT.COUNT,
+.THEME.CLR, LINEINPUT.LEN and LINEINPUT.RETURN all contain reserved words and
+.all work, because BASLOAD matches the whole identifier. An undotted one does
+.not -- POS, MB, ST, LEN, CHAR cannot be variables at all. That is the main
+.reason the library is dotted throughout.
+.
+=SEE ALSO
+.
+>36|4.7 SORT.INC.BL -- shell sort a string array

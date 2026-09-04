@@ -1,0 +1,5 @@
+# The X16 reads these back byte for byte and the viewer addresses topics by
+# LINE NUMBER, so a checkout that rewrote the endings would still work but
+# would change every file's size for no reason. Keep them exactly as built.
+*.HLP -text
+*.IDX -text

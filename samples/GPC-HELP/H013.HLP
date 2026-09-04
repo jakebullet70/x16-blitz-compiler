@@ -1,0 +1,28 @@
+@3.9 Inline assembly (2)
+=What is not there
+.
+.No expressions -- {N%}+1 and LABEL+2 are not understood; use an index
+.register, which is what the 6502 wants anyway. Zero page or absolute is
+.decided by the operand: $34 is zero page, $0034 is absolute, a decimal under
+.256 is zero page. Every 65C02 addressing mode is available, including the
+.two the NMOS 6502 lacks -- LDA ($34) and JMP ($1234,X) -- except BBR/BBS/
+.RMB/SMB.
+.
+.Registers come back through GP.A / GP.X / GP.Y / GP.C exactly as they do
+.from GP.CALL, because a block goes through the same $030C-$030F slots -- but
+.those four are GP block keywords, so reading one costs the 2 KB the block
+.otherwise saves you. {VAR} does not.
+.
+.A body can come from a file, which is the same thing spelt differently --
+.#INCLUDE splices it in verbatim, and BASLOAD's own REM #nn-mm attribution
+.means an error inside names the file:
+.
+:#REM 1
+:GP.ASM
+:#INCLUDE "MACPTR.ASM"
+:GP.ENDASM
+:#REM 0
+.
+=EXAMPLE PROGRAM
+.
+.  ASM.EXP.BL -- runnable, in the GPC-BASIC folder

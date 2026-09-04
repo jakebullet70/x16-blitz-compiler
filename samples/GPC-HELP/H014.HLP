@@ -1,0 +1,8 @@
+@4. Module reference -- the BASL library
+.
+=4. MODULE REFERENCE -- THE BASL LIBRARY
+.
+.Called with GOSUB. Arguments go in named variables first, results come back
+.in named variables after. Every one of these files is position-independent
+.(each jumps over itself), so #INCLUDE it anywhere, the top of the program
+.included.
