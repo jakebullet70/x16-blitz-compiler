@@ -27,6 +27,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 ## Build and toolchain
 - **Build setup** — *(note missing: linked by the index but never committed)* how to build it, and the 5 blockers that made a fresh clone unbuildable on any OS. See docs/BUILDING.md.
 - [Build toolchain location](build-toolchain-location.md) — make, 64tass and python are off-PATH in C:\8bitProgramming
+- [Measure p-code per module](measure-pcode-per-module.md) — the map file plus the SYM give exact bytes per include and per routine
 - [Headless BASL build recipe](headless-basl-build-recipe.md) — the three emulator runs and the stop conditions that keep a cycle to ~70s
 - [GPC.ERR builds shared, in the main dir](gpcerr-build-shared-in-main-dir.md) — never standalone; the headless harness builds the wrong kind
 - [Tests share the product's memory](tests-share-the-products-memory.md) — the harness was 3,615 B of workspace; and BASLOAD does not nest #IFNDEF
