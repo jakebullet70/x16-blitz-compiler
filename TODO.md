@@ -1024,35 +1024,34 @@ outcome, so there is nothing for a second key to mean.
 `DUPLICATE SYMBOL`, and the `$` does not separate them. `GUI.TEXT`/`GUI.INPUT$` had already been
 through this; the header says so.
 
-### `GUI.SAY` — let the caller name the button
+### `GUI.YN` — let the caller name the two buttons
 
-Today the button says `OK`, or whatever bare text is in `GUI.HINT$`. That is right for "wrote 34
-lines" and wrong for everything where the acknowledgement IS the verb: a `< DISMISS >`, a
-`< GOT IT >`, a `< CONTINUE >` at the end of a wizard step.
+**Half done.** `&` in a label now marks the accelerator (`"&SAVE"` answers to S), and `GUI.SAY`
+already takes its label from `GUI.HINT$`, so a caller can say `< DISMISS >` today. `GUI.YN` cannot:
+it overwrites `GUI.BTN.ONE$` / `GUI.BTN.TWO$` at the top from `GUI.OKCANCEL`, so the two choices are
+YES/NO or OK/CANCEL and nothing else — even though everything below now reads the keys back off
+whatever was drawn, so `< SAVE >` / `< DISCARD >` would work the moment the labels got through.
 
-`GUI.HINT$` already carries it, so the shape is there — what is missing is that **the caller cannot
-say it without also knowing the button convention**. Decide alongside the buttons question below,
-because the two share `GUI.BUTTON.ONE$`:
+The shape to decide: a third `GUI.OKCANCEL` mode reading caller-set labels, or a `GUI.BTN.CUSTOM`
+flag that says "leave what I put there alone".
 
-- keep `GUI.HINT$` as the label and document it as such (no code, just a header and a name that
-  stops reading like a hint line), or
-- give it its own input — `GUI.BTN$`, defaulting to `OK` — and leave `GUI.HINT$` meaning what it
-  means in `GUI.TEXT` and `GUI.MENU`.
-
-The second is cleaner and costs a variable. **The trap is stickiness**: every input in this library
-persists, so a caller that sets a label once sets it for every box afterwards. `GUI.SAY` already
-clears `GUI.HINT$` for exactly this reason and whatever replaces it has to do the same, or the
-"not found" box in `samples/GPC-HELP` ends up saying `< DISMISS >` because something else did.
-
-Worth doing at the same time for `GUI.YN`: `< YES >` / `< NO >` is not always the question, and
-`< SAVE >` / `< DISCARD >` reads better than a hint line explaining which is which.
+**The trap is stickiness**: every input in this library persists, so a caller that sets labels once
+sets them for every dialog afterwards. `GUI.SAY` already clears `GUI.HINT$` for exactly this reason,
+and whatever gets added has to do the same — or the "not found" box ends up offering
+`< DISCARD >` because something else did.
 
 ### Buttons — decide whether the library adopts them
 
 `samples/GPC-HELP/GPC-BASIC/GUI.INC.BL` is a **deliberately diverged copy**: the answers are drawn
 as `< OK >` in the panel's own attribute with the nibbles swapped, where the library still prints a
-dimmed hint line with one letter lit. `GUI.BUTTON`, `GUI.BUTTON.SIZE` and `GUI.BUTTON.ROW` are the
-three routines; `GUI.YN`, `GUI.TEXT` and `GUI.SAY` call them.
+dimmed hint line with one letter lit. `GUI.BUTTON`, `GUI.BUTTON.SIZE`, `GUI.BUTTON.WIDE`,
+`GUI.BUTTON.ROW` and `GUI.BTN.PAIR` are the routines; `GUI.YN`, `GUI.TEXT` and `GUI.SAY` call them.
+`GUI.YN.MARK` was deleted — the hint line it repainted does not exist in this copy, and a BASL
+module has no dead code elimination.
+
+**`&` marks the accelerator**: `"&OK"` draws `< OK >` with the O lit and answers to O or o. The `&`
+is neither drawn nor counted in the width, and it is the only place the key is written down.
+`GUI.TEXT` has none on purpose — there every printable key belongs to the field.
 
 It is out here rather than in `GPC-BASIC/` so the look can be seen running before every dialog in
 the tree changes. **The decision to make**: adopt it into the library (which changes

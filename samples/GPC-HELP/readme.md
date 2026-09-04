@@ -84,7 +84,7 @@ python source\gpc\compile_shared.py --embedded HELP.SRC.PRG HELP.PRG
 ```
 
 then copy `HELP.PRG` back here. **EMBEDDED, not shared**, so this directory stands on its own
-without a `GPB.RT.nnn.BIN` whose name carries a build number. 22,259 bytes.
+without a `GPB.RT.nnn.BIN` whose name carries a build number. 22,603 bytes.
 
 **No `#AUTONUM`.** With `STRCASE.INC.BL` included it resolves label targets against the wrong step
 and the compile stops with `UNKNOWN LINE NUMBER`.
@@ -156,6 +156,26 @@ single-line slides against one full repaint at that offset, and ten down plus te
 the same. **Rows 1–27 are byte-identical, characters and attributes.** The only row that differs is
 29, which the full repaint blanks and the slide leaves alone, which is the point.
 
+### `&` in a button label marks the key
+
+`"&OK"` draws `< OK >` with the `O` in the key colour and answers to `O` or `o`; `"&CANCEL"` to `C`
+or `c`. The `&` is not drawn and **not counted in the width** — get that off by one and the box is a
+cell too wide with the buttons off centre in it.
+
+**The label is the only place the key is written down.** `GUI.YN` reads back whatever the drawn
+button actually marked, so `GUI.BTN.ONE$ = "&SAVE"` / `"&DISCARD"` answers to S and D with nothing
+else to keep in step. Measured: keys 83 and 68, and the two letters carry the highlight attribute.
+
+**`GUI.TEXT` deliberately has no `&`.** Every printable key there belongs to the field, so an `O`
+cannot close the dialog — it types an `O`. Marking a letter that does nothing is worse than marking
+none.
+
+The marked letter keeps the button's background and takes `THEME.WARN`'s foreground, so it reads as
+part of the button rather than a hole in it. If a palette ever made those two equal it falls back to
+the panel attribute, which contrasts by construction — the button being the panel reversed.
+
+There is **no escape for a literal `&`**; a label that needs one cannot have an accelerator.
+
 ### The bars are reversed
 
 `THEME.HI` trades an attribute's two nibbles, which is what turns white-on-black text into a
@@ -187,7 +207,8 @@ flag, because `screen_set_charset` does not clear bit 6 on its own.
 
 `GPC-BASIC/GUI.INC.BL` in this directory draws the answers as **buttons** — `< OK >` in the panel's
 own attribute with the nibbles swapped — where the library still prints a dimmed hint line with one
-letter lit. `GUI.BUTTON`, `GUI.BUTTON.SIZE` and `GUI.BUTTON.ROW` are the three new routines.
+letter lit. `GUI.BUTTON`, `GUI.BUTTON.SIZE`, `GUI.BUTTON.WIDE`, `GUI.BUTTON.ROW` and `GUI.BTN.PAIR` are the
+new routines. `GUI.YN.MARK` went the other way: the hint line it repainted no longer exists here.
 
 It is here rather than in the master `GPC-BASIC/` so the look can be seen running before every
 dialog in the tree changes; nothing else compiles against this copy. See TODO.md, "Buttons — decide
@@ -202,6 +223,12 @@ Y and the first N in the line are lit as the keys" has nothing to light when the
 `HELP.BASL` carries a headless harness behind one flat symbol. **Comment out `#DEFINE
 HELP.RELEASE 1`** and build as above; it runs instead of the viewer, prints to the log, and stops.
 A BASL module has no dead code elimination, so leaving it in would be p-code every user carries.
+
+**Do not stack another check on top of it.** The self-check build ends with about 1,000 bytes of
+workspace, and adding a second harness beside it dies with `OUT OF MEMORY` partway through — which
+reads like a product fault and is not one. Measured in the shipping configuration: **2,408 bytes
+free** after the biggest topic, twenty slides, a dialog and a menu, and FRE does not move across the
+slides, so the slide leaks nothing. Extra harnesses go in their own build.
 
 It asserts the thing that cannot be checked by looking — that every row in `HELP.IDX` still reaches
 the topic `MKHELP.PY` meant it to:
@@ -227,7 +254,7 @@ not a test double.
 | | |
 |---|---|
 | `HELP.BASL` | the viewer |
-| `HELP.PRG` | compiled, embedded, 22,259 bytes — what `help-demo.bat` runs |
+| `HELP.PRG` | compiled, embedded, 22,603 bytes — what `help-demo.bat` runs |
 | `MKHELP.PY` | the content build |
 | `HELP.IDX` | the master index, 89 rows |
 | `H001.HLP`…`H038.HLP` | one topic each |

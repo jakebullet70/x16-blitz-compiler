@@ -10,6 +10,15 @@
 ## **  seen running before every dialog in the tree changes; nothing else
 ## **  compiles against this file. See samples/GPC-HELP/readme.md.
 ## **
+## **  "&" IN A BUTTON LABEL marks the next character as the key: "&OK" draws
+## **  < OK > with the O in the key colour and answers to O or o, "&CANCEL" to
+## **  C or c. The "&" is not drawn and not counted in the width. It is the
+## **  ONLY place the key is written down -- GUI.YN reads back what the button
+## **  actually marked -- so "&SAVE" / "&DISCARD" needs no other change. A label
+## **  with no "&" simply has no letter key, which is what GUI.TEXT wants: there
+## **  every printable key belongs to the field. There is no escape for a
+## **  literal "&"; a label that needs one cannot have an accelerator.
+## **
 ## **  What diverges: GUI.BUTTON / GUI.BUTTON.ROW / GUI.BUTTON.SIZE are new,
 ## **  GUI.YN and GUI.TEXT and GUI.SAY draw with them, and GUI.YN no longer
 ## **  reads GUI.HINT$ -- its two labels are the answers themselves.
@@ -170,11 +179,11 @@ GUI.YN:
 ## ---- a default string rather than in two routines.
     GUI.YES = GUI.UY : GUI.YES.ALT = GUI.LY
     GUI.NO = GUI.UN : GUI.NO.ALT = GUI.LN
-    GUI.BTN.ONE$ = "YES" : GUI.BTN.TWO$ = "NO"
+    GUI.BTN.ONE$ = "&YES" : GUI.BTN.TWO$ = "&NO"
     IF GUI.OKCANCEL = 0 THEN GOTO GUI.YN.SET
     GUI.YES = GUI.UO : GUI.YES.ALT = GUI.LO
     GUI.NO = GUI.UC : GUI.NO.ALT = GUI.LC
-    GUI.BTN.ONE$ = "OK" : GUI.BTN.TWO$ = "CANCEL"
+    GUI.BTN.ONE$ = "&OK" : GUI.BTN.TWO$ = "&CANCEL"
 
 GUI.YN.SET:
     ## THE LABELS ARE THE ANSWERS, so GUI.HINT$ is not read here any more --
@@ -186,6 +195,19 @@ GUI.YN.SET:
     GOSUB GUI.OPEN
     GUI.BTN.Y = GUI.INNER.TOP
     GOSUB GUI.BUTTON.ROW
+
+## ---- THE LABEL IS NOW THE ONLY PLACE THE KEY IS WRITTEN DOWN. The four
+## ---- assignments above set the defaults; whatever "&" the drawn button
+## ---- actually marked wins, so "&SAVE" / "&DISCARD" answers to S and D with
+## ---- nothing here to keep in step.
+    GP.IF GUI.BTN.KEY.ONE <> 0 THEN
+        GUI.BTN.OF = GUI.BTN.KEY.ONE : GOSUB GUI.BTN.PAIR
+        GUI.YES = GUI.BTN.UC : GUI.YES.ALT = GUI.BTN.LC
+    GP.ENDIF
+    GP.IF GUI.BTN.KEY.TWO <> 0 THEN
+        GUI.BTN.OF = GUI.BTN.KEY.TWO : GOSUB GUI.BTN.PAIR
+        GUI.NO = GUI.BTN.UC : GUI.NO.ALT = GUI.BTN.LC
+    GP.ENDIF
     GUI.ANSWER = 0
 
 ## ---- Six keys scattered across 256 with everything else falling through: the
@@ -217,23 +239,6 @@ GUI.YN.DONE:
     GOSUB GUI.CLOSE : RETURN
 
 ## ***********************************************************************
-## **  GUI.YN.MARK -- repaint one letter of the hint in the key colour.
-## **
-## **   in   GUI.MARK.CH    the character code to look for
-## **        GUI.HINT.LINE$ GUI.HINT.LEFT GUI.INNER.TOP   the line as printed
-## **
-## **  THE FIRST MATCH WINS, so a key's letter has to be the first of its kind in
-## **  the line -- which is why "YES      NO" and "OK      CANCEL" are in that
-## **  order. A hint string that puts an N before the NO lights the wrong cell.
-## ***********************************************************************
-
-GUI.YN.MARK:
-    FOR GUI.INDEX = 1 TO LEN(GUI.HINT.LINE$)
-        IF ASC(MID$(GUI.HINT.LINE$, GUI.INDEX, 1)) = GUI.MARK.CH THEN GP.PRINTAT GUI.HINT.LEFT + GUI.INDEX - 1, GUI.INNER.TOP, MID$(GUI.HINT.LINE$, GUI.INDEX, 1), THEME.CLR(THEME.TITLE) : RETURN
-    NEXT GUI.INDEX
-    RETURN
-
-## ***********************************************************************
 ## **  GUI.BUTTON -- one answer, drawn as a button.
 ## **
 ## **   in   GUI.BTN.TEXT$   the label, without its brackets
@@ -254,7 +259,41 @@ GUI.YN.MARK:
 ## ***********************************************************************
 
 GUI.BUTTON:
-    GP.PRINTAT GUI.BTN.X, GUI.BTN.Y, "< " + GUI.BTN.TEXT$ + " >", GUI.BTN.ATTR
+    GUI.BTN.KEY = 0
+    GUI.BTN.AMP = GP.INSTR(GUI.BTN.TEXT$, "&")
+    GP.IF GUI.BTN.AMP = 0 THEN
+        GP.PRINTAT GUI.BTN.X, GUI.BTN.Y, "< " + GUI.BTN.TEXT$ + " >", GUI.BTN.ATTR
+        RETURN
+    GP.ENDIF
+    GUI.BTN.HEAD$ = LEFT$(GUI.BTN.TEXT$, GUI.BTN.AMP - 1)
+    GUI.BTN.MARK$ = MID$(GUI.BTN.TEXT$, GUI.BTN.AMP + 1, 1)
+    GUI.BTN.TAIL$ = MID$(GUI.BTN.TEXT$, GUI.BTN.AMP + 2)
+    IF GUI.BTN.MARK$ <> "" THEN GUI.BTN.KEY = ASC(GUI.BTN.MARK$)
+## ---- Three prints, not one: GP.PRINTAT takes ONE attribute for the whole
+## ---- string, so a differently coloured letter is a separate call. The two
+## ---- ends are never empty -- they carry the brackets -- but the middle is,
+## ---- for a trailing "&", and GP.PRINTAT of "" is not something to hand it.
+    GP.PRINTAT GUI.BTN.X, GUI.BTN.Y, "< " + GUI.BTN.HEAD$, GUI.BTN.ATTR
+    GUI.BTN.AT = GUI.BTN.X + 2 + LEN(GUI.BTN.HEAD$)
+    IF GUI.BTN.MARK$ <> "" THEN GP.PRINTAT GUI.BTN.AT, GUI.BTN.Y, GUI.BTN.MARK$, GUI.BTN.HI
+    GP.PRINTAT GUI.BTN.AT + LEN(GUI.BTN.MARK$), GUI.BTN.Y, GUI.BTN.TAIL$ + " >", GUI.BTN.ATTR
+    RETURN
+
+## ***********************************************************************
+## **  GUI.BTN.PAIR -- a letter's two cases, so a key test can take either.
+## **
+## **   in   GUI.BTN.OF    a character code    out  GUI.BTN.UC  GUI.BTN.LC
+## **
+## **  ARITHMETIC, NOT STRCASE.INC.BL: this is two comparisons on one byte, and
+## **  a dialog should not drag a whole module in to fold a single letter. A
+## **  code that is not a letter comes back as itself in both, which is what
+## **  makes "&1" answer to "1" rather than to nothing.
+## ***********************************************************************
+
+GUI.BTN.PAIR:
+    GUI.BTN.UC = GUI.BTN.OF : GUI.BTN.LC = GUI.BTN.OF
+    IF GUI.BTN.OF > 96 AND GUI.BTN.OF < 123 THEN GUI.BTN.UC = GUI.BTN.OF - 32
+    IF GUI.BTN.OF > 64 AND GUI.BTN.OF < 91 THEN GUI.BTN.LC = GUI.BTN.OF + 32
     RETURN
 
 ## ***********************************************************************
@@ -270,12 +309,22 @@ GUI.BUTTON:
 ## ***********************************************************************
 
 GUI.BUTTON.SIZE:
-    GUI.BTN.W.ONE = LEN(GUI.BTN.ONE$) + 4
+    GUI.BTN.TEXT$ = GUI.BTN.ONE$ : GOSUB GUI.BUTTON.WIDE
+    GUI.BTN.W.ONE = GUI.BTN.WIDE
     GUI.BTN.W.TWO = 0
     GUI.BTN.TOTAL = GUI.BTN.W.ONE
     IF GUI.BTN.TWO$ = "" THEN RETURN
-    GUI.BTN.W.TWO = LEN(GUI.BTN.TWO$) + 4
+    GUI.BTN.TEXT$ = GUI.BTN.TWO$ : GOSUB GUI.BUTTON.WIDE
+    GUI.BTN.W.TWO = GUI.BTN.WIDE
     GUI.BTN.TOTAL = GUI.BTN.W.ONE + GUI.BTN.GAP + GUI.BTN.W.TWO
+    RETURN
+
+## ---- "< " + label + " >" is four cells more than the label, LESS the "&",
+## ---- which marks a letter and is not one. Get this wrong by one and the box
+## ---- is a cell too wide with the buttons off centre inside it.
+GUI.BUTTON.WIDE:
+    GUI.BTN.WIDE = LEN(GUI.BTN.TEXT$) + 4
+    IF GP.INSTR(GUI.BTN.TEXT$, "&") > 0 THEN GUI.BTN.WIDE = GUI.BTN.WIDE - 1
     RETURN
 
 ## ***********************************************************************
@@ -290,12 +339,21 @@ GUI.BUTTON.ROW:
     ## The panel, with its two nibbles traded. GUI.PANEL is background * 16 +
     ## foreground, so this is the same two colours the other way up.
     GUI.BTN.ATTR = (GUI.PANEL AND 15) * 16 + INT(GUI.PANEL / 16)
+## ---- The marked letter keeps the button's BACKGROUND and takes WARN's
+## ---- foreground, so it reads as part of the button rather than a hole in it.
+## ---- If that palette happens to make the two equal the letter would vanish,
+## ---- so it falls back to the panel itself -- which contrasts by construction,
+## ---- the button being the panel reversed.
+    GUI.BTN.HI = INT(GUI.BTN.ATTR / 16) * 16 + (THEME.CLR(THEME.WARN) AND 15)
+    IF (GUI.BTN.HI AND 15) = INT(GUI.BTN.HI / 16) THEN GUI.BTN.HI = GUI.PANEL
     GUI.BTN.X = GUI.INNER.LEFT + INT((GUI.INNER.WIDTH - GUI.BTN.TOTAL) / 2)
     IF GUI.BTN.X < GUI.INNER.LEFT THEN GUI.BTN.X = GUI.INNER.LEFT
     GUI.BTN.TEXT$ = GUI.BTN.ONE$ : GOSUB GUI.BUTTON
+    GUI.BTN.KEY.ONE = GUI.BTN.KEY : GUI.BTN.KEY.TWO = 0
     IF GUI.BTN.TWO$ = "" THEN RETURN
     GUI.BTN.X = GUI.BTN.X + GUI.BTN.W.ONE + GUI.BTN.GAP
     GUI.BTN.TEXT$ = GUI.BTN.TWO$ : GOSUB GUI.BUTTON
+    GUI.BTN.KEY.TWO = GUI.BTN.KEY
     RETURN
 
 ## ***********************************************************************
@@ -323,7 +381,7 @@ GUI.BUTTON.ROW:
 
 GUI.SAY:
     GUI.BTN.ONE$ = GUI.HINT$
-    IF GUI.BTN.ONE$ = "" THEN GUI.BTN.ONE$ = "OK"
+    IF GUI.BTN.ONE$ = "" THEN GUI.BTN.ONE$ = "&OK"
     GUI.BTN.TWO$ = ""
     GOSUB GUI.BUTTON.SIZE
     GUI.BODY.ROWS = 1 : GUI.BODY.WIDTH = GUI.BTN.TOTAL
@@ -339,6 +397,14 @@ GUI.SAY.WAIT:
         GP.CASE GUI.RETURN, GUI.SPACE, GUI.ESCAPE, GUI.STOP
             GUI.DONE = 1
     GP.ENDSEL
+    ## The marked letter closes it too, in either case. GP.SELECT cannot take a
+    ## variable in a GP.CASE, so this is tested outside it -- and only when the
+    ## label actually marked one, or "" would match every key.
+    GP.IF GUI.BTN.KEY.ONE <> 0 THEN
+        GUI.BTN.OF = GUI.BTN.KEY.ONE : GOSUB GUI.BTN.PAIR
+        IF GUI.KEY = GUI.BTN.UC THEN GUI.DONE = 1
+        IF GUI.KEY = GUI.BTN.LC THEN GUI.DONE = 1
+    GP.ENDIF
     IF GUI.DONE = 0 THEN GOTO GUI.SAY.WAIT
     GOSUB GUI.CLOSE : RETURN
 
@@ -407,6 +473,10 @@ GUI.MENU:
 
 GUI.TEXT:
     IF GUI.LEN = 0 THEN GUI.LEN = 20
+## ---- NO "&" HERE, deliberately. Every printable key belongs to the field, so
+## ---- an O could not close the dialog -- it types an O. Marking a letter that
+## ---- does nothing is worse than marking none: RETURN and ESC are the way out
+## ---- and the hint line below already says so.
     GUI.BTN.ONE$ = "OK" : GUI.BTN.TWO$ = "CANCEL"
     GOSUB GUI.BUTTON.SIZE
     GUI.BODY.ROWS = 3 : GUI.BODY.WIDTH = GUI.LEN
