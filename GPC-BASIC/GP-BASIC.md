@@ -1130,27 +1130,8 @@ list of them. They are tokens rather than variables for a hard reason: **nothing
 can write a BASIC variable by name**, so a command that hands a value back has to hand it back
 through a keyword. X16's own `ST`, `MX` and `MY` exist for the same reason.
 
-### Nothing here is re-entrant
-
-A module's parameters **are** its globals; there is nowhere else to put them. So `LINEINPUT.GET` cannot
-be called from inside itself, `BMX.OPEN` cannot nest, and a `GOSUB` from inside a module into code
-that calls the same module corrupts it silently. In practice this only bites if you write a callback
-— copy the values you care about into your own variables first. `THEME.*` is the exception:
-`THEME.LOAD` only writes.
-
-### Labels are global too
-
-Every `NAME:` is a jump target in the same flat space, internal ones included —
-`BMX.STREAM.MORE`, `LINEINPUT.REDRAW`, `THEME.LOAD.DARK`. Each module also has a skip label it jumps
-over itself with (`THEME.SKIP`, `APPSYS.SKIP`, `STR.SKIP`, `BMX.MODULE.END`,
-`LINEINPUT.MODULE.END`). **Do not branch to one.**
-
-**BASLOAD refuses a name used as both a label and a variable** (`BASLOAD.MD:319`) — which is why
-`BMX`'s skip label is `BMX.MODULE.END` and not `BMX.SKIP`: that name was already the byte-skip
-counter.
-
 **→ The complete per-module in / out / internal register is [GP-BASIC.GLOBALS.md](GP-BASIC.GLOBALS.md),
-with a script in §7 *of that file* for re-checking it after a change.**
+with a script in §6 *of that file* for re-checking it after a change.**
 
 ---
 

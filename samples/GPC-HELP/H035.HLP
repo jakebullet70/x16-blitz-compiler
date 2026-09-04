@@ -1,30 +1,23 @@
-@5. Labels are global too
+@5. Two more naming rules that are not about collisions
 .
-=5. LABELS ARE GLOBAL TOO
+=5. TWO MORE NAMING RULES THAT ARE NOT ABOUT COLLISIONS
 .
-.Every NAME: in every module is a jump target in one flat space, including
-.the ones you were never meant to call. BMX.STREAM.MORE, LINEINPUT.REDRAW,
-.THEME.LOAD.DARK and most of MENUVERT.* are internal, and a GOSUB to one will
-.do something, just not something useful.
+.#DEFINE takes an INT16 (BASLOAD.MD:313). A constant above 65535 is ERROR:
+.INVALID PARAMETER, not a warning -- which is why BMX.PALBASE (VRAM $1FA00,
+.129536) is an ordinary variable and not a #DEFINE. Every VRAM address past
+.$FFFF has the same problem.
 .
-.MENUVERT is the module with the most of them, because driving a menu is
-.mostly branching: MENUVERT.RUN, MENUVERT.DRAW, MENUVERT.ROW and
-.MENUVERT.HOTFIND are the four you may call. MENUVERT.WAIT, .KEYED, .SETTLE,
-..WRAPTOP, .WRAPBOT, .CANCEL, .HOTKEY, .PADKEY, .PADREAD and the three FOLD
-.helpers are not.
+.A dotted name whose tail is a reserved word is fine. MENUVERT.COUNT,
+.THEME.CLR, LINEINPUT.LEN and LINEINPUT.RETURN all contain keywords and all
+.work, because BASLOAD matches the whole identifier. An undotted one does
+.not: POS, MB, ST, LEN and CHAR cannot be variables at all. This is the main
+.reason the library is dotted throughout.
 .
-.STRINGS has two of its own, both loop continuations rather than entry
-.points: STR.SPLIT.NEXT and STR.REPLACE.NEXT. Enter either one directly and
-.you resume a loop whose accumulators were never initialised. The callable
-.names are STR.PADR, PADL, PADC, SPLIT, REPLACE and PET2SCR.
-.
-.Each module also has a skip label it jumps over itself with -- THEME.SKIP,
-.APPSYS.SKIP, STR.SKIP, BMX.MODULE.END, LINEINPUT.MODULE.END,
-.MENUVERT.MODULE.END. Those exist so an include can sit anywhere in the file,
-.the top included. Do not branch to one.
-.
-.One trap found the hard way, worth repeating: BASLOAD refuses a name used as
-.both a label and a variable (BASLOAD.MD:319). BMX.SKIP is the byte-skip
-.counter, so the module's skip label had to be BMX.MODULE.END -- a name is
-.either a label or a variable, never both.
+.And the rule that only applies outside BASL: BASLOAD gives 64 significant
+.characters, but the built-in BASIC gives two. Write the same code as a
+.hand-typed .bas for the host tokeniser and THEME.CLR and THEME.COUNT become
+.the same variable. That is a silent wrong answer -- it cost two test cycles
+.during tier 6, both times looking exactly like a compiler bug. Inside BASL
+.you are safe; in a raw .bas, give every variable a distinct first two
+.characters.
 .

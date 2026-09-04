@@ -47,10 +47,9 @@ python samples/GPC-HELP/MKHELP.PY
   - [2. GP.* is keywords, not variables -- and the difference bites](#2-gp-is-keywords-not-variables----and-the-difference-bites)
   - [3. The modules](#3-the-modules)
   - [3. The modules (2)](#3-the-modules-2)
-  - [4. Nothing here is re-entrant, and that is not a bug you can work around](#4-nothing-here-is-re-entrant-and-that-is-not-a-bug-you-can-work-around)
-  - [5. Labels are global too](#5-labels-are-global-too)
-  - [6. Two more naming rules that are not about collisions](#6-two-more-naming-rules-that-are-not-about-collisions)
-  - [7. Regenerating this](#7-regenerating-this)
+  - [4. Labels are global too](#4-labels-are-global-too)
+  - [5. Two more naming rules that are not about collisions](#5-two-more-naming-rules-that-are-not-about-collisions)
+  - [6. Regenerating this](#6-regenerating-this)
 - **THE TRAPS**
   - [6. The traps, collected](#6-the-traps-collected)
 
@@ -1661,32 +1660,13 @@ list of them. They are tokens rather than variables for a hard reason: **nothing
 can write a BASIC variable by name**, so a command that hands a value back has to hand it back
 through a keyword. X16's own `ST`, `MX` and `MY` exist for the same reason.
 
-##### Nothing here is re-entrant
-
-A module's parameters **are** its globals; there is nowhere else to put them. So `LINEINPUT.GET` cannot
-be called from inside itself, `BMX.OPEN` cannot nest, and a `GOSUB` from inside a module into code
-that calls the same module corrupts it silently. In practice this only bites if you write a callback
-— copy the values you care about into your own variables first. `THEME.*` is the exception:
-`THEME.LOAD` only writes.
-
-##### Labels are global too
-
-Every `NAME:` is a jump target in the same flat space, internal ones included —
-`BMX.STREAM.MORE`, `LINEINPUT.REDRAW`, `THEME.LOAD.DARK`. Each module also has a skip label it jumps
-over itself with (`THEME.SKIP`, `APPSYS.SKIP`, `STR.SKIP`, `BMX.MODULE.END`,
-`LINEINPUT.MODULE.END`). **Do not branch to one.**
-
-**BASLOAD refuses a name used as both a label and a variable** (`BASLOAD.MD:319`) — which is why
-`BMX`'s skip label is `BMX.MODULE.END` and not `BMX.SKIP`: that name was already the byte-skip
-counter.
-
 **→ The complete per-module in / out / internal register is [GP-BASIC.GLOBALS.md](GP-BASIC.GLOBALS.md),
-with a script in §7 *of that file* for re-checking it after a change.**
+with a script in §6 *of that file* for re-checking it after a change.**
 
 ---
 
 
-*See also: 4.2 STRINGS.INC.BL -- string helpers, 4.1 THEME.INC.BL -- named colour roles, 4.3 APPSYS.INC.BL -- start politely, leave it as you found it, 4.4 LINEINPUT.INC.BL -- a positioned entry field, 4.6 MENUVERT.INC.BL -- a vertical menu, 4.5 BMX.INC.BL -- a BMX bitmap into VERA*
+*See also: 6. The traps, collected, 4.2 STRINGS.INC.BL -- string helpers, 4.1 THEME.INC.BL -- named colour roles, 4.3 APPSYS.INC.BL -- start politely, leave it as you found it, 4.4 LINEINPUT.INC.BL -- a positioned entry field, 4.6 MENUVERT.INC.BL -- a vertical menu, 4.5 BMX.INC.BL -- a BMX bitmap into VERA*
 
 ## 1. The prefixes that are taken
 
@@ -1839,27 +1819,9 @@ you. `MENUVERT.HOTFIND` reads the first two and answers in `MENUVERT.HOTAT`.
 
 *See also: 4.1 THEME.INC.BL -- named colour roles, 4.3 APPSYS.INC.BL -- start politely, leave it as you found it, 4.2 STRINGS.INC.BL -- string helpers, 4.4 LINEINPUT.INC.BL -- a positioned entry field, 4.5 BMX.INC.BL -- a BMX bitmap into VERA, 4.6 MENUVERT.INC.BL -- a vertical menu*
 
-## 4. Nothing here is re-entrant, and that is not a bug you can work around
+## 4. Labels are global too
 
-#### 4. Nothing here is re-entrant, and that is not a bug you can work around
-
-A module's parameters *are* its globals. There is nowhere else to put them. So:
-
-- **You cannot call `LINEINPUT.GET` from inside `LINEINPUT.GET`** — no callback out of a field.
-- **You cannot nest `BMX.OPEN`** — one file at a time, and `BMXK.LFN` says so too.
-- **A `GOSUB` from inside a module into code that calls the same module will corrupt it silently.**
-
-In practice this only bites if you write a callback. If you need one, copy the values you care about
-into your own variables first.
-
-`THEME.*` is the exception: `THEME.LOAD` only writes, so calling it from anywhere is safe.
-
----
-
-
-## 5. Labels are global too
-
-#### 5. Labels are global too
+#### 4. Labels are global too
 
 Every `NAME:` in every module is a jump target in one flat space, including the ones you were never
 meant to call. `BMX.STREAM.MORE`, `LINEINPUT.REDRAW`, `THEME.LOAD.DARK` and most of `MENUVERT.*` are
@@ -1886,9 +1848,9 @@ be `BMX.MODULE.END` — a name is either a label or a variable, never both.
 ---
 
 
-## 6. Two more naming rules that are not about collisions
+## 5. Two more naming rules that are not about collisions
 
-#### 6. Two more naming rules that are not about collisions
+#### 5. Two more naming rules that are not about collisions
 
 **`#DEFINE` takes an INT16** (`BASLOAD.MD:313`). A constant above 65535 is
 `ERROR: INVALID PARAMETER`, not a warning — which is why `BMX.PALBASE` (VRAM `$1FA00`, 129536) is an
@@ -1908,9 +1870,9 @@ in a raw `.bas`, give every variable a distinct first two characters.
 ---
 
 
-## 7. Regenerating this
+## 6. Regenerating this
 
-#### 7. Regenerating this
+#### 6. Regenerating this
 
 The tables above were extracted from the sources rather than remembered. To check them after a
 change:

@@ -1,20 +1,30 @@
-@4. Nothing here is re-entrant, and that is not a bug you can work around
+@4. Labels are global too
 .
-=4. NOTHING HERE IS RE-ENTRANT, AND THAT IS NOT A BUG YOU CAN WORK AROUND
+=4. LABELS ARE GLOBAL TOO
 .
-.A module's parameters are its globals. There is nowhere else to put them.
-.So:
+.Every NAME: in every module is a jump target in one flat space, including
+.the ones you were never meant to call. BMX.STREAM.MORE, LINEINPUT.REDRAW,
+.THEME.LOAD.DARK and most of MENUVERT.* are internal, and a GOSUB to one will
+.do something, just not something useful.
 .
-.  - You cannot call LINEINPUT.GET from inside LINEINPUT.GET -- no callback
-.    out of a field.
-.  - You cannot nest BMX.OPEN -- one file at a time, and BMXK.LFN says so
-.    too.
-.  - A GOSUB from inside a module into code that calls the same module will
-.    corrupt it silently.
+.MENUVERT is the module with the most of them, because driving a menu is
+.mostly branching: MENUVERT.RUN, MENUVERT.DRAW, MENUVERT.ROW and
+.MENUVERT.HOTFIND are the four you may call. MENUVERT.WAIT, .KEYED, .SETTLE,
+..WRAPTOP, .WRAPBOT, .CANCEL, .HOTKEY, .PADKEY, .PADREAD and the three FOLD
+.helpers are not.
 .
-.In practice this only bites if you write a callback. If you need one, copy
-.the values you care about into your own variables first.
+.STRINGS has two of its own, both loop continuations rather than entry
+.points: STR.SPLIT.NEXT and STR.REPLACE.NEXT. Enter either one directly and
+.you resume a loop whose accumulators were never initialised. The callable
+.names are STR.PADR, PADL, PADC, SPLIT, REPLACE and PET2SCR.
 .
-.THEME.* is the exception: THEME.LOAD only writes, so calling it from
-.anywhere is safe.
+.Each module also has a skip label it jumps over itself with -- THEME.SKIP,
+.APPSYS.SKIP, STR.SKIP, BMX.MODULE.END, LINEINPUT.MODULE.END,
+.MENUVERT.MODULE.END. Those exist so an include can sit anywhere in the file,
+.the top included. Do not branch to one.
+.
+.One trap found the hard way, worth repeating: BASLOAD refuses a name used as
+.both a label and a variable (BASLOAD.MD:319). BMX.SKIP is the byte-skip
+.counter, so the module's skip label had to be BMX.MODULE.END -- a name is
+.either a label or a variable, never both.
 .

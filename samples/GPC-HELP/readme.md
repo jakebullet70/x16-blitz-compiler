@@ -1,6 +1,6 @@
 # GPC-HELP
 
-The GP.BASIC and BASL reference, on the machine. A scrolling master index over 38 topics, written
+The GP.BASIC and BASL reference, on the machine. A scrolling master index over 37 topics, written
 in GP.BASIC and built from `GPC-BASIC/` — the manual, the name register and the module banner
 headers — by a script, so the help cannot drift from the library it documents.
 
@@ -61,7 +61,7 @@ screens away.
 python samples/GPC-HELP/MKHELP.PY
 ```
 
-Reads `GPC-BASIC/` and writes `H001.HLP`…`H038.HLP`, `HELP.IDX` and `GPC-HELP.md` beside itself.
+Reads `GPC-BASIC/` and writes `H001.HLP`…`H037.HLP`, `HELP.IDX` and `GPC-HELP.md` beside itself.
 `--src` and `--out` move either end; `--maxpage` changes where a long topic is split.
 
 **It exits non-zero if a character had no ASCII mapping**, listing the code points. That check
@@ -310,7 +310,7 @@ not a test double.
 | `HELP.BASL` | the viewer |
 | `HELP.PRG` | compiled, embedded, 23,530 bytes — what `help-demo.bat` runs |
 | `MKHELP.PY` | the content build |
-| `HELP.IDX` | the master index, 91 rows |
-| `H001.HLP`…`H038.HLP` | one topic each |
+| `HELP.IDX` | the master index, 88 rows |
+| `H001.HLP`…`H037.HLP` | one topic each |
 | `GPC-HELP.md` | the same content, for a PC |
 | `GPC-BASIC/` | the eight modules a rebuild needs, so it needs nothing from the master |

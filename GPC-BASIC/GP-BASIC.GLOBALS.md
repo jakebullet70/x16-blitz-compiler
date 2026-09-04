@@ -150,22 +150,7 @@ you. `MENUVERT.HOTFIND` reads the first two and answers in `MENUVERT.HOTAT`.
 
 ---
 
-## 4. Nothing here is re-entrant, and that is not a bug you can work around
-
-A module's parameters *are* its globals. There is nowhere else to put them. So:
-
-- **You cannot call `LINEINPUT.GET` from inside `LINEINPUT.GET`** — no callback out of a field.
-- **You cannot nest `BMX.OPEN`** — one file at a time, and `BMXK.LFN` says so too.
-- **A `GOSUB` from inside a module into code that calls the same module will corrupt it silently.**
-
-In practice this only bites if you write a callback. If you need one, copy the values you care about
-into your own variables first.
-
-`THEME.*` is the exception: `THEME.LOAD` only writes, so calling it from anywhere is safe.
-
----
-
-## 5. Labels are global too
+## 4. Labels are global too
 
 Every `NAME:` in every module is a jump target in one flat space, including the ones you were never
 meant to call. `BMX.STREAM.MORE`, `LINEINPUT.REDRAW`, `THEME.LOAD.DARK` and most of `MENUVERT.*` are
@@ -191,7 +176,7 @@ be `BMX.MODULE.END` — a name is either a label or a variable, never both.
 
 ---
 
-## 6. Two more naming rules that are not about collisions
+## 5. Two more naming rules that are not about collisions
 
 **`#DEFINE` takes an INT16** (`BASLOAD.MD:313`). A constant above 65535 is
 `ERROR: INVALID PARAMETER`, not a warning — which is why `BMX.PALBASE` (VRAM `$1FA00`, 129536) is an
@@ -210,7 +195,7 @@ in a raw `.bas`, give every variable a distinct first two characters.
 
 ---
 
-## 7. Regenerating this
+## 6. Regenerating this
 
 The tables above were extracted from the sources rather than remembered. To check them after a
 change:

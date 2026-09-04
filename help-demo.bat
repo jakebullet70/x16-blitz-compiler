@@ -3,7 +3,7 @@ rem ---------------------------------------------------------------------------
 rem  help-demo.bat -- GPC-HELP, the GP.BASIC and BASL reference, in a VISIBLE
 rem  window.
 rem
-rem  A scrolling master index over 38 topics, built from GPC-BASIC/ -- the
+rem  A scrolling master index over 37 topics, built from GPC-BASIC/ -- the
 rem  manual, the name register and the module banner headers -- so the help
 rem  cannot drift from the library it documents.
 rem
