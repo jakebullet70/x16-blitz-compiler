@@ -47,16 +47,6 @@
 .      WHAT HAPPENS: #DEFINE takes an INT16 -- ERROR: INVALID PARAMETER
 .      DO THIS: an ordinary variable
 .
-.  a GP. keyword in a hand-written .bas
-.      WHAT HAPPENS: the ROM cannot LIST or RUN a $CE7x token
-.      DO THIS: expected -- compile it
-.
-.  readable names in a hand-written .bas
-.      WHAT HAPPENS: the built-in BASIC gives TWO significant characters --
-.        THEME.CLR and THEME.COUNT become one variable, silently
-.      DO THIS: write BASL, or give every variable a distinct first two
-.        characters
-.
 .The last one is worth its own sentence. Inside BASL you are safe -- 64
 .significant characters, so PANEL.COL and PANEL.ROW are genuinely different
 .variables and the readable names cost nothing. Write the same test as a raw
