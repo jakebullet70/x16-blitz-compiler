@@ -1040,6 +1040,24 @@ sets them for every dialog afterwards. `GUI.SAY` already clears `GUI.HINT$` for 
 and whatever gets added has to do the same — or the "not found" box ends up offering
 `< DISCARD >` because something else did.
 
+### `GUI.TEXT` draws two buttons and never says which keys press them
+
+Reported 2026-09-04, from `samples/GPC-HELP`'s find box: **"no idea that ENTER and ESC are valid."**
+
+The dialog paints `< OK >` and `< CANCEL >` two rows under the field, and neither one can be
+pressed. There is no `&` on either label, deliberately — every printable key belongs to the field,
+so an `O` types an `O` rather than closing the box — which leaves two buttons that look like
+answers and answer to nothing. The library version this diverged from printed
+`ENTER = OK    ESC = CANCEL` dimmed under the field and lit the two key names; the buttons replaced
+that line and took the sentence with it.
+
+**The header already claims the fix that is missing**: "the hint line below already says so." It
+does not. Either the buttons carry their key (`< ENTER=OK >`, or the key name under each button),
+or the hint line comes back and the buttons go.
+
+Whatever is chosen belongs in the diverged copy AND the master, and `GUI.YN` is the comparison to
+keep it honest — its two labels ARE the answers, so it has never had this problem.
+
 ### Buttons — decide whether the library adopts them
 
 `samples/GPC-HELP/GPC-BASIC/GUI.INC.BL` is a **deliberately diverged copy**: the answers are drawn
@@ -1089,9 +1107,9 @@ that switches per dialog would notice.
 
 ### How much of the GUI library fits in a bank?
 
-`samples/GPC-HELP` compiles to 22,816 bytes embedded and has **1,620 bytes of workspace left** —
-and it holds nothing but its index; the topic text is read to the screen and dropped precisely
-because there was no room to keep it. The GUI stack is what ate it: measured on this box,
+`samples/GPC-HELP` compiles to 10,474 bytes of p-code (23,530 embedded) and has **2,458 bytes of
+workspace left** — and it holds nothing but its index; the topic text lives in RAM bank 9 precisely
+because there was no room to keep it on the heap. The GUI stack is what ate it: measured on this box,
 
 | | object bytes |
 |---|---:|
@@ -1113,6 +1131,48 @@ call across a bank boundary would have to save and restore, and whether the fram
 territory itself, 16 pages) can coexist. If the interpreter is hard-wired to low RAM this is a
 runtime change, not a library one — which is the answer worth having before anyone designs it.
 
+
+### Crunch AFTER BASLOAD, not before
+
+`samples/cruncher` runs on `.BASL` source. Measured on `HELP.BASL` 2026-09-04, and the source-level
+version is leaving most of it on the table:
+
+| | BASIC lines | saved |
+|---|---:|---:|
+| uncrunched | 1,225 | — |
+| CRUNCH `JOIN`, `KEEP` | 960 | 265 |
+| CRUNCH `JOIN COLLAPSE`, `KEEP` | 943 | 282 |
+| post-BASLOAD, GP blocks still breaking runs | **782** | **443** |
+| post-BASLOAD, joining across everything legal | **579** | **646** |
+
+A line is one byte of p-code plus four in the compiler's line table, and the object measurement
+confirms it exactly: 1,225 → 960 lines, 10,474 → 10,209 bytes.
+
+**It is NOT about shorter names, which was the first guess.** The join simulation at 250, 255, 500
+and unlimited characters gives the identical 579 lines — no run ever reaches 250 bytes before
+something else stops it. Of the 1,007 crunched source lines only **16** exceed 200 characters.
+BASLOAD renaming `HELP.PAGE.LINES` to `HJ` buys nothing.
+
+What actually stops the runs, biggest first:
+
+- **Scope.** `ROOT` crunches `HELP.BASL` only, and the eight library modules are roughly 440 of the
+  1,225 lines — untouched. After BASLOAD there are no modules, just one program.
+- **`THEN`.** A line holding one may be joined *to*, never appended *to*.
+- **133 branch targets.** After BASLOAD only lines actually branched to block a join; at source
+  level all 68 labels do, plus every module label.
+- **`GP.CASE` and the block keywords.** The engine breaks the run both ways on every `GP.` block
+  keyword, which is the over-conservative guess its own notes flag as the tuning knob — and
+  `GP.CASE 5 : body` is **documented as legal** (GP-BASIC.md §3.8: "More than one statement after
+  the colon is fine"). That one alone is the gap between 782 and 579.
+- Comments barely matter: `HOIST` over `KEEP` bought 17 lines of 265.
+
+**What a post-BASLOAD tool takes on that the source one never faces**: labels are line numbers by
+then, so every `GOTO`/`GOSUB`/`ON` target has to be rewritten as lines merge, and one wrong target
+is a silent branch into the middle of a statement. That is the whole trade — 646 bytes for owning
+line-number correctness.
+
+Test material is in `testing/`: `HELPC.BASL` (JOIN/KEEP), `HELPH.BASL` (HOIST), `HELPX.BASL`
+(JOIN+COLLAPSE), against `HELP.BASL`.
 
 ### RETURN in the editor was slow — FIXED, the table shift is GP.ASM now
 
