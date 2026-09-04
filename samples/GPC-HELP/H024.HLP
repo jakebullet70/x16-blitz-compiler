@@ -102,8 +102,8 @@
 .
 =SEE ALSO
 .
->57|STASH.INC.BL -- save a text rectangle, and put it back.
->28|4.1 THEME.INC.BL -- named colour roles
->33|4.6 MENUVERT.INC.BL -- a vertical menu
->31|4.4 LINEINPUT.INC.BL -- a positioned entry field
->44|GUI2.INC.BL -- a listbox, single or multi select.
+>58|STASH.INC.BL -- save a text rectangle, and put it back.
+>29|4.1 THEME.INC.BL -- named colour roles
+>34|4.6 MENUVERT.INC.BL -- a vertical menu
+>32|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>45|GUI2.INC.BL -- a listbox, single or multi select.

@@ -2,26 +2,47 @@
 .
 =1. WHAT GP.BASIC IS
 .
-.Two halves, and the split is deliberate.
+.Three layers, innermost first.
 .
-.The keywords -- 27 of them, GP.DO through GP.ENDSEL -- are compiled into
-.p-code and handled by assembly in the runtime. They exist because BASIC is
-.bad at what they do: searching a string a character at a time, sorting an
-.array, pushing bytes at VERA. 1,970 bytes of assembly, which page alignment
-.rounds to the 2,048 a program actually pays.
+.Core keywords. 30 tokens, GP.DO down to GP.CHAR: GP.DO GP.LOOP GP.EXITDO,
+.GP.IF GP.ELSEIF GP.ELSE GP.ENDIF, GP.SELECT GP.CASE GP.OTHER GP.ENDSEL,
+.GP.INSTR GP.COMP GP.STRPTR GP.ARRPTR, GP.BOX GP.FILL GP.CHAR GP.PRINTAT,
+.GP.CALL with GP.A GP.X GP.Y GP.C, GP.ASM GP.ENDASM. Compiled to p-code,
+.handled by assembly in the runtime. They are assembly because BASIC is slow
+.at what they do: per-character string scans, screen fills, VERA writes.
 .
-.Those bytes are spent only by a program that uses at least one GP keyword.
-.One that uses none has the whole block left out of its object, and gets the
-.2,048 back as workspace as well.
+.The handlers occupy GPBase $3800 to ObjectBase $3c00 -- 1,024 bytes, page
+.aligned, all or nothing. ScanGPUsage walks the finished p-code and drops the
+.whole block from the object if nothing in it is reached.
 .
-.The library -- seven .INC.BL modules and fourteen .EXP.BL examples, beside
-.this file -- is ordinary BASL, called with GOSUB. Menus, panels, themes,
-.entry fields, BMX loading. Zero runtime bytes: only a program that #INCLUDEs
-.one pays for it, and it pays in its own p-code.
+.What the block costs is 1,024 bytes, once. The bytes in the object and the
+.bytes off the workspace floor are the same bytes: runtimeEndPage is one page
+.number, and it decides how much of the runtime image is written out, where
+.the p-code lands, and where the workspace starts. Max p-code is 17,152 bytes
+.with the block, 18,176 without -- ObjectBase to $9F00, less the 4K frame
+.stack and the 4K minimum workspace.
 .
-.  | The rule that decides which side a thing goes on: assembly gets what
-.  | runs in a loop or moves bulk data. Everything else is BASIC.
-.  | LINEINPUT.GET waits on a human, so the speed argument that puts sorting
-.  | in assembly does not apply to it -- and it saved 166 bytes of runtime
-.  | for every program ever compiled.
+.Composites. GP.CONTAINS, GP.ISEMPTY, GP.HIBYTE, GP.LOBYTE. The compiler
+.expands each into opcodes that already exist: no handler, no vector slot,
+.nothing in the block.
 .
+.The library. GPC-BASIC/: 14 .INC.BL modules, 22 .EXP.BL examples. Ordinary
+.BASL, #INCLUDEd by path, called with GOSUB. Zero runtime bytes -- a module
+.costs its own p-code, in the programs that include it. Menus vertical and
+.bar, panels, themes, entry fields, in-place case and trim, shell sort, a
+.screen rectangle to a RAM bank or a file, BMX into VERA.
+.
+.STASH.INC.BL, SORT.INC.BL and STRCASE.INC.BL are GP.ASM and still modules:
+.as keywords their 925 bytes (329, 408, 188) would sit in the block, paid by
+.every GP program. GP.ARRPTR and GP.STRPTR are what lets them out -- a BASL
+.subroutine takes an address, not an array or a string.
+.
+.Which side a thing goes on: assembly for loops and bulk moves, BASIC for the
+.rest. LINEINPUT.GET waits on the keyboard, so speed is not an argument for
+.it -- 166 bytes of runtime saved by writing it in BASL.
+.
+=SEE ALSO
+.
+>58|STASH.INC.BL -- save a text rectangle, and put it back.
+>37|4.7 SORT.INC.BL -- shell sort a string array
+>38|4.8 STRCASE.INC.BL -- case and trim, in place

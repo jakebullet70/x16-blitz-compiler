@@ -86,7 +86,7 @@ byte of it is written into the object *and* taken off the bottom of the workspac
 that uses one GP keyword. A sort nobody calls and a stash nobody uses would be paid for by every GP
 program in the tree. Written in `GP.ASM` and `#INCLUDE`d they cost their own bytes, in the programs
 that ask for them, and nothing at all in the ones that do not — which is what keeps the block at
-1,280 bytes rather than 2,048.
+1,024 bytes rather than 2,048.
 
 **`STASHFILE.INC.BL` is the file half of `STASH.INC.BL`,** and a separate file on purpose: a BASL
 module has no dead code elimination, so everything it holds is compiled into every program that

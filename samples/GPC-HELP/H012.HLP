@@ -19,10 +19,18 @@
 =DESCRIPTION
 .
 .65C02 assembly, assembled by GPC at compile time, with the bytes going into
-.the program. It is what GP.CALL needed a POKE loop and a spare RAM bank for:
+.the program.
 .
+.Before this, running your own machine code meant assembling it yourself:
+.work out the opcode for each instruction, POKE the numbers into memory
+.nothing else was using, and point GP.CALL at that address. GP.ASM writes the
+.instructions and the compiler works out the bytes. These two do the same
+.thing -- increment A, then X, then Y:
+.
+:## by hand: 26, 232 and 200 ARE inc a / inx / iny, and ML has to be somewher
 :POKE ML+0,26 : POKE ML+1,232 : POKE ML+2,200 : GP.CALL ML,10,20,30
 .
+:## assembled: the bytes land in the program, and there is no address to find
 :GP.ASM
 :REM inc a
 :REM inx
@@ -32,7 +40,7 @@
 .It costs no runtime bytes. A block is five bytes of p-code plus your
 .instructions, and every handler it uses is already in every compiled program
 .-- so a program whose only GP.BASIC keyword is GP.ASM still compiles
-.GP-BASIC OUT, without the 2 KB GP block. Measured: RT 12031, the same as a
+.GP-BASIC OUT, without the 1 KB GP block. Measured: RT 12031, the same as a
 .program using no GP keyword at all.
 .
 =#REM 1 is required

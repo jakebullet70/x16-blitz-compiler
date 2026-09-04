@@ -1942,6 +1942,70 @@ prompt. `-pastewarp`, and dropping `-warp`, change nothing. To test it headlessl
 `.BASL` with only `CLEAR.KB` stubbed to a bare `RETURN` and drive that; the decode logic under test is
 untouched. (`LINPUT` programs such as `testing/MD5` are unaffected — no drain loop.)
 
+### `STASHVRAM.INC.BL` — a handle-based VRAM store
+
+Proposed. A second stash whose backing store is spare VRAM instead of a RAM bank, addressed by
+handle so a program can hold many at once. `STASH.INC.BL` stays as it is: banked RAM is `PEEK`able
+and survives a screen-mode change, VRAM is 11x bigger and faster and does neither.
+
+- **It needs no `GP.ASM`, and that is the main argument for it.** The cells never leave VRAM: point
+  ADDR0 at the map and ADDR1 at the spare region, r0/r1 = `$9F23`/`$9F24`, count in r2,
+  `GP.CALL $FEE7`. The KERNAL does not step a pointer inside `$9F00`-`$9FFF`, so VERA's own
+  auto-increment walks both ends. `BMX.PALCOPY` is the worked example. No CPU byte loop means no
+  blob, and no blob means no `#SYMFILE` requirement — the sharpest edge on `STASH` today.
+- **A map-width rectangle is ONE call.** Map rows are contiguous at 128 cells = 256 bytes, so a full
+  80x60 save is 15,360 bytes in one `memory_copy` rather than 9,600 in sixty. Narrower rectangles
+  still need the per-row walk; `STASH.WALK` already has that arithmetic and asks VERA for
+  `L1_CONFIG`/`L1_MAPBASE` rather than assuming the mode. Reuse it.
+- **Handles are a main-RAM table**, and the point of them is that nothing outside the table holds a
+  VRAM pointer. **A handle's address CANNOT be an `A%` element** — `%` is signed 16-bit and a VRAM
+  address is 17. Untyped array (6 bytes an element), or page plus offset in two `%` arrays (4). Size
+  the table first: it is workspace, and workspace is the budget that binds.
+- **Allocation: bump pointer, LIFO release.** Panels nest and close in reverse order, so free is a
+  pointer decrement and fragmentation never arises.
+- **"Garbage collection" is a compactor, not a tracer.** Liveness is known from the table, not
+  discovered, so there is no mark phase: walk live blocks in address order, slide each down to the
+  low-water mark with one `memory_copy`, rewrite the table. Destination below source, so overlap is
+  safe. Put it in `STASHVRAMGC.INC.BL` — a BASL module has no dead code elimination, so a compactor
+  nobody calls is compiled into every program that includes the module. Never call it automatically.
+- **Two faces on one allocator.** Rectangles (the `STASH` job) and blobs streamed from a RAM address
+  are the same allocation problem, and the blob face is what makes the undo buffer below fall out of
+  this module for nothing.
+- **Traps to design around.** `#DEFINE` takes a signed int16, so no VRAM address past `$FFFF` can be
+  one — `BMX.STASH` hit this; base and limit are runtime variables the caller sets. The 17th address
+  bit rides in bit 0 of ADDRH beside the auto-increment nibble, and `GP.HIBYTE`/`GP.LOBYTE` only
+  reach 65,535 — take bit 16 off first (`B = INT(P/65536) : P16 = P - B*65536`), then split `P16`. `memory_copy`'s count is 16-bit, so a
+  blob face has to chunk above 65,535. There is no allocator but this one and no collision check, so
+  `SV.BASE`/`SV.TOP` need sane defaults and `SV.RESET` has to exist — a mode change re-uploads the
+  charset and can re-lay the map.
+
+**Retire one risk before designing anything else:** confirm `memory_copy` holds with BOTH pointers
+parked on VERA data ports at a large count. `BMX.PALCOPY` only proves it at 512 bytes. Copy 15,360
+between two VRAM regions, read back scattered cells, compare against the same move done a byte at a
+time.
+
+### Undo buffer in VRAM — `samples/editor`
+
+The editor has no undo (`samples/editor/readme.md` says so). VRAM is where to look first: 128K that
+costs nothing from the 17,152-byte p-code budget and nothing from the workspace, and that bank
+switching and string garbage collection cannot touch.
+
+- **Free window today.** The editor's layer 0 map is at `$00000` (`ED.LAYERS`), 16,384 B at 128x64;
+  layer 1's map is `$1B000`-`$1EFFF`; the charset is `$1F000`-`$1F7FF` and `ED.PETFONT` rewrites it;
+  PSG, palette and sprite attributes sit above `$1F9C0`. That leaves `$04000`-`$1AFFF`, about **92K**.
+  Raising `ED.MAP.H` for more hardware scroll room grows layer 0's map — 128x256 is 64K and ends at
+  `$0FFFF`, cutting the window to 44K. Cost the two together, not separately.
+- **The access pattern fits.** Undo is append-only, written once and read only on an undo, which is
+  what a port-addressed store is good at: one access per byte with auto-increment, and KERNAL
+  `memory_copy` `$FEE7` moves a whole record in one call with r0 or r1 pointed at `$9F23` (it does not
+  step a pointer inside `$9F00`-`$9FFF`). Random access per item is where VRAM stops paying.
+- **The index is the real cost.** Offset, length and type per record live in main RAM, and that is
+  workspace — the budget that actually binds. Size it before anything else.
+- **No allocator and no collision check.** A screen-mode change re-uploads the charset and can re-lay
+  the map. Decide whether an undo buffer is invalidated on a mode change or placed clear of one.
+- **Compare with a RAM bank per N records** — 8,192 B each, `PEEK`able at a real address, slower to
+  bulk-move, and limited to the 63 banks a 512K machine has.
+
 ## Build / infrastructure
 
 ### NOTHING BUILDS THE EXAMPLES, so one was broken for weeks

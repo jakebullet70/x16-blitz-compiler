@@ -2,8 +2,9 @@
 .
 =3. COMMAND REFERENCE
 .
-.27 keywords, tokens $CE7F down to $CE63, allocated downward. $CE67 and $CE68
-.are holes. The token values are the ABI.
+.30 tokens, $CE7F down to $CE58, allocated downward. Ten of the forty slots
+.are holes, and they stay holes: the token values are the ABI and are never
+.renumbered.
 .
 =At a glance -- the whole library, and what each part costs
 .
@@ -102,15 +103,15 @@
 .
 =SEE ALSO
 .
->27|4. Module reference -- the BASL library
->19|3.8 Block IF
->20|3.9 Inline assembly
->13|3.4 Strings
->11|3.3 Machine code
->28|4.1 THEME.INC.BL -- named colour roles
->29|4.2 STRINGS.INC.BL -- string helpers
->30|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
->31|4.4 LINEINPUT.INC.BL -- a positioned entry field
->32|4.5 BMX.INC.BL -- a BMX bitmap into VERA
->33|4.6 MENUVERT.INC.BL -- a vertical menu
+>28|4. Module reference -- the BASL library
+>20|3.8 Block IF
+>21|3.9 Inline assembly
+>14|3.4 Strings
+>12|3.3 Machine code
+>29|4.1 THEME.INC.BL -- named colour roles
+>30|4.2 STRINGS.INC.BL -- string helpers
+>31|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>32|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>33|4.5 BMX.INC.BL -- a BMX bitmap into VERA
+>34|4.6 MENUVERT.INC.BL -- a vertical menu
 >2|1. What GP.BASIC is

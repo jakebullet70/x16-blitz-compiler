@@ -29,8 +29,8 @@ to write the code — **by finding it did not belong in the block at all**:
   once at entry. `$3d00` -> `$3c00`. `GP.STRPTR` stayed and is what the module is built on, for the
   same reason `GP.ARRPTR` did.
 
-Each page is charged twice — object *and* workspace floor — so that is **1,536 bytes back for every
-GP program in the tree**, whether or not it sorts, stashes or touches a string, and no keyword was
+A page comes off the object and off the workspace floor together — they are the same page, counted
+once — so that is **768 bytes back for every GP program in the tree**, whether or not it sorts, stashes or touches a string, and no keyword was
 lost: all three are still available as an `#INCLUDE`, in the programs that actually want them.
 
 **The pattern is now explicit enough to state as a rule.** A group can leave the block when its

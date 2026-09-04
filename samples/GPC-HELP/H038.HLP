@@ -9,6 +9,11 @@
 .        instead of masking
 .      DO THIS: H = INT(P/256) : L = P - H*256
 .
+.  an address in an A% variable
+.      WHAT HAPPENS: % is signed 16-bit and truncates silently -- A% = 49152
+.        reads back -16,384
+.      DO THIS: untyped variable, or split into page and offset
+.
 .  $0400 for machine code
 .      WHAT HAPPENS: stock BASIC leaves it free, a compiled GPC program does
 .        not -- runtime state lives there, and it corrupts silently
@@ -18,11 +23,6 @@
 .      WHAT HAPPENS: GP drawing never calls the KERNAL, so the cursor is
 .        wherever it was
 .      DO THIS: LOCATE first, or stay in one world
-.
-.  GOTO sideways, one GP.DO into another
-.      WHAT HAPPENS: .unwind counts depth difference, so sideways closes
-.        nothing and the loop frame leaks
-.      DO THIS: jump out first, or GP.EXITDO
 .
 .  GP.ARRPTR(A$)
 .      WHAT HAPPENS: A$ and A$() are different variables -- it finds the
@@ -84,4 +84,4 @@
 .
 =SEE ALSO
 .
->36|4.7 SORT.INC.BL -- shell sort a string array
+>37|4.7 SORT.INC.BL -- shell sort a string array

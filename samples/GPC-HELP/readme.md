@@ -20,7 +20,7 @@ topics are indented under them, sections under those.
 | up / down | move the highlight | scroll a line |
 | PgUp / PgDn | a screen at a time | a screen at a time |
 | HOME / END | first entry / last | top / bottom |
-| RETURN | open the topic | follow a cross reference |
+| RETURN | open the topic | -- |
 | `/` or `F` | find | |
 | `N` | find the next match | |
 | `L` | | the cross references, as a list |
@@ -84,12 +84,12 @@ python source\gpc\compile_shared.py --embedded HELP.SRC.PRG HELP.PRG
 ```
 
 then copy `HELP.PRG` back here. **EMBEDDED, not shared**, so this directory stands on its own
-without a `GPB.RT.nnn.BIN` whose name carries a build number. 22,603 bytes.
+without a `GPB.RT.nnn.BIN` whose name carries a build number. 23,530 bytes.
 
 **No `#AUTONUM`.** With `STRCASE.INC.BL` included it resolves label targets against the wrong step
 and the compile stops with `UNKNOWN LINE NUMBER`.
 
-## The four decisions, and the measurements behind them
+## The decisions, and the measurements behind them
 
 ### One `.HLP` per topic, not one per category
 
@@ -106,13 +106,14 @@ Measured on the X16, against a 41 KB `MODS.HLP`:
 **3.4 seconds to turn to a page near the end, growing with depth.** The skip was the entire cost;
 the reading was free. So there is now nothing to skip — 38 files, and every open is the same price.
 
-### The screen is the page buffer
+### The topic lives in a bank, and it is read once
 
-A topic is read straight from its file to the screen and **not kept**. Only the index is resident.
+A topic is read once, into RAM bank 9, and every repaint comes out of that. Only the index is on
+the string heap.
 
-That is a memory decision, not a style one. Blitz's string heap costs **about 1.67 bytes per
+Not the heap, because there is no room on it. Blitz's string heap costs **about 1.67 bytes per
 character** (measured: 88 strings of 38 characters cost 5,280 bytes), and a program carrying this
-much of the GUI library has only a few KB of workspace to spend:
+much of the GUI library has about a kilobyte of workspace left over:
 
 | | object bytes |
 |---|---:|
@@ -121,40 +122,93 @@ much of the GUI library has only a few KB of workspace to spend:
 | `+ STRCASE + APPSYS` | 17,688 |
 | `+ GUI2` (the listbox) | 19,306 |
 
-The index alone is ~4,900 bytes of heap. Holding a 120-line topic as well would have been another
-~7,000, and the first build died with `OUT OF MEMORY` doing exactly that. Since scrolling now
-re-reads, and an open plus 27 lines is 4 jiffies, nothing is lost.
+The index alone is ~5,000 bytes of heap. A 120-line topic beside it is another ~7,000, and the
+first build died with `OUT OF MEMORY` doing exactly that. A bank costs the workspace nothing.
+
+**The line table is in the bank too**, at the front: four bytes a line — offset low, offset high,
+length, kind — and the text above it, truncated at 78 characters because no row can show more.
+Three BASIC arrays of 140 entries would have been 840 bytes of workspace, which is most of what
+there is. Bank 9 is `HELP.TBANK`; bank 8 is `GUI.BANK` and holds the cells under an open dialog.
 
 `GUI2.INC.BL` went for the same reason: the section and cross-reference pickers are at most 12
 items, which fit a screen, so `GUI.MENU` does the job and the listbox's 1,618 bytes buy nothing.
 
-### A one-line scroll slides the text; it does not repaint it
+### A one-line scroll slides the text in VRAM; it does not repaint it
 
-Reading the topic again on every keypress is cheap. **Repainting the whole screen was not** — not in
-total time so much as in what it looked like: `GP.FILL` blanked all 30 rows and the 27 lines came
-back one at a time, so a held-down cursor key flickered.
+Repainting all 28 rows was not so much slow as ugly: `GP.FILL` blanked them and they came back one
+at a time, so a held cursor key flickered. `HELP.PAGE.SHIFT` moves the text region up or down a row
+instead, and the draw pass is then allowed to paint exactly one row — the one the slide exposed.
+`HELP.ONLY` carries which.
 
-`HELP.PAGE.SHIFT` slides the text region up or down a row with `STASH` instead, and the read pass is
-then allowed to draw exactly one row — the one the slide exposed. `HELP.ONLY` carries which.
+The move is VERA to VERA. Both of VERA's data ports are aimed into the tile map, one a row ahead of
+the other, and the KERNAL's `memory_copy` ($FEE7) is pointed at `$9F23` and `$9F24`: it does not
+step a pointer that lands inside `$9F00`–`$9FFF`, so VERA's own auto-increment walks both ends and
+the rectangle moves without a byte crossing the CPU's address arithmetic. Going down, both ports
+run backwards (ADDRH bit 3) from the far end so the copy does not eat its own source.
 
-**The bars are outside the rectangle, so they do not move and are not repainted.** The window is
-screen rows 1–27; the title is row 0 and the status line is row 29, and neither is in the stash.
+**The bars are outside the rectangle**, so they neither move nor get repainted. The window is
+screen rows 1–28; the title is row 0 and the status line row 29.
 
-Two details that are not free to get wrong:
+Measured on the bench in `testing/SCRLTST.BASL`, 50 slides each:
 
-- **Bank 9, not `HELP.BANK`.** Bank 8 is `GUI.BANK` and holds the cells underneath an open dialog.
-- **The clamp runs before the move is classified**, so a PgDn landing one line short of the bottom
-  arrives as a delta of 1 and takes the fast path too.
+| one scroll step | jiffies |
+|---|---:|
+| `STASH` the rectangle out and back | 11.0 |
+| VERA to VERA | **1.6** |
+| painting the exposed row from the bank | 1.0 |
 
-`STASH` refuses a rectangle it cannot fit and says so in `STASH.OK`, so there is a way back: the
-full repaint. Slower, never wrong.
+`GP.CHAR` a cell at a time beat building the row as a `CHR$` string and printing it, 1.0 against
+1.6 — the concatenation allocates.
 
-Cost: **227 bytes** of object, 22,032 → 22,259.
+### Where the time actually was
 
-Verified by reaching the same offset two ways and comparing the screens cell by cell — five
-single-line slides against one full repaint at that offset, and ten down plus ten back up against
-the same. **Rows 1–27 are byte-identical, characters and attributes.** The only row that differs is
-29, which the full repaint blanks and the slide leaves alone, which is the point.
+The first version of all this made the cells move six times faster and **the scroll did not get
+faster**, because the cells were never the cost: the topic was re-read from its file on every
+keypress, an OPEN and a LINPUT# of up to 120 lines to find the one line a slide had exposed.
+
+| one scroll step | jiffies |
+|---|---:|
+| full repaint of the 28 rows | 37.4 |
+| slide, then re-read the file for one row | 36.8 |
+| slide, then one row out of the bank | **2.6** |
+
+Reading it once moved that cost to the front, where it was worse still — 158 jiffies, 2.6 seconds,
+for the longest topic, `POKE`ing a character at a time. `HELP.STORE.ASM` is a `GP.ASM` blob that
+copies a line into the bank and writes its four-byte record, with the bank held across both:
+
+| loading the longest topic | jiffies |
+|---|---:|
+| `POKE` per character, line table in BASIC arrays | 158 |
+| the text copied by the blob | 61 |
+| the record written by the blob as well | **47** |
+| — of which `LINPUT#` itself is | 22 |
+
+**The four-byte record cost 23 jiffies, as much as reading the entire file.** Four banked `POKE`s a
+line is 480 bank selects, and splitting the offset into two bytes is a float divide each time; the
+blob has the bank already and splits the offset with a byte load.
+
+Three things here were measured because guessing them got them wrong:
+
+- **The per-line string work costs nothing.** Peeling the marker off each line with `LEFT$` and
+  `MID$` looked like the obvious next target. Reading it through `GP.STRPTR` with `PEEK` instead
+  changed the time not at all — 62/59 against 60/61. It stayed in regardless: it is about five
+  fewer heap allocations a line, and the self-check build runs a kilobyte from `OUT OF MEMORY`.
+- **`memory_copy` cannot do the load**, though it does the slide. It takes no bank argument, and
+  `BANK` in BASL applies only around a `PEEK` or a `POKE` — a raw `GP.CALL` runs with whatever
+  BASIC left in `$00`. It loaded in 91 jiffies and got 214 of 218 test bytes wrong. Holding a bank
+  across a KERNAL call is what `GP.ASM` is for.
+- **`GP.STRPTR` points at the length byte**, not the first character. Without the `+ 1` the blob
+  copied the length into the text and every line was wrong, but only 14% of them *looked* wrong,
+  because a length of 32–126 is itself a printable character. The tell is that the first stored
+  byte equals the stored length.
+
+The slide is verified rather than eyeballed: the same offset reached two ways — five single-line
+slides against one full repaint, and ten down plus ten back up against the same — compared cell by
+cell. **Rows 1–28 are byte-identical, characters and attributes.** `STASH` was the first
+implementation and is worth one warning if it ever comes back: `STASH.SAVE` and `STASH.RESTORE`
+each select their own bank and do not put it back, so the row painter read the stash buffer as
+text and the screen filled with `#G#U#I#`. `HELP.PAGE.ROW` re-selects `HELP.TBANK` every time for
+that reason.
 
 ### `&` in a button label marks the key
 
@@ -254,9 +308,9 @@ not a test double.
 | | |
 |---|---|
 | `HELP.BASL` | the viewer |
-| `HELP.PRG` | compiled, embedded, 22,603 bytes — what `help-demo.bat` runs |
+| `HELP.PRG` | compiled, embedded, 23,530 bytes — what `help-demo.bat` runs |
 | `MKHELP.PY` | the content build |
-| `HELP.IDX` | the master index, 90 rows |
+| `HELP.IDX` | the master index, 91 rows |
 | `H001.HLP`…`H038.HLP` | one topic each |
 | `GPC-HELP.md` | the same content, for a PC |
 | `GPC-BASIC/` | the eight modules a rebuild needs, so it needs nothing from the master |

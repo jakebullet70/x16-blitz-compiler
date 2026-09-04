@@ -80,9 +80,9 @@
 .
 =SEE ALSO
 .
->28|4.1 THEME.INC.BL -- named colour roles
->30|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
->29|4.2 STRINGS.INC.BL -- string helpers
->31|4.4 LINEINPUT.INC.BL -- a positioned entry field
->32|4.5 BMX.INC.BL -- a BMX bitmap into VERA
->33|4.6 MENUVERT.INC.BL -- a vertical menu
+>29|4.1 THEME.INC.BL -- named colour roles
+>31|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>30|4.2 STRINGS.INC.BL -- string helpers
+>32|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>33|4.5 BMX.INC.BL -- a BMX bitmap into VERA
+>34|4.6 MENUVERT.INC.BL -- a vertical menu

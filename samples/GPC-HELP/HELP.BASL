@@ -18,13 +18,27 @@
 ## from GPC-BASIC/. Nothing here parses markdown, measures a string or wraps a
 ## line: that happened on the host once instead of on the X16 every time.
 ##
-## THE SCREEN IS THE PAGE BUFFER, and that is the whole memory design. A topic
-## is read straight from its file to the screen and NOT kept, so the only
-## thing resident is the index. Blitz's string heap costs about 1.67 bytes a
-## character -- measured -- and a program carrying this much of the GUI library
-## has around 9 KB of workspace left, so holding a topic as well as the index
-## does not fit. Scrolling therefore re-reads, which costs an OPEN and 27
-## lines: 4 jiffies, measured.
+## THE TOPIC LIVES IN A RAM BANK, and that is the whole memory design. It is
+## read once, on entry, into HELP.TBANK, and every scroll after that paints a
+## row out of RAM.
+##
+## IT USED TO BE THE SCREEN, and re-reading is what made it slow. A topic was
+## read from file straight to the screen and not kept, so a one line scroll
+## re-opened the file and read the WHOLE topic to find the single line the
+## slide had exposed: 36.8 jiffies a step, against 37.4 for repainting the
+## page outright. The cells were already being moved in one VERA memory_copy
+## and it made no difference -- 1.6 of those 36.8 jiffies were the slide.
+##
+## THE HEAP IS WHY IT IS A BANK AND NOT A STRING ARRAY. Blitz's string heap
+## costs about 1.67 bytes a character -- measured -- and a program carrying
+## this much of the GUI library has around 9 KB of workspace left, which the
+## index already has a claim on. A bank is 8 KB that costs the workspace
+## nothing, and the largest topic in the tree is 5.2 KB.
+##
+## WHAT IT COSTS is at the other end: storing a line is a POKE a character, so
+## opening the largest topic takes 158 jiffies where it used to take 37.
+## HELP.PAGE.LOADING says so on the screen rather than letting it read as a
+## hang. See HELP.PAGE.LOAD for the one-call version that does not work.
 ##
 ## ONE FILE PER TOPIC IS WHY THAT IS AFFORDABLE. Packed into five category
 ## files a topic was reached by skipping lines, and skipping to line 1000 of a
@@ -65,7 +79,13 @@
 ## HELP.IDX is 89 rows today. The headroom is for the library growing, and
 ## running out is not a crash: the rows past the end are dropped. Every row
 ## costs its own text on the heap, so this is a memory number, not a limit.
-#DEFINE HELP.MAXIX 160
+## MEASURED, NOT GUESSED AT: the self-check reports FRE AT THE END, and with
+## 160 it was 1,046 bytes. A row costs ten bytes of workspace whether it is
+## used or not -- four integer arrays and a string pointer -- so forty rows of
+## unused headroom is four hundred bytes in a program that has one kilobyte.
+## 120 still leaves room for twenty-nine more rows than the library has today,
+## and running out is not a crash: the rows past the end are dropped.
+#DEFINE HELP.MAXIX 120
 
 ## Cross references in one topic, and the deepest chain of them ESC can walk
 ## back along. Twelve is what MKHELP.PY emits at most.
@@ -76,10 +96,52 @@
 ## the keyboard layout lives there -- so anything above it will do.
 #DEFINE HELP.BANK 8
 
-## And a SECOND one, for sliding the text region a row instead of repainting
-## it -- see HELP.PAGE.SHIFT. It cannot be HELP.BANK: that is GUI.BANK, and a
-## dialog open over the page is holding the cells underneath it in there.
-#DEFINE HELP.SBANK 9
+## And a SECOND one, for the topic itself -- see HELP.PAGE.LOAD. It cannot be
+## HELP.BANK: that is GUI.BANK, and a dialog open over the page is holding the
+## cells underneath it in there.
+##
+## HEX FOR THE WINDOW, because a #DEFINE takes a SIGNED int16 and 40960 is out
+## of range where $A000 is accepted.
+#DEFINE HELP.TBANK 9
+#DEFINE HELP.WIN $A000
+#DEFINE HELP.BANKSIZE 8192
+#DEFINE HELP.MAXLINES 140
+
+## THE LINE TABLE IS IN THE BANK TOO, and it is there because it does not fit
+## anywhere else: three DIMs of HELP.MAXLINES were 840 bytes of workspace and
+## the answer was OUT OF MEMORY before the index had finished loading. In the
+## bank they cost nothing that is scarce.
+##
+## Four bytes a line at the FRONT of the bank -- offset low, offset high,
+## length, kind -- and the text follows them. Line N is at (N-1)*4.
+#DEFINE HELP.RECSIZE 4
+
+## VERA and the KERNAL, for sliding the text region a row -- see
+## HELP.PAGE.SHIFT. The cells never leave VRAM, so no bank is involved.
+##
+## HEX, AND NO DIGIT ANYWHERE IN A NAME. Both are BASLOAD rules answering with
+## the same "INVALID PARAMETER" at the #DEFINE line: a #DEFINE takes a SIGNED
+## int16, so $9F25 is accepted where 40741 is out of range; and a digit in the
+## name is refused outright, which is why the data ports are named .B and not
+## by their number.
+#DEFINE HELPK.MEMCOPY $FEE7
+#DEFINE HELPK.VCTRL $9F25
+#DEFINE HELPK.VLO $9F20
+#DEFINE HELPK.VMID $9F21
+#DEFINE HELPK.VHI $9F22
+#DEFINE HELPK.LCONFIG $9F34
+#DEFINE HELPK.LMAPBASE $9F35
+
+## $9F23 and $9F24, VERA's two data ports, split into the bytes the 16-bit ABI
+## registers want.
+#DEFINE HELPK.PORTLO 35
+#DEFINE HELPK.PORTLO.B 36
+#DEFINE HELPK.PORTHI 159
+
+## ADDRH: bank in bit 0, DECR in bit 3, auto-increment in the top nibble. 16 is
+## "step forward by one", 24 the same walking backwards.
+#DEFINE HELPK.UP 16
+#DEFINE HELPK.DOWN 24
 
 #DEFINE HELP.CHAN 2
 
@@ -165,9 +227,11 @@ HELP.BOOT:
     GOSUB GUI.SCREEN
     HELP.COLS = GUI.SCREEN.COLS : HELP.ROWS = GUI.SCREEN.ROWS
 
-    ## Row 0 is the title, the last row the hint, and the one above it is left
-    ## blank so the text never runs into either.
-    HELP.VIEW = HELP.ROWS - 3
+    ## Row 0 is the title and the last row is the hint. There USED to be a
+    ## blank spacer above the hint as well, which cost a line of text on every
+    ## page to keep it off the bar -- the bar has its own colour and does not
+    ## need the gap.
+    HELP.VIEW = HELP.ROWS - 2
     IF HELP.VIEW < 4 THEN HELP.VIEW = 4
 
     THEME.DARK = 1 : GOSUB THEME.LOAD
@@ -341,18 +405,60 @@ HELP.INDEX.LOOP:
     GOSUB HELP.IX.SHOW
     ## A scroll repaints the page; a move inside it repaints TWO rows. That is
     ## the only reason the highlight is not simply redrawn everywhere.
+    ## A ONE ROW SCROLL SLIDES, exactly as a topic page does -- the list is
+    ## 28 rows and repainting all of them is what made this flicker where the
+    ## content page does not. A page jump or a HOME still repaints: there is
+    ## nothing to keep.
     GP.IF HELP.IX.TOP <> HELP.TOP.WAS THEN
-        HELP.FULL = 1
+        HELP.IXD = HELP.IX.TOP - HELP.TOP.WAS
+        HELP.SHIFT = 0
+        IF HELP.IXD = 1 THEN HELP.SHIFT = 1
+        IF HELP.IXD = 0 - 1 THEN HELP.SHIFT = 0 - 1
+        GP.IF HELP.SHIFT <> 0 THEN
+            GOSUB HELP.INDEX.SLIDE
+        GP.ELSE
+            GOSUB HELP.INDEX.ROWS
+        GP.ENDIF
+        ## The row the highlight came FROM slid with everything else and is
+        ## still wearing it, so it is redrawn at wherever it landed.
+        HELP.ROWI = HELP.SEL.WAS : GOSUB HELP.INDEX.ROW
     GP.ELSE
         HELP.ROWI = HELP.SEL.WAS : GOSUB HELP.INDEX.ROW
         HELP.ROWI = HELP.IX.SEL : GOSUB HELP.INDEX.ROW
     GP.ENDIF
     GOTO HELP.INDEX.LOOP
 
+## The whole thing: the screen, the bars, and the entries. Only for entering
+## the index or coming back to it from a topic or a dialog.
 HELP.INDEX.DRAW:
-    GP.FILL 0, 0, HELP.COLS, HELP.ROWS, 32, THEME.CLR(THEME.PAGE)
+    GOSUB HELP.PAGE.FRAME
     HELP.TITLE$ = "GPC-HELP    GP.BASIC and BASL, built from the library"
     GOSUB HELP.TITLEBAR
+    GOSUB HELP.INDEX.ROWS
+    RETURN
+
+## THE ENTRIES ONLY, AND A SCROLL COMES HERE. It used to set HELP.FULL and go
+## through HELP.INDEX.DRAW, which fills the whole screen -- the FOOTER ROW
+## INCLUDED -- before HELP.STATUSBAR puts the text back. That is a blank frame
+## on the footer for every press of an arrow key, which is the flicker taking
+## the fill out of HELP.STATUSBAR did not fix: it had moved here.
+##
+## The bars do not change when the list moves, so they are not touched. The
+## region is cleared because HELP.INDEX.ROW draws nothing past the end of the
+## list and the rows below it would otherwise be left behind.
+## One row of movement, in VERA. HELP.PAGE.SHIFT knows nothing about topics --
+## it slides screen rows 1..HELP.VIEW and says in HELP.ONLY which one it
+## exposed -- so the index gets it for the cost of naming the entry that lands
+## there. That entry is the newly selected one, the scroll having happened
+## because the selection reached the edge.
+HELP.INDEX.SLIDE:
+    GOSUB HELP.PAGE.SHIFT
+    HELP.ROWI = HELP.IX.TOP + HELP.ONLY
+    GOSUB HELP.INDEX.ROW
+    RETURN
+
+HELP.INDEX.ROWS:
+    GP.FILL 0, 1, HELP.COLS, HELP.VIEW, 32, THEME.CLR(THEME.PAGE)
     FOR HELP.R = 0 TO HELP.VIEW - 1
         HELP.ROWI = HELP.IX.TOP + HELP.R
         GOSUB HELP.INDEX.ROW
@@ -463,6 +569,9 @@ HELP.PG.CLAMP:
 ## also means a chain of links cannot run the frame stack out.
 HELP.TOPIC:
 HELP.TOPIC.ENTER:
+    ## ONCE PER TOPIC, not once per scroll. Everything below draws out of the
+    ## bank this fills.
+    GOSUB HELP.PAGE.LOAD
     HELP.REDRAW = 1 : HELP.SHIFT = 0
 HELP.PAGE.LOOP:
     GP.IF HELP.REDRAW <> 0 THEN
@@ -489,7 +598,10 @@ HELP.PAGE.LOOP:
             HELP.PG.FROM = 0
         GP.CASE HELP.K.END
             HELP.PG.FROM = HELP.IX.LINES%(HELP.GO)
-        GP.CASE 76, 108, GUI.RETURN
+        ## L ONLY. RETURN used to open this too, which is the index's meaning
+        ## of the key leaking into a page that has no "open" to do -- and the
+        ## footer advertises L, not RETURN.
+        GP.CASE 76, 108
             GOSUB HELP.LINKS
         GP.CASE 88, 120
             GOSUB HELP.EXPORT
@@ -509,63 +621,251 @@ HELP.PAGE.LOOP:
     IF HELP.DELTA <> 0 THEN HELP.REDRAW = 1
     GOTO HELP.PAGE.LOOP
 
-## Read the topic straight to the screen. Nothing is kept but the cross
-## references, which are twelve integers and twelve short strings, and which
-## have to be collected on this pass because there is no other one.
-HELP.PAGE.DRAW:
+## ============================================================================
+## THE TOPIC LIVES IN A BANK, and that is the change that made this fast.
+##
+## It used to be read straight from the file to the screen on EVERY scroll: an
+## OPEN and a LINPUT# of the whole topic, up to 120 lines, to find the ONE line
+## a slide had exposed. Measured 04/09/26 -- 36.8 jiffies a scroll step against
+## a full repaint's 37.4, which is why making the cells move 6x faster bought
+## 4%. The file read WAS the scroll. Now it is read once, into HELP.TBANK, and
+## a scroll paints one row out of RAM at about a jiffy.
+##
+## THE COST MOVED TO THE OTHER END, and it is not small: storing a line is a
+## POKE a character, 158 jiffies -- 2.6 seconds -- for the largest topic in the
+## tree, where opening one used to cost 0.6. HELP.PAGE.LOADING puts that on the
+## screen so it reads as work and not as a hang.
+##
+## THE ONE CALL VERSION DOES NOT WORK, and it was measured, not assumed:
+## GP.STRPTR for the characters and the KERNAL's memory_copy to move them loads
+## in 91 jiffies and gets 214 of 218 test bytes WRONG. memory_copy takes no
+## bank argument, so the destination bank must be live in $00 when it runs, and
+## BANK only applies around a PEEK or a POKE -- a raw GP.CALL runs with
+## whatever BASIC left there. Holding a bank across a KERNAL call needs GP.ASM.
+## ============================================================================
+HELP.PAGE.LOAD:
+    ## The text starts ABOVE the line table, which owns the front of the bank.
+    HELP.HASCODE = 0
     HELP.PG.LINES = 0 : HELP.LINKN = 0 : HELP.ATTOPIC = 0
+    HELP.PG.P = HELP.MAXLINES * HELP.RECSIZE
+    HELP.RECP = HELP.WIN
     HELP.TOPICNUM = HELP.IX.TOPIC%(HELP.GO)
     IF HELP.TOPICNUM < 1 THEN RETURN
     GOSUB HELP.FILENAME
-    HELP.ONLY = 0 - 1
-    GP.IF HELP.SHIFT <> 0 THEN
-        GOSUB HELP.PAGE.SHIFT
-    GP.ELSE
-        GP.FILL 0, 0, HELP.COLS, HELP.ROWS, 32, THEME.CLR(THEME.PAGE)
-    GP.ENDIF
+    GOSUB HELP.PAGE.LOADING
 
     OPEN HELP.CHAN, 8, HELP.CHAN, HELP.NAME$ + ",S,R"
     LINPUT# HELP.CHAN, HELP.LINE$, 10 : HELP.ST = ST
-    IF (HELP.ST AND 2) <> 0 THEN GOTO HELP.PAGE.CLOSE
+    IF (HELP.ST AND 2) <> 0 THEN GOTO HELP.LOAD.CLOSE
     GOSUB HELP.STRIP
     HELP.TITLE$ = HELP.IX.TEXT$(HELP.GO)
     ## Line 1 being the topic's own record is what the addressing rests on, so
     ## it is recorded rather than assumed -- the self-check asserts it.
     IF LEFT$(HELP.LINE$, 1) = "@" THEN HELP.TITLE$ = MID$(HELP.LINE$, 2) : HELP.ATTOPIC = 1
-    GOSUB HELP.TITLEBAR
-    HELP.R = 0
 
-HELP.PAGE.READ:
+HELP.LOAD.READ:
     ## The index says how long this topic is, so a file that never signals its
     ## end cannot spin here. It is a guard, not the terminator -- reading FOUR
     ## past the count leaves the self-check's length assertion still able to
     ## fail, which is what would catch the index and the file disagreeing.
-    IF HELP.PG.LINES > HELP.IX.LINES%(HELP.GO) + 4 THEN GOTO HELP.PAGE.CLOSE
+    IF HELP.PG.LINES > HELP.IX.LINES%(HELP.GO) + 4 THEN GOTO HELP.LOAD.CLOSE
     LINPUT# HELP.CHAN, HELP.LINE$, 10 : HELP.ST = ST
-    IF (HELP.ST AND 2) <> 0 THEN GOTO HELP.PAGE.CLOSE
-    GOSUB HELP.STRIP
+    IF (HELP.ST AND 2) <> 0 THEN GOTO HELP.LOAD.CLOSE
     HELP.PG.LINES = HELP.PG.LINES + 1
-    HELP.MARK$ = LEFT$(HELP.LINE$, 1)
-    HELP.BODY$ = MID$(HELP.LINE$, 2)
+    ## ------------------------------------------------------------------
+    ## THE LINE IS READ THROUGH ITS POINTER, NOT TAKEN APART INTO STRINGS.
+    ##
+    ## This used to be GOSUB HELP.STRIP, then LEFT$ for the marker and MID$
+    ## for the body -- about five heap allocations a line, one of them a copy
+    ## of the whole line. Measured on the 120 line topic: LINPUT# is 22
+    ## jiffies, storing the text is 1, and that string work was the other 37.
+    ##
+    ## GP.STRPTR gives the length byte, characters from +1. So the length is
+    ## offset 0, the marker is offset 1, the body starts at offset 2, and none
+    ## of the three costs an allocation. PEEK reads main RAM here and is not
+    ## affected by whichever bank is selected.
+    ## ------------------------------------------------------------------
+    HELP.LP = GP.STRPTR(HELP.LINE$)
+    HELP.LL = LEN(HELP.LINE$)
+    IF HELP.LL > 0 THEN IF PEEK(HELP.LP + HELP.LL) = 13 THEN HELP.LL = HELP.LL - 1
+    HELP.MARKC = 0
+    IF HELP.LL > 0 THEN HELP.MARKC = PEEK(HELP.LP + 1)
     HELP.KIND = 0
-    IF HELP.MARK$ = "=" THEN HELP.KIND = 1
-    IF HELP.MARK$ = ":" THEN HELP.KIND = 2
-    IF HELP.MARK$ = ">" THEN GOSUB HELP.PAGE.REF
-    GP.IF HELP.PG.LINES > HELP.PG.FROM AND HELP.R < HELP.VIEW THEN
+    IF HELP.MARKC = 61 THEN HELP.KIND = 1
+    IF HELP.MARKC = 58 THEN HELP.KIND = 2
+    IF HELP.MARKC = 58 THEN HELP.HASCODE = 1
+    ## A CROSS REFERENCE IS THE ONE LINE THAT STILL NEEDS A STRING, because
+    ## HELP.PAGE.REF splits it on "|" and hands the text to MENUVERT. That is
+    ## 195 lines out of 6,658, so the slow path is 3% of them.
+    GP.IF HELP.MARKC = 62 THEN
+        HELP.BODY$ = MID$(HELP.LINE$, 2, HELP.LL - 1)
+        GOSUB HELP.PAGE.REF
+        HELP.SP = GP.STRPTR(HELP.BODY$) + 1 : HELP.W = LEN(HELP.BODY$)
+    GP.ELSE
+        HELP.SP = HELP.LP + 2 : HELP.W = HELP.LL - 1
+    GP.ENDIF
+    IF HELP.W < 0 THEN HELP.W = 0
+    GOSUB HELP.LOAD.STORE
+    IF HELP.PG.LINES >= HELP.MAXLINES THEN GOTO HELP.LOAD.CLOSE
+    ## Bit 6 is the end. The last line carries data AND the flag, so it is
+    ## stored first and the loop leaves after it -- see the note in HELP.IDXLOAD
+    ## about why "ST <> 0" is the wrong test.
+    IF (HELP.ST AND 64) = 0 THEN GOTO HELP.LOAD.READ
+
+HELP.LOAD.CLOSE:
+    CLOSE HELP.CHAN
+    RETURN
+
+## One line into the bank, with its kind beside it so no row is ever parsed
+## twice. The body is TRUNCATED to what a row can show: a long line then costs
+## its screen width instead of its own, and the bank holds more topic for it.
+## IN: HELP.SP the address of the first body character, HELP.W how many, and
+## HELP.KIND. The caller says where the text IS rather than handing over a
+## string, which is what lets the common path avoid building one at all.
+HELP.LOAD.STORE:
+    ## Two, because ordinary text starts at column 2 and that is the widest a
+    ## row can be. NOT five: a cross reference indents to 5 for its "->", but
+    ## charging every line for that clipped the last character off the longest
+    ## ones -- the widest line in the tree is 76 and "Prefer" arrived as
+    ## "Prefe". The link rows are clamped where they are drawn instead.
+    IF HELP.W > HELP.COLS - 2 THEN HELP.W = HELP.COLS - 2
+    ## OUT OF BANK IS RECORDED AS AN EMPTY LINE, not as a half written one, so
+    ## a topic too big to fit comes out SHORT rather than corrupt -- and the
+    ## self-check's length assertion is what would then catch it.
+    IF HELP.PG.P + HELP.W > HELP.BANKSIZE THEN HELP.W = 0
+    ## THE RECORD IS WRITTEN BY THE BLOB TOO, and that was worth as much as
+    ## everything else here put together. In BASIC it was four POKEs a line --
+    ## each of which selects the bank and puts it back -- plus an INT(x/256) to
+    ## split the offset, which is a floating point divide. Measured on the 120
+    ## line topic: 23 jiffies, against 22 to read the whole file and 1 to copy
+    ## all the text. The blob already holds the bank and splits the offset with
+    ## a byte load, so it costs nothing there.
+    ##
+    ## A RUNNING POINTER, not (lines-1)*RECSIZE: that multiply is floating
+    ## point too, once a line, for an address that only ever steps by four.
+    GP.IF 1 = 1 THEN
+        ## SIGNED int16 HOLDING AN UNSIGNED ADDRESS, deliberately. $A000 and up
+        ## does not fit a % and comes back negative -- but WriteInteger keeps
+        ## the low two bytes and the blob reads those two bytes, so the BIT
+        ## PATTERN is right and that is all it needs. Never do arithmetic on
+        ## these in BASIC.
+        ## HELP.SP already points at the first CHARACTER -- the callers add the
+        ## one that GP.STRPTR does not, because it returns the address of the
+        ## LENGTH BYTE. Get that wrong and every line is stored a byte early,
+        ## its own length as the first character; and it only LOOKS broken on
+        ## short lines, a length of 32 to 126 being a printable character.
+        HELP.AS.SRC% = HELP.SP
+        HELP.AS.DST% = HELP.WIN + HELP.PG.P
+        HELP.AS.LEN% = HELP.W
+        HELP.AS.BANK% = HELP.TBANK
+        HELP.AS.REC% = HELP.RECP
+        HELP.AS.OFF% = HELP.PG.P
+        HELP.AS.KIND% = HELP.KIND
+        GOSUB HELP.STORE.ASM
+        HELP.RECP = HELP.RECP + HELP.RECSIZE
+        HELP.PG.P = HELP.PG.P + HELP.W
+    GP.ENDIF
+    RETURN
+
+## ============================================================================
+## One line into the bank, in assembly, because a POKE loop was 158 jiffies.
+##
+## WHAT WAS SLOW WAS NOT THE POKE. It was MID$: the loop asked for one
+## character at a time, and every one of those 5,169 asks allocated a string on
+## the heap for the scavenger to take back. This is called once a LINE.
+##
+## zTemp0 and zTemp1 hold the two pointers. They are free inside a blob -- SYS
+## clobbers zTemp0 reaching it, and nothing on the way out reads any of the
+## three -- which is what makes this a straight (ptr),y copy instead of the
+## operand-patching STASH has to do.
+##
+## THE BANK IS HELD ACROSS THE WHOLE COPY, and that is the point of doing it
+## here at all: a KERNAL memory_copy cannot be given one, because BANK only
+## applies around a PEEK or a POKE. $00 is saved and put back so the
+## interpreter finds it as it left it.
+##
+## A line is at most 78 bytes, so the count fits in X and Y never wraps.
+## ============================================================================
+HELP.STORE.ASM:
+    #REM 1
+    GP.ASM
+    REM LDA {HELP.AS.SRC%}       ; source -> zTemp0
+    REM STA $2C
+    REM LDX #1
+    REM LDA {HELP.AS.SRC%},X
+    REM STA $2D
+    REM LDA {HELP.AS.DST%}       ; destination -> zTemp1
+    REM STA $2E
+    REM LDX #1
+    REM LDA {HELP.AS.DST%},X
+    REM STA $2F
+    REM LDA {HELP.AS.REC%}       ; the line record -> zTemp2
+    REM STA $30
+    REM LDX #1
+    REM LDA {HELP.AS.REC%},X
+    REM STA $31
+    REM LDA $00                  ; the bank we were handed, to put back
+    REM PHA
+    REM LDA {HELP.AS.BANK%}
+    REM STA $00
+    REM ; ---- offset low, offset high, length, kind ----
+    REM LDY #0
+    REM LDA {HELP.AS.OFF%}
+    REM STA ($30),Y
+    REM INY
+    REM LDX #1
+    REM LDA {HELP.AS.OFF%},X
+    REM STA ($30),Y
+    REM INY
+    REM LDA {HELP.AS.LEN%}
+    REM STA ($30),Y
+    REM INY
+    REM LDA {HELP.AS.KIND%}
+    REM STA ($30),Y
+    REM LDX {HELP.AS.LEN%}
+    REM BEQ HSDONE
+    REM LDY #0
+    REM HSLP: LDA ($2C),Y
+    REM STA ($2E),Y
+    REM INY
+    REM DEX
+    REM BNE HSLP
+    REM HSDONE: PLA
+    REM STA $00
+    GP.ENDASM
+    #REM 0
+    RETURN
+
+## The pause, explained. The title bar goes up FIRST so the topic is named
+## while it is being read, rather than the screen sitting blank.
+HELP.PAGE.LOADING:
+    GOSUB HELP.PAGE.FRAME
+    HELP.TITLE$ = HELP.IX.TEXT$(HELP.GO)
+    GOSUB HELP.TITLEBAR
+    GP.PRINTAT 2, 2, "Reading " + HELP.NAME$ + " ...", THEME.CLR(THEME.DIMMED)
+    RETURN
+
+## ============================================================================
+## The page, painted from the bank. NO FILE IS OPENED HERE AT ALL, which is the
+## whole point: this runs on every scroll and HELP.PAGE.LOAD does not.
+## ============================================================================
+HELP.PAGE.DRAW:
+    IF HELP.PG.LINES = 0 THEN RETURN
+    GOSUB HELP.TITLEBAR
+    HELP.ONLY = 0 - 1
+    GP.IF HELP.SHIFT <> 0 THEN
+        GOSUB HELP.PAGE.SHIFT
+    GP.ELSE
+        GP.FILL 0, 1, HELP.COLS, HELP.VIEW, 32, THEME.CLR(THEME.PAGE)
+    GP.ENDIF
+    FOR HELP.R = 0 TO HELP.VIEW - 1
+        HELP.LN = HELP.PG.FROM + HELP.R + 1
         HELP.Y = 1 + HELP.R
         ## HELP.ONLY < 0 is "all of them". Otherwise exactly one row is new and
         ## the other 26 are already on the screen, slid into place.
         IF HELP.ONLY < 0 THEN GOSUB HELP.PAGE.ROW
         IF HELP.ONLY = HELP.R THEN GOSUB HELP.PAGE.ROW
-        HELP.R = HELP.R + 1
-    GP.ENDIF
-    ## Bit 6 is the end. The last line carries data AND the flag, so it is
-    ## drawn first and the loop leaves after it -- see the note in HELP.IDXLOAD
-    ## about why "ST <> 0" is the wrong test.
-    IF (HELP.ST AND 64) = 0 THEN GOTO HELP.PAGE.READ
-
-HELP.PAGE.CLOSE:
-    CLOSE HELP.CHAN
+    NEXT HELP.R
     RETURN
 
 ## Slide the text region one row, rather than repainting all of it.
@@ -577,28 +877,76 @@ HELP.PAGE.CLOSE:
 ##
 ## What this removes is the whole-screen GP.FILL and 26 of the 27 GP.PRINTATs
 ## -- and with them the blank-then-repaint that made a held down cursor key
-## flicker. STASH moves the cells in assembly, a row at a time.
+## flicker.
 ##
-## STASH REFUSES A RECTANGLE IT CANNOT FIT and says so in STASH.OK, so there is
-## a way back: the full repaint. Slower, never wrong.
+## THE CELLS NEVER LEAVE VRAM. Map rows are contiguous -- 128 cells at two
+## bytes is a 256 byte stride -- so the whole 26 row block is ONE memory_copy
+## with the ports one row apart: ADDR0 on the source, ADDR1 on the target,
+## $9F23 and $9F24 in r0 and r1, where the KERNAL does not step a pointer, so
+## VERA walks both addresses itself. BMX.PALCOPY is the same idiom.
+##
+## It moves the off-screen columns 80..127 along with the visible ones, which
+## is 60% waste and still far less work than 26 separate calls.
+##
+## DIRECTION MATTERS, because the ranges overlap. Moving the text UP the target
+## is below the source and a forward copy is safe. Moving it DOWN, a forward
+## copy would smear the first row over all the others, so both ports start on
+## the LAST byte and VERA's DECR bit walks them backwards.
 HELP.PAGE.SHIFT:
-    STASH.BANK = HELP.SBANK : STASH.X = 0
-    STASH.W = HELP.COLS : STASH.H = HELP.VIEW - 1
-    ## Scrolling DOWN the text moves UP: rows 2..VIEW are kept, and land at 1.
-    STASH.Y = 1 : IF HELP.SHIFT = 1 THEN STASH.Y = 2
-    GOSUB STASH.SAVE
-    GP.IF STASH.OK = 0 THEN
-        GP.FILL 0, 0, HELP.COLS, HELP.ROWS, 32, THEME.CLR(THEME.PAGE)
-        RETURN
+    ## Asked of VERA rather than assumed, exactly as STASH.SETUP does it.
+    HELP.SC.MAPW = 32 * 2 ^ INT((PEEK(HELPK.LCONFIG) AND 48) / 16)
+    HELP.SC.STRIDE = HELP.SC.MAPW * 2
+    HELP.SC.BASE = PEEK(HELPK.LMAPBASE) * 512
+    HELP.SC.N = (HELP.VIEW - 1) * HELP.SC.STRIDE
+
+    HELP.SC.SRC = HELP.SC.BASE + HELP.SC.STRIDE * 2
+    HELP.SC.DST = HELP.SC.BASE + HELP.SC.STRIDE
+    HELP.SC.STEP = HELPK.UP
+    HELP.ONLY = HELP.VIEW - 1
+    GP.IF HELP.SHIFT <> 1 THEN
+        HELP.SC.SRC = HELP.SC.BASE + HELP.SC.STRIDE + HELP.SC.N - 1
+        HELP.SC.DST = HELP.SC.BASE + HELP.SC.STRIDE * 2 + HELP.SC.N - 1
+        HELP.SC.STEP = HELPK.DOWN
+        HELP.ONLY = 0
     GP.ENDIF
-    HELP.ONLY = 0 : STASH.Y = 2
-    GP.IF HELP.SHIFT = 1 THEN
-        HELP.ONLY = HELP.VIEW - 1 : STASH.Y = 1
-    GP.ENDIF
-    STASH.MOVE = 1 : GOSUB STASH.RESTORE : STASH.MOVE = 0
+
+    HELP.SC.ADDR = HELP.SC.SRC : GOSUB HELP.SC.PORTA
+    HELP.SC.ADDR = HELP.SC.DST : GOSUB HELP.SC.PORTB
+    POKE 2, HELPK.PORTLO : POKE 3, HELPK.PORTHI
+    POKE 4, HELPK.PORTLO.B : POKE 5, HELPK.PORTHI
+    HELP.SC.HI = INT(HELP.SC.N / 256)
+    POKE 6, HELP.SC.N - HELP.SC.HI * 256 : POKE 7, HELP.SC.HI
+    GP.CALL HELPK.MEMCOPY
+
     ## The row the slide exposed still holds its old text. HELP.PAGE.ROW paints
     ## over a cleared row -- it does not clear one itself.
     GP.FILL 0, 1 + HELP.ONLY, HELP.COLS, 1, 32, THEME.CLR(THEME.PAGE)
+    RETURN
+
+## The two address ports. CTRL bit 0 is ADDRSEL, so $9F20-$9F22 are port 1's
+## registers while it is set, and it goes back to 0 for the streaming path.
+HELP.SC.PORTA:
+    GOSUB HELP.SC.SPLIT
+    POKE HELPK.VCTRL, 0
+    POKE HELPK.VLO, HELP.SC.LO : POKE HELPK.VMID, HELP.SC.MID
+    POKE HELPK.VHI, HELP.SC.BANK + HELP.SC.STEP
+    RETURN
+
+HELP.SC.PORTB:
+    GOSUB HELP.SC.SPLIT
+    POKE HELPK.VCTRL, 1
+    POKE HELPK.VLO, HELP.SC.LO : POKE HELPK.VMID, HELP.SC.MID
+    POKE HELPK.VHI, HELP.SC.BANK + HELP.SC.STEP
+    POKE HELPK.VCTRL, 0
+    RETURN
+
+## A VRAM address is 17 bits, so GP.HIBYTE and GP.LOBYTE cannot split it --
+## they reach 65535. Bit 16 comes off first and rides in ADDRH.
+HELP.SC.SPLIT:
+    HELP.SC.BANK = INT(HELP.SC.ADDR / 65536)
+    HELP.SC.REST = HELP.SC.ADDR - HELP.SC.BANK * 65536
+    HELP.SC.MID = INT(HELP.SC.REST / 256)
+    HELP.SC.LO = HELP.SC.REST - HELP.SC.MID * 256
     RETURN
 
 ## A ">" line is "ordinal|text". The ordinal is a HELP.IDX row, resolved by
@@ -617,27 +965,54 @@ HELP.PAGE.REF:
     MENUVERT.ITEM$(HELP.LINKN) = HELP.BODY$
     RETURN
 
+## One row, out of the bank. HELP.LN is the line and HELP.Y the screen row;
+## the row is expected to be CLEAR already, as it was before -- the full draw
+## fills the region and a slide fills the one row it exposed.
 HELP.PAGE.ROW:
+    IF HELP.LN < 1 THEN RETURN
+    IF HELP.LN > HELP.PG.LINES THEN RETURN
+    ## THE BANK, EVERY TIME, and this is not belt and braces: GUI.OPEN stashes
+    ## the cells under a dialog, and STASH selects its OWN bank and does not put
+    ## ours back. A row read after one comes out as the stash buffer -- cell
+    ## pairs, character and attribute alternating, rendered as text -- and it
+    ## looks exactly like the scroll corrupting the screen.
+    BANK HELP.TBANK
+    HELP.REC = HELP.WIN + (HELP.LN - 1) * HELP.RECSIZE
+    HELP.A = HELP.WIN + PEEK(HELP.REC) + PEEK(HELP.REC + 1) * 256
+    HELP.W = PEEK(HELP.REC + 2)
+    HELP.KIND = PEEK(HELP.REC + 3)
+    HELP.ATTR = THEME.CLR(THEME.TEXT)
+    HELP.INDENT = 2
     GP.IF HELP.KIND = 1 THEN
         ## The one line of highlighting the X16 side has: a section header,
         ## as a bar the width of the screen.
         GP.FILL 0, HELP.Y, HELP.COLS, 1, 32, THEME.CLR(THEME.TITLE)
-        GP.PRINTAT 2, HELP.Y, HELP.BODY$, THEME.CLR(THEME.TITLE)
-        RETURN
+        HELP.ATTR = THEME.CLR(THEME.TITLE)
     GP.ENDIF
-    HELP.ATTR = THEME.CLR(THEME.TEXT)
     IF HELP.KIND = 2 THEN HELP.ATTR = THEME.CLR(THEME.DIMMED)
-    HELP.OUT$ = HELP.BODY$
     GP.IF HELP.KIND = 3 THEN
         HELP.ATTR = THEME.CLR(THEME.WARN)
-        HELP.OUT$ = "-> " + HELP.OUT$
+        GP.PRINTAT 2, HELP.Y, "->", HELP.ATTR
+        HELP.INDENT = 5
     GP.ENDIF
-    IF HELP.OUT$ <> "" THEN GP.PRINTAT 2, HELP.Y, HELP.OUT$, HELP.ATTR
+    ## What fits from THIS row's indent. One test a row, not one a cell.
+    HELP.WMAX = HELP.COLS - HELP.INDENT
+    IF HELP.W > HELP.WMAX THEN HELP.W = HELP.WMAX
+    ## A dialog may have run between the record read and here, so select again.
+    BANK HELP.TBANK
+    GP.IF HELP.W > 0 THEN
+        FOR HELP.I = 0 TO HELP.W - 1
+            GP.CHAR HELP.INDENT + HELP.I, HELP.Y, PEEK(HELP.A + HELP.I), HELP.ATTR
+        NEXT HELP.I
+    GP.ENDIF
     RETURN
 
+## Only what this topic can actually do. A topic with no ":" lines has nothing
+## to export, and offering it was a key that answered with an error box.
 HELP.PAGE.STATUS:
-    HELP.HINT$ = "L links   X export code   ESC back"
-    IF HELP.LINKN = 0 THEN HELP.HINT$ = "X export code   ESC back"
+    HELP.HINT$ = "ESC back"
+    IF HELP.HASCODE <> 0 THEN HELP.HINT$ = "X export code   " + HELP.HINT$
+    IF HELP.LINKN > 0 THEN HELP.HINT$ = "L links   " + HELP.HINT$
     HELP.NUMV = HELP.PG.FROM + 1 : GOSUB HELP.NUMSTR
     HELP.NOTE$ = "line " + HELP.NUM$
     HELP.NUMV = HELP.PG.LINES : GOSUB HELP.NUMSTR
@@ -651,7 +1026,11 @@ HELP.PAGE.STATUS:
 ## ============================================================================
 
 HELP.LINKS:
-    IF HELP.LINKN = 0 THEN GOSUB HELP.NOLINKS : RETURN
+    ## THE FOOTER IS THE CONTRACT. It does not offer L on a topic with no cross
+    ## references, so the key does nothing -- it used to open a dialog saying
+    ## there were none, which is an answer to a question the footer had already
+    ## answered. Same rule as X in HELP.EXPORT.
+    IF HELP.LINKN = 0 THEN RETURN
     GUI.TITLE$ = "SEE ALSO" : GUI.MSG$ = "Follow" : GUI.MSG2$ = ""
     GUI.COUNT = HELP.LINKN : GUI.SEL = 1 : GUI.FLAGS = 0
     GOSUB GUI.MENU
@@ -686,6 +1065,9 @@ HELP.BACK.POP:
 ## ============================================================================
 
 HELP.EXPORT:
+    ## The footer does not offer X on a topic with no code, so the key does
+    ## nothing rather than opening a dialog to say there is nothing to write.
+    IF HELP.HASCODE = 0 THEN RETURN
     GUI.TITLE$ = "EXPORT" : GUI.MSG2$ = ""
     GUI.MSG$ = "Write this topic's code to:"
     GUI.INPUT$ = "EXAMPLE.BL" : GUI.LEN = 24 : GUI.MASK = 0
@@ -799,12 +1181,6 @@ HELP.SAY:
     GOSUB GUI.SAY
     RETURN
 
-HELP.NOLINKS:
-    HELP.MSG.ONE$ = "This topic has no cross references." : HELP.MSG.TWO$ = ""
-    GOSUB HELP.SAY
-    HELP.REDRAW = 1
-    RETURN
-
 HELP.ABOUT:
     HELP.MSG.ONE$ = "GPC-HELP -- the GP.BASIC and BASL reference."
     HELP.MSG.TWO$ = "Built from GPC-BASIC by MKHELP.PY. Written in GP.BASIC."
@@ -821,15 +1197,53 @@ HELP.ASKQUIT:
     HELP.FULL = 1
     RETURN
 
-HELP.TITLEBAR:
+## ============================================================================
+## THE BARS ARE PADDED, NOT BLANKED FIRST, and that is what stopped the footer
+## flickering. Both used to GP.FILL the whole row and then GP.PRINTAT over it,
+## which leaves the bar EMPTY for the time between the two -- and the status bar
+## is redrawn on every pass of the key loop, so under a held arrow key that
+## empty moment is continuous. Padding the string to the full width instead
+## means one GP.PRINTAT overwrites every cell and no blank frame ever exists.
+## ============================================================================
+## ============================================================================
+## THE BARS ARE FILLED ONCE AND THEN WRITTEN OVER, and that is what stopped the
+## footer flickering. They used to GP.FILL the whole row and GP.PRINTAT over it
+## on EVERY pass of the key loop, which leaves the bar empty for the time
+## between the two -- continuous, under a held arrow key. The fill now happens
+## once per page in HELP.PAGE.LOADING, and an update overwrites only the cells
+## the text occupies plus the gap in front of the note. No cell is ever blank
+## and then filled again.
+## ============================================================================
+## The screen, and the two BARS BEHIND THEIR TEXT. Every full repaint goes
+## through here -- the index and a topic both -- because HELP.TITLEBAR and
+## HELP.STATUSBAR no longer fill a row of their own, and a page that skipped
+## this got a status line printed onto the page colour with no bar under it.
+HELP.PAGE.FRAME:
+    GP.FILL 0, 0, HELP.COLS, HELP.ROWS, 32, THEME.CLR(THEME.PAGE)
     GP.FILL 0, 0, HELP.COLS, 1, 32, HELP.BAR.TOP
+    GP.FILL 0, HELP.ROWS - 1, HELP.COLS, 1, 32, HELP.BAR.BOT
+    RETURN
+
+## THE TAIL IS CLEARED, and it has to be: the bar is filled once per page, but
+## the title is set TWICE -- HELP.PAGE.LOADING puts the index text up while the
+## file is read and the topic's own "@" record replaces it -- and a shorter
+## second title left the end of the first one behind. Only the cells past the
+## text are filled, so nothing is ever blanked and repainted.
+HELP.TITLEBAR:
     GP.PRINTAT 1, 0, HELP.TITLE$, HELP.BAR.TOP
+    HELP.X = 1 + LEN(HELP.TITLE$)
+    IF HELP.X < HELP.COLS THEN GP.FILL HELP.X, 0, HELP.COLS - HELP.X, 1, 32, HELP.BAR.TOP
     RETURN
 
 HELP.STATUSBAR:
-    GP.FILL 0, HELP.ROWS - 1, HELP.COLS, 1, 32, HELP.BAR.BOT
     GP.PRINTAT 1, HELP.ROWS - 1, HELP.HINT$, HELP.BAR.BOT
-    IF HELP.NOTE$ <> "" THEN GP.PRINTAT HELP.COLS - LEN(HELP.NOTE$) - 1, HELP.ROWS - 1, HELP.NOTE$, HELP.BAR.BOT
+    HELP.X = 1 + LEN(HELP.HINT$)
+    HELP.NX = HELP.COLS
+    IF HELP.NOTE$ <> "" THEN HELP.NX = HELP.COLS - LEN(HELP.NOTE$) - 1
+    ## The gap between the two, so a note that shrinks by a digit does not
+    ## leave the old one's tail behind.
+    IF HELP.NX > HELP.X THEN GP.FILL HELP.X, HELP.ROWS - 1, HELP.NX - HELP.X, 1, 32, HELP.BAR.BOT
+    IF HELP.NOTE$ <> "" THEN GP.PRINTAT HELP.NX, HELP.ROWS - 1, HELP.NOTE$, HELP.BAR.BOT
     RETURN
 
 ## STR$ leads a positive number with a space, and a status bar is not the
@@ -845,6 +1259,20 @@ HELP.GETKEY.WAIT:
     GET HELP.IN$
     IF HELP.IN$ = "" THEN GOTO HELP.GETKEY.WAIT
     HELP.KEY = ASC(HELP.IN$)
+    GOSUB HELP.CLEAR.KB
+    RETURN
+
+## The buffer, drained, so ONE keystroke is one move. A held arrow key repeats
+## faster than a page is drawn, and without this the queue keeps the page
+## scrolling after the key has been let go. The same loop GPC.BASL and
+## CRUNCH.BASL use.
+HELP.CLEAR.KB:
+    GP.DO
+        GET HELP.KB$
+        GP.IF GP.ISEMPTY(HELP.KB$) THEN
+            GP.EXITDO
+        GP.ENDIF
+    GP.LOOP
     RETURN
 
 
@@ -880,7 +1308,7 @@ HELP.SELFCHECK:
     FOR HELP.J = 1 TO HELP.IX.N
         GP.IF HELP.IX.TYPE%(HELP.J) > 0 THEN
             HELP.GO = HELP.J : HELP.PG.FROM = 0
-            GOSUB HELP.PAGE.DRAW
+            GOSUB HELP.PAGE.LOAD
             IF HELP.ATTOPIC = 0 THEN HELP.NOTAT = HELP.NOTAT + 1
             IF HELP.ATTOPIC = 0 THEN PRINT "NO TOPIC RECORD, ROW"; HELP.J
             IF HELP.PG.LINES <> HELP.IX.LINES%(HELP.J) THEN HELP.WRONGLEN = HELP.WRONGLEN + 1

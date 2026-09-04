@@ -20,6 +20,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [Compiler must not cap program size](compiler-must-not-cap-program-size.md) — standing rule: a build-side wall is a bug, report costs in max program size
 - [No backward compatibility needed](no-backward-compatibility-needed.md) — sole user; token renumbering and forced recompiles cost nothing
 - [Ask before writing asm](ask-before-writing-asm.md) — standing order: no GP.ASM or 64tass without agreeing it first
+- [The compiler is GPC](name-the-compiler-gpc.md) — "Blitz" is a heritage nod to the C64 compiler; all the code here is the user's own
 - [User runs concurrent agents here](user-runs-concurrent-agents-here.md) — default to read-only research; re-read before any write
 
 ## Build and toolchain
@@ -40,6 +41,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [GP.ASM implementation status](gpasm-implementation-status.md) — shipped; dotted {VAR} names, the self-patching-operand idiom, and the 123x editor render numbers
 - [GP.ASM inline assembly research](gpasm-inline-assembly-research.md) — where the research doc lives, what was decided, what is still open
 - [GP.ASM blobs may use zTemp0/1/2](gpasm-blob-may-use-ztemp.md) — SYS already clobbers zTemp0 to get there, so `(ptr),y` is available
+- [GP.STRPTR points at the length byte](gp-strptr-points-at-the-length-byte.md) — text starts at +1; forgetting it corrupts only the short lines
 - [GP draw under a re-ordered font](gp-draw-under-a-reordered-font.md) — only GP.BOX style 0 survives, and GP.FILL converts its glyph argument (+$40)
 
 ## Compiler limits, memory and banking
@@ -51,6 +53,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [String blocks never shrink](gpc-string-blocks-never-shrink.md) — a big temporary must not be built; freeing it is not a thing
 - [Banking strings: length, not count](banking-strings-scales-with-length.md) — the menus broke even at 249 saved vs 245 spent
 - [BANK, not POKE 0](gpc-bank-statement-not-poke-zero.md) — PEEK/POKE restore the bank around every access, so POKE 0 can never select one
+- [STASH leaves its bank selected](stash-leaves-its-bank-selected.md) — PEEK after a slide reads the stash buffer; looks like scroll corruption
 
 ## The editor sample
 - [Editor branch state, GUI next](gpc-editor-branch-and-gui-next.md) — the self-check lines to keep green
@@ -59,6 +62,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [Editor: ASCII inside, PETSCII outside](gpc-editor-is-ascii-inside-petscii-outside.md) — why the font is re-ordered in VRAM
 - [ALT keys need the keymap](gpc-editor-alt-keys-need-the-keymap.md) — in ISO mode ALT+F sends nothing; rewrite the layout table at $A000 bank 0
 - [VERA FX cache writes are aligned](vera-fx-cache-write-is-aligned.md) — the row renderer needs an EVEN text column
+- [GPC-HELP scroll cost is the file read](gpc-help-scroll-cost-is-the-file-read.md) — the cell move was 4%; the .HLP is re-read every keypress
 - [Bar and dropdown drive each other](menubar-menuhelp-cross-axis-exits.md) — MENUBAR.DOWNEXIT and MENUHELP.KEYEXIT are the two halves
 - [MENUHELP: use the whole interface](menuhelp-use-the-whole-interface.md) — build the library's own example headlessly before blaming it
 
@@ -87,6 +91,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 
 ## X16 platform / toolchain
 - [Scrolling a screen region](scrolling-a-screen-region.md) — no GP command for it; STASH moved, VERA-to-VERA memcopy, or a masked layer
+- [GP drawing targets layer 1](gp-drawing-targets-layer-1.md) — only layer 1, but no row clamp and L1_MAPBASE is POKEable
 - [X16 ROM internal calls](x16-rom-internal-calls.md) — verified R49 dispatcher/GC addresses + ZP pointers
 - [X16 toolchain](x16-toolchain.md) — 64tass / emulator paths on this machine
 - [x16emu -echo doubling](x16emu-echo-doubling.md) — non-warp `-echo raw` prints every char TWICE

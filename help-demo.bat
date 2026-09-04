@@ -8,7 +8,7 @@ rem  manual, the name register and the module banner headers -- so the help
 rem  cannot drift from the library it documents.
 rem
 rem      up/down  PgUp/PgDn  HOME/END    move
-rem      RETURN                          open a topic, or follow a "->" link
+rem      RETURN                          open a topic (index only)
 rem      /  or F                         find in the index, N for the next
 rem      L                               this topic's cross references
 rem      X                               write this topic's code out as a .BL

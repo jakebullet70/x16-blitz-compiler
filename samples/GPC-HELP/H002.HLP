@@ -30,9 +30,52 @@
 .Then it is BASLOAD and GPC as usual: BASLOAD "MYPROG.BL", then compile the
 .PRG with GPC.PRG.
 .
-=A .PRG with GP tokens is compile-only
+=A program that uses GP.BASIC is compile-only
 .
-.A $CE7x byte has no BASIC handler behind it, so the ROM cannot LIST or RUN
-.the tokenised program. That is expected, not a fault. Compile it and run the
-.object.
+.Once a program uses a single GP.BASIC keyword, the ROM can no longer LIST or
+.RUN it. BASLOAD tokenises those keywords into the $CE58-$CE7F range, and
+.stock BASIC has no handler behind those bytes -- they are GPC's, and only
+.the compiler knows what they mean.
 .
+.That is expected, not a fault, and it is not a limitation either: the whole
+.point is to compile. Run GPC.PRG on the tokenised .PRG and run the object it
+.writes.
+.
+=Numbers, and what a variable holds
+.
+.One numeric type on the evaluation stack: a 4-byte mantissa, a 1-byte
+.exponent and a status byte carrying the sign. Exponent 0 means the value is
+.an exact integer.
+.
+.  A A()
+.      BYTES: 6
+.      HOLDS: mantissa, exponent, status. Exact integers while the exponent
+.        is 0
+.
+.  A% A%()
+.      BYTES: 2
+.      HOLDS: signed 16-bit two's complement, -32,768 to 32,767
+.
+.  A$ A$()
+.      BYTES: 2
+.      HOLDS: a pointer into the string heap
+.
+.% is not a faster integer, it is a smaller one, and it truncates in silence.
+.WriteInteger stores the low two bytes of whatever is on the stack and
+.ReadInteger sign-extends the MSB back, so A% = 49152 reads back as -16,384
+.with no error. Counters, indices and screen coordinates: yes. Addresses: no.
+.
+.No address fits %. Main RAM runs to $9F00 (40,704), the string heap is above
+.32,767 by definition, and a VRAM address is 17 bits (up to 131,071). Keep an
+.address in an untyped variable, which holds all three exactly, or split it
+.into page and offset.
+.
+.Numeric literals above 65,535 are fine. The compiler has a 16-bit fast path
+.for constants and anything wider compiles through the float encoder instead
+.-- no wrap.
+.
+.AND and OR are 16-bit signed and raise OUT OF RANGE above 32,767; see SEC 6.
+.
+=SEE ALSO
+.
+>91|6. The traps, collected

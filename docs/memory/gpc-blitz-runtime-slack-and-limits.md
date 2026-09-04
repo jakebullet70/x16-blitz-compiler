@@ -77,13 +77,16 @@ This is what a new GP keyword actually costs, and the two halves land in differe
   so there are only **8 ids and 4 are spoken for** (7 GOSUB, 6 FOR, 5 GP.DO, 4 GP.SELECT) and
   no frame can exceed 31 bytes.
 
-**THE GP BLOCK IS 1,280 BYTES NOW, NOT 2,048 (1st September 2026), and every "2,048" above is
-history.** `GPBase $3700` -> `ObjectBase` **`$3c00`**, `RT` **13,311**, code ends `$3B54`, 172 free.
+**THE GP BLOCK IS 1,024 BYTES NOW, NOT 2,048, and every "2,048" above is
+history.** `GPBase` **`$3800`** -> `ObjectBase` **`$3c00`**, `RT` **13,311**, code ends `$3B54`, 172 free.
 Three groups left the block outright rather than being made smaller, all to `GP.ASM` modules:
 `GP.STASH`/`GP.RESTR` (329 B) -> `STASH.INC.BL`; `GP.SORT` (408 B) -> `SORT.INC.BL`; the five
 in-place string statements `GP.UPPER`/`GP.LOWER`/`GP.TRIM`/`GP.LTRIM`/`GP.RTRIM` (188 B with their
-shared `GPStringAddress`) -> `STRCASE.INC.BL`. Each page is charged twice — object and workspace
-floor — so that is **1,536 bytes back for every GP program**, with no keyword lost.
+shared `GPStringAddress`) -> `STRCASE.INC.BL`. A page comes off the object and off the workspace floor
+together — they are the SAME page, counted once, not twice: `runtimeEndPage` (`object.asm`) is one
+page number deciding how much image is copied out, where the p-code lands AND where the workspace
+starts. So that is **768 bytes back for every GP program**, not 1,536, with no keyword lost. In the
+currency that matters, max p-code is **17,152 bytes with the block and 18,176 without it**.
 
 **THE RULE THAT CAME OUT OF IT, and it predicts the next one.** A group can leave the block when
 (a) its argument reduces to an ADDRESS a BASL routine can be handed, and (b) it is a STATEMENT, not

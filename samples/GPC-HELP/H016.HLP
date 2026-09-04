@@ -78,5 +78,5 @@
 .
 =SEE ALSO
 .
->37|4.8 STRCASE.INC.BL -- case and trim, in place
->29|4.2 STRINGS.INC.BL -- string helpers
+>38|4.8 STRCASE.INC.BL -- case and trim, in place
+>30|4.2 STRINGS.INC.BL -- string helpers

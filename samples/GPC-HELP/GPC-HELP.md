@@ -62,27 +62,45 @@ python samples/GPC-HELP/MKHELP.PY
 
 #### 1. What GP.BASIC is
 
-Two halves, and the split is deliberate.
+Three layers, innermost first.
 
-**The keywords** — 27 of them, `GP.DO` through `GP.ENDSEL` — are compiled into p-code and handled by
-assembly in the runtime. They exist because BASIC is bad at what they do: searching a string a
-character at a time, sorting an array, pushing bytes at VERA. **1,970 bytes** of assembly, which
-page alignment rounds to the **2,048** a program actually pays.
+**Core keywords.** 30 tokens, `GP.DO` down to `GP.CHAR`: `GP.DO` `GP.LOOP` `GP.EXITDO`, `GP.IF`
+`GP.ELSEIF` `GP.ELSE` `GP.ENDIF`, `GP.SELECT` `GP.CASE` `GP.OTHER` `GP.ENDSEL`, `GP.INSTR` `GP.COMP`
+`GP.STRPTR` `GP.ARRPTR`, `GP.BOX` `GP.FILL` `GP.CHAR` `GP.PRINTAT`, `GP.CALL` with `GP.A` `GP.X`
+`GP.Y` `GP.C`, `GP.ASM` `GP.ENDASM`. Compiled to p-code, handled by assembly in the runtime. They
+are assembly because BASIC is slow at what they do: per-character string scans, screen fills, VERA
+writes.
 
-Those bytes are spent only by a program that uses at least one GP keyword. One that uses none has
-the whole block left out of its object, and gets the 2,048 back as workspace as well.
+The handlers occupy `GPBase $3800` to `ObjectBase $3c00` — **1,024 bytes**, page aligned, all or
+nothing. `ScanGPUsage` walks the finished p-code and drops the whole block from the object if
+nothing in it is reached.
 
-**The library** — seven `.INC.BL` modules and fourteen `.EXP.BL` examples, beside this file — is
-ordinary BASL, called with `GOSUB`. Menus, panels, themes, entry fields, BMX loading. **Zero runtime
-bytes**: only a program that `#INCLUDE`s one pays for it, and it pays in its own p-code.
+**What the block costs is 1,024 bytes, once.** The bytes in the object and the bytes off the
+workspace floor are the same bytes: `runtimeEndPage` is one page number, and it decides how much of
+the runtime image is written out, where the p-code lands, and where the workspace starts. Max
+p-code is **17,152 bytes with the block, 18,176 without** — `ObjectBase` to `$9F00`, less the 4K
+frame stack and the 4K minimum workspace.
 
-> **The rule that decides which side a thing goes on:** assembly gets what runs in a loop or moves
-> bulk data. Everything else is BASIC. `LINEINPUT.GET` waits on a *human*, so the speed argument that
-> puts sorting in assembly does not apply to it — and it saved 166 bytes of runtime for every program
-> ever compiled.
+**Composites.** `GP.CONTAINS`, `GP.ISEMPTY`, `GP.HIBYTE`, `GP.LOBYTE`. The compiler expands each
+into opcodes that already exist: no handler, no vector slot, nothing in the block.
+
+**The library.** `GPC-BASIC/`: 14 `.INC.BL` modules, 22 `.EXP.BL` examples. Ordinary BASL,
+`#INCLUDE`d by path, called with `GOSUB`. Zero runtime bytes — a module costs its own p-code, in the
+programs that include it. Menus vertical and bar, panels, themes, entry fields, in-place case and
+trim, shell sort, a screen rectangle to a RAM bank or a file, BMX into VERA.
+
+`STASH.INC.BL`, `SORT.INC.BL` and `STRCASE.INC.BL` are `GP.ASM` and still modules: as keywords their
+925 bytes (329, 408, 188) would sit in the block, paid by every GP program. `GP.ARRPTR` and
+`GP.STRPTR` are what lets them out — a BASL subroutine takes an address, not an array or a string.
+
+**Which side a thing goes on:** assembly for loops and bulk moves, BASIC for the rest.
+`LINEINPUT.GET` waits on the keyboard, so speed is not an argument for it — 166 bytes of runtime
+saved by writing it in BASL.
 
 ---
 
+
+*See also: STASH.INC.BL -- save a text rectangle, and put it back., 4.7 SORT.INC.BL -- shell sort a string array, 4.8 STRCASE.INC.BL -- case and trim, in place*
 
 ## 2. Using it
 
@@ -118,13 +136,44 @@ for no reason.
 
 Then it is BASLOAD and GPC as usual: `BASLOAD "MYPROG.BL"`, then compile the PRG with `GPC.PRG`.
 
-##### A `.PRG` with GP tokens is compile-only
+##### A program that uses GP.BASIC is compile-only
 
-A `$CE7x` byte has no BASIC handler behind it, so the ROM cannot `LIST` or `RUN` the tokenised
-program. That is expected, not a fault. Compile it and run the object.
+Once a program uses a single GP.BASIC keyword, the ROM can no longer `LIST` or `RUN` it. BASLOAD
+tokenises those keywords into the `$CE58`-`$CE7F` range, and stock BASIC has no handler behind
+those bytes — they are GPC's, and only the compiler knows what they mean.
+
+That is expected, not a fault, and it is not a limitation either: the whole point is to compile.
+Run `GPC.PRG` on the tokenised `.PRG` and run the object it writes.
+
+##### Numbers, and what a variable holds
+
+One numeric type on the evaluation stack: a 4-byte mantissa, a 1-byte exponent and a status byte
+carrying the sign. Exponent 0 means the value is an exact integer.
+
+| Variable | Bytes | Holds |
+|---|---:|---|
+| `A` `A()` | 6 | mantissa, exponent, status. Exact integers while the exponent is 0 |
+| `A%` `A%()` | 2 | signed 16-bit two's complement, **-32,768 to 32,767** |
+| `A$` `A$()` | 2 | a pointer into the string heap |
+
+**`%` is not a faster integer, it is a smaller one, and it truncates in silence.** `WriteInteger`
+stores the low two bytes of whatever is on the stack and `ReadInteger` sign-extends the MSB back, so
+`A% = 49152` reads back as -16,384 with no error. Counters, indices and screen coordinates: yes.
+Addresses: no.
+
+**No address fits `%`.** Main RAM runs to `$9F00` (40,704), the string heap is above 32,767 by
+definition, and a VRAM address is 17 bits (up to 131,071). Keep an address in an untyped variable,
+which holds all three exactly, or split it into page and offset.
+
+Numeric literals above 65,535 are fine. The compiler has a 16-bit fast path for constants and
+anything wider compiles through the float encoder instead — no wrap.
+
+`AND` and `OR` are 16-bit signed and raise `OUT OF RANGE` above 32,767; see §6.
 
 ---
 
+
+*See also: 6. The traps, collected*
 
 ---
 
@@ -134,8 +183,8 @@ program. That is expected, not a fault. Compile it and run the object.
 
 #### 3. Command reference
 
-27 keywords, tokens `$CE7F` down to `$CE63`, allocated downward. `$CE67` and `$CE68` are holes. The
-token values are the ABI.
+30 tokens, `$CE7F` down to `$CE58`, allocated downward. Ten of the forty slots are holes, and they
+stay holes: the token values are the ABI and are never renumbered.
 
 ##### At a glance — the whole library, and what each part costs
 
@@ -605,13 +654,19 @@ REM <instruction>
 GP.ENDASM
 ```
 
-65C02 assembly, assembled by GPC at compile time, with the bytes going **into the program**. It is
-what `GP.CALL` needed a POKE loop and a spare RAM bank for:
+65C02 assembly, assembled by GPC at compile time, with the bytes going **into the program**.
+
+Before this, running your own machine code meant assembling it yourself: work out the opcode for
+each instruction, `POKE` the numbers into memory nothing else was using, and point `GP.CALL` at that
+address. `GP.ASM` writes the instructions and the compiler works out the bytes. These two do the
+same thing — increment A, then X, then Y:
 
 ```basic
+#### by hand: 26, 232 and 200 ARE inc a / inx / iny, and ML has to be somewhere safe
 POKE ML+0,26 : POKE ML+1,232 : POKE ML+2,200 : GP.CALL ML,10,20,30
 ```
 ```basic
+#### assembled: the bytes land in the program, and there is no address to find
 GP.ASM
 REM inc a
 REM inx
@@ -621,7 +676,7 @@ GP.ENDASM
 
 **It costs no runtime bytes.** A block is five bytes of p-code plus your instructions, and every
 handler it uses is already in every compiled program — so a program whose only GP.BASIC keyword is
-`GP.ASM` still compiles **GP-BASIC OUT**, without the 2 KB GP block. Measured: `RT 12031`, the same as a
+`GP.ASM` still compiles **GP-BASIC OUT**, without the 1 KB GP block. Measured: `RT 12031`, the same as a
 program using no GP keyword at all.
 
 ###### `#REM 1` is required
@@ -1896,9 +1951,9 @@ Every one of these has cost a debugging session at least once.
 | Trap | What happens | Do this |
 |---|---|---|
 | `P AND 255` on a heap or VRAM address | `AND` is **16-bit signed**; above 32767 it raises `OUT OF RANGE` instead of masking | `H = INT(P/256) : L = P - H*256` |
+| an address in an `A%` variable | `%` is signed 16-bit and truncates silently — `A% = 49152` reads back -16,384 | untyped variable, or split into page and offset |
 | `$0400` for machine code | stock BASIC leaves it free, **a compiled GPC program does not** — runtime state lives there, and it corrupts silently | banked RAM, `$A000`–`$BFFF` |
 | `PRINT` after `GP.PRINTAT` | GP drawing never calls the KERNAL, so the cursor is wherever it was | `LOCATE` first, or stay in one world |
-| `GOTO` sideways, one `GP.DO` into another | `.unwind` counts depth difference, so sideways closes nothing and the loop frame leaks | jump out first, or `GP.EXITDO` |
 | `GP.ARRPTR(A$)` | `A$` and `A$()` are different variables — it finds the scalar | `GP.ARRPTR(A$())` |
 | `SORT.INC.BL` with no `#SYMFILE` | `{VAR}` cannot resolve a crunched name — `NO SYMBOL FILE FOR {}` | `#SYMFILE "@:PROG.SYM"`, before the `#INCLUDE`s |
 | `GP.BOX X,Y,W,H,,7` | optionals cannot be skipped over | `GP.BOX X,Y,W,H,0,7` |

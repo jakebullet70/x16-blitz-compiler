@@ -95,7 +95,7 @@
 .
 =SEE ALSO
 .
->37|4.8 STRCASE.INC.BL -- case and trim, in place
->29|4.2 STRINGS.INC.BL -- string helpers
->11|3.3 Machine code
->37|4.8 STRCASE.INC.BL -- case and trim, in place
+>38|4.8 STRCASE.INC.BL -- case and trim, in place
+>30|4.2 STRINGS.INC.BL -- string helpers
+>12|3.3 Machine code
+>38|4.8 STRCASE.INC.BL -- case and trim, in place
