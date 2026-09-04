@@ -1144,15 +1144,51 @@ that switches per dialog would notice.
 workspace left** — and it holds nothing but its index; the topic text lives in RAM bank 9 precisely
 because there was no room to keep it on the heap. The GUI stack is what ate it: measured on this box,
 
-| | object bytes |
-|---|---:|
-| `GPB.INC.BL` alone | 12,331 |
-| `+ THEME + STASH + MENUVERT + LINEINPUT + GUI` | 17,399 |
-| `+ STRCASE + APPSYS` | 17,688 |
-| `+ GUI2` (the listbox) | 19,306 |
+**Measured exactly 2026-09-04**, from the compiler's own map file (`compile_shared.py SRC OBJ MAP`
+writes address-per-line; `HELP.SRC.SYM` says which file each line came from), on the real GPC-HELP
+build — 10,474 bytes of p-code:
 
-So **the GUI stack is ~5,000 bytes of p-code and the listbox another 1,600**, in every program that
-includes them, called or not — a BASL module has no dead code elimination.
+| | p-code bytes |
+|---|---:|
+| `HELP.BASL` itself | 5,148 |
+| `GUI.INC.BL` | 2,147 |
+| `MENUVERT.INC.BL` | 1,122 |
+| `LINEINPUT.INC.BL` | 704 |
+| `STASH.INC.BL` | 376 |
+| `THEME.INC.BL` | 226 |
+| `APPSYS.INC.BL` | 88 |
+| `STRCASE.INC.BL` | 26 — it is a `GP.ASM` blob, and the `REM` lines carrying it vanish |
+| **the GUI stack** | **4,575** |
+
+And inside `GUI.INC.BL`, which is the surprise:
+
+| | p-code bytes |
+|---|---:|
+| the box machinery — `GUI.OPEN`/`CLOSE`/`SIZE`/`FRAME`/`BUTTON*`/`SCREEN` | **1,322** |
+| `GUI.YN` | 311 |
+| `GUI.TEXT` | 220 |
+| `GUI.SAY` | 180 |
+| `GUI.MENU` | 114 |
+
+**All four dialogs together are 825 bytes; the box under them is 1,322.** So splitting the module
+into per-dialog includes — the obvious first idea, since a BASL module has no dead code elimination
+and the include IS the granularity — is worth a few hundred bytes at best. It is not the lever.
+
+The levers, measured, biggest first:
+
+- **`MENUVERT` is 1,122 bytes for two pickers of at most 12 items.** `GUI.MENU` is only 114 because
+  all the work is out in the module, and 601 of those 1,122 are keyboard machinery —
+  `.KEYED` 204, `.HOTFIND` 162, `.HOTKEY` 110, `.PADKEY` 86, `.PADREAD` 39 — for hotkeys and
+  padding neither picker uses. A purpose-built list inside `GUI` (draw N rows, up/down/RETURN/ESC)
+  should be 250-350, so **net ~800 bytes**. Same reasoning that already dropped `GUI2`'s 1,618.
+- **`LINEINPUT` is 704 for one find box**, 261 of it `.KEYED` — full line editing, cursor, insert,
+  rubout, HOME/END. A 20-character field with backspace is maybe 150. **~500 bytes.**
+- **The box machinery itself, 1,322, plus `STASH`'s 376**, is the floor. Nothing in it is
+  optional: it fills, frames, titles, sizes, centres, saves what it covers and puts it back.
+
+Worth saying plainly: **`HELP.BASL`'s own 5,148 bytes are bigger than the whole GUI stack minus
+`MENUVERT`.** If the goal is workspace for THIS program rather than a smaller library, its own code
+is the larger target.
 
 The question: can p-code live in a RAM bank and be paged in? A dialog is exactly the right shape
 for it — it runs, it waits for a human, it returns, and nothing else is running while it does. If
