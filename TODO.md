@@ -1052,11 +1052,44 @@ answers and answer to nothing. The library version this diverged from printed
 that line and took the sentence with it.
 
 **The header already claims the fix that is missing**: "the hint line below already says so." It
-does not. Either the buttons carry their key (`< ENTER=OK >`, or the key name under each button),
-or the hint line comes back and the buttons go.
+does not — and whatever replaces it should take that comment with it.
 
-Whatever is chosen belongs in the diverged copy AND the master, and `GUI.YN` is the comparison to
-keep it honest — its two labels ARE the answers, so it has never had this problem.
+**No `&` accelerator can work here**, which is why this is awkward at all: every printable key
+belongs to the field, so an `O` types an `O`. The key names have to be WRITTEN, not marked.
+
+Four shapes, worked out 2026-09-04:
+
+**A — a legend in the bottom border, and the pick.** `GUI.OPEN` already writes the title INTO the
+top edge (`GP.PRINTAT GUI.TITLE.LEFT, GUI.TOP, " " + GUI.TITLE$ + " "`), so the bottom edge at
+`GUI.TOP + GUI.HEIGHT - 1` is the same trick, proven in the same routine:
+
+```
++-------- Find --------+
+|                      |
+|  [_________________] |
+|                      |
++- ENTER=OK  ESC=CANCEL +
+```
+
+` ENTER=OK  ESC=CANCEL ` is 22 cells and a 20-character field gives a 24-wide box, so it **costs no
+rows and no width**. The buttons go away, which is the actual win: nothing that looks pressable is
+unpressable. Keys lit in `THEME.WARN`, as the button accelerator already does.
+
+**B — put the key in the label.** `< ENTER=OK >` and `< ESC=CANCEL >`, two string assignments;
+`GUI.BUTTON.SIZE` measures labels already so the box resizes itself. Costs 30 cells against today's
+20. The five-minute version if A turns awkward.
+
+**C — buttons with the key names on a row underneath.** Costs a row and says it twice. Skip.
+
+**D — make them real: TAB moves focus, ENTER presses the focused button.** The honest GUI answer.
+`LINEINPUT` already hands TAB back as an exit key and `GUI.TEXT` swallows it to re-enter the field,
+so the pieces exist: a focus index, the focused button drawn in the hilite attr, ENTER presses it.
+Real work, but it is the machinery a multi-field form needs anyway — and that is where
+"`GUI.YN` — let the caller name the two buttons" is already heading.
+
+Consistency: `GUI.YN` needs nothing (its labels ARE the keys, Y and N lit), `GUI.SAY` takes its one
+label from `GUI.HINT$`, so if A lands it should probably serve all three. Whatever is chosen belongs
+in the diverged copy AND the master.
 
 ### Buttons — decide whether the library adopts them
 
