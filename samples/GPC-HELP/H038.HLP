@@ -24,11 +24,6 @@
 .        wherever it was
 .      DO THIS: LOCATE first, or stay in one world
 .
-.  GP.ARRPTR(A$)
-.      WHAT HAPPENS: A$ and A$() are different variables -- it finds the
-.        scalar
-.      DO THIS: GP.ARRPTR(A$())
-.
 .  SORT.INC.BL with no #SYMFILE
 .      WHAT HAPPENS: {VAR} cannot resolve a crunched name -- NO SYMBOL FILE
 .        FOR {}
@@ -42,10 +37,6 @@
 .      WHAT HAPPENS: reloads the default palette and throws the image's
 .        colours away
 .      DO THIS: set the mode first
-.
-.  DIM THEME.CLR(...)
-.      WHAT HAPPENS: the module owns it; re-DIMing is an error
-.      DO THIS: leave it alone
 .
 .  STR.FIELD$ wanted bigger
 .      WHAT HAPPENS: auto-DIMed at 0..10 on first use, and you cannot DIM it
