@@ -22,6 +22,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [Ask before writing asm](ask-before-writing-asm.md) — standing order: no GP.ASM or 64tass without agreeing it first
 - [The compiler is GPC](name-the-compiler-gpc.md) — "Blitz" is a heritage nod to the C64 compiler; all the code here is the user's own
 - [User runs concurrent agents here](user-runs-concurrent-agents-here.md) — default to read-only research; re-read before any write
+- [Compile shared, not embedded](compile-shared-not-embedded.md) — standing: SHARED is the p-code number; GPC-HELP stays uncrunched
 
 ## Build and toolchain
 - **Build setup** — *(note missing: linked by the index but never committed)* how to build it, and the 5 blockers that made a fresh clone unbuildable on any OS. See docs/BUILDING.md.
