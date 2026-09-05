@@ -28,18 +28,11 @@
 .
 =A program that uses GP.BASIC is compile-only
 .
-.One GP.BASIC keyword is enough: from there the program is compiler input,
-.and the ROM can no longer LIST or RUN it. BASLOAD encodes those keywords as
-.the byte pairs $CE58-$CE7F, and stock BASIC has no handler behind them.
+.One GP.BASIC keyword is enough. BASLOAD encodes them as the byte pairs
+.$CE58-$CE7F and stock BASIC has no handler behind them, so the ROM can
+.neither LIST nor RUN the result. It is compiler input.
 .
-.GPB is what GPC implements, and it has no existence apart from it. The
-.keyword set is not an extension the ROM might one day understand, or a
-.library that could be loaded to make it work: GP.DO means something because
-.the compiler emits code for it, and nowhere else. That is why BASLOAD's
-.output is not a program yet -- there is nothing to run it with but GPC.
-.
-.That is the intended route: run GPC.PRG on BASLOAD's .PRG and run the object
-.it writes.
+.Run GPC.PRG on BASLOAD's .PRG, then run the object it writes.
 .
 =Numbers, and what a variable holds
 .
@@ -78,4 +71,4 @@
 .
 =SEE ALSO
 .
->99|6. The traps, collected
+>98|6. The traps, collected

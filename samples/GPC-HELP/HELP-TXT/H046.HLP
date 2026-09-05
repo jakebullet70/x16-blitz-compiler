@@ -19,4 +19,3 @@
 .variable. That is a silent wrong answer -- it cost two test cycles during
 .tier 6, both times looking exactly like a compiler bug. Inside BASL you are
 .safe; in a raw .bas, give every variable a distinct first two characters.
-.

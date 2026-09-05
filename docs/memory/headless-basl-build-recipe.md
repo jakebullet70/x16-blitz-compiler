@@ -70,6 +70,13 @@ included module uses a `{VAR}` operand in `GP.ASM` -- STASH does -- or GPC stops
 STASH.SAVE: no `#SYMFILE` and no `#INCLUDE "STASH.INC.BL"`. Read the raw `CMP.LOG`, not the
 summary -- the real message is two lines above the BASIC error.
 
+**THE SYM IS NAMED AFTER THE SOURCE PRG, NOT THE PROGRAM.** `SymBuildName` (`symfile.asm`) replaces
+the source's `.PRG` with `.SYM`, so `#SAVEAS "@:X.SRC.PRG"` needs `#SYMFILE "@:X.SRC.SYM"` --
+`GPB.HELP.BASL` is the model, `COLORTST.BASL` has the mismatch and only escapes it by using no
+`{VAR}`. Get it wrong and the tokenise succeeds and writes the SYM; the COMPILE then stops with
+`NO SYMBOL FILE FOR {} @ 98`, naming a line inside `STASH.INC.BL` and saying nothing about a file
+name. Cost the first build of `samples/GPB-MODS-TESTING`, 05/09/26.
+
 A successful tokenise prints `LOADING...BASLOAD 0.2.1 ...` and then `SAVING @:NAME.PRG`; **the
 banner is the signal that BASLOAD actually ran**, so stop on `SAVING`, not on a READY count, when
 the file might be malformed.

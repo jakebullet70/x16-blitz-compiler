@@ -104,6 +104,16 @@ GP.ENDIF 		X:CommandEndIfCompile N
 GP.ASM 			X:CommandAsmCompile N
 GP.ENDASM 		X:CommandEndAsmCompile N
 #
+#		GP.BANKED <bank> / GP.ENDBANKED -- mark a run of p-code as belonging at $A000 in a RAM
+#		bank. NO "#" ON GP.BANKED: its operand is a DECIMAL CONSTANT read by the handler, not an
+#		expression compiled to p-code -- the number is patched into the program's bootstrap.
+#		Compile time markers, alone on their line, no operand. No "T" on either: they write no
+#		keyword token at all, so ScanGPUsage cannot see them and a program whose only GP.BASIC
+#		keyword is GP.BANKED stays GP OUT -- GP.ASM's argument, for the same reason.
+#
+GP.BANKED 		X:CommandGPBankedCompile N
+GP.ENDBANKED 	X:CommandGPEndBankedCompile N
+#
 #		GP.CALL <addr> [,a] [,x] [,y] [,c] -- call machine code with the registers set. Results
 #		come back through the GP.A/GP.X/GP.Y/GP.C value words (x16_unary.def), which are ordinary
 #		tokens, NOT variables: nothing lets the runtime write a variable by name, and X16's own

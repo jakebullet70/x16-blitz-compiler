@@ -1,0 +1,124 @@
+#SAVEAS "@:SPIKE.SRC.PRG"
+#SYMFILE "@:SPIKE.SRC.SYM"
+#INCLUDE "GPB.INC.BL"
+
+## ***********************************************************************
+## **
+## **  SPIKE.BASL -- does GPC p-code execute from a RAM bank?
+## **
+## **  THROWAWAY. It proves one thing and changes nothing: no ABI change, no
+## **  runtime change, no compiler change. Two GP.ASM blobs and a copy loop.
+## **
+## **  The method:
+## **    1  GOSUB SPIKE.CAPTURE runs SPIKE.MARK = 111 : RETURN in low RAM.
+## **       A blob records codePtr + Y first, which IS the address of that
+## **       statement -- CommandSYS leaves Y pointing at the next p-code byte.
+## **    2  Copy 64 bytes from there into bank 7 at $A000, changing the
+## **       literal 111 to 222 as it goes.
+## **    3  GOSUB SPIKE.JUMP. Its blob selects the bank and points codePtr at
+## **       $A000, so the interpreter's next fetch comes from the window.
+## **    4  The copy runs and RETURNs. That RETURN pops the frame GOSUB
+## **       SPIKE.JUMP pushed, so it lands back in low RAM -- and needs no
+## **       bank restore, because codePtr is then below $A000 where banking
+## **       does not apply.
+## **
+## **  SPIKE.MARK = 222 can only mean the copy in the bank executed.
+## **
+## **  THE STACK OFFSET IS THE FRAGILE PART. At blob entry CommandSYS has
+## **  pushed X then Y then the JSR return, so the saved Y is at $0103 + S.
+## **  Good enough to prove a point, not good enough to ship.
+## **
+## **  ZERO PAGE: codePtr is $28, and objPtr $2A, zTemp0 $2C follow it.
+## **
+## ***********************************************************************
+
+#DEFINE SPIKE.WINDOW 40960
+#DEFINE SPIKE.BYTES 64
+
+SPIKE.BANK% = 7
+SPIKE.SRC% = 0
+SPIKE.MARK = 0
+
+PRINT "SPIKE - P-CODE FROM A RAM BANK"
+PRINT
+
+## ---- Pass one, in low RAM. It also tells us where the statement lives.
+
+GOSUB SPIKE.CAPTURE
+PRINT "T1 LOW RAM MARK ";SPIKE.MARK;" WANT 111"
+PRINT "T2 SOURCE AT    ";SPIKE.SRC%
+
+## ---- The copy, with the literal changed so the two cannot be confused.
+## ---- SPIKE.SRC% is low RAM, so PEEK reads it whatever bank is selected.
+
+BANK SPIKE.BANK%
+SPIKE.HIT = 0
+FOR SPIKE.I = 0 TO SPIKE.BYTES - 1
+    SPIKE.B = PEEK(SPIKE.SRC% + SPIKE.I)
+    IF SPIKE.B = 111 THEN IF SPIKE.HIT = 0 THEN SPIKE.B = 222 : SPIKE.HIT = 1
+    POKE SPIKE.WINDOW + SPIKE.I, SPIKE.B
+NEXT SPIKE.I
+PRINT "T3 PATCHED      ";SPIKE.HIT;" WANT 1"
+
+## ---- Pass two. Everything after the blob in SPIKE.JUMP runs from the bank.
+
+SPIKE.MARK = 0
+GOSUB SPIKE.JUMP
+PRINT "T4 BANK MARK    ";SPIKE.MARK;" WANT 222"
+
+IF SPIKE.MARK = 222 THEN PRINT "P-CODE EXECUTED FROM THE BANK"
+IF SPIKE.MARK = 111 THEN PRINT "THE BLOB DID NOT JUMP - LOW RAM RAN"
+IF SPIKE.MARK = 0 THEN PRINT "NOTHING RAN"
+PRINT "DONE"
+END
+
+
+## ***********************************************************************
+## **  SPIKE.CAPTURE -- record where the next statement is, then run it.
+## **
+## **  SPIKE.SRC% = codePtr + Y. The blob reads codePtr from $28 and the Y
+## **  the SYS handler will restore off the 6502 stack.
+## ***********************************************************************
+
+SPIKE.CAPTURE:
+    #REM 1
+    GP.ASM
+    REM TSX
+    REM LDA $0103,X            ; the Y CommandSYS pushed
+    REM CLC
+    REM ADC $28                ; + codePtr low
+    REM STA {SPIKE.SRC%}
+    REM LDA $29                ; codePtr high
+    REM ADC #0
+    REM LDX #1
+    REM STA {SPIKE.SRC%},X
+    GP.ENDASM
+    #REM 0
+    SPIKE.MARK = 111
+    RETURN
+
+
+## ***********************************************************************
+## **  SPIKE.JUMP -- select the bank and point codePtr at the window.
+## **
+## **  The Y the handler restores is zeroed on the stack, so the next fetch
+## **  is (codePtr),0 = $A000 exactly. The two lines under the blob are the
+## **  low RAM originals and are never reached on the jump path.
+## ***********************************************************************
+
+SPIKE.JUMP:
+    #REM 1
+    GP.ASM
+    REM LDA {SPIKE.BANK%}
+    REM STA $00                ; select the code bank
+    REM LDA #0
+    REM STA $28                ; codePtr = $A000
+    REM LDA #160
+    REM STA $29
+    REM TSX
+    REM LDA #0
+    REM STA $0103,X            ; and the Y it will be fetched with
+    GP.ENDASM
+    #REM 0
+    PRINT "THE BLOB DID NOT JUMP"
+    RETURN

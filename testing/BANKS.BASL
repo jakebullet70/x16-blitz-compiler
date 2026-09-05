@@ -1,0 +1,22 @@
+#SAVEAS "@:BANKS.SRC.PRG"
+#REM 0
+#SYMFILE "@:BANKS.SRC.SYM"
+#INCLUDE "GPB.INC.BL"
+
+## BANKR without the fault: identical, except the code bank is put back before the
+## call into the region.  If this one runs to the end, BANKR's death was the bank.
+
+PRINT "S1"
+BANK 3
+POKE 40960, 77
+PRINT "S2 POKED";PEEK(40960)
+BANK 5
+GOSUB BK.IN
+PRINT "S4 DONE"
+END
+
+GP.BANKED 5
+BK.IN:
+    PRINT "S3 IN BANK"
+    RETURN
+GP.ENDBANKED

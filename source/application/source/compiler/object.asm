@@ -270,11 +270,23 @@ _WOCShared:
 		;
 		;		p-code length -> whole pages (same as the embedded path)
 		;
-		sec
+		;		...but only the LOW part of it. A GP.BANKED region sits at the top of the object,
+		;		page aligned, and the bootstrap moves it into the bank before the runtime starts.
+		;		So the workspace begins where the region begins: those bytes are in the file, and
+		;		in memory for as long as it takes to copy them, and then they are workspace. That
+		;		is the whole return on putting the region up there.
+		;
 		lda 	objPtr
+		ldy 	objPtr+1
+		ldx 	gpBankActive
+		beq 	_WOCSLength
+		lda 	gpBankStart 				; where the region ends up -- page aligned
+		ldy 	gpBankStart+1
+_WOCSLength:
+		sec
 		sbc 	#FreeMemory & $FF
 		sta 	zTemp1
-		lda 	objPtr+1
+		tya
 		sbc 	#FreeMemory >> 8
 		sta 	zTemp1+1
 		lda 	zTemp1
@@ -354,13 +366,28 @@ _WOCSFits:
 		lda 	#1 							; normalise: the bootstrap tests it with BEQ
 _WOCSFlag:
 		sta 	BootPatchTable+8
+		;
+		;		...and the three GP.BANKED needs: where the region sits once the program is
+		;		loaded, how many pages of it there are, and which bank it belongs in. All three
+		;		are zero for a program with no region, and a zero page count is what makes the
+		;		bootstrap skip the copy entirely.
+		;
+		.set16 	BootPatchTable+9, ProgramBootstrap+BootCodeSrcOffset
+		lda 	gpBankRunBase 				; an instruction OPERAND, not a data byte
+		sta 	BootPatchTable+11
+		.set16 	BootPatchTable+12, ProgramBootstrap+BootCodePagesOffset
+		lda 	gpBankPages
+		sta 	BootPatchTable+14
+		.set16 	BootPatchTable+15, ProgramBootstrap+BootCodeBankOffset
+		lda 	gpBankNumber
+		sta 	BootPatchTable+17
 		.set16 	zTemp0,ProgramBootstrap
 _WOCSBoot:
 		;
-		;		THREE patched bytes now, not one, so the loop asks a table rather than growing a third
+		;		SIX patched bytes now, not one, so the loop asks a table rather than growing a sixth
 		;		copy of the same compare. Each entry is (address lo, hi, value): workspace START page,
-		;		workspace END page -- which is the runtime base this program will use -- and the flag
-		;		saying whether it needs the GPB handlers at all.
+		;		workspace END page -- which is the runtime base this program will use -- the flag
+		;		saying whether it needs the GPB handlers at all, and then GP.BANKED's three.
 		;
 		ldx 	#0
 _WOCSBootPatch:
@@ -458,9 +485,18 @@ NoRuntimeImageText:
 ;		space and the DECIMAL BASIC line number that begins there. To place an error, find the
 ;		largest offset that is <= the one reported.
 ;
+;		ASCENDING CODE ORDER, EXCEPT AFTER A GP.BANKED. The table is walked in the order the
+;		lines were marked, which is source order, and those two were the same thing until
+;		GPBankRelocate started lifting a region out to the end of the object. A program with a
+;		region in it has that region's lines carrying the HIGHEST offsets while still sitting
+;		where they were written. Every entry is still right; the file is simply no longer
+;		sorted, so the "largest offset <= the one reported" rule means reading the whole file
+;		rather than reading down it. Sorting here instead would cost a sort of a 2,048 entry
+;		banked table, and the reader can sort.
+;
 ;		It is built straight from the compiler's line-number table (STRMarkLine): 4-byte entries
 ;		[line# lo, line# hi, addr lo, addr hi], growing DOWNWARD from compilerEndHigh:$00 to
-;		lineNumberTable, walked here from the top down so the file comes out in code order. The
+;		lineNumberTable, walked here from the top down. The
 ;		stored addr is the compile-time position in the object buffer (based at FreeMemory), so
 ;		offset = addr - FreeMemory -- the same number the runtime reports, because the object is
 ;		copied verbatim from FreeMemory to its run address. The two synthetic lines the implicit
@@ -609,8 +645,8 @@ _WMFPow10L:
 _WMFPow10H:
 		.byte 	>10000, >1000, >100, >10
 
-BootPatchTable: 							; three (addr lo, addr hi, value) triples, built per program
-		.fill 	9 							; by the shared path just above -- see the note there.
+BootPatchTable: 							; six (addr lo, addr hi, value) triples, built per program
+		.fill 	18 							; by the shared path just above -- see the note there.
 BootPatchEnd:
 sharedCeilPage: 							; page the shared workspace stops at: RTBASE normally,
 		.fill 	1 							; RTGPBASE when the GPB handlers sit below it.

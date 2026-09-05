@@ -1,0 +1,181 @@
+## ***********************************************************************
+## **
+## **  STRINGS.INC.BL -- string helpers that belong in BASIC, not ASM.
+## **
+## **  Modelled on prog8's strings module: one dotted namespace, one routine per job.
+## **  Unlike GPB.INC.BL this file contains CODE -- call the routines with GOSUB. It is
+## **  position independent (the module jumps over itself), so #INCLUDE it anywhere.
+## **
+## **  prog8 passes arguments in registers; BASL has none, so the module owns named
+## **  parameter variables instead:
+## **
+## **      STR.STR$    the string, in and out
+## **      STR.WIDTH   the field width  (PADR / PADL / PADC)
+## **      STR.DELIM$  the separator    (SPLIT)
+## **      STR.MAX     field array size (SPLIT, 0 means 10)
+## **      STR.FIND$   what to look for (REPLACE)
+## **      STR.REPL$   what to put back (REPLACE)
+## **      STR.PET     a PETSCII code   (PET2SCR)
+## **
+## **  Clobbered (prog8 would say "clobbers"):
+## **      STR.GAP     STR.HALF          by the pad routines
+## **      STR.REST$   STR.AT            by SPLIT and REPLACE
+## **      STR.LIM     STR.N             by SPLIT
+## **      STR.OUT$                          by REPLACE
+## **      STR.SCR     the result            of PET2SCR
+## **
+## **  Usage:
+## **      STR.STR$ = NAME$ : STR.WIDTH = 20
+## **      GOSUB STR.PADR
+## **      NAME$ = STR.STR$
+## **
+## **  THE PAD ROUTINES PAD, THEY NEVER TRUNCATE -- a string already at or past the
+## **  width is left alone. Use STRCASE.RTRIM to go the other way. The padded result
+## **  must fit a BASIC string; not checked, as in prog8, because checking costs more
+## **  than the mistake.
+## **
+## ***********************************************************************
+#IFNDEF STR.DEFS
+#DEFINE STR.DEFS 1
+
+GOTO STR.SKIP
+
+## STR.PADR -- pad on the RIGHT to STR.WIDTH: left justify, the
+## text-in-a-column case.
+##
+## BASIC, NOT ASM, AND IT HAS TO BE: an in-place handler only ever gets the string's
+## BLOCK, never the variable slot, so it cannot GROW one past the capacity it was born
+## with. Padding "HI" to a 20 column field is exactly that, and it is the entire point.
+## BASIC assignment reallocates; a blob cannot.
+
+STR.PADR:
+    IF LEN(STR.STR$) < STR.WIDTH THEN STR.STR$ = STR.STR$ + RPT$(32, STR.WIDTH - LEN(STR.STR$))
+    RETURN
+
+## STR.PADL -- pad on the LEFT to STR.WIDTH: right justify, the
+## numbers-in-a-column case.
+
+STR.PADL:
+    IF LEN(STR.STR$) < STR.WIDTH THEN STR.STR$ = RPT$(32, STR.WIDTH - LEN(STR.STR$)) + STR.STR$
+    RETURN
+
+## STR.PADC -- pad BOTH sides to STR.WIDTH: centre, for headings
+## and menu titles. An odd gap puts the extra space on the RIGHT.
+##
+## THE TWO GUARDS ARE LOAD BEARING, not defensive padding: RPT$ raises ILLEGAL QUANTITY
+## on a count of ZERO rather than returning "", so a gap of 1 (half = 0) fails on the
+## left call. The right one is always safe -- after the left pad the remainder is >= 1.
+
+STR.PADC:
+    STR.GAP = STR.WIDTH - LEN(STR.STR$)
+    IF STR.GAP < 1 THEN RETURN
+    STR.HALF = INT(STR.GAP / 2)
+    IF STR.HALF > 0 THEN STR.STR$ = RPT$(32, STR.HALF) + STR.STR$
+    STR.STR$ = STR.STR$ + RPT$(32, STR.WIDTH - LEN(STR.STR$))
+    RETURN
+
+## STR.SPLIT -- cut STR.STR$ into fields on STR.DELIM$.
+##
+##   in    STR.STR$    the string (READ ONLY -- unlike the pad routines
+##                         this one does not modify it)
+##         STR.DELIM$  the separator, one character or several
+##         STR.MAX     how many fields the array holds; 0 means 10
+##   out   STR.N       how many fields were produced, always >= 1
+##         STR.FIELD$  the fields, 1..STR.N
+##   clobbers  STR.REST$  STR.AT  STR.LIM
+##
+## Composition, not bulk data, so it stays in BASIC. GP.INSTR does the searching, which
+## is the only slow part -- the MID$ loop it replaces allocated a temporary per
+## character compared.
+##
+## STR.FIELD$ is NOT dimensioned here: leave it and GPC's implicit DIM gives 0..10,
+## or DIM it yourself BEFORE the first call and set STR.MAX to match. DIMming one
+## GPC already auto-dimensioned is an error, so it is one or the other.
+##
+## Reaching the limit loses nothing -- the last field gets the whole unsplit remainder.
+## EMPTY FIELDS ARE PRESERVED, which is what makes it safe for data rows: "A,,C" is
+## three fields, "A," is two. Splitting an empty string gives one empty field, not zero.
+
+STR.SPLIT:
+    STR.N = 0 : STR.LIM = STR.MAX
+    IF STR.LIM < 1 THEN STR.LIM = 10
+    STR.REST$ = STR.STR$
+STR.SPLIT.NEXT:
+    STR.N = STR.N + 1
+    IF STR.N >= STR.LIM THEN STR.FIELD$(STR.N) = STR.REST$ : RETURN
+    STR.AT = GP.INSTR(STR.REST$, STR.DELIM$)
+    IF STR.AT = 0 THEN STR.FIELD$(STR.N) = STR.REST$ : RETURN
+    STR.FIELD$(STR.N) = LEFT$(STR.REST$, STR.AT - 1)
+    STR.REST$ = MID$(STR.REST$, STR.AT + LEN(STR.DELIM$))
+    GOTO STR.SPLIT.NEXT
+
+## STR.REPLACE -- replace EVERY occurrence of STR.FIND$ in
+## STR.STR$ with STR.REPL$.
+##
+##   in    STR.STR$    the string, MODIFIED IN PLACE like the pad
+##                         routines (SPLIT is the odd one out there)
+##         STR.FIND$   what to look for. Case SENSITIVE, because
+##                         GP.INSTR compares raw bytes
+##         STR.REPL$   what to put in its place. May be shorter,
+##                         longer, or "" to DELETE every occurrence
+##   clobbers  STR.OUT$  STR.REST$  STR.AT
+##
+## IT BUILDS A NEW STRING RATHER THAN EDITING IN PLACE, which is what makes it safe when
+## the replacement CONTAINS what is being replaced: "A" -> "AA" would never terminate if
+## the output were re-scanned, but everything emitted has moved into STR.OUT$ and
+## only STR.REST$ -- shrinking by at least LEN(FIND$) a pass -- is searched again.
+## In place is not available anyway: a longer replacement GROWS the string.
+##
+## An EMPTY STR.FIND$ leaves the string alone rather than looping forever, and no
+## guard here does it -- GP.INSTR reports "not found" for a zero length needle, so the
+## first pass takes the exit branch.
+##
+## NOT LENGTH CHECKED, as with the pad routines.
+
+STR.REPLACE:
+    STR.OUT$ = "" : STR.REST$ = STR.STR$
+STR.REPLACE.NEXT:
+    STR.AT = GP.INSTR(STR.REST$, STR.FIND$)
+    IF STR.AT = 0 THEN STR.STR$ = STR.OUT$ + STR.REST$ : RETURN
+    STR.OUT$ = STR.OUT$ + LEFT$(STR.REST$, STR.AT - 1) + STR.REPL$
+    STR.REST$ = MID$(STR.REST$, STR.AT + LEN(STR.FIND$))
+    GOTO STR.REPLACE.NEXT
+
+## STR.PET2SCR -- a PETSCII code to the SCREEN code the tile map holds.
+##
+##   in    STR.PET     0..255, what ASC() gives you
+##   out   STR.SCR     the screen code TILE, TDATA and VPOKE want
+##   clobbers  nothing
+##
+## GP.PRINTAT and GP.FILL do this internally, so you only need it when writing the map
+## yourself -- TILE X,Y,STR.SCR, or a VPOKE for a whole row at once.
+##
+## IN BASIC ON PURPOSE, and not for the byte count: the ASM GPDrawPet2Scr sits at NO
+## FIXED ADDRESS. The resident runtime pins two things only, the magic at RTBASE and the
+## entry jmp at RTBASE+4; everything else floats from build to build, so a GP.CALL to an
+## address read out of code.lbl works until the next build and then writes somewhere
+## else. Nine lines here cannot rot.
+##
+## A compare chain rather than an offset table, because a table needs a DATA statement --
+## and READ walks every DATA in the whole program in order.
+##
+## $FF is the one value the arithmetic gets wrong: pi is screen code 94, not 127.
+## CHR$(222) is the same character and needs no special case.
+##
+## Nothing converts to 160..191, the reverse-video glyphs: PETSCII says "reverse" with a
+## control code, not a character. Swap the colour attribute instead.
+
+STR.PET2SCR:
+    STR.SCR = STR.PET
+    IF STR.PET = 255 THEN STR.SCR = 94 : RETURN
+    IF STR.PET < 32 THEN STR.SCR = STR.PET + 128 : RETURN
+    IF STR.PET < 64 THEN RETURN
+    IF STR.PET < 96 THEN STR.SCR = STR.PET - 64 : RETURN
+    IF STR.PET < 128 THEN STR.SCR = STR.PET - 32 : RETURN
+    IF STR.PET < 160 THEN STR.SCR = STR.PET + 64 : RETURN
+    IF STR.PET < 192 THEN STR.SCR = STR.PET - 64 : RETURN
+    STR.SCR = STR.PET - 128
+    RETURN
+
+STR.SKIP:
+#ENDIF

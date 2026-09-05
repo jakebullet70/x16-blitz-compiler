@@ -61,7 +61,6 @@ python samples/GPC-HELP/MKHELP.PY
   - [3. The modules (2)](#3-the-modules-2)
   - [4. Labels are global too](#4-labels-are-global-too)
   - [5. Two more naming rules that are not about collisions](#5-two-more-naming-rules-that-are-not-about-collisions)
-  - [6. Regenerating this](#6-regenerating-this)
 - **THE TRAPS**
   - [6. The traps, collected](#6-the-traps-collected)
 - **MEMORY AND LIMITS**
@@ -151,16 +150,11 @@ Then BASLOAD and GPC as usual: `BASLOAD "MYPROG.BL"`, then compile the resulting
 
 ##### A program that uses GP.BASIC is compile-only
 
-One GP.BASIC keyword is enough: from there the program is **compiler input**, and the ROM can no
-longer `LIST` or `RUN` it. BASLOAD encodes those keywords as the byte pairs `$CE58`-`$CE7F`, and
-stock BASIC has no handler behind them.
+One GP.BASIC keyword is enough. BASLOAD encodes them as the byte pairs `$CE58`-`$CE7F` and stock
+BASIC has no handler behind them, so the ROM can neither `LIST` nor `RUN` the result. It is compiler
+input.
 
-**GPB is what GPC implements, and it has no existence apart from it.** The keyword set is not an
-extension the ROM might one day understand, or a library that could be loaded to make it work:
-`GP.DO` means something because the compiler emits code for it, and nowhere else. That is why
-BASLOAD's output is not a program yet — there is nothing to run it with but GPC.
-
-That is the intended route: run `GPC.PRG` on BASLOAD's `.PRG` and run the object it writes.
+Run `GPC.PRG` on BASLOAD's `.PRG`, then run the object it writes.
 
 ##### Numbers, and what a variable holds
 
@@ -253,9 +247,11 @@ A compiled program identifies itself: `LIST` one and the BASIC stub reads `SYS 2
 compiler writes when `MAKE A DEBUG MAP?` is answered yes. Without the map the address cannot be
 resolved.
 
-`BASLOAD` is not a file here; it is built into the R49 ROM. It reads `.BASL` source — BASIC with
-long names, labels instead of line numbers, `#INCLUDE` and `#DEFINE` — and writes the `.PRG` that
-GPC compiles. Every `.INC.BL` and `.EXP.BL` in this folder is BASLOAD source.
+`GPB.HELP.PRG` is this reference, on the machine. It reads `HELP-TXT/` beside it — `GPB.HELP.IDX`
+and one `.HLP` per topic — and shows 49 topics at 80x30. Arrows, `PgUp` / `PgDn`, `HOME` and `END`
+move. `RETURN` opens the highlighted index row. `/` finds and `N` repeats the search. `L` follows a
+topic's cross references, `X` writes its code out as a `.BL` where it has any, `T` cycles the colour
+themes, `?` is the about box. `ESC` goes back a step, and quits from the index.
 
 ---
 
@@ -2075,39 +2071,6 @@ gives two. Write the same code as a hand-typed `.bas` for the PC-side converter 
 `THEME.CLR` and `THEME.COUNT` become the same variable. That is a silent wrong answer — it cost two
 test cycles during tier 6, both times looking exactly like a compiler bug. Inside BASL you are safe;
 in a raw `.bas`, give every variable a distinct first two characters.
-
----
-
-
-## 6. Regenerating this
-
-#### 6. Regenerating this
-
-The tables above were extracted from the sources rather than remembered. To check them after a
-change:
-
-```bash
-python - <<'PY'
-import re, os, glob
-for f in sorted(glob.glob("GPC-BASIC/*.INC.BL")):
-    s = open(f, encoding="utf-8").read()
-    body = "\n".join(l for l in s.split("\n") if not l.strip().startswith("##"))
-    body = re.sub(r'"[^"]*"', ' ', body)          # literals are not identifiers
-    defines = set(re.findall(r"^#DEFINE\s+([A-Z0-9.$]+)", body, re.M))
-    labels  = set(re.findall(r"^([A-Z][A-Z0-9.]*):", body, re.M))
-    pref    = os.path.basename(f).split(".")[0]
-    idents  = {i for i in re.findall(r"\b([A-Z][A-Z0-9.]*\$?)", body)
-               if i.startswith(pref) or i.startswith(pref[:3] + "K")}
-    print(os.path.basename(f))
-    print("  const :", " ".join(sorted(defines)))
-    print("  labels:", " ".join(sorted(labels)))
-    print("  vars  :", " ".join(sorted(idents - defines - labels)))
-PY
-```
-
-It cannot tell **in** from **out** from **internal** — that is a judgement call and lives in each
-module's header comment. What it will catch is a variable that has appeared and is not written down
-here.
 
 ---
 

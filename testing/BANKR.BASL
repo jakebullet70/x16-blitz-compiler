@@ -1,0 +1,20 @@
+#SAVEAS "@:BANKR.SRC.PRG"
+#REM 0
+#SYMFILE "@:BANKR.SRC.SYM"
+#INCLUDE "GPB.INC.BL"
+
+## The same BANK in LOW memory, with a region present: allowed, and it still works.
+
+PRINT "R1"
+BANK 3
+POKE 40960, 77
+PRINT "R2 POKED";PEEK(40960)
+GOSUB BK.IN
+PRINT "R3 DONE"
+END
+
+GP.BANKED 5
+BK.IN:
+    PRINT "R2B IN BANK"
+    RETURN
+GP.ENDBANKED

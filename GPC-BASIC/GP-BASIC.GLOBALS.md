@@ -193,33 +193,3 @@ gives two. Write the same code as a hand-typed `.bas` for the PC-side converter 
 `THEME.CLR` and `THEME.COUNT` become the same variable. That is a silent wrong answer — it cost two
 test cycles during tier 6, both times looking exactly like a compiler bug. Inside BASL you are safe;
 in a raw `.bas`, give every variable a distinct first two characters.
-
----
-
-## 6. Regenerating this
-
-The tables above were extracted from the sources rather than remembered. To check them after a
-change:
-
-```bash
-python - <<'PY'
-import re, os, glob
-for f in sorted(glob.glob("GPC-BASIC/*.INC.BL")):
-    s = open(f, encoding="utf-8").read()
-    body = "\n".join(l for l in s.split("\n") if not l.strip().startswith("##"))
-    body = re.sub(r'"[^"]*"', ' ', body)          # literals are not identifiers
-    defines = set(re.findall(r"^#DEFINE\s+([A-Z0-9.$]+)", body, re.M))
-    labels  = set(re.findall(r"^([A-Z][A-Z0-9.]*):", body, re.M))
-    pref    = os.path.basename(f).split(".")[0]
-    idents  = {i for i in re.findall(r"\b([A-Z][A-Z0-9.]*\$?)", body)
-               if i.startswith(pref) or i.startswith(pref[:3] + "K")}
-    print(os.path.basename(f))
-    print("  const :", " ".join(sorted(defines)))
-    print("  labels:", " ".join(sorted(labels)))
-    print("  vars  :", " ".join(sorted(idents - defines - labels)))
-PY
-```
-
-It cannot tell **in** from **out** from **internal** — that is a judgement call and lives in each
-module's header comment. What it will catch is a variable that has appeared and is not written down
-here.

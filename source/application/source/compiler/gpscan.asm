@@ -82,7 +82,9 @@ _GPSCheck:
 _GPSNext:
 		jsr 	MoveObjectForward
 		bcc 	_GPSLoop
-_GPSDone:
+		jsr 	GPBankHop 					; a GP.BANKED region is past the GP.ASM pool, so the
+		bcc 	_GPSLoop 					; walk leaves low memory and carries on there. Its
+_GPSDone: 									; keywords count exactly like any other.
 		lda 	gpScanEnd 					; put objPtr back
 		sta 	objPtr
 		lda 	gpScanEnd+1

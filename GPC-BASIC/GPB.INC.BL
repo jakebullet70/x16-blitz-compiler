@@ -247,6 +247,15 @@
 ## 12 bytes of runtime for the whole construct, because all four opcodes reuse handlers
 ## that were already there.
 
+## GP.BANKED <bank> ... GP.ENDBANKED marks a run of p-code as belonging at $A000
+## in that RAM bank rather than in low memory. Both are alone on their line, and
+## the bank is a decimal constant. They are COMPILE TIME MARKERS and select
+## nothing -- BANK is the statement that selects one, and these are deliberately
+## not spelled like it.
+
+#TOKEN GP.BANKED 52823
+#TOKEN GP.ENDBANKED 52822
+
 #TOKEN GP.IF 52830
 #TOKEN GP.ELSEIF 52829
 #TOKEN GP.ELSE 52828

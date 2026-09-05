@@ -59,7 +59,12 @@ TILE 			#,#,# X:OptionalParameterCompile T N
 # 	ROM bank as $FF meaning "not given", which is exactly what OptionalParameterCompile pushes.
 # 	It was only ever missing this one line.
 
-BANK 			# X:OptionalParameterCompile T N
+#
+# 	THE GUARD RUNS FIRST, and refuses a BANK compiled inside a GP.BANKED region -- banked
+# 	p-code is fetched from $A000 and BANK leaves the register somewhere else. See
+# 	commands/gpbank.asm. PEEK and POKE restore the bank around every access and are fine.
+#
+BANK 			X:CommandBankGuard # X:OptionalParameterCompile T N
 
 # 	Binary load and save. See loadsave.asm for the two knobs (secondary address, and A) that
 # 	decide between these.

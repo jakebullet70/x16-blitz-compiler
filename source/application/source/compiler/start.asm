@@ -30,6 +30,22 @@ CompileCode:
 								; lands under the IN:/OUT: lines that name the file.
 								; It has already said which of the two reasons it was.
 
+		;
+		;		GP.BANKED needs to know where the p-code will RUN, and it needs it INSIDE the
+		;		compile: FixBranches resolves the branches that cross into the bank long before
+		;		WriteObjectCode has settled anything. In shared mode that is the constant
+		;		PCODE_PAGE, so it can be handed over now. Embedded, it depends on ScanGPUsage --
+		;		and there is no bootstrap there to copy the region either, so gpbank.asm refuses
+		;		a region rather than guessing.
+		;
+		lda 	#(PCODE_PAGE - (FreeMemory >> 8)) & $FF
+		sta 	gpBankRunPage
+		stz 	gpBankShared
+		lda 	ModeText 					; GPC.INPUT line 4 -- 'S' is SHARED
+		cmp 	#'S'
+		bne 	_CCNotShared
+		inc 	gpBankShared
+_CCNotShared:
 		ldx 	#APIDesc & $FF
 		ldy 	#APIDesc >> 8
 		jsr 	StartCompiler

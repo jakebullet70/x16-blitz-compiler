@@ -89,16 +89,11 @@ Then BASLOAD and GPC as usual: `BASLOAD "MYPROG.BL"`, then compile the resulting
 
 ### A program that uses GP.BASIC is compile-only
 
-One GP.BASIC keyword is enough: from there the program is **compiler input**, and the ROM can no
-longer `LIST` or `RUN` it. BASLOAD encodes those keywords as the byte pairs `$CE58`-`$CE7F`, and
-stock BASIC has no handler behind them.
+One GP.BASIC keyword is enough. BASLOAD encodes them as the byte pairs `$CE58`-`$CE7F` and stock
+BASIC has no handler behind them, so the ROM can neither `LIST` nor `RUN` the result. It is compiler
+input.
 
-**GPB is what GPC implements, and it has no existence apart from it.** The keyword set is not an
-extension the ROM might one day understand, or a library that could be loaded to make it work:
-`GP.DO` means something because the compiler emits code for it, and nowhere else. That is why
-BASLOAD's output is not a program yet — there is nothing to run it with but GPC.
-
-That is the intended route: run `GPC.PRG` on BASLOAD's `.PRG` and run the object it writes.
+Run `GPC.PRG` on BASLOAD's `.PRG`, then run the object it writes.
 
 ### Numbers, and what a variable holds
 
@@ -478,8 +473,10 @@ All three write directly to VERA and call no KERNAL routine, which is why they a
 faster than `PRINT`. GPC's character output makes two KERNAL calls per character, and `BSOUT`
 carries scroll, quote mode and cursor handling.
 
-`GP.BOX` draws the frame only. Styles: 0 solid, 1 dither, 2 single line, 3 rounded, 4 thick, 5 thick
-shaded. `char` in `GP.FILL` is PETSCII, e.g. `ASC(" ")`.
+`GP.BOX` draws the frame only. Styles: 0 solid block, 1 single line, 2 single line with rounded
+corners, 3 thick line. A style of 256 or more is an ADDRESS, not a style: eight screen codes of the
+caller's own, in the table's order — see the custom glyph note below. `char` in `GP.FILL` is
+PETSCII, e.g. `ASC(" ")`.
 
 The colour argument is optional. Omitted, it uses whatever `COLOR` last set, read from the KERNAL's
 `$0376` — the colour a `PRINT` would have used. Supplied, it is one byte packed as the X16 packs it:

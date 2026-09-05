@@ -1190,15 +1190,69 @@ Worth saying plainly: **`HELP.BASL`'s own 5,148 bytes are bigger than the whole 
 `MENUVERT`.** If the goal is workspace for THIS program rather than a smaller library, its own code
 is the larger target.
 
-The question: can p-code live in a RAM bank and be paged in? A dialog is exactly the right shape
-for it — it runs, it waits for a human, it returns, and nothing else is running while it does. If
-`GOSUB` could reach a routine in a bank, the whole of `GUI` would cost its callers a window and not
-5,000 bytes of workspace.
+**The library's strings are not the lever either.** `GUI`, `MENUVERT` and `LINEINPUT` hold 116
+quoted characters between them, 97 and 8 and 11. At the rates measured in *The MENU string arrays
+live in banked RAM* below, that nets under 200 bytes before any accessor code, against an editor
+measurement that broke even on 249. The library is code, and the question is whether code can move.
 
-What to find out first: whether the p-code interpreter's PC can address banked RAM at all, what a
-call across a bank boundary would have to save and restore, and whether the frame stack (`$A000`
-territory itself, 16 pages) can coexist. If the interpreter is hard-wired to low RAM this is a
-runtime change, not a library one — which is the answer worth having before anyone designs it.
+**Answered 2026-09-05, from the runtime sources: p-code runs from the window.** `codePtr` is a
+16-bit zero-page pointer and every fetch is `lda (codePtr),y` (`00runtime.asm:130`), so the
+interpreter has no opinion about what is behind `$A000`.
+
+- Control flow is PC-relative. `PerformGOTO` adds a signed 16-bit offset to `codePtr`
+  (`goto.asm:35`) and `GOSUB` runs the same code, so a blob's internal branches survive a copy to
+  any address. No relocation.
+- The frame stack does not collide with the window. It is `FrameStackPages = 16` growing down from
+  the workspace floor in low RAM (`00runtime.asm:51`). Variables, arrays, the string heap and DATA
+  are low RAM as well, and a routine executing in the window reaches all of them unchanged.
+- The saved return position is 2 bytes at frame offset +2/+3 (`location.asm:21`). A bank byte makes
+  the GOSUB frame 5 bytes; the frame marker's size field is 5 bits, so it fits.
+
+**BUILT 2026-09-05 as `GP.BANKED <n>` / `GP.ENDBANKED`, and none of the three things this section
+said had to be built were needed.** See `samples/GPB-MODS-TESTING/PLAN.md` for the whole account.
+
+- **No bank-aware call opcode.** Offsets are 16 bit and wrapping, so every target is reachable; a
+  branch with one end in the bank is corrected by ONE BYTE, because both bases are page aligned.
+- **`BANK` keeps its semantics.** It is refused inside a region at compile time instead, and the
+  library selects its own bank on the way in (below).
+- **No companion file.** The region ships at the top of the p-code, page aligned, and the program's
+  own bootstrap moves it into the bank before the runtime starts -- 33 bytes, which fitted in the
+  padding at `$08DF..$08FF` after reclaiming 4 elsewhere. The workspace then starts where the region
+  was, so it costs no low RAM at all.
+
+What is left, and it is library work rather than compiler work:
+
+- **A LOW MEMORY ENTRY SHIM PER PUBLIC ENTRY POINT.** A banked routine cannot select its own bank:
+  by the time its first instruction is fetched the wrong bank is already selected. So each public
+  name becomes a front door in low memory --
+
+  ```
+  GUI.OPEN:                    ' low memory -- the name the application calls
+      BANK GUI.CODEBANK
+      GOSUB GUI.OPEN.BODY      ' in the bank
+      RETURN
+  ```
+
+  This is what makes the application's own banking a non-issue: it can `BANK`, `BLOAD`, `BSAVE` and
+  `STASH` freely and never think about the code bank. MEASURED: one `BANK` is 5 bytes of p-code, so
+  a shim is about 10 to 14 with the `GOSUB`, the `RETURN` and the line marker. At ~30 entry points
+  that is ~400 bytes against ~7,500 moved out -- about 5%. `#DEFINE GUI.CODEBANK 5` feeds both
+  `GP.BANKED` and the shims so the number cannot be written twice.
+- **`STASH` must put the bank back.** The shim closes the way IN; this is the way OUT -- banked code
+  calling a low routine that leaves a different bank selected, then returning into the bank. `STASH`
+  is the only routine in `GPC-BASIC` that does it (`BMX` uses `POKE`). `BLOAD`/`BSAVE`/`BVERIFY`
+  leave the bank where they stopped too, but they are called BY the application, on the way in,
+  where the shim covers them.
+
+WARNING: `GUI.OPEN` BANKS. It stashes the covered cells into `GUI.BANK` (`GUI.INC.BL:390`), so a
+banked `GUI` is code in bank A switching to bank B and back on every call, and spends two banks
+instead of one. A string literal is a bare pointer into the p-code (`pushstring.asm:21`).
+Assignment concretes it onto the heap, so the ordinary paths are safe, but anything that holds the
+pointer past a bank switch reads the wrong bank.
+
+The size of the prize: `GUI` + `MENUVERT` + `LINEINPUT` is 3,973 bytes, one 8K bank with 4K spare.
+For GPC-HELP that turns 2,458 bytes of workspace into about 6,400. The `MENUVERT` and `LINEINPUT`
+trims listed above are worth ~1,300 for library work alone.
 
 
 ### Crunch AFTER BASLOAD, not before
@@ -2136,6 +2190,21 @@ switching and string garbage collection cannot touch.
   bulk-move, and limited to the 63 banks a 512K machine has.
 
 ## Build / infrastructure
+
+### Update README.md before a release — TODO
+
+The repository README is the maintainer-facing document and nothing regenerates it, so it goes stale
+quietly. Read it against the tree at the top of every release:
+
+- **The name-register check under *Testing*.** It moved there on 2026-09-05, out of
+  `GP-BASIC.GLOBALS.md` §6, because that file is generated into the on-machine help and the X16 has
+  no Python. Anything else in that class belongs here too: a script, a `make` target, a host-side
+  tool. The rule is that `GPC-BASIC/*.md` carries only what a person reading the help on the machine
+  can act on.
+- **Repository layout**, against what is actually in the tree.
+- **Runtime footprint** and **How big a program can it compile?**, against a fresh `OK CODE ... FREE
+  ... RT ...` line rather than the numbers already written down.
+- **Status**, against what shipped.
 
 ### NOTHING BUILDS THE EXAMPLES, so one was broken for weeks
 

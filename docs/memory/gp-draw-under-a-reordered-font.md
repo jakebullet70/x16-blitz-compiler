@@ -18,15 +18,20 @@ the *variable it lands in*, not the argument you hand it. So to place a glyph at
 park the bitmap at `T` and pass `T - $40` for that range.
 
 **`GP.BOX` takes its glyphs from a table in the RUNTIME**, so it can only ever draw the
-six styles that table holds:
+four styles that table holds (RENUMBERED since this note was written -- dither and thick
+shaded are gone and everything above 1 moved down one):
 
 ```
-0 solid block $A0     1 chequer $66      2 single line     3 single, round corners
-4 thick line          5 thick, shaded
+0 solid block $A0   1 single line   2 single line, round corners   3 thick line
 ```
 
-Styles 1-5 are built from screen codes `$40-$7F`. Under `samples/editor`'s ASCII-ordered
-font that range is ASCII letters, so **style 2 draws "p @ B"** and only **style 0
+A style of 256 or more is an address -- the caller's own eight screen codes, copied into
+`GPDrawCustom` and then indexed as `GPD_CUSTOM = 4`. `GPD_STYLES = 4`, so a plain 4..255 is
+`BAD STYLE`.
+
+Styles 1-3 are built from screen codes `$40-$7D`. Under `samples/editor`'s ASCII-ordered
+font that range is ASCII letters, so **the single-line style draws "p @ B"** (observed
+as style 2, which is style 1 under the numbering above) and only **style 0
 survives**, because `$80-$FF` is the one region the re-order never touches. If a different
 border is wanted, draw it with `GP.FILL` — which takes the glyph as an argument — not with
 `GP.BOX`.

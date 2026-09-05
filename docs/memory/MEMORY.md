@@ -15,6 +15,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [Answer the question asked](answer-the-question-asked.md) — lead with the number asked for; no adjacent easier problem, no edge cases nobody writes
 - [Measure before changing code](measure-before-changing-code.md) — FRE probes found in 2 minutes what 2 rounds of edits missed
 - [Prose style is flat reference](prose-style-is-flat-reference.md) — the five settled rules for comments and help text; the `doc-style` agent owns them
+- [Write readable code, user crunches](write-readable-code-user-crunches.md) — one statement a line, plain IF for one statement, never a statement on a label line
 - [Comments light, code should flow](comments-light-code-should-flow.md) — a note or two, not essays; heavy REMs mean bad naming
 - [No ship language, no unasked builds](no-ship-language-this-is-dev.md) — dev and test work only; "commit and push" does not include a build
 - [Commit to main directly](commit-to-main-directly.md) — do not branch first; solo repo, no review step
@@ -24,6 +25,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [The compiler is GPC](name-the-compiler-gpc.md) — "Blitz" is a heritage nod to the C64 compiler; all the code here is the user's own
 - [User runs concurrent agents here](user-runs-concurrent-agents-here.md) — default to read-only research; re-read before any write
 - [Compile shared, not embedded](compile-shared-not-embedded.md) — standing: SHARED is the p-code number; GPC-HELP stays uncrunched
+- [Library working copy, then root](library-working-copy-then-root.md) — edit modules in samples/GPB-MODS-TESTING/GPC-BASIC/, copy to root only when they pass
 
 ## Build and toolchain
 - **Build setup** — *(note missing: linked by the index but never committed)* how to build it, and the 5 blockers that made a fresh clone unbuildable on any OS. See docs/BUILDING.md.
@@ -96,6 +98,9 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 ## X16 platform / toolchain
 - [Scrolling a screen region](scrolling-a-screen-region.md) — no GP command for it; STASH moved, VERA-to-VERA memcopy, or a masked layer
 - [GP drawing targets layer 1](gp-drawing-targets-layer-1.md) — only layer 1, but no row clamp and L1_MAPBASE is POKEable
+- [P-code runs from a bank, PROVEN](pcode-runs-from-a-bank-proven.md) — executed at $A000 with two GP.ASM blobs and no ABI change; RETURN out needs no bank restore
+- [GP.BANKED region relocation](gp-banked-region-relocation.md) — the region moves to the end of the object with a rotation and two GOTOs to line numbers; the three things holding a buffer address
+- [KERNAL preserves the RAM bank](kernal-preserves-ram-bank.md) — CHROUT, GETIN, scroll, CLS and screen_mode all leave $00 alone; measure it in asm, PEEK(0) cannot see it
 - [X16 ROM internal calls](x16-rom-internal-calls.md) — verified R49 dispatcher/GC addresses + ZP pointers
 - [X16 toolchain](x16-toolchain.md) — 64tass / emulator paths on this machine
 - [x16emu -echo doubling](x16emu-echo-doubling.md) — non-warp `-echo raw` prints every char TWICE

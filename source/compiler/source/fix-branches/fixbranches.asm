@@ -76,7 +76,9 @@ _FBDepthUp:
 _FBStep:
 		jsr 	MoveObjectForward 			; move forward in object code.
 		bcc 	_FBLoop 					; not finished
-_FBExit:
+		jsr 	GPBankHop 					; the low code ends at its $FF, but a GP.BANKED region
+		bcc 	_FBLoop 					; sits past the GP.ASM pool -- carry clear means it
+_FBExit: 									; hopped there and the walk goes on
 		rts
 _FBUnwindFar:
 		jmp 	_FBFixUnwind
@@ -136,7 +138,9 @@ _FBFAllowZero:
 		pla
 
 _FBFFound:		
-		jsr 	STRMakeOffset 				; make it an offset from X:YA
+		jsr 	GPBankMakeOffset 			; make it an offset from X:YA -- and correct it if this
+											; branch crosses into or out of a GP.BANKED region, which
+											; runs at $A000 rather than where it sits in the buffer
 		
 		phy	 								; patch the GOTO/GOSUB
 		ldy 	#1
@@ -230,7 +234,7 @@ _FBEDTarget: 								; enter here when objPtr IS the target already
 		;
 		lda 	_FBExitTarget 				; target in YA, exactly as the GOTO path passes it
 		ldy 	_FBExitTarget+1
-		jsr 	STRMakeOffset
+		jsr 	GPBankMakeOffset 			; bank aware, exactly as the GOTO tail above
 		phy
 		ldy 	#1
 		sta 	(objPtr),y
@@ -438,6 +442,8 @@ _FBUWUp:
 		inc 	_FBUnwindDepth
 _FBUWStep:
 		jsr 	MoveObjectForward
+		bcc 	_FBUWalk
+		jsr 	GPBankHop 					; over the pool to the region, exactly as the main loop
 		bcc 	_FBUWalk 					; running off the end lands here too, with the depth
 _FBUWDone: 									; it had reached, which is the right answer for a
 		sec 								; target that IS the end marker

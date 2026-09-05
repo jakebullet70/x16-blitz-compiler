@@ -339,6 +339,34 @@ emulator says so on stdout) and **fails by looping forever**, so always run unde
 give the `variables` and `arrays` suites several minutes each before concluding anything, because
 the replay step is not warped. Details in [`docs/BUILDING.md`](docs/BUILDING.md#3-test-it).
 
+### Checking the name register
+
+The name tables in [`GPC-BASIC/GP-BASIC.GLOBALS.md`](GPC-BASIC/GP-BASIC.GLOBALS.md) are extracted
+from the sources rather than remembered. To check them after a change:
+
+```bash
+python - <<'PY'
+import re, os, glob
+for f in sorted(glob.glob("GPC-BASIC/*.INC.BL")):
+    s = open(f, encoding="utf-8").read()
+    body = "\n".join(l for l in s.split("\n") if not l.strip().startswith("##"))
+    body = re.sub(r'"[^"]*"', ' ', body)          # literals are not identifiers
+    defines = set(re.findall(r"^#DEFINE\s+([A-Z0-9.$]+)", body, re.M))
+    labels  = set(re.findall(r"^([A-Z][A-Z0-9.]*):", body, re.M))
+    pref    = os.path.basename(f).split(".")[0]
+    idents  = {i for i in re.findall(r"\b([A-Z][A-Z0-9.]*\$?)", body)
+               if i.startswith(pref) or i.startswith(pref[:3] + "K")}
+    print(os.path.basename(f))
+    print("  const :", " ".join(sorted(defines)))
+    print("  labels:", " ".join(sorted(labels)))
+    print("  vars  :", " ".join(sorted(idents - defines - labels)))
+PY
+```
+
+It cannot tell **in** from **out** from **internal** — that is a judgement call and lives in each
+module's header comment. What it will catch is a variable that has appeared and is not written down
+here.
+
 ## License
 
 MIT — see [`LICENSE`](LICENSE). © 2023 paulscottrobson and contributors.

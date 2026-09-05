@@ -69,6 +69,10 @@ StartCompiler:
 		stz 	blockDepth 					; GP.DO nesting -- the storage section is
 											; uninitialised RAM, and a non-zero start makes every
 											; GOTO emit an .unwind it does not need
+		stz 	gpBankState 				; no GP.BANKED region seen yet, and nothing relocated --
+		stz 	gpBankActive 				; same argument as blockDepth above, the storage section
+		stz 	gpBankNumber 				; is not cleared. The last two are read unconditionally
+		stz 	gpBankPages 				; by the bootstrap patch table, so zero means "no region".
 		stz 	implicitDimCount
 		stz 	implicitDimFirstSet
 		stz 	clrCheckpoint 				; no CLR compiled yet -> no array is re-DIMmable
@@ -217,9 +221,30 @@ SaveCodeAndExit:
 		;
 		lda 	#$FF 						; add end marker
 		jsr 	WriteCodeByte
-		jsr 	FixBranches 				; fix up GOTO/GOSUB etc.
 		jsr 	AsmFlushPool 				; append the GP.ASM blob pool AFTER the $FF end marker,
 											; where nothing walks -- see commands/gpasmcode.asm
+		jsr 	GPBankRelocate 				; lift a GP.BANKED region out to the end of the object,
+											; past the pool. AFTER AsmFlushPool so the pool stays in
+											; low memory below it, and BEFORE FixBranches so every
+											; branch is still a line number -- commands/gpbank.asm.
+											; Does nothing to a program without a region.
+		;
+		;		FIXBRANCHES DESTROYS objPtr. It rewinds to the start and walks to the end marker,
+		;		so it comes back pointing at the $FF -- and everything after that is invisible to
+		;		it. That used to be the whole object, because the GP.ASM pool was appended
+		;		afterwards. Now the pool goes on first, and objPtr is the length WriteObjectCode
+		;		streams, so leaving it at the end marker silently truncated every pool: a program
+		;		with an inline blob compiled OK and jumped into nothing at the first call.
+		;
+		lda 	objPtr
+		sta 	objectEnd
+		lda 	objPtr+1
+		sta 	objectEnd+1
+		jsr 	FixBranches 				; fix up GOTO/GOSUB etc.
+		lda 	objectEnd
+		sta 	objPtr
+		lda 	objectEnd+1
+		sta 	objPtr+1
 
 		lda 	#BLC_CLOSEOUT 				; close output store 
 		jsr 	CallAPIHandler
@@ -305,6 +330,8 @@ compilerStartHigh:							; MSB of workspace start address
 		.fill 	1
 compilerEndHigh:							; MSB of workspace end address
 		.fill 	1
+objectEnd:									; the true end of the object, held across FixBranches --
+		.fill 	2							; which rewinds objPtr and leaves it at the end marker
 ;
 ;		Implicit array dimensioning. Interpreted BASIC auto-creates an array (0..10 per
 ;		dimension) the first time it is used without a DIM. We can't do that lazily -- this VM

@@ -1,0 +1,643 @@
+#SAVEAS "@:GPBMODS.SRC.PRG"
+#SYMFILE "@:GPBMODS.SRC.SYM"
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "BANKMGR.INC.BL"
+#INCLUDE "THEME.INC.BL"
+#INCLUDE "APPSYS.INC.BL"
+#INCLUDE "STASH.INC.BL"
+#INCLUDE "STASHFILE.INC.BL"
+#INCLUDE "STRCASE.INC.BL"
+#INCLUDE "STRINGS.INC.BL"
+#INCLUDE "SORT.INC.BL"
+#INCLUDE "MENUVERT.INC.BL"
+#INCLUDE "MENUBAR.INC.BL"
+#INCLUDE "LINEINPUT.INC.BL"
+#INCLUDE "GUI.INC.BL"
+#INCLUDE "GUI2.INC.BL"
+
+## ***********************************************************************
+## **
+## **  GPBMODS.BASL -- the GPC-BASIC library, under a menu bar.
+## **
+## **  Eight bar items, one dropdown each, one row a library entry point.
+## **  THE PANELS ARE STUBS: every row opens GUI.SAY naming itself. The shell
+## **  is the real program at this stage, and it is already a test of three
+## **  modules -- MENUBAR drives the bar, MENUVERT every dropdown, STASH puts
+## **  the screen back under a closed one.
+## **
+## **  It also holds every module at once, which is what the p-code map is
+## **  read off. See PLAN.md.
+## **
+## **  Keys:
+## **      LEFT RIGHT    walk the bar
+## **      DOWN RETURN   open the dropdown under the marked item
+## **      LEFT RIGHT    with a dropdown open, move to the next one
+## **      UP DOWN       walk the dropdown, RETURN chooses
+## **      ESC           closes the dropdown, then leaves the program
+## **
+## **  BANKS: 2 holds the cells a dropdown covers, 3 the cells a dialog does.
+## **  Both are written whole, and both are CLAIMED from BANKMGR at startup
+## **  rather than assumed -- ABOUT / BANK MAP reads the result back.
+## **
+## **  UPPER CASE LITERALS ONLY. GP.PRINTAT converts PETSCII and BASLOAD passes
+## **  literals through as source bytes, so lower case lands on the graphics
+## **  half of the default font.
+## **
+## ***********************************************************************
+
+## The screen this is laid out for. 1 is 80x30, 0 is 80x60.
+#DEFINE GM.MODE 1
+
+#DEFINE GM.DDBANK 2
+#DEFINE GM.GUIBANK 3
+
+## The bar sits on row 0 and the first item starts here.
+#DEFINE GM.BARX 1
+
+## PETSCII, as GET reports it -- the two keys MENUVERT.KEYEXIT hands back.
+#DEFINE GM.LEFT 157
+#DEFINE GM.RIGHT 29
+
+## The caller owns the DIM. Thirty-two covers the bar's eight, the longest
+## dropdown, and the twenty-four row list GUI.LISTBOX is shown with. Do not
+## also leave it implicit.
+DIM MENUVERT.ITEM$(32)
+
+## APPSYS.STARTUP first, before any SCREEN of our own: it records the screen
+## the user had, and that is what APPSYS.RESTORE puts back.
+GOSUB APPSYS.STARTUP
+SCREEN GM.MODE
+
+## Asked after the mode change, not before. APPSYS.STARTUP reported the size
+## of the screen the user had, not the one just set.
+GP.CALL APPSYS.SCRMODE, 0, 0, 0, 1
+APPSYS.COLS = GP.X
+APPSYS.ROWS = GP.Y
+
+THEME.ID = 0 : GOSUB THEME.LOAD
+
+## The two banks this program writes, taken from the manager rather than
+## assumed. Nothing here can fail on a real machine -- 2 and 3 exist on the
+## smallest X16 -- but claiming them is what stops a later panel handing one
+## of them out again.
+GOSUB BANKMGR.INIT
+BANKMGR.WANT = GM.DDBANK : GOSUB BANKMGR.CLAIM
+BANKMGR.WANT = GM.GUIBANK : GOSUB BANKMGR.CLAIM
+
+GM.SEL = 1
+GM.OPEN = 0
+
+## Where a panel writes what it got back, and what stands there before one has run.
+GM.RESY = APPSYS.ROWS - 3
+GM.RESULT$ = "NOTHING RUN YET"
+
+GOSUB GMX.CHROME
+
+## ---- The shell. GM.OPEN is set by a dropdown that ended on LEFT or RIGHT,
+## ---- and it means "the bar has already moved, go straight back down".
+
+GP.DO
+  GP.IF GM.OPEN = 0 THEN
+    GOSUB GMX.BAR
+    GP.IF MENUBAR.SEL = 0 THEN
+      GP.EXITDO
+    GP.ENDIF
+    GM.SEL = MENUBAR.SEL
+  GP.ENDIF
+  GM.OPEN = 0
+  GOSUB GMX.DROP
+GP.LOOP
+
+GOSUB APPSYS.RESTORE
+END
+
+
+## ***********************************************************************
+## **  GMX.CHROME -- the page, the bar row and the key line.
+## **
+## **  Redrawn whole rather than patched: a theme change repaints everything
+## **  from here, and nothing is left behind by a shorter string.
+## ***********************************************************************
+
+GMX.CHROME:
+  GP.FILL 0, 0, APPSYS.COLS, APPSYS.ROWS, ASC(" "), THEME.CLR(THEME.PAGE)
+  GP.FILL 0, 0, APPSYS.COLS, 1, ASC(" "), THEME.CLR(THEME.TITLE)
+  GP.PRINTAT 2, 2, "GPB-MODS-TESTING -- THE GPC-BASIC LIBRARY UNDER A BAR", THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 2, 4, "EVERY PANEL IS A STUB. THE BAR, THE DROPDOWNS AND THE", THEME.CLR(THEME.DIMMED)
+  GP.PRINTAT 2, 5, "SCREEN SAVE UNDER THEM ARE REAL.", THEME.CLR(THEME.DIMMED)
+  GM.KEYS$ = "<- ->  BAR     DOWN  OPEN     RETURN  CHOOSE     ESC  BACK / QUIT"
+  GP.PRINTAT 2, APPSYS.ROWS - 1, GM.KEYS$, THEME.CLR(THEME.DIMMED)
+  GOSUB GMX.RESULT
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.RESULT -- what the last panel came back with.
+## **
+## **  Its own row, so a panel says what it returned without opening a second
+## **  dialog to say it. GMX.CHROME calls it, so a repaint keeps it.
+## ***********************************************************************
+
+GMX.RESULT:
+  GP.FILL 2, GM.RESY, APPSYS.COLS - 4, 1, ASC(" "), THEME.CLR(THEME.PAGE)
+  GP.PRINTAT 2, GM.RESY, "LAST: " + GM.RESULT$, THEME.CLR(THEME.WARN)
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.BAR -- draw the bar and drive it.
+## **
+## **   out  MENUBAR.SEL   the item, or 0 if ESC ended it
+## **
+## **  DOWNEXIT is what makes this a bar over dropdowns: DOWN ends the call
+## **  so the caller can open the panel. KEEPMARK leaves the highlight on
+## **  while it is open.
+## ***********************************************************************
+
+GMX.BAR:
+  GOSUB GMX.BAR.LOAD
+  MENUBAR.X = GM.BARX : MENUBAR.Y = 0 : MENUBAR.GAP = 0
+  MENUBAR.FLAGS = MENUBAR.DOWNEXIT + MENUBAR.KEEPMARK
+  MENUBAR.SEL = GM.SEL
+  GOSUB MENUBAR.RUN
+  RETURN
+
+
+## ---- The bar's own array. MENUBAR and MENUVERT share it, so it is reloaded
+## ---- on every use of either. An item's width is its text, which is why the
+## ---- padding is in the string.
+
+GMX.BAR.LOAD:
+  MENUVERT.ITEM$(1) = " DIALOG "
+  MENUVERT.ITEM$(2) = " LISTS "
+  MENUVERT.ITEM$(3) = " INPUT "
+  MENUVERT.ITEM$(4) = " SCREEN "
+  MENUVERT.ITEM$(5) = " STRINGS "
+  MENUVERT.ITEM$(6) = " DATA "
+  MENUVERT.ITEM$(7) = " THEME "
+  MENUVERT.ITEM$(8) = " ABOUT "
+  MENUVERT.COUNT = 8
+
+## A hotkey need not be an item's initial -- SCREEN and STRINGS both start S,
+## so STRINGS answers to G. HOTATTR tints whichever letter it finds.
+  MENUVERT.HOT$ = "DLISGATB"
+  MENUVERT.ATTR = THEME.CLR(THEME.TITLE)
+  MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
+  MENUVERT.HOTATTR = THEME.CLR(THEME.WARN)
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.DROP -- the dropdown under the marked bar item.
+## **
+## **  Redraws and re-marks the bar first, so this is the same whether it was
+## **  reached from MENUBAR.RUN or from a sideways exit out of another
+## **  dropdown. MENUBAR.WHERE then reports the column and width of the item.
+## **
+## **  KEYEXIT hands LEFT and RIGHT back instead of swallowing them, which is
+## **  the other half of MENUBAR.DOWNEXIT.
+## ***********************************************************************
+
+GMX.DROP:
+  GOSUB GMX.BAR.LOAD
+  MENUBAR.SEL = GM.SEL
+  GOSUB MENUBAR.DRAW
+  GOSUB MENUBAR.MARK
+  GOSUB MENUBAR.WHERE
+
+  GOSUB GMX.DD.LOAD
+
+## ---- the highlight is one cell wider than the longest row ----
+  GM.DDW = 0
+  FOR GM.I = 1 TO MENUVERT.COUNT
+    IF LEN(MENUVERT.ITEM$(GM.I)) > GM.DDW THEN GM.DDW = LEN(MENUVERT.ITEM$(GM.I))
+  NEXT GM.I
+  GM.DDW = GM.DDW + 1
+
+  GM.DDX = MENUBAR.SELX
+  GM.DDY = 1
+  IF GM.DDX + GM.DDW + 2 > APPSYS.COLS THEN GM.DDX = APPSYS.COLS - GM.DDW - 2
+
+## ---- what the frame and the rows will cover, saved before either is drawn ----
+  STASH.BANK = GM.DDBANK
+  STASH.X = GM.DDX : STASH.Y = GM.DDY
+  STASH.W = GM.DDW + 2 : STASH.H = MENUVERT.COUNT + 2
+  GOSUB STASH.SAVE
+
+  GP.FILL GM.DDX, GM.DDY, GM.DDW + 2, MENUVERT.COUNT + 2, ASC(" "), THEME.CLR(THEME.TEXT)
+  GP.BOX GM.DDX, GM.DDY, GM.DDW + 2, MENUVERT.COUNT + 2, 0, THEME.CLR(THEME.BORDER)
+
+  MENUVERT.X = GM.DDX + 1
+  MENUVERT.Y = GM.DDY + 1
+  MENUVERT.WIDTH = GM.DDW
+  MENUVERT.FLAGS = MENUVERT.KEYEXIT
+  MENUVERT.SEL = 0
+  GOSUB MENUVERT.RUN
+
+## ---- the screen back, before anything else draws on it ----
+  STASH.BANK = GM.DDBANK : STASH.MOVE = 0
+  GOSUB STASH.RESTORE
+
+  GP.SELECT MENUVERT.KEY
+  GP.CASE GM.LEFT
+    GM.SEL = GM.SEL - 1 : IF GM.SEL < 1 THEN GM.SEL = 8
+    GM.OPEN = 1
+  GP.CASE GM.RIGHT
+    GM.SEL = GM.SEL + 1 : IF GM.SEL > 8 THEN GM.SEL = 1
+    GM.OPEN = 1
+  GP.OTHER
+    IF MENUVERT.SEL > 0 THEN GOSUB GMX.DISPATCH
+  GP.ENDSEL
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.DD.LOAD -- one dropdown's rows, and the bar item's name.
+## **
+## **  MENUVERT.HOT$ IS EMPTIED. The bar's letters are still in it otherwise,
+## **  and MENUVERT.HOTKEY would match them against these rows.
+## ***********************************************************************
+
+GMX.DD.LOAD:
+  MENUVERT.HOT$ = ""
+  MENUVERT.HOTATTR = 0
+  MENUVERT.ATTR = THEME.CLR(THEME.TEXT)
+  MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
+
+  GP.SELECT GM.SEL
+  GP.CASE 1
+    GM.NAME$ = "DIALOG"
+    MENUVERT.ITEM$(1) = " GUI.SAY"
+    MENUVERT.ITEM$(2) = " GUI.YN"
+    MENUVERT.ITEM$(3) = " GUI.MENU"
+    MENUVERT.ITEM$(4) = " GUI.TEXT"
+    MENUVERT.ITEM$(5) = " GUI.LISTBOX  ONE"
+    MENUVERT.ITEM$(6) = " GUI.LISTBOX  MANY"
+    MENUVERT.ITEM$(7) = " GUI.OPEN + GUI.CLOSE"
+    MENUVERT.ITEM$(8) = " BOX STYLES 0-3"
+    MENUVERT.COUNT = 8
+  GP.CASE 2
+    GM.NAME$ = "LISTS"
+    MENUVERT.ITEM$(1) = " MENUVERT.RUN"
+    MENUVERT.ITEM$(2) = " MENUVERT.DRAW"
+    MENUVERT.ITEM$(3) = " MENUVERT.ROW"
+    MENUVERT.ITEM$(4) = " MENUBAR.RUN"
+    MENUVERT.ITEM$(5) = " HOTKEYS"
+    MENUVERT.ITEM$(6) = " FLAGS"
+    MENUVERT.COUNT = 6
+  GP.CASE 3
+    GM.NAME$ = "INPUT"
+    MENUVERT.ITEM$(1) = " LINEINPUT.GET"
+    MENUVERT.ITEM$(2) = " LINEINPUT.ASK"
+    MENUVERT.ITEM$(3) = " THREE FIELDS"
+    MENUVERT.ITEM$(4) = " LENGTH LIMITS"
+    MENUVERT.COUNT = 4
+  GP.CASE 4
+    GM.NAME$ = "SCREEN"
+    MENUVERT.ITEM$(1) = " GP.BOX"
+    MENUVERT.ITEM$(2) = " GP.FILL"
+    MENUVERT.ITEM$(3) = " GP.PRINTAT"
+    MENUVERT.ITEM$(4) = " GP.DRAW"
+    MENUVERT.ITEM$(5) = " STASH SAVE + RESTORE"
+    MENUVERT.ITEM$(6) = " STASH MOVE"
+    MENUVERT.ITEM$(7) = " STASH TO A FILE"
+    MENUVERT.COUNT = 7
+  GP.CASE 5
+    GM.NAME$ = "STRINGS"
+    MENUVERT.ITEM$(1) = " STR.PADR"
+    MENUVERT.ITEM$(2) = " STR.PADL"
+    MENUVERT.ITEM$(3) = " STR.PADC"
+    MENUVERT.ITEM$(4) = " STR.SPLIT"
+    MENUVERT.ITEM$(5) = " STR.REPLACE"
+    MENUVERT.ITEM$(6) = " STRCASE  FIVE MODES"
+    MENUVERT.COUNT = 6
+  GP.CASE 6
+    GM.NAME$ = "DATA"
+    MENUVERT.ITEM$(1) = " SORT.RUN"
+    MENUVERT.ITEM$(2) = " ARRAYS"
+    MENUVERT.ITEM$(3) = " BANK MAP"
+    MENUVERT.COUNT = 3
+  GP.CASE 7
+    GM.NAME$ = "THEME"
+    MENUVERT.ITEM$(1) = " X-SIXTEEN"
+    MENUVERT.ITEM$(2) = " DARK"
+    MENUVERT.ITEM$(3) = " LIGHT"
+    MENUVERT.ITEM$(4) = " GRAY"
+    MENUVERT.ITEM$(5) = " CUSTOM"
+    MENUVERT.COUNT = 5
+  GP.OTHER
+    GM.NAME$ = "ABOUT"
+    MENUVERT.ITEM$(1) = " MEMORY"
+    MENUVERT.ITEM$(2) = " MODULE SIZES"
+    MENUVERT.ITEM$(3) = " BANK MAP"
+    MENUVERT.ITEM$(4) = " KEYS"
+    MENUVERT.COUNT = 4
+  GP.ENDSEL
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.DISPATCH -- the chosen row, to its panel or to the stub.
+## **
+## **  One test a built panel. It stays a list rather than becoming a GP.SELECT
+## **  on two coordinates: a panel is identified by BAR ITEM and ROW, and a
+## **  nested select on both reads worse than the line it replaces.
+## ***********************************************************************
+
+GMX.DISPATCH:
+  GM.DONE = 0
+  IF GM.SEL = 1 THEN GOSUB GMX.DIALOG : GM.DONE = 1
+  IF GM.SEL = 8 THEN IF MENUVERT.SEL = 3 THEN GOSUB GMX.BANKMAP : GM.DONE = 1
+  IF GM.DONE = 0 THEN GOSUB GMX.STUB
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.BANKMAP -- ABOUT / BANK MAP. What BANKMGR thinks it owns.
+## **
+## **  MID$(STR$(N), 2) drops the leading space STR$ puts on a positive number.
+## ***********************************************************************
+
+GMX.BANKMAP:
+  GOSUB BANKMGR.COUNT
+  GOSUB GMX.D.RESET
+  GUI.TITLE$ = " BANK MAP "
+  GUI.MSG$ = "BANKS " + MID$(STR$(BANKMGR.BANKS), 2) + "    FREE " + MID$(STR$(BANKMGR.SPARE), 2)
+  GUI.MSG2$ = "IN USE " + MID$(STR$(GM.DDBANK), 2) + " DROPDOWN, " + MID$(STR$(GM.GUIBANK), 2) + " DIALOG"
+  GOSUB GUI.SAY
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.STUB -- what a row does until its panel is written.
+## **
+## **  The whole GUI.* interface is set, not the three fields that happen to
+## **  matter: a routine relying on what the last caller left is not calling
+## **  the module, it is guessing at it.
+## ***********************************************************************
+
+GMX.STUB:
+  GUI.BANK = GM.GUIBANK
+  GUI.TITLE$ = " " + GM.NAME$ + " "
+  GUI.MSG$ = MENUVERT.ITEM$(MENUVERT.SEL)
+  GUI.MSG2$ = "PANEL NOT BUILT YET"
+  GUI.STYLE = 0
+  GUI.GLYPH = 0
+  GUI.PLACE = 0
+  GUI.ROW.OFFSET = 0
+  GUI.PANEL.IN = 0
+  GUI.BORDER.IN = 0
+  GOSUB GUI.SAY
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.DIALOG -- the DIALOG dropdown, one row a demonstration.
+## **
+## **  Every row leaves its answer in GM.RESULT$, and the page is repainted
+## **  afterwards because the box styles row draws on the page rather than in
+## **  a dialog that puts the screen back for itself.
+## ***********************************************************************
+
+GMX.DIALOG:
+  GP.SELECT MENUVERT.SEL
+  GP.CASE 1
+    GOSUB GMX.D.SAY
+  GP.CASE 2
+    GOSUB GMX.D.YN
+  GP.CASE 3
+    GOSUB GMX.D.MENU
+  GP.CASE 4
+    GOSUB GMX.D.TEXT
+  GP.CASE 5
+    GOSUB GMX.D.LIST.ONE
+  GP.CASE 6
+    GOSUB GMX.D.LIST.MANY
+  GP.CASE 7
+    GOSUB GMX.D.PANEL
+  GP.OTHER
+    GOSUB GMX.D.STYLES
+  GP.ENDSEL
+  GOSUB GMX.CHROME
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.D.RESET -- the whole GUI interface, back to its defaults.
+## **
+## **  EVERY FIELD, not the three a demonstration happens to vary. The inputs
+## **  are ordinary variables and all of them are sticky, so a panel setting
+## **  only what it cares about inherits the last panel's title, hint and mask.
+## ***********************************************************************
+
+GMX.D.RESET:
+  GUI.BANK = GM.GUIBANK
+  GUI.MSG$ = ""
+  GUI.MSG2$ = ""
+  GUI.TITLE$ = ""
+  GUI.HINT$ = ""
+  GUI.STYLE = 0
+  GUI.GLYPH = 0
+  GUI.PLACE = 0
+  GUI.X = 0
+  GUI.Y = 0
+  GUI.ROW.OFFSET = 0
+  GUI.PANEL.IN = 0
+  GUI.BORDER.IN = 0
+  GUI.OKCANCEL = 0
+  GUI.LEN = 0
+  GUI.MASK = 0
+  GUI.FLAGS = 0
+  GUI.SEL = 0
+  GUI.COUNT = 0
+  RETURN
+
+
+## ---- A key, for the two demonstrations that draw and then wait ----
+
+GMX.D.WAIT:
+  GP.DO
+    GET GM.K$
+    IF GM.K$ <> "" THEN GP.EXITDO
+  GP.LOOP
+  RETURN
+
+
+## ---- Twenty-four rows, for the two listbox demonstrations ----
+
+GMX.D.FILL:
+  FOR GM.I = 1 TO 24
+    MENUVERT.ITEM$(GM.I) = " ITEM " + MID$(STR$(GM.I), 2)
+  NEXT GM.I
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.D.SAY -- GUI.SAY. One message, one way out.
+## ***********************************************************************
+
+GMX.D.SAY:
+  GOSUB GMX.D.RESET
+  GUI.TITLE$ = " GUI.SAY "
+  GUI.MSG$ = "SOMETHING TO SAY, AND ONE WAY OUT."
+  GUI.MSG2$ = "GUI.MSG2$ IS THE SECOND LINE."
+  GUI.HINT$ = "OK"
+  GOSUB GUI.SAY
+  GM.RESULT$ = "GUI.SAY CLOSED ON KEY " + MID$(STR$(GUI.KEY), 2)
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.D.YN -- GUI.YN, both ways round. YES/NO, then OK/CANCEL.
+## ***********************************************************************
+
+GMX.D.YN:
+  GOSUB GMX.D.RESET
+  GUI.TITLE$ = " GUI.YN "
+  GUI.MSG$ = "DELETE THE FILE?"
+  GUI.MSG2$ = "ESC AND STOP BOTH ANSWER NO."
+  GOSUB GUI.YN
+  GM.YESNO = GUI.ANSWER
+
+  GOSUB GMX.D.RESET
+  GUI.TITLE$ = " GUI.YN - OKCANCEL "
+  GUI.MSG$ = "THE SAME DIALOG, ASKING OK OR CANCEL."
+  GUI.MSG2$ = "RETURN ACCEPTS THIS ONE AS WELL."
+  GUI.OKCANCEL = 1
+  GOSUB GUI.YN
+  GM.RESULT$ = "GUI.YN  YESNO " + MID$(STR$(GM.YESNO), 2) + "   OKCANCEL " + MID$(STR$(GUI.ANSWER), 2)
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.D.MENU -- GUI.MENU. MENUVERT.RUN inside a frame.
+## ***********************************************************************
+
+GMX.D.MENU:
+  GOSUB GMX.D.RESET
+  MENUVERT.ITEM$(1) = " NEW GAME"
+  MENUVERT.ITEM$(2) = " LOAD"
+  MENUVERT.ITEM$(3) = " OPTIONS"
+  MENUVERT.ITEM$(4) = " QUIT"
+  GUI.COUNT = 4
+  GUI.TITLE$ = " GUI.MENU "
+  GUI.MSG$ = "CHOOSE A ROW."
+  GOSUB GUI.MENU
+  GM.RESULT$ = "GUI.MENU SEL " + MID$(STR$(GUI.SEL), 2)
+  IF GUI.SEL = 0 THEN GM.RESULT$ = "GUI.MENU CANCELLED"
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.D.TEXT -- GUI.TEXT, plain then masked.
+## **
+## **  The answer is GUI.INPUT$ and not GUI.TEXT$: GUI.TEXT is the routine's
+## **  own label, and a string of that name beside it compiles into something
+## **  else.
+## ***********************************************************************
+
+GMX.D.TEXT:
+  GOSUB GMX.D.RESET
+  GUI.TITLE$ = " GUI.TEXT "
+  GUI.MSG$ = "TYPE A NAME."
+  GUI.LEN = 20
+  GUI.INPUT$ = "GPC"
+  GOSUB GUI.TEXT
+  GM.TYPED$ = GUI.INPUT$
+  GM.TYPED.OK = GUI.OK
+
+  GOSUB GMX.D.RESET
+  GUI.TITLE$ = " GUI.TEXT - MASKED "
+  GUI.MSG$ = "AND THE SAME FIELD AS A PASSWORD."
+  GUI.LEN = 12
+  GUI.INPUT$ = ""
+  GUI.MASK = 1
+  GOSUB GUI.TEXT
+  GM.RESULT$ = "GUI.TEXT OK " + MID$(STR$(GM.TYPED.OK), 2) + "  [" + GM.TYPED$ + "]"
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.D.LIST.ONE -- GUI.LISTBOX, one answer from a list that scrolls.
+## ***********************************************************************
+
+GMX.D.LIST.ONE:
+  GOSUB GMX.D.RESET
+  GOSUB GMX.D.FILL
+  GUI.TITLE$ = " GUI.LISTBOX "
+  GUI.MSG$ = "ONE OF TWENTY-FOUR, IN A BOX EIGHT ROWS DEEP."
+  GUI.LISTBOX.COUNT = 24
+  GUI.LISTBOX.ROWS = 8
+  GUI.LISTBOX.MULTI = 0
+  GUI.LISTBOX.SEL = 0
+  GOSUB GUI.LISTBOX
+  GM.RESULT$ = "LISTBOX SEL " + MID$(STR$(GUI.LISTBOX.SEL), 2)
+  IF GUI.LISTBOX.SEL = 0 THEN GM.RESULT$ = "LISTBOX CANCELLED"
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.D.LIST.MANY -- GUI.LISTBOX in multi select. SPACE marks a row.
+## ***********************************************************************
+
+GMX.D.LIST.MANY:
+  GOSUB GMX.D.RESET
+  GOSUB GMX.D.FILL
+  GUI.TITLE$ = " GUI.LISTBOX - MULTI "
+  GUI.MSG$ = "SPACE MARKS A ROW, RETURN ACCEPTS THE SET."
+  GUI.LISTBOX.COUNT = 24
+  GUI.LISTBOX.ROWS = 8
+  GUI.LISTBOX.MULTI = 1
+  GUI.LISTBOX.MARKS$ = ""
+  GUI.LISTBOX.SEL = 0
+  GOSUB GUI.LISTBOX
+  GM.RESULT$ = "LISTBOX MARKED " + MID$(STR$(GUI.LISTBOX.MARKED), 2) + " OF 24"
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.D.PANEL -- GUI.OPEN and GUI.CLOSE, with the caller drawing inside.
+## **
+## **  GUI.BODY.ROWS and .WIDTH say what the caller needs under the message;
+## **  GUI.INNER.LEFT, .TOP and .WIDTH are where it may put it. This is the
+## **  entry point a fifth kind of dialog is built on.
+## ***********************************************************************
+
+GMX.D.PANEL:
+  GOSUB GMX.D.RESET
+  GUI.TITLE$ = " GUI.OPEN "
+  GUI.MSG$ = "THE BOX, WITH NO DIALOG INSIDE IT."
+  GUI.BODY.ROWS = 4
+  GUI.BODY.WIDTH = 32
+  GOSUB GUI.OPEN
+  GP.PRINTAT GUI.INNER.LEFT, GUI.INNER.TOP, "THE CALLER DREW THESE FOUR ROWS", GUI.PANEL
+  GP.PRINTAT GUI.INNER.LEFT, GUI.INNER.TOP + 1, "AT GUI.INNER.LEFT AND .TOP.", GUI.PANEL
+  GP.PRINTAT GUI.INNER.LEFT, GUI.INNER.TOP + 2, "GUI.STASHED = " + MID$(STR$(GUI.STASHED), 2), GUI.PANEL
+  GP.PRINTAT GUI.INNER.LEFT, GUI.INNER.TOP + 3, "PRESS A KEY.", THEME.CLR(THEME.WARN)
+  GOSUB GMX.D.WAIT
+  GOSUB GUI.CLOSE
+  GM.RESULT$ = "GUI.OPEN BOX " + MID$(STR$(GUI.WIDTH), 2) + " X " + MID$(STR$(GUI.HEIGHT), 2)
+  GM.RESULT$ = GM.RESULT$ + " AT " + MID$(STR$(GUI.LEFT), 2) + "," + MID$(STR$(GUI.TOP), 2)
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.D.STYLES -- GP.BOX, all four of them.
+## **
+## **  FOUR, NOT SIX. The runtime table holds 0 solid, 1 single line, 2 single
+## **  line with rounded corners, 3 thick line. GPD_STYLES is 4, so 4 to 255 is
+## **  BAD STYLE, and 256 or more is an address -- eight screen codes of the
+## **  caller's own.
+## ***********************************************************************
+
+GMX.D.STYLES:
+  GP.FILL 0, 7, APPSYS.COLS, 11, ASC(" "), THEME.CLR(THEME.PAGE)
+  FOR GM.I = 0 TO 3
+    GM.BOXX = 4 + GM.I * 18
+    GP.BOX GM.BOXX, 8, 14, 6, GM.I, THEME.CLR(THEME.BORDER)
+    GP.PRINTAT GM.BOXX + 4, 10, "STYLE " + MID$(STR$(GM.I), 2), THEME.CLR(THEME.TEXT)
+  NEXT GM.I
+  GP.PRINTAT 4, 16, "FOUR STYLES, 0 TO 3. PRESS A KEY.", THEME.CLR(THEME.WARN)
+  GOSUB GMX.D.WAIT
+  GM.RESULT$ = "GP.BOX DREW STYLES 0 TO 3"
+  RETURN

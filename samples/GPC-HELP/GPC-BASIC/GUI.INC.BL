@@ -61,8 +61,8 @@
 ## **        GUI.BANK        a spare RAM bank to save the covered cells in.
 ## **                        0 MEANS DO NOT SAVE, and then the box is still on
 ## **                        the screen when the call returns
-## **        GUI.STYLE       0, the default, draws the single line box. 1 to 5
-## **                        are GP.BOX's other styles
+## **        GUI.STYLE       0, the default, draws the rounded single line box.
+## **                        1 to 3 are GP.BOX's other styles
 ## **        GUI.PANEL.IN    the panel: the box's background AND the colour the
 ## **                        message lines are written in. 0 takes THEME.TEXT
 ## **        GUI.BORDER.IN   the frame's attribute. 0 takes THEME.BORDER
@@ -118,7 +118,8 @@
 ## X, rows in Y. Named here so GUI does not depend on APPSYS being included.
 #DEFINE GUI.SCRMODE $FF5F
 
-## The frame GUI.STYLE 0 means. GP.BOX style 2 is the single line.
+## The frame GUI.STYLE 0 means. GP.BOX style 2 is the single line with rounded
+## corners. There are four styles, 0 to 3.
 #DEFINE GUI.LINEBOX 2
 
 ## A bank is 8K and a cell 2 bytes, so this is the ceiling on a saved rectangle.

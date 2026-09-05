@@ -433,11 +433,11 @@ GPDrawP2SOffset:
 
 ; ************************************************************************************************
 ;
-;		The six border styles, eight SCREEN CODES each, lifted byte for byte from VTUIlib (public
+;		The four border styles, eight SCREEN CODES each, lifted byte for byte from VTUIlib (public
 ;		domain). Order per GPD_* above: TR, TL, BR, BL, top, bottom, left, right.
 ;
 ;		Verified against the ROM charset rather than taken on trust -- rendering the bitmaps out
-;		of rom.bin is what settled the slot order, e.g. style 4's $77 is two filled rows at the
+;		of rom.bin is what settled the slot order, e.g. style 3's $77 is two filled rows at the
 ;		TOP of the cell and its $74 two filled columns at the LEFT, which no other reading fits.
 ;
 ; ************************************************************************************************

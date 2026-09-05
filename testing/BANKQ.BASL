@@ -1,0 +1,14 @@
+#SAVEAS "@:BANKQ.SRC.PRG"
+#REM 0
+#SYMFILE "@:BANKQ.SRC.SYM"
+#INCLUDE "GPB.INC.BL"
+
+## BANK inside the region: refused, and named against its own line.
+
+PRINT "Q1"
+GP.BANKED 5
+BK.IN:
+    BANK 3
+    RETURN
+GP.ENDBANKED
+END

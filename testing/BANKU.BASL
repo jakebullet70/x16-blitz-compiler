@@ -1,0 +1,11 @@
+#SAVEAS "@:BANKU.SRC.PRG"
+#REM 0
+#SYMFILE "@:BANKU.SRC.SYM"
+#INCLUDE "GPB.INC.BL"
+
+## What one BANK statement costs in p-code.  The control keeps the line count,
+## because the compiler emits one line marker per source line.
+
+PRINT "X"
+BANK 5
+END

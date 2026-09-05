@@ -158,6 +158,14 @@
 ;
 	.byte	$07,$ce,$59,$03,CommandEndAsmCompile & $FF,CommandEndAsmCompile >> 8,$06
 ;
+;	GP.BANKED   X:CommandGPBankedCompile N
+;
+	.byte	$07,$ce,$57,$03,CommandGPBankedCompile & $FF,CommandGPBankedCompile >> 8,$06
+;
+;	GP.ENDBANKED  X:CommandGPEndBankedCompile N
+;
+	.byte	$07,$ce,$56,$03,CommandGPEndBankedCompile & $FF,CommandGPEndBankedCompile >> 8,$06
+;
 ;	GP.CALL   # X:OptionalZeroCompile X:OptionalZeroCompile X:OptionalZeroCompile X:OptionalZeroCompile T N
 ;
 	.byte	$13,$ce,$7c,$e3,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$20,34013 & $FF,34013 >> 8,$06

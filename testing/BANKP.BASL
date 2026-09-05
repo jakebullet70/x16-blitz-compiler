@@ -1,0 +1,54 @@
+#SAVEAS "@:BANKP.SRC.PRG"
+#REM 0
+#SYMFILE "@:BANKP.SRC.SYM"
+#INCLUDE "GPB.INC.BL"
+
+## Does the region actually EXECUTE from the bank, or does it merely still work?
+##
+## It still sits at its old low memory address in the loaded image -- the bootstrap
+## copies it up, it does not remove it -- so a branch that wrongly pointed back at the
+## low copy would work too, until the workspace grew over it.  So read the answer out
+## rather than infer it: a blob inside the region reports codePtr and the bank register.
+##
+## Expect CODEPTR 160 ($A0xx) and BANK 5.  Anything under 160 is the low memory copy,
+## and the whole thing is a coincidence.
+
+BK.P% = 0
+BK.B% = 0
+BK.L% = 0
+
+## The same reading taken from LOW memory first, as the control.
+#REM 1
+GP.ASM
+REM LDA $29
+REM STA {BK.L%}
+REM LDX #1
+REM LDA #0
+REM STA {BK.L%},X
+GP.ENDASM
+#REM 0
+
+PRINT "P1 LOW CODEPTR";BK.L%
+GOSUB BK.WHERE
+PRINT "P2 BANKED CODEPTR";BK.P%
+PRINT "P3 BANK";BK.B%
+END
+
+GP.BANKED 5
+BK.WHERE:
+    #REM 1
+    GP.ASM
+    REM LDA $29                 ; codePtr high -- $A0 if this is running in the window
+    REM STA {BK.P%}
+    REM LDX #1
+    REM LDA #0
+    REM STA {BK.P%},X
+    REM LDA $00                 ; and the RAM bank register, which PEEK(0) cannot see
+    REM STA {BK.B%}
+    REM LDX #1
+    REM LDA #0
+    REM STA {BK.B%},X
+    GP.ENDASM
+    #REM 0
+    RETURN
+GP.ENDBANKED

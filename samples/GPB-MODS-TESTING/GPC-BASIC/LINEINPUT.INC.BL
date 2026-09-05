@@ -1,0 +1,223 @@
+## ***********************************************************************
+## **
+## **  LINEINPUT.INC.BL -- a positioned, length-limited entry field.
+## **
+## **      LINEINPUT.GET     edit a string in a field at x, y
+## **      LINEINPUT.ASK     a label, then a field after it
+## **
+## **  What INPUT and LINPUT cannot do: both own the whole bottom of the screen, scroll
+## **  it, echo in whatever colour is current and accept any length. A field stays where
+## **  you put it, in the colour you give it, and stops at the width you allow.
+## **
+## **  Usage:
+## **      LINEINPUT.X = 10 : LINEINPUT.Y = 6
+## **      LINEINPUT.LEN = 20
+## **      LINEINPUT.ATTR = THEME.CLR(THEME.TEXT)
+## **      LINEINPUT.TEXT$ = ""
+## **      GOSUB LINEINPUT.GET
+## **      IF LINEINPUT.KEY = 27 THEN <cancelled>
+## **
+## **   in   LINEINPUT.X  LINEINPUT.Y     top left of the field
+## **        LINEINPUT.LEN               how many characters fit
+## **        LINEINPUT.ATTR              packed attribute, background * 16 + fg
+## **        LINEINPUT.TEXT$             the starting value, edited in place
+## **        LINEINPUT.MASK              non-zero shows asterisks
+## **        LINEINPUT.LABEL$            LINEINPUT.ASK only
+## **
+## **   out  LINEINPUT.TEXT$             what was typed. ESC restores what it
+## **                                  was when you called, so a cancelled
+## **                                  field is not a silently emptied one
+## **        LINEINPUT.KEY               the key that ended it:
+## **                                     13  RETURN, finished
+## **                                     27  ESC, cancelled (3 is STOP)
+## **                                     17  cursor down / 145 up / 9 TAB
+## **                                         -- left the field, text kept
+## **
+## **  So a form is a loop: call the field, look at LINEINPUT.KEY, move the focus. The
+## **  field never scrolls -- when full, further characters are refused and the cursor
+## **  sits on the last one rather than off the end.
+## **
+## **  THE CARET MOVES: LEFT and RIGHT walk it, HOME and END jump to the ends, typing
+## **  INSERTS where it stands and DEL rubs out what is before it. It starts after the
+## **  last character, so a caller that never presses an arrow sees exactly the old
+## **  append-and-rub-out field.
+## **
+## **   also out  LINEINPUT.POS   where the caret ended up, 0..LEN(TEXT$)
+## **
+## **  The whole LINEINPUT.* name space belongs to this file.
+## **
+## ***********************************************************************
+#IFNDEF LINEINPUT.DEFS
+#DEFINE LINEINPUT.DEFS 1
+
+#DEFINE LINEINPUT.RETURN 13
+#DEFINE LINEINPUT.DELETE 20
+#DEFINE LINEINPUT.ESCAPE 27
+#DEFINE LINEINPUT.STOP 3
+#DEFINE LINEINPUT.SPACE 32
+#DEFINE LINEINPUT.STAR 42
+
+## The keys that LEAVE a field without cancelling it, so a form can move between
+## fields. The text is kept -- only ESC puts it back -- and LINEINPUT.KEY says which way
+## to go. Without these RETURN would have to mean both "next field" and "done", and a
+## form could never go back up.
+#DEFINE LINEINPUT.DOWN 17
+#DEFINE LINEINPUT.UP 145
+#DEFINE LINEINPUT.TAB 9
+
+## The keys that move the CARET inside the field, as opposed to leaving it.
+#DEFINE LINEINPUT.LEFT 157
+#DEFINE LINEINPUT.RIGHT 29
+#DEFINE LINEINPUT.HOME 19
+#DEFINE LINEINPUT.END 4
+
+## Jiffies between cursor flips: 60 to the second, so 15 is four a second.
+#DEFINE LINEINPUT.BLINK 15
+
+GOTO LINEINPUT.MODULE.END
+
+## ***********************************************************************
+## **  LINEINPUT.GET -- the field.
+## ***********************************************************************
+
+LINEINPUT.GET:
+    LINEINPUT.INV = (LINEINPUT.ATTR AND 15) * 16 + INT(LINEINPUT.ATTR / 16)
+    LINEINPUT.WAS$ = LINEINPUT.TEXT$ : LINEINPUT.POS = LEN(LINEINPUT.TEXT$)
+    LINEINPUT.DONE = 0 : LINEINPUT.KEY = 0 : LINEINPUT.LIT = 1  : LINEINPUT.TICK = TI
+
+LINEINPUT.REDRAW:
+    GOSUB LINEINPUT.RENDER
+    GP.FILL LINEINPUT.X, LINEINPUT.Y, LINEINPUT.LEN, 1, LINEINPUT.SPACE, LINEINPUT.ATTR
+    IF LINEINPUT.SHOW$ <> "" THEN GP.PRINTAT LINEINPUT.X, LINEINPUT.Y, LINEINPUT.SHOW$, LINEINPUT.ATTR
+    GOSUB LINEINPUT.CURSOR
+
+## ---- GET returns immediately with "" when nothing is pressed, so the blink runs off
+## ---- TI rather than a delay loop, which would swallow keys pressed during it.
+
+LINEINPUT.WAIT:
+    GET LINEINPUT.K$
+    IF LINEINPUT.K$ <> "" THEN GOTO LINEINPUT.KEYED
+    IF TI < LINEINPUT.TICK THEN GOTO LINEINPUT.WAIT
+    LINEINPUT.TICK = TI + LINEINPUT.BLINK : LINEINPUT.LIT = 1 - LINEINPUT.LIT
+    GOSUB LINEINPUT.CURSOR : GOTO LINEINPUT.WAIT
+
+## ---- Seven control codes scattered across 256, which ON x GOSUB cannot index: the
+## ---- sparse selector GP.SELECT exists for. LINEINPUT.DONE is tested AFTER GP.ENDSEL
+## ---- rather than jumping out of the select -- one comparison, and it cannot leak.
+
+LINEINPUT.KEYED:
+    LINEINPUT.CODE = ASC(LINEINPUT.K$)
+    GP.SELECT LINEINPUT.CODE
+        GP.CASE LINEINPUT.RETURN : LINEINPUT.DONE = 1
+        GP.CASE LINEINPUT.ESCAPE, LINEINPUT.STOP
+            LINEINPUT.TEXT$ = LINEINPUT.WAS$ : LINEINPUT.POS = LEN(LINEINPUT.TEXT$) : LINEINPUT.DONE = 1
+        GP.CASE LINEINPUT.DOWN, LINEINPUT.UP, LINEINPUT.TAB
+            LINEINPUT.DONE = 1
+        GP.CASE LINEINPUT.LEFT   : IF LINEINPUT.POS > 0 THEN LINEINPUT.POS = LINEINPUT.POS - 1
+        GP.CASE LINEINPUT.RIGHT  : IF LINEINPUT.POS < LEN(LINEINPUT.TEXT$) THEN LINEINPUT.POS = LINEINPUT.POS + 1
+        GP.CASE LINEINPUT.HOME   : LINEINPUT.POS = 0
+        GP.CASE LINEINPUT.END    : LINEINPUT.POS = LEN(LINEINPUT.TEXT$)
+        GP.CASE LINEINPUT.DELETE : GOSUB LINEINPUT.RUBOUT
+        GP.OTHER                 : GOSUB LINEINPUT.TYPED
+    GP.ENDSEL
+    LINEINPUT.KEY = LINEINPUT.CODE : IF LINEINPUT.DONE = 0 THEN GOTO LINEINPUT.REDRAW
+
+## ---- Redraw once with no cursor, so a finished field is not still blinking at a user
+## ---- who has moved on.
+
+    LINEINPUT.LIT = 0 : GOSUB LINEINPUT.RENDER
+    GP.FILL LINEINPUT.X, LINEINPUT.Y, LINEINPUT.LEN, 1, LINEINPUT.SPACE, LINEINPUT.ATTR
+    IF LINEINPUT.SHOW$ <> "" THEN GP.PRINTAT LINEINPUT.X, LINEINPUT.Y, LINEINPUT.SHOW$, LINEINPUT.ATTR
+    RETURN
+
+## ---- A label, then a field after it. LINEINPUT.X is put back on the way out, so calling
+## ---- this in a loop does not walk the field across the screen.
+
+## ---- LINEINPUT.SAVEX, NOT LINEINPUT.HOME: that name is #DEFINEd as 19, so this line
+## ---- compiled as "19 = LINEINPUT.X" -- a syntax error, which DEFERS. The compile said
+## ---- OK CODE and ASK would have thrown SYNTAX ERROR the first time it was called.
+## ---- Nothing in the tree calls ASK, which is the only reason it went unseen.
+LINEINPUT.ASK:
+    LINEINPUT.SAVEX = LINEINPUT.X : GP.PRINTAT LINEINPUT.X, LINEINPUT.Y, LINEINPUT.LABEL$, LINEINPUT.ATTR
+    LINEINPUT.X = LINEINPUT.X + LEN(LINEINPUT.LABEL$)
+    GOSUB LINEINPUT.GET : LINEINPUT.X = LINEINPUT.SAVEX
+    RETURN
+
+## ***********************************************************************
+## **  LINEINPUT.TYPED -- accept a printable character, if there is room.
+## **
+## **  Refused: below 32, DEL, and $80-$9F -- the PETSCII control codes,
+## **  colours and cursor moves and reverse on and off, which would take
+## **  effect on the way OUT if they were let into the string.
+## **
+## **  ONE RANGE TEST, NOT A FLAG. Comparisons bind TIGHTER than AND here, so
+## **  K >= 128 AND K <= 159 reads as the range it looks like -- which is why
+## **  ED.KEY >= 32 AND ED.KEY <= 126 works in the editor. Believing it the
+## **  other way round is what makes people reach for a flag they do not need.
+## ***********************************************************************
+
+LINEINPUT.TYPED:
+    IF LEN(LINEINPUT.TEXT$) >= LINEINPUT.LEN THEN RETURN
+    IF LINEINPUT.CODE < 32 OR LINEINPUT.CODE = 127 THEN RETURN
+    IF LINEINPUT.CODE > 127 AND LINEINPUT.CODE < 160 THEN RETURN
+
+## ---- INSERTED AT THE CARET, not appended. With the caret at the end --
+## ---- where it starts, and where it stays unless someone moves it --
+## ---- LEFT$ is the whole string and MID$ past the end is "", so this is
+## ---- the old append with two joins nobody asked for. That is the price
+## ---- of the caret, and it is paid per keystroke, on a human's timescale.
+    LINEINPUT.TEXT$ = LEFT$(LINEINPUT.TEXT$, LINEINPUT.POS) + LINEINPUT.K$ + MID$(LINEINPUT.TEXT$, LINEINPUT.POS + 1)
+    LINEINPUT.POS = LINEINPUT.POS + 1
+    RETURN
+
+## ***********************************************************************
+## **  LINEINPUT.RUBOUT -- DEL takes the character BEFORE the caret.
+## **
+## **  Which is what DEL has always meant, and what the old code did by
+## **  accident: with the caret at the end, "before the caret" IS "off the
+## **  end". At the start of the field there is nothing before it, so DEL
+## **  is ignored rather than wrapping round to eat the last character.
+## ***********************************************************************
+
+LINEINPUT.RUBOUT:
+    IF LINEINPUT.POS = 0 THEN RETURN
+    LINEINPUT.TEXT$ = LEFT$(LINEINPUT.TEXT$, LINEINPUT.POS - 1) + MID$(LINEINPUT.TEXT$, LINEINPUT.POS + 1)
+    LINEINPUT.POS = LINEINPUT.POS - 1
+    RETURN
+
+## ---- What the field displays, which is not always what it holds.
+## ---- RPT$ raises an error on a count of zero, hence the guard.
+
+LINEINPUT.RENDER:
+    LINEINPUT.SHOW$ = LINEINPUT.TEXT$ : IF LINEINPUT.MASK = 0 THEN RETURN
+    LINEINPUT.SHOW$ = "" : IF LEN(LINEINPUT.TEXT$) > 0 THEN LINEINPUT.SHOW$ = RPT$(LINEINPUT.STAR, LEN(LINEINPUT.TEXT$))
+    RETURN
+
+## ***********************************************************************
+## **  LINEINPUT.CURSOR -- one cell, drawn twice a blink.
+## **
+## **  With room left it is an inverse space after the text. With the field
+## **  full there is no cell after the text, so it inverts the LAST
+## **  CHARACTER instead of blanking it -- printing the character back in
+## **  the inverse attribute, which says "full" without losing anything off
+## **  the display.
+## ***********************************************************************
+
+LINEINPUT.CURSOR:
+    LINEINPUT.FILLED = LEN(LINEINPUT.SHOW$)
+    LINEINPUT.CP = LINEINPUT.POS : IF LINEINPUT.CP > LINEINPUT.FILLED THEN LINEINPUT.CP = LINEINPUT.FILLED
+    LINEINPUT.CX = LINEINPUT.X + LINEINPUT.CP : LINEINPUT.CELL$ = " "
+
+## ---- ON a character, the cursor IS that character, drawn inverse on the
+## ---- lit half of the blink and normal on the other -- so the blink puts
+## ---- back exactly what it covered and nothing has to be remembered.
+    IF LINEINPUT.CP < LINEINPUT.FILLED THEN LINEINPUT.CELL$ = MID$(LINEINPUT.SHOW$, LINEINPUT.CP + 1, 1)
+    IF LINEINPUT.CP >= LINEINPUT.LEN THEN LINEINPUT.CX = LINEINPUT.X + LINEINPUT.LEN - 1
+    IF LINEINPUT.CP >= LINEINPUT.LEN THEN LINEINPUT.CELL$ = RIGHT$(LINEINPUT.SHOW$, 1)
+    LINEINPUT.CA = LINEINPUT.ATTR
+    IF LINEINPUT.LIT = 1 THEN LINEINPUT.CA = LINEINPUT.INV
+    GP.PRINTAT LINEINPUT.CX, LINEINPUT.Y, LINEINPUT.CELL$, LINEINPUT.CA
+    RETURN
+
+LINEINPUT.MODULE.END:
+#ENDIF

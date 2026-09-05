@@ -102,9 +102,9 @@
 ;
 	.byte	$0c,$ce,$b9,$ea,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,43997 & $FF,43997 >> 8,$06
 ;
-;	BANK    # X:OptionalParameterCompile T N
+;	BANK    X:CommandBankGuard # X:OptionalParameterCompile T N
 ;
-	.byte	$0a,$ce,$98,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,45533 & $FF,45533 >> 8,$06
+	.byte	$0d,$ce,$98,$03,CommandBankGuard & $FF,CommandBankGuard >> 8,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,45533 & $FF,45533 >> 8,$06
 ;
 ;	BLOAD    $,#,#,# T N
 ;

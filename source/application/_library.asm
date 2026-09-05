@@ -349,12 +349,44 @@ _BBEnter:
 		lda 	BBNeedGP
 		bne 	_BBGo 						; a GPB program keeps them, and its workspace stops below them
 		ldx 	#3
-		lda 	#0
 _BBZap:
-		sta 	RTGPMAGIC,x
-		dex
+		stz 	RTGPMAGIC,x 				; stz abs,x rather than lda #0 / sta abs,x -- two bytes, and
+		dex 								; the padding below is where GP.BANKED's copy loop went
 		bpl 	_BBZap
 _BBGo:
+		;
+		;		A GP.BANKED region ships at the TOP of the p-code, page aligned, and belongs at
+		;		$A000 in the bank the program named. Move it there and LEAVE THE BANK SELECTED:
+		;		that window is where the code runs for the life of the program.
+		;
+		;		ONCE PER LOAD, NOT PER RUN. The workspace starts where the region was -- that is
+		;		the whole point of putting it at the top -- so by the time a second RUN reaches
+		;		here those bytes are variables and strings. Zeroing the page count makes the
+		;		second RUN skip the copy and use what is already in the bank, which is still
+		;		exactly what the first one put there.
+		;
+		;		THREE GLOBAL LABELS, not "_" ones. object.asm patches the source page straight
+		;		into BBCodeSrc's operand as the template streams past, and it needs the address
+		;		to do it. Everything that branches across them branches to a global too, for the
+		;		scope reason BBTryLoad's own note gives.
+		;
+		ldx 	BBCodePages 				; 0 = this program has no banked region
+		beq 	BBCodeSkip
+		stz 	BBCodePages
+		lda 	BBCodeBank
+		sta 	$00
+		ldy 	#0 							; and it stays 0 between pages -- the byte loop wraps
+BBCodeSrc:
+		lda 	$FF00,y 					; source page PATCHED
+BBCodeDst:
+		sta 	$A000,y
+		iny
+		bne 	BBCodeSrc
+		inc 	BBCodeSrc+2
+		inc 	BBCodeDst+2
+		dex
+		bne 	BBCodeSrc
+BBCodeSkip:
 		lda 	#PCODE_PAGE 				; A = p-code base page ($09), page-aligned for codePtr
 		ldx 	BBWSStart 					; X = workspace start page
 		ldy 	BBWSEnd 					; Y = workspace end page -- RTBASE>>8 for a program with no GPB
@@ -394,14 +426,10 @@ BBLoadX:
 		pha
 		lda 	BBNameTab,x 				; A = name length
 		plx 								; X = name address low
-		bra 	BBTryLoad 					; A/X/Y are now exactly what SETNAM wants
-
-BBNameTab:
-			.byte 	BBCoreEnd-BBCore, <BBCore, >BBCore 					; 0  local, core only
-			.byte 	BBFullEnd-BBFull, <BBFull, >BBFull 					; 3  local, full
-			.byte 	BBCoreEnd-BBCoreRoot, <BBCoreRoot, >BBCoreRoot 	; 6  root, core only
-			.byte 	BBFullEnd-BBFullRoot, <BBFullRoot, >BBFullRoot 	; 9  root, full
-
+											; ...and fall straight through: A/X/Y are now exactly what
+											; SETNAM wants. The table used to sit between the two, and
+											; the "bra BBTryLoad" that jumped it was two of the bytes
+											; GP.BANKED's copy loop needed.
 BBTryLoad:
 		jsr 	X16_SETNAM 					; SETNAM(length in A, name in X/Y)
 		lda 	#0 							; SETLFS(logical file 0, device 8, secondary 1)
@@ -412,6 +440,12 @@ BBTryLoad:
 		ldx 	#<RTBASE 					; load address (ignored under SA=1, but pass the home)
 		ldy 	#>RTBASE
 		jmp 	X16_LOAD 					; its carry is our carry
+
+BBNameTab:
+			.byte 	BBCoreEnd-BBCore, <BBCore, >BBCore 					; 0  local, core only
+			.byte 	BBFullEnd-BBFull, <BBFull, >BBFull 					; 3  local, full
+			.byte 	BBCoreEnd-BBCoreRoot, <BBCoreRoot, >BBCoreRoot 	; 6  root, core only
+			.byte 	BBFullEnd-BBFullRoot, <BBFullRoot, >BBFullRoot 	; 9  root, full
 
 		;
 		;		TWO different numbers here, deliberately, because they answer two questions:
@@ -471,15 +505,22 @@ BBNeedGP:
 		.byte 	$FF 						; 0 = no GPB keyword, 1 = uses them -- PATCHED
 BBNameIdx:
 		.byte 	0 							; which name triple (0 or 3), chosen at run time
+BBCodePages:
+		.byte 	$FF 						; pages of GP.BANKED region to move, 0 = none -- PATCHED
+BBCodeBank:
+		.byte 	$FF 						; which bank to move it to -- PATCHED
 
 		.fill 	$0900 - *, 0 				; pad through $08FF so the p-code starts exactly at $0900
 
 		.here
 ProgramBootstrapEnd: 						; PHYSICAL end -- (End - Start) == 255 bytes ($0801..$08FF)
 
-BootWSPatchOffset = BBWSStart - $0801 		; offsets of the three per-program bytes within the
+BootWSPatchOffset = BBWSStart - $0801 		; offsets of the six per-program bytes within the
 BootWSEndPatchOffset = BBWSEnd - $0801 		; streamed template -- object.asm builds its patch
-BootGPPatchOffset = BBNeedGP - $0801 		; table from these three and nothing else.
+BootGPPatchOffset = BBNeedGP - $0801 		; table from these and nothing else.
+BootCodeSrcOffset = BBCodeSrc+2 - $0801 	; ...and the three GP.BANKED needs. The first is an
+BootCodePagesOffset = BBCodePages - $0801 	; instruction OPERAND rather than a data byte, which is
+BootCodeBankOffset = BBCodeBank - $0801 	; what keeps the copy loop inside the padding.
 
 		.send code
 
@@ -928,7 +969,9 @@ _GPSCheck:
 _GPSNext:
 		jsr 	MoveObjectForward
 		bcc 	_GPSLoop
-_GPSDone:
+		jsr 	GPBankHop 					; a GP.BANKED region is past the GP.ASM pool, so the
+		bcc 	_GPSLoop 					; walk leaves low memory and carries on there. Its
+_GPSDone: 									; keywords count exactly like any other.
 		lda 	gpScanEnd 					; put objPtr back
 		sta 	objPtr
 		lda 	gpScanEnd+1
@@ -1473,11 +1516,23 @@ _WOCShared:
 		;
 		;		p-code length -> whole pages (same as the embedded path)
 		;
-		sec
+		;		...but only the LOW part of it. A GP.BANKED region sits at the top of the object,
+		;		page aligned, and the bootstrap moves it into the bank before the runtime starts.
+		;		So the workspace begins where the region begins: those bytes are in the file, and
+		;		in memory for as long as it takes to copy them, and then they are workspace. That
+		;		is the whole return on putting the region up there.
+		;
 		lda 	objPtr
+		ldy 	objPtr+1
+		ldx 	gpBankActive
+		beq 	_WOCSLength
+		lda 	gpBankStart 				; where the region ends up -- page aligned
+		ldy 	gpBankStart+1
+_WOCSLength:
+		sec
 		sbc 	#FreeMemory & $FF
 		sta 	zTemp1
-		lda 	objPtr+1
+		tya
 		sbc 	#FreeMemory >> 8
 		sta 	zTemp1+1
 		lda 	zTemp1
@@ -1557,13 +1612,28 @@ _WOCSFits:
 		lda 	#1 							; normalise: the bootstrap tests it with BEQ
 _WOCSFlag:
 		sta 	BootPatchTable+8
+		;
+		;		...and the three GP.BANKED needs: where the region sits once the program is
+		;		loaded, how many pages of it there are, and which bank it belongs in. All three
+		;		are zero for a program with no region, and a zero page count is what makes the
+		;		bootstrap skip the copy entirely.
+		;
+		.set16 	BootPatchTable+9, ProgramBootstrap+BootCodeSrcOffset
+		lda 	gpBankRunBase 				; an instruction OPERAND, not a data byte
+		sta 	BootPatchTable+11
+		.set16 	BootPatchTable+12, ProgramBootstrap+BootCodePagesOffset
+		lda 	gpBankPages
+		sta 	BootPatchTable+14
+		.set16 	BootPatchTable+15, ProgramBootstrap+BootCodeBankOffset
+		lda 	gpBankNumber
+		sta 	BootPatchTable+17
 		.set16 	zTemp0,ProgramBootstrap
 _WOCSBoot:
 		;
-		;		THREE patched bytes now, not one, so the loop asks a table rather than growing a third
+		;		SIX patched bytes now, not one, so the loop asks a table rather than growing a sixth
 		;		copy of the same compare. Each entry is (address lo, hi, value): workspace START page,
-		;		workspace END page -- which is the runtime base this program will use -- and the flag
-		;		saying whether it needs the GPB handlers at all.
+		;		workspace END page -- which is the runtime base this program will use -- the flag
+		;		saying whether it needs the GPB handlers at all, and then GP.BANKED's three.
 		;
 		ldx 	#0
 _WOCSBootPatch:
@@ -1661,9 +1731,18 @@ NoRuntimeImageText:
 ;		space and the DECIMAL BASIC line number that begins there. To place an error, find the
 ;		largest offset that is <= the one reported.
 ;
+;		ASCENDING CODE ORDER, EXCEPT AFTER A GP.BANKED. The table is walked in the order the
+;		lines were marked, which is source order, and those two were the same thing until
+;		GPBankRelocate started lifting a region out to the end of the object. A program with a
+;		region in it has that region's lines carrying the HIGHEST offsets while still sitting
+;		where they were written. Every entry is still right; the file is simply no longer
+;		sorted, so the "largest offset <= the one reported" rule means reading the whole file
+;		rather than reading down it. Sorting here instead would cost a sort of a 2,048 entry
+;		banked table, and the reader can sort.
+;
 ;		It is built straight from the compiler's line-number table (STRMarkLine): 4-byte entries
 ;		[line# lo, line# hi, addr lo, addr hi], growing DOWNWARD from compilerEndHigh:$00 to
-;		lineNumberTable, walked here from the top down so the file comes out in code order. The
+;		lineNumberTable, walked here from the top down. The
 ;		stored addr is the compile-time position in the object buffer (based at FreeMemory), so
 ;		offset = addr - FreeMemory -- the same number the runtime reports, because the object is
 ;		copied verbatim from FreeMemory to its run address. The two synthetic lines the implicit
@@ -1812,8 +1891,8 @@ _WMFPow10L:
 _WMFPow10H:
 		.byte 	>10000, >1000, >100, >10
 
-BootPatchTable: 							; three (addr lo, addr hi, value) triples, built per program
-		.fill 	9 							; by the shared path just above -- see the note there.
+BootPatchTable: 							; six (addr lo, addr hi, value) triples, built per program
+		.fill 	18 							; by the shared path just above -- see the note there.
 BootPatchEnd:
 sharedCeilPage: 							; page the shared workspace stops at: RTBASE normally,
 		.fill 	1 							; RTGPBASE when the GPB handlers sit below it.
@@ -2124,6 +2203,22 @@ CompileCode:
 								; lands under the IN:/OUT: lines that name the file.
 								; It has already said which of the two reasons it was.
 
+		;
+		;		GP.BANKED needs to know where the p-code will RUN, and it needs it INSIDE the
+		;		compile: FixBranches resolves the branches that cross into the bank long before
+		;		WriteObjectCode has settled anything. In shared mode that is the constant
+		;		PCODE_PAGE, so it can be handed over now. Embedded, it depends on ScanGPUsage --
+		;		and there is no bootstrap there to copy the region either, so gpbank.asm refuses
+		;		a region rather than guessing.
+		;
+		lda 	#(PCODE_PAGE - (FreeMemory >> 8)) & $FF
+		sta 	gpBankRunPage
+		stz 	gpBankShared
+		lda 	ModeText 					; GPC.INPUT line 4 -- 'S' is SHARED
+		cmp 	#'S'
+		bne 	_CCNotShared
+		inc 	gpBankShared
+_CCNotShared:
 		ldx 	#APIDesc & $FF
 		ldy 	#APIDesc >> 8
 		jsr 	StartCompiler

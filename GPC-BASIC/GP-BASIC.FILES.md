@@ -57,9 +57,11 @@ A compiled program identifies itself: `LIST` one and the BASIC stub reads `SYS 2
 compiler writes when `MAKE A DEBUG MAP?` is answered yes. Without the map the address cannot be
 resolved.
 
-`BASLOAD` is not a file here; it is built into the R49 ROM. It reads `.BASL` source — BASIC with
-long names, labels instead of line numbers, `#INCLUDE` and `#DEFINE` — and writes the `.PRG` that
-GPC compiles. Every `.INC.BL` and `.EXP.BL` in this folder is BASLOAD source.
+`GPB.HELP.PRG` is this reference, on the machine. It reads `HELP-TXT/` beside it — `GPB.HELP.IDX`
+and one `.HLP` per topic — and shows 49 topics at 80x30. Arrows, `PgUp` / `PgDn`, `HOME` and `END`
+move. `RETURN` opens the highlighted index row. `/` finds and `N` repeats the search. `L` follows a
+topic's cross references, `X` writes its code out as a `.BL` where it has any, `T` cycles the colour
+themes, `?` is the about box. `ESC` goes back a step, and quits from the index.
 
 ---
 
