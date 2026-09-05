@@ -1,13 +1,23 @@
 ---
 name: stash-leaves-its-bank-selected
-description: "STASH.SAVE and STASH.RESTORE each do BANK STASH.BANK, so anything reading banked data after one must re-select its own bank"
+description: "FIXED 2026-09-05 -- STASH now restores the caller's bank. What it looked like before, and why the symptom named the wrong routine"
 metadata:
   type: reference
 ---
 
-**`STASH.SAVE` and `STASH.RESTORE` both do `BANK STASH.BANK` internally**, and neither puts back
-what was selected. Any `PEEK` after a STASH call reads the STASH BUFFER unless the caller selects
-its own bank again.
+**FIXED 05/09/26. `STASH.SAVE` and `STASH.RESTORE` now leave by one exit, `STASH.DONE`, which puts
+the caller's bank back.** `STASH.BANK.HOLD` captures it first, and it has to be a GP.ASM blob
+because BASIC cannot see the register -- `PEEK` selects and restores around every access, so
+`PEEK(0)` reads back whatever `BANK` last set rather than what the hardware holds.
+
+The second reason it had to be fixed, and the one that forced it: banked p-code is FETCHED from
+`$A000`, so a `STASH` followed by a call into a `GP.BANKED` region fetched the next instruction out
+of the stash bank. A silent hang, nowhere near the STASH. `testing/BANKV.BASL` is that program --
+against the old module it prints `V2 BANK AFTER STASH 8` and stops. See
+[[gp-banked-region-relocation]].
+
+**What it did before**, and worth keeping because the symptom named the wrong routine: any `PEEK`
+after a STASH call read the STASH BUFFER unless the caller selected its own bank again.
 
 **What it looks like:** text read from a bank after a STASH slide comes out with a junk glyph
 between every character -- `#G#U#I#.#Y#N#` for `GUI.YN`. Those are the cell ATTRIBUTE bytes: the

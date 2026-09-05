@@ -59,7 +59,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [String blocks never shrink](gpc-string-blocks-never-shrink.md) — a big temporary must not be built; freeing it is not a thing
 - [Banking strings: length, not count](banking-strings-scales-with-length.md) — the menus broke even at 249 saved vs 245 spent
 - [BANK, not POKE 0](gpc-bank-statement-not-poke-zero.md) — PEEK/POKE restore the bank around every access, so POKE 0 can never select one
-- [STASH leaves its bank selected](stash-leaves-its-bank-selected.md) — PEEK after a slide reads the stash buffer; looks like scroll corruption
+- [STASH leaves its bank selected — FIXED](stash-leaves-its-bank-selected.md) — it now restores the caller's bank; what the symptom looked like, and why it named the wrong routine
 
 ## The editor sample
 - [Editor branch state, GUI next](gpc-editor-branch-and-gui-next.md) — the self-check lines to keep green

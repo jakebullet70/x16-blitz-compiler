@@ -1,0 +1,42 @@
+#SAVEAS "@:BANKV.SRC.PRG"
+#REM 0
+#SYMFILE "@:BANKV.SRC.SYM"
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "STASH.INC.BL"
+
+## STASH used to leave ITS bank selected, so a STASH followed by a call into
+## GP.BANKED code fetched the next instruction out of the stash bank.  Before the
+## fix this printed V2 BANK AFTER STASH 8 and then hung at GOSUB BK.IN.
+
+BK.B% = 0
+STASH.BANK = 8
+STASH.X = 0 : STASH.Y = 0 : STASH.W = 4 : STASH.H = 2
+
+PRINT "V1 START"
+GOSUB STASH.SAVE
+GOSUB BK.READBANK
+PRINT "V2 BANK AFTER STASH";BK.B%
+GOSUB BK.IN
+GOSUB STASH.RESTORE
+GOSUB BK.READBANK
+PRINT "V5 BANK AFTER RESTORE";BK.B%
+PRINT "V6 DONE"
+END
+
+BK.READBANK:
+    #REM 1
+    GP.ASM
+    REM LDA $00
+    REM STA {BK.B%}
+    REM LDX #1
+    REM LDA #0
+    REM STA {BK.B%},X
+    GP.ENDASM
+    #REM 0
+    RETURN
+
+GP.BANKED 5
+BK.IN:
+    PRINT "V3 IN BANK, V4 STILL ALIVE"
+    RETURN
+GP.ENDBANKED

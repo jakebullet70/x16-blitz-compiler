@@ -9,9 +9,9 @@
 ## **  kept separate so a program wanting only the bank does not carry the disk half --
 ## **  a BASL module has no dead code elimination, and those three routines are 127 bytes.
 ## **
-## **  This is what GP.STASH and GP.RESTR were, moved out of the all-or-nothing GP block
-## **  into GP.ASM: 329 bytes carried by every program that never stashed anything.
-## **  GP.MENU went the same way in August and became MENUVERT.INC.BL.
+## **  A MODULE, NOT A RUNTIME KEYWORD, so it costs its bytes only in the programs that
+## **  ask for it: as a keyword it would be 329 bytes carried by every program that never
+## **  stashed anything.
 ## **
 ## **  YOUR PROGRAM MUST HAVE A #SYMFILE. The assembly reaches BASIC's variables through
 ## **  {VAR} and BASLOAD crunches every name first -- STASH.VADDR% is some two-letter
@@ -90,14 +90,15 @@ GOTO STASH.MODULE.END
 ## ***********************************************************************
 
 STASH.SAVE:
+    GOSUB STASH.BANK.HOLD
     STASH.MODE = 0 : GOSUB STASH.SETUP
-    IF STASH.OK = 0 THEN RETURN
+    IF STASH.OK = 0 THEN GOTO STASH.DONE
 
 ## ---- the header first, so RESTORE needs only the bank ----
     BANK STASH.BANK : POKE STASH.WINDOW, STASH.W : POKE STASH.WINDOW + 1, STASH.H
     POKE STASH.WINDOW + 2, STASH.X : POKE STASH.WINDOW + 3, STASH.Y
     GOSUB STASH.WALK
-    RETURN
+    GOTO STASH.DONE
 
 ## ***********************************************************************
 ## **  STASH.RESTORE -- the bank back onto the screen.
@@ -108,13 +109,53 @@ STASH.SAVE:
 ## ***********************************************************************
 
 STASH.RESTORE:
+    GOSUB STASH.BANK.HOLD
     BANK STASH.BANK
     STASH.W = PEEK(STASH.WINDOW) :  STASH.H = PEEK(STASH.WINDOW + 1)
     IF STASH.MOVE <> 0 THEN GOTO STASH.RESTORE.GO
     STASH.X = PEEK(STASH.WINDOW + 2) : STASH.Y = PEEK(STASH.WINDOW + 3)
 STASH.RESTORE.GO:
-    STASH.MODE = 1  : GOSUB STASH.SETUP : IF STASH.OK = 0 THEN RETURN
+    STASH.MODE = 1  : GOSUB STASH.SETUP
+    IF STASH.OK = 0 THEN GOTO STASH.DONE
     BANK STASH.BANK : GOSUB STASH.WALK
+
+## ***********************************************************************
+## **  STASH.DONE -- the one exit both entry points leave by.
+## **
+## **  PUTS THE CALLER'S BANK BACK, and that is not tidiness. BANK writes
+## **  the hardware register and leaves it there, so a STASH followed by a
+## **  call into GP.BANKED code would fetch the next instruction out of
+## **  the stash bank -- a silent hang, nowhere near the STASH. It also
+## **  ends the older surprise where a PEEK after a STASH read the stash
+## **  buffer and looked like screen corruption.
+## **
+## **  ONE EXIT is what makes it reliable: both entry points can fail
+## **  early, and each of those used to be a bare RETURN that skipped
+## **  whatever came after it.
+## ***********************************************************************
+
+STASH.DONE:
+    BANK STASH.WAS%
+    RETURN
+
+## ***********************************************************************
+## **  STASH.BANK.HOLD -- remember the bank the caller had selected.
+## **
+## **  A BLOB, because BASIC cannot see the register: PEEK selects and
+## **  restores around every access, so PEEK(0) reads back whatever BANK
+## **  last set rather than what the hardware holds.
+## ***********************************************************************
+
+STASH.BANK.HOLD:
+    #REM 1
+    GP.ASM
+    REM LDA $00
+    REM STA {STASH.WAS%}
+    REM LDX #1
+    REM LDA #0
+    REM STA {STASH.WAS%},X
+    GP.ENDASM
+    #REM 0
     RETURN
 
 ## ***********************************************************************

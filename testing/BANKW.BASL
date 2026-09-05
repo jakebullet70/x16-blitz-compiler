@@ -1,0 +1,39 @@
+#SAVEAS "@:BANKW.SRC.PRG"
+#REM 0
+#SYMFILE "@:BANKW.SRC.SYM"
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "STASH.INC.BL"
+
+## The FAILURE path, which the restructure moved: STASH.RESTORE's early exit
+## happens AFTER its BANK, so it has to leave by STASH.DONE like the good path.
+## Bank 9 was never written, so the header it reads is garbage and SETUP refuses it.
+
+BK.B% = 0
+STASH.BANK = 9
+STASH.MOVE = 0
+
+PRINT "W1 START"
+GOSUB STASH.RESTORE
+GOSUB BK.READBANK
+PRINT "W2 BANK AFTER A REFUSED RESTORE";BK.B%
+GOSUB BK.IN
+PRINT "W4 DONE"
+END
+
+BK.READBANK:
+    #REM 1
+    GP.ASM
+    REM LDA $00
+    REM STA {BK.B%}
+    REM LDX #1
+    REM LDA #0
+    REM STA {BK.B%},X
+    GP.ENDASM
+    #REM 0
+    RETURN
+
+GP.BANKED 5
+BK.IN:
+    PRINT "W3 IN BANK"
+    RETURN
+GP.ENDBANKED
