@@ -8,8 +8,9 @@
 =THEME.INC.BL
 .
 .  in
-.      THEME.DARK -- 0 light, non-zero dark, read by THEME.LOAD<br>THEME.ATTR
-.        -- a packed attribute, for THEME.SET and THEME.HI
+.      THEME.ID -- 0 classic, 1 dark, 2 light, read by
+.        THEME.LOAD<br>THEME.ATTR -- a packed attribute, for THEME.SET and
+.        THEME.HI
 .
 .  out
 .      THEME.CLR(role) -- the colour array, DIMmed to
@@ -20,7 +21,7 @@
 .
 .  constants
 .      THEME.PAGE THEME.TEXT THEME.TITLE THEME.BORDER THEME.HILITE
-.        THEME.DIMMED THEME.WARN THEME.SLOTS
+.        THEME.DIMMED THEME.WARN THEME.SLOTS THEME.COUNT
 .
 .THEME.CLR is the array this module DIMs. Do not DIM it yourself -- the
 .module owns it, and DIMming an array GPC has already dimensioned is an

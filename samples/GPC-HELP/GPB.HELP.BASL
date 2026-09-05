@@ -28,20 +28,24 @@
 ## CP437 (charset 7) with bit 6 of $0372 set, 80x30. Labels and variables are
 ## both HELP.*: BASL files them in one symbol table.
 ##
-## NO #AUTONUM -- with STRCASE.INC.BL it resolves label targets against the
-## wrong step and the compile stops with UNKNOWN LINE NUMBER.
+## NO #AUTONUM. The directive sets the STEP between generated line numbers,
+## not whether lines are numbered, and the default step of 1 is the only one
+## STRCASE.INC.BL survives: at any other step its label jumps resolve to lines
+## that were never generated and GPC stops with UNKNOWN LINE NUMBER.
 ##
 ## The design and the measurements behind it are in readme.md.
 ## ============================================================================
 
-## 95 rows today, so this leaves twenty-five spare; rows past the end are
-## dropped. A row costs ten bytes of workspace used or not, plus its own text on
-## the heap. The self-check build is the one that cannot afford the headroom.
-#DEFINE HELP.MAXIX 120
+## 99 rows today, so this leaves six spare; rows past the end are dropped. A row
+## costs ten bytes of workspace used or not, plus its own text on the heap, and
+## the heap is what runs out first: FREE is 10,496 against a 4,096 floor and the
+## index is about 5,400 of what is left. Raise this only with a FREE figure in
+## hand.
+#DEFINE HELP.MAXIX 105
 
 ## Cross references in one topic, and the deepest chain of them ESC can walk
 ## back along. Twelve is what MKHELP.PY emits at most.
-#DEFINE HELP.MAXPICK 24
+#DEFINE HELP.MAXPICK 20
 #DEFINE HELP.MAXBACK 12
 
 ## A spare RAM bank for the cells a dialog covers. Bank 0 is the KERNAL's --
@@ -168,13 +172,7 @@ HELP.BOOT:
     HELP.VIEW = HELP.ROWS - 2
     IF HELP.VIEW < 4 THEN HELP.VIEW = 4
 
-    THEME.DARK = 1 : GOSUB THEME.LOAD
-
-    ## THE TWO BARS ARE REVERSED. THEME.HI trades an attribute's nibbles, which is
-    ## what turns white-on-black text into a black-on-white bar. Worked out once
-    ## here because they are painted on every page turn.
-    THEME.ATTR = THEME.CLR(THEME.TITLE)  : GOSUB THEME.HI : HELP.BAR.TOP = THEME.INV
-    THEME.ATTR = THEME.CLR(THEME.DIMMED) : GOSUB THEME.HI : HELP.BAR.BOT = THEME.INV
+    THEME.ID = 1 : GOSUB HELP.THEME.SET
 
     ## CP437, then declare that the text is ASCII. The order matters:
     ## screen_set_charset does NOT clear bit 6, so the charset goes first and
@@ -333,6 +331,8 @@ HELP.INDEX.LOOP:
             GOSUB HELP.FIND.ASK
         GP.CASE 78, 110
             GOSUB HELP.FIND.NEXT
+        GP.CASE 84, 116
+            GOSUB HELP.THEME.NEXT : HELP.FULL = 1
         GP.CASE 63, 72, 104
             GOSUB HELP.ABOUT
         GP.CASE GUI.RETURN
@@ -405,7 +405,7 @@ HELP.INDEX.ROW:
     RETURN
 
 HELP.INDEX.STATUS:
-    HELP.HINT$ = "ENTER open   / find   N next   ? about   ESC quit"
+    HELP.HINT$ = "ENTER open   / find   N next   T theme   ? about   ESC quit"
     HELP.NUMV = HELP.IX.SEL : GOSUB HELP.NUMSTR
     HELP.NOTE$ = HELP.NUM$
     HELP.NUMV = HELP.IX.N : GOSUB HELP.NUMSTR
@@ -526,6 +526,12 @@ HELP.PAGE.LOOP:
         ## footer advertises L, not RETURN.
         GP.CASE 76, 108
             GOSUB HELP.LINKS
+        GP.CASE 84, 116
+            ## THE FRAME TOO. A topic page never paints one -- it inherits the
+            ## index's -- and the title and status text start at column 1, so
+            ## the three corner cells they never cover would keep the colours
+            ## of the theme before this one.
+            GOSUB HELP.THEME.NEXT : GOSUB HELP.PAGE.FRAME : HELP.REDRAW = 1
         GP.CASE 88, 120
             GOSUB HELP.EXPORT
         GP.CASE GUI.ESCAPE, GUI.STOP
@@ -873,7 +879,7 @@ HELP.PAGE.ROW:
 ## Only what this topic can actually do. A topic with no ":" lines has nothing
 ## to export, and offering it was a key that answered with an error box.
 HELP.PAGE.STATUS:
-    HELP.HINT$ = "ESC back"
+    HELP.HINT$ = "T theme   ESC back"
     IF HELP.HASCODE <> 0 THEN HELP.HINT$ = "X export code   " + HELP.HINT$
     IF HELP.LINKN > 0 THEN HELP.HINT$ = "L links   " + HELP.HINT$
     HELP.NUMV = HELP.PG.FROM + 1 : GOSUB HELP.NUMSTR
@@ -1056,6 +1062,23 @@ HELP.ASKQUIT:
     HELP.DONE = 0
     IF GUI.ANSWER = 1 THEN HELP.DONE = 1
     HELP.FULL = 1
+    RETURN
+
+## THE TWO BARS ARE REVERSED. THEME.HI trades an attribute's nibbles, which is
+## what turns white-on-black text into a black-on-white bar. They are worked out
+## on a theme change rather than at every page turn, so every theme change has to
+## come back through here or the bars keep the colours of the one before.
+##
+## THEME.NEXT wraps at THEME.COUNT, so T cycles CLASSIC, DARK, LIGHT.
+HELP.THEME.NEXT:
+    GOSUB THEME.NEXT
+    GOTO HELP.THEME.BARS
+
+HELP.THEME.SET:
+    GOSUB THEME.LOAD
+HELP.THEME.BARS:
+    THEME.ATTR = THEME.CLR(THEME.TITLE)  : GOSUB THEME.HI : HELP.BAR.TOP = THEME.INV
+    THEME.ATTR = THEME.CLR(THEME.DIMMED) : GOSUB THEME.HI : HELP.BAR.BOT = THEME.INV
     RETURN
 
 ## ============================================================================

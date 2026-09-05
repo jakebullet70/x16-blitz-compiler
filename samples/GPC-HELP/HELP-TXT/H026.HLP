@@ -10,8 +10,12 @@
 =DESCRIPTION
 .
 .  THEME.LOAD
-.      IN: THEME.DARK (0 light, non-zero dark)
+.      IN: THEME.ID
 .      OUT: fills THEME.CLR()
+.
+.  THEME.NEXT
+.      IN: THEME.ID
+.      OUT: the following theme, loaded
 .
 .  THEME.SET
 .      IN: THEME.ATTR
@@ -21,10 +25,28 @@
 .      IN: THEME.ATTR
 .      OUT: THEME.INV, the inverse attribute
 .
+.Three themes, THEME.COUNT of them:
+.
+.  0
+.      CLASSIC
+.      blue page, white text, yellow headings. The default
+.
+.  1
+.      DARK
+.      black page, light grey text
+.
+.  2
+.      LIGHT
+.      white page, black text
+.
+.THEME.NEXT moves to the following one and wraps, which is what a program
+.binds to a key. A cached attribute does not follow it: work out anything
+.derived from THEME.CLR(), a reversed bar included, after every load.
+.
 .Roles, for indexing THEME.CLR(): THEME.PAGE THEME.TEXT THEME.TITLE
 .THEME.BORDER THEME.HILITE THEME.DIMMED THEME.WARN, and THEME.SLOTS = 7.
 .
-:THEME.DARK = 1 : GOSUB THEME.LOAD
+:THEME.ID = 1 : GOSUB THEME.LOAD
 :GP.BOX 4,2,30,8, 2, THEME.CLR(THEME.BORDER)
 :GP.PRINTAT 6,3, "TITLE", THEME.CLR(THEME.TITLE)
 .

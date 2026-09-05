@@ -46,7 +46,6 @@ Including throwaway test files. BASLOAD does **not** derive the output name from
 
 ```
 #SAVEAS "@:NAME.PRG"
-#AUTONUM 1
 #REM 0
 #SYMFILE "@:NAME.SYM"
 ```
@@ -58,7 +57,9 @@ Including throwaway test files. BASLOAD does **not** derive the output name from
   prints an empty `OUT:`, and falls out to BASIC with a **`?STRING TOO LONG ERROR` that names
   neither the file nor the cause**. The real message is two lines above the BASIC error in
   `CMP.LOG`.
-- **`#AUTONUM` with a step other than 1 is a trap** — see below. Leave it at 1 or leave it out.
+- **Do not write `#AUTONUM`.** It sets the step between generated line numbers, not whether lines
+  are numbered — BASLOAD numbers them regardless — and the default step of 1 is the only one that
+  works with the library. See below.
 
 ---
 
@@ -99,12 +100,18 @@ Nine are in use across the tree: `#SAVEAS`, `#AUTONUM`, `#REM`, `#SYMFILE`, `#IN
 
 ### `#AUTONUM`
 
+- **It sets the step between generated line numbers, nothing more.** BASLOAD auto-numbers whether
+  or not the directive is present; the default step is 1. With step 1 a line's number and its
+  ordinal position coincide, which is why the bug below only shows up above 1.
 - **`#AUTONUM 5` plus `#INCLUDE "STRCASE.INC.BL"` makes GPC stop with `UNKNOWN LINE NUMBER @ 129`.**
   129 is not a multiple of 5 — it is a line that **cannot exist** — so the temptation is to hunt for
   a bad `GOTO` in your own code. There is none. BASLOAD resolves the module's label targets against
   the wrong step, and `STRCASE`'s `GOTO STRCASE.MODULE.END` over its own body is what lands wrong.
-- The directive is not broken alone: `GPC.BASL` uses `#AUTONUM 5` with only `GPB.INC.BL`. **Step 1
-  is fine; when in doubt leave it out.**
+- **The error belongs to GPC, not BASLOAD** — `ErrorV_line` in `bin/common.library`. The tokenise
+  succeeds; the bad `GOTO` target is refused a step later, so it lands in `CMP.LOG`, not `TOK.LOG`.
+- The directive is not broken alone: `GPC.BASL` uses `#AUTONUM 5` with only `GPB.INC.BL`. **Leave
+  it out of anything that includes the library.** The default step of 1 is the one that works, and
+  a directive that can only be written one way is a directive not worth writing.
 
 ### `#REM`
 

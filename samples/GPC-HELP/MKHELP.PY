@@ -83,6 +83,7 @@ CATS = [
     ("mods",    "BASL MODULES"),
     ("globals", "GLOBALS AND NAMING"),
     ("traps",   "THE TRAPS"),
+    ("memory",  "MEMORY AND LIMITS"),
 ]
 
 # Modules whose only documentation is their own banner header -- everything in
@@ -370,7 +371,8 @@ class Topic(object):
     def __init__(self, cat, key, title):
         self.cat = cat
         self.key = key            # "3.4", "GUI.INC.BL", "G1" ...
-        self.title = title        # what the index shows
+        self.title = title        # what a cross reference shows
+        self.short = ""           # what the INDEX shows, when shorter
         self.lines = []
         self.secs = []
         self.md = []
@@ -477,7 +479,7 @@ def build_manual(src, tiers):
 
     # Which top level section a heading belongs to, and therefore which file.
     top_of = {"1": "start", "2": "start", "3": "core",
-              "4": "mods", "5": "globals", "6": "traps"}
+              "4": "mods", "5": "globals", "6": "traps", "7": "memory"}
 
     i = 0
     while i < len(secs):
@@ -627,7 +629,8 @@ def manual_split(cat, group, tiers, top):
             # The bar carries the number and the keyword, not the gloss after
             # the dash: uppercased it shouts, and the reader opening the page
             # has just read it on the row they pressed RETURN on.
-            ee.header(et.title.split(" -- ")[0].upper())
+            et.short = et.title.split(" -- ")[0]
+            ee.header(et.short.upper())
             for kind, payload in blocks(sub[3]):
                 emit_block(ee, kind, payload)
             emd = [sub[2]] + sub[3]
@@ -959,7 +962,11 @@ def build_index(files, topics, nosections=False):
         for t in files[cat]:
             n = len(t.lines)
             t.ordinal = len(rows) + 1
-            rows.append(["T", t.number, 0, n, fit("  " + t.title)])
+            # THE INDEX IS THE ONE THING THE VIEWER KEEPS RESIDENT, at about 1.67
+            # bytes a character, so an entry gives it the number and the keyword
+            # and leaves the gloss to the cross reference, which is read off the
+            # topic file and costs the heap nothing.
+            rows.append(["T", t.number, 0, n, fit("  " + (t.short or t.title))])
             if nosections:
                 continue
             for sec_title, off in t.secs:

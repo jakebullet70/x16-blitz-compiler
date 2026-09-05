@@ -47,10 +47,9 @@ which holds only `GPC.BIN`.
 source name: with no `#SAVEAS "@:NAME.PRG"` it loads the file, writes NOTHING, and returns to
 `READY.` **without printing an error** — the log shows `LOADING...` then `READY.` and no banner,
 which reads exactly like a missing BASLOAD or a broken harness. Three cycles went into that on
-03/09/26 while debugging a five-line test file. Copy the four lines every real source starts with:
+03/09/26 while debugging a five-line test file. Copy the three lines every real source starts with:
 
     #SAVEAS "@:NAME.PRG"
-    #AUTONUM 1
     #REM 0
     #SYMFILE "@:NAME.SYM"
 

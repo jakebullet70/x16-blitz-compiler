@@ -64,6 +64,8 @@ python samples/GPC-HELP/MKHELP.PY
   - [6. Regenerating this](#6-regenerating-this)
 - **THE TRAPS**
   - [6. The traps, collected](#6-the-traps-collected)
+- **MEMORY AND LIMITS**
+  - [7. Memory, and what the compiler tells you](#7-memory-and-what-the-compiler-tells-you)
 
 ---
 
@@ -1001,15 +1003,28 @@ anywhere, including the top of the program.
 
 | Routine | in | out |
 |---|---|---|
-| `THEME.LOAD` | `THEME.DARK` (0 light, non-zero dark) | fills `THEME.CLR()` |
+| `THEME.LOAD` | `THEME.ID` | fills `THEME.CLR()` |
+| `THEME.NEXT` | `THEME.ID` | the following theme, loaded |
 | `THEME.SET` | `THEME.ATTR` | issues `COLOR` — makes it the colour `PRINT` uses |
 | `THEME.HI` | `THEME.ATTR` | `THEME.INV`, the inverse attribute |
+
+Three themes, `THEME.COUNT` of them:
+
+| `THEME.ID` | | |
+|---:|---|---|
+| 0 | `CLASSIC` | blue page, white text, yellow headings. The default |
+| 1 | `DARK` | black page, light grey text |
+| 2 | `LIGHT` | white page, black text |
+
+`THEME.NEXT` moves to the following one and wraps, which is what a program binds to a key. A cached
+attribute does not follow it: work out anything derived from `THEME.CLR()`, a reversed bar included,
+after every load.
 
 Roles, for indexing `THEME.CLR()`: `THEME.PAGE` `THEME.TEXT` `THEME.TITLE` `THEME.BORDER`
 `THEME.HILITE` `THEME.DIMMED` `THEME.WARN`, and `THEME.SLOTS` = 7.
 
 ```basic
-THEME.DARK = 1 : GOSUB THEME.LOAD
+THEME.ID = 1 : GOSUB THEME.LOAD
 GP.BOX 4,2,30,8, 2, THEME.CLR(THEME.BORDER)
 GP.PRINTAT 6,3, "TITLE", THEME.CLR(THEME.TITLE)
 ```
@@ -1458,7 +1473,7 @@ catch an off-by-one write into the neighbouring block.
   stops BASLOAD with LABEL NOT FOUND rather than compiling a smaller program.
 
   Usage, the whole of it:
-      THEME.DARK = 0 : GOSUB THEME.LOAD
+      THEME.ID = 0 : GOSUB THEME.LOAD
       GUI.BANK = 8
       GUI.MSG$ = "Delete the file?"
       GOSUB GUI.YN
@@ -1921,10 +1936,10 @@ read, do not write, do not rely on).
 
 | | |
 |---|---|
-| in | `THEME.DARK` — 0 light, non-zero dark, read by `THEME.LOAD`<br>`THEME.ATTR` — a packed attribute, for `THEME.SET` and `THEME.HI` |
+| in | `THEME.ID` — 0 classic, 1 dark, 2 light, read by `THEME.LOAD`<br>`THEME.ATTR` — a packed attribute, for `THEME.SET` and `THEME.HI` |
 | out | `THEME.CLR(role)` — the colour array, `DIM`med to `THEME.SLOTS`<br>`THEME.INV` — the inverse attribute, from `THEME.HI` |
 | internal | `THEME.READY` |
-| constants | `THEME.PAGE` `THEME.TEXT` `THEME.TITLE` `THEME.BORDER` `THEME.HILITE` `THEME.DIMMED` `THEME.WARN` `THEME.SLOTS` |
+| constants | `THEME.PAGE` `THEME.TEXT` `THEME.TITLE` `THEME.BORDER` `THEME.HILITE` `THEME.DIMMED` `THEME.WARN` `THEME.SLOTS` `THEME.COUNT` |
 
 `THEME.CLR` is the array this module `DIM`s. Do not `DIM` it yourself — the module owns it, and
 `DIM`ming an array GPC has already dimensioned is an error.
@@ -2116,5 +2131,75 @@ Each of these has cost a debugging session at least once.
 | `#DEFINE X 129536` | `#DEFINE` takes an INT16 — `ERROR: INVALID PARAMETER` | an ordinary variable |
 | a variable called `LEN`, `ST`, `POS`, `MB` or `CHAR` | the name is a reserved word on its own | dot it — BASLOAD matches the whole identifier, so `LINEINPUT.LEN` works |
 
+---
+
+
 *See also: 4.7 SORT.INC.BL -- shell sort a string array*
+
+---
+
+# MEMORY AND LIMITS
+
+## 7. Memory, and what the compiler tells you
+
+#### 7. Memory, and what the compiler tells you
+
+##### The line GPC prints when it finishes
+
+```
+OK CODE 10734 FREE 10496 RT 13311 GP-BASIC IN
+OK CODE 1234 FREE 19200 RT SHARED RT
+```
+
+| | |
+|---|---|
+| `CODE` | the p-code. What the program *is*, in bytes |
+| `FREE` | what is left above it for variables, strings and arrays. **This is the number that runs out.** It already excludes the 4K frame stack, which is reserved rather than available |
+| `RT` | the runtime bytes carried inside the object, or `SHARED` when the program loads `GPC.RT.nnn.BIN` at run time instead. `SHARED RC` asks for the core alone, `SHARED RT` for the core and the `GP.` handlers |
+| `GP-BASIC` | embedded builds only. `IN` if a `GP.` keyword reached the 1,024-byte handler block and it had to go in the object, `OUT` if `ScanGPUsage` dropped it |
+
+Two different budgets come off one figure, so read it twice:
+
+- **`FREE` is the workspace** the running program has for its data.
+- **`FREE` minus 4,096 is how much more p-code will fit.** `WriteObjectCode` refuses to leave less
+  than 4K of workspace, so a build reporting `FREE 4096` is one page from `PROGRAM TOO BIG`.
+
+A program can be comfortable on one and out of room on the other. `CODE 17406 FREE 4096` has 4K to
+run in and nowhere left to grow; `CODE 10734 FREE 10496` has both.
+
+##### `OUT OF MEMORY`
+
+Everything the program allocates comes out of the one `FREE` pool: scalars, arrays, and the string
+heap. There is no separate heap to run out of.
+
+- **A `DIM` costs its full size whether the entries are used or not.** `DIM A$(120)` is 121 string
+  slots from the moment it runs. Five arrays dimensioned to the same 120 is 1,210 bytes gone before
+  a single row exists.
+- **A string block never shrinks.** Assigning a shorter string to a variable that already holds a
+  longer one reuses the block it has; assigning a longer one allocates a new block and abandons the
+  old. The abandoned blocks are reclaimed by the heap scavenger when one of the right size is
+  wanted again, not immediately.
+- **What fails is therefore a high-water mark, not a total.** The allocation that raises
+  `OUT OF MEMORY` is rarely the large one — it is an ordinary one that arrives after the heap has
+  been churned. The same key on the same screen can work or not depending on what was visited
+  first, which is what makes it read as intermittent.
+
+The error itself comes from the runtime library and names an address in it, not a line in your
+program: `OUT OF MEMORY @ $03A5 library`. It tells you the allocator refused, and nothing about
+which of your strings was asking.
+
+##### Staying inside it
+
+- **Quote `FREE` when you change anything.** It is one line of build output and it is the only
+  early warning; `PROGRAM TOO BIG` arrives once it is already too late.
+- **Size a `DIM` to what is used, not to a round number.** The cost is paid on the first line of
+  the program, forever.
+- **Put bulk in a RAM bank.** A bank is 8,192 bytes that cost the workspace nothing. Anything held
+  from start to finish and read a row at a time — a file's worth of text, a table, a screen — is
+  better in a bank with an offset table at the front, read back with `PEEK` under `BANK`. See §4.5
+  and `STASH.INC.BL` for the pattern.
+- **A big temporary cannot be built and then freed.** Freeing is not a thing that happens on
+  demand: build it in a bank, or in pieces.
+
+*See also: 4.5 BMX.INC.BL -- a BMX bitmap into VERA, STASH.INC.BL -- save a text rectangle, and put it back.*
 

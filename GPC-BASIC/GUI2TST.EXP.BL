@@ -36,7 +36,7 @@
 
 CLS
 COLOR 1,0
-THEME.DARK = 0 : GOSUB THEME.LOAD
+THEME.ID = 0 : GOSUB THEME.LOAD
 
 ## ---- twenty items, a five row window: every case below needs a list longer
 ## ---- than the box, because that is the thing GUI.MENU cannot do.

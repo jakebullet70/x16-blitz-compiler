@@ -87,10 +87,12 @@ python source\gpc\compile_shared.py --embedded GPB.HELP.SRC.PRG GPB.HELP.PRG
 ```
 
 then copy `GPB.HELP.PRG` back here. **EMBEDDED, not shared**, so this directory stands on its own
-without a `GPB.RT.nnn.BIN` whose name carries a build number. 23,563 bytes.
+without a `GPB.RT.nnn.BIN` whose name carries a build number. 23,772 bytes.
 
-**No `#AUTONUM`.** With `STRCASE.INC.BL` included it resolves label targets against the wrong step
-and the compile stops with `UNKNOWN LINE NUMBER`.
+**No `#AUTONUM`.** The directive sets the *step* between generated line numbers, not whether lines
+are numbered, and the default step of 1 is the only one `STRCASE.INC.BL` survives. At any other step
+its label jumps resolve to lines that were never generated: BASLOAD tokenises happily and GPC stops
+with `UNKNOWN LINE NUMBER`.
 
 ## The decisions, and the measurements behind them
 

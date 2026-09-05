@@ -1894,8 +1894,8 @@ the file, and hands the machine over to the compiler.
 
 ### Two more themes, `x16` and `grey` — TODO
 
-`GPC-BASIC/THEME.INC.BL` ships exactly two palettes, selected by `THEME.DARK` (0 light, non-zero
-dark). Wanted: two more.
+`GPC-BASIC/THEME.INC.BL` ships three palettes, selected by `THEME.ID` (0 classic, 1 dark, 2 light),
+with `THEME.NEXT` to cycle them. `GPB.HELP` binds that to **T**. Wanted: two more.
 
 - **`x16`** — the machine's own look, the pair the KERNAL sets at power-on. **Read it out of `$0376`
   on a freshly booted R49 rather than typing what it looks like** — the candidates are `$61` (white
@@ -1908,9 +1908,9 @@ dark). Wanted: two more.
 
 Two things fall out of it:
 
-- **`THEME.DARK` stops being the right interface.** A flag cannot select one of four. Rename it
-  `THEME.ID` (0 light, 1 dark, 2 x16, 3 grey) and dispatch on it; every caller in the tree sets
-  `THEME.DARK` today and each one has to move. Nothing here needs backward compatibility.
+- **~~`THEME.DARK` stops being the right interface.~~ DONE.** It is `THEME.ID` and dispatches on
+  the number. 0 stayed the blue palette rather than becoming `light`, so no existing program changed
+  appearance; `light` is 2, and `x16` and `grey` take 3 and 4.
 - **Each palette is p-code in every program that includes the module**, used or not — seven straight
   assignments plus a branch, and dead code is not free here (see the module-level elimination item
   under *A MASTER COMPILER* below). Four palettes roughly doubles `THEME`'s 45 lines. If that reads

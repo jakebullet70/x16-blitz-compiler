@@ -29,8 +29,10 @@ REM
 REM Labels are CX.*, variables CR.* -- BASLOAD files both in one symbol table and
 REM a label that spells a variable is DUPLICATE SYMBOL.
 REM
-REM NO #AUTONUM. With STRCASE.INC.BL included it resolves label targets against
-REM the wrong step and the compile stops with UNKNOWN LINE NUMBER.
+REM NO #AUTONUM. The directive sets the STEP between generated line numbers,
+REM not whether lines are numbered, and the default step of 1 is the only one
+REM STRCASE.INC.BL survives: at any other step its label jumps resolve to
+REM lines that were never generated and GPC stops with UNKNOWN LINE NUMBER.
 REM ============================================================================
 
 CR.VER$ = "0.2"

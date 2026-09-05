@@ -21,7 +21,7 @@
 ## **      LINEINPUT.INC.BL    GUI.TEXT only
 ## **
 ## **  Usage, the whole of it:
-## **      THEME.DARK = 0 : GOSUB THEME.LOAD
+## **      THEME.ID = 0 : GOSUB THEME.LOAD
 ## **      GUI.BANK = 8
 ## **      GUI.MSG$ = "Delete the file?"
 ## **      GOSUB GUI.YN

@@ -44,7 +44,7 @@
 
 GOSUB APPSYS.STARTUP
 
-THEME.DARK = 0
+THEME.ID = 0
 GOSUB THEME.LOAD
 
 DIM MENUVERT.ITEM$(MENU.COUNT)
@@ -79,7 +79,7 @@ MENU.QUIT:
 
 ## ---- Drawing. Note there is no colour arithmetic anywhere: every colour
 ## ---- is a NAMED ROLE, so re-skinning the whole application is
-## ---- THEME.DARK = 1 and nothing else.
+## ---- THEME.ID = 1 and nothing else.
 
 MENU.DRAW:
     GP.FILL 0, 0, APPSYS.COLS, APPSYS.ROWS, ASC(" "), THEME.CLR(THEME.PAGE)

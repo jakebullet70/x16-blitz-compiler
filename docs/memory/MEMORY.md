@@ -77,7 +77,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 ## BASLOAD
 - [BASLOAD #DEFINE rejects digits](basload-define-rejects-digits.md) — GUI2.DEFS is INVALID PARAMETER but GUI2.SEL is fine; and no #INCLUDE is ever optional
 - [Labels and variables collide](basload-label-and-variable-collide.md) — DUPLICATE SYMBOL, and the $ does not separate FOO from FOO$
-- [#AUTONUM breaks STRCASE](basload-autonum-breaks-strcase.md) — it sets the STEP, not whether lines are numbered; keep the step at 1
+- [#AUTONUM breaks STRCASE](basload-autonum-breaks-strcase.md) — do not write it; it sets the STEP, and only the default 1 survives STRCASE
 
 ## X16 BASIC semantics (ROM-verified — apply to any compiler)
 - [IF semantics](gpc-if-semantics.md) — a false IF skips the WHOLE line, not just the first statement. Blitz gets this right.

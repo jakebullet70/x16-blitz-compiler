@@ -257,7 +257,7 @@ REM ============================================================================
 ED.THEME:
   REM THEME.LOAD owns the DIM: GPC rejects a second DIM of the same array even when only
   REM one can run (ARRAY REDEFINED), so call it and then overwrite the slots.
-  THEME.DARK = ED.DARK
+  THEME.ID = ED.DARK
   GOSUB THEME.LOAD
   IF ED.DARK <> 0 THEN GOTO ED.THEME.DARK
   THEME.CLR(THEME.PAGE)   = 15 * 16 + ED.BLK : REM black on light grey -- unused: the dropdown is TEXT

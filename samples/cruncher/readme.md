@@ -124,8 +124,10 @@ then copy `CRUNCH.PRG` and `CRUNCH.BIN` back here. **EMBEDDED, not shared**, so 
 stands on its own without a `GPB.RT.nnn.BIN` whose name carries a build number. Shared they are
 1,990 and 4,657 bytes; the p-code is what that second pair measures.
 
-**No `#AUTONUM`.** With `STRCASE.INC.BL` included it resolves label targets against the wrong step
-and the compile stops with `UNKNOWN LINE NUMBER`.
+**No `#AUTONUM`.** The directive sets the *step* between generated line numbers, not whether lines
+are numbered, and the default step of 1 is the only one `STRCASE.INC.BL` survives. At any other step
+its label jumps resolve to lines that were never generated: BASLOAD tokenises happily and GPC stops
+with `UNKNOWN LINE NUMBER`.
 
 ## How it is tested
 
