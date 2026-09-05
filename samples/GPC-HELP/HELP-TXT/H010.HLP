@@ -16,14 +16,14 @@
 .
 =DESCRIPTION
 .
-.Counted loop, modelled on prog8's repeat. Count 0 or omitted loops forever.
-.Nesting works.
+.Counted loop, modelled on prog8's repeat. A count of 0, or no count, loops
+.forever. Loops nest.
 .
 :GP.EXITDO
 .
-.Leave the innermost GP.DO early, closing its stack frame on the way. This is
-.the leak-free exit -- a GOTO out of a GP.DO abandons the frame, and the
-.frames do not get reclaimed.
+.Leaves the innermost GP.DO, closing its stack frame. A GOTO out of a GP.DO
+.closes its frames too -- see SEC 3.2 -- but GP.EXITDO is two bytes and needs
+.no branch target.
 .
 :GP.DO
 :  TICK = TICK + 1
@@ -33,3 +33,7 @@
 =EXAMPLE PROGRAM
 .
 .  LOOPS.EXP.BL -- runnable, in the GPC-BASIC folder
+.
+=SEE ALSO
+.
+>18|3.2 Multi-way branch

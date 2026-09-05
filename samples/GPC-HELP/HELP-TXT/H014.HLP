@@ -14,18 +14,17 @@
 .
 =DESCRIPTION
 .
-.  | Sorting is SORT.INC.BL (SEC 4.7), not a keyword: 408 bytes of the GP
-.  | block, which is all or nothing, carried by every program that never
-.  | sorted anything. GP.ARRPTR is here because the module is built on it --
-.  | a BASL subroutine cannot be handed an array, so an address is the only
-.  | interface there is.
+.Sorting is SORT.INC.BL (SEC 4.7) rather than a keyword: 408 bytes of the
+.all-or-nothing GP block, carried by every program whether or not it sorts.
+.GP.ARRPTR is a keyword because the module needs it -- a BASL subroutine
+.cannot be passed an array, so an address is the only interface.
 .
-.GP.ARRPTR returns the address of element zero -- the header is already
-.skipped -- so machine code reached by GP.CALL can work on the array in bulk.
-.Stride is yours to add: 2 bytes per element for a string array (each element
-.is a pointer to the string's block -- follow it, and see GP.STRPTR for the
-.layout), 6 for a numeric one. Multi-dimensional arrays are rejected, and
-.GP.ARRPTR(A(3)) is a syntax error -- add 3*2 or 3*6 yourself.
+.GP.ARRPTR returns the address of element zero; the header is already
+.skipped. Machine code called through GP.CALL can then work on the array in
+.bulk. Add the stride yourself: 2 bytes per element for a string array (each
+.element is a pointer to the string block -- see GP.STRPTR for its layout), 6
+.for a numeric array. Multi-dimensional arrays are rejected, and
+.GP.ARRPTR(A(3)) is a syntax error; write 3*2 or 3*6 into the address.
 .
 =EXAMPLE PROGRAM
 .

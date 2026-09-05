@@ -1,38 +1,31 @@
 @4.6 MENUVERT.INC.BL -- a vertical menu (2)
-.hotkey still works. Only rows in the normal attribute are tinted: on the
-.selected row the highlight is the message, and a second colour inside the
-.bar is noise.
-.
-.  | The caller owns the DIM, deliberately. A module cannot be handed an
-.  | array in BASIC, so it has to name one -- and if it DIMmed that array
-.  | itself it would have to guess a bound, then fail on the caller who
-.  | wanted more. Leave MENUVERT.ITEM$ undimensioned and GPC's implicit DIM
-.  | gives you 0..10, a ten-row menu for free; DIM it yourself for more. What
-.  | you must not do is both.
+.The caller owns the DIM. A module cannot be passed an array in BASIC, so it
+.names one; DIMming it inside the module would fix a bound and then fail for
+.a caller who wanted more rows. Leave MENUVERT.ITEM$ undimensioned and GPC's
+.implicit DIM gives 0..10, a ten-row menu. DIM it yourself for more. Do not
+.do both.
 .
 =The gamepad flag
 .
 .With flag 8, up and down move the highlight and B or Start chooses. Cancel
-.stays on the keyboard -- ESC and STOP have no pad equivalent that would not
-.be a guess, and a must select menu has no cancel anyway.
+.remains keyboard-only: ESC and STOP have no unambiguous pad equivalent, and
+.a must-select menu has no cancel.
 .
-.Port 1, the physical pad -- not port 0. Port 0 is the keyboard presented as
-.a joystick, and the menu already reads the keyboard directly, so reading
-.both would move the highlight twice for one press of a cursor key. Port 0 is
-.also the unreliable half of the pair: it reports "absent" on roughly half of
-.all reads (measured in AlienAirlift -- 2,060 negative against 2,057 valid
-.over 14 seconds).
+.It reads port 1, the physical pad, not port 0. Port 0 is the keyboard
+.presented as a joystick, and the menu reads the keyboard directly, so
+.reading both would move the highlight twice for one cursor key. Port 0 is
+.also unreliable, reporting absent on roughly half of all reads (measured in
+.AlienAirlift: 2,060 negative against 2,057 valid over 14 seconds).
 .
 .One step per press, no auto-repeat. The wait loop spins as fast as the CPU
-.allows, so the pad is edge-triggered; holding a direction moves once. A menu
-.is short, and a wrong guess at a repeat rate is worse than no repeat. A
+.allows, so the pad is edge-triggered and holding a direction moves once. A
 .button still held from whatever opened the menu is not read as a fresh press
 .either, so a menu cannot answer itself on the way in.
 .
-.With no pad plugged in the flag costs nothing and changes nothing -- the pad
-.is consulted only when the keyboard is quiet, and an absent pad reads as
-."nothing held". In the emulator a real pad needs -joy1, which binds physical
-.hardware and does not map the keyboard.
+.With no pad connected the flag changes nothing: the pad is read only when
+.the keyboard is quiet, and an absent pad reads as nothing held. In the
+.emulator a real pad needs -joy1, which binds physical hardware and does not
+.map the keyboard.
 .
 .Examples: MENUDEMO.EXP.BL on its own, MENU.EXP.BL inside a whole small
 .application, and MENUTST.EXP.BL for the 21-case regression test.

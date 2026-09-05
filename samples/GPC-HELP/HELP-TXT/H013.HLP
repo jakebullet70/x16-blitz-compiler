@@ -31,63 +31,57 @@
 .  GP.STRPTR(a$)
 .      DOES: address of the string's [ActLen][Data] block
 .
-.  | Trimming and case folding are STRCASE.INC.BL (SEC 4.8), not keywords:
-.  | 188 bytes in the GP block, which is all or nothing, to serve one caller
-.  | in the whole tree outside its own example. GP.STRPTR is here because
-.  | that is what the module is built on.
+.Trimming and case folding are in STRCASE.INC.BL (SEC 4.8) rather than
+.keywords: they would take 188 bytes of the all-or-nothing GP block to serve
+.one caller in the tree outside their own example. GP.STRPTR is a keyword
+.because the module is built on it.
 .
-.GP.INSTR is the gap that matters: GPC has no string search of any kind
-.without it.
+.GP.INSTR is the only string search GPC has; without it there is none.
 .
-.GP.CONTAINS is the yes/no spelling of the same question, for when you do not
-.care where: IF GP.CONTAINS(F$, ".BAS"). It is case sensitive -- it compares
-.raw bytes, like GP.INSTR -- so reach for GP.COMP when you need case-blind.
-.An empty needle is 0, not -1, because GP.INSTR reports "not found" for one
-.and this is built on it.
+.GP.CONTAINS answers the same question without the position: IF
+.GP.CONTAINS(F$, ".BAS"). It is case sensitive, comparing raw bytes as
+.GP.INSTR does; use GP.COMP for a case-blind test. An empty needle returns 0,
+.not -1, because GP.INSTR reports not-found for one.
 .
-.  | GP.CONTAINS is the library's first COMPOSITE keyword: it adds no runtime
-.  | code at all. The compiler expands it into GP.INSTR(hay$, needle$) <> 0,
-.  | and the compiled object is byte-for-byte identical to writing that out
-.  | by hand (verified by compiling both). So it costs nothing to use and
-.  | nothing to have -- unlike every other GP. keyword, whose machine code is
-.  | linked into every GPB program whether you call it or not. If you ever
-.  | want the position rather than a flag, write the GP.INSTR out; you are
-.  | not paying twice for the two spellings.
+.GP.CONTAINS is composite. The compiler expands it to GP.INSTR(hay$, needle$)
+.<> 0, and the object is byte-for-byte identical to writing that out
+.(verified by compiling both). Use whichever spelling reads better; there is
+.no size difference.
 .
-.GP.ISEMPTY(a$) is LEN(a$) = 0 with the question written down instead of
-.implied. A string of spaces is not empty -- STRCASE.TRIM it first if that is
-.what you meant. It is for readability only: it compiles to the same four
-.bytes as LEN(a$)=0, and IF a$="" costs about the same again (a literal
-.points into the p-code, so even the empty string allocates nothing). Do not
-.pick between the three on size.
+.GP.ISEMPTY(a$) is LEN(a$) = 0. A string of spaces is not empty -- apply
+.STRCASE.TRIM first if that is the intent. It compiles to the same four bytes
+.as LEN(a$)=0, and IF a$="" costs about the same (a literal points into the
+.p-code, so the empty string allocates nothing). The three spellings do not
+.differ in size.
 .
-.GP.COMP gives you a case-blind equality test -- IF GP.COMP(A$,B$) = 0 --
-.which plain = cannot do, and the comparator for ordering names. Length
-.breaks a tie, so "abc" sorts before "ABCD".
+.GP.COMP provides a case-blind equality test, IF GP.COMP(A$,B$) = 0, which =
+.cannot do, and an ordering comparator. Length breaks a tie: "abc" sorts
+.before "ABCD".
 .
-.The five in-place statements take a string VARIABLE, never a literal or an
+.The in-place statements take a string variable, never a literal or an
 .expression; the compiler rejects those. Case conversion leaves digits,
-.punctuation and PETSCII graphics untouched.
+.punctuation and PETSCII graphics unchanged.
 .
 .There is no GP.PAD. Padding grows a string, and an in-place handler receives
-.only the string's block, never the variable slot -- so it can never
-.reallocate past the capacity the string was born with. Use STR.PADR / PADL /
-.PADC (SEC 4.2), which are plain BASIC assignment and reallocate.
+.the string block and not the variable slot, so it cannot reallocate beyond
+.the capacity the string was created with. Use STR.PADR / PADL / PADC (SEC
+.4.2), which are BASIC assignments and do reallocate.
 .
 =GP.STRPTR and the address-splitting trap
 .
-.The address is of [ActLen][Data]: length at that address, first character at
-.+1, and the block's capacity at -2. With GP.CALL that lets machine code fill
-.a BASIC string in place and set its length -- something stock BASIC cannot
-.do at all.
+.The address is that of [ActLen][Data]: the length byte is at the address,
+.the first character at +1, and the block capacity at -2. With GP.CALL,
+.machine code can fill a BASIC string in place and set its length, which
+.stock BASIC cannot do.
 .
-.  | Splitting the address, do NOT write P AND 255. AND is 16-bit signed in
-.  | GPC and the string heap lives above 32767, so it raises OUT OF RANGE
-.  | rather than masking. Write: basic GP.CALL $A000, GP.LOBYTE(P),
-.  | GP.HIBYTE(P) -- see SEC 3.3. The longhand H = INT(P / 256) : L = P - H *
-.  | 256 is still correct and is what the keywords compile to. This applies
-.  | to GP.ARRPTR and to every VRAM address past the top eighth of the screen
-.  | too.
+.Split the address with GP.LOBYTE / GP.HIBYTE, not with P AND 255:
+.
+:GP.CALL $A000, GP.LOBYTE(P), GP.HIBYTE(P)
+.
+.AND is 16-bit signed and the string heap is above 32,767, so P AND 255
+.raises OUT OF RANGE. The longhand H = INT(P / 256) : L = P - H * 256 is
+.correct and is what the keywords compile to. The same applies to GP.ARRPTR
+.and to any VRAM address in the top eighth of memory.
 .
 =EXAMPLE PROGRAM
 .
@@ -97,5 +91,4 @@
 .
 >45|4.8 STRCASE.INC.BL -- case and trim, in place
 >37|4.2 STRINGS.INC.BL -- string helpers
->19|3.3 Machine code
 >45|4.8 STRCASE.INC.BL -- case and trim, in place

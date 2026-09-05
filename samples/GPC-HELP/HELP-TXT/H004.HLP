@@ -4,23 +4,22 @@
 .
 .GPC.PRG asks four questions -- input file, output file, debug map, shared
 .runtime -- writes the answers to GPC.INPUT, and chain-loads the engine.
-.Writing that file is the only thing it does.
+.Writing that file is all it does.
 .
-.GPC.BIN takes its whole job from GPC.INPUT and asks nothing. That is what
-.lets one program drive another: write the control file yourself and RUN
-.GPC.BIN, which is how this project's own test harness compiles, and how you
-.get a build if the front end is ever the broken thing.
+.GPC.BIN takes its whole job from GPC.INPUT and asks nothing. One program can
+.therefore drive another: write the control file and RUN GPC.BIN. That is how
+.this project's test harness compiles, and how to get a build if the front
+.end itself is broken.
 .
-.GPC.INPUT is up to four text lines -- source, object, map file, and the word
-.SHARED. It is per-user state and is not shipped; the front end writes it
-.every time.
+.GPC.INPUT is up to four text lines: source, object, map file, and the word
+.SHARED. It is per-user state and is not shipped; the front end rewrites it
+.on every compile.
 .
-.GPC.IMG.nnn.BIN is the runtime that gets streamed into every self-contained
-.object as it is written. The engine cannot compile without it. It used to
-.live inside the engine and moved out so the object buffer could have the low
-.RAM -- which is why the largest program GPC can build got bigger the day it
-.moved.
+.GPC.IMG.nnn.BIN is the runtime streamed into every self-contained object as
+.it is written. The engine cannot compile without it. It was inside the
+.engine until the object buffer was given the low RAM, which is when the
+.largest program GPC can build grew.
 .
-.A compiled program identifies itself. LIST one and the BASIC stub reads SYS
+.A compiled program identifies itself: LIST one and the BASIC stub reads SYS
 .2069 : REM GPC!.
 .

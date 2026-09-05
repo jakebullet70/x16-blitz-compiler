@@ -20,30 +20,25 @@
 .
 =DESCRIPTION
 .
-.Every one of the four is alone on its line, and THEN is required. There is
-.no one-line form: GP.IF X > 5 THEN PRINT is a syntax error, not a short IF.
-.That is deliberate -- a mandatory THEN invites the one-line reading, and
-.allowing it would mean a block that silently swallowed every line down to
-.the next GP.ENDIF. Stock IF ... THEN is untouched and remains the right
-.answer for a one-liner.
+.Each of the four keywords is alone on its line, and THEN is required. There
+.is no one-line form: GP.IF X > 5 THEN PRINT is a syntax error. Allowing it
+.would mean a block that swallowed every line down to the next GP.ENDIF.
+.Stock IF ... THEN is unchanged and remains the one-line form.
 .
-.GP.ELSEIF may repeat as often as you like; GP.ELSE is optional. The first
-.true condition wins and nothing below it runs, so there is no "break" to
-.forget. Nothing matching with no GP.ELSE is not an error -- the whole block
-.is simply skipped. Conditions are numeric expressions, as everywhere else.
+.GP.ELSEIF may repeat any number of times; GP.ELSE is optional. The first
+.true condition wins and nothing below it runs, so there is no break to omit.
+.If nothing matches and there is no GP.ELSE the block is skipped, which is
+.not an error. Conditions are numeric expressions.
 .
-.This is not a worse GP.SELECT, it is the other half. A select fetches one
-.value and compares it against each alternative, which is what you want for a
-.sparse key code or a state machine. A block IF tests something different in
-.every branch -- ranges, compound conditions, a string in one arm and a
-.number in the next. Neither replaces the other.
+.GP.IF and GP.SELECT cover different cases. A select fetches one value and
+.compares it against each alternative -- a sparse key code, a state machine.
+.A block IF tests a different condition in every branch: ranges, compound
+.conditions, a string in one arm and a number in the next.
 .
-.  | GP.ENDIF is required, but unlike GP.ENDSEL it does no work -- there is
-.  | no frame to release, because the condition is evaluated and consumed on
-.  | the same line it is written. So a GOTO out of a GP.IF is safe, where one
-.  | out of a select leaks the selector's frame. Leaving the GP.ENDIF off
-.  | stops the compile with STRUCTURE IMBALANCE rather than guessing where
-.  | you meant the block to end.
+.GP.ENDIF is required, but unlike GP.ENDSEL it does no work: the condition is
+.evaluated and consumed on the line it is written, so there is no frame to
+.release and a GOTO out of a GP.IF is safe. Omitting GP.ENDIF stops the
+.compile with STRUCTURE IMBALANCE.
 .
 :GP.IF N < 0 THEN
 :    PRINT "NEGATIVE"
@@ -56,10 +51,10 @@
 .IFs nest freely -- inside each other, inside a GP.CASE body, and inside a
 .GP.DO loop.
 .
-.It costs 14 bytes of runtime, and none of them are code. All four of its
-.p-code opcodes reuse a handler that already existed: the two branches are
-.the .goto.z and .goto handlers under different names, and the two markers
-.share one four-byte no-op. See SEC 11 of docs/blitz/GP-BASIC.TIERS.md.
+.It costs 14 runtime bytes, none of them code. All four p-code opcodes reuse
+.existing handlers: the two branches are .goto.z and .goto under different
+.names, and the two markers share one four-byte no-op. See SEC 11 of
+.docs/blitz/GP-BASIC.TIERS.md.
 .
 =EXAMPLE PROGRAM
 .

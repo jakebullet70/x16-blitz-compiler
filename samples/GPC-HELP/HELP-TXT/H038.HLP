@@ -42,9 +42,9 @@
 .  constants
 .      APPSYS.SCRMODE APPSYS.COLREG APPSYS.WINDOW APPSYS.HEADER
 .
-.APPSYS.COLS and APPSYS.ROWS are the ones to lay your screen out from. Do not
-.assume 80x60 -- the X16 boots there but SCREEN 0 is 40x30, and someone who
-.prefers larger text is running one.
+.Lay the screen out from APPSYS.COLS and APPSYS.ROWS. Do not assume 80x60 --
+.the X16 boots there but SCREEN 0 is 40x30, and someone who prefers larger
+.text is running one.
 .
 =STRINGS.INC.BL
 .
@@ -62,12 +62,11 @@
 .  internal
 .      STR.GAP STR.HALF STR.REST$ STR.AT STR.LIM STR.OUT$
 .
-.STR.FIELD$ is the one array the library deliberately does NOT DIM. Left
-.alone, GPC's implicit DIM gives you 0..10. If you want more, DIM it yourself
-.before the first call and set STR.MAX to match -- DIMming an array GPC has
-.already auto-dimensioned is an error, so it is one or the other. This is the
-.opposite of THEME.CLR, which the module owns outright; the two are worth
-.keeping straight.
+.STR.FIELD$ is the one array the library does not DIM. Left alone, GPC's
+.implicit DIM gives 0..10. For more, DIM it before the first call and set
+.STR.MAX to match -- DIMming an array GPC has already auto-dimensioned is an
+.error, so it is one or the other. This is the opposite of THEME.CLR, which
+.the module owns outright; the two are worth keeping straight.
 .
 =LINEINPUT.INC.BL
 .

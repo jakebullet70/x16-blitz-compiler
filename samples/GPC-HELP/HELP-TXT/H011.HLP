@@ -19,27 +19,25 @@
 .
 =DESCRIPTION
 .
-.The selector is a plain numeric variable, re-read at each GP.CASE; the tests
-.run in the order written and the first match wins. GP.OTHER is optional.
-.Nothing matching with no GP.OTHER is not an error -- the whole select is
-.simply skipped.
+.The selector must be a plain numeric variable. It is re-read at each
+.GP.CASE, the tests run in the order written, and the first match wins.
+.GP.OTHER is optional; if nothing matches and there is no GP.OTHER the select
+.is skipped, which is not an error.
 .
 .An expression, a constant or an array element is refused at compile time.
-.Assign it to a scalar first -- T = RND(1)*3 : GP.SELECT T -- which is also
-.what makes the re-read sound: a scalar is a fixed slot, so reading it seven
-.times is the same value seven times. What the restriction buys is that the
-.whole construct compiles to core opcodes: a program whose only GP keyword is
-.a select does not carry the GP block at all, exactly like GP.IF.
+.Assign to a scalar first: T = RND(1)*3 : GP.SELECT T. A scalar is a fixed
+.slot, so the re-read yields the same value every time. The restriction is
+.what lets the construct compile to core opcodes only -- a program whose one
+.GP keyword is a select does not carry the GP block, as with GP.IF.
 .
-.Case values are ordinary numeric expressions, not just constants -- which is
-.a step past prog8's when, whose choices must be compile-time integers.
+.Case values are numeric expressions, not only constants. prog8's when
+.requires compile-time integers.
 .
-.GP.ENDSEL is required -- not for cleanup, of which there is none, but for
-.structure: the compiler has no symbol table, the emitted tokens ARE the
+.GP.ENDSEL is required. Nothing needs cleaning up; the requirement is
+.structural. The compiler has no symbol table, the emitted tokens are the
 .block, and every case branch resolves by scanning forward to it.
 .
-.A case body takes its statements on the same line, after a colon, which is
-.what makes a sparse dispatch read as the table it is:
+.A case body may take its statements on the same line, after a colon:
 .
 :GP.SELECT ED.KEY
 :  GP.CASE 157 : GOSUB ED.MOVE.LEFT
@@ -48,22 +46,21 @@
 :  GP.OTHER    : GOSUB ED.KEY.RANGE
 :GP.ENDSEL
 .
-.More than one statement after the colon is fine, and so is GP.OTHER. The
-.body may still go on the following lines instead -- both forms are the same
+.More than one statement after the colon is allowed, and so is GP.OTHER. The
+.body may also go on the following lines. Both forms compile to the same
 .code.
 .
-.  | GOTO out of a select is safe, and trivially so: a select keeps nothing
-.  | alive, so there is nothing to leak. GP.DO is the one block that still
-.  | opens a stack frame, and a GOTO leaving one is covered too -- the
-.  | compiler puts an .unwind in front of it and FixBranches fills in how
-.  | many loop frames it closes. No runtime bytes, two p-code bytes at the
-.  | GOTO itself. One thing that does not cover, because nothing could: a
-.  | GOTO sideways, out of one GP.DO and into a different one at the same
-.  | depth. The count comes out zero and the loop frame survives.
+.GOTO out of a select is safe: a select holds nothing open. GP.DO is the one
+.block that opens a stack frame, and a GOTO leaving one is handled -- the
+.compiler emits an .unwind before it and FixBranches fills in how many loop
+.frames it closes. No runtime bytes; two p-code bytes at the GOTO. The case
+.it cannot handle is a GOTO from inside one GP.DO into another at the same
+.depth: the depth difference is zero, nothing is closed, and the frame
+.survives.
 .
-.This does not replace ON x GOTO/GOSUB, which is a real skip table and
-.remains the right answer for a dense 1..n index. GP.SELECT is for the sparse
-.selector -- key codes, state machines, bit depths -- where ON cannot go.
+.GP.SELECT does not replace ON x GOTO/GOSUB, which is a jump table and
+.remains correct for a dense 1..n index. Use GP.SELECT for a sparse selector
+.-- key codes, state machines, bit depths -- where ON does not apply.
 .
 :GP.SELECT BMX.DEPTH
 :    GP.CASE 8
@@ -73,8 +70,8 @@
 :        BMX.ERROR$ = "BAD BIT DEPTH"
 :GP.ENDSEL
 .
-.An empty case body -- the 8 above -- is the cheapest possible "this one is
-.fine": the match falls straight out of the select.
+.An empty case body, 8 above, matches and falls out of the select. It is the
+.cheapest way to say that a value is acceptable.
 .
 =EXAMPLE PROGRAM
 .

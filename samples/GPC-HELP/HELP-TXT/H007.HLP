@@ -2,8 +2,8 @@
 .
 =5. GPC-BASIC/ -- THE EXAMPLES
 .
-.One .EXP.BL per idea. They are meant to be read as much as run, and several
-.are the regression test for the module they sit beside.
+.One .EXP.BL per topic. Several are also the regression test for the module
+.they sit beside.
 .
 .  LOOPS.EXP.BL
 .      GP.DO / GP.LOOP / GP.EXITDO

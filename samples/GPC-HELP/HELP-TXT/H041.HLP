@@ -13,11 +13,10 @@
 .not: POS, MB, ST, LEN and CHAR cannot be variables at all. This is the main
 .reason the library is dotted throughout.
 .
-.And the rule that only applies outside BASL: BASLOAD gives 64 significant
-.characters, but the built-in BASIC gives two. Write the same code as a
-.hand-typed .bas for the host tokeniser and THEME.CLR and THEME.COUNT become
-.the same variable. That is a silent wrong answer -- it cost two test cycles
-.during tier 6, both times looking exactly like a compiler bug. Inside BASL
-.you are safe; in a raw .bas, give every variable a distinct first two
-.characters.
+.One rule applies only outside BASL: BASLOAD gives 64 significant characters,
+.the built-in BASIC gives two. Write the same code as a hand-typed .bas for
+.the host tokeniser and THEME.CLR and THEME.COUNT become the same variable.
+.That is a silent wrong answer -- it cost two test cycles during tier 6, both
+.times looking exactly like a compiler bug. Inside BASL you are safe; in a
+.raw .bas, give every variable a distinct first two characters.
 .

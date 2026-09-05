@@ -2,21 +2,21 @@
 .
 =6. THE TRAPS, COLLECTED
 .
-.Every one of these has cost a debugging session at least once.
+.Each of these has cost a debugging session at least once.
 .
 .  P AND 255 on a heap or VRAM address
-.      WHAT HAPPENS: AND is 16-bit signed; above 32767 it raises OUT OF RANGE
-.        instead of masking
+.      WHAT HAPPENS: AND is 16-bit signed; above 32,767 it raises OUT OF
+.        RANGE instead of masking
 .      DO THIS: H = INT(P/256) : L = P - H*256
 .
 .  an address in an A% variable
-.      WHAT HAPPENS: % is signed 16-bit and truncates silently -- A% = 49152
-.        reads back -16,384
+.      WHAT HAPPENS: % is signed 16-bit and truncates without error -- A% =
+.        49152 reads back -16,384
 .      DO THIS: untyped variable, or split into page and offset
 .
 .  $0400 for machine code
 .      WHAT HAPPENS: stock BASIC leaves it free, a compiled GPC program does
-.        not -- runtime state lives there, and it corrupts silently
+.        not -- runtime state lives there, and it is corrupted with no error
 .      DO THIS: banked RAM, $A000-$BFFF
 .
 .  PRINT after GP.PRINTAT
@@ -47,17 +47,16 @@
 .      WHAT HAPPENS: #DEFINE takes an INT16 -- ERROR: INVALID PARAMETER
 .      DO THIS: an ordinary variable
 .
-.The last one is worth its own sentence. Inside BASL you are safe -- 64
-.significant characters, so PANEL.COL and PANEL.ROW are genuinely different
-.variables and the readable names cost nothing. Write the same test as a raw
-..bas for the host tokeniser and the two-character rule is back. It cost two
-.test cycles during tier 6, both times looking exactly like a compiler bug.
+.Two notes on names. Inside BASL, 64 characters are significant, so PANEL.COL
+.and PANEL.ROW are different variables and readable names cost nothing. The
+.same source written as a raw .bas for the host tokeniser is back to two
+.significant characters.
 .
-.Dotted names also dodge the keyword-collision trap: MENUVERT.COUNT,
+.Dotted names also avoid the keyword-collision trap. MENUVERT.COUNT,
 .THEME.CLR, LINEINPUT.LEN and LINEINPUT.RETURN all contain reserved words and
-.all work, because BASLOAD matches the whole identifier. An undotted one does
-.not -- POS, MB, ST, LEN, CHAR cannot be variables at all. That is the main
-.reason the library is dotted throughout.
+.all work, because BASLOAD matches the whole identifier. Undotted names do
+.not: POS, MB, ST, LEN and CHAR cannot be variables. That is why the library
+.is dotted throughout.
 .
 =SEE ALSO
 .

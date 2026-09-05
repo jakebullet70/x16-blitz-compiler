@@ -7,8 +7,8 @@
 :#INCLUDE "GPB.INC.BL"
 .
 .BASLOAD knows only the ROM's keywords. Without that line GP.DO 5 is a syntax
-.error. (The host-side tokeniser for hand-written .bas needs nothing -- it
-.learns the same tokens from c64tokens.py at build time.)
+.error. The host-side tokeniser for hand-written .bas needs no such
+.declaration; it learns the same tokens from c64tokens.py at build time.
 .
 =Where the library lives
 .
@@ -17,18 +17,14 @@
 .
 :#INCLUDE "/GPC-BASIC/GPB.INC.BL"
 .
-.#INCLUDE takes a path, not just a bare filename -- verified on R49, both
-.absolute (/GPC-BASIC/GPB.INC.BL) and relative (GPC-BASIC/GPB.INC.BL). Prefer
-.the leading slash: it is absolute from the drive root, so it still resolves
-.when your own program sits in a subdirectory. ../ and // are not understood
-.by the X16's filesystem, so a path goes down from somewhere, never up.
+.#INCLUDE accepts a path as well as a bare filename. Verified on R49 for both
+.absolute (/GPC-BASIC/GPB.INC.BL) and relative (GPC-BASIC/GPB.INC.BL) forms.
+.Use the leading slash: it is absolute from the drive root and still resolves
+.when the program sits in a subdirectory. ../ and // are not understood by
+.the filesystem, so a path descends and never rises.
 .
-.Earlier versions of this manual said the include had to be a bare filename
-.and told you to copy the library next to every program. That was wrong, and
-.it meant twenty-odd files in your working folder for no reason.
-.
-.Then it is BASLOAD and GPC as usual: BASLOAD "MYPROG.BL", then compile the
-.PRG with GPC.PRG.
+.Then BASLOAD and GPC as usual: BASLOAD "MYPROG.BL", then compile the
+.resulting PRG with GPC.PRG.
 .
 =A program that uses GP.BASIC is compile-only
 .
@@ -42,8 +38,8 @@
 .the compiler emits code for it, and nowhere else. That is why the tokenised
 .file is not a program yet -- there is nothing to run it with but GPC.
 .
-.Which is the whole point, not a limitation. Run GPC.PRG on the tokenised
-..PRG, and run the object it writes.
+.That is the intended route: run GPC.PRG on the tokenised .PRG and run the
+.object it writes.
 .
 =Numbers, and what a variable holds
 .
@@ -64,19 +60,19 @@
 .      BYTES: 2
 .      HOLDS: a pointer into the string heap
 .
-.% is not a faster integer, it is a smaller one, and it truncates in silence.
-.WriteInteger stores the low two bytes of whatever is on the stack and
-.ReadInteger sign-extends the MSB back, so A% = 49152 reads back as -16,384
-.with no error. Counters, indices and screen coordinates: yes. Addresses: no.
+.% is smaller, not faster, and it truncates without raising an error.
+.WriteInteger stores the low two bytes of the value on the stack; ReadInteger
+.sign-extends the MSB. A% = 49152 reads back as -16,384. Use % for counters,
+.indices and screen coordinates.
 .
-.No address fits %. Main RAM runs to $9F00 (40,704), the string heap is above
-.32,767 by definition, and a VRAM address is 17 bits (up to 131,071). Keep an
-.address in an untyped variable, which holds all three exactly, or split it
-.into page and offset.
+.Do not use % for an address. Main RAM runs to $9F00 (40,704), the string
+.heap is above 32,767 by definition, and a VRAM address is 17 bits (up to
+.131,071). Hold an address in an untyped variable, which represents all three
+.exactly, or split it into page and offset.
 .
-.Numeric literals above 65,535 are fine. The compiler has a 16-bit fast path
-.for constants and anything wider compiles through the float encoder instead
-.-- no wrap.
+.Numeric literals above 65,535 are accepted. The compiler has a 16-bit fast
+.path for constants; anything wider compiles through the float encoder.
+.Neither wraps.
 .
 .AND and OR are 16-bit signed and raise OUT OF RANGE above 32,767; see SEC 6.
 .

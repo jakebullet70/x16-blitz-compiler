@@ -27,11 +27,12 @@
 .BMX.INIT has run. Zeroing it yourself would leak a string block and
 .re-allocate.
 .
-.BMX.STASH is the one variable here you may want to set, and it has to be set
-.before the first BMX.OPEN -- BMX.INIT runs then, and fills in the default
-.only if you have not. That is why -1 rather than 0 switches the stash off: 0
-.already means "never set". BMX.KEPT is the once-per-run guard that makes a
-.slideshow restore the machine's palette rather than the previous picture's.
+.BMX.STASH is the one variable here a caller may want to set, and it has to
+.be set before the first BMX.OPEN -- BMX.INIT runs then, and fills in the
+.default only if you have not. That is why -1 rather than 0 switches the
+.stash off: 0 already means "never set". BMX.KEPT is the once-per-run guard
+.that makes a slideshow restore the machine's palette rather than the
+.previous picture's.
 .
 =MENUVERT.INC.BL
 .
@@ -64,10 +65,10 @@
 .        MENUVERT.STOP MENUVERT.SPACE MENUVERT.PORT MENUVERT.PAD.UP
 .        MENUVERT.PAD.DOWN MENUVERT.PAD.B MENUVERT.PAD.START
 .
-.MENUVERT.SEL is both an input and an output -- it is the row to start on
-.going in and the row chosen coming out, so a menu reopened without clearing
-.it reopens where it was. That is usually what you want; set it to 0 when it
-.is not.
+.MENUVERT.SEL is both an input and an output: the row to start on going in,
+.and the row chosen coming out, so a menu reopened without clearing it
+.reopens where it was. That is usually what you want; set it to 0 when it is
+.not.
 .
 .MENUVERT.DRAWROW, MENUVERT.DRAWATTR and MENUVERT.DRAWTEXT$ are listed
 .internal but are the documented arguments to MENUVERT.ROW, which is public:

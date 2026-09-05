@@ -1,10 +1,9 @@
 # What is in GPC
 
-Every file that comes with the compiler, and what each one is for. If something here is not on the
-drive when it is wanted, the error you get names the symptom and not the missing file — which is
-the reason this page exists.
+Every file that comes with the compiler, and what each one is for. When one of them is missing the
+error names the symptom rather than the file, so the list is worth having.
 
-**Generated into the on-machine help by `MKHELP.PY`.** Fix anything wrong here, not there.
+This page is generated into the on-machine help by `MKHELP.PY`. Correct it here, not there.
 
 ---
 
@@ -23,56 +22,54 @@ Five files, and all five. Put them beside each other:
 `nnn` is the runtime build number and it is part of the name on purpose: a stale runtime under a
 fixed name would still be found, and the mismatch would not show until something ran wrong.
 
-**Both shared runtimes ship, and both are needed.** Which one a program wants is settled when it is
-compiled, not when it runs, so a drive carrying only one works for half the programs built against
-it. A program that cannot find its runtime prints `?RT` and stops.
+Both shared runtimes are needed. Which one a program wants is decided when it is compiled, not when
+it runs, so a drive carrying only one works for half the programs built against it. A program that
+cannot find its runtime prints `?RT` and stops.
 
-**The front end needs `GPB.RT.nnn.BIN` for itself.** `GPC.PRG` is a compiled GP.BASIC program built
-in shared mode — the compiler is written in the language it compiles.
+The front end needs `GPB.RT.nnn.BIN` for itself: `GPC.PRG` is a compiled GP.BASIC program built in
+shared mode. The compiler is written in the language it compiles.
 
 ---
 
 ## 2. The compiler
 
-**`GPC.PRG`** asks four questions — input file, output file, debug map, shared runtime — writes the
-answers to `GPC.INPUT`, and chain-loads the engine. Writing that file is the only thing it does.
+`GPC.PRG` asks four questions — input file, output file, debug map, shared runtime — writes the
+answers to `GPC.INPUT`, and chain-loads the engine. Writing that file is all it does.
 
-**`GPC.BIN`** takes its whole job from `GPC.INPUT` and asks nothing. That is what lets one program
-drive another: write the control file yourself and `RUN GPC.BIN`, which is how this project's own
-test harness compiles, and how you get a build if the front end is ever the broken thing.
+`GPC.BIN` takes its whole job from `GPC.INPUT` and asks nothing. One program can therefore drive
+another: write the control file and `RUN GPC.BIN`. That is how this project's test harness compiles,
+and how to get a build if the front end itself is broken.
 
-**`GPC.INPUT`** is up to four text lines — source, object, map file, and the word `SHARED`. It is
-per-user state and is not shipped; the front end writes it every time.
+`GPC.INPUT` is up to four text lines: source, object, map file, and the word `SHARED`. It is
+per-user state and is not shipped; the front end rewrites it on every compile.
 
-**`GPC.IMG.nnn.BIN`** is the runtime that gets streamed into every self-contained object as it is
-written. **The engine cannot compile without it.** It used to live inside the engine and moved out
-so the object buffer could have the low RAM — which is why the largest program GPC can build got
-bigger the day it moved.
+`GPC.IMG.nnn.BIN` is the runtime streamed into every self-contained object as it is written. The
+engine cannot compile without it. It was inside the engine until the object buffer was given the low
+RAM, which is when the largest program GPC can build grew.
 
-**A compiled program identifies itself.** `LIST` one and the BASIC stub reads `SYS 2069 : REM GPC!`.
+A compiled program identifies itself: `LIST` one and the BASIC stub reads `SYS 2069 : REM GPC!`.
 
 ---
 
 ## 3. The tools
 
-**`GPC.ERR.PRG`** turns a runtime error's `@ $XXXX` into a source line, given the debug map the
-compiler writes when you answer yes to `MAKE A DEBUG MAP?`. Without the map an address is just an
-address.
+`GPC.ERR.PRG` turns a runtime error's `@ $XXXX` into a source line, using the debug map the
+compiler writes when `MAKE A DEBUG MAP?` is answered yes. Without the map the address cannot be
+resolved.
 
-**`BASLOAD` is not a file here** — it is built into the R49 ROM. It reads `.BASL` source, which is
-BASIC with long names, labels instead of line numbers, `#INCLUDE` and `#DEFINE`, and writes the
-tokenised `.PRG` that GPC compiles. Every `.INC.BL` and `.EXP.BL` in this folder is BASLOAD source.
+`BASLOAD` is not a file here; it is built into the R49 ROM. It reads `.BASL` source — BASIC with
+long names, labels instead of line numbers, `#INCLUDE` and `#DEFINE` — and writes the tokenised
+`.PRG` that GPC compiles. Every `.INC.BL` and `.EXP.BL` in this folder is BASLOAD source.
 
-**A program using GP.BASIC is compile-only.** BASLOAD's output for one is not a program the ROM can
-`LIST` or `RUN` — nothing in BASIC sits behind a `GP.` token. It is compiler input, and that is the
-expected state, not a fault.
+A program using GP.BASIC is compile-only. BASLOAD's output for one is not a program the ROM can
+`LIST` or `RUN`, because nothing in BASIC sits behind a `GP.` token. It is compiler input.
 
 ---
 
 ## 4. `GPC-BASIC/` — the library
 
-Text-mode building blocks, in BASL, `#INCLUDE`d into your source. **A module has no dead code
-elimination: including one costs its whole size whether you call it or not.**
+Text-mode building blocks, in BASL, `#INCLUDE`d into your source. BASL has no dead code
+elimination: including a module costs its whole size whether or not it is called.
 
 | | |
 |---|---|
@@ -97,8 +94,7 @@ What each one costs in bytes is in the command reference, under *At a glance*.
 
 ## 5. `GPC-BASIC/` — the examples
 
-One `.EXP.BL` per idea. They are meant to be read as much as run, and several are the regression
-test for the module they sit beside.
+One `.EXP.BL` per topic. Several are also the regression test for the module they sit beside.
 
 | | |
 |---|---|
@@ -133,5 +129,5 @@ test for the module they sit beside.
 | `README.md` | how to run the compiler, and what its answers mean |
 | `SRC/` | the BASLOAD source of the tools. Reference only — nothing in it is needed to run |
 
-The library's docs live **beside the includes they describe**, in this folder, so a relative link
-works in the repository and in an unzipped release alike.
+The library's documents live beside the includes they describe, in this folder, so a relative link
+works both in the repository and in an unzipped release.

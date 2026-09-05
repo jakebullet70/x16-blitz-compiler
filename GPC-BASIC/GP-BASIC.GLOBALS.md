@@ -1,6 +1,6 @@
 # GP.BASIC — the global name register
 
-**BASL has one flat namespace and nothing else.** No locals, no scoping, no parameters. Every
+BASL has one flat namespace. No locals, no scoping, no parameters. Every
 variable in every `#INCLUDE`d module is visible to your program, and every variable in your program
 is visible to the modules. Nothing warns you: a collision is a wrong answer, not an error.
 
@@ -11,7 +11,7 @@ full.
 
 The rule the library follows, and that you should follow too:
 
-> **One module, one dotted prefix, and nothing writes outside its own.**
+The convention is one dotted prefix per module, and nothing writes outside its own prefix.
 
 ---
 
@@ -29,17 +29,17 @@ The rule the library follows, and that you should follow too:
 | `BMXK.` | `BMX.INC.BL` | its KERNAL/VERA constants, kept apart from its variables |
 
 Pick anything else for your own program. `AIRLIFT.`, `GAME.`, `MAP.` — a prefix costs nothing at
-runtime because **BASLOAD crunches every identifier down to a short BASIC variable**, so a long
+runtime because BASLOAD crunches every identifier down to a short BASIC variable, so a long
 readable name and a two-letter one compile to exactly the same thing.
 
-**Do not reuse a taken prefix even for something the module has not defined.** `THEME.MINE` looks
+Do not reuse a taken prefix for a name the module has not defined. `THEME.MINE` looks
 free today; it is one library update away from not being.
 
 ---
 
 ## 2. `GP.*` is keywords, not variables — and the difference bites
 
-`GPB.INC.BL` defines **no variables at all**. It is 31 `#TOKEN` lines and nothing else. Everything
+`GPB.INC.BL` defines no variables. It is 31 `#TOKEN` lines and nothing else. Everything
 spelled `GP.something` is a BASIC *keyword*, so:
 
 ```basic
@@ -48,8 +48,8 @@ X = GP.A          ← correct. It reads the accumulator after the last GP.CALL.
 ```
 
 The value words are `GP.A`, `GP.X`, `GP.Y` and `GP.C` — the registers after `GP.CALL`, and now the
-whole list of them. They are tokens rather than variables for a hard reason: **nothing in the
-runtime can write a BASIC variable by name**, so a command that needs to hand a value back has to
+whole list of them. They are tokens rather than variables because nothing in the runtime can write
+a BASIC variable by name, so a command that returns a value has to
 hand it back through a keyword. X16's own `ST`, `MX` and `MY` exist for the same reason.
 
 The full keyword list lives in `GPC-BASIC/GPB.INC.BL`, and the token numbers mirror `getGP()` in
@@ -71,7 +71,7 @@ read, do not write, do not rely on).
 | internal | `THEME.READY` |
 | constants | `THEME.PAGE` `THEME.TEXT` `THEME.TITLE` `THEME.BORDER` `THEME.HILITE` `THEME.DIMMED` `THEME.WARN` `THEME.SLOTS` |
 
-`THEME.CLR` is the array this module `DIM`s. **Do not `DIM` it yourself** — the module owns it, and
+`THEME.CLR` is the array this module `DIM`s. Do not `DIM` it yourself — the module owns it, and
 `DIM`ming an array GPC has already dimensioned is an error.
 
 ### `APPSYS.INC.BL`
@@ -83,7 +83,7 @@ read, do not write, do not rely on).
 | internal | `APPSYS.LAST` |
 | constants | `APPSYS.SCRMODE` `APPSYS.COLREG` `APPSYS.WINDOW` `APPSYS.HEADER` |
 
-`APPSYS.COLS` and `APPSYS.ROWS` are the ones to lay your screen out from. **Do not assume 80×60** —
+Lay the screen out from `APPSYS.COLS` and `APPSYS.ROWS`. Do not assume 80x60 —
 the X16 boots there but `SCREEN 0` is 40×30, and someone who prefers larger text is running one.
 
 ### `STRINGS.INC.BL`
@@ -94,8 +94,8 @@ the X16 boots there but `SCREEN 0` is 40×30, and someone who prefers larger tex
 | out | `STR.STR$` — padded, or replaced, in place<br>`STR.N` — how many fields `SPLIT` found, always ≥ 1<br>`STR.FIELD$(1..N)` — the fields themselves<br>`STR.SCR` — the screen code from `PET2SCR` |
 | internal | `STR.GAP` `STR.HALF` `STR.REST$` `STR.AT` `STR.LIM` `STR.OUT$` |
 
-**`STR.FIELD$` is the one array the library deliberately does NOT `DIM`.** Left alone, GPC's
-implicit `DIM` gives you 0..10. If you want more, `DIM` it yourself **before the first call** and set
+`STR.FIELD$` is the one array the library does not `DIM`. Left alone, GPC's implicit `DIM` gives
+0..10. For more, `DIM` it before the first call and set
 `STR.MAX` to match — `DIM`ming an array GPC has already auto-dimensioned is an error, so it is
 one or the other. This is the opposite of `THEME.CLR`, which the module owns outright; the two are
 worth keeping straight.
@@ -126,7 +126,8 @@ uses it for exactly that.
 `BMX.PTR` doubles as the "have I initialised" flag — it is zero until `BMX.INIT` has run. Zeroing it
 yourself would leak a string block and re-allocate.
 
-**`BMX.STASH` is the one variable here you may want to set**, and it has to be set before the first
+`BMX.STASH` is the one variable here a caller may want to set, and it has to be set before the
+first
 `BMX.OPEN` — `BMX.INIT` runs then, and fills in the default only if you have not. That is why `-1`
 rather than `0` switches the stash off: `0` already means "never set". `BMX.KEPT` is the once-per-run
 guard that makes a slideshow restore the *machine's* palette rather than the previous picture's.
@@ -140,7 +141,7 @@ guard that makes a slideshow restore the *machine's* palette rather than the pre
 | internal | `MENUVERT.SCAN` `MENUVERT.EACH` `MENUVERT.DONE` `MENUVERT.CODE` `MENUVERT.INCHAR$` `MENUVERT.PREVSEL` `MENUVERT.HIGHLIGHT` `MENUVERT.DRAWROW` `MENUVERT.DRAWATTR` `MENUVERT.DRAWTEXT$` `MENUVERT.DRAWY` `MENUVERT.HOTCODE` `MENUVERT.HOTLAST` `MENUVERT.WANTCODE` `MENUVERT.HOTAT` `MENUVERT.HOTWANT` `MENUVERT.HOTHERE` `MENUVERT.HOTSCAN` `MENUVERT.PADNOW` `MENUVERT.PADNEW` `MENUVERT.PADHELD` `MENUVERT.PADRAW` |
 | constants | `MENUVERT.MUSTSEL` `MENUVERT.KEEPMARK` `MENUVERT.NOWRAP` `MENUVERT.GAMEPAD` `MENUVERT.UP` `MENUVERT.DOWN` `MENUVERT.ENTER` `MENUVERT.ESCAPE` `MENUVERT.STOP` `MENUVERT.SPACE` `MENUVERT.PORT` `MENUVERT.PAD.UP` `MENUVERT.PAD.DOWN` `MENUVERT.PAD.B` `MENUVERT.PAD.START` |
 
-**`MENUVERT.SEL` is both an input and an output** — it is the row to start on going in and the row
+`MENUVERT.SEL` is both an input and an output: the row to start on going in, and the row
 chosen coming out, so a menu reopened without clearing it reopens where it was. That is usually what
 you want; set it to 0 when it is not.
 
@@ -170,8 +171,8 @@ Each module also has a skip label it jumps over itself with — `THEME.SKIP`, `A
 `STR.SKIP`, `BMX.MODULE.END`, `LINEINPUT.MODULE.END`, `MENUVERT.MODULE.END`. Those exist so an
 include can sit anywhere in the file, the top included. **Do not branch to one.**
 
-One trap found the hard way, worth repeating: **BASLOAD refuses a name used as both a label and a
-variable** (`BASLOAD.MD:319`). `BMX.SKIP` is the byte-skip counter, so the module's skip label had to
+BASLOAD refuses a name used as both a label and a variable (`BASLOAD.MD:319`). `BMX.SKIP` is the
+byte-skip counter, so the module's skip label had to
 be `BMX.MODULE.END` — a name is either a label or a variable, never both.
 
 ---
@@ -187,8 +188,8 @@ ordinary variable and not a `#DEFINE`. Every VRAM address past `$FFFF` has the s
 *undotted* one does not: `POS`, `MB`, `ST`, `LEN` and `CHAR` cannot be variables at all. This is the
 main reason the library is dotted throughout.
 
-**And the rule that only applies outside BASL:** BASLOAD gives 64 significant characters, but the
-built-in BASIC gives **two**. Write the same code as a hand-typed `.bas` for the host tokeniser and
+One rule applies only outside BASL: BASLOAD gives 64 significant characters, the built-in BASIC
+gives two. Write the same code as a hand-typed `.bas` for the host tokeniser and
 `THEME.CLR` and `THEME.COUNT` become the same variable. That is a silent wrong answer — it cost two
 test cycles during tier 6, both times looking exactly like a compiler bug. Inside BASL you are safe;
 in a raw `.bas`, give every variable a distinct first two characters.

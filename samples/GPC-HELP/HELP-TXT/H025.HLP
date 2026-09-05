@@ -32,8 +32,8 @@
 :GOSUB BMX.SHOW
 :IF BMX.ERROR$ <> "" THEN PRINT BMX.ERROR$
 .
-.The careful form, when you want the size before committing to a screen mode,
-.or want to report a bad file without the display already torn down:
+.Use the long form to read the size before committing to a screen mode, or to
+.report a bad file before the display is torn down:
 .
 :BMX.FILE$ = F$
 :GOSUB BMX.OPEN
@@ -42,15 +42,14 @@
 :SCREEN 128
 :GOSUB BMX.PAINT
 .
-.  | Set the screen mode BEFORE BMX.PAINT, not after. SCREEN reloads the
-.  | default palette, so a mode change after painting throws the image's
-.  | colours away -- right pixels, wrong colours, which reads as a corrupt
-.  | file rather than a mistake.
+.Set the screen mode before BMX.PAINT, not after. SCREEN reloads the default
+.palette, so a mode change after painting discards the image's colours:
+.correct pixels, wrong palette.
 .
-.The palette is borrowed, not taken. BMX.PAINT writes the picture's colours
-.over the machine's, and nothing on the X16 puts them back -- not SCREEN, not
-.the KERNAL's screen_mode. So BMX.PAINT stashes all 256 entries in spare VRAM
-.first, and BMX.RESTORE writes them back:
+.BMX.PAINT writes the image's colours over the machine's palette, and nothing
+.on the X16 restores them -- not SCREEN, not the KERNAL's screen_mode.
+.BMX.PAINT therefore stashes all 256 entries in spare VRAM first, and
+.BMX.RESTORE writes them back:
 .
 :BMX.FILE$ = "TITLE.BMX"
 :SCREEN 128
@@ -58,28 +57,28 @@
 :' ... the title screen ...
 :GOSUB BMX.RESTORE
 .
-.A program that owns the machine can simply never call it. One that hands the
-.machine back -- to BASIC, or to the next program in a chain -- calls it and
-.is done. It is safe at any time: nothing kept means nothing to do, so a
-.program whose picture failed to load can still call it on the way out. All
-.256 entries are kept rather than the range the file claims, and kept once
-.per run, which is what makes a slideshow restore what the machine had rather
-.than the previous picture's leftovers.
+.A program that keeps the machine need never call it. A program that returns
+.the machine to BASIC or chains to another calls it once. It is safe to call
+.at any time: with nothing stashed there is nothing to do, so a program whose
+.image failed to load can still call it on the way out. All 256 entries are
+.kept, not the range the file claims, and they are kept once per run -- so a
+.slideshow restores the machine's own palette rather than the previous
+.image's.
 .
-.BMX.STASH is where they go -- VRAM $13000 by default, free above the 320x240
-.framebuffer in the mode this module paints into. A caller with tiles,
-.sprites or a second bitmap up there must move it, or switch it off with
-.BMX.STASH = -1. It is checked rather than trusted: a stash inside the bitmap
-.or running into the PSG registers is reported, and nothing is painted.
+.BMX.STASH is the VRAM address they go to, $13000 by default, which is free
+.above the 320x240 framebuffer in the mode this module paints into. A caller
+.using tiles, sprites or a second bitmap there must move it or switch it off
+.with BMX.STASH = -1. The address is checked: a stash inside the bitmap or
+.overlapping the PSG registers is reported and nothing is painted.
 .
-.  | -1 and not 0 to switch it off. Zero is what the variable holds before
-.  | anyone has touched it, and BMX.INIT runs at the first BMX.OPEN -- long
-.  | after a caller would have set it -- so 0 has to keep meaning "never
-.  | set".
+.Use -1 to switch it off, not 0. Zero is what the variable holds before it is
+.set, and BMX.INIT runs at the first BMX.OPEN, after a caller would have set
+.it, so 0 has to keep meaning unset.
 .
-.8 bits per pixel, uncompressed, which is what SCREEN 128 shows without a
-.decompressor. Anything else is reported, not attempted. The image is
-.centred; larger than 320x240 is clipped.
+.The module handles 8 bits per pixel, uncompressed, which is what SCREEN 128
+.displays without a decompressor. Anything else is reported rather than
+.attempted. The image is centred, and anything larger than 320x240 is
+.clipped.
 .
 .Examples: BMXVIEW.EXP.BL, and BMXPAL.EXP.BL for the palette
 .

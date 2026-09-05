@@ -2,9 +2,9 @@
 .
 =4. GPC-BASIC/ -- THE LIBRARY
 .
-.Text-mode building blocks, in BASL, #INCLUDEd into your source. A module has
-.no dead code elimination: including one costs its whole size whether you
-.call it or not.
+.Text-mode building blocks, in BASL, #INCLUDEd into your source. BASL has no
+.dead code elimination: including a module costs its whole size whether or
+.not it is called.
 .
 .  GPB.INC.BL
 .      the GP.* keyword definitions for BASLOAD. Every source using a GP

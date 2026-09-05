@@ -4,26 +4,29 @@
 .
 .Three layers, innermost first.
 .
-.Core keywords. 30 tokens, GP.DO down to GP.CHAR: GP.DO GP.LOOP GP.EXITDO,
-.GP.IF GP.ELSEIF GP.ELSE GP.ENDIF, GP.SELECT GP.CASE GP.OTHER GP.ENDSEL,
-.GP.INSTR GP.COMP GP.STRPTR GP.ARRPTR, GP.BOX GP.FILL GP.CHAR GP.PRINTAT,
-.GP.CALL with GP.A GP.X GP.Y GP.C, GP.ASM GP.ENDASM. Compiled to p-code,
-.handled by assembly in the runtime. They are assembly because BASIC is slow
-.at what they do: per-character string scans, screen fills, VERA writes.
+.Core keywords. 30 tokens, compiled to p-code and handled by assembly in the
+.runtime:
 .
-.The handlers occupy GPBase $3800 to ObjectBase $3c00 -- 1,024 bytes, page
+.GP.DO GP.LOOP GP.EXITDO GP.IF GP.ELSEIF GP.ELSE GP.ENDIF GP.SELECT GP.CASE
+.GP.OTHER GP.ENDSEL GP.INSTR GP.COMP GP.STRPTR GP.ARRPTR GP.BOX GP.FILL
+.GP.CHAR GP.PRINTAT GP.CALL GP.A GP.X GP.Y GP.C GP.ASM GP.ENDASM
+.
+.They are assembly because BASIC is slow at per-character string scans,
+.screen fills and VERA writes.
+.
+.The handlers occupy GPBase $3800 to ObjectBase $3c00: 1,024 bytes, page
 .aligned, all or nothing. ScanGPUsage walks the finished p-code and drops the
 .whole block from the object if nothing in it is reached.
 .
-.What the block costs is 1,024 bytes, once. The bytes in the object and the
-.bytes off the workspace floor are the same bytes: runtimeEndPage is one page
-.number, and it decides how much of the runtime image is written out, where
-.the p-code lands, and where the workspace starts. Max p-code is 17,152 bytes
-.with the block, 18,176 without -- ObjectBase to $9F00, less the 4K frame
-.stack and the 4K minimum workspace.
+.The block costs those 1,024 bytes once. The bytes in the object and the
+.bytes off the workspace floor are the same bytes -- runtimeEndPage is a
+.single page number that decides how much of the runtime image is written
+.out, where the p-code lands, and where the workspace starts. Maximum p-code
+.is 17,152 bytes with the block and 18,176 without: ObjectBase to $9F00, less
+.the 4K frame stack and the 4K minimum workspace.
 .
 .Composites. GP.CONTAINS, GP.ISEMPTY, GP.HIBYTE, GP.LOBYTE. The compiler
-.expands each into opcodes that already exist: no handler, no vector slot,
+.expands each into opcodes that already exist. No handler, no vector slot,
 .nothing in the block.
 .
 .The library. GPC-BASIC/: 14 .INC.BL modules, 22 .EXP.BL examples. Ordinary
@@ -37,9 +40,9 @@
 .every GP program. GP.ARRPTR and GP.STRPTR are what lets them out -- a BASL
 .subroutine takes an address, not an array or a string.
 .
-.Which side a thing goes on: assembly for loops and bulk moves, BASIC for the
-.rest. LINEINPUT.GET waits on the keyboard, so speed is not an argument for
-.it -- 166 bytes of runtime saved by writing it in BASL.
+.The division is assembly for loops and bulk moves, BASIC for everything
+.else. LINEINPUT.GET waits on the keyboard, so speed does not apply to it;
+.writing it in BASL saved 166 runtime bytes.
 .
 =SEE ALSO
 .

@@ -28,15 +28,14 @@
 :GP.BOX 4,2,30,8, 2, THEME.CLR(THEME.BORDER)
 :GP.PRINTAT 6,3, "TITLE", THEME.CLR(THEME.TITLE)
 .
-.The values are packed attributes -- background * 16 + foreground -- because
-.that is exactly what GP.BOX, GP.FILL and GP.PRINTAT take. For COLOR, which
-.wants the halves separately, use THEME.SET.
+.The values are packed attributes, background * 16 + foreground, which is
+.what GP.BOX, GP.FILL and GP.PRINTAT take. For COLOR, which takes the halves
+.separately, use THEME.SET.
 .
 .#DEFINE substitutes at translation time, so THEME.CLR(THEME.TITLE) compiles
-.to THEME.CLR(2) -- the readable name costs no variable, no lookup, and a
-.one-byte constant index.
+.to THEME.CLR(2). The readable name costs no variable and no lookup.
 .
-.THEME.CLR is DIMmed by the module. Do not DIM it yourself.
+.THEME.CLR is DIMmed by the module. Do not DIM it in your own program.
 .
 =SEE ALSO
 .

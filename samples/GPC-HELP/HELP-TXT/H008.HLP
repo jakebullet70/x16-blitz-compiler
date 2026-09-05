@@ -18,5 +18,6 @@
 .      the BASLOAD source of the tools. Reference only -- nothing in it is
 .        needed to run
 .
-.The library's docs live beside the includes they describe, in this folder,
-.so a relative link works in the repository and in an unzipped release alike.
+.The library's documents live beside the includes they describe, in this
+.folder, so a relative link works both in the repository and in an unzipped
+.release.

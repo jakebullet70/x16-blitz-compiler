@@ -2,18 +2,17 @@
 .
 =2. GP.* IS KEYWORDS, NOT VARIABLES -- AND THE DIFFERENCE BITES
 .
-.GPB.INC.BL defines no variables at all. It is 31 #TOKEN lines and nothing
-.else. Everything spelled GP.something is a BASIC keyword, so:
+.GPB.INC.BL defines no variables. It is 31 #TOKEN lines and nothing else.
+.Everything spelled GP.something is a BASIC keyword, so:
 .
 :GP.A = 5          <- SYNTAX ERROR. GP.A is a keyword; you cannot assign to i
 :X = GP.A          <- correct. It reads the accumulator after the last GP.CAL
 .
 .The value words are GP.A, GP.X, GP.Y and GP.C -- the registers after
 .GP.CALL, and now the whole list of them. They are tokens rather than
-.variables for a hard reason: nothing in the runtime can write a BASIC
-.variable by name, so a command that needs to hand a value back has to hand
-.it back through a keyword. X16's own ST, MX and MY exist for the same
-.reason.
+.variables because nothing in the runtime can write a BASIC variable by name,
+.so a command that returns a value has to hand it back through a keyword.
+.X16's own ST, MX and MY exist for the same reason.
 .
 .The full keyword list lives in GPC-BASIC/GPB.INC.BL, and the token numbers
 .mirror getGP() in source/common-scripts/c64tokens.py.

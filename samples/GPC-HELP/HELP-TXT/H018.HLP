@@ -18,14 +18,13 @@
 .
 =DESCRIPTION
 .
-.65C02 assembly, assembled by GPC at compile time, with the bytes going into
+.65C02 assembly, assembled by GPC at compile time, with the bytes placed in
 .the program.
 .
-.Before this, running your own machine code meant assembling it yourself:
-.work out the opcode for each instruction, POKE the numbers into memory
-.nothing else was using, and point GP.CALL at that address. GP.ASM writes the
-.instructions and the compiler works out the bytes. These two do the same
-.thing -- increment A, then X, then Y:
+.The alternative is to assemble by hand: work out the opcode for each
+.instruction, POKE the numbers into memory nothing else is using, and point
+.GP.CALL at that address. These two do the same thing -- increment A, then X,
+.then Y:
 .
 :## by hand: 26, 232 and 200 ARE inc a / inx / iny, and ML has to be somewher
 :POKE ML+0,26 : POKE ML+1,232 : POKE ML+2,200 : GP.CALL ML,10,20,30
@@ -37,23 +36,23 @@
 :REM iny
 :GP.ENDASM
 .
-.It costs no runtime bytes. A block is five bytes of p-code plus your
-.instructions, and every handler it uses is already in every compiled program
-.-- so a program whose only GP.BASIC keyword is GP.ASM still compiles
-.GP-BASIC OUT, without the 1 KB GP block. Measured: RT 12031, the same as a
-.program using no GP keyword at all.
+.It costs no runtime bytes. A block is five bytes of p-code plus the
+.assembled instructions, and every handler it uses is already in every
+.compiled program. A program whose only GP.BASIC keyword is GP.ASM compiles
+.GP-BASIC OUT, without the 1 KB block: measured RT 12031, the same as a
+.program using no GP keyword.
 .
 =#REM 1 is required
 .
-.  | The body rides in REM statements, because BASLOAD stores REM text byte
-.  | for byte. Outside a REM, ORA, AND, EOR and ROR are BASIC keywords and
-.  | the text is destroyed; inside one it arrives intact, braces and all.
-.  | Lower case is fine -- it is upshifted for you. #REM 0 is BASLOAD's
-.  | default, and with it the body is stripped before the compiler runs. That
-.  | is why GP.ASM and GP.ENDASM are real keywords and not REMs: the block is
-.  | still there to be found empty, and GPC says BLOCK MISMATCH instead of
-.  | compiling a program that silently contains no code. Turn REMs back off
-.  | after GP.ENDASM.
+.The body rides in REM statements because BASLOAD stores REM text byte for
+.byte. Outside a REM, ORA, AND, EOR and ROR are BASIC keywords and the text
+.is destroyed; inside one it arrives intact, braces included. Lower case is
+.accepted and upshifted.
+.
+.#REM 0 is BASLOAD's default and strips the body before the compiler runs.
+.GP.ASM and GP.ENDASM are real keywords rather than REMs so that the block is
+.still found, empty, and GPC reports BLOCK MISMATCH rather than compiling a
+.program that contains no code. Set #REM 0 again after GP.ENDASM.
 .
 =Labels and branches
 .
@@ -69,15 +68,15 @@
 :REM bne loop
 :GP.ENDASM
 .
-.BNE/BEQ/BRA and the rest take a label, and so do JMP and JSR. A branch
-.further than 127 bytes is OUT OF RANGE at compile time, on the line it is on
-.-- not a wrong address at run time.
+.BNE, BEQ, BRA and the rest take a label, as do JMP and JSR. A branch further
+.than 127 bytes is OUT OF RANGE at compile time, reported on its own line,
+.rather than a wrong address at run time.
 .
 ={VAR} -- a BASIC variable's slot
 .
-.{VAR} is the address of the variable's slot, which is what makes reading and
-.writing the same thing: LDA {N%} reads it, STA {N%} writes it, in the slot
-.BASIC itself uses.
+.{VAR} is the address of the variable's slot, so reading and writing use the
+.same form: LDA {N%} reads it, STA {N%} writes it, in the slot BASIC itself
+.uses.
 .
 .  {N} {N%} {N$}
 .      IS: the scalar's slot
@@ -86,26 +85,35 @@
 .      IS: the array's slot, which holds the base address of its data -- an
 .        element is two steps, as through GP.ARRPTR
 .
-.The name is letters, digits and dots, starting with a letter -- so
-.{DOC.GOT.OFF} works, and the dotted names the library and the samples use
-.everywhere are reachable from assembly. Underscore is not: BASLOAD allows it
-.in a name, this does not, and {A_B} reads the name as A. Up to 64
-.characters, the same as BASLOAD.
+.A name is letters, digits and dots, starting with a letter, up to 64
+.characters -- the same limit as BASLOAD. {DOC.GOT.OFF} works, so the dotted
+.names used throughout the library are reachable from assembly. Underscore is
+.not accepted: BASLOAD allows it in a name, this does not, and {A_B} reads
+.the name as A.
 .
-.  | {VAR} needs #SYMFILE, and that is the one thing to remember. BASLOAD
-.  | renames variables -- N% becomes A%, which is how it gives you 64
-.  | significant characters on a two-character BASIC -- and it does not
-.  | rename REM text with them. So the code says A% while the REM still says
-.  | {N%}. #SYMFILE is BASLOAD's own record of that mapping, and the compiler
-.  | reads it: #SYMFILE "@:PROG.SYM" at the top of the source, named to match
-.  | the PRG -- compiling PROG.PRG reads PROG.SYM. Nothing else changes: {N%}
-.  | is still written the way you wrote the variable. Two errors, both at
-.  | compile time and both naming the line: | | means | |---|---| | NO SYMBOL
-.  | FILE FOR {} | no #SYMFILE, or it is not beside the PRG under the
-.  | matching name | | UNKNOWN VARIABLE IN {} | the name is not a variable of
-.  | this program | {VAR} never creates a variable, which is the opposite of
-.  | what an ordinary BASIC reference does -- so assign it once in BASIC
-.  | first, even M% = 0. A name that missed would otherwise hand back a slot
-.  | BASIC never reads, and the block would run, store, and change nothing
-.  | you can see.
+.{VAR} requires #SYMFILE. BASLOAD renames variables -- N% becomes A%, which
+.is how it provides 64 significant characters on a two-character BASIC -- and
+.it does not rename REM text with them, so the code says A% while the REM
+.still says {N%}. #SYMFILE is BASLOAD's record of that mapping and the
+.compiler reads it:
+.
+:#SYMFILE "@:PROG.SYM"
+.
+.Put it at the top of the source, named to match the PRG: compiling PROG.PRG
+.reads PROG.SYM. Nothing else changes -- {N%} is still written with the name
+.as authored.
+.
+.Two compile-time errors, both naming the line:
+.
+.  NO SYMBOL FILE FOR {}
+.      MEANS: no #SYMFILE, or it is not beside the PRG under the matching
+.        name
+.
+.  UNKNOWN VARIABLE IN {}
+.      MEANS: the name is not a variable of this program
+.
+.{VAR} never creates a variable, unlike an ordinary BASIC reference. Assign
+.the variable once in BASIC first, even M% = 0. A name that does not exist
+.otherwise resolves to a slot BASIC never reads, and the block runs, stores,
+.and changes nothing observable.
 .

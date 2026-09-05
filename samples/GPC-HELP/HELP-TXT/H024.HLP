@@ -19,13 +19,13 @@
 :GOSUB LINEINPUT.GET
 :IF LINEINPUT.KEY = 27 THEN GOTO CANCELLED
 .
-.This is what INPUT and LINPUT cannot do. Both own the whole bottom of the
-.screen, scroll it, echo in whatever colour is current, and accept any length
-.-- all four fatal on a drawn screen. A field stays where you put it, in the
-.colour you give it, and stops at the width you allow.
+.INPUT and LINPUT cannot be used on a drawn screen: both take the bottom of
+.the screen, scroll it, echo in the current colour, and accept any length. A
+.LINEINPUT field stays at the given position, in the given colour, and stops
+.at the given width.
 .
-.LINEINPUT.KEY is the key that ended it, and it is what makes a multi-field
-.form possible:
+.LINEINPUT.KEY is the key that ended the field, which is what makes a
+.multi-field form possible:
 .
 .  13
 .      RETURN -- finished
@@ -37,13 +37,13 @@
 .  17 / 145 / 9
 .      cursor down / up / TAB -- left the field, text kept
 .
-.So a form is a loop over fields, not a sequence of prompts, and the user can
-.go back and fix the first one without starting again.
+.A form is therefore a loop over fields rather than a sequence of prompts,
+.and the user can return to an earlier field without restarting.
 .
-.LINEINPUT.MASK non-zero shows asterisks while holding the real string. The
-.field never scrolls: when full, further characters are refused and the
-.cursor inverts the last character rather than sitting off the end. The
-.cursor blinks off TI rather than a delay loop, because a delay loop would
+.LINEINPUT.MASK non-zero displays asterisks while holding the real string.
+.The field does not scroll: when it is full, further characters are refused
+.and the cursor inverts the last character rather than sitting past the end.
+.The cursor blinks off TI rather than a delay loop; a delay loop would
 .swallow keys pressed during it.
 .
 .Example: FORM.EXP.BL -- three fields, one masked, in a themed panel.

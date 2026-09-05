@@ -2,12 +2,13 @@
 .
 =5. VARIABLES
 .
-.BASL has one flat namespace and nothing else. No locals, no scoping, no
+.BASL has one flat namespace. There are no locals, no scoping and no
 .parameters. Every variable in every #INCLUDEd module is visible to your
-.program and vice versa, and nothing warns you: a collision is a wrong
+.program and the reverse, and nothing warns you: a collision is a wrong
 .answer, not an error.
 .
-.  | One module, one dotted prefix, and nothing writes outside its own.
+.The convention is one dotted prefix per module, and nothing writes outside
+.its own prefix.
 .
 =Prefixes already taken
 .
@@ -32,30 +33,29 @@
 .  BMX. / BMXK.
 .      OWNER: BMX.INC.BL (variables / its KERNAL constants)
 .
-.Pick anything else for your own program -- GAME., MAP., AIRLIFT.. A prefix
-.costs nothing at runtime, because BASLOAD crunches every identifier down to
-.a short BASIC variable: a long readable name and a two-letter one compile to
-.exactly the same thing.
+.Use any other prefix for your own program: GAME., MAP., AIRLIFT.. A prefix
+.costs nothing at runtime -- BASLOAD crunches every identifier to a short
+.BASIC variable, so a long readable name and a two-letter one compile to the
+.same thing.
 .
-.Do not reuse a taken prefix even for something the module has not defined.
-.THEME.MINE looks free today; it is one library update away from not being.
+.Do not reuse a taken prefix for a name the module has not defined.
+.THEME.MINE is free today and is one library update from not being.
 .
 =GP.* is keywords, not variables
 .
-.GPB.INC.BL defines no variables at all -- 27 #TOKEN lines and nothing else.
+.GPB.INC.BL defines no variables: 27 #TOKEN lines and nothing else.
 .
 :GP.A = 5          ' SYNTAX ERROR -- GP.A is a keyword
 :X = GP.A          ' correct
 .
-.The value words are GP.A GP.X GP.Y GP.C -- the registers after GP.CALL, and
-.now the whole list of them. They are tokens rather than variables for a hard
-.reason: nothing in the runtime can write a BASIC variable by name, so a
-.command that hands a value back has to hand it back through a keyword. X16's
-.own ST, MX and MY exist for the same reason.
+.The value words are GP.A GP.X GP.Y GP.C, the registers after GP.CALL, and
+.that is all of them. They are tokens rather than variables because nothing
+.in the runtime can write a BASIC variable by name, so a command that returns
+.a value must return it through a keyword. X16's own ST, MX and MY work the
+.same way.
 .
-.-> The complete per-module in / out / internal register is
-.GP-BASIC.GLOBALS.md, with a script in SEC 6 of that file for re-checking it
-.after a change.
+.The complete per-module in / out / internal register is GP-BASIC.GLOBALS.md,
+.with a script in SEC 6 of that file for re-checking it after a change.
 .
 =SEE ALSO
 .

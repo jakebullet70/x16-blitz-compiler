@@ -40,37 +40,36 @@
 .      IN: STR.PET
 .      OUT: STR.SCR
 .
-.All three pad routines leave a string already at or past the width alone.
-.They pad; they never truncate -- use STRCASE.RTRIM (SEC 4.8) to go the other
-.way.
+.The three pad routines leave a string that is already at or past the width
+.unchanged. They pad and never truncate; use STRCASE.RTRIM (SEC 4.8) to
+.shorten.
 .
 .SPLIT reads STR.STR$ without modifying it. STR.MAX of 0 means 10. Empty
-.fields are preserved, which is what makes it safe for data rows: "A,,C" is
-.three fields, "A," is two. Splitting an empty string gives one empty field,
-.never zero. Reaching the limit is not an error and loses nothing -- the last
-.field gets the whole unsplit remainder, delimiters and all.
+.fields are preserved: "A,,C" is three fields and "A," is two. Splitting an
+.empty string gives one empty field, never zero. Reaching the limit is not an
+.error and loses nothing -- the last field receives the unsplit remainder,
+.delimiters included.
 .
-.STR.FIELD$ is the one array the library deliberately does NOT DIM. Left
-.alone, GPC's implicit DIM gives 0..10. Want more, DIM it yourself before the
-.first call and set STR.MAX to match. DIMming an array GPC has already
-.auto-dimensioned is an error, so it is one or the other. This is the
-.opposite of THEME.CLR -- worth keeping straight.
+.STR.FIELD$ is the one array the library does not DIM. Left alone, GPC's
+.implicit DIM gives 0..10. For more, DIM it before the first call and set
+.STR.MAX to match. DIMming an array GPC has already auto-dimensioned is an
+.error, so it is one or the other. Note that this is the reverse of
+.THEME.CLR, which the module DIMs.
 .
 .REPLACE swaps every occurrence of STR.FIND$ for STR.REPL$, modifying
 .STR.STR$ in place. The replacement may be shorter, longer, or "" to delete.
-.Case sensitive, because GP.INSTR compares raw bytes.
+.It is case sensitive, because GP.INSTR compares raw bytes.
 .
-.  | It is safe when the replacement contains the thing being replaced -- "A"
-.  | -> "AA" terminates and gives you twice the As, where a naive in-place
-.  | version loops forever. The routine builds a new string and never
-.  | re-scans what it has already emitted. An empty STR.FIND$ leaves the
-.  | string alone rather than hanging; that falls out of GP.INSTR reporting
-.  | "not found" for a zero-length needle, so no guard is needed. Like the
-.  | pad routines it is not length checked -- a longer replacement can push
-.  | the result past 255 characters.
+.A replacement that contains the search text is safe: "A" to "AA" terminates
+.and doubles the As, where a naive in-place version would not. The routine
+.builds a new string and never re-scans what it has emitted. An empty
+.STR.FIND$ leaves the string unchanged rather than hanging, because GP.INSTR
+.reports not-found for a zero-length needle. Like the pad routines it is not
+.length checked: a longer replacement can push the result past 255
+.characters.
 .
 .PET2SCR converts a PETSCII code to the screen code the tile map holds, for
-.TILE, TDATA and VPOKE. GP.PRINTAT and GP.FILL already do it internally.
+.TILE, TDATA and VPOKE. GP.PRINTAT and GP.FILL do this internally.
 .
 =EXAMPLE PROGRAM
 .

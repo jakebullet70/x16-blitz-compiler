@@ -6,21 +6,19 @@
 .are holes, and they stay holes: the token values are the ABI and are never
 .renumbered.
 .
-=At a glance -- the whole library, and what each part costs
+=At a glance -- where each part comes from
 .
-.Everything GP.BASIC gives you, and where it comes from. The rest of SEC 3 is
-.the keywords; the BASIC modules are written up in SEC 4.
+.Three implementations, and what each costs:
 .
-.  - ASM -- a keyword the compiler knows, run by machine code in the runtime.
-.    Costs runtime bytes, and a program that uses one GP keyword pays for the
-.    whole block. Written in SEC 3.
+.  - ASM -- a keyword run by machine code in the runtime. Costs runtime
+.    bytes, and one GP keyword anywhere in a program pays for the whole
+.    1,024-byte block. Documented in SEC 3.
 .  - BASIC -- a .INC.BL module of ordinary BASL, called with GOSUB. Costs
-.    nothing unless you #INCLUDE it, and then only its own p-code. Written in
+.    nothing unless #INCLUDEd, and then only its own p-code. Documented in
 .    SEC 4.
-.  - COMPOSITE -- a keyword the compiler knows that has no machine code of
-.    its own. The compiler expands it into keywords that already exist, so it
-.    reads like a keyword and costs the runtime nothing at all. Written in
-.    SEC 3 alongside the ASM ones.
+.  - COMPOSITE -- a keyword with no machine code of its own; the compiler
+.    expands it into keywords that already exist. Costs the runtime nothing.
+.    Documented in SEC 3 with the ASM keywords.
 .
 .  Loops
 .      ASM
@@ -91,15 +89,15 @@
 .      BASIC
 .      MENUVERT.INC.BL -- RUN DRAW ROW HOTFIND - SEC 4.6
 .
-.The rule that decides the side is in SEC 1: assembly gets what runs in a
-.tight loop or moves bulk data, BASIC gets everything else -- and anything
-.that is only a rename of keywords already present gets neither, and becomes
-.a composite. A menu waits on a human, so it is BASIC: as a keyword it would
-.cost every GPB program 462 bytes whether it had a menu or not.
+.The rule is in SEC 1: assembly for tight loops and bulk data moves, BASIC
+.for everything else, and a composite for anything that is only a spelling of
+.keywords already present. A menu waits on a human, so MENUVERT is BASIC; as
+.a keyword it would cost every GP program 462 bytes whether or not it used a
+.menu.
 .
-.The keywords, in detail. Square brackets mean optional, and optionals cannot
-.be skipped over -- GP.BOX X,Y,W,H,,7 is a syntax error; write the style you
-.are defaulting.
+.The keywords in detail. Square brackets mean optional. Optionals cannot be
+.skipped over: GP.BOX X,Y,W,H,,7 is a syntax error -- write out the default
+.you are passing through.
 .
 =SEE ALSO
 .

@@ -16,20 +16,19 @@
 =DESCRIPTION
 .
 .Calls machine code with the registers set. All four arguments are optional
-.and default to 0. The four value words read the results back afterwards.
+.and default to 0. The four value words read the registers back afterwards.
 .
-.They are keywords, not variables -- X = GP.A reads, GP.A = 5 is a syntax
+.They are keywords, not variables: X = GP.A reads, GP.A = 5 is a syntax
 .error. They share SYS's $030C-$030F, so they also read what a plain SYS left
 .behind.
 .
 :GP.CALL $FF5F, 0, 0, 0, 1          ' KERNAL screen_mode, carry set = report
 :COLS = GP.X : ROWS = GP.Y
 .
-.  | Put your machine code in banked RAM ($A000-$BFFF), not $0400. Stock X16
-.  | BASIC leaves $0400 free for the user; a compiled GPC program does not --
-.  | that page holds runtime state (stringHighMemory, storeStartHigh,
-.  | variableStartPage), and POKEing code over it corrupts the program
-.  | silently.
+.Put machine code in banked RAM, $A000-$BFFF, not at $0400. Stock X16 BASIC
+.leaves $0400 free for the user; a compiled GPC program does not. That page
+.holds runtime state (stringHighMemory, storeStartHigh, variableStartPage),
+.and code POKEd over it corrupts the program without raising an error.
 .
 =Splitting an address -- GP.HIBYTE / GP.LOBYTE
 .
@@ -39,29 +38,25 @@
 .  GP.LOBYTE(n)
 .      DOES: MOD(n, 256) -- the offset within it. Composite
 .
-.A 6502 address is sixteen bits, and everything that consumes one takes eight
-.at a time -- GP.CALL's registers, VERA's $9F20/$9F21. So every address that
-.leaves BASIC for machine code gets split, and GP.STRPTR / GP.ARRPTR exist in
-.order to hand one over:
+.A 6502 address is sixteen bits and everything that consumes one takes eight
+.bits at a time: GP.CALL's registers, VERA's $9F20/$9F21. Every address
+.passed from BASIC to machine code is therefore split. GP.STRPTR and
+.GP.ARRPTR produce the addresses to pass:
 .
 :P = GP.STRPTR(A$)
 :GP.CALL $A000, GP.LOBYTE(P), GP.HIBYTE(P)
 .
-.  | This is the reason they are keywords rather than something you write
-.  | out. The spelling that looks right -- P AND 255 -- is a live bug in GPC:
-.  | AND is 16-bit signed, and every address worth splitting is above 32767
-.  | (the string heap always is), so it raises OUT OF RANGE instead of
-.  | masking. GP.LOBYTE is built on MOD, which runs through the full 32-bit
-.  | divide and is not on that path.
+.Do not write P AND 255 for the low byte. AND is 16-bit signed in GPC, and
+.any address worth splitting is above 32,767 (the string heap always is), so
+.it raises OUT OF RANGE rather than masking. GP.LOBYTE is built on MOD, which
+.uses the full 32-bit divide.
 .
-.Range is 0-65535, which is every address on the machine. Both are composite
-.-- they add no runtime code, and compile to exactly INT(n/256) and
-.MOD(n,256).
+.Range is 0-65,535, which covers every address on the machine. Both are
+.composite: no runtime code, compiling to INT(n/256) and MOD(n,256).
 .
-.  | For anything longer than a few bytes, write it as assembly instead --
-.  | SEC 3.9. GP.ASM assembles into the program, so there is no bank to
-.  | reserve, no POKE loop, and no comment to keep in step with a list of
-.  | numbers.
+.For anything longer than a few bytes use GP.ASM (SEC 3.9) instead of GP.CALL
+.and a POKE loop. It assembles into the program: no bank to reserve, and no
+.list of numbers to keep in step with a comment.
 .
 =EXAMPLE PROGRAM
 .

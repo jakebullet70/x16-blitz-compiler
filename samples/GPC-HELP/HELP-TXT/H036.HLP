@@ -40,7 +40,7 @@
 .short BASIC variable, so a long readable name and a two-letter one compile
 .to exactly the same thing.
 .
-.Do not reuse a taken prefix even for something the module has not defined.
+.Do not reuse a taken prefix for a name the module has not defined.
 .THEME.MINE looks free today; it is one library update away from not being.
 .
 =SEE ALSO

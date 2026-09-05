@@ -2,16 +2,16 @@
 .
 =3. THE TOOLS
 .
-.GPC.ERR.PRG turns a runtime error's @ $XXXX into a source line, given the
-.debug map the compiler writes when you answer yes to MAKE A DEBUG MAP?.
-.Without the map an address is just an address.
+.GPC.ERR.PRG turns a runtime error's @ $XXXX into a source line, using the
+.debug map the compiler writes when MAKE A DEBUG MAP? is answered yes.
+.Without the map the address cannot be resolved.
 .
-.BASLOAD is not a file here -- it is built into the R49 ROM. It reads .BASL
-.source, which is BASIC with long names, labels instead of line numbers,
-.#INCLUDE and #DEFINE, and writes the tokenised .PRG that GPC compiles. Every
+.BASLOAD is not a file here; it is built into the R49 ROM. It reads .BASL
+.source -- BASIC with long names, labels instead of line numbers, #INCLUDE
+.and #DEFINE -- and writes the tokenised .PRG that GPC compiles. Every
 ..INC.BL and .EXP.BL in this folder is BASLOAD source.
 .
 .A program using GP.BASIC is compile-only. BASLOAD's output for one is not a
-.program the ROM can LIST or RUN -- nothing in BASIC sits behind a GP. token.
-.It is compiler input, and that is the expected state, not a fault.
+.program the ROM can LIST or RUN, because nothing in BASIC sits behind a GP.
+.token. It is compiler input.
 .
