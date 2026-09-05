@@ -33,6 +33,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [GPC.ERR builds shared, in the main dir](gpcerr-build-shared-in-main-dir.md) — never standalone; the headless harness builds the wrong kind
 - [Tests share the product's memory](tests-share-the-products-memory.md) — the harness was 3,615 B of workspace; and BASLOAD does not nest #IFNDEF
 - [Paste can't drive a running program](paste-cannot-drive-a-running-program.md) — test an interactive front end with a generated fixed-answer variant
+- [File I/O dies in a GP.DO key loop](file-io-error-in-gpdo-key-loop.md) — writes the file, then INPUT/OUTPUT ERROR; the seven shapes already ruled out
 - [Retired keyword defers to runtime](retired-keyword-defers-to-runtime.md) — stale callers compile clean and explode; grep testing/ too
 - **Emulator split** — *(note missing: linked by the index but never committed)* x16emu r49 runs the tests, Box16 is for debugging.
 

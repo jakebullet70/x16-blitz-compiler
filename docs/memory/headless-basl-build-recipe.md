@@ -28,6 +28,14 @@ is how the compiler's own messages get out.
    just waits out the timeout and is caught by the missing object file.
 3. **Run**: `-prg C.NAME.PRG -run -echo`, plus `-warp` unless `TI` is being measured.
 
+**ON WINDOWS, A BACKGROUNDED `x16emu` CANNOT BE KILLED FROM BASH.** `emu & ... kill $!` kills the
+shell's job, not the Windows process: nine warp-mode emulators accumulated unnoticed on 2026-09-05
+and starved the box until a tokenise step failed with an empty echo log. Drive manual runs from a
+Python wrapper that holds the real handle (`subprocess.Popen` then `p.kill()`), the way
+`build_basl.py` already does. To clear a mess, list command lines first --
+`Get-CimInstance Win32_Process -Filter "Name='x16emu.exe'"` -- and kill only the `-warp` ones:
+an interactive session of the user's is usually running too, and it is not yours to kill.
+
 **Read the raw `RUN.LOG`, never a filtered summary, before believing a program printed
 nothing.** Two real failures now: a helper keeping only the last N fragments dropped an
 assertion behind a font dump; and `edbuild.py`'s `readable()` kept only printable runs of

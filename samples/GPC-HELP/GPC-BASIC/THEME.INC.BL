@@ -1,18 +1,25 @@
 ## ***********************************************************************
 ## **
-## **  THEME.INC.BL -- named colour roles, in three themes.
+## **  THEME.INC.BL -- named colour roles, in five themes.
 ## **
 ## **  A theme costs NO KEYWORDS AND NO RUNTIME BYTES. The colours are read by BASIC, for
 ## **  COLOR and the GP drawing commands -- assembly never touches them -- so a runtime
 ## **  version would have bought nothing and spent two keyword slots. As data they also save
 ## **  and load like any array, so "switch to dark" is reloading one.
 ## **
-## **      THEME.ID   0 CLASSIC   blue page, white text -- the default
+## **      THEME.ID   0 X16       blue page, white text -- the default
 ## **                  1 DARK      black page, light grey text
 ## **                  2 LIGHT     white page, black text
+## **                  3 GRAY      dark grey page, light blue frames
+## **                  4 CUSTOM    whatever THEME.CLR already holds
 ## **
 ## **  THEME.NEXT cycles to the following one and loads it, which is what a
-## **  program binds to a key.
+## **  program binds to a key. THEME.RESET reloads the one already selected.
+## **
+## **  CUSTOM LOADS NOTHING. Selecting it leaves THEME.CLR as it stands, so a program that
+## **  lets the user change colours carries those changes into CUSTOM rather than losing
+## **  them. On a COLD START -- CUSTOM selected before any other theme has been loaded --
+## **  there is nothing to keep, so it takes X16's values. THEME.RESET goes back to those.
 ## **
 ## **  #DEFINE substitutes at TRANSLATION time, so THEME.CLR(THEME.TITLE) compiles to
 ## **  THEME.CLR(2): no variable, no lookup, and a one-byte constant index.
@@ -30,7 +37,7 @@
 #IFNDEF THEME.DEFS
 #DEFINE THEME.DEFS 1
 
-## The roles. Add one here and to ALL THREE palettes below, and raise SLOTS.
+## The roles. Add one here and to ALL FIVE palettes below, and raise SLOTS.
 
 #DEFINE THEME.PAGE 0
 #DEFINE THEME.TEXT 1
@@ -42,7 +49,7 @@
 #DEFINE THEME.SLOTS 7
 
 ## How many themes THEME.NEXT cycles through.
-#DEFINE THEME.COUNT 3
+#DEFINE THEME.COUNT 5
 
 ## X16 palette indices, for reading the tables below.
 ##   0 black    1 white   2 red     3 cyan     4 purple  5 green
@@ -51,7 +58,7 @@
 
 GOTO THEME.SKIP
 
-## THEME.LOAD -- fill THEME.CLR from THEME.ID (0 classic, 1 dark, 2 light).
+## THEME.LOAD -- fill THEME.CLR from THEME.ID.
 ##
 ## THEME.CLR is DIMmed here rather than left implicit: an implicit array is 0..10 and
 ## DIMming one GPC already auto-dimensioned is an error, so the module owns it outright.
@@ -60,18 +67,20 @@ GOTO THEME.SKIP
 ## so a library owning one would silently derail the caller's own READs.
 
 THEME.LOAD:
-    IF THEME.READY = 0 THEN DIM THEME.CLR(THEME.SLOTS) : THEME.READY = 1
+    THEME.FIRST = 0
+    IF THEME.READY = 0 THEN DIM THEME.CLR(THEME.SLOTS) : THEME.READY = 1 : THEME.FIRST = 1
     IF THEME.ID = 1 THEN GOTO THEME.LOAD.DARK
     IF THEME.ID = 2 THEN GOTO THEME.LOAD.LIGHT
+    IF THEME.ID = 3 THEN GOTO THEME.LOAD.GRAY
+    IF THEME.ID = 4 THEN GOTO THEME.LOAD.CUSTOM
 
+THEME.LOAD.X16:
     THEME.CLR(THEME.PAGE)   = 6 * 16 + 6
     THEME.CLR(THEME.TEXT)   = 6 * 16 + 1
     THEME.CLR(THEME.TITLE)  = 6 * 16 + 3
     THEME.CLR(THEME.BORDER) = 6 * 16 + 14
     THEME.CLR(THEME.HILITE) = 1 * 16 + 6
     THEME.CLR(THEME.DIMMED) = 6 * 16 + 12
-    ## PROVISIONAL, pending the colour test program. Red 2 (#880000) and light
-    ## red 10 (#FF7777) were both refused on this page.
     THEME.CLR(THEME.WARN)   = 6 * 16 + 13
     RETURN
 
@@ -97,11 +106,37 @@ THEME.LOAD.LIGHT:
     THEME.CLR(THEME.WARN)   = 1 * 16 + 2
     RETURN
 
+## Lifted from the XFMGR file manager, src/stree.pb MODULE theme: TXT_NORMAL $B1,
+## TXT_BRIGHT $B7, BOXES $BE, ROW_HILIGHT $E1. DIMMED and WARN are not in that module
+## and are chosen here.
+THEME.LOAD.GRAY:
+    THEME.CLR(THEME.PAGE)   = 11 * 16 + 11
+    THEME.CLR(THEME.TEXT)   = 11 * 16 + 1
+    THEME.CLR(THEME.TITLE)  = 11 * 16 + 7
+    THEME.CLR(THEME.BORDER) = 11 * 16 + 14
+    THEME.CLR(THEME.HILITE) = 14 * 16 + 1
+    THEME.CLR(THEME.DIMMED) = 11 * 16 + 12
+    THEME.CLR(THEME.WARN)   = 11 * 16 + 2
+    RETURN
+
+## CUSTOM keeps whatever is in THEME.CLR, so switching to it carries the colours the
+## user was looking at. THEME.FIRST is set only when THEME.LOAD had to create the array,
+## which is the one case where there is nothing to keep.
+THEME.LOAD.CUSTOM:
+    IF THEME.FIRST = 0 THEN RETURN
+    GOTO THEME.LOAD.X16
+
 ## THEME.NEXT -- the following theme, loaded. Falls into THEME.LOAD, so its
 ## RETURN is the one the caller gets.
 THEME.NEXT:
     THEME.ID = THEME.ID + 1
     IF THEME.ID >= THEME.COUNT THEN THEME.ID = 0
+    GOTO THEME.LOAD
+
+## THEME.RESET -- the selected theme's shipped values, throwing away any changes.
+## CUSTOM has none of its own, so it resets to X16.
+THEME.RESET:
+    IF THEME.ID = 4 THEN GOTO THEME.LOAD.X16
     GOTO THEME.LOAD
 
 ## THEME.SET -- make THEME.ATTR the colour PRINT uses.

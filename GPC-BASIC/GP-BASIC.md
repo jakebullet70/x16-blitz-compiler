@@ -717,20 +717,31 @@ anywhere, including the top of the program.
 |---|---|---|
 | `THEME.LOAD` | `THEME.ID` | fills `THEME.CLR()` |
 | `THEME.NEXT` | `THEME.ID` | the following theme, loaded |
+| `THEME.RESET` | `THEME.ID` | the selected theme's shipped values, reloaded |
 | `THEME.SET` | `THEME.ATTR` | issues `COLOR` — makes it the colour `PRINT` uses |
 | `THEME.HI` | `THEME.ATTR` | `THEME.INV`, the inverse attribute |
 
-Three themes, `THEME.COUNT` of them:
+Five themes, `THEME.COUNT` of them:
 
 | `THEME.ID` | | |
 |---:|---|---|
-| 0 | `CLASSIC` | blue page, white text, yellow headings. The default |
+| 0 | `X16` | blue page, white text, cyan headings. The default |
 | 1 | `DARK` | black page, light grey text |
 | 2 | `LIGHT` | white page, black text |
+| 3 | `GRAY` | dark grey page, light blue frames. From the XFMGR file manager |
+| 4 | `CUSTOM` | whatever `THEME.CLR()` already holds |
 
 `THEME.NEXT` moves to the following one and wraps, which is what a program binds to a key. A cached
 attribute does not follow it: work out anything derived from `THEME.CLR()`, a reversed bar included,
 after every load.
+
+**`CUSTOM` loads nothing.** Selecting it leaves `THEME.CLR()` as it stands, so a program that lets
+the user change colours carries those changes into `CUSTOM` rather than discarding them. The one
+exception is a cold start — `CUSTOM` selected before any other theme has been loaded — where there
+is nothing to keep and it takes `X16`'s values. `THEME.RESET` goes back to those.
+
+`samples/color-test` edits all seven roles against a mock of the GUI and prints the
+`THEME.CLR()` lines to paste back in here.
 
 Roles, for indexing `THEME.CLR()`: `THEME.PAGE` `THEME.TEXT` `THEME.TITLE` `THEME.BORDER`
 `THEME.HILITE` `THEME.DIMMED` `THEME.WARN`, and `THEME.SLOTS` = 7.

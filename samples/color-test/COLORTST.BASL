@@ -1,0 +1,333 @@
+#SAVEAS "@:COLORTST.SRC.PRG"
+#SYMFILE "@:COLORTST.SYM"
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "APPSYS.INC.BL"
+#INCLUDE "THEME.INC.BL"
+
+## ***********************************************************************
+## **
+## **  COLORTST.BASL -- edit a THEME.INC.BL theme against a mock of the GUI,
+## **  and read the result back as source.
+## **
+## **  A vertical menu of the seven roles. UP and DOWN choose one, LEFT and
+## **  RIGHT walk its colour through the palette, and the mock repaints on
+## **  every step. T selects the next theme, R reloads the selected theme's
+## **  shipped values, Q leaves the screen as it was found.
+## **
+## **  ONE COLOUR A ROLE, on a background every role shares. BACKGROUND is the
+## **  first menu row and is THEME.PAGE; the other six are foregrounds on it.
+## **
+## **  HILITE IS THE EXCEPTION. It is a filled bar, so its menu row picks the
+## **  BAR colour and the text on it is the page colour -- which is what makes
+## **  it read as reversed, and what reproduces the shipped X16, DARK and LIGHT
+## **  values exactly. A bar set to the page colour would vanish, so there the
+## **  text falls back to black or white.
+## **
+## **  CUSTOM INHERITS WHAT IS ON SCREEN. T writes the roles back to THEME.CLR
+## **  before cycling and THEME.ID 4 loads nothing, so the theme you step to
+## **  CUSTOM from is the one it starts as. The four before it DO load, so tune
+## **  after arriving at CUSTOM, or tune GRAY and press T once.
+## **
+## **  THE CONTROLS ARE NOT DRAWN IN THE SCHEME. Below CT.CHY the screen is
+## **  white on black and stays that way, so a background set equal to the
+## **  text blanks the mock and never the instructions.
+## **
+## **  80 COLUMNS. The row anchors follow APPSYS.ROWS, so 80x30 and 80x60 both
+## **  work; the columns are laid out for 80 and do not narrow.
+## **
+## **  UPPER CASE LITERALS ONLY. GP.PRINTAT converts PETSCII and BASLOAD
+## **  passes literals through as source bytes, so lower case lands on the
+## **  graphics half of the default font.
+## **
+## ***********************************************************************
+
+## The screen this is laid out for. 1 is 80x30, 0 is 80x60.
+#DEFINE CT.MODE 1
+
+## The control area, fixed whatever the scheme is set to.
+#DEFINE CT.CHROME 1
+#DEFINE CT.CHSEL 16
+#DEFINE CT.CHDIM 12
+
+DIM CT.CLR(6)
+
+CT.HEX$ = "0123456789ABCDEF"
+CT.BAR$ = "===="
+
+## One flag a palette index: 1 means the colour is light enough to want black
+## text on it. Read by the swatch and by the HILITE fallback.
+CT.LIGHT$ = "0101000100100101"
+
+## Six characters a palette index, cut out by position.
+CT.NAMES$ = "BLACK WHITE RED   CYAN  PURPLEGREEN BLUE  YELLOWORANGEBROWN PINK  DKGREYMDGREYLTGRN LTBLUELTGREY"
+
+## The menu, ten characters a role, in THEME's own role order.
+CT.LABS$ = "BACKGROUNDTEXT      TITLE     BOX FRAME HILITE BARDIMMED    WARN      "
+
+## The left hand side of each line the menu produces, padded to 24.
+CT.LHS$ = "THEME.CLR(THEME.PAGE)   THEME.CLR(THEME.TEXT)   THEME.CLR(THEME.TITLE)  THEME.CLR(THEME.BORDER) "
+CT.LHS$ = CT.LHS$ + "THEME.CLR(THEME.HILITE) THEME.CLR(THEME.DIMMED) THEME.CLR(THEME.WARN)   "
+
+## APPSYS.STARTUP first, before any SCREEN of our own: it records the screen
+## the user had, and that is what APPSYS.RESTORE puts back.
+GOSUB APPSYS.STARTUP
+SCREEN CT.MODE
+
+## Asked after the mode change, not before. APPSYS.STARTUP reported the size
+## of the screen the user had, not the one just set.
+GP.CALL APPSYS.SCRMODE, 0, 0, 0, 1
+APPSYS.COLS = GP.X
+APPSYS.ROWS = GP.Y
+
+THEME.ID = 0 : GOSUB THEME.LOAD
+GOSUB CTX.FROMTHEME
+CT.SEL = 0
+
+## ---- Layout. The controls are the bottom 13 rows; the mock gets the rest.
+
+CT.CHY  = APPSYS.ROWS - 13
+CT.SWY  = CT.CHY + 1
+CT.CURY = CT.CHY + 2
+CT.MNY  = CT.CHY + 4
+CT.KYY  = CT.CHY + 12
+
+CT.SWX = 10
+CT.SWW = 4
+CT.PSX = 28
+
+CT.DW = 36
+CT.DH = 9
+CT.DX = INT((APPSYS.COLS - CT.DW) / 2)
+CT.DY = 5 + INT((CT.CHY - 5 - CT.DH) / 2)
+
+CLS
+GOSUB CTX.DRAW
+
+GP.DO
+  GET CT.K$
+  GP.IF CT.K$ <> "" THEN
+    GOSUB CTX.KEY
+    GP.IF CT.QUIT <> 0 THEN
+      GP.EXITDO
+    GP.ENDIF
+  GP.ENDIF
+GP.LOOP
+
+GOSUB APPSYS.RESTORE
+END
+
+
+## ***********************************************************************
+## **  CTX.ROLES -- the seven packed attributes the mock draws with.
+## ***********************************************************************
+
+CTX.ROLES:
+  CT.BG     = CT.CLR(0)
+  CT.PAGE   = CT.BG * 16 + CT.BG
+  CT.TEXT   = CT.BG * 16 + CT.CLR(1)
+  CT.TITLE  = CT.BG * 16 + CT.CLR(2)
+  CT.BORDER = CT.BG * 16 + CT.CLR(3)
+  CT.DIMMED = CT.BG * 16 + CT.CLR(5)
+  CT.WARN   = CT.BG * 16 + CT.CLR(6)
+  CT.HB     = CT.CLR(4)
+  CT.HF     = CT.BG
+  IF CT.HB = CT.BG THEN CT.HF = 1 - VAL(MID$(CT.LIGHT$, CT.HB + 1, 1))
+  CT.HILITE = CT.HB * 16 + CT.HF
+  RETURN
+
+
+## ***********************************************************************
+## **  CTX.DRAW -- the whole screen, every time. Nothing is left behind by a
+## **  shorter string because the two region fills run first.
+## ***********************************************************************
+
+CTX.DRAW:
+  GOSUB CTX.ROLES
+
+  ## The mock, and only the mock, is painted in the scheme.
+  GP.FILL 0, 0, APPSYS.COLS, CT.CHY, ASC(" "), CT.PAGE
+  GP.FILL 0, 0, APPSYS.COLS, 1, ASC(" "), CT.HILITE
+  GP.PRINTAT 2, 0, "FILE   EDIT   VIEW   HELP", CT.HILITE
+
+  GP.PRINTAT 2, 2, "THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG", CT.TEXT
+  GP.PRINTAT 2, 3, "0123456789 .,:;!?()-+=*/", CT.TEXT
+
+  GP.FILL CT.DX, CT.DY, CT.DW, CT.DH, ASC(" "), CT.TEXT
+  GP.BOX CT.DX, CT.DY, CT.DW, CT.DH, 1, CT.BORDER
+  GP.PRINTAT CT.DX + 2, CT.DY, " OPTIONS ", CT.TITLE
+  GP.PRINTAT CT.DX + 3, CT.DY + 2, "NORMAL TEXT ON THE PANEL", CT.TEXT
+  GP.PRINTAT CT.DX + 3, CT.DY + 3, "DIMMED - A DISABLED ITEM", CT.DIMMED
+  GP.PRINTAT CT.DX + 3, CT.DY + 4, "WARN - SOMETHING IS WRONG", CT.WARN
+  GP.PRINTAT CT.DX + 3, CT.DY + 6, "  OK  ", CT.HILITE
+  GP.PRINTAT CT.DX + 13, CT.DY + 6, " CANCEL ", CT.TEXT
+
+  ## Everything from here down is white on black and stays that way.
+  GP.FILL 0, CT.CHY, APPSYS.COLS, APPSYS.ROWS - CT.CHY, ASC(" "), CT.CHROME
+  GOSUB CTX.SWATCH
+  GOSUB CTX.MENU
+
+  GOSUB CTX.THNAME
+  GP.PRINTAT 2, CT.KYY, "UP DN  ROLE   <- ->  COLOUR   T  THEME - " + CT.TH$ + "   R  RESET   Q  QUIT", CT.CHROME
+  RETURN
+
+
+## ---- The 16 palette entries, with a bar under the selected role's colour.
+
+CTX.SWATCH:
+  CT.CUR = CT.CLR(CT.SEL)
+  GP.PRINTAT 2, CT.SWY, "COLOUR", CT.CHROME
+  FOR CT.N = 0 TO 15
+    CT.SWFG = 1 - VAL(MID$(CT.LIGHT$, CT.N + 1, 1))
+    GP.FILL CT.SWX + CT.N * CT.SWW, CT.SWY, CT.SWW, 1, ASC(" "), CT.N * 16 + CT.SWFG
+    GP.PRINTAT CT.SWX + 1 + CT.N * CT.SWW, CT.SWY, MID$(CT.HEX$, CT.N + 1, 1), CT.N * 16 + CT.SWFG
+  NEXT
+  GP.PRINTAT CT.SWX + CT.CUR * CT.SWW, CT.CURY, LEFT$(CT.BAR$, CT.SWW), CT.CHROME
+  RETURN
+
+
+## ---- The menu, and beside each row the line that row produces.
+
+CTX.MENU:
+  FOR CT.N = 0 TO 6
+    GOSUB CTX.MROW
+    CT.FA = CT.CHROME
+    IF CT.N = CT.SEL THEN CT.FA = CT.CHSEL
+    GP.PRINTAT 2, CT.MNY + CT.N, CT.ROW$, CT.FA
+    GOSUB CTX.PLINE
+    GP.PRINTAT CT.PSX, CT.MNY + CT.N, CT.PL$, CT.CHDIM
+  NEXT
+  RETURN
+
+
+## CTX.MROW -- role CT.N as a fixed 22 character row, so reversing one reads
+## as a block and not as ragged text.
+
+CTX.MROW:
+  CT.C = CT.CLR(CT.N)
+  GOSUB CTX.CNAME
+  CT.ROW$ = " " + MID$(CT.LABS$, CT.N * 10 + 1, 10) + " " + CT.CN$ + " "
+  RETURN
+
+
+## CTX.PLINE -- role CT.N as the THEME.CLR assignment it compiles to. PAGE is
+## the background twice over, and HILITE is the one role with its own.
+
+CTX.PLINE:
+  CT.PB = CT.BG
+  CT.PF = CT.CLR(CT.N)
+  IF CT.N = 0 THEN CT.PF = CT.BG
+  IF CT.N = 4 THEN CT.PB = CT.HB : CT.PF = CT.HF
+  CT.V = CT.PB
+  GOSUB CTX.NUM
+  CT.PL$ = MID$(CT.LHS$, CT.N * 24 + 1, 24) + "=" + CT.V$ + " * 16 +"
+  CT.V = CT.PF
+  GOSUB CTX.NUM
+  CT.PL$ = CT.PL$ + CT.V$
+  RETURN
+
+
+## CTX.CNAME -- palette index CT.C as "nn NAME", nine characters.
+
+CTX.CNAME:
+  CT.V = CT.C
+  GOSUB CTX.NUM
+  CT.CN$ = CT.V$ + " " + MID$(CT.NAMES$, CT.C * 6 + 1, 6)
+  RETURN
+
+
+CTX.THNAME:
+  GP.SELECT THEME.ID
+    GP.CASE 1
+      CT.TH$ = "DARK  "
+    GP.CASE 2
+      CT.TH$ = "LIGHT "
+    GP.CASE 3
+      CT.TH$ = "GRAY  "
+    GP.CASE 4
+      CT.TH$ = "CUSTOM"
+    GP.OTHER
+      CT.TH$ = "X16   "
+  GP.ENDSEL
+  RETURN
+
+
+## CT.V as two right-aligned digits. STR$ leads a positive number with a space.
+
+CTX.NUM:
+  CT.V$ = MID$(STR$(CT.V), 2)
+  IF LEN(CT.V$) < 2 THEN CT.V$ = " " + CT.V$
+  RETURN
+
+
+## ***********************************************************************
+## **  CTX.KEY -- one keypress. UP and DOWN move the menu, LEFT and RIGHT
+## **  move the selected role's colour, and the screen repaints either way.
+## ***********************************************************************
+
+CTX.KEY:
+  CT.K = ASC(CT.K$)
+  IF CT.K >= 97 AND CT.K <= 122 THEN CT.K = CT.K - 32
+  IF CT.K >= 193 AND CT.K <= 218 THEN CT.K = CT.K - 128
+  GP.SELECT CT.K
+    GP.CASE 145
+      CT.SEL = CT.SEL - 1
+      IF CT.SEL < 0 THEN CT.SEL = 6
+    GP.CASE 17
+      CT.SEL = CT.SEL + 1
+      IF CT.SEL > 6 THEN CT.SEL = 0
+    GP.CASE 157
+      CT.STEP = -1
+      GOSUB CTX.MOVE
+    GP.CASE 29
+      CT.STEP = 1
+      GOSUB CTX.MOVE
+    GP.CASE 84
+      GOSUB CTX.TOTHEME
+      GOSUB THEME.NEXT
+      GOSUB CTX.FROMTHEME
+    GP.CASE 82
+      GOSUB THEME.RESET
+      GOSUB CTX.FROMTHEME
+    GP.CASE 81
+      CT.QUIT = 1
+  GP.ENDSEL
+  GP.IF CT.QUIT = 0 THEN
+    GOSUB CTX.DRAW
+  GP.ENDIF
+  RETURN
+
+
+## ---- The selected role, one step along the palette and wrapping.
+
+CTX.MOVE:
+  CT.C = CT.CLR(CT.SEL) + CT.STEP
+  IF CT.C < 0 THEN CT.C = 15
+  IF CT.C > 15 THEN CT.C = 0
+  CT.CLR(CT.SEL) = CT.C
+  RETURN
+
+
+## ---- THEME.CLR to the menu, and back. CTX.TOTHEME runs before THEME.NEXT so
+## ---- that CUSTOM, which loads nothing, picks up what is on the screen.
+
+CTX.FROMTHEME:
+  CT.CLR(0) = INT(THEME.CLR(THEME.PAGE) / 16)
+  CT.CLR(1) = THEME.CLR(THEME.TEXT) AND 15
+  CT.CLR(2) = THEME.CLR(THEME.TITLE) AND 15
+  CT.CLR(3) = THEME.CLR(THEME.BORDER) AND 15
+  CT.CLR(4) = INT(THEME.CLR(THEME.HILITE) / 16)
+  CT.CLR(5) = THEME.CLR(THEME.DIMMED) AND 15
+  CT.CLR(6) = THEME.CLR(THEME.WARN) AND 15
+  RETURN
+
+
+CTX.TOTHEME:
+  GOSUB CTX.ROLES
+  THEME.CLR(THEME.PAGE)   = CT.PAGE
+  THEME.CLR(THEME.TEXT)   = CT.TEXT
+  THEME.CLR(THEME.TITLE)  = CT.TITLE
+  THEME.CLR(THEME.BORDER) = CT.BORDER
+  THEME.CLR(THEME.HILITE) = CT.HILITE
+  THEME.CLR(THEME.DIMMED) = CT.DIMMED
+  THEME.CLR(THEME.WARN)   = CT.WARN
+  RETURN
