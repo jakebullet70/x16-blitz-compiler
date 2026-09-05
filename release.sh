@@ -97,6 +97,12 @@ out = os.path.join(release_dir, "gpc-release-%s.zip" % num)
 #                  tokenised build is NOT shipped -- it exists in the tree only as the
 #                  compile input, and could not be run in any case: GPC.ERR.BASL uses GP
 #                  tokens, so BASLOAD's output is compile-only, same as the front end's.
+#   GPB.HELP.PRG   the on-machine reference -- the manual, the globals register and the
+#                  file list, readable on the X16. Taken from samples/GPC-HELP/ already
+#                  built, EMBEDDED, so it needs no runtime beside it.
+#   HELP-TXT/      GPB.HELP.IDX and H001..Hnnn.HLP, the viewer's index and topics. It opens
+#                  them as //HELP-TXT/:NAME, the CMD subdirectory syntax, so the folder has
+#                  to stay a folder in the zip.
 #   SRC/*.BASL     the BASLOAD sources (NOT needed to run; see SRC/README.TXT)
 #   GPC-BASIC/     the GP.BASIC library -- the .INC.BL includes every BASL source using GP
 #                  keywords needs, the .EXP.BL examples, and its manual (GP-BASIC.md) and
@@ -132,6 +138,13 @@ DOCS    = ("README.md", "LICENSE")
 # (GP-BASIC.TIERS.md, GP-BASIC.PLAN.md) are deliberately NOT shipped -- they are the argument
 # for how the library was built, not instructions for using it.
 GPBASIC_DIR  = os.path.join(root, "GPC-BASIC")
+
+# The viewer and its content, from the sample folder rather than from testing/ -- the same
+# reason GPC-BASIC/ comes from the master. The PRG is checked in built, and HELP_DIR must
+# keep its name: the viewer opens its files as //HELP-TXT/:NAME.
+HELP_SRC = os.path.join(root, "samples", "GPC-HELP")
+HELP_PRG = "GPB.HELP.PRG"
+HELP_DIR = "HELP-TXT"
 
 # The note that ships inside SRC/, explaining the folder is source and not required to run.
 SRC_README = (
@@ -212,6 +225,21 @@ with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
     for must in ("GPC-BASIC/GP-BASIC.md", "GPC-BASIC/GP-BASIC.GLOBALS.md", "GPC-BASIC/README.md"):
         if must not in names:
             raise SystemExit("release: %s is missing -- the library ships with its documentation" % must)
+
+    # The on-machine reference. Its absence does not break a release, so this warns rather
+    # than failing -- unlike GPC-BASIC/, without which every #INCLUDE dangles.
+    help_prg = os.path.join(HELP_SRC, HELP_PRG)
+    help_dir = os.path.join(HELP_SRC, HELP_DIR)
+    if os.path.isfile(help_prg) and os.path.isdir(help_dir):
+        z.write(help_prg, HELP_PRG)
+        names.append(HELP_PRG)
+        for name in sorted(os.listdir(help_dir)):
+            full = os.path.join(help_dir, name)
+            if os.path.isfile(full):
+                z.write(full, HELP_DIR + "/" + name)
+                names.append(HELP_DIR + "/" + name)
+    else:
+        print("release: NOTE -- samples/GPC-HELP is not built, so GPB.HELP is not in this zip")
 
     for doc in DOCS:
         full = os.path.join(root, doc)

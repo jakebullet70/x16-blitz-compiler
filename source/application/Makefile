@@ -95,6 +95,14 @@ release:  build
 	$(CCOPY) build$(S)*.bas $(RELEASEDIR)
 	$(CCOPY) $(BINDIR)tokenise.zip $(RELEASEDIR)
 	#
+	#		The on-machine reference, so a staged drive can run GPB.HELP beside the
+	#		compiler. The PRG is checked in already built (EMBEDDED, so it needs no
+	#		runtime beside it); HELP-TXT holds the index and the topics, and the viewer
+	#		opens both as //HELP-TXT/:NAME -- so the folder has to arrive as a folder.
+	#
+	$(CCOPY) $(ROOTDIR)samples$(S)GPC-HELP$(S)GPB.HELP.PRG $(RELEASEDIR)
+	$(CCOPY) -r $(ROOTDIR)samples$(S)GPC-HELP$(S)HELP-TXT $(RELEASEDIR)
+	#
 	#		There is deliberately no CHANGES.txt here. The original author's was deleted ("Del
 	#		old files from previous build") and git history is the changelog -- copying one in
 	#		unconditionally only meant the release failed to package over a missing text file.
