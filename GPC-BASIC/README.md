@@ -7,6 +7,8 @@ example for each.
 routine, every variable name they take, and the traps collected in one table.
 [GP-BASIC.GLOBALS.md](GP-BASIC.GLOBALS.md) lists every global each module owns, which
 matters because BASL has one flat namespace: a collision is a wrong answer, not an error.
+[GP-BASIC.FILES.md](GP-BASIC.FILES.md) says what every file that comes with GPC is for,
+including the four the compiler will not run without.
 
 ## Using it
 

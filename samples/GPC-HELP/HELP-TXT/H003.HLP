@@ -1,0 +1,34 @@
+@1. What has to be on the drive to compile
+.
+=1. WHAT HAS TO BE ON THE DRIVE TO COMPILE
+.
+.Five files, and all five. Put them beside each other:
+.
+.  GPC.PRG
+.      the front end you RUN
+.
+.  GPC.BIN
+.      the engine it hands the job to
+.
+.  GPC.IMG.nnn.BIN
+.      the runtime a self-contained object carries
+.
+.  GPB.RT.nnn.BIN
+.      the shared runtime, with the GP.* handlers
+.
+.  GPC.RT.nnn.BIN
+.      the same runtime without them
+.
+.nnn is the runtime build number and it is part of the name on purpose: a
+.stale runtime under a fixed name would still be found, and the mismatch
+.would not show until something ran wrong.
+.
+.Both shared runtimes ship, and both are needed. Which one a program wants is
+.settled when it is compiled, not when it runs, so a drive carrying only one
+.works for half the programs built against it. A program that cannot find its
+.runtime prints ?RT and stops.
+.
+.The front end needs GPB.RT.nnn.BIN for itself. GPC.PRG is a compiled
+.GP.BASIC program built in shared mode -- the compiler is written in the
+.language it compiles.
+.

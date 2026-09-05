@@ -1,9 +1,9 @@
 @echo off
 rem ---------------------------------------------------------------------------
-rem  help-demo.bat -- GPC-HELP, the GP.BASIC and BASL reference, in a VISIBLE
+rem  help-demo.bat -- GPB.HELP, the GP.BASIC and BASL reference, in a VISIBLE
 rem  window.
 rem
-rem  A scrolling master index over 37 topics, built from GPC-BASIC/ -- the
+rem  A scrolling master index over 43 topics, built from GPC-BASIC/ -- the
 rem  manual, the name register and the module banner headers -- so the help
 rem  cannot drift from the library it documents.
 rem
@@ -20,10 +20,14 @@ rem  the text is mixed case with no re-ordered font, and the high half has real
 rem  line drawing for the dialog frames. APPSYS.RESTORE hands the screen mode
 rem  and the whole $0372 charset byte back on the way out.
 rem
+rem  THE TOPICS ARE IN samples\GPC-HELP\HELP-TXT and the index is not: a topic
+rem  opens through the CMD path syntax "//HELP-TXT/:Hnnn.HLP", which is what
+rem  CMDR-DOS documents and what a real SD card wants.
+rem
 rem  NOTE THAT THE DRIVE IS samples\GPC-HELP, so an "X" export lands in the repo
 rem  beside the sources. git clean -f samples/GPC-HELP/ tidies up.
 rem
-rem  Source: samples\GPC-HELP\HELP.BASL on GPB, THEME, STASH, STRCASE, APPSYS,
+rem  Source: samples\GPC-HELP\GPB.HELP.BASL on GPB, THEME, STASH, STRCASE, APPSYS,
 rem  MENUVERT, LINEINPUT and GUI, all shipped in samples\GPC-HELP\GPC-BASIC\
 rem  beside the sample so a rebuild needs nothing from GPC-BASIC\. The object is
 rem  EMBEDDED and checked in. See samples\GPC-HELP\readme.md for the rebuild,
@@ -43,16 +47,16 @@ if not exist "%ROM%" (
 	echo ROM not found: "%ROM%"
 	exit /b 1
 )
-if not exist "%DRIVE%\HELP.PRG" (
+if not exist "%DRIVE%\GPB.HELP.PRG" (
 	echo.
-	echo   samples\GPC-HELP\HELP.PRG is not built.
+	echo   samples\GPC-HELP\GPB.HELP.PRG is not built.
 	echo   See the rebuild section of samples\GPC-HELP\readme.md.
 	echo.
 	exit /b 1
 )
-if not exist "%DRIVE%\HELP.IDX" (
+if not exist "%DRIVE%\GPB.HELP.IDX" (
 	echo.
-	echo   samples\GPC-HELP\HELP.IDX is missing -- the viewer has no index to
+	echo   samples\GPC-HELP\GPB.HELP.IDX is missing -- the viewer has no index to
 	echo   load and will say so and stop. Rebuild the content with:
 	echo.
 	echo       python samples\GPC-HELP\MKHELP.PY
@@ -60,5 +64,5 @@ if not exist "%DRIVE%\HELP.IDX" (
 	exit /b 1
 )
 
-"%X16EMU%" -rom "%ROM%" -fsroot "%DRIVE%" -scale 2 -sound none -prg "%DRIVE%\HELP.PRG" -run
+"%X16EMU%" -rom "%ROM%" -fsroot "%DRIVE%" -scale 2 -sound none -prg "%DRIVE%\GPB.HELP.PRG" -run
 endlocal

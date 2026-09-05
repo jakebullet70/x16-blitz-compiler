@@ -1,0 +1,68 @@
+@4. GPC-BASIC/ -- the library
+.
+=4. GPC-BASIC/ -- THE LIBRARY
+.
+.Text-mode building blocks, in BASL, #INCLUDEd into your source. A module has
+.no dead code elimination: including one costs its whole size whether you
+.call it or not.
+.
+.  GPB.INC.BL
+.      the GP.* keyword definitions for BASLOAD. Every source using a GP
+.        keyword needs this one, and no other include is ever optional either
+.
+.  THEME.INC.BL
+.      named colour roles, light and dark
+.
+.  APPSYS.INC.BL
+.      start an application politely, and leave the machine as it was found
+.
+.  STASH.INC.BL
+.      save a text rectangle to a RAM bank, and put it back
+.
+.  STASHFILE.INC.BL
+.      the same rectangle, through a file
+.
+.  LINEINPUT.INC.BL
+.      a positioned, length-limited entry field
+.
+.  MENUVERT.INC.BL
+.      a vertical menu
+.
+.  MENUBAR.INC.BL
+.      a horizontal menu bar
+.
+.  GUI.INC.BL
+.      four dialogs -- ask, say, type, choose -- in a box that puts the
+.        screen back
+.
+.  GUI2.INC.BL
+.      a listbox, single or multi select
+.
+.  STRINGS.INC.BL
+.      the string helpers that belong in BASIC rather than assembly
+.
+.  STRCASE.INC.BL
+.      case and trim, rewriting a string in place, in assembly
+.
+.  SORT.INC.BL
+.      shell sort a string array in place, in assembly
+.
+.  BMX.INC.BL
+.      load a BMX bitmap into VERA
+.
+.What each one costs in bytes is in the command reference, under At a glance.
+.
+=SEE ALSO
+.
+>36|4.1 THEME.INC.BL -- named colour roles
+>38|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>65|STASH.INC.BL -- save a text rectangle, and put it back.
+>73|STASHFILE.INC.BL -- a saved text rectangle, through a file.
+>39|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>41|4.6 MENUVERT.INC.BL -- a vertical menu
+>59|MENUBAR.INC.BL -- a horizontal menu, in BASIC.
+>46|GUI.INC.BL -- four dialogs, in a box that puts the screen back.
+>52|GUI2.INC.BL -- a listbox, single or multi select.
+>37|4.2 STRINGS.INC.BL -- string helpers
+>45|4.8 STRCASE.INC.BL -- case and trim, in place
+>44|4.7 SORT.INC.BL -- shell sort a string array

@@ -42,5 +42,5 @@
 .
 =SEE ALSO
 .
->31|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
->66|STASHFILE.INC.BL -- a saved text rectangle, through a file.
+>38|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>73|STASHFILE.INC.BL -- a saved text rectangle, through a file.

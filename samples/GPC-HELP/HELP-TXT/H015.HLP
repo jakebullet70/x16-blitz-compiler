@@ -33,5 +33,5 @@
 .
 =SEE ALSO
 .
->58|STASH.INC.BL -- save a text rectangle, and put it back.
->66|STASHFILE.INC.BL -- a saved text rectangle, through a file.
+>65|STASH.INC.BL -- save a text rectangle, and put it back.
+>73|STASHFILE.INC.BL -- a saved text rectangle, through a file.

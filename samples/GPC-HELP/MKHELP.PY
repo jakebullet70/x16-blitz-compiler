@@ -5,12 +5,19 @@
 #  Reads, and reads NOTHING ELSE:
 #      GPC-BASIC/GP-BASIC.md            the manual        -- sections 1..6
 #      GPC-BASIC/GP-BASIC.GLOBALS.md    the name register
+#      GPC-BASIC/GP-BASIC.FILES.md      what is in the box, file by file
 #      GPC-BASIC/*.INC.BL               the banner header of every module
 #
 #  Writes, beside this script:
-#      H001.HLP ... Hnnn.HLP   one file per topic -- see layout() for why
-#      HELP.IDX                the master index
+#      HELP-TXT/H001.HLP ... Hnnn.HLP   one file per topic -- see layout()
+#      GPB.HELP.IDX            the master index
 #      GPC-HELP.md             the same content, for reading on a PC
+#
+#  THE TOPICS ARE IN A SUBFOLDER and the index is not: GPB.HELP.PRG opens the
+#  index by name in its own directory and the topics through the CMD path
+#  syntax "//HELP-TXT/:Hnnn.HLP", which is what CMDR-DOS documents and what a
+#  real SD card wants -- the emulator's host filesystem also takes a plain
+#  "HELP-TXT/Hnnn.HLP", and that is the one that would not port.
 #
 #  THE .HLP FORMAT is one screen line per file line, first character a marker:
 #
@@ -42,6 +49,12 @@ import sys
 
 WIDTH = 76
 
+# The topics live in a subfolder of the program's directory; the index does
+# not. Both names are spelled again in GPB.HELP.BASL -- HELP.DIR$ and the
+# OPEN in HELP.IDXLOAD -- so changing one here means changing it there.
+HELPDIR = "HELP-TXT"
+IDXNAME = "GPB.HELP.IDX"
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_SRC = os.path.normpath(os.path.join(HERE, "..", "..", "GPC-BASIC"))
 
@@ -50,6 +63,7 @@ DEFAULT_SRC = os.path.normpath(os.path.join(HERE, "..", "..", "GPC-BASIC"))
 # .HLP, named by its number. See layout().
 CATS = [
     ("start",   "GETTING STARTED"),
+    ("files",   "WHAT IS IN GPC"),
     ("core",    "GP.* CORE KEYWORDS"),
     ("mods",    "BASL MODULES"),
     ("globals", "GLOBALS AND NAMING"),
@@ -592,6 +606,34 @@ def build_globals(src):
 
 
 # ---------------------------------------------------------------------------
+#  What is in the box -- the file manifest
+# ---------------------------------------------------------------------------
+
+def build_files(src):
+    """GP-BASIC.FILES.md, one topic per '##' section. Same shape as the globals
+    register: a second document, read whole, rather than a section of the
+    manual -- the manual is about the language and this is about the drive."""
+    path = os.path.join(src, "GP-BASIC.FILES.md")
+    if not os.path.exists(path):
+        return []
+    secs = split_sections(path)
+    topics = []
+    i = 0
+    while i < len(secs):
+        if secs[i][0] != 2:
+            i += 1
+            continue
+        j = i + 1
+        while j < len(secs) and secs[j][0] > 2:
+            j += 1
+        t = manual_whole("files", secs[i:j])
+        t.key = "F" + t.key
+        topics.append(t)
+        i = j
+    return topics
+
+
+# ---------------------------------------------------------------------------
 #  Module banners
 # ---------------------------------------------------------------------------
 
@@ -868,12 +910,20 @@ def substitute(topics, byord):
 # ---------------------------------------------------------------------------
 
 def write_hlp(out, files):
-    """One file per topic: line 1 is its @ record, the rest is the body."""
+    """One file per topic: line 1 is its @ record, the rest is the body.
+
+    THEY GO IN A SUBFOLDER, HELPDIR, so the program's directory holds the
+    program, its index and one folder instead of the program and forty files.
+    The viewer opens them through the CMD path syntax -- see the header.
+    """
+    where = os.path.join(out, HELPDIR)
+    if not os.path.isdir(where):
+        os.makedirs(where)
     made, biggest, total = 0, 0, 0
     for ci, (cat, name) in enumerate(CATS):
         for t in files[cat]:
             body = ["@" + t.title[:WIDTH]] + t.lines
-            path = os.path.join(out, hlp_name(t.number))
+            path = os.path.join(where, hlp_name(t.number))
             with open(path, "w", encoding="ascii", errors="replace",
                       newline="\n") as fh:
                 fh.write("\n".join(body) + "\n")
@@ -881,21 +931,34 @@ def write_hlp(out, files):
             total += os.path.getsize(path)
             biggest = max(biggest, len(t.lines))
         print("  %-20s %2d topics" % (name, len(files[cat])))
+    # A SHORTER RUN THAN LAST TIME LEAVES ORPHANS, and an orphan .HLP is a file
+    # the index cannot reach and nothing will ever delete. Losing a topic is
+    # ordinary -- a section is cut and the numbering closes up behind it.
+    dropped = 0
+    for name in sorted(os.listdir(where)):
+        if not re.match("^H[0-9]+[.]HLP$", name):
+            continue
+        if int(name[1:-4]) > made:
+            os.remove(os.path.join(where, name))
+            dropped += 1
+
     print("  %-20s %2d files, %d bytes, longest topic %d lines"
-          % ("H001..%s" % hlp_name(made), made, total, biggest))
+          % ("%s/H001..%s" % (HELPDIR, hlp_name(made)), made, total, biggest))
+    if dropped:
+        print("  %-20s %2d stale .HLP removed" % ("", dropped))
     return made
 
 
 def write_idx(out, rows):
-    lines = ["# GPC-HELP index, generated by MKHELP.PY -- do not edit",
+    lines = ["# GPB.HELP index, generated by MKHELP.PY -- do not edit",
              "N|%d" % len(rows)]
     for r in rows:
         lines.append("%s|%s|%s|%s|%s" % (r[0], r[1], r[2], r[3], r[4]))
-    path = os.path.join(out, "HELP.IDX")
+    path = os.path.join(out, IDXNAME)
     with open(path, "w", encoding="ascii", errors="replace", newline="\n") as fh:
         fh.write("\n".join(lines) + "\n")
     print("  %-20s %d rows, %d bytes"
-          % ("HELP.IDX", len(rows), os.path.getsize(path)))
+          % (IDXNAME, len(rows), os.path.getsize(path)))
 
 
 def anchor(s):
@@ -908,7 +971,7 @@ def write_md(out, files, topics):
     L = []
     L.append("# GPC-HELP")
     L.append("")
-    L.append("The GP.BASIC and BASL reference that `HELP.PRG` shows on the X16, "
+    L.append("The GP.BASIC and BASL reference that `GPB.HELP.PRG` shows on the X16, "
              "in one file you can read on a PC.")
     L.append("")
     L.append("**Generated. Do not edit.** `MKHELP.PY` builds it and the `.HLP` "
@@ -990,6 +1053,7 @@ def main():
     topics = build_manual(src, tiers)
     topics += build_banners(src)
     topics += build_globals(src)
+    topics += build_files(src)
 
     add_tails(topics)
     topics = split_long(topics, args.maxpage)

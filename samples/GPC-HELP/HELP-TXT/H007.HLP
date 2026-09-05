@@ -1,0 +1,86 @@
+@5. GPC-BASIC/ -- the examples
+.
+=5. GPC-BASIC/ -- THE EXAMPLES
+.
+.One .EXP.BL per idea. They are meant to be read as much as run, and several
+.are the regression test for the module they sit beside.
+.
+.  LOOPS.EXP.BL
+.      GP.DO / GP.LOOP / GP.EXITDO
+.
+.  IF.EXP.BL
+.      GP.IF / GP.ELSEIF / GP.ELSE / GP.ENDIF
+.
+.  SELECT.EXP.BL
+.      GP.SELECT / GP.CASE / GP.OTHER / GP.ENDSEL
+.
+.  UNWIND.EXP.BL
+.      a GOTO may leave a GP.SELECT or a GP.DO
+.
+.  STRINGS.EXP.BL
+.      the GP.BASIC string set
+.
+.  ARRAYS.EXP.BL
+.      the GP.BASIC array set
+.
+.  SCREEN.EXP.BL
+.      the GP.BASIC text drawing set
+.
+.  ISO.EXP.BL
+.      GP.PRINTAT and GP.BOX in ISO mode
+.
+.  MLCALL.EXP.BL
+.      GP.CALL with GP.A / GP.X / GP.Y / GP.C
+.
+.  ASM.EXP.BL
+.      GP.ASM / GP.ENDASM, inline 65C02
+.
+.  MENU.EXP.BL
+.      a whole small application, in the shape the GP set is for
+.
+.  MENUDEMO.EXP.BL
+.      MENUVERT drawn the way an application would draw it
+.
+.  GUI.EXP.BL
+.      the four dialogs, over a screen they have to put back
+.
+.  FORM.EXP.BL
+.      three fields you can move between, LINEINPUT style
+.
+.  BMXVIEW.EXP.BL
+.      a BMX bitmap viewer, in about thirty lines
+.
+.  BMXPAL.EXP.BL BMXSPD.EXP.BL
+.      the palette question, and the speed of each path
+.
+.  SORT.EXP.BL STRCTST.EXP.BL SPLITT.EXP.BL
+.      the regression tests for SORT, STRCASE and STR.SPLIT
+.
+.  MENUTST.EXP.BL GUI2TST.EXP.BL
+.      the same for the menu and the listbox, driven through the keyboard
+.        buffer
+.
+=EXAMPLE PROGRAM
+.
+.  LOOPS.EXP.BL -- runnable, in the GPC-BASIC folder
+.  IF.EXP.BL -- runnable, in the GPC-BASIC folder
+.  SELECT.EXP.BL -- runnable, in the GPC-BASIC folder
+.  UNWIND.EXP.BL -- runnable, in the GPC-BASIC folder
+.  STRINGS.EXP.BL -- runnable, in the GPC-BASIC folder
+.  ARRAYS.EXP.BL -- runnable, in the GPC-BASIC folder
+.  SCREEN.EXP.BL -- runnable, in the GPC-BASIC folder
+.  ISO.EXP.BL -- runnable, in the GPC-BASIC folder
+.  MLCALL.EXP.BL -- runnable, in the GPC-BASIC folder
+.  ASM.EXP.BL -- runnable, in the GPC-BASIC folder
+.  MENU.EXP.BL -- runnable, in the GPC-BASIC folder
+.  MENUDEMO.EXP.BL -- runnable, in the GPC-BASIC folder
+.  GUI.EXP.BL -- runnable, in the GPC-BASIC folder
+.  FORM.EXP.BL -- runnable, in the GPC-BASIC folder
+.  BMXVIEW.EXP.BL -- runnable, in the GPC-BASIC folder
+.  BMXPAL.EXP.BL -- runnable, in the GPC-BASIC folder
+.  BMXSPD.EXP.BL -- runnable, in the GPC-BASIC folder
+.  SORT.EXP.BL -- runnable, in the GPC-BASIC folder
+.  STRCTST.EXP.BL -- runnable, in the GPC-BASIC folder
+.  SPLITT.EXP.BL -- runnable, in the GPC-BASIC folder
+.  MENUTST.EXP.BL -- runnable, in the GPC-BASIC folder
+.  GUI2TST.EXP.BL -- runnable, in the GPC-BASIC folder

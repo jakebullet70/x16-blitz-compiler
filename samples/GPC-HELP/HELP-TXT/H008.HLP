@@ -1,0 +1,22 @@
+@6. The documents
+.
+=6. THE DOCUMENTS
+.
+.  GP-BASIC.md
+.      the manual -- the keyword reference and the module reference
+.
+.  GP-BASIC.GLOBALS.md
+.      every global name each module owns, and the prefixes you may not use
+.
+.  GP-BASIC.FILES.md
+.      this page
+.
+.  README.md
+.      how to run the compiler, and what its answers mean
+.
+.  SRC/
+.      the BASLOAD source of the tools. Reference only -- nothing in it is
+.        needed to run
+.
+.The library's docs live beside the includes they describe, in this folder,
+.so a relative link works in the repository and in an unzipped release alike.

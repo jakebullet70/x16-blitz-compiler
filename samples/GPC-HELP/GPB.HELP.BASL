@@ -1,5 +1,5 @@
-#SAVEAS "@:HELP.SRC.PRG"
-#SYMFILE "@:HELP.SRC.SYM"
+#SAVEAS "@:GPB.HELP.SRC.PRG"
+#SYMFILE "@:GPB.HELP.SRC.SYM"
 #INCLUDE "GPB.INC.BL"
 #INCLUDE "THEME.INC.BL"
 #INCLUDE "STASH.INC.BL"
@@ -10,11 +10,12 @@
 #INCLUDE "GUI.INC.BL"
 
 ## ============================================================================
-## HELP.BASL -- GPC-HELP, the GP.BASIC and BASL reference, on the machine.
+## GPB.HELP.BASL -- GPB.HELP, the GP.BASIC and BASL reference, on the machine.
 ##
 ## ONE MASTER INDEX, loaded at startup and never read again, and one .HLP file
-## per topic that it opens into. HELP.IDX carries a row per entry -- category
-## header, topic, or a section inside one -- and MKHELP.PY builds all of it
+## per topic that it opens into, in the HELP-TXT folder beside the program.
+## GPB.HELP.IDX carries a row per entry -- a category header, a topic, or a
+## section inside one -- and MKHELP.PY builds all of it
 ## from GPC-BASIC/. Nothing here parses markdown, measures a string or wraps a
 ## line: that happened on the host once instead of on the X16 every time.
 ##
@@ -76,15 +77,19 @@
 ## the wrong step and the compile stops with UNKNOWN LINE NUMBER.
 ## ============================================================================
 
-## HELP.IDX is 89 rows today. The headroom is for the library growing, and
-## running out is not a crash: the rows past the end are dropped. Every row
-## costs its own text on the heap, so this is a memory number, not a limit.
-## MEASURED, NOT GUESSED AT: the self-check reports FRE AT THE END, and with
-## 160 it was 1,046 bytes. A row costs ten bytes of workspace whether it is
-## used or not -- four integer arrays and a string pointer -- so forty rows of
-## unused headroom is four hundred bytes in a program that has one kilobyte.
-## 120 still leaves room for twenty-nine more rows than the library has today,
-## and running out is not a crash: the rows past the end are dropped.
+## GPB.HELP.IDX is 95 rows today, so this leaves twenty-five spare. The
+## headroom is for the library growing, and running out is not a crash: the
+## rows past the end are dropped.
+##
+## MEASURED, NOT GUESSED AT. A row costs TEN BYTES OF WORKSPACE whether it is
+## used or not -- four integer arrays and a string pointer -- plus its own text
+## on the heap, so this is a memory number and not a limit. At 160 the release
+## build had 1,046 bytes free; at 120 it has about 2,100.
+##
+## THE SELF-CHECK IS THE ONE THAT CANNOT AFFORD IT. It carries its own harness
+## on top of all this and runs out of memory before it finishes -- see the
+## readme. Building the check with a smaller MAXIX is legitimate: the check
+## verifies the index that EXISTS, and the headroom is a release concern.
 #DEFINE HELP.MAXIX 120
 
 ## Cross references in one topic, and the deepest chain of them ESC can walk
@@ -194,9 +199,9 @@ GOSUB HELP.BOOT
 GP.IF HELP.OK = 0 THEN
     GOSUB APPSYS.RESTORE
     PRINT
-    PRINT "GPC-HELP: HELP.IDX WOULD NOT LOAD."
-    PRINT "RUN MKHELP.PY AND PUT HELP.IDX AND THE"
-    PRINT ".HLP FILES BESIDE HELP.PRG."
+    PRINT "GPB.HELP: GPB.HELP.IDX WOULD NOT LOAD."
+    PRINT "RUN MKHELP.PY AND PUT GPB.HELP.IDX AND THE"
+    PRINT "HELP-TXT FOLDER BESIDE GPB.HELP.PRG."
     END
 GP.ENDIF
 
@@ -209,7 +214,7 @@ END
 GOSUB HELP.INDEX
 GOSUB APPSYS.RESTORE
 PRINT
-PRINT "GPC-HELP."
+PRINT "GPB.HELP."
 END
 
 
@@ -272,6 +277,11 @@ HELP.BOOT:
     ## module cannot be handed an array.
     DIM MENUVERT.ITEM$(HELP.MAXPICK)
 
+    ## The topics are in a folder beside the program; the index is not. Held
+    ## in a variable rather than written into HELP.FILENAME, so opening a
+    ## topic allocates one string instead of two.
+    HELP.DIR$ = "//HELP-TXT/:"
+
     HELP.FIND$ = ""
     GOSUB HELP.IDXLOAD
     RETURN
@@ -283,7 +293,7 @@ HELP.BOOT:
 
 HELP.IDXLOAD:
     HELP.OK = 0 : HELP.IX.N = 0
-    OPEN HELP.CHAN, 8, HELP.CHAN, "HELP.IDX,S,R"
+    OPEN HELP.CHAN, 8, HELP.CHAN, "GPB.HELP.IDX,S,R"
 HELP.IDXLOAD.LOOP:
     LINPUT# HELP.CHAN, HELP.LINE$, 10 : HELP.ST = ST
     ## BIT 1 OF ST IS A READ ERROR. An OPEN that found no file still opens, and
@@ -345,11 +355,18 @@ HELP.IDXROW:
     HELP.IX.TEXT$(HELP.IX.N) = HELP.FLD$(5)
     RETURN
 
-## Topic 7 is H007.HLP. The number is what the index carries, so no row has to
-## hold a file NAME -- sixty more strings on a heap that has none spare.
+## Topic 7 is HELP-TXT/H007.HLP. The number is what the index carries, so no
+## row has to hold a file NAME -- forty more strings on a heap that has none
+## spare.
+##
+## "//DIR/:NAME" IS THE CMD SUBDIRECTORY SYNTAX, and it is the one CMDR-DOS
+## documents (X16 Reference 13, "CMD subdirectory syntax //DIR/: /DIR/:").
+## The emulator's host filesystem also opens a plain "HELP-TXT/H007.HLP" --
+## both were tried and both worked there -- but that is the form that would
+## not port to an SD card, so the documented one is what is written.
 HELP.FILENAME:
     HELP.NUMV = HELP.TOPICNUM : GOSUB HELP.NUMSTR
-    HELP.NAME$ = "H" + RIGHT$("000" + HELP.NUM$, 3) + ".HLP"
+    HELP.NAME$ = HELP.DIR$ + "H" + RIGHT$("000" + HELP.NUM$, 3) + ".HLP"
     RETURN
 
 
@@ -432,7 +449,7 @@ HELP.INDEX.LOOP:
 ## the index or coming back to it from a topic or a dialog.
 HELP.INDEX.DRAW:
     GOSUB HELP.PAGE.FRAME
-    HELP.TITLE$ = "GPC-HELP    GP.BASIC and BASL, built from the library"
+    HELP.TITLE$ = "GPB.HELP    GP.BASIC and BASL, built from the library"
     GOSUB HELP.TITLEBAR
     GOSUB HELP.INDEX.ROWS
     RETURN
@@ -1086,7 +1103,7 @@ HELP.EXPORT:
     HELP.CNT = 0
     OPEN 3, 8, 3, "@:" + HELP.OUTNAME$ + ",S,W"
     PRINT# 3, "## " + HELP.TITLE$
-    PRINT# 3, "## exported by GPC-HELP from " + HELP.NAME$
+    PRINT# 3, "## exported by GPB.HELP from " + HELP.NAME$
     PRINT# 3, ""
     OPEN HELP.CHAN, 8, HELP.CHAN, HELP.NAME$ + ",S,R"
 HELP.EXPORT.LOOP:
@@ -1173,7 +1190,7 @@ HELP.FIND.MISS:
 ## ============================================================================
 
 HELP.SAY:
-    GUI.TITLE$ = "GPC-HELP"
+    GUI.TITLE$ = "GPB.HELP"
     GUI.MSG$ = HELP.MSG.ONE$ : GUI.MSG2$ = HELP.MSG.TWO$
     ## Sticky, like every input in this library: a GUI.SAY after something that
     ## set a hint would inherit it.
@@ -1181,15 +1198,18 @@ HELP.SAY:
     GOSUB GUI.SAY
     RETURN
 
+## WHAT IT TAKES OF THE MACHINE, rather than how it was built -- a reader who
+## is about to GP.CALL something or open a bank of their own needs to know
+## which two are spoken for, and nobody needs the build recipe at run time.
 HELP.ABOUT:
-    HELP.MSG.ONE$ = "GPC-HELP -- the GP.BASIC and BASL reference."
-    HELP.MSG.TWO$ = "Built from GPC-BASIC by MKHELP.PY. Written in GP.BASIC."
+    HELP.MSG.ONE$ = "GPB.HELP -- the GP.BASIC and BASL reference."
+    HELP.MSG.TWO$ = "RAM banks used: 8 for dialogs, 9 for the open topic."
     GOSUB HELP.SAY
     HELP.FULL = 1
     RETURN
 
 HELP.ASKQUIT:
-    GUI.TITLE$ = "GPC-HELP" : GUI.OKCANCEL = 0
+    GUI.TITLE$ = "GPB.HELP" : GUI.OKCANCEL = 0
     GUI.MSG$ = "Leave the help viewer?" : GUI.MSG2$ = ""
     GOSUB GUI.YN
     HELP.DONE = 0

@@ -102,7 +102,7 @@
 .
 =SEE ALSO
 .
->39|GUI.INC.BL -- four dialogs, in a box that puts the screen back.
->58|STASH.INC.BL -- save a text rectangle, and put it back.
->29|4.1 THEME.INC.BL -- named colour roles
->34|4.6 MENUVERT.INC.BL -- a vertical menu
+>46|GUI.INC.BL -- four dialogs, in a box that puts the screen back.
+>65|STASH.INC.BL -- save a text rectangle, and put it back.
+>36|4.1 THEME.INC.BL -- named colour roles
+>41|4.6 MENUVERT.INC.BL -- a vertical menu

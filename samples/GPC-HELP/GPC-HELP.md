@@ -1,6 +1,6 @@
 # GPC-HELP
 
-The GP.BASIC and BASL reference that `HELP.PRG` shows on the X16, in one file you can read on a PC.
+The GP.BASIC and BASL reference that `GPB.HELP.PRG` shows on the X16, in one file you can read on a PC.
 
 **Generated. Do not edit.** `MKHELP.PY` builds it and the `.HLP` files together from `GPC-BASIC/` -- the manual, the name register and the module banner headers. Fix anything wrong at the source and rebuild:
 
@@ -13,6 +13,13 @@ python samples/GPC-HELP/MKHELP.PY
 - **GETTING STARTED**
   - [1. What GP.BASIC is](#1-what-gpbasic-is)
   - [2. Using it](#2-using-it)
+- **WHAT IS IN GPC**
+  - [1. What has to be on the drive to compile](#1-what-has-to-be-on-the-drive-to-compile)
+  - [2. The compiler](#2-the-compiler)
+  - [3. The tools](#3-the-tools)
+  - [4. GPC-BASIC/ -- the library](#4-gpc-basic----the-library)
+  - [5. GPC-BASIC/ -- the examples](#5-gpc-basic----the-examples)
+  - [6. The documents](#6-the-documents)
 - **GP.* CORE KEYWORDS**
   - [3. Command reference](#3-command-reference)
   - [3.1 Loops](#31-loops)
@@ -173,6 +180,157 @@ anything wider compiles through the float encoder instead — no wrap.
 
 
 *See also: 6. The traps, collected*
+
+---
+
+# WHAT IS IN GPC
+
+## 1. What has to be on the drive to compile
+
+#### 1. What has to be on the drive to compile
+
+Five files, and all five. Put them beside each other:
+
+| | |
+|---|---|
+| `GPC.PRG` | the front end you `RUN` |
+| `GPC.BIN` | the engine it hands the job to |
+| `GPC.IMG.nnn.BIN` | the runtime a self-contained object carries |
+| `GPB.RT.nnn.BIN` | the shared runtime, with the `GP.*` handlers |
+| `GPC.RT.nnn.BIN` | the same runtime without them |
+
+`nnn` is the runtime build number and it is part of the name on purpose: a stale runtime under a
+fixed name would still be found, and the mismatch would not show until something ran wrong.
+
+**Both shared runtimes ship, and both are needed.** Which one a program wants is settled when it is
+compiled, not when it runs, so a drive carrying only one works for half the programs built against
+it. A program that cannot find its runtime prints `?RT` and stops.
+
+**The front end needs `GPB.RT.nnn.BIN` for itself.** `GPC.PRG` is a compiled GP.BASIC program built
+in shared mode — the compiler is written in the language it compiles.
+
+---
+
+
+## 2. The compiler
+
+#### 2. The compiler
+
+**`GPC.PRG`** asks four questions — input file, output file, debug map, shared runtime — writes the
+answers to `GPC.INPUT`, and chain-loads the engine. Writing that file is the only thing it does.
+
+**`GPC.BIN`** takes its whole job from `GPC.INPUT` and asks nothing. That is what lets one program
+drive another: write the control file yourself and `RUN GPC.BIN`, which is how this project's own
+test harness compiles, and how you get a build if the front end is ever the broken thing.
+
+**`GPC.INPUT`** is up to four text lines — source, object, map file, and the word `SHARED`. It is
+per-user state and is not shipped; the front end writes it every time.
+
+**`GPC.IMG.nnn.BIN`** is the runtime that gets streamed into every self-contained object as it is
+written. **The engine cannot compile without it.** It used to live inside the engine and moved out
+so the object buffer could have the low RAM — which is why the largest program GPC can build got
+bigger the day it moved.
+
+**A compiled program identifies itself.** `LIST` one and the BASIC stub reads `SYS 2069 : REM GPC!`.
+
+---
+
+
+## 3. The tools
+
+#### 3. The tools
+
+**`GPC.ERR.PRG`** turns a runtime error's `@ $XXXX` into a source line, given the debug map the
+compiler writes when you answer yes to `MAKE A DEBUG MAP?`. Without the map an address is just an
+address.
+
+**`BASLOAD` is not a file here** — it is built into the R49 ROM. It reads `.BASL` source, which is
+BASIC with long names, labels instead of line numbers, `#INCLUDE` and `#DEFINE`, and writes the
+tokenised `.PRG` that GPC compiles. Every `.INC.BL` and `.EXP.BL` in this folder is BASLOAD source.
+
+**A program using GP.BASIC is compile-only.** BASLOAD's output for one is not a program the ROM can
+`LIST` or `RUN` — nothing in BASIC sits behind a `GP.` token. It is compiler input, and that is the
+expected state, not a fault.
+
+---
+
+
+## 4. GPC-BASIC/ -- the library
+
+#### 4. `GPC-BASIC/` — the library
+
+Text-mode building blocks, in BASL, `#INCLUDE`d into your source. **A module has no dead code
+elimination: including one costs its whole size whether you call it or not.**
+
+| | |
+|---|---|
+| `GPB.INC.BL` | the `GP.*` keyword definitions for BASLOAD. **Every source using a GP keyword needs this one**, and no other include is ever optional either |
+| `THEME.INC.BL` | named colour roles, light and dark |
+| `APPSYS.INC.BL` | start an application politely, and leave the machine as it was found |
+| `STASH.INC.BL` | save a text rectangle to a RAM bank, and put it back |
+| `STASHFILE.INC.BL` | the same rectangle, through a file |
+| `LINEINPUT.INC.BL` | a positioned, length-limited entry field |
+| `MENUVERT.INC.BL` | a vertical menu |
+| `MENUBAR.INC.BL` | a horizontal menu bar |
+| `GUI.INC.BL` | four dialogs — ask, say, type, choose — in a box that puts the screen back |
+| `GUI2.INC.BL` | a listbox, single or multi select |
+| `STRINGS.INC.BL` | the string helpers that belong in BASIC rather than assembly |
+| `STRCASE.INC.BL` | case and trim, rewriting a string in place, in assembly |
+| `SORT.INC.BL` | shell sort a string array in place, in assembly |
+| `BMX.INC.BL` | load a BMX bitmap into VERA |
+
+What each one costs in bytes is in the command reference, under *At a glance*.
+
+---
+
+
+*See also: 4.1 THEME.INC.BL -- named colour roles, 4.3 APPSYS.INC.BL -- start politely, leave it as you found it, STASH.INC.BL -- save a text rectangle, and put it back., STASHFILE.INC.BL -- a saved text rectangle, through a file., 4.4 LINEINPUT.INC.BL -- a positioned entry field, 4.6 MENUVERT.INC.BL -- a vertical menu, MENUBAR.INC.BL -- a horizontal menu, in BASIC., GUI.INC.BL -- four dialogs, in a box that puts the screen back., GUI2.INC.BL -- a listbox, single or multi select., 4.2 STRINGS.INC.BL -- string helpers, 4.8 STRCASE.INC.BL -- case and trim, in place, 4.7 SORT.INC.BL -- shell sort a string array*
+
+## 5. GPC-BASIC/ -- the examples
+
+#### 5. `GPC-BASIC/` — the examples
+
+One `.EXP.BL` per idea. They are meant to be read as much as run, and several are the regression
+test for the module they sit beside.
+
+| | |
+|---|---|
+| `LOOPS.EXP.BL` | `GP.DO` / `GP.LOOP` / `GP.EXITDO` |
+| `IF.EXP.BL` | `GP.IF` / `GP.ELSEIF` / `GP.ELSE` / `GP.ENDIF` |
+| `SELECT.EXP.BL` | `GP.SELECT` / `GP.CASE` / `GP.OTHER` / `GP.ENDSEL` |
+| `UNWIND.EXP.BL` | a `GOTO` may leave a `GP.SELECT` or a `GP.DO` |
+| `STRINGS.EXP.BL` | the GP.BASIC string set |
+| `ARRAYS.EXP.BL` | the GP.BASIC array set |
+| `SCREEN.EXP.BL` | the GP.BASIC text drawing set |
+| `ISO.EXP.BL` | `GP.PRINTAT` and `GP.BOX` in ISO mode |
+| `MLCALL.EXP.BL` | `GP.CALL` with `GP.A` / `GP.X` / `GP.Y` / `GP.C` |
+| `ASM.EXP.BL` | `GP.ASM` / `GP.ENDASM`, inline 65C02 |
+| `MENU.EXP.BL` | a whole small application, in the shape the GP set is for |
+| `MENUDEMO.EXP.BL` | `MENUVERT` drawn the way an application would draw it |
+| `GUI.EXP.BL` | the four dialogs, over a screen they have to put back |
+| `FORM.EXP.BL` | three fields you can move between, `LINEINPUT` style |
+| `BMXVIEW.EXP.BL` | a BMX bitmap viewer, in about thirty lines |
+| `BMXPAL.EXP.BL` `BMXSPD.EXP.BL` | the palette question, and the speed of each path |
+| `SORT.EXP.BL` `STRCTST.EXP.BL` `SPLITT.EXP.BL` | the regression tests for `SORT`, `STRCASE` and `STR.SPLIT` |
+| `MENUTST.EXP.BL` `GUI2TST.EXP.BL` | the same for the menu and the listbox, driven through the keyboard buffer |
+
+---
+
+
+## 6. The documents
+
+#### 6. The documents
+
+| | |
+|---|---|
+| `GP-BASIC.md` | the manual — the keyword reference and the module reference |
+| `GP-BASIC.GLOBALS.md` | every global name each module owns, and the prefixes you may not use |
+| `GP-BASIC.FILES.md` | this page |
+| `README.md` | how to run the compiler, and what its answers mean |
+| `SRC/` | the BASLOAD source of the tools. Reference only — nothing in it is needed to run |
+
+The library's docs live **beside the includes they describe**, in this folder, so a relative link
+works in the repository and in an unzipped release alike.
 
 ---
 
