@@ -12,8 +12,19 @@
 #INCLUDE "MENUVERT.INC.BL"
 #INCLUDE "MENUBAR.INC.BL"
 #INCLUDE "LINEINPUT.INC.BL"
+#INCLUDE "GUIBANK.INC.BL"
+
+## ---- THE GUI RUNS FROM A RAM BANK. GUIBANK.INC.BL is the low memory front
+## ---- door -- seven shims that select the bank and call the body. The GOTO
+## ---- jumps the region rather than falling into it through the bridge
+## ---- GP.BANKED leaves; see that file for why that matters.
+
+GOTO GM.LIBEND
+GP.BANKED GUI.CODEBANK
 #INCLUDE "GUI.INC.BL"
 #INCLUDE "GUI2.INC.BL"
+GP.ENDBANKED
+GM.LIBEND:
 
 ## ***********************************************************************
 ## **
@@ -86,6 +97,7 @@ THEME.ID = 0 : GOSUB THEME.LOAD
 GOSUB BANKMGR.INIT
 BANKMGR.WANT = GM.DDBANK : GOSUB BANKMGR.CLAIM
 BANKMGR.WANT = GM.GUIBANK : GOSUB BANKMGR.CLAIM
+BANKMGR.WANT = GUI.CODEBANK : GOSUB BANKMGR.CLAIM
 
 GM.SEL = 1
 GM.OPEN = 0

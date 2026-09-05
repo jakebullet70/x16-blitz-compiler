@@ -145,7 +145,7 @@ GOTO GUI.MODULE.END
 ## **  someone, and "no" is the safe reading of walking away from a question.
 ## ***********************************************************************
 
-GUI.YN:
+GUI.YN.BODY:
 
 ## ---- which pair of answers, and therefore which two keys. Everything below
 ## ---- works off GUI.YES/GUI.NO, so the two modes differ in four assignments and
@@ -237,7 +237,7 @@ GUI.YN.MARK:
 ## **  Set it, or clear it, every call.
 ## ***********************************************************************
 
-GUI.SAY:
+GUI.SAY.BODY:
     GUI.HINT.LINE$ = GUI.HINT$
     IF GUI.HINT.LINE$ = "" THEN GUI.HINT.LINE$ = "OK"
     GUI.BODY.ROWS = 1 : GUI.BODY.WIDTH = LEN(GUI.HINT.LINE$)
@@ -278,7 +278,7 @@ GUI.SAY.WAIT:
 ## **  highlight, so a leading space in the item is what insets the bar.
 ## ***********************************************************************
 
-GUI.MENU:
+GUI.MENU.BODY:
     GUI.BODY.ROWS = GUI.COUNT
     GUI.BODY.WIDTH = 0
     FOR GUI.INDEX = 1 TO GUI.COUNT
@@ -320,7 +320,7 @@ GUI.MENU:
 ## **  nowhere to move to. Only RETURN and ESC end it.
 ## ***********************************************************************
 
-GUI.TEXT:
+GUI.TEXT.BODY:
     IF GUI.LEN = 0 THEN GUI.LEN = 20
     GUI.HINT.LINE$ = "ENTER = OK    ESC = CANCEL"
     GUI.BODY.ROWS = 3 : GUI.BODY.WIDTH = GUI.LEN
@@ -378,7 +378,7 @@ GUI.TEXT.FIELD:
 ## **  rather than on a copy of it.
 ## ***********************************************************************
 
-GUI.OPEN:
+GUI.OPEN.BODY:
     GOSUB GUI.SIZE : GOSUB GUI.PLACE.BOX
 
 ## ---- Save what the box is about to cover. Both reasons to skip are ordinary
@@ -461,7 +461,7 @@ GUI.GLYPHS:
 ## **  GUI.CLOSE -- give the pixels back, if we took a copy.
 ## ***********************************************************************
 
-GUI.CLOSE:
+GUI.CLOSE.BODY:
     IF GUI.STASHED = 0 THEN RETURN
     STASH.BANK = GUI.BANK : STASH.MOVE = 0 : GOSUB STASH.RESTORE
     RETURN

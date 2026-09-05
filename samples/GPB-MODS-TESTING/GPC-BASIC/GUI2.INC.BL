@@ -95,7 +95,7 @@ GOTO GUI.LISTBOX.MODULE.END
 ## **  GUI.LISTBOX -- the whole thing.
 ## ***********************************************************************
 
-GUI.LISTBOX:
+GUI.LISTBOX.BODY:
     GUI.KEY = 0
     IF GUI.LISTBOX.COUNT < 1 THEN GUI.LISTBOX.SEL = 0 : RETURN
 

@@ -481,7 +481,19 @@ one-off proofs named above.
    biggest, and it decides whether the guards are needed at all.
 6. **The regression pass.** Every panel run once against the current root modules. Anything that
    fails is a defect in the module or in the panel, recorded before any refactor starts.
-7. **The banked GUI**, against a harness that already proves the before state.
+7. **The banked GUI. DONE 2026-09-05** -- `GUI.INC.BL` and `GUI2.INC.BL` run from bank 4.
+   `GUIBANK.INC.BL` is the low memory front door: seven shims, `BANK GUI.CODEBANK` then
+   `GOSUB <name>.BODY`, because a banked routine cannot select its own bank. The two modules
+   are unchanged but for a `.BODY` suffix on their seven public labels -- every call site
+   still says `GOSUB GUI.SAY` and reaches the shim. One `#DEFINE` feeds both `GP.BANKED` and
+   the shims so they cannot drift.
+
+   **Measured:** the workspace starts at page 75 instead of 86 -- 6,912 bytes against the
+   4,096 minimum -- and 12 pages (3,072 bytes) are copied into the bank at startup. The
+   unbanked build of the same source does not compile: `PROGRAM TOO BIG`.
+
+   **`STASH` restoring the caller's bank is what makes it work.** Banked code calls STASH in
+   low RAM and has to return to a fetch in bank 4.
 
 **PROVEN 2026-09-05, ahead of the panels: p-code executes from a RAM bank.** `SPIKE.BASL` in this
 folder does it with two `GP.ASM` blobs and a copy loop, changing nothing -- no ABI change, no

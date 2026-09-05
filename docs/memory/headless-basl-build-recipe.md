@@ -77,6 +77,21 @@ the source's `.PRG` with `.SYM`, so `#SAVEAS "@:X.SRC.PRG"` needs `#SYMFILE "@:X
 `NO SYMBOL FILE FOR {} @ 98`, naming a line inside `STASH.INC.BL` and saying nothing about a file
 name. Cost the first build of `samples/GPB-MODS-TESTING`, 05/09/26.
 
+**`cp GPC-BASIC/*.INC.BL testing/` CAN OVERWRITE THE KEYWORD FILE WITH A STALE ONE.**
+`GPB.INC.BL` is not a library module -- it is the `#TOKEN` list, maintained beside the compiler --
+but it sits in the same folders and matches the same glob. A sample folder holding an older copy
+silently downgrades `testing/`, and a keyword added since then STOPS BEING A KEYWORD: BASLOAD
+tokenises the line into something harmless, the compile SUCCEEDS, and the feature is simply absent.
+On 05/09/26 that made every `GP.BANKED` build compile with no region at all, reported only as a
+`PROGRAM TOO BIG` that was perfectly true. Copy `GPB.INC.BL` from the ROOT `GPC-BASIC/`, never from
+a sample -- it is the one file where root is upstream of the working copy, the opposite of
+[[library-working-copy-then-root]].
+
+**A FEATURE THAT WORKED LAST SESSION AND DOES NOT NOW: rebuild its OLD TEST before reading any of
+your own new code.** Same source, same compiler, different output means an INPUT changed, and that
+comparison costs one 70 s cycle. Reasoning about the new code instead cost an hour of chasing a
+shape problem that did not exist.
+
 **`build_basl.py` DOES NOT SEE AN EDITED `#INCLUDE`.** Its up-to-date check compares only the
 named `.BASL` against the `.SRC.PRG`, so after changing a `.INC.BL` it prints
 `skip -- ... is up to date (source no newer)` and the compile happily rebuilds the OLD p-code --

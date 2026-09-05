@@ -1,0 +1,109 @@
+## ***********************************************************************
+## **
+## **  GUIBANK.INC.BL -- the low memory front door to a banked GUI.
+## **
+## **      GUI.SAY   GUI.YN   GUI.MENU   GUI.TEXT
+## **      GUI.OPEN  GUI.CLOSE
+## **      GUI.LISTBOX
+## **
+## **  Seven shims, and nothing else. Each one selects the code bank and calls
+## **  the body, which lives at $A000 in that bank; the bodies are the same
+## **  routines under a .BODY name, in GUI.INC.BL and GUI2.INC.BL unchanged
+## **  but for their label lines.
+## **
+## **  WHY A SHIM AT ALL: a banked routine cannot select its own bank. By the
+## **  time its first instruction is fetched the wrong bank is already selected
+## **  and the fetch has already read rubbish. Something in LOW memory has to
+## **  set the bank before the call, and that is the whole job of this file.
+## **
+## **  Usage -- the caller says nothing it did not say before:
+## **
+## **      #INCLUDE "GUIBANK.INC.BL"        ' before the region
+## **      GOTO MY.LIBEND
+## **      GP.BANKED GUI.CODEBANK
+## **      #INCLUDE "GUI.INC.BL"
+## **      #INCLUDE "GUI2.INC.BL"
+## **      GP.ENDBANKED
+## **      MY.LIBEND:
+## **
+## **  THE GOTO OVER THE REGION IS NOT OPTIONAL. GP.BANKED leaves a bridge so
+## **  that falling into the region still works, and at program start it does
+## **  work -- the bootstrap copies the code up and leaves that bank selected.
+## **  Relying on it means every module's GOTO ... MODULE.END runs from the
+## **  bank for no reason, and stops working the day anything selects another
+## **  bank before the includes are reached. Jump over it instead.
+## **
+## **  ONE #DEFINE, USED TWICE: GP.BANKED takes a decimal constant and #DEFINE
+## **  substitutes at translation time, so GP.BANKED GUI.CODEBANK and the BANK
+## **  in every shim below cannot drift apart. Claim it from BANKMGR as well,
+## **  or something else will hand it out:
+## **
+## **      BANKMGR.WANT = GUI.CODEBANK : GOSUB BANKMGR.CLAIM
+## **
+## **  A GUI CALL LEAVES THE CODE BANK SELECTED, and that is safe rather than
+## **  merely tolerable. Nothing in BASIC can read the bank back -- PEEK and
+## **  POKE select and restore around every access -- BLOAD, BSAVE and BVERIFY
+## **  take the bank as an argument, and STASH puts the caller's bank back for
+## **  itself. The one thing that would care is p-code in ANOTHER bank, and the
+## **  compiler allows one region a program.
+## **
+## **  The shims do NOT restore the caller's bank, deliberately. It would need
+## **  a variable to hold it and GUI.LISTBOX calls GUI.OPEN through this file,
+## **  so a single variable would be overwritten by the inner call and the
+## **  outer one would put back the wrong bank -- worse than not trying.
+## **
+## **  GUI2's calls to GUI.OPEN and GUI.CLOSE come back through here too. Both
+## **  are already in the bank, so the hop is two GOSUBs it did not need; it is
+## **  left that way because the alternative is editing call sites inside a
+## **  module to say .BODY, and a wrong one there fails as a hang rather than
+## **  as a message.
+## **
+## **  The whole GUI.* name space belongs to GUI.INC.BL and GUI2.INC.BL; this
+## **  file owns only GUI.CODEBANK and the seven labels above.
+## **
+## ***********************************************************************
+#IFNDEF GUIBANK.DEFS
+#DEFINE GUIBANK.DEFS 1
+
+## The bank the GUI runs in. Two of the 63 a 512K machine has.
+#DEFINE GUI.CODEBANK 4
+
+GOTO GUIBANK.MODULE.END
+
+GUI.SAY:
+    BANK GUI.CODEBANK
+    GOSUB GUI.SAY.BODY
+    RETURN
+
+GUI.YN:
+    BANK GUI.CODEBANK
+    GOSUB GUI.YN.BODY
+    RETURN
+
+GUI.MENU:
+    BANK GUI.CODEBANK
+    GOSUB GUI.MENU.BODY
+    RETURN
+
+GUI.TEXT:
+    BANK GUI.CODEBANK
+    GOSUB GUI.TEXT.BODY
+    RETURN
+
+GUI.OPEN:
+    BANK GUI.CODEBANK
+    GOSUB GUI.OPEN.BODY
+    RETURN
+
+GUI.CLOSE:
+    BANK GUI.CODEBANK
+    GOSUB GUI.CLOSE.BODY
+    RETURN
+
+GUI.LISTBOX:
+    BANK GUI.CODEBANK
+    GOSUB GUI.LISTBOX.BODY
+    RETURN
+
+GUIBANK.MODULE.END:
+#ENDIF
