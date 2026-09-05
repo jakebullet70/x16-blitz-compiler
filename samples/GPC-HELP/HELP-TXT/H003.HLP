@@ -2,7 +2,8 @@
 .
 =1. WHAT HAS TO BE ON THE DRIVE TO COMPILE
 .
-.Five files, and all five. Put them beside each other:
+.These five files are needed for the compiler to work. Put them beside each
+.other:
 .
 .  GPC.PRG
 .      the front end you RUN
@@ -14,10 +15,10 @@
 .      the runtime a self-contained object carries
 .
 .  GPB.RT.nnn.BIN
-.      the shared runtime, with the GP.* handlers
+.      the shared runtime, with GP.BASIC included
 .
 .  GPC.RT.nnn.BIN
-.      the same runtime without them
+.      the same runtime without it
 .
 .nnn is the runtime build number and it is part of the name on purpose: a
 .stale runtime under a fixed name would still be found, and the mismatch
@@ -29,6 +30,6 @@
 .prints ?RT and stops.
 .
 .The front end needs GPB.RT.nnn.BIN for itself: GPC.PRG is a compiled
-.GP.BASIC program built in shared mode. The compiler is written in the
-.language it compiles.
+.GP.BASIC program built in shared mode. The compiler front end is written in
+.the language it compiles. The engine behind it, GPC.BIN, is 100% assembly.
 .

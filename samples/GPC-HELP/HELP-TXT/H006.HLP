@@ -11,7 +11,7 @@
 .        keyword needs this one, and no other include is ever optional either
 .
 .  THEME.INC.BL
-.      named colour roles, light and dark
+.      named colour roles, in three themes
 .
 .  APPSYS.INC.BL
 .      start an application politely, and leave the machine as it was found

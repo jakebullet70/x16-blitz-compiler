@@ -199,15 +199,15 @@ anything wider compiles through the float encoder. Neither wraps.
 
 #### 1. What has to be on the drive to compile
 
-Five files, and all five. Put them beside each other:
+These five files are needed for the compiler to work. Put them beside each other:
 
 | | |
 |---|---|
 | `GPC.PRG` | the front end you `RUN` |
 | `GPC.BIN` | the engine it hands the job to |
 | `GPC.IMG.nnn.BIN` | the runtime a self-contained object carries |
-| `GPB.RT.nnn.BIN` | the shared runtime, with the `GP.*` handlers |
-| `GPC.RT.nnn.BIN` | the same runtime without them |
+| `GPB.RT.nnn.BIN` | the shared runtime, with GP.BASIC included |
+| `GPC.RT.nnn.BIN` | the same runtime without it |
 
 `nnn` is the runtime build number and it is part of the name on purpose: a stale runtime under a
 fixed name would still be found, and the mismatch would not show until something ran wrong.
@@ -217,7 +217,8 @@ it runs, so a drive carrying only one works for half the programs built against 
 cannot find its runtime prints `?RT` and stops.
 
 The front end needs `GPB.RT.nnn.BIN` for itself: `GPC.PRG` is a compiled GP.BASIC program built in
-shared mode. The compiler is written in the language it compiles.
+shared mode. The compiler front end is written in the language it compiles. The engine behind it,
+`GPC.BIN`, is 100% assembly.
 
 ---
 
@@ -269,7 +270,7 @@ elimination: including a module costs its whole size whether or not it is called
 | | |
 |---|---|
 | `GPB.INC.BL` | the `GP.*` keyword definitions for BASLOAD. **Every source using a GP keyword needs this one**, and no other include is ever optional either |
-| `THEME.INC.BL` | named colour roles, light and dark |
+| `THEME.INC.BL` | named colour roles, in three themes |
 | `APPSYS.INC.BL` | start an application politely, and leave the machine as it was found |
 | `STASH.INC.BL` | save a text rectangle to a RAM bank, and put it back |
 | `STASHFILE.INC.BL` | the same rectangle, through a file |

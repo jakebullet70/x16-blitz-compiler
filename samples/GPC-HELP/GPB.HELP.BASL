@@ -36,12 +36,11 @@
 ## The design and the measurements behind it are in readme.md.
 ## ============================================================================
 
-## 99 rows today, so this leaves six spare; rows past the end are dropped. A row
-## costs ten bytes of workspace used or not, plus its own text on the heap, and
-## the heap is what runs out first: FREE is 10,496 against a 4,096 floor and the
-## index is about 5,400 of what is left. Raise this only with a FREE figure in
-## hand.
-#DEFINE HELP.MAXIX 105
+## THE INDEX IS IN A BANK, so a row costs bank bytes and not workspace: eight
+## for its record plus its own text. 104 rows and 3,213 characters today against
+## a bank that holds 250 records and 6,192 characters. Rows past the end are
+## dropped.
+#DEFINE HELP.MAXIX 250
 
 ## Cross references in one topic, and the deepest chain of them ESC can walk
 ## back along. Twelve is what MKHELP.PY emits at most.
@@ -55,6 +54,14 @@
 ## The topic bank. NOT HELP.BANK -- that is GUI.BANK, holding the cells under an
 ## open dialog. Hex for the window: a #DEFINE takes a SIGNED int16.
 #DEFINE HELP.TBANK 9
+
+## The index bank. Records at the front, eight bytes each -- text offset lo and
+## hi, length, type, topic, section line, topic length lo and hi -- with the
+## text above them, row N at HELP.IWIN + (N - 1) * 8.
+#DEFINE HELP.IBANK 10
+#DEFINE HELP.IWIN $A000
+#DEFINE HELP.IXREC 8
+#DEFINE HELP.IXWIDE 72
 #DEFINE HELP.WIN $A000
 #DEFINE HELP.BANKSIZE 8192
 #DEFINE HELP.MAXLINES 140
@@ -189,11 +196,12 @@ HELP.BOOT:
     GUI.CORNER.BL = HELP.GL.BL : GUI.CORNER.BR = HELP.GL.BR
     GUI.BANK = HELP.BANK
 
-    DIM HELP.IX.TEXT$(HELP.MAXIX)
-    DIM HELP.IX.TYPE%(HELP.MAXIX)
-    DIM HELP.IX.TOPIC%(HELP.MAXIX)
-    DIM HELP.IX.SEC%(HELP.MAXIX)
-    DIM HELP.IX.LINES%(HELP.MAXIX)
+    ## ONE ROW AT A TIME, out of the bank and into a string that is allocated
+    ## here and never reallocated: HELP.IXTEXT pokes the length byte and the
+    ## characters through GP.STRPTR, so a row costs the heap nothing. The
+    ## capacity has to be there before the first poke -- a block never grows.
+    HELP.ROW$ = "                                                                        "
+    HELP.IXFREE = HELP.MAXIX * HELP.IXREC
     DIM HELP.PICK%(HELP.MAXPICK)
     DIM HELP.BACK.GO%(HELP.MAXBACK)
     DIM HELP.BACK.AT%(HELP.MAXBACK)
@@ -274,11 +282,58 @@ HELP.IDXROW:
     HELP.KIND = 0
     IF HELP.TAG$ = "T" THEN HELP.KIND = 1
     IF HELP.TAG$ = "S" THEN HELP.KIND = 2
-    HELP.IX.TYPE%(HELP.IX.N) = HELP.KIND
-    HELP.IX.TOPIC%(HELP.IX.N) = VAL(HELP.FLD$(2))
-    HELP.IX.SEC%(HELP.IX.N) = VAL(HELP.FLD$(3))
-    HELP.IX.LINES%(HELP.IX.N) = VAL(HELP.FLD$(4))
-    HELP.IX.TEXT$(HELP.IX.N) = HELP.FLD$(5)
+    HELP.T$ = HELP.FLD$(5)
+    HELP.TL = LEN(HELP.T$)
+    IF HELP.TL > HELP.IXWIDE THEN HELP.TL = HELP.IXWIDE
+    ## Out of text before out of records, so both ends are checked. A row that
+    ## will not fit is dropped whole rather than half written.
+    IF HELP.IXFREE + HELP.TL > 8192 THEN HELP.IX.N = HELP.IX.N - 1 : RETURN
+    HELP.REC = HELP.IWIN + (HELP.IX.N - 1) * HELP.IXREC
+    HELP.LN2 = VAL(HELP.FLD$(4))
+    HELP.HI = INT(HELP.LN2 / 256)
+    BANK HELP.IBANK
+    POKE HELP.REC, HELP.IXFREE - INT(HELP.IXFREE / 256) * 256
+    POKE HELP.REC + 1, INT(HELP.IXFREE / 256)
+    POKE HELP.REC + 2, HELP.TL
+    POKE HELP.REC + 3, HELP.KIND
+    POKE HELP.REC + 4, VAL(HELP.FLD$(2))
+    POKE HELP.REC + 5, VAL(HELP.FLD$(3))
+    POKE HELP.REC + 6, HELP.LN2 - HELP.HI * 256
+    POKE HELP.REC + 7, HELP.HI
+    HELP.SP = GP.STRPTR(HELP.T$) + 1
+    GP.IF HELP.TL > 0 THEN
+        FOR HELP.I = 0 TO HELP.TL - 1
+            POKE HELP.IWIN + HELP.IXFREE + HELP.I, PEEK(HELP.SP + HELP.I)
+        NEXT HELP.I
+    GP.ENDIF
+    HELP.IXFREE = HELP.IXFREE + HELP.TL
+    RETURN
+
+## ONE ROW OUT OF THE BANK. HELP.IXR in, the six fields out. Every caller that
+## wants a field calls this first -- there is no array left to read.
+HELP.IXREAD:
+    BANK HELP.IBANK
+    HELP.REC = HELP.IWIN + (HELP.IXR - 1) * HELP.IXREC
+    HELP.IXOFF = PEEK(HELP.REC) + PEEK(HELP.REC + 1) * 256
+    HELP.IXLEN = PEEK(HELP.REC + 2)
+    HELP.IXTYPE = PEEK(HELP.REC + 3)
+    HELP.IXTOPIC = PEEK(HELP.REC + 4)
+    HELP.IXSEC = PEEK(HELP.REC + 5)
+    HELP.IXLINES = PEEK(HELP.REC + 6) + PEEK(HELP.REC + 7) * 256
+    RETURN
+
+## The row's text, in HELP.ROW$. HELP.IXREAD first -- this uses its offset and
+## length. The length byte is poked rather than the string assigned, so nothing
+## is allocated and the block keeps the capacity it was born with.
+HELP.IXTEXT:
+    HELP.RP = GP.STRPTR(HELP.ROW$)
+    POKE HELP.RP, HELP.IXLEN
+    BANK HELP.IBANK
+    GP.IF HELP.IXLEN > 0 THEN
+        FOR HELP.I = 0 TO HELP.IXLEN - 1
+            POKE HELP.RP + 1 + HELP.I, PEEK(HELP.IWIN + HELP.IXOFF + HELP.I)
+        NEXT HELP.I
+    GP.ENDIF
     RETURN
 
 ## Topic 7 is HELP-TXT/H007.HLP: the index carries the number, so no row holds a
@@ -299,7 +354,8 @@ HELP.INDEX:
     HELP.IX.SEL = 1
 HELP.INDEX.FIRST:
     ## Row 1 is a category header, and a header is not a destination.
-    IF HELP.IX.TYPE%(HELP.IX.SEL) = 0 THEN HELP.IX.SEL = HELP.IX.SEL + 1 : GOTO HELP.INDEX.FIRST
+    HELP.IXR = HELP.IX.SEL : GOSUB HELP.IXREAD
+    IF HELP.IXTYPE = 0 THEN HELP.IX.SEL = HELP.IX.SEL + 1 : GOTO HELP.INDEX.FIRST
     HELP.IX.TOP = 1
     HELP.FULL = 1
 
@@ -396,12 +452,14 @@ HELP.INDEX.ROW:
     IF HELP.ROWI > HELP.IX.TOP + HELP.VIEW - 1 THEN RETURN
     IF HELP.ROWI > HELP.IX.N THEN RETURN
     HELP.Y = 1 + HELP.ROWI - HELP.IX.TOP
+    HELP.IXR = HELP.ROWI : GOSUB HELP.IXREAD
     HELP.ATTR = THEME.CLR(THEME.TEXT)
-    IF HELP.IX.TYPE%(HELP.ROWI) = 0 THEN HELP.ATTR = THEME.CLR(THEME.TITLE)
-    IF HELP.IX.TYPE%(HELP.ROWI) = 2 THEN HELP.ATTR = THEME.CLR(THEME.DIMMED)
+    IF HELP.IXTYPE = 0 THEN HELP.ATTR = THEME.CLR(THEME.TITLE)
+    IF HELP.IXTYPE = 2 THEN HELP.ATTR = THEME.CLR(THEME.DIMMED)
     IF HELP.ROWI = HELP.IX.SEL THEN HELP.ATTR = THEME.CLR(THEME.HILITE)
     GP.FILL 0, HELP.Y, HELP.COLS, 1, 32, HELP.ATTR
-    GP.PRINTAT 1, HELP.Y, HELP.IX.TEXT$(HELP.ROWI), HELP.ATTR
+    GOSUB HELP.IXTEXT
+    GP.PRINTAT 1, HELP.Y, HELP.ROW$, HELP.ATTR
     RETURN
 
 HELP.INDEX.STATUS:
@@ -419,7 +477,8 @@ HELP.IX.STEP:
 HELP.IX.STEP.SCAN:
     IF HELP.J < 1 THEN RETURN
     IF HELP.J > HELP.IX.N THEN RETURN
-    IF HELP.IX.TYPE%(HELP.J) = 0 THEN HELP.J = HELP.J + HELP.DIR : GOTO HELP.IX.STEP.SCAN
+    HELP.IXR = HELP.J : GOSUB HELP.IXREAD
+    IF HELP.IXTYPE = 0 THEN HELP.J = HELP.J + HELP.DIR : GOTO HELP.IX.STEP.SCAN
     HELP.IX.SEL = HELP.J
     RETURN
 
@@ -438,7 +497,8 @@ HELP.IX.SNAP:
 HELP.IX.SNAP.SCAN:
     IF HELP.J < 1 THEN GOTO HELP.IX.SNAP.TURN
     IF HELP.J > HELP.IX.N THEN GOTO HELP.IX.SNAP.TURN
-    IF HELP.IX.TYPE%(HELP.J) <> 0 THEN HELP.IX.SEL = HELP.J : RETURN
+    HELP.IXR = HELP.J : GOSUB HELP.IXREAD
+    IF HELP.IXTYPE <> 0 THEN HELP.IX.SEL = HELP.J : RETURN
     HELP.J = HELP.J + HELP.DIR
     GOTO HELP.IX.SNAP.SCAN
 HELP.IX.SNAP.TURN:
@@ -454,7 +514,8 @@ HELP.IX.SHOW:
     ## Do not scroll a category heading off the top when the row under it is
     ## what is selected: the heading is how you know where you are.
     GP.IF HELP.IX.SEL > 1 AND HELP.IX.TOP = HELP.IX.SEL THEN
-        IF HELP.IX.TYPE%(HELP.IX.SEL - 1) = 0 THEN HELP.IX.TOP = HELP.IX.SEL - 1
+        HELP.IXR = HELP.IX.SEL - 1 : GOSUB HELP.IXREAD
+        IF HELP.IXTYPE = 0 THEN HELP.IX.TOP = HELP.IX.SEL - 1
     GP.ENDIF
     IF HELP.IX.TOP > HELP.IX.N - HELP.VIEW + 1 THEN HELP.IX.TOP = HELP.IX.N - HELP.VIEW + 1
     IF HELP.IX.TOP < 1 THEN HELP.IX.TOP = 1
@@ -477,12 +538,14 @@ HELP.OPEN.SEL:
 ## topic row starts at the top.
 HELP.START.AT:
     HELP.PG.FROM = 0
-    IF HELP.IX.SEC%(HELP.GO) > 1 THEN HELP.PG.FROM = HELP.IX.SEC%(HELP.GO) - 1
+    HELP.IXR = HELP.GO : GOSUB HELP.IXREAD
+    IF HELP.IXSEC > 1 THEN HELP.PG.FROM = HELP.IXSEC - 1
     GOSUB HELP.PG.CLAMP
     RETURN
 
 HELP.PG.CLAMP:
-    HELP.PG.MAX = HELP.IX.LINES%(HELP.GO) - HELP.VIEW
+    HELP.IXR = HELP.GO : GOSUB HELP.IXREAD
+    HELP.PG.MAX = HELP.IXLINES - HELP.VIEW
     IF HELP.PG.FROM > HELP.PG.MAX THEN HELP.PG.FROM = HELP.PG.MAX
     IF HELP.PG.FROM < 0 THEN HELP.PG.FROM = 0
     RETURN
@@ -520,7 +583,7 @@ HELP.PAGE.LOOP:
         GP.CASE HELP.K.HOME
             HELP.PG.FROM = 0
         GP.CASE HELP.K.END
-            HELP.PG.FROM = HELP.IX.LINES%(HELP.GO)
+            HELP.IXR = HELP.GO : GOSUB HELP.IXREAD : HELP.PG.FROM = HELP.IXLINES
         ## L ONLY. RETURN used to open this too, which is the index's meaning
         ## of the key leaking into a page that has no "open" to do -- and the
         ## footer advertises L, not RETURN.
@@ -569,7 +632,8 @@ HELP.PAGE.LOAD:
     HELP.PG.LINES = 0 : HELP.LINKN = 0 : HELP.ATTOPIC = 0
     HELP.PG.P = HELP.MAXLINES * HELP.RECSIZE
     HELP.RECP = HELP.WIN
-    HELP.TOPICNUM = HELP.IX.TOPIC%(HELP.GO)
+    HELP.IXR = HELP.GO : GOSUB HELP.IXREAD
+    HELP.TOPICNUM = HELP.IXTOPIC
     IF HELP.TOPICNUM < 1 THEN RETURN
     GOSUB HELP.FILENAME
     GOSUB HELP.PAGE.LOADING
@@ -578,7 +642,9 @@ HELP.PAGE.LOAD:
     LINPUT# HELP.CHAN, HELP.LINE$, 10 : HELP.ST = ST
     IF (HELP.ST AND 2) <> 0 THEN GOTO HELP.LOAD.CLOSE
     GOSUB HELP.STRIP
-    HELP.TITLE$ = HELP.IX.TEXT$(HELP.GO)
+    HELP.IXR = HELP.GO : GOSUB HELP.IXREAD : GOSUB HELP.IXTEXT
+    ## A COPY. HELP.ROW$ is rewritten in place by the next row read.
+    HELP.TITLE$ = HELP.ROW$ + ""
     ## Line 1 being the topic's own record is what the addressing rests on, so
     ## it is recorded rather than assumed -- the self-check asserts it.
     IF LEFT$(HELP.LINE$, 1) = "@" THEN HELP.TITLE$ = MID$(HELP.LINE$, 2) : HELP.ATTOPIC = 1
@@ -587,7 +653,7 @@ HELP.LOAD.READ:
     ## A guard, not the terminator: the index says how long the topic is, so a file
     ## that never signals its end cannot spin here. Four past the count, so the
     ## self-check's length assertion can still catch index and file disagreeing.
-    IF HELP.PG.LINES > HELP.IX.LINES%(HELP.GO) + 4 THEN GOTO HELP.LOAD.CLOSE
+    IF HELP.PG.LINES > HELP.IXLINES + 4 THEN GOTO HELP.LOAD.CLOSE
     LINPUT# HELP.CHAN, HELP.LINE$, 10 : HELP.ST = ST
     IF (HELP.ST AND 2) <> 0 THEN GOTO HELP.LOAD.CLOSE
     HELP.PG.LINES = HELP.PG.LINES + 1
@@ -728,7 +794,9 @@ HELP.STORE.ASM:
 ## while it is being read, rather than the screen sitting blank.
 HELP.PAGE.LOADING:
     GOSUB HELP.PAGE.FRAME
-    HELP.TITLE$ = HELP.IX.TEXT$(HELP.GO)
+    HELP.IXR = HELP.GO : GOSUB HELP.IXREAD : GOSUB HELP.IXTEXT
+    ## A COPY. HELP.ROW$ is rewritten in place by the next row read.
+    HELP.TITLE$ = HELP.ROW$ + ""
     GOSUB HELP.TITLEBAR
     GP.PRINTAT 2, 2, "Reading " + HELP.NAME$ + " ...", THEME.CLR(THEME.DIMMED)
     RETURN
@@ -946,7 +1014,8 @@ HELP.EXPORT:
 
     ## Channel 2 reads the topic and channel 3 writes the export. "@:" replaces.
     ## The lines are ASCII already, which is what BASLOAD reads.
-    HELP.TOPICNUM = HELP.IX.TOPIC%(HELP.GO) : GOSUB HELP.FILENAME
+    HELP.IXR = HELP.GO : GOSUB HELP.IXREAD
+    HELP.TOPICNUM = HELP.IXTOPIC : GOSUB HELP.FILENAME
     HELP.CNT = 0
     OPEN 3, 8, 3, "@:" + HELP.OUTNAME$ + ",S,W"
     PRINT# 3, "## " + HELP.TITLE$
@@ -1015,8 +1084,10 @@ HELP.FIND.SCAN:
     IF HELP.TRIES > HELP.IX.N THEN GOTO HELP.FIND.MISS
     HELP.J = HELP.J + 1
     IF HELP.J > HELP.IX.N THEN HELP.J = 1
-    IF HELP.IX.TYPE%(HELP.J) = 0 THEN GOTO HELP.FIND.SCAN
-    HELP.HAY$ = HELP.IX.TEXT$(HELP.J) + ""
+    HELP.IXR = HELP.J : GOSUB HELP.IXREAD
+    IF HELP.IXTYPE = 0 THEN GOTO HELP.FIND.SCAN
+    GOSUB HELP.IXTEXT
+    HELP.HAY$ = HELP.ROW$ + ""
     STRCASE.PTR = GP.STRPTR(HELP.HAY$) : STRCASE.MODE = STRCASE.UPPER
     GOSUB STRCASE.GO
     IF GP.INSTR(HELP.HAY$, HELP.FIND$) = 0 THEN GOTO HELP.FIND.SCAN
@@ -1159,9 +1230,10 @@ HELP.SELFCHECK:
 
     HELP.BAD = 0
     FOR HELP.J = 1 TO HELP.IX.N
-        GP.IF HELP.IX.TYPE%(HELP.J) > 0 THEN
-            IF HELP.IX.TOPIC%(HELP.J) < 1 THEN HELP.BAD = HELP.BAD + 1
-            IF HELP.IX.LINES%(HELP.J) < 1 THEN HELP.BAD = HELP.BAD + 1
+        HELP.IXR = HELP.J : GOSUB HELP.IXREAD
+        GP.IF HELP.IXTYPE > 0 THEN
+            IF HELP.IXTOPIC < 1 THEN HELP.BAD = HELP.BAD + 1
+            IF HELP.IXLINES < 1 THEN HELP.BAD = HELP.BAD + 1
         GP.ENDIF
     NEXT HELP.J
     PRINT "ROWS WITHOUT A TOPIC OR LENGTH"; HELP.BAD
@@ -1169,14 +1241,15 @@ HELP.SELFCHECK:
     HELP.OPENED = 0 : HELP.NOTAT = 0 : HELP.WRONGLEN = 0
     HELP.LINES = 0 : HELP.REFS = 0 : HELP.SECBAD = 0
     FOR HELP.J = 1 TO HELP.IX.N
-        GP.IF HELP.IX.TYPE%(HELP.J) > 0 THEN
+        HELP.IXR = HELP.J : GOSUB HELP.IXREAD
+        GP.IF HELP.IXTYPE > 0 THEN
             HELP.GO = HELP.J : HELP.PG.FROM = 0
             GOSUB HELP.PAGE.LOAD
             IF HELP.ATTOPIC = 0 THEN HELP.NOTAT = HELP.NOTAT + 1
             IF HELP.ATTOPIC = 0 THEN PRINT "NO TOPIC RECORD, ROW"; HELP.J
-            IF HELP.PG.LINES <> HELP.IX.LINES%(HELP.J) THEN HELP.WRONGLEN = HELP.WRONGLEN + 1
-            IF HELP.PG.LINES <> HELP.IX.LINES%(HELP.J) THEN PRINT "LENGTH DISAGREES, ROW"; HELP.J
-            IF HELP.IX.SEC%(HELP.J) > HELP.PG.LINES THEN HELP.SECBAD = HELP.SECBAD + 1
+            IF HELP.PG.LINES <> HELP.IXLINES THEN HELP.WRONGLEN = HELP.WRONGLEN + 1
+            IF HELP.PG.LINES <> HELP.IXLINES THEN PRINT "LENGTH DISAGREES, ROW"; HELP.J
+            IF HELP.IXSEC > HELP.PG.LINES THEN HELP.SECBAD = HELP.SECBAD + 1
             HELP.OPENED = HELP.OPENED + 1
             HELP.LINES = HELP.LINES + HELP.PG.LINES
             HELP.REFS = HELP.REFS + HELP.LINKN
@@ -1209,8 +1282,10 @@ HELP.FINDONLY.SCAN:
     IF HELP.TRIES > HELP.IX.N THEN HELP.IX.SEL = 0 : RETURN
     HELP.J = HELP.J + 1
     IF HELP.J > HELP.IX.N THEN HELP.J = 1
-    IF HELP.IX.TYPE%(HELP.J) = 0 THEN GOTO HELP.FINDONLY.SCAN
-    HELP.HAY$ = HELP.IX.TEXT$(HELP.J) + ""
+    HELP.IXR = HELP.J : GOSUB HELP.IXREAD
+    IF HELP.IXTYPE = 0 THEN GOTO HELP.FINDONLY.SCAN
+    GOSUB HELP.IXTEXT
+    HELP.HAY$ = HELP.ROW$ + ""
     STRCASE.PTR = GP.STRPTR(HELP.HAY$) : STRCASE.MODE = STRCASE.UPPER
     GOSUB STRCASE.GO
     IF GP.INSTR(HELP.HAY$, HELP.FIND$) = 0 THEN GOTO HELP.FINDONLY.SCAN
