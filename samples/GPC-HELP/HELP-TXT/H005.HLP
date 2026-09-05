@@ -11,7 +11,3 @@
 .and #DEFINE -- and writes the .PRG that GPC compiles. Every .INC.BL and
 ..EXP.BL in this folder is BASLOAD source.
 .
-.A program using GP.BASIC is compile-only. BASLOAD's output for one is not a
-.program the ROM can LIST or RUN, because nothing in BASIC sits behind a GP.
-.keyword. It is compiler input.
-.

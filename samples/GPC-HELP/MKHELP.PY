@@ -574,6 +574,7 @@ def manual_split(cat, group, tiers, top):
         t.refs = collect_refs("\n".join(md), t.key)
         t.examples = examples_in("\n".join(md))
         out.append(t)
+
         k = m
     return out
 
@@ -757,6 +758,7 @@ def add_tails(topics):
         m = MOD_RE.search(t.title)
         if m:
             have.add(m.group(1))
+    bykey = resolve_module_keys(topics)
     for t in topics:
         exs = getattr(t, "examples", None) or examples_in("\n".join(t.md))
         if exs:
@@ -769,7 +771,19 @@ def add_tails(topics):
                        indent="    ", first="  ")
             t.lines, t.secs = e.lines, e.secs
 
-        refs = [r for r in t.refs if r in have and r != t.key]
+        # A section 4 topic answers to two keys -- "4.8" and "STRCASE.INC.BL"
+        # -- so a paragraph naming both listed it twice under SEE ALSO. Dedupe
+        # on the topic the key resolves to, not on the key.
+        refs, seen_t = [], set()
+        for r in t.refs:
+            if r not in have or r == t.key:
+                continue
+            tgt = bykey.get(r)
+            mark = id(tgt) if tgt is not None else r
+            if mark in seen_t:
+                continue
+            seen_t.add(mark)
+            refs.append(r)
         if not refs:
             continue
         e = Emit()

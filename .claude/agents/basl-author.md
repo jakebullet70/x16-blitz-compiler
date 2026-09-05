@@ -138,6 +138,10 @@ is visible everywhere, and **a collision is a wrong answer, not an error**.
 
 ### Comments: light
 
+The full rules — the five kinds of comment that earn their place, the three that do not, the flat
+reference voice and the `WARNING` convention — are in the **`doc-style`** agent. Hand it a file when
+the job is the prose rather than the code. What follows is the part you need while writing.
+
 Direct instruction from the user, who has 40+ years behind it:
 
 > "code needs to be written so it flows and the programmer can follow it; when there are lots of

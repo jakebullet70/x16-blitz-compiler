@@ -16,9 +16,7 @@
 .on every compile.
 .
 .GPC.IMG.nnn.BIN is the runtime streamed into every self-contained object as
-.it is written. The engine cannot compile without it. It was inside the
-.engine until the object buffer was given the low RAM, which is when the
-.largest program GPC can build grew.
+.it is written. The engine cannot compile without it.
 .
 .A compiled program identifies itself: LIST one and the BASIC stub reads SYS
 .2069 : REM GPC!.

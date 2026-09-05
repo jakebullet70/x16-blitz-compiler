@@ -44,8 +44,7 @@ and how to get a build if the front end itself is broken.
 per-user state and is not shipped; the front end rewrites it on every compile.
 
 `GPC.IMG.nnn.BIN` is the runtime streamed into every self-contained object as it is written. The
-engine cannot compile without it. It was inside the engine until the object buffer was given the low
-RAM, which is when the largest program GPC can build grew.
+engine cannot compile without it.
 
 A compiled program identifies itself: `LIST` one and the BASIC stub reads `SYS 2069 : REM GPC!`.
 
@@ -60,9 +59,6 @@ resolved.
 `BASLOAD` is not a file here; it is built into the R49 ROM. It reads `.BASL` source — BASIC with
 long names, labels instead of line numbers, `#INCLUDE` and `#DEFINE` — and writes the `.PRG` that
 GPC compiles. Every `.INC.BL` and `.EXP.BL` in this folder is BASLOAD source.
-
-A program using GP.BASIC is compile-only. BASLOAD's output for one is not a program the ROM can
-`LIST` or `RUN`, because nothing in BASIC sits behind a `GP.` keyword. It is compiler input.
 
 ---
 

@@ -14,6 +14,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 ## How to work in this repo
 - [Answer the question asked](answer-the-question-asked.md) — lead with the number asked for; no adjacent easier problem, no edge cases nobody writes
 - [Measure before changing code](measure-before-changing-code.md) — FRE probes found in 2 minutes what 2 rounds of edits missed
+- [Prose style is flat reference](prose-style-is-flat-reference.md) — the five settled rules for comments and help text; the `doc-style` agent owns them
 - [Comments light, code should flow](comments-light-code-should-flow.md) — a note or two, not essays; heavy REMs mean bad naming
 - [No ship language, no unasked builds](no-ship-language-this-is-dev.md) — dev and test work only; "commit and push" does not include a build
 - [Commit to main directly](commit-to-main-directly.md) — do not branch first; solo repo, no review step
@@ -76,7 +77,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 ## BASLOAD
 - [BASLOAD #DEFINE rejects digits](basload-define-rejects-digits.md) — GUI2.DEFS is INVALID PARAMETER but GUI2.SEL is fine; and no #INCLUDE is ever optional
 - [Labels and variables collide](basload-label-and-variable-collide.md) — DUPLICATE SYMBOL, and the $ does not separate FOO from FOO$
-- [#AUTONUM breaks STRCASE](basload-autonum-breaks-strcase.md) — UNKNOWN LINE NUMBER at a line that cannot exist; drop the directive
+- [#AUTONUM breaks STRCASE](basload-autonum-breaks-strcase.md) — it sets the STEP, not whether lines are numbered; keep the step at 1
 
 ## X16 BASIC semantics (ROM-verified — apply to any compiler)
 - [IF semantics](gpc-if-semantics.md) — a false IF skips the WHOLE line, not just the first statement. Blitz gets this right.
