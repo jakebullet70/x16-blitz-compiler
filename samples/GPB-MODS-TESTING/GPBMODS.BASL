@@ -687,21 +687,24 @@ GMX.SCREEN:
   RETURN
 
 
-## ---- The rows these panels have to themselves. Row 6 up is chrome, and
-## ---- GM.RESY -- ROWS-3 -- is the result line.
+## ---- GMX.S.CLEARPANEL -- blank the rows a SCREEN panel draws in, and say
+## ---- where they are. Rows 0 to 6 are chrome; the bottom five carry GM.RESY
+## ---- -- ROWS-3 -- and the key line. So a panel owns 7 to ROWS-6, which is
+## ---- the 7 and the ROWS-12 below. GM.PANELTOP and GM.PANELROWS are left set
+## ---- for GMX.S.TELL, whose prompt goes on the last row of the panel.
 
-GMX.S.AREA:
-  GM.AY = 7
-  GM.AH = APPSYS.ROWS - 12
-  GP.FILL 0, GM.AY, APPSYS.COLS, GM.AH, ASC(" "), THEME.CLR(THEME.PAGE)
+GMX.S.CLEARPANEL:
+  GM.PANELTOP = 7
+  GM.PANELROWS = APPSYS.ROWS - 12
+  GP.FILL 0, GM.PANELTOP, APPSYS.COLS, GM.PANELROWS, ASC(" "), THEME.CLR(THEME.PAGE)
   RETURN
 
 
 ## ---- A prompt on the last row of the work area, then a key ----
 
 GMX.S.TELL:
-  GP.FILL 0, GM.AY + GM.AH - 1, APPSYS.COLS, 1, ASC(" "), THEME.CLR(THEME.PAGE)
-  GP.PRINTAT 4, GM.AY + GM.AH - 1, GM.TELL$, THEME.CLR(THEME.WARN)
+  GP.FILL 0, GM.PANELTOP + GM.PANELROWS - 1, APPSYS.COLS, 1, ASC(" "), THEME.CLR(THEME.PAGE)
+  GP.PRINTAT 4, GM.PANELTOP + GM.PANELROWS - 1, GM.TELL$, THEME.CLR(THEME.WARN)
   GOSUB GMX.D.WAIT
   RETURN
 
@@ -753,7 +756,7 @@ GMX.S.PATTERN:
 ## ***********************************************************************
 
 GMX.S.BOX:
-  GOSUB GMX.S.AREA
+  GOSUB GMX.S.CLEARPANEL
   GP.BOX 4, 9, 22, 7, 1, THEME.CLR(THEME.BORDER)
   GP.PRINTAT 6, 12, "STYLE 1, BUILT IN", THEME.CLR(THEME.TEXT)
 
@@ -777,7 +780,7 @@ GMX.S.BOX:
 ## ***********************************************************************
 
 GMX.S.FILL:
-  GOSUB GMX.S.AREA
+  GOSUB GMX.S.CLEARPANEL
   GP.FILL 4, 9, 26, 9, ASC("."), THEME.CLR(THEME.DIMMED)
   GP.FILL 8, 11, 18, 5, ASC("+"), THEME.CLR(THEME.BORDER)
   GP.FILL 12, 12, 10, 3, ASC(" "), THEME.CLR(THEME.HILITE)
@@ -804,7 +807,7 @@ GMX.S.FILL:
 ## ***********************************************************************
 
 GMX.S.PRINTAT:
-  GOSUB GMX.S.AREA
+  GOSUB GMX.S.CLEARPANEL
   GP.PRINTAT 4, 9, "GP.PRINTAT WRITES STRAIGHT TO VERA.", THEME.CLR(THEME.TITLE)
   GP.PRINTAT 4, 11, "NO KERNAL CALL PER CHARACTER, WHICH IS WHY IT IS", THEME.CLR(THEME.TEXT)
   GP.PRINTAT 4, 12, "SEVERAL TIMES FASTER THAN PRINT.", THEME.CLR(THEME.TEXT)
@@ -826,7 +829,7 @@ GMX.S.PRINTAT:
 ## ***********************************************************************
 
 GMX.S.CHAR:
-  GOSUB GMX.S.AREA
+  GOSUB GMX.S.CLEARPANEL
   FOR GM.I = 0 TO 15
     GP.CHAR 6 + GM.I * 3, 9 + GM.I, ASC("A") + GM.I, THEME.CLR(THEME.TEXT)
     GP.CHAR 7 + GM.I * 3, 9 + GM.I, ASC("*"), GM.I * 16 + 15
@@ -853,7 +856,7 @@ GMX.S.CHAR:
 ## ***********************************************************************
 
 GMX.S.STASH:
-  GOSUB GMX.S.AREA
+  GOSUB GMX.S.CLEARPANEL
   GOSUB GMX.S.PATTERN
 
   STASH.BANK = GM.DDBANK
@@ -889,7 +892,7 @@ GMX.S.STASH:
 ## ***********************************************************************
 
 GMX.S.MOVE:
-  GOSUB GMX.S.AREA
+  GOSUB GMX.S.CLEARPANEL
   GP.FILL 4, 9, 12, 4, ASC("."), THEME.CLR(THEME.DIMMED)
   GP.BOX 4, 9, 12, 4, 2, THEME.CLR(THEME.BORDER)
   GP.PRINTAT 6, 10, "STAMP", THEME.CLR(THEME.WARN)
@@ -932,7 +935,7 @@ GMX.S.MOVE:
 ## ***********************************************************************
 
 GMX.S.FILE:
-  GOSUB GMX.S.AREA
+  GOSUB GMX.S.CLEARPANEL
   GOSUB GMX.S.PATTERN
   BANK 1
 
