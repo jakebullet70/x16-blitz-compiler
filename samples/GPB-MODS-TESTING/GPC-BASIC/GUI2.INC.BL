@@ -242,7 +242,23 @@ GUI.LISTBOX.WAIT:
     GUI.LISTBOX.ROW = GUI.LISTBOX.SEL - MENUVERT.SCROLL : GUI.LISTBOX.ATTR = GUI.LISTBOX.HI : GOSUB GUI.LISTBOX.PAINT.ROW
     GOTO GUI.LISTBOX.WAIT
 
+## ***********************************************************************
+## **  GUI.LISTBOX.FINISH -- the one way out.
+## **
+## **  MENUVERT.SCROLL GOES BACK TO 0, and that is not tidiness. MENUVERT.ROW
+## **  draws ITEM$(SCROLL + R) and MENUBAR aims that same routine sideways, so
+## **  a scroll left behind here makes the NEXT menu -- any menu, in any file --
+## **  draw the rows above the ones it asked for, each cut to the width of the
+## **  row it replaced.
+## **
+## **  MENUVERT.INC.BL states the contract this keeps: 0 is what an unassigned
+## **  variable already is, so a menu that never heard of SCROLL is unchanged.
+## **  This file is the only thing that ever sets it, and so the only thing that
+## **  can break that.
+## ***********************************************************************
+
 GUI.LISTBOX.FINISH:
+    MENUVERT.SCROLL = 0
     GUI.KEY = GUI.LISTBOX.CODE
     GOSUB GUI.CLOSE
     RETURN

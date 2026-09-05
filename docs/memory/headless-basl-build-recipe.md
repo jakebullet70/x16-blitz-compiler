@@ -77,6 +77,13 @@ the source's `.PRG` with `.SYM`, so `#SAVEAS "@:X.SRC.PRG"` needs `#SYMFILE "@:X
 `NO SYMBOL FILE FOR {} @ 98`, naming a line inside `STASH.INC.BL` and saying nothing about a file
 name. Cost the first build of `samples/GPB-MODS-TESTING`, 05/09/26.
 
+**`build_basl.py` DOES NOT SEE AN EDITED `#INCLUDE`.** Its up-to-date check compares only the
+named `.BASL` against the `.SRC.PRG`, so after changing a `.INC.BL` it prints
+`skip -- ... is up to date (source no newer)` and the compile happily rebuilds the OLD p-code --
+same object size, no warning, and the fix appears not to have worked. Delete the `.SRC.PRG` (or
+touch the `.BASL`) whenever a module changed. Cost a confused cycle on 05/09/26 chasing a
+`GUI2.INC.BL` fix that was never tokenised.
+
 A successful tokenise prints `LOADING...BASLOAD 0.2.1 ...` and then `SAVING @:NAME.PRG`; **the
 banner is the signal that BASLOAD actually ran**, so stop on `SAVING`, not on a READY count, when
 the file might be malformed.

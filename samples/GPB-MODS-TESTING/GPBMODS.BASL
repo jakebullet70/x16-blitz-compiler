@@ -20,10 +20,13 @@
 ## **  GPBMODS.BASL -- the GPC-BASIC library, under a menu bar.
 ## **
 ## **  Eight bar items, one dropdown each, one row a library entry point.
-## **  THE PANELS ARE STUBS: every row opens GUI.SAY naming itself. The shell
-## **  is the real program at this stage, and it is already a test of three
-## **  modules -- MENUBAR drives the bar, MENUVERT every dropdown, STASH puts
-## **  the screen back under a closed one.
+## **
+## **  TWO PANELS ARE BUILT -- DIALOG and SCREEN. Every row in those calls the
+## **  library for real. The remaining six open GUI.SAY naming the row, which is
+## **  what a row does until its panel is written.
+## **
+## **  The shell is itself a test of three modules: MENUBAR drives the bar,
+## **  MENUVERT every dropdown, and STASH puts the screen back under a closed one.
 ## **
 ## **  It also holds every module at once, which is what the p-code map is
 ## **  read off. See PLAN.md.
@@ -123,8 +126,8 @@ GMX.CHROME:
   GP.FILL 0, 0, APPSYS.COLS, APPSYS.ROWS, ASC(" "), THEME.CLR(THEME.PAGE)
   GP.FILL 0, 0, APPSYS.COLS, 1, ASC(" "), THEME.CLR(THEME.TITLE)
   GP.PRINTAT 2, 2, "GPB-MODS-TESTING -- THE GPC-BASIC LIBRARY UNDER A BAR", THEME.CLR(THEME.TEXT)
-  GP.PRINTAT 2, 4, "EVERY PANEL IS A STUB. THE BAR, THE DROPDOWNS AND THE", THEME.CLR(THEME.DIMMED)
-  GP.PRINTAT 2, 5, "SCREEN SAVE UNDER THEM ARE REAL.", THEME.CLR(THEME.DIMMED)
+  GP.PRINTAT 2, 4, "DIALOG AND SCREEN ARE BUILT -- EVERY ROW IN THEM RUNS THE", THEME.CLR(THEME.DIMMED)
+  GP.PRINTAT 2, 5, "REAL LIBRARY CALL. THE OTHER SIX JUST NAME THE ROW YOU PICK.", THEME.CLR(THEME.DIMMED)
   GM.KEYS$ = "<- ->  BAR     DOWN  OPEN     RETURN  CHOOSE     ESC  BACK / QUIT"
   GP.PRINTAT 2, APPSYS.ROWS - 1, GM.KEYS$, THEME.CLR(THEME.DIMMED)
   GOSUB GMX.RESULT
@@ -225,7 +228,7 @@ GMX.DROP:
   GOSUB STASH.SAVE
 
   GP.FILL GM.DDX, GM.DDY, GM.DDW + 2, MENUVERT.COUNT + 2, ASC(" "), THEME.CLR(THEME.TEXT)
-  GP.BOX GM.DDX, GM.DDY, GM.DDW + 2, MENUVERT.COUNT + 2, 0, THEME.CLR(THEME.BORDER)
+  GP.BOX GM.DDX, GM.DDY, GM.DDW + 2, MENUVERT.COUNT + 2, 2, THEME.CLR(THEME.BORDER)
 
   MENUVERT.X = GM.DDX + 1
   MENUVERT.Y = GM.DDY + 1
@@ -297,7 +300,7 @@ GMX.DD.LOAD:
     MENUVERT.ITEM$(1) = " GP.BOX"
     MENUVERT.ITEM$(2) = " GP.FILL"
     MENUVERT.ITEM$(3) = " GP.PRINTAT"
-    MENUVERT.ITEM$(4) = " GP.DRAW"
+    MENUVERT.ITEM$(4) = " GP.CHAR"
     MENUVERT.ITEM$(5) = " STASH SAVE + RESTORE"
     MENUVERT.ITEM$(6) = " STASH MOVE"
     MENUVERT.ITEM$(7) = " STASH TO A FILE"
@@ -347,6 +350,7 @@ GMX.DD.LOAD:
 GMX.DISPATCH:
   GM.DONE = 0
   IF GM.SEL = 1 THEN GOSUB GMX.DIALOG : GM.DONE = 1
+  IF GM.SEL = 4 THEN GOSUB GMX.SCREEN : GM.DONE = 1
   IF GM.SEL = 8 THEN IF MENUVERT.SEL = 3 THEN GOSUB GMX.BANKMAP : GM.DONE = 1
   IF GM.DONE = 0 THEN GOSUB GMX.STUB
   RETURN
@@ -640,4 +644,317 @@ GMX.D.STYLES:
   GP.PRINTAT 4, 16, "FOUR STYLES, 0 TO 3. PRESS A KEY.", THEME.CLR(THEME.WARN)
   GOSUB GMX.D.WAIT
   GM.RESULT$ = "GP.BOX DREW STYLES 0 TO 3"
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.SCREEN -- the SCREEN dropdown. The drawing keywords, then STASH.
+## **
+## **  Every row repaints the page afterwards. These draw ON the page rather
+## **  than in a dialog that puts the screen back for itself.
+## ***********************************************************************
+
+GMX.SCREEN:
+  GP.SELECT MENUVERT.SEL
+  GP.CASE 1
+    GOSUB GMX.S.BOX
+  GP.CASE 2
+    GOSUB GMX.S.FILL
+  GP.CASE 3
+    GOSUB GMX.S.PRINTAT
+  GP.CASE 4
+    GOSUB GMX.S.CHAR
+  GP.CASE 5
+    GOSUB GMX.S.STASH
+  GP.CASE 6
+    GOSUB GMX.S.MOVE
+  GP.OTHER
+    GOSUB GMX.S.FILE
+  GP.ENDSEL
+  GOSUB GMX.CHROME
+  RETURN
+
+
+## ---- The rows these panels have to themselves. Row 6 up is chrome, and
+## ---- GM.RESY -- ROWS-3 -- is the result line.
+
+GMX.S.AREA:
+  GM.AY = 7
+  GM.AH = APPSYS.ROWS - 12
+  GP.FILL 0, GM.AY, APPSYS.COLS, GM.AH, ASC(" "), THEME.CLR(THEME.PAGE)
+  RETURN
+
+
+## ---- A prompt on the last row of the work area, then a key ----
+
+GMX.S.TELL:
+  GP.FILL 0, GM.AY + GM.AH - 1, APPSYS.COLS, 1, ASC(" "), THEME.CLR(THEME.PAGE)
+  GP.PRINTAT 4, GM.AY + GM.AH - 1, GM.TELL$, THEME.CLR(THEME.WARN)
+  GOSUB GMX.D.WAIT
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.S.BANKNOW -- which RAM bank is actually selected, into GM.BANKNOW.
+## **
+## **  STASH.BANK.HOLD, borrowed. It is the blob that reads $00, and BASIC
+## **  cannot: PEEK selects and restores around every access, so PEEK(0)
+## **  reads back what BANK last set rather than what the hardware holds.
+## **  Borrowing it rather than writing a second blob also means the panel
+## **  measures the module with the module.
+## **
+## **  STASH.WAS% IS SAFE TO CLOBBER between STASH calls -- it is live only
+## **  from a STASH entry point to its exit.
+## ***********************************************************************
+
+GMX.S.BANKNOW:
+  GOSUB STASH.BANK.HOLD
+  GM.BANKNOW = STASH.WAS%
+  RETURN
+
+
+## ---- Something worth saving: a frame, a label and a run of colour ----
+
+GMX.S.PATTERN:
+  GP.FILL 10, 9, 30, 8, ASC("."), THEME.CLR(THEME.DIMMED)
+  GP.BOX 10, 9, 30, 8, 1, THEME.CLR(THEME.BORDER)
+  GP.PRINTAT 12, 11, "THIRTY BY EIGHT", THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 12, 12, "CELLS, AND THE", THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 12, 13, "COLOUR GOES TOO", THEME.CLR(THEME.WARN)
+  FOR GM.I = 0 TO 13
+    GP.CHAR 12 + GM.I, 15, ASC("*"), GM.I * 16 + 15
+  NEXT GM.I
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.S.BOX -- GP.BOX, and the eight glyphs of your own.
+## **
+## **  The four built-in styles are DIALOG / BOX STYLES. This is the other
+## **  form: a style of 256 or more is an ADDRESS, and GP.STRPTR + 1 is the
+## **  cheapest way to carry eight bytes -- the pointer is at the length
+## **  byte and the text starts after it.
+## **
+## **  IT IS ALSO THE ISO ANSWER. GP.BOX does no translation, so the built-in
+## **  styles are PETSCII screen codes and come out as letters in ISO mode;
+## **  there, a tile index is a character code and + - | make a frame.
+## ***********************************************************************
+
+GMX.S.BOX:
+  GOSUB GMX.S.AREA
+  GP.BOX 4, 9, 22, 7, 1, THEME.CLR(THEME.BORDER)
+  GP.PRINTAT 6, 12, "STYLE 1, BUILT IN", THEME.CLR(THEME.TEXT)
+
+  GM.GLYPH$ = "++++--||"
+  GP.BOX 32, 9, 22, 7, GP.STRPTR(GM.GLYPH$) + 1, THEME.CLR(THEME.BORDER)
+  GP.PRINTAT 34, 11, "EIGHT GLYPHS OF", THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 34, 12, "THE CALLERS OWN, IN", THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 34, 13, "ORDER TR TL BR BL", THEME.CLR(THEME.DIMMED)
+  GP.PRINTAT 34, 14, "TOP BOTTOM LEFT RIGHT", THEME.CLR(THEME.DIMMED)
+
+  GM.TELL$ = "GP.BOX DRAWS THE FRAME ONLY. PRESS A KEY."
+  GOSUB GMX.S.TELL
+  GM.RESULT$ = "GP.BOX  STYLE 1 AND AN EIGHT GLYPH TABLE"
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.S.FILL -- GP.FILL, three rectangles deep.
+## **
+## **  The char is PETSCII, which is why it is written ASC(" ") and not 32.
+## ***********************************************************************
+
+GMX.S.FILL:
+  GOSUB GMX.S.AREA
+  GP.FILL 4, 9, 26, 9, ASC("."), THEME.CLR(THEME.DIMMED)
+  GP.FILL 8, 11, 18, 5, ASC("+"), THEME.CLR(THEME.BORDER)
+  GP.FILL 12, 12, 10, 3, ASC(" "), THEME.CLR(THEME.HILITE)
+
+  GP.PRINTAT 36, 9, "GP.FILL X,Y,W,H,CHAR,COL", THEME.CLR(THEME.TITLE)
+  GP.PRINTAT 36, 11, "THE CHAR IS PETSCII, SO IT", THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 36, 12, "IS WRITTEN ASC OF SOMETHING.", THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 36, 14, "A SPACE FILL IS THE WAY TO", THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 36, 15, "BLANK A REGION, AND IT IS", THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 36, 16, "RIGHT IN ISO MODE TOO.", THEME.CLR(THEME.TEXT)
+
+  GM.TELL$ = "THREE RECTANGLES, THE LAST ONE BLANK. PRESS A KEY."
+  GOSUB GMX.S.TELL
+  GM.RESULT$ = "GP.FILL  THREE RECTANGLES"
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.S.PRINTAT -- GP.PRINTAT, in three colours.
+## **
+## **  NOTHING IS CLIPPED is stated rather than shown: drawing past the right
+## **  edge wraps onto the next row, and past the bottom writes off the end of
+## **  the screen map, which would take the chrome with it.
+## ***********************************************************************
+
+GMX.S.PRINTAT:
+  GOSUB GMX.S.AREA
+  GP.PRINTAT 4, 9, "GP.PRINTAT WRITES STRAIGHT TO VERA.", THEME.CLR(THEME.TITLE)
+  GP.PRINTAT 4, 11, "NO KERNAL CALL PER CHARACTER, WHICH IS WHY IT IS", THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 4, 12, "SEVERAL TIMES FASTER THAN PRINT.", THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 4, 14, "IT DOES NOT MOVE THE CURSOR PRINT USES, SO THE TWO", THEME.CLR(THEME.DIMMED)
+  GP.PRINTAT 4, 15, "DO NOT MIX WITHOUT A LOCATE BETWEEN THEM.", THEME.CLR(THEME.DIMMED)
+  GP.PRINTAT 4, 17, "NOTHING IS CLIPPED. PAST THE RIGHT EDGE WRAPS ONTO", THEME.CLR(THEME.WARN)
+  GP.PRINTAT 4, 18, "THE NEXT ROW, AND PAST THE BOTTOM IS OFF THE MAP.", THEME.CLR(THEME.WARN)
+
+  GM.TELL$ = "PRESS A KEY."
+  GOSUB GMX.S.TELL
+  GM.RESULT$ = "GP.PRINTAT  SEVEN LINES IN THREE COLOURS"
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.S.CHAR -- GP.CHAR, one cell at a time.
+## **
+## **  FREE: it is GP.PRINTAT in shape and GP.FILL underneath, a 1x1 fill.
+## ***********************************************************************
+
+GMX.S.CHAR:
+  GOSUB GMX.S.AREA
+  FOR GM.I = 0 TO 15
+    GP.CHAR 6 + GM.I * 3, 9 + GM.I, ASC("A") + GM.I, THEME.CLR(THEME.TEXT)
+    GP.CHAR 7 + GM.I * 3, 9 + GM.I, ASC("*"), GM.I * 16 + 15
+  NEXT GM.I
+  GP.PRINTAT 56, 12, "ONE CELL A CALL,", THEME.CLR(THEME.TITLE)
+  GP.PRINTAT 56, 13, "IN GP.PRINTAT SHAPE", THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 56, 14, "RUNNING GP.FILL.", THEME.CLR(THEME.TEXT)
+
+  GM.TELL$ = "SIXTEEN LETTERS AND SIXTEEN BACKGROUNDS. PRESS A KEY."
+  GOSUB GMX.S.TELL
+  GM.RESULT$ = "GP.CHAR  THIRTY-TWO SINGLE CELLS"
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.S.STASH -- STASH.SAVE and STASH.RESTORE, over a scribble.
+## **
+## **  THE DROPDOWN BANK IS FREE HERE. GMX.DROP restores the screen under the
+## **  dropdown BEFORE it dispatches, so nothing in bank GM.DDBANK is wanted
+## **  by the time a panel runs.
+## **
+## **  The bank is read back at the end because STASH selects one and used to
+## **  leave it selected. It must report the bank this panel had, not GM.DDBANK.
+## ***********************************************************************
+
+GMX.S.STASH:
+  GOSUB GMX.S.AREA
+  GOSUB GMX.S.PATTERN
+
+  STASH.BANK = GM.DDBANK
+  STASH.X = 10 : STASH.Y = 9 : STASH.W = 30 : STASH.H = 8
+  GOSUB STASH.SAVE
+  GM.SOK = STASH.OK
+
+  GM.TELL$ = "SAVED TO A BANK. PRESS A KEY TO SCRIBBLE OVER IT."
+  GOSUB GMX.S.TELL
+  GP.FILL 10, 9, 30, 8, ASC("X"), THEME.CLR(THEME.WARN)
+
+  GM.TELL$ = "GONE. PRESS A KEY TO PUT IT BACK."
+  GOSUB GMX.S.TELL
+  STASH.BANK = GM.DDBANK
+  STASH.MOVE = 0
+  GOSUB STASH.RESTORE
+  GOSUB GMX.S.BANKNOW
+
+  GM.TELL$ = "BACK, COLOUR AND ALL. PRESS A KEY."
+  GOSUB GMX.S.TELL
+  GM.RESULT$ = "STASH  OK " + MID$(STR$(GM.SOK), 2)
+  GM.RESULT$ = GM.RESULT$ + "   BANK AFTER " + MID$(STR$(GM.BANKNOW), 2)
+  GM.RESULT$ = GM.RESULT$ + "  (STASHED IN " + MID$(STR$(GM.DDBANK), 2) + ")"
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.S.MOVE -- STASH.MOVE, which makes a saved rectangle a stamp.
+## **
+## **  RESTORE reads the size out of the four header bytes, so MOVE needs only
+## **  a new X and Y. MOVE IS CLEARED ON THE WAY OUT: it is an input a caller
+## **  sets once, and it would otherwise leak into the next restore.
+## ***********************************************************************
+
+GMX.S.MOVE:
+  GOSUB GMX.S.AREA
+  GP.FILL 4, 9, 12, 4, ASC("."), THEME.CLR(THEME.DIMMED)
+  GP.BOX 4, 9, 12, 4, 2, THEME.CLR(THEME.BORDER)
+  GP.PRINTAT 6, 10, "STAMP", THEME.CLR(THEME.WARN)
+  GP.PRINTAT 6, 11, "12 X 4", THEME.CLR(THEME.TEXT)
+
+  STASH.BANK = GM.DDBANK
+  STASH.X = 4 : STASH.Y = 9 : STASH.W = 12 : STASH.H = 4
+  GOSUB STASH.SAVE
+
+  GM.TELL$ = "SAVED. PRESS A KEY TO STAMP IT FIVE TIMES."
+  GOSUB GMX.S.TELL
+
+  FOR GM.I = 1 TO 5
+    STASH.BANK = GM.DDBANK
+    STASH.MOVE = 1
+    STASH.X = 20 + GM.I * 9
+    STASH.Y = 9 + GM.I * 2
+    GOSUB STASH.RESTORE
+  NEXT GM.I
+  STASH.MOVE = 0
+  GOSUB GMX.S.BANKNOW
+
+  GM.TELL$ = "ONE RECTANGLE, SIX PLACES. PRESS A KEY."
+  GOSUB GMX.S.TELL
+  GM.RESULT$ = "STASH.MOVE  FIVE STAMPS   BANK AFTER " + MID$(STR$(GM.BANKNOW), 2)
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.S.FILE -- STASHFILE. Save, load back, and stamp elsewhere.
+## **
+## **  BANK 1 FIRST, AND IT IS THE POINT OF THE ROW. BLOAD and BSAVE write the
+## **  RAM bank register directly and leave it where the transfer ended, so
+## **  each of the three is asked afterwards which bank is selected. All three
+## **  must answer 1 -- the bank this row chose -- and not GM.DDBANK, which is
+## **  the one the file was staged through.
+## **
+## **  THE NAME CARRIES @: so a second run overwrites rather than failing on an
+## **  existing file.
+## ***********************************************************************
+
+GMX.S.FILE:
+  GOSUB GMX.S.AREA
+  GOSUB GMX.S.PATTERN
+  BANK 1
+
+  STASH.BANK = GM.DDBANK
+  STASH.DEV = 8
+  STASH.FILE$ = "@:PANEL.BIN"
+  STASH.X = 10 : STASH.Y = 9 : STASH.W = 30 : STASH.H = 8
+  GOSUB STASH.FILE.SAVE
+  GM.SOK = STASH.OK
+  GOSUB GMX.S.BANKNOW
+  GM.BSAVE = GM.BANKNOW
+
+  GM.TELL$ = "WRITTEN TO PANEL.BIN. PRESS A KEY TO BLANK IT."
+  GOSUB GMX.S.TELL
+  GP.FILL 10, 9, 30, 8, ASC(" "), THEME.CLR(THEME.PAGE)
+
+  GM.TELL$ = "BLANK. PRESS A KEY TO LOAD IT BACK."
+  GOSUB GMX.S.TELL
+  STASH.FILE$ = "PANEL.BIN"
+  GOSUB STASH.FILE.LOAD
+  GOSUB GMX.S.BANKNOW
+  GM.BLOAD = GM.BANKNOW
+
+  GM.TELL$ = "BACK. PRESS A KEY TO STAMP THE FILE SOMEWHERE ELSE."
+  GOSUB GMX.S.TELL
+  STASH.X = 44 : STASH.Y = 13
+  GOSUB STASH.FILE.PUT
+  GOSUB GMX.S.BANKNOW
+
+  GM.TELL$ = "PRESS A KEY."
+  GOSUB GMX.S.TELL
+  GM.RESULT$ = "STASHFILE OK " + MID$(STR$(GM.SOK), 2) + "   BANK AFTER"
+  GM.RESULT$ = GM.RESULT$ + " SAVE " + MID$(STR$(GM.BSAVE), 2)
+  GM.RESULT$ = GM.RESULT$ + " LOAD " + MID$(STR$(GM.BLOAD), 2)
+  GM.RESULT$ = GM.RESULT$ + " PUT " + MID$(STR$(GM.BANKNOW), 2)
+  GM.RESULT$ = GM.RESULT$ + "   WANT 1 1 1"
   RETURN

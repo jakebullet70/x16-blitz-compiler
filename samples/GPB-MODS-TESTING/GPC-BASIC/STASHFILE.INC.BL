@@ -23,9 +23,15 @@
 ## **        STASH.BANK     the bank to stage through
 ## **        and, for SAVE, the geometry STASH.SAVE wants
 ## **
+## **  ALL THREE PUT THE CALLER'S BANK BACK, and the fix in STASH.INC.BL is not enough
+## **  on its own: BLOAD and BSAVE write the RAM bank register directly and leave it
+## **  where the transfer ended. STASH.SAVE puts your bank back and then BSAVE takes it
+## **  away again. See STASH.FILE.DONE.
+## **
 ## **  A SEPARATE FILE FROM STASH.INC.BL ON PURPOSE: a BASL module has no dead code
-## **  elimination, and these three are 127 bytes. A dialog that stashes to a bank and
-## **  puts it back never goes near a disk and should not pay for one.
+## **  elimination, and this one is 174 bytes -- measured off the map, GPBMODS 2026-09-05.
+## **  A dialog that stashes to a bank and puts it back never goes near a disk and should
+## **  not pay for one.
 ## **
 ## **  THE FILE IS SELF-DESCRIBING BECAUSE THE STASH IS -- the four header bytes go out
 ## **  with the cells, so loading one back needs nothing but the name. That is the flaw
@@ -46,25 +52,62 @@
 GOTO STASHFILE.MODULE.END
 
 STASH.FILE.SAVE:
+    GOSUB STASH.FILE.HOLD
     IF STASH.DEV = 0 THEN STASH.DEV = 8
-    GOSUB STASH.SAVE : IF STASH.OK = 0 THEN RETURN
+    GOSUB STASH.SAVE
+    IF STASH.OK = 0 THEN GOTO STASH.FILE.DONE
     STASH.LAST = STASH.WINDOW + STASH.HEADER + STASH.W * STASH.H * 2
     BSAVE STASH.FILE$, STASH.DEV, STASH.BANK, STASH.WINDOW, STASH.LAST
-    RETURN
+    GOTO STASH.FILE.DONE
 
 STASH.FILE.LOAD:
+    GOSUB STASH.FILE.HOLD
     IF STASH.DEV = 0 THEN STASH.DEV = 8
     BLOAD STASH.FILE$, STASH.DEV, STASH.BANK, STASH.WINDOW
-    STASH.MOVE = 0 : GOSUB STASH.RESTORE : RETURN
+    STASH.MOVE = 0
+    GOSUB STASH.RESTORE
+    GOTO STASH.FILE.DONE
 
 ## ---- the same file stamped anywhere, which makes a saved panel a sprite for the text
 ## ---- screen: draw once, save, put it wherever. MOVE is cleared on the way out, being
 ## ---- an input a caller sets once that would otherwise leak into the next restore.
 
 STASH.FILE.PUT:
+    GOSUB STASH.FILE.HOLD
     IF STASH.DEV = 0 THEN STASH.DEV = 8
     BLOAD STASH.FILE$, STASH.DEV, STASH.BANK, STASH.WINDOW
-    STASH.MOVE = 1 : GOSUB STASH.RESTORE : STASH.MOVE = 0 : RETURN
+    STASH.MOVE = 1
+    GOSUB STASH.RESTORE
+    STASH.MOVE = 0
+
+## ***********************************************************************
+## **  STASH.FILE.DONE -- the one exit all three leave by.
+## **
+## **  BLOAD, BSAVE and BVERIFY WRITE THE BANK REGISTER AND LEAVE IT THERE,
+## **  so the fix in STASH.INC.BL does not reach this file: STASH.SAVE puts
+## **  the caller's bank back and then BSAVE takes it away again.
+## **
+## **  LOAD and PUT were the worse pair. BLOAD runs BEFORE STASH.RESTORE, so
+## **  the bank RESTORE captured to put back was the one BLOAD had just left,
+## **  not the caller's -- it restored the leak.
+## ***********************************************************************
+
+STASH.FILE.DONE:
+    BANK STASH.FWAS
+    RETURN
+
+## ***********************************************************************
+## **  STASH.FILE.HOLD -- the caller's bank, before any of this touches it.
+## **
+## **  A VARIABLE OF ITS OWN. STASH.WAS% belongs to STASH.SAVE and
+## **  STASH.RESTORE, which call STASH.BANK.HOLD themselves and would
+## **  overwrite it half way through.
+## ***********************************************************************
+
+STASH.FILE.HOLD:
+    GOSUB STASH.BANK.HOLD
+    STASH.FWAS = STASH.WAS%
+    RETURN
 
 STASHFILE.MODULE.END:
 #ENDIF

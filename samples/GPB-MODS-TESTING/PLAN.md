@@ -32,7 +32,7 @@ Eight bar items, one dropdown each. The shape is itself a test: `MENUBAR` drives
 | `DIALOG` | SAY · YN · MENU · TEXT · LISTBOX single · LISTBOX multi · OPEN/CLOSE panel · box styles 0-5 | `GUI`, `GUI2` |
 | `LISTS` | MENUVERT.RUN · .DRAW · .ROW · MENUBAR.RUN · .DRAW · .ITEM · hotkeys · NOWRAP · MUSTSEL · KEEPMARK · GAMEPAD | `MENUVERT`, `MENUBAR` |
 | `INPUT` | LINEINPUT.GET · .ASK · three-field form · length and insert limits | `LINEINPUT` |
-| `SCREEN` | GP.BOX styles · GP.FILL · GP.PRINTAT · GP.DRAW · STASH save/restore · STASH move · STASHFILE save/load/put | `STASH`, `STASHFILE`, `GPB` |
+| `SCREEN` | GP.BOX styles · GP.FILL · GP.PRINTAT · GP.CHAR · STASH save/restore · STASH move · STASHFILE save/load/put | `STASH`, `STASHFILE`, `GPB` |
 | `STRINGS` | STR.PADR/PADL/PADC · STR.SPLIT · STR.REPLACE · STR.PET2SCR · STRCASE 5 modes | `STRINGS`, `STRCASE` |
 | `DATA` | SORT.RUN on a fixture · array set · BMX.SHOW · BANKMGR alloc/free/claim | `SORT`, `BMX`, `BANKMGR` |
 | `THEME` | the five themes live · THEME.NEXT · THEME.SET · THEME.HI · colour readout | `THEME` |
@@ -169,7 +169,7 @@ library fits in a bank?*
 | variables, arrays, the string heap, `DIM` | all in the low-RAM workspace |
 | `GOSUB`/`RETURN` inside the module | PC-relative, and the module is contiguous |
 | calls out to low-RAM routines, and back | the low-RAM routine banks freely; `RETURN` restores from the frame |
-| `GP.BOX`, `GP.FILL`, `GP.PRINTAT`, `GP.DRAW`, `GP.TILE` | runtime handlers, resident in low RAM |
+| `GP.BOX`, `GP.FILL`, `GP.PRINTAT`, `GP.CHAR` | runtime handlers, resident in low RAM |
 | `VPEEK`/`VPOKE`, direct VERA at `$9F2x` | VERA is not in the window |
 | string functions, `GP.INSTR`, `GP.COMP`, `GP.STRPTR` | operate on heap pointers |
 | `PRINT`, `GET`, `GETKEY`, joystick | subject to the KERNAL question below |
