@@ -104,7 +104,7 @@ GOTO MENUBAR.MODULE.END
 ## **  MENUBAR.RUN -- the whole thing.
 ## ***********************************************************************
 
-MENUBAR.RUN:
+MENUBAR.RUN.BODY:
     IF MENUBAR.SEL < 1 THEN MENUBAR.SEL = 1
     IF MENUBAR.SEL > MENUVERT.COUNT THEN MENUBAR.SEL = MENUVERT.COUNT
     MENUBAR.KEY = 0 : GOSUB MENUBAR.DRAW : GOSUB MENUBAR.MARK
@@ -217,7 +217,7 @@ MENUBAR.PADREAD:
 ## **  MENUBAR.DRAW -- every item, unhighlighted.
 ## ***********************************************************************
 
-MENUBAR.DRAW:
+MENUBAR.DRAW.BODY:
     FOR MENUBAR.EACH = 1 TO MENUVERT.COUNT
         MENUBAR.DRAWN = MENUBAR.EACH : MENUBAR.PAINT = MENUVERT.ATTR
         GOSUB MENUBAR.ITEM
@@ -227,7 +227,7 @@ MENUBAR.DRAW:
 ## ---- the highlight, on whatever MENUBAR.SEL now is. HIATTR of 0 means "invert ATTR",
 ## ---- as MENUVERT does.
 
-MENUBAR.MARK:
+MENUBAR.MARK.BODY:
     MENUBAR.PAINT = MENUVERT.HIATTR
     IF MENUBAR.PAINT = 0 THEN MENUBAR.PAINT = (MENUVERT.ATTR AND 15) * 16 + INT(MENUVERT.ATTR / 16)
     MENUBAR.DRAWN = MENUBAR.SEL
@@ -246,7 +246,7 @@ MENUBAR.MARK:
 ## **  arithmetic, and if that line changes this breaks loudly on the first draw.
 ## ***********************************************************************
 
-MENUBAR.ITEM:
+MENUBAR.ITEM.BODY:
     MENUBAR.FIND = MENUBAR.DRAWN : GOSUB MENUBAR.COLUMN
     MENUVERT.X = MENUBAR.AT : MENUVERT.WIDTH = MENUBAR.WIDE : MENUVERT.Y = MENUBAR.Y - MENUBAR.DRAWN + 1
     MENUVERT.DRAWROW = MENUBAR.DRAWN : MENUVERT.DRAWATTR = MENUBAR.PAINT
@@ -281,7 +281,7 @@ MENUBAR.COLUMN:
 ## ---- where the chosen item sits, for a caller about to open something under it. Set
 ## ---- on the way out of MENUBAR.CHOSE, so it survives the highlight being lifted.
 
-MENUBAR.WHERE:
+MENUBAR.WHERE.BODY:
     MENUBAR.FIND = MENUBAR.SEL : GOSUB MENUBAR.COLUMN
     MENUBAR.SELX = MENUBAR.AT : MENUBAR.SELW = MENUBAR.WIDE : RETURN
 

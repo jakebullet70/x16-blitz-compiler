@@ -9,10 +9,7 @@
 #INCLUDE "STRCASE.INC.BL"
 #INCLUDE "STRINGS.INC.BL"
 #INCLUDE "SORT.INC.BL"
-#INCLUDE "MENUVERT.INC.BL"
-#INCLUDE "MENUBAR.INC.BL"
-#INCLUDE "LINEINPUT.INC.BL"
-#INCLUDE "GUIBANK.INC.BL"
+#INCLUDE "LIBBANK.INC.BL"
 
 ## ---- THE GUI RUNS FROM A RAM BANK. GUIBANK.INC.BL is the low memory front
 ## ---- door -- seven shims that select the bank and call the body. The GOTO
@@ -20,7 +17,10 @@
 ## ---- GP.BANKED leaves; see that file for why that matters.
 
 GOTO GM.LIBEND
-GP.BANKED GUI.CODEBANK
+GP.BANKED LIB.CODEBANK
+#INCLUDE "MENUVERT.INC.BL"
+#INCLUDE "MENUBAR.INC.BL"
+#INCLUDE "LINEINPUT.INC.BL"
 #INCLUDE "GUI.INC.BL"
 #INCLUDE "GUI2.INC.BL"
 GP.ENDBANKED
@@ -97,7 +97,7 @@ THEME.ID = 0 : GOSUB THEME.LOAD
 GOSUB BANKMGR.INIT
 BANKMGR.WANT = GM.DDBANK : GOSUB BANKMGR.CLAIM
 BANKMGR.WANT = GM.GUIBANK : GOSUB BANKMGR.CLAIM
-BANKMGR.WANT = GUI.CODEBANK : GOSUB BANKMGR.CLAIM
+BANKMGR.WANT = LIB.CODEBANK : GOSUB BANKMGR.CLAIM
 
 GM.SEL = 1
 GM.OPEN = 0
@@ -362,6 +362,7 @@ GMX.DD.LOAD:
 GMX.DISPATCH:
   GM.DONE = 0
   IF GM.SEL = 1 THEN GOSUB GMX.DIALOG : GM.DONE = 1
+  IF GM.SEL = 2 THEN GOSUB GMX.LISTS : GM.DONE = 1
   IF GM.SEL = 4 THEN GOSUB GMX.SCREEN : GM.DONE = 1
   IF GM.SEL = 8 THEN IF MENUVERT.SEL = 3 THEN GOSUB GMX.BANKMAP : GM.DONE = 1
   IF GM.DONE = 0 THEN GOSUB GMX.STUB
@@ -471,7 +472,7 @@ GMX.D.RESET:
 
 ## ---- A key, for the two demonstrations that draw and then wait ----
 
-GMX.D.WAIT:
+GMX.WAIT:
   GP.DO
     GET GM.K$
     IF GM.K$ <> "" THEN GP.EXITDO
@@ -630,7 +631,7 @@ GMX.D.PANEL:
   GP.PRINTAT GUI.INNER.LEFT, GUI.INNER.TOP + 1, "AT GUI.INNER.LEFT AND .TOP.", GUI.PANEL
   GP.PRINTAT GUI.INNER.LEFT, GUI.INNER.TOP + 2, "GUI.STASHED = " + MID$(STR$(GUI.STASHED), 2), GUI.PANEL
   GP.PRINTAT GUI.INNER.LEFT, GUI.INNER.TOP + 3, "PRESS A KEY.", THEME.CLR(THEME.WARN)
-  GOSUB GMX.D.WAIT
+  GOSUB GMX.WAIT
   GOSUB GUI.CLOSE
   GM.RESULT$ = "GUI.OPEN BOX " + MID$(STR$(GUI.WIDTH), 2) + " X " + MID$(STR$(GUI.HEIGHT), 2)
   GM.RESULT$ = GM.RESULT$ + " AT " + MID$(STR$(GUI.LEFT), 2) + "," + MID$(STR$(GUI.TOP), 2)
@@ -654,7 +655,7 @@ GMX.D.STYLES:
     GP.PRINTAT GM.BOXX + 4, 10, "STYLE " + MID$(STR$(GM.I), 2), THEME.CLR(THEME.TEXT)
   NEXT GM.I
   GP.PRINTAT 4, 16, "FOUR STYLES, 0 TO 3. PRESS A KEY.", THEME.CLR(THEME.WARN)
-  GOSUB GMX.D.WAIT
+  GOSUB GMX.WAIT
   GM.RESULT$ = "GP.BOX DREW STYLES 0 TO 3"
   RETURN
 
@@ -687,13 +688,13 @@ GMX.SCREEN:
   RETURN
 
 
-## ---- GMX.S.CLEARPANEL -- blank the rows a SCREEN panel draws in, and say
+## ---- GMX.CLEARPANEL -- blank the rows a SCREEN panel draws in, and say
 ## ---- where they are. Rows 0 to 6 are chrome; the bottom five carry GM.RESY
 ## ---- -- ROWS-3 -- and the key line. So a panel owns 7 to ROWS-6, which is
 ## ---- the 7 and the ROWS-12 below. GM.PANELTOP and GM.PANELROWS are left set
-## ---- for GMX.S.TELL, whose prompt goes on the last row of the panel.
+## ---- for GMX.TELL, whose prompt goes on the last row of the panel.
 
-GMX.S.CLEARPANEL:
+GMX.CLEARPANEL:
   GM.PANELTOP = 7
   GM.PANELROWS = APPSYS.ROWS - 12
   GP.FILL 0, GM.PANELTOP, APPSYS.COLS, GM.PANELROWS, ASC(" "), THEME.CLR(THEME.PAGE)
@@ -702,15 +703,15 @@ GMX.S.CLEARPANEL:
 
 ## ---- A prompt on the last row of the work area, then a key ----
 
-GMX.S.TELL:
+GMX.TELL:
   GP.FILL 0, GM.PANELTOP + GM.PANELROWS - 1, APPSYS.COLS, 1, ASC(" "), THEME.CLR(THEME.PAGE)
   GP.PRINTAT 4, GM.PANELTOP + GM.PANELROWS - 1, GM.TELL$, THEME.CLR(THEME.WARN)
-  GOSUB GMX.D.WAIT
+  GOSUB GMX.WAIT
   RETURN
 
 
 ## ***********************************************************************
-## **  GMX.S.BANKNOW -- which RAM bank is actually selected, into GM.BANKNOW.
+## **  GMX.BANKNOW -- which RAM bank is actually selected, into GM.BANKNOW.
 ## **
 ## **  STASH.BANK.HOLD, borrowed. It is the blob that reads $00, and BASIC
 ## **  cannot: PEEK selects and restores around every access, so PEEK(0)
@@ -722,7 +723,7 @@ GMX.S.TELL:
 ## **  from a STASH entry point to its exit.
 ## ***********************************************************************
 
-GMX.S.BANKNOW:
+GMX.BANKNOW:
   GOSUB STASH.BANK.HOLD
   GM.BANKNOW = STASH.WAS%
   RETURN
@@ -756,7 +757,7 @@ GMX.S.PATTERN:
 ## ***********************************************************************
 
 GMX.S.BOX:
-  GOSUB GMX.S.CLEARPANEL
+  GOSUB GMX.CLEARPANEL
   GP.BOX 4, 9, 22, 7, 1, THEME.CLR(THEME.BORDER)
   GP.PRINTAT 6, 12, "STYLE 1, BUILT IN", THEME.CLR(THEME.TEXT)
 
@@ -768,7 +769,7 @@ GMX.S.BOX:
   GP.PRINTAT 34, 14, "TOP BOTTOM LEFT RIGHT", THEME.CLR(THEME.DIMMED)
 
   GM.TELL$ = "GP.BOX DRAWS THE FRAME ONLY. PRESS A KEY."
-  GOSUB GMX.S.TELL
+  GOSUB GMX.TELL
   GM.RESULT$ = "GP.BOX  STYLE 1 AND AN EIGHT GLYPH TABLE"
   RETURN
 
@@ -780,7 +781,7 @@ GMX.S.BOX:
 ## ***********************************************************************
 
 GMX.S.FILL:
-  GOSUB GMX.S.CLEARPANEL
+  GOSUB GMX.CLEARPANEL
   GP.FILL 4, 9, 26, 9, ASC("."), THEME.CLR(THEME.DIMMED)
   GP.FILL 8, 11, 18, 5, ASC("+"), THEME.CLR(THEME.BORDER)
   GP.FILL 12, 12, 10, 3, ASC(" "), THEME.CLR(THEME.HILITE)
@@ -793,7 +794,7 @@ GMX.S.FILL:
   GP.PRINTAT 36, 16, "RIGHT IN ISO MODE TOO.", THEME.CLR(THEME.TEXT)
 
   GM.TELL$ = "THREE RECTANGLES, THE LAST ONE BLANK. PRESS A KEY."
-  GOSUB GMX.S.TELL
+  GOSUB GMX.TELL
   GM.RESULT$ = "GP.FILL  THREE RECTANGLES"
   RETURN
 
@@ -807,7 +808,7 @@ GMX.S.FILL:
 ## ***********************************************************************
 
 GMX.S.PRINTAT:
-  GOSUB GMX.S.CLEARPANEL
+  GOSUB GMX.CLEARPANEL
   GP.PRINTAT 4, 9, "GP.PRINTAT WRITES STRAIGHT TO VERA.", THEME.CLR(THEME.TITLE)
   GP.PRINTAT 4, 11, "NO KERNAL CALL PER CHARACTER, WHICH IS WHY IT IS", THEME.CLR(THEME.TEXT)
   GP.PRINTAT 4, 12, "SEVERAL TIMES FASTER THAN PRINT.", THEME.CLR(THEME.TEXT)
@@ -817,7 +818,7 @@ GMX.S.PRINTAT:
   GP.PRINTAT 4, 18, "THE NEXT ROW, AND PAST THE BOTTOM IS OFF THE MAP.", THEME.CLR(THEME.WARN)
 
   GM.TELL$ = "PRESS A KEY."
-  GOSUB GMX.S.TELL
+  GOSUB GMX.TELL
   GM.RESULT$ = "GP.PRINTAT  SEVEN LINES IN THREE COLOURS"
   RETURN
 
@@ -829,7 +830,7 @@ GMX.S.PRINTAT:
 ## ***********************************************************************
 
 GMX.S.CHAR:
-  GOSUB GMX.S.CLEARPANEL
+  GOSUB GMX.CLEARPANEL
   FOR GM.I = 0 TO 15
     GP.CHAR 6 + GM.I * 3, 9 + GM.I, ASC("A") + GM.I, THEME.CLR(THEME.TEXT)
     GP.CHAR 7 + GM.I * 3, 9 + GM.I, ASC("*"), GM.I * 16 + 15
@@ -839,7 +840,7 @@ GMX.S.CHAR:
   GP.PRINTAT 56, 14, "RUNNING GP.FILL.", THEME.CLR(THEME.TEXT)
 
   GM.TELL$ = "SIXTEEN LETTERS AND SIXTEEN BACKGROUNDS. PRESS A KEY."
-  GOSUB GMX.S.TELL
+  GOSUB GMX.TELL
   GM.RESULT$ = "GP.CHAR  THIRTY-TWO SINGLE CELLS"
   RETURN
 
@@ -856,7 +857,7 @@ GMX.S.CHAR:
 ## ***********************************************************************
 
 GMX.S.STASH:
-  GOSUB GMX.S.CLEARPANEL
+  GOSUB GMX.CLEARPANEL
   GOSUB GMX.S.PATTERN
 
   STASH.BANK = GM.DDBANK
@@ -865,18 +866,18 @@ GMX.S.STASH:
   GM.SOK = STASH.OK
 
   GM.TELL$ = "SAVED TO A BANK. PRESS A KEY TO SCRIBBLE OVER IT."
-  GOSUB GMX.S.TELL
+  GOSUB GMX.TELL
   GP.FILL 10, 9, 30, 8, ASC("X"), THEME.CLR(THEME.WARN)
 
   GM.TELL$ = "GONE. PRESS A KEY TO PUT IT BACK."
-  GOSUB GMX.S.TELL
+  GOSUB GMX.TELL
   STASH.BANK = GM.DDBANK
   STASH.MOVE = 0
   GOSUB STASH.RESTORE
-  GOSUB GMX.S.BANKNOW
+  GOSUB GMX.BANKNOW
 
   GM.TELL$ = "BACK, COLOUR AND ALL. PRESS A KEY."
-  GOSUB GMX.S.TELL
+  GOSUB GMX.TELL
   GM.RESULT$ = "STASH  OK " + MID$(STR$(GM.SOK), 2)
   GM.RESULT$ = GM.RESULT$ + "   BANK AFTER " + MID$(STR$(GM.BANKNOW), 2)
   GM.RESULT$ = GM.RESULT$ + "  (STASHED IN " + MID$(STR$(GM.DDBANK), 2) + ")"
@@ -892,7 +893,7 @@ GMX.S.STASH:
 ## ***********************************************************************
 
 GMX.S.MOVE:
-  GOSUB GMX.S.CLEARPANEL
+  GOSUB GMX.CLEARPANEL
   GP.FILL 4, 9, 12, 4, ASC("."), THEME.CLR(THEME.DIMMED)
   GP.BOX 4, 9, 12, 4, 2, THEME.CLR(THEME.BORDER)
   GP.PRINTAT 6, 10, "STAMP", THEME.CLR(THEME.WARN)
@@ -903,7 +904,7 @@ GMX.S.MOVE:
   GOSUB STASH.SAVE
 
   GM.TELL$ = "SAVED. PRESS A KEY TO STAMP IT FIVE TIMES."
-  GOSUB GMX.S.TELL
+  GOSUB GMX.TELL
 
   FOR GM.I = 1 TO 5
     STASH.BANK = GM.DDBANK
@@ -913,10 +914,10 @@ GMX.S.MOVE:
     GOSUB STASH.RESTORE
   NEXT GM.I
   STASH.MOVE = 0
-  GOSUB GMX.S.BANKNOW
+  GOSUB GMX.BANKNOW
 
   GM.TELL$ = "ONE RECTANGLE, SIX PLACES. PRESS A KEY."
-  GOSUB GMX.S.TELL
+  GOSUB GMX.TELL
   GM.RESULT$ = "STASH.MOVE  FIVE STAMPS   BANK AFTER " + MID$(STR$(GM.BANKNOW), 2)
   RETURN
 
@@ -935,7 +936,7 @@ GMX.S.MOVE:
 ## ***********************************************************************
 
 GMX.S.FILE:
-  GOSUB GMX.S.CLEARPANEL
+  GOSUB GMX.CLEARPANEL
   GOSUB GMX.S.PATTERN
   BANK 1
 
@@ -945,31 +946,269 @@ GMX.S.FILE:
   STASH.X = 10 : STASH.Y = 9 : STASH.W = 30 : STASH.H = 8
   GOSUB STASH.FILE.SAVE
   GM.SOK = STASH.OK
-  GOSUB GMX.S.BANKNOW
+  GOSUB GMX.BANKNOW
   GM.BSAVE = GM.BANKNOW
 
   GM.TELL$ = "WRITTEN TO PANEL.BIN. PRESS A KEY TO BLANK IT."
-  GOSUB GMX.S.TELL
+  GOSUB GMX.TELL
   GP.FILL 10, 9, 30, 8, ASC(" "), THEME.CLR(THEME.PAGE)
 
   GM.TELL$ = "BLANK. PRESS A KEY TO LOAD IT BACK."
-  GOSUB GMX.S.TELL
+  GOSUB GMX.TELL
   STASH.FILE$ = "PANEL.BIN"
   GOSUB STASH.FILE.LOAD
-  GOSUB GMX.S.BANKNOW
+  GOSUB GMX.BANKNOW
   GM.BLOAD = GM.BANKNOW
 
   GM.TELL$ = "BACK. PRESS A KEY TO STAMP THE FILE SOMEWHERE ELSE."
-  GOSUB GMX.S.TELL
+  GOSUB GMX.TELL
   STASH.X = 44 : STASH.Y = 13
   GOSUB STASH.FILE.PUT
-  GOSUB GMX.S.BANKNOW
+  GOSUB GMX.BANKNOW
 
   GM.TELL$ = "PRESS A KEY."
-  GOSUB GMX.S.TELL
+  GOSUB GMX.TELL
   GM.RESULT$ = "STASHFILE OK " + MID$(STR$(GM.SOK), 2) + "   BANK AFTER"
   GM.RESULT$ = GM.RESULT$ + " SAVE " + MID$(STR$(GM.BSAVE), 2)
   GM.RESULT$ = GM.RESULT$ + " LOAD " + MID$(STR$(GM.BLOAD), 2)
   GM.RESULT$ = GM.RESULT$ + " PUT " + MID$(STR$(GM.BANKNOW), 2)
   GM.RESULT$ = GM.RESULT$ + "   WANT 1 1 1"
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.LISTS -- the LISTS dropdown. MENUVERT, MENUBAR, and the one row
+## **  painter underneath both of them.
+## ***********************************************************************
+
+GMX.LISTS:
+  GP.SELECT MENUVERT.SEL
+  GP.CASE 1
+    GOSUB GMX.L.RUN
+  GP.CASE 2
+    GOSUB GMX.L.DRAW
+  GP.CASE 3
+    GOSUB GMX.L.ROW
+  GP.CASE 4
+    GOSUB GMX.L.BAR
+  GP.CASE 5
+    GOSUB GMX.L.HOT
+  GP.OTHER
+    GOSUB GMX.L.FLAGS
+  GP.ENDSEL
+  GOSUB GMX.CHROME
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.L.LOAD -- six rows and the whole MENUVERT interface, every time.
+## **
+## **  HOT$ AND HOTATTR ARE CLEARED HERE. They are sticky, the bar leaves its
+## **  own letters in them, and MENUVERT.HOTKEY would match those against
+## **  these rows.
+## ***********************************************************************
+
+GMX.L.LOAD:
+  MENUVERT.ITEM$(1) = " NEW GAME"
+  MENUVERT.ITEM$(2) = " LOAD"
+  MENUVERT.ITEM$(3) = " SAVE"
+  MENUVERT.ITEM$(4) = " OPTIONS"
+  MENUVERT.ITEM$(5) = " CREDITS"
+  MENUVERT.ITEM$(6) = " QUIT"
+  MENUVERT.COUNT = 6
+  MENUVERT.HOT$ = ""
+  MENUVERT.HOTATTR = 0
+  MENUVERT.ATTR = THEME.CLR(THEME.TEXT)
+  MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
+  MENUVERT.FLAGS = 0
+  MENUVERT.SEL = 0
+  MENUVERT.X = 6
+  MENUVERT.Y = 10
+  MENUVERT.WIDTH = 20
+  RETURN
+
+
+## ---- The frame the demonstrations draw round the six rows. MENUVERT owns the
+## ---- rows and nothing else, which is why this is here and not in the module.
+
+GMX.L.FRAME:
+  GP.BOX 5, 9, 22, 8, 1, THEME.CLR(THEME.BORDER)
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.L.RUN -- MENUVERT.RUN. Draws it, drives it, returns the row.
+## ***********************************************************************
+
+GMX.L.RUN:
+  GOSUB GMX.CLEARPANEL
+  GOSUB GMX.L.LOAD
+  GOSUB GMX.L.FRAME
+  GP.PRINTAT 32, 10, "DRAWS IT AND DRIVES IT.", THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 32, 11, "UP DOWN RETURN, ESC CANCELS.", THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 32, 13, "THE FRAME IS THE CALLERS.", THEME.CLR(THEME.DIMMED)
+  GP.PRINTAT 32, 14, "MENUVERT OWNS THE ROWS ONLY,", THEME.CLR(THEME.DIMMED)
+  GP.PRINTAT 32, 15, "SO IT OWES NOTHING TO ONE", THEME.CLR(THEME.DIMMED)
+  GP.PRINTAT 32, 16, "STYLE OF BORDER.", THEME.CLR(THEME.DIMMED)
+  GOSUB MENUVERT.RUN
+  GM.RESULT$ = "MENUVERT.RUN  SEL " + MID$(STR$(MENUVERT.SEL), 2)
+  GM.RESULT$ = GM.RESULT$ + "  KEY " + MID$(STR$(MENUVERT.KEY), 2)
+  IF MENUVERT.SEL = 0 THEN GM.RESULT$ = "MENUVERT.RUN  CANCELLED"
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.L.DRAW -- MENUVERT.DRAW. The rows, and no key loop at all.
+## ***********************************************************************
+
+GMX.L.DRAW:
+  GOSUB GMX.CLEARPANEL
+  GOSUB GMX.L.LOAD
+  GOSUB GMX.L.FRAME
+  GOSUB MENUVERT.DRAW
+  GP.PRINTAT 32, 10, "PAINTS THE ROWS AND RETURNS.", THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 32, 11, "NO KEYS, NO HIGHLIGHT, NO", THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 32, 12, "WAIT.", THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 32, 14, "FOR A MENU THAT IS PART OF A", THEME.CLR(THEME.DIMMED)
+  GP.PRINTAT 32, 15, "PAGE RATHER THAN A CHOICE.", THEME.CLR(THEME.DIMMED)
+  GM.TELL$ = "NOTHING IS DRIVING IT. PRESS A KEY."
+  GOSUB GMX.TELL
+  GM.RESULT$ = "MENUVERT.DRAW  SIX ROWS, NO KEY LOOP"
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.L.ROW -- MENUVERT.ROW, the one primitive under both modules.
+## **
+## **  MENUBAR aims this same routine sideways rather than repeating it, which
+## **  is why a stale MENUVERT.SCROLL once corrupted the BAR as well as the
+## **  dropdowns. Inputs are DRAWROW and DRAWATTR; everything else it reads is
+## **  the interface the menu was already set up with.
+## ***********************************************************************
+
+GMX.L.ROW:
+  GOSUB GMX.CLEARPANEL
+  GOSUB GMX.L.LOAD
+  GOSUB GMX.L.FRAME
+  GOSUB MENUVERT.DRAW
+  GP.PRINTAT 32, 10, "ONE ROW, IN WHICHEVER", THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 32, 11, "ATTRIBUTE YOU NAME.", THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 32, 13, "MENUBAR AIMS THIS SAME", THEME.CLR(THEME.DIMMED)
+  GP.PRINTAT 32, 14, "ROUTINE SIDEWAYS, WHICH IS", THEME.CLR(THEME.DIMMED)
+  GP.PRINTAT 32, 15, "THE WHOLE OF THAT MODULE.", THEME.CLR(THEME.DIMMED)
+
+  MENUVERT.DRAWROW = 2
+  MENUVERT.DRAWATTR = THEME.CLR(THEME.WARN)
+  GOSUB MENUVERT.ROW
+  MENUVERT.DRAWROW = 5
+  MENUVERT.DRAWATTR = THEME.CLR(THEME.HILITE)
+  GOSUB MENUVERT.ROW
+
+  GM.TELL$ = "ROWS 2 AND 5 REPAINTED ON THEIR OWN. PRESS A KEY."
+  GOSUB GMX.TELL
+  GM.RESULT$ = "MENUVERT.ROW  TWO ROWS REPAINTED IN PLACE"
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.L.BAR -- MENUBAR.RUN, on its own rather than as the shell's bar.
+## **
+## **  It reports the COLUMN and WIDTH of what was chosen, which is what lets
+## **  a caller drop a panel under an item without working the layout out
+## **  again -- GMX.DROP is built on exactly that.
+## ***********************************************************************
+
+GMX.L.BAR:
+  GOSUB GMX.CLEARPANEL
+  MENUVERT.ITEM$(1) = " FILE "
+  MENUVERT.ITEM$(2) = " EDIT "
+  MENUVERT.ITEM$(3) = " SEARCH "
+  MENUVERT.ITEM$(4) = " HELP "
+  MENUVERT.COUNT = 4
+  MENUVERT.HOT$ = ""
+  MENUVERT.HOTATTR = 0
+  MENUVERT.ATTR = THEME.CLR(THEME.TITLE)
+  MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
+  MENUBAR.X = 6
+  MENUBAR.Y = 10
+  MENUBAR.GAP = 0
+  MENUBAR.FLAGS = 0
+  MENUBAR.SEL = 0
+
+  GP.PRINTAT 6, 13, "AN ITEM IS AS WIDE AS ITS OWN TEXT -- THERE IS NO", THEME.CLR(THEME.DIMMED)
+  GP.PRINTAT 6, 14, "COLUMN WIDTH -- WHICH IS WHY THE PADDING SPACES ARE", THEME.CLR(THEME.DIMMED)
+  GP.PRINTAT 6, 15, "INSIDE THE STRINGS.", THEME.CLR(THEME.DIMMED)
+  GP.PRINTAT 6, 17, "LEFT RIGHT MOVE, RETURN CHOOSES, ESC CANCELS.", THEME.CLR(THEME.TEXT)
+
+  GOSUB MENUBAR.RUN
+  GM.RESULT$ = "MENUBAR.RUN  SEL " + MID$(STR$(MENUBAR.SEL), 2)
+  GM.RESULT$ = GM.RESULT$ + "  COLUMN " + MID$(STR$(MENUBAR.SELX), 2)
+  GM.RESULT$ = GM.RESULT$ + "  WIDTH " + MID$(STR$(MENUBAR.SELW), 2)
+  IF MENUBAR.SEL = 0 THEN GM.RESULT$ = "MENUBAR.RUN  CANCELLED"
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.L.HOT -- MENUVERT.HOT$. One letter a row, matched without case.
+## **
+## **  The letter is found in the ROW'S OWN TEXT, so " OPTIONS" with hotkey O
+## **  needs no markup. A row not containing its hotkey is left alone, and only
+## **  rows in the normal attribute are tinted -- on the selected row the
+## **  highlight is already the message.
+## ***********************************************************************
+
+GMX.L.HOT:
+  GOSUB GMX.CLEARPANEL
+  GOSUB GMX.L.LOAD
+  MENUVERT.HOT$ = "NLSOCQ"
+  MENUVERT.HOTATTR = THEME.CLR(THEME.WARN)
+  GOSUB GMX.L.FRAME
+  GP.PRINTAT 32, 10, "ONE LETTER A ROW, TINTED", THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 32, 11, "WHERE IT ALREADY SITS IN THE", THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 32, 12, "ROWS OWN TEXT.", THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 32, 14, "A HOTKEY CHOOSES ITS ROW", THEME.CLR(THEME.DIMMED)
+  GP.PRINTAT 32, 15, "RATHER THAN MOVING TO IT, SO", THEME.CLR(THEME.DIMMED)
+  GP.PRINTAT 32, 16, "N L S O C OR Q ENDS IT.", THEME.CLR(THEME.DIMMED)
+  GOSUB MENUVERT.RUN
+  GM.RESULT$ = "HOTKEYS  SEL " + MID$(STR$(MENUVERT.SEL), 2)
+  GM.RESULT$ = GM.RESULT$ + "  KEY " + MID$(STR$(MENUVERT.KEY), 2)
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.L.FLAGS -- KEEPMARK and NOWRAP, then MUSTSEL. Two menus.
+## **
+## **  MUSTSEL IS SHOWN SECOND AND ON ITS OWN because it is the one that
+## **  changes what the user can do rather than how it looks: ESC stops
+## **  working, and a menu is not leaving until a row is chosen.
+## ***********************************************************************
+
+GMX.L.FLAGS:
+  GOSUB GMX.CLEARPANEL
+  GOSUB GMX.L.LOAD
+  MENUVERT.FLAGS = MENUVERT.NOWRAP + MENUVERT.KEEPMARK
+  GOSUB GMX.L.FRAME
+  GP.PRINTAT 32, 10, "NOWRAP STOPS AT THE ENDS,", THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 32, 11, "FOR A LIST THAT READS AS A", THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 32, 12, "RANGE.", THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 32, 14, "KEEPMARK LEAVES THE CHOSEN", THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 32, 15, "ROW LIT AFTER IT RETURNS.", THEME.CLR(THEME.TEXT)
+  GOSUB MENUVERT.RUN
+  GM.KEPT = MENUVERT.SEL
+  GM.TELL$ = "THE ROW IS STILL LIT. THAT IS KEEPMARK. PRESS A KEY."
+  GOSUB GMX.TELL
+
+  GOSUB GMX.CLEARPANEL
+  GOSUB GMX.L.LOAD
+  MENUVERT.FLAGS = MENUVERT.MUSTSEL
+  GOSUB GMX.L.FRAME
+  GP.PRINTAT 32, 10, "MUSTSEL TAKES ESC AWAY, FOR", THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 32, 11, "A MENU WITH NOTHING BEHIND", THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 32, 12, "IT.", THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 32, 14, "TRY ESC. IT WILL NOT LEAVE", THEME.CLR(THEME.WARN)
+  GP.PRINTAT 32, 15, "UNTIL A ROW IS CHOSEN.", THEME.CLR(THEME.WARN)
+  GOSUB MENUVERT.RUN
+
+  GM.RESULT$ = "FLAGS  KEEPMARK SEL " + MID$(STR$(GM.KEPT), 2)
+  GM.RESULT$ = GM.RESULT$ + "   MUSTSEL SEL " + MID$(STR$(MENUVERT.SEL), 2)
   RETURN

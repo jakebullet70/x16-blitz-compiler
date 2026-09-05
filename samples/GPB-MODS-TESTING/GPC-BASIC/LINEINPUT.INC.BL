@@ -80,7 +80,7 @@ GOTO LINEINPUT.MODULE.END
 ## **  LINEINPUT.GET -- the field.
 ## ***********************************************************************
 
-LINEINPUT.GET:
+LINEINPUT.GET.BODY:
     LINEINPUT.INV = (LINEINPUT.ATTR AND 15) * 16 + INT(LINEINPUT.ATTR / 16)
     LINEINPUT.WAS$ = LINEINPUT.TEXT$ : LINEINPUT.POS = LEN(LINEINPUT.TEXT$)
     LINEINPUT.DONE = 0 : LINEINPUT.KEY = 0 : LINEINPUT.LIT = 1  : LINEINPUT.TICK = TI
@@ -137,7 +137,7 @@ LINEINPUT.KEYED:
 ## ---- compiled as "19 = LINEINPUT.X" -- a syntax error, which DEFERS. The compile said
 ## ---- OK CODE and ASK would have thrown SYNTAX ERROR the first time it was called.
 ## ---- Nothing in the tree calls ASK, which is the only reason it went unseen.
-LINEINPUT.ASK:
+LINEINPUT.ASK.BODY:
     LINEINPUT.SAVEX = LINEINPUT.X : GP.PRINTAT LINEINPUT.X, LINEINPUT.Y, LINEINPUT.LABEL$, LINEINPUT.ATTR
     LINEINPUT.X = LINEINPUT.X + LEN(LINEINPUT.LABEL$)
     GOSUB LINEINPUT.GET : LINEINPUT.X = LINEINPUT.SAVEX

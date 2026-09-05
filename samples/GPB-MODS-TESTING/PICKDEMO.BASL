@@ -1,0 +1,94 @@
+#SAVEAS "@:PICKDEMO.SRC.PRG"
+#REM 0
+#SYMFILE "@:PICKDEMO.SRC.SYM"
+
+## ***********************************************************************
+## **
+## **  PICKDEMO.BASL -- GUI.LISTBOX in multi select, with the GUI in a bank.
+## **
+## **  The smallest program that does both. Twenty rows, SPACE marks, RETURN
+## **  accepts, and the marked ones are printed afterwards.
+## **
+## **  BUILD IT SHARED. GP.BANKED refuses an embedded build and says NOT
+## **  IMPLEMENTED: the copy is done by the shared bootstrap, and there is no
+## **  bootstrap in an embedded object to do it.
+## **
+## **      python source/gpc/build_basl.py     PICKDEMO.BASL    PICKDEMO.SRC.PRG
+## **      python source/gpc/compile_shared.py PICKDEMO.SRC.PRG PICKDEMO.PRG
+## **
+## ***********************************************************************
+
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "THEME.INC.BL"
+#INCLUDE "STASH.INC.BL"
+
+## ---- MENUBAR IS HERE AND NEVER CALLED. LIBBANK.INC.BL shims all five
+## ---- modules, and BASLOAD resolves every label in a file rather than the
+## ---- ones a path reaches -- so leaving one out stops the build with LABEL
+## ---- NOT FOUND. It costs bank space, not low memory.
+## ----
+## ---- THE FRONT DOOR GOES IN LOW MEMORY, THE GUI GOES IN THE BANK.
+## ----
+## ---- LIBBANK.INC.BL is seventeen shims: each selects LIB.CODEBANK and calls
+## ---- the body. A banked routine cannot select its own bank -- by the time its
+## ---- first instruction is fetched the wrong bank is already selected -- so
+## ---- something in low memory has to do it first.
+## ----
+## ---- THE GOTO OVER THE REGION IS NOT OPTIONAL. GP.BANKED leaves a bridge so
+## ---- that falling into the region still works, and at program start it does
+## ---- work, because the bootstrap leaves the code bank selected. Relying on
+## ---- that means every module's GOTO ... MODULE.END runs from the bank for no
+## ---- reason, and stops working the day anything selects another bank first.
+
+#INCLUDE "LIBBANK.INC.BL"
+
+GOTO PD.LIBEND
+GP.BANKED LIB.CODEBANK
+#INCLUDE "MENUVERT.INC.BL"
+#INCLUDE "MENUBAR.INC.BL"
+#INCLUDE "LINEINPUT.INC.BL"
+#INCLUDE "GUI.INC.BL"
+#INCLUDE "GUI2.INC.BL"
+GP.ENDBANKED
+PD.LIBEND:
+
+## The caller owns the DIM -- a module cannot be handed an array.
+DIM MENUVERT.ITEM$(20)
+
+## TWO DIFFERENT BANKS, AND THEY MUST NOT BE THE SAME ONE. GUI.CODEBANK (4,
+## from GUIBANK.INC.BL) holds the GUI's CODE for the life of the program.
+## GUI.BANK is scratch: GUI.OPEN stashes the cells the dialog covers there and
+## GUI.CLOSE puts them back. Point GUI.BANK at 4 and the dialog would write
+## the screen over its own code.
+GUI.BANK = 3
+
+THEME.ID = 0 : GOSUB THEME.LOAD
+SCREEN 1
+GP.FILL 0, 0, 80, 30, ASC(" "), THEME.CLR(THEME.PAGE)
+
+FOR PD.I = 1 TO 20
+    MENUVERT.ITEM$(PD.I) = " ROW " + MID$(STR$(PD.I), 2)
+NEXT PD.I
+
+## ---- The listbox. MARKS$ is an input as well as an output: anything that is
+## ---- not COUNT characters -- "" included -- starts with none marked.
+
+GUI.TITLE$ = " PICK SOME "
+GUI.MSG$ = "SPACE MARKS A ROW, RETURN ACCEPTS THE SET."
+GUI.LISTBOX.COUNT = 20
+GUI.LISTBOX.ROWS = 8
+GUI.LISTBOX.MULTI = 1
+GUI.LISTBOX.MARKS$ = ""
+GUI.LISTBOX.SEL = 0
+GOSUB GUI.LISTBOX
+
+## ---- GUI.LISTBOX.SEL is where the CURSOR was, not the answer. In multi the
+## ---- marks are the answer: MARKS$ is COUNT characters and "1" means marked.
+
+IF GUI.KEY <> 13 THEN PRINT "CANCELLED" : END
+
+PRINT GUI.LISTBOX.MARKED; "MARKED OF"; GUI.LISTBOX.COUNT
+FOR PD.I = 1 TO GUI.LISTBOX.COUNT
+    IF MID$(GUI.LISTBOX.MARKS$, PD.I, 1) = "1" THEN PRINT MENUVERT.ITEM$(PD.I)
+NEXT PD.I
+END

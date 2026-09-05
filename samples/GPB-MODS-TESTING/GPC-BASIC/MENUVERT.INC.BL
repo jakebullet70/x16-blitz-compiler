@@ -118,7 +118,7 @@ GOTO MENUVERT.MODULE.END
 ## **  MENUVERT.RUN -- the whole thing.
 ## ***********************************************************************
 
-MENUVERT.RUN:
+MENUVERT.RUN.BODY:
     MENUVERT.KEY = 0
     IF MENUVERT.COUNT < 1 THEN MENUVERT.SEL = 0 : RETURN
 
@@ -307,7 +307,7 @@ MENUVERT.PADREAD:
 ## **  underneath. ROWS ONLY, never a frame, so calling it again cannot damage a border.
 ## ***********************************************************************
 
-MENUVERT.DRAW:
+MENUVERT.DRAW.BODY:
     FOR MENUVERT.EACH = 1 TO MENUVERT.COUNT
         MENUVERT.DRAWROW = MENUVERT.EACH : MENUVERT.DRAWATTR = MENUVERT.ATTR
         GOSUB MENUVERT.ROW
@@ -328,7 +328,7 @@ MENUVERT.DRAW:
 ## **  cells, which is the next line of the screen.
 ## ***********************************************************************
 
-MENUVERT.ROW:
+MENUVERT.ROW.BODY:
     MENUVERT.DRAWY = MENUVERT.Y + MENUVERT.DRAWROW - 1
     MENUVERT.DRAWITEM = MENUVERT.SCROLL + MENUVERT.DRAWROW
     GP.FILL MENUVERT.X, MENUVERT.DRAWY, MENUVERT.WIDTH, 1, MENUVERT.SPACE, MENUVERT.DRAWATTR
