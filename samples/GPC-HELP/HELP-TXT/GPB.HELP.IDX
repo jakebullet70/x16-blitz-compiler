@@ -2,10 +2,10 @@
 N|95
 H|0|0|0|GETTING STARTED
 T|1|0|47|  1. What GP.BASIC is
-T|2|0|80|  2. Using it
-S|2|12|80|     Where the library lives
-S|2|32|80|     A program that uses GP.BASIC is compile-only
-S|2|43|80|     Numbers, and what a variable holds
+T|2|0|84|  2. Using it
+S|2|12|84|     Where the library lives
+S|2|32|84|     A program that uses GP.BASIC is compile-only
+S|2|47|84|     Numbers, and what a variable holds
 H|0|0|0|WHAT IS IN GPC
 T|3|0|33|  1. What has to be on the drive to compile
 T|4|0|25|  2. The compiler

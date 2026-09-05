@@ -32,14 +32,18 @@
 .
 =A program that uses GP.BASIC is compile-only
 .
-.Once a program uses a single GP.BASIC keyword, the ROM can no longer LIST or
-.RUN it. BASLOAD tokenises those keywords into the $CE58-$CE7F range, and
-.stock BASIC has no handler behind those bytes -- they are GPC's, and only
-.the compiler knows what they mean.
+.One GP.BASIC keyword is enough: from there the program is compiler input,
+.and the ROM can no longer LIST or RUN it. BASLOAD tokenises those keywords
+.into $CE58-$CE7F and stock BASIC has no handler behind those bytes.
 .
-.That is expected, not a fault, and it is not a limitation either: the whole
-.point is to compile. Run GPC.PRG on the tokenised .PRG and run the object it
-.writes.
+.GPB is what GPC implements, and it has no existence apart from it. The
+.keyword set is not an extension the ROM might one day understand, or a
+.library that could be loaded to make it work: GP.DO means something because
+.the compiler emits code for it, and nowhere else. That is why the tokenised
+.file is not a program yet -- there is nothing to run it with but GPC.
+.
+.Which is the whole point, not a limitation. Run GPC.PRG on the tokenised
+..PRG, and run the object it writes.
 .
 =Numbers, and what a variable holds
 .
