@@ -66,7 +66,7 @@ GOTO THEME.SKIP
 ## NO DATA STATEMENT, on purpose: READ walks every DATA in the whole program in order,
 ## so a library owning one would silently derail the caller's own READs.
 
-THEME.LOAD:
+THEME.LOAD.BODY:
     THEME.FIRST = 0
     IF THEME.READY = 0 THEN DIM THEME.CLR(THEME.SLOTS) : THEME.READY = 1 : THEME.FIRST = 1
     IF THEME.ID = 1 THEN GOTO THEME.LOAD.DARK

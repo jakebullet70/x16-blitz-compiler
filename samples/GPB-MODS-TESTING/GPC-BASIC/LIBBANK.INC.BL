@@ -2,6 +2,7 @@
 ## **
 ## **  LIBBANK.INC.BL -- the low memory front door to a banked library.
 ## **
+## **      THEME.LOAD
 ## **      MENUVERT.RUN    MENUVERT.DRAW   MENUVERT.ROW
 ## **      MENUBAR.RUN     MENUBAR.DRAW    MENUBAR.ITEM
 ## **      MENUBAR.MARK    MENUBAR.WHERE
@@ -9,7 +10,7 @@
 ## **      GUI.SAY         GUI.YN          GUI.MENU        GUI.TEXT
 ## **      GUI.OPEN        GUI.CLOSE       GUI.LISTBOX
 ## **
-## **  Seventeen shims and nothing else. Each selects the code bank and calls
+## **  Eighteen shims and nothing else. Each selects the code bank and calls
 ## **  the body, which lives at $A000 in that bank; the bodies are the same
 ## **  routines under a .BODY name, in their own modules unchanged but for
 ## **  their label lines.
@@ -24,6 +25,7 @@
 ## **      #INCLUDE "LIBBANK.INC.BL"        ' before the region
 ## **      GOTO MY.LIBEND
 ## **      GP.BANKED LIB.CODEBANK
+## **      #INCLUDE "THEME.INC.BL"
 ## **      #INCLUDE "MENUVERT.INC.BL"
 ## **      #INCLUDE "MENUBAR.INC.BL"
 ## **      #INCLUDE "LINEINPUT.INC.BL"
@@ -32,7 +34,7 @@
 ## **      GP.ENDBANKED
 ## **      MY.LIBEND:
 ## **
-## **  ALL FIVE MODULES ARE REQUIRED, even by a program that calls only one of
+## **  ALL SIX MODULES ARE REQUIRED, even by a program that calls only one of
 ## **  them. This file shims every entry point, and BASLOAD resolves every label
 ## **  in a file rather than the ones a path reaches -- so leaving MENUBAR out
 ## **  because you never draw a bar stops the build with LABEL NOT FOUND. It is
@@ -41,6 +43,10 @@
 ## **
 ## **  ORDER INSIDE THE REGION IS THE ORDER THE MODULES ALREADY WANT --
 ## **  MENUVERT before MENUBAR, both before GUI. Banking changes none of that.
+## **  THEME goes first because everything else reads THEME.CLR.
+## **
+## **  THEME IS THE CHEAPEST MODULE IN HERE: 480 bytes behind ONE shim, because
+## **  THEME.LOAD is the only label anything outside the file ever calls.
 ## **
 ## **  THE GOTO OVER THE REGION IS NOT OPTIONAL. GP.BANKED leaves a bridge so
 ## **  that falling into the region still works, and at program start it does
@@ -93,7 +99,7 @@
 ## **  call sites inside a module to say .BODY, and MENUVERT.ROW is the one
 ## **  routine where that would be worth measuring first.
 ## **
-## **  This file owns LIB.CODEBANK and the seventeen labels above, and nothing
+## **  This file owns LIB.CODEBANK and the eighteen labels above, and nothing
 ## **  else. Each name space still belongs to its own module.
 ## **
 ## ***********************************************************************
@@ -104,6 +110,10 @@
 #DEFINE LIB.CODEBANK 4
 
 GOTO LIBBANK.MODULE.END
+
+## ---- THEME ----
+
+THEME.LOAD:   BANK LIB.CODEBANK :  GOSUB THEME.LOAD.BODY :  RETURN
 
 ## ---- MENUVERT ----
 
