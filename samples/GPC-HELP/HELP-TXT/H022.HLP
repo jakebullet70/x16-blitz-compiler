@@ -1,81 +1,61 @@
-@4.2 STRINGS.INC.BL -- string helpers
+@3.8 Block IF
 .
-=4.2 STRINGS.INC.BL -- STRING HELPERS
+=3.8 BLOCK IF
+.
+=SYNTAX
+.
+:GP.IF <expr> THEN
+:    ...
+:GP.ELSEIF <expr> THEN
+:    ...
+:GP.ELSE
+:    ...
+:GP.ENDIF
 .
 =WHAT IT COSTS
 .
-.  ASM: GP.INSTR GP.STRPTR GP.COMP
+.  ASM: GP.IF GP.ELSEIF GP.ELSE GP.ENDIF
 .    ASM -- a keyword, run by machine code in the GP runtime block. A program
 .    using ANY GP keyword pays for the whole block.
-.  COMPOSITE: GP.CONTAINS GP.ISEMPTY
-.    COMPOSITE -- a keyword with no machine code of its own. The compiler
-.    expands it into keywords that already exist, so it costs the runtime
-.    nothing at all.
-.    BASIC -- a .INC.BL module of ordinary BASL, called with GOSUB. Costs
-.    nothing unless you #INCLUDE it.
 .
 =DESCRIPTION
 .
-.  STR.PADR
-.      IN: STR.STR$ STR.WIDTH
-.      OUT: STR.STR$ left-justified
+.Each of the four keywords is alone on its line, and THEN is required. There
+.is no one-line form: GP.IF X > 5 THEN PRINT is a syntax error. Allowing it
+.would mean a block that swallowed every line down to the next GP.ENDIF.
+.Stock IF ... THEN is unchanged and remains the one-line form.
 .
-.  STR.PADL
-.      IN: same
-.      OUT: right-justified
+.GP.ELSEIF may repeat any number of times; GP.ELSE is optional. The first
+.true condition wins and nothing below it runs, so there is no break to omit.
+.If nothing matches and there is no GP.ELSE the block is skipped, which is
+.not an error. Conditions are numeric expressions.
 .
-.  STR.PADC
-.      IN: same
-.      OUT: centred (odd gap goes right)
+.GP.IF and GP.SELECT cover different cases. A select fetches one value and
+.compares it against each alternative -- a sparse key code, a state machine.
+.A block IF tests a different condition in every branch: ranges, compound
+.conditions, a string in one arm and a number in the next.
 .
-.  STR.SPLIT
-.      IN: STR.STR$ STR.DELIM$ STR.MAX
-.      OUT: STR.N, STR.FIELD$(1..N)
+.GP.ENDIF is required, but unlike GP.ENDSEL it does no work: the condition is
+.evaluated and consumed on the line it is written, so there is no frame to
+.release and a GOTO out of a GP.IF is safe. Omitting GP.ENDIF stops the
+.compile with STRUCTURE IMBALANCE.
 .
-.  STR.REPLACE
-.      IN: STR.STR$ STR.FIND$ STR.REPL$
-.      OUT: STR.STR$, every occurrence replaced
+:GP.IF N < 0 THEN
+:    PRINT "NEGATIVE"
+:GP.ELSEIF N = 0 THEN
+:    PRINT "ZERO"
+:GP.ELSE
+:    PRINT "POSITIVE"
+:GP.ENDIF
 .
-.  STR.PET2SCR
-.      IN: STR.PET
-.      OUT: STR.SCR
+.IFs nest freely -- inside each other, inside a GP.CASE body, and inside a
+.GP.DO loop.
 .
-.The three pad routines leave a string that is already at or past the width
-.unchanged. They pad and never truncate; use STRCASE.RTRIM (SEC 4.8) to
-.shorten.
-.
-.SPLIT reads STR.STR$ without modifying it. STR.MAX of 0 means 10. Empty
-.fields are preserved: "A,,C" is three fields and "A," is two. Splitting an
-.empty string gives one empty field, never zero. Reaching the limit is not an
-.error and loses nothing -- the last field receives the unsplit remainder,
-.delimiters included.
-.
-.STR.FIELD$ is the one array the library does not DIM. Left alone, GPC's
-.implicit DIM gives 0..10. For more, DIM it before the first call and set
-.STR.MAX to match. DIMming an array GPC has already auto-dimensioned is an
-.error, so it is one or the other. Note that this is the reverse of
-.THEME.CLR, which the module DIMs.
-.
-.REPLACE swaps every occurrence of STR.FIND$ for STR.REPL$, modifying
-.STR.STR$ in place. The replacement may be shorter, longer, or "" to delete.
-.It is case sensitive, because GP.INSTR compares raw bytes.
-.
-.A replacement that contains the search text is safe: "A" to "AA" terminates
-.and doubles the As, where a naive in-place version would not. The routine
-.builds a new string and never re-scans what it has emitted. An empty
-.STR.FIND$ leaves the string unchanged rather than hanging, because GP.INSTR
-.reports not-found for a zero-length needle. Like the pad routines it is not
-.length checked: a longer replacement can push the result past 255
-.characters.
-.
-.PET2SCR converts a PETSCII code to the screen code the tile map holds, for
-.TILE, TDATA and VPOKE. GP.PRINTAT and GP.FILL do this internally.
+.It costs 14 runtime bytes, none of them code. All four p-code opcodes reuse
+.existing handlers: the two branches are .goto.z and .goto under different
+.names, and the two markers share one four-byte no-op. See SEC 11 of
+.docs/blitz/GP-BASIC.TIERS.md.
 .
 =EXAMPLE PROGRAM
 .
-.  SPLITT.EXP.BL -- runnable, in the GPC-BASIC folder
-.
-=SEE ALSO
-.
->45|4.8 STRCASE.INC.BL -- case and trim, in place
->37|4.2 STRINGS.INC.BL -- string helpers
+.  IF.EXP.BL -- runnable, in the GPC-BASIC folder

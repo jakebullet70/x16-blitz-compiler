@@ -1,89 +1,54 @@
-@3. The modules (2)
-=BMX.INC.BL
+@STASHFILE.INC.BL -- a saved text rectangle, through a file.
 .
-.  in
-.      BMX.FILE$
+=STASHFILE.INC.BL
 .
-.  out
-.      BMX.ERROR$ -- empty means it worked<br>BMX.WIDTH BMX.HEIGHT BMX.DEPTH
-.        BMX.VERSION BMX.PALUSED BMX.PALFIRST BMX.DATAOFF BMX.PACKED -- the
-.        header, readable after BMX.OPEN
+.  a saved text rectangle, through a file.
 .
-.  in, optional
-.      BMX.STASH -- where BMX.PAINT keeps the machine's palette; VRAM $13000
-.        by default, -1 to keep nothing
+=MODULE HEADER
 .
-.  internal
-.      BMX.PTR BMX.HEADER$ BMX.SCRATCH BMX.SCRATCH$ BMX.PALBASE BMX.ADDR
-.        BMX.LO BMX.HI BMX.BANK BMX.REST BMX.COUNT BMX.CHUNK BMX.GOT BMX.STEP
-.        BMX.SKIP BMX.ROW BMX.ROWS BMX.X0 BMX.Y0 BMX.BAD BMX.KEPT BMX.SRC
-.        BMX.DST
+:      STASH.FILE.SAVE   a rectangle of the screen, out to a file
+:      STASH.FILE.LOAD   a saved file, back where it came from
+:      STASH.FILE.PUT    a saved file, pasted somewhere else
 .
-.  constants
-.      BMXK.MACPTR BMXK.CHKIN BMXK.CLRCHN BMXK.MEMCOPY BMXK.VCTRL BMXK.VLO
-.        BMXK.VMID BMXK.VHI BMXK.PORTLO BMXK.PORTLO.B BMXK.PORTHI BMXK.LFN
+.  REQUIRES, and does not #INCLUDE for you:
+:      GPB.INC.BL      GP.ASM
+:      STASH.INC.BL    which does the actual copying
 .
-.BMX.PTR doubles as the "have I initialised" flag -- it is zero until
-.BMX.INIT has run. Zeroing it yourself would leak a string block and
-.re-allocate.
+.  and, like it, a #SYMFILE in your program. See that file's header.
 .
-.BMX.STASH is the one variable here a caller may want to set, and it has to
-.be set before the first BMX.OPEN -- BMX.INIT runs then, and fills in the
-.default only if you have not. That is why -1 rather than 0 switches the
-.stash off: 0 already means "never set". BMX.KEPT is the once-per-run guard
-.that makes a slideshow restore the machine's palette rather than the
-.previous picture's.
+.  Usage:
+:      STASH.BANK = 8 : STASH.FILE$ = "PANEL.BIN"
+:      STASH.X = 10 : STASH.Y = 4 : STASH.W = 30 : STASH.H = 8
+:      GOSUB STASH.FILE.SAVE
+:      ...
+:      GOSUB STASH.FILE.LOAD
 .
-=MENUVERT.INC.BL
+:   in   STASH.FILE$    the name
+:        STASH.DEV      the device. 0 means 8, the usual drive
+:        STASH.BANK     the bank to stage through
+:        and, for SAVE, the geometry STASH.SAVE wants
 .
-.  in
-.      MENUVERT.X MENUVERT.Y -- top left of the first row<br>MENUVERT.WIDTH
-.        -- cells wide, which is the width of the highlight<br>MENUVERT.COUNT
-.        -- how many rows<br>MENUVERT.ITEM$() -- the rows, 1..COUNT; the
-.        caller owns the DIM<br>MENUVERT.ATTR -- packed
-.        attribute<br>MENUVERT.HIATTR -- the highlighted row; 0 inverts
-.        MENUVERT.ATTR<br>MENUVERT.HOT$ -- one hotkey character a
-.        row<br>MENUVERT.HOTATTR -- tint for the hotkey letter; 0 is
-.        off<br>MENUVERT.FLAGS -- added together<br>MENUVERT.SEL -- the row
-.        to start on
+=A SEPARATE FILE FROM STASH.INC.BL ON PURPOSE
 .
-.  out
-.      MENUVERT.SEL -- 1..COUNT, or 0 if cancelled<br>MENUVERT.KEY -- the key
-.        that ended it
+.  a BASL module has no dead code elimination, and these three are 127 bytes.
+.  A dialog that stashes to a bank and puts it back never goes near a disk
+.  and should not pay for one.
 .
-.  internal
-.      MENUVERT.SCAN MENUVERT.EACH MENUVERT.DONE MENUVERT.CODE
-.        MENUVERT.INCHAR$ MENUVERT.PREVSEL MENUVERT.HIGHLIGHT
-.        MENUVERT.DRAWROW MENUVERT.DRAWATTR MENUVERT.DRAWTEXT$ MENUVERT.DRAWY
-.        MENUVERT.HOTCODE MENUVERT.HOTLAST MENUVERT.WANTCODE MENUVERT.HOTAT
-.        MENUVERT.HOTWANT MENUVERT.HOTHERE MENUVERT.HOTSCAN MENUVERT.PADNOW
-.        MENUVERT.PADNEW MENUVERT.PADHELD MENUVERT.PADRAW
+=THE FILE IS SELF-DESCRIBING BECAUSE THE STASH IS
 .
-.  constants
-.      MENUVERT.MUSTSEL MENUVERT.KEEPMARK MENUVERT.NOWRAP MENUVERT.GAMEPAD
-.        MENUVERT.UP MENUVERT.DOWN MENUVERT.ENTER MENUVERT.ESCAPE
-.        MENUVERT.STOP MENUVERT.SPACE MENUVERT.PORT MENUVERT.PAD.UP
-.        MENUVERT.PAD.DOWN MENUVERT.PAD.B MENUVERT.PAD.START
+.  the four header bytes go out with the cells, so loading one back needs
+.  nothing but the name. That is the flaw dotBASIC admits to in its own
+.  .CUT/.PASTE, which "requires correctly re-describing the width and height
+.  of each cut".
 .
-.MENUVERT.SEL is both an input and an output: the row to start on going in,
-.and the row chosen coming out, so a menu reopened without clearing it
-.reopens where it was. That is usually what you want; set it to 0 when it is
-.not.
+.  BSAVE's end address is EXCLUSIVE, so this writes the header and the cells
+.  and no padding. The length is w h 2 + 4, which BASIC works out for itself
+.  -- which is why no GP.END keyword was ever spent on telling BSAVE where a
+.  stash ended.
 .
-.MENUVERT.DRAWROW, MENUVERT.DRAWATTR and MENUVERT.DRAWTEXT$ are listed
-.internal but are the documented arguments to MENUVERT.ROW, which is public:
-.they are internal to MENUVERT.RUN, not to you. MENUVERT.HOTFIND reads the
-.first two and answers in MENUVERT.HOTAT.
-.
-=EXAMPLE PROGRAM
-.
-.  FORM.EXP.BL -- runnable, in the GPC-BASIC folder
+.  The STASH.FILE. names belong to this file; the rest of STASH. is
+.  STASH.INC.BL's.
 .
 =SEE ALSO
 .
->36|4.1 THEME.INC.BL -- named colour roles
->38|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
->37|4.2 STRINGS.INC.BL -- string helpers
->39|4.4 LINEINPUT.INC.BL -- a positioned entry field
->40|4.5 BMX.INC.BL -- a BMX bitmap into VERA
->41|4.6 MENUVERT.INC.BL -- a vertical menu
+>69|STASH.INC.BL -- save a text rectangle, and put it back.

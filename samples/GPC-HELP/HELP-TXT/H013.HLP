@@ -14,74 +14,29 @@
 .
 =DESCRIPTION
 .
-.  GP.INSTR(hay$, needle$ [,start])
-.      DOES: position of needle$, 1-based; 0 = not found. start is where to
-.        begin
+.Five keywords. GP.INSTR is the only string search GPC has; without it there
+.is none.
 .
-.  GP.CONTAINS(hay$, needle$)
-.      DOES: -1 if needle$ occurs anywhere in hay$, 0 if not. Composite --
-.        see below
+.Trimming, padding and case folding are modules, not keywords: STRCASE.INC.BL
+.(SEC 4.8) for case and trim in place, STRINGS.INC.BL (SEC 4.2) for padding.
+.They cost 188 bytes of p-code in the programs that #INCLUDE them and nothing
+.in the GP block. GP.STRPTR is the keyword they are built on.
 .
-.  GP.ISEMPTY(a$)
-.      DOES: -1 if a$ has zero length, 0 if not. Composite
+.The in-place statements in STRCASE.INC.BL take a string variable, never a
+.literal or an expression. The compiler rejects those. Case conversion leaves
+.digits, punctuation and PETSCII graphics unchanged.
 .
-.  GP.COMP(a$, b$)
-.      DOES: compare ignoring case: -1 before, 0 same, 1 after
+.There is no GP.PAD. In-place statements cannot grow a string past the
+.capacity it was created with. STR.PADR / PADL / PADC (SEC 4.2) are BASIC
+.assignments and do reallocate.
 .
-.  GP.STRPTR(a$)
-.      DOES: address of the string's [ActLen][Data] block
+=IN THIS SECTION
 .
-.Trimming and case folding are in STRCASE.INC.BL (SEC 4.8) rather than
-.keywords: they would take 188 bytes of the all-or-nothing GP block to serve
-.one caller in the tree outside their own example. GP.STRPTR is a keyword
-.because the module is built on it.
-.
-.GP.INSTR is the only string search GPC has; without it there is none.
-.
-.GP.CONTAINS answers the same question without the position: IF
-.GP.CONTAINS(F$, ".BAS"). It is case sensitive, comparing raw bytes as
-.GP.INSTR does; use GP.COMP for a case-blind test. An empty needle returns 0,
-.not -1, because GP.INSTR reports not-found for one.
-.
-.GP.CONTAINS is composite. The compiler expands it to GP.INSTR(hay$, needle$)
-.<> 0, and the object is byte-for-byte identical to writing that out
-.(verified by compiling both). Use whichever spelling reads better; there is
-.no size difference.
-.
-.GP.ISEMPTY(a$) is LEN(a$) = 0. A string of spaces is not empty -- apply
-.STRCASE.TRIM first if that is the intent. It compiles to the same four bytes
-.as LEN(a$)=0, and IF a$="" costs about the same (a literal points into the
-.p-code, so the empty string allocates nothing). The three spellings do not
-.differ in size.
-.
-.GP.COMP provides a case-blind equality test, IF GP.COMP(A$,B$) = 0, which =
-.cannot do, and an ordering comparator. Length breaks a tie: "abc" sorts
-.before "ABCD".
-.
-.The in-place statements take a string variable, never a literal or an
-.expression; the compiler rejects those. Case conversion leaves digits,
-.punctuation and PETSCII graphics unchanged.
-.
-.There is no GP.PAD. Padding grows a string, and an in-place handler receives
-.the string block and not the variable slot, so it cannot reallocate beyond
-.the capacity the string was created with. Use STR.PADR / PADL / PADC (SEC
-.4.2), which are BASIC assignments and do reallocate.
-.
-=GP.STRPTR and the address-splitting trap
-.
-.The address is that of [ActLen][Data]: the length byte is at the address,
-.the first character at +1, and the block capacity at -2. With GP.CALL,
-.machine code can fill a BASIC string in place and set its length, which
-.stock BASIC cannot do.
-.
-.Split the address with GP.LOBYTE / GP.HIBYTE, not with P AND 255:
-.
-:GP.CALL $A000, GP.LOBYTE(P), GP.HIBYTE(P)
-.
-.AND is 16-bit signed and the string heap is above 32,767, so P AND 255
-.raises OUT OF RANGE. The longhand H = INT(P / 256) : L = P - H * 256 is
-.correct and is what the keywords compile to. The same applies to GP.ARRPTR
-.and to any VRAM address in the top eighth of memory.
+>22|3.4.1 GP.INSTR -- position of a substring
+>23|3.4.2 GP.CONTAINS -- test for a substring
+>24|3.4.3 GP.ISEMPTY -- test for a zero-length string
+>25|3.4.4 GP.COMP -- compare two strings, ignoring case
+>26|3.4.5 GP.STRPTR -- address of a string block
 .
 =EXAMPLE PROGRAM
 .
@@ -89,5 +44,5 @@
 .
 =SEE ALSO
 .
->45|4.8 STRCASE.INC.BL -- case and trim, in place
->37|4.2 STRINGS.INC.BL -- string helpers
+>49|4.8 STRCASE.INC.BL -- case and trim, in place
+>41|4.2 STRINGS.INC.BL -- string helpers

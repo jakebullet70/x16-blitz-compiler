@@ -1,35 +1,19 @@
-@3.5 Arrays
+@3.4.1 GP.INSTR -- position of a substring
 .
-=3.5 ARRAYS
+=3.4.1 GP.INSTR
 .
-=SYNTAX
+.  Syntax    GP.INSTR(hay$, needle$ [, start])
+.  Returns   Position of needle$ in hay$, 1-based. 0 if not found.
+.  Kind      ASM. Needs the GP block.
+.  Notes     start is the position to begin at. Default 1.
+.            Case sensitive. It compares raw bytes; SEC 3.4.4 is the
+.            case-blind test.
+.            An empty needle$ returns 0.
+.  Example
 .
-:GP.ARRPTR(a())
-.
-=WHAT IT COSTS
-.
-.  ASM: GP.ARRPTR
-.    ASM -- a keyword, run by machine code in the GP runtime block. A program
-.    using ANY GP keyword pays for the whole block.
-.
-=DESCRIPTION
-.
-.Sorting is SORT.INC.BL (SEC 4.7) rather than a keyword: 408 bytes of the
-.all-or-nothing GP block, carried by every program whether or not it sorts.
-.GP.ARRPTR is a keyword because the module needs it -- a BASL subroutine
-.cannot be passed an array, so an address is the only interface.
-.
-.GP.ARRPTR returns the address of element zero; the header is already
-.skipped. Machine code called through GP.CALL can then work on the array in
-.bulk. Add the stride yourself: 2 bytes per element for a string array (each
-.element is a pointer to the string block -- see GP.STRPTR for its layout), 6
-.for a numeric array. Multi-dimensional arrays are rejected, and
-.GP.ARRPTR(A(3)) is a syntax error; write 3*2 or 3*6 into the address.
-.
-=EXAMPLE PROGRAM
-.
-.  ARRAYS.EXP.BL -- runnable, in the GPC-BASIC folder
+:            P = GP.INSTR(F$, ".BAS", 1)
+:            IF P > 0 THEN PRINT "FOUND AT"; P
 .
 =SEE ALSO
 .
->44|4.7 SORT.INC.BL -- shell sort a string array
+>25|3.4.4 GP.COMP -- compare two strings, ignoring case

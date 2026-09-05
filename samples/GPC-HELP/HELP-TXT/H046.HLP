@@ -1,0 +1,22 @@
+@5. Two more naming rules that are not about collisions
+.
+=5. TWO MORE NAMING RULES THAT ARE NOT ABOUT COLLISIONS
+.
+.#DEFINE takes an INT16 (BASLOAD.MD:313). A constant above 65535 is ERROR:
+.INVALID PARAMETER, not a warning -- which is why BMX.PALBASE (VRAM $1FA00,
+.129536) is an ordinary variable and not a #DEFINE. Every VRAM address past
+.$FFFF has the same problem.
+.
+.A dotted name whose tail is a reserved word is fine. MENUVERT.COUNT,
+.THEME.CLR, LINEINPUT.LEN and LINEINPUT.RETURN all contain keywords and all
+.work, because BASLOAD matches the whole identifier. An undotted one does
+.not: POS, MB, ST, LEN and CHAR cannot be variables at all. This is the main
+.reason the library is dotted throughout.
+.
+.One rule applies only outside BASL: BASLOAD gives 64 significant characters,
+.the built-in BASIC gives two. Write the same code as a hand-typed .bas for
+.the PC-side converter and THEME.CLR and THEME.COUNT become the same
+.variable. That is a silent wrong answer -- it cost two test cycles during
+.tier 6, both times looking exactly like a compiler bug. Inside BASL you are
+.safe; in a raw .bas, give every variable a distinct first two characters.
+.

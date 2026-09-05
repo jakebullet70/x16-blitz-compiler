@@ -1,63 +1,98 @@
-@6. The traps, collected
+@3. The modules
 .
-=6. THE TRAPS, COLLECTED
+=3. THE MODULES
 .
-.Each of these has cost a debugging session at least once.
+.Each table is in (set before the GOSUB), out (read after it), and internal
+.(do not read, do not write, do not rely on).
 .
-.  P AND 255 on a heap or VRAM address
-.      WHAT HAPPENS: AND is 16-bit signed; above 32,767 it raises OUT OF
-.        RANGE instead of masking
-.      DO THIS: H = INT(P/256) : L = P - H*256
+=THEME.INC.BL
 .
-.  an address in an A% variable
-.      WHAT HAPPENS: % is signed 16-bit and truncates without error -- A% =
-.        49152 reads back -16,384
-.      DO THIS: untyped variable, or split into page and offset
+.  in
+.      THEME.DARK -- 0 light, non-zero dark, read by THEME.LOAD<br>THEME.ATTR
+.        -- a packed attribute, for THEME.SET and THEME.HI
 .
-.  $0400 for machine code
-.      WHAT HAPPENS: stock BASIC leaves it free, a compiled GPC program does
-.        not -- runtime state lives there, and it is corrupted with no error
-.      DO THIS: banked RAM, $A000-$BFFF
+.  out
+.      THEME.CLR(role) -- the colour array, DIMmed to
+.        THEME.SLOTS<br>THEME.INV -- the inverse attribute, from THEME.HI
 .
-.  PRINT after GP.PRINTAT
-.      WHAT HAPPENS: GP drawing never calls the KERNAL, so the cursor is
-.        wherever it was
-.      DO THIS: LOCATE first, or stay in one world
+.  internal
+.      THEME.READY
 .
-.  SORT.INC.BL with no #SYMFILE
-.      WHAT HAPPENS: {VAR} cannot resolve a crunched name -- NO SYMBOL FILE
-.        FOR {}
-.      DO THIS: #SYMFILE "@:PROG.SYM", before the #INCLUDEs
+.  constants
+.      THEME.PAGE THEME.TEXT THEME.TITLE THEME.BORDER THEME.HILITE
+.        THEME.DIMMED THEME.WARN THEME.SLOTS
 .
-.  GP.BOX X,Y,W,H,,7
-.      WHAT HAPPENS: optionals cannot be skipped over
-.      DO THIS: GP.BOX X,Y,W,H,0,7
+.THEME.CLR is the array this module DIMs. Do not DIM it yourself -- the
+.module owns it, and DIMming an array GPC has already dimensioned is an
+.error.
 .
-.  SCREEN after BMX.PAINT
-.      WHAT HAPPENS: reloads the default palette and throws the image's
-.        colours away
-.      DO THIS: set the mode first
+=APPSYS.INC.BL
 .
-.  STR.FIELD$ wanted bigger
-.      WHAT HAPPENS: auto-DIMed at 0..10 on first use, and you cannot DIM it
-.        after
-.      DO THIS: DIM it before the first call, set STR.MAX
+.  in
+.      APPSYS.FILE$ APPSYS.BANK APPSYS.X APPSYS.Y APPSYS.W APPSYS.H
+.        APPSYS.DEV -- the panel routines
 .
-.  #DEFINE X 129536
-.      WHAT HAPPENS: #DEFINE takes an INT16 -- ERROR: INVALID PARAMETER
-.      DO THIS: an ordinary variable
+.  out
+.      APPSYS.MODE APPSYS.COLS APPSYS.ROWS APPSYS.COLOUR -- set by
+.        APPSYS.STARTUP
 .
-.Two notes on names. Inside BASL, 64 characters are significant, so PANEL.COL
-.and PANEL.ROW are different variables and readable names cost nothing. The
-.same source written as a raw .bas for the PC-side converter is back to two
-.significant characters.
+.  internal
+.      APPSYS.LAST
 .
-.Dotted names also avoid the keyword-collision trap. MENUVERT.COUNT,
-.THEME.CLR, LINEINPUT.LEN and LINEINPUT.RETURN all contain reserved words and
-.all work, because BASLOAD matches the whole identifier. Undotted names do
-.not: POS, MB, ST, LEN and CHAR cannot be variables. That is why the library
-.is dotted throughout.
+.  constants
+.      APPSYS.SCRMODE APPSYS.COLREG APPSYS.WINDOW APPSYS.HEADER
 .
-=SEE ALSO
+.Lay the screen out from APPSYS.COLS and APPSYS.ROWS. Do not assume 80x60 --
+.the X16 boots there but SCREEN 0 is 40x30, and someone who prefers larger
+.text is running one.
 .
->44|4.7 SORT.INC.BL -- shell sort a string array
+=STRINGS.INC.BL
+.
+.  in
+.      STR.STR$ -- the string, in and out<br>STR.WIDTH -- field width, the
+.        pad routines<br>STR.DELIM$ STR.MAX -- SPLIT (MAX 0 means
+.        10)<br>STR.FIND$ STR.REPL$ -- REPLACE<br>STR.PET -- a PETSCII code,
+.        PET2SCR
+.
+.  out
+.      STR.STR$ -- padded, or replaced, in place<br>STR.N -- how many fields
+.        SPLIT found, always >= 1<br>STR.FIELD$(1..N) -- the fields
+.        themselves<br>STR.SCR -- the screen code from PET2SCR
+.
+.  internal
+.      STR.GAP STR.HALF STR.REST$ STR.AT STR.LIM STR.OUT$
+.
+.STR.FIELD$ is the one array the library does not DIM. Left alone, GPC's
+.implicit DIM gives 0..10. For more, DIM it before the first call and set
+.STR.MAX to match -- DIMming an array GPC has already auto-dimensioned is an
+.error, so it is one or the other. This is the opposite of THEME.CLR, which
+.the module owns outright; the two are worth keeping straight.
+.
+=LINEINPUT.INC.BL
+.
+.  in
+.      LINEINPUT.X LINEINPUT.Y -- top left of the field<br>LINEINPUT.LEN --
+.        how many characters fit<br>LINEINPUT.ATTR -- packed
+.        attribute<br>LINEINPUT.TEXT$ -- the starting value<br>LINEINPUT.MASK
+.        -- non-zero shows asterisks<br>LINEINPUT.LABEL$ -- LINEINPUT.ASK
+.        only
+.
+.  out
+.      LINEINPUT.TEXT$ -- what was typed<br>LINEINPUT.KEY -- the key that
+.        ended it
+.
+.  internal
+.      LINEINPUT.SHOW$ LINEINPUT.WAS$ LINEINPUT.K$ LINEINPUT.CELL$
+.        LINEINPUT.CODE LINEINPUT.CX LINEINPUT.CA LINEINPUT.INV LINEINPUT.LIT
+.        LINEINPUT.TICK LINEINPUT.DONE LINEINPUT.FILLED LINEINPUT.HOME
+.        LINEINPUT.BAR
+.
+.  constants
+.      LINEINPUT.RETURN LINEINPUT.DELETE LINEINPUT.ESCAPE LINEINPUT.STOP
+.        LINEINPUT.DOWN LINEINPUT.UP LINEINPUT.TAB LINEINPUT.SPACE
+.        LINEINPUT.STAR LINEINPUT.BLINK
+.
+.LINEINPUT.SHOW$ is listed internal but is the one exception worth knowing:
+.it holds what the field displayed, which is what you want if you are
+.repainting a masked field yourself. FORM.EXP.BL uses it for exactly that.
+.

@@ -1,108 +1,121 @@
-@GUI2.INC.BL -- a listbox, single or multi select.
+@4.6 MENUVERT.INC.BL -- a vertical menu
 .
-=GUI2.INC.BL
+=4.6 MENUVERT.INC.BL -- A VERTICAL MENU
 .
-.  a listbox, single or multi select.
+=DESCRIPTION
 .
-=MODULE HEADER
+.  MENUVERT.RUN
+.      IN: the variables below
+.      OUT: MENUVERT.SEL MENUVERT.KEY
 .
-:      GUI.LISTBOX   a WINDOW onto a list longer than the box, and
-:                    optionally more than one answer
+.  MENUVERT.DRAW
+.      IN: the same
+.      OUT: draws the menu without driving it
 .
-=SEPARATE FROM GUI.INC.BL ON PURPOSE
+.  MENUVERT.ROW
+.      IN: MENUVERT.DRAWROW MENUVERT.DRAWATTR
+.      OUT: one row, in the attribute you name
 .
-.  This is the only dialog that needs a scrolling window and a set of marks,
-.  and nothing else in the library wants either. #INCLUDE it when you want a
-.  listbox and pay nothing when you do not.
+.  MENUVERT.HOTFIND
+.      IN: MENUVERT.DRAWROW MENUVERT.DRAWTEXT$
+.      OUT: MENUVERT.HOTAT -- where that row's hotkey letter sits, 1-based,
+.        or 0 for "do not tint"
 .
-.  GUI.MENU is not this and should not be stretched into it: that is
-.  MENUVERT.RUN in a frame, so the list must fit the screen and it returns
-.  one row. This is the two things it does not do.
+.The menu is BASIC rather than assembly, which keeps 462 bytes of code and 11
+.of storage out of the block every GP program carries. Assembly would only be
+.needed to move the highlight without knowing the text underneath it, by
+.swapping the cell's attribute nibbles instead of redrawing. A BASIC menu
+.owns the item array and can reprint the row.
 .
-.  REQUIRES, and does not #INCLUDE for you, in this order:
-:      GPB.INC.BL        GP.FILL, GP.PRINTAT, GP.STRPTR, GP.SELECT
-:      STASH.INC.BL      via GUI.OPEN -- and wants a #SYMFILE, see its header
-:      THEME.INC.BL      the colour roles, and GOSUB THEME.LOAD first
-:      MENUVERT.INC.BL   MENUVERT.ROW draws the rows
-:      GUI.INC.BL        GUI.OPEN and GUI.CLOSE are the box
+.The difference is not visible: a nibble swap is 59 cycles a cell, GP.FILL 31
+.and GP.PRINTAT 94, so redrawing two rows costs about a millisecond against
+.the swap's half, in a 16.7 ms frame.
 .
-.  Usage:
-:      DIM MENUVERT.ITEM$(200)
-:      ... fill 1..N ...
-:      GUI.LISTBOX.COUNT = N : GUI.LISTBOX.ROWS = 8 : GUI.LISTBOX.MULTI = 1
-:      GUI.MSG$ = "PICK FILES" : GUI.BANK = 8
-:      GOSUB GUI.LISTBOX
-:      IF GUI.LISTBOX.SEL = 0 THEN <cancelled>
+.  MENUVERT.X .Y
+.      top left of the first row, not of a frame -- draw the border yourself
+.        with GP.BOX, so the menu owes nothing to one style of border
 .
-:   in   GUI.LISTBOX.COUNT   how many items. 0 or less returns cancelled
-:        MENUVERT.ITEM$()    the items, 1..COUNT. THE CALLER OWNS THE DIM,
-:                            for MENUVERT's reason: a module cannot be handed
-:                            an array, and DIMming one means guessing a bound
-:        GUI.LISTBOX.ROWS    rows visible at once. 0 takes 10, and it is
-:                            always cut to COUNT and to what the screen holds
-:        GUI.LISTBOX.MULTI   0 chooses one row. 1 marks a set with SPACE
-:        GUI.LISTBOX.MARKS$  multi only, IN as well as out: COUNT characters,
-:                            "1" marked. Anything else -- "" included --
-:                            starts with none marked
-:        GUI.LISTBOX.SEL     the item to start on. 0 starts at 1
-:        plus everything GUI.OPEN reads: GUI.MSG$, GUI.MSG2$, GUI.TITLE$,
-:        GUI.BANK, GUI.STYLE, GUI.GLYPH, GUI.PLACE and the rest
+.  MENUVERT.WIDTH
+.      cells wide. This is the width of the highlight, so it is the width of
+.        the menu whatever the text happens to do
 .
-:   out  GUI.LISTBOX.SEL     the item under the highlight, 1..COUNT, or 0 if
-:                            cancelled. In multi that is where the cursor was
-:                            not the answer -- the marks are the answer
-:        GUI.LISTBOX.MARKS$  multi only: COUNT characters, "1" marked
-:        GUI.LISTBOX.MARKED  multi only: how many are marked
-:        GUI.KEY             13 accepted, 27 or 3 cancelled
+.  MENUVERT.COUNT
+.      how many rows
 .
-.  THE BOTTOM FRAME EDGE says nothing it does not have to. In multi it is "2
-.  SELECTED OF 20" and follows every SPACE; otherwise it is "20 ITEMS" for a
-.  list too long to see at once, and blank for one that fits.
+.  MENUVERT.ITEM$()
+.      the rows, 1..COUNT -- the caller owns the DIM, see below
 .
-.  KEYS: up and down move, PgUp and PgDn page, HOME and END jump, SPACE
-.  toggles a mark in multi, RETURN accepts, ESC and STOP cancel. The codes
-.  are the ones samples/editor dispatches on, so they are known good.
+.  MENUVERT.ATTR
+.      packed attribute, background * 16 + foreground
 .
-=THE LAST TWO ARE ON THE BOX
+.  MENUVERT.HIATTR
+.      the same for the highlighted row. 0 means invert MENUVERT.ATTR
 .
-.  in a dimmed row under the list with ENTER and ESC picked out -- GUI.TEXT's
-.  hint, in GUI.TEXT's words, at GUI.TEXT's two offsets, because a dialog
-.  that answers OK or CANCEL should say so the same way wherever you meet it.
-.  It costs the body a spacer row and a hint row, and the box a minimum width
-.  of 26.
+.  MENUVERT.HOT$
+.      one character a row, "" for none
 .
-=THE MARKS ARE A STRING AND ARE TOGGLED IN PLACE
+.  MENUVERT.HOTATTR
+.      paint the hotkey letter in this attribute. 0 is off, and off is the
+.        default
 .
-.  GP.STRPTR gives the address of the characters, so SPACE POKEs one byte and
-.  allocates nothing -- where LEFT$ + CHR$ + MID$ would build a whole new
-.  string per keypress, and the old block is dead for good. It also means no
-.  second array to DIM and no bound to guess. THE PRICE IS 250 ITEMS, which
-.  is a string.
+.  MENUVERT.FLAGS
+.      added together, below
 .
-=THE WINDOW IS MENUVERT.SCROLL
+.  MENUVERT.SEL
+.      the row to start on; 0 starts at 1
 .
-.  Screen row R draws ITEM$(SCROLL + R), so the drawing is MENUVERT.ROW
-.  unchanged and this file only decides what SCROLL is. That input is an
-.  offset defaulting to 0 precisely so every menu that never heard of it is
-.  unaffected.
+.  MENUVERT.SEL
+.      1..COUNT, or 0 if cancelled
 .
-=THE MARK COLUMNS ARE THIS FILE'S
+.  MENUVERT.KEY
+.      the key that ended it -- 13 chose, 27 cancelled, or the hotkey itself
 .
-.  NOT MENUVERT'S. In multi the rows are indented by two columns and MENUVERT
-.  owns only the text columns, so the caller's array is never touched to add
-.  a marker to it.
+:MENUVERT.X = 8 : MENUVERT.Y = 6
+:MENUVERT.WIDTH = 24 : MENUVERT.COUNT = 4
+:MENUVERT.ITEM$(1) = " NEW GAME"           ' ... and so on
+:MENUVERT.ATTR = THEME.CLR(THEME.TEXT)
+:MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
+:MENUVERT.HOT$ = "NLOQ"
+:GOSUB MENUVERT.RUN
+:IF MENUVERT.SEL = 0 THEN GOTO CANCELLED
 .
-.  NO #DEFINEs AND NO INCLUDE GUARD IN HERE, ON PURPOSE. BASLOAD rejects a
-.  DIGIT in a #DEFINE or #IFNDEF name, so a GUI.LISTBOX.* constant cannot
-.  exist and a GUILIST.* one would be a second name space for one module. The
-.  numbers are written where they are used, next to the comment that names
-.  them. #INCLUDE this file once.
+.  cursor up / down
+.      move
 .
-.  The whole GUI.LISTBOX.* name space belongs to this file.
+.  RETURN
+.      choose
 .
-=SEE ALSO
+.  ESC or STOP
+.      cancel
 .
->46|GUI.INC.BL -- four dialogs, in a box that puts the screen back.
->65|STASH.INC.BL -- save a text rectangle, and put it back.
->36|4.1 THEME.INC.BL -- named colour roles
->41|4.6 MENUVERT.INC.BL -- a vertical menu
+.  a hotkey
+.      chooses its row at once
+.
+.  1
+.      must select -- ESC does not cancel
+.
+.  2
+.      keep mark -- leave the chosen row highlighted on the way out
+.
+.  4
+.      no wrap -- stop at the ends instead of wrapping round
+.
+.  8
+.      gamepad -- drive it from the SNES pad in port 1 as well as the
+.        keyboard
+.
+.The constants MENUVERT.MUSTSEL, .KEEPMARK, .NOWRAP and .GAMEPAD are defined;
+.add those rather than the numbers.
+.
+.A hotkey chooses its row rather than moving to it. MENUVERT.HOT$ is one
+.character per row in order, matched without case. It may be shorter than
+.MENUVERT.COUNT, in which case the later rows have no hotkey.
+.
+.MENUVERT.HOTATTR paints the hotkey letter in a second attribute. The letter
+.is located in the row's own text -- the first case-insensitive match for
+.that row's MENUVERT.HOT$ character -- so nothing extra is passed in and "
+.START" with hotkey S needs no markup. A row whose text does not contain its
+.hotkey is left untinted rather than reported; the hotkey still works. Only
+.rows in the normal attribute are tinted: on the selected row the highlight
+.carries the meaning.
+.

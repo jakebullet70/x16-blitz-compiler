@@ -1,61 +1,14 @@
-@3.8 Block IF
+@3.4.4 GP.COMP -- compare two strings, ignoring case
 .
-=3.8 BLOCK IF
+=3.4.4 GP.COMP
 .
-=SYNTAX
+.  Syntax    GP.COMP(a$, b$)
+.  Returns   -1 if a$ sorts before b$, 0 the same, 1 after.
+.  Kind      ASM. Needs the GP block.
+.  Notes     Case is ignored. GP.COMP(A$, B$) = 0 is the case-blind
+.            equality test that = cannot do, and the same call orders
+.            a sort.
+.            Length breaks a tie: "abc" sorts before "ABCD".
+.  Example
 .
-:GP.IF <expr> THEN
-:    ...
-:GP.ELSEIF <expr> THEN
-:    ...
-:GP.ELSE
-:    ...
-:GP.ENDIF
-.
-=WHAT IT COSTS
-.
-.  ASM: GP.IF GP.ELSEIF GP.ELSE GP.ENDIF
-.    ASM -- a keyword, run by machine code in the GP runtime block. A program
-.    using ANY GP keyword pays for the whole block.
-.
-=DESCRIPTION
-.
-.Each of the four keywords is alone on its line, and THEN is required. There
-.is no one-line form: GP.IF X > 5 THEN PRINT is a syntax error. Allowing it
-.would mean a block that swallowed every line down to the next GP.ENDIF.
-.Stock IF ... THEN is unchanged and remains the one-line form.
-.
-.GP.ELSEIF may repeat any number of times; GP.ELSE is optional. The first
-.true condition wins and nothing below it runs, so there is no break to omit.
-.If nothing matches and there is no GP.ELSE the block is skipped, which is
-.not an error. Conditions are numeric expressions.
-.
-.GP.IF and GP.SELECT cover different cases. A select fetches one value and
-.compares it against each alternative -- a sparse key code, a state machine.
-.A block IF tests a different condition in every branch: ranges, compound
-.conditions, a string in one arm and a number in the next.
-.
-.GP.ENDIF is required, but unlike GP.ENDSEL it does no work: the condition is
-.evaluated and consumed on the line it is written, so there is no frame to
-.release and a GOTO out of a GP.IF is safe. Omitting GP.ENDIF stops the
-.compile with STRUCTURE IMBALANCE.
-.
-:GP.IF N < 0 THEN
-:    PRINT "NEGATIVE"
-:GP.ELSEIF N = 0 THEN
-:    PRINT "ZERO"
-:GP.ELSE
-:    PRINT "POSITIVE"
-:GP.ENDIF
-.
-.IFs nest freely -- inside each other, inside a GP.CASE body, and inside a
-.GP.DO loop.
-.
-.It costs 14 runtime bytes, none of them code. All four p-code opcodes reuse
-.existing handlers: the two branches are .goto.z and .goto under different
-.names, and the two markers share one four-byte no-op. See SEC 11 of
-.docs/blitz/GP-BASIC.TIERS.md.
-.
-=EXAMPLE PROGRAM
-.
-.  IF.EXP.BL -- runnable, in the GPC-BASIC folder
+:            IF GP.COMP(N$, "QUIT") = 0 THEN GOTO BYE

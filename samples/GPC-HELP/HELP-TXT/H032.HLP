@@ -1,81 +1,41 @@
-@MENUBAR.INC.BL -- a horizontal menu, in BASIC.
+@4.6 MENUVERT.INC.BL -- a vertical menu (2)
+.The caller owns the DIM. A module cannot be passed an array in BASIC, so it
+.names one; DIMming it inside the module would fix a bound and then fail for
+.a caller who wanted more rows. Leave MENUVERT.ITEM$ undimensioned and GPC's
+.implicit DIM gives 0..10, a ten-row menu. DIM it yourself for more. Do not
+.do both.
 .
-=MENUBAR.INC.BL
+=The gamepad flag
 .
-.  a horizontal menu, in BASIC.
+.With flag 8, up and down move the highlight and B or Start chooses. Cancel
+.remains keyboard-only: ESC and STOP have no unambiguous pad equivalent, and
+.a must-select menu has no cancel.
 .
-=MODULE HEADER
+.It reads port 1, the physical pad, not port 0. Port 0 is the keyboard
+.presented as a joystick, and the menu reads the keyboard directly, so
+.reading both would move the highlight twice for one cursor key. Port 0 is
+.also unreliable, reporting absent on roughly half of all reads (measured in
+.AlienAirlift: 2,060 negative against 2,057 valid over 14 seconds).
 .
-:      MENUBAR.RUN     draw it, drive it, return the item chosen
-:      MENUBAR.DRAW    draw it without driving it
-:      MENUBAR.ITEM    one item, in whichever attribute you name
+.One step per press, no auto-repeat. The wait loop spins as fast as the CPU
+.allows, so the pad is edge-triggered and holding a direction moves once. A
+.button still held from whatever opened the menu is not read as a fresh press
+.either, so a menu cannot answer itself on the way in.
 .
-.  MENUVERT.INC.BL is the VERTICAL menu; this is the other axis. Items sit
-.  side by side, each as wide as its own text, and left and right are what
-.  move.
+.With no pad connected the flag changes nothing: the pad is read only when
+.the keyboard is quiet, and an absent pad reads as nothing held. In the
+.emulator a real pad needs -joy1, which binds physical hardware and does not
+.map the keyboard.
 .
-.  REQUIRES, and does not #INCLUDE for you:
-:      GPB.INC.BL        GP.FILL, GP.PRINTAT
-:      MENUVERT.INC.BL   MENUVERT.ROW draws the items and tints the
-:                        hotkeys; this file owns the layout and the keys
+.Examples: MENUDEMO.EXP.BL on its own, MENU.EXP.BL inside a whole small
+.application, and MENUTST.EXP.BL for the 21-case regression test.
 .
-=A SEPARATE FILE
+=EXAMPLE PROGRAM
 .
-.  NOT A FLAG ON MENUVERT: a BASL module has no dead code elimination, so a
-.  horizontal path inside MENUVERT would be carried by every vertical menu
-.  ever written. STASHFILE.INC.BL was split off for the same reason.
-.
-=IT SHARES MENUVERT'S ARRAY AND COLOURS
-.
-.  MENUVERT.ITEM$, .ATTR, .HIATTR, .HOTATTR, .HOT$ -- because a program with
-.  a bar and a dropdown wants one convention, and copying an array between
-.  name spaces per call would be worse.
-.
-.  Usage:
-:      MENUVERT.ITEM$(1) = " FILE "     ... and so on
-:      MENUVERT.COUNT = 3
-:      MENUVERT.ATTR = THEME.CLR(THEME.TITLE)
-:      MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
-:      MENUBAR.X = 0 : MENUBAR.Y = 0
-:      GOSUB MENUBAR.RUN
-:      IF MENUBAR.SEL = 0 THEN <cancelled>
-.
-:   in   MENUBAR.X  MENUBAR.Y   where the bar starts
-:        MENUBAR.GAP            cells BETWEEN items. 0 is the default,
-:                               because the space belongs in the item
-:                               text -- " FILE " is how you get a
-:                               highlight with air in it, exactly as a
-:                               vertical menu's " NEW GAME" does
-:        MENUBAR.FLAGS          added together, see below
-:        MENUBAR.SEL            the item to start on; 0 starts at 1
-:        and MENUVERT.COUNT, MENUVERT.ITEM$(), MENUVERT.ATTR,
-:        MENUVERT.HIATTR, MENUVERT.HOT$, MENUVERT.HOTATTR
-.
-:   out  MENUBAR.SEL     1..COUNT, or 0 if cancelled
-:        MENUBAR.KEY     what ended it: 13 chose, 27 cancelled, 17 or
-:                        145 if the cross-axis flags are on, or the
-:                        hotkey itself
-:        MENUBAR.SELX    the COLUMN the chosen item starts at, and
-:        MENUBAR.SELW    how wide it is -- so a caller can drop a panel
-:                        under it without working the layout out again
-.
-=THE WIDTH OF AN ITEM IS THE LENGTH OF ITS TEXT
-.
-.  no column width, no MENUBAR.WIDTH. A bar reading "FILE SEARCH HELP" with
-.  every item as wide as the longest is a row of buttons, not a menu bar.
-.  That is the real difference from MENUVERT, and why this could not have
-.  been a flag.
-.
-=UP AND DOWN ARE OPTIONAL EXITS
-.
-.  off by default. A bar over dropdowns wants DOWN to end it so the caller
-.  can open the panel and come back; a bar that is only a bar wants them
-.  ignored. Neither is the general case, so off means "an arrow across the
-.  grain does nothing".
-.
-.  The whole MENUBAR.* name space belongs to this file.
+.  MENUDEMO.EXP.BL -- runnable, in the GPC-BASIC folder
+.  MENU.EXP.BL -- runnable, in the GPC-BASIC folder
+.  MENUTST.EXP.BL -- runnable, in the GPC-BASIC folder
 .
 =SEE ALSO
 .
->41|4.6 MENUVERT.INC.BL -- a vertical menu
->73|STASHFILE.INC.BL -- a saved text rectangle, through a file.
+>45|4.6 MENUVERT.INC.BL -- a vertical menu

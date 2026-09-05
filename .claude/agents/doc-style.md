@@ -1,6 +1,6 @@
 ---
 name: doc-style
-description: Write and revise the prose in this project — REM/## comments in BASL and 64tass sources, and the reference content in GP-BASIC.md that becomes the on-machine GPB.HELP. Use when adding comments, trimming them, or rewriting a manual section. It owns voice, comment taxonomy and topic shape; it does not own code.
+description: Write and revise the prose in this project — REM/## comments in BASL and 64tass sources, and the reference content in GP-BASIC.md that becomes the on-machine GPB.HELP. Use when adding comments, trimming them, writing a keyword entry, or rewriting a manual section. It owns voice, comment taxonomy and help-entry shape; it does not own code.
 tools: Read, Write, Edit, Grep, Glob, Bash
 ---
 
@@ -112,7 +112,7 @@ countable:
     ## screen. Select the bank again here, and again after any dialog.
 ```
 
-In help text a trap gets its own `####` heading, which puts it in the master index. Expect a handful
+In help text the same fact takes the `WARNING` slot. Expect a handful
 per file, not per screen. If a file has six warnings, five of them are notes.
 
 Keywords keep their natural case: `GP.INSTR`, not GP.INSTR-as-shouting. Error text quoted from the
@@ -140,32 +140,79 @@ gone at the next build.
 Markdown maps to the index: `##` is a category, `###` a topic, `####` a section inside a topic.
 Body text wraps to `WIDTH = 76`; the viewer prints what it is given and adds indent 2.
 
-### Shape: one topic per group
+### Shape: a concept page, then one entry per keyword
 
-A `###` heading in section 3 or 4 is a topic and everything under it belongs to that topic. A `####`
-under it is a section header inside the same page, indexed as an `S` row so the master index can
-jump straight to it. That is the whole structure available.
+A group of keywords gets a short concept page that points, and each keyword gets its own fixed-slot
+entry that answers. Neither one scrolls.
 
-**Do not try to give a keyword its own page.** The viewer has no cursor on a topic page and RETURN
-is deliberately not "open a link" — see the note at `HELP.TOPIC.KEY` in `GPB.HELP.BASL`. A `>` row
-is display only; the sole way to follow one is the **L** dialog, which lists every cross reference in
-the topic at once. A table of links on a page therefore reads as navigation and is not.
-Do not build one.
+**How the builder knows.** A `####` heading numbered three deep is an entry and becomes its own
+topic; the parent gets an `IN THIS SECTION` jump table pointing at it. A `####` that is *not*
+numbered stays a section inside its parent, which is what the prose subsections in §3.3, §3.7 and
+§3.9 rely on. Put the one-line gloss in the heading after an em dash — it is what the jump table and
+the index row show.
 
-So a group's page carries all of its keywords, and the reader scrolls. Make the scroll worth it:
+```markdown
+#### 3.4.5 `GP.STRPTR` — address of a string block
+```
 
-- **Lead with the table.** `| Form | Does |` per keyword, which `emit_table` stacks into one entry
-  per row. That is the syntax and the one-line meaning, at the top, before any prose.
-- **Then the prose, one keyword at a time, in table order.** Semantics not visible in the syntax:
-  what a value means, what is case sensitive, what an empty argument does.
-- **A trap gets its own `####`.** It becomes an index row, so it is reachable from the master index
-  without reading the page — `GP.STRPTR and the address-splitting trap` is the model.
-- **`Example:` on its own line** naming an `.EXP.BL` builds the EXAMPLE PROGRAM block.
-- **`§4.8` anywhere in the body** builds a SEE ALSO row. Nothing to type by hand.
+**Concept page** — prose, then the jump table, then what is deliberately *not* here.
 
-A topic over `MAXPAGE` (120 lines) is split at a section header into numbered parts, which costs an
-index row and reads badly. Keep a group under it; if a group cannot fit, the prose is carrying
-explanation that does not belong in a reference.
+```markdown
+### 3.4 Strings
+
+Five keywords. `GP.INSTR` is the only string search GPC has; without it there is none.
+
+Trimming, padding and case folding are modules, not keywords: `STRCASE.INC.BL` (§4.8) for
+case and trim in place, `STRINGS.INC.BL` (§4.2) for padding. They cost 188 bytes of p-code
+in the programs that `#INCLUDE` them and nothing in the GP block.
+```
+
+**Entry** — the slots, in this order, label column 8 wide, text from column 10, wrapped at 76.
+
+| Slot | Rule |
+|---|---|
+| `Syntax` | Required. The call, with optional arguments in `[ ]`. |
+| `Returns` | Required for a function. A statement uses `Does` instead. |
+| `Kind` | Required. `ASM. Needs the GP block.` or `COMPOSITE. Expands to <x>.` |
+| `Notes` | Optional. Semantics not visible in the syntax line. One fact a line. |
+| `WARNING` | Optional. The footgun. At most one per entry. |
+| `Example` | Optional. Real code that compiles. Omit rather than invent a thin one. |
+
+Write the slots inside a **`` ```entry ``` fence**. Its columns are the layout, so the builder emits
+it with the spacing you wrote and never re-wraps it. The example code goes in an ordinary fence
+straight after, where it is dimmed and `X export code` can write it out. `See also` is **generated**
+— write `§3.5` in the body and it becomes a live cross-reference row, so there is no `See also` line
+to type.
+
+````markdown
+#### 3.4.5 `GP.STRPTR` — address of a string block
+
+```entry
+  Syntax    GP.STRPTR(a$)
+  Returns   Address of the string's [ActLen][Data] block.
+  Kind      ASM. Needs the GP block.
+  Notes     The length byte is at the address, the first character at
+            +1, the block capacity at -2.
+  WARNING   Split the address with GP.LOBYTE / GP.HIBYTE (§3.3),
+            never with P AND 255. AND is 16-bit signed and the string
+            heap is above 32,767, so P AND 255 raises OUT OF RANGE.
+  Example
+```
+```basic
+            P = GP.STRPTR(A$)
+            GP.CALL $A000, GP.LOBYTE(P), GP.HIBYTE(P)
+```
+````
+
+§3.4 is written this way already; copy it rather than working from this sketch.
+
+An entry should fit one screen. If it does not, the Notes slot is carrying explanation that belongs
+on the concept page.
+
+**Following a link.** A `>` row is display only. The viewer has no cursor on a topic page and RETURN
+is deliberately not "open a link" — the reader presses **L**, which lists every cross reference in
+the topic and opens the one chosen. The jump table and the generated `SEE ALSO` rows arrive in that
+same dialog together.
 
 ### No Why
 
@@ -187,6 +234,18 @@ YES   There is no GP.PAD. In-place statements cannot grow a string
 
 What a group **costs** — bytes, which block, whether it is resident — is a number a reader acts on
 and stays. The argument that led to the number does not.
+
+### What converting a section costs
+
+The index is the one thing the viewer keeps resident. Measured on §3.4, five entries: **+38
+characters of index and about +64 bytes of string heap each**. Converting the rest of section 3 —
+around 25 more keywords — is roughly +950 index characters and +1,600 heap bytes, against 5,380
+today.
+
+Convert a section because the group is looked up, not to be uniform. §3.1 Loops is four keywords a
+reader meets once, and it is fine as a page.
+
+The concept page shrinks in return. §3.4 went from 118 lines to 47, and no entry exceeds 26.
 
 ## Before you finish
 

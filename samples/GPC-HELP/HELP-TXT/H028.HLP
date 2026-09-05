@@ -1,56 +1,45 @@
-@4.7 SORT.INC.BL -- shell sort a string array
+@4.3 APPSYS.INC.BL -- start politely, leave it as you found it
 .
-=4.7 SORT.INC.BL -- SHELL SORT A STRING ARRAY
+=4.3 APPSYS.INC.BL -- START POLITELY, LEAVE IT AS YOU FOUND IT
 .
 =DESCRIPTION
 .
-.  SORT.RUN
-.      IN: SORT.PTR SORT.DESCEND SORT.NOCASE
-.      OUT: SORT.OK SORT.COUNT
+.  APPSYS.STARTUP
+.      IN: --
+.      OUT: APPSYS.MODE APPSYS.COLS APPSYS.ROWS APPSYS.COLOUR
 .
-:#SYMFILE "@:MYPROG.SYM"
-:#INCLUDE "SORT.INC.BL"
-:
-:SORT.PTR = GP.ARRPTR(NAME$())
-:SORT.DESCEND = 0 : SORT.NOCASE = 0
-:GOSUB SORT.RUN
+.  APPSYS.RESTORE
+.      IN: those
+.      OUT: screen mode and colour put back
 .
-.Shell sort with Ciura's gap sequence -- 132, 57, 23, 10, 4, 1 -- moving the
-.2-byte element pointers rather than string data. A swap costs the same
-.whatever the strings are: no temporary, no copy, no heap traffic.
+.  APPSYS.PANEL.SAVE
+.      IN: APPSYS.FILE$ .BANK .X .Y .W .H [.DEV]
+.      OUT: a file
 .
-.The array is passed as an address because a BASL subroutine cannot be passed
-.an array; GP.ARRPTR is a keyword for this purpose. The empty parentheses in
-.GP.ARRPTR(A$()) are required -- A$ and A$() are different variables.
+.  APPSYS.PANEL.LOAD
+.      IN: APPSYS.FILE$ .BANK
+.      OUT: back where it came from
 .
-.SORT.OK is 0 if the sort was refused: more than 255 elements, so DIM A$(254)
-.is the largest accepted (DIM A$(255) is 256 elements), or an array whose
-.elements are not strings. The element count and the type are read from the
-.array's own header, three bytes below what GP.ARRPTR returns, so a wrong
-.count cannot be passed in.
+.  APPSYS.PANEL.PUT
+.      IN: APPSYS.FILE$ .BANK .X .Y
+.      OUT: pasted somewhere else
 .
-.Never-assigned elements are empty strings, not garbage. A DIM A$(20) with
-.five entries filled sorts its fifteen empties to the front; a null pointer
-.reads as "", as it does elsewhere in the runtime.
+:GOSUB APPSYS.STARTUP
+:' ... the application, laid out with APPSYS.COLS / APPSYS.ROWS ...
+:GOSUB APPSYS.RESTORE : END
 .
-.SORT.DESCEND and SORT.NOCASE are ordinary variables rather than arguments,
-.so they are sticky. Set both on every call.
+.Call STARTUP before any SCREEN or COLOR of your own. It records the state as
+.it finds it, so anything changed beforehand is what gets restored.
 .
-.The program must have a #SYMFILE, placed before the #INCLUDEs. The assembly
-.reaches BASIC's variables through {VAR}, and BASLOAD crunches every name
-.before the compiler sees it; without the mapping the compile stops with NO
-.SYMBOL FILE FOR {}.
+.Lay out from APPSYS.COLS / APPSYS.ROWS rather than assuming 80x60. The X16
+.boots 80x60, but SCREEN 0 is 40x30 and a user who prefers larger text is
+.running one.
 .
-.Example: ARRAYS.EXP.BL. Regression test: SORT.EXP.BL, eight cases including
-.a 200-element array -- element 128 is where the doubled index stops fitting
-.in a byte. Every case checks content as well as order: a sort that reads the
-.wrong element leaves the array in order with a string duplicated.
-.
-=EXAMPLE PROGRAM
-.
-.  ARRAYS.EXP.BL -- runnable, in the GPC-BASIC folder
-.  SORT.EXP.BL -- runnable, in the GPC-BASIC folder
+.APPSYS.DEV defaults to 8. The panel routines are implemented in
+.STASHFILE.INC.BL. A panel file is self-describing -- it carries the stash's
+.4-byte header -- so loading one needs only its name.
 .
 =SEE ALSO
 .
->44|4.7 SORT.INC.BL -- shell sort a string array
+>42|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>77|STASHFILE.INC.BL -- a saved text rectangle, through a file.

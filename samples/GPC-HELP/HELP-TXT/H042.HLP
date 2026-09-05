@@ -1,27 +1,19 @@
-@6. Regenerating this
+@2. GP.* is keywords, not variables -- and the difference bites
 .
-=6. REGENERATING THIS
+=2. GP.* IS KEYWORDS, NOT VARIABLES -- AND THE DIFFERENCE BITES
 .
-.The tables above were extracted from the sources rather than remembered. To
-.check them after a change:
+.GPB.INC.BL defines no variables. It is 31 keyword declarations and nothing
+.else. Everything spelled GP.something is a BASIC keyword, so:
 .
-:python - <<'PY'
-:import re, os, glob
-:for f in sorted(glob.glob("GPC-BASIC/*.INC.BL")):
-:    s = open(f, encoding="utf-8").read()
-:    body = "\n".join(l for l in s.split("\n") if not l.strip().startswith("#
-:    body = re.sub(r'"[^"]*"', ' ', body)          # literals are not identif
-:    defines = set(re.findall(r"^#DEFINE\s+([A-Z0-9.$]+)", body, re.M))
-:    labels  = set(re.findall(r"^([A-Z][A-Z0-9.]*):", body, re.M))
-:    pref    = os.path.basename(f).split(".")[0]
-:    idents  = {i for i in re.findall(r"\b([A-Z][A-Z0-9.]*\$?)", body)
-:               if i.startswith(pref) or i.startswith(pref[:3] + "K")}
-:    print(os.path.basename(f))
-:    print("  const :", " ".join(sorted(defines)))
-:    print("  labels:", " ".join(sorted(labels)))
-:    print("  vars  :", " ".join(sorted(idents - defines - labels)))
-:PY
+:GP.A = 5          <- SYNTAX ERROR. GP.A is a keyword; you cannot assign to i
+:X = GP.A          <- correct. It reads the accumulator after the last GP.CAL
 .
-.It cannot tell in from out from internal -- that is a judgement call and
-.lives in each module's header comment. What it will catch is a variable that
-.has appeared and is not written down here.
+.The value words are GP.A, GP.X, GP.Y and GP.C -- the registers after
+.GP.CALL, and now the whole list of them. They are keywords rather than
+.variables because nothing in the runtime can write a BASIC variable by name,
+.so a command that returns a value has to hand it back through a keyword.
+.X16's own ST, MX and MY exist for the same reason.
+.
+.The full keyword list lives in GPC-BASIC/GPB.INC.BL, and the byte values
+.mirror getGP() in source/common-scripts/c64tokens.py.
+.

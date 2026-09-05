@@ -1,121 +1,42 @@
-@4.6 MENUVERT.INC.BL -- a vertical menu
+@4.1 THEME.INC.BL -- named colour roles
 .
-=4.6 MENUVERT.INC.BL -- A VERTICAL MENU
+=4.1 THEME.INC.BL -- NAMED COLOUR ROLES
+.
+=WHAT IT COSTS
+.
+.    BASIC -- a .INC.BL module of ordinary BASL, called with GOSUB. Costs
+.    nothing unless you #INCLUDE it.
 .
 =DESCRIPTION
 .
-.  MENUVERT.RUN
-.      IN: the variables below
-.      OUT: MENUVERT.SEL MENUVERT.KEY
+.  THEME.LOAD
+.      IN: THEME.DARK (0 light, non-zero dark)
+.      OUT: fills THEME.CLR()
 .
-.  MENUVERT.DRAW
-.      IN: the same
-.      OUT: draws the menu without driving it
+.  THEME.SET
+.      IN: THEME.ATTR
+.      OUT: issues COLOR -- makes it the colour PRINT uses
 .
-.  MENUVERT.ROW
-.      IN: MENUVERT.DRAWROW MENUVERT.DRAWATTR
-.      OUT: one row, in the attribute you name
+.  THEME.HI
+.      IN: THEME.ATTR
+.      OUT: THEME.INV, the inverse attribute
 .
-.  MENUVERT.HOTFIND
-.      IN: MENUVERT.DRAWROW MENUVERT.DRAWTEXT$
-.      OUT: MENUVERT.HOTAT -- where that row's hotkey letter sits, 1-based,
-.        or 0 for "do not tint"
+.Roles, for indexing THEME.CLR(): THEME.PAGE THEME.TEXT THEME.TITLE
+.THEME.BORDER THEME.HILITE THEME.DIMMED THEME.WARN, and THEME.SLOTS = 7.
 .
-.The menu is BASIC rather than assembly, which keeps 462 bytes of code and 11
-.of storage out of the block every GP program carries. Assembly would only be
-.needed to move the highlight without knowing the text underneath it, by
-.swapping the cell's attribute nibbles instead of redrawing. A BASIC menu
-.owns the item array and can reprint the row.
+:THEME.DARK = 1 : GOSUB THEME.LOAD
+:GP.BOX 4,2,30,8, 2, THEME.CLR(THEME.BORDER)
+:GP.PRINTAT 6,3, "TITLE", THEME.CLR(THEME.TITLE)
 .
-.The difference is not visible: a nibble swap is 59 cycles a cell, GP.FILL 31
-.and GP.PRINTAT 94, so redrawing two rows costs about a millisecond against
-.the swap's half, in a 16.7 ms frame.
+.The values are packed attributes, background * 16 + foreground, which is
+.what GP.BOX, GP.FILL and GP.PRINTAT take. For COLOR, which takes the halves
+.separately, use THEME.SET.
 .
-.  MENUVERT.X .Y
-.      top left of the first row, not of a frame -- draw the border yourself
-.        with GP.BOX, so the menu owes nothing to one style of border
+.#DEFINE substitutes at translation time, so THEME.CLR(THEME.TITLE) compiles
+.to THEME.CLR(2). The readable name costs no variable and no lookup.
 .
-.  MENUVERT.WIDTH
-.      cells wide. This is the width of the highlight, so it is the width of
-.        the menu whatever the text happens to do
+.THEME.CLR is DIMmed by the module. Do not DIM it in your own program.
 .
-.  MENUVERT.COUNT
-.      how many rows
+=SEE ALSO
 .
-.  MENUVERT.ITEM$()
-.      the rows, 1..COUNT -- the caller owns the DIM, see below
-.
-.  MENUVERT.ATTR
-.      packed attribute, background * 16 + foreground
-.
-.  MENUVERT.HIATTR
-.      the same for the highlighted row. 0 means invert MENUVERT.ATTR
-.
-.  MENUVERT.HOT$
-.      one character a row, "" for none
-.
-.  MENUVERT.HOTATTR
-.      paint the hotkey letter in this attribute. 0 is off, and off is the
-.        default
-.
-.  MENUVERT.FLAGS
-.      added together, below
-.
-.  MENUVERT.SEL
-.      the row to start on; 0 starts at 1
-.
-.  MENUVERT.SEL
-.      1..COUNT, or 0 if cancelled
-.
-.  MENUVERT.KEY
-.      the key that ended it -- 13 chose, 27 cancelled, or the hotkey itself
-.
-:MENUVERT.X = 8 : MENUVERT.Y = 6
-:MENUVERT.WIDTH = 24 : MENUVERT.COUNT = 4
-:MENUVERT.ITEM$(1) = " NEW GAME"           ' ... and so on
-:MENUVERT.ATTR = THEME.CLR(THEME.TEXT)
-:MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
-:MENUVERT.HOT$ = "NLOQ"
-:GOSUB MENUVERT.RUN
-:IF MENUVERT.SEL = 0 THEN GOTO CANCELLED
-.
-.  cursor up / down
-.      move
-.
-.  RETURN
-.      choose
-.
-.  ESC or STOP
-.      cancel
-.
-.  a hotkey
-.      chooses its row at once
-.
-.  1
-.      must select -- ESC does not cancel
-.
-.  2
-.      keep mark -- leave the chosen row highlighted on the way out
-.
-.  4
-.      no wrap -- stop at the ends instead of wrapping round
-.
-.  8
-.      gamepad -- drive it from the SNES pad in port 1 as well as the
-.        keyboard
-.
-.The constants MENUVERT.MUSTSEL, .KEEPMARK, .NOWRAP and .GAMEPAD are defined;
-.add those rather than the numbers.
-.
-.A hotkey chooses its row rather than moving to it. MENUVERT.HOT$ is one
-.character per row in order, matched without case. It may be shorter than
-.MENUVERT.COUNT, in which case the later rows have no hotkey.
-.
-.MENUVERT.HOTATTR paints the hotkey letter in a second attribute. The letter
-.is located in the row's own text -- the first case-insensitive match for
-.that row's MENUVERT.HOT$ character -- so nothing extra is passed in and "
-.START" with hotkey S needs no markup. A row whose text does not contain its
-.hotkey is left untinted rather than reported; the hotkey still works. Only
-.rows in the normal attribute are tinted: on the selected row the highlight
-.carries the meaning.
-.
+>40|4.1 THEME.INC.BL -- named colour roles

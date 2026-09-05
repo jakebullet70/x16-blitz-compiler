@@ -1,22 +1,54 @@
-@5. Two more naming rules that are not about collisions
+@1. The prefixes that are taken
 .
-=5. TWO MORE NAMING RULES THAT ARE NOT ABOUT COLLISIONS
+=1. THE PREFIXES THAT ARE TAKEN
 .
-.#DEFINE takes an INT16 (BASLOAD.MD:313). A constant above 65535 is ERROR:
-.INVALID PARAMETER, not a warning -- which is why BMX.PALBASE (VRAM $1FA00,
-.129536) is an ordinary variable and not a #DEFINE. Every VRAM address past
-.$FFFF has the same problem.
+.  GP.
+.      OWNER: GPB.INC.BL
+.      WHAT IT IS: keywords, not variables -- see SEC 2, this one is
+.        different
 .
-.A dotted name whose tail is a reserved word is fine. MENUVERT.COUNT,
-.THEME.CLR, LINEINPUT.LEN and LINEINPUT.RETURN all contain keywords and all
-.work, because BASLOAD matches the whole identifier. An undotted one does
-.not: POS, MB, ST, LEN and CHAR cannot be variables at all. This is the main
-.reason the library is dotted throughout.
+.  STR.
+.      OWNER: STRINGS.INC.BL
+.      WHAT IT IS: string helpers
 .
-.One rule applies only outside BASL: BASLOAD gives 64 significant characters,
-.the built-in BASIC gives two. Write the same code as a hand-typed .bas for
-.the PC-side converter and THEME.CLR and THEME.COUNT become the same
-.variable. That is a silent wrong answer -- it cost two test cycles during
-.tier 6, both times looking exactly like a compiler bug. Inside BASL you are
-.safe; in a raw .bas, give every variable a distinct first two characters.
+.  THEME.
+.      OWNER: THEME.INC.BL
+.      WHAT IT IS: colour roles
 .
+.  APPSYS.
+.      OWNER: APPSYS.INC.BL
+.      WHAT IT IS: screen save/restore, panels to disk
+.
+.  LINEINPUT.
+.      OWNER: LINEINPUT.INC.BL
+.      WHAT IT IS: entry fields
+.
+.  MENUVERT.
+.      OWNER: MENUVERT.INC.BL
+.      WHAT IT IS: vertical menus
+.
+.  BMX.
+.      OWNER: BMX.INC.BL
+.      WHAT IT IS: BMX bitmap loading
+.
+.  BMXK.
+.      OWNER: BMX.INC.BL
+.      WHAT IT IS: its KERNAL/VERA constants, kept apart from its variables
+.
+.Pick anything else for your own program. AIRLIFT., GAME., MAP. -- a prefix
+.costs nothing at runtime because BASLOAD crunches every identifier down to a
+.short BASIC variable, so a long readable name and a two-letter one compile
+.to exactly the same thing.
+.
+.Do not reuse a taken prefix for a name the module has not defined.
+.THEME.MINE looks free today; it is one library update away from not being.
+.
+=SEE ALSO
+.
+>3|2. Using it
+>41|4.2 STRINGS.INC.BL -- string helpers
+>40|4.1 THEME.INC.BL -- named colour roles
+>42|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>43|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>45|4.6 MENUVERT.INC.BL -- a vertical menu
+>44|4.5 BMX.INC.BL -- a BMX bitmap into VERA

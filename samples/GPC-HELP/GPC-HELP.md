@@ -26,6 +26,11 @@ python samples/GPC-HELP/MKHELP.PY
   - [3.2 Multi-way branch](#32-multi-way-branch)
   - [3.3 Machine code](#33-machine-code)
   - [3.4 Strings](#34-strings)
+  - [3.4.1 GP.INSTR -- position of a substring](#341-gpinstr----position-of-a-substring)
+  - [3.4.2 GP.CONTAINS -- test for a substring](#342-gpcontains----test-for-a-substring)
+  - [3.4.3 GP.ISEMPTY -- test for a zero-length string](#343-gpisempty----test-for-a-zero-length-string)
+  - [3.4.4 GP.COMP -- compare two strings, ignoring case](#344-gpcomp----compare-two-strings-ignoring-case)
+  - [3.4.5 GP.STRPTR -- address of a string block](#345-gpstrptr----address-of-a-string-block)
   - [3.5 Arrays](#35-arrays)
   - [3.6 Screen -- stash and restore](#36-screen----stash-and-restore)
   - [3.7 Screen -- drawing](#37-screen----drawing)
@@ -550,65 +555,129 @@ comment.
 
 ##### 3.4 Strings
 
-| Form | Does |
-|---|---|
-| `GP.INSTR(hay$, needle$ [,start])` | position of `needle$`, 1-based; **0 = not found**. `start` is where to begin |
-| `GP.CONTAINS(hay$, needle$)` | −1 if `needle$` occurs anywhere in `hay$`, 0 if not. **Composite** — see below |
-| `GP.ISEMPTY(a$)` | −1 if `a$` has zero length, 0 if not. **Composite** |
-| `GP.COMP(a$, b$)` | compare **ignoring case**: −1 before, 0 same, 1 after |
-| `GP.STRPTR(a$)` | address of the string's `[ActLen][Data]` block |
+Five keywords. `GP.INSTR` is the only string search GPC has; without it there is none.
 
-Trimming and case folding are in `STRCASE.INC.BL` (§4.8) rather than keywords: they would take 188
-bytes of the all-or-nothing GP block to serve one caller in the tree outside their own example.
-`GP.STRPTR` is a keyword because the module is built on it.
+Trimming, padding and case folding are modules, not keywords: `STRCASE.INC.BL` (§4.8) for case and
+trim in place, `STRINGS.INC.BL` (§4.2) for padding. They cost 188 bytes of p-code in the programs
+that `#INCLUDE` them and nothing in the GP block. `GP.STRPTR` is the keyword they are built on.
 
-`GP.INSTR` is the only string search GPC has; without it there is none.
+The in-place statements in `STRCASE.INC.BL` take a string variable, never a literal or an
+expression. The compiler rejects those. Case conversion leaves digits, punctuation and PETSCII
+graphics unchanged.
 
-`GP.CONTAINS` answers the same question without the position: `IF GP.CONTAINS(F$, ".BAS")`. It is
-case sensitive, comparing raw bytes as `GP.INSTR` does; use `GP.COMP` for a case-blind test. An
-empty needle returns 0, not −1, because `GP.INSTR` reports not-found for one.
-
-`GP.CONTAINS` is composite. The compiler expands it to `GP.INSTR(hay$, needle$) <> 0`, and the
-object is byte-for-byte identical to writing that out (verified by compiling both). Use whichever
-spelling reads better; there is no size difference.
-
-`GP.ISEMPTY(a$)` is `LEN(a$) = 0`. A string of spaces is not empty — apply `STRCASE.TRIM` first if
-that is the intent. It compiles to the same four bytes as `LEN(a$)=0`, and `IF a$=""` costs about
-the same (a literal points into the p-code, so the empty string allocates nothing). The three
-spellings do not differ in size.
-
-`GP.COMP` provides a case-blind equality test, `IF GP.COMP(A$,B$) = 0`, which `=` cannot do, and an
-ordering comparator. Length breaks a tie: `"abc"` sorts before `"ABCD"`.
-
-The in-place statements take a string variable, never a literal or an expression; the compiler
-rejects those. Case conversion leaves digits, punctuation and PETSCII graphics unchanged.
-
-There is no `GP.PAD`. Padding grows a string, and an in-place handler receives the string block and
-not the variable slot, so it cannot reallocate beyond the capacity the string was created with. Use
-`STR.PADR` / `PADL` / `PADC` (§4.2), which are BASIC assignments and do reallocate.
-
-###### `GP.STRPTR` and the address-splitting trap
-
-The address is that of `[ActLen][Data]`: the length byte is at the address, the first character at
-+1, and the block capacity at −2. With `GP.CALL`, machine code can fill a BASIC string in place and
-set its length, which stock BASIC cannot do.
-
-Split the address with `GP.LOBYTE` / `GP.HIBYTE`, not with `P AND 255`:
-
-```basic
-GP.CALL $A000, GP.LOBYTE(P), GP.HIBYTE(P)
-```
-
-`AND` is 16-bit signed and the string heap is above 32,767, so `P AND 255` raises `OUT OF RANGE`.
-The longhand `H = INT(P / 256) : L = P - H * 256` is correct and is what the keywords compile to.
-The same applies to `GP.ARRPTR` and to any VRAM address in the top eighth of memory.
+There is no `GP.PAD`. In-place statements cannot grow a string past the capacity it was created
+with. `STR.PADR` / `PADL` / `PADC` (§4.2) are BASIC assignments and do reallocate.
 
 Example: [`STRINGS.EXP.BL`](STRINGS.EXP.BL)
 
----
+
+*See also: 3.4.1 GP.INSTR -- position of a substring, 3.4.2 GP.CONTAINS -- test for a substring, 3.4.3 GP.ISEMPTY -- test for a zero-length string, 3.4.4 GP.COMP -- compare two strings, ignoring case, 3.4.5 GP.STRPTR -- address of a string block, 4.8 STRCASE.INC.BL -- case and trim, in place, 4.2 STRINGS.INC.BL -- string helpers*
+
+## 3.4.1 GP.INSTR -- position of a substring
+
+###### 3.4.1 `GP.INSTR` — position of a substring
+
+```entry
+  Syntax    GP.INSTR(hay$, needle$ [, start])
+  Returns   Position of needle$ in hay$, 1-based. 0 if not found.
+  Kind      ASM. Needs the GP block.
+  Notes     start is the position to begin at. Default 1.
+            Case sensitive. It compares raw bytes; §3.4.4 is the
+            case-blind test.
+            An empty needle$ returns 0.
+  Example
+```
+```basic
+            P = GP.INSTR(F$, ".BAS", 1)
+            IF P > 0 THEN PRINT "FOUND AT"; P
+```
 
 
-*See also: 4.8 STRCASE.INC.BL -- case and trim, in place, 4.2 STRINGS.INC.BL -- string helpers*
+*See also: 3.4.4 GP.COMP -- compare two strings, ignoring case*
+
+## 3.4.2 GP.CONTAINS -- test for a substring
+
+###### 3.4.2 `GP.CONTAINS` — test for a substring
+
+```entry
+  Syntax    GP.CONTAINS(hay$, needle$)
+  Returns   -1 if needle$ occurs anywhere in hay$, 0 if not.
+  Kind      COMPOSITE. Expands to GP.INSTR(hay$, needle$) <> 0, and
+            compiles to the same object. Use whichever reads better.
+  Notes     Case sensitive, as §3.4.1 is.
+            An empty needle$ returns 0, not -1, because GP.INSTR
+            reports not-found for one.
+  Example
+```
+```basic
+            IF GP.CONTAINS(F$, ".BAS") THEN GOSUB LOAD.IT
+```
+
+
+*See also: 3.4.1 GP.INSTR -- position of a substring*
+
+## 3.4.3 GP.ISEMPTY -- test for a zero-length string
+
+###### 3.4.3 `GP.ISEMPTY` — test for a zero-length string
+
+```entry
+  Syntax    GP.ISEMPTY(a$)
+  Returns   -1 if a$ has zero length, 0 if not.
+  Kind      COMPOSITE. Expands to LEN(a$) = 0.
+  Notes     A string of spaces is not empty. STRCASE.TRIM first if
+            that is the intent.
+            GP.ISEMPTY(a$), LEN(a$) = 0 and a$ = "" are the same four
+            bytes. Use whichever reads better.
+```
+
+
+## 3.4.4 GP.COMP -- compare two strings, ignoring case
+
+###### 3.4.4 `GP.COMP` — compare two strings, ignoring case
+
+```entry
+  Syntax    GP.COMP(a$, b$)
+  Returns   -1 if a$ sorts before b$, 0 the same, 1 after.
+  Kind      ASM. Needs the GP block.
+  Notes     Case is ignored. GP.COMP(A$, B$) = 0 is the case-blind
+            equality test that = cannot do, and the same call orders
+            a sort.
+            Length breaks a tie: "abc" sorts before "ABCD".
+  Example
+```
+```basic
+            IF GP.COMP(N$, "QUIT") = 0 THEN GOTO BYE
+```
+
+
+## 3.4.5 GP.STRPTR -- address of a string block
+
+###### 3.4.5 `GP.STRPTR` — address of a string block
+
+```entry
+  Syntax    GP.STRPTR(a$)
+  Returns   Address of the string's [ActLen][Data] block.
+  Kind      ASM. Needs the GP block.
+  Notes     The length byte is at the address, the first character at
+            +1, the block capacity at -2.
+            With GP.CALL, machine code can fill a string in place and
+            set its length. Stock BASIC cannot do that.
+  WARNING   Split the address with GP.LOBYTE / GP.HIBYTE (§3.3),
+            never with P AND 255. AND is 16-bit signed and the string
+            heap is above 32,767, so P AND 255 raises OUT OF RANGE.
+            The longhand H = INT(P / 256) : L = P - H * 256 is what
+            the keywords compile to. The same applies to §3.5
+            GP.ARRPTR and to any VRAM address in the top eighth of
+            memory.
+  Example
+```
+```basic
+            P = GP.STRPTR(A$)
+            GP.CALL $A000, GP.LOBYTE(P), GP.HIBYTE(P)
+```
+
+
+*See also: 3.3 Machine code, 3.5 Arrays*
 
 ## 3.5 Arrays
 
@@ -2045,15 +2114,7 @@ Each of these has cost a debugging session at least once.
 | `SCREEN` after `BMX.PAINT` | reloads the default palette and throws the image's colours away | set the mode first |
 | `STR.FIELD$` wanted bigger | auto-`DIM`ed at 0..10 on first use, and you cannot `DIM` it after | `DIM` it **before** the first call, set `STR.MAX` |
 | `#DEFINE X 129536` | `#DEFINE` takes an INT16 — `ERROR: INVALID PARAMETER` | an ordinary variable |
-
-Two notes on names. Inside BASL, 64 characters are significant, so `PANEL.COL` and `PANEL.ROW` are
-different variables and readable names cost nothing. The same source written as a raw `.bas` for the
-PC-side converter is back to two significant characters.
-
-Dotted names also avoid the keyword-collision trap. `MENUVERT.COUNT`, `THEME.CLR`, `LINEINPUT.LEN`
-and `LINEINPUT.RETURN` all contain reserved words and all work, because BASLOAD matches the whole
-identifier. Undotted names do not: `POS`, `MB`, `ST`, `LEN` and `CHAR` cannot be variables. That is
-why the library is dotted throughout.
+| a variable called `LEN`, `ST`, `POS`, `MB` or `CHAR` | the name is a reserved word on its own | dot it — BASLOAD matches the whole identifier, so `LINEINPUT.LEN` works |
 
 *See also: 4.7 SORT.INC.BL -- shell sort a string array*
 

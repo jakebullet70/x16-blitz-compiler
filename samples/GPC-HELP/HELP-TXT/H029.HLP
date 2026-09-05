@@ -1,68 +1,57 @@
-@4.8 STRCASE.INC.BL -- case and trim, in place
+@4.4 LINEINPUT.INC.BL -- a positioned entry field
 .
-=4.8 STRCASE.INC.BL -- CASE AND TRIM, IN PLACE
+=4.4 LINEINPUT.INC.BL -- A POSITIONED ENTRY FIELD
 .
 =DESCRIPTION
 .
-.  STRCASE.GO
-.      IN: STRCASE.PTR STRCASE.MODE
-.      OUT: (the string itself)
+.  LINEINPUT.GET
+.      IN: LINEINPUT.X .Y .LEN .ATTR .TEXT$ .MASK
+.      OUT: LINEINPUT.TEXT$ LINEINPUT.KEY
 .
-:#SYMFILE "@:MYPROG.SYM"
-:#INCLUDE "STRCASE.INC.BL"
-:
-:STRCASE.PTR = GP.STRPTR(LINE$)
-:STRCASE.MODE = STRCASE.RTRIM
-:GOSUB STRCASE.GO
+.  LINEINPUT.ASK
+.      IN: the same plus LINEINPUT.LABEL$
+.      OUT: the same; LINEINPUT.X restored
 .
-.  STRCASE.UPPER
-.      DOES: a-z -> A-Z, everything else untouched
+:LINEINPUT.X = 10 : LINEINPUT.Y = 6
+:LINEINPUT.LEN = 20
+:LINEINPUT.ATTR = THEME.CLR(THEME.TEXT)
+:LINEINPUT.TEXT$ = ""
+:GOSUB LINEINPUT.GET
+:IF LINEINPUT.KEY = 27 THEN GOTO CANCELLED
 .
-.  STRCASE.LOWER
-.      DOES: A-Z -> a-z, everything else untouched
+.INPUT and LINPUT cannot be used on a drawn screen: both take the bottom of
+.the screen, scroll it, echo in the current colour, and accept any length. A
+.LINEINPUT field stays at the given position, in the given colour, and stops
+.at the given width.
 .
-.  STRCASE.TRIM
-.      DOES: spaces off both ends
+.LINEINPUT.KEY is the key that ended the field, which is what makes a
+.multi-field form possible:
 .
-.  STRCASE.LTRIM
-.      DOES: spaces off the leading end
+.  13
+.      RETURN -- finished
 .
-.  STRCASE.RTRIM
-.      DOES: spaces off the trailing end
+.  27 / 3
+.      ESC / STOP -- cancelled, and LINEINPUT.TEXT$ is put back to what it
+.        was
 .
-.One blob, with the mode tested once at entry rather than inside the loop,
-.where the byte count is the whole cost.
+.  17 / 145 / 9
+.      cursor down / up / TAB -- left the field, text kept
 .
-.The argument is an address because a BASL subroutine cannot be passed a
-.variable. Copying the caller's string in and back out would be two
-.allocations and two copies per call -- the heap traffic this module exists
-.to avoid. GP.STRPTR gives the block and the assembly rewrites it in place.
+.A form is therefore a loop over fields rather than a sequence of prompts,
+.and the user can return to an earlier field without restarting.
 .
-.Do not pass a literal. GP.STRPTR("hello") is the address of that text inside
-.the p-code, so upper-casing it edits the running program, and the edit
-.persists the next time the line runs. The equivalent keywords could not be
-.misused this way, because the compiler required a string variable at the
-.call site; a GOSUB cannot enforce that.
+.LINEINPUT.MASK non-zero displays asterisks while holding the real string.
+.The field does not scroll: when it is full, further characters are refused
+.and the cursor inverts the last character rather than sitting past the end.
+.The cursor blinks off TI rather than a delay loop; a delay loop would
+.swallow keys pressed during it.
 .
-.STRCASE.MODE is sticky: an ordinary variable, not an argument, so a call
-.that does not set it repeats the last operation. Set both inputs every time,
-.as with SORT.DESCEND and STASH.MOVE.
-.
-.There is no pad routine here. Padding grows a string, and nothing working on
-.the block alone can grow one past the capacity it was created with. Use
-.STR.PADR (SEC 4.2).
-.
-.Example: STRINGS.EXP.BL. Regression test: STRCTST.EXP.BL, twenty cases --
-.empty, all spaces, a single space, one character, a single leading space
-.(the boundary in the slide), 200 characters, and guard strings either side
-.to catch an off-by-one write into the neighbouring block.
+.Example: FORM.EXP.BL -- three fields, one masked, in a themed panel.
 .
 =EXAMPLE PROGRAM
 .
-.  STRINGS.EXP.BL -- runnable, in the GPC-BASIC folder
-.  STRCTST.EXP.BL -- runnable, in the GPC-BASIC folder
+.  FORM.EXP.BL -- runnable, in the GPC-BASIC folder
 .
 =SEE ALSO
 .
->37|4.2 STRINGS.INC.BL -- string helpers
->45|4.8 STRCASE.INC.BL -- case and trim, in place
+>43|4.4 LINEINPUT.INC.BL -- a positioned entry field

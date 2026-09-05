@@ -1,109 +1,92 @@
-@GUI.INC.BL -- four dialogs, in a box that puts the screen back.
+@4.5 BMX.INC.BL -- a BMX bitmap into VERA
 .
-=GUI.INC.BL
+=4.5 BMX.INC.BL -- A BMX BITMAP INTO VERA
 .
-.  four dialogs, in a box that puts the screen back.
+=DESCRIPTION
 .
-=MODULE HEADER
+.  BMX.OPEN
+.      IN: BMX.FILE$
+.      OUT: BMX.ERROR$, and the header -- BMX.WIDTH .HEIGHT .DEPTH .VERSION
+.        .PALUSED .PALFIRST .DATAOFF .PACKED
 .
-:      GUI.SAY     something to say, and one way out
-:      GUI.YN      a question, and a Y or N answer
-:      GUI.MENU    a question, and a row chosen from a list
-:      GUI.TEXT    a question, and a line of typed text
+.  BMX.PAINT
+.      IN: an open file
+.      OUT: palette and pixels in VRAM, file closed
 .
-.  What they share is the BOX: measure it against the text, centre it, save
-.  what it covers, draw a frame, give the pixels back on the way out. That is
-.  GUI.OPEN and GUI.CLOSE, and the three entry points are thin. GUI.MENU is
-.  MENUVERT.RUN inside a frame and GUI.TEXT is LINEINPUT.GET inside one, so
-.  only GUI.YN -- four keys -- reads the keyboard itself.
+.  BMX.SHOW
+.      IN: BMX.FILE$
+.      OUT: both of the above
 .
-.  REQUIRES, and does not #INCLUDE for you, in this order:
-:      GPB.INC.BL        GP.BOX, GP.FILL, GP.PRINTAT, GP.CALL
-:      STASH.INC.BL      saves the cells the box covers -- and wants a
-:                        #SYMFILE in your program, see its own header
-:      THEME.INC.BL      the colour roles, and GOSUB THEME.LOAD first
-:      MENUVERT.INC.BL   drawn on by GUI.MENU
-:      LINEINPUT.INC.BL  drawn on by GUI.TEXT
+.  BMX.CLOSE
+.      IN: --
+.      OUT: abandons a file opened by BMX.OPEN
 .
-=BOTH ARE REQUIRED EVEN IF YOU ONLY CALL GUI.YN
+.  BMX.RESTORE
+.      IN: --
+.      OUT: puts the machine's own palette back
 .
-.  BASLOAD resolves every label in the file, not the ones a path reaches, so
-.  leaving either out stops BASLOAD with LABEL NOT FOUND rather than
-.  compiling a smaller program.
+.BMX.ERROR$ empty means it worked.
 .
-.  Usage, the whole of it:
-:      THEME.DARK = 0 : GOSUB THEME.LOAD
-:      GUI.BANK = 8
-:      GUI.MSG$ = "Delete the file?"
-:      GOSUB GUI.YN
-:      IF GUI.ANSWER = 1 THEN <yes>
+:BMX.FILE$ = "TITLE.BMX"
+:SCREEN 128
+:GOSUB BMX.SHOW
+:IF BMX.ERROR$ <> "" THEN PRINT BMX.ERROR$
 .
-:   in   GUI.MSG$        the question. "" for none
-:        GUI.MSG2$       a second line, for detail that does not fit. "" for
-:                        none, and then there is no gap
-:        GUI.TITLE$      a name in the top edge of the frame. "" for none
-:        GUI.BANK        a spare RAM bank to save the covered cells in.
-:                        0 MEANS DO NOT SAVE, and then the box is still on
-:                        the screen when the call returns
-:        GUI.STYLE       0, the default, draws the single line box. 1 to 5
-:                        are GP.BOX's other styles
-:        GUI.PANEL.IN    the panel: the box's background AND the colour the
-:                        message lines are written in. 0 takes THEME.TEXT
-:        GUI.BORDER.IN   the frame's attribute. 0 takes THEME.BORDER
-:        GUI.GLYPH       non-zero frames the box from six glyphs of the
-:                        CALLER'S, and GUI.STYLE is then not consulted.
-:                        They are TILE INDICES: GUI.FRAME hands them to
-:                        GP.BOX as a custom set, which does not convert
-:                            GUI.EDGE.H      the horizontal run
-:                            GUI.EDGE.V      the vertical run
-:                            GUI.CORNER.TL   .TR  .BL  .BR
-:        GUI.PLACE       0 centres the box. Non-zero uses GUI.X, GUI.Y
-:        GUI.X  GUI.Y    top left, when GUI.PLACE says so
-:        GUI.ROW.OFFSET  added to the row the box lands on, however it was
-:                        placed. 0 for almost everybody -- see below
+.Use the long form to read the size before committing to a screen mode, or to
+.report a bad file before the display is torn down:
 .
-:   out  GUI.KEY         the key that ended it, whichever call
-:        GUI.LEFT GUI.TOP GUI.WIDTH GUI.HEIGHT   where the box went, and
-:                        how big it turned out
+:BMX.FILE$ = F$
+:GOSUB BMX.OPEN
+:IF BMX.ERROR$ <> "" THEN GOTO COMPLAIN
+:' ... BMX.WIDTH, BMX.HEIGHT, BMX.PALUSED readable here ...
+:SCREEN 128
+:GOSUB BMX.PAINT
 .
-=GUI.ROW.OFFSET IS FOR HARDWARE SCROLLING
+.Set the screen mode before BMX.PAINT, not after. SCREEN reloads the default
+.palette, so a mode change after painting discards the image's colours:
+.correct pixels, wrong palette.
 .
-.  The GP commands address the text MAP, and VERA's L1_VSCROLL decides which
-.  map row shows as screen row 0. A caller scrolling that way sets
-.  GUI.ROW.OFFSET to VSCROLL/8 and is centred against what the user can see.
-.  Everyone else leaves it 0.
+.BMX.PAINT writes the image's colours over the machine's palette, and nothing
+.on the X16 restores them -- not SCREEN, not the KERNAL's screen_mode.
+.BMX.PAINT therefore stashes all 256 entries in spare VRAM first, and
+.BMX.RESTORE writes them back:
 .
-=UPPER CASE, ON THE DEFAULT CHARSET
+:BMX.FILE$ = "TITLE.BMX"
+:SCREEN 128
+:GOSUB BMX.SHOW
+:' ... the title screen ...
+:GOSUB BMX.RESTORE
 .
-.  GP.PRINTAT converts PETSCII and BASLOAD passes literals through as source
-.  bytes, so on charset 2 ASCII lower case lands on the graphics half of the
-.  font -- "Confirm" measured as tiles 3, 79, 78, 70, 73, 82, 77. ISO mode
-.  fixes the text and breaks the frame, GP.BOX's $40-$7D being letters in
-.  that order: so it is upper case with a frame, or mixed case without one,
-.  unless the caller re-orders the font and says where the glyphs went with
-.  GUI.GLYPH. That is what samples/editor does, and the whole reason the
-.  frame is overridable.
+.A program that keeps the machine need never call it. A program that returns
+.the machine to BASIC or chains to another calls it once. It is safe to call
+.at any time: with nothing stashed there is nothing to do, so a program whose
+.image failed to load can still call it on the way out. All 256 entries are
+.kept, not the range the file claims, and they are kept once per run -- so a
+.slideshow restores the machine's own palette rather than the previous
+.image's.
 .
-=A BOX OVER 4094 CELLS WILL NOT FIT ONE BANK
+.BMX.STASH is the VRAM address they go to, $13000 by default, which is free
+.above the 320x240 framebuffer in the mode this module paints into. A caller
+.using tiles, sprites or a second bitmap there must move it or switch it off
+.with BMX.STASH = -1. The address is checked: a stash inside the bitmap or
+.overlapping the PSG registers is reported and nothing is painted.
 .
-.  and that is not an error: the save is skipped, the dialog still runs, and
-.  GUI.STASHED comes back 0 so the caller knows it must repaint. Same when
-.  GUI.BANK is 0.
+.Use -1 to switch it off, not 0. Zero is what the variable holds before it is
+.set, and BMX.INIT runs at the first BMX.OPEN, after a caller would have set
+.it, so 0 has to keep meaning unset.
 .
-.  .IN IS "WHAT THE CALLER ASKED FOR" -- GUI.PANEL and GUI.BORDER are what
-.  GUI.OPEN settled on, and those are what everything downstream draws with.
-.  Both requests are 0-means-default: attribute 0 is black on black, legal
-.  and no use to anybody, so it is free to spend as "I did not choose".
+.The module handles 8 bits per pixel, uncompressed, which is what SCREEN 128
+.displays without a decompressor. Anything else is reported rather than
+.attempted. The image is centred, and anything larger than 320x240 is
+.clipped.
 .
-.  The whole GUI. name space belongs to this file, except GUI.LISTBOX., which
-.  is GUI2.INC.BL -- a listbox is a GUI dialog and reads like one, but it is
-.  the only one that scrolls and the only one that marks, so it is its own
-.  #INCLUDE and you pay for it only when you want it.
+.Examples: BMXVIEW.EXP.BL, and BMXPAL.EXP.BL for the palette
+.
+=EXAMPLE PROGRAM
+.
+.  BMXVIEW.EXP.BL -- runnable, in the GPC-BASIC folder
+.  BMXPAL.EXP.BL -- runnable, in the GPC-BASIC folder
 .
 =SEE ALSO
 .
->65|STASH.INC.BL -- save a text rectangle, and put it back.
->36|4.1 THEME.INC.BL -- named colour roles
->41|4.6 MENUVERT.INC.BL -- a vertical menu
->39|4.4 LINEINPUT.INC.BL -- a positioned entry field
->52|GUI2.INC.BL -- a listbox, single or multi select.
+>44|4.5 BMX.INC.BL -- a BMX bitmap into VERA

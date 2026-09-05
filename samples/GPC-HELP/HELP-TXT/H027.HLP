@@ -1,41 +1,81 @@
-@4.6 MENUVERT.INC.BL -- a vertical menu (2)
-.The caller owns the DIM. A module cannot be passed an array in BASIC, so it
-.names one; DIMming it inside the module would fix a bound and then fail for
-.a caller who wanted more rows. Leave MENUVERT.ITEM$ undimensioned and GPC's
-.implicit DIM gives 0..10, a ten-row menu. DIM it yourself for more. Do not
-.do both.
+@4.2 STRINGS.INC.BL -- string helpers
 .
-=The gamepad flag
+=4.2 STRINGS.INC.BL -- STRING HELPERS
 .
-.With flag 8, up and down move the highlight and B or Start chooses. Cancel
-.remains keyboard-only: ESC and STOP have no unambiguous pad equivalent, and
-.a must-select menu has no cancel.
+=WHAT IT COSTS
 .
-.It reads port 1, the physical pad, not port 0. Port 0 is the keyboard
-.presented as a joystick, and the menu reads the keyboard directly, so
-.reading both would move the highlight twice for one cursor key. Port 0 is
-.also unreliable, reporting absent on roughly half of all reads (measured in
-.AlienAirlift: 2,060 negative against 2,057 valid over 14 seconds).
+.  ASM: GP.INSTR GP.STRPTR GP.COMP
+.    ASM -- a keyword, run by machine code in the GP runtime block. A program
+.    using ANY GP keyword pays for the whole block.
+.  COMPOSITE: GP.CONTAINS GP.ISEMPTY
+.    COMPOSITE -- a keyword with no machine code of its own. The compiler
+.    expands it into keywords that already exist, so it costs the runtime
+.    nothing at all.
+.    BASIC -- a .INC.BL module of ordinary BASL, called with GOSUB. Costs
+.    nothing unless you #INCLUDE it.
 .
-.One step per press, no auto-repeat. The wait loop spins as fast as the CPU
-.allows, so the pad is edge-triggered and holding a direction moves once. A
-.button still held from whatever opened the menu is not read as a fresh press
-.either, so a menu cannot answer itself on the way in.
+=DESCRIPTION
 .
-.With no pad connected the flag changes nothing: the pad is read only when
-.the keyboard is quiet, and an absent pad reads as nothing held. In the
-.emulator a real pad needs -joy1, which binds physical hardware and does not
-.map the keyboard.
+.  STR.PADR
+.      IN: STR.STR$ STR.WIDTH
+.      OUT: STR.STR$ left-justified
 .
-.Examples: MENUDEMO.EXP.BL on its own, MENU.EXP.BL inside a whole small
-.application, and MENUTST.EXP.BL for the 21-case regression test.
+.  STR.PADL
+.      IN: same
+.      OUT: right-justified
+.
+.  STR.PADC
+.      IN: same
+.      OUT: centred (odd gap goes right)
+.
+.  STR.SPLIT
+.      IN: STR.STR$ STR.DELIM$ STR.MAX
+.      OUT: STR.N, STR.FIELD$(1..N)
+.
+.  STR.REPLACE
+.      IN: STR.STR$ STR.FIND$ STR.REPL$
+.      OUT: STR.STR$, every occurrence replaced
+.
+.  STR.PET2SCR
+.      IN: STR.PET
+.      OUT: STR.SCR
+.
+.The three pad routines leave a string that is already at or past the width
+.unchanged. They pad and never truncate; use STRCASE.RTRIM (SEC 4.8) to
+.shorten.
+.
+.SPLIT reads STR.STR$ without modifying it. STR.MAX of 0 means 10. Empty
+.fields are preserved: "A,,C" is three fields and "A," is two. Splitting an
+.empty string gives one empty field, never zero. Reaching the limit is not an
+.error and loses nothing -- the last field receives the unsplit remainder,
+.delimiters included.
+.
+.STR.FIELD$ is the one array the library does not DIM. Left alone, GPC's
+.implicit DIM gives 0..10. For more, DIM it before the first call and set
+.STR.MAX to match. DIMming an array GPC has already auto-dimensioned is an
+.error, so it is one or the other. Note that this is the reverse of
+.THEME.CLR, which the module DIMs.
+.
+.REPLACE swaps every occurrence of STR.FIND$ for STR.REPL$, modifying
+.STR.STR$ in place. The replacement may be shorter, longer, or "" to delete.
+.It is case sensitive, because GP.INSTR compares raw bytes.
+.
+.A replacement that contains the search text is safe: "A" to "AA" terminates
+.and doubles the As, where a naive in-place version would not. The routine
+.builds a new string and never re-scans what it has emitted. An empty
+.STR.FIND$ leaves the string unchanged rather than hanging, because GP.INSTR
+.reports not-found for a zero-length needle. Like the pad routines it is not
+.length checked: a longer replacement can push the result past 255
+.characters.
+.
+.PET2SCR converts a PETSCII code to the screen code the tile map holds, for
+.TILE, TDATA and VPOKE. GP.PRINTAT and GP.FILL do this internally.
 .
 =EXAMPLE PROGRAM
 .
-.  MENUDEMO.EXP.BL -- runnable, in the GPC-BASIC folder
-.  MENU.EXP.BL -- runnable, in the GPC-BASIC folder
-.  MENUTST.EXP.BL -- runnable, in the GPC-BASIC folder
+.  SPLITT.EXP.BL -- runnable, in the GPC-BASIC folder
 .
 =SEE ALSO
 .
->41|4.6 MENUVERT.INC.BL -- a vertical menu
+>49|4.8 STRCASE.INC.BL -- case and trim, in place
+>41|4.2 STRINGS.INC.BL -- string helpers

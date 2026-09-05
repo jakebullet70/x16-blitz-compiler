@@ -101,15 +101,15 @@
 .
 =SEE ALSO
 .
->35|4. Module reference -- the BASL library
->27|3.8 Block IF
->28|3.9 Inline assembly
+>39|4. Module reference -- the BASL library
+>31|3.8 Block IF
+>32|3.9 Inline assembly
 >21|3.4 Strings
 >19|3.3 Machine code
->36|4.1 THEME.INC.BL -- named colour roles
->37|4.2 STRINGS.INC.BL -- string helpers
->38|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
->39|4.4 LINEINPUT.INC.BL -- a positioned entry field
->40|4.5 BMX.INC.BL -- a BMX bitmap into VERA
->41|4.6 MENUVERT.INC.BL -- a vertical menu
+>40|4.1 THEME.INC.BL -- named colour roles
+>41|4.2 STRINGS.INC.BL -- string helpers
+>42|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>43|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>44|4.5 BMX.INC.BL -- a BMX bitmap into VERA
+>45|4.6 MENUVERT.INC.BL -- a vertical menu
 >2|1. What GP.BASIC is

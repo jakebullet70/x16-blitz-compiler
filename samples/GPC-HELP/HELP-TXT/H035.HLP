@@ -1,69 +1,109 @@
-@5. Variables
+@GUI.INC.BL -- four dialogs, in a box that puts the screen back.
 .
-=5. VARIABLES
+=GUI.INC.BL
 .
-.BASL has one flat namespace. There are no locals, no scoping and no
-.parameters. Every variable in every #INCLUDEd module is visible to your
-.program and the reverse, and nothing warns you: a collision is a wrong
-.answer, not an error.
+.  four dialogs, in a box that puts the screen back.
 .
-.The convention is one dotted prefix per module, and nothing writes outside
-.its own prefix.
+=MODULE HEADER
 .
-=Prefixes already taken
+:      GUI.SAY     something to say, and one way out
+:      GUI.YN      a question, and a Y or N answer
+:      GUI.MENU    a question, and a row chosen from a list
+:      GUI.TEXT    a question, and a line of typed text
 .
-.  GP.
-.      OWNER: keywords, not variables -- see below
+.  What they share is the BOX: measure it against the text, centre it, save
+.  what it covers, draw a frame, give the pixels back on the way out. That is
+.  GUI.OPEN and GUI.CLOSE, and the three entry points are thin. GUI.MENU is
+.  MENUVERT.RUN inside a frame and GUI.TEXT is LINEINPUT.GET inside one, so
+.  only GUI.YN -- four keys -- reads the keyboard itself.
 .
-.  STR.
-.      OWNER: STRINGS.INC.BL
+.  REQUIRES, and does not #INCLUDE for you, in this order:
+:      GPB.INC.BL        GP.BOX, GP.FILL, GP.PRINTAT, GP.CALL
+:      STASH.INC.BL      saves the cells the box covers -- and wants a
+:                        #SYMFILE in your program, see its own header
+:      THEME.INC.BL      the colour roles, and GOSUB THEME.LOAD first
+:      MENUVERT.INC.BL   drawn on by GUI.MENU
+:      LINEINPUT.INC.BL  drawn on by GUI.TEXT
 .
-.  THEME.
-.      OWNER: THEME.INC.BL
+=BOTH ARE REQUIRED EVEN IF YOU ONLY CALL GUI.YN
 .
-.  APPSYS.
-.      OWNER: APPSYS.INC.BL
+.  BASLOAD resolves every label in the file, not the ones a path reaches, so
+.  leaving either out stops BASLOAD with LABEL NOT FOUND rather than
+.  compiling a smaller program.
 .
-.  LINEINPUT.
-.      OWNER: LINEINPUT.INC.BL
+.  Usage, the whole of it:
+:      THEME.DARK = 0 : GOSUB THEME.LOAD
+:      GUI.BANK = 8
+:      GUI.MSG$ = "Delete the file?"
+:      GOSUB GUI.YN
+:      IF GUI.ANSWER = 1 THEN <yes>
 .
-.  MENUVERT.
-.      OWNER: MENUVERT.INC.BL
+:   in   GUI.MSG$        the question. "" for none
+:        GUI.MSG2$       a second line, for detail that does not fit. "" for
+:                        none, and then there is no gap
+:        GUI.TITLE$      a name in the top edge of the frame. "" for none
+:        GUI.BANK        a spare RAM bank to save the covered cells in.
+:                        0 MEANS DO NOT SAVE, and then the box is still on
+:                        the screen when the call returns
+:        GUI.STYLE       0, the default, draws the single line box. 1 to 5
+:                        are GP.BOX's other styles
+:        GUI.PANEL.IN    the panel: the box's background AND the colour the
+:                        message lines are written in. 0 takes THEME.TEXT
+:        GUI.BORDER.IN   the frame's attribute. 0 takes THEME.BORDER
+:        GUI.GLYPH       non-zero frames the box from six glyphs of the
+:                        CALLER'S, and GUI.STYLE is then not consulted.
+:                        They are TILE INDICES: GUI.FRAME hands them to
+:                        GP.BOX as a custom set, which does not convert
+:                            GUI.EDGE.H      the horizontal run
+:                            GUI.EDGE.V      the vertical run
+:                            GUI.CORNER.TL   .TR  .BL  .BR
+:        GUI.PLACE       0 centres the box. Non-zero uses GUI.X, GUI.Y
+:        GUI.X  GUI.Y    top left, when GUI.PLACE says so
+:        GUI.ROW.OFFSET  added to the row the box lands on, however it was
+:                        placed. 0 for almost everybody -- see below
 .
-.  BMX. / BMXK.
-.      OWNER: BMX.INC.BL (variables / its KERNAL constants)
+:   out  GUI.KEY         the key that ended it, whichever call
+:        GUI.LEFT GUI.TOP GUI.WIDTH GUI.HEIGHT   where the box went, and
+:                        how big it turned out
 .
-.Use any other prefix for your own program: GAME., MAP., AIRLIFT.. A prefix
-.costs nothing at runtime -- BASLOAD crunches every identifier to a short
-.BASIC variable, so a long readable name and a two-letter one compile to the
-.same thing.
+=GUI.ROW.OFFSET IS FOR HARDWARE SCROLLING
 .
-.Do not reuse a taken prefix for a name the module has not defined.
-.THEME.MINE is free today and is one library update from not being.
+.  The GP commands address the text MAP, and VERA's L1_VSCROLL decides which
+.  map row shows as screen row 0. A caller scrolling that way sets
+.  GUI.ROW.OFFSET to VSCROLL/8 and is centred against what the user can see.
+.  Everyone else leaves it 0.
 .
-=GP.* is keywords, not variables
+=UPPER CASE, ON THE DEFAULT CHARSET
 .
-.GPB.INC.BL defines no variables. It is 27 keyword declarations and nothing
-.else.
+.  GP.PRINTAT converts PETSCII and BASLOAD passes literals through as source
+.  bytes, so on charset 2 ASCII lower case lands on the graphics half of the
+.  font -- "Confirm" measured as tiles 3, 79, 78, 70, 73, 82, 77. ISO mode
+.  fixes the text and breaks the frame, GP.BOX's $40-$7D being letters in
+.  that order: so it is upper case with a frame, or mixed case without one,
+.  unless the caller re-orders the font and says where the glyphs went with
+.  GUI.GLYPH. That is what samples/editor does, and the whole reason the
+.  frame is overridable.
 .
-:GP.A = 5          ' SYNTAX ERROR -- GP.A is a keyword
-:X = GP.A          ' correct
+=A BOX OVER 4094 CELLS WILL NOT FIT ONE BANK
 .
-.The value words are GP.A GP.X GP.Y GP.C, the registers after GP.CALL, and
-.that is all of them. They are keywords rather than variables because nothing
-.in the runtime can write a BASIC variable by name, so a command that returns
-.a value must return it through a keyword. X16's own ST, MX and MY work the
-.same way.
+.  and that is not an error: the save is skipped, the dialog still runs, and
+.  GUI.STASHED comes back 0 so the caller knows it must repaint. Same when
+.  GUI.BANK is 0.
 .
-.The complete per-module in / out / internal register is GP-BASIC.GLOBALS.md,
-.with a script in SEC 6 of that file for re-checking it after a change.
+.  .IN IS "WHAT THE CALLER ASKED FOR" -- GUI.PANEL and GUI.BORDER are what
+.  GUI.OPEN settled on, and those are what everything downstream draws with.
+.  Both requests are 0-means-default: attribute 0 is black on black, legal
+.  and no use to anybody, so it is free to spend as "I did not choose".
+.
+.  The whole GUI. name space belongs to this file, except GUI.LISTBOX., which
+.  is GUI2.INC.BL -- a listbox is a GUI dialog and reads like one, but it is
+.  the only one that scrolls and the only one that marks, so it is its own
+.  #INCLUDE and you pay for it only when you want it.
 .
 =SEE ALSO
 .
->95|6. The traps, collected
->37|4.2 STRINGS.INC.BL -- string helpers
->36|4.1 THEME.INC.BL -- named colour roles
->38|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
->39|4.4 LINEINPUT.INC.BL -- a positioned entry field
->41|4.6 MENUVERT.INC.BL -- a vertical menu
->40|4.5 BMX.INC.BL -- a BMX bitmap into VERA
+>69|STASH.INC.BL -- save a text rectangle, and put it back.
+>40|4.1 THEME.INC.BL -- named colour roles
+>45|4.6 MENUVERT.INC.BL -- a vertical menu
+>43|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>56|GUI2.INC.BL -- a listbox, single or multi select.

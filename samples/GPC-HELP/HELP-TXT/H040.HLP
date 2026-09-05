@@ -1,29 +1,69 @@
-@4. Labels are global too
+@5. Variables
 .
-=4. LABELS ARE GLOBAL TOO
+=5. VARIABLES
 .
-.Every NAME: in every module is a jump target in one flat space, including
-.the ones you were never meant to call. BMX.STREAM.MORE, LINEINPUT.REDRAW,
-.THEME.LOAD.DARK and most of MENUVERT.* are internal, and a GOSUB to one will
-.do something, just not something useful.
+.BASL has one flat namespace. There are no locals, no scoping and no
+.parameters. Every variable in every #INCLUDEd module is visible to your
+.program and the reverse, and nothing warns you: a collision is a wrong
+.answer, not an error.
 .
-.MENUVERT is the module with the most of them, because driving a menu is
-.mostly branching: MENUVERT.RUN, MENUVERT.DRAW, MENUVERT.ROW and
-.MENUVERT.HOTFIND are the four you may call. MENUVERT.WAIT, .KEYED, .SETTLE,
-..WRAPTOP, .WRAPBOT, .CANCEL, .HOTKEY, .PADKEY, .PADREAD and the three FOLD
-.helpers are not.
+.The convention is one dotted prefix per module, and nothing writes outside
+.its own prefix.
 .
-.STRINGS has two of its own, both loop continuations rather than entry
-.points: STR.SPLIT.NEXT and STR.REPLACE.NEXT. Enter either one directly and
-.you resume a loop whose accumulators were never initialised. The callable
-.names are STR.PADR, PADL, PADC, SPLIT, REPLACE and PET2SCR.
+=Prefixes already taken
 .
-.Each module also has a skip label it jumps over itself with -- THEME.SKIP,
-.APPSYS.SKIP, STR.SKIP, BMX.MODULE.END, LINEINPUT.MODULE.END,
-.MENUVERT.MODULE.END. Those exist so an include can sit anywhere in the file,
-.the top included. Do not branch to one.
+.  GP.
+.      OWNER: keywords, not variables -- see below
 .
-.BASLOAD refuses a name used as both a label and a variable (BASLOAD.MD:319).
-.BMX.SKIP is the byte-skip counter, so the module's skip label had to be
-.BMX.MODULE.END -- a name is either a label or a variable, never both.
+.  STR.
+.      OWNER: STRINGS.INC.BL
 .
+.  THEME.
+.      OWNER: THEME.INC.BL
+.
+.  APPSYS.
+.      OWNER: APPSYS.INC.BL
+.
+.  LINEINPUT.
+.      OWNER: LINEINPUT.INC.BL
+.
+.  MENUVERT.
+.      OWNER: MENUVERT.INC.BL
+.
+.  BMX. / BMXK.
+.      OWNER: BMX.INC.BL (variables / its KERNAL constants)
+.
+.Use any other prefix for your own program: GAME., MAP., AIRLIFT.. A prefix
+.costs nothing at runtime -- BASLOAD crunches every identifier to a short
+.BASIC variable, so a long readable name and a two-letter one compile to the
+.same thing.
+.
+.Do not reuse a taken prefix for a name the module has not defined.
+.THEME.MINE is free today and is one library update from not being.
+.
+=GP.* is keywords, not variables
+.
+.GPB.INC.BL defines no variables. It is 27 keyword declarations and nothing
+.else.
+.
+:GP.A = 5          ' SYNTAX ERROR -- GP.A is a keyword
+:X = GP.A          ' correct
+.
+.The value words are GP.A GP.X GP.Y GP.C, the registers after GP.CALL, and
+.that is all of them. They are keywords rather than variables because nothing
+.in the runtime can write a BASIC variable by name, so a command that returns
+.a value must return it through a keyword. X16's own ST, MX and MY work the
+.same way.
+.
+.The complete per-module in / out / internal register is GP-BASIC.GLOBALS.md,
+.with a script in SEC 6 of that file for re-checking it after a change.
+.
+=SEE ALSO
+.
+>99|6. The traps, collected
+>41|4.2 STRINGS.INC.BL -- string helpers
+>40|4.1 THEME.INC.BL -- named colour roles
+>42|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>43|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>45|4.6 MENUVERT.INC.BL -- a vertical menu
+>44|4.5 BMX.INC.BL -- a BMX bitmap into VERA

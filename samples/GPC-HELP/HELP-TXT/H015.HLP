@@ -1,37 +1,18 @@
-@3.6 Screen -- stash and restore
+@3.4.2 GP.CONTAINS -- test for a substring
 .
-=3.6 SCREEN -- STASH AND RESTORE
+=3.4.2 GP.CONTAINS
 .
-=WHAT IT COSTS
+.  Syntax    GP.CONTAINS(hay$, needle$)
+.  Returns   -1 if needle$ occurs anywhere in hay$, 0 if not.
+.  Kind      COMPOSITE. Expands to GP.INSTR(hay$, needle$) <> 0, and
+.            compiles to the same object. Use whichever reads better.
+.  Notes     Case sensitive, as SEC 3.4.1 is.
+.            An empty needle$ returns 0, not -1, because GP.INSTR
+.            reports not-found for one.
+.  Example
 .
-.  ASM: GP.BOX GP.FILL GP.PRINTAT
-.    ASM -- a keyword, run by machine code in the GP runtime block. A program
-.    using ANY GP keyword pays for the whole block.
-.  COMPOSITE: GP.CHAR GP.PRINTAT GP.FILL
-.    COMPOSITE -- a keyword with no machine code of its own. The compiler
-.    expands it into keywords that already exist, so it costs the runtime
-.    nothing at all.
-.
-=DESCRIPTION
-.
-.Stashing a rectangle is STASH.INC.BL, written in GP.ASM, rather than a
-.keyword. It writes a 4-byte self-describing header and holds at most 4,094
-.cells: a bank is 8K and a cell is two bytes, so a full 80x60 screen at 9,600
-.bytes does not fit. As keywords it would take 329 bytes of the
-.all-or-nothing GP block in every program, stashing or not.
-.
-:#SYMFILE "@:MYPROG.SYM"
-:#INCLUDE "STASH.INC.BL"
-:STASH.BANK = 8 : STASH.X = 10 : STASH.Y = 4 : STASH.W = 30 : STASH.H = 8
-:GOSUB STASH.SAVE
-:...
-:GOSUB STASH.RESTORE
-.
-.STASHFILE.INC.BL is the same rectangle through a file. It is a separate
-.module because BASL has no dead code elimination: everything a module holds
-.is compiled into every program that includes it, called or not.
+:            IF GP.CONTAINS(F$, ".BAS") THEN GOSUB LOAD.IT
 .
 =SEE ALSO
 .
->65|STASH.INC.BL -- save a text rectangle, and put it back.
->73|STASHFILE.INC.BL -- a saved text rectangle, through a file.
+>22|3.4.1 GP.INSTR -- position of a substring

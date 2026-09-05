@@ -1,119 +1,27 @@
-@3.9 Inline assembly
+@3.4.5 GP.STRPTR -- address of a string block
 .
-=3.9 INLINE ASSEMBLY
+=3.4.5 GP.STRPTR
 .
-=SYNTAX
+.  Syntax    GP.STRPTR(a$)
+.  Returns   Address of the string's [ActLen][Data] block.
+.  Kind      ASM. Needs the GP block.
+.  Notes     The length byte is at the address, the first character at
+.            +1, the block capacity at -2.
+.            With GP.CALL, machine code can fill a string in place and
+.            set its length. Stock BASIC cannot do that.
+.  WARNING   Split the address with GP.LOBYTE / GP.HIBYTE (SEC 3.3),
+.            never with P AND 255. AND is 16-bit signed and the string
+.            heap is above 32,767, so P AND 255 raises OUT OF RANGE.
+.            The longhand H = INT(P / 256) : L = P - H * 256 is what
+.            the keywords compile to. The same applies to SEC 3.5
+.            GP.ARRPTR and to any VRAM address in the top eighth of
+.            memory.
+.  Example
 .
-:GP.ASM
-:REM <instruction>
-:...
-:GP.ENDASM
+:            P = GP.STRPTR(A$)
+:            GP.CALL $A000, GP.LOBYTE(P), GP.HIBYTE(P)
 .
-=WHAT IT COSTS
+=SEE ALSO
 .
-.  COMPOSITE: GP.ASM GP.ENDASM
-.    COMPOSITE -- a keyword with no machine code of its own. The compiler
-.    expands it into keywords that already exist, so it costs the runtime
-.    nothing at all.
-.
-=DESCRIPTION
-.
-.65C02 assembly, assembled by GPC at compile time, with the bytes placed in
-.the program.
-.
-.The alternative is to assemble by hand: work out the opcode for each
-.instruction, POKE the numbers into memory nothing else is using, and point
-.GP.CALL at that address. These two do the same thing -- increment A, then X,
-.then Y:
-.
-:## by hand: 26, 232 and 200 ARE inc a / inx / iny, and ML has to be somewher
-:POKE ML+0,26 : POKE ML+1,232 : POKE ML+2,200 : GP.CALL ML,10,20,30
-.
-:## assembled: the bytes land in the program, and there is no address to find
-:GP.ASM
-:REM inc a
-:REM inx
-:REM iny
-:GP.ENDASM
-.
-.It costs no runtime bytes. A block is five bytes of p-code plus the
-.assembled instructions, and every handler it uses is already in every
-.compiled program. A program whose only GP.BASIC keyword is GP.ASM compiles
-.GP-BASIC OUT, without the 1 KB block: measured RT 12031, the same as a
-.program using no GP keyword.
-.
-=#REM 1 is required
-.
-.The body rides in REM statements because BASLOAD stores REM text byte for
-.byte. Outside a REM, ORA, AND, EOR and ROR are BASIC keywords and the text
-.is destroyed; inside one it arrives intact, braces included. Lower case is
-.accepted and upshifted.
-.
-.#REM 0 is BASLOAD's default and strips the body before the compiler runs.
-.GP.ASM and GP.ENDASM are real keywords rather than REMs so that the block is
-.still found, empty, and GPC reports BLOCK MISMATCH rather than compiling a
-.program that contains no code. Set #REM 0 again after GP.ENDASM.
-.
-=Labels and branches
-.
-.A label is name:, alone on a line or in front of an instruction; six
-.characters are significant. Labels belong to their block -- the same name in
-.two blocks is two different labels, and neither can branch to the other.
-.
-:GP.ASM
-:REM ldx #5
-:REM loop: lda #42
-:REM jsr $ffd2
-:REM dex
-:REM bne loop
-:GP.ENDASM
-.
-.BNE, BEQ, BRA and the rest take a label, as do JMP and JSR. A branch further
-.than 127 bytes is OUT OF RANGE at compile time, reported on its own line,
-.rather than a wrong address at run time.
-.
-={VAR} -- a BASIC variable's slot
-.
-.{VAR} is the address of the variable's slot, so reading and writing use the
-.same form: LDA {N%} reads it, STA {N%} writes it, in the slot BASIC itself
-.uses.
-.
-.  {N} {N%} {N$}
-.      IS: the scalar's slot
-.
-.  {N()}
-.      IS: the array's slot, which holds the base address of its data -- an
-.        element is two steps, as through GP.ARRPTR
-.
-.A name is letters, digits and dots, starting with a letter, up to 64
-.characters -- the same limit as BASLOAD. {DOC.GOT.OFF} works, so the dotted
-.names used throughout the library are reachable from assembly. Underscore is
-.not accepted: BASLOAD allows it in a name, this does not, and {A_B} reads
-.the name as A.
-.
-.{VAR} requires #SYMFILE. BASLOAD renames variables -- N% becomes A%, which
-.is how it provides 64 significant characters on a two-character BASIC -- and
-.it does not rename REM text with them, so the code says A% while the REM
-.still says {N%}. #SYMFILE is BASLOAD's record of that mapping and the
-.compiler reads it:
-.
-:#SYMFILE "@:PROG.SYM"
-.
-.Put it at the top of the source, named to match the PRG: compiling PROG.PRG
-.reads PROG.SYM. Nothing else changes -- {N%} is still written with the name
-.as authored.
-.
-.Two compile-time errors, both naming the line:
-.
-.  NO SYMBOL FILE FOR {}
-.      MEANS: no #SYMFILE, or it is not beside the PRG under the matching
-.        name
-.
-.  UNKNOWN VARIABLE IN {}
-.      MEANS: the name is not a variable of this program
-.
-.{VAR} never creates a variable, unlike an ordinary BASIC reference. Assign
-.the variable once in BASIC first, even M% = 0. A name that does not exist
-.otherwise resolves to a slot BASIC never reads, and the block runs, stores,
-.and changes nothing observable.
-.
+>19|3.3 Machine code
+>27|3.5 Arrays

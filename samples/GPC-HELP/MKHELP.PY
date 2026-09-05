@@ -31,6 +31,20 @@
 #  Wrapped here rather than on the X16 because the wrap is the expensive part
 #  and it only has to happen once. The viewer prints what it is given.
 #
+#  KEYWORD ENTRIES. In sections 3 and 4 a level-3 heading is a topic. A level-4
+#  heading under one is a section INSIDE that topic -- unless it is numbered
+#  three deep ("#### 3.4.5 `GP.STRPTR` -- address of a string block"), which
+#  makes it a topic of its own and puts a cross reference to it in the parent's
+#  IN THIS SECTION table. The page points, the entry answers, and neither one
+#  scrolls.
+#
+#  A ```entry fence is the slot block of such an entry -- Syntax, Returns,
+#  Kind, Notes, WARNING, Example. Its COLUMNS ARE THE LAYOUT, so it goes out as
+#  text with the spacing it was written with, never re-wrapped and never
+#  dimmed. Keep its lines within WIDTH. The example code follows in an ordinary
+#  fence, where it is dimmed and "X export code" can write it out, and SEE ALSO
+#  builds itself from the section references in the body.
+#
 #  HELP.IDX is "type|topic|section|lines|text" per row. Type H is a category
 #  header (not selectable), T a topic, S a section inside one. The topic
 #  number names the file. The viewer loads the index at startup and never
@@ -173,12 +187,16 @@ def blocks(lines):
         s = raw.strip()
 
         if s.startswith("```"):
+            info = s[3:].strip().lower()
             body, i = [], i + 1
             while i < n and not lines[i].strip().startswith("```"):
                 body.append(lines[i].rstrip("\n"))
                 i += 1
             i += 1
-            out.append(("code", body))
+            # ```entry is a keyword entry's slot block. Its columns ARE the
+            # layout, so it goes out as text with the spacing it was written
+            # with, not as dimmed code and not re-wrapped.
+            out.append(("entry" if info == "entry" else "code", body))
             continue
 
         m = re.match(r"^(#{1,6})\s+(.*)$", s)
@@ -294,6 +312,10 @@ def emit_block(e, kind, payload):
         e.blank()
         for ln in payload:
             e.code(inline_code(ln))
+    elif kind == "entry":
+        e.blank()
+        for ln in payload:
+            e.lines.append("." + inline_code(ln)[:WIDTH])
     elif kind == "list":
         e.blank()
         for item in payload:
@@ -357,7 +379,7 @@ class Topic(object):
         self.ordinal = 0
 
 
-REF_RE = re.compile(r"\u00a7\s*(\d+(?:\.\d+)?)")
+REF_RE = re.compile(r"\u00a7\s*(\d+(?:\.\d+)*)")
 EXP_RE = re.compile(r"\b([A-Z0-9]+\.EXP\.BL)\b")
 MOD_RE = re.compile(r"\b([A-Z0-9]+\.INC\.BL)\b")
 
@@ -541,6 +563,18 @@ def manual_split(cat, group, tiers, top):
             kids.append(group[m])
             m += 1
 
+        # A NUMBERED level-4 heading is a keyword entry and becomes a topic of
+        # its own, so the reader lands on the syntax line instead of scrolling
+        # to it. An unnumbered one is prose about the group and stays a section
+        # inside this page, as it always was.
+        entries, secs_here = [], []
+        for s in kids:
+            if s[0] == 4 and re.match(r"^\d+\.\d+\.\d+\s", s[1]):
+                entries.append(s)
+            else:
+                secs_here.append(s)
+        kids = secs_here
+
         t = Topic(cat, key_of(title), inline(title))
         e = Emit()
         e.header(t.title.upper())
@@ -564,6 +598,15 @@ def manual_split(cat, group, tiers, top):
             emit_block(e, kind, payload)
         md += body
 
+        # The jump table, high on the page rather than under the prose: on a
+        # concept page it is the thing the reader came for. substitute() turns
+        # each placeholder into the entry's ordinal and title once every topic
+        # has a number.
+        if entries:
+            e.header("IN THIS SECTION")
+            for sub in entries:
+                e.lines.append(">@@%s@@|" % key_of(sub[1]))
+
         for sub in kids:
             e.header(inline(sub[1]), indexed=True)
             for kind, payload in blocks(sub[3]):
@@ -575,12 +618,32 @@ def manual_split(cat, group, tiers, top):
         t.examples = examples_in("\n".join(md))
         out.append(t)
 
+        # One topic per keyword entry. No costs card and no syntax card: the
+        # slot block carries Syntax itself, and what the group costs is on the
+        # concept page above.
+        for sub in entries:
+            et = Topic(cat, key_of(sub[1]), inline(sub[1]))
+            ee = Emit()
+            # The bar carries the number and the keyword, not the gloss after
+            # the dash: uppercased it shouts, and the reader opening the page
+            # has just read it on the row they pressed RETURN on.
+            ee.header(et.title.split(" -- ")[0].upper())
+            for kind, payload in blocks(sub[3]):
+                emit_block(ee, kind, payload)
+            emd = [sub[2]] + sub[3]
+            et.lines, et.secs, et.md = ee.lines, ee.secs, emd
+            et.refs = collect_refs("\n".join(emd), et.key)
+            et.examples = examples_in("\n".join(emd))
+            out.append(et)
+
         k = m
     return out
 
 
 def key_of(title):
-    m = re.match(r"^(\d+(?:\.\d+)?)\.?\s", title)
+    # Three parts as well as two: a keyword entry is 3.4.5, and its key is what
+    # the concept page's jump table and every SEC 3.4.5 reference resolve to.
+    m = re.match(r"^(\d+(?:\.\d+)*)\.?\s", title)
     return m.group(1) if m else inline(title).upper()
 
 

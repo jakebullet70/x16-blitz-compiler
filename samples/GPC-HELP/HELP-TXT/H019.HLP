@@ -1,28 +1,35 @@
-@3.9 Inline assembly (2)
-=What is not there
+@3.5 Arrays
 .
-.No expressions: {N%}+1 and LABEL+2 are not understood. Use an index
-.register.
+=3.5 ARRAYS
 .
-.Zero page or absolute is decided by the operand. $34 is zero page, $0034 is
-.absolute, and a decimal under 256 is zero page. Every 65C02 addressing mode
-.is available, including the two the NMOS 6502 lacks -- LDA ($34) and JMP
-.($1234,X) -- except BBR, BBS, RMB and SMB.
+=SYNTAX
 .
-.Registers come back through GP.A / GP.X / GP.Y / GP.C as they do from
-.GP.CALL; a block uses the same $030C-$030F slots. Those four are GP block
-.keywords, so reading one pulls in the 1 KB block that GP.ASM alone avoids.
-.{VAR} does not.
+:GP.ARRPTR(a())
 .
-.A body can come from a file. #INCLUDE splices it in verbatim, and BASLOAD's
-.REM #nn-mm attribution makes an error inside it name the file:
+=WHAT IT COSTS
 .
-:#REM 1
-:GP.ASM
-:#INCLUDE "MACPTR.ASM"
-:GP.ENDASM
-:#REM 0
+.  ASM: GP.ARRPTR
+.    ASM -- a keyword, run by machine code in the GP runtime block. A program
+.    using ANY GP keyword pays for the whole block.
+.
+=DESCRIPTION
+.
+.Sorting is SORT.INC.BL (SEC 4.7) rather than a keyword: 408 bytes of the
+.all-or-nothing GP block, carried by every program whether or not it sorts.
+.GP.ARRPTR is a keyword because the module needs it -- a BASL subroutine
+.cannot be passed an array, so an address is the only interface.
+.
+.GP.ARRPTR returns the address of element zero; the header is already
+.skipped. Machine code called through GP.CALL can then work on the array in
+.bulk. Add the stride yourself: 2 bytes per element for a string array (each
+.element is a pointer to the string block -- see GP.STRPTR for its layout), 6
+.for a numeric array. Multi-dimensional arrays are rejected, and
+.GP.ARRPTR(A(3)) is a syntax error; write 3*2 or 3*6 into the address.
 .
 =EXAMPLE PROGRAM
 .
-.  ASM.EXP.BL -- runnable, in the GPC-BASIC folder
+.  ARRAYS.EXP.BL -- runnable, in the GPC-BASIC folder
+.
+=SEE ALSO
+.
+>48|4.7 SORT.INC.BL -- shell sort a string array

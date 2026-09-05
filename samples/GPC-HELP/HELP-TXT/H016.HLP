@@ -1,81 +1,11 @@
-@3.7 Screen -- drawing
+@3.4.3 GP.ISEMPTY -- test for a zero-length string
 .
-=3.7 SCREEN -- DRAWING
+=3.4.3 GP.ISEMPTY
 .
-=SYNTAX
-.
-:GP.BOX x, y, w, h [,style] [,col]
-:GP.FILL x, y, w, h, char [,col]
-:GP.PRINTAT x, y, text$ [,col]
-.
-=WHAT IT COSTS
-.
-.  ASM: GP.BOX GP.FILL GP.PRINTAT
-.    ASM -- a keyword, run by machine code in the GP runtime block. A program
-.    using ANY GP keyword pays for the whole block.
-.  COMPOSITE: GP.CHAR GP.PRINTAT GP.FILL
-.    COMPOSITE -- a keyword with no machine code of its own. The compiler
-.    expands it into keywords that already exist, so it costs the runtime
-.    nothing at all.
-.
-=DESCRIPTION
-.
-.All three write directly to VERA and call no KERNAL routine, which is why
-.they are several times faster than PRINT. GPC's character output makes two
-.KERNAL calls per character, and BSOUT carries scroll, quote mode and cursor
-.handling.
-.
-.GP.BOX draws the frame only. Styles: 0 solid, 1 dither, 2 single line, 3
-.rounded, 4 thick, 5 thick shaded. char in GP.FILL is PETSCII, e.g. ASC(" ").
-.
-.The colour argument is optional. Omitted, it uses whatever COLOR last set,
-.read from the KERNAL's $0376 -- the colour a PRINT would have used.
-.Supplied, it is one byte packed as the X16 packs it: background * 16 +
-.foreground. 255 is a real colour (light grey on light grey), not a
-.leave-unchanged marker.
-.
-.These calls do not move the cursor PRINT uses. A PRINT after a GP.PRINTAT
-.continues from wherever the KERNAL's cursor was, not after the text just
-.drawn. Use LOCATE first, or stay in one world or the other.
-.
-.Nothing is clipped. Drawing off the right edge wraps to the next row; off
-.the bottom writes past the end of the screen map. Zero width or height draws
-.nothing, which is what a computed size reaches when it collapses.
-.
-=ISO mode is handled for you
-.
-.In ISO mode -- PRINT CHR$(15), or Ctrl+O -- the VERA tile index is the
-.character code, so translating PETSCII to a screen code is wrong rather than
-.merely wasteful: A would be written as $01. GP.PRINTAT reads the KERNAL's
-.ISO flag (bit 6 of $0372) per character and skips the translation when it is
-.set. A program that switches charset needs no source change and nothing to
-.declare. The test costs 7 cycles a cell in PETSCII mode and saves 34 in ISO.
-.
-.GP.FILL needs no test: it converts its single character before the loop, and
-.$20 is a fixed point of the translation, so a space fill -- padding and
-.blanking -- is correct in both modes.
-.
-.GP.BOX is the one case that needs the caller to act. It does no translation
-.at all; its glyphs go to VERA as tile indices, so the four built-in styles
-.are PETSCII screen codes and appear as letters in ISO mode. Translation
-.cannot fix this, because ISO-8859-15 has no box-drawing characters to
-.translate to. A style value of 256 or more is instead the address of eight
-.glyphs, and in ISO mode a tile index is a character code, so ASCII + - |
-.make a usable frame:
-.
-:ISO.GLYPH$ = "++++--||"                        ' TR TL BR BL TOP BOTTOM LEFT
-:GP.BOX 50, 26, 4, 3, GP.STRPTR(ISO.GLYPH$) + 1, 1
-.
-.GP.STRPTR returns the address of the string block and the text starts at +1,
-.so a string literal is the cheapest way to carry the eight bytes. This costs
-.no runtime bytes; the pointer form already exists, and samples/editor uses
-.the same mechanism to draw frames from a re-ordered font.
-.
-.ISO.EXP.BL tests all of this, reading cells back with VPEEK rather than
-.trusting the display. The ISO box corner, top edge and side read back as 43,
-.45 and 124.
-.
-=EXAMPLE PROGRAM
-.
-.  ISO.EXP.BL -- runnable, in the GPC-BASIC folder
-.  SCREEN.EXP.BL -- runnable, in the GPC-BASIC folder
+.  Syntax    GP.ISEMPTY(a$)
+.  Returns   -1 if a$ has zero length, 0 if not.
+.  Kind      COMPOSITE. Expands to LEN(a$) = 0.
+.  Notes     A string of spaces is not empty. STRCASE.TRIM first if
+.            that is the intent.
+.            GP.ISEMPTY(a$), LEN(a$) = 0 and a$ = "" are the same four
+.            bytes. Use whichever reads better.

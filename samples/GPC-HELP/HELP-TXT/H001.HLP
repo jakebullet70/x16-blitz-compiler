@@ -46,6 +46,6 @@
 .
 =SEE ALSO
 .
->65|STASH.INC.BL -- save a text rectangle, and put it back.
->44|4.7 SORT.INC.BL -- shell sort a string array
->45|4.8 STRCASE.INC.BL -- case and trim, in place
+>69|STASH.INC.BL -- save a text rectangle, and put it back.
+>48|4.7 SORT.INC.BL -- shell sort a string array
+>49|4.8 STRCASE.INC.BL -- case and trim, in place
