@@ -20,9 +20,9 @@ rem  the text is mixed case with no re-ordered font, and the high half has real
 rem  line drawing for the dialog frames. APPSYS.RESTORE hands the screen mode
 rem  and the whole $0372 charset byte back on the way out.
 rem
-rem  THE TOPICS ARE IN samples\GPC-HELP\HELP-TXT and the index is not: a topic
-rem  opens through the CMD path syntax "//HELP-TXT/:Hnnn.HLP", which is what
-rem  CMDR-DOS documents and what a real SD card wants.
+rem  EVERYTHING IT READS IS IN samples\GPC-HELP\HELP-TXT -- the index and the
+rem  topics alike -- opened through the CMD path syntax "//HELP-TXT/:NAME", which
+rem  is what CMDR-DOS documents and what a real SD card wants.
 rem
 rem  NOTE THAT THE DRIVE IS samples\GPC-HELP, so an "X" export lands in the repo
 rem  beside the sources. git clean -f samples/GPC-HELP/ tidies up.
@@ -54,9 +54,9 @@ if not exist "%DRIVE%\GPB.HELP.PRG" (
 	echo.
 	exit /b 1
 )
-if not exist "%DRIVE%\GPB.HELP.IDX" (
+if not exist "%DRIVE%\HELP-TXT\GPB.HELP.IDX" (
 	echo.
-	echo   samples\GPC-HELP\GPB.HELP.IDX is missing -- the viewer has no index to
+	echo   samples\GPC-HELP\HELP-TXT\GPB.HELP.IDX is missing -- no index to
 	echo   load and will say so and stop. Rebuild the content with:
 	echo.
 	echo       python samples\GPC-HELP\MKHELP.PY

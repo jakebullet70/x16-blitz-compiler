@@ -61,10 +61,11 @@ screens away.
 python samples/GPC-HELP/MKHELP.PY
 ```
 
-Reads `GPC-BASIC/` and writes `HELP-TXT/H001.HLP`…`H043.HLP`, `GPB.HELP.IDX` and
-`GPC-HELP.md` beside itself. **The topics go in the subfolder and the index does not** — the
-program opens the index by name in its own directory and a topic through the CMD path syntax
-`//HELP-TXT/:Hnnn.HLP`. A run that produces fewer topics than the last one deletes the orphans.
+Reads `GPC-BASIC/` and writes `HELP-TXT/H001.HLP`…`H043.HLP` and `HELP-TXT/GPB.HELP.IDX`, plus
+`GPC-HELP.md` beside itself. **Everything the viewer reads is in the one subfolder**, opened
+through the CMD path syntax `//HELP-TXT/:NAME` — what CMDR-DOS documents, and what a real SD
+card wants; the emulator would also take a plain `HELP-TXT/NAME`, which is the form that would
+not port. A run that produces fewer topics than the last one deletes the orphans.
 `--src` and `--out` move either end; `--maxpage` changes where a long topic is split.
 
 **It exits non-zero if a character had no ASCII mapping**, listing the code points. That check
@@ -80,14 +81,13 @@ filesystem root, so everything stages there first. `python` and `make` are off P
 ```
 copy samples\GPC-HELP\GPB.HELP.BASL       testing\
 copy samples\GPC-HELP\GPC-BASIC\*.INC.BL  testing\
-copy samples\GPC-HELP\GPB.HELP.IDX        testing\
 xcopy /e /i samples\GPC-HELP\HELP-TXT     testing\HELP-TXT
 python source\gpc\build_basl.py      GPB.HELP.BASL GPB.HELP.SRC.PRG
 python source\gpc\compile_shared.py --embedded GPB.HELP.SRC.PRG GPB.HELP.PRG
 ```
 
 then copy `GPB.HELP.PRG` back here. **EMBEDDED, not shared**, so this directory stands on its own
-without a `GPB.RT.nnn.BIN` whose name carries a build number. 23,568 bytes.
+without a `GPB.RT.nnn.BIN` whose name carries a build number. 23,563 bytes.
 
 **No `#AUTONUM`.** With `STRCASE.INC.BL` included it resolves label targets against the wrong step
 and the compile stops with `UNKNOWN LINE NUMBER`.
@@ -298,7 +298,7 @@ Even at 96 it stops before the cross-reference and slide passes. **The fix is th
 move the index text into a bank the way the topic already is, which ends the workspace pressure
 rather than trading against it. Until then the check proves the part that catches real damage.
 
-It asserts the thing that cannot be checked by looking — that every row in `GPB.HELP.IDX` still reaches
+It asserts the thing that cannot be checked by looking — that every row in the index still reaches
 the topic `MKHELP.PY` meant it to:
 
 ```
@@ -321,9 +321,9 @@ not a test double.
 | | |
 |---|---|
 | `GPB.HELP.BASL` | the viewer |
-| `GPB.HELP.PRG` | compiled, embedded, 23,568 bytes — what `help-demo.bat` runs |
+| `GPB.HELP.PRG` | compiled, embedded, 23,563 bytes — what `help-demo.bat` runs |
 | `MKHELP.PY` | the content build |
-| `GPB.HELP.IDX` | the master index, 95 rows |
+| `HELP-TXT/GPB.HELP.IDX` | the master index, 95 rows |
 | `HELP-TXT/H001.HLP`…`H043.HLP` | one topic each |
 | `GPC-HELP.md` | the same content, for a PC |
 | `GPC-BASIC/` | the eight modules a rebuild needs, so it needs nothing from the master |

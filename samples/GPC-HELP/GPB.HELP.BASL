@@ -14,8 +14,8 @@
 ##
 ## ONE MASTER INDEX, loaded at startup and never read again, and one .HLP file
 ## per topic that it opens into, in the HELP-TXT folder beside the program.
-## GPB.HELP.IDX carries a row per entry -- a category header, a topic, or a
-## section inside one -- and MKHELP.PY builds all of it
+## HELP-TXT/GPB.HELP.IDX carries a row per entry -- a category header, a
+## topic, or a section inside one -- and MKHELP.PY builds all of it
 ## from GPC-BASIC/. Nothing here parses markdown, measures a string or wraps a
 ## line: that happened on the host once instead of on the X16 every time.
 ##
@@ -77,7 +77,7 @@
 ## the wrong step and the compile stops with UNKNOWN LINE NUMBER.
 ## ============================================================================
 
-## GPB.HELP.IDX is 95 rows today, so this leaves twenty-five spare. The
+## The index is 95 rows today, so this leaves twenty-five spare. The
 ## headroom is for the library growing, and running out is not a crash: the
 ## rows past the end are dropped.
 ##
@@ -199,9 +199,9 @@ GOSUB HELP.BOOT
 GP.IF HELP.OK = 0 THEN
     GOSUB APPSYS.RESTORE
     PRINT
-    PRINT "GPB.HELP: GPB.HELP.IDX WOULD NOT LOAD."
-    PRINT "RUN MKHELP.PY AND PUT GPB.HELP.IDX AND THE"
-    PRINT "HELP-TXT FOLDER BESIDE GPB.HELP.PRG."
+    PRINT "GPB.HELP: HELP-TXT/GPB.HELP.IDX WOULD NOT LOAD."
+    PRINT "RUN MKHELP.PY AND PUT THE HELP-TXT FOLDER"
+    PRINT "BESIDE GPB.HELP.PRG."
     END
 GP.ENDIF
 
@@ -277,9 +277,9 @@ HELP.BOOT:
     ## module cannot be handed an array.
     DIM MENUVERT.ITEM$(HELP.MAXPICK)
 
-    ## The topics are in a folder beside the program; the index is not. Held
-    ## in a variable rather than written into HELP.FILENAME, so opening a
-    ## topic allocates one string instead of two.
+    ## EVERYTHING THE VIEWER READS is in one folder beside the program, the
+    ## index included, and this is the only place its name is written. Set
+    ## before HELP.IDXLOAD, which is the first thing to use it.
     HELP.DIR$ = "//HELP-TXT/:"
 
     HELP.FIND$ = ""
@@ -293,7 +293,7 @@ HELP.BOOT:
 
 HELP.IDXLOAD:
     HELP.OK = 0 : HELP.IX.N = 0
-    OPEN HELP.CHAN, 8, HELP.CHAN, "GPB.HELP.IDX,S,R"
+    OPEN HELP.CHAN, 8, HELP.CHAN, HELP.DIR$ + "GPB.HELP.IDX,S,R"
 HELP.IDXLOAD.LOOP:
     LINPUT# HELP.CHAN, HELP.LINE$, 10 : HELP.ST = ST
     ## BIT 1 OF ST IS A READ ERROR. An OPEN that found no file still opens, and

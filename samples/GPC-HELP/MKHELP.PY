@@ -10,14 +10,14 @@
 #
 #  Writes, beside this script:
 #      HELP-TXT/H001.HLP ... Hnnn.HLP   one file per topic -- see layout()
-#      GPB.HELP.IDX            the master index
+#      HELP-TXT/GPB.HELP.IDX             the master index
 #      GPC-HELP.md             the same content, for reading on a PC
 #
-#  THE TOPICS ARE IN A SUBFOLDER and the index is not: GPB.HELP.PRG opens the
-#  index by name in its own directory and the topics through the CMD path
-#  syntax "//HELP-TXT/:Hnnn.HLP", which is what CMDR-DOS documents and what a
-#  real SD card wants -- the emulator's host filesystem also takes a plain
-#  "HELP-TXT/Hnnn.HLP", and that is the one that would not port.
+#  THE CONTENT IS ALL IN ONE SUBFOLDER, index included, so the program sits in
+#  a directory holding the program and one folder. Both are opened through the
+#  CMD path syntax "//HELP-TXT/:NAME", which is what CMDR-DOS documents and
+#  what a real SD card wants -- the emulator's host filesystem also takes a
+#  plain "HELP-TXT/NAME", and that is the one that would not port.
 #
 #  THE .HLP FORMAT is one screen line per file line, first character a marker:
 #
@@ -49,9 +49,10 @@ import sys
 
 WIDTH = 76
 
-# The topics live in a subfolder of the program's directory; the index does
-# not. Both names are spelled again in GPB.HELP.BASL -- HELP.DIR$ and the
-# OPEN in HELP.IDXLOAD -- so changing one here means changing it there.
+# The content -- topics and index alike -- lives in a subfolder of the
+# program's directory. Both names are spelled again in GPB.HELP.BASL, as
+# HELP.DIR$ and the OPEN in HELP.IDXLOAD, so changing one here means
+# changing it there.
 HELPDIR = "HELP-TXT"
 IDXNAME = "GPB.HELP.IDX"
 
@@ -954,11 +955,14 @@ def write_idx(out, rows):
              "N|%d" % len(rows)]
     for r in rows:
         lines.append("%s|%s|%s|%s|%s" % (r[0], r[1], r[2], r[3], r[4]))
-    path = os.path.join(out, IDXNAME)
+    where = os.path.join(out, HELPDIR)
+    if not os.path.isdir(where):
+        os.makedirs(where)
+    path = os.path.join(where, IDXNAME)
     with open(path, "w", encoding="ascii", errors="replace", newline="\n") as fh:
         fh.write("\n".join(lines) + "\n")
     print("  %-20s %d rows, %d bytes"
-          % (IDXNAME, len(rows), os.path.getsize(path)))
+          % ("%s/%s" % (HELPDIR, IDXNAME), len(rows), os.path.getsize(path)))
 
 
 def anchor(s):
