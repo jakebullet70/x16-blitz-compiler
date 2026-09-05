@@ -28,8 +28,8 @@
 =BOTH ARE REQUIRED EVEN IF YOU ONLY CALL GUI.YN
 .
 .  BASLOAD resolves every label in the file, not the ones a path reaches, so
-.  leaving either out stops the tokenise with LABEL NOT FOUND rather than
-.  compiling a smaller
+.  leaving either out stops BASLOAD with LABEL NOT FOUND rather than
+.  compiling a smaller program.
 .
 .  Usage, the whole of it:
 :      THEME.DARK = 0 : GOSUB THEME.LOAD

@@ -4,16 +4,16 @@
 ## **
 ## **  #INCLUDE "GPB.INC.BL" at the top of any BASL source that uses GP
 ## **  keywords. BASLOAD only knows the ROM's keywords; this teaches it
-## **  the GP tokens so GP.DO parses instead of raising a syntax error.
-## **  The host-side tokeniser (bin/tokenise.zip) does not need this file
-## **  -- it learns the same tokens from c64tokens.py at build time.
+## **  the GP keywords so GP.DO parses instead of raising a syntax error.
+## **  The PC-side converter (bin/tokenise.zip) does not need this file
+## **  -- it reads the same keyword list from c64tokens.py at build time.
 ## **
-## **  THE TOKEN VALUES ARE THE ABI. They mirror getGP() in
+## **  THE BYTE VALUES ARE THE ABI. They mirror getGP() in
 ## **  source/common-scripts/c64tokens.py exactly: $CE7F down, one per
 ## **  keyword, allocated DOWNWARD and never renumbered. When a keyword
 ## **  is added there, add it here in the same change.
 ## **
-## **  A PRG containing these tokens is compile-only: the ROM cannot
+## **  A PRG containing these keywords is compile-only: the ROM cannot
 ## **  LIST or RUN it, because nothing in BASIC is behind $CE7x.
 ## **
 ## ***********************************************************************

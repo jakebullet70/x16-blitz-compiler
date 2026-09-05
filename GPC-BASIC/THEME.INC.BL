@@ -2,9 +2,9 @@
 ## **
 ## **  THEME.INC.BL -- named colour roles, light and dark.
 ## **
-## **  A theme costs NO TOKENS AND NO RUNTIME BYTES. The colours are read by BASIC, for
+## **  A theme costs NO KEYWORDS AND NO RUNTIME BYTES. The colours are read by BASIC, for
 ## **  COLOR and the GP drawing commands -- assembly never touches them -- so a runtime
-## **  version would have bought nothing and spent two keywords. As data they also save
+## **  version would have bought nothing and spent two keyword slots. As data they also save
 ## **  and load like any array, so "switch to dark" is reloading one.
 ## **
 ## **  #DEFINE substitutes at TRANSLATION time, so THEME.CLR(THEME.TITLE) compiles to

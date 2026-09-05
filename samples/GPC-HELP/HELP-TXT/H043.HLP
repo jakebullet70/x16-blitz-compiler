@@ -49,7 +49,7 @@
 .
 .Two notes on names. Inside BASL, 64 characters are significant, so PANEL.COL
 .and PANEL.ROW are different variables and readable names cost nothing. The
-.same source written as a raw .bas for the host tokeniser is back to two
+.same source written as a raw .bas for the PC-side converter is back to two
 .significant characters.
 .
 .Dotted names also avoid the keyword-collision trap. MENUVERT.COUNT,

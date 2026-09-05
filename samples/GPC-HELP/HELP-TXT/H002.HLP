@@ -2,13 +2,13 @@
 .
 =2. USING IT
 .
-.Every BASL source that uses a GP. keyword must declare the tokens:
+.Every BASL source that uses a GP. keyword must declare the keyword set:
 .
 :#INCLUDE "GPB.INC.BL"
 .
 .BASLOAD knows only the ROM's keywords. Without that line GP.DO 5 is a syntax
-.error. The host-side tokeniser for hand-written .bas needs no such
-.declaration; it learns the same tokens from c64tokens.py at build time.
+.error. The PC-side converter for hand-written .bas needs no such
+.declaration; it reads the same keyword list from c64tokens.py at build time.
 .
 =Where the library lives
 .
@@ -29,17 +29,17 @@
 =A program that uses GP.BASIC is compile-only
 .
 .One GP.BASIC keyword is enough: from there the program is compiler input,
-.and the ROM can no longer LIST or RUN it. BASLOAD tokenises those keywords
-.into $CE58-$CE7F and stock BASIC has no handler behind those bytes.
+.and the ROM can no longer LIST or RUN it. BASLOAD encodes those keywords as
+.the byte pairs $CE58-$CE7F, and stock BASIC has no handler behind them.
 .
 .GPB is what GPC implements, and it has no existence apart from it. The
 .keyword set is not an extension the ROM might one day understand, or a
 .library that could be loaded to make it work: GP.DO means something because
-.the compiler emits code for it, and nowhere else. That is why the tokenised
-.file is not a program yet -- there is nothing to run it with but GPC.
+.the compiler emits code for it, and nowhere else. That is why BASLOAD's
+.output is not a program yet -- there is nothing to run it with but GPC.
 .
-.That is the intended route: run GPC.PRG on the tokenised .PRG and run the
-.object it writes.
+.That is the intended route: run GPC.PRG on BASLOAD's .PRG and run the object
+.it writes.
 .
 =Numbers, and what a variable holds
 .

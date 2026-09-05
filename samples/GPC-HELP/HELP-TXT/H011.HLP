@@ -34,7 +34,7 @@
 .requires compile-time integers.
 .
 .GP.ENDSEL is required. Nothing needs cleaning up; the requirement is
-.structural. The compiler has no symbol table, the emitted tokens are the
+.structural. The compiler has no symbol table, the emitted keywords are the
 .block, and every case branch resolves by scanning forward to it.
 .
 .A case body may take its statements on the same line, after a colon:

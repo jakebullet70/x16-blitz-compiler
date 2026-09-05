@@ -70,7 +70,7 @@ python samples/GPC-HELP/MKHELP.PY
 
 Three layers, innermost first.
 
-**Core keywords.** 30 tokens, compiled to p-code and handled by assembly in the runtime:
+**Core keywords.** 30 of them, compiled to p-code and handled by assembly in the runtime:
 
     GP.DO GP.LOOP GP.EXITDO
     GP.IF GP.ELSEIF GP.ELSE GP.ENDIF
@@ -116,15 +116,15 @@ waits on the keyboard, so speed does not apply to it; writing it in BASL saved 1
 
 #### 2. Using it
 
-Every BASL source that uses a `GP.` keyword must declare the tokens:
+Every BASL source that uses a `GP.` keyword must declare the keyword set:
 
 ```basic
 #INCLUDE "GPB.INC.BL"
 ```
 
 BASLOAD knows only the ROM's keywords. Without that line `GP.DO 5` is a syntax error. The
-host-side tokeniser for hand-written `.bas` needs no such declaration; it learns the same tokens
-from `c64tokens.py` at build time.
+PC-side converter for hand-written `.bas` needs no such declaration; it reads the same keyword
+list from `c64tokens.py` at build time.
 
 ##### Where the library lives
 
@@ -145,15 +145,15 @@ Then BASLOAD and GPC as usual: `BASLOAD "MYPROG.BL"`, then compile the resulting
 ##### A program that uses GP.BASIC is compile-only
 
 One GP.BASIC keyword is enough: from there the program is **compiler input**, and the ROM can no
-longer `LIST` or `RUN` it. BASLOAD tokenises those keywords into `$CE58`-`$CE7F` and stock BASIC
-has no handler behind those bytes.
+longer `LIST` or `RUN` it. BASLOAD encodes those keywords as the byte pairs `$CE58`-`$CE7F`, and
+stock BASIC has no handler behind them.
 
 **GPB is what GPC implements, and it has no existence apart from it.** The keyword set is not an
 extension the ROM might one day understand, or a library that could be loaded to make it work:
-`GP.DO` means something because the compiler emits code for it, and nowhere else. That is why the
-tokenised file is not a program yet — there is nothing to run it with but GPC.
+`GP.DO` means something because the compiler emits code for it, and nowhere else. That is why
+BASLOAD's output is not a program yet — there is nothing to run it with but GPC.
 
-That is the intended route: run `GPC.PRG` on the tokenised `.PRG` and run the object it writes.
+That is the intended route: run `GPC.PRG` on BASLOAD's `.PRG` and run the object it writes.
 
 ##### Numbers, and what a variable holds
 
@@ -247,11 +247,11 @@ compiler writes when `MAKE A DEBUG MAP?` is answered yes. Without the map the ad
 resolved.
 
 `BASLOAD` is not a file here; it is built into the R49 ROM. It reads `.BASL` source — BASIC with
-long names, labels instead of line numbers, `#INCLUDE` and `#DEFINE` — and writes the tokenised
-`.PRG` that GPC compiles. Every `.INC.BL` and `.EXP.BL` in this folder is BASLOAD source.
+long names, labels instead of line numbers, `#INCLUDE` and `#DEFINE` — and writes the `.PRG` that
+GPC compiles. Every `.INC.BL` and `.EXP.BL` in this folder is BASLOAD source.
 
 A program using GP.BASIC is compile-only. BASLOAD's output for one is not a program the ROM can
-`LIST` or `RUN`, because nothing in BASIC sits behind a `GP.` token. It is compiler input.
+`LIST` or `RUN`, because nothing in BASIC sits behind a `GP.` keyword. It is compiler input.
 
 ---
 
@@ -340,8 +340,8 @@ works both in the repository and in an unzipped release.
 
 #### 3. Command reference
 
-30 tokens, `$CE7F` down to `$CE58`, allocated downward. Ten of the forty slots are holes, and they
-stay holes: the token values are the ABI and are never renumbered.
+30 keywords, encoded `$CE7F` down to `$CE58` and allocated downward. Ten of the forty slots are
+holes and stay holes: the byte values are the ABI and are never renumbered.
 
 ##### At a glance — where each part comes from
 
@@ -446,7 +446,7 @@ Case values are numeric expressions, not only constants. prog8's `when` requires
 integers.
 
 `GP.ENDSEL` is required. Nothing needs cleaning up; the requirement is structural. The compiler has
-no symbol table, the emitted tokens are the block, and every case branch resolves by scanning
+no symbol table, the emitted keywords are the block, and every case branch resolves by scanning
 forward to it.
 
 A case body may take its statements on the same line, after a colon:
@@ -1390,7 +1390,7 @@ catch an off-by-one write into the neighbouring block.
 
   BOTH ARE REQUIRED EVEN IF YOU ONLY CALL GUI.YN. BASLOAD resolves every
   label in the file, not the ones a path reaches, so leaving either out
-  stops the tokenise with LABEL NOT FOUND rather than compiling a smaller
+  stops BASLOAD with LABEL NOT FOUND rather than compiling a smaller program.
 
   Usage, the whole of it:
       THEME.DARK = 0 : GOSUB THEME.LOAD
@@ -1774,7 +1774,7 @@ one library update from not being.
 
 ##### `GP.*` is keywords, not variables
 
-`GPB.INC.BL` defines no variables: 27 `#TOKEN` lines and nothing else.
+`GPB.INC.BL` defines no variables. It is 27 keyword declarations and nothing else.
 
 ```basic
 GP.A = 5          ' SYNTAX ERROR — GP.A is a keyword
@@ -1782,7 +1782,7 @@ X = GP.A          ' correct
 ```
 
 The value words are `GP.A` `GP.X` `GP.Y` `GP.C`, the registers after `GP.CALL`, and that is all of
-them. They are tokens rather than variables because nothing in the runtime can write a BASIC
+them. They are keywords rather than variables because nothing in the runtime can write a BASIC
 variable by name, so a command that returns a value must return it through a keyword. X16's own
 `ST`, `MX` and `MY` work the same way.
 
@@ -1826,7 +1826,7 @@ free today; it is one library update away from not being.
 
 #### 2. `GP.*` is keywords, not variables — and the difference bites
 
-`GPB.INC.BL` defines no variables. It is 31 `#TOKEN` lines and nothing else. Everything
+`GPB.INC.BL` defines no variables. It is 31 keyword declarations and nothing else. Everything
 spelled `GP.something` is a BASIC *keyword*, so:
 
 ```basic
@@ -1835,11 +1835,11 @@ X = GP.A          ← correct. It reads the accumulator after the last GP.CALL.
 ```
 
 The value words are `GP.A`, `GP.X`, `GP.Y` and `GP.C` — the registers after `GP.CALL`, and now the
-whole list of them. They are tokens rather than variables because nothing in the runtime can write
+whole list of them. They are keywords rather than variables because nothing in the runtime can write
 a BASIC variable by name, so a command that returns a value has to
 hand it back through a keyword. X16's own `ST`, `MX` and `MY` exist for the same reason.
 
-The full keyword list lives in `GPC-BASIC/GPB.INC.BL`, and the token numbers mirror `getGP()` in
+The full keyword list lives in `GPC-BASIC/GPB.INC.BL`, and the byte values mirror `getGP()` in
 `source/common-scripts/c64tokens.py`.
 
 ---
@@ -1990,7 +1990,7 @@ ordinary variable and not a `#DEFINE`. Every VRAM address past `$FFFF` has the s
 main reason the library is dotted throughout.
 
 One rule applies only outside BASL: BASLOAD gives 64 significant characters, the built-in BASIC
-gives two. Write the same code as a hand-typed `.bas` for the host tokeniser and
+gives two. Write the same code as a hand-typed `.bas` for the PC-side converter and
 `THEME.CLR` and `THEME.COUNT` become the same variable. That is a silent wrong answer — it cost two
 test cycles during tier 6, both times looking exactly like a compiler bug. Inside BASL you are safe;
 in a raw `.bas`, give every variable a distinct first two characters.
@@ -2052,7 +2052,7 @@ Each of these has cost a debugging session at least once.
 
 Two notes on names. Inside BASL, 64 characters are significant, so `PANEL.COL` and `PANEL.ROW` are
 different variables and readable names cost nothing. The same source written as a raw `.bas` for the
-host tokeniser is back to two significant characters.
+PC-side converter is back to two significant characters.
 
 Dotted names also avoid the keyword-collision trap. `MENUVERT.COUNT`, `THEME.CLR`, `LINEINPUT.LEN`
 and `LINEINPUT.RETURN` all contain reserved words and all work, because BASLOAD matches the whole

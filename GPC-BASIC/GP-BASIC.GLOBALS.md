@@ -39,7 +39,7 @@ free today; it is one library update away from not being.
 
 ## 2. `GP.*` is keywords, not variables — and the difference bites
 
-`GPB.INC.BL` defines no variables. It is 31 `#TOKEN` lines and nothing else. Everything
+`GPB.INC.BL` defines no variables. It is 31 keyword declarations and nothing else. Everything
 spelled `GP.something` is a BASIC *keyword*, so:
 
 ```basic
@@ -48,11 +48,11 @@ X = GP.A          ← correct. It reads the accumulator after the last GP.CALL.
 ```
 
 The value words are `GP.A`, `GP.X`, `GP.Y` and `GP.C` — the registers after `GP.CALL`, and now the
-whole list of them. They are tokens rather than variables because nothing in the runtime can write
+whole list of them. They are keywords rather than variables because nothing in the runtime can write
 a BASIC variable by name, so a command that returns a value has to
 hand it back through a keyword. X16's own `ST`, `MX` and `MY` exist for the same reason.
 
-The full keyword list lives in `GPC-BASIC/GPB.INC.BL`, and the token numbers mirror `getGP()` in
+The full keyword list lives in `GPC-BASIC/GPB.INC.BL`, and the byte values mirror `getGP()` in
 `source/common-scripts/c64tokens.py`.
 
 ---
@@ -189,7 +189,7 @@ ordinary variable and not a `#DEFINE`. Every VRAM address past `$FFFF` has the s
 main reason the library is dotted throughout.
 
 One rule applies only outside BASL: BASLOAD gives 64 significant characters, the built-in BASIC
-gives two. Write the same code as a hand-typed `.bas` for the host tokeniser and
+gives two. Write the same code as a hand-typed `.bas` for the PC-side converter and
 `THEME.CLR` and `THEME.COUNT` become the same variable. That is a silent wrong answer — it cost two
 test cycles during tier 6, both times looking exactly like a compiler bug. Inside BASL you are safe;
 in a raw `.bas`, give every variable a distinct first two characters.

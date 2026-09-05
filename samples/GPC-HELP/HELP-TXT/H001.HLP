@@ -4,7 +4,7 @@
 .
 .Three layers, innermost first.
 .
-.Core keywords. 30 tokens, compiled to p-code and handled by assembly in the
+.Core keywords. 30 of them, compiled to p-code and handled by assembly in the
 .runtime:
 .
 .GP.DO GP.LOOP GP.EXITDO GP.IF GP.ELSEIF GP.ELSE GP.ENDIF GP.SELECT GP.CASE

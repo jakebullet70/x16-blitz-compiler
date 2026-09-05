@@ -43,13 +43,14 @@
 .
 =GP.* is keywords, not variables
 .
-.GPB.INC.BL defines no variables: 27 #TOKEN lines and nothing else.
+.GPB.INC.BL defines no variables. It is 27 keyword declarations and nothing
+.else.
 .
 :GP.A = 5          ' SYNTAX ERROR -- GP.A is a keyword
 :X = GP.A          ' correct
 .
 .The value words are GP.A GP.X GP.Y GP.C, the registers after GP.CALL, and
-.that is all of them. They are tokens rather than variables because nothing
+.that is all of them. They are keywords rather than variables because nothing
 .in the runtime can write a BASIC variable by name, so a command that returns
 .a value must return it through a keyword. X16's own ST, MX and MY work the
 .same way.

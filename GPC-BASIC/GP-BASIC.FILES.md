@@ -58,11 +58,11 @@ compiler writes when `MAKE A DEBUG MAP?` is answered yes. Without the map the ad
 resolved.
 
 `BASLOAD` is not a file here; it is built into the R49 ROM. It reads `.BASL` source — BASIC with
-long names, labels instead of line numbers, `#INCLUDE` and `#DEFINE` — and writes the tokenised
-`.PRG` that GPC compiles. Every `.INC.BL` and `.EXP.BL` in this folder is BASLOAD source.
+long names, labels instead of line numbers, `#INCLUDE` and `#DEFINE` — and writes the `.PRG` that
+GPC compiles. Every `.INC.BL` and `.EXP.BL` in this folder is BASLOAD source.
 
 A program using GP.BASIC is compile-only. BASLOAD's output for one is not a program the ROM can
-`LIST` or `RUN`, because nothing in BASIC sits behind a `GP.` token. It is compiler input.
+`LIST` or `RUN`, because nothing in BASIC sits behind a `GP.` keyword. It is compiler input.
 
 ---
 

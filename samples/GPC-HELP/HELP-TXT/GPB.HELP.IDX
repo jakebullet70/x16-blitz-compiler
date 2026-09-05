@@ -77,9 +77,9 @@ S|34|6|53|     MODULE HEADER
 S|34|30|53|     A SEPARATE FILE FROM STASH.INC.BL ON PURPOSE
 S|34|36|53|     THE FILE IS SELF-DESCRIBING BECAUSE THE STASH IS
 H|0|0|0|GLOBALS AND NAMING
-T|35|0|67|  5. Variables
-S|35|12|67|     Prefixes already taken
-S|35|43|67|     GP.* is keywords, not variables
+T|35|0|68|  5. Variables
+S|35|12|68|     Prefixes already taken
+S|35|43|68|     GP.* is keywords, not variables
 T|36|0|53|  1. The prefixes that are taken
 T|37|0|18|  2. GP.* is keywords, not variables -- and the difference bites
 T|38|0|97|  3. The modules

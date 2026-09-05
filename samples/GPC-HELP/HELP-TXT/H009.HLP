@@ -2,9 +2,9 @@
 .
 =3. COMMAND REFERENCE
 .
-.30 tokens, $CE7F down to $CE58, allocated downward. Ten of the forty slots
-.are holes, and they stay holes: the token values are the ABI and are never
-.renumbered.
+.30 keywords, encoded $CE7F down to $CE58 and allocated downward. Ten of the
+.forty slots are holes and stay holes: the byte values are the ABI and are
+.never renumbered.
 .
 =At a glance -- where each part comes from
 .
