@@ -363,6 +363,7 @@ GMX.DISPATCH:
   GM.DONE = 0
   IF GM.SEL = 1 THEN GOSUB GMX.DIALOG : GM.DONE = 1
   IF GM.SEL = 2 THEN GOSUB GMX.LISTS : GM.DONE = 1
+  IF GM.SEL = 3 THEN GOSUB GMX.INPUT : GM.DONE = 1
   IF GM.SEL = 4 THEN GOSUB GMX.SCREEN : GM.DONE = 1
   IF GM.SEL = 8 THEN IF MENUVERT.SEL = 3 THEN GOSUB GMX.BANKMAP : GM.DONE = 1
   IF GM.DONE = 0 THEN GOSUB GMX.STUB
@@ -1211,4 +1212,181 @@ GMX.L.FLAGS:
 
   GM.RESULT$ = "FLAGS  KEEPMARK SEL " + MID$(STR$(GM.KEPT), 2)
   GM.RESULT$ = GM.RESULT$ + "   MUSTSEL SEL " + MID$(STR$(MENUVERT.SEL), 2)
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.INPUT -- the INPUT dropdown. LINEINPUT, one field and then several.
+## ***********************************************************************
+
+GMX.INPUT:
+  GP.SELECT MENUVERT.SEL
+  GP.CASE 1
+    GOSUB GMX.I.GET
+  GP.CASE 2
+    GOSUB GMX.I.ASK
+  GP.CASE 3
+    GOSUB GMX.I.FORM
+  GP.OTHER
+    GOSUB GMX.I.LIMITS
+  GP.ENDSEL
+  GOSUB GMX.CHROME
+  RETURN
+
+
+## ---- The whole LINEINPUT interface, every time. Every field of it is sticky,
+## ---- so a demonstration setting only what it varies inherits the last one's
+## ---- mask and label -- which is how a plain field comes up full of asterisks.
+
+GMX.I.RESET:
+  LINEINPUT.X = 12
+  LINEINPUT.Y = 11
+  LINEINPUT.LEN = 20
+  LINEINPUT.ATTR = THEME.CLR(THEME.HILITE)
+  LINEINPUT.MASK = 0
+  LINEINPUT.LABEL$ = ""
+  LINEINPUT.TEXT$ = ""
+  RETURN
+
+
+## ---- What a field answered, in the shape every row here reports it ----
+
+GMX.I.SAID:
+  GM.SAID$ = "[" + LINEINPUT.TEXT$ + "]  KEY " + MID$(STR$(LINEINPUT.KEY), 2)
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.I.GET -- LINEINPUT.GET. One field, and what ESC does to it.
+## ***********************************************************************
+
+GMX.I.GET:
+  GOSUB GMX.CLEARPANEL
+  GOSUB GMX.I.RESET
+  GP.PRINTAT 6, 9, "A FIELD THAT STAYS WHERE YOU PUT IT, IN THE COLOUR YOU", THEME.CLR(THEME.DIMMED)
+  GP.PRINTAT 6, 10, "GIVE IT. ESC PUTS BACK WHAT IT WAS RATHER THAN EMPTYING IT.", THEME.CLR(THEME.DIMMED)
+  GP.PRINTAT 6, 11, "NAME", THEME.CLR(THEME.TEXT)
+  LINEINPUT.TEXT$ = "GPC"
+  GOSUB LINEINPUT.GET
+  GOSUB GMX.I.SAID
+  GM.RESULT$ = "LINEINPUT.GET  " + GM.SAID$ + "  POS " + MID$(STR$(LINEINPUT.POS), 2)
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.I.ASK -- LINEINPUT.ASK. The label, then the field after it.
+## ***********************************************************************
+
+GMX.I.ASK:
+  GOSUB GMX.CLEARPANEL
+  GOSUB GMX.I.RESET
+  GP.PRINTAT 6, 9, "ASK PRINTS THE LABEL AND PUTS THE FIELD AFTER IT.", THEME.CLR(THEME.DIMMED)
+  LINEINPUT.X = 6
+  LINEINPUT.LEN = 16
+  LINEINPUT.LABEL$ = "FILE NAME: "
+  GOSUB LINEINPUT.ASK
+  GOSUB GMX.I.SAID
+  GM.RESULT$ = "LINEINPUT.ASK  " + GM.SAID$
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.I.RUNFORM -- the focus loop. Both multi-field rows use it.
+## **
+## **  THIS IS WHAT LINEINPUT.KEY IS FOR. UP, DOWN and TAB leave a field
+## **  WITHOUT cancelling it and say which way the focus went; only ESC puts
+## **  the text back. That is why RETURN does not have to mean both "next
+## **  field" and "done", and why a form can go back up.
+## **
+## **  CALLING LINEINPUT.GET IN A ROW INSTEAD IS A BUG, and it was one here:
+## **  three plain calls treat every exit key as "next", so UP goes forward,
+## **  ESC goes forward, and DOWN on the last field falls out of the panel.
+## **
+## **   in   GM.FCOUNT   how many fields
+## **        GM.FY()  GM.FLEN()  GM.FMASK()   one entry a field
+## **        GM.FLD$()   the text, edited in place
+## **   out  GM.FLD$()   what was typed, and GM.FKEY 13 accepted / 27 abandoned
+## **
+## **  THE FOUR ARRAYS ARE LEFT UNDIMENSIONED -- an implicit array is 0..10 and
+## **  three fields fit. DIMming them as well is the one thing that breaks it.
+## ***********************************************************************
+
+GMX.I.RUNFORM:
+  GM.FOCUS = 1
+  GP.DO
+    GOSUB GMX.I.RESET
+    LINEINPUT.Y = GM.FY(GM.FOCUS)
+    LINEINPUT.LEN = GM.FLEN(GM.FOCUS)
+    LINEINPUT.MASK = GM.FMASK(GM.FOCUS)
+    LINEINPUT.TEXT$ = GM.FLD$(GM.FOCUS)
+    GOSUB LINEINPUT.GET
+    GM.FLD$(GM.FOCUS) = LINEINPUT.TEXT$
+    GM.FKEY = LINEINPUT.KEY
+    IF GM.FKEY = 13 THEN GP.EXITDO
+    IF GM.FKEY = 27 THEN GP.EXITDO
+    IF GM.FKEY = 145 THEN GM.FOCUS = GM.FOCUS - 1
+    IF GM.FKEY <> 145 THEN GM.FOCUS = GM.FOCUS + 1
+    IF GM.FOCUS < 1 THEN GM.FOCUS = GM.FCOUNT
+    IF GM.FOCUS > GM.FCOUNT THEN GM.FOCUS = 1
+  GP.LOOP
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.I.FORM -- three fields of one size. The plain form.
+## ***********************************************************************
+
+GMX.I.FORM:
+  GOSUB GMX.CLEARPANEL
+  GP.PRINTAT 6, 9, "UP DOWN AND TAB MOVE AND KEEP THE TEXT. RETURN ACCEPTS,", THEME.CLR(THEME.DIMMED)
+  GP.PRINTAT 6, 10, "ESC ABANDONS.", THEME.CLR(THEME.DIMMED)
+  GP.PRINTAT 6, 12, "NAME", THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 6, 13, "CITY", THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 6, 14, "CODE", THEME.CLR(THEME.TEXT)
+
+  GM.FCOUNT = 3
+  FOR GM.I = 1 TO GM.FCOUNT
+    GM.FLD$(GM.I) = ""
+    GM.FY(GM.I) = 11 + GM.I
+    GM.FLEN(GM.I) = 18
+    GM.FMASK(GM.I) = 0
+  NEXT GM.I
+  GOSUB GMX.I.RUNFORM
+
+  GM.RESULT$ = "FORM  [" + GM.FLD$(1) + "] [" + GM.FLD$(2) + "] [" + GM.FLD$(3) + "]"
+  IF GM.FKEY = 27 THEN GM.RESULT$ = "FORM ABANDONED"
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.I.LIMITS -- the same three fields at different widths, and a mask.
+## **
+## **  A FIELD NEVER SCROLLS. Full, it refuses the character and leaves the
+## **  caret on the last one rather than off the end.
+## ***********************************************************************
+
+GMX.I.LIMITS:
+  GOSUB GMX.CLEARPANEL
+  GP.PRINTAT 6, 9, "FULL, A FIELD REFUSES THE KEY. IT NEVER SCROLLS.", THEME.CLR(THEME.DIMMED)
+  GP.PRINTAT 6, 10, "UP DOWN AND TAB MOVE, RETURN ACCEPTS, ESC ABANDONS.", THEME.CLR(THEME.DIMMED)
+  GP.PRINTAT 6, 12, "LEN 4", THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 6, 13, "LEN 30", THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 6, 14, "MASKED", THEME.CLR(THEME.TEXT)
+
+  GM.FCOUNT = 3
+  FOR GM.I = 1 TO GM.FCOUNT
+    GM.FLD$(GM.I) = ""
+    GM.FY(GM.I) = 11 + GM.I
+    GM.FMASK(GM.I) = 0
+  NEXT GM.I
+  GM.FLEN(1) = 4
+  GM.FLEN(2) = 30
+  GM.FLEN(3) = 12
+  GM.FMASK(3) = 1
+  GOSUB GMX.I.RUNFORM
+
+  GM.RESULT$ = "LIMITS  4 [" + GM.FLD$(1) + "]"
+  GM.RESULT$ = GM.RESULT$ + "   30 TOOK " + MID$(STR$(LEN(GM.FLD$(2))), 2)
+  GM.RESULT$ = GM.RESULT$ + "   MASKED [" + GM.FLD$(3) + "]"
+  IF GM.FKEY = 27 THEN GM.RESULT$ = "LIMITS ABANDONED"
   RETURN
