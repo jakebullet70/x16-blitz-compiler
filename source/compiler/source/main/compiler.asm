@@ -71,8 +71,13 @@ StartCompiler:
 											; GOTO emit an .unwind it does not need
 		stz 	gpBankState 				; no GP.BANKED region seen yet, and nothing relocated --
 		stz 	gpBankActive 				; same argument as blockDepth above, the storage section
-		stz 	gpBankNumber 				; is not cleared. The last two are read unconditionally
-		stz 	gpBankPages 				; by the bootstrap patch table, so zero means "no region".
+		stz 	gpBankCount 				; is not cleared, and gpBankCount is the one that MUST
+											; start at zero: it is the length of every region table,
+											; so a stale byte walks all of them off the end.
+		stz 	gpBankNumber 				; The last two are read unconditionally by the bootstrap
+		stz 	gpBankRunBase 				; patch table, and gpBankRunBase derives from FreeMemory,
+											; so left stale it writes a dead byte into a non-banked
+											; object that MOVES when the compiler's own size changes.
 		stz 	implicitDimCount
 		stz 	implicitDimFirstSet
 		stz 	clrCheckpoint 				; no CLR compiled yet -> no array is re-DIMmable

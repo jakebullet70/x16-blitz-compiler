@@ -1,0 +1,24 @@
+#SAVEAS "@:BANKY.SRC.PRG"
+#REM 0
+#SYMFILE "@:BANKY.SRC.SYM"
+#INCLUDE "GPB.INC.BL"
+
+## A CALL FROM ONE REGION TO ANOTHER. Both run at $A000 in different banks, so
+## the branch has no distance and no offset describes it -- NOT IMPLEMENTED.
+
+PRINT "Q1"
+GOSUB BK.ONE
+END
+
+GP.BANKED 5
+BK.ONE:
+    PRINT "Q2"
+    GOSUB BK.TWO
+    RETURN
+GP.ENDBANKED
+
+GP.BANKED 6
+BK.TWO:
+    PRINT "Q3"
+    RETURN
+GP.ENDBANKED

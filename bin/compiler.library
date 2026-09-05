@@ -770,8 +770,13 @@ StartCompiler:
 											; GOTO emit an .unwind it does not need
 		stz 	gpBankState 				; no GP.BANKED region seen yet, and nothing relocated --
 		stz 	gpBankActive 				; same argument as blockDepth above, the storage section
-		stz 	gpBankNumber 				; is not cleared. The last two are read unconditionally
-		stz 	gpBankPages 				; by the bootstrap patch table, so zero means "no region".
+		stz 	gpBankCount 				; is not cleared, and gpBankCount is the one that MUST
+											; start at zero: it is the length of every region table,
+											; so a stale byte walks all of them off the end.
+		stz 	gpBankNumber 				; The last two are read unconditionally by the bootstrap
+		stz 	gpBankRunBase 				; patch table, and gpBankRunBase derives from FreeMemory,
+											; so left stale it writes a dead byte into a non-banked
+											; object that MOVES when the compiler's own size changes.
 		stz 	implicitDimCount
 		stz 	implicitDimFirstSet
 		stz 	clrCheckpoint 				; no CLR compiled yet -> no array is re-DIMmable
@@ -6730,28 +6735,46 @@ AsmModeTable:
 ;		BOTH MUST RETURN CARRY CLEAR. A .def helper returning carry set makes the generator drop
 ;		every table element after it, with no error and no clue.
 ;
-;		ONE REGION A PROGRAM, for now. A second GP.BANKED is a structure error rather than a
-;		second region: one bank holds the whole GUI stack with room to spare, and the machinery
-;		for several is not worth carrying until something needs it.
+;		SEVERAL REGIONS A PROGRAM, each in its own bank, up to GPBANK_MAXREGIONS. What they may
+;		NOT do is call each other: two regions live at the same $A000 in different banks, so a
+;		branch from one to the other has no distance to travel and GPBankMakeOffset refuses it.
+;		Everything reaches everything else the way it already does -- out to a low-memory shim
+;		and back in.
+;
+;		EIGHT IS THE LIMIT and it comes from the bootstrap extension page, whose own table is
+;		that long. A ninth GP.BANKED is refused rather than overrunning it.
 ;
 ; ************************************************************************************************
+
+GPBANK_MAXREGIONS = 8 						; and eight is what the extension page's table holds
 
 CommandGPBankedCompile:
 		stz 	deferErrors 				; a block opener must never defer -- see the header
 		lda 	gpBankState 				; 0 = never seen, 1 = open, 2 = closed
-		bne 	GPBankStructure 			; a second GP.BANKED, or one after a closed region
+		cmp 	#1
+		beq 	GPBankStructure 			; a GP.BANKED inside a region that is still open
+		lda 	gpBankCount
+		cmp 	#GPBANK_MAXREGIONS
+		bcs 	GPBankStructure 			; ...or one region more than the table holds
 		jsr 	GPBankCheckAlone 			; first on its line, and outside every block
 		jsr 	GPBankReadNumber 			; the bank, into gpBankNumber
+		jsr 	GPBankCheckBankFree 		; ...which no other region may already own
 		lda 	#1
 		sta 	gpBankState
+		ldx 	gpBankCount
+		lda 	gpBankNumber
+		sta 	gpBankBanks,x
+		txa 								; the two-byte tables want the subscript doubled
+		asl 	a
+		tax
 		lda 	zTemp0 						; THE REGION STARTS AT ITS OWN LINE MARKER, so the line
-		sta 	gpBankStart 				; table entry for this line moves with it -- which is
+		sta 	gpBankStarts,x 				; table entry for this line moves with it -- which is
 		lda 	zTemp0+1 					; what lets the bridge below be an ordinary GOTO to an
-		sta 	gpBankStart+1 				; ordinary line number
+		sta 	gpBankStarts+1,x 			; ordinary line number
 		lda 	currentLineNumber 			; ...and this is the line number it goes to
-		sta 	gpBankLineIn
+		sta 	gpBankLinesIn,x
 		lda 	currentLineNumber+1
-		sta 	gpBankLineIn+1
+		sta 	gpBankLinesIn+1,x
 		clc
 		rts
 
@@ -6763,15 +6786,19 @@ CommandGPEndBankedCompile:
 		jsr 	GPBankCheckAlone
 		lda 	#2
 		sta 	gpBankState
+		lda 	gpBankCount
+		asl 	a
+		tax
 		lda 	zTemp0 						; THE REGION ENDS AT THIS LINE'S MARKER, which stays
-		sta 	gpBankEnd 					; behind in low memory: it is the first byte of what
+		sta 	gpBankEnds,x 				; behind in low memory: it is the first byte of what
 		lda 	zTemp0+1 					; follows the region, not the last byte of it
-		sta 	gpBankEnd+1
+		sta 	gpBankEnds+1,x
 		lda 	currentLineNumber
-		sta 	gpBankLineOut
+		sta 	gpBankLinesOut,x
 		lda 	currentLineNumber+1
-		sta 	gpBankLineOut+1
-		clc
+		sta 	gpBankLinesOut+1,x
+		inc 	gpBankCount 				; ONLY NOW is the region a region: an unclosed one is
+		clc 								; a structure error and must not reach the relocator
 		rts
 
 ;
@@ -6922,12 +6949,13 @@ GPBankCheckAlone:
 GPBankRelocate:
 		stz 	deferErrors
 		lda 	gpBankState
-		beq 	_GBRNothing 				; no GP.BANKED in this program at all
-		cmp 	#2
-		beq 	_GBRHaveRegion
-		jmp 	GPBankStructure 			; a GP.BANKED that was never closed
-_GBRNothing:
-		rts
+		cmp 	#1
+		beq 	_GBRUnclosed 				; a GP.BANKED that was never closed
+		lda 	gpBankCount
+		bne 	_GBRHaveRegion
+		rts 								; no GP.BANKED in this program at all
+_GBRUnclosed:
+		jmp 	GPBankStructure
 _GBRHaveRegion:
 		;
 		;		SHARED MODE ONLY. The correction below needs to know where the p-code will RUN,
@@ -6936,12 +6964,36 @@ _GBRHaveRegion:
 		;		the copying either. Refusing is honest; guessing would miscompile silently.
 		;
 		lda 	gpBankShared
-		bne 	_GBRShared
+		bne 	_GBRPasses
 		.error_unimplemented
-_GBRShared:
-		lda 	objPtr 						; Q, one past everything including the pool
-		sta 	gpBankTailEnd
+;
+;		ONE PASS A REGION, LAST REGION FIRST, AND EACH ONE LANDS BELOW THE LAST. gpBankCeiling
+;		is the bottom of what earlier passes have already placed, and no pass touches a byte
+;		above it: the rotation runs from the region up to the ceiling, and the placed block is
+;		lifted bodily out of the way first. So the regions come to rest in SOURCE order, R0
+;		lowest, each one starting on a page boundary and padded out to a whole number of pages
+;		-- which is what lets the bootstrap copy the lot with one running source address.
+;
+;		A PASS MUST NOT DISTURB WHAT AN EARLIER PASS ALIGNED, and that is the whole reason for
+;		the ceiling. Rotating each region to the top of the OBJECT instead would shift every
+;		region already placed down by (3 - its length), which is not a whole number of pages, so
+;		the second region to be moved would knock the first one off its page boundary and the
+;		bootstrap would copy it from the wrong address. The block is lifted by a multiple of 256
+;		here precisely so that cannot happen.
+;
+_GBRPasses:
+		lda 	objPtr 						; nothing is placed yet, so the ceiling is the top
+		sta 	gpBankCeiling
 		lda 	objPtr+1
+		sta 	gpBankCeiling+1
+		lda 	gpBankCount
+		sta 	gpBankPass
+_GBRPass:
+		dec 	gpBankPass
+		jsr 	_GBRLoadRegion 				; the table -> the scalars this pass works in
+		lda 	gpBankCeiling 				; Q, one past the tail -- NOT one past the object
+		sta 	gpBankTailEnd
+		lda 	gpBankCeiling+1
 		sta 	gpBankTailEnd+1
 		;
 		;		The region's length, the tail's length, and where the region ends up.
@@ -6990,23 +7042,76 @@ _GBRShared:
 		adc 	#0
 		sta 	gpBankNewBase+1
 		;
-		;		Reserve what the move needs -- two bridges, the padding and the new end marker --
-		;		through WriteCodeByte rather than by moving objPtr, because that is the only
+		;		FILLER ABOVE THE END MARKER, so the region's SPAN is a whole number of pages and
+		;		the region above it starts exactly where this one's pages stop. The span is the
+		;		region, its exit bridge and the marker: L + 4. Nothing walks past the marker, so
+		;		the filler is only ever copied into the bank and never read.
+		;
+		;		NONE OF IT FOR THE TOPMOST REGION, which is the one the FIRST pass places and the
+		;		only one a program with a single region has. Nothing sits above it to be pushed
+		;		off a page boundary, so writing up to 255 bytes to reach one would grow every
+		;		banked object for no reason. Its last page is short and the bootstrap copies a
+		;		few bytes of whatever follows into the bank behind it, which is what it has
+		;		always done and what nothing ever reads.
+		;
+		stz 	gpBankFill
+		lda 	gpBankPass
+		inc 	a
+		cmp 	gpBankCount
+		bcs 	_GBRNoFill
+		clc
+		lda 	gpBankLength
+		adc 	#4
+		sta 	gpBankTemp
+		sec
+		lda 	#0
+		sbc 	gpBankTemp
+		sta 	gpBankFill
+_GBRNoFill:
+		;
+		;		Room for the whole insertion: entry bridge, alignment padding, exit bridge, end
+		;		marker and that filler. IT CAN PASS 256 -- padding and filler are a byte each and
+		;		both can be 255 -- so the count is sixteen bits and not the X register.
+		;
+		;		Taken through WriteCodeByte rather than by moving objPtr, because that is the only
 		;		place the object ceiling is tested. A program that no longer fits has to say
 		;		PROGRAM TOO BIG here, not run off the top of the buffer.
 		;
-		lda 	gpBankPad
+		lda 	objPtr
+		sta 	gpBankOldTop
+		lda 	objPtr+1
+		sta 	gpBankOldTop+1
 		clc
+		lda 	gpBankPad
 		adc 	#7
-		tax
+		sta 	gpBankRoom
+		lda 	#0
+		adc 	#0
+		sta 	gpBankRoom+1
+		clc
+		lda 	gpBankRoom
+		adc 	gpBankFill
+		sta 	gpBankRoom
+		lda 	gpBankRoom+1
+		adc 	#0
+		sta 	gpBankRoom+1
 _GBRoom:
+		lda 	gpBankRoom
+		ora 	gpBankRoom+1
+		beq 	_GBRoomDone
 		lda 	#0
 		jsr 	WriteCodeByte
-		dex
-		bne 	_GBRoom
+		lda 	gpBankRoom
+		bne 	_GBRoomNoBorrow
+		dec 	gpBankRoom+1
+_GBRoomNoBorrow:
+		dec 	gpBankRoom
+		bra 	_GBRoom
+_GBRoomDone:
 		;
-		;		The two deltas every recorded address is corrected by. The tail moves from
-		;		gpBankEnd down to start+3; the region moves to gpBankNewBase.
+		;		The three deltas every recorded address is corrected by. The tail moves from
+		;		gpBankEnd down to start+3; the region moves to gpBankNewBase; and the block of
+		;		regions an earlier pass placed moves UP, by the whole insertion.
 		;
 		sec
 		lda 	#3
@@ -7023,6 +7128,35 @@ _GBRoom:
 		lda 	gpBankNewBase+1
 		sbc 	gpBankStart+1
 		sta 	gpBankDelta+1
+
+		sec 								; objPtr has already grown by the insertion
+		lda 	objPtr
+		sbc 	gpBankOldTop
+		sta 	gpBankDelta+4
+		lda 	objPtr+1
+		sbc 	gpBankOldTop+1
+		sta 	gpBankDelta+5
+		;
+		;		Lift the placed block out of the way, by exactly that. It is a whole number of
+		;		pages -- the region's base is aligned and its span is whole pages, so what is
+		;		inserted below the block has to be too -- which is what keeps every region an
+		;		earlier pass aligned still aligned.
+		;
+		;		A no-op on the first pass, where the block is empty and the two ends meet.
+		;
+		lda 	gpBankCeiling
+		sta 	gpBankMoveLow
+		lda 	gpBankCeiling+1
+		sta 	gpBankMoveLow+1
+		lda 	gpBankOldTop
+		sta 	zTemp0
+		lda 	gpBankOldTop+1
+		sta 	zTemp0+1
+		lda 	objPtr
+		sta 	zTemp1
+		lda 	objPtr+1
+		sta 	zTemp1+1
+		jsr 	_GBShiftUp
 		;
 		;		Step one: shift the region and the tail up by three, to open the gap the entry
 		;		bridge goes in.
@@ -7151,42 +7285,48 @@ _GBRPadded:
 		lda 	#$FF
 		ldy 	#3
 		sta 	(zTemp0),y
-		;
-		;		Where the walkers hop FROM: one past the low code's own $FF, which is where the
-		;		pool starts if there is one and the end of everything if there is not. Recorded
-		;		before it moves, then corrected with everything else.
-		;
-		lda 	AsmPoolLen
-		ora 	AsmPoolLen+1
-		beq 	_GBRNoPool
-		lda 	AsmPoolBase
-		sta 	gpBankHopFrom
-		lda 	AsmPoolBase+1
-		sta 	gpBankHopFrom+1
-		bra 	_GBRFixUp
-_GBRNoPool:
-		lda 	gpBankTailEnd
-		sta 	gpBankHopFrom
-		lda 	gpBankTailEnd+1
-		sta 	gpBankHopFrom+1
 _GBRFixUp:
 		;
 		;		Everything that recorded a position in the buffer now has to be told.
 		;
 		jsr 	_GBFixLineTable
+		jsr 	_GBFixRegions 				; BEFORE the .fngosub walk, which reads the new bases
 		jsr 	_GBFixFnCalls
 		jsr 	_GBFixAsmCalls
 		jsr 	_GBFixPoolBase
-		jsr 	_GBFixHopFrom
 		;
-		;		Leave the region's new bounds behind, and open the hop.
+		;		WHERE THE WALK LEAVES OFF TO REACH THE REGION ABOVE THIS ONE. The walkers run to
+		;		this region's own end marker and stop; one past it is where they must be sent on,
+		;		and what they must be sent to is the next region's base -- which is exactly the
+		;		page boundary the filler above reaches. The topmost region has nothing above it
+		;		and so opens no hop.
+		;
+		;		RECORDED AFTER THE FIX-UPS, not before them. _GBFixRegions corrects every table
+		;		entry an EARLIER pass wrote, and hops[pass+1] is one of them -- so writing this
+		;		pass's own hop first would have it corrected a second time. The region it names
+		;		is placed by a LATER pass, and its own base is written by that pass.
+		;
+		lda 	gpBankPass
+		inc 	a
+		cmp 	gpBankCount
+		bcs 	_GBROnlyHop
+		asl 	a
+		tax
+		clc
+		lda 	gpBankHigh 					; the exit bridge is 3 and the marker 1
+		adc 	#4
+		sta 	gpBankHops,x
+		lda 	gpBankHigh+1
+		adc 	#0
+		sta 	gpBankHops+1,x
+_GBROnlyHop:
+		;
+		;		Leave the region's new bounds behind.
 		;
 		lda 	gpBankNewBase
 		sta 	gpBankStart
-		sta 	gpBankHopTo
 		lda 	gpBankNewBase+1
 		sta 	gpBankStart+1
-		sta 	gpBankHopTo+1
 		clc 								; one past the exit bridge
 		lda 	gpBankHigh
 		adc 	#3
@@ -7195,41 +7335,237 @@ _GBRFixUp:
 		adc 	#0
 		sta 	gpBankEnd+1
 		;
-		;		THE CROSS-BOUNDARY CORRECTION. A branch offset is target minus source computed in
-		;		BUFFER addresses, which works because every byte has the same buffer-to-run delta
-		;		and the two cancel in the subtraction. The region's delta is different -- buffer
-		;		to $A000, not buffer to $0900 -- so a branch with one end each side comes out
-		;		wrong by exactly the difference, and only such a branch does.
+		;		And how much the bootstrap has to move: the region, its exit bridge and the end
+		;		marker, rounded up to whole pages. Any filler is inside that rounding rather than
+		;		added to it -- it exists precisely to fill the part page this counts.
 		;
-		;		It is a whole number of PAGES: both bases are page aligned and so is the region.
-		;		So the correction is one byte, added to or taken off the offset's high half.
+		;		NOT objPtr MINUS THE BASE any more. That worked while the region was the last
+		;		thing in the object, and with several it is only the topmost that still is.
 		;
 		clc
-		lda 	gpBankNewBase+1 			; the page the region WOULD have run at
-		adc 	gpBankRunPage
-		sta 	gpBankRunBase
-		sec
-		lda 	#$A0 						; ...against the page it is actually going to
-		sbc 	gpBankRunBase
-		sta 	gpBankCrossHigh
-		;
-		;		And how much the bootstrap has to move: the region, its exit bridge and the end
-		;		marker, rounded up to whole pages. It starts on a page boundary, so the low byte
-		;		of the difference is objPtr's own.
-		;
-		sec
-		lda 	objPtr
-		sbc 	gpBankNewBase
+		lda 	gpBankLength
+		adc 	#4
 		sta 	gpBankTemp
-		lda 	objPtr+1
-		sbc 	gpBankNewBase+1
+		lda 	gpBankLength+1
+		adc 	#0
 		sta 	gpBankPages
 		lda 	gpBankTemp 					; a part page needs one more
 		beq 	_GBRWholePages
 		inc 	gpBankPages
 _GBRWholePages:
+		;
+		;		A REGION HAS TO FIT THE WINDOW. 32 pages is the whole of $A000-$BFFF, and nothing
+		;		up to here has said no to a bigger one: the copy would simply run past $BFFF into
+		;		the I/O page. It is checked HERE rather than at GP.ENDBANKED because this is where
+		;		the padding and the two bridges are counted, and they are part of what has to fit.
+		;
+		lda 	gpBankPages
+		cmp 	#33
+		bcs 	_GBRTooBig
+		jsr 	_GBRSaveRegion 				; ...and back into the table
+		lda 	gpBankStart 				; the ceiling comes down onto it: the next pass may
+		sta 	gpBankCeiling 				; not touch a byte from here up
+		lda 	gpBankStart+1
+		sta 	gpBankCeiling+1
+		lda 	gpBankPass
+		beq 	_GBRPlaced
+		jmp 	_GBRPass
+_GBRTooBig:
+		.error_range
+_GBRPlaced:
+		;
+		;		Nothing moves again, so the two things that had to wait for that can be settled:
+		;		what a branch crossing into each region is out by, and where the whole run of
+		;		them starts once the program is loaded.
+		;
+		;		THE CROSS-BOUNDARY CORRECTION. A branch offset is target minus source computed in
+		;		BUFFER addresses, which works because every byte has the same buffer-to-run delta
+		;		and the two cancel in the subtraction. A region's delta is different -- buffer to
+		;		$A000, not buffer to the p-code base -- so a branch with one end each side comes
+		;		out wrong by exactly the difference, and only such a branch does.
+		;
+		;		It is a whole number of PAGES: both bases are page aligned and so is every region.
+		;		So the correction is one byte, added to or taken off the offset's high half.
+		;
+		ldx 	#0
+_GBRCross:
+		txa
+		asl 	a
+		tay
+		clc
+		lda 	gpBankStarts+1,y 			; the page this region WOULD have run at in low memory
+		adc 	gpBankRunPage
+		inc 	a 							; ...plus one, for the BOOTSTRAP EXTENSION PAGE. Only a
+											; banked program carries it, and this routine only runs
+											; for a banked program, so the +1 is unconditional:
+											; low p-code starts at $0A00 here, not $0900.
+		sta 	gpBankTemp
+		sec
+		lda 	#$A0 						; ...against the page it is actually going to -- and
+		sbc 	gpBankTemp 					; every region goes to $A000, in its own bank
+		sta 	gpBankCrossings,x
+		inx
+		cpx 	gpBankCount
+		bcc 	_GBRCross
+		;
+		;		...and where the whole run of them sits once the program is loaded. That is the
+		;		LOWEST region, which is region 0: the passes go downwards and each one lands
+		;		below the last, so the regions end up in source order with R0 at the bottom. One
+		;		address is enough because they are contiguous in whole pages.
+		;
+		clc
+		lda 	gpBankStarts+1
+		adc 	gpBankRunPage
+		inc 	a
+		sta 	gpBankRunBase
+		jsr 	_GBRFindLowEnd
 		lda 	#1
 		sta 	gpBankActive
+		rts
+
+; ************************************************************************************************
+;
+;		Where the walk leaves LOW MEMORY, which is hops[0]: the first region is reached from
+;		there and every other one from the region below it.
+;
+;		FOUND BY WALKING, not by arithmetic. It used to be "one past the tail", and with a single
+;		region that was the same thing -- the tail ended at the low code's own end marker. With
+;		several it is not: each pass leaves its alignment padding behind in what the NEXT pass
+;		treats as tail, so one past the tail is one past a stretch of padding the walkers stop
+;		short of. They stop at the marker, so this stops where they do.
+;
+;		gpBankActive is still 0 here, so the walk cannot hop -- which is the point. objPtr is the
+;		end of the object and WriteObjectCode streams up to it, so it is put back.
+;
+;		THE PADDING BELOW THE FIRST REGION IS DEAD SPACE, up to 255 bytes for every region after
+;		the first. It sits below the region and so counts as low p-code. Worth reclaiming if a
+;		program ever gets close enough to the ceiling to care.
+;
+; ************************************************************************************************
+
+_GBRFindLowEnd:
+		lda 	objPtr
+		sta 	gpBankSave
+		lda 	objPtr+1
+		sta 	gpBankSave+1
+		lda 	#BLC_RESETOUT 				; the compiler library cannot name FreeMemory -- the
+		jsr 	CallAPIHandler 				; same reason FixBranches rewinds this way
+_GBRFLELoop:
+		jsr 	MoveObjectForward
+		bcc 	_GBRFLELoop
+		lda 	objPtr
+		sta 	gpBankHops
+		lda 	objPtr+1
+		sta 	gpBankHops+1
+		lda 	gpBankSave
+		sta 	objPtr
+		lda 	gpBankSave+1
+		sta 	objPtr+1
+		rts
+
+;
+;		The pass's region, out of the table and back into it. X indexes the byte tables and the
+;		two-byte ones want it doubled, so the subscript is built once rather than at every field.
+;
+;		LOAD IS BEFORE THE ROTATION and SAVE IS AFTER, and in between gpBankStart and gpBankEnd
+;		mean what they meant when they went in -- where the region was. GPBankAdjust reads them
+;		that whole time to decide which side of the move an address was on, which is why the
+;		post-move values go back through here at the end and not the moment they are known.
+;
+_GBRLoadRegion:
+		ldx 	gpBankPass
+		lda 	gpBankBanks,x
+		sta 	gpBankNumber
+		txa
+		asl 	a
+		tax
+		lda 	gpBankStarts,x
+		sta 	gpBankStart
+		lda 	gpBankStarts+1,x
+		sta 	gpBankStart+1
+		lda 	gpBankEnds,x
+		sta 	gpBankEnd
+		lda 	gpBankEnds+1,x
+		sta 	gpBankEnd+1
+		lda 	gpBankLinesIn,x
+		sta 	gpBankLineIn
+		lda 	gpBankLinesIn+1,x
+		sta 	gpBankLineIn+1
+		lda 	gpBankLinesOut,x
+		sta 	gpBankLineOut
+		lda 	gpBankLinesOut+1,x
+		sta 	gpBankLineOut+1
+		rts
+
+_GBRSaveRegion:
+		ldx 	gpBankPass
+		lda 	gpBankPages
+		sta 	gpBankPageCounts,x
+		txa
+		asl 	a
+		tax
+		lda 	gpBankStart
+		sta 	gpBankStarts,x
+		lda 	gpBankStart+1
+		sta 	gpBankStarts+1,x
+		lda 	gpBankEnd
+		sta 	gpBankEnds,x
+		lda 	gpBankEnd+1
+		sta 	gpBankEnds+1,x
+		rts
+
+; ************************************************************************************************
+;
+;		The regions an EARLIER pass already placed. Each of them sits above the region this pass
+;		took, so this pass's rotation moved every one of them, and their recorded base, end and
+;		hop are ordinary buffer addresses that move like any other -- GPBankAdjust knows what by.
+;
+;		A program with one region never enters the loop.
+;
+; ************************************************************************************************
+
+_GBFixRegions:
+		lda 	gpBankPass
+		sta 	gpBankTemp
+_GBFRNext:
+		inc 	gpBankTemp
+		lda 	gpBankTemp
+		cmp 	gpBankCount
+		bcs 	_GBFRDone
+		asl 	a
+		sta 	gpBankTemp2 				; the doubled subscript, for all three tables
+		.set16 	zTemp0, gpBankStarts
+		jsr 	_GBFRField
+		.set16 	zTemp0, gpBankEnds
+		jsr 	_GBFRField
+		.set16 	zTemp0, gpBankHops
+		jsr 	_GBFRField
+		bra 	_GBFRNext
+_GBFRDone:
+		rts
+
+;
+;		One two-byte table entry, through GPBankAdjust: the table's base in zTemp0 and the
+;		doubled subscript in gpBankTemp2. Written once and called three times rather than
+;		spelled out three times, which is 50 bytes of a compiler that is measured against the
+;		object buffer it shares a page boundary with -- see [[compiler-must-not-cap-program-size]].
+;
+;		GPBankAdjust reads and writes zTemp1 and corrupts X, and touches nothing else.
+;
+_GBFRField:
+		ldy 	gpBankTemp2
+		lda 	(zTemp0),y
+		sta 	zTemp1
+		iny
+		lda 	(zTemp0),y
+		sta 	zTemp1+1
+		jsr 	GPBankAdjust
+		ldy 	gpBankTemp2
+		lda 	zTemp1
+		sta 	(zTemp0),y
+		iny
+		lda 	zTemp1+1
+		sta 	(zTemp0),y
 		rts
 
 _GBFixPoolBase:
@@ -7246,18 +7582,6 @@ _GBFixPoolBase:
 		lda 	zTemp1+1
 		sta 	AsmPoolBase+1
 _GBFPBOut:
-		rts
-
-_GBFixHopFrom:
-		lda 	gpBankHopFrom
-		sta 	zTemp1
-		lda 	gpBankHopFrom+1
-		sta 	zTemp1+1
-		jsr 	GPBankAdjust
-		lda 	zTemp1
-		sta 	gpBankHopFrom
-		lda 	zTemp1+1
-		sta 	gpBankHopFrom+1
 		rts
 
 ; ************************************************************************************************
@@ -7441,11 +7765,31 @@ _GBFixFnCalls:
 		lda 	#BLC_RESETOUT 				; the compiler library cannot name FreeMemory -- the
 		jsr 	CallAPIHandler 				; same reason FixBranches rewinds this way
 		jsr 	_GBFFCRange 				; the low code
-		lda 	gpBankNewBase 				; ...then the region
+		lda 	gpBankNewBase 				; ...then the region this pass just moved
 		sta 	objPtr
 		lda 	gpBankNewBase+1
 		sta 	objPtr+1
 		jsr 	_GBFFCRange
+		;
+		;		...and then every region an earlier pass placed. They moved too, _GBFixRegions
+		;		has just said where to, and a DEF FN inside one is as legal as anywhere else.
+		;
+		lda 	gpBankPass
+		sta 	gpBankTemp
+_GBFFCRegion:
+		inc 	gpBankTemp
+		lda 	gpBankTemp
+		cmp 	gpBankCount
+		bcs 	_GBFFCEnd
+		asl 	a
+		tax
+		lda 	gpBankStarts,x
+		sta 	objPtr
+		lda 	gpBankStarts+1,x
+		sta 	objPtr+1
+		jsr 	_GBFFCRange
+		bra 	_GBFFCRegion
+_GBFFCEnd:
 		lda 	gpBankSave
 		sta 	objPtr
 		lda 	gpBankSave+1
@@ -7537,9 +7881,38 @@ _GBFACDone:
 
 ; ************************************************************************************************
 ;
+;		TWO REGIONS IN ONE BANK would put the second at $A000 on top of the first, and the only
+;		symptom would be the first one's code running as whatever the second one's is. The bank
+;		is a constant read at compile time, so this costs one walk of a table that is at most
+;		eight long, once per GP.BANKED.
+;
+;		BAD VALUE, reported at the GP.BANKED whose operand is the repeat -- which is the second
+;		of the two, and the one the user can move.
+;
+; ************************************************************************************************
+
+GPBankCheckBankFree:
+		ldx 	#0
+_GBCBFNext:
+		cpx 	gpBankCount
+		bcs 	_GBCBFOkay
+		lda 	gpBankBanks,x
+		cmp 	gpBankNumber
+		beq 	_GBCBFTaken
+		inx
+		bra 	_GBCBFNext
+_GBCBFOkay:
+		rts
+_GBCBFTaken:
+		.error_value
+
+; ************************************************************************************************
+;
 ;		zTemp1 holds an address recorded before the move. Replace it with where that byte is
-;		now. Three cases and two deltas: below the region nothing moved, inside it everything
-;		moved to the new base, and after it everything moved by the bridge minus the region.
+;		now. Four cases and three deltas: below the region nothing moved, inside it everything
+;		moved to the new base, after it everything moved down by the region minus the bridge,
+;		and above the ceiling -- the regions an earlier pass already placed -- everything moved
+;		UP by the whole insertion.
 ;
 ;		Corrupts X.
 ;
@@ -7563,7 +7936,17 @@ _GBANotBelow:
 		cmp 	gpBankEnd
 		bcc 	_GBAAdd
 _GBAAfter:
-		ldx 	#2 							; ...or after it
+		ldx 	#2 							; ...or after it, in the tail
+		lda 	zTemp1+1
+		cmp 	gpBankCeiling+1
+		bcc 	_GBAAdd
+		bne 	_GBAPlaced
+		lda 	zTemp1
+		cmp 	gpBankCeiling
+		bcc 	_GBAAdd
+_GBAPlaced:
+		ldx 	#4 							; ...or up in a region an earlier pass placed, which
+											; this pass lifted bodily rather than rotating
 _GBAAdd:
 		clc
 		lda 	zTemp1
@@ -7590,18 +7973,28 @@ _GBADone:
 GPBankHop:
 		lda 	gpBankActive
 		beq 	_GBHEnd
+		ldx 	#0
+_GBHNext:
+		cpx 	gpBankCount
+		bcs 	_GBHEnd
+		txa
+		asl 	a
+		tay
 		lda 	objPtr
-		cmp 	gpBankHopFrom
-		bne 	_GBHEnd
+		cmp 	gpBankHops,y
+		bne 	_GBHSkip
 		lda 	objPtr+1
-		cmp 	gpBankHopFrom+1
-		bne 	_GBHEnd
-		lda 	gpBankHopTo
+		cmp 	gpBankHops+1,y
+		bne 	_GBHSkip
+		lda 	gpBankStarts,y 				; the hop lands on the region itself
 		sta 	objPtr
-		lda 	gpBankHopTo+1
+		lda 	gpBankStarts+1,y
 		sta 	objPtr+1
 		clc
 		rts
+_GBHSkip:
+		inx
+		bra 	_GBHNext
 _GBHEnd:
 		sec
 		rts
@@ -7633,37 +8026,83 @@ GPBankMakeOffset:
 		lda 	gpBankTarget 				; ...and the target ?
 		ldy 	gpBankTarget+1
 		jsr 	_GBMOSide
+		sta 	gpBankSideTo
 		cmp 	gpBankSideFrom
 		beq 	_GBMOOut 					; the same side: the deltas cancel as they always did
-		cmp 	#1
-		beq 	_GBMOInto
-		sec 								; out of the bank, into low memory
+		;
+		;		ONE END IN A REGION AND THE OTHER IN LOW MEMORY is what the correction is for.
+		;		ONE END IN EACH OF TWO REGIONS cannot be corrected at all: both regions run at
+		;		$A000, in different banks, so the branch has no distance to travel and no offset
+		;		describes it. Refused here rather than miscompiled -- and it is the same rule the
+		;		library already works to, where everything reaches everything else by going out
+		;		to a low-memory shim and back in.
+		;
+		lda 	gpBankSideFrom
+		beq 	_GBMOInto 					; 0 = low memory, so this one goes INTO a region
+		ldx 	gpBankSideTo
+		bne 	_GBMOCross 					; both ends in regions, and not the same one
+		ldx 	gpBankSideFrom 				; out of a region, into low memory
+		dex
+		sec
 		lda 	gpBankOffset+1
-		sbc 	gpBankCrossHigh
+		sbc 	gpBankCrossings,x
 		sta 	gpBankOffset+1
 		bra 	_GBMOOut
 _GBMOInto:
-		clc 								; out of low memory, into the bank
+		ldx 	gpBankSideTo 				; out of low memory, into a region
+		dex
+		clc
 		lda 	gpBankOffset+1
-		adc 	gpBankCrossHigh
+		adc 	gpBankCrossings,x
 		sta 	gpBankOffset+1
 _GBMOOut:
 		lda 	gpBankOffset
 		ldy 	gpBankOffset+1
 		rts
 
+_GBMOCross:
+		.error_unimplemented
+
 ;
-;		YA is an address in the object buffer; A comes back 1 if it is in the region and 0 if it
-;		is not. The region is the last thing in the buffer, so one comparison settles it.
+;		YA is an address in the object buffer. A comes back 0 if it is in low memory, or the
+;		region's number PLUS ONE if it is inside one -- so that "same side" is still a single
+;		compare, and which region it was is still in hand for the correction.
+;
+;		The regions are the last things in the buffer, in source order with a few bytes of page
+;		filler between them. Nothing branches at filler, so an address in none of them is in
+;		low memory.
 ;
 _GBMOSide:
-		cpy 	gpBankStart+1
-		bcc 	_GBMOLow
-		bne 	_GBMOHigh
-		cmp 	gpBankStart
-		bcc 	_GBMOLow
+		sta 	gpBankTemp
+		sty 	gpBankTemp2
+		ldx 	#0
+_GBMOSNext:
+		cpx 	gpBankCount
+		bcs 	_GBMOLow
+		txa
+		asl 	a
+		tay
+		lda 	gpBankTemp2 				; below this region ? then it is not this one
+		cmp 	gpBankStarts+1,y
+		bcc 	_GBMOSSkip
+		bne 	_GBMOSNotBelow
+		lda 	gpBankTemp
+		cmp 	gpBankStarts,y
+		bcc 	_GBMOSSkip
+_GBMOSNotBelow:
+		lda 	gpBankTemp2 				; ...and before its end ?
+		cmp 	gpBankEnds+1,y
+		bcc 	_GBMOHigh
+		bne 	_GBMOSSkip
+		lda 	gpBankTemp
+		cmp 	gpBankEnds,y
+		bcc 	_GBMOHigh
+_GBMOSSkip:
+		inx
+		bra 	_GBMOSNext
 _GBMOHigh:
-		lda 	#1
+		txa
+		inc 	a
 		rts
 _GBMOLow:
 		lda 	#0
@@ -7729,11 +8168,15 @@ gpBankNewBase:									; where the region is moved to, page aligned
 		.fill 	2
 gpBankPad:										; bytes of padding that alignment needed
 		.fill 	1
-gpBankDelta:									; two 16 bit deltas: inside the region, then after it
-		.fill 	4
-gpBankHopFrom:									; the walkers leave low memory here...
+gpBankDelta:									; three 16 bit deltas, and GPBankAdjust indexes them:
+		.fill 	6 								; inside the region, after it, and the placed block
+gpBankCeiling:									; where the regions an earlier pass placed begin --
+		.fill 	2 								; the top of what this pass is allowed to move
+gpBankFill:										; bytes of filler above the region's end marker, to
+		.fill 	1 								; make its span a whole number of pages
+gpBankRoom:										; the whole insertion, which can pass 256
 		.fill 	2
-gpBankHopTo:									; ...and carry on there
+gpBankOldTop:									; objPtr before the insertion was reserved
 		.fill 	2
 gpBankLow:										; the three boundaries of the rotation
 		.fill 	2
@@ -7759,8 +8202,6 @@ gpBankRunPage:									; buffer page -> run page, which shared mode knows
 		.fill 	1 								; up front and embedded mode does not
 gpBankRunBase:									; the page the region would have run at in low memory
 		.fill 	1
-gpBankCrossHigh:								; what a branch crossing the boundary is out by,
-		.fill 	1 								; in pages -- see GPBankMakeOffset
 gpBankPages:									; pages for the bootstrap to move into the bank
 		.fill 	1
 gpBankTarget:									; a branch target, held across STRMakeOffset
@@ -7771,6 +8212,41 @@ gpBankSideFrom:									; 1 if the branch itself is in the region
 		.fill 	1
 gpBankTemp:										; scratch
 		.fill 	1
+gpBankTemp2:									; ...and a second, for the table walks
+		.fill 	1
+gpBankSideTo:									; which region a branch points AT, 0 for low memory
+		.fill 	1
+
+;
+;		THE REGION TABLE. One entry a GP.BANKED, in SOURCE order. Everything above is either
+;		global to the compile or the WORKING COPY of whichever region GPBankRelocate has in
+;		hand: the rotation happens once per region and each pass wants the same values the
+;		single-region version always wanted, so the pass loads them out of here and puts the
+;		results back.
+;
+;		EIGHT, because eight is what the bootstrap extension page's own table holds. A ninth
+;		GP.BANKED is refused rather than overrunning either of them.
+;
+gpBankCount:									; how many regions the program has
+		.fill 	1
+gpBankPass:										; which one GPBankRelocate is moving
+		.fill 	1
+gpBankBanks:									; the bank each one named
+		.fill 	GPBANK_MAXREGIONS
+gpBankStarts:									; where each starts -- in the object buffer while
+		.fill 	GPBANK_MAXREGIONS * 2 			; compiling, and where it ended up once its pass ran
+gpBankEnds:										; ...and one past where each ends
+		.fill 	GPBANK_MAXREGIONS * 2
+gpBankLinesIn:									; the GP.BANKED line, for the entry bridge
+		.fill 	GPBANK_MAXREGIONS * 2
+gpBankLinesOut:									; the GP.ENDBANKED line, for the exit bridge
+		.fill 	GPBANK_MAXREGIONS * 2
+gpBankPageCounts:								; pages of each, for the bootstrap's table
+		.fill 	GPBANK_MAXREGIONS
+gpBankCrossings:								; what a branch crossing INTO each one is out by
+		.fill 	GPBANK_MAXREGIONS
+gpBankHops:										; where the walk leaves off to reach each one
+		.fill 	GPBANK_MAXREGIONS * 2
 		.send 	storage
 
 ; ************************************************************************************************

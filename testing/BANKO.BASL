@@ -1,0 +1,49 @@
+#SAVEAS "@:BANKO.SRC.PRG"
+#REM 0
+#SYMFILE "@:BANKO.SRC.SYM"
+#INCLUDE "GPB.INC.BL"
+
+## TWO REGIONS, TWO BANKS. Each is entered from low memory and each calls back
+## down into low memory. Neither calls the other -- that is refused, and BANKQ
+## is the test that says so.
+
+## EVERY CALL SELECTS ITS BANK FIRST. With one region the bootstrap left the
+## only bank selected and nothing had to say so; with two it leaves the LAST
+## one selected, and a call into the other lands on the wrong region's bytes at
+## the same $A000 offset. This is the shim pattern the library already uses.
+
+PRINT "N1 BEFORE"
+BANK 5 : GOSUB BK.ONE
+BANK 5 : GOSUB BK.TWO
+BANK 6 : GOSUB BK.FOUR
+BANK 6 : GOSUB BK.FIVE
+PRINT "N7 AFTER"
+END
+
+:
+BK.ONE:
+    PRINT "N2 ONE"
+    RETURN
+BK.TWO:
+    PRINT "N3 TWO"
+    GOSUB BK.THREE
+    RETURN
+:
+
+BK.THREE:
+    PRINT "N4 THREE"
+    RETURN
+
+:
+BK.FOUR:
+    PRINT "N5 FOUR"
+    RETURN
+BK.FIVE:
+    PRINT "N6 FIVE"
+    GOSUB BK.SIX
+    RETURN
+:
+
+BK.SIX:
+    PRINT "N6B SIX"
+    RETURN

@@ -62,9 +62,6 @@ GM.LIBEND:
 ## The screen this is laid out for. 1 is 80x30, 0 is 80x60.
 #DEFINE GM.MODE 1
 
-#DEFINE GM.DDBANK 2
-#DEFINE GM.GUIBANK 3
-
 ## The bar sits on row 0 and the first item starts here.
 #DEFINE GM.BARX 1
 
@@ -85,26 +82,37 @@ SCREEN GM.MODE
 ## Asked after the mode change, not before. APPSYS.STARTUP reported the size
 ## of the screen the user had, not the one just set.
 GP.CALL APPSYS.SCRMODE, 0, 0, 0, 1
-APPSYS.COLS = GP.X
-APPSYS.ROWS = GP.Y
+APPSYS.COLS = GP.X : APPSYS.ROWS = GP.Y
 
 THEME.ID = 0 : GOSUB THEME.LOAD
 
-## The two banks this program writes, taken from the manager rather than
-## assumed. Nothing here can fail on a real machine -- 2 and 3 exist on the
-## smallest X16 -- but claiming them is what stops a later panel handing one
-## of them out again.
+## A CODE BANK IS CLAIMED AND A DATA BANK IS ALLOCATED, and the difference is
+## not a style choice. GP.BANKED takes a decimal constant read while the object
+## is being written, so the COMPILER picks the code bank and the manager is only
+## TOLD -- which is what stops a later ALLOC handing that bank to a panel that
+## would then write screen cells over the GUI's own code.
+##
+## The two scratch banks are the opposite: nothing needs their numbers before
+## the program runs, so nothing names them. They are whatever is free.
 GOSUB BANKMGR.INIT
-BANKMGR.WANT = GM.DDBANK : GOSUB BANKMGR.CLAIM
-BANKMGR.WANT = GM.GUIBANK : GOSUB BANKMGR.CLAIM
-BANKMGR.WANT = LIB.CODEBANK : GOSUB BANKMGR.CLAIM
+GM.BANKFAIL$ = ""
 
-GM.SEL = 1
-GM.OPEN = 0
+BANKMGR.WANT = LIB.CODEBANK
+GOSUB BANKMGR.CLAIM
+IF BANKMGR.OK = 0 THEN GM.BANKFAIL$ = "CODE BANK IS ALREADY TAKEN"
+
+GOSUB BANKMGR.ALLOC
+GM.DDBANK = BANKMGR.BANK
+GOSUB BANKMGR.ALLOC
+GM.GUIBANK = BANKMGR.BANK
+IF GM.GUIBANK = 0 THEN GM.BANKFAIL$ = "NO SCRATCH BANK LEFT"
+
+IF GM.BANKFAIL$ <> "" THEN GOTO GM.BANKSTOP
+
+GM.SEL = 1 : GM.OPEN = 0
 
 ## Where a panel writes what it got back, and what stands there before one has run.
-GM.RESY = APPSYS.ROWS - 3
-GM.RESULT$ = "NOTHING RUN YET"
+GM.RESY = APPSYS.ROWS - 3 : GM.RESULT$ = "NOTHING RUN YET"
 
 GOSUB GMX.CHROME
 
@@ -173,8 +181,7 @@ GMX.BAR:
   GOSUB GMX.BAR.LOAD
   MENUBAR.X = GM.BARX : MENUBAR.Y = 0 : MENUBAR.GAP = 0
   MENUBAR.FLAGS = MENUBAR.DOWNEXIT + MENUBAR.KEEPMARK
-  MENUBAR.SEL = GM.SEL
-  GOSUB MENUBAR.RUN
+  MENUBAR.SEL = GM.SEL : GOSUB MENUBAR.RUN
   RETURN
 
 
@@ -216,10 +223,7 @@ GMX.BAR.LOAD:
 GMX.DROP:
   GOSUB GMX.BAR.LOAD
   MENUBAR.SEL = GM.SEL
-  GOSUB MENUBAR.DRAW
-  GOSUB MENUBAR.MARK
-  GOSUB MENUBAR.WHERE
-
+  GOSUB MENUBAR.DRAW : GOSUB MENUBAR.MARK : GOSUB MENUBAR.WHERE
   GOSUB GMX.DD.LOAD
 
 ## ---- the highlight is one cell wider than the longest row ----
@@ -229,8 +233,7 @@ GMX.DROP:
   NEXT GM.I
   GM.DDW = GM.DDW + 1
 
-  GM.DDX = MENUBAR.SELX
-  GM.DDY = 1
+  GM.DDX = MENUBAR.SELX : GM.DDY = 1
   IF GM.DDX + GM.DDW + 2 > APPSYS.COLS THEN GM.DDX = APPSYS.COLS - GM.DDW - 2
 
 ## ---- what the frame and the rows will cover, saved before either is drawn ----
@@ -242,10 +245,8 @@ GMX.DROP:
   GP.FILL GM.DDX, GM.DDY, GM.DDW + 2, MENUVERT.COUNT + 2, ASC(" "), THEME.CLR(THEME.TEXT)
   GP.BOX GM.DDX, GM.DDY, GM.DDW + 2, MENUVERT.COUNT + 2, 2, THEME.CLR(THEME.BORDER)
 
-  MENUVERT.X = GM.DDX + 1
-  MENUVERT.Y = GM.DDY + 1
-  MENUVERT.WIDTH = GM.DDW
-  MENUVERT.FLAGS = MENUVERT.KEYEXIT
+  MENUVERT.X = GM.DDX + 1 :MENUVERT.Y = GM.DDY + 1
+  MENUVERT.WIDTH = GM.DDW : MENUVERT.FLAGS = MENUVERT.KEYEXIT
   MENUVERT.SEL = 0
   GOSUB MENUVERT.RUN
 
@@ -274,8 +275,7 @@ GMX.DROP:
 ## ***********************************************************************
 
 GMX.DD.LOAD:
-  MENUVERT.HOT$ = ""
-  MENUVERT.HOTATTR = 0
+  MENUVERT.HOT$ = "" : MENUVERT.HOTATTR = 0
   MENUVERT.ATTR = THEME.CLR(THEME.TEXT)
   MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
 
@@ -377,8 +377,7 @@ GMX.DISPATCH:
 ## ***********************************************************************
 
 GMX.BANKMAP:
-  GOSUB BANKMGR.COUNT
-  GOSUB GMX.D.RESET
+  GOSUB BANKMGR.COUNT : GOSUB GMX.D.RESET
   GUI.TITLE$ = " BANK MAP "
   GUI.MSG$ = "BANKS " + MID$(STR$(BANKMGR.BANKS), 2) + "    FREE " + MID$(STR$(BANKMGR.SPARE), 2)
   GUI.MSG2$ = "IN USE " + MID$(STR$(GM.DDBANK), 2) + " DROPDOWN, " + MID$(STR$(GM.GUIBANK), 2) + " DIALOG"
@@ -399,12 +398,8 @@ GMX.STUB:
   GUI.TITLE$ = " " + GM.NAME$ + " "
   GUI.MSG$ = MENUVERT.ITEM$(MENUVERT.SEL)
   GUI.MSG2$ = "PANEL NOT BUILT YET"
-  GUI.STYLE = 0
-  GUI.GLYPH = 0
-  GUI.PLACE = 0
-  GUI.ROW.OFFSET = 0
-  GUI.PANEL.IN = 0
-  GUI.BORDER.IN = 0
+  GUI.STYLE = 0 : GUI.GLYPH = 0 : GUI.PLACE = 0 : GUI.ROW.OFFSET = 0
+  GUI.PANEL.IN = 0 : GUI.BORDER.IN = 0
   GOSUB GUI.SAY
   RETURN
 
@@ -450,24 +445,10 @@ GMX.DIALOG:
 
 GMX.D.RESET:
   GUI.BANK = GM.GUIBANK
-  GUI.MSG$ = ""
-  GUI.MSG2$ = ""
-  GUI.TITLE$ = ""
-  GUI.HINT$ = ""
-  GUI.STYLE = 0
-  GUI.GLYPH = 0
-  GUI.PLACE = 0
-  GUI.X = 0
-  GUI.Y = 0
-  GUI.ROW.OFFSET = 0
-  GUI.PANEL.IN = 0
-  GUI.BORDER.IN = 0
-  GUI.OKCANCEL = 0
-  GUI.LEN = 0
-  GUI.MASK = 0
-  GUI.FLAGS = 0
-  GUI.SEL = 0
-  GUI.COUNT = 0
+  GUI.MSG$ = "" : GUI.MSG2$ = "" : GUI.TITLE$ = "" : GUI.HINT$ = ""
+  GUI.STYLE = 0 : GUI.GLYPH = 0 : GUI.PLACE = 0 : GUI.X = 0 : GUI.Y = 0
+  GUI.ROW.OFFSET = 0 : GUI.PANEL.IN = 0 : GUI.BORDER.IN = 0 : GUI.OKCANCEL = 0
+  GUI.LEN = 0 : GUI.MASK = 0 : GUI.FLAGS = 0 : GUI.SEL = 0 : GUI.COUNT = 0
   RETURN
 
 
@@ -1390,3 +1371,19 @@ GMX.I.LIMITS:
   GM.RESULT$ = GM.RESULT$ + "   MASKED [" + GM.FLD$(3) + "]"
   IF GM.FKEY = 27 THEN GM.RESULT$ = "LIMITS ABANDONED"
   RETURN
+
+
+## ***********************************************************************
+## **  GM.BANKSTOP -- the one thing that can go wrong before anything is
+## **  drawn, and the only place this program refuses to run.
+## **
+## **  Neither failure can happen on a real X16: nothing else has claimed a
+## **  bank when this runs, and 63 is the SMALLEST machine. It is here because
+## **  running on regardless would write the GUI's own code with screen cells
+## **  and report it as a drawing bug.
+## ***********************************************************************
+
+GM.BANKSTOP:
+  GOSUB APPSYS.RESTORE
+  PRINT "BANKS: " ; GM.BANKFAIL$
+  END

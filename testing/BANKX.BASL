@@ -1,0 +1,25 @@
+#SAVEAS "@:BANKX.SRC.PRG"
+#REM 0
+#SYMFILE "@:BANKX.SRC.SYM"
+#INCLUDE "GPB.INC.BL"
+
+## TWO REGIONS NAMING THE SAME BANK. The second would land at $A000 on top of
+## the first and the only symptom would be one region's code running as the
+## other's, so it is refused at the GP.BANKED that repeats -- BAD VALUE.
+
+PRINT "P1"
+GOSUB BK.ONE
+GOSUB BK.TWO
+END
+
+GP.BANKED 5
+BK.ONE:
+    PRINT "P2"
+    RETURN
+GP.ENDBANKED
+
+GP.BANKED 5
+BK.TWO:
+    PRINT "P3"
+    RETURN
+GP.ENDBANKED

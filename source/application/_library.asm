@@ -355,44 +355,34 @@ _BBZap:
 		bpl 	_BBZap
 _BBGo:
 		;
-		;		A GP.BANKED region ships at the TOP of the p-code, page aligned, and belongs at
-		;		$A000 in the bank the program named. Move it there and LEAVE THE BANK SELECTED:
-		;		that window is where the code runs for the life of the program.
+		;		HAND OVER. Three values the runtime wants, and a jmp -- and BOTH the base page
+		;		and the jmp target are PATCHED, because a GP.BANKED program does not come
+		;		straight here from the bootstrap.
 		;
-		;		ONCE PER LOAD, NOT PER RUN. The workspace starts where the region was -- that is
-		;		the whole point of putting it at the top -- so by the time a second RUN reaches
-		;		here those bytes are variables and strings. Zeroing the page count makes the
-		;		second RUN skip the copy and use what is already in the bank, which is still
-		;		exactly what the first one put there.
+		;		A banked program carries a second bootstrap page (bootstrap2.asm) at $0900, which
+		;		copies its regions into their banks; its p-code therefore starts at $0A00 rather
+		;		than $0900. So WriteObjectCode patches the base page to $0A and this jmp to
+		;		$0900, and the extension page does this same handover itself once it is done.
+		;		A program with no region gets $09 and RT_ENTRY -- the bytes already in the
+		;		template -- and its object is byte for byte what it was before any of this.
 		;
-		;		THREE GLOBAL LABELS, not "_" ones. object.asm patches the source page straight
-		;		into BBCodeSrc's operand as the template streams past, and it needs the address
-		;		to do it. Everything that branches across them branches to a global too, for the
-		;		scope reason BBTryLoad's own note gives.
+		;		THE COPYING USED TO BE HERE, an 8-page loop inside this padding. It moved out to
+		;		the extension page when regions became plural: the loop grew a table walk, every
+		;		program was paying for it in a 255-byte template with two bytes spare, and only
+		;		a banked one ever ran a single instruction of it.
 		;
-		ldx 	BBCodePages 				; 0 = this program has no banked region
-		beq 	BBCodeSkip
-		stz 	BBCodePages
-		lda 	BBCodeBank
-		sta 	$00
-		ldy 	#0 							; and it stays 0 between pages -- the byte loop wraps
-BBCodeSrc:
-		lda 	$FF00,y 					; source page PATCHED
-BBCodeDst:
-		sta 	$A000,y
-		iny
-		bne 	BBCodeSrc
-		inc 	BBCodeSrc+2
-		inc 	BBCodeDst+2
-		dex
-		bne 	BBCodeSrc
-BBCodeSkip:
-		lda 	#PCODE_PAGE 				; A = p-code base page ($09), page-aligned for codePtr
+		;		GLOBAL LABELS, not "_" ones -- object.asm patches these operands as the template
+		;		streams past and needs the addresses to do it. See BBTryLoad's own note.
+		;
+BBBasePage:
+		lda 	#PCODE_PAGE 				; A = p-code base page -- PATCHED, $09 or $0A
 		ldx 	BBWSStart 					; X = workspace start page
 		ldy 	BBWSEnd 					; Y = workspace end page -- RTBASE>>8 for a program with no GPB
 											; keyword, RTGPBASE>>8 for one with the handlers below it. That
 											; difference is the whole point of the split: 2,560 bytes.
-		jmp 	RT_ENTRY 					; RTBASE+4 -> jmp StartRuntime
+BBRunJmp:
+		jmp 	RT_ENTRY 					; RTBASE+4 -> jmp StartRuntime -- PATCHED, both operand
+											; bytes, to $0900 when there is an extension page
 
 ; ------------------------------------------------------------------------------------------------
 ;		Try to LOAD the runtime under the name in A (length) / X,Y (address). Secondary address 1
@@ -505,10 +495,6 @@ BBNeedGP:
 		.byte 	$FF 						; 0 = no GPB keyword, 1 = uses them -- PATCHED
 BBNameIdx:
 		.byte 	0 							; which name triple (0 or 3), chosen at run time
-BBCodePages:
-		.byte 	$FF 						; pages of GP.BANKED region to move, 0 = none -- PATCHED
-BBCodeBank:
-		.byte 	$FF 						; which bank to move it to -- PATCHED
 
 		.fill 	$0900 - *, 0 				; pad through $08FF so the p-code starts exactly at $0900
 
@@ -517,10 +503,10 @@ ProgramBootstrapEnd: 						; PHYSICAL end -- (End - Start) == 255 bytes ($0801..
 
 BootWSPatchOffset = BBWSStart - $0801 		; offsets of the six per-program bytes within the
 BootWSEndPatchOffset = BBWSEnd - $0801 		; streamed template -- object.asm builds its patch
-BootGPPatchOffset = BBNeedGP - $0801 		; table from these and nothing else.
-BootCodeSrcOffset = BBCodeSrc+2 - $0801 	; ...and the three GP.BANKED needs. The first is an
-BootCodePagesOffset = BBCodePages - $0801 	; instruction OPERAND rather than a data byte, which is
-BootCodeBankOffset = BBCodeBank - $0801 	; what keeps the copy loop inside the padding.
+BootGPPatchOffset = BBNeedGP - $0801 		; table from these and nothing else. The first three
+BootBasePageOffset = BBBasePage+1 - $0801 	; are DATA bytes; the last three are instruction
+BootRunJmpOffset = BBRunJmp+1 - $0801 		; OPERANDS -- the base page, and the jmp's two, which
+											; are patched to the extension page for a banked program.
 
 		.send code
 
@@ -534,6 +520,142 @@ BootCodeBankOffset = BBCodeBank - $0801 	; what keeps the copy loop inside the p
 ;		==== 			=====
 ;
 ; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		Name:		bootstrap2.asm
+;		Purpose:	Bootstrap EXTENSION page -- copies every GP.BANKED region into its bank.
+;		Created:	5th September 2026
+;		Reviewed: 	No
+;
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		ONLY A BANKED PROGRAM CARRIES THIS. A program with no GP.BANKED region gets the 255-byte
+;		bootstrap it always got, with its p-code at $0900, and its object is byte for byte what it
+;		was before this file existed. A banked program gets this page as well: the bootstrap runs
+;		to its end as usual, and its closing "jmp RT_ENTRY" has been patched to come here instead.
+;		This copies the regions and then does that jmp itself.
+;
+;		So the price -- 256 bytes of low RAM, and p-code starting at $0A00 rather than $0900 -- is
+;		paid by the programs that bank and by nobody else. Against the 6,400 bytes the bench moves
+;		out of low memory it is not a close call.
+;
+;		WHY IT CANNOT LIVE IN THE P-CODE. The region's loaded image sits at exactly
+;		PCODE_PAGE + pages(low p-code), which is where the 4K frame stack begins. The frame stack
+;		is ON the region, deliberately -- that is what banking reclaims. So the first frame push
+;		lands on the region's first byte, and any p-code that runs has a frame stack. The bootstrap
+;		is the only moment the bytes are still there, and this page is part of the bootstrap.
+;
+;		WHY NOT SIMPLY GROW THE BOOTSTRAP. Because then every program pays. The bootstrap ends at
+;		$08FF with two bytes spare, so the multi-region loop would have had to go somewhere; the
+;		p-code base page is handed to the runtime in A at run time and is not baked into it, so a
+;		SECOND page costs a patched operand and nothing else.
+;
+;		ONCE PER LOAD, NOT PER RUN, for the bootstrap's own reason: the workspace starts where the
+;		regions were, so by the time a second RUN reaches here those bytes are variables. Zeroing
+;		the first table entry makes a second RUN skip the copy and use what is already in the bank,
+;		which is still what the first one put there. This page is never written over -- p-code
+;		starts at $0A00 and the frame stack is far above -- so the zero sticks.
+;
+;		HOW MANY REGIONS. Eight is arbitrary and costs 18 bytes of a page that has 130 spare;
+;		the compiler refuses a ninth rather than overrunning the table.
+;
+;		EVERY LABEL HERE IS GLOBAL AND PREFIXED BX. 64tass scopes a "_" label to the enclosing
+;		global, and this file sits in the same section as bootstrap.asm; a local here would bind
+;		to whatever global preceded it. See bootstrap.asm's own note.
+;
+; ************************************************************************************************
+
+BXMAXREGIONS = 8
+
+		.section code
+
+ProgramBootExt: 							; PHYSICAL label -- object.asm streams from here
+		.logical $0900
+
+; ------------------------------------------------------------------------------------------------
+;		Entered from the bootstrap's patched jmp, with the three values it was about to hand the
+;		runtime already in the registers: A = p-code base page ($0A here), X = workspace start
+;		page, Y = workspace end page. Put them down, do the copies, pick them back up.
+; ------------------------------------------------------------------------------------------------
+BXEntry:
+		sta 	BXBase
+		stx 	BXWS
+		sty 	BXWSEnd
+
+		ldx 	#0 							; X walks the table, two bytes an entry
+BXNext:
+		lda 	BXTable,x 					; pages in this region, 0 = end of the table
+		beq 	BXDone
+		sta 	BXCount
+		lda 	BXTable+1,x 				; ...and the bank it belongs in
+		sta 	$00
+		stx 	BXIndex
+
+		ldx 	BXCount 					; whole pages, and Y stays 0 between them
+		ldy 	#0
+BXSrc:
+		lda 	$FF00,y 					; source page -- PATCHED, and it RUNS ON across
+BXDst: 										; regions, because they are contiguous in the object
+		sta 	$A000,y
+		iny
+		bne 	BXSrc
+		inc 	BXSrc+2
+		inc 	BXDst+2
+		dex
+		bne 	BXSrc
+
+		lda 	#$A0 						; every region lands at $A000 in its own bank, so the
+		sta 	BXDst+2 					; destination goes back to the top of the window
+
+		ldx 	BXIndex
+		inx
+		inx
+		bne 	BXNext 						; always taken -- the table is far shorter than 256
+
+BXDone:
+		stz 	BXTable 					; a second RUN finds 0 pages and skips the lot
+		lda 	BXBase
+		ldx 	BXWS
+		ldy 	BXWSEnd
+		jmp 	RT_ENTRY
+
+; ------------------------------------------------------------------------------------------------
+;		The region table: (pages, bank) a region, terminated by a zero page count. Written by
+;		object.asm from the compiler's region list. BXMAXREGIONS entries plus the terminator.
+;
+;		PAGES IS A BYTE AND A BANK IS 32 PAGES, so a region larger than 8K cannot be described
+;		here -- which is why the compiler refuses one rather than letting the copy run past $BFFF.
+; ------------------------------------------------------------------------------------------------
+BXTable:
+		.fill 	BXMAXREGIONS * 2 + 2, 0
+
+BXBase:
+		.byte 	0 							; the three the runtime is waiting for
+BXWS:
+		.byte 	0
+BXWSEnd:
+		.byte 	0
+BXCount:
+		.byte 	0 							; pages left in the region being copied
+BXIndex:
+		.byte 	0 							; where the table walk had got to
+
+		.fill 	$0A00 - *, 0 				; pad through $09FF so the p-code starts at $0A00
+
+		.here
+ProgramBootExtEnd: 							; PHYSICAL end -- (End - Start) == 256 bytes
+
+; ------------------------------------------------------------------------------------------------
+;		Offsets of the bytes object.asm patches, within the streamed template. The source page is
+;		an instruction OPERAND, as it is in the bootstrap, which is what keeps the loop tight.
+; ------------------------------------------------------------------------------------------------
+BootExtSrcOffset = BXSrc+2 - $0900
+BootExtTableOffset = BXTable - $0900
+BootExtEntry = BXEntry 						; the address the bootstrap's jmp is patched to
+
+		.send code
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;
@@ -1558,6 +1680,8 @@ _WOCSCeiling:
 		sta 	sharedCeilPage
 		clc
 		lda 	#PCODE_PAGE
+		adc 	gpBankActive 				; ...plus the bootstrap extension page, which only a
+											; banked program carries. Its p-code starts at $0A00.
 		adc 	zTemp1+1
 		bcs 	_WOCSBigFar
 		adc 	#FrameStackPages
@@ -1613,20 +1737,29 @@ _WOCSFits:
 _WOCSFlag:
 		sta 	BootPatchTable+8
 		;
-		;		...and the three GP.BANKED needs: where the region sits once the program is
-		;		loaded, how many pages of it there are, and which bank it belongs in. All three
-		;		are zero for a program with no region, and a zero page count is what makes the
-		;		bootstrap skip the copy entirely.
+		;		...and the three the handover needs: the p-code base page the runtime is given in
+		;		A, and the two operand bytes of the closing jmp. A program with no region gets
+		;		$09 and RT_ENTRY -- exactly the bytes already in the template, so patching them
+		;		unconditionally costs it nothing and leaves its object byte for byte unchanged.
+		;		A banked one gets $0A and $0900, which is the extension page: it does the copies
+		;		and then repeats this handover itself.
 		;
-		.set16 	BootPatchTable+9, ProgramBootstrap+BootCodeSrcOffset
-		lda 	gpBankRunBase 				; an instruction OPERAND, not a data byte
+		.set16 	BootPatchTable+9, ProgramBootstrap+BootBasePageOffset
+		clc
+		lda 	#PCODE_PAGE 				; an instruction OPERAND, not a data byte
+		adc 	gpBankActive
 		sta 	BootPatchTable+11
-		.set16 	BootPatchTable+12, ProgramBootstrap+BootCodePagesOffset
-		lda 	gpBankPages
-		sta 	BootPatchTable+14
-		.set16 	BootPatchTable+15, ProgramBootstrap+BootCodeBankOffset
-		lda 	gpBankNumber
-		sta 	BootPatchTable+17
+		.set16 	BootPatchTable+12, ProgramBootstrap+BootRunJmpOffset
+		.set16 	BootPatchTable+15, ProgramBootstrap+BootRunJmpOffset+1
+		ldx 	#RT_ENTRY & $FF
+		ldy 	#RT_ENTRY >> 8
+		lda 	gpBankActive
+		beq 	_WOCSJmpTo
+		ldx 	#BootExtEntry & $FF
+		ldy 	#BootExtEntry >> 8
+_WOCSJmpTo:
+		stx 	BootPatchTable+14
+		sty 	BootPatchTable+17
 		.set16 	zTemp0,ProgramBootstrap
 _WOCSBoot:
 		;
@@ -1665,7 +1798,66 @@ _WOCSBootNoHi:
 		cmp 	#>ProgramBootstrapEnd
 		bne 	_WOCSBoot
 		;
-		;		Part two: the p-code from FreeMemory..objPtr, which lands at $0900 on reload.
+		;		Part one and a half: the bootstrap EXTENSION page, and only for a banked program.
+		;		It lands at $0900 and copies every region into its bank before handing over.
+		;
+		;		BUILT IN A BUFFER RATHER THAN PATCHED IN FLIGHT, unlike the bootstrap above. What
+		;		goes into it is a TABLE -- two bytes a region -- so the address/value list the
+		;		streaming loop asks would have to be as long as the table it was writing. Copying
+		;		the template into a page of compiler RAM and poking it costs the compiled program
+		;		nothing and stays one line of code per region.
+		;
+		;		imageBuffer IS THE RUNTIME IMAGE'S PAGE IN TRANSIT, and it is dead in shared mode:
+		;		a shared object carries no runtime, which is the whole point of it. Same buffer,
+		;		same job -- a page on its way into OBJECT.PRG.
+		;
+		lda 	gpBankActive
+		beq 	_WOCSCodePart
+		.set16 	zTemp0,ProgramBootExt
+		.set16 	zTemp1,imageBuffer
+		ldy 	#0 							; 256 bytes exactly, so Y wraps to end it
+_WOCSExtCopy:
+		lda 	(zTemp0),y
+		sta 	(zTemp1),y
+		iny
+		bne 	_WOCSExtCopy
+		;
+		;		Where the regions sit once the program is loaded -- ONE address, because they are
+		;		contiguous in whole pages and the copy loop runs on across them -- and then the
+		;		(pages, bank) table. The terminating zero is already there: the template's table
+		;		is a .fill of zeroes.
+		;
+		;		THE TABLE IS IN OBJECT ORDER, which is source order: GPBankRelocate moves the last
+		;		region first and each one after that lands BELOW the last, so region 0 finishes
+		;		at the bottom of the run. The copy walks straight on from one region to the next,
+		;		so this has to be the order the pages actually sit in.
+		;
+		lda 	gpBankRunBase
+		sta 	imageBuffer+BootExtSrcOffset
+		ldx 	#0
+		ldy 	#0
+_WOCSExtTable:
+		lda 	gpBankPageCounts,x
+		sta 	imageBuffer+BootExtTableOffset,y
+		iny
+		lda 	gpBankBanks,x
+		sta 	imageBuffer+BootExtTableOffset,y
+		iny
+		inx
+		cpx 	gpBankCount
+		bcc 	_WOCSExtTable
+		ldy 	#0
+_WOCSExtWrite:
+		phy 								; IOWriteByte makes no promise about Y
+		lda 	imageBuffer,y
+		jsr 	IOWriteByte
+		ply
+		iny
+		bne 	_WOCSExtWrite
+_WOCSCodePart:
+		;
+		;		Part two: the p-code from FreeMemory..objPtr, which lands at $0900 on reload --
+		;		or at $0A00, above the extension page, if this program has a region.
 		;
 		.set16 	zTemp0,FreeMemory
 _WOCSCode:
@@ -1941,8 +2133,10 @@ PatchAsmFixups:
 		jmp 	AsmPatchAll
 
 PatchAsmFixupsShared:
+		clc
 		lda 	#(PCODE_PAGE - (FreeMemory >> 8)) & $FF
-		sta 	AsmPageDelta 				; shared p-code always lands at $0900
+		adc 	gpBankActive 				; shared p-code lands at $0900, or $0A00 for a banked
+		sta 	AsmPageDelta 				; program -- the extension page is below it
 		lda 	newWorkspacePage 			; _WOCShared carries WS_START in this byte
 		sta 	AsmWorkspacePage
 		jmp 	AsmPatchAll

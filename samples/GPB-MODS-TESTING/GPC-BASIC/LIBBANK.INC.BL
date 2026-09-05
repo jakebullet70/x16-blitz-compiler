@@ -84,8 +84,14 @@
 ## **  merely tolerated. Nothing in BASIC can read the bank back -- PEEK and
 ## **  POKE select and restore around every access -- BLOAD, BSAVE and BVERIFY
 ## **  take the bank as an argument, and STASH puts the caller's bank back for
-## **  itself. The one thing that would care is p-code in ANOTHER bank, and the
-## **  compiler allows one region a program.
+## **  itself.
+## **
+## **  THE ONE THING THAT WOULD CARE IS A SECOND CODE BANK, and the compiler
+## **  now allows up to eight. A program with two regions must select the bank
+## **  before EVERY call into either -- which is exactly what the shims below
+## **  do, so a library built this way is already correct. What it must not do
+## **  is call from one region into another: both run at $A000 and the branch
+## **  has no distance, so the compiler refuses it with NOT IMPLEMENTED.
 ## **
 ## **  The shims do NOT restore the caller's bank, deliberately. It would need
 ## **  a variable to hold it, and these routines call each other through this

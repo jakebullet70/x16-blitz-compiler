@@ -163,44 +163,34 @@ _BBZap:
 		bpl 	_BBZap
 _BBGo:
 		;
-		;		A GP.BANKED region ships at the TOP of the p-code, page aligned, and belongs at
-		;		$A000 in the bank the program named. Move it there and LEAVE THE BANK SELECTED:
-		;		that window is where the code runs for the life of the program.
+		;		HAND OVER. Three values the runtime wants, and a jmp -- and BOTH the base page
+		;		and the jmp target are PATCHED, because a GP.BANKED program does not come
+		;		straight here from the bootstrap.
 		;
-		;		ONCE PER LOAD, NOT PER RUN. The workspace starts where the region was -- that is
-		;		the whole point of putting it at the top -- so by the time a second RUN reaches
-		;		here those bytes are variables and strings. Zeroing the page count makes the
-		;		second RUN skip the copy and use what is already in the bank, which is still
-		;		exactly what the first one put there.
+		;		A banked program carries a second bootstrap page (bootstrap2.asm) at $0900, which
+		;		copies its regions into their banks; its p-code therefore starts at $0A00 rather
+		;		than $0900. So WriteObjectCode patches the base page to $0A and this jmp to
+		;		$0900, and the extension page does this same handover itself once it is done.
+		;		A program with no region gets $09 and RT_ENTRY -- the bytes already in the
+		;		template -- and its object is byte for byte what it was before any of this.
 		;
-		;		THREE GLOBAL LABELS, not "_" ones. object.asm patches the source page straight
-		;		into BBCodeSrc's operand as the template streams past, and it needs the address
-		;		to do it. Everything that branches across them branches to a global too, for the
-		;		scope reason BBTryLoad's own note gives.
+		;		THE COPYING USED TO BE HERE, an 8-page loop inside this padding. It moved out to
+		;		the extension page when regions became plural: the loop grew a table walk, every
+		;		program was paying for it in a 255-byte template with two bytes spare, and only
+		;		a banked one ever ran a single instruction of it.
 		;
-		ldx 	BBCodePages 				; 0 = this program has no banked region
-		beq 	BBCodeSkip
-		stz 	BBCodePages
-		lda 	BBCodeBank
-		sta 	$00
-		ldy 	#0 							; and it stays 0 between pages -- the byte loop wraps
-BBCodeSrc:
-		lda 	$FF00,y 					; source page PATCHED
-BBCodeDst:
-		sta 	$A000,y
-		iny
-		bne 	BBCodeSrc
-		inc 	BBCodeSrc+2
-		inc 	BBCodeDst+2
-		dex
-		bne 	BBCodeSrc
-BBCodeSkip:
-		lda 	#PCODE_PAGE 				; A = p-code base page ($09), page-aligned for codePtr
+		;		GLOBAL LABELS, not "_" ones -- object.asm patches these operands as the template
+		;		streams past and needs the addresses to do it. See BBTryLoad's own note.
+		;
+BBBasePage:
+		lda 	#PCODE_PAGE 				; A = p-code base page -- PATCHED, $09 or $0A
 		ldx 	BBWSStart 					; X = workspace start page
 		ldy 	BBWSEnd 					; Y = workspace end page -- RTBASE>>8 for a program with no GPB
 											; keyword, RTGPBASE>>8 for one with the handlers below it. That
 											; difference is the whole point of the split: 2,560 bytes.
-		jmp 	RT_ENTRY 					; RTBASE+4 -> jmp StartRuntime
+BBRunJmp:
+		jmp 	RT_ENTRY 					; RTBASE+4 -> jmp StartRuntime -- PATCHED, both operand
+											; bytes, to $0900 when there is an extension page
 
 ; ------------------------------------------------------------------------------------------------
 ;		Try to LOAD the runtime under the name in A (length) / X,Y (address). Secondary address 1
@@ -313,10 +303,6 @@ BBNeedGP:
 		.byte 	$FF 						; 0 = no GPB keyword, 1 = uses them -- PATCHED
 BBNameIdx:
 		.byte 	0 							; which name triple (0 or 3), chosen at run time
-BBCodePages:
-		.byte 	$FF 						; pages of GP.BANKED region to move, 0 = none -- PATCHED
-BBCodeBank:
-		.byte 	$FF 						; which bank to move it to -- PATCHED
 
 		.fill 	$0900 - *, 0 				; pad through $08FF so the p-code starts exactly at $0900
 
@@ -325,10 +311,10 @@ ProgramBootstrapEnd: 						; PHYSICAL end -- (End - Start) == 255 bytes ($0801..
 
 BootWSPatchOffset = BBWSStart - $0801 		; offsets of the six per-program bytes within the
 BootWSEndPatchOffset = BBWSEnd - $0801 		; streamed template -- object.asm builds its patch
-BootGPPatchOffset = BBNeedGP - $0801 		; table from these and nothing else.
-BootCodeSrcOffset = BBCodeSrc+2 - $0801 	; ...and the three GP.BANKED needs. The first is an
-BootCodePagesOffset = BBCodePages - $0801 	; instruction OPERAND rather than a data byte, which is
-BootCodeBankOffset = BBCodeBank - $0801 	; what keeps the copy loop inside the padding.
+BootGPPatchOffset = BBNeedGP - $0801 		; table from these and nothing else. The first three
+BootBasePageOffset = BBBasePage+1 - $0801 	; are DATA bytes; the last three are instruction
+BootRunJmpOffset = BBRunJmp+1 - $0801 		; OPERANDS -- the base page, and the jmp's two, which
+											; are patched to the extension page for a banked program.
 
 		.send code
 

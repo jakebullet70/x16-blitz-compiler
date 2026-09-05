@@ -209,6 +209,13 @@ the layout documented, which is the only variant with clean semantics — and it
 `STRCASE.INC.BL` is built on it, as `SORT.INC.BL` is on `GP.ARRPTR`. Nothing is waiting on a decision
 here.
 
+## Library renames waiting to be done
+
+### `GUI.TEXT` should be `GUI.INPUT`
+
+It asks for a line of text and gives it back; `GUI.TEXT` reads like it draws some. Every caller and
+every shim in `LIBBANK.INC.BL` changes with it. Nothing depends on the old name outside this repo.
+
 ## Bugs
 
 ### A RETIRED KEYWORD COMPILES CLEAN AND EXPLODES AT RUN TIME — FIXED 2026-09-03

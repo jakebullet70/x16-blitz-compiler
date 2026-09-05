@@ -312,6 +312,8 @@ _WOCSCeiling:
 		sta 	sharedCeilPage
 		clc
 		lda 	#PCODE_PAGE
+		adc 	gpBankActive 				; ...plus the bootstrap extension page, which only a
+											; banked program carries. Its p-code starts at $0A00.
 		adc 	zTemp1+1
 		bcs 	_WOCSBigFar
 		adc 	#FrameStackPages
@@ -367,20 +369,29 @@ _WOCSFits:
 _WOCSFlag:
 		sta 	BootPatchTable+8
 		;
-		;		...and the three GP.BANKED needs: where the region sits once the program is
-		;		loaded, how many pages of it there are, and which bank it belongs in. All three
-		;		are zero for a program with no region, and a zero page count is what makes the
-		;		bootstrap skip the copy entirely.
+		;		...and the three the handover needs: the p-code base page the runtime is given in
+		;		A, and the two operand bytes of the closing jmp. A program with no region gets
+		;		$09 and RT_ENTRY -- exactly the bytes already in the template, so patching them
+		;		unconditionally costs it nothing and leaves its object byte for byte unchanged.
+		;		A banked one gets $0A and $0900, which is the extension page: it does the copies
+		;		and then repeats this handover itself.
 		;
-		.set16 	BootPatchTable+9, ProgramBootstrap+BootCodeSrcOffset
-		lda 	gpBankRunBase 				; an instruction OPERAND, not a data byte
+		.set16 	BootPatchTable+9, ProgramBootstrap+BootBasePageOffset
+		clc
+		lda 	#PCODE_PAGE 				; an instruction OPERAND, not a data byte
+		adc 	gpBankActive
 		sta 	BootPatchTable+11
-		.set16 	BootPatchTable+12, ProgramBootstrap+BootCodePagesOffset
-		lda 	gpBankPages
-		sta 	BootPatchTable+14
-		.set16 	BootPatchTable+15, ProgramBootstrap+BootCodeBankOffset
-		lda 	gpBankNumber
-		sta 	BootPatchTable+17
+		.set16 	BootPatchTable+12, ProgramBootstrap+BootRunJmpOffset
+		.set16 	BootPatchTable+15, ProgramBootstrap+BootRunJmpOffset+1
+		ldx 	#RT_ENTRY & $FF
+		ldy 	#RT_ENTRY >> 8
+		lda 	gpBankActive
+		beq 	_WOCSJmpTo
+		ldx 	#BootExtEntry & $FF
+		ldy 	#BootExtEntry >> 8
+_WOCSJmpTo:
+		stx 	BootPatchTable+14
+		sty 	BootPatchTable+17
 		.set16 	zTemp0,ProgramBootstrap
 _WOCSBoot:
 		;
@@ -419,7 +430,66 @@ _WOCSBootNoHi:
 		cmp 	#>ProgramBootstrapEnd
 		bne 	_WOCSBoot
 		;
-		;		Part two: the p-code from FreeMemory..objPtr, which lands at $0900 on reload.
+		;		Part one and a half: the bootstrap EXTENSION page, and only for a banked program.
+		;		It lands at $0900 and copies every region into its bank before handing over.
+		;
+		;		BUILT IN A BUFFER RATHER THAN PATCHED IN FLIGHT, unlike the bootstrap above. What
+		;		goes into it is a TABLE -- two bytes a region -- so the address/value list the
+		;		streaming loop asks would have to be as long as the table it was writing. Copying
+		;		the template into a page of compiler RAM and poking it costs the compiled program
+		;		nothing and stays one line of code per region.
+		;
+		;		imageBuffer IS THE RUNTIME IMAGE'S PAGE IN TRANSIT, and it is dead in shared mode:
+		;		a shared object carries no runtime, which is the whole point of it. Same buffer,
+		;		same job -- a page on its way into OBJECT.PRG.
+		;
+		lda 	gpBankActive
+		beq 	_WOCSCodePart
+		.set16 	zTemp0,ProgramBootExt
+		.set16 	zTemp1,imageBuffer
+		ldy 	#0 							; 256 bytes exactly, so Y wraps to end it
+_WOCSExtCopy:
+		lda 	(zTemp0),y
+		sta 	(zTemp1),y
+		iny
+		bne 	_WOCSExtCopy
+		;
+		;		Where the regions sit once the program is loaded -- ONE address, because they are
+		;		contiguous in whole pages and the copy loop runs on across them -- and then the
+		;		(pages, bank) table. The terminating zero is already there: the template's table
+		;		is a .fill of zeroes.
+		;
+		;		THE TABLE IS IN OBJECT ORDER, which is source order: GPBankRelocate moves the last
+		;		region first and each one after that lands BELOW the last, so region 0 finishes
+		;		at the bottom of the run. The copy walks straight on from one region to the next,
+		;		so this has to be the order the pages actually sit in.
+		;
+		lda 	gpBankRunBase
+		sta 	imageBuffer+BootExtSrcOffset
+		ldx 	#0
+		ldy 	#0
+_WOCSExtTable:
+		lda 	gpBankPageCounts,x
+		sta 	imageBuffer+BootExtTableOffset,y
+		iny
+		lda 	gpBankBanks,x
+		sta 	imageBuffer+BootExtTableOffset,y
+		iny
+		inx
+		cpx 	gpBankCount
+		bcc 	_WOCSExtTable
+		ldy 	#0
+_WOCSExtWrite:
+		phy 								; IOWriteByte makes no promise about Y
+		lda 	imageBuffer,y
+		jsr 	IOWriteByte
+		ply
+		iny
+		bne 	_WOCSExtWrite
+_WOCSCodePart:
+		;
+		;		Part two: the p-code from FreeMemory..objPtr, which lands at $0900 on reload --
+		;		or at $0A00, above the extension page, if this program has a region.
 		;
 		.set16 	zTemp0,FreeMemory
 _WOCSCode:
@@ -695,8 +765,10 @@ PatchAsmFixups:
 		jmp 	AsmPatchAll
 
 PatchAsmFixupsShared:
+		clc
 		lda 	#(PCODE_PAGE - (FreeMemory >> 8)) & $FF
-		sta 	AsmPageDelta 				; shared p-code always lands at $0900
+		adc 	gpBankActive 				; shared p-code lands at $0900, or $0A00 for a banked
+		sta 	AsmPageDelta 				; program -- the extension page is below it
 		lda 	newWorkspacePage 			; _WOCShared carries WS_START in this byte
 		sta 	AsmWorkspacePage
 		jmp 	AsmPatchAll
