@@ -1006,6 +1006,24 @@ SaveCodeAndExit:
 		sta 	pass1VarSpace 				; at the top of the program. STRReset zeroes the
 		lda 	freeVariableMemory+1 		; original, so it has to be kept here.
 		sta 	pass1VarSpace+1
+		;
+		;		LAY THE OBJECT OUT, in pass one, so that pass two can know where everything ends
+		;		up before it emits its first byte. That is the thing pass two is missing and the
+		;		reason a branch cannot yet be resolved as it is written: a GP.BANKED region does
+		;		not reach its final address until GPBankRelocate has moved it, and that has
+		;		always happened after the compile rather than before.
+		;
+		;		It runs on PASS ONE'S buffer, which pass two overwrites from FreeMemory upwards,
+		;		so nothing it moves survives and nothing it moves matters. What survives is the
+		;		region table -- starts, ends, page counts, crossings, run base and hops -- and
+		;		the pool base. ResetPassState clears gpBankActive so pass two lays out again from
+		;		scratch, which is what proves the two agree.
+		;
+		;		FixBranches is NOT run here. It resolves branches in a buffer that is about to be
+		;		thrown away; the layout is the only thing worth having.
+		;
+		jsr 	AsmFlushPool
+		jsr 	GPBankRelocate
 		inc 	passNumber
 		jmp 	CompilePass
 
