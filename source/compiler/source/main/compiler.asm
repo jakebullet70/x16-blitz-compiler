@@ -375,6 +375,9 @@ ResetPassState:
 											; emit an .unwind it does not need
 		stz 	blockCount 					; ...and the ordinals handed to the blocks themselves,
 		stz 	blockCount+1 				; which BOTH passes count out and must agree on
+		stz 	altCount
+		stz 	altCount+1
+		stz 	ifDepth 					; no GP.IF open
 		stz 	gpBankState 				; no GP.BANKED region seen yet, and nothing relocated.
 		stz 	gpBankActive
 		stz 	gpBankCount 				; MUST start at zero: it is the length of every region

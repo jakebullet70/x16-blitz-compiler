@@ -1163,6 +1163,9 @@ ResetPassState:
 											; emit an .unwind it does not need
 		stz 	blockCount 					; ...and the ordinals handed to the blocks themselves,
 		stz 	blockCount+1 				; which BOTH passes count out and must agree on
+		stz 	altCount
+		stz 	altCount+1
+		stz 	ifDepth 					; no GP.IF open
 		stz 	gpBankState 				; no GP.BANKED region seen yet, and nothing relocated.
 		stz 	gpBankActive
 		stz 	gpBankCount 				; MUST start at zero: it is the length of every region
@@ -2840,6 +2843,10 @@ _FBLoop:
 		beq 	_FBUnwindFar
 		cmp 	#PCD_CMD_EXITDO 			; GP.EXITDO: resolve against its own GP.LOOP.
 		beq 	_FBExitDoFar
+		cmp 	#PCD_CMD_IFNEXT 			; GP.IF / GP.ELSEIF test false: the next alternative.
+		beq 	_FBIfNextFar
+		cmp 	#PCD_CMD_IFELSE 			; end of an IF body: out to the GP.ENDIF.
+		beq 	_FBIfElseFar
 		;
 		;		WHAT IS LEFT, both passes. Their targets are code positions found by walking the
 		;		object, which is a thing only this side can do.
@@ -2849,10 +2856,6 @@ _FBStructural:
 		beq 	_FBCaseNextFar
 		cmp 	#PCD_CMD_CASEEND 			; end of a case body: out to the GP.ENDSEL.
 		beq 	_FBCaseEndFar
-		cmp 	#PCD_CMD_IFNEXT 			; GP.IF / GP.ELSEIF test false: the next alternative.
-		beq 	_FBIfNextFar
-		cmp 	#PCD_CMD_IFELSE 			; end of an IF body: out to the GP.ENDIF.
-		beq 	_FBIfElseFar
 _FBNext:
 		;
 		;		Block depth, counted as the walk passes the openers and closers -- the same
@@ -5413,6 +5416,106 @@ BlockEndPointer:
 		sta 	zTemp0+1
 		rts
 
+; ************************************************************************************************
+;
+;		THE ALTERNATIVES. A GP.IF or a GP.CASE that comes out false branches to the NEXT
+;		alternative, which is a different place for each one -- so each gets an ordinal of its
+;		own, and the target is written down by whatever alternative follows it.
+;
+;		BlockAltOpen 	take the next ordinal, into blockAlt. The caller remembers it as its
+;						block's PENDING alternative.
+;		BlockAltHere 	blockAlt's target is where the write cursor stands. Pass one only.
+;		BlockAltRead 	...and reading it back, into branchTarget.
+;
+;		ONE PENDING ALTERNATIVE PER OPEN BLOCK IS ENOUGH, which is what makes this a slot rather
+;		than a chain: a GP.IF's test is resolved by the next GP.ELSEIF, GP.ELSE or GP.ENDIF, and
+;		by then the next test has not been written.
+;
+; ************************************************************************************************
+
+BlockAltOpen:
+		lda 	altCount
+		sta 	blockAlt
+		lda 	altCount+1
+		sta 	blockAlt+1
+		inc 	altCount
+		bne 	_BAOCounted
+		inc 	altCount+1
+_BAOCounted:
+		lda 	altCount+1
+		cmp 	#BLOCK_MAX >> 8
+		bcc 	_BAORoom
+		jmp 	BlockFailCount 				; a jmp: the error exits sit above the table routines
+_BAORoom:
+		rts
+
+BlockAltHere:
+		lda 	passNumber
+		bne 	_BAHDone 					; pass two READS this table; it does not write it
+		lda 	blockAlt+1 					; $FFFF -- nothing is waiting for a target
+		and 	blockAlt
+		cmp 	#$FF
+		beq 	_BAHDone
+		lda 	blockAlt
+		sta 	blockIndex
+		lda 	blockAlt+1
+		sta 	blockIndex+1
+		sec 								; one short, and the reader adds it back -- see
+		lda 	objPtr 						; BlockDepthDown for why
+		sbc 	#1
+		sta 	blockValue
+		lda 	objPtr+1
+		sbc 	#0
+		sta 	blockValue+1
+		jsr 	BlockAltWrite
+_BAHDone:
+		rts
+
+BlockAltRead:
+		lda 	blockAlt
+		sta 	blockIndex
+		lda 	blockAlt+1
+		sta 	blockIndex+1
+		jsr 	BlockAltFetch
+		jmp 	BlockPlusOne 				; the stored address is one short, as always
+
+; ************************************************************************************************
+;
+;		Entry blockIndex of the ALTERNATIVE table, to and from blockValue. The same two routines
+;		as the block-end table, over the other half of the bank.
+;
+; ************************************************************************************************
+
+BlockAltWrite:
+		jsr 	BlockAltPointer
+		.block_access
+		lda 	blockValue
+		sta 	(zTemp0)
+		ldy 	#1
+		lda 	blockValue+1
+		sta 	(zTemp0),y
+		.block_release
+		rts
+
+BlockAltFetch:
+		jsr 	BlockAltPointer
+		.block_access
+		lda 	(zTemp0)
+		sta 	blockValue
+		ldy 	#1
+		lda 	(zTemp0),y
+		sta 	blockValue+1
+		.block_release
+		rts
+
+BlockAltPointer:
+		jsr 	BlockEndPointer
+		lda 	zTemp0+1 					; the same offset, in the other table
+		clc
+		adc 	#(BlockAltTable - BlockEndTable) >> 8
+		sta 	zTemp0+1
+		rts
+
 
 ; ************************************************************************************************
 ;
@@ -5536,6 +5639,16 @@ blockValue: 								; ...and what is in it
 		.fill 	2
 blockWalk: 									; the relocator's place in the table
 		.fill 	2
+altCount: 									; how many alternatives this pass has written
+		.fill 	2
+blockAlt: 									; the alternative being opened, resolved or read
+		.fill 	2
+ifOrdinals: 								; the block ordinal of each open GP.IF...
+		.fill 	2*BLOCK_MAX_NEST
+ifPending: 									; ...and the alternative inside it still waiting for
+		.fill 	2*BLOCK_MAX_NEST 			; a target, or $FFFF
+ifDepth: 									; how many GP.IFs are open right now
+		.fill 	1
 
 		.send code
 
@@ -8228,6 +8341,7 @@ _GBRFixUp:
 		;
 		jsr 	_GBFixLineTable
 		jsr 	_GBFixBlockEnds
+		jsr 	_GBFixBlockAlts
 		jsr 	_GBFixRegions 				; BEFORE the .fngosub walk, which reads the new bases
 		jsr 	_GBFixFnCalls
 		jsr 	_GBFixAsmCalls
@@ -8723,6 +8837,44 @@ _GBFBEEntry:
 		inc 	blockWalk+1
 		bra 	_GBFBELoop
 _GBFBEDone:
+		rts
+
+;
+;		...and the alternative table, which holds the same kind of address and moves the same way.
+;
+
+_GBFixBlockAlts:
+		stz 	blockWalk
+		stz 	blockWalk+1
+_GBFBALoop:
+		lda 	blockWalk+1
+		cmp 	altCount+1
+		bcc 	_GBFBAEntry
+		bne 	_GBFBADone
+		lda 	blockWalk
+		cmp 	altCount
+		bcs 	_GBFBADone
+_GBFBAEntry:
+		lda 	blockWalk
+		sta 	blockIndex
+		lda 	blockWalk+1
+		sta 	blockIndex+1
+		jsr 	BlockAltFetch
+		lda 	blockValue
+		sta 	zTemp1
+		lda 	blockValue+1
+		sta 	zTemp1+1
+		jsr 	GPBankAdjust
+		lda 	zTemp1
+		sta 	blockValue
+		lda 	zTemp1+1
+		sta 	blockValue+1
+		jsr 	BlockAltWrite
+		inc 	blockWalk
+		bne 	_GBFBALoop
+		inc 	blockWalk+1
+		bra 	_GBFBALoop
+_GBFBADone:
 		rts
 
 ; ************************************************************************************************
@@ -9473,6 +9625,11 @@ GPIsEmptyCompile:
 ;		already in flight and send it past its own gp.endif. So depth is counted on a marker
 ;		GP.ELSEIF does not emit -- and note below that it deliberately writes no gp.if.
 ;
+;		THAT IS PASS ONE'S PROBLEM ONLY NOW. Pass two keeps a stack of the open GP.IFs instead of
+;		scanning for one, so an inner IF is invisible to an outer one's branches because it is a
+;		different entry, not because a count came out right. The marker stays: pass one still
+;		resolves the old way, and the checksum compares the two answers.
+;
 ;		ALL FOUR DISARM deferErrors FIRST. A statement that fails with a SYNTAX error while the
 ;		deferral is armed is rolled back and replaced with a runtime throw-stub -- which for a
 ;		block opener means its gp.if vanishes while the GP.ENDIF on a later line still compiles
@@ -9492,11 +9649,10 @@ CommandIfCompile:
 		cmp 	#NSSIFloat
 		bne 	IfFailType
 		jsr 	IfRequireThenEOL
+		jsr 	IfOpen 						; this IF's ordinal, and nothing pending inside it yet
 		lda 	#PCD_GPCMD_IF 				; the marker FixBranches counts nesting on
 		jsr 	WriteCodeByte
-		lda 	#PCD_CMD_IFNEXT 			; false -> the next alternative, or the gp.endif
-		jsr 	WriteCodeByte
-		jmp 	IfWritePlaceholder
+		jmp 	IfWriteNext 				; false -> the next alternative, or the gp.endif
 
 ;
 ;		GP.ELSEIF is a closer and an opener in one: the .ifelse leaves the body above, then the
@@ -9505,23 +9661,19 @@ CommandIfCompile:
 ;
 CommandElseIfCompile:
 		stz 	deferErrors
-		lda 	#PCD_CMD_IFELSE 			; out of the body above, to the gp.endif
-		jsr 	WriteCodeByte
-		jsr 	IfWritePlaceholder
+		jsr 	IfWriteElse 				; out of the body above, to the gp.endif
+		jsr 	IfAltHere 					; and the test above lands HERE, one past it
 		jsr 	CompileExpressionAt0
 		and 	#NSSTypeMask
 		cmp 	#NSSIFloat
 		bne 	IfFailType
 		jsr 	IfRequireThenEOL
-		lda 	#PCD_CMD_IFNEXT
-		jsr 	WriteCodeByte
-		jmp 	IfWritePlaceholder
+		jmp 	IfWriteNext
 
 CommandElseCompile:
 		stz 	deferErrors
-		lda 	#PCD_CMD_IFELSE
-		jsr 	WriteCodeByte
-		jsr 	IfWritePlaceholder
+		jsr 	IfWriteElse
+		jsr 	IfAltHere
 		jmp 	IfRequireEOL
 
 ;
@@ -9530,6 +9682,8 @@ CommandElseCompile:
 ;
 CommandEndIfCompile:
 		stz 	deferErrors
+		jsr 	IfAltHere 					; the last test lands ON the gp.endif...
+		jsr 	IfClose 					; ...and so does every body that finished
 		lda 	#PCD_GPCMD_ENDIF
 		jsr 	WriteCodeByte
 		jmp 	IfRequireEOL
@@ -9554,8 +9708,9 @@ _IREDone:
 		rts
 
 ;
-;		Two placeholder bytes. The value is never read: FixBranches overwrites both
+;		Two placeholder bytes, in pass one. The value is never read: FixBranches overwrites both
 ;		unconditionally, and errors out rather than leaving them if it cannot resolve the branch.
+;		Pass two writes the offset instead and never comes through here.
 ;
 IfWritePlaceholder:
 		lda 	#0
@@ -9565,8 +9720,135 @@ IfWritePlaceholder:
 		clc
 		rts
 
+;
+;		The three ways an IF can be refused, and the one line of arithmetic every hook below
+;		starts with. HERE, above the hooks rather than under them: the tests that reach these
+;		are on both sides of a hundred and fifty bytes of table plumbing, and a relative branch
+;		does not span it.
+;
+;		X = (ifDepth-1) * 2, the innermost open GP.IF.
+;
+IfIndex:
+		lda 	ifDepth
+		beq 	IfFailStructure 			; a GP.ELSEIF, GP.ELSE or GP.ENDIF with no GP.IF
+		dec 	a
+		asl 	a
+		tax
+		rts
+
 IfFailType:
 		.error_type
+IfFailNest:
+		.error_memory
+IfFailStructure:
+		.error_structure
+
+; ************************************************************************************************
+;
+;		The four hooks that make this resolvable in one forward pass. Pass one writes placeholders
+;		and notes where each branch should land as it goes past the landing place; pass two writes
+;		the offsets out of those notes. See commands/goto.asm for the tables.
+;
+;		THE OPEN GP.IFs ARE A STACK, because an inner IF's alternatives must be invisible to the
+;		outer one's -- the same thing FixBranches gets by counting gp.if against gp.endif as it
+;		scans. GP.ELSEIF pushes nothing: it continues the chain its GP.IF started.
+;
+; ************************************************************************************************
+
+IfOpen:
+		lda 	ifDepth
+		cmp 	#BLOCK_MAX_NEST
+		bcs 	IfFailNest
+		asl 	a
+		tax
+		jsr 	BlockOpen 					; a new block ordinal, in blockIndex
+		lda 	blockIndex
+		sta 	ifOrdinals,x
+		lda 	blockIndex+1
+		sta 	ifOrdinals+1,x
+		lda 	#$FF 						; nothing inside it is waiting for a target yet
+		sta 	ifPending,x
+		sta 	ifPending+1,x
+		inc 	ifDepth
+		rts
+
+;
+;		.ifnext -- the test came out false. It takes an alternative of its own and becomes this
+;		IF's pending one; whatever alternative follows says where it lands.
+;
+IfWriteNext:
+		jsr 	IfIndex
+		jsr 	BlockAltOpen
+		lda 	blockAlt
+		sta 	ifPending,x
+		lda 	blockAlt+1
+		sta 	ifPending+1,x
+		;
+		lda 	passNumber
+		beq 	_IWNPlaceholder
+		jsr 	BlockAltRead 				; where the next alternative starts
+		lda 	#PCD_CMD_IFNEXT
+		jsr 	WriteBranchToAddress
+		clc
+		rts
+_IWNPlaceholder:
+		lda 	#PCD_CMD_IFNEXT
+		jsr 	WriteCodeByte
+		jmp 	IfWritePlaceholder
+
+;
+;		.ifelse -- a body finished, so out to the gp.endif. Every one of them in an IF goes to
+;		the same place, which is why they read the block's end rather than an alternative.
+;
+IfWriteElse:
+		lda 	passNumber
+		beq 	_IWEPlaceholder
+		jsr 	IfIndex
+		lda 	ifOrdinals,x
+		sta 	blockIndex
+		lda 	ifOrdinals+1,x
+		sta 	blockIndex+1
+		jsr 	BlockEndTarget
+		lda 	#PCD_CMD_IFELSE
+		jsr 	WriteBranchToAddress
+		clc
+		rts
+_IWEPlaceholder:
+		lda 	#PCD_CMD_IFELSE
+		jsr 	WriteCodeByte
+		jmp 	IfWritePlaceholder
+
+;
+;		The pending .ifnext, if there is one, lands where the cursor stands. After a GP.ELSE
+;		there is none -- it opens the last body and writes no test.
+;
+IfAltHere:
+		jsr 	IfIndex
+		lda 	ifPending,x
+		sta 	blockAlt
+		lda 	ifPending+1,x
+		sta 	blockAlt+1
+		jsr 	BlockAltHere
+		jsr 	IfIndex 					; X again: the write above goes through a bank window
+		lda 	#$FF 						; resolved, so no longer pending
+		sta 	ifPending,x
+		sta 	ifPending+1,x
+		rts
+
+;
+;		GP.ENDIF. Where the block ends is where the cursor stands, and the stack gives the level
+;		back.
+;
+IfClose:
+		jsr 	IfIndex
+		lda 	ifOrdinals,x
+		sta 	blockIndex
+		lda 	ifOrdinals+1,x
+		sta 	blockIndex+1
+		jsr 	BlockEndHere
+		dec 	ifDepth
+		rts
+
 
 		.send code
 

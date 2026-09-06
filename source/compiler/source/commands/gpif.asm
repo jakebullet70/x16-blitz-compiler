@@ -46,6 +46,11 @@
 ;		already in flight and send it past its own gp.endif. So depth is counted on a marker
 ;		GP.ELSEIF does not emit -- and note below that it deliberately writes no gp.if.
 ;
+;		THAT IS PASS ONE'S PROBLEM ONLY NOW. Pass two keeps a stack of the open GP.IFs instead of
+;		scanning for one, so an inner IF is invisible to an outer one's branches because it is a
+;		different entry, not because a count came out right. The marker stays: pass one still
+;		resolves the old way, and the checksum compares the two answers.
+;
 ;		ALL FOUR DISARM deferErrors FIRST. A statement that fails with a SYNTAX error while the
 ;		deferral is armed is rolled back and replaced with a runtime throw-stub -- which for a
 ;		block opener means its gp.if vanishes while the GP.ENDIF on a later line still compiles
@@ -65,11 +70,10 @@ CommandIfCompile:
 		cmp 	#NSSIFloat
 		bne 	IfFailType
 		jsr 	IfRequireThenEOL
+		jsr 	IfOpen 						; this IF's ordinal, and nothing pending inside it yet
 		lda 	#PCD_GPCMD_IF 				; the marker FixBranches counts nesting on
 		jsr 	WriteCodeByte
-		lda 	#PCD_CMD_IFNEXT 			; false -> the next alternative, or the gp.endif
-		jsr 	WriteCodeByte
-		jmp 	IfWritePlaceholder
+		jmp 	IfWriteNext 				; false -> the next alternative, or the gp.endif
 
 ;
 ;		GP.ELSEIF is a closer and an opener in one: the .ifelse leaves the body above, then the
@@ -78,23 +82,19 @@ CommandIfCompile:
 ;
 CommandElseIfCompile:
 		stz 	deferErrors
-		lda 	#PCD_CMD_IFELSE 			; out of the body above, to the gp.endif
-		jsr 	WriteCodeByte
-		jsr 	IfWritePlaceholder
+		jsr 	IfWriteElse 				; out of the body above, to the gp.endif
+		jsr 	IfAltHere 					; and the test above lands HERE, one past it
 		jsr 	CompileExpressionAt0
 		and 	#NSSTypeMask
 		cmp 	#NSSIFloat
 		bne 	IfFailType
 		jsr 	IfRequireThenEOL
-		lda 	#PCD_CMD_IFNEXT
-		jsr 	WriteCodeByte
-		jmp 	IfWritePlaceholder
+		jmp 	IfWriteNext
 
 CommandElseCompile:
 		stz 	deferErrors
-		lda 	#PCD_CMD_IFELSE
-		jsr 	WriteCodeByte
-		jsr 	IfWritePlaceholder
+		jsr 	IfWriteElse
+		jsr 	IfAltHere
 		jmp 	IfRequireEOL
 
 ;
@@ -103,6 +103,8 @@ CommandElseCompile:
 ;
 CommandEndIfCompile:
 		stz 	deferErrors
+		jsr 	IfAltHere 					; the last test lands ON the gp.endif...
+		jsr 	IfClose 					; ...and so does every body that finished
 		lda 	#PCD_GPCMD_ENDIF
 		jsr 	WriteCodeByte
 		jmp 	IfRequireEOL
@@ -127,8 +129,9 @@ _IREDone:
 		rts
 
 ;
-;		Two placeholder bytes. The value is never read: FixBranches overwrites both
+;		Two placeholder bytes, in pass one. The value is never read: FixBranches overwrites both
 ;		unconditionally, and errors out rather than leaving them if it cannot resolve the branch.
+;		Pass two writes the offset instead and never comes through here.
 ;
 IfWritePlaceholder:
 		lda 	#0
@@ -138,8 +141,135 @@ IfWritePlaceholder:
 		clc
 		rts
 
+;
+;		The three ways an IF can be refused, and the one line of arithmetic every hook below
+;		starts with. HERE, above the hooks rather than under them: the tests that reach these
+;		are on both sides of a hundred and fifty bytes of table plumbing, and a relative branch
+;		does not span it.
+;
+;		X = (ifDepth-1) * 2, the innermost open GP.IF.
+;
+IfIndex:
+		lda 	ifDepth
+		beq 	IfFailStructure 			; a GP.ELSEIF, GP.ELSE or GP.ENDIF with no GP.IF
+		dec 	a
+		asl 	a
+		tax
+		rts
+
 IfFailType:
 		.error_type
+IfFailNest:
+		.error_memory
+IfFailStructure:
+		.error_structure
+
+; ************************************************************************************************
+;
+;		The four hooks that make this resolvable in one forward pass. Pass one writes placeholders
+;		and notes where each branch should land as it goes past the landing place; pass two writes
+;		the offsets out of those notes. See commands/goto.asm for the tables.
+;
+;		THE OPEN GP.IFs ARE A STACK, because an inner IF's alternatives must be invisible to the
+;		outer one's -- the same thing FixBranches gets by counting gp.if against gp.endif as it
+;		scans. GP.ELSEIF pushes nothing: it continues the chain its GP.IF started.
+;
+; ************************************************************************************************
+
+IfOpen:
+		lda 	ifDepth
+		cmp 	#BLOCK_MAX_NEST
+		bcs 	IfFailNest
+		asl 	a
+		tax
+		jsr 	BlockOpen 					; a new block ordinal, in blockIndex
+		lda 	blockIndex
+		sta 	ifOrdinals,x
+		lda 	blockIndex+1
+		sta 	ifOrdinals+1,x
+		lda 	#$FF 						; nothing inside it is waiting for a target yet
+		sta 	ifPending,x
+		sta 	ifPending+1,x
+		inc 	ifDepth
+		rts
+
+;
+;		.ifnext -- the test came out false. It takes an alternative of its own and becomes this
+;		IF's pending one; whatever alternative follows says where it lands.
+;
+IfWriteNext:
+		jsr 	IfIndex
+		jsr 	BlockAltOpen
+		lda 	blockAlt
+		sta 	ifPending,x
+		lda 	blockAlt+1
+		sta 	ifPending+1,x
+		;
+		lda 	passNumber
+		beq 	_IWNPlaceholder
+		jsr 	BlockAltRead 				; where the next alternative starts
+		lda 	#PCD_CMD_IFNEXT
+		jsr 	WriteBranchToAddress
+		clc
+		rts
+_IWNPlaceholder:
+		lda 	#PCD_CMD_IFNEXT
+		jsr 	WriteCodeByte
+		jmp 	IfWritePlaceholder
+
+;
+;		.ifelse -- a body finished, so out to the gp.endif. Every one of them in an IF goes to
+;		the same place, which is why they read the block's end rather than an alternative.
+;
+IfWriteElse:
+		lda 	passNumber
+		beq 	_IWEPlaceholder
+		jsr 	IfIndex
+		lda 	ifOrdinals,x
+		sta 	blockIndex
+		lda 	ifOrdinals+1,x
+		sta 	blockIndex+1
+		jsr 	BlockEndTarget
+		lda 	#PCD_CMD_IFELSE
+		jsr 	WriteBranchToAddress
+		clc
+		rts
+_IWEPlaceholder:
+		lda 	#PCD_CMD_IFELSE
+		jsr 	WriteCodeByte
+		jmp 	IfWritePlaceholder
+
+;
+;		The pending .ifnext, if there is one, lands where the cursor stands. After a GP.ELSE
+;		there is none -- it opens the last body and writes no test.
+;
+IfAltHere:
+		jsr 	IfIndex
+		lda 	ifPending,x
+		sta 	blockAlt
+		lda 	ifPending+1,x
+		sta 	blockAlt+1
+		jsr 	BlockAltHere
+		jsr 	IfIndex 					; X again: the write above goes through a bank window
+		lda 	#$FF 						; resolved, so no longer pending
+		sta 	ifPending,x
+		sta 	ifPending+1,x
+		rts
+
+;
+;		GP.ENDIF. Where the block ends is where the cursor stands, and the stack gives the level
+;		back.
+;
+IfClose:
+		jsr 	IfIndex
+		lda 	ifOrdinals,x
+		sta 	blockIndex
+		lda 	ifOrdinals+1,x
+		sta 	blockIndex+1
+		jsr 	BlockEndHere
+		dec 	ifDepth
+		rts
+
 
 		.send code
 

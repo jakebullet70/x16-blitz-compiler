@@ -641,6 +641,7 @@ _GBRFixUp:
 		;
 		jsr 	_GBFixLineTable
 		jsr 	_GBFixBlockEnds
+		jsr 	_GBFixBlockAlts
 		jsr 	_GBFixRegions 				; BEFORE the .fngosub walk, which reads the new bases
 		jsr 	_GBFixFnCalls
 		jsr 	_GBFixAsmCalls
@@ -1136,6 +1137,44 @@ _GBFBEEntry:
 		inc 	blockWalk+1
 		bra 	_GBFBELoop
 _GBFBEDone:
+		rts
+
+;
+;		...and the alternative table, which holds the same kind of address and moves the same way.
+;
+
+_GBFixBlockAlts:
+		stz 	blockWalk
+		stz 	blockWalk+1
+_GBFBALoop:
+		lda 	blockWalk+1
+		cmp 	altCount+1
+		bcc 	_GBFBAEntry
+		bne 	_GBFBADone
+		lda 	blockWalk
+		cmp 	altCount
+		bcs 	_GBFBADone
+_GBFBAEntry:
+		lda 	blockWalk
+		sta 	blockIndex
+		lda 	blockWalk+1
+		sta 	blockIndex+1
+		jsr 	BlockAltFetch
+		lda 	blockValue
+		sta 	zTemp1
+		lda 	blockValue+1
+		sta 	zTemp1+1
+		jsr 	GPBankAdjust
+		lda 	zTemp1
+		sta 	blockValue
+		lda 	zTemp1+1
+		sta 	blockValue+1
+		jsr 	BlockAltWrite
+		inc 	blockWalk
+		bne 	_GBFBALoop
+		inc 	blockWalk+1
+		bra 	_GBFBALoop
+_GBFBADone:
 		rts
 
 ; ************************************************************************************************

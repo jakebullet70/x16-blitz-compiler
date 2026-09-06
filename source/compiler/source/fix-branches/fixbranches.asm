@@ -48,6 +48,10 @@ _FBLoop:
 		beq 	_FBUnwindFar
 		cmp 	#PCD_CMD_EXITDO 			; GP.EXITDO: resolve against its own GP.LOOP.
 		beq 	_FBExitDoFar
+		cmp 	#PCD_CMD_IFNEXT 			; GP.IF / GP.ELSEIF test false: the next alternative.
+		beq 	_FBIfNextFar
+		cmp 	#PCD_CMD_IFELSE 			; end of an IF body: out to the GP.ENDIF.
+		beq 	_FBIfElseFar
 		;
 		;		WHAT IS LEFT, both passes. Their targets are code positions found by walking the
 		;		object, which is a thing only this side can do.
@@ -57,10 +61,6 @@ _FBStructural:
 		beq 	_FBCaseNextFar
 		cmp 	#PCD_CMD_CASEEND 			; end of a case body: out to the GP.ENDSEL.
 		beq 	_FBCaseEndFar
-		cmp 	#PCD_CMD_IFNEXT 			; GP.IF / GP.ELSEIF test false: the next alternative.
-		beq 	_FBIfNextFar
-		cmp 	#PCD_CMD_IFELSE 			; end of an IF body: out to the GP.ENDIF.
-		beq 	_FBIfElseFar
 _FBNext:
 		;
 		;		Block depth, counted as the walk passes the openers and closers -- the same

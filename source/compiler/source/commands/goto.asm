@@ -287,6 +287,106 @@ BlockEndPointer:
 		sta 	zTemp0+1
 		rts
 
+; ************************************************************************************************
+;
+;		THE ALTERNATIVES. A GP.IF or a GP.CASE that comes out false branches to the NEXT
+;		alternative, which is a different place for each one -- so each gets an ordinal of its
+;		own, and the target is written down by whatever alternative follows it.
+;
+;		BlockAltOpen 	take the next ordinal, into blockAlt. The caller remembers it as its
+;						block's PENDING alternative.
+;		BlockAltHere 	blockAlt's target is where the write cursor stands. Pass one only.
+;		BlockAltRead 	...and reading it back, into branchTarget.
+;
+;		ONE PENDING ALTERNATIVE PER OPEN BLOCK IS ENOUGH, which is what makes this a slot rather
+;		than a chain: a GP.IF's test is resolved by the next GP.ELSEIF, GP.ELSE or GP.ENDIF, and
+;		by then the next test has not been written.
+;
+; ************************************************************************************************
+
+BlockAltOpen:
+		lda 	altCount
+		sta 	blockAlt
+		lda 	altCount+1
+		sta 	blockAlt+1
+		inc 	altCount
+		bne 	_BAOCounted
+		inc 	altCount+1
+_BAOCounted:
+		lda 	altCount+1
+		cmp 	#BLOCK_MAX >> 8
+		bcc 	_BAORoom
+		jmp 	BlockFailCount 				; a jmp: the error exits sit above the table routines
+_BAORoom:
+		rts
+
+BlockAltHere:
+		lda 	passNumber
+		bne 	_BAHDone 					; pass two READS this table; it does not write it
+		lda 	blockAlt+1 					; $FFFF -- nothing is waiting for a target
+		and 	blockAlt
+		cmp 	#$FF
+		beq 	_BAHDone
+		lda 	blockAlt
+		sta 	blockIndex
+		lda 	blockAlt+1
+		sta 	blockIndex+1
+		sec 								; one short, and the reader adds it back -- see
+		lda 	objPtr 						; BlockDepthDown for why
+		sbc 	#1
+		sta 	blockValue
+		lda 	objPtr+1
+		sbc 	#0
+		sta 	blockValue+1
+		jsr 	BlockAltWrite
+_BAHDone:
+		rts
+
+BlockAltRead:
+		lda 	blockAlt
+		sta 	blockIndex
+		lda 	blockAlt+1
+		sta 	blockIndex+1
+		jsr 	BlockAltFetch
+		jmp 	BlockPlusOne 				; the stored address is one short, as always
+
+; ************************************************************************************************
+;
+;		Entry blockIndex of the ALTERNATIVE table, to and from blockValue. The same two routines
+;		as the block-end table, over the other half of the bank.
+;
+; ************************************************************************************************
+
+BlockAltWrite:
+		jsr 	BlockAltPointer
+		.block_access
+		lda 	blockValue
+		sta 	(zTemp0)
+		ldy 	#1
+		lda 	blockValue+1
+		sta 	(zTemp0),y
+		.block_release
+		rts
+
+BlockAltFetch:
+		jsr 	BlockAltPointer
+		.block_access
+		lda 	(zTemp0)
+		sta 	blockValue
+		ldy 	#1
+		lda 	(zTemp0),y
+		sta 	blockValue+1
+		.block_release
+		rts
+
+BlockAltPointer:
+		jsr 	BlockEndPointer
+		lda 	zTemp0+1 					; the same offset, in the other table
+		clc
+		adc 	#(BlockAltTable - BlockEndTable) >> 8
+		sta 	zTemp0+1
+		rts
+
 
 ; ************************************************************************************************
 ;
@@ -410,6 +510,16 @@ blockValue: 								; ...and what is in it
 		.fill 	2
 blockWalk: 									; the relocator's place in the table
 		.fill 	2
+altCount: 									; how many alternatives this pass has written
+		.fill 	2
+blockAlt: 									; the alternative being opened, resolved or read
+		.fill 	2
+ifOrdinals: 								; the block ordinal of each open GP.IF...
+		.fill 	2*BLOCK_MAX_NEST
+ifPending: 									; ...and the alternative inside it still waiting for
+		.fill 	2*BLOCK_MAX_NEST 			; a target, or $FFFF
+ifDepth: 									; how many GP.IFs are open right now
+		.fill 	1
 
 		.send code
 
