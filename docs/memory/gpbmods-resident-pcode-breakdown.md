@@ -9,21 +9,29 @@ metadata:
 distance to the next label in OBJECT order. Totals 13,563 against the 13,568 `gpBankStart` read off
 the map's own discontinuity, so the method is sound to five bytes.
 
-| file | resident p-code | bankable |
+| file | resident p-code | `BANK`/`BLOAD`/`BSAVE` in code |
 |---|---:|---|
-| **(main program) -- the GPBMODS shell** | **11,453** | **no** -- calls the GUI |
-| `BANKMGR.INC.BL` | 574 | no -- a `BANK` |
-| `STRINGS.INC.BL` | 430 | yes |
-| `STASH.INC.BL` | 407 | no -- six |
-| `SORT.INC.BL` | 200 | yes |
-| `LIBBANK.INC.BL` | 187 | no -- it IS the shims |
-| `STASHFILE.INC.BL` | 171 | no -- twelve |
-| `APPSYS.INC.BL` | 114 | no -- a `BSAVE` |
-| `STRCASE.INC.BL` | 26 | yes |
+| **(main program) -- the GPBMODS shell** | **11,453** | none, but it calls the GUI |
+| `BANKMGR.INC.BL` | 574 | none |
+| `STRINGS.INC.BL` | 430 | none |
+| `STASH.INC.BL` | 407 | **4** |
+| `SORT.INC.BL` | 200 | none |
+| `LIBBANK.INC.BL` | 187 | **18** -- it IS the shims |
+| `STASHFILE.INC.BL` | 171 | **4** |
+| `APPSYS.INC.BL` | 114 | none |
+| `STRCASE.INC.BL` | 26 | none |
 
-**The shell is 84% of it.** Every library module put together is 2,109 bytes, 16%, and only
-`STRINGS` + `SORT` + `STRCASE` = **656 bytes** can go in a region at all. Banking the whole library
-would buy less than a page.
+**Grep for these with `##` comment lines stripped first.** Counting raw matched the word `BSAVE`
+inside an APPSYS comment explaining why there is no BSAVE, and wrongly excluded both APPSYS and
+BANKMGR -- which halved the apparent total.
+
+**The shell is 84% of it.** Every library module put together is 2,109 bytes, 16%. The five with no
+bank statement come to **1,344 bytes** -- five pages, against a gap of several thousand.
+
+**Passing that grep is necessary, not sufficient.** The second test is whether the module is ever
+called WITH A DATA BANK SELECTED, which is what disqualifies `FILE.DIR.FILL` and `FILE.DIR.STEP`
+even though the `BANK` statements are in their callers -- see [[filedir-bank-split]]. Check both
+before counting a module as movable.
 
 **So "bank another module" is not a lever on this program.** The lever is the shell, and the shell
 cannot be banked because it calls `GUI.SAY` and friends -- see [[gp-banked-call-out-loses-the-bank]].
