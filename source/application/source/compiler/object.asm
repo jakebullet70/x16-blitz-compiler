@@ -133,6 +133,7 @@ _WOCWholePages:
 _WOCTooBig:
 		jmp 	ObjectTooBig 					; shared with the SHARED path: prints PROGRAM TOO BIG,
 _POCFits: 									; returns carry set, caller skips the map file and OK
+		jsr 	AsmSetBases 				; as the shared path -- see AsmCloseBlock
 		clc
 		rts
 
@@ -148,9 +149,6 @@ WriteObjectCode:
 		bne 	_WOCEmbedded
 		jmp 	ObjectWriteShared
 _WOCEmbedded:
-		jsr 	PatchAsmFixups 				; GP.ASM: blob calls, label targets and {VAR}, all of
-											; which needed newWorkspacePage as well as the run base
-
 		;
 		;		THE RUNTIME IMAGE IS OPENED FIRST, before the object file is created. It is the
 		;		one thing here that can fail for a reason outside this program, and a compile
@@ -376,7 +374,8 @@ _WOCSCeiling:
 		lda 	newWorkspacePage
 		cmp 	zTemp1
 		bcs 	_WOCSBigFar
-		clc
+		jsr 	AsmSetBasesShared 			; GP.ASM needs both of them, and pass two needs them
+		clc 								; while it compiles -- see AsmCloseBlock
 		rts
 ;
 ;		ObjectTooBig is at the far end of this file, out of branch range from here -- the same
@@ -386,7 +385,6 @@ _WOCSBigFar:
 		jmp 	ObjectTooBig
 
 ObjectWriteShared:
-		jsr 	PatchAsmFixupsShared 		; GP.ASM, as the embedded path -- see _WOCEmbedded
 		;
 		;		Header: a normal PRG loading at $0801 -- the bootstrap sits there.
 		;
@@ -814,23 +812,23 @@ mapLead:
 ;
 ; ************************************************************************************************
 
-PatchAsmFixups:
+AsmSetBases:
 		sec 								; embedded: it runs at runtimeEndPage, it sits at
 		lda 	runtimeEndPage 				; FreeMemory, and the difference is what every blob
 		sbc 	#FreeMemory >> 8 			; address and label target has to move by
 		sta 	AsmPageDelta
 		lda 	newWorkspacePage
 		sta 	AsmWorkspacePage
-		jmp 	AsmPatchAll
+		rts
 
-PatchAsmFixupsShared:
+AsmSetBasesShared:
 		clc
 		lda 	#(PCODE_PAGE - (FreeMemory >> 8)) & $FF
 		adc 	gpBankActive 				; shared p-code lands at $0900, or $0A00 for a banked
 		sta 	AsmPageDelta 				; program -- the extension page is below it
-		lda 	newWorkspacePage 			; ObjectWriteShared carries WS_START in this byte
+		lda 	newWorkspacePage 			; ObjectPrepareShared carries WS_START in this byte
 		sta 	AsmWorkspacePage
-		jmp 	AsmPatchAll
+		rts
 
 ;
 ;		One page of the runtime image, in transit from GPC.IMG.nnn.BIN to OBJECT.PRG. It is in

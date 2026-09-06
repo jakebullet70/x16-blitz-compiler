@@ -300,9 +300,13 @@ _SCEResolve:
 		;
 		lda 	#BLC_ENDPASS1
 		jsr 	CallAPIHandler
-		bcc 	_SCEChecksum
+		bcc 	_SCEFits
 		sec 								; too big, and it has already said so
 		jmp 	ExitCompiler
+_SCEFits:
+		jsr 	AsmPatchAll 				; ...and with the two bases known, GP.ASM's blob calls
+											; can be filled in. Pass two wrote them out resolved,
+											; so the checksum compares the two answers.
 _SCEChecksum:
 		jsr 	ObjectChecksum
 		;

@@ -181,6 +181,8 @@ AsmCloseBlock:
 		;		assembled straight into the window, because WriteCodeByte sits in the middle of
 		;		it and can leave through the error handler, which prints in bank 0.
 		;
+		lda 	passNumber
+		bne 	_ACBResolve
 		lda 	#AFIX_CALL
 		sta 	AsmNewKind
 		lda 	objPtr
@@ -198,6 +200,33 @@ AsmCloseBlock:
 
 		.keyword PCD_SYS 					; $DD $B0 -- call it
 		jmp 	AsmAddFixup
+;
+;		PASS TWO KNOWS THE ANSWER HERE. The pool's base was settled at the end of pass one and
+;		so was the page the object runs at, so the blob's run address is arithmetic rather than
+;		something to come back to -- which is what matters, because pass two's object goes
+;		straight out and there is nothing to come back to.
+;
+;		AN ABSOLUTE ADDRESS, NOT AN OFFSET, so a call from inside a GP.BANKED region needs no
+;		correction: the pool stays in low memory and the region reaches it from $A000 exactly as
+;		low code does.
+;
+_ACBResolve:
+		clc
+		lda 	AsmPoolBase
+		adc 	AsmBlobStart
+		sta 	AsmBlobAddr
+		lda 	AsmPoolBase+1
+		adc 	AsmBlobStart+1
+		clc
+		adc 	AsmPageDelta
+		sta 	AsmBlobAddr+1
+		lda 	AsmBlobAddr
+		jsr 	WriteCodeByte
+		lda 	AsmBlobAddr+1
+		jsr 	WriteCodeByte
+
+		.keyword PCD_SYS 					; $DD $B0 -- call it
+		rts
 
 ; ************************************************************************************************
 ;
@@ -279,6 +308,25 @@ AsmFlushPool:
 		bne 	_AFPGo
 		rts
 _AFPGo:
+		lda 	passNumber
+		beq 	_AFPBase
+		;
+		;		PASS TWO MUST LAND ON PASS ONE'S POOL BASE. Every blob call it has already
+		;		written was resolved against that figure, so a pool that turned out to start
+		;		somewhere else would have every one of them pointing at nothing.
+		;
+		lda 	objPtr
+		cmp 	AsmPoolBase
+		bne 	_AFPDiverged
+		lda 	objPtr+1
+		cmp 	AsmPoolBase+1
+		beq 	_AFPResolve
+_AFPDiverged:
+		.error_internal
+_AFPResolve:
+		jsr 	AsmPatchAll 				; ...and the pool goes out RESOLVED, because once it
+											; has gone out there is no going back to it
+_AFPBase:
 		lda 	objPtr 						; where the pool starts, in the buffer
 		sta 	AsmPoolBase
 		lda 	objPtr+1
@@ -374,13 +422,21 @@ _APAVariable:
 		adc 	AsmWorkspacePage
 		sta 	zTemp0+1
 		;
-		;		THE TARGET. A blob call patches the p-code, which is already in the buffer, so
-		;		its address was recorded absolutely as it was emitted. The other two patch the
-		;		pool, which had not been placed when they were recorded, so they hold offsets.
+		;		THE TARGET, and there are two kinds of it. A blob call patches the p-code, whose
+		;		address was recorded absolutely as it was emitted -- pass one only, because pass
+		;		two wrote the answer there in the first place. The other two patch the POOL,
+		;		which had not been placed when they were recorded, so they hold offsets into it.
+		;
+		;		AND THE POOL IS IN TWO PLACES. Pass one has already copied it into the object and
+		;		patches that copy; pass two patches it where it still lives, in the bank, because
+		;		it is about to be copied out and will not be reachable afterwards. Same offsets,
+		;		different base.
 		;
 _APATarget:
 		lda 	AsmKind
-		beq 	_APAStore
+		beq 	_APAStore 					; a blob call: the recorded address, as it stands
+		lda 	passNumber
+		bne 	_APAInPool
 		clc
 		lda 	zTemp1
 		adc 	AsmPoolBase
@@ -394,7 +450,23 @@ _APAStore:
 		ldy 	#1
 		lda 	zTemp0+1
 		sta 	(zTemp1),y
-
+		bra 	_APANext
+_APAInPool:
+		clc
+		lda 	zTemp1
+		adc 	#AsmPool & $FF
+		sta 	zTemp1
+		lda 	zTemp1+1
+		adc 	#AsmPool >> 8
+		sta 	zTemp1+1
+		.asm_access
+		lda 	zTemp0
+		sta 	(zTemp1)
+		ldy 	#1
+		lda 	zTemp0+1
+		sta 	(zTemp1),y
+		.asm_release
+_APANext:
 		inc 	AsmFixIdx
 		lda 	AsmFixIdx
 		cmp 	AsmFixupCount
@@ -1503,6 +1575,8 @@ AsmPoolBase:
 		.fill 	2 						; where the pool landed within the object
 AsmBlobStart:
 		.fill 	2 						; pool offset of the blob being assembled
+AsmBlobAddr:
+		.fill 	2 						; ...and where pass two says it will RUN
 AsmNewKind: 							; one fixup, built here before it is banked
 		.fill 	1
 AsmNewTarget:
