@@ -19,50 +19,38 @@
 #IFNDEF APPSYS.DEFS
 #DEFINE APPSYS.DEFS 1
 
-## The KERNAL's screen_mode. Carry set reports -- mode in .A, width .X, height .Y;
-## carry clear sets. GPC's own SCREEN is the carry-clear half of this call.
+## screen_mode. Carry set reports: mode in .A, width .X, height .Y.
 #DEFINE APPSYS.SCRMODE $FF5F
 
-## The current text colour, packed background * 16 + foreground -- the packing the GP
-## drawing commands take, and the byte they read when their colour is left off.
+## Text colour, packed background * 16 + foreground.
 #DEFINE APPSYS.COLREG $0376
 
-## screen_set_charset, and the byte holding the charset number in its low bits with
-## flags in the high, bit 6 being ISO.
+## screen_set_charset, and the byte holding the charset number.
 ##
-## WARNING: $FF62 only sets, and does not clear bit 6. Restoring the charset alone
-## leaves a machine that believes it is in ISO mode, so the whole byte goes back.
+## WARNING: $FF62 does not clear bit 6 of $0372, so restoring the charset alone
+## leaves the machine in ISO mode. The whole byte goes back.
 #DEFINE APPSYS.SETCHR $FF62
 #DEFINE APPSYS.CHRREG $0372
 
-## The emulator's I/O registers. The last two answer 49 and 54 -- "1" and "6" -- and
-## that pair is the whole of the detection. $9FB8 moves and $9FBC is not a register.
+## $9FBE and $9FBF read 49 and 54 -- "1" and "6" -- under x16emu.
 #DEFINE APPSYS.EMUSIG $9FBE
 
 GOTO APPSYS.SKIP
 
 ## APPSYS.STARTUP -- remember what the user had, and report the size.
+## Call it before any SCREEN or COLOR of your own.
 ##
 ##   out  APPSYS.MODE    the screen mode, for APPSYS.RESTORE
 ##        APPSYS.CHARSET the charset number, likewise
-##        APPSYS.COLS    columns, e.g. 80
-##        APPSYS.ROWS    rows, e.g. 60
+##        APPSYS.COLS    columns
+##        APPSYS.ROWS    rows
 ##        APPSYS.COLOUR  the packed text colour
-##
-## Call it before any SCREEN or COLOR of your own: it restores the state it finds.
-## Lay out from APPSYS.COLS and APPSYS.ROWS rather than 80x60 -- SCREEN 0 is 40x30.
 
 APPSYS.STARTUP:  GP.CALL APPSYS.SCRMODE, 0, 0, 0, 1 : APPSYS.MODE = GP.A : APPSYS.COLS = GP.X : APPSYS.ROWS = GP.Y
     APPSYS.COLOUR = PEEK(APPSYS.COLREG) : APPSYS.CHARSET = PEEK(APPSYS.CHRREG)
     RETURN
 
 ## APPSYS.RESTORE -- the screen as it was, for whatever runs next.
-##
-## Setting the mode clears the screen. Restoring the colour matters as much: leave it
-## and every later PRINT, BASIC's own included, comes out in what the application set.
-##
-## AND 15 is safe only because a packed attribute is 0..255. AND is 16-bit signed here
-## and raises OUT OF RANGE above 32767.
 
 APPSYS.RESTORE:  GP.CALL APPSYS.SCRMODE, APPSYS.MODE, 0, 0, 0 : GP.CALL APPSYS.SETCHR, APPSYS.CHARSET AND 63, 0, 0, 0
     POKE APPSYS.CHRREG, APPSYS.CHARSET : COLOR APPSYS.COLOUR AND 15, INT(APPSYS.COLOUR / 16)
@@ -71,18 +59,6 @@ APPSYS.RESTORE:  GP.CALL APPSYS.SCRMODE, APPSYS.MODE, 0, 0, 0 : GP.CALL APPSYS.S
 ## APPSYS.ISEMU -- x16emu, or the machine?
 ##
 ##   out  APPSYS.IS.EMULATOR   -1 under x16emu, 0 otherwise
-##
-## It answers for x16emu and nothing else: a 0 is a real machine or another emulator.
-## $9FA0-$9FBF is expansion card I/O, so a card at I/O5 could answer too. Treat a 1 as
-## strong and a 0 as certain.
-##
-## -1 and not 1, so that NOT works on it: NOT is -x-1 here, so NOT -1 is 0 while
-## NOT 1 is -2, which is still true.
-##
-## WARNING: the RETURN is on its own line and has to be. A false IF skips the whole
-## line, so a RETURN written after the test is reached only on the emulator; off it
-## the routine falls out of itself into whatever follows and dies on a full frame
-## stack, as OUT OF MEMORY @ $0077.
 
 APPSYS.ISEMU:  APPSYS.IS.EMULATOR = 0 : IF PEEK(APPSYS.EMUSIG) = 49 THEN IF PEEK(APPSYS.EMUSIG + 1) = 54 THEN APPSYS.IS.EMULATOR = -1
     RETURN
