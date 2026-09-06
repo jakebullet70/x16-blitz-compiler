@@ -57,6 +57,15 @@ BLC_PRINTCHAR = 6
 ;		the compiler library and so can see them, and not the other way round.
 ;
 BLC_SYMLOOKUP = 7
+;
+;		End of the FIRST pass. The object's length is now known and everything that follows from
+;		it can be settled: how much of the runtime this program needs, where its object code will
+;		land, where its workspace starts -- and whether it fits at all.
+;
+;		PASS TWO NEEDS ALL OF THAT WHILE IT IS COMPILING, which is why it is asked for here
+;		rather than at the end. Returns CS if the program is too big, having already said so.
+;
+BLC_ENDPASS1 = 8
 
 ; ************************************************************************************************
 ;

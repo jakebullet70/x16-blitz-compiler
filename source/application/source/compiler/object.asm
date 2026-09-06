@@ -45,17 +45,37 @@
 ;
 ; ************************************************************************************************
 
-WriteObjectCode:
+; ************************************************************************************************
+;
+;		HOW BIG IT IS, AND THEREFORE WHERE IT GOES. Called at the END OF PASS ONE, through
+;		BLC_ENDPASS1, because pass one is where the object's length stops changing and
+;		everything here follows from that length: how much of the runtime the program needs,
+;		where the object code lands on reload, where the workspace starts.
+;
+;		PASS TWO NEEDS THE ANSWERS WHILE IT COMPILES. It was enough to work them out at the top
+;		of WriteObjectCode while the finished object sat in a buffer waiting to be streamed;
+;		pass two is about to write straight to the file instead, which means the file is opened
+;		and the runtime written into it before pass two starts.
+;
+;		AND SO IS PROGRAM TOO BIG, which is the point of the exercise: a program with no room to
+;		run is refused here, before a byte of it has been written, rather than after the whole
+;		thing has been laid out.
+;
+;		Carry set = rejected, and the message has already been printed.
+;
+; ************************************************************************************************
+
+PrepareObjectCode:
 		lda 	ModeText 					; GPC.INPUT line 4 -- 'S' (SHARED) selects resident-runtime
 		cmp 	#'S' 						; mode: emit a bootstrap + p-code, no embedded runtime
-		bne 	_WOCEmbedded 				; (see the shared branch below and compiler/bootstrap.asm).
-		jmp 	_WOCShared 					; jmp, not a branch -- the embedded path is >127 bytes
-_WOCEmbedded:
+		bne 	_POCEmbedded 				; (see the shared branch below and compiler/bootstrap.asm).
+		jmp 	ObjectPrepareShared 					; jmp, not a branch -- the embedded path is >127 bytes
+_POCEmbedded:
 		jsr 	ScanGPUsage 				; does anything reach a handler above GPBase ?
 		lda 	gpUsed 						; TEMPORARY, while both routes to that answer exist:
 		cmp 	gpStreamUsed 				; the walk and the stream have to agree, on every
 		beq 	_WOCScanOK 					; program compiled. The walk goes when pass one stops
-		jmp 	_WOCScanBad 				; storing the object and there is nothing left to walk.
+		jmp 	ObjectScanBad 				; storing the object and there is nothing left to walk.
 _WOCScanOK:
 		;
 		;		The cut. A program using no GP.BASIC keyword takes the runtime as $0801..GPBase
@@ -99,7 +119,7 @@ _WOCWholePages:
 		;
 		;		The workspace runs from newWorkspacePage to $9F00, so require MIN_WS_PAGES (4K)
 		;		of it, and reject a page count that overflowed a byte on the way -- the same two
-		;		tests, in the same order, as _WOCShared.
+		;		tests, in the same order, as ObjectWriteShared.
 		;
 		clc
 		lda 	runtimeEndPage 				; where the object code will actually land
@@ -109,11 +129,25 @@ _WOCWholePages:
 		bcs 	_WOCTooBig
 		sta 	newWorkspacePage
 		cmp 	#(ObjectCeiling >> 8) - MIN_WS_PAGES + 1
-		bcc 	_WOCFits
+		bcc 	_POCFits
 _WOCTooBig:
-		jmp 	_WOCSBig 					; shared with the SHARED path: prints PROGRAM TOO BIG,
-_WOCFits: 									; returns carry set, caller skips the map file and OK
+		jmp 	ObjectTooBig 					; shared with the SHARED path: prints PROGRAM TOO BIG,
+_POCFits: 									; returns carry set, caller skips the map file and OK
+		clc
+		rts
 
+; ************************************************************************************************
+;
+;		Write the object out, now that all of that has been settled.
+;
+; ************************************************************************************************
+
+WriteObjectCode:
+		lda 	ModeText
+		cmp 	#'S'
+		bne 	_WOCEmbedded
+		jmp 	ObjectWriteShared
+_WOCEmbedded:
 		jsr 	PatchAsmFixups 				; GP.ASM: blob calls, label targets and {VAR}, all of
 											; which needed newWorkspacePage as well as the run base
 
@@ -133,9 +167,9 @@ _WOCFits: 									; returns carry set, caller skips the map file and OK
 		;		here -- the same trampoline _WOCSBigFar needs, for the same reason.
 		;
 _WOCImgNoneFar:
-		jmp 	_WOCNoImage
+		jmp 	ObjectNoImage
 _WOCImgBadFar:
-		jmp 	_WOCBadImage
+		jmp 	ObjectBadImage
 _WOCImgOpened:
 		jsr 	IOImageIn
 		jsr 	IOReadByte 					; the image's own two byte load address, which is
@@ -271,7 +305,7 @@ _WOCDone:
 ;
 ; ************************************************************************************************
 
-_WOCShared:
+ObjectPrepareShared:
 		;
 		;		p-code length -> whole pages (same as the embedded path)
 		;
@@ -306,7 +340,7 @@ _WOCSWhole:
 		lda 	gpUsed 						; ...and the same comparison as the embedded path
 		cmp 	gpStreamUsed
 		beq 	_WOCSScanOK
-		jmp 	_WOCScanBad
+		jmp 	ObjectScanBad
 _WOCSScanOK:
 		;
 		;		The workspace ends where the resident runtime starts, and that is no longer one
@@ -342,15 +376,17 @@ _WOCSCeiling:
 		lda 	newWorkspacePage
 		cmp 	zTemp1
 		bcs 	_WOCSBigFar
-		bra 	_WOCSFits
+		clc
+		rts
 ;
-;		_WOCSBig is at the far end of this file, out of branch range from here -- the same
+;		ObjectTooBig is at the far end of this file, out of branch range from here -- the same
 ;		trampoline FixBranches needs for its GP.EXITDO handler, for the same reason.
 ;
 _WOCSBigFar:
-		jmp 	_WOCSBig
-_WOCSFits:
-		jsr 	PatchAsmFixupsShared 		; GP.ASM, as the embedded path -- see _WOCFits
+		jmp 	ObjectTooBig
+
+ObjectWriteShared:
+		jsr 	PatchAsmFixupsShared 		; GP.ASM, as the embedded path -- see _WOCEmbedded
 		;
 		;		Header: a normal PRG loading at $0801 -- the bootstrap sits there.
 		;
@@ -520,20 +556,20 @@ _WOCSCodeDone:
 		jsr 	IOWriteClose
 		clc 								; success
 		rts
-_WOCSBig:
+ObjectTooBig:
 		ldx 	#ProgramTooBigText & $FF
 		ldy 	#ProgramTooBigText >> 8
-		bra 	_WOCFail
+		bra 	ObjectFail
 ;
 ;		TEMPORARY. The two ways of deciding gpUsed disagreed, which means the byte stream was
 ;		decoded differently from the finished object -- and the answer says how much of the
 ;		runtime goes into the file, so getting it wrong writes a program with its handlers cut
 ;		out. Refusing is the only safe thing to do with it.
 ;
-_WOCScanBad:
+ObjectScanBad:
 		ldx 	#ScanMismatchText & $FF
 		ldy 	#ScanMismatchText >> 8
-		bra 	_WOCFail
+		bra 	ObjectFail
 
 ;
 ;		The runtime image is missing, or is not the file its name claims. Either way there is
@@ -542,8 +578,8 @@ _WOCScanBad:
 ;		what a stale image from an older release looks like -- which is the point of numbering
 ;		it rather than trusting a fixed name to be the right one.
 ;
-_WOCBadImage: 								; missing, wrong load address, or shorter than
-_WOCNoImage: 								; ObjectBase says it should be
+ObjectBadImage: 								; missing, wrong load address, or shorter than
+ObjectNoImage: 								; ObjectBase says it should be
 		jsr 	IOCloseImage 				; CLOSE on a logical file that was never opened is
 											; harmless, and the OPEN may have half-registered it.
 											; Leaving it would fail the NEXT compile's open, and
@@ -552,7 +588,7 @@ _WOCNoImage: 								; ObjectBase says it should be
 											; run the program instead.
 		ldx 	#NoRuntimeImageText & $FF
 		ldy 	#NoRuntimeImageText >> 8
-_WOCFail:
+ObjectFail:
 		jsr 	PrintMessage
 		sec 								; rejected -- CompileCode skips the map file and the OK
 		rts
@@ -792,7 +828,7 @@ PatchAsmFixupsShared:
 		lda 	#(PCODE_PAGE - (FreeMemory >> 8)) & $FF
 		adc 	gpBankActive 				; shared p-code lands at $0900, or $0A00 for a banked
 		sta 	AsmPageDelta 				; program -- the extension page is below it
-		lda 	newWorkspacePage 			; _WOCShared carries WS_START in this byte
+		lda 	newWorkspacePage 			; ObjectWriteShared carries WS_START in this byte
 		sta 	AsmWorkspacePage
 		jmp 	AsmPatchAll
 

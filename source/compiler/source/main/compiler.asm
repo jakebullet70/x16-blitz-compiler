@@ -288,6 +288,21 @@ _SCEResolve:
 		sta 	objPtr
 		lda 	objectEnd+1
 		sta 	objPtr+1
+		;
+		;		THE LENGTH IS THE LAST THING PASS ONE HAD TO FIND OUT, so this is where the
+		;		application settles what follows from it -- how much of the runtime this program
+		;		needs, where its object code lands, where its workspace starts. PROGRAM TOO BIG
+		;		is that test, and it is here now rather than after the whole compile: a program
+		;		with no room to run is refused before pass two writes a byte of it.
+		;
+		;		BEFORE THE CHECKSUM, because pass two is going to be told these answers and
+		;		compile against them -- so pass one has to have finished with them too.
+		;
+		lda 	#BLC_ENDPASS1
+		jsr 	CallAPIHandler
+		bcc 	_SCEChecksum
+		sec 								; too big, and it has already said so
+		jmp 	ExitCompiler
 _SCEChecksum:
 		jsr 	ObjectChecksum
 		;

@@ -35,7 +35,19 @@ CompilerAPI:
 		beq 	_CAPrintScreen
 		cmp 	#BLC_SYMLOOKUP
 		beq 	_CASymLookup
+		cmp 	#BLC_ENDPASS1
+		beq 	_CAEndPass1
 		.debug
+
+; ************************************************************************************************
+;
+;		End of pass one: settle how big the program is and where everything in it goes, so that
+;		pass two can be told. See PrepareObjectCode in compiler/object.asm.
+;
+; ************************************************************************************************
+
+_CAEndPass1:
+		jmp 	PrepareObjectCode
 
 ; ************************************************************************************************
 ;

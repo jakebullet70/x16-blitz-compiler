@@ -35,7 +35,16 @@ TestAPI:
 		beq 	_TAWriteByte
 		cmp 	#BLC_PRINTCHAR
 		beq 	_TAPrintScreen
+		cmp 	#BLC_ENDPASS1
+		beq 	_TAEndPass1
 		.debug
+;
+;		The harness compiles into a bank and never writes a file, so nothing here depends on the
+;		object's length. Say yes.
+;
+_TAEndPass1:
+		clc
+		rts
 
 _TAOpenIn:		
 		.set16 	srcInputPtr,EndProgram+2 	
