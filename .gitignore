@@ -66,6 +66,7 @@ source/unit-tests/compiler-runtime/CODE.BIN
 # ---------------------------------------------------------------------------
 testing/GPCBLD.BAS
 testing/GPCBLD.LOG
+testing/BASLDONE
 testing/GPC.SRC.PRG
 testing/GPC.SRC.SYM
 testing/GPC.ERR.SYM

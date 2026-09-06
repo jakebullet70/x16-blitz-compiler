@@ -11,10 +11,20 @@
 # ************************************************************************************************
 #
 #		The GPC front end is written in BASLOAD source (GPC.BASL). BASLOAD is an X16 ROM utility,
-#		so there is no host-side tokeniser for it: we tokenise by booting the bundled emulator,
-#		"typing"  BASLOAD "GPC.BASL"  at the BASIC prompt, and letting the source's own
-#		  #SAVEAS "@:GPC.PRG"  option write the tokenised program to the drive. This replaces the
-#		old Prog8/Java build of GPC.PRG (now in source/gpc/old-archive/).
+#		so there is no host-side tokeniser for it: we tokenise by booting the bundled emulator and
+#		letting the source's own  #SAVEAS "@:GPC.PRG"  option write the tokenised program to the
+#		drive. This replaces the old Prog8/Java build of GPC.PRG (now in source/gpc/old-archive/).
+#
+#		NOT THE ROM BASLOAD ANY MORE. The ROM build assembles the tokenised program in BASIC RAM,
+#		which capped a .BASL plus every #INCLUDE it pulls in at 38,655 bytes -- and it truncated
+#		SILENTLY, printing SAVING and writing a short file before reporting the error. BASLOAD-GPC
+#		is the same source built as a RAM-resident PRG that streams each line to the output file as
+#		it finishes it, so the ceiling is the disk. See BASLOAD-GPC/README.md.
+#
+#		That costs one thing: the ROM's  BASLOAD "X"  command printed its own result, and a PRG
+#		cannot. BASLOAD leaves a NUL-terminated message at $bf00 in bank 0 and the CALLER reports
+#		it, so the driver below writes that message to a sentinel file and this script reads it.
+#		The sentinel is also how we know the run finished -- see tokenise().
 #
 #		DIRECTION: the MASTER copy is testing/GPC.BASL -- that is where the front end is edited
 #		and interactively BASLOAD-tested (testing/ is the emulator's drive). This build tokenises
@@ -30,10 +40,11 @@
 #
 #		EXTRA TOOLS: run  build_basl.py GPC.ERR.BASL GPC.ERR.PRG  to tokenise a companion tool the
 #		same headless way. These live only in testing/ (no source/ mirror), so this mode just
-#		tokenises -- no mirror. It skips when the source is absent, and
-#		when the PRG is already up to date (BASLOAD writes 2 nondeterministic trailing bytes past
-#		the program's end marker, so re-tokenising an unchanged source would only churn those). The
-#		Makefile's "release" target uses it to freshen GPC.ERR.PRG when its source has changed.
+#		tokenises -- no mirror. It skips when the source is absent, and when the PRG is already up
+#		to date, which is now an optimisation rather than a necessity: the ROM build wrote two
+#		nondeterministic bytes past the program's end marker, so re-tokenising an unchanged source
+#		churned them. The streaming build stops at the end marker and its output is byte for byte
+#		the same every time. The Makefile's "release" target uses it to freshen GPC.ERR.PRG.
 #
 #		Headless, exactly like the other emulator-driven steps in this tree (see
 #		source/unit-tests/shared-runtime/shared_test.py): SDL_VIDEODRIVER=dummy so the emulator
@@ -55,8 +66,44 @@ MIRROR = os.path.join(HERE, "GPC.BASL")     # committed mirror in the source tre
 BASL   = "GPC.BASL"                          # its name on the emulator drive (= testing/)
 PRG    = "GPC.SRC.PRG"                       # #SAVEAS "@:GPC.SRC.PRG" writes this
 SYM    = "GPC.SRC.SYM"                       # #SYMFILE "@:GPC.SRC.SYM" writes this
-DRIVER = "GPCBLD.BAS"                        # scratch: the one line we "type" at BASIC
+DRIVER = "GPCBLD.BAS"                        # scratch: the BASIC driver we "type" at the prompt
 LOG    = "GPCBLD.LOG"                        # scratch: the emulator echo log
+DONE   = "BASLDONE"                          # scratch: the driver writes BASLOAD's message here
+
+#	The streaming tokeniser. BASLOAD-GPC/build/ is the dev copy, rebuilt by BASLOAD-GPC/build.py;
+#	testing/ carries the shipped one beside GPC.BIN, so a fresh checkout with no cc65 still builds.
+#	The dev copy wins when it exists, which is what keeps an edit to the fork from being ignored.
+BASLOAD_BUILT = os.path.join(ROOT, "BASLOAD-GPC", "build", "BASLOAD.PRG")
+BASLOAD_DRIVE = os.path.join(TESTING, "BASLOAD.PRG")
+
+#
+#	The API is three inputs and one output, all in RAM bank 0 -- see BASLOAD-GPC/README.md.
+#
+#	  $bf00  the source file name, and afterwards the NUL-terminated result message
+#	  r0L/$02  name length     r0H/$03  device     SYS $6000  go
+#
+#	BANK 0, NOT POKE 0,0. X16 BASIC saves and restores the RAM bank around every PEEK and POKE, so
+#	POKE 0,0 selects nothing and the name lands in whichever bank was live. The symptom is silent:
+#	SYS returns cleanly, no file is written, and $bf00 still reads back what you poked. BASLOAD
+#	also leaves bank 1 selected on return, so line 90 selects bank 0 again before reading $bf00.
+#
+#	LOAD inside a BASIC program restarts it AND clears variables, so the re-entry guard is a POKEd
+#	byte in golden RAM rather than a variable.
+#
+DRIVER_TEXT = """10 IF PEEK(1024)=42 THEN 50
+20 POKE 1024,42
+30 LOAD"BASLOAD.PRG",8,1
+50 B$="{basl}"
+60 BANK 0
+70 FOR I=1 TO LEN(B$):POKE 48896+I-1,ASC(MID$(B$,I,1)):NEXT
+80 POKE 2,LEN(B$):POKE 3,8:SYS 24576
+90 BANK 0:R$=""
+100 FOR I=0 TO 79:C=PEEK(48896+I):IF C=0 THEN 120
+110 R$=R$+CHR$(C):NEXT
+120 OPEN 13,8,13,"@:{done},S,W":PRINT#13,R$:CLOSE 13
+130 PRINT"BASLOAD:";R$
+RUN
+"""
 
 
 def die(msg):
@@ -74,79 +121,114 @@ def die(msg):
 
 
 #
-#   BASLOAD PRINTS "SAVING" BEFORE IT FAILS. On "BASIC RAM FULL" it writes a TRUNCATED program
-#   to the drive and only then reports the error, so a file that exists, is non-empty and loads
-#   at $0801 is NOT evidence of a good tokenise. GPC then stops a stage later on a label whose
-#   line was never written -- "UNKNOWN LINE NUMBER @ nnnn" -- naming neither the file nor the
-#   cause. The echo log is the only place BASLOAD's own message appears, so it is read here
-#   rather than deleted unread. Its nineteen return codes are listed in testing/MSEDIT/BASLOAD.MD.
+#   A FILE THAT EXISTS AND LOADS AT $0801 IS NOT EVIDENCE OF A GOOD TOKENISE, and it never was.
+#   The ROM BASLOAD printed SAVING and wrote a TRUNCATED program before reporting BASIC RAM FULL;
+#   the streaming build has no such ceiling, but a run that fails partway has still written every
+#   line up to the failure and closed the file with a valid end marker. GPC compiles that happily.
+#   BASLOAD's own message is the only thing that distinguishes the two, so it is what gets checked.
 #
-#   Anchored to the START of a line: the log also carries the #SYMFILE dump, which is the user's
-#   own symbol names and could hold anything.
+#   THE CHECK IS POSITIVE, not the absence of the word ERROR. The driver writes BASLOAD's result
+#   message to a sentinel file, and only the literal "SUCCESS" lets the build continue. That also
+#   makes the sentinel the completion signal: an emulator that crashed, hung or never reached the
+#   SYS leaves no sentinel, which used to be indistinguishable from a slow save.
 #
-def scan_for_error(log):
-    """BASLOAD's error line out of the emulator echo, or "" if it reported none."""
-    text = log.decode("latin-1", "replace")
-    for line in text.replace("\r", "\n").split("\n"):
-        line = line.strip("\0 \t")
-        if line.startswith("ERROR:"):
-            return line
-    return ""
+#   Reading a file rather than the echo log is deliberate. The log carries the #SYMFILE dump --
+#   the user's own symbol names, which could contain anything -- and wraps at 80 columns, which
+#   would split a long message across lines. BASLOAD's nineteen return codes are listed in
+#   testing/MSEDIT/BASLOAD.MD.
+#
+def read_response(path):
+    """BASLOAD's result message from the sentinel, or "" if the run never got that far."""
+    if not os.path.exists(path):
+        return ""
+    return open(path, "rb").read().decode("latin-1", "replace").strip("\0 \r\n\t")
+
+
+def stage_basload():
+    """Put the streaming BASLOAD on the emulator's drive, preferring the dev build over the
+    shipped one so an edit to BASLOAD-GPC/src/ cannot be silently ignored."""
+    if os.path.exists(BASLOAD_BUILT):
+        built = open(BASLOAD_BUILT, "rb").read()
+        drive = open(BASLOAD_DRIVE, "rb").read() if os.path.exists(BASLOAD_DRIVE) else None
+        if built != drive:
+            with open(BASLOAD_DRIVE, "wb") as f:
+                f.write(built)
+            print("  build_basl: staged BASLOAD-GPC/build/BASLOAD.PRG -> testing/ (%d bytes)"
+                  % len(built))
+        return
+    if not os.path.exists(BASLOAD_DRIVE):
+        die("no BASLOAD.PRG in testing/ or BASLOAD-GPC/build/ -- run:\n"
+            "               python BASLOAD-GPC/build.py prg")
 
 
 def tokenise(basl_name, prg_name, also_clean=()):
-    """Boot the emulator headless and run  BASLOAD "<basl_name>"  so the source's own #SAVEAS
-    writes testing/<prg_name>. Returns the tokenised PRG's bytes; dies on failure. also_clean
-    lists extra outputs (e.g. a #SYMFILE) to remove up front so a stale one can't fake success."""
-    with open(os.path.join(TESTING, DRIVER), "w", newline="\n") as f:
-        f.write('BASLOAD "%s"\n' % basl_name)
+    """Boot the emulator headless, load BASLOAD.PRG and SYS it at <basl_name>, so the source's own
+    #SAVEAS writes testing/<prg_name>. Returns the tokenised PRG's bytes; dies on failure.
+    also_clean lists extra outputs (e.g. a #SYMFILE) to remove up front so a stale one can't fake
+    success."""
+    stage_basload()
 
-    # Start from a clean slate so we can poll for the freshly written file (#SAVEAS overwrites,
-    # but we want to detect a NEW PRG, not mistake a stale one for success).
-    for f in (prg_name,) + tuple(also_clean):
+    with open(os.path.join(TESTING, DRIVER), "w", newline="\n") as f:
+        f.write(DRIVER_TEXT.format(basl=basl_name, done=DONE))
+
+    #   Start from a clean slate. #SAVEAS overwrites, but a stale PRG from an earlier run must not
+    #   be able to stand in for a new one -- and the sentinel especially, since it IS the verdict.
+    for f in (prg_name, DONE) + tuple(also_clean):
         p = os.path.join(TESTING, f)
         if os.path.exists(p):
             os.remove(p)
 
     env = dict(os.environ); env["SDL_VIDEODRIVER"] = "dummy"
     args = [EMU, "-rom", ROM, "-fsroot", ".", "-warp", "-pastewarp", "-echo", "-bas", DRIVER]
-    logpath = os.path.join(TESTING, LOG)
-    target  = os.path.join(TESTING, prg_name)
+    logpath  = os.path.join(TESTING, LOG)
+    donepath = os.path.join(TESTING, DONE)
+    target   = os.path.join(TESTING, prg_name)
 
+    #
+    #   WAIT FOR THE SENTINEL, NOT FOR THE OUTPUT FILE. The old wait watched <prg_name> for a
+    #   stable size, which worked when BASLOAD SAVEd in one go. Streaming writes it a line at a
+    #   time over several seconds, so any pause -- an #INCLUDE being opened, say -- looks exactly
+    #   like a finished save. The sentinel is written once, after BASLOAD has returned.
+    #
+    #   The budget is generous because it is not a polling cost: the wait ends the moment the
+    #   sentinel appears, so a two-second tokenise still takes two seconds.
+    #
     lf = open(logpath, "wb")
     proc = subprocess.Popen(args, cwd=TESTING, stdout=lf, stderr=subprocess.STDOUT, env=env)
-    ok = False
     try:
-        deadline = time.time() + 30
+        deadline = time.time() + 180
         while time.time() < deadline:
             time.sleep(0.4)
-            if os.path.exists(target) and os.path.getsize(target) > 0:
-                s1 = os.path.getsize(target); time.sleep(0.4)
-                if os.path.getsize(target) == s1:      # size stable -> save finished
-                    ok = True
-                    break
+            if os.path.exists(donepath) and os.path.getsize(donepath) > 0:
+                time.sleep(0.4)                        # let the CLOSE land
+                break
     finally:
         proc.kill()
         try: proc.wait(timeout=5)
         except subprocess.TimeoutExpired: pass
         lf.close()
 
-    log = open(logpath, "rb").read()
+    log      = open(logpath, "rb").read()
+    response = read_response(donepath)
 
-    for f in (DRIVER, LOG):
+    for f in (DRIVER, LOG, DONE):
         p = os.path.join(TESTING, f)
         if os.path.exists(p):
             try: os.remove(p)
             except OSError: pass
 
-    #   Checked BEFORE the "did a file appear" test, because on a truncating failure one did.
-    bad = scan_for_error(log)
-    if bad:
-        die("BASLOAD said %s -- %s is truncated, do not compile it" % (bad, prg_name))
-
-    if not ok:
-        die("BASLOAD wrote no %s within 30s -- echo log tail:\n%s"
+    #   Checked BEFORE the "did a file appear" test, because on a failure partway through one did,
+    #   and it is a complete, valid, WRONG program.
+    if not response:
+        die("BASLOAD never reported back within 180s -- it crashed, hung, or never reached the\n"
+            "               SYS. No %s was produced. Echo log tail:\n%s"
             % (prg_name, log[-400:].decode("latin-1", "replace")))
+    if response != "SUCCESS":
+        die("BASLOAD said %s -- %s stops where the error did, do not compile it"
+            % (response, prg_name))
+
+    if not os.path.exists(target) or os.path.getsize(target) == 0:
+        die("BASLOAD reported SUCCESS but wrote no %s -- check the #SAVEAS name" % prg_name)
 
     data = open(target, "rb").read()
     if len(data) < 3 or data[0] != 0x01 or data[1] != 0x08:
@@ -185,8 +267,8 @@ def build_front_end():
 def build_tool(basl_name, prg_name):
     """Tokenise a companion tool (e.g. GPC.ERR.BASL -> GPC.ERR.PRG) that lives only in testing/.
     No version bump, no source mirror. "If needed": skip when the source is absent, or when the
-    PRG is already at least as new as its source. (BASLOAD writes 2 nondeterministic trailing
-    bytes past the program's end marker, so re-tokenising an unchanged source only churns those.)"""
+    PRG is already at least as new as its source -- an emulator boot saved, nothing more, now that
+    the streaming build's output is byte for byte identical run to run."""
     basl = os.path.join(TESTING, basl_name)
     prg  = os.path.join(TESTING, prg_name)
     if not os.path.exists(basl):
