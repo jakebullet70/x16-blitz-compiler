@@ -513,9 +513,8 @@ WriteCodeByte:
 		pha 								; save on stack
 		phx
 		phy
-		tax 								; X = the byte, which is what BLC_WRITEOUT wants, and
-											; it frees A for the sum
-		txa
+		tax 								; X = the byte, which is what BLC_WRITEOUT wants -- and
+											; it leaves A free for the sum below
 		clc
 		adc 	passSum 					; sum1 += byte
 		sta 	passSum
