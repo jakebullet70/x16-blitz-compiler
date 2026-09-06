@@ -42,6 +42,11 @@ select. [[macptr-wraps-banks-itself]] means a block read crossing $BFFF needs no
 own, so the trampoline is smaller than it sounds.
 
 Until then FILEDIR stays in low memory. FILEIO is clean -- no `BANK`, `BLOAD` or `BSAVE` -- and can
-be banked today behind the [[gpc-shared-pcode-cap-is-rtbase]] budget.
+be banked today.
+
+**But do not expect that to buy headroom.** Measured afterwards: 84% of GPBMODS resident p-code is
+the shell, all eight library modules together are 16%, and only 656 bytes of that is bankable at
+all. See [[gpbmods-resident-pcode-breakdown]] -- it is the reason this split is filed as "noted, not
+built" rather than queued.
 
 See [[gp-banked-call-out-loses-the-bank]] for the constraint that decides where a *caller* can live.
