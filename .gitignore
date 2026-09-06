@@ -207,6 +207,14 @@ testing/samples/
 # The masters are in samples/BMXVIEWER/SAMPLES; these are copies.
 testing/*.BMX
 
+# BASLOAD-GPC/build/ is cl65 output plus the emulator drive runtest.py makes: two bank images,
+# a PRG, their maps, and a throwaway testdrive/. All of it comes back from
+#     python BASLOAD-GPC/build.py both
+# The VENDORED SOURCE under BASLOAD-GPC/upstream/ IS tracked -- it is a third-party BSD-2-Clause
+# tree we build against, and the whole point of keeping it is that a fresh clone builds the same
+# bytes without going back to GitHub.
+BASLOAD-GPC/build/
+
 # The packaged release zip -- built by release.sh / release.bat into the release/ drop
 # folder as gpc-release-<n>.zip. Build artifact (matches in any folder), not committed.
 gpc-release.zip
