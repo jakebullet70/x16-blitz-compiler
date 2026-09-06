@@ -64,6 +64,17 @@ _SMLRoom:
 		sta 	(zTemp0),y
 
 		.storage_release
+		;
+		;		...and how many GP.DO blocks are open at the start of this line, in a bank of its
+		;		own at the same address. A GOTO out of a block needs the depth where it LANDS,
+		;		which is a fact about a line that may not have been compiled yet -- so pass one
+		;		writes it here and pass two reads it back with STRLineDepth. See x16_storage.inc
+		;		for why it is a separate bank and not a fifth byte on the record.
+		;
+		.depth_access
+		lda 	blockDepth
+		sta 	(zTemp0)
+		.depth_release
 		rts
 
 ; ************************************************************************************************
@@ -103,6 +114,10 @@ _STRNext: 									; next table entry.
 		.error_internal 					; it, or the error handler runs with the wrong RAM bank
 
 _STRFound:
+		lda 	zTemp1 						; remember WHICH record matched, so STRLineDepth can
+		sta 	STRFoundAt 				; read the depth byte that goes with it. A is dead
+		lda 	zTemp1+1 					; here -- the compare below reloads it.
+		sta 	STRFoundAt+1
 		lda 	(zTemp1) 					; set A = 0 if the same, 0 if different.
 		eor 	zTemp0
 		bne 	_STRDifferent
@@ -138,6 +153,30 @@ _STRPrevLine:
 		rts
 ; ************************************************************************************************
 ;
+;					The block depth of the line STRFindLine last matched, in A
+;
+;		Two calls rather than one because the answer is wanted in exactly one place -- the
+;		.unwind in front of a GOTO -- and every other caller of STRFindLine wants only the
+;		address. Call it straight after STRFindLine: the record it read is remembered in
+;		STRFoundAt, and the next STRFindLine overwrites that.
+;
+;		zTemp0 IS FREE HERE. STRFindLine has finished with it -- it held the line number being
+;		searched for -- and it is the only zero page pointer this can reach the bank through.
+;
+; ************************************************************************************************
+
+STRLineDepth:
+		lda 	STRFoundAt
+		sta 	zTemp0
+		lda 	STRFoundAt+1
+		sta 	zTemp0+1
+		.depth_access
+		lda 	(zTemp0)
+		.depth_release
+		rts
+
+; ************************************************************************************************
+;
 ;								Make position X:YA to Offset X:YA
 ;
 ; ************************************************************************************************
@@ -153,6 +192,11 @@ STRMakeOffset:
 		rts
 		
 		.send code
+
+		.section storage
+STRFoundAt: 								; the line record STRFindLine last matched
+		.fill 	2
+		.send 	storage
 
 ; ************************************************************************************************
 ;

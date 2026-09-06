@@ -229,6 +229,7 @@ CompilerRAMBankReg	= $0000
 ;			2	the LINE NUMBER TABLE.
 ;			3	GP.ASM's blob pool and fixup list (see the second pair of macros below).
 ;			4	the VARIABLE NAME LIST.
+;			5	the BLOCK DEPTH of each line, one byte per line-table entry.
 ;
 ;		BANKS 2 AND 4 WERE ONE BANK, and that was the wall. The two tables shared 8K, growing
 ;		towards each other, and samples/editor had used 7,981 bytes of it -- 1,461 line entries
@@ -247,6 +248,7 @@ CompilerRAMBankReg	= $0000
 ;
 CompilerStorageBank	= 2 					; line number table, grows DOWN from $C000
 CompilerVarBank		= 4 					; variable name list, grows UP from $A000
+CompilerDepthBank	= 5 					; block depth per line, alongside the line table
 
 storage_access .macro
 		php
@@ -305,6 +307,45 @@ varSavedBank: 								; caller's RAM bank, saved across a variable window
 		.fill 	1
 		.send 	storage
 
+;
+;		And a third, for the BLOCK DEPTH TABLE -- one byte saying how many GP.DO blocks are open
+;		at the start of each source line. A GOTO out of a block emits an .unwind saying how many
+;		frames it closes, which is the depth where it stands minus the depth where it lands, and
+;		the second half of that is a fact about a line the compiler may not have reached yet.
+;		Pass one writes it down; pass two reads it back and answers at emit.
+;
+;		A WHOLE BANK FOR ONE BYTE IN FOUR. The depth for the line record at address P is at the
+;		SAME address P in this bank, so there is no arithmetic to get wrong -- and the line
+;		table's own window is 8K, exactly one bank, so the three bytes in four that go unused
+;		cost nothing that was ever available. Widening the line record to carry the byte instead
+;		would have cost real ground: 5 bytes an entry drops the limit from 2,048 lines to 1,638.
+;
+
+depth_access .macro
+		php
+		pha
+		lda 	CompilerRAMBankReg 			; remember whatever the caller had selected
+		sta 	depthSavedBank
+		lda 	#CompilerDepthBank
+		sta 	CompilerRAMBankReg
+		pla
+		plp
+		.endm
+
+depth_release .macro
+		php
+		pha
+		lda 	depthSavedBank
+		sta 	CompilerRAMBankReg
+		pla
+		plp
+		.endm
+
+		.section storage
+depthSavedBank: 							; caller's RAM bank, saved across a depth window
+		.fill 	1
+		.send 	storage
+
 ; ************************************************************************************************
 ;
 ;									Changes and Updates
@@ -316,6 +357,7 @@ varSavedBank: 								; caller's RAM bank, saved across a variable window
 ;		02/08/26		Implemented (were no-ops); tables moved to banked RAM $A000-$BFFF.
 ;		01/09/26		Split: the line table keeps bank 2, the variable list moves to bank 4,
 ;						so neither table bounds the other.
+;		06/09/26		Bank 5 added for the per-line block depth (the two-pass compiler).
 ;
 ; ************************************************************************************************
 
@@ -9493,6 +9535,17 @@ _SMLRoom:
 		sta 	(zTemp0),y
 
 		.storage_release
+		;
+		;		...and how many GP.DO blocks are open at the start of this line, in a bank of its
+		;		own at the same address. A GOTO out of a block needs the depth where it LANDS,
+		;		which is a fact about a line that may not have been compiled yet -- so pass one
+		;		writes it here and pass two reads it back with STRLineDepth. See x16_storage.inc
+		;		for why it is a separate bank and not a fifth byte on the record.
+		;
+		.depth_access
+		lda 	blockDepth
+		sta 	(zTemp0)
+		.depth_release
 		rts
 
 ; ************************************************************************************************
@@ -9532,6 +9585,10 @@ _STRNext: 									; next table entry.
 		.error_internal 					; it, or the error handler runs with the wrong RAM bank
 
 _STRFound:
+		lda 	zTemp1 						; remember WHICH record matched, so STRLineDepth can
+		sta 	STRFoundAt 				; read the depth byte that goes with it. A is dead
+		lda 	zTemp1+1 					; here -- the compare below reloads it.
+		sta 	STRFoundAt+1
 		lda 	(zTemp1) 					; set A = 0 if the same, 0 if different.
 		eor 	zTemp0
 		bne 	_STRDifferent
@@ -9567,6 +9624,30 @@ _STRPrevLine:
 		rts
 ; ************************************************************************************************
 ;
+;					The block depth of the line STRFindLine last matched, in A
+;
+;		Two calls rather than one because the answer is wanted in exactly one place -- the
+;		.unwind in front of a GOTO -- and every other caller of STRFindLine wants only the
+;		address. Call it straight after STRFindLine: the record it read is remembered in
+;		STRFoundAt, and the next STRFindLine overwrites that.
+;
+;		zTemp0 IS FREE HERE. STRFindLine has finished with it -- it held the line number being
+;		searched for -- and it is the only zero page pointer this can reach the bank through.
+;
+; ************************************************************************************************
+
+STRLineDepth:
+		lda 	STRFoundAt
+		sta 	zTemp0
+		lda 	STRFoundAt+1
+		sta 	zTemp0+1
+		.depth_access
+		lda 	(zTemp0)
+		.depth_release
+		rts
+
+; ************************************************************************************************
+;
 ;								Make position X:YA to Offset X:YA
 ;
 ; ************************************************************************************************
@@ -9582,6 +9663,11 @@ STRMakeOffset:
 		rts
 		
 		.send code
+
+		.section storage
+STRFoundAt: 								; the line record STRFindLine last matched
+		.fill 	2
+		.send 	storage
 
 ; ************************************************************************************************
 ;

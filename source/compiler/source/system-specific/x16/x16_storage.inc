@@ -66,6 +66,7 @@ CompilerRAMBankReg	= $0000
 ;			2	the LINE NUMBER TABLE.
 ;			3	GP.ASM's blob pool and fixup list (see the second pair of macros below).
 ;			4	the VARIABLE NAME LIST.
+;			5	the BLOCK DEPTH of each line, one byte per line-table entry.
 ;
 ;		BANKS 2 AND 4 WERE ONE BANK, and that was the wall. The two tables shared 8K, growing
 ;		towards each other, and samples/editor had used 7,981 bytes of it -- 1,461 line entries
@@ -84,6 +85,7 @@ CompilerRAMBankReg	= $0000
 ;
 CompilerStorageBank	= 2 					; line number table, grows DOWN from $C000
 CompilerVarBank		= 4 					; variable name list, grows UP from $A000
+CompilerDepthBank	= 5 					; block depth per line, alongside the line table
 
 storage_access .macro
 		php
@@ -142,6 +144,45 @@ varSavedBank: 								; caller's RAM bank, saved across a variable window
 		.fill 	1
 		.send 	storage
 
+;
+;		And a third, for the BLOCK DEPTH TABLE -- one byte saying how many GP.DO blocks are open
+;		at the start of each source line. A GOTO out of a block emits an .unwind saying how many
+;		frames it closes, which is the depth where it stands minus the depth where it lands, and
+;		the second half of that is a fact about a line the compiler may not have reached yet.
+;		Pass one writes it down; pass two reads it back and answers at emit.
+;
+;		A WHOLE BANK FOR ONE BYTE IN FOUR. The depth for the line record at address P is at the
+;		SAME address P in this bank, so there is no arithmetic to get wrong -- and the line
+;		table's own window is 8K, exactly one bank, so the three bytes in four that go unused
+;		cost nothing that was ever available. Widening the line record to carry the byte instead
+;		would have cost real ground: 5 bytes an entry drops the limit from 2,048 lines to 1,638.
+;
+
+depth_access .macro
+		php
+		pha
+		lda 	CompilerRAMBankReg 			; remember whatever the caller had selected
+		sta 	depthSavedBank
+		lda 	#CompilerDepthBank
+		sta 	CompilerRAMBankReg
+		pla
+		plp
+		.endm
+
+depth_release .macro
+		php
+		pha
+		lda 	depthSavedBank
+		sta 	CompilerRAMBankReg
+		pla
+		plp
+		.endm
+
+		.section storage
+depthSavedBank: 							; caller's RAM bank, saved across a depth window
+		.fill 	1
+		.send 	storage
+
 ; ************************************************************************************************
 ;
 ;									Changes and Updates
@@ -153,6 +194,7 @@ varSavedBank: 								; caller's RAM bank, saved across a variable window
 ;		02/08/26		Implemented (were no-ops); tables moved to banked RAM $A000-$BFFF.
 ;		01/09/26		Split: the line table keeps bank 2, the variable list moves to bank 4,
 ;						so neither table bounds the other.
+;		06/09/26		Bank 5 added for the per-line block depth (the two-pass compiler).
 ;
 ; ************************************************************************************************
 
