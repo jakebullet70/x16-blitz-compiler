@@ -218,8 +218,6 @@ _BOPCounted:
 		rts
 
 BlockEndHere:
-		lda 	passNumber
-		bne 	_BEHDone 					; pass two READS this table; it does not write it
 		sec 								; one short, and the reader adds it back
 		lda 	objPtr
 		sbc 	#1
@@ -227,9 +225,9 @@ BlockEndHere:
 		lda 	objPtr+1
 		sbc 	#0
 		sta 	blockValue+1
-		jsr 	BlockEndWrite
-_BEHDone:
-		rts
+		lda 	passNumber
+		beq 	BlockEndWrite 				; pass one writes it down
+		jmp 	BlockEndCheck 				; pass two makes sure it is what it read
 
 BlockEndTarget:
 		jsr 	BlockEndRead
@@ -259,6 +257,30 @@ BlockEndWrite:
 		lda 	blockValue+1
 		sta 	(zTemp0),y
 		.block_release
+		rts
+
+;
+;		AND THE SAME ENTRY, COMPARED. Pass two recomputes every block end where pass one wrote
+;		it down, and a disagreement is the same failure STRMarkLine guards against: pass two
+;		resolved a GP.EXITDO or a GP.ELSE out of a table that no longer describes the object it
+;		is writing. See the note in storage/mark_line.asm.
+;
+BlockEndCheck:
+		lda 	blockValue 					; the answer this pass just worked out
+		sta 	blockCheck
+		lda 	blockValue+1
+		sta 	blockCheck+1
+		jsr 	BlockEndRead 				; ...against the one pass one left here
+BlockEndCompare:
+		lda 	blockValue
+		cmp 	blockCheck
+		bne 	_BECDiverged
+		lda 	blockValue+1
+		cmp 	blockCheck+1
+		beq 	_BECAgreed
+_BECDiverged:
+		.error_internal
+_BECAgreed:
 		rts
 
 BlockEndRead:
@@ -321,8 +343,6 @@ _BAORoom:
 		rts
 
 BlockAltHere:
-		lda 	passNumber
-		bne 	_BAHDone 					; pass two READS this table; it does not write it
 		lda 	blockAlt+1 					; $FFFF -- nothing is waiting for a target
 		and 	blockAlt
 		cmp 	#$FF
@@ -338,7 +358,16 @@ BlockAltHere:
 		lda 	objPtr+1
 		sbc 	#0
 		sta 	blockValue+1
-		jsr 	BlockAltWrite
+		lda 	passNumber
+		bne 	_BAHCheck 					; pass two makes sure it is what it read
+		jmp 	BlockAltWrite
+_BAHCheck:
+		lda 	blockValue 					; as BlockEndCheck, over the other table
+		sta 	blockCheck
+		lda 	blockValue+1
+		sta 	blockCheck+1
+		jsr 	BlockAltFetch
+		jmp 	BlockEndCompare
 _BAHDone:
 		rts
 
@@ -507,6 +536,8 @@ blockCount: 								; how many this pass has opened altogether
 blockIndex: 								; the table entry being read or written...
 		.fill 	2
 blockValue: 								; ...and what is in it
+		.fill 	2
+blockCheck: 								; what pass two thinks it should have been
 		.fill 	2
 blockWalk: 									; the relocator's place in the table
 		.fill 	2

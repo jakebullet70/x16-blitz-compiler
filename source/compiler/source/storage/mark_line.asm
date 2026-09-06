@@ -50,6 +50,34 @@ STRMarkLine:
 _SMLRoom:
 
 		.storage_access
+		;
+		;		PASS TWO MUST FIND ITS OWN ANSWER ALREADY IN THE RECORD. Everything the second
+		;		pass resolves -- every branch, every .unwind, every block end -- is read out of
+		;		this table, so a line that lands somewhere else this time round is the one
+		;		failure that cannot be allowed to reach an object. Nothing has been written yet
+		;		and nothing will be.
+		;
+		;		THIS IS THE CHECK, once pass one has no buffer to lay an object out in. The
+		;		checksum compares two finished objects and there will only be one; what the two
+		;		passes still both produce is this table, and it is what the object is built from.
+		;
+		lda 	passNumber
+		beq 	_SMLWrite
+		phy 								; THE LINE NUMBER IS STILL IN YA -- A is on the stack
+		ldy 	#2 							; already, and the high byte stays in Y until the tya
+		lda 	(zTemp0),y 					; below writes it
+		cmp 	objPtr
+		bne 	_SMLDiverged
+		iny
+		lda 	(zTemp0),y
+		cmp 	objPtr+1
+		bne 	_SMLDiverged
+		ply
+		bra 	_SMLWrite
+_SMLDiverged:
+		.storage_release 					; as _STRNext: never raise inside the window, the
+		.error_internal 					; error handler prints and that is bank 0
+_SMLWrite:
 		pla
 		sta 	(zTemp0) 					; line # save it in +0,+1
 		tya
