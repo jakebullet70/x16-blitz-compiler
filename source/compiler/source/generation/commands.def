@@ -108,7 +108,7 @@ GP.ENDASM 		X:CommandEndAsmCompile N
 #		bank. NO "#" ON GP.BANKED: its operand is a DECIMAL CONSTANT read by the handler, not an
 #		expression compiled to p-code -- the number is patched into the program's bootstrap.
 #		Compile time markers, alone on their line, no operand. No "T" on either: they write no
-#		keyword token at all, so ScanGPUsage cannot see them and a program whose only GP.BASIC
+#		keyword token at all, so the GP usage scan cannot see them and a program whose only GP.BASIC
 #		keyword is GP.BANKED stays GP OUT -- GP.ASM's argument, for the same reason.
 #
 GP.BANKED 		X:CommandGPBankedCompile N

@@ -41,7 +41,7 @@ FNCompile:
 		;
 		;		FindVariable returns the FN body's ABSOLUTE code position in X (low) and Y (high),
 		;		as stored by SetVariableRecordToCodePosition. Emit it verbatim as the operand of a
-		;		.fngosub -- its own opcode, so FixBranches turns this absolute address into an
+		;		.fngosub -- its own opcode, so the branch writer turns this absolute address into an
 		;		offset (like any branch) instead of mistaking it for a source line number. Push
 		;		high then low so, after the argument is compiled, the low byte is written first.
 		;
@@ -53,8 +53,8 @@ FNCompile:
 		jsr 	CompileExpressionAt0
 		jsr 	CheckNextRParen
 		;
-		;		Compile the call : .fngosub <lo> <hi>. Pass one writes the address and FixBranches
-		;		turns it into an offset; pass two writes the offset, because the body is always
+		;		Compile the call : .fngosub <lo> <hi>. Pass one only counts the three bytes;
+		;		pass two writes the offset, because the body is always
 		;		BEHIND the call -- a forward FN reference was refused above -- so the address is
 		;		already final. Either way the operand goes through the branch writer, which knows
 		;		what to correct when one end is inside a GP.BANKED region.

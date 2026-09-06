@@ -67,11 +67,8 @@ BLC_SYMLOOKUP = 7
 ;
 BLC_ENDPASS1 = 8
 ;
-;		End of the SECOND pass, before the two passes are compared. Whatever the application
-;		still has in hand goes out here, because the checksum it returns has to cover all of it.
-;
-;		Returns CS with the object's checksum in YA, or CC to say it has none and the object is
-;		still somewhere the compiler can walk -- which is what the native test harness answers.
+;		End of the SECOND pass. Whatever the application still has in hand goes out here, so
+;		that the object is complete before the two passes are compared and the output closed.
 ;
 BLC_ENDPASS2 = 9
 

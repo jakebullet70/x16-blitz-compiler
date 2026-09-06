@@ -38,9 +38,9 @@
 ;		A condition is evaluated and consumed by its .ifnext on the SAME line, so there is
 ;		nothing to preserve -- which is why the whole construct costs 12 runtime bytes and none
 ;		of them are code. .ifnext runs the .goto.z handler and .ifelse runs the .goto handler;
-;		only FixBranches tells them from .casenext and .caseend.
+;		only the marker in front tells them from .casenext and .caseend.
 ;
-;		GP.ELSEIF IS WHAT FORCES gp.if TO EXIST. Without it FixBranches could count nesting on
+;		GP.ELSEIF IS WHAT FORCED gp.if TO EXIST. Without it the old resolver could count nesting on
 ;		.ifnext against gp.endif, one to one, and the marker would not be needed. But GP.ELSEIF
 ;		emits .ifelse and then its OWN <cond> .ifnext, which would inflate the depth of a scan
 ;		already in flight and send it past its own gp.endif. So depth is counted on a marker
@@ -71,7 +71,7 @@ CommandIfCompile:
 		bne 	IfFailType
 		jsr 	IfRequireThenEOL
 		jsr 	IfOpen 						; this IF's ordinal, and nothing pending inside it yet
-		lda 	#PCD_GPCMD_IF 				; the marker FixBranches counts nesting on
+		lda 	#PCD_GPCMD_IF 				; the marker the old resolver counted nesting on
 		jsr 	WriteCodeByte
 		jmp 	IfWriteNext 				; false -> the next alternative, or the gp.endif
 
@@ -129,11 +129,14 @@ _IREDone:
 		rts
 
 ;
-;		Two placeholder bytes, in pass one. The value is never read: FixBranches overwrites both
-;		unconditionally, and errors out rather than leaving them if it cannot resolve the branch.
-;		Pass two writes the offset instead and never comes through here.
+;		Two bytes go past, in pass one, and nothing is in them: the value is pass two's to work
+;		out, and pass two writes the offset here instead and never comes through this. They are
+;		left out of the sum for the same reason -- see EmitBranch.
 ;
 IfWritePlaceholder:
+		lda 	#2
+		ldy 	#0
+		jsr 	SumSkipYA
 		lda 	#0
 		jsr 	WriteCodeByte
 		lda 	#0
@@ -171,7 +174,7 @@ IfFailStructure:
 ;		the offsets out of those notes. See commands/goto.asm for the tables.
 ;
 ;		THE OPEN GP.IFs ARE A STACK, because an inner IF's alternatives must be invisible to the
-;		outer one's -- the same thing FixBranches gets by counting gp.if against gp.endif as it
+;		outer one's -- the same thing the old resolver got by counting gp.if against gp.endif as it
 ;		scans. GP.ELSEIF pushes nothing: it continues the chain its GP.IF started.
 ;
 ; ************************************************************************************************

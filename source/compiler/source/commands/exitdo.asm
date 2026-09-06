@@ -20,10 +20,9 @@
 ;		system tokens carry an inline operand the table has no way to reserve. So the token and
 ;		its two operand bytes are written here.
 ;
-;		PASS ONE WRITES A PLACEHOLDER, which FixBranches resolves by scanning forward for the
-;		matching GP.LOOP -- it has the whole object laid out and can look. The value is never
-;		read: FixBranches overwrites both bytes unconditionally, and errors out if there is no
-;		matching GP.LOOP rather than leaving them.
+;		PASS ONE ONLY COUNTS the two operand bytes: nothing goes into them, because where the
+;		matching GP.LOOP ends is not known yet. It writes down where each block ends as it goes
+;		past, which is what pass two answers from.
 ;
 ;		PASS TWO WRITES THE OFFSET, out of the table pass one filled in as it passed each
 ;		GP.LOOP. See BlockDepthDown in commands/goto.asm.
@@ -36,8 +35,11 @@
 CommandExitDoCompile:
 		lda 	passNumber
 		bne 	_CEDResolve
-		lda 	#PCD_CMD_EXITDO 			; pass one: FixBranches scans forward for the GP.LOOP
-		jsr 	WriteCodeByte 				; and fills the offset in
+		lda 	#PCD_CMD_EXITDO 			; pass one only counts: two bytes go past, and pass two
+		jsr 	WriteCodeByte 				; writes the offset that belongs in them
+		lda 	#2 							; ...so they are not summed either -- see EmitBranch
+		ldy 	#0
+		jsr 	SumSkipYA
 		lda 	#0
 		jsr 	WriteCodeByte
 		lda 	#0

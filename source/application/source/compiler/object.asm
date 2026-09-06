@@ -71,12 +71,6 @@ PrepareObjectCode:
 		bne 	_POCEmbedded 				; (see the shared branch below and compiler/bootstrap.asm).
 		jmp 	ObjectPrepareShared 					; jmp, not a branch -- the embedded path is >127 bytes
 _POCEmbedded:
-		jsr 	ScanGPUsage 				; does anything reach a handler above GPBase ?
-		lda 	gpUsed 						; TEMPORARY, while both routes to that answer exist:
-		cmp 	gpStreamUsed 				; the walk and the stream have to agree, on every
-		beq 	_WOCScanOK 					; program compiled. The walk goes when pass one stops
-		jmp 	ObjectScanBad 				; storing the object and there is nothing left to walk.
-_WOCScanOK:
 		;
 		;		The cut. A program using no GP.BASIC keyword takes the runtime as $0801..GPBase
 		;		and puts its object code there; one that uses any takes the whole thing,
@@ -320,12 +314,6 @@ _WOCSWhole:
 		;		WS_START = PCODE_PAGE + pages(p-code) + the frame-stack gap. Reject if that leaves
 		;		fewer than MIN_WS_PAGES below RTBASE, or if the page count itself overflowed a byte.
 		;
-		jsr 	ScanGPUsage 				; the shared runtime is two files now -- see below
-		lda 	gpUsed 						; ...and the same comparison as the embedded path
-		cmp 	gpStreamUsed
-		beq 	_WOCSScanOK
-		jmp 	ObjectScanBad
-_WOCSScanOK:
 		;
 		;		The workspace ends where the resident runtime starts, and that is no longer one
 		;		address: a program using no GPB keyword loads the CORE-ONLY file at RTBASE and keeps
@@ -364,7 +352,7 @@ _WOCSCeiling:
 		jmp 	ObjStreamOpen 				; while it compiles -- see AsmCloseBlock
 ;
 ;		ObjectTooBig is at the far end of this file, out of branch range from here -- the same
-;		trampoline FixBranches needs for its GP.EXITDO handler, for the same reason.
+;		trampoline the embedded path needs for its image failures, for the same reason.
 ;
 _WOCSBigFar:
 		jmp 	ObjectTooBig
@@ -575,11 +563,7 @@ ObjStreamReset:
 		.set16 	objBufBase, FreeMemory
 		.set16 	objBufTop, FreeMemory
 		.set16 	objStmtAt, FreeMemory
-		stz 	objDeferWas
-		stz 	objSum
-		stz 	objSum+1
-		lda 	#3 							; _variable.space and its operand: the one place the
-		sta 	objSumSkip 					; two passes are meant to differ
+		stz 	objHold
 		;
 		lda 	layoutCount
 		beq 	_OSRDone
@@ -645,23 +629,30 @@ ObjStreamByte:
 
 ObjStreamWork:
 		;
-		;		A statement that has just armed itself: remember where it begins. Nothing from
-		;		there on can go out until it has compiled, because a SYNTAX error rolls the write
-		;		cursor back to it and puts a throw-stub in its place.
+		;		A statement that has armed itself: remember where it begins. Nothing from there on
+		;		can go out until it has compiled, because a SYNTAX error rolls the write cursor
+		;		back to it and puts a throw-stub in its place.
+		;
+		;		ONLY IF IT BEGINS IN THE LOW BUFFER. A region is a bank of its own and therefore
+		;		random access, so a rollback inside one is written over where it stands and
+		;		nothing has to be held for it -- and holding a REGION address as the low buffer's
+		;		high-water mark makes the flush length a subtraction of two unrelated addresses.
 		;
 		lda 	deferErrors
-		beq 	_OSWKeep
-		ldx 	objDeferWas
-		bne 	_OSWArmed
+		bne 	_OSWArming
+		stz 	objHold 					; the statement compiled: nothing is held back now
+		bra 	_OSWPlace
+_OSWArming:
+		lda 	objHold 					; already holding for this one
+		bne 	_OSWPlace
+		lda 	regionOpen
+		bne 	_OSWPlace
 		lda 	objPtr
 		sta 	objStmtAt
 		lda 	objPtr+1
 		sta 	objStmtAt+1
-_OSWArmed:
-		lda 	#1
-_OSWKeep:
-		sta 	objDeferWas
-		;
+		inc 	objHold
+_OSWPlace:
 		lda 	regionOpen 					; inside a GP.BANKED region ?
 		bne 	_OSWRegion
 		jsr 	ObjStreamOffset 			; where in the buffer it goes
@@ -764,7 +755,7 @@ ObjStreamBank:
 ; ************************************************************************************************
 
 ObjStreamFlush:
-		lda 	deferErrors
+		lda 	objHold
 		beq 	_OSFAll
 		lda 	objStmtAt
 		ldy 	objStmtAt+1
@@ -798,13 +789,13 @@ _OSFLoop:
 		lda 	(zTemp0)
 		ldx 	objSaveBank
 		stx 	CompilerRAMBankReg
-		jsr 	ObjEmit
+		jsr 	IOWriteByte
 		inc 	objBufIdx
 		bne 	_OSFLoop
 		inc 	objBufIdx+1
 		bra 	_OSFLoop
 _OSFWritten:
-		lda 	deferErrors 				; nothing was held back, so nothing has to move
+		lda 	objHold 					; nothing was held back, so nothing has to move
 		beq 	_OSFRebase
 		sec
 		lda 	objBufTop
@@ -859,48 +850,18 @@ _OSFNone:
 
 ; ************************************************************************************************
 ;
-;		One byte into the file, and into the running Fletcher-16 of the object. The first three
-;		-- _variable.space and its operand -- are written but not summed: they are the one place
-;		the two passes are meant to differ, and ObjectChecksum skips them on the other side.
-;
-; ************************************************************************************************
-
-ObjEmit:
-		pha
-		lda 	objSumSkip
-		beq 	_OEMSum
-		dec 	objSumSkip
-		bra 	_OEMWrite
-_OEMSum:
-		pla
-		pha
-		clc
-		adc 	objSum 						; sum1 += byte
-		sta 	objSum
-		clc
-		adc 	objSum+1 					; sum2 += sum1, so a reordering shows up too
-		sta 	objSum+1
-_OEMWrite:
-		pla
-		jmp 	IOWriteByte
-
-; ************************************************************************************************
-;
 ;		END OF PASS TWO: everything the buffer still holds, then the alignment padding below the
-;		first GP.BANKED region, then each region out of its bank.
-;
-;		THE SUM COMES BACK IN YA with carry set, and the compiler compares it against pass one's.
-;		Carry clear would mean "no sum, walk the object yourself", which is what the native test
-;		harness answers -- it keeps its object in a bank and the walk still works there.
+;		first GP.BANKED region, then each region out of its bank. After this the object is
+;		complete on disk.
 ;
 ; ************************************************************************************************
 
 ObjStreamClose:
-		jsr 	ObjStreamFlush 				; deferErrors is zero at the end of a compile, so
-											; this empties it
+		stz 	objHold 					; nothing is in flight at the end of a compile, so the
+		jsr 	ObjStreamFlush 				; flush empties the buffer
 		lda 	layoutCount
 		bne 	_OSCPlaced
-		jmp 	_OSCSum 					; no regions: the buffer was the whole object
+		jmp 	_OSCDone 					; no regions: the buffer was the whole object
 _OSCPlaced:
 		jsr 	IOSelectObject
 		;
@@ -920,7 +881,7 @@ _OSCPad:
 		beq 	_OSCRegions
 _OSCPadByte:
 		lda 	#$FF
-		jsr 	ObjEmit
+		jsr 	IOWriteByte
 		inc 	objPadAt
 		bne 	_OSCPad
 		inc 	objPadAt+1
@@ -935,7 +896,7 @@ _OSCRegion:
 		lda 	objRgnNo
 		cmp 	layoutCount
 		bcc 	_OSCMore
-		jmp 	_OSCSum
+		jmp 	_OSCDone
 _OSCMore:
 		asl 	a
 		tax
@@ -977,7 +938,7 @@ _OSCByte:
 		lda 	(zTemp0)
 		ldx 	objSaveBank
 		stx 	CompilerRAMBankReg
-		jsr 	ObjEmit
+		jsr 	IOWriteByte
 		inc 	objBufIdx
 		bne 	_OSCByte
 		inc 	objBufIdx+1
@@ -985,11 +946,9 @@ _OSCByte:
 _OSCNext:
 		inc 	objRgnNo
 		bra 	_OSCRegion
-_OSCSum:
-		lda 	objSum
-		ldy 	objSum+1
-		sec 								; the sum is here -- see BLC_ENDPASS2
+_OSCDone:
 		rts
+
 
 objBufBase: 								; the objPtr of the first byte still in the buffer
 		.fill 	2
@@ -1007,14 +966,10 @@ objPadAt: 									; the alignment gap being filled
 		.fill 	2
 objSpan: 									; the region being written out
 		.fill 	2
-objSum: 									; Fletcher-16 over what has gone into the file
-		.fill 	2
-objSumSkip: 								; bytes still to be written but not summed
-		.fill 	1
 objByte: 									; the byte in hand, across the zTemp save
 		.fill 	1
-objDeferWas: 								; deferErrors as it stood at the last byte
-		.fill 	1
+objHold: 									; nonzero while the low buffer is holding a statement
+		.fill 	1 							; back, because it might yet be rolled back
 objRgnNo: 									; the region being filled or written
 		.fill 	1
 objSaveBank: 								; the caller's RAM bank, across a window
@@ -1045,16 +1000,6 @@ ObjectTooBig:
 		ldx 	#ProgramTooBigText & $FF
 		ldy 	#ProgramTooBigText >> 8
 		bra 	ObjectFail
-;
-;		TEMPORARY. The two ways of deciding gpUsed disagreed, which means the byte stream was
-;		decoded differently from the finished object -- and the answer says how much of the
-;		runtime goes into the file, so getting it wrong writes a program with its handlers cut
-;		out. Refusing is the only safe thing to do with it.
-;
-ObjectScanBad:
-		ldx 	#ScanMismatchText & $FF
-		ldy 	#ScanMismatchText >> 8
-		bra 	ObjectFail
 
 ;
 ;		The runtime image is missing, or is not the file its name claims. Either way there is
@@ -1084,9 +1029,6 @@ ProgramTooBigText:
 
 NoRuntimeImageText:
 		.text 	"NO RUNTIME IMAGE", 13, 0
-
-ScanMismatchText:
-		.text 	"GP SCAN MISMATCH", 13, 0
 
 ; ************************************************************************************************
 ;

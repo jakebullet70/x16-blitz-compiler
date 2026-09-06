@@ -39,7 +39,7 @@
 ;
 ;		  - the 112 bytes come out of the block, and
 ;		  - a program whose only GP.BASIC keyword is a GP.SELECT is now GP-BASIC **OUT**.
-;		    ScanGPUsage decides by HANDLER ADDRESS, and every opcode this emits -- the markers,
+;		    The GP usage scan decides by HANDLER ADDRESS, and every opcode this emits -- the markers,
 ;		    the variable read, f.cmp, =, or, .casenext, .caseend -- has its handler below GPBase.
 ;		    Exactly what GP.IF already did, and for the same reason.
 ;
@@ -47,7 +47,7 @@
 ;
 ;			T = RND(1)*3 : GP.SELECT T
 ;
-;		THE MARKERS ARE STILL EMITTED AND MUST BE. FixBranches has no symbol table and no
+;		THE MARKERS ARE STILL EMITTED. The resolver that needed them has no
 ;		back-patching, so the emitted token stream IS the block structure: it scans for
 ;		gp.select/gp.case/gp.other/gp.endsel to resolve .casenext and .caseend and to count
 ;		nesting. Delete the tokens and the branch resolver has nothing to walk. They cost one
@@ -83,7 +83,7 @@
 ;		known at the point each GP.CASE is compiled.
 ;
 ;		NO STACK FRAME MEANS NO UNWINDING. BlockDepthUp/Down are deliberately NOT called any
-;		more, and FixBranches no longer counts gp.select/gp.endsel in either of its depth walks.
+;		more, and nothing counts gp.select/gp.endsel as depth any longer.
 ;		A GOTO leaving a select has nothing to close, and an .unwind emitted for one would close
 ;		a frame belonging to something else.
 ;
@@ -159,7 +159,7 @@ _CSCHave:
 		sta 	SelectPending+1,x
 		inc 	SelectDepth
 		;
-		lda 	#PCD_GPCMD_SELECT 			; a MARKER, for FixBranches. Nothing runs.
+		lda 	#PCD_GPCMD_SELECT 			; a MARKER. Nothing runs.
 		jsr 	WriteCodeByte
 		;
 		;		The alternative that comes next is the FIRST one, so it must not be preceded by
@@ -195,7 +195,7 @@ _CCCDone:
 ;		emits for any "=" between numbers.
 ;
 CompileCaseTest:
-		lda 	#PCD_GPCMD_CASE 			; the marker FixBranches looks for, then the read
+		lda 	#PCD_GPCMD_CASE 			; the marker, then the read
 		jsr 	WriteCodeByte
 		jsr 	SelectEmitRead
 		jsr 	CompileExpressionAt0
@@ -226,7 +226,7 @@ CommandOtherCompile:
 CommandEndSelectCompile:
 		stz 	SelectFirstCase
 		lda 	SelectDepth 				; underflow is not guarded, as with blockDepth: a stray
-		beq 	_CESCFloor 					; GP.ENDSEL is caught structurally, by FixBranches
+		beq 	_CESCFloor 					; GP.ENDSEL is caught structurally, at the end of
 											; raising BLOCK MISMATCH
 		jsr 	SelectAltHere 				; the last test lands ON the gp.endsel, and so does
 		jsr 	SelectClose 				; every case body that finished
@@ -262,10 +262,13 @@ _CCEPlaceholder:
 		lda 	#PCD_CMD_CASEEND
 		jsr 	WriteCodeByte
 ;
-;		Two placeholder bytes, in pass one. The value is never read: FixBranches overwrites both
-;		unconditionally, and errors out rather than leaving them if it cannot resolve the branch.
+;		Two bytes go past, in pass one, and nothing is in them: the value is pass two's to work
+;		out. They are left out of the sum for the same reason -- see EmitBranch.
 ;
 SelectWritePlaceholder:
+		lda 	#2
+		ldy 	#0
+		jsr 	SumSkipYA
 		lda 	#0
 		jsr 	WriteCodeByte
 		lda 	#0

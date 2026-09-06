@@ -55,17 +55,21 @@ StartCompiler:
 ;		Pass two then compiles the same source again knowing all of it, so nothing has to be
 ;		written down and gone back to.
 ;
-;		THE TWO PASSES PRODUCING THE SAME OBJECT IS A LOAD-BEARING ASSUMPTION and nothing in the
-;		structure enforces it -- so it is checked rather than trusted. Each pass lays its object
-;		out and ObjectChecksum sums the result; the tail of pass two compares that, the length
-;		and the variable space against pass one's before anything is written out. A mismatch is a
-;		compiler bug and says so; it is never a silently wrong object, which is the one failure
-;		this must not have.
 ;
-;		THE FINISHED OBJECT, NOT THE STREAM OF WRITES. It was the stream to begin with, summed in
-;		WriteCodeByte, and that is the weaker check: the object is what ships, and the order the
-;		bytes are written in is free to differ -- a region is emitted where it appears and moved
-;		afterwards, and it will not always be.
+;		THE TWO PASSES AGREEING IS A LOAD-BEARING ASSUMPTION and nothing in the structure
+;		enforces it -- so it is checked rather than trusted. It used to be checked by summing
+;		both objects and comparing, and there is only one object now: pass one lays none out at
+;		all. What the two passes still both produce is the tables the second one resolves out
+;		of, so those are what is checked, each where it is read --
+;
+;			every line's address 		storage/mark_line.asm
+;			every block end 			commands/goto.asm
+;			every alternative 			commands/goto.asm
+;			the GP.ASM pool's base 		commands/gpasmcode.asm
+;			the length, and the variable space, at the end of this file
+;
+;		-- and a disagreement is a compiler bug that says so. It is never a silently wrong
+;		object, which is the one failure this must not have.
 ;
 ;		Everything a compile accumulates has to be back at its starting value for pass two, which
 ;		is what ResetPassState is for. Anything missed from it shows up as a checksum mismatch on
@@ -87,15 +91,18 @@ CompilePass:
 		;		shape of problem the second pass exists to solve: pass one emits nothing useful
 		;		here and finishes with the total, pass two writes that total straight in.
 		;
-		;		This used to be patched in place by FixBranches, which is why the opcode was here
-		;		in the first place -- it was a one-pass compiler with one two-pass-shaped hole in
-		;		it. That handler is gone.
+		;		This used to be patched in place after the whole object was laid out, which is why
+		;		the opcode was here in the first place -- it was a one-pass compiler with one
+		;		two-pass-shaped hole in it.
 		;
 		lda 	#PCD_CMD_VARSPACE
 		jsr 	WriteCodeByte
-		lda 	pass1VarSpace 				; zero in pass one, the real figure in pass two --
-		jsr 	WriteCodeByte 				; the one place the two objects differ on purpose,
-		lda 	pass1VarSpace+1 			; which is why ObjectChecksum skips these two bytes
+		lda 	#2 							; the one place the two objects differ on purpose, so
+		ldy 	#0 							; the sum steps over it
+		jsr 	SumSkipYA
+		lda 	pass1VarSpace 				; zero in pass one, the real figure in pass two
+		jsr 	WriteCodeByte
+		lda 	pass1VarSpace+1
 		jsr 	WriteCodeByte
 		;
 		;		Emit the jump to the implicit-DIM prologue. The prologue lives at line $FFFF
@@ -133,6 +140,10 @@ _MCLHaveFirst:
 											; marked, so the marker and its table entry land on
 											; the side the line belongs to
 		jsr 	STRMarkLine 				; remember the code position and number of this line.
+		lda 	objPtr 						; ...and where its marker byte goes, which is what
+		sta 	lineMarkerAt 				; GP.BANKED means by "alone on its line"
+		lda 	objPtr+1
+		sta 	lineMarkerAt+1
 		lda 	#PCD_NEWCMD_LINE 			; generate new command line
 		jsr 	WriteCodeByte
 
@@ -223,6 +234,18 @@ DeferStatementToRuntime:
 SaveCodeAndExit:
 		lda 	#BLC_CLOSEIN				; finish input.
 		jsr 	CallAPIHandler
+		;
+		;		A BLOCK LEFT OPEN AT THE END OF THE SOURCE. FixBranches used to find this: it
+		;		scanned forward for the closing token and ran off the end of the object. Nothing
+		;		scans now, so the three stacks are asked directly -- which is a better answer
+		;		anyway, since it costs a compare rather than a walk.
+		;
+		lda 	blockDepth 					; GP.DO
+		ora 	ifDepth 					; GP.IF
+		ora 	SelectDepth 				; GP.SELECT
+		beq 	_SCEClosed
+		.error_structure
+_SCEClosed:
 
 		lda 	#$00 						; end-of-program line = $FE00 for forward THEN / goto-past-end.
 		ldy 	#$FE 						; Deliberately NOT $FFxx: STRFindLine treats any entry whose
@@ -263,31 +286,21 @@ SaveCodeAndExit:
 _SCEPlaced:
 		jsr 	ClaimRegionTop 				; the layout itself was restored before this pass began
 		;
-		;		BOTH PASSES RESOLVE, so the checksum compares a FINISHED object rather than one
-		;		with holes in it. That is what lets the resolving move into pass two's emitter one
-		;		branch kind at a time: pass one still answers from the laid-out object, the old
-		;		way, and a disagreement between the two answers is a mismatch here rather than a
-		;		wrong program. Pass one keeps FixBranches for as long as it has a buffer to walk.
+		;		NEITHER PASS HAS AN OBJECT ANY MORE. Pass one only counts -- it works out where
+		;		every line, block and region lands, and how long the whole thing is -- and pass
+		;		two writes the answer straight into the file, resolving every branch where it
+		;		writes it. FixBranches, which resolved them afterwards by walking the finished
+		;		p-code, has nothing left to walk and is gone.
 		;
-		;		FIXBRANCHES DESTROYS objPtr. It rewinds to the start and walks to the end marker,
-		;		so it comes back pointing at the $FF -- and everything after that is invisible to
-		;		it. That used to be the whole object, because the GP.ASM pool was appended
-		;		afterwards. Now the pool goes on first, and objPtr is the length WriteObjectCode
-		;		streams, so leaving it at the end marker silently truncated every pool: a program
-		;		with an inline blob compiled OK and jumped into nothing at the first call.
+		;		SO IS THE CHECKSUM, which compared the two objects. What the two passes still
+		;		both produce is the tables the second one resolves out of, and those are checked
+		;		instead: every line's address in STRMarkLine, every block end and alternative in
+		;		commands/goto.asm, the GP.ASM pool's base in AsmFlushPool, and the length and
+		;		variable space below.
 		;
 _SCEResolve:
 		lda 	passNumber
-		bne 	_SCEChecksum 				; PASS TWO RESOLVES EVERY BRANCH WHERE IT WRITES IT.
-		lda 	objPtr 						; Nothing is left for a second look, which is what
-		sta 	objectEnd 					; step seven needs: an object that is final on the
-		lda 	objPtr+1 					; way out can go straight to the file.
-		sta 	objectEnd+1
-		jsr 	FixBranches 				; fix up GOTO/GOSUB etc.
-		lda 	objectEnd
-		sta 	objPtr
-		lda 	objectEnd+1
-		sta 	objPtr+1
+		bne 	_SCEPassTwo
 		;
 		;		THE LENGTH IS THE LAST THING PASS ONE HAD TO FIND OUT, so this is where the
 		;		application settles what follows from it -- how much of the runtime this program
@@ -295,38 +308,24 @@ _SCEResolve:
 		;		is that test, and it is here now rather than after the whole compile: a program
 		;		with no room to run is refused before pass two writes a byte of it.
 		;
-		;		BEFORE THE CHECKSUM, because pass two is going to be told these answers and
-		;		compile against them -- so pass one has to have finished with them too.
+		;		AND PASS TWO COMPILES AGAINST THEM: a GP.ASM blob's address is worked out from
+		;		where the object will run, so the answers have to be in before it starts.
 		;
 		lda 	#BLC_ENDPASS1
 		jsr 	CallAPIHandler
-		bcc 	_SCEFits
+		bcc 	_SCEPassOne
 		sec 								; too big, and it has already said so
 		jmp 	ExitCompiler
-_SCEFits:
-		jsr 	AsmPatchAll 				; ...and with the two bases known, GP.ASM's blob calls
-											; can be filled in. Pass two wrote them out resolved,
-											; so the checksum compares the two answers.
-_SCEChecksum:
-		lda 	passNumber
-		beq 	_SCEWalk
 		;
-		;		PASS TWO HAS NO OBJECT TO WALK. It wrote one, a byte at a time, into a file --
-		;		so the sum was taken as the bytes went past, and this is where the last of them
-		;		go. Whatever is still buffered has to be out before the sum is asked for.
+		;		Pass two: whatever the application still has in hand goes out, and then the two
+		;		passes are compared.
 		;
+_SCEPassTwo:
 		lda 	#BLC_ENDPASS2
 		jsr 	CallAPIHandler
-		bcc 	_SCEWalk 					; no sum offered: the object is still readable, and
-		sta 	passSum 					; the native test harness is where that happens
-		sty 	passSum+1
 		bra 	_SCECompare
-_SCEWalk:
-		jsr 	ObjectChecksum
-		;
-		lda 	passNumber
-		bne 	_SCECompare
-		;
+
+_SCEPassOne:
 		lda 	passSum 					; what pass two now has to reproduce, exactly
 		sta 	pass1Sum
 		lda 	passSum+1
@@ -343,8 +342,9 @@ _SCEWalk:
 		jmp 	CompilePass
 
 		;
-		;		Pass two. Length first, then the sum: a length mismatch is the likelier bug and
-		;		the more informative one, though both land in the same place.
+		;		Pass two. The line table, the block tables and the pool base were checked where
+		;		they were read, so by here they already agree; what is left is the length, the
+		;		sum of what was emitted, and the variable space.
 		;
 _SCECompare:
 		lda 	objPtr
@@ -353,16 +353,15 @@ _SCECompare:
 		lda 	objPtr+1
 		cmp 	pass1Len+1
 		bne 	_SCEDiverged
-		lda 	passSum
-		cmp 	pass1Sum
+		lda 	passSum 					; ...and every byte either pass emitted, bar the ones
+		cmp 	pass1Sum 					; pass two alone could work out
 		bne 	_SCEDiverged
 		lda 	passSum+1
 		cmp 	pass1Sum+1
 		bne 	_SCEDiverged
 		;
 		;		And the variable space, which pass two wrote into the program before it had
-		;		recomputed it. Free to check, and it is what covers the three bytes ObjectChecksum
-		;		skips -- the only place the two objects are meant to differ.
+		;		recomputed it -- the one figure that is not a byte of the object.
 		;
 		lda 	freeVariableMemory
 		cmp 	pass1VarSpace
@@ -372,9 +371,10 @@ _SCECompare:
 		beq 	_SCEAgreed
 		;
 		;		The passes disagree, so some piece of compile state was carried from one into the
-		;		other -- ResetPassState is missing something. Nothing has been written yet, and
-		;		nothing is going to be: an object built from two different compiles of the same
-		;		source is exactly the corrupt output this check exists to prevent.
+		;		other -- ResetPassState is missing something. The object is already on disk, and
+		;		it is taken away again on the way out (ObjStreamAbort): an object built from two
+		;		different compiles of the same source is exactly what this check exists to stop
+		;		anyone running.
 		;
 _SCEDiverged:
 		.error_internal
@@ -405,6 +405,10 @@ ExitCompiler:
 ResetPassState:
 		jsr 	STRReset 					; line number table, variable list, free variable memory
 
+		stz 	passSum 					; the sum of what this pass emits, and how many bytes
+		stz 	passSum+1 					; of it are being stepped over
+		stz 	sumSkip
+		stz 	sumSkip+1
 		stz 	SelectDepth 				; open GP.SELECTs, for the selector-variable stack
 		stz 	blockDepth 					; GP.DO nesting -- a non-zero start makes every GOTO
 											; emit an .unwind it does not need
@@ -452,68 +456,6 @@ ResetPassState:
 		beq 	_RPSDone
 		jsr 	RestoreLayout
 _RPSDone:
-		rts
-
-; ************************************************************************************************
-;
-;		Fletcher-16 over the object this pass has just laid out. Called once per pass, after the
-;		pool has gone on, the regions have been placed and the branches resolved, so what it sums
-;		is the object exactly as it would be written to disk.
-;
-;		THE FIRST THREE BYTES ARE SKIPPED. They are _variable.space and its operand, and the
-;		operand is the one thing the two passes are MEANT to differ on -- pass one does not yet
-;		know the figure. The opcode is a constant and the figure is compared directly in the
-;		tail, so nothing is left uncovered.
-;
-;		BLC_RESETOUT is how the object's base is found: the compiler library cannot name
-;		FreeMemory -- it is an application symbol, and this half also builds standalone -- and
-;		resetting the cursor is the only thing that asks the API where the object starts.
-;		FixBranches rewinds the same way.
-;
-; ************************************************************************************************
-
-ObjectChecksum:
-		lda 	objPtr 						; where the object ends, over the rewind below
-		sta 	sumEnd
-		lda 	objPtr+1
-		sta 	sumEnd+1
-
-		lda 	#BLC_RESETOUT
-		jsr 	CallAPIHandler
-		clc 								; ...and start three bytes in, past _variable.space
-		lda 	objPtr
-		adc 	#3
-		sta 	zTemp0
-		lda 	objPtr+1
-		adc 	#0
-		sta 	zTemp0+1
-
-		stz 	passSum
-		stz 	passSum+1
-_OCLoop:
-		lda 	zTemp0+1 					; reached the end ?
-		cmp 	sumEnd+1
-		bne 	_OCByte
-		lda 	zTemp0
-		cmp 	sumEnd
-		beq 	_OCDone
-_OCByte:
-		lda 	(zTemp0)
-		clc
-		adc 	passSum 					; sum1 += byte
-		sta 	passSum
-		clc
-		adc 	passSum+1 					; sum2 += sum1, so a reordering shows up too
-		sta 	passSum+1
-		inc 	zTemp0
-		bne 	_OCLoop
-		inc 	zTemp0+1
-		bra 	_OCLoop
-_OCDone:
-		lda 	sumEnd 						; put the cursor back: it is the object's length, and
-		sta 	objPtr 						; WriteObjectCode streams up to it
-		lda 	sumEnd+1
-		sta 	objPtr+1
 		rts
 
 ; ************************************************************************************************
@@ -603,8 +545,11 @@ _RSClosing:
 		bne 	_RSDone
 
 		jsr 	_RSBridge
-		lda 	#$FF 						; the region's own end marker, which is what stops the
-		jsr 	WriteCodeByte 				; walkers once they have hopped up here
+		lda 	#1 							; the region's own end marker, which pass one counts
+		ldy 	#0 							; rather than writes
+		jsr 	SumSkipYA
+		lda 	#$FF
+		jsr 	WriteCodeByte
 		lda 	lowResume
 		sta 	objPtr
 		lda 	lowResume+1
@@ -615,10 +560,13 @@ _RSClosing:
 ;
 ;		Both bridges are GOTO THIS LINE, and that is the whole trick -- a region begins and ends
 ;		on a line marker, so both lines have a table entry pointing exactly at a boundary and
-;		FixBranches resolves the bridges by the path it resolves every other branch. No new
+;		pass two resolves the bridges by the path it resolves every other branch. No new
 ;		opcode and no absolute operand. See the header in commands/gpbank.asm.
 ;
 _RSBridge:
+		lda 	#1 							; PASS TWO'S ALONE. Pass one writes no bridge at all --
+		ldy 	#0 							; it counts the same three bytes in GPBankRelocate --
+		jsr 	SumSkipYA 					; so neither the opcode nor its operand is summed
 		lda 	currentLineNumber 			; both bridges go to the line the switch happens on:
 		sta 	branchTarget 				; the entry one into the region, the exit one back out
 		lda 	currentLineNumber+1
@@ -634,12 +582,11 @@ _RSBridge:
 ;		as it compiles -- it has to, the generators are the same code -- but they describe where
 ;		it PUT things, which for gpBankEnds is not what the relocator means by the same name.
 ;		Overwriting the lot afterwards is shorter than teaching the generators the difference,
-;		and it is pass one's figures that FixBranches and the bootstrap patcher want.
+;		and it is pass one's figures that pass two and the bootstrap patcher want.
 ;
-;		THE ALIGNMENT PADDING IS NOT REWRITTEN. Pass two lands its low code and its regions on
-;		the addresses pass one used, in the same buffer, so the gaps between them still hold the
-;		bytes pass one left there. That stops being true the day pass two streams to a file, and
-;		the gaps will have to be filled then.
+;
+;		THE ALIGNMENT PADDING IS PASS TWO'S. It writes the gaps itself, on its way out of
+;		ObjStreamClose, because there is no buffer left holding what pass one put there.
 ;
 ; ************************************************************************************************
 
@@ -655,8 +602,6 @@ _SLLoop:
 		sta 	layoutStart,x
 		lda 	gpBankEnds,x
 		sta 	layoutEnd,x
-		lda 	gpBankHops,x
-		sta 	layoutHops,x
 		txa
 		bne 	_SLLoop
 
@@ -687,8 +632,6 @@ _RLLoop:
 		sta 	gpBankStarts,x
 		lda 	layoutEnd,x
 		sta 	gpBankEnds,x
-		lda 	layoutHops,x
-		sta 	gpBankHops,x
 		txa
 		bne 	_RLLoop
 
@@ -704,8 +647,8 @@ _RLByteLoop:
 
 		lda 	layoutRunBase
 		sta 	gpBankRunBase
-		lda 	#1 							; the hop is open: the walk crosses the low code and
-		sta 	gpBankActive 				; then jumps up to the regions
+		lda 	#1 							; the layout is in place, which is what gpBankActive
+		sta 	gpBankActive 				; says to everything that corrects an address
 _RLDone:
 		rts
 
@@ -803,18 +746,18 @@ compilerStartHigh:							; MSB of workspace start address
 		.fill 	1
 compilerEndHigh:							; MSB of workspace end address
 		.fill 	1
-objectEnd:									; the true end of the object, held across FixBranches --
-		.fill 	2							; which rewinds objPtr and leaves it at the end marker
 ;
 ;		The two passes. passNumber is 0 while the first is running and 1 for the second, and it
 ;		is the only thing that tells them apart -- everything else about a pass is identical, by
-;		construction and by the checksum below.
+;		construction and by the checks listed at the head of this file.
 ;
 passNumber:								; 0 = first pass, 1 = second
 		.fill 	1
-passSum:									; Fletcher-16 over the object this pass laid out
+lineMarkerAt: 								; where the current line's PCD_NEWCMD_LINE byte went
 		.fill 	2
-sumEnd:										; one past its last byte, held across the walk
+passSum: 									; Fletcher-16 over what this pass emitted
+		.fill 	2
+sumSkip: 									; ...and how many bytes it is stepping over
 		.fill 	2
 ;
 ;		The GP.BANKED layout, carried from pass one into pass two. The tables mirror the ones in
@@ -825,8 +768,6 @@ layoutCount:								; regions pass one found and placed
 layoutStart:								; where each one ended up
 		.fill 	2*GPBANK_MAXREGIONS
 layoutEnd:									; and one past where each one ends
-		.fill 	2*GPBANK_MAXREGIONS
-layoutHops:									; where the walk leaves off to reach each one
 		.fill 	2*GPBANK_MAXREGIONS
 layoutPages:								; pages of each, for the bootstrap's table
 		.fill 	GPBANK_MAXREGIONS
@@ -840,7 +781,7 @@ regionOpen:									; nonzero while pass two is writing into one
 		.fill 	1
 lowResume:									; where the low code left off, across a region
 		.fill 	2
-pass1Sum:									; ...and what pass one came to, kept for the compare
+pass1Sum:									; what pass one came to, kept for the compare
 		.fill 	2
 pass1Len:									; pass one's object length, compared the same way
 		.fill 	2

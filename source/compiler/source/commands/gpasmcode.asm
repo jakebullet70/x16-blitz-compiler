@@ -28,7 +28,7 @@
 ;		GP-BASIC OUT at RT 12031, exactly what a program with no GP keyword at all costs.
 ;
 ;		THE BLOBS THEMSELVES GO IN A POOL APPENDED AFTER THE $FF END MARKER. Nothing walks
-;		there: MoveObjectForward returns carry set on $FF, and FixBranches, ScanGPUsage and
+;		there: MoveObjectForward returned carry set on $FF, and the walkers that used to run
 ;		ReadLookNext all stop on it. So the pool needs no length byte, no carrier opcode and
 ;		no framing -- and therefore has none of the 127-byte-per-block cap a carried payload
 ;		would have had.
@@ -37,7 +37,7 @@
 ;		the first position-dependent operand in this p-code. Branches are offsets, .string is
 ;		codePtr relative and .varspace is workspace relative; this is not. It cannot be
 ;		computed while the statement compiles either, because the object's run base is not
-;		known until ScanGPUsage has decided whether the GP block is cut. So each one is
+;		known until the GP block has been decided cut or kept. So each one is
 ;		recorded as a fixup and patched into the object buffer inside WriteObjectCode, where
 ;		runtimeEndPage (or PCODE_PAGE, shared) is finally known. All of that is compiler work,
 ;		which costs a compiled program nothing.
@@ -98,10 +98,12 @@ ASM_SYM_MAX    = 64 						; longest name {VAR} can carry -- BASLOAD's own limit
 ;			2	{VAR}.             target = a pool offset. value = the variable slot's offset
 ;			                       within the workspace.
 ;
-;		0 and 1 resolve against where the object will RUN, 2 against where the workspace will
-;		be -- which is why WriteObjectCode has to hand over both.
+;		1 resolves against where the object will RUN, 2 against where the workspace will be --
+;		which is why PrepareObjectCode has to settle both before pass two starts.
 ;
-AFIX_CALL  = 0
+;		0 WAS A BLOB CALL, the ".word <address>" in front of the SYS. It is not a fixup any
+;		more: pass two knows both bases by the time it writes one, so it writes the answer.
+;
 AFIX_LABEL = 1
 AFIX_VAR   = 2
 
@@ -171,6 +173,9 @@ AsmCloseBlock:
 
 		lda 	#PCD_CMD_WORD 				; .word <blob address>
 		jsr 	WriteCodeByte
+		lda 	#2 							; ...whose operand is pass two's answer, so the sum
+		ldy 	#0 							; steps over it -- see EmitBranch
+		jsr 	SumSkipYA
 		;
 		;		Capture where the operand lands BEFORE writing it -- objPtr is the write cursor,
 		;		so this IS the address of the low byte, in the buffer, right now. Absolute and
@@ -183,23 +188,14 @@ AsmCloseBlock:
 		;
 		lda 	passNumber
 		bne 	_ACBResolve
-		lda 	#AFIX_CALL
-		sta 	AsmNewKind
-		lda 	objPtr
-		sta 	AsmNewTarget
-		lda 	objPtr+1
-		sta 	AsmNewTarget+1
-		lda 	AsmBlobStart 				; where this blob starts in the pool
-		sta 	AsmNewValue
-		lda 	AsmBlobStart+1
-		sta 	AsmNewValue+1
-		lda 	#0 							; two placeholders, overwritten by AsmPatchAll
-		jsr 	WriteCodeByte
+		lda 	#0 							; pass one only counts: two bytes go past, and pass
+		jsr 	WriteCodeByte 				; two writes what belongs in them
 		lda 	#0
 		jsr 	WriteCodeByte
 
 		.keyword PCD_SYS 					; $DD $B0 -- call it
-		jmp 	AsmAddFixup
+		clc
+		rts
 ;
 ;		PASS TWO KNOWS THE ANSWER HERE. The pool's base was settled at the end of pass one and
 ;		so was the page the object runs at, so the blob's run address is arithmetic rather than
@@ -297,8 +293,8 @@ _APWFull:
 
 ; ************************************************************************************************
 ;
-;		Append the whole pool to the object, AFTER the $FF end marker and after FixBranches has
-;		walked the p-code. Records where it landed so the fixups can be resolved later.
+;		Append the whole pool to the object, AFTER the $FF end marker, where nothing walks.
+;		Records where it landed, which is what the fixups resolve against.
 ;
 ; ************************************************************************************************
 
@@ -333,6 +329,9 @@ _AFPBase:
 		sta 	AsmPoolBase+1
 
 		.set16 	zTemp2,AsmPool
+		lda 	AsmPoolLen 					; the pool is resolved in the bank by pass two and not
+		ldy 	AsmPoolLen+1 				; at all by pass one, so it is not summed either
+		jsr 	SumSkipYA
 		stz 	AsmCopyIdx
 		stz 	AsmCopyIdx+1
 _AFPLoop:
@@ -369,9 +368,9 @@ _AFPDone:
 ;		                  The caller works it out because FreeMemory is an application symbol,
 ;		                  and both ends are page aligned so one byte says all of it.
 ;
-;		This runs LATE -- after WriteObjectCode has settled newWorkspacePage -- and it has to,
-;		because {VAR} needs it. Nothing here changes the object's length, so running late is
-;		free: the buffer is untouched until it is streamed out.
+;		It runs at the end of PASS TWO, from AsmFlushPool, because both bases are settled by
+;		then and because that is the last moment the pool is still somewhere that can be
+;		written to. Nothing here changes the object's length.
 ;
 ; ************************************************************************************************
 
@@ -422,36 +421,11 @@ _APAVariable:
 		adc 	AsmWorkspacePage
 		sta 	zTemp0+1
 		;
-		;		THE TARGET, and there are two kinds of it. A blob call patches the p-code, whose
-		;		address was recorded absolutely as it was emitted -- pass one only, because pass
-		;		two wrote the answer there in the first place. The other two patch the POOL,
-		;		which had not been placed when they were recorded, so they hold offsets into it.
-		;
-		;		AND THE POOL IS IN TWO PLACES. Pass one has already copied it into the object and
-		;		patches that copy; pass two patches it where it still lives, in the bank, because
-		;		it is about to be copied out and will not be reachable afterwards. Same offsets,
-		;		different base.
+		;		THE TARGET IS ALWAYS IN THE POOL, and it is patched where the pool still lives --
+		;		in its bank, immediately before AsmFlushPool copies it into the object. After
+		;		that copy it is out of reach: the object goes straight into a file.
 		;
 _APATarget:
-		lda 	AsmKind
-		beq 	_APAStore 					; a blob call: the recorded address, as it stands
-		lda 	passNumber
-		bne 	_APAInPool
-		clc
-		lda 	zTemp1
-		adc 	AsmPoolBase
-		sta 	zTemp1
-		lda 	zTemp1+1
-		adc 	AsmPoolBase+1
-		sta 	zTemp1+1
-_APAStore:
-		lda 	zTemp0
-		sta 	(zTemp1)
-		ldy 	#1
-		lda 	zTemp0+1
-		sta 	(zTemp1),y
-		bra 	_APANext
-_APAInPool:
 		clc
 		lda 	zTemp1
 		adc 	#AsmPool & $FF
@@ -466,7 +440,6 @@ _APAInPool:
 		lda 	zTemp0+1
 		sta 	(zTemp1),y
 		.asm_release
-_APANext:
 		inc 	AsmFixIdx
 		lda 	AsmFixIdx
 		cmp 	AsmFixupCount

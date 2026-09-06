@@ -98,11 +98,23 @@ IOObjectClose:
 		sta 	ioOutSel
 		rts
 
+;
+;		SELECTING ONE DIRECTION TAKES THE OTHER WITH IT, so each of these forgets what the
+;		other knew. CHKIN and CHKOUT are not independent here: after the object file has been
+;		selected for output the source is no longer selected for input, and a read that assumed
+;		it still was simply stopped -- with no error and no end of file, which read as the
+;		compiler hanging. It cost an afternoon on 06/09/26.
+;
+;		The cost is one CHKIN/CHKOUT pair per buffer flush, which is 8K of object code apart --
+;		the same economy the runtime image gets by streaming a page at a time.
+;
 IOSelectSource:
 		lda 	#3
 		cmp 	ioInSel
 		beq 	_IOSSDone
 		sta 	ioInSel
+		lda 	#$FF
+		sta 	ioOutSel
 		ldx 	#3
 		jmp 	$FFC6 						; CHKIN
 _IOSSDone:
@@ -113,6 +125,8 @@ IOSelectObject:
 		cmp 	ioOutSel
 		beq 	_IOSODone
 		sta 	ioOutSel
+		lda 	#$FF
+		sta 	ioInSel
 		ldx 	#IO_OBJECT_FILE
 		jmp 	$FFC9 						; CHKOUT
 _IOSODone:

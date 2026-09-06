@@ -32,11 +32,11 @@ CompileCode:
 
 		;
 		;		GP.BANKED needs to know where the p-code will RUN, and it needs it INSIDE the
-		;		compile: FixBranches resolves the branches that cross into the bank long before
-		;		WriteObjectCode has settled anything. In shared mode that is the constant
-		;		PCODE_PAGE, so it can be handed over now. Embedded, it depends on ScanGPUsage --
-		;		and there is no bootstrap there to copy the region either, so gpbank.asm refuses
-		;		a region rather than guessing.
+		;		compile: pass two resolves the branches that cross into the bank as it writes
+		;		them. In shared mode that is the constant PCODE_PAGE, so it can be handed over
+		;		now. Embedded, it depends on how much of the runtime the program needs -- and
+		;		there is no bootstrap there to copy the region either, so gpbank.asm refuses a
+		;		region rather than guessing.
 		;
 		lda 	#(PCODE_PAGE - (FreeMemory >> 8)) & $FF
 		sta 	gpBankRunPage
@@ -54,11 +54,10 @@ _CCNotShared:
 		bcs 	_CCStopped 					; THE COMPILE ITSELF FAILED. StartCompiler documents CC = okay
 									; and CompilerErrorHandler has already printed the message and the
 									; line, so there is nothing to add -- but this carry used to be
-									; DROPPED, and WriteObjectCode ran anyway. A structure error out of
-									; FixBranches (GP.IF with no GP.ENDIF, GP.SELECT with no GP.ENDSEL,
-									; GP.EXITDO with no GP.LOOP) therefore wrote out the half-resolved
-									; object -- truncated at the branch it could not fix, because
-									; _FBEDNoLoop restores objPtr to it -- and then printed OK.
+									; DROPPED, and the object was written anyway. A structure error --
+									; GP.IF with no GP.ENDIF, GP.SELECT with no GP.ENDSEL, GP.EXITDO
+									; with no GP.LOOP -- therefore wrote out a half-resolved object,
+									; truncated at the branch it could not fix, and then printed OK.
 		jsr 	WriteMapFile 				; and the line#->offset map, if GPC.INPUT asked for one
 		lda 	#"O" 						; the only other thing it prints, and the only way a
 		jsr 	$FFD2 						; caller can tell a compile that worked from one that

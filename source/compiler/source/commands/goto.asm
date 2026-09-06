@@ -58,6 +58,9 @@ CommandGOTO:
 		pha
 		lda 	#PCD_CMD_UNWIND
 		jsr 	WriteCodeByte
+		lda 	#1 							; the count is pass two's answer -- see EmitBranch
+		ldy 	#0
+		jsr 	SumSkipYA
 		pla
 		jsr 	WriteCodeByte
 _CGNoUnwind:
@@ -73,9 +76,9 @@ _CGSyntax:
 ;		How many block frames the GOTO to branchTarget closes, in A.
 ;
 ;		PASS ONE CANNOT ANSWER. The target line may not have been compiled yet, and the depth
-;		there is exactly what is being asked for -- which is why this used to be FixBranches'
-;		job, done after the whole object was laid out. It writes a zero and FixBranches fills it
-;		in, the old way. Pass two has pass one's table and answers here.
+;		there is exactly what is being asked for -- which is why this used to be done after the
+;		whole object was laid out, by walking it. Pass one writes a zero and counts the byte;
+;		pass two has pass one's table and answers here.
 ;
 ;		A jump SIDEWAYS -- out of one block into another at the same depth -- computes zero and
 ;		closes nothing. That is not worth code to detect: the frame it lands in belongs to a
@@ -85,7 +88,7 @@ _CGSyntax:
 
 UnwindCount:
 		lda 	passNumber
-		beq 	_UCNone 					; pass one: FixBranches still fills this in
+		beq 	_UCNone 					; pass one: the byte goes past with nothing in it
 		lda 	branchTarget
 		ldy 	branchTarget+1
 		jsr 	STRFindLine 				; the record for the line it lands on
@@ -113,7 +116,7 @@ _UCDone:
 ;		GP.EXITDO -- a branch to a place the compiler has not reached -- be resolved where it is
 ;		written rather than by walking the finished object afterwards.
 ;
-;		Underflow is not guarded here. A stray GP.LOOP is caught structurally -- FixBranches
+;		Underflow is not guarded here. A stray GP.LOOP is caught structurally -- BlockDepthDown
 ;		raises BLOCK MISMATCH -- and a depth that went briefly negative would only make a GOTO
 ;		emit an .unwind it did not need, whose count comes out as zero anyway.
 ;
@@ -440,7 +443,9 @@ _CBCSyntax:
 ;
 ;		Write a branch: the opcode in A, the LINE it goes to in branchTarget.
 ;
-;		PASS ONE WRITES THE LINE NUMBER and FixBranches turns it into an offset afterwards, once
+;		PASS ONE WRITES THE LINE NUMBER, which is only ever counted, and pass two writes the
+;		offset. The two are the same length, which is all pass one needs of it. It used to be
+;		that pass one's line number was turned into an offset afterwards, once
 ;		the whole object is laid out. Pass two has pass one's line table already, so it writes the
 ;		offset -- and an object whose every byte is final on the way out is one that can be
 ;		streamed instead of built and then gone back over.
@@ -480,7 +485,7 @@ _WBTFound:
 		bra 	WriteBranchToAddress
 
 _WBTNoLine:
-		lda 	branchTarget 				; name the line that is missing, as FixBranches does
+		lda 	branchTarget 				; name the line that is missing
 		sta 	currentLineNumber
 		lda 	branchTarget+1
 		sta 	currentLineNumber+1
@@ -513,6 +518,9 @@ WriteBranchToAddress:
 EmitBranch:
 		lda 	branchOpcode
 		jsr 	WriteCodeByte
+		lda 	#2 							; the operand is the answer pass two worked out and
+		ldy 	#0 							; pass one could not, so the sum steps over it
+		jsr 	SumSkipYA
 		lda 	branchTarget
 		jsr 	WriteCodeByte
 		lda 	branchTarget+1

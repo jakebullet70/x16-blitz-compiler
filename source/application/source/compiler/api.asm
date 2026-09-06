@@ -65,7 +65,7 @@ _CAEndPass2:
 ;
 ;		Translate a GP.ASM {VAR} name through BASLOAD's #SYMFILE. Here rather than in the
 ;		compiler library because the file name comes from GPC.INPUT's source line, which is an
-;		application symbol -- the same reason ScanGPUsage is on this side.
+;		application symbol -- the same reason the GP usage scan is on this side.
 ;
 ; ************************************************************************************************
 
@@ -111,39 +111,31 @@ _CACloseOut:
 
 ; ************************************************************************************************
 ;
-;									Write byte A to free memory
+;								One object byte, in X, at objPtr
+;
+;		NEITHER PASS STORES THE OBJECT. Pass two's goes into the file as it is compiled -- see
+;		ObjStreamByte -- and pass one's is never written down at all: what pass one is for is
+;		working out where everything lands, and for that it only has to COUNT.
+;
+;		THAT IS WHAT TOOK THE SIZE WALL AWAY. The object used to be built in a buffer running
+;		from FreeMemory up to $9F00, so every byte of the compiler came straight off the largest
+;		program it could build -- and a program with eight GP.BANKED regions can be 81,152 bytes
+;		against 39,679 of low RAM, which no amount of shrinking the compiler could have reached.
+;		There is no buffer, so there is no ceiling here to test against: what bounds a program
+;		now is whether it can RUN, which PrepareObjectCode asks at the end of pass one.
+;
+;		Pass one still walks every byte past GPScanByte, because "does this program reach a GP
+;		handler?" has to be answered before pass two starts -- see compiler/gpscan.asm.
 ;
 ; ************************************************************************************************
 
 _CAWriteByte:
-		;
-		;		The object buffer has a CEILING and this is the only place that can enforce it.
-		;		Without this test the p-code just kept going past the end of usable low RAM,
-		;		over whatever was there, and the compile still said OK -- see the note on
-		;		ObjectCeiling in start.asm for what that cost. Refusing to emit a byte we have
-		;		nowhere to put is the whole fix; PROGRAM TOO BIG is reported against the source
-		;		line being compiled, so the message says where the budget ran out.
-		;
-		;		The ceiling is page aligned, so comparing the high byte is exact.
-		;
-		;
-		;		PASS TWO DOES NOT STORE IT. Its object goes into the file as it is compiled --
-		;		see ObjStreamByte -- and objPtr is a write cursor over an object that is not in
-		;		memory at all. Pass one still lays one out, for as long as anything reads it.
-		;
-		lda 	passNumber
-		bne 	_CAWBStream
-		lda 	objPtr+1
-		cmp 	#ObjectCeiling >> 8
-		bcs 	_CAWBTooBig
 		txa
-		sta 	(objPtr)
-		jsr 	GPScanByte 					; ...and the one place every object byte goes past, so
-											; it is where "does this program reach a GP handler?"
-											; is answered -- see compiler/gpscan.asm
+		ldx 	passNumber
+		bne 	_CAWBStream
+		jsr 	GPScanByte
 		bra 	_CAWBBump
 _CAWBStream:
-		txa
 		jsr 	ObjStreamByte
 _CAWBBump:
 		inc 	objPtr
@@ -152,9 +144,6 @@ _CAWBBump:
 _HWOWBNoCarry:
 		rts
 
-_CAWBTooBig:
-		.error_toobig
-
 ; ************************************************************************************************
 ;
 ;								Print character to screen
@@ -162,8 +151,10 @@ _CAWBTooBig:
 ; ************************************************************************************************
 		
 _CAPrintScreen:
+		txa 								; CLRCHN DOES NOT PRESERVE X, and the character to
+		pha 								; print is in it
 		jsr 	IOSelectScreen 				; the object file is open for output and may be
-		txa 								; selected -- CHROUT would put the message in it
+		pla 								; selected -- CHROUT would put the message in it
 		jmp 	$FFD2
 
 ; ************************************************************************************************

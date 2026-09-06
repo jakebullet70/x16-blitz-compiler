@@ -41,10 +41,9 @@ TestAPI:
 		beq 	_TAEndPass2
 		.debug
 ;
-;		...and its object is still in the bank it wrote it to, so the checksum can walk it.
+;		...and it holds nothing back: its object goes straight into the bank as it is written.
 ;
 _TAEndPass2:
-		clc
 		rts
 ;
 ;		The harness compiles into a bank and never writes a file, so nothing here depends on the

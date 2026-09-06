@@ -31,7 +31,7 @@
 ;		not select anything -- it is a compile time marker. Two keywords one letter apart, one of
 ;		which changes the hardware and one of which does not, is a trap not worth setting.
 ;
-;		NO "T" ON EITHER, in commands.def. They write no keyword token, so ScanGPUsage cannot
+;		NO "T" ON EITHER, in commands.def. They write no keyword token, so the GP usage scan
 ;		see them and a program whose only GP.BASIC keyword is GP.BANKED stays GP OUT and pays
 ;		nothing for the GP runtime block -- the argument GP.ASM already makes for itself.
 ;
@@ -240,8 +240,11 @@ GPBankCheckAlone:
 		lda 	objPtr+1
 		sbc 	#0
 		sta 	zTemp0+1
-		lda 	(zTemp0)
-		cmp 	#PCD_NEWCMD_LINE
+		lda 	zTemp0 						; THE BYTE ITSELF IS NOT THERE TO READ any more, so the
+		cmp 	lineMarkerAt 				; question is asked of the address instead: is
+		bne 	GPBankStructure 			; objPtr-1 the marker this line began with, or has
+		lda 	zTemp0+1 					; something been compiled on top of it since ?
+		cmp 	lineMarkerAt+1
 		bne 	GPBankStructure
 		rts
 
@@ -250,9 +253,9 @@ GPBankCheckAlone:
 ;		Lift the GP.BANKED region out of the middle of the object and put it at the end, past
 ;		the GP.ASM pool, on a page boundary.
 ;
-;		Called from SaveCodeAndExit after AsmFlushPool and BEFORE FixBranches, so every branch is
-;		still an unresolved line number and the only things that have to be corrected are the
-;		line number table and the three places that hold a buffer ADDRESS.
+;		Called from SaveCodeAndExit after AsmFlushPool, at the end of PASS ONE, where nothing
+;		has been resolved yet -- so the only things to correct are the tables pass two will
+;		resolve from.
 ;
 ;		BEFORE                                AFTER
 ;		+---------------------------------+   +---------------------------------+
@@ -270,9 +273,8 @@ GPBankCheckAlone:
 ;		THE TWO BRIDGES ARE ORDINARY GOTOs TO ORDINARY LINE NUMBERS, and that is the whole
 ;		trick. The region begins on the GP.BANKED line's marker byte and ends on the
 ;		GP.ENDBANKED line's, so both lines have a table entry pointing exactly at a boundary.
-;		Correct the table and FixBranches -- which runs next, and knows nothing about any of
-;		this -- resolves both bridges by the path it resolves every other GOTO. No new opcode,
-;		no absolute operand, no back-patching.
+;		Correct the table and pass two resolves both bridges by the path it resolves every other
+;		GOTO. No new opcode, no absolute operand, no back-patching.
 ;
 ;		THE POOL STAYS IN LOW MEMORY and the region goes ABOVE it. A blob is 65C02 code, and a
 ;		blob that changes the RAM bank -- STASH does -- must not itself be executing out of one.
@@ -288,11 +290,13 @@ GPBankCheckAlone:
 ;		about where the pool goes. What did change is that two walkers now HOP over the pool to
 ;		reach the region -- see GPBankHop.
 ;
-;		THE MOVE IS A ROTATION, done in place: shift the region and the whole tail up by three
-;		to open the gap for the first bridge, reverse the region, reverse the tail, reverse the
-;		pair -- which leaves the tail followed by the region -- then lift the region again by
-;		the padding. No second buffer. The object buffer is the largest thing in low RAM
-;		precisely because there is no room for one.
+;		NOTHING IS ACTUALLY MOVED. It used to be a rotation done in place -- shift the region
+;		and the whole tail up by three, reverse the region, reverse the tail, reverse the pair,
+;		then lift the region again by the padding -- because the object was sitting in a buffer
+;		and had to end up in the right order in it. There is no buffer now: pass one only
+;		counts, and pass two writes each region into a bank of its own and sends it out after
+;		the low code. What is left here is the arithmetic -- where every region lands, and what
+;		that does to every address written down before it.
 ;
 ; ************************************************************************************************
 
@@ -310,7 +314,7 @@ _GBRHaveRegion:
 		;
 		;		SHARED MODE ONLY. The correction below needs to know where the p-code will RUN,
 		;		and in shared mode that is the constant PCODE_PAGE. Embedded, it depends on
-		;		ScanGPUsage, which has not happened yet -- and there is no bootstrap there to do
+		;		the GP usage scan, which has not finished yet -- and there is no bootstrap there to do
 		;		the copying either. Refusing is honest; guessing would miscompile silently.
 		;
 		lda 	gpBankShared
@@ -445,6 +449,9 @@ _GBRNoFill:
 		lda 	gpBankRoom+1
 		adc 	#0
 		sta 	gpBankRoom+1
+		lda 	gpBankRoom 					; PASS ONE'S BOOKKEEPING, not p-code: pass two writes
+		ldy 	gpBankRoom+1 				; the bridges and the markers instead, and neither is
+		jsr 	SumSkipYA 					; summed on either side
 _GBRoom:
 		lda 	gpBankRoom
 		ora 	gpBankRoom+1
@@ -487,143 +494,9 @@ _GBRoomDone:
 		sbc 	gpBankOldTop+1
 		sta 	gpBankDelta+5
 		;
-		;		Lift the placed block out of the way, by exactly that. It is a whole number of
-		;		pages -- the region's base is aligned and its span is whole pages, so what is
-		;		inserted below the block has to be too -- which is what keeps every region an
-		;		earlier pass aligned still aligned.
-		;
-		;		A no-op on the first pass, where the block is empty and the two ends meet.
-		;
-		lda 	gpBankCeiling
-		sta 	gpBankMoveLow
-		lda 	gpBankCeiling+1
-		sta 	gpBankMoveLow+1
-		lda 	gpBankOldTop
-		sta 	zTemp0
-		lda 	gpBankOldTop+1
-		sta 	zTemp0+1
-		lda 	objPtr
-		sta 	zTemp1
-		lda 	objPtr+1
-		sta 	zTemp1+1
-		jsr 	_GBShiftUp
-		;
-		;		Step one: shift the region and the tail up by three, to open the gap the entry
-		;		bridge goes in.
-		;
-		lda 	gpBankStart
-		sta 	gpBankMoveLow
-		lda 	gpBankStart+1
-		sta 	gpBankMoveLow+1
-		lda 	gpBankTailEnd
-		sta 	zTemp0
-		lda 	gpBankTailEnd+1
-		sta 	zTemp0+1
-		clc
-		lda 	gpBankTailEnd
-		adc 	#3
-		sta 	zTemp1
-		lda 	gpBankTailEnd+1
-		adc 	#0
-		sta 	zTemp1+1
-		jsr 	_GBShiftUp
-		;
-		;		Step two: rotate, so the tail comes first and the region follows it.
-		;
-		clc
-		lda 	gpBankStart
-		adc 	#3
-		sta 	gpBankLow
-		lda 	gpBankStart+1
-		adc 	#0
-		sta 	gpBankLow+1
-
-		clc
-		lda 	gpBankLow
-		adc 	gpBankLength
-		sta 	gpBankMid
-		lda 	gpBankLow+1
-		adc 	gpBankLength+1
-		sta 	gpBankMid+1
-
-		clc
-		lda 	gpBankTailEnd
-		adc 	#3
-		sta 	gpBankHigh
-		lda 	gpBankTailEnd+1
-		adc 	#0
-		sta 	gpBankHigh+1
-
-		lda 	gpBankLow 					; reverse the region
-		ldy 	gpBankLow+1
-		ldx 	gpBankMid
-		stx 	gpBankRevEnd
-		ldx 	gpBankMid+1
-		stx 	gpBankRevEnd+1
-		jsr 	_GBReverse
-
-		lda 	gpBankMid 					; reverse the tail
-		ldy 	gpBankMid+1
-		ldx 	gpBankHigh
-		stx 	gpBankRevEnd
-		ldx 	gpBankHigh+1
-		stx 	gpBankRevEnd+1
-		jsr 	_GBReverse
-
-		lda 	gpBankLow 					; and the pair, leaving tail then region
-		ldy 	gpBankLow+1
-		ldx 	gpBankHigh
-		stx 	gpBankRevEnd
-		ldx 	gpBankHigh+1
-		stx 	gpBankRevEnd+1
-		jsr 	_GBReverse
-		;
-		;		Step three: lift the region again by the padding, so it starts on a page. The
-		;		rotation left it at gpBankHigh - length; it has to end at newBase + length.
-		;
-		lda 	gpBankPad
-		beq 	_GBRPadded 					; already aligned
-		sec
-		lda 	gpBankHigh
-		sbc 	gpBankLength
-		sta 	gpBankMoveLow 				; where the region sits now
-		lda 	gpBankHigh+1
-		sbc 	gpBankLength+1
-		sta 	gpBankMoveLow+1
-		lda 	gpBankHigh 					; ...and one past its last byte
-		sta 	zTemp0
-		lda 	gpBankHigh+1
-		sta 	zTemp0+1
-		clc
-		lda 	gpBankHigh
-		adc 	gpBankPad
-		sta 	zTemp1
-		lda 	gpBankHigh+1
-		adc 	#0
-		sta 	zTemp1+1
-		jsr 	_GBShiftUp
-_GBRPadded:
-		;
-		;		THE ALIGNMENT GAP, GIVEN A VALUE. Nothing writes these bytes -- the region was
-		;		lifted off them and the copy left its own first few behind -- and nothing reads
-		;		them either, so they have never mattered. They matter the day pass two streams
-		;		the object to a file instead of landing on pass one's addresses in pass one's
-		;		buffer: there is no leftover to inherit then, and a padding byte has to be
-		;		something. $FF, because that is the end marker: a walk that ever reached one
-		;		would stop rather than read whatever came next as an opcode.
-		;
-		sec
-		lda 	gpBankNewBase
-		sbc 	gpBankPad
-		sta 	zTemp1
-		lda 	gpBankNewBase+1
-		sbc 	#0
-		sta 	zTemp1+1
-		lda 	gpBankPad
-		sta 	gpBankTemp
-		jsr 	_GBRFill
-		;
-		;		gpBankHigh is now one past the region: where the exit bridge goes.
+		;		WHERE THE REGION ENDS UP is all that is left of the move: one past it is where the
+		;		exit bridge goes, and the region above starts a whole number of pages further on,
+		;		which is what keeps every region an earlier pass aligned still aligned.
 		;
 		clc
 		lda 	gpBankNewBase
@@ -633,78 +506,13 @@ _GBRPadded:
 		adc 	gpBankLength+1
 		sta 	gpBankHigh+1
 		;
-		;		The two bridges, and the end marker of the whole object.
-		;
-		lda 	gpBankStart
-		sta 	zTemp0
-		lda 	gpBankStart+1
-		sta 	zTemp0+1
-		lda 	gpBankLineIn
-		ldy 	gpBankLineIn+1
-		jsr 	_GBWriteGoto
-
-		lda 	gpBankHigh
-		sta 	zTemp0
-		lda 	gpBankHigh+1
-		sta 	zTemp0+1
-		lda 	gpBankLineOut
-		ldy 	gpBankLineOut+1
-		jsr 	_GBWriteGoto
-
-		lda 	#$FF
-		ldy 	#3
-		sta 	(zTemp0),y
-		;
-		;		...and the filler above that marker, which is there so the region above starts
-		;		on the page this one's span ends at. Same bytes, same reason as the gap above.
-		;
-		clc
-		lda 	zTemp0
-		adc 	#4
-		sta 	zTemp1
-		lda 	zTemp0+1
-		adc 	#0
-		sta 	zTemp1+1
-		lda 	gpBankFill
-		sta 	gpBankTemp
-		jsr 	_GBRFill
-_GBRFixUp:
-		;
-		;		Everything that recorded a position in the buffer now has to be told.
+		;		Everything that recorded a position now has to be told where it went.
 		;
 		jsr 	_GBFixLineTable
 		jsr 	_GBFixBlockEnds
 		jsr 	_GBFixBlockAlts
-		jsr 	_GBFixRegions 				; BEFORE the .fngosub walk, which reads the new bases
-		jsr 	_GBFixFnCalls
-		jsr 	_GBFixAsmCalls
+		jsr 	_GBFixRegions
 		jsr 	_GBFixPoolBase
-		;
-		;		WHERE THE WALK LEAVES OFF TO REACH THE REGION ABOVE THIS ONE. The walkers run to
-		;		this region's own end marker and stop; one past it is where they must be sent on,
-		;		and what they must be sent to is the next region's base -- which is exactly the
-		;		page boundary the filler above reaches. The topmost region has nothing above it
-		;		and so opens no hop.
-		;
-		;		RECORDED AFTER THE FIX-UPS, not before them. _GBFixRegions corrects every table
-		;		entry an EARLIER pass wrote, and hops[pass+1] is one of them -- so writing this
-		;		pass's own hop first would have it corrected a second time. The region it names
-		;		is placed by a LATER pass, and its own base is written by that pass.
-		;
-		lda 	gpBankPass
-		inc 	a
-		cmp 	gpBankCount
-		bcs 	_GBROnlyHop
-		asl 	a
-		tax
-		clc
-		lda 	gpBankHigh 					; the exit bridge is 3 and the marker 1
-		adc 	#4
-		sta 	gpBankHops,x
-		lda 	gpBankHigh+1
-		adc 	#0
-		sta 	gpBankHops+1,x
-_GBROnlyHop:
 		;
 		;		Leave the region's new bounds behind.
 		;
@@ -803,49 +611,8 @@ _GBRCross:
 		adc 	gpBankRunPage
 		inc 	a
 		sta 	gpBankRunBase
-		jsr 	_GBRFindLowEnd
 		lda 	#1
 		sta 	gpBankActive
-		rts
-
-; ************************************************************************************************
-;
-;		Where the walk leaves LOW MEMORY, which is hops[0]: the first region is reached from
-;		there and every other one from the region below it.
-;
-;		FOUND BY WALKING, not by arithmetic. It used to be "one past the tail", and with a single
-;		region that was the same thing -- the tail ended at the low code's own end marker. With
-;		several it is not: each pass leaves its alignment padding behind in what the NEXT pass
-;		treats as tail, so one past the tail is one past a stretch of padding the walkers stop
-;		short of. They stop at the marker, so this stops where they do.
-;
-;		gpBankActive is still 0 here, so the walk cannot hop -- which is the point. objPtr is the
-;		end of the object and WriteObjectCode streams up to it, so it is put back.
-;
-;		THE PADDING BELOW THE FIRST REGION IS DEAD SPACE, up to 255 bytes for every region after
-;		the first. It sits below the region and so counts as low p-code. Worth reclaiming if a
-;		program ever gets close enough to the ceiling to care.
-;
-; ************************************************************************************************
-
-_GBRFindLowEnd:
-		lda 	objPtr
-		sta 	gpBankSave
-		lda 	objPtr+1
-		sta 	gpBankSave+1
-		lda 	#BLC_RESETOUT 				; the compiler library cannot name FreeMemory -- the
-		jsr 	CallAPIHandler 				; same reason FixBranches rewinds this way
-_GBRFLELoop:
-		jsr 	MoveObjectForward
-		bcc 	_GBRFLELoop
-		lda 	objPtr
-		sta 	gpBankHops
-		lda 	objPtr+1
-		sta 	gpBankHops+1
-		lda 	gpBankSave
-		sta 	objPtr
-		lda 	gpBankSave+1
-		sta 	objPtr+1
 		rts
 
 ;
@@ -923,8 +690,6 @@ _GBFRNext:
 		jsr 	_GBFRField
 		.set16 	zTemp0, gpBankEnds
 		jsr 	_GBFRField
-		.set16 	zTemp0, gpBankHops
-		jsr 	_GBFRField
 		bra 	_GBFRNext
 _GBFRDone:
 		rts
@@ -971,129 +736,10 @@ _GBFPBOut:
 
 ; ************************************************************************************************
 ;
-;		Write .goto <line YA> at zTemp0.
-;
-; ************************************************************************************************
-
-_GBWriteGoto:
-		pha 								; line low
-		phy 								; line high
-		lda 	#PCD_CMD_GOTO
-		sta 	(zTemp0)
-		pla 								; high comes back off first
-		tax
-		pla 								; low
-		ldy 	#1
-		sta 	(zTemp0),y
-		txa
-		iny
-		sta 	(zTemp0),y
-		rts
-
-; ************************************************************************************************
-;
-;		Write gpBankTemp bytes of $FF from zTemp1 upwards. Both counts are a single byte -- the
-;		alignment is under a page by definition and so is the filler -- so Y is the whole loop.
-;
-; ************************************************************************************************
-
-_GBRFill:
-		ldy 	#0
-		cpy 	gpBankTemp
-		beq 	_GBRFillDone 				; nothing to pad
-		lda 	#$FF
-_GBRFillLoop:
-		sta 	(zTemp1),y
-		iny
-		cpy 	gpBankTemp
-		bne 	_GBRFillLoop
-_GBRFillDone:
-		rts
-
-; ************************************************************************************************
-;
-;		Move the bytes in [gpBankMoveLow, zTemp0) up so that they end at zTemp1. Copied from the
-;		top down, so the source and the destination may overlap.
-;
-; ************************************************************************************************
-
-_GBShiftUp:
-		lda 	zTemp0
-		cmp 	gpBankMoveLow
-		bne 	_GBSUByte
-		lda 	zTemp0+1
-		cmp 	gpBankMoveLow+1
-		beq 	_GBSUDone
-_GBSUByte:
-		lda 	zTemp0
-		bne 	_GBSUNoBorrow0
-		dec 	zTemp0+1
-_GBSUNoBorrow0:
-		dec 	zTemp0
-		lda 	zTemp1
-		bne 	_GBSUNoBorrow1
-		dec 	zTemp1+1
-_GBSUNoBorrow1:
-		dec 	zTemp1
-		lda 	(zTemp0)
-		sta 	(zTemp1)
-		bra 	_GBShiftUp
-_GBSUDone:
-		rts
-
-; ************************************************************************************************
-;
-;		Reverse the bytes from YA up to gpBankRevEnd, which is one past the last. An empty range
-;		and a range of one byte both fall straight out.
-;
-; ************************************************************************************************
-
-_GBReverse:
-		sta 	zTemp0 						; zTemp0 = the first byte
-		sty 	zTemp0+1
-		lda 	gpBankRevEnd 				; zTemp1 = the LAST byte, one below the end
-		sta 	zTemp1
-		lda 	gpBankRevEnd+1
-		sta 	zTemp1+1
-		lda 	zTemp1
-		bne 	_GBRevNoBorrow
-		dec 	zTemp1+1
-_GBRevNoBorrow:
-		dec 	zTemp1
-_GBRevLoop:
-		lda 	zTemp0+1 					; done once the two pointers meet or cross
-		cmp 	zTemp1+1
-		bcc 	_GBRevSwap
-		bne 	_GBRevDone
-		lda 	zTemp0
-		cmp 	zTemp1
-		bcs 	_GBRevDone
-_GBRevSwap:
-		lda 	(zTemp0)
-		tax
-		lda 	(zTemp1)
-		sta 	(zTemp0)
-		txa
-		sta 	(zTemp1)
-		inc 	zTemp0
-		bne 	_GBRevNoCarry
-		inc 	zTemp0+1
-_GBRevNoCarry:
-		lda 	zTemp1
-		bne 	_GBRevNoBorrow2
-		dec 	zTemp1+1
-_GBRevNoBorrow2:
-		dec 	zTemp1
-		bra 	_GBRevLoop
-_GBRevDone:
-		rts
-
-; ************************************************************************************************
-;
 ;		Every entry in the line number table holds the compile time address of the line it
 ;		names, and the whole point of moving the region on line boundaries is that these stay
-;		usable: FixBranches resolves both bridges through them a moment from now, and the map
-;		file is written from them afterwards.
+;		usable: pass two resolves both bridges through them, and the map file is written from
+;		them afterwards.
 ;
 ;		The table is walked exactly as WriteMapFile walks it -- 4 byte entries growing DOWN from
 ;		compilerEndHigh:$00 to lineNumberTable -- and the window is opened and closed once per
@@ -1232,137 +878,12 @@ _GBFBADone:
 
 ; ************************************************************************************************
 ;
-;		.fngosub is the one p-code operand that is an absolute buffer address at this point --
-;		FixBranches turns it into an offset a moment later, but it is not one yet, so a body or
-;		a call that moved has to be corrected first.
-;
-;		The walk is MoveObjectForward's, which steps by real instruction size, so an operand
-;		byte that happens to equal PCD_CMD_FNGOSUB is never read as one. It runs BEFORE the hop
-;		is opened, so it stops at the low code's $FF -- and then does the region as a second
-;		range, because a DEF FN inside one is perfectly legal.
-;
-;		objPtr is put back afterwards: it is the end of the object, and WriteObjectCode streams
-;		up to it.
-;
-; ************************************************************************************************
-
-_GBFixFnCalls:
-		lda 	objPtr
-		sta 	gpBankSave
-		lda 	objPtr+1
-		sta 	gpBankSave+1
-		lda 	#BLC_RESETOUT 				; the compiler library cannot name FreeMemory -- the
-		jsr 	CallAPIHandler 				; same reason FixBranches rewinds this way
-		jsr 	_GBFFCRange 				; the low code
-		lda 	gpBankNewBase 				; ...then the region this pass just moved
-		sta 	objPtr
-		lda 	gpBankNewBase+1
-		sta 	objPtr+1
-		jsr 	_GBFFCRange
-		;
-		;		...and then every region an earlier pass placed. They moved too, _GBFixRegions
-		;		has just said where to, and a DEF FN inside one is as legal as anywhere else.
-		;
-		lda 	gpBankPass
-		sta 	gpBankTemp
-_GBFFCRegion:
-		inc 	gpBankTemp
-		lda 	gpBankTemp
-		cmp 	gpBankCount
-		bcs 	_GBFFCEnd
-		asl 	a
-		tax
-		lda 	gpBankStarts,x
-		sta 	objPtr
-		lda 	gpBankStarts+1,x
-		sta 	objPtr+1
-		jsr 	_GBFFCRange
-		bra 	_GBFFCRegion
-_GBFFCEnd:
-		lda 	gpBankSave
-		sta 	objPtr
-		lda 	gpBankSave+1
-		sta 	objPtr+1
-		rts
-
-_GBFFCRange:
-		lda 	(objPtr)
-		cmp 	#PCD_CMD_FNGOSUB
-		bne 	_GBFFCNext
-		ldy 	#1
-		lda 	(objPtr),y
-		sta 	zTemp1
-		iny
-		lda 	(objPtr),y
-		sta 	zTemp1+1
-		jsr 	GPBankAdjust
-		ldy 	#1
-		lda 	zTemp1
-		sta 	(objPtr),y
-		iny
-		lda 	zTemp1+1
-		sta 	(objPtr),y
-_GBFFCNext:
-		jsr 	MoveObjectForward
-		bcc 	_GBFFCRange
-		rts
-
-; ************************************************************************************************
-;
-;		GP.ASM's blob calls are the other absolute address, and they are not in the object at
-;		all -- a blob call's fixup records WHERE IN THE BUFFER its .word operand sits, so that
-;		AsmPatchAll can fill it in once the run base is known. That target is a buffer address
-;		like any other and moves with the byte it names. The other two fixup kinds hold pool and
-;		workspace offsets, which this does not touch.
-;
-; ************************************************************************************************
-
-_GBFixAsmCalls:
-		lda 	AsmFixupCount
-		beq 	_GBFACDone
-		stz 	gpBankIdx
-_GBFACLoop:
-		lda 	gpBankIdx
-		asl 	a
-		tax 								; the two byte arrays index by count*2
-		ldy 	gpBankIdx 					; ...and the kind array by count
-		.asm_access
-		lda 	AsmFixKind,y
-		sta 	gpBankKind
-		lda 	AsmFixTarget,x
-		sta 	zTemp1
-		lda 	AsmFixTarget+1,x
-		sta 	zTemp1+1
-		.asm_release
-		lda 	gpBankKind
-		cmp 	#AFIX_CALL 					; only a blob call's target is a buffer address
-		bne 	_GBFACNext
-		jsr 	GPBankAdjust 				; corrupts X, so rebuild the subscript after it
-		lda 	gpBankIdx
-		asl 	a
-		tax
-		.asm_access
-		lda 	zTemp1
-		sta 	AsmFixTarget,x
-		lda 	zTemp1+1
-		sta 	AsmFixTarget+1,x
-		.asm_release
-_GBFACNext:
-		inc 	gpBankIdx
-		lda 	gpBankIdx
-		cmp 	AsmFixupCount
-		bcc 	_GBFACLoop
-_GBFACDone:
-		rts
-
-; ************************************************************************************************
-;
 ;		EVERY GLOBAL BELOW THIS LINE, AND NOWHERE ELSE.
 ;
 ;		64tass scopes a "_" label to the enclosing GLOBAL, so a global dropped in among another
 ;		routine's locals starts a new scope and every branch to a local defined after it stops
-;		resolving -- "not defined symbol '_GBShiftUp'", and so on down the file. GPBankRelocate's
-;		helpers run from _GBWriteGoto to _GBFixAsmCalls; put a new global in the middle of them
+;		resolving -- "not defined symbol '_GBFRField'", and so on down the file. GPBankRelocate's
+;		helpers run from _GBFixRegions to _GBFixBlockAlts; put a new global in the middle of them
 ;		and the build breaks in six places that have nothing to do with what was added. Twice, so
 ;		far.
 ;
@@ -1449,51 +970,9 @@ _GBADone:
 
 ; ************************************************************************************************
 ;
-;		The walk over the object runs out of low memory at the $FF that ends it, and the region
-;		is on the far side of the GP.ASM pool. Called by everything that walks the whole object
-;		-- FixBranches' main loop and its unwind-depth walk, and ScanGPUsage -- when
-;		MoveObjectForward has just said "end".
-;
-;		Carry CLEAR means it hopped and there is more to walk; carry SET means that really was
-;		the end. A program with no GP.BANKED always gets carry set, so nothing changes for it.
-;
-; ************************************************************************************************
-
-GPBankHop:
-		lda 	gpBankActive
-		beq 	_GBHEnd
-		ldx 	#0
-_GBHNext:
-		cpx 	gpBankCount
-		bcs 	_GBHEnd
-		txa
-		asl 	a
-		tay
-		lda 	objPtr
-		cmp 	gpBankHops,y
-		bne 	_GBHSkip
-		lda 	objPtr+1
-		cmp 	gpBankHops+1,y
-		bne 	_GBHSkip
-		lda 	gpBankStarts,y 				; the hop lands on the region itself
-		sta 	objPtr
-		lda 	gpBankStarts+1,y
-		sta 	objPtr+1
-		clc
-		rts
-_GBHSkip:
-		inx
-		bra 	_GBHNext
-_GBHEnd:
-		sec
-		rts
-
-
-; ************************************************************************************************
-;
 ;		STRMakeOffset, plus the correction a branch needs when exactly one of its ends is in the
 ;		banked region. YA is the target on the way in and the finished offset on the way out, so
-;		it drops straight into FixBranches' two patch tails in place of STRMakeOffset.
+;		it drops straight into the branch writer in place of STRMakeOffset.
 ;
 ;		Both ends the same side and nothing changes -- which is every branch in a program with no
 ;		GP.BANKED in it, and almost every branch in one that has.
@@ -1686,7 +1165,7 @@ gpBankIdx:										; cursor into the GP.ASM fixup list
 gpBankKind:										; the kind byte of the fixup in hand
 		.fill 	1
 gpBankShared:									; 1 in SHARED mode. Set by CompileCode before the
-		.fill 	1 								; compile, because FixBranches needs it
+		.fill 	1 								; compile, because the relocator needs it
 gpBankRunPage:									; buffer page -> run page, which shared mode knows
 		.fill 	1 								; up front and embedded mode does not
 gpBankRunBase:									; the page the region would have run at in low memory
