@@ -53,6 +53,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 
 ## Compiler limits, memory and banking
 - [PROGRAM TOO BIG was the workspace](program-too-big-fires-early.md) — FIXED with a RAM bank per table; three raise sites, and the real max program size
+- [SHARED p-code cap is RTBASE](gpc-shared-pcode-cap-is-rtbase.md) - ~17,920 bytes, not $9F00; and PROGRAM TOO BIG proves the source was read in full
 - [GPC Blitz runtime slack and limits](gpc-blitz-runtime-slack-and-limits.md) — measured memory layout; the run-side ceiling, quotable as FREE minus 4096
 - [Core page cushion below GPBase](gpc-core-page-cushion-below-gpbase.md) — only ~40 B of padding; cross it and every program grows 256 B
 - [Runtime footprint](blitz-x16-runtime-footprint.md) — the 10,956 B runtime copied into every program, and how to shrink it
@@ -64,6 +65,8 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [Banking strings: length, not count](banking-strings-scales-with-length.md) — the menus broke even at 249 saved vs 245 spent
 - [BANK, not POKE 0](gpc-bank-statement-not-poke-zero.md) — PEEK/POKE restore the bank around every access, so POKE 0 can never select one
 - [STASH leaves its bank selected — FIXED](stash-leaves-its-bank-selected.md) — it now restores the caller's bank; what the symptom looked like, and why it named the wrong routine
+
+- [color-test sample state](color-test-sample-state.md) — parked 2026-09-06; the four loose ends, incl. an unverified X16 colour pair
 
 ## The editor sample
 - [Editor branch state, GUI next](gpc-editor-branch-and-gui-next.md) — the self-check lines to keep green
@@ -82,9 +85,14 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [All three line endings](basl-sources-use-all-three-line-endings.md) — how to sniff, and why a short CR file reads as CRLF
 
 ## BASLOAD
+- [BASIC RAM was the tokenise ceiling](basload-basic-ram-is-the-tokenise-ceiling.md) — REMOVED for build_basl.py; still binds the BASIC prompt and the work-* harnesses
+- [BASLOAD streams to a file](basload-streams-to-a-file.md) — SHIPPED: the fork, its 2-bytes-shorter invariant, and the partial-output defect the SUCCESS check guards
+- [BASLOAD runs from RAM unmodified](basload-runs-from-ram-unmodified.md) — the ROM source builds as a plain PRG with no source changes; cc65 is installed
 - [BASLOAD #DEFINE rejects digits](basload-define-rejects-digits.md) — GUI2.DEFS is INVALID PARAMETER but GUI2.SEL is fine; and no #INCLUDE is ever optional
 - [Labels and variables collide](basload-label-and-variable-collide.md) — DUPLICATE SYMBOL, and the $ does not separate FOO from FOO$
 - [#AUTONUM breaks STRCASE](basload-autonum-breaks-strcase.md) — do not write it; it sets the STEP, and only the default 1 survives STRCASE
+
+- [TRUE is -1](gpc-basl-true-is-minus-one.md) — the library's booleans, why NOT needs -1, and the two spellings that break
 
 ## X16 BASIC semantics (ROM-verified — apply to any compiler)
 - [IF semantics](gpc-if-semantics.md) — a false IF skips the WHOLE line, not just the first statement. Blitz gets this right.
@@ -105,6 +113,8 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [GP drawing targets layer 1](gp-drawing-targets-layer-1.md) — only layer 1, but no row clamp and L1_MAPBASE is POKEable
 - [P-code runs from a bank, PROVEN](pcode-runs-from-a-bank-proven.md) — executed at $A000 with two GP.ASM blobs and no ABI change; RETURN out needs no bank restore
 - [GP.BANKED region relocation](gp-banked-region-relocation.md) — the region moves to the end of the object with a rotation and two GOTOs to line numbers; the three things holding a buffer address
+- [Banked code loses the bank on a call out](gp-banked-call-out-loses-the-bank.md) — a region cannot call another bank and survive the return, and may not BANK itself back
+- [Split FILEDIR for banking](filedir-bank-split.md) — TODO; the naive split moves only 22%, because FILL and STEP run WITH the data bank selected
 - [KERNAL preserves the RAM bank](kernal-preserves-ram-bank.md) — CHROUT, GETIN, scroll, CLS and screen_mode all leave $00 alone; measure it in asm, PEEK(0) cannot see it
 - [X16 ROM internal calls](x16-rom-internal-calls.md) — verified R49 dispatcher/GC addresses + ZP pointers
 - [X16 toolchain](x16-toolchain.md) — 64tass / emulator paths on this machine
