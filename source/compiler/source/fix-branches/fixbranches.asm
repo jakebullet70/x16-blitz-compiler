@@ -24,6 +24,14 @@ FixBranches:
 		stz 	_FBBlockDepth
 _FBLoop:
 		lda 	(objPtr) 					; get the next one.
+		;
+		;		EVERYTHING THAT NAMES A LINE, PASS ONE ONLY. Pass two resolved these where it
+		;		wrote them, from pass one's line table, so coming through here would only
+		;		overwrite its answers with these -- and the two objects would then agree whether
+		;		or not the answers did. Pass one still walks them, so the checksum compares.
+		;
+		ldx 	passNumber
+		bne 	_FBStructural
 		cmp 	#PCD_CMD_GOTO 				; found GOTO or GOSUB, patch up.
 		beq 	_FBFixGotoGosub
 		cmp 	#PCD_CMD_GOSUB
@@ -36,6 +44,13 @@ _FBLoop:
 		beq 	_FBFixGotoGosub
 		cmp 	#PCD_CMD_RESTORE 			; patch restore.
 		beq 	_FBFixRestore
+		cmp 	#PCD_CMD_UNWIND 			; a GOTO leaving blocks: how many frames it closes.
+		beq 	_FBUnwindFar
+		;
+		;		THE STRUCTURAL BRANCHES, both passes. Their targets are code positions found by
+		;		walking the object, which is a thing only this side can do.
+		;
+_FBStructural:
 		cmp 	#PCD_CMD_EXITDO 			; GP.EXITDO: resolve against its own GP.LOOP.
 		beq 	_FBExitDoFar
 		cmp 	#PCD_CMD_CASENEXT 			; GP.CASE that did not match: the next alternative.
@@ -46,8 +61,6 @@ _FBLoop:
 		beq 	_FBIfNextFar
 		cmp 	#PCD_CMD_IFELSE 			; end of an IF body: out to the GP.ENDIF.
 		beq 	_FBIfElseFar
-		cmp 	#PCD_CMD_UNWIND 			; a GOTO leaving blocks: how many frames it closes.
-		beq 	_FBUnwindFar
 _FBNext:
 		;
 		;		Block depth, counted as the walk passes the openers and closers -- the same
@@ -78,15 +91,7 @@ _FBStep:
 		bcc 	_FBLoop 					; sits past the GP.ASM pool -- carry clear means it
 _FBExit: 									; hopped there and the walk goes on
 		rts
-;
-;		PASS TWO WORKED THE COUNT OUT WHEN IT WROTE THE GOTO (CommandGOTO), so leave it alone --
-;		and leaving it alone is the point. Recomputing it here would overwrite pass two's answer
-;		with this one, and the two objects would agree whether or not the answers did. Pass one
-;		still comes through here, so the checksum compares the two.
-;
 _FBUnwindFar:
-		lda 	passNumber
-		bne 	_FBNext
 		jmp 	_FBFixUnwind
 ;
 ;		The GP.EXITDO handler lives at the very end of this file, deliberately: dropping it inline

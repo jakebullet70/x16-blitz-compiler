@@ -846,11 +846,11 @@ CompilePass:
 		;		any. VARSPACE has already run, so the array allocator (availableMemory) is set up
 		;		by the time the prologue executes.
 		;
-		lda 	#PCD_CMD_GOTO
-		jsr 	WriteCodeByte
 		lda 	#$FF 						; -> line $FFFF (the prologue)
-		jsr 	WriteCodeByte
-		jsr 	WriteCodeByte
+		sta 	branchTarget
+		sta 	branchTarget+1
+		lda 	#PCD_CMD_GOTO
+		jsr 	WriteBranchTo
 		;
 		;		Main compilation loop
 		;
@@ -979,12 +979,12 @@ SaveCodeAndExit:
 		ldy 	#$FF 						; is also the $FF end-of-table sentinel STRFindLine expects)
 		jsr 	STRMarkLine
 		jsr 	EmitImplicitDims
-		lda 	#PCD_CMD_GOTO 				; return to the first real line (or $FFFE if none)
-		jsr 	WriteCodeByte
-		lda 	implicitDimFirst
-		jsr 	WriteCodeByte
+		lda 	implicitDimFirst 			; return to the first real line (or to the END marker
+		sta 	branchTarget 				; at $FE00 if the program has none)
 		lda 	implicitDimFirst+1
-		jsr 	WriteCodeByte
+		sta 	branchTarget+1
+		lda 	#PCD_CMD_GOTO
+		jsr 	WriteBranchTo
 		;
 		lda 	#$FF 						; add end marker
 		jsr 	WriteCodeByte
@@ -1273,7 +1273,9 @@ RegionSwitchWork:
 		;		It does. The entry bridge stays behind in low memory, where the region used to
 		;		be, and the cursor moves to where the region goes.
 		;
-		jsr 	_RSBridge
+		phx 								; X IS THE REGION, and the bridge now resolves its own
+		jsr 	_RSBridge 					; target -- which goes through GPBankMakeOffset, and
+		plx 								; that works through X
 		lda 	objPtr
 		sta 	lowResume
 		lda 	objPtr+1
@@ -1318,13 +1320,12 @@ _RSClosing:
 ;		opcode and no absolute operand. See the header in commands/gpbank.asm.
 ;
 _RSBridge:
-		lda 	#PCD_CMD_GOTO
-		jsr 	WriteCodeByte
-		lda 	currentLineNumber
-		jsr 	WriteCodeByte
+		lda 	currentLineNumber 			; both bridges go to the line the switch happens on:
+		sta 	branchTarget 				; the entry one into the region, the exit one back out
 		lda 	currentLineNumber+1
-		jsr 	WriteCodeByte
-		rts
+		sta 	branchTarget+1
+		lda 	#PCD_CMD_GOTO
+		jmp 	WriteBranchTo
 
 ; ************************************************************************************************
 ;
@@ -2750,6 +2751,14 @@ FixBranches:
 		stz 	_FBBlockDepth
 _FBLoop:
 		lda 	(objPtr) 					; get the next one.
+		;
+		;		EVERYTHING THAT NAMES A LINE, PASS ONE ONLY. Pass two resolved these where it
+		;		wrote them, from pass one's line table, so coming through here would only
+		;		overwrite its answers with these -- and the two objects would then agree whether
+		;		or not the answers did. Pass one still walks them, so the checksum compares.
+		;
+		ldx 	passNumber
+		bne 	_FBStructural
 		cmp 	#PCD_CMD_GOTO 				; found GOTO or GOSUB, patch up.
 		beq 	_FBFixGotoGosub
 		cmp 	#PCD_CMD_GOSUB
@@ -2762,6 +2771,13 @@ _FBLoop:
 		beq 	_FBFixGotoGosub
 		cmp 	#PCD_CMD_RESTORE 			; patch restore.
 		beq 	_FBFixRestore
+		cmp 	#PCD_CMD_UNWIND 			; a GOTO leaving blocks: how many frames it closes.
+		beq 	_FBUnwindFar
+		;
+		;		THE STRUCTURAL BRANCHES, both passes. Their targets are code positions found by
+		;		walking the object, which is a thing only this side can do.
+		;
+_FBStructural:
 		cmp 	#PCD_CMD_EXITDO 			; GP.EXITDO: resolve against its own GP.LOOP.
 		beq 	_FBExitDoFar
 		cmp 	#PCD_CMD_CASENEXT 			; GP.CASE that did not match: the next alternative.
@@ -2772,8 +2788,6 @@ _FBLoop:
 		beq 	_FBIfNextFar
 		cmp 	#PCD_CMD_IFELSE 			; end of an IF body: out to the GP.ENDIF.
 		beq 	_FBIfElseFar
-		cmp 	#PCD_CMD_UNWIND 			; a GOTO leaving blocks: how many frames it closes.
-		beq 	_FBUnwindFar
 _FBNext:
 		;
 		;		Block depth, counted as the walk passes the openers and closers -- the same
@@ -2804,15 +2818,7 @@ _FBStep:
 		bcc 	_FBLoop 					; sits past the GP.ASM pool -- carry clear means it
 _FBExit: 									; hopped there and the walk goes on
 		rts
-;
-;		PASS TWO WORKED THE COUNT OUT WHEN IT WROTE THE GOTO (CommandGOTO), so leave it alone --
-;		and leaving it alone is the point. Recomputing it here would overwrite pass two's answer
-;		with this one, and the two objects would agree whether or not the answers did. Pass one
-;		still comes through here, so the checksum compares the two.
-;
 _FBUnwindFar:
-		lda 	passNumber
-		bne 	_FBNext
 		jmp 	_FBFixUnwind
 ;
 ;		The GP.EXITDO handler lives at the very end of this file, deliberately: dropping it inline
@@ -3404,14 +3410,18 @@ FNCompile:
 		jsr 	CompileExpressionAt0
 		jsr 	CheckNextRParen
 		;
-		;		Compile the call : .fngosub <lo> <hi>
+		;		Compile the call : .fngosub <lo> <hi>. Pass one writes the address and FixBranches
+		;		turns it into an offset; pass two writes the offset, because the body is always
+		;		BEHIND the call -- a forward FN reference was refused above -- so the address is
+		;		already final. Either way the operand goes through the branch writer, which knows
+		;		what to correct when one end is inside a GP.BANKED region.
 		;
+		pla 								; abs LOW
+		sta 	branchTarget
+		pla 								; abs HIGH
+		sta 	branchTarget+1
 		lda 	#PCD_CMD_FNGOSUB
-		jsr 	WriteCodeByte
-		pla 								; abs LOW  -> operand byte 1
-		jsr 	WriteCodeByte
-		pla 								; abs HIGH -> operand byte 2
-		jsr 	WriteCodeByte
+		jsr 	WriteBranchToAddress
 
 		clc
 		rts
@@ -5100,8 +5110,8 @@ CommandGOTO:
 		jsr 	GetNextNonSpace
 		jsr 	ParseConstant 				; the target line, into YA
 		bcc 	_CGSyntax
-		sta 	gotoTarget
-		sty 	gotoTarget+1
+		sta 	branchTarget
+		sty 	branchTarget+1
 		;
 		lda 	blockDepth
 		beq 	_CGNoUnwind
@@ -5113,11 +5123,7 @@ CommandGOTO:
 		jsr 	WriteCodeByte
 _CGNoUnwind:
 		lda 	#PCD_CMD_GOTO
-		jsr 	WriteCodeByte
-		lda 	gotoTarget
-		jsr 	WriteCodeByte
-		lda 	gotoTarget+1
-		jsr 	WriteCodeByte
+		jsr 	WriteBranchTo
 		rts
 
 _CGSyntax:
@@ -5125,7 +5131,7 @@ _CGSyntax:
 
 ; ************************************************************************************************
 ;
-;		How many block frames the GOTO to gotoTarget closes, in A.
+;		How many block frames the GOTO to branchTarget closes, in A.
 ;
 ;		PASS ONE CANNOT ANSWER. The target line may not have been compiled yet, and the depth
 ;		there is exactly what is being asked for -- which is why this used to be FixBranches'
@@ -5141,8 +5147,8 @@ _CGSyntax:
 UnwindCount:
 		lda 	passNumber
 		beq 	_UCNone 					; pass one: FixBranches still fills this in
-		lda 	gotoTarget
-		ldy 	gotoTarget+1
+		lda 	branchTarget
+		ldy 	branchTarget+1
 		jsr 	STRFindLine 				; the record for the line it lands on
 		bcs 	_UCNone 					; no such line -- the GOTO itself reports it
 		jsr 	STRLineDepth 				; ...and how deep in blocks that line is
@@ -5190,27 +5196,112 @@ _BDDFloor:
 ; ************************************************************************************************
 
 CompileBranchCommand:
-		jsr 	WriteCodeByte 				; write the command out.
-		jsr 	GetNextNonSpace
-		jsr 	ParseConstant 				; get constant into YA
+		sta 	branchOpcode 				; the opcode cannot go out yet: pass two works its
+		jsr 	GetNextNonSpace 			; operand out from where the opcode is going to sit
+		jsr 	ParseConstant 				; the line number, into YA
 		bcc 	_CBCSyntax
-
- 				
-		jsr 	WriteCodeByte				; and compile the actual line number
-		tya
-		jsr 	WriteCodeByte
-		rts		
+		sta 	branchTarget
+		sty 	branchTarget+1
+		lda 	branchOpcode
+		jmp 	WriteBranchTo
 
 _CBCSyntax:
 		.error_syntax
+
+; ************************************************************************************************
+;
+;		Write a branch: the opcode in A, the LINE it goes to in branchTarget.
+;
+;		PASS ONE WRITES THE LINE NUMBER and FixBranches turns it into an offset afterwards, once
+;		the whole object is laid out. Pass two has pass one's line table already, so it writes the
+;		offset -- and an object whose every byte is final on the way out is one that can be
+;		streamed instead of built and then gone back over.
+;
+;		THE OFFSET IS MEASURED FROM THE OPCODE, which is why nothing is written until it has been
+;		worked out: at that moment objPtr is still pointing at where the opcode is about to go.
+;
+;		A MISSING LINE IS AN ERROR for everything except .gotoz and RESTORE. A false IF branches
+;		to "this line + 1", which is a line number that usually does not exist, and RESTORE with
+;		no argument compiles as RESTORE 0. Both mean "the first line at or after this", which is
+;		what STRFindLine returns with the carry set.
+;
+; ************************************************************************************************
+
+WriteBranchTo:
+		sta 	branchOpcode
+		lda 	passNumber
+		beq 	EmitBranch 					; pass one: the line number goes out as it stands
+		;
+		lda 	branchTarget
+		ldy 	branchTarget+1
+		jsr 	STRFindLine 				; where that line starts
+		sta 	branchAddress
+		sty 	branchAddress+1
+		bcc 	_WBTFound
+		lda 	branchOpcode 				; not an exact match, and only two opcodes may miss
+		cmp 	#PCD_CMD_GOTOCMD_Z
+		beq 	_WBTFound
+		cmp 	#PCD_CMD_RESTORE
+		bne 	_WBTNoLine
+_WBTFound:
+		lda 	branchAddress 				; the address it lands at is the operand from here on,
+		sta 	branchTarget 				; which is exactly an FN call's problem
+		lda 	branchAddress+1
+		sta 	branchTarget+1
+		lda 	branchOpcode
+		bra 	WriteBranchToAddress
+
+_WBTNoLine:
+		lda 	branchTarget 				; name the line that is missing, as FixBranches does
+		sta 	currentLineNumber
+		lda 	branchTarget+1
+		sta 	currentLineNumber+1
+		.error_line
+
+; ************************************************************************************************
+;
+;		The same, for the one operand that is an ABSOLUTE code address rather than a line: the
+;		body of an FN, which FNCompile reads out of the variable record. Opcode in A, address in
+;		branchTarget.
+;
+; ************************************************************************************************
+
+WriteBranchToAddress:
+		sta 	branchOpcode
+		lda 	passNumber
+		beq 	EmitBranch 					; pass one: the address goes out as it stands
+		lda 	branchTarget
+		ldy 	branchTarget+1
+		jsr 	GPBankMakeOffset 			; an offset from here -- and corrected if this branch
+		sta 	branchTarget 				; crosses into or out of a GP.BANKED region, which runs
+		sty 	branchTarget+1 				; at $A000 rather than where it sits in the buffer
+
+; ************************************************************************************************
+;
+;						Opcode in branchOpcode, operand in branchTarget
+;
+; ************************************************************************************************
+
+EmitBranch:
+		lda 	branchOpcode
+		jsr 	WriteCodeByte
+		lda 	branchTarget
+		jsr 	WriteCodeByte
+		lda 	branchTarget+1
+		jsr 	WriteCodeByte
+		rts
 
 		.send code
 
 		.section storage
 blockDepth: 								; GP.DO / GP.SELECT nesting at the statement being
 		.fill 	1 						; compiled. Reset by the compiler's own start-up.
-gotoTarget: 								; the line a GOTO being compiled goes to, read before
-		.fill 	2 							; the .unwind in front of it is written
+branchOpcode: 								; the branch being written, held while its operand is
+		.fill 	1 							; worked out
+branchTarget: 								; ...and that operand: a line number on the way in, the
+		.fill 	2 							; offset that reaches it on the way out
+branchAddress: 								; where the line the branch goes to starts
+		.fill 	2
 unwindTarget: 								; the block depth at that line
 		.fill 	1
 		.send 	storage
@@ -9238,17 +9329,15 @@ _CIGoto2:
 		rts
 		
 CompileGotoEOL: 							; compile GOTOZ <next line>
-		lda 	#PCD_CMD_GOTOCMD_Z
-		jsr 	WriteCodeByte
 		jsr 	GetLineNumber 				; Get the current line number => YA
 		inc 	a 							; and branch to +1
 		bne 	_CGENoCarry
 		iny
 _CGENoCarry:		
-		jsr 	WriteCodeByte
-		tya
-		jsr 	WriteCodeByte
-		rts
+		sta 	branchTarget 				; a line number that usually does not exist, which is
+		sty 	branchTarget+1 				; why .gotoz is allowed to miss -- see WriteBranchTo
+		lda 	#PCD_CMD_GOTOCMD_Z
+		jmp 	WriteBranchTo
 
 		.send code
 
@@ -10582,12 +10671,10 @@ CommandRESTORE:
 		rts
 
 _CRDefault:
-		lda 	#PCD_CMD_RESTORE 			; compile RESTORE
-		jsr 	WriteCodeByte
-		lda 	#0		 					; with zero "line#"
-		jsr 	WriteCodeByte	
-		jsr 	WriteCodeByte
-		rts
+		stz 	branchTarget 				; RESTORE with no line number is RESTORE 0, which
+		stz 	branchTarget+1 				; resolves to the first line -- see WriteBranchTo
+		lda 	#PCD_CMD_RESTORE
+		jmp 	WriteBranchTo
 
 		.send code
 

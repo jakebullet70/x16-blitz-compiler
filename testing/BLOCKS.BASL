@@ -1,0 +1,130 @@
+#SAVEAS "@:BLOCKS.SRC.PRG"
+#REM 0
+#SYMFILE "@:BLOCKS.SRC.SYM"
+#INCLUDE "GPB.INC.BL"
+
+## ***********************************************************************
+## **
+## **  BLOCKS.BASL -- every forward branch a GP block emits
+## **
+## **  .ifnext  a GP.IF or GP.ELSEIF test came out false
+## **  .ifelse  an IF body finished
+## **  .casenext  a GP.CASE did not match
+## **  .caseend   a case body finished
+## **  .exitdo    out of a GP.DO early
+## **
+## **  All five point FORWARDS, at a place the compiler has not reached
+## **  when it writes them. Each arm prints its own marker, so a branch
+## **  that lands one alternative out says so rather than merely running.
+## **
+## **  The chains are walked with EVERY value, including the ones that
+## **  fall through to GP.ELSE and GP.OTHER, so no alternative is left
+## **  unentered.
+## **
+## ***********************************************************************
+
+PRINT "B1 START"
+
+FOR BL.I = 0 TO 4
+  GOSUB BL.CHAIN
+NEXT BL.I
+
+FOR BL.I = 0 TO 4
+  GOSUB BL.PICK
+NEXT BL.I
+
+GOSUB BL.NESTED
+GOSUB BL.LOOPS
+
+PRINT "B9 DONE"
+END
+
+## ---- a four-arm IF chain -----------------------------------------------
+
+BL.CHAIN:
+  GP.IF BL.I = 0 THEN
+    PRINT "B2 IF";BL.I
+  GP.ELSEIF BL.I = 1 THEN
+    PRINT "B3 ELSEIF1";BL.I
+  GP.ELSEIF BL.I = 2 THEN
+    PRINT "B4 ELSEIF2";BL.I
+  GP.ELSE
+    PRINT "B5 ELSE";BL.I
+  GP.ENDIF
+  RETURN
+
+## ---- a select with a comma list, an OTHER, and a body that is not the
+## ---- last one
+
+BL.PICK:
+  GP.SELECT BL.I
+    GP.CASE 0,1
+      PRINT "B6 CASE01";BL.I
+    GP.CASE 3
+      PRINT "B7 CASE3";BL.I
+    GP.OTHER
+      PRINT "B8 OTHER";BL.I
+  GP.ENDSEL
+  RETURN
+
+## ---- one inside the other, both ways round. An inner block must be
+## ---- invisible to the outer one's branches.
+
+BL.NESTED:
+  BL.N = 0
+  GP.IF BL.N = 0 THEN
+    GP.SELECT BL.N
+      GP.CASE 0
+        GP.IF BL.N = 0 THEN
+          PRINT "BA IN-IF-SEL-IF"
+        GP.ELSE
+          PRINT "B0 WRONG"
+        GP.ENDIF
+      GP.OTHER
+        PRINT "B0 WRONG"
+    GP.ENDSEL
+  GP.ELSE
+    PRINT "B0 WRONG"
+  GP.ENDIF
+  ## ----
+  GP.SELECT BL.N
+    GP.CASE 0
+      GP.IF BL.N = 1 THEN
+        PRINT "B0 WRONG"
+      GP.ELSEIF BL.N = 0 THEN
+        PRINT "BB IN-SEL-IF"
+      GP.ENDIF
+    GP.OTHER
+      PRINT "B0 WRONG"
+  GP.ENDSEL
+  RETURN
+
+## ---- GP.EXITDO out of a loop, out of a loop inside a loop, and out of
+## ---- one that is inside an IF inside the loop
+
+BL.LOOPS:
+  BL.N = 0
+  GP.DO
+    BL.N = BL.N + 1
+    GP.IF BL.N > 2 THEN
+      GP.EXITDO
+    GP.ENDIF
+  GP.LOOP
+  PRINT "BC OUTER";BL.N
+  ## ----
+  BL.M = 0
+  GP.DO
+    BL.M = BL.M + 1
+    BL.N = 0
+    GP.DO
+      BL.N = BL.N + 1
+      GP.IF BL.N > 1 THEN
+        GP.EXITDO
+      GP.ENDIF
+    GP.LOOP
+    GP.IF BL.M > 1 THEN
+      GP.EXITDO
+    GP.ENDIF
+  GP.LOOP
+  PRINT "BD NESTED";BL.M;BL.N
+  RETURN

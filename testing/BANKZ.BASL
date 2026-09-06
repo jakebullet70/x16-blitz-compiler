@@ -1,0 +1,58 @@
+#SAVEAS "@:BANKZ.SRC.PRG"
+#REM 0
+#SYMFILE "@:BANKZ.SRC.SYM"
+#INCLUDE "GPB.INC.BL"
+
+## ***********************************************************************
+## **
+## **  BANKZ.BASL -- GP blocks INSIDE a GP.BANKED region
+## **
+## **  Every forward branch a GP block emits is resolved against a code
+## **  position, and a region's code positions are not where they were
+## **  compiled: the region moves to the end of the object and runs at
+## **  $A000. Nothing in the suite put a GP.DO, a GP.IF or a GP.SELECT in
+## **  one until now.
+## **
+## **  The GP.LOOP is deliberately the LAST statement in the region. A
+## **  GP.EXITDO lands one past its GP.LOOP, and one past the last byte of
+## **  a region is the exit bridge -- the boundary, and the one place an
+## **  address recorded before the move can be put on the wrong side of it.
+## **
+## ***********************************************************************
+
+PRINT "Z1 START"
+Z.N = 0
+
+## ---- a loop in LOW memory first, so both sides are covered
+
+GP.DO
+  Z.N = Z.N + 1
+  GP.IF Z.N > 1 THEN
+    GP.EXITDO
+  GP.ENDIF
+GP.LOOP
+
+PRINT "Z2 LOW";Z.N
+
+GP.BANKED 5
+PRINT "Z3 IN"
+
+GP.SELECT Z.N
+  GP.CASE 1
+    PRINT "Z0 WRONG"
+  GP.CASE 2
+    PRINT "Z4 CASE2"
+  GP.OTHER
+    PRINT "Z0 OTHER"
+GP.ENDSEL
+
+GP.DO
+  Z.N = Z.N + 1
+  GP.IF Z.N > 4 THEN
+    GP.EXITDO
+  GP.ENDIF
+GP.LOOP
+GP.ENDBANKED
+
+PRINT "Z5 OUT";Z.N
+END

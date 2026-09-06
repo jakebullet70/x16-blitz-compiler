@@ -39,17 +39,15 @@ _CIGoto2:
 		rts
 		
 CompileGotoEOL: 							; compile GOTOZ <next line>
-		lda 	#PCD_CMD_GOTOCMD_Z
-		jsr 	WriteCodeByte
 		jsr 	GetLineNumber 				; Get the current line number => YA
 		inc 	a 							; and branch to +1
 		bne 	_CGENoCarry
 		iny
 _CGENoCarry:		
-		jsr 	WriteCodeByte
-		tya
-		jsr 	WriteCodeByte
-		rts
+		sta 	branchTarget 				; a line number that usually does not exist, which is
+		sty 	branchTarget+1 				; why .gotoz is allowed to miss -- see WriteBranchTo
+		lda 	#PCD_CMD_GOTOCMD_Z
+		jmp 	WriteBranchTo
 
 		.send code
 

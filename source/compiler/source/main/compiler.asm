@@ -105,11 +105,11 @@ CompilePass:
 		;		any. VARSPACE has already run, so the array allocator (availableMemory) is set up
 		;		by the time the prologue executes.
 		;
-		lda 	#PCD_CMD_GOTO
-		jsr 	WriteCodeByte
 		lda 	#$FF 						; -> line $FFFF (the prologue)
-		jsr 	WriteCodeByte
-		jsr 	WriteCodeByte
+		sta 	branchTarget
+		sta 	branchTarget+1
+		lda 	#PCD_CMD_GOTO
+		jsr 	WriteBranchTo
 		;
 		;		Main compilation loop
 		;
@@ -238,12 +238,12 @@ SaveCodeAndExit:
 		ldy 	#$FF 						; is also the $FF end-of-table sentinel STRFindLine expects)
 		jsr 	STRMarkLine
 		jsr 	EmitImplicitDims
-		lda 	#PCD_CMD_GOTO 				; return to the first real line (or $FFFE if none)
-		jsr 	WriteCodeByte
-		lda 	implicitDimFirst
-		jsr 	WriteCodeByte
+		lda 	implicitDimFirst 			; return to the first real line (or to the END marker
+		sta 	branchTarget 				; at $FE00 if the program has none)
 		lda 	implicitDimFirst+1
-		jsr 	WriteCodeByte
+		sta 	branchTarget+1
+		lda 	#PCD_CMD_GOTO
+		jsr 	WriteBranchTo
 		;
 		lda 	#$FF 						; add end marker
 		jsr 	WriteCodeByte
@@ -532,7 +532,9 @@ RegionSwitchWork:
 		;		It does. The entry bridge stays behind in low memory, where the region used to
 		;		be, and the cursor moves to where the region goes.
 		;
-		jsr 	_RSBridge
+		phx 								; X IS THE REGION, and the bridge now resolves its own
+		jsr 	_RSBridge 					; target -- which goes through GPBankMakeOffset, and
+		plx 								; that works through X
 		lda 	objPtr
 		sta 	lowResume
 		lda 	objPtr+1
@@ -577,13 +579,12 @@ _RSClosing:
 ;		opcode and no absolute operand. See the header in commands/gpbank.asm.
 ;
 _RSBridge:
-		lda 	#PCD_CMD_GOTO
-		jsr 	WriteCodeByte
-		lda 	currentLineNumber
-		jsr 	WriteCodeByte
+		lda 	currentLineNumber 			; both bridges go to the line the switch happens on:
+		sta 	branchTarget 				; the entry one into the region, the exit one back out
 		lda 	currentLineNumber+1
-		jsr 	WriteCodeByte
-		rts
+		sta 	branchTarget+1
+		lda 	#PCD_CMD_GOTO
+		jmp 	WriteBranchTo
 
 ; ************************************************************************************************
 ;

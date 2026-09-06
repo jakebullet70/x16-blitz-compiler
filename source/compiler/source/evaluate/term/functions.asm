@@ -53,14 +53,18 @@ FNCompile:
 		jsr 	CompileExpressionAt0
 		jsr 	CheckNextRParen
 		;
-		;		Compile the call : .fngosub <lo> <hi>
+		;		Compile the call : .fngosub <lo> <hi>. Pass one writes the address and FixBranches
+		;		turns it into an offset; pass two writes the offset, because the body is always
+		;		BEHIND the call -- a forward FN reference was refused above -- so the address is
+		;		already final. Either way the operand goes through the branch writer, which knows
+		;		what to correct when one end is inside a GP.BANKED region.
 		;
+		pla 								; abs LOW
+		sta 	branchTarget
+		pla 								; abs HIGH
+		sta 	branchTarget+1
 		lda 	#PCD_CMD_FNGOSUB
-		jsr 	WriteCodeByte
-		pla 								; abs LOW  -> operand byte 1
-		jsr 	WriteCodeByte
-		pla 								; abs HIGH -> operand byte 2
-		jsr 	WriteCodeByte
+		jsr 	WriteBranchToAddress
 
 		clc
 		rts

@@ -30,12 +30,10 @@ CommandRESTORE:
 		rts
 
 _CRDefault:
-		lda 	#PCD_CMD_RESTORE 			; compile RESTORE
-		jsr 	WriteCodeByte
-		lda 	#0		 					; with zero "line#"
-		jsr 	WriteCodeByte	
-		jsr 	WriteCodeByte
-		rts
+		stz 	branchTarget 				; RESTORE with no line number is RESTORE 0, which
+		stz 	branchTarget+1 				; resolves to the first line -- see WriteBranchTo
+		lda 	#PCD_CMD_RESTORE
+		jmp 	WriteBranchTo
 
 		.send code
 
