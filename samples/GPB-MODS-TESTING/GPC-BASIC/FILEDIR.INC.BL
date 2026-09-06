@@ -19,6 +19,8 @@
 ## **
 ## **   out  FILE.DIR.GOT      bytes read. 0 is an empty or failed listing
 ## **        FILE.DIR.FULL     the buffer filled before the listing ended
+## **        FILE.DIR.SLOW     1 if the device had no MACPTR and the read
+## **                          fell back to CHRIN a byte at a time
 ## **        FILE.DIR.MORE     1 while NEXT produced an entry, 0 at the end
 ## **        FILE.NAME$        the entry
 ## **        FILE.BLOCKS       its size in blocks
@@ -27,6 +29,7 @@
 ## **  internal  FILE.DIR.AT FILE.DIR.ASK$ FILE.DIR.ADDR% FILE.DIR.ROOM%
 ## **            FILE.DIR.OFF% FILE.DIR.BYTES% FILE.DIR.CNT% FILE.DIR.BLK%
 ## **            FILE.DIR.OK% FILE.DIR.SLOW% FILE.DIR.LFN% FILE.DIR.NAMEA%
+## **            FILE.DIR.WAS% FILE.DIR.OWAS%
 ## **            FILE.DIR.TYPEA%
 ## **
 ## **  Two destinations, one code path: the reader takes an address and a size.
@@ -77,7 +80,8 @@
 ## **
 ## **  MACPTR is asked for at most 255 bytes a call, so its returned count fits
 ## **  one byte. It can return fewer than asked for. Carry set means the device
-## **  has no MACPTR and the read falls back to CHRIN; that path is untested.
+## **  has no MACPTR and the read falls back to CHRIN, setting FILE.DIR.SLOW;
+## **  that path is untested, no device here refuses MACPTR.
 ## **
 ## **  MACPTR wraps banks by itself and leaves the new one selected. This module
 ## **  stops at the end of its one bank, so a listing cannot spill into a bank it
@@ -125,6 +129,8 @@ FILE.DIR.INIT:
     FILE.NAME$ = RPT$(32, FILE.DIR.NAMEMAX) : FILE.TYPE$ = RPT$(32, 3)
     FILE.DIR.NAMEA% = GP.STRPTR(FILE.NAME$) : FILE.DIR.TYPEA% = GP.STRPTR(FILE.TYPE$)
     FILE.DIR.ADDR% = 0 : FILE.DIR.ROOM% = 0 : FILE.DIR.LFN% = FILE.CHAN : FILE.DIR.BYTES% = 0 : FILE.DIR.CNT% = 0 : FILE.DIR.OFF% = 0
+    FILE.DIR.WAS% = 0 : FILE.DIR.OWAS% = 0
+    FILE.DIR.SLOW = 0
     FILE.DIR.BLK% = 0 : FILE.DIR.OK% = 0 : FILE.DIR.SLOW% = 0 : FILE.DIR.AT = 0 : FILE.DIR.GOT = 0 : FILE.DIR.MORE = 0 : FILE.DIR.FULL = 0  
     RETURN
 
@@ -141,11 +147,12 @@ FILE.DIR.INIT:
 
 FILE.DIR.OPEN:
     FILE.DIR.GOT = 0 : FILE.DIR.FULL = 0 : FILE.DIR.MORE = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
+    GOSUB FILE.DIR.BANKHOLD : FILE.DIR.OWAS% = FILE.DIR.WAS%
     GOSUB FILE.DIR.WHERE : GOSUB FILE.DIR.ASKFOR : OPEN 15, FILE.DEVICE, 15
     OPEN FILE.CHAN, FILE.DEVICE, 0, FILE.DIR.ASK$
     INPUT#15, FILE.ERR, FILE.MSG$, FILE.TRK, FILE.SEC
     IF FILE.ERR < FILE.OKMAX THEN GOSUB FILE.DIR.SUCK
-    CLOSE FILE.CHAN : CLOSE 15 : IF FILE.DIR.BANK > 0 THEN BANK 0
+    CLOSE FILE.CHAN : CLOSE 15 : IF FILE.DIR.BANK > 0 THEN BANK FILE.DIR.OWAS%
     FILE.DIR.AT = 4 : GOSUB FILE.DIR.SKIPDISK
     RETURN
 
@@ -164,6 +171,36 @@ FILE.DIR.SKIPDISK:  IF FILE.DIR.GOT = 0 THEN RETURN
     GOSUB FILE.DIR.NEXT : FILE.DIR.MORE = 0
     RETURN
 
+## ***********************************************************************
+## **  FILE.DIR.BANKHOLD -- the caller's RAM bank, into FILE.DIR.WAS%.
+## **
+## **  BANK 0 IS NOT A RESTORE, it selects bank 0. CommandBank writes both
+## **  ramBank and the hardware register, so a caller left on bank 0 gets the
+## **  wrong 8K from PEEK and from assembly alike, with no error.
+## **
+## **  Assembly because PEEK(0) cannot read the register back. This is
+## **  STASH.BANK.HOLD, which exists for the same bug.
+## **
+## **  ONLY THE LOW BYTE COMES FROM THE REGISTER; the high byte is zeroed here
+## **  rather than left to INIT, because the slot is written every call.
+## **
+## **  FILE.DIR.NEXT KEEPS ITS OWN COPY. FILE.DIR.OPEN's is FILE.DIR.OWAS%,
+## **  because OPEN's is still live when SKIPDISK calls NEXT and NEXT would
+## **  overwrite it half way through.
+## ***********************************************************************
+
+FILE.DIR.BANKHOLD:
+    #REM 1
+    GP.ASM
+    REM LDA $00
+    REM STA {FILE.DIR.WAS%}
+    REM LDX #1
+    REM LDA #0
+    REM STA {FILE.DIR.WAS%},X
+    GP.ENDASM
+    #REM 0
+    RETURN
+
 ## Where the bytes land. A bank is always the same address and size; low RAM is
 ## whatever the caller handed over.
 
@@ -171,7 +208,12 @@ FILE.DIR.WHERE:  IF FILE.DIR.BANK = 0 THEN GOTO FILE.DIR.LOWRAM
     FILE.DIR.ADDR% = FILE.DIR.BANKBASE : FILE.DIR.ROOM% = FILE.DIR.BANKROOM
     RETURN
 
+## A CAP WITH NO PTR WOULD WRITE OVER ZERO PAGE. Forgetting both is already
+## safe, because no room ends the read at once; forgetting only the address is
+## not, so no address means no room either.
+
 FILE.DIR.LOWRAM:  FILE.DIR.ADDR% = FILE.DIR.PTR : FILE.DIR.ROOM% = FILE.DIR.CAP
+    IF FILE.DIR.PTR = 0 THEN FILE.DIR.ROOM% = 0
     RETURN
 
 ## "$", "$:PATTERN", "$:*=P", "$:PATTERN=D" -- the pattern and the filter are
@@ -185,12 +227,12 @@ FILE.DIR.ASKFOR:
     IF FILE.DIR.ONLY = FILE.DIR.DIRS THEN FILE.DIR.ASK$ = FILE.DIR.ASK$ + "=D"
     RETURN
 
-## The bank is selected around the read and nothing else, so a caller's bank is
-## only disturbed for the length of it -- and OPEN puts it back.
+## The bank is selected around the read and nothing else. FILE.DIR.OPEN puts the
+## caller's bank back afterwards, from FILE.DIR.OWAS%.
 
 FILE.DIR.SUCK:
     IF FILE.DIR.BANK > 0 THEN BANK FILE.DIR.BANK
-    GOSUB FILE.DIR.FILL : FILE.DIR.GOT = FILE.DIR.BYTES%
+    GOSUB FILE.DIR.FILL : FILE.DIR.GOT = FILE.DIR.BYTES% : FILE.DIR.SLOW = FILE.DIR.SLOW%
     IF FILE.DIR.BYTES% >= FILE.DIR.ROOM% THEN FILE.DIR.FULL = 1
     RETURN
 
@@ -242,6 +284,8 @@ FILE.DIR.FILL:
     REM CLC                          ; carry clear: advance as it writes
     REM JSR $FF44                    ; MACPTR
     REM BCS FDFSLOW                  ; this device has none
+    REM CPX #0                       ; documented as never 0, and a 0 here
+    REM BEQ FDFDONE                  ; would loop making no progress
     REM JSR FDFADV                   ; X holds the count, always under 256
     REM JSR $FFB7                    ; READST
     REM AND #$40
@@ -314,9 +358,10 @@ FILE.DIR.FILL:
 
 FILE.DIR.NEXT:
     FILE.DIR.MORE = 0 : IF FILE.DIR.GOT = 0 THEN RETURN
-    FILE.DIR.OFF% = FILE.DIR.AT : IF FILE.DIR.BANK > 0 THEN BANK FILE.DIR.BANK
+    FILE.DIR.OFF% = FILE.DIR.AT : GOSUB FILE.DIR.BANKHOLD
+    IF FILE.DIR.BANK > 0 THEN BANK FILE.DIR.BANK
     GOSUB FILE.DIR.STEP
-    IF FILE.DIR.BANK > 0 THEN BANK 0
+    IF FILE.DIR.BANK > 0 THEN BANK FILE.DIR.WAS%
     IF FILE.DIR.OK% = 0 THEN RETURN
     FILE.DIR.AT = FILE.DIR.OFF% : FILE.BLOCKS = FILE.DIR.BLK% : FILE.DIR.MORE = 1
     RETURN

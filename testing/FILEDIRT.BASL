@@ -117,6 +117,56 @@ IF FT.SEEN = 0 THEN FT.GOT = 1
 FT.ID$ = "D06 DIRSANY"
 GOSUB FT.EQNUM
 
+## ------------------------------------------- low RAM with no address
+
+## CAP set, PTR forgotten. Without the guard the blob is handed address 0 and
+## 2 KB of room, and writes over zero page.
+
+FILE.DIR.BANK = 0
+FILE.DIR.PTR = 0
+FILE.DIR.CAP = 2046
+FILE.DIR.PATTERN$ = ""
+FILE.DIR.ONLY = FILE.DIR.ALL
+GOSUB FILE.DIR.OPEN
+FT.WANT = 0
+FT.GOT = FILE.DIR.GOT
+FT.ID$ = "D10 NOPTR"
+GOSUB FT.EQNUM
+
+## ---------------------------------------------------- the caller's bank
+
+## Two different markers at the same address in two banks, so reading the wrong
+## bank cannot pass by luck. The caller sits on 7; the listing goes to 5. If
+## FILE.DIR.NEXT restores by selecting bank 0 instead of putting 7 back, the
+## PEEK after it reads 111.
+
+BANK 0 : POKE $A000, 111
+BANK 7 : POKE $A000, 123
+
+FILE.DIR.BANK = 5
+FILE.DIR.PATTERN$ = "ZZTEST*"
+FILE.DIR.ONLY = FILE.DIR.ALL
+
+## THE CALLER SELECTS 7 AND DOES NOT SELECT IT AGAIN. Re-selecting between the
+## call and the PEEK is what makes this test useless: it repairs the very thing
+## it is meant to catch, and D08 passed against the broken code that way.
+
+BANK 7
+GOSUB FILE.DIR.OPEN
+
+FT.WANT = 123
+FT.GOT = PEEK($A000)
+FT.ID$ = "D08 BANKAFTEROPEN"
+GOSUB FT.EQNUM
+
+GOSUB FILE.DIR.NEXT
+FT.WANT = 123
+FT.GOT = PEEK($A000)
+FT.ID$ = "D09 BANKAFTERNEXT"
+GOSUB FT.EQNUM
+
+BANK 0
+
 ## ---------------------------------------------------------------- tidy up
 
 FILE.NAME$ = "ZZTESTA.DAT"
