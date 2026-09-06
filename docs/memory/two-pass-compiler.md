@@ -1,6 +1,6 @@
 ---
 name: two-pass-compiler
-description: "Rebuilding GPC to compile the source twice and stream p-code to disk, so the object buffer stops capping program size. Branch two-pass-compiler; step 6 done, so pass two resolves every branch where it writes it and FixBranches is pass one's alone. Step 7 is what makes GPBMODS compile."
+description: "Rebuilding GPC to compile the source twice and write p-code straight to disk, so the compiler's own size stops capping program size. Branch two-pass-compiler; steps 1-7 done -- neither pass stores an object, GPBMODS compiles, and what bounds a program is now whether it can RUN."
 metadata: 
   node_type: memory
   type: project
@@ -12,123 +12,132 @@ metadata:
 compiler bytes and over [[compiler-overlay-into-a-bank]], both of which only move the wall. Rests
 on [[compile-is-write-only]].
 
-**The problem.** `FreeMemory` is `.align 256` after the compiler's last byte and the object buffer
-runs from there to `ObjectCeiling $9F00`, so every compiler byte comes 1:1 off the largest
-compilable program. Worse now that a program may have **eight** GP.BANKED regions: a maximal
-object is 15,616 low + 8 x 8,192 = 81,152 bytes and low RAM below `$9F00` is 39,679 in total, so
-**no amount of overlaying compiler code into banks can ever reach it.**
+**The problem, and it is gone.** `FreeMemory` was `.align 256` after the compiler's last byte and
+the object buffer ran from there to `ObjectCeiling $9F00`, so every compiler byte came 1:1 off the
+largest compilable program. With **eight** GP.BANKED regions a maximal object is 15,616 low +
+8 x 8,192 = 81,152 bytes against 39,679 of low RAM in total, so no amount of overlaying compiler
+code into banks could ever have reached it.
 
-## THE INVARIANT, and why it is what made every step safe
+**Neither pass stores an object now.** Pass one only COUNTS -- it works out where every line,
+block and region lands and how long the whole thing is. Pass two writes the answer straight into
+OBJECT.PRG as it compiles. `samples/GPB-MODS-TESTING/GPBMODS.BASL` compiles: **OK CODE 19730 FREE
+5888**, against a compile-side wall that stood at 19,712.
 
-`ObjectChecksum` Fletcher-16s the object each pass has laid out; the tail of pass two compares
-sum, length and variable space, and a mismatch is `.error_internal` with no object written. It
-sums the **finished object, not the stream of writes** -- the write order legitimately differs
-once pass two places regions directly. It skips the first three bytes, `_variable.space` and its
-operand, the one place the two objects are meant to differ.
+## WHAT BOUNDS A PROGRAM NOW
 
-**BOTH PASSES RESOLVE.** FixBranches runs at the end of pass ONE, so the checksum compares two
-FINISHED objects. That turned it from a consistency check into a **differential test of the new
-resolver against the old one**: every branch kind that moved into pass two's emitter was checked
-against the answer FixBranches used to get for it, on every program compiled. Six kinds moved over
-five commits and not one needed a debugging session. Pass one keeps FixBranches until step 7 takes
-its buffer away.
+Not the compiler. `PrepareObjectCode` asks, at the end of pass one, whether the thing can RUN --
+p-code base page + pages + the 4K frame stack gap, against the runtime's base less `MIN_WS_PAGES`.
+Shared mode: **15,360 bytes** of low p-code with the GPB handlers, 17,664 without, PLUS up to
+8 x 8,192 in banks -- so a maximal object is about 80,896. Embedded: 17,152 / 18,176 and no
+regions. The other two limits are the line table (2,048 lines) and the variable list (1,365).
 
-## DONE AND VERIFIED (steps 1-6)
+## THE INVARIANT, and how it changed
 
-1. **The gate.** Nothing reads the object mid-compile -- see [[compile-is-write-only]].
-2. **The driver.** `CompilePass` / `ResetPassState` in `main/compiler.asm`. Turned up `AsmPoolLen`
-   and `AsmFixupCount`, never reset, working only because they sit in the code section and arrive
-   zeroed by the loader -- same family as the `gpBankCount` bug.
-3. **`_variable.space` resolved at emit**, its `FixBranches` handler deleted.
-4. **Pass one lays the object out** (runs `AsmFlushPool` + `GPBankRelocate` too) and **pass two
-   writes each region straight to its final address** -- entry bridge in low memory, cursor to the
-   region, exit bridge and end marker, cursor back. Pass two rotates nothing.
-5. **The layout is handed over at the HEAD of pass two**, so `GPBankMakeOffset` works while pass
-   two is still emitting. The GP.BANKED generators get a pass-two path that neither records nor
-   re-validates.
-6. **Everything resolved at emit**, in this order, because `.unwind` reads the FOLLOWING GOTO's
-   operand as a line number and breaks the moment that GOTO is resolved:
-   - **6a** one byte of **block depth per line**, bank 5, at the SAME address as the line record
-     so there is no arithmetic between them. `STRMarkLine` writes it, `STRFindLine` remembers
-     which record matched and `STRLineDepth` reads it back. Do NOT widen the 4-byte line record:
-     5 bytes an entry drops the cap from 2,048 lines to 1,638.
-   - **6b** `.unwind` from that table. `CommandGOTO` reads the target line BEFORE writing
-     anything, because the `.unwind` goes in front of the GOTO.
-   - **6c** GOTO / GOSUB / `.gotoz` / `.gotonz` / RESTORE / `.fngosub`, through `WriteBranchTo`
-     and `WriteBranchToAddress` in `commands/goto.asm`. **The line table needed no change**:
-     `STRReset` resets the POINTER, not the banked data, so through pass two the lines not yet
-     re-marked still hold pass one's final addresses and the re-marked ones hold identical values.
-     Five more emitters had to join them and finding them was most of the work -- `CompileGotoEOL`
-     (a false IF), bare `RESTORE`, the FN call, the compiler's own two GOTOs into and out of the
-     implicit-DIM prologue, and `_RSBridge`, the GP.BANKED bridges pass two writes itself.
-   - **6d** the structural branches: `.exitdo`, then `.ifnext`/`.ifelse`, then
-     `.casenext`/`.caseend`. **Each block takes an ORDINAL as it opens** and pass one writes down
-     where it ended under that ordinal, in bank 6 -- `BlockEndTable $A000`, `BlockAltTable $B000`,
-     2,048 entries of 2 bytes each. NOT indexed by nesting depth: two sibling loops share a depth
-     and the second would overwrite an answer the first still needs. `_GBFixBlockEnds` /
-     `_GBFixBlockAlts` walk both tables when a region moves, exactly as the line table is walked.
-     `blockDepth`, `ifDepth` and `SelectDepth` are the three stacks of open blocks.
+It was `ObjectChecksum`: a Fletcher-16 over the object each pass laid out, compared at the end.
+Both passes laying a FINISHED object out is what let the resolving move into pass two's emitter
+one branch kind at a time -- pass one still answered the old way, and a disagreement was
+`.error_internal` here rather than a wrong program. Six branch kinds moved over five commits and
+not one needed a debugging session.
 
-**PASS TWO NEVER CALLS FixBranches NOW.** That is what step 7 needs: an object that is final on
-the way out can go straight to the file.
+There is no object to sum now, so what the two passes still both produce is checked instead, each
+where it is read:
+
+- **every line's address** -- `STRMarkLine` compares rather than overwrites (storage/mark_line.asm)
+- **every block end and alternative** -- `BlockEndCheck` (commands/goto.asm)
+- **the GP.ASM pool's base** -- `AsmFlushPool` (commands/gpasmcode.asm)
+- **the sum of every byte the GENERATORS emit**, in `WriteCodeByte`. That stream IS identical in
+  both passes except where pass two writes an answer pass one could not know, and those are
+  counted out in `sumSkip`: a branch's two operand bytes, an `.unwind`'s count, a blob's address,
+  the variable space, the GP.ASM pool, and the GP.BANKED bookkeeping. **Every placeholder writer
+  has to skip too** -- exitdo.asm, gpif.asm and select.asm each write two bytes pass one cannot
+  fill in, and forgetting them is an INTERNAL ERROR on every program with a block in it.
+- **the length and the variable space**, at the tail of `SaveCodeAndExit`.
+
+## HOW PASS TWO WRITES
+
+- **The object file is opened between the passes**, by `PrepareObjectCode` -> `ObjStreamOpen`, and
+  the runtime image (or the bootstrap and its extension page) goes into it there. It is open
+  across the whole of pass two, so it needs a logical file of its own: **3 source, 4 runtime
+  image, 5 symbol file, 6 object.**
+- **SELECTING ONE DIRECTION TAKES THE OTHER WITH IT.** CHKIN and CHKOUT are not independent here:
+  after the object file is selected for output the source is no longer selected for input, and a
+  read that assumed it still was simply STOPPED -- no error, no end of file, indistinguishable
+  from the compiler hanging. That is what GPBMODS did at line 1573, one buffer-flush in. Each of
+  `IOSelectSource` / `IOSelectObject` now forgets what the other knew.
+- **The low code is buffered 8K in bank 7**, because a statement that fails to compile is rolled
+  back and a throw-stub put in its place -- bytes already in a file cannot be taken back. Nothing
+  goes out until the statement that wrote it has compiled (`objHold`). **Only for statements that
+  begin in the LOW buffer**: a region is random access, so a rollback there is written over, and
+  holding a REGION address as the low buffer's mark makes the flush length a subtraction of two
+  unrelated addresses.
+- **Each GP.BANKED region gets a bank of its own, 8 upwards.** A region is written to its final
+  address, which is ABOVE the low code still being emitted, so the two cannot share one
+  forward-only stream. At most 8 regions of at most 8K each, so it fits exactly.
+- **The object still leaves in file order**: low code and the GP.ASM pool as they are compiled,
+  then the alignment padding, then each region out of its bank.
+- **A compile that stops takes the object with it** (`ObjStreamAbort` from `_CCStopped`). The file
+  exists from the end of pass one, so a failure would otherwise leave a truncated one -- which at
+  the filesystem level is indistinguishable from a program.
+
+## WHAT WENT, AND WHAT REPLACED IT
+
+- `FixBranches` -- pass two resolves every branch where it writes it, out of pass one's tables.
+- `ScanGPUsage`'s walk -- `GPScanByte` decodes the p-code FORWARDS as pass one emits it, same
+  bitmap and same instruction sizes. The cursor is checked, not assumed: a rolled-back statement
+  restarts the decoder at an instruction boundary, which needs nothing to tell it.
+- `GPBankRelocate`'s rotation, `_GBShiftUp`, `_GBReverse`, `_GBWriteGoto`, `_GBRFindLowEnd`,
+  `GPBankHop`, `gpBankHops`, `_GBFixFnCalls`, `_GBFixAsmCalls` -- all of it walked or moved bytes.
+  What is left of the relocator is the arithmetic.
+- `AFIX_CALL` -- pass two knows the pool base and the run page by the time it writes a blob call,
+  so it writes the address. The pool's own fixups are resolved IN THE BANK, immediately before
+  `AsmFlushPool` copies it out, because after that it is out of reach.
+- **An unclosed block** was found by FixBranches running off the end. `SaveCodeAndExit` asks
+  `blockDepth | ifDepth | SelectDepth` instead -- a compare, not a walk.
+- **"GP.BANKED alone on its line"** read the byte at objPtr-1. It compares objPtr-1 against
+  `lineMarkerAt` now.
 
 ## Traps that cost a cycle each
 
-- **`STRMarkLine` is called with the line number still in YA.** The `RegionSwitch` hook sits in
-  front of it in the main loop (it must, a region begins ON the GP.BANKED line's marker byte) and
-  so has to be register-transparent. It was not: every banked program failed
-  `UNKNOWN LINE NUMBER @ 3`.
-- **BRANCH RANGE, four times.** Every one of these steps put 150+ bytes of table plumbing between
-  a test and the `.error_*` exit it branches to. The fix each time is to move the error exits ABOVE
-  the new routines (`gpif.asm`, `goto.asm`) or to reach them with a `jmp` (`select.asm`, which
-  already had three). `GPBankStructure` had the same trouble in step 5.
-- **64tass scopes a `_` label to the enclosing GLOBAL label.** `_STRFoundAt` had to become
-  `STRFoundAt`; the GP.BANKED pass-two halves had to become globals too.
-- **`GPBankMakeOffset` corrupts X.** `RegionSwitchWork` holds the region number in X across the
-  bridge, and the bridge resolves itself now, so it needs a `phx`/`plx`.
-- **An address recorded before the move must fall strictly INSIDE its section.** `GPBankAdjust`
-  puts the byte at `gpBankEnd` on the LOW side, and "one past the last GP.LOOP of a region" is
-  exactly that byte. So the block tables store one SHORT of the answer and every reader adds it
-  back. `testing/BANKZ.BASL` is that case, and it runs.
-- **A `.def` helper MUST return carry clear.** Every pass-two path that ends in
-  `WriteBranchToAddress` needs an explicit `clc` before its `rts`.
+- **`STRMarkLine` is called with the line number still in YA**, and anything hooked in front of or
+  inside it has to hand A and Y back. Cost `UNKNOWN LINE NUMBER @ 3` once and a wrong line record
+  once.
+- **`IOSelectScreen` does not preserve X**, and `_CAPrintScreen` keeps the character to print
+  there. CLRCHN clobbers it.
+- **BRANCH RANGE, six times.** Every step put 150+ bytes between a test and the `.error_*` exit it
+  branched to. Move the error exits ABOVE the new routines, or reach them with a `jmp`.
+- **64tass scopes a `_` label to the enclosing GLOBAL label.** Splitting one routine into two puts
+  half the branches on the wrong side of the new name: `WriteObjectCode` becoming
+  `PrepareObjectCode` + `WriteObjectCode` made six labels globals.
+- **`GPBankMakeOffset` corrupts X**, and `RegionSwitchWork` holds the region number there.
+- **An address recorded before the move must fall strictly INSIDE its section.** The block tables
+  store one SHORT of the answer and every reader adds it back. `testing/BANKZ.BASL` is that case.
+- **A `.def` helper MUST return carry clear**, or the generator silently drops every token after it.
+- **The alignment padding is $FF now.** Nothing writes or reads it, and there is no buffer left
+  holding what the rotation used to leave there.
 
-## STILL TO DO -- step 7, and it is the one that matters
+## Verification
 
-**Stream pass two to the file.** Both files are open at once, so buffer a page -- `object.asm`
-already measures it: 28,000 CHKIN/CHKOUT pairs per byte against 94 per page. Four things:
-- **Pass one loses its buffer too, or the wall stays.** So FixBranches goes with it, and the
-  checksum cannot walk an object any more. It has to become a WRITE-TIME sum, and the two passes
-  write in different orders: one accumulator for low code and one for the regions, switched where
-  `RegionSwitch` already switches, keeps each one's order identical in both passes.
-- The **alignment gaps** between regions must be FILLED; today pass two lands on pass one's
-  addresses in the same buffer, so the gaps still hold pass one's bytes.
-- `AsmPatchAll` (`commands/gpasmcode.asm`) patches the buffer AFTER `WriteObjectCode` has settled
-  `newWorkspacePage` -- the last real back-patching in the compiler.
-- Move `PROGRAM TOO BIG` to the end of pass one as a run-side test, so a rejected compile writes
-  nothing.
+**A stored reference set beats the internal checksum**: `chk.py ref` compiles thirteen programs
+and keeps the objects; `chk.py chk` compiles them again and diffs. Byte for byte identical through
+every step of 7, GPBMODS added to it afterwards. The bank suite (`banktest3.py`) is the behaviour
+test and `sweep.py` compiles everything in `testing/`.
 
-**Measured cost: 2.08x** (PICKDEMO 3.55 s -> 7.37 s, warp, best of 3), down from 2.19x at
-step 5 -- pass two no longer walks the object, which more than pays for pass one now doing it.
-Pass one still stores every byte and will keep parsing everything whatever happens, so 2x is the
-standing cost.
+**x16emu's `-echo` catches every CHROUT, and the object file is written through CHROUT**, so the
+p-code goes into the log too and "ERROR" turns up inside string literals. Stop on `READY.` AFTER
+`OUT:`, not on a word in the text.
 
-**GPBMODS still fails `PROGRAM TOO BIG` -- on the compiler at `3335ab5` too.** It has never
-compiled on this branch's baseline. The line it dies on has crept 1,889 -> 1,813 as the compiler
-grew through step 6, which is the wall doing exactly what it does. Only step 7 fixes it.
-`FreeMemory` has gone `$5200 -> $5A00` along the way; irrelevant, the buffer goes away.
+**Measured cost: 2.08x** at step 6 (PICKDEMO 3.55 s -> 7.37 s, warp, best of 3). Pass one still
+parses everything and will always cost about what pass two does, so 2x is the standing price.
 
 **Test programs added:** `testing/UNWIND.BASL` (GOTO out of one, two and three nested GP.DO
-blocks, forwards, backwards and at the same depth), `testing/BLOCKS.BASL` (every arm of a four-way
-IF chain and a SELECT, including the values that fall through to GP.ELSE and GP.OTHER, plus both
-nestings) and `testing/BANKZ.BASL` (all three block kinds INSIDE a GP.BANKED region, with the
-GP.LOOP deliberately its last statement). Nothing in the suite covered any of it before.
+blocks), `testing/BLOCKS.BASL` (every arm of a four-way IF chain and a SELECT) and
+`testing/BANKZ.BASL` (all three block kinds INSIDE a GP.BANKED region). Nothing covered any of it
+before.
 
-**The build harnesses live in the session scratchpad**, not the repo: `objdiff.py` (compile with
-both compilers and list the differing bytes), `sweep.py` (every `testing/*.BASL`, flagging
-`INTERNAL ERROR`), `run1.py` (compile one and run it), `banktest3.py`, `timeit.py`. All of them
-A/B against `git show 3335ab5:source/application/GPC.BIN` -- see
-[[baseline-compiler-is-the-application-copy]].
+**Still open:** the `gp.if` / `gp.select` / `gp.case` / `gp.endsel` MARKER tokens are emitted into
+every program and nothing reads them any more -- the resolver that walked them is gone. Removing
+them is a byte off every block keyword and its own verification job.
 
 Related: [[compiler-must-not-cap-program-size]], [[gp-banked-region-relocation]],
-[[measure-before-changing-code]], [[write-readable-code-user-crunches]].
+[[measure-before-changing-code]], [[write-readable-code-user-crunches]],
+[[baseline-compiler-is-the-application-copy]].

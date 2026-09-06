@@ -59,7 +59,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [String heap scavenger](string-heap-scavenger.md) — SHIPPED: dead blocks reused, +1 page RT; the intermittent OOM was no-reclaim plus a garbage line-0 read
 - [String blocks never shrink](gpc-string-blocks-never-shrink.md) — a big temporary must not be built; freeing it is not a thing
 - [Compile is write-only](compile-is-write-only.md) — one instruction touches the object during a compile and it is a store; the premise the two-pass work rests on
-- [Two-pass compiler](two-pass-compiler.md) — the rebuild that removes the compile-side size wall: step 6 done, so pass two never looks back; step 7 is what makes GPBMODS compile
+- [Two-pass compiler](two-pass-compiler.md) — DONE: neither pass stores an object, so the compiler's own size bounds nothing; GPBMODS compiles
 - [Compiler overlay into a bank](compiler-overlay-into-a-bank.md) — REVERTED, but the 64tass mechanism works and is measured at +2,560 bytes of object buffer
 - [Banking strings: length, not count](banking-strings-scales-with-length.md) — the menus broke even at 249 saved vs 245 spent
 - [BANK, not POKE 0](gpc-bank-statement-not-poke-zero.md) — PEEK/POKE restore the bank around every access, so POKE 0 can never select one
