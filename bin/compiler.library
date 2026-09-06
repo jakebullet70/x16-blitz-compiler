@@ -959,7 +959,7 @@ SaveCodeAndExit:
 		jsr 	SaveLayout 					; of the object and works out where they all go; pass
 		bra 	_SCEChecksum 				; two is handed that and writes them there directly
 _SCEPlaced:
-		jsr 	RestoreLayout
+		jsr 	ClaimRegionTop 				; the layout itself was restored before this pass began
 _SCEChecksum:
 		jsr 	ObjectChecksum
 		;
@@ -1094,6 +1094,16 @@ ResetPassState:
 		stz 	nextRegion 					; ...and pass two's place in the region layout
 		stz 	regionOpen
 		;
+		;		PASS TWO STARTS WITH PASS ONE'S REGION LAYOUT ALREADY IN PLACE, because it needs
+		;		it while it compiles and not merely afterwards: a branch that crosses into or out
+		;		of a region is out by the difference between where the region sits and the $A000
+		;		it runs at, and GPBankMakeOffset cannot correct that without the table. The lines
+		;		above have just cleared the two fields that say a layout exists, so this goes last.
+		;
+		lda 	passNumber
+		beq 	_RPSDone
+		jsr 	RestoreLayout
+_RPSDone:
 		rts
 
 ; ************************************************************************************************
@@ -1345,17 +1355,28 @@ _RLByteLoop:
 
 		lda 	layoutRunBase
 		sta 	gpBankRunBase
-		lda 	#1 							; the hop is open again: FixBranches walks the low code
-		sta 	gpBankActive 				; and then jumps up to the regions
-		;
-		;		The object reaches the top of the LAST region, and pass two's cursor came to rest
-		;		at the end of the low code. Pass one's length is that top, so take it back.
-		;
+		lda 	#1 							; the hop is open: the walk crosses the low code and
+		sta 	gpBankActive 				; then jumps up to the regions
+_RLDone:
+		rts
+
+; ************************************************************************************************
+;
+;		The object reaches the top of the LAST region, and pass two's write cursor came to rest
+;		at the end of the low code -- the regions are above it and it did not write them last.
+;		Pass one's length is that top, so take it back, or WriteObjectCode would stream the low
+;		code and stop.
+;
+; ************************************************************************************************
+
+ClaimRegionTop:
+		lda 	layoutCount
+		beq 	_CRTDone 					; no regions, so the cursor is already the top
 		lda 	pass1Len
 		sta 	objPtr
 		lda 	pass1Len+1
 		sta 	objPtr+1
-_RLDone:
+_CRTDone:
 		rts
 
 ; ************************************************************************************************
@@ -7172,11 +7193,29 @@ AsmModeTable:
 
 GPBANK_MAXREGIONS = 8 						; and eight is what the extension page's table holds
 
+; ************************************************************************************************
+;
+;		PASS TWO NEITHER RECORDS NOR RE-VALIDATES. It is handed pass one's finished region table
+;		before it starts -- it is being steered by it, main/compiler.asm moves the write cursor
+;		from it -- so recording would overwrite the very thing in use. Re-validating would be
+;		worse than useless: the count is already final, so a program with the full eight regions
+;		would fail the max-regions test, and this region's own bank is already in the list, which
+;		reads as a duplicate. Pass one checked both, on the same source, and refused there.
+;
+;		What pass two must still do is read the operand -- it is in the source either way -- and
+;		keep gpBankState, which is what pairs GP.BANKED with GP.ENDBANKED.
+;
+; ************************************************************************************************
+
 CommandGPBankedCompile:
 		stz 	deferErrors 				; a block opener must never defer -- see the header
 		lda 	gpBankState 				; 0 = never seen, 1 = open, 2 = closed
 		cmp 	#1
 		beq 	GPBankStructure 			; a GP.BANKED inside a region that is still open
+		lda 	passNumber
+		beq 	_CGBCRecord
+		jmp 	GPBankOpenPassTwo 			; jmp, not a branch: the recording block is in between
+_CGBCRecord:
 		lda 	gpBankCount
 		cmp 	#GPBANK_MAXREGIONS
 		bcs 	GPBankStructure 			; ...or one region more than the table holds
@@ -7210,6 +7249,8 @@ CommandGPEndBankedCompile:
 		jsr 	GPBankCheckAlone
 		lda 	#2
 		sta 	gpBankState
+		lda 	passNumber 					; pass two keeps pass one's table -- see the note on
+		bne 	GPBankClosePassTwo 			; CommandGPBankedCompile above
 		lda 	gpBankCount
 		asl 	a
 		tax
@@ -7231,6 +7272,28 @@ CommandGPEndBankedCompile:
 ;
 GPBankStructure:
 		.error_structure
+
+;
+;		The pass-two halves of the two generators, BELOW GPBankStructure rather than inside the
+;		routines they belong to. Above it they pushed it out of branch range of the checks at the
+;		head of CommandGPBankedCompile, which is a long routine already. Global names for the
+;		same reason the label above is one: 64tass scopes a _ label to the enclosing global.
+;
+;		Both do what pass two still owes -- consume the operand, keep gpBankState -- and nothing
+;		else. See the note on CommandGPBankedCompile.
+;
+
+GPBankOpenPassTwo:
+		jsr 	GPBankCheckAlone
+		jsr 	GPBankReadNumber
+		lda 	#1
+		sta 	gpBankState
+		clc
+		rts
+
+GPBankClosePassTwo:
+		clc
+		rts
 
 ; ************************************************************************************************
 ;

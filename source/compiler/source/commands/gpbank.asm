@@ -56,11 +56,29 @@
 
 GPBANK_MAXREGIONS = 8 						; and eight is what the extension page's table holds
 
+; ************************************************************************************************
+;
+;		PASS TWO NEITHER RECORDS NOR RE-VALIDATES. It is handed pass one's finished region table
+;		before it starts -- it is being steered by it, main/compiler.asm moves the write cursor
+;		from it -- so recording would overwrite the very thing in use. Re-validating would be
+;		worse than useless: the count is already final, so a program with the full eight regions
+;		would fail the max-regions test, and this region's own bank is already in the list, which
+;		reads as a duplicate. Pass one checked both, on the same source, and refused there.
+;
+;		What pass two must still do is read the operand -- it is in the source either way -- and
+;		keep gpBankState, which is what pairs GP.BANKED with GP.ENDBANKED.
+;
+; ************************************************************************************************
+
 CommandGPBankedCompile:
 		stz 	deferErrors 				; a block opener must never defer -- see the header
 		lda 	gpBankState 				; 0 = never seen, 1 = open, 2 = closed
 		cmp 	#1
 		beq 	GPBankStructure 			; a GP.BANKED inside a region that is still open
+		lda 	passNumber
+		beq 	_CGBCRecord
+		jmp 	GPBankOpenPassTwo 			; jmp, not a branch: the recording block is in between
+_CGBCRecord:
 		lda 	gpBankCount
 		cmp 	#GPBANK_MAXREGIONS
 		bcs 	GPBankStructure 			; ...or one region more than the table holds
@@ -94,6 +112,8 @@ CommandGPEndBankedCompile:
 		jsr 	GPBankCheckAlone
 		lda 	#2
 		sta 	gpBankState
+		lda 	passNumber 					; pass two keeps pass one's table -- see the note on
+		bne 	GPBankClosePassTwo 			; CommandGPBankedCompile above
 		lda 	gpBankCount
 		asl 	a
 		tax
@@ -115,6 +135,28 @@ CommandGPEndBankedCompile:
 ;
 GPBankStructure:
 		.error_structure
+
+;
+;		The pass-two halves of the two generators, BELOW GPBankStructure rather than inside the
+;		routines they belong to. Above it they pushed it out of branch range of the checks at the
+;		head of CommandGPBankedCompile, which is a long routine already. Global names for the
+;		same reason the label above is one: 64tass scopes a _ label to the enclosing global.
+;
+;		Both do what pass two still owes -- consume the operand, keep gpBankState -- and nothing
+;		else. See the note on CommandGPBankedCompile.
+;
+
+GPBankOpenPassTwo:
+		jsr 	GPBankCheckAlone
+		jsr 	GPBankReadNumber
+		lda 	#1
+		sta 	gpBankState
+		clc
+		rts
+
+GPBankClosePassTwo:
+		clc
+		rts
 
 ; ************************************************************************************************
 ;
