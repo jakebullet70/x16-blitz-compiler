@@ -24,6 +24,10 @@
 .      IN: APPSYS.FILE$ .BANK .X .Y
 .      OUT: pasted somewhere else
 .
+.  APPSYS.ISEMU
+.      IN: --
+.      OUT: APPSYS.IS.EMULATOR -- -1 under x16emu, 0 otherwise
+.
 :GOSUB APPSYS.STARTUP
 :' ... the application, laid out with APPSYS.COLS / APPSYS.ROWS ...
 :GOSUB APPSYS.RESTORE : END
@@ -38,6 +42,25 @@
 .APPSYS.DEV defaults to 8. The panel routines are implemented in
 .STASHFILE.INC.BL. A panel file is self-describing -- it carries the stash's
 .4-byte header -- so loading one needs only its name.
+.
+.APPSYS.ISEMU answers the question a timing loop has to ask. $9FBE and $9FBF
+.are the last of the emulator's own I/O registers and read as "1" and "6"
+.under x16emu, with the debugger on or off; the routine is those two PEEKs
+.and a comparison.
+.
+:GOSUB APPSYS.ISEMU
+:IF APPSYS.IS.EMULATOR THEN PRINT "EMULATED"
+:IF NOT APPSYS.IS.EMULATOR THEN PRINT "NOT x16emu"
+.
+.The flag is -1, not 1, so NOT works on it: NOT is -x-1 here, so NOT -1 is 0
+.while NOT 1 is -2 -- still true. -1 is also what a comparison hands back, so
+.the flag reads like one. IF itself tests non-zero, so either value would
+.have worked with the plain form.
+.
+.It answers for x16emu and nothing else. A 0 means "not x16emu" -- a real
+.machine, or another emulator that does not carry those registers. And
+.$9FA0-$9FBF is expansion card I/O on the real machine, so a card at I/O5
+.could in principle answer "16" as well: a 1 is strong, a 0 is certain.
 .
 =SEE ALSO
 .

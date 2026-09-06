@@ -161,7 +161,7 @@ MENUVERT.KEYED:
             MENUVERT.SEL = MENUVERT.SEL + 1
             IF MENUVERT.SEL > MENUVERT.COUNT THEN GOSUB MENUVERT.WRAPBOT
         GP.CASE MENUVERT.ENTER
-            MENUVERT.DONE = 1
+            MENUVERT.DONE = -1
         GP.CASE MENUVERT.ESCAPE, MENUVERT.STOP
             GOSUB MENUVERT.CANCEL
         GP.OTHER
@@ -214,19 +214,19 @@ MENUVERT.WRAPBOT:
 
 MENUVERT.CANCEL:
     IF (MENUVERT.FLAGS AND MENUVERT.MUSTSEL) <> 0 THEN RETURN
-    MENUVERT.SEL = 0 : MENUVERT.DONE = 1 : RETURN
+    MENUVERT.SEL = 0 : MENUVERT.DONE = -1 : RETURN
 
 ## ---- KEYEXIT leaves MENUVERT.SEL ALONE, which is the whole difference from ESC
 ## ---- returning 0: it lets a caller tell "went elsewhere, from row 3" from
 ## ---- "cancelled". Reached only when the hotkeys did not claim the key.
 ## ----
-## ---- AND THAT IS WHY MENUVERT.HOTHIT EXISTS. Both exits leave DONE = 1 and KEY = the
+## ---- AND THAT IS WHY MENUVERT.HOTHIT EXISTS. Both exits leave DONE set and KEY = the
 ## ---- character, so without it a KEYEXIT caller cannot tell "a hotkey chose row 3" from
 ## ---- "a key I must handle came back, and SEL is still 3 from before". 1 means the
 ## ---- hotkeys claimed the key and SEL is the row they chose.
 
 MENUVERT.KEYBACK:
-    IF (MENUVERT.FLAGS AND MENUVERT.KEYEXIT) <> 0 THEN MENUVERT.DONE = 1
+    IF (MENUVERT.FLAGS AND MENUVERT.KEYEXIT) <> 0 THEN MENUVERT.DONE = -1
     RETURN
 
 ## ***********************************************************************
@@ -248,7 +248,7 @@ MENUVERT.HOTKEY:
     FOR MENUVERT.SCAN = 1 TO MENUVERT.HOTLAST
         MENUVERT.HOTCODE = ASC(MID$(MENUVERT.HOT$, MENUVERT.SCAN, 1))
         IF MENUVERT.HOTCODE > 96 THEN GOSUB MENUVERT.FOLDHC
-        IF MENUVERT.HOTCODE = MENUVERT.WANTCODE THEN MENUVERT.SEL = MENUVERT.SCAN : MENUVERT.DONE = 1 : MENUVERT.HOTHIT = 1
+        IF MENUVERT.HOTCODE = MENUVERT.WANTCODE THEN MENUVERT.SEL = MENUVERT.SCAN : MENUVERT.DONE = -1 : MENUVERT.HOTHIT = -1
     NEXT
     RETURN
 

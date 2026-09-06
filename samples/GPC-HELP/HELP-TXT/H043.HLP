@@ -8,7 +8,7 @@
 =THEME.INC.BL
 .
 .  in
-.      THEME.ID -- 0 classic, 1 dark, 2 light, read by
+.      THEME.ID -- 0 x16, 1 dark, 2 light, 3 gray, 4 custom, read by
 .        THEME.LOAD<br>THEME.ATTR -- a packed attribute, for THEME.SET and
 .        THEME.HI
 .
@@ -35,13 +35,13 @@
 .
 .  out
 .      APPSYS.MODE APPSYS.COLS APPSYS.ROWS APPSYS.COLOUR -- set by
-.        APPSYS.STARTUP
+.        APPSYS.STARTUP<br>APPSYS.IS.EMULATOR -- set by APPSYS.ISEMU
 .
 .  internal
 .      APPSYS.LAST
 .
 .  constants
-.      APPSYS.SCRMODE APPSYS.COLREG APPSYS.WINDOW APPSYS.HEADER
+.      APPSYS.SCRMODE APPSYS.COLREG APPSYS.SETCHR APPSYS.CHRREG APPSYS.EMUSIG
 .
 .Lay the screen out from APPSYS.COLS and APPSYS.ROWS. Do not assume 80x60 --
 .the X16 boots there but SCREEN 0 is 40x30, and someone who prefers larger
@@ -75,8 +75,9 @@
 .      LINEINPUT.X LINEINPUT.Y -- top left of the field<br>LINEINPUT.LEN --
 .        how many characters fit<br>LINEINPUT.ATTR -- packed
 .        attribute<br>LINEINPUT.TEXT$ -- the starting value<br>LINEINPUT.MASK
-.        -- non-zero shows asterisks<br>LINEINPUT.LABEL$ -- LINEINPUT.ASK
-.        only
+.        -- non-zero shows asterisks<br>LINEINPUT.ALLOW$ -- the only
+.        characters accepted<br>LINEINPUT.DENY$ -- characters
+.        refused<br>LINEINPUT.LABEL$ -- LINEINPUT.ASK only
 .
 .  out
 .      LINEINPUT.TEXT$ -- what was typed<br>LINEINPUT.KEY -- the key that

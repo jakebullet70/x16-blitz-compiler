@@ -7,6 +7,7 @@
 ## **      APPSYS.RESTORE     put it back, on the way out
 ## **      APPSYS.PANEL.LOAD  and back again, where it came from
 ## **      APPSYS.PANEL.PUT   or somewhere else
+## **      APPSYS.ISEMU       am I running on the emulator?
 ## **
 ## **  NOT A KEYWORD: everything here is one KERNAL call and some arithmetic, none of
 ## **  it in a loop or over bulk data, so by the rule the GP set is built on it belongs
@@ -38,6 +39,13 @@
 #DEFINE APPSYS.SETCHR $FF62
 #DEFINE APPSYS.CHRREG $0372
 
+## The emulator's own I/O registers. The last two of them answer 49 and 54 --
+## "1" and "6" -- and that pair is the whole of the detection. PROBED on x16emu
+## r49, with -debug and without: same answer both times, so it does not depend on
+## the debugger being on. Nothing else in the range is worth reading -- $9FB8 is a
+## counter that moves, and $9FBC warns that it is not a register at all.
+#DEFINE APPSYS.EMUSIG $9FBE
+
 ## Where a RAM bank appears, and the size of a stash's self-describing
 ## header (w, h, x, y).
 
@@ -57,13 +65,8 @@ GOTO APPSYS.SKIP
 ## Lay out from APPSYS.COLS and APPSYS.ROWS rather than assuming 80x60 -- SCREEN 0 is
 ## 40x30, and a user who prefers larger text will be running one.
 
-APPSYS.STARTUP:
-    GP.CALL APPSYS.SCRMODE, 0, 0, 0, 1
-    APPSYS.MODE = GP.A
-    APPSYS.COLS = GP.X
-    APPSYS.ROWS = GP.Y
-    APPSYS.COLOUR = PEEK(APPSYS.COLREG)
-    APPSYS.CHARSET = PEEK(APPSYS.CHRREG)
+APPSYS.STARTUP:  GP.CALL APPSYS.SCRMODE, 0, 0, 0, 1 : APPSYS.MODE = GP.A : APPSYS.COLS = GP.X : APPSYS.ROWS = GP.Y
+    APPSYS.COLOUR = PEEK(APPSYS.COLREG) : APPSYS.CHARSET = PEEK(APPSYS.CHRREG)
     RETURN
 
 ## APPSYS.RESTORE -- the screen as it was, for whatever runs next.
@@ -76,11 +79,40 @@ APPSYS.STARTUP:
 ## AND 15 is safe here only because a packed attribute is 0..255; AND is 16-bit SIGNED
 ## in GPC and raises OUT OF RANGE above 32767.
 
-APPSYS.RESTORE:
-    GP.CALL APPSYS.SCRMODE, APPSYS.MODE, 0, 0, 0
-    GP.CALL APPSYS.SETCHR, APPSYS.CHARSET AND 63, 0, 0, 0
-    POKE APPSYS.CHRREG, APPSYS.CHARSET
-    COLOR APPSYS.COLOUR AND 15, INT(APPSYS.COLOUR / 16)
+APPSYS.RESTORE:  GP.CALL APPSYS.SCRMODE, APPSYS.MODE, 0, 0, 0 : GP.CALL APPSYS.SETCHR, APPSYS.CHARSET AND 63, 0, 0, 0
+    POKE APPSYS.CHRREG, APPSYS.CHARSET : COLOR APPSYS.COLOUR AND 15, INT(APPSYS.COLOUR / 16)
+    RETURN
+
+## APPSYS.ISEMU -- x16emu, or the machine?
+##
+##   out  APPSYS.IS.EMULATOR   -1 under x16emu, 0 otherwise
+##
+## For the things that only make sense on one of them: a timing loop written for
+## 8 MHz, the fast path in a test harness, a line in an about box, or refusing to
+## run a routine that wants the real hardware.
+##
+## IT ANSWERS FOR x16emu AND NOTHING ELSE. A 0 means "not x16emu", which is a real
+## machine or another emulator, not "hardware" -- Box16 need not implement the same
+## registers and is not claimed here. And $9FA0-$9FBF is expansion card I/O on the
+## real machine, so a card sitting at I/O5 could in principle answer "16" too. Treat
+## a 1 as strong and a 0 as certain.
+##
+## Two PEEKs and a comparison, which is why this is BASIC and not a keyword.
+##
+## -1 AND NOT 1, so that NOT works on it: NOT is -x-1 here, so NOT -1 is 0 and
+## NOT 1 is -2, which is still true. -1 is also what a comparison in this compiler
+## hands back, so the flag reads like one:
+##
+##     IF APPSYS.IS.EMULATOR THEN <emulated>
+##     IF NOT APPSYS.IS.EMULATOR THEN <the machine, or something else>
+
+## THE RETURN IS ON ITS OWN LINE, and has to be. A false IF skips the WHOLE line,
+## so a RETURN written after the test is only reached on the machine that passes
+## it -- which here is the emulator. Off it, the routine would fall out of itself
+## into whatever follows and die on a full frame stack, measured as
+## OUT OF MEMORY @ $0077.
+
+APPSYS.ISEMU:  APPSYS.IS.EMULATOR = 0 : IF PEEK(APPSYS.EMUSIG) = 49 THEN IF PEEK(APPSYS.EMUSIG + 1) = 54 THEN APPSYS.IS.EMULATOR = -1
     RETURN
 
 ## A SCREEN RECTANGLE THROUGH A FILE IS STASH.FILE.SAVE / .LOAD / .PUT, in

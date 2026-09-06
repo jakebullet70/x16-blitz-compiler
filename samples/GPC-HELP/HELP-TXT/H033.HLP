@@ -23,11 +23,11 @@
 .an array; GP.ARRPTR is a keyword for this purpose. The empty parentheses in
 .GP.ARRPTR(A$()) are required -- A$ and A$() are different variables.
 .
-.SORT.OK is 0 if the sort was refused: more than 255 elements, so DIM A$(254)
-.is the largest accepted (DIM A$(255) is 256 elements), or an array whose
-.elements are not strings. The element count and the type are read from the
-.array's own header, three bytes below what GP.ARRPTR returns, so a wrong
-.count cannot be passed in.
+.SORT.OK is -1 when it sorted and 0 if the sort was refused: more than 255
+.elements, so DIM A$(254) is the largest accepted (DIM A$(255) is 256
+.elements), or an array whose elements are not strings. The element count and
+.the type are read from the array's own header, three bytes below what
+.GP.ARRPTR returns, so a wrong count cannot be passed in.
 .
 .Never-assigned elements are empty strings, not garbage. A DIM A$(20) with
 .five entries filled sorts its fifteen empties to the front; a null pointer

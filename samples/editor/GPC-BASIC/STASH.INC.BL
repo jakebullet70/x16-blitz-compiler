@@ -37,7 +37,7 @@
 ## **        STASH.X  STASH.Y     top left, in CELLS
 ## **        STASH.W  STASH.H     size, in cells
 ## **
-## **   out  STASH.OK       1 if it fitted and was saved, 0 if not
+## **   out  STASH.OK       -1 if it fitted and was saved, 0 if not
 ## **
 ## **  RESTORE NEEDS ONLY THE BANK: four header bytes go in first -- w, h, x, y -- so the
 ## **  rectangle describes itself and cannot be put back at the wrong size. STASH.MOVE = 1
@@ -179,7 +179,7 @@ STASH.SETUP:
     STASH.BYTES = STASH.W * 2
     IF STASH.BYTES * STASH.H + STASH.HEADER > STASH.MAXBYTES THEN RETURN
     STASH.MAPW = 32 * 2 ^ INT((PEEK(STASH.LCONFIG) AND 48) / 16)
-    STASH.BASE = PEEK(STASH.LMAPBASE) * 512 : STASH.STRIDE = STASH.MAPW * 2 : STASH.OK = 1
+    STASH.BASE = PEEK(STASH.LMAPBASE) * 512 : STASH.STRIDE = STASH.MAPW * 2 : STASH.OK = -1
     RETURN
 
 ## ***********************************************************************

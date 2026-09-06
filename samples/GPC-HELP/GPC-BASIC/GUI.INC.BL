@@ -52,7 +52,7 @@
 ## **      GUI.BANK = 8
 ## **      GUI.MSG$ = "Delete the file?"
 ## **      GOSUB GUI.YN
-## **      IF GUI.ANSWER = 1 THEN <yes>
+## **      IF GUI.ANSWER THEN <yes>
 ## **
 ## **   in   GUI.MSG$        the question. "" for none
 ## **        GUI.MSG2$       a second line, for detail that does not fit. "" for
@@ -163,7 +163,7 @@ GOTO GUI.MODULE.END
 ## **        GUI.OKCANCEL  0 asks YES/NO on Y and N, the default. Non-zero asks
 ## **                    OK/CANCEL on O and C, and then RETURN also accepts
 ## **
-## **   out  GUI.ANSWER  1 for yes or OK, 0 for no or cancel
+## **   out  GUI.ANSWER  -1 for yes or OK, 0 for no or cancel
 ## **        GUI.KEY     the key itself, so a caller that cares whether the no
 ## **                    was ESC or N can still tell
 ## **
@@ -221,16 +221,16 @@ GUI.YN.WAIT:
     GUI.KEY = ASC(GUI.PRESSED$) : GUI.DONE = 0
     GP.SELECT GUI.KEY
         GP.CASE GUI.YES, GUI.YES.ALT
-            GUI.ANSWER = 1 : GUI.DONE = 1
+            GUI.ANSWER = -1 : GUI.DONE = -1
         GP.CASE GUI.NO, GUI.NO.ALT, GUI.ESCAPE, GUI.STOP
-            GUI.DONE = 1
+            GUI.DONE = -1
 
 ## ---- RETURN accepts, but ONLY in OK/CANCEL. A dialog offering OK has a default
 ## ---- and RETURN is how everyone takes it; a YES/NO question is asked precisely
 ## ---- because there is none, and it is usually the destructive one. In YES/NO
 ## ---- the key falls out with GUI.DONE still 0, which is what ignoring it means.
         GP.CASE GUI.RETURN
-            IF GUI.OKCANCEL <> 0 THEN GUI.ANSWER = 1 : GUI.DONE = 1
+            IF GUI.OKCANCEL <> 0 THEN GUI.ANSWER = -1 : GUI.DONE = -1
     GP.ENDSEL
     IF GUI.DONE = 0 THEN GOTO GUI.YN.WAIT
 
@@ -393,15 +393,15 @@ GUI.SAY.WAIT:
     GUI.KEY = ASC(GUI.PRESSED$) : GUI.DONE = 0
     GP.SELECT GUI.KEY
         GP.CASE GUI.RETURN, GUI.SPACE, GUI.ESCAPE, GUI.STOP
-            GUI.DONE = 1
+            GUI.DONE = -1
     GP.ENDSEL
     ## The marked letter closes it too, in either case. GP.SELECT cannot take a
     ## variable in a GP.CASE, so this is tested outside it -- and only when the
     ## label actually marked one, or "" would match every key.
     GP.IF GUI.BTN.KEY.ONE <> 0 THEN
         GUI.BTN.OF = GUI.BTN.KEY.ONE : GOSUB GUI.BTN.PAIR
-        IF GUI.KEY = GUI.BTN.UC THEN GUI.DONE = 1
-        IF GUI.KEY = GUI.BTN.LC THEN GUI.DONE = 1
+        IF GUI.KEY = GUI.BTN.UC THEN GUI.DONE = -1
+        IF GUI.KEY = GUI.BTN.LC THEN GUI.DONE = -1
     GP.ENDIF
     IF GUI.DONE = 0 THEN GOTO GUI.SAY.WAIT
     GOSUB GUI.CLOSE : RETURN
@@ -454,7 +454,7 @@ GUI.MENU:
 ## **        GUI.MASK    non-zero shows asterisks, for a password
 ## **
 ## **   out  GUI.INPUT$  what was typed
-## **        GUI.OK      1 if RETURN finished it, 0 if it was cancelled
+## **        GUI.OK      -1 if RETURN finished it, 0 if cancelled
 ## **        GUI.KEY     the key itself
 ## **
 ## **  THE RESULT IS GUI.INPUT$, NOT GUI.TEXT$: GUI.TEXT is this routine's label,
@@ -509,7 +509,7 @@ GUI.TEXT.FIELD:
     GUI.INPUT$ = LINEINPUT.TEXT$
     GUI.KEY = LINEINPUT.KEY
     GUI.OK = 0
-    IF GUI.KEY = GUI.RETURN THEN GUI.OK = 1
+    IF GUI.KEY = GUI.RETURN THEN GUI.OK = -1
 
 ## ---- A cancel gives back what was passed IN. LINEINPUT restores to the value at
 ## ---- ITS last call, which after an arrow key is not the same thing.
@@ -525,7 +525,7 @@ GUI.TEXT.FIELD:
 ## **
 ## **   out  GUI.INNER.LEFT GUI.INNER.TOP   where the caller's own rows start
 ## **        GUI.INNER.WIDTH          how wide they may be
-## **        GUI.STASHED     1 if the covered cells were saved
+## **        GUI.STASHED     -1 if the covered cells were saved
 ## **
 ## **  Public: a caller wanting a fourth kind of dialog should build it on this
 ## **  rather than on a copy of it.

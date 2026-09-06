@@ -1075,7 +1075,34 @@ image for all 12,031 bytes of the GP-BASIC OUT cut, with the only differences th
 
 ## Wanted
 
-### `IsEmulator()` — am I running on x16emu, or on the machine?
+### `IsEmulator()` — BUILT 06/09/26, as `APPSYS.ISEMU`
+
+**Shipped** in all five copies of `APPSYS.INC.BL`, with `GP-BASIC.md` §4.3, `GP-BASIC.GLOBALS.md`
+and the regenerated `HELP-TXT`. `GOSUB APPSYS.ISEMU` sets `APPSYS.IS.EMULATOR` to -1 or 0 — a real BASIC TRUE, so `NOT` works on it
+(`NOT` is `-x-1`, so `NOT 1` would be -2 and still true). `IF` itself tests non-zero, so the plain
+form reads the same either way. Two `PEEK`s and
+a comparison, so BASIC and not a keyword, exactly as the shape below argued.
+
+**The register pair is `$9FBE` and `$9FBF`, and they read 49 and 54** — `"1"` and `"6"`. PROBED
+rather than read off a page: the whole range was `PEEK`ed on x16emu r49 **with `-debug` and
+without**, and the pair answers the same both times, so it does not depend on the debugger. The
+rest of the range is not usable — `$9FB0` differs between those two runs, `$9FB8`/`$9FB9` are a
+counter that moves while you read it, and `$9FBC` prints `WARN: Invalid register 9fbc` on the
+emulator's own console.
+
+**Box16 is not claimed**, on instruction: it is buggy here and was not tested. So a 1 means x16emu
+and a 0 means "not x16emu", which is a real machine OR another emulator — and since `$9FA0-$9FBF`
+is expansion card I/O on the real machine, a card at I/O5 could in principle answer `"16"` too.
+The header says a 1 is strong and a 0 is certain rather than pretending otherwise.
+
+`work-lineinput/EMUTST.BASL` is the check: it prints the two bytes beside the answer, so a 0 can
+be told from a wrong read. **Run it both ways**: point `APPSYS.EMUSIG` at a byte that does not
+read 49 and the not-an-emulator path is exercised on the emulator, which is the only way to test
+it here. That caught a crunched version whose `RETURN` had ended up on the `IF` line — true on
+x16emu, and on a real machine a fall-through out of the routine that died with
+`OUT OF MEMORY @ $0077` on the frame stack.
+
+The original entry follows.
 
 Wanted so a program can behave differently under emulation: skip a timing loop that only makes sense
 at 8 MHz, take the fast path in a test harness, print which it is in an about box, or refuse to run a
@@ -1100,7 +1127,7 @@ bulk data, so by the rule the GP set is built on it belongs in BASIC — a few l
 the programs that do not include it.
 
     GOSUB APPSYS.ISEMU
-    IF APPSYS.EMU = 1 THEN ...
+    IF APPSYS.IS.EMULATOR = 1 THEN ...
 
 ### `LINEINPUT` wants a character filter — BUILT 06/09/26
 

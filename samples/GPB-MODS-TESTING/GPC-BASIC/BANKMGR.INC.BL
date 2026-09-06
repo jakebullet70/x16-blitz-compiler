@@ -26,7 +26,7 @@
 ## **
 ## **   out  BANKMGR.BANKS   how many the machine has, 64 or 256
 ## **        BANKMGR.BANK    what ALLOC handed out. 0 MEANS NONE LEFT
-## **        BANKMGR.OK      1 if CLAIM took it, 0 if it was taken or out of range
+## **        BANKMGR.OK      -1 if CLAIM took it, 0 if taken or out of range
 ## **        BANKMGR.SPARE   what COUNT found free
 ## **
 ## **  0 IS NOT A BANK. It is the KERNAL's, reserved by INIT, and it is what ALLOC
@@ -72,7 +72,7 @@ GOTO BANKMGR.SKIP
 ## **  auto-dimensioned is an error, so the module owns both outright.
 ## ***********************************************************************
 
-BANKMGR.INIT: IF BANKMGR.READY = 0 THEN DIM BANKMGR.MAP%(BANKMGR.BYTES) : DIM BANKMGR.BIT%(7) : BANKMGR.READY = 1
+BANKMGR.INIT: IF BANKMGR.READY = 0 THEN DIM BANKMGR.MAP%(BANKMGR.BYTES) : DIM BANKMGR.BIT%(7) : BANKMGR.READY = -1
 
 ## ---- 1, 2, 4 .. 128, built rather than written out: it is the only place a
 ## ---- power of two is needed and GPC has no shift.
@@ -114,14 +114,14 @@ BANKMGR.INIT.PART:
 ## ***********************************************************************
 ## **  BANKMGR.CLAIM -- take BANKMGR.WANT, if it is free and real.
 ## **
-## **   out  BANKMGR.OK   1 took it, 0 already taken or out of range
+## **   out  BANKMGR.OK   -1 took it, 0 already taken or out of range
 ## ***********************************************************************
 
 BANKMGR.CLAIM:
     BANKMGR.OK = 0 : IF BANKMGR.WANT < 1 THEN RETURN
     IF BANKMGR.WANT >= BANKMGR.BANKS THEN RETURN
     GOSUB BANKMGR.TEST : IF BANKMGR.USED <> 0 THEN RETURN
-    GOSUB BANKMGR.SET :  BANKMGR.OK = 1
+    GOSUB BANKMGR.SET :  BANKMGR.OK = -1
     RETURN
 
 

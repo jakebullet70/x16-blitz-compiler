@@ -75,7 +75,7 @@
 .
 .  Screen etiquette, panels
 .      BASIC
-.      APPSYS.INC.BL -- STARTUP RESTORE PANEL.SAVE/LOAD/PUT - SEC 4.3
+.      APPSYS.INC.BL -- STARTUP RESTORE PANEL.SAVE/LOAD/PUT ISEMU - SEC 4.3
 .
 .  Entry fields
 .      BASIC

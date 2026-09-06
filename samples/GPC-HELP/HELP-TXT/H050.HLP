@@ -1,0 +1,81 @@
+@7. Memory, and what the compiler tells you
+.
+=7. MEMORY, AND WHAT THE COMPILER TELLS YOU
+.
+=The line GPC prints when it finishes
+.
+:OK CODE 10734 FREE 10496 RT 13311 GP-BASIC IN
+:OK CODE 1234 FREE 19200 RT SHARED RT
+.
+.  CODE
+.      the p-code. What the program is, in bytes
+.
+.  FREE
+.      what is left above it for variables, strings and arrays. This is the
+.        number that runs out. It already excludes the 4K frame stack, which
+.        is reserved rather than available
+.
+.  RT
+.      the runtime bytes carried inside the object, or SHARED when the
+.        program loads GPC.RT.nnn.BIN at run time instead. SHARED RC asks for
+.        the core alone, SHARED RT for the core and the GP. handlers
+.
+.  GP-BASIC
+.      embedded builds only. IN if a GP. keyword reached the 1,024-byte
+.        handler block and it had to go in the object, OUT if ScanGPUsage
+.        dropped it
+.
+.Two different budgets come off one figure, so read it twice:
+.
+.  - FREE is the workspace the running program has for its data.
+.  - FREE minus 4,096 is how much more p-code will fit. WriteObjectCode
+.    refuses to leave less than 4K of workspace, so a build reporting FREE
+.    4096 is one page from PROGRAM TOO BIG.
+.
+.A program can be comfortable on one and out of room on the other. CODE 17406
+.FREE 4096 has 4K to run in and nowhere left to grow; CODE 10734 FREE 10496
+.has both.
+.
+=OUT OF MEMORY
+.
+.Everything the program allocates comes out of the one FREE pool: scalars,
+.arrays, and the string heap. There is no separate heap to run out of.
+.
+.  - A DIM costs its full size whether the entries are used or not. DIM
+.    A$(120) is 121 string slots from the moment it runs. Five arrays
+.    dimensioned to the same 120 is 1,210 bytes gone before a single row
+.    exists.
+.  - A string block never shrinks. Assigning a shorter string to a variable
+.    that already holds a longer one reuses the block it has; assigning a
+.    longer one allocates a new block and abandons the old. The abandoned
+.    blocks are reclaimed by the heap scavenger when one of the right size is
+.    wanted again, not immediately.
+.  - What fails is therefore a high-water mark, not a total. The allocation
+.    that raises OUT OF MEMORY is rarely the large one -- it is an ordinary
+.    one that arrives after the heap has been churned. The same key on the
+.    same screen can work or not depending on what was visited first, which
+.    is what makes it read as intermittent.
+.
+.The error itself comes from the runtime library and names an address in it,
+.not a line in your program: OUT OF MEMORY @ $03A5 library. It tells you the
+.allocator refused, and nothing about which of your strings was asking.
+.
+=Staying inside it
+.
+.  - Quote FREE when you change anything. It is one line of build output and
+.    it is the only early warning; PROGRAM TOO BIG arrives once it is already
+.    too late.
+.  - Size a DIM to what is used, not to a round number. The cost is paid on
+.    the first line of the program, forever.
+.  - Put bulk in a RAM bank. A bank is 8,192 bytes that cost the workspace
+.    nothing. Anything held from start to finish and read a row at a time --
+.    a file's worth of text, a table, a screen -- is better in a bank with an
+.    offset table at the front, read back with PEEK under BANK. See SEC 4.5
+.    and STASH.INC.BL for the pattern.
+.  - A big temporary cannot be built and then freed. Freeing is not a thing
+.    that happens on demand: build it in a bank, or in pieces.
+.
+=SEE ALSO
+.
+>44|4.5 BMX.INC.BL -- a BMX bitmap into VERA
+>69|STASH.INC.BL -- save a text rectangle, and put it back.

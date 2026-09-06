@@ -35,6 +35,14 @@
 .      OWNER: BMX.INC.BL
 .      WHAT IT IS: its KERNAL/VERA constants, kept apart from its variables
 .
+.  FILE.
+.      OWNER: FILEIO.INC.BL
+.      WHAT IT IS: the drive: status, exists, delete, rename, directories
+.
+.  FILE.DIR.
+.      OWNER: FILEDIR.INC.BL
+.      WHAT IT IS: reading a directory, kept apart from the rest of FILE.
+.
 .Pick anything else for your own program. AIRLIFT., GAME., MAP. -- a prefix
 .costs nothing at runtime because BASLOAD crunches every identifier down to a
 .short BASIC variable, so a long readable name and a two-letter one compile

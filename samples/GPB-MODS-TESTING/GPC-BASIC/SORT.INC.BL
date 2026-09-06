@@ -53,7 +53,7 @@
 ## **        SORT.DESCEND   non-zero = largest first
 ## **        SORT.NOCASE    non-zero = fold case while comparing
 ## **
-## **   out  SORT.OK        1 if it sorted, 0 if it refused
+## **   out  SORT.OK        -1 if it sorted, 0 if it refused
 ## **        SORT.COUNT     elements found in the array header
 ## **
 ## **  LIMIT: 255 ELEMENTS, so DIM A$(254) is the largest -- A$(255) is 256 of them, one
@@ -117,7 +117,7 @@ SORT.RUN:
     IF SORT.TYPE >= 128 THEN RETURN
     IF (SORT.TYPE AND 64) = 0 THEN RETURN
     IF SORT.COUNT > 255 THEN RETURN
-    SORT.OK = 1
+    SORT.OK = -1
     IF SORT.COUNT < 2 THEN RETURN
 
 ## ---- Every {VAR} must EXIST before the assembly can name it -- the compiler looks it

@@ -81,9 +81,9 @@ read, do not write, do not rely on).
 | | |
 |---|---|
 | in | `APPSYS.FILE$` `APPSYS.BANK` `APPSYS.X` `APPSYS.Y` `APPSYS.W` `APPSYS.H` `APPSYS.DEV` — the panel routines |
-| out | `APPSYS.MODE` `APPSYS.COLS` `APPSYS.ROWS` `APPSYS.COLOUR` — set by `APPSYS.STARTUP` |
+| out | `APPSYS.MODE` `APPSYS.COLS` `APPSYS.ROWS` `APPSYS.COLOUR` — set by `APPSYS.STARTUP`<br>`APPSYS.IS.EMULATOR` — set by `APPSYS.ISEMU` |
 | internal | `APPSYS.LAST` |
-| constants | `APPSYS.SCRMODE` `APPSYS.COLREG` `APPSYS.WINDOW` `APPSYS.HEADER` |
+| constants | `APPSYS.SCRMODE` `APPSYS.COLREG` `APPSYS.SETCHR` `APPSYS.CHRREG` `APPSYS.EMUSIG` |
 
 Lay the screen out from `APPSYS.COLS` and `APPSYS.ROWS`. Do not assume 80x60 —
 the X16 boots there but `SCREEN 0` is 40×30, and someone who prefers larger text is running one.
@@ -222,7 +222,32 @@ be `BMX.MODULE.END` — a name is either a label or a variable, never both.
 
 ---
 
-## 5. Two more naming rules that are not about collisions
+## 5. TRUE IS -1
+
+**Every flag the library hands back is -1 for true and 0 for false**, and anything written
+against it should be too. `GUI.OK` `GUI.ANSWER` `GUI.STASHED` `STASH.OK` `SORT.OK`
+`MENUVERT.HOTHIT` `FILE.OK` `BANKMGR.OK` `APPSYS.IS.EMULATOR` — all of them.
+
+That is what a comparison in this compiler evaluates to, so a flag and a test read the same
+way, and it is the value `NOT` wants: `NOT` is `-x-1`, so `NOT -1` is 0 while `NOT 1` is -2,
+which is still true. `IF` itself tests non-zero, so `IF FLAG THEN` works either way and
+`IF FLAG = 1 THEN` is the spelling that breaks.
+
+```basic
+IF GUI.OK THEN <accepted>            ' yes
+IF NOT GUI.OK THEN <cancelled>       ' yes
+IF GUI.OK = 0 THEN <cancelled>       ' yes
+IF GUI.OK = 1 THEN <accepted>        ' NO -- it is -1
+```
+
+**A flag the CALLER sets is read as non-zero**, so `LINEINPUT.MASK = 1` and `STASH.MOVE = 1`
+still work. Write -1 in new code all the same.
+
+**Printing one needs `STR$` whole.** The `MID$(STR$(N), 2)` idiom strips the leading space
+`STR$` puts on a positive number; -1 has no leading space, so that idiom eats the minus and
+prints `1`.
+
+## 6. Two more naming rules that are not about collisions
 
 **`#DEFINE` takes an INT16** (`BASLOAD.MD:313`). A constant above 65535 is
 `ERROR: INVALID PARAMETER`, not a warning — which is why `BMX.PALBASE` (VRAM `$1FA00`, 129536) is an

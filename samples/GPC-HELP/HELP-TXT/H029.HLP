@@ -5,7 +5,7 @@
 =DESCRIPTION
 .
 .  LINEINPUT.GET
-.      IN: LINEINPUT.X .Y .LEN .ATTR .TEXT$ .MASK
+.      IN: LINEINPUT.X .Y .LEN .ATTR .TEXT$ .MASK .ALLOW$ .DENY$
 .      OUT: LINEINPUT.TEXT$ LINEINPUT.KEY
 .
 .  LINEINPUT.ASK
@@ -46,7 +46,38 @@
 .The cursor blinks off TI rather than a delay loop; a delay loop would
 .swallow keys pressed during it.
 .
-.Example: FORM.EXP.BL -- three fields, one masked, in a themed panel.
+.LINEINPUT.ALLOW$ and LINEINPUT.DENY$ restrict what may be typed. Both are
+.empty by default, and the field then takes any printable character, as it
+.always has. ALLOW$ lists the characters accepted and DENY$ the ones refused;
+.a caller that sets both gets ALLOW$, and DENY$ is not consulted. A refused
+.key changes nothing -- not the text, and not the caret.
+.
+.They compare raw bytes, so a set of LETTERS depends on the charset: PETSCII
+.shifted letters arrive as $C1-$DA and ISO ones as $41-$5A, and an ALLOW$
+.written for one silently refuses every capital in the other. Digits are
+.48-57 in both. Use ALLOW$ for a closed set short enough to write out, DENY$
+.for everything-except:
+.
+.  Digits only
+.      SPELLING: ALLOW$ = "0123456789"
+.
+.  Number with sign and point
+.      SPELLING: ALLOW$ = "0123456789.-"
+.
+.  Yes or no
+.      SPELLING: ALLOW$ = "YyNn"
+.
+.  Letters, no digits
+.      SPELLING: DENY$ = "0123456789"
+.
+.  Filename, no punctuation
+.      SPELLING: DENY$ = ",:=*?"
+.
+.Both are sticky, like every other input in the library, so a form sets them
+.on the way into each field rather than once at the top.
+.
+.Example: FORM.EXP.BL -- three fields, one masked and one digits-only, in a
+.themed panel.
 .
 =EXAMPLE PROGRAM
 .

@@ -17,6 +17,13 @@ via `gone3`); on FALSE it falls to `rem: jsr remn` -- the SAME REM skip-to-end-o
 line). So false => skip to `$00` end of line. **Technique: read `ref/x16-rom/*` to settle "how does X16 BASIC really
 behave" questions authoritatively instead of guessing.**
 
+**THE STATEMENT THIS BITES IS `RETURN`.** `LBL: F = 0 : IF <test> THEN F = 1 : RETURN` returns only
+when the test PASSES; when it fails the routine falls out of itself into whatever follows, with the
+GOSUB frame still on the stack. Found 06/09/26 in a crunched `APPSYS.ISEMU`, where the test passes
+on the emulator and fails on the machine, so it looked perfect in every headless run. The symptom
+is `OUT OF MEMORY @ $0077` from the frame stack, not a wrong answer. Keep `RETURN` on its own line,
+and test the FALSE path by making the test fail on purpose.
+
 **GPC before:** each guard JZ was backpatched to end-of-BODY (one statement), so `IF 0 THEN A=1:A=2` still ran A=2
 (empirically 2, should be 5). **Fix:** parse_if no longer backpatches locally; each guard's JZ/IJZ operand slot is
 appended to a per-LINE module list `if_line_patch[MAXIFLINE=16]` (count `n_if_line`, reset per line), and the line loop

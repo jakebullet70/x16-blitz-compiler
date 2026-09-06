@@ -609,7 +609,7 @@ ED.CMD.ABOUT:
   RETURN
 
 ED.CONFIRM.DISCARD:
-  ED.DISCARD.OK = 1
+  ED.DISCARD.OK = -1
   IF ED.DOC.DIRTY = 0 THEN RETURN
   ED.PROMPT.MSG$ = "Discard changes?" : GOSUB ED.PROMPT.YN
   ED.DISCARD.OK = ED.YN
@@ -675,7 +675,7 @@ REM cannot be typed past, a box that puts back what it covered. The interface di
 REM ED.PROMPT.MSG$ in and ED.INPUT$ + ED.PROMPT.OK or ED.YN out, so no call site moved.
 
 ED.PROMPT:
-  IF ED.SIM.MODE = 1 THEN ED.INPUT$ = ED.SIM.INPUT$ : ED.PROMPT.OK = 1 : RETURN
+  IF ED.SIM.MODE = 1 THEN ED.INPUT$ = ED.SIM.INPUT$ : ED.PROMPT.OK = -1 : RETURN
   GUI.TITLE$ = "" : GUI.MSG2$ = "" : GUI.MASK = 0
   GUI.MSG$ = ED.PROMPT.MSG$
   REM Wide enough for a path, and the box sizes itself around it. The old bottom-row field
@@ -1068,7 +1068,7 @@ REM ---- OPTIONAL: goto, find, new/discard ----
   ED.DOC.DIRTY = 1 : ED.SIM.YN = 0
   GOSUB ED.CMD.NEW
   PRINT "DECLINE COUNT=";LINE.COUNT;" DIRTY=";ED.DOC.DIRTY
-  ED.SIM.YN = 1
+  ED.SIM.YN = -1
   GOSUB ED.CMD.NEW
   PRINT "ACCEPT COUNT=";LINE.COUNT;" NAME=";DOC.FILE.NAME$
 #ENDIF
@@ -1331,7 +1331,7 @@ REM ---- OPTIONAL: key dispatch, the menu loop, the GUI dialogs ----
   ED.PROMPT.MSG$ = "Discard changes?"
   ED.QK = 89 : GOSUB ED.PUSHKEY
   GOSUB ED.PROMPT.YN
-  PRINT "GUI YN Y ->";ED.YN;" (want 1)"
+  PRINT "GUI YN Y ->";ED.YN;" (want -1)"
   ED.QK = 27 : GOSUB ED.PUSHKEY
   GOSUB ED.PROMPT.YN
   PRINT "GUI YN ESC ->";ED.YN;" (want 0)"
@@ -1352,7 +1352,7 @@ REM ---- OPTIONAL: key dispatch, the menu loop, the GUI dialogs ----
   ED.QK = 20 : GOSUB ED.PUSHKEY
   ED.QK = 13 : GOSUB ED.PUSHKEY
   GOSUB ED.PROMPT
-  PRINT "GUI TEXT ->";ED.INPUT$;" OK=";ED.PROMPT.OK;" (want ABXC 1)"
+  PRINT "GUI TEXT ->";ED.INPUT$;" OK=";ED.PROMPT.OK;" (want ABXC -1)"
 
   REM ---- and ESC still throws the typing away rather than returning it
   ED.QK = 90 : GOSUB ED.PUSHKEY

@@ -36,7 +36,7 @@
 :      GUI.BANK = 8
 :      GUI.MSG$ = "Delete the file?"
 :      GOSUB GUI.YN
-:      IF GUI.ANSWER = 1 THEN <yes>
+:      IF GUI.ANSWER THEN <yes>
 .
 :   in   GUI.MSG$        the question. "" for none
 :        GUI.MSG2$       a second line, for detail that does not fit. "" for
@@ -45,8 +45,8 @@
 :        GUI.BANK        a spare RAM bank to save the covered cells in.
 :                        0 MEANS DO NOT SAVE, and then the box is still on
 :                        the screen when the call returns
-:        GUI.STYLE       0, the default, draws the single line box. 1 to 5
-:                        are GP.BOX's other styles
+:        GUI.STYLE       0, the default, draws the rounded single line box.
+:                        1 to 3 are GP.BOX's other styles
 :        GUI.PANEL.IN    the panel: the box's background AND the colour the
 :                        message lines are written in. 0 takes THEME.TEXT
 :        GUI.BORDER.IN   the frame's attribute. 0 takes THEME.BORDER

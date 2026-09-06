@@ -46,7 +46,7 @@
 :        STASH.X  STASH.Y     top left, in CELLS
 :        STASH.W  STASH.H     size, in cells
 .
-:   out  STASH.OK       1 if it fitted and was saved, 0 if not
+:   out  STASH.OK       -1 if it fitted and was saved, 0 if not
 .
 =RESTORE NEEDS ONLY THE BANK
 .

@@ -1131,7 +1131,7 @@ HELP.ASKQUIT:
     GUI.MSG$ = "Leave the help viewer?" : GUI.MSG2$ = ""
     GOSUB GUI.YN
     HELP.DONE = 0
-    IF GUI.ANSWER = 1 THEN HELP.DONE = 1
+    IF GUI.ANSWER THEN HELP.DONE = -1
     HELP.FULL = 1
     RETURN
 

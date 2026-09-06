@@ -164,7 +164,7 @@ T.ONE$(0) = "SOLO"
 SORT.PTR = GP.ARRPTR(T.ONE$()) : GOSUB SORT.RUN
 T.BAD = 0
 IF T.ONE$(0) <> "SOLO" THEN T.BAD = T.BAD + 1
-IF SORT.OK <> 1 THEN T.BAD = T.BAD + 1
+IF SORT.OK = 0 THEN T.BAD = T.BAD + 1
 T.CASE$ = "ONE ELEMENT" : GOSUB T.REPORT
 
 ## =======================================================================

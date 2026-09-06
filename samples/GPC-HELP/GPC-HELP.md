@@ -59,8 +59,10 @@ python samples/GPC-HELP/MKHELP.PY
   - [2. GP.* is keywords, not variables -- and the difference bites](#2-gp-is-keywords-not-variables----and-the-difference-bites)
   - [3. The modules](#3-the-modules)
   - [3. The modules (2)](#3-the-modules-2)
+  - [3. The modules (3)](#3-the-modules-3)
   - [4. Labels are global too](#4-labels-are-global-too)
-  - [5. Two more naming rules that are not about collisions](#5-two-more-naming-rules-that-are-not-about-collisions)
+  - [5. TRUE IS -1](#5-true-is--1)
+  - [6. Two more naming rules that are not about collisions](#6-two-more-naming-rules-that-are-not-about-collisions)
 - **THE TRAPS**
   - [6. The traps, collected](#6-the-traps-collected)
 - **MEMORY AND LIMITS**
@@ -369,7 +371,7 @@ Three implementations, and what each costs:
 | **Screen** | COMPOSITE | `GP.CHAR` — free, one cell in `GP.PRINTAT`'s shape running `GP.FILL`'s handler |
 | **Colour roles** | BASIC | `THEME.INC.BL` — `THEME.LOAD`, `THEME.CLR()` · §4.1 |
 | **String helpers** | BASIC | `STRINGS.INC.BL` — `PADR` `PADL` `PADC` `SPLIT` `REPLACE` `PET2SCR` · §4.2 |
-| **Screen etiquette, panels** | BASIC | `APPSYS.INC.BL` — `STARTUP` `RESTORE` `PANEL.SAVE/LOAD/PUT` · §4.3 |
+| **Screen etiquette, panels** | BASIC | `APPSYS.INC.BL` — `STARTUP` `RESTORE` `PANEL.SAVE/LOAD/PUT` `ISEMU` · §4.3 |
 | **Entry fields** | BASIC | `LINEINPUT.INC.BL` — `LINEINPUT.GET`, `LINEINPUT.ASK` · §4.4 |
 | **Bitmaps** | BASIC | `BMX.INC.BL` — `BMX.SHOW`, `BMX.RESTORE` · §4.5 |
 | **Menus** | BASIC | `MENUVERT.INC.BL` — `RUN` `DRAW` `ROW` `HOTFIND` · §4.6 |
@@ -744,8 +746,10 @@ All three write directly to VERA and call no KERNAL routine, which is why they a
 faster than `PRINT`. GPC's character output makes two KERNAL calls per character, and `BSOUT`
 carries scroll, quote mode and cursor handling.
 
-`GP.BOX` draws the frame only. Styles: 0 solid, 1 dither, 2 single line, 3 rounded, 4 thick, 5 thick
-shaded. `char` in `GP.FILL` is PETSCII, e.g. `ASC(" ")`.
+`GP.BOX` draws the frame only. Styles: 0 solid block, 1 single line, 2 single line with rounded
+corners, 3 thick line. A style of 256 or more is an ADDRESS, not a style: eight screen codes of the
+caller's own, in the table's order — see the custom glyph note below. `char` in `GP.FILL` is
+PETSCII, e.g. `ASC(" ")`.
 
 The colour argument is optional. Omitted, it uses whatever `COLOR` last set, read from the KERNAL's
 `$0376` — the colour a `PRINT` would have used. Supplied, it is one byte packed as the X16 packs it:
@@ -1002,20 +1006,31 @@ anywhere, including the top of the program.
 |---|---|---|
 | `THEME.LOAD` | `THEME.ID` | fills `THEME.CLR()` |
 | `THEME.NEXT` | `THEME.ID` | the following theme, loaded |
+| `THEME.RESET` | `THEME.ID` | the selected theme's shipped values, reloaded |
 | `THEME.SET` | `THEME.ATTR` | issues `COLOR` — makes it the colour `PRINT` uses |
 | `THEME.HI` | `THEME.ATTR` | `THEME.INV`, the inverse attribute |
 
-Three themes, `THEME.COUNT` of them:
+Five themes, `THEME.COUNT` of them:
 
 | `THEME.ID` | | |
 |---:|---|---|
-| 0 | `CLASSIC` | blue page, white text, yellow headings. The default |
+| 0 | `X16` | blue page, white text, cyan headings. The default |
 | 1 | `DARK` | black page, light grey text |
 | 2 | `LIGHT` | white page, black text |
+| 3 | `GRAY` | dark grey page, light blue frames. From the XFMGR file manager |
+| 4 | `CUSTOM` | whatever `THEME.CLR()` already holds |
 
 `THEME.NEXT` moves to the following one and wraps, which is what a program binds to a key. A cached
 attribute does not follow it: work out anything derived from `THEME.CLR()`, a reversed bar included,
 after every load.
+
+**`CUSTOM` loads nothing.** Selecting it leaves `THEME.CLR()` as it stands, so a program that lets
+the user change colours carries those changes into `CUSTOM` rather than discarding them. The one
+exception is a cold start — `CUSTOM` selected before any other theme has been loaded — where there
+is nothing to keep and it takes `X16`'s values. `THEME.RESET` goes back to those.
+
+`samples/color-test` edits all seven roles against a mock of the GUI and prints the
+`THEME.CLR()` lines to paste back in here.
 
 Roles, for indexing `THEME.CLR()`: `THEME.PAGE` `THEME.TEXT` `THEME.TITLE` `THEME.BORDER`
 `THEME.HILITE` `THEME.DIMMED` `THEME.WARN`, and `THEME.SLOTS` = 7.
@@ -1092,6 +1107,7 @@ Examples: [`SPLITT.EXP.BL`](SPLITT.EXP.BL)
 | `APPSYS.PANEL.SAVE` | `APPSYS.FILE$` `.BANK` `.X` `.Y` `.W` `.H` [`.DEV`] | a file |
 | `APPSYS.PANEL.LOAD` | `APPSYS.FILE$` `.BANK` | back where it came from |
 | `APPSYS.PANEL.PUT` | `APPSYS.FILE$` `.BANK` `.X` `.Y` | pasted somewhere else |
+| `APPSYS.ISEMU` | — | `APPSYS.IS.EMULATOR` — -1 under x16emu, 0 otherwise |
 
 ```basic
 GOSUB APPSYS.STARTUP
@@ -1108,6 +1124,25 @@ Lay out from `APPSYS.COLS` / `APPSYS.ROWS` rather than assuming 80x60. The X16 b
 `APPSYS.DEV` defaults to 8. The panel routines are implemented in `STASHFILE.INC.BL`. A panel file
 is self-describing — it carries the stash's 4-byte header — so loading one needs only its name.
 
+`APPSYS.ISEMU` answers the question a timing loop has to ask. `$9FBE` and `$9FBF` are the last of
+the emulator's own I/O registers and read as `"1"` and `"6"` under x16emu, with the debugger on or
+off; the routine is those two `PEEK`s and a comparison.
+
+```basic
+GOSUB APPSYS.ISEMU
+IF APPSYS.IS.EMULATOR THEN PRINT "EMULATED"
+IF NOT APPSYS.IS.EMULATOR THEN PRINT "NOT x16emu"
+```
+
+**The flag is -1, not 1**, so `NOT` works on it: `NOT` is `-x-1` here, so `NOT -1` is 0 while
+`NOT 1` is -2 — still true. -1 is also what a comparison hands back, so the flag reads like one.
+`IF` itself tests non-zero, so either value would have worked with the plain form.
+
+**It answers for x16emu and nothing else.** A 0 means "not x16emu" — a real machine, or another
+emulator that does not carry those registers. And `$9FA0-$9FBF` is expansion card I/O on the real
+machine, so a card at I/O5 could in principle answer `"16"` as well: a 1 is strong, a 0 is
+certain.
+
 
 *See also: 4.3 APPSYS.INC.BL -- start politely, leave it as you found it, STASHFILE.INC.BL -- a saved text rectangle, through a file.*
 
@@ -1117,7 +1152,7 @@ is self-describing — it carries the stash's 4-byte header — so loading one n
 
 | Routine | in | out |
 |---|---|---|
-| `LINEINPUT.GET` | `LINEINPUT.X` `.Y` `.LEN` `.ATTR` `.TEXT$` `.MASK` | `LINEINPUT.TEXT$` `LINEINPUT.KEY` |
+| `LINEINPUT.GET` | `LINEINPUT.X` `.Y` `.LEN` `.ATTR` `.TEXT$` `.MASK` `.ALLOW$` `.DENY$` | `LINEINPUT.TEXT$` `LINEINPUT.KEY` |
 | `LINEINPUT.ASK` | the same plus `LINEINPUT.LABEL$` | the same; `LINEINPUT.X` restored |
 
 ```basic
@@ -1149,7 +1184,28 @@ scroll: when it is full, further characters are refused and the cursor inverts t
 rather than sitting past the end. The cursor blinks off `TI` rather than a delay loop; a delay loop
 would swallow keys pressed during it.
 
-Example: [`FORM.EXP.BL`](FORM.EXP.BL) — three fields, one masked, in a themed panel.
+`LINEINPUT.ALLOW$` and `LINEINPUT.DENY$` restrict what may be typed. Both are empty by default, and
+the field then takes any printable character, as it always has. `ALLOW$` lists the characters
+accepted and `DENY$` the ones refused; a caller that sets both gets `ALLOW$`, and `DENY$` is not
+consulted. A refused key changes nothing — not the text, and not the caret.
+
+They compare raw bytes, so a set of LETTERS depends on the charset: PETSCII shifted letters arrive
+as `$C1-$DA` and ISO ones as `$41-$5A`, and an `ALLOW$` written for one silently refuses every
+capital in the other. Digits are 48-57 in both. Use `ALLOW$` for a closed set short enough to write
+out, `DENY$` for everything-except:
+
+| Field | Spelling |
+|---|---|
+| Digits only | `ALLOW$ = "0123456789"` |
+| Number with sign and point | `ALLOW$ = "0123456789.-"` |
+| Yes or no | `ALLOW$ = "YyNn"` |
+| Letters, no digits | `DENY$ = "0123456789"` |
+| Filename, no punctuation | `DENY$ = ",:=*?"` |
+
+Both are sticky, like every other input in the library, so a form sets them on the way into each
+field rather than once at the top.
+
+Example: [`FORM.EXP.BL`](FORM.EXP.BL) — three fields, one masked and one digits-only, in a themed panel.
 
 
 *See also: 4.4 LINEINPUT.INC.BL -- a positioned entry field*
@@ -1360,7 +1416,7 @@ The array is passed as an address because a BASL subroutine cannot be passed an 
 is a keyword for this purpose. The empty parentheses in `GP.ARRPTR(A$())` are required — `A$` and
 `A$()` are different variables.
 
-`SORT.OK` is 0 if the sort was refused: more than 255 elements, so `DIM A$(254)` is the largest
+`SORT.OK` is -1 when it sorted and 0 if the sort was refused: more than 255 elements, so `DIM A$(254)` is the largest
 accepted (`DIM A$(255)` is 256 elements), or an array whose elements are not strings. The element
 count and the type are read from the array's own header, three bytes below what `GP.ARRPTR` returns,
 so a wrong count cannot be passed in.
@@ -1474,7 +1530,7 @@ catch an off-by-one write into the neighbouring block.
       GUI.BANK = 8
       GUI.MSG$ = "Delete the file?"
       GOSUB GUI.YN
-      IF GUI.ANSWER = 1 THEN <yes>
+      IF GUI.ANSWER THEN <yes>
 
    in   GUI.MSG$        the question. "" for none
         GUI.MSG2$       a second line, for detail that does not fit. "" for
@@ -1483,8 +1539,8 @@ catch an off-by-one write into the neighbouring block.
         GUI.BANK        a spare RAM bank to save the covered cells in.
                         0 MEANS DO NOT SAVE, and then the box is still on
                         the screen when the call returns
-        GUI.STYLE       0, the default, draws the single line box. 1 to 5
-                        are GP.BOX's other styles
+        GUI.STYLE       0, the default, draws the rounded single line box.
+                        1 to 3 are GP.BOX's other styles
         GUI.PANEL.IN    the panel: the box's background AND the colour the
                         message lines are written in. 0 takes THEME.TEXT
         GUI.BORDER.IN   the frame's attribute. 0 takes THEME.BORDER
@@ -1742,7 +1798,7 @@ catch an off-by-one write into the neighbouring block.
         STASH.X  STASH.Y     top left, in CELLS
         STASH.W  STASH.H     size, in cells
 
-   out  STASH.OK       1 if it fitted and was saved, 0 if not
+   out  STASH.OK       -1 if it fitted and was saved, 0 if not
 
   RESTORE NEEDS ONLY THE BANK: four header bytes go in first -- w, h, x, y -- so the
   rectangle describes itself and cannot be put back at the wrong size. STASH.MOVE = 1
@@ -1886,6 +1942,8 @@ after a change.
 | `MENUVERT.` | `MENUVERT.INC.BL` | vertical menus |
 | `BMX.` | `BMX.INC.BL` | BMX bitmap loading |
 | `BMXK.` | `BMX.INC.BL` | its KERNAL/VERA constants, kept apart from its variables |
+| `FILE.` | `FILEIO.INC.BL` | the drive: status, exists, delete, rename, directories |
+| `FILE.DIR.` | `FILEDIR.INC.BL` | reading a directory, kept apart from the rest of `FILE.` |
 
 Pick anything else for your own program. `AIRLIFT.`, `GAME.`, `MAP.` — a prefix costs nothing at
 runtime because BASLOAD crunches every identifier down to a short BASIC variable, so a long
@@ -1933,7 +1991,7 @@ read, do not write, do not rely on).
 
 | | |
 |---|---|
-| in | `THEME.ID` — 0 classic, 1 dark, 2 light, read by `THEME.LOAD`<br>`THEME.ATTR` — a packed attribute, for `THEME.SET` and `THEME.HI` |
+| in | `THEME.ID` — 0 x16, 1 dark, 2 light, 3 gray, 4 custom, read by `THEME.LOAD`<br>`THEME.ATTR` — a packed attribute, for `THEME.SET` and `THEME.HI` |
 | out | `THEME.CLR(role)` — the colour array, `DIM`med to `THEME.SLOTS`<br>`THEME.INV` — the inverse attribute, from `THEME.HI` |
 | internal | `THEME.READY` |
 | constants | `THEME.PAGE` `THEME.TEXT` `THEME.TITLE` `THEME.BORDER` `THEME.HILITE` `THEME.DIMMED` `THEME.WARN` `THEME.SLOTS` `THEME.COUNT` |
@@ -1946,9 +2004,9 @@ read, do not write, do not rely on).
 | | |
 |---|---|
 | in | `APPSYS.FILE$` `APPSYS.BANK` `APPSYS.X` `APPSYS.Y` `APPSYS.W` `APPSYS.H` `APPSYS.DEV` — the panel routines |
-| out | `APPSYS.MODE` `APPSYS.COLS` `APPSYS.ROWS` `APPSYS.COLOUR` — set by `APPSYS.STARTUP` |
+| out | `APPSYS.MODE` `APPSYS.COLS` `APPSYS.ROWS` `APPSYS.COLOUR` — set by `APPSYS.STARTUP`<br>`APPSYS.IS.EMULATOR` — set by `APPSYS.ISEMU` |
 | internal | `APPSYS.LAST` |
-| constants | `APPSYS.SCRMODE` `APPSYS.COLREG` `APPSYS.WINDOW` `APPSYS.HEADER` |
+| constants | `APPSYS.SCRMODE` `APPSYS.COLREG` `APPSYS.SETCHR` `APPSYS.CHRREG` `APPSYS.EMUSIG` |
 
 Lay the screen out from `APPSYS.COLS` and `APPSYS.ROWS`. Do not assume 80x60 —
 the X16 boots there but `SCREEN 0` is 40×30, and someone who prefers larger text is running one.
@@ -1971,7 +2029,7 @@ worth keeping straight.
 
 | | |
 |---|---|
-| in | `LINEINPUT.X` `LINEINPUT.Y` — top left of the field<br>`LINEINPUT.LEN` — how many characters fit<br>`LINEINPUT.ATTR` — packed attribute<br>`LINEINPUT.TEXT$` — the starting value<br>`LINEINPUT.MASK` — non-zero shows asterisks<br>`LINEINPUT.LABEL$` — `LINEINPUT.ASK` only |
+| in | `LINEINPUT.X` `LINEINPUT.Y` — top left of the field<br>`LINEINPUT.LEN` — how many characters fit<br>`LINEINPUT.ATTR` — packed attribute<br>`LINEINPUT.TEXT$` — the starting value<br>`LINEINPUT.MASK` — non-zero shows asterisks<br>`LINEINPUT.ALLOW$` — the only characters accepted<br>`LINEINPUT.DENY$` — characters refused<br>`LINEINPUT.LABEL$` — `LINEINPUT.ASK` only |
 | out | `LINEINPUT.TEXT$` — what was typed<br>`LINEINPUT.KEY` — the key that ended it |
 | internal | `LINEINPUT.SHOW$` `LINEINPUT.WAS$` `LINEINPUT.K$` `LINEINPUT.CELL$` `LINEINPUT.CODE` `LINEINPUT.CX` `LINEINPUT.CA` `LINEINPUT.INV` `LINEINPUT.LIT` `LINEINPUT.TICK` `LINEINPUT.DONE` `LINEINPUT.FILLED` `LINEINPUT.HOME` `LINEINPUT.BAR` |
 | constants | `LINEINPUT.RETURN` `LINEINPUT.DELETE` `LINEINPUT.ESCAPE` `LINEINPUT.STOP` `LINEINPUT.DOWN` `LINEINPUT.UP` `LINEINPUT.TAB` `LINEINPUT.SPACE` `LINEINPUT.STAR` `LINEINPUT.BLINK` |
@@ -1999,6 +2057,41 @@ first
 rather than `0` switches the stash off: `0` already means "never set". `BMX.KEPT` is the once-per-run
 guard that makes a slideshow restore the *machine's* palette rather than the previous picture's.
 
+##### `FILEIO.INC.BL`
+
+Needs a `#SYMFILE` — `FILE.TOPET` is a `GP.ASM` blob.
+
+| | |
+|---|---|
+| in | `FILE.NAME$` — the file every routine acts on<br>`FILE.NEW$` — the second name, `RENAME` and `COPY`<br>`FILE.DEVICE` — the drive; 0 means 8<br>`FILE.ISO` — non-zero converts names to PETSCII on the way out<br>`FILE.N` — rows to write, `SAVEARRAY`<br>`FILE.MAX` — rows that will fit, `LOADARRAY`; 0 means 10<br>`FILE.LINE$()` — the rows; **the caller owns the `DIM`** |
+| out | `FILE.ERR` `FILE.MSG$` `FILE.TRK` `FILE.SEC` — the command channel<br>`FILE.OK` — `FILE.EXISTS`<br>`FILE.N` — rows read, `LOADARRAY`<br>`FILE.PATH$` — `FILE.CURDIR` |
+| internal | `FILE.CMDSTR$` `FILE.OUT$` `FILE.RAW$` `FILE.ROW$` `FILE.ST` `FILE.KEEP` `FILE.I` `FILE.PETP%` |
+| constants | `FILE.OKMAX` `FILE.NOTFOUND` `FILE.EXISTSERR` `FILE.PROTECTED` `FILE.CHAN` |
+
+**This module is the missing `DS` and `DS$`.** `FILE.ERR` is `DS` and `FILE.MSG$` is `DS$`. `ST` is
+*not* a disk status — it is the KERNAL's serial bus status and cannot report `FILE NOT FOUND`.
+
+`FILE.N` is both an input and an output, the way `MENUVERT.SEL` is. `FILE.LINE$()` is the caller's
+`DIM`, like `MENUVERT.ITEM$` and unlike `THEME.CLR`.
+
+##### `FILEDIR.INC.BL`
+
+Needs `FILEIO.INC.BL`, and a `#SYMFILE` — it is two `GP.ASM` blobs.
+
+| | |
+|---|---|
+| in | `FILE.DIR.BANK` — the bank to read into, or 0 for low RAM<br>`FILE.DIR.PTR` `FILE.DIR.CAP` — the low-RAM buffer, when `BANK` is 0<br>`FILE.DIR.PAT$` — a name pattern, or empty<br>`FILE.DIR.ONLY` — `FILE.DIR.ALL`, `.FILES` or `.DIRS` |
+| out | `FILE.DIR.GOT` — bytes read<br>`FILE.DIR.FULL` — the buffer filled before the listing ended<br>`FILE.DIR.MORE` — 1 while `NEXT` produced an entry<br>`FILE.NAME$` `FILE.BLOCKS` `FILE.TYPE$` — the entry itself |
+| internal | `FILE.DIR.AT` `FILE.DIR.ASK$` `FILE.DIR.ADDR%` `FILE.DIR.ROOM%` `FILE.DIR.OFF%` `FILE.DIR.BYTES%` `FILE.DIR.CNT%` `FILE.DIR.BLK%` `FILE.DIR.OK%` `FILE.DIR.SLOW%` `FILE.DIR.LFN%` `FILE.DIR.NAMEA%` `FILE.DIR.TYPEA%` |
+| constants | `FILE.DIR.ALL` `FILE.DIR.FILES` `FILE.DIR.DIRS` `FILE.DIR.NAMEMAX` `FILE.DIR.BANKROOM` `FILE.DIR.BANKBASE` |
+
+`FILE.DIR.INIT` must run once before anything else: it sizes `FILE.NAME$` and `FILE.TYPE$` for the
+assembly to write into, and creates every `{VAR}` slot. **Do not assign `FILE.NAME$` or
+`FILE.TYPE$` afterwards** — an assignment reallocates and the block the assembly holds goes stale.
+
+`FILE.NAME$` is shared with `FILEIO` on purpose: the name a picker chose is the name `FILE.EXISTS`
+and `FILE.DELETE` want.
+
 ##### `MENUVERT.INC.BL`
 
 | | |
@@ -2022,6 +2115,9 @@ you. `MENUVERT.HOTFIND` reads the first two and answers in `MENUVERT.HOTAT`.
 ## 3. The modules (2)
 
 
+## 3. The modules (3)
+
+
 *See also: 4.1 THEME.INC.BL -- named colour roles, 4.3 APPSYS.INC.BL -- start politely, leave it as you found it, 4.2 STRINGS.INC.BL -- string helpers, 4.4 LINEINPUT.INC.BL -- a positioned entry field, 4.5 BMX.INC.BL -- a BMX bitmap into VERA, 4.6 MENUVERT.INC.BL -- a vertical menu*
 
 ## 4. Labels are global too
@@ -2036,6 +2132,14 @@ internal, and a `GOSUB` to one will do something, just not something useful.
 **`MENUVERT.RUN`, `MENUVERT.DRAW`, `MENUVERT.ROW` and `MENUVERT.HOTFIND` are the four you may call.**
 `MENUVERT.WAIT`, `.KEYED`, `.SETTLE`, `.WRAPTOP`, `.WRAPBOT`, `.CANCEL`, `.HOTKEY`, `.PADKEY`,
 `.PADREAD` and the three `FOLD` helpers are not.
+
+`FILE.*` has a great many, because most of the module is one routine feeding another: **the
+callable names are `FILE.STATUS`, `EXISTS`, `DELETE`, `RENAME`, `COPY`, `MKDIR`, `CHDIR`, `UP`,
+`GETPATH`, `SAVEARRAY` and `LOADARRAY`, plus `FILE.DIR.INIT`, `.OPEN` and `.NEXT`.**
+`FILE.CMD`, `.DONE`, `.PETNAME`, `.PETNEW`, `.TOPET`, `.PATHWALK`, `.WRITEROWS`, `.READROWS`,
+`.ROWREAL`, `.ROWDROP`, `.KEEPROW`, `FILE.DIR.WHERE`, `.LOWRAM`, `.ASKFOR`, `.SUCK`,
+`.SKIPDISK`, `.FILL` and `.STEP` are not. `FILE.DIR.FILL` and `FILE.DIR.STEP` are the two
+assembly blobs and enter with no arguments set up at all.
 
 `STRINGS` has two of its own, both loop continuations rather than entry points:
 **`STR.SPLIT.NEXT`** and **`STR.REPLACE.NEXT`**. Enter either one directly and you resume a
@@ -2053,9 +2157,37 @@ be `BMX.MODULE.END` — a name is either a label or a variable, never both.
 ---
 
 
-## 5. Two more naming rules that are not about collisions
+## 5. TRUE IS -1
 
-#### 5. Two more naming rules that are not about collisions
+#### 5. TRUE IS -1
+
+**Every flag the library hands back is -1 for true and 0 for false**, and anything written
+against it should be too. `GUI.OK` `GUI.ANSWER` `GUI.STASHED` `STASH.OK` `SORT.OK`
+`MENUVERT.HOTHIT` `FILE.OK` `BANKMGR.OK` `APPSYS.IS.EMULATOR` — all of them.
+
+That is what a comparison in this compiler evaluates to, so a flag and a test read the same
+way, and it is the value `NOT` wants: `NOT` is `-x-1`, so `NOT -1` is 0 while `NOT 1` is -2,
+which is still true. `IF` itself tests non-zero, so `IF FLAG THEN` works either way and
+`IF FLAG = 1 THEN` is the spelling that breaks.
+
+```basic
+IF GUI.OK THEN <accepted>            ' yes
+IF NOT GUI.OK THEN <cancelled>       ' yes
+IF GUI.OK = 0 THEN <cancelled>       ' yes
+IF GUI.OK = 1 THEN <accepted>        ' NO -- it is -1
+```
+
+**A flag the CALLER sets is read as non-zero**, so `LINEINPUT.MASK = 1` and `STASH.MOVE = 1`
+still work. Write -1 in new code all the same.
+
+**Printing one needs `STR$` whole.** The `MID$(STR$(N), 2)` idiom strips the leading space
+`STR$` puts on a positive number; -1 has no leading space, so that idiom eats the minus and
+prints `1`.
+
+
+## 6. Two more naming rules that are not about collisions
+
+#### 6. Two more naming rules that are not about collisions
 
 **`#DEFINE` takes an INT16** (`BASLOAD.MD:313`). A constant above 65535 is
 `ERROR: INVALID PARAMETER`, not a warning — which is why `BMX.PALBASE` (VRAM `$1FA00`, 129536) is an

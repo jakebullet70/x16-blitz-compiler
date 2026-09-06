@@ -152,7 +152,7 @@ Three implementations, and what each costs:
 | **Screen** | COMPOSITE | `GP.CHAR` — free, one cell in `GP.PRINTAT`'s shape running `GP.FILL`'s handler |
 | **Colour roles** | BASIC | `THEME.INC.BL` — `THEME.LOAD`, `THEME.CLR()` · §4.1 |
 | **String helpers** | BASIC | `STRINGS.INC.BL` — `PADR` `PADL` `PADC` `SPLIT` `REPLACE` `PET2SCR` · §4.2 |
-| **Screen etiquette, panels** | BASIC | `APPSYS.INC.BL` — `STARTUP` `RESTORE` `PANEL.SAVE/LOAD/PUT` · §4.3 |
+| **Screen etiquette, panels** | BASIC | `APPSYS.INC.BL` — `STARTUP` `RESTORE` `PANEL.SAVE/LOAD/PUT` `ISEMU` · §4.3 |
 | **Entry fields** | BASIC | `LINEINPUT.INC.BL` — `LINEINPUT.GET`, `LINEINPUT.ASK` · §4.4 |
 | **Bitmaps** | BASIC | `BMX.INC.BL` — `BMX.SHOW`, `BMX.RESTORE` · §4.5 |
 | **Menus** | BASIC | `MENUVERT.INC.BL` — `RUN` `DRAW` `ROW` `HOTFIND` · §4.6 |
@@ -805,6 +805,7 @@ Examples: [`SPLITT.EXP.BL`](SPLITT.EXP.BL)
 | `APPSYS.PANEL.SAVE` | `APPSYS.FILE$` `.BANK` `.X` `.Y` `.W` `.H` [`.DEV`] | a file |
 | `APPSYS.PANEL.LOAD` | `APPSYS.FILE$` `.BANK` | back where it came from |
 | `APPSYS.PANEL.PUT` | `APPSYS.FILE$` `.BANK` `.X` `.Y` | pasted somewhere else |
+| `APPSYS.ISEMU` | — | `APPSYS.IS.EMULATOR` — -1 under x16emu, 0 otherwise |
 
 ```basic
 GOSUB APPSYS.STARTUP
@@ -820,6 +821,25 @@ Lay out from `APPSYS.COLS` / `APPSYS.ROWS` rather than assuming 80x60. The X16 b
 
 `APPSYS.DEV` defaults to 8. The panel routines are implemented in `STASHFILE.INC.BL`. A panel file
 is self-describing — it carries the stash's 4-byte header — so loading one needs only its name.
+
+`APPSYS.ISEMU` answers the question a timing loop has to ask. `$9FBE` and `$9FBF` are the last of
+the emulator's own I/O registers and read as `"1"` and `"6"` under x16emu, with the debugger on or
+off; the routine is those two `PEEK`s and a comparison.
+
+```basic
+GOSUB APPSYS.ISEMU
+IF APPSYS.IS.EMULATOR THEN PRINT "EMULATED"
+IF NOT APPSYS.IS.EMULATOR THEN PRINT "NOT x16emu"
+```
+
+**The flag is -1, not 1**, so `NOT` works on it: `NOT` is `-x-1` here, so `NOT -1` is 0 while
+`NOT 1` is -2 — still true. -1 is also what a comparison hands back, so the flag reads like one.
+`IF` itself tests non-zero, so either value would have worked with the plain form.
+
+**It answers for x16emu and nothing else.** A 0 means "not x16emu" — a real machine, or another
+emulator that does not carry those registers. And `$9FA0-$9FBF` is expansion card I/O on the real
+machine, so a card at I/O5 could in principle answer `"16"` as well: a 1 is strong, a 0 is
+certain.
 
 ### 4.4 `LINEINPUT.INC.BL` — a positioned entry field
 
@@ -1071,7 +1091,7 @@ The array is passed as an address because a BASL subroutine cannot be passed an 
 is a keyword for this purpose. The empty parentheses in `GP.ARRPTR(A$())` are required — `A$` and
 `A$()` are different variables.
 
-`SORT.OK` is 0 if the sort was refused: more than 255 elements, so `DIM A$(254)` is the largest
+`SORT.OK` is -1 when it sorted and 0 if the sort was refused: more than 255 elements, so `DIM A$(254)` is the largest
 accepted (`DIM A$(255)` is 256 elements), or an array whose elements are not strings. The element
 count and the type are read from the array's own header, three bytes below what `GP.ARRPTR` returns,
 so a wrong count cannot be passed in.

@@ -21,7 +21,7 @@
 ## **        FILE.DIR.FULL     the buffer filled before the listing ended
 ## **        FILE.DIR.SLOW     1 if the device had no MACPTR and the read
 ## **                          fell back to CHRIN a byte at a time
-## **        FILE.DIR.MORE     1 while NEXT produced an entry, 0 at the end
+## **        FILE.DIR.MORE     -1 while NEXT produced an entry, 0 at the end
 ## **        FILE.NAME$        the entry
 ## **        FILE.BLOCKS       its size in blocks
 ## **        FILE.TYPE$        PRG, SEQ or DIR
@@ -233,7 +233,7 @@ FILE.DIR.ASKFOR:
 FILE.DIR.SUCK:
     IF FILE.DIR.BANK > 0 THEN BANK FILE.DIR.BANK
     GOSUB FILE.DIR.FILL : FILE.DIR.GOT = FILE.DIR.BYTES% : FILE.DIR.SLOW = FILE.DIR.SLOW%
-    IF FILE.DIR.BYTES% >= FILE.DIR.ROOM% THEN FILE.DIR.FULL = 1
+    IF FILE.DIR.BYTES% >= FILE.DIR.ROOM% THEN FILE.DIR.FULL = -1
     RETURN
 
 ## ***********************************************************************
@@ -363,7 +363,7 @@ FILE.DIR.NEXT:
     GOSUB FILE.DIR.STEP
     IF FILE.DIR.BANK > 0 THEN BANK FILE.DIR.WAS%
     IF FILE.DIR.OK% = 0 THEN RETURN
-    FILE.DIR.AT = FILE.DIR.OFF% : FILE.BLOCKS = FILE.DIR.BLK% : FILE.DIR.MORE = 1
+    FILE.DIR.AT = FILE.DIR.OFF% : FILE.BLOCKS = FILE.DIR.BLK% : FILE.DIR.MORE = -1
     RETURN
 
 ## ***********************************************************************
