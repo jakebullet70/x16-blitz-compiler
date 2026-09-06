@@ -128,6 +128,10 @@ MainCompileLoop:
 		sta 	implicitDimFirst
 		sty 	implicitDimFirst+1
 _MCLHaveFirst:
+		jsr 	RegionSwitch 				; pass two: if this line opens or closes a GP.BANKED
+											; region, move the write cursor BEFORE the line is
+											; marked, so the marker and its table entry land on
+											; the side the line belongs to
 		jsr 	STRMarkLine 				; remember the code position and number of this line.
 		lda 	#PCD_NEWCMD_LINE 			; generate new command line
 		jsr 	WriteCodeByte
@@ -250,9 +254,14 @@ SaveCodeAndExit:
 		;
 		jsr 	AsmFlushPool 				; append the GP.ASM blob pool AFTER the $FF end marker,
 											; where nothing walks -- see commands/gpasmcode.asm
-		jsr 	GPBankRelocate 				; lift each GP.BANKED region out to the end of the
-											; object, past the pool -- commands/gpbank.asm. Does
-											; nothing to a program without a region.
+		lda 	passNumber
+		bne 	_SCEPlaced
+		jsr 	GPBankRelocate 				; PASS ONE ONLY. It lifts each region out to the end
+		jsr 	SaveLayout 					; of the object and works out where they all go; pass
+		bra 	_SCEChecksum 				; two is handed that and writes them there directly
+_SCEPlaced:
+		jsr 	RestoreLayout
+_SCEChecksum:
 		jsr 	ObjectChecksum
 		;
 		lda 	passNumber
@@ -383,6 +392,9 @@ ResetPassState:
 		stz 	AsmPoolLen+1
 		stz 	AsmFixupCount
 		;
+		stz 	nextRegion 					; ...and pass two's place in the region layout
+		stz 	regionOpen
+		;
 		rts
 
 ; ************************************************************************************************
@@ -445,6 +457,206 @@ _OCDone:
 		sta 	objPtr 						; WriteObjectCode streams up to it
 		lda 	sumEnd+1
 		sta 	objPtr+1
+		rts
+
+; ************************************************************************************************
+;
+;		PASS TWO WRITES EACH GP.BANKED REGION STRAIGHT INTO ITS FINAL PLACE.
+;
+;		Pass one compiles a region where it appears and GPBankRelocate rotates it out to the end
+;		of the object afterwards -- see the diagram in commands/gpbank.asm. So pass one has
+;		already worked out where every region lands, and pass two is handed the answer: reaching
+;		the GP.BANKED line it drops the entry bridge in low memory and moves the write cursor to
+;		the region's address, and reaching the GP.ENDBANKED line it writes the exit bridge and
+;		the region's end marker and moves the cursor back. Nothing is rotated.
+;
+;		THE SWITCH HAPPENS BEFORE THE LINE IS MARKED, which is why this is called from the main
+;		loop and not from the GP.BANKED generator. A region begins ON the GP.BANKED line's marker
+;		byte, so by the time the generator runs the marker has already been written -- into low
+;		memory, where it does not belong.
+;
+;		Regions cannot nest and are placed in source order, so which one is next is an index
+;		rather than a search.
+;
+; ************************************************************************************************
+
+RegionSwitch:
+		pha 								; STRMarkLine IS CALLED WITH THE LINE NUMBER IN YA --
+		phx 								; GetLineNumber loaded it before the main loop reached
+		phy 								; here -- so this has to hand A, X and Y back untouched
+		jsr 	RegionSwitchWork
+		ply
+		plx
+		pla
+		rts
+
+RegionSwitchWork:
+		lda 	passNumber 					; pass one compiles inline and relocates afterwards,
+		beq 	_RSDone 					; exactly as it always did
+		lda 	regionOpen
+		bne 	_RSClosing
+		;
+		;		Outside a region. Does this line open the next one ? gpBankLinesIn still holds
+		;		pass one's answer at this point: pass two writes its own copy in the generator,
+		;		which runs after this, and writes the same value.
+		;
+		lda 	nextRegion
+		cmp 	layoutCount
+		bcs 	_RSDone 					; every region is placed already
+		asl 	a
+		tax
+		lda 	currentLineNumber
+		cmp 	gpBankLinesIn,x
+		bne 	_RSDone
+		lda 	currentLineNumber+1
+		cmp 	gpBankLinesIn+1,x
+		bne 	_RSDone
+		;
+		;		It does. The entry bridge stays behind in low memory, where the region used to
+		;		be, and the cursor moves to where the region goes.
+		;
+		jsr 	_RSBridge
+		lda 	objPtr
+		sta 	lowResume
+		lda 	objPtr+1
+		sta 	lowResume+1
+		lda 	layoutStart,x
+		sta 	objPtr
+		lda 	layoutStart+1,x
+		sta 	objPtr+1
+		inc 	regionOpen
+_RSDone:
+		rts
+		;
+		;		Inside a region. Does this line close it ? The GP.ENDBANKED line's marker belongs
+		;		in LOW memory -- it is the first byte of what follows the region, not the last
+		;		byte of it -- so the region has to be finished off before that marker is written.
+		;
+_RSClosing:
+		lda 	nextRegion
+		asl 	a
+		tax
+		lda 	currentLineNumber
+		cmp 	gpBankLinesOut,x
+		bne 	_RSDone
+		lda 	currentLineNumber+1
+		cmp 	gpBankLinesOut+1,x
+		bne 	_RSDone
+
+		jsr 	_RSBridge
+		lda 	#$FF 						; the region's own end marker, which is what stops the
+		jsr 	WriteCodeByte 				; walkers once they have hopped up here
+		lda 	lowResume
+		sta 	objPtr
+		lda 	lowResume+1
+		sta 	objPtr+1
+		stz 	regionOpen
+		inc 	nextRegion
+		rts
+;
+;		Both bridges are GOTO THIS LINE, and that is the whole trick -- a region begins and ends
+;		on a line marker, so both lines have a table entry pointing exactly at a boundary and
+;		FixBranches resolves the bridges by the path it resolves every other branch. No new
+;		opcode and no absolute operand. See the header in commands/gpbank.asm.
+;
+_RSBridge:
+		lda 	#PCD_CMD_GOTO
+		jsr 	WriteCodeByte
+		lda 	currentLineNumber
+		jsr 	WriteCodeByte
+		lda 	currentLineNumber+1
+		jsr 	WriteCodeByte
+		rts
+
+; ************************************************************************************************
+;
+;		The layout pass one worked out, kept across the reset and handed back to pass two.
+;
+;		A BULK COPY RATHER THAN A SECOND CALCULATION. Pass two records region bounds of its own
+;		as it compiles -- it has to, the generators are the same code -- but they describe where
+;		it PUT things, which for gpBankEnds is not what the relocator means by the same name.
+;		Overwriting the lot afterwards is shorter than teaching the generators the difference,
+;		and it is pass one's figures that FixBranches and the bootstrap patcher want.
+;
+;		THE ALIGNMENT PADDING IS NOT REWRITTEN. Pass two lands its low code and its regions on
+;		the addresses pass one used, in the same buffer, so the gaps between them still hold the
+;		bytes pass one left there. That stops being true the day pass two streams to a file, and
+;		the gaps will have to be filled then.
+;
+; ************************************************************************************************
+
+SaveLayout:
+		lda 	gpBankCount
+		sta 	layoutCount
+		beq 	_SLDone 					; no regions, nothing to keep
+		asl 	a 							; the two-byte tables want the count doubled
+		tax
+_SLLoop:
+		dex
+		lda 	gpBankStarts,x
+		sta 	layoutStart,x
+		lda 	gpBankEnds,x
+		sta 	layoutEnd,x
+		lda 	gpBankHops,x
+		sta 	layoutHops,x
+		txa
+		bne 	_SLLoop
+
+		ldx 	layoutCount
+_SLByteLoop:
+		dex
+		lda 	gpBankPageCounts,x
+		sta 	layoutPages,x
+		lda 	gpBankCrossings,x
+		sta 	layoutCross,x
+		txa
+		bne 	_SLByteLoop
+
+		lda 	gpBankRunBase
+		sta 	layoutRunBase
+_SLDone:
+		rts
+
+RestoreLayout:
+		lda 	layoutCount
+		beq 	_RLDone 					; no regions, and nothing pass two did needs undoing
+		sta 	gpBankCount
+		asl 	a
+		tax
+_RLLoop:
+		dex
+		lda 	layoutStart,x
+		sta 	gpBankStarts,x
+		lda 	layoutEnd,x
+		sta 	gpBankEnds,x
+		lda 	layoutHops,x
+		sta 	gpBankHops,x
+		txa
+		bne 	_RLLoop
+
+		ldx 	layoutCount
+_RLByteLoop:
+		dex
+		lda 	layoutPages,x
+		sta 	gpBankPageCounts,x
+		lda 	layoutCross,x
+		sta 	gpBankCrossings,x
+		txa
+		bne 	_RLByteLoop
+
+		lda 	layoutRunBase
+		sta 	gpBankRunBase
+		lda 	#1 							; the hop is open again: FixBranches walks the low code
+		sta 	gpBankActive 				; and then jumps up to the regions
+		;
+		;		The object reaches the top of the LAST region, and pass two's cursor came to rest
+		;		at the end of the low code. Pass one's length is that top, so take it back.
+		;
+		lda 	pass1Len
+		sta 	objPtr
+		lda 	pass1Len+1
+		sta 	objPtr+1
+_RLDone:
 		rts
 
 ; ************************************************************************************************
@@ -534,6 +746,30 @@ passNumber:								; 0 = first pass, 1 = second
 passSum:									; Fletcher-16 over the object this pass laid out
 		.fill 	2
 sumEnd:										; one past its last byte, held across the walk
+		.fill 	2
+;
+;		The GP.BANKED layout, carried from pass one into pass two. The tables mirror the ones in
+;		commands/gpbank.asm they are copied from.
+;
+layoutCount:								; regions pass one found and placed
+		.fill 	1
+layoutStart:								; where each one ended up
+		.fill 	2*GPBANK_MAXREGIONS
+layoutEnd:									; and one past where each one ends
+		.fill 	2*GPBANK_MAXREGIONS
+layoutHops:									; where the walk leaves off to reach each one
+		.fill 	2*GPBANK_MAXREGIONS
+layoutPages:								; pages of each, for the bootstrap's table
+		.fill 	GPBANK_MAXREGIONS
+layoutCross:								; what a branch crossing into each one is out by
+		.fill 	GPBANK_MAXREGIONS
+layoutRunBase:								; the page the whole run of them starts at
+		.fill 	1
+nextRegion:									; which region pass two is looking for next
+		.fill 	1
+regionOpen:									; nonzero while pass two is writing into one
+		.fill 	1
+lowResume:									; where the low code left off, across a region
 		.fill 	2
 pass1Sum:									; ...and what pass one came to, kept for the compare
 		.fill 	2
