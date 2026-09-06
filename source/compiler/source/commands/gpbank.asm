@@ -604,6 +604,25 @@ _GBRoomDone:
 		jsr 	_GBShiftUp
 _GBRPadded:
 		;
+		;		THE ALIGNMENT GAP, GIVEN A VALUE. Nothing writes these bytes -- the region was
+		;		lifted off them and the copy left its own first few behind -- and nothing reads
+		;		them either, so they have never mattered. They matter the day pass two streams
+		;		the object to a file instead of landing on pass one's addresses in pass one's
+		;		buffer: there is no leftover to inherit then, and a padding byte has to be
+		;		something. $FF, because that is the end marker: a walk that ever reached one
+		;		would stop rather than read whatever came next as an opcode.
+		;
+		sec
+		lda 	gpBankNewBase
+		sbc 	gpBankPad
+		sta 	zTemp1
+		lda 	gpBankNewBase+1
+		sbc 	#0
+		sta 	zTemp1+1
+		lda 	gpBankPad
+		sta 	gpBankTemp
+		jsr 	_GBRFill
+		;
 		;		gpBankHigh is now one past the region: where the exit bridge goes.
 		;
 		clc
@@ -635,6 +654,20 @@ _GBRPadded:
 		lda 	#$FF
 		ldy 	#3
 		sta 	(zTemp0),y
+		;
+		;		...and the filler above that marker, which is there so the region above starts
+		;		on the page this one's span ends at. Same bytes, same reason as the gap above.
+		;
+		clc
+		lda 	zTemp0
+		adc 	#4
+		sta 	zTemp1
+		lda 	zTemp0+1
+		adc 	#0
+		sta 	zTemp1+1
+		lda 	gpBankFill
+		sta 	gpBankTemp
+		jsr 	_GBRFill
 _GBRFixUp:
 		;
 		;		Everything that recorded a position in the buffer now has to be told.
@@ -955,6 +988,26 @@ _GBWriteGoto:
 		txa
 		iny
 		sta 	(zTemp0),y
+		rts
+
+; ************************************************************************************************
+;
+;		Write gpBankTemp bytes of $FF from zTemp1 upwards. Both counts are a single byte -- the
+;		alignment is under a page by definition and so is the filler -- so Y is the whole loop.
+;
+; ************************************************************************************************
+
+_GBRFill:
+		ldy 	#0
+		cpy 	gpBankTemp
+		beq 	_GBRFillDone 				; nothing to pad
+		lda 	#$FF
+_GBRFillLoop:
+		sta 	(zTemp1),y
+		iny
+		cpy 	gpBankTemp
+		bne 	_GBRFillLoop
+_GBRFillDone:
 		rts
 
 ; ************************************************************************************************
