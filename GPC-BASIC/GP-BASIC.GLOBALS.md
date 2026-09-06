@@ -27,6 +27,8 @@ The convention is one dotted prefix per module, and nothing writes outside its o
 | `MENUVERT.` | `MENUVERT.INC.BL` | vertical menus |
 | `BMX.` | `BMX.INC.BL` | BMX bitmap loading |
 | `BMXK.` | `BMX.INC.BL` | its KERNAL/VERA constants, kept apart from its variables |
+| `FILE.` | `FILEIO.INC.BL` | the drive: status, exists, delete, rename, directories |
+| `FILE.DIR.` | `FILEDIR.INC.BL` | reading a directory, kept apart from the rest of `FILE.` |
 
 Pick anything else for your own program. `AIRLIFT.`, `GAME.`, `MAP.` — a prefix costs nothing at
 runtime because BASLOAD crunches every identifier down to a short BASIC variable, so a long
@@ -132,6 +134,41 @@ first
 rather than `0` switches the stash off: `0` already means "never set". `BMX.KEPT` is the once-per-run
 guard that makes a slideshow restore the *machine's* palette rather than the previous picture's.
 
+### `FILEIO.INC.BL`
+
+Needs a `#SYMFILE` — `FILE.TOPET` is a `GP.ASM` blob.
+
+| | |
+|---|---|
+| in | `FILE.NAME$` — the file every routine acts on<br>`FILE.NEW$` — the second name, `RENAME` and `COPY`<br>`FILE.DEVICE` — the drive; 0 means 8<br>`FILE.ISO` — non-zero converts names to PETSCII on the way out<br>`FILE.N` — rows to write, `SAVEARRAY`<br>`FILE.MAX` — rows that will fit, `LOADARRAY`; 0 means 10<br>`FILE.LINE$()` — the rows; **the caller owns the `DIM`** |
+| out | `FILE.ERR` `FILE.MSG$` `FILE.TRK` `FILE.SEC` — the command channel<br>`FILE.OK` — `FILE.EXISTS`<br>`FILE.N` — rows read, `LOADARRAY`<br>`FILE.PATH$` — `FILE.CURDIR` |
+| internal | `FILE.CMDSTR$` `FILE.OUT$` `FILE.RAW$` `FILE.ROW$` `FILE.ST` `FILE.KEEP` `FILE.I` `FILE.PETP%` |
+| constants | `FILE.OKMAX` `FILE.NOTFOUND` `FILE.EXISTSERR` `FILE.PROTECTED` `FILE.CHAN` |
+
+**This module is the missing `DS` and `DS$`.** `FILE.ERR` is `DS` and `FILE.MSG$` is `DS$`. `ST` is
+*not* a disk status — it is the KERNAL's serial bus status and cannot report `FILE NOT FOUND`.
+
+`FILE.N` is both an input and an output, the way `MENUVERT.SEL` is. `FILE.LINE$()` is the caller's
+`DIM`, like `MENUVERT.ITEM$` and unlike `THEME.CLR`.
+
+### `FILEDIR.INC.BL`
+
+Needs `FILEIO.INC.BL`, and a `#SYMFILE` — it is two `GP.ASM` blobs.
+
+| | |
+|---|---|
+| in | `FILE.DIR.BANK` — the bank to read into, or 0 for low RAM<br>`FILE.DIR.PTR` `FILE.DIR.CAP` — the low-RAM buffer, when `BANK` is 0<br>`FILE.DIR.PAT$` — a name pattern, or empty<br>`FILE.DIR.ONLY` — `FILE.DIR.ALL`, `.FILES` or `.DIRS` |
+| out | `FILE.DIR.GOT` — bytes read<br>`FILE.DIR.FULL` — the buffer filled before the listing ended<br>`FILE.DIR.MORE` — 1 while `NEXT` produced an entry<br>`FILE.NAME$` `FILE.BLOCKS` `FILE.TYPE$` — the entry itself |
+| internal | `FILE.DIR.AT` `FILE.DIR.ASK$` `FILE.DIR.ADDR%` `FILE.DIR.ROOM%` `FILE.DIR.OFF%` `FILE.DIR.BYTES%` `FILE.DIR.CNT%` `FILE.DIR.BLK%` `FILE.DIR.OK%` `FILE.DIR.SLOW%` `FILE.DIR.LFN%` `FILE.DIR.NAMEA%` `FILE.DIR.TYPEA%` |
+| constants | `FILE.DIR.ALL` `FILE.DIR.FILES` `FILE.DIR.DIRS` `FILE.DIR.NAMEMAX` `FILE.DIR.BANKROOM` `FILE.DIR.BANKBASE` |
+
+`FILE.DIR.INIT` must run once before anything else: it sizes `FILE.NAME$` and `FILE.TYPE$` for the
+assembly to write into, and creates every `{VAR}` slot. **Do not assign `FILE.NAME$` or
+`FILE.TYPE$` afterwards** — an assignment reallocates and the block the assembly holds goes stale.
+
+`FILE.NAME$` is shared with `FILEIO` on purpose: the name a picker chose is the name `FILE.EXISTS`
+and `FILE.DELETE` want.
+
 ### `MENUVERT.INC.BL`
 
 | | |
@@ -161,6 +198,14 @@ internal, and a `GOSUB` to one will do something, just not something useful.
 **`MENUVERT.RUN`, `MENUVERT.DRAW`, `MENUVERT.ROW` and `MENUVERT.HOTFIND` are the four you may call.**
 `MENUVERT.WAIT`, `.KEYED`, `.SETTLE`, `.WRAPTOP`, `.WRAPBOT`, `.CANCEL`, `.HOTKEY`, `.PADKEY`,
 `.PADREAD` and the three `FOLD` helpers are not.
+
+`FILE.*` has a great many, because most of the module is one routine feeding another: **the
+callable names are `FILE.STATUS`, `EXISTS`, `DELETE`, `RENAME`, `COPY`, `MKDIR`, `CHDIR`, `UP`,
+`GETPATH`, `SAVEARRAY` and `LOADARRAY`, plus `FILE.DIR.INIT`, `.OPEN` and `.NEXT`.**
+`FILE.CMD`, `.DONE`, `.PETNAME`, `.PETNEW`, `.TOPET`, `.PATHWALK`, `.WRITEROWS`, `.READROWS`,
+`.ROWREAL`, `.ROWDROP`, `.KEEPROW`, `FILE.DIR.WHERE`, `.LOWRAM`, `.ASKFOR`, `.SUCK`,
+`.SKIPDISK`, `.FILL` and `.STEP` are not. `FILE.DIR.FILL` and `FILE.DIR.STEP` are the two
+assembly blobs and enter with no arguments set up at all.
 
 `STRINGS` has two of its own, both loop continuations rather than entry points:
 **`STR.SPLIT.NEXT`** and **`STR.REPLACE.NEXT`**. Enter either one directly and you resume a

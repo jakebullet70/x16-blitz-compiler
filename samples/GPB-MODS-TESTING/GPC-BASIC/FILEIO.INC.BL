@@ -1,0 +1,324 @@
+## ***********************************************************************
+## **
+## **  FILEIO.INC.BL -- the drive: status, files, directories.
+## **
+## **      FILE.STATUS     read the command channel
+## **      FILE.EXISTS     is FILE.NAME$ on the drive
+## **      FILE.DELETE     scratch it, pattern allowed
+## **      FILE.RENAME     FILE.NAME$ -> FILE.NEW$
+## **      FILE.COPY       one drive only
+## **      FILE.MKDIR      make a subdirectory
+## **      FILE.CHDIR      change to one
+## **      FILE.UP         change to the parent
+## **      FILE.CURDIR     the current directory, into FILE.PATH$
+## **      FILE.SAVEARRAY  FILE.LINE$() out to a SEQ file
+## **      FILE.LOADARRAY  and back
+## **
+## **  Requires GPB.INC.BL, and does not #INCLUDE it.
+## **
+## **      #SYMFILE "@:MYPROG.SYM"   <- required, before the #INCLUDEs.
+## **
+## **  FILE.TOPET is GP.ASM and reaches FILE.PETP% through {VAR}. Without a
+## **  #SYMFILE the compile stops at NO SYMBOL FILE FOR {}.
+## **
+## **   in   FILE.NAME$     the file acted on
+## **        FILE.NEW$      the second name, RENAME and COPY
+## **        FILE.DEVICE       the drive. 0 means 8
+## **        FILE.ISO       non-zero folds names to PETSCII on the way out
+## **        FILE.N         rows to write, SAVEARRAY
+## **        FILE.MAX       rows that fit, LOADARRAY. 0 means 10
+## **        FILE.LINE$()   the rows. The caller owns the DIM
+## **
+## **   out  FILE.ERR       error number. Under 20 is success
+## **        FILE.MSG$      the drive's text
+## **        FILE.TRK       FILE.SEC   the two trailing fields
+## **        FILE.OK        FILE.EXISTS
+## **        FILE.N         rows read, LOADARRAY
+## **        FILE.PATH$     FILE.CURDIR
+## **
+## **  internal  FILE.CMDSTR$ FILE.OUT$ FILE.RAW$ FILE.ROW$ FILE.ST FILE.KEEP
+## **            FILE.I FILE.PETP%
+## **
+## **  FILE.ERR is DS and FILE.MSG$ is DS$. The X16 has neither.
+## **
+## **  FILE.N is an input to SAVEARRAY and an output from LOADARRAY.
+## **  FILE.LINE$() is the caller's DIM, like MENUVERT.ITEM$. Left alone the
+## **  implicit DIM gives 0..10.
+## **
+## **  This module takes logical file 14 and secondary address 14. Not 2 or 3:
+## **  those belong to the editor, GPC-HELP and the cruncher. The two are equal
+## **  so a later FILE.SEEK needs no reopen -- see the P and T note below.
+## **
+## **  Error under 20 is success. 0 is OK. 1 is "files scratched" and carries
+## **  the count in FILE.TRK. 62 is FILE NOT FOUND, 63 FILE EXISTS, 26 WRITE
+## **  PROTECT.
+## **
+## ** ---- WARNING: ST IS NOT A DISK STATUS ----
+## **
+## **  LINPUT# on a channel whose OPEN found nothing returns CHR$(0) with
+## **  ST = 66, and keeps doing so.
+## **
+## **  ST is 64 before a program's first statement: LOAD leaves bit 6 set.
+## **
+## ** ---- traps ----
+## **
+## **  Read the command channel or the next OPEN misbehaves. The drive holds
+## **  its error state until channel 15 is read. Every routine here ends by
+## **  reading it.
+## **
+## **  FILE.RENAME onto a name that exists returns 62, not 63, which is what a
+## **  missing source also returns. Test with FILE.EXISTS first.
+## **
+## **  FILE.COPY is one drive. C:new=old cannot cross devices. It takes a comma
+## **  list, so it also concatenates.
+## **
+## **  FILE.SAVEARRAY overwrites, with @: on the open.
+## **
+## **  FILE.DELETE takes a pattern. S:*.BAK scratches every match.
+## **
+## **  The last row of a file arrives with ST already set, so a row is stored
+## **  before the loop ends. A blank final line is indistinguishable from end
+## **  of file and is dropped.
+## **
+## ** ---- random access ----
+## **
+## **  CMDR-DOS has no REL files. Use ,M open mode with P and T on channel 15:
+## **
+## **      OPEN 1,8,2,"LEVEL.DAT,S,R"
+## **      OPEN 15,8,15,"P"+CHR$(2)+CHR$(0)+CHR$(1)+CHR$(0)+CHR$(0)
+## **
+## **  T returns the position and the file size. The data channel's secondary
+## **  address must equal the P or T channel argument. VAL("$"+MID$(A$,10)) from
+## **  the manual returns 0 here: VAL stops at the first non-numeric character,
+## **  so parse the eight hex digits by hand.
+## **
+## ** ---- size ----
+## **
+## **  900 bytes, and there is no dead code elimination. FILE.SAVEARRAY and
+## **  FILE.LOADARRAY with their helpers are 364 of that.
+## **
+## **  The FILE.* name space belongs to this file and to FILEDIR.INC.BL.
+## **
+## ***********************************************************************
+#IFNDEF FILEIO.DEFS
+#DEFINE FILEIO.DEFS 1
+
+## An error number under this is success.
+#DEFINE FILE.OKMAX 20
+
+## FILE.EXISTSERR is not what FILE.RENAME gives on a clash. It is the code for
+## opening an existing file for writing without @:.
+#DEFINE FILE.NOTFOUND 62
+#DEFINE FILE.EXISTSERR 63
+#DEFINE FILE.PROTECTED 26
+
+#DEFINE FILE.CHAN 14
+
+GOTO FILEIO.MODULE.END
+
+## ***********************************************************************
+## **  The command channel
+## ***********************************************************************
+
+## FILE.STATUS falls into FILE.CMD with an empty command: SETNAM with a length
+## of zero opens the channel and reads it without asking for anything.
+
+FILE.STATUS:  FILE.CMDSTR$ = ""
+
+## FILE.CMD sends FILE.CMDSTR$ and reads the answer. The command rides on the
+## OPEN, so nothing in this file uses PRINT# for a command.
+FILE.CMD:
+    IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
+    OPEN 15, FILE.DEVICE, 15, FILE.CMDSTR$
+    INPUT#15, FILE.ERR, FILE.MSG$, FILE.TRK, FILE.SEC
+    CLOSE 15 : FILE.CMDSTR$ = ""
+    RETURN
+
+## Channel 15 is opened first and read while the file is still open: the answer
+## being read is the drive's answer to that open.
+FILE.EXISTS:
+    FILE.OK = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
+    GOSUB FILE.PETNAME : OPEN 15, FILE.DEVICE, 15
+    OPEN FILE.CHAN, FILE.DEVICE, FILE.CHAN, FILE.OUT$ + ",S,R"
+    INPUT#15, FILE.ERR, FILE.MSG$, FILE.TRK, FILE.SEC
+    CLOSE FILE.CHAN : CLOSE 15
+    IF FILE.ERR < FILE.OKMAX THEN FILE.OK = 1
+    RETURN
+
+
+
+
+## ***********************************************************************
+## **  One DOS line each
+## ***********************************************************************
+
+## All of these tail-call FILE.CMD, whose RETURN is the caller's.
+
+FILE.DELETE:  GOSUB FILE.PETNAME : FILE.CMDSTR$ = "S:" + FILE.OUT$ : GOTO FILE.CMD
+
+## FILE.OUT$ holds one name at a time, so the new name is taken first and kept
+## in the part-built command.
+FILE.RENAME:  GOSUB FILE.PETNEW : FILE.CMDSTR$ = "R:" + FILE.OUT$ + "=" : GOSUB FILE.PETNAME : FILE.CMDSTR$ = FILE.CMDSTR$ + FILE.OUT$ : GOTO FILE.CMD
+FILE.COPY:  GOSUB FILE.PETNEW : FILE.CMDSTR$ = "C:" + FILE.OUT$ + "=" : GOSUB FILE.PETNAME : FILE.CMDSTR$ = FILE.CMDSTR$ + FILE.OUT$ : GOTO FILE.CMD
+FILE.MKDIR:  GOSUB FILE.PETNAME : FILE.CMDSTR$ = "MD:" + FILE.OUT$ : GOTO FILE.CMD
+FILE.CHDIR:  GOSUB FILE.PETNAME : FILE.CMDSTR$ = "CD:" + FILE.OUT$ : GOTO FILE.CMD
+
+## CHR$(95) is the left arrow, spelled by code so the source does not depend on
+## its encoding.
+FILE.UP:  FILE.CMDSTR$ = "CD:" + CHR$(95) : GOTO FILE.CMD
+
+
+
+
+## ***********************************************************************
+## **  The current directory
+## ***********************************************************************
+
+## $=C lists the current directory, then each parent, ending at /. It arrives
+## as a fake BASIC program.
+##
+##      0 "/TEST            "
+##      0    "TEST"             DIR
+##      0    "/"                DIR
+##
+## The first line is skipped and the path rebuilt from the components: it is
+## padded to a fixed width and truncates a long path.
+
+FILE.CURDIR:
+    FILE.PATH$ = "" : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
+    OPEN 15, FILE.DEVICE, 15
+    OPEN FILE.CHAN, FILE.DEVICE, 0, "$=C"
+    INPUT#15, FILE.ERR, FILE.MSG$, FILE.TRK, FILE.SEC
+    IF FILE.ERR < FILE.OKMAX THEN GOSUB FILE.PATHWALK
+    CLOSE FILE.CHAN
+    CLOSE 15
+    IF FILE.PATH$ = "" THEN FILE.PATH$ = "/"
+    RETURN
+
+## Delimiter 34 is the quote. Reads alternate: one swallows up to an opening
+## quote, the next takes the name. The first pair lands on the header line.
+## Entries arrive innermost first, so each goes on the front.
+FILE.PATHWALK:
+    LINPUT# FILE.CHAN, FILE.ROW$, 34 : LINPUT# FILE.CHAN, FILE.ROW$, 34
+    GP.DO
+        LINPUT# FILE.CHAN, FILE.ROW$, 34 : IF ST <> 0 THEN GP.EXITDO
+        LINPUT# FILE.CHAN, FILE.ROW$, 34 : IF ST <> 0 THEN GP.EXITDO
+        IF FILE.ROW$ <> "/" THEN FILE.PATH$ = "/" + FILE.ROW$ + FILE.PATH$
+    GP.LOOP
+    RETURN
+
+
+
+
+## ***********************************************************************
+## **  A string array to a file and back
+## ***********************************************************************
+FILE.SAVEARRAY:
+    IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
+    GOSUB FILE.PETNAME : OPEN 15, FILE.DEVICE, 15
+    OPEN FILE.CHAN, FILE.DEVICE, FILE.CHAN, "@:" + FILE.OUT$ + ",S,W"
+    IF FILE.N > 0 THEN GOSUB FILE.WRITEROWS
+    CLOSE FILE.CHAN : INPUT#15, FILE.ERR, FILE.MSG$, FILE.TRK, FILE.SEC : CLOSE 15
+    RETURN
+
+FILE.WRITEROWS:  FOR FILE.I = 1 TO FILE.N : PRINT# FILE.CHAN, FILE.LINE$(FILE.I) : NEXT FILE.I
+    RETURN
+
+## FILE.N = FILE.MAX on return means the file may hold more.
+
+FILE.LOADARRAY:
+    FILE.N = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
+    IF FILE.MAX = 0 THEN FILE.MAX = 10
+    GOSUB FILE.PETNAME : OPEN 15, FILE.DEVICE, 15
+    OPEN FILE.CHAN, FILE.DEVICE, FILE.CHAN, FILE.OUT$ + ",S,R"
+    INPUT#15, FILE.ERR, FILE.MSG$, FILE.TRK, FILE.SEC
+    IF FILE.ERR < FILE.OKMAX THEN GOSUB FILE.READROWS
+    CLOSE FILE.CHAN : CLOSE 15
+    RETURN
+
+## ST is taken into a variable before anything else touches the channel. The
+## row is stored before the loop ends: the CR that completes the last row is
+## the last byte of the file, so that read is also end of file.
+FILE.READROWS:
+    GP.DO
+        LINPUT# FILE.CHAN, FILE.ROW$
+        FILE.ST = ST : GOSUB FILE.ROWREAL
+        IF FILE.KEEP = 1 THEN GOSUB FILE.KEEPROW
+        IF FILE.ST <> 0 THEN GP.EXITDO
+        IF FILE.N >= FILE.MAX THEN GP.EXITDO
+    GP.LOOP
+    RETURN
+
+## Row, or end of file. Past the end the KERNAL gives nothing or a single NUL.
+## The length tests are separate statements: AND does not stop evaluating once
+## it knows the answer, so ASC would still reach the empty string.
+FILE.ROWREAL:
+    FILE.KEEP = 1 : IF FILE.ST = 0 THEN RETURN
+    IF LEN(FILE.ROW$) = 0 THEN GOTO FILE.ROWDROP
+    IF LEN(FILE.ROW$) > 1 THEN RETURN
+    IF ASC(FILE.ROW$) = 0 THEN GOTO FILE.ROWDROP
+    RETURN
+
+FILE.ROWDROP:  FILE.KEEP = 0 : RETURN
+
+FILE.KEEPROW:
+    IF FILE.N >= FILE.MAX THEN RETURN
+    FILE.N = FILE.N + 1 : FILE.LINE$(FILE.N) = FILE.ROW$
+    RETURN
+
+## ***********************************************************************
+## **  Names on the way out
+## ***********************************************************************
+
+
+
+
+
+## FILE.ISO non-zero folds ASCII to PETSCII. Names only, never the rows
+## SAVEARRAY writes.
+##
+## The copy is made in BASIC and folded in place, so the whole routine costs one
+## allocation whatever the name's length.
+##
+
+FILE.PETNAME:  FILE.RAW$ = FILE.NAME$ : GOTO FILE.TOPET
+FILE.PETNEW:   FILE.RAW$ = FILE.NEW$
+FILE.TOPET:
+    FILE.OUT$ = FILE.RAW$ : IF FILE.ISO = 0 THEN RETURN
+    IF LEN(FILE.OUT$) = 0 THEN RETURN
+    FILE.PETP% = GP.STRPTR(FILE.OUT$)
+    #REM 1
+    GP.ASM
+    REM CLD                          ; SYS enters with the caller's flags
+    REM LDA {FILE.PETP%}             ; zTemp0 -> the length byte, text at +1
+    REM STA $2C
+    REM LDX #1
+    REM LDA {FILE.PETP%},X
+    REM STA $2D
+    REM LDA ($2C)
+    REM BEQ FTPX
+    REM TAY
+    REM FTPL: LDA ($2C),Y
+    REM CMP #65
+    REM BCC FTPN
+    REM CMP #91
+    REM BCS FTPLO
+    REM ORA #$80                     ; A-Z, +128
+    REM STA ($2C),Y
+    REM BRA FTPN
+    REM FTPLO: CMP #97
+    REM BCC FTPN
+    REM CMP #123
+    REM BCS FTPN
+    REM SEC
+    REM SBC #32                      ; a-z, -32
+    REM STA ($2C),Y
+    REM FTPN: DEY
+    REM BNE FTPL
+    REM FTPX: RTS
+    GP.ENDASM
+    #REM 0
+    RETURN
+
+FILEIO.MODULE.END:
+#ENDIF

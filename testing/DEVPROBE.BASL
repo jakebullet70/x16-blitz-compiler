@@ -1,0 +1,54 @@
+#SAVEAS "@:DEVPROBE.SRC.PRG"
+#REM 0
+#SYMFILE "@:DEVPROBE.SRC.SYM"
+#INCLUDE "GPB.INC.BL"
+
+## ***********************************************************************
+## **
+## **  DEVPROBE.BASL -- can a compiled program ask "is device N there?"
+## **  without dying when the answer is no.
+## **
+## **  A plain OPEN cannot: CommandXOpen does bcs _COError on the KERNAL's
+## **  carry, and DEVICE NOT PRESENT sets it. There is no TRAP, so the
+## **  program ends. This is the LISTEN / SECOND / UNLSTN sequence instead,
+## **  which reports through ST rather than through the carry.
+## **
+## **  Prog8's diskio commented the same ST bit 7 test out of its status(),
+## **  saying READST sometimes returns 128 when the drive is fine. So the
+## **  question is not only "does 9 read as absent" but "does 8 read as
+## **  present, every time".
+## **
+## **  Expect: 8 present, 9 10 11 absent, and a DONE line proving the
+## **  program outlived all four.
+## **
+## ***********************************************************************
+
+DP.LISTEN = 65457
+DP.SECOND = 65427
+DP.UNLSTN = 65454
+
+PRINT "DEVPROBE"
+
+## ST BEFORE ANYTHING. Every compiled program has just been LOADed and LOAD
+## leaves bit 6 set, so this is expected to be 64 and not 0.
+PRINT "BASE"; ST
+
+FOR DP.PASS = 1 TO 2
+  FOR DP.DEV = 8 TO 11
+    GP.CALL DP.LISTEN, DP.DEV
+    GP.CALL DP.SECOND, 111
+    GP.CALL DP.UNLSTN
+    DP.ST = ST
+    PRINT "P"; DP.PASS; "D"; DP.DEV; "S"; DP.ST
+  NEXT DP.DEV
+NEXT DP.PASS
+
+## The drive still has to work afterwards. If the probe left the bus in a
+## state an OPEN cannot recover from, that matters more than the reading.
+OPEN 15,8,15
+INPUT#15, DP.EN, DP.EM$, DP.ET, DP.ES
+CLOSE 15
+PRINT "AFTER"; DP.EN
+PRINT DP.EM$
+
+PRINT "DONE"

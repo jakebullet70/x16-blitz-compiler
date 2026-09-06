@@ -1,0 +1,309 @@
+#SAVEAS "@:FILEIOT.SRC.PRG"
+#REM 0
+#SYMFILE "@:FILEIOT.SRC.SYM"
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "FILEIO.INC.BL"
+
+## ***********************************************************************
+## **
+## **  FILEIOT.BASL -- FILEIO.INC.BL, driven with fixed answers.
+## **
+## **  Nothing here waits for a key: paste cannot drive a running program, so
+## **  an interactive harness cannot be run headlessly at all.
+## **
+## **  Every line is "Tnn <verdict>", and a verdict is OK or BAD followed by
+## **  what was actually seen. Read the raw log, not a filter.
+## **
+## ***********************************************************************
+
+DIM FILE.LINE$(40)
+
+FT.FAIL = 0
+PRINT "FILEIOT"
+
+## ---------------------------------------------------------------- T01
+## The drive answers at all, and answers 0.
+
+GOSUB FILE.STATUS
+FT.WANT = 0
+FT.GOT = FILE.ERR
+FT.ID$ = "T01 STATUS"
+GOSUB FT.EQNUM
+
+## ---------------------------------------------------------------- T02
+## A file that is not there. The number AND the message, because the
+## message is what a program compares and a leading space is invisible.
+
+FILE.NAME$ = "NOSUCH.XYZ"
+GOSUB FILE.EXISTS
+FT.WANT = 0
+FT.GOT = FILE.OK
+FT.ID$ = "T02 ABSENT"
+GOSUB FT.EQNUM
+
+FT.WANT = FILE.NOTFOUND
+FT.GOT = FILE.ERR
+FT.ID$ = "T03 ERRNO"
+GOSUB FT.EQNUM
+
+FT.A$ = FILE.MSG$
+FT.B$ = "FILE NOT FOUND"
+FT.ID$ = "T04 MESSAGE"
+GOSUB FT.EQSTR
+
+## ---------------------------------------------------------------- T05
+## Write an array, including the two rows that break naive code: an
+## empty one and a full width one.
+
+FILE.LINE$(1) = "FIRST ROW"
+FILE.LINE$(2) = ""
+FILE.LINE$(3) = "0123456789012345678901234567890123456789"
+FILE.LINE$(4) = "LAST ROW"
+FILE.N = 4
+FILE.NAME$ = "FIOTEST.DAT"
+GOSUB FILE.SAVEARRAY
+FT.WANT = 0
+FT.GOT = FILE.ERR
+FT.ID$ = "T05 SAVEARRAY"
+GOSUB FT.EQNUM
+
+## ---------------------------------------------------------------- T06
+## It exists now. Same call that said no a moment ago.
+
+GOSUB FILE.EXISTS
+FT.WANT = 1
+FT.GOT = FILE.OK
+FT.ID$ = "T06 PRESENT"
+GOSUB FT.EQNUM
+
+## ---------------------------------------------------------------- T07
+## And reads back, row for row.
+
+## CLEARED FIRST. Leaving the written values in place made T08 to T11 pass on
+## stale data while T07 was reporting a short read -- the array still held what
+## SAVEARRAY had put there.
+
+FOR FT.I = 1 TO 8
+    FILE.LINE$(FT.I) = "?"
+NEXT FT.I
+
+FILE.MAX = 40
+FILE.N = 0
+GOSUB FILE.LOADARRAY
+FT.WANT = 4
+FT.GOT = FILE.N
+FT.ID$ = "T07 ROWS"
+GOSUB FT.EQNUM
+
+FT.A$ = FILE.LINE$(1)
+FT.B$ = "FIRST ROW"
+FT.ID$ = "T08 ROW1"
+GOSUB FT.EQSTR
+
+FT.WANT = 0
+FT.GOT = LEN(FILE.LINE$(2))
+FT.ID$ = "T09 EMPTYROW"
+GOSUB FT.EQNUM
+
+FT.WANT = 40
+FT.GOT = LEN(FILE.LINE$(3))
+FT.ID$ = "T10 WIDEROW"
+GOSUB FT.EQNUM
+
+FT.A$ = FILE.LINE$(4)
+FT.B$ = "LAST ROW"
+FT.ID$ = "T11 ROW4"
+GOSUB FT.EQSTR
+
+## ---------------------------------------------------------------- T12
+## Overwrite. The second SAVEARRAY of the same name must not be
+## FILE EXISTS -- that is what the @: is for.
+
+FILE.N = 2
+GOSUB FILE.SAVEARRAY
+FT.WANT = 0
+FT.GOT = FILE.ERR
+FT.ID$ = "T12 OVERWRITE"
+GOSUB FT.EQNUM
+
+## ---------------------------------------------------------------- T13
+## Rename, then rename ONTO the name that now exists.
+
+## DELETE ACTS ON FILE.NAME$, not FILE.NEW$. Setting the wrong one here deleted
+## FIOTEST.DAT instead of clearing the target, so the rename below had nothing to
+## rename and answered 62.
+
+FILE.NAME$ = "FIOTEST.BAK"
+GOSUB FILE.DELETE
+FILE.NAME$ = "FIOTEST.DAT"
+FILE.NEW$ = "FIOTEST.BAK"
+GOSUB FILE.RENAME
+FT.WANT = 0
+FT.GOT = FILE.ERR
+FT.ID$ = "T13 RENAME"
+GOSUB FT.EQNUM
+
+## Both halves of the clash are checked before it is attempted, so a failure
+## here names the drive's answer rather than a setup that never happened.
+
+FILE.N = 1
+FILE.NAME$ = "FIOTEST.DAT"
+GOSUB FILE.SAVEARRAY
+FT.WANT = 0
+FT.GOT = FILE.ERR
+FT.ID$ = "T14A REMADE"
+GOSUB FT.EQNUM
+
+GOSUB FILE.EXISTS
+FT.WANT = 1
+FT.GOT = FILE.OK
+FT.ID$ = "T14B SRCTHERE"
+GOSUB FT.EQNUM
+
+FILE.NAME$ = "FIOTEST.BAK"
+GOSUB FILE.EXISTS
+FT.WANT = 1
+FT.GOT = FILE.OK
+FT.ID$ = "T14C DSTTHERE"
+GOSUB FT.EQNUM
+
+FILE.NAME$ = "FIOTEST.DAT"
+FILE.NEW$ = "FIOTEST.BAK"
+## 62, NOT 63. CMDR-DOS reports a rename whose target exists as FILE NOT FOUND,
+## measured on R49 with both files confirmed present two calls above. Asserted at
+## the value the drive actually gives, so a future ROM that fixes it says so.
+
+GOSUB FILE.RENAME
+FT.WANT = FILE.NOTFOUND
+FT.GOT = FILE.ERR
+FT.ID$ = "T14D CLASH"
+GOSUB FT.EQNUM
+
+## ---------------------------------------------------------------- T15
+## Delete, and it is gone.
+
+FILE.NAME$ = "FIOTEST.BAK"
+GOSUB FILE.DELETE
+FILE.NAME$ = "FIOTEST.BAK"
+GOSUB FILE.EXISTS
+FT.WANT = 0
+FT.GOT = FILE.OK
+FT.ID$ = "T15 DELETED"
+GOSUB FT.EQNUM
+
+## ---------------------------------------------------------------- T16
+## Directories. MKDIR, CHDIR into it, ask where we are, then back up.
+
+FILE.NAME$ = "FIODIR"
+GOSUB FILE.MKDIR
+GOSUB FILE.CHDIR
+FT.WANT = 0
+FT.GOT = FILE.ERR
+FT.ID$ = "T16 CHDIR"
+GOSUB FT.EQNUM
+
+GOSUB FILE.CURDIR
+FT.A$ = FILE.PATH$
+FT.B$ = "/FIODIR"
+FT.ID$ = "T17 GETPATH"
+GOSUB FT.EQSTR
+
+GOSUB FILE.UP
+GOSUB FILE.CURDIR
+FT.A$ = FILE.PATH$
+FT.B$ = "/"
+FT.ID$ = "T18 UPPATH"
+GOSUB FT.EQSTR
+
+## ---------------------------------------------------------------- T21
+## THE SHAPE THAT FAILS. A save reached from inside a GP.DO loop writes
+## its file and then stops with INPUT/OUTPUT ERROR -- the open runtime
+## bug. This module never uses PRINT# for a command, so the question is
+## whether it still reproduces. Keys are pushed into the KERNAL buffer
+## rather than waited for, so the loop ends on its own.
+
+FT.KBDPUT = 61599
+FT.LOOPS = 0
+GP.DO
+    POKE 1,0
+    GP.CALL FT.KBDPUT, 88
+    POKE 1,4
+    GET FT.K$
+    FT.LOOPS = FT.LOOPS + 1
+    FILE.NAME$ = "FIOLOOP.DAT"
+    FILE.N = 1
+    FILE.LINE$(1) = "WRITTEN FROM A LOOP"
+    GOSUB FILE.SAVEARRAY
+    IF FT.LOOPS >= 3 THEN GP.EXITDO
+GP.LOOP
+
+FT.WANT = 0
+FT.GOT = FILE.ERR
+FT.ID$ = "T21 INLOOP"
+GOSUB FT.EQNUM
+
+## The PETSCII fold. FILE.ISO on, a mixed case name: A-Z go up by 128 and a-z
+## down by 32, in place, and the length must not move.
+
+FILE.ISO = 1
+FILE.NAME$ = "Ab"
+GOSUB FILE.PETNAME
+FILE.ISO = 0
+FT.WANT = 2
+FT.GOT = LEN(FILE.OUT$)
+FT.ID$ = "T22 ISOLEN"
+GOSUB FT.EQNUM
+
+FT.WANT = 193
+FT.GOT = ASC(FILE.OUT$)
+FT.ID$ = "T23 ISOUPPER"
+GOSUB FT.EQNUM
+
+FT.WANT = 66
+FT.GOT = ASC(MID$(FILE.OUT$, 2, 1))
+FT.ID$ = "T24 ISOLOWER"
+GOSUB FT.EQNUM
+
+## ISO off leaves the name exactly as given.
+
+FILE.NAME$ = "Ab"
+GOSUB FILE.PETNAME
+FT.WANT = 65
+FT.GOT = ASC(FILE.OUT$)
+FT.ID$ = "T25 ISOOFF"
+GOSUB FT.EQNUM
+
+FILE.NAME$ = "FIOLOOP.DAT"
+GOSUB FILE.DELETE
+FILE.NAME$ = "FIOTEST.DAT"
+GOSUB FILE.DELETE
+
+## ---------------------------------------------------------------- done
+
+PRINT "FAILURES"; FT.FAIL
+PRINT "DONE"
+END
+
+## ***********************************************************************
+## **  The two comparisons. Both print the verdict and count a failure.
+## ***********************************************************************
+
+FT.EQNUM:
+    IF FT.GOT = FT.WANT THEN GOTO FT.EQNUM.OK
+    PRINT FT.ID$; " BAD GOT"; FT.GOT; " WANT"; FT.WANT
+    FT.FAIL = FT.FAIL + 1
+    RETURN
+
+FT.EQNUM.OK:
+    PRINT FT.ID$; " OK"
+    RETURN
+
+FT.EQSTR:
+    IF FT.A$ = FT.B$ THEN GOTO FT.EQSTR.OK
+    PRINT FT.ID$; " BAD GOT["; FT.A$; "] WANT["; FT.B$; "]"
+    FT.FAIL = FT.FAIL + 1
+    RETURN
+
+FT.EQSTR.OK:
+    PRINT FT.ID$; " OK"
+    RETURN

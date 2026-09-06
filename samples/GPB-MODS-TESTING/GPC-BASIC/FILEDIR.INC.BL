@@ -1,0 +1,458 @@
+## ***********************************************************************
+## **
+## **  FILEDIR.INC.BL -- a directory, into a bank or into low RAM.
+## **
+## **      FILE.DIR.INIT   once, before anything else here
+## **      FILE.DIR.OPEN   read the whole listing into the buffer
+## **      FILE.DIR.NEXT   the next entry out of it
+## **
+## **  Requires GPB.INC.BL and FILEIO.INC.BL, and #INCLUDEs neither.
+## **
+## **      #SYMFILE "@:MYPROG.SYM"   <- required, before the #INCLUDEs.
+## **
+## **   in   FILE.DIR.BANK     the bank to read into, or 0 for low RAM
+## **        FILE.DIR.PTR      the low RAM buffer, when BANK is 0
+## **        FILE.DIR.CAP      how many bytes that buffer holds
+## **        FILE.DIR.PATTERN$  a name pattern, or empty for all
+## **        FILE.DIR.ONLY     FILE.DIR.ALL, FILE.DIR.FILES, FILE.DIR.DIRS
+## **        FILE.DEVICE       the drive, from FILEIO. 0 means 8
+## **
+## **   out  FILE.DIR.GOT      bytes read. 0 is an empty or failed listing
+## **        FILE.DIR.FULL     the buffer filled before the listing ended
+## **        FILE.DIR.MORE     1 while NEXT produced an entry, 0 at the end
+## **        FILE.NAME$        the entry
+## **        FILE.BLOCKS       its size in blocks
+## **        FILE.TYPE$        PRG, SEQ or DIR
+## **
+## **  internal  FILE.DIR.AT FILE.DIR.ASK$ FILE.DIR.ADDR% FILE.DIR.ROOM%
+## **            FILE.DIR.OFF% FILE.DIR.BYTES% FILE.DIR.CNT% FILE.DIR.BLK%
+## **            FILE.DIR.OK% FILE.DIR.SLOW% FILE.DIR.LFN% FILE.DIR.NAMEA%
+## **            FILE.DIR.TYPEA%
+## **
+## **  Two destinations, one code path: the reader takes an address and a size.
+## **
+## **      a bank    FILE.DIR.BANK = BANKMGR.BANK
+## **                8,192 bytes at $A000, about 250 entries
+## **
+## **      low RAM   FILE.DIR.BANK = 0
+## **                DIM FD.BUF%(340)
+## **                FILE.DIR.PTR = GP.ARRPTR(FD.BUF%())
+## **                FILE.DIR.CAP = 341 * 6
+## **
+## **  A numeric array is six bytes an element and the assembly treats it as a
+## **  run of bytes, so 341 elements is a 2,046 byte buffer out of the workspace.
+## **
+## **  FILE.DIR.BANKBASE and FILE.DIR.BANKROOM are the hardware window, not an
+## **  allocation: every bank appears at $A000 and every bank is 8,192 bytes.
+## **  The bank NUMBER is the resource. Take it from BANKMGR.ALLOC and put it in
+## **  FILE.DIR.BANK. This module selects a bank and puts 0 back; it claims none.
+## **
+## **  The drive does the filtering. Do not write a pattern matcher.
+## **
+## **      FILE.DIR.PATTERN$ = "GAME*"
+## **      FILE.DIR.ONLY = FILE.DIR.FILES
+## **
+## **  A listing arrives as a fake BASIC program: two bytes of load address, then
+## **  per entry a two byte link, a two byte line number that is the block count,
+## **  the text, and a NUL. The blocks-free line at the end carries no quoted
+## **  name, so running out of quotes is the end. FILE.DIR.AT starts at 4.
+## **
+## ** ---- traps ----
+## **
+## **  Read once, walk many times. Going back to the drive to scroll or filter is
+## **  the cost, not the parsing.
+## **
+## **  The disk name is not an entry. Every listing opens with the volume line,
+## **  which parses exactly like a file. FILE.DIR.OPEN swallows it.
+## **
+## **  FILE.NAME$ and FILE.TYPE$ are written in place, not assigned. Do not
+## **  assign either after FILE.DIR.INIT: an assignment reallocates and the block
+## **  the assembly holds goes stale.
+## **
+## **  FILE.NAME$ is shared with FILEIO, so any FILEIO call destroys a walk in
+## **  progress. Copy the name out per entry.
+## **
+## **  FILE.DIR.NAMEMAX is the name length and the assembly has the same number
+## **  as a literal. Change both.
+## **
+## **  MACPTR is asked for at most 255 bytes a call, so its returned count fits
+## **  one byte. It can return fewer than asked for. Carry set means the device
+## **  has no MACPTR and the read falls back to CHRIN; that path is untested.
+## **
+## **  MACPTR wraps banks by itself and leaves the new one selected. This module
+## **  stops at the end of its one bank, so a listing cannot spill into a bank it
+## **  does not own.
+## **
+## **  878 bytes on top of FILEIO, blobs included.
+## **
+## **  The FILE.DIR.* names belong to this file; the rest of FILE.* is
+## **  FILEIO.INC.BL's.
+## **
+## ***********************************************************************
+#IFNDEF FILEDIR.DEFS
+#DEFINE FILEDIR.DEFS 1
+
+## What the drive is asked to list.
+#DEFINE FILE.DIR.ALL 0
+#DEFINE FILE.DIR.FILES 1
+#DEFINE FILE.DIR.DIRS 2
+
+## The longest entry name kept. The assembly has 32 as a literal in its name
+## copy; the assembler cannot read this. Change both.
+#DEFINE FILE.DIR.NAMEMAX 32
+
+## The bank window. The reader stops at BANKROOM so MACPTR is never asked for a
+## chunk that would carry it past $BFFF into the automatic wrap.
+#DEFINE FILE.DIR.BANKROOM $2000
+#DEFINE FILE.DIR.BANKBASE $A000
+
+GOTO FILEDIR.MODULE.END
+
+## ***********************************************************************
+## **  FILE.DIR.INIT -- size the two strings, make every {VAR} slot. Call once.
+## **
+## **  The strings are grown to full length here because nothing holding only a
+## **  block can grow one. Whatever length they have on return is the most they
+## **  will ever hold.
+## **
+## **  Every {VAR} name is assigned here because the slot must exist before the
+## **  compiler reaches a GP.ASM block naming it. One assigned further down the
+## **  file gives UNKNOWN VARIABLE IN {}, and the ?STRING TOO LONG after it is
+## **  fallout rather than the cause.
+## ***********************************************************************
+
+FILE.DIR.INIT:
+    FILE.NAME$ = RPT$(32, FILE.DIR.NAMEMAX) : FILE.TYPE$ = RPT$(32, 3)
+    FILE.DIR.NAMEA% = GP.STRPTR(FILE.NAME$) : FILE.DIR.TYPEA% = GP.STRPTR(FILE.TYPE$)
+    FILE.DIR.ADDR% = 0 : FILE.DIR.ROOM% = 0 : FILE.DIR.LFN% = FILE.CHAN : FILE.DIR.BYTES% = 0 : FILE.DIR.CNT% = 0 : FILE.DIR.OFF% = 0
+    FILE.DIR.BLK% = 0 : FILE.DIR.OK% = 0 : FILE.DIR.SLOW% = 0 : FILE.DIR.AT = 0 : FILE.DIR.GOT = 0 : FILE.DIR.MORE = 0 : FILE.DIR.FULL = 0  
+    RETURN
+
+## ***********************************************************************
+## **  FILE.DIR.OPEN -- the whole listing, into the buffer, in one go.
+## **
+## **  The name asked for is built from the pattern and the filter: "$" for
+## **  everything, "$:GAME*" for a pattern, "$:*=P" for files only. The drive does
+## **  the matching.
+## **
+## **  THE COMMAND CHANNEL IS OPENED FIRST AND READ AFTERWARDS, the same order
+## **  FILE.EXISTS uses, so FILE.ERR means something when the listing is empty.
+## ***********************************************************************
+
+FILE.DIR.OPEN:
+    FILE.DIR.GOT = 0 : FILE.DIR.FULL = 0 : FILE.DIR.MORE = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
+    GOSUB FILE.DIR.WHERE : GOSUB FILE.DIR.ASKFOR : OPEN 15, FILE.DEVICE, 15
+    OPEN FILE.CHAN, FILE.DEVICE, 0, FILE.DIR.ASK$
+    INPUT#15, FILE.ERR, FILE.MSG$, FILE.TRK, FILE.SEC
+    IF FILE.ERR < FILE.OKMAX THEN GOSUB FILE.DIR.SUCK
+    CLOSE FILE.CHAN : CLOSE 15 : IF FILE.DIR.BANK > 0 THEN BANK 0
+    FILE.DIR.AT = 4 : GOSUB FILE.DIR.SKIPDISK
+    RETURN
+
+## ***********************************************************************
+## **  FILE.DIR.SKIPDISK -- eat the first entry, which is not a file.
+## **
+## **  Every listing opens with the volume line; on the host filesystem it reads
+## **  0 "/               " HOS. It parses exactly like an entry, block count and
+## **  all, so nothing downstream can tell it from a real one.
+## **
+## **  Consumed here rather than flagged, so FILE.DIR.NEXT stays "an entry, or
+## **  the end" with no special first call.
+## ***********************************************************************
+
+FILE.DIR.SKIPDISK:  IF FILE.DIR.GOT = 0 THEN RETURN
+    GOSUB FILE.DIR.NEXT : FILE.DIR.MORE = 0
+    RETURN
+
+## Where the bytes land. A bank is always the same address and size; low RAM is
+## whatever the caller handed over.
+
+FILE.DIR.WHERE:  IF FILE.DIR.BANK = 0 THEN GOTO FILE.DIR.LOWRAM
+    FILE.DIR.ADDR% = FILE.DIR.BANKBASE : FILE.DIR.ROOM% = FILE.DIR.BANKROOM
+    RETURN
+
+FILE.DIR.LOWRAM:  FILE.DIR.ADDR% = FILE.DIR.PTR : FILE.DIR.ROOM% = FILE.DIR.CAP
+    RETURN
+
+## "$", "$:PATTERN", "$:*=P", "$:PATTERN=D" -- the pattern and the filter are
+## independent, and a filter with no pattern still needs the * to hang it on.
+
+FILE.DIR.ASKFOR:
+    FILE.DIR.ASK$ = "$" : IF FILE.DIR.ONLY = FILE.DIR.ALL AND GP.ISEMPTY(FILE.DIR.PATTERN$) THEN RETURN
+    FILE.DIR.ASK$ = "$:" + FILE.DIR.PATTERN$
+    IF GP.ISEMPTY(FILE.DIR.PATTERN$) THEN FILE.DIR.ASK$ = "$:*"
+    IF FILE.DIR.ONLY = FILE.DIR.FILES THEN FILE.DIR.ASK$ = FILE.DIR.ASK$ + "=P"
+    IF FILE.DIR.ONLY = FILE.DIR.DIRS THEN FILE.DIR.ASK$ = FILE.DIR.ASK$ + "=D"
+    RETURN
+
+## The bank is selected around the read and nothing else, so a caller's bank is
+## only disturbed for the length of it -- and OPEN puts it back.
+
+FILE.DIR.SUCK:
+    IF FILE.DIR.BANK > 0 THEN BANK FILE.DIR.BANK
+    GOSUB FILE.DIR.FILL : FILE.DIR.GOT = FILE.DIR.BYTES%
+    IF FILE.DIR.BYTES% >= FILE.DIR.ROOM% THEN FILE.DIR.FULL = 1
+    RETURN
+
+## ***********************************************************************
+## **  FILE.DIR.FILL -- MACPTR the open channel into the buffer.
+## **
+## **  zTemp0 walks the destination, zTemp1 counts down the room left, zTemp2
+## **  accumulates the total. All three are free inside a blob: SYS has already
+## **  used zTemp0 to get here and nothing on the way back out reads any of them.
+## **
+## **  THE CHUNK IS NEVER MORE THAN 255, which is what makes every add and
+## **  subtract below eight bit -- MACPTR cannot then return a count with a high
+## **  byte. FILE.DIR.CNT% holds it between the three sums; ONLY ITS LOW BYTE IS
+## **  EVER WRITTEN, so the high byte is zeroed in FILE.DIR.INIT and left alone.
+## ***********************************************************************
+
+FILE.DIR.FILL:
+    FILE.DIR.BYTES% = 0
+    FILE.DIR.SLOW% = 0
+    #REM 1
+    GP.ASM
+    REM CLD                          ; SYS enters with the caller's flags
+    REM LDX {FILE.DIR.LFN%}
+    REM JSR $FFC6                    ; CHKIN -- input comes from the listing
+    REM BCS FDFOUT
+    REM LDX #1
+    REM LDA {FILE.DIR.ADDR%}         ; zTemp0 = where the bytes go
+    REM STA $2C
+    REM LDA {FILE.DIR.ADDR%},X
+    REM STA $2D
+    REM LDA {FILE.DIR.ROOM%}         ; zTemp1 = how much room is left
+    REM STA $2E
+    REM LDA {FILE.DIR.ROOM%},X
+    REM STA $2F
+    REM LDA #0                       ; zTemp2 = how much has been read
+    REM STA $30
+    REM STA $31
+    REM ;
+    REM ; ---- ask for min(255, room). Room zero is the buffer full. ----
+    REM FDFLOOP: LDA $2F
+    REM BNE FDFBIG
+    REM LDA $2E
+    REM BEQ FDFDONE
+    REM CMP #255
+    REM BCC FDFGO
+    REM FDFBIG: LDA #255
+    REM FDFGO: LDX $2C
+    REM LDY $2D
+    REM CLC                          ; carry clear: advance as it writes
+    REM JSR $FF44                    ; MACPTR
+    REM BCS FDFSLOW                  ; this device has none
+    REM JSR FDFADV                   ; X holds the count, always under 256
+    REM JSR $FFB7                    ; READST
+    REM AND #$40
+    REM BEQ FDFLOOP
+    REM FDFDONE: JSR $FFCC           ; CLRCHN
+    REM LDX #1
+    REM LDA $30
+    REM STA {FILE.DIR.BYTES%}
+    REM LDA $31
+    REM STA {FILE.DIR.BYTES%},X
+    REM RTS
+    REM FDFOUT: RTS
+    REM ;
+    REM ; ---- ptr up, room down, total up, all by the count in X ----
+    REM FDFADV: STX {FILE.DIR.CNT%}
+    REM CLC
+    REM LDA $2C
+    REM ADC {FILE.DIR.CNT%}
+    REM STA $2C
+    REM LDA $2D
+    REM ADC #0
+    REM STA $2D
+    REM SEC
+    REM LDA $2E
+    REM SBC {FILE.DIR.CNT%}
+    REM STA $2E
+    REM LDA $2F
+    REM SBC #0
+    REM STA $2F
+    REM CLC
+    REM LDA $30
+    REM ADC {FILE.DIR.CNT%}
+    REM STA $30
+    REM LDA $31
+    REM ADC #0
+    REM STA $31
+    REM RTS
+    REM ;
+    REM ; ---- no MACPTR on this device: one byte at a time. UNTESTED. ----
+    REM FDFSLOW: LDA #1
+    REM STA {FILE.DIR.SLOW%}
+    REM FDFSL: LDA $2F
+    REM BNE FDFSRD
+    REM LDA $2E
+    REM BEQ FDFDONE
+    REM FDFSRD: JSR $FFCF            ; CHRIN
+    REM STA ($2C)
+    REM LDX #1
+    REM JSR FDFADV                   ; one byte, same three sums
+    REM JSR $FFB7
+    REM AND #$40
+    REM BEQ FDFSL
+    REM JMP FDFDONE
+    GP.ENDASM
+    #REM 0
+    RETURN
+
+## ***********************************************************************
+## **  FILE.DIR.NEXT -- one entry out of the buffer.
+## **
+## **  FILE.DIR.MORE is 0 when the walk ran out, which happens naturally: the
+## **  blocks-free line at the end carries no quoted name, so the scan for one
+## **  reaches the end of the buffer and gives up.
+## ***********************************************************************
+
+## BASIC never does arithmetic on the buffer address. $A000 is 40960 and a 16
+## bit slot holds that verbatim, but adding to it in BASIC goes through the float
+## domain and anything above 32767 is one sign extension from negative. BASIC
+## holds the offset; the assembly adds it to the base.
+
+FILE.DIR.NEXT:
+    FILE.DIR.MORE = 0 : IF FILE.DIR.GOT = 0 THEN RETURN
+    FILE.DIR.OFF% = FILE.DIR.AT : IF FILE.DIR.BANK > 0 THEN BANK FILE.DIR.BANK
+    GOSUB FILE.DIR.STEP
+    IF FILE.DIR.BANK > 0 THEN BANK 0
+    IF FILE.DIR.OK% = 0 THEN RETURN
+    FILE.DIR.AT = FILE.DIR.OFF% : FILE.BLOCKS = FILE.DIR.BLK% : FILE.DIR.MORE = 1
+    RETURN
+
+## ***********************************************************************
+## **  FILE.DIR.STEP -- the parser.
+## **
+## **  zTemp0 walks the buffer, zTemp1 is one past its last valid byte, zTemp2
+## **  points at the string being filled. FDSGET is the only reader and it is the
+## **  only place the end is tested, so running off the end anywhere -- a
+## **  truncated listing, a buffer that filled mid entry -- lands in one place.
+## **
+## **  FDSGET DOES NOT REPORT THE END, IT LEAVES. Running out mid entry drops
+## **  its own return address and jumps to the exit, so the stack is back to what
+## **  SYS handed over and no caller needs a test after the call.
+## **
+## **  THAT IS BRANCH RANGE, NOT TIDINESS. Ten separate BCS instructions reaching
+## **  the end of a 180 byte parser are well past the 127 bytes a branch can go,
+## **  and the compile fails with OUT OF RANGE naming a line inside the block --
+## **  which reads like a bad instruction rather than a distance.
+## **
+## **  THE NAME IS CLAMPED AT 32, which is FILE.DIR.NAMEMAX above. A longer name
+## **  is truncated and the rest of it skipped, not stored past the end of a
+## **  string block that cannot grow.
+## ***********************************************************************
+
+FILE.DIR.STEP:
+    FILE.DIR.OK% = 0
+    #REM 1
+    GP.ASM
+    REM CLD
+    REM LDX #1
+    REM CLC                          ; zTemp0 = base + offset
+    REM LDA {FILE.DIR.ADDR%}
+    REM ADC {FILE.DIR.OFF%}
+    REM STA $2C
+    REM LDA {FILE.DIR.ADDR%},X
+    REM ADC {FILE.DIR.OFF%},X
+    REM STA $2D
+    REM CLC                          ; zTemp1 = base + bytes read
+    REM LDA {FILE.DIR.ADDR%}
+    REM ADC {FILE.DIR.BYTES%}
+    REM STA $2E
+    REM LDA {FILE.DIR.ADDR%},X
+    REM ADC {FILE.DIR.BYTES%},X
+    REM STA $2F
+    REM ;
+    REM ; ---- the two byte line number IS the block count ----
+    REM JSR FDSGET
+    REM STA {FILE.DIR.BLK%}
+    REM JSR FDSGET
+    REM LDX #1
+    REM STA {FILE.DIR.BLK%},X
+    REM ;
+    REM ; ---- forward to the opening quote. No quote left means no entry. ----
+    REM FDSQ1: JSR FDSGET
+    REM CMP #34
+    REM BNE FDSQ1
+    REM ;
+    REM ; ---- the name, up to the closing quote, clamped at 32 ----
+    REM LDA {FILE.DIR.NAMEA%}
+    REM STA $30
+    REM LDX #1
+    REM LDA {FILE.DIR.NAMEA%},X
+    REM STA $31
+    REM LDY #0
+    REM FDSNM: JSR FDSGET
+    REM CMP #34
+    REM BEQ FDSNMD
+    REM CPY #32
+    REM BCS FDSNM                    ; full: keep scanning, stop storing
+    REM INY
+    REM STA ($30),Y
+    REM BRA FDSNM
+    REM FDSNMD: TYA
+    REM STA ($30)                    ; offset zero is the length byte
+    REM ;
+    REM ; ---- blanks, then three characters of type ----
+    REM LDA {FILE.DIR.TYPEA%}
+    REM STA $30
+    REM LDX #1
+    REM LDA {FILE.DIR.TYPEA%},X
+    REM STA $31
+    REM FDSSP: JSR FDSGET
+    REM CMP #32
+    REM BEQ FDSSP
+    REM LDY #1
+    REM STA ($30),Y
+    REM JSR FDSGET
+    REM LDY #2
+    REM STA ($30),Y
+    REM JSR FDSGET
+    REM LDY #3
+    REM STA ($30),Y
+    REM LDA #3
+    REM STA ($30)
+    REM ;
+    REM ; ---- the rest of the entry, its NUL, and the next link ----
+    REM FDSZ: JSR FDSGET
+    REM CMP #0
+    REM BNE FDSZ
+    REM JSR FDSGET
+    REM JSR FDSGET
+    REM ;
+    REM ; ---- an entry, and where the next one starts ----
+    REM LDA #1
+    REM STA {FILE.DIR.OK%}
+    REM ; ---- the offset back out: where we stopped, less the base ----
+    REM FDSEND: LDX #1
+    REM SEC
+    REM LDA $2C
+    REM SBC {FILE.DIR.ADDR%}
+    REM STA {FILE.DIR.OFF%}
+    REM LDA $2D
+    REM SBC {FILE.DIR.ADDR%},X
+    REM STA {FILE.DIR.OFF%},X
+    REM RTS
+    REM ;
+    REM ; ---- the one reader. Carry set means there was nothing left. ----
+    REM FDSGET: LDA $2C
+    REM CMP $2E
+    REM LDA $2D
+    REM SBC $2F
+    REM BCC FDSGOK
+    REM PLA                          ; nothing left. Drop this JSR's return
+    REM PLA                          ; address and leave the blob entirely --
+    REM JMP FDSEND                   ; the stack is then as SYS handed it over.
+    REM FDSGOK: LDA ($2C)
+    REM INC $2C
+    REM BNE FDSGNC
+    REM INC $2D
+    REM FDSGNC: CLC
+    REM RTS
+    GP.ENDASM
+    #REM 0
+    RETURN
+
+FILEDIR.MODULE.END:
+#ENDIF

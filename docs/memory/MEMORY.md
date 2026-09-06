@@ -100,6 +100,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [Array index fast path](gpc-array-index-fastpath.md) — 1-D indexing fast path was worth ~31%; incl. the OOB short-circuit gotcha
 
 ## X16 platform / toolchain
+- [MACPTR wraps banks itself](macptr-wraps-banks-itself.md) — a block read crossing $BFFF needs no banking code; the caller that wants it is STASH, not FILEDIR
 - [Scrolling a screen region](scrolling-a-screen-region.md) — no GP command for it; STASH moved, VERA-to-VERA memcopy, or a masked layer
 - [GP drawing targets layer 1](gp-drawing-targets-layer-1.md) — only layer 1, but no row clamp and L1_MAPBASE is POKEable
 - [P-code runs from a bank, PROVEN](pcode-runs-from-a-bank-proven.md) — executed at $A000 with two GP.ASM blobs and no ABI change; RETURN out needs no bank restore

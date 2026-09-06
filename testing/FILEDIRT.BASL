@@ -1,0 +1,161 @@
+#SAVEAS "@:FILEDIRT.SRC.PRG"
+#REM 0
+#SYMFILE "@:FILEDIRT.SRC.SYM"
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "FILEIO.INC.BL"
+#INCLUDE "FILEDIR.INC.BL"
+
+## ***********************************************************************
+## **  FILEDIRT.BASL -- FILEDIR.INC.BL both ways, low RAM and a bank.
+## ***********************************************************************
+
+DIM FILE.LINE$(10)
+DIM FD.BUF%(340)
+
+FT.FAIL = 0
+PRINT "FILEDIRT"
+
+GOSUB FILE.DIR.INIT
+
+## Three files whose names sort together, so they are easy to find again.
+FILE.LINE$(1) = "X"
+FILE.N = 1
+FILE.NAME$ = "ZZTESTA.DAT"
+GOSUB FILE.SAVEARRAY
+FILE.NAME$ = "ZZTESTB.DAT"
+GOSUB FILE.SAVEARRAY
+FILE.NAME$ = "ZZTESTC.DAT"
+GOSUB FILE.SAVEARRAY
+
+## ---------------------------------------------------------------- low RAM
+
+FILE.DIR.BANK = 0
+FILE.DIR.PTR = GP.ARRPTR(FD.BUF%())
+FILE.DIR.CAP = 2046
+FILE.DIR.PATTERN$ = "ZZTEST*"
+FILE.DIR.ONLY = FILE.DIR.ALL
+GOSUB FILE.DIR.OPEN
+
+PRINT "L GOT"; FILE.DIR.GOT; " ERR"; FILE.ERR; " FULL"; FILE.DIR.FULL
+FT.WANT = 1
+FT.GOT = 0
+IF FILE.DIR.GOT > 0 THEN FT.GOT = 1
+FT.ID$ = "D01 LOWREAD"
+GOSUB FT.EQNUM
+
+GOSUB FT.WALK
+PRINT "L ENTRIES"; FT.SEEN; " HITS"; FT.HIT
+FT.WANT = 3
+FT.GOT = FT.HIT
+FT.ID$ = "D02 LOWFOUND"
+GOSUB FT.EQNUM
+
+## ---------------------------------------------------------------- a bank
+
+FILE.DIR.BANK = 5
+FILE.DIR.PATTERN$ = "ZZTEST*"
+FILE.DIR.ONLY = FILE.DIR.ALL
+GOSUB FILE.DIR.OPEN
+
+PRINT "B GOT"; FILE.DIR.GOT; " ERR"; FILE.ERR
+GOSUB FT.WALK
+PRINT "B ENTRIES"; FT.SEEN; " HITS"; FT.HIT
+FT.WANT = 3
+FT.GOT = FT.HIT
+FT.ID$ = "D03 BANKFOUND"
+GOSUB FT.EQNUM
+
+## The two reads must agree about how many entries there are.
+FT.WANT = FT.LOWSEEN
+FT.GOT = FT.SEEN
+FT.ID$ = "D04 SAMECOUNT"
+GOSUB FT.EQNUM
+
+## ---------------------------------------------------------------- pattern
+
+FILE.DIR.BANK = 5
+FILE.DIR.PATTERN$ = "ZZTEST*"
+FILE.DIR.ONLY = FILE.DIR.ALL
+GOSUB FILE.DIR.OPEN
+GOSUB FT.WALK
+PRINT "P ENTRIES"; FT.SEEN; " HITS"; FT.HIT
+FT.WANT = 3
+FT.GOT = FT.SEEN
+FT.ID$ = "D05 PATTERN"
+GOSUB FT.EQNUM
+
+## ------------------------------------------------------- buffer overflow
+
+## A 64 BYTE BUFFER, so this overflows whatever directory it is run in. Sizing
+## it to "bigger than I think the listing is" made the test pass or fail on how
+## crowded the drive happened to be.
+
+FILE.DIR.BANK = 0
+FILE.DIR.CAP = 64
+FILE.DIR.PATTERN$ = ""
+FILE.DIR.ONLY = FILE.DIR.ALL
+GOSUB FILE.DIR.OPEN
+PRINT "F GOT"; FILE.DIR.GOT; " FULL"; FILE.DIR.FULL
+FT.WANT = 1
+FT.GOT = FILE.DIR.FULL
+FT.ID$ = "D07 FULLFLAG"
+GOSUB FT.EQNUM
+
+## ---------------------------------------------------------------- dirs only
+
+FILE.DIR.CAP = 2046
+FILE.NAME$ = "ZZDIR"
+GOSUB FILE.MKDIR
+FILE.DIR.PATTERN$ = ""
+FILE.DIR.ONLY = FILE.DIR.DIRS
+GOSUB FILE.DIR.OPEN
+GOSUB FT.WALK
+PRINT "D ENTRIES"; FT.SEEN
+FT.WANT = 0
+FT.GOT = 0
+IF FT.SEEN = 0 THEN FT.GOT = 1
+FT.ID$ = "D06 DIRSANY"
+GOSUB FT.EQNUM
+
+## ---------------------------------------------------------------- tidy up
+
+FILE.NAME$ = "ZZTESTA.DAT"
+GOSUB FILE.DELETE
+FILE.NAME$ = "ZZTESTB.DAT"
+GOSUB FILE.DELETE
+FILE.NAME$ = "ZZTESTC.DAT"
+GOSUB FILE.DELETE
+
+PRINT "FAILURES"; FT.FAIL
+PRINT "DONE"
+END
+
+## ***********************************************************************
+## **  FT.WALK -- drain the listing, printing the first few, counting the
+## **  three known names in FT.HIT and everything in FT.SEEN.
+## ***********************************************************************
+
+FT.WALK:
+    FT.SEEN = 0
+    FT.HIT = 0
+    GP.DO
+        GOSUB FILE.DIR.NEXT
+        IF FILE.DIR.MORE = 0 THEN GP.EXITDO
+        FT.SEEN = FT.SEEN + 1
+        FT.NM$ = FILE.NAME$
+        IF FT.SEEN <= 6 THEN PRINT "  ["; FT.NM$; "]"; FILE.BLOCKS; " "; FILE.TYPE$
+        IF LEFT$(FT.NM$, 6) = "ZZTEST" THEN FT.HIT = FT.HIT + 1
+        IF FT.SEEN > 300 THEN GP.EXITDO
+    GP.LOOP
+    IF FT.LOWSEEN = 0 THEN FT.LOWSEEN = FT.SEEN
+    RETURN
+
+FT.EQNUM:
+    IF FT.GOT = FT.WANT THEN GOTO FT.EQNUM.OK
+    PRINT FT.ID$; " BAD GOT"; FT.GOT; " WANT"; FT.WANT
+    FT.FAIL = FT.FAIL + 1
+    RETURN
+
+FT.EQNUM.OK:
+    PRINT FT.ID$; " OK"
+    RETURN
