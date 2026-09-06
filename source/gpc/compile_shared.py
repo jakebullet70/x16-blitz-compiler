@@ -90,18 +90,35 @@ def compile_one(source, obj, mapfile="", shared=True):
 		logpath = os.path.join(TESTING, "GPCCOMP.LOG")
 		with open(logpath, "wb") as log:
 			p = subprocess.Popen([EMU, "-rom", ROM, "-fsroot", ".", "-warp", "-sound", "none",
-								  "-prg", ENGINE, "-run"],
+								  "-echo", "raw", "-prg", ENGINE, "-run"],
 								 cwd=TESTING, stdout=log, stderr=subprocess.STDOUT, env=env)
 			try:
+				#
+				#		STOP ON "OK CODE" AND NOTHING ELSE.
+				#
+				#		The old stop condition was "the object exists and has not grown for 0.6s",
+				#		and the TWO-PASS COMPILER retired it: pass two writes the object AS it
+				#		compiles, so the file appears early and grows in bursts. A lull in warp
+				#		mode killed the emulator mid-compile, leaving a 513 byte object, NO MAP,
+				#		and a cheerful "compiled" line. Size is not progress; the banner is.
+				#
+				#		Do not widen this to match an error word. GPC echoes its whole
+				#		error-message TABLE just after its banner -- OUT OF RANGE, SYNTAX ERROR,
+				#		TYPE MISMATCH are all in the log of a perfect build -- so anything
+				#		looser fires on success. A real failure waits out TIMEOUT and is caught
+				#		by the missing object below.
+				#
 				deadline = time.time() + TIMEOUT
 				while time.time() < deadline:
 					time.sleep(0.5)
-					#	wait for the object to appear AND stop growing
-					if os.path.exists(objpath) and os.path.getsize(objpath) > 0:
-						size = os.path.getsize(objpath)
-						time.sleep(0.6)
-						if os.path.getsize(objpath) == size:
-							break
+					try:
+						with open(logpath, "rb") as r:
+							echo = r.read()
+					except OSError:
+						continue
+					if b"OK CODE" in echo:
+						time.sleep(1.5)			# let the last write and the map land
+						break
 			finally:
 				p.kill()
 				try:

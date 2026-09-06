@@ -198,11 +198,7 @@ testing/MD5FIX.DAT
 testing/MD5DRV.TXT
 testing/MD5*.LOG
 
-# testing/samples/
-
-# BMX images staged into testing/ by hand to run a viewer or the paint benchmark.
-# The masters are in samples/BMXVIEWER/SAMPLES; these are copies.
-testing/*.BMX is a build artifact: the root-level samples/ tree is the tracked
+# testing/samples/ is a build artifact: the root-level samples/ tree is the tracked
 # master, mirrored here by `make samples` so the samples are runnable in the emulator
 # and ship in the release zip. Ignore the mirror; edit samples/ instead.
 testing/samples/
@@ -227,6 +223,20 @@ testing/GPC.INPUT
 # every one of them is regenerable from the tracked .BASL/.PRG plus a build.
 testing/*.OBJ
 testing/GPCCOMP.LOG
+
+# The two BUILD STAGES between a .BASL and a runnable object, for every program built
+# in here: BASLOAD writes <name>.SRC.PRG and its <name>.SRC.SYM, GPC writes <name>.MAP.
+# All three are regenerable from a tracked source plus a build.
+#
+# Globbed rather than named one at a time, because naming them one at a time is exactly
+# how this went wrong: the bank tests BANKA..BANKZ.BASL ARE tracked, none of their four
+# outputs was listed, and 114 untracked files had accumulated by 6th Sep 2026 -- one
+# "git add -A" away from being committed, which is the mistake this whole section exists
+# to prevent.
+testing/*.SRC.PRG
+testing/*.SRC.SYM
+testing/*.MAP
+testing/BANK*.PRG
 
 # Claude Code local settings (personal, not team config)
 .claude/settings.local.json

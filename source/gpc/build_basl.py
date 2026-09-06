@@ -73,6 +73,27 @@ def die(msg):
 #
 
 
+#
+#   BASLOAD PRINTS "SAVING" BEFORE IT FAILS. On "BASIC RAM FULL" it writes a TRUNCATED program
+#   to the drive and only then reports the error, so a file that exists, is non-empty and loads
+#   at $0801 is NOT evidence of a good tokenise. GPC then stops a stage later on a label whose
+#   line was never written -- "UNKNOWN LINE NUMBER @ nnnn" -- naming neither the file nor the
+#   cause. The echo log is the only place BASLOAD's own message appears, so it is read here
+#   rather than deleted unread. Its nineteen return codes are listed in testing/MSEDIT/BASLOAD.MD.
+#
+#   Anchored to the START of a line: the log also carries the #SYMFILE dump, which is the user's
+#   own symbol names and could hold anything.
+#
+def scan_for_error(log):
+    """BASLOAD's error line out of the emulator echo, or "" if it reported none."""
+    text = log.decode("latin-1", "replace")
+    for line in text.replace("\r", "\n").split("\n"):
+        line = line.strip("\0 \t")
+        if line.startswith("ERROR:"):
+            return line
+    return ""
+
+
 def tokenise(basl_name, prg_name, also_clean=()):
     """Boot the emulator headless and run  BASLOAD "<basl_name>"  so the source's own #SAVEAS
     writes testing/<prg_name>. Returns the tokenised PRG's bytes; dies on failure. also_clean
@@ -117,6 +138,11 @@ def tokenise(basl_name, prg_name, also_clean=()):
         if os.path.exists(p):
             try: os.remove(p)
             except OSError: pass
+
+    #   Checked BEFORE the "did a file appear" test, because on a truncating failure one did.
+    bad = scan_for_error(log)
+    if bad:
+        die("BASLOAD said %s -- %s is truncated, do not compile it" % (bad, prg_name))
 
     if not ok:
         die("BASLOAD wrote no %s within 30s -- echo log tail:\n%s"
