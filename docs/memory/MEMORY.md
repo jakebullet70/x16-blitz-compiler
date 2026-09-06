@@ -57,6 +57,9 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [Runtime footprint](blitz-x16-runtime-footprint.md) — the 10,956 B runtime copied into every program, and how to shrink it
 - [String heap scavenger](string-heap-scavenger.md) — SHIPPED: dead blocks reused, +1 page RT; the intermittent OOM was no-reclaim plus a garbage line-0 read
 - [String blocks never shrink](gpc-string-blocks-never-shrink.md) — a big temporary must not be built; freeing it is not a thing
+- [Compile is write-only](compile-is-write-only.md) — one instruction touches the object during a compile and it is a store; the premise the two-pass work rests on
+- [Two-pass compiler](two-pass-compiler.md) — the rebuild that removes the compile-side size wall: what is done, the checksum invariant, what is left
+- [Compiler overlay into a bank](compiler-overlay-into-a-bank.md) — REVERTED, but the 64tass mechanism works and is measured at +2,560 bytes of object buffer
 - [Banking strings: length, not count](banking-strings-scales-with-length.md) — the menus broke even at 249 saved vs 245 spent
 - [BANK, not POKE 0](gpc-bank-statement-not-poke-zero.md) — PEEK/POKE restore the bank around every access, so POKE 0 can never select one
 - [STASH leaves its bank selected — FIXED](stash-leaves-its-bank-selected.md) — it now restores the caller's bank; what the symptom looked like, and why it named the wrong routine
@@ -88,7 +91,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [FOR 1 TO 0 runs once](gpc-basic-for-loop-runs-once.md) — the string-walk idiom turns an empty string into CHR$(0); guard every FOR 1 TO LEN()
 - [X16 BASIC conformance](blitz-x16-basic-conformance.md) — Blitz vs stock BASIC: 4 real defects (float literals, STEP 0, sci notation, reversed relops)
 - [X16 BASIC coverage](gpc-x16-basic-coverage.md) — the 7 lexer blockers on valid X16 BASIC (hex, binary, .5, >=65536, 9.2E5, long names, `=<` `=>` `><`)
-- [R44+ keywords](blitz-x16-r44-plus-keywords.md) — 10 keywords added after R43 that Blitz doesn't know + a LINPUT/LINPUT# token swap
+- [R44+ keywords](blitz-x16-r44-plus-keywords.md) — CLOSED: all 10 are in and implemented, `MOD` included; do not re-fix
 
 ## Performance
 - [C64 Blitz benchmark yardstick](blitz-c64-benchmark-yardstick.md) — real C64 Blitz ≈2.6× vs stock BASIC; the bar to beat
