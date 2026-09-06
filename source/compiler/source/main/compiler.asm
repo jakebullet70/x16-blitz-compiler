@@ -42,7 +42,33 @@ StartCompiler:
 		tsx 								; save stack pointer
 		stx 	compilerSP
 
-		jsr 	STRReset 					; reset storage (line#, variable)
+		stz 	passNumber 					; the first of the two
+		stz 	pass1VarSpace 				; nothing known yet, so pass one emits zeroes into the
+		stz 	pass1VarSpace+1 			; _variable.space operand and pass two emits the answer
+
+; ************************************************************************************************
+;
+;		THE WHOLE SOURCE IS COMPILED TWICE, and the two passes emit exactly the same bytes.
+;
+;		Pass one exists to answer the questions a single forward pass cannot: where every line
+;		ends up, how much space the variables need, where each block's forward branches land.
+;		Pass two then compiles the same source again knowing all of it, so nothing has to be
+;		written down and gone back to.
+;
+;		THE TWO PASSES PRODUCING IDENTICAL BYTES IS A LOAD-BEARING ASSUMPTION and nothing in the
+;		structure enforces it -- so it is checked rather than trusted. WriteCodeByte accumulates
+;		a Fletcher-16 over every byte, and the tail of pass two compares that and the length
+;		against pass one's before anything is written out. A mismatch is a compiler bug and says
+;		so; it is never a silently wrong object, which is the one failure this must not have.
+;
+;		Everything a compile accumulates has to be back at its starting value for pass two, which
+;		is what ResetPassState is for. Anything missed from it shows up as a checksum mismatch on
+;		the first program that touches it, rather than as a corrupt object months later.
+;
+; ************************************************************************************************
+
+CompilePass:
+		jsr 	ResetPassState 				; every counter and table this pass will fill
 
 		lda 	#BLC_OPENIN					; reset data input
 		jsr 	CallAPIHandler
@@ -50,43 +76,28 @@ StartCompiler:
 		lda 	#BLC_RESETOUT 				; reset data output.
 		jsr 	CallAPIHandler
 		;
-		;		Compile _variable.space, filled in on pass 2.
+		;		_variable.space -- how much room the variables need. It sits at the very top of
+		;		the program and the answer is only known at the very bottom, which is exactly the
+		;		shape of problem the second pass exists to solve: pass one emits nothing useful
+		;		here and finishes with the total, pass two writes that total straight in.
+		;
+		;		This used to be patched in place by FixBranches, which is why the opcode was here
+		;		in the first place -- it was a one-pass compiler with one two-pass-shaped hole in
+		;		it. That handler is gone.
 		;
 		lda 	#PCD_CMD_VARSPACE
 		jsr 	WriteCodeByte
-		lda 	#0
-		jsr 	WriteCodeByte
-		jsr 	WriteCodeByte
+		lda 	pass1VarSpace 				; zero in pass one, the real figure in pass two
+		jsr 	WriteCodeResolved
+		lda 	pass1VarSpace+1
+		jsr 	WriteCodeResolved
 		;
-		;		Reset implicit-array tracking, and emit the jump to the implicit-DIM prologue.
-		;		The prologue lives at line $FFFF (emitted at the end); it dimensions every
-		;		undimensioned array and then jumps to the first real line. It is emitted whether
-		;		or not any arrays need it -- with none it is just a jump straight back -- because
-		;		we don't yet know if the program has any. VARSPACE has already run, so the array
-		;		allocator (availableMemory) is set up by the time the prologue executes.
-		;
-		stz 	SelectDepth 				; open GP.SELECTs, for the selector-variable stack
-		stz 	blockDepth 					; GP.DO nesting -- the storage section is
-											; uninitialised RAM, and a non-zero start makes every
-											; GOTO emit an .unwind it does not need
-		stz 	gpBankState 				; no GP.BANKED region seen yet, and nothing relocated --
-		stz 	gpBankActive 				; same argument as blockDepth above, the storage section
-		stz 	gpBankCount 				; is not cleared, and gpBankCount is the one that MUST
-											; start at zero: it is the length of every region table,
-											; so a stale byte walks all of them off the end.
-		stz 	gpBankNumber 				; The last two are read unconditionally by the bootstrap
-		stz 	gpBankRunBase 				; patch table, and gpBankRunBase derives from FreeMemory,
-											; so left stale it writes a dead byte into a non-banked
-											; object that MOVES when the compiler's own size changes.
-		stz 	implicitDimCount
-		stz 	implicitDimFirstSet
-		stz 	clrCheckpoint 				; no CLR compiled yet -> no array is re-DIMmable
-		stz 	clrCheckpoint+1
-		stz 	deferErrors 				; not deferring compile errors until a statement arms it
-		lda 	#$00 						; default return target $FE00 (the END marker) so an
-		sta 	implicitDimFirst 			; empty program's prologue just exits cleanly.
-		lda 	#$FE
-		sta 	implicitDimFirst+1
+		;		Emit the jump to the implicit-DIM prologue. The prologue lives at line $FFFF
+		;		(emitted at the end); it dimensions every undimensioned array and then jumps to
+		;		the first real line. It is emitted whether or not any arrays need it -- with none
+		;		it is just a jump straight back -- because we don't yet know if the program has
+		;		any. VARSPACE has already run, so the array allocator (availableMemory) is set up
+		;		by the time the prologue executes.
 		;
 		lda 	#PCD_CMD_GOTO
 		jsr 	WriteCodeByte
@@ -226,6 +237,71 @@ SaveCodeAndExit:
 		;
 		lda 	#$FF 						; add end marker
 		jsr 	WriteCodeByte
+		;
+		;		END OF A PASS. Pass one stops here and goes round again -- everything below this
+		;		point runs once, on the p-code pass two produced.
+		;
+		;		The pool is deliberately NOT flushed in pass one. AsmFlushPool appends it through
+		;		WriteCodeByte, so flushing would put it in the checksum, and pass two rebuilds the
+		;		pool from scratch anyway (ResetPassState clears AsmPoolLen). Comparing the p-code
+		;		alone is the comparison that means something.
+		;
+		lda 	passNumber
+		bne 	_SCECompare
+		;
+		lda 	passSum 					; what pass two now has to reproduce, exactly
+		sta 	pass1Sum
+		lda 	passSum+1
+		sta 	pass1Sum+1
+		lda 	objPtr
+		sta 	pass1Len
+		lda 	objPtr+1
+		sta 	pass1Len+1
+		lda 	freeVariableMemory 			; ...and the answer pass two writes into the operand
+		sta 	pass1VarSpace 				; at the top of the program. STRReset zeroes the
+		lda 	freeVariableMemory+1 		; original, so it has to be kept here.
+		sta 	pass1VarSpace+1
+		inc 	passNumber
+		jmp 	CompilePass
+
+		;
+		;		Pass two. Length first, then the sum: a length mismatch is the likelier bug and
+		;		the more informative one, though both land in the same place.
+		;
+_SCECompare:
+		lda 	objPtr
+		cmp 	pass1Len
+		bne 	_SCEDiverged
+		lda 	objPtr+1
+		cmp 	pass1Len+1
+		bne 	_SCEDiverged
+		lda 	passSum
+		cmp 	pass1Sum
+		bne 	_SCEDiverged
+		lda 	passSum+1
+		cmp 	pass1Sum+1
+		bne 	_SCEDiverged
+		;
+		;		And the variable space, which pass two wrote into the program before it had
+		;		recomputed it. Free to check and it covers the one value the object carries that
+		;		the byte stream cannot see -- the operand holding it is not in the sum.
+		;
+		lda 	freeVariableMemory
+		cmp 	pass1VarSpace
+		bne 	_SCEDiverged
+		lda 	freeVariableMemory+1
+		cmp 	pass1VarSpace+1
+		beq 	_SCEAgreed
+		;
+		;		The passes disagree, so some piece of compile state was carried from one into the
+		;		other -- ResetPassState is missing something. Nothing has been written yet, and
+		;		nothing is going to be: an object built from two different compiles of the same
+		;		source is exactly the corrupt output this check exists to prevent.
+		;
+_SCEDiverged:
+		.error_internal
+
+_SCEAgreed:
 		jsr 	AsmFlushPool 				; append the GP.ASM blob pool AFTER the $FF end marker,
 											; where nothing walks -- see commands/gpasmcode.asm
 		jsr 	GPBankRelocate 				; lift a GP.BANKED region out to the end of the object,
@@ -255,9 +331,58 @@ SaveCodeAndExit:
 		jsr 	CallAPIHandler
 		clc 								; CC = success
 
-ExitCompiler:		
+ExitCompiler:
 		ldx 	compilerSP 					; reload SP and exit.
 		txs
+		rts
+
+; ************************************************************************************************
+;
+;		Put every piece of state a compile accumulates back to where it started, so the next pass
+;		sees exactly what the last one saw. Called once per pass, before a byte is read or
+;		written.
+;
+;		THE STORAGE SECTION IS UNINITIALISED RAM (a .dsection at $0400, below the loaded file --
+;		see common.inc), so most of this was already needed for the FIRST pass. What the second
+;		pass adds is the two GP.ASM counters below, which live in the code section and so used to
+;		arrive zeroed by the loader and never needed clearing again.
+;
+; ************************************************************************************************
+
+ResetPassState:
+		jsr 	STRReset 					; line number table, variable list, free variable memory
+
+		stz 	SelectDepth 				; open GP.SELECTs, for the selector-variable stack
+		stz 	blockDepth 					; GP.DO nesting -- a non-zero start makes every GOTO
+											; emit an .unwind it does not need
+		stz 	gpBankState 				; no GP.BANKED region seen yet, and nothing relocated.
+		stz 	gpBankActive
+		stz 	gpBankCount 				; MUST start at zero: it is the length of every region
+											; table, so a stale byte walks all of them off the end.
+		stz 	gpBankNumber 				; The last two are read unconditionally by the bootstrap
+		stz 	gpBankRunBase 				; patch table, and gpBankRunBase derives from FreeMemory,
+											; so left stale it writes a dead byte into a non-banked
+											; object that MOVES when the compiler's own size changes.
+		stz 	implicitDimCount
+		stz 	implicitDimFirstSet
+		stz 	clrCheckpoint 				; no CLR compiled yet -> no array is re-DIMmable
+		stz 	clrCheckpoint+1
+		stz 	deferErrors 				; not deferring compile errors until a statement arms it
+		lda 	#$00 						; default return target $FE00 (the END marker) so an
+		sta 	implicitDimFirst 			; empty program's prologue just exits cleanly.
+		lda 	#$FE
+		sta 	implicitDimFirst+1
+		;
+		;		GP.ASM. The pool and the fixup list are both rebuilt from scratch by each pass --
+		;		the fixups especially, because AsmFixTarget records the address the operand landed
+		;		at, and pass one's addresses are not the ones PatchAsmFixups will be resolving.
+		;
+		stz 	AsmPoolLen
+		stz 	AsmPoolLen+1
+		stz 	AsmFixupCount
+		;
+		stz 	passSum 					; and the stream checksum this pass will build
+		stz 	passSum+1
 		rts
 
 ; ************************************************************************************************
@@ -337,6 +462,21 @@ compilerEndHigh:							; MSB of workspace end address
 		.fill 	1
 objectEnd:									; the true end of the object, held across FixBranches --
 		.fill 	2							; which rewinds objPtr and leaves it at the end marker
+;
+;		The two passes. passNumber is 0 while the first is running and 1 for the second, and it
+;		is the only thing that tells them apart -- everything else about a pass is identical, by
+;		construction and by the checksum below.
+;
+passNumber:								; 0 = first pass, 1 = second
+		.fill 	1
+passSum:									; Fletcher-16 over every byte this pass emitted,
+		.fill 	2							; accumulated by WriteCodeByte (helpers/api.asm)
+pass1Sum:									; ...and what pass one came to, kept for the compare
+		.fill 	2
+pass1Len:									; pass one's object length, compared the same way
+		.fill 	2
+pass1VarSpace:								; what the variables came to -- zero while pass one is
+		.fill 	2							; running, which is what it emits into _variable.space
 ;
 ;		Implicit array dimensioning. Interpreted BASIC auto-creates an array (0..10 per
 ;		dimension) the first time it is used without a DIM. We can't do that lazily -- this VM

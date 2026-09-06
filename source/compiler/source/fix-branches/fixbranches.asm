@@ -14,7 +14,7 @@
 
 ; ************************************************************************************************
 ;
-;								Fix up GOTO and GOSUB, and VARSPACE
+;									 Fix up GOTO and GOSUB
 ;
 ; ************************************************************************************************
 
@@ -34,8 +34,6 @@ _FBLoop:
 		beq 	_FBFixGotoGosub
 		cmp 	#PCD_CMD_GOTOCMD_Z 
 		beq 	_FBFixGotoGosub
-		cmp 	#PCD_CMD_VARSPACE
-		beq 	_FBVarSpaceFar
 		cmp 	#PCD_CMD_RESTORE 			; patch restore.
 		beq 	_FBFixRestore
 		cmp 	#PCD_CMD_EXITDO 			; GP.EXITDO: resolve against its own GP.LOOP.
@@ -82,8 +80,6 @@ _FBExit: 									; hopped there and the walk goes on
 		rts
 _FBUnwindFar:
 		jmp 	_FBFixUnwind
-_FBVarSpaceFar: 							; the dispatch grew when the depth count went into
-		jmp 	_FBFixVarSpace 				; _FBNext, and this was the branch it pushed over
 ;
 ;		The GP.EXITDO handler lives at the very end of this file, deliberately: dropping it inline
 ;		pushed the branches around it out of range. Hence this trampoline.
@@ -165,18 +161,6 @@ _FBFFail:
 		lda 	(objPtr),y
 		sta 	currentLineNumber+1
 		.error_line
-
-;
-;		Found VarSpace, fix up with free space after variables
-;
-_FBFixVarSpace:
-		ldy 	#1
-		lda 	freeVariableMemory
-		sta 	(objPtr),y
-		iny
-		lda 	freeVariableMemory+1
-		sta 	(objPtr),y
-		jmp 	_FBNext 					; jmp, not bra: _FBNext is out of branch range now
 
 ;
 ;		Found GP.EXITDO. Its target is whatever follows the GP.LOOP that closes the GP.DO it sits
