@@ -9,10 +9,10 @@
 # ************************************************************************************************
 # ************************************************************************************************
 #
-#		Two targets out of ONE unmodified source tree:
+#		Two targets out of ONE source tree:
 #
-#		  rom   upstream/conf/basload-rom.cfg   16,384 bytes, loads at $c000 in ROM bank 15
-#		  prg   conf/basload-prg.cfg            a PRG that loads and runs anywhere in RAM
+#		  rom   conf/basload-rom.cfg   16,384 bytes, loads at $c000 in ROM bank 15
+#		  prg   conf/basload-prg.cfg   a PRG that loads and runs anywhere in RAM
 #
 #		The prg target is the whole point of this folder -- see README.md. There is no source
 #		diff between them and there is not meant to be one: everything ROM-specific in BASLOAD
@@ -20,6 +20,15 @@
 #		a linker config and nothing else.
 #
 #		  python BASLOAD-GPC/build.py [rom|prg|both]      default: both
+#
+#		THE FORK IS AN OVERLAY, NOT A PATCH SET. upstream/ stays exactly as it was vendored and
+#		src/ holds a whole copy of each file we changed, so
+#
+#		  diff BASLOAD-GPC/upstream/line.inc BASLOAD-GPC/src/line.inc
+#
+#		is the fork, in full, with no tooling. Each build copies upstream/ to build/work/, drops
+#		src/ over it and assembles there, which also means a half-finished edit can never leave
+#		the vendored tree dirty. Every changed hunk sits inside a ;=== GPC begin/end === banner.
 #
 #		VERIFY is the reason the rom target exists at all. It rebuilds the bank and diffs it
 #		against bank 15 of bin/x16emu/rom.bin, which answers "is the vendored source actually
@@ -33,13 +42,17 @@
 # ************************************************************************************************
 
 import os
+import shutil
 import subprocess
 import sys
 
 HERE     = os.path.dirname(os.path.abspath(__file__))
 ROOT     = os.path.abspath(os.path.join(HERE, ".."))
 UPSTREAM = os.path.join(HERE, "upstream")
+SRC      = os.path.join(HERE, "src")
 BUILD    = os.path.join(HERE, "build")
+WORK     = os.path.join(BUILD, "work")      # upstream + src: the fork, and what ships
+STOCK    = os.path.join(BUILD, "stock")     # upstream alone: what the rom target checks
 ROM      = os.path.join(ROOT, "bin", "x16emu", "rom.bin")
 
 #	The bank BASLOAD occupies. conf/basload-rom.cfg says bank=$0f, and grepping rom.bin for
@@ -62,25 +75,51 @@ def die(msg):
 	sys.exit("build.py: " + msg)
 
 
-def run(cfg, out, mapfile):
+def overlay(tree, with_src):
+	"""Lay out a tree to assemble in. Rebuilt from scratch every time, so a file removed from src/
+	goes back to being upstream's on the very next build, with nothing to undo.
+
+	THE ROM TARGET TAKES with_src=False ON PURPOSE. Its job is to answer "is the vendored source
+	actually what the ROM runs", and it can only answer that about a tree we have not touched."""
+	if os.path.exists(tree):
+		shutil.rmtree(tree)
+	shutil.copytree(UPSTREAM, tree)
+	if not with_src:
+		return
+	forked = []
+	for name in sorted(os.listdir(SRC)) if os.path.isdir(SRC) else []:
+		path = os.path.join(SRC, name)
+		if not os.path.isfile(path):
+			continue
+		#	A src/ file that overlays nothing is a typo, not a new feature: main.asm includes a
+		#	fixed list, so a misspelt name would be copied in and then silently never assembled.
+		if not os.path.exists(os.path.join(UPSTREAM, name)):
+			die("src/%s overlays nothing -- upstream has no file by that name" % name)
+		shutil.copy(path, os.path.join(tree, name))
+		forked.append(name)
+	print("  fork %s" % (", ".join(forked) if forked else "(none -- building stock upstream)"))
+
+
+def run(tree, cfg, out, mapfile):
 	"""cl65 over main.asm with the given linker config. Every include is pulled in by main.asm,
 	so there is exactly one translation unit and no link order to get wrong."""
 	if not os.path.exists(CL65):
 		die("no cl65 at %s -- set CC65_HOME, or install the cc65 Windows snapshot" % CL65)
 	args = [CL65, "-o", out, "--cpu", "65C02", "-t", "none",
 			"-C", cfg, "-m", mapfile, "main.asm"]
-	r = subprocess.run(args, cwd=UPSTREAM, capture_output=True, text=True)
+	r = subprocess.run(args, cwd=tree, capture_output=True, text=True)
 	if r.returncode != 0:
 		die("cl65 failed:\n" + (r.stdout or "") + (r.stderr or ""))
 	#	cl65 leaves the object beside the source; the Makefile deletes it and so do we.
-	stray = os.path.join(UPSTREAM, "main.o")
+	stray = os.path.join(tree, "main.o")
 	if os.path.exists(stray):
 		os.remove(stray)
 
 
 def build_rom():
+	overlay(STOCK, with_src=False)
 	out = os.path.join(BUILD, "basload-rom.bin")
-	run(os.path.join(UPSTREAM, "conf", "basload-rom.cfg"), out,
+	run(STOCK, os.path.join(STOCK, "conf", "basload-rom.cfg"), out,
 		os.path.join(BUILD, "basload-rom.map"))
 	print("  rom  %s (%d bytes)" % (os.path.basename(out), os.path.getsize(out)))
 	verify(out)
@@ -114,7 +153,8 @@ def verify(built):
 
 def build_prg():
 	raw = os.path.join(BUILD, "basload-prg.raw")
-	run(os.path.join(HERE, "conf", "basload-prg.cfg"), raw,
+	overlay(WORK, with_src=True)
+	run(WORK, os.path.join(HERE, "conf", "basload-prg.cfg"), raw,
 		os.path.join(BUILD, "basload-prg.map"))
 	#	A PRG is the load address little-endian, then the image. cl65 emits the image alone.
 	out = os.path.join(BUILD, "BASLOAD.PRG")

@@ -15,9 +15,15 @@
 #		testing here: a RAM build that runs but tokenises differently is worse than one that
 #		does not run at all.
 #
-#		THE LAST TWO BYTES ARE EXCLUDED FROM THE COMPARE, and that is not slack. BASLOAD writes
-#		two bytes past the end of the program that differ run to run -- source/gpc/build_basl.py
-#		documents the same thing and skips its up-to-date check because of it.
+#		THE ROM'S LAST TWO BYTES ARE EXCLUDED FROM THE COMPARE, and that is not slack. The ROM
+#		build SAVEs up to line_code, which is four bytes past the last line -- two of them the
+#		zero link that ends a program, and two whatever was in RAM. Those two differ run to run;
+#		source/gpc/build_basl.py documents the same thing and skips its up-to-date check for it.
+#
+#		The RAM build has no such tail. It streams a line at a time and writes the zero link
+#		itself at close, so it stops exactly where a BASIC program stops -- which is why the
+#		compare is rom[:-2] against the whole of the PRG's output, and why the RAM build's file
+#		is two bytes SHORTER. That is the fork working, not a truncation.
 #
 #		Build first:  python BASLOAD-GPC/build.py prg
 #
@@ -118,8 +124,8 @@ def main():
 		die("the RAM-resident BASLOAD wrote no %s" % OUTPUT)
 	print("       %d bytes" % len(from_prg))
 
-	#	Trailing two bytes dropped -- see the header.
-	a, b = from_rom[:-2], from_prg[:-2]
+	#	Two bytes off the ROM's output only -- see the header.
+	a, b = from_rom[:-2], from_prg
 	if a != b:
 		bad = next(i for i in range(min(len(a), len(b))) if a[i] != b[i]) if len(a) == len(b) \
 			else "length %d vs %d" % (len(a), len(b))
