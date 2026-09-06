@@ -76,7 +76,7 @@ BL.NESTED:
     GP.SELECT BL.N
       GP.CASE 0
         GP.IF BL.N = 0 THEN
-          PRINT "BA IN-IF-SEL-IF"
+          PRINT "B10 IN-IF-SEL-IF"
         GP.ELSE
           PRINT "B0 WRONG"
         GP.ENDIF
@@ -92,7 +92,7 @@ BL.NESTED:
       GP.IF BL.N = 1 THEN
         PRINT "B0 WRONG"
       GP.ELSEIF BL.N = 0 THEN
-        PRINT "BB IN-SEL-IF"
+        PRINT "B11 IN-SEL-IF"
       GP.ENDIF
     GP.OTHER
       PRINT "B0 WRONG"
@@ -110,7 +110,7 @@ BL.LOOPS:
       GP.EXITDO
     GP.ENDIF
   GP.LOOP
-  PRINT "BC OUTER";BL.N
+  PRINT "B12 OUTER";BL.N
   ## ----
   BL.M = 0
   GP.DO
@@ -126,5 +126,5 @@ BL.LOOPS:
       GP.EXITDO
     GP.ENDIF
   GP.LOOP
-  PRINT "BD NESTED";BL.M;BL.N
+  PRINT "B13 NESTED";BL.M;BL.N
   RETURN

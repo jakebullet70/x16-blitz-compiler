@@ -103,19 +103,33 @@ _UCDone:
 
 ; ************************************************************************************************
 ;
-;		Block nesting, counted at compile time purely so CommandGOTO above can ask "am I inside
-;		one?". Nothing else needs it -- FixBranches works structurally, off the emitted code, and
-;		deliberately keeps no compile-time state. GP.IF is NOT counted: it opens no stack frame
-;		(its four opcodes are markers and reused goto handlers), so there is nothing to unwind.
+;		Block nesting, counted at compile time so that CommandGOTO above can ask "am I inside
+;		one?" and .unwind can ask "how far inside?". GP.IF is NOT counted: it opens no stack
+;		frame (its four opcodes are markers and reused goto handlers), so there is nothing to
+;		unwind out of it.
 ;
-;		Underflow is not guarded here. A stray GP.LOOP or GP.ENDSEL is caught structurally --
-;		FixBranches raises BLOCK MISMATCH -- and a depth that went briefly negative would only
-;		make a GOTO emit an .unwind it did not need, whose count FixBranches then computes as
-;		zero anyway.
+;		EACH LOOP ALSO GETS AN ORDINAL, and where it ends is written down under that ordinal as
+;		the GP.LOOP goes past. Only pass one writes; pass two reads, and that is what lets a
+;		GP.EXITDO -- a branch to a place the compiler has not reached -- be resolved where it is
+;		written rather than by walking the finished object afterwards.
+;
+;		Underflow is not guarded here. A stray GP.LOOP is caught structurally -- FixBranches
+;		raises BLOCK MISMATCH -- and a depth that went briefly negative would only make a GOTO
+;		emit an .unwind it did not need, whose count comes out as zero anyway.
 ;
 ; ************************************************************************************************
 
 BlockDepthUp: 								;; called from commands.def for GP.DO
+		lda 	blockDepth
+		cmp 	#BLOCK_MAX_NEST
+		bcs 	BlockFailNest
+		asl 	a
+		tax
+		jsr 	BlockOpen 					; this loop's ordinal, in blockIndex
+		lda 	blockIndex
+		sta 	blockOrdinals,x
+		lda 	blockIndex+1
+		sta 	blockOrdinals+1,x
 		inc 	blockDepth
 		clc 								; .def helpers MUST return carry clear
 		rts
@@ -124,9 +138,155 @@ BlockDepthDown: 							;; and for GP.LOOP
 		lda 	blockDepth
 		beq 	_BDDFloor
 		dec 	blockDepth
+		lda 	passNumber
+		bne 	_BDDFloor 					; pass two READS this table; it does not write it
+		;
+		;		Where a GP.EXITDO in this loop lands: one past the GP.LOOP just written. What is
+		;		STORED is one less than that -- the GP.LOOP's own address -- and the reader adds
+		;		the one back. Stored that way the address always falls strictly INSIDE its own
+		;		stretch of object, which is what matters when the loop is inside a GP.BANKED
+		;		region: GPBankAdjust puts the byte at the region's end on the LOW side of the
+		;		move, and one past the last GP.LOOP of a region is exactly that byte.
+		;
+		lda 	blockDepth
+		asl 	a
+		tax
+		lda 	blockOrdinals,x
+		sta 	blockIndex
+		lda 	blockOrdinals+1,x
+		sta 	blockIndex+1
+		jsr 	BlockEndHere
 _BDDFloor:
 		clc
 		rts
+
+; ************************************************************************************************
+;
+;		Where the innermost open GP.DO ends, into branchTarget. Pass two only -- in pass one the
+;		answer does not exist yet, which is the whole reason there are two passes.
+;
+; ************************************************************************************************
+
+BlockEnclosingDo:
+		lda 	blockDepth
+		beq 	BlockFailStructure 			; a GP.EXITDO that is not inside a loop at all
+		dec 	a
+		asl 	a
+		tax
+		lda 	blockOrdinals,x
+		sta 	blockIndex
+		lda 	blockOrdinals+1,x
+		sta 	blockIndex+1
+		jmp 	BlockEndTarget
+
+;
+;		The three ways a block can be refused, HERE rather than at the foot of the file: the
+;		tests that reach them are spread over the routines below, and a relative branch does not
+;		span them.
+;
+BlockFailNest:
+		.error_memory 						; more nesting than BLOCK_MAX_NEST allows
+BlockFailCount:
+		.error_toobig 						; more blocks than the table holds
+BlockFailStructure:
+		.error_structure
+
+; ************************************************************************************************
+;
+;		The two things EVERY block does, whichever keyword opened it.
+;
+;		BlockOpen 		take the next block ordinal, into blockIndex. Both passes count them out
+;						in the same order, over the same source, and so agree on every one.
+;		BlockEndHere 	the block whose ordinal is in blockIndex ends where the write cursor
+;						stands. Pass one only -- pass two is reading what this wrote.
+;		BlockEndTarget 	...and reading it back, into branchTarget.
+;
+; ************************************************************************************************
+
+BlockOpen:
+		lda 	blockCount
+		sta 	blockIndex
+		lda 	blockCount+1
+		sta 	blockIndex+1
+		inc 	blockCount
+		bne 	_BOPCounted
+		inc 	blockCount+1
+_BOPCounted:
+		lda 	blockCount+1 				; the table holds BLOCK_MAX of them
+		cmp 	#BLOCK_MAX >> 8
+		bcs 	BlockFailCount
+		rts
+
+BlockEndHere:
+		lda 	passNumber
+		bne 	_BEHDone 					; pass two READS this table; it does not write it
+		sec 								; one short, and the reader adds it back
+		lda 	objPtr
+		sbc 	#1
+		sta 	blockValue
+		lda 	objPtr+1
+		sbc 	#0
+		sta 	blockValue+1
+		jsr 	BlockEndWrite
+_BEHDone:
+		rts
+
+BlockEndTarget:
+		jsr 	BlockEndRead
+BlockPlusOne:
+		clc 								; the stored address is one short -- see BlockDepthDown
+		lda 	blockValue
+		adc 	#1
+		sta 	branchTarget
+		lda 	blockValue+1
+		adc 	#0
+		sta 	branchTarget+1
+		rts
+
+; ************************************************************************************************
+;
+;		Entry blockIndex of the block-end table, to and from blockValue. The window is opened and
+;		closed around the two bytes rather than held, for the reason x16_storage.inc gives.
+;
+; ************************************************************************************************
+
+BlockEndWrite:
+		jsr 	BlockEndPointer
+		.block_access
+		lda 	blockValue
+		sta 	(zTemp0)
+		ldy 	#1
+		lda 	blockValue+1
+		sta 	(zTemp0),y
+		.block_release
+		rts
+
+BlockEndRead:
+		jsr 	BlockEndPointer
+		.block_access
+		lda 	(zTemp0)
+		sta 	blockValue
+		ldy 	#1
+		lda 	(zTemp0),y
+		sta 	blockValue+1
+		.block_release
+		rts
+
+;
+;		zTemp0 = BlockEndTable + blockIndex*2. The table base is page aligned and the index is
+;		under 2,048, so the doubled index cannot leave the table's own 4K.
+;
+BlockEndPointer:
+		lda 	blockIndex
+		asl 	a
+		sta 	zTemp0
+		lda 	blockIndex+1
+		rol 	a
+		clc
+		adc 	#BlockEndTable >> 8
+		sta 	zTemp0+1
+		rts
+
 
 ; ************************************************************************************************
 ;
@@ -229,6 +389,27 @@ EmitBranch:
 		lda 	branchTarget+1
 		jsr 	WriteCodeByte
 		rts
+
+BLOCK_MAX_NEST = 16 						; GP.DOs open at once, on SELECT_MAX_NEST's reasoning:
+											; two bytes of compiler space each, and nothing in
+											; the tree nests past three
+
+;
+;		Compiler-only working storage, in the CODE section rather than in storage, for the reason
+;		select.asm gives: storage is the 1K hole below $0801 and is already full, and compiler
+;		code is thrown away when the object is written, so these bytes cost a compiled program
+;		nothing at all.
+;
+blockOrdinals: 								; the ordinal of each GP.DO that is open right now
+		.fill 	2*BLOCK_MAX_NEST
+blockCount: 								; how many this pass has opened altogether
+		.fill 	2
+blockIndex: 								; the table entry being read or written...
+		.fill 	2
+blockValue: 								; ...and what is in it
+		.fill 	2
+blockWalk: 									; the relocator's place in the table
+		.fill 	2
 
 		.send code
 

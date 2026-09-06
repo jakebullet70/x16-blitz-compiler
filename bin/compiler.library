@@ -230,6 +230,7 @@ CompilerRAMBankReg	= $0000
 ;			3	GP.ASM's blob pool and fixup list (see the second pair of macros below).
 ;			4	the VARIABLE NAME LIST.
 ;			5	the BLOCK DEPTH of each line, one byte per line-table entry.
+;			6	WHERE EACH BLOCK ENDS, and where each of its alternatives goes next.
 ;
 ;		BANKS 2 AND 4 WERE ONE BANK, and that was the wall. The two tables shared 8K, growing
 ;		towards each other, and samples/editor had used 7,981 bytes of it -- 1,461 line entries
@@ -249,6 +250,11 @@ CompilerRAMBankReg	= $0000
 CompilerStorageBank	= 2 					; line number table, grows DOWN from $C000
 CompilerVarBank		= 4 					; variable name list, grows UP from $A000
 CompilerDepthBank	= 5 					; block depth per line, alongside the line table
+CompilerBlockBank	= 6 					; where each block ends, and its alternatives
+
+BlockEndTable		= $A000 				; 2,048 entries of 2 bytes: where block N ends
+BlockAltTable		= $B000 				; ...and the same for its alternatives
+BLOCK_MAX 			= 2048
 
 storage_access .macro
 		php
@@ -346,6 +352,46 @@ depthSavedBank: 							; caller's RAM bank, saved across a depth window
 		.fill 	1
 		.send 	storage
 
+;
+;		And a fourth, for the BLOCK END tables -- where a GP.DO, a GP.IF or a GP.SELECT finishes,
+;		and where each alternative inside one hands on to the next. Every branch in that family
+;		points FORWARDS, at a place the compiler has not reached, which is what made them
+;		FixBranches' work: it resolved them by scanning the finished object for the closing
+;		token. Pass one writes each answer down as it passes it; pass two reads it back and
+;		resolves the branch where it writes it.
+;
+;		Two tables of 2,048 entries, 4K each and 8K together, which is the bank exactly. Indexed
+;		by ORDINAL -- the n'th block the pass opened, the n'th alternative it wrote -- because
+;		both passes compile the same source in the same order and so number them the same way.
+;		NOT by nesting depth: two sibling loops share a depth, and the second would overwrite an
+;		answer the first still needs.
+;
+
+block_access .macro
+		php
+		pha
+		lda 	CompilerRAMBankReg 			; remember whatever the caller had selected
+		sta 	blockSavedBank
+		lda 	#CompilerBlockBank
+		sta 	CompilerRAMBankReg
+		pla
+		plp
+		.endm
+
+block_release .macro
+		php
+		pha
+		lda 	blockSavedBank
+		sta 	CompilerRAMBankReg
+		pla
+		plp
+		.endm
+
+		.section storage
+blockSavedBank: 							; caller's RAM bank, saved across a block window
+		.fill 	1
+		.send 	storage
+
 ; ************************************************************************************************
 ;
 ;									Changes and Updates
@@ -357,7 +403,8 @@ depthSavedBank: 							; caller's RAM bank, saved across a depth window
 ;		02/08/26		Implemented (were no-ops); tables moved to banked RAM $A000-$BFFF.
 ;		01/09/26		Split: the line table keeps bank 2, the variable list moves to bank 4,
 ;						so neither table bounds the other.
-;		06/09/26		Bank 5 added for the per-line block depth (the two-pass compiler).
+;		06/09/26		Bank 5 added for the per-line block depth, and bank 6 for the block
+;						end tables (the two-pass compiler).
 ;
 ; ************************************************************************************************
 
@@ -1114,6 +1161,8 @@ ResetPassState:
 		stz 	SelectDepth 				; open GP.SELECTs, for the selector-variable stack
 		stz 	blockDepth 					; GP.DO nesting -- a non-zero start makes every GOTO
 											; emit an .unwind it does not need
+		stz 	blockCount 					; ...and the ordinals handed to the blocks themselves,
+		stz 	blockCount+1 				; which BOTH passes count out and must agree on
 		stz 	gpBankState 				; no GP.BANKED region seen yet, and nothing relocated.
 		stz 	gpBankActive
 		stz 	gpBankCount 				; MUST start at zero: it is the length of every region
@@ -2326,12 +2375,16 @@ _EHDisplayLine:
 ;		GP.EXITDO -- leave the innermost GP.DO ... GP.LOOP early.
 ;
 ;		This cannot go in the command table as a plain "T", because .exitdo is a SYSTEM token and
-;		system tokens carry an inline operand the table has no way to reserve. So the token and a
-;		two byte placeholder are written here, and FixBranches resolves the placeholder into a
-;		branch offset by scanning forward for the matching GP.LOOP.
+;		system tokens carry an inline operand the table has no way to reserve. So the token and
+;		its two operand bytes are written here.
 ;
-;		The placeholder value is never read -- FixBranches overwrites both bytes unconditionally,
-;		and errors out if there is no matching GP.LOOP rather than leaving them.
+;		PASS ONE WRITES A PLACEHOLDER, which FixBranches resolves by scanning forward for the
+;		matching GP.LOOP -- it has the whole object laid out and can look. The value is never
+;		read: FixBranches overwrites both bytes unconditionally, and errors out if there is no
+;		matching GP.LOOP rather than leaving them.
+;
+;		PASS TWO WRITES THE OFFSET, out of the table pass one filled in as it passed each
+;		GP.LOOP. See BlockDepthDown in commands/goto.asm.
 ;
 ;		MUST return carry CLEAR. A .def helper that returns carry set makes the generator silently
 ;		drop every token after it, with no error and no clue -- see the compiled OPEN15,8,15 hang.
@@ -2339,12 +2392,24 @@ _EHDisplayLine:
 ; ************************************************************************************************
 
 CommandExitDoCompile:
-		lda 	#PCD_CMD_EXITDO
-		jsr 	WriteCodeByte
-		lda 	#0 							; branch offset placeholder, patched by FixBranches
+		lda 	passNumber
+		bne 	_CEDResolve
+		lda 	#PCD_CMD_EXITDO 			; pass one: FixBranches scans forward for the GP.LOOP
+		jsr 	WriteCodeByte 				; and fills the offset in
+		lda 	#0
 		jsr 	WriteCodeByte
 		lda 	#0
 		jsr 	WriteCodeByte
+		clc
+		rts
+;
+;		Pass two knows where the loop ends, because pass one wrote it down as it went past --
+;		see BlockDepthDown in commands/goto.asm.
+;
+_CEDResolve:
+		jsr 	BlockEnclosingDo 			; where the innermost open GP.DO ends
+		lda 	#PCD_CMD_EXITDO
+		jsr 	WriteBranchToAddress
 		clc
 		rts
 
@@ -2773,13 +2838,13 @@ _FBLoop:
 		beq 	_FBFixRestore
 		cmp 	#PCD_CMD_UNWIND 			; a GOTO leaving blocks: how many frames it closes.
 		beq 	_FBUnwindFar
-		;
-		;		THE STRUCTURAL BRANCHES, both passes. Their targets are code positions found by
-		;		walking the object, which is a thing only this side can do.
-		;
-_FBStructural:
 		cmp 	#PCD_CMD_EXITDO 			; GP.EXITDO: resolve against its own GP.LOOP.
 		beq 	_FBExitDoFar
+		;
+		;		WHAT IS LEFT, both passes. Their targets are code positions found by walking the
+		;		object, which is a thing only this side can do.
+		;
+_FBStructural:
 		cmp 	#PCD_CMD_CASENEXT 			; GP.CASE that did not match: the next alternative.
 		beq 	_FBCaseNextFar
 		cmp 	#PCD_CMD_CASEEND 			; end of a case body: out to the GP.ENDSEL.
@@ -5164,19 +5229,33 @@ _UCDone:
 
 ; ************************************************************************************************
 ;
-;		Block nesting, counted at compile time purely so CommandGOTO above can ask "am I inside
-;		one?". Nothing else needs it -- FixBranches works structurally, off the emitted code, and
-;		deliberately keeps no compile-time state. GP.IF is NOT counted: it opens no stack frame
-;		(its four opcodes are markers and reused goto handlers), so there is nothing to unwind.
+;		Block nesting, counted at compile time so that CommandGOTO above can ask "am I inside
+;		one?" and .unwind can ask "how far inside?". GP.IF is NOT counted: it opens no stack
+;		frame (its four opcodes are markers and reused goto handlers), so there is nothing to
+;		unwind out of it.
 ;
-;		Underflow is not guarded here. A stray GP.LOOP or GP.ENDSEL is caught structurally --
-;		FixBranches raises BLOCK MISMATCH -- and a depth that went briefly negative would only
-;		make a GOTO emit an .unwind it did not need, whose count FixBranches then computes as
-;		zero anyway.
+;		EACH LOOP ALSO GETS AN ORDINAL, and where it ends is written down under that ordinal as
+;		the GP.LOOP goes past. Only pass one writes; pass two reads, and that is what lets a
+;		GP.EXITDO -- a branch to a place the compiler has not reached -- be resolved where it is
+;		written rather than by walking the finished object afterwards.
+;
+;		Underflow is not guarded here. A stray GP.LOOP is caught structurally -- FixBranches
+;		raises BLOCK MISMATCH -- and a depth that went briefly negative would only make a GOTO
+;		emit an .unwind it did not need, whose count comes out as zero anyway.
 ;
 ; ************************************************************************************************
 
 BlockDepthUp: 								;; called from commands.def for GP.DO
+		lda 	blockDepth
+		cmp 	#BLOCK_MAX_NEST
+		bcs 	BlockFailNest
+		asl 	a
+		tax
+		jsr 	BlockOpen 					; this loop's ordinal, in blockIndex
+		lda 	blockIndex
+		sta 	blockOrdinals,x
+		lda 	blockIndex+1
+		sta 	blockOrdinals+1,x
 		inc 	blockDepth
 		clc 								; .def helpers MUST return carry clear
 		rts
@@ -5185,9 +5264,155 @@ BlockDepthDown: 							;; and for GP.LOOP
 		lda 	blockDepth
 		beq 	_BDDFloor
 		dec 	blockDepth
+		lda 	passNumber
+		bne 	_BDDFloor 					; pass two READS this table; it does not write it
+		;
+		;		Where a GP.EXITDO in this loop lands: one past the GP.LOOP just written. What is
+		;		STORED is one less than that -- the GP.LOOP's own address -- and the reader adds
+		;		the one back. Stored that way the address always falls strictly INSIDE its own
+		;		stretch of object, which is what matters when the loop is inside a GP.BANKED
+		;		region: GPBankAdjust puts the byte at the region's end on the LOW side of the
+		;		move, and one past the last GP.LOOP of a region is exactly that byte.
+		;
+		lda 	blockDepth
+		asl 	a
+		tax
+		lda 	blockOrdinals,x
+		sta 	blockIndex
+		lda 	blockOrdinals+1,x
+		sta 	blockIndex+1
+		jsr 	BlockEndHere
 _BDDFloor:
 		clc
 		rts
+
+; ************************************************************************************************
+;
+;		Where the innermost open GP.DO ends, into branchTarget. Pass two only -- in pass one the
+;		answer does not exist yet, which is the whole reason there are two passes.
+;
+; ************************************************************************************************
+
+BlockEnclosingDo:
+		lda 	blockDepth
+		beq 	BlockFailStructure 			; a GP.EXITDO that is not inside a loop at all
+		dec 	a
+		asl 	a
+		tax
+		lda 	blockOrdinals,x
+		sta 	blockIndex
+		lda 	blockOrdinals+1,x
+		sta 	blockIndex+1
+		jmp 	BlockEndTarget
+
+;
+;		The three ways a block can be refused, HERE rather than at the foot of the file: the
+;		tests that reach them are spread over the routines below, and a relative branch does not
+;		span them.
+;
+BlockFailNest:
+		.error_memory 						; more nesting than BLOCK_MAX_NEST allows
+BlockFailCount:
+		.error_toobig 						; more blocks than the table holds
+BlockFailStructure:
+		.error_structure
+
+; ************************************************************************************************
+;
+;		The two things EVERY block does, whichever keyword opened it.
+;
+;		BlockOpen 		take the next block ordinal, into blockIndex. Both passes count them out
+;						in the same order, over the same source, and so agree on every one.
+;		BlockEndHere 	the block whose ordinal is in blockIndex ends where the write cursor
+;						stands. Pass one only -- pass two is reading what this wrote.
+;		BlockEndTarget 	...and reading it back, into branchTarget.
+;
+; ************************************************************************************************
+
+BlockOpen:
+		lda 	blockCount
+		sta 	blockIndex
+		lda 	blockCount+1
+		sta 	blockIndex+1
+		inc 	blockCount
+		bne 	_BOPCounted
+		inc 	blockCount+1
+_BOPCounted:
+		lda 	blockCount+1 				; the table holds BLOCK_MAX of them
+		cmp 	#BLOCK_MAX >> 8
+		bcs 	BlockFailCount
+		rts
+
+BlockEndHere:
+		lda 	passNumber
+		bne 	_BEHDone 					; pass two READS this table; it does not write it
+		sec 								; one short, and the reader adds it back
+		lda 	objPtr
+		sbc 	#1
+		sta 	blockValue
+		lda 	objPtr+1
+		sbc 	#0
+		sta 	blockValue+1
+		jsr 	BlockEndWrite
+_BEHDone:
+		rts
+
+BlockEndTarget:
+		jsr 	BlockEndRead
+BlockPlusOne:
+		clc 								; the stored address is one short -- see BlockDepthDown
+		lda 	blockValue
+		adc 	#1
+		sta 	branchTarget
+		lda 	blockValue+1
+		adc 	#0
+		sta 	branchTarget+1
+		rts
+
+; ************************************************************************************************
+;
+;		Entry blockIndex of the block-end table, to and from blockValue. The window is opened and
+;		closed around the two bytes rather than held, for the reason x16_storage.inc gives.
+;
+; ************************************************************************************************
+
+BlockEndWrite:
+		jsr 	BlockEndPointer
+		.block_access
+		lda 	blockValue
+		sta 	(zTemp0)
+		ldy 	#1
+		lda 	blockValue+1
+		sta 	(zTemp0),y
+		.block_release
+		rts
+
+BlockEndRead:
+		jsr 	BlockEndPointer
+		.block_access
+		lda 	(zTemp0)
+		sta 	blockValue
+		ldy 	#1
+		lda 	(zTemp0),y
+		sta 	blockValue+1
+		.block_release
+		rts
+
+;
+;		zTemp0 = BlockEndTable + blockIndex*2. The table base is page aligned and the index is
+;		under 2,048, so the doubled index cannot leave the table's own 4K.
+;
+BlockEndPointer:
+		lda 	blockIndex
+		asl 	a
+		sta 	zTemp0
+		lda 	blockIndex+1
+		rol 	a
+		clc
+		adc 	#BlockEndTable >> 8
+		sta 	zTemp0+1
+		rts
+
 
 ; ************************************************************************************************
 ;
@@ -5290,6 +5515,27 @@ EmitBranch:
 		lda 	branchTarget+1
 		jsr 	WriteCodeByte
 		rts
+
+BLOCK_MAX_NEST = 16 						; GP.DOs open at once, on SELECT_MAX_NEST's reasoning:
+											; two bytes of compiler space each, and nothing in
+											; the tree nests past three
+
+;
+;		Compiler-only working storage, in the CODE section rather than in storage, for the reason
+;		select.asm gives: storage is the 1K hole below $0801 and is already full, and compiler
+;		code is thrown away when the object is written, so these bytes cost a compiled program
+;		nothing at all.
+;
+blockOrdinals: 								; the ordinal of each GP.DO that is open right now
+		.fill 	2*BLOCK_MAX_NEST
+blockCount: 								; how many this pass has opened altogether
+		.fill 	2
+blockIndex: 								; the table entry being read or written...
+		.fill 	2
+blockValue: 								; ...and what is in it
+		.fill 	2
+blockWalk: 									; the relocator's place in the table
+		.fill 	2
 
 		.send code
 
@@ -7981,6 +8227,7 @@ _GBRFixUp:
 		;		Everything that recorded a position in the buffer now has to be told.
 		;
 		jsr 	_GBFixLineTable
+		jsr 	_GBFixBlockEnds
 		jsr 	_GBFixRegions 				; BEFORE the .fngosub walk, which reads the new bases
 		jsr 	_GBFixFnCalls
 		jsr 	_GBFixAsmCalls
@@ -8430,6 +8677,52 @@ _GBFLTEntry:
 		.storage_release
 		bra 	_GBFLTLoop
 _GBFLTDone:
+		rts
+
+; ************************************************************************************************
+;
+;		...and the same for the block-end table. Every entry is an address in the object recorded
+;		before the move, so every one of them moves with it -- a GP.DO inside a region is as legal
+;		as anywhere else.
+;
+;		Entries for blocks that are still OPEN hold nothing yet and are adjusted along with the
+;		rest, which is harmless: an unclosed GP.DO is a structure error and its entry is never
+;		read.
+;
+; ************************************************************************************************
+
+_GBFixBlockEnds:
+		stz 	blockWalk
+		stz 	blockWalk+1
+_GBFBELoop:
+		lda 	blockWalk+1 				; done them all ?
+		cmp 	blockCount+1
+		bcc 	_GBFBEEntry
+		bne 	_GBFBEDone
+		lda 	blockWalk
+		cmp 	blockCount
+		bcs 	_GBFBEDone
+_GBFBEEntry:
+		lda 	blockWalk
+		sta 	blockIndex
+		lda 	blockWalk+1
+		sta 	blockIndex+1
+		jsr 	BlockEndRead
+		lda 	blockValue
+		sta 	zTemp1
+		lda 	blockValue+1
+		sta 	zTemp1+1
+		jsr 	GPBankAdjust
+		lda 	zTemp1
+		sta 	blockValue
+		lda 	zTemp1+1
+		sta 	blockValue+1
+		jsr 	BlockEndWrite
+		inc 	blockWalk
+		bne 	_GBFBELoop
+		inc 	blockWalk+1
+		bra 	_GBFBELoop
+_GBFBEDone:
 		rts
 
 ; ************************************************************************************************

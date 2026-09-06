@@ -67,6 +67,7 @@ CompilerRAMBankReg	= $0000
 ;			3	GP.ASM's blob pool and fixup list (see the second pair of macros below).
 ;			4	the VARIABLE NAME LIST.
 ;			5	the BLOCK DEPTH of each line, one byte per line-table entry.
+;			6	WHERE EACH BLOCK ENDS, and where each of its alternatives goes next.
 ;
 ;		BANKS 2 AND 4 WERE ONE BANK, and that was the wall. The two tables shared 8K, growing
 ;		towards each other, and samples/editor had used 7,981 bytes of it -- 1,461 line entries
@@ -86,6 +87,11 @@ CompilerRAMBankReg	= $0000
 CompilerStorageBank	= 2 					; line number table, grows DOWN from $C000
 CompilerVarBank		= 4 					; variable name list, grows UP from $A000
 CompilerDepthBank	= 5 					; block depth per line, alongside the line table
+CompilerBlockBank	= 6 					; where each block ends, and its alternatives
+
+BlockEndTable		= $A000 				; 2,048 entries of 2 bytes: where block N ends
+BlockAltTable		= $B000 				; ...and the same for its alternatives
+BLOCK_MAX 			= 2048
 
 storage_access .macro
 		php
@@ -183,6 +189,46 @@ depthSavedBank: 							; caller's RAM bank, saved across a depth window
 		.fill 	1
 		.send 	storage
 
+;
+;		And a fourth, for the BLOCK END tables -- where a GP.DO, a GP.IF or a GP.SELECT finishes,
+;		and where each alternative inside one hands on to the next. Every branch in that family
+;		points FORWARDS, at a place the compiler has not reached, which is what made them
+;		FixBranches' work: it resolved them by scanning the finished object for the closing
+;		token. Pass one writes each answer down as it passes it; pass two reads it back and
+;		resolves the branch where it writes it.
+;
+;		Two tables of 2,048 entries, 4K each and 8K together, which is the bank exactly. Indexed
+;		by ORDINAL -- the n'th block the pass opened, the n'th alternative it wrote -- because
+;		both passes compile the same source in the same order and so number them the same way.
+;		NOT by nesting depth: two sibling loops share a depth, and the second would overwrite an
+;		answer the first still needs.
+;
+
+block_access .macro
+		php
+		pha
+		lda 	CompilerRAMBankReg 			; remember whatever the caller had selected
+		sta 	blockSavedBank
+		lda 	#CompilerBlockBank
+		sta 	CompilerRAMBankReg
+		pla
+		plp
+		.endm
+
+block_release .macro
+		php
+		pha
+		lda 	blockSavedBank
+		sta 	CompilerRAMBankReg
+		pla
+		plp
+		.endm
+
+		.section storage
+blockSavedBank: 							; caller's RAM bank, saved across a block window
+		.fill 	1
+		.send 	storage
+
 ; ************************************************************************************************
 ;
 ;									Changes and Updates
@@ -194,7 +240,8 @@ depthSavedBank: 							; caller's RAM bank, saved across a depth window
 ;		02/08/26		Implemented (were no-ops); tables moved to banked RAM $A000-$BFFF.
 ;		01/09/26		Split: the line table keeps bank 2, the variable list moves to bank 4,
 ;						so neither table bounds the other.
-;		06/09/26		Bank 5 added for the per-line block depth (the two-pass compiler).
+;		06/09/26		Bank 5 added for the per-line block depth, and bank 6 for the block
+;						end tables (the two-pass compiler).
 ;
 ; ************************************************************************************************
 

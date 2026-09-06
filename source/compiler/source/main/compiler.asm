@@ -373,6 +373,8 @@ ResetPassState:
 		stz 	SelectDepth 				; open GP.SELECTs, for the selector-variable stack
 		stz 	blockDepth 					; GP.DO nesting -- a non-zero start makes every GOTO
 											; emit an .unwind it does not need
+		stz 	blockCount 					; ...and the ordinals handed to the blocks themselves,
+		stz 	blockCount+1 				; which BOTH passes count out and must agree on
 		stz 	gpBankState 				; no GP.BANKED region seen yet, and nothing relocated.
 		stz 	gpBankActive
 		stz 	gpBankCount 				; MUST start at zero: it is the length of every region

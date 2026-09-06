@@ -46,13 +46,13 @@ _FBLoop:
 		beq 	_FBFixRestore
 		cmp 	#PCD_CMD_UNWIND 			; a GOTO leaving blocks: how many frames it closes.
 		beq 	_FBUnwindFar
-		;
-		;		THE STRUCTURAL BRANCHES, both passes. Their targets are code positions found by
-		;		walking the object, which is a thing only this side can do.
-		;
-_FBStructural:
 		cmp 	#PCD_CMD_EXITDO 			; GP.EXITDO: resolve against its own GP.LOOP.
 		beq 	_FBExitDoFar
+		;
+		;		WHAT IS LEFT, both passes. Their targets are code positions found by walking the
+		;		object, which is a thing only this side can do.
+		;
+_FBStructural:
 		cmp 	#PCD_CMD_CASENEXT 			; GP.CASE that did not match: the next alternative.
 		beq 	_FBCaseNextFar
 		cmp 	#PCD_CMD_CASEEND 			; end of a case body: out to the GP.ENDSEL.

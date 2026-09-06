@@ -640,6 +640,7 @@ _GBRFixUp:
 		;		Everything that recorded a position in the buffer now has to be told.
 		;
 		jsr 	_GBFixLineTable
+		jsr 	_GBFixBlockEnds
 		jsr 	_GBFixRegions 				; BEFORE the .fngosub walk, which reads the new bases
 		jsr 	_GBFixFnCalls
 		jsr 	_GBFixAsmCalls
@@ -1089,6 +1090,52 @@ _GBFLTEntry:
 		.storage_release
 		bra 	_GBFLTLoop
 _GBFLTDone:
+		rts
+
+; ************************************************************************************************
+;
+;		...and the same for the block-end table. Every entry is an address in the object recorded
+;		before the move, so every one of them moves with it -- a GP.DO inside a region is as legal
+;		as anywhere else.
+;
+;		Entries for blocks that are still OPEN hold nothing yet and are adjusted along with the
+;		rest, which is harmless: an unclosed GP.DO is a structure error and its entry is never
+;		read.
+;
+; ************************************************************************************************
+
+_GBFixBlockEnds:
+		stz 	blockWalk
+		stz 	blockWalk+1
+_GBFBELoop:
+		lda 	blockWalk+1 				; done them all ?
+		cmp 	blockCount+1
+		bcc 	_GBFBEEntry
+		bne 	_GBFBEDone
+		lda 	blockWalk
+		cmp 	blockCount
+		bcs 	_GBFBEDone
+_GBFBEEntry:
+		lda 	blockWalk
+		sta 	blockIndex
+		lda 	blockWalk+1
+		sta 	blockIndex+1
+		jsr 	BlockEndRead
+		lda 	blockValue
+		sta 	zTemp1
+		lda 	blockValue+1
+		sta 	zTemp1+1
+		jsr 	GPBankAdjust
+		lda 	zTemp1
+		sta 	blockValue
+		lda 	zTemp1+1
+		sta 	blockValue+1
+		jsr 	BlockEndWrite
+		inc 	blockWalk
+		bne 	_GBFBELoop
+		inc 	blockWalk+1
+		bra 	_GBFBELoop
+_GBFBEDone:
 		rts
 
 ; ************************************************************************************************
