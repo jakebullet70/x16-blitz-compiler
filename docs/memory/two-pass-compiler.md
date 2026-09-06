@@ -124,10 +124,13 @@ test and `sweep.py` compiles everything in `testing/`.
 
 **x16emu's `-echo` catches every CHROUT, and the object file is written through CHROUT**, so the
 p-code goes into the log too and "ERROR" turns up inside string literals. Stop on `READY.` AFTER
-`OUT:`, not on a word in the text.
+`OUT:`, not on a word in the text -- and a program's last byte is not a newline, so the verdict
+ends up WELDED ONTO THE END of a line of p-code. Match it anywhere and take the last hit; a
+harness that anchors it to the start of a line reports a rejection that happened as no rejection.
 
-**Measured cost: 2.08x** at step 6 (PICKDEMO 3.55 s -> 7.37 s, warp, best of 3). Pass one still
-parses everything and will always cost about what pass two does, so 2x is the standing price.
+**Measured cost: 1.88x** -- PICKDEMO 5.89 s -> 11.07 s, warp, best of 3, against `3335ab5`. It
+was 2.19x at step 5 and 2.08x at step 6, and step 7 took the last walk out of pass one. Pass one
+still parses everything and always will, so a little under 2x is the standing price.
 
 **Test programs added:** `testing/UNWIND.BASL` (GOTO out of one, two and three nested GP.DO
 blocks), `testing/BLOCKS.BASL` (every arm of a four-way IF chain and a SELECT) and

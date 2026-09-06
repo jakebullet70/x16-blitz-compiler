@@ -38,13 +38,37 @@ CompilerAPI:
 		beq 	_CAPrintScreen
 		cmp 	#BLC_SYMLOOKUP
 		beq 	_CASymLookup
+		cmp 	#BLC_ENDPASS1
+		beq 	_CAEndPass1
+		cmp 	#BLC_ENDPASS2
+		beq 	_CAEndPass2
 		.debug
+
+; ************************************************************************************************
+;
+;		End of pass one: settle how big the program is and where everything in it goes, so that
+;		pass two can be told. See PrepareObjectCode in compiler/object.asm.
+;
+; ************************************************************************************************
+
+_CAEndPass1:
+		jmp 	PrepareObjectCode
+
+; ************************************************************************************************
+;
+;		End of pass two: everything still buffered, then the padding and the GP.BANKED regions.
+;		Comes back with the object's checksum in YA -- see ObjStreamClose.
+;
+; ************************************************************************************************
+
+_CAEndPass2:
+		jmp 	ObjStreamClose
 
 ; ************************************************************************************************
 ;
 ;		Translate a GP.ASM {VAR} name through BASLOAD's #SYMFILE. Here rather than in the
 ;		compiler library because the file name comes from GPC.INPUT's source line, which is an
-;		application symbol -- the same reason ScanGPUsage is on this side.
+;		application symbol -- the same reason the GP usage scan is on this side.
 ;
 ; ************************************************************************************************
 
@@ -85,38 +109,43 @@ _CAResetOut:
 		rts
 
 _CACloseOut:
-		rts
+		stz 	objStreamLive 				; the compile worked and the object is complete, so
+		jmp 	IOObjectClose 				; there is nothing left to tidy away
 
 ; ************************************************************************************************
 ;
-;									Write byte A to free memory
+;								One object byte, in X, at objPtr
+;
+;		NEITHER PASS STORES THE OBJECT. Pass two's goes into the file as it is compiled -- see
+;		ObjStreamByte -- and pass one's is never written down at all: what pass one is for is
+;		working out where everything lands, and for that it only has to COUNT.
+;
+;		THAT IS WHAT TOOK THE SIZE WALL AWAY. The object used to be built in a buffer running
+;		from FreeMemory up to $9F00, so every byte of the compiler came straight off the largest
+;		program it could build -- and a program with eight GP.BANKED regions can be 81,152 bytes
+;		against 39,679 of low RAM, which no amount of shrinking the compiler could have reached.
+;		There is no buffer, so there is no ceiling here to test against: what bounds a program
+;		now is whether it can RUN, which PrepareObjectCode asks at the end of pass one.
+;
+;		Pass one still walks every byte past GPScanByte, because "does this program reach a GP
+;		handler?" has to be answered before pass two starts -- see compiler/gpscan.asm.
 ;
 ; ************************************************************************************************
 
 _CAWriteByte:
-		;
-		;		The object buffer has a CEILING and this is the only place that can enforce it.
-		;		Without this test the p-code just kept going past the end of usable low RAM,
-		;		over whatever was there, and the compile still said OK -- see the note on
-		;		ObjectCeiling in start.asm for what that cost. Refusing to emit a byte we have
-		;		nowhere to put is the whole fix; PROGRAM TOO BIG is reported against the source
-		;		line being compiled, so the message says where the budget ran out.
-		;
-		;		The ceiling is page aligned, so comparing the high byte is exact.
-		;
-		lda 	objPtr+1
-		cmp 	#ObjectCeiling >> 8
-		bcs 	_CAWBTooBig
 		txa
-		sta 	(objPtr)
+		ldx 	passNumber
+		bne 	_CAWBStream
+		jsr 	GPScanByte
+		bra 	_CAWBBump
+_CAWBStream:
+		jsr 	ObjStreamByte
+_CAWBBump:
 		inc 	objPtr
 		bne 	_HWOWBNoCarry
 		inc 	objPtr+1
 _HWOWBNoCarry:
 		rts
-
-_CAWBTooBig:
-		.error_toobig
 
 ; ************************************************************************************************
 ;
@@ -125,7 +154,10 @@ _CAWBTooBig:
 ; ************************************************************************************************
 		
 _CAPrintScreen:
-		txa
+		txa 								; CLRCHN DOES NOT PRESERVE X, and the character to
+		pha 								; print is in it
+		jsr 	IOSelectScreen 				; the object file is open for output and may be
+		pla 								; selected -- CHROUT would put the message in it
 		jmp 	$FFD2
 
 ; ************************************************************************************************
@@ -135,6 +167,7 @@ _CAPrintScreen:
 ; ************************************************************************************************
 
 _CARead:
+		jsr 	IOSelectSource 			; the object file may have had the channel last
 		jsr 	IOReadByte 				; copy the address of next into the buffer
 		sta 	SourceLine+0
 		jsr 	IOReadByte
@@ -1037,68 +1070,22 @@ cfJustCR: 									; ReadControlFile scratch: nonzero if the last byte was a CR
 ;		genrtimage.py does the comparison against the image's own linked table at build time and
 ;		emits GPUsageBits. Same question, same answer, asked of 32 bytes instead of 386.
 ;
-;		IT SCANS THE P-CODE RATHER THAN HOOKING THE EMITTER, which is what makes it total.
+;		IT READS THE P-CODE RATHER THAN HOOKING THE EMITTER, which is what makes it total.
 ;		Tokens reach the object from two places -- the generator's T action for most keywords,
 ;		and hand-written X: helpers for the five that carry inline branch offsets (GP.EXITDO and
 ;		the four GP.SELECT commands, which cannot use T at all). Hooking emission means hooking
 ;		both, and means the next hand-written GP command silently opts itself out of the check.
-;		Reading the finished code has one site and no way to miss anything.
+;		Reading the code has one site and no way to miss anything.
 ;
-;		MoveObjectForward is what makes the walk safe: it steps by real instruction size, so an
-;		operand byte that happens to equal a GP opcode is never read as one. Same reason
-;		FixBranches uses it.
+;		IT USED TO WALK THE FINISHED OBJECT, stepping by MoveObjectForward so that an operand
+;		byte which happens to equal a GP opcode was never read as one. There is no finished
+;		object to walk any more -- pass one stores nothing and pass two's goes straight into a
+;		file -- so the p-code is decoded FORWARDS instead, a byte at a time, as pass one emits
+;		it. Same question, same bitmap, same instruction sizes.
 ;
 ; ************************************************************************************************
 
 		.section code
-
-; ************************************************************************************************
-;
-;		Set gpUsed nonzero if the object code at FreeMemory..objPtr reaches any handler at or
-;		above GPBase. Preserves objPtr.
-;
-; ************************************************************************************************
-
-ScanGPUsage:
-		stz 	gpUsed
-		lda 	objPtr 						; the walk destroys objPtr, and WriteObjectCode still
-		sta 	gpScanEnd 					; needs it as the end of the object code
-		lda 	objPtr+1
-		sta 	gpScanEnd+1
-		.set16 	objPtr,FreeMemory
-_GPSLoop:
-		lda 	(objPtr) 					; the opcode
-		cmp 	#$FF 						; the end marker, and it must be tested BEFORE the
-		beq 	_GPSDone 					; lookup: $FF is not an opcode at all
-		cmp 	#PCD_ENDSYSTEM+1 			; nothing above the last system token is a real opcode
-		bcs 	_GPSNext 					; (defensive -- the walk should never produce one)
-		cmp 	#PCD_STARTSYSTEM 			; the .shift prefix -- a two byte token, the one that
-		beq 	_GPSShifted 				; matters is the byte after it
-		cmp 	#PCD_STARTBINARY 			; below $80 is a variable or literal reference, which
-		bcc 	_GPSNext 					; has no vector slot at all
-		ldx 	#0 							; VectorTable half of the map
-		bra 	_GPSCheck
-_GPSShifted:
-		ldy 	#1
-		lda 	(objPtr),y 					; the shifted token
-		ldx 	#1 							; ShiftVectorTable half likewise
-_GPSCheck:
-		jsr 	_GPSUsesGP 					; carry set if this opcode's handler is above the cut
-		bcc 	_GPSNext
-		lda 	#1
-		sta 	gpUsed
-		bra 	_GPSDone 					; one is enough -- nothing later can un-use it
-_GPSNext:
-		jsr 	MoveObjectForward
-		bcc 	_GPSLoop
-		jsr 	GPBankHop 					; a GP.BANKED region is past the GP.ASM pool, so the
-		bcc 	_GPSLoop 					; walk leaves low memory and carries on there. Its
-_GPSDone: 									; keywords count exactly like any other.
-		lda 	gpScanEnd 					; put objPtr back
-		sta 	objPtr
-		lda 	gpScanEnd+1
-		sta 	objPtr+1
-		rts
 
 ;
 ;		A = token ($80..$FF), X = 0 for the plain table / 1 for the shifted one. Returns carry
@@ -1108,7 +1095,7 @@ _GPSDone: 									; keywords count exactly like any other.
 ;		opcode, bit set meaning "above the cut". The index is the token with bit 7 cleared,
 ;		which is exactly what the tables themselves are indexed by.
 ;
-_GPSUsesGP:
+GPScanUsesGP:
 		pha
 		and 	#$7F 						; opcode index, 0..127
 		lsr 	a
@@ -1138,9 +1125,175 @@ _GPSUTest:
 
 gpUsed: 									; nonzero if any GP handler is reachable. Code section,
 		.fill 	1 							; not storage -- it belongs to the compiler and is
-gpScanEnd: 									; thrown away with it, so it costs a compiled program
-		.fill 	2 							; nothing. See the note in file-io/read.asm.
-gpBits:
+gpBits: 									; thrown away with it, so it costs a compiled program
+		.fill 	1 							; nothing. See the note in file-io/read.asm.
+
+; ************************************************************************************************
+;
+;		THE ANSWER, WORKED OUT AS PASS ONE WRITES THE BYTES.
+;
+;		THE STATE SAYS WHAT THE NEXT BYTE IS -- an opcode, the token after a .shift, the length
+;		of a .string or .data, or an operand to be stepped over. Only pass one runs it: pass two
+;		writes the same bytes and counting them twice would prove nothing.
+;
+;		THE CURSOR IS CHECKED, NOT ASSUMED. A statement that fails to compile is rolled back to
+;		where it began and the next one is written over it (DeferStatementToRuntime). That start
+;		is an instruction boundary, so a write cursor that did not move on by one means "begin
+;		again here" -- which is exactly right, and needs nothing to tell it.
+;
+; ************************************************************************************************
+
+GPS_OPCODE = 0 								; the next byte is an opcode
+GPS_SHIFT  = 1 								; ...the token after a .shift prefix
+GPS_LENGTH = 2 								; ...the length byte of a .string or .data
+GPS_SKIP   = 3 								; ...one of gpScanSkip operand bytes
+
+GPScanReset:
+		stz 	gpUsed
+		stz 	gpScanState
+		stz 	gpScanStop
+		.set16 	gpScanAt,FreeMemory
+		rts
+
+GPScanByte:
+		ldx 	passNumber 					; pass one settles it
+		bne 	_GPSBOut
+		ldx 	gpScanStop 					; ...and stops at the end marker, or as soon as the
+		bne 	_GPSBOut 					; answer is yes
+		pha
+		lda 	objPtr 						; in step with the byte before it ?
+		cmp 	gpScanAt
+		bne 	_GPSBResync
+		lda 	objPtr+1
+		cmp 	gpScanAt+1
+		beq 	_GPSBInStep
+_GPSBResync:
+		stz 	gpScanState 				; no -- a rolled back statement, so start again here
+_GPSBInStep:
+		clc
+		lda 	objPtr
+		adc 	#1
+		sta 	gpScanAt
+		lda 	objPtr+1
+		adc 	#0
+		sta 	gpScanAt+1
+		pla
+		;
+		ldx 	gpScanState
+		beq 	_GPSBOpcode
+		cpx 	#GPS_SHIFT
+		beq 	_GPSBShifted
+		cpx 	#GPS_LENGTH
+		beq 	_GPSBLength
+		dec 	gpScanSkip 					; GPS_SKIP: one operand byte gone
+		bne 	_GPSBOut
+		stz 	gpScanState
+_GPSBOut:
+		rts
+;
+;		The token after a .shift. MOFSizeTable gives .shift a size of one, which is this byte,
+;		so the next one is an opcode again.
+;
+_GPSBShifted:
+		stz 	gpScanState
+		ldx 	#1 							; the ShiftVectorTable half of the map
+		jsr 	GPScanUsesGP
+		bcc 	_GPSBOut
+		bra 	_GPSBFound
+;
+;		The length byte of a .string or .data. A zero length leaves the next byte an opcode.
+;
+_GPSBLength:
+		sta 	gpScanSkip
+		ldx 	#GPS_SKIP
+		cmp 	#0
+		bne 	_GPSBState
+		ldx 	#GPS_OPCODE
+_GPSBState:
+		stx 	gpScanState
+		rts
+;
+;		An opcode. The ranges are MoveObjectForward's, so this steps by the same sizes the
+;		runtime does, and which of them has a vector slot is GPScanUsesGP's question.
+;
+_GPSBOpcode:
+		cmp 	#$FF 						; the end marker: the GP.ASM pool and the relocator's
+		beq 	_GPSBStop 					; padding follow it and are not p-code at all
+		cmp 	#$40
+		bcc 	_GPSBOut 					; 00-3F: one byte, no vector slot
+		cmp 	#$70
+		bcc 	_GPSBOne 					; 40-6F: two bytes, no vector slot
+		cmp 	#PCD_STARTBINARY
+		bcc 	_GPSBOut 					; 70-7F: one byte, no vector slot
+		cmp 	#PCD_STARTSYSTEM
+		bcc 	_GPSBKeyword 				; 80-DC: a keyword, one byte, and it has one
+		bne 	_GPSBSystem
+		lda 	#GPS_SHIFT 					; DD: the token after it is the one that matters
+		sta 	gpScanState
+		rts
+
+_GPSBOne:
+		lda 	#1
+		sta 	gpScanSkip
+		lda 	#GPS_SKIP
+		sta 	gpScanState
+		rts
+
+_GPSBKeyword:
+		ldx 	#0 							; the VectorTable half of the map
+		jsr 	GPScanUsesGP
+		bcs 	_GPSBFound
+		rts
+;
+;		DE and up: a system token, whose operand count is the table MoveObjectForward steps by.
+;		255 there means a .string or .data, and the byte after the token is its length.
+;
+_GPSBSystem:
+		pha
+		cmp 	#PCD_ENDSYSTEM+1 			; defensive, exactly as the walk is: nothing above the
+		bcs 	_GPSBSized 					; last system token has a vector slot
+		ldx 	#0
+		jsr 	GPScanUsesGP
+		bcc 	_GPSBSized
+		pla
+		bra 	_GPSBFound
+_GPSBSized:
+		pla
+		tay
+		lda 	MOFSizeTable-PCD_STARTSYSTEM,y
+		cmp 	#$FF
+		beq 	_GPSBString
+		tax 								; .deferror has no operand at all
+		beq 	_GPSBOutFar
+		sta 	gpScanSkip
+		lda 	#GPS_SKIP
+		sta 	gpScanState
+		rts
+_GPSBString:
+		lda 	#GPS_LENGTH
+		sta 	gpScanState
+_GPSBOutFar:
+		rts
+;
+;		Found one, so the answer is yes and nothing later can change it -- the same reasoning
+;		the walk makes when it stops at the first hit.
+;
+_GPSBFound:
+		lda 	#1
+		sta 	gpUsed
+_GPSBStop:
+		lda 	#1
+		sta 	gpScanStop
+		stz 	gpScanState
+		rts
+
+gpScanState: 								; what the NEXT byte is
+		.fill 	1
+gpScanSkip: 								; ...and how many operand bytes are still to go past
+		.fill 	1
+gpScanAt: 									; where the next byte belongs, so a statement rolled
+		.fill 	2 							; back can be noticed for what it is
+gpScanStop: 								; nonzero once the answer is in, or the end marker seen
 		.fill 	1
 
 		.send code
@@ -1413,13 +1566,32 @@ reportLead:
 ;
 ; ************************************************************************************************
 
-WriteObjectCode:
+; ************************************************************************************************
+;
+;		HOW BIG IT IS, AND THEREFORE WHERE IT GOES. Called at the END OF PASS ONE, through
+;		BLC_ENDPASS1, because pass one is where the object's length stops changing and
+;		everything here follows from that length: how much of the runtime the program needs,
+;		where the object code lands on reload, where the workspace starts.
+;
+;		PASS TWO NEEDS THE ANSWERS WHILE IT COMPILES. It was enough to work them out at the top
+;		of WriteObjectCode while the finished object sat in a buffer waiting to be streamed;
+;		pass two is about to write straight to the file instead, which means the file is opened
+;		and the runtime written into it before pass two starts.
+;
+;		AND SO IS PROGRAM TOO BIG, which is the point of the exercise: a program with no room to
+;		run is refused here, before a byte of it has been written, rather than after the whole
+;		thing has been laid out.
+;
+;		Carry set = rejected, and the message has already been printed.
+;
+; ************************************************************************************************
+
+PrepareObjectCode:
 		lda 	ModeText 					; GPC.INPUT line 4 -- 'S' (SHARED) selects resident-runtime
 		cmp 	#'S' 						; mode: emit a bootstrap + p-code, no embedded runtime
-		bne 	_WOCEmbedded 				; (see the shared branch below and compiler/bootstrap.asm).
-		jmp 	_WOCShared 					; jmp, not a branch -- the embedded path is >127 bytes
-_WOCEmbedded:
-		jsr 	ScanGPUsage 				; does anything reach a handler above GPBase ?
+		bne 	_POCEmbedded 				; (see the shared branch below and compiler/bootstrap.asm).
+		jmp 	ObjectPrepareShared 					; jmp, not a branch -- the embedded path is >127 bytes
+_POCEmbedded:
 		;
 		;		The cut. A program using no GP.BASIC keyword takes the runtime as $0801..GPBase
 		;		and puts its object code there; one that uses any takes the whole thing,
@@ -1462,7 +1634,7 @@ _WOCWholePages:
 		;
 		;		The workspace runs from newWorkspacePage to $9F00, so require MIN_WS_PAGES (4K)
 		;		of it, and reject a page count that overflowed a byte on the way -- the same two
-		;		tests, in the same order, as _WOCShared.
+		;		tests, in the same order, as ObjectWriteShared.
 		;
 		clc
 		lda 	runtimeEndPage 				; where the object code will actually land
@@ -1472,14 +1644,31 @@ _WOCWholePages:
 		bcs 	_WOCTooBig
 		sta 	newWorkspacePage
 		cmp 	#(ObjectCeiling >> 8) - MIN_WS_PAGES + 1
-		bcc 	_WOCFits
+		bcc 	_POCFits
 _WOCTooBig:
-		jmp 	_WOCSBig 					; shared with the SHARED path: prints PROGRAM TOO BIG,
-_WOCFits: 									; returns carry set, caller skips the map file and OK
+		jmp 	ObjectTooBig 					; shared with the SHARED path: prints PROGRAM TOO BIG,
+_POCFits: 									; returns carry set, caller skips the map file and OK
+		jsr 	AsmSetBases 				; as the shared path -- see AsmCloseBlock
+		jmp 	ObjStreamOpen
 
-		jsr 	PatchAsmFixups 				; GP.ASM: blob calls, label targets and {VAR}, all of
-											; which needed newWorkspacePage as well as the run base
+; ************************************************************************************************
+;
+;		OPEN THE OBJECT FILE AND PUT THE RUNTIME IN IT -- everything that goes into the file
+;		BEFORE the p-code, and all of it known by the end of pass one.
+;
+;		ON A LOGICAL FILE OF ITS OWN, because it stays open for the whole of pass two while the
+;		source is being read on file 3. See IOOpenObject in file-io/read.asm.
+;
+;		Carry set = it failed, and it has said why.
+;
+; ************************************************************************************************
 
+ObjStreamOpen:
+		lda 	ModeText
+		cmp 	#'S'
+		bne 	_WOCEmbedded
+		jmp 	ObjectWriteShared
+_WOCEmbedded:
 		;
 		;		THE RUNTIME IMAGE IS OPENED FIRST, before the object file is created. It is the
 		;		one thing here that can fail for a reason outside this program, and a compile
@@ -1496,9 +1685,9 @@ _WOCFits: 									; returns carry set, caller skips the map file and OK
 		;		here -- the same trampoline _WOCSBigFar needs, for the same reason.
 		;
 _WOCImgNoneFar:
-		jmp 	_WOCNoImage
+		jmp 	ObjectNoImage
 _WOCImgBadFar:
-		jmp 	_WOCBadImage
+		jmp 	ObjectBadImage
 _WOCImgOpened:
 		jsr 	IOImageIn
 		jsr 	IOReadByte 					; the image's own two byte load address, which is
@@ -1512,7 +1701,10 @@ _WOCImgOpened:
 
 		ldy 	#ObjectFile >> 8
 		ldx 	#ObjectFile & $FF
-		jsr 	IOOpenWrite 				; open write
+		jsr 	IOOpenObject 				; open write, on its own logical file
+		jsr 	IOSelectObject
+		lda 	#1
+		sta 	objStreamLive 				; from here on a failure has a file to tidy away
 
 		lda 	#RTIMG_LOAD & $FF 			; write out the load address $0801
 		jsr 	IOWriteByte
@@ -1601,29 +1793,7 @@ _WOCImgMore:
 		bne 	_WOCImgChunk
 
 		jsr 	IOCloseImage 				; CLRCHNs, so the object file has to be reselected
-		jsr 	IOObjectOut
-		;
-		;		Part two : the object code itself, which lands at ObjectBase on reload.
-		;
-		.set16 	zTemp0,FreeMemory
-_WOCCode:
-		lda 	zTemp0 						; done ?
-		cmp 	objPtr
-		bne 	_WOCCodeByte
-		lda 	zTemp0+1
-		cmp 	objPtr+1
-		beq 	_WOCDone
-_WOCCodeByte:
-		lda 	(zTemp0)
-		jsr 	IOWriteByte
-		inc 	zTemp0
-		bne 	_WOCCode
-		inc 	zTemp0+1
-		bra 	_WOCCode
-_WOCDone:
-		jsr 	IOWriteClose 				; close the file.
-		clc 								; success -- CompileCode reads the carry (set = rejected)
-		rts
+		jmp 	ObjStreamReady
 
 ; ************************************************************************************************
 ;
@@ -1634,7 +1804,7 @@ _WOCDone:
 ;
 ; ************************************************************************************************
 
-_WOCShared:
+ObjectPrepareShared:
 		;
 		;		p-code length -> whole pages (same as the embedded path)
 		;
@@ -1665,7 +1835,6 @@ _WOCSWhole:
 		;		WS_START = PCODE_PAGE + pages(p-code) + the frame-stack gap. Reject if that leaves
 		;		fewer than MIN_WS_PAGES below RTBASE, or if the page count itself overflowed a byte.
 		;
-		jsr 	ScanGPUsage 				; the shared runtime is two files now -- see below
 		;
 		;		The workspace ends where the resident runtime starts, and that is no longer one
 		;		address: a program using no GPB keyword loads the CORE-ONLY file at RTBASE and keeps
@@ -1700,21 +1869,25 @@ _WOCSCeiling:
 		lda 	newWorkspacePage
 		cmp 	zTemp1
 		bcs 	_WOCSBigFar
-		bra 	_WOCSFits
+		jsr 	AsmSetBasesShared 			; GP.ASM needs both of them, and pass two needs them
+		jmp 	ObjStreamOpen 				; while it compiles -- see AsmCloseBlock
 ;
-;		_WOCSBig is at the far end of this file, out of branch range from here -- the same
-;		trampoline FixBranches needs for its GP.EXITDO handler, for the same reason.
+;		ObjectTooBig is at the far end of this file, out of branch range from here -- the same
+;		trampoline the embedded path needs for its image failures, for the same reason.
 ;
 _WOCSBigFar:
-		jmp 	_WOCSBig
-_WOCSFits:
-		jsr 	PatchAsmFixupsShared 		; GP.ASM, as the embedded path -- see _WOCFits
+		jmp 	ObjectTooBig
+
+ObjectWriteShared:
 		;
 		;		Header: a normal PRG loading at $0801 -- the bootstrap sits there.
 		;
 		ldy 	#ObjectFile >> 8
 		ldx 	#ObjectFile & $FF
-		jsr 	IOOpenWrite
+		jsr 	IOOpenObject 				; open write, on its own logical file
+		jsr 	IOSelectObject
+		lda 	#1
+		sta 	objStreamLive 				; from here on a failure has a file to tidy away
 		lda 	#1
 		jsr 	IOWriteByte
 		lda 	#8
@@ -1856,32 +2029,498 @@ _WOCSExtWrite:
 		bne 	_WOCSExtWrite
 _WOCSCodePart:
 		;
-		;		Part two: the p-code from FreeMemory..objPtr, which lands at $0900 on reload --
-		;		or at $0A00, above the extension page, if this program has a region.
+		;		Part two -- the p-code itself -- follows, and pass two is what writes it.
 		;
-		.set16 	zTemp0,FreeMemory
-_WOCSCode:
-		lda 	zTemp0
-		cmp 	objPtr
-		bne 	_WOCSCodeByte
-		lda 	zTemp0+1
-		cmp 	objPtr+1
-		beq 	_WOCSCodeDone
-_WOCSCodeByte:
-		lda 	(zTemp0)
-		jsr 	IOWriteByte
-		inc 	zTemp0
-		bne 	_WOCSCode
-		inc 	zTemp0+1
-		bra 	_WOCSCode
-_WOCSCodeDone:
-		jsr 	IOWriteClose
-		clc 								; success
+ObjStreamReady:
+		lda 	#$FF 						; the image left CLRCHN behind it, so neither channel
+		sta 	ioInSel 					; is known any more
+		sta 	ioOutSel
+		jsr 	ObjStreamReset 				; an empty buffer for pass two to fill
+		clc
 		rts
-_WOCSBig:
+
+
+; ************************************************************************************************
+;
+;		PASS TWO WRITES THE OBJECT AS IT COMPILES IT.
+;
+;		THE BUFFER IS IN A BANK, and it is there for one reason: a statement that fails to
+;		compile with a SYNTAX error is rolled back to where it started and a runtime throw-stub
+;		is put in its place (DeferStatementToRuntime). Bytes already sent to the file cannot be
+;		taken back, so nothing goes out until the statement that wrote it has compiled. Flushing
+;		8K at a time also means the write channel is selected once per 8K rather than once per
+;		source line, which is the same trick the runtime image already uses a page at a time.
+;
+;		A REGION IS A BANK OF ITS OWN. Pass two writes each GP.BANKED region straight to its
+;		final address, which is ABOVE the low code it is still emitting -- so the two cannot
+;		share one forward-only stream. One bank per region costs nothing (a region is at most
+;		8K by definition, and there are at most eight) and makes a region random access, so a
+;		rollback inside one simply gets written over.
+;
+;		THE OBJECT GOES OUT IN FILE ORDER: the low code and the GP.ASM pool as they are
+;		compiled, then the alignment padding, then each region out of its bank. That is what
+;		lets the checksum stay what it was -- a Fletcher-16 over the finished object -- with
+;		pass one summing its buffer and pass two summing what it writes.
+;
+; ************************************************************************************************
+
+OBJ_BUF_BANK = 7 							; the low code, waiting to go out
+OBJ_RGN_BANK = 8 							; ...and one bank per region, 8 upwards
+OBJ_WINDOW   = $A000
+OBJ_BUF_SIZE = $2000
+
+; ************************************************************************************************
+;
+;		Start of pass two: an empty buffer, an empty sum, and every region's bank filled with
+;		the padding byte.
+;
+;		THE FILL IS NOT WASTE. Above each region's end marker sits filler that carries it up to
+;		a page boundary, and pass two writes none of it -- there is nothing to write. Pass one's
+;		relocator fills the same bytes with the same $FF, so the two objects agree.
+;
+; ************************************************************************************************
+
+ObjStreamReset:
+		.set16 	objBufBase, FreeMemory
+		.set16 	objBufTop, FreeMemory
+		.set16 	objStmtAt, FreeMemory
+		stz 	objHold
+		;
+		lda 	layoutCount
+		beq 	_OSRDone
+		stz 	objRgnNo
+_OSRBank:
+		clc
+		lda 	objRgnNo
+		adc 	#OBJ_RGN_BANK
+		jsr 	ObjStreamBank
+		lda 	#OBJ_WINDOW >> 8
+		sta 	zTemp0+1
+		stz 	zTemp0
+		lda 	#$FF
+_OSRPage:
+		ldy 	#0
+_OSRByte:
+		sta 	(zTemp0),y
+		iny
+		bne 	_OSRByte
+		inc 	zTemp0+1
+		ldx 	zTemp0+1
+		cpx 	#(OBJ_WINDOW + OBJ_BUF_SIZE) >> 8
+		bcc 	_OSRPage
+		ldx 	objSaveBank
+		stx 	CompilerRAMBankReg
+		inc 	objRgnNo
+		lda 	objRgnNo
+		cmp 	layoutCount
+		bcc 	_OSRBank
+_OSRDone:
+		rts
+
+; ************************************************************************************************
+;
+;		One object byte, in A, belonging at objPtr. Called from _CAWriteByte in pass two.
+;
+;		zTemp0 AND zTemp1 ARE BORROWED AND GIVEN STRAIGHT BACK. This runs between two
+;		instructions of whatever generator is emitting, and they hold live pointers in both of
+;		them.
+;
+; ************************************************************************************************
+
+ObjStreamByte:
+		sta 	objByte
+		lda 	zTemp0
+		pha
+		lda 	zTemp0+1
+		pha
+		lda 	zTemp1
+		pha
+		lda 	zTemp1+1
+		pha
+		jsr 	ObjStreamWork
+		pla
+		sta 	zTemp1+1
+		pla
+		sta 	zTemp1
+		pla
+		sta 	zTemp0+1
+		pla
+		sta 	zTemp0
+		rts
+
+ObjStreamWork:
+		;
+		;		A statement that has armed itself: remember where it begins. Nothing from there on
+		;		can go out until it has compiled, because a SYNTAX error rolls the write cursor
+		;		back to it and puts a throw-stub in its place.
+		;
+		;		ONLY IF IT BEGINS IN THE LOW BUFFER. A region is a bank of its own and therefore
+		;		random access, so a rollback inside one is written over where it stands and
+		;		nothing has to be held for it -- and holding a REGION address as the low buffer's
+		;		high-water mark makes the flush length a subtraction of two unrelated addresses.
+		;
+		lda 	deferErrors
+		bne 	_OSWArming
+		stz 	objHold 					; the statement compiled: nothing is held back now
+		bra 	_OSWPlace
+_OSWArming:
+		lda 	objHold 					; already holding for this one
+		bne 	_OSWPlace
+		lda 	regionOpen
+		bne 	_OSWPlace
+		lda 	objPtr
+		sta 	objStmtAt
+		lda 	objPtr+1
+		sta 	objStmtAt+1
+		inc 	objHold
+_OSWPlace:
+		lda 	regionOpen 					; inside a GP.BANKED region ?
+		bne 	_OSWRegion
+		jsr 	ObjStreamOffset 			; where in the buffer it goes
+		bcs 	_OSWLow
+		jsr 	ObjStreamFlush 				; full: send out what can go, and ask again
+		jsr 	ObjStreamOffset
+		bcc 	_OSWLost
+_OSWLow:
+		lda 	#OBJ_BUF_BANK
+		jsr 	ObjStreamWindow
+		lda 	objByte
+		sta 	(zTemp0)
+		clc 								; the buffer now holds everything up to here, and a
+		lda 	objPtr 						; statement rolled back lowers this with it
+		adc 	#1
+		sta 	objBufTop
+		lda 	objPtr+1
+		adc 	#0
+		sta 	objBufTop+1
+		bra 	_OSWClose
+;
+;		A single statement whose p-code is longer than the whole buffer, which no BASIC line can
+;		produce: a tokenised source line is 252 bytes at most.
+;
+_OSWLost:
+		.error_internal
+;
+;		Inside a region, which is a bank of its own -- random access, so a rollback here is
+;		simply written over and there is nothing to hold back.
+;
+_OSWRegion:
+		lda 	nextRegion
+		asl 	a
+		tax
+		sec
+		lda 	objPtr
+		sbc 	layoutStart,x
+		sta 	objBufIdx
+		lda 	objPtr+1
+		sbc 	layoutStart+1,x
+		sta 	objBufIdx+1
+		clc
+		lda 	nextRegion
+		adc 	#OBJ_RGN_BANK
+		jsr 	ObjStreamWindow
+		lda 	objByte
+		sta 	(zTemp0)
+_OSWClose:
+		lda 	objSaveBank
+		sta 	CompilerRAMBankReg
+		rts
+
+;
+;		objBufIdx = objPtr - objBufBase, with carry set if that is inside the window.
+;
+ObjStreamOffset:
+		sec
+		lda 	objPtr
+		sbc 	objBufBase
+		sta 	objBufIdx
+		lda 	objPtr+1
+		sbc 	objBufBase+1
+		sta 	objBufIdx+1
+		bcc 	_OSOOut 					; below it: rolled back past what is still held
+		cmp 	#OBJ_BUF_SIZE >> 8
+		bcs 	_OSOOut
+		sec
+		rts
+_OSOOut:
+		clc
+		rts
+
+;
+;		Select bank A, remembering the caller's, and point zTemp0 at OBJ_WINDOW + objBufIdx.
+;
+ObjStreamWindow:
+		jsr 	ObjStreamBank
+		lda 	objBufIdx
+		sta 	zTemp0
+		clc
+		lda 	objBufIdx+1
+		adc 	#OBJ_WINDOW >> 8
+		sta 	zTemp0+1
+		rts
+
+ObjStreamBank:
+		pha
+		lda 	CompilerRAMBankReg
+		sta 	objSaveBank
+		pla
+		sta 	CompilerRAMBankReg
+		rts
+
+; ************************************************************************************************
+;
+;		Send what the buffer holds to the file -- everything, or everything below the statement
+;		in flight, which then moves down to the bottom of the window so the buffer is empty
+;		behind it.
+;
+; ************************************************************************************************
+
+ObjStreamFlush:
+		lda 	objHold
+		beq 	_OSFAll
+		lda 	objStmtAt
+		ldy 	objStmtAt+1
+		bra 	_OSFTo
+_OSFAll:
+		lda 	objBufTop
+		ldy 	objBufTop+1
+_OSFTo:
+		sec 								; how many bytes can go
+		sbc 	objBufBase
+		sta 	objFlushLen
+		tya
+		sbc 	objBufBase+1
+		sta 	objFlushLen+1
+		lda 	objFlushLen
+		ora 	objFlushLen+1
+		bne 	_OSFSome
+		rts 								; nothing can go yet
+_OSFSome:
+		jsr 	IOSelectObject
+		stz 	objBufIdx
+		stz 	objBufIdx+1
+_OSFLoop:
+		lda 	objBufIdx
+		cmp 	objFlushLen
+		lda 	objBufIdx+1
+		sbc 	objFlushLen+1
+		bcs 	_OSFWritten
+		lda 	#OBJ_BUF_BANK 				; the window closes again before every write: the
+		jsr 	ObjStreamWindow 			; KERNAL's own buffers live in bank 0
+		lda 	(zTemp0)
+		ldx 	objSaveBank
+		stx 	CompilerRAMBankReg
+		jsr 	IOWriteByte
+		inc 	objBufIdx
+		bne 	_OSFLoop
+		inc 	objBufIdx+1
+		bra 	_OSFLoop
+_OSFWritten:
+		lda 	objHold 					; nothing was held back, so nothing has to move
+		beq 	_OSFRebase
+		sec
+		lda 	objBufTop
+		sbc 	objStmtAt
+		sta 	objMoveLen
+		lda 	objBufTop+1
+		sbc 	objStmtAt+1
+		sta 	objMoveLen+1
+		ora 	objMoveLen
+		beq 	_OSFRebase
+		;
+		lda 	#OBJ_BUF_BANK
+		jsr 	ObjStreamBank
+		clc
+		lda 	objFlushLen
+		sta 	zTemp0
+		lda 	objFlushLen+1
+		adc 	#OBJ_WINDOW >> 8
+		sta 	zTemp0+1
+		.set16 	zTemp1, OBJ_WINDOW
+_OSFMove:
+		lda 	(zTemp0)
+		sta 	(zTemp1)
+		inc 	zTemp0
+		bne 	_OSFMSrc
+		inc 	zTemp0+1
+_OSFMSrc:
+		inc 	zTemp1
+		bne 	_OSFMDst
+		inc 	zTemp1+1
+_OSFMDst:
+		lda 	objMoveLen
+		bne 	_OSFMLow
+		dec 	objMoveLen+1
+_OSFMLow:
+		dec 	objMoveLen
+		lda 	objMoveLen
+		ora 	objMoveLen+1
+		bne 	_OSFMove
+		lda 	objSaveBank
+		sta 	CompilerRAMBankReg
+_OSFRebase:
+		clc
+		lda 	objBufBase
+		adc 	objFlushLen
+		sta 	objBufBase
+		lda 	objBufBase+1
+		adc 	objFlushLen+1
+		sta 	objBufBase+1
+_OSFNone:
+		rts
+
+; ************************************************************************************************
+;
+;		END OF PASS TWO: everything the buffer still holds, then the alignment padding below the
+;		first GP.BANKED region, then each region out of its bank. After this the object is
+;		complete on disk.
+;
+; ************************************************************************************************
+
+ObjStreamClose:
+		stz 	objHold 					; nothing is in flight at the end of a compile, so the
+		jsr 	ObjStreamFlush 				; flush empties the buffer
+		lda 	layoutCount
+		bne 	_OSCPlaced
+		jmp 	_OSCDone 					; no regions: the buffer was the whole object
+_OSCPlaced:
+		jsr 	IOSelectObject
+		;
+		;		The padding. One gap only: every region above the first starts exactly where the
+		;		one below it ends, which is what the filler is for.
+		;
+		lda 	objBufTop
+		sta 	objPadAt
+		lda 	objBufTop+1
+		sta 	objPadAt+1
+_OSCPad:
+		lda 	objPadAt
+		cmp 	layoutStart
+		bne 	_OSCPadByte
+		lda 	objPadAt+1
+		cmp 	layoutStart+1
+		beq 	_OSCRegions
+_OSCPadByte:
+		lda 	#$FF
+		jsr 	IOWriteByte
+		inc 	objPadAt
+		bne 	_OSCPad
+		inc 	objPadAt+1
+		bra 	_OSCPad
+;
+;		...and the regions, in source order, which is the order they sit in. A region's span is
+;		where the next one starts, or the object's own end for the topmost.
+;
+_OSCRegions:
+		stz 	objRgnNo
+_OSCRegion:
+		lda 	objRgnNo
+		cmp 	layoutCount
+		bcc 	_OSCMore
+		jmp 	_OSCDone
+_OSCMore:
+		asl 	a
+		tax
+		lda 	objRgnNo
+		inc 	a
+		cmp 	layoutCount
+		bcs 	_OSCTop
+		lda 	layoutStart+2,x
+		sta 	objSpan
+		lda 	layoutStart+3,x
+		sta 	objSpan+1
+		bra 	_OSCSpan
+_OSCTop:
+		lda 	pass1Len
+		sta 	objSpan
+		lda 	pass1Len+1
+		sta 	objSpan+1
+_OSCSpan:
+		sec
+		lda 	objSpan
+		sbc 	layoutStart,x
+		sta 	objSpan
+		lda 	objSpan+1
+		sbc 	layoutStart+1,x
+		sta 	objSpan+1
+		;
+		stz 	objBufIdx
+		stz 	objBufIdx+1
+_OSCByte:
+		lda 	objBufIdx
+		cmp 	objSpan
+		lda 	objBufIdx+1
+		sbc 	objSpan+1
+		bcs 	_OSCNext
+		clc
+		lda 	objRgnNo
+		adc 	#OBJ_RGN_BANK
+		jsr 	ObjStreamWindow
+		lda 	(zTemp0)
+		ldx 	objSaveBank
+		stx 	CompilerRAMBankReg
+		jsr 	IOWriteByte
+		inc 	objBufIdx
+		bne 	_OSCByte
+		inc 	objBufIdx+1
+		bra 	_OSCByte
+_OSCNext:
+		inc 	objRgnNo
+		bra 	_OSCRegion
+_OSCDone:
+		rts
+
+
+objBufBase: 								; the objPtr of the first byte still in the buffer
+		.fill 	2
+objBufTop: 									; ...and one past the last
+		.fill 	2
+objStmtAt: 									; where the statement in flight began
+		.fill 	2
+objBufIdx: 									; an offset into whichever window is open
+		.fill 	2
+objFlushLen: 								; how many bytes this flush is sending
+		.fill 	2
+objMoveLen: 								; ...and how many it is shuffling down afterwards
+		.fill 	2
+objPadAt: 									; the alignment gap being filled
+		.fill 	2
+objSpan: 									; the region being written out
+		.fill 	2
+objByte: 									; the byte in hand, across the zTemp save
+		.fill 	1
+objHold: 									; nonzero while the low buffer is holding a statement
+		.fill 	1 							; back, because it might yet be rolled back
+objRgnNo: 									; the region being filled or written
+		.fill 	1
+objSaveBank: 								; the caller's RAM bank, across a window
+		.fill 	1
+
+; ************************************************************************************************
+;
+;		A COMPILE THAT STOPS LEAVES NO OBJECT. The file is created before pass two starts now,
+;		so a failure anywhere in pass two would otherwise leave a truncated one behind -- and at
+;		the filesystem level that is indistinguishable from a program.
+;
+; ************************************************************************************************
+
+ObjStreamAbort:
+		lda 	objStreamLive
+		beq 	_OSADone
+		stz 	objStreamLive
+		jsr 	IOObjectClose
+		ldx 	#ObjectFile & $FF
+		ldy 	#ObjectFile >> 8
+		jmp 	IOScratchFile
+_OSADone:
+		rts
+
+objStreamLive: 								; nonzero while there is a half written object file
+		.fill 	1
+ObjectTooBig:
 		ldx 	#ProgramTooBigText & $FF
 		ldy 	#ProgramTooBigText >> 8
-		bra 	_WOCFail
+		bra 	ObjectFail
 
 ;
 ;		The runtime image is missing, or is not the file its name claims. Either way there is
@@ -1890,8 +2529,9 @@ _WOCSBig:
 ;		what a stale image from an older release looks like -- which is the point of numbering
 ;		it rather than trusting a fixed name to be the right one.
 ;
-_WOCBadImage: 								; missing, wrong load address, or shorter than
-_WOCNoImage: 								; ObjectBase says it should be
+ObjectBadImage: 								; missing, wrong load address, or shorter than
+ObjectNoImage: 								; ObjectBase says it should be
+		jsr 	ObjStreamAbort 				; the object file may already exist -- see above
 		jsr 	IOCloseImage 				; CLOSE on a logical file that was never opened is
 											; harmless, and the OPEN may have half-registered it.
 											; Leaving it would fail the NEXT compile's open, and
@@ -1900,7 +2540,7 @@ _WOCNoImage: 								; ObjectBase says it should be
 											; run the program instead.
 		ldx 	#NoRuntimeImageText & $FF
 		ldy 	#NoRuntimeImageText >> 8
-_WOCFail:
+ObjectFail:
 		jsr 	PrintMessage
 		sec 								; rejected -- CompileCode skips the map file and the OK
 		rts
@@ -2123,23 +2763,23 @@ mapLead:
 ;
 ; ************************************************************************************************
 
-PatchAsmFixups:
+AsmSetBases:
 		sec 								; embedded: it runs at runtimeEndPage, it sits at
 		lda 	runtimeEndPage 				; FreeMemory, and the difference is what every blob
 		sbc 	#FreeMemory >> 8 			; address and label target has to move by
 		sta 	AsmPageDelta
 		lda 	newWorkspacePage
 		sta 	AsmWorkspacePage
-		jmp 	AsmPatchAll
+		rts
 
-PatchAsmFixupsShared:
+AsmSetBasesShared:
 		clc
 		lda 	#(PCODE_PAGE - (FreeMemory >> 8)) & $FF
 		adc 	gpBankActive 				; shared p-code lands at $0900, or $0A00 for a banked
 		sta 	AsmPageDelta 				; program -- the extension page is below it
-		lda 	newWorkspacePage 			; _WOCShared carries WS_START in this byte
+		lda 	newWorkspacePage 			; ObjectPrepareShared carries WS_START in this byte
 		sta 	AsmWorkspacePage
-		jmp 	AsmPatchAll
+		rts
 
 ;
 ;		One page of the runtime image, in transit from GPC.IMG.nnn.BIN to OBJECT.PRG. It is in
@@ -2202,6 +2842,7 @@ IOOpenRead:
 ; ************************************************************************************************
 
 IO_IMAGE_FILE = 4
+IO_OBJECT_FILE = 6
 
 IOOpenImage:
 		lda 	#IO_IMAGE_FILE
@@ -2223,8 +2864,90 @@ IOImageIn:
 		jmp 	$FFC6 						; CHKIN
 
 IOObjectOut:
-		ldx 	#3
+		ldx 	#IO_OBJECT_FILE
 		jmp 	$FFC9 						; CHKOUT
+
+; ************************************************************************************************
+;
+;		THE OBJECT FILE HAS A LOGICAL FILE OF ITS OWN, and it needs one: it is open for write
+;		for the whole of pass two, while the source is open for read on file 3 and being read a
+;		line at a time. Everything here used file 3 for both, which was fine while the object
+;		was written after the source had been closed.
+;
+;		WHICH CHANNEL IS SELECTED IS REMEMBERED. The KERNAL has one input channel and one
+;		output, so reading a source line and writing object bytes means switching between them
+;		-- and asking for the one that is already selected is the common case by far. Two bytes
+;		turn that into a compare.
+;
+;		$FF in either means "not known": CLRCHN, an OPEN, or anything else that goes behind
+;		these routines' backs leaves them that way and the next select does the work.
+;
+; ************************************************************************************************
+
+IOOpenObject:
+		lda 	#IO_OBJECT_FILE
+		sta 	ioFileNo
+		lda 	#'W'
+		jsr 	IOSetFileName 				; carry comes back from OPEN
+		ldy 	#3 							; put the default back for every other caller
+		sty 	ioFileNo 					; (sty leaves the carry alone)
+		rts
+
+IOObjectClose:
+		lda 	#IO_OBJECT_FILE
+		jsr 	$FFC3 						; CLOSE
+		jsr 	$FFCC 						; CLRCHN
+		lda 	#$FF
+		sta 	ioInSel
+		sta 	ioOutSel
+		rts
+
+;
+;		SELECTING ONE DIRECTION TAKES THE OTHER WITH IT, so each of these forgets what the
+;		other knew. CHKIN and CHKOUT are not independent here: after the object file has been
+;		selected for output the source is no longer selected for input, and a read that assumed
+;		it still was simply stopped -- with no error and no end of file, which read as the
+;		compiler hanging. It cost an afternoon on 06/09/26.
+;
+;		The cost is one CHKIN/CHKOUT pair per buffer flush, which is 8K of object code apart --
+;		the same economy the runtime image gets by streaming a page at a time.
+;
+IOSelectSource:
+		lda 	#3
+		cmp 	ioInSel
+		beq 	_IOSSDone
+		sta 	ioInSel
+		lda 	#$FF
+		sta 	ioOutSel
+		ldx 	#3
+		jmp 	$FFC6 						; CHKIN
+_IOSSDone:
+		rts
+
+IOSelectObject:
+		lda 	#IO_OBJECT_FILE
+		cmp 	ioOutSel
+		beq 	_IOSODone
+		sta 	ioOutSel
+		lda 	#$FF
+		sta 	ioInSel
+		ldx 	#IO_OBJECT_FILE
+		jmp 	$FFC9 						; CHKOUT
+_IOSODone:
+		rts
+;
+;		The error handler prints through CHROUT, and with the object file selected for output
+;		that would put the message INTO the program being compiled.
+;
+IOSelectScreen:
+		lda 	ioOutSel
+		beq 	_IOSCDone
+		stz 	ioOutSel 					; CLRCHN puts both back to the default, so neither
+		lda 	#$FF 						; is known afterwards
+		sta 	ioInSel
+		jmp 	$FFCC 						; CLRCHN
+_IOSCDone:
+		rts
 
 ; ************************************************************************************************
 ;
@@ -2349,6 +3072,10 @@ _IOSSetName:
 ioFileNo: 									; the logical file IOSetFileName opens on. Code
 		.byte 	3 							; section, like everything else here -- it is the
 											; compiler's, and the compiler is thrown away.
+ioInSel: 									; which file is selected for input, and which for
+		.byte 	$FF 						; output. $FF = not known.
+ioOutSel:
+		.byte 	$FF
 
 IONameBuffer:
 		.fill 	CFLineSize+8 				; the longest line GPC.INPUT can hold, plus ",S,R"
@@ -2399,11 +3126,11 @@ CompileCode:
 
 		;
 		;		GP.BANKED needs to know where the p-code will RUN, and it needs it INSIDE the
-		;		compile: FixBranches resolves the branches that cross into the bank long before
-		;		WriteObjectCode has settled anything. In shared mode that is the constant
-		;		PCODE_PAGE, so it can be handed over now. Embedded, it depends on ScanGPUsage --
-		;		and there is no bootstrap there to copy the region either, so gpbank.asm refuses
-		;		a region rather than guessing.
+		;		compile: pass two resolves the branches that cross into the bank as it writes
+		;		them. In shared mode that is the constant PCODE_PAGE, so it can be handed over
+		;		now. Embedded, it depends on how much of the runtime the program needs -- and
+		;		there is no bootstrap there to copy the region either, so gpbank.asm refuses a
+		;		region rather than guessing.
 		;
 		lda 	#(PCODE_PAGE - (FreeMemory >> 8)) & $FF
 		sta 	gpBankRunPage
@@ -2413,19 +3140,18 @@ CompileCode:
 		bne 	_CCNotShared
 		inc 	gpBankShared
 _CCNotShared:
+		jsr 	GPScanReset 				; before a byte is written, because pass one decides
+											; gpUsed as it writes them
 		ldx 	#APIDesc & $FF
 		ldy 	#APIDesc >> 8
 		jsr 	StartCompiler
 		bcs 	_CCStopped 					; THE COMPILE ITSELF FAILED. StartCompiler documents CC = okay
 									; and CompilerErrorHandler has already printed the message and the
 									; line, so there is nothing to add -- but this carry used to be
-									; DROPPED, and WriteObjectCode ran anyway. A structure error out of
-									; FixBranches (GP.IF with no GP.ENDIF, GP.SELECT with no GP.ENDSEL,
-									; GP.EXITDO with no GP.LOOP) therefore wrote out the half-resolved
-									; object -- truncated at the branch it could not fix, because
-									; _FBEDNoLoop restores objPtr to it -- and then printed OK.
-		jsr 	WriteObjectCode
-		bcs 	_CCStopped 					; shared-mode reject (PROGRAM TOO BIG) -- also already reported
+									; DROPPED, and the object was written anyway. A structure error --
+									; GP.IF with no GP.ENDIF, GP.SELECT with no GP.ENDSEL, GP.EXITDO
+									; with no GP.LOOP -- therefore wrote out a half-resolved object,
+									; truncated at the branch it could not fix, and then printed OK.
 		jsr 	WriteMapFile 				; and the line#->offset map, if GPC.INPUT asked for one
 		lda 	#"O" 						; the only other thing it prints, and the only way a
 		jsr 	$FFD2 						; caller can tell a compile that worked from one that
@@ -2436,7 +3162,9 @@ _CCNotShared:
 		jmp 	PrintMemoryReport 			; ... and what it cost -- see compiler/memreport.asm
 
 _CCStopped: 								; either half set carry and has already said why, so stop
-		rts 								; here: no object, no map file, and above all no OK.
+		jmp 	ObjStreamAbort 				; here: no object -- and the object file is created
+											; before pass two now, so a half written one has to
+											; be taken away -- no map file, and above all no OK.
 
 _CCNoControlFile: 							; a compiler that guesses at what it was asked to
 		jmp 	PrintNoControlFile 			; build is worse than one that refuses
@@ -2568,7 +3296,7 @@ APIDesc:
 
 		.section code
 
-IO_SYM_FILE = 5 							; 3 is the source, 4 the runtime image at write time
+IO_SYM_FILE = 5 							; 3 is the source, 4 the runtime image, 6 the object
 
 ; ************************************************************************************************
 ;

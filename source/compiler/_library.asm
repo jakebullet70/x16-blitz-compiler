@@ -60,6 +60,20 @@ BLC_PRINTCHAR = 6
 ;		the compiler library and so can see them, and not the other way round.
 ;
 BLC_SYMLOOKUP = 7
+;
+;		End of the FIRST pass. The object's length is now known and everything that follows from
+;		it can be settled: how much of the runtime this program needs, where its object code will
+;		land, where its workspace starts -- and whether it fits at all.
+;
+;		PASS TWO NEEDS ALL OF THAT WHILE IT IS COMPILING, which is why it is asked for here
+;		rather than at the end. Returns CS if the program is too big, having already said so.
+;
+BLC_ENDPASS1 = 8
+;
+;		End of the SECOND pass. Whatever the application still has in hand goes out here, so
+;		that the object is complete before the two passes are compared and the output closed.
+;
+BLC_ENDPASS2 = 9
 
 ; ************************************************************************************************
 ;
@@ -590,12 +604,69 @@ WriteCodeByte:
 		pha 								; save on stack
 		phx
 		phy
+		jsr 	SumCodeByte 				; A is still the byte
 		tax
 		lda 	#BLC_WRITEOUT
 		jsr 	CallAPIHandler
 		ply 								; restore from stack
 		plx
 		pla
+		rts
+
+; ************************************************************************************************
+;
+;		THE SUM THE TWO PASSES ARE COMPARED BY.
+;
+;		Neither pass has an object to checksum -- pass one stores nothing and pass two's goes
+;		straight into a file -- so what is compared is the STREAM OF BYTES THE GENERATORS EMIT.
+;		That stream is identical in both passes, byte for byte and in the same order, except
+;		where pass two writes an answer pass one could not know. Those are counted out in
+;		sumSkip and left out of the sum:
+;
+;			a branch's two operand bytes 	EmitBranch
+;			an .unwind's count 				CommandGOTO
+;			a GP.ASM blob's address 		AsmCloseBlock
+;			the variable space 				CompilePass
+;			the GP.ASM pool 				AsmFlushPool -- pass two resolves it in its bank first
+;			the GP.BANKED bookkeeping 		GPBankRelocate in pass one, RegionSwitch in pass two
+;
+;		What it does cover is every opcode and every other operand, in order, which is what
+;		catches a second pass that compiled anything differently -- and it catches it before the
+;		object is written. That is what the object checksum used to do, and this is what is left
+;		to do it with.
+;
+; ************************************************************************************************
+
+SumCodeByte:
+		pha
+		lda 	sumSkip 					; one of the bytes the two passes may differ on ?
+		ora 	sumSkip+1
+		beq 	_SCBSum
+		lda 	sumSkip 					; then step over it
+		bne 	_SCBNoBorrow
+		dec 	sumSkip+1
+_SCBNoBorrow:
+		dec 	sumSkip
+		pla
+		rts
+_SCBSum:
+		pla
+		pha
+		clc
+		adc 	passSum 					; sum1 += byte
+		sta 	passSum
+		clc
+		adc 	passSum+1 					; sum2 += sum1, so a reordering shows up too
+		sta 	passSum+1
+		pla
+		rts
+
+;
+;		The next YA bytes are not summed.
+;
+SumSkipYA:
+		sta 	sumSkip
+		sty 	sumSkip+1
 		rts
 
 ; ************************************************************************************************
@@ -843,17 +914,21 @@ StartCompiler:
 ;		Pass two then compiles the same source again knowing all of it, so nothing has to be
 ;		written down and gone back to.
 ;
-;		THE TWO PASSES PRODUCING THE SAME OBJECT IS A LOAD-BEARING ASSUMPTION and nothing in the
-;		structure enforces it -- so it is checked rather than trusted. Each pass lays its object
-;		out and ObjectChecksum sums the result; the tail of pass two compares that, the length
-;		and the variable space against pass one's before anything is written out. A mismatch is a
-;		compiler bug and says so; it is never a silently wrong object, which is the one failure
-;		this must not have.
 ;
-;		THE FINISHED OBJECT, NOT THE STREAM OF WRITES. It was the stream to begin with, summed in
-;		WriteCodeByte, and that is the weaker check: the object is what ships, and the order the
-;		bytes are written in is free to differ -- a region is emitted where it appears and moved
-;		afterwards, and it will not always be.
+;		THE TWO PASSES AGREEING IS A LOAD-BEARING ASSUMPTION and nothing in the structure
+;		enforces it -- so it is checked rather than trusted. It used to be checked by summing
+;		both objects and comparing, and there is only one object now: pass one lays none out at
+;		all. What the two passes still both produce is the tables the second one resolves out
+;		of, so those are what is checked, each where it is read --
+;
+;			every line's address 		storage/mark_line.asm
+;			every block end 			commands/goto.asm
+;			every alternative 			commands/goto.asm
+;			the GP.ASM pool's base 		commands/gpasmcode.asm
+;			the length, and the variable space, at the end of this file
+;
+;		-- and a disagreement is a compiler bug that says so. It is never a silently wrong
+;		object, which is the one failure this must not have.
 ;
 ;		Everything a compile accumulates has to be back at its starting value for pass two, which
 ;		is what ResetPassState is for. Anything missed from it shows up as a checksum mismatch on
@@ -875,15 +950,18 @@ CompilePass:
 		;		shape of problem the second pass exists to solve: pass one emits nothing useful
 		;		here and finishes with the total, pass two writes that total straight in.
 		;
-		;		This used to be patched in place by FixBranches, which is why the opcode was here
-		;		in the first place -- it was a one-pass compiler with one two-pass-shaped hole in
-		;		it. That handler is gone.
+		;		This used to be patched in place after the whole object was laid out, which is why
+		;		the opcode was here in the first place -- it was a one-pass compiler with one
+		;		two-pass-shaped hole in it.
 		;
 		lda 	#PCD_CMD_VARSPACE
 		jsr 	WriteCodeByte
-		lda 	pass1VarSpace 				; zero in pass one, the real figure in pass two --
-		jsr 	WriteCodeByte 				; the one place the two objects differ on purpose,
-		lda 	pass1VarSpace+1 			; which is why ObjectChecksum skips these two bytes
+		lda 	#2 							; the one place the two objects differ on purpose, so
+		ldy 	#0 							; the sum steps over it
+		jsr 	SumSkipYA
+		lda 	pass1VarSpace 				; zero in pass one, the real figure in pass two
+		jsr 	WriteCodeByte
+		lda 	pass1VarSpace+1
 		jsr 	WriteCodeByte
 		;
 		;		Emit the jump to the implicit-DIM prologue. The prologue lives at line $FFFF
@@ -921,6 +999,10 @@ _MCLHaveFirst:
 											; marked, so the marker and its table entry land on
 											; the side the line belongs to
 		jsr 	STRMarkLine 				; remember the code position and number of this line.
+		lda 	objPtr 						; ...and where its marker byte goes, which is what
+		sta 	lineMarkerAt 				; GP.BANKED means by "alone on its line"
+		lda 	objPtr+1
+		sta 	lineMarkerAt+1
 		lda 	#PCD_NEWCMD_LINE 			; generate new command line
 		jsr 	WriteCodeByte
 
@@ -1011,6 +1093,18 @@ DeferStatementToRuntime:
 SaveCodeAndExit:
 		lda 	#BLC_CLOSEIN				; finish input.
 		jsr 	CallAPIHandler
+		;
+		;		A BLOCK LEFT OPEN AT THE END OF THE SOURCE. FixBranches used to find this: it
+		;		scanned forward for the closing token and ran off the end of the object. Nothing
+		;		scans now, so the three stacks are asked directly -- which is a better answer
+		;		anyway, since it costs a compare rather than a walk.
+		;
+		lda 	blockDepth 					; GP.DO
+		ora 	ifDepth 					; GP.IF
+		ora 	SelectDepth 				; GP.SELECT
+		beq 	_SCEClosed
+		.error_structure
+_SCEClosed:
 
 		lda 	#$00 						; end-of-program line = $FE00 for forward THEN / goto-past-end.
 		ldy 	#$FE 						; Deliberately NOT $FFxx: STRFindLine treats any entry whose
@@ -1051,37 +1145,46 @@ SaveCodeAndExit:
 _SCEPlaced:
 		jsr 	ClaimRegionTop 				; the layout itself was restored before this pass began
 		;
-		;		BOTH PASSES RESOLVE, so the checksum compares a FINISHED object rather than one
-		;		with holes in it. That is what lets the resolving move into pass two's emitter one
-		;		branch kind at a time: pass one still answers from the laid-out object, the old
-		;		way, and a disagreement between the two answers is a mismatch here rather than a
-		;		wrong program. Pass one keeps FixBranches for as long as it has a buffer to walk.
+		;		NEITHER PASS HAS AN OBJECT ANY MORE. Pass one only counts -- it works out where
+		;		every line, block and region lands, and how long the whole thing is -- and pass
+		;		two writes the answer straight into the file, resolving every branch where it
+		;		writes it. FixBranches, which resolved them afterwards by walking the finished
+		;		p-code, has nothing left to walk and is gone.
 		;
-		;		FIXBRANCHES DESTROYS objPtr. It rewinds to the start and walks to the end marker,
-		;		so it comes back pointing at the $FF -- and everything after that is invisible to
-		;		it. That used to be the whole object, because the GP.ASM pool was appended
-		;		afterwards. Now the pool goes on first, and objPtr is the length WriteObjectCode
-		;		streams, so leaving it at the end marker silently truncated every pool: a program
-		;		with an inline blob compiled OK and jumped into nothing at the first call.
+		;		SO IS THE CHECKSUM, which compared the two objects. What the two passes still
+		;		both produce is the tables the second one resolves out of, and those are checked
+		;		instead: every line's address in STRMarkLine, every block end and alternative in
+		;		commands/goto.asm, the GP.ASM pool's base in AsmFlushPool, and the length and
+		;		variable space below.
 		;
 _SCEResolve:
 		lda 	passNumber
-		bne 	_SCEChecksum 				; PASS TWO RESOLVES EVERY BRANCH WHERE IT WRITES IT.
-		lda 	objPtr 						; Nothing is left for a second look, which is what
-		sta 	objectEnd 					; step seven needs: an object that is final on the
-		lda 	objPtr+1 					; way out can go straight to the file.
-		sta 	objectEnd+1
-		jsr 	FixBranches 				; fix up GOTO/GOSUB etc.
-		lda 	objectEnd
-		sta 	objPtr
-		lda 	objectEnd+1
-		sta 	objPtr+1
-_SCEChecksum:
-		jsr 	ObjectChecksum
+		bne 	_SCEPassTwo
 		;
-		lda 	passNumber
-		bne 	_SCECompare
+		;		THE LENGTH IS THE LAST THING PASS ONE HAD TO FIND OUT, so this is where the
+		;		application settles what follows from it -- how much of the runtime this program
+		;		needs, where its object code lands, where its workspace starts. PROGRAM TOO BIG
+		;		is that test, and it is here now rather than after the whole compile: a program
+		;		with no room to run is refused before pass two writes a byte of it.
 		;
+		;		AND PASS TWO COMPILES AGAINST THEM: a GP.ASM blob's address is worked out from
+		;		where the object will run, so the answers have to be in before it starts.
+		;
+		lda 	#BLC_ENDPASS1
+		jsr 	CallAPIHandler
+		bcc 	_SCEPassOne
+		sec 								; too big, and it has already said so
+		jmp 	ExitCompiler
+		;
+		;		Pass two: whatever the application still has in hand goes out, and then the two
+		;		passes are compared.
+		;
+_SCEPassTwo:
+		lda 	#BLC_ENDPASS2
+		jsr 	CallAPIHandler
+		bra 	_SCECompare
+
+_SCEPassOne:
 		lda 	passSum 					; what pass two now has to reproduce, exactly
 		sta 	pass1Sum
 		lda 	passSum+1
@@ -1098,8 +1201,9 @@ _SCEChecksum:
 		jmp 	CompilePass
 
 		;
-		;		Pass two. Length first, then the sum: a length mismatch is the likelier bug and
-		;		the more informative one, though both land in the same place.
+		;		Pass two. The line table, the block tables and the pool base were checked where
+		;		they were read, so by here they already agree; what is left is the length, the
+		;		sum of what was emitted, and the variable space.
 		;
 _SCECompare:
 		lda 	objPtr
@@ -1108,16 +1212,15 @@ _SCECompare:
 		lda 	objPtr+1
 		cmp 	pass1Len+1
 		bne 	_SCEDiverged
-		lda 	passSum
-		cmp 	pass1Sum
+		lda 	passSum 					; ...and every byte either pass emitted, bar the ones
+		cmp 	pass1Sum 					; pass two alone could work out
 		bne 	_SCEDiverged
 		lda 	passSum+1
 		cmp 	pass1Sum+1
 		bne 	_SCEDiverged
 		;
 		;		And the variable space, which pass two wrote into the program before it had
-		;		recomputed it. Free to check, and it is what covers the three bytes ObjectChecksum
-		;		skips -- the only place the two objects are meant to differ.
+		;		recomputed it -- the one figure that is not a byte of the object.
 		;
 		lda 	freeVariableMemory
 		cmp 	pass1VarSpace
@@ -1127,9 +1230,10 @@ _SCECompare:
 		beq 	_SCEAgreed
 		;
 		;		The passes disagree, so some piece of compile state was carried from one into the
-		;		other -- ResetPassState is missing something. Nothing has been written yet, and
-		;		nothing is going to be: an object built from two different compiles of the same
-		;		source is exactly the corrupt output this check exists to prevent.
+		;		other -- ResetPassState is missing something. The object is already on disk, and
+		;		it is taken away again on the way out (ObjStreamAbort): an object built from two
+		;		different compiles of the same source is exactly what this check exists to stop
+		;		anyone running.
 		;
 _SCEDiverged:
 		.error_internal
@@ -1160,6 +1264,10 @@ ExitCompiler:
 ResetPassState:
 		jsr 	STRReset 					; line number table, variable list, free variable memory
 
+		stz 	passSum 					; the sum of what this pass emits, and how many bytes
+		stz 	passSum+1 					; of it are being stepped over
+		stz 	sumSkip
+		stz 	sumSkip+1
 		stz 	SelectDepth 				; open GP.SELECTs, for the selector-variable stack
 		stz 	blockDepth 					; GP.DO nesting -- a non-zero start makes every GOTO
 											; emit an .unwind it does not need
@@ -1207,68 +1315,6 @@ ResetPassState:
 		beq 	_RPSDone
 		jsr 	RestoreLayout
 _RPSDone:
-		rts
-
-; ************************************************************************************************
-;
-;		Fletcher-16 over the object this pass has just laid out. Called once per pass, after the
-;		pool has gone on, the regions have been placed and the branches resolved, so what it sums
-;		is the object exactly as it would be written to disk.
-;
-;		THE FIRST THREE BYTES ARE SKIPPED. They are _variable.space and its operand, and the
-;		operand is the one thing the two passes are MEANT to differ on -- pass one does not yet
-;		know the figure. The opcode is a constant and the figure is compared directly in the
-;		tail, so nothing is left uncovered.
-;
-;		BLC_RESETOUT is how the object's base is found: the compiler library cannot name
-;		FreeMemory -- it is an application symbol, and this half also builds standalone -- and
-;		resetting the cursor is the only thing that asks the API where the object starts.
-;		FixBranches rewinds the same way.
-;
-; ************************************************************************************************
-
-ObjectChecksum:
-		lda 	objPtr 						; where the object ends, over the rewind below
-		sta 	sumEnd
-		lda 	objPtr+1
-		sta 	sumEnd+1
-
-		lda 	#BLC_RESETOUT
-		jsr 	CallAPIHandler
-		clc 								; ...and start three bytes in, past _variable.space
-		lda 	objPtr
-		adc 	#3
-		sta 	zTemp0
-		lda 	objPtr+1
-		adc 	#0
-		sta 	zTemp0+1
-
-		stz 	passSum
-		stz 	passSum+1
-_OCLoop:
-		lda 	zTemp0+1 					; reached the end ?
-		cmp 	sumEnd+1
-		bne 	_OCByte
-		lda 	zTemp0
-		cmp 	sumEnd
-		beq 	_OCDone
-_OCByte:
-		lda 	(zTemp0)
-		clc
-		adc 	passSum 					; sum1 += byte
-		sta 	passSum
-		clc
-		adc 	passSum+1 					; sum2 += sum1, so a reordering shows up too
-		sta 	passSum+1
-		inc 	zTemp0
-		bne 	_OCLoop
-		inc 	zTemp0+1
-		bra 	_OCLoop
-_OCDone:
-		lda 	sumEnd 						; put the cursor back: it is the object's length, and
-		sta 	objPtr 						; WriteObjectCode streams up to it
-		lda 	sumEnd+1
-		sta 	objPtr+1
 		rts
 
 ; ************************************************************************************************
@@ -1358,8 +1404,11 @@ _RSClosing:
 		bne 	_RSDone
 
 		jsr 	_RSBridge
-		lda 	#$FF 						; the region's own end marker, which is what stops the
-		jsr 	WriteCodeByte 				; walkers once they have hopped up here
+		lda 	#1 							; the region's own end marker, which pass one counts
+		ldy 	#0 							; rather than writes
+		jsr 	SumSkipYA
+		lda 	#$FF
+		jsr 	WriteCodeByte
 		lda 	lowResume
 		sta 	objPtr
 		lda 	lowResume+1
@@ -1370,10 +1419,13 @@ _RSClosing:
 ;
 ;		Both bridges are GOTO THIS LINE, and that is the whole trick -- a region begins and ends
 ;		on a line marker, so both lines have a table entry pointing exactly at a boundary and
-;		FixBranches resolves the bridges by the path it resolves every other branch. No new
+;		pass two resolves the bridges by the path it resolves every other branch. No new
 ;		opcode and no absolute operand. See the header in commands/gpbank.asm.
 ;
 _RSBridge:
+		lda 	#1 							; PASS TWO'S ALONE. Pass one writes no bridge at all --
+		ldy 	#0 							; it counts the same three bytes in GPBankRelocate --
+		jsr 	SumSkipYA 					; so neither the opcode nor its operand is summed
 		lda 	currentLineNumber 			; both bridges go to the line the switch happens on:
 		sta 	branchTarget 				; the entry one into the region, the exit one back out
 		lda 	currentLineNumber+1
@@ -1389,12 +1441,11 @@ _RSBridge:
 ;		as it compiles -- it has to, the generators are the same code -- but they describe where
 ;		it PUT things, which for gpBankEnds is not what the relocator means by the same name.
 ;		Overwriting the lot afterwards is shorter than teaching the generators the difference,
-;		and it is pass one's figures that FixBranches and the bootstrap patcher want.
+;		and it is pass one's figures that pass two and the bootstrap patcher want.
 ;
-;		THE ALIGNMENT PADDING IS NOT REWRITTEN. Pass two lands its low code and its regions on
-;		the addresses pass one used, in the same buffer, so the gaps between them still hold the
-;		bytes pass one left there. That stops being true the day pass two streams to a file, and
-;		the gaps will have to be filled then.
+;
+;		THE ALIGNMENT PADDING IS PASS TWO'S. It writes the gaps itself, on its way out of
+;		ObjStreamClose, because there is no buffer left holding what pass one put there.
 ;
 ; ************************************************************************************************
 
@@ -1410,8 +1461,6 @@ _SLLoop:
 		sta 	layoutStart,x
 		lda 	gpBankEnds,x
 		sta 	layoutEnd,x
-		lda 	gpBankHops,x
-		sta 	layoutHops,x
 		txa
 		bne 	_SLLoop
 
@@ -1442,8 +1491,6 @@ _RLLoop:
 		sta 	gpBankStarts,x
 		lda 	layoutEnd,x
 		sta 	gpBankEnds,x
-		lda 	layoutHops,x
-		sta 	gpBankHops,x
 		txa
 		bne 	_RLLoop
 
@@ -1459,8 +1506,8 @@ _RLByteLoop:
 
 		lda 	layoutRunBase
 		sta 	gpBankRunBase
-		lda 	#1 							; the hop is open: the walk crosses the low code and
-		sta 	gpBankActive 				; then jumps up to the regions
+		lda 	#1 							; the layout is in place, which is what gpBankActive
+		sta 	gpBankActive 				; says to everything that corrects an address
 _RLDone:
 		rts
 
@@ -1558,18 +1605,18 @@ compilerStartHigh:							; MSB of workspace start address
 		.fill 	1
 compilerEndHigh:							; MSB of workspace end address
 		.fill 	1
-objectEnd:									; the true end of the object, held across FixBranches --
-		.fill 	2							; which rewinds objPtr and leaves it at the end marker
 ;
 ;		The two passes. passNumber is 0 while the first is running and 1 for the second, and it
 ;		is the only thing that tells them apart -- everything else about a pass is identical, by
-;		construction and by the checksum below.
+;		construction and by the checks listed at the head of this file.
 ;
 passNumber:								; 0 = first pass, 1 = second
 		.fill 	1
-passSum:									; Fletcher-16 over the object this pass laid out
+lineMarkerAt: 								; where the current line's PCD_NEWCMD_LINE byte went
 		.fill 	2
-sumEnd:										; one past its last byte, held across the walk
+passSum: 									; Fletcher-16 over what this pass emitted
+		.fill 	2
+sumSkip: 									; ...and how many bytes it is stepping over
 		.fill 	2
 ;
 ;		The GP.BANKED layout, carried from pass one into pass two. The tables mirror the ones in
@@ -1580,8 +1627,6 @@ layoutCount:								; regions pass one found and placed
 layoutStart:								; where each one ended up
 		.fill 	2*GPBANK_MAXREGIONS
 layoutEnd:									; and one past where each one ends
-		.fill 	2*GPBANK_MAXREGIONS
-layoutHops:									; where the walk leaves off to reach each one
 		.fill 	2*GPBANK_MAXREGIONS
 layoutPages:								; pages of each, for the bootstrap's table
 		.fill 	GPBANK_MAXREGIONS
@@ -1595,7 +1640,7 @@ regionOpen:									; nonzero while pass two is writing into one
 		.fill 	1
 lowResume:									; where the low code left off, across a region
 		.fill 	2
-pass1Sum:									; ...and what pass one came to, kept for the compare
+pass1Sum:									; what pass one came to, kept for the compare
 		.fill 	2
 pass1Len:									; pass one's object length, compared the same way
 		.fill 	2
@@ -2383,10 +2428,9 @@ _EHDisplayLine:
 ;		system tokens carry an inline operand the table has no way to reserve. So the token and
 ;		its two operand bytes are written here.
 ;
-;		PASS ONE WRITES A PLACEHOLDER, which FixBranches resolves by scanning forward for the
-;		matching GP.LOOP -- it has the whole object laid out and can look. The value is never
-;		read: FixBranches overwrites both bytes unconditionally, and errors out if there is no
-;		matching GP.LOOP rather than leaving them.
+;		PASS ONE ONLY COUNTS the two operand bytes: nothing goes into them, because where the
+;		matching GP.LOOP ends is not known yet. It writes down where each block ends as it goes
+;		past, which is what pass two answers from.
 ;
 ;		PASS TWO WRITES THE OFFSET, out of the table pass one filled in as it passed each
 ;		GP.LOOP. See BlockDepthDown in commands/goto.asm.
@@ -2399,8 +2443,11 @@ _EHDisplayLine:
 CommandExitDoCompile:
 		lda 	passNumber
 		bne 	_CEDResolve
-		lda 	#PCD_CMD_EXITDO 			; pass one: FixBranches scans forward for the GP.LOOP
-		jsr 	WriteCodeByte 				; and fills the offset in
+		lda 	#PCD_CMD_EXITDO 			; pass one only counts: two bytes go past, and pass two
+		jsr 	WriteCodeByte 				; writes the offset that belongs in them
+		lda 	#2 							; ...so they are not summed either -- see EmitBranch
+		ldy 	#0
+		jsr 	SumSkipYA
 		lda 	#0
 		jsr 	WriteCodeByte
 		lda 	#0
@@ -2798,507 +2845,6 @@ _IVNotFound:
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;
-;		Name:		fixbranches.asm
-;		Purpose:	Fix up GOTO and GOSUB commands -- PASS ONE ONLY
-;		Created:	18th April 2023
-;		Reviewed: 	No
-;		Author:		Paul Robson (paul@robsons.org.uk)
-;
-; ************************************************************************************************
-; ************************************************************************************************
-
-		.section code
-
-; ************************************************************************************************
-;
-;									 Fix up GOTO and GOSUB
-;
-;		PASS ONE ONLY. Pass two resolves every branch where it writes it, out of the tables this
-;		pass fills in -- see commands/goto.asm -- so it never comes here at all.
-;
-;		This is still what says whether those answers are RIGHT. Both passes lay a finished
-;		object out and ObjectChecksum sums it, so a branch resolved differently by the two
-;		routes is a mismatch in main/compiler.asm rather than a wrong program. It stays for as
-;		long as pass one has a buffer to walk, which is until pass one stops storing bytes.
-;
-; ************************************************************************************************
-
-FixBranches:
-		lda 	#BLC_RESETOUT				; back to the start of the *object* code.
-		jsr 	CallAPIHandler
-		stz 	_FBBlockDepth
-_FBLoop:
-		lda 	(objPtr) 					; get the next one.
-		cmp 	#PCD_CMD_GOTO 				; found GOTO or GOSUB, patch up.
-		beq 	_FBFixGotoGosub
-		cmp 	#PCD_CMD_GOSUB
-		beq 	_FBFixGotoGosub
-		cmp 	#PCD_CMD_FNGOSUB 			; an FN call: resolve like a branch but from an
-		beq 	_FBFixFnGosub 				; absolute address, not a line number.
-		cmp 	#PCD_CMD_GOTOCMD_NZ 		; patch the conditional GOTOs for Z/NZ TOS.
-		beq 	_FBFixGotoGosub
-		cmp 	#PCD_CMD_GOTOCMD_Z 
-		beq 	_FBFixGotoGosub
-		cmp 	#PCD_CMD_RESTORE 			; patch restore.
-		beq 	_FBFixRestore
-		cmp 	#PCD_CMD_UNWIND 			; a GOTO leaving blocks: how many frames it closes.
-		beq 	_FBUnwindFar
-		cmp 	#PCD_CMD_EXITDO 			; GP.EXITDO: resolve against its own GP.LOOP.
-		beq 	_FBExitDoFar
-		cmp 	#PCD_CMD_IFNEXT 			; GP.IF / GP.ELSEIF test false: the next alternative.
-		beq 	_FBIfNextFar
-		cmp 	#PCD_CMD_IFELSE 			; end of an IF body: out to the GP.ENDIF.
-		beq 	_FBIfElseFar
-		cmp 	#PCD_CMD_CASENEXT 			; GP.CASE that did not match: the next alternative.
-		beq 	_FBCaseNextFar
-		cmp 	#PCD_CMD_CASEEND 			; end of a case body: out to the GP.ENDSEL.
-		beq 	_FBCaseEndFar
-_FBNext:
-		;
-		;		Block depth, counted as the walk passes the openers and closers -- the same
-		;		structural count the branch scanners below do locally, kept running here so the
-		;		.unwind resolver can ask "how deep am I?" without a second walk.
-		;
-		;		ONLY GP.DO IS COUNTED. GP.IF never was: it opens no stack frame, so there is
-		;		nothing to unwind out of it. GP.SELECT stopped being counted on 1st September
-		;		2026 for exactly the same reason -- its selector became a plain variable that
-		;		each alternative re-reads, so it opens no frame either. gp.select and gp.endsel
-		;		are still SCANNED FOR as structure below (_FBCaseScan needs them to find where
-		;		an alternative ends); they are simply not depth.
-		;
-		lda 	(objPtr)
-		cmp 	#PCD_GPCMD_DO
-		beq 	_FBDepthUp
-		cmp 	#PCD_GPCMD_LOOP
-		bne 	_FBStep
-_FBDepthDown:
-		dec 	_FBBlockDepth
-		bra 	_FBStep
-_FBDepthUp:
-		inc 	_FBBlockDepth
-_FBStep:
-		jsr 	MoveObjectForward 			; move forward in object code.
-		bcc 	_FBLoop 					; not finished
-		jsr 	GPBankHop 					; the low code ends at its $FF, but a GP.BANKED region
-		bcc 	_FBLoop 					; sits past the GP.ASM pool -- carry clear means it
-_FBExit: 									; hopped there and the walk goes on
-		rts
-_FBUnwindFar:
-		jmp 	_FBFixUnwind
-;
-;		The GP.EXITDO handler lives at the very end of this file, deliberately: dropping it inline
-;		pushed the branches around it out of range. Hence this trampoline.
-;
-_FBExitDoFar:
-		jmp 	_FBFixExitDo
-_FBCaseNextFar:
-		jmp 	_FBFixCaseNext
-_FBCaseEndFar:
-		jmp 	_FBFixCaseEnd
-_FBIfNextFar:
-		jmp 	_FBFixIfNext
-_FBIfElseFar:
-		jmp 	_FBFixIfElse
-;
-;		Found an FN call (.fngosub). Its operand is already the ABSOLUTE code position of the FN
-;		body, not a source line number, so skip STRFindLine: load the address into YA and join the
-;		shared tail, which turns it into an offset from this opcode -- exactly like every branch.
-;
-_FBFixFnGosub:
-		ldy 	#1
-		lda 	(objPtr),y 					; operand byte 1 = abs LOW
-		pha
-		iny
-		lda 	(objPtr),y 					; operand byte 2 = abs HIGH
-		tay 								; Y = abs HIGH
-		pla 								; A = abs LOW
-		jmp 	_FBFFound
-;
-;		Found GOTO/GOSUB - look it up in the line# table and fix it up.
-;
-;		also handles RESTORE.
-;
-_FBFixGotoGosub:
-_FBFixRestore:
-		ldy 	#1							; line number in YA
-		lda 	(objPtr),y
-		pha
-		iny
-		lda 	(objPtr),y
-		tay
-		pla
-		jsr 	STRFindLine			 		; find where it is YA
-		bcc 	_FBFFound 					; not found, so must be >
-		pha
-		lda 	(objPtr) 					; which is a fail if not CMD_GOTOCMD_Z
-		cmp 	#PCD_CMD_GOTOCMD_Z 			; or RESTORE. These go to the next line
-		beq 	_FBFAllowZero 				; after ; for IF forward scanning, and
-		cmp 	#PCD_CMD_RESTORE 			; because RESTORE <n> <n> is optional.
-		bne 	_FBFFail
-_FBFAllowZero:		
-		pla
-
-_FBFFound:		
-		jsr 	GPBankMakeOffset 			; make it an offset from X:YA -- and correct it if this
-											; branch crosses into or out of a GP.BANKED region, which
-											; runs at $A000 rather than where it sits in the buffer
-		
-		phy	 								; patch the GOTO/GOSUB
-		ldy 	#1
-		sta 	(objPtr),y
-		iny
-		pla
-		sta 	(objPtr),y
-		bra 	_FBNext
-
-;
-;		Report the line number that could not be found. The operand is at offsets 1 (low) and
-;		2 (high) -- the same place _FBFixGotoGosub reads it from and _FBFFound patches it. Do
-;		not use the ldy #2/iny idiom from GetNextLine: that reads a *source* line record,
-;		where the line number follows a 2 byte link, and applying it here reported
-;		(next opcode << 8) | line high -- a meaningless number.
-;
-_FBFFail:
-		ldy 	#1
-		lda 	(objPtr),y
-		sta 	currentLineNumber
-		iny
-		lda 	(objPtr),y
-		sta 	currentLineNumber+1
-		.error_line
-
-;
-;		Found GP.EXITDO. Its target is whatever follows the GP.LOOP that closes the GP.DO it sits
-;		inside, which is not known when the command is compiled -- and this compiler has no
-;		back-patching machinery at all (IF sidesteps the problem entirely by branching to "current
-;		line + 1" and letting STRFindLine resolve it). So resolve it HERE instead, where the whole
-;		object is laid out and randomly addressable through objPtr.
-;
-;		Scan FORWARD from the .exitdo counting nesting: every GP.DO seen is a loop that must close
-;		before ours, so it raises the depth; every GP.LOOP lowers it, and the one found at depth
-;		zero is ours. That is a structural match on the emitted code, so it cannot be fooled by
-;		line numbering or by an inner loop, and it needs no compile-time state whatsoever.
-;
-;		MoveObjectForward is what makes the walk safe: it steps by real instruction size, so an
-;		operand byte that happens to equal a GP.DO or GP.LOOP token is never read as one.
-;
-_FBFixExitDo:
-		lda 	objPtr 						; remember where the .exitdo is, to come back and patch
-		sta 	_FBExitSave
-		lda 	objPtr+1
-		sta 	_FBExitSave+1
-		stz 	_FBExitDepth
-_FBEDScan:
-		jsr 	MoveObjectForward
-		bcs 	_FBEDNoLoop 				; ran off the end without finding one
-		lda 	(objPtr)
-		cmp 	#PCD_GPCMD_LOOP
-		beq 	_FBEDLoop
-		cmp 	#PCD_GPCMD_DO
-		bne 	_FBEDScan
-		inc 	_FBExitDepth 				; a nested GP.DO -- its GP.LOOP is not ours
-		bra 	_FBEDScan
-_FBEDLoop:
-		lda 	_FBExitDepth
-		beq 	_FBEDFound 					; depth zero, so this GP.LOOP closes OUR loop
-		dec 	_FBExitDepth
-		bra 	_FBEDScan
-;
-;		Found it. The target is the instruction AFTER the GP.LOOP -- one more step forward. If that
-;		step hits the end of the object the target is the end marker, which is exactly where the
-;		loop would have fallen through to anyway, so the carry is deliberately ignored here.
-;
-_FBEDFound:
-		jsr 	MoveObjectForward
-_FBEDTarget: 								; enter here when objPtr IS the target already
-		lda 	objPtr
-		sta 	_FBExitTarget
-		lda 	objPtr+1
-		sta 	_FBExitTarget+1
-		;
-		lda 	_FBExitSave 				; back to the .exitdo: STRMakeOffset works from objPtr
-		sta 	objPtr
-		lda 	_FBExitSave+1
-		sta 	objPtr+1
-		;
-		lda 	_FBExitTarget 				; target in YA, exactly as the GOTO path passes it
-		ldy 	_FBExitTarget+1
-		jsr 	GPBankMakeOffset 			; bank aware, exactly as the GOTO tail above
-		phy
-		ldy 	#1
-		sta 	(objPtr),y
-		iny
-		pla
-		sta 	(objPtr),y
-		jmp 	_FBNext
-;
-;		A GP.EXITDO with no GP.LOOP after it at its own nesting depth is not in a loop at all. This
-;		is the compile-time half of the check; StackFindFrame's structure error is the runtime half.
-;
-_FBEDNoLoop:
-		lda 	_FBExitSave 				; put objPtr back so nothing downstream sees the walk
-		sta 	objPtr
-		lda 	_FBExitSave+1
-		sta 	objPtr+1
-		.error_structure
-
-;
-;		GP.SELECT's two forward branches. Same problem and same answer as GP.EXITDO above: the
-;		target is a code POSITION, CompileBranchCommand only speaks line numbers, and there is no
-;		back-patching -- so it is resolved here, where the whole object is laid out and randomly
-;		addressable through objPtr.
-;
-;			.casenext 	a GP.CASE test came out false  ->  the next GP.CASE or GP.OTHER, or the
-;						GP.ENDSEL if this was the last alternative and there is no GP.OTHER.
-;			.caseend 	a case body has finished       ->  the GP.ENDSEL, always.
-;
-;		One scanner does both; they differ only in whether a GP.CASE / GP.OTHER at depth zero is a
-;		landing place or just more code to step over. Nesting is counted on GP.SELECT / GP.ENDSEL
-;		exactly as GP.EXITDO counts GP.DO / GP.LOOP, so a whole select inside a case body is
-;		invisible to the scan -- and MoveObjectForward is again what makes that safe, because it
-;		steps by real instruction size and never reads an operand byte as a token.
-;
-;		BOTH land ON the target token, not past it: a .caseend must EXECUTE the GP.ENDSEL, or the
-;		selector's stack frame is never closed.
-;
-_FBFixCaseNext:
-		lda 	#$FF 						; stop at a GP.CASE / GP.OTHER as well as the GP.ENDSEL
-		bra 	_FBCaseScan
-_FBFixCaseEnd:
-		lda 	#0 							; only the GP.ENDSEL will do
-_FBCaseScan:
-		sta 	_FBCaseStop
-		lda 	objPtr 						; remember the branch, to come back and patch it
-		sta 	_FBExitSave
-		lda 	objPtr+1
-		sta 	_FBExitSave+1
-		stz 	_FBExitDepth
-_FBCSScan:
-		jsr 	MoveObjectForward
-		bcs 	_FBCSNoEnd 					; ran off the end: the GP.SELECT was never closed
-		lda 	(objPtr)
-		cmp 	#PCD_GPCMD_SELECT
-		beq 	_FBCSNested
-		cmp 	#PCD_GPCMD_ENDSEL
-		beq 	_FBCSEndSel
-		ldy 	_FBExitDepth 				; everything below only counts at our own depth
-		bne 	_FBCSScan
-		bit 	_FBCaseStop 				; a .caseend walks straight past the alternatives
-		bpl 	_FBCSScan
-		cmp 	#PCD_GPCMD_CASE 			; the FIRST gp.case of the next alternative -- the
-		beq 	_FBCSFound 					; extra ones a comma list emits are all behind us
-		cmp 	#PCD_GPCMD_OTHER
-		bne 	_FBCSScan
-_FBCSFound:
-		jmp 	_FBEDTarget 				; objPtr is the target; share the patching tail
-_FBCSNested:
-		inc 	_FBExitDepth 				; a select inside a case body -- not ours
-		bra 	_FBCSScan
-_FBCSEndSel:
-		lda 	_FBExitDepth
-		beq 	_FBCSFound 					; depth zero, so this GP.ENDSEL closes OUR select
-		dec 	_FBExitDepth
-		bra 	_FBCSScan
-_FBCSNoEnd:
-		jmp 	_FBEDNoLoop 				; same restore-and-raise as an EXITDO with no GP.LOOP
-
-;
-;		GP.IF's two forward branches, and the same scanner shape a third time. Depth is counted
-;		on gp.if against gp.endif -- NOT on .ifnext -- because GP.ELSEIF emits .ifelse and then
-;		its OWN <cond> .ifnext, which would inflate the depth of a scan already in flight and
-;		send it straight past its own gp.endif. GP.ELSEIF writes no gp.if, so it is invisible
-;		here, which is exactly what a continuation of the chain should be.
-;
-;			.ifnext		a test came out false  ->  ONE PAST the next .ifelse (the start of the
-;						next GP.ELSEIF test, or of the GP.ELSE body), or the gp.endif if this
-;						was the last alternative.
-;			.ifelse		a body has finished    ->  the gp.endif, always.
-;
-;		A .ifnext lands ONE PAST its .ifelse, not on it: landing on it would run the jump out
-;		of the body it was trying to enter. A .ifelse lands ON the gp.endif, which is free --
-;		unlike GP.ENDSEL there is no frame to close, gp.endif simply does nothing.
-;
-_FBFixIfNext:
-		lda 	#$FF 						; stop at an .ifelse as well as the gp.endif
-		bra 	_FBIfScan
-_FBFixIfElse:
-		lda 	#0 							; only the gp.endif will do
-_FBIfScan:
-		sta 	_FBIfStop
-		lda 	objPtr 						; remember the branch, to come back and patch it
-		sta 	_FBExitSave
-		lda 	objPtr+1
-		sta 	_FBExitSave+1
-		stz 	_FBExitDepth
-_FBISScan:
-		jsr 	MoveObjectForward
-		bcs 	_FBISNoEnd 					; ran off the end: the GP.IF was never closed
-		lda 	(objPtr)
-		cmp 	#PCD_GPCMD_IF
-		beq 	_FBISNested
-		cmp 	#PCD_GPCMD_ENDIF
-		beq 	_FBISEndIf
-		ldy 	_FBExitDepth 				; everything below only counts at our own depth
-		bne 	_FBISScan
-		bit 	_FBIfStop 					; an .ifelse walks straight past the other .ifelses
-		bpl 	_FBISScan
-		cmp 	#PCD_CMD_IFELSE
-		bne 	_FBISScan
-		jsr 	MoveObjectForward 			; ONE PAST it. Carry is deliberately ignored, exactly
-		jmp 	_FBEDTarget 				; as _FBEDFound ignores it: the end marker is the target
-_FBISNested:
-		inc 	_FBExitDepth 				; an IF inside a body -- not ours
-		bra 	_FBISScan
-_FBISEndIf:
-		lda 	_FBExitDepth
-		beq 	_FBISFound 					; depth zero, so this gp.endif closes OUR if
-		dec 	_FBExitDepth
-		bra 	_FBISScan
-_FBISFound:
-		jmp 	_FBEDTarget 				; objPtr is the target; share the patching tail
-_FBISNoEnd:
-		jmp 	_FBEDNoLoop 				; same restore-and-raise as a GP.IF with no GP.ENDIF
-
-
-; ************************************************************************************************
-;
-;		.unwind -- the number of block frames the GOTO after it has to close on its way out.
-;
-;		GP.LOOP and GP.ENDSEL are what release a GP.DO's and a GP.SELECT's stack frame, so a GOTO
-;		that jumps past them leaks one. The compiler puts an .unwind in front of every GOTO it
-;		compiles inside a block; this works out the count, and zero is a perfectly good answer.
-;
-;		THE GOTO IS THE VERY NEXT OPCODE AND STILL HOLDS ITS SOURCE LINE NUMBER -- the walk
-;		patches in object order, so the .unwind is reached first. STRFindLine turns that line
-;		into the target's address, and a walk from the top of the object counts the block depth
-;		there. The depth HERE is the running count the main loop keeps. The difference is how
-;		many blocks the jump leaves.
-;
-;		Both numbers come from the emitted code, so nothing rests on compile-time bookkeeping
-;		being right -- the same reason GP.EXITDO and the GP.SELECT branches are resolved here
-;		and not when they were written.
-;
-;		A jump SIDEWAYS -- out of one block into another at the same depth -- computes zero and
-;		closes nothing. That is not worth code to detect: the frame it lands in belongs to a
-;		block whose own GP.LOOP or GP.ENDSEL will release it.
-;
-; ************************************************************************************************
-
-_FBFixUnwind:
-		lda 	objPtr 						; remember the .unwind, to come back and patch it
-		sta 	_FBExitSave
-		lda 	objPtr+1
-		sta 	_FBExitSave+1
-		;
-		jsr 	MoveObjectForward 			; the GOTO this .unwind belongs to
-		ldy 	#1
-		lda 	(objPtr),y 					; its line number, not yet an offset
-		pha
-		iny
-		lda 	(objPtr),y
-		tay
-		pla
-		jsr 	STRFindLine 				; -> YA, where that line starts
-		bcs 	_FBUNoLine 					; no such line -- let the GOTO itself report it
-		sta 	_FBUnwindTo
-		sty 	_FBUnwindTo+1
-		;
-		;		Count the depth at the target, by walking to it from the top of the object.
-		;		BLC_RESETOUT is how FixBranches itself rewinds; it only sets objPtr, so it is
-		;		safe to ask for a second time. (The compiler library cannot name FreeMemory --
-		;		it is an application symbol, and this half also builds standalone.)
-		;
-		stz 	_FBUnwindDepth
-		lda 	#BLC_RESETOUT
-		jsr 	CallAPIHandler
-_FBUWalk:
-		lda 	objPtr+1 					; reached the target ?
-		cmp 	_FBUnwindTo+1
-		bne 	_FBUWNot
-		lda 	objPtr
-		cmp 	_FBUnwindTo
-		beq 	_FBUWDone
-_FBUWNot:
-		lda 	(objPtr)
-		cmp 	#PCD_GPCMD_DO
-		beq 	_FBUWUp
-		cmp 	#PCD_GPCMD_LOOP
-		bne 	_FBUWStep
-_FBUWDown:
-		dec 	_FBUnwindDepth
-		bra 	_FBUWStep
-_FBUWUp:
-		inc 	_FBUnwindDepth
-_FBUWStep:
-		jsr 	MoveObjectForward
-		bcc 	_FBUWalk
-		jsr 	GPBankHop 					; over the pool to the region, exactly as the main loop
-		bcc 	_FBUWalk 					; running off the end lands here too, with the depth
-_FBUWDone: 									; it had reached, which is the right answer for a
-		sec 								; target that IS the end marker
-		lda 	_FBBlockDepth
-		sbc 	_FBUnwindDepth
-		bcs 	_FBUStore
-		lda 	#0 							; the target is deeper than we are: nothing to close
-_FBUStore:
-		pha
-		lda 	_FBExitSave 				; back to the .unwind, and patch its count
-		sta 	objPtr
-		lda 	_FBExitSave+1
-		sta 	objPtr+1
-		pla
-		ldy 	#1
-		sta 	(objPtr),y
-		jmp 	_FBNext
-;
-;		The line does not exist. Leave the count at zero and put objPtr back on the .unwind: the
-;		GOTO is the next thing the walk reaches, and reporting the missing line is its job, with
-;		its operand and its error message.
-;
-_FBUNoLine:
-		lda 	_FBExitSave
-		sta 	objPtr
-		lda 	_FBExitSave+1
-		sta 	objPtr+1
-		jmp 	_FBNext
-
-		.send code
-
-		.section storage
-_FBBlockDepth: 								; GP.DO / GP.SELECT nesting at the opcode being walked
-		.fill 	1
-_FBUnwindDepth: 							; ...and the same count at a GOTO's target
-		.fill 	1
-_FBUnwindTo: 								; that target's address
-		.fill 	2
-		.send 	storage
-
-		.section storage
-_FBExitSave:								; where the .exitdo being resolved lives
-		.fill 	2
-_FBExitTarget:								; where its branch should land
-		.fill 	2
-_FBExitDepth:								; nested GP.DOs still to be closed before ours
-		.fill 	1
-_FBCaseStop:								; $FF if a GP.CASE / GP.OTHER ends the scan too
-		.fill 	1
-_FBIfStop:								; $FF if an .ifelse ends the scan too
-		.fill 	1
-		.send 	storage
-
-; ************************************************************************************************
-;
-;									Changes and Updates
-;
-; ************************************************************************************************
-;
-;		Date			Notes
-;		==== 			=====
-;
-; ************************************************************************************************
-; ************************************************************************************************
-; ************************************************************************************************
-;
 ;		Name:		for.asm
 ;		Purpose:	FOR compile
 ;		Created:	20th April 2023
@@ -3463,7 +3009,7 @@ FNCompile:
 		;
 		;		FindVariable returns the FN body's ABSOLUTE code position in X (low) and Y (high),
 		;		as stored by SetVariableRecordToCodePosition. Emit it verbatim as the operand of a
-		;		.fngosub -- its own opcode, so FixBranches turns this absolute address into an
+		;		.fngosub -- its own opcode, so the branch writer turns this absolute address into an
 		;		offset (like any branch) instead of mistaking it for a source line number. Push
 		;		high then low so, after the argument is compiled, the low byte is written first.
 		;
@@ -3475,8 +3021,8 @@ FNCompile:
 		jsr 	CompileExpressionAt0
 		jsr 	CheckNextRParen
 		;
-		;		Compile the call : .fngosub <lo> <hi>. Pass one writes the address and FixBranches
-		;		turns it into an offset; pass two writes the offset, because the body is always
+		;		Compile the call : .fngosub <lo> <hi>. Pass one only counts the three bytes;
+		;		pass two writes the offset, because the body is always
 		;		BEHIND the call -- a forward FN reference was refused above -- so the address is
 		;		already final. Either way the operand goes through the branch writer, which knows
 		;		what to correct when one end is inside a GP.BANKED region.
@@ -5184,6 +4730,9 @@ CommandGOTO:
 		pha
 		lda 	#PCD_CMD_UNWIND
 		jsr 	WriteCodeByte
+		lda 	#1 							; the count is pass two's answer -- see EmitBranch
+		ldy 	#0
+		jsr 	SumSkipYA
 		pla
 		jsr 	WriteCodeByte
 _CGNoUnwind:
@@ -5199,9 +4748,9 @@ _CGSyntax:
 ;		How many block frames the GOTO to branchTarget closes, in A.
 ;
 ;		PASS ONE CANNOT ANSWER. The target line may not have been compiled yet, and the depth
-;		there is exactly what is being asked for -- which is why this used to be FixBranches'
-;		job, done after the whole object was laid out. It writes a zero and FixBranches fills it
-;		in, the old way. Pass two has pass one's table and answers here.
+;		there is exactly what is being asked for -- which is why this used to be done after the
+;		whole object was laid out, by walking it. Pass one writes a zero and counts the byte;
+;		pass two has pass one's table and answers here.
 ;
 ;		A jump SIDEWAYS -- out of one block into another at the same depth -- computes zero and
 ;		closes nothing. That is not worth code to detect: the frame it lands in belongs to a
@@ -5211,7 +4760,7 @@ _CGSyntax:
 
 UnwindCount:
 		lda 	passNumber
-		beq 	_UCNone 					; pass one: FixBranches still fills this in
+		beq 	_UCNone 					; pass one: the byte goes past with nothing in it
 		lda 	branchTarget
 		ldy 	branchTarget+1
 		jsr 	STRFindLine 				; the record for the line it lands on
@@ -5239,7 +4788,7 @@ _UCDone:
 ;		GP.EXITDO -- a branch to a place the compiler has not reached -- be resolved where it is
 ;		written rather than by walking the finished object afterwards.
 ;
-;		Underflow is not guarded here. A stray GP.LOOP is caught structurally -- FixBranches
+;		Underflow is not guarded here. A stray GP.LOOP is caught structurally -- BlockDepthDown
 ;		raises BLOCK MISMATCH -- and a depth that went briefly negative would only make a GOTO
 ;		emit an .unwind it did not need, whose count comes out as zero anyway.
 ;
@@ -5344,8 +4893,6 @@ _BOPCounted:
 		rts
 
 BlockEndHere:
-		lda 	passNumber
-		bne 	_BEHDone 					; pass two READS this table; it does not write it
 		sec 								; one short, and the reader adds it back
 		lda 	objPtr
 		sbc 	#1
@@ -5353,9 +4900,9 @@ BlockEndHere:
 		lda 	objPtr+1
 		sbc 	#0
 		sta 	blockValue+1
-		jsr 	BlockEndWrite
-_BEHDone:
-		rts
+		lda 	passNumber
+		beq 	BlockEndWrite 				; pass one writes it down
+		jmp 	BlockEndCheck 				; pass two makes sure it is what it read
 
 BlockEndTarget:
 		jsr 	BlockEndRead
@@ -5385,6 +4932,30 @@ BlockEndWrite:
 		lda 	blockValue+1
 		sta 	(zTemp0),y
 		.block_release
+		rts
+
+;
+;		AND THE SAME ENTRY, COMPARED. Pass two recomputes every block end where pass one wrote
+;		it down, and a disagreement is the same failure STRMarkLine guards against: pass two
+;		resolved a GP.EXITDO or a GP.ELSE out of a table that no longer describes the object it
+;		is writing. See the note in storage/mark_line.asm.
+;
+BlockEndCheck:
+		lda 	blockValue 					; the answer this pass just worked out
+		sta 	blockCheck
+		lda 	blockValue+1
+		sta 	blockCheck+1
+		jsr 	BlockEndRead 				; ...against the one pass one left here
+BlockEndCompare:
+		lda 	blockValue
+		cmp 	blockCheck
+		bne 	_BECDiverged
+		lda 	blockValue+1
+		cmp 	blockCheck+1
+		beq 	_BECAgreed
+_BECDiverged:
+		.error_internal
+_BECAgreed:
 		rts
 
 BlockEndRead:
@@ -5447,8 +5018,6 @@ _BAORoom:
 		rts
 
 BlockAltHere:
-		lda 	passNumber
-		bne 	_BAHDone 					; pass two READS this table; it does not write it
 		lda 	blockAlt+1 					; $FFFF -- nothing is waiting for a target
 		and 	blockAlt
 		cmp 	#$FF
@@ -5464,7 +5033,16 @@ BlockAltHere:
 		lda 	objPtr+1
 		sbc 	#0
 		sta 	blockValue+1
-		jsr 	BlockAltWrite
+		lda 	passNumber
+		bne 	_BAHCheck 					; pass two makes sure it is what it read
+		jmp 	BlockAltWrite
+_BAHCheck:
+		lda 	blockValue 					; as BlockEndCheck, over the other table
+		sta 	blockCheck
+		lda 	blockValue+1
+		sta 	blockCheck+1
+		jsr 	BlockAltFetch
+		jmp 	BlockEndCompare
 _BAHDone:
 		rts
 
@@ -5537,7 +5115,9 @@ _CBCSyntax:
 ;
 ;		Write a branch: the opcode in A, the LINE it goes to in branchTarget.
 ;
-;		PASS ONE WRITES THE LINE NUMBER and FixBranches turns it into an offset afterwards, once
+;		PASS ONE WRITES THE LINE NUMBER, which is only ever counted, and pass two writes the
+;		offset. The two are the same length, which is all pass one needs of it. It used to be
+;		that pass one's line number was turned into an offset afterwards, once
 ;		the whole object is laid out. Pass two has pass one's line table already, so it writes the
 ;		offset -- and an object whose every byte is final on the way out is one that can be
 ;		streamed instead of built and then gone back over.
@@ -5577,7 +5157,7 @@ _WBTFound:
 		bra 	WriteBranchToAddress
 
 _WBTNoLine:
-		lda 	branchTarget 				; name the line that is missing, as FixBranches does
+		lda 	branchTarget 				; name the line that is missing
 		sta 	currentLineNumber
 		lda 	branchTarget+1
 		sta 	currentLineNumber+1
@@ -5610,6 +5190,9 @@ WriteBranchToAddress:
 EmitBranch:
 		lda 	branchOpcode
 		jsr 	WriteCodeByte
+		lda 	#2 							; the operand is the answer pass two worked out and
+		ldy 	#0 							; pass one could not, so the sum steps over it
+		jsr 	SumSkipYA
 		lda 	branchTarget
 		jsr 	WriteCodeByte
 		lda 	branchTarget+1
@@ -5633,6 +5216,8 @@ blockCount: 								; how many this pass has opened altogether
 blockIndex: 								; the table entry being read or written...
 		.fill 	2
 blockValue: 								; ...and what is in it
+		.fill 	2
+blockCheck: 								; what pass two thinks it should have been
 		.fill 	2
 blockWalk: 									; the relocator's place in the table
 		.fill 	2
@@ -5843,7 +5428,7 @@ AsmBodyLines: 								; REM lines seen in the block so far, capped at 255.
 ;		GP-BASIC OUT at RT 12031, exactly what a program with no GP keyword at all costs.
 ;
 ;		THE BLOBS THEMSELVES GO IN A POOL APPENDED AFTER THE $FF END MARKER. Nothing walks
-;		there: MoveObjectForward returns carry set on $FF, and FixBranches, ScanGPUsage and
+;		there: MoveObjectForward returned carry set on $FF, and the walkers that used to run
 ;		ReadLookNext all stop on it. So the pool needs no length byte, no carrier opcode and
 ;		no framing -- and therefore has none of the 127-byte-per-block cap a carried payload
 ;		would have had.
@@ -5852,7 +5437,7 @@ AsmBodyLines: 								; REM lines seen in the block so far, capped at 255.
 ;		the first position-dependent operand in this p-code. Branches are offsets, .string is
 ;		codePtr relative and .varspace is workspace relative; this is not. It cannot be
 ;		computed while the statement compiles either, because the object's run base is not
-;		known until ScanGPUsage has decided whether the GP block is cut. So each one is
+;		known until the GP block has been decided cut or kept. So each one is
 ;		recorded as a fixup and patched into the object buffer inside WriteObjectCode, where
 ;		runtimeEndPage (or PCODE_PAGE, shared) is finally known. All of that is compiler work,
 ;		which costs a compiled program nothing.
@@ -5913,10 +5498,12 @@ ASM_SYM_MAX    = 64 						; longest name {VAR} can carry -- BASLOAD's own limit
 ;			2	{VAR}.             target = a pool offset. value = the variable slot's offset
 ;			                       within the workspace.
 ;
-;		0 and 1 resolve against where the object will RUN, 2 against where the workspace will
-;		be -- which is why WriteObjectCode has to hand over both.
+;		1 resolves against where the object will RUN, 2 against where the workspace will be --
+;		which is why PrepareObjectCode has to settle both before pass two starts.
 ;
-AFIX_CALL  = 0
+;		0 WAS A BLOB CALL, the ".word <address>" in front of the SYS. It is not a fixup any
+;		more: pass two knows both bases by the time it writes one, so it writes the answer.
+;
 AFIX_LABEL = 1
 AFIX_VAR   = 2
 
@@ -5986,6 +5573,9 @@ AsmCloseBlock:
 
 		lda 	#PCD_CMD_WORD 				; .word <blob address>
 		jsr 	WriteCodeByte
+		lda 	#2 							; ...whose operand is pass two's answer, so the sum
+		ldy 	#0 							; steps over it -- see EmitBranch
+		jsr 	SumSkipYA
 		;
 		;		Capture where the operand lands BEFORE writing it -- objPtr is the write cursor,
 		;		so this IS the address of the low byte, in the buffer, right now. Absolute and
@@ -5996,23 +5586,43 @@ AsmCloseBlock:
 		;		assembled straight into the window, because WriteCodeByte sits in the middle of
 		;		it and can leave through the error handler, which prints in bank 0.
 		;
-		lda 	#AFIX_CALL
-		sta 	AsmNewKind
-		lda 	objPtr
-		sta 	AsmNewTarget
-		lda 	objPtr+1
-		sta 	AsmNewTarget+1
-		lda 	AsmBlobStart 				; where this blob starts in the pool
-		sta 	AsmNewValue
-		lda 	AsmBlobStart+1
-		sta 	AsmNewValue+1
-		lda 	#0 							; two placeholders, overwritten by AsmPatchAll
-		jsr 	WriteCodeByte
+		lda 	passNumber
+		bne 	_ACBResolve
+		lda 	#0 							; pass one only counts: two bytes go past, and pass
+		jsr 	WriteCodeByte 				; two writes what belongs in them
 		lda 	#0
 		jsr 	WriteCodeByte
 
 		.keyword PCD_SYS 					; $DD $B0 -- call it
-		jmp 	AsmAddFixup
+		clc
+		rts
+;
+;		PASS TWO KNOWS THE ANSWER HERE. The pool's base was settled at the end of pass one and
+;		so was the page the object runs at, so the blob's run address is arithmetic rather than
+;		something to come back to -- which is what matters, because pass two's object goes
+;		straight out and there is nothing to come back to.
+;
+;		AN ABSOLUTE ADDRESS, NOT AN OFFSET, so a call from inside a GP.BANKED region needs no
+;		correction: the pool stays in low memory and the region reaches it from $A000 exactly as
+;		low code does.
+;
+_ACBResolve:
+		clc
+		lda 	AsmPoolBase
+		adc 	AsmBlobStart
+		sta 	AsmBlobAddr
+		lda 	AsmPoolBase+1
+		adc 	AsmBlobStart+1
+		clc
+		adc 	AsmPageDelta
+		sta 	AsmBlobAddr+1
+		lda 	AsmBlobAddr
+		jsr 	WriteCodeByte
+		lda 	AsmBlobAddr+1
+		jsr 	WriteCodeByte
+
+		.keyword PCD_SYS 					; $DD $B0 -- call it
+		rts
 
 ; ************************************************************************************************
 ;
@@ -6083,8 +5693,8 @@ _APWFull:
 
 ; ************************************************************************************************
 ;
-;		Append the whole pool to the object, AFTER the $FF end marker and after FixBranches has
-;		walked the p-code. Records where it landed so the fixups can be resolved later.
+;		Append the whole pool to the object, AFTER the $FF end marker, where nothing walks.
+;		Records where it landed, which is what the fixups resolve against.
 ;
 ; ************************************************************************************************
 
@@ -6094,12 +5704,34 @@ AsmFlushPool:
 		bne 	_AFPGo
 		rts
 _AFPGo:
+		lda 	passNumber
+		beq 	_AFPBase
+		;
+		;		PASS TWO MUST LAND ON PASS ONE'S POOL BASE. Every blob call it has already
+		;		written was resolved against that figure, so a pool that turned out to start
+		;		somewhere else would have every one of them pointing at nothing.
+		;
+		lda 	objPtr
+		cmp 	AsmPoolBase
+		bne 	_AFPDiverged
+		lda 	objPtr+1
+		cmp 	AsmPoolBase+1
+		beq 	_AFPResolve
+_AFPDiverged:
+		.error_internal
+_AFPResolve:
+		jsr 	AsmPatchAll 				; ...and the pool goes out RESOLVED, because once it
+											; has gone out there is no going back to it
+_AFPBase:
 		lda 	objPtr 						; where the pool starts, in the buffer
 		sta 	AsmPoolBase
 		lda 	objPtr+1
 		sta 	AsmPoolBase+1
 
 		.set16 	zTemp2,AsmPool
+		lda 	AsmPoolLen 					; the pool is resolved in the bank by pass two and not
+		ldy 	AsmPoolLen+1 				; at all by pass one, so it is not summed either
+		jsr 	SumSkipYA
 		stz 	AsmCopyIdx
 		stz 	AsmCopyIdx+1
 _AFPLoop:
@@ -6136,9 +5768,9 @@ _AFPDone:
 ;		                  The caller works it out because FreeMemory is an application symbol,
 ;		                  and both ends are page aligned so one byte says all of it.
 ;
-;		This runs LATE -- after WriteObjectCode has settled newWorkspacePage -- and it has to,
-;		because {VAR} needs it. Nothing here changes the object's length, so running late is
-;		free: the buffer is untouched until it is streamed out.
+;		It runs at the end of PASS TWO, from AsmFlushPool, because both bases are settled by
+;		then and because that is the last moment the pool is still somewhere that can be
+;		written to. Nothing here changes the object's length.
 ;
 ; ************************************************************************************************
 
@@ -6189,27 +5821,25 @@ _APAVariable:
 		adc 	AsmWorkspacePage
 		sta 	zTemp0+1
 		;
-		;		THE TARGET. A blob call patches the p-code, which is already in the buffer, so
-		;		its address was recorded absolutely as it was emitted. The other two patch the
-		;		pool, which had not been placed when they were recorded, so they hold offsets.
+		;		THE TARGET IS ALWAYS IN THE POOL, and it is patched where the pool still lives --
+		;		in its bank, immediately before AsmFlushPool copies it into the object. After
+		;		that copy it is out of reach: the object goes straight into a file.
 		;
 _APATarget:
-		lda 	AsmKind
-		beq 	_APAStore
 		clc
 		lda 	zTemp1
-		adc 	AsmPoolBase
+		adc 	#AsmPool & $FF
 		sta 	zTemp1
 		lda 	zTemp1+1
-		adc 	AsmPoolBase+1
+		adc 	#AsmPool >> 8
 		sta 	zTemp1+1
-_APAStore:
+		.asm_access
 		lda 	zTemp0
 		sta 	(zTemp1)
 		ldy 	#1
 		lda 	zTemp0+1
 		sta 	(zTemp1),y
-
+		.asm_release
 		inc 	AsmFixIdx
 		lda 	AsmFixIdx
 		cmp 	AsmFixupCount
@@ -7318,6 +6948,8 @@ AsmPoolBase:
 		.fill 	2 						; where the pool landed within the object
 AsmBlobStart:
 		.fill 	2 						; pool offset of the blob being assembled
+AsmBlobAddr:
+		.fill 	2 						; ...and where pass two says it will RUN
 AsmNewKind: 							; one fixup, built here before it is banked
 		.fill 	1
 AsmNewTarget:
@@ -7728,7 +7360,7 @@ AsmModeTable:
 ;		not select anything -- it is a compile time marker. Two keywords one letter apart, one of
 ;		which changes the hardware and one of which does not, is a trap not worth setting.
 ;
-;		NO "T" ON EITHER, in commands.def. They write no keyword token, so ScanGPUsage cannot
+;		NO "T" ON EITHER, in commands.def. They write no keyword token, so the GP usage scan
 ;		see them and a program whose only GP.BASIC keyword is GP.BANKED stays GP OUT and pays
 ;		nothing for the GP runtime block -- the argument GP.ASM already makes for itself.
 ;
@@ -7937,8 +7569,11 @@ GPBankCheckAlone:
 		lda 	objPtr+1
 		sbc 	#0
 		sta 	zTemp0+1
-		lda 	(zTemp0)
-		cmp 	#PCD_NEWCMD_LINE
+		lda 	zTemp0 						; THE BYTE ITSELF IS NOT THERE TO READ any more, so the
+		cmp 	lineMarkerAt 				; question is asked of the address instead: is
+		bne 	GPBankStructure 			; objPtr-1 the marker this line began with, or has
+		lda 	zTemp0+1 					; something been compiled on top of it since ?
+		cmp 	lineMarkerAt+1
 		bne 	GPBankStructure
 		rts
 
@@ -7947,9 +7582,9 @@ GPBankCheckAlone:
 ;		Lift the GP.BANKED region out of the middle of the object and put it at the end, past
 ;		the GP.ASM pool, on a page boundary.
 ;
-;		Called from SaveCodeAndExit after AsmFlushPool and BEFORE FixBranches, so every branch is
-;		still an unresolved line number and the only things that have to be corrected are the
-;		line number table and the three places that hold a buffer ADDRESS.
+;		Called from SaveCodeAndExit after AsmFlushPool, at the end of PASS ONE, where nothing
+;		has been resolved yet -- so the only things to correct are the tables pass two will
+;		resolve from.
 ;
 ;		BEFORE                                AFTER
 ;		+---------------------------------+   +---------------------------------+
@@ -7967,9 +7602,8 @@ GPBankCheckAlone:
 ;		THE TWO BRIDGES ARE ORDINARY GOTOs TO ORDINARY LINE NUMBERS, and that is the whole
 ;		trick. The region begins on the GP.BANKED line's marker byte and ends on the
 ;		GP.ENDBANKED line's, so both lines have a table entry pointing exactly at a boundary.
-;		Correct the table and FixBranches -- which runs next, and knows nothing about any of
-;		this -- resolves both bridges by the path it resolves every other GOTO. No new opcode,
-;		no absolute operand, no back-patching.
+;		Correct the table and pass two resolves both bridges by the path it resolves every other
+;		GOTO. No new opcode, no absolute operand, no back-patching.
 ;
 ;		THE POOL STAYS IN LOW MEMORY and the region goes ABOVE it. A blob is 65C02 code, and a
 ;		blob that changes the RAM bank -- STASH does -- must not itself be executing out of one.
@@ -7985,11 +7619,13 @@ GPBankCheckAlone:
 ;		about where the pool goes. What did change is that two walkers now HOP over the pool to
 ;		reach the region -- see GPBankHop.
 ;
-;		THE MOVE IS A ROTATION, done in place: shift the region and the whole tail up by three
-;		to open the gap for the first bridge, reverse the region, reverse the tail, reverse the
-;		pair -- which leaves the tail followed by the region -- then lift the region again by
-;		the padding. No second buffer. The object buffer is the largest thing in low RAM
-;		precisely because there is no room for one.
+;		NOTHING IS ACTUALLY MOVED. It used to be a rotation done in place -- shift the region
+;		and the whole tail up by three, reverse the region, reverse the tail, reverse the pair,
+;		then lift the region again by the padding -- because the object was sitting in a buffer
+;		and had to end up in the right order in it. There is no buffer now: pass one only
+;		counts, and pass two writes each region into a bank of its own and sends it out after
+;		the low code. What is left here is the arithmetic -- where every region lands, and what
+;		that does to every address written down before it.
 ;
 ; ************************************************************************************************
 
@@ -8007,7 +7643,7 @@ _GBRHaveRegion:
 		;
 		;		SHARED MODE ONLY. The correction below needs to know where the p-code will RUN,
 		;		and in shared mode that is the constant PCODE_PAGE. Embedded, it depends on
-		;		ScanGPUsage, which has not happened yet -- and there is no bootstrap there to do
+		;		the GP usage scan, which has not finished yet -- and there is no bootstrap there to do
 		;		the copying either. Refusing is honest; guessing would miscompile silently.
 		;
 		lda 	gpBankShared
@@ -8142,6 +7778,9 @@ _GBRNoFill:
 		lda 	gpBankRoom+1
 		adc 	#0
 		sta 	gpBankRoom+1
+		lda 	gpBankRoom 					; PASS ONE'S BOOKKEEPING, not p-code: pass two writes
+		ldy 	gpBankRoom+1 				; the bridges and the markers instead, and neither is
+		jsr 	SumSkipYA 					; summed on either side
 _GBRoom:
 		lda 	gpBankRoom
 		ora 	gpBankRoom+1
@@ -8184,124 +7823,9 @@ _GBRoomDone:
 		sbc 	gpBankOldTop+1
 		sta 	gpBankDelta+5
 		;
-		;		Lift the placed block out of the way, by exactly that. It is a whole number of
-		;		pages -- the region's base is aligned and its span is whole pages, so what is
-		;		inserted below the block has to be too -- which is what keeps every region an
-		;		earlier pass aligned still aligned.
-		;
-		;		A no-op on the first pass, where the block is empty and the two ends meet.
-		;
-		lda 	gpBankCeiling
-		sta 	gpBankMoveLow
-		lda 	gpBankCeiling+1
-		sta 	gpBankMoveLow+1
-		lda 	gpBankOldTop
-		sta 	zTemp0
-		lda 	gpBankOldTop+1
-		sta 	zTemp0+1
-		lda 	objPtr
-		sta 	zTemp1
-		lda 	objPtr+1
-		sta 	zTemp1+1
-		jsr 	_GBShiftUp
-		;
-		;		Step one: shift the region and the tail up by three, to open the gap the entry
-		;		bridge goes in.
-		;
-		lda 	gpBankStart
-		sta 	gpBankMoveLow
-		lda 	gpBankStart+1
-		sta 	gpBankMoveLow+1
-		lda 	gpBankTailEnd
-		sta 	zTemp0
-		lda 	gpBankTailEnd+1
-		sta 	zTemp0+1
-		clc
-		lda 	gpBankTailEnd
-		adc 	#3
-		sta 	zTemp1
-		lda 	gpBankTailEnd+1
-		adc 	#0
-		sta 	zTemp1+1
-		jsr 	_GBShiftUp
-		;
-		;		Step two: rotate, so the tail comes first and the region follows it.
-		;
-		clc
-		lda 	gpBankStart
-		adc 	#3
-		sta 	gpBankLow
-		lda 	gpBankStart+1
-		adc 	#0
-		sta 	gpBankLow+1
-
-		clc
-		lda 	gpBankLow
-		adc 	gpBankLength
-		sta 	gpBankMid
-		lda 	gpBankLow+1
-		adc 	gpBankLength+1
-		sta 	gpBankMid+1
-
-		clc
-		lda 	gpBankTailEnd
-		adc 	#3
-		sta 	gpBankHigh
-		lda 	gpBankTailEnd+1
-		adc 	#0
-		sta 	gpBankHigh+1
-
-		lda 	gpBankLow 					; reverse the region
-		ldy 	gpBankLow+1
-		ldx 	gpBankMid
-		stx 	gpBankRevEnd
-		ldx 	gpBankMid+1
-		stx 	gpBankRevEnd+1
-		jsr 	_GBReverse
-
-		lda 	gpBankMid 					; reverse the tail
-		ldy 	gpBankMid+1
-		ldx 	gpBankHigh
-		stx 	gpBankRevEnd
-		ldx 	gpBankHigh+1
-		stx 	gpBankRevEnd+1
-		jsr 	_GBReverse
-
-		lda 	gpBankLow 					; and the pair, leaving tail then region
-		ldy 	gpBankLow+1
-		ldx 	gpBankHigh
-		stx 	gpBankRevEnd
-		ldx 	gpBankHigh+1
-		stx 	gpBankRevEnd+1
-		jsr 	_GBReverse
-		;
-		;		Step three: lift the region again by the padding, so it starts on a page. The
-		;		rotation left it at gpBankHigh - length; it has to end at newBase + length.
-		;
-		lda 	gpBankPad
-		beq 	_GBRPadded 					; already aligned
-		sec
-		lda 	gpBankHigh
-		sbc 	gpBankLength
-		sta 	gpBankMoveLow 				; where the region sits now
-		lda 	gpBankHigh+1
-		sbc 	gpBankLength+1
-		sta 	gpBankMoveLow+1
-		lda 	gpBankHigh 					; ...and one past its last byte
-		sta 	zTemp0
-		lda 	gpBankHigh+1
-		sta 	zTemp0+1
-		clc
-		lda 	gpBankHigh
-		adc 	gpBankPad
-		sta 	zTemp1
-		lda 	gpBankHigh+1
-		adc 	#0
-		sta 	zTemp1+1
-		jsr 	_GBShiftUp
-_GBRPadded:
-		;
-		;		gpBankHigh is now one past the region: where the exit bridge goes.
+		;		WHERE THE REGION ENDS UP is all that is left of the move: one past it is where the
+		;		exit bridge goes, and the region above starts a whole number of pages further on,
+		;		which is what keeps every region an earlier pass aligned still aligned.
 		;
 		clc
 		lda 	gpBankNewBase
@@ -8311,64 +7835,13 @@ _GBRPadded:
 		adc 	gpBankLength+1
 		sta 	gpBankHigh+1
 		;
-		;		The two bridges, and the end marker of the whole object.
-		;
-		lda 	gpBankStart
-		sta 	zTemp0
-		lda 	gpBankStart+1
-		sta 	zTemp0+1
-		lda 	gpBankLineIn
-		ldy 	gpBankLineIn+1
-		jsr 	_GBWriteGoto
-
-		lda 	gpBankHigh
-		sta 	zTemp0
-		lda 	gpBankHigh+1
-		sta 	zTemp0+1
-		lda 	gpBankLineOut
-		ldy 	gpBankLineOut+1
-		jsr 	_GBWriteGoto
-
-		lda 	#$FF
-		ldy 	#3
-		sta 	(zTemp0),y
-_GBRFixUp:
-		;
-		;		Everything that recorded a position in the buffer now has to be told.
+		;		Everything that recorded a position now has to be told where it went.
 		;
 		jsr 	_GBFixLineTable
 		jsr 	_GBFixBlockEnds
 		jsr 	_GBFixBlockAlts
-		jsr 	_GBFixRegions 				; BEFORE the .fngosub walk, which reads the new bases
-		jsr 	_GBFixFnCalls
-		jsr 	_GBFixAsmCalls
+		jsr 	_GBFixRegions
 		jsr 	_GBFixPoolBase
-		;
-		;		WHERE THE WALK LEAVES OFF TO REACH THE REGION ABOVE THIS ONE. The walkers run to
-		;		this region's own end marker and stop; one past it is where they must be sent on,
-		;		and what they must be sent to is the next region's base -- which is exactly the
-		;		page boundary the filler above reaches. The topmost region has nothing above it
-		;		and so opens no hop.
-		;
-		;		RECORDED AFTER THE FIX-UPS, not before them. _GBFixRegions corrects every table
-		;		entry an EARLIER pass wrote, and hops[pass+1] is one of them -- so writing this
-		;		pass's own hop first would have it corrected a second time. The region it names
-		;		is placed by a LATER pass, and its own base is written by that pass.
-		;
-		lda 	gpBankPass
-		inc 	a
-		cmp 	gpBankCount
-		bcs 	_GBROnlyHop
-		asl 	a
-		tax
-		clc
-		lda 	gpBankHigh 					; the exit bridge is 3 and the marker 1
-		adc 	#4
-		sta 	gpBankHops,x
-		lda 	gpBankHigh+1
-		adc 	#0
-		sta 	gpBankHops+1,x
-_GBROnlyHop:
 		;
 		;		Leave the region's new bounds behind.
 		;
@@ -8467,49 +7940,8 @@ _GBRCross:
 		adc 	gpBankRunPage
 		inc 	a
 		sta 	gpBankRunBase
-		jsr 	_GBRFindLowEnd
 		lda 	#1
 		sta 	gpBankActive
-		rts
-
-; ************************************************************************************************
-;
-;		Where the walk leaves LOW MEMORY, which is hops[0]: the first region is reached from
-;		there and every other one from the region below it.
-;
-;		FOUND BY WALKING, not by arithmetic. It used to be "one past the tail", and with a single
-;		region that was the same thing -- the tail ended at the low code's own end marker. With
-;		several it is not: each pass leaves its alignment padding behind in what the NEXT pass
-;		treats as tail, so one past the tail is one past a stretch of padding the walkers stop
-;		short of. They stop at the marker, so this stops where they do.
-;
-;		gpBankActive is still 0 here, so the walk cannot hop -- which is the point. objPtr is the
-;		end of the object and WriteObjectCode streams up to it, so it is put back.
-;
-;		THE PADDING BELOW THE FIRST REGION IS DEAD SPACE, up to 255 bytes for every region after
-;		the first. It sits below the region and so counts as low p-code. Worth reclaiming if a
-;		program ever gets close enough to the ceiling to care.
-;
-; ************************************************************************************************
-
-_GBRFindLowEnd:
-		lda 	objPtr
-		sta 	gpBankSave
-		lda 	objPtr+1
-		sta 	gpBankSave+1
-		lda 	#BLC_RESETOUT 				; the compiler library cannot name FreeMemory -- the
-		jsr 	CallAPIHandler 				; same reason FixBranches rewinds this way
-_GBRFLELoop:
-		jsr 	MoveObjectForward
-		bcc 	_GBRFLELoop
-		lda 	objPtr
-		sta 	gpBankHops
-		lda 	objPtr+1
-		sta 	gpBankHops+1
-		lda 	gpBankSave
-		sta 	objPtr
-		lda 	gpBankSave+1
-		sta 	objPtr+1
 		rts
 
 ;
@@ -8587,8 +8019,6 @@ _GBFRNext:
 		jsr 	_GBFRField
 		.set16 	zTemp0, gpBankEnds
 		jsr 	_GBFRField
-		.set16 	zTemp0, gpBankHops
-		jsr 	_GBFRField
 		bra 	_GBFRNext
 _GBFRDone:
 		rts
@@ -8635,109 +8065,10 @@ _GBFPBOut:
 
 ; ************************************************************************************************
 ;
-;		Write .goto <line YA> at zTemp0.
-;
-; ************************************************************************************************
-
-_GBWriteGoto:
-		pha 								; line low
-		phy 								; line high
-		lda 	#PCD_CMD_GOTO
-		sta 	(zTemp0)
-		pla 								; high comes back off first
-		tax
-		pla 								; low
-		ldy 	#1
-		sta 	(zTemp0),y
-		txa
-		iny
-		sta 	(zTemp0),y
-		rts
-
-; ************************************************************************************************
-;
-;		Move the bytes in [gpBankMoveLow, zTemp0) up so that they end at zTemp1. Copied from the
-;		top down, so the source and the destination may overlap.
-;
-; ************************************************************************************************
-
-_GBShiftUp:
-		lda 	zTemp0
-		cmp 	gpBankMoveLow
-		bne 	_GBSUByte
-		lda 	zTemp0+1
-		cmp 	gpBankMoveLow+1
-		beq 	_GBSUDone
-_GBSUByte:
-		lda 	zTemp0
-		bne 	_GBSUNoBorrow0
-		dec 	zTemp0+1
-_GBSUNoBorrow0:
-		dec 	zTemp0
-		lda 	zTemp1
-		bne 	_GBSUNoBorrow1
-		dec 	zTemp1+1
-_GBSUNoBorrow1:
-		dec 	zTemp1
-		lda 	(zTemp0)
-		sta 	(zTemp1)
-		bra 	_GBShiftUp
-_GBSUDone:
-		rts
-
-; ************************************************************************************************
-;
-;		Reverse the bytes from YA up to gpBankRevEnd, which is one past the last. An empty range
-;		and a range of one byte both fall straight out.
-;
-; ************************************************************************************************
-
-_GBReverse:
-		sta 	zTemp0 						; zTemp0 = the first byte
-		sty 	zTemp0+1
-		lda 	gpBankRevEnd 				; zTemp1 = the LAST byte, one below the end
-		sta 	zTemp1
-		lda 	gpBankRevEnd+1
-		sta 	zTemp1+1
-		lda 	zTemp1
-		bne 	_GBRevNoBorrow
-		dec 	zTemp1+1
-_GBRevNoBorrow:
-		dec 	zTemp1
-_GBRevLoop:
-		lda 	zTemp0+1 					; done once the two pointers meet or cross
-		cmp 	zTemp1+1
-		bcc 	_GBRevSwap
-		bne 	_GBRevDone
-		lda 	zTemp0
-		cmp 	zTemp1
-		bcs 	_GBRevDone
-_GBRevSwap:
-		lda 	(zTemp0)
-		tax
-		lda 	(zTemp1)
-		sta 	(zTemp0)
-		txa
-		sta 	(zTemp1)
-		inc 	zTemp0
-		bne 	_GBRevNoCarry
-		inc 	zTemp0+1
-_GBRevNoCarry:
-		lda 	zTemp1
-		bne 	_GBRevNoBorrow2
-		dec 	zTemp1+1
-_GBRevNoBorrow2:
-		dec 	zTemp1
-		bra 	_GBRevLoop
-_GBRevDone:
-		rts
-
-; ************************************************************************************************
-;
 ;		Every entry in the line number table holds the compile time address of the line it
 ;		names, and the whole point of moving the region on line boundaries is that these stay
-;		usable: FixBranches resolves both bridges through them a moment from now, and the map
-;		file is written from them afterwards.
+;		usable: pass two resolves both bridges through them, and the map file is written from
+;		them afterwards.
 ;
 ;		The table is walked exactly as WriteMapFile walks it -- 4 byte entries growing DOWN from
 ;		compilerEndHigh:$00 to lineNumberTable -- and the window is opened and closed once per
@@ -8876,137 +8207,12 @@ _GBFBADone:
 
 ; ************************************************************************************************
 ;
-;		.fngosub is the one p-code operand that is an absolute buffer address at this point --
-;		FixBranches turns it into an offset a moment later, but it is not one yet, so a body or
-;		a call that moved has to be corrected first.
-;
-;		The walk is MoveObjectForward's, which steps by real instruction size, so an operand
-;		byte that happens to equal PCD_CMD_FNGOSUB is never read as one. It runs BEFORE the hop
-;		is opened, so it stops at the low code's $FF -- and then does the region as a second
-;		range, because a DEF FN inside one is perfectly legal.
-;
-;		objPtr is put back afterwards: it is the end of the object, and WriteObjectCode streams
-;		up to it.
-;
-; ************************************************************************************************
-
-_GBFixFnCalls:
-		lda 	objPtr
-		sta 	gpBankSave
-		lda 	objPtr+1
-		sta 	gpBankSave+1
-		lda 	#BLC_RESETOUT 				; the compiler library cannot name FreeMemory -- the
-		jsr 	CallAPIHandler 				; same reason FixBranches rewinds this way
-		jsr 	_GBFFCRange 				; the low code
-		lda 	gpBankNewBase 				; ...then the region this pass just moved
-		sta 	objPtr
-		lda 	gpBankNewBase+1
-		sta 	objPtr+1
-		jsr 	_GBFFCRange
-		;
-		;		...and then every region an earlier pass placed. They moved too, _GBFixRegions
-		;		has just said where to, and a DEF FN inside one is as legal as anywhere else.
-		;
-		lda 	gpBankPass
-		sta 	gpBankTemp
-_GBFFCRegion:
-		inc 	gpBankTemp
-		lda 	gpBankTemp
-		cmp 	gpBankCount
-		bcs 	_GBFFCEnd
-		asl 	a
-		tax
-		lda 	gpBankStarts,x
-		sta 	objPtr
-		lda 	gpBankStarts+1,x
-		sta 	objPtr+1
-		jsr 	_GBFFCRange
-		bra 	_GBFFCRegion
-_GBFFCEnd:
-		lda 	gpBankSave
-		sta 	objPtr
-		lda 	gpBankSave+1
-		sta 	objPtr+1
-		rts
-
-_GBFFCRange:
-		lda 	(objPtr)
-		cmp 	#PCD_CMD_FNGOSUB
-		bne 	_GBFFCNext
-		ldy 	#1
-		lda 	(objPtr),y
-		sta 	zTemp1
-		iny
-		lda 	(objPtr),y
-		sta 	zTemp1+1
-		jsr 	GPBankAdjust
-		ldy 	#1
-		lda 	zTemp1
-		sta 	(objPtr),y
-		iny
-		lda 	zTemp1+1
-		sta 	(objPtr),y
-_GBFFCNext:
-		jsr 	MoveObjectForward
-		bcc 	_GBFFCRange
-		rts
-
-; ************************************************************************************************
-;
-;		GP.ASM's blob calls are the other absolute address, and they are not in the object at
-;		all -- a blob call's fixup records WHERE IN THE BUFFER its .word operand sits, so that
-;		AsmPatchAll can fill it in once the run base is known. That target is a buffer address
-;		like any other and moves with the byte it names. The other two fixup kinds hold pool and
-;		workspace offsets, which this does not touch.
-;
-; ************************************************************************************************
-
-_GBFixAsmCalls:
-		lda 	AsmFixupCount
-		beq 	_GBFACDone
-		stz 	gpBankIdx
-_GBFACLoop:
-		lda 	gpBankIdx
-		asl 	a
-		tax 								; the two byte arrays index by count*2
-		ldy 	gpBankIdx 					; ...and the kind array by count
-		.asm_access
-		lda 	AsmFixKind,y
-		sta 	gpBankKind
-		lda 	AsmFixTarget,x
-		sta 	zTemp1
-		lda 	AsmFixTarget+1,x
-		sta 	zTemp1+1
-		.asm_release
-		lda 	gpBankKind
-		cmp 	#AFIX_CALL 					; only a blob call's target is a buffer address
-		bne 	_GBFACNext
-		jsr 	GPBankAdjust 				; corrupts X, so rebuild the subscript after it
-		lda 	gpBankIdx
-		asl 	a
-		tax
-		.asm_access
-		lda 	zTemp1
-		sta 	AsmFixTarget,x
-		lda 	zTemp1+1
-		sta 	AsmFixTarget+1,x
-		.asm_release
-_GBFACNext:
-		inc 	gpBankIdx
-		lda 	gpBankIdx
-		cmp 	AsmFixupCount
-		bcc 	_GBFACLoop
-_GBFACDone:
-		rts
-
-; ************************************************************************************************
-;
 ;		EVERY GLOBAL BELOW THIS LINE, AND NOWHERE ELSE.
 ;
 ;		64tass scopes a "_" label to the enclosing GLOBAL, so a global dropped in among another
 ;		routine's locals starts a new scope and every branch to a local defined after it stops
-;		resolving -- "not defined symbol '_GBShiftUp'", and so on down the file. GPBankRelocate's
-;		helpers run from _GBWriteGoto to _GBFixAsmCalls; put a new global in the middle of them
+;		resolving -- "not defined symbol '_GBFRField'", and so on down the file. GPBankRelocate's
+;		helpers run from _GBFixRegions to _GBFixBlockAlts; put a new global in the middle of them
 ;		and the build breaks in six places that have nothing to do with what was added. Twice, so
 ;		far.
 ;
@@ -9093,51 +8299,9 @@ _GBADone:
 
 ; ************************************************************************************************
 ;
-;		The walk over the object runs out of low memory at the $FF that ends it, and the region
-;		is on the far side of the GP.ASM pool. Called by everything that walks the whole object
-;		-- FixBranches' main loop and its unwind-depth walk, and ScanGPUsage -- when
-;		MoveObjectForward has just said "end".
-;
-;		Carry CLEAR means it hopped and there is more to walk; carry SET means that really was
-;		the end. A program with no GP.BANKED always gets carry set, so nothing changes for it.
-;
-; ************************************************************************************************
-
-GPBankHop:
-		lda 	gpBankActive
-		beq 	_GBHEnd
-		ldx 	#0
-_GBHNext:
-		cpx 	gpBankCount
-		bcs 	_GBHEnd
-		txa
-		asl 	a
-		tay
-		lda 	objPtr
-		cmp 	gpBankHops,y
-		bne 	_GBHSkip
-		lda 	objPtr+1
-		cmp 	gpBankHops+1,y
-		bne 	_GBHSkip
-		lda 	gpBankStarts,y 				; the hop lands on the region itself
-		sta 	objPtr
-		lda 	gpBankStarts+1,y
-		sta 	objPtr+1
-		clc
-		rts
-_GBHSkip:
-		inx
-		bra 	_GBHNext
-_GBHEnd:
-		sec
-		rts
-
-
-; ************************************************************************************************
-;
 ;		STRMakeOffset, plus the correction a branch needs when exactly one of its ends is in the
 ;		banked region. YA is the target on the way in and the finished offset on the way out, so
-;		it drops straight into FixBranches' two patch tails in place of STRMakeOffset.
+;		it drops straight into the branch writer in place of STRMakeOffset.
 ;
 ;		Both ends the same side and nothing changes -- which is every branch in a program with no
 ;		GP.BANKED in it, and almost every branch in one that has.
@@ -9330,7 +8494,7 @@ gpBankIdx:										; cursor into the GP.ASM fixup list
 gpBankKind:										; the kind byte of the fixup in hand
 		.fill 	1
 gpBankShared:									; 1 in SHARED mode. Set by CompileCode before the
-		.fill 	1 								; compile, because FixBranches needs it
+		.fill 	1 								; compile, because the relocator needs it
 gpBankRunPage:									; buffer page -> run page, which shared mode knows
 		.fill 	1 								; up front and embedded mode does not
 gpBankRunBase:									; the page the region would have run at in low memory
@@ -9614,9 +8778,9 @@ GPIsEmptyCompile:
 ;		A condition is evaluated and consumed by its .ifnext on the SAME line, so there is
 ;		nothing to preserve -- which is why the whole construct costs 12 runtime bytes and none
 ;		of them are code. .ifnext runs the .goto.z handler and .ifelse runs the .goto handler;
-;		only FixBranches tells them from .casenext and .caseend.
+;		only the marker in front tells them from .casenext and .caseend.
 ;
-;		GP.ELSEIF IS WHAT FORCES gp.if TO EXIST. Without it FixBranches could count nesting on
+;		GP.ELSEIF IS WHAT FORCED gp.if TO EXIST. Without it the old resolver could count nesting on
 ;		.ifnext against gp.endif, one to one, and the marker would not be needed. But GP.ELSEIF
 ;		emits .ifelse and then its OWN <cond> .ifnext, which would inflate the depth of a scan
 ;		already in flight and send it past its own gp.endif. So depth is counted on a marker
@@ -9647,7 +8811,7 @@ CommandIfCompile:
 		bne 	IfFailType
 		jsr 	IfRequireThenEOL
 		jsr 	IfOpen 						; this IF's ordinal, and nothing pending inside it yet
-		lda 	#PCD_GPCMD_IF 				; the marker FixBranches counts nesting on
+		lda 	#PCD_GPCMD_IF 				; the marker the old resolver counted nesting on
 		jsr 	WriteCodeByte
 		jmp 	IfWriteNext 				; false -> the next alternative, or the gp.endif
 
@@ -9705,11 +8869,14 @@ _IREDone:
 		rts
 
 ;
-;		Two placeholder bytes, in pass one. The value is never read: FixBranches overwrites both
-;		unconditionally, and errors out rather than leaving them if it cannot resolve the branch.
-;		Pass two writes the offset instead and never comes through here.
+;		Two bytes go past, in pass one, and nothing is in them: the value is pass two's to work
+;		out, and pass two writes the offset here instead and never comes through this. They are
+;		left out of the sum for the same reason -- see EmitBranch.
 ;
 IfWritePlaceholder:
+		lda 	#2
+		ldy 	#0
+		jsr 	SumSkipYA
 		lda 	#0
 		jsr 	WriteCodeByte
 		lda 	#0
@@ -9747,7 +8914,7 @@ IfFailStructure:
 ;		the offsets out of those notes. See commands/goto.asm for the tables.
 ;
 ;		THE OPEN GP.IFs ARE A STACK, because an inner IF's alternatives must be invisible to the
-;		outer one's -- the same thing FixBranches gets by counting gp.if against gp.endif as it
+;		outer one's -- the same thing the old resolver got by counting gp.if against gp.endif as it
 ;		scans. GP.ELSEIF pushes nothing: it continues the chain its GP.IF started.
 ;
 ; ************************************************************************************************
@@ -10246,6 +9413,34 @@ STRMarkLine:
 _SMLRoom:
 
 		.storage_access
+		;
+		;		PASS TWO MUST FIND ITS OWN ANSWER ALREADY IN THE RECORD. Everything the second
+		;		pass resolves -- every branch, every .unwind, every block end -- is read out of
+		;		this table, so a line that lands somewhere else this time round is the one
+		;		failure that cannot be allowed to reach an object. Nothing has been written yet
+		;		and nothing will be.
+		;
+		;		THIS IS THE CHECK, once pass one has no buffer to lay an object out in. The
+		;		checksum compares two finished objects and there will only be one; what the two
+		;		passes still both produce is this table, and it is what the object is built from.
+		;
+		lda 	passNumber
+		beq 	_SMLWrite
+		phy 								; THE LINE NUMBER IS STILL IN YA -- A is on the stack
+		ldy 	#2 							; already, and the high byte stays in Y until the tya
+		lda 	(zTemp0),y 					; below writes it
+		cmp 	objPtr
+		bne 	_SMLDiverged
+		iny
+		lda 	(zTemp0),y
+		cmp 	objPtr+1
+		bne 	_SMLDiverged
+		ply
+		bra 	_SMLWrite
+_SMLDiverged:
+		.storage_release 					; as _STRNext: never raise inside the window, the
+		.error_internal 					; error handler prints and that is bank 0
+_SMLWrite:
 		pla
 		sta 	(zTemp0) 					; line # save it in +0,+1
 		tya
@@ -11302,7 +10497,7 @@ _CRDefault:
 ;
 ;		  - the 112 bytes come out of the block, and
 ;		  - a program whose only GP.BASIC keyword is a GP.SELECT is now GP-BASIC **OUT**.
-;		    ScanGPUsage decides by HANDLER ADDRESS, and every opcode this emits -- the markers,
+;		    The GP usage scan decides by HANDLER ADDRESS, and every opcode this emits -- the markers,
 ;		    the variable read, f.cmp, =, or, .casenext, .caseend -- has its handler below GPBase.
 ;		    Exactly what GP.IF already did, and for the same reason.
 ;
@@ -11310,7 +10505,7 @@ _CRDefault:
 ;
 ;			T = RND(1)*3 : GP.SELECT T
 ;
-;		THE MARKERS ARE STILL EMITTED AND MUST BE. FixBranches has no symbol table and no
+;		THE MARKERS ARE STILL EMITTED. The resolver that needed them has no
 ;		back-patching, so the emitted token stream IS the block structure: it scans for
 ;		gp.select/gp.case/gp.other/gp.endsel to resolve .casenext and .caseend and to count
 ;		nesting. Delete the tokens and the branch resolver has nothing to walk. They cost one
@@ -11346,7 +10541,7 @@ _CRDefault:
 ;		known at the point each GP.CASE is compiled.
 ;
 ;		NO STACK FRAME MEANS NO UNWINDING. BlockDepthUp/Down are deliberately NOT called any
-;		more, and FixBranches no longer counts gp.select/gp.endsel in either of its depth walks.
+;		more, and nothing counts gp.select/gp.endsel as depth any longer.
 ;		A GOTO leaving a select has nothing to close, and an .unwind emitted for one would close
 ;		a frame belonging to something else.
 ;
@@ -11422,7 +10617,7 @@ _CSCHave:
 		sta 	SelectPending+1,x
 		inc 	SelectDepth
 		;
-		lda 	#PCD_GPCMD_SELECT 			; a MARKER, for FixBranches. Nothing runs.
+		lda 	#PCD_GPCMD_SELECT 			; a MARKER. Nothing runs.
 		jsr 	WriteCodeByte
 		;
 		;		The alternative that comes next is the FIRST one, so it must not be preceded by
@@ -11458,7 +10653,7 @@ _CCCDone:
 ;		emits for any "=" between numbers.
 ;
 CompileCaseTest:
-		lda 	#PCD_GPCMD_CASE 			; the marker FixBranches looks for, then the read
+		lda 	#PCD_GPCMD_CASE 			; the marker, then the read
 		jsr 	WriteCodeByte
 		jsr 	SelectEmitRead
 		jsr 	CompileExpressionAt0
@@ -11489,7 +10684,7 @@ CommandOtherCompile:
 CommandEndSelectCompile:
 		stz 	SelectFirstCase
 		lda 	SelectDepth 				; underflow is not guarded, as with blockDepth: a stray
-		beq 	_CESCFloor 					; GP.ENDSEL is caught structurally, by FixBranches
+		beq 	_CESCFloor 					; GP.ENDSEL is caught structurally, at the end of
 											; raising BLOCK MISMATCH
 		jsr 	SelectAltHere 				; the last test lands ON the gp.endsel, and so does
 		jsr 	SelectClose 				; every case body that finished
@@ -11525,10 +10720,13 @@ _CCEPlaceholder:
 		lda 	#PCD_CMD_CASEEND
 		jsr 	WriteCodeByte
 ;
-;		Two placeholder bytes, in pass one. The value is never read: FixBranches overwrites both
-;		unconditionally, and errors out rather than leaving them if it cannot resolve the branch.
+;		Two bytes go past, in pass one, and nothing is in them: the value is pass two's to work
+;		out. They are left out of the sum for the same reason -- see EmitBranch.
 ;
 SelectWritePlaceholder:
+		lda 	#2
+		ldy 	#0
+		jsr 	SumSkipYA
 		lda 	#0
 		jsr 	WriteCodeByte
 		lda 	#0
