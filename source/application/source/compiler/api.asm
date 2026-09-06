@@ -94,7 +94,8 @@ _CAResetOut:
 		rts
 
 _CACloseOut:
-		rts
+		jmp 	ObjStreamBody 				; the compile worked: put the object code in the file
+											; that has been open since the end of pass one
 
 ; ************************************************************************************************
 ;
@@ -137,7 +138,8 @@ _CAWBTooBig:
 ; ************************************************************************************************
 		
 _CAPrintScreen:
-		txa
+		jsr 	IOSelectScreen 				; the object file is open for output and may be
+		txa 								; selected -- CHROUT would put the message in it
 		jmp 	$FFD2
 
 ; ************************************************************************************************
@@ -147,6 +149,7 @@ _CAPrintScreen:
 ; ************************************************************************************************
 
 _CARead:
+		jsr 	IOSelectSource 			; the object file may have had the channel last
 		jsr 	IOReadByte 				; copy the address of next into the buffer
 		sta 	SourceLine+0
 		jsr 	IOReadByte

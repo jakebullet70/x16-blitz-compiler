@@ -134,16 +134,21 @@ _WOCTooBig:
 		jmp 	ObjectTooBig 					; shared with the SHARED path: prints PROGRAM TOO BIG,
 _POCFits: 									; returns carry set, caller skips the map file and OK
 		jsr 	AsmSetBases 				; as the shared path -- see AsmCloseBlock
-		clc
-		rts
+		jmp 	ObjStreamOpen
 
 ; ************************************************************************************************
 ;
-;		Write the object out, now that all of that has been settled.
+;		OPEN THE OBJECT FILE AND PUT THE RUNTIME IN IT -- everything that goes into the file
+;		BEFORE the p-code, and all of it known by the end of pass one.
+;
+;		ON A LOGICAL FILE OF ITS OWN, because it stays open for the whole of pass two while the
+;		source is being read on file 3. See IOOpenObject in file-io/read.asm.
+;
+;		Carry set = it failed, and it has said why.
 ;
 ; ************************************************************************************************
 
-WriteObjectCode:
+ObjStreamOpen:
 		lda 	ModeText
 		cmp 	#'S'
 		bne 	_WOCEmbedded
@@ -181,7 +186,10 @@ _WOCImgOpened:
 
 		ldy 	#ObjectFile >> 8
 		ldx 	#ObjectFile & $FF
-		jsr 	IOOpenWrite 				; open write
+		jsr 	IOOpenObject 				; open write, on its own logical file
+		jsr 	IOSelectObject
+		lda 	#1
+		sta 	objStreamLive 				; from here on a failure has a file to tidy away
 
 		lda 	#RTIMG_LOAD & $FF 			; write out the load address $0801
 		jsr 	IOWriteByte
@@ -270,29 +278,7 @@ _WOCImgMore:
 		bne 	_WOCImgChunk
 
 		jsr 	IOCloseImage 				; CLRCHNs, so the object file has to be reselected
-		jsr 	IOObjectOut
-		;
-		;		Part two : the object code itself, which lands at ObjectBase on reload.
-		;
-		.set16 	zTemp0,FreeMemory
-_WOCCode:
-		lda 	zTemp0 						; done ?
-		cmp 	objPtr
-		bne 	_WOCCodeByte
-		lda 	zTemp0+1
-		cmp 	objPtr+1
-		beq 	_WOCDone
-_WOCCodeByte:
-		lda 	(zTemp0)
-		jsr 	IOWriteByte
-		inc 	zTemp0
-		bne 	_WOCCode
-		inc 	zTemp0+1
-		bra 	_WOCCode
-_WOCDone:
-		jsr 	IOWriteClose 				; close the file.
-		clc 								; success -- CompileCode reads the carry (set = rejected)
-		rts
+		jmp 	ObjStreamReady
 
 ; ************************************************************************************************
 ;
@@ -375,8 +361,7 @@ _WOCSCeiling:
 		cmp 	zTemp1
 		bcs 	_WOCSBigFar
 		jsr 	AsmSetBasesShared 			; GP.ASM needs both of them, and pass two needs them
-		clc 								; while it compiles -- see AsmCloseBlock
-		rts
+		jmp 	ObjStreamOpen 				; while it compiles -- see AsmCloseBlock
 ;
 ;		ObjectTooBig is at the far end of this file, out of branch range from here -- the same
 ;		trampoline FixBranches needs for its GP.EXITDO handler, for the same reason.
@@ -390,7 +375,10 @@ ObjectWriteShared:
 		;
 		ldy 	#ObjectFile >> 8
 		ldx 	#ObjectFile & $FF
-		jsr 	IOOpenWrite
+		jsr 	IOOpenObject 				; open write, on its own logical file
+		jsr 	IOSelectObject
+		lda 	#1
+		sta 	objStreamLive 				; from here on a failure has a file to tidy away
 		lda 	#1
 		jsr 	IOWriteByte
 		lda 	#8
@@ -532,28 +520,68 @@ _WOCSExtWrite:
 		bne 	_WOCSExtWrite
 _WOCSCodePart:
 		;
-		;		Part two: the p-code from FreeMemory..objPtr, which lands at $0900 on reload --
-		;		or at $0A00, above the extension page, if this program has a region.
+		;		Part two -- the p-code itself -- follows, and pass two is what writes it.
 		;
+ObjStreamReady:
+		lda 	#$FF 						; the image left CLRCHN behind it, so neither channel
+		sta 	ioInSel 					; is known any more
+		sta 	ioOutSel
+		clc
+		rts
+
+; ************************************************************************************************
+;
+;		PART TWO: the object code, FreeMemory..objPtr. Written at the end of a compile that
+;		worked, through BLC_CLOSEOUT.
+;
+;		It lands at ObjectBase on reload in embedded mode, and at $0900 -- $0A00 for a banked
+;		program, above the extension page -- in shared mode. One loop for both: the two differed
+;		in their labels and in nothing else.
+;
+; ************************************************************************************************
+
+ObjStreamBody:
+		jsr 	IOSelectObject
 		.set16 	zTemp0,FreeMemory
-_WOCSCode:
-		lda 	zTemp0
+_OSBoLoop:
+		lda 	zTemp0 						; done ?
 		cmp 	objPtr
-		bne 	_WOCSCodeByte
+		bne 	_OSBoByte
 		lda 	zTemp0+1
 		cmp 	objPtr+1
-		beq 	_WOCSCodeDone
-_WOCSCodeByte:
+		beq 	_OSBoDone
+_OSBoByte:
 		lda 	(zTemp0)
 		jsr 	IOWriteByte
 		inc 	zTemp0
-		bne 	_WOCSCode
+		bne 	_OSBoLoop
 		inc 	zTemp0+1
-		bra 	_WOCSCode
-_WOCSCodeDone:
-		jsr 	IOWriteClose
-		clc 								; success
+		bra 	_OSBoLoop
+_OSBoDone:
+		stz 	objStreamLive 				; written in full, so there is nothing to tidy away
+		jmp 	IOObjectClose
+
+; ************************************************************************************************
+;
+;		A COMPILE THAT STOPS LEAVES NO OBJECT. The file is created before pass two starts now,
+;		so a failure anywhere in pass two would otherwise leave a truncated one behind -- and at
+;		the filesystem level that is indistinguishable from a program.
+;
+; ************************************************************************************************
+
+ObjStreamAbort:
+		lda 	objStreamLive
+		beq 	_OSADone
+		stz 	objStreamLive
+		jsr 	IOObjectClose
+		ldx 	#ObjectFile & $FF
+		ldy 	#ObjectFile >> 8
+		jmp 	IOScratchFile
+_OSADone:
 		rts
+
+objStreamLive: 								; nonzero while there is a half written object file
+		.fill 	1
 ObjectTooBig:
 		ldx 	#ProgramTooBigText & $FF
 		ldy 	#ProgramTooBigText >> 8
@@ -578,6 +606,7 @@ ObjectScanBad:
 ;
 ObjectBadImage: 								; missing, wrong load address, or shorter than
 ObjectNoImage: 								; ObjectBase says it should be
+		jsr 	ObjStreamAbort 				; the object file may already exist -- see above
 		jsr 	IOCloseImage 				; CLOSE on a logical file that was never opened is
 											; harmless, and the OPEN may have half-registered it.
 											; Leaving it would fail the NEXT compile's open, and

@@ -60,7 +60,7 @@
 
 		.section code
 
-IO_SYM_FILE = 5 							; 3 is the source, 4 the runtime image at write time
+IO_SYM_FILE = 5 							; 3 is the source, 4 the runtime image, 6 the object
 
 ; ************************************************************************************************
 ;

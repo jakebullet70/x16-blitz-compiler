@@ -38,6 +38,7 @@ IOOpenRead:
 ; ************************************************************************************************
 
 IO_IMAGE_FILE = 4
+IO_OBJECT_FILE = 6
 
 IOOpenImage:
 		lda 	#IO_IMAGE_FILE
@@ -59,8 +60,76 @@ IOImageIn:
 		jmp 	$FFC6 						; CHKIN
 
 IOObjectOut:
-		ldx 	#3
+		ldx 	#IO_OBJECT_FILE
 		jmp 	$FFC9 						; CHKOUT
+
+; ************************************************************************************************
+;
+;		THE OBJECT FILE HAS A LOGICAL FILE OF ITS OWN, and it needs one: it is open for write
+;		for the whole of pass two, while the source is open for read on file 3 and being read a
+;		line at a time. Everything here used file 3 for both, which was fine while the object
+;		was written after the source had been closed.
+;
+;		WHICH CHANNEL IS SELECTED IS REMEMBERED. The KERNAL has one input channel and one
+;		output, so reading a source line and writing object bytes means switching between them
+;		-- and asking for the one that is already selected is the common case by far. Two bytes
+;		turn that into a compare.
+;
+;		$FF in either means "not known": CLRCHN, an OPEN, or anything else that goes behind
+;		these routines' backs leaves them that way and the next select does the work.
+;
+; ************************************************************************************************
+
+IOOpenObject:
+		lda 	#IO_OBJECT_FILE
+		sta 	ioFileNo
+		lda 	#'W'
+		jsr 	IOSetFileName 				; carry comes back from OPEN
+		ldy 	#3 							; put the default back for every other caller
+		sty 	ioFileNo 					; (sty leaves the carry alone)
+		rts
+
+IOObjectClose:
+		lda 	#IO_OBJECT_FILE
+		jsr 	$FFC3 						; CLOSE
+		jsr 	$FFCC 						; CLRCHN
+		lda 	#$FF
+		sta 	ioInSel
+		sta 	ioOutSel
+		rts
+
+IOSelectSource:
+		lda 	#3
+		cmp 	ioInSel
+		beq 	_IOSSDone
+		sta 	ioInSel
+		ldx 	#3
+		jmp 	$FFC6 						; CHKIN
+_IOSSDone:
+		rts
+
+IOSelectObject:
+		lda 	#IO_OBJECT_FILE
+		cmp 	ioOutSel
+		beq 	_IOSODone
+		sta 	ioOutSel
+		ldx 	#IO_OBJECT_FILE
+		jmp 	$FFC9 						; CHKOUT
+_IOSODone:
+		rts
+;
+;		The error handler prints through CHROUT, and with the object file selected for output
+;		that would put the message INTO the program being compiled.
+;
+IOSelectScreen:
+		lda 	ioOutSel
+		beq 	_IOSCDone
+		stz 	ioOutSel 					; CLRCHN puts both back to the default, so neither
+		lda 	#$FF 						; is known afterwards
+		sta 	ioInSel
+		jmp 	$FFCC 						; CLRCHN
+_IOSCDone:
+		rts
 
 ; ************************************************************************************************
 ;
@@ -185,6 +254,10 @@ _IOSSetName:
 ioFileNo: 									; the logical file IOSetFileName opens on. Code
 		.byte 	3 							; section, like everything else here -- it is the
 											; compiler's, and the compiler is thrown away.
+ioInSel: 									; which file is selected for input, and which for
+		.byte 	$FF 						; output. $FF = not known.
+ioOutSel:
+		.byte 	$FF
 
 IONameBuffer:
 		.fill 	CFLineSize+8 				; the longest line GPC.INPUT can hold, plus ",S,R"
