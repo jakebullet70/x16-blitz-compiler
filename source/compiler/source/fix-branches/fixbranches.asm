@@ -2,7 +2,7 @@
 ; ************************************************************************************************
 ;
 ;		Name:		fixbranches.asm
-;		Purpose:	Fix up GOTO and GOSUB commands
+;		Purpose:	Fix up GOTO and GOSUB commands -- PASS ONE ONLY
 ;		Created:	18th April 2023
 ;		Reviewed: 	No
 ;		Author:		Paul Robson (paul@robsons.org.uk)
@@ -16,6 +16,14 @@
 ;
 ;									 Fix up GOTO and GOSUB
 ;
+;		PASS ONE ONLY. Pass two resolves every branch where it writes it, out of the tables this
+;		pass fills in -- see commands/goto.asm -- so it never comes here at all.
+;
+;		This is still what says whether those answers are RIGHT. Both passes lay a finished
+;		object out and ObjectChecksum sums it, so a branch resolved differently by the two
+;		routes is a mismatch in main/compiler.asm rather than a wrong program. It stays for as
+;		long as pass one has a buffer to walk, which is until pass one stops storing bytes.
+;
 ; ************************************************************************************************
 
 FixBranches:
@@ -24,14 +32,6 @@ FixBranches:
 		stz 	_FBBlockDepth
 _FBLoop:
 		lda 	(objPtr) 					; get the next one.
-		;
-		;		EVERYTHING THAT NAMES A LINE, PASS ONE ONLY. Pass two resolved these where it
-		;		wrote them, from pass one's line table, so coming through here would only
-		;		overwrite its answers with these -- and the two objects would then agree whether
-		;		or not the answers did. Pass one still walks them, so the checksum compares.
-		;
-		ldx 	passNumber
-		bne 	_FBStructural
 		cmp 	#PCD_CMD_GOTO 				; found GOTO or GOSUB, patch up.
 		beq 	_FBFixGotoGosub
 		cmp 	#PCD_CMD_GOSUB
@@ -52,11 +52,6 @@ _FBLoop:
 		beq 	_FBIfNextFar
 		cmp 	#PCD_CMD_IFELSE 			; end of an IF body: out to the GP.ENDIF.
 		beq 	_FBIfElseFar
-		;
-		;		WHAT IS LEFT, both passes. Their targets are code positions found by walking the
-		;		object, which is a thing only this side can do.
-		;
-_FBStructural:
 		cmp 	#PCD_CMD_CASENEXT 			; GP.CASE that did not match: the next alternative.
 		beq 	_FBCaseNextFar
 		cmp 	#PCD_CMD_CASEEND 			; end of a case body: out to the GP.ENDSEL.

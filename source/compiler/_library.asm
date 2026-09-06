@@ -1065,16 +1065,18 @@ _SCEPlaced:
 		;		with an inline blob compiled OK and jumped into nothing at the first call.
 		;
 _SCEResolve:
-		lda 	objPtr
-		sta 	objectEnd
-		lda 	objPtr+1
+		lda 	passNumber
+		bne 	_SCEChecksum 				; PASS TWO RESOLVES EVERY BRANCH WHERE IT WRITES IT.
+		lda 	objPtr 						; Nothing is left for a second look, which is what
+		sta 	objectEnd 					; step seven needs: an object that is final on the
+		lda 	objPtr+1 					; way out can go straight to the file.
 		sta 	objectEnd+1
 		jsr 	FixBranches 				; fix up GOTO/GOSUB etc.
 		lda 	objectEnd
 		sta 	objPtr
 		lda 	objectEnd+1
 		sta 	objPtr+1
-		;
+_SCEChecksum:
 		jsr 	ObjectChecksum
 		;
 		lda 	passNumber
@@ -2797,7 +2799,7 @@ _IVNotFound:
 ; ************************************************************************************************
 ;
 ;		Name:		fixbranches.asm
-;		Purpose:	Fix up GOTO and GOSUB commands
+;		Purpose:	Fix up GOTO and GOSUB commands -- PASS ONE ONLY
 ;		Created:	18th April 2023
 ;		Reviewed: 	No
 ;		Author:		Paul Robson (paul@robsons.org.uk)
@@ -2811,6 +2813,14 @@ _IVNotFound:
 ;
 ;									 Fix up GOTO and GOSUB
 ;
+;		PASS ONE ONLY. Pass two resolves every branch where it writes it, out of the tables this
+;		pass fills in -- see commands/goto.asm -- so it never comes here at all.
+;
+;		This is still what says whether those answers are RIGHT. Both passes lay a finished
+;		object out and ObjectChecksum sums it, so a branch resolved differently by the two
+;		routes is a mismatch in main/compiler.asm rather than a wrong program. It stays for as
+;		long as pass one has a buffer to walk, which is until pass one stops storing bytes.
+;
 ; ************************************************************************************************
 
 FixBranches:
@@ -2819,14 +2829,6 @@ FixBranches:
 		stz 	_FBBlockDepth
 _FBLoop:
 		lda 	(objPtr) 					; get the next one.
-		;
-		;		EVERYTHING THAT NAMES A LINE, PASS ONE ONLY. Pass two resolved these where it
-		;		wrote them, from pass one's line table, so coming through here would only
-		;		overwrite its answers with these -- and the two objects would then agree whether
-		;		or not the answers did. Pass one still walks them, so the checksum compares.
-		;
-		ldx 	passNumber
-		bne 	_FBStructural
 		cmp 	#PCD_CMD_GOTO 				; found GOTO or GOSUB, patch up.
 		beq 	_FBFixGotoGosub
 		cmp 	#PCD_CMD_GOSUB
@@ -2847,11 +2849,6 @@ _FBLoop:
 		beq 	_FBIfNextFar
 		cmp 	#PCD_CMD_IFELSE 			; end of an IF body: out to the GP.ENDIF.
 		beq 	_FBIfElseFar
-		;
-		;		WHAT IS LEFT, both passes. Their targets are code positions found by walking the
-		;		object, which is a thing only this side can do.
-		;
-_FBStructural:
 		cmp 	#PCD_CMD_CASENEXT 			; GP.CASE that did not match: the next alternative.
 		beq 	_FBCaseNextFar
 		cmp 	#PCD_CMD_CASEEND 			; end of a case body: out to the GP.ENDSEL.
@@ -11319,6 +11316,12 @@ _CRDefault:
 ;		nesting. Delete the tokens and the branch resolver has nothing to walk. They cost one
 ;		vector slot each, in the core, which they already had.
 ;
+;		PASS TWO DOES NOT SCAN. It keeps a stack of the open selects and reads where each one
+;		ended out of a table pass one filled in, so an inner select is invisible to an outer
+;		one's branches because it is a different entry rather than because a count came out
+;		right. The markers stay because pass one still resolves the old way, and the checksum
+;		compares the two answers on every program compiled.
+;
 ;		AN ARRAY ELEMENT IS REFUSED -- GP.SELECT A(3) does not compile. GetReferenceTerm emits
 ;		the subscript expression as it parses, and re-issuing the read at each alternative would
 ;		not re-issue that, so the index would be whatever happened to be on the stack. A scalar
@@ -11406,6 +11409,17 @@ _CSCHave:
 		sta 	SelectVars+1,x
 		lda 	SelectSaveType
 		sta 	SelectVars+2,x
+		lda 	SelectDepth 				; this select's ordinal, and nothing inside it is
+		asl 	a 							; waiting for a target yet
+		tax
+		jsr 	BlockOpen
+		lda 	blockIndex
+		sta 	SelectOrdinals,x
+		lda 	blockIndex+1
+		sta 	SelectOrdinals+1,x
+		lda 	#$FF
+		sta 	SelectPending,x
+		sta 	SelectPending+1,x
 		inc 	SelectDepth
 		;
 		lda 	#PCD_GPCMD_SELECT 			; a MARKER, for FixBranches. Nothing runs.
@@ -11424,6 +11438,7 @@ _CSCHave:
 
 CommandCaseCompile:
 		jsr 	CompileCaseEnd 				; close the previous case body, if there was one
+		jsr 	SelectAltHere 				; and the test above lands on the gp.case below
 		jsr 	CompileCaseTest 			; the first alternative
 _CCCList:
 		jsr 	LookNextNonSpace 			; a comma list is an OR of tests, and it is cheaper
@@ -11435,9 +11450,7 @@ _CCCList:
 		jsr 	WriteCodeByte
 		bra 	_CCCList
 _CCCDone:
-		lda 	#PCD_CMD_CASENEXT 			; and branch on to the next alternative if none matched
-		jsr 	WriteCodeByte
-		bra 	SelectWritePlaceholder
+		jmp 	SelectWriteNext 			; and branch on to the next alternative if none matched
 
 ;
 ;		One alternative: fetch the selector again, compile the value, compare. CompareEqual
@@ -11451,14 +11464,17 @@ CompileCaseTest:
 		jsr 	CompileExpressionAt0
 		and 	#NSSTypeMask
 		cmp 	#NSSIFloat
-		bne 	SelectFailType
-		lda 	#PCD_FCMD_CMP
+		beq 	_CCTNumeric
+		jmp 	SelectFailType 				; a JMP for the same reason the three at the head of
+_CCTNumeric: 								; CommandSelectCompile are: the exits are a long way
+		lda 	#PCD_FCMD_CMP 				; below, past every hook this file now carries
 		jsr 	WriteCodeByte
 		lda 	#PCD_EQUAL
 		jmp 	WriteCodeByte
 
 CommandOtherCompile:
 		jsr 	CompileCaseEnd
+		jsr 	SelectAltHere 				; the test above lands on the gp.other below
 		lda 	#PCD_GPCMD_OTHER
 		jsr 	WriteCodeByte
 		clc
@@ -11472,9 +11488,12 @@ CommandOtherCompile:
 ;
 CommandEndSelectCompile:
 		stz 	SelectFirstCase
-		lda 	SelectDepth 				; underflow is not guarded, as with blockDepth: a
-		beq 	_CESCFloor 					; stray GP.ENDSEL is caught structurally, by
-		dec 	SelectDepth 				; FixBranches raising BLOCK MISMATCH
+		lda 	SelectDepth 				; underflow is not guarded, as with blockDepth: a stray
+		beq 	_CESCFloor 					; GP.ENDSEL is caught structurally, by FixBranches
+											; raising BLOCK MISMATCH
+		jsr 	SelectAltHere 				; the last test lands ON the gp.endsel, and so does
+		jsr 	SelectClose 				; every case body that finished
+		dec 	SelectDepth
 _CESCFloor:
 		lda 	#PCD_GPCMD_ENDSEL
 		jsr 	WriteCodeByte
@@ -11492,10 +11511,21 @@ CompileCaseEnd:
 		stz 	SelectFirstCase 			; the first alternative: nothing in front to leave
 		rts
 _CCEBranch:
+		lda 	passNumber
+		beq 	_CCEPlaceholder
+		jsr 	SelectIndex 				; every .caseend in a select goes to the same place,
+		lda 	SelectOrdinals,x 			; so they read the block's end rather than the
+		sta 	blockIndex 					; alternative chain
+		lda 	SelectOrdinals+1,x
+		sta 	blockIndex+1
+		jsr 	BlockEndTarget
+		lda 	#PCD_CMD_CASEEND
+		jmp 	WriteBranchToAddress
+_CCEPlaceholder:
 		lda 	#PCD_CMD_CASEEND
 		jsr 	WriteCodeByte
 ;
-;		Two placeholder bytes. The value is never read: FixBranches overwrites both
+;		Two placeholder bytes, in pass one. The value is never read: FixBranches overwrites both
 ;		unconditionally, and errors out rather than leaving them if it cannot resolve the branch.
 ;
 SelectWritePlaceholder:
@@ -11504,6 +11534,73 @@ SelectWritePlaceholder:
 		lda 	#0
 		jsr 	WriteCodeByte
 		clc
+		rts
+
+; ************************************************************************************************
+;
+;		The three hooks that make this resolvable in one forward pass, the same shape as GP.IF's
+;		-- see commands/gpif.asm, and commands/goto.asm for the tables underneath.
+;
+;		.casenext takes an ALTERNATIVE of its own and becomes this select's pending one; whatever
+;		alternative comes next says where it lands, and the GP.ENDSEL says so if none does.
+;
+; ************************************************************************************************
+
+SelectWriteNext:
+		jsr 	SelectIndex
+		jsr 	BlockAltOpen
+		lda 	blockAlt
+		sta 	SelectPending,x
+		lda 	blockAlt+1
+		sta 	SelectPending+1,x
+		;
+		lda 	passNumber
+		beq 	_SWNPlaceholder
+		jsr 	BlockAltRead 				; where the next alternative starts
+		lda 	#PCD_CMD_CASENEXT
+		jsr 	WriteBranchToAddress
+		clc 								; a .def helper MUST return carry clear
+		rts
+_SWNPlaceholder:
+		lda 	#PCD_CMD_CASENEXT
+		jsr 	WriteCodeByte
+		bra 	SelectWritePlaceholder
+
+;
+;		The pending .casenext, if there is one, lands where the cursor stands. After a GP.OTHER
+;		there is none -- it opens the last body and tests nothing.
+;
+SelectAltHere:
+		jsr 	SelectIndex
+		lda 	SelectPending,x
+		sta 	blockAlt
+		lda 	SelectPending+1,x
+		sta 	blockAlt+1
+		jsr 	BlockAltHere
+		jsr 	SelectIndex 				; BlockAltHere works through X
+		lda 	#$FF 						; resolved, so no longer pending
+		sta 	SelectPending,x
+		sta 	SelectPending+1,x
+		rts
+
+SelectClose:
+		jsr 	SelectIndex
+		lda 	SelectOrdinals,x
+		sta 	blockIndex
+		lda 	SelectOrdinals+1,x
+		sta 	blockIndex+1
+		jmp 	BlockEndHere
+
+;
+;		X = (SelectDepth-1) * 2, the innermost open GP.SELECT. Every caller has already tested
+;		the depth, so a zero here is a bug rather than a bad program.
+;
+SelectIndex:
+		lda 	SelectDepth
+		beq 	SelectFailStructure
+		dec 	a
+		asl 	a
+		tax
 		rts
 
 ;
@@ -11568,6 +11665,10 @@ SelectSaveType:
 		.fill 	1
 SelectSaveIdx:
 		.fill 	1
+SelectOrdinals: 							; the block ordinal of each open GP.SELECT...
+		.fill 	2*SELECT_MAX_NEST
+SelectPending: 								; ...and the alternative inside it still waiting for
+		.fill 	2*SELECT_MAX_NEST 			; a target, or $FFFF
 
 		.send code
 

@@ -1,6 +1,6 @@
 ---
 name: two-pass-compiler
-description: "Rebuilding GPC to compile the source twice and stream p-code to disk, so the object buffer stops capping program size. Branch two-pass-compiler; steps 1-6c done and verified; both passes now resolve, and the object checksum compares the two answers."
+description: "Rebuilding GPC to compile the source twice and stream p-code to disk, so the object buffer stops capping program size. Branch two-pass-compiler; step 6 done, so pass two resolves every branch where it writes it and FixBranches is pass one's alone. Step 7 is what makes GPBMODS compile."
 metadata: 
   node_type: memory
   type: project
@@ -16,10 +16,9 @@ on [[compile-is-write-only]].
 runs from there to `ObjectCeiling $9F00`, so every compiler byte comes 1:1 off the largest
 compilable program. Worse now that a program may have **eight** GP.BANKED regions: a maximal
 object is 15,616 low + 8 x 8,192 = 81,152 bytes and low RAM below `$9F00` is 39,679 in total, so
-**no amount of overlaying compiler code into banks can ever reach it.** That, not the failed
-overlay attempt, is the real argument for two passes.
+**no amount of overlaying compiler code into banks can ever reach it.**
 
-## THE INVARIANT, and why it is what makes the rest safe
+## THE INVARIANT, and why it is what made every step safe
 
 `ObjectChecksum` Fletcher-16s the object each pass has laid out; the tail of pass two compares
 sum, length and variable space, and a mismatch is `.error_internal` with no object written. It
@@ -27,13 +26,14 @@ sums the **finished object, not the stream of writes** -- the write order legiti
 once pass two places regions directly. It skips the first three bytes, `_variable.space` and its
 operand, the one place the two objects are meant to differ.
 
-**BOTH PASSES NOW RESOLVE.** FixBranches runs at the end of pass one as well, so what the checksum
-compares is two FINISHED objects. That is what lets the resolving move into pass two's emitter one
-branch kind at a time: pass one keeps answering the old way, structurally, from the laid-out
-object, so every kind that moves is checked against the answer it used to get, on every program
-compiled. Pass one keeps FixBranches until step 7 takes its buffer away.
+**BOTH PASSES RESOLVE.** FixBranches runs at the end of pass ONE, so the checksum compares two
+FINISHED objects. That turned it from a consistency check into a **differential test of the new
+resolver against the old one**: every branch kind that moved into pass two's emitter was checked
+against the answer FixBranches used to get for it, on every program compiled. Six kinds moved over
+five commits and not one needed a debugging session. Pass one keeps FixBranches until step 7 takes
+its buffer away.
 
-## DONE AND VERIFIED (steps 1-6c)
+## DONE AND VERIFIED (steps 1-6)
 
 1. **The gate.** Nothing reads the object mid-compile -- see [[compile-is-write-only]].
 2. **The driver.** `CompilePass` / `ResetPassState` in `main/compiler.asm`. Turned up `AsmPoolLen`
@@ -46,18 +46,31 @@ compiled. Pass one keeps FixBranches until step 7 takes its buffer away.
 5. **The layout is handed over at the HEAD of pass two**, so `GPBankMakeOffset` works while pass
    two is still emitting. The GP.BANKED generators get a pass-two path that neither records nor
    re-validates.
-6a. **One byte of block depth per line**, bank 5, at the SAME address as the line record so there
-   is no arithmetic between them. `STRMarkLine` writes it, `STRFindLine` remembers which record
-   matched and `STRLineDepth` reads it back. Do NOT widen the 4-byte line record instead: 5 bytes
-   an entry drops the cap from 2,048 lines to 1,638.
-6b. **`.unwind` at emit**, from that table. `CommandGOTO` reads the target line BEFORE writing
-   anything, because the `.unwind` goes in front of the GOTO.
-6c. **GOTO / GOSUB / .gotoz / .gotonz / RESTORE / .fngosub at emit**, through `WriteBranchTo` and
-   `WriteBranchToAddress` in `commands/goto.asm`. The offset is measured from the OPCODE, so
-   nothing is written until it is worked out. Five more emitters had to join them: `CompileGotoEOL`
-   (a false IF), bare `RESTORE`, the FN call, the compiler's own two GOTOs into and out of the
-   implicit-DIM prologue, and `_RSBridge` -- the GP.BANKED entry and exit bridges, which pass two
-   writes itself.
+6. **Everything resolved at emit**, in this order, because `.unwind` reads the FOLLOWING GOTO's
+   operand as a line number and breaks the moment that GOTO is resolved:
+   - **6a** one byte of **block depth per line**, bank 5, at the SAME address as the line record
+     so there is no arithmetic between them. `STRMarkLine` writes it, `STRFindLine` remembers
+     which record matched and `STRLineDepth` reads it back. Do NOT widen the 4-byte line record:
+     5 bytes an entry drops the cap from 2,048 lines to 1,638.
+   - **6b** `.unwind` from that table. `CommandGOTO` reads the target line BEFORE writing
+     anything, because the `.unwind` goes in front of the GOTO.
+   - **6c** GOTO / GOSUB / `.gotoz` / `.gotonz` / RESTORE / `.fngosub`, through `WriteBranchTo`
+     and `WriteBranchToAddress` in `commands/goto.asm`. **The line table needed no change**:
+     `STRReset` resets the POINTER, not the banked data, so through pass two the lines not yet
+     re-marked still hold pass one's final addresses and the re-marked ones hold identical values.
+     Five more emitters had to join them and finding them was most of the work -- `CompileGotoEOL`
+     (a false IF), bare `RESTORE`, the FN call, the compiler's own two GOTOs into and out of the
+     implicit-DIM prologue, and `_RSBridge`, the GP.BANKED bridges pass two writes itself.
+   - **6d** the structural branches: `.exitdo`, then `.ifnext`/`.ifelse`, then
+     `.casenext`/`.caseend`. **Each block takes an ORDINAL as it opens** and pass one writes down
+     where it ended under that ordinal, in bank 6 -- `BlockEndTable $A000`, `BlockAltTable $B000`,
+     2,048 entries of 2 bytes each. NOT indexed by nesting depth: two sibling loops share a depth
+     and the second would overwrite an answer the first still needs. `_GBFixBlockEnds` /
+     `_GBFixBlockAlts` walk both tables when a region moves, exactly as the line table is walked.
+     `blockDepth`, `ifDepth` and `SelectDepth` are the three stacks of open blocks.
+
+**PASS TWO NEVER CALLS FixBranches NOW.** That is what step 7 needs: an object that is final on
+the way out can go straight to the file.
 
 ## Traps that cost a cycle each
 
@@ -65,56 +78,52 @@ compiled. Pass one keeps FixBranches until step 7 takes its buffer away.
   front of it in the main loop (it must, a region begins ON the GP.BANKED line's marker byte) and
   so has to be register-transparent. It was not: every banked program failed
   `UNKNOWN LINE NUMBER @ 3`.
-- **`GPBankStructure` goes out of branch range easily.** `CommandGPBankedCompile` is long and
-  branches to it; anything inserted between pushes it away. The pass-two halves live BELOW it, as
-  globals -- 64tass scopes a `_` label to the enclosing global. Same trap bit `_STRFoundAt`, which
-  had to become the global `STRFoundAt`.
+- **BRANCH RANGE, four times.** Every one of these steps put 150+ bytes of table plumbing between
+  a test and the `.error_*` exit it branches to. The fix each time is to move the error exits ABOVE
+  the new routines (`gpif.asm`, `goto.asm`) or to reach them with a `jmp` (`select.asm`, which
+  already had three). `GPBankStructure` had the same trouble in step 5.
+- **64tass scopes a `_` label to the enclosing GLOBAL label.** `_STRFoundAt` had to become
+  `STRFoundAt`; the GP.BANKED pass-two halves had to become globals too.
 - **`GPBankMakeOffset` corrupts X.** `RegionSwitchWork` holds the region number in X across the
   bridge, and the bridge resolves itself now, so it needs a `phx`/`plx`.
 - **An address recorded before the move must fall strictly INSIDE its section.** `GPBankAdjust`
   puts the byte at `gpBankEnd` on the LOW side, and "one past the last GP.LOOP of a region" is
-  exactly that byte. So the block-end table stores the GP.LOOP's own address and the reader adds
-  one back.
+  exactly that byte. So the block tables store one SHORT of the answer and every reader adds it
+  back. `testing/BANKZ.BASL` is that case, and it runs.
+- **A `.def` helper MUST return carry clear.** Every pass-two path that ends in
+  `WriteBranchToAddress` needs an explicit `clc` before its `rts`.
 
-## STILL TO DO
+## STILL TO DO -- step 7, and it is the one that matters
 
-6d. **The structural forward branches**, and then `FixBranches` is pass one's alone.
-   Each block gets an ORDINAL as it opens (both passes number them the same way, being the same
-   source in the same order) and pass one writes down where it ended under that ordinal, in bank
-   6 -- `BlockEndTable $A000`, `BlockAltTable $B000`, 2,048 entries of 2 bytes each. NOT indexed
-   by nesting depth: two sibling loops share a depth and the second would overwrite an answer the
-   first still needs. Every entry is fixed up by `_GBFixBlockEnds` when a region moves, exactly as
-   the line table is.
-   - **6d-1 `.exitdo`** -- WRITTEN, not yet built or tested. `BlockDepthUp` hands out the ordinal,
-     `BlockDepthDown` records the end, `BlockEnclosingDo` reads it back.
-   - **6d-2 `.ifnext` / `.ifelse`** -- `.ifelse` goes to `structEnd[the open GP.IF]`; `.ifnext`
-     gets an ALTERNATIVE ordinal and its target is recorded by whatever alternative comes next
-     (GP.ELSEIF, GP.ELSE or GP.ENDIF). One pending alternative per open IF, no chains.
-   - **6d-3 `.casenext` / `.caseend`** -- the same shape, with GP.CASE / GP.OTHER / GP.ENDSEL.
-     `SelectDepth` is already the compile-time stack.
-7. **Stream pass two to the file.** Both files are open at once, so buffer a page -- `object.asm`
-   already measures it: 28,000 CHKIN/CHKOUT pairs per byte against 94 per page. Three things it
-   has to deal with:
-   - the alignment gaps between regions must be FILLED then; today pass two lands on pass one's
-     addresses in the same buffer, so the gaps still hold pass one's bytes;
-   - `AsmPatchAll` (`commands/gpasmcode.asm`) patches the buffer AFTER `WriteObjectCode` has
-     settled `newWorkspacePage` -- real back-patching, and the last of it;
-   - pass one loses its buffer too, or the wall stays -- so FixBranches goes, and the checksum
-     cannot walk an object any more. It has to become a WRITE-TIME sum, and the write order
-     differs between the passes: one accumulator for low code and one for the regions, switched
-     where `RegionSwitch` already switches, keeps each one's order identical in both passes.
-
-**Measured cost: 2.19x** at step 5 (PICKDEMO 3.54 s -> 7.75 s, warp, best of 3). Pass one now
-runs FixBranches too, so it is worse than that today and comes back as each kind moves.
-`FreeMemory` has gone `$5200 -> $5500`; irrelevant, the buffer goes away at step 7.
+**Stream pass two to the file.** Both files are open at once, so buffer a page -- `object.asm`
+already measures it: 28,000 CHKIN/CHKOUT pairs per byte against 94 per page. Four things:
+- **Pass one loses its buffer too, or the wall stays.** So FixBranches goes with it, and the
+  checksum cannot walk an object any more. It has to become a WRITE-TIME sum, and the two passes
+  write in different orders: one accumulator for low code and one for the regions, switched where
+  `RegionSwitch` already switches, keeps each one's order identical in both passes.
+- The **alignment gaps** between regions must be FILLED; today pass two lands on pass one's
+  addresses in the same buffer, so the gaps still hold pass one's bytes.
+- `AsmPatchAll` (`commands/gpasmcode.asm`) patches the buffer AFTER `WriteObjectCode` has settled
+  `newWorkspacePage` -- the last real back-patching in the compiler.
+- Move `PROGRAM TOO BIG` to the end of pass one as a run-side test, so a rejected compile writes
+  nothing.
 
 **GPBMODS still fails `PROGRAM TOO BIG` -- on the compiler at `3335ab5` too.** It has never
-compiled on this branch's baseline; only step 7 fixes it.
+compiled on this branch's baseline. The line it dies on has crept 1,889 -> 1,813 as the compiler
+grew through step 6, which is the wall doing exactly what it does. Only step 7 fixes it.
+`FreeMemory` has gone `$5200 -> $5A00` along the way; irrelevant, the buffer goes away.
 
 **Test programs added:** `testing/UNWIND.BASL` (GOTO out of one, two and three nested GP.DO
-blocks, forwards, backwards and at the same depth) and `testing/BANKZ.BASL` (GP.DO, GP.IF and
-GP.SELECT INSIDE a GP.BANKED region, with the GP.LOOP deliberately the last statement in it --
-the boundary case above). Nothing in the suite covered either before.
+blocks, forwards, backwards and at the same depth), `testing/BLOCKS.BASL` (every arm of a four-way
+IF chain and a SELECT, including the values that fall through to GP.ELSE and GP.OTHER, plus both
+nestings) and `testing/BANKZ.BASL` (all three block kinds INSIDE a GP.BANKED region, with the
+GP.LOOP deliberately its last statement). Nothing in the suite covered any of it before.
+
+**The build harnesses live in the session scratchpad**, not the repo: `objdiff.py` (compile with
+both compilers and list the differing bytes), `sweep.py` (every `testing/*.BASL`, flagging
+`INTERNAL ERROR`), `run1.py` (compile one and run it), `banktest3.py`, `timeit.py`. All of them
+A/B against `git show 3335ab5:source/application/GPC.BIN` -- see
+[[baseline-compiler-is-the-application-copy]].
 
 Related: [[compiler-must-not-cap-program-size]], [[gp-banked-region-relocation]],
-[[baseline-compiler-is-the-application-copy]], [[measure-before-changing-code]].
+[[measure-before-changing-code]], [[write-readable-code-user-crunches]].

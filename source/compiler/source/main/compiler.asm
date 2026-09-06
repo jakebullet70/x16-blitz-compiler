@@ -277,16 +277,18 @@ _SCEPlaced:
 		;		with an inline blob compiled OK and jumped into nothing at the first call.
 		;
 _SCEResolve:
-		lda 	objPtr
-		sta 	objectEnd
-		lda 	objPtr+1
+		lda 	passNumber
+		bne 	_SCEChecksum 				; PASS TWO RESOLVES EVERY BRANCH WHERE IT WRITES IT.
+		lda 	objPtr 						; Nothing is left for a second look, which is what
+		sta 	objectEnd 					; step seven needs: an object that is final on the
+		lda 	objPtr+1 					; way out can go straight to the file.
 		sta 	objectEnd+1
 		jsr 	FixBranches 				; fix up GOTO/GOSUB etc.
 		lda 	objectEnd
 		sta 	objPtr
 		lda 	objectEnd+1
 		sta 	objPtr+1
-		;
+_SCEChecksum:
 		jsr 	ObjectChecksum
 		;
 		lda 	passNumber
