@@ -60,8 +60,6 @@
 ## **  bar wants them ignored. Neither is the general case, so off means "an arrow
 ## **  across the grain does nothing".
 ## **
-## **  The whole MENUBAR.* name space belongs to this file.
-## **
 ## ***********************************************************************
 #IFNDEF MENUBAR.DEFS
 #DEFINE MENUBAR.DEFS 1

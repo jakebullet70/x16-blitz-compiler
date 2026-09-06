@@ -8,12 +8,8 @@
 ## **      BANKMGR.RELEASE  give one back
 ## **      BANKMGR.COUNT    how many exist, how many are free
 ## **
-## **  A PROGRAM WITH ONE BANK DOES NOT NEED THIS. It is for a program with
-## **  several owners of banked RAM -- a stash, a document arena, a menu store --
-## **  none of which can see the others' numbers.
-## **
-## **  REQUIRES, and does not #INCLUDE for you:
-## **      GPB.INC.BL      GP.CALL, GP.A
+## **  For a program with several owners of banked RAM, none of which can see
+## **  the others' numbers. Requires GPB.INC.BL, and does not #INCLUDE it.
 ## **
 ## **  Usage, and the order matters:
 ## **      GOSUB BANKMGR.INIT
@@ -29,9 +25,8 @@
 ## **        BANKMGR.OK      -1 if CLAIM took it, 0 if taken or out of range
 ## **        BANKMGR.SPARE   what COUNT found free
 ## **
-## **  0 IS NOT A BANK. It is the KERNAL's, reserved by INIT, and it is what ALLOC
-## **  returns for "none left" -- the same convention GUI.BANK already uses for
-## **  "do not save the screen", so the two agree.
+## **  0 is not a bank. It is the KERNAL's, reserved by INIT, and it is what
+## **  ALLOC returns for "none left".
 ## **
 ## **  WARNING: MEMTOP RETURNS $00 ON A 2MB MACHINE. The count is one byte and 256
 ## **  does not fit, so 512K reads $40 = 64 and 2MB reads $00, meaning 256. INIT
@@ -39,15 +34,9 @@
 ## **  exactly the larger machine. Values that are not a multiple of 8 are legal --
 ## **  the reference names $42 -- and mean some banked RAM is bad.
 ## **
-## **  ONE BIT A BANK, 32 bytes of it, held as 32 elements of BANKMGR.MAP%. Not one
-## **  array element a bank: that is 512 bytes of a caller's workspace for something
-## **  a library has no business spending.
-## **
-## **  IT TRACKS, IT DOES NOT SELECT. Nothing here executes BANK. A claim is a
-## **  promise between the program's own modules, and the accessor still sets its
-## **  own bank on every access -- STASH.INC.BL and ED-STORE.BASL already do.
-## **
-## **  The whole BANKMGR.* name space belongs to this file.
+## **  It tracks, it does not select. Nothing here executes BANK. A claim is a
+## **  promise between the program's own modules, and an accessor still sets its
+## **  own bank on every access.
 ## **
 ## ***********************************************************************
 #IFNDEF BANKMGR.DEFS
@@ -67,15 +56,13 @@ GOTO BANKMGR.SKIP
 ## **
 ## **  Call it once, before any CLAIM. Calling it again forgets every claim.
 ## **
-## **  The arrays are DIMmed on the first call behind BANKMGR.READY, THEME's
-## **  idiom: an implicit array is 0..10, and DIMming one GPC has already
-## **  auto-dimensioned is an error, so the module owns both outright.
+## **  The arrays are DIMmed on the first call, behind BANKMGR.READY: an implicit
+## **  array is 0..10, and DIMming one GPC auto-dimensioned is an error.
 ## ***********************************************************************
 
 BANKMGR.INIT: IF BANKMGR.READY = 0 THEN DIM BANKMGR.MAP%(BANKMGR.BYTES) : DIM BANKMGR.BIT%(7) : BANKMGR.READY = -1
 
-## ---- 1, 2, 4 .. 128, built rather than written out: it is the only place a
-## ---- power of two is needed and GPC has no shift.
+## ---- 1, 2, 4 .. 128. GPC has no shift.
     BANKMGR.BIT%(0) = 1
     FOR BANKMGR.I = 1 TO 7
         BANKMGR.BIT%(BANKMGR.I) = BANKMGR.BIT%(BANKMGR.I - 1) * 2
@@ -84,8 +71,7 @@ BANKMGR.INIT: IF BANKMGR.READY = 0 THEN DIM BANKMGR.MAP%(BANKMGR.BYTES) : DIM BA
     GP.CALL BANKMGR.MEMTOP, 0, 0, 0, 1 : BANKMGR.BANKS = GP.A
     IF BANKMGR.BANKS = 0 THEN BANKMGR.BANKS = 256
 
-## ---- a byte at a time, not a bank at a time: a whole byte above the count is
-## ---- 255 outright, which is 224 of the 256 banks on a 512K machine.
+## ---- a byte at a time: a whole byte above the count is 255 outright.
     FOR BANKMGR.SCAN = 0 TO BANKMGR.BYTES - 1
         BANKMGR.MAP%(BANKMGR.SCAN) = 0
         IF BANKMGR.SCAN * 8 >= BANKMGR.BANKS THEN BANKMGR.MAP%(BANKMGR.SCAN) = 255
@@ -98,10 +84,8 @@ BANKMGR.INIT: IF BANKMGR.READY = 0 THEN DIM BANKMGR.MAP%(BANKMGR.BYTES) : DIM BA
     BANKMGR.WANT = 0 : GOSUB BANKMGR.SET
     RETURN
 
-## ---- Only reached when the count is not a multiple of 8, which means some
-## ---- banked RAM is bad. The loop cannot be empty here: BANKS AND 7 is non-zero,
-## ---- so the last bank of the byte is above BANKS. That matters, because
-## ---- FOR 1 TO 0 RUNS ONCE in this BASIC.
+## ---- Only reached when the count is not a multiple of 8. The loop cannot be empty
+## ---- here -- BANKS AND 7 is non-zero -- and FOR 1 TO 0 runs once in this BASIC.
 
 BANKMGR.INIT.PART:
     BANKMGR.SCAN = INT(BANKMGR.BANKS / 8)
@@ -129,9 +113,6 @@ BANKMGR.CLAIM:
 ## **  BANKMGR.ALLOC -- the lowest free bank.
 ## **
 ## **   out  BANKMGR.BANK   1..BANKS-1, or 0 for none left
-## **
-## **  Skips a full byte in one test, so a 512K machine with everything taken
-## **  costs 32 comparisons and not 255.
 ## ***********************************************************************
 
 BANKMGR.ALLOC:
@@ -143,8 +124,8 @@ BANKMGR.ALLOC:
     GP.LOOP
     IF BANKMGR.SCAN >= BANKMGR.BYTES THEN RETURN
 
-## ---- the low clear bit of that byte. Bank 0 is always taken, so 0 is safe
-## ---- as "nothing found yet" and can never be the answer.
+## ---- the low clear bit of that byte. Bank 0 is always taken, so 0 is safe as
+## ---- "nothing found yet".
     FOR BANKMGR.I = 0 TO 7
         IF BANKMGR.BANK = 0 THEN IF (BANKMGR.MAP%(BANKMGR.SCAN) AND BANKMGR.BIT%(BANKMGR.I)) = 0 THEN BANKMGR.BANK = BANKMGR.SCAN * 8 + BANKMGR.I
     NEXT BANKMGR.I
@@ -157,8 +138,7 @@ BANKMGR.ALLOC:
 ## ***********************************************************************
 ## **  BANKMGR.RELEASE -- give BANKMGR.WANT back.
 ## **
-## **  Silent about a bank that was not taken: releasing twice is not an error
-## **  worth a caller writing a test for.
+## **  Silent about a bank that was not taken.
 ## ***********************************************************************
 
 BANKMGR.RELEASE:
@@ -189,18 +169,14 @@ BANKMGR.COUNT.NEXT:
 ## ***********************************************************************
 ## **  The bitmap. BANKMGR.WANT in, and nothing else calls these.
 ## **
-## **  BANKMGR.SLOT is WHICH OF THE 32 BYTES holds the bank and BANKMGR.MASK is
-## **  WHICH BIT of it: bank 19 is byte 2, bit 3, so SLOT 2 and MASK 8. Both are
-## **  LOCATE's output and belong to these four routines. The byte-index loops in
-## **  INIT, ALLOC and COUNT count in BANKMGR.SCAN and not in SLOT for that
-## **  reason -- INIT.PART calls SET from inside a loop whose limit is built from
-## **  the byte index, and sharing one variable made that work only because a FOR
-## **  limit is evaluated once into the frame.
+## **  BANKMGR.SLOT is which of the 32 bytes holds the bank, BANKMGR.MASK which
+## **  bit: bank 19 is byte 2 bit 3, so SLOT 2 and MASK 8. Both are LOCATE's
+## **  output and belong to these four routines -- the byte-index loops in INIT,
+## **  ALLOC and COUNT count in BANKMGR.SCAN so as not to share them.
 ## **
-## **  CLR SUBTRACTS RATHER THAN MASKING. Clearing a bit wants AND NOT, and GPC's
-## **  AND is 16-bit SIGNED and raises OUT OF RANGE above 32767, so NOT 8 is not
-## **  a number this BASIC will take. The bit is known set before the subtraction,
-## **  which makes it the same answer.
+## **  WARNING: CLR subtracts rather than masking. Clearing a bit wants AND NOT,
+## **  and GPC's AND is 16-bit signed, so NOT 8 raises OUT OF RANGE. The bit is
+## **  known set before the subtraction, which makes it the same answer.
 ## ***********************************************************************
 
 BANKMGR.LOCATE: BANKMGR.SLOT = INT(BANKMGR.WANT / 8) : BANKMGR.MASK = BANKMGR.BIT%(BANKMGR.WANT - BANKMGR.SLOT * 8) 

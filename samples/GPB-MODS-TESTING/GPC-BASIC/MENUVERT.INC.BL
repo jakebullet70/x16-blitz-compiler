@@ -63,8 +63,6 @@
 ## **  more. Leave MENUVERT.ITEM$ undimensioned and GPC's implicit DIM gives 0..10 -- a
 ## **  ten row menu free. DIM it for more. What you must NOT do is both.
 ## **
-## **  The whole MENUVERT.* name space belongs to this file.
-## **
 ## ***********************************************************************
 #IFNDEF MENUVERT.DEFS
 #DEFINE MENUVERT.DEFS 1

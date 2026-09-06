@@ -67,8 +67,8 @@
 ## **
 ## **  UPPER CASE, ON THE DEFAULT CHARSET. GP.PRINTAT converts PETSCII and
 ## **  BASLOAD passes literals through as source bytes, so on charset 2 ASCII
-## **  lower case lands on the graphics half of the font -- "Confirm" measured as
-## **  tiles 3, 79, 78, 70, 73, 82, 77. ISO mode fixes the text and breaks the
+## **  lower case lands on the graphics half of the font. ISO mode fixes the
+## **  text and breaks the
 ## **  frame, GP.BOX's $40-$7D being letters in that order: so it is upper case
 ## **  with a frame, or mixed case without one, unless the caller re-orders the
 ## **  font and says where the glyphs went with GUI.GLYPH. That is what
@@ -83,10 +83,7 @@
 ## **  Both requests are 0-means-default: attribute 0 is black on black, legal and
 ## **  no use to anybody, so it is free to spend as "I did not choose".
 ## **
-## **  The whole GUI.* name space belongs to this file, except GUI.LISTBOX.*,
-## **  which is GUI2.INC.BL -- a listbox is a GUI dialog and reads like one, but
-## **  it is the only one that scrolls and the only one that marks, so it is its
-## **  own #INCLUDE and you pay for it only when you want it.
+## **  GUI.LISTBOX.* is GUI2.INC.BL, its own #INCLUDE.
 ## **
 ## ***********************************************************************
 #IFNDEF GUI.DEFS

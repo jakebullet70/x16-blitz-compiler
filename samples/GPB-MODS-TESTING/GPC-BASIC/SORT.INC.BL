@@ -4,36 +4,13 @@
 ## **
 ## **      SORT.RUN        sort the array SORT.PTR points at
 ## **
-## **  A MODULE, NOT A RUNTIME KEYWORD, so it costs its bytes only in the programs that
-## **  ask for it: as a keyword it would be 408 bytes carried by every program that never
-## **  sorted anything.
+## **  Shell sort with Ciura's gaps -- 132, 57, 23, 10, 4, 1 -- moving 2-byte
+## **  pointers, not string data, so a swap is a swap whatever the strings are.
+## **  The gap loop is in BASIC and the assembly is handed one gap a pass.
 ## **
-## **  Shell sort with Ciura's gaps --
-## **  132, 57, 23, 10, 4, 1 -- moving 2-byte POINTERS, not string data, so a swap is a
-## **  swap whatever the strings are. No temporary, no copying, no heap traffic, which
-## **  is what made it worth assembly in the first place.
-## **
-## **  THE GAP LOOP IS UP HERE IN BASIC, because six iterations do not need to be fast
-## **  and a six byte table inside a blob would have to be stepped over to reach the
-## **  code. The assembly is handed one gap and does one complete pass.
-## **
-## **  SIZE, MEASURED:
-## **
-## **      299   the GP.ASM blob below
-## **      254   prog8 shellsort_pointers + string_comparator + strcmp_mem
-## **      408   the same sort as a runtime keyword, for comparison
-## **
-## **  Against prog8 it is 45 bytes LARGER, and every one is a feature prog8's has not
-## **  got: case folding (~26 with the two JSRs), the descending flag (8), and reading a
-## **  null element as "" rather than following it (~16). Take those out and the two are
-## **  level. prog8 has one real advantage -- @requirezp puts j, k and temp in zero page,
-## **  where these are BASIC variables reached absolutely. What it cannot do is compare
-## **  COUNTED strings: its strcmp_mem is 32 bytes because a NUL-terminated compare is
-## **  trivial, and this has to take min(lenL, lenR) and break the tie on length.
-## **
-## **  YOUR PROGRAM MUST HAVE A #SYMFILE, BEFORE THE INCLUDES. The assembly reaches
-## **  BASIC's variables through {VAR} and BASLOAD crunches every name first; without it
-## **  the compile stops with "NO SYMBOL FILE FOR {}", naming the cause but not the file:
+## **  Your program needs a #SYMFILE, before the includes. The assembly reaches
+## **  BASIC's variables through {VAR} and BASLOAD crunches every name first;
+## **  without one the compile stops with "NO SYMBOL FILE FOR {}":
 ## **
 ## **      #SAVEAS "@:MYPROG.PRG"
 ## **      #SYMFILE "@:MYPROG.SYM"
@@ -46,48 +23,34 @@
 ## **      GOSUB SORT.RUN
 ## **
 ## **   in   SORT.PTR       GP.ARRPTR of the array -- element ZERO, the
-## **                       3 byte header already skipped. THE ARRAY GOES
-## **                       IN HERE AND NOWHERE ELSE: a BASL subroutine
-## **                       cannot be passed an array, so the caller takes
-## **                       its address and this sorts through that.
+## **                       3 byte header already skipped
 ## **        SORT.DESCEND   non-zero = largest first
 ## **        SORT.NOCASE    non-zero = fold case while comparing
 ## **
 ## **   out  SORT.OK        -1 if it sorted, 0 if it refused
 ## **        SORT.COUNT     elements found in the array header
 ## **
-## **  LIMIT: 255 ELEMENTS, so DIM A$(254) is the largest -- A$(255) is 256 of them, one
-## **  too many. Beyond that SORT.OK = 0 rather than a wrong answer: every address in
-## **  the inner loop is 8-bit indexed, and widening it for a case this machine cannot
-## **  reach would cost the whole loop.
+## **  Limit: 255 elements, so DIM A$(254) is the largest. Beyond that SORT.OK = 0
+## **  rather than a wrong answer -- every address in the inner loop is 8-bit
+## **  indexed. A string array only; a float element is six bytes, not a pointer.
 ## **
-## **  A STRING ARRAY ONLY -- a float element is six bytes, not a 2-byte pointer.
-## **  GP.ARRPTR has already refused a multi-dimensional one before this runs.
+## **  A null pointer is an empty string. A never-assigned element is $0000 and the
+## **  runtime hands out a static empty string for it, so DIM A$(20) with five
+## **  entries filled sorts its fifteen empties to the front.
 ## **
-## **  A NULL POINTER IS AN EMPTY STRING. A never-assigned element is $0000 and the
-## **  runtime hands out a static empty string for it, so DIM A$(20) with five entries
-## **  filled sorts its fifteen empties to the front rather than comparing against
-## **  whatever lives at address 2.
+## **  zTemp0/1/2 -- $2C, $2E, $30 -- are the three pointers. A blob is reached
+## **  through the SYS handler, which JMPs through zTemp0, and nothing reads them
+## **  again until the next command. codePtr, the number stack and the mantissas
+## **  are not free and are untouched.
 ## **
-## **  WHY THIS USES ZERO PAGE AND STASH.INC.BL DOES NOT: not that stash could not, but
-## **  that stash was written believing it could not. A GP.ASM blob is reached through
-## **  the SYS handler, which loads the blob address into zTemp0 and JMPs through it --
-## **  and after that jump nothing in the interpreter reads zTemp0/1/2 again until the
-## **  next command sets them. They are per-command scratch and a blob runs inside a
-## **  command, so the three pointers here are $2C, $2E and $30, as the runtime version
-## **  used. codePtr, the number stack and the mantissas are NOT free and are untouched.
+## **  WARNING: CLD is the first instruction. SYS enters a blob with the status
+## **  PLP'd from SYS_Reg_S, holding whatever a previous GP.CALL left, and one
+## **  stray decimal flag makes every element address wrong.
 ## **
-## **  CLD IS THE FIRST INSTRUCTION AND IS NOT DECORATION: SYS enters a blob with the
-## **  status PLP'd from SYS_Reg_S, holding whatever a previous GP.CALL left. This adds
-## **  and subtracts addresses, and one stray decimal flag makes every element address
-## **  wrong.
-## **
-## **  THE BLOCK IS WRAPPED IN #REM 1 / #REM 0. Without it BASLOAD's default strips the
-## **  body and the block reaches the compiler EMPTY, which is refused as "block
-## **  mismatch" rather than silently compiled to nothing. The #REM 0 after it restores
-## **  BASLOAD's default, not the caller's.
-## **
-## **  The whole SORT.* name space belongs to this file.
+## **  The block is wrapped in #REM 1 / #REM 0 because the assembly rides in REM
+## **  statements, which BASLOAD's default would strip -- the block would reach the
+## **  compiler empty and be refused as a block mismatch. The #REM 0 after it
+## **  restores BASLOAD's default, not the caller's setting.
 ## **
 ## ***********************************************************************
 #IFNDEF SORT.DEFS
@@ -98,16 +61,13 @@ GOTO SORT.MODULE.END
 ## ***********************************************************************
 ## **  SORT.RUN -- check the array, then walk Ciura's gaps.
 ## **
-## **  The header is still three bytes below SORT.PTR -- count low, count high, type --
-## **  and is READ BACK rather than asked of the caller, so a wrong count cannot be
-## **  passed in and sort past the end of the array.
+## **  The header is three bytes below SORT.PTR -- count low, count high, type --
+## **  and is read back rather than asked of the caller, so a wrong count cannot
+## **  sort past the end of the array. The type byte is $40 for a string element,
+## **  $00 for a number, bit 7 for sub-arrays.
 ## **
-## **  The type byte is $40 for a string element, $00 for a number, bit 7 for sub-arrays.
-## **  GP.ARRPTR raises an index error on that last one before it returns, so the test
-## **  here can never fire -- kept because a pointer from anywhere else would be followed.
-## **
-## **  GAPS LARGER THAN THE ARRAY NEED NO GUARD: the pass starts i AT the gap and falls
-## **  straight out when that is already past the end.
+## **  Gaps larger than the array need no guard: the pass starts i at the gap and
+## **  falls straight out when that is already past the end.
 ## ***********************************************************************
 
 SORT.RUN:
@@ -120,11 +80,9 @@ SORT.RUN:
     SORT.OK = -1
     IF SORT.COUNT < 2 THEN RETURN
 
-## ---- Every {VAR} must EXIST before the assembly can name it -- the compiler looks it
-## ---- up in the symbol file and refuses one it cannot find. These are the assembly's
-## ---- working storage and exist for no other reason. THE HIGH BYTES ARE SET ONCE AND
-## ---- NEVER AGAIN: the indices and counters are all bytes and the assembly writes only
-## ---- the low one, so they must start at zero and stay there.
+## ---- Every {VAR} must exist before the assembly can name it. These are the assembly's
+## ---- working storage. The high bytes are set once and never again -- the indices and
+## ---- counters are all bytes and the assembly writes only the low one.
     SORT.I% = 0 : SORT.J% = 0 : SORT.TMP% = 0
     SORT.LL% = 0 : SORT.LR% = 0 : SORT.RN% = 0 : SORT.CHR% = 0
     SORT.BASE% = SORT.PTR
@@ -132,10 +90,8 @@ SORT.RUN:
     SORT.DESC% = 0 : IF SORT.DESCEND <> 0 THEN SORT.DESC% = 1
     SORT.FOLD% = 0 : IF SORT.NOCASE <> 0 THEN SORT.FOLD% = 1
 
-## ---- Ciura's sequence, not the halving one Shell published in 1959: halving is the
-## ---- weakest known, worst case n^2, and these six are empirically the best for arrays
-## ---- this size at about n^1.25. Written out rather than held in an array, because a
-## ---- DIM in an include file is allocated by every program that includes it.
+## ---- Ciura's sequence. Written out rather than held in an array, because a DIM in an
+## ---- include file is allocated by every program that includes it.
     SORT.GAP% = 132 : GOSUB SORT.PASS
     SORT.GAP% = 57  : GOSUB SORT.PASS
     SORT.GAP% = 23  : GOSUB SORT.PASS
@@ -153,12 +109,12 @@ SORT.RUN:
 ## **              a[j] = a[j-gap] : j = j - gap
 ## **          a[j] = temp
 ## **
-## **  The three helpers below the RTS are JSR'd from inside the same blob, which is safe
-## **  because the blob was entered with a JSR and ends with the RTS the assembler
-## **  appends -- the stack is level either way.
+## **  The three helpers below the RTS are JSR'd from inside the same blob. The
+## **  blob was entered with a JSR and ends with the RTS the assembler appends, so
+## **  the stack is level either way.
 ## **
-## **  EVERY LOOP EXIT IS A JMP REACHED BY SKIPPING ONE BRANCH: the inner loop body is
-## **  well past the 127 bytes a relative branch can reach.
+## **  Every loop exit is a JMP reached by skipping one branch: the inner loop body
+## **  is well past the 127 bytes a relative branch can reach.
 ## ***********************************************************************
 
 SORT.PASS:

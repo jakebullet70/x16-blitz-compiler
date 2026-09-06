@@ -55,8 +55,6 @@
 ## **
 ## **   also out  LINEINPUT.POS   where the caret ended up, 0..LEN(TEXT$)
 ## **
-## **  The whole LINEINPUT.* name space belongs to this file.
-## **
 ## ***********************************************************************
 #IFNDEF LINEINPUT.DEFS
 #DEFINE LINEINPUT.DEFS 1

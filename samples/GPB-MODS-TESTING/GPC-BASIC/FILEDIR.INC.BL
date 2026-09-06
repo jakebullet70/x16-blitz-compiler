@@ -87,11 +87,6 @@
 ## **  stops at the end of its one bank, so a listing cannot spill into a bank it
 ## **  does not own.
 ## **
-## **  878 bytes on top of FILEIO, blobs included.
-## **
-## **  The FILE.DIR.* names belong to this file; the rest of FILE.* is
-## **  FILEIO.INC.BL's.
-## **
 ## ***********************************************************************
 #IFNDEF FILEDIR.DEFS
 #DEFINE FILEDIR.DEFS 1

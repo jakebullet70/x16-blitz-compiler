@@ -92,13 +92,6 @@
 ## **  the manual returns 0 here: VAL stops at the first non-numeric character,
 ## **  so parse the eight hex digits by hand.
 ## **
-## ** ---- size ----
-## **
-## **  900 bytes, and there is no dead code elimination. FILE.SAVEARRAY and
-## **  FILE.LOADARRAY with their helpers are 364 of that.
-## **
-## **  The FILE.* name space belongs to this file and to FILEDIR.INC.BL.
-## **
 ## ***********************************************************************
 #IFNDEF FILEIO.DEFS
 #DEFINE FILEIO.DEFS 1
@@ -275,10 +268,7 @@ FILE.KEEPROW:
 
 
 ## FILE.ISO non-zero folds ASCII to PETSCII. Names only, never the rows
-## SAVEARRAY writes.
-##
-## The copy is made in BASIC and folded in place, so the whole routine costs one
-## allocation whatever the name's length.
+## SAVEARRAY writes. The copy is made in BASIC and folded in place.
 ##
 
 FILE.PETNAME:  FILE.RAW$ = FILE.NAME$ : GOTO FILE.TOPET

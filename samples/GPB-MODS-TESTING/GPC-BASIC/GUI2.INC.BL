@@ -85,8 +85,6 @@
 ## **  are written where they are used, next to the comment that names them.
 ## **  #INCLUDE this file once.
 ## **
-## **  The whole GUI.LISTBOX.* name space belongs to this file.
-## **
 ## ***********************************************************************
 
 GOTO GUI.LISTBOX.MODULE.END
