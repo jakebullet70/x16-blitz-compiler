@@ -1282,6 +1282,20 @@ poking it directly reads back fine and changes nothing.
 
 ## 8. Open
 
+### Candidates from Simons' BASIC
+
+[SIMONS-BASIC.REVIEW.md](SIMONS-BASIC.REVIEW.md) dispositions all 114 Simons' BASIC keywords. Six are
+worth taking and none of them is a new keyword: a screen-rectangle move and scroll, `FCOL` and `INV`,
+`USE` number formatting, a filtered `FETCH` input, `DESIGN` shape authoring, and positional string
+insert. Two large items are left open there, error trapping and `LOCAL`/`GLOBAL`.
+
+### Candidates from Commodore BASIC 7.0 and 3.5
+
+[CBM-BASIC-7.REVIEW.md](CBM-BASIC-7.REVIEW.md), same five sections. The graphics and sound are what
+the X16 ROM already does; what these two dialects have that this machine never got is the structure.
+Four to take — `TRAP`/`ER`/`EL` error trapping, `PRINT USING`'s mask as `STR.USE`'s syntax, `DS`/`DS$`
+as `FILE.STATUS`, and `DEC()` — and two left open, relative files and a clip rectangle.
+
 ### Abandoned-loop frame leak — `FOR` FIXED, `GP.DO` still open
 
 Escaping a loop with `GOTO`/`IF…THEN` leaves its frame open. **Stock BASIC 2.0 self-heals and GPC did

@@ -216,6 +216,43 @@ here.
 It asks for a line of text and gives it back; `GUI.TEXT` reads like it draws some. Every caller and
 every shim in `LIBBANK.INC.BL` changes with it. Nothing depends on the old name outside this repo.
 
+### `THEME.LOAD` should be `THEME.SELECT`, and `THEME.LOAD` should then load an array
+
+`THEME.LOAD` does not load anything. It takes a number in `THEME.ID` and picks one of five built-in
+palettes, which is selecting. Rename it `THEME.SELECT` and the name is free for the routine that is
+actually missing: **install a caller's array of seven packed attributes as the custom theme.**
+
+    DIM MY.THEME(6)
+    MY.THEME(THEME.PAGE) = 6 * 16 + 6
+    ...
+    GOSUB THEME.LOAD          ' copies it into THEME.CLR, sets THEME.ID to 4
+
+That closes the loop `samples/color-test` leaves open: it prints seven `THEME.CLR` assignment lines
+to paste back into this file by hand. With an array-taking `THEME.LOAD` a program can carry a scheme
+as data — and an array saves and loads like any other, which is the whole reason themes are data and
+not keywords.
+
+**The rename is not a search and replace.** The five branch labels share the prefix —
+`THEME.LOAD.X16` `.DARK` `.LIGHT` `.GRAY` `.CUSTOM`, plus `.BODY` in the `GPB-MODS-TESTING`
+variant — so a blind swap renames them too and then the new `THEME.LOAD` collides with the family it
+just created. Rename the branches to `THEME.SELECT.*` in the same pass. Counted 2026-09-06,
+excluding `TODO.md` and the `testing/` mirror: **72 bare `THEME.LOAD` references, 131 including the
+label family**, across the library, six samples, `GP-BASIC.md` and `GP-BASIC.GLOBALS.md`.
+`LIBBANK.INC.BL` carries a shim, as it does for `GUI.TEXT`.
+
+**Five copies of `THEME.INC.BL`, and one has already drifted** —
+`samples/GPB-MODS-TESTING/GPC-BASIC/THEME.INC.BL` differs from the other four, which are identical.
+Reconcile before renaming, not after.
+
+Two decisions to take at the keyboard:
+
+- **What `THEME.RESET` means once a custom definition exists.** It sends `CUSTOM` back to `X16`
+  today because `CUSTOM` has no values of its own. If `THEME.LOAD` gives it some, reset should
+  arguably go back to *those*, which costs a second seven-slot array to hold them.
+- **Whether the input array is the caller's or the module's.** `THEME.CLR` is `DIM`med by the module
+  and callers are told not to touch it; a second array with the opposite rule is a trap unless the
+  header is explicit about which is which.
+
 ## Bugs
 
 ### A RETIRED KEYWORD COMPILES CLEAN AND EXPLODES AT RUN TIME — FIXED 2026-09-03
@@ -1015,6 +1052,429 @@ image for all 12,031 bytes of the GP-BASIC OUT cut, with the only differences th
 
 ## Wanted
 
+### `IsEmulator()` — am I running on x16emu, or on the machine?
+
+Wanted so a program can behave differently under emulation: skip a timing loop that only makes sense
+at 8 MHz, take the fast path in a test harness, print which it is in an about box, or refuse to run a
+hardware-only routine.
+
+**The detail is not in this tree, so establish it before writing anything.**
+`docs/x16/X16 Reference - 08 - Memory Map.md` says `$9FB0-$9FBF` is *"Used by emulator"* and points
+at the emulator's own README, `x16-emulator#emulator-io-registers`, for what each register does.
+That page is the authority on which address answers and with what — read it, then confirm the value
+by `PEEK`ing the range on a booted `x16emu` **and** checking what the same address reads as when the
+emulator's debug registers are disabled, since a detector that only ever ran under the emulator has
+tested one of its two answers. Note `$9FA0-$9FBF` is expansion-card I/O on real hardware, so a card
+could in principle answer too.
+
+Also decide what "emulator" means here: **Box16 is a second emulator** in this tree
+(`bin/box16/`) and need not implement the same registers. A three-way answer — hardware, x16emu,
+something else — may be more honest than a boolean.
+
+Shape, once the register is known: not a keyword. It is one `PEEK` and a comparison, no loop and no
+bulk data, so by the rule the GP set is built on it belongs in BASIC — a few lines in
+`APPSYS.INC.BL`, which already owns "what machine am I on" questions and already costs nothing to
+the programs that do not include it.
+
+    GOSUB APPSYS.ISEMU
+    IF APPSYS.EMU = 1 THEN ...
+
+### `LINEINPUT` wants a character filter
+
+From §1.4 of [SIMONS-BASIC.REVIEW.md](docs/blitz/SIMONS-BASIC.REVIEW.md), which dispositions all 114
+Simons' BASIC keywords and holds the other five candidates. Simons' `FETCH` restricts three things
+and two of them are already here: the maximum length is `LINEINPUT.LEN` and the terminator is
+`LINEINPUT.KEY`. Only the character set is missing.
+
+**Not `LINEINPUT.MASK`.** That name is taken and means "show asterisks" — `FORM.EXP.BL` sets it from
+`FORM.HIDE`. The two new inputs are `LINEINPUT.ALLOW$` and `LINEINPUT.DENY$`, both empty by default,
+so an unset caller keeps today's behaviour and nothing in the tree needs touching.
+
+Two lines in `LINEINPUT.TYPED`, under the three guards it already has:
+
+```basic
+    IF LINEINPUT.ALLOW$ <> "" AND GP.INSTR(LINEINPUT.ALLOW$, LINEINPUT.K$) = 0 THEN RETURN
+    IF LINEINPUT.DENY$ <> "" AND GP.INSTR(LINEINPUT.DENY$, LINEINPUT.K$) > 0 THEN RETURN
+```
+
+**Why both, and it is not a convenience.** An allow list is charset-dependent. `TYPED` refuses
+128-159 and passes 160-255, so PETSCII shifted letters arrive as `$C1-$DA` — an `ALLOW$` of
+`"ABC...XYZabc...xyz"` is 53 characters and silently refuses every capital in a PETSCII field, while
+being correct in ISO. Digits are 48-57 in both, so the questions split cleanly:
+
+| Field | Spelling |
+|---|---|
+| Digits only | `ALLOW$ = "0123456789"` |
+| Number with sign and point | `ALLOW$ = "0123456789.-"` |
+| Yes or no | `ALLOW$ = "YyNn"` |
+| Letters, no digits | `DENY$ = "0123456789"` |
+| Filename, no punctuation | `DENY$ = ",:=*?"` |
+
+`ALLOW$` for a closed set short enough to write out, `DENY$` for everything-except. Both set means
+`ALLOW$` decides; say so in the header rather than raising an error. `GP.INSTR` compares raw bytes,
+so `ALLOW$` carries both cases. Case folding is a separate question — PETSCII case is not ASCII
+case, and `STRCASE.INC.BL` is the whole-string answer.
+
+Also touched: the header's `in` block, `GP-BASIC.GLOBALS.md`, `GP-BASIC.md` §4.4, and one field in
+`FORM.EXP.BL` given a digits-only `ALLOW$` so the example exercises it. `LIBBANK.INC.BL` needs
+nothing — no new entry point, so the shim table is unchanged.
+
+**BASL only.** No token, no p-code, no runtime byte, nothing in `GPC.BIN`. Roughly 30 bytes of
+p-code, and only in programs that include the module.
+
+**Test without the keyboard.** `LINEINPUT.TYPED` is directly callable: set `LINEINPUT.K$` and
+`LINEINPUT.CODE`, `GOSUB LINEINPUT.TYPED`, read `LINEINPUT.TEXT$` back. A `DATA` list of codes covers
+accept, refuse, the full-field refusal and the caret position with no emulator interaction, which is
+the way past `paste cannot drive a running program`. Run the banked build once afterwards, since the
+filter runs per keystroke inside `LIB.CODEBANK`.
+
+### `STRINGS.INC.BL` wants `STR.CENTRE`
+
+Centre a string on a row and print it. Simons' `CENTRE`, and the commonest line in every dialog and
+title bar in the tree.
+
+```
+   in   STR.STR$              the text
+        STR.Y                 the row
+        STR.ATTR              packed attribute
+        STR.X  STR.WIDTH      optional region, default the whole line
+```
+
+The column is `STR.X + INT((STR.WIDTH - LEN(STR.STR$)) / 2)`, floored at `STR.X`.
+
+**Ask the KERNAL for the width, do not assume 80.** A program that centres on 80 columns and then
+runs in 40 puts its title off the screen:
+
+```basic
+GP.CALL $FF5F, 0, 0, 0, 1          ' KERNAL screen_mode, carry set = report
+STR.WIDTH = GP.X
+```
+
+**Text longer than the width truncates with `LEFT$`.** `GP.PRINTAT` clips nothing — drawing off the
+right edge wraps onto the next row, so an over-long title corrupts the line below instead of looking
+too long.
+
+**The decision to make first:** `STR.PADC` already centres a string inside a width, so what this adds
+is the screen half — and that makes `STRINGS.INC.BL` depend on a screen keyword for the first time.
+Either accept that, or put the routine in `APPSYS.INC.BL` where the screen already lives.
+
+### `STRINGS.INC.BL` wants `STR.USE` — a number to a template
+
+§1.3 of [SIMONS-BASIC.REVIEW.md](docs/blitz/SIMONS-BASIC.REVIEW.md). X16 BASIC has no `PRINT USING`
+and neither does GP.BASIC. `STR.PADL` aligns a column; it does not align a decimal point, pad with
+leading zeros, group thousands or reserve a sign column, and a table of numbers wants all four.
+
+```
+   in   STR.NUM               the value
+        STR.MASK$             "###0.00" -- # optional digit, 0 forced, . the point
+   out  STR.STR$
+```
+
+Traps, all three of which show up as a misaligned column rather than an error:
+
+- `STR$` puts a leading space on a positive number. Strip it, or every positive value is one column
+  wide of every negative one.
+- Round at the cut rather than letting `INT` floor it, and handle the sign before the round — `INT`
+  goes toward minus infinity, so `-1.5` and `1.5` round in opposite directions.
+- A number wider than its mask has to do something visible. Fill the field with `*`, as other BASICs
+  do, rather than overflowing the width and pushing the rest of the row along.
+
+### `STRINGS.INC.BL` wants positional insert and overwrite
+
+§1.6 of the same review. Simons' `INSERT` and `INST`. `STR.REPLACE` edits by content and `STR.SPLIT`
+cuts by delimiter; neither edits at an index, and this BASIC has no `MID$` assignment.
+
+```
+   in   STR.STR$  STR.AT  STR.SUB$
+   out  STR.STR$
+```
+
+`STR.INSERT` opens a gap and `STR.INST` writes over what is there. `STR.AT` is 1-based, matching
+`GP.INSTR`. Past the end appends; below 1 clamps to 1. Not length checked, like `STR.REPLACE` — a
+result past 255 characters is the caller's problem.
+
+Add these when a caller exists. Two routines nothing calls are two routines every includer compiles.
+
+### A screen-rectangle move and scroll
+
+§1.1 of the review, and the largest gap it found. `docs/memory/scrolling-a-screen-region.md` lists
+three workarounds and opens with "There is no `GP.SCROLL`". Simons' spends five keywords —
+`MOVE`, `LEFT`, `RIGHT`, `UP`, `DOWN` — on one operation: move a rectangle by a signed row and column
+delta. One routine covers all five.
+
+```
+   in   the rectangle, plus a signed row and column delta
+```
+
+`GP.ASM` in a new module, not a keyword: the GP block is 1,970 B against a 1,536 B target and every
+program with one `GP.` keyword pays for all of it. **Standing order — agree the assembly before
+writing any.**
+
+- VERA-to-VERA `memory_copy` at `$FEE7`, one call per row. `r0`/`r1` hold `$9F23`/`$9F24` and `r2`
+  the byte count; the KERNAL does not increment pointers inside `$9F00-$9FFF`.
+- A cell is two bytes, so a column delta of `n` is `2 * n` bytes.
+- Copy rows in the order that does not overwrite the source — top-down or bottom-up depending on the
+  sign of the row delta.
+- `BMX.PALCOPY` in `GPC-BASIC/BMX.INC.BL` is the worked example. `STASH.WALK` has the row-address
+  arithmetic, which asks VERA for `L1_CONFIG` and `L1_MAPBASE` rather than assuming the mode.
+- The newly exposed row or column is the caller's to fill.
+
+**Verify by reaching one position two ways**, sliding and repainting, then comparing cells with
+`VPEEK` including attributes. A slide that lands one row out looks like a working scroll.
+
+### `FCOL` and `INV` — recolour and invert a rectangle
+
+§1.2 of the review, and the highest value per byte in it. `GP.FILL` writes the character and the
+colour together, so neither of these can be spelled with it. Every menu highlight, selected editor
+row and greyed-out item wants exactly one of the two.
+
+- Writes to the odd plane only: the address is `x * 2 + 1` and VERA's address increment of 2 does the
+  stride, so it is one pass per row with no read-back.
+- `INV` swaps the two nibbles of each attribute byte. `LINEINPUT` already computes that inversion in
+  BASIC for its cursor.
+- Estimate 60-100 B, `GP.ASM`, in the same module as the rectangle move above — **and the same
+  standing order applies: agree the assembly first.**
+
+### `FILEIO.INC.BL` and `FILEDIR.INC.BL` — BUILT 06/09/26
+
+**Shipped** as `samples/GPB-MODS-TESTING/GPC-BASIC/FILEIO.INC.BL` (900 bytes) and
+`FILEDIR.INC.BL` (878 more). 33 assertions green headlessly — `testing/FILEIOT.BASL` and
+`testing/FILEDIRT.BASL`. Not yet promoted to the root `GPC-BASIC/`, and not yet wired into
+`GPBMODS`'s DATA panel.
+
+In: `FILE.STATUS` `EXISTS` `DELETE` `RENAME` `COPY` `MKDIR` `CHDIR` `UP` `GETPATH` `SAVEARRAY`
+`LOADARRAY`, and `FILE.DIR.INIT` `.OPEN` `.NEXT`. **Both modules need a `#SYMFILE`** — `FILE.TOPET`
+is a `GP.ASM` blob, and so is the directory reader.
+
+**What the build settled, none of it guessable from the spec below:**
+
+- **The command rides on the `OPEN`.** `OPEN 15,8,15,"S:NAME"` sends it, so there is no `PRINT#`
+  in `FILEIO` at all — one statement shorter per routine, and off the runtime's channel-output
+  path. The `GP.DO` file-I/O bug **did not reproduce** through it (`T21`).
+- **`FILE.RENAME` onto an existing name answers 62, not 63.** Measured with both files confirmed
+  present. There is no error code meaning "target exists", so ask `FILE.EXISTS` first.
+- **The last row of a file arrives with `ST` already set**, because its terminating CR is the last
+  byte — testing `ST` before storing loses it, and a four-row file reads back as three.
+- **Every listing starts with the volume line**, which parses exactly like a file. A three-file
+  pattern answers with four names unless it is skipped.
+- **A non-fatal device probe exists, and it is not `OPEN`.** Built as `FILE.DEVSCAN`, proven on
+  R49, then **removed** — kept here because the technique is the useful part. A plain `OPEN` on an
+  absent device is fatal (`CommandXOpen` branches on the KERNAL's carry, and there is no `TRAP`),
+  but `GP.CALL` to LISTEN ($FFB1, A=device) / SECOND ($FF93, A=111) / UNLSTN ($FFAE) then reads the
+  answer in `ST`: present 0, absent 128, repeatably, and the bus opens normally afterwards. prog8
+  abandoned the same test, but it read `READST` at the top of `status()` where the value was stale;
+  this reads a transaction it just performed.
+- **`V` (validate) is a documented no-op** returning `00, OK`. Dropped, not deferred.
+
+**Still open, and now specified rather than guessed:**
+
+- `FILE.SEEK` / `FILE.TELL` / `FILE.SIZE` — see the `P`/`T` note below; the header of `FILEIO`
+  carries the three traps.
+- `FILE.APPEND`, `FILE.SIZE`, `FILE.TYPE`, `FILE.FAST` (`U0>B`), `FILE.LOCK`/`UNLOCK` (`F-L`/`F-U`),
+  `FILE.DISKCHANGE` (`G-D`), `FILE.MOUNT` (`I`), `FILE.RMDIR` (`RD`) — reviewed, not selected.
+- **The split, if `FILEIO` is ever too heavy**: `SAVEARRAY`/`LOADARRAY` are 364 of its 1,075 bytes.
+- **`FILEDIR`'s no-MACPTR fallback is untested** — no device on this machine refuses `MACPTR`.
+
+The original specification follows.
+
+### `FILES.INC.BL` — the disk questions a program has to ask
+
+BASIC 4.0 answered these with `DS` and `DS$`, and neither reached this machine — *there is no `DS` in
+this compiler*. The X16's `DOS` keyword **prints**; a compiled program needs the answer in a variable.
+So every program in the tree that touches the drive has rolled its own, and
+[`CX.FILECHECK`](samples/cruncher/CRUNCH.BASL#L172) is the one that works. Promote it.
+
+| Routine | in | out |
+|---|---|---|
+| `FILE.STATUS` | — | `FILE.ERR` `FILE.MSG$` `FILE.TRK` `FILE.SEC` |
+| `FILE.EXISTS` | `FILE.NAME$` | `FILE.OK` |
+| `FILE.DELETE` | `FILE.NAME$` | `FILE.ERR` |
+| `FILE.RENAME` | `FILE.NAME$` `FILE.NEW$` | `FILE.ERR` |
+| `FILE.COPY` | `FILE.NAME$` `FILE.NEW$` | `FILE.ERR` |
+| `FILE.MKDIR` `FILE.CHDIR` | `FILE.NAME$` | `FILE.ERR` |
+| `FILE.DIR` | `FILE.PAT$` `FILE.MAX` | `FILE.N` `FILE.NAME$()` `FILE.BLOCKS()` `FILE.FREE` |
+
+All of them take `FILE.DEV`, defaulting to 8, rather than hard-coding the drive. `FILE.` is free in
+the prefix registry.
+
+**`FILE.STATUS` is the foundation and everything else ends by calling it.** The command channel has
+to be read or the drive stays in its error state and the next `OPEN` misbehaves; close the data
+channel before channel 15. An error number under 20 is success — 0 is OK, 1 is "files scratched" and
+carries the count. The three worth naming are 62 `FILE NOT FOUND`, 63 `FILE EXISTS` and 26
+`WRITE PROTECT`.
+
+**Do not test existence with `ST`.** `LINPUT#` on a channel whose `OPEN` found nothing returns
+`CHR$(0)` with `ST = 66` **for ever** — `docs/memory/gpc-editor-loader-linput-and-blob.md`. That trap
+built a document containing a NUL once already. Channel 15 answers the question cleanly, which is
+what `CX.FILECHECK` does.
+
+**`FILE.DIR` is the fiddly one.** The directory arrives as a fake BASIC program: a two-byte load
+address, then per entry a two-byte link, a two-byte line number that IS the block count, and the name
+in quotes. Read it with `BINPUT#` at a fixed count rather than `GET#` per byte — the loader work
+measured that difference at 10.5x. The last entry is the blocks free.
+
+**Names travel in PETSCII.** A program running in ISO mode holds ASCII names and has to convert
+before sending, or a lower-case filename reaches the drive as something else.
+
+**Split it like `STASH` and `STASHFILE`.** A module compiles whole into every includer — there is no
+dead code elimination — so `FILE.DIR` and its two arrays belong in their own file. The
+status/exists/delete/rename core is small enough for everything to carry.
+
+BASL throughout: no token, no p-code opcode, no runtime byte.
+
+**More worth having, roughly in the order they earn their bytes:**
+
+- `FILE.SAVEARRAY` / `FILE.LOADARRAY` — a string array to a `SEQ` file and back, over `PRINT#` and
+  `LINPUT#`. Every settings file, recent-files list, high-score table and picker list in this tree is
+  the same twenty lines written again. The highest value of the lot after `FILE.EXISTS`.
+- `FILE.APPEND` — `,A` on the open, so adding a line to a log does not rewrite the file.
+- `FILE.SIZE` and `FILE.TYPE` — blocks, and `PRG` or `SEQ`, from a directory read filtered to one
+  name. Save As wants the size; a picker wants the type.
+- `FILE.PATH$` and the `CD` readback — the SD card has subdirectories and a program that changes
+  directory has no way to say where it is.
+- `FILE.DEVSCAN` — try 8 to 11 and report which answer. Always 8 on a stock machine, and not on one
+  with a second device or a mounted image.
+- `FILE.VALIDATE` (`V`) and `FILE.HEADER` (`N:name,id`) — one DOS line each, both destructive, so
+  both behind a confirm and neither in the core module.
+- Record positioning for random access. **ANSWERED 06/09/26: CMDR-DOS has no `REL` files** — the
+  feature table lists them "not yet". The equivalent is `,?,M` open mode plus the `P` (position)
+  and `T` (tell) command-channel calls, and chapter 13 gives it in BASIC:
+  `OPEN 15,8,15,"P"+CHR$(2)+CHR$(0)+CHR$(1)+CHR$(0)+CHR$(0)`. `T` returns the position **and the
+  file size**, which is what Save As wants without a directory read. Three traps: the data channel's
+  secondary address must equal the `P`/`T` channel argument (which is why `FILE.CHAN` is 14 for
+  both); `T` is R48+ and `FL` R49+; and the manual's `VAL("$"+MID$(A$,10))` **does not work here**,
+  because `VAL` stops at the first non-numeric character.
+
+`DOS "C:new=old"` copies only within one drive, so a real `FILE.COPY` across devices has to go
+through memory. Worth knowing before someone finds out with a half-written file.
+
+**Two callers are waiting.** A file picker for the editor and `GPC-HELP` wants `FILE.DIR`, and Save As
+wants `FILE.EXISTS` so it can ask before it overwrites — see *Save As accepts a BLANK name* below.
+Keep the module's own examples clear of the `GP.DO` key-loop shape in
+`docs/memory/file-io-error-in-gpdo-key-loop.md`.
+
+### `KV.INC.BL` — text out of low RAM, an index in it
+
+Asked 2026-09-06. **A program's string constants are the one thing it pays for twice**: once as
+p-code, and again as a heap block the moment they are assigned, at `max(10, len * 1.5) + 3` bytes
+each. A program with a lot of text — prompts, help, messages, tables — spends its workspace on
+words. The module holds the text somewhere else and hands back one value at a time, keyed by name.
+
+**Read it ONCE, into a bank, and serve from the bank.** `GPC-HELP` is the cautionary tale and the
+measurement already exists: its `.HLP` is re-read from disk on **every keypress**, and that read IS
+the scroll cost — the cell move was 4% of it. "Load as needed" must mean *as needed from a bank*, not
+as needed from a disk, or the module is slower than the arrays it replaces.
+
+**The index is the real cost, and it is workspace.** An offset table is 3 bytes an entry — bank,
+offset lo, offset hi — and that part has to be resident. **The keys must NOT be**, or the module
+gives back most of what it saved: keep a one-byte hash of the key in RAM, and confirm the hit against
+the key text in the bank. 300 keys is then 1,200 bytes resident against however much text.
+
+| Routine | in | out |
+|---|---|---|
+| `KV.OPEN` | `KV.FILE$` `KV.BANK` `KV.MAX` | `KV.N` `KV.ERR` |
+| `KV.GET` | `KV.KEY$` | `KV.VALUE$` `KV.OK` |
+| `KV.AT` | `KV.I` | `KV.KEY$` `KV.VALUE$` |
+| `KV.SET` | `KV.KEY$` `KV.VALUE$` | `KV.OK` — decide whether it exists at all |
+
+**The file format has to be settled first, and it should be the one `LINPUT#` reads.** One record a
+line, key and value separated by the first `=` or a tab. `LINPUT#` is **10.5x** `GET#` (the editor's
+loader) and that margin is what makes a whole-file load at startup acceptable — but it **stops on a
+NUL**, which is the loader's documented trap, so a value cannot contain one. `ST = 66` on a missing
+file and stays there for ever, so check the name before opening it, with `FILE.EXISTS` from
+`FILES.INC.BL` above.
+
+**Do not spec random access on disk until the `REL` question in `FILES.INC.BL` above is answered.**
+Without a seek, a per-lookup disk read is O(lines) and re-opens the file every time; the banked
+version is then the only sane design and the file is purely a load format.
+
+**Sizing.** One bank is 8,192 bytes of text. Past that the bank belongs in the index entry (which is
+why it is 3 bytes and not 2), and `KV.OPEN` fills consecutive banks — no record straddles a boundary,
+so the last few bytes of a bank go to waste rather than into an allocator.
+
+**It is not `STASH`.** `STASH` stores a rectangle of screen cells at a fixed stride; this is
+variable-length text found by name. The one thing to borrow is `ED-MENUS.BASL`'s conclusion that a
+small fixed set does not need an allocator — but a config file is not a small fixed set.
+
+### `INI.INC.BL` — a config file a program can read and write
+
+Asked 2026-09-06, and the natural pair to `KV.INC.BL` above: **`INI` parses, `KV` stores.** If the
+store lands first this module is thin — walk the file once, prefix each key with its section, hand
+the pairs to `KV`. If it does not, `INI` reads the file on demand and is a different, worse module.
+Build them in that order.
+
+`[section]`, `key=value`, `;` or `#` to end of line as a comment, blank lines ignored.
+
+| Routine | in | out |
+|---|---|---|
+| `INI.LOAD` | `INI.FILE$` | `INI.N` `INI.ERR` |
+| `INI.GET$` | `INI.SEC$` `INI.KEY$` `INI.DEF$` | `INI.VALUE$` |
+| `INI.GET` | same, numeric default | `INI.VALUE` |
+| `INI.PUT` | `INI.SEC$` `INI.KEY$` `INI.VALUE$` | `INI.OK` |
+| `INI.SAVE` | — | `INI.ERR` |
+
+**Reading is the easy half. WRITING is where these modules go wrong**, and the failure is silent: a
+naive rewrite emits only the keys it knows and quietly eats every comment, every unknown key and the
+file's order — so two programs sharing one `.INI` destroy each other's settings. The correct shape is
+a copy, not a dump: read the original line by line, echo each line out to a temp file, substitute the
+value on the one line being changed, append anything never seen at the end of its section, then
+delete and rename. **That needs `FILE.DELETE` and `FILE.RENAME`, so `FILES.INC.BL` lands first** —
+three modules deep, and worth saying out loud before someone starts at the top.
+
+**Parsing details to decide, not discover:**
+
+- **Split on the FIRST `=` only.** A value may contain one; a key may not.
+- **A comment character inside a value is not a comment.** Either strip trailing comments and forbid
+  `;` in values, or do not strip them at all. Pick one and write it in the header — the half-way
+  version is the bug.
+- **Trim whitespace around the key and around the `=`, but decide about the value.** Leading spaces
+  in a value are sometimes deliberate. `STR.` has `STR.SKIP` already; `GP.TRIM`/`GP.LTRIM` are in
+  `STRCASE.INC.BL`, which is a `GP.ASM` module and therefore drags a `#SYMFILE` requirement into any
+  program that includes it. Decide whether `INI` takes that dependency or does its own compare.
+- **Case.** Sections and keys case-insensitive is what everyone expects, and it costs either
+  `GP.UPPER` (the `#SYMFILE` dependency again) or a hand-written compare. Values are case-sensitive.
+- **Use `STR.SPLIT`.** `STRINGS.INC.BL` has it. Do not write a second splitter.
+
+**Callers waiting.** The editor's theme, tab width and last-opened file; `GPC-HELP`'s starting topic.
+**Leave `GPC`'s own control file alone** — `control.asm` reads exactly four 256-byte lines and
+`CFLineCount = 4`, with the blanking loop depending on that; an `.INI` face on it is a different job
+and a byte-counted format is not one to make friendly.
+
+### Error trapping, BASIC 3.5 style — `TRAP` / `ER` / `EL`
+
+A compiled program has no error trap. A disk error inside an application ends it, and the `FILES`
+module above can only report what it asked for — it cannot catch what goes wrong inside a `LOAD`, a
+`PRINT#` or an array index. This is the largest open item in the tree.
+
+**Take the 3.5 / 7.0 design, not Simons' `ON ERROR`.** It is four pieces and each one is small:
+
+```
+TRAP <line>       arm: send control there on the next error
+TRAP              disarm
+ER  EL            the error number, and the line it happened on
+RESUME [NEXT]     retry the statement, or carry on past it
+```
+
+**Why it fits a compiler where `CGOTO` does not.** `TRAP` names a target that exists at compile time,
+so it resolves exactly like a `GOTO` and `FixBranches` already knows how. Nothing has to survive as a
+line number at run time.
+
+**Build it in two halves and ship the first one on its own:**
+
+1. **`TRAP`, `ER`, `EL`, and a `GOTO` out of the handler.** The runtime's error path prints and stops
+   today; it grows a vector holding the armed handler or zero, stores the number and line, and jumps.
+   The handler leaves by `GOTO`, which the `.unwind` opcode already makes safe out of any block. That
+   alone buys "a disk error does not kill the program", which is the whole point.
+2. **`RESUME`.** Needs the p-code IP of the failing statement, and `RESUME NEXT` the IP of the one
+   after it, both recovered with a stack that an error left mid-expression. That is the expensive
+   half and nothing needs it to be useful.
+
+`ER` and `EL` are value words like `GP.A` — tokens, not variables, because nothing lets the runtime
+write a variable by name. `ERR$(n)` can come later off the message table the runtime already carries.
+
+**The runtime half is assembly, so agree it before writing any.** Costs: two value-word tokens, one
+system token for `TRAP` with its operand, and a handful of runtime bytes on the error path.
+
 ### `GUI.INC.BL` message box — DONE, as `GUI.SAY`
 
 `GUI.YN`, `GUI.MENU` and `GUI.TEXT` all ASK something. There was no way to just **say** something
@@ -1097,6 +1557,50 @@ Real work, but it is the machinery a multi-field form needs anyway — and that 
 Consistency: `GUI.YN` needs nothing (its labels ARE the keys, Y and N lit), `GUI.SAY` takes its one
 label from `GUI.HINT$`, so if A lands it should probably serve all three. Whatever is chosen belongs
 in the diverged copy AND the master.
+
+### A shared keyboard drain — yes. A shared `GETKEY` — no
+
+**`CLEARKB` is worth it.** Three copies exist already and they are the same four lines:
+`CX.CLEARKB` and `CX.FLUSH` in the cruncher, `HELP.CLEAR.KB` in `GPC-HELP`. It has no per-caller
+variation and it has a real trap behind it: a modal dialog that opens with a keystroke still in the
+buffer answers itself and vanishes before the user sees it, which reads as the dialog not appearing
+at all. That is worth one routine everybody calls.
+
+**`GETKEY` is not.** BASIC 7.0 has it, and as a shared BASL routine it would be a `GOSUB` that does
+less than the loop it replaces. Every wait in this library does something while it waits:
+`LINEINPUT` blinks a cursor off `TI`, `MENUVERT` and `MENUBAR` repaint the highlight, `GUI2` scrolls
+the list. A shared version would need a callback and BASL has no callbacks, so each caller would go
+back to its own loop anyway — and a module compiles whole into every includer whether it is called or
+not.
+
+**Where it goes is the one decision.** `APPSYS.INC.BL` rather than `GUI.INC.BL`: it is the screen
+etiquette module, `MENUVERT` and `LINEINPUT` both want the drain, and neither should have to pull the
+dialog library in to get it.
+
+### `GUI.SHADOW` — a drop shadow on the dialog boxes
+
+A flag, default off, that darkens the row under the box and the two columns to its right, so a dialog
+lifts off what it covers. One extra input on every `GUI.*` box; nothing else in the interface moves.
+
+**The trap is the stash, not the drawing.** `GUI.SAVE` stashes exactly `GUI.LEFT`, `GUI.TOP`,
+`GUI.WIDTH`, `GUI.HEIGHT` and `GUI.RESTORE` puts that rectangle back. A shadow is drawn OUTSIDE that
+rectangle, so it survives the close and the screen keeps a dark L where a dialog used to be. The
+stash has to grow to `WIDTH + 2` by `HEIGHT + 1` when the flag is set, which also costs bank: a cell
+is two bytes, `STASH` holds 4,094 of them and refuses `W > 128`.
+
+**And it has to clamp.** `GP.FILL` and `GP.BOX` clip nothing, so a dialog against the right edge
+wraps its shadow onto the next row, and one at the bottom writes past the end of the screen map. Trim
+the shadow to the screen rather than moving the box.
+
+Two ways to draw it, and the good one is waiting on the entry above:
+
+- **Recolour.** `FCOL` over the L, keeping the characters underneath and dropping them to a dark
+  attribute. This is what a shadow means and it is why *`FCOL` and `INV`* is worth building.
+- **Solid.** Two `GP.FILL`s of spaces in black. Works today, costs nothing, and rubs out what it
+  covers rather than shading it — acceptable, because the stash restores it.
+
+Build the solid one only if the recolour is not coming soon; they have the same interface and the
+same stash change, so the second one is a two-line swap.
 
 ### Buttons — decide whether the library adopts them
 
@@ -1721,6 +2225,64 @@ the four lines being exactly 256 bytes, so a fifth line means reworking it or ov
 beside the mode -- `GPC.BASL` for the prompt, and `source/unit-tests/shared-runtime/shared_test.py`,
 which hardcodes `FRAME_STACK_PAGES = 16` and checks the handoff opcodes byte by byte.
 
+### Arrays into a bank — the other lever on max program size
+
+Asked 2026-09-06, out of the Paradoxon Basic question: the C64 trick of paging a ROM away to reach
+the RAM underneath has no analogue here, because nothing is under `$C000`-`$FFFF` but more ROM. The
+X16's answer is the `$A000` window, and the useful question is which of GPC's four data structures
+should go through it. **Arrays are the one still in low RAM, and they are the best-shaped
+candidate.**
+
+**There is no array heap.** `DIM` bump-allocates upward from `availableMemory` in the same pot as
+p-code, variables and the string heap, and `DIMWriteByte` compares against `stringHighMemory` on
+every page boundary, so a too-big `DIM` raises `OUT OF MEMORY` and every element is charged directly
+against the room the program has left to run in. An `%` element is 2 bytes, a float **6** —
+`array.asm` multiplies the index by 3 and then by 2 — plus a 3-byte header per level.
+
+**Arrays are bulk, indexed, and reached through one code path, which is exactly what a window
+suits.** The menus were not: banking them netted **-29 bytes**, because a string value is a bare
+pointer dereferenced at ~111 sites and banking helps strings you HOLD, not strings you USE. An array
+element is fetched by arithmetic from a base, and the base is computed in one file.
+
+**The seam is one idiom, and `grep variableStartPage source/runtime/source` finds every site — there
+are twelve.** An array address is carried as a page-relative OFFSET, not an absolute address, and
+turned into one with `adc variableStartPage` at the point of use. Arrays own four of the twelve
+(`array.asm`) and the load/store owns two more — `indirect.asm`'s `rcall` and `wcall` macros, which
+are every indirect read and write in the language.
+
+**THE BANK BYTE ALREADY HAS A HOME, and this is the finding that makes it cheap.** `ArrayConvert`
+writes the address back into the number-stack slot as `NSMantissa0/1` and then explicitly does `stz
+NSMantissa2,x` / `stz NSMantissa3,x`. A bank number rides in `NSMantissa2` with **no change to the
+stack entry, no new opcode and no ABI bump** — and bank 0 meaning low RAM is what that `stz` already
+writes, so a program using no banked array pays nothing but the `rcall`/`wcall` test.
+
+**Cost lands on the 1-D fast path**, which was worth ~31% and exists precisely because
+single-subscript access is nearly all of them. Cost it there before anywhere else.
+
+**First cut: one array per bank, no straddling.** 8,192 bytes is 4,096 `%` elements or 1,365 floats,
+already far more than the workspace will ever give, and it keeps the index walk free of a carry into
+a bank register. A straddling array is a second increment, if anything ever wants one.
+
+**Open, and to be settled before any code:**
+
+- **How the bank is named.** Explicit, like `GP.BANKED`, not automatic — `DIM A%(1000) BANK 9` or a
+  `GP.` statement beside the `DIM`. Automatic placement needs an allocator nobody has written, and
+  there is no compatibility to keep, so the explicit form costs nothing to change later.
+- **String arrays move the pointers, not the text.** Elements are heap pointers into low RAM, so
+  banking one saves 2 bytes an element and moves nothing that matters. Say so in the docs or someone
+  will bank the wrong array.
+- **`BANK` inside an expression.** A banked array reference selects a bank mid-expression, so
+  anything holding a pointer across it reads the wrong bank — the `ED.ALTKEYS` trap again. The
+  `rcall`/`wcall` pair is the only place that can put the caller's bank back, and it must.
+- **MEASURE FIRST.** Nothing measures how much workspace a real program's arrays take; the editor's
+  `FREE 6144` is the whole two-ended heap and says nothing about the split. Paint the workspace the
+  way the frame-stack entry above proposes painting the gap, and get the number before designing to
+  it.
+
+Prior art, all in this tree: p-code executes from a bank (`docs/memory/pcode-runs-from-a-bank-proven.md`),
+`GP.BANKED` moves a p-code region into one, and the compiler's own line table and variable list have
+a bank each. The lesson from the menus is the one to carry in: **banking wins on bulk, not on count.**
+
 ### The MENU string arrays live in banked RAM — DONE, and it broke even
 
 Asked 2026-09-02, built 2026-09-03. `ED-MENUS.BASL` (`#INCLUDE`d beside `ED-STORE.BASL`, which was
@@ -2131,6 +2693,48 @@ a 46-character tail after `RUN` vanished completely and the program then waited 
 prompt. `-pastewarp`, and dropping `-warp`, change nothing. To test it headlessly, rebuild the same
 `.BASL` with only `CLEAR.KB` stubbed to a bare `RETURN` and drive that; the decode logic under test is
 untouched. (`LINPUT` programs such as `testing/MD5` are unaffected — no drain loop.)
+
+### `STASH.AT` — more than one rectangle in the same bank
+
+One `STASH` owns a whole bank today, so two nested dialogs need two banks. The bank is 8,192 bytes
+and a dialog is a few hundred: `GUI.OPEN` stashing a 30x8 panel uses 964 of them and wastes the rest.
+
+**Two variables, and no assembly.**
+
+```
+   in   STASH.AT       byte offset into the bank window. Default 0 -- every existing
+                       caller keeps today's behaviour with no change
+   out  STASH.NEXT     STASH.AT + 4 + W * H * 2, the offset just past what was written
+```
+
+Feed `STASH.NEXT` back in as the next `STASH.AT` and a bank holds a stack of rectangles. That is a
+bump allocator in two variables with no table, and release is LIFO by remembering the offset — the
+same scheme the `STASHVRAM` entry below argues for, which is a reason to make the two agree now.
+
+**What changes, all of it BASL:**
+
+- `STASH.SAVE`'s four header `POKE`s and `STASH.RESTORE`'s four `PEEK`s move to
+  `STASH.WINDOW + STASH.AT`.
+- `STASH.WALK` line 1: `STASH.DEST% = STASH.WINDOW + STASH.HEADER + STASH.AT`.
+- `STASH.SETUP`'s fit test becomes `BYTES * H + HEADER + AT > MAXBYTES`, so a rectangle that would
+  run off the end of the bank is still refused before the first write with `STASH.OK = 0`.
+
+The `GP.ASM` blobs do not change at all. They are handed a destination address and a count; the
+address is worked out in BASIC, which is what the module's own header says the split is for.
+
+**Test the arithmetic at the top of the bank.** `STASH.DEST%` is a `%` — signed 16-bit — and
+`$A000` is already past 32,767, so it works today by bit pattern rather than by value. An offset that
+carries the sum toward `$BFFF` is the case to check before trusting it. That family of traps has
+already produced `OUT OF RANGE` once, in `AND`.
+
+**Nothing checks that two saves do not overlap.** The offsets are the caller's to keep straight, the
+same way the bank number is now. Restoring the wrong offset restores whatever is there: the header
+describes its size, not its identity. A magic byte would catch it and would change the four-byte
+header format, so decide that when adding it, not after.
+
+**The caller that wants it is `GUI`.** Nested dialogs keep one offset per level and one bank for the
+lot, instead of one bank per level — and `GUI.SHADOW` above enlarges every stashed rectangle, which
+makes the waste worse.
 
 ### `STASHVRAM.INC.BL` — a handle-based VRAM store
 

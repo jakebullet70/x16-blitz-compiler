@@ -19,7 +19,9 @@ bcs     _DIMWBMemory                ; -> .error_memory
 ```
 
 So a too-big `DIM` **raises `OUT OF MEMORY`**. It is loud, and it is charged directly against the
-room the program has left to run in. A float element is 5 bytes, an int (`%`) 2.
+room the program has left to run in. A float element is **6** bytes, an int (`%`) 2, plus a 3-byte
+header per level. Re-checked 2026-09-06 against `array.asm`, which multiplies the index by 3 and then
+by 2 -- its own comment says "x2 or x6 depending on type". An earlier revision of this note said 5.
 
 **THIS REPLACES A NOTE THAT WAS ABOUT A DIFFERENT COMPILER.** `gpc-array-heap-capacity` recorded
 fixed bump heaps -- `ARRHEAP_SIZE = 2048` float / `IARRHEAP_SIZE = 1024` int, so ~409 and 512
