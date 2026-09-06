@@ -48,18 +48,24 @@ StartCompiler:
 
 ; ************************************************************************************************
 ;
-;		THE WHOLE SOURCE IS COMPILED TWICE, and the two passes emit exactly the same bytes.
+;		THE WHOLE SOURCE IS COMPILED TWICE, and the two passes produce exactly the same object.
 ;
 ;		Pass one exists to answer the questions a single forward pass cannot: where every line
 ;		ends up, how much space the variables need, where each block's forward branches land.
 ;		Pass two then compiles the same source again knowing all of it, so nothing has to be
 ;		written down and gone back to.
 ;
-;		THE TWO PASSES PRODUCING IDENTICAL BYTES IS A LOAD-BEARING ASSUMPTION and nothing in the
-;		structure enforces it -- so it is checked rather than trusted. WriteCodeByte accumulates
-;		a Fletcher-16 over every byte, and the tail of pass two compares that and the length
-;		against pass one's before anything is written out. A mismatch is a compiler bug and says
-;		so; it is never a silently wrong object, which is the one failure this must not have.
+;		THE TWO PASSES PRODUCING THE SAME OBJECT IS A LOAD-BEARING ASSUMPTION and nothing in the
+;		structure enforces it -- so it is checked rather than trusted. Each pass lays its object
+;		out and ObjectChecksum sums the result; the tail of pass two compares that, the length
+;		and the variable space against pass one's before anything is written out. A mismatch is a
+;		compiler bug and says so; it is never a silently wrong object, which is the one failure
+;		this must not have.
+;
+;		THE FINISHED OBJECT, NOT THE STREAM OF WRITES. It was the stream to begin with, summed in
+;		WriteCodeByte, and that is the weaker check: the object is what ships, and the order the
+;		bytes are written in is free to differ -- a region is emitted where it appears and moved
+;		afterwards, and it will not always be.
 ;
 ;		Everything a compile accumulates has to be back at its starting value for pass two, which
 ;		is what ResetPassState is for. Anything missed from it shows up as a checksum mismatch on
@@ -87,10 +93,10 @@ CompilePass:
 		;
 		lda 	#PCD_CMD_VARSPACE
 		jsr 	WriteCodeByte
-		lda 	pass1VarSpace 				; zero in pass one, the real figure in pass two
-		jsr 	WriteCodeResolved
-		lda 	pass1VarSpace+1
-		jsr 	WriteCodeResolved
+		lda 	pass1VarSpace 				; zero in pass one, the real figure in pass two --
+		jsr 	WriteCodeByte 				; the one place the two objects differ on purpose,
+		lda 	pass1VarSpace+1 			; which is why ObjectChecksum skips these two bytes
+		jsr 	WriteCodeByte
 		;
 		;		Emit the jump to the implicit-DIM prologue. The prologue lives at line $FFFF
 		;		(emitted at the end); it dimensions every undimensioned array and then jumps to
@@ -238,13 +244,16 @@ SaveCodeAndExit:
 		lda 	#$FF 						; add end marker
 		jsr 	WriteCodeByte
 		;
-		;		END OF A PASS. Pass one stops here and goes round again -- everything below this
-		;		point runs once, on the p-code pass two produced.
+		;		END OF A PASS. Both passes lay the object out -- the pool goes on and the regions
+		;		are moved into place -- and then the finished object is checksummed. Pass one
+		;		stops there and goes round again; everything below the comparison runs once.
 		;
-		;		The pool is deliberately NOT flushed in pass one. AsmFlushPool appends it through
-		;		WriteCodeByte, so flushing would put it in the checksum, and pass two rebuilds the
-		;		pool from scratch anyway (ResetPassState clears AsmPoolLen). Comparing the p-code
-		;		alone is the comparison that means something.
+		jsr 	AsmFlushPool 				; append the GP.ASM blob pool AFTER the $FF end marker,
+											; where nothing walks -- see commands/gpasmcode.asm
+		jsr 	GPBankRelocate 				; lift each GP.BANKED region out to the end of the
+											; object, past the pool -- commands/gpbank.asm. Does
+											; nothing to a program without a region.
+		jsr 	ObjectChecksum
 		;
 		lda 	passNumber
 		bne 	_SCECompare
@@ -261,24 +270,6 @@ SaveCodeAndExit:
 		sta 	pass1VarSpace 				; at the top of the program. STRReset zeroes the
 		lda 	freeVariableMemory+1 		; original, so it has to be kept here.
 		sta 	pass1VarSpace+1
-		;
-		;		LAY THE OBJECT OUT, in pass one, so that pass two can know where everything ends
-		;		up before it emits its first byte. That is the thing pass two is missing and the
-		;		reason a branch cannot yet be resolved as it is written: a GP.BANKED region does
-		;		not reach its final address until GPBankRelocate has moved it, and that has
-		;		always happened after the compile rather than before.
-		;
-		;		It runs on PASS ONE'S buffer, which pass two overwrites from FreeMemory upwards,
-		;		so nothing it moves survives and nothing it moves matters. What survives is the
-		;		region table -- starts, ends, page counts, crossings, run base and hops -- and
-		;		the pool base. ResetPassState clears gpBankActive so pass two lays out again from
-		;		scratch, which is what proves the two agree.
-		;
-		;		FixBranches is NOT run here. It resolves branches in a buffer that is about to be
-		;		thrown away; the layout is the only thing worth having.
-		;
-		jsr 	AsmFlushPool
-		jsr 	GPBankRelocate
 		inc 	passNumber
 		jmp 	CompilePass
 
@@ -301,8 +292,8 @@ _SCECompare:
 		bne 	_SCEDiverged
 		;
 		;		And the variable space, which pass two wrote into the program before it had
-		;		recomputed it. Free to check and it covers the one value the object carries that
-		;		the byte stream cannot see -- the operand holding it is not in the sum.
+		;		recomputed it. Free to check, and it is what covers the three bytes ObjectChecksum
+		;		skips -- the only place the two objects are meant to differ.
 		;
 		lda 	freeVariableMemory
 		cmp 	pass1VarSpace
@@ -320,13 +311,6 @@ _SCEDiverged:
 		.error_internal
 
 _SCEAgreed:
-		jsr 	AsmFlushPool 				; append the GP.ASM blob pool AFTER the $FF end marker,
-											; where nothing walks -- see commands/gpasmcode.asm
-		jsr 	GPBankRelocate 				; lift a GP.BANKED region out to the end of the object,
-											; past the pool. AFTER AsmFlushPool so the pool stays in
-											; low memory below it, and BEFORE FixBranches so every
-											; branch is still a line number -- commands/gpbank.asm.
-											; Does nothing to a program without a region.
 		;
 		;		FIXBRANCHES DESTROYS objPtr. It rewinds to the start and walks to the end marker,
 		;		so it comes back pointing at the $FF -- and everything after that is invisible to
@@ -399,8 +383,68 @@ ResetPassState:
 		stz 	AsmPoolLen+1
 		stz 	AsmFixupCount
 		;
-		stz 	passSum 					; and the stream checksum this pass will build
+		rts
+
+; ************************************************************************************************
+;
+;		Fletcher-16 over the object this pass has just laid out. Called once per pass, after the
+;		pool has gone on and the regions have been placed, so what it sums is the object as it
+;		would be written to disk.
+;
+;		THE FIRST THREE BYTES ARE SKIPPED. They are _variable.space and its operand, and the
+;		operand is the one thing the two passes are MEANT to differ on -- pass one does not yet
+;		know the figure. The opcode is a constant and the figure is compared directly in the
+;		tail, so nothing is left uncovered.
+;
+;		BLC_RESETOUT is how the object's base is found: the compiler library cannot name
+;		FreeMemory -- it is an application symbol, and this half also builds standalone -- and
+;		resetting the cursor is the only thing that asks the API where the object starts.
+;		FixBranches rewinds the same way.
+;
+; ************************************************************************************************
+
+ObjectChecksum:
+		lda 	objPtr 						; where the object ends, over the rewind below
+		sta 	sumEnd
+		lda 	objPtr+1
+		sta 	sumEnd+1
+
+		lda 	#BLC_RESETOUT
+		jsr 	CallAPIHandler
+		clc 								; ...and start three bytes in, past _variable.space
+		lda 	objPtr
+		adc 	#3
+		sta 	zTemp0
+		lda 	objPtr+1
+		adc 	#0
+		sta 	zTemp0+1
+
+		stz 	passSum
 		stz 	passSum+1
+_OCLoop:
+		lda 	zTemp0+1 					; reached the end ?
+		cmp 	sumEnd+1
+		bne 	_OCByte
+		lda 	zTemp0
+		cmp 	sumEnd
+		beq 	_OCDone
+_OCByte:
+		lda 	(zTemp0)
+		clc
+		adc 	passSum 					; sum1 += byte
+		sta 	passSum
+		clc
+		adc 	passSum+1 					; sum2 += sum1, so a reordering shows up too
+		sta 	passSum+1
+		inc 	zTemp0
+		bne 	_OCLoop
+		inc 	zTemp0+1
+		bra 	_OCLoop
+_OCDone:
+		lda 	sumEnd 						; put the cursor back: it is the object's length, and
+		sta 	objPtr 						; WriteObjectCode streams up to it
+		lda 	sumEnd+1
+		sta 	objPtr+1
 		rts
 
 ; ************************************************************************************************
@@ -487,8 +531,10 @@ objectEnd:									; the true end of the object, held across FixBranches --
 ;
 passNumber:								; 0 = first pass, 1 = second
 		.fill 	1
-passSum:									; Fletcher-16 over every byte this pass emitted,
-		.fill 	2							; accumulated by WriteCodeByte (helpers/api.asm)
+passSum:									; Fletcher-16 over the object this pass laid out
+		.fill 	2
+sumEnd:										; one past its last byte, held across the walk
+		.fill 	2
 pass1Sum:									; ...and what pass one came to, kept for the compare
 		.fill 	2
 pass1Len:									; pass one's object length, compared the same way
