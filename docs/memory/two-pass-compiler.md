@@ -108,6 +108,11 @@ already measures it: 28,000 CHKIN/CHKOUT pairs per byte against 94 per page. Fou
 - Move `PROGRAM TOO BIG` to the end of pass one as a run-side test, so a rejected compile writes
   nothing.
 
+**Measured cost: 2.08x** (PICKDEMO 3.55 s -> 7.37 s, warp, best of 3), down from 2.19x at
+step 5 -- pass two no longer walks the object, which more than pays for pass one now doing it.
+Pass one still stores every byte and will keep parsing everything whatever happens, so 2x is the
+standing cost.
+
 **GPBMODS still fails `PROGRAM TOO BIG` -- on the compiler at `3335ab5` too.** It has never
 compiled on this branch's baseline. The line it dies on has crept 1,889 -> 1,813 as the compiler
 grew through step 6, which is the wall doing exactly what it does. Only step 7 fixes it.
