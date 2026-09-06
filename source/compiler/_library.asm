@@ -947,9 +947,10 @@ SaveCodeAndExit:
 		lda 	#$FF 						; add end marker
 		jsr 	WriteCodeByte
 		;
-		;		END OF A PASS. Both passes lay the object out -- the pool goes on and the regions
-		;		are moved into place -- and then the finished object is checksummed. Pass one
-		;		stops there and goes round again; everything below the comparison runs once.
+		;		END OF A PASS. Both passes lay the object out -- the pool goes on, the regions are
+		;		moved into place, the branches are resolved -- and then the finished object is
+		;		checksummed. Pass one stops there and goes round again; everything below the
+		;		comparison runs once.
 		;
 		jsr 	AsmFlushPool 				; append the GP.ASM blob pool AFTER the $FF end marker,
 											; where nothing walks -- see commands/gpasmcode.asm
@@ -957,10 +958,34 @@ SaveCodeAndExit:
 		bne 	_SCEPlaced
 		jsr 	GPBankRelocate 				; PASS ONE ONLY. It lifts each region out to the end
 		jsr 	SaveLayout 					; of the object and works out where they all go; pass
-		bra 	_SCEChecksum 				; two is handed that and writes them there directly
+		bra 	_SCEResolve 				; two is handed that and writes them there directly
 _SCEPlaced:
 		jsr 	ClaimRegionTop 				; the layout itself was restored before this pass began
-_SCEChecksum:
+		;
+		;		BOTH PASSES RESOLVE, so the checksum compares a FINISHED object rather than one
+		;		with holes in it. That is what lets the resolving move into pass two's emitter one
+		;		branch kind at a time: pass one still answers from the laid-out object, the old
+		;		way, and a disagreement between the two answers is a mismatch here rather than a
+		;		wrong program. Pass one keeps FixBranches for as long as it has a buffer to walk.
+		;
+		;		FIXBRANCHES DESTROYS objPtr. It rewinds to the start and walks to the end marker,
+		;		so it comes back pointing at the $FF -- and everything after that is invisible to
+		;		it. That used to be the whole object, because the GP.ASM pool was appended
+		;		afterwards. Now the pool goes on first, and objPtr is the length WriteObjectCode
+		;		streams, so leaving it at the end marker silently truncated every pool: a program
+		;		with an inline blob compiled OK and jumped into nothing at the first call.
+		;
+_SCEResolve:
+		lda 	objPtr
+		sta 	objectEnd
+		lda 	objPtr+1
+		sta 	objectEnd+1
+		jsr 	FixBranches 				; fix up GOTO/GOSUB etc.
+		lda 	objectEnd
+		sta 	objPtr
+		lda 	objectEnd+1
+		sta 	objPtr+1
+		;
 		jsr 	ObjectChecksum
 		;
 		lda 	passNumber
@@ -1019,25 +1044,7 @@ _SCEDiverged:
 		.error_internal
 
 _SCEAgreed:
-		;
-		;		FIXBRANCHES DESTROYS objPtr. It rewinds to the start and walks to the end marker,
-		;		so it comes back pointing at the $FF -- and everything after that is invisible to
-		;		it. That used to be the whole object, because the GP.ASM pool was appended
-		;		afterwards. Now the pool goes on first, and objPtr is the length WriteObjectCode
-		;		streams, so leaving it at the end marker silently truncated every pool: a program
-		;		with an inline blob compiled OK and jumped into nothing at the first call.
-		;
-		lda 	objPtr
-		sta 	objectEnd
-		lda 	objPtr+1
-		sta 	objectEnd+1
-		jsr 	FixBranches 				; fix up GOTO/GOSUB etc.
-		lda 	objectEnd
-		sta 	objPtr
-		lda 	objectEnd+1
-		sta 	objPtr+1
-
-		lda 	#BLC_CLOSEOUT 				; close output store 
+		lda 	#BLC_CLOSEOUT 				; close output store, which is already resolved
 		jsr 	CallAPIHandler
 		clc 								; CC = success
 
@@ -1109,8 +1116,8 @@ _RPSDone:
 ; ************************************************************************************************
 ;
 ;		Fletcher-16 over the object this pass has just laid out. Called once per pass, after the
-;		pool has gone on and the regions have been placed, so what it sums is the object as it
-;		would be written to disk.
+;		pool has gone on, the regions have been placed and the branches resolved, so what it sums
+;		is the object exactly as it would be written to disk.
 ;
 ;		THE FIRST THREE BYTES ARE SKIPPED. They are _variable.space and its operand, and the
 ;		operand is the one thing the two passes are MEANT to differ on -- pass one does not yet
