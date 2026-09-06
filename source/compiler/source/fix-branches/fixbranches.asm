@@ -78,7 +78,15 @@ _FBStep:
 		bcc 	_FBLoop 					; sits past the GP.ASM pool -- carry clear means it
 _FBExit: 									; hopped there and the walk goes on
 		rts
+;
+;		PASS TWO WORKED THE COUNT OUT WHEN IT WROTE THE GOTO (CommandGOTO), so leave it alone --
+;		and leaving it alone is the point. Recomputing it here would overwrite pass two's answer
+;		with this one, and the two objects would agree whether or not the answers did. Pass one
+;		still comes through here, so the checksum compares the two.
+;
 _FBUnwindFar:
+		lda 	passNumber
+		bne 	_FBNext
 		jmp 	_FBFixUnwind
 ;
 ;		The GP.EXITDO handler lives at the very end of this file, deliberately: dropping it inline

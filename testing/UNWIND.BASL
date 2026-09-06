@@ -1,0 +1,102 @@
+#SAVEAS "@:UNWIND.SRC.PRG"
+#REM 0
+#SYMFILE "@:UNWIND.SRC.SYM"
+#INCLUDE "GPB.INC.BL"
+
+## ***********************************************************************
+## **
+## **  UNWIND.BASL -- a GOTO leaving GP.DO blocks, at every depth
+## **
+## **  The .unwind in front of such a GOTO says how many block frames it
+## **  closes: the depth where it stands minus the depth where it lands.
+## **  This walks out from depths 1, 2 and 3, forwards and backwards, and
+## **  jumps within a block, where the depth does not change and the count
+## **  is zero.
+## **
+## **  A wrong count leaks or over-pops a frame, so where it shows up is
+## **  the GOSUB/RETURN pair and the END: a leaked frame leaves the return
+## **  address buried, and an over-pop returns to somewhere nobody called
+## **  from.
+## **
+## ***********************************************************************
+
+PRINT "U1 START"
+UW.N = 0
+UW.LAPS = 0
+
+## ---- out of one block ----
+
+GP.DO
+  UW.N = UW.N + 1
+  GOTO UW.ONE
+GP.LOOP
+
+UW.ONE:
+PRINT "U2 OUT OF ONE";UW.N
+
+## ---- out of two ----
+
+GP.DO
+  GP.DO
+    UW.N = UW.N + 1
+    GOTO UW.TWO
+  GP.LOOP
+GP.LOOP
+
+UW.TWO:
+PRINT "U3 OUT OF TWO";UW.N
+
+## ---- out of three, with a GOSUB from inside so the frame stack is not
+## ---- blocks alone
+
+GP.DO
+  GP.DO
+    GP.DO
+      GOSUB UW.SUB
+      GOTO UW.THREE
+    GP.LOOP
+  GP.LOOP
+GP.LOOP
+
+UW.THREE:
+PRINT "U4 OUT OF THREE";UW.N
+
+## ---- backwards, out of two. The target is BEHIND the GOTO, so pass one
+## ---- had already marked it; the forward jumps above are the half that
+## ---- needs pass one's table.
+
+UW.BACK:
+UW.LAPS = UW.LAPS + 1
+IF UW.LAPS > 3 THEN GOTO UW.SAME
+
+GP.DO
+  GP.DO
+    GOTO UW.BACK
+  GP.LOOP
+GP.LOOP
+
+## ---- a jump WITHIN a block: same depth, count zero, and the block's own
+## ---- GP.LOOP still releases the frame
+
+UW.SAME:
+PRINT "U5 BACKWARDS";UW.LAPS
+
+GP.DO
+  GOTO UW.INSIDE
+  PRINT "U6 NOT REACHED"
+UW.INSIDE:
+  PRINT "U6 SAME DEPTH"
+  GP.EXITDO
+GP.LOOP
+
+## ---- and a GOTO at depth zero, which must carry no .unwind at all
+
+GOTO UW.DONE
+
+UW.SUB:
+  UW.N = UW.N + 10
+  RETURN
+
+UW.DONE:
+PRINT "U7 DONE";UW.N
+END

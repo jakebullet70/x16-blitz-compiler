@@ -2804,7 +2804,15 @@ _FBStep:
 		bcc 	_FBLoop 					; sits past the GP.ASM pool -- carry clear means it
 _FBExit: 									; hopped there and the walk goes on
 		rts
+;
+;		PASS TWO WORKED THE COUNT OUT WHEN IT WROTE THE GOTO (CommandGOTO), so leave it alone --
+;		and leaving it alone is the point. Recomputing it here would overwrite pass two's answer
+;		with this one, and the two objects would agree whether or not the answers did. Pass one
+;		still comes through here, so the checksum compares the two.
+;
 _FBUnwindFar:
+		lda 	passNumber
+		bne 	_FBNext
 		jmp 	_FBFixUnwind
 ;
 ;		The GP.EXITDO handler lives at the very end of this file, deliberately: dropping it inline
@@ -5074,26 +5082,78 @@ CommandGOAlt:
 
 CommandGOTO: 
 		;
-		;		A GOTO that is lexically inside a GP.DO or a GP.SELECT has to close those blocks'
-		;		stack frames on its way out, because GP.LOOP and GP.ENDSEL -- the things that
-		;		normally release them -- are exactly what it is jumping past. So it is prefixed
-		;		with an .unwind whose count FixBranches fills in: it knows the block depth here
-		;		and at the target, and the difference is how many blocks the jump leaves.
+		;		A GOTO that is lexically inside a GP.DO has to close those blocks' stack frames on
+		;		its way out, because GP.LOOP -- the thing that normally releases them -- is exactly
+		;		what it is jumping past. So it is prefixed with an .unwind saying how many: the
+		;		block depth here, minus the block depth where it lands.
 		;
 		;		ONLY WHEN THE DEPTH IS NON-ZERO, and that matters more than it looks. The .unwind
 		;		handler lives above GPBase, so emitting one unconditionally would mark EVERY
 		;		program as using the GP block -- 2,048 bytes onto a program that never wrote a
-		;		GP keyword. A program that is inside a GP.DO or GP.SELECT already carries it.
+		;		GP keyword. A program that is inside a GP.DO already carries it.
+		;
+		;		THE TARGET IS READ BEFORE ANYTHING IS WRITTEN, because the .unwind goes in front
+		;		of the GOTO and its count depends on where the GOTO goes. That is the only reason
+		;		this does not simply call CompileBranchCommand, which writes its opcode first and
+		;		reads the line number afterwards.
+		;
+		jsr 	GetNextNonSpace
+		jsr 	ParseConstant 				; the target line, into YA
+		bcc 	_CGSyntax
+		sta 	gotoTarget
+		sty 	gotoTarget+1
 		;
 		lda 	blockDepth
 		beq 	_CGNoUnwind
+		jsr 	UnwindCount
+		pha
 		lda 	#PCD_CMD_UNWIND
 		jsr 	WriteCodeByte
-		lda 	#0 							; count placeholder, patched by FixBranches
+		pla
 		jsr 	WriteCodeByte
 _CGNoUnwind:
 		lda 	#PCD_CMD_GOTO
-		jsr 	CompileBranchCommand
+		jsr 	WriteCodeByte
+		lda 	gotoTarget
+		jsr 	WriteCodeByte
+		lda 	gotoTarget+1
+		jsr 	WriteCodeByte
+		rts
+
+_CGSyntax:
+		.error_syntax
+
+; ************************************************************************************************
+;
+;		How many block frames the GOTO to gotoTarget closes, in A.
+;
+;		PASS ONE CANNOT ANSWER. The target line may not have been compiled yet, and the depth
+;		there is exactly what is being asked for -- which is why this used to be FixBranches'
+;		job, done after the whole object was laid out. It writes a zero and FixBranches fills it
+;		in, the old way. Pass two has pass one's table and answers here.
+;
+;		A jump SIDEWAYS -- out of one block into another at the same depth -- computes zero and
+;		closes nothing. That is not worth code to detect: the frame it lands in belongs to a
+;		block whose own GP.LOOP will release it.
+;
+; ************************************************************************************************
+
+UnwindCount:
+		lda 	passNumber
+		beq 	_UCNone 					; pass one: FixBranches still fills this in
+		lda 	gotoTarget
+		ldy 	gotoTarget+1
+		jsr 	STRFindLine 				; the record for the line it lands on
+		bcs 	_UCNone 					; no such line -- the GOTO itself reports it
+		jsr 	STRLineDepth 				; ...and how deep in blocks that line is
+		sta 	unwindTarget
+		sec
+		lda 	blockDepth
+		sbc 	unwindTarget
+		bcs 	_UCDone 					; the target is DEEPER than we are: nothing to close
+_UCNone:
+		lda 	#0
+_UCDone:
 		rts
 
 ; ************************************************************************************************
@@ -5149,6 +5209,10 @@ _CBCSyntax:
 		.section storage
 blockDepth: 								; GP.DO / GP.SELECT nesting at the statement being
 		.fill 	1 						; compiled. Reset by the compiler's own start-up.
+gotoTarget: 								; the line a GOTO being compiled goes to, read before
+		.fill 	2 							; the .unwind in front of it is written
+unwindTarget: 								; the block depth at that line
+		.fill 	1
 		.send 	storage
 
 ; ************************************************************************************************
