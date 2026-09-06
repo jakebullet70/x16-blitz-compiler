@@ -13,6 +13,11 @@
 ## **  and RETURN accepts the lot -- which also means the user can go back
 ## **  and fix the first field without starting again.
 ## **
+## **  LANDING PAD TAKES DIGITS ONLY, through LINEINPUT.ALLOW$. The filter is a
+## **  per-field property here, like the width and the mask, because it is set
+## **  from the array on the way into every field -- a field that leaves it unset
+## **  would otherwise inherit the last one's.
+## **
 ## **  Build:  copy GPB.INC.BL, THEME.INC.BL, APPSYS.INC.BL, LINEINPUT.INC.BL
 ## **          and this file into testing/, then
 ## **            python source/gpc/build_basl.py FORM.EXP.BL FORM.PRG
@@ -39,10 +44,13 @@ DIM FORM.LABEL$(FORM.FIELDS)
 DIM FORM.VALUE$(FORM.FIELDS)
 DIM FORM.WIDTH(FORM.FIELDS)
 DIM FORM.HIDE(FORM.FIELDS)
+DIM FORM.ALLOW$(FORM.FIELDS)
 
 FORM.LABEL$(1) = "CALL SIGN"       : FORM.WIDTH(1) = 12 : FORM.HIDE(1) = 0
 FORM.LABEL$(2) = "LANDING PAD"     : FORM.WIDTH(2) =  4 : FORM.HIDE(2) = 0
 FORM.LABEL$(3) = "ACCESS CODE"     : FORM.WIDTH(3) =  8 : FORM.HIDE(3) = 1
+
+FORM.ALLOW$(2) = "0123456789"
 
 GOSUB FORM.DRAW
 
@@ -56,6 +64,7 @@ FORM.LOOP:
     LINEINPUT.LEN = FORM.WIDTH(FORM.AT)
     LINEINPUT.ATTR = THEME.CLR(THEME.HILITE)
     LINEINPUT.MASK = FORM.HIDE(FORM.AT)
+    LINEINPUT.ALLOW$ = FORM.ALLOW$(FORM.AT)
     LINEINPUT.TEXT$ = FORM.VALUE$(FORM.AT)
     GOSUB LINEINPUT.GET
     FORM.VALUE$(FORM.AT) = LINEINPUT.TEXT$

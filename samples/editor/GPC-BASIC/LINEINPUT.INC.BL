@@ -22,6 +22,8 @@
 ## **        LINEINPUT.ATTR              packed attribute, background * 16 + fg
 ## **        LINEINPUT.TEXT$             the starting value, edited in place
 ## **        LINEINPUT.MASK              non-zero shows asterisks
+## **        LINEINPUT.ALLOW$            the only characters accepted
+## **        LINEINPUT.DENY$             characters refused
 ## **        LINEINPUT.LABEL$            LINEINPUT.ASK only
 ## **
 ## **   out  LINEINPUT.TEXT$             what was typed. ESC restores what it
@@ -36,6 +38,15 @@
 ## **  So a form is a loop: call the field, look at LINEINPUT.KEY, move the focus. The
 ## **  field never scrolls -- when full, further characters are refused and the cursor
 ## **  sits on the last one rather than off the end.
+## **
+## **  THE FIELD CAN BE RESTRICTED to a character set. Both filters are empty by
+## **  default, which accepts what it always did. ALLOW$ lists what may be typed,
+## **  DENY$ what may not, and with both set ALLOW$ decides. They are raw bytes, so
+## **  a set of letters is charset dependent -- PETSCII shifted letters arrive as
+## **  $C1-$DA and ISO ones as $41-$5A. Digits are 48-57 in both:
+## **
+## **      LINEINPUT.ALLOW$ = "0123456789.-"    a signed number
+## **      LINEINPUT.DENY$  = ",:=*?"           a filename
 ## **
 ## **  THE CARET MOVES: LEFT and RIGHT walk it, HOME and END jump to the ends, typing
 ## **  INSERTS where it stands and DEL rubs out what is before it. It starts after the
@@ -155,12 +166,22 @@ LINEINPUT.ASK:
 ## **  around it. It does not: comparisons bind tighter, which is why
 ## **  ED.KEY >= 32 AND ED.KEY <= 126 has always worked in the editor. One
 ## **  range test says what the flag was spelling out.
+## **
+## **  Then the caller's filters, if it set any. ALLOW$ is asked first, so a
+## **  caller that sets both gets the allow list and DENY$ never runs.
 ## ***********************************************************************
 
 LINEINPUT.TYPED:
     IF LEN(LINEINPUT.TEXT$) >= LINEINPUT.LEN THEN RETURN
     IF LINEINPUT.CODE < 32 OR LINEINPUT.CODE = 127 THEN RETURN
     IF LINEINPUT.CODE > 127 AND LINEINPUT.CODE < 160 THEN RETURN
+
+## ---- NESTED, not one AND: the empty test comes first on its own, so a field
+## ---- with no filter -- which is every caller in the tree today -- does not pay
+## ---- for a search of an empty string on every keystroke. A false IF skips the
+## ---- whole line, which is what makes the second test safe to write here.
+    IF LINEINPUT.ALLOW$ <> "" THEN IF GP.INSTR(LINEINPUT.ALLOW$, LINEINPUT.K$) = 0 THEN RETURN
+    IF LINEINPUT.ALLOW$ = "" THEN IF LINEINPUT.DENY$ <> "" THEN IF GP.INSTR(LINEINPUT.DENY$, LINEINPUT.K$) > 0 THEN RETURN
 
 ## ---- INSERTED AT THE CARET, not appended. With the caret at the end --
 ## ---- where it starts, and where it stays unless someone moves it --

@@ -1102,7 +1102,31 @@ the programs that do not include it.
     GOSUB APPSYS.ISEMU
     IF APPSYS.EMU = 1 THEN ...
 
-### `LINEINPUT` wants a character filter
+### `LINEINPUT` wants a character filter — BUILT 06/09/26
+
+**Shipped** as `LINEINPUT.ALLOW$` and `LINEINPUT.DENY$`, in all four copies of the module, with
+`GP-BASIC.md` §4.4, `GP-BASIC.GLOBALS.md` and the regenerated `HELP-TXT`. `FORM.EXP.BL`'s LANDING
+PAD field takes digits only, set per field from a `FORM.ALLOW$()` array beside the width and the
+mask. `LIBBANK.INC.BL` needed nothing, as expected.
+
+**The two guards are nested, not the one-line `AND` sketched below.** Written as one line each,
+`DENY$` would still be asked after `ALLOW$` passed a character, so a caller that set both would get
+`DENY$` deciding — the opposite of the rule the entry states. Nesting also keeps the `GP.INSTR` off
+the keystroke path of every field in the tree that sets no filter, which is all of them today.
+
+**Cost: 55 bytes of p-code**, measured as `GPBMODS` before and after (`OK CODE 19730` -> `19785`),
+against an estimate of 30 here. Tokenised source grew 76 bytes, leaving 703 under BASLOAD's 38,655.
+No token, no runtime byte, nothing in `GPC.BIN`.
+
+**Six cases, twice.** `work-rename/LINTST.BASL` runs them against the banked working copy, calling
+`LINEINPUT.TYPED` directly with a code and a character — no field, no keyboard, no blink — and then
+once more live through `GUI.INPUT` with keys pushed by `kbdbuf_put`, because the filter runs per
+keystroke inside `LIB.CODEBANK`. `work-lineinput/LINTST2.BASL` is the same six against the unbanked
+root library. No filter set leaves the field as it was; `ALLOW$` refuses without moving the caret;
+`DENY$` passes everything else; both set gives `ALLOW$`; a full field still refuses; and RETURN is
+still refused by the three older guards, which the filter never sees.
+
+The original entry follows.
 
 From §1.4 of [SIMONS-BASIC.REVIEW.md](docs/blitz/SIMONS-BASIC.REVIEW.md), which dispositions all 114
 Simons' BASIC keywords and holds the other five candidates. Simons' `FETCH` restricts three things

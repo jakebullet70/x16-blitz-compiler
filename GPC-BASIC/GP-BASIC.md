@@ -825,7 +825,7 @@ is self-describing — it carries the stash's 4-byte header — so loading one n
 
 | Routine | in | out |
 |---|---|---|
-| `LINEINPUT.GET` | `LINEINPUT.X` `.Y` `.LEN` `.ATTR` `.TEXT$` `.MASK` | `LINEINPUT.TEXT$` `LINEINPUT.KEY` |
+| `LINEINPUT.GET` | `LINEINPUT.X` `.Y` `.LEN` `.ATTR` `.TEXT$` `.MASK` `.ALLOW$` `.DENY$` | `LINEINPUT.TEXT$` `LINEINPUT.KEY` |
 | `LINEINPUT.ASK` | the same plus `LINEINPUT.LABEL$` | the same; `LINEINPUT.X` restored |
 
 ```basic
@@ -857,7 +857,28 @@ scroll: when it is full, further characters are refused and the cursor inverts t
 rather than sitting past the end. The cursor blinks off `TI` rather than a delay loop; a delay loop
 would swallow keys pressed during it.
 
-Example: [`FORM.EXP.BL`](FORM.EXP.BL) — three fields, one masked, in a themed panel.
+`LINEINPUT.ALLOW$` and `LINEINPUT.DENY$` restrict what may be typed. Both are empty by default, and
+the field then takes any printable character, as it always has. `ALLOW$` lists the characters
+accepted and `DENY$` the ones refused; a caller that sets both gets `ALLOW$`, and `DENY$` is not
+consulted. A refused key changes nothing — not the text, and not the caret.
+
+They compare raw bytes, so a set of LETTERS depends on the charset: PETSCII shifted letters arrive
+as `$C1-$DA` and ISO ones as `$41-$5A`, and an `ALLOW$` written for one silently refuses every
+capital in the other. Digits are 48-57 in both. Use `ALLOW$` for a closed set short enough to write
+out, `DENY$` for everything-except:
+
+| Field | Spelling |
+|---|---|
+| Digits only | `ALLOW$ = "0123456789"` |
+| Number with sign and point | `ALLOW$ = "0123456789.-"` |
+| Yes or no | `ALLOW$ = "YyNn"` |
+| Letters, no digits | `DENY$ = "0123456789"` |
+| Filename, no punctuation | `DENY$ = ",:=*?"` |
+
+Both are sticky, like every other input in the library, so a form sets them on the way into each
+field rather than once at the top.
+
+Example: [`FORM.EXP.BL`](FORM.EXP.BL) — three fields, one masked and one digits-only, in a themed panel.
 
 ### 4.5 `BMX.INC.BL` — a BMX bitmap into VERA
 
