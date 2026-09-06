@@ -25,7 +25,7 @@
 ## **  THEME.CLR(2): no variable, no lookup, and a one-byte constant index.
 ## **
 ## **  Usage:
-## **      THEME.ID = 1 : GOSUB THEME.LOAD
+## **      THEME.ID = 1 : GOSUB THEME.SELECT
 ## **      GP.BOX 4,2,30,8, 2, THEME.CLR(THEME.BORDER)
 ## **      GP.PRINTAT 6,3, "TITLE", THEME.CLR(THEME.TITLE)
 ## **
@@ -58,7 +58,7 @@
 
 GOTO THEME.SKIP
 
-## THEME.LOAD -- fill THEME.CLR from THEME.ID.
+## THEME.SELECT -- fill THEME.CLR from THEME.ID.
 ##
 ## THEME.CLR is DIMmed here rather than left implicit: an implicit array is 0..10 and
 ## DIMming one GPC already auto-dimensioned is an error, so the module owns it outright.
@@ -66,15 +66,15 @@ GOTO THEME.SKIP
 ## NO DATA STATEMENT, on purpose: READ walks every DATA in the whole program in order,
 ## so a library owning one would silently derail the caller's own READs.
 
-THEME.LOAD.BODY:
+THEME.SELECT.BODY:
     THEME.FIRST = 0
     IF THEME.READY = 0 THEN DIM THEME.CLR(THEME.SLOTS) : THEME.READY = 1 : THEME.FIRST = 1
-    IF THEME.ID = 1 THEN GOTO THEME.LOAD.DARK
-    IF THEME.ID = 2 THEN GOTO THEME.LOAD.LIGHT
-    IF THEME.ID = 3 THEN GOTO THEME.LOAD.GRAY
-    IF THEME.ID = 4 THEN GOTO THEME.LOAD.CUSTOM
+    IF THEME.ID = 1 THEN GOTO THEME.SELECT.DARK
+    IF THEME.ID = 2 THEN GOTO THEME.SELECT.LIGHT
+    IF THEME.ID = 3 THEN GOTO THEME.SELECT.GRAY
+    IF THEME.ID = 4 THEN GOTO THEME.SELECT.CUSTOM
 
-THEME.LOAD.X16:
+THEME.SELECT.X16:
     THEME.CLR(THEME.PAGE)   = 6 * 16 + 6
     THEME.CLR(THEME.TEXT)   = 6 * 16 + 1
     THEME.CLR(THEME.TITLE)  = 6 * 16 + 3
@@ -84,7 +84,7 @@ THEME.LOAD.X16:
     THEME.CLR(THEME.WARN)   = 6 * 16 + 13
     RETURN
 
-THEME.LOAD.DARK:
+THEME.SELECT.DARK:
     THEME.CLR(THEME.PAGE)   = 0 * 16 + 0
     THEME.CLR(THEME.TEXT)   = 0 * 16 + 15
     THEME.CLR(THEME.TITLE)  = 0 * 16 + 1
@@ -96,7 +96,7 @@ THEME.LOAD.DARK:
 
 ## A white page. DIMMED is mid grey rather than dark grey so that reversing it
 ## for a status bar still leaves the text readable on it.
-THEME.LOAD.LIGHT:
+THEME.SELECT.LIGHT:
     THEME.CLR(THEME.PAGE)   = 1 * 16 + 1
     THEME.CLR(THEME.TEXT)   = 1 * 16 + 0
     THEME.CLR(THEME.TITLE)  = 1 * 16 + 6
@@ -109,7 +109,7 @@ THEME.LOAD.LIGHT:
 ## Lifted from the XFMGR file manager, src/stree.pb MODULE theme: TXT_NORMAL $B1,
 ## TXT_BRIGHT $B7, BOXES $BE, ROW_HILIGHT $E1. DIMMED and WARN are not in that module
 ## and are chosen here.
-THEME.LOAD.GRAY:
+THEME.SELECT.GRAY:
     THEME.CLR(THEME.PAGE)   = 11 * 16 + 11
     THEME.CLR(THEME.TEXT)   = 11 * 16 + 1
     THEME.CLR(THEME.TITLE)  = 11 * 16 + 7
@@ -120,24 +120,24 @@ THEME.LOAD.GRAY:
     RETURN
 
 ## CUSTOM keeps whatever is in THEME.CLR, so switching to it carries the colours the
-## user was looking at. THEME.FIRST is set only when THEME.LOAD had to create the array,
+## user was looking at. THEME.FIRST is set only when THEME.SELECT had to create the array,
 ## which is the one case where there is nothing to keep.
-THEME.LOAD.CUSTOM:
+THEME.SELECT.CUSTOM:
     IF THEME.FIRST = 0 THEN RETURN
-    GOTO THEME.LOAD.X16
+    GOTO THEME.SELECT.X16
 
-## THEME.NEXT -- the following theme, loaded. Falls into THEME.LOAD, so its
+## THEME.NEXT -- the following theme, selected. Falls into THEME.SELECT, so its
 ## RETURN is the one the caller gets.
 THEME.NEXT:
     THEME.ID = THEME.ID + 1
     IF THEME.ID >= THEME.COUNT THEN THEME.ID = 0
-    GOTO THEME.LOAD
+    GOTO THEME.SELECT
 
 ## THEME.RESET -- the selected theme's shipped values, throwing away any changes.
 ## CUSTOM has none of its own, so it resets to X16.
 THEME.RESET:
-    IF THEME.ID = 4 THEN GOTO THEME.LOAD.X16
-    GOTO THEME.LOAD
+    IF THEME.ID = 4 THEN GOTO THEME.SELECT.X16
+    GOTO THEME.SELECT
 
 ## THEME.SET -- make THEME.ATTR the colour PRINT uses.
 ##

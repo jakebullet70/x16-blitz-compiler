@@ -84,7 +84,7 @@ SCREEN GM.MODE
 GP.CALL APPSYS.SCRMODE, 0, 0, 0, 1
 APPSYS.COLS = GP.X : APPSYS.ROWS = GP.Y
 
-THEME.ID = 0 : GOSUB THEME.LOAD
+THEME.ID = 0 : GOSUB THEME.SELECT
 
 ## A CODE BANK IS CLAIMED AND A DATA BANK IS ALLOCATED, and the difference is
 ## not a style choice. GP.BANKED takes a decimal constant read while the object
@@ -285,7 +285,7 @@ GMX.DD.LOAD:
     MENUVERT.ITEM$(1) = " GUI.SAY"
     MENUVERT.ITEM$(2) = " GUI.YN"
     MENUVERT.ITEM$(3) = " GUI.MENU"
-    MENUVERT.ITEM$(4) = " GUI.TEXT"
+    MENUVERT.ITEM$(4) = " GUI.INPUT"
     MENUVERT.ITEM$(5) = " GUI.LISTBOX  ONE"
     MENUVERT.ITEM$(6) = " GUI.LISTBOX  MANY"
     MENUVERT.ITEM$(7) = " GUI.OPEN + GUI.CLOSE"
@@ -421,7 +421,7 @@ GMX.DIALOG:
   GP.CASE 3
     GOSUB GMX.D.MENU
   GP.CASE 4
-    GOSUB GMX.D.TEXT
+    GOSUB GMX.D.INPUT
   GP.CASE 5
     GOSUB GMX.D.LIST.ONE
   GP.CASE 6
@@ -528,31 +528,31 @@ GMX.D.MENU:
 
 
 ## ***********************************************************************
-## **  GMX.D.TEXT -- GUI.TEXT, plain then masked.
+## **  GMX.D.INPUT -- GUI.INPUT, plain then masked.
 ## **
-## **  The answer is GUI.INPUT$ and not GUI.TEXT$: GUI.TEXT is the routine's
-## **  own label, and a string of that name beside it compiles into something
-## **  else.
+## **  The answer is GUI.TEXT$ and not GUI.INPUT$: GUI.INPUT is the routine's
+## **  own label, and BASLOAD stops with DUPLICATE SYMBOL on a string of that
+## **  name beside it -- the $ does not separate the two.
 ## ***********************************************************************
 
-GMX.D.TEXT:
+GMX.D.INPUT:
   GOSUB GMX.D.RESET
-  GUI.TITLE$ = " GUI.TEXT "
+  GUI.TITLE$ = " GUI.INPUT "
   GUI.MSG$ = "TYPE A NAME."
   GUI.LEN = 20
-  GUI.INPUT$ = "GPC"
-  GOSUB GUI.TEXT
-  GM.TYPED$ = GUI.INPUT$
+  GUI.TEXT$ = "GPC"
+  GOSUB GUI.INPUT
+  GM.TYPED$ = GUI.TEXT$
   GM.TYPED.OK = GUI.OK
 
   GOSUB GMX.D.RESET
-  GUI.TITLE$ = " GUI.TEXT - MASKED "
+  GUI.TITLE$ = " GUI.INPUT - MASKED "
   GUI.MSG$ = "AND THE SAME FIELD AS A PASSWORD."
   GUI.LEN = 12
-  GUI.INPUT$ = ""
+  GUI.TEXT$ = ""
   GUI.MASK = 1
-  GOSUB GUI.TEXT
-  GM.RESULT$ = "GUI.TEXT OK " + MID$(STR$(GM.TYPED.OK), 2) + "  [" + GM.TYPED$ + "]"
+  GOSUB GUI.INPUT
+  GM.RESULT$ = "GUI.INPUT OK " + MID$(STR$(GM.TYPED.OK), 2) + "  [" + GM.TYPED$ + "]"
   RETURN
 
 

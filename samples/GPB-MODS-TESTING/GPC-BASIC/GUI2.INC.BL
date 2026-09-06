@@ -17,7 +17,7 @@
 ## **  REQUIRES, and does not #INCLUDE for you, in this order:
 ## **      GPB.INC.BL        GP.FILL, GP.PRINTAT, GP.STRPTR, GP.SELECT
 ## **      STASH.INC.BL      via GUI.OPEN -- and wants a #SYMFILE, see its header
-## **      THEME.INC.BL      the colour roles, and GOSUB THEME.LOAD first
+## **      THEME.INC.BL      the colour roles, and GOSUB THEME.SELECT first
 ## **      MENUVERT.INC.BL   MENUVERT.ROW draws the rows
 ## **      GUI.INC.BL        GUI.OPEN and GUI.CLOSE are the box
 ## **
@@ -59,7 +59,7 @@
 ## **  are the ones samples/editor dispatches on, so they are known good.
 ## **
 ## **  THE LAST TWO ARE ON THE BOX, in a dimmed row under the list with ENTER and
-## **  ESC picked out -- GUI.TEXT's hint, in GUI.TEXT's words, at GUI.TEXT's two
+## **  ESC picked out -- GUI.INPUT's hint, in GUI.INPUT's words, at GUI.INPUT's two
 ## **  offsets, because a dialog that answers OK or CANCEL should say so the same
 ## **  way wherever you meet it. It costs the body a spacer row and a hint row,
 ## **  and the box a minimum width of 26.
@@ -139,7 +139,7 @@ GUI.LISTBOX.BODY:
 
 ## ---- The hint, and the two rows it costs: one blank between it and the list, then
 ## ---- itself. Fixed text, because the two key names are lit at known offsets rather
-## ---- than searched for -- the same trade GUI.TEXT makes, and the same 0 and 14.
+## ---- than searched for -- the same trade GUI.INPUT makes, and the same 0 and 14.
 
     GUI.LISTBOX.HINT$ = "ENTER = OK    ESC = CANCEL"
     IF LEN(GUI.LISTBOX.HINT$) > GUI.BODY.WIDTH THEN GUI.BODY.WIDTH = LEN(GUI.LISTBOX.HINT$)

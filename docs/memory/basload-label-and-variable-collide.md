@@ -14,6 +14,11 @@ as the owner of the name.
 Proved 03/09/26 building `GPC-BASIC/GUI2.INC.BL`; renaming the string to `GUI.LISTBOX.EDGE$` fixed
 it with no other change, and the 16-case regression went green.
 
+**Hit again 06/09/26 renaming `GUI.TEXT` to `GUI.INPUT`**, whose own in/out string was already
+`GUI.INPUT$`. The fix was to SWAP the two: the routine is `GUI.INPUT` and the string it edits is
+`GUI.TEXT$`. Check the target name against the variables before any rename, not after the
+tokenise fails.
+
 **A longer name is fine** -- `GUI.OPEN` and `GUI.OPEN.DRAW` are both labels, `GUI.SCREEN` is a
 label beside the variables `GUI.SCREEN.ROWS` and `GUI.SCREEN.COLS`. It is only the exact same name
 that collides.

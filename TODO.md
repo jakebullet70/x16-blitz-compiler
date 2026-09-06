@@ -209,14 +209,36 @@ the layout documented, which is the only variant with clean semantics — and it
 `STRCASE.INC.BL` is built on it, as `SORT.INC.BL` is on `GP.ARRPTR`. Nothing is waiting on a decision
 here.
 
-## Library renames waiting to be done
+## Library renames — DONE in the GPB-MODS-TESTING working copy, 06/09/26
 
-### `GUI.TEXT` should be `GUI.INPUT`
+Both renames are in `samples/GPB-MODS-TESTING/`, tokenised, compiled and run. **The rest of the tree
+still says the old names**: root `GPC-BASIC/`, `samples/editor`, `samples/GPC-HELP`,
+`samples/color-test`, `GP-BASIC.md` and `GP-BASIC.GLOBALS.md`, the `HELP-TXT` entries GPB.HELP reads,
+three readmes and `color-demo.bat`. Copy the working copy over the root modules and sweep the callers
+in one pass; the two naming decisions below are already taken.
+
+**Proven by running it, not by reading it.** `testing/GPBTRN.BASL` builds the renamed modules the
+way `GPBMODS` does — the library in bank 4 behind `LIBBANK`'s shims — and pushes its keys through
+`kbdbuf_put`. `THEME.SELECT` fills the palette and `THEME.NEXT` still falls into it; `GUI.INPUT`
+comes back with `GUI.TEXT$` = `GPC` and `GUI.OK` 1 on RETURN, and puts `KEEP ME` back with
+`GUI.OK` 0 on ESC. **The rename costs no p-code**: `GPBMODS` compiles to the same `OK CODE 19730
+FREE 5888`. It costs 4 bytes of tokenised source, which leaves 779 under BASLOAD's 38,655.
+It needs the renamed modules copied into `testing/`, so run it after the sweep, not before.
+
+### `GUI.TEXT` should be `GUI.INPUT` — DONE here, AND ITS STRING MOVED WITH IT
 
 It asks for a line of text and gives it back; `GUI.TEXT` reads like it draws some. Every caller and
 every shim in `LIBBANK.INC.BL` changes with it. Nothing depends on the old name outside this repo.
 
-### `THEME.LOAD` should be `THEME.SELECT`, and `THEME.LOAD` should then load an array
+**The routine's own in/out string was already `GUI.INPUT$`, so the obvious rename does not compile.**
+BASLOAD will not have a label and a variable of one name, and the `$` does not separate them, so a
+`GUI.INPUT:` label beside `GUI.INPUT$` is `DUPLICATE SYMBOL` — the trap `GUI.LISTBOX.FOOT$` fell
+into. **The two names were swapped**: the routine is `GUI.INPUT`, the string it edits is `GUI.TEXT$`.
+That name was free, being mentioned only in the comment explaining why the string was not called
+that, and the comment now states the real rule instead. `GUI.TEXT.FIELD` and `GUI.TEXT.BODY` follow
+the label; `GPBMODS`'s row handler `GMX.D.TEXT` became `GMX.D.INPUT`.
+
+### `THEME.LOAD` should be `THEME.SELECT` — DONE here. The array-taking `THEME.LOAD` is not written
 
 `THEME.LOAD` does not load anything. It takes a number in `THEME.ID` and picks one of five built-in
 palettes, which is selecting. Rename it `THEME.SELECT` and the name is free for the routine that is
@@ -235,14 +257,15 @@ not keywords.
 **The rename is not a search and replace.** The five branch labels share the prefix —
 `THEME.LOAD.X16` `.DARK` `.LIGHT` `.GRAY` `.CUSTOM`, plus `.BODY` in the `GPB-MODS-TESTING`
 variant — so a blind swap renames them too and then the new `THEME.LOAD` collides with the family it
-just created. Rename the branches to `THEME.SELECT.*` in the same pass. Counted 2026-09-06,
+just created. Rename the branches to `THEME.SELECT.*` in the same pass, which is what was done
+here. Counted 2026-09-06,
 excluding `TODO.md` and the `testing/` mirror: **72 bare `THEME.LOAD` references, 131 including the
 label family**, across the library, six samples, `GP-BASIC.md` and `GP-BASIC.GLOBALS.md`.
-`LIBBANK.INC.BL` carries a shim, as it does for `GUI.TEXT`.
+`LIBBANK.INC.BL` carries a shim, as it does for `GUI.INPUT`.
 
-**Five copies of `THEME.INC.BL`, and one has already drifted** —
-`samples/GPB-MODS-TESTING/GPC-BASIC/THEME.INC.BL` differs from the other four, which are identical.
-Reconcile before renaming, not after.
+**The drift between the five copies of `THEME.INC.BL` was one line** — the `GPB-MODS-TESTING`
+variant's `.BODY` suffix, which its banked build needs. The other four are identical, so the sweep
+is a copy plus that one suffix.
 
 Two decisions to take at the keyboard:
 
