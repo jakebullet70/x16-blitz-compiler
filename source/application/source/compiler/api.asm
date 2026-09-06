@@ -37,6 +37,8 @@ CompilerAPI:
 		beq 	_CASymLookup
 		cmp 	#BLC_ENDPASS1
 		beq 	_CAEndPass1
+		cmp 	#BLC_ENDPASS2
+		beq 	_CAEndPass2
 		.debug
 
 ; ************************************************************************************************
@@ -48,6 +50,16 @@ CompilerAPI:
 
 _CAEndPass1:
 		jmp 	PrepareObjectCode
+
+; ************************************************************************************************
+;
+;		End of pass two: everything still buffered, then the padding and the GP.BANKED regions.
+;		Comes back with the object's checksum in YA -- see ObjStreamClose.
+;
+; ************************************************************************************************
+
+_CAEndPass2:
+		jmp 	ObjStreamClose
 
 ; ************************************************************************************************
 ;
@@ -94,8 +106,8 @@ _CAResetOut:
 		rts
 
 _CACloseOut:
-		jmp 	ObjStreamBody 				; the compile worked: put the object code in the file
-											; that has been open since the end of pass one
+		stz 	objStreamLive 				; the compile worked and the object is complete, so
+		jmp 	IOObjectClose 				; there is nothing left to tidy away
 
 ; ************************************************************************************************
 ;
@@ -114,6 +126,13 @@ _CAWriteByte:
 		;
 		;		The ceiling is page aligned, so comparing the high byte is exact.
 		;
+		;
+		;		PASS TWO DOES NOT STORE IT. Its object goes into the file as it is compiled --
+		;		see ObjStreamByte -- and objPtr is a write cursor over an object that is not in
+		;		memory at all. Pass one still lays one out, for as long as anything reads it.
+		;
+		lda 	passNumber
+		bne 	_CAWBStream
 		lda 	objPtr+1
 		cmp 	#ObjectCeiling >> 8
 		bcs 	_CAWBTooBig
@@ -122,6 +141,11 @@ _CAWriteByte:
 		jsr 	GPScanByte 					; ...and the one place every object byte goes past, so
 											; it is where "does this program reach a GP handler?"
 											; is answered -- see compiler/gpscan.asm
+		bra 	_CAWBBump
+_CAWBStream:
+		txa
+		jsr 	ObjStreamByte
+_CAWBBump:
 		inc 	objPtr
 		bne 	_HWOWBNoCarry
 		inc 	objPtr+1

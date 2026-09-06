@@ -526,40 +526,499 @@ ObjStreamReady:
 		lda 	#$FF 						; the image left CLRCHN behind it, so neither channel
 		sta 	ioInSel 					; is known any more
 		sta 	ioOutSel
+		jsr 	ObjStreamReset 				; an empty buffer for pass two to fill
 		clc
+		rts
+
+
+; ************************************************************************************************
+;
+;		PASS TWO WRITES THE OBJECT AS IT COMPILES IT.
+;
+;		THE BUFFER IS IN A BANK, and it is there for one reason: a statement that fails to
+;		compile with a SYNTAX error is rolled back to where it started and a runtime throw-stub
+;		is put in its place (DeferStatementToRuntime). Bytes already sent to the file cannot be
+;		taken back, so nothing goes out until the statement that wrote it has compiled. Flushing
+;		8K at a time also means the write channel is selected once per 8K rather than once per
+;		source line, which is the same trick the runtime image already uses a page at a time.
+;
+;		A REGION IS A BANK OF ITS OWN. Pass two writes each GP.BANKED region straight to its
+;		final address, which is ABOVE the low code it is still emitting -- so the two cannot
+;		share one forward-only stream. One bank per region costs nothing (a region is at most
+;		8K by definition, and there are at most eight) and makes a region random access, so a
+;		rollback inside one simply gets written over.
+;
+;		THE OBJECT GOES OUT IN FILE ORDER: the low code and the GP.ASM pool as they are
+;		compiled, then the alignment padding, then each region out of its bank. That is what
+;		lets the checksum stay what it was -- a Fletcher-16 over the finished object -- with
+;		pass one summing its buffer and pass two summing what it writes.
+;
+; ************************************************************************************************
+
+OBJ_BUF_BANK = 7 							; the low code, waiting to go out
+OBJ_RGN_BANK = 8 							; ...and one bank per region, 8 upwards
+OBJ_WINDOW   = $A000
+OBJ_BUF_SIZE = $2000
+
+; ************************************************************************************************
+;
+;		Start of pass two: an empty buffer, an empty sum, and every region's bank filled with
+;		the padding byte.
+;
+;		THE FILL IS NOT WASTE. Above each region's end marker sits filler that carries it up to
+;		a page boundary, and pass two writes none of it -- there is nothing to write. Pass one's
+;		relocator fills the same bytes with the same $FF, so the two objects agree.
+;
+; ************************************************************************************************
+
+ObjStreamReset:
+		.set16 	objBufBase, FreeMemory
+		.set16 	objBufTop, FreeMemory
+		.set16 	objStmtAt, FreeMemory
+		stz 	objDeferWas
+		stz 	objSum
+		stz 	objSum+1
+		lda 	#3 							; _variable.space and its operand: the one place the
+		sta 	objSumSkip 					; two passes are meant to differ
+		;
+		lda 	layoutCount
+		beq 	_OSRDone
+		stz 	objRgnNo
+_OSRBank:
+		clc
+		lda 	objRgnNo
+		adc 	#OBJ_RGN_BANK
+		jsr 	ObjStreamBank
+		lda 	#OBJ_WINDOW >> 8
+		sta 	zTemp0+1
+		stz 	zTemp0
+		lda 	#$FF
+_OSRPage:
+		ldy 	#0
+_OSRByte:
+		sta 	(zTemp0),y
+		iny
+		bne 	_OSRByte
+		inc 	zTemp0+1
+		ldx 	zTemp0+1
+		cpx 	#(OBJ_WINDOW + OBJ_BUF_SIZE) >> 8
+		bcc 	_OSRPage
+		ldx 	objSaveBank
+		stx 	CompilerRAMBankReg
+		inc 	objRgnNo
+		lda 	objRgnNo
+		cmp 	layoutCount
+		bcc 	_OSRBank
+_OSRDone:
 		rts
 
 ; ************************************************************************************************
 ;
-;		PART TWO: the object code, FreeMemory..objPtr. Written at the end of a compile that
-;		worked, through BLC_CLOSEOUT.
+;		One object byte, in A, belonging at objPtr. Called from _CAWriteByte in pass two.
 ;
-;		It lands at ObjectBase on reload in embedded mode, and at $0900 -- $0A00 for a banked
-;		program, above the extension page -- in shared mode. One loop for both: the two differed
-;		in their labels and in nothing else.
+;		zTemp0 AND zTemp1 ARE BORROWED AND GIVEN STRAIGHT BACK. This runs between two
+;		instructions of whatever generator is emitting, and they hold live pointers in both of
+;		them.
 ;
 ; ************************************************************************************************
 
-ObjStreamBody:
-		jsr 	IOSelectObject
-		.set16 	zTemp0,FreeMemory
-_OSBoLoop:
-		lda 	zTemp0 						; done ?
-		cmp 	objPtr
-		bne 	_OSBoByte
+ObjStreamByte:
+		sta 	objByte
+		lda 	zTemp0
+		pha
 		lda 	zTemp0+1
-		cmp 	objPtr+1
-		beq 	_OSBoDone
-_OSBoByte:
+		pha
+		lda 	zTemp1
+		pha
+		lda 	zTemp1+1
+		pha
+		jsr 	ObjStreamWork
+		pla
+		sta 	zTemp1+1
+		pla
+		sta 	zTemp1
+		pla
+		sta 	zTemp0+1
+		pla
+		sta 	zTemp0
+		rts
+
+ObjStreamWork:
+		;
+		;		A statement that has just armed itself: remember where it begins. Nothing from
+		;		there on can go out until it has compiled, because a SYNTAX error rolls the write
+		;		cursor back to it and puts a throw-stub in its place.
+		;
+		lda 	deferErrors
+		beq 	_OSWKeep
+		ldx 	objDeferWas
+		bne 	_OSWArmed
+		lda 	objPtr
+		sta 	objStmtAt
+		lda 	objPtr+1
+		sta 	objStmtAt+1
+_OSWArmed:
+		lda 	#1
+_OSWKeep:
+		sta 	objDeferWas
+		;
+		lda 	regionOpen 					; inside a GP.BANKED region ?
+		bne 	_OSWRegion
+		jsr 	ObjStreamOffset 			; where in the buffer it goes
+		bcs 	_OSWLow
+		jsr 	ObjStreamFlush 				; full: send out what can go, and ask again
+		jsr 	ObjStreamOffset
+		bcc 	_OSWLost
+_OSWLow:
+		lda 	#OBJ_BUF_BANK
+		jsr 	ObjStreamWindow
+		lda 	objByte
+		sta 	(zTemp0)
+		clc 								; the buffer now holds everything up to here, and a
+		lda 	objPtr 						; statement rolled back lowers this with it
+		adc 	#1
+		sta 	objBufTop
+		lda 	objPtr+1
+		adc 	#0
+		sta 	objBufTop+1
+		bra 	_OSWClose
+;
+;		A single statement whose p-code is longer than the whole buffer, which no BASIC line can
+;		produce: a tokenised source line is 252 bytes at most.
+;
+_OSWLost:
+		.error_internal
+;
+;		Inside a region, which is a bank of its own -- random access, so a rollback here is
+;		simply written over and there is nothing to hold back.
+;
+_OSWRegion:
+		lda 	nextRegion
+		asl 	a
+		tax
+		sec
+		lda 	objPtr
+		sbc 	layoutStart,x
+		sta 	objBufIdx
+		lda 	objPtr+1
+		sbc 	layoutStart+1,x
+		sta 	objBufIdx+1
+		clc
+		lda 	nextRegion
+		adc 	#OBJ_RGN_BANK
+		jsr 	ObjStreamWindow
+		lda 	objByte
+		sta 	(zTemp0)
+_OSWClose:
+		lda 	objSaveBank
+		sta 	CompilerRAMBankReg
+		rts
+
+;
+;		objBufIdx = objPtr - objBufBase, with carry set if that is inside the window.
+;
+ObjStreamOffset:
+		sec
+		lda 	objPtr
+		sbc 	objBufBase
+		sta 	objBufIdx
+		lda 	objPtr+1
+		sbc 	objBufBase+1
+		sta 	objBufIdx+1
+		bcc 	_OSOOut 					; below it: rolled back past what is still held
+		cmp 	#OBJ_BUF_SIZE >> 8
+		bcs 	_OSOOut
+		sec
+		rts
+_OSOOut:
+		clc
+		rts
+
+;
+;		Select bank A, remembering the caller's, and point zTemp0 at OBJ_WINDOW + objBufIdx.
+;
+ObjStreamWindow:
+		jsr 	ObjStreamBank
+		lda 	objBufIdx
+		sta 	zTemp0
+		clc
+		lda 	objBufIdx+1
+		adc 	#OBJ_WINDOW >> 8
+		sta 	zTemp0+1
+		rts
+
+ObjStreamBank:
+		pha
+		lda 	CompilerRAMBankReg
+		sta 	objSaveBank
+		pla
+		sta 	CompilerRAMBankReg
+		rts
+
+; ************************************************************************************************
+;
+;		Send what the buffer holds to the file -- everything, or everything below the statement
+;		in flight, which then moves down to the bottom of the window so the buffer is empty
+;		behind it.
+;
+; ************************************************************************************************
+
+ObjStreamFlush:
+		lda 	deferErrors
+		beq 	_OSFAll
+		lda 	objStmtAt
+		ldy 	objStmtAt+1
+		bra 	_OSFTo
+_OSFAll:
+		lda 	objBufTop
+		ldy 	objBufTop+1
+_OSFTo:
+		sec 								; how many bytes can go
+		sbc 	objBufBase
+		sta 	objFlushLen
+		tya
+		sbc 	objBufBase+1
+		sta 	objFlushLen+1
+		lda 	objFlushLen
+		ora 	objFlushLen+1
+		bne 	_OSFSome
+		rts 								; nothing can go yet
+_OSFSome:
+		jsr 	IOSelectObject
+		stz 	objBufIdx
+		stz 	objBufIdx+1
+_OSFLoop:
+		lda 	objBufIdx
+		cmp 	objFlushLen
+		lda 	objBufIdx+1
+		sbc 	objFlushLen+1
+		bcs 	_OSFWritten
+		lda 	#OBJ_BUF_BANK 				; the window closes again before every write: the
+		jsr 	ObjStreamWindow 			; KERNAL's own buffers live in bank 0
 		lda 	(zTemp0)
-		jsr 	IOWriteByte
+		ldx 	objSaveBank
+		stx 	CompilerRAMBankReg
+		jsr 	ObjEmit
+		inc 	objBufIdx
+		bne 	_OSFLoop
+		inc 	objBufIdx+1
+		bra 	_OSFLoop
+_OSFWritten:
+		lda 	deferErrors 				; nothing was held back, so nothing has to move
+		beq 	_OSFRebase
+		sec
+		lda 	objBufTop
+		sbc 	objStmtAt
+		sta 	objMoveLen
+		lda 	objBufTop+1
+		sbc 	objStmtAt+1
+		sta 	objMoveLen+1
+		ora 	objMoveLen
+		beq 	_OSFRebase
+		;
+		lda 	#OBJ_BUF_BANK
+		jsr 	ObjStreamBank
+		clc
+		lda 	objFlushLen
+		sta 	zTemp0
+		lda 	objFlushLen+1
+		adc 	#OBJ_WINDOW >> 8
+		sta 	zTemp0+1
+		.set16 	zTemp1, OBJ_WINDOW
+_OSFMove:
+		lda 	(zTemp0)
+		sta 	(zTemp1)
 		inc 	zTemp0
-		bne 	_OSBoLoop
+		bne 	_OSFMSrc
 		inc 	zTemp0+1
-		bra 	_OSBoLoop
-_OSBoDone:
-		stz 	objStreamLive 				; written in full, so there is nothing to tidy away
-		jmp 	IOObjectClose
+_OSFMSrc:
+		inc 	zTemp1
+		bne 	_OSFMDst
+		inc 	zTemp1+1
+_OSFMDst:
+		lda 	objMoveLen
+		bne 	_OSFMLow
+		dec 	objMoveLen+1
+_OSFMLow:
+		dec 	objMoveLen
+		lda 	objMoveLen
+		ora 	objMoveLen+1
+		bne 	_OSFMove
+		lda 	objSaveBank
+		sta 	CompilerRAMBankReg
+_OSFRebase:
+		clc
+		lda 	objBufBase
+		adc 	objFlushLen
+		sta 	objBufBase
+		lda 	objBufBase+1
+		adc 	objFlushLen+1
+		sta 	objBufBase+1
+_OSFNone:
+		rts
+
+; ************************************************************************************************
+;
+;		One byte into the file, and into the running Fletcher-16 of the object. The first three
+;		-- _variable.space and its operand -- are written but not summed: they are the one place
+;		the two passes are meant to differ, and ObjectChecksum skips them on the other side.
+;
+; ************************************************************************************************
+
+ObjEmit:
+		pha
+		lda 	objSumSkip
+		beq 	_OEMSum
+		dec 	objSumSkip
+		bra 	_OEMWrite
+_OEMSum:
+		pla
+		pha
+		clc
+		adc 	objSum 						; sum1 += byte
+		sta 	objSum
+		clc
+		adc 	objSum+1 					; sum2 += sum1, so a reordering shows up too
+		sta 	objSum+1
+_OEMWrite:
+		pla
+		jmp 	IOWriteByte
+
+; ************************************************************************************************
+;
+;		END OF PASS TWO: everything the buffer still holds, then the alignment padding below the
+;		first GP.BANKED region, then each region out of its bank.
+;
+;		THE SUM COMES BACK IN YA with carry set, and the compiler compares it against pass one's.
+;		Carry clear would mean "no sum, walk the object yourself", which is what the native test
+;		harness answers -- it keeps its object in a bank and the walk still works there.
+;
+; ************************************************************************************************
+
+ObjStreamClose:
+		jsr 	ObjStreamFlush 				; deferErrors is zero at the end of a compile, so
+											; this empties it
+		lda 	layoutCount
+		bne 	_OSCPlaced
+		jmp 	_OSCSum 					; no regions: the buffer was the whole object
+_OSCPlaced:
+		jsr 	IOSelectObject
+		;
+		;		The padding. One gap only: every region above the first starts exactly where the
+		;		one below it ends, which is what the filler is for.
+		;
+		lda 	objBufTop
+		sta 	objPadAt
+		lda 	objBufTop+1
+		sta 	objPadAt+1
+_OSCPad:
+		lda 	objPadAt
+		cmp 	layoutStart
+		bne 	_OSCPadByte
+		lda 	objPadAt+1
+		cmp 	layoutStart+1
+		beq 	_OSCRegions
+_OSCPadByte:
+		lda 	#$FF
+		jsr 	ObjEmit
+		inc 	objPadAt
+		bne 	_OSCPad
+		inc 	objPadAt+1
+		bra 	_OSCPad
+;
+;		...and the regions, in source order, which is the order they sit in. A region's span is
+;		where the next one starts, or the object's own end for the topmost.
+;
+_OSCRegions:
+		stz 	objRgnNo
+_OSCRegion:
+		lda 	objRgnNo
+		cmp 	layoutCount
+		bcc 	_OSCMore
+		jmp 	_OSCSum
+_OSCMore:
+		asl 	a
+		tax
+		lda 	objRgnNo
+		inc 	a
+		cmp 	layoutCount
+		bcs 	_OSCTop
+		lda 	layoutStart+2,x
+		sta 	objSpan
+		lda 	layoutStart+3,x
+		sta 	objSpan+1
+		bra 	_OSCSpan
+_OSCTop:
+		lda 	pass1Len
+		sta 	objSpan
+		lda 	pass1Len+1
+		sta 	objSpan+1
+_OSCSpan:
+		sec
+		lda 	objSpan
+		sbc 	layoutStart,x
+		sta 	objSpan
+		lda 	objSpan+1
+		sbc 	layoutStart+1,x
+		sta 	objSpan+1
+		;
+		stz 	objBufIdx
+		stz 	objBufIdx+1
+_OSCByte:
+		lda 	objBufIdx
+		cmp 	objSpan
+		lda 	objBufIdx+1
+		sbc 	objSpan+1
+		bcs 	_OSCNext
+		clc
+		lda 	objRgnNo
+		adc 	#OBJ_RGN_BANK
+		jsr 	ObjStreamWindow
+		lda 	(zTemp0)
+		ldx 	objSaveBank
+		stx 	CompilerRAMBankReg
+		jsr 	ObjEmit
+		inc 	objBufIdx
+		bne 	_OSCByte
+		inc 	objBufIdx+1
+		bra 	_OSCByte
+_OSCNext:
+		inc 	objRgnNo
+		bra 	_OSCRegion
+_OSCSum:
+		lda 	objSum
+		ldy 	objSum+1
+		sec 								; the sum is here -- see BLC_ENDPASS2
+		rts
+
+objBufBase: 								; the objPtr of the first byte still in the buffer
+		.fill 	2
+objBufTop: 									; ...and one past the last
+		.fill 	2
+objStmtAt: 									; where the statement in flight began
+		.fill 	2
+objBufIdx: 									; an offset into whichever window is open
+		.fill 	2
+objFlushLen: 								; how many bytes this flush is sending
+		.fill 	2
+objMoveLen: 								; ...and how many it is shuffling down afterwards
+		.fill 	2
+objPadAt: 									; the alignment gap being filled
+		.fill 	2
+objSpan: 									; the region being written out
+		.fill 	2
+objSum: 									; Fletcher-16 over what has gone into the file
+		.fill 	2
+objSumSkip: 								; bytes still to be written but not summed
+		.fill 	1
+objByte: 									; the byte in hand, across the zTemp save
+		.fill 	1
+objDeferWas: 								; deferErrors as it stood at the last byte
+		.fill 	1
+objRgnNo: 									; the region being filled or written
+		.fill 	1
+objSaveBank: 								; the caller's RAM bank, across a window
+		.fill 	1
 
 ; ************************************************************************************************
 ;

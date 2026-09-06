@@ -37,7 +37,15 @@ TestAPI:
 		beq 	_TAPrintScreen
 		cmp 	#BLC_ENDPASS1
 		beq 	_TAEndPass1
+		cmp 	#BLC_ENDPASS2
+		beq 	_TAEndPass2
 		.debug
+;
+;		...and its object is still in the bank it wrote it to, so the checksum can walk it.
+;
+_TAEndPass2:
+		clc
+		rts
 ;
 ;		The harness compiles into a bank and never writes a file, so nothing here depends on the
 ;		object's length. Say yes.

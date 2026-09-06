@@ -308,6 +308,20 @@ _SCEFits:
 											; can be filled in. Pass two wrote them out resolved,
 											; so the checksum compares the two answers.
 _SCEChecksum:
+		lda 	passNumber
+		beq 	_SCEWalk
+		;
+		;		PASS TWO HAS NO OBJECT TO WALK. It wrote one, a byte at a time, into a file --
+		;		so the sum was taken as the bytes went past, and this is where the last of them
+		;		go. Whatever is still buffered has to be out before the sum is asked for.
+		;
+		lda 	#BLC_ENDPASS2
+		jsr 	CallAPIHandler
+		bcc 	_SCEWalk 					; no sum offered: the object is still readable, and
+		sta 	passSum 					; the native test harness is where that happens
+		sty 	passSum+1
+		bra 	_SCECompare
+_SCEWalk:
 		jsr 	ObjectChecksum
 		;
 		lda 	passNumber
