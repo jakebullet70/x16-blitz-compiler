@@ -109,8 +109,9 @@ can never leave the vendored tree dirty.
 
 | file | what changed |
 |---|---|
-| `line.inc` | `line_meta` points at a 260-byte staging buffer for the whole run; `eol_mark` streams the finished line, and `out_addr` carries the address it *would* have had; the five `out_*` routines that own the output file; the BASIC RAM ceiling test and `mem_top` are gone |
+| `line.inc` | `line_meta` points at a 260-byte staging buffer for the whole run; `eol_mark` streams the finished line, and `out_addr` carries the address it *would* have had; the five `out_*` routines that own the output file; `gpc_emit`; the BASIC RAM ceiling test and `mem_top` are gone |
 | `loader.inc` | opens the file before pass 2, closes it at exit; the `SAVE` at the end is gone, and with it the `VARTAB`/`ARYTAB`/`STREND` stores |
+| `option.inc` | one directive, `#GPC` — see below |
 | `response.inc` | one word: message 15 was `SYMFILE IO ERR`, so a stock BASLOAD reports the wrong error for a `#SAVEAS` with no argument |
 
 **Nothing downstream can tell the program was never in RAM.** GPC reads the two-byte line link, ORs
@@ -122,6 +123,34 @@ needs no compiler change at all.
 listable when the `SAVE` failed; today a file that will not open costs the whole run. `out_open`
 reports a missing `#SAVEAS` name, a KERNAL error, and a drive that refuses; `out_close` asks the
 drive how it went, because a disk that fills mid-stream says nothing until it is asked.
+
+## `#GPC` — a directive channel BASLOAD never has to understand
+
+One table entry buys the compiler an unlimited directive namespace. `#GPC` passes the rest of its
+line through into the tokenised program as a `REM`, verbatim, and BASLOAD never learns what any of
+it means:
+
+```
+#GPC OBJECT "GPBMODS.PRG"        ->   1 REM#GPC OBJECT "GPBMODS.PRG"
+#GPC SHARED                      ->   2 REM#GPC SHARED
+```
+
+**The `#` is kept, and there is no space after the `REM` token.** That is what a reader matches on:
+`$8f` then `#GPC`, which no ordinary comment produces by accident. GPC already consumes REM-carried
+payload — `GP.ASM` blocks are written as `REM` lines and read back by `commands/gpasm.asm` — so this
+is that mechanism made first-class. Every future compiler directive is then a GPC-side change alone.
+
+Three things it does that are easy to get wrong:
+
+- **Both passes emit.** A directive line normally leaves `index_dst` at zero and `eol` rewinds the
+  destination line number, spending none; `#GPC` spends one. If only pass 2 knew, every line number
+  after it would shift and every label pass 1 resolved would point one line short.
+- **It goes to `eol_mark`, not `eol`**, so `#SOURCELINES` cannot append `:REM #nnn` *inside* the
+  directive, where a reader has no way to tell where the directive stopped.
+- **A hidden `#IFDEF` block emits nothing**, the same test `#DEFINE` already makes.
+
+It costs a line number and the bytes of the text. Nothing reads these yet — the channel ships before
+its first caller, deliberately, because adding it later would mean another BASLOAD build.
 
 ## Layout
 

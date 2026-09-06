@@ -228,6 +228,20 @@ default:
     sec
     rts
 
+    ;=== GPC begin === #GPC emits, so pass 1 has to count it
+    ;
+    ;   A directive line normally leaves index_dst at zero and eol rewinds the
+    ;   destination line number, spending none. #GPC spends one. If only pass 2
+    ;   knew that, every line number after it would shift and every label pass 1
+    ;   resolved would point one line short.
+    ;
+:   cmp #$f9
+    bne :+
+    ldx index_src
+    jsr gpc_emit
+    sta index_dst
+    ;=== GPC end ===
+
 :   jmp eol
 
 ifoption:
@@ -662,6 +676,21 @@ default:
     jsr response_set
     sec
     rts
+
+    ;=== GPC begin === #GPC goes out as a REM, verbatim
+    ;
+    ;   eol_mark, not eol: eol would let #SOURCELINES append ": REM nnn" INSIDE
+    ;   the directive, and the compiler reading it back has no way to know where
+    ;   the directive stopped and the line number began. gpc_emit leaves Y at
+    ;   the byte count, which is what eol_mark expects.
+    ;
+:   cmp #$f9
+    bne :+
+    ldx index_src
+    jsr gpc_emit
+    sta index_dst
+    jmp eol_mark
+    ;=== GPC end ===
 
 :   jmp eol
 
@@ -1277,6 +1306,37 @@ jump_table:
     backslash_char: .res 1
 .CODE
 .endproc
+
+;=== GPC begin === the #GPC directive channel
+;
+;******************************************************************************
+;Function name: gpc_emit
+;Purpose......: Stages a #GPC line as a REM, copied from the # so the directive
+;               arrives at the compiler exactly as it was written
+;Input........: X = index of the '#' in file_buf
+;Output.......: A and Y = bytes staged, the REM token included
+;Errors.......: None -- a line longer than the buffer is truncated, and a source
+;               line cannot be that long anyway
+.proc gpc_emit
+    ldy #0
+    lda #$8f                        ; the REM token
+    sta (line_code),y
+    iny
+
+loop:
+    lda file_buf,x
+    beq done
+    sta (line_code),y
+    inx
+    iny
+    cpy #250
+    bcc loop
+
+done:
+    tya
+    rts
+.endproc
+;=== GPC end ===
 
 ;=== GPC begin === the streamed output channel
 ;
