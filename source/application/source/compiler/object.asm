@@ -52,6 +52,11 @@ WriteObjectCode:
 		jmp 	_WOCShared 					; jmp, not a branch -- the embedded path is >127 bytes
 _WOCEmbedded:
 		jsr 	ScanGPUsage 				; does anything reach a handler above GPBase ?
+		lda 	gpUsed 						; TEMPORARY, while both routes to that answer exist:
+		cmp 	gpStreamUsed 				; the walk and the stream have to agree, on every
+		beq 	_WOCScanOK 					; program compiled. The walk goes when pass one stops
+		jmp 	_WOCScanBad 				; storing the object and there is nothing left to walk.
+_WOCScanOK:
 		;
 		;		The cut. A program using no GP.BASIC keyword takes the runtime as $0801..GPBase
 		;		and puts its object code there; one that uses any takes the whole thing,
@@ -298,6 +303,11 @@ _WOCSWhole:
 		;		fewer than MIN_WS_PAGES below RTBASE, or if the page count itself overflowed a byte.
 		;
 		jsr 	ScanGPUsage 				; the shared runtime is two files now -- see below
+		lda 	gpUsed 						; ...and the same comparison as the embedded path
+		cmp 	gpStreamUsed
+		beq 	_WOCSScanOK
+		jmp 	_WOCScanBad
+_WOCSScanOK:
 		;
 		;		The workspace ends where the resident runtime starts, and that is no longer one
 		;		address: a program using no GPB keyword loads the CORE-ONLY file at RTBASE and keeps
@@ -514,6 +524,16 @@ _WOCSBig:
 		ldx 	#ProgramTooBigText & $FF
 		ldy 	#ProgramTooBigText >> 8
 		bra 	_WOCFail
+;
+;		TEMPORARY. The two ways of deciding gpUsed disagreed, which means the byte stream was
+;		decoded differently from the finished object -- and the answer says how much of the
+;		runtime goes into the file, so getting it wrong writes a program with its handlers cut
+;		out. Refusing is the only safe thing to do with it.
+;
+_WOCScanBad:
+		ldx 	#ScanMismatchText & $FF
+		ldy 	#ScanMismatchText >> 8
+		bra 	_WOCFail
 
 ;
 ;		The runtime image is missing, or is not the file its name claims. Either way there is
@@ -542,6 +562,9 @@ ProgramTooBigText:
 
 NoRuntimeImageText:
 		.text 	"NO RUNTIME IMAGE", 13, 0
+
+ScanMismatchText:
+		.text 	"GP SCAN MISMATCH", 13, 0
 
 ; ************************************************************************************************
 ;

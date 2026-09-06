@@ -74,7 +74,7 @@ _GPSShifted:
 		lda 	(objPtr),y 					; the shifted token
 		ldx 	#1 							; ShiftVectorTable half likewise
 _GPSCheck:
-		jsr 	_GPSUsesGP 					; carry set if this opcode's handler is above the cut
+		jsr 	GPScanUsesGP 					; carry set if this opcode's handler is above the cut
 		bcc 	_GPSNext
 		lda 	#1
 		sta 	gpUsed
@@ -99,7 +99,7 @@ _GPSDone: 									; keywords count exactly like any other.
 ;		opcode, bit set meaning "above the cut". The index is the token with bit 7 cleared,
 ;		which is exactly what the tables themselves are indexed by.
 ;
-_GPSUsesGP:
+GPScanUsesGP:
 		pha
 		and 	#$7F 						; opcode index, 0..127
 		lsr 	a
@@ -132,6 +132,187 @@ gpUsed: 									; nonzero if any GP handler is reachable. Code section,
 gpScanEnd: 									; thrown away with it, so it costs a compiled program
 		.fill 	2 							; nothing. See the note in file-io/read.asm.
 gpBits:
+		.fill 	1
+
+; ************************************************************************************************
+;
+;		THE SAME QUESTION, ANSWERED AS THE BYTES GO PAST.
+;
+;		The walk above needs a finished object to read, and pass one is about to stop storing
+;		one. The answer is wanted before pass two starts, too, because it says how much of the
+;		runtime goes into the file and therefore where the object code lands -- so it cannot
+;		wait for the object to exist.
+;
+;		SAME BITMAP, SAME INSTRUCTION SIZES, STILL THE FINISHED CODE. What changes is that the
+;		p-code is decoded FORWARDS, a byte at a time, instead of being stepped over with
+;		MoveObjectForward. It is still reading what was emitted rather than hooking the two
+;		places tokens are emitted from, which is what makes it total: the next hand-written GP
+;		command cannot opt itself out of it.
+;
+;		THE STATE SAYS WHAT THE NEXT BYTE IS -- an opcode, the token after a .shift, the length
+;		of a .string or .data, or an operand to be stepped over. Only pass one runs it: pass two
+;		writes the same bytes and counting them twice would prove nothing.
+;
+;		THE CURSOR IS CHECKED, NOT ASSUMED. A statement that fails to compile is rolled back to
+;		where it began and the next one is written over it (DeferStatementToRuntime). That start
+;		is an instruction boundary, so a write cursor that did not move on by one means "begin
+;		again here" -- which is exactly right, and needs nothing to tell it.
+;
+; ************************************************************************************************
+
+GPS_OPCODE = 0 								; the next byte is an opcode
+GPS_SHIFT  = 1 								; ...the token after a .shift prefix
+GPS_LENGTH = 2 								; ...the length byte of a .string or .data
+GPS_SKIP   = 3 								; ...one of gpScanSkip operand bytes
+
+GPScanReset:
+		stz 	gpStreamUsed
+		stz 	gpScanState
+		stz 	gpScanStop
+		.set16 	gpScanAt,FreeMemory
+		rts
+
+GPScanByte:
+		ldx 	passNumber 					; pass one settles it
+		bne 	_GPSBOut
+		ldx 	gpScanStop 					; ...and stops at the end marker, or as soon as the
+		bne 	_GPSBOut 					; answer is yes
+		pha
+		lda 	objPtr 						; in step with the byte before it ?
+		cmp 	gpScanAt
+		bne 	_GPSBResync
+		lda 	objPtr+1
+		cmp 	gpScanAt+1
+		beq 	_GPSBInStep
+_GPSBResync:
+		stz 	gpScanState 				; no -- a rolled back statement, so start again here
+_GPSBInStep:
+		clc
+		lda 	objPtr
+		adc 	#1
+		sta 	gpScanAt
+		lda 	objPtr+1
+		adc 	#0
+		sta 	gpScanAt+1
+		pla
+		;
+		ldx 	gpScanState
+		beq 	_GPSBOpcode
+		cpx 	#GPS_SHIFT
+		beq 	_GPSBShifted
+		cpx 	#GPS_LENGTH
+		beq 	_GPSBLength
+		dec 	gpScanSkip 					; GPS_SKIP: one operand byte gone
+		bne 	_GPSBOut
+		stz 	gpScanState
+_GPSBOut:
+		rts
+;
+;		The token after a .shift. MOFSizeTable gives .shift a size of one, which is this byte,
+;		so the next one is an opcode again.
+;
+_GPSBShifted:
+		stz 	gpScanState
+		ldx 	#1 							; the ShiftVectorTable half of the map
+		jsr 	GPScanUsesGP
+		bcc 	_GPSBOut
+		bra 	_GPSBFound
+;
+;		The length byte of a .string or .data. A zero length leaves the next byte an opcode.
+;
+_GPSBLength:
+		sta 	gpScanSkip
+		ldx 	#GPS_SKIP
+		cmp 	#0
+		bne 	_GPSBState
+		ldx 	#GPS_OPCODE
+_GPSBState:
+		stx 	gpScanState
+		rts
+;
+;		An opcode. The ranges are MoveObjectForward's, so the two step by the same sizes, and
+;		which of them has a vector slot is ScanGPUsage's question above.
+;
+_GPSBOpcode:
+		cmp 	#$FF 						; the end marker: the GP.ASM pool and the relocator's
+		beq 	_GPSBStop 					; padding follow it and are not p-code at all
+		cmp 	#$40
+		bcc 	_GPSBOut 					; 00-3F: one byte, no vector slot
+		cmp 	#$70
+		bcc 	_GPSBOne 					; 40-6F: two bytes, no vector slot
+		cmp 	#PCD_STARTBINARY
+		bcc 	_GPSBOut 					; 70-7F: one byte, no vector slot
+		cmp 	#PCD_STARTSYSTEM
+		bcc 	_GPSBKeyword 				; 80-DC: a keyword, one byte, and it has one
+		bne 	_GPSBSystem
+		lda 	#GPS_SHIFT 					; DD: the token after it is the one that matters
+		sta 	gpScanState
+		rts
+
+_GPSBOne:
+		lda 	#1
+		sta 	gpScanSkip
+		lda 	#GPS_SKIP
+		sta 	gpScanState
+		rts
+
+_GPSBKeyword:
+		ldx 	#0 							; the VectorTable half of the map
+		jsr 	GPScanUsesGP
+		bcs 	_GPSBFound
+		rts
+;
+;		DE and up: a system token, whose operand count is the table MoveObjectForward steps by.
+;		255 there means a .string or .data, and the byte after the token is its length.
+;
+_GPSBSystem:
+		pha
+		cmp 	#PCD_ENDSYSTEM+1 			; defensive, exactly as the walk is: nothing above the
+		bcs 	_GPSBSized 					; last system token has a vector slot
+		ldx 	#0
+		jsr 	GPScanUsesGP
+		bcc 	_GPSBSized
+		pla
+		bra 	_GPSBFound
+_GPSBSized:
+		pla
+		tay
+		lda 	MOFSizeTable-PCD_STARTSYSTEM,y
+		cmp 	#$FF
+		beq 	_GPSBString
+		tax 								; .deferror has no operand at all
+		beq 	_GPSBOutFar
+		sta 	gpScanSkip
+		lda 	#GPS_SKIP
+		sta 	gpScanState
+		rts
+_GPSBString:
+		lda 	#GPS_LENGTH
+		sta 	gpScanState
+_GPSBOutFar:
+		rts
+;
+;		Found one, so the answer is yes and nothing later can change it -- the same reasoning
+;		the walk makes when it stops at the first hit.
+;
+_GPSBFound:
+		lda 	#1
+		sta 	gpStreamUsed
+_GPSBStop:
+		lda 	#1
+		sta 	gpScanStop
+		stz 	gpScanState
+		rts
+
+gpStreamUsed: 								; the emit-time answer, which gpUsed is checked against
+		.fill 	1 							; for as long as there is an object left to walk
+gpScanState: 								; what the NEXT byte is
+		.fill 	1
+gpScanSkip: 								; ...and how many operand bytes are still to go past
+		.fill 	1
+gpScanAt: 									; where the next byte belongs, so a statement rolled
+		.fill 	2 							; back can be noticed for what it is
+gpScanStop: 								; nonzero once the answer is in, or the end marker seen
 		.fill 	1
 
 		.send code

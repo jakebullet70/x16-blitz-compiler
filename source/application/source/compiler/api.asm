@@ -106,6 +106,9 @@ _CAWriteByte:
 		bcs 	_CAWBTooBig
 		txa
 		sta 	(objPtr)
+		jsr 	GPScanByte 					; ...and the one place every object byte goes past, so
+											; it is where "does this program reach a GP handler?"
+											; is answered -- see compiler/gpscan.asm
 		inc 	objPtr
 		bne 	_HWOWBNoCarry
 		inc 	objPtr+1

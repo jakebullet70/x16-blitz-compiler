@@ -46,6 +46,8 @@ CompileCode:
 		bne 	_CCNotShared
 		inc 	gpBankShared
 _CCNotShared:
+		jsr 	GPScanReset 				; before a byte is written, because pass one decides
+											; gpUsed as it writes them
 		ldx 	#APIDesc & $FF
 		ldy 	#APIDesc >> 8
 		jsr 	StartCompiler
