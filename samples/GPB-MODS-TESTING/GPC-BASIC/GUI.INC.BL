@@ -1,31 +1,21 @@
 ## ***********************************************************************
-## **
 ## **  GUI.INC.BL -- four dialogs, in a box that puts the screen back.
+## **  BASIC crunched.
 ## **
 ## **      GUI.SAY      something to say, and one way out
 ## **      GUI.YN       a question, and a Y or N answer
 ## **      GUI.MENU     a question, and a row chosen from a list
 ## **      GUI.INPUT    a question, and a line of typed text
 ## **
-## **  What they share is the BOX: measure it against the text, centre it, save
-## **  what it covers, draw a frame, give the pixels back on the way out. That is
-## **  GUI.OPEN and GUI.CLOSE, and the three entry points are thin. GUI.MENU is
-## **  MENUVERT.RUN inside a frame and GUI.INPUT is LINEINPUT.GET inside one, so
-## **  only GUI.YN -- four keys -- reads the keyboard itself.
-## **
-## **  REQUIRES, and does not #INCLUDE for you, in this order:
+## **  Requires, and #INCLUDEs none of them, in this order:
 ## **      GPB.INC.BL        GP.BOX, GP.FILL, GP.PRINTAT, GP.CALL
-## **      STASH.INC.BL      saves the cells the box covers -- and wants a
-## **                        #SYMFILE in your program, see its own header
-## **      THEME.INC.BL      the colour roles, and GOSUB THEME.SELECT first
-## **      MENUVERT.INC.BL   drawn on by GUI.MENU
-## **      LINEINPUT.INC.BL  drawn on by GUI.INPUT
+## **      STASH.INC.BL      saves the covered cells; wants a #SYMFILE
+## **      THEME.INC.BL      GOSUB THEME.SELECT first
+## **      MENUVERT.INC.BL   GUI.MENU
+## **      LINEINPUT.INC.BL  GUI.INPUT
+## **  All five, whichever dialog you call: BASLOAD resolves every label in the
+## **  file, so leaving one out is LABEL NOT FOUND.
 ## **
-## **  BOTH ARE REQUIRED EVEN IF YOU ONLY CALL GUI.YN. BASLOAD resolves every
-## **  label in the file, not the ones a path reaches, so leaving either out
-## **  stops BASLOAD with LABEL NOT FOUND rather than compiling a smaller program.
-## **
-## **  Usage, the whole of it:
 ## **      THEME.ID = 0 : GOSUB THEME.SELECT
 ## **      GUI.BANK = 8
 ## **      GUI.MSG$ = "Delete the file?"
@@ -33,86 +23,61 @@
 ## **      IF GUI.ANSWER THEN <yes>
 ## **
 ## **   in   GUI.MSG$        the question. "" for none
-## **        GUI.MSG2$       a second line, for detail that does not fit. "" for
-## **                        none, and then there is no gap
-## **        GUI.TITLE$      a name in the top edge of the frame. "" for none
-## **        GUI.BANK        a spare RAM bank to save the covered cells in.
-## **                        0 MEANS DO NOT SAVE, and then the box is still on
-## **                        the screen when the call returns
-## **        GUI.STYLE       0, the default, draws the rounded single line box.
-## **                        1 to 3 are GP.BOX's other styles
-## **        GUI.PANEL.IN    the panel: the box's background AND the colour the
-## **                        message lines are written in. 0 takes THEME.TEXT
+## **        GUI.MSG2$       a second line. "" for none, and then no gap
+## **        GUI.TITLE$      a name in the top edge. "" for none
+## **        GUI.BANK        a spare RAM bank for the covered cells. 0 does not
+## **                        save, and the box is still on screen on return.
+## **                        Over GUI.MAXCELLS does not save either
+## **        GUI.STYLE       0 is the rounded single line. 1 to 3 are GP.BOX's
+## **        GUI.PANEL.IN    the box background, and the message lines' colour.
+## **                        0 takes THEME.TEXT
 ## **        GUI.BORDER.IN   the frame's attribute. 0 takes THEME.BORDER
-## **        GUI.GLYPH       non-zero frames the box from six glyphs of the
-## **                        CALLER'S, and GUI.STYLE is then not consulted.
-## **                        They are TILE INDICES: GUI.FRAME hands them to
-## **                        GP.BOX as a custom set, which does not convert
+## **        GUI.GLYPH       non-zero frames from the caller's six glyphs, and
+## **                        GUI.STYLE is not consulted. Tile indices:
 ## **                            GUI.EDGE.H      the horizontal run
 ## **                            GUI.EDGE.V      the vertical run
 ## **                            GUI.CORNER.TL   .TR  .BL  .BR
-## **        GUI.PLACE       0 centres the box. Non-zero uses GUI.X, GUI.Y
+## **        GUI.PLACE       0 centres. Non-zero uses GUI.X, GUI.Y
 ## **        GUI.X  GUI.Y    top left, when GUI.PLACE says so
-## **        GUI.ROW.OFFSET  added to the row the box lands on, however it was
-## **                        placed. 0 for almost everybody -- see below
+## **        GUI.ROW.OFFSET  added to the box's row. VSCROLL/8 under hardware
+## **                        scrolling, 0 otherwise
 ## **
 ## **   out  GUI.KEY         the key that ended it, whichever call
-## **        GUI.LEFT GUI.TOP GUI.WIDTH GUI.HEIGHT   where the box went, and
-## **                        how big it turned out
+## **        GUI.STASHED     -1 if the covered cells were saved
+## **        GUI.LEFT GUI.TOP GUI.WIDTH GUI.HEIGHT   where the box went
 ## **
-## **  GUI.ROW.OFFSET IS FOR HARDWARE SCROLLING. The GP commands address the text
-## **  MAP, and VERA's L1_VSCROLL decides which map row shows as screen row 0. A
-## **  caller scrolling that way sets GUI.ROW.OFFSET to VSCROLL/8 and is centred
-## **  against what the user can see. Everyone else leaves it 0.
-## **
-## **  UPPER CASE, ON THE DEFAULT CHARSET. GP.PRINTAT converts PETSCII and
-## **  BASLOAD passes literals through as source bytes, so on charset 2 ASCII
-## **  lower case lands on the graphics half of the font. ISO mode fixes the
-## **  text and breaks the
-## **  frame, GP.BOX's $40-$7D being letters in that order: so it is upper case
-## **  with a frame, or mixed case without one, unless the caller re-orders the
-## **  font and says where the glyphs went with GUI.GLYPH. That is what
-## **  samples/editor does, and the whole reason the frame is overridable.
-## **
-## **  A BOX OVER 4094 CELLS WILL NOT FIT ONE BANK, and that is not an error: the
-## **  save is skipped, the dialog still runs, and GUI.STASHED comes back 0 so the
-## **  caller knows it must repaint. Same when GUI.BANK is 0.
-## **
-## **  .IN IS "WHAT THE CALLER ASKED FOR" -- GUI.PANEL and GUI.BORDER are what
-## **  GUI.OPEN settled on, and those are what everything downstream draws with.
-## **  Both requests are 0-means-default: attribute 0 is black on black, legal and
-## **  no use to anybody, so it is free to spend as "I did not choose".
+## **  WARNING: upper case, on the default charset. GP.PRINTAT converts PETSCII
+## **  and BASLOAD passes literals through as source bytes, so charset 2 lands
+## **  lower case on the graphics half of the font. ISO mode fixes the text and
+## **  breaks the frame, GP.BOX's $40-$7D being letters. Upper case with a
+## **  frame, mixed case without one, or re-order the font and set GUI.GLYPH.
 ## **
 ## **  GUI.LISTBOX.* is GUI2.INC.BL, its own #INCLUDE.
-## **
 ## ***********************************************************************
 #IFNDEF GUI.DEFS
 #DEFINE GUI.DEFS 1
 
-## screen_mode. With carry SET it REPORTS rather than sets: mode in A, columns in
-## X, rows in Y. Named here so GUI does not depend on APPSYS being included.
+## screen_mode. Carry set reports rather than sets: mode in A, columns in X,
+## rows in Y.
 #DEFINE GUI.SCRMODE $FF5F
 
-## The frame GUI.STYLE 0 means. GP.BOX style 2 is the single line with rounded
-## corners. There are four styles, 0 to 3.
+## GP.BOX style 2, the single line with rounded corners. Styles are 0 to 3.
 #DEFINE GUI.LINEBOX 2
 
 ## A bank is 8K and a cell 2 bytes, so this is the ceiling on a saved rectangle.
 #DEFINE GUI.MAXCELLS 4094
 
-## Air INSIDE the frame: columns each side, rows above and below. One place to
-## change, and every box changes with it.
+## Air INSIDE the frame: columns each side, rows above and below.
 #DEFINE GUI.PADX 2
 #DEFINE GUI.PADY 1
 
-## Keys GUI.YN answers to. Y and N without case, and both ways of saying "no
-## thanks" -- ESC and STOP -- which answer NO rather than hanging.
+## GUI.YN's keys. Y and N without case; ESC and STOP answer NO.
 #DEFINE GUI.UY 89
 #DEFINE GUI.LY 121
 #DEFINE GUI.UN 78
 #DEFINE GUI.LN 110
 
-## ...and the other pair, for GUI.OKCANCEL. O and C.
+## ...and GUI.OKCANCEL's. O and C.
 #DEFINE GUI.UO 79
 #DEFINE GUI.LO 111
 #DEFINE GUI.UC 67
@@ -127,55 +92,39 @@ GOTO GUI.MODULE.END
 ## ***********************************************************************
 ## **  GUI.YN -- a question, and a Y or N answer.
 ## **
-## **   in   GUI.MSG$ GUI.MSG2$ GUI.TITLE$ and the box inputs
-## **        GUI.HINT$   the answers, under the question. "" takes the default,
-## **                    "YES      NO". Whatever it says, the first Y and the
-## **                    first N in it are lit as the keys
-## **        GUI.OKCANCEL  0 asks YES/NO on Y and N, the default. Non-zero asks
-## **                    OK/CANCEL on O and C, and then RETURN also accepts
+## **   in   GUI.HINT$     the answers, under the question. "" takes the
+## **                      default. The first Y and first N in it are lit
+## **        GUI.OKCANCEL  0 asks YES/NO on Y and N. Non-zero asks OK/CANCEL
+## **                      on O and C, and then RETURN also accepts
 ## **
-## **   out  GUI.ANSWER  -1 for yes or OK, 0 for no or cancel
-## **        GUI.KEY     the key itself, so a caller that cares whether the no
-## **                    was ESC or N can still tell
+## **   out  GUI.ANSWER    -1 for yes or OK, 0 for no or cancel
+## **        GUI.KEY       the key itself, so a caller can tell an ESC from an N
 ## **
-## **  ESC AND STOP ANSWER NO. A dialog that can only be answered can trap
-## **  someone, and "no" is the safe reading of walking away from a question.
+## **  ESC and STOP answer NO.
 ## ***********************************************************************
 
 GUI.YN.BODY:
 
-## ---- which pair of answers, and therefore which two keys. Everything below
-## ---- works off GUI.YES/GUI.NO, so the two modes differ in four assignments and
-## ---- a default string rather than in two routines.
-    GUI.YES = GUI.UY : GUI.YES.ALT = GUI.LY
-    GUI.NO = GUI.UN : GUI.NO.ALT = GUI.LN
+## ---- Both modes work off GUI.YES/GUI.NO, so they differ in four assignments
+## ---- and a default string rather than in two routines.
+    GUI.YES = GUI.UY : GUI.YES.ALT = GUI.LY : GUI.NO = GUI.UN : GUI.NO.ALT = GUI.LN
     GUI.HINT.DEFAULT$ = "YES      NO"
     IF GUI.OKCANCEL = 0 THEN GOTO GUI.YN.SET
-    GUI.YES = GUI.UO : GUI.YES.ALT = GUI.LO
-    GUI.NO = GUI.UC : GUI.NO.ALT = GUI.LC
+    GUI.YES = GUI.UO : GUI.YES.ALT = GUI.LO : GUI.NO = GUI.UC : GUI.NO.ALT = GUI.LC
     GUI.HINT.DEFAULT$ = "OK      CANCEL"
 
 GUI.YN.SET:
-    GUI.HINT.LINE$ = GUI.HINT$
-    IF GUI.HINT.LINE$ = "" THEN GUI.HINT.LINE$ = GUI.HINT.DEFAULT$
-    GUI.BODY.ROWS = 1 : GUI.BODY.WIDTH = LEN(GUI.HINT.LINE$)
-    GOSUB GUI.OPEN
+    GUI.HINT.LINE$ = GUI.HINT$ : IF GUI.HINT.LINE$ = "" THEN GUI.HINT.LINE$ = GUI.HINT.DEFAULT$
+    GUI.BODY.ROWS = 1 : GUI.BODY.WIDTH = LEN(GUI.HINT.LINE$) : GOSUB GUI.OPEN
     GUI.HINT.LEFT = GUI.INNER.LEFT + INT((GUI.INNER.WIDTH - LEN(GUI.HINT.LINE$)) / 2)
     IF GUI.HINT.LEFT < GUI.INNER.LEFT THEN GUI.HINT.LEFT = GUI.INNER.LEFT
     GP.PRINTAT GUI.HINT.LEFT, GUI.INNER.TOP, GUI.HINT.LINE$, THEME.CLR(THEME.DIMMED)
     GUI.MARK.CH = GUI.YES : GOSUB GUI.YN.MARK
-    GUI.MARK.CH = GUI.NO : GOSUB GUI.YN.MARK
+    GUI.MARK.CH = GUI.NO  : GOSUB GUI.YN.MARK
     GUI.ANSWER = 0
 
-## ---- Six keys scattered across 256 with everything else falling through: the
-## ---- sparse selector GP.SELECT is for, and the comma lists are what earn it --
-## ---- "yes, or the lower case yes" is one alternative and reads as one.
-## ---- Costs no runtime: all four select keywords are markers on a core handler,
-## ---- so this does not drag the GP block into a program that has none.
-
 GUI.YN.WAIT:
-    GET GUI.PRESSED$
-    IF GUI.PRESSED$ = "" THEN GOTO GUI.YN.WAIT
+    GET GUI.PRESSED$ : IF GUI.PRESSED$ = "" THEN GOTO GUI.YN.WAIT
     GUI.KEY = ASC(GUI.PRESSED$) : GUI.DONE = 0
     GP.SELECT GUI.KEY
         GP.CASE GUI.YES, GUI.YES.ALT
@@ -183,10 +132,8 @@ GUI.YN.WAIT:
         GP.CASE GUI.NO, GUI.NO.ALT, GUI.ESCAPE, GUI.STOP
             GUI.DONE = -1
 
-## ---- RETURN accepts, but ONLY in OK/CANCEL. A dialog offering OK has a default
-## ---- and RETURN is how everyone takes it; a YES/NO question is asked precisely
-## ---- because there is none, and it is usually the destructive one. In YES/NO
-## ---- the key falls out with GUI.DONE still 0, which is what ignoring it means.
+## ---- RETURN accepts, but ONLY in OK/CANCEL. In YES/NO the key falls out
+## ---- with GUI.DONE still 0, which is what ignoring it means.
         GP.CASE GUI.RETURN
             IF GUI.OKCANCEL <> 0 THEN GUI.ANSWER = -1 : GUI.DONE = -1
     GP.ENDSEL
@@ -201,9 +148,10 @@ GUI.YN.DONE:
 ## **   in   GUI.MARK.CH    the character code to look for
 ## **        GUI.HINT.LINE$ GUI.HINT.LEFT GUI.INNER.TOP   the line as printed
 ## **
-## **  THE FIRST MATCH WINS, so a key's letter has to be the first of its kind in
-## **  the line -- which is why "YES      NO" and "OK      CANCEL" are in that
-## **  order. A hint string that puts an N before the NO lights the wrong cell.
+## **  WARNING: the first match wins, so a key's letter must be the first of its
+## **  kind in the line. A hint that puts an N before the NO lights the wrong
+## **  cell; "YES      NO" and "OK      CANCEL" are in that order for it, and so
+## **  are the two calls below.
 ## ***********************************************************************
 
 GUI.YN.MARK:
@@ -215,37 +163,24 @@ GUI.YN.MARK:
 ## ***********************************************************************
 ## **  GUI.SAY -- something to say, and one way out.
 ## **
-## **   in   GUI.MSG$ GUI.MSG2$ GUI.TITLE$ and the box inputs
-## **        GUI.HINT$   what the way out is called, under the message. ""
-## **                    takes "OK"
-## **
+## **   in   GUI.HINT$   what the way out is called. "" takes "OK"
 ## **   out  GUI.KEY     the key that closed it
 ## **
-## **  THE ONE DIALOG THAT DOES NOT ASK ANYTHING, and the commonest an
-## **  application has: "wrote 34 lines", "not found", "there is nothing to
-## **  export".
+## **  RETURN, SPACE, ESC and STOP all close it.
 ## **
-## **  RETURN, SPACE, ESC AND STOP ALL CLOSE IT. There is one outcome, so
-## **  there is nothing for a second key to mean, and a message a user cannot
-## **  dismiss with the key under their thumb is a trap.
-## **
-## **  GUI.HINT$ IS STICKY, like the rest of the library's inputs: it is an
-## **  ordinary variable, so a GUI.SAY after a GUI.YN that set one inherits it.
-## **  Set it, or clear it, every call.
+## **  GUI.HINT$ is sticky, like the rest of the library's inputs: a GUI.SAY
+## **  after a GUI.YN that set one inherits it. Set it, or clear it, every call.
 ## ***********************************************************************
 
 GUI.SAY.BODY:
-    GUI.HINT.LINE$ = GUI.HINT$
-    IF GUI.HINT.LINE$ = "" THEN GUI.HINT.LINE$ = "OK"
+    GUI.HINT.LINE$ = GUI.HINT$ : IF GUI.HINT.LINE$ = "" THEN GUI.HINT.LINE$ = "OK"
     GUI.BODY.ROWS = 1 : GUI.BODY.WIDTH = LEN(GUI.HINT.LINE$)
-    GOSUB GUI.OPEN
-    GUI.HINT.LEFT = GUI.INNER.LEFT + INT((GUI.INNER.WIDTH - LEN(GUI.HINT.LINE$)) / 2)
+    GOSUB GUI.OPEN : GUI.HINT.LEFT = GUI.INNER.LEFT + INT((GUI.INNER.WIDTH - LEN(GUI.HINT.LINE$)) / 2)
     IF GUI.HINT.LEFT < GUI.INNER.LEFT THEN GUI.HINT.LEFT = GUI.INNER.LEFT
     GP.PRINTAT GUI.HINT.LEFT, GUI.INNER.TOP, GUI.HINT.LINE$, THEME.CLR(THEME.TITLE)
 
 GUI.SAY.WAIT:
-    GET GUI.PRESSED$
-    IF GUI.PRESSED$ = "" THEN GOTO GUI.SAY.WAIT
+    GET GUI.PRESSED$ : IF GUI.PRESSED$ = "" THEN GOTO GUI.SAY.WAIT
     GUI.KEY = ASC(GUI.PRESSED$) : GUI.DONE = 0
     GP.SELECT GUI.KEY
         GP.CASE GUI.RETURN, GUI.SPACE, GUI.ESCAPE, GUI.STOP
@@ -257,41 +192,30 @@ GUI.SAY.WAIT:
 ## ***********************************************************************
 ## **  GUI.MENU -- a question, and a row chosen from a list.
 ## **
-## **   in   GUI.COUNT          how many rows
-## **        MENUVERT.ITEM$()    the rows, 1..GUI.COUNT
-## **        GUI.SEL             the row to start on, 0 for the first
-## **        GUI.FLAGS           passed to MENUVERT.FLAGS -- MUSTSEL,
-## **                            NOWRAP, GAMEPAD. KEEPMARK is meaningless
-## **                            here because the box does not survive
+## **   in   GUI.COUNT         how many rows
+## **        MENUVERT.ITEM$()  the rows, 1..GUI.COUNT, and the caller DIMs it
+## **        GUI.SEL           the row to start on, 0 for the first
+## **        GUI.FLAGS         passed to MENUVERT.FLAGS -- MUSTSEL, NOWRAP,
+## **                          GAMEPAD. KEEPMARK means nothing here
 ## **
-## **   out  GUI.SEL             1..GUI.COUNT, or 0 if cancelled
-## **        GUI.KEY             13 chose, 27 cancelled
-## **
-## **  THE ROWS GO IN MENUVERT.ITEM$ AND THE CALLER DIMS IT -- MENUVERT's own
-## **  contract. A second array here would copy every row on every call and still
-## **  have to guess a bound, which is the thing MENUVERT refuses to do.
+## **   out  GUI.SEL           1..GUI.COUNT, or 0 if cancelled
+## **        GUI.KEY           13 chose, 27 cancelled
 ## **
 ## **  Items are NOT indented here: MENUVERT prints them at the left edge of the
 ## **  highlight, so a leading space in the item is what insets the bar.
 ## ***********************************************************************
 
 GUI.MENU.BODY:
-    GUI.BODY.ROWS = GUI.COUNT
-    GUI.BODY.WIDTH = 0
+    GUI.BODY.ROWS = GUI.COUNT : GUI.BODY.WIDTH = 0
     FOR GUI.INDEX = 1 TO GUI.COUNT
         IF LEN(MENUVERT.ITEM$(GUI.INDEX)) > GUI.BODY.WIDTH THEN GUI.BODY.WIDTH = LEN(MENUVERT.ITEM$(GUI.INDEX))
     NEXT GUI.INDEX
     GOSUB GUI.OPEN
-    MENUVERT.X = GUI.INNER.LEFT : MENUVERT.Y = GUI.INNER.TOP
-    MENUVERT.WIDTH = GUI.INNER.WIDTH : MENUVERT.COUNT = GUI.COUNT
-    REM GUI.PANEL, the panel GUI.OPEN just painted, so unselected rows are the colour of
-    REM the box they sit in. THEME.PAGE was blue on blue in the light palette -- fine for a
-    REM GP.FILL, where only the background shows, invisible for anything with letters.
-    MENUVERT.ATTR = GUI.PANEL : MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
-    MENUVERT.HOTATTR = 0 : MENUVERT.FLAGS = GUI.FLAGS : MENUVERT.SEL = GUI.SEL
-    GOSUB MENUVERT.RUN
-    GUI.SEL = MENUVERT.SEL : GUI.KEY = MENUVERT.KEY
-    GOSUB GUI.CLOSE
+    MENUVERT.X = GUI.INNER.LEFT : MENUVERT.Y = GUI.INNER.TOP : MENUVERT.WIDTH = GUI.INNER.WIDTH : MENUVERT.COUNT = GUI.COUNT
+## ---- the panel GUI.OPEN just painted, so unselected rows are the colour of
+## ---- the box they sit in.
+    MENUVERT.ATTR = GUI.PANEL : MENUVERT.HIATTR = THEME.CLR(THEME.HILITE) : MENUVERT.HOTATTR = 0 : MENUVERT.FLAGS = GUI.FLAGS : MENUVERT.SEL = GUI.SEL
+    GOSUB MENUVERT.RUN : GUI.SEL = MENUVERT.SEL : GUI.KEY = MENUVERT.KEY : GOSUB GUI.CLOSE
     RETURN
 
 ## ***********************************************************************
@@ -305,26 +229,22 @@ GUI.MENU.BODY:
 ## **        GUI.OK     -1 if RETURN finished it, 0 if cancelled
 ## **        GUI.KEY    the key itself
 ## **
-## **  THE RESULT IS GUI.TEXT$, NOT GUI.INPUT$: GUI.INPUT is this routine's label,
-## **  and BASLOAD will not have a label and a variable of one name -- the $ does
-## **  not separate them, so GUI.INPUT$ beside it is DUPLICATE SYMBOL. The field
-## **  is drawn in THEME.HILITE so it is visibly a place to type, and LINEINPUT
-## **  restores the old text on ESC.
+## **  The result is GUI.TEXT$, not GUI.INPUT$: GUI.INPUT is this routine's
+## **  label, and BASLOAD will not have a label and a variable of one name --
+## **  the $ does not separate them, so GUI.INPUT$ is DUPLICATE SYMBOL.
 ## **
-## **  THE HINT LINE IS FIXED HERE, unlike GUI.YN's: its two key names are painted
-## **  at known offsets, so a caller's string would highlight the wrong words.
+## **  The hint line is fixed here, unlike GUI.YN's: its two key names are
+## **  painted at known offsets.
 ## **
-## **  Cursor up, down and TAB do NOT leave this dialog -- with one field there is
-## **  nowhere to move to. Only RETURN and ESC end it.
+## **  Cursor up, down and TAB do NOT leave this dialog. Only RETURN and ESC
+## **  end it.
 ## ***********************************************************************
 
 GUI.INPUT.BODY:
     IF GUI.LEN = 0 THEN GUI.LEN = 20
-    GUI.HINT.LINE$ = "ENTER = OK    ESC = CANCEL"
-    GUI.BODY.ROWS = 3 : GUI.BODY.WIDTH = GUI.LEN
+    GUI.HINT.LINE$ = "ENTER = OK    ESC = CANCEL" : GUI.BODY.ROWS = 3 : GUI.BODY.WIDTH = GUI.LEN
     IF LEN(GUI.HINT.LINE$) > GUI.BODY.WIDTH THEN GUI.BODY.WIDTH = LEN(GUI.HINT.LINE$)
-    GUI.WAS$ = GUI.TEXT$
-    GOSUB GUI.OPEN
+    GUI.WAS$ = GUI.TEXT$ : GOSUB GUI.OPEN
 
 ## ---- the field, centred over the inner width like the hint under it
     GUI.FIELD.LEFT = GUI.INNER.LEFT + INT((GUI.INNER.WIDTH - GUI.LEN) / 2)
@@ -333,34 +253,31 @@ GUI.INPUT.BODY:
     LINEINPUT.LEN = GUI.LEN : LINEINPUT.ATTR = THEME.CLR(THEME.HILITE)
     LINEINPUT.TEXT$ = GUI.TEXT$ : LINEINPUT.MASK = GUI.MASK
 
-## ---- the two key names picked out of the dimmed line, at known offsets rather
-## ---- than searched for, because unlike GUI.YN's hint this text is fixed.
+## ---- the two key names at known offsets rather than searched for, because
+## ---- unlike GUI.YN's hint this text is fixed.
     GUI.HINT.LEFT = GUI.INNER.LEFT + INT((GUI.INNER.WIDTH - LEN(GUI.HINT.LINE$)) / 2)
     IF GUI.HINT.LEFT < GUI.INNER.LEFT THEN GUI.HINT.LEFT = GUI.INNER.LEFT
     GP.PRINTAT GUI.HINT.LEFT, GUI.INNER.TOP + 2, GUI.HINT.LINE$, THEME.CLR(THEME.DIMMED)
     GP.PRINTAT GUI.HINT.LEFT, GUI.INNER.TOP + 2, "ENTER", THEME.CLR(THEME.TITLE)
     GP.PRINTAT GUI.HINT.LEFT + 14, GUI.INNER.TOP + 2, "ESC", THEME.CLR(THEME.TITLE)
 
-## ---- UP, DOWN AND TAB LEAVE AN LINEINPUT FIELD WITHOUT CANCELLING IT -- that is
-## ---- how a form moves between fields. With one field they came back as "not
-## ---- RETURN", read as a cancel, and an arrow key silently threw the typing
-## ---- away. Re-enter the field instead: only the two named keys end this.
-GUI.INPUT.FIELD:
-    GOSUB LINEINPUT.GET
+## ---- Up, down and TAB leave a LINEINPUT field without cancelling it, which
+## ---- is how a form moves between fields. With one field there is nowhere to
+## ---- go, so re-enter it: only RETURN and ESC end this.
+GUI.INPUT.FIELD:  GOSUB LINEINPUT.GET
     IF LINEINPUT.KEY = LINEINPUT.DOWN THEN GOTO GUI.INPUT.FIELD
     IF LINEINPUT.KEY = LINEINPUT.UP THEN GOTO GUI.INPUT.FIELD
     IF LINEINPUT.KEY = LINEINPUT.TAB THEN GOTO GUI.INPUT.FIELD
 
-    GUI.TEXT$ = LINEINPUT.TEXT$
-    GUI.KEY = LINEINPUT.KEY
-    GUI.OK = 0
+    GUI.TEXT$ = LINEINPUT.TEXT$ : GUI.KEY = LINEINPUT.KEY : GUI.OK = 0
     IF GUI.KEY = GUI.RETURN THEN GUI.OK = -1
 
-## ---- A cancel gives back what was passed IN. LINEINPUT restores to the value at
-## ---- ITS last call, which after an arrow key is not the same thing.
+## ---- A cancel gives back what was passed IN. LINEINPUT restores to the value
+## ---- at ITS last call, which after an arrow key is not the same thing.
+## ---- WARNING: GOSUB GUI.CLOSE must not ride on that IF. A false IF skips the
+## ---- whole line, so the OK path would leave the box painted.
     IF GUI.OK = 0 THEN GUI.TEXT$ = GUI.WAS$
-    GOSUB GUI.CLOSE
-    RETURN
+    GOSUB GUI.CLOSE : RETURN
 
 ## ***********************************************************************
 ## **  GUI.OPEN -- measure, place, save, draw, and print the question.
@@ -369,48 +286,38 @@ GUI.INPUT.FIELD:
 ## **        GUI.BODY.WIDTH  and how wide its widest one is
 ## **
 ## **   out  GUI.INNER.LEFT GUI.INNER.TOP   where the caller's own rows start
-## **        GUI.INNER.WIDTH          how wide they may be
-## **        GUI.STASHED     -1 if the covered cells were saved
+## **        GUI.INNER.WIDTH                how wide they may be
+## **        GUI.STASHED                    -1 if the covered cells were saved
 ## **
-## **  Public: a caller wanting a fourth kind of dialog should build it on this
-## **  rather than on a copy of it.
+## **  Public: build a fourth kind of dialog on this, not on a copy of it.
 ## ***********************************************************************
 
 GUI.OPEN.BODY:
     GOSUB GUI.SIZE : GOSUB GUI.PLACE.BOX
 
-## ---- Save what the box is about to cover. Both reasons to skip are ordinary
-## ---- rather than errors, and both leave GUI.STASHED at 0: no bank offered, or
-## ---- a rectangle bigger than a bank holds.
+## ---- Save what the box is about to cover. No bank, or a rectangle over
+## ---- GUI.MAXCELLS, skips the save and leaves GUI.STASHED 0.
 
-    GUI.STASHED = 0
-    IF GUI.BANK = 0 THEN GOTO GUI.OPEN.DRAW
+    GUI.STASHED = 0 : IF GUI.BANK = 0 THEN GOTO GUI.OPEN.DRAW
     IF GUI.WIDTH * GUI.HEIGHT > GUI.MAXCELLS THEN GOTO GUI.OPEN.DRAW
-    STASH.BANK = GUI.BANK
-    STASH.X = GUI.LEFT : STASH.Y = GUI.TOP : STASH.W = GUI.WIDTH : STASH.H = GUI.HEIGHT
-    GOSUB STASH.SAVE
-    GUI.STASHED = STASH.OK
+    STASH.BANK = GUI.BANK : STASH.X = GUI.LEFT : STASH.Y = GUI.TOP : STASH.W = GUI.WIDTH : STASH.H = GUI.HEIGHT
+    GOSUB STASH.SAVE : GUI.STASHED = STASH.OK
 
-## ---- Fill THEN frame: the fill is what makes the box opaque. Without it the
-## ---- frame is a rectangle over whatever was underneath, and reads as a mistake.
+## ---- Fill THEN frame: the fill is what makes the box opaque.
 
-GUI.OPEN.DRAW:
-    GUI.BOX.STYLE = GUI.STYLE
+GUI.OPEN.DRAW:  GUI.BOX.STYLE = GUI.STYLE
     IF GUI.BOX.STYLE = 0 THEN GUI.BOX.STYLE = GUI.LINEBOX
-## ---- What the caller asked for, or the theme, settled ONCE here so the fill,
-## ---- the frame, the message lines and MENUVERT's rows all read one answer.
-    GUI.PANEL = GUI.PANEL.IN
-    IF GUI.PANEL = 0 THEN GUI.PANEL = THEME.CLR(THEME.TEXT)
-    GUI.BORDER = GUI.BORDER.IN
-    IF GUI.BORDER = 0 THEN GUI.BORDER = THEME.CLR(THEME.BORDER)
+## ---- Settled ONCE here, so the fill, the frame, the message lines and
+## ---- MENUVERT's rows all read one answer.
+    GUI.PANEL = GUI.PANEL.IN :   IF GUI.PANEL = 0 THEN GUI.PANEL = THEME.CLR(THEME.TEXT)
+    GUI.BORDER = GUI.BORDER.IN : IF GUI.BORDER = 0 THEN GUI.BORDER = THEME.CLR(THEME.BORDER)
     GP.FILL GUI.LEFT, GUI.TOP, GUI.WIDTH, GUI.HEIGHT, GUI.SPACE, GUI.PANEL
     IF GUI.GLYPH <> 0 THEN GOSUB GUI.FRAME : GOTO GUI.OPEN.TITLE
     GP.BOX GUI.LEFT, GUI.TOP, GUI.WIDTH, GUI.HEIGHT, GUI.BOX.STYLE, GUI.BORDER
 GUI.OPEN.TITLE:
     IF GUI.TITLE$ <> "" THEN GUI.TITLE.LEFT = GUI.LEFT + INT((GUI.WIDTH - LEN(GUI.TITLE$) - 2) / 2) : GP.PRINTAT GUI.TITLE.LEFT, GUI.TOP, " " + GUI.TITLE$ + " ", THEME.CLR(THEME.TITLE)
 
-## ---- The question, then a blank row before the caller's own -- but only if
-## ---- there WAS a question. A menu with no message opens with no empty line.
+## ---- The question, then a blank row -- but only if there WAS a question.
 
     GUI.INNER.LEFT = GUI.LEFT + 1 + GUI.PADX : GUI.INNER.TOP = GUI.TOP + 1 + GUI.PADY
     IF GUI.MSG$ <> "" THEN GP.PRINTAT GUI.INNER.LEFT, GUI.INNER.TOP, GUI.MSG$, GUI.PANEL : GUI.INNER.TOP = GUI.INNER.TOP + 1
@@ -426,17 +333,15 @@ GUI.OPEN.TITLE:
 ## **        GUI.BORDER                              their attribute
 ## **   out  GUI.RIGHT GUI.BOTTOM                    the far column and row
 ## **
-## **  THE GLYPHS ARE TILE INDICES, not PETSCII: GP.BOX writes a custom set
-## **  straight to the cell. GP.FILL converts, and converts even with the $0372
-## **  ASCII flag set -- which is why the eight fills this replaced needed their
-## **  glyphs biased by 64.
+## **  WARNING: the glyphs are TILE INDICES, not PETSCII. GP.BOX writes a custom
+## **  set straight to the cell; GP.FILL converts, and converts even with the
+## **  $0372 ASCII flag set.
 ## ***********************************************************************
 
 GUI.FRAME:
     IF GUI.WIDTH < 2 THEN RETURN
     IF GUI.HEIGHT < 2 THEN RETURN
-    GUI.RIGHT = GUI.LEFT + GUI.WIDTH - 1
-    GUI.BOTTOM = GUI.TOP + GUI.HEIGHT - 1
+    GUI.RIGHT = GUI.LEFT + GUI.WIDTH - 1 : GUI.BOTTOM = GUI.TOP + GUI.HEIGHT - 1
     IF LEN(GUI.GLYPH$) <> 8 THEN GOSUB GUI.GLYPHS
     GP.BOX GUI.LEFT, GUI.TOP, GUI.WIDTH, GUI.HEIGHT, GP.STRPTR(GUI.GLYPH$) + 1, GUI.BORDER
     RETURN
@@ -444,14 +349,12 @@ GUI.FRAME:
 ## ***********************************************************************
 ## **  GUI.GLYPHS -- the six, packed into the eight bytes GP.BOX reads.
 ## **
-## **  The order is TR TL BR BL TOP BOTTOM LEFT RIGHT. Cached, because a string
-## **  built per dialog is garbage per dialog -- set GUI.GLYPH$ = "" to force a
-## **  rebuild after changing a glyph. The POINTER is taken fresh at every GP.BOX
-## **  above, since a string moves when BASIC tidies.
+## **  The order is TR TL BR BL TOP BOTTOM LEFT RIGHT. Cached: set
+## **  GUI.GLYPH$ = "" to force a rebuild after changing a glyph. GP.BOX above
+## **  takes the pointer fresh, since a string moves when BASIC tidies.
 ## ***********************************************************************
 
-GUI.GLYPHS:
-    GUI.GLYPH$ = CHR$(GUI.CORNER.TR) + CHR$(GUI.CORNER.TL) + CHR$(GUI.CORNER.BR) + CHR$(GUI.CORNER.BL)
+GUI.GLYPHS:  GUI.GLYPH$ = CHR$(GUI.CORNER.TR) + CHR$(GUI.CORNER.TL) + CHR$(GUI.CORNER.BR) + CHR$(GUI.CORNER.BL)
     GUI.GLYPH$ = GUI.GLYPH$ + CHR$(GUI.EDGE.H) + CHR$(GUI.EDGE.H) + CHR$(GUI.EDGE.V) + CHR$(GUI.EDGE.V)
     RETURN
 
@@ -459,21 +362,17 @@ GUI.GLYPHS:
 ## **  GUI.CLOSE -- give the pixels back, if we took a copy.
 ## ***********************************************************************
 
-GUI.CLOSE.BODY:
-    IF GUI.STASHED = 0 THEN RETURN
+GUI.CLOSE.BODY:  IF GUI.STASHED = 0 THEN RETURN
     STASH.BANK = GUI.BANK : STASH.MOVE = 0 : GOSUB STASH.RESTORE
     RETURN
 
 ## ***********************************************************************
 ## **  GUI.SIZE -- how big the box has to be.
 ## **
-## **  Width is the widest thing that must fit; height is the message, a blank,
-## **  the caller's rows and the two frame rows. The 4 on the width is two frame
-## **  columns and a column of air each side.
+## **  The 4 on the width is two frame columns and a column of air each side.
 ## ***********************************************************************
 
-GUI.SIZE:
-    GUI.HEAD.ROWS = 0
+GUI.SIZE:  GUI.HEAD.ROWS = 0
     IF GUI.MSG$ <> "" THEN GUI.HEAD.ROWS = 1
     IF GUI.MSG2$ <> "" THEN GUI.HEAD.ROWS = 2
     GUI.INNER.WIDTH = GUI.BODY.WIDTH
@@ -481,44 +380,34 @@ GUI.SIZE:
     IF LEN(GUI.MSG2$) > GUI.INNER.WIDTH THEN GUI.INNER.WIDTH = LEN(GUI.MSG2$)
     IF LEN(GUI.TITLE$) + 2 > GUI.INNER.WIDTH THEN GUI.INNER.WIDTH = LEN(GUI.TITLE$) + 2
     GUI.GAP.ROWS = 0 : IF GUI.HEAD.ROWS > 0 THEN GUI.GAP.ROWS = 1
-    GUI.WIDTH = GUI.INNER.WIDTH + GUI.PADX * 2 + 2
-    GUI.HEIGHT = GUI.HEAD.ROWS + GUI.GAP.ROWS + GUI.BODY.ROWS + GUI.PADY * 2 + 2
+    GUI.WIDTH = GUI.INNER.WIDTH + GUI.PADX * 2 + 2 : GUI.HEIGHT = GUI.HEAD.ROWS + GUI.GAP.ROWS + GUI.BODY.ROWS + GUI.PADY * 2 + 2
     RETURN
 
 ## ***********************************************************************
 ## **  GUI.PLACE.BOX -- centred, or where the caller said.
 ## **
-## **  Clamped at 0 on both axes, so a box too big for the mode is cut off at the
-## **  right and bottom rather than drawn at a negative coordinate -- which VERA
-## **  would happily write somewhere else entirely.
+## **  Clamped at 0 on both axes: a negative coordinate has VERA writing
+## **  somewhere else entirely.
 ## ***********************************************************************
 
-GUI.PLACE.BOX:
-    GOSUB GUI.SCREEN
+GUI.PLACE.BOX:  GOSUB GUI.SCREEN
     IF GUI.PLACE <> 0 THEN GUI.LEFT = GUI.X : GUI.TOP = GUI.Y : GOTO GUI.PLACE.SCROLL
-    GUI.LEFT = INT((GUI.SCREEN.COLS - GUI.WIDTH) / 2)
-    GUI.TOP = INT((GUI.SCREEN.ROWS - GUI.HEIGHT) / 2)
+    GUI.LEFT = INT((GUI.SCREEN.COLS - GUI.WIDTH) / 2) : GUI.TOP = INT((GUI.SCREEN.ROWS - GUI.HEIGHT) / 2)
     IF GUI.LEFT < 0 THEN GUI.LEFT = 0
     IF GUI.TOP < 0 THEN GUI.TOP = 0
 
-## ---- LAST, and on BOTH paths: from here on every coordinate -- the frame, the
-## ---- text, the rectangle STASH saves -- is a map row. Applying it to the
-## ---- explicit path too is what keeps GUI.X and GUI.Y screen coordinates.
-GUI.PLACE.SCROLL:
-    GUI.TOP = GUI.TOP + GUI.ROW.OFFSET
-    RETURN
+## ---- LAST, and on BOTH paths, so GUI.X and GUI.Y stay screen coordinates.
+GUI.PLACE.SCROLL:  GUI.TOP = GUI.TOP + GUI.ROW.OFFSET : RETURN
 
 ## ***********************************************************************
 ## **  GUI.SCREEN -- the mode's size, asked rather than assumed.
 ## **
-## **  NOT CACHED: a program that switches mode between two dialogs would place the
-## **  second against the first one's screen. It is one KERNAL call on a path that
-## **  is about to wait for a human. The floors catch a mode that reports something
-## **  unusable, and 80x60 is a safe thing to be wrong towards.
+## **  Not cached: a program that switches mode between two dialogs would place
+## **  the second against the first one's screen. The floors catch a mode that
+## **  reports something unusable, and 80x60 is a safe thing to be wrong towards.
 ## ***********************************************************************
 
-GUI.SCREEN:
-    GP.CALL GUI.SCRMODE, 0, 0, 0, 1
+GUI.SCREEN:  GP.CALL GUI.SCRMODE, 0, 0, 0, 1
     GUI.SCREEN.COLS = GP.X : GUI.SCREEN.ROWS = GP.Y
     IF GUI.SCREEN.COLS < 20 THEN GUI.SCREEN.COLS = 80
     IF GUI.SCREEN.ROWS < 8 THEN GUI.SCREEN.ROWS = 60
