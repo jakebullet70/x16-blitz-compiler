@@ -29,3 +29,16 @@ crunch was 17 lines for 18 bytes — so it buys little and costs review.
 program genuinely will not fit, say so and let him decide, rather than crunching pre-emptively.
 See [[comments-light-code-should-flow]] and [[prose-style-is-flat-reference]] for the prose half,
 and [[basl-cruncher-built]] for what a crunch pass is actually worth.
+
+## Reviewing a crunch he hands back
+
+**Check every merged line for an `IF` that is not LAST on it.** A false `IF` skips the WHOLE line,
+so a statement joined after the THEN-clause silently becomes conditional. The `STRUSING` crunch was
+clean; `GUI.INC.BL` 2026-09-07 was not, and merged `GOSUB GUI.CLOSE` onto
+`IF GUI.OK = 0 THEN GUI.TEXT$ = GUI.WAS$`, so `GUI.INPUT` closed its box only on a cancel. Fix by
+splitting, then fold the following statement onto the next line instead -- the byte comes back.
+
+**Prove the rest mechanically, do not read it.** Split both versions on the statement separator and
+diff the lists: same count, same order means only the grouping moved. That settled 86 statements in
+`STRUSING` and 216 in `GUI` in seconds. See [[gpc-if-semantics]] and
+[[folding-onto-a-label-line-saves-nothing]].
