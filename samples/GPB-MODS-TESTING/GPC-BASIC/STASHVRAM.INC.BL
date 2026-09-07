@@ -81,8 +81,7 @@ GOTO SV.MODULE.END
 ## **  SV.INIT -- the window, and an empty table.
 ## ***********************************************************************
 
-SV.INIT:
-    SV.ERROR$ = "" : SV.OK = 0
+SV.INIT:  SV.ERROR$ = "" : SV.OK = 0
     IF SV.BASE = 0 THEN SV.BASE = $04000
     IF SV.TOP = 0 THEN SV.TOP = $1AFFF
     IF SV.MAX < 1 THEN SV.ERROR$ = "SV.MAX IS NOT SET" : RETURN
@@ -101,8 +100,7 @@ SV.INIT:
     SV.READY = -1 : SV.OK = -1
 
 ## ---- SV.RESET is the whole of the rest of INIT, so it is not written twice.
-SV.RESET:
-    IF SV.READY = 0 THEN RETURN
+SV.RESET:  IF SV.READY = 0 THEN RETURN
     SV.NEXT = SV.BASEPG
     FOR SV.I = 1 TO SV.MAX
         SV.PAGE%(SV.I) = 0 : SV.PAGES%(SV.I) = 0
@@ -114,21 +112,15 @@ SV.RESET:
 ## **  SV.SAVE -- a screen rectangle into VRAM.
 ## ***********************************************************************
 
-SV.SAVE:
-    SV.HND = 0 : SV.OK = 0 : SV.ERROR$ = ""
+SV.SAVE:  SV.HND = 0 : SV.OK = 0 : SV.ERROR$ = ""
     IF SV.READY = 0 THEN SV.ERROR$ = "SV.INIT HAS NOT RUN" : RETURN
     IF SV.W < 1 THEN RETURN
     IF SV.H < 1 THEN RETURN
-    GOSUB SV.GEOM
-    SV.BYTES = SV.W * 2
-    SV.N = SV.BYTES * SV.H + SV.HEADER
-    GOSUB SV.ALLOC
-    IF SV.HND = 0 THEN RETURN
+    GOSUB SV.GEOM : SV.BYTES = SV.W * 2 : SV.N = SV.BYTES * SV.H + SV.HEADER
+    GOSUB SV.ALLOC : IF SV.HND = 0 THEN RETURN
 
-    SV.VA = SV.PAGE%(SV.HND) * 256
-    GOSUB SV.HDRW
-    SV.MODE = 0 : GOSUB SV.WALK
-    SV.OK = -1
+    SV.VA = SV.PAGE%(SV.HND) * 256 : GOSUB SV.HDRW
+    SV.MODE = 0 : GOSUB SV.WALK : SV.OK = -1
     RETURN
 
 ## ***********************************************************************
@@ -139,18 +131,13 @@ SV.SAVE:
 ## **  how a rectangle is slid somewhere else.
 ## ***********************************************************************
 
-SV.RESTORE:
-    SV.OK = 0 : SV.ERROR$ = ""
-    GOSUB SV.LIVE
+SV.RESTORE:  SV.OK = 0 : SV.ERROR$ = "" : GOSUB SV.LIVE
     IF SV.OK = 0 THEN RETURN
     SV.OK = 0
 
     SV.VA = SV.PAGE%(SV.HND) * 256
-    GOSUB SV.HDRR
-    GOSUB SV.GEOM
-    SV.BYTES = SV.W * 2
-    SV.MODE = 1 : GOSUB SV.WALK
-    SV.OK = -1
+    GOSUB SV.HDRR : GOSUB SV.GEOM : SV.BYTES = SV.W * 2
+    SV.MODE = 1 : GOSUB SV.WALK : SV.OK = -1
     RETURN
 
 ## ***********************************************************************
@@ -160,21 +147,17 @@ SV.RESTORE:
 ## **  a banked source has to be moved a window at a time by the caller.
 ## ***********************************************************************
 
-SV.PUT:
-    SV.HND = 0 : SV.OK = 0 : SV.ERROR$ = ""
+SV.PUT:  SV.HND = 0 : SV.OK = 0 : SV.ERROR$ = ""
     IF SV.READY = 0 THEN SV.ERROR$ = "SV.INIT HAS NOT RUN" : RETURN
     IF SV.LEN < 1 THEN RETURN
-    SV.N = SV.LEN
-    GOSUB SV.ALLOC
+    SV.N = SV.LEN : GOSUB SV.ALLOC
     IF SV.HND = 0 THEN RETURN
 
-    SV.VA = SV.PAGE%(SV.HND) * 256
-    GOSUB SV.PORTB
+    SV.VA = SV.PAGE%(SV.HND) * 256 : GOSUB SV.PORTB
     POKE 2, GP.LOBYTE(SV.ADDR) : POKE 3, GP.HIBYTE(SV.ADDR)
     POKE 4, SV.PORTLO.B : POKE 5, SV.PORTHI
     POKE 6, GP.LOBYTE(SV.LEN) : POKE 7, GP.HIBYTE(SV.LEN)
-    GP.CALL SV.MEMCOPY
-    SV.OK = -1
+    GP.CALL SV.MEMCOPY : SV.OK = -1
     RETURN
 
 ## ***********************************************************************
@@ -184,20 +167,16 @@ SV.PUT:
 ## **  asking for more than was put in reads whatever follows it in VRAM.
 ## ***********************************************************************
 
-SV.GET:
-    SV.OK = 0 : SV.ERROR$ = ""
-    GOSUB SV.LIVE
+SV.GET:  SV.OK = 0 : SV.ERROR$ = "" : GOSUB SV.LIVE
     IF SV.OK = 0 THEN RETURN
     SV.OK = 0
     IF SV.LEN < 1 THEN RETURN
 
-    SV.VA = SV.PAGE%(SV.HND) * 256
-    GOSUB SV.PORTA
+    SV.VA = SV.PAGE%(SV.HND) * 256 : GOSUB SV.PORTA
     POKE 2, SV.PORTLO : POKE 3, SV.PORTHI
     POKE 4, GP.LOBYTE(SV.ADDR) : POKE 5, GP.HIBYTE(SV.ADDR)
     POKE 6, GP.LOBYTE(SV.LEN) : POKE 7, GP.HIBYTE(SV.LEN)
-    GP.CALL SV.MEMCOPY
-    SV.OK = -1
+    GP.CALL SV.MEMCOPY : SV.OK = -1
     RETURN
 
 ## ***********************************************************************
@@ -208,21 +187,17 @@ SV.GET:
 ## **  of order leaves a hole that STASHVRAMGC closes.
 ## ***********************************************************************
 
-SV.FREE:
-    SV.OK = 0 : SV.ERROR$ = ""
-    GOSUB SV.LIVE
+SV.FREE:  SV.OK = 0 : SV.ERROR$ = "" : GOSUB SV.LIVE
     IF SV.OK = 0 THEN RETURN
 
-    SV.PAGE%(SV.HND) = 0 : SV.PAGES%(SV.HND) = 0
-    SV.NEXT = SV.BASEPG
+    SV.PAGE%(SV.HND) = 0 : SV.PAGES%(SV.HND) = 0 : SV.NEXT = SV.BASEPG
     FOR SV.I = 1 TO SV.MAX
         IF SV.PAGE%(SV.I) <> 0 THEN GOSUB SV.HIWATER
     NEXT SV.I
     SV.OK = -1
     RETURN
 
-SV.HIWATER:
-    SV.PG = SV.PAGE%(SV.I) + SV.PAGES%(SV.I)
+SV.HIWATER:  SV.PG = SV.PAGE%(SV.I) + SV.PAGES%(SV.I)
     IF SV.PG > SV.NEXT THEN SV.NEXT = SV.PG
     RETURN
 
@@ -230,8 +205,7 @@ SV.HIWATER:
 ## **  SV.LIVE -- is SV.HND a handle that is actually allocated.
 ## ***********************************************************************
 
-SV.LIVE:
-    SV.OK = 0
+SV.LIVE:  SV.OK = 0
     IF SV.READY = 0 THEN SV.ERROR$ = "SV.INIT HAS NOT RUN" : RETURN
     IF SV.HND < 1 THEN SV.ERROR$ = "NO SUCH HANDLE" : RETURN
     IF SV.HND > SV.MAX THEN SV.ERROR$ = "NO SUCH HANDLE" : RETURN
@@ -244,16 +218,13 @@ SV.LIVE:
 ## **  0 if the table is full or the window is.
 ## ***********************************************************************
 
-SV.ALLOC:
-    SV.HND = 0
-    SV.NP = INT((SV.N + 255) / 256)
+SV.ALLOC:  SV.HND = 0 : SV.NP = INT((SV.N + 255) / 256)
     IF SV.NEXT + SV.NP > SV.TOPPG THEN SV.ERROR$ = "THE VRAM WINDOW IS FULL" : RETURN
     FOR SV.I = 1 TO SV.MAX
         IF SV.PAGE%(SV.I) = 0 AND SV.HND = 0 THEN SV.HND = SV.I
     NEXT SV.I
     IF SV.HND = 0 THEN SV.ERROR$ = "NO FREE HANDLE" : RETURN
-    SV.PAGE%(SV.HND) = SV.NEXT : SV.PAGES%(SV.HND) = SV.NP
-    SV.NEXT = SV.NEXT + SV.NP
+    SV.PAGE%(SV.HND) = SV.NEXT : SV.PAGES%(SV.HND) = SV.NP : SV.NEXT = SV.NEXT + SV.NP
     RETURN
 
 ## ***********************************************************************
@@ -262,10 +233,8 @@ SV.ALLOC:
 ## **  width as 32 << n; L1_MAPBASE holds bits 16:9.
 ## ***********************************************************************
 
-SV.GEOM:
-    SV.MAPW = 32 * 2 ^ INT((PEEK(SV.LCONFIG) AND 48) / 16)
-    SV.MAPBASE = PEEK(SV.LMAPBASE) * 512
-    SV.STRIDE = SV.MAPW * 2
+SV.GEOM:  SV.MAPW = 32 * 2 ^ INT((PEEK(SV.LCONFIG) AND 48) / 16)
+    SV.MAPBASE = PEEK(SV.LMAPBASE) * 512 : SV.STRIDE = SV.MAPW * 2
     RETURN
 
 ## ***********************************************************************
@@ -277,8 +246,7 @@ SV.GEOM:
 ## **  work/stashvram/SVGATE.BASL.
 ## ***********************************************************************
 
-SV.WALK:
-    SV.VA = SV.PAGE%(SV.HND) * 256 + SV.HEADER
+SV.WALK:  SV.VA = SV.PAGE%(SV.HND) * 256 + SV.HEADER
 ## ---- memory_copy counts in 16 bits, so a map-width block that reaches 64K
 ## ---- walks its rows instead. A 128-wide map is 256 bytes a row, so that is
 ## ---- 256 rows -- reachable, because the map may be 256 rows deep.
@@ -291,15 +259,12 @@ SV.WALK:
     NEXT SV.ROW
     RETURN
 
-SV.WALK.ONE:
-    SV.CELL = SV.MAPBASE + SV.Y * SV.STRIDE
-    SV.N = SV.BYTES * SV.H
-    GOSUB SV.MOVEIT
+SV.WALK.ONE:  SV.CELL = SV.MAPBASE + SV.Y * SV.STRIDE
+    SV.N = SV.BYTES * SV.H : GOSUB SV.MOVEIT
     RETURN
 
 ## ---- One direction or the other, so the port setup is written once.
-SV.MOVEIT:
-    IF SV.MODE = 0 THEN SV.SRC = SV.CELL : SV.DST = SV.VA
+SV.MOVEIT:  IF SV.MODE = 0 THEN SV.SRC = SV.CELL : SV.DST = SV.VA
     IF SV.MODE <> 0 THEN SV.SRC = SV.VA : SV.DST = SV.CELL
     GOSUB SV.COPY
     RETURN
@@ -308,12 +273,8 @@ SV.MOVEIT:
 ## **  SV.COPY -- SV.N bytes from SV.SRC to SV.DST, both in VRAM.
 ## ***********************************************************************
 
-SV.COPY:
-    SV.ADR = SV.SRC : GOSUB SV.PORTA.AT
-    SV.ADR = SV.DST : GOSUB SV.PORTB.AT
-    POKE 2, SV.PORTLO : POKE 3, SV.PORTHI
-    POKE 4, SV.PORTLO.B : POKE 5, SV.PORTHI
-    POKE 6, GP.LOBYTE(SV.N) : POKE 7, GP.HIBYTE(SV.N)
+SV.COPY:  SV.ADR = SV.SRC : GOSUB SV.PORTA.AT : SV.ADR = SV.DST : GOSUB SV.PORTB.AT
+    POKE 2, SV.PORTLO : POKE 3, SV.PORTHI : POKE 4, SV.PORTLO.B : POKE 5, SV.PORTHI : POKE 6, GP.LOBYTE(SV.N) : POKE 7, GP.HIBYTE(SV.N)
     GP.CALL SV.MEMCOPY
     RETURN
 
@@ -321,10 +282,8 @@ SV.COPY:
 ## **  SV.HDRW / SV.HDRR -- the four bytes in front of a saved rectangle.
 ## ***********************************************************************
 
-SV.HDRW:
-    SV.ADR = SV.VA : GOSUB SV.PORTA.AT
-    POKE SV.DATA, SV.W : POKE SV.DATA, SV.H
-    POKE SV.DATA, SV.X : POKE SV.DATA, SV.Y
+SV.HDRW:  SV.ADR = SV.VA : GOSUB SV.PORTA.AT
+    POKE SV.DATA, SV.W : POKE SV.DATA, SV.H : POKE SV.DATA, SV.X : POKE SV.DATA, SV.Y
     RETURN
 
 SV.HDRR:
@@ -342,28 +301,18 @@ SV.HDRR:
 ## **  GP.HIBYTE and GP.LOBYTE reach 65,535, and AND is signed.
 ## ***********************************************************************
 
-SV.PORTA:
-    SV.ADR = SV.VA
-SV.PORTA.AT:
-    GOSUB SV.SPLIT
-    POKE SV.VCTRL, 0
-    POKE SV.VLO, SV.LO : POKE SV.VMID, SV.MID : POKE SV.VHI, SV.BNK + SV.UP
+SV.PORTA:  SV.ADR = SV.VA
+SV.PORTA.AT:  GOSUB SV.SPLIT
+    POKE SV.VCTRL, 0 : POKE SV.VLO, SV.LO : POKE SV.VMID, SV.MID : POKE SV.VHI, SV.BNK + SV.UP
     RETURN
 
-SV.PORTB:
-    SV.ADR = SV.VA
-SV.PORTB.AT:
-    GOSUB SV.SPLIT
-    POKE SV.VCTRL, 1
-    POKE SV.VLO, SV.LO : POKE SV.VMID, SV.MID : POKE SV.VHI, SV.BNK + SV.UP
-    POKE SV.VCTRL, 0
+SV.PORTB:  SV.ADR = SV.VA
+SV.PORTB.AT:  GOSUB SV.SPLIT
+    POKE SV.VCTRL, 1 : POKE SV.VLO, SV.LO : POKE SV.VMID, SV.MID : POKE SV.VHI, SV.BNK + SV.UP : POKE SV.VCTRL, 0
     RETURN
 
-SV.SPLIT:
-    SV.BNK = INT(SV.ADR / 65536)
-    SV.REST = SV.ADR - SV.BNK * 65536
-    SV.MID = INT(SV.REST / 256)
-    SV.LO = SV.REST - SV.MID * 256
+SV.SPLIT:  SV.BNK = INT(SV.ADR / 65536)
+    SV.REST = SV.ADR - SV.BNK * 65536 : SV.MID = INT(SV.REST / 256) :SV.LO = SV.REST - SV.MID * 256
     RETURN
 
 SV.MODULE.END:
