@@ -47,11 +47,11 @@ into opcodes that already exist. No handler, no vector slot, nothing in the bloc
 
 **The library.** `GPC-BASIC/`: 14 `.INC.BL` modules, 22 `.EXP.BL` examples. Ordinary BASL,
 `#INCLUDE`d by path, called with `GOSUB`. Zero runtime bytes — a module costs its own p-code, in the
-programs that include it. Menus vertical and bar, panels, themes, entry fields, in-place case and
-trim, shell sort, a screen rectangle to a RAM bank or a file, BMX into VERA.
+programs that include it. Menus vertical and bar, panels, themes, entry fields, in-place case, trim
+and splice, shell sort, a screen rectangle to a RAM bank or a file, BMX into VERA.
 
-`STASH.INC.BL`, `SORT.INC.BL` and `STRCASE.INC.BL` are `GP.ASM` and still modules: as keywords their
-925 bytes (329, 408, 188) would sit in the block, paid by every GP program. `GP.ARRPTR` and
+`STASH.INC.BL`, `SORT.INC.BL`, `STRCASE.INC.BL` and `STRINGS.INC.BL` are `GP.ASM` and still
+modules: as keywords their bytes would sit in the block, paid by every GP program. `GP.ARRPTR` and
 `GP.STRPTR` are what lets them out — a BASL subroutine takes an address, not an array or a string.
 
 The division is assembly for loops and bulk moves, BASIC for everything else. `LINEINPUT.GET`
@@ -151,7 +151,7 @@ Three implementations, and what each costs:
 | **Screen** | ASM | `GP.BOX` `GP.FILL` `GP.PRINTAT` |
 | **Screen** | COMPOSITE | `GP.CHAR` — free, one cell in `GP.PRINTAT`'s shape running `GP.FILL`'s handler |
 | **Colour roles** | BASIC | `THEME.INC.BL` — `THEME.LOAD`, `THEME.CLR()` · §4.1 |
-| **String helpers** | BASIC | `STRINGS.INC.BL` — `PADR` `PADL` `PADC` `SPLIT` `REPLACE` `PET2SCR` · §4.2 |
+| **String helpers** | BASIC+ASM | `STRINGS.INC.BL` — `PADR` `PADL` `PADC` `SPLIT` `REPLACE` `SPLICE` `PET2SCR` `TRIM` `LTRIM` `RTRIM` · §4.2 |
 | **Screen etiquette, panels** | BASIC | `APPSYS.INC.BL` — `STARTUP` `RESTORE` `PANEL.SAVE/LOAD/PUT` `ISEMU` · §4.3 |
 | **Entry fields** | BASIC | `LINEINPUT.INC.BL` — `LINEINPUT.GET`, `LINEINPUT.ASK` · §4.4 |
 | **Bitmaps** | BASIC | `BMX.INC.BL` — `BMX.SHOW`, `BMX.RESTORE` · §4.5 |
@@ -321,16 +321,17 @@ comment.
 
 Five keywords. `GP.INSTR` is the only string search GPC has; without it there is none.
 
-Trimming, padding and case folding are modules, not keywords: `STRCASE.INC.BL` (§4.8) for case and
-trim in place, `STRINGS.INC.BL` (§4.2) for padding. They cost 188 bytes of p-code in the programs
-that `#INCLUDE` them and nothing in the GP block. `GP.STRPTR` is the keyword they are built on.
+Trimming, padding, splicing and case folding are modules, not keywords: `STRCASE.INC.BL` (§4.8)
+for case, `STRINGS.INC.BL` (§4.2) for everything else. They cost p-code only in the programs that
+`#INCLUDE` them and nothing in the GP block. `GP.STRPTR` is the keyword they are built on.
 
-The in-place statements in `STRCASE.INC.BL` take a string variable, never a literal or an
-expression. The compiler rejects those. Case conversion leaves digits, punctuation and PETSCII
-graphics unchanged.
+The in-place routines take an ADDRESS, `GP.STRPTR(a$)`, and never a literal: `GP.STRPTR("hello")`
+is an address inside the p-code, so trimming it edits the running program. Case conversion leaves
+digits, punctuation and PETSCII graphics unchanged.
 
-There is no `GP.PAD`. In-place statements cannot grow a string past the capacity it was created
-with. `STR.PADR` / `PADL` / `PADC` (§4.2) are BASIC assignments and do reallocate.
+There is no `GP.PAD`. In-place work cannot grow a string past the capacity it was created with,
+which is what decides which side of `STRINGS.INC.BL` a routine lands on: the pads and `STR.SPLICE`
+grow, so they are BASIC assignments and reallocate; the trims only shrink, so they are assembly.
 
 Example: [`STRINGS.EXP.BL`](STRINGS.EXP.BL)
 
@@ -373,7 +374,7 @@ Example: [`STRINGS.EXP.BL`](STRINGS.EXP.BL)
   Syntax    GP.ISEMPTY(a$)
   Returns   -1 if a$ has zero length, 0 if not.
   Kind      COMPOSITE. Expands to LEN(a$) = 0.
-  Notes     A string of spaces is not empty. STRCASE.TRIM first if
+  Notes     A string of spaces is not empty. STR.TRIM first if
             that is the intent.
             GP.ISEMPTY(a$), LEN(a$) = 0 and a$ = "" are the same four
             bytes. Use whichever reads better.
@@ -767,9 +768,26 @@ The readable name costs no variable and no lookup.
 | `STR.SPLIT` | `STR.STR$` `STR.DELIM$` `STR.MAX` | `STR.N`, `STR.FIELD$(1..N)` |
 | `STR.REPLACE` | `STR.STR$` `STR.FIND$` `STR.REPL$` | `STR.STR$`, every occurrence replaced |
 | `STR.PET2SCR` | `STR.PET` | `STR.SCR` |
+| `STR.SPLICE` | `STR.STR$` `STR.AT` `STR.CUT` `STR.SUB$` | `STR.STR$`, edited at that position |
 
+| `STR.TRIM` | `STR.PTR` | *(the string itself)*, spaces off both ends |
+| `STR.LTRIM` | same | spaces off the **leading** end |
+| `STR.RTRIM` | same | spaces off the **trailing** end |
+
+**The module needs a `#SYMFILE`, and so does every program that includes it**, before the
+`#INCLUDE`s and named after the source PRG. The three trims are `GP.ASM` and reach BASIC's
+variables through `{VAR}`; without a symbol file the compile stops with `NO SYMBOL FILE FOR {}`.
+This is new — the module was pure BASIC until the trims moved here out of `STRCASE.INC.BL`.
+
+**The two halves take their argument differently, and one question decides which:** does the
+routine GROW the string. The pads and `SPLICE` do, so they are BASIC — they take the string by
+value in `STR.STR$` and hand it back there, and an assignment reallocates for free. The trims only
+ever shrink, so they are assembly — they take its ADDRESS in `STR.PTR` and rewrite the block where
+it lies, which is the only way a `GOSUB` can edit a caller's string without two allocations and two
+copies a call. Never pass a literal to those: `GP.STRPTR("hello")` is an address inside the
+p-code.
 The three pad routines leave a string that is already at or past the width unchanged. They pad and
-never truncate; use `STRCASE.RTRIM` (§4.8) to shorten.
+never truncate; use `STR.RTRIM` to shorten.
 
 `SPLIT` reads `STR.STR$` without modifying it. `STR.MAX` of 0 means 10. Empty fields are preserved:
 `"A,,C"` is three fields and `"A,"` is two. Splitting an empty string gives one empty field, never
@@ -794,7 +812,29 @@ checked: a longer replacement can push the result past 255 characters.
 `PET2SCR` converts a PETSCII code to the screen code the tile map holds, for `TILE`, `TDATA` and
 `VPOKE`. `GP.PRINTAT` and `GP.FILL` do this internally.
 
-Examples: [`SPLITT.EXP.BL`](SPLITT.EXP.BL)
+The three trims are three entry labels sharing one blob, so there is no mode to forget to set. A
+zero-length string and an all-spaces string are not special cases: the walk counts down and
+reaching zero is the answer.
+
+`SPLICE` edits by POSITION where `REPLACE` edits by content: it replaces `STR.CUT` characters at
+`STR.AT` with `STR.SUB$`. One routine covers all three of insert, overwrite and delete, because
+they are the same operation with a different count — `STR.CUT` of 0 inserts, `LEN(STR.SUB$)`
+overwrites, and an empty `STR.SUB$` deletes. `STR.AT` is 1-based, matching `GP.INSTR`.
+
+Past the end appends and below 1 clamps to 1, both falling out of `LEFT$` and `MID$` rather than
+being tested for; a cut running past the end takes the rest of the string. It is not length
+checked, like `REPLACE` and the pads. `SPLICE` clamps `STR.AT` and `STR.CUT` in place, so read them
+back rather than assuming what you set survived the call.
+
+It was written in `GP.ASM` first and rewritten in BASIC, which is worth knowing because the reason
+generalises: the assembly could overwrite and delete but never insert, because in-place work cannot
+grow a string, and it cost about 280 bytes of p-code where the one BASIC line costs about 40.
+
+Examples: [`SPLITT.EXP.BL`](SPLITT.EXP.BL), [`STRINGS.EXP.BL`](STRINGS.EXP.BL). Regression test:
+[`STRTST.EXP.BL`](STRTST.EXP.BL), thirty-three cases — the trim edges, every splice mode, both
+clamps, appending past the end, splicing an empty string, growing a 200-character string past the
+block it was born with, and guard strings either side to catch an off-by-one write into the
+neighbouring block.
 
 ### 4.3 `APPSYS.INC.BL` — start politely, leave it as you found it
 
@@ -802,12 +842,11 @@ Examples: [`SPLITT.EXP.BL`](SPLITT.EXP.BL)
 |---|---|---|
 | `APPSYS.STARTUP` | — | `APPSYS.MODE` `APPSYS.COLS` `APPSYS.ROWS` `APPSYS.COLOUR` |
 | `APPSYS.RESTORE` | those | screen mode and colour put back |
-| `APPSYS.PANEL.SAVE` | `APPSYS.FILE$` `.BANK` `.X` `.Y` `.W` `.H` [`.DEV`] | a file |
-| `APPSYS.PANEL.LOAD` | `APPSYS.FILE$` `.BANK` | back where it came from |
-| `APPSYS.PANEL.PUT` | `APPSYS.FILE$` `.BANK` `.X` `.Y` | pasted somewhere else |
 | `APPSYS.ISEMU` | — | `APPSYS.IS.EMULATOR` — -1 under x16emu, 0 otherwise |
 
 ```basic
+A screen rectangle through a file is `STASH.FILE.SAVE` / `.LOAD` / `.PUT` in `STASHFILE.INC.BL`.
+
 GOSUB APPSYS.STARTUP
 ' ... the application, laid out with APPSYS.COLS / APPSYS.ROWS ...
 GOSUB APPSYS.RESTORE : END
@@ -1114,7 +1153,7 @@ array in order with a string duplicated.
 
 ---
 
-### 4.8 `STRCASE.INC.BL` — case and trim, in place
+### 4.8 `STRCASE.INC.BL` — case, in place
 
 | Routine | in | out |
 |---|---|---|
@@ -1125,7 +1164,7 @@ array in order with a string duplicated.
 #INCLUDE "STRCASE.INC.BL"
 
 STRCASE.PTR = GP.STRPTR(LINE$)
-STRCASE.MODE = STRCASE.RTRIM
+STRCASE.MODE = STRCASE.UPPER
 GOSUB STRCASE.GO
 ```
 
@@ -1133,14 +1172,16 @@ GOSUB STRCASE.GO
 |---|---|
 | `STRCASE.UPPER` | a–z → A–Z, everything else untouched |
 | `STRCASE.LOWER` | A–Z → a–z, everything else untouched |
-| `STRCASE.TRIM` | spaces off **both** ends |
-| `STRCASE.LTRIM` | spaces off the **leading** end |
-| `STRCASE.RTRIM` | spaces off the **trailing** end |
 
 One blob, with the mode tested once at entry rather than inside the loop, where the byte count is
 the whole cost.
 
 The argument is an address because a BASL subroutine cannot be passed a variable. Copying the
+**`TRIM`, `LTRIM` and `RTRIM` were here** and are `STR.TRIM` / `STR.LTRIM` / `STR.RTRIM` in
+`STRINGS.INC.BL` (§4.2) now. They are string editing rather than case work, and every other
+string routine already lived in that one module. A program that only trims does not need this file
+at all; one that only folds case saves 113 bytes of p-code by the move.
+
 caller's string in and back out would be two allocations and two copies per call — the heap traffic
 this module exists to avoid. `GP.STRPTR` gives the block and the assembly rewrites it in place.
 
@@ -1156,9 +1197,9 @@ There is no pad routine here. Padding grows a string, and nothing working on the
 grow one past the capacity it was created with. Use `STR.PADR` (§4.2).
 
 Example: [`STRINGS.EXP.BL`](STRINGS.EXP.BL). Regression test:
-[`STRCTST.EXP.BL`](STRCTST.EXP.BL), twenty cases — empty, all spaces, a single space, one character,
-a single leading space (the boundary in the slide), 200 characters, and guard strings either side to
-catch an off-by-one write into the neighbouring block.
+[`STRCTST.EXP.BL`](STRCTST.EXP.BL), eight cases — empty, one character, 200 characters, and guard
+strings either side to catch an off-by-one write into the neighbouring block. The trim cases moved
+with the trims, to [`STRTST.EXP.BL`](STRTST.EXP.BL).
 
 ---
 

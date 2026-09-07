@@ -1,4 +1,7 @@
 ## SPLITT -- exercise STR.SPLIT
+## STRINGS.INC.BL reaches BASIC's variables through {VAR}, so this program needs a
+## #SYMFILE. It goes BEFORE the #INCLUDEs.
+#SYMFILE "@:SPLITT.SYM"
 #INCLUDE "GPB.INC.BL"
 #INCLUDE "STRINGS.INC.BL"
 #SAVEAS "@:SPLITT.PRG"

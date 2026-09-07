@@ -29,7 +29,20 @@ If one of them ever hits the wall, point it at `testing/BASLOAD.PRG` and copy th
 ## Sizes worth keeping
 
 `GPBMODS.BASL` tokenised to **37,872 bytes -- 783 bytes under the old ceiling** with twelve modules
-in, which is why `FILEIO` + `FILEDIR` (~7,200) and a FILES panel (~8,000) could not go in. Rule of
+in, which is why `FILEIO` + `FILEDIR` (~7,200) and a FILES panel (~8,000) could not go in.
+
+**GPBMODS CROSSED IT on 2026-09-07** and came back under, which is the useful part. Moving the
+three trims into `STRINGS.INC.BL` **with an assembly `STR.SPLICE` beside them** took it to 39,794
+and `work/rename/build.py` died on `ERROR: BASIC RAM FULL`; rewriting `STR.SPLICE` in BASIC brought
+it to 38,226, and trimming the prose of `STRINGS` and `STRCASE` to **37,197 -- 1,458 bytes under,
+and 675 below where GPBMODS started**. Comment lines are worth as much here as code: `##` prose
+does not survive tokenising, but the `REM`-carried assembly and the sheer line count do. The mechanism to remember: **`GP.ASM` rides in `REM` statements,
+so a blob costs tokenised bytes even though `##` prose costs none** -- trimming comments to make
+room does nothing, and adding a blob to a widely-included module is what moves this number.
+
+`work/rename/build2.py` is `build.py` with the streaming driver lifted out of
+`source/gpc/build_basl.py`. **Copy `build2.py`, not `build.py`, into any new work dir that compiles
+GPBMODS or anything its size** -- the margin is 1,458 bytes. Rule of
 thumb from two real builds: **~17.5 tokenised bytes per non-comment source line** (GPBMODS 16.9,
 FILEDIRT 18.2).
 

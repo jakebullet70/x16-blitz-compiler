@@ -54,14 +54,19 @@
 #TOKEN GP.STRPTR 52854
 
 
-## TRIMMING AND CASE FOLDING ARE STRCASE.INC.BL, in GP.ASM, built on GP.STRPTR above:
+## CASE FOLDING IS STRCASE.INC.BL, in GP.ASM, built on GP.STRPTR above:
 ## it takes the block address and rewrites it where it lies, no copy either way.
 ##
 ##      #SYMFILE "@:MYPROG.SYM"          <- and it is not optional
 ##      #INCLUDE "STRCASE.INC.BL"
 ##      STRCASE.PTR = GP.STRPTR(LINE$)
-##      STRCASE.MODE = STRCASE.RTRIM
+##      STRCASE.MODE = STRCASE.UPPER
 ##      GOSUB STRCASE.GO
+##
+## TRIMMING IS STR.TRIM / STR.LTRIM / STR.RTRIM IN STRINGS.INC.BL, which is also
+## GP.ASM and also needs the #SYMFILE. STR.SPLICE is there too, in plain BASIC:
+## it replaces so many characters at a position, which is insert, overwrite and
+## delete depending on the count.
 ##
 ## NEVER HAND IT A LITERAL. GP.STRPTR("text") is an address inside the p-code, so
 ## folding it edits the program itself, and nothing stops you. Fold a variable.
@@ -256,6 +261,15 @@
 #TOKEN GP.BANKED 52823
 #TOKEN GP.ENDBANKED 52822
 
+## ---- banked text: GP.BANKEDSTR <bank> <name> ... GP.ENDBANKEDSTR, read with
+## ---- GP.BSTR(<name>,n). GP.BSTRCOUNT(<name>) is the group's size, a compile-time
+## ---- constant. The body lines are BARE QUOTED STRINGS, not REMs: BASLOAD upper-cases
+## ---- REM text and would destroy the case of every string.
+#TOKEN GP.BSTR 52821
+#TOKEN GP.BSTRCOUNT 52820
+#TOKEN GP.BANKEDSTR 52819
+#TOKEN GP.ENDBANKEDSTR 52818
+
 #TOKEN GP.IF 52830
 #TOKEN GP.ELSEIF 52829
 #TOKEN GP.ELSE 52828
@@ -347,7 +361,7 @@
 #TOKEN GP.LOBYTE 52832
 
 ## GP.ISEMPTY(a$) is -1 when a$ has zero length, 0 otherwise. A string of SPACES is not
-## empty -- STRCASE.TRIM it first if that is what you meant.
+## empty -- STR.TRIM it first if that is what you meant.
 ##
 ## For READABILITY and nothing else: it is the same four bytes as LEN(A$)=0, and IF
 ## A$="" costs about the same, so do not choose between the three on size.

@@ -54,15 +54,20 @@
 #TOKEN GP.STRPTR 52854
 
 
-## GP.TRIM, GP.LTRIM, GP.RTRIM, GP.UPPER and GP.LOWER ARE GONE -- STRCASE.INC.BL now,
+## GP.UPPER AND GP.LOWER ARE GONE -- STRCASE.INC.BL now,
 ## in GP.ASM, built on GP.STRPTR above: it takes the block address and rewrites it
 ## where it lies, no copy either way.
 ##
 ##      #SYMFILE "@:MYPROG.SYM"          <- and it is not optional
 ##      #INCLUDE "STRCASE.INC.BL"
 ##      STRCASE.PTR = GP.STRPTR(LINE$)
-##      STRCASE.MODE = STRCASE.RTRIM
+##      STRCASE.MODE = STRCASE.UPPER
 ##      GOSUB STRCASE.GO
+##
+## TRIMMING IS STR.TRIM / STR.LTRIM / STR.RTRIM IN STRINGS.INC.BL, which is also
+## GP.ASM and also needs the #SYMFILE. STR.SPLICE is there too, in plain BASIC:
+## it replaces so many characters at a position, which is insert, overwrite and
+## delete depending on the count.
 ##
 ## ONE THING WAS LOST: the compiler used to reject a literal at the call site.
 ## GP.STRPTR("text") is an address inside the p-code, and upper-casing it edits the
@@ -338,7 +343,7 @@
 #TOKEN GP.LOBYTE 52832
 
 ## GP.ISEMPTY(a$) is -1 when a$ has zero length, 0 otherwise. A string of SPACES is not
-## empty -- STRCASE.TRIM it first if that is what you meant.
+## empty -- STR.TRIM it first if that is what you meant.
 ##
 ## For READABILITY and nothing else: it is the same four bytes as LEN(A$)=0, and IF
 ## A$="" costs about the same, so do not choose between the three on size.

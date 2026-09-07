@@ -82,8 +82,8 @@ elimination: including a module costs its whole size whether or not it is called
 | `MENUBAR.INC.BL` | a horizontal menu bar |
 | `GUI.INC.BL` | four dialogs — ask, say, type, choose — in a box that puts the screen back |
 | `GUI2.INC.BL` | a listbox, single or multi select |
-| `STRINGS.INC.BL` | the string helpers that belong in BASIC rather than assembly |
-| `STRCASE.INC.BL` | case and trim, rewriting a string in place, in assembly |
+| `STRINGS.INC.BL` | the string helpers: BASIC where BASIC is enough, assembly where it is not |
+| `STRCASE.INC.BL` | case, rewriting a string in place, in assembly |
 | `SORT.INC.BL` | shell sort a string array in place, in assembly |
 | `BMX.INC.BL` | load a BMX bitmap into VERA |
 
@@ -113,7 +113,7 @@ One `.EXP.BL` per topic. Several are also the regression test for the module the
 | `FORM.EXP.BL` | three fields you can move between, `LINEINPUT` style |
 | `BMXVIEW.EXP.BL` | a BMX bitmap viewer, in about thirty lines |
 | `BMXPAL.EXP.BL` `BMXSPD.EXP.BL` | the palette question, and the speed of each path |
-| `SORT.EXP.BL` `STRCTST.EXP.BL` `SPLITT.EXP.BL` | the regression tests for `SORT`, `STRCASE` and `STR.SPLIT` |
+| `SORT.EXP.BL` `STRCTST.EXP.BL` `STRTST.EXP.BL` `SPLITT.EXP.BL` | the regression tests for `SORT`, `STRCASE`, the `STRINGS` assembly and `STR.SPLIT` |
 | `MENUTST.EXP.BL` `GUI2TST.EXP.BL` | the same for the menu and the listbox, driven through the keyboard buffer |
 
 ---

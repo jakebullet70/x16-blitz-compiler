@@ -1204,33 +1204,43 @@ filter runs per keystroke inside `LIB.CODEBANK`.
 
 ### `STRINGS.INC.BL` wants `STR.CENTRE`
 
-Centre a string on a row and print it. Simons' `CENTRE`, and the commonest line in every dialog and
-title bar in the tree.
+Where does a string start if it is to sit centred in a field. Simons' `CENTRE`, and the commonest
+line in every dialog and title bar in the tree.
 
 ```
-   in   STR.STR$              the text
-        STR.Y                 the row
-        STR.ATTR              packed attribute
-        STR.X  STR.WIDTH      optional region, default the whole line
+   in    STR.STR$   the text; TRUNCATED to STR.WIDTH if it is longer
+         STR.X      left edge of the field
+         STR.WIDTH  how wide the field is
+   out   STR.COL    where to start printing, in STR.X's own origin
+         STR.STR$
 ```
 
-The column is `STR.X + INT((STR.WIDTH - LEN(STR.STR$)) / 2)`, floored at `STR.X`.
+`STR.COL = STR.X + INT((STR.WIDTH - LEN(STR.STR$)) / 2)`, floored at `STR.X`, with a `LEFT$`
+truncation first. Three lines, no screen keyword, no printing.
 
-**Ask the KERNAL for the width, do not assume 80.** A program that centres on 80 columns and then
-runs in 40 puts its title off the screen:
+**IT TAKES A WIDTH, NOT A SCREEN.** The caller passes the field, so the same routine centres in the
+screen, in a `GP.BOX`, in a panel or in one column of a table -- and `STRINGS.INC.BL` needs nothing
+from the screen to do it. An earlier draft of this entry took a row and an attribute and printed
+the result, which is what made it look like it belonged in `APPSYS.INC.BL`. It does not.
 
-```basic
-GP.CALL $FF5F, 0, 0, 0, 1          ' KERNAL screen_mode, carry set = report
-STR.WIDTH = GP.X
-```
+**It is not `STR.PADC`.** `PADC` returns the text with the field's spaces attached, so printing it
+paints the whole field; `CENTRE` returns a column and touches nothing else, which is what a box
+interior or an already-drawn background wants.
 
-**Text longer than the width truncates with `LEFT$`.** `GP.PRINTAT` clips nothing — drawing off the
-right edge wraps onto the next row, so an over-long title corrupts the line below instead of looking
-too long.
+Two notes for the CALLER, not requirements on the routine:
 
-**The decision to make first:** `STR.PADC` already centres a string inside a width, so what this adds
-is the screen half — and that makes `STRINGS.INC.BL` depend on a screen keyword for the first time.
-Either accept that, or put the routine in `APPSYS.INC.BL` where the screen already lives.
+- **Ask the KERNAL for the width, do not assume 80.** A program that centres on 80 columns and then
+  runs in 40 puts its title off the screen:
+
+  ```basic
+  GP.CALL $FF5F, 0, 0, 0, 1          ' KERNAL screen_mode, carry set = report
+  STR.WIDTH = GP.X
+  ```
+
+- **Text longer than the width truncates.** `GP.PRINTAT` clips nothing -- drawing off the right edge
+  wraps onto the next row, so an over-long title corrupts the line below instead of looking too long.
+
+Add it when a caller exists, on the same rule the rest of this section runs on.
 
 ### `STRINGS.INC.BL` wants `STR.USE` — a number to a template
 
@@ -1252,22 +1262,6 @@ Traps, all three of which show up as a misaligned column rather than an error:
   goes toward minus infinity, so `-1.5` and `1.5` round in opposite directions.
 - A number wider than its mask has to do something visible. Fill the field with `*`, as other BASICs
   do, rather than overflowing the width and pushing the rest of the row along.
-
-### `STRINGS.INC.BL` wants positional insert and overwrite
-
-§1.6 of the same review. Simons' `INSERT` and `INST`. `STR.REPLACE` edits by content and `STR.SPLIT`
-cuts by delimiter; neither edits at an index, and this BASIC has no `MID$` assignment.
-
-```
-   in   STR.STR$  STR.AT  STR.SUB$
-   out  STR.STR$
-```
-
-`STR.INSERT` opens a gap and `STR.INST` writes over what is there. `STR.AT` is 1-based, matching
-`GP.INSTR`. Past the end appends; below 1 clamps to 1. Not length checked, like `STR.REPLACE` — a
-result past 255 characters is the caller's problem.
-
-Add these when a caller exists. Two routines nothing calls are two routines every includer compiles.
 
 ### A screen-rectangle move and scroll
 
@@ -1502,12 +1496,13 @@ three modules deep, and worth saying out loud before someone starts at the top.
   `;` in values, or do not strip them at all. Pick one and write it in the header — the half-way
   version is the bug.
 - **Trim whitespace around the key and around the `=`, but decide about the value.** Leading spaces
-  in a value are sometimes deliberate. `STR.` has `STR.SKIP` already; `GP.TRIM`/`GP.LTRIM` are in
-  `STRCASE.INC.BL`, which is a `GP.ASM` module and therefore drags a `#SYMFILE` requirement into any
-  program that includes it. Decide whether `INI` takes that dependency or does its own compare.
+  in a value are sometimes deliberate. The trims are `STR.TRIM` / `STR.LTRIM` / `STR.RTRIM` in
+  `STRINGS.INC.BL`, which `INI` wants anyway for `STR.SPLIT` -- so this one is free.
 - **Case.** Sections and keys case-insensitive is what everyone expects, and it costs either
-  `GP.UPPER` (the `#SYMFILE` dependency again) or a hand-written compare. Values are case-sensitive.
-- **Use `STR.SPLIT`.** `STRINGS.INC.BL` has it. Do not write a second splitter.
+  `STRCASE.UPPER` -- a second module, 87 bytes -- or a hand-written compare. Values are
+  case-sensitive.
+- **Use `STR.SPLIT`.** `STRINGS.INC.BL` has it. Do not write a second splitter. Note that the module
+  is `GP.ASM` now and therefore drags a `#SYMFILE` requirement into any program that includes it.
 
 **Callers waiting.** The editor's theme, tab width and last-opened file; `GPC-HELP`'s starting topic.
 **Leave `GPC`'s own control file alone** — `control.asm` reads exactly four 256-byte lines and
@@ -2584,6 +2579,14 @@ can sit side by side on the disk.
 There is **no fallback**: without a readable `GPC.INPUT` the compiler prints `NO GPC.INPUT FILE` and
 stops. A compiler that guesses at what it was asked to build is worse than one that refuses. Every
 caller in the tree — `source/application/Makefile`, `bench/run-bench.sh`, the reproductions under
+**IT CAME BACK IN `STRINGS` AND `STRCASE`, 2026-09-07, and was cut again.** Writing the trims,
+`STR.SPLICE` and the new headers took `STRINGS.INC.BL` to 371 lines and `STRCASE.INC.BL` to 149 --
+past where either started. Re-cut to **275 and 102**, prose 138 and 42, with `STRCASE` back to half
+its post-sweep 80. What went in was exactly what rule 5 forbids: the same "BASIC, not ASM, and it
+has to be" argument written three times, the history of what the routine used to be, and the
+byte-count arithmetic behind a decision already made. Both rebuilt to the same object -- `STRCTST`
+`OK CODE 825`, `STRTST` 33/33 -- and `GPBMODS` tokenised 38,226 -> 37,197 for it.
+
 `fixes/` — therefore writes one.
 
 `GPC.PRG` (`source/gpc/GPC.BASL`, BASLOAD source) is the front end: it asks for the two names, writes
@@ -2918,7 +2921,7 @@ anything but a hand-run script:
 **Step 1 is the one worth having, and today measured exactly why.** A program pays for every line of
 every module it includes, in p-code AND therefore in workspace -- the workspace is what is left after
 the object code, so **256 bytes of unused library is 256 bytes the running program does not get**.
-Two numbers from the same afternoon: `STRCASE.INC.BL` costs **132 bytes** and the editor uses ONE of
+Two numbers from the same afternoon: `STRCASE.INC.BL` cost **200 bytes** and the editor used ONE of
 its five modes; compiling the self-check out of the editor moved it **16,497 -> 12,882 bytes and the
 workspace 4,608 -> 8,192**. Dead code is not free here, it is the scarcest thing there is.
 
@@ -2929,8 +2932,12 @@ module used" is "does any identifier with its prefix appear outside its own file
 or omit, never de-duplicate. Dependencies are transitive (`GUI` uses `MENUVERT`, `STASH`, `THEME`),
 so iterate to a fixpoint rather than scanning once.
 
-**The bigger prize, and the harder half: per-ROUTINE elimination inside a module.** `STRCASE` is one
-`GP.ASM` body plus five modes; the editor wants `UPPER`. The house layout makes it tractable -- one
+**The bigger prize, and the harder half: per-ROUTINE elimination inside a module.** `STRINGS` is ten
+routines and the cruncher wants two; `STRCASE` is one `GP.ASM` body plus two modes, and the editor
+wants `UPPER`. A blob reached through ONE label and a mode variable can never be cut down -- the
+modes are one routine to any scanner -- which is why `STR.TRIM` / `STR.LTRIM` / `STR.RTRIM` were
+given three entry labels over one shared body when they moved, and why new assembly should be
+written one routine per label from the start. The house layout makes it tractable -- one
 label per routine, a `GOTO x.MODULE.END` skip at the top, parameters documented in the banner -- so a
 scanner can bracket a routine by its label and drop the ones nothing calls. Do the module-level cut
 first; it is most of the win for a fraction of the risk.
@@ -2951,6 +2958,22 @@ Related, and the reason it matters: [[program-too-big-fires-early]] and the rele
   memory from compiled programs"). What is *not* done is the in-memory "RUN the compiler a second time"
   path, which still runs the object where it was generated (up at `FreeMemory`, workspace hardcoded at
   `$8000`). **Parked as a low-value dev-path cleanup:** it only affects testing a program in the
+**And one from 07/09/26, which is the sharpest case in the tree.** Moving the three trims out of
+`STRCASE.INC.BL` into `STRINGS.INC.BL` left `STRCASE` at **87 bytes** (from 200) and `STRINGS` at
+**633** (from 438, the trims plus the new `STR.SPLICE`). Every program that only folds case got
+**113 bytes back** -- `GPC-HELP` measured 11,173 -> 11,060 -- and `GPBMODS`, which carries both
+modules, came out at **19,804 either way, exactly break-even**. But `CRUNCHER.BASL` calls two trims
+and nothing else in `STRINGS`, and paid **4,400 -> 4,893, +493 bytes**, for `PADR`, `PADL`, `PADC`,
+`SPLIT`, `REPLACE`, `SPLICE` and `PET2SCR` that it never calls. That is a tenth of the program, and
+per-routine elimination is the whole of the fix.
+
+**A second lesson from the same afternoon, about where the p-code goes.** `STR.SPLICE` was built in
+`GP.ASM` first: **~280 bytes**, and it could overwrite and delete but never INSERT, because in-place
+work only ever gets the block and cannot grow a string. Rewritten as the one BASIC line it replaces
+-- `LEFT$ + SUB$ + MID$` -- it does all three in **~40 bytes**. Assembly earns its place on a loop
+or a bulk move, not on an operation BASIC already spells in one statement; the trims stay assembly
+because they only ever SHRINK, which is the half in-place can do.
+
   compiler's own memory without reloading the saved file — the shipped `OBJECT.PRG` is unaffected. The
   one real wrinkle is a size ceiling on that path (object code over ~14K grows past `$8000` and the
   in-memory run's workspace stomps it, even though the saved file is fine). If it is ever worth doing:

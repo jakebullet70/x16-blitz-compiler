@@ -1,30 +1,50 @@
 ## ***********************************************************************
 ## **
-## **  STRINGS.INC.BL -- string helpers, in BASIC.
+## **  STRINGS.INC.BL -- string helpers. BASIC, plus one GP.ASM blob for the trims.
 ## **
-## **  Position independent, so #INCLUDE it anywhere. Call with GOSUB.
+## **  Modelled on prog8's strings module: one dotted namespace, one routine per job.
+## **  This file holds CODE -- call the routines with GOSUB. It is position independent
+## **  (the module jumps over itself), so #INCLUDE it anywhere.
 ## **
-## **   in   STR.STR$    the string, in and out
-## **        STR.WIDTH   the field width  (PADR / PADL / PADC)
-## **        STR.DELIM$  the separator    (SPLIT)
-## **        STR.MAX     field array size (SPLIT, 0 means 10)
-## **        STR.FIND$   what to look for (REPLACE)
-## **        STR.REPL$   what to put back (REPLACE)
-## **        STR.PET     a PETSCII code   (PET2SCR)
+## **  Parameters, since a BASL subroutine takes no arguments:
 ## **
-## **  clobbers  STR.GAP STR.HALF      the pad routines
-## **            STR.REST$ STR.AT      SPLIT and REPLACE
-## **            STR.LIM STR.N         SPLIT
-## **            STR.OUT$              REPLACE
-## **            STR.SCR               PET2SCR
+## **      STR.STR$    the string, in and out
+## **      STR.WIDTH   field width          PADR PADL PADC
+## **      STR.DELIM$  the separator        SPLIT
+## **      STR.MAX     field array size     SPLIT, 0 means 10
+## **      STR.FIND$   what to look for     REPLACE
+## **      STR.REPL$   what to put back     REPLACE
+## **      STR.AT      1-based position     SPLICE
+## **      STR.CUT     characters to cut    SPLICE
+## **      STR.SUB$    what to put there    SPLICE
+## **      STR.PET     a PETSCII code       PET2SCR
+## **      STR.PTR     GP.STRPTR(a$)        TRIM LTRIM RTRIM
 ## **
-## **  Usage:
+## **  Clobbered:
+## **      STR.GAP  STR.HALF                the pads
+## **      STR.REST$  STR.AT  STR.LIM       SPLIT, and STR.N is its count
+## **      STR.OUT$  STR.REST$  STR.AT      REPLACE
+## **      STR.AT  STR.CUT                  SPLICE clamps its own inputs
+## **      STR.SCR                          the PET2SCR result
+## **
 ## **      STR.STR$ = NAME$ : STR.WIDTH = 20
 ## **      GOSUB STR.PADR
 ## **      NAME$ = STR.STR$
 ## **
-## **  The pad routines pad and never truncate: a string at or past the width is
-## **  left alone. Trimming is STRCASE.RTRIM. Lengths are not checked.
+## **  Two calling conventions. The BASIC routines take the string by value in
+## **  STR.STR$ and hand it back there. The three trims take its address in STR.PTR and
+## **  rewrite the block where it lies. In place shrinks and rewrites but cannot grow,
+## **  so the pads and SPLICE are BASIC and the trims are not.
+## **
+## **  The module needs a #SYMFILE, and so does every program that includes it, before
+## **  the #INCLUDEs and named after the source PRG. Without one the compile stops with
+## **  "NO SYMBOL FILE FOR {}", which names the cause but not the file.
+## **
+## **      #SYMFILE "@:MYPROG.SYM"
+## **      #INCLUDE "STRINGS.INC.BL"
+## **
+## **  WARNING: pass the trims a variable, never a literal. GP.STRPTR("hello") is an
+## **  address inside the p-code, and trimming it EDITS THE PROGRAM.
 ## **
 ## ***********************************************************************
 #IFNDEF STR.DEFS
@@ -33,71 +53,69 @@
 GOTO STR.SKIP
 
 ## STR.PADR -- pad on the RIGHT to STR.WIDTH. Left justify.
+## The pads pad only: a string at or past the width is left alone, and the result is
+## not length checked.
 
-STR.PADR:
-    IF LEN(STR.STR$) < STR.WIDTH THEN STR.STR$ = STR.STR$ + RPT$(32, STR.WIDTH - LEN(STR.STR$))
+STR.PADR:  IF LEN(STR.STR$) < STR.WIDTH THEN STR.STR$ = STR.STR$ + RPT$(32, STR.WIDTH - LEN(STR.STR$))
     RETURN
 
 ## STR.PADL -- pad on the LEFT to STR.WIDTH. Right justify.
 
-STR.PADL:
-    IF LEN(STR.STR$) < STR.WIDTH THEN STR.STR$ = RPT$(32, STR.WIDTH - LEN(STR.STR$)) + STR.STR$
+STR.PADL:  IF LEN(STR.STR$) < STR.WIDTH THEN STR.STR$ = RPT$(32, STR.WIDTH - LEN(STR.STR$)) + STR.STR$
     RETURN
 
-## STR.PADC -- pad BOTH sides to STR.WIDTH. An odd gap puts the extra space on the right.
+## STR.PADC -- pad BOTH sides to STR.WIDTH. An odd gap puts the extra space right.
 ##
-## WARNING: the two guards are load bearing. RPT$ raises ILLEGAL QUANTITY on a count of
-## zero rather than returning "", so a gap of 1 fails on the left call.
+## The two guards are load bearing: RPT$ raises ILLEGAL QUANTITY on a count of zero, so
+## a gap of 1 makes STR.HALF zero and fails the left call.
 
-STR.PADC:
-    STR.GAP = STR.WIDTH - LEN(STR.STR$)
+STR.PADC:  STR.GAP = STR.WIDTH - LEN(STR.STR$)
     IF STR.GAP < 1 THEN RETURN
-    STR.HALF = INT(STR.GAP / 2)
-    IF STR.HALF > 0 THEN STR.STR$ = RPT$(32, STR.HALF) + STR.STR$
+    STR.HALF = INT(STR.GAP / 2) : IF STR.HALF > 0 THEN STR.STR$ = RPT$(32, STR.HALF) + STR.STR$
     STR.STR$ = STR.STR$ + RPT$(32, STR.WIDTH - LEN(STR.STR$))
     RETURN
 
 ## STR.SPLIT -- cut STR.STR$ into fields on STR.DELIM$.
 ##
-##   in    STR.STR$    the string, read only -- SPLIT is the one routine here that
-##                         does not modify it
+##   in    STR.STR$    read only, unlike the pads
 ##         STR.DELIM$  the separator, one character or several
 ##         STR.MAX     how many fields the array holds; 0 means 10
-##   out   STR.N       how many fields were produced, always >= 1
+##   out   STR.N       fields produced, always >= 1
 ##         STR.FIELD$  the fields, 1..STR.N
+##   clobbers  STR.REST$  STR.AT  STR.LIM
 ##
-## STR.FIELD$ is not dimensioned here. Either leave it to GPC's implicit DIM, which
-## gives 0..10, or DIM it yourself before the first call and set STR.MAX to match --
-## DIMming one GPC already auto-dimensioned is an error.
+## STR.FIELD$ is not dimensioned here. Leave it and GPC's implicit DIM gives 0..10; for
+## more, DIM it before the first call and set STR.MAX to match. DIMming an array GPC has
+## already auto-dimensioned is an error, so it is one or the other.
 ##
-## Empty fields are preserved: "A,,C" is three fields, "A," is two, "" is one. At the
-## limit the last field takes the whole unsplit remainder.
+## Empty fields are preserved: "A,,C" is three fields and "A," is two. An empty string
+## gives one empty field. Reaching STR.MAX loses nothing -- the last field takes the
+## whole unsplit remainder.
 
-STR.SPLIT:
-    STR.N = 0 : STR.LIM = STR.MAX
+STR.SPLIT:  STR.N = 0 : STR.LIM = STR.MAX
     IF STR.LIM < 1 THEN STR.LIM = 10
     STR.REST$ = STR.STR$
 STR.SPLIT.NEXT:
-    STR.N = STR.N + 1
-    IF STR.N >= STR.LIM THEN STR.FIELD$(STR.N) = STR.REST$ : RETURN
-    STR.AT = GP.INSTR(STR.REST$, STR.DELIM$)
-    IF STR.AT = 0 THEN STR.FIELD$(STR.N) = STR.REST$ : RETURN
-    STR.FIELD$(STR.N) = LEFT$(STR.REST$, STR.AT - 1)
-    STR.REST$ = MID$(STR.REST$, STR.AT + LEN(STR.DELIM$))
+    STR.N = STR.N + 1 : IF STR.N >= STR.LIM THEN STR.FIELD$(STR.N) = STR.REST$ : RETURN
+    STR.AT = GP.INSTR(STR.REST$, STR.DELIM$) : IF STR.AT = 0 THEN STR.FIELD$(STR.N) = STR.REST$ : RETURN
+    STR.FIELD$(STR.N) = LEFT$(STR.REST$, STR.AT - 1) : STR.REST$ = MID$(STR.REST$, STR.AT + LEN(STR.DELIM$))
     GOTO STR.SPLIT.NEXT
 
 ## STR.REPLACE -- replace every occurrence of STR.FIND$ with STR.REPL$.
 ##
-##   in    STR.STR$    the string, modified in place
-##         STR.FIND$   what to look for. Case sensitive; GP.INSTR compares raw bytes
-##         STR.REPL$   what to put in its place. Shorter, longer, or "" to delete
+##   in    STR.STR$    modified in place
+##         STR.FIND$   case sensitive; GP.INSTR compares raw bytes
+##         STR.REPL$   shorter, longer, or "" to delete
+##   clobbers  STR.OUT$  STR.REST$  STR.AT
 ##
-## A replacement containing what it replaces is safe -- "A" -> "AA" terminates, because
-## only the unsearched remainder is scanned again. An empty STR.FIND$ leaves the string
-## alone: GP.INSTR reports not found for a zero length needle.
+## A replacement containing the needle terminates: what is emitted moves into STR.OUT$
+## and is never re-scanned, and STR.REST$ shrinks by at least LEN(STR.FIND$) a pass. An
+## empty STR.FIND$ leaves the string alone, because GP.INSTR reports not-found for a
+## zero length needle.
+##
+## Not length checked. A result past 255 characters is the caller's problem.
 
-STR.REPLACE:
-    STR.OUT$ = "" : STR.REST$ = STR.STR$
+STR.REPLACE:  STR.OUT$ = "" : STR.REST$ = STR.STR$
 STR.REPLACE.NEXT:
     STR.AT = GP.INSTR(STR.REST$, STR.FIND$)
     IF STR.AT = 0 THEN STR.STR$ = STR.OUT$ + STR.REST$ : RETURN
@@ -105,14 +123,45 @@ STR.REPLACE.NEXT:
     STR.REST$ = MID$(STR.REST$, STR.AT + LEN(STR.FIND$))
     GOTO STR.REPLACE.NEXT
 
+## STR.SPLICE -- replace STR.CUT characters at STR.AT with STR.SUB$.
+##
+##   in    STR.STR$    modified in place
+##         STR.AT      1-based, matching GP.INSTR
+##         STR.CUT     how many characters to remove there
+##         STR.SUB$    what to put in their place
+##   clobbers  clamps STR.AT and STR.CUT
+##
+## Edits by position where STR.REPLACE edits by content. One routine covers three
+## operations, which are one operation with a different count:
+##
+##      insert      STR.CUT = 0
+##      overwrite   STR.CUT = LEN(STR.SUB$)
+##      delete      STR.SUB$ = ""
+##
+## Past the end appends, below 1 clamps to 1, and a cut past the end takes the rest of
+## the string. Not length checked.
+
+STR.SPLICE:
+    IF STR.AT < 1 THEN STR.AT = 1
+    IF STR.CUT < 0 THEN STR.CUT = 0
+    STR.STR$ = LEFT$(STR.STR$, STR.AT - 1) + STR.SUB$ + MID$(STR.STR$, STR.AT + STR.CUT)
+    RETURN
+
 ## STR.PET2SCR -- a PETSCII code to the screen code the tile map holds.
 ##
 ##   in    STR.PET     0..255, what ASC() gives you
-##   out   STR.SCR     the screen code TILE, TDATA and VPOKE want
+##   out   STR.SCR     for TILE, TDATA and VPOKE
 ##
-## GP.PRINTAT and GP.FILL do this internally; you need it when writing the map yourself.
-## Nothing converts to 160..191, the reverse-video glyphs -- PETSCII says reverse with a
-## control code, not a character. Swap the colour attribute instead.
+## GP.PRINTAT and GP.FILL convert internally; this is for writing the map yourself.
+##
+## Not a GP.CALL to GPDrawPet2Scr: the runtime pins only the magic at RTBASE and the
+## entry jmp at RTBASE+4, so that address moves every build. A compare chain rather than
+## a table, because a table needs a DATA statement and READ walks every DATA in the
+## program in order.
+##
+## $FF is the one value the arithmetic gets wrong: pi is screen code 94, not 127.
+## Nothing converts to 160..191 -- PETSCII says reverse with a control code, not a
+## character. Swap the colour attribute instead.
 
 STR.PET2SCR:
     STR.SCR = STR.PET
@@ -124,6 +173,102 @@ STR.PET2SCR:
     IF STR.PET < 160 THEN STR.SCR = STR.PET + 64 : RETURN
     IF STR.PET < 192 THEN STR.SCR = STR.PET - 64 : RETURN
     STR.SCR = STR.PET - 128
+    RETURN
+
+## ---- assembly from here down: STR.PTR, an address, not STR.STR$ ----
+
+## STR.TRIM / STR.LTRIM / STR.RTRIM -- spaces off a string in place.
+##
+##   in    STR.PTR   GP.STRPTR of the string
+##   out   the string itself
+##
+##      STR.PTR = GP.STRPTR(LINE$)
+##      GOSUB STR.RTRIM
+##
+## Three entry labels over one blob, with the mode tested once at entry. An empty string
+## and an all-spaces string are not special cases: the walks count down and reaching
+## zero is the answer.
+##
+## STR.KEEP% is the counter and the assembly writes only its low byte, so the high byte
+## is set here and must stay zero. STR.ADDR% and STR.OP% are the 16-bit integer slots
+## {VAR} needs, named apart from STR.PTR because BASLOAD's symbol file does not record
+## the sigil.
+##
+## #REM 1 is load bearing: without it BASLOAD strips the body and the block reaches the
+## compiler empty, refused as "block mismatch". #REM 0 restores the default.
+
+STR.TRIM:   STR.OP% = 0 : GOTO STR.TRIM.GO
+STR.LTRIM:  STR.OP% = 1 : GOTO STR.TRIM.GO
+STR.RTRIM:  STR.OP% = 2
+STR.TRIM.GO:
+    STR.ADDR% = STR.PTR
+    STR.KEEP% = 0
+    #REM 1
+    GP.ASM
+    REM CLD                      ; SYS enters with the caller's flags
+    REM LDA {STR.ADDR%}          ; zTemp0 -> the length byte, text from +1
+    REM STA $2C
+    REM LDX #1
+    REM LDA {STR.ADDR%},X
+    REM STA $2D
+    REM LDA {STR.OP%}            ; one test, at entry, never inside a loop
+    REM BEQ STBOTH
+    REM CMP #1
+    REM BEQ STLEAD
+    REM JMP STTRAIL
+    REM ; ---- both ends: RIGHT first, so the left pass walks less and an
+    REM ; ---- emptied string falls straight out. Falls into it after.
+    REM STBOTH: JSR STTRAIL
+    REM ; ---- leading: find the first non-space, slide it down to offset 1.
+    REM ; ---- STR.KEEP% counts down as spaces are skipped, so it holds the
+    REM ; ---- kept length when the scan stops.
+    REM STLEAD: LDA ($2C)
+    REM BEQ STLX                 ; already empty
+    REM STA {STR.KEEP%}
+    REM LDY #1
+    REM STLS: LDA ($2C),Y
+    REM CMP #32
+    REM BNE STLF
+    REM INY
+    REM DEC {STR.KEEP%}
+    REM BNE STLS
+    REM LDA #0                   ; all spaces
+    REM STA ($2C)
+    REM RTS
+    REM STLF: CPY #1             ; nothing to slide if it already starts at 1
+    REM BEQ STLSET
+    REM TYA                      ; zTemp1 = zTemp0 + (first - 1), so (zTemp1),1
+    REM DEC                      ; is the first character being kept
+    REM CLC
+    REM ADC $2C
+    REM STA $2E
+    REM LDA $2D
+    REM ADC #0
+    REM STA $2F
+    REM LDY #0
+    REM STLM: INY
+    REM LDA ($2E),Y
+    REM STA ($2C),Y
+    REM CPY {STR.KEEP%}
+    REM BNE STLM
+    REM STLSET: LDA {STR.KEEP%}
+    REM STA ($2C)
+    REM STLX: RTS
+    REM ; ---- trailing: walk back and write the new length. Nothing moves,
+    REM ; ---- which is why the two ends are separate routines.
+    REM STTRAIL: LDA ($2C)
+    REM BEQ STTX                 ; already empty
+    REM TAY
+    REM STTL: LDA ($2C),Y
+    REM CMP #32
+    REM BNE STTS                 ; Y is the last non-space
+    REM DEY
+    REM BNE STTL
+    REM STTS: TYA
+    REM STA ($2C)
+    REM STTX: RTS
+    GP.ENDASM
+    #REM 0
     RETURN
 
 STR.SKIP:

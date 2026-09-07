@@ -6,9 +6,10 @@
 ## **  GP.CONTAINS / GP.ISEMPTY      composite -- no runtime code
 ## **  GP.HIBYTE / GP.LOBYTE         composite -- splitting an address
 ## **  STRCASE.GO                    BASL+ASM, from STRCASE.INC.BL:
-## **                                  TRIM / LTRIM / RTRIM / UPPER / LOWER
-## **  STR.PADR / PADL / PADC     BASL, from STRINGS.INC.BL
-## **  STR.REPLACE               BASL, from STRINGS.INC.BL
+## **                                  UPPER / LOWER
+## **  STR.TRIM / LTRIM / RTRIM      BASL+ASM, from STRINGS.INC.BL
+## **  STR.PADR / PADL / PADC        BASL, from STRINGS.INC.BL
+## **  STR.REPLACE / STR.SPLICE      BASL, from STRINGS.INC.BL
 ## **
 ## **  Build:  copy GPC-BASIC/GPB.INC.BL, GPC-BASIC/STRINGS.INC.BL,
 ## **          GPC-BASIC/STRCASE.INC.BL and this file into testing/, then
@@ -18,8 +19,8 @@
 ## **  Compile-only: the ROM cannot RUN a PRG containing GP tokens.
 ## **
 ## ***********************************************************************
-## STRCASE.INC.BL reaches BASIC's variables through {VAR}, so this program
-## needs a #SYMFILE. Both directives go BEFORE the #INCLUDEs.
+## BOTH modules reach BASIC's variables through {VAR}, so this program needs a
+## #SYMFILE. Both directives go BEFORE the #INCLUDEs.
 #SAVEAS "@:STRINGS.PRG"
 #SYMFILE "@:STRINGS.SYM"
 #INCLUDE "GPB.INC.BL"
@@ -70,37 +71,37 @@ PRINT "ISEMPTY SPACES ->"; GP.ISEMPTY(SPACES$)
 ## ---- A STRING OF SPACES IS NOT EMPTY. Trim it first if that is what you
 ## ---- meant -- which is the next section.
 
-STRCASE.PTR = GP.STRPTR(SPACES$) : STRCASE.MODE = STRCASE.TRIM
-GOSUB STRCASE.GO
+STR.PTR = GP.STRPTR(SPACES$)
+GOSUB STR.TRIM
 PRINT "  after TRIM   ->"; GP.ISEMPTY(SPACES$)
 
 ## ---- 2. the trims.  TRIM does both ends, LTRIM the left (leading
 ## ---- spaces), RTRIM the right (trailing spaces).
 ## ----
-## ---- THESE WERE KEYWORDS -- GP.TRIM, GP.LTRIM, GP.RTRIM, GP.UPPER, GP.LOWER -- and
-## ---- are STRCASE.INC.BL now, GP.ASM driven by GP.STRPTR. The string still goes in as
-## ---- an ADDRESS and is rewritten where it lies, so nothing is copied or allocated.
-## ---- Set BOTH inputs every time: STRCASE.MODE is an ordinary variable, so a call that
-## ---- forgets it repeats whatever the last one did.
+## ---- THESE WERE KEYWORDS -- GP.TRIM, GP.LTRIM, GP.RTRIM -- and are STRINGS.INC.BL
+## ---- now, GP.ASM driven by GP.STRPTR. The string still goes in as an ADDRESS and is
+## ---- rewritten where it lies, so nothing is copied or allocated. One input and three
+## ---- entry labels: there is no mode to forget to set.
 ## ----
 ## ---- PASS A VARIABLE, NEVER A LITERAL. GP.STRPTR("  both  ") is the address of that
 ## ---- text inside the P-CODE, and trimming it would EDIT THE PROGRAM. The keyword form
 ## ---- could not be misused this way -- the compiler insisted on a variable.
 
 BOTH$ = "  both  "
-STRCASE.PTR = GP.STRPTR(BOTH$) : STRCASE.MODE = STRCASE.TRIM : GOSUB STRCASE.GO
+STR.PTR = GP.STRPTR(BOTH$) : GOSUB STR.TRIM
 PRINT "TRIM  ["; BOTH$; "]"
 
 LEAD$ = "  left  "
-STRCASE.PTR = GP.STRPTR(LEAD$) : STRCASE.MODE = STRCASE.LTRIM : GOSUB STRCASE.GO
+STR.PTR = GP.STRPTR(LEAD$) : GOSUB STR.LTRIM
 PRINT "LTRIM ["; LEAD$; "]"
 
 TRAIL$ = "  right  "
-STRCASE.PTR = GP.STRPTR(TRAIL$) : STRCASE.MODE = STRCASE.RTRIM : GOSUB STRCASE.GO
+STR.PTR = GP.STRPTR(TRAIL$) : GOSUB STR.RTRIM
 PRINT "RTRIM ["; TRAIL$; "]"
 
 ## ---- 3. case.  A-Z only: digits, punctuation and PETSCII graphics are
-## ---- left exactly as they were.
+## ---- left exactly as they were. STRCASE.MODE IS AN ORDINARY VARIABLE, so a
+## ---- call that forgets to set it repeats whatever the last one did.
 
 WORD$ = "Mixed Case 42!"
 STRCASE.PTR = GP.STRPTR(WORD$) : STRCASE.MODE = STRCASE.UPPER : GOSUB STRCASE.GO
@@ -150,6 +151,33 @@ PRINT "GROWING  ["; STR.STR$; "]"
 STR.STR$ = "UNTOUCHED" : STR.FIND$ = "" : STR.REPL$ = "X"
 GOSUB STR.REPLACE
 PRINT "EMPTY    ["; STR.STR$; "]"
+
+## ---- 4c. STR.SPLICE edits by POSITION rather than by content: it replaces STR.CUT
+## ---- characters at STR.AT with STR.SUB$. One routine covers all three of insert,
+## ---- overwrite and delete, because they are the same operation with a different
+## ---- count -- 0 to insert, LEN(STR.SUB$) to overwrite, and an empty STR.SUB$ to
+## ---- delete.
+
+STR.STR$ = "ABCDEFGH" : STR.AT = 3 : STR.CUT = 0 : STR.SUB$ = "xy"
+GOSUB STR.SPLICE
+PRINT "INSERT   ["; STR.STR$; "]"
+
+STR.STR$ = "ABCDEFGH" : STR.AT = 3 : STR.CUT = 2 : STR.SUB$ = "xy"
+GOSUB STR.SPLICE
+PRINT "OVERWRITE["; STR.STR$; "]"
+
+STR.STR$ = "ABCDEFGH" : STR.AT = 3 : STR.CUT = 2 : STR.SUB$ = ""
+GOSUB STR.SPLICE
+PRINT "DELETE   ["; STR.STR$; "]"
+
+## ---- BASIC, LIKE THE PADS, and for the same reason: an insert GROWS the string, and
+## ---- the in-place routines below only ever get the BLOCK, never the variable slot.
+## ---- Past the end appends and below 1 clamps to 1, both falling out of LEFT$ and
+## ---- MID$ rather than being tested for.
+
+STR.STR$ = "ABCDE" : STR.AT = 99 : STR.CUT = 0 : STR.SUB$ = "!"
+GOSUB STR.SPLICE
+PRINT "APPEND   ["; STR.STR$; "]"
 
 ## ---- 5. GP.STRPTR hands the address of [ActLen][Data] to machine code:
 ## ---- length AT that address, first character at +1, capacity at -2.
