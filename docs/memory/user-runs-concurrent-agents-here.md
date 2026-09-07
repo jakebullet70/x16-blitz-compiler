@@ -34,4 +34,20 @@ sources into a private directory and point `-fsroot` there. `source/unit-tests/d
 one in `GPCWORK` and tokenises itself rather than calling `source/gpc/build_basl.py`, which
 hardcodes `testing/` and is the other session's tool.
 
+## Committing into a file the other agent is also editing
+
+**Rebuild the blob from HEAD plus only your edits and stage that**, rather than `git add`ing a
+working copy that holds someone else's half-finished work:
+`git show HEAD:<path>` -> apply your substitutions -> `git hash-object -w --path <path>` ->
+`git update-index --cacheinfo 100644,<sha>,<path>`. Then prove it: grep the staged diff for
+their markers and expect **0 foreign lines**. Used repeatedly on `TODO.md`,
+`GP-BASIC.GLOBALS.md` and `MEMORY.md`, which are the three files two sessions always collide in.
+
+**THE TRAP, AND IT IS EASY TO MISS: that leaves the WORKING COPY BEHIND.** The commit has your
+change and the file on disk does not, so when the other agent commits their working copy
+wholesale **your change is silently reverted** — and it looks like it was never made rather
+than like a conflict. Caught on 2026-09-07 only by grepping HEAD against the working copy for
+each thing added. **After staging an exact blob, apply the same substitutions to the working
+copy too**, then confirm `git diff` for that file contains none of your own content.
+
 Related: [[headless-basl-build-recipe]].
