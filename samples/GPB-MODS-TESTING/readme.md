@@ -32,9 +32,13 @@ written whole. All four are CLAIMED from `BANKMGR`, and the first two have to be
 picks them while the object is written, so the manager is told rather than asked.
 
 **The text is in a bank.** Every string the shell says is in a `GP.BANKEDSTR` block in front of
-the routine that says it, read back with `GP.BSTR`. That is 258 strings in 37 named groups, and
-it buys 3,840 bytes of low RAM — see §3.10 of `GP-BASIC.md`. Add a line to a group and nothing
-outside it moves, which is the point of the groups being named.
+the routine that says it, read back with `GP.BSTR` — 260 strings in 44 named groups, buying 4,096
+bytes of low RAM. See §3.10 of `GP-BASIC.md`.
+
+**Every menu is a block of its own**, index 0 the dropdown's title (the bar's hotkey string), 1
+upwards the rows. So a menu is edited in one place and one place only: `MENUVERT.COUNT` comes
+from `GP.BSTRCOUNT` and the rows are read by a loop, so adding a row means adding a line to the
+block and nothing else — and no other menu moves.
 
 ## Build
 
