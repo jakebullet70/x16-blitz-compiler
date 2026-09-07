@@ -14,9 +14,9 @@
 ## **  THEME.NEXT cycles to the following one and loads it, which is what a
 ## **  program binds to a key. THEME.RESET reloads the one already selected.
 ## **
-## **  CUSTOM loads nothing: it leaves THEME.CLR as it stands, so a program that
-## **  lets the user change colours carries those changes into it. Selected before
-## **  any other theme it takes X16's values, there being nothing to keep.
+## **  CUSTOM loads nothing, leaving THEME.CLR as it stands, so a program that lets
+## **  the user change colours carries those changes into it. Selected before any
+## **  other theme it takes X16's values.
 ## **
 ## **  Usage:
 ## **      THEME.ID = 1 : GOSUB THEME.SELECT
@@ -54,11 +54,9 @@ GOTO THEME.SKIP
 
 ## THEME.SELECT -- fill THEME.CLR from THEME.ID.
 ##
-## THEME.CLR is DIMmed here: an implicit array is 0..10, and DIMming one GPC already
-## auto-dimensioned is an error.
-##
-## No DATA statement -- READ walks every DATA in the whole program in order, so a
-## library owning one would derail the caller's own READs.
+## THEME.CLR is DIMmed here, because DIMming an array GPC has already auto-dimensioned
+## is an error. No DATA statement, because READ walks every DATA in the whole program
+## in order and a library owning one would derail the caller's READs.
 
 THEME.SELECT.BODY:
     THEME.FIRST = 0
@@ -111,23 +109,19 @@ THEME.SELECT.GRAY:
     THEME.CLR(THEME.WARN)   = 11 * 16 + 2
     RETURN
 
-## THEME.FIRST is set only when THEME.SELECT had to create the array, which is the one
-## case where there is nothing to keep.
-THEME.SELECT.CUSTOM:
-    IF THEME.FIRST = 0 THEN RETURN
+## THEME.FIRST is set only when THEME.SELECT created the array, the one case with
+## nothing to keep.
+THEME.SELECT.CUSTOM:  IF THEME.FIRST = 0 THEN RETURN
     GOTO THEME.SELECT.X16
 
-## THEME.NEXT -- the following theme, selected. Falls into THEME.SELECT, so its
-## RETURN is the one the caller gets.
-THEME.NEXT:
-    THEME.ID = THEME.ID + 1
-    IF THEME.ID >= THEME.COUNT THEN THEME.ID = 0
+## THEME.NEXT -- the following theme, selected. It GOTOs THEME.SELECT rather than
+## GOSUBing it, so THEME.SELECT's RETURN is the one the caller gets.
+THEME.NEXT:  THEME.ID = THEME.ID + 1 : IF THEME.ID >= THEME.COUNT THEN THEME.ID = 0
     GOTO THEME.SELECT
 
 ## THEME.RESET -- the selected theme's shipped values, throwing away any changes.
 ## CUSTOM has none of its own, so it resets to X16.
-THEME.RESET:
-    IF THEME.ID = 4 THEN GOTO THEME.SELECT.X16
+THEME.RESET:  IF THEME.ID = 4 THEN GOTO THEME.SELECT.X16
     GOTO THEME.SELECT
 
 ## THEME.SET -- make THEME.ATTR the colour PRINT uses.
@@ -135,20 +129,16 @@ THEME.RESET:
 ##   in   THEME.ATTR   a packed attribute, e.g. THEME.CLR(THEME.TEXT)
 ##
 ## WARNING: AND 15 is safe only because a packed attribute is 0..255. AND is 16-bit
-## signed in GPC and raises OUT OF RANGE above 32767.
+## signed and raises OUT OF RANGE above 32767.
 
-THEME.SET:
-    COLOR THEME.ATTR AND 15, INT(THEME.ATTR / 16)
-    RETURN
+THEME.SET:  COLOR THEME.ATTR AND 15, INT(THEME.ATTR / 16) : RETURN
 
 ## THEME.HI -- the inverse of a packed attribute, for pre-drawing a row that should
 ## already look selected.
 ##
 ##   in   THEME.ATTR   packed attribute      out  THEME.INV
 
-THEME.HI:
-    THEME.INV = (THEME.ATTR AND 15) * 16 + INT(THEME.ATTR / 16)
-    RETURN
+THEME.HI:  THEME.INV = (THEME.ATTR AND 15) * 16 + INT(THEME.ATTR / 16) : RETURN
 
 THEME.SKIP:
 #ENDIF

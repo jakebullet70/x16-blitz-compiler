@@ -7,16 +7,14 @@
 ## **
 ## **  The same rectangle through a FILE is STASHFILE.INC.BL, built on this.
 ## **
-## **  Your program needs a #SYMFILE. The assembly reaches BASIC's variables
-## **  through {VAR} and BASLOAD crunches every name first, so without one the
-## **  compile stops with "NO SYMBOL FILE FOR {}":
+## **  The program needs a #SYMFILE, before the includes and named after the source
+## **  PRG. The assembly reaches BASIC's variables through {VAR} and BASLOAD crunches
+## **  every name first; without one the compile stops with "NO SYMBOL FILE FOR {}".
 ## **
 ## **      #SAVEAS "@:MYPROG.PRG"
 ## **      #SYMFILE "@:MYPROG.SYM"
 ## **      #INCLUDE "GPB.INC.BL"
 ## **      #INCLUDE "STASH.INC.BL"
-## **
-## **  Both directives go BEFORE the includes.
 ## **
 ## **  Usage:
 ## **      STASH.BANK = 8
@@ -40,16 +38,13 @@
 ## **  NOT a whole 80x60 screen. Too big is refused before the first write, with
 ## **  STASH.OK = 0.
 ## **
-## **  A row's address is worked out in BASIC, once a row, and the 160 bytes are
-## **  copied in assembly. That keeps the assembly free of any pointer needing
-## **  zero page -- there is none to have, because a blob runs with the interpreter
-## **  live and codePtr, zTemp0, NSStatus and the mantissas must survive it. The
-## **  destination goes into the OPERAND of the instruction that uses it.
+## **  A row's address is worked out in BASIC, once a row, and the row is copied in
+## **  assembly. That keeps the assembly free of any pointer needing zero page: a blob
+## **  runs with the interpreter live, so codePtr, zTemp0, NSStatus and the mantissas
+## **  must survive it. The destination goes into the OPERAND of the store instead.
 ## **
-## **  Each block is wrapped in #REM 1 / #REM 0 because the assembly rides in REM
-## **  statements, which BASLOAD's default would strip -- the block would reach the
-## **  compiler empty and gpasm.asm refuses that as a block mismatch. The #REM 0
-## **  after each block restores BASLOAD's default.
+## **  #REM 1 is load bearing: without it BASLOAD strips the body and the block reaches
+## **  the compiler empty, refused as "block mismatch". #REM 0 restores the default.
 ## **
 ## ***********************************************************************
 #IFNDEF STASH.DEFS
@@ -62,8 +57,8 @@
 ## int16, so 40756 is out of range where $9F34 is fine, and STASH.L1.CONFIG is
 ## rejected for the digit in its L1 segment.
 ##
-## The addresses the copy loop uses are written out in the assembly rather than defined
-## here: #DEFINE substitutes into BASIC source, and the assembly reads its own REM text.
+## The copy loop writes its addresses out in the assembly: #DEFINE substitutes into
+## BASIC source, and the assembly reads its own REM text.
 #DEFINE STASH.LCONFIG $9F34
 #DEFINE STASH.LMAPBASE $9F35
 
@@ -74,61 +69,40 @@
 
 GOTO STASH.MODULE.END
 
-## ***********************************************************************
-## **  STASH.SAVE -- the screen into the bank.
-## ***********************************************************************
+## STASH.SAVE -- the screen into the bank.
 
-STASH.SAVE:
-    GOSUB STASH.BANK.HOLD
+STASH.SAVE:  GOSUB STASH.BANK.HOLD
     STASH.MODE = 0 : GOSUB STASH.SETUP
     IF STASH.OK = 0 THEN GOTO STASH.DONE
 
 ## ---- the header first, so RESTORE needs only the bank ----
     BANK STASH.BANK : POKE STASH.WINDOW, STASH.W : POKE STASH.WINDOW + 1, STASH.H
     POKE STASH.WINDOW + 2, STASH.X : POKE STASH.WINDOW + 3, STASH.Y
-    GOSUB STASH.WALK
-    GOTO STASH.DONE
+    GOSUB STASH.WALK : GOTO STASH.DONE
 
-## ***********************************************************************
-## **  STASH.RESTORE -- the bank back onto the screen.
-## **
-## **  Reads the size out of the header, so the only input is the bank.
-## **  STASH.MOVE = 1 uses the caller's STASH.X / STASH.Y instead of the
-## **  saved ones, which pastes the rectangle somewhere else.
-## ***********************************************************************
+## STASH.RESTORE -- the bank back onto the screen.
+##
+## The size comes out of the header, so the only input is the bank. STASH.MOVE = 1
+## uses the caller's STASH.X / STASH.Y instead of the saved ones.
 
-STASH.RESTORE:
-    GOSUB STASH.BANK.HOLD
-    BANK STASH.BANK
-    STASH.W = PEEK(STASH.WINDOW) :  STASH.H = PEEK(STASH.WINDOW + 1)
+STASH.RESTORE:  GOSUB STASH.BANK.HOLD
+    BANK STASH.BANK : STASH.W = PEEK(STASH.WINDOW) :  STASH.H = PEEK(STASH.WINDOW + 1)
     IF STASH.MOVE <> 0 THEN GOTO STASH.RESTORE.GO
     STASH.X = PEEK(STASH.WINDOW + 2) : STASH.Y = PEEK(STASH.WINDOW + 3)
-STASH.RESTORE.GO:
-    STASH.MODE = 1  : GOSUB STASH.SETUP
+STASH.RESTORE.GO:  STASH.MODE = 1  : GOSUB STASH.SETUP
     IF STASH.OK = 0 THEN GOTO STASH.DONE
     BANK STASH.BANK : GOSUB STASH.WALK
 
-## ***********************************************************************
-## **  STASH.DONE -- the one exit both entry points leave by.
-## **
-## **  Puts the caller's bank back. BANK writes the hardware register and
-## **  leaves it there, so a STASH followed by a call into GP.BANKED code
-## **  would fetch its next instruction out of the stash bank -- a silent
-## **  hang, nowhere near the STASH.
-## **
-## **  One exit, because both entry points can fail early.
-## ***********************************************************************
+## STASH.DONE -- the one exit both entry points leave by, because both can fail early.
+##
+## It puts the caller's bank back. BANK writes the hardware register and leaves it
+## there, so a STASH followed by a call into GP.BANKED code would fetch its next
+## instruction out of the stash bank -- a silent hang, nowhere near the STASH.
 
-STASH.DONE:
-    BANK STASH.WAS%
-    RETURN
+STASH.DONE:  BANK STASH.WAS% : RETURN
 
-## ***********************************************************************
-## **  STASH.BANK.HOLD -- remember the bank the caller had selected.
-## **
-## **  A blob, because BASIC cannot see the register: PEEK selects and
-## **  restores around every access.
-## ***********************************************************************
+## STASH.BANK.HOLD -- remember the bank the caller had selected. A blob, because BASIC
+## cannot see the register: PEEK selects and restores around every access.
 
 STASH.BANK.HOLD:
     #REM 1
@@ -142,12 +116,10 @@ STASH.BANK.HOLD:
     #REM 0
     RETURN
 
-## ***********************************************************************
-## **  STASH.SETUP -- the map's shape, and whether the rectangle fits.
-## **
-## **  Asked of VERA, not assumed: L1_MAPBASE holds bits 16:9 of the map address and
-## **  L1_CONFIG bits 5:4 the map width as 32 << n, so any mode and map size works.
-## ***********************************************************************
+## STASH.SETUP -- the map's shape, and whether the rectangle fits.
+##
+## Asked of VERA, not assumed: L1_MAPBASE holds bits 16:9 of the map address and
+## L1_CONFIG bits 5:4 the map width as 32 << n, so any mode and map size works.
 
 STASH.SETUP:
     STASH.OK = 0
@@ -162,13 +134,11 @@ STASH.SETUP:
     STASH.BASE = PEEK(STASH.LMAPBASE) * 512 : STASH.STRIDE = STASH.MAPW * 2 : STASH.OK = -1
     RETURN
 
-## ***********************************************************************
-## **  STASH.WALK -- one row at a time.
-## **
-## **  VERA's address is 17 bits, the high one riding in bit 0 of ADDRH with the
-## **  auto-increment in the top nibble -- 16 is "+1 per access", which walks a row
-## **  of char, attr, char, attr.
-## ***********************************************************************
+## STASH.WALK -- one row at a time.
+##
+## VERA's address is 17 bits, the high one riding in bit 0 of ADDRH with the
+## auto-increment in the top nibble -- 16 is "+1 per access", which walks a row of
+## char, attr, char, attr.
 
 STASH.WALK:
     STASH.DEST% = STASH.WINDOW + STASH.HEADER : STASH.NBYTES% = STASH.BYTES
@@ -182,14 +152,14 @@ STASH.WALK:
     NEXT STASH.ROW
     RETURN
 
-## ***********************************************************************
-## **  STASH.ROW.IN -- one row, VERA to the bank window.
-## **
-## **  No zero page. The source is VERA's data port, a fixed address that
-## **  auto-increments; the destination is absolute,Y with the base written into the
-## **  operand of the STA that uses it -- STA DST,X with X=1 patches the low byte,
-## **  X=2 the high. A row is at most 160 bytes, so Y indexes all of it.
-## ***********************************************************************
+## STASH.ROW.IN -- one row, VERA to the bank window.
+##
+## No zero page. The source is VERA's data port, a fixed address that auto-increments;
+## the destination is absolute,Y with the base written into the operand of the STA that
+## uses it -- STA DST,X with X=1 patches the low byte, X=2 the high.
+##
+## A row is at most 128 cells, so 256 bytes, and Y indexes all of it: at 256 the count
+## reads back as 0 and Y wraps onto it after the last store.
 
 STASH.ROW.IN:
     #REM 1
@@ -218,12 +188,9 @@ STASH.ROW.IN:
     #REM 0
     RETURN
 
-## ***********************************************************************
-## **  STASH.ROW.OUT -- one row, the bank window back to VERA.
-## **
-## **  The same loop with the ends swapped. A shared version would test a flag once
-## **  per byte, in the one loop where that is the whole cost.
-## ***********************************************************************
+## STASH.ROW.OUT -- one row, the bank window back to VERA. The same loop with the ends
+## swapped: sharing one would test a flag once per byte, in the one loop where that is
+## the whole cost.
 
 STASH.ROW.OUT:
     #REM 1
