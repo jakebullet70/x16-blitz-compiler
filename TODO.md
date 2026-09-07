@@ -2742,7 +2742,20 @@ prompt. `-pastewarp`, and dropping `-warp`, change nothing. To test it headlessl
 `.BASL` with only `CLEAR.KB` stubbed to a bare `RETURN` and drive that; the decode logic under test is
 untouched. (`LINPUT` programs such as `testing/MD5` are unaffected — no drain loop.)
 
-### `STASH.AT` — more than one rectangle in the same bank
+### `STASH.SLOT` — more than one rectangle in the same bank. BUILT 07/09/26
+
+**Shipped**, at **27 bytes** of p-code measured against the same body (543 -> 570). `STASH.SLOT`
+in, default 0; `STASH.NEXT` out. The `GP.ASM` blobs did not change at all.
+
+**The name below could not be used: `STASH.AT` is already the computed VRAM row address inside
+`STASH.WALK`.** The internal is now `STASH.ORG` rather than `STASH.HEAD`, because `STASH.HEADER`
+exists and one name being a prefix of the other fails silently rather than loudly.
+
+Six assertions in `work/stashvram/SLOTT.BASL`. Two worth naming: a save with `STASH.SLOT` never
+mentioned behaves exactly as before, and a rectangle saved at offset 8000 round-trips — the
+signed-`%` case the entry below predicted, and it holds.
+
+The original entry follows.
 
 One `STASH` owns a whole bank today, so two nested dialogs need two banks. The bank is 8,192 bytes
 and a dialog is a few hundred: `GUI.OPEN` stashing a 30x8 panel uses 964 of them and wastes the rest.
@@ -2784,9 +2797,35 @@ header format, so decide that when adding it, not after.
 lot, instead of one bank per level — and `GUI.SHADOW` above enlarges every stashed rectangle, which
 makes the waste worse.
 
-### `STASHVRAM.INC.BL` — a handle-based VRAM store
+### `STASHVRAM.INC.BL` — a handle-based VRAM store. BUILT 07/09/26
 
-Proposed. A second stash whose backing store is spare VRAM instead of a RAM bank, addressed by
+**Shipped** as `STASHVRAM.INC.BL` (**1,697 bytes**) and `STASHVRAMGC.INC.BL` (**316**), measured
+against a baseline with the same body. Rectangles and blobs both, a bump allocator on 256-byte
+pages, LIFO release, and the compactor in its own file. **No `GP.ASM`, so no `#SYMFILE`** — the
+thing `STASH` cannot fix. It executes no `BANK` either, so it runs inside a `GP.BANKED` region:
+tested, `work/stashvram/SVB.BASL`, 4/4.
+
+**The risk this entry said to retire first was retired first, and everything passed** —
+`work/stashvram/SVGATE.BASL`, 8/8. See [[vram-to-vram-memory-copy-limits]]. The three that
+mattered: VERA's auto-increment DOES carry into bit 16 (nothing in the tree had ever crossed
+`$10000` mid-transfer); 15,360 bytes in one call is exact, across that line, both directions; and
+an overlapping slide DOWNWARD is safe, which is what the compactor does.
+
+**This entry undercounted the prior art.** `BMX.PALCOPY` proves 512 bytes, but
+`HELP.PAGE.SHIFT` (`GPB.HELP.BASL:835`) already shipped the same trick at **4,480 bytes** in one
+call, benchmarked at 1.6 jiffies against `STASH`'s 11.0. It is the template, not just a proof.
+
+Pages rather than bytes are what let a handle's address live in an ordinary `%`: a page number
+reaches 511 where a 17-bit VRAM address would not. `SV.MAX` handles, and the caller `DIM`s
+`SV.PAGE%` and `SV.PAGES%` — a `%` array is **two** bytes an element, see
+[[array-element-sizes-measured]], which is a live trap this build walked into.
+
+**Still open:** `GUI.OPEN` has not been moved onto it, and `BMX.STASH` defaults to `$13000`,
+inside the default `SV.BASE`/`SV.TOP` window — a program using both must move one.
+
+The original proposal follows.
+
+A second stash whose backing store is spare VRAM instead of a RAM bank, addressed by
 handle so a program can hold many at once. `STASH.INC.BL` stays as it is: banked RAM is `PEEK`able
 and survives a screen-mode change, VRAM is 11x bigger and faster and does neither.
 

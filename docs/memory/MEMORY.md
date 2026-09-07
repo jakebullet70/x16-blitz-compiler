@@ -121,6 +121,8 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [FILEDIR banks whole](filedir-bank-split.md) — BUILT; the bank switch moved into its two blobs, and the "78% cannot move" was a line count of REM assembly
 - [GPBMODS resident p-code breakdown](gpbmods-resident-pcode-breakdown.md) — MEASURED; the shell is 79%, all eight modules are 21%, the map cannot see GP.ASM blobs, and grep for BANK with comments STRIPPED
 - [Dead-code elimination, measured](basl-dead-code-elimination-measured.md) — PARKED; 1,212 resident bytes are never called, but 691 of them are free by deleting two #INCLUDE lines
+- [VRAM-to-VRAM memory_copy limits](vram-to-vram-memory-copy-limits.md) — MEASURED; the auto-increment carries into bit 16, 15,360 in one call, and a descending overlap is safe
+- [Array element sizes, measured](array-element-sizes-measured.md) — a `%` array is TWO bytes an element and an untyped one SIX; FILEDIR's header had it wrong
 - [KERNAL preserves the RAM bank](kernal-preserves-ram-bank.md) — CHROUT, GETIN, scroll, CLS and screen_mode all leave $00 alone; measure it in asm, PEEK(0) cannot see it
 - [X16 ROM internal calls](x16-rom-internal-calls.md) — verified R49 dispatcher/GC addresses + ZP pointers
 - [X16 toolchain](x16-toolchain.md) — 64tass / emulator paths on this machine
