@@ -28,7 +28,11 @@
 ## **        STASH.X  STASH.Y     top left, in CELLS
 ## **        STASH.W  STASH.H     size, in cells
 ## **
+## **        STASH.SLOT     byte offset into the bank. Default 0, which is what
+## **                       every caller that never heard of it holds
+## **
 ## **   out  STASH.OK       -1 if it fitted and was saved, 0 if not
+## **        STASH.NEXT     the offset just past what was written
 ## **
 ## **  RESTORE needs only the bank: four header bytes go in first -- w, h, x, y --
 ## **  so the rectangle describes itself. STASH.MOVE = 1 with STASH.X / STASH.Y
@@ -37,6 +41,18 @@
 ## **  A bank is 8,192 bytes and a cell is two, so 4,094 cells fit -- 63x63, and
 ## **  NOT a whole 80x60 screen. Too big is refused before the first write, with
 ## **  STASH.OK = 0.
+## **
+## **  MORE THAN ONE RECTANGLE IN A BANK. Feed STASH.NEXT back in as the next
+## **  STASH.SLOT and the bank holds a stack of them, which is what nested
+## **  dialogs want -- one bank for the lot rather than one bank a level. That
+## **  is a bump allocator in two variables, and release is LIFO by remembering
+## **  the offset. STASHVRAM.INC.BL allocates the same way.
+## **
+## **  RESTORE READS THE SLOT IT IS GIVEN. Nothing checks that two saves do not
+## **  overlap and nothing records which is which: the header describes a
+## **  rectangle's SIZE, not its identity, so restoring the wrong offset
+## **  restores whatever is there. The offsets are the caller's to keep
+## **  straight, the same way the bank number already is.
 ## **
 ## **  A row's address is worked out in BASIC, once a row, and the row is copied in
 ## **  assembly. That keeps the assembly free of any pointer needing zero page: a blob
@@ -76,8 +92,8 @@ STASH.SAVE:  GOSUB STASH.BANK.HOLD
     IF STASH.OK = 0 THEN GOTO STASH.DONE
 
 ## ---- the header first, so RESTORE needs only the bank ----
-    BANK STASH.BANK : POKE STASH.WINDOW, STASH.W : POKE STASH.WINDOW + 1, STASH.H
-    POKE STASH.WINDOW + 2, STASH.X : POKE STASH.WINDOW + 3, STASH.Y
+    BANK STASH.BANK : POKE STASH.ORG, STASH.W : POKE STASH.ORG + 1, STASH.H
+    POKE STASH.ORG + 2, STASH.X : POKE STASH.ORG + 3, STASH.Y
     GOSUB STASH.WALK : GOTO STASH.DONE
 
 ## STASH.RESTORE -- the bank back onto the screen.
@@ -86,9 +102,10 @@ STASH.SAVE:  GOSUB STASH.BANK.HOLD
 ## uses the caller's STASH.X / STASH.Y instead of the saved ones.
 
 STASH.RESTORE:  GOSUB STASH.BANK.HOLD
-    BANK STASH.BANK : STASH.W = PEEK(STASH.WINDOW) :  STASH.H = PEEK(STASH.WINDOW + 1)
+    STASH.ORG = STASH.WINDOW + STASH.SLOT
+    BANK STASH.BANK : STASH.W = PEEK(STASH.ORG) :  STASH.H = PEEK(STASH.ORG + 1)
     IF STASH.MOVE <> 0 THEN GOTO STASH.RESTORE.GO
-    STASH.X = PEEK(STASH.WINDOW + 2) : STASH.Y = PEEK(STASH.WINDOW + 3)
+    STASH.X = PEEK(STASH.ORG + 2) : STASH.Y = PEEK(STASH.ORG + 3)
 STASH.RESTORE.GO:  STASH.MODE = 1  : GOSUB STASH.SETUP
     IF STASH.OK = 0 THEN GOTO STASH.DONE
     BANK STASH.BANK : GOSUB STASH.WALK
@@ -129,7 +146,10 @@ STASH.SETUP:
 ## ---- bytes: 128 works, 129 would count the low byte of 258 and copy two cells.
     IF STASH.W > 128 THEN RETURN
     STASH.BYTES = STASH.W * 2
-    IF STASH.BYTES * STASH.H + STASH.HEADER > STASH.MAXBYTES THEN RETURN
+    IF STASH.SLOT < 0 THEN RETURN
+    STASH.ORG = STASH.WINDOW + STASH.SLOT
+    STASH.NEXT = STASH.SLOT + STASH.HEADER + STASH.BYTES * STASH.H
+    IF STASH.NEXT > STASH.MAXBYTES THEN RETURN
     STASH.MAPW = 32 * 2 ^ INT((PEEK(STASH.LCONFIG) AND 48) / 16)
     STASH.BASE = PEEK(STASH.LMAPBASE) * 512 : STASH.STRIDE = STASH.MAPW * 2 : STASH.OK = -1
     RETURN
@@ -141,7 +161,7 @@ STASH.SETUP:
 ## char, attr, char, attr.
 
 STASH.WALK:
-    STASH.DEST% = STASH.WINDOW + STASH.HEADER : STASH.NBYTES% = STASH.BYTES
+    STASH.DEST% = STASH.ORG + STASH.HEADER : STASH.NBYTES% = STASH.BYTES
     FOR STASH.ROW = 0 TO STASH.H - 1
         STASH.AT = STASH.BASE + (STASH.Y + STASH.ROW) * STASH.STRIDE + STASH.X * 2
         STASH.HI = INT(STASH.AT / 65536) : STASH.VADDR% = STASH.AT - STASH.HI * 65536

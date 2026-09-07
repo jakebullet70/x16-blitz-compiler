@@ -460,6 +460,19 @@ GOSUB STASH.RESTORE
 no dead code elimination: everything a module holds is compiled into every program that includes it,
 called or not.
 
+**More than one rectangle in a bank.** `STASH.SLOT` is a byte offset into the bank, default 0, and
+`STASH.NEXT` comes back as the offset just past what was written. Feed one into the other and the
+bank holds a stack of rectangles — which is what nested dialogs want, one bank for the lot rather
+than one bank a level. Nothing checks that two saves do not overlap: the header describes a
+rectangle's size, not its identity, so the offsets are yours to keep straight.
+
+**`STASHVRAM.INC.BL` keeps rectangles in spare VRAM instead**, addressed by handle so a program can
+hold many at once without counting offsets. It needs **no `#SYMFILE`**, because there is no
+`GP.ASM` in it: the cells never leave VRAM, so one data port reads, the other writes, and
+`memory_copy` moves between them. It executes no `BANK` either, so unlike `STASH` it runs inside a
+`GP.BANKED` region. `STASHVRAMGC.INC.BL` closes the holes if a caller frees out of order, and is a
+third file for the same dead-code reason.
+
 ---
 
 ### 3.7 Screen — drawing
