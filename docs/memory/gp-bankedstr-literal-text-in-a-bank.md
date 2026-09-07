@@ -30,12 +30,44 @@ GPBMODS, 258 strings in 37 groups, one group per routine:
 | before | 19,778 | 5,888 | 20,291 |
 | after | 22,016 | **9,728** | 22,529 |
 
-**+3,840 bytes of workspace**, against ~4,230 predicted. The object grows because the text moved
-into a bank region, which is outside the p-code fit check.
+**+4,096 bytes of workspace** once the menus were regrouped (3,840 from the text alone), against
+~4,230 predicted for the text. The object grows because the text moved into a bank region, which
+is outside the p-code fit check.
+
+**Walked on screen and correct** — the bar, all eight dropdowns and the panels, 2026-09-07. That
+is the check the string-by-string tests cannot make: a wrong `GP.BSTRCOUNT` shows up as a menu one
+row short or one row long, and only the running program shows it.
 
 **The 256-byte GP block crossing was spent**: `UnaryGPBStr` is 81 bytes against the 27 free below
 `ObjectBase`, so `ObjectBase` moved `$3C00` → `$3D00`. `GPBase` did not move, so a non-GP program
 pays nothing. Every GP program pays 256 whether it uses `GP.BSTR` or not.
+
+## Group by MENU, not by ROUTINE
+
+**The mechanical conversion recreated the very thing the design exists to remove**, and it is
+worth knowing why. A script that puts each routine's literals in a group of its own is the
+obvious rule and it is wrong wherever ONE routine loads MANY things: GPBMODS builds all nine
+dropdowns inside `GMX.DD.LOAD`, so all nine landed in one group numbered 0..48 by hand. It had
+already bitten before anyone read it — `GP.OTHER` was reading index 38, borrowing the DATA menu's
+`" BANK MAP"` for ABOUT's third row, because the converter deduplicated within the group and the
+two menus name the same thing. Editing one would have silently changed the other.
+
+**A group is one THING the program says, not one place it says it from.** Split per menu and each
+case of the `GP.SELECT` collapses to a title, a count and a loop:
+
+```basic
+GP.CASE 1
+  GM.NAME$ = GP.BSTR(BS.DD.DIALOG, 0)
+  MENUVERT.COUNT = GP.BSTRCOUNT(BS.DD.DIALOG) - 1
+  FOR GM.I = 1 TO MENUVERT.COUNT
+    MENUVERT.ITEM$(GM.I) = GP.BSTR(BS.DD.DIALOG, GM.I)
+  NEXT GM.I
+```
+
+Index 0 is the group's header — a dropdown's title, the bar's hotkey string — and 1 upwards are
+the rows, so one shape serves every menu. `MENUVERT.COUNT` is DERIVED and cannot drift from the
+list it counts. It also **saved another 256 bytes**: the loop is smaller than the row-by-row
+assignments from about three rows up.
 
 ## GPBFILES, which is what it was for
 
