@@ -265,3 +265,15 @@ testing/BANK*.PRG
 source/application/rtimage.gen.asm
 source/*/build/rtimage.prg
 source/*/build/rtimage.lbl
+
+# The per-feature emulator drives -- work/help, work/lineinput, work/rename, work/fileio.
+# Each is a complete -fsroot: its own GPC.BIN, runtimes, library module copies and build.py, so a
+# feature can be built and run WITHOUT contending for testing/, which is the one drive every other
+# harness writes to. That is the whole reason they exist and why the module copies inside them are
+# deliberate duplicates rather than drift to be reconciled.
+#
+# Regenerable, 1.2 MB, and full of binaries. NOT regenerable, and living only on this disk: the
+# three build.py harnesses and the test sources TODO.md cites by name -- work/lineinput/EMUTST.BASL
+# (the two-byte GETKEY probe), work/lineinput/KBTST.BASL (the undrained kbdbuf_put case),
+# work/rename/LINTST.BASL and work/lineinput/LINTST2.BASL (the same six cases banked and unbanked).
+/work/
