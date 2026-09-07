@@ -1,0 +1,370 @@
+## ***********************************************************************
+## **  STASHVRAM.INC.BL -- screen rectangles and byte blobs, kept in VRAM.
+## **
+## **      SV.INIT      once, before anything else here
+## **      SV.SAVE      a screen rectangle -> a handle
+## **      SV.RESTORE   a handle -> the screen
+## **      SV.PUT       low RAM -> a handle
+## **      SV.GET       a handle -> low RAM
+## **      SV.FREE      give one back
+## **      SV.RESET     give them all back
+## **
+## **  NO GP.ASM, AND SO NO #SYMFILE. The cells never leave VRAM: one data port
+## **  reads, the other writes, and the KERNAL's memory_copy moves between them
+## **  without stepping either. That is what STASH.INC.BL cannot do, and the
+## **  reason to reach for this one.
+## **
+## **  It also executes no BANK, so unlike STASH it may live inside a
+## **  GP.BANKED region.
+## **
+## **  Requires GPB.INC.BL, and #INCLUDEs it not.
+## **
+## **   in   SV.BASE SV.TOP   the VRAM window, in bytes. Rounded in to whole
+## **                         256-byte pages. Defaults $04000 and $1AFFF
+## **        SV.MAX           how many handles. THE CALLER DIMS THE TWO ARRAYS
+## **                         to it: DIM SV.PAGE%(n), SV.PAGES%(n)
+## **        SV.X SV.Y SV.W SV.H   the rectangle, for SV.SAVE
+## **        SV.MOVE          SV.RESTORE puts it back where it came from when
+## **                         0, at SV.X SV.Y when not -- as STASH.MOVE
+## **        SV.ADDR SV.LEN   low RAM address and count, for SV.PUT and SV.GET
+## **        SV.HND           the handle, for RESTORE, GET and FREE
+## **
+## **   out  SV.HND           1..SV.MAX, or 0 if it did not fit
+## **        SV.OK            -1 done, 0 refused
+## **        SV.ERROR$        why, when something is refused. "" otherwise
+## **
+## **  ALLOCATION IS A BUMP POINTER ON 256-BYTE PAGES, released LIFO. Panels
+## **  nest and close in reverse and a log is append-only, so a hole only
+## **  appears if a caller frees out of order -- and then STASHVRAMGC.INC.BL
+## **  closes it. Pages, rather than bytes, are what let a handle's address
+## **  live in an ordinary %: a page number reaches 511 where a VRAM address
+## **  is 17 bits and would not.
+## **
+## **  WARNING: there is one allocator and it is this one. SV.BASE and SV.TOP
+## **  are the caller's contract, checked only against the layer 1 map and the
+## **  charset. BMX.STASH defaults to $13000, INSIDE the default window -- a
+## **  program using both must move one of them.
+## **
+## **  A screen-mode change re-uploads the charset and can re-lay the map.
+## **  Held handles do not survive it; call SV.RESET after one.
+## ***********************************************************************
+#IFNDEF SV.DEFS
+#DEFINE SV.DEFS 1
+
+## VERA. A #DEFINE takes a signed int16, so these are written in hex; and no
+## #DEFINE name may contain a digit, which is why the second data port is
+## SV.PORTLO.B rather than anything with a 1 in it.
+#DEFINE SV.VLO $9F20
+#DEFINE SV.VMID $9F21
+#DEFINE SV.VHI $9F22
+#DEFINE SV.DATA $9F23
+#DEFINE SV.VCTRL $9F25
+#DEFINE SV.LCONFIG $9F34
+#DEFINE SV.LMAPBASE $9F35
+
+## The two data ports as address bytes, for r0 and r1.
+#DEFINE SV.PORTLO $23
+#DEFINE SV.PORTLO.B $24
+#DEFINE SV.PORTHI $9F
+
+#DEFINE SV.MEMCOPY $FEE7
+
+## ADDRH: bank in bit 0, auto-increment in the top nibble. 16 steps by one.
+#DEFINE SV.UP 16
+
+## W, H, X, Y, written ahead of the cells so a handle describes itself.
+#DEFINE SV.HEADER 4
+
+GOTO SV.MODULE.END
+
+## ***********************************************************************
+## **  SV.INIT -- the window, and an empty table.
+## ***********************************************************************
+
+SV.INIT:
+    SV.ERROR$ = "" : SV.OK = 0
+    IF SV.BASE = 0 THEN SV.BASE = $04000
+    IF SV.TOP = 0 THEN SV.TOP = $1AFFF
+    IF SV.MAX < 1 THEN SV.ERROR$ = "SV.MAX IS NOT SET" : RETURN
+
+## ---- Checked, not trusted. A base of 0 would make page 0 a legal handle and
+## ---- 0 is what "no handle" means; the top two guards are the charset and the
+## ---- layer 1 map, which are the only fixed claims on VRAM.
+    IF SV.BASE < 256 THEN SV.ERROR$ = "SV.BASE IS TOO LOW" : RETURN
+    IF SV.TOP > $1AFFF THEN SV.ERROR$ = "SV.TOP RUNS INTO THE LAYER 1 MAP" : RETURN
+    IF SV.TOP <= SV.BASE THEN SV.ERROR$ = "SV.TOP IS NOT ABOVE SV.BASE" : RETURN
+
+    SV.BASEPG = INT((SV.BASE + 255) / 256)
+    SV.TOPPG = INT((SV.TOP + 1) / 256)
+    IF SV.TOPPG <= SV.BASEPG THEN SV.ERROR$ = "THE WINDOW IS UNDER ONE PAGE" : RETURN
+
+    SV.READY = -1 : SV.OK = -1
+
+## ---- SV.RESET is the whole of the rest of INIT, so it is not written twice.
+SV.RESET:
+    IF SV.READY = 0 THEN RETURN
+    SV.NEXT = SV.BASEPG
+    FOR SV.I = 1 TO SV.MAX
+        SV.PAGE%(SV.I) = 0 : SV.PAGES%(SV.I) = 0
+    NEXT SV.I
+    SV.OK = -1
+    RETURN
+
+## ***********************************************************************
+## **  SV.SAVE -- a screen rectangle into VRAM.
+## ***********************************************************************
+
+SV.SAVE:
+    SV.HND = 0 : SV.OK = 0 : SV.ERROR$ = ""
+    IF SV.READY = 0 THEN SV.ERROR$ = "SV.INIT HAS NOT RUN" : RETURN
+    IF SV.W < 1 THEN RETURN
+    IF SV.H < 1 THEN RETURN
+    GOSUB SV.GEOM
+    SV.BYTES = SV.W * 2
+    SV.N = SV.BYTES * SV.H + SV.HEADER
+    GOSUB SV.ALLOC
+    IF SV.HND = 0 THEN RETURN
+
+    SV.VA = SV.PAGE%(SV.HND) * 256
+    GOSUB SV.HDRW
+    SV.MODE = 0 : GOSUB SV.WALK
+    SV.OK = -1
+    RETURN
+
+## ***********************************************************************
+## **  SV.RESTORE -- a handle back onto the screen.
+## **
+## **  The header carries where it came from, so a plain restore needs only
+## **  the handle. SV.MOVE keeps the caller's SV.X and SV.Y instead, which is
+## **  how a rectangle is slid somewhere else.
+## ***********************************************************************
+
+SV.RESTORE:
+    SV.OK = 0 : SV.ERROR$ = ""
+    GOSUB SV.LIVE
+    IF SV.OK = 0 THEN RETURN
+    SV.OK = 0
+
+    SV.VA = SV.PAGE%(SV.HND) * 256
+    GOSUB SV.HDRR
+    GOSUB SV.GEOM
+    SV.BYTES = SV.W * 2
+    SV.MODE = 1 : GOSUB SV.WALK
+    SV.OK = -1
+    RETURN
+
+## ***********************************************************************
+## **  SV.PUT -- SV.LEN bytes of low RAM into VRAM.
+## **
+## **  memory_copy addresses main RAM with 16 bits, so SV.ADDR is low RAM and
+## **  a banked source has to be moved a window at a time by the caller.
+## ***********************************************************************
+
+SV.PUT:
+    SV.HND = 0 : SV.OK = 0 : SV.ERROR$ = ""
+    IF SV.READY = 0 THEN SV.ERROR$ = "SV.INIT HAS NOT RUN" : RETURN
+    IF SV.LEN < 1 THEN RETURN
+    SV.N = SV.LEN
+    GOSUB SV.ALLOC
+    IF SV.HND = 0 THEN RETURN
+
+    SV.VA = SV.PAGE%(SV.HND) * 256
+    GOSUB SV.PORTB
+    POKE 2, GP.LOBYTE(SV.ADDR) : POKE 3, GP.HIBYTE(SV.ADDR)
+    POKE 4, SV.PORTLO.B : POKE 5, SV.PORTHI
+    POKE 6, GP.LOBYTE(SV.LEN) : POKE 7, GP.HIBYTE(SV.LEN)
+    GP.CALL SV.MEMCOPY
+    SV.OK = -1
+    RETURN
+
+## ***********************************************************************
+## **  SV.GET -- a blob back out, into SV.LEN bytes at SV.ADDR.
+## **
+## **  It does not remember how long a blob was: the caller sets SV.LEN, and
+## **  asking for more than was put in reads whatever follows it in VRAM.
+## ***********************************************************************
+
+SV.GET:
+    SV.OK = 0 : SV.ERROR$ = ""
+    GOSUB SV.LIVE
+    IF SV.OK = 0 THEN RETURN
+    SV.OK = 0
+    IF SV.LEN < 1 THEN RETURN
+
+    SV.VA = SV.PAGE%(SV.HND) * 256
+    GOSUB SV.PORTA
+    POKE 2, SV.PORTLO : POKE 3, SV.PORTHI
+    POKE 4, GP.LOBYTE(SV.ADDR) : POKE 5, GP.HIBYTE(SV.ADDR)
+    POKE 6, GP.LOBYTE(SV.LEN) : POKE 7, GP.HIBYTE(SV.LEN)
+    GP.CALL SV.MEMCOPY
+    SV.OK = -1
+    RETURN
+
+## ***********************************************************************
+## **  SV.FREE -- one handle back.
+## **
+## **  The bump pointer is recomputed as the high-water mark of what is still
+## **  live, so freeing in reverse order reclaims every page and freeing out
+## **  of order leaves a hole that STASHVRAMGC closes.
+## ***********************************************************************
+
+SV.FREE:
+    SV.OK = 0 : SV.ERROR$ = ""
+    GOSUB SV.LIVE
+    IF SV.OK = 0 THEN RETURN
+
+    SV.PAGE%(SV.HND) = 0 : SV.PAGES%(SV.HND) = 0
+    SV.NEXT = SV.BASEPG
+    FOR SV.I = 1 TO SV.MAX
+        IF SV.PAGE%(SV.I) <> 0 THEN GOSUB SV.HIWATER
+    NEXT SV.I
+    SV.OK = -1
+    RETURN
+
+SV.HIWATER:
+    SV.PG = SV.PAGE%(SV.I) + SV.PAGES%(SV.I)
+    IF SV.PG > SV.NEXT THEN SV.NEXT = SV.PG
+    RETURN
+
+## ***********************************************************************
+## **  SV.LIVE -- is SV.HND a handle that is actually allocated.
+## ***********************************************************************
+
+SV.LIVE:
+    SV.OK = 0
+    IF SV.READY = 0 THEN SV.ERROR$ = "SV.INIT HAS NOT RUN" : RETURN
+    IF SV.HND < 1 THEN SV.ERROR$ = "NO SUCH HANDLE" : RETURN
+    IF SV.HND > SV.MAX THEN SV.ERROR$ = "NO SUCH HANDLE" : RETURN
+    IF SV.PAGE%(SV.HND) = 0 THEN SV.ERROR$ = "THAT HANDLE IS NOT IN USE" : RETURN
+    SV.OK = -1
+    RETURN
+
+## ***********************************************************************
+## **  SV.ALLOC -- SV.N bytes, rounded up to whole pages. SV.HND comes back
+## **  0 if the table is full or the window is.
+## ***********************************************************************
+
+SV.ALLOC:
+    SV.HND = 0
+    SV.NP = INT((SV.N + 255) / 256)
+    IF SV.NEXT + SV.NP > SV.TOPPG THEN SV.ERROR$ = "THE VRAM WINDOW IS FULL" : RETURN
+    FOR SV.I = 1 TO SV.MAX
+        IF SV.PAGE%(SV.I) = 0 AND SV.HND = 0 THEN SV.HND = SV.I
+    NEXT SV.I
+    IF SV.HND = 0 THEN SV.ERROR$ = "NO FREE HANDLE" : RETURN
+    SV.PAGE%(SV.HND) = SV.NEXT : SV.PAGES%(SV.HND) = SV.NP
+    SV.NEXT = SV.NEXT + SV.NP
+    RETURN
+
+## ***********************************************************************
+## **  SV.GEOM -- the map's width and base, asked of VERA rather than
+## **  assumed, exactly as STASH.SETUP does it. L1_CONFIG bits 5:4 give the
+## **  width as 32 << n; L1_MAPBASE holds bits 16:9.
+## ***********************************************************************
+
+SV.GEOM:
+    SV.MAPW = 32 * 2 ^ INT((PEEK(SV.LCONFIG) AND 48) / 16)
+    SV.MAPBASE = PEEK(SV.LMAPBASE) * 512
+    SV.STRIDE = SV.MAPW * 2
+    RETURN
+
+## ***********************************************************************
+## **  SV.WALK -- the cells, one row a call. SV.MODE 0 saves, 1 restores.
+## **
+## **  A rectangle that is the whole map width is contiguous in VRAM, so it
+## **  goes in ONE call instead of SV.H of them: a full 80x60 screen is 15,360
+## **  bytes at once. Measured legal at that size, across the 64K line, in
+## **  work/stashvram/SVGATE.BASL.
+## ***********************************************************************
+
+SV.WALK:
+    SV.VA = SV.PAGE%(SV.HND) * 256 + SV.HEADER
+## ---- memory_copy counts in 16 bits, so a map-width block that reaches 64K
+## ---- walks its rows instead. A 128-wide map is 256 bytes a row, so that is
+## ---- 256 rows -- reachable, because the map may be 256 rows deep.
+    IF SV.X = 0 AND SV.W = SV.MAPW AND SV.BYTES * SV.H < 65536 THEN GOTO SV.WALK.ONE
+    FOR SV.ROW = 0 TO SV.H - 1
+        SV.CELL = SV.MAPBASE + (SV.Y + SV.ROW) * SV.STRIDE + SV.X * 2
+        SV.N = SV.BYTES
+        GOSUB SV.MOVEIT
+        SV.VA = SV.VA + SV.BYTES
+    NEXT SV.ROW
+    RETURN
+
+SV.WALK.ONE:
+    SV.CELL = SV.MAPBASE + SV.Y * SV.STRIDE
+    SV.N = SV.BYTES * SV.H
+    GOSUB SV.MOVEIT
+    RETURN
+
+## ---- One direction or the other, so the port setup is written once.
+SV.MOVEIT:
+    IF SV.MODE = 0 THEN SV.SRC = SV.CELL : SV.DST = SV.VA
+    IF SV.MODE <> 0 THEN SV.SRC = SV.VA : SV.DST = SV.CELL
+    GOSUB SV.COPY
+    RETURN
+
+## ***********************************************************************
+## **  SV.COPY -- SV.N bytes from SV.SRC to SV.DST, both in VRAM.
+## ***********************************************************************
+
+SV.COPY:
+    SV.ADR = SV.SRC : GOSUB SV.PORTA.AT
+    SV.ADR = SV.DST : GOSUB SV.PORTB.AT
+    POKE 2, SV.PORTLO : POKE 3, SV.PORTHI
+    POKE 4, SV.PORTLO.B : POKE 5, SV.PORTHI
+    POKE 6, GP.LOBYTE(SV.N) : POKE 7, GP.HIBYTE(SV.N)
+    GP.CALL SV.MEMCOPY
+    RETURN
+
+## ***********************************************************************
+## **  SV.HDRW / SV.HDRR -- the four bytes in front of a saved rectangle.
+## ***********************************************************************
+
+SV.HDRW:
+    SV.ADR = SV.VA : GOSUB SV.PORTA.AT
+    POKE SV.DATA, SV.W : POKE SV.DATA, SV.H
+    POKE SV.DATA, SV.X : POKE SV.DATA, SV.Y
+    RETURN
+
+SV.HDRR:
+    SV.ADR = SV.VA : GOSUB SV.PORTA.AT
+    SV.W = PEEK(SV.DATA) : SV.H = PEEK(SV.DATA)
+    SV.RX = PEEK(SV.DATA) : SV.RY = PEEK(SV.DATA)
+    IF SV.MOVE <> 0 THEN RETURN
+    SV.X = SV.RX : SV.Y = SV.RY
+    RETURN
+
+## ***********************************************************************
+## **  The two data ports. ADDRSEL goes to 1 to reach ADDR1's registers and
+## **  MUST go back to 0, or every later write to $9F20 programs the wrong
+## **  port. A VRAM address is 17 bits, so bit 16 comes off by division:
+## **  GP.HIBYTE and GP.LOBYTE reach 65,535, and AND is signed.
+## ***********************************************************************
+
+SV.PORTA:
+    SV.ADR = SV.VA
+SV.PORTA.AT:
+    GOSUB SV.SPLIT
+    POKE SV.VCTRL, 0
+    POKE SV.VLO, SV.LO : POKE SV.VMID, SV.MID : POKE SV.VHI, SV.BNK + SV.UP
+    RETURN
+
+SV.PORTB:
+    SV.ADR = SV.VA
+SV.PORTB.AT:
+    GOSUB SV.SPLIT
+    POKE SV.VCTRL, 1
+    POKE SV.VLO, SV.LO : POKE SV.VMID, SV.MID : POKE SV.VHI, SV.BNK + SV.UP
+    POKE SV.VCTRL, 0
+    RETURN
+
+SV.SPLIT:
+    SV.BNK = INT(SV.ADR / 65536)
+    SV.REST = SV.ADR - SV.BNK * 65536
+    SV.MID = INT(SV.REST / 256)
+    SV.LO = SV.REST - SV.MID * 256
+    RETURN
+
+SV.MODULE.END:
+#ENDIF

@@ -77,6 +77,8 @@ elimination: including a module costs its whole size whether or not it is called
 | `APPSYS.INC.BL` | start an application politely, and leave the machine as it was found |
 | `STASH.INC.BL` | save a text rectangle to a RAM bank, and put it back |
 | `STASHFILE.INC.BL` | the same rectangle, through a file |
+| `STASHVRAM.INC.BL` | rectangles and byte blobs in spare VRAM, addressed by handle. No `GP.ASM`, so no `#SYMFILE` |
+| `STASHVRAMGC.INC.BL` | closes the holes a `STASHVRAM` freed out of order. Its own file, so it costs nothing unless called |
 | `LINEINPUT.INC.BL` | a positioned, length-limited entry field |
 | `MENUVERT.INC.BL` | a vertical menu |
 | `MENUBAR.INC.BL` | a horizontal menu bar |

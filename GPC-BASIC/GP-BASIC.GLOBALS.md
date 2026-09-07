@@ -30,6 +30,7 @@ The convention is one dotted prefix per module, and nothing writes outside its o
 | `BMXK.` | `BMX.INC.BL` | its KERNAL/VERA constants, kept apart from its variables |
 | `FILE.` | `FILEIO.INC.BL` | the drive: status, exists, delete, rename, directories |
 | `FILE.DIR.` | `FILEDIR.INC.BL` | reading a directory, kept apart from the rest of `FILE.` |
+| `SV.` | `STASHVRAM.INC.BL` | the VRAM store. `SVGC.` is `STASHVRAMGC.INC.BL`'s one constant |
 
 Pick anything else for your own program. `AIRLIFT.`, `GAME.`, `MAP.` — a prefix costs nothing at
 runtime because BASLOAD crunches every identifier down to a short BASIC variable, so a long
@@ -194,6 +195,31 @@ assembly to write into, and creates every `{VAR}` slot. **Do not assign `FILE.NA
 
 `FILE.NAME$` is shared with `FILEIO` on purpose: the name a picker chose is the name `FILE.EXISTS`
 and `FILE.DELETE` want.
+
+### `STASHVRAM.INC.BL`
+
+Needs `GPB.INC.BL`, and **no `#SYMFILE`** — there is no `GP.ASM` in it. The cells never leave
+VRAM: one data port reads, the other writes, and `memory_copy` moves between them without
+stepping either.
+
+**It executes no `BANK`**, so it can live in a `GP.BANKED` region — measured, `work/stashvram/SVB.BASL`.
+That is the difference from `STASH.INC.BL`, which cannot.
+
+| | |
+|---|---|
+| in | `SV.BASE` `SV.TOP` — the VRAM window in bytes. Default `$04000`/`$1AFFF`<br>`SV.MAX` — how many handles. **The caller `DIM`s `SV.PAGE%` and `SV.PAGES%` to it**<br>`SV.X` `SV.Y` `SV.W` `SV.H` — the rectangle, for `SV.SAVE`<br>`SV.MOVE` — non-zero restores at `SV.X` `SV.Y` rather than where it came from<br>`SV.ADDR` `SV.LEN` — low RAM address and count, for `SV.PUT` and `SV.GET`<br>`SV.HND` — the handle, for `RESTORE`, `GET` and `FREE` |
+| out | `SV.HND` — 1..`SV.MAX`, or 0 if it did not fit<br>`SV.OK` — −1 done, 0 refused<br>`SV.ERROR$` — why, when something is refused<br>`SV.MOVED` — `SV.COMPACT` only: how many blocks moved |
+| arrays | `SV.PAGE%()` `SV.PAGES%()` — the handle table, `DIM`med by the caller |
+| internal | `SV.READY` `SV.NEXT` `SV.BASEPG` `SV.TOPPG` `SV.I` `SV.PG` `SV.NP` `SV.N` `SV.BYTES` `SV.MAPW` `SV.MAPBASE` `SV.STRIDE` `SV.ROW` `SV.CELL` `SV.SRC` `SV.DST` `SV.VA` `SV.ADR` `SV.BNK` `SV.REST` `SV.MID` `SV.LO` `SV.MODE` `SV.RX` `SV.RY`<br>`SV.COMPACT` adds `SV.PICK` `SV.BEST` `SV.J` `SV.TO` `SV.GCS` `SV.GCD` `SV.LEFT` `SV.CH` |
+| constants | `SV.VLO` `SV.VMID` `SV.VHI` `SV.DATA` `SV.VCTRL` `SV.LCONFIG` `SV.LMAPBASE` `SV.PORTLO` `SV.PORTLO.B` `SV.PORTHI` `SV.MEMCOPY` `SV.UP` `SV.HEADER` `SVGC.CHUNK` |
+
+`SV.INIT` must run once before anything else, and the two arrays must be `DIM`med before it.
+
+**Blocks are whole 256-byte pages**, which is what lets a handle's address live in an ordinary
+`%`: a page number reaches 511 where a VRAM address is 17 bits and would not.
+
+**WARNING: `BMX.STASH` defaults to `$13000`, inside the default window.** A program using both
+must move one of them. There is one allocator and no collision check.
 
 ### `MENUVERT.INC.BL`
 

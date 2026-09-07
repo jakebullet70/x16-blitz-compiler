@@ -48,12 +48,15 @@
 ## **                8,192 bytes at $A000, about 250 entries
 ## **
 ## **      low RAM   FILE.DIR.BANK = 0
-## **                DIM FD.BUF%(340)
+## **                DIM FD.BUF%(1022)
 ## **                FILE.DIR.PTR = GP.ARRPTR(FD.BUF%())
-## **                FILE.DIR.CAP = 341 * 6
+## **                FILE.DIR.CAP = 1023 * 2
 ## **
-## **  A numeric array is six bytes an element and the assembly treats it as a
-## **  run of bytes, so 341 elements is a 2,046 byte buffer out of the workspace.
+## **  WARNING: a % array is TWO bytes an element, not six. The recipe here said
+## **  six until 07/09/26 and sized a 682-byte buffer as 2,046 -- a caller
+## **  following it handed the assembly three times the room it had, and the
+## **  reader would have run 1,364 bytes off the end of the array and into
+## **  whatever the workspace put after it. An untyped array is the six.
 ## **
 ## **  FILE.DIR.BANKBASE and FILE.DIR.BANKROOM are the hardware window, not an
 ## **  allocation: every bank appears at $A000 and every bank is 8,192 bytes.
