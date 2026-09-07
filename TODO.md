@@ -1244,7 +1244,7 @@ Add it when a caller exists, on the same rule the rest of this section runs on.
 
 ### `STRUSING.INC.BL` — a number to a template. BUILT 07/09/26
 
-**Shipped** as `GPC-BASIC/STRUSING.INC.BL`, **744 bytes** of p-code, thirty-eight assertions green
+**Shipped** as `GPC-BASIC/STRUSING.INC.BL`, **726 bytes** of p-code, thirty-nine assertions green
 headlessly — `GPC-BASIC/USINGT.EXP.BL`. Example `GPC-BASIC/STRUSING.EXP.BL`. Documented at
 `GP-BASIC.md` §4.10.
 
@@ -1271,11 +1271,11 @@ first two are cheap (~25 and ~50 bytes) if a caller ever wants them.
   (`source/polynomials/source/unary/power.asm:41-45`). But `STR$` turns over to E notation at 1e9,
   so the scaled value must stay under it: **two decimal places reach 9,999,999.99**, five reach
   9,999.99999. Past that the field stars rather than printing something wrong.
-- **Its own module, not a routine in `STRINGS.INC.BL`.** 744 bytes is more than the whole BASIC
+- **Its own module, not a routine in `STRINGS.INC.BL`.** 726 bytes is more than the whole BASIC
   half of `STRINGS`, and every includer would pay it — the `CRUNCHER` +493 measurement below is
   the same lesson. The prefix `STR.USING.` is a sub-prefix of `STR.`, on the `FILE.DIR.` pattern,
   so the module-level scan still works.
-- **`STR.USING.FIX` alone is 210 of the 744**, measured by compiling it on its own. If per-routine
+- **`STR.USING.FIX` alone is 205 of the 726**, measured by compiling it on its own. If per-routine
   elimination ever lands, that is the split.
 - **`STR.USING.DP` is an output of `STR.USING` and an input to `STR.USING.FIX`** — the mask
   carries the count. Alternating the two routines means setting it again every time.

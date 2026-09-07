@@ -1270,12 +1270,12 @@ and it takes *significant digits*, never decimal places — `FloatToString` reco
 fixed-decimal mode was tried and printed `12345678.9` as `12345678.8984375`. So a scaled integer is
 the only exact route, and the 1e9 ceiling above is its price.
 
-Cost: **744 bytes** of p-code, of which `STR.USING.FIX` alone is **210**. Its own module rather
+Cost: **726 bytes** of p-code, of which `STR.USING.FIX` alone is **205**. Its own module rather
 than a routine in `STRINGS.INC.BL` for that reason — a program wanting `STR.PADL` and a split
 should not carry a mask parser.
 
 Example: [`STRUSING.EXP.BL`](STRUSING.EXP.BL). Regression test:
-[`USINGT.EXP.BL`](USINGT.EXP.BL), thirty-eight cases — both entry points, every mask character,
+[`USINGT.EXP.BL`](USINGT.EXP.BL), thirty-nine cases — both entry points, every mask character,
 the rounding traps, the sign column and both overflows. Text and length are compared every time:
 the result is a field, so a right answer in the wrong number of columns still breaks the table.
 

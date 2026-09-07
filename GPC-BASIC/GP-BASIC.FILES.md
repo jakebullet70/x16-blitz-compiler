@@ -116,7 +116,7 @@ One `.EXP.BL` per topic. Several are also the regression test for the module the
 | `BMXVIEW.EXP.BL` | a BMX bitmap viewer, in about thirty lines |
 | `BMXPAL.EXP.BL` `BMXSPD.EXP.BL` | the palette question, and the speed of each path |
 | `SORT.EXP.BL` `STRCTST.EXP.BL` `STRTST.EXP.BL` `SPLITT.EXP.BL` | the regression tests for `SORT`, `STRCASE`, the `STRINGS` assembly and `STR.SPLIT` |
-| `USINGT.EXP.BL` | the regression test for `STR.USING`, thirty-eight cases |
+| `USINGT.EXP.BL` | the regression test for `STR.USING`, thirty-nine cases |
 | `MENUTST.EXP.BL` `GUI2TST.EXP.BL` | the same for the menu and the listbox, driven through the keyboard buffer |
 
 ---
