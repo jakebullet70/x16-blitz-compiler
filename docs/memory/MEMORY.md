@@ -45,6 +45,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [Block openers must not defer](gpb-block-openers-must-not-defer.md) — .error_syntax rolls a statement back and silently corrupts enclosing block nesting
 - [GOTO out of a GP block](gpb-goto-out-of-block-design.md) — BUILT: .unwind opcode, zero runtime bytes, and the four traps each build cost
 - [RETURN unwinds frames](gpc-return-unwinds-frames.md) — StackFindFrame closes what it passes, so RETURN out of a FOR/GP.DO/GP.SELECT is safe
+- [GP.ASM fixups retired by two passes](gpasm-fixups-retired-by-two-passes.md) — the 128-reference cap was a single-pass habit; pass two knows every base while it assembles
 - [GP.ASM implementation status](gpasm-implementation-status.md) — shipped; dotted {VAR} names, the self-patching-operand idiom, and the 123x editor render numbers
 - [GP.ASM inline assembly research](gpasm-inline-assembly-research.md) — where the research doc lives, what was decided, what is still open
 - [GP.ASM blobs may use zTemp0/1/2](gpasm-blob-may-use-ztemp.md) — SYS already clobbers zTemp0 to get there, so `(ptr),y` is available
@@ -115,7 +116,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [GP drawing targets layer 1](gp-drawing-targets-layer-1.md) — only layer 1, but no row clamp and L1_MAPBASE is POKEable
 - [P-code runs from a bank, PROVEN](pcode-runs-from-a-bank-proven.md) — executed at $A000 with two GP.ASM blobs and no ABI change; RETURN out needs no bank restore
 - [GP.BANKED region relocation](gp-banked-region-relocation.md) — the region moves to the end of the object with a rotation and two GOTOs to line numbers; the three things holding a buffer address
-- [GP.BANKEDSTR: literal text in a bank](gp-bankedstr-literal-text-in-a-bank.md) — BUILT: named groups resolved at compile time, +3,840 B on GPBMODS; GPBFILES is blocked by ASM_MAX_FIXUPS, not p-code
+- [GP.BANKEDSTR: literal text in a bank](gp-bankedstr-literal-text-in-a-bank.md) — BUILT: named groups resolved at compile time, +3,840 B on GPBMODS, and GPBFILES compiles at last
 - [Object writer: regions vs low code](object-writer-regions-vs-low-code.md) — write above the buffer's reach and the streamer pads forward 65,535 bytes, with both passes agreeing and no check firing
 - [Banked code loses the bank on a call out](gp-banked-call-out-loses-the-bank.md) — a region cannot call another bank and survive the return, and may not BANK itself back
 - [FILEDIR banks whole](filedir-bank-split.md) — BUILT; the bank switch moved into its two blobs, and the "78% cannot move" was a line count of REM assembly

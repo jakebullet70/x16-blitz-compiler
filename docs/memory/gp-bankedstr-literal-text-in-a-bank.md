@@ -1,6 +1,6 @@
 ---
 name: gp-bankedstr-literal-text-in-a-bank
-description: "BUILT: GP.BANKEDSTR puts a program's literal text in a RAM bank with named, compile-time-resolved groups; measured +3,840 bytes on GPBMODS, and GPBFILES is blocked by ASM_MAX_FIXUPS instead"
+description: "BUILT: GP.BANKEDSTR puts a program's literal text in a RAM bank with named, compile-time-resolved groups; +3,840 bytes on GPBMODS and GPBFILES compiles at last, with 2,304 to spare"
 metadata:
   type: project
 ---
@@ -37,18 +37,20 @@ into a bank region, which is outside the p-code fit check.
 `ObjectBase`, so `ObjectBase` moved `$3C00` → `$3D00`. `GPBase` did not move, so a non-GP program
 pays nothing. Every GP program pays 256 whether it uses `GP.BSTR` or not.
 
-## The two caps
+## GPBFILES, which is what it was for
 
-`BSTR_MAX_GROUPS` was 32 and is now **128**, which is the shape's own ceiling — the subscript is
-doubled into X with one `ASL`, so 128 wraps to 0. 32 is plenty for a program written by hand and
-not plenty for one converted from literals.
+**It compiles**, 341 strings in 51 groups: `CODE 27,392  FREE 6,400`, so 2,304 bytes above the
+4,096 reserve. All 341 come back byte for byte.
 
-**GPBFILES is still blocked, but NOT by p-code** — by `ASM_MAX_FIXUPS = 128` in
-`commands/gpasmcode.asm`, which has the identical `asl a / tax` ceiling. It needs ~194 fixups
-across nine `GP.ASM` blocks (SORT alone is 67, the two FILEDIR blocks 71); **GPBMODS is at ~114
-and about to hit it too**. Lifting it needs 16-bit indexing in `AsmAddFixup` and `AsmPatchAll`,
-or — cheaper and probably right — noticing that pass two knows `AsmPoolBase` and
-`AsmWorkspacePage` while it assembles and could resolve on the spot instead of recording anything.
+It took two walls, not one. The p-code cap was the second; the first was
+`ASM_MAX_FIXUPS = 128`, which stopped it on its ninth `GP.ASM` block long before the p-code was
+measured — see [[gpasm-fixups-retired-by-two-passes]]. **Neither wall was visible behind the
+other**: with the fixup table gone GPBFILES reached `PROGRAM TOO BIG`, which is the failure the
+plan had assumed all along.
+
+`BSTR_MAX_GROUPS` was 32 and is now **128**, the shape's own ceiling — the subscript is doubled
+into X with one `ASL`, so 128 wraps to 0. 32 is plenty for a program written by hand and not
+plenty for one converted from its own literals: GPBMODS wants 37 groups and GPBFILES 51.
 
 ## Traps it cost
 
@@ -61,6 +63,10 @@ or — cheaper and probably right — noticing that pass two knows `AsmPoolBase`
 - **`make -C source/runtime gpc-rt` is a separate target** that neither `make libs` nor the
   application build runs. A two-day-stale `GPB.RT.120.BIN` with no `gp.bstr` vector cost a long
   detour; the ABI bump now catches it.
+- **`bstrBank` is poked into EVERY object's bootstrap**, banked text or not, so leaving it
+  uninitialised made two compiles of one source differ. Cleared for pass one now. The checksum
+  cannot catch that class of bug — it compares pass two against pass one, and both passes read
+  the same stale byte.
 - The object-writer half of this is its own note: [[object-writer-regions-vs-low-code]].
 
 Related: [[gp-banked-region-relocation]], [[banking-strings-scales-with-length]],

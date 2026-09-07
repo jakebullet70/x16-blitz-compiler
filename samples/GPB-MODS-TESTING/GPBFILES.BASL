@@ -1,5 +1,5 @@
-#SAVEAS "@:GPBMODS.SRC.PRG"
-#SYMFILE "@:GPBMODS.SRC.SYM"
+#SAVEAS "@:GPBFILES.SRC.PRG"
+#SYMFILE "@:GPBFILES.SRC.SYM"
 #INCLUDE "GPB.INC.BL"
 #INCLUDE "BANKMGR.INC.BL"
 #INCLUDE "APPSYS.INC.BL"
@@ -9,6 +9,8 @@
 #INCLUDE "STRINGS.INC.BL"
 #INCLUDE "SORT.INC.BL"
 #INCLUDE "LIBBANK.INC.BL"
+#INCLUDE "LIBBANKFD.INC.BL"
+#INCLUDE "FILEIO.INC.BL"
 
 ## ---- THE PROGRAM'S LITERAL TEXT LIVES IN A BANK. Every GP.BANKEDSTR block below
 ## ---- names this, and it is CLAIMED from BANKMGR at startup for the same reason
@@ -31,11 +33,13 @@ GP.BANKED LIB.CODEBANK
 #INCLUDE "LINEINPUT.INC.BL"
 #INCLUDE "GUI.INC.BL"
 #INCLUDE "GUI2.INC.BL"
+#INCLUDE "FILEDIR.INC.BL"
 GP.ENDBANKED
 
 GP.BANKEDSTR GM.TEXTBANK BS.LIBEND
   "CODE BANK IS ALREADY TAKEN"
   "NO SCRATCH BANK LEFT"
+  "NO DIRECTORY BANK LEFT"
   "NOTHING RUN YET"
   "TEXT BANK IS ALREADY TAKEN"
 GP.ENDBANKEDSTR
@@ -126,12 +130,20 @@ GOSUB BANKMGR.ALLOC
 GM.GUIBANK = BANKMGR.BANK
 IF GM.GUIBANK = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 1)
 
+GOSUB BANKMGR.ALLOC
+GM.DIRBANK = BANKMGR.BANK
+IF GM.DIRBANK = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 2)
+
 IF GM.BANKFAIL$ <> "" THEN GOTO GM.BANKSTOP
+
+## FILEDIR sizes FILE.NAME$ here and holds the block's address. Nothing may assign a longer
+## name afterwards -- see FILEDIR.INC.BL, "assign either after FILE.DIR.INIT".
+GOSUB FILE.DIR.INIT
 
 GM.SEL = 1 : GM.OPEN = 0
 
 ## Where a panel writes what it got back, and what stands there before one has run.
-GM.RESY = APPSYS.ROWS - 3 : GM.RESULT$ = GP.BSTR(BS.LIBEND, 2)
+GM.RESY = APPSYS.ROWS - 3 : GM.RESULT$ = GP.BSTR(BS.LIBEND, 3)
 
 GOSUB GMX.CHROME
 
@@ -229,7 +241,8 @@ GP.BANKEDSTR GM.TEXTBANK BS.BAR.LOAD
   " DATA "
   " THEME "
   " ABOUT "
-  "DLISGATB"
+  " FILES "
+  "DLISGATBF"
 GP.ENDBANKEDSTR
 GMX.BAR.LOAD:
   MENUVERT.ITEM$(1) = GP.BSTR(BS.BAR.LOAD, 0)
@@ -240,11 +253,12 @@ GMX.BAR.LOAD:
   MENUVERT.ITEM$(6) = GP.BSTR(BS.BAR.LOAD, 5)
   MENUVERT.ITEM$(7) = GP.BSTR(BS.BAR.LOAD, 6)
   MENUVERT.ITEM$(8) = GP.BSTR(BS.BAR.LOAD, 7)
-  MENUVERT.COUNT = 8
+  MENUVERT.ITEM$(9) = GP.BSTR(BS.BAR.LOAD, 8)
+  MENUVERT.COUNT = 9
 
 ## A hotkey need not be an item's initial -- SCREEN and STRINGS both start S,
 ## so STRINGS answers to G. HOTATTR tints whichever letter it finds.
-  MENUVERT.HOT$ = GP.BSTR(BS.BAR.LOAD, 8)
+  MENUVERT.HOT$ = GP.BSTR(BS.BAR.LOAD, 9)
   MENUVERT.ATTR = THEME.CLR(THEME.TITLE)
   MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
   MENUVERT.HOTATTR = THEME.CLR(THEME.WARN)
@@ -367,6 +381,16 @@ GP.BANKEDSTR GM.TEXTBANK BS.DD.LOAD
   " MEMORY"
   " MODULE SIZES"
   " KEYS"
+  "FILES"
+  " FILE.DIR.OPEN"
+  " DIR  BY PATTERN"
+  " DIR  DIRECTORIES"
+  " FILE.STATUS"
+  " FILE.EXISTS"
+  " FILE.CURDIR + UP"
+  " SAVEARRAY + LOADARRAY"
+  " RENAME + DELETE"
+  " MKDIR + CHDIR"
 GP.ENDBANKEDSTR
 GMX.DD.LOAD:
   MENUVERT.HOT$ = "" : MENUVERT.HOTATTR = 0
@@ -434,13 +458,25 @@ GMX.DD.LOAD:
     MENUVERT.ITEM$(4) = GP.BSTR(BS.DD.LOAD, 43)
     MENUVERT.ITEM$(5) = GP.BSTR(BS.DD.LOAD, 44)
     MENUVERT.COUNT = 5
-  GP.OTHER
+  GP.CASE 8
     GM.NAME$ = GP.BSTR(BS.DD.LOAD, 45)
     MENUVERT.ITEM$(1) = GP.BSTR(BS.DD.LOAD, 46)
     MENUVERT.ITEM$(2) = GP.BSTR(BS.DD.LOAD, 47)
     MENUVERT.ITEM$(3) = GP.BSTR(BS.DD.LOAD, 38)
     MENUVERT.ITEM$(4) = GP.BSTR(BS.DD.LOAD, 48)
     MENUVERT.COUNT = 4
+  GP.OTHER
+    GM.NAME$ = GP.BSTR(BS.DD.LOAD, 49)
+    MENUVERT.ITEM$(1) = GP.BSTR(BS.DD.LOAD, 50)
+    MENUVERT.ITEM$(2) = GP.BSTR(BS.DD.LOAD, 51)
+    MENUVERT.ITEM$(3) = GP.BSTR(BS.DD.LOAD, 52)
+    MENUVERT.ITEM$(4) = GP.BSTR(BS.DD.LOAD, 53)
+    MENUVERT.ITEM$(5) = GP.BSTR(BS.DD.LOAD, 54)
+    MENUVERT.ITEM$(6) = GP.BSTR(BS.DD.LOAD, 55)
+    MENUVERT.ITEM$(7) = GP.BSTR(BS.DD.LOAD, 56)
+    MENUVERT.ITEM$(8) = GP.BSTR(BS.DD.LOAD, 57)
+    MENUVERT.ITEM$(9) = GP.BSTR(BS.DD.LOAD, 58)
+    MENUVERT.COUNT = 9
   GP.ENDSEL
   RETURN
 
@@ -460,6 +496,7 @@ GMX.DISPATCH:
   IF GM.SEL = 3 THEN GOSUB GMX.INPUT : GM.DONE = 1
   IF GM.SEL = 4 THEN GOSUB GMX.SCREEN : GM.DONE = 1
   IF GM.SEL = 8 THEN IF MENUVERT.SEL = 3 THEN GOSUB GMX.BANKMAP : GM.DONE = 1
+  IF GM.SEL = 9 THEN GOSUB GMX.FILES : GM.DONE = 1
   IF GM.DONE = 0 THEN GOSUB GMX.STUB
   RETURN
 
@@ -1749,6 +1786,552 @@ GMX.I.LIMITS:
   GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.I.LIMITS, 6) + MID$(STR$(LEN(GM.FLD$(2))), 2)
   GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.I.LIMITS, 7) + GM.FLD$(3) + "]"
   IF GM.FKEY = 27 THEN GM.RESULT$ = GP.BSTR(BS.I.LIMITS, 8)
+  RETURN
+
+
+
+## ***********************************************************************
+## **  GMX.FILES -- the FILES dropdown. FILEIO and FILEDIR, one row each.
+## **
+## **  THE DRIVE IS REAL, and four of these rows write to it. Everything they
+## **  make is named GPBFILE.* or GPBDIR, and the two files are scratched by
+## **  the row that made them. The directory is not: FILEIO has no RMDIR.
+## **
+## **  FILE.NAME$ IS ASSIGNED BY FIVE ROWS HERE and written in place by
+## **  FILEDIR, which is only safe because none of them assigns a name longer
+## **  than the 32 FILE.DIR.INIT sized it to. A string block never shrinks, so
+## **  a shorter name reuses the block FILEDIR holds the pointer to; a longer
+## **  one would reallocate and leave that pointer aimed at freed heap. The
+## **  typed field is GUI.LEN 24 for that reason and not for the look of it.
+## ***********************************************************************
+
+GMX.FILES:
+  GP.SELECT MENUVERT.SEL
+  GP.CASE 1
+    GOSUB GMX.F.DIR
+  GP.CASE 2
+    GOSUB GMX.F.PATTERN
+  GP.CASE 3
+    GOSUB GMX.F.DIRS
+  GP.CASE 4
+    GOSUB GMX.F.STATUS
+  GP.CASE 5
+    GOSUB GMX.F.EXISTS
+  GP.CASE 6
+    GOSUB GMX.F.CURDIR
+  GP.CASE 7
+    GOSUB GMX.F.ARRAY
+  GP.CASE 8
+    GOSUB GMX.F.RENAME
+  GP.OTHER
+    GOSUB GMX.F.MKDIR
+  GP.ENDSEL
+  GOSUB GMX.CHROME
+  RETURN
+
+
+## ---- A line in the work area, and the row after it ----
+
+GMX.F.SAY:
+  GP.PRINTAT 6, GM.FROW, GM.FTXT$, THEME.CLR(THEME.TEXT)
+  GM.FROW = GM.FROW + 1
+  RETURN
+
+
+## ---- What the drive said to the last thing asked of it. An error number
+## ---- under FILE.OKMAX is success, and 0 is the only one that is silent.
+
+
+GP.BANKEDSTR GM.TEXTBANK BS.F.DRIVE
+  "  --  ERR "
+GP.ENDBANKEDSTR
+GMX.F.DRIVE:
+  GM.FTXT$ = GM.FSTEP$ + GP.BSTR(BS.F.DRIVE, 0) + MID$(STR$(FILE.ERR), 2) + "  " + FILE.MSG$
+  GOSUB GMX.F.SAY
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.F.READ -- one listing, walked into MENUVERT.ITEM$ for a listbox.
+## **
+## **   in   GM.FPAT$    the drive's pattern, or empty for everything
+## **        GM.FONLY    FILE.DIR.ALL, FILE.DIR.FILES or FILE.DIR.DIRS
+## **   out  GM.FSEEN    entries in the listing
+## **        GM.FSHOWN   how many of them reached the array
+## **
+## **  READ ONCE, WALK ONCE. The whole listing comes back in one go into the
+## **  bank BANKMGR handed out -- 8,192 bytes at $A000, about 250 entries --
+## **  and FILE.DIR.NEXT then walks that buffer without going near the drive.
+## **
+## **  FILE.NAME$ IS ONE STRING, written in place by every FILE.DIR.NEXT, so
+## **  the name is copied into the array here rather than kept a pointer to.
+## **
+## **  The walk stops FILLING at 24 because MENUVERT.ITEM$ is DIMmed 32 and
+## **  GUI.LISTBOX reads that array. GM.FSEEN keeps counting past it, so the
+## **  panel can still say how many entries were left out.
+## ***********************************************************************
+
+GMX.F.READ:
+  FILE.DIR.BANK = GM.DIRBANK
+  FILE.DIR.PATTERN$ = GM.FPAT$
+  FILE.DIR.ONLY = GM.FONLY
+  GOSUB FILE.DIR.OPEN
+  GM.FSEEN = 0
+  GM.FSHOWN = 0
+  GP.DO
+    GOSUB FILE.DIR.NEXT
+    IF FILE.DIR.MORE = 0 THEN GP.EXITDO
+    GM.FSEEN = GM.FSEEN + 1
+    IF GM.FSHOWN < 24 THEN GOSUB GMX.F.KEEP
+  GP.LOOP
+  RETURN
+
+
+## ---- One entry into the array: the name in a column, then the block count
+## ---- and the three characters of type.
+
+GMX.F.KEEP:
+  STR.STR$ = FILE.NAME$
+  STR.WIDTH = 26
+  GOSUB STR.PADR
+  STR.STR$ = STR.STR$ + STR$(FILE.BLOCKS)
+  STR.WIDTH = 32
+  GOSUB STR.PADR
+  GM.FSHOWN = GM.FSHOWN + 1
+  MENUVERT.ITEM$(GM.FSHOWN) = " " + STR.STR$ + "  " + FILE.TYPE$
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.F.LIST -- what GMX.F.READ found, in a listbox.
+## **
+## **  The row picked is thrown away. This panel is about the READ; choosing
+## **  from a list is GUI.LISTBOX's own row under DIALOG.
+## ***********************************************************************
+
+
+GP.BANKEDSTR GM.TEXTBANK BS.F.LIST
+  " ENTRIES, "
+  " OF THEM SHOWN."
+  "NAME, BLOCKS AND TYPE, ALL THREE FROM FILE.DIR.NEXT."
+  "FILEDIR  "
+  " ENTRIES IN "
+  " BYTES"
+  "  BUFFER FULL"
+GP.ENDBANKEDSTR
+GMX.F.LIST:
+  IF GM.FSHOWN = 0 THEN GOTO GMX.F.NONE
+  GOSUB GMX.D.RESET
+  GUI.TITLE$ = GM.FTITLE$
+  GUI.MSG$ = MID$(STR$(GM.FSEEN), 2) + GP.BSTR(BS.F.LIST, 0) + MID$(STR$(GM.FSHOWN), 2) + GP.BSTR(BS.F.LIST, 1)
+  GUI.MSG2$ = GP.BSTR(BS.F.LIST, 2)
+  GUI.LISTBOX.COUNT = GM.FSHOWN
+  GUI.LISTBOX.ROWS = 12
+  GUI.LISTBOX.MULTI = 0
+  GUI.LISTBOX.SEL = 0
+  GOSUB GUI.LISTBOX
+  GM.RESULT$ = GP.BSTR(BS.F.LIST, 3) + MID$(STR$(GM.FSEEN), 2) + GP.BSTR(BS.F.LIST, 4) + MID$(STR$(FILE.DIR.GOT), 2) + GP.BSTR(BS.F.LIST, 5)
+  IF FILE.DIR.FULL = 1 THEN GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.F.LIST, 6)
+  RETURN
+
+
+GP.BANKEDSTR GM.TEXTBANK BS.F.NONE
+  "NOTHING TO LIST."
+  "FILEDIR  NOTHING FOUND"
+GP.ENDBANKEDSTR
+GMX.F.NONE:
+  GOSUB GMX.D.RESET
+  GUI.TITLE$ = GM.FTITLE$
+  GUI.MSG$ = GP.BSTR(BS.F.NONE, 0)
+  GUI.MSG2$ = "ERR " + MID$(STR$(FILE.ERR), 2) + "  " + FILE.MSG$
+  GOSUB GUI.SAY
+  GM.RESULT$ = GP.BSTR(BS.F.NONE, 1)
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.F.DIR -- FILEDIR, everything on the drive.
+## ***********************************************************************
+
+
+GP.BANKEDSTR GM.TEXTBANK BS.F.DIR
+  " DIRECTORY "
+GP.ENDBANKEDSTR
+GMX.F.DIR:
+  GM.FPAT$ = ""
+  GM.FONLY = FILE.DIR.ALL
+  GOSUB GMX.F.READ
+  GM.FTITLE$ = GP.BSTR(BS.F.DIR, 0)
+  GOSUB GMX.F.LIST
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.F.PATTERN -- the same read, with the DRIVE doing the filtering.
+## **
+## **  The pattern rides on the name the listing is opened with, so * and ?
+## **  are the drive's and a filtered listing is also a smaller buffer. There
+## **  is no matcher in the module and there should not be one here.
+## ***********************************************************************
+
+
+GP.BANKEDSTR GM.TEXTBANK BS.F.PATTERN
+  " DIRECTORY PATTERN "
+  "A PATTERN FOR THE DRIVE TO MATCH."
+  "FILE.DIR.ONLY IS SET TO FILES, SO NO DIRECTORY ANSWERS IT."
+  "*.PRG"
+  " PATTERN "
+GP.ENDBANKEDSTR
+GMX.F.PATTERN:
+  GOSUB GMX.D.RESET
+  GUI.TITLE$ = GP.BSTR(BS.F.PATTERN, 0)
+  GUI.MSG$ = GP.BSTR(BS.F.PATTERN, 1)
+  GUI.MSG2$ = GP.BSTR(BS.F.PATTERN, 2)
+  GUI.LEN = 20
+  GUI.TEXT$ = GP.BSTR(BS.F.PATTERN, 3)
+  GOSUB GUI.INPUT
+  IF GUI.OK = 0 THEN GOTO GMX.F.PATOFF
+  GM.FPAT$ = GUI.TEXT$
+  GM.FONLY = FILE.DIR.FILES
+  GOSUB GMX.F.READ
+  GM.FTITLE$ = GP.BSTR(BS.F.PATTERN, 4) + GM.FPAT$ + " "
+  GOSUB GMX.F.LIST
+  RETURN
+
+
+GP.BANKEDSTR GM.TEXTBANK BS.F.PATOFF
+  "DIRECTORY PATTERN CANCELLED"
+GP.ENDBANKEDSTR
+GMX.F.PATOFF:
+  GM.RESULT$ = GP.BSTR(BS.F.PATOFF, 0)
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.F.DIRS -- FILE.DIR.DIRS. The subdirectories and nothing else.
+## **
+## **  MKDIR + CHDIR + UP leaves GPBDIR behind, so once that row has been run
+## **  this one has something to find.
+## ***********************************************************************
+
+
+GP.BANKEDSTR GM.TEXTBANK BS.F.DIRS
+  " DIRECTORIES "
+GP.ENDBANKEDSTR
+GMX.F.DIRS:
+  GM.FPAT$ = ""
+  GM.FONLY = FILE.DIR.DIRS
+  GOSUB GMX.F.READ
+  GM.FTITLE$ = GP.BSTR(BS.F.DIRS, 0)
+  GOSUB GMX.F.LIST
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.F.STATUS -- FILE.STATUS. The command channel, read for its own sake.
+## **
+## **  The drive holds its error state until channel 15 is read, which is why
+## **  every routine in FILEIO ends by reading it. This row is that read on its
+## **  own, and the four fields it fills are what DS and DS$ would have said on
+## **  a machine that had them.
+## ***********************************************************************
+
+
+GP.BANKEDSTR GM.TEXTBANK BS.F.STATUS
+  "FILE.STATUS OPENS CHANNEL 15 WITH NO COMMAND AND READS IT."
+  "STATUS"
+  "TRACK "
+  "    SECTOR "
+  "DEVICE "
+  "    AN ERROR NUMBER UNDER 20 IS SUCCESS"
+  "PRESS A KEY."
+  "FILE.STATUS  ERR "
+GP.ENDBANKEDSTR
+GMX.F.STATUS:
+  GOSUB GMX.CLEARPANEL
+  GM.FROW = 8
+  GM.FTXT$ = GP.BSTR(BS.F.STATUS, 0)
+  GOSUB GMX.F.SAY
+  GM.FROW = GM.FROW + 1
+  GOSUB FILE.STATUS
+  GM.FSTEP$ = GP.BSTR(BS.F.STATUS, 1)
+  GOSUB GMX.F.DRIVE
+  GM.FTXT$ = GP.BSTR(BS.F.STATUS, 2) + MID$(STR$(FILE.TRK), 2) + GP.BSTR(BS.F.STATUS, 3) + MID$(STR$(FILE.SEC), 2)
+  GOSUB GMX.F.SAY
+  GM.FTXT$ = GP.BSTR(BS.F.STATUS, 4) + MID$(STR$(FILE.DEVICE), 2) + GP.BSTR(BS.F.STATUS, 5)
+  GOSUB GMX.F.SAY
+  GM.TELL$ = GP.BSTR(BS.F.STATUS, 6)
+  GOSUB GMX.TELL
+  GM.RESULT$ = GP.BSTR(BS.F.STATUS, 7) + MID$(STR$(FILE.ERR), 2) + "  " + FILE.MSG$
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.F.EXISTS -- FILE.EXISTS, on a name you type.
+## **
+## **  It opens the file for reading and reads the command channel while that
+## **  file is still open, so the answer is the drive's answer to THAT open.
+## **  62 is FILE NOT FOUND, and it is the ordinary no.
+## ***********************************************************************
+
+
+GP.BANKEDSTR GM.TEXTBANK BS.F.EXISTS
+  " FILE.EXISTS "
+  "A NAME TO LOOK FOR ON THE DRIVE."
+  "GPBMODS.PRG"
+  "  IS NOT ON THE DRIVE."
+  "  IS ON THE DRIVE."
+  "FILE.OK "
+  "    ERR "
+  "FILE.EXISTS  "
+  "  OK "
+GP.ENDBANKEDSTR
+GMX.F.EXISTS:
+  GOSUB GMX.D.RESET
+  GUI.TITLE$ = GP.BSTR(BS.F.EXISTS, 0)
+  GUI.MSG$ = GP.BSTR(BS.F.EXISTS, 1)
+  GUI.LEN = 24
+  GUI.TEXT$ = GP.BSTR(BS.F.EXISTS, 2)
+  GOSUB GUI.INPUT
+  IF GUI.OK = 0 THEN GOTO GMX.F.EXOFF
+  GM.FNAME$ = GUI.TEXT$
+  FILE.NAME$ = GM.FNAME$
+  GOSUB FILE.EXISTS
+  GOSUB GMX.D.RESET
+  GUI.TITLE$ = GP.BSTR(BS.F.EXISTS, 0)
+  GUI.MSG$ = GM.FNAME$ + GP.BSTR(BS.F.EXISTS, 3)
+  IF FILE.OK = 1 THEN GUI.MSG$ = GM.FNAME$ + GP.BSTR(BS.F.EXISTS, 4)
+  GUI.MSG2$ = GP.BSTR(BS.F.EXISTS, 5) + MID$(STR$(FILE.OK), 2) + GP.BSTR(BS.F.EXISTS, 6) + MID$(STR$(FILE.ERR), 2) + "  " + FILE.MSG$
+  GOSUB GUI.SAY
+  GM.RESULT$ = GP.BSTR(BS.F.EXISTS, 7) + GM.FNAME$ + GP.BSTR(BS.F.EXISTS, 8) + MID$(STR$(FILE.OK), 2)
+  RETURN
+
+
+GP.BANKEDSTR GM.TEXTBANK BS.F.EXOFF
+  "FILE.EXISTS CANCELLED"
+GP.ENDBANKEDSTR
+GMX.F.EXOFF:
+  GM.RESULT$ = GP.BSTR(BS.F.EXOFF, 0)
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.F.CURDIR -- FILE.CURDIR. Where the drive is, as a path.
+## **
+## **  $=C lists the current directory and then each parent, innermost first,
+## **  and the routine rebuilds the path out of those components. The root
+## **  reads back as a bare /.
+## ***********************************************************************
+
+
+GP.BANKEDSTR GM.TEXTBANK BS.F.CURDIR
+  " FILE.CURDIR "
+  "THE DRIVE IS IN  "
+  "FILE.CURDIR  "
+GP.ENDBANKEDSTR
+GMX.F.CURDIR:
+  GOSUB FILE.CURDIR
+  GOSUB GMX.D.RESET
+  GUI.TITLE$ = GP.BSTR(BS.F.CURDIR, 0)
+  GUI.MSG$ = GP.BSTR(BS.F.CURDIR, 1) + FILE.PATH$
+  GUI.MSG2$ = "ERR " + MID$(STR$(FILE.ERR), 2) + "  " + FILE.MSG$
+  GOSUB GUI.SAY
+  GM.RESULT$ = GP.BSTR(BS.F.CURDIR, 2) + FILE.PATH$
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.F.ARRAY -- FILE.SAVEARRAY and FILE.LOADARRAY, out and back.
+## **
+## **  FILE.N IS AN INPUT TO THE SAVE AND AN OUTPUT FROM THE LOAD, which is
+## **  the one thing about this pair worth carrying away. FILE.MAX is how many
+## **  rows the array can hold, and FILE.N coming back equal to it means the
+## **  file may have held more.
+## **
+## **  A BLANK LAST ROW WOULD NOT SURVIVE THE TRIP. The CR that ends the last
+## **  row is also the last byte of the file, so end of file and an empty line
+## **  are the same thing to the reader. Five rows with text in them come back
+## **  as five.
+## ***********************************************************************
+
+
+GP.BANKEDSTR GM.TEXTBANK BS.F.ARRAY
+  "THREE"
+  "GPBFILE.DAT"
+  "SAVEARRAY  5 ROWS TO GPBFILE.DAT"
+  "LOADARRAY  "
+  " ROWS BACK"
+  "PRESS A KEY TO SCRATCH GPBFILE.DAT."
+  "DELETE"
+  "PRESS A KEY."
+  "ARRAY  5 ROWS OUT, "
+  " BACK"
+GP.ENDBANKEDSTR
+GMX.F.ARRAY:
+  GOSUB GMX.CLEARPANEL
+  GM.FROW = 8
+  FILE.LINE$(1) = "ONE"
+  FILE.LINE$(2) = "TWO"
+  FILE.LINE$(3) = GP.BSTR(BS.F.ARRAY, 0)
+  FILE.LINE$(4) = "FOUR"
+  FILE.LINE$(5) = "FIVE"
+  FILE.N = 5
+  FILE.NAME$ = GP.BSTR(BS.F.ARRAY, 1)
+  GOSUB FILE.SAVEARRAY
+  GM.FSTEP$ = GP.BSTR(BS.F.ARRAY, 2)
+  GOSUB GMX.F.DRIVE
+
+## ---- emptied, so what comes back can only have come off the drive ----
+  FOR GM.I = 1 TO 16
+    FILE.LINE$(GM.I) = ""
+  NEXT GM.I
+
+  FILE.MAX = 16
+  GOSUB FILE.LOADARRAY
+  GM.FSTEP$ = GP.BSTR(BS.F.ARRAY, 3) + MID$(STR$(FILE.N), 2) + GP.BSTR(BS.F.ARRAY, 4)
+  GOSUB GMX.F.DRIVE
+  GM.FROW = GM.FROW + 1
+  FOR GM.I = 1 TO FILE.N
+    GM.FTXT$ = "  " + MID$(STR$(GM.I), 2) + "   [" + FILE.LINE$(GM.I) + "]"
+    GOSUB GMX.F.SAY
+  NEXT GM.I
+
+  GM.TELL$ = GP.BSTR(BS.F.ARRAY, 5)
+  GOSUB GMX.TELL
+  GOSUB FILE.DELETE
+  GM.FSTEP$ = GP.BSTR(BS.F.ARRAY, 6)
+  GOSUB GMX.F.DRIVE
+  GM.TELL$ = GP.BSTR(BS.F.ARRAY, 7)
+  GOSUB GMX.TELL
+  GM.RESULT$ = GP.BSTR(BS.F.ARRAY, 8) + MID$(STR$(FILE.N), 2) + GP.BSTR(BS.F.ARRAY, 9)
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.F.RENAME -- FILE.RENAME and FILE.DELETE, round trip on one file.
+## **
+## **  RENAME ONTO A NAME THAT ALREADY EXISTS RETURNS 62, the same code that a
+## **  missing SOURCE gives. So the target is scratched first, and what this
+## **  panel trusts afterwards is FILE.EXISTS rather than the error number.
+## **
+## **  FILE.NEW$ IS THE NEW NAME and FILE.NAME$ the old one; the command sent
+## **  is R:new=old. A rename does not touch FILE.NAME$, so the DELETE at the
+## **  end has to be told the new name.
+## ***********************************************************************
+
+
+GP.BANKEDSTR GM.TEXTBANK BS.F.RENAME
+  "A FILE TO RENAME"
+  "GPBFILE.BAK"
+  "GPBFILE.DAT"
+  "WROTE GPBFILE.DAT"
+  "EXISTS  GPBFILE.DAT  "
+  "    WANT 1"
+  "RENAME TO GPBFILE.BAK"
+  "    WANT 0"
+  "EXISTS  GPBFILE.BAK  "
+  "PRESS A KEY TO SCRATCH GPBFILE.BAK."
+  "DELETE"
+  "ERR 1 IS FILES SCRATCHED, AND FILE.TRK CARRIES THE COUNT: "
+  "PRESS A KEY."
+  "RENAME + DELETE  ERR "
+GP.ENDBANKEDSTR
+GMX.F.RENAME:
+  GOSUB GMX.CLEARPANEL
+  GM.FROW = 8
+  FILE.LINE$(1) = GP.BSTR(BS.F.RENAME, 0)
+  FILE.N = 1
+
+  FILE.NAME$ = GP.BSTR(BS.F.RENAME, 1)
+  GOSUB FILE.DELETE
+  FILE.NAME$ = GP.BSTR(BS.F.RENAME, 2)
+  GOSUB FILE.SAVEARRAY
+  GM.FSTEP$ = GP.BSTR(BS.F.RENAME, 3)
+  GOSUB GMX.F.DRIVE
+
+  GOSUB FILE.EXISTS
+  GM.FTXT$ = GP.BSTR(BS.F.RENAME, 4) + MID$(STR$(FILE.OK), 2) + GP.BSTR(BS.F.RENAME, 5)
+  GOSUB GMX.F.SAY
+
+  FILE.NEW$ = GP.BSTR(BS.F.RENAME, 1)
+  GOSUB FILE.RENAME
+  GM.FSTEP$ = GP.BSTR(BS.F.RENAME, 6)
+  GOSUB GMX.F.DRIVE
+
+  GOSUB FILE.EXISTS
+  GM.FTXT$ = GP.BSTR(BS.F.RENAME, 4) + MID$(STR$(FILE.OK), 2) + GP.BSTR(BS.F.RENAME, 7)
+  GOSUB GMX.F.SAY
+  FILE.NAME$ = GP.BSTR(BS.F.RENAME, 1)
+  GOSUB FILE.EXISTS
+  GM.FTXT$ = GP.BSTR(BS.F.RENAME, 8) + MID$(STR$(FILE.OK), 2) + GP.BSTR(BS.F.RENAME, 5)
+  GOSUB GMX.F.SAY
+
+  GM.TELL$ = GP.BSTR(BS.F.RENAME, 9)
+  GOSUB GMX.TELL
+  GOSUB FILE.DELETE
+  GM.FSTEP$ = GP.BSTR(BS.F.RENAME, 10)
+  GOSUB GMX.F.DRIVE
+  GM.FTXT$ = GP.BSTR(BS.F.RENAME, 11) + MID$(STR$(FILE.TRK), 2)
+  GOSUB GMX.F.SAY
+  GM.TELL$ = GP.BSTR(BS.F.RENAME, 12)
+  GOSUB GMX.TELL
+  GM.RESULT$ = GP.BSTR(BS.F.RENAME, 13) + MID$(STR$(FILE.ERR), 2) + "  " + FILE.MSG$
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.F.MKDIR -- FILE.MKDIR, FILE.CHDIR, FILE.CURDIR and FILE.UP.
+## **
+## **  THE DIRECTORY IS LEFT BEHIND. FILEIO has no RMDIR, so a second run of
+## **  this row reports 63 FILE EXISTS on the make and carries on into it --
+## **  which is the error path working rather than the panel failing.
+## **
+## **  FILE.UP sends CD: and the left arrow, CHR$(95), spelled by code so the
+## **  source does not depend on how that character is encoded.
+## ***********************************************************************
+
+
+GP.BANKEDSTR GM.TEXTBANK BS.F.MKDIR
+  "STARTING IN  "
+  "GPBDIR"
+  "MKDIR GPBDIR"
+  "CHDIR GPBDIR"
+  "NOW IN  "
+  "BACK IN  "
+  "GPBDIR IS LEFT BEHIND -- FILEIO HAS NO RMDIR. PRESS A KEY."
+  "MKDIR + CHDIR + UP  BACK IN "
+GP.ENDBANKEDSTR
+GMX.F.MKDIR:
+  GOSUB GMX.CLEARPANEL
+  GM.FROW = 8
+  GOSUB FILE.CURDIR
+  GM.FTXT$ = GP.BSTR(BS.F.MKDIR, 0) + FILE.PATH$
+  GOSUB GMX.F.SAY
+
+  FILE.NAME$ = GP.BSTR(BS.F.MKDIR, 1)
+  GOSUB FILE.MKDIR
+  GM.FSTEP$ = GP.BSTR(BS.F.MKDIR, 2)
+  GOSUB GMX.F.DRIVE
+
+  GOSUB FILE.CHDIR
+  GM.FSTEP$ = GP.BSTR(BS.F.MKDIR, 3)
+  GOSUB GMX.F.DRIVE
+
+  GOSUB FILE.CURDIR
+  GM.FTXT$ = GP.BSTR(BS.F.MKDIR, 4) + FILE.PATH$
+  GOSUB GMX.F.SAY
+
+  GOSUB FILE.UP
+  GM.FSTEP$ = "UP"
+  GOSUB GMX.F.DRIVE
+
+  GOSUB FILE.CURDIR
+  GM.FTXT$ = GP.BSTR(BS.F.MKDIR, 5) + FILE.PATH$
+  GOSUB GMX.F.SAY
+
+  GM.TELL$ = GP.BSTR(BS.F.MKDIR, 6)
+  GOSUB GMX.TELL
+  GM.RESULT$ = GP.BSTR(BS.F.MKDIR, 7) + FILE.PATH$
   RETURN
 
 

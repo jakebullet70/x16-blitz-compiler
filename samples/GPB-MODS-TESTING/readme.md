@@ -26,8 +26,15 @@ A chosen row opens `GUI.SAY` naming itself. What is real is the shell, and the s
 test of four modules: `MENUBAR` drives the bar, `MENUVERT` every dropdown, `STASH` puts the screen
 back under a closed one, and `GUI` draws the stub.
 
-Banks 2 and 3 are used — 2 for the cells a dropdown covers, 3 for the cells a dialog covers. Both
-are written whole. Nothing else in the program touches banked RAM.
+Banks 4 and 5 are named by the compiler: 4 holds the banked library, 5 the program's own literal
+text. Two more are allocated at run time for the cells a dropdown and a dialog cover, and are
+written whole. All four are CLAIMED from `BANKMGR`, and the first two have to be — the compiler
+picks them while the object is written, so the manager is told rather than asked.
+
+**The text is in a bank.** Every string the shell says is in a `GP.BANKEDSTR` block in front of
+the routine that says it, read back with `GP.BSTR`. That is 258 strings in 37 named groups, and
+it buys 3,840 bytes of low RAM — see §3.10 of `GP-BASIC.md`. Add a line to a group and nothing
+outside it moves, which is the point of the groups being named.
 
 ## Build
 
@@ -67,6 +74,12 @@ Built 2026-09-05 with all twelve modules: `OK CODE 10047 FREE 9472`.
 and proved here, then copied whole into the root — never merged by hand, and the root copy is what
 `samples/GPC-HELP` and `samples/editor` build against.
 
-Twelve of the fourteen are included. `BMX` is out: it needs a bitmap file and a screen-mode change
-and is not GUI, and `GPC-BASIC/BMXVIEW.EXP.BL` already covers it. `GPB.INC.BL` is the keyword ABI
-and is not edited here.
+**Twelve are in the shell.** `BMX` is out: it needs a bitmap file and a screen-mode change and
+is not GUI, and `GPC-BASIC/BMXVIEW.EXP.BL` already covers it. `FILEIO`, `FILEDIR` and `KB` are
+newer than the shell — they sit in the folder, they have their own tests, and no panel calls
+them yet. `GPB.INC.BL` is the keyword ABI and is not edited here; `LIBBANK.INC.BL` and
+`LIBBANKFD.INC.BL` are this sample's own front door to the banked library, not library modules.
+
+`LIBBANKFD` is separate from `LIBBANK` because BASLOAD resolves every label in every file it
+reads, so a `FILE.DIR` shim in `LIBBANK` stops the build with `LABEL NOT FOUND` in any program
+that does not also include `FILEDIR` — which is every program here but `GPBFILES`.

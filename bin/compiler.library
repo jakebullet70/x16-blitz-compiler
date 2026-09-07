@@ -463,6 +463,51 @@ asm_release .macro
 asmSavedBank: 								; caller's RAM bank, saved across an assembler window
 		.fill 	1
 		.send 	storage
+
+;
+;		BANK 16 -- the GP.BANKEDSTR group tables and string pool. Same rules again. These windows
+;		are never nested inside any of the others: the block reads its own source lines and
+;		touches no variable name, line number or block end while it is open. BStrFlush opens and
+;		closes ONCE PER BYTE for the same reason AsmFlushPool does -- WriteCodeByte can raise
+;		PROGRAM TOO BIG and leave through the error handler, which prints in bank 0.
+;
+;		SIXTEEN, NOT SEVEN, AND THE APPLICATION IS WHY. The banks above are the COMPILER's, but
+;		the application takes more that are not listed anywhere near them: OBJ_BUF_BANK is 7 and
+;		OBJ_RGN_BANK is 8, one bank a region up to GPBANK_MAXREGIONS, so 7 through 15 all belong
+;		to the object writer (application/compiler/object.asm:548).
+;
+;		This cost most of a day. Bank 7 held the string pool perfectly through PASS ONE -- which
+;		writes no object -- and pass two then filled the same bank with the object as it streamed
+;		it, so every length byte read back as zero. The symptom was not a wrong string: it was
+;		INTERNAL ERROR from the two-pass agreement check, because the region came out 44 bytes in
+;		pass two against 20 in pass one, with the page padding hiding it in the total length.
+;
+BStrStorageBank	= 16
+
+bstr_access .macro
+		php
+		pha
+		lda 	CompilerRAMBankReg 			; remember whatever the caller had selected
+		sta 	bstrSavedBank
+		lda 	#BStrStorageBank
+		sta 	CompilerRAMBankReg
+		pla
+		plp
+		.endm
+
+bstr_release .macro
+		php
+		pha
+		lda 	bstrSavedBank
+		sta 	CompilerRAMBankReg
+		pla
+		plp
+		.endm
+
+		.section storage
+bstrSavedBank: 								; caller's RAM bank, saved across a banked-string window
+		.fill 	1
+		.send 	storage
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;
@@ -1140,10 +1185,30 @@ _SCEClosed:
 		lda 	passNumber
 		bne 	_SCEPlaced
 		jsr 	GPBankRelocate 				; PASS ONE ONLY. It lifts each region out to the end
-		jsr 	SaveLayout 					; of the object and works out where they all go; pass
-		bra 	_SCEResolve 				; two is handed that and writes them there directly
+											; of the object and works out where they all go; pass
+											; two is handed that and writes them there directly
+		;
+		;		AND THE TEXT GOES ON BEFORE THE LAYOUT IS SAVED, which is not an ordering nicety:
+		;		the text is a REGION, in its own bank, with its own layout slot, and the layout is
+		;		how pass two and ObjStreamClose both find it. Written as low code instead, its
+		;		bytes stream through the low buffer at an objPtr above everything the buffer has
+		;		reached, and the streamer pads forward across the whole span the GP.BANKED regions
+		;		occupy -- 65,535 bytes of filler in a 22K program, invisible to every check here
+		;		because both passes do it identically. See commands/gpbstrflush.asm.
+		;
+		jsr 	BStrFlush
+		jsr 	SaveLayout
+		bra 	_SCEResolve
 _SCEPlaced:
 		jsr 	ClaimRegionTop 				; the layout itself was restored before this pass began
+_SCEBankedText:
+		;
+		;		GP.BANKEDSTR's text goes on LAST, above every GP.BANKED region, as one more entry
+		;		in the same table -- see commands/gpbstrflush.asm. Both passes write it and both
+		;		must come out the same length, which is why it is here on both paths and not
+		;		inside the pass-one branch above.
+		;
+		jsr 	BStrFlush
 		;
 		;		NEITHER PASS HAS AN OBJECT ANY MORE. Pass one only counts -- it works out where
 		;		every line, block and region lands, and how long the whole thing is -- and pass
@@ -1294,13 +1359,25 @@ ResetPassState:
 		lda 	#$FE
 		sta 	implicitDimFirst+1
 		;
-		;		GP.ASM. The pool and the fixup list are both rebuilt from scratch by each pass --
-		;		the fixups especially, because AsmFixTarget records the address the operand landed
-		;		at, and pass one's addresses are not the ones PatchAsmFixups will be resolving.
+		;		GP.ASM. The blob pool is rebuilt from scratch by each pass, and only pass two's
+		;		reaches the object -- pass one's is stepped over in the checksum, which is what
+		;		lets pass one leave every reference in it unresolved.
 		;
 		stz 	AsmPoolLen
 		stz 	AsmPoolLen+1
-		stz 	AsmFixupCount
+		;
+		;		GP.BANKEDSTR, the same way: the group tables and the string pool are rebuilt from
+		;		scratch by each pass and must come out identical, because the constants pass one
+		;		pushed for every GP.BSTR are what pass two has to push again.
+		;
+		stz 	bstrGroupCount
+		stz 	bstrStringCount
+		stz 	bstrStringCount+1
+		stz 	bstrPoolLen
+		stz 	bstrPoolLen+1
+		stz 	bstrState 					; no GP.BANKEDSTR block open
+											; bstrBank is NOT cleared: the bootstrap extension page
+											; carries it and goes out before pass two reads a block
 		;
 		stz 	nextRegion 					; ...and pass two's place in the region layout
 		stz 	regionOpen
@@ -1312,9 +1389,29 @@ ResetPassState:
 		;		above have just cleared the two fields that say a layout exists, so this goes last.
 		;
 		lda 	passNumber
-		beq 	_RPSDone
+		bne 	_RPSPassTwo
+		stz 	bstrPages 					; PASS ONE STARTS WITH NO BANKED TEXT. Both of these
+		stz 	bstrBank 					; are cleared HERE and not with the rest above,
+											; because pass two has to inherit pass one's answers:
+											; the bootstrap extension page carries the bank byte
+											; and goes out before pass two reads a block.
+											;
+											; bstrBank matters even to a program with no
+											; GP.BANKEDSTR at all -- object.asm pokes it into
+											; every bootstrap, so left uninitialised it puts a
+											; different stale byte in each build and two compiles
+											; of one source stop matching.
+		rts
+_RPSPassTwo:
+		;
+		;		THE BANKED-TEXT REGION COMES BACK WITH THE REST OF THE LAYOUT, and it has to be
+		;		here rather than at the end of the pass: the bootstrap extension page carries the
+		;		region table and is written before pass two compiles anything, so a region entered
+		;		at the end of pass two is entered after the table describing it has gone to disk.
+		;		The program then loads with nothing copied to $A000 and dies at run time, having
+		;		compiled clean. See commands/gpbstrflush.asm.
+		;
 		jsr 	RestoreLayout
-_RPSDone:
 		rts
 
 ; ************************************************************************************************
@@ -1518,9 +1615,20 @@ _RLDone:
 ;		Pass one's length is that top, so take it back, or WriteObjectCode would stream the low
 ;		code and stop.
 ;
+;		UNLESS THERE IS BANKED TEXT, because then pass one's length is one region FURTHER on:
+;		BStrFlush appends the text above every GP.BANKED region, so pass1Len is the top of the
+;		TEXT, not the top of the regions -- and the text is the very next thing pass two writes.
+;		Claiming the text's own top left BStrFlush winding the cursor BACKWARDS over its own
+;		region, and the object stream answers a backward move by padding forward to it: 65,535
+;		bytes of filler in a 22K program, with the length check none the wiser because both
+;		passes did exactly the same thing. bstrStart is where pass one began the text, which is
+;		the top of the regions, which is where pass two has to start it.
+;
 ; ************************************************************************************************
 
 ClaimRegionTop:
+		lda 	bstrPages
+		bne 	_CRTBankedText
 		lda 	layoutCount
 		beq 	_CRTDone 					; no regions, so the cursor is already the top
 		lda 	pass1Len
@@ -1528,6 +1636,12 @@ ClaimRegionTop:
 		lda 	pass1Len+1
 		sta 	objPtr+1
 _CRTDone:
+		rts
+_CRTBankedText:
+		lda 	bstrStart
+		sta 	objPtr
+		lda 	bstrStart+1
+		sta 	objPtr+1
 		rts
 
 ; ************************************************************************************************
@@ -3159,7 +3273,7 @@ CommandTables:
 ;
 ;	SYS    # T N
 ;
-	.byte	$07,$9e,$00,$e2,43229 & $FF,43229 >> 8,$06
+	.byte	$07,$9e,$00,$e2,43485 & $FF,43485 >> 8,$06
 ;
 ;	POKE    #,# T N
 ;
@@ -3171,7 +3285,7 @@ CommandTables:
 ;
 ;	STOP    T N
 ;
-	.byte	$07,$90,$00,$20,42973 & $FF,42973 >> 8,$06
+	.byte	$07,$90,$00,$20,43229 & $FF,43229 >> 8,$06
 ;
 ;	END    T N
 ;
@@ -3241,9 +3355,17 @@ CommandTables:
 ;
 	.byte	$07,$ce,$56,$03,CommandGPEndBankedCompile & $FF,CommandGPEndBankedCompile >> 8,$06
 ;
+;	GP.BANKEDSTR  X:CommandGPBankedStrCompile N
+;
+	.byte	$07,$ce,$53,$03,CommandGPBankedStrCompile & $FF,CommandGPBankedStrCompile >> 8,$06
+;
+;	GP.ENDBANKEDSTR X:CommandGPEndBankedStrCompile N
+;
+	.byte	$07,$ce,$52,$03,CommandGPEndBankedStrCompile & $FF,CommandGPEndBankedStrCompile >> 8,$06
+;
 ;	GP.CALL   # X:OptionalZeroCompile X:OptionalZeroCompile X:OptionalZeroCompile X:OptionalZeroCompile T N
 ;
-	.byte	$13,$ce,$7c,$e3,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$20,34013 & $FF,34013 >> 8,$06
+	.byte	$13,$ce,$7c,$e3,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$20,34269 & $FF,34269 >> 8,$06
 ;
 ;	This file is automatically generated.
 ;
@@ -3262,15 +3384,15 @@ CommandTables:
 ;
 ;	CLS    T N
 ;
-	.byte	$07,$ce,$90,$20,50909 & $FF,50909 >> 8,$06
+	.byte	$07,$ce,$90,$20,51165 & $FF,51165 >> 8,$06
 ;
 ;	LOCATE    # X:OptionalParameterCompile T N
 ;
-	.byte	$0a,$ce,$92,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,51165 & $FF,51165 >> 8,$06
+	.byte	$0a,$ce,$92,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,51421 & $FF,51421 >> 8,$06
 ;
 ;	COLOR    # X:OptionalParameterCompile T N
 ;
-	.byte	$0a,$ce,$8d,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,51421 & $FF,51421 >> 8,$06
+	.byte	$0a,$ce,$8d,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,51677 & $FF,51677 >> 8,$06
 ;
 ;	SCREEN    # T N
 ;
@@ -3282,27 +3404,27 @@ CommandTables:
 ;
 ;	SLEEP    X:OptionalNumberCompile T N
 ;
-	.byte	$0a,$ce,$af,$03,OptionalNumberCompile & $FF,OptionalNumberCompile >> 8,$20,45789 & $FF,45789 >> 8,$06
+	.byte	$0a,$ce,$af,$03,OptionalNumberCompile & $FF,OptionalNumberCompile >> 8,$20,46045 & $FF,46045 >> 8,$06
 ;
 ;	MOUSE    # T N
 ;
-	.byte	$07,$ce,$8c,$e2,40413 & $FF,40413 >> 8,$06
+	.byte	$07,$ce,$8c,$e2,40669 & $FF,40669 >> 8,$06
 ;
 ;	I2CPOKE   #,#,# T N
 ;
-	.byte	$09,$ce,$ae,$ea,$ea,$e2,45021 & $FF,45021 >> 8,$06
+	.byte	$09,$ce,$ae,$ea,$ea,$e2,45277 & $FF,45277 >> 8,$06
 ;
 ;	POWEROFF   T N
 ;
-	.byte	$07,$ce,$ad,$20,39645 & $FF,39645 >> 8,$06
+	.byte	$07,$ce,$ad,$20,39901 & $FF,39901 >> 8,$06
 ;
 ;	RESET    T N
 ;
-	.byte	$07,$ce,$8f,$20,39901 & $FF,39901 >> 8,$06
+	.byte	$07,$ce,$8f,$20,40157 & $FF,40157 >> 8,$06
 ;
 ;	REBOOT    T N
 ;
-	.byte	$07,$ce,$ac,$20,40157 & $FF,40157 >> 8,$06
+	.byte	$07,$ce,$ac,$20,40413 & $FF,40413 >> 8,$06
 ;
 ;	PSET    #,#,# T N
 ;
@@ -3334,47 +3456,47 @@ CommandTables:
 ;
 ;	SPRITE    #,# X:OptionalParameterCompile X:OptionalParameterCompile X:OptionalParameterCompile X:OptionalParameterCompile X:OptionalParameterCompile T N
 ;
-	.byte	$17,$ce,$bb,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,41949 & $FF,41949 >> 8,$06
+	.byte	$17,$ce,$bb,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,42205 & $FF,42205 >> 8,$06
 ;
 ;	SPRMEM    #,#,# X:OptionalParameterCompile T N
 ;
-	.byte	$0c,$ce,$bc,$ea,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,42205 & $FF,42205 >> 8,$06
+	.byte	$0c,$ce,$bc,$ea,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,42461 & $FF,42461 >> 8,$06
 ;
 ;	MOVSPR    #,#,# T N
 ;
-	.byte	$09,$ce,$bd,$ea,$ea,$e2,42461 & $FF,42461 >> 8,$06
+	.byte	$09,$ce,$bd,$ea,$ea,$e2,42717 & $FF,42717 >> 8,$06
 ;
 ;	TILE    #,#,# X:OptionalParameterCompile T N
 ;
-	.byte	$0c,$ce,$b9,$ea,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,43997 & $FF,43997 >> 8,$06
+	.byte	$0c,$ce,$b9,$ea,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,44253 & $FF,44253 >> 8,$06
 ;
 ;	BANK    X:CommandBankGuard # X:OptionalParameterCompile T N
 ;
-	.byte	$0d,$ce,$98,$03,CommandBankGuard & $FF,CommandBankGuard >> 8,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,45533 & $FF,45533 >> 8,$06
+	.byte	$0d,$ce,$98,$03,CommandBankGuard & $FF,CommandBankGuard >> 8,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,45789 & $FF,45789 >> 8,$06
 ;
 ;	BLOAD    $,#,#,# T N
 ;
-	.byte	$0a,$ce,$95,$fa,$ea,$ea,$e2,38365 & $FF,38365 >> 8,$06
+	.byte	$0a,$ce,$95,$fa,$ea,$ea,$e2,38621 & $FF,38621 >> 8,$06
 ;
 ;	BVLOAD    $,#,#,# T N
 ;
-	.byte	$0a,$ce,$96,$fa,$ea,$ea,$e2,38621 & $FF,38621 >> 8,$06
+	.byte	$0a,$ce,$96,$fa,$ea,$ea,$e2,38877 & $FF,38877 >> 8,$06
 ;
 ;	VLOAD    $,#,#,# T N
 ;
-	.byte	$0a,$ce,$85,$fa,$ea,$ea,$e2,38877 & $FF,38877 >> 8,$06
+	.byte	$0a,$ce,$85,$fa,$ea,$ea,$e2,39133 & $FF,39133 >> 8,$06
 ;
 ;	BSAVE    $,#,#,#,# T N
 ;
-	.byte	$0b,$ce,$b0,$fa,$ea,$ea,$ea,$e2,39133 & $FF,39133 >> 8,$06
+	.byte	$0b,$ce,$b0,$fa,$ea,$ea,$ea,$e2,39389 & $FF,39389 >> 8,$06
 ;
 ;	BVERIFY   $,#,#,# T N
 ;
-	.byte	$0a,$ce,$97,$fa,$ea,$ea,$e2,39389 & $FF,39389 >> 8,$06
+	.byte	$0a,$ce,$97,$fa,$ea,$ea,$e2,39645 & $FF,39645 >> 8,$06
 ;
 ;	LOAD    $ T N
 ;
-	.byte	$07,$93,$00,$f2,38109 & $FF,38109 >> 8,$06
+	.byte	$07,$93,$00,$f2,38365 & $FF,38365 >> 8,$06
 ;
 ;	LINPUT    X:CommandLINPUT N
 ;
@@ -3390,98 +3512,98 @@ CommandTables:
 ;
 ;	GP.BOX    #,#,#,# X:OptionalZeroCompile X:OptionalColourCompile T N
 ;
-	.byte	$10,$ce,$6b,$ea,$ea,$ea,$e3,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$20,34269 & $FF,34269 >> 8,$06
+	.byte	$10,$ce,$6b,$ea,$ea,$ea,$e3,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$20,34525 & $FF,34525 >> 8,$06
 ;
 ;	GP.FILL   #,#,#,#,# X:OptionalColourCompile T N
 ;
-	.byte	$0e,$ce,$6a,$ea,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$20,34525 & $FF,34525 >> 8,$06
+	.byte	$0e,$ce,$6a,$ea,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$20,34781 & $FF,34781 >> 8,$06
 ;
 ;	GP.PRINTAT   #,#,$ X:OptionalColourCompile T N
 ;
-	.byte	$0c,$ce,$69,$ea,$ea,$f3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$20,34781 & $FF,34781 >> 8,$06
+	.byte	$0c,$ce,$69,$ea,$ea,$f3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$20,35037 & $FF,35037 >> 8,$06
 ;
 ;	GP.CHAR   #,# X:PushOneCompile X:PushOneCompile ,# X:OptionalColourCompile T:GP.FILL N
 ;
-	.byte	$12,$ce,$58,$ea,$e3,PushOneCompile & $FF,PushOneCompile >> 8,$03,PushOneCompile & $FF,PushOneCompile >> 8,$ae,$03,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$20,34525 & $FF,34525 >> 8,$06
+	.byte	$12,$ce,$58,$ea,$e3,PushOneCompile & $FF,PushOneCompile >> 8,$03,PushOneCompile & $FF,PushOneCompile >> 8,$ae,$03,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$20,34781 & $FF,34781 >> 8,$06
 ;
 ;	This file is automatically generated.
 ;
 ;
 ;	FMINIT       T N
 ;
-	.byte	$07,$ce,$99,$20,46045 & $FF,46045 >> 8,$06
+	.byte	$07,$ce,$99,$20,46301 & $FF,46301 >> 8,$06
 ;
 ;	FMNOTE      #,# T N
 ;
-	.byte	$08,$ce,$9a,$ea,$e2,46301 & $FF,46301 >> 8,$06
+	.byte	$08,$ce,$9a,$ea,$e2,46557 & $FF,46557 >> 8,$06
 ;
 ;	FMDRUM      #,# T N
 ;
-	.byte	$08,$ce,$9b,$ea,$e2,46557 & $FF,46557 >> 8,$06
+	.byte	$08,$ce,$9b,$ea,$e2,46813 & $FF,46813 >> 8,$06
 ;
 ;	FMINST      #,# T N
 ;
-	.byte	$08,$ce,$9c,$ea,$e2,46813 & $FF,46813 >> 8,$06
+	.byte	$08,$ce,$9c,$ea,$e2,47069 & $FF,47069 >> 8,$06
 ;
 ;	FMVIB       #,# T N
 ;
-	.byte	$08,$ce,$9d,$ea,$e2,47069 & $FF,47069 >> 8,$06
+	.byte	$08,$ce,$9d,$ea,$e2,47325 & $FF,47325 >> 8,$06
 ;
 ;	FMFREQ      #,# T N
 ;
-	.byte	$08,$ce,$9e,$ea,$e2,47325 & $FF,47325 >> 8,$06
+	.byte	$08,$ce,$9e,$ea,$e2,47581 & $FF,47581 >> 8,$06
 ;
 ;	FMVOL       #,# T N
 ;
-	.byte	$08,$ce,$9f,$ea,$e2,47581 & $FF,47581 >> 8,$06
+	.byte	$08,$ce,$9f,$ea,$e2,47837 & $FF,47837 >> 8,$06
 ;
 ;	FMPAN       #,# T N
 ;
-	.byte	$08,$ce,$a0,$ea,$e2,47837 & $FF,47837 >> 8,$06
+	.byte	$08,$ce,$a0,$ea,$e2,48093 & $FF,48093 >> 8,$06
 ;
 ;	FMPLAY      #,$ T N
 ;
-	.byte	$08,$ce,$a1,$ea,$f2,48093 & $FF,48093 >> 8,$06
+	.byte	$08,$ce,$a1,$ea,$f2,48349 & $FF,48349 >> 8,$06
 ;
 ;	FMCHORD     #,$ T N
 ;
-	.byte	$08,$ce,$a2,$ea,$f2,48349 & $FF,48349 >> 8,$06
+	.byte	$08,$ce,$a2,$ea,$f2,48605 & $FF,48605 >> 8,$06
 ;
 ;	FMPOKE      #,# T N
 ;
-	.byte	$08,$ce,$a3,$ea,$e2,48605 & $FF,48605 >> 8,$06
+	.byte	$08,$ce,$a3,$ea,$e2,48861 & $FF,48861 >> 8,$06
 ;
 ;	PSGINIT      T N
 ;
-	.byte	$07,$ce,$a4,$20,48861 & $FF,48861 >> 8,$06
+	.byte	$07,$ce,$a4,$20,49117 & $FF,49117 >> 8,$06
 ;
 ;	PSGNOTE     #,# T N
 ;
-	.byte	$08,$ce,$a5,$ea,$e2,49117 & $FF,49117 >> 8,$06
+	.byte	$08,$ce,$a5,$ea,$e2,49373 & $FF,49373 >> 8,$06
 ;
 ;	PSGVOL      #,# T N
 ;
-	.byte	$08,$ce,$a6,$ea,$e2,49373 & $FF,49373 >> 8,$06
+	.byte	$08,$ce,$a6,$ea,$e2,49629 & $FF,49629 >> 8,$06
 ;
 ;	PSGWAV      #,# T N
 ;
-	.byte	$08,$ce,$a7,$ea,$e2,49629 & $FF,49629 >> 8,$06
+	.byte	$08,$ce,$a7,$ea,$e2,49885 & $FF,49885 >> 8,$06
 ;
 ;	PSGFREQ     #,# T N
 ;
-	.byte	$08,$ce,$a8,$ea,$e2,49885 & $FF,49885 >> 8,$06
+	.byte	$08,$ce,$a8,$ea,$e2,50141 & $FF,50141 >> 8,$06
 ;
 ;	PSGPAN      #,# T N
 ;
-	.byte	$08,$ce,$a9,$ea,$e2,50141 & $FF,50141 >> 8,$06
+	.byte	$08,$ce,$a9,$ea,$e2,50397 & $FF,50397 >> 8,$06
 ;
 ;	PSGPLAY     #,$ T N
 ;
-	.byte	$08,$ce,$aa,$ea,$f2,50397 & $FF,50397 >> 8,$06
+	.byte	$08,$ce,$aa,$ea,$f2,50653 & $FF,50653 >> 8,$06
 ;
 ;	PSGCHORD    #,$ T N
 ;
-	.byte	$08,$ce,$ab,$ea,$f2,50653 & $FF,50653 >> 8,$06
+	.byte	$08,$ce,$ab,$ea,$f2,50909 & $FF,50909 >> 8,$06
 		.byte 	0
 
 UnaryTables:
@@ -3495,7 +3617,7 @@ UnaryTables:
 ;
 ;	INT    (#) T N
 ;
-	.byte	$08,$b5,$00,$8e,$92,35549 & $FF,35549 >> 8,$06
+	.byte	$08,$b5,$00,$8e,$92,35805 & $FF,35805 >> 8,$06
 ;
 ;	ABS    (#) T N
 ;
@@ -3515,7 +3637,7 @@ UnaryTables:
 ;
 ;	SQR    (#) T N
 ;
-	.byte	$08,$ba,$00,$8e,$92,35805 & $FF,35805 >> 8,$06
+	.byte	$08,$ba,$00,$8e,$92,36061 & $FF,36061 >> 8,$06
 ;
 ;	RND    (#) T N
 ;
@@ -3523,27 +3645,27 @@ UnaryTables:
 ;
 ;	LOG    (#) T N
 ;
-	.byte	$08,$bc,$00,$8e,$92,36061 & $FF,36061 >> 8,$06
+	.byte	$08,$bc,$00,$8e,$92,36317 & $FF,36317 >> 8,$06
 ;
 ;	EXP    (#) T N
 ;
-	.byte	$08,$bd,$00,$8e,$92,36317 & $FF,36317 >> 8,$06
+	.byte	$08,$bd,$00,$8e,$92,36573 & $FF,36573 >> 8,$06
 ;
 ;	COS    (#) T N
 ;
-	.byte	$08,$be,$00,$8e,$92,36573 & $FF,36573 >> 8,$06
+	.byte	$08,$be,$00,$8e,$92,36829 & $FF,36829 >> 8,$06
 ;
 ;	SIN    (#) T N
 ;
-	.byte	$08,$bf,$00,$8e,$92,36829 & $FF,36829 >> 8,$06
+	.byte	$08,$bf,$00,$8e,$92,37085 & $FF,37085 >> 8,$06
 ;
 ;	TAN    (#) T N
 ;
-	.byte	$08,$c0,$00,$8e,$92,37085 & $FF,37085 >> 8,$06
+	.byte	$08,$c0,$00,$8e,$92,37341 & $FF,37341 >> 8,$06
 ;
 ;	ATN    (#) T N
 ;
-	.byte	$08,$c1,$00,$8e,$92,37341 & $FF,37341 >> 8,$06
+	.byte	$08,$c1,$00,$8e,$92,37597 & $FF,37597 >> 8,$06
 ;
 ;	PEEK    (#) T N
 ;
@@ -3599,7 +3721,7 @@ UnaryTables:
 ;
 ;	GP.COMP   ($,$) T N
 ;
-	.byte	$09,$ce,$70,$8f,$af,$92,35037 & $FF,35037 >> 8,$06
+	.byte	$09,$ce,$70,$8f,$af,$92,35293 & $FF,35293 >> 8,$06
 ;
 ;	GP.STRPTR   ($) T N
 ;
@@ -3608,6 +3730,14 @@ UnaryTables:
 ;	GP.ARRPTR   (X:AnyArrayCompile) T N
 ;
 	.byte	$0a,$ce,$6e,$83,AnyArrayCompile & $FF,AnyArrayCompile >> 8,$92,33757 & $FF,33757 >> 8,$06
+;
+;	GP.BSTR   (X:BankedStrGroupCompile,# X:BankedStrAddCompile) T S
+;
+	.byte	$0e,$ce,$55,$83,BankedStrGroupCompile & $FF,BankedStrGroupCompile >> 8,$ae,$03,BankedStrAddCompile & $FF,BankedStrAddCompile >> 8,$92,34013 & $FF,34013 >> 8,$07
+;
+;	GP.BSTRCOUNT  (X:BankedStrCountCompile) N
+;
+	.byte	$07,$ce,$54,$83,BankedStrCountCompile & $FF,BankedStrCountCompile >> 8,$96
 ;
 ;	GP.CONTAINS  ($,$) X:GPContainsCompile N
 ;
@@ -3642,27 +3772,27 @@ UnaryTables:
 ;
 ;	JOY    (#) T N
 ;
-	.byte	$08,$ce,$d4,$8e,$92,35293 & $FF,35293 >> 8,$06
+	.byte	$08,$ce,$d4,$8e,$92,35549 & $FF,35549 >> 8,$06
 ;
 ;	MB     T N
 ;
-	.byte	$07,$ce,$d3,$20,40669 & $FF,40669 >> 8,$06
+	.byte	$07,$ce,$d3,$20,40925 & $FF,40925 >> 8,$06
 ;
 ;	MX     T N
 ;
-	.byte	$07,$ce,$d1,$20,40925 & $FF,40925 >> 8,$06
+	.byte	$07,$ce,$d1,$20,41181 & $FF,41181 >> 8,$06
 ;
 ;	MY     T N
 ;
-	.byte	$07,$ce,$d2,$20,41181 & $FF,41181 >> 8,$06
+	.byte	$07,$ce,$d2,$20,41437 & $FF,41437 >> 8,$06
 ;
 ;	MWHEEL    T N
 ;
-	.byte	$07,$ce,$db,$20,41437 & $FF,41437 >> 8,$06
+	.byte	$07,$ce,$db,$20,41693 & $FF,41693 >> 8,$06
 ;
 ;	I2CPEEK   (#,#) T N
 ;
-	.byte	$09,$ce,$d7,$8e,$ae,$92,45277 & $FF,45277 >> 8,$06
+	.byte	$09,$ce,$d7,$8e,$ae,$92,45533 & $FF,45533 >> 8,$06
 ;
 ;	MOD    (#,#) T N
 ;
@@ -3670,15 +3800,15 @@ UnaryTables:
 ;
 ;	TDATA    (#,#) T N
 ;
-	.byte	$09,$ce,$dc,$8e,$ae,$92,43485 & $FF,43485 >> 8,$06
+	.byte	$09,$ce,$dc,$8e,$ae,$92,43741 & $FF,43741 >> 8,$06
 ;
 ;	TATTR    (#,#) T N
 ;
-	.byte	$09,$ce,$dd,$8e,$ae,$92,43741 & $FF,43741 >> 8,$06
+	.byte	$09,$ce,$dd,$8e,$ae,$92,43997 & $FF,43997 >> 8,$06
 ;
 ;	RPT$    (#,#) T S
 ;
-	.byte	$09,$ce,$da,$8e,$ae,$92,41693 & $FF,41693 >> 8,$07
+	.byte	$09,$ce,$da,$8e,$ae,$92,41949 & $FF,41949 >> 8,$07
 ;
 ;	GP.A    T N
 ;
@@ -5478,7 +5608,6 @@ AsmBodyLines: 								; REM lines seen in the block so far, capped at 255.
 ;		the label cap was hit by the first routine that had a subroutine in it.
 ;
 ASM_MAX_BLOCKS = 32 						; GP.ASM blocks in one program
-ASM_MAX_FIXUPS = 128 						; blob calls + label references + {VAR} references
 ASM_MAX_LABELS = 32 						; labels in ONE block -- they do not cross GP.ENDASM
 ASM_MAX_LOCALS = 64 						; label references in one block, awaiting resolution
 ASM_SYM_MAX    = 64 						; longest name {VAR} can carry -- BASLOAD's own limit
@@ -5508,15 +5637,24 @@ AFIX_LABEL = 1
 AFIX_VAR   = 2
 
 ;
-;		Three parallel arrays rather than one array of records, and deliberately: a record
-;		index would be count*5, which passes 255 well before the table is full and would need
-;		a sixteen bit pointer at every touch. Indexed this way every subscript is count or
-;		count*2 and stays in X.
+;		AND NEITHER IS A TABLE ANY MORE, for the same reason. There WAS a list of up to 128
+;		deferred fixups, walked at the end of pass two -- a single-pass compiler's habit, kept
+;		through the two-pass rewrite without being re-asked. Two facts retire it:
 ;
-AsmFixKind    = $A000 						; 1 each
-AsmFixTarget  = AsmFixKind   + ASM_MAX_FIXUPS 	; 2 each
-AsmFixValue   = AsmFixTarget + 2*ASM_MAX_FIXUPS ; 2 each
-AsmLabels     = AsmFixValue  + 2*ASM_MAX_FIXUPS ; 8 each: 6 of name, then the pool offset
+;			AsmSetBases has run before pass two compiles a line (application/compiler/
+;			object.asm), so AsmPoolBase, AsmPageDelta and AsmWorkspacePage are all in hand
+;			WHILE a blob is being assembled, not merely afterwards;
+;
+;			pass one resolves nothing at all -- AsmFlushPool skips the whole pool from the
+;			checksum and pass two rebuilds it from scratch -- so pass one never needed to
+;			record a fixup either.
+;
+;		So a reference is resolved where it is made, and the count that used to bound them is
+;		gone with the table. It was a real wall: GPBFILES needs about 194 references (SORT
+;		alone is 67, the two FILEDIR blocks 71) and stopped with OUT OF MEMORY on its ninth
+;		GP.ASM block, and GPBMODS was at 114 of 128 without anybody knowing.
+;
+AsmLabels     = $A000 						; 8 each: 6 of name, then the pool offset
 AsmLocals     = AsmLabels    + 8*ASM_MAX_LABELS ; 4 each: pool offset, label index, kind
 AsmPool       = AsmLocals    + 4*ASM_MAX_LOCALS ; every blob in the program, back to back
 ASM_POOL_SIZE = $C000 - AsmPool 			; ...to the top of the window
@@ -5626,35 +5764,68 @@ _ACBResolve:
 
 ; ************************************************************************************************
 ;
-;		Add the fixup described by AsmNewKind / AsmNewTarget / AsmNewValue.
+;		Resolve the reference described by AsmNewKind / AsmNewTarget / AsmNewValue, into the
+;		pool, where it stands. AsmNewTarget is the pool offset of the two operand bytes.
+;
+;		PASS ONE DOES NOTHING HERE, and that is not an optimisation. Its pool never reaches the
+;		object -- AsmFlushPool steps the whole thing over in the checksum and pass two builds it
+;		again from scratch -- so an operand pass one left unresolved is an operand nobody reads.
+;		This is what lets the deferred list go: a fixup only ever existed to carry an answer
+;		forward to a moment when it could be computed, and in pass two that moment is now.
 ;
 ; ************************************************************************************************
 
-AsmAddFixup:
-		lda 	AsmFixupCount
-		cmp 	#ASM_MAX_FIXUPS
-		bcs 	_AAFTooMany
-		asl 	a 							; the two-byte arrays index by count*2
-		tax
-		lda 	AsmFixupCount
-		tay 								; ...and the kind array by count
-		.asm_access
+AsmResolveRef:
+		lda 	passNumber
+		beq 	_ARRDone
+		phy
+		;
+		;		THE VALUE. A blob address and a label are both somewhere in the pool, so both are
+		;		(where the pool sits in the buffer) + offset + the page delta. A {VAR} is an
+		;		offset into the workspace instead, and the workspace has its own base.
+		;
 		lda 	AsmNewKind
-		sta 	AsmFixKind,y
-		lda 	AsmNewTarget
-		sta 	AsmFixTarget,x
-		lda 	AsmNewTarget+1
-		sta 	AsmFixTarget+1,x
-		lda 	AsmNewValue
-		sta 	AsmFixValue,x
+		cmp 	#AFIX_VAR
+		beq 	_ARRVariable
+		clc
+		lda 	AsmPoolBase
+		adc 	AsmNewValue
+		sta 	AsmNewValue
+		lda 	AsmPoolBase+1
+		adc 	AsmNewValue+1
+		clc
+		adc 	AsmPageDelta
+		sta 	AsmNewValue+1
+		bra 	_ARRTarget
+_ARRVariable:
+		clc
 		lda 	AsmNewValue+1
-		sta 	AsmFixValue+1,x
+		adc 	AsmWorkspacePage
+		sta 	AsmNewValue+1
+		;
+		;		THE TARGET IS ALWAYS IN THE POOL, which is still in its bank: the operand bytes
+		;		went in a moment ago and the pool is not copied into the object until the end of
+		;		the pass. zTemp2 is the assembler's own pool pointer and is rebuilt at every
+		;		touch, so borrowing it here costs nothing.
+		;
+_ARRTarget:
+		clc
+		lda 	AsmNewTarget
+		adc 	#AsmPool & $FF
+		sta 	zTemp2
+		lda 	AsmNewTarget+1
+		adc 	#AsmPool >> 8
+		sta 	zTemp2+1
+		.asm_access
+		lda 	AsmNewValue
+		sta 	(zTemp2)
+		ldy 	#1
+		lda 	AsmNewValue+1
+		sta 	(zTemp2),y
 		.asm_release
-		inc 	AsmFixupCount
+		ply
+_ARRDone:
 		rts
-
-_AAFTooMany:
-		.error_memory
 
 ; ************************************************************************************************
 ;
@@ -5716,12 +5887,9 @@ _AFPGo:
 		bne 	_AFPDiverged
 		lda 	objPtr+1
 		cmp 	AsmPoolBase+1
-		beq 	_AFPResolve
-_AFPDiverged:
+		beq 	_AFPBase 					; the pool is already resolved: every reference was
+_AFPDiverged: 								; written into it as it was made
 		.error_internal
-_AFPResolve:
-		jsr 	AsmPatchAll 				; ...and the pool goes out RESOLVED, because once it
-											; has gone out there is no going back to it
 _AFPBase:
 		lda 	objPtr 						; where the pool starts, in the buffer
 		sta 	AsmPoolBase
@@ -5755,97 +5923,6 @@ _AFPNoCarry:
 		inc 	AsmCopyIdx+1
 		bra 	_AFPLoop
 _AFPDone:
-		rts
-
-; ************************************************************************************************
-;
-;		Resolve every fixup, now that both bases are finally known. The caller sets:
-;
-;		AsmWorkspacePage  where the variables will be -- newWorkspacePage.
-;		AsmPageDelta      the difference between where the object sits in the buffer NOW and
-;		                  where it will sit when the program runs: runtimeEndPage minus
-;		                  FreeMemory >> 8 embedded, PCODE_PAGE minus FreeMemory >> 8 shared.
-;		                  The caller works it out because FreeMemory is an application symbol,
-;		                  and both ends are page aligned so one byte says all of it.
-;
-;		It runs at the end of PASS TWO, from AsmFlushPool, because both bases are settled by
-;		then and because that is the last moment the pool is still somewhere that can be
-;		written to. Nothing here changes the object's length.
-;
-; ************************************************************************************************
-
-AsmPatchAll:
-		lda 	AsmFixupCount
-		bne 	_APAGo
-		rts
-_APAGo:
-		stz 	AsmFixIdx
-_APALoop:
-		lda 	AsmFixIdx
-		asl 	a
-		tax 								; the two-byte arrays
-		ldy 	AsmFixIdx 					; ...and the kind array
-		.asm_access
-		lda 	AsmFixKind,y
-		sta 	AsmKind
-		lda 	AsmFixTarget,x
-		sta 	zTemp1
-		lda 	AsmFixTarget+1,x
-		sta 	zTemp1+1
-		lda 	AsmFixValue,x
-		sta 	zTemp0
-		lda 	AsmFixValue+1,x
-		sta 	zTemp0+1
-		.asm_release
-		;
-		;		THE VALUE. A blob address and a label are both somewhere in the pool, so both
-		;		are (where the pool sits in the buffer) + offset + the page delta. A {VAR} is
-		;		an offset into the workspace instead, and the workspace has its own base.
-		;
-		lda 	AsmKind
-		cmp 	#AFIX_VAR
-		beq 	_APAVariable
-		clc
-		lda 	AsmPoolBase
-		adc 	zTemp0
-		sta 	zTemp0
-		lda 	AsmPoolBase+1
-		adc 	zTemp0+1
-		clc
-		adc 	AsmPageDelta
-		sta 	zTemp0+1
-		bra 	_APATarget
-_APAVariable:
-		clc
-		lda 	zTemp0+1
-		adc 	AsmWorkspacePage
-		sta 	zTemp0+1
-		;
-		;		THE TARGET IS ALWAYS IN THE POOL, and it is patched where the pool still lives --
-		;		in its bank, immediately before AsmFlushPool copies it into the object. After
-		;		that copy it is out of reach: the object goes straight into a file.
-		;
-_APATarget:
-		clc
-		lda 	zTemp1
-		adc 	#AsmPool & $FF
-		sta 	zTemp1
-		lda 	zTemp1+1
-		adc 	#AsmPool >> 8
-		sta 	zTemp1+1
-		.asm_access
-		lda 	zTemp0
-		sta 	(zTemp1)
-		ldy 	#1
-		lda 	zTemp0+1
-		sta 	(zTemp1),y
-		.asm_release
-		inc 	AsmFixIdx
-		lda 	AsmFixIdx
-		cmp 	AsmFixupCount
-		bcs 	_APADone 					; the loop body is past branch range, so it is
-		jmp 	_APALoop 					; inverted around a jmp
-_APADone:
 		rts
 
 ; ************************************************************************************************
@@ -6392,7 +6469,7 @@ _AEIDeferred:
 		sta 	AsmNewValue
 		lda 	AsmValue+1
 		sta 	AsmNewValue+1
-		jmp 	AsmAddFixup
+		jmp 	AsmResolveRef
 
 _AEIMaybeLabel:
 		lda 	AsmIsLabel 					; a label may not be placed yet -- hold it locally
@@ -6656,7 +6733,7 @@ _ARLLoop:
 		sta 	AsmNewValue
 		lda 	AsmValue+1
 		sta 	AsmNewValue+1
-		jsr 	AsmAddFixup
+		jsr 	AsmResolveRef
 		bra 	_ARLNext
 		;
 		;		A branch: displacement = label - (the byte after the operand)
@@ -6950,20 +7027,14 @@ AsmBlobStart:
 		.fill 	2 						; pool offset of the blob being assembled
 AsmBlobAddr:
 		.fill 	2 						; ...and where pass two says it will RUN
-AsmNewKind: 							; one fixup, built here before it is banked
-		.fill 	1
+AsmNewKind: 							; one reference, built here and then resolved into the
+		.fill 	1 						; pool by AsmResolveRef
 AsmNewTarget:
 		.fill 	2
 AsmNewValue:
 		.fill 	2
 AsmByte:
 		.fill 	1 						; one pool byte, carried out of the window
-AsmKind:
-		.fill 	1 						; the fixup being resolved
-AsmFixupCount:
-		.fill 	1
-AsmFixIdx:
-		.fill 	1
 AsmPageDelta:
 		.fill 	1
 AsmWorkspacePage: 						; where the variables land -- newWorkspacePage
@@ -8561,6 +8632,956 @@ gpBankHops:										; where the walk leaves off to reach each one
 ;						and onto a page boundary, and the object walkers hop over the pool.
 ;
 ; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		Name:		gpbstr.asm
+;		Purpose:	GP.BANKEDSTR / GP.ENDBANKEDSTR -- literal text into a RAM bank
+;		Created:	7th September 2026
+;		Reviewed: 	No
+;		Author : 	Steven De George SR
+;
+; ************************************************************************************************
+; ************************************************************************************************
+
+		.section code
+
+; ************************************************************************************************
+;
+;		GP.BANKEDSTR <bank> <name>
+;		"first"
+;		"second"
+;		GP.ENDBANKEDSTR
+;
+;		and then, anywhere:  A$ = GP.BSTR(<name>, n)   and   GP.BSTRCOUNT(<name>)
+;
+;		Text is the one thing in a program with no reason to be in low RAM: it is never executed,
+;		never indexed by the interpreter, and read one item at a time. A string constant costs
+;		2 + its length in RESIDENT p-code (evaluate/term/term.asm) and over half of a GUI
+;		program's shell is literal text, which is what puts GPBFILES.BASL over the cap.
+;
+;		WHY THE BODY IS BARE QUOTED LINES, not REMs the way GP.ASM's is. BASLOAD UPPER-CASES REM
+;		text -- zTemp0 reaches the object as ZTEMP0 -- so a REM body could only ever hold
+;		upper-case strings. A line that is nothing but a quoted string passes through byte for
+;		byte: case, leading and trailing spaces and all. Measured 7th September 2026, not
+;		assumed -- " Open " tokenises to 22 20 4F 70 65 6E 20 22.
+;
+;		Neither delimiter has a "T", so neither writes a keyword token and neither makes the
+;		program GP IN on its own -- GP.ASM's argument, for the same reason. GP.BSTR does, and
+;		that is where the cost is.
+;
+;		NAMED GROUPS, RESOLVED AT COMPILE TIME. Several blocks a program, each named, each indexed
+;		from ZERO within itself, all feeding one bank. Insert a line into one group and nothing
+;		outside it moves. The name never reaches the object: BankedStrGroupCompile turns it into a
+;		constant, so a group name costs no run-time bytes at all. A RUNTIME name index was costed
+;		and refused -- it would put the name's letters back into resident p-code at every call
+;		site, which is the very thing this exists to remove.
+;
+;		A NAME IS TWO BYTES, and that is not a shortcut: ExtractVariableName compresses every name
+;		to two (variables/getname.asm), and BASLOAD has already crunched MENU.FILE to something
+;		like A0 by the time we see it. The block header and the reference site are read by the
+;		SAME routine, so the two spellings cannot diverge.
+;
+;		THE POOL IS IN A RAM BANK, rebuilt identically by both passes. It holds the strings back
+;		to back as [len][chars] and nothing else -- the group tables slice that flat list by
+;		index. The bank image is assembled from it at the end of the compile.
+;
+;		Errors are .error_structure and .error_syntax, reusing existing messages: errors.asm links
+;		below GPBase and is copied into EVERY compiled object, so a new message would cost its
+;		text in programs that never use this. Same rule as GP.ASM.
+;
+;		Both handlers MUST return carry clear -- a .def helper returning carry set makes the
+;		generator silently drop every table element after it, with no error and no clue.
+;
+; ************************************************************************************************
+
+;
+;		The low byte of GP.ENDBANKEDSTR's keyword id (52818 = $CE52). GP keywords are two bytes,
+;		$CE then this. Written as the id so it tracks c64tokens.py rather than a bare $52.
+;
+GP_TOKEN_ENDBANKEDSTR = 52818 & $FF
+
+CommandGPBankedStrCompile:
+		stz 	deferErrors 				; a block opener must never defer -- a rolled back
+											; opener leaves its closer behind and corrupts the
+											; nesting of any block enclosing it, silently.
+		lda 	bstrState
+		bne 	_CBSStructure 				; a GP.BANKEDSTR inside one still open
+		stz 	bstrBodyLines
+		jsr 	BStrReadHeader 				; the bank, then the name, then end of line
+		lda 	#1
+		sta 	bstrState
+
+_CBSNextLine:
+		lda 	#BLC_READIN 				; pull the next source line ourselves -- the main
+		jsr 	CallAPIHandler 				; compile loop has no swallow-until-terminator mode
+		bcc 	_CBSNoEnd 					; source ran out with the block still open
+		jsr 	ProcessNewLine 				; srcPtr and currentLineNumber for the line just read
+
+		jsr 	GetNextNonSpace 			; first thing on it
+		beq 	_CBSNextLine 				; blank line inside the block, ignore it
+		cmp 	#34 						; a double quote -- a body line
+		beq 	_CBSBody
+		cmp 	#$CE 						; the GP keyword prefix ?
+		bne 	_CBSStructure
+		jsr 	GetNext 					; which GP keyword
+		cmp 	#GP_TOKEN_ENDBANKEDSTR
+		beq 	_CBSClose
+_CBSStructure: 								; anything else in here is not a string
+		.error_structure
+
+_CBSBody:
+		jsr 	BStrAppendString 			; the opening quote is already consumed
+		inc 	bstrBodyLines 				; a body line -- the block is not empty
+		bne 	_CBSNextLine 				; (255 lines wraps to 0; the emptiness test only
+		dec 	bstrBodyLines 				;  cares about zero, so stick at 255)
+		bra 	_CBSNextLine
+
+;
+;		GP.ENDBANKEDSTR. An empty block is refused: a group with no strings makes GP.BSTRCOUNT
+;		zero and every GP.BSTR on it read the next group's text.
+;
+_CBSClose:
+		lda 	bstrBodyLines
+		beq 	_CBSStructure
+		jsr 	BStrCloseGroup 				; the count goes in, and the group becomes a group
+		stz 	bstrState
+		jmp 	BStrRequireEOL
+
+_CBSNoEnd: 									; GP.BANKEDSTR with no GP.ENDBANKEDSTR
+		.error_structure
+
+;
+;		A GP.ENDBANKEDSTR reached by the main compile loop had no opener -- the handler above
+;		consumes its own, so this is only ever reached by a stray one.
+;
+CommandGPEndBankedStrCompile:
+		stz 	deferErrors
+		.error_structure
+
+; ************************************************************************************************
+;
+;		The header:  GP.BANKEDSTR <bank> <name>
+;
+;		ONE BANK FOR THE WHOLE PROGRAM, so the second and later blocks must name the same one. It
+;		is written on every block rather than only the first because a block should be readable
+;		where it sits: a reader must not have to find the first one to know where the text lives.
+;
+;		THE NAME MAY NOT CARRY A TYPE. A group is not a variable, so a $, a % or a ( on it is a
+;		syntax error rather than something quietly ignored -- NSSString, NSSIInt16 and NSSArray
+;		all ride in the X byte ExtractVariableName returns, and any of them puts it above 31.
+;
+; ************************************************************************************************
+
+BStrReadHeader:
+		jsr 	GPBankReadNumber 			; the bank, into gpBankNumber -- shared with GP.BANKED
+		lda 	bstrGroupCount
+		bne 	_BRHSameBank
+		lda 	gpBankNumber 				; the first block names the bank for all of them
+		sta 	bstrBank
+		bra 	_BRHName
+_BRHSameBank:
+		lda 	gpBankNumber
+		cmp 	bstrBank
+		bne 	_BRHStructure 				; ...and every later one must agree with it
+_BRHName:
+		jsr 	GetNextNonSpace 			; a name starts with a letter
+		jsr 	CharIsAlpha
+		bcc 	_BRHSyntax
+		jsr 	ExtractVariableName 		; X = first char + type bits, Y = second
+		cpx 	#32 						; any type bit at all is a syntax error
+		bcs 	_BRHSyntax
+		stx 	bstrName
+		sty 	bstrName+1
+		jsr 	BStrFindGroup 				; CS: this name is already a group
+		bcs 	_BRHStructure
+		jsr 	BStrOpenGroup
+		jmp 	BStrRequireEOL
+
+_BRHStructure:
+		.error_structure
+_BRHSyntax:
+		.error_syntax
+
+;
+;		Nothing may follow either delimiter. With deferErrors already disarmed this aborts the
+;		compile rather than quietly becoming a runtime throw-stub.
+;
+BStrRequireEOL:
+		jsr 	LookNextNonSpace
+		bne 	_BREBad
+		clc 								; .def helpers MUST return carry clear
+		rts
+_BREBad:
+		.error_syntax
+
+
+; ************************************************************************************************
+;
+;		GP.BSTR(<name>, n)  and  GP.BSTRCOUNT(<name>)
+;
+;		The two argument helpers, and they are the whole of the naming. Each reads a bare
+;		identifier straight out of the source -- exactly as AnyArrayCompile does for
+;		GP.ARRPTR(A$()) (evaluate/term/gensupport.asm) -- looks it up in the GROUP table rather
+;		than the variable table, and pushes a CONSTANT.
+;
+;		SO THE NAME NEVER REACHES THE OBJECT. GP.BSTR(MENU.FILE, I) compiles to a small constant
+;		plus I plus the keyword; the letters M-E-N-U cost nothing at run time. That is the whole
+;		reason the lookup is here and not in the bank.
+;
+;		THEY MUST NOT FALL THROUGH TO THE VARIABLE TABLE. A mistyped group name has to be a hard
+;		error: silently finding a variable of the same name would compile clean and read the
+;		wrong string, or string zero, for ever.
+;
+;		GP.BSTRCOUNT HAS NO "T" and so no runtime handler anywhere -- it is the GP.HIBYTE pattern
+;		(evaluate/term/gpcomposite.asm). It emits the group's count as a plain integer constant,
+;		which is what makes FOR I = 0 TO GP.BSTRCOUNT(X)-1 free.
+;
+; ************************************************************************************************
+
+BankedStrGroupCompile:
+		jsr 	BStrReadName 				; X = the doubled subscript of the group
+		.bstr_access
+		lda 	BStrBases,x
+		sta 	bstrTemp
+		lda 	BStrBases+1,x
+		.bstr_release
+		tay
+		lda 	bstrTemp
+		jsr 	PushIntegerYA 				; the group's first index in the flat list
+		clc 								; carry CLEAR or the "N" after the X: is dropped
+		rts
+
+BankedStrCountCompile:
+		jsr 	BStrReadName
+		.bstr_access
+		lda 	BStrCounts,x
+		sta 	bstrTemp
+		lda 	BStrCounts+1,x
+		.bstr_release
+		tay
+		lda 	bstrTemp
+		jsr 	PushIntegerYA 				; how many strings the group holds
+		clc
+		rts
+
+
+;
+;		The name at a reference site, into X as the doubled group subscript. Read with the SAME
+;		ExtractVariableName the block header used, which is what stops the two spellings from
+;		ever disagreeing -- BASLOAD has crunched the source name to two characters by now and
+;		both sites see the same two.
+;
+BStrReadName:
+		jsr 	GetNextNonSpace
+		jsr 	CharIsAlpha
+		bcc 	_BRNSyntax
+		jsr 	ExtractVariableName 		; X = first char + type bits, Y = second
+		cpx 	#32 						; a group name carries no $, % or ( -- see the header
+		bcs 	_BRNSyntax
+		stx 	bstrName
+		sty 	bstrName+1
+		jsr 	BStrFindGroup
+		bcc 	_BRNSyntax 					; no GP.BANKEDSTR block ever declared this name
+		rts
+_BRNSyntax:
+		;
+		;		NOT DEFERRED. An expression statement arms deferErrors, which turns a compile error
+		;		into a runtime throw-stub -- right for a keyword the runtime might not have, wrong
+		;		for a name that is resolved entirely at compile time. A typo'd group name would
+		;		otherwise compile clean and explode when that line ran.
+		;
+		stz 	deferErrors
+		.error_syntax
+
+;
+;		And the add that turns (base, index) into the one flat index the handler takes. It sits after
+;		the "#" in the .def line, which is where MID$'s OptionalParameterCompile sits, so by the time
+;		it runs both halves are on the stack.
+;
+;		ONE P-CODE BYTE AT THE CALL SITE, and it buys the whole addition out of the runtime handler --
+;		which is the side that is short of room, not the object.
+;
+BankedStrAddCompile:
+		.keyword PCD_PLUS
+		clc 								; carry CLEAR or the "S" after the X: is dropped
+		rts
+
+		.send code
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;		07/09/26		Written.
+;
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		Name:		gpbstrflush.asm
+;		Purpose:	GP.BANKEDSTR -- the bank image, into the object as one more region
+;		Created:	7th September 2026
+;		Reviewed: 	No
+;		Author : 	Steven De George SR
+;
+; ************************************************************************************************
+; ************************************************************************************************
+
+		.section code
+
+; ************************************************************************************************
+;
+;		The finished text goes into the object as ONE MORE BANK REGION, above every GP.BANKED one,
+;		and that is the whole of the placement. It needs none of GPBankRelocate's machinery --
+;		no line table to fix, no block ends, no branch corrections, no entry or exit bridge --
+;		because nothing ever branches into text. It is data.
+;
+;		WHY IT CAN JUST BE APPENDED. The bootstrap extension page copies the regions with ONE loop
+;		that runs on from each to the next (application/compiler/bootstrap2.asm), so all it asks of
+;		a region is that it be whole pages and contiguous with the one below it, and that the
+;		(pages, bank) table be in object order. Appending above the topmost region satisfies all
+;		three: it becomes the last entry and it is the last thing in the object.
+;
+;		AND IT IS A REGION TO THE OBJECT WRITER TOO, which is not a detail. Pass two streams the
+;		low code through a buffer and each region into a bank of its own, and ObjStreamClose
+;		writes the buffer, one gap of filler, then the regions (application/compiler/object.asm).
+;		Written as low code this region's bytes go through the buffer at an objPtr far above where
+;		the buffer has reached, and the streamer pads forward to it -- across the whole span the
+;		GP.BANKED regions occupy, which it then writes AGAIN out of their banks. A 22K program
+;		came out 88K, and neither the length check nor the checksum saw anything wrong, because
+;		both passes did the identical thing and the padding is the streamer's, not the compiler's.
+;
+;		So it takes a LAYOUT slot like any other region. Its line numbers are $FFFE, which is not
+;		a line: RegionSwitch walks the layout looking for the line that opens each region, and a
+;		text region has none to find.
+;
+;		BOTH PASSES RUN IT, and they must produce byte for byte the same length -- pass one is only
+;		counting, and the figure it counts is what PROGRAM TOO BIG is decided on and what pass two
+;		then has to fill exactly. Everything it reads is rebuilt identically by each pass.
+;
+;		THE IMAGE, all offsets from $A000, which is where the bank window is:
+;
+;			+0		string count, 16 bit
+;			+2		count * 16-bit offsets, each the offset of one record from $A000
+;			...		the records, [length][characters] back to back
+;
+;		THE DIRECTORY IS BUILT BY WALKING THE POOL, not read out of a table beside it. Every record
+;		starts with its own length, so the offsets follow from the records -- and a record's offset
+;		from $A000 could not have been stored when it was appended anyway, because the directory it
+;		sits behind is not sized until the last block has closed.
+;
+; ************************************************************************************************
+
+BStrFlush:
+		lda 	bstrGroupCount 				; no GP.BANKEDSTR in this program at all
+		bne 	_BFGo
+		rts
+_BFGo:
+		;
+		;		SHARED MODE ONLY, the same rule GP.BANKED has and for the same reason: the region
+		;		is moved into its bank by the program's BOOTSTRAP, and an embedded program has
+		;		none. Refusing is honest; compiling it would produce a program whose text never
+		;		reaches $A000 and which reads an empty bank at run time.
+		;
+		lda 	gpBankShared
+		bne 	_BFShared
+		.error_unimplemented
+_BFShared:
+		;
+		;		BOTH PASSES EMIT THE IDENTICAL BYTE STREAM FROM THE IDENTICAL ADDRESS, and that is
+		;		not tidiness: the compiler checks pass two's finished length AND its running
+		;		checksum against pass one's and raises INTERNAL ERROR on either
+		;		(main/compiler.asm). A pass two that skipped so much as the page padding fails it.
+		;
+		;		AND THEY START IN THE SAME PLACE, which is the only thing to arrange. Pass one
+		;		arrives here straight after GPBankRelocate, with the cursor on top of the relocated
+		;		regions, aligns it, and writes down where that came to. Pass two is put back there
+		;		by ClaimRegionTop, which reads the same figure -- so pass two never moves the
+		;		cursor here at all, and in particular never winds it BACKWARDS.
+		;
+		jsr 	BStrAlignPage 				; whole pages, so the bootstrap's copy loop can run on
+											; into this region from the one below it
+		lda 	objPtr+1 					; where the region sits in the buffer, page aligned
+		sta 	bstrRegionPage
+		lda 	passNumber
+		bne 	_BFRegionOpen
+		lda 	objPtr
+		sta 	bstrStart
+		lda 	objPtr+1
+		sta 	bstrStart+1
+		bra 	_BFCommon
+		;
+		;		PASS TWO WRITES IT INTO THE REGION'S OWN BANK, and says so: ObjStreamByte routes on
+		;		regionOpen and works out which bank from nextRegion and the layout. Every GP.BANKED
+		;		region has closed by now, so nextRegion is already this one -- set anyway, rather
+		;		than depend on a count kept somewhere else.
+		;
+_BFRegionOpen:
+		lda 	layoutCount
+		dec 	a
+		sta 	nextRegion
+		lda 	#1
+		sta 	regionOpen
+_BFCommon:
+		;
+		;		The directory size, which every offset is shifted by: 2 for the count, then two
+		;		bytes an entry.
+		;
+		lda 	bstrStringCount
+		asl 	a
+		sta 	bstrDirLen
+		lda 	bstrStringCount+1
+		rol 	a
+		sta 	bstrDirLen+1
+		clc
+		lda 	bstrDirLen
+		adc 	#2
+		sta 	bstrDirLen
+		bcc 	_BFNoCarry
+		inc 	bstrDirLen+1
+_BFNoCarry:
+		;
+		;		The count, then the directory.
+		;
+		lda 	bstrStringCount
+		jsr 	WriteCodeByte
+		lda 	bstrStringCount+1
+		jsr 	WriteCodeByte
+
+		stz 	bstrIdx 					; the cursor into the pool, which is also this
+		stz 	bstrIdx+1 					; record's offset within it
+_BFDirLoop:
+		lda 	bstrIdx
+		cmp 	bstrPoolLen 				; every record accounted for ?
+		lda 	bstrIdx+1
+		sbc 	bstrPoolLen+1
+		bcs 	_BFDirDone
+		clc 								; the offset from $A000: past the directory
+		lda 	bstrIdx
+		adc 	bstrDirLen
+		sta 	bstrTemp
+		lda 	bstrIdx+1
+		adc 	bstrDirLen+1
+		sta 	bstrTemp+1
+		lda 	bstrTemp
+		jsr 	WriteCodeByte
+		lda 	bstrTemp+1
+		jsr 	WriteCodeByte
+		;
+		jsr 	BStrPoolByte 				; the record's length byte, and step over the record
+		sec
+		adc 	bstrIdx 					; SEC, so this is length + 1: the length byte too
+		sta 	bstrIdx
+		bcc 	_BFDirLoop
+		inc 	bstrIdx+1
+		bra 	_BFDirLoop
+_BFDirDone:
+		;
+		;		Then the records themselves, straight out of the pool. ONE BYTE AT A TIME with the
+		;		window opened and closed around each, exactly as AsmFlushPool does and for the same
+		;		reason: WriteCodeByte can raise PROGRAM TOO BIG and leave through the error handler,
+		;		which prints, through the KERNAL, in bank 0.
+		;
+		stz 	bstrIdx
+		stz 	bstrIdx+1
+_BFPoolLoop:
+		lda 	bstrIdx
+		cmp 	bstrPoolLen
+		lda 	bstrIdx+1
+		sbc 	bstrPoolLen+1
+		bcs 	_BFPoolDone
+		jsr 	BStrPoolByte
+		jsr 	WriteCodeByte
+		inc 	bstrIdx
+		bne 	_BFPoolLoop
+		inc 	bstrIdx+1
+		bra 	_BFPoolLoop
+_BFPoolDone:
+		jsr 	BStrAlignPage 				; and the region is whole pages too
+		stz 	regionOpen 					; pass two is out of it; pass one never set it
+
+		;
+		;		PASS ONE WORKS OUT THE REGION'S SIZE AND ENTERS IT IN THE TABLE; PASS TWO IS TOLD
+		;		BOTH. Pass two writes exactly what pass one wrote and ends in the same place, so it
+		;		has nothing to measure -- and it must not enter the region here either, because by
+		;		the time it reaches this point the bootstrap has already carried the table to disk.
+		;		SaveLayout takes pass one's entry and RestoreLayout hands it back.
+		;
+		lda 	passNumber
+		bne 	_BFDone
+		sec 								; A REGION IS AT MOST 32 PAGES: that is the whole of
+		lda 	objPtr+1 					; $A000-$BFFF, and a longer one would have the copy run
+		sbc 	bstrRegionPage 				; past $BFFF into the I/O page
+		cmp 	#33
+		bcs 	_BFTooBig
+		sta 	bstrPages
+		jsr 	BStrRegister
+_BFDone:
+		rts
+
+_BFTooBig:
+		.error_range
+
+; ************************************************************************************************
+;
+;		The region into the bank table, as the last entry. Called at the END of pass one, where
+;		its size has just been worked out, and at the START of pass two, from ResetPerPass.
+;
+;		THE TIMING IS THE WHOLE POINT AND IT COST A DAY. The bootstrap extension page -- which
+;		carries the (pages, bank) table and the GP.BSTR bank byte -- is written at the very
+;		BEGINNING of pass two, before a line of the program is compiled. A region entered at the
+;		end of pass two is entered after the table describing it has already gone out to disk: the
+;		program then loads with an empty table, nothing is copied to $A000, and GP.BSTR reads an
+;		empty bank. Everything compiles clean and the program dies at run time.
+;
+;		Pass two cannot re-derive any of this either -- it has not read the blocks yet -- so the
+;		three facts are carried over from pass one in bstrPages, bstrBank and bstrRegionPage,
+;		none of which is reset between passes.
+;
+;		It is NOT in the saved LAYOUT, deliberately: layoutCount is what RegionSwitch walks looking
+;		for the line that opens each region, and a text region has no line.
+;
+; ************************************************************************************************
+
+BStrRegister:
+		ldx 	gpBankCount
+		cpx 	#GPBANK_MAXREGIONS
+		bcs 	_BRTooMany
+		lda 	bstrPages
+		sta 	gpBankPageCounts,x
+		lda 	bstrBank
+		sta 	gpBankBanks,x
+		;
+		;		AND ITS EXTENT IN THE BUFFER, which is not bookkeeping. GPBankMakeOffset asks
+		;		_GBMOSide which region each end of a branch is in, and _GBMOSide walks
+		;		gpBankCount entries of gpBankStarts/gpBankEnds. Raising the count without
+		;		filling them leaves it reading a stale entry that any address can fall inside:
+		;		the compile then stops with NOT IMPLEMENTED on an ordinary branch, because
+		;		both ends were read as being in two different banks. Nothing branches into
+		;		text, so with the real extent in place this entry never matches anything --
+		;		which is also what keeps the two passes agreeing, one having registered the
+		;		region at its end and the other before its first line.
+		;
+		txa
+		asl 	a
+		tay
+		lda 	#0
+		sta 	gpBankStarts,y
+		sta 	gpBankEnds,y
+		lda 	bstrRegionPage
+		sta 	gpBankStarts+1,y
+		clc
+		adc 	bstrPages
+		sta 	gpBankEnds+1,y
+		;
+		;		A LINE NUMBER THAT IS NOT A LINE. RegionSwitch walks the layout looking for the
+		;		line each region opens and closes on, and text opens on none -- so it is given
+		;		$FFFE, which is above every line BASLOAD writes and is neither the end marker
+		;		($FE00) nor the implicit-DIM prologue ($FFFF).
+		;
+		lda 	#$FE
+		sta 	gpBankLinesIn,y
+		sta 	gpBankLinesOut,y
+		lda 	#$FF
+		sta 	gpBankLinesIn+1,y
+		sta 	gpBankLinesOut+1,y
+		lda 	#0 							; nothing branches into text, so nothing reads this --
+		sta 	gpBankCrossings,x 			; but a stale byte in a table is a trap for later
+		inc 	gpBankCount
+		;
+		;		A PROGRAM WITH TEXT AND NO GP.BANKED HAS NO RUN BASE YET, because GPBankRelocate
+		;		is what sets one and it had nothing to relocate. This region is then also the
+		;		lowest, so it is the one the bootstrap starts its copy from.
+		;
+		lda 	gpBankActive
+		bne 	_BRDone
+		clc
+		lda 	bstrRegionPage
+		adc 	gpBankRunPage 				; buffer page -> the page it loads at
+		inc 	a 							; ...plus the bootstrap EXTENSION page, which a banked
+		sta 	gpBankRunBase 				; program carries and this program now is
+		;
+		;		AND gpBankStart, WHICH IS THE FIT CHECK'S IDEA OF WHERE THE P-CODE STOPS.
+		;		ObjectPrepareShared measures resident p-code as FreeMemory..gpBankStart once
+		;		gpBankActive is set (application/compiler/object.asm), so setting the flag without
+		;		this leaves it measuring against a stale zero -- which is PROGRAM TOO BIG on a
+		;		six line program, and was.
+		;
+		stz 	gpBankStart
+		lda 	bstrRegionPage
+		sta 	gpBankStart+1
+		lda 	#1
+		sta 	gpBankActive
+_BRDone:
+		rts
+_BRTooMany:
+		.error_memory
+
+;
+;		Up to the next page boundary. It ADVANCES THE CURSOR RATHER THAN WRITING, and that is the
+;		difference between a gap and a byte: ObjStreamClose fills the one gap below the first
+;		region with $FF itself, and a region above the first has to start exactly where the one
+;		below it ended, or the filler is written twice over. Nothing reads either -- the tail is
+;		inside the region's page count and the head is below it.
+;
+;		Both passes take the same step, so neither the length nor the checksum notices.
+;
+BStrAlignPage:
+		lda 	objPtr
+		beq 	_BAPDone
+		stz 	objPtr
+		inc 	objPtr+1
+_BAPDone:
+		rts
+
+;
+;		The pool byte at bstrIdx, in A. The window is opened and closed around the one access:
+;		the compiler's own code is not in that bank.
+;
+BStrPoolByte:
+		clc
+		lda 	#BStrPool & $FF
+		adc 	bstrIdx
+		sta 	zTemp2
+		lda 	#BStrPool >> 8
+		adc 	bstrIdx+1
+		sta 	zTemp2+1
+		.bstr_access
+		lda 	(zTemp2)
+		sta 	bstrByte
+		.bstr_release
+		lda 	bstrByte
+		rts
+
+		.send code
+
+		.section storage
+bstrRegionPage: 							; the page the region starts on, in the object buffer
+		.fill 	1
+bstrDirLen: 								; bytes of count and directory in front of the records
+		.fill 	2
+bstrIdx: 									; the flush loops' cursor
+		.fill 	2
+bstrByte: 									; one pool byte, out of the window before it is written
+		.fill 	1
+bstrPages: 									; whole pages the region takes, worked out by pass one
+		.fill 	1 							; and handed to pass two
+bstrStart: 									; where pass one began the region -- ClaimRegionTop
+		.fill 	2 							; puts pass two back there, so neither pass moves the cursor
+		.send storage
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;		07/09/26		Written.
+;
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		Name:		gpbstrpool.asm
+;		Purpose:	GP.BANKEDSTR -- the group table and the string pool
+;		Created:	7th September 2026
+;		Reviewed: 	No
+;		Author : 	Steven De George SR
+;
+; ************************************************************************************************
+; ************************************************************************************************
+
+		.section code
+
+; ************************************************************************************************
+;
+;		A BANK OF ITS OWN, and its own window macros, for the same reason GP.ASM has bank 3: the
+;		tables are far too big for the compiler's own low memory. WHICH bank is in
+;		system-specific/x16/x16_storage.inc, beside the note on why it is not one of the low ones.
+;
+;		FOUR TABLES AND A POOL, all parallel arrays rather than arrays of records: a record index
+;		would be count*n, which passes 255 long before the table is full and would need a sixteen
+;		bit pointer at every touch. Indexed this way every subscript is count or count*2.
+;
+;		  BStrNames    2 a group   the compressed name, exactly as ExtractVariableName returns it
+;		  BStrBases    2 a group   the group's first index in the flat string list
+;		  BStrCounts   2 a group   how many strings are in it
+;		  BStrPool                 the records, back to back
+;
+;		THERE IS NO TABLE OF POOL OFFSETS, and there was: the pool is SELF-DESCRIBING, because
+;		every record starts with its own length, so the flush works the offsets out by walking it.
+;		Keeping them in a parallel table meant the same fact written twice and two chances to
+;		disagree -- which is exactly what happened, and cost an afternoon: every directory entry
+;		but the first came out as zero while the records themselves were perfect.
+;
+;		THE GROUPS ARE A COMPILE-TIME SLICE OF ONE FLAT LIST, and that is what makes naming free.
+;		The bank image knows nothing about groups: it is a count, a flat directory and the
+;		records. A group name resolves to its base, the base is added to the index at the call
+;		site, and no letter of the name and no group table reaches the object at all.
+;
+; ************************************************************************************************
+
+;
+;		BStrStorageBank and the two window macros are in system-specific/x16/x16_storage.inc,
+;		beside the five that were already there.
+;
+;
+;		128 GROUPS IS THE SHAPE'S OWN CEILING, not a guess: the subscript is doubled into X with a
+;		single ASL, so group 128 would wrap to group 0. It was 32, which is plenty for a program
+;		written by hand and NOT plenty for one converted from literals -- GPBMODS has 37 routines
+;		carrying text, and a group per routine is the whole point. 128 groups costs 768 bytes of
+;		the window, leaving 7,424 for text; the largest program measured needs 6,842.
+;
+BSTR_MAX_GROUPS  = 128
+BSTR_MAX_STRINGS = 1000 					; comfortably past what 7,424 bytes of pool can hold
+
+BStrNames   = $A000 							; 2 each
+BStrBases   = BStrNames   + 2*BSTR_MAX_GROUPS 	; 2 each
+BStrCounts  = BStrBases   + 2*BSTR_MAX_GROUPS 	; 2 each
+BStrPool    = BStrCounts  + 2*BSTR_MAX_GROUPS
+BSTR_POOL_SIZE = $C000 - BStrPool 			; ...to the top of the window
+
+; ************************************************************************************************
+;
+;		Start a group. The name is in bstrName and has already been checked for a duplicate.
+;
+; ************************************************************************************************
+
+BStrOpenGroup:
+		lda 	bstrGroupCount
+		cmp 	#BSTR_MAX_GROUPS
+		bcs 	_BOGFull
+		asl 	a 							; the two-byte tables want the subscript doubled
+		tax
+		.bstr_access
+		lda 	bstrName
+		sta 	BStrNames,x
+		lda 	bstrName+1
+		sta 	BStrNames+1,x
+		lda 	bstrStringCount 			; the group starts where the flat list has got to
+		sta 	BStrBases,x
+		lda 	bstrStringCount+1
+		sta 	BStrBases+1,x
+		.bstr_release
+		rts
+_BOGFull:
+		.error_memory
+
+; ************************************************************************************************
+;
+;		Close it: the count is what the flat list has advanced by, and ONLY NOW does the group
+;		count go up. An unclosed group is a structure error and must never be findable.
+;
+; ************************************************************************************************
+
+BStrCloseGroup:
+		lda 	bstrGroupCount
+		asl 	a
+		tax
+		.bstr_access
+		sec
+		lda 	bstrStringCount
+		sbc 	BStrBases,x
+		sta 	BStrCounts,x
+		lda 	bstrStringCount+1
+		sbc 	BStrBases+1,x
+		sta 	BStrCounts+1,x
+		.bstr_release
+		inc 	bstrGroupCount
+		rts
+
+; ************************************************************************************************
+;
+;		Find the group named in bstrName. CS and X = the doubled subscript if it exists, CC if
+;		not. Two bytes to compare, so this is a plain linear walk -- once a block and once a
+;		reference, so even a full table is nothing beside reading the source line.
+;
+; ************************************************************************************************
+
+BStrFindGroup:
+		ldx 	#0
+		lda 	bstrGroupCount
+		beq 	_BFGMiss 					; no groups at all
+		stz 	bstrTemp
+_BFGLoop:
+		.bstr_access
+		lda 	BStrNames,x
+		cmp 	bstrName
+		bne 	_BFGNext
+		lda 	BStrNames+1,x
+		cmp 	bstrName+1
+_BFGNext:
+		.bstr_release
+		beq 	_BFGHit
+		inx
+		inx
+		inc 	bstrTemp
+		lda 	bstrTemp
+		cmp 	bstrGroupCount
+		bcc 	_BFGLoop
+_BFGMiss:
+		clc
+		rts
+_BFGHit:
+		sec
+		rts
+
+; ************************************************************************************************
+;
+;		Append the body line's string to the pool. The opening quote is already consumed; this
+;		reads to the closing one and requires end of line after it.
+;
+;		THE LENGTH GOES IN FIRST AND IS PATCHED, not counted ahead: counting would mean walking
+;		the source twice, and the source pointer is the only cursor there is.
+;
+;		A 255 CHARACTER LIMIT, because the record's length is one byte -- and because the runtime
+;		hands the text to StringAllocTemp, which has the same limit. Refused here rather than
+;		truncated there.
+;
+; ************************************************************************************************
+
+BStrAppendString:
+		lda 	bstrStringCount 			; room in the flat list ?
+		cmp 	#BSTR_MAX_STRINGS & $FF
+		lda 	bstrStringCount+1
+		sbc 	#BSTR_MAX_STRINGS >> 8
+		bcc 	_BASRoom
+		jmp 	_BASFull 					; the error exits are past a branch's reach
+_BASRoom:
+		;
+		;		Leave a byte for the length, and remember where it is.
+		;
+		lda 	bstrPoolLen 				; where the length byte itself goes, for the patch
+		sta 	bstrLenAt
+		lda 	bstrPoolLen+1
+		sta 	bstrLenAt+1
+		lda 	#0
+		jsr 	BStrPoolWrite
+		stz 	bstrLength
+		;
+_BASLoop:
+		jsr 	LookNext 					; end of line inside an unterminated string
+		beq 	_BASSyntax
+		cmp 	#34 						; the closing quote
+		beq 	_BASDone
+		jsr 	BStrPoolWrite
+		jsr 	GetNext 					; consume it
+		inc 	bstrLength
+		beq 	_BASTooLong 				; 256 characters wrapped the count
+		bra 	_BASLoop
+_BASDone:
+		jsr 	GetNext 					; consume the closing quote
+		lda 	bstrLength
+		ldx 	bstrLenAt
+		ldy 	bstrLenAt+1
+		jsr 	BStrPoolPatch 				; ...and the length goes into the byte left for it
+		inc 	bstrStringCount
+		bne 	_BASNoCarry
+		inc 	bstrStringCount+1
+_BASNoCarry:
+		jmp 	BStrRequireEOL 				; nothing may follow the string on its line
+
+_BASFull:
+		.error_memory
+_BASTooLong:
+		.error_syntax
+_BASSyntax:
+		.error_syntax
+
+; ************************************************************************************************
+;
+;		Append A to the pool, and patch a byte already in it. Both go through zTemp2 with the
+;		window OPEN for one access only: the compiler's own code is not in that bank.
+;
+; ************************************************************************************************
+
+BStrPoolWrite:
+		pha
+		lda 	bstrPoolLen+1 				; full ?
+		cmp 	#BSTR_POOL_SIZE >> 8
+		bcc 	_BPWSpace
+		lda 	bstrPoolLen
+		cmp 	#BSTR_POOL_SIZE & $FF
+		bcs 	_BPWFull
+_BPWSpace:
+		clc
+		lda 	#BStrPool & $FF
+		adc 	bstrPoolLen
+		sta 	zTemp2
+		lda 	#BStrPool >> 8
+		adc 	bstrPoolLen+1
+		sta 	zTemp2+1
+		pla
+		.bstr_access
+		sta 	(zTemp2)
+		.bstr_release
+		inc 	bstrPoolLen
+		bne 	_BPWDone
+		inc 	bstrPoolLen+1
+_BPWDone:
+		rts
+_BPWFull:
+		pla
+		.error_memory
+
+;
+;		A = the byte, YX = the pool offset to put it at.
+;
+BStrPoolPatch:
+		pha
+		clc
+		txa
+		adc 	#BStrPool & $FF
+		sta 	zTemp2
+		tya
+		adc 	#BStrPool >> 8
+		sta 	zTemp2+1
+		pla
+		.bstr_access
+		sta 	(zTemp2)
+		.bstr_release
+		rts
+
+		.send code
+
+		.section storage
+bstrGroupCount: 							; named blocks closed so far
+		.fill 	1
+bstrStringCount: 							; strings in the flat list, across every group
+		.fill 	2
+bstrPoolLen: 								; bytes of [len][chars] records written
+		.fill 	2
+bstrBank: 									; the one bank every group in this program goes to
+		.fill 	1
+bstrState: 									; 0 = no block open, 1 = one is
+		.fill 	1
+bstrBodyLines: 								; strings in the block being read, capped at 255
+		.fill 	1
+bstrName: 									; the name being opened or looked up, compressed
+		.fill 	2
+bstrLength: 								; characters in the string being read
+		.fill 	1
+bstrLenAt: 									; where its length byte sits in the pool
+		.fill 	2
+bstrTemp:
+		.fill 	2
+		.send storage
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;		07/09/26		Written.
+;
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;

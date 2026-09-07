@@ -78,7 +78,6 @@
 ;		the label cap was hit by the first routine that had a subroutine in it.
 ;
 ASM_MAX_BLOCKS = 32 						; GP.ASM blocks in one program
-ASM_MAX_FIXUPS = 128 						; blob calls + label references + {VAR} references
 ASM_MAX_LABELS = 32 						; labels in ONE block -- they do not cross GP.ENDASM
 ASM_MAX_LOCALS = 64 						; label references in one block, awaiting resolution
 ASM_SYM_MAX    = 64 						; longest name {VAR} can carry -- BASLOAD's own limit
@@ -108,15 +107,24 @@ AFIX_LABEL = 1
 AFIX_VAR   = 2
 
 ;
-;		Three parallel arrays rather than one array of records, and deliberately: a record
-;		index would be count*5, which passes 255 well before the table is full and would need
-;		a sixteen bit pointer at every touch. Indexed this way every subscript is count or
-;		count*2 and stays in X.
+;		AND NEITHER IS A TABLE ANY MORE, for the same reason. There WAS a list of up to 128
+;		deferred fixups, walked at the end of pass two -- a single-pass compiler's habit, kept
+;		through the two-pass rewrite without being re-asked. Two facts retire it:
 ;
-AsmFixKind    = $A000 						; 1 each
-AsmFixTarget  = AsmFixKind   + ASM_MAX_FIXUPS 	; 2 each
-AsmFixValue   = AsmFixTarget + 2*ASM_MAX_FIXUPS ; 2 each
-AsmLabels     = AsmFixValue  + 2*ASM_MAX_FIXUPS ; 8 each: 6 of name, then the pool offset
+;			AsmSetBases has run before pass two compiles a line (application/compiler/
+;			object.asm), so AsmPoolBase, AsmPageDelta and AsmWorkspacePage are all in hand
+;			WHILE a blob is being assembled, not merely afterwards;
+;
+;			pass one resolves nothing at all -- AsmFlushPool skips the whole pool from the
+;			checksum and pass two rebuilds it from scratch -- so pass one never needed to
+;			record a fixup either.
+;
+;		So a reference is resolved where it is made, and the count that used to bound them is
+;		gone with the table. It was a real wall: GPBFILES needs about 194 references (SORT
+;		alone is 67, the two FILEDIR blocks 71) and stopped with OUT OF MEMORY on its ninth
+;		GP.ASM block, and GPBMODS was at 114 of 128 without anybody knowing.
+;
+AsmLabels     = $A000 						; 8 each: 6 of name, then the pool offset
 AsmLocals     = AsmLabels    + 8*ASM_MAX_LABELS ; 4 each: pool offset, label index, kind
 AsmPool       = AsmLocals    + 4*ASM_MAX_LOCALS ; every blob in the program, back to back
 ASM_POOL_SIZE = $C000 - AsmPool 			; ...to the top of the window
@@ -226,35 +234,68 @@ _ACBResolve:
 
 ; ************************************************************************************************
 ;
-;		Add the fixup described by AsmNewKind / AsmNewTarget / AsmNewValue.
+;		Resolve the reference described by AsmNewKind / AsmNewTarget / AsmNewValue, into the
+;		pool, where it stands. AsmNewTarget is the pool offset of the two operand bytes.
+;
+;		PASS ONE DOES NOTHING HERE, and that is not an optimisation. Its pool never reaches the
+;		object -- AsmFlushPool steps the whole thing over in the checksum and pass two builds it
+;		again from scratch -- so an operand pass one left unresolved is an operand nobody reads.
+;		This is what lets the deferred list go: a fixup only ever existed to carry an answer
+;		forward to a moment when it could be computed, and in pass two that moment is now.
 ;
 ; ************************************************************************************************
 
-AsmAddFixup:
-		lda 	AsmFixupCount
-		cmp 	#ASM_MAX_FIXUPS
-		bcs 	_AAFTooMany
-		asl 	a 							; the two-byte arrays index by count*2
-		tax
-		lda 	AsmFixupCount
-		tay 								; ...and the kind array by count
-		.asm_access
+AsmResolveRef:
+		lda 	passNumber
+		beq 	_ARRDone
+		phy
+		;
+		;		THE VALUE. A blob address and a label are both somewhere in the pool, so both are
+		;		(where the pool sits in the buffer) + offset + the page delta. A {VAR} is an
+		;		offset into the workspace instead, and the workspace has its own base.
+		;
 		lda 	AsmNewKind
-		sta 	AsmFixKind,y
-		lda 	AsmNewTarget
-		sta 	AsmFixTarget,x
-		lda 	AsmNewTarget+1
-		sta 	AsmFixTarget+1,x
-		lda 	AsmNewValue
-		sta 	AsmFixValue,x
+		cmp 	#AFIX_VAR
+		beq 	_ARRVariable
+		clc
+		lda 	AsmPoolBase
+		adc 	AsmNewValue
+		sta 	AsmNewValue
+		lda 	AsmPoolBase+1
+		adc 	AsmNewValue+1
+		clc
+		adc 	AsmPageDelta
+		sta 	AsmNewValue+1
+		bra 	_ARRTarget
+_ARRVariable:
+		clc
 		lda 	AsmNewValue+1
-		sta 	AsmFixValue+1,x
+		adc 	AsmWorkspacePage
+		sta 	AsmNewValue+1
+		;
+		;		THE TARGET IS ALWAYS IN THE POOL, which is still in its bank: the operand bytes
+		;		went in a moment ago and the pool is not copied into the object until the end of
+		;		the pass. zTemp2 is the assembler's own pool pointer and is rebuilt at every
+		;		touch, so borrowing it here costs nothing.
+		;
+_ARRTarget:
+		clc
+		lda 	AsmNewTarget
+		adc 	#AsmPool & $FF
+		sta 	zTemp2
+		lda 	AsmNewTarget+1
+		adc 	#AsmPool >> 8
+		sta 	zTemp2+1
+		.asm_access
+		lda 	AsmNewValue
+		sta 	(zTemp2)
+		ldy 	#1
+		lda 	AsmNewValue+1
+		sta 	(zTemp2),y
 		.asm_release
-		inc 	AsmFixupCount
+		ply
+_ARRDone:
 		rts
-
-_AAFTooMany:
-		.error_memory
 
 ; ************************************************************************************************
 ;
@@ -316,12 +357,9 @@ _AFPGo:
 		bne 	_AFPDiverged
 		lda 	objPtr+1
 		cmp 	AsmPoolBase+1
-		beq 	_AFPResolve
-_AFPDiverged:
+		beq 	_AFPBase 					; the pool is already resolved: every reference was
+_AFPDiverged: 								; written into it as it was made
 		.error_internal
-_AFPResolve:
-		jsr 	AsmPatchAll 				; ...and the pool goes out RESOLVED, because once it
-											; has gone out there is no going back to it
 _AFPBase:
 		lda 	objPtr 						; where the pool starts, in the buffer
 		sta 	AsmPoolBase
@@ -355,97 +393,6 @@ _AFPNoCarry:
 		inc 	AsmCopyIdx+1
 		bra 	_AFPLoop
 _AFPDone:
-		rts
-
-; ************************************************************************************************
-;
-;		Resolve every fixup, now that both bases are finally known. The caller sets:
-;
-;		AsmWorkspacePage  where the variables will be -- newWorkspacePage.
-;		AsmPageDelta      the difference between where the object sits in the buffer NOW and
-;		                  where it will sit when the program runs: runtimeEndPage minus
-;		                  FreeMemory >> 8 embedded, PCODE_PAGE minus FreeMemory >> 8 shared.
-;		                  The caller works it out because FreeMemory is an application symbol,
-;		                  and both ends are page aligned so one byte says all of it.
-;
-;		It runs at the end of PASS TWO, from AsmFlushPool, because both bases are settled by
-;		then and because that is the last moment the pool is still somewhere that can be
-;		written to. Nothing here changes the object's length.
-;
-; ************************************************************************************************
-
-AsmPatchAll:
-		lda 	AsmFixupCount
-		bne 	_APAGo
-		rts
-_APAGo:
-		stz 	AsmFixIdx
-_APALoop:
-		lda 	AsmFixIdx
-		asl 	a
-		tax 								; the two-byte arrays
-		ldy 	AsmFixIdx 					; ...and the kind array
-		.asm_access
-		lda 	AsmFixKind,y
-		sta 	AsmKind
-		lda 	AsmFixTarget,x
-		sta 	zTemp1
-		lda 	AsmFixTarget+1,x
-		sta 	zTemp1+1
-		lda 	AsmFixValue,x
-		sta 	zTemp0
-		lda 	AsmFixValue+1,x
-		sta 	zTemp0+1
-		.asm_release
-		;
-		;		THE VALUE. A blob address and a label are both somewhere in the pool, so both
-		;		are (where the pool sits in the buffer) + offset + the page delta. A {VAR} is
-		;		an offset into the workspace instead, and the workspace has its own base.
-		;
-		lda 	AsmKind
-		cmp 	#AFIX_VAR
-		beq 	_APAVariable
-		clc
-		lda 	AsmPoolBase
-		adc 	zTemp0
-		sta 	zTemp0
-		lda 	AsmPoolBase+1
-		adc 	zTemp0+1
-		clc
-		adc 	AsmPageDelta
-		sta 	zTemp0+1
-		bra 	_APATarget
-_APAVariable:
-		clc
-		lda 	zTemp0+1
-		adc 	AsmWorkspacePage
-		sta 	zTemp0+1
-		;
-		;		THE TARGET IS ALWAYS IN THE POOL, and it is patched where the pool still lives --
-		;		in its bank, immediately before AsmFlushPool copies it into the object. After
-		;		that copy it is out of reach: the object goes straight into a file.
-		;
-_APATarget:
-		clc
-		lda 	zTemp1
-		adc 	#AsmPool & $FF
-		sta 	zTemp1
-		lda 	zTemp1+1
-		adc 	#AsmPool >> 8
-		sta 	zTemp1+1
-		.asm_access
-		lda 	zTemp0
-		sta 	(zTemp1)
-		ldy 	#1
-		lda 	zTemp0+1
-		sta 	(zTemp1),y
-		.asm_release
-		inc 	AsmFixIdx
-		lda 	AsmFixIdx
-		cmp 	AsmFixupCount
-		bcs 	_APADone 					; the loop body is past branch range, so it is
-		jmp 	_APALoop 					; inverted around a jmp
-_APADone:
 		rts
 
 ; ************************************************************************************************
@@ -992,7 +939,7 @@ _AEIDeferred:
 		sta 	AsmNewValue
 		lda 	AsmValue+1
 		sta 	AsmNewValue+1
-		jmp 	AsmAddFixup
+		jmp 	AsmResolveRef
 
 _AEIMaybeLabel:
 		lda 	AsmIsLabel 					; a label may not be placed yet -- hold it locally
@@ -1256,7 +1203,7 @@ _ARLLoop:
 		sta 	AsmNewValue
 		lda 	AsmValue+1
 		sta 	AsmNewValue+1
-		jsr 	AsmAddFixup
+		jsr 	AsmResolveRef
 		bra 	_ARLNext
 		;
 		;		A branch: displacement = label - (the byte after the operand)
@@ -1550,20 +1497,14 @@ AsmBlobStart:
 		.fill 	2 						; pool offset of the blob being assembled
 AsmBlobAddr:
 		.fill 	2 						; ...and where pass two says it will RUN
-AsmNewKind: 							; one fixup, built here before it is banked
-		.fill 	1
+AsmNewKind: 							; one reference, built here and then resolved into the
+		.fill 	1 						; pool by AsmResolveRef
 AsmNewTarget:
 		.fill 	2
 AsmNewValue:
 		.fill 	2
 AsmByte:
 		.fill 	1 						; one pool byte, carried out of the window
-AsmKind:
-		.fill 	1 						; the fixup being resolved
-AsmFixupCount:
-		.fill 	1
-AsmFixIdx:
-		.fill 	1
 AsmPageDelta:
 		.fill 	1
 AsmWorkspacePage: 						; where the variables land -- newWorkspacePage

@@ -455,13 +455,12 @@ ResetPassState:
 		lda 	#$FE
 		sta 	implicitDimFirst+1
 		;
-		;		GP.ASM. The pool and the fixup list are both rebuilt from scratch by each pass --
-		;		the fixups especially, because AsmFixTarget records the address the operand landed
-		;		at, and pass one's addresses are not the ones PatchAsmFixups will be resolving.
+		;		GP.ASM. The blob pool is rebuilt from scratch by each pass, and only pass two's
+		;		reaches the object -- pass one's is stepped over in the checksum, which is what
+		;		lets pass one leave every reference in it unresolved.
 		;
 		stz 	AsmPoolLen
 		stz 	AsmPoolLen+1
-		stz 	AsmFixupCount
 		;
 		;		GP.BANKEDSTR, the same way: the group tables and the string pool are rebuilt from
 		;		scratch by each pass and must come out identical, because the constants pass one
@@ -487,7 +486,17 @@ ResetPassState:
 		;
 		lda 	passNumber
 		bne 	_RPSPassTwo
-		stz 	bstrPages 					; pass one starts with no banked-text region
+		stz 	bstrPages 					; PASS ONE STARTS WITH NO BANKED TEXT. Both of these
+		stz 	bstrBank 					; are cleared HERE and not with the rest above,
+											; because pass two has to inherit pass one's answers:
+											; the bootstrap extension page carries the bank byte
+											; and goes out before pass two reads a block.
+											;
+											; bstrBank matters even to a program with no
+											; GP.BANKEDSTR at all -- object.asm pokes it into
+											; every bootstrap, so left uninitialised it puts a
+											; different stale byte in each build and two compiles
+											; of one source stop matching.
 		rts
 _RPSPassTwo:
 		;

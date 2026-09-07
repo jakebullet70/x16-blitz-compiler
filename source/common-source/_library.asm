@@ -81,6 +81,10 @@ C64_RIGHTDOLLAR          = $c9 ; $c9 right$
 C64_MIDDOLLAR            = $ca ; $ca mid$
 C64_GO                   = $cb ; $cb go
 C64_PI                   = $ff ; $ff pi
+C64_GPCMD_ENDBANKEDSTR   = $ce52 ; $ce52 gp.endbankedstr
+C64_GPCMD_BANKEDSTR      = $ce53 ; $ce53 gp.bankedstr
+C64_GPCMD_BSTRCOUNT      = $ce54 ; $ce54 gp.bstrcount
+C64_GPCMD_BSTR           = $ce55 ; $ce55 gp.bstr
 C64_GPCMD_ENDBANKED      = $ce56 ; $ce56 gp.endbanked
 C64_GPCMD_BANKED         = $ce57 ; $ce57 gp.banked
 C64_GPCMD_CHAR           = $ce58 ; $ce58 gp.char
@@ -310,6 +314,22 @@ RTGPBASE = $6600 							; GPB handler block + load address of the FULL file
 RTBASE = $6E00 								; interpreter core home -- the base that never moves
 RT_ENTRY = RTBASE+4 						; 4-byte magic at RTBASE, then jmp StartRuntime
 RTGPMAGIC = RTBASE-4 						; 4-byte "handlers are loaded too" magic
+
+;
+;		GP.BSTR's text bank, one byte, handed from the program's bootstrap to the runtime.
+;
+;		A FIXED ADDRESS AND NOT A STORAGE LABEL, and the reason is worth writing down. The runtime
+;		is linked TWICE with gp.library at opposite ends -- last in the application's embedded
+;		image, first in the standalone GPB.RT file -- so every label in the GPB half lands at a
+;		different address in the two. A handover through a label works in whichever link the
+;		bootstrap was told about and reads a stale byte in the other: here it was $05E5 against
+;		$0400, and the program ran, printed garbage, and blamed the handler.
+;
+;		It sits in the divider's padding, immediately below RTGPMAGIC. A core-only program's
+;		workspace runs up to RTBASE and overwrites it, which is correct -- such a program has no
+;		GPB handlers and so cannot call GP.BSTR.
+;
+GPBSTRBANK = RTGPMAGIC-1 					; the RAM bank a GP.BANKEDSTR program keeps its text in
 PCODE_PAGE = $09 							; shared-mode p-code base page ($0900, page-aligned)
 MIN_WS_PAGES = 16 							; smallest workspace a shared program keeps (4K)
 ;
@@ -416,7 +436,7 @@ FrameStackPages = 16 						; 4K, ~250 frames
 ;		(.ifnext, .ifelse) were appended after .caseend on top of that. The gp.else -> gp.other
 ;		rename moved nothing: same position, same id.
 ;
-RT_ABI = 22 								; runtime ABI ordinal -> "GP22" magic (NOT the file name)
+RT_ABI = 23 								; runtime ABI ordinal -> "GP23" magic (NOT the file name)
 
 ; ************************************************************************************************
 ;
@@ -697,75 +717,76 @@ PCD_CLR              = $dd80 ; clr
 PCD_DIM              = $dd81 ; dim
 PCD_END              = $dd82 ; end
 PCD_GPCMD_ARRPTR     = $dd83 ; gp.arrptr
-PCD_GPCMD_CALL       = $dd84 ; gp.call
-PCD_GPCMD_BOX        = $dd85 ; gp.box
-PCD_GPCMD_FILL       = $dd86 ; gp.fill
-PCD_GPCMD_PRINTAT    = $dd87 ; gp.printat
-PCD_GPCMD_COMP       = $dd88 ; gp.comp
-PCD_JOY              = $dd89 ; joy
-PCD_INT              = $dd8a ; int
-PCD_SQR              = $dd8b ; sqr
-PCD_LOG              = $dd8c ; log
-PCD_EXP              = $dd8d ; exp
-PCD_COS              = $dd8e ; cos
-PCD_SIN              = $dd8f ; sin
-PCD_TAN              = $dd90 ; tan
-PCD_ATN              = $dd91 ; atn
-PCD_LINPUT           = $dd92 ; linput
-PCD_BINPUT           = $dd93 ; binput
-PCD_LOAD             = $dd94 ; load
-PCD_BLOAD            = $dd95 ; bload
-PCD_BVLOAD           = $dd96 ; bvload
-PCD_VLOAD            = $dd97 ; vload
-PCD_BSAVE            = $dd98 ; bsave
-PCD_BVERIFY          = $dd99 ; bverify
-PCD_POWEROFF         = $dd9a ; poweroff
-PCD_RESET            = $dd9b ; reset
-PCD_REBOOT           = $dd9c ; reboot
-PCD_MOUSE            = $dd9d ; mouse
-PCD_MB               = $dd9e ; mb
-PCD_MX               = $dd9f ; mx
-PCD_MY               = $dda0 ; my
-PCD_MWHEEL           = $dda1 ; mwheel
-PCD_RPTDOLLAR        = $dda2 ; rpt$
-PCD_SPRITE           = $dda3 ; sprite
-PCD_SPRMEM           = $dda4 ; sprmem
-PCD_MOVSPR           = $dda5 ; movspr
-PCD_ST               = $dda6 ; st
-PCD_STOP             = $dda7 ; stop
-PCD_SYS              = $dda8 ; sys
-PCD_TDATA            = $dda9 ; tdata
-PCD_TATTR            = $ddaa ; tattr
-PCD_TILE             = $ddab ; tile
-PCD_TICMD_WRITE      = $ddac ; ti.write
-PCD_TIDOLLARCMD_WRITE = $ddad ; ti$.write
-PCD_WAIT             = $ddae ; wait
-PCD_I2CPOKE          = $ddaf ; i2cpoke
-PCD_I2CPEEK          = $ddb0 ; i2cpeek
-PCD_BANK             = $ddb1 ; bank
-PCD_SLEEP            = $ddb2 ; sleep
-PCD_FMINIT           = $ddb3 ; fminit
-PCD_FMNOTE           = $ddb4 ; fmnote
-PCD_FMDRUM           = $ddb5 ; fmdrum
-PCD_FMINST           = $ddb6 ; fminst
-PCD_FMVIB            = $ddb7 ; fmvib
-PCD_FMFREQ           = $ddb8 ; fmfreq
-PCD_FMVOL            = $ddb9 ; fmvol
-PCD_FMPAN            = $ddba ; fmpan
-PCD_FMPLAY           = $ddbb ; fmplay
-PCD_FMCHORD          = $ddbc ; fmchord
-PCD_FMPOKE           = $ddbd ; fmpoke
-PCD_PSGINIT          = $ddbe ; psginit
-PCD_PSGNOTE          = $ddbf ; psgnote
-PCD_PSGVOL           = $ddc0 ; psgvol
-PCD_PSGWAV           = $ddc1 ; psgwav
-PCD_PSGFREQ          = $ddc2 ; psgfreq
-PCD_PSGPAN           = $ddc3 ; psgpan
-PCD_PSGPLAY          = $ddc4 ; psgplay
-PCD_PSGCHORD         = $ddc5 ; psgchord
-PCD_CLS              = $ddc6 ; cls
-PCD_LOCATE           = $ddc7 ; locate
-PCD_COLOR            = $ddc8 ; color
+PCD_GPCMD_BSTR       = $dd84 ; gp.bstr
+PCD_GPCMD_CALL       = $dd85 ; gp.call
+PCD_GPCMD_BOX        = $dd86 ; gp.box
+PCD_GPCMD_FILL       = $dd87 ; gp.fill
+PCD_GPCMD_PRINTAT    = $dd88 ; gp.printat
+PCD_GPCMD_COMP       = $dd89 ; gp.comp
+PCD_JOY              = $dd8a ; joy
+PCD_INT              = $dd8b ; int
+PCD_SQR              = $dd8c ; sqr
+PCD_LOG              = $dd8d ; log
+PCD_EXP              = $dd8e ; exp
+PCD_COS              = $dd8f ; cos
+PCD_SIN              = $dd90 ; sin
+PCD_TAN              = $dd91 ; tan
+PCD_ATN              = $dd92 ; atn
+PCD_LINPUT           = $dd93 ; linput
+PCD_BINPUT           = $dd94 ; binput
+PCD_LOAD             = $dd95 ; load
+PCD_BLOAD            = $dd96 ; bload
+PCD_BVLOAD           = $dd97 ; bvload
+PCD_VLOAD            = $dd98 ; vload
+PCD_BSAVE            = $dd99 ; bsave
+PCD_BVERIFY          = $dd9a ; bverify
+PCD_POWEROFF         = $dd9b ; poweroff
+PCD_RESET            = $dd9c ; reset
+PCD_REBOOT           = $dd9d ; reboot
+PCD_MOUSE            = $dd9e ; mouse
+PCD_MB               = $dd9f ; mb
+PCD_MX               = $dda0 ; mx
+PCD_MY               = $dda1 ; my
+PCD_MWHEEL           = $dda2 ; mwheel
+PCD_RPTDOLLAR        = $dda3 ; rpt$
+PCD_SPRITE           = $dda4 ; sprite
+PCD_SPRMEM           = $dda5 ; sprmem
+PCD_MOVSPR           = $dda6 ; movspr
+PCD_ST               = $dda7 ; st
+PCD_STOP             = $dda8 ; stop
+PCD_SYS              = $dda9 ; sys
+PCD_TDATA            = $ddaa ; tdata
+PCD_TATTR            = $ddab ; tattr
+PCD_TILE             = $ddac ; tile
+PCD_TICMD_WRITE      = $ddad ; ti.write
+PCD_TIDOLLARCMD_WRITE = $ddae ; ti$.write
+PCD_WAIT             = $ddaf ; wait
+PCD_I2CPOKE          = $ddb0 ; i2cpoke
+PCD_I2CPEEK          = $ddb1 ; i2cpeek
+PCD_BANK             = $ddb2 ; bank
+PCD_SLEEP            = $ddb3 ; sleep
+PCD_FMINIT           = $ddb4 ; fminit
+PCD_FMNOTE           = $ddb5 ; fmnote
+PCD_FMDRUM           = $ddb6 ; fmdrum
+PCD_FMINST           = $ddb7 ; fminst
+PCD_FMVIB            = $ddb8 ; fmvib
+PCD_FMFREQ           = $ddb9 ; fmfreq
+PCD_FMVOL            = $ddba ; fmvol
+PCD_FMPAN            = $ddbb ; fmpan
+PCD_FMPLAY           = $ddbc ; fmplay
+PCD_FMCHORD          = $ddbd ; fmchord
+PCD_FMPOKE           = $ddbe ; fmpoke
+PCD_PSGINIT          = $ddbf ; psginit
+PCD_PSGNOTE          = $ddc0 ; psgnote
+PCD_PSGVOL           = $ddc1 ; psgvol
+PCD_PSGWAV           = $ddc2 ; psgwav
+PCD_PSGFREQ          = $ddc3 ; psgfreq
+PCD_PSGPAN           = $ddc4 ; psgpan
+PCD_PSGPLAY          = $ddc5 ; psgplay
+PCD_PSGCHORD         = $ddc6 ; psgchord
+PCD_CLS              = $ddc7 ; cls
+PCD_LOCATE           = $ddc8 ; locate
+PCD_COLOR            = $ddc9 ; color
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;

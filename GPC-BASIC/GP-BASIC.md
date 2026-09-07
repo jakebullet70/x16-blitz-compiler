@@ -123,8 +123,8 @@ anything wider compiles through the float encoder. Neither wraps.
 
 ## 3. Command reference
 
-30 keywords, encoded `$CE7F` down to `$CE58` and allocated downward. Ten of the forty slots are
-holes and stay holes: the byte values are the ABI and are never renumbered.
+36 keywords, encoded `$CE7F` down to `$CE52` and allocated downward. Ten of the forty-six slots
+are holes and stay holes: the byte values are the ABI and are never renumbered.
 
 ### At a glance — where each part comes from
 
@@ -148,6 +148,7 @@ Three implementations, and what each costs:
 | **Strings** | COMPOSITE | `GP.CONTAINS` `GP.ISEMPTY` — free, see §3.4 |
 | **Addresses** | COMPOSITE | `GP.HIBYTE` `GP.LOBYTE` — free, see §3.3 |
 | **Arrays** | ASM | `GP.ARRPTR` |
+| **Banked text** | ASM | `GP.BANKEDSTR` `GP.ENDBANKEDSTR` `GP.BSTR` · `GP.BSTRCOUNT` is COMPOSITE — see §3.10 |
 | **Screen** | ASM | `GP.BOX` `GP.FILL` `GP.PRINTAT` |
 | **Screen** | COMPOSITE | `GP.CHAR` — free, one cell in `GP.PRINTAT`'s shape running `GP.FILL`'s handler |
 | **Colour roles** | BASIC | `THEME.INC.BL` — `THEME.LOAD`, `THEME.CLR()` · §4.1 |
@@ -713,6 +714,88 @@ GP.ENDASM
 ```
 
 Example: [`ASM.EXP.BL`](ASM.EXP.BL)
+
+### 3.10 Text in a bank
+
+```basic
+GP.BANKEDSTR <bank> <NAME>
+  "first"
+  "second"
+GP.ENDBANKEDSTR
+
+  A$ = GP.BSTR(<NAME>, n)
+  N  = GP.BSTRCOUNT(<NAME>)
+```
+
+Moves a program's literal text out of low RAM and into a RAM bank, at compile time. A string
+constant costs `2 + LEN` bytes of p-code wherever it appears; `GP.BSTR(NAME, n)` costs **5**, so
+text of four characters or more is cheaper read from the bank than written in the line. Over half
+of a menu-driven program's own code is usually literal text, and text is the one thing in a
+program with no reason to be resident: it is never executed, never indexed, and read one item at a
+time.
+
+**The body is bare quoted lines.** One string a line, nothing else on the line, and they pass
+through byte for byte — case, leading spaces and trailing spaces included. They are not `REM`
+lines and must not be: BASLOAD upper-cases `REM` text.
+
+**Blocks are named, and you may write as many as you like.** Each is indexed from zero within
+itself, so inserting a line in one group moves nothing outside it. All the groups in a program
+share one bank, which is why every block names the same one — written on each block rather than
+only the first so a block can be read where it sits.
+
+**The name costs nothing at run time.** It is resolved while the program compiles, into the
+group's first index, and the compiler adds that to your index for you. No letter of the name
+reaches the object, which is the whole reason the lookup is not in the bank.
+
+`GP.BSTRCOUNT(NAME)` is a composite: it compiles to a plain number, so
+`FOR I = 0 TO GP.BSTRCOUNT(MENU.FILE) - 1` costs no more than writing the count out.
+
+```basic
+#DEFINE GM.TEXTBANK 5
+
+GP.BANKEDSTR GM.TEXTBANK MENU.FILE
+  " OPEN "
+  " SAVE "
+  " QUIT "
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR GM.TEXTBANK MENU.EDIT
+  " CUT "
+  " PASTE "
+GP.ENDBANKEDSTR
+
+  FOR I = 0 TO GP.BSTRCOUNT(MENU.EDIT) - 1
+    PRINT GP.BSTR(MENU.EDIT, I)
+  NEXT I
+```
+
+**Claim the bank**, exactly as a `GP.BANKED` code region's bank is claimed. The compiler picks it
+while the object is written, so `BANKMGR` has to be told rather than asked:
+
+```basic
+BANKMGR.WANT = GM.TEXTBANK : GOSUB BANKMGR.CLAIM
+```
+
+**Compile SHARED.** The text is copied into its bank by the program's bootstrap, and an embedded
+program has none — the same rule `GP.BANKED` works to. An embedded build is refused rather than
+compiled into a program that reads an empty bank.
+
+**A group name is not a variable.** No `$`, no `%`, no `(` — any of those is a syntax error rather
+than something quietly ignored. A name that no block declared is a syntax error at the line that
+used it, and so is a second block claiming a name already taken. An empty block is refused too: a
+group of no strings would make `GP.BSTRCOUNT` zero and every `GP.BSTR` on it read the next group's
+text.
+
+**There is no run-time bounds check.** The compiler knows every index it emits and nothing a
+program does can produce one out of range, so an index past the end of a group reads whatever
+follows it. That is the same bargain the array fast path makes.
+
+One bank of text a program, up to 8 KB of it, up to 128 groups. `GP.BSTR` is an ordinary GP
+keyword, so it pulls in the 1 KB GP block; the two block keywords do not, and neither does
+`GP.BSTRCOUNT`.
+
+Reading it from inside a `GP.BANKED` region works: the handler puts the caller's bank back before
+it returns.
 
 ---
 
