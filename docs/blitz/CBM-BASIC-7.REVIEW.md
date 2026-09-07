@@ -57,8 +57,8 @@ a fifth input that no caller in this tree would ever set, and a global at that.
 BASIC 4.0's, kept by 3.5 and 7.0, and the thing this compiler most obviously lacks: *there is no `DS`
 in this compiler*, and the X16's `DOS` keyword prints where a program needs a variable.
 
-Specced in TODO.md as `FILE.STATUS` in the `FILES.INC.BL` entry, along with the `SCRATCH`, `RENAME`
-and `COPY` verbs from the same family. BASL, zero runtime bytes.
+**Shipped 06/09/26** as `FILE.STATUS` in `FILEIO.INC.BL`, along with the `SCRATCH`, `RENAME` and
+`COPY` verbs from the same family. BASL, zero runtime bytes.
 
 ### 1.4 `DEC()` — a hex string to a number
 

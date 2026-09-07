@@ -961,8 +961,6 @@ Related: the same survey found `GP.SELECT` and an `GP.IF`/`GP.ELSEIF` chain with
 other on LINEINPUT's real seven-way dispatch (~75 B against ~78 B), so the two constructs are a
 readability choice, not a size one.
 
-
-
 ## `BMX.INC.BL` wants the `GP.ASM` treatment
 
 **The BMX loader is the last big BASL routine still doing per-byte work in BASIC**, and it is the
@@ -1376,93 +1374,25 @@ data bank at entry and put the caller's back at every exit. `FILE.DIR.BANKHOLD` 
   abandoned the same test, but it read `READST` at the top of `status()` where the value was stale;
   this reads a transaction it just performed.
 - **`V` (validate) is a documented no-op** returning `00, OK`. Dropped, not deferred.
+- **`FILE.COPY` cannot cross devices.** `DOS "C:new=old"` copies only within one drive, so a
+  copy between devices has to go through memory. Worth knowing before someone finds out with a
+  half-written file.
 
 **Still open, and now specified rather than guessed:**
 
-- `FILE.SEEK` / `FILE.TELL` / `FILE.SIZE` — see the `P`/`T` note below; the header of `FILEIO`
-  carries the three traps.
+- `FILE.SEEK` / `FILE.TELL` / `FILE.SIZE`. **CMDR-DOS has no `REL` files** — the feature
+  table lists them "not yet". The equivalent is `,?,M` open mode plus the command-channel `P`
+  (position) and `T` (tell) calls, and chapter 13 gives it in BASIC:
+  `OPEN 15,8,15,"P"+CHR$(2)+CHR$(0)+CHR$(1)+CHR$(0)+CHR$(0)`. **`T` returns the position AND
+  the file size**, which is what Save As wants without a directory read. Three traps, and the
+  header of `FILEIO` carries them: the data channel's secondary address must equal the `P`/`T`
+  channel argument (which is why `FILE.CHAN` is 14 for both); `T` is R48+ and `FL` R49+; and the
+  manual's `VAL("$"+MID$(A$,10))` does NOT work here, because `VAL` stops at the first
+  non-numeric character.
 - `FILE.APPEND`, `FILE.SIZE`, `FILE.TYPE`, `FILE.FAST` (`U0>B`), `FILE.LOCK`/`UNLOCK` (`F-L`/`F-U`),
   `FILE.DISKCHANGE` (`G-D`), `FILE.MOUNT` (`I`), `FILE.RMDIR` (`RD`) — reviewed, not selected.
 - **The split, if `FILEIO` is ever too heavy**: `SAVEARRAY`/`LOADARRAY` are 364 of its 1,075 bytes.
 - **`FILEDIR`'s no-MACPTR fallback is untested** — no device on this machine refuses `MACPTR`.
-
-The original specification follows.
-
-### `FILES.INC.BL` — the disk questions a program has to ask
-
-BASIC 4.0 answered these with `DS` and `DS$`, and neither reached this machine — *there is no `DS` in
-this compiler*. The X16's `DOS` keyword **prints**; a compiled program needs the answer in a variable.
-So every program in the tree that touches the drive has rolled its own, and
-[`CX.FILECHECK`](samples/cruncher/CRUNCH.BASL#L172) is the one that works. Promote it.
-
-| Routine | in | out |
-|---|---|---|
-| `FILE.STATUS` | — | `FILE.ERR` `FILE.MSG$` `FILE.TRK` `FILE.SEC` |
-| `FILE.EXISTS` | `FILE.NAME$` | `FILE.OK` |
-| `FILE.DELETE` | `FILE.NAME$` | `FILE.ERR` |
-| `FILE.RENAME` | `FILE.NAME$` `FILE.NEW$` | `FILE.ERR` |
-| `FILE.COPY` | `FILE.NAME$` `FILE.NEW$` | `FILE.ERR` |
-| `FILE.MKDIR` `FILE.CHDIR` | `FILE.NAME$` | `FILE.ERR` |
-| `FILE.DIR` | `FILE.PAT$` `FILE.MAX` | `FILE.N` `FILE.NAME$()` `FILE.BLOCKS()` `FILE.FREE` |
-
-All of them take `FILE.DEV`, defaulting to 8, rather than hard-coding the drive. `FILE.` is free in
-the prefix registry.
-
-**`FILE.STATUS` is the foundation and everything else ends by calling it.** The command channel has
-to be read or the drive stays in its error state and the next `OPEN` misbehaves; close the data
-channel before channel 15. An error number under 20 is success — 0 is OK, 1 is "files scratched" and
-carries the count. The three worth naming are 62 `FILE NOT FOUND`, 63 `FILE EXISTS` and 26
-`WRITE PROTECT`.
-
-**Do not test existence with `ST`.** `LINPUT#` on a channel whose `OPEN` found nothing returns
-`CHR$(0)` with `ST = 66` **for ever** — `docs/memory/gpc-editor-loader-linput-and-blob.md`. That trap
-built a document containing a NUL once already. Channel 15 answers the question cleanly, which is
-what `CX.FILECHECK` does.
-
-**`FILE.DIR` is the fiddly one.** The directory arrives as a fake BASIC program: a two-byte load
-address, then per entry a two-byte link, a two-byte line number that IS the block count, and the name
-in quotes. Read it with `BINPUT#` at a fixed count rather than `GET#` per byte — the loader work
-measured that difference at 10.5x. The last entry is the blocks free.
-
-**Names travel in PETSCII.** A program running in ISO mode holds ASCII names and has to convert
-before sending, or a lower-case filename reaches the drive as something else.
-
-**Split it like `STASH` and `STASHFILE`.** A module compiles whole into every includer — there is no
-dead code elimination — so `FILE.DIR` and its two arrays belong in their own file. The
-status/exists/delete/rename core is small enough for everything to carry.
-
-BASL throughout: no token, no p-code opcode, no runtime byte.
-
-**More worth having, roughly in the order they earn their bytes:**
-
-- `FILE.SAVEARRAY` / `FILE.LOADARRAY` — a string array to a `SEQ` file and back, over `PRINT#` and
-  `LINPUT#`. Every settings file, recent-files list, high-score table and picker list in this tree is
-  the same twenty lines written again. The highest value of the lot after `FILE.EXISTS`.
-- `FILE.APPEND` — `,A` on the open, so adding a line to a log does not rewrite the file.
-- `FILE.SIZE` and `FILE.TYPE` — blocks, and `PRG` or `SEQ`, from a directory read filtered to one
-  name. Save As wants the size; a picker wants the type.
-- `FILE.PATH$` and the `CD` readback — the SD card has subdirectories and a program that changes
-  directory has no way to say where it is.
-- `FILE.DEVSCAN` — try 8 to 11 and report which answer. Always 8 on a stock machine, and not on one
-  with a second device or a mounted image.
-- `FILE.VALIDATE` (`V`) and `FILE.HEADER` (`N:name,id`) — one DOS line each, both destructive, so
-  both behind a confirm and neither in the core module.
-- Record positioning for random access. **ANSWERED 06/09/26: CMDR-DOS has no `REL` files** — the
-  feature table lists them "not yet". The equivalent is `,?,M` open mode plus the `P` (position)
-  and `T` (tell) command-channel calls, and chapter 13 gives it in BASIC:
-  `OPEN 15,8,15,"P"+CHR$(2)+CHR$(0)+CHR$(1)+CHR$(0)+CHR$(0)`. `T` returns the position **and the
-  file size**, which is what Save As wants without a directory read. Three traps: the data channel's
-  secondary address must equal the `P`/`T` channel argument (which is why `FILE.CHAN` is 14 for
-  both); `T` is R48+ and `FL` R49+; and the manual's `VAL("$"+MID$(A$,10))` **does not work here**,
-  because `VAL` stops at the first non-numeric character.
-
-`DOS "C:new=old"` copies only within one drive, so a real `FILE.COPY` across devices has to go
-through memory. Worth knowing before someone finds out with a half-written file.
-
-**Two callers are waiting.** A file picker for the editor and `GPC-HELP` wants `FILE.DIR`, and Save As
-wants `FILE.EXISTS` so it can ask before it overwrites — see *Save As accepts a BLANK name* below.
-Keep the module's own examples clear of the `GP.DO` key-loop shape in
-`docs/memory/file-io-error-in-gpdo-key-loop.md`.
 
 ### `KV.INC.BL` — text out of low RAM, an index in it
 
@@ -1493,11 +1423,12 @@ line, key and value separated by the first `=` or a tab. `LINPUT#` is **10.5x** 
 loader) and that margin is what makes a whole-file load at startup acceptable — but it **stops on a
 NUL**, which is the loader's documented trap, so a value cannot contain one. `ST = 66` on a missing
 file and stays there for ever, so check the name before opening it, with `FILE.EXISTS` from
-`FILES.INC.BL` above.
+`FILEIO.INC.BL`.
 
-**Do not spec random access on disk until the `REL` question in `FILES.INC.BL` above is answered.**
-Without a seek, a per-lookup disk read is O(lines) and re-opens the file every time; the banked
-version is then the only sane design and the file is purely a load format.
+**The `REL` question is answered: there are none, and random access is the `P`/`T` command-channel
+calls** — see the `FILEIO` entry above. Until those are built there is no seek, so a per-lookup disk
+read is O(lines) and re-opens the file every time; the banked version is then the only sane design
+and the file is purely a load format.
 
 **Sizing.** One bank is 8,192 bytes of text. Past that the bank belongs in the index entry (which is
 why it is 3 bytes and not 2), and `KV.OPEN` fills consecutive banks — no record straddles a boundary,
@@ -1529,8 +1460,8 @@ naive rewrite emits only the keys it knows and quietly eats every comment, every
 file's order — so two programs sharing one `.INI` destroy each other's settings. The correct shape is
 a copy, not a dump: read the original line by line, echo each line out to a temp file, substitute the
 value on the one line being changed, append anything never seen at the end of its section, then
-delete and rename. **That needs `FILE.DELETE` and `FILE.RENAME`, so `FILES.INC.BL` lands first** —
-three modules deep, and worth saying out loud before someone starts at the top.
+delete and rename. That needs `FILE.DELETE` and `FILE.RENAME`, **and both are in `FILEIO.INC.BL`
+already**, so this no longer waits on a module landing first.
 
 **Parsing details to decide, not discover:**
 
@@ -1877,7 +1808,6 @@ The size of the prize: `GUI` + `MENUVERT` + `LINEINPUT` is 3,973 bytes, one 8K b
 For GPC-HELP that turns 2,458 bytes of workspace into about 6,400. The `MENUVERT` and `LINEINPUT`
 trims listed above are worth ~1,300 for library work alone.
 
-
 ### Crunch AFTER BASLOAD, not before
 
 `samples/cruncher` runs on `.BASL` source. Measured on `HELP.BASL` 2026-09-04, and the source-level
@@ -2113,7 +2043,6 @@ compiler has ALREADY made, so one first assigned further down the file is `UNKNO
 **Method note, since it cost the day:** two rounds of plausible code changes bought 18 bytes; one
 `FRE` probe run found the 579 in two minutes. Probe first.
 
-
 The original diagnosis, kept because its numbers and its method lesson still stand:
 
 ### The original write-up — the leak was real, the "workspace" framing was half of it
@@ -2209,7 +2138,6 @@ emulator's host filesystem) and `DIR`, the `LABELS` transform, the map file, and
 `VERIFY`. **`LABELS` cannot be per-file**: a label defined in `GUI.INC.BL` may be referenced only
 from `EDITOR.BASL`, so the engine must walk the whole `#INCLUDE` tree for the reference set even
 when it rewrites one file. That is what scope `TREE` is for.
-
 
 Asked 2026-09-02, and it is worth doing because **a line costs exactly one byte of p-code.**
 Measured, not guessed: hand-compacting `samples/editor/EDITOR.BASL` on 2026-09-02 joined **80**
@@ -2992,7 +2920,6 @@ scanner that assumes it will be wrong eventually, so warn rather than assume.
 
 Related, and the reason it matters: [[program-too-big-fires-early]] and the release-build split in
 `samples/editor/EDITOR.BASL` (`#IFNDEF ED.RELEASE`).
-
 
 - Copy the object code *down* after compiling, rather than leaving it above the compiler and its
   libraries (must stay on a page boundary). **The part that matters is DONE** — a saved `OBJECT.PRG`
