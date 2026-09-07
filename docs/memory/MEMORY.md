@@ -81,6 +81,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 
 ## The BASL cruncher
 - [BASL cruncher built](basl-cruncher-built.md) — samples/cruncher: 255 lines, 255 bytes on the editor; and the three guesses it disproved
+- [Folding onto a label line saves nothing](folding-onto-a-label-line-saves-nothing.md) — a bare label is not a BASIC line; only merging real statements buys bytes
 - [BASL cruncher internals](basl-cruncher-internals.md) — routine map, the two join properties, the build cycle; the harness is NOT in the repo
 - [All three line endings](basl-sources-use-all-three-line-endings.md) — how to sniff, and why a short CR file reads as CRLF
 
