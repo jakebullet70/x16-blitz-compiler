@@ -31,12 +31,13 @@
 ## **  Claim the bank as well, or something else will hand it out:
 ## **      BANKMGR.WANT = LIB.CODEBANK : GOSUB BANKMGR.CLAIM
 ## **
-## **  All six modules are required, even by a program that calls one of them.
+## **  All seven modules are required, even by a program that calls one of them.
 ## **  This file shims every entry point and BASLOAD resolves every label in a
 ## **  file, so leaving MENUBAR out stops the build with LABEL NOT FOUND.
 ## **
 ## **  Order inside the region is the order the modules already want: THEME
-## **  first, MENUVERT before MENUBAR, both before GUI.
+## **  first, MENUVERT before MENUBAR, both before GUI. FILEDIR goes last and
+## **  reaches FILEIO through variables only, so FILEIO stays in low memory.
 ## **
 ## **  The GOTO over the region is not optional. Falling in through the bridge
 ## **  GP.BANKED leaves works at program start and stops working the day
@@ -95,6 +96,11 @@ GUI.INPUT:    BANK LIB.CODEBANK :  GOSUB GUI.INPUT.BODY   :  RETURN
 GUI.OPEN:     BANK LIB.CODEBANK :  GOSUB GUI.OPEN.BODY    :  RETURN
 GUI.CLOSE:    BANK LIB.CODEBANK :  GOSUB GUI.CLOSE.BODY   :  RETURN
 GUI.LISTBOX:  BANK LIB.CODEBANK :  GOSUB GUI.LISTBOX.BODY :  RETURN
+
+## ---- FILEDIR ----
+FILE.DIR.INIT:  BANK LIB.CODEBANK :  GOSUB FILE.DIR.INIT.BODY :  RETURN
+FILE.DIR.OPEN:  BANK LIB.CODEBANK :  GOSUB FILE.DIR.OPEN.BODY :  RETURN
+FILE.DIR.NEXT:  BANK LIB.CODEBANK :  GOSUB FILE.DIR.NEXT.BODY :  RETURN
 
 LIBBANK.MODULE.END:
 #ENDIF

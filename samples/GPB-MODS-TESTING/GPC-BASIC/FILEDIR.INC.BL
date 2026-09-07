@@ -8,6 +8,16 @@
 ## **
 ## **  Requires GPB.INC.BL and FILEIO.INC.BL, and #INCLUDEs neither.
 ## **
+## **  THE THREE ENTRY POINTS ARE SPELLED .BODY HERE, and the names above are the
+## **  shims in LIBBANK.INC.BL. This copy of the module lives in a GP.BANKED region
+## **  -- MENUVERT.INC.BL beside it is written the same way for the same reason. A
+## **  program that wants it in low memory calls the .BODY labels directly and needs
+## **  no shim.
+## **
+## **  A shim leaves ITS bank selected on return, by LIBBANK's design, so a banked
+## **  build does not preserve the caller's RAM bank across a call here. The blobs
+## **  preserve the bank they are entered with; the shim in front of them does not.
+## **
 ## **      #SYMFILE "@:MYPROG.SYM"   <- required, before the #INCLUDEs.
 ## **
 ## **   in   FILE.DIR.BANK     the bank to read into, or 0 for low RAM
@@ -29,7 +39,7 @@
 ## **  internal  FILE.DIR.AT FILE.DIR.ASK$ FILE.DIR.ADDR% FILE.DIR.ROOM%
 ## **            FILE.DIR.OFF% FILE.DIR.BYTES% FILE.DIR.CNT% FILE.DIR.BLK%
 ## **            FILE.DIR.OK% FILE.DIR.SLOW% FILE.DIR.LFN% FILE.DIR.NAMEA%
-## **            FILE.DIR.WAS% FILE.DIR.OWAS%
+## **            FILE.DIR.WAS% FILE.DIR.BNK%
 ## **            FILE.DIR.TYPEA%
 ## **
 ## **  Two destinations, one code path: the reader takes an address and a size.
@@ -48,7 +58,15 @@
 ## **  FILE.DIR.BANKBASE and FILE.DIR.BANKROOM are the hardware window, not an
 ## **  allocation: every bank appears at $A000 and every bank is 8,192 bytes.
 ## **  The bank NUMBER is the resource. Take it from BANKMGR.ALLOC and put it in
-## **  FILE.DIR.BANK. This module selects a bank and puts 0 back; it claims none.
+## **  FILE.DIR.BANK. This module claims no bank and executes no BANK statement.
+## **
+## **  THE WINDOW IS SWITCHED IN ASSEMBLY, NOT IN BASIC, and that is what lets this
+## **  module live in a GP.BANKED region. The two blobs take the data bank at entry
+## **  and put the caller's back on every exit; no BASIC line here ever runs with a
+## **  foreign bank selected. A BANK statement in banked p-code is refused by the
+## **  compiler, and one either side of a GOSUB would leave the return fetching its
+## **  next byte from the data bank. FILE.DIR.BNK% carries the bank to the assembly
+## **  because {VAR} on the untyped FILE.DIR.BANK would read a float's mantissa.
 ## **
 ## **  The drive does the filtering. Do not write a pattern matcher.
 ## **
@@ -120,11 +138,11 @@ GOTO FILEDIR.MODULE.END
 ## **  fallout rather than the cause.
 ## ***********************************************************************
 
-FILE.DIR.INIT:
+FILE.DIR.INIT.BODY:
     FILE.NAME$ = RPT$(32, FILE.DIR.NAMEMAX) : FILE.TYPE$ = RPT$(32, 3)
     FILE.DIR.NAMEA% = GP.STRPTR(FILE.NAME$) : FILE.DIR.TYPEA% = GP.STRPTR(FILE.TYPE$)
     FILE.DIR.ADDR% = 0 : FILE.DIR.ROOM% = 0 : FILE.DIR.LFN% = FILE.CHAN : FILE.DIR.BYTES% = 0 : FILE.DIR.CNT% = 0 : FILE.DIR.OFF% = 0
-    FILE.DIR.WAS% = 0 : FILE.DIR.OWAS% = 0
+    FILE.DIR.WAS% = 0 : FILE.DIR.BNK% = 0
     FILE.DIR.SLOW = 0
     FILE.DIR.BLK% = 0 : FILE.DIR.OK% = 0 : FILE.DIR.SLOW% = 0 : FILE.DIR.AT = 0 : FILE.DIR.GOT = 0 : FILE.DIR.MORE = 0 : FILE.DIR.FULL = 0  
     RETURN
@@ -140,14 +158,14 @@ FILE.DIR.INIT:
 ## **  FILE.EXISTS uses, so FILE.ERR means something when the listing is empty.
 ## ***********************************************************************
 
-FILE.DIR.OPEN:
+FILE.DIR.OPEN.BODY:
     FILE.DIR.GOT = 0 : FILE.DIR.FULL = 0 : FILE.DIR.MORE = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
-    GOSUB FILE.DIR.BANKHOLD : FILE.DIR.OWAS% = FILE.DIR.WAS%
+    FILE.DIR.BNK% = FILE.DIR.BANK
     GOSUB FILE.DIR.WHERE : GOSUB FILE.DIR.ASKFOR : OPEN 15, FILE.DEVICE, 15
     OPEN FILE.CHAN, FILE.DEVICE, 0, FILE.DIR.ASK$
     INPUT#15, FILE.ERR, FILE.MSG$, FILE.TRK, FILE.SEC
     IF FILE.ERR < FILE.OKMAX THEN GOSUB FILE.DIR.SUCK
-    CLOSE FILE.CHAN : CLOSE 15 : IF FILE.DIR.BANK > 0 THEN BANK FILE.DIR.OWAS%
+    CLOSE FILE.CHAN : CLOSE 15
     FILE.DIR.AT = 4 : GOSUB FILE.DIR.SKIPDISK
     RETURN
 
@@ -163,37 +181,7 @@ FILE.DIR.OPEN:
 ## ***********************************************************************
 
 FILE.DIR.SKIPDISK:  IF FILE.DIR.GOT = 0 THEN RETURN
-    GOSUB FILE.DIR.NEXT : FILE.DIR.MORE = 0
-    RETURN
-
-## ***********************************************************************
-## **  FILE.DIR.BANKHOLD -- the caller's RAM bank, into FILE.DIR.WAS%.
-## **
-## **  BANK 0 IS NOT A RESTORE, it selects bank 0. CommandBank writes both
-## **  ramBank and the hardware register, so a caller left on bank 0 gets the
-## **  wrong 8K from PEEK and from assembly alike, with no error.
-## **
-## **  Assembly because PEEK(0) cannot read the register back. This is
-## **  STASH.BANK.HOLD, which exists for the same bug.
-## **
-## **  ONLY THE LOW BYTE COMES FROM THE REGISTER; the high byte is zeroed here
-## **  rather than left to INIT, because the slot is written every call.
-## **
-## **  FILE.DIR.NEXT KEEPS ITS OWN COPY. FILE.DIR.OPEN's is FILE.DIR.OWAS%,
-## **  because OPEN's is still live when SKIPDISK calls NEXT and NEXT would
-## **  overwrite it half way through.
-## ***********************************************************************
-
-FILE.DIR.BANKHOLD:
-    #REM 1
-    GP.ASM
-    REM LDA $00
-    REM STA {FILE.DIR.WAS%}
-    REM LDX #1
-    REM LDA #0
-    REM STA {FILE.DIR.WAS%},X
-    GP.ENDASM
-    #REM 0
+    GOSUB FILE.DIR.NEXT.BODY : FILE.DIR.MORE = 0
     RETURN
 
 ## Where the bytes land. A bank is always the same address and size; low RAM is
@@ -222,11 +210,10 @@ FILE.DIR.ASKFOR:
     IF FILE.DIR.ONLY = FILE.DIR.DIRS THEN FILE.DIR.ASK$ = FILE.DIR.ASK$ + "=D"
     RETURN
 
-## The bank is selected around the read and nothing else. FILE.DIR.OPEN puts the
-## caller's bank back afterwards, from FILE.DIR.OWAS%.
+## No bank statement here. FILE.DIR.FILL's blob takes the data bank and gives the
+## caller's back, so this routine and its caller stay on whatever bank they had.
 
 FILE.DIR.SUCK:
-    IF FILE.DIR.BANK > 0 THEN BANK FILE.DIR.BANK
     GOSUB FILE.DIR.FILL : FILE.DIR.GOT = FILE.DIR.BYTES% : FILE.DIR.SLOW = FILE.DIR.SLOW%
     IF FILE.DIR.BYTES% >= FILE.DIR.ROOM% THEN FILE.DIR.FULL = -1
     RETURN
@@ -250,7 +237,12 @@ FILE.DIR.FILL:
     #REM 1
     GP.ASM
     REM CLD                          ; SYS enters with the caller's flags
-    REM LDX {FILE.DIR.LFN%}
+    REM LDA $00                      ; the caller's window, for the exit below
+    REM STA {FILE.DIR.WAS%}
+    REM LDA {FILE.DIR.BNK%}
+    REM BEQ FDFNOBANK                ; 0 is low RAM: leave the window alone
+    REM STA $00
+    REM FDFNOBANK: LDX {FILE.DIR.LFN%}
     REM JSR $FFC6                    ; CHKIN -- input comes from the listing
     REM BCS FDFOUT
     REM LDX #1
@@ -291,8 +283,9 @@ FILE.DIR.FILL:
     REM STA {FILE.DIR.BYTES%}
     REM LDA $31
     REM STA {FILE.DIR.BYTES%},X
-    REM RTS
-    REM FDFOUT: RTS
+    REM FDFOUT: LDA {FILE.DIR.WAS%}  ; THE WINDOW BACK, ON EVERY PATH. The caller
+    REM STA $00                      ; may be banked p-code at $A000 and its next
+    REM RTS                          ; byte would be fetched from the data bank.
     REM ;
     REM ; ---- ptr up, room down, total up, all by the count in X ----
     REM FDFADV: STX {FILE.DIR.CNT%}
@@ -351,12 +344,10 @@ FILE.DIR.FILL:
 ## domain and anything above 32767 is one sign extension from negative. BASIC
 ## holds the offset; the assembly adds it to the base.
 
-FILE.DIR.NEXT:
+FILE.DIR.NEXT.BODY:
     FILE.DIR.MORE = 0 : IF FILE.DIR.GOT = 0 THEN RETURN
-    FILE.DIR.OFF% = FILE.DIR.AT : GOSUB FILE.DIR.BANKHOLD
-    IF FILE.DIR.BANK > 0 THEN BANK FILE.DIR.BANK
+    FILE.DIR.OFF% = FILE.DIR.AT : FILE.DIR.BNK% = FILE.DIR.BANK
     GOSUB FILE.DIR.STEP
-    IF FILE.DIR.BANK > 0 THEN BANK FILE.DIR.WAS%
     IF FILE.DIR.OK% = 0 THEN RETURN
     FILE.DIR.AT = FILE.DIR.OFF% : FILE.BLOCKS = FILE.DIR.BLK% : FILE.DIR.MORE = -1
     RETURN
@@ -388,7 +379,12 @@ FILE.DIR.STEP:
     #REM 1
     GP.ASM
     REM CLD
-    REM LDX #1
+    REM LDA $00                      ; the caller's window, for FDSEND
+    REM STA {FILE.DIR.WAS%}
+    REM LDA {FILE.DIR.BNK%}
+    REM BEQ FDSNOBANK                ; 0 is low RAM: leave the window alone
+    REM STA $00
+    REM FDSNOBANK: LDX #1
     REM CLC                          ; zTemp0 = base + offset
     REM LDA {FILE.DIR.ADDR%}
     REM ADC {FILE.DIR.OFF%}
@@ -473,6 +469,8 @@ FILE.DIR.STEP:
     REM LDA $2D
     REM SBC {FILE.DIR.ADDR%},X
     REM STA {FILE.DIR.OFF%},X
+    REM LDA {FILE.DIR.WAS%}          ; THE WINDOW BACK. FDSGET's early out jumps
+    REM STA $00                      ; to FDSEND, so this is the only way out.
     REM RTS
     REM ;
     REM ; ---- the one reader. Carry set means there was nothing left. ----

@@ -1328,14 +1328,34 @@ row and greyed-out item wants exactly one of the two.
 
 ### `FILEIO.INC.BL` and `FILEDIR.INC.BL` — BUILT 06/09/26
 
-**Shipped** as `samples/GPB-MODS-TESTING/GPC-BASIC/FILEIO.INC.BL` (900 bytes) and
-`FILEDIR.INC.BL` (878 more). 33 assertions green headlessly — `testing/FILEIOT.BASL` and
+**Shipped** as `samples/GPB-MODS-TESTING/GPC-BASIC/FILEIO.INC.BL` (**833 bytes**) and
+`FILEDIR.INC.BL` (**435 more**, and it BANKS — see below). The 900/878 written here before were
+guesses; both are measured from the map now. 33 assertions green headlessly — `testing/FILEIOT.BASL` and
 `testing/FILEDIRT.BASL`. Not yet promoted to the root `GPC-BASIC/`, and not yet wired into
 `GPBMODS`'s DATA panel.
 
 In: `FILE.STATUS` `EXISTS` `DELETE` `RENAME` `COPY` `MKDIR` `CHDIR` `UP` `GETPATH` `SAVEARRAY`
 `LOADARRAY`, and `FILE.DIR.INIT` `.OPEN` `.NEXT`. **Both modules need a `#SYMFILE`** — `FILE.TOPET`
 is a `GP.ASM` blob, and so is the directory reader.
+
+**FILEDIR NOW BANKS — 07/09/26.** All 435 bytes of it live in a `GP.BANKED` region. It was not
+split; the four `BANK` statements moved out of BASIC and into the two `GP.ASM` blobs, which take the
+data bank at entry and put the caller's back at every exit. `FILE.DIR.BANKHOLD` and
+`FILE.DIR.OWAS%` went with them, which is why the module got 72 bytes SMALLER doing it.
+
+- **The gate was the disk KERNAL.** `FILE.DIR.OPEN` runs `OPEN`, `INPUT#` and two `CLOSE`s, and
+  banked, that p-code is fetched from `$A000` while they run. Probed on the machine with a `GP.ASM`
+  reader of `$00` — `PEEK(0)` cannot see it — and all three leave the RAM bank alone. That extends
+  `kernal-preserves-ram-bank`, which covered only the screen calls.
+- **The old "78% cannot move" was a line count of `REM` assembly.** `FILE.DIR.FILL` and
+  `FILE.DIR.STEP` are blobs: 16 and 12 bytes of p-code, not 93 and 112 lines. A blob body never
+  occupies a region either way.
+- **The restore is load bearing, not tidiness.** Control returns to banked p-code at `$A000`, so a
+  blob leaving the data bank selected would have the interpreter fetch its next byte from it.
+- **A banked build does not preserve the caller's RAM bank**, because a `LIBBANK` shim leaves its
+  own selected. The blobs preserve the bank they are entered with; the shim in front does not.
+- `FILE.DIR.BNK%` carries the bank into the assembly, because `{FILE.DIR.BANK}` is an untyped
+  variable — a 6-byte float slot, where `LDA` reads the mantissa and works only by accident.
 
 **What the build settled, none of it guessable from the spec below:**
 

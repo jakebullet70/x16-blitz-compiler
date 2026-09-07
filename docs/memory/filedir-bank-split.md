@@ -1,52 +1,76 @@
 ---
 name: filedir-bank-split
-description: "TODO: split FILEDIR into a bankable half and a low-memory half. The naive split only moves 22% of it -- FILL and STEP run WITH THE DATA BANK SELECTED, so they cannot live in a code bank either."
+description: "BUILT: FILEDIR banks whole, by moving the bank switch out of BASIC and into its two GP.ASM blobs. No split was needed, and the '78% cannot move' that stopped it was a line count, not a byte count."
 metadata:
+  node_type: memory
   type: project
 ---
 
-**Noted 2026-09-06, not built.** `FILEDIR.INC.BL` cannot go in a `GP.BANKED` region, which is what
-stopped `GPBFILES.BASL` (GPBMODS + FILEIO + FILEDIR + a FILES panel) from compiling after the
-tokenise ceiling was removed -- see [[basload-streams-to-a-file]].
+**BUILT 2026-09-07.** `FILEDIR.INC.BL` now lives in a `GP.BANKED` region. It was not split, and the
+earlier entry here talked itself out of the right answer with a bad measurement.
 
-**The obvious reason is `BANK`.** The compiler refuses a `BANK` statement inside a region, because
-code fetched from the window cannot be running when the window changes. FILEDIR has four, in three
-routines:
+## What the old note got wrong
 
-    FILE.DIR.OPEN   restore the caller's bank after the read
-    FILE.DIR.SUCK   select the data bank, then GOSUB FILE.DIR.FILL
-    FILE.DIR.NEXT   select the data bank, GOSUB FILE.DIR.STEP, restore
+It said `FILE.DIR.FILL` (93 lines) and `FILE.DIR.STEP` (112 lines) were "205 of 264 code lines,
+**78%**, in the two that cannot move". **Those two routines are `GP.ASM` blobs**, and that count is
+of `REM` assembly. Measured from the map instead — the method in [[measure-pcode-per-module]] —
+they are **16 and 12 bytes of p-code, 28 of 507, 5.5%**. A blob's body never occupies a region
+either way: the pool is appended at the object tail in low RAM and the call is an absolute `.word`.
 
-**The real reason is worse, and it is why a naive split is not worth doing.** `FILE.DIR.FILL` and
-`FILE.DIR.STEP` are *called with the data bank already selected*. Put either in a CODE bank and its
-own p-code is fetched from the DATA bank. They are also the two big ones:
+The same note's own recommendation — push the window switch below BASIC — was right, and it is
+cheap precisely because the two blobs already exist.
 
-| routine | code lines | bankable |
-|---|---:|---|
-| `FILE.DIR.FILL` (MACPTR reader) | 93 | **no** -- runs under the data bank |
-| `FILE.DIR.STEP` (entry parser) | 112 | **no** -- runs under the data bank |
-| everything else, 9 routines | 59 | yes, once the `BANK`s move out |
+## What was done
 
-205 of 264 code lines, **78%**, are in the two that cannot move. A split that banks only the small
-routines pays a shim per entry point to move a fifth of the module.
+The four `BANK` statements are gone. Both blobs now take the data bank at entry and put the
+caller's back at **every** exit:
 
-## What would actually work
+```
+REM LDA $00
+REM STA {FILE.DIR.WAS%}
+REM LDA {FILE.DIR.BNK%}
+REM BEQ <skip>            ; 0 is low RAM: leave the window alone
+REM STA $00
+```
 
-**Push the window switch below BASIC**, so no `BANK` statement exists and no p-code ever runs under
-a foreign bank: a low-memory `GP.ASM` trampoline that selects the data bank, does the access, and
-restores -- *and is itself in low memory*, because a blob inside the region would stop fetching the
-moment it changed the window. Then all of FILEDIR banks.
+`FILE.DIR.BANKHOLD` and `FILE.DIR.OWAS%` were deleted with them. **The restore is not optional and
+not merely tidy**: control returns to banked p-code at `$A000`, so a blob that left the data bank
+selected would have the interpreter fetch its next byte from it.
 
-That is the same shape as the existing `FILE.DIR.FILL` MACPTR blob, moved down and given the bank
-select. [[macptr-wraps-banks-itself]] means a block read crossing $BFFF needs no banking code of its
-own, so the trampoline is smaller than it sounds.
+`FILE.DIR.BNK%` carries the bank into the assembly because `{FILE.DIR.BANK}` is an untyped variable
+— a 6-byte float slot, where `LDA` would read the mantissa's low byte and work only by accident.
 
-Until then FILEDIR stays in low memory. FILEIO is clean -- no `BANK`, `BLOAD` or `BSAVE` -- and can
-be banked today.
+The three entry points became `.BODY` and got shims in `LIBBANK.INC.BL`, exactly as `MENUVERT` in
+the same directory already does.
 
-**But do not expect that to buy headroom.** Measured afterwards: 84% of GPBMODS resident p-code is
-the shell, all eight library modules together are 16%, and only 656 bytes of that is bankable at
-all. See [[gpbmods-resident-pcode-breakdown]] -- it is the reason this split is filed as "noted, not
-built" rather than queued.
+## Numbers
 
-See [[gp-banked-call-out-loses-the-bank]] for the constraint that decides where a *caller* can live.
+| | bytes |
+|---|---:|
+| `FILEDIR.INC.BL` before | 507 |
+| after — the bank handling deleted itself | **435** |
+| of which bankable before | 213 |
+| of which bankable after | **435, all of it** |
+
+`TODO.md` said 878 for FILEDIR and 900 for FILEIO. Both were wrong; FILEIO measures 833.
+
+## The gate, and it passed
+
+`FILE.DIR.OPEN` runs `OPEN`, `INPUT#` and two `CLOSE`s. Banked, that p-code is fetched from `$A000`
+**while those KERNAL calls run**, so a call that left the RAM bank changed would kill the next
+instruction with no diagnostic. Probed on the machine with a `GP.ASM` reader of `$00` —
+`PEEK(0)` cannot see it — and **`OPEN`, `INPUT#` and `CLOSE` on device 8 all leave `$00` alone**.
+That extends [[kernal-preserves-ram-bank]], which covered only the screen calls.
+
+## The one behaviour change
+
+**A banked build no longer preserves the caller's RAM bank across a `FILE.DIR` call.** That is the
+shim's doing, not the module's — a `LIBBANK` shim deliberately leaves its own bank selected, see
+[[gp-banked-call-out-loses-the-bank]]. The blobs preserve the bank they are entered with. Callers
+in low memory do not care; a caller that did would have to re-select.
+
+`testing/FILEDIRT.BASL`'s `D08 BANKAFTEROPEN` and `D09 BANKAFTERNEXT` assert the unbanked contract
+and still hold for the `.BODY` labels called directly.
+
+Related: [[pcode-runs-from-a-bank-proven]], [[gp-banked-region-relocation]],
+[[macptr-wraps-banks-itself]], [[gpbmods-resident-pcode-breakdown]].
