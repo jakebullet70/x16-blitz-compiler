@@ -59,6 +59,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [Runtime footprint](blitz-x16-runtime-footprint.md) — the 10,956 B runtime copied into every program, and how to shrink it
 - [String heap scavenger](string-heap-scavenger.md) — SHIPPED: dead blocks reused, +1 page RT; the intermittent OOM was no-reclaim plus a garbage line-0 read
 - [String blocks never shrink](gpc-string-blocks-never-shrink.md) — a big temporary must not be built; freeing it is not a thing
+- [LOAD chain strands array strings](load-chain-strands-array-strings.md) — chaining skips ClearMemory, so the string ceiling never falls; bounded for scalars, an UNBOUNDED leak for string arrays
 - [Compile is write-only](compile-is-write-only.md) — one instruction touches the object during a compile and it is a store; the premise the two-pass work rests on
 - [Two-pass compiler](two-pass-compiler.md) — DONE: neither pass stores an object, so the compiler's own size bounds nothing; GPBMODS compiles
 - [Compiler overlay into a bank](compiler-overlay-into-a-bank.md) — REVERTED, but the 64tass mechanism works and is measured at +2,560 bytes of object buffer
@@ -80,8 +81,8 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [MENUHELP: use the whole interface](menuhelp-use-the-whole-interface.md) — build the library's own example headlessly before blaming it
 
 ## The BASL cruncher
-- [BASL cruncher built](basl-cruncher-built.md) — samples/cruncher: 255 lines, 255 bytes on the editor; and the three guesses it disproved
 - [Folding onto a label line saves nothing](folding-onto-a-label-line-saves-nothing.md) — a bare label is not a BASIC line; only merging real statements buys bytes
+- [BASL cruncher built](basl-cruncher-built.md) — samples/cruncher: 255 lines, 255 bytes on the editor; and the three guesses it disproved
 - [BASL cruncher internals](basl-cruncher-internals.md) — routine map, the two join properties, the build cycle; the harness is NOT in the repo
 - [All three line endings](basl-sources-use-all-three-line-endings.md) — how to sniff, and why a short CR file reads as CRLF
 
@@ -114,6 +115,8 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [GP drawing targets layer 1](gp-drawing-targets-layer-1.md) — only layer 1, but no row clamp and L1_MAPBASE is POKEable
 - [P-code runs from a bank, PROVEN](pcode-runs-from-a-bank-proven.md) — executed at $A000 with two GP.ASM blobs and no ABI change; RETURN out needs no bank restore
 - [GP.BANKED region relocation](gp-banked-region-relocation.md) — the region moves to the end of the object with a rotation and two GOTOs to line numbers; the three things holding a buffer address
+- [GP.BANKEDSTR: literal text in a bank](gp-bankedstr-literal-text-in-a-bank.md) — BUILT: named groups resolved at compile time, +3,840 B on GPBMODS; GPBFILES is blocked by ASM_MAX_FIXUPS, not p-code
+- [Object writer: regions vs low code](object-writer-regions-vs-low-code.md) — write above the buffer's reach and the streamer pads forward 65,535 bytes, with both passes agreeing and no check firing
 - [Banked code loses the bank on a call out](gp-banked-call-out-loses-the-bank.md) — a region cannot call another bank and survive the return, and may not BANK itself back
 - [FILEDIR banks whole](filedir-bank-split.md) — BUILT; the bank switch moved into its two blobs, and the "78% cannot move" was a line count of REM assembly
 - [GPBMODS resident p-code breakdown](gpbmods-resident-pcode-breakdown.md) — MEASURED; the shell is 79%, all eight modules are 21%, the map cannot see GP.ASM blobs, and grep for BANK with comments STRIPPED

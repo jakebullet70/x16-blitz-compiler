@@ -486,6 +486,8 @@ _WOCSExtCopy:
 		;
 		lda 	gpBankRunBase
 		sta 	imageBuffer+BootExtSrcOffset
+		lda 	bstrBank 					; ...and which bank GP.BSTR reads its text out of. Zero
+		sta 	imageBuffer+BootExtBStrOffset 	; when the program has none, and then never read
 		ldx 	#0
 		ldy 	#0
 _WOCSExtTable:

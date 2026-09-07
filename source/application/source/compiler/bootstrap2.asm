@@ -94,6 +94,18 @@ BXDst: 										; regions, because they are contiguous in the object
 
 BXDone:
 		stz 	BXTable 					; a second RUN finds 0 pages and skips the lot
+		;
+		;		WHICH BANK GP.BSTR READS, handed to the runtime rather than assembled into it: the
+		;		runtime is SHARED, so one image serves every program and cannot know which bank any
+		;		of them chose for its text. Written here because this page already exists only for
+		;		a banked program, and a program with GP.BANKEDSTR is one by definition.
+		;
+		;		Harmless in a program that has no text: the byte is written and never read, because
+		;		nothing calls GP.BSTR.
+		;
+BXBStrBank:
+		lda 	#0 							; PATCHED with the GP.BANKEDSTR bank
+		sta 	GPBSTRBANK
 		lda 	BXBase
 		ldx 	BXWS
 		ldy 	BXWSEnd
@@ -131,6 +143,7 @@ ProgramBootExtEnd: 							; PHYSICAL end -- (End - Start) == 256 bytes
 ; ------------------------------------------------------------------------------------------------
 BootExtSrcOffset = BXSrc+2 - $0900
 BootExtTableOffset = BXTable - $0900
+BootExtBStrOffset = BXBStrBank+1 - $0900 	; the GP.BSTR bank, an instruction OPERAND again
 BootExtEntry = BXEntry 						; the address the bootstrap's jmp is patched to
 
 		.send code

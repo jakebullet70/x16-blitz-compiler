@@ -281,10 +281,30 @@ _SCEClosed:
 		lda 	passNumber
 		bne 	_SCEPlaced
 		jsr 	GPBankRelocate 				; PASS ONE ONLY. It lifts each region out to the end
-		jsr 	SaveLayout 					; of the object and works out where they all go; pass
-		bra 	_SCEResolve 				; two is handed that and writes them there directly
+											; of the object and works out where they all go; pass
+											; two is handed that and writes them there directly
+		;
+		;		AND THE TEXT GOES ON BEFORE THE LAYOUT IS SAVED, which is not an ordering nicety:
+		;		the text is a REGION, in its own bank, with its own layout slot, and the layout is
+		;		how pass two and ObjStreamClose both find it. Written as low code instead, its
+		;		bytes stream through the low buffer at an objPtr above everything the buffer has
+		;		reached, and the streamer pads forward across the whole span the GP.BANKED regions
+		;		occupy -- 65,535 bytes of filler in a 22K program, invisible to every check here
+		;		because both passes do it identically. See commands/gpbstrflush.asm.
+		;
+		jsr 	BStrFlush
+		jsr 	SaveLayout
+		bra 	_SCEResolve
 _SCEPlaced:
 		jsr 	ClaimRegionTop 				; the layout itself was restored before this pass began
+_SCEBankedText:
+		;
+		;		GP.BANKEDSTR's text goes on LAST, above every GP.BANKED region, as one more entry
+		;		in the same table -- see commands/gpbstrflush.asm. Both passes write it and both
+		;		must come out the same length, which is why it is here on both paths and not
+		;		inside the pass-one branch above.
+		;
+		jsr 	BStrFlush
 		;
 		;		NEITHER PASS HAS AN OBJECT ANY MORE. Pass one only counts -- it works out where
 		;		every line, block and region lands, and how long the whole thing is -- and pass
@@ -443,6 +463,19 @@ ResetPassState:
 		stz 	AsmPoolLen+1
 		stz 	AsmFixupCount
 		;
+		;		GP.BANKEDSTR, the same way: the group tables and the string pool are rebuilt from
+		;		scratch by each pass and must come out identical, because the constants pass one
+		;		pushed for every GP.BSTR are what pass two has to push again.
+		;
+		stz 	bstrGroupCount
+		stz 	bstrStringCount
+		stz 	bstrStringCount+1
+		stz 	bstrPoolLen
+		stz 	bstrPoolLen+1
+		stz 	bstrState 					; no GP.BANKEDSTR block open
+											; bstrBank is NOT cleared: the bootstrap extension page
+											; carries it and goes out before pass two reads a block
+		;
 		stz 	nextRegion 					; ...and pass two's place in the region layout
 		stz 	regionOpen
 		;
@@ -453,9 +486,19 @@ ResetPassState:
 		;		above have just cleared the two fields that say a layout exists, so this goes last.
 		;
 		lda 	passNumber
-		beq 	_RPSDone
+		bne 	_RPSPassTwo
+		stz 	bstrPages 					; pass one starts with no banked-text region
+		rts
+_RPSPassTwo:
+		;
+		;		THE BANKED-TEXT REGION COMES BACK WITH THE REST OF THE LAYOUT, and it has to be
+		;		here rather than at the end of the pass: the bootstrap extension page carries the
+		;		region table and is written before pass two compiles anything, so a region entered
+		;		at the end of pass two is entered after the table describing it has gone to disk.
+		;		The program then loads with nothing copied to $A000 and dies at run time, having
+		;		compiled clean. See commands/gpbstrflush.asm.
+		;
 		jsr 	RestoreLayout
-_RPSDone:
 		rts
 
 ; ************************************************************************************************
@@ -659,9 +702,20 @@ _RLDone:
 ;		Pass one's length is that top, so take it back, or WriteObjectCode would stream the low
 ;		code and stop.
 ;
+;		UNLESS THERE IS BANKED TEXT, because then pass one's length is one region FURTHER on:
+;		BStrFlush appends the text above every GP.BANKED region, so pass1Len is the top of the
+;		TEXT, not the top of the regions -- and the text is the very next thing pass two writes.
+;		Claiming the text's own top left BStrFlush winding the cursor BACKWARDS over its own
+;		region, and the object stream answers a backward move by padding forward to it: 65,535
+;		bytes of filler in a 22K program, with the length check none the wiser because both
+;		passes did exactly the same thing. bstrStart is where pass one began the text, which is
+;		the top of the regions, which is where pass two has to start it.
+;
 ; ************************************************************************************************
 
 ClaimRegionTop:
+		lda 	bstrPages
+		bne 	_CRTBankedText
 		lda 	layoutCount
 		beq 	_CRTDone 					; no regions, so the cursor is already the top
 		lda 	pass1Len
@@ -669,6 +723,12 @@ ClaimRegionTop:
 		lda 	pass1Len+1
 		sta 	objPtr+1
 _CRTDone:
+		rts
+_CRTBankedText:
+		lda 	bstrStart
+		sta 	objPtr
+		lda 	bstrStart+1
+		sta 	objPtr+1
 		rts
 
 ; ************************************************************************************************

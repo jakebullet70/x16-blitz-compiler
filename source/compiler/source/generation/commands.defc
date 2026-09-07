@@ -84,7 +84,7 @@
 ;
 ;	SYS    # T N
 ;
-	.byte	$07,$9e,$00,$e2,43229 & $FF,43229 >> 8,$06
+	.byte	$07,$9e,$00,$e2,43485 & $FF,43485 >> 8,$06
 ;
 ;	POKE    #,# T N
 ;
@@ -96,7 +96,7 @@
 ;
 ;	STOP    T N
 ;
-	.byte	$07,$90,$00,$20,42973 & $FF,42973 >> 8,$06
+	.byte	$07,$90,$00,$20,43229 & $FF,43229 >> 8,$06
 ;
 ;	END    T N
 ;
@@ -166,6 +166,14 @@
 ;
 	.byte	$07,$ce,$56,$03,CommandGPEndBankedCompile & $FF,CommandGPEndBankedCompile >> 8,$06
 ;
+;	GP.BANKEDSTR  X:CommandGPBankedStrCompile N
+;
+	.byte	$07,$ce,$53,$03,CommandGPBankedStrCompile & $FF,CommandGPBankedStrCompile >> 8,$06
+;
+;	GP.ENDBANKEDSTR X:CommandGPEndBankedStrCompile N
+;
+	.byte	$07,$ce,$52,$03,CommandGPEndBankedStrCompile & $FF,CommandGPEndBankedStrCompile >> 8,$06
+;
 ;	GP.CALL   # X:OptionalZeroCompile X:OptionalZeroCompile X:OptionalZeroCompile X:OptionalZeroCompile T N
 ;
-	.byte	$13,$ce,$7c,$e3,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$20,34013 & $FF,34013 >> 8,$06
+	.byte	$13,$ce,$7c,$e3,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$03,OptionalZeroCompile & $FF,OptionalZeroCompile >> 8,$20,34269 & $FF,34269 >> 8,$06

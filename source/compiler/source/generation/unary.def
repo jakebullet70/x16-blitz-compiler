@@ -51,6 +51,17 @@ GP.STRPTR 		($) T N
 #
 GP.ARRPTR 		(X:AnyArrayCompile) T N
 #
+# 	GP.BSTR(<name>,n) -- string n of a GP.BANKEDSTR group, fetched from its bank. The NAME is read
+# 	out of the source by BankedStrGroupCompile and resolved to a constant base at COMPILE time, the
+# 	way GP.ARRPTR reads an array name above, so no letter of it reaches the object. "S" is what
+# 	makes it return a string.
+#
+# 	GP.BSTRCOUNT(<name>) is COMPOSITE -- no "T", no handler anywhere: it emits the group's count as
+# 	an integer constant, so FOR I = 0 TO GP.BSTRCOUNT(X)-1 costs nothing but the constant.
+#
+GP.BSTR 		(X:BankedStrGroupCompile,# X:BankedStrAddCompile) T S
+GP.BSTRCOUNT 	(X:BankedStrCountCompile) N
+#
 # 	GP.CONTAINS(a$,b$) -- the first COMPOSITE keyword: it has NO "T", so it emits no p-code of its
 # 	own and there is no handler for it anywhere in the runtime. GPContainsCompile lowers it into
 # 	gp.instr / f.cmp / <>, all of which already exist, so the object code is byte for byte what

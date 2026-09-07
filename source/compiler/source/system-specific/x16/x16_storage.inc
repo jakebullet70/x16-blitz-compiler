@@ -286,3 +286,48 @@ asm_release .macro
 asmSavedBank: 								; caller's RAM bank, saved across an assembler window
 		.fill 	1
 		.send 	storage
+
+;
+;		BANK 16 -- the GP.BANKEDSTR group tables and string pool. Same rules again. These windows
+;		are never nested inside any of the others: the block reads its own source lines and
+;		touches no variable name, line number or block end while it is open. BStrFlush opens and
+;		closes ONCE PER BYTE for the same reason AsmFlushPool does -- WriteCodeByte can raise
+;		PROGRAM TOO BIG and leave through the error handler, which prints in bank 0.
+;
+;		SIXTEEN, NOT SEVEN, AND THE APPLICATION IS WHY. The banks above are the COMPILER's, but
+;		the application takes more that are not listed anywhere near them: OBJ_BUF_BANK is 7 and
+;		OBJ_RGN_BANK is 8, one bank a region up to GPBANK_MAXREGIONS, so 7 through 15 all belong
+;		to the object writer (application/compiler/object.asm:548).
+;
+;		This cost most of a day. Bank 7 held the string pool perfectly through PASS ONE -- which
+;		writes no object -- and pass two then filled the same bank with the object as it streamed
+;		it, so every length byte read back as zero. The symptom was not a wrong string: it was
+;		INTERNAL ERROR from the two-pass agreement check, because the region came out 44 bytes in
+;		pass two against 20 in pass one, with the page padding hiding it in the total length.
+;
+BStrStorageBank	= 16
+
+bstr_access .macro
+		php
+		pha
+		lda 	CompilerRAMBankReg 			; remember whatever the caller had selected
+		sta 	bstrSavedBank
+		lda 	#BStrStorageBank
+		sta 	CompilerRAMBankReg
+		pla
+		plp
+		.endm
+
+bstr_release .macro
+		php
+		pha
+		lda 	bstrSavedBank
+		sta 	CompilerRAMBankReg
+		pla
+		plp
+		.endm
+
+		.section storage
+bstrSavedBank: 								; caller's RAM bank, saved across a banked-string window
+		.fill 	1
+		.send 	storage

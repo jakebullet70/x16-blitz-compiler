@@ -57,6 +57,15 @@
 #TOKEN GP.BANKED 52823
 #TOKEN GP.ENDBANKED 52822
 
+## ---- banked text: GP.BANKEDSTR <bank> <name> ... GP.ENDBANKEDSTR, read with
+## ---- GP.BSTR(<name>,n). GP.BSTRCOUNT(<name>) is the group's size, a compile-time
+## ---- constant. The body lines are BARE QUOTED STRINGS, not REMs: BASLOAD upper-cases
+## ---- REM text and would destroy the case of every string.
+#TOKEN GP.BSTR 52821
+#TOKEN GP.BSTRCOUNT 52820
+#TOKEN GP.BANKEDSTR 52819
+#TOKEN GP.ENDBANKEDSTR 52818
+
 ## ---- block if ----
 #TOKEN GP.IF 52830
 #TOKEN GP.ELSEIF 52829

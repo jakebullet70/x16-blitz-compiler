@@ -114,6 +114,15 @@ GP.ENDASM 		X:CommandEndAsmCompile N
 GP.BANKED 		X:CommandGPBankedCompile N
 GP.ENDBANKED 	X:CommandGPEndBankedCompile N
 #
+#		GP.BANKEDSTR <bank> <name> / GP.ENDBANKEDSTR -- literal text into a RAM bank, read back with
+#		GP.BSTR(<name>,n). NO "#" ON GP.BANKEDSTR: like GP.BANKED its bank is a decimal constant read
+#		by the handler, and the name after it is read the same way -- neither is an expression. No "T"
+#		on either, so they write no keyword token and a program whose only GP.BASIC keywords are these
+#		stays GP OUT; GP.BSTR is what makes it GP IN, and that is where the cost belongs.
+#
+GP.BANKEDSTR 	X:CommandGPBankedStrCompile N
+GP.ENDBANKEDSTR X:CommandGPEndBankedStrCompile N
+#
 #		GP.CALL <addr> [,a] [,x] [,y] [,c] -- call machine code with the registers set. Results
 #		come back through the GP.A/GP.X/GP.Y/GP.C value words (x16_unary.def), which are ordinary
 #		tokens, NOT variables: nothing lets the runtime write a variable by name, and X16's own

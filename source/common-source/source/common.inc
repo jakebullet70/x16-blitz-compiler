@@ -114,6 +114,22 @@ RTGPBASE = $6600 							; GPB handler block + load address of the FULL file
 RTBASE = $6E00 								; interpreter core home -- the base that never moves
 RT_ENTRY = RTBASE+4 						; 4-byte magic at RTBASE, then jmp StartRuntime
 RTGPMAGIC = RTBASE-4 						; 4-byte "handlers are loaded too" magic
+
+;
+;		GP.BSTR's text bank, one byte, handed from the program's bootstrap to the runtime.
+;
+;		A FIXED ADDRESS AND NOT A STORAGE LABEL, and the reason is worth writing down. The runtime
+;		is linked TWICE with gp.library at opposite ends -- last in the application's embedded
+;		image, first in the standalone GPB.RT file -- so every label in the GPB half lands at a
+;		different address in the two. A handover through a label works in whichever link the
+;		bootstrap was told about and reads a stale byte in the other: here it was $05E5 against
+;		$0400, and the program ran, printed garbage, and blamed the handler.
+;
+;		It sits in the divider's padding, immediately below RTGPMAGIC. A core-only program's
+;		workspace runs up to RTBASE and overwrites it, which is correct -- such a program has no
+;		GPB handlers and so cannot call GP.BSTR.
+;
+GPBSTRBANK = RTGPMAGIC-1 					; the RAM bank a GP.BANKEDSTR program keeps its text in
 PCODE_PAGE = $09 							; shared-mode p-code base page ($0900, page-aligned)
 MIN_WS_PAGES = 16 							; smallest workspace a shared program keeps (4K)
 ;
@@ -220,7 +236,7 @@ FrameStackPages = 16 						; 4K, ~250 frames
 ;		(.ifnext, .ifelse) were appended after .caseend on top of that. The gp.else -> gp.other
 ;		rename moved nothing: same position, same id.
 ;
-RT_ABI = 22 								; runtime ABI ordinal -> "GP22" magic (NOT the file name)
+RT_ABI = 23 								; runtime ABI ordinal -> "GP23" magic (NOT the file name)
 
 ; ************************************************************************************************
 ;
