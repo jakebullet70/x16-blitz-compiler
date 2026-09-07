@@ -1,0 +1,185 @@
+## ***********************************************************************
+## **
+## **  STRUSING.INC.BL -- a number to a template. PRINT USING's mask, in BASIC.
+## **
+## **      STR.USING       the value through STR.USING.MASK$
+## **      STR.USING.FIX   the value to STR.USING.DP decimal places, no mask
+## **
+## **  This file holds CODE -- call the routines with GOSUB. It is position independent
+## **  (the module jumps over itself), so #INCLUDE it anywhere. Pure BASIC: it needs no
+## **  #SYMFILE and depends on no other module.
+## **
+## **  Parameters, since a BASL subroutine takes no arguments:
+## **
+## **      STR.USING.NUM     the value                    both
+## **      STR.USING.MASK$   the template                 USING
+## **      STR.USING.DP      decimal places               FIX
+## **      STR.USING.STR$    the result                   both
+## **
+## **  Clobbered:
+## **      STR.USING.DP                    USING reads it out of the mask
+## **      STR.USING.INT$  STR.USING.FRC$  the two halves of the digits
+## **      STR.USING.SGN   STR.USING.OVR   -1 when the value was negative / too wide
+## **      STR.USING.SIGN$  STR.USING.OUT$  STR.USING.C$
+## **      STR.USING.IW  STR.USING.ZW  STR.USING.Z  STR.USING.W  STR.USING.F
+## **      STR.USING.GRP  STR.USING.PT  STR.USING.I  STR.USING.V
+## **
+## **      STR.USING.NUM = 1234.5 : STR.USING.MASK$ = "#,##0.00"
+## **      GOSUB STR.USING
+## **      PRINT STR.USING.STR$                ' 1,234.50
+## **
+## **  THE MASK:
+## **
+## **      #     a digit position, SPACE if the number does not reach it
+## **      0     a digit position, ZERO if the number does not reach it
+## **      .     the decimal point everything aligns on
+## **      ,     anywhere in the mask, groups the integer part in threes
+## **      +     first character only: a sign column, + or -
+## **      -     first character only: a sign column, - or a space
+## **
+## **  The result is exactly LEN(STR.USING.MASK$) characters wide, right justified, so a
+## **  column of them lines up on the point. Everything after the point prints, so # and
+## **  0 do not differ there.
+## **
+## **  A value too wide for its mask fills the whole field with "*". That is deliberate
+## **  and visible: overflowing the width instead would push the rest of the row along.
+## **  A negative value with no sign column in the mask spends one of the digit
+## **  positions on its minus, and overflows when there is none to spend.
+## **
+## **  WARNING: the value must scale to under 1,000,000,000. The digits are built by
+## **  multiplying up by 10^DP and rounding, and STR$ turns over to E notation at 1e9 --
+## **  so two decimal places reach 9,999,999.99 and five reach 9,999.99999. Past that
+## **  the field fills with "*".
+## **
+## **  ROUNDING IS HALF AWAY FROM ZERO, done on the absolute value before the sign goes
+## **  back on. INT alone floors toward minus infinity, which rounds -1.5 and 1.5 in
+## **  opposite directions.
+## **
+## ***********************************************************************
+#IFNDEF STR.USING.DEFS
+#DEFINE STR.USING.DEFS 1
+
+GOTO STR.USING.SKIP
+
+## STR.USING -- the value through the mask.
+##
+##   in    STR.USING.NUM     the value
+##         STR.USING.MASK$   the template
+##   out   STR.USING.STR$    LEN(STR.USING.MASK$) characters
+##
+## Reads the mask, formats the digits, then fits them to the field. An empty mask gives
+## an empty result.
+
+STR.USING:
+    STR.USING.W = LEN(STR.USING.MASK$)
+    STR.USING.STR$ = ""
+    IF STR.USING.W = 0 THEN RETURN
+    STR.USING.DP = 0 : STR.USING.IW = 0 : STR.USING.ZW = 0
+    STR.USING.GRP = 0 : STR.USING.PT = 0 : STR.USING.SIGN$ = ""
+    STR.USING.I = 1
+    STR.USING.C$ = LEFT$(STR.USING.MASK$, 1)
+    IF STR.USING.C$ = "+" THEN STR.USING.SIGN$ = "+" : STR.USING.I = 2
+    IF STR.USING.C$ = "-" THEN STR.USING.SIGN$ = "-" : STR.USING.I = 2
+
+## ---- one pass over the mask. STR.USING.PT flips at the point, so the same digit test
+## ---- counts the integer width before it and the decimal places after. STR.USING.ZW
+## ---- remembers the LEFTMOST 0, because the forced zeros run from there to the point.
+
+STR.USING.SCAN:
+    IF STR.USING.I > STR.USING.W THEN GOTO STR.USING.READY
+    STR.USING.C$ = MID$(STR.USING.MASK$, STR.USING.I, 1)
+    STR.USING.I = STR.USING.I + 1
+    IF STR.USING.C$ = "," THEN STR.USING.GRP = -1
+    IF STR.USING.C$ = "." THEN STR.USING.PT = -1
+    IF STR.USING.C$ <> "#" AND STR.USING.C$ <> "0" THEN GOTO STR.USING.SCAN
+    IF STR.USING.PT THEN STR.USING.DP = STR.USING.DP + 1 : GOTO STR.USING.SCAN
+    STR.USING.IW = STR.USING.IW + 1
+    IF STR.USING.C$ = "0" AND STR.USING.ZW = 0 THEN STR.USING.ZW = STR.USING.IW
+    GOTO STR.USING.SCAN
+
+## ---- the digits, then the field. Overflow is tested on the integer DIGITS against the
+## ---- mask's digit positions, before the grouping commas are added, and again on the
+## ---- finished string against the field -- the second catches a minus with nowhere to go.
+
+STR.USING.READY:
+    GOSUB STR.USING.FIX
+    IF STR.USING.OVR THEN GOTO STR.USING.STAR
+    IF LEN(STR.USING.INT$) > STR.USING.IW THEN GOTO STR.USING.STAR
+    STR.USING.Z = 0
+    IF STR.USING.ZW > 0 THEN STR.USING.Z = STR.USING.IW - STR.USING.ZW + 1
+    IF LEN(STR.USING.INT$) < STR.USING.Z THEN STR.USING.INT$ = RPT$(48, STR.USING.Z - LEN(STR.USING.INT$)) + STR.USING.INT$
+    IF STR.USING.GRP THEN GOSUB STR.USING.GROUP
+    STR.USING.STR$ = STR.USING.INT$
+    IF STR.USING.DP > 0 THEN STR.USING.STR$ = STR.USING.STR$ + "." + STR.USING.FRC$
+    STR.USING.F = STR.USING.W
+    IF STR.USING.SIGN$ <> "" THEN STR.USING.F = STR.USING.W - 1
+    IF STR.USING.SIGN$ = "" AND STR.USING.SGN THEN STR.USING.STR$ = "-" + STR.USING.STR$
+    IF LEN(STR.USING.STR$) > STR.USING.F THEN GOTO STR.USING.STAR
+    IF LEN(STR.USING.STR$) < STR.USING.F THEN STR.USING.STR$ = RPT$(32, STR.USING.F - LEN(STR.USING.STR$)) + STR.USING.STR$
+    IF STR.USING.SIGN$ = "" THEN RETURN
+    IF STR.USING.SGN THEN STR.USING.STR$ = "-" + STR.USING.STR$ : RETURN
+    IF STR.USING.SIGN$ = "+" THEN STR.USING.STR$ = "+" + STR.USING.STR$ : RETURN
+    STR.USING.STR$ = " " + STR.USING.STR$
+    RETURN
+
+STR.USING.STAR:
+    STR.USING.STR$ = RPT$(42, STR.USING.W)
+    RETURN
+
+## STR.USING.FIX -- the value to STR.USING.DP decimal places, and nothing else.
+##
+##   in    STR.USING.NUM   the value
+##         STR.USING.DP    decimal places, 0 upwards
+##   out   STR.USING.STR$  "-12.50" -- no leading space, no field, no mask
+##         STR.USING.INT$  the digits before the point
+##         STR.USING.FRC$  the digits after it, exactly STR.USING.DP of them
+##         STR.USING.SGN   -1 if the ROUNDED value is negative
+##         STR.USING.OVR   -1 if it scaled past 1e9 and the digits are unusable
+##   clobbers  STR.USING.V
+##
+## Right justify it with STR.PADL if you want a column; this routine has no field.
+##
+## The digits come out of a scaled INTEGER, not out of STR$'s fraction: STR$ trims
+## trailing zeros, so 12.30 comes back as "12.3", and it drops the leading zero of a
+## pure fraction, so a half is " .5". Neither can be padded back into a column.
+##
+## -0.004 to two places is "0.00", not "-0.00" -- the sign is dropped when the rounded
+## value is zero, because a signed zero in a column reads as a real negative.
+
+STR.USING.FIX:
+    STR.USING.SGN = 0 : STR.USING.OVR = 0
+    STR.USING.V = ABS(STR.USING.NUM)
+    IF STR.USING.NUM < 0 THEN STR.USING.SGN = -1
+    IF STR.USING.DP > 0 THEN STR.USING.V = STR.USING.V * 10 ^ STR.USING.DP
+    STR.USING.V = INT(STR.USING.V + 0.5)
+    IF STR.USING.V = 0 THEN STR.USING.SGN = 0
+    IF STR.USING.V > 999999999 THEN STR.USING.OVR = -1 : STR.USING.V = 0
+    STR.USING.INT$ = MID$(STR$(STR.USING.V), 2)
+    IF LEN(STR.USING.INT$) < STR.USING.DP + 1 THEN STR.USING.INT$ = RPT$(48, STR.USING.DP + 1 - LEN(STR.USING.INT$)) + STR.USING.INT$
+    STR.USING.FRC$ = ""
+    IF STR.USING.DP > 0 THEN STR.USING.FRC$ = RIGHT$(STR.USING.INT$, STR.USING.DP)
+    STR.USING.INT$ = LEFT$(STR.USING.INT$, LEN(STR.USING.INT$) - STR.USING.DP)
+    STR.USING.STR$ = STR.USING.INT$
+    IF STR.USING.DP > 0 THEN STR.USING.STR$ = STR.USING.STR$ + "." + STR.USING.FRC$
+    IF STR.USING.SGN THEN STR.USING.STR$ = "-" + STR.USING.STR$
+    RETURN
+
+## STR.USING.GROUP -- commas into STR.USING.INT$, every three digits from the right.
+##
+##   in    STR.USING.INT$   digits only, no sign and no point
+##   out   STR.USING.INT$
+##   clobbers  STR.USING.OUT$  STR.USING.I
+##
+## Walked from the right, because that is the end the grouping is anchored to. Three or
+## fewer digits are returned untouched, so it is safe on any width.
+
+STR.USING.GROUP:
+    STR.USING.OUT$ = "" : STR.USING.I = LEN(STR.USING.INT$)
+STR.USING.GROUP.NEXT:
+    IF STR.USING.I <= 3 THEN STR.USING.INT$ = LEFT$(STR.USING.INT$, STR.USING.I) + STR.USING.OUT$ : RETURN
+    STR.USING.OUT$ = "," + MID$(STR.USING.INT$, STR.USING.I - 2, 3) + STR.USING.OUT$
+    STR.USING.I = STR.USING.I - 3
+    GOTO STR.USING.GROUP.NEXT
+
+STR.USING.SKIP:
+#ENDIF

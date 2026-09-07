@@ -21,6 +21,7 @@ The convention is one dotted prefix per module, and nothing writes outside its o
 |---|---|---|
 | `GP.` | `GPB.INC.BL` | **keywords, not variables** — see §2, this one is different |
 | `STR.` | `STRINGS.INC.BL` | string helpers |
+| `STR.USING.` | `STRUSING.INC.BL` | a number to a template, kept apart from the rest of `STR.` |
 | `THEME.` | `THEME.INC.BL` | colour roles |
 | `APPSYS.` | `APPSYS.INC.BL` | screen save/restore, panels to disk |
 | `LINEINPUT.` | `LINEINPUT.INC.BL` | entry fields |
@@ -101,6 +102,26 @@ the X16 boots there but `SCREEN 0` is 40×30, and someone who prefers larger tex
 `STR.MAX` to match — `DIM`ming an array GPC has already auto-dimensioned is an error, so it is
 one or the other. This is the opposite of `THEME.CLR`, which the module owns outright; the two are
 worth keeping straight.
+
+### `STRUSING.INC.BL`
+
+| | |
+|---|---|
+| in | `STR.USING.NUM` — the value, both routines<br>`STR.USING.MASK$` — the template, `STR.USING`<br>`STR.USING.DP` — decimal places, `STR.USING.FIX` |
+| out | `STR.USING.STR$` — the result: a field from `STR.USING`, digits from `STR.USING.FIX`<br>`STR.USING.OVR` — −1 when the value scaled past 1e9 and the digits are unusable<br>`STR.USING.SGN` — −1 when the ROUNDED value is negative |
+| internal | `STR.USING.INT$` `STR.USING.FRC$` `STR.USING.SIGN$` `STR.USING.OUT$` `STR.USING.C$`<br>`STR.USING.IW` `STR.USING.ZW` `STR.USING.Z` `STR.USING.W` `STR.USING.F`<br>`STR.USING.GRP` `STR.USING.PT` `STR.USING.I` `STR.USING.V` |
+
+**`STR.USING.DP` is an output of `STR.USING` and an input to `STR.USING.FIX`.** The mask carries
+the decimal count, so `STR.USING` overwrites whatever was there. A program alternating the two
+routines must set `STR.USING.DP` again before every `FIX`.
+
+`STR.USING.INT$` and `STR.USING.FRC$` survive a call and are the two halves of the digits, without
+sign, point or field. They are listed internal because their width is the routine's business, not
+the caller's — read `STR.USING.STR$`.
+
+The prefix is `STR.USING.`, a sub-prefix of `STRINGS.INC.BL`'s `STR.`, on the same footing as
+`FILE.DIR.` inside `FILE.`. Nothing here is written by `STRINGS.INC.BL` and nothing there is
+written by this module, so either can be included alone.
 
 ### `LINEINPUT.INC.BL`
 

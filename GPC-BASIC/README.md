@@ -70,7 +70,7 @@ All of it needs `#INCLUDE "GPB.INC.BL"`, and nothing else.
 
 | Module | What it gives you | Example |
 | --- | --- | --- |
-| `STRINGS.INC.BL` | strings: `PADR`/`PADL`/`PADC` pad, `SPLIT` on a delimiter, `REPLACE` every occurrence, `PET2SCR`, and in `GP.ASM` `TRIM`/`LTRIM`/`RTRIM` and `SPLICE` in place | `SPLITT.EXP.BL` `STRINGS.EXP.BL` `STRTST.EXP.BL` |
+| `STRINGS.INC.BL` | strings: `PADR`/`PADL`/`PADC` pad, `SPLIT` on a delimiter, `REPLACE` every occurrence, `PET2SCR`, `SPLICE` at a position, and in `GP.ASM` `TRIM`/`LTRIM`/`RTRIM` in place | `SPLITT.EXP.BL` `STRINGS.EXP.BL` `STRTST.EXP.BL` |
 | `THEME.INC.BL` | named colour roles, light and dark, so re-skinning is one variable | `MENU.EXP.BL` |
 | `APPSYS.INC.BL` | leave the screen as you found it, and **panels to and from disk** | `MENU.EXP.BL` |
 | `LINEINPUT.INC.BL` | a positioned, length-limited entry field — what `INPUT` cannot do on a drawn screen | `FORM.EXP.BL` |
@@ -80,6 +80,7 @@ All of it needs `#INCLUDE "GPB.INC.BL"`, and nothing else.
 | `STASHFILE.INC.BL` | the same rectangle through a **file**, so a panel outlives the program | — |
 | `SORT.INC.BL` | shell sort a string array in place, in `GP.ASM` | `ARRAYS.EXP.BL` |
 | `STRCASE.INC.BL` | case, in place, in `GP.ASM` | `STRINGS.EXP.BL` `STRCTST.EXP.BL` |
+| `STRUSING.INC.BL` | a number to a template: `STR.USING` through a `"#,##0.00"` mask, `STR.USING.FIX` to a decimal count | `STRUSING.EXP.BL` `USINGT.EXP.BL` |
 | `BMX.INC.BL` | a BMX bitmap straight into VERA | `BMXVIEW.EXP.BL` |
 
 **Five of those modules are deliberately not keywords.** The menu, the stash, the sort and the five

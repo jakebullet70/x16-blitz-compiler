@@ -1,0 +1,120 @@
+## ***********************************************************************
+## **  USINGT.EXP.BL -- the regression test for STRUSING.INC.BL.
+## **  Thirty-eight cases: the two entry points, every mask character,
+## **  the rounding traps, the sign column and both overflows.
+## **
+## **  BOTH THE TEXT AND THE LENGTH are compared every time. They are not
+## **  the same test -- the result is a FIELD, so a right answer in the
+## **  wrong number of columns still breaks the table it was printed for.
+## **
+## **  Pure BASIC, so no #SYMFILE.
+## ***********************************************************************
+#SAVEAS "@:USINGT.PRG"
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "STRUSING.INC.BL"
+
+T.FAILS = 0
+
+## =======================================================================
+## STR.USING.FIX -- the digits, with no mask over them.
+## =======================================================================
+T.NUM = 12.4 : T.DP = 0 : T.WANT$ = "12" : T.NAME$ = "FIX.DOWN" : GOSUB T.FIX
+T.NUM = 12.5 : T.DP = 0 : T.WANT$ = "13" : T.NAME$ = "FIX.HALF.UP" : GOSUB T.FIX
+T.NUM = -12.5 : T.DP = 0 : T.WANT$ = "-13" : T.NAME$ = "FIX.HALF.DOWN" : GOSUB T.FIX
+T.NUM = 12.5 : T.DP = 2 : T.WANT$ = "12.50" : T.NAME$ = "FIX.TRAILZERO" : GOSUB T.FIX
+T.NUM = 0 : T.DP = 2 : T.WANT$ = "0.00" : T.NAME$ = "FIX.ZERO" : GOSUB T.FIX
+T.NUM = 0.5 : T.DP = 2 : T.WANT$ = "0.50" : T.NAME$ = "FIX.LEADZERO" : GOSUB T.FIX
+T.NUM = -0.004 : T.DP = 2 : T.WANT$ = "0.00" : T.NAME$ = "FIX.NEG.ZERO" : GOSUB T.FIX
+T.NUM = 1 / 3 : T.DP = 5 : T.WANT$ = "0.33333" : T.NAME$ = "FIX.THIRD" : GOSUB T.FIX
+T.NUM = -3.7 : T.DP = 0 : T.WANT$ = "-4" : T.NAME$ = "FIX.NEG.INT" : GOSUB T.FIX
+
+## =======================================================================
+## The pads: # is a space, 0 is a zero.
+## =======================================================================
+T.NUM = 12.5 : T.M$ = "###0.00" : T.WANT$ = "  12.50" : T.NAME$ = "HASH.PAD" : GOSUB T.RUN
+T.NUM = 12.5 : T.M$ = "0000.00" : T.WANT$ = "0012.50" : T.NAME$ = "ZERO.PAD" : GOSUB T.RUN
+T.NUM = 42 : T.M$ = "#####" : T.WANT$ = "   42" : T.NAME$ = "NO.POINT" : GOSUB T.RUN
+T.NUM = 42 : T.M$ = "00000" : T.WANT$ = "00042" : T.NAME$ = "ALL.ZERO" : GOSUB T.RUN
+T.NUM = 42 : T.M$ = "##000" : T.WANT$ = "  042" : T.NAME$ = "PART.ZERO" : GOSUB T.RUN
+T.NUM = 0 : T.M$ = "###0.00" : T.WANT$ = "   0.00" : T.NAME$ = "ZERO" : GOSUB T.RUN
+
+## =======================================================================
+## Rounding that carries into another integer digit.
+## =======================================================================
+T.NUM = 999.999 : T.M$ = "###0.00" : T.WANT$ = "1000.00" : T.NAME$ = "CARRY" : GOSUB T.RUN
+T.NUM = 9.996 : T.M$ = "##0.00" : T.WANT$ = " 10.00" : T.NAME$ = "CARRY.SMALL" : GOSUB T.RUN
+
+## =======================================================================
+## Thousands grouping, at 3, 4, 6 and 7 digits.
+## =======================================================================
+T.NUM = 123 : T.M$ = "#,##0" : T.WANT$ = "  123" : T.NAME$ = "GRP.3" : GOSUB T.RUN
+T.NUM = 1234.5 : T.M$ = "#,##0.00" : T.WANT$ = "1,234.50" : T.NAME$ = "GRP.4" : GOSUB T.RUN
+T.NUM = 1234 : T.M$ = "###,##0" : T.WANT$ = "  1,234" : T.NAME$ = "GRP.PAD" : GOSUB T.RUN
+T.NUM = 123456 : T.M$ = "#,###,##0" : T.WANT$ = "  123,456" : T.NAME$ = "GRP.6" : GOSUB T.RUN
+T.NUM = 1234567 : T.M$ = "#,###,##0" : T.WANT$ = "1,234,567" : T.NAME$ = "GRP.7" : GOSUB T.RUN
+
+## =======================================================================
+## The sign column. + always shows one, - reserves the space.
+## =======================================================================
+T.NUM = 1.5 : T.M$ = "+##0.00" : T.WANT$ = "+  1.50" : T.NAME$ = "PLUS.POS" : GOSUB T.RUN
+T.NUM = -1.5 : T.M$ = "+##0.00" : T.WANT$ = "-  1.50" : T.NAME$ = "PLUS.NEG" : GOSUB T.RUN
+T.NUM = 1.5 : T.M$ = "-##0.00" : T.WANT$ = "   1.50" : T.NAME$ = "MINUS.POS" : GOSUB T.RUN
+T.NUM = -1.5 : T.M$ = "-##0.00" : T.WANT$ = "-  1.50" : T.NAME$ = "MINUS.NEG" : GOSUB T.RUN
+
+## ---- no sign column: the minus spends a digit position ----
+T.NUM = -12.5 : T.M$ = "###0.00" : T.WANT$ = " -12.50" : T.NAME$ = "BARE.NEG" : GOSUB T.RUN
+T.NUM = -123 : T.M$ = "####" : T.WANT$ = "-123" : T.NAME$ = "BARE.NEG.TIGHT" : GOSUB T.RUN
+
+## =======================================================================
+## Overflow fills the field with stars.
+## =======================================================================
+T.NUM = 12345 : T.M$ = "##0" : T.WANT$ = "***" : T.NAME$ = "OVER.DIGITS" : GOSUB T.RUN
+T.NUM = -123 : T.M$ = "##0" : T.WANT$ = "***" : T.NAME$ = "OVER.MINUS" : GOSUB T.RUN
+T.NUM = 12345 : T.M$ = "#,##0" : T.WANT$ = "*****" : T.NAME$ = "OVER.GROUPED" : GOSUB T.RUN
+
+## ---- the documented 1e9 ceiling: scaled past it, the field stars ----
+T.NUM = 1234567.89 : T.M$ = "#######0.00" : T.WANT$ = " 1234567.89" : T.NAME$ = "CEILING.OK" : GOSUB T.RUN
+T.NUM = 99999999 : T.M$ = "##########.00" : T.WANT$ = "*************" : T.NAME$ = "CEILING.OVER" : GOSUB T.RUN
+
+## =======================================================================
+## Edges.
+## =======================================================================
+T.NUM = 5 : T.M$ = "" : T.WANT$ = "" : T.NAME$ = "EMPTY.MASK" : GOSUB T.RUN
+T.NUM = 12.5 : T.M$ = "##0." : T.WANT$ = "  13" : T.NAME$ = "POINT.NO.DP" : GOSUB T.RUN
+T.NUM = 0.75 : T.M$ = ".00" : T.WANT$ = "***" : T.NAME$ = "NO.INT.POS" : GOSUB T.RUN
+
+## ---- the mask is reusable: two calls in a row must not accumulate state ----
+T.NUM = 1234.5 : T.M$ = "#,##0.00" : T.WANT$ = "1,234.50" : T.NAME$ = "REUSE.1" : GOSUB T.RUN
+T.NUM = 1234.5 : T.M$ = "#,##0.00" : T.WANT$ = "1,234.50" : T.NAME$ = "REUSE.2" : GOSUB T.RUN
+T.NUM = 7 : T.M$ = "###0" : T.WANT$ = "   7" : T.NAME$ = "REUSE.3" : GOSUB T.RUN
+
+PRINT "FAILS "; T.FAILS
+PRINT "DONE"
+END
+
+T.RUN:
+    STR.USING.NUM = T.NUM
+    STR.USING.MASK$ = T.M$
+    GOSUB STR.USING
+    T.GOT$ = STR.USING.STR$
+    T.BAD = 0
+    IF LEN(T.WANT$) <> LEN(T.GOT$) THEN T.BAD = T.BAD + 10
+    IF T.WANT$ <> T.GOT$ THEN T.BAD = T.BAD + 1
+    GOSUB T.REPORT
+    RETURN
+
+T.FIX:
+    STR.USING.NUM = T.NUM
+    STR.USING.DP = T.DP
+    GOSUB STR.USING.FIX
+    T.GOT$ = STR.USING.STR$
+    T.BAD = 0
+    IF LEN(T.WANT$) <> LEN(T.GOT$) THEN T.BAD = T.BAD + 10
+    IF T.WANT$ <> T.GOT$ THEN T.BAD = T.BAD + 1
+    GOSUB T.REPORT
+    RETURN
+
+T.REPORT:
+    IF T.BAD = 0 THEN PRINT "PASS "; T.NAME$
+    IF T.BAD <> 0 THEN PRINT "FAIL "; T.NAME$; " BAD "; T.BAD; " WANT["; T.WANT$; "] GOT["; T.GOT$; "]" : T.FAILS = T.FAILS + 1
+    RETURN

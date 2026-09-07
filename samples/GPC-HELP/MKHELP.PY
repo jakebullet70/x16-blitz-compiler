@@ -257,6 +257,14 @@ def blocks(lines):
                 break
             para.append(t.strip())
             i += 1
+        # A LINE NO BRANCH ABOVE CLAIMED and no paragraph would take -- a table
+        # row whose header and |---| separator are on the far side of a blank
+        # line -- used to leave i where it was and spin here for ever. Emit it
+        # as its own paragraph and move on: a malformed table renders oddly,
+        # which is findable, where a hang is not.
+        if not para:
+            para = [s]
+            i += 1
         out.append(("para", " ".join(para)))
     return out
 

@@ -1242,26 +1242,49 @@ Two notes for the CALLER, not requirements on the routine:
 
 Add it when a caller exists, on the same rule the rest of this section runs on.
 
-### `STRINGS.INC.BL` wants `STR.USE` — a number to a template
+### `STRUSING.INC.BL` — a number to a template. BUILT 07/09/26
 
-§1.3 of [SIMONS-BASIC.REVIEW.md](docs/blitz/SIMONS-BASIC.REVIEW.md). X16 BASIC has no `PRINT USING`
-and neither does GP.BASIC. `STR.PADL` aligns a column; it does not align a decimal point, pad with
-leading zeros, group thousands or reserve a sign column, and a table of numbers wants all four.
+**Shipped** as `GPC-BASIC/STRUSING.INC.BL`, **744 bytes** of p-code, thirty-eight assertions green
+headlessly — `GPC-BASIC/USINGT.EXP.BL`. Example `GPC-BASIC/STRUSING.EXP.BL`. Documented at
+`GP-BASIC.md` §4.10.
 
 ```
-   in   STR.NUM               the value
-        STR.MASK$             "###0.00" -- # optional digit, 0 forced, . the point
-   out  STR.STR$
+STR.USING       in  STR.USING.NUM  STR.USING.MASK$   out  STR.USING.STR$
+STR.USING.FIX   in  STR.USING.NUM  STR.USING.DP      out  STR.USING.STR$
 ```
 
-Traps, all three of which show up as a misaligned column rather than an error:
+Mask: `#` optional digit, `0` forced, `.` the point, `,` thousands, a leading `+` or `-` for the
+sign column, and `*` filling the field on overflow. That is BASIC 7.0's `PRINT USING` mask less
+the four characters that earn nothing here — `$` floating currency, a trailing sign, `^^^^`
+exponential, and `=` / `>`, which justify a **string** and are `STR.PADC` and `STR.PADL`. The
+first two are cheap (~25 and ~50 bytes) if a caller ever wants them.
 
-- `STR$` puts a leading space on a positive number. Strip it, or every positive value is one column
-  wide of every negative one.
-- Round at the cut rather than letting `INT` floor it, and handle the sign before the round — `INT`
-  goes toward minus infinity, so `-1.5` and `1.5` round in opposite directions.
-- A number wider than its mask has to do something visible. Fill the field with `*`, as other BASICs
-  do, rather than overflowing the width and pushing the rest of the row along.
+**What the build settled, none of it guessable from the old spec:**
+
+- **`STR$` cannot be asked for decimal places, and a fixed-decimal mode was tried and reverted.**
+  `FloatToString` (`source/ifloat32/source/utility/float/tostring.asm:21-27`) takes *significant
+  digits*; passing decimal places printed `12345678.9` as `12345678.8984375`. It also trims
+  trailing zeros (`12.30` → `"12.3"`) and drops the leading zero of a pure fraction (`" .5"`). So
+  the fraction cannot be read out of `STR$` at all — the digits come from a scaled integer.
+- **That scaling is exact, and it sets the ceiling.** The mantissa is a true 32-bit integer at
+  exponent 0, and `^` with a whole exponent is repeated multiplication, not logs
+  (`source/polynomials/source/unary/power.asm:41-45`). But `STR$` turns over to E notation at 1e9,
+  so the scaled value must stay under it: **two decimal places reach 9,999,999.99**, five reach
+  9,999.99999. Past that the field stars rather than printing something wrong.
+- **Its own module, not a routine in `STRINGS.INC.BL`.** 744 bytes is more than the whole BASIC
+  half of `STRINGS`, and every includer would pay it — the `CRUNCHER` +493 measurement below is
+  the same lesson. The prefix `STR.USING.` is a sub-prefix of `STR.`, on the `FILE.DIR.` pattern,
+  so the module-level scan still works.
+- **`STR.USING.FIX` alone is 210 of the 744**, measured by compiling it on its own. If per-routine
+  elimination ever lands, that is the split.
+- **`STR.USING.DP` is an output of `STR.USING` and an input to `STR.USING.FIX`** — the mask
+  carries the count. Alternating the two routines means setting it again every time.
+
+**Not a keyword, and the numbers say why.** The GP block has ~200 bytes of slack (GP code ends
+≈`$3C37`, `ObjectBase` is `$3D00`); a formatter is 150-250, so it lands on the page boundary and
+crossing it costs **+512 bytes off every GP program**, charged twice. A new opcode also costs 2
+bytes of vector table in *every* compiled program and forces an `RT_ABI` bump that invalidates
+every compiled shared-mode program. It could not be a composite either — those may not loop.
 
 ### A screen-rectangle move and scroll
 

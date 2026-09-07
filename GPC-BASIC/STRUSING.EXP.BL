@@ -1,0 +1,70 @@
+## STRUSING -- exercise STR.USING and STR.USING.FIX
+## STRUSING.INC.BL is pure BASIC, so this program needs no #SYMFILE.
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "STRUSING.INC.BL"
+#SAVEAS "@:STRUSING.PRG"
+
+PRINT "-- ONE VALUE, SIX MASKS --"
+STR.USING.NUM = 1234.5
+GOSUB E.SIX
+
+PRINT
+PRINT "-- A COLUMN LINES UP ON THE POINT --"
+STR.USING.MASK$ = "###,##0.00"
+FOR I = 1 TO 6
+    READ E.V
+    STR.USING.NUM = E.V
+    GOSUB STR.USING
+    PRINT STR.USING.STR$
+NEXT
+DATA 5, 42.5, 1234.567, 0, -99.9, 123456
+
+PRINT
+PRINT "-- A NEGATIVE, WITH AND WITHOUT A SIGN COLUMN --"
+STR.USING.NUM = -1.5
+STR.USING.MASK$ = "###0.00" : GOSUB E.ONE
+STR.USING.MASK$ = "-###0.00" : GOSUB E.ONE
+STR.USING.MASK$ = "+###0.00" : GOSUB E.ONE
+STR.USING.NUM = 1.5
+STR.USING.MASK$ = "+###0.00" : GOSUB E.ONE
+
+PRINT
+PRINT "-- TOO WIDE FOR ITS MASK --"
+STR.USING.NUM = 12345
+STR.USING.MASK$ = "##0" : GOSUB E.ONE
+STR.USING.MASK$ = "##,##0" : GOSUB E.ONE
+
+PRINT
+PRINT "-- STR.USING.FIX: DECIMAL PLACES, NO FIELD --"
+STR.USING.NUM = 2 / 3
+FOR I = 0 TO 4
+    STR.USING.DP = I
+    GOSUB STR.USING.FIX
+    PRINT "DP"; I; " ["; STR.USING.STR$; "]"
+NEXT
+
+## ---- ROUNDING IS HALF AWAY FROM ZERO. Both of these go to 13, which plain INT
+## ---- would not do -- it floors toward minus infinity and would give -12.
+STR.USING.DP = 0
+STR.USING.NUM = 12.5 : GOSUB STR.USING.FIX : PRINT "12.5 -> "; STR.USING.STR$
+STR.USING.NUM = -12.5 : GOSUB STR.USING.FIX : PRINT "-12.5 -> "; STR.USING.STR$
+
+PRINT
+PRINT "DONE"
+END
+
+## ---- one value through six masks ----
+E.SIX:
+    STR.USING.MASK$ = "###0" : GOSUB E.ONE
+    STR.USING.MASK$ = "###0.00" : GOSUB E.ONE
+    STR.USING.MASK$ = "0000.00" : GOSUB E.ONE
+    STR.USING.MASK$ = "#,##0.00" : GOSUB E.ONE
+    STR.USING.MASK$ = "########" : GOSUB E.ONE
+    STR.USING.MASK$ = "+#,##0.00" : GOSUB E.ONE
+    RETURN
+
+## ---- one call, printed between brackets so the field width shows ----
+E.ONE:
+    GOSUB STR.USING
+    PRINT STR.USING.MASK$; " -> ["; STR.USING.STR$; "]"
+    RETURN

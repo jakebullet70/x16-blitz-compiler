@@ -758,6 +758,9 @@ The readable name costs no variable and no lookup.
 
 `THEME.CLR` is `DIM`med by the module. Do not `DIM` it in your own program.
 
+Formatting a NUMBER into a column is `STRUSING.INC.BL` (§4.10), a separate
+module: it needs no `#SYMFILE` and neither module depends on the other.
+
 ### 4.2 `STRINGS.INC.BL` — string helpers
 
 | Routine | in | out |
@@ -769,7 +772,6 @@ The readable name costs no variable and no lookup.
 | `STR.REPLACE` | `STR.STR$` `STR.FIND$` `STR.REPL$` | `STR.STR$`, every occurrence replaced |
 | `STR.PET2SCR` | `STR.PET` | `STR.SCR` |
 | `STR.SPLICE` | `STR.STR$` `STR.AT` `STR.CUT` `STR.SUB$` | `STR.STR$`, edited at that position |
-
 | `STR.TRIM` | `STR.PTR` | *(the string itself)*, spaces off both ends |
 | `STR.LTRIM` | same | spaces off the **leading** end |
 | `STR.RTRIM` | same | spaces off the **trailing** end |
@@ -1200,6 +1202,82 @@ Example: [`STRINGS.EXP.BL`](STRINGS.EXP.BL). Regression test:
 [`STRCTST.EXP.BL`](STRCTST.EXP.BL), eight cases — empty, one character, 200 characters, and guard
 strings either side to catch an off-by-one write into the neighbouring block. The trim cases moved
 with the trims, to [`STRTST.EXP.BL`](STRTST.EXP.BL).
+
+---
+
+### 4.10 `STRUSING.INC.BL` — a number to a template
+
+| Routine | in | out |
+|---|---|---|
+| `STR.USING` | `STR.USING.NUM` `STR.USING.MASK$` | `STR.USING.STR$`, a field |
+| `STR.USING.FIX` | `STR.USING.NUM` `STR.USING.DP` | `STR.USING.STR$`, digits only |
+
+```basic
+#INCLUDE "STRUSING.INC.BL"
+
+STR.USING.NUM = 1234.5 : STR.USING.MASK$ = "#,##0.00"
+GOSUB STR.USING
+PRINT STR.USING.STR$                    ' 1,234.50
+```
+
+Pure BASIC. It needs no `#SYMFILE` and depends on no other module, so a program can take it
+without taking `STRINGS.INC.BL` (§4.2) — and the other way round.
+
+| In the mask | Means |
+|---|---|
+| `#` | a digit position, **space** if the number does not reach it |
+| `0` | a digit position, **zero** if the number does not reach it |
+| `.` | the decimal point everything aligns on |
+| `,` | anywhere in the mask, groups the integer part in threes |
+| `+` | first character only: a sign column, `+` or `-` |
+| `-` | first character only: a sign column, `-` or a space |
+
+`PRINT USING`'s mask, from BASIC 7.0, less the four characters that earn nothing here: `$`
+floating currency, a trailing sign, `^^^^` exponential, and `=` / `>` — those last two justify a
+**string**, which is `STR.PADC` and `STR.PADL` (§4.2).
+
+**The result is exactly `LEN(STR.USING.MASK$)` characters, right justified**, so a column of them
+lines up on the point. Everything after the point prints, so `#` and `0` do not differ there. A
+point with no digit positions after it is ignored.
+
+```
+"###0.00"    12.5    ->  "  12.50"        "#,##0.00"   1234.5  ->  "1,234.50"
+"0000.00"    12.5    ->  "0012.50"        "+##0.00"      -1.5  ->  "-  1.50"
+"##000"        42    ->  "  042"          "##0"         12345  ->  "***"
+```
+
+**Too wide fills the whole field with `*`.** That is deliberate and visible; overflowing the width
+instead would push the rest of the row along and misalign every column after it. A negative value
+with **no** sign column spends one digit position on its minus, and stars when there is none to
+spend — `"##0"` holds `-12` but not `-123`.
+
+**Rounding is half away from zero**, done on the absolute value before the sign goes back on.
+`INT` alone floors toward minus infinity, which rounds `-1.5` and `1.5` in opposite directions.
+`-0.004` to two places is `"0.00"`, not `"-0.00"`: a signed zero in a column reads as a real
+negative.
+
+**WARNING: the value must scale to under 1,000,000,000.** The digits are built by multiplying up
+by `10 ^ DP` and rounding, and `STR$` turns over to E notation at 1e9 — so two decimal places
+reach `9,999,999.99` and five reach `9,999.99999`. Past that the field fills with `*` rather than
+printing something wrong.
+
+`STR.USING.FIX` is the same digits with no field over them: `STR.USING.NUM` to `STR.USING.DP`
+places, sign attached, no leading space. Right justify it with `STR.PADL` if you want a column.
+
+**The digits do not come out of `STR$`'s fraction, and cannot.** `STR$` trims trailing zeros, so
+`12.30` comes back as `"12.3"`; it drops the leading zero of a pure fraction, so a half is `" .5"`;
+and it takes *significant digits*, never decimal places — `FloatToString` records that a
+fixed-decimal mode was tried and printed `12345678.9` as `12345678.8984375`. So a scaled integer is
+the only exact route, and the 1e9 ceiling above is its price.
+
+Cost: **744 bytes** of p-code, of which `STR.USING.FIX` alone is **210**. Its own module rather
+than a routine in `STRINGS.INC.BL` for that reason — a program wanting `STR.PADL` and a split
+should not carry a mask parser.
+
+Example: [`STRUSING.EXP.BL`](STRUSING.EXP.BL). Regression test:
+[`USINGT.EXP.BL`](USINGT.EXP.BL), thirty-eight cases — both entry points, every mask character,
+the rounding traps, the sign column and both overflows. Text and length are compared every time:
+the result is a field, so a right answer in the wrong number of columns still breaks the table.
 
 ---
 
