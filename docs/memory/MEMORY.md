@@ -115,7 +115,8 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [GP.BANKED region relocation](gp-banked-region-relocation.md) — the region moves to the end of the object with a rotation and two GOTOs to line numbers; the three things holding a buffer address
 - [Banked code loses the bank on a call out](gp-banked-call-out-loses-the-bank.md) — a region cannot call another bank and survive the return, and may not BANK itself back
 - [Split FILEDIR for banking](filedir-bank-split.md) — TODO; the naive split moves only 22%, because FILL and STEP run WITH the data bank selected
-- [GPBMODS resident p-code breakdown](gpbmods-resident-pcode-breakdown.md) — MEASURED; the shell is 84%, all eight library modules are 16%, and grep for BANK with comments STRIPPED
+- [GPBMODS resident p-code breakdown](gpbmods-resident-pcode-breakdown.md) — MEASURED; the shell is 79%, all eight modules are 21%, the map cannot see GP.ASM blobs, and grep for BANK with comments STRIPPED
+- [Dead-code elimination, measured](basl-dead-code-elimination-measured.md) — PARKED; 1,212 resident bytes are never called, but 691 of them are free by deleting two #INCLUDE lines
 - [KERNAL preserves the RAM bank](kernal-preserves-ram-bank.md) — CHROUT, GETIN, scroll, CLS and screen_mode all leave $00 alone; measure it in asm, PEEK(0) cannot see it
 - [X16 ROM internal calls](x16-rom-internal-calls.md) — verified R49 dispatcher/GC addresses + ZP pointers
 - [X16 toolchain](x16-toolchain.md) — 64tass / emulator paths on this machine
