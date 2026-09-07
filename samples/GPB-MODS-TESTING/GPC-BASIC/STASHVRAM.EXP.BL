@@ -1,0 +1,226 @@
+## STASHVRAM -- rectangles and blobs kept in spare VRAM, addressed by handle.
+##
+## THIS PROGRAM HAS NO #SYMFILE, and that is the point of the module. STASH.INC.BL
+## is GP.ASM and every program that stashes has to carry the directive; there is no
+## assembly in here at all. The cells never leave VRAM: one VERA data port reads,
+## the other writes, and the KERNAL's memory_copy moves between them without
+## stepping either.
+##
+## Four things, in the order a caller meets them:
+##
+##   1  three panels opened over each other and closed in reverse, which is what
+##      the handle table is for -- one store, many rectangles, no offsets to keep
+##      straight and no bank a level
+##   2  the blob face: low RAM out and back
+##   3  STASHVRAMGC, for the one case LIFO release does not cover
+##   4  a refusal, because a full window is an answer and not a crash
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "STASHVRAM.INC.BL"
+#INCLUDE "STASHVRAMGC.INC.BL"
+#SAVEAS "@:STASHVRAM.PRG"
+
+## THE CALLER DIMS THE HANDLE TABLE, like MENUVERT.ITEM$ -- a module cannot be
+## handed an array and must not guess a bound. Two % arrays, and a % array is TWO
+## bytes an element, so this is 68 bytes of workspace.
+DIM SV.PAGE%(16)
+DIM SV.PAGES%(16)
+DIM E.BUF%(400)
+DIM E.SUM(30)
+DIM E.WANT(30)
+
+SV.MAX = 16
+GOSUB SV.INIT
+IF SV.OK = 0 THEN PRINT "SV.INIT: "; SV.ERROR$ : END
+
+PRINT "STASHVRAM -- WINDOW PAGES"; SV.BASEPG; " TO"; SV.TOPPG
+PRINT
+
+## =======================================================================
+## 1. THREE PANELS, CLOSED IN REVERSE.
+##
+## Each save returns a handle and each restore takes one, so the caller never
+## works out where anything went. Freeing in reverse gives every page back --
+## the bump pointer ends where it started.
+## =======================================================================
+GOSUB E.WALLPAPER
+E.PX = 0 : E.PY = 0 : E.PW = 40 : E.PH = 18
+GOSUB E.SNAP
+
+E.X = 4 : E.Y = 2 : GOSUB E.PANEL : E.H1 = SV.HND
+E.X = 10 : E.Y = 5 : GOSUB E.PANEL : E.H2 = SV.HND
+E.X = 16 : E.Y = 8 : GOSUB E.PANEL : E.H3 = SV.HND
+E.OPEN = SV.NEXT
+
+## Closing is the handle and nothing else: the four bytes in front of the cells
+## carry W, H, X and Y, so a rectangle describes itself.
+SV.HND = E.H3 : SV.MOVE = 0 : GOSUB SV.RESTORE : GOSUB SV.FREE
+SV.HND = E.H2 : SV.MOVE = 0 : GOSUB SV.RESTORE : GOSUB SV.FREE
+SV.HND = E.H1 : SV.MOVE = 0 : GOSUB SV.RESTORE : GOSUB SV.FREE
+
+## NOTHING IS PRINTED BETWEEN THE SNAPSHOT AND HERE, on purpose: PRINT writes at
+## the cursor, the cursor is inside the wallpaper, and the program would then be
+## comparing the screen against a picture it had scribbled on itself.
+GOSUB E.SCAN
+
+PRINT "  THREE PANELS OPENED AND CLOSED, HANDLES"; E.H1; E.H2; E.H3
+PRINT "  WITH ALL THREE OPEN THE NEXT FREE PAGE WAS"; E.OPEN
+PRINT "  RESTORED: ROWS DIFFERING FROM THE WALLPAPER"; E.DIFF
+PRINT "  EVERY PAGE BACK: NEXT IS"; SV.NEXT; " AND THE BASE IS"; SV.BASEPG
+PRINT
+
+## =======================================================================
+## 2. THE BLOB FACE.
+##
+## SV.PUT takes a low RAM address and a count. memory_copy addresses main RAM
+## with 16 bits, so a banked source is the caller's to move a window at a time.
+## SV.GET does not remember how long a blob was -- the caller sets SV.LEN.
+## =======================================================================
+E.ADDR = GP.ARRPTR(E.BUF%())
+E.LEN = 700
+FOR E.I = 0 TO E.LEN - 1
+    POKE E.ADDR + E.I, E.I - INT(E.I / 251) * 251
+NEXT E.I
+
+SV.ADDR = E.ADDR : SV.LEN = E.LEN
+GOSUB SV.PUT
+E.B1 = SV.HND
+
+FOR E.I = 0 TO E.LEN - 1
+    POKE E.ADDR + E.I, 0
+NEXT E.I
+
+SV.HND = E.B1 : SV.ADDR = E.ADDR : SV.LEN = E.LEN
+GOSUB SV.GET
+
+E.WRONG = 0
+FOR E.I = 0 TO E.LEN - 1
+    IF PEEK(E.ADDR + E.I) <> E.I - INT(E.I / 251) * 251 THEN E.WRONG = E.WRONG + 1
+NEXT E.I
+PRINT "  BLOB OF"; E.LEN; " BYTES OUT AND BACK, WRONG"; E.WRONG
+PRINT
+
+## =======================================================================
+## 3. THE COMPACTOR.
+##
+## Release is LIFO, so nested panels leave no holes and this is not needed for
+## them. Free out of ORDER and a hole appears; SV.COMPACT slides the live blocks
+## down and rewrites the table. HANDLES SURVIVE IT -- a block's page changes,
+## the handle naming it does not.
+##
+## It is a separate #INCLUDE because a BASL module has no dead code elimination:
+## a compactor nobody calls would otherwise be compiled into every program.
+## =======================================================================
+SV.ADDR = E.ADDR : SV.LEN = 600 : GOSUB SV.PUT : E.C1 = SV.HND
+SV.ADDR = E.ADDR : SV.LEN = 900 : GOSUB SV.PUT : E.C2 = SV.HND
+SV.ADDR = E.ADDR : SV.LEN = 500 : GOSUB SV.PUT : E.C3 = SV.HND
+PRINT "  THREE BLOBS AT PAGES"; SV.PAGE%(E.C1); SV.PAGE%(E.C2); SV.PAGE%(E.C3)
+
+SV.HND = E.C2 : GOSUB SV.FREE
+PRINT "  FREED THE MIDDLE ONE -- NEXT IS STILL"; SV.NEXT
+
+E.WAS = SV.PAGE%(E.C3)
+GOSUB SV.COMPACT
+PRINT "  COMPACTED:"; SV.MOVED; " MOVED, NEXT IS NOW"; SV.NEXT
+PRINT "  THE LAST BLOB WENT FROM PAGE"; E.WAS; " TO"; SV.PAGE%(E.C3); " ON THE SAME HANDLE"
+
+FOR E.I = 0 TO 499
+    POKE E.ADDR + E.I, 0
+NEXT E.I
+SV.HND = E.C3 : SV.ADDR = E.ADDR : SV.LEN = 500 : GOSUB SV.GET
+E.WRONG = 0
+FOR E.I = 0 TO 499
+    IF PEEK(E.ADDR + E.I) <> E.I - INT(E.I / 251) * 251 THEN E.WRONG = E.WRONG + 1
+NEXT E.I
+PRINT "  AND IT STILL READS BACK -- WRONG"; E.WRONG
+PRINT
+
+## =======================================================================
+## 4. A REFUSAL.
+##
+## Too big for the window comes back as SV.HND = 0 and a reason in SV.ERROR$,
+## before anything is written. So does an unknown handle, and a full table.
+## =======================================================================
+SV.BASE = $04000 : SV.TOP = $043FF : GOSUB SV.INIT
+SV.X = 0 : SV.Y = 0 : SV.W = 60 : SV.H = 40
+GOSUB SV.SAVE
+PRINT "  A 60x40 RECTANGLE INTO FOUR PAGES: HANDLE"; SV.HND; " -- "; SV.ERROR$
+
+SV.HND = 99 : GOSUB SV.RESTORE
+PRINT "  RESTORING HANDLE 99: OK"; SV.OK; " -- "; SV.ERROR$
+
+PRINT
+PRINT "DONE"
+END
+
+## ***********************************************************************
+## **  E.PANEL -- save what a panel is about to cover, then draw it. This is
+## **  GUI.OPEN's shape: the save comes FIRST and the handle is what closes it.
+## ***********************************************************************
+
+E.PANEL:
+    SV.X = E.X : SV.Y = E.Y : SV.W = 18 : SV.H = 6
+    GOSUB SV.SAVE
+    IF SV.HND = 0 THEN PRINT "  PANEL REFUSED: "; SV.ERROR$ : RETURN
+    GP.FILL E.X, E.Y, 18, 6, 32, 1
+    GP.BOX E.X, E.Y, 18, 6, 2, 1
+    GP.PRINTAT E.X + 2, E.Y + 2, "PANEL", 1
+    RETURN
+
+## ***********************************************************************
+## **  E.WALLPAPER -- something under the panels that is worth putting back.
+## ***********************************************************************
+
+E.WALLPAPER:
+    FOR E.R = 0 TO 17
+        FOR E.C = 0 TO 39
+            E.V = E.R * 7 + E.C * 3
+            E.V = E.V - INT(E.V / 60) * 60
+            GP.PRINTAT E.C, E.R, CHR$(33 + E.V), 5
+        NEXT E.C
+    NEXT E.R
+    RETURN
+
+## ***********************************************************************
+## **  E.SNAP / E.SCAN -- one checksum a ROW, read straight out of VRAM.
+## **
+## **  Reaching the same screen two ways and comparing per row is how a slide
+## **  that lands one row out gets caught; one number for the lot would only
+## **  say something was wrong.
+## ***********************************************************************
+
+E.SNAP:
+    GOSUB E.ROWS
+    FOR E.R = 0 TO E.PH - 1
+        E.WANT(E.R) = E.SUM(E.R)
+    NEXT E.R
+    RETURN
+
+E.SCAN:
+    GOSUB E.ROWS
+    E.DIFF = 0
+    FOR E.R = 0 TO E.PH - 1
+        IF E.SUM(E.R) <> E.WANT(E.R) THEN E.DIFF = E.DIFF + 1
+    NEXT E.R
+    RETURN
+
+## ---- The map's width and base are asked of VERA, never assumed: L1_CONFIG
+## ---- bits 5:4 give the width as 32 << n, and L1_MAPBASE holds bits 16:9.
+E.ROWS:
+    E.MAPW = 32 * 2 ^ INT((PEEK($9F34) AND 48) / 16)
+    E.BASE = PEEK($9F35) * 512
+    FOR E.R = 0 TO E.PH - 1
+        E.AT = E.BASE + (E.PY + E.R) * E.MAPW * 2 + E.PX * 2
+        E.BNK = INT(E.AT / 65536)
+        E.REST = E.AT - E.BNK * 65536
+        E.MID = INT(E.REST / 256)
+        POKE $9F25, 0
+        POKE $9F20, E.REST - E.MID * 256
+        POKE $9F21, E.MID
+        POKE $9F22, E.BNK + 16
+        E.S = 0
+        FOR E.C = 0 TO E.PW * 2 - 1
+            E.S = E.S + PEEK($9F23) * (1 + E.C - INT(E.C / 13) * 13)
+        NEXT E.C
+        E.SUM(E.R) = E.S
+    NEXT E.R
+    RETURN

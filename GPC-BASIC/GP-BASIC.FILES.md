@@ -114,6 +114,7 @@ One `.EXP.BL` per topic. Several are also the regression test for the module the
 | `MENU.EXP.BL` | a whole small application, in the shape the GP set is for |
 | `MENUDEMO.EXP.BL` | `MENUVERT` drawn the way an application would draw it |
 | `GUI.EXP.BL` | the four dialogs, over a screen they have to put back |
+| `STASHVRAM.EXP.BL` | three panels nested in VRAM, a blob, and the compactor. Needs no `#SYMFILE`, which is the point |
 | `FORM.EXP.BL` | three fields you can move between, `LINEINPUT` style |
 | `BMXVIEW.EXP.BL` | a BMX bitmap viewer, in about thirty lines |
 | `BMXPAL.EXP.BL` `BMXSPD.EXP.BL` | the palette question, and the speed of each path |
