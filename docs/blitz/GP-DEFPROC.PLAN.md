@@ -99,21 +99,25 @@ module's own globals (§5).
 
 ## 3. Cost
 
-### Runtime: 0 bytes
+### Runtime: 0 bytes for `GP.SUB`, and 0 of PROGRAM SIZE for `GP.FN`
 
-No new opcode. `.gosub`, `.fngosub`, the variable writes and the variable read are all in the
-10,956-byte runtime copied into every program. Max program size stays 17,408 bytes of p-code.
+`GP.DEFPROC` and `GP.SUB` add no opcode: `.gosub`, `.fngosub`, the variable writes and the variable
+read are all in the runtime already. **`GP.FN` did add two** -- `.fnsave` and `.fnrestore`, 213
+bytes -- and they went into the padding that carries the GP block up to `RTBASE`, so they still
+cost a program nothing. `RTGPBASE` and `RTBASE` did not move. See §9 for the measurement.
 
-| feature | runtime bytes |
-|---|---:|
-| `GP.CALL` | 77 |
-| `GP.SELECT` / `GP.CASE` | 127 |
-| block `GP.IF` | 14 |
-| **`GP.DEFPROC` / `GP.SUB` / `GP.FN`** | **0** |
+| feature | runtime bytes | program bytes |
+|---|---:|---:|
+| `GP.CALL` | 77 | 77 |
+| `GP.SELECT` / `GP.CASE` | 127 | 127 |
+| block `GP.IF` | 14 | 14 |
+| **`GP.DEFPROC` / `GP.SUB`** | **0** | **0** |
+| **`GP.FN`** | **213, into GP block padding** | **0** |
 
-### Call site: 0 bytes over hand-written
+### Call site: 0 bytes over hand-written for `GP.SUB`, 2 for `GP.FN`
 
-`GP.FN` is about 3 bytes more than `GP.SUB`, for the result read.
+`GP.FN` is 5 bytes of bracket -- `.fnsave`, `.fngosub` and its operand, `.fnrestore` -- against
+`GP.SUB`'s 3, plus the result read the long spelling pays anyway.
 
 ### Compiler: 672 bytes, MEASURED
 
@@ -163,23 +167,49 @@ verbs is about 300 bytes. Compile-time banks 0-4 are taken -- KERNAL, native har
 line table, `GP.ASM` blob pool, variable list. Bank 5 is free. The table costs no low RAM and does
 not touch the 2,048-line or 1,365-variable ceilings.
 
-### Tokens: 2 taken, and GP.FN still wants two not one
+### Tokens: 4 taken
 
 **Taken, in `c64tokens.py` and `GPB.INC.BL`:**
 
 ```
 #TOKEN GP.DEFPROC 52817
 #TOKEN GP.SUB     52816
+#TOKEN GP.FN      52815
+#TOKEN RETURNS    52814
 ```
 
 `GP.FN` at 52815 is still free and still proposed. **`RETURNS` needs a token of its own, which this
 section did not count**: it is not a ROM keyword, so BASLOAD crunches it as an ordinary identifier
-and the compiler never sees the word. Either allocate 52814 for it, or spell the declaration with
-`TO`, which is already token $A4 and reads no worse:
+and the compiler never sees the word.
+
+**DECIDED 08/09/26: a token, 52814, not `TO`.** The alternative was the ROM's `TO` (token $A4), already
+an equate and already reserved by `FOR..TO`, so it allocates nothing. The difference is **seven
+bytes of GPC.BIN and one reserved word**, and neither is a reason:
+
+- **A new token costs no keyword table row.** `RETURNS` only ever appears mid-statement, so it needs
+  no `commands.def` entry — `GP.A`, `GP.X`, `GP.Y`, `GP.C`, `GP.HIBYTE` and `GP.CONTAINS` are the
+  precedent, all `#TOKEN` declarations with no table line. A row is seven bytes
+  (`length, $ce, id, $03, handler lo, handler hi, terminator`), and it is not spent.
+- **It costs about 17 bytes of compiler code to test for**, against ~10 for `TO`: a GP keyword is
+  two bytes, so `cmp #$CE` / `bne` / `jsr GetNext` / `cmp #GP_TOKEN_RETURNS` where `TO` is
+  `lda #C64_TO` / `jsr CheckNextA`. `gpbstr.asm:94` is the written idiom for the first,
+  `for.asm:79` for the second.
+- **It costs one BASLOAD symbol**, permanently reserving the word `RETURNS` against every source
+  that includes `GPB.INC.BL`, because tokens and variables share one namespace. `TO` was never
+  available to a program anyway.
+- **0 bytes of runtime and 0 of program size**, either way. The declaration emits no p-code.
+
+What decides it is reading. `TO` already means *up to* in this BASIC, and
+`GP.DEFPROC RND100 TO R` reads as a range on first sight:
 
 ```
 GP.DEFPROC DBFIND, DB.F, DB.KEY$, DB.EXACT TO DB.FOUND
+GP.DEFPROC DBFIND, DB.F, DB.KEY$, DB.EXACT RETURNS DB.FOUND
 ```
+
+Seven bytes of compiler is not a reason to make a declaration harder to read, and
+`docs/memory/compiler-must-not-cap-program-size.md` says the compiler's own size is the side that
+gives.
 
 The floor was 52818 (`GP.ENDBANKEDSTR`) and is 52816 now. Ten numbers inside the allocated range are unused
 and 82 remain below it. The byte values are the ABI and mirror `getGP()` in
@@ -317,7 +347,8 @@ already is.
 
 **`RETURNS` in phase 1 or phase 2 -- PHASE 2, and it needs a token.** Not built. See §3: `RETURNS`
 is not a ROM keyword, so BASLOAD crunches it as an identifier and the compiler never sees the word.
-Allocate 52814 for it, or spell it `TO`.
+**DECIDED 08/09/26: 52814, a token of its own, not `TO`** — the cost is seven bytes of GPC.BIN and
+one reserved word, and §3 carries the breakdown.
 
 **Whether `GP.SUB` should also accept a forward declaration**, given the `.fngosub` restriction.
 Still open. It is refused by name today (`GP.SUB BEFORE ITS GP.DEFPROC`), which is what §5 asks
@@ -327,10 +358,11 @@ for.
 in the tree wants half of it, so the number is about what a shim plausibly takes rather than about
 room. A thirteenth is `TOO MANY GP.DEFPROC FORMALS`.
 
-**One set of formals is enough for `GP.SUB` and will not be for `GP.FN`.** `GP.SUB` is a statement
-and nothing an argument expression can contain re-enters it, so the buffers are flat. `GP.FN` is an
-expression term and can appear inside an argument to another `GP.FN`: the buffers have to become a
-stack before it is built. This is written at the top of `gpdefproc.asm` as well.
+**One set of formals is enough for `GP.SUB` and will not be for `GP.FN`. BUILT 08/09/26, and it
+took two things and not one.** The compile-time buffers did become a stack, `ProcStatePush` /
+`ProcStatePull` around each argument. That was not sufficient: the RUN-time formals are one set
+too, and storing each argument as it compiled let a nested call write a formal the outer call had
+already filled. The stores are deferred to the end of the list now. See §9.
 
 ---
 
@@ -374,3 +406,200 @@ All three questions are settled:
 `GP.FN` follows only if 2 holds. It does.
 
 Use `make libs` -- a change under `source/compiler/` silently misses `GPC.BIN` otherwise.
+
+## 9. `GP.FN` -- BUILT AND MEASURED 08/09/26
+
+`GP.FN(<verb>[, <expression> ...])` is a term in an expression. It fills the formals, calls the
+routine, and gives back the variable `GP.DEFPROC` named after `RETURNS`. The body may be as long as
+it likes -- print, read files, open blocks, call other verbs.
+
+### What it cost
+
+| | before | after | delta |
+|---|---:|---:|---|
+| `GPC.BIN` | 24,299 | 25,145 | **+846** |
+| GP block code | ends `$6A5D` | ends `$6B32` | **+213, all of it into padding** |
+| runtime image | ends `$9CEE` | ends `$9CFB` | **+13** |
+| max program size | | | **0** |
+
+Measured against a clean `HEAD` build in a detached worktree, not against the tree. **§10 adds two
+more opcodes on top of these figures**; the running totals are there.
+
+**The 213 bytes of handler cost a program nothing.** `source/main/05rtcore.divider` pads the GP
+block out so the core lands exactly on `RTBASE`, and the two handlers went into that padding: the
+slack was 927 bytes and is 714. The +13 in the image is the core side -- `clr.asm` initialising
+`stringTempPages`, `stralloc.asm` reading it instead of a constant, and two vector table entries.
+
+**`RTGPBASE $6600` and `RTBASE $6E00` did not move**, so the p-code ceiling is exactly what it was.
+What the growth spends is runtime headroom: the image ends at `$9CFB` with **517 bytes** left below
+`$9F00`.
+
+### The two opcodes
+
+`.fnsave` `$F1` and `.fnrestore` `$F2` bracket the `.fngosub`. They exist because
+`MainCompileLoop` emits `PCD_NEWCMD_LINE` before every source line and `CommandNewLine` is
+`.resetStringSystem` plus `ldx #$FF` -- so a call into a multi-line body from mid-expression would
+wipe the caller's evaluation stack and its string temporaries. `.fnsave` pushes the live stack onto
+the frame stack, one `FRAME_FNSLOT` a slot, and drops `stringTempPointer` below the caller's live
+temporaries so the callee's per-line resets hand out memory underneath them. `.fnrestore` puts both
+back. `stringTempPages` was a constant 2 inside `StringInitialise` and is now a variable, which is
+the whole of the change on the string side.
+
+The heap ceiling could not be moved instead: `StringConcrete`'s scavenger walks the blocks upward
+from `stringHighMemory` and needs them to tile it exactly.
+
+### The two defects, and what found them
+
+**A nested call clobbered the outer call's formals.** `GP.FN(AREA, 2, GP.FN(AREA, 3, 4))` gave 36
+where the longhand gives 24. Formals are plain variables, so storing each argument as it compiled
+let the inner call write `A.W` while the outer call's 2 was already sitting in it -- silently, with
+both passes agreeing. `ProcCompileArguments` now evaluates the whole list before storing any of it,
+leaving the values on the evaluation stack and taking them off **last formal first**. What that
+deferral cost was evaluation stack -- N formals in N of the twelve slots where one had done -- and
+that is the hazard §10 closes.
+
+**Every GP.FN program wedged with `OUT OF MEMORY` and a runaway PC, and no code was wrong.**
+`testing/GPB.RT.120.BIN` was three and a half hours stale: `make libs` builds `gp.library` and
+`GPC.BIN` but never installs the runtime, which is `make -C source/runtime gpc-rt`. The compiler
+emitted `$F1`/`$F2` correctly and the loaded runtime's vector table had no entries for them.
+Bisecting the handlers "changed nothing" because the gutted file was not the one being loaded. See
+[make libs does not install the runtime](../memory/make-libs-does-not-install-the-runtime.md).
+
+### The tests
+
+`source/unit-tests/fntest.py`, six programs, `FAILURES: 0`.
+
+| | what it is |
+|---|---|
+| `DEFFN1` | eight `GP.FN` call sites: bare, in a sum, nested in its own argument list, two in one expression, string concatenation, and inside a `FOR` |
+| `DEFFN1C` | the same ten lines written the long way -- the control |
+| `DEFP3` / `DEFP3C` | the twenty-one verb `GP.SUB` regression, in this harness because both keywords share `ProcCompileArguments` |
+| `DEFFNX` | a verb with no `RETURNS` -- `GP.FN NEEDS A VERB DECLARED RETURNS @ 6` |
+| `DEFFNY` | a call above its declaration -- `GP.FN BEFORE ITS GP.DEFPROC @ 1` |
+| `DEFFNZ` | the wrong number of arguments -- `ARGUMENTS DO NOT MATCH THE GP.DEFPROC @ 6` |
+| `DEFFNW` | `RETURNS A(1)` -- `GP.DEFPROC RETURNS IS NOT A VARIABLE @ 2` |
+| `DEFFN2` | the minimal case: one formal, a one-line body, checked against the lines it prints |
+| `DEFFN3` | a multi-line body that PRINTS from inside the call, reached by both `GP.SUB` and `GP.FN` |
+| `DEFFN4` | the body folded onto the declaration -- the shortest thing `RETURNS` can name |
+
+**`DEFFN2`, `DEFFN3` and `DEFFN4` have no longhand control**, because what they test is the shape
+and not a byte count: the callee prints, so every line of it emits a `new.line` marker that would
+have reset the string system and emptied the caller's evaluation stack. They are checked against
+the lines they print instead, which is the harness's `EXPECT` table.
+
+### What is not checked, and will not be
+
+**A verb's body must not call its own verb.** There is one set of formals, so a routine that
+recurses -- directly or round through another verb -- writes over the arguments it is still using.
+It compiles, both passes agree, and the answer is wrong. Detecting it needs a call graph the
+compiler does not build, and it is in `GP-BASIC.md` §3.11 as a rule instead.
+
+A verb inside its **own argument list** is correct, and `DEFFN1`'s T3 is the test.
+
+### The diagnostics in `.fnrestore`
+
+Two conditions, one message. `_CXRBroken` raises `.error_structure` when the frame on top is
+neither a slot nor the state frame -- which a callee returning with a block still open produces --
+and the slot count reaching `MathStackSize` branches to the same place, because a store past
+`NSExponent` runs off the end of the register file. Neither is in `errors.asm`, which links below
+`GPBase` and is copied into every compiled program.
+
+
+## 10. `.fnpush` / `.fnpop` -- BUILT AND MEASURED 08/09/26
+
+§9 left a hazard behind it. `ProcCompileArguments` evaluates the whole argument list before storing
+any of it, which is what makes `GP.FN(AREA, 2, GP.FN(AREA, 3, 4))` correct -- but it also means **N
+formals hold N evaluation stack slots where one used to do**.
+
+**And the evaluation stack is twelve slots with no overflow check anywhere in the runtime.**
+`MathStackSize` is 12 (`ifloat32/source/data.inc:36`), six parallel zero page arrays of that length,
+X the index. `NSStatus,x` at x=12 is `NSMantissa0[0]` -- the bottom slot of the same stack. So
+overflowing it corrupts a live value rather than reporting anything, and `PROC_MAXFORMALS` is also
+12, so a twelve-formal verb sat exactly on the edge of it with one deep argument to go.
+
+That would have made the formal count a cap on what may be written, which
+[compiler-must-not-cap-program-size](../memory/compiler-must-not-cap-program-size.md) forbids.
+
+### Four options, and why this one
+
+| | |
+|---|---|
+| cap the formals and check | a build-side wall, and the rule says no |
+| grow `MathStackSize` | 6 bytes of zero page a slot, and it only moves the wall |
+| spill to the string heap | the heap is what the callee is about to reset; wrong stack entirely |
+| **spill to the frame stack** | **the machinery `.fnsave` already has, no cap, ~1 byte an argument** |
+
+The frame stack is 4K and `StackOpenFrame` has checked it against `stackFloorHigh` since 02/08/26.
+An argument waiting for a call **is** a saved evaluation stack slot, so it is the same frame.
+
+### What it does
+
+`.fnpush` `$F3` sends the argument just evaluated to the frame stack as a `FRAME_FNSLOT` and does
+`dex`; `.fnpop` `$F4` does `inx` and brings one back, in front of the store that consumes it. The
+evaluation stack then holds **one argument at a time however many there are**, so what a call needs
+is the depth of its deepest single argument and nothing else.
+
+**The last argument is never pushed.** It is evaluated last and stored first, so nothing runs
+between the two. A one-formal verb emits neither opcode and costs exactly what the longhand did.
+
+**Reusing `FRAME_FNSLOT` is safe, and it was checked rather than assumed.** `.fnsave` pushes its
+`FRAME_FNSTATE` first and its slot frames above it, and `.fnrestore` stops counting at the state
+frame, so it can never see an argument frame below. `.fnpop` pops **exactly one** frame rather than
+counting, so a `GP.SUB` executed inside a `GP.FN` body -- whose own frames sit directly on top of
+the enclosing call's argument frames -- is invisible to it. That is also why an auto-counting
+`.fnargs` opcode was rejected: "pop until the frame is not a slot" would have over-popped in exactly
+that case. An explicit count operand was dropped as dearer than `.fnpush`/`.fnpop` at 1-3 formals,
+which is every real call site.
+
+The slot copy was factored out of `.fnsave`/`.fnrestore` into `FnPushSlot`/`FnPullSlot`, which both
+new handlers call. That is why two whole opcodes cost 39 bytes and not ninety. Neither
+`StackOpenFrame` nor `StackCloseFrame` touches X, which is what lets both take X as the slot index
+and leave it alone -- the pre-existing `.fnrestore` loop had already relied on half of that.
+
+### What it cost
+
+| | before | after | delta |
+|---|---:|---:|---|
+| `GPC.BIN` | 25,145 | 25,174 | **+29** |
+| GP block code | ends `$6B32` | ends `$6B59` | **+39, all of it into padding** |
+| runtime image | ends `$9CFB` | ends `$9D01` | **+6** |
+| max program size | | | **0** |
+
+The divider slack is **675** of the 927 that were there, and the image has **511 bytes** to `$9F00`.
+`RTGPBASE $6600` and `RTBASE $6E00` did not move. The +6 is four bytes of vector table and two of
+`pcodesize`. Running totals for the whole of `GP.FN`: +875 of `GPC.BIN`, +252 of GP block, +19 of
+image, and still **0 of max program size**.
+
+**At the call site: 2 bytes an argument after the first**, both opcodes being one byte with no
+operand. Measured on `DEFP3`, which has twenty-one call sites, twenty of them 0 or 1 formal and one
+`GP.SUB DBFIND, 3, "ACME", 0-1` at three: predicted +4, and the object went **528 to 532**.
+`DEFFN2`/`DEFFN3`/`DEFFN4` are one-formal verbs and did not move -- 85, 131, 79 in both runs. The
+longhand controls `DEFP3C` and `DEFFN1C` are byte identical, as a program not using the keywords
+must be.
+
+**At run time: ~360 cycles an argument after the first**, counted from the sources -- `.fnpush` is
+188 (33 of dispatch, 155 of handler, of which `FnPushSlot` is 133 and `StackOpenFrame` 47) and
+`.fnpop` is 163, plus about 11 amortised for the two extra p-code words against the one-in-sixteen
+Ctrl+C poll. **The old code paid none of it**, so it is purely additive, with two qualifications:
+
+- **a nested `GP.FN` gets most of it back.** The outer call's evaluated argument used to be on the
+  evaluation stack when the inner `.fnsave` ran, so `.fnsave` pushed it to a `FRAME_FNSLOT` and
+  `.fnrestore` pulled it back -- the identical work through the identical routines. `.fnpush` only
+  does it earlier, and the real cost is the extra dispatch: **80 cycles, not 360**.
+- **`GP.SUB` pays and gets nothing back**, having no `.fnsave` to offset against. Both keywords
+  share `ProcCompileArguments`. A three-formal `GP.SUB` costs 720 cycles a call that it did not.
+  That is the honest price: the hazard is a `GP.SUB` hazard as much as a `GP.FN` one.
+
+### The test
+
+**`testing/DEFFNS.BASL`.** A twelve-formal verb `WIDE` -- `W.A`..`W.L`, `RETURNS W.R`, body
+`W.R = W.A + W.L` -- called by both `GP.SUB` and `GP.FN` with `1..11` and a last argument
+`N + N * 2 + N * 3 + N * 4` at `N = 1`. Twelve formals is `PROC_MAXFORMALS` and the last argument is
+four terms deep, so the arguments alone filled the stack and the depth ran off the end of it. Both
+calls answer `1 + 10 = 11`. `fntest.py` is `FAILURES: 0` over all twelve programs.
+
+**The harness needed one fix to get there, and it is not about this work.** `-echo` writes the
+colour change following a printed number through as a literal `\X1D`, so `A2  6\X1D` never string
+equals `A2  6` and `DEFFN2`/`DEFFN3`/`DEFFN4` reported `*** WRONG ***` while printing exactly the
+right thing. The comparison truncates at the first backslash now; nothing here tests colour and no
+line these programs print contains one of its own.

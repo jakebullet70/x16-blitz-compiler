@@ -145,3 +145,7 @@
 ;	GP.ISEMPTY   ($) X:GPIsEmptyCompile N
 ;
 	.byte	$08,$ce,$5f,$8f,$93,GPIsEmptyCompile & $FF,GPIsEmptyCompile >> 8,$06
+;
+;	GP.FN    X:GPFNCompile N
+;
+	.byte	$07,$ce,$4f,$03,GPFNCompile & $FF,GPFNCompile >> 8,$06

@@ -23,4 +23,8 @@ MOFSizeTable:
 	.byte	2         	; $ee .ifnext
 	.byte	2         	; $ef .ifelse
 	.byte	1         	; $f0 .unwind
+	.byte	0         	; $f1 .fnsave
+	.byte	0         	; $f2 .fnrestore
+	.byte	0         	; $f3 .fnpush
+	.byte	0         	; $f4 .fnpop
 .send code

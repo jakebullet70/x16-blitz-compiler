@@ -311,6 +311,10 @@ ordinary variable and not a `#DEFINE`. Every VRAM address past `$FFFF` has the s
 *undotted* one does not: `POS`, `MB`, `ST`, `LEN` and `CHAR` cannot be variables at all. This is the
 main reason the library is dotted throughout.
 
+`RETURNS` joined that list on 08/09/26 -- it is `GP.DEFPROC`'s result clause and has a token
+of its own, so a bare `RETURNS` is no longer a name. `RETURN` is untouched, and so is anything
+dotted.
+
 One rule applies only outside BASL: BASLOAD gives 64 significant characters, the built-in BASIC
 gives two. Write the same code as a hand-typed `.bas` for the PC-side converter and
 `THEME.CLR` and `THEME.COUNT` become the same variable. That is a silent wrong answer — it cost two

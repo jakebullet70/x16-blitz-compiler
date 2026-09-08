@@ -96,6 +96,19 @@ class PCode(object):
 											# GP.LOOP / GP.ENDSEL would have released. The 1 is
 											# the count byte FixBranches patches. Appended, for
 											# the reason directly above.
+		self.extra(".fnsave",0) 			# GP.FN: push the caller's live evaluation stack onto the
+											# frame stack, and drop the string temp base below its live
+											# temporaries, so the per-line new.line resets inside the
+											# callee destroy neither. No operand. APPENDED, never
+											# inserted, for the reason directly above.
+		self.extra(".fnrestore",0) 			# ...and put both back when it returns. Appended.
+		self.extra(".fnpush",0) 			# One evaluated argument off the evaluation stack and onto
+											# the frame stack, where it waits for the call. A list is
+											# evaluated in full before any of it is stored, and twelve
+											# formals held there would have filled the twelve-slot
+											# evaluation stack on their own. Appended.
+		self.extra(".fnpop",0) 				# ...and one back, in front of the store that consumes it.
+											# Appended.
 		self.define("PCD_ENDSYSTEM")
 		self.endCommands = self.currentID	
 

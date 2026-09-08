@@ -32,6 +32,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - **Build setup** — *(note missing: linked by the index but never committed)* how to build it, and the 5 blockers that made a fresh clone unbuildable on any OS. See docs/BUILDING.md.
 - [Build toolchain location](build-toolchain-location.md) — make, 64tass and python are off-PATH in C:\8bitProgramming
 - [App make skips compiler.library](app-make-does-not-rebuild-compiler-library.md) — a change under source/compiler/ silently misses GPC.BIN; use `make libs`
+- [make libs does not install the runtime](make-libs-does-not-install-the-runtime.md) — a new runtime opcode dispatches into garbage; `make -C source/runtime gpc-rt` is the other half
 - [Baseline compiler is the application copy](baseline-compiler-is-the-application-copy.md) — testing/GPC.BIN can be committed stale; A/B against source/application/GPC.BIN or invent regressions
 - [Measure p-code per module](measure-pcode-per-module.md) — the map file plus the SYM give exact bytes per include and per routine
 - [Headless BASL build recipe](headless-basl-build-recipe.md) — the three emulator runs and the stop conditions that keep a cycle to ~70s
@@ -43,7 +44,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - **Emulator split** — *(note missing: linked by the index but never committed)* x16emu r49 runs the tests, Box16 is for debugging.
 
 ## GP.BASIC — the GP block and inline assembly
-- [GP.DEFPROC one-line calls](gp-defproc-one-line-calls.md) — BUILT: the verb is a NAME in the variable list, no proc table; the call site costs nothing and a declaration costs one byte
+- [GP.DEFPROC one-line calls](gp-defproc-one-line-calls.md) — BUILT incl. GP.FN: the verb is a NAME in the variable list, no proc table; the formals are shared, so a body must not call its own verb
 - [Block GP.IF design](gpb-block-if-design.md) — SHIPPED at 14 runtime bytes; why it was 14 not 12, and the headless emulator test recipe
 - [Block openers must not defer](gpb-block-openers-must-not-defer.md) — .error_syntax rolls a statement back and silently corrupts enclosing block nesting
 - [GOTO out of a GP block](gpb-goto-out-of-block-design.md) — BUILT: .unwind opcode, zero runtime bytes, and the four traps each build cost

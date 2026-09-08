@@ -37,6 +37,7 @@ FIXED = {
     ".varspace": 2, ".restore": 2, ".fngosub": 2,
     ".deferror": 0, ".exitdo": 2, ".casenext": 2, ".caseend": 2,
     ".ifnext": 2, ".ifelse": 2, ".unwind": 1, ".data": 2,
+    ".fnsave": 0, ".fnrestore": 0, ".fnpush": 0, ".fnpop": 0,
 }
 
 def walk(code):

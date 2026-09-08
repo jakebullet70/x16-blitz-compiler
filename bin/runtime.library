@@ -79,12 +79,20 @@ FRAME_GOSUB = $E4 							; Gosub has 4 bytes
 FRAME_FOR = $C0+19 							; For has 19 bytes
 FRAME_LOOP = $A0+6 							; GP.DO has 6 bytes
 FRAME_SELECT = $80+7 						; GP.SELECT has 7 bytes
+FRAME_FNSTATE = $60+4 					; GP.FN's saved string state has 4 bytes
+FRAME_FNSLOT = $40+7 					; ...and one saved evaluation stack slot has 7
 
 ;
-;		Identifiers are the UPPER 3 BITS, so there are only eight and four are now spoken for:
-;		7 GOSUB, 6 FOR, 5 GP.DO, 4 GP.SELECT. $FF is the stack-empty fail marker StackFindFrame
-;		stops on -- it is id 7 size 31, which no real frame can be, so it can never be mistaken
-;		for a GOSUB.
+;		Identifiers are the UPPER 3 BITS, so there are only eight and six are now spoken for:
+;		7 GOSUB, 6 FOR, 5 GP.DO, 4 GP.SELECT, 3 GP.FN state, 2 GP.FN slot. $FF is the
+;		stack-empty fail marker StackFindFrame stops on -- it is id 7 size 31, which no real
+;		frame can be, so it can never be mistaken for a GOSUB.
+;
+;		GP.SELECT no longer opens one (01/09/26) but keeps its id, since nothing needs it.
+;		A GP.FN call opens ONE state frame and ONE slot frame per live evaluation stack slot,
+;		rather than one frame holding the lot: the size field is five bits, and twelve slots
+;		of six bytes is 72. Every frame carrying its own true size is what lets StackFindFrame
+;		walk over them correctly if a RETURN ever has to.
 ;
 
 ; ************************************************************************************************
@@ -1648,6 +1656,10 @@ _ClearLoop1:
 		lda 	storeEndHigh
 		sta 	stringHighMemory+1
 		stz 	stringHighMemory
+
+		lda 	#2 										; temporaries start two pages below the ceiling. A
+		sta 	stringTempPages 						; constant inside StringInitialise until GP.FN, which
+													; raises it for the length of a call and puts it back.
 
 		stz 	stringInitialised 						; string system not initialised
 		;
@@ -7453,6 +7465,15 @@ resetStringSystem .macro
 ;
 ;							Initialise string system if required
 ;
+;		TEMPORARIES START stringTempPages BELOW THE HEAP CEILING, and that used to be the
+;		constant 2. GP.FN raises it for the length of a call so the callee's own per-line
+;		resets hand out memory BELOW the temporaries its caller is still holding -- see
+;		gp-runtime/commands/gpfncall.asm, which is the only thing that ever writes it.
+;
+;		The heap ceiling itself could not be moved instead: StringConcrete's scavenger walks
+;		the blocks upward from stringHighMemory and needs them to tile it exactly, so a ceiling
+;		lowered into the temporary area starts that walk in garbage.
+;
 ; ************************************************************************************************
 
 StringInitialise:
@@ -7460,11 +7481,11 @@ StringInitialise:
 		lda 	stringInitialised 			; already done
 		bne 	_SIExit
 
-		lda 	stringHighMemory 			; copy high memory - 512 => stringTempPointer
+		lda 	stringHighMemory 			; copy high memory - stringTempPages => stringTempPointer
 		sta 	stringTempPointer
 		lda 	stringHighMemory+1
-		dec 	a
-		dec 	a
+		sec
+		sbc 	stringTempPages
 		sta 	stringTempPointer+1
 
 		dec 	stringInitialised 			; set the initialised flag.
@@ -7534,6 +7555,8 @@ stringInitialised:							; non zero if string system not set up
 		.fill 	1		
 stringTempPointer: 							; allocated temporary pointer
 		.fill 	2
+stringTempPages: 							; pages below the heap ceiling the temporaries start at
+		.fill 	1
 		.send storage
 
 ; ************************************************************************************************
@@ -8658,6 +8681,10 @@ VectorTable:
 	.word	CommandXIfNext           ; $ee .ifnext
 	.word	CommandXIfElse           ; $ef .ifelse
 	.word	CommandXUnwind           ; $f0 .unwind
+	.word	CommandXFnSave           ; $f1 .fnsave
+	.word	CommandXFnRestore        ; $f2 .fnrestore
+	.word	CommandXFnPush           ; $f3 .fnpush
+	.word	CommandXFnPop            ; $f4 .fnpop
 
 
 ShiftVectorTable:

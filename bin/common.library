@@ -81,6 +81,8 @@ C64_RIGHTDOLLAR          = $c9 ; $c9 right$
 C64_MIDDOLLAR            = $ca ; $ca mid$
 C64_GO                   = $cb ; $cb go
 C64_PI                   = $ff ; $ff pi
+C64_RETURNS              = $ce4e ; $ce4e returns
+C64_GPCMD_FN             = $ce4f ; $ce4f gp.fn
 C64_GPCMD_SUB            = $ce50 ; $ce50 gp.sub
 C64_GPCMD_DEFPROC        = $ce51 ; $ce51 gp.defproc
 C64_GPCMD_ENDBANKEDSTR   = $ce52 ; $ce52 gp.endbankedstr
@@ -616,7 +618,7 @@ PCD_ENDBINARY = $8d
 PCD_STARTCOMMAND = $8d
 PCD_ENDCOMMAND = $dd
 PCD_STARTSYSTEM = $dd
-PCD_ENDSYSTEM = $f1
+PCD_ENDSYSTEM = $f5
 
 PCD_PLUS             = $80 ; +
 PCD_MINUS            = $81 ; -
@@ -731,6 +733,10 @@ PCD_CMD_CASEEND      = $ed ; .caseend
 PCD_CMD_IFNEXT       = $ee ; .ifnext
 PCD_CMD_IFELSE       = $ef ; .ifelse
 PCD_CMD_UNWIND       = $f0 ; .unwind
+PCD_CMD_FNSAVE       = $f1 ; .fnsave
+PCD_CMD_FNRESTORE    = $f2 ; .fnrestore
+PCD_CMD_FNPUSH       = $f3 ; .fnpush
+PCD_CMD_FNPOP        = $f4 ; .fnpop
 PCD_CLR              = $dd80 ; clr
 PCD_DIM              = $dd81 ; dim
 PCD_END              = $dd82 ; end
@@ -1034,4 +1040,8 @@ MOFSizeTable:
 	.byte	2         	; $ee .ifnext
 	.byte	2         	; $ef .ifelse
 	.byte	1         	; $f0 .unwind
+	.byte	0         	; $f1 .fnsave
+	.byte	0         	; $f2 .fnrestore
+	.byte	0         	; $f3 .fnpush
+	.byte	0         	; $f4 .fnpop
 .send code

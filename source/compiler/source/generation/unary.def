@@ -85,3 +85,13 @@ GP.LOBYTE 		(#) X:GPLoByteCompile N
 # 	states the question instead of leaving the reader to infer it from the shape of a test.
 #
 GP.ISEMPTY 		($) X:GPIsEmptyCompile N
+
+#
+# 	GP.FN(<verb>[, <expression> ...]) -- a GP.DEFPROC routine called from inside an expression,
+# 	returning the variable its declaration named after RETURNS. NO PARENTHESIS SPEC: the handler
+# 	reads its own brackets, because the verb is a NAME resolved at compile time and not an
+# 	expression, the way FN and GP.ARRPTR do. The trailing N is never reached -- GPFNCompile ends
+# 	the generator itself, with the RETURNS variable's own type in A, so a verb returning a string
+# 	is a string term.
+#
+GP.FN 			X:GPFNCompile N

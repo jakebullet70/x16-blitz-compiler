@@ -150,6 +150,7 @@ Three implementations, and what each costs:
 | **Arrays** | ASM | `GP.ARRPTR` |
 | **Banked text** | ASM | `GP.BANKEDSTR` `GP.ENDBANKEDSTR` `GP.BSTR` · `GP.BSTRCOUNT` is COMPOSITE — see §3.10 |
 | **Routine calls** | COMPOSITE | `GP.DEFPROC` `GP.SUB` — free, and stays GP-BASIC OUT, see §3.11 |
+| **Routine calls** | ASM | `GP.FN` — the same call as a value, and it brings the GP block in |
 | **Screen** | ASM | `GP.BOX` `GP.FILL` `GP.PRINTAT` |
 | **Screen** | COMPOSITE | `GP.CHAR` — free, one cell in `GP.PRINTAT`'s shape running `GP.FILL`'s handler |
 | **Colour roles** | BASIC | `THEME.INC.BL` — `THEME.LOAD`, `THEME.CLR()` · §4.1 |
@@ -802,8 +803,9 @@ it returns.
 
 ### 3.11 Calling a routine in one statement
 
-Two keywords. `GP.DEFPROC` names a `GOSUB` target and the variables its callers fill in, and
-`GP.SUB` fills them and calls it in one statement.
+Three keywords. `GP.DEFPROC` names a `GOSUB` target and the variables its callers fill in, `GP.SUB`
+fills them and calls it in one statement, and `GP.FN` does the same from inside an expression and
+gives back a value.
 
 ```basic
     DB.A = 1 : GOSUB DB.SELECT
@@ -816,10 +818,24 @@ costs what the long spelling costs. A declaration on a line of its own costs one
 marker every source line emits. Folded onto the routine's own first statement it costs nothing. A
 bare label is not a line, so folding onto one costs the byte anyway.
 
-Neither keyword has machine code of its own, so a program whose only GP.BASIC keywords are these
-two stays GP OUT and carries none of the 1,024-byte GP block.
+`GP.DEFPROC` and `GP.SUB` have no machine code of their own, so a program whose only GP.BASIC
+keywords are those two stays GP OUT and carries none of the GP block. `GP.FN` has two runtime
+opcodes and brings the block in.
 
-A routine returns its results in named variables, as a `GOSUB` does. There is no `GP.FN`.
+#### The formals are ordinary variables
+
+A verb's formals and its `RETURNS` variable are plain variables in the program's one variable list.
+Every call writes the same ones, and the body can read and write them like any other. That is what
+makes the call cost nothing, and it is also the whole of the rule about nesting:
+
+- **A verb may appear inside its own argument list.** `GP.FN(AREA, 2, GP.FN(AREA, 3, 4))` is
+  correct, because a call list is evaluated in full before any of it is stored into a formal. The
+  inner call runs and finishes before the outer writes `A.W`. The values wait on the 4K frame
+  stack while the rest of the list is read, so neither the number of arguments nor the depth of
+  any one of them is a limit.
+- **A verb's body may not call the verb.** There is one set of formals, so a routine that calls
+  itself — directly, or round through another verb — writes over the arguments it is still using.
+  Nothing detects this: it compiles, both passes agree, and the answer is wrong.
 
 The refusals, all at compile time:
 
@@ -827,20 +843,25 @@ The refusals, all at compile time:
     GP.DEFPROC VERB IS NOT A PLAIN NAME     a $, % or subscript on the verb
     GP.DEFPROC VERB ALREADY DECLARED        a second declaration of that verb
     GP.DEFPROC FORMAL IS NOT A VARIABLE     an array, or something that is not a name
+    GP.DEFPROC RETURNS IS NOT A VARIABLE    an array element or a literal after RETURNS
     TOO MANY GP.DEFPROC FORMALS             a thirteenth formal
     GP.SUB BEFORE ITS GP.DEFPROC            the call sits above the declaration
     GP.SUB DOES NOT MATCH ITS GP.DEFPROC    the wrong number of arguments
+    GP.FN BEFORE ITS GP.DEFPROC             the call sits above the declaration
+    GP.FN NEEDS A VERB DECLARED RETURNS     the verb has no result variable
+    ARGUMENTS DO NOT MATCH THE GP.DEFPROC   the wrong number of arguments
     TYPE MISMATCH                           a string for a number, or a number for a string
 ```
 
 #### 3.11.1 `GP.DEFPROC` — declare a verb and its arguments
 
 ```entry
-  Syntax    GP.DEFPROC verb [, formal ...]
-  Does      Names the routine that follows it, and the variables a
-            caller fills in. Emits no code.
-  Kind      COMPOSITE. Records a position and a formal list at
-            compile time.
+  Syntax    GP.DEFPROC verb [, formal ...] [RETURNS variable]
+  Does      Names the routine that follows it, the variables a caller
+            fills in, and the one its result comes back in. Emits no
+            code.
+  Kind      COMPOSITE. Records a position, a formal list and a result
+            variable at compile time.
   Notes     The routine starts at the next statement, on the same
             line or on the line below. GOSUB to its label still
             works.
@@ -849,8 +870,12 @@ The refusals, all at compile time:
             share a name. One verb costs one variable record.
             A formal is a plain scalar variable, numeric or string.
             Up to 12 of them.
-  WARNING   An array or an array element cannot be a formal. A module
-            whose arguments are array elements takes the verb and no
+            RETURNS names a plain scalar variable too, and it is what
+            GP.FN reads after the call. Its type is the type of the
+            call. Without it the verb is GP.SUB-only.
+  WARNING   An array or an array element cannot be a formal, and it
+            cannot be the RETURNS variable either. A module whose
+            arguments are array elements takes the verb and no
             formals, and its caller sets the array first.
   Example
 ```
@@ -858,6 +883,11 @@ The refusals, all at compile time:
             DB.SELECT:
               GP.DEFPROC DBSELECT, DB.A : BANK DB.CODEBANK
               GOSUB DB.SELECT.BODY
+              RETURN
+
+            AREA:
+              GP.DEFPROC AREA, A.W, A.H RETURNS A.R
+              A.R = A.W * A.H
               RETURN
 ```
 
@@ -881,6 +911,41 @@ The refusals, all at compile time:
             GP.SUB DBSELECT, 1
             GP.SUB DBFIND, PRICE, "ACME", TRUE
             GP.SUB DBWRITE
+```
+
+#### 3.11.3 `GP.FN` — call a verb from inside an expression
+
+```entry
+  Syntax    GP.FN(verb [, expression ...])
+  Does      Assigns each expression to the matching formal, calls the
+            routine, and gives back the variable the declaration
+            named after RETURNS.
+  Kind      FUNCTION. Two runtime opcodes bracket the call.
+  Notes     The verb must be declared RETURNS. Its type is the type
+            of the term, so a verb returning a string is a string
+            term and concatenates.
+            The body may be as long as it likes and may print, read
+            files, open blocks and call other verbs. The caller's
+            half-built expression and its string temporaries are
+            carried across it.
+            Costs 5 bytes of p-code at the call site against GP.SUB's
+            3, plus the read of the RETURNS variable that the long
+            spelling pays anyway, plus 2 bytes for each argument
+            after the first -- an argument waits on the frame stack
+            until the call, so the number of formals is not a limit.
+  WARNING   The call must sit below its GP.DEFPROC, as GP.SUB's does.
+            The body must not call its own verb: there is one set of
+            formals and it would write over the arguments in use.
+            An argument may be as deep an expression as any other,
+            and however many there are only one of them is on the
+            evaluation stack at a time.
+  Example
+```
+```basic
+            PRINT "AREA "; GP.FN(AREA, 3, 4)
+            T = A + GP.FN(AREA, 3, 4) * 2
+            PRINT "X" + GP.FN(TAG, "AB") + "Y"
+            PRINT GP.FN(AREA, 2, GP.FN(AREA, 3, 4))
 ```
 
 ---
@@ -1527,6 +1592,7 @@ Each of these has cost a debugging session at least once.
 | `#DEFINE X 129536` | `#DEFINE` takes an INT16 — `ERROR: INVALID PARAMETER` | an ordinary variable |
 | `GP.SUB` above its `GP.DEFPROC` | the call carries an address, not a line number — `GP.SUB BEFORE ITS GP.DEFPROC` | declare the routine above every caller |
 | an array element as a `GP.DEFPROC` formal | `GP.DEFPROC FORMAL IS NOT A VARIABLE` | plain scalar formals, and set the array before the call |
+| a `GP.DEFPROC` body calling its own verb | one set of formals, so it writes over the arguments in use — wrong answer, no error | recursion needs its own saved copies, or a different shape |
 | a variable called `LEN`, `ST`, `POS`, `MB` or `CHAR` | the name is a reserved word on its own | dot it — BASLOAD matches the whole identifier, so `LINEINPUT.LEN` works |
 
 ---

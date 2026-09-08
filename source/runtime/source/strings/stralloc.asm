@@ -26,6 +26,15 @@ resetStringSystem .macro
 ;
 ;							Initialise string system if required
 ;
+;		TEMPORARIES START stringTempPages BELOW THE HEAP CEILING, and that used to be the
+;		constant 2. GP.FN raises it for the length of a call so the callee's own per-line
+;		resets hand out memory BELOW the temporaries its caller is still holding -- see
+;		gp-runtime/commands/gpfncall.asm, which is the only thing that ever writes it.
+;
+;		The heap ceiling itself could not be moved instead: StringConcrete's scavenger walks
+;		the blocks upward from stringHighMemory and needs them to tile it exactly, so a ceiling
+;		lowered into the temporary area starts that walk in garbage.
+;
 ; ************************************************************************************************
 
 StringInitialise:
@@ -33,11 +42,11 @@ StringInitialise:
 		lda 	stringInitialised 			; already done
 		bne 	_SIExit
 
-		lda 	stringHighMemory 			; copy high memory - 512 => stringTempPointer
+		lda 	stringHighMemory 			; copy high memory - stringTempPages => stringTempPointer
 		sta 	stringTempPointer
 		lda 	stringHighMemory+1
-		dec 	a
-		dec 	a
+		sec
+		sbc 	stringTempPages
 		sta 	stringTempPointer+1
 
 		dec 	stringInitialised 			; set the initialised flag.
@@ -107,6 +116,8 @@ stringInitialised:							; non zero if string system not set up
 		.fill 	1		
 stringTempPointer: 							; allocated temporary pointer
 		.fill 	2
+stringTempPages: 							; pages below the heap ceiling the temporaries start at
+		.fill 	1
 		.send storage
 
 ; ************************************************************************************************

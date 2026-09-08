@@ -294,6 +294,22 @@
 #TOKEN GP.DEFPROC 52817
 #TOKEN GP.SUB 52816
 
+## GP.FN(<verb>[, <expression> ...]) is the same call from inside an EXPRESSION,
+## and it reads back the variable the declaration named after RETURNS:
+##
+##   GP.DEFPROC AREA, A.W, A.H RETURNS A.R
+##   AREA.BODY:  A.R = A.W * A.H : RETURN
+##
+##   PRINT "AREA IS "; GP.FN(AREA, 3, 4) + 1
+##
+## A verb without a RETURNS may only be called with GP.SUB. Calling one from mid
+## expression saves the caller's half-finished expression across the call, which
+## GP.SUB never has to do, so GP.FN costs a few bytes at the call site where
+## GP.SUB costs none. Prefer GP.SUB where a statement will do.
+
+#TOKEN GP.FN 52815
+#TOKEN RETURNS 52814
+
 #TOKEN GP.IF 52830
 #TOKEN GP.ELSEIF 52829
 #TOKEN GP.ELSE 52828

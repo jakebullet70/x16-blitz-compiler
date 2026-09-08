@@ -116,6 +116,10 @@ VectorTable:
 	.word	CommandXIfNext           ; $ee .ifnext
 	.word	CommandXIfElse           ; $ef .ifelse
 	.word	CommandXUnwind           ; $f0 .unwind
+	.word	CommandXFnSave           ; $f1 .fnsave
+	.word	CommandXFnRestore        ; $f2 .fnrestore
+	.word	CommandXFnPush           ; $f3 .fnpush
+	.word	CommandXFnPop            ; $f4 .fnpop
 
 
 ShiftVectorTable:

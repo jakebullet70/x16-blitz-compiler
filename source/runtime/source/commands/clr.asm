@@ -70,6 +70,10 @@ _ClearLoop1:
 		sta 	stringHighMemory+1
 		stz 	stringHighMemory
 
+		lda 	#2 										; temporaries start two pages below the ceiling. A
+		sta 	stringTempPages 						; constant inside StringInitialise until GP.FN, which
+													; raises it for the length of a call and puts it back.
+
 		stz 	stringInitialised 						; string system not initialised
 		;
 		;		Initialise stack space.
