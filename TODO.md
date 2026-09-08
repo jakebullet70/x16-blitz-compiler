@@ -2587,6 +2587,38 @@ Two things fall out of it:
   under *A MASTER COMPILER* below). Four palettes roughly doubles `THEME`'s 45 lines. If that reads
   as too much, the alternative is one indexed table rather than four branches of assignments.
 
+### `BASLOAD-GPC` has no way to be told what to compile — DONE
+
+**BUILT 08/09/26.** The BASIC launcher, the first of the two options below. `BASLOAD-GPC/frontend/
+BASLOAD.BASL` asks for a name, pokes it, `SYS`es and prints what comes back, then asks again; an
+empty answer quits. It is tokenised by the engine it fronts (`build.py front`) and tested end to
+end by `test/runfront.py`, with a fixed-answer variant generated off the real source — the only way
+to drive an interactive program headlessly.
+
+**The engine is `BASLOAD.BIN` now and the front end is `BASLOAD.PRG`**, the same division as
+`GPC.BIN` and `GPC.PRG`: the name a person types belongs to the thing a person runs. Every caller
+moved with it — `test/runtest.py`, `source/gpc/build_basl.py`, and `build_basl.py` stages both files
+into `testing/`.
+
+The open questions closed as: **device 8, not asked for**; **an empty answer quits**, rather than
+error 2; **no last-name offer and no directory listing** — a bare prompt. The name is re-poked on
+every pass, because the engine answers in the buffer it was asked in.
+
+**No assembly, and the poked-name path is untouched** — a caller that sets up the ABI itself gets
+exactly what it always did. The second option below was not taken, and needs no decision now.
+
+The record of the choice, for anyone reopening it:
+
+- **A BASIC launcher that asks and pokes** — **this is what shipped.** No assembly at all, it works
+  against the engine unchanged, and it is the same shape `runtest.py` already generates. Costs a
+  second file to ship and load.
+- **Prompting inside the PRG** — `main_entry` branches to `no_file` on a zero length, so the hook is
+  there: print, read into `file_main_name`, set `file_main_len`, fall through to `loader_run`
+  instead of returning 2. One file, no BASIC stub, but it is assembly in the vendored fork (see the
+  standing order in [Ask before writing asm](docs/memory/ask-before-writing-asm.md)).
+
+Still open, and small: `release.sh` does not ship BASLOAD at all yet — neither file is in the zip.
+
 ## Samples
 
 A `samples/` tree of real programs that show off what the compiler buys you, one directory per sample

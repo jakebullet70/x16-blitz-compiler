@@ -9,17 +9,23 @@
 # ************************************************************************************************
 # ************************************************************************************************
 #
-#		Two targets out of ONE source tree:
+#		Three targets out of ONE source tree, plus the launcher that drives them:
 #
-#		  rom   conf/basload-rom.cfg   16,384 bytes, loads at $c000 in ROM bank 15
-#		  prg   conf/basload-prg.cfg   a PRG that loads and runs anywhere in RAM
+#		  rom    conf/basload-rom.cfg   16,384 bytes, loads at $c000 in ROM bank 15
+#		  prg    conf/basload-prg.cfg   BASLOAD.BIN -- the engine, loads and runs at $6000
+#		  front  frontend/BASLOAD.BASL  BASLOAD.PRG -- the front end you actually launch
 #
 #		The prg target is the whole point of this folder -- see README.md. There is no source
-#		diff between them and there is not meant to be one: everything ROM-specific in BASLOAD
-#		is already RAM-resident (the bridge copies itself to golden RAM), so the difference is
-#		a linker config and nothing else.
+#		diff between it and the rom target and there is not meant to be one: everything
+#		ROM-specific in BASLOAD is already RAM-resident (the bridge copies itself to golden
+#		RAM), so the difference is a linker config and nothing else.
 #
-#		  python BASLOAD-GPC/build.py [rom|prg|both]      default: both
+#		BASLOAD.BIN, NOT BASLOAD.PRG. The engine's only interface is an ABI -- name at $bf00,
+#		length in r0L, device in r0H, SYS $6000 -- so the name a person types has to belong to
+#		the front end, exactly as GPC.PRG and GPC.BIN divide it. The front target tokenises
+#		that front end WITH THE ENGINE IT JUST BUILT, which also exercises the fork end to end.
+#
+#		  python BASLOAD-GPC/build.py [rom|prg|front|all]      default: all
 #
 #		THE FORK IS AN OVERLAY, NOT A PATCH SET. upstream/ stays exactly as it was vendored and
 #		src/ holds a whole copy of each file we changed, so
@@ -45,6 +51,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 
 HERE     = os.path.dirname(os.path.abspath(__file__))
 ROOT     = os.path.abspath(os.path.join(HERE, ".."))
@@ -69,6 +76,16 @@ PRG_ADDR = 0x6000
 
 CC65 = os.environ.get("CC65_HOME", r"C:\8bitProgramming\cc65")
 CL65 = os.path.join(CC65, "bin", "cl65.exe" if os.name == "nt" else "cl65")
+
+#	The front end. Its source is BASLOAD source, so tokenising it needs a running X16 -- the same
+#	bundled emulator every other BASL step in this tree drives (source/gpc/build_basl.py).
+FRONTEND  = os.path.join(HERE, "frontend")
+FRONT_DIR = os.path.join(BUILD, "frontdrive")	# the emulator's drive for that one run
+EMU       = os.path.join(ROOT, "bin", "x16emu", "x16emu.exe" if os.name == "nt" else "x16emu")
+ENGINE    = "BASLOAD.BIN"
+FRONT_SRC = "BASLOAD.BASL"
+FRONT_PRG = "BASLOAD.PRG"						# frontend/BASLOAD.BASL says #SAVEAS "@:BASLOAD.PRG"
+DONE      = "BASLDONE"							# the driver writes BASLOAD's own message here
 
 
 def die(msg):
@@ -157,7 +174,8 @@ def build_prg():
 	run(WORK, os.path.join(HERE, "conf", "basload-prg.cfg"), raw,
 		os.path.join(BUILD, "basload-prg.map"))
 	#	A PRG is the load address little-endian, then the image. cl65 emits the image alone.
-	out = os.path.join(BUILD, "BASLOAD.PRG")
+	#	.BIN, not .PRG: this is the engine, called through an ABI. BASLOAD.PRG is the front end.
+	out = os.path.join(BUILD, ENGINE)
 	with open(out, "wb") as f:
 		f.write(bytes([PRG_ADDR & 0xFF, PRG_ADDR >> 8]))
 		with open(raw, "rb") as g:
@@ -167,15 +185,110 @@ def build_prg():
 		  % (os.path.basename(out), os.path.getsize(out), PRG_ADDR, PRG_ADDR))
 
 
+#
+#	THE DRIVER. Typed at the READY. prompt, it is the engine's ABI written out in BASIC: name to
+#	$bf00 in bank 0, length to r0L, device to r0H, SYS $6000. The front end being built does the
+#	same thing from a prompt -- see frontend/BASLOAD.BASL.
+#
+#	BANK 0, NOT POKE 0,0. X16 BASIC saves and restores the RAM bank around every PEEK and POKE, so
+#	POKE 0,0 selects nothing and the name lands in whichever bank was live; the symptom is silent.
+#	LOAD inside a running program restarts it AND clears variables, so the re-entry guard is a
+#	POKEd byte. Line 90 re-selects bank 0 because BASLOAD returns with bank 1 live.
+#
+DRIVER_TEXT = """10 IF PEEK(1024)=42 THEN 50
+20 POKE 1024,42
+30 LOAD"{engine}",8,1
+50 B$="{basl}"
+60 BANK 0
+70 FOR I=1 TO LEN(B$):POKE 48896+I-1,ASC(MID$(B$,I,1)):NEXT
+80 POKE 2,LEN(B$):POKE 3,8:SYS 24576
+90 BANK 0:R$=""
+100 FOR I=0 TO 79:C=PEEK(48896+I):IF C=0 THEN 120
+110 R$=R$+CHR$(C):NEXT
+120 OPEN 13,8,13,"@:{done},S,W":PRINT#13,R$:CLOSE 13
+130 PRINT"BASLOAD:";R$
+RUN
+"""
+
+
+def build_front():
+	"""Tokenise frontend/BASLOAD.BASL into build/BASLOAD.PRG, the launcher a person runs.
+
+	IT IS TOKENISED BY THE ENGINE THIS SCRIPT JUST BUILT, not by the ROM's BASLOAD. Two reasons.
+	The ROM command prints its result and a script would have to scrape the screen for it, whereas
+	the PRG leaves a message at $bf00 that the driver can write to a sentinel file -- and that
+	sentinel is also how we know the run finished, rather than guessing at a sleep. And a front end
+	built by the engine it fronts is one more end-to-end exercise of the fork on every build."""
+	engine = os.path.join(BUILD, ENGINE)
+	src    = os.path.join(FRONTEND, FRONT_SRC)
+	for need in (engine, src, EMU, ROM):
+		if not os.path.exists(need):
+			die("missing %s%s" % (need, "  -- run build.py prg first" if need == engine else ""))
+
+	if os.path.exists(FRONT_DIR):
+		shutil.rmtree(FRONT_DIR)
+	os.makedirs(FRONT_DIR)
+	shutil.copy(engine, FRONT_DIR)
+	shutil.copy(src, FRONT_DIR)
+	with open(os.path.join(FRONT_DIR, "DRV.BAS"), "w", newline="\n") as f:
+		f.write(DRIVER_TEXT.format(engine=ENGINE, basl=FRONT_SRC, done=DONE))
+
+	env = dict(os.environ)
+	env["SDL_VIDEODRIVER"] = "dummy"		# never steal the desktop's keyboard focus
+	args = [EMU, "-rom", ROM, "-fsroot", ".", "-warp", "-pastewarp", "-sound", "none",
+			"-echo", "-bas", "DRV.BAS"]
+	done = os.path.join(FRONT_DIR, DONE)
+	log  = open(os.path.join(FRONT_DIR, "RUN.LOG"), "wb")
+	#	Killed by PID, NEVER by image name: other projects on this box run x16emu too.
+	proc = subprocess.Popen(args, cwd=FRONT_DIR, stdout=log, stderr=subprocess.STDOUT, env=env)
+	try:
+		deadline = time.time() + 90
+		while time.time() < deadline:
+			time.sleep(0.3)
+			if os.path.exists(done) and os.path.getsize(done) > 0:
+				time.sleep(0.3)						# let the CLOSE land
+				break
+	finally:
+		proc.kill()
+		try:
+			proc.wait(timeout=5)
+		except subprocess.TimeoutExpired:
+			pass
+		log.close()
+
+	#	THE CHECK IS POSITIVE, and it comes before "did a file appear". A run that fails partway
+	#	has still written every line up to the failure and closed the file with a valid end marker,
+	#	so an output file is not evidence of anything. Only the literal SUCCESS is.
+	msg = ""
+	if os.path.exists(done):
+		msg = open(done, "rb").read().decode("latin-1", "replace").strip("\0 \r\n\t")
+	if not msg:
+		die("BASLOAD never reported back within 90s tokenising %s -- see %s"
+			% (FRONT_SRC, os.path.join(FRONT_DIR, "RUN.LOG")))
+	if msg != "SUCCESS":
+		die("BASLOAD said %s tokenising %s" % (msg, FRONT_SRC))
+
+	built = os.path.join(FRONT_DIR, FRONT_PRG)
+	if not os.path.exists(built) or os.path.getsize(built) == 0:
+		die("BASLOAD reported SUCCESS but wrote no %s -- check the #SAVEAS name" % FRONT_PRG)
+	out = os.path.join(BUILD, FRONT_PRG)
+	shutil.copy(built, out)
+	print("  front %s (%d bytes, RUN it -- it LOADs %s itself)"
+		  % (FRONT_PRG, os.path.getsize(out), ENGINE))
+
+
 def main():
-	what = sys.argv[1] if len(sys.argv) > 1 else "both"
-	if what not in ("rom", "prg", "both"):
-		die("usage: build.py [rom|prg|both]")
+	what = sys.argv[1] if len(sys.argv) > 1 else "all"
+	if what not in ("rom", "prg", "front", "all"):
+		die("usage: build.py [rom|prg|front|all]")
 	os.makedirs(BUILD, exist_ok=True)
-	if what in ("rom", "both"):
+	if what in ("rom", "all"):
 		build_rom()
-	if what in ("prg", "both"):
+	if what in ("prg", "all"):
 		build_prg()
+	#	After prg, always: the front end is tokenised by the engine, so it has to be the fresh one.
+	if what in ("front", "all"):
+		build_front()
 
 
 main()

@@ -18,6 +18,14 @@ is why the entire `scripts/test.sh` corpus — all `-testbench` — never sees i
 though the program ran correctly and POWEROFF'd. This is an EMULATOR/echo artifact, not a VM or compiler
 bug: verified byte-for-byte identical output between a good baseline and a changed runtime.
 
+## `-echo` also catches what never reached the screen
+
+`-echo` hooks **CHROUT**, not the screen driver, so a run log carries everything the program wrote to
+an **open file channel** as well. A BASLOAD run under it prints the tokenised program's raw bytes and
+the `#SYMFILE` dump into the log, mid-sentence, and none of that is on the X16's screen. Read a log
+expecting it — and never scrape a log for something a file could carry instead
+([[basload-streams-to-a-file]]).
+
 **De-double recipe (recover the real value):** the doubling is exactly 2x, char-for-char. Take the doubled
 digit run after the doubled `R=` (`RR==`) and keep every 2nd char:
 ```bash

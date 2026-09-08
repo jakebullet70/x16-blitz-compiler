@@ -21,7 +21,8 @@ no source changes at all — only a linker config. That is what made the rest of
 A source that died at 38,421 bytes with `ERROR: BASIC RAM FULL` now tokenises to 47,765 and
 compiles. See [The fork](#the-fork).
 
-Nothing here is wired into the build yet. `source/gpc/build_basl.py` still drives the ROM BASLOAD.
+`source/gpc/build_basl.py` drives this build now, not the ROM's, and stages both files into
+`testing/` beside `GPC.BIN`.
 
 ## Build
 
@@ -29,13 +30,18 @@ Needs **cc65**, not 64tass — BASLOAD is a cc65 project. Installed at `C:\8bitP
 (`cl65 V2.19 - Git e11fb5c`, the official Windows snapshot); override with `CC65_HOME`.
 
 ```
-python BASLOAD-GPC/build.py both     # or: rom | prg
+python BASLOAD-GPC/build.py all     # or: rom | prg | front
 ```
 
-| target | config | output |
+| target | from | output |
 |---|---|---|
 | `rom` | `upstream/conf/basload-rom.cfg` | `build/basload-rom.bin`, 16,384 B, $c000 in ROM bank 15 |
-| `prg` | `conf/basload-prg.cfg` | `build/BASLOAD.PRG`, 8,924 B, loads $6000 |
+| `prg` | `conf/basload-prg.cfg` | `build/BASLOAD.BIN`, 9,003 B, loads $6000 — **the engine** |
+| `front` | `frontend/BASLOAD.BASL` | `build/BASLOAD.PRG`, 842 B — **the front end you launch** |
+
+**`BASLOAD.BIN`, not `BASLOAD.PRG`.** The engine's only interface is an ABI, so the name a person
+types belongs to the front end — the same division as `GPC.PRG` and `GPC.BIN`. Only `front` needs
+the emulator; the other two need only cc65.
 
 **The `rom` target exists to be checked, not shipped.** It rebuilds the bank and diffs it against
 bank 15 of `bin/x16emu/rom.bin`, which answers *"is the vendored source what is actually running?"*
@@ -46,14 +52,55 @@ after every pull.
 It builds from `upstream/` alone, with `src/` left out. A canary carrying the fork's own changes
 cannot answer the question it is there to answer.
 
+## The front end
+
+`BASLOAD.PRG` is what you `RUN`. It asks for a source file, hands it to the engine, prints what
+comes back, and asks again — an empty answer quits.
+
+```
+BASLOAD -- BASL SOURCE TO TOKENISED PRG
+
+SOURCE FILE: HELLO.BASL
+
+TOKENISING HELLO.BASL ...
+
+SUCCESS
+```
+
+It **loads `BASLOAD.BIN` itself**, so both files have to be on the drive, and nothing else does.
+
+**Plain X16 BASIC, not GP.BASIC** — `frontend/BASLOAD.BASL`, tokenised like any other `.BASL`. It
+has to run from `READY.` with nothing on the disk but itself and the engine, so it cannot want
+`GPC.BIN` or a runtime. The key reader is `GPC.BASL`'s, written out in plain BASIC, and `INPUT` is
+not used on purpose: it splits a name on a comma, answers a bare RETURN by leaving the variable
+alone rather than emptying it, and prints `?REDO FROM START` at its own discretion.
+
+Two things in it are not obvious:
+
+- **The engine is loaded once, behind a guard.** `LOAD` inside a running program restarts it *and*
+  clears variables, so the guard is a POKEd byte at `$0400` — golden RAM, which the engine backs up
+  and restores around every run, so it survives a tokenise and the loop never reloads. It is
+  checked together with the engine's own first byte (`$4C`, a `JMP`), so a cold boot that happens
+  to have 42 sitting at `$0400` still cannot `SYS` into nothing.
+- **The name is re-poked every time.** The engine answers in the buffer it was asked in — the
+  message at `$BF00` overwrites the name — so a launcher that poked once would hand its own error
+  text to the engine as the next file name.
+
+There is no prompt for the output name and there cannot be: that is the source's own `#SAVEAS`.
+The device is 8.
+
+**The poked-name path is untouched.** A caller that sets up the ABI itself still gets exactly what
+it always did — `test/runtest.py` and `source/gpc/build_basl.py` both still call the engine direct.
+
 ## Test
 
 ```
-python BASLOAD-GPC/build.py prg
-python BASLOAD-GPC/test/runtest.py
+python BASLOAD-GPC/build.py all
+python BASLOAD-GPC/test/runtest.py      # the engine: ROM vs RAM
+python BASLOAD-GPC/test/runfront.py     # the front end, end to end
 ```
 
-It tokenises `test/HELLO.BASL` twice — once through the ROM BASLOAD, once through the PRG — and
+`runtest.py` tokenises `test/HELLO.BASL` twice — once through the ROM BASLOAD, once through the PRG — and
 compares. That is the only claim worth testing: a RAM build that runs but tokenises *differently*
 is worse than one that does not run.
 
@@ -67,9 +114,25 @@ whatever was in RAM, and those two differ run to run. `source/gpc/build_basl.py`
 thing and skips its up-to-date check because of it. The streaming build writes the zero link itself
 at close and stops there, so the compare is `rom[:-2]` against the whole of the PRG's output.
 
-## Calling it
+`runfront.py` drives the front end. **An interactive program cannot be pasted at** — `x16emu -bas`
+types at the `READY.` prompt only, and once a program is running the rest is dropped, not queued —
+so it generates a **fixed-answer variant from the real source**, asserting on every substitution.
+Only the key reader goes untested. The three answers are a **missing file, then a good one, then
+nothing**, which is the arrangement that catches the name not being re-poked, and the verdict is
+the screen rather than the output file: a run that fails partway still writes a complete, valid,
+wrong program.
 
-Load `BASLOAD.PRG` at $6000, then:
+```
+  PASS -- the front end loaded the engine, tokenised HELLO.BASL to 34 bytes, and quit
+```
+
+**The raw bytes in `RUN.LOG` are not on the screen.** `-echo` hooks CHROUT, so it catches what the
+engine *streams to the output file* as well.
+
+## Calling the engine
+
+This is the ABI the front end drives, and any other caller can drive it the same way. Load
+`BASLOAD.BIN` at $6000, then:
 
 | | |
 |---|---|
@@ -79,6 +142,10 @@ Load `BASLOAD.PRG` at $6000, then:
 | call | `SYS $6000` |
 | return code | `R1L`, `$04`. 0 is OK |
 | message | `$BF00` onward, bank 0 — it overwrites the name you passed |
+| source line | `R1H`..`R2H`, `$05`-`$07`, 24 bits — **0 when the fault has no line to name** |
+
+A message that ends in a colon is the one expecting that number after it; `SYMBOL TABLE FULL` and
+the rest do not, and get a zero rather than a line. Print the number only when it is non-zero.
 
 **`BANK 0`, not `POKE 0,0`.** X16 BASIC saves and restores the RAM bank around every `PEEK` and
 `POKE`, so `POKE 0,0` selects nothing and the name lands in whichever bank was live. The symptom is
@@ -158,8 +225,9 @@ its first caller, deliberately, because adding it later would mean another BASLO
 upstream/       basload-rom @ caaaaf0, unmodified. BSD 2-Clause, Stefan Jakobsson
 src/            the fork: whole copies of the files above, overlaid at build time
 conf/           basload-prg.cfg -- ours
-test/           HELLO.BASL and the ROM-vs-RAM equivalence test
-build.py        both targets, the overlay, and the rom.bin verify
+frontend/       BASLOAD.BASL, the launcher. Plain X16 BASIC, tokenised by the engine
+test/           HELLO.BASL, the ROM-vs-RAM equivalence test, and the front-end test
+build.py        all three targets, the overlay, and the rom.bin verify
 build/          output, not tracked. work/ is the fork's tree, stock/ the canary's
 ```
 
