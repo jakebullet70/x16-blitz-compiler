@@ -21,6 +21,28 @@
 ## **  does not set it repeats the last one. Set both inputs every call, as with
 ## **  SORT.DESCEND and STASH.MOVE.
 ## **
+## **  ONE-LINE CALLS. Three verbs say the same thing in one statement, and every
+## **  argument is written at the call, so the sticky mode above cannot bite:
+## **
+## **      GP.SUB STRCASE.APPLY, GP.STRPTR(LINE$), STRCASE.UPPER
+## **      A$ = GP.FN(STR.UCASE, A$)
+## **      PRINT GP.FN(STR.LCASE, N$)
+## **
+## **  STRCASE.APPLY is STRCASE.GO with both inputs as arguments. STR.UCASE and
+## **  STR.LCASE take a string and give back a cased COPY, which is a different
+## **  interface: they rewrite the copy, never the caller's string, so A$ = GP.FN(...)
+## **  is what changes A$. A literal is SAFE in those two -- the argument is copied
+## **  into the formal on the way in and the copy is what gets rewritten -- where it
+## **  is not safe in STRCASE.APPLY, which is handed an address.
+## **
+## **  WARNING: one call to the SAME verb per expression. A string result is passed
+## **  by address, so GP.FN(STR.UCASE,A$) + GP.FN(STR.UCASE,B$) reads one variable
+## **  twice and gives the second answer both times. Two DIFFERENT verbs are fine, so
+## **  UCASE and LCASE may be mixed in one expression.
+## **
+## **  The verbs need GPB.INC.BL, and a program that has no GP block does not want
+## **  them; STRCASE.GO is the whole module without them.
+## **
 ## **  The module needs a #SYMFILE, before the #INCLUDEs and named after the source PRG.
 ## **  Without one the compile stops with "NO SYMBOL FILE FOR {}", which names the cause
 ## **  but not the file.
@@ -34,7 +56,8 @@
 ## **  #REM 1 is load bearing: without it BASLOAD strips the body and the block reaches
 ## **  the compiler empty, refused as "block mismatch". #REM 0 restores the default.
 ## **
-## **  The whole STRCASE.* name space belongs to this file.
+## **  The whole STRCASE.* name space belongs to this file, except the two verbs
+## **  STR.UCASE and STR.LCASE, named for STRINGS.INC.BL, which they merge into later.
 ## **
 ## ***********************************************************************
 #IFNDEF STRCASE.DEFS
@@ -96,6 +119,29 @@ STRCASE.GO:
     REM SCLOX: RTS
     GP.ENDASM
     #REM 0
+    RETURN
+
+## The verbs. Each is a shim on its own statement line, so the declaration costs no
+## p-code of its own, and all three sit inside the GOTO above and never run in order.
+GP.DEFPROC STRCASE.APPLY, STRCASE.PTR, STRCASE.MODE : GOSUB STRCASE.GO
+RETURN
+
+## STRCASE.S$ is the argument AND the result. The argument copy is the working copy,
+## so a second string variable would only be a second copy of the same bytes.
+GP.DEFPROC STR.UCASE, STRCASE.S$ RETURNS STRCASE.S$ : GOSUB STR.UCASE.BODY
+RETURN
+STR.UCASE.BODY:
+    STRCASE.PTR = GP.STRPTR(STRCASE.S$)
+    STRCASE.MODE = STRCASE.UPPER
+    GOSUB STRCASE.GO
+    RETURN
+
+GP.DEFPROC STR.LCASE, STRCASE.S$ RETURNS STRCASE.S$ : GOSUB STR.LCASE.BODY
+RETURN
+STR.LCASE.BODY:
+    STRCASE.PTR = GP.STRPTR(STRCASE.S$)
+    STRCASE.MODE = STRCASE.LOWER
+    GOSUB STRCASE.GO
     RETURN
 
 STRCASE.MODULE.END:

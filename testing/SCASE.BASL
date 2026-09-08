@@ -1,0 +1,44 @@
+#SAVEAS "@:SCASE.SRC.PRG"
+#SYMFILE "@:SCASE.SRC.SYM"
+#REM 0
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "STRCASE.INC.BL"
+
+## STRCASE's three verbs. C5 is the one that says the GP.FN pair works on a COPY -- the
+## caller's string comes back untouched -- and C6 that a literal is safe in them, where
+## it is not safe handed to STRCASE.APPLY as an address.
+##
+## C8 is the experiment, not a demonstration. A string result is passed by ADDRESS, so two
+## calls to the SAME verb in one expression may both be reading one variable.
+
+PRINT "C1 START"
+
+A$ = "Hello World 123"
+GP.SUB STRCASE.APPLY, GP.STRPTR(A$), STRCASE.UPPER
+PRINT "C2 "; A$
+
+B$ = "Hello World 123"
+GP.SUB STRCASE.APPLY, GP.STRPTR(B$), STRCASE.LOWER
+PRINT "C3 "; B$
+
+C$ = "MiXeD case"
+PRINT "C4 "; GP.FN(STR.UCASE, C$)
+PRINT "C5 "; C$
+
+D$ = "one"
+E$ = "two"
+PRINT "C6 "; GP.FN(STR.UCASE, D$) + "-" + GP.FN(STR.LCASE, E$)
+PRINT "C7 "; GP.FN(STR.UCASE, D$) + "-" + GP.FN(STR.UCASE, E$)
+
+## D1 is the shape C7 does not reach, and it RECORDS A DEFECT rather than a result. "+" is
+## left associative, so A + "-" + B concretes A into a temporary before B runs; two calls
+## ADJACENT leave both references live at once and D1 prints TWOTWO, not ONETWO. A string
+## RETURNS is read with GetSetVariable and passed by ADDRESS, so both terms are the one
+## variable. Nothing about STRCASE causes it -- any string-returning verb does this.
+PRINT "D1 "; GP.FN(STR.UCASE, D$) + GP.FN(STR.UCASE, E$)
+
+PRINT "C8 "; GP.FN(STR.LCASE, "LITERAL TEXT")
+PRINT "C9 LITERAL TEXT"
+
+PRINT "Z9 DONE"
+END
