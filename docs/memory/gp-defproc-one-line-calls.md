@@ -33,9 +33,21 @@ number, and it is refused by name. `WriteBranchToAddress` corrects the operand i
 so the [[gp-banked-region-relocation]] shim pattern works: declaration on a low memory shim whose
 body is at `$A000`, and a `GP.SUB` inside a region reaching back down.
 
-Tests are `testing/DEFP1|DEFP1B|DEFP1C|DEFP2.BASL` and five refusals `DEFPV`..`DEFPZ`. **`GP.FN` and
+**A FORMAL MUST BE A PLAIN SCALAR, so an array-indexed API gets the one-line call and no
+argument passing at all.** `GetReferenceTerm` returns a negative type for an array and the formal is
+refused. XBase's `DBBANK.INC.BL` is the case: its convention is that a record is an array element
+(`DB.FILE$(DB.A)`, `DB.FLD$(0, 2)`, `DB.RECNO(DB.A)`), so of its twenty-one shims only three read
+scalars and can take formals -- `DB.SELECT`, `DB.FIND` and `DB.FINDFLD`. The other eighteen declare
+a verb worth nothing over the `GOSUB` it replaces. Check what a module's arguments actually ARE
+before expecting `GP.SUB` to carry them.
+
+Tests are `testing/DEFP1|DEFP1B|DEFP1C|DEFP2.BASL` and five refusals `DEFPV`..`DEFPZ`. `DEFP3` is
+that whole front door -- **twenty-one verbs in one program**, three of them with formals -- against
+its longhand control `DEFP3C`: both 785 bytes, differing in **42 bytes, two at each of the
+twenty-one call sites**, so nothing about the cost changes with the number of records. **`GP.FN` and
 `RETURNS` are NOT built** — and `RETURNS` will need a `#TOKEN` of its own, because BASLOAD crunches
 a bare word as a variable and the compiler never sees it; `TO` (token $A4) is the free alternative.
 The buffers holding one call's formals are flat, which is safe only because `GP.SUB` is a statement;
 `GP.FN` is an expression term and will need them as a stack. Plan and measurements:
-`docs/blitz/GP-DEFPROC.PLAN.md`.
+`docs/blitz/GP-DEFPROC.PLAN.md`. Reference entries are `GP-BASIC.md` §3.11, which `MKHELP.PY`
+turns into the on-machine help.

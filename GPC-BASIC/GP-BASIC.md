@@ -123,7 +123,7 @@ anything wider compiles through the float encoder. Neither wraps.
 
 ## 3. Command reference
 
-36 keywords, encoded `$CE7F` down to `$CE52` and allocated downward. Ten of the forty-six slots
+38 keywords, encoded `$CE7F` down to `$CE50` and allocated downward. Ten of the forty-eight slots
 are holes and stay holes: the byte values are the ABI and are never renumbered.
 
 ### At a glance — where each part comes from
@@ -149,6 +149,7 @@ Three implementations, and what each costs:
 | **Addresses** | COMPOSITE | `GP.HIBYTE` `GP.LOBYTE` — free, see §3.3 |
 | **Arrays** | ASM | `GP.ARRPTR` |
 | **Banked text** | ASM | `GP.BANKEDSTR` `GP.ENDBANKEDSTR` `GP.BSTR` · `GP.BSTRCOUNT` is COMPOSITE — see §3.10 |
+| **Routine calls** | COMPOSITE | `GP.DEFPROC` `GP.SUB` — free, and stays GP-BASIC OUT, see §3.11 |
 | **Screen** | ASM | `GP.BOX` `GP.FILL` `GP.PRINTAT` |
 | **Screen** | COMPOSITE | `GP.CHAR` — free, one cell in `GP.PRINTAT`'s shape running `GP.FILL`'s handler |
 | **Colour roles** | BASIC | `THEME.INC.BL` — `THEME.LOAD`, `THEME.CLR()` · §4.1 |
@@ -799,6 +800,91 @@ it returns.
 
 ---
 
+### 3.11 Calling a routine in one statement
+
+Two keywords. `GP.DEFPROC` names a `GOSUB` target and the variables its callers fill in, and
+`GP.SUB` fills them and calls it in one statement.
+
+```basic
+    DB.A = 1 : GOSUB DB.SELECT
+
+    GP.SUB DBSELECT, 1
+```
+
+The two lines compile to the same p-code: an assignment per formal, then the call. A call site
+costs what the long spelling costs. A declaration on a line of its own costs one byte, the line
+marker every source line emits. Folded onto the routine's own first statement it costs nothing. A
+bare label is not a line, so folding onto one costs the byte anyway.
+
+Neither keyword has machine code of its own, so a program whose only GP.BASIC keywords are these
+two stays GP OUT and carries none of the 1,024-byte GP block.
+
+A routine returns its results in named variables, as a `GOSUB` does. There is no `GP.FN`.
+
+The refusals, all at compile time:
+
+```
+    GP.DEFPROC VERB IS NOT A PLAIN NAME     a $, % or subscript on the verb
+    GP.DEFPROC VERB ALREADY DECLARED        a second declaration of that verb
+    GP.DEFPROC FORMAL IS NOT A VARIABLE     an array, or something that is not a name
+    TOO MANY GP.DEFPROC FORMALS             a thirteenth formal
+    GP.SUB BEFORE ITS GP.DEFPROC            the call sits above the declaration
+    GP.SUB DOES NOT MATCH ITS GP.DEFPROC    the wrong number of arguments
+    TYPE MISMATCH                           a string for a number, or a number for a string
+```
+
+#### 3.11.1 `GP.DEFPROC` — declare a verb and its arguments
+
+```entry
+  Syntax    GP.DEFPROC verb [, formal ...]
+  Does      Names the routine that follows it, and the variables a
+            caller fills in. Emits no code.
+  Kind      COMPOSITE. Records a position and a formal list at
+            compile time.
+  Notes     The routine starts at the next statement, on the same
+            line or on the line below. GOSUB to its label still
+            works.
+            A verb is a bare name: no $, no %, no subscript. Verbs
+            are their own namespace, so a verb and a variable may
+            share a name. One verb costs one variable record.
+            A formal is a plain scalar variable, numeric or string.
+            Up to 12 of them.
+  WARNING   An array or an array element cannot be a formal. A module
+            whose arguments are array elements takes the verb and no
+            formals, and its caller sets the array first.
+  Example
+```
+```basic
+            DB.SELECT:
+              GP.DEFPROC DBSELECT, DB.A : BANK DB.CODEBANK
+              GOSUB DB.SELECT.BODY
+              RETURN
+```
+
+#### 3.11.2 `GP.SUB` — call a verb
+
+```entry
+  Syntax    GP.SUB verb [, expression ...]
+  Does      Assigns each expression to the matching formal, in order,
+            then calls the routine.
+  Kind      COMPOSITE. Expands to an assignment per formal and a
+            GOSUB.
+  Notes     The count and the types must match the declaration.
+            A call into a GP.BANKED region works, and so does a call
+            out of one. The address is corrected in both directions.
+  WARNING   The call must sit below its GP.DEFPROC. It carries an
+            address and not a line number, so a forward call is
+            refused rather than compiled.
+  Example
+```
+```basic
+            GP.SUB DBSELECT, 1
+            GP.SUB DBFIND, PRICE, "ACME", TRUE
+            GP.SUB DBWRITE
+```
+
+---
+
 ## 4. Module reference — the BASL library
 
 Called with `GOSUB`. Arguments go into named variables before the call, results come back in named
@@ -1439,6 +1525,8 @@ Each of these has cost a debugging session at least once.
 | `SCREEN` after `BMX.PAINT` | reloads the default palette and throws the image's colours away | set the mode first |
 | `STR.FIELD$` wanted bigger | auto-`DIM`ed at 0..10 on first use, and you cannot `DIM` it after | `DIM` it **before** the first call, set `STR.MAX` |
 | `#DEFINE X 129536` | `#DEFINE` takes an INT16 — `ERROR: INVALID PARAMETER` | an ordinary variable |
+| `GP.SUB` above its `GP.DEFPROC` | the call carries an address, not a line number — `GP.SUB BEFORE ITS GP.DEFPROC` | declare the routine above every caller |
+| an array element as a `GP.DEFPROC` formal | `GP.DEFPROC FORMAL IS NOT A VARIABLE` | plain scalar formals, and set the array before the call |
 | a variable called `LEN`, `ST`, `POS`, `MB` or `CHAR` | the name is a reserved word on its own | dot it — BASLOAD matches the whole identifier, so `LINEINPUT.LEN` works |
 
 ---
