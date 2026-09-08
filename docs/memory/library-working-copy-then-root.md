@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 75714395-f705-4d27-8da6-af4a832a1e0b
-  modified: 2026-09-05T17:29:43.127Z
+  modified: 2026-09-08T00:00:00.000Z
 ---
 
 **A `GPC-BASIC` module is edited in `samples/GPB-MODS-TESTING/GPC-BASIC/`, proved there, and copied
@@ -23,4 +23,13 @@ issue" as permission to skip the working copy — that answers a different quest
 breaking dependent samples matters (it does not: sole user, see
 [[no-backward-compatibility-needed]]), not about where the edit happens.
 
-Related: [[compile-shared-not-embedded]], [[measure-pcode-per-module]].
+**THE DRIFT RUNS BOTH WAYS, so "take the mods copy" is not a safe shortcut.** Diffed on 2026-09-08
+while wiring `samples/XBASE` to the banked library. `STRINGS` and `APPSYS` are identical and `KB`
+differs only in comments, but `STASH` is **newer in GPB-MODS-TESTING** (it grew a slot allocator,
+`STASH.SLOT` / `STASH.ORG` / `STASH.NEXT`, defaulting to slot 0 so old callers are unaffected) while
+`GPB.INC.BL` is **newer in root** — root is the only copy carrying the `#TOKEN` lines for
+`GP.DEFPROC`, `GP.SUB`, `GP.FN` and `RETURNS`. A program pulling its whole library from one directory
+gets a broken half either way. `THEME` disagrees on a label name as well: root calls the entry
+`THEME.LOAD`, GPB-MODS-TESTING calls it `THEME.SELECT`.
+
+Related: [[compile-shared-not-embedded]], [[measure-pcode-per-module]], [[xbase-engine-planned]].

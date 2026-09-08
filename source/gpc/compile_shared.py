@@ -45,7 +45,9 @@ ROM       = os.path.join(EMUDIR, "rom.bin")
 GPC_INPUT = os.path.join(TESTING, "GPC.INPUT")
 ENGINE    = "GPC.BIN"
 
-TIMEOUT = 180			# generous: the engine compiles on an emulated 8 MHz 65C02
+TIMEOUT = 420			# generous: the engine compiles on an emulated 8 MHz 65C02.
+						# GPBMODS at 2,200 lines and two GP.BANKED regions takes about
+						# 200 s, so 180 was under the biggest thing in the tree.
 
 
 def die(msg):
@@ -108,6 +110,7 @@ def compile_one(source, obj, mapfile="", shared=True):
 				#		looser fires on success. A real failure waits out TIMEOUT and is caught
 				#		by the missing object below.
 				#
+				finished = False
 				deadline = time.time() + TIMEOUT
 				while time.time() < deadline:
 					time.sleep(0.5)
@@ -117,6 +120,7 @@ def compile_one(source, obj, mapfile="", shared=True):
 					except OSError:
 						continue
 					if b"OK CODE" in echo:
+						finished = True
 						time.sleep(1.5)			# let the last write and the map land
 						break
 			finally:
@@ -130,8 +134,20 @@ def compile_one(source, obj, mapfile="", shared=True):
 			with open(GPC_INPUT, "wb") as f:
 				f.write(saved)
 
+	#
+	#		THE OBJECT EXISTING IS NOT THE TEST. Pass two writes it as it compiles, so a run
+	#		killed at TIMEOUT leaves a short one -- 513 bytes, the bootstrap and nothing else --
+	#		and this used to print "compiled" over it. The banner is what says the compile ran
+	#		to the end, and the map is what says the object was finished; a build asking for a
+	#		map and not getting one did not succeed, whatever is sitting in the object file.
+	#
+	if not finished:
+		die("%s did not finish %s within %ds -- see testing/GPCCOMP.LOG"
+			% (ENGINE, source, TIMEOUT))
 	if not os.path.exists(objpath):
 		die("%s did not compile %s -- see testing/GPCCOMP.LOG" % (ENGINE, source))
+	if mapfile and not os.path.exists(os.path.join(TESTING, mapfile)):
+		die("%s wrote no map for %s -- see testing/GPCCOMP.LOG" % (ENGINE, source))
 	print("  compiled %s -> %s (%d bytes, %s)"
 		  % (source, obj, os.path.getsize(objpath), "SHARED" if shared else "EMBEDDED"))
 	os.remove(os.path.join(TESTING, "GPCCOMP.LOG"))

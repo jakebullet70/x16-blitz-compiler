@@ -35,6 +35,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [make libs does not install the runtime](make-libs-does-not-install-the-runtime.md) — a new runtime opcode dispatches into garbage; `make -C source/runtime gpc-rt` is the other half
 - [Baseline compiler is the application copy](baseline-compiler-is-the-application-copy.md) — testing/GPC.BIN can be committed stale; A/B against source/application/GPC.BIN or invent regressions
 - [Measure p-code per module](measure-pcode-per-module.md) — the map file plus the SYM give exact bytes per include and per routine
+- [A compile timeout faked success](compile-shared-timeout-fakes-success.md) — 513 bytes and no map, reported as "compiled"; the banner is the finish line, not the file size
 - [Headless BASL build recipe](headless-basl-build-recipe.md) — the three emulator runs and the stop conditions that keep a cycle to ~70s
 - [GPC.ERR builds shared, in the main dir](gpcerr-build-shared-in-main-dir.md) — never standalone; the headless harness builds the wrong kind
 - [Tests share the product's memory](tests-share-the-products-memory.md) — the harness was 3,615 B of workspace; and BASLOAD does not nest #IFNDEF
@@ -61,6 +62,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [PROGRAM TOO BIG was the workspace](program-too-big-fires-early.md) — FIXED with a RAM bank per table, then a second bank under the line table for 4,096 lines; the raise sites, and the real max program size
 - [SHARED p-code cap is RTBASE](gpc-shared-pcode-cap-is-rtbase.md) - ~17,920 bytes, not $9F00; and PROGRAM TOO BIG proves the source was read in full
 - [GPC Blitz runtime slack and limits](gpc-blitz-runtime-slack-and-limits.md) — measured memory layout; the run-side ceiling, quotable as FREE minus 4096
+- [Run-side workspace, read from the PRG](run-side-workspace-read-from-the-prg.md) — the two bootstrap page numbers and .varspace give the whole budget; and a run-time OUT OF MEMORY names the messenger
 - [Core page cushion below GPBase](gpc-core-page-cushion-below-gpbase.md) — only ~40 B of padding; cross it and every program grows 256 B
 - [Runtime footprint](blitz-x16-runtime-footprint.md) — the 10,956 B runtime copied into every program, and how to shrink it
 - [String heap scavenger](string-heap-scavenger.md) — SHIPPED: dead blocks reused, +1 page RT; the intermittent OOM was no-reclaim plus a garbage line-0 read
@@ -129,6 +131,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [Wildcard scratch eats the source](wildcard-scratch-eats-the-source.md) — S0:NAME.B* matches NAME.BASL; it deleted 17 test sources, never send one through IOScratchFile
 - [Every region gets its own .Bnn file](region-overlay-ovl-file.md) — BUILT; secondary address 1 lands each overlay at $A000, so regions never enter low RAM or the 24,063-byte file ceiling
 - [Object writer: regions vs low code](object-writer-regions-vs-low-code.md) — write above the buffer's reach and the streamer pads forward 65,535 bytes, with both passes agreeing and no check firing
+- [A second region for the utilities](second-region-for-the-utilities.md) — BUILT; a BANK statement is the ONLY disqualifier, file I/O and GP.ASM blobs are fine, and GP.DEFPROC must leave its declaration behind
 - [Banked code loses the bank on a call out](gp-banked-call-out-loses-the-bank.md) — a region cannot call another bank and survive the return, and may not BANK itself back
 - [FILEDIR banks whole](filedir-bank-split.md) — BUILT; the bank switch moved into its two blobs, and the "78% cannot move" was a line count of REM assembly
 - [GPBMODS resident p-code breakdown](gpbmods-resident-pcode-breakdown.md) — MEASURED; the shell is 79%, all eight modules are 21%, the map cannot see GP.ASM blobs, and grep for BANK with comments STRIPPED

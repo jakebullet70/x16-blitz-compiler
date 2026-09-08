@@ -28,3 +28,32 @@ See [[gpc-blitz-runtime-slack-and-limits]] and [[gpasm-implementation-status]].
 is the ONLY channel through which compiler size matters. Compile time, compile-time memory,
 how much work the generator or `FixBranches` has to do — none of it belongs in a costing
 answer, and quoting it reads as dodging the question. See [[answer-the-question-asked]].
+
+**THE MECHANISM IS GONE, AND THE RULE STILL STANDS — measured 08/09/26.** `FreeMemory..ObjectCeiling`
+has not been the object buffer since the compiler went two-pass: the object lives in bank 7, and
+`FreeMemory` is only the origin `objPtr` counts from. Every use of it is a relative length
+(`objPtr - FreeMemory`, `memreport.asm:45-50`), a page delta, or a cursor compare. **Wall 2 of the
+regions work is the proof: +1,139 bytes of GPC.BIN, and GPC still compiled to a byte-identical
+1,284.** So compiler growth now costs a compiled program **nothing**, and the honest answer to "do
+we care if we add code to the compiler" is no.
+
+What growth does spend, measured at GPC.BIN 24,299:
+
+| | now | headroom |
+|---|---|---|
+| compiler in low RAM | `$0801`-`$66FF`, 24,319 bytes | `$6700`-`$9F00` unused while it runs — **14,336 bytes** |
+| the 1K storage hole | `StorageEnd $066D` | **404 bytes**, and this is the tight one |
+
+So put compiler-only buffers in the **code section**, not in storage — the `.cerror` at
+`common-source/source/common.inc:280` says exactly that, and `IONameBuffer` and Wall 2's region
+tables are both precedents.
+
+**`start.asm:89-91` STILL SAYS THE OLD THING** — *"written by `_CAWriteByte` from `FreeMemory`
+upwards... Capacity = ObjectCeiling - FreeMemory"* — and it is the sentence that makes compiler
+size look like a real cost. `ObjectCeiling $9F00` survives in two places and neither is a
+compile-side wall: `object.asm:125` tests where the COMPILED PROGRAM's workspace tops out, and
+`memreport.asm:60` prints FREE. Not yet corrected.
+
+Still report a cost in max program size — that is unchanged. The answer is now usually zero.
+See [[two-pass-compiler]].
+

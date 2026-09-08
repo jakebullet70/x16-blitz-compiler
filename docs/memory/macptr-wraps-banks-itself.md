@@ -21,6 +21,22 @@ screen either spans two banks or cannot be taken. `FILEDIR` deliberately does *n
 stops at the end of the one bank it was given, because wrapping would spill the listing into a bank
 it never claimed. The trick is recorded here for the case that actually needs it.
 
+**THE DESTINATION IS AN ARBITRARY POINTER, NOT A BANK WINDOW.** Read out of the working blob on
+2026-09-08: `FILEDIR.INC.BL`'s `JSR $FF44` loads `.X`/`.Y` from `{FILE.DIR.ADDR%}`, a plain 16-bit
+variable. Bank wrapping is what happens *if* the pointer is in `$A000-$BFFF`, not a requirement.
+Point the same blob at `GP.STRPTR(a$) + 1` and it block-reads straight into a BASIC string's heap
+block -- and the heap is always low RAM, so it never crosses `$A000` and the wrap never fires. That
+is the way past [[binput-caps-at-255-bytes]]'s `CHRIN` loop without moving anything into a bank.
+
+Three traps on that path: pre-allocate the string at full width with `RPT$(32, 255)` so the block
+exists; take `GP.STRPTR` **fresh before each call**, because the scavenger can move blocks between
+statements; and `POKE` the length byte afterwards, because `MACPTR` may return fewer bytes than
+asked for.
+
+**The blob restores the caller's window on every exit path**, which `FILEDIR`'s comments say is
+because the caller may be banked p-code at `$A000` whose next byte would otherwise be fetched from
+the data bank. Copy that property, do not re-derive it.
+
 **The details that bite either way:**
 
 - Ask for **at most 255 bytes** a call and the returned count fits one byte, which keeps the

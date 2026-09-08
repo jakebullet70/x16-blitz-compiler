@@ -160,7 +160,18 @@ MIN_WS_PAGES = 16 							; smallest workspace a shared program keeps (4K)
 ;		below. Change it in one place and a program compiled by the old engine, running under a
 ;		new runtime, gets a floor that is not where its gap is.
 ;
-FrameStackPages = 16 						; 4K, ~250 frames
+;		EIGHT, not sixteen, since 08/09/26. Four kilobytes was set when a program was small and
+;		its workspace was most of the machine; it is now most of the workspace. GPBMODS gets
+;		$5400..$6600 = 4,608 bytes to run in, of which 2,282 are its scalars, and the frame stack
+;		below it was very nearly as big as the whole thing -- so FILES/DIR OPEN ran out of string
+;		heap building twenty-four listbox rows and reported OUT OF MEMORY from inside STR.PADR.
+;
+;		Two kilobytes is still ~125 GOSUB frames (4 bytes), ~107 FOR frames (19, the largest), and
+;		nothing in this tree recurses. Overflow is not silent either way: StackOpenFrame tests
+;		stackFloorHigh and reports OUT OF MEMORY, which is what stock BASIC says for too many
+;		nested GOSUBs. So the trade is depth nobody uses for 2,048 bytes every program can spend.
+;
+FrameStackPages = 8 						; 2K, ~125 frames
 ;
 ;		RT_ABI is the runtime's ABI ordinal, and it is the ONE place it is written down. It drives
 ;		the 4-byte magic at RTBASE ("GPC" + the digit), which the bootstrap compares to answer a

@@ -1,16 +1,11 @@
 #SAVEAS "@:GPBMODS.SRC.PRG"
 #SYMFILE "@:GPBMODS.SRC.SYM"
 #INCLUDE "GPB.INC.BL"
-#INCLUDE "BANKMGR.INC.BL"
-#INCLUDE "APPSYS.INC.BL"
 #INCLUDE "STASH.INC.BL"
 #INCLUDE "STASHFILE.INC.BL"
-#INCLUDE "STRCASE.INC.BL"
-#INCLUDE "STRINGS.INC.BL"
 #INCLUDE "LIBBANK.INC.BL"
-#INCLUDE "SORT.INC.BL"
 #INCLUDE "LIBBANKFD.INC.BL"
-#INCLUDE "FILEIO.INC.BL"
+#INCLUDE "LIBUTIL.INC.BL"
 
 ## ---- THE PROGRAM'S LITERAL TEXT LIVES IN A BANK. Every GP.BANKEDSTR block below
 ## ---- names this, and it is CLAIMED from BANKMGR at startup for the same reason
@@ -27,13 +22,38 @@
 ## ---- fills, so an overrun cannot pass silently.
 #DEFINE GM.TEXTBANKB 6
 
-## ---- THE GUI RUNS FROM A RAM BANK. GUIBANK.INC.BL is the low memory front
-## ---- door -- seven shims that select the bank and call the body. The GOTO
-## ---- jumps the region rather than falling into it through the bridge
-## ---- GP.BANKED leaves; see that file for why that matters.
+## ---- THE GUI RUNS FROM A RAM BANK, AND SO DO THE UTILITIES. LIBBANK.INC.BL
+## ---- and LIBUTIL.INC.BL are the two low memory front doors -- a shim an
+## ---- entry point, selecting the bank and calling the body. The GOTO jumps
+## ---- each region rather than falling into it through the bridge GP.BANKED
+## ---- leaves; see those files for why that matters.
+## ----
+## ---- TWO REGIONS AND NOT ONE, because a region may not call another: both
+## ---- live at $A000, so the branch has no distance to travel and the
+## ---- compiler refuses it. They are independent here -- the only call the
+## ---- GUI bank makes downwards is to STASH, which is in low memory.
+## ----
+## ---- WHAT STAYS IN LOW RAM is what holds a BANK statement, which the
+## ---- compiler refuses inside a region: STASH, STASHFILE, and the three
+## ---- shim files themselves. GPB.INC.BL is definitions and no code.
 
 
 GOTO GM.LIBEND
+
+## THE UTILITY REGION IS FIRST BECAUSE FILEDIR READS FILEIO'S FILE.CHAN.
+## BASLOAD substitutes a #DEFINE where it stands, so the file that supplies
+## one has to be read before the file that uses it. 
+GP.BANKED LIB.UTILBANK
+#INCLUDE "APPSYS.INC.BL"
+#INCLUDE "BANKMGR.INC.BL"
+#INCLUDE "STRCASE.INC.BL"
+#INCLUDE "STRINGS.INC.BL"
+#INCLUDE "STRUSING.INC.BL"
+#INCLUDE "SORT.INC.BL"
+#INCLUDE "STASHVRAM.INC.BL"
+#INCLUDE "FILEIO.INC.BL"
+GP.ENDBANKED
+
 GP.BANKED LIB.CODEBANK
 #INCLUDE "THEME.INC.BL"
 #INCLUDE "MENUVERT.INC.BL"
@@ -50,6 +70,7 @@ GP.BANKEDSTR GM.TEXTBANK BS.LIBEND
   "NOTHING RUN YET"
   "TEXT BANK IS ALREADY TAKEN"
   "NO DIRECTORY BANK LEFT"
+  "UTILITY BANK IS ALREADY TAKEN"
 GP.ENDBANKEDSTR
 GM.LIBEND:
 
@@ -106,7 +127,7 @@ GM.LIBEND:
 #DEFINE GM.LEFT 157
 #DEFINE GM.RIGHT 29
 
-## The caller owns the DIM. Thirty-two covers the bar's eight, the longest
+## The caller owns the DIM. Thirty-two covers the bar's nine, the longest
 ## dropdown, and the twenty-four row list GUI.LISTBOX is shown with. Do not
 ## also leave it implicit.
 DIM MENUVERT.ITEM$(32)
@@ -156,6 +177,9 @@ IF BANKMGR.OK = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 3)
 BANKMGR.SET.BANK = GM.TEXTBANKB : GOSUB BANKMGR.CLAIM
 IF BANKMGR.OK = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 3)
 
+BANKMGR.SET.BANK = LIB.UTILBANK : GOSUB BANKMGR.CLAIM
+IF BANKMGR.OK = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 5)
+
 GOSUB BANKMGR.GET.FREE.BANK : GM.DDBANK = BANKMGR.BANK
 GOSUB BANKMGR.GET.FREE.BANK : GM.GUIBANK = BANKMGR.BANK
 IF GM.GUIBANK = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 1)
@@ -166,6 +190,15 @@ GOSUB BANKMGR.GET.FREE.BANK : GM.DIRBANK = BANKMGR.BANK
 IF GM.DIRBANK = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 4)
 
 IF GM.BANKFAIL$ <> "" THEN GOTO GM.BANKSTOP
+
+## STASHVRAM KEEPS ITS HANDLE TABLE IN THE CALLER'S ARRAYS, so the caller
+## dims them, and SV.MAX has to agree with the DIM or SV.RESET walks off the
+## end. Eight is what the panel needs and the table costs 2 bytes an entry.
+SV.MAX = 8
+DIM SV.PAGE%(SV.MAX)
+DIM SV.PAGES%(SV.MAX)
+GOSUB SV.INIT
+IF SV.OK = 0 THEN GM.BANKFAIL$ = SV.ERROR$
 
 ## FILEDIR sizes FILE.NAME$ here and keeps the block's address. Nothing may
 ## assign a longer name afterwards -- see FILEDIR.INC.BL, "assign either
@@ -272,7 +305,7 @@ GMX.CHROME:
 
 ## ---- GMX.BARDRAW -- every bar item, and the highlight if there is one to
 ## ---- put. GM.BARWAS is what is highlighted ON SCREEN right now, which is
-## ---- what lets GMX.DROP repaint two items instead of eight. Cleared first,
+## ---- what lets GMX.DROP repaint two items instead of nine. Cleared first,
 ## ---- so a GP.STOP between the two draws leaves it honest.
 ## ----
 ## ---- GM.SEL is 0 before the first pass round the shell, and MENUBAR.MARK on
@@ -349,12 +382,16 @@ GMX.BAR.LOAD:
 ## to G. HOTATTR tints whichever letter it finds.
   MENUVERT.HOT$ = GP.BSTR(BS.BAR.LOAD, 0)
   MENUVERT.COUNT = GP.BSTRCOUNT(BS.BAR.LOAD) - 1
+
+## GM.BARN is the same number, kept. MENUVERT.COUNT is the dropdown's by the time
+## GMX.DROP walks sideways off one, so the bar's own count has to survive that.
+  GM.BARN = MENUVERT.COUNT
   FOR GM.I = 1 TO MENUVERT.COUNT
     MENUVERT.ITEM$(GM.I) = GP.BSTR(BS.BAR.LOAD, GM.I)
   NEXT GM.I
-  MENUVERT.ATTR = THEME.CLR(THEME.TITLE)
+  MENUVERT.ATTR = THEME.CLR(THEME.TEXT)
   MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
-  MENUVERT.HOTATTR = THEME.CLR(THEME.WARN)
+  MENUVERT.HOTATTR = THEME.CLR(THEME.TITLE)
   MENUBAR.X = GM.BARX : MENUBAR.Y = 0 : MENUBAR.GAP = 0
   RETURN
 
@@ -366,7 +403,7 @@ GMX.BAR.LOAD:
 ## **  MENUBAR.RUN or from a sideways exit out of another dropdown.
 ## **  MENUBAR.WHERE then reports the column and width of the item.
 ## **
-## **  TWO ITEMS, NOT EIGHT. A sideways exit comes straight back here, so this
+## **  TWO ITEMS, NOT NINE. A sideways exit comes straight back here, so this
 ## **  is the walk when a dropdown is open, and redrawing the whole bar a step
 ## **  makes it crawl. GM.BARWAS says what the highlight is sitting on, so the
 ## **  bar only has to be drawn whole when nothing is on it.
@@ -419,10 +456,10 @@ GMX.DROP:
 
   GP.SELECT MENUVERT.KEY
   GP.CASE GM.LEFT
-    GM.SEL = GM.SEL - 1 : IF GM.SEL < 1 THEN GM.SEL = 8
+    GM.SEL = GM.SEL - 1 : IF GM.SEL < 1 THEN GM.SEL = GM.BARN
     GM.OPEN = 1
   GP.CASE GM.RIGHT
-    GM.SEL = GM.SEL + 1 : IF GM.SEL > 8 THEN GM.SEL = 1
+    GM.SEL = GM.SEL + 1 : IF GM.SEL > GM.BARN THEN GM.SEL = 1
     GM.OPEN = 1
   GP.OTHER
     IF MENUVERT.SEL > 0 THEN GOSUB GMX.DISPATCH
@@ -484,6 +521,7 @@ GP.BANKEDSTR GM.TEXTBANK BS.DD.SCREEN
   " STASH SAVE + RESTORE"
   " STASH MOVE"
   " STASH TO A FILE"
+  " STASHVRAM  SAVE + STAMP"
 GP.ENDBANKEDSTR
 
 GP.BANKEDSTR GM.TEXTBANK BS.DD.STRINGS
@@ -494,6 +532,8 @@ GP.BANKEDSTR GM.TEXTBANK BS.DD.STRINGS
   " STR.SPLIT"
   " STR.REPLACE"
   " STRCASE  UPPER/LOWER"
+  " STR.USING"
+  " STR.USING.FIX"
 GP.ENDBANKEDSTR
 
 GP.BANKEDSTR GM.TEXTBANK BS.DD.DATA
@@ -984,8 +1024,10 @@ GMX.SCREEN:
     GOSUB GMX.S.STASH
   GP.CASE 6
     GOSUB GMX.S.MOVE
-  GP.OTHER
+  GP.CASE 7
     GOSUB GMX.S.FILE
+  GP.OTHER
+    GOSUB GMX.S.VRAM
   GP.ENDSEL
   GOSUB GMX.CHROME
   RETURN
@@ -1356,6 +1398,76 @@ GMX.S.FILE:
   GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.S.FILE, 9) + MID$(STR$(GM.BLOAD), 2)
   GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.S.FILE, 10) + MID$(STR$(GM.BANKNOW), 2)
   GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.S.FILE, 11)
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.S.VRAM -- STASHVRAM, which keeps the cells in VRAM instead.
+## **
+## **  THE SAME DEMONSTRATION AS STASH, ON PURPOSE. Save a rectangle, scribble
+## **  over it, put it back, then stamp it somewhere else -- so the two rows
+## **  can be read against each other. What differs is where the cells go and
+## **  what it costs: STASH spends a whole 8K RAM bank, this spends VRAM pages
+## **  above the layer 1 map, and the cells never travel through low memory
+## **  because one VERA data port reads while the other writes.
+## **
+## **  IT NEEDS NO BANK, which is why it is in bank 7 with the rest of the
+## **  utilities and STASH is not -- the compiler refuses BANK inside a region.
+## **
+## **  SV.MOVE IS CLEARED ON THE WAY OUT, as STASH.MOVE is: it is an input a
+## **  caller sets once and it would otherwise leak into the next restore.
+## **
+## **  THE HANDLE IS FREED. Allocation is a bump pointer released LIFO, so a
+## **  panel that kept its handle would walk the window down the drive of the
+## **  program's life; this one gives it straight back.
+## ***********************************************************************
+
+
+GP.BANKEDSTR GM.TEXTBANKB BS.S.VRAM
+  "IN VRAM. PRESS A KEY TO SCRIBBLE OVER IT."
+  "GONE. PRESS A KEY TO PUT IT BACK."
+  "BACK. PRESS A KEY TO STAMP IT LOWER DOWN."
+  "ONE RECTANGLE, TWO PLACES, NO RAM BANK. PRESS A KEY."
+  "SV  OK"
+  "   HANDLE "
+  "   PAGES "
+GP.ENDBANKEDSTR
+GMX.S.VRAM:
+  GOSUB GMX.CLEARPANEL
+  GOSUB GMX.S.PATTERN
+
+  SV.X = 10 : SV.Y = 9 : SV.W = 30 : SV.H = 8
+  GOSUB SV.SAVE
+  GM.SOK = SV.OK
+  GM.SHND = SV.HND
+  GM.SPAGES = SV.PAGES%(SV.HND)
+
+  GM.TELL$ = GP.BSTR(BS.S.VRAM, 0)
+  GOSUB GMX.TELL
+  GP.FILL 10, 9, 30, 8, ASC("X"), THEME.CLR(THEME.WARN)
+
+  GM.TELL$ = GP.BSTR(BS.S.VRAM, 1)
+  GOSUB GMX.TELL
+  SV.HND = GM.SHND
+  SV.MOVE = 0
+  GOSUB SV.RESTORE
+
+  GM.TELL$ = GP.BSTR(BS.S.VRAM, 2)
+  GOSUB GMX.TELL
+  SV.HND = GM.SHND
+  SV.MOVE = -1
+  SV.X = 44 : SV.Y = 13
+  GOSUB SV.RESTORE
+  SV.MOVE = 0
+
+  SV.HND = GM.SHND
+  GOSUB SV.FREE
+
+  GM.TELL$ = GP.BSTR(BS.S.VRAM, 3)
+  GOSUB GMX.TELL
+  GM.RESULT$ = GP.BSTR(BS.S.VRAM, 4) + STR$(GM.SOK)
+  GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.S.VRAM, 5) + MID$(STR$(GM.SHND), 2)
+  GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.S.VRAM, 6) + MID$(STR$(GM.SPAGES), 2)
   RETURN
 
 
@@ -1914,8 +2026,12 @@ GMX.STRINGS:
     GOSUB GMX.G.SPLIT
   GP.CASE 5
     GOSUB GMX.G.REPLACE
-  GP.OTHER
+  GP.CASE 6
     GOSUB GMX.G.CASE
+  GP.CASE 7
+    GOSUB GMX.G.USING
+  GP.OTHER
+    GOSUB GMX.G.USINGFIX
   GP.ENDSEL
   GOSUB GMX.CHROME
   RETURN
@@ -1935,10 +2051,15 @@ GMX.STRINGS:
 
 ## ---- TWO LINES A PANEL -- a heading and one line under it, read as a pair, so
 ## ---- a panel's index into this group is always even. STRINGS filled the first
-## ---- six pairs and DATA and ABOUT took the next five. They are in one group
+## ---- eight pairs and DATA and ABOUT took the next five. They are in one group
 ## ---- because GMX.G.SAY names one group, and a group name cannot be passed.
+## ----
+## ---- IN BANK 6, NOT BANK 5, and that is the only reason it is: bank 5's pool
+## ---- is a full 8,192 bytes and this group is ~830 of them. Which bank a group
+## ---- is in costs the call site nothing, so moving one is how a full pool is
+## ---- answered.
 
-GP.BANKEDSTR GM.TEXTBANK BS.G.SAY
+GP.BANKEDSTR GM.TEXTBANKB BS.G.SAY
   "STR.PADR  PAD ON THE RIGHT"
   "STR.WIDTH IS A FIELD, NOT AN AMOUNT."
   "STR.PADL  PAD ON THE LEFT"
@@ -1959,6 +2080,10 @@ GP.BANKEDSTR GM.TEXTBANK BS.G.SAY
   "P-CODE SIZE IS A COMPILE-TIME FACT."
   "MODULE SIZES  P-CODE BYTES AN INCLUDE"
   "FROM THE MAP FILE AGAINST THE SYM."
+  "STR.USING  A NUMBER THROUGH A MASK"
+  "THE RESULT IS THE MASK'S WIDTH, ALWAYS."
+  "STR.USING.FIX  DECIMAL PLACES, NO MASK"
+  "AS WIDE AS THE NUMBER NEEDS. NO PADDING."
 GP.ENDBANKEDSTR
 
 ##  The strings the STRINGS rows work ON, and the labels they print with.
@@ -2093,6 +2218,84 @@ GMX.G.CASE:
   GM.TELL$ = GP.BSTR(BS.G.DATA, 6)
   GOSUB GMX.TELL
   GM.RESULT$ = GP.BSTR(BS.G.DATA, 10)
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.G.USING -- STR.USING, one mask over six magnitudes.
+## **
+## **  THE VALUE CLIMBS BY A DIGIT A ROW, so the column proves the two things
+## **  the mask is for: every result is the same width and lines up on the
+## **  point, and the last one does not fit and fills with "*". Grown
+## **  arithmetically rather than read from a table -- six literals would say
+## **  no more and would need somewhere to live.
+## **
+## **  THE MASK IS READ FROM A BANKED STRING and assigned to STR.USING.MASK$
+## **  once. GP.BSTR builds a temporary on every call, and a string block is
+## **  never freed, so a fetch inside the loop would spend six blocks saying
+## **  the same eight characters.
+## ***********************************************************************
+
+
+GP.BANKEDSTR GM.TEXTBANKB BS.G.USING
+  "#,##0.00"
+  "  MASK        VALUE            RESULT"
+  "PRESS A KEY."
+  "STR.USING  SIX MAGNITUDES, ONE MASK"
+  "  PLACES "
+  "STR.USING.FIX  FIVE WIDTHS OF ONE VALUE"
+GP.ENDBANKEDSTR
+GMX.G.USING:
+  GM.GRP = 20
+  GOSUB GMX.G.SAY
+  GP.PRINTAT 4, 12, GP.BSTR(BS.G.USING, 1), THEME.CLR(THEME.DIMMED)
+
+  STR.USING.MASK$ = GP.BSTR(BS.G.USING, 0)
+  GM.UVAL = 0.5
+  GM.SROW = 14
+  FOR GM.I = 1 TO 6
+    STR.USING.NUM = GM.UVAL
+    GOSUB STR.USING
+    GP.PRINTAT 6, GM.SROW, STR.USING.MASK$, THEME.CLR(THEME.DIMMED)
+    GP.PRINTAT 20, GM.SROW, MID$(STR$(GM.UVAL), 2), THEME.CLR(THEME.TEXT)
+    GP.PRINTAT 40, GM.SROW, STR.USING.STR$, THEME.CLR(THEME.TITLE)
+    GM.SROW = GM.SROW + 1
+    GM.UVAL = GM.UVAL * 10 + GM.I
+  NEXT GM.I
+
+  GM.TELL$ = GP.BSTR(BS.G.USING, 2)
+  GOSUB GMX.TELL
+  GM.RESULT$ = GP.BSTR(BS.G.USING, 3)
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.G.USINGFIX -- STR.USING.FIX, the same value at five widths.
+## **
+## **  NO MASK AND NO PADDING: the result is as wide as the number needs, so
+## **  a column of these does NOT line up. That is the difference the row is
+## **  here to show, and it is why STR.USING exists on top of it.
+## **
+## **  ROUNDING IS HALF AWAY FROM ZERO. 1234.56789 at nought places is 1235,
+## **  not 1234.
+## ***********************************************************************
+
+GMX.G.USINGFIX:
+  GM.GRP = 22
+  GOSUB GMX.G.SAY
+  GM.SROW = 14
+  FOR GM.I = 0 TO 4
+    STR.USING.NUM = 1234.56789
+    STR.USING.DP = GM.I
+    GOSUB STR.USING.FIX
+    GP.PRINTAT 6, GM.SROW, GP.BSTR(BS.G.USING, 4) + MID$(STR$(GM.I), 2), THEME.CLR(THEME.DIMMED)
+    GP.PRINTAT 24, GM.SROW, STR.USING.STR$, THEME.CLR(THEME.TITLE)
+    GM.SROW = GM.SROW + 1
+  NEXT GM.I
+
+  GM.TELL$ = GP.BSTR(BS.G.USING, 2)
+  GOSUB GMX.TELL
+  GM.RESULT$ = GP.BSTR(BS.G.USING, 5)
   RETURN
 
 
@@ -2256,8 +2459,8 @@ GMX.A.ARRAY:
 GP.BANKEDSTR GM.TEXTBANK BS.THEME
   "THEME.SELECT "
   "THE SEVEN ROLES, EACH IN ITS OWN ATTRIBUTE"
-  "EVERY COLOUR IS READ FROM THEME.CLR, SO"
-  "FILLING IT AND DRAWING AGAIN IS ALL OF IT."
+  "EVERY DRAW READS ITS COLOUR FROM THEME.CLR."
+  "A THEME REFILLS THAT ARRAY. NOTHING ELSE."
   "PAGE"
   "TEXT"
   "TITLE"
@@ -2325,7 +2528,7 @@ GMX.ABOUT:
 ## **  ONE OVERLAY FILE A BANK. Every GP.BANKED region and every GP.BANKEDSTR
 ## **  bank is written as its own .Bnn beside the .PRG and loaded to $A000,
 ## **  so the count is the number of banks named in the source, not a
-## **  property of the program's size. This one names three: 4 for code,
+## **  property of the program's size. This one names four: 4 and 7 for code,
 ## **  5 and 6 for text.
 ## ***********************************************************************
 
@@ -2334,11 +2537,11 @@ GP.BANKEDSTR GM.TEXTBANK BS.B.MEM
   "FRE(0)  BYTES FREE  "
   "BANKS "
   "  SPARE "
-  "CODE BANK "
+  "CODE BANKS "
   "  TEXT BANKS "
   "BANK SELECTED NOW  "
-  "RESIDENT P-CODE  15209    MAP TOTAL  20221"
-  "OVERLAYS  3   .B04 6658  .B05 8194  .B06 1794"
+  "RESIDENT P-CODE  13994    MAP TOTAL  23819"
+  "OVERLAYS 4  .B04 6658 .B05 7426 .B06 3074 .B07 4866"
 GP.ENDBANKEDSTR
 GMX.B.MEMORY:
   GM.GRP = 16
@@ -2348,7 +2551,7 @@ GMX.B.MEMORY:
 
   GP.PRINTAT 4, 13, GP.BSTR(BS.B.MEM, 0) + MID$(STR$(FRE(0)), 2), THEME.CLR(THEME.WARN)
   GP.PRINTAT 4, 15, GP.BSTR(BS.B.MEM, 1) + MID$(STR$(BANKMGR.BANKS), 2) + GP.BSTR(BS.B.MEM, 2) + MID$(STR$(BANKMGR.SPARE), 2), THEME.CLR(THEME.TEXT)
-  GP.PRINTAT 4, 16, GP.BSTR(BS.B.MEM, 3) + MID$(STR$(LIB.CODEBANK), 2) + GP.BSTR(BS.B.MEM, 4) + MID$(STR$(GM.TEXTBANK), 2) + " " + MID$(STR$(GM.TEXTBANKB), 2), THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 4, 16, GP.BSTR(BS.B.MEM, 3) + MID$(STR$(LIB.CODEBANK), 2) + " " + MID$(STR$(LIB.UTILBANK), 2) + GP.BSTR(BS.B.MEM, 4) + MID$(STR$(GM.TEXTBANK), 2) + " " + MID$(STR$(GM.TEXTBANKB), 2), THEME.CLR(THEME.TEXT)
   GP.PRINTAT 4, 17, GP.BSTR(BS.B.MEM, 5) + MID$(STR$(GM.BANKNOW), 2), THEME.CLR(THEME.TEXT)
   GP.PRINTAT 4, 19, GP.BSTR(BS.B.MEM, 6), THEME.CLR(THEME.TEXT)
   GP.PRINTAT 4, 20, GP.BSTR(BS.B.MEM, 7), THEME.CLR(THEME.TEXT)
@@ -2372,66 +2575,83 @@ GMX.B.MEMORY:
 ## **  The rows are pre-formatted rather than a name and a number joined here:
 ## **  the column is already aligned in the source, where it is easy to see.
 ## **
-## **  THE TWO COLUMNS ARE THE TWO PLACES P-CODE CAN LIVE, which is the whole
-## **  point of the panel. The left column is resident: it is loaded at $0801
-## **  and it is what has to fit under the runtime. The right column is inside
-## **  the GP.BANKED region, which is written to GPBMODS.B04 and loaded to
-## **  $A000 in bank 4 -- none of it costs low RAM. It is drawn in the title
-## **  colour rather than the text colour so the split reads at a glance.
+## **  THE THREE COLUMNS ARE THE THREE PLACES P-CODE CAN LIVE, which is the
+## **  whole point of the panel. The left column is resident: it is loaded at
+## **  $0801 and it is what has to fit under the runtime. The other two are
+## **  GP.BANKED regions, written to GPBMODS.B04 and GPBMODS.B07 and loaded to
+## **  $A000 in banks 4 and 7 -- neither costs low RAM. They are drawn in the
+## **  title colour rather than the text colour so the split reads at a glance.
 ## **
-## **  The literal text is in neither column. It is not p-code, so the map
-## **  cannot see it; ABOUT / MEMORY carries the two text overlays instead.
+## **  SIX ENTRIES IN THE LEFT COLUMN AGAINST FIFTEEN ON THE RIGHT, AND THAT
+## **  IS THE POINT OF BANK 7. What is left down there is what could not go:
+## **  STASH and STASHFILE hold BANK statements, which the compiler refuses
+## **  inside a region, and the three LIB* files are the shim layer that
+## **  reaches the other two columns.
+## **
+## **  The literal text is in no column at all. It is not p-code, so the map
+## **  cannot see it; ABOUT / MEMORY carries the four overlay sizes instead.
 ## ***********************************************************************
 
 
 GP.BANKEDSTR GM.TEXTBANK BS.B.SIZES
   "FROM THE MAP FILE AGAINST THE SYM"
-  "IN LOW RAM  --  LOADED AT $0801"
-  "BANKMGR      578"
-  "APPSYS       114"
+  "IN LOW RAM  --  AT $0801"
   "STASH        431"
   "STASHFILE    171"
-  "STRCASE       66"
-  "STRINGS      511"
   "LIBBANK      184"
   "LIBBANKFD     34"
-  "SORT         189"
-  "FILEIO       839"
-  "GPBMODS    10495"
-  "IN BANK 4  --  GPBMODS.B04"
+  "LIBUTIL      359"
+  "GPBMODS    11165"
+  "IN BANK 4  --  .B04"
   "THEME        479"
   "MENUVERT    1104"
   "MENUBAR      826"
   "LINEINPUT    762"
   "GUI         1647"
   "GUI2        1360"
-  "FILEDIR      431"
-  "TOTAL      20221"
+  "FILEDIR      433"
+  "IN BANK 7  --  .B07"
+  "APPSYS       114"
+  "BANKMGR      586"
+  "STRCASE       54"
+  "STRINGS      511"
+  "STRUSING     726"
+  "SORT         189"
+  "STASHVRAM   1681"
+  "FILEIO      1003"
+  "TOTAL      23819"
 GP.ENDBANKEDSTR
 GMX.B.SIZES:
   GM.GRP = 18
   GOSUB GMX.G.SAY
   GP.PRINTAT 4, 12, GP.BSTR(BS.B.SIZES, 0), THEME.CLR(THEME.DIMMED)
 
-  GP.PRINTAT 6, 13, GP.BSTR(BS.B.SIZES, 1), THEME.CLR(THEME.WARN)
+  GP.PRINTAT 4, 13, GP.BSTR(BS.B.SIZES, 1), THEME.CLR(THEME.WARN)
   GM.SROW = 14
-  FOR GM.I = 2 TO 12
-    GP.PRINTAT 6, GM.SROW, GP.BSTR(BS.B.SIZES, GM.I), THEME.CLR(THEME.TEXT)
+  FOR GM.I = 2 TO 7
+    GP.PRINTAT 4, GM.SROW, GP.BSTR(BS.B.SIZES, GM.I), THEME.CLR(THEME.TEXT)
     GM.SROW = GM.SROW + 1
   NEXT GM.I
 
-  GP.PRINTAT 42, 13, GP.BSTR(BS.B.SIZES, 13), THEME.CLR(THEME.WARN)
+  GP.PRINTAT 30, 13, GP.BSTR(BS.B.SIZES, 8), THEME.CLR(THEME.WARN)
   GM.SROW = 14
-  FOR GM.I = 14 TO 20
-    GP.PRINTAT 42, GM.SROW, GP.BSTR(BS.B.SIZES, GM.I), THEME.CLR(THEME.TITLE)
+  FOR GM.I = 9 TO 15
+    GP.PRINTAT 30, GM.SROW, GP.BSTR(BS.B.SIZES, GM.I), THEME.CLR(THEME.TITLE)
     GM.SROW = GM.SROW + 1
   NEXT GM.I
 
-  GP.PRINTAT 42, 23, GP.BSTR(BS.B.SIZES, 21), THEME.CLR(THEME.WARN)
+  GP.PRINTAT 54, 13, GP.BSTR(BS.B.SIZES, 16), THEME.CLR(THEME.WARN)
+  GM.SROW = 14
+  FOR GM.I = 17 TO 24
+    GP.PRINTAT 54, GM.SROW, GP.BSTR(BS.B.SIZES, GM.I), THEME.CLR(THEME.TITLE)
+    GM.SROW = GM.SROW + 1
+  NEXT GM.I
+
+  GP.PRINTAT 4, 23, GP.BSTR(BS.B.SIZES, 25), THEME.CLR(THEME.WARN)
 
   GM.TELL$ = GP.BSTR(BS.G.DATA, 6)
   GOSUB GMX.TELL
-  GM.RESULT$ = GP.BSTR(BS.B.SIZES, 21)
+  GM.RESULT$ = GP.BSTR(BS.B.SIZES, 25)
   RETURN
 
 
@@ -2439,8 +2659,9 @@ GMX.B.SIZES:
 ## **  GMX.FILES -- the FILES dropdown. FILEIO and FILEDIR, one row each.
 ## **
 ## **  THE DRIVE IS REAL, and four of these rows write to it. Everything they
-## **  make is named GPBFILE.* or GPBDIR, and the two files are scratched by
-## **  the row that made them. The directory is not: FILEIO has no RMDIR.
+## **  make is named GPBFILE.* or GPBDIR, and every one of them is removed by
+## **  the row that made it -- the directory by FILE.RMDIR, after the drive
+## **  has come back up out of it.
 ## **
 ## **  FILE.NAME$ IS ASSIGNED BY FIVE ROWS HERE and written in place by
 ## **  FILEDIR, which is only safe because none of them assigns a name longer
@@ -2925,11 +3146,11 @@ GMX.F.RENAME:
 
 
 ## ***********************************************************************
-## **  GMX.F.MKDIR -- FILE.MKDIR, FILE.CHDIR, FILE.CURDIR and FILE.UP.
+## **  GMX.F.MKDIR -- FILE.MKDIR, FILE.CHDIR, FILE.CURDIR, FILE.UP, FILE.RMDIR.
 ## **
-## **  THE DIRECTORY IS LEFT BEHIND. FILEIO has no RMDIR, so a second run of
-## **  this row reports 63 FILE EXISTS on the make and carries on into it --
-## **  which is the error path working rather than the panel failing.
+## **  THE ROW PUTS THE DRIVE BACK AS IT FOUND IT, so it can be run twice.
+## **  RMDIR comes after UP, because RD will not remove the directory the
+## **  drive is standing in.
 ## **
 ## **  FILE.UP sends CD: and the left arrow, CHR$(95), spelled by code so the
 ## **  source does not depend on how that character is encoded.
@@ -2943,8 +3164,9 @@ GP.BANKEDSTR GM.TEXTBANKB BS.F.MKDIR
   "CHDIR GPBDIR"
   "NOW IN  "
   "BACK IN  "
-  "GPBDIR IS LEFT BEHIND -- FILEIO HAS NO RMDIR. PRESS A KEY."
-  "MKDIR + CHDIR + UP  BACK IN "
+  "RMDIR GPBDIR"
+  "GPBDIR MADE, ENTERED, LEFT AND REMOVED. PRESS A KEY."
+  "MKDIR + CHDIR + UP + RMDIR  BACK IN "
 GP.ENDBANKEDSTR
 GMX.F.MKDIR:
   GOSUB GMX.CLEARPANEL
@@ -2974,9 +3196,14 @@ GMX.F.MKDIR:
   GM.FTXT$ = GP.BSTR(BS.F.MKDIR, 5) + FILE.PATH$
   GOSUB GMX.F.SAY
 
-  GM.TELL$ = GP.BSTR(BS.F.MKDIR, 6)
+  FILE.NAME$ = GP.BSTR(BS.F.MKDIR, 1)
+  GOSUB FILE.RMDIR
+  GM.FSTEP$ = GP.BSTR(BS.F.MKDIR, 6)
+  GOSUB GMX.F.DRIVE
+
+  GM.TELL$ = GP.BSTR(BS.F.MKDIR, 7)
   GOSUB GMX.TELL
-  GM.RESULT$ = GP.BSTR(BS.F.MKDIR, 7) + FILE.PATH$
+  GM.RESULT$ = GP.BSTR(BS.F.MKDIR, 8) + FILE.PATH$
   RETURN
 
 

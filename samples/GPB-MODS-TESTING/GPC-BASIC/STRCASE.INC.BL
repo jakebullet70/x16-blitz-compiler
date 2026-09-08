@@ -72,7 +72,7 @@ GOTO STRCASE.MODULE.END
 ## from STRCASE.PTR / STRCASE.MODE because BASLOAD's symbol file does not record the
 ## sigil -- X and X% would be one entry.
 
-STRCASE.GO:
+STRCASE.GO.BODY:
     STRCASE.ADDR% = STRCASE.PTR
     STRCASE.OP% = STRCASE.MODE
     #REM 1
@@ -121,27 +121,24 @@ STRCASE.GO:
     #REM 0
     RETURN
 
-## The verbs. Each is a shim on its own statement line, so the declaration costs no
-## p-code of its own, and all three sit inside the GOTO above and never run in order.
+## The verbs' bodies. THE GP.DEFPROC DECLARATIONS ARE NOT HERE -- they are in
+## LIBUTIL.INC.BL, which is in low memory, because a verb's call site is compiled
+## into a jump to the body and a jump out of low memory has to select the bank
+## first. See that file's header. The third verb was never built:
 ## GP.DEFPROC STRCASE.APPLY, STRCASE.PTR, STRCASE.MODE : GOSUB STRCASE.GO
-## RETURN
 
 ## STRCASE.S$ is the argument AND the result. The argument copy is the working copy,
 ## so a second string variable would only be a second copy of the same bytes.
-GP.DEFPROC STR.UCASE, STRCASE.S$ RETURNS STRCASE.S$ : GOSUB STR.UCASE.BODY
-RETURN
 STR.UCASE.BODY:
     STRCASE.PTR = GP.STRPTR(STRCASE.S$)
     STRCASE.MODE = STRCASE.UPPER
-    GOSUB STRCASE.GO
+    GOSUB STRCASE.GO.BODY
     RETURN
 
-GP.DEFPROC STR.LCASE, STRCASE.S$ RETURNS STRCASE.S$ : GOSUB STR.LCASE.BODY
-RETURN
 STR.LCASE.BODY:
     STRCASE.PTR = GP.STRPTR(STRCASE.S$)
     STRCASE.MODE = STRCASE.LOWER
-    GOSUB STRCASE.GO
+    GOSUB STRCASE.GO.BODY
     RETURN
 
 STRCASE.MODULE.END:

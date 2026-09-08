@@ -9,14 +9,18 @@ rem      <- ->      with a dropdown open, move to the next one
 rem      UP DOWN    walk the dropdown, RETURN chooses
 rem      ESC        closes the dropdown, then leaves the program
 rem
-rem  EVERY PANEL IS A STUB. A chosen row opens GUI.SAY naming itself. The bar,
-rem  the dropdowns and the screen save under them are real.
+rem  EVERY PANEL IS WRITTEN. A chosen row runs the library call it names and
+rem  leaves the answer on the bottom row. FILES writes to the drive -- every
+rem  file and directory it makes is removed by the row that made it.
 rem
-rem  THE DRIVE IS testing\, NOT the sample directory. GPBMODS.PRG is compiled
-rem  SHARED, so it loads the resident GPC.RT.nnn.BIN rather than carrying a
-rem  copy, and testing\ is where that runtime lives.
+rem  THE DRIVE IS testing\, NOT the sample directory, and it needs more than
+rem  the PRG. GPBMODS.PRG is compiled SHARED, so it loads the resident
+rem  GPC.RT.nnn.BIN rather than carrying a copy; and it has four overlays --
+rem  GPBMODS.B04, .B05, .B06 and .B07 -- which the bootstrap LOADs into their
+rem  banks at startup. A missing one stops with ?OVL. All of them live in
+rem  testing\ beside the PRG.
 rem
-rem  Source: samples\GPB-MODS-TESTING\GPBMODS.BASL, on the twelve modules
+rem  Source: samples\GPB-MODS-TESTING\GPBMODS.BASL, on the seventeen modules
 rem  shipped in samples\GPB-MODS-TESTING\GPC-BASIC\ beside it. See that
 rem  folder's readme.md for the two-step rebuild.
 rem ---------------------------------------------------------------------------

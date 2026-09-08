@@ -63,7 +63,7 @@ GOTO SORT.MODULE.END
 ## A gap larger than the array needs no guard: the pass starts i at the gap and
 ## falls straight out.
 
-SORT.RUN:  SORT.OK = 0 : SORT.COUNT = PEEK(SORT.PTR - 3) + PEEK(SORT.PTR - 2) * 256 : SORT.TYPE = PEEK(SORT.PTR - 1)
+SORT.RUN.BODY:  SORT.OK = 0 : SORT.COUNT = PEEK(SORT.PTR - 3) + PEEK(SORT.PTR - 2) * 256 : SORT.TYPE = PEEK(SORT.PTR - 1)
     IF SORT.TYPE >= 128 THEN RETURN
     IF (SORT.TYPE AND 64) = 0 THEN RETURN
     IF SORT.COUNT > 255 THEN RETURN

@@ -72,7 +72,8 @@ This is what a new GP keyword actually costs, and the two halves land in differe
   which gets a whole feature for zero runtime bytes this way.
 - Core cushion below `GPBase`: the last core symbol is `FloatTangent $369D`, 99 bytes short of
   `$3700`, of which ~40 are genuinely free — see [[gpc-core-page-cushion-below-gpbase]].
-- Frame stack is `FrameStackPages = 16` = **4 KB**; a `GP.SELECT` frame is 7 bytes, a `GP.DO`
+- Frame stack is `FrameStackPages` = **8 pages, 2 KB since 2026-09-08** (it was 16 = 4 KB, and
+  every "4 KB" below is history); a `GP.SELECT` frame is 7 bytes, a `GP.DO`
   frame 6, `GOSUB` 4, `FOR` 19. Frame markers pack **id in the top 3 bits, size in the low 5**,
   so there are only **8 ids and 4 are spoken for** (7 GOSUB, 6 FOR, 5 GP.DO, 4 GP.SELECT) and
   no frame can exceed 31 bytes.
@@ -117,3 +118,10 @@ costing anything, not `ObjectCeiling - FreeMemory`, which is only where the comp
 See [[program-too-big-fires-early]].
 
 **UPDATE 2026-09-02:** the string-heap scavenger ([[string-heap-scavenger]]) took the runtime 13,055 -> 13,311 -- the ~62 bytes crossed the page cushion, so every figure above that quotes a max program size is now 256 bytes smaller. GPBase $3800, ObjectBase $3c00 per genrtimage.
+
+**THE FRAME STACK HALVED, 2026-09-08, and it is 2,048 bytes on every shared program's workspace.**
+4 KB was set when a program was small; GPBMODS's whole workspace was 4,608 bytes, so the gap below
+it was nearly as big as the thing it protected, and `FILES / DIR OPEN` ran out of string heap.
+`FrameStackPages = 8` in `common.inc`; GPBMODS went 4,608 -> 6,656. Both the compiler and the
+runtime read that constant, so it takes `make libs` and `make -C source/runtime gpc-rt` together.
+See [[run-side-workspace-read-from-the-prg]] for how to read a program's budget off its `.PRG`.

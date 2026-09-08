@@ -81,7 +81,7 @@ GOTO SV.MODULE.END
 ## **  SV.INIT -- the window, and an empty table.
 ## ***********************************************************************
 
-SV.INIT:  SV.ERROR$ = "" : SV.OK = 0
+SV.INIT.BODY:  SV.ERROR$ = "" : SV.OK = 0
     IF SV.BASE = 0 THEN SV.BASE = $04000
     IF SV.TOP = 0 THEN SV.TOP = $1AFFF
     IF SV.MAX < 1 THEN SV.ERROR$ = "SV.MAX IS NOT SET" : RETURN
@@ -100,7 +100,7 @@ SV.INIT:  SV.ERROR$ = "" : SV.OK = 0
     SV.READY = -1 : SV.OK = -1
 
 ## ---- SV.RESET is the whole of the rest of INIT, so it is not written twice.
-SV.RESET:  IF SV.READY = 0 THEN RETURN
+SV.RESET.BODY:  IF SV.READY = 0 THEN RETURN
     SV.NEXT = SV.BASEPG
     FOR SV.I = 1 TO SV.MAX
         SV.PAGE%(SV.I) = 0 : SV.PAGES%(SV.I) = 0
@@ -112,7 +112,7 @@ SV.RESET:  IF SV.READY = 0 THEN RETURN
 ## **  SV.SAVE -- a screen rectangle into VRAM.
 ## ***********************************************************************
 
-SV.SAVE:  SV.HND = 0 : SV.OK = 0 : SV.ERROR$ = ""
+SV.SAVE.BODY:  SV.HND = 0 : SV.OK = 0 : SV.ERROR$ = ""
     IF SV.READY = 0 THEN SV.ERROR$ = "SV.INIT HAS NOT RUN" : RETURN
     IF SV.W < 1 THEN RETURN
     IF SV.H < 1 THEN RETURN
@@ -131,7 +131,7 @@ SV.SAVE:  SV.HND = 0 : SV.OK = 0 : SV.ERROR$ = ""
 ## **  how a rectangle is slid somewhere else.
 ## ***********************************************************************
 
-SV.RESTORE:  SV.OK = 0 : SV.ERROR$ = "" : GOSUB SV.LIVE
+SV.RESTORE.BODY:  SV.OK = 0 : SV.ERROR$ = "" : GOSUB SV.LIVE
     IF SV.OK = 0 THEN RETURN
     SV.OK = 0
 
@@ -147,7 +147,7 @@ SV.RESTORE:  SV.OK = 0 : SV.ERROR$ = "" : GOSUB SV.LIVE
 ## **  a banked source has to be moved a window at a time by the caller.
 ## ***********************************************************************
 
-SV.PUT:  SV.HND = 0 : SV.OK = 0 : SV.ERROR$ = ""
+SV.PUT.BODY:  SV.HND = 0 : SV.OK = 0 : SV.ERROR$ = ""
     IF SV.READY = 0 THEN SV.ERROR$ = "SV.INIT HAS NOT RUN" : RETURN
     IF SV.LEN < 1 THEN RETURN
     SV.N = SV.LEN : GOSUB SV.ALLOC
@@ -167,7 +167,7 @@ SV.PUT:  SV.HND = 0 : SV.OK = 0 : SV.ERROR$ = ""
 ## **  asking for more than was put in reads whatever follows it in VRAM.
 ## ***********************************************************************
 
-SV.GET:  SV.OK = 0 : SV.ERROR$ = "" : GOSUB SV.LIVE
+SV.GET.BODY:  SV.OK = 0 : SV.ERROR$ = "" : GOSUB SV.LIVE
     IF SV.OK = 0 THEN RETURN
     SV.OK = 0
     IF SV.LEN < 1 THEN RETURN
@@ -187,7 +187,7 @@ SV.GET:  SV.OK = 0 : SV.ERROR$ = "" : GOSUB SV.LIVE
 ## **  of order leaves a hole that STASHVRAMGC closes.
 ## ***********************************************************************
 
-SV.FREE:  SV.OK = 0 : SV.ERROR$ = "" : GOSUB SV.LIVE
+SV.FREE.BODY:  SV.OK = 0 : SV.ERROR$ = "" : GOSUB SV.LIVE
     IF SV.OK = 0 THEN RETURN
 
     SV.PAGE%(SV.HND) = 0 : SV.PAGES%(SV.HND) = 0 : SV.NEXT = SV.BASEPG

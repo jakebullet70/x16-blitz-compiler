@@ -25,8 +25,8 @@ GRAY is the only theme with a dark grey page, and plain red on it is barely legi
 where that shows up first, long before any actual warning.
 
 **FILES writes to the drive.** Four of its rows do. Everything they make is named `GPBFILE.*` or
-`GPBDIR`, and the two files are scratched by the row that made them; the directory is not, because
-`FILEIO` has no RMDIR.
+`GPBDIR`, and every one of them is removed by the row that made it -- the files with
+`FILE.DELETE`, the directory with `FILE.RMDIR` once the drive has come back up out of it.
 
 ## Every panel is real
 
@@ -82,33 +82,45 @@ about the file name.
 
 ## Where the bytes go
 
-Built 2026-09-08 with all fifteen modules and every panel written. `GPBMODS.PRG` is 15,209 bytes,
-`GPBMODS.B04` 6,658, `GPBMODS.B05` 8,194 and `GPBMODS.B06` 1,794 — **three overlay files, because
-the source names three banks.** One `.Bnn` is written per bank, not per some size threshold:
-`GP.BANKED LIB.CODEBANK` makes `.B04`, and the two `GP.BANKEDSTR` banks make `.B05` and `.B06`.
-Each is loaded to `$A000` in its own bank, which is why none counts against low RAM or the file
-ceiling.
+Built 2026-09-09 with all seventeen modules and every panel written. `GPBMODS.PRG` is 14,001
+bytes, `GPBMODS.B04` 6,658, `GPBMODS.B05` 7,426, `GPBMODS.B06` 3,074 and `GPBMODS.B07` 4,866 —
+**four overlay files, because the source names four banks.** One `.Bnn` is written per bank, not per some
+size threshold: the two `GP.BANKED` regions make `.B04` and `.B07`, and the two `GP.BANKEDSTR`
+banks make `.B05` and `.B06`. Each is loaded to `$A000` in its own bank, which is why none counts
+against low RAM or the file ceiling.
 
-P-code bytes, differenced out of `testing/GPBMODS.MAP` against `testing/GPBMODS.SRC.SYM` — low RAM
-and the banked region together, which is why the total is larger than the resident object:
+P-code bytes, differenced out of `testing/GPBMODS.MAP` against `testing/GPBMODS.SRC.SYM` — all
+three places p-code can live, which is why the total is far larger than the resident object:
 
-| | p-code | | | p-code |
-|---|---:|---|---|---:|
-| `BANKMGR` | 578 | | `THEME` | 479 |
-| `APPSYS` | 114 | | `MENUVERT` | 1,104 |
-| `STASH` | 431 | | `MENUBAR` | 826 |
-| `STASHFILE` | 171 | | `LINEINPUT` | 762 |
-| `STRCASE` | 66 | | `GUI` | 1,647 |
-| `STRINGS` | 511 | | `GUI2` | 1,360 |
-| `LIBBANK` | 184 | | `FILEDIR` | 431 |
-| `LIBBANKFD` | 34 | | | |
-| `SORT` | 189 | | `GPBMODS.BASL` | 10,495 |
-| `FILEIO` | 839 | | **total** | **20,221** |
+| low RAM | p-code | | bank 4 `.B04` | p-code | | bank 7 `.B07` | p-code |
+|---|---:|---|---|---:|---|---|---:|
+| `STASH` | 431 | | `THEME` | 479 | | `APPSYS` | 114 |
+| `STASHFILE` | 171 | | `MENUVERT` | 1,104 | | `BANKMGR` | 586 |
+| `LIBBANK` | 184 | | `MENUBAR` | 826 | | `STRCASE` | 54 |
+| `LIBBANKFD` | 34 | | `LINEINPUT` | 762 | | `STRINGS` | 511 |
+| `LIBUTIL` | 359 | | `GUI` | 1,647 | | `STRUSING` | 726 |
+| `GPBMODS.BASL` | 11,165 | | `GUI2` | 1,360 | | `SORT` | 189 |
+| | | | `FILEDIR` | 433 | | `STASHVRAM` | 1,681 |
+| | | | | | | `FILEIO` | 1,003 |
+| **12,344** | | | **6,611** | | | **4,864** | |
 
-Bank 5 is the tight one: **7,999 of 8,192 used, 193 free**, against bank 6 at 1,706. It is a hard
-wall rather than a budget — `BStrPoolWrite` stops the compile with `.error_memory` when a pool
-fills, so an overrun cannot pass silently. `ABOUT / MODULE SIZES` carries the same table on screen,
-and the numbers there are only true of the build they were taken from.
+**Six entries in the left column against fifteen on the right is the point of bank 7.** What is left in low RAM is what could
+not go: `STASH` and `STASHFILE` hold `BANK` statements, which `CommandBankGuard` refuses inside a
+region, and the three `LIB*` files are the shim layer that reaches the other two columns. Nothing
+else disqualified anything — `FILEIO`'s `OPEN`, `INPUT#` and `CLOSE` leave `$00` alone (measured
+for `FILEDIR`, banked since 2026-09-07), a `GP.ASM` blob's body never occupies a region either
+way, and `BANKMGR` names banks without ever selecting one.
+
+**Two regions and not one**, because a region may not call another: both live at `$A000`, so the
+branch has no distance to travel and `GPBankMakeOffset` refuses it. They are independent here —
+the only call the GUI bank makes downwards is to `STASH`, which is in low memory.
+
+Bank 5 **filled**, and `BS.G.SAY` was moved to bank 6 to answer it — the overlay went 8,194 ->
+7,426 and bank 6 1,794 -> 3,074. Which bank a group is in costs the call site nothing, so moving
+one is the whole of the fix. It is a hard wall rather than a budget: `BStrPoolWrite` stops the
+compile with `.error_memory` when a pool fills, so an overrun cannot pass silently, and the next
+group of text to be added belongs in bank 6. `ABOUT / MODULE SIZES` carries the module table on screen, and the
+numbers there are only true of the build they were taken from.
 
 **This is the program that needed the compiler line table doubled.** It marks 2,156 lines and the
 table held 2,048 — one 8K bank at 4 bytes an entry — so the compile stopped with
@@ -116,8 +128,37 @@ table held 2,048 — one 8K bank at 4 bytes an entry — so the compile stopped 
 table runs on two banks now and holds 4,096; see `STRPageLine` in
 `source/compiler/source/storage/mark_line.asm`.
 
-`PLAN.md` §3 has how the measurement is done. The script is in
-`docs/memory/measure-pcode-per-module.md`.
+`PLAN.md` §3 has how the measurement is done, and the method is in
+`docs/memory/measure-pcode-per-module.md`. **Charge each module by the difference between its own
+first label and the next module's, WITHIN one region** — a naive walk down the map charges a
+module the padding at its region's end, which made `FILEIO` read 1,106 rather than 853.
+
+## The room it has to RUN in, which is the tighter budget
+
+**A shared program's workspace is what is left between its own p-code and the resident runtime**,
+and for this one that is `$4800`..`$6600` -- **7,680 bytes**, all of it read straight out of the
+built `.PRG`: the bootstrap carries the two page numbers as the operands of `ldx`/`ldy` at
+`BBBasePage`, and the first p-code opcode is `.varspace`, whose operand says how much of the
+workspace the scalars take. Here that is **2,652**, leaving about 5,030 for the string arrays
+(2 bytes an element) and the whole string heap.
+
+**That is the number FILES/DIR OPEN ran out of.** It builds twenty-four listbox rows of ~38
+characters, and a concrete block is `length x 1.5 + 3`, so the rows alone want ~1,440 bytes --
+against a heap that was 1,660 before this was fixed. It reported `OUT OF MEMORY @ $056B`, which
+the map places inside `STR.PADR`: the pad is where the last temporary was asked for, not where the
+memory went. `StringInitialise` refuses once the heap ceiling comes within 512 bytes of the arrays,
+so the failure lands on whatever allocates next.
+
+The fix was not in this program. `FrameStackPages` (`source/common-source/source/common.inc`) was
+**16 pages, 4K** -- nearly as big as the whole workspace, for a stack nothing here nests more than
+a dozen frames deep. It is 8 now, and every shared program gets those 2,048 bytes back.
+
+**Bank 7 was the second half of it, and it is this program's own doing.** Every include that
+could go, went: `APPSYS`, `BANKMGR`, `STRCASE`, `STRINGS`, `SORT` and `FILEIO` first, then
+`STRUSING` and `STASHVRAM` as they were added. The shims cost 359 bytes of low RAM and the region
+holds 4,864, so the resident object fell 15,254 -> 14,001 **while gaining two modules and three
+panels**, and the workspace rose 6,656 -> 7,680. Against the ~1,440 bytes of listbox rows that
+started this, the heap is no longer the binding constraint.
 
 ## The modules
 
@@ -125,11 +166,26 @@ table runs on two banks now and holds 4,096; see `STRPageLine` in
 and proved here, then copied whole into the root — never merged by hand, and the root copy is what
 `samples/GPC-HELP` and `samples/editor` build against.
 
-**Fifteen are in the shell.** `BMX` is out: it needs a bitmap file and a screen-mode change and
-is not GUI, and `GPC-BASIC/BMXVIEW.EXP.BL` already covers it. `KB` is newer than the shell — it
-sits in the folder, it has its own test, and no panel calls it yet. `GPB.INC.BL` is the keyword
+**EIGHT OF THEM CAN NO LONGER BE COPIED TO ROOT AS THEY STAND, and that is the price of bank 7.**
+`APPSYS`, `BANKMGR`, `STRCASE`, `STRINGS`, `STRUSING`, `SORT`, `STASHVRAM` and `FILEIO` have had
+their public entry points renamed to `.BODY` so `LIBUTIL.INC.BL` can own the plain names — the
+same surgery `LIBBANK` already did to the seven GUI modules, and the same surgery any program
+banking them would have to repeat. A program that wants them in low memory wants the root copies;
+a program that wants them banked wants these. `STRCASE` is the one that changed shape as well as
+name: its two `GP.DEFPROC` declarations moved into `LIBUTIL`, because a verb's call site is
+compiled into a jump to the body and a jump out of low memory has to select the bank first.
+
+Port a fix by hand in either direction, and mind that `FILEIO.INC.BL` does not exist in root at
+all yet — this is the only copy, and it has a `FILE.RMDIR` the older notes say it lacks.
+
+**Seventeen are in the shell**, `STRUSING` and `STASHVRAM` being the two most recently added —
+`STRINGS` gained a `STR.USING` and a `STR.USING.FIX` row, and `SCREEN` a `STASHVRAM` row that
+does the same demonstration as the `STASH` row above it so the two can be read against each
+other. `BMX` is out: it needs a bitmap file and a screen-mode change and is not GUI, and
+`GPC-BASIC/BMXVIEW.EXP.BL` already covers it. `KB` is newer than the shell — it sits in the
+folder, it has its own test, and no panel calls it yet. `GPB.INC.BL` is the keyword
 ABI and is not edited here; `LIBBANK.INC.BL` and `LIBBANKFD.INC.BL` are this sample's own front
-door to the banked library, not library modules.
+door to the banked library, not library modules; `LIBUTIL.INC.BL` is the same thing for bank 7.
 
 `THEME.INC.BL` here has **diverged from the root copy** and is not a straight overwrite either
 way: this one renames `THEME.LOAD` to `THEME.SELECT` and carries the comments swept down in

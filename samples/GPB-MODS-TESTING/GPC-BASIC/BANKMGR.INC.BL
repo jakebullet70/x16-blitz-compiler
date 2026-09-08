@@ -60,7 +60,7 @@ GOTO BANKMGR.SKIP
 ## **  array is 0..10, and DIMming one GPC auto-dimensioned is an error.
 ## ***********************************************************************
 
-BANKMGR.INIT: IF BANKMGR.READY = 0 THEN DIM BANKMGR.MAP%(BANKMGR.BYTES) : DIM BANKMGR.BIT%(7) : BANKMGR.READY = -1
+BANKMGR.INIT.BODY: IF BANKMGR.READY = 0 THEN DIM BANKMGR.MAP%(BANKMGR.BYTES) : DIM BANKMGR.BIT%(7) : BANKMGR.READY = -1
 
 ## ---- 1, 2, 4 .. 128. GPC has no shift.
     BANKMGR.BIT%(0) = 1
@@ -101,7 +101,7 @@ BANKMGR.INIT.PART:
 ## **   out  BANKMGR.OK   -1 took it, 0 already taken or out of range
 ## ***********************************************************************
 
-BANKMGR.CLAIM:
+BANKMGR.CLAIM.BODY:
     BANKMGR.OK = 0 : IF BANKMGR.SET.BANK < 1 THEN RETURN
     IF BANKMGR.SET.BANK >= BANKMGR.BANKS THEN RETURN
     GOSUB BANKMGR.TEST : IF BANKMGR.USED <> 0 THEN RETURN
@@ -115,7 +115,7 @@ BANKMGR.CLAIM:
 ## **   out  BANKMGR.BANK   1..BANKS-1, or 0 for none left
 ## ***********************************************************************
 
-BANKMGR.GET.FREE.BANK:
+BANKMGR.GET.FREE.BANK.BODY:
     BANKMGR.BANK = 0 : BANKMGR.SCAN = 0
     GP.DO
         IF BANKMGR.SCAN >= BANKMGR.BYTES THEN GP.EXITDO
@@ -154,7 +154,7 @@ BANKMGR.RELEASE:
 ## **   out  BANKMGR.SPARE   free banks. BANKMGR.BANKS is how many exist
 ## ***********************************************************************
 
-BANKMGR.COUNT:
+BANKMGR.COUNT.BODY:
     BANKMGR.SPARE = 0
     FOR BANKMGR.SCAN = 0 TO BANKMGR.BYTES - 1
         IF BANKMGR.MAP%(BANKMGR.SCAN) = 255 THEN GOTO BANKMGR.COUNT.NEXT
