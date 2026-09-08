@@ -1860,6 +1860,50 @@ _WOCSWhole:
 		lda 	#RTGPBASE >> 8
 _WOCSCeiling:
 		sta 	sharedCeilPage
+		;
+		;		AND THE WHOLE FILE HAS TO FIT UNDER IT, which is a different test from the one
+		;		below and not implied by it.
+		;
+		;		Below measures RESIDENT P-CODE -- FreeMemory..gpBankStart -- because that is what
+		;		the workspace stands on, and every GP.BANKED and GP.BANKEDSTR region is ABOVE
+		;		gpBankStart and deliberately invisible to it. But the FILE is loaded whole, at
+		;		$0801, regions and all, and the resident runtime is sitting at sharedCeilPage. An
+		;		object that reaches past it overwrites the runtime; the magic check then fails, the
+		;		runtime is reloaded over the object's own tail, and the program runs with its
+		;		regions full of runtime image.
+		;
+		;		NOTHING REPORTED THAT. GPBMODS compiled clean 703 bytes over and read machine
+		;		code out of its own text bank -- the directory intact, the records past the
+		;		overlap replaced. Found 7th September 2026 by PEEKing the bank the compiler had
+		;		just filled.
+		;
+		sec
+		lda 	objPtr 						; the whole object, which is what gets loaded
+		sbc 	#FreeMemory & $FF
+		sta 	zTemp0
+		lda 	objPtr+1
+		sbc 	#FreeMemory >> 8
+		sta 	zTemp0+1
+		lda 	zTemp0
+		beq 	_WOCSFileWhole
+		inc 	zTemp0+1 					; a part page still costs a whole one
+_WOCSFileWhole:
+		;
+		;		THE SAME BASE THE WORKSPACE IS COUNTED FROM, and it has to be: the file loads at
+		;		$0801 but its p-code does not start there. PCODE_PAGE is where that lands, plus
+		;		the bootstrap extension page a banked program carries -- 511 bytes of prefix in
+		;		GPBMODS's case, which is two pages, which is exactly the margin this test was
+		;		wrong by when it counted from page 8 instead.
+		;
+		clc
+		lda 	#PCODE_PAGE
+		adc 	gpBankActive
+		adc 	zTemp0+1
+		bcs 	_WOCSBigFar
+		cmp 	sharedCeilPage 				; ending exactly ON the ceiling is fine: the last
+		beq 	_WOCSFileFits 				; byte written is the one below it
+		bcs 	_WOCSBigFar
+_WOCSFileFits:
 		clc
 		lda 	#PCODE_PAGE
 		adc 	gpBankActive 				; ...plus the bootstrap extension page, which only a
