@@ -164,32 +164,23 @@ testing/GPC.RC.*.BIN
 #   class of mistake 15208f3 had to back out.
 testing/*.INC.BL
 testing/*.EXP.BL
-testing/ARRAYS.PRG
-testing/SPLITT.PRG
-testing/STRINGS.PRG
-testing/SCREEN.PRG
-testing/MENU.PRG
-testing/BMXSPD.PRG
-testing/BMXPAL.PRG
-testing/MENUTST.PRG
-testing/MENUDEMO.PRG
-testing/SELECT.PRG
-testing/BMXVIEW.PRG
-testing/BMXTST.PRG
-testing/THMTST.PRG
-testing/INPTST.PRG
-testing/FORM.PRG
-testing/FORMTST.PRG
-testing/CURTST.PRG
 
-#   The same staging, one level up: a PROGRAM's source is copied in beside the modules it
-#   #INCLUDEs, because BASLOAD resolves both off the drive. samples/GPB-MODS-TESTING/PLAN.md
-#   and samples/GPC-HELP/readme.md give the copies as build steps. The master is the tracked
-#   one under samples/; a copy here that outlives it is stale, and GPBMODS.BASL had already
-#   drifted a build behind by 8th Sep 2026.
-testing/GPBMODS.BASL
-testing/GPBFILES.BASL
-testing/GPB.HELP.BASL
+#   The same staging one level up -- a PROGRAM's source is copied in beside the modules it
+#   #INCLUDEs, because BASLOAD resolves both off the drive -- and the objects built from
+#   the pair. Both used to be enumerated, a line per program, and the same lesson landed
+#   again: GPBMODS.PRG and GPB.HELP.PRG were untracked AND unignored, which is how they
+#   went unnoticed while testing/ grew to 13 MB. Globbed now, with the handful that are
+#   NOT build output named back in. testing/readme.md says what is kept and why.
+testing/*.PRG
+testing/*.BASL
+!testing/BASLOAD-GPC.PRG
+!testing/C.GPC.ERR.PRG
+!testing/DIR.PRG
+!testing/GPC.ERR.PRG
+!testing/GPC.PRG
+!testing/POINTER.PRG
+!testing/GPC.BASL
+!testing/GPC.ERR.BASL
 
 #   HELP-TXT/ is the viewer's data, xcopied from samples/GPC-HELP/HELP-TXT (readme.md line
 #   106) so GPB.HELP.PRG can open //HELP-TXT/:NAME off the drive. Sixty files, byte-identical
