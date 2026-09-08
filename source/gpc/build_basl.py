@@ -74,13 +74,13 @@ DONE   = "BASLDONE"                          # scratch: the driver writes BASLOA
 #	testing/ carries the shipped one beside GPC.BIN, so a fresh checkout with no cc65 still builds.
 #	The dev copy wins when it exists, which is what keeps an edit to the fork from being ignored.
 #
-#	TWO FILES, not one. BASLOAD.BIN is the engine and the only thing this script calls -- it pokes
-#	the name and SYSes, the same as any other caller. BASLOAD.PRG is the FRONT END, which does
+#	TWO FILES, not one. BASLOAD-GPC.BIN is the engine and the only thing this script calls -- it pokes
+#	the name and SYSes, the same as any other caller. BASLOAD-GPC.PRG is the FRONT END, which does
 #	that from a prompt instead; nothing here needs it, but testing/ is the emulator's drive and the
 #	release directory, so the tool a person runs belongs next to the one the build runs.
-BASLOAD_FILES = ("BASLOAD.BIN", "BASLOAD.PRG")
-BASLOAD_BUILT = os.path.join(ROOT, "BASLOAD-GPC", "build", "BASLOAD.BIN")
-BASLOAD_DRIVE = os.path.join(TESTING, "BASLOAD.BIN")
+BASLOAD_FILES = ("BASLOAD-GPC.BIN", "BASLOAD-GPC.PRG")
+BASLOAD_BUILT = os.path.join(ROOT, "BASLOAD-GPC", "build", "BASLOAD-GPC.BIN")
+BASLOAD_DRIVE = os.path.join(TESTING, "BASLOAD-GPC.BIN")
 
 #
 #	The API is three inputs and one output, all in RAM bank 0 -- see BASLOAD-GPC/README.md.
@@ -98,7 +98,7 @@ BASLOAD_DRIVE = os.path.join(TESTING, "BASLOAD.BIN")
 #
 DRIVER_TEXT = """10 IF PEEK(1024)=42 THEN 50
 20 POKE 1024,42
-30 LOAD"BASLOAD.BIN",8,1
+30 LOAD"BASLOAD-GPC.BIN",8,1
 50 B$="{basl}"
 60 BANK 0
 70 FOR I=1 TO LEN(B$):POKE 48896+I-1,ASC(MID$(B$,I,1)):NEXT
@@ -168,12 +168,12 @@ def stage_basload():
             print("  build_basl: staged BASLOAD-GPC/build/%s -> testing/ (%d bytes)"
                   % (name, len(built)))
     if not os.path.exists(BASLOAD_DRIVE):
-        die("no BASLOAD.BIN in testing/ or BASLOAD-GPC/build/ -- run:\n"
+        die("no BASLOAD-GPC.BIN in testing/ or BASLOAD-GPC/build/ -- run:\n"
             "               python BASLOAD-GPC/build.py prg")
 
 
 def tokenise(basl_name, prg_name, also_clean=()):
-    """Boot the emulator headless, load BASLOAD.BIN and SYS it at <basl_name>, so the source's own
+    """Boot the emulator headless, load BASLOAD-GPC.BIN and SYS it at <basl_name>, so the source's own
     #SAVEAS writes testing/<prg_name>. Returns the tokenised PRG's bytes; dies on failure.
     also_clean lists extra outputs (e.g. a #SYMFILE) to remove up front so a stale one can't fake
     success."""
