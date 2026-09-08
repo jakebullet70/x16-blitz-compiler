@@ -1,0 +1,15 @@
+#SAVEAS "@:DEFPV.SRC.PRG"
+#REM 0
+#INCLUDE "GPB.INC.BL"
+
+## A verb is a plain name -- no suffix, no subscript.
+
+GOTO DP.MAIN
+
+GP.DEFPROC DP.BADNAME$
+DP.BAD:
+PRINT "NEVER"
+RETURN
+
+DP.MAIN:
+END

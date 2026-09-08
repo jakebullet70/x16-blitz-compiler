@@ -270,6 +270,30 @@
 #TOKEN GP.BANKEDSTR 52819
 #TOKEN GP.ENDBANKEDSTR 52818
 
+## ---- one-line calls to BASL routines ----
+##
+## GP.DEFPROC <verb> [, <formal> ...] declares the routine that FOLLOWS it -- the
+## next statement in the source -- and names the variables its callers fill in.
+## It emits nothing. GP.SUB <verb> [, <expression> ...] then assigns each
+## expression to the matching formal and calls the routine, in one statement.
+##
+##   GP.DEFPROC DBOPEN, DB.NAME$, DB.DEVICE
+##   DB.OPEN:  BANK DB.CODEBANK : GOSUB DB.OPEN.BODY : RETURN
+##
+##   GP.SUB DBOPEN, "PARTS.DBF", 8
+##
+## The verb is an ordinary name and lives beside the variables, so it may not be
+## a label and may not carry a $ or % suffix. The declaration must be COMPILED
+## BEFORE any call to it -- the call carries an address, not a line number -- so
+## shim files belong at the top, above the code that calls them. GOSUB DB.OPEN
+## still works and still means the same thing; adoption is per call site.
+##
+## The p-code is the assignments and the GOSUB a programmer would have written by
+## hand, so this costs a compiled program nothing over doing it the long way.
+
+#TOKEN GP.DEFPROC 52817
+#TOKEN GP.SUB 52816
+
 #TOKEN GP.IF 52830
 #TOKEN GP.ELSEIF 52829
 #TOKEN GP.ELSE 52828

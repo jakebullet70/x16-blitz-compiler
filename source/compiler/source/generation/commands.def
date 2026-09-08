@@ -123,6 +123,17 @@ GP.ENDBANKED 	X:CommandGPEndBankedCompile N
 GP.BANKEDSTR 	X:CommandGPBankedStrCompile N
 GP.ENDBANKEDSTR X:CommandGPEndBankedStrCompile N
 #
+#		GP.DEFPROC <verb> [,<formal> ...] declares the routine that FOLLOWS it; GP.SUB <verb>
+#		[,<expression> ...] fills its formals in and calls it. NO "#" on either: a verb is a NAME
+#		read by the handler, and GP.SUB's arguments are compiled one at a time against the formals
+#		the declaration recorded, which the table cannot know about. No "T" on either either --
+#		they lower onto the assignments and the .fngosub a programmer would have written by hand,
+#		so a program whose only GP.BASIC keywords are these stays GP OUT and carries none of the
+#		GP runtime block. See commands/gpdefproc.asm.
+#
+GP.DEFPROC 	X:CommandDefProcCompile N
+GP.SUB 		X:CommandSubCompile N
+#
 #		GP.CALL <addr> [,a] [,x] [,y] [,c] -- call machine code with the registers set. Results
 #		come back through the GP.A/GP.X/GP.Y/GP.C value words (x16_unary.def), which are ordinary
 #		tokens, NOT variables: nothing lets the runtime write a variable by name, and X16's own

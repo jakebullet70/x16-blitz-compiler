@@ -1,0 +1,35 @@
+#SAVEAS "@:DEFP1C.SRC.PRG"
+#REM 0
+#INCLUDE "GPB.INC.BL"
+
+## DEFP1 written the long way. Same routines, same order, same variables created in the same
+## order -- only the five call sites differ.
+
+GOTO DP.MAIN
+
+DP.HELLO:
+PRINT "D2 HELLO"
+RETURN
+
+DP.SHOUT:
+PRINT "D3 " + DP.S$
+RETURN
+
+DP.TWICE:
+PRINT "D4 " + STR$(DP.N * 2)
+RETURN
+
+DP.REPORT:
+PRINT "D5 " + DP.A$ + STR$(DP.M) + " " + DP.B$
+RETURN
+
+DP.MAIN:
+PRINT "D1 START"
+GOSUB DP.HELLO
+DP.S$ = "ONE" : GOSUB DP.SHOUT
+DP.N = 7 : GOSUB DP.TWICE
+DP.N = 20 : GOSUB DP.TWICE
+DP.A$ = "R" : DP.M = 3 : DP.B$ = "X" : GOSUB DP.REPORT
+GOSUB DP.SHOUT
+PRINT "D9 END"
+END

@@ -1,0 +1,40 @@
+#SAVEAS "@:DEFP1.SRC.PRG"
+#REM 0
+#INCLUDE "GPB.INC.BL"
+
+## GP.DEFPROC / GP.SUB with no banking: no formals, one, and three mixed. DEFP1C is the
+## same program with every call site written out the long way, and the two objects have to
+## come out the same length -- that is the claim this pair exists to check.
+
+GOTO DP.MAIN
+
+GP.DEFPROC HELLO
+DP.HELLO:
+PRINT "D2 HELLO"
+RETURN
+
+GP.DEFPROC SHOUT, DP.S$
+DP.SHOUT:
+PRINT "D3 " + DP.S$
+RETURN
+
+GP.DEFPROC TWICE, DP.N
+DP.TWICE:
+PRINT "D4 " + STR$(DP.N * 2)
+RETURN
+
+GP.DEFPROC REPORT, DP.A$, DP.M, DP.B$
+DP.REPORT:
+PRINT "D5 " + DP.A$ + STR$(DP.M) + " " + DP.B$
+RETURN
+
+DP.MAIN:
+PRINT "D1 START"
+GP.SUB HELLO
+GP.SUB SHOUT, "ONE"
+GP.SUB TWICE, 7
+GP.SUB TWICE, 20
+GP.SUB REPORT, "R", 3, "X"
+GOSUB DP.SHOUT
+PRINT "D9 END"
+END
