@@ -606,7 +606,9 @@ BootRunJmpOffset = BBRunJmp+1 - $0801 		; OPERANDS -- the base page, and the jmp
 ;
 ; ************************************************************************************************
 
-BXMAXREGIONS = 8
+BXMAXREGIONS = 16 							; GPBANK_MAXREGIONS, and the compiler is what caps it --
+											; one byte a region here, so this page has room for far
+											; more than the storage hole will carry
 BXNAMEMAX = 48 								; the overlay name the compiler bakes in below. The
 											; compiler refuses a longer one rather than truncating
 											; it -- see ObjBuildOverlayName.
@@ -2185,9 +2187,16 @@ ObjStreamReady:
 ;
 ;		A REGION IS A BANK OF ITS OWN. Pass two writes each GP.BANKED region straight to its
 ;		final address, which is ABOVE the low code it is still emitting -- so the two cannot
-;		share one forward-only stream. One bank per region costs nothing (a region is at most
-;		8K by definition, and there are at most eight) and makes a region random access, so a
+;		share one forward-only stream. One bank per region makes a region random access, so a
 ;		rollback inside one simply gets written over.
+;
+;		IT COSTS A BANK A REGION, AND THAT IS THE THING THAT SCALES BADLY. "Costs nothing, a
+;		region is at most 8K and there are at most eight" is what this said, and it is circular
+;		-- it is only cheap while the count is small, and the count is what the compiler is
+;		supposed to stop capping. Sixteen regions take banks 8 to 23. Only ONE region is ever
+;		open (regionOpen is a boolean and nextRegion a single index), so they can all share one
+;		scratch bank flushed at region close, and that is what takes the ceiling to the machine's
+;		63 rather than the compiler's.
 ;
 ;		THE OBJECT GOES OUT IN FILE ORDER: the low code and the GP.ASM pool as they are
 ;		compiled, then the alignment padding, then each region out of its bank. That is what

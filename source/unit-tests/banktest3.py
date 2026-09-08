@@ -18,6 +18,20 @@ GPC_ERRORS = re.findall(
     open(os.path.join(ROOT, "source", "common-source", "source", "generated",
                       "errors.asm"), encoding="latin-1").read())
 
+#   ...AND THE MESSAGES THAT ARE NOT IN THAT TABLE. errors.asm links below GPBase and is
+#   copied into every compiled program, so a diagnostic only the compiler can ever print
+#   goes in compiler space instead -- "jsr CallErrorHandler" followed by inline .text.
+#   Eight of them exist now and the number is growing.  Miss them and a rejection test that
+#   is working perfectly reports "???" and counts as a FAILURE, because the check below is
+#   kind == "ERR": the message is right there in the tail and the harness cannot see it.
+for _d in ("compiler", "application"):
+    for _root, _dirs, _files in os.walk(os.path.join(ROOT, "source", _d, "source")):
+        for _f in _files:
+            if _f.endswith(".asm"):
+                GPC_ERRORS += re.findall(
+                    r'CallErrorHandler\s*\.text\s+"([^"]+)"',
+                    open(os.path.join(_root, _f), encoding="latin-1").read())
+
 env = dict(os.environ)
 env["SDL_VIDEODRIVER"] = "dummy"
 
@@ -99,7 +113,11 @@ PAIRS = [("BANKA", "BANKE"), ("BANKB", "BANKF"), ("BANKH", "BANKI"), ("BANKJ", "
          ("BANKN", "BANKO")]
 BAD = [("BANKC", "BLOCK MISMATCH"), ("BANKD", "BLOCK MISMATCH"),
        ("BANKG", "BLOCK MISMATCH"), ("BANKL", "VALUE"), ("BANKM", "VALUE"),
-       ("BANKX", "BAD VALUE"), ("BANKY", "NOT IMPLEMENTED")]
+       ("BANKX", "BAD VALUE"), ("BANKY", "NOT IMPLEMENTED"),
+       #   The region COUNT is a checked limit, not a crash.  BNK17 is seventeen trivial
+       #   regions in banks 5 up; the message names the seventeenth GP.BANKED, and it is a
+       #   compiler-space one, so this test is also what proves the scan above reaches them.
+       ("BNK17", "TOO MANY GP.BANKED REGIONS")]
 BADNAMES = [b[0] for b in BAD]
 
 results = {}

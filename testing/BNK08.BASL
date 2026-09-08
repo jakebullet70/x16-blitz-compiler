@@ -1,0 +1,69 @@
+#SAVEAS "@:BNK08.SRC.PRG"
+#REM 0
+#INCLUDE "GPB.INC.BL"
+
+## REGIONS, one bank each from 5 up.  The COUNT is the whole test -- what each
+## region does is deliberately trivial.  Every call selects its bank first: with
+## several regions the bootstrap leaves the LAST one selected, and a call into
+## any other lands on the wrong bytes at the same $A000.
+
+PRINT "R0 BEFORE"
+BANK 5 : GOSUB BK.0
+BANK 6 : GOSUB BK.1
+BANK 7 : GOSUB BK.2
+BANK 8 : GOSUB BK.3
+BANK 9 : GOSUB BK.4
+BANK 10 : GOSUB BK.5
+BANK 11 : GOSUB BK.6
+BANK 12 : GOSUB BK.7
+PRINT "RZ AFTER"
+END
+
+GP.BANKED 5
+BK.0:
+    PRINT "R1 IN 5"
+    RETURN
+GP.ENDBANKED
+
+GP.BANKED 6
+BK.1:
+    PRINT "R2 IN 6"
+    RETURN
+GP.ENDBANKED
+
+GP.BANKED 7
+BK.2:
+    PRINT "R3 IN 7"
+    RETURN
+GP.ENDBANKED
+
+GP.BANKED 8
+BK.3:
+    PRINT "R4 IN 8"
+    RETURN
+GP.ENDBANKED
+
+GP.BANKED 9
+BK.4:
+    PRINT "R5 IN 9"
+    RETURN
+GP.ENDBANKED
+
+GP.BANKED 10
+BK.5:
+    PRINT "R6 IN 10"
+    RETURN
+GP.ENDBANKED
+
+GP.BANKED 11
+BK.6:
+    PRINT "R7 IN 11"
+    RETURN
+GP.ENDBANKED
+
+GP.BANKED 12
+BK.7:
+    PRINT "R8 IN 12"
+    RETURN
+GP.ENDBANKED
+

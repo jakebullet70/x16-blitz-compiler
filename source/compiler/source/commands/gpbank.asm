@@ -49,19 +49,22 @@
 ;		Everything reaches everything else the way it already does -- out to a low-memory shim
 ;		and back in.
 ;
-;		EIGHT IS THE LIMIT and it comes from the bootstrap extension page, whose own table is
-;		that long. A ninth GP.BANKED is refused rather than overrunning it.
+;		SIXTEEN IS THE LIMIT, and the 1K storage hole is where it comes from -- not the bootstrap
+;		extension page, which now holds one byte a region and has room for over a hundred. The
+;		tables at the foot of this file and the layout copy in main/compiler.asm come to 17 bytes
+;		a region out of $0400-$0801, which leaves 133 bytes in hand at sixteen and 14 at the
+;		twenty-three the hole would actually allow. A seventeenth GP.BANKED is refused BY NAME.
 ;
 ; ************************************************************************************************
 
-GPBANK_MAXREGIONS = 8 						; and eight is what the extension page's table holds
+GPBANK_MAXREGIONS = 16 						; the 1K storage hole caps it, not the extension page
 
 ; ************************************************************************************************
 ;
 ;		PASS TWO NEITHER RECORDS NOR RE-VALIDATES. It is handed pass one's finished region table
 ;		before it starts -- it is being steered by it, main/compiler.asm moves the write cursor
 ;		from it -- so recording would overwrite the very thing in use. Re-validating would be
-;		worse than useless: the count is already final, so a program with the full eight regions
+;		worse than useless: the count is already final, so a program with the full sixteen regions
 ;		would fail the max-regions test, and this region's own bank is already in the list, which
 ;		reads as a duplicate. Pass one checked both, on the same source, and refused there.
 ;
@@ -81,7 +84,9 @@ CommandGPBankedCompile:
 _CGBCRecord:
 		lda 	gpBankCount
 		cmp 	#GPBANK_MAXREGIONS
-		bcs 	GPBankStructure 			; ...or one region more than the table holds
+		bcc 	_CGBCRoom
+		jmp 	GPBankTooMany 				; ...or one region more than the tables hold
+_CGBCRoom:
 		jsr 	GPBankCheckAlone 			; first on its line, and outside every block
 		jsr 	GPBankReadNumber 			; the bank, into gpBankNumber
 		jsr 	GPBankCheckBankFree 		; ...which no other region may already own
@@ -951,6 +956,20 @@ _GBFBADone:
 ;
 ; ************************************************************************************************
 
+;		ITS OWN MESSAGE, for the same reason and in the same place as the one below. BLOCK
+;		MISMATCH is what this used to say -- .error_structure, shared with a GP.BANKED inside an
+;		open region and with a GP.ENDBANKED that has no opener. The structure is not what is
+;		wrong here: the program is perfectly well formed and there is simply one region more
+;		than the compiler's tables hold, which is a number a programmer can act on and a block
+;		mismatch is not. The line is already right -- currentLineNumber is the offending
+;		GP.BANKED, measured at the ninth of nine before this was raised to sixteen.
+;
+GPBankTooMany:
+		jsr 	CallErrorHandler
+		.text 	"TOO MANY GP.BANKED REGIONS", 0
+
+; ************************************************************************************************
+
 GPBankCheckBankNumber:
 		lda 	gpBankNumber
 		cmp 	#100
@@ -1207,24 +1226,12 @@ gpBankRoom:										; the whole insertion, which can pass 256
 		.fill 	2
 gpBankOldTop:									; objPtr before the insertion was reserved
 		.fill 	2
-gpBankLow:										; the three boundaries of the rotation
+gpBankMid:										; start + header + tail, before page padding
 		.fill 	2
-gpBankMid:
-		.fill 	2
-gpBankHigh:
-		.fill 	2
-gpBankMoveLow:									; the bottom of the range _GBShiftUp is moving
-		.fill 	2
-gpBankRevEnd:									; one past the last byte of the range being reversed
+gpBankHigh:										; ...and one past the region once it has moved
 		.fill 	2
 gpBankWalk:										; cursor into the line number table
 		.fill 	2
-gpBankSave:										; objPtr, held across the .fngosub walk
-		.fill 	2
-gpBankIdx:										; cursor into the GP.ASM fixup list
-		.fill 	1
-gpBankKind:										; the kind byte of the fixup in hand
-		.fill 	1
 gpBankShared:									; 1 in SHARED mode. Set by CompileCode before the
 		.fill 	1 								; compile, because the relocator needs it
 gpBankRunPage:									; buffer page -> run page, which shared mode knows
@@ -1253,8 +1260,8 @@ gpBankSideTo:									; which region a branch points AT, 0 for low memory
 ;		single-region version always wanted, so the pass loads them out of here and puts the
 ;		results back.
 ;
-;		EIGHT, because eight is what the bootstrap extension page's own table holds. A ninth
-;		GP.BANKED is refused rather than overrunning either of them.
+;		SIXTEEN, because seventeen bytes a region is what the 1K storage hole will carry. A
+;		seventeenth GP.BANKED is refused rather than overrunning these.
 ;
 gpBankCount:									; how many regions the program has
 		.fill 	1
@@ -1274,8 +1281,6 @@ gpBankPageCounts:								; pages of each, for the bootstrap's table
 		.fill 	GPBANK_MAXREGIONS
 gpBankCrossings:								; what a branch crossing INTO each one is out by
 		.fill 	GPBANK_MAXREGIONS
-gpBankHops:										; where the walk leaves off to reach each one
-		.fill 	GPBANK_MAXREGIONS * 2
 		.send 	storage
 
 ; ************************************************************************************************

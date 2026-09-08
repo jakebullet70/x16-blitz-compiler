@@ -245,6 +245,9 @@ CompilerRAMBankReg	= $0000
 ;			4	the VARIABLE NAME LIST.
 ;			5	the BLOCK DEPTH of each line, one byte per line-table entry.
 ;			6	WHERE EACH BLOCK ENDS, and where each of its alternatives goes next.
+;			7	the OBJECT BUFFER -- the application's, not the compiler's.
+;			8+	ONE BANK A REGION, growing UP, as many as GPBANK_MAXREGIONS allows.
+;			63	the GP.BANKEDSTR pool, growing DOWN from the top bank a 512K machine has.
 ;
 ;		BANKS 2 AND 4 WERE ONE BANK, and that was the wall. The two tables shared 8K, growing
 ;		towards each other, and samples/editor had used 7,981 bytes of it -- 1,461 line entries
@@ -465,24 +468,36 @@ asmSavedBank: 								; caller's RAM bank, saved across an assembler window
 		.send 	storage
 
 ;
-;		BANK 16 -- the GP.BANKEDSTR group tables and string pool. Same rules again. These windows
+;		BANK 63 -- the GP.BANKEDSTR group tables and string pool. Same rules again. These windows
 ;		are never nested inside any of the others: the block reads its own source lines and
 ;		touches no variable name, line number or block end while it is open. BStrFlush opens and
 ;		closes ONCE PER BYTE for the same reason AsmFlushPool does -- WriteCodeByte can raise
 ;		PROGRAM TOO BIG and leave through the error handler, which prints in bank 0.
 ;
-;		SIXTEEN, NOT SEVEN, AND THE APPLICATION IS WHY. The banks above are the COMPILER's, but
-;		the application takes more that are not listed anywhere near them: OBJ_BUF_BANK is 7 and
-;		OBJ_RGN_BANK is 8, one bank a region up to GPBANK_MAXREGIONS, so 7 through 15 all belong
-;		to the object writer (application/compiler/object.asm:548).
+;		THE TOP BANK, NOT A LOW ONE, AND THE OBJECT WRITER IS WHY. The banks listed above are the
+;		COMPILER's, but the application takes more that are not listed anywhere near them:
+;		OBJ_BUF_BANK is 7 and OBJ_RGN_BANK is 8, ONE BANK A REGION growing upward
+;		(application/compiler/object.asm). So any fixed low number for the pool is a collision
+;		waiting for the region count to reach it.
 ;
-;		This cost most of a day. Bank 7 held the string pool perfectly through PASS ONE -- which
-;		writes no object -- and pass two then filled the same bank with the object as it streamed
-;		it, so every length byte read back as zero. The symptom was not a wrong string: it was
-;		INTERNAL ERROR from the two-pass agreement check, because the region came out 44 bytes in
-;		pass two against 20 in pass one, with the page padding hiding it in the total length.
+;		IT WAS 16, AND SIXTEEN IS EXACTLY WHERE EIGHT REGIONS STOPPED. Banks 8 to 15 were the
+;		regions and 16 was the pool -- adjacent, with nothing between them and nothing checking.
+;		A ninth region would have written straight through the string pool, and the count that
+;		refused a ninth was the extension page's table rather than this. Two limits, one number,
+;		by luck.
 ;
-BStrStorageBank	= 16
+;		63 IS THE TOP BANK A 512K X16 HAS, so the object writer grows up from 8 and the pool
+;		grows down from 63 and they do not meet at any region count the machine can hold. This
+;		is the line that then never needs revisiting.
+;
+;		This cost most of a day when it was 7. Bank 7 held the string pool perfectly through
+;		PASS ONE -- which writes no object -- and pass two then filled the same bank with the
+;		object as it streamed it, so every length byte read back as zero. The symptom was not a
+;		wrong string: it was INTERNAL ERROR from the two-pass agreement check, because the region
+;		came out 44 bytes in pass two against 20 in pass one, with the page padding hiding it in
+;		the total length.
+;
+BStrStorageBank	= 63
 
 bstr_access .macro
 		php
@@ -7449,19 +7464,22 @@ AsmModeTable:
 ;		Everything reaches everything else the way it already does -- out to a low-memory shim
 ;		and back in.
 ;
-;		EIGHT IS THE LIMIT and it comes from the bootstrap extension page, whose own table is
-;		that long. A ninth GP.BANKED is refused rather than overrunning it.
+;		SIXTEEN IS THE LIMIT, and the 1K storage hole is where it comes from -- not the bootstrap
+;		extension page, which now holds one byte a region and has room for over a hundred. The
+;		tables at the foot of this file and the layout copy in main/compiler.asm come to 17 bytes
+;		a region out of $0400-$0801, which leaves 133 bytes in hand at sixteen and 14 at the
+;		twenty-three the hole would actually allow. A seventeenth GP.BANKED is refused BY NAME.
 ;
 ; ************************************************************************************************
 
-GPBANK_MAXREGIONS = 8 						; and eight is what the extension page's table holds
+GPBANK_MAXREGIONS = 16 						; the 1K storage hole caps it, not the extension page
 
 ; ************************************************************************************************
 ;
 ;		PASS TWO NEITHER RECORDS NOR RE-VALIDATES. It is handed pass one's finished region table
 ;		before it starts -- it is being steered by it, main/compiler.asm moves the write cursor
 ;		from it -- so recording would overwrite the very thing in use. Re-validating would be
-;		worse than useless: the count is already final, so a program with the full eight regions
+;		worse than useless: the count is already final, so a program with the full sixteen regions
 ;		would fail the max-regions test, and this region's own bank is already in the list, which
 ;		reads as a duplicate. Pass one checked both, on the same source, and refused there.
 ;
@@ -7481,7 +7499,9 @@ CommandGPBankedCompile:
 _CGBCRecord:
 		lda 	gpBankCount
 		cmp 	#GPBANK_MAXREGIONS
-		bcs 	GPBankStructure 			; ...or one region more than the table holds
+		bcc 	_CGBCRoom
+		jmp 	GPBankTooMany 				; ...or one region more than the tables hold
+_CGBCRoom:
 		jsr 	GPBankCheckAlone 			; first on its line, and outside every block
 		jsr 	GPBankReadNumber 			; the bank, into gpBankNumber
 		jsr 	GPBankCheckBankFree 		; ...which no other region may already own
@@ -8351,6 +8371,20 @@ _GBFBADone:
 ;
 ; ************************************************************************************************
 
+;		ITS OWN MESSAGE, for the same reason and in the same place as the one below. BLOCK
+;		MISMATCH is what this used to say -- .error_structure, shared with a GP.BANKED inside an
+;		open region and with a GP.ENDBANKED that has no opener. The structure is not what is
+;		wrong here: the program is perfectly well formed and there is simply one region more
+;		than the compiler's tables hold, which is a number a programmer can act on and a block
+;		mismatch is not. The line is already right -- currentLineNumber is the offending
+;		GP.BANKED, measured at the ninth of nine before this was raised to sixteen.
+;
+GPBankTooMany:
+		jsr 	CallErrorHandler
+		.text 	"TOO MANY GP.BANKED REGIONS", 0
+
+; ************************************************************************************************
+
 GPBankCheckBankNumber:
 		lda 	gpBankNumber
 		cmp 	#100
@@ -8607,24 +8641,12 @@ gpBankRoom:										; the whole insertion, which can pass 256
 		.fill 	2
 gpBankOldTop:									; objPtr before the insertion was reserved
 		.fill 	2
-gpBankLow:										; the three boundaries of the rotation
+gpBankMid:										; start + header + tail, before page padding
 		.fill 	2
-gpBankMid:
-		.fill 	2
-gpBankHigh:
-		.fill 	2
-gpBankMoveLow:									; the bottom of the range _GBShiftUp is moving
-		.fill 	2
-gpBankRevEnd:									; one past the last byte of the range being reversed
+gpBankHigh:										; ...and one past the region once it has moved
 		.fill 	2
 gpBankWalk:										; cursor into the line number table
 		.fill 	2
-gpBankSave:										; objPtr, held across the .fngosub walk
-		.fill 	2
-gpBankIdx:										; cursor into the GP.ASM fixup list
-		.fill 	1
-gpBankKind:										; the kind byte of the fixup in hand
-		.fill 	1
 gpBankShared:									; 1 in SHARED mode. Set by CompileCode before the
 		.fill 	1 								; compile, because the relocator needs it
 gpBankRunPage:									; buffer page -> run page, which shared mode knows
@@ -8653,8 +8675,8 @@ gpBankSideTo:									; which region a branch points AT, 0 for low memory
 ;		single-region version always wanted, so the pass loads them out of here and puts the
 ;		results back.
 ;
-;		EIGHT, because eight is what the bootstrap extension page's own table holds. A ninth
-;		GP.BANKED is refused rather than overrunning either of them.
+;		SIXTEEN, because seventeen bytes a region is what the 1K storage hole will carry. A
+;		seventeenth GP.BANKED is refused rather than overrunning these.
 ;
 gpBankCount:									; how many regions the program has
 		.fill 	1
@@ -8674,8 +8696,6 @@ gpBankPageCounts:								; pages of each, for the bootstrap's table
 		.fill 	GPBANK_MAXREGIONS
 gpBankCrossings:								; what a branch crossing INTO each one is out by
 		.fill 	GPBANK_MAXREGIONS
-gpBankHops:										; where the walk leaves off to reach each one
-		.fill 	GPBANK_MAXREGIONS * 2
 		.send 	storage
 
 ; ************************************************************************************************
@@ -9295,8 +9315,17 @@ BStrRegister:
 		sta 	gpBankActive
 _BRDone:
 		rts
+;
+;		ITS OWN MESSAGE, in compiler space -- errors.asm links below GPBase and is copied into
+;		every compiled program, so a message there would cost bytes to programs that never write
+;		a GP.BANKEDSTR. OUT OF MEMORY is what this said, and it sent the programmer looking at
+;		the size of their text when the text is not the problem: every region slot is taken by a
+;		GP.BANKED and there is none left for the pool to occupy. Freeing one is a different act
+;		from making the text smaller.
+;
 _BRTooMany:
-		.error_memory
+		jsr 	CallErrorHandler
+		.text 	"NO REGION LEFT FOR GP.BANKEDSTR TEXT", 0
 
 ;
 ;		Up to the next page boundary. It ADVANCES THE CURSOR RATHER THAN WRITING, and that is the

@@ -122,7 +122,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [GP.BANKEDSTR: literal text in a bank](gp-bankedstr-literal-text-in-a-bank.md) — BUILT: named groups resolved at compile time, +3,840 B on GPBMODS, and GPBFILES compiles at last
 - [Object file must fit under the runtime](object-file-must-fit-under-the-runtime.md) — a shared object is LOADED whole at $0801; regions were invisible to the fit check, so GPBMODS and GPBFILES both compiled into programs that ate the resident runtime
 - [Wildcard scratch eats the source](wildcard-scratch-eats-the-source.md) — S0:NAME.B* matches NAME.BASL; it deleted 17 test sources, never send one through IOScratchFile
-- [Regions in a separate .OVL file](region-overlay-ovl-file.md) — DESIGN, not built; LOAD fills consecutive banks by itself, so regions can go straight to $A000 and never enter low RAM or the 24,063-byte file ceiling
+- [Every region gets its own .Bnn file](region-overlay-ovl-file.md) — BUILT; secondary address 1 lands each overlay at $A000, so regions never enter low RAM or the 24,063-byte file ceiling
 - [Object writer: regions vs low code](object-writer-regions-vs-low-code.md) — write above the buffer's reach and the streamer pads forward 65,535 bytes, with both passes agreeing and no check firing
 - [Banked code loses the bank on a call out](gp-banked-call-out-loses-the-bank.md) — a region cannot call another bank and survive the return, and may not BANK itself back
 - [FILEDIR banks whole](filedir-bank-split.md) — BUILT; the bank switch moved into its two blobs, and the "78% cannot move" was a line count of REM assembly

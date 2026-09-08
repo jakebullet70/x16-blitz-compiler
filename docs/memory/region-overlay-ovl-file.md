@@ -1,101 +1,71 @@
 ---
 name: region-overlay-ovl-file
-description: "DESIGN, not built: ship GP.BANKED and GP.BANKEDSTR regions in a separate .OVL file the bootstrap LOADs into banks, so region bytes stop counting against the 24,065-byte file ceiling"
+description: "BUILT: every GP.BANKED region goes to its own NAME.Bnn file that the bootstrap LOADs straight into its bank, so region bytes never enter low RAM or the 24,063-byte file ceiling"
 metadata:
   type: project
 ---
 
-**Proposed 2026-09-08. Not built.** The user does exactly this in Prog8, so the shape is proven
-elsewhere.
+**Designed 2026-09-08, built the same day.** GPBMODS fell from 23,553 bytes to 10,249 and GPBFILES
+went from `PROGRAM TOO BIG` to 13,538. Cost: +305 bytes of compiler, none of runtime.
 
-## The problem it solves
+## The problem it solved
 
-Every region ships inside the object, and a GP program's whole file is capped at **24,065 bytes**
-([[object-file-must-fit-under-the-runtime]]). GPBMODS spends ~13K on low p-code, so **all** its
-regions together get ~10K — barely more than one full bank. Eight regions of 8K would be 64K,
-three times the entire file budget. **The 8-region cap is not what binds; the file is.**
+Every region used to ship inside the object, and a GP program's whole file is capped at **24,063
+bytes** ([[object-file-must-fit-under-the-runtime]]). So a banked byte paid full file price to
+arrive: it was compiled into the object, LOADed at `$0801` with everything else, and only then
+copied up to `$A000`. Eight regions of 8K would have been 64K against a 24K file. **The region cap
+was never what bound; the file was.**
 
-Pull the regions into `NAME.OVL`, loaded separately, and the file ceiling stops applying to them
-entirely.
+## What was built
 
-## Most of it is already written
+**One file per region, named by its bank** — `GPBMODS.B05`. Not the single `.OVL` the design
+first chose: that wanted consecutive banks and 8K of padding a region on disk, and per-region
+files want neither. The compiler writes each one at `ObjStreamClose`, after the source is finished,
+scratching it by exact name first because `"name,S,W"` refuses to open over a file that exists.
 
-- **The bootstrap already LOADs a file by name** — `BBTryLoad` (`bootstrap.asm:229-240`) is nine
-  instructions of SETNAM/SETLFS/LOAD, with a local-then-root fallback, carry-based retry, and a
-  `?RT` error path to copy.
-- **`BXTable` is already the OVL's directory** — `(pages, bank)` per region, in object order.
-- **The once-per-load latch already exists** — `stz BXTable` (`bootstrap2.asm:96`).
-- **`GPBankRelocate` already emits the regions as one contiguous page-aligned blob** at the end of
-  the object. It lands in the same file only because nothing tells it not to.
-- **130 spare bytes** on the extension page.
+**The extension page's table is one byte a region — the bank — terminated by 0.** Bank 0 is refused
+everywhere, which is what frees it as the terminator. The compiler bakes in ONE name template with
+`B00` on the end and the bootstrap pokes the two digits in per region, because N names at 16
+characters would not fit the page.
 
-## What is new — four things
+**Secondary address 1 is the whole trick.** It makes the KERNAL honour the file's own two-byte load
+address and ignore the address in X/Y, so an overlay whose header says `$A000` lands at `$A000`.
+Selecting the bank in `$00` is then the entire bank handling, and `bootstrap2.asm`'s copy loop is
+gone. **The bytes never enter the low 40K at all.**
 
-1. `ObjectWriteShared` opens a second stream and diverts the region run to it.
-2. The compiler bakes the OVL name into the extension page — the patched-operand trick already
-   used for `BBBasePage` and `BXBStrBank`, plus ~16 bytes of string.
-3. The load itself (below).
-4. **The fit check drops its region term**: `fileEndPage = PCODE_PAGE + gpBankActive +
-   pages(low code)`. That is the whole prize.
+**A missing overlay prints `?OVL` and stops.** Running whatever the bank happened to hold is the one
+failure this must not have.
 
-## The one real decision: LOAD cannot seek
+## What was decided against, and why
 
-| | banks | padding | bootstrap |
-|---|---|---|---|
-| **(a) one LOAD, consecutive banks** | must be consecutive | 8K a region on disk | one LOAD, no loop |
-| (b) one file a region | arbitrary | none | a loop, N files to keep together |
-| (c) OPEN + MACPTR | arbitrary | none | most code, none of it written yet |
+- **No version stamp pairing `.PRG` to `.Bnn`.** The programmer owns stale overlays, by decision.
+- **No wildcard sweep of old overlays** — see [[wildcard-scratch-eats-the-source]]. `S0:NAME.B*`
+  deletes `NAME.BASL`. Exact-name scratching covers what the sweep was for.
+- **Two digits, so the bank caps at 99.** One fixed-width template rather than N names. A 512K X16
+  has banks 0-63 so nothing runnable is bounded, and `GPBankReadNumber` refuses 100 up by name
+  rather than emitting `.B:0`. Three digits is about six bytes if it ever matters.
 
-**Take (a).** The X16 KERNAL auto-increments the RAM bank crossing `$BFFF`, so select the first
-bank, `LOAD` at `$A000`, and one call fills consecutive banks — the bootstrap does not even keep
-its copy loop. The compiler pads each region to 8K in the OVL and refuses non-consecutive banks
-with a message. Padding costs disk and nothing else. (c) is the upgrade if arbitrary banks ever
-matter.
+## The fact worth keeping on its own
 
-**The auto-increment is CONFIRMED** — no test needed, it is already documented and already relied
-on here:
+**LOAD into banked RAM auto-increments the bank crossing `$BFFF`**, so setting the bank IS the whole
+of the bank handling — `source/runtime/_library.asm:4403`, `docs/x16/X16 Reference - 04 - BASIC.md`
+line 417, and `samples/prg2basload/prg2basload.basl:76` which BLOADs through as many banks as it
+needs. Per-region files never cross `$BFFF`, so this is not relied on here any more, but it is true
+and [[macptr-wraps-banks-itself]] is its neighbour.
 
-- `source/runtime/_library.asm:4403` — *"LOAD into banked RAM starts at whatever bank `$00` selects
-  and advances it by itself when a file runs past `$BFFF`, so setting the bank IS the whole of the
-  bank handling."*
-- `docs/x16/X16 Reference - 04 - BASIC.md:417` says the same for the KERNAL.
-- `samples/prg2basload/prg2basload.basl:76` BLOADs a source file through as many banks as it needs,
-  and works.
+`$030D/$030E` hold the end address after a LOAD and `$00` the ending bank, so a caller can check a
+file arrived whole for free.
 
-The load also reports back: `$030D/$030E` hold the end address and `$00` the ending bank, so the
-bootstrap can check the OVL arrived whole for free.
+## What it unlocked
 
-**The OVL never touches low RAM.** That is the whole point and it is worth stating plainly, because
-today's path does: a region is compiled into the object, LOADed at `$0801` with everything else, and
-only then copied up to `$A000` — so it pays full file price to arrive. Select the bank, LOAD
-straight to `$A000`, and the bytes never enter the low 40K at all. `bootstrap2.asm`'s copy loop
-disappears with them.
+Region bytes stopped counting against the file, which is what made raising the region count worth
+doing at all — do it the other way round and you only move where `PROGRAM TOO BIG` fires.
+`GPBANK_MAXREGIONS` is **16** now, capped by the 1K compiler storage hole rather than by the
+extension page (which holds a byte a region and has room for over a hundred). See
+[[compiler-must-not-cap-program-size]].
 
-Secondary address 1 (what `BBTryLoad` already passes) loads at the file's own header address, so the
-compiler writes an `$A000` header and the bank select is the only new instruction pair.
+**Resident p-code is still capped by the workspace test** — this never touched that, and GPBMODS
+proves it: its object fell by 13K while its free-memory figure did not move.
 
-See [[macptr-wraps-banks-itself]] for the neighbouring fact that MACPTR does it too.
-
-## Costs, stated
-
-- **Two files that must travel together, versioned as a pair.** A stale `.OVL` beside a fresh
-  `.PRG` is silently wrong text -- the same class of bug that cost a day in
-  [[object-file-must-fit-under-the-runtime]]. It needs a stamp the bootstrap checks; the runtime
-  already solves this with a build number in the filename, so there is a pattern to copy.
-- A LOAD-chained set needs an OVL each ([[load-chain-strands-array-strings]]).
-- One more file open per run.
-
-## What it unlocks, and in what order
-
-Region bytes stop counting against the file. **Resident p-code stays capped at 15,360** — that is
-the workspace test and this does not touch it. Only after this is banked content bounded by banks
-rather than by the file, which is the point at which raising `GPBANK_MAXREGIONS` (8, and cheap to
-raise — 130 spare bootstrap bytes, 13 bytes of compiler storage a region) and the one-text-bank
-rule become worth doing. **In that order.** Do them first and you only move where
-`PROGRAM TOO BIG` fires.
-
-**Measure GPBFILES against BOTH ceilings before building this.** If it is over on the workspace
-test too, the OVL does not help it and it still needs splitting.
-
-Related: [[gp-banked-region-relocation]], [[gp-bankedstr-literal-text-in-a-bank]],
-[[compiler-must-not-cap-program-size]], [[object-writer-regions-vs-low-code]].
+Related: [[gp-bankedstr-literal-text-in-a-bank]], [[object-writer-regions-vs-low-code]],
+[[load-chain-strands-array-strings]] (a LOAD-chained set needs its own overlays per program).

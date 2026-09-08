@@ -51,7 +51,9 @@
 ;
 ; ************************************************************************************************
 
-BXMAXREGIONS = 8
+BXMAXREGIONS = 16 							; GPBANK_MAXREGIONS, and the compiler is what caps it --
+											; one byte a region here, so this page has room for far
+											; more than the storage hole will carry
 BXNAMEMAX = 48 								; the overlay name the compiler bakes in below. The
 											; compiler refuses a longer one rather than truncating
 											; it -- see ObjBuildOverlayName.

@@ -68,6 +68,9 @@ CompilerRAMBankReg	= $0000
 ;			4	the VARIABLE NAME LIST.
 ;			5	the BLOCK DEPTH of each line, one byte per line-table entry.
 ;			6	WHERE EACH BLOCK ENDS, and where each of its alternatives goes next.
+;			7	the OBJECT BUFFER -- the application's, not the compiler's.
+;			8+	ONE BANK A REGION, growing UP, as many as GPBANK_MAXREGIONS allows.
+;			63	the GP.BANKEDSTR pool, growing DOWN from the top bank a 512K machine has.
 ;
 ;		BANKS 2 AND 4 WERE ONE BANK, and that was the wall. The two tables shared 8K, growing
 ;		towards each other, and samples/editor had used 7,981 bytes of it -- 1,461 line entries
@@ -288,24 +291,36 @@ asmSavedBank: 								; caller's RAM bank, saved across an assembler window
 		.send 	storage
 
 ;
-;		BANK 16 -- the GP.BANKEDSTR group tables and string pool. Same rules again. These windows
+;		BANK 63 -- the GP.BANKEDSTR group tables and string pool. Same rules again. These windows
 ;		are never nested inside any of the others: the block reads its own source lines and
 ;		touches no variable name, line number or block end while it is open. BStrFlush opens and
 ;		closes ONCE PER BYTE for the same reason AsmFlushPool does -- WriteCodeByte can raise
 ;		PROGRAM TOO BIG and leave through the error handler, which prints in bank 0.
 ;
-;		SIXTEEN, NOT SEVEN, AND THE APPLICATION IS WHY. The banks above are the COMPILER's, but
-;		the application takes more that are not listed anywhere near them: OBJ_BUF_BANK is 7 and
-;		OBJ_RGN_BANK is 8, one bank a region up to GPBANK_MAXREGIONS, so 7 through 15 all belong
-;		to the object writer (application/compiler/object.asm:548).
+;		THE TOP BANK, NOT A LOW ONE, AND THE OBJECT WRITER IS WHY. The banks listed above are the
+;		COMPILER's, but the application takes more that are not listed anywhere near them:
+;		OBJ_BUF_BANK is 7 and OBJ_RGN_BANK is 8, ONE BANK A REGION growing upward
+;		(application/compiler/object.asm). So any fixed low number for the pool is a collision
+;		waiting for the region count to reach it.
 ;
-;		This cost most of a day. Bank 7 held the string pool perfectly through PASS ONE -- which
-;		writes no object -- and pass two then filled the same bank with the object as it streamed
-;		it, so every length byte read back as zero. The symptom was not a wrong string: it was
-;		INTERNAL ERROR from the two-pass agreement check, because the region came out 44 bytes in
-;		pass two against 20 in pass one, with the page padding hiding it in the total length.
+;		IT WAS 16, AND SIXTEEN IS EXACTLY WHERE EIGHT REGIONS STOPPED. Banks 8 to 15 were the
+;		regions and 16 was the pool -- adjacent, with nothing between them and nothing checking.
+;		A ninth region would have written straight through the string pool, and the count that
+;		refused a ninth was the extension page's table rather than this. Two limits, one number,
+;		by luck.
 ;
-BStrStorageBank	= 16
+;		63 IS THE TOP BANK A 512K X16 HAS, so the object writer grows up from 8 and the pool
+;		grows down from 63 and they do not meet at any region count the machine can hold. This
+;		is the line that then never needs revisiting.
+;
+;		This cost most of a day when it was 7. Bank 7 held the string pool perfectly through
+;		PASS ONE -- which writes no object -- and pass two then filled the same bank with the
+;		object as it streamed it, so every length byte read back as zero. The symptom was not a
+;		wrong string: it was INTERNAL ERROR from the two-pass agreement check, because the region
+;		came out 44 bytes in pass two against 20 in pass one, with the page padding hiding it in
+;		the total length.
+;
+BStrStorageBank	= 63
 
 bstr_access .macro
 		php

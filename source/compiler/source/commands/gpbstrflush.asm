@@ -313,8 +313,17 @@ BStrRegister:
 		sta 	gpBankActive
 _BRDone:
 		rts
+;
+;		ITS OWN MESSAGE, in compiler space -- errors.asm links below GPBase and is copied into
+;		every compiled program, so a message there would cost bytes to programs that never write
+;		a GP.BANKEDSTR. OUT OF MEMORY is what this said, and it sent the programmer looking at
+;		the size of their text when the text is not the problem: every region slot is taken by a
+;		GP.BANKED and there is none left for the pool to occupy. Freeing one is a different act
+;		from making the text smaller.
+;
 _BRTooMany:
-		.error_memory
+		jsr 	CallErrorHandler
+		.text 	"NO REGION LEFT FOR GP.BANKEDSTR TEXT", 0
 
 ;
 ;		Up to the next page boundary. It ADVANCES THE CURSOR RATHER THAN WRITING, and that is the
