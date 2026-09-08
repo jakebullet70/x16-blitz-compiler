@@ -564,7 +564,27 @@ _GBRWholePages:
 		beq 	_GBRPlaced
 		jmp 	_GBRPass
 _GBRTooBig:
-		.error_range
+		;
+		;		NAME THE REGION. This runs at the END of pass one, so currentLineNumber is the last
+		;		line of the program and the handler's " @ nnnnn" would point at a line that has
+		;		nothing to do with the fault -- which identifies nothing at all in a program with ten
+		;		banks. _GBRLoadRegion has already put this region's GP.BANKED line in gpBankLineIn,
+		;		so the right answer is one copy away. WriteBranchTo names a missing line the same way.
+		;
+		;		Relocate never sees a text region -- BStrFlush runs after it -- so this is always a
+		;		real line and never BStrRegister's $FFFE sentinel.
+		;
+		;		THE TEXT SITS HERE RATHER THAN IN THE SHARED ERROR TABLE. errors.asm is in
+		;		common-source, which links BELOW GPBase and is therefore copied into every compiled
+		;		program, so a message there would cost bytes to every program that never writes a
+		;		GP.BANKED. Up here it costs nothing. Same trick as gpasmcode.asm's _APBUnknown.
+		;
+		lda 	gpBankLineIn
+		sta 	currentLineNumber
+		lda 	gpBankLineIn+1
+		sta 	currentLineNumber+1
+		jsr 	CallErrorHandler
+		.text 	"GP.BANKED REGION OVER 8K", 0
 _GBRPlaced:
 		;
 		;		Nothing moves again, so the two things that had to wait for that can be settled:

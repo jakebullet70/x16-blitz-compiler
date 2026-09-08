@@ -27,7 +27,15 @@ running it before would not have.
 
 **How to apply:** `/compact` when the context gets large, not when the work is finishing. It cut the
 per-turn read 558K -> 70K, an **8x** cut, and the tail of that session would have been nearly free on
-the other side of it. Two specific traps:
+the other side of it.
+
+**A phase boundary is the cadence to use.** Asked for 2026-09-08: on a staged plan, remind the user
+to `/compact` **between phases** — after a phase lands and before the next one is picked up. It is
+the natural point, because the context that mattered for the phase just finished is exactly what
+compaction should drop, and the plan document carries forward what the next phase needs anyway.
+**Prompt for it; do not wait to be asked.**
+
+Two specific traps:
 
 - **Resuming a huge session is not free.** It re-establishes the entire cache first — 522K here,
   before a single useful token. A session left to grow across days is worth ending, not resuming.

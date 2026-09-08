@@ -31,6 +31,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 ## Build and toolchain
 - **Build setup** — *(note missing: linked by the index but never committed)* how to build it, and the 5 blockers that made a fresh clone unbuildable on any OS. See docs/BUILDING.md.
 - [Build toolchain location](build-toolchain-location.md) — make, 64tass and python are off-PATH in C:\8bitProgramming
+- [App make skips compiler.library](app-make-does-not-rebuild-compiler-library.md) — a change under source/compiler/ silently misses GPC.BIN; use `make libs`
 - [Baseline compiler is the application copy](baseline-compiler-is-the-application-copy.md) — testing/GPC.BIN can be committed stale; A/B against source/application/GPC.BIN or invent regressions
 - [Measure p-code per module](measure-pcode-per-module.md) — the map file plus the SYM give exact bytes per include and per routine
 - [Headless BASL build recipe](headless-basl-build-recipe.md) — the three emulator runs and the stop conditions that keep a cycle to ~70s
@@ -67,6 +68,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [Compiler overlay into a bank](compiler-overlay-into-a-bank.md) — REVERTED, but the 64tass mechanism works and is measured at +2,560 bytes of object buffer
 - [Banking strings: length, not count](banking-strings-scales-with-length.md) — the menus broke even at 249 saved vs 245 spent
 - [BANK, not POKE 0](gpc-bank-statement-not-poke-zero.md) — PEEK/POKE restore the bank around every access, so POKE 0 can never select one
+- [Claim every compile-time bank](claim-every-compile-time-bank.md) - every GP.BANKED / GP.BANKEDSTR number needs a BANKMGR.CLAIM before the first ALLOC; check each program as it moves to the new runtime
 - [STASH leaves its bank selected — FIXED](stash-leaves-its-bank-selected.md) — it now restores the caller's bank; what the symptom looked like, and why it named the wrong routine
 
 - [color-test sample state](color-test-sample-state.md) — parked 2026-09-06; the four loose ends, incl. an unverified X16 colour pair
@@ -119,6 +121,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [GP.BANKED region relocation](gp-banked-region-relocation.md) — the region moves to the end of the object with a rotation and two GOTOs to line numbers; the three things holding a buffer address
 - [GP.BANKEDSTR: literal text in a bank](gp-bankedstr-literal-text-in-a-bank.md) — BUILT: named groups resolved at compile time, +3,840 B on GPBMODS, and GPBFILES compiles at last
 - [Object file must fit under the runtime](object-file-must-fit-under-the-runtime.md) — a shared object is LOADED whole at $0801; regions were invisible to the fit check, so GPBMODS and GPBFILES both compiled into programs that ate the resident runtime
+- [Regions in a separate .OVL file](region-overlay-ovl-file.md) — DESIGN, not built; LOAD fills consecutive banks by itself, so regions can go straight to $A000 and never enter low RAM or the 24,063-byte file ceiling
 - [Object writer: regions vs low code](object-writer-regions-vs-low-code.md) — write above the buffer's reach and the streamer pads forward 65,535 bytes, with both passes agreeing and no check firing
 - [Banked code loses the bank on a call out](gp-banked-call-out-loses-the-bank.md) — a region cannot call another bank and survive the return, and may not BANK itself back
 - [FILEDIR banks whole](filedir-bank-split.md) — BUILT; the bank switch moved into its two blobs, and the "78% cannot move" was a line count of REM assembly

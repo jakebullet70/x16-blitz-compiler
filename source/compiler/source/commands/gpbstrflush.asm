@@ -203,7 +203,23 @@ _BFDone:
 		rts
 
 _BFTooBig:
-		.error_range
+		;
+		;		ALL of it, not one group: every GP.BANKEDSTR block in the program shares one bank,
+		;		so the total is what has overflowed and the message says so. NO LINE IS NAMED --
+		;		this runs at the end of pass one and the text belongs to no line in particular, so
+		;		currentLineNumber is zeroed rather than left holding the last line of the program,
+		;		which would send the programmer to a line that has nothing to do with it.
+		;
+		;		PHASE 3 CHANGES THIS. Once text can live in several banks the message has to say
+		;		which, and bstrBank is what it will name.
+		;
+		;		The text is in compiler space, not in errors.asm: that table links below GPBase and
+		;		is copied into every compiled program. See gpasmcode.asm's _APBUnknown.
+		;
+		stz 	currentLineNumber
+		stz 	currentLineNumber+1
+		jsr 	CallErrorHandler
+		.text 	"ALL GP.BANKEDSTR TEXT OVER 8K", 0
 
 ; ************************************************************************************************
 ;

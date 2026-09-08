@@ -740,6 +740,9 @@ _OSWRegion:
 		lda 	objPtr+1
 		sbc 	layoutStart+1,x
 		sta 	objBufIdx+1
+		bcc 	_OSWDiverged 				; below the region, or past $BFFF -- and neither happens
+		cmp 	#OBJ_BUF_SIZE >> 8 			; unless pass two wrote more than pass one did
+		bcs 	_OSWDiverged
 		clc
 		lda 	nextRegion
 		adc 	#OBJ_RGN_BANK
@@ -750,6 +753,22 @@ _OSWClose:
 		lda 	objSaveBank
 		sta 	CompilerRAMBankReg
 		rts
+
+;
+;		PASS TWO WROTE MORE THAN PASS ONE DID, which is the only way to get here: an oversized
+;		region is stopped at the end of pass one by GPBankRelocate, and pass two is never reached.
+;		The two-pass agreement check finds this too, but not until the end of the pass -- and by
+;		then the stores have landed. Past 8K they go to $C000, which is ROM and discards them
+;		silently; past 24K the add above wraps and they go to ZERO PAGE and low RAM, corrupting
+;		the compiler that is meant to report it. Four instructions, and it says so instead.
+;
+;		TESTED BEFORE ObjStreamWindow, deliberately: that leaves the region's bank selected for
+;		the caller to put back, and an error raised with it open would run all the way out --
+;		handler, ExitCompiler, caller -- in the wrong bank. ObjStreamOffset tests in the same
+;		place, for the same reason.
+;
+_OSWDiverged:
+		.error_internal
 
 ;
 ;		objBufIdx = objPtr - objBufBase, with carry set if that is inside the window.
