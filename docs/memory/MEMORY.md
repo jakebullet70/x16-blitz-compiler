@@ -26,6 +26,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [User runs concurrent agents here](user-runs-concurrent-agents-here.md) — default to read-only research; re-read before any write
 - [Compile shared, not embedded](compile-shared-not-embedded.md) — standing: SHARED is the p-code number; GPC-HELP stays uncrunched
 - [Library working copy, then root](library-working-copy-then-root.md) — edit modules in samples/GPB-MODS-TESTING/GPC-BASIC/, copy to root only when they pass
+- [Compact early, not at the end](compact-early-not-at-the-end.md) — cost is context size x turns; 75% of a window went in 18 minutes on a 558K-token context
 
 ## Build and toolchain
 - **Build setup** — *(note missing: linked by the index but never committed)* how to build it, and the 5 blockers that made a fresh clone unbuildable on any OS. See docs/BUILDING.md.
@@ -117,6 +118,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [P-code runs from a bank, PROVEN](pcode-runs-from-a-bank-proven.md) — executed at $A000 with two GP.ASM blobs and no ABI change; RETURN out needs no bank restore
 - [GP.BANKED region relocation](gp-banked-region-relocation.md) — the region moves to the end of the object with a rotation and two GOTOs to line numbers; the three things holding a buffer address
 - [GP.BANKEDSTR: literal text in a bank](gp-bankedstr-literal-text-in-a-bank.md) — BUILT: named groups resolved at compile time, +3,840 B on GPBMODS, and GPBFILES compiles at last
+- [Object file must fit under the runtime](object-file-must-fit-under-the-runtime.md) — a shared object is LOADED whole at $0801; regions were invisible to the fit check, so GPBMODS and GPBFILES both compiled into programs that ate the resident runtime
 - [Object writer: regions vs low code](object-writer-regions-vs-low-code.md) — write above the buffer's reach and the streamer pads forward 65,535 bytes, with both passes agreeing and no check firing
 - [Banked code loses the bank on a call out](gp-banked-call-out-loses-the-bank.md) — a region cannot call another bank and survive the return, and may not BANK itself back
 - [FILEDIR banks whole](filedir-bank-split.md) — BUILT; the bank switch moved into its two blobs, and the "78% cannot move" was a line count of REM assembly

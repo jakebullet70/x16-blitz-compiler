@@ -28,3 +28,18 @@ have: the front end writes CR-terminated output, which the engine's sniffer misr
 
 Chain-loading is fine in both directions: **a compiled GPC program chain-loads another compiled
 GPC program**, EMBEDDED or SHARED, with `LOAD "NAME"` and no `,8`.
+
+## The same trick on a menu-driven GUI
+
+For a program whose front end is a menu bar and dropdowns, the variant needs three edits, all
+scripted off the real source with an assert on each: **disarm the key wait** (`GMX.WAIT` becomes a
+bare `RETURN` — a headless `GET` on an empty buffer spins for ever), **replace the first
+`GOSUB GMX.CHROME`** with a driver that sets `GM.SEL` / `MENUVERT.SEL` and `PRINT`s what the panel
+handed back, and `END`. That runs the REAL panel routines, so a wrong `GP.BSTR` index or a misused
+`STR.*` shows up as text in a log rather than as garbage on a screen no script can read.
+
+Two traps. The probe can only name `GP.BANKEDSTR` groups declared ABOVE it
+([[gp-bankedstr-literal-text-in-a-bank]]). And **the harness costs object bytes**: on
+2026-09-08 GPBMODS sat exactly on the file ceiling and the 445-byte driver would not fit, so the
+program had to be trimmed before it could be tested at all
+([[object-file-must-fit-under-the-runtime]]).
