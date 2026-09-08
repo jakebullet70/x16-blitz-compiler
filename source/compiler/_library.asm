@@ -7560,13 +7560,19 @@ GPBankClosePassTwo:
 
 ; ************************************************************************************************
 ;
-;		Read GP.BANKED's operand: a decimal constant, 1 to 255.
+;		Read GP.BANKED's operand: a decimal constant, 1 to 99.
 ;
 ;		BANK 0 IS REFUSED. It is the KERNAL's -- its FAT32 buffers live there -- so a program
 ;		that put its code in it would work until the first file operation and then not.
 ;
-;		No upper check beyond the byte. A 512K machine has banks 0..63 and a 2MB machine 0..255,
-;		and which one this will run on is not a compile time fact.
+;		AND 100 UP, because of the overlay's NAME. A region is a file called <object>.Bnn, and
+;		the bootstrap holds one name template with the bank poked into its last two characters:
+;		one name rather than one a region, which is what makes it fit a page with under 200
+;		bytes spare. Bank 100 would come out as ".B:0" -- ':' is '0'+10 -- and load nothing.
+;
+;		A 512K MACHINE HAS BANKS 0..63, so this bounds nothing anyone can currently run; only a
+;		2MB machine reaches 100. Widening it is a third digit here, in the extension page's
+;		template and in ObjBuildOverlayName, and nothing else.
 ;
 ; ************************************************************************************************
 
@@ -7601,10 +7607,17 @@ _GBRNDigit:
 		bcc 	_GBRNDone
 		jsr 	GetNext
 		bra 	_GBRNDigit
+;
+;		THE UPPER CHECK IS A jmp TO THE BOTTOM OF THE FILE, and it is worth knowing why rather
+;		than tidying it back inline. GPBankStructure sits above here and GPBankCheckAlone below,
+;		and three of its branches reach BACK to it -- so anything added between the two costs
+;		branch range. The message and its test inline were 40 bytes and broke all three. Two is
+;		what a jmp costs over the rts it replaced.
+;
 _GBRNDone:
 		lda 	gpBankNumber
 		beq 	GPBankBadNumber 			; bank 0 belongs to the KERNAL
-		rts
+		jmp 	GPBankCheckBankNumber 		; ...and 100 up has no two-digit overlay name
 
 GPBankBadNumber:
 		.error_value
@@ -7964,7 +7977,27 @@ _GBRWholePages:
 		beq 	_GBRPlaced
 		jmp 	_GBRPass
 _GBRTooBig:
-		.error_range
+		;
+		;		NAME THE REGION. This runs at the END of pass one, so currentLineNumber is the last
+		;		line of the program and the handler's " @ nnnnn" would point at a line that has
+		;		nothing to do with the fault -- which identifies nothing at all in a program with ten
+		;		banks. _GBRLoadRegion has already put this region's GP.BANKED line in gpBankLineIn,
+		;		so the right answer is one copy away. WriteBranchTo names a missing line the same way.
+		;
+		;		Relocate never sees a text region -- BStrFlush runs after it -- so this is always a
+		;		real line and never BStrRegister's $FFFE sentinel.
+		;
+		;		THE TEXT SITS HERE RATHER THAN IN THE SHARED ERROR TABLE. errors.asm is in
+		;		common-source, which links BELOW GPBase and is therefore copied into every compiled
+		;		program, so a message there would cost bytes to every program that never writes a
+		;		GP.BANKED. Up here it costs nothing. Same trick as gpasmcode.asm's _APBUnknown.
+		;
+		lda 	gpBankLineIn
+		sta 	currentLineNumber
+		lda 	gpBankLineIn+1
+		sta 	currentLineNumber+1
+		jsr 	CallErrorHandler
+		.text 	"GP.BANKED REGION OVER 8K", 0
 _GBRPlaced:
 		;
 		;		Nothing moves again, so the two things that had to wait for that can be settled:
@@ -8299,6 +8332,34 @@ _GBFBADone:
 ;		BAD VALUE, reported at the GP.BANKED whose operand is the repeat -- which is the second
 ;		of the two, and the one the user can move.
 ;
+; ************************************************************************************************
+
+;		THE BANK HAS TO HAVE AN OVERLAY NAME. A region is a file called <object>.Bnn beside the
+;		program, and the bootstrap holds ONE name template with the bank poked into its last two
+;		characters -- one name rather than one a region, which is what makes it fit a page with
+;		under 200 bytes spare. Bank 100 would come out as ".B:0", ':' being '0'+10, and load
+;		nothing.
+;
+;		A 512K MACHINE HAS BANKS 0..63, so this bounds nothing anyone can currently run; only a
+;		2MB machine reaches 100. Widening it is a third digit here, in the extension page's
+;		template and in ObjBuildOverlayName, and nothing else.
+;
+;		ITS OWN MESSAGE, in compiler space rather than errors.asm: that table links below GPBase
+;		and is copied into every compiled program, so a message there would cost bytes to every
+;		program that never writes a GP.BANKED. BAD VALUE on its own would send the programmer
+;		hunting for a syntax mistake in a bank number that is perfectly well formed.
+;
+; ************************************************************************************************
+
+GPBankCheckBankNumber:
+		lda 	gpBankNumber
+		cmp 	#100
+		bcs 	_GBCBNNoName
+		rts
+_GBCBNNoName:
+		jsr 	CallErrorHandler
+		.text 	"BANK OVER 99 HAS NO OVERLAY NAME", 0
+
 ; ************************************************************************************************
 
 GPBankCheckBankFree:
@@ -9124,7 +9185,23 @@ _BFDone:
 		rts
 
 _BFTooBig:
-		.error_range
+		;
+		;		ALL of it, not one group: every GP.BANKEDSTR block in the program shares one bank,
+		;		so the total is what has overflowed and the message says so. NO LINE IS NAMED --
+		;		this runs at the end of pass one and the text belongs to no line in particular, so
+		;		currentLineNumber is zeroed rather than left holding the last line of the program,
+		;		which would send the programmer to a line that has nothing to do with it.
+		;
+		;		PHASE 3 CHANGES THIS. Once text can live in several banks the message has to say
+		;		which, and bstrBank is what it will name.
+		;
+		;		The text is in compiler space, not in errors.asm: that table links below GPBase and
+		;		is copied into every compiled program. See gpasmcode.asm's _APBUnknown.
+		;
+		stz 	currentLineNumber
+		stz 	currentLineNumber+1
+		jsr 	CallErrorHandler
+		.text 	"ALL GP.BANKEDSTR TEXT OVER 8K", 0
 
 ; ************************************************************************************************
 ;

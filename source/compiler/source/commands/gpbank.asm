@@ -160,13 +160,19 @@ GPBankClosePassTwo:
 
 ; ************************************************************************************************
 ;
-;		Read GP.BANKED's operand: a decimal constant, 1 to 255.
+;		Read GP.BANKED's operand: a decimal constant, 1 to 99.
 ;
 ;		BANK 0 IS REFUSED. It is the KERNAL's -- its FAT32 buffers live there -- so a program
 ;		that put its code in it would work until the first file operation and then not.
 ;
-;		No upper check beyond the byte. A 512K machine has banks 0..63 and a 2MB machine 0..255,
-;		and which one this will run on is not a compile time fact.
+;		AND 100 UP, because of the overlay's NAME. A region is a file called <object>.Bnn, and
+;		the bootstrap holds one name template with the bank poked into its last two characters:
+;		one name rather than one a region, which is what makes it fit a page with under 200
+;		bytes spare. Bank 100 would come out as ".B:0" -- ':' is '0'+10 -- and load nothing.
+;
+;		A 512K MACHINE HAS BANKS 0..63, so this bounds nothing anyone can currently run; only a
+;		2MB machine reaches 100. Widening it is a third digit here, in the extension page's
+;		template and in ObjBuildOverlayName, and nothing else.
 ;
 ; ************************************************************************************************
 
@@ -201,10 +207,17 @@ _GBRNDigit:
 		bcc 	_GBRNDone
 		jsr 	GetNext
 		bra 	_GBRNDigit
+;
+;		THE UPPER CHECK IS A jmp TO THE BOTTOM OF THE FILE, and it is worth knowing why rather
+;		than tidying it back inline. GPBankStructure sits above here and GPBankCheckAlone below,
+;		and three of its branches reach BACK to it -- so anything added between the two costs
+;		branch range. The message and its test inline were 40 bytes and broke all three. Two is
+;		what a jmp costs over the rts it replaced.
+;
 _GBRNDone:
 		lda 	gpBankNumber
 		beq 	GPBankBadNumber 			; bank 0 belongs to the KERNAL
-		rts
+		jmp 	GPBankCheckBankNumber 		; ...and 100 up has no two-digit overlay name
 
 GPBankBadNumber:
 		.error_value
@@ -919,6 +932,34 @@ _GBFBADone:
 ;		BAD VALUE, reported at the GP.BANKED whose operand is the repeat -- which is the second
 ;		of the two, and the one the user can move.
 ;
+; ************************************************************************************************
+
+;		THE BANK HAS TO HAVE AN OVERLAY NAME. A region is a file called <object>.Bnn beside the
+;		program, and the bootstrap holds ONE name template with the bank poked into its last two
+;		characters -- one name rather than one a region, which is what makes it fit a page with
+;		under 200 bytes spare. Bank 100 would come out as ".B:0", ':' being '0'+10, and load
+;		nothing.
+;
+;		A 512K MACHINE HAS BANKS 0..63, so this bounds nothing anyone can currently run; only a
+;		2MB machine reaches 100. Widening it is a third digit here, in the extension page's
+;		template and in ObjBuildOverlayName, and nothing else.
+;
+;		ITS OWN MESSAGE, in compiler space rather than errors.asm: that table links below GPBase
+;		and is copied into every compiled program, so a message there would cost bytes to every
+;		program that never writes a GP.BANKED. BAD VALUE on its own would send the programmer
+;		hunting for a syntax mistake in a bank number that is perfectly well formed.
+;
+; ************************************************************************************************
+
+GPBankCheckBankNumber:
+		lda 	gpBankNumber
+		cmp 	#100
+		bcs 	_GBCBNNoName
+		rts
+_GBCBNNoName:
+		jsr 	CallErrorHandler
+		.text 	"BANK OVER 99 HAS NO OVERLAY NAME", 0
+
 ; ************************************************************************************************
 
 GPBankCheckBankFree:

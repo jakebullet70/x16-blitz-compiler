@@ -70,11 +70,15 @@ def compile_one(name, mode="SHARED"):
     j = tail.find("OK CODE")
     if j >= 0:
         return "OK", tail[j:j + 30].split("\r")[0].strip()
-    for line in tail.split("\r\n"):
-        s = line.strip()
-        for e in GPC_ERRORS:
-            if s.startswith(e):
-                return "ERR", s
+    #   NOT line by line.  -echo streams the object bytes through CHROUT as they are
+    #   written, so the message can be glued to the tail of them with no CR in between --
+    #   BANKY reported "???" for exactly that reason while the compiler had printed
+    #   NOT IMPLEMENTED @ 6 perfectly well.  Match the message and its " @ line" instead,
+    #   which is a shape nothing in a p-code stream produces.
+    for e in GPC_ERRORS:
+        m = re.search(re.escape(e) + r" @ *[0-9]+", tail)
+        if m:
+            return "ERR", m.group(0)
     return "???", tail[:100].replace("\r\n", " | ")
 
 

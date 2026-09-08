@@ -39,6 +39,7 @@ IOOpenRead:
 
 IO_IMAGE_FILE = 4
 IO_OBJECT_FILE = 6
+IO_OVL_FILE = 7 							; ...and one for the .Bnn overlays -- see below
 
 IOOpenImage:
 		lda 	#IO_IMAGE_FILE
@@ -91,6 +92,46 @@ IOOpenObject:
 
 IOObjectClose:
 		lda 	#IO_OBJECT_FILE
+		jsr 	$FFC3 						; CLOSE
+		jsr 	$FFCC 						; CLRCHN
+		lda 	#$FF
+		sta 	ioInSel
+		sta 	ioOutSel
+		rts
+
+; ************************************************************************************************
+;
+;		THE OVERLAYS GET A THIRD LOGICAL FILE, and they need one for the same reason the object
+;		does: they are written at the end of pass two with the object still open on 6 and the
+;		source still open on 3. One at a time -- opened, filled, closed -- so one file number
+;		serves all of them.
+;
+;		SELECTING ONE IS NOT WORTH CACHING, unlike the object: an overlay is selected once and
+;		then written from end to end, so the compare would never save a CHKOUT. What it must do
+;		is tell the cache that the object is no longer the selected output, or the object writer
+;		would skip the CHKOUT it needs on the way back.
+;
+; ************************************************************************************************
+
+IOOpenOverlay:
+		lda 	#IO_OVL_FILE
+		sta 	ioFileNo
+		lda 	#'W'
+		jsr 	IOSetFileName 				; carry comes back from OPEN
+		ldy 	#3 							; put the default back for every other caller
+		sty 	ioFileNo 					; (sty leaves the carry alone)
+		rts
+
+IOSelectOverlay:
+		lda 	#IO_OVL_FILE
+		sta 	ioOutSel
+		lda 	#$FF
+		sta 	ioInSel
+		ldx 	#IO_OVL_FILE
+		jmp 	$FFC9 						; CHKOUT
+
+IOOverlayClose:
+		lda 	#IO_OVL_FILE
 		jsr 	$FFC3 						; CLOSE
 		jsr 	$FFCC 						; CLRCHN
 		lda 	#$FF

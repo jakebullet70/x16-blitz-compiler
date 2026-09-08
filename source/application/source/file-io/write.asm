@@ -79,6 +79,26 @@ IODeleteOutputs:
 _IODODone:
 		rts
 
+;
+;		AND NOT THE .Bnn OVERLAYS, which is a deliberate gap and not an oversight.
+;
+;		The obvious sweep is one wildcard -- "S0:<object>.B*" -- because which banks this source
+;		asks for is not known until it has been read. IT SCRATCHES THE SOURCE. CBM pattern
+;		matching is a prefix and a "*", so "BANKA.B*" matches BANKA.BASL as squarely as it
+;		matches BANKA.B05, and building it destroyed seventeen test sources on 08/09/26. Nor is
+;		there a safer spelling: every extension this project uses begins with B.
+;
+;		WHAT THE SWEEP WAS FOR IS DONE ELSEWHERE ANYWAY. ObjEmitOverlay scratches each overlay
+;		by its exact name immediately before writing it, which is what "name,S,W" needs -- it
+;		refuses to open over a file that exists -- and covers every overlay this compile
+;		produces. ObjStreamAbort takes away the one that was in flight if the compile stopped.
+;
+;		WHAT IS LEFT IS AN ORPHAN: a .Bnn from an earlier run whose GP.BANKED has since changed
+;		its bank number or gone. It is not part of the program any more, so nothing loads it,
+;		and the programmer owns stale overlays by decision. Deleting it would need a list of
+;		the banks the LAST compile used, which nothing keeps.
+;
+
 ; ************************************************************************************************
 ;
 ;								Scratch one file.  YX = ASCIIZ name

@@ -327,33 +327,30 @@ _WOCSWhole:
 _WOCSCeiling:
 		sta 	sharedCeilPage
 		;
-		;		AND THE WHOLE FILE HAS TO FIT UNDER IT, which is a different test from the one
-		;		below and not implied by it.
+		;		AND THE WHOLE FILE HAS TO FIT UNDER IT.
 		;
-		;		Below measures RESIDENT P-CODE -- FreeMemory..gpBankStart -- because that is what
-		;		the workspace stands on, and every GP.BANKED and GP.BANKEDSTR region is ABOVE
-		;		gpBankStart and deliberately invisible to it. But the FILE is loaded whole, at
-		;		$0801, regions and all, and the resident runtime is sitting at sharedCeilPage. An
-		;		object that reaches past it overwrites the runtime; the magic check then fails, the
-		;		runtime is reloaded over the object's own tail, and the program runs with its
-		;		regions full of runtime image.
+		;		THE REGIONS ARE NO LONGER IN IT. They used to be -- compiled into the object,
+		;		loaded at $0801 with everything else, copied up to $A000 from there -- so the file
+		;		test had to count them and the workspace test did not, and the two measured
+		;		different lengths. Now each region is a .Bnn file of its own that loads straight
+		;		into its bank, so the file ends where the low code ends, which is exactly what the
+		;		workspace test already measured into zTemp1. THAT IS THE WHOLE RETURN on the
+		;		overlays: a banked byte stops paying file price to arrive.
 		;
-		;		NOTHING REPORTED THAT. GPBMODS compiled clean 703 bytes over and read machine
-		;		code out of its own text bank -- the directory intact, the records past the
-		;		overlap replaced. Found 7th September 2026 by PEEKing the bank the compiler had
-		;		just filled.
+		;		SO THE TEST IS NOW IMPLIED by the one below -- same length, and below adds the
+		;		frame stack and a minimum workspace on top of it before comparing. It stays
+		;		because it is the check that names the failure the file has, it costs a compiled
+		;		program nothing, and the day something is written after the low code again it is
+		;		the one that notices.
 		;
-		sec
-		lda 	objPtr 						; the whole object, which is what gets loaded
-		sbc 	#FreeMemory & $FF
+		;		NOTHING REPORTED THIS AT ALL until 7th September 2026, when GPBMODS compiled clean
+		;		703 bytes over and read machine code out of its own text bank -- the directory
+		;		intact, the records past the overlap replaced.
+		;
+		lda 	zTemp1 						; the low code, which is now the whole file
 		sta 	zTemp0
-		lda 	objPtr+1
-		sbc 	#FreeMemory >> 8
+		lda 	zTemp1+1
 		sta 	zTemp0+1
-		lda 	zTemp0
-		beq 	_WOCSFileWhole
-		inc 	zTemp0+1 					; a part page still costs a whole one
-_WOCSFileWhole:
 		;
 		;		THE SAME BASE THE WORKSPACE IS COUNTED FROM, and it has to be: the file loads at
 		;		$0801 but its p-code does not start there. PCODE_PAGE is where that lands, plus
@@ -518,32 +515,56 @@ _WOCSExtCopy:
 		iny
 		bne 	_WOCSExtCopy
 		;
-		;		Where the regions sit once the program is loaded -- ONE address, because they are
-		;		contiguous in whole pages and the copy loop runs on across them -- and then the
-		;		(pages, bank) table. The terminating zero is already there: the template's table
-		;		is a .fill of zeroes.
+		;		The bank table -- ONE BYTE A REGION now, and no page counts: each region is a file
+		;		of its own and LOAD knows how long a file is. The terminating zero is already
+		;		there, because the template's table is a .fill of zeroes and bank 0 is refused
+		;		everywhere else in the compiler.
 		;
-		;		THE TABLE IS IN OBJECT ORDER, which is source order: GPBankRelocate moves the last
-		;		region first and each one after that lands BELOW the last, so region 0 finishes
-		;		at the bottom of the run. The copy walks straight on from one region to the next,
-		;		so this has to be the order the pages actually sit in.
+		;		ORDER DOES NOT MATTER ANY MORE, which it used to: the copy loop ran on from one
+		;		region into the next and so needed the pages in the order they sat in. Each file
+		;		carries its own load address now, so the table is only a list of banks.
 		;
-		lda 	gpBankRunBase
-		sta 	imageBuffer+BootExtSrcOffset
-		lda 	bstrBank 					; ...and which bank GP.BSTR reads its text out of. Zero
-		sta 	imageBuffer+BootExtBStrOffset 	; when the program has none, and then never read
+		;		AND THE NAME THE LOADER ASKS FOR, once, with "B00" on the end -- the extension
+		;		page pokes the bank's two digits into it per region. See ObjBuildOverlayName.
+		;
+		lda 	bstrBank 					; which bank GP.BSTR reads its text out of. Zero when
+		sta 	imageBuffer+BootExtBStrOffset 	; the program has none, and then never read
 		ldx 	#0
-		ldy 	#0
 _WOCSExtTable:
-		lda 	gpBankPageCounts,x
-		sta 	imageBuffer+BootExtTableOffset,y
-		iny
 		lda 	gpBankBanks,x
-		sta 	imageBuffer+BootExtTableOffset,y
-		iny
+		sta 	imageBuffer+BootExtTableOffset,x
 		inx
 		cpx 	gpBankCount
 		bcc 	_WOCSExtTable
+		;
+		lda 	#0 							; bank 0, so the template comes out as "...B00"
+		jsr 	ObjBuildOverlayName
+		ldx 	ovlNameLen
+		cpx 	#BXNAMEMAX+1
+		bcs 	_WOCSExtNameLong
+		stx 	imageBuffer+BootExtNameLenOffset
+_WOCSExtName:
+		dex
+		lda 	OvlFileName,x
+		sta 	imageBuffer+BootExtNameOffset,x
+		txa
+		bne 	_WOCSExtName
+		bra 	_WOCSExtWrite2
+;
+;		THE NAME IS BOUNDED BY THE PAGE, and only here. GPC.INPUT allows 63 characters and the
+;		extension page has room for BXNAMEMAX, so a longer object name has nowhere to put the
+;		template the loader reads. It is the file NAME that is bounded and never the program --
+;		and only a program with a region ever asks, which is why the test is here and not in the
+;		name builder.
+;
+;		COMPILER SPACE, not errors.asm: that table links below GPBase and is copied into every
+;		compiled program, so a message there would cost bytes to every program that never writes
+;		a GP.BANKED. Same trick as gpasmcode.asm's _APBUnknown.
+;
+_WOCSExtNameLong:
+		jsr 	CallErrorHandler
+		.text 	"OBJECT NAME TOO LONG FOR AN OVERLAY", 0
+_WOCSExtWrite2:
 		ldy 	#0
 _WOCSExtWrite:
 		phy 								; IOWriteByte makes no promise about Y
@@ -915,9 +936,26 @@ _OSFNone:
 
 ; ************************************************************************************************
 ;
-;		END OF PASS TWO: everything the buffer still holds, then the alignment padding below the
-;		first GP.BANKED region, then each region out of its bank. After this the object is
-;		complete on disk.
+;		END OF PASS TWO: everything the buffer still holds, and then each region out of its bank
+;		into a file of its own. After this the object and its overlays are complete on disk.
+;
+;		THE ALIGNMENT PADDING IS GONE WITH THE REGIONS. It existed only because the regions
+;		followed the low code in one file and had to start on a page boundary within it; nothing
+;		follows the low code now, so there is nothing to align to. Its loop compared for EQUALITY
+;		only, so a cursor that had run past layoutStart wrapped and padded forward with 65,535
+;		bytes of filler, with nothing saying so. It bit twice. See
+;		docs/memory/object-writer-regions-vs-low-code.md.
+;
+;		HERE AND NOT AT REGION CLOSE, deliberately, and the difference is IO rather than layout.
+;		By here the source has been read to its end, so opening and filling a second output file
+;		cannot interleave with reading it -- and IOSelectObject / IOSelectSource invalidate each
+;		other on every flip, which is the trap that cost an afternoon on 06/09/26. What is
+;		already proven is that an output file can be HELD open across source reads: the object
+;		is. That a second one can be WRITTEN mid-compile is not, and this does not need it.
+;
+;		THE EMIT IS A ROUTINE TAKING ONE REGION so that it can move later. Sharing one scratch
+;		bank between regions means flushing each as it closes, and then what moves to _RSClosing
+;		is a CALL and this loop is what stops existing.
 ;
 ; ************************************************************************************************
 
@@ -926,43 +964,16 @@ ObjStreamClose:
 		jsr 	ObjStreamFlush 				; flush empties the buffer
 		lda 	layoutCount
 		bne 	_OSCPlaced
-		jmp 	_OSCDone 					; no regions: the buffer was the whole object
+		rts 								; no regions: the buffer was the whole object
+;
+;		A region's span is where the next one starts, or the object's own end for the topmost.
+;
 _OSCPlaced:
-		jsr 	IOSelectObject
-		;
-		;		The padding. One gap only: every region above the first starts exactly where the
-		;		one below it ends, which is what the filler is for.
-		;
-		lda 	objBufTop
-		sta 	objPadAt
-		lda 	objBufTop+1
-		sta 	objPadAt+1
-_OSCPad:
-		lda 	objPadAt
-		cmp 	layoutStart
-		bne 	_OSCPadByte
-		lda 	objPadAt+1
-		cmp 	layoutStart+1
-		beq 	_OSCRegions
-_OSCPadByte:
-		lda 	#$FF
-		jsr 	IOWriteByte
-		inc 	objPadAt
-		bne 	_OSCPad
-		inc 	objPadAt+1
-		bra 	_OSCPad
-;
-;		...and the regions, in source order, which is the order they sit in. A region's span is
-;		where the next one starts, or the object's own end for the topmost.
-;
-_OSCRegions:
 		stz 	objRgnNo
 _OSCRegion:
 		lda 	objRgnNo
 		cmp 	layoutCount
-		bcc 	_OSCMore
-		jmp 	_OSCDone
-_OSCMore:
+		bcs 	_OSCDone
 		asl 	a
 		tax
 		lda 	objRgnNo
@@ -987,17 +998,53 @@ _OSCSpan:
 		lda 	objSpan+1
 		sbc 	layoutStart+1,x
 		sta 	objSpan+1
+		jsr 	ObjEmitOverlay
+		inc 	objRgnNo
+		bra 	_OSCRegion
+_OSCDone:
+		rts
+
+; ************************************************************************************************
+;
+;		Region objRgnNo, objSpan bytes of it, out to <object>.Bnn -- nn being the bank it will
+;		load into. Two bytes of header saying $A000 and then the bytes, so the KERNAL's LOAD
+;		with secondary address 1 puts it where it belongs and the bootstrap does no arithmetic
+;		at all.
+;
+;		SCRATCHED BEFORE IT IS OPENED. "name,S,W" refuses to open over a file that already
+;		exists -- which is what IODeleteOutputs is for -- and quite apart from that, a stale
+;		overlay beside a fresh program is the one pairing that loads, runs, and is wrong.
+;
+; ************************************************************************************************
+
+ObjEmitOverlay:
+		ldx 	objRgnNo 					; the bank this region belongs in, which is what names
+		lda 	gpBankBanks,x 				; the file. Pass two neither records nor revalidates
+		jsr 	ObjBuildOverlayName 		; the bank table, so this is still pass one's.
+		ldx 	#OvlFileName & $FF
+		ldy 	#OvlFileName >> 8
+		jsr 	IOScratchFile
+		ldx 	#OvlFileName & $FF
+		ldy 	#OvlFileName >> 8
+		jsr 	IOOpenOverlay
+		lda 	#1
+		sta 	ovlStreamLive 				; from here on a failure has this to tidy away too
+		jsr 	IOSelectOverlay
+		lda 	#OBJ_WINDOW & $FF 			; the load address, low byte first
+		jsr 	IOWriteByte
+		lda 	#OBJ_WINDOW >> 8
+		jsr 	IOWriteByte
 		;
 		stz 	objBufIdx
 		stz 	objBufIdx+1
-_OSCByte:
+_OEOByte:
 		lda 	objBufIdx
 		cmp 	objSpan
 		lda 	objBufIdx+1
 		sbc 	objSpan+1
-		bcs 	_OSCNext
-		clc
-		lda 	objRgnNo
+		bcs 	_OEODone
+		clc 								; the window closes again before every write: the
+		lda 	objRgnNo 					; KERNAL's own buffers live in bank 0
 		adc 	#OBJ_RGN_BANK
 		jsr 	ObjStreamWindow
 		lda 	(zTemp0)
@@ -1005,14 +1052,94 @@ _OSCByte:
 		stx 	CompilerRAMBankReg
 		jsr 	IOWriteByte
 		inc 	objBufIdx
-		bne 	_OSCByte
+		bne 	_OEOByte
 		inc 	objBufIdx+1
-		bra 	_OSCByte
-_OSCNext:
-		inc 	objRgnNo
-		bra 	_OSCRegion
-_OSCDone:
+		bra 	_OEOByte
+_OEODone:
+		stz 	ovlStreamLive
+		jmp 	IOOverlayClose
+
+; ************************************************************************************************
+;
+;		ObjectFile with its extension replaced by ".Bnn", nn being the bank in A. Modelled on
+;		SymBuildName, which does the same job for the .SYM -- and like it, a name with no dot at
+;		all gets the suffix appended rather than nothing.
+;
+;		BOTH DIGITS, ALWAYS, and that is not cosmetic: the bootstrap holds ONE name and pokes the
+;		bank into the last two characters of it, because sixteen names at sixteen characters
+;		would be 256 bytes of a page with under 200 spare. A fixed width is what lets one
+;		template serve every region.
+;
+;		WHICH IS WHY THE BANK STOPS AT 99. GPBankReadNumber refuses higher and says so, rather
+;		than letting bank 100 come out as ".B:0" -- see commands/gpbank.asm.
+;
+;		NO LENGTH CHECK HERE. It is the extension page's TEMPLATE that the page has to hold, so
+;		that is where the bound is tested -- see _WOCSExtNameLong. This buffer is CFLineSize+8
+;		and a name cannot outgrow it.
+;
+; ************************************************************************************************
+
+ObjBuildOverlayName:
+		sta 	ovlBank
+		ldx 	#0
+		ldy 	#0 							; Y = length up to and including the last dot, 0 = none
+_OBONCopy:
+		lda 	ObjectFile,x
+		beq 	_OBONEnd
+		sta 	OvlFileName,x
+		cmp 	#'.'
+		bne 	_OBONNext
+		txa
+		tay
+		iny 								; keep the dot itself
+_OBONNext:
+		inx
+		cpx 	#CFLineSize
+		bne 	_OBONCopy
+_OBONEnd:
+		cpy 	#0
+		beq 	_OBONAppend 				; no dot at all -- append ".Bnn" to the whole name
+		tya
+		tax
+		bra 	_OBONSuffix
+_OBONAppend:
+		lda 	#'.'
+		sta 	OvlFileName,x
+		inx
+_OBONSuffix:
+		lda 	#'B'
+		sta 	OvlFileName,x
+		inx
+		lda 	ovlBank 					; the bank in decimal, tens in Y and units in A
+		ldy 	#'0'
+_OBONTens:
+		cmp 	#10
+		bcc 	_OBONUnits
+		sbc 	#10 						; carry is set -- the compare above put it there
+		iny
+		bra 	_OBONTens
+_OBONUnits:
+		clc
+		adc 	#'0'
+		pha
+		tya
+		sta 	OvlFileName,x
+		inx
+		pla
+		sta 	OvlFileName,x
+		inx
+		stz 	OvlFileName,x 				; ASCIIZ, for IOScratchFile and IOSetFileName
+		stx 	ovlNameLen
 		rts
+
+ovlBank: 									; the region's bank, across the name build
+		.fill 	1
+ovlNameLen: 								; ...and how long the name came out
+		.fill 	1
+ovlStreamLive: 								; nonzero while there is a half written overlay
+		.fill 	1
+OvlFileName: 								; code section, like every other compiler buffer -- see
+		.fill 	CFLineSize+8 				; the note in file-io/read.asm
 
 
 objBufBase: 								; the objPtr of the first byte still in the buffer
@@ -1026,8 +1153,6 @@ objBufIdx: 									; an offset into whichever window is open
 objFlushLen: 								; how many bytes this flush is sending
 		.fill 	2
 objMoveLen: 								; ...and how many it is shuffling down afterwards
-		.fill 	2
-objPadAt: 									; the alignment gap being filled
 		.fill 	2
 objSpan: 									; the region being written out
 		.fill 	2
@@ -1049,6 +1174,20 @@ objSaveBank: 								; the caller's RAM bank, across a window
 ; ************************************************************************************************
 
 ObjStreamAbort:
+		;
+		;		THE OVERLAY IN FLIGHT FIRST, if there is one -- OvlFileName still holds its name,
+		;		because ObjEmitOverlay is the only thing that writes it and it had not finished.
+		;		A truncated region is worse than a truncated object: the object is at least short
+		;		against a length the loader knows, and a short overlay simply loads and runs.
+		;
+		lda 	ovlStreamLive
+		beq 	_OSAObject
+		stz 	ovlStreamLive
+		jsr 	IOOverlayClose
+		ldx 	#OvlFileName & $FF
+		ldy 	#OvlFileName >> 8
+		jsr 	IOScratchFile
+_OSAObject:
 		lda 	objStreamLive
 		beq 	_OSADone
 		stz 	objStreamLive

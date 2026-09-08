@@ -2,7 +2,7 @@
 ; ************************************************************************************************
 ;
 ;		Name:		bootstrap2.asm
-;		Purpose:	Bootstrap EXTENSION page -- copies every GP.BANKED region into its bank.
+;		Purpose:	Bootstrap EXTENSION page -- LOADs every GP.BANKED region into its bank.
 ;		Created:	5th September 2026
 ;		Reviewed: 	No
 ;
@@ -13,31 +13,37 @@
 ;		bootstrap it always got, with its p-code at $0900, and its object is byte for byte what it
 ;		was before this file existed. A banked program gets this page as well: the bootstrap runs
 ;		to its end as usual, and its closing "jmp RT_ENTRY" has been patched to come here instead.
-;		This copies the regions and then does that jmp itself.
+;		This loads the regions and then does that jmp itself.
 ;
-;		So the price -- 256 bytes of low RAM, and p-code starting at $0A00 rather than $0900 -- is
-;		paid by the programs that bank and by nobody else. Against the 6,400 bytes the bench moves
-;		out of low memory it is not a close call.
+;		THE REGIONS ARE NOT IN THE PROGRAM ANY MORE. They used to be: compiled into the object,
+;		loaded at $0801 with everything else, and copied up to $A000 from there. That made a
+;		banked byte pay full FILE price to arrive, and the object file has to end below the
+;		resident runtime -- 24,063 bytes for the whole thing, regions included. Eight regions of
+;		8K is 64K against that, so the eight the tables allow could never have been used.
 ;
-;		WHY IT CANNOT LIVE IN THE P-CODE. The region's loaded image sits at exactly
-;		PCODE_PAGE + pages(low p-code), which is where the 4K frame stack begins. The frame stack
-;		is ON the region, deliberately -- that is what banking reclaims. So the first frame push
-;		lands on the region's first byte, and any p-code that runs has a frame stack. The bootstrap
-;		is the only moment the bytes are still there, and this page is part of the bootstrap.
+;		Now each region is a file of its own beside the program, named for its bank -- PROG.B09
+;		for GP.BANKED 9 -- with $A000 in its own two-byte header. Secondary address 1 makes the
+;		KERNAL honour that header, so selecting the bank is the whole of the work: no address
+;		arithmetic, no copy loop, and the region never enters low memory at all.
+;
+;		WHY IT CANNOT LIVE IN THE P-CODE. The workspace starts where the regions would have run,
+;		so by the time any p-code executes those addresses are variables. The bootstrap is the
+;		one moment before that, and this page is part of the bootstrap.
 ;
 ;		WHY NOT SIMPLY GROW THE BOOTSTRAP. Because then every program pays. The bootstrap ends at
-;		$08FF with two bytes spare, so the multi-region loop would have had to go somewhere; the
-;		p-code base page is handed to the runtime in A at run time and is not baked into it, so a
-;		SECOND page costs a patched operand and nothing else.
+;		$08FF with a handful of bytes spare; the p-code base page is handed to the runtime in A at
+;		run time rather than baked into it, so a SECOND page costs a patched operand and nothing
+;		else.
 ;
-;		ONCE PER LOAD, NOT PER RUN, for the bootstrap's own reason: the workspace starts where the
-;		regions were, so by the time a second RUN reaches here those bytes are variables. Zeroing
-;		the first table entry makes a second RUN skip the copy and use what is already in the bank,
-;		which is still what the first one put there. This page is never written over -- p-code
-;		starts at $0A00 and the frame stack is far above -- so the zero sticks.
+;		ONCE PER LOAD, NOT PER RUN. The workspace starts where the regions were, and a second RUN
+;		would reload files it already has in the banks. Zeroing the first table entry makes a
+;		second RUN skip the lot. This page is never written over -- p-code starts at $0A00 and
+;		the frame stack is far above -- so the zero sticks.
 ;
-;		HOW MANY REGIONS. Eight is arbitrary and costs 18 bytes of a page that has 130 spare;
-;		the compiler refuses a ninth rather than overrunning the table.
+;		A MISSING OVERLAY STOPS, and that is the point of checking the carry. The bank holds
+;		whatever the last program to use it left there, and running that is the one failure this
+;		must not have. The programmer owns the overlay files: nothing pairs a .Bnn to the .PRG
+;		that wants it, by decision, so a stale one is a stale one.
 ;
 ;		EVERY LABEL HERE IS GLOBAL AND PREFIXED BX. 64tass scopes a "_" label to the enclosing
 ;		global, and this file sits in the same section as bootstrap.asm; a local here would bind
@@ -46,6 +52,9 @@
 ; ************************************************************************************************
 
 BXMAXREGIONS = 8
+BXNAMEMAX = 48 								; the overlay name the compiler bakes in below. The
+											; compiler refuses a longer one rather than truncating
+											; it -- see ObjBuildOverlayName.
 
 		.section code
 
@@ -55,45 +64,57 @@ ProgramBootExt: 							; PHYSICAL label -- object.asm streams from here
 ; ------------------------------------------------------------------------------------------------
 ;		Entered from the bootstrap's patched jmp, with the three values it was about to hand the
 ;		runtime already in the registers: A = p-code base page ($0A here), X = workspace start
-;		page, Y = workspace end page. Put them down, do the copies, pick them back up.
+;		page, Y = workspace end page. Put them down, load the regions, pick them back up.
 ; ------------------------------------------------------------------------------------------------
 BXEntry:
 		sta 	BXBase
 		stx 	BXWS
 		sty 	BXWSEnd
 
-		ldx 	#0 							; X walks the table, two bytes an entry
+		ldx 	#0 							; X walks the table, one byte an entry
 BXNext:
-		lda 	BXTable,x 					; pages in this region, 0 = end of the table
+		lda 	BXTable,x 					; the bank this region lives in, 0 = end of the table
 		beq 	BXDone
-		sta 	BXCount
-		lda 	BXTable+1,x 				; ...and the bank it belongs in
-		sta 	$00
 		stx 	BXIndex
+		sta 	$00 						; LOAD writes $A000-$BFFF through the current bank
 
-		ldx 	BXCount 					; whole pages, and Y stays 0 between them
-		ldy 	#0
-BXSrc:
-		lda 	$FF00,y 					; source page -- PATCHED, and it RUNS ON across
-BXDst: 										; regions, because they are contiguous in the object
-		sta 	$A000,y
-		iny
-		bne 	BXSrc
-		inc 	BXSrc+2
-		inc 	BXDst+2
-		dex
-		bne 	BXSrc
+; ------------------------------------------------------------------------------------------------
+;		ONE NAME, PATCHED, not one name a region. Sixteen names at sixteen characters would be
+;		256 bytes of a page with under 200 spare, so the compiler bakes the base name with "B00"
+;		on the end and the two digits are poked in from the bank byte already in hand.
+;
+;		A is the bank, 1..99 -- the compiler refuses anything higher precisely because two digits
+;		is what this template holds.
+; ------------------------------------------------------------------------------------------------
+		ldx 	#'0' 						; X counts tens, A comes out as the units
+BXTens:
+		cmp 	#10
+		bcc 	BXUnits
+		sbc 	#10 						; carry is set -- the compare above put it there
+		inx
+		bra 	BXTens
+BXUnits:
+		clc
+		adc 	#'0'
+		ldy 	BXNameLen 					; the two digits are the last two characters
+		dey
+		sta 	BXName,y
+		dey
+		txa
+		sta 	BXName,y
 
-		lda 	#$A0 						; every region lands at $A000 in its own bank, so the
-		sta 	BXDst+2 					; destination goes back to the top of the window
+		lda 	BXNameLen 					; SETNAM wants length in A, address in X/Y
+		ldx 	#<BXName
+		ldy 	#>BXName
+		jsr 	BBTryLoad 					; secondary address 1: the file's own header says $A000
+		bcs 	BXFail
 
 		ldx 	BXIndex
-		inx
 		inx
 		bne 	BXNext 						; always taken -- the table is far shorter than 256
 
 BXDone:
-		stz 	BXTable 					; a second RUN finds 0 pages and skips the lot
+		stz 	BXTable 					; a second RUN finds bank 0 and skips the lot
 		;
 		;		WHICH BANK GP.BSTR READS, handed to the runtime rather than assembled into it: the
 		;		runtime is SHARED, so one image serves every program and cannot know which bank any
@@ -112,14 +133,44 @@ BXBStrBank:
 		jmp 	RT_ENTRY
 
 ; ------------------------------------------------------------------------------------------------
-;		The region table: (pages, bank) a region, terminated by a zero page count. Written by
-;		object.asm from the compiler's region list. BXMAXREGIONS entries plus the terminator.
+;		An overlay that is not on the disk. Say so and drop back to BASIC READY -- the SYS return
+;		address is still on the stack, exactly as it is on the bootstrap's own ?RT path.
 ;
-;		PAGES IS A BYTE AND A BANK IS 32 PAGES, so a region larger than 8K cannot be described
-;		here -- which is why the compiler refuses one rather than letting the copy run past $BFFF.
+;		SHORT, because a full sentence would wrap in 40 columns, and because this page is spent
+;		on the loader. "?OVL" and the bank number would be better and costs a digit routine that
+;		is right there above -- but the routine has already run and A is gone by here, so it
+;		would have to be kept, and what the programmer does next is the same either way: look at
+;		which .Bnn files are beside the program.
+; ------------------------------------------------------------------------------------------------
+BXFail:
+		ldx 	#0
+BXErr:
+		lda 	BXErrText,x
+		beq 	BXErrDone
+		phx
+		jsr 	X16_CHROUT
+		plx
+		inx
+		bne 	BXErr
+BXErrDone:
+		rts 								; return to the SYS caller -> BASIC READY
+
+; ------------------------------------------------------------------------------------------------
+;		The region table: ONE BYTE A REGION -- the bank it loads into -- terminated by a zero.
+;		Written by object.asm from the compiler's region list.
+;
+;		IT LOST ITS PAGE COUNTS when the regions became files. LOAD knows how long a file is, so
+;		the only thing left to say is where it goes, and bank 0 is refused everywhere else in the
+;		compiler -- it is the KERNAL's -- which is what makes it free to use as the terminator.
+;		Sixteen regions would cost 17 bytes here, still fewer than the 18 that eight used to.
 ; ------------------------------------------------------------------------------------------------
 BXTable:
-		.fill 	BXMAXREGIONS * 2 + 2, 0
+		.fill 	BXMAXREGIONS + 1, 0
+
+BXNameLen:
+		.byte 	0 							; PATCHED -- the overlay name and its length, with the
+BXName: 									; bank's two digits at the end of it
+		.fill 	BXNAMEMAX, 0
 
 BXBase:
 		.byte 	0 							; the three the runtime is waiting for
@@ -127,10 +178,11 @@ BXWS:
 		.byte 	0
 BXWSEnd:
 		.byte 	0
-BXCount:
-		.byte 	0 							; pages left in the region being copied
 BXIndex:
 		.byte 	0 							; where the table walk had got to
+
+BXErrText:
+		.text 	"?OVL", 13, 0
 
 		.fill 	$0A00 - *, 0 				; pad through $09FF so the p-code starts at $0A00
 
@@ -138,12 +190,12 @@ BXIndex:
 ProgramBootExtEnd: 							; PHYSICAL end -- (End - Start) == 256 bytes
 
 ; ------------------------------------------------------------------------------------------------
-;		Offsets of the bytes object.asm patches, within the streamed template. The source page is
-;		an instruction OPERAND, as it is in the bootstrap, which is what keeps the loop tight.
+;		Offsets of the bytes object.asm patches, within the streamed template.
 ; ------------------------------------------------------------------------------------------------
-BootExtSrcOffset = BXSrc+2 - $0900
 BootExtTableOffset = BXTable - $0900
-BootExtBStrOffset = BXBStrBank+1 - $0900 	; the GP.BSTR bank, an instruction OPERAND again
+BootExtNameLenOffset = BXNameLen - $0900
+BootExtNameOffset = BXName - $0900
+BootExtBStrOffset = BXBStrBank+1 - $0900 	; the GP.BSTR bank, an instruction OPERAND
 BootExtEntry = BXEntry 						; the address the bootstrap's jmp is patched to
 
 		.send code
