@@ -26,12 +26,11 @@
 ;
 ;		Rules these macros must obey, because of where they are used:
 ;
-;		* Preserve A, X, Y AND the flags. STRFindLine (storage/mark_line.asm) opens its window
-;		  as its very first instruction with the line number live in A and Y; FindVariable
-;		  closes one with the variable's address live in A, X and Y; and STRFindLine closes over
-;		  a php/plp pair carrying the found/not-found carry. Hence the php/pha ... pla/plp
-;		  wrapper -- the macros are stack-neutral, so the pha/pla pairs already in that code
-;		  still line up.
+;		* Preserve A, X, Y AND the flags. STRMarkLine (storage/mark_line.asm) opens its window
+;		  with the line number live in A and Y; FindVariable closes one with the variable's
+;		  address live in A, X and Y; and STRFindLine's search closes one over the carry of the
+;		  16-bit compare it just made. Hence the php/pha ... pla/plp wrapper -- the macros are
+;		  stack-neutral, so the pha/pla pairs already in that code still line up.
 ;
 ;		* Restore the CALLER's bank, not a hardcoded 0. The compiler is entered from GPC.PRG and
 ;		  has no business assuming what was selected.
@@ -43,8 +42,10 @@
 ;		  and writes a file, and it already pulls each entry out through zTemp0 BEFORE it starts
 ;		  emitting bytes, so the window closes before the first IOWriteByte.
 ;
-;		* No nesting. Verified: none of the windows contains another, and the only jsr inside
-;		  any of them is STRFindLine's local _STRPrevLine.
+;		* No nesting, and no jsr at all. Verified: none of the windows contains another, and
+;		  every one of them is now a straight run of loads and stores. STRFindLine used to
+;		  hold one open across its whole search and call _STRPrevLine inside it; the line
+;		  table spanning two banks ended that, because the bank has to be re-chosen per entry.
 ;
 ; ************************************************************************************************
 
@@ -63,14 +64,16 @@ CompilerRAMBankReg	= $0000
 ;			0	the KERNAL's (FAT32 buffers and friends). Never ours.
 ;			1	the NATIVE TEST HARNESS's p-code buffer. source/compiler/testing/api/api.asm
 ;				does "lda #1 / sta 0" in _TAResetOut and then writes the object from $A000 up.
-;			2	the LINE NUMBER TABLE.
+;			2	the LINE NUMBER TABLE, first half.
 ;			3	GP.ASM's blob pool and fixup list (see the second pair of macros below).
 ;			4	the VARIABLE NAME LIST.
-;			5	the BLOCK DEPTH of each line, one byte per line-table entry.
+;			5	the BLOCK DEPTH of each line, one byte per line-table entry -- first half.
 ;			6	WHERE EACH BLOCK ENDS, and where each of its alternatives goes next.
 ;			7	the OBJECT BUFFER -- the application's, not the compiler's.
 ;			8	the ONE scratch bank EVERY region shares -- cleared as each one opens, and
 ;				emptied to that region's own .Bnn file as it closes.
+;			9	the LINE NUMBER TABLE, second half.
+;			10	the BLOCK DEPTH, second half. It follows the line table's split exactly.
 ;			63	the GP.BANKEDSTR pool, growing DOWN from the top bank a 512K machine has.
 ;
 ;		BANKS 2 AND 4 WERE ONE BANK, and that was the wall. The two tables shared 8K, growing
@@ -82,6 +85,13 @@ CompilerRAMBankReg	= $0000
 ;		each takes the tables to 2,048 lines and 1,365 variables, so the limit a program meets
 ;		is the object ceiling -- the one that is really there.
 ;
+;		AND 2,048 LINES WAS THE WALL AGAIN, at samples/GPB-MODS-TESTING/GPBMODS.BASL, which
+;		marks about 2,200. Same message, same wrong limit, one table further along. The line
+;		table has a SECOND bank under it now and its pointers are virtual addresses covering
+;		both -- see STRPageLine in storage/mark_line.asm, which is the only thing that knows.
+;		4,096 lines, and the depth table splits with it because its byte for a record is at the
+;		record's own address.
+;
 ;		This was bank 1 for one build, and the compiler-runtime `variables` and `arrays` suites
 ;		hung: the harness's object code and the variable name list were overwriting each other,
 ;		same addresses, same bank. Nothing detected it -- both were doing exactly what they had
@@ -92,17 +102,34 @@ CompilerStorageBank	= 2 					; line number table, grows DOWN from $C000
 CompilerVarBank		= 4 					; variable name list, grows UP from $A000
 CompilerDepthBank	= 5 					; block depth per line, alongside the line table
 CompilerBlockBank	= 6 					; where each block ends, and its alternatives
+CompilerStorageBank2 = 9 					; the second 8K the line table runs on down into
+CompilerDepthBank2	= 10 					; ...and the second 8K of depth bytes shadowing it
+
+;
+;		THE FLOOR OF THE LINE TABLE'S VIRTUAL ADDRESS SPACE. It starts at compilerEndHigh:$00,
+;		which is CompilerWorkspaceEnd ($C000, application/source/compiler/start.asm), and runs
+;		down through two banks of $2000 -- so $8000, and 4,096 four-byte entries. Change either
+;		of those and this moves with them.
+;
+LineTableFloorHigh	= $80
 
 BlockEndTable		= $A000 				; 2,048 entries of 2 bytes: where block N ends
 BlockAltTable		= $B000 				; ...and the same for its alternatives
 BLOCK_MAX 			= 2048
 
+;
+;		THE BANK IS A VARIABLE HERE, not a constant, because the line table spans two of them:
+;		STRPageLine writes storageBankNow as it translates a virtual table address, and nothing
+;		else ever writes it. Open a window without having paged a record first and you get
+;		whichever segment the last call left selected -- which is why every walk of the table
+;		calls STRPageLine immediately before its .storage_access, with nothing in between.
+;
 storage_access .macro
 		php
 		pha
 		lda 	CompilerRAMBankReg 			; remember whatever the caller had selected
 		sta 	storageSavedBank
-		lda 	#CompilerStorageBank
+		lda 	storageBankNow
 		sta 	CompilerRAMBankReg
 		pla
 		plp
@@ -120,6 +147,8 @@ storage_release .macro
 		.section storage
 storageSavedBank: 							; caller's RAM bank, saved across a storage window
 		.fill 	1
+storageBankNow: 							; which half of the line table is being reached --
+		.fill 	1 							; STRReset seeds it, STRPageLine keeps it right
 		.send 	storage
 
 ;
@@ -167,13 +196,16 @@ varSavedBank: 								; caller's RAM bank, saved across a variable window
 ;		cost nothing that was ever available. Widening the line record to carry the byte instead
 ;		would have cost real ground: 5 bytes an entry drops the limit from 2,048 lines to 1,638.
 ;
+;		IT IS TWO BANKS NOW, in the same halves as the line table and for the same reason, and
+;		the bank is a variable here for the same reason as well. STRPageLine writes both.
+;
 
 depth_access .macro
 		php
 		pha
 		lda 	CompilerRAMBankReg 			; remember whatever the caller had selected
 		sta 	depthSavedBank
-		lda 	#CompilerDepthBank
+		lda 	depthBankNow
 		sta 	CompilerRAMBankReg
 		pla
 		plp
@@ -191,6 +223,8 @@ depth_release .macro
 		.section storage
 depthSavedBank: 							; caller's RAM bank, saved across a depth window
 		.fill 	1
+depthBankNow: 								; which half of the depth table is being reached --
+		.fill 	1 							; STRReset seeds it, STRPageLine keeps it right
 		.send 	storage
 
 ;
@@ -246,6 +280,8 @@ blockSavedBank: 							; caller's RAM bank, saved across a block window
 ;						so neither table bounds the other.
 ;		06/09/26		Bank 5 added for the per-line block depth, and bank 6 for the block
 ;						end tables (the two-pass compiler).
+;		08/09/26		Banks 9 and 10 added: a second half for the line table and for the
+;						depth table, reached through STRPageLine. 4,096 lines.
 ;
 ; ************************************************************************************************
 

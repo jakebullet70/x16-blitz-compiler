@@ -15,8 +15,8 @@
 ## ---- THE PROGRAM'S LITERAL TEXT LIVES IN A BANK. Every GP.BANKEDSTR block below
 ## ---- names this, and it is CLAIMED from BANKMGR at startup for the same reason
 ## ---- LIB.CODEBANK is: the compiler picks it while the object is written, so the
-## ---- manager has to be told rather than asked, or a later ALLOC hands it to a
-## ---- panel that writes screen cells over the program's own words.
+## ---- manager has to be told rather than asked, or a later GET.FREE.BANK hands
+## ---- it to a panel that writes screen cells over the program's own words.
 #DEFINE GM.TEXTBANK 5
 
 ## ---- THE GUI RUNS FROM A RAM BANK. GUIBANK.INC.BL is the low memory front
@@ -108,29 +108,29 @@ THEME.ID = 0 : GOSUB THEME.SELECT
 ## A CODE BANK IS CLAIMED AND A DATA BANK IS ALLOCATED, and the difference is
 ## not a style choice. GP.BANKED takes a decimal constant read while the object
 ## is being written, so the COMPILER picks the code bank and the manager is only
-## TOLD -- which is what stops a later ALLOC handing that bank to a panel that
-## would then write screen cells over the GUI's own code.
+## TOLD -- which is what stops a later GET.FREE.BANK handing that bank to a
+## panel that would then write screen cells over the GUI's own code.
 ##
 ## The two scratch banks are the opposite: nothing needs their numbers before
 ## the program runs, so nothing names them. They are whatever is free.
 GOSUB BANKMGR.INIT
 GM.BANKFAIL$ = ""
 
-BANKMGR.WANT = LIB.CODEBANK
+BANKMGR.SET.BANK = LIB.CODEBANK
 GOSUB BANKMGR.CLAIM
 IF BANKMGR.OK = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 0)
 
-BANKMGR.WANT = GM.TEXTBANK
+BANKMGR.SET.BANK = GM.TEXTBANK
 GOSUB BANKMGR.CLAIM
 IF BANKMGR.OK = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 3)
 
-GOSUB BANKMGR.ALLOC
+GOSUB BANKMGR.GET.FREE.BANK
 GM.DDBANK = BANKMGR.BANK
-GOSUB BANKMGR.ALLOC
+GOSUB BANKMGR.GET.FREE.BANK
 GM.GUIBANK = BANKMGR.BANK
 IF GM.GUIBANK = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 1)
 
-GOSUB BANKMGR.ALLOC
+GOSUB BANKMGR.GET.FREE.BANK
 GM.DIRBANK = BANKMGR.BANK
 IF GM.DIRBANK = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 2)
 

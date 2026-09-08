@@ -5,6 +5,13 @@ metadata:
   type: project
 ---
 
+**RE-MEASURED 2026-09-08, and the shape held.** The program has since grown the FILES bar item,
+`FILEIO`, `LIBBANKFD` and `FILEDIR`, and is 15,209 bytes resident. Of the 13,612 map bytes that
+live in low RAM, the shell is **10,495 (77%)** and all ten resident modules together are **3,117**
+-- the same conclusion, one point weaker, with three more modules in it. The table below is the
+2026-09-06 build and is kept for the label-gap method and the GP.ASM correction, not the figures;
+`samples/GPB-MODS-TESTING/readme.md` carries the current ones.
+
 **Measured 2026-09-06** from `testing/GPBMODS.MAP` + `GPBMODS.SRC.SYM`, charging each label the
 distance to the next label in OBJECT order. Totals 13,563 against the 13,568 `gpBankStart` read off
 the map's own discontinuity, so the method is sound to five bytes.

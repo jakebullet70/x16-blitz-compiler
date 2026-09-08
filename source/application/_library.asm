@@ -2895,7 +2895,8 @@ NoRuntimeImageText:
 ;
 ;		It is built straight from the compiler's line-number table (STRMarkLine): 4-byte entries
 ;		[line# lo, line# hi, addr lo, addr hi], growing DOWNWARD from compilerEndHigh:$00 to
-;		lineNumberTable, walked here from the top down. The
+;		lineNumberTable, walked here from the top down. Those are VIRTUAL addresses and the
+;		table is two banks, so each entry is paged in through STRPageLine as it is reached. The
 ;		stored addr is the compile-time position in the object buffer (based at FreeMemory), so
 ;		offset = addr - FreeMemory -- the same number the runtime reports, because the object is
 ;		copied verbatim from FreeMemory to its run address. The two synthetic lines the implicit
@@ -2942,10 +2943,11 @@ _WMFDone:
 ;		but mapValue/mapOff are plain RAM and survive it.
 ;
 _WMFWriteEntry:
-		lda 	mapWalk 					; point zTemp0 at the entry.
-		sta 	zTemp0
-		lda 	mapWalk+1
-		sta 	zTemp0+1
+		lda 	mapWalk 					; mapWalk is a VIRTUAL address covering both banks of
+		sta 	lineWalk 					; the table; STRPageLine points zTemp0 at the entry
+		lda 	mapWalk+1 					; for real, and selects the bank it is in.
+		sta 	lineWalk+1
+		jsr 	STRPageLine
 		;
 		;		The table is in banked RAM now, so page it in for the four reads and page it back
 		;		out again before any file I/O -- the KERNAL owns bank 0. That the entry is fully

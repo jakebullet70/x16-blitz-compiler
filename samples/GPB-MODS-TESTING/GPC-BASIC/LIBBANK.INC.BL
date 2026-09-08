@@ -29,7 +29,7 @@
 ## **      MY.LIBEND:
 ## **
 ## **  Claim the bank as well, or something else will hand it out:
-## **      BANKMGR.WANT = LIB.CODEBANK : GOSUB BANKMGR.CLAIM
+## **      BANKMGR.SET.BANK = LIB.CODEBANK : GOSUB BANKMGR.CLAIM
 ## **
 ## **  All seven modules are required, even by a program that calls one of them.
 ## **  This file shims every entry point and BASLOAD resolves every label in a

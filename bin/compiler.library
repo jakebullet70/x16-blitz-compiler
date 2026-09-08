@@ -220,12 +220,11 @@ keyword .macro
 ;
 ;		Rules these macros must obey, because of where they are used:
 ;
-;		* Preserve A, X, Y AND the flags. STRFindLine (storage/mark_line.asm) opens its window
-;		  as its very first instruction with the line number live in A and Y; FindVariable
-;		  closes one with the variable's address live in A, X and Y; and STRFindLine closes over
-;		  a php/plp pair carrying the found/not-found carry. Hence the php/pha ... pla/plp
-;		  wrapper -- the macros are stack-neutral, so the pha/pla pairs already in that code
-;		  still line up.
+;		* Preserve A, X, Y AND the flags. STRMarkLine (storage/mark_line.asm) opens its window
+;		  with the line number live in A and Y; FindVariable closes one with the variable's
+;		  address live in A, X and Y; and STRFindLine's search closes one over the carry of the
+;		  16-bit compare it just made. Hence the php/pha ... pla/plp wrapper -- the macros are
+;		  stack-neutral, so the pha/pla pairs already in that code still line up.
 ;
 ;		* Restore the CALLER's bank, not a hardcoded 0. The compiler is entered from GPC.PRG and
 ;		  has no business assuming what was selected.
@@ -237,8 +236,10 @@ keyword .macro
 ;		  and writes a file, and it already pulls each entry out through zTemp0 BEFORE it starts
 ;		  emitting bytes, so the window closes before the first IOWriteByte.
 ;
-;		* No nesting. Verified: none of the windows contains another, and the only jsr inside
-;		  any of them is STRFindLine's local _STRPrevLine.
+;		* No nesting, and no jsr at all. Verified: none of the windows contains another, and
+;		  every one of them is now a straight run of loads and stores. STRFindLine used to
+;		  hold one open across its whole search and call _STRPrevLine inside it; the line
+;		  table spanning two banks ended that, because the bank has to be re-chosen per entry.
 ;
 ; ************************************************************************************************
 
@@ -257,14 +258,16 @@ CompilerRAMBankReg	= $0000
 ;			0	the KERNAL's (FAT32 buffers and friends). Never ours.
 ;			1	the NATIVE TEST HARNESS's p-code buffer. source/compiler/testing/api/api.asm
 ;				does "lda #1 / sta 0" in _TAResetOut and then writes the object from $A000 up.
-;			2	the LINE NUMBER TABLE.
+;			2	the LINE NUMBER TABLE, first half.
 ;			3	GP.ASM's blob pool and fixup list (see the second pair of macros below).
 ;			4	the VARIABLE NAME LIST.
-;			5	the BLOCK DEPTH of each line, one byte per line-table entry.
+;			5	the BLOCK DEPTH of each line, one byte per line-table entry -- first half.
 ;			6	WHERE EACH BLOCK ENDS, and where each of its alternatives goes next.
 ;			7	the OBJECT BUFFER -- the application's, not the compiler's.
 ;			8	the ONE scratch bank EVERY region shares -- cleared as each one opens, and
 ;				emptied to that region's own .Bnn file as it closes.
+;			9	the LINE NUMBER TABLE, second half.
+;			10	the BLOCK DEPTH, second half. It follows the line table's split exactly.
 ;			63	the GP.BANKEDSTR pool, growing DOWN from the top bank a 512K machine has.
 ;
 ;		BANKS 2 AND 4 WERE ONE BANK, and that was the wall. The two tables shared 8K, growing
@@ -276,6 +279,13 @@ CompilerRAMBankReg	= $0000
 ;		each takes the tables to 2,048 lines and 1,365 variables, so the limit a program meets
 ;		is the object ceiling -- the one that is really there.
 ;
+;		AND 2,048 LINES WAS THE WALL AGAIN, at samples/GPB-MODS-TESTING/GPBMODS.BASL, which
+;		marks about 2,200. Same message, same wrong limit, one table further along. The line
+;		table has a SECOND bank under it now and its pointers are virtual addresses covering
+;		both -- see STRPageLine in storage/mark_line.asm, which is the only thing that knows.
+;		4,096 lines, and the depth table splits with it because its byte for a record is at the
+;		record's own address.
+;
 ;		This was bank 1 for one build, and the compiler-runtime `variables` and `arrays` suites
 ;		hung: the harness's object code and the variable name list were overwriting each other,
 ;		same addresses, same bank. Nothing detected it -- both were doing exactly what they had
@@ -286,17 +296,34 @@ CompilerStorageBank	= 2 					; line number table, grows DOWN from $C000
 CompilerVarBank		= 4 					; variable name list, grows UP from $A000
 CompilerDepthBank	= 5 					; block depth per line, alongside the line table
 CompilerBlockBank	= 6 					; where each block ends, and its alternatives
+CompilerStorageBank2 = 9 					; the second 8K the line table runs on down into
+CompilerDepthBank2	= 10 					; ...and the second 8K of depth bytes shadowing it
+
+;
+;		THE FLOOR OF THE LINE TABLE'S VIRTUAL ADDRESS SPACE. It starts at compilerEndHigh:$00,
+;		which is CompilerWorkspaceEnd ($C000, application/source/compiler/start.asm), and runs
+;		down through two banks of $2000 -- so $8000, and 4,096 four-byte entries. Change either
+;		of those and this moves with them.
+;
+LineTableFloorHigh	= $80
 
 BlockEndTable		= $A000 				; 2,048 entries of 2 bytes: where block N ends
 BlockAltTable		= $B000 				; ...and the same for its alternatives
 BLOCK_MAX 			= 2048
 
+;
+;		THE BANK IS A VARIABLE HERE, not a constant, because the line table spans two of them:
+;		STRPageLine writes storageBankNow as it translates a virtual table address, and nothing
+;		else ever writes it. Open a window without having paged a record first and you get
+;		whichever segment the last call left selected -- which is why every walk of the table
+;		calls STRPageLine immediately before its .storage_access, with nothing in between.
+;
 storage_access .macro
 		php
 		pha
 		lda 	CompilerRAMBankReg 			; remember whatever the caller had selected
 		sta 	storageSavedBank
-		lda 	#CompilerStorageBank
+		lda 	storageBankNow
 		sta 	CompilerRAMBankReg
 		pla
 		plp
@@ -314,6 +341,8 @@ storage_release .macro
 		.section storage
 storageSavedBank: 							; caller's RAM bank, saved across a storage window
 		.fill 	1
+storageBankNow: 							; which half of the line table is being reached --
+		.fill 	1 							; STRReset seeds it, STRPageLine keeps it right
 		.send 	storage
 
 ;
@@ -361,13 +390,16 @@ varSavedBank: 								; caller's RAM bank, saved across a variable window
 ;		cost nothing that was ever available. Widening the line record to carry the byte instead
 ;		would have cost real ground: 5 bytes an entry drops the limit from 2,048 lines to 1,638.
 ;
+;		IT IS TWO BANKS NOW, in the same halves as the line table and for the same reason, and
+;		the bank is a variable here for the same reason as well. STRPageLine writes both.
+;
 
 depth_access .macro
 		php
 		pha
 		lda 	CompilerRAMBankReg 			; remember whatever the caller had selected
 		sta 	depthSavedBank
-		lda 	#CompilerDepthBank
+		lda 	depthBankNow
 		sta 	CompilerRAMBankReg
 		pla
 		plp
@@ -385,6 +417,8 @@ depth_release .macro
 		.section storage
 depthSavedBank: 							; caller's RAM bank, saved across a depth window
 		.fill 	1
+depthBankNow: 								; which half of the depth table is being reached --
+		.fill 	1 							; STRReset seeds it, STRPageLine keeps it right
 		.send 	storage
 
 ;
@@ -440,6 +474,8 @@ blockSavedBank: 							; caller's RAM bank, saved across a block window
 ;						so neither table bounds the other.
 ;		06/09/26		Bank 5 added for the per-line block depth, and bank 6 for the block
 ;						end tables (the two-pass compiler).
+;		08/09/26		Banks 9 and 10 added: a second half for the line table and for the
+;						depth table, reached through STRPageLine. 4,096 lines.
 ;
 ; ************************************************************************************************
 
@@ -8301,6 +8337,10 @@ _GBFPBOut:
 ;		compilerEndHigh:$00 to lineNumberTable -- and the window is opened and closed once per
 ;		entry rather than held across the loop, for the reason x16_storage.inc gives.
 ;
+;		Those addresses are VIRTUAL and the table is two banks; STRPageLine is what turns one
+;		into a real address and a bank. The compare that ends the walk is a plain 16-bit
+;		compare of two virtual addresses either way.
+;
 ; ************************************************************************************************
 
 _GBFixLineTable:
@@ -8323,10 +8363,11 @@ _GBFLTLoop:
 		cmp 	lineNumberTable
 		bcc 	_GBFLTDone
 _GBFLTEntry:
-		lda 	gpBankWalk
-		sta 	zTemp0
-		lda 	gpBankWalk+1
-		sta 	zTemp0+1
+		lda 	gpBankWalk 					; gpBankWalk is a VIRTUAL address covering both banks
+		sta 	lineWalk 					; of the table -- STRPageLine turns it into the real
+		lda 	gpBankWalk+1 				; one in zTemp0 and selects the bank it is in
+		sta 	lineWalk+1
+		jsr 	STRPageLine
 		.storage_access
 		ldy 	#2 							; the address is at +2,+3
 		lda 	(zTemp0),y
@@ -8335,8 +8376,8 @@ _GBFLTEntry:
 		lda 	(zTemp0),y
 		sta 	zTemp1+1
 		.storage_release
-		jsr 	GPBankAdjust
-		.storage_access
+		jsr 	GPBankAdjust 				; which works on zTemp1 and leaves zTemp0 alone, so
+		.storage_access 					; the paged pointer and the bank both still stand
 		ldy 	#2
 		lda 	zTemp1
 		sta 	(zTemp0),y
@@ -11619,6 +11660,24 @@ LinputSyntax:
 
 ; ************************************************************************************************
 ;
+;		THE TABLE IS TWO BANKS AND ONE ADDRESS SPACE. Every pointer into it -- here, in
+;		GPBankRelocate and in WriteMapFile -- is a VIRTUAL address running from compilerEndHigh:$00
+;		down to LineTableFloorHigh:$00, sixteen kilobytes and so 4,096 entries. STRPageLine turns
+;		one into the real $A000-$BFFF address and the bank it is in, and nothing else knows the
+;		table is split: the walks still start at the top, still step down four bytes an entry,
+;		still stop at lineNumberTable, and the compare that ends them is a plain sixteen bit
+;		compare of two virtual addresses.
+;
+;		SELECT THE BANK THROUGH STRPageLine, NEVER BY HAND. It sets the storage bank AND the
+;		depth bank together, because the depth byte for a record sits at the same address in a
+;		bank of its own and so is in the same segment by construction. Anything that opens a
+;		.depth_access without having paged the record first gets whichever segment the last
+;		call happened to leave selected.
+;
+; ************************************************************************************************
+
+; ************************************************************************************************
+;
 ;								Store current position, line YA
 ;
 ; ************************************************************************************************
@@ -11626,33 +11685,34 @@ LinputSyntax:
 STRMarkLine:
 		pha
 		sec 								; allocate 4 bytes (line #,address)
-		lda 	lineNumberTable 			; and copy to zTemp0
+		lda 	lineNumberTable 			; and copy to the walk pointer
 		sbc 	#4
 		sta 	lineNumberTable
-		sta 	zTemp0
+		sta 	lineWalk
 		lda 	lineNumberTable+1
 		sbc 	#0
 		sta 	lineNumberTable+1
-		sta 	zTemp0+1
+		sta 	lineWalk+1
 
 		;
-		;		Still inside the window? This table grows DOWN from CompilerWorkspaceEnd, and
-		;		without a test it was free to walk out of the bottom of the bank in silence.
-		;		(A is free here: the caller's value is on the stack until the pla below, and
-		;		ExitCompiler restores SP, so raising with it still pushed is fine.)
+		;		Still inside the table? It grows DOWN from compilerEndHigh:$00 and the floor is
+		;		two banks under that, and without a test it was free to walk out of the bottom
+		;		in silence. (A is free here: the caller's value is on the stack until the pla
+		;		below, and ExitCompiler restores SP, so raising with it still pushed is fine.)
 		;
 		;		THIS USED TO TEST AGAINST variableListEnd. Both tables lived in one 8K bank and
 		;		grew towards each other, so the real limit was the SUM of the two -- and
 		;		samples/editor had reached 7,981 of 8,192 with 1,461 lines and 356 variables.
 		;		Fifty-two more lines and this test fired PROGRAM TOO BIG with a THIRD of the
-		;		object budget unused. One bank each (x16_storage.inc) makes the limit this
-		;		table's own window, which is 2,048 lines.
+		;		object budget unused. One bank each (x16_storage.inc) made the limit this table's
+		;		own window, 2,048 lines; a second bank under it makes that 4,096.
 		;
-		lda 	lineNumberTable+1 			; the entry is 4 bytes AT the pointer and the window
-		cmp 	compilerStartHigh 			; starts on a page boundary, so the high byte is the
-		bcs 	_SMLRoom 					; whole test -- any offset within that page is inside.
+		lda 	lineNumberTable+1 			; the entry is 4 bytes AT the pointer and the floor is
+		cmp 	#LineTableFloorHigh 		; a page boundary, so the high byte is the whole test
+		bcs 	_SMLRoom 					; -- any offset within that page is inside.
 		.error_toobig
 _SMLRoom:
+		jsr 	STRPageLine 				; lineWalk -> zTemp0, and the two banks it lives in
 
 		.storage_access
 		;
@@ -11680,8 +11740,8 @@ _SMLRoom:
 		ply
 		bra 	_SMLWrite
 _SMLDiverged:
-		.storage_release 					; as _STRNext: never raise inside the window, the
-		.error_internal 					; error handler prints and that is bank 0
+		.storage_release 					; never raise inside the window: the error handler
+		.error_internal 					; prints, and that is bank 0
 _SMLWrite:
 		pla
 		sta 	(zTemp0) 					; line # save it in +0,+1
@@ -11704,6 +11764,9 @@ _SMLWrite:
 		;		writes it here and pass two reads it back with STRLineDepth. See x16_storage.inc
 		;		for why it is a separate bank and not a fifth byte on the record.
 		;
+		;		zTemp0 is already paged and depthBankNow already names this record's segment,
+		;		both from the STRPageLine above.
+		;
 		.depth_access
 		lda 	blockDepth
 		sta 	(zTemp0)
@@ -11712,78 +11775,137 @@ _SMLWrite:
 
 ; ************************************************************************************************
 ;
-;				Line number YA - find in table, return address YA 
-;				
+;				Line number YA - find in table, return address YA
+;
 ;				If FOUND: of the matching line, with Carry Clear.
 ;				If NOT FOUND : of the previous line (e.g. next code line), with Carry Set.
 ;
 ; ************************************************************************************************
 
 STRFindLine:
-		.storage_access
+		sta 	lineTarget 					; the line number being searched for
+		sty 	lineTarget+1
 
-		sta 	zTemp0 						; zTemp0 line number being searched
-		sty 	zTemp0+1
-		
 		lda 	compilerEndHigh 			; work backwards through table
-		sta 	zTemp1+1
-		stz 	zTemp1
+		sta 	lineWalk+1
+		stz 	lineWalk
 
 _STRSearch:
 		jsr 	_STRPrevLine 				; look at previous record.
-
+		jsr 	STRPageLine 				; lineWalk -> zTemp0, in whichever bank it is in
+		;
+		;		THE WHOLE RECORD COMES OUT IN ONE GO, and the window closes before anything is
+		;		decided about it. It used to be held open across the entire search, which worked
+		;		while the table was one bank and the pointer never had to be re-paged -- and it
+		;		is why both exits from inside the loop had to remember to .storage_release
+		;		before raising. Four loads and four stores instead, and no way out of here with
+		;		the wrong bank selected.
+		;
+		.storage_access
+		lda 	(zTemp0)
+		sta 	lineRec
 		ldy 	#1
-		lda 	(zTemp1) 					; check table line # >= target
-		cmp 	zTemp0
-		lda 	(zTemp1),y
-		sbc 	zTemp0+1
+		lda 	(zTemp0),y
+		sta 	lineRec+1
+		iny
+		lda 	(zTemp0),y
+		sta 	lineRec+2
+		iny
+		lda 	(zTemp0),y
+		sta 	lineRec+3
+		.storage_release
+
+		lda 	lineRec 					; check table line # >= target
+		cmp 	lineTarget
+		lda 	lineRec+1
+		sbc 	lineTarget+1
 		bcs 	_STRFound 					; >=
-_STRNext: 									; next table entry.
-		ldy 	#1 							; should not be required !
-		lda 	(zTemp1),y
-		cmp 	#$FF
+
+		lda 	lineRec+1 					; next table entry, until off the bottom of what was
+		cmp 	#$FF 						; ever written. Should not be required !
 		bne 	_STRSearch
-		.storage_release 					; the only escape from inside a storage window -- close
-		.error_internal 					; it, or the error handler runs with the wrong RAM bank
+		.error_internal
 
 _STRFound:
-		lda 	zTemp1 						; remember WHICH record matched, so STRLineDepth can
-		sta 	STRFoundAt 				; read the depth byte that goes with it. A is dead
-		lda 	zTemp1+1 					; here -- the compare below reloads it.
+		lda 	lineWalk 					; remember WHICH record matched, so STRLineDepth can
+		sta 	STRFoundAt 					; read the depth byte that goes with it. This is the
+		lda 	lineWalk+1 					; VIRTUAL address: STRLineDepth pages it again.
 		sta 	STRFoundAt+1
-		lda 	(zTemp1) 					; set A = 0 if the same, 0 if different.
-		eor 	zTemp0
+		;
+		;		BOTH BYTES, and it used to be the low one twice -- the second read was written
+		;		`lda (zTemp1)` where it meant `(zTemp1),y`, against zTemp0 where it meant
+		;		zTemp0+1. Any line whose LOW byte matched the target reported an exact match, so
+		;		GOTO 300 could resolve to line 556, and the carry a caller reads to tell found
+		;		from not-found was wrong with it.
+		;
+		lda 	lineRec 					; set A = 0 if the same, non-zero if different.
+		eor 	lineTarget
 		bne 	_STRDifferent
-		lda 	(zTemp1)
-		eor 	zTemp0
+		lda 	lineRec+1
+		eor 	lineTarget+1
 		beq 	_STROut 					; if zero, exit with A = 0 and correct line.
 
 _STRDifferent:
-		lda 	#$FF 						
+		lda 	#$FF
 _STROut:
 		clc  								; set carry if different, e.g. > rather than >=
-		adc 	#255 				
+		adc 	#255
 		php
-		iny 								; address into YA
-		lda 	(zTemp1),y
-		pha
-		iny
-		lda 	(zTemp1),y
+		lda 	lineRec+3 					; address into YA
 		tay
-		pla	
-		.storage_release
-		plp	
+		lda 	lineRec+2
+		plp
 		rts
 
 _STRPrevLine:
 		sec 								; move backwards one entry.
-		lda 	zTemp1
+		lda 	lineWalk
 		sbc 	#4
-		sta 	zTemp1
-		lda 	zTemp1+1
+		sta 	lineWalk
+		lda 	lineWalk+1
 		sbc 	#0
-		sta 	zTemp1+1
+		sta 	lineWalk+1
 		rts
+
+; ************************************************************************************************
+;
+;			Virtual line-table address in lineWalk -> real address in zTemp0, with the storage
+;			bank and the depth bank selected for it. Preserves X and Y.
+;
+;		BIT 13 IS THE WHOLE OF IT. The virtual space is compilerEndHigh:$00 down to
+;		LineTableFloorHigh:$00, sixteen kilobytes, and each bank shows eight of them at
+;		$A000-$BFFF: $A000-$BFFF is the first bank at its own address, $8000-$9FFF is the second
+;		bank with $2000 added back. So the segment is one bit of the high byte and the
+;		translation is an ORA.
+;
+; ************************************************************************************************
+
+STRPageLine:
+		pha
+		lda 	lineWalk
+		sta 	zTemp0
+		lda 	lineWalk+1
+		and 	#$20 						; bit 13: set is the first bank, clear the second
+		beq 	_SPLSecond
+		lda 	#CompilerStorageBank
+		sta 	storageBankNow
+		lda 	#CompilerDepthBank
+		sta 	depthBankNow
+		lda 	lineWalk+1
+		sta 	zTemp0+1
+		pla
+		rts
+_SPLSecond:
+		lda 	#CompilerStorageBank2
+		sta 	storageBankNow
+		lda 	#CompilerDepthBank2
+		sta 	depthBankNow
+		lda 	lineWalk+1 					; $8000-$9FFF is that bank's own $A000-$BFFF
+		ora 	#$20
+		sta 	zTemp0+1
+		pla
+		rts
+
 ; ************************************************************************************************
 ;
 ;					The block depth of the line STRFindLine last matched, in A
@@ -11793,16 +11915,14 @@ _STRPrevLine:
 ;		address. Call it straight after STRFindLine: the record it read is remembered in
 ;		STRFoundAt, and the next STRFindLine overwrites that.
 ;
-;		zTemp0 IS FREE HERE. STRFindLine has finished with it -- it held the line number being
-;		searched for -- and it is the only zero page pointer this can reach the bank through.
-;
 ; ************************************************************************************************
 
 STRLineDepth:
 		lda 	STRFoundAt
-		sta 	zTemp0
+		sta 	lineWalk
 		lda 	STRFoundAt+1
-		sta 	zTemp0+1
+		sta 	lineWalk+1
+		jsr 	STRPageLine 				; which selects the depth bank of that segment too
 		.depth_access
 		lda 	(zTemp0)
 		.depth_release
@@ -11823,12 +11943,18 @@ STRMakeOffset:
 		tay
 		pla
 		rts
-		
+
 		.send code
 
 		.section storage
-STRFoundAt: 								; the line record STRFindLine last matched
+STRFoundAt: 								; the line record STRFindLine last matched (virtual)
 		.fill 	2
+lineWalk: 									; STRPageLine's input, and the search's walk pointer
+		.fill 	2
+lineTarget: 								; the line number STRFindLine is looking for
+		.fill 	2
+lineRec: 									; one whole record, copied out of the bank
+		.fill 	4
 		.send 	storage
 
 ; ************************************************************************************************
@@ -11839,6 +11965,8 @@ STRFoundAt: 								; the line record STRFindLine last matched
 ;
 ;		Date			Notes
 ;		==== 			=====
+;		08/09/26		A second bank under the line table, 2,048 entries to 4,096, reached
+;						through STRPageLine. STRFindLine's high byte compare fixed with it.
 ;
 ; ************************************************************************************************
 ; ************************************************************************************************
@@ -12604,6 +12732,17 @@ STRReset:
 		lda 	compilerEndHigh
 		sta 	lineNumberTable+1
 		stz 	lineNumberTable
+
+		;
+		;		The line table starts in its first bank, and so does the depth table beside it.
+		;		STRPageLine writes both of these on every access afterwards; seeding them here
+		;		only means a window opened before the first STRMarkLine cannot select a bank
+		;		that was never chosen.
+		;
+		lda 	#CompilerStorageBank
+		sta 	storageBankNow
+		lda 	#CompilerDepthBank
+		sta 	depthBankNow
 
 		.varstore_access 				; clear the head of the work area list.
 

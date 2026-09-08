@@ -19,13 +19,13 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [Comments light, code should flow](comments-light-code-should-flow.md) — a note or two, not essays; heavy REMs mean bad naming
 - [No ship language, no unasked builds](no-ship-language-this-is-dev.md) — dev and test work only; "commit and push" does not include a build
 - [Commit to main directly](commit-to-main-directly.md) — do not branch first; solo repo, no review step
-- [Compiler must not cap program size](compiler-must-not-cap-program-size.md) — standing rule: a build-side wall is a bug, report costs in max program size
+- [Compiler must not cap program size](compiler-must-not-cap-program-size.md) — standing rule: a build-side wall is a bug — but since two-pass, compiler growth costs a program ZERO; 14,336 bytes of low RAM headroom, 404 of storage
 - [No backward compatibility needed](no-backward-compatibility-needed.md) — sole user; token renumbering and forced recompiles cost nothing
 - [Ask before writing asm](ask-before-writing-asm.md) — standing order: no GP.ASM or 64tass without agreeing it first
 - [The compiler is GPC](name-the-compiler-gpc.md) — "Blitz" is a heritage nod to the C64 compiler; all the code here is the user's own
 - [User runs concurrent agents here](user-runs-concurrent-agents-here.md) — default to read-only research; re-read before any write
 - [Compile shared, not embedded](compile-shared-not-embedded.md) — standing: SHARED is the p-code number; GPC-HELP stays uncrunched
-- [Library working copy, then root](library-working-copy-then-root.md) — edit modules in samples/GPB-MODS-TESTING/GPC-BASIC/, copy to root only when they pass
+- [Library working copy, then root](library-working-copy-then-root.md) — edit modules in samples/GPB-MODS-TESTING/GPC-BASIC/, copy to root only when they pass; and the drift runs BOTH ways
 - [Compact early, not at the end](compact-early-not-at-the-end.md) — cost is context size x turns; 75% of a window went in 18 minutes on a 558K-token context
 
 ## Build and toolchain
@@ -58,12 +58,13 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [GP draw under a re-ordered font](gp-draw-under-a-reordered-font.md) — only GP.BOX style 0 survives, and GP.FILL converts its glyph argument (+$40)
 
 ## Compiler limits, memory and banking
-- [PROGRAM TOO BIG was the workspace](program-too-big-fires-early.md) — FIXED with a RAM bank per table; three raise sites, and the real max program size
+- [PROGRAM TOO BIG was the workspace](program-too-big-fires-early.md) — FIXED with a RAM bank per table, then a second bank under the line table for 4,096 lines; the raise sites, and the real max program size
 - [SHARED p-code cap is RTBASE](gpc-shared-pcode-cap-is-rtbase.md) - ~17,920 bytes, not $9F00; and PROGRAM TOO BIG proves the source was read in full
 - [GPC Blitz runtime slack and limits](gpc-blitz-runtime-slack-and-limits.md) — measured memory layout; the run-side ceiling, quotable as FREE minus 4096
 - [Core page cushion below GPBase](gpc-core-page-cushion-below-gpbase.md) — only ~40 B of padding; cross it and every program grows 256 B
 - [Runtime footprint](blitz-x16-runtime-footprint.md) — the 10,956 B runtime copied into every program, and how to shrink it
 - [String heap scavenger](string-heap-scavenger.md) — SHIPPED: dead blocks reused, +1 page RT; the intermittent OOM was no-reclaim plus a garbage line-0 read
+- [BINPUT# caps at 255 bytes](binput-caps-at-255-bytes.md) — three separate caps land on the same number, and it is a CHRIN loop not a block read
 - [String blocks never shrink](gpc-string-blocks-never-shrink.md) — a big temporary must not be built; freeing it is not a thing
 - [LOAD chain strands array strings](load-chain-strands-array-strings.md) — chaining skips ClearMemory, so the string ceiling never falls; bounded for scalars, an UNBOUNDED leak for string arrays
 - [Compile is write-only](compile-is-write-only.md) — one instruction touches the object during a compile and it is a store; the premise the two-pass work rests on
@@ -75,6 +76,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [STASH leaves its bank selected — FIXED](stash-leaves-its-bank-selected.md) — it now restores the caller's bank; what the symptom looked like, and why it named the wrong routine
 
 - [color-test sample state](color-test-sample-state.md) — parked 2026-09-06; the four loose ends, incl. an unverified X16 colour pair
+- [XBase engine planned](xbase-engine-planned.md) — skeleton on disk, GUI already in bank 4, no function keys, and 255 bytes a record has to go
 
 ## The editor sample
 - [Editor branch state, GUI next](gpc-editor-branch-and-gui-next.md) — the self-check lines to keep green

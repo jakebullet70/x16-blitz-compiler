@@ -109,6 +109,10 @@ THEME.LOAD.LIGHT:
 ## Lifted from the XFMGR file manager, src/stree.pb MODULE theme: TXT_NORMAL $B1,
 ## TXT_BRIGHT $B7, BOXES $BE, ROW_HILIGHT $E1. DIMMED and WARN are not in that module
 ## and are chosen here.
+##
+## WARN IS LIGHT RED, NOT RED. This is the only theme with a dark grey page, and plain
+## red on it is barely legible -- which shows up on a MENUBAR, where WARN is what tints
+## the hotkey letter, long before it shows up on any warning.
 THEME.LOAD.GRAY:
     THEME.CLR(THEME.PAGE)   = 11 * 16 + 11
     THEME.CLR(THEME.TEXT)   = 11 * 16 + 1
@@ -116,7 +120,7 @@ THEME.LOAD.GRAY:
     THEME.CLR(THEME.BORDER) = 11 * 16 + 14
     THEME.CLR(THEME.HILITE) = 14 * 16 + 1
     THEME.CLR(THEME.DIMMED) = 11 * 16 + 12
-    THEME.CLR(THEME.WARN)   = 11 * 16 + 2
+    THEME.CLR(THEME.WARN)   = 11 * 16 + 10
     RETURN
 
 ## CUSTOM keeps whatever is in THEME.CLR, so switching to it carries the colours the

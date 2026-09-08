@@ -1,11 +1,11 @@
 ---
 name: program-too-big-fires-early
-description: "PROGRAM TOO BIG was the compiler's shared 8K workspace, not the object buffer — fixed by a RAM bank each; and the real max program size is 17,408 bytes, not 22,272"
+description: "PROGRAM TOO BIG was the compiler's shared 8K workspace, not the object buffer — a RAM bank each, then a second bank under the line table for 4,096 lines; and the real max program size is 17,408 bytes, not 22,272"
 metadata:
   node_type: memory
   type: project
   originSessionId: 5591d6bc-636d-4001-b0b0-d858156d6ec0
-  modified: 2026-09-01T20:03:48.859Z
+  modified: 2026-09-08T22:30:00.000Z
 ---
 
 **FIXED 2026-09-01.** It was never the object buffer.
@@ -27,9 +27,34 @@ split is clean because no routine touches both tables: `mark_line.asm` + `WriteM
 line table; `create.asm`, `findvar.asm`, `reset.asm` are the variable list. **2,048 lines and 1,365
 variables now.** `GPC.BIN` came out 13 bytes smaller — both bounds tests got simpler.
 
+**AND 2,048 LINES WAS THE WALL AGAIN, 2026-09-08.** `samples/GPB-MODS-TESTING/GPBMODS.BASL` marks
+**2,156** lines and stopped with `PROGRAM TOO BIG @ 3055` — same message, same wrong limit, one
+table further along. **The line table has a SECOND bank under it now (9, and 10 for the block
+depths that shadow it), and holds 4,096.**
+
+The mechanism is worth knowing before touching any of it: every pointer into the table — in
+`mark_line.asm`, in `GPBankRelocate` and in `WriteMapFile` — is now a **virtual** address running
+`$C000` down to `$8000`, and `STRPageLine` (`storage/mark_line.asm`) is the only thing that turns
+one into a real `$A000-$BFFF` address plus a bank. **Bit 13 is the whole of the segment**, so the
+translation is an `ORA #$20`. `storage_access` and `depth_access` therefore select from a
+*variable* rather than a constant, which `STRPageLine` writes — so **page the record first, with
+nothing between that and the window**, or you get whichever segment the last call left selected.
+`STRFindLine` no longer holds one window across its whole search: it copies the four-byte record
+out and closes, because the bank has to be re-chosen per entry.
+
+Fixed in passing, since it was in the rewritten lines: `STRFindLine`'s exact-match test compared
+the line number's **low byte twice** (`lda (zTemp1)` where it meant `(zTemp1),y`), so `GOTO 300`
+could report an exact match on line 556 and hand back its address.
+
+Evidence it is transparent: `samples/editor` (1,461 lines) compiles **byte-for-byte identically**
+under the old compiler and the new one, and GPBMODS's 2,156 lines all pass the two-pass agreement
+check in `STRMarkLine`, which is an exhaustive round trip of the table across the bank boundary.
+
 **Bank allocation at compile time, and it matters**: 0 KERNAL, 1 the native test harness's p-code
-buffer, 2 line table, 3 GP.ASM's blob pool, 4 variable list. A table in bank 1 once broke the
-`variables` and `arrays` suites silently, so run those six after touching any of this.
+buffer, 2 line table, 3 GP.ASM's blob pool, 4 variable list, 5 block depth, 6 block ends, 7 the
+object buffer, 8 the shared region scratch, 9 the line table's second half, 10 the block depth's
+second half, 63 down the GP.BANKEDSTR pools. A table in bank 1 once broke the `variables` and
+`arrays` suites silently, so run those six after touching any of this.
 
 ## THE REAL MAX PROGRAM SIZE IS 17,408 BYTES OF P-CODE
 
@@ -55,8 +80,10 @@ fit. I previously told the user `FREE` was not headroom at all; that was half ri
 half was the part I dropped. See [[answer-the-question-asked]].
 
 **Which limit binds now:** at editor density (10.4 bytes/line) the object wall arrives at ~1,675
-lines and the line table not until 2,048, so the object budget binds first — which is correct, the
-wall is now about the program's own size. Sparse code meets the line table first.
+lines and the line table not until 4,096, so the object budget binds first — which is correct, the
+wall is about the program's own size. Only very sparse code, or a program that puts most of its
+p-code in `GP.BANKED` regions the fit check does not see, reaches the line table at all: GPBMODS is
+15,209 bytes resident with 2,156 lines, and that is what got there.
 
 To raise it further, in order of work: relax `MIN_WS_PAGES` for a program that needs little
 workspace (policy, not hardware); shrink the 4K frame stack (~250 frames); or shrink the runtime,

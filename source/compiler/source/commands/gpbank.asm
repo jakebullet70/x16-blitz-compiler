@@ -790,6 +790,10 @@ _GBFPBOut:
 ;		compilerEndHigh:$00 to lineNumberTable -- and the window is opened and closed once per
 ;		entry rather than held across the loop, for the reason x16_storage.inc gives.
 ;
+;		Those addresses are VIRTUAL and the table is two banks; STRPageLine is what turns one
+;		into a real address and a bank. The compare that ends the walk is a plain 16-bit
+;		compare of two virtual addresses either way.
+;
 ; ************************************************************************************************
 
 _GBFixLineTable:
@@ -812,10 +816,11 @@ _GBFLTLoop:
 		cmp 	lineNumberTable
 		bcc 	_GBFLTDone
 _GBFLTEntry:
-		lda 	gpBankWalk
-		sta 	zTemp0
-		lda 	gpBankWalk+1
-		sta 	zTemp0+1
+		lda 	gpBankWalk 					; gpBankWalk is a VIRTUAL address covering both banks
+		sta 	lineWalk 					; of the table -- STRPageLine turns it into the real
+		lda 	gpBankWalk+1 				; one in zTemp0 and selects the bank it is in
+		sta 	lineWalk+1
+		jsr 	STRPageLine
 		.storage_access
 		ldy 	#2 							; the address is at +2,+3
 		lda 	(zTemp0),y
@@ -824,8 +829,8 @@ _GBFLTEntry:
 		lda 	(zTemp0),y
 		sta 	zTemp1+1
 		.storage_release
-		jsr 	GPBankAdjust
-		.storage_access
+		jsr 	GPBankAdjust 				; which works on zTemp1 and leaves zTemp0 alone, so
+		.storage_access 					; the paged pointer and the bank both still stand
 		ldy 	#2
 		lda 	zTemp1
 		sta 	(zTemp0),y

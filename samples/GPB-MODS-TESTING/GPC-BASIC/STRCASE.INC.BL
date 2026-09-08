@@ -123,8 +123,8 @@ STRCASE.GO:
 
 ## The verbs. Each is a shim on its own statement line, so the declaration costs no
 ## p-code of its own, and all three sit inside the GOTO above and never run in order.
-GP.DEFPROC STRCASE.APPLY, STRCASE.PTR, STRCASE.MODE : GOSUB STRCASE.GO
-RETURN
+## GP.DEFPROC STRCASE.APPLY, STRCASE.PTR, STRCASE.MODE : GOSUB STRCASE.GO
+## RETURN
 
 ## STRCASE.S$ is the argument AND the result. The argument copy is the working copy,
 ## so a second string variable would only be a second copy of the same bytes.

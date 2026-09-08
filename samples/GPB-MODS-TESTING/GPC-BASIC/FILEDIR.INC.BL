@@ -60,8 +60,9 @@
 ## **
 ## **  FILE.DIR.BANKBASE and FILE.DIR.BANKROOM are the hardware window, not an
 ## **  allocation: every bank appears at $A000 and every bank is 8,192 bytes.
-## **  The bank NUMBER is the resource. Take it from BANKMGR.ALLOC and put it in
-## **  FILE.DIR.BANK. This module claims no bank and executes no BANK statement.
+## **  The bank NUMBER is the resource. Take it from BANKMGR.GET.FREE.BANK and
+## **  put it in FILE.DIR.BANK. This module claims no bank and executes no BANK
+## **  statement.
 ## **
 ## **  THE WINDOW IS SWITCHED IN ASSEMBLY, NOT IN BASIC, and that is what lets this
 ## **  module live in a GP.BANKED region. The two blobs take the data bank at entry

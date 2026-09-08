@@ -28,6 +28,17 @@ STRReset:
 		sta 	lineNumberTable+1
 		stz 	lineNumberTable
 
+		;
+		;		The line table starts in its first bank, and so does the depth table beside it.
+		;		STRPageLine writes both of these on every access afterwards; seeding them here
+		;		only means a window opened before the first STRMarkLine cannot select a bank
+		;		that was never chosen.
+		;
+		lda 	#CompilerStorageBank
+		sta 	storageBankNow
+		lda 	#CompilerDepthBank
+		sta 	depthBankNow
+
 		.varstore_access 				; clear the head of the work area list.
 
 		;

@@ -37,6 +37,7 @@ Eight bar items, one dropdown each. The shape is itself a test: `MENUBAR` drives
 | `DATA` | SORT.RUN on a fixture · array set · BMX.SHOW · BANKMGR alloc/free/claim | `SORT`, `BMX`, `BANKMGR` |
 | `THEME` | the five themes live · THEME.NEXT · THEME.SET · THEME.HI · colour readout | `THEME` |
 | `ABOUT` | FREE, p-code size, build number, per-module byte table, the bank map | `BANKMGR` |
+| `FILES` | DIR open/pattern/directories · STATUS · EXISTS · CURDIR and UP · SAVEARRAY and LOADARRAY · RENAME and DELETE · MKDIR and CHDIR | `FILEIO`, `FILEDIR` |
 
 Bar and dropdown join through `MENUBAR.DOWNEXIT` (DOWN ends the bar so the caller opens the panel)
 and `MENUVERT.KEYEXIT` (LEFT and RIGHT end the dropdown so the caller walks the bar).
@@ -49,6 +50,12 @@ drawing the bar. Empty `MENUVERT.HOT$` for a dropdown whose letters mean bar ite
 Every panel returns to the bar. `APPSYS.STARTUP` and `APPSYS.RESTORE` bracket the program.
 
 ## 3. The budget -- MEASURED 2026-09-05, and it is not binding yet
+
+> **Superseded as a set of numbers, kept as the reasoning.** This was measured against a shell
+> of stubs, before the panels were written, before `GP.BANKED` moved the GUI into bank 4 and
+> before `GP.BANKEDSTR` moved the text out of low RAM. `readme.md` carries the figures for the
+> program as it is built now. What still holds is the method, and the conclusion the estimates
+> were wrong in both directions.
 
 Shared mode: p-code runs from `PCODE_PAGE $0900` to `RTGPBASE $6600`, 23,808 bytes, less the 4K
 frame stack and the 4K minimum workspace. **15,616 bytes of p-code is the ceiling.**
@@ -229,7 +236,7 @@ workspace, and 32 `POKE`d bytes in low RAM is the cheaper shape.
 |---|---|
 | `BANKMGR.INIT` | read the real bank count, reserve bank 0, mark everything above the count unavailable |
 | `BANKMGR.CLAIM` | take a named bank, fail if taken. The code bank claims itself here, first |
-| `BANKMGR.ALLOC` | the lowest free bank, or 0 for none |
+| `BANKMGR.GET.FREE.BANK` | the lowest free bank, or 0 for none |
 | `BANKMGR.FREE` | give one back |
 | `BANKMGR.COUNT` | how many exist, how many free |
 
@@ -248,7 +255,7 @@ Two things it absorbs rather than breaks:
   arena, written into `ED-STORE.BASL` as constants. Those become `BANKMGR.CLAIM` calls, or the
   manager is a second source of truth.
 - **`GUI.BANK = 0` already means "do not save the screen"**, so 0 is load-bearing as a not-a-bank
-  value. `BANKMGR.ALLOC` returning 0 for "none free" agrees with it, and that agreement is
+  value. `BANKMGR.GET.FREE.BANK` returning 0 for "none free" agrees with it, and that agreement is
   deliberate.
 
 ## 8. What this project is for
@@ -471,8 +478,8 @@ one-off proofs named above.
    The gate on the banked design is clear.
 3. **`BANKMGR.INC.BL`. DONE 2026-09-05** -- 590 bytes, in the shell, claiming banks 2 and 3 at
    startup, read out by ABOUT / BANK MAP. Eleven assertions pass headlessly: `BANKS 64` on the
-   emulator, free 61 after two claims, a re-claim refused, `ALLOC` returning 1 then 4 around them,
-   `ALLOC` returning 2 again after a `RELEASE`, bank 0 and bank 64 both refused, bank 63 taken, and
+   emulator, free 61 after two claims, a re-claim refused, `GET.FREE.BANK` returning 1 then 4 around them,
+   `GET.FREE.BANK` returning 2 again after a `RELEASE`, bank 0 and bank 64 both refused, bank 63 taken, and
    a drain of exactly 58 more before it returns 0. NOT YET COPIED to the root `GPC-BASIC/` -- the
    panel has not been watched on screen.
 4. **The shell.** Bar, dropdowns, cross-axis exits, `APPSYS` bracket, ABOUT panel. One module under

@@ -2,31 +2,31 @@
 ## **  FYI: File has been semi crunched to save some bytes
 ## **  BANKMGR.INC.BL -- who owns which RAM bank.
 ## **
-## **      BANKMGR.INIT     ask the machine how many banks it has
-## **      BANKMGR.CLAIM    take a named one, or fail
-## **      BANKMGR.ALLOC    take the lowest free one
-## **      BANKMGR.RELEASE  give one back
-## **      BANKMGR.COUNT    how many exist, how many are free
+## **      BANKMGR.INIT           ask the machine how many banks it has
+## **      BANKMGR.CLAIM          take a named one, or fail
+## **      BANKMGR.GET.FREE.BANK  take the lowest free one
+## **      BANKMGR.RELEASE        give one back
+## **      BANKMGR.COUNT          how many exist, how many are free
 ## **
 ## **  For a program with several owners of banked RAM, none of which can see
 ## **  the others' numbers. Requires GPB.INC.BL, and does not #INCLUDE it.
 ## **
 ## **  Usage, and the order matters:
 ## **      GOSUB BANKMGR.INIT
-## **      BANKMGR.WANT = 2 : GOSUB BANKMGR.CLAIM
+## **      BANKMGR.SET.BANK = 2 : GOSUB BANKMGR.CLAIM
 ## **      IF BANKMGR.OK = 0 THEN <bank 2 was already taken>
-## **      GOSUB BANKMGR.ALLOC
+## **      GOSUB BANKMGR.GET.FREE.BANK
 ## **      IF BANKMGR.BANK = 0 THEN <none left>
 ## **
-## **   in   BANKMGR.WANT    the bank CLAIM or RELEASE acts on
+## **   in   BANKMGR.SET.BANK  the bank CLAIM or RELEASE acts on
 ## **
-## **   out  BANKMGR.BANKS   how many the machine has, 64 or 256
-## **        BANKMGR.BANK    what ALLOC handed out. 0 MEANS NONE LEFT
-## **        BANKMGR.OK      -1 if CLAIM took it, 0 if taken or out of range
-## **        BANKMGR.SPARE   what COUNT found free
+## **   out  BANKMGR.BANKS     how many the machine has, 64 or 256
+## **        BANKMGR.BANK      what GET.FREE.BANK handed out. 0 MEANS NONE LEFT
+## **        BANKMGR.OK        -1 if CLAIM took it, 0 if taken or out of range
+## **        BANKMGR.SPARE     what COUNT found free
 ## **
 ## **  0 is not a bank. It is the KERNAL's, reserved by INIT, and it is what
-## **  ALLOC returns for "none left".
+## **  GET.FREE.BANK returns for "none left".
 ## **
 ## **  WARNING: MEMTOP RETURNS $00 ON A 2MB MACHINE. The count is one byte and 256
 ## **  does not fit, so 512K reads $40 = 64 and 2MB reads $00, meaning 256. INIT
@@ -81,7 +81,7 @@ BANKMGR.INIT: IF BANKMGR.READY = 0 THEN DIM BANKMGR.MAP%(BANKMGR.BYTES) : DIM BA
     IF (BANKMGR.BANKS AND 7) <> 0 THEN GOSUB BANKMGR.INIT.PART
 
 ## ---- bank 0 is the KERNAL's ----
-    BANKMGR.WANT = 0 : GOSUB BANKMGR.SET
+    BANKMGR.SET.BANK = 0 : GOSUB BANKMGR.SET
     RETURN
 
 ## ---- Only reached when the count is not a multiple of 8. The loop cannot be empty
@@ -90,32 +90,32 @@ BANKMGR.INIT: IF BANKMGR.READY = 0 THEN DIM BANKMGR.MAP%(BANKMGR.BYTES) : DIM BA
 BANKMGR.INIT.PART:
     BANKMGR.SCAN = INT(BANKMGR.BANKS / 8)
     FOR BANKMGR.I = BANKMGR.BANKS TO BANKMGR.SCAN * 8 + 7
-        BANKMGR.WANT = BANKMGR.I : GOSUB BANKMGR.SET
+        BANKMGR.SET.BANK = BANKMGR.I : GOSUB BANKMGR.SET
     NEXT BANKMGR.I
     RETURN
 
 
 ## ***********************************************************************
-## **  BANKMGR.CLAIM -- take BANKMGR.WANT, if it is free and real.
+## **  BANKMGR.CLAIM -- take BANKMGR.SET.BANK, if it is free and real.
 ## **
 ## **   out  BANKMGR.OK   -1 took it, 0 already taken or out of range
 ## ***********************************************************************
 
 BANKMGR.CLAIM:
-    BANKMGR.OK = 0 : IF BANKMGR.WANT < 1 THEN RETURN
-    IF BANKMGR.WANT >= BANKMGR.BANKS THEN RETURN
+    BANKMGR.OK = 0 : IF BANKMGR.SET.BANK < 1 THEN RETURN
+    IF BANKMGR.SET.BANK >= BANKMGR.BANKS THEN RETURN
     GOSUB BANKMGR.TEST : IF BANKMGR.USED <> 0 THEN RETURN
     GOSUB BANKMGR.SET :  BANKMGR.OK = -1
     RETURN
 
 
 ## ***********************************************************************
-## **  BANKMGR.ALLOC -- the lowest free bank.
+## **  BANKMGR.GET.FREE.BANK -- the lowest free bank.
 ## **
 ## **   out  BANKMGR.BANK   1..BANKS-1, or 0 for none left
 ## ***********************************************************************
 
-BANKMGR.ALLOC:
+BANKMGR.GET.FREE.BANK:
     BANKMGR.BANK = 0 : BANKMGR.SCAN = 0
     GP.DO
         IF BANKMGR.SCAN >= BANKMGR.BYTES THEN GP.EXITDO
@@ -131,19 +131,19 @@ BANKMGR.ALLOC:
     NEXT BANKMGR.I
 
     IF BANKMGR.BANK = 0 THEN RETURN
-    BANKMGR.WANT = BANKMGR.BANK : GOSUB BANKMGR.SET
+    BANKMGR.SET.BANK = BANKMGR.BANK : GOSUB BANKMGR.SET
     RETURN
 
 
 ## ***********************************************************************
-## **  BANKMGR.RELEASE -- give BANKMGR.WANT back.
+## **  BANKMGR.RELEASE -- give BANKMGR.SET.BANK back.
 ## **
 ## **  Silent about a bank that was not taken.
 ## ***********************************************************************
 
 BANKMGR.RELEASE:
-    IF BANKMGR.WANT < 1 THEN RETURN
-    IF BANKMGR.WANT >= BANKMGR.BANKS THEN RETURN
+    IF BANKMGR.SET.BANK < 1 THEN RETURN
+    IF BANKMGR.SET.BANK >= BANKMGR.BANKS THEN RETURN
     GOSUB BANKMGR.CLR
     RETURN
 
@@ -167,19 +167,19 @@ BANKMGR.COUNT.NEXT:
 
 
 ## ***********************************************************************
-## **  The bitmap. BANKMGR.WANT in, and nothing else calls these.
+## **  The bitmap. BANKMGR.SET.BANK in, and nothing else calls these.
 ## **
 ## **  BANKMGR.SLOT is which of the 32 bytes holds the bank, BANKMGR.MASK which
 ## **  bit: bank 19 is byte 2 bit 3, so SLOT 2 and MASK 8. Both are LOCATE's
 ## **  output and belong to these four routines -- the byte-index loops in INIT,
-## **  ALLOC and COUNT count in BANKMGR.SCAN so as not to share them.
+## **  GET.FREE.BANK and COUNT count in BANKMGR.SCAN so as not to share them.
 ## **
 ## **  WARNING: CLR subtracts rather than masking. Clearing a bit wants AND NOT,
 ## **  and GPC's AND is 16-bit signed, so NOT 8 raises OUT OF RANGE. The bit is
 ## **  known set before the subtraction, which makes it the same answer.
 ## ***********************************************************************
 
-BANKMGR.LOCATE: BANKMGR.SLOT = INT(BANKMGR.WANT / 8) : BANKMGR.MASK = BANKMGR.BIT%(BANKMGR.WANT - BANKMGR.SLOT * 8) 
+BANKMGR.LOCATE: BANKMGR.SLOT = INT(BANKMGR.SET.BANK / 8) : BANKMGR.MASK = BANKMGR.BIT%(BANKMGR.SET.BANK - BANKMGR.SLOT * 8) 
     RETURN
 
 BANKMGR.SET: GOSUB BANKMGR.LOCATE : BANKMGR.MAP%(BANKMGR.SLOT) = BANKMGR.MAP%(BANKMGR.SLOT) OR BANKMGR.MASK 

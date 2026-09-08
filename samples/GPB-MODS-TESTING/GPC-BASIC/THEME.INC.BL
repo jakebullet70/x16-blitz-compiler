@@ -99,6 +99,10 @@ THEME.SELECT.LIGHT:
     RETURN
 
 ## From the XFMGR file manager's theme module. DIMMED and WARN are not in it.
+##
+## WARN IS LIGHT RED, NOT RED. This is the only theme with a dark grey page, and
+## plain red on it is barely legible -- which shows up on the BAR, where WARN is
+## what tints the hotkey letter, before it shows up on any warning.
 THEME.SELECT.GRAY:
     THEME.CLR(THEME.PAGE)   = 11 * 16 + 11
     THEME.CLR(THEME.TEXT)   = 11 * 16 + 1
@@ -106,7 +110,7 @@ THEME.SELECT.GRAY:
     THEME.CLR(THEME.BORDER) = 11 * 16 + 14
     THEME.CLR(THEME.HILITE) = 14 * 16 + 1
     THEME.CLR(THEME.DIMMED) = 11 * 16 + 12
-    THEME.CLR(THEME.WARN)   = 11 * 16 + 2
+    THEME.CLR(THEME.WARN)   = 11 * 16 + 10
     RETURN
 
 ## THEME.FIRST is set only when THEME.SELECT created the array, the one case with
