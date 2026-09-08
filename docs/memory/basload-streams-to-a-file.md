@@ -8,7 +8,7 @@ metadata:
 **Shipped 2026-09-06** -- `c0b978f` (the fork), `08443c1` (the build wired to it).
 `BASLOAD-GPC/` holds BASLOAD built as a RAM-resident PRG that emits each line to an open file as it
 finishes it, instead of accumulating the program in BASIC RAM. `source/gpc/build_basl.py` drives it;
-`testing/BASLOAD.BIN` ships beside `GPC.BIN`.
+`testing/BASLOAD-GPC.BIN` ships beside `GPC.BIN`.
 
 Measured: **47,765 bytes tokenised** where the ROM stopped at 38,421 with `ERROR: BASIC RAM FULL`,
 and GPC compiled and ran it. `GPC.BASL` comes out **byte-identical** to the ROM's output, and the
@@ -16,11 +16,11 @@ and GPC compiled and ran it. `GPC.BASL` comes out **byte-identical** to the ROM'
 
 ## The front end, 2026-09-08 -- and the rename that came with it
 
-**`BASLOAD.BIN` is the engine, `BASLOAD.PRG` is the front end.** Same division as `GPC.BIN` and
+**`BASLOAD-GPC.BIN` is the engine, `BASLOAD-GPC.PRG` is the front end.** Same division as `GPC.BIN` and
 `GPC.PRG`: the engine's only interface is the `$bf00` ABI, so the name a person types has to belong
 to the thing a person runs. `build_basl.py` stages **both** into `testing/`.
 
-`BASLOAD-GPC/frontend/BASLOAD.BASL` is **plain X16 BASIC, not GP.BASIC** -- it has to run from
+`BASLOAD-GPC/frontend/BASLOAD-GPC.BASL` is **plain X16 BASIC, not GP.BASIC** -- it has to run from
 `READY.` with nothing on the disk but itself and the engine, so it cannot want `GPC.BIN` or a
 runtime. `build.py front` tokenises it **with the engine it just built**, which exercises the fork
 end to end on every build.

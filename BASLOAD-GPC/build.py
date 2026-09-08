@@ -12,15 +12,15 @@
 #		Three targets out of ONE source tree, plus the launcher that drives them:
 #
 #		  rom    conf/basload-rom.cfg   16,384 bytes, loads at $c000 in ROM bank 15
-#		  prg    conf/basload-prg.cfg   BASLOAD.BIN -- the engine, loads and runs at $6000
-#		  front  frontend/BASLOAD.BASL  BASLOAD.PRG -- the front end you actually launch
+#		  prg    conf/basload-prg.cfg   BASLOAD-GPC.BIN -- the engine, loads and runs at $6000
+#		  front  frontend/BASLOAD-GPC.BASL  BASLOAD-GPC.PRG -- the front end you actually launch
 #
 #		The prg target is the whole point of this folder -- see README.md. There is no source
 #		diff between it and the rom target and there is not meant to be one: everything
 #		ROM-specific in BASLOAD is already RAM-resident (the bridge copies itself to golden
 #		RAM), so the difference is a linker config and nothing else.
 #
-#		BASLOAD.BIN, NOT BASLOAD.PRG. The engine's only interface is an ABI -- name at $bf00,
+#		BASLOAD-GPC.BIN, NOT BASLOAD-GPC.PRG. The engine's only interface is an ABI -- name at $bf00,
 #		length in r0L, device in r0H, SYS $6000 -- so the name a person types has to belong to
 #		the front end, exactly as GPC.PRG and GPC.BIN divide it. The front target tokenises
 #		that front end WITH THE ENGINE IT JUST BUILT, which also exercises the fork end to end.
@@ -82,9 +82,9 @@ CL65 = os.path.join(CC65, "bin", "cl65.exe" if os.name == "nt" else "cl65")
 FRONTEND  = os.path.join(HERE, "frontend")
 FRONT_DIR = os.path.join(BUILD, "frontdrive")	# the emulator's drive for that one run
 EMU       = os.path.join(ROOT, "bin", "x16emu", "x16emu.exe" if os.name == "nt" else "x16emu")
-ENGINE    = "BASLOAD.BIN"
-FRONT_SRC = "BASLOAD.BASL"
-FRONT_PRG = "BASLOAD.PRG"						# frontend/BASLOAD.BASL says #SAVEAS "@:BASLOAD.PRG"
+ENGINE    = "BASLOAD-GPC.BIN"
+FRONT_SRC = "BASLOAD-GPC.BASL"
+FRONT_PRG = "BASLOAD-GPC.PRG"						# frontend/BASLOAD-GPC.BASL says #SAVEAS "@:BASLOAD-GPC.PRG"
 DONE      = "BASLDONE"							# the driver writes BASLOAD's own message here
 
 
@@ -174,7 +174,7 @@ def build_prg():
 	run(WORK, os.path.join(HERE, "conf", "basload-prg.cfg"), raw,
 		os.path.join(BUILD, "basload-prg.map"))
 	#	A PRG is the load address little-endian, then the image. cl65 emits the image alone.
-	#	.BIN, not .PRG: this is the engine, called through an ABI. BASLOAD.PRG is the front end.
+	#	.BIN, not .PRG: this is the engine, called through an ABI. BASLOAD-GPC.PRG is the front end.
 	out = os.path.join(BUILD, ENGINE)
 	with open(out, "wb") as f:
 		f.write(bytes([PRG_ADDR & 0xFF, PRG_ADDR >> 8]))
@@ -188,7 +188,7 @@ def build_prg():
 #
 #	THE DRIVER. Typed at the READY. prompt, it is the engine's ABI written out in BASIC: name to
 #	$bf00 in bank 0, length to r0L, device to r0H, SYS $6000. The front end being built does the
-#	same thing from a prompt -- see frontend/BASLOAD.BASL.
+#	same thing from a prompt -- see frontend/BASLOAD-GPC.BASL.
 #
 #	BANK 0, NOT POKE 0,0. X16 BASIC saves and restores the RAM bank around every PEEK and POKE, so
 #	POKE 0,0 selects nothing and the name lands in whichever bank was live; the symptom is silent.
@@ -212,7 +212,7 @@ RUN
 
 
 def build_front():
-	"""Tokenise frontend/BASLOAD.BASL into build/BASLOAD.PRG, the launcher a person runs.
+	"""Tokenise frontend/BASLOAD-GPC.BASL into build/BASLOAD-GPC.PRG, the launcher a person runs.
 
 	IT IS TOKENISED BY THE ENGINE THIS SCRIPT JUST BUILT, not by the ROM's BASLOAD. Two reasons.
 	The ROM command prints its result and a script would have to scrape the screen for it, whereas

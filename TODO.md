@@ -2590,12 +2590,12 @@ Two things fall out of it:
 ### `BASLOAD-GPC` has no way to be told what to compile — DONE
 
 **BUILT 08/09/26.** The BASIC launcher, the first of the two options below. `BASLOAD-GPC/frontend/
-BASLOAD.BASL` asks for a name, pokes it, `SYS`es and prints what comes back, then asks again; an
+BASLOAD-GPC.BASL` asks for a name, pokes it, `SYS`es and prints what comes back, then asks again; an
 empty answer quits. It is tokenised by the engine it fronts (`build.py front`) and tested end to
 end by `test/runfront.py`, with a fixed-answer variant generated off the real source — the only way
 to drive an interactive program headlessly.
 
-**The engine is `BASLOAD.BIN` now and the front end is `BASLOAD.PRG`**, the same division as
+**The engine is `BASLOAD-GPC.BIN` now and the front end is `BASLOAD-GPC.PRG`**, the same division as
 `GPC.BIN` and `GPC.PRG`: the name a person types belongs to the thing a person runs. Every caller
 moved with it — `test/runtest.py`, `source/gpc/build_basl.py`, and `build_basl.py` stages both files
 into `testing/`.

@@ -2,7 +2,7 @@
 # ************************************************************************************************
 #
 #		Name : 		runfront.py
-#		Purpose :	Prove the front end (frontend/BASLOAD.BASL -> BASLOAD.PRG) actually drives
+#		Purpose :	Prove the front end (frontend/BASLOAD-GPC.BASL -> BASLOAD-GPC.PRG) actually drives
 #				the engine: loads it, hands it a name, and reports what came back.
 #		Date :		8th September 2026
 #
@@ -59,8 +59,8 @@ EMU    = os.path.join(EMUDIR, "x16emu.exe" if os.name == "nt" else "x16emu")
 ROMBIN = os.path.join(EMUDIR, "rom.bin")
 
 BUILD  = os.path.join(GPCDIR, "build")
-ENGINE = os.path.join(BUILD, "BASLOAD.BIN")
-SOURCE = os.path.join(GPCDIR, "frontend", "BASLOAD.BASL")
+ENGINE = os.path.join(BUILD, "BASLOAD-GPC.BIN")
+SOURCE = os.path.join(GPCDIR, "frontend", "BASLOAD-GPC.BASL")
 DRIVE  = os.path.join(BUILD, "fronttest")
 
 VARIANT = "BASLOADT.BASL"           # the fixed-answer front end
@@ -73,7 +73,7 @@ DONE    = "BASLDONE"
 #	Run 1: the engine's ABI, exactly as build.py drives it. See BASLOAD-GPC/README.md.
 TOKENISE = """10 IF PEEK(1024)=42 THEN 50
 20 POKE 1024,42
-30 LOAD"BASLOAD.BIN",8,1
+30 LOAD"BASLOAD-GPC.BIN",8,1
 50 B$="{basl}"
 60 BANK 0
 70 FOR I=1 TO LEN(B$):POKE 48896+I-1,ASC(MID$(B$,I,1)):NEXT
@@ -104,7 +104,7 @@ def make_variant():
         return src.replace(old, new, 1)
 
     #	Its own output name, so a test run can never overwrite the shipped front end.
-    src = swap('#SAVEAS "@:BASLOAD.PRG"', '#SAVEAS "@:%s"' % VARPRG, "#SAVEAS line")
+    src = swap('#SAVEAS "@:BASLOAD-GPC.PRG"', '#SAVEAS "@:%s"' % VARPRG, "#SAVEAS line")
 
     #	The prompt itself. NF is the pass counter, and the three answers are the whole test:
     #	a name that is not there, a name that is, and an empty one to quit.

@@ -36,10 +36,10 @@ python BASLOAD-GPC/build.py all     # or: rom | prg | front
 | target | from | output |
 |---|---|---|
 | `rom` | `upstream/conf/basload-rom.cfg` | `build/basload-rom.bin`, 16,384 B, $c000 in ROM bank 15 |
-| `prg` | `conf/basload-prg.cfg` | `build/BASLOAD.BIN`, 9,003 B, loads $6000 — **the engine** |
-| `front` | `frontend/BASLOAD.BASL` | `build/BASLOAD.PRG`, 842 B — **the front end you launch** |
+| `prg` | `conf/basload-prg.cfg` | `build/BASLOAD-GPC.BIN`, 9,003 B, loads $6000 — **the engine** |
+| `front` | `frontend/BASLOAD-GPC.BASL` | `build/BASLOAD-GPC.PRG`, 971 B — **the front end you launch** |
 
-**`BASLOAD.BIN`, not `BASLOAD.PRG`.** The engine's only interface is an ABI, so the name a person
+**`BASLOAD-GPC.BIN`, not `BASLOAD-GPC.PRG`.** The engine's only interface is an ABI, so the name a person
 types belongs to the front end — the same division as `GPC.PRG` and `GPC.BIN`. Only `front` needs
 the emulator; the other two need only cc65.
 
@@ -54,22 +54,28 @@ cannot answer the question it is there to answer.
 
 ## The front end
 
-`BASLOAD.PRG` is what you `RUN`. It asks for a source file, hands it to the engine, prints what
+`BASLOAD-GPC.PRG` is what you `RUN`. It asks for a source file, hands it to the engine, prints what
 comes back, and asks again — an empty answer quits.
 
 ```
-BASLOAD -- BASL SOURCE TO TOKENISED PRG
+BASLOAD --> BASIC SOURCE TO TOKENISED PRG (GPC VERSION)
+BASLOAD-GPC.BIN WAS BUILT FROM GIT SOURCE, SEPT 2026
+BASLOAD IS (C)2021-2023, STEFAN JAKOBSSON
 
 SOURCE FILE: HELLO.BASL
 
 TOKENISING HELLO.BASL ...
 
 SUCCESS
+
+SOURCE FILE:
+
+AND... BYE!
 ```
 
-It **loads `BASLOAD.BIN` itself**, so both files have to be on the drive, and nothing else does.
+It **loads `BASLOAD-GPC.BIN` itself**, so both files have to be on the drive, and nothing else does.
 
-**Plain X16 BASIC, not GP.BASIC** — `frontend/BASLOAD.BASL`, tokenised like any other `.BASL`. It
+**Plain X16 BASIC, not GP.BASIC** — `frontend/BASLOAD-GPC.BASL`, tokenised like any other `.BASL`. It
 has to run from `READY.` with nothing on the disk but itself and the engine, so it cannot want
 `GPC.BIN` or a runtime. The key reader is `GPC.BASL`'s, written out in plain BASIC, and `INPUT` is
 not used on purpose: it splits a name on a comma, answers a bare RETURN by leaving the variable
@@ -132,7 +138,7 @@ engine *streams to the output file* as well.
 ## Calling the engine
 
 This is the ABI the front end drives, and any other caller can drive it the same way. Load
-`BASLOAD.BIN` at $6000, then:
+`BASLOAD-GPC.BIN` at $6000, then:
 
 | | |
 |---|---|
@@ -225,7 +231,7 @@ its first caller, deliberately, because adding it later would mean another BASLO
 upstream/       basload-rom @ caaaaf0, unmodified. BSD 2-Clause, Stefan Jakobsson
 src/            the fork: whole copies of the files above, overlaid at build time
 conf/           basload-prg.cfg -- ours
-frontend/       BASLOAD.BASL, the launcher. Plain X16 BASIC, tokenised by the engine
+frontend/       BASLOAD-GPC.BASL, the launcher. Plain X16 BASIC, tokenised by the engine
 test/           HELLO.BASL, the ROM-vs-RAM equivalence test, and the front-end test
 build.py        all three targets, the overlay, and the rom.bin verify
 build/          output, not tracked. work/ is the fork's tree, stock/ the canary's

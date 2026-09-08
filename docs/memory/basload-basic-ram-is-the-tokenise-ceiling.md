@@ -23,7 +23,7 @@ the disk. See [[basload-streams-to-a-file]].
 Anything that types `BASLOAD "X"` at the BASIC prompt, which is **the interactive path and every
 other emulator harness in this tree**: `work/help/build.py`, `work/lineinput/build.py`,
 `work/rename/build.py`, `source/unit-tests/devprobe.py`. They are dev scratch and were left alone.
-If one of them ever hits the wall, point it at `testing/BASLOAD.BIN` and copy the driver out of
+If one of them ever hits the wall, point it at `testing/BASLOAD-GPC.BIN` and copy the driver out of
 `source/gpc/build_basl.py`.
 
 ## Sizes worth keeping

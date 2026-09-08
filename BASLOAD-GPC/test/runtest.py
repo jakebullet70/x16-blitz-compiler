@@ -45,7 +45,7 @@ ROMBIN = os.path.join(EMUDIR, "rom.bin")
 DRIVE  = os.path.join(GPCDIR, "build", "testdrive")
 SOURCE = "HELLO.BASL"
 OUTPUT = "HELLO.PRG"
-PRG    = os.path.join(GPCDIR, "build", "BASLOAD.BIN")
+PRG    = os.path.join(GPCDIR, "build", "BASLOAD-GPC.BIN")
 
 #	Where build.py links the PRG, and the API's three inputs. $bf00 = 48896, r0L = 2, r0H = 3.
 SYS_ADDR  = 0x6000
@@ -62,7 +62,7 @@ NAME_ADDR = 0xBF00
 #
 DRIVER = """10 IF PEEK(1024)=42 THEN 50
 20 POKE 1024,42
-30 LOAD"BASLOAD.BIN",8,1
+30 LOAD"BASLOAD-GPC.BIN",8,1
 50 B$="{source}"
 60 BANK 0
 70 FOR I=1 TO LEN(B$):POKE {name}+I-1,ASC(MID$(B$,I,1)):NEXT

@@ -92,7 +92,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 
 ## BASLOAD
 - [BASIC RAM was the tokenise ceiling](basload-basic-ram-is-the-tokenise-ceiling.md) — REMOVED for build_basl.py; still binds the BASIC prompt and the work-* harnesses
-- [BASLOAD streams to a file](basload-streams-to-a-file.md) — SHIPPED: the fork, its 2-bytes-shorter invariant, the partial-output defect the SUCCESS check guards, and the BASLOAD.PRG front end over the BASLOAD.BIN engine
+- [BASLOAD streams to a file](basload-streams-to-a-file.md) — SHIPPED: the fork, its 2-bytes-shorter invariant, the partial-output defect the SUCCESS check guards, and the BASLOAD-GPC.PRG front end over the BASLOAD-GPC.BIN engine
 - [BASLOAD runs from RAM unmodified](basload-runs-from-ram-unmodified.md) — the ROM source builds as a plain PRG with no source changes; cc65 is installed
 - [BASLOAD #DEFINE rejects digits](basload-define-rejects-digits.md) — GUI2.DEFS is INVALID PARAMETER but GUI2.SEL is fine; and no #INCLUDE is ever optional
 - [Labels and variables collide](basload-label-and-variable-collide.md) — DUPLICATE SYMBOL, and the $ does not separate FOO from FOO$
