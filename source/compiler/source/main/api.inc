@@ -71,6 +71,23 @@ BLC_ENDPASS1 = 8
 ;		that the object is complete before the two passes are compared and the output closed.
 ;
 BLC_ENDPASS2 = 9
+;
+;		A GP.BANKED or GP.BANKEDSTR region is ABOUT TO BE WRITTEN INTO. Every region shares one
+;		compile-time scratch bank -- only one is ever open -- so the bank has to be cleared to the
+;		padding byte here rather than once at the start of the pass.
+;
+;		THE PADDING IS PART OF THE OBJECT. Above each region's end marker sits filler carrying it
+;		to a page boundary; pass two writes none of it, and pass one's relocator fills the same
+;		bytes with the same $FF so the two agree. Leave the PREVIOUS region's bytes in the bank
+;		and they do not, and the two-pass check reports it a long way from the cause.
+;
+BLC_REGIONOPEN = 10
+;
+;		The region in nextRegion is COMPLETE. Write it out to its own overlay file and free the
+;		scratch bank for the next one. Called from both region-close sites -- RegionSwitch for
+;		code and BStrFlush for banked text -- after regionOpen has been cleared.
+;
+BLC_REGIONDONE = 11
 
 ; ************************************************************************************************
 ;

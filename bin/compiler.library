@@ -74,6 +74,23 @@ BLC_ENDPASS1 = 8
 ;		that the object is complete before the two passes are compared and the output closed.
 ;
 BLC_ENDPASS2 = 9
+;
+;		A GP.BANKED or GP.BANKEDSTR region is ABOUT TO BE WRITTEN INTO. Every region shares one
+;		compile-time scratch bank -- only one is ever open -- so the bank has to be cleared to the
+;		padding byte here rather than once at the start of the pass.
+;
+;		THE PADDING IS PART OF THE OBJECT. Above each region's end marker sits filler carrying it
+;		to a page boundary; pass two writes none of it, and pass one's relocator fills the same
+;		bytes with the same $FF so the two agree. Leave the PREVIOUS region's bytes in the bank
+;		and they do not, and the two-pass check reports it a long way from the cause.
+;
+BLC_REGIONOPEN = 10
+;
+;		The region in nextRegion is COMPLETE. Write it out to its own overlay file and free the
+;		scratch bank for the next one. Called from both region-close sites -- RegionSwitch for
+;		code and BStrFlush for banked text -- after regionOpen has been cleared.
+;
+BLC_REGIONDONE = 11
 
 ; ************************************************************************************************
 ;
@@ -246,7 +263,8 @@ CompilerRAMBankReg	= $0000
 ;			5	the BLOCK DEPTH of each line, one byte per line-table entry.
 ;			6	WHERE EACH BLOCK ENDS, and where each of its alternatives goes next.
 ;			7	the OBJECT BUFFER -- the application's, not the compiler's.
-;			8+	ONE BANK A REGION, growing UP, as many as GPBANK_MAXREGIONS allows.
+;			8	the ONE scratch bank EVERY region shares -- cleared as each one opens, and
+;				emptied to that region's own .Bnn file as it closes.
 ;			63	the GP.BANKEDSTR pool, growing DOWN from the top bank a 512K machine has.
 ;
 ;		BANKS 2 AND 4 WERE ONE BANK, and that was the wall. The two tables shared 8K, growing
@@ -475,20 +493,20 @@ asmSavedBank: 								; caller's RAM bank, saved across an assembler window
 ;		PROGRAM TOO BIG and leave through the error handler, which prints in bank 0.
 ;
 ;		THE TOP BANK, NOT A LOW ONE, AND THE OBJECT WRITER IS WHY. The banks listed above are the
-;		COMPILER's, but the application takes more that are not listed anywhere near them:
-;		OBJ_BUF_BANK is 7 and OBJ_RGN_BANK is 8, ONE BANK A REGION growing upward
-;		(application/compiler/object.asm). So any fixed low number for the pool is a collision
-;		waiting for the region count to reach it.
+;		COMPILER's, but the application takes two more that are not listed anywhere near them:
+;		OBJ_BUF_BANK is 7 and OBJ_RGN_BANK is 8 (application/compiler/object.asm).
 ;
-;		IT WAS 16, AND SIXTEEN IS EXACTLY WHERE EIGHT REGIONS STOPPED. Banks 8 to 15 were the
-;		regions and 16 was the pool -- adjacent, with nothing between them and nothing checking.
-;		A ninth region would have written straight through the string pool, and the count that
-;		refused a ninth was the extension page's table rather than this. Two limits, one number,
-;		by luck.
+;		IT WAS 16, AND SIXTEEN IS EXACTLY WHERE EIGHT REGIONS STOPPED. OBJ_RGN_BANK used to take
+;		ONE BANK A REGION growing upward, so banks 8 to 15 were the regions and 16 was the pool
+;		-- adjacent, with nothing between them and nothing checking. A ninth region would have
+;		written straight through the string pool, and the count that refused a ninth was the
+;		extension page's table rather than this. Two limits, one number, by luck.
 ;
-;		63 IS THE TOP BANK A 512K X16 HAS, so the object writer grows up from 8 and the pool
-;		grows down from 63 and they do not meet at any region count the machine can hold. This
-;		is the line that then never needs revisiting.
+;		THE REGIONS SHARE ONE BANK NOW, so bank 8 is the whole of what the object writer takes
+;		and the pool could sit almost anywhere. 63 stays regardless: it is where Phase 3's text
+;		pools grow DOWN from, it is the top bank a 512K X16 has, and a number that cannot collide
+;		with anything at any region count is the one that never needs revisiting. Being right for
+;		a second reason is not a reason to change it.
 ;
 ;		This cost most of a day when it was 7. Bank 7 held the string pool perfectly through
 ;		PASS ONE -- which writes no object -- and pass two then filled the same bank with the
@@ -1497,6 +1515,8 @@ RegionSwitchWork:
 		lda 	layoutStart+1,x
 		sta 	objPtr+1
 		inc 	regionOpen
+		lda 	#BLC_REGIONOPEN 			; the shared scratch bank belongs to this region now, and
+		jsr 	CallAPIHandler 				; starts out as the page padding above its end marker
 _RSDone:
 		rts
 		;
@@ -1526,6 +1546,8 @@ _RSClosing:
 		lda 	lowResume+1
 		sta 	objPtr+1
 		stz 	regionOpen
+		lda 	#BLC_REGIONDONE 			; out to its own overlay while the bank still holds it, so
+		jsr 	CallAPIHandler 				; the next region can have the bank
 		inc 	nextRegion
 		rts
 ;
@@ -9107,6 +9129,8 @@ _BFRegionOpen:
 		sta 	nextRegion
 		lda 	#1
 		sta 	regionOpen
+		lda 	#BLC_REGIONOPEN 			; the same shared scratch bank a GP.BANKED region uses, and
+		jsr 	CallAPIHandler 				; cleared to padding the same way
 _BFCommon:
 		;
 		;		The directory size, which every offset is shifted by: 2 for the count, then two
@@ -9184,6 +9208,11 @@ _BFPoolLoop:
 _BFPoolDone:
 		jsr 	BStrAlignPage 				; and the region is whole pages too
 		stz 	regionOpen 					; pass two is out of it; pass one never set it
+		lda 	passNumber 					; and pass two's copy goes out to its own overlay, down the
+		beq 	_BFMeasure 					; same path a GP.BANKED region takes
+		lda 	#BLC_REGIONDONE
+		jsr 	CallAPIHandler
+_BFMeasure:
 
 		;
 		;		PASS ONE WORKS OUT THE REGION'S SIZE AND ENTERS IT IN THE TABLE; PASS TWO IS TOLD

@@ -42,6 +42,10 @@ CompilerAPI:
 		beq 	_CAEndPass1
 		cmp 	#BLC_ENDPASS2
 		beq 	_CAEndPass2
+		cmp 	#BLC_REGIONOPEN
+		beq 	_CARegionOpen
+		cmp 	#BLC_REGIONDONE
+		beq 	_CARegionDone
 		.debug
 
 ; ************************************************************************************************
@@ -63,6 +67,19 @@ _CAEndPass1:
 
 _CAEndPass2:
 		jmp 	ObjStreamClose
+
+; ************************************************************************************************
+;
+;		A region is opening, and closing. One scratch bank serves them all, so it is cleared to the
+;		padding byte as each one opens and emptied to the region's own .Bnn as each one closes.
+;
+; ************************************************************************************************
+
+_CARegionOpen:
+		jmp 	ObjStreamRegionFill
+
+_CARegionDone:
+		jmp 	ObjEmitRegion
 
 ; ************************************************************************************************
 ;
@@ -2190,13 +2207,18 @@ ObjStreamReady:
 ;		share one forward-only stream. One bank per region makes a region random access, so a
 ;		rollback inside one simply gets written over.
 ;
-;		IT COSTS A BANK A REGION, AND THAT IS THE THING THAT SCALES BADLY. "Costs nothing, a
-;		region is at most 8K and there are at most eight" is what this said, and it is circular
-;		-- it is only cheap while the count is small, and the count is what the compiler is
-;		supposed to stop capping. Sixteen regions take banks 8 to 23. Only ONE region is ever
-;		open (regionOpen is a boolean and nextRegion a single index), so they can all share one
-;		scratch bank flushed at region close, and that is what takes the ceiling to the machine's
-;		63 rather than the compiler's.
+;		ONE SCRATCH BANK SERVES THEM ALL, and that is why the region count is not bounded by
+;		banks. It used to be a bank a region, justified as costing nothing because "a region is
+;		at most 8K by definition, and there are at most eight" -- which is circular: it is only
+;		cheap while the count is small, and the count is what the compiler is meant to stop
+;		capping. Sixteen regions took banks 8 to 23, and sixty-three would have run off the top.
+;
+;		ONLY ONE REGION IS EVER OPEN. regionOpen is a boolean and nextRegion a single index, and
+;		gpbank.asm refuses a GP.BANKED inside an open region. Nothing writes into a region after
+;		it closes either -- the exit bridge and the $FF end marker go in while the cursor is
+;		still inside it, the entry bridge lands in low memory before the cursor moves, and pass
+;		two never goes back over what it has written. So the bank is cleared as a region opens
+;		and emptied to the region's own .Bnn as it closes, and the next region has it.
 ;
 ;		THE OBJECT GOES OUT IN FILE ORDER: the low code and the GP.ASM pool as they are
 ;		compiled, then the alignment padding, then each region out of its bank. That is what
@@ -2206,18 +2228,14 @@ ObjStreamReady:
 ; ************************************************************************************************
 
 OBJ_BUF_BANK = 7 							; the low code, waiting to go out
-OBJ_RGN_BANK = 8 							; ...and one bank per region, 8 upwards
+OBJ_RGN_BANK = 8 							; ...and the one scratch bank every region shares
 OBJ_WINDOW   = $A000
 OBJ_BUF_SIZE = $2000
 
 ; ************************************************************************************************
 ;
-;		Start of pass two: an empty buffer, an empty sum, and every region's bank filled with
-;		the padding byte.
-;
-;		THE FILL IS NOT WASTE. Above each region's end marker sits filler that carries it up to
-;		a page boundary, and pass two writes none of it -- there is nothing to write. Pass one's
-;		relocator fills the same bytes with the same $FF, so the two objects agree.
+;		Start of pass two: an empty buffer and an empty sum. The scratch bank is NOT filled
+;		here -- ObjStreamRegionFill does that as each region opens.
 ;
 ; ************************************************************************************************
 
@@ -2226,14 +2244,23 @@ ObjStreamReset:
 		.set16 	objBufTop, FreeMemory
 		.set16 	objStmtAt, FreeMemory
 		stz 	objHold
-		;
-		lda 	layoutCount
-		beq 	_OSRDone
-		stz 	objRgnNo
-_OSRBank:
-		clc
-		lda 	objRgnNo
-		adc 	#OBJ_RGN_BANK
+		rts
+
+; ************************************************************************************************
+;
+;		A region is opening: clear the shared scratch bank to the padding byte. BLC_REGIONOPEN.
+;
+;		THE FILL IS NOT WASTE, AND IT IS PER REGION BECAUSE THE BANK IS SHARED. Above each
+;		region's end marker sits filler that carries it up to a page boundary, and pass two
+;		writes none of it -- there is nothing to write. Pass one's relocator fills the same bytes
+;		with the same $FF, so the two objects agree. Leave the PREVIOUS region's bytes sitting
+;		there and they do not, and the two-pass check reports an internal error a long way from
+;		the cause.
+;
+; ************************************************************************************************
+
+ObjStreamRegionFill:
+		lda 	#OBJ_RGN_BANK
 		jsr 	ObjStreamBank
 		lda 	#OBJ_WINDOW >> 8
 		sta 	zTemp0+1
@@ -2251,11 +2278,6 @@ _OSRByte:
 		bcc 	_OSRPage
 		ldx 	objSaveBank
 		stx 	CompilerRAMBankReg
-		inc 	objRgnNo
-		lda 	objRgnNo
-		cmp 	layoutCount
-		bcc 	_OSRBank
-_OSRDone:
 		rts
 
 ; ************************************************************************************************
@@ -2359,9 +2381,7 @@ _OSWRegion:
 		bcc 	_OSWDiverged 				; below the region, or past $BFFF -- and neither happens
 		cmp 	#OBJ_BUF_SIZE >> 8 			; unless pass two wrote more than pass one did
 		bcs 	_OSWDiverged
-		clc
-		lda 	nextRegion
-		adc 	#OBJ_RGN_BANK
+		lda 	#OBJ_RGN_BANK 				; one bank, shared -- only one region is ever open
 		jsr 	ObjStreamWindow
 		lda 	objByte
 		sta 	(zTemp0)
@@ -2556,36 +2576,41 @@ _OSFNone:
 
 ObjStreamClose:
 		stz 	objHold 					; nothing is in flight at the end of a compile, so the
-		jsr 	ObjStreamFlush 				; flush empties the buffer
-		lda 	layoutCount
-		bne 	_OSCPlaced
-		rts 								; no regions: the buffer was the whole object
+		jmp 	ObjStreamFlush 				; flush empties the buffer -- and every region has already
+											; gone out, each one as it closed
+
+; ************************************************************************************************
 ;
-;		A region's span is where the next one starts, or the object's own end for the topmost.
+;		The region in nextRegion is finished: work out how long it is and send it out to its own
+;		overlay file. BLC_REGIONDONE, from both of the close sites.
 ;
-_OSCPlaced:
-		stz 	objRgnNo
-_OSCRegion:
-		lda 	objRgnNo
-		cmp 	layoutCount
-		bcs 	_OSCDone
+;		THE SPAN IS PASS ONE'S ARITHMETIC, AND IT IS SETTLED THE WHOLE TIME. A region runs from
+;		its own layoutStart to where the NEXT one starts, or to pass1Len for the topmost, and all
+;		of those are known before pass two writes a byte. So this asks at region close exactly
+;		what the end-of-compile loop used to ask afterwards, and gets the same answer.
+;
+; ************************************************************************************************
+
+ObjEmitRegion:
+		lda 	nextRegion 					; the one that has just closed
+		sta 	objRgnNo
 		asl 	a
 		tax
 		lda 	objRgnNo
 		inc 	a
 		cmp 	layoutCount
-		bcs 	_OSCTop
+		bcs 	_OERTop
 		lda 	layoutStart+2,x
 		sta 	objSpan
 		lda 	layoutStart+3,x
 		sta 	objSpan+1
-		bra 	_OSCSpan
-_OSCTop:
+		bra 	_OERSpan
+_OERTop:
 		lda 	pass1Len
 		sta 	objSpan
 		lda 	pass1Len+1
 		sta 	objSpan+1
-_OSCSpan:
+_OERSpan:
 		sec
 		lda 	objSpan
 		sbc 	layoutStart,x
@@ -2593,11 +2618,7 @@ _OSCSpan:
 		lda 	objSpan+1
 		sbc 	layoutStart+1,x
 		sta 	objSpan+1
-		jsr 	ObjEmitOverlay
-		inc 	objRgnNo
-		bra 	_OSCRegion
-_OSCDone:
-		rts
+		jmp 	ObjEmitOverlay
 
 ; ************************************************************************************************
 ;
@@ -2638,10 +2659,8 @@ _OEOByte:
 		lda 	objBufIdx+1
 		sbc 	objSpan+1
 		bcs 	_OEODone
-		clc 								; the window closes again before every write: the
-		lda 	objRgnNo 					; KERNAL's own buffers live in bank 0
-		adc 	#OBJ_RGN_BANK
-		jsr 	ObjStreamWindow
+		lda 	#OBJ_RGN_BANK 				; the window closes again before every write: the
+		jsr 	ObjStreamWindow 				; KERNAL's own buffers live in bank 0
 		lda 	(zTemp0)
 		ldx 	objSaveBank
 		stx 	CompilerRAMBankReg

@@ -39,6 +39,10 @@ CompilerAPI:
 		beq 	_CAEndPass1
 		cmp 	#BLC_ENDPASS2
 		beq 	_CAEndPass2
+		cmp 	#BLC_REGIONOPEN
+		beq 	_CARegionOpen
+		cmp 	#BLC_REGIONDONE
+		beq 	_CARegionDone
 		.debug
 
 ; ************************************************************************************************
@@ -60,6 +64,19 @@ _CAEndPass1:
 
 _CAEndPass2:
 		jmp 	ObjStreamClose
+
+; ************************************************************************************************
+;
+;		A region is opening, and closing. One scratch bank serves them all, so it is cleared to the
+;		padding byte as each one opens and emptied to the region's own .Bnn as each one closes.
+;
+; ************************************************************************************************
+
+_CARegionOpen:
+		jmp 	ObjStreamRegionFill
+
+_CARegionDone:
+		jmp 	ObjEmitRegion
 
 ; ************************************************************************************************
 ;

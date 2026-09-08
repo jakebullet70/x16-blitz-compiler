@@ -105,6 +105,8 @@ _BFRegionOpen:
 		sta 	nextRegion
 		lda 	#1
 		sta 	regionOpen
+		lda 	#BLC_REGIONOPEN 			; the same shared scratch bank a GP.BANKED region uses, and
+		jsr 	CallAPIHandler 				; cleared to padding the same way
 _BFCommon:
 		;
 		;		The directory size, which every offset is shifted by: 2 for the count, then two
@@ -182,6 +184,11 @@ _BFPoolLoop:
 _BFPoolDone:
 		jsr 	BStrAlignPage 				; and the region is whole pages too
 		stz 	regionOpen 					; pass two is out of it; pass one never set it
+		lda 	passNumber 					; and pass two's copy goes out to its own overlay, down the
+		beq 	_BFMeasure 					; same path a GP.BANKED region takes
+		lda 	#BLC_REGIONDONE
+		jsr 	CallAPIHandler
+_BFMeasure:
 
 		;
 		;		PASS ONE WORKS OUT THE REGION'S SIZE AND ENTERS IT IN THE TABLE; PASS TWO IS TOLD

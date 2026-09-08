@@ -578,6 +578,8 @@ RegionSwitchWork:
 		lda 	layoutStart+1,x
 		sta 	objPtr+1
 		inc 	regionOpen
+		lda 	#BLC_REGIONOPEN 			; the shared scratch bank belongs to this region now, and
+		jsr 	CallAPIHandler 				; starts out as the page padding above its end marker
 _RSDone:
 		rts
 		;
@@ -607,6 +609,8 @@ _RSClosing:
 		lda 	lowResume+1
 		sta 	objPtr+1
 		stz 	regionOpen
+		lda 	#BLC_REGIONDONE 			; out to its own overlay while the bank still holds it, so
+		jsr 	CallAPIHandler 				; the next region can have the bank
 		inc 	nextRegion
 		rts
 ;

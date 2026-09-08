@@ -69,7 +69,8 @@ CompilerRAMBankReg	= $0000
 ;			5	the BLOCK DEPTH of each line, one byte per line-table entry.
 ;			6	WHERE EACH BLOCK ENDS, and where each of its alternatives goes next.
 ;			7	the OBJECT BUFFER -- the application's, not the compiler's.
-;			8+	ONE BANK A REGION, growing UP, as many as GPBANK_MAXREGIONS allows.
+;			8	the ONE scratch bank EVERY region shares -- cleared as each one opens, and
+;				emptied to that region's own .Bnn file as it closes.
 ;			63	the GP.BANKEDSTR pool, growing DOWN from the top bank a 512K machine has.
 ;
 ;		BANKS 2 AND 4 WERE ONE BANK, and that was the wall. The two tables shared 8K, growing
@@ -298,20 +299,20 @@ asmSavedBank: 								; caller's RAM bank, saved across an assembler window
 ;		PROGRAM TOO BIG and leave through the error handler, which prints in bank 0.
 ;
 ;		THE TOP BANK, NOT A LOW ONE, AND THE OBJECT WRITER IS WHY. The banks listed above are the
-;		COMPILER's, but the application takes more that are not listed anywhere near them:
-;		OBJ_BUF_BANK is 7 and OBJ_RGN_BANK is 8, ONE BANK A REGION growing upward
-;		(application/compiler/object.asm). So any fixed low number for the pool is a collision
-;		waiting for the region count to reach it.
+;		COMPILER's, but the application takes two more that are not listed anywhere near them:
+;		OBJ_BUF_BANK is 7 and OBJ_RGN_BANK is 8 (application/compiler/object.asm).
 ;
-;		IT WAS 16, AND SIXTEEN IS EXACTLY WHERE EIGHT REGIONS STOPPED. Banks 8 to 15 were the
-;		regions and 16 was the pool -- adjacent, with nothing between them and nothing checking.
-;		A ninth region would have written straight through the string pool, and the count that
-;		refused a ninth was the extension page's table rather than this. Two limits, one number,
-;		by luck.
+;		IT WAS 16, AND SIXTEEN IS EXACTLY WHERE EIGHT REGIONS STOPPED. OBJ_RGN_BANK used to take
+;		ONE BANK A REGION growing upward, so banks 8 to 15 were the regions and 16 was the pool
+;		-- adjacent, with nothing between them and nothing checking. A ninth region would have
+;		written straight through the string pool, and the count that refused a ninth was the
+;		extension page's table rather than this. Two limits, one number, by luck.
 ;
-;		63 IS THE TOP BANK A 512K X16 HAS, so the object writer grows up from 8 and the pool
-;		grows down from 63 and they do not meet at any region count the machine can hold. This
-;		is the line that then never needs revisiting.
+;		THE REGIONS SHARE ONE BANK NOW, so bank 8 is the whole of what the object writer takes
+;		and the pool could sit almost anywhere. 63 stays regardless: it is where Phase 3's text
+;		pools grow DOWN from, it is the top bank a 512K X16 has, and a number that cannot collide
+;		with anything at any region count is the one that never needs revisiting. Being right for
+;		a second reason is not a reason to change it.
 ;
 ;		This cost most of a day when it was 7. Bank 7 held the string pool perfectly through
 ;		PASS ONE -- which writes no object -- and pass two then filled the same bank with the
