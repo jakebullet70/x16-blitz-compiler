@@ -1,0 +1,44 @@
+## ***********************************************************************
+## **
+## **  KB.INC.BL -- the keyboard buffer, emptied.
+## **
+## **      KB.CLEARKB     throw away whatever is already typed
+## **
+## **  ONE ROUTINE, ON ITS OWN, because the cheapest module in the tree should be
+## **  cheap to reach. A drain belongs to programs that draw and to modules that
+## **  read keys, and neither should have to include the screen etiquette or the
+## **  dialog library to get four lines.
+## **
+## **  NOT A KEYWORD: a GET loop, no bulk data, so by the rule the GP set is built
+## **  on it belongs in BASIC.
+## **
+## **  REQUIRES, and does not #INCLUDE for you:
+## **      GPB.INC.BL        GP.DO, GP.EXITDO, GP.ISEMPTY
+## **
+## **  The whole KB.* name space belongs to this file.
+## **
+## ***********************************************************************
+#IFNDEF KB.DEFS
+#DEFINE KB.DEFS 1
+
+GOTO KB.MODULE.END
+
+## KB.CLEARKB -- throw away whatever is already typed.
+##
+## Call it before opening a dialog, and after a keystroke that redraws. Two things go
+## wrong without it. A MODAL DIALOG opened with a key still in the buffer reads that key
+## the instant it starts, answers itself and closes -- which reads as the dialog never
+## having appeared. And a HELD ARROW repeats faster than a page can be drawn, so the
+## queue keeps scrolling after the key has been let go.
+##
+## GET hands back "" on an empty buffer, so the drain stops at the first empty read.
+
+KB.CLEARKB:
+    GP.DO
+        GET KB.K$
+        IF GP.ISEMPTY(KB.K$) THEN GP.EXITDO
+    GP.LOOP
+    RETURN
+
+KB.MODULE.END:
+#ENDIF

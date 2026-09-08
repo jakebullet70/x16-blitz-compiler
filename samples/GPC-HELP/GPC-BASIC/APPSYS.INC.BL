@@ -9,6 +9,10 @@
 ## **      APPSYS.PANEL.PUT   or somewhere else
 ## **      APPSYS.ISEMU       am I running on the emulator?
 ## **
+## **  THE KEYBOARD DRAIN IS NOT HERE. It was, for an afternoon; it is KB.CLEARKB in
+## **  KB.INC.BL, so that a program wanting four lines of GET loop need not include the
+## **  screen etiquette to reach them.
+## **
 ## **  NOT A KEYWORD: everything here is one KERNAL call and some arithmetic, none of
 ## **  it in a loop or over bulk data, so by the rule the GP set is built on it belongs
 ## **  in BASIC -- and only programs that want it pay.

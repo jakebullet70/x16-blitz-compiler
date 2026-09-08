@@ -25,6 +25,7 @@ The convention is one dotted prefix per module, and nothing writes outside its o
 | `THEME.` | `THEME.INC.BL` | colour roles |
 | `APPSYS.` | `APPSYS.INC.BL` | screen save/restore, panels to disk |
 | `LINEINPUT.` | `LINEINPUT.INC.BL` | entry fields |
+| `KB.` | `KB.INC.BL` | the keyboard drain |
 | `MENUVERT.` | `MENUVERT.INC.BL` | vertical menus |
 | `BMX.` | `BMX.INC.BL` | BMX bitmap loading |
 | `BMXK.` | `BMX.INC.BL` | its KERNAL/VERA constants, kept apart from its variables |
@@ -123,6 +124,15 @@ the caller's — read `STR.USING.STR$`.
 The prefix is `STR.USING.`, a sub-prefix of `STRINGS.INC.BL`'s `STR.`, on the same footing as
 `FILE.DIR.` inside `FILE.`. Nothing here is written by `STRINGS.INC.BL` and nothing there is
 written by this module, so either can be included alone.
+
+### `KB.INC.BL`
+
+| | |
+|---|---|
+| out | — |
+| internal | `KB.K$` |
+
+One routine, `KB.CLEARKB`, and one variable it drains into. Nothing else is in the prefix.
 
 ### `LINEINPUT.INC.BL`
 

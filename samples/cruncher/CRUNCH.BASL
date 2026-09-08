@@ -1,6 +1,7 @@
 #SAVEAS "@:CRUNCH.SRC.PRG"
 #SYMFILE "@:CRUNCH.SRC.SYM"
 #INCLUDE "GPB.INC.BL"
+#INCLUDE "KB.INC.BL"
 #REM 0
 
 REM ============================================================================
@@ -24,7 +25,7 @@ PRINT "NAMES. WHAT IT DOES NOT DO IS PUT TWO"
 PRINT "STATEMENTS ON ONE LINE, AND A LINE COSTS"
 PRINT "ONE BYTE OF P-CODE. THAT IS THIS."
 PRINT
-GOSUB CX.CLEARKB
+GOSUB KB.CLEARKB
 
 REM ---- SOURCE FILE (BARE RETURN = QUIT) ----
 CR.PR$ = "SOURCE FILE: " : GOSUB CX.READLINE
@@ -107,7 +108,7 @@ PRINT#1, CR.CM$
 PRINT#1, ""
 CLOSE 1
 
-GOSUB CX.CLEARKB
+GOSUB KB.CLEARKB
 REM No ",8" here. A compiled LOAD takes the name and nothing else and chain-loads
 REM exactly as stock BASIC does inside a running program.
 LOAD "CRUNCH.BIN"
@@ -180,11 +181,3 @@ CX.FILECHECK:
   GP.ENDIF
   RETURN
 
-CX.CLEARKB:
-  GP.DO
-    GET CR.K$
-    GP.IF GP.ISEMPTY(CR.K$) THEN
-      GP.EXITDO
-    GP.ENDIF
-  GP.LOOP
-  RETURN

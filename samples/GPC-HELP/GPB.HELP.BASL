@@ -5,6 +5,7 @@
 #INCLUDE "STASH.INC.BL"
 #INCLUDE "STRCASE.INC.BL"
 #INCLUDE "APPSYS.INC.BL"
+#INCLUDE "KB.INC.BL"
 #INCLUDE "MENUVERT.INC.BL"
 #INCLUDE "LINEINPUT.INC.BL"
 #INCLUDE "GUI.INC.BL"
@@ -1198,21 +1199,12 @@ HELP.GETKEY.WAIT:
     GET HELP.IN$
     IF HELP.IN$ = "" THEN GOTO HELP.GETKEY.WAIT
     HELP.KEY = ASC(HELP.IN$)
-    GOSUB HELP.CLEAR.KB
+    GOSUB KB.CLEARKB
     RETURN
 
-## The buffer, drained, so ONE keystroke is one move. A held arrow key repeats
-## faster than a page is drawn, and without this the queue keeps the page
-## scrolling after the key has been let go. The same loop GPC.BASL and
-## CRUNCH.BASL use.
-HELP.CLEAR.KB:
-    GP.DO
-        GET HELP.KB$
-        GP.IF GP.ISEMPTY(HELP.KB$) THEN
-            GP.EXITDO
-        GP.ENDIF
-    GP.LOOP
-    RETURN
+## The drain is KB.CLEARKB now, and the reason it matters here is the second one
+## its header gives: a held arrow repeats faster than a page is drawn, so without it
+## the queue keeps the page scrolling after the key has been let go.
 
 
 ## ============================================================================
