@@ -23,9 +23,15 @@
 ;		bit pointer at every touch. Indexed this way every subscript is count or count*2.
 ;
 ;		  BStrNames    2 a group   the compressed name, exactly as ExtractVariableName returns it
-;		  BStrBases    2 a group   the group's first index in the flat string list
+;		  BStrBases    2 a group   its first index in the flat list OF THE BANK IT IS IN
 ;		  BStrCounts   2 a group   how many strings are in it
-;		  BStrPool                 the records, back to back
+;		  BStrSlots    1 a group   which text bank it is in, as a slot 0..BSTR_MAX_BANKS-1
+;
+;		AND THE RECORDS ARE NOT IN THIS BANK AT ALL. Each text bank has a pool bank of its own
+;		(BStrPoolBankTop downward, x16_storage.inc), so the tables have this one to themselves and
+;		a program's text is no longer one 8K bank in total. Only the SELECTED slot's pool is
+;		reachable at a time, which is what lets every pool sit at $A000 and the routines below not
+;		know there is more than one.
 ;
 ;		THERE IS NO TABLE OF POOL OFFSETS, and there was: the pool is SELF-DESCRIBING, because
 ;		every record starts with its own length, so the flush works the offsets out by walking it.
@@ -52,13 +58,22 @@
 ;		the window, leaving 7,424 for text; the largest program measured needs 6,842.
 ;
 BSTR_MAX_GROUPS  = 128
-BSTR_MAX_STRINGS = 1000 					; comfortably past what 7,424 bytes of pool can hold
+;
+;		4,096 IS THE SLOT FIELD'S OWN CEILING and not a budget: a GP.BSTR call site pushes
+;		slot<<12 + the index, so twelve bits are what is left for the index. It caps nothing --
+;		an 8K bank holds at most 2,730 strings, two directory bytes and a length byte each, so
+;		the region's 8K check always stops a bank first. It is here to keep the packing honest
+;		rather than to refuse a program anything.
+;
+BSTR_MAX_STRINGS = 4096 					; strings in ONE bank -- the index field's range
 
-BStrNames   = $A000 							; 2 each
+BStrNames   = $A000 							; 2 each -- bank BStrStorageBank, the tables' own
 BStrBases   = BStrNames   + 2*BSTR_MAX_GROUPS 	; 2 each
 BStrCounts  = BStrBases   + 2*BSTR_MAX_GROUPS 	; 2 each
-BStrPool    = BStrCounts  + 2*BSTR_MAX_GROUPS
-BSTR_POOL_SIZE = $C000 - BStrPool 			; ...to the top of the window
+BStrSlots   = BStrCounts  + 2*BSTR_MAX_GROUPS 	; 1 each
+
+BStrPool    = $A000 							; ...and the records, in the SELECTED SLOT's own bank
+BSTR_POOL_SIZE = $2000 						; all 8K of it: nothing shares the bank with them now
 
 ; ************************************************************************************************
 ;
@@ -77,10 +92,13 @@ BStrOpenGroup:
 		sta 	BStrNames,x
 		lda 	bstrName+1
 		sta 	BStrNames+1,x
-		lda 	bstrStringCount 			; the group starts where the flat list has got to
+		lda 	bstrStringCount 			; the group starts where its BANK's flat list has got to
 		sta 	BStrBases,x
 		lda 	bstrStringCount+1
 		sta 	BStrBases+1,x
+		ldy 	bstrGroupCount 				; ...and the bank it is in, undoubled: one byte a group
+		lda 	bstrSlot
+		sta 	BStrSlots,y
 		.bstr_release
 		rts
 _BOGFull:
@@ -115,6 +133,10 @@ BStrCloseGroup:
 ;		not. Two bytes to compare, so this is a plain linear walk -- once a block and once a
 ;		reference, so even a full table is nothing beside reading the source line.
 ;
+;		AND bstrGroupIdx IS THE SAME SUBSCRIPT UNDOUBLED, which BStrSlots wants: it is one byte a
+;		group where the other three are two. It is written rather than derived because the caller
+;		has its own use for bstrTemp the moment it gets here.
+;
 ; ************************************************************************************************
 
 BStrFindGroup:
@@ -122,6 +144,7 @@ BStrFindGroup:
 		lda 	bstrGroupCount
 		beq 	_BFGMiss 					; no groups at all
 		stz 	bstrTemp
+		stz 	bstrGroupIdx
 _BFGLoop:
 		.bstr_access
 		lda 	BStrNames,x
@@ -134,6 +157,7 @@ _BFGNext:
 		beq 	_BFGHit
 		inx
 		inx
+		inc 	bstrGroupIdx
 		inc 	bstrTemp
 		lda 	bstrTemp
 		cmp 	bstrGroupCount
@@ -201,7 +225,14 @@ _BASNoCarry:
 		jmp 	BStrRequireEOL 				; nothing may follow the string on its line
 
 _BASFull:
-		.error_memory
+		;
+		;		IN COMPILER SPACE, not errors.asm: that table links below GPBase and is copied into
+		;		every compiled program. It said OUT OF MEMORY, which sends the programmer to look at
+		;		the size of the text -- and the size of the text is not what has run out. See
+		;		gpasmcode.asm's _APBUnknown for the pattern.
+		;
+		jsr 	CallErrorHandler
+		.text 	"GP.BANKEDSTR BANK OVER 4096 STRINGS", 0
 _BASTooLong:
 		.error_syntax
 _BASSyntax:
@@ -231,9 +262,9 @@ _BPWSpace:
 		adc 	bstrPoolLen+1
 		sta 	zTemp2+1
 		pla
-		.bstr_access
+		.bpool_access
 		sta 	(zTemp2)
-		.bstr_release
+		.bpool_release
 		inc 	bstrPoolLen
 		bne 	_BPWDone
 		inc 	bstrPoolLen+1
@@ -256,9 +287,169 @@ BStrPoolPatch:
 		adc 	#BStrPool >> 8
 		sta 	zTemp2+1
 		pla
-		.bstr_access
+		.bpool_access
 		sta 	(zTemp2)
-		.bstr_release
+		.bpool_release
+		rts
+
+; ************************************************************************************************
+;
+;		Select the text bank in A: find it among the ones this program has already named, or add
+;		it, and make it the bank the pool routines write to.
+;
+;		THE SLOT IS A POSITION IN THAT LIST AND NOT THE BANK NUMBER, which is what makes the
+;		packing fit. A GP.BSTR call site pushes slot<<12 + index: four bits address sixteen slots
+;		where a bank number would need six, and the twelve left over are more index than an 8K
+;		bank can physically hold. The list itself is what the bootstrap extension page carries to
+;		the runtime, sixteen bytes at GPBSTRBANKS.
+;
+;		FIRST APPEARANCE ORDER, so both passes number the slots identically. Pass two re-reads the
+;		same blocks in the same order, and the constants pass one pushed for every GP.BSTR are
+;		exactly what pass two has to push again.
+;
+; ************************************************************************************************
+
+BStrSelectBank:
+		ldx 	#0
+_BSBFind:
+		cpx 	bstrBankCount
+		bcs 	_BSBNew
+		cmp 	bstrBankNums,x
+		beq 	_BSBHave
+		inx
+		bra 	_BSBFind
+_BSBNew:
+		cpx 	#BSTR_MAX_BANKS
+		bcs 	BStrTooManyBanks
+		sta 	bstrBankNums,x
+		;
+		;		AND THE LINE THAT OPENED IT, which is the only line a bank has. Two errors are about
+		;		a whole bank rather than a statement -- its text overflowing 8K, and a GP.BANKED
+		;		already owning it -- and both fire at the end of a pass, where currentLineNumber is
+		;		the end of the program and names nothing. This is a real line carrying a real
+		;		GP.BANKEDSTR header, and the bank number is written on it.
+		;
+		phx
+		txa
+		asl 	a
+		tax
+		lda 	currentLineNumber
+		sta 	bstrBankLines,x
+		lda 	currentLineNumber+1
+		sta 	bstrBankLines+1,x
+		plx
+		inc 	bstrBankCount
+_BSBHave:
+		txa
+
+; ************************************************************************************************
+;
+;		Make the slot in A the current one: the slot being left puts its two counters away and the
+;		one arriving takes its own out.
+;
+;		SWAPPED THROUGH SCALARS RATHER THAN INDEXED IN PLACE, and that is the whole reason the
+;		pool and group routines above do not know there is more than one bank. Every one of them
+;		reads bstrStringCount and bstrPoolLen exactly as it did when there was one, and only this
+;		routine and the flush ever change which bank those two describe.
+;
+; ************************************************************************************************
+
+BStrSelectSlot:
+		pha
+		lda 	bstrSlot
+		asl 	a 							; the two-byte tables want the slot doubled
+		tax
+		lda 	bstrStringCount
+		sta 	bstrBankStrings,x
+		lda 	bstrStringCount+1
+		sta 	bstrBankStrings+1,x
+		lda 	bstrPoolLen
+		sta 	bstrBankPoolLens,x
+		lda 	bstrPoolLen+1
+		sta 	bstrBankPoolLens+1,x
+		pla
+		sta 	bstrSlot
+		asl 	a
+		tax
+		lda 	bstrBankStrings,x
+		sta 	bstrStringCount
+		lda 	bstrBankStrings+1,x
+		sta 	bstrStringCount+1
+		lda 	bstrBankPoolLens,x
+		sta 	bstrPoolLen
+		lda 	bstrBankPoolLens+1,x
+		sta 	bstrPoolLen+1
+		ldx 	bstrSlot
+		lda 	bstrBankNums,x 				; BStrRegister reads the bank as a scalar, as it always did
+		sta 	bstrBank
+		lda 	#BStrPoolBankTop 			; ...and the pool window reads ITS bank the same way
+		sec
+		sbc 	bstrSlot
+		sta 	bstrPoolBank
+		rts
+
+;
+;		In compiler space, by the rule above. The fix is to put two of the groups in one bank, so
+;		the message says what has run out rather than how big anything is.
+;
+;		A GLOBAL NAME AND NOT A LOCAL ONE, because BStrSelectBank falls THROUGH into
+;		BStrSelectSlot: 64tass scopes a local label to the global above it, so a message that has
+;		to sit past the fall-through is out of the scope of the branch that reaches it.
+;
+BStrTooManyBanks:
+		jsr 	CallErrorHandler
+		.text 	"TOO MANY GP.BANKEDSTR TEXT BANKS", 0
+
+; ************************************************************************************************
+;
+;		The per-pass reset, and the pass-one-only one.
+;
+;		THE BANK LIST SURVIVES INTO PASS TWO AND THE COUNTERS DO NOT, and the difference matters.
+;		The bootstrap extension page carries the slot -> bank list and is written BEFORE pass two
+;		reads a block, so clearing the list at the top of pass two would send an empty table out
+;		to disk and every GP.BSTR would read whatever bank happened to be selected. The counters
+;		are rebuilt from the source by each pass and must start at zero in both.
+;
+; ************************************************************************************************
+
+; ************************************************************************************************
+;
+;		Point currentLineNumber at the GP.BANKEDSTR that opened the selected slot's bank, for the
+;		two messages that are about the bank and not about a statement. WriteBranchTo's _WBTNoLine
+;		(commands/goto.asm) is the same move made to name a missing line.
+;
+; ************************************************************************************************
+
+BStrNameSlotLine:
+		lda 	bstrSlot
+		asl 	a
+		tax
+		lda 	bstrBankLines,x
+		sta 	currentLineNumber
+		lda 	bstrBankLines+1,x
+		sta 	currentLineNumber+1
+		rts
+
+BStrResetPass:
+		stz 	bstrBankCount 				; the list is re-found, in the same order, from the same source
+		stz 	bstrSlot
+		ldx 	#2*BSTR_MAX_BANKS-1
+_BRPZero:
+		stz 	bstrBankStrings,x
+		stz 	bstrBankPoolLens,x
+		dex
+		bpl 	_BRPZero
+		lda 	#BStrPoolBankTop
+		sta 	bstrPoolBank
+		rts
+
+BStrResetBankList:
+		ldx 	#BSTR_MAX_BANKS-1
+_BRBZero:
+		stz 	bstrBankNums,x
+		dex
+		bpl 	_BRBZero
+		stz 	bstrBank
 		rts
 
 		.send code
@@ -266,11 +457,17 @@ BStrPoolPatch:
 		.section storage
 bstrGroupCount: 							; named blocks closed so far
 		.fill 	1
-bstrStringCount: 							; strings in the flat list, across every group
+bstrStringCount: 							; strings in the SELECTED SLOT's flat list
 		.fill 	2
-bstrPoolLen: 								; bytes of [len][chars] records written
+bstrPoolLen: 								; bytes of [len][chars] records in the selected slot's pool
 		.fill 	2
-bstrBank: 									; the one bank every group in this program goes to
+bstrBank: 									; the bank the selected slot is, for BStrRegister
+		.fill 	1
+bstrSlot: 									; which slot that is, 0..BSTR_MAX_BANKS-1
+		.fill 	1
+bstrBankCount: 								; distinct text banks this program names
+		.fill 	1
+bstrGroupIdx: 								; BStrFindGroup's hit, UNDOUBLED -- BStrSlots is one byte a group
 		.fill 	1
 bstrState: 									; 0 = no block open, 1 = one is
 		.fill 	1
@@ -285,6 +482,30 @@ bstrLenAt: 									; where its length byte sits in the pool
 bstrTemp:
 		.fill 	2
 		.send storage
+
+; ************************************************************************************************
+;
+;		THE PER-SLOT STATE, IN THE CODE SECTION and not in storage, for the reason gpbank.asm's
+;		region tables are there: the code section is the compiler's own image, above ObjectBase,
+;		thrown away when the object is written -- so a compiled program pays nothing for it. This
+;		is 112 bytes and the storage hole is 1K holding everything else the compiler keeps between
+;		statements.
+;
+;		Each slot's two counters are what BStrSelectSlot swaps through bstrStringCount and
+;		bstrPoolLen; the records themselves are in the slot's own RAM bank and never here.
+;
+; ************************************************************************************************
+
+		.section code
+bstrBankNums: 								; the RAM bank each slot is -- THIS is what goes to the runtime
+		.fill 	BSTR_MAX_BANKS
+bstrBankStrings: 							; strings in each slot's flat list
+		.fill 	2*BSTR_MAX_BANKS
+bstrBankPoolLens: 							; bytes of records in each slot's pool
+		.fill 	2*BSTR_MAX_BANKS
+bstrBankLines: 								; the GP.BANKEDSTR line that first named each slot's bank
+		.fill 	2*BSTR_MAX_BANKS
+		.send code
 
 ; ************************************************************************************************
 ;

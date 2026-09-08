@@ -2,7 +2,7 @@
 ; ************************************************************************************************
 ;
 ;		Name:		gpbstrflush.asm
-;		Purpose:	GP.BANKEDSTR -- the bank image, into the object as one more region
+;		Purpose:	GP.BANKEDSTR -- the bank images, into the object as one region each
 ;		Created:	7th September 2026
 ;		Reviewed: 	No
 ;		Author : 	Steven De George SR
@@ -14,10 +14,16 @@
 
 ; ************************************************************************************************
 ;
-;		The finished text goes into the object as ONE MORE BANK REGION, above every GP.BANKED one,
-;		and that is the whole of the placement. It needs none of GPBankRelocate's machinery --
-;		no line table to fix, no block ends, no branch corrections, no entry or exit bridge --
-;		because nothing ever branches into text. It is data.
+;		The finished text goes into the object as ONE BANK REGION A TEXT BANK, above every
+;		GP.BANKED one, and that is the whole of the placement. It needs none of GPBankRelocate's
+;		machinery -- no line table to fix, no block ends, no branch corrections, no entry or exit
+;		bridge -- because nothing ever branches into text. It is data.
+;
+;		ONE REGION EACH AND NOT ONE BETWEEN THEM, which is the whole of Phase 3 down here: a
+;		region is a bank, so several text banks are several regions, and each one then gets its
+;		own .Bnn overlay file with no further arrangement -- the region machinery does it. The
+;		loop runs in SLOT order, so the layout slots they take are contiguous and last, which is
+;		how pass two finds each of them again.
 ;
 ;		WHY IT CAN JUST BE APPENDED. The bootstrap extension page copies the regions with ONE loop
 ;		that runs on from each to the next (application/compiler/bootstrap2.asm), so all it asks of
@@ -56,7 +62,7 @@
 ; ************************************************************************************************
 
 BStrFlush:
-		lda 	bstrGroupCount 				; no GP.BANKEDSTR in this program at all
+		lda 	bstrBankCount 				; no GP.BANKEDSTR in this program at all
 		bne 	_BFGo
 		rts
 _BFGo:
@@ -70,6 +76,9 @@ _BFGo:
 		bne 	_BFShared
 		.error_unimplemented
 _BFShared:
+		lda 	#0 							; the first slot, and A carries the next one round the loop
+_BFSlotLoop:
+		jsr 	BStrSelectSlot 				; ...which brings its counters and its pool bank with it
 		;
 		;		BOTH PASSES EMIT THE IDENTICAL BYTE STREAM FROM THE IDENTICAL ADDRESS, and that is
 		;		not tidiness: the compiler checks pass two's finished length AND its running
@@ -88,6 +97,8 @@ _BFShared:
 		sta 	bstrRegionPage
 		lda 	passNumber
 		bne 	_BFRegionOpen
+		lda 	bstrSlot 					; and where pass two has to start again is the FIRST slot's
+		bne 	_BFCommon 					; start, not each one's -- see ClaimRegionTop
 		lda 	objPtr
 		sta 	bstrStart
 		lda 	objPtr+1
@@ -100,8 +111,11 @@ _BFShared:
 		;		than depend on a count kept somewhere else.
 		;
 _BFRegionOpen:
-		lda 	layoutCount
-		dec 	a
+		sec 									; THE TEXT REGIONS ARE THE LAST bstrBankCount ENTRIES of the
+		lda 	layoutCount 				; layout and they are in slot order, because pass one
+		sbc 	bstrBankCount 				; registered them from this same loop
+		clc
+		adc 	bstrSlot
 		sta 	nextRegion
 		lda 	#1
 		sta 	regionOpen
@@ -198,7 +212,7 @@ _BFMeasure:
 		;		SaveLayout takes pass one's entry and RestoreLayout hands it back.
 		;
 		lda 	passNumber
-		bne 	_BFDone
+		bne 	_BFNext
 		sec 								; A REGION IS AT MOST 32 PAGES: that is the whole of
 		lda 	objPtr+1 					; $A000-$BFFF, and a longer one would have the copy run
 		sbc 	bstrRegionPage 				; past $BFFF into the I/O page
@@ -206,27 +220,32 @@ _BFMeasure:
 		bcs 	_BFTooBig
 		sta 	bstrPages
 		jsr 	BStrRegister
+_BFNext:
+		lda 	bstrSlot 					; ...and on to the next text bank
+		inc 	a
+		cmp 	bstrBankCount
+		bcs 	_BFDone
+		jmp 	_BFSlotLoop 				; jmp: the body is far longer than a branch reaches
 _BFDone:
 		rts
 
 _BFTooBig:
 		;
-		;		ALL of it, not one group: every GP.BANKEDSTR block in the program shares one bank,
-		;		so the total is what has overflowed and the message says so. NO LINE IS NAMED --
-		;		this runs at the end of pass one and the text belongs to no line in particular, so
-		;		currentLineNumber is zeroed rather than left holding the last line of the program,
-		;		which would send the programmer to a line that has nothing to do with it.
+		;		ONE BANK'S WORTH, not the program's: text lives in as many banks as it names, so what
+		;		has overflowed is one of them and the message has to say which. It says it with a
+		;		LINE -- the GP.BANKEDSTR that first named that bank -- because a line is what the
+		;		programmer can go and read, and the bank number is written on it. This runs at the
+		;		end of pass one, where currentLineNumber is the end of the program and names nothing.
 		;
-		;		PHASE 3 CHANGES THIS. Once text can live in several banks the message has to say
-		;		which, and bstrBank is what it will name.
+		;		The fix is to split the groups across another bank or to shorten the text, and the
+		;		first of those did not exist until this pass over the code.
 		;
 		;		The text is in compiler space, not in errors.asm: that table links below GPBase and
 		;		is copied into every compiled program. See gpasmcode.asm's _APBUnknown.
 		;
-		stz 	currentLineNumber
-		stz 	currentLineNumber+1
+		jsr 	BStrNameSlotLine
 		jsr 	CallErrorHandler
-		.text 	"ALL GP.BANKEDSTR TEXT OVER 8K", 0
+		.text 	"GP.BANKEDSTR TEXT IN ONE BANK OVER 8K", 0
 
 ; ************************************************************************************************
 ;
@@ -361,13 +380,14 @@ _BRTooMany:
 		.text 	"NO REGION LEFT FOR GP.BANKEDSTR TEXT", 0
 
 ;
-;		AND ITS OWN MESSAGE TOO, for the same reason. It names both keywords because that
-;		is the whole of the identification a programmer needs: there is one text bank in a
-;		program, so which GP.BANKEDSTR is never in question, and the GP.BANKED to move is
-;		the one that names the same number. The line is beside the point -- this fires from
-;		BStrFlush at the end of pass one, where currentLineNumber is the end of the source.
+;		AND ITS OWN MESSAGE TOO, for the same reason. It names both keywords, and the LINE it
+;		names is the GP.BANKEDSTR that first asked for that bank -- so the programmer has one end
+;		of the clash in hand and the GP.BANKED to move is the one naming the same number. Without
+;		that line it would report the end of the source, because this fires from BStrFlush at the
+;		end of pass one.
 ;
 _BRBankTaken:
+		jsr 	BStrNameSlotLine
 		jsr 	CallErrorHandler
 		.text 	"GP.BANKEDSTR AND GP.BANKED SHARE A BANK", 0
 
@@ -400,10 +420,10 @@ BStrPoolByte:
 		lda 	#BStrPool >> 8
 		adc 	bstrIdx+1
 		sta 	zTemp2+1
-		.bstr_access
+		.bpool_access
 		lda 	(zTemp2)
 		sta 	bstrByte
-		.bstr_release
+		.bpool_release
 		lda 	bstrByte
 		rts
 

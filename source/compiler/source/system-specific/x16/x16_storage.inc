@@ -309,10 +309,16 @@ asmSavedBank: 								; caller's RAM bank, saved across an assembler window
 ;		extension page's table rather than this. Two limits, one number, by luck.
 ;
 ;		THE REGIONS SHARE ONE BANK NOW, so bank 8 is the whole of what the object writer takes
-;		and the pool could sit almost anywhere. 63 stays regardless: it is where Phase 3's text
-;		pools grow DOWN from, it is the top bank a 512K X16 has, and a number that cannot collide
-;		with anything at any region count is the one that never needs revisiting. Being right for
-;		a second reason is not a reason to change it.
+;		and the pool could sit almost anywhere. 63 stays regardless: it is where the text pools
+;		grow DOWN from, it is the top bank a 512K X16 has, and a number that cannot collide with
+;		anything at any region count is the one that never needs revisiting. Being right for a
+;		second reason is not a reason to change it.
+;
+;		THE POOLS ARE NOT IN HERE ANY MORE, and that is Phase 3: this bank holds the four GROUP
+;		tables and nothing else, and each text bank's records live in a bank of their own -- see
+;		below. What it buys the single-bank program is the 768 bytes the tables used to take out
+;		of its pool: the pool was 7,424 and is 8,192 now, and the region's own 8K check is the
+;		only thing that stops it.
 ;
 ;		This cost most of a day when it was 7. Bank 7 held the string pool perfectly through
 ;		PASS ONE -- which writes no object -- and pass two then filled the same bank with the
@@ -345,5 +351,48 @@ bstr_release .macro
 
 		.section storage
 bstrSavedBank: 								; caller's RAM bank, saved across a banked-string window
+		.fill 	1
+		.send 	storage
+
+;
+;		BANKS 62 DOWNWARD -- ONE A GP.BANKEDSTR TEXT BANK, holding that bank's records and nothing
+;		else. Sixteen text banks reach 47, and the object writer's shared scratch bank is 8, so the
+;		two grow towards each other and do not meet at any count either of them can have.
+;
+;		THE BANK IS A VARIABLE HERE AND A CONSTANT IN EVERY OTHER WINDOW, which is the whole of
+;		the difference: the pool routines are written once and the slot says which bank they land
+;		in. BStrSelectSlot is the only thing that writes bstrPoolBank, and it writes it whenever
+;		the slot changes -- at a GP.BANKEDSTR header, and once per slot in the flush.
+;
+;		Same rules as the others: never nested inside another window, never held across a KERNAL
+;		call, and opened and closed ONCE PER BYTE in the flush because WriteCodeByte can raise
+;		PROGRAM TOO BIG and leave through an error handler that prints in bank 0.
+;
+BStrPoolBankTop	= 62
+
+bpool_access .macro
+		php
+		pha
+		lda 	CompilerRAMBankReg 			; remember whatever the caller had selected
+		sta 	bpoolSavedBank
+		lda 	bstrPoolBank
+		sta 	CompilerRAMBankReg
+		pla
+		plp
+		.endm
+
+bpool_release .macro
+		php
+		pha
+		lda 	bpoolSavedBank
+		sta 	CompilerRAMBankReg
+		pla
+		plp
+		.endm
+
+		.section storage
+bpoolSavedBank: 							; caller's RAM bank, saved across a string-pool window
+		.fill 	1
+bstrPoolBank: 								; which bank that is -- the selected slot's, not a constant
 		.fill 	1
 		.send 	storage

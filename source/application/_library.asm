@@ -690,17 +690,11 @@ BXUnits:
 BXDone:
 		stz 	BXTable 					; a second RUN finds bank 0 and skips the lot
 		;
-		;		WHICH BANK GP.BSTR READS, handed to the runtime rather than assembled into it: the
-		;		runtime is SHARED, so one image serves every program and cannot know which bank any
-		;		of them chose for its text. Written here because this page already exists only for
-		;		a banked program, and a program with GP.BANKEDSTR is one by definition.
+		;		NOTHING IS DONE HERE FOR GP.BSTR ANY MORE. Which bank each of its slots reads is a
+		;		table at the top of this very page, at the fixed address GPBSTRBANKS, and the runtime
+		;		reads it where it lies -- so the handover is the page arriving, and there is no code.
+		;		It was one byte copied into the runtime's divider padding when there was one bank.
 		;
-		;		Harmless in a program that has no text: the byte is written and never read, because
-		;		nothing calls GP.BSTR.
-		;
-BXBStrBank:
-		lda 	#0 							; PATCHED with the GP.BANKEDSTR bank
-		sta 	GPBSTRBANK
 		lda 	BXBase
 		ldx 	BXWS
 		ldy 	BXWSEnd
@@ -758,7 +752,24 @@ BXIndex:
 BXErrText:
 		.text 	"?OVL", 13, 0
 
-		.fill 	$0A00 - *, 0 				; pad through $09FF so the p-code starts at $0A00
+; ------------------------------------------------------------------------------------------------
+;		WHICH RAM BANK EACH GP.BSTR SLOT READS -- one byte a slot, written by object.asm out of the
+;		compiler's text-bank list, and read by the RUNTIME where it lies. There is no copy and no
+;		code: the handover is this page arriving with the program.
+;
+;		AT THE TOP OF THE PAGE AND NOT WHEREVER IT FELL, because the runtime has to know the
+;		address and cannot be told one -- it is SHARED, so one image serves every program. The
+;		address is GPBSTRBANKS in common.inc, the .cerror below is what stops the loader growing
+;		into it, and the table ending exactly at $0A00 is what keeps the p-code where it was.
+;
+;		A slot with no bank stays zero and is never read: the compiler only ever emits a slot it
+;		has filled in.
+; ------------------------------------------------------------------------------------------------
+		.cerror * > GPBSTRBANKS, "bootstrap extension page has grown into the GP.BSTR bank table"
+		.fill 	GPBSTRBANKS - *, 0 			; pad up to the table
+BXBStrBanks:
+		.fill 	BSTR_MAX_BANKS, 0 			; PATCHED -- and it ends exactly at $0A00, where the p-code
+											; starts
 
 		.here
 ProgramBootExtEnd: 							; PHYSICAL end -- (End - Start) == 256 bytes
@@ -769,7 +780,7 @@ ProgramBootExtEnd: 							; PHYSICAL end -- (End - Start) == 256 bytes
 BootExtTableOffset = BXTable - $0900
 BootExtNameLenOffset = BXNameLen - $0900
 BootExtNameOffset = BXName - $0900
-BootExtBStrOffset = BXBStrBank+1 - $0900 	; the GP.BSTR bank, an instruction OPERAND
+BootExtBStrOffset = BXBStrBanks - $0900 	; the GP.BSTR slot -> bank table, BSTR_MAX_BANKS long
 BootExtEntry = BXEntry 						; the address the bootstrap's jmp is patched to
 
 		.send code
@@ -2110,7 +2121,9 @@ _WOCSBootNoHi:
 		;		same job -- a page on its way into OBJECT.PRG.
 		;
 		lda 	gpBankActive
-		beq 	_WOCSCodePart
+		bne 	_WOCSExtPage 				; jmp: the page is built and patched below, which the two
+		jmp 	_WOCSCodePart 				; tables put out of a branch's reach
+_WOCSExtPage:
 		.set16 	zTemp0,ProgramBootExt
 		.set16 	zTemp1,imageBuffer
 		ldy 	#0 							; 256 bytes exactly, so Y wraps to end it
@@ -2132,8 +2145,19 @@ _WOCSExtCopy:
 		;		AND THE NAME THE LOADER ASKS FOR, once, with "B00" on the end -- the extension
 		;		page pokes the bank's two digits into it per region. See ObjBuildOverlayName.
 		;
-		lda 	bstrBank 					; which bank GP.BSTR reads its text out of. Zero when
-		sta 	imageBuffer+BootExtBStrOffset 	; the program has none, and then never read
+		;
+		;		AND WHICH BANK EACH GP.BSTR SLOT READS ITS TEXT OUT OF -- the whole table, not the
+		;		slots in use, because a slot the program never filled is zero and never read: the
+		;		compiler only ever emits a slot it has filled in. Copying all of it means nothing
+		;		here has to know how many there are.
+		;
+		ldx 	#BSTR_MAX_BANKS-1
+_WOCSExtBStr:
+		lda 	bstrBankNums,x
+		sta 	imageBuffer+BootExtBStrOffset,x
+		dex
+		bpl 	_WOCSExtBStr
+		;
 		ldx 	#0
 _WOCSExtTable:
 		lda 	gpBankBanks,x

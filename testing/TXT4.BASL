@@ -1,0 +1,22 @@
+#SAVEAS "@:TXT4.SRC.PRG"
+#REM 0
+#INCLUDE "GPB.INC.BL"
+
+## TXT3 WITH THE BANKS THE OTHER WAY ROUND, to tell slot 0 apart from bank 6: in TXT3 the
+## group that came out wrong was in bank 6 AND in slot 0, and only one of those can be the
+## reason.
+
+GP.BANKEDSTR 7 G.A
+  "A0"
+  "A1"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR 6 G.B
+  "B0"
+GP.ENDBANKEDSTR
+
+PRINT "T1 " + GP.BSTR(G.A, 0)
+PRINT "T2 " + GP.BSTR(G.A, 1)
+PRINT "T3 " + GP.BSTR(G.B, 0)
+PRINT "T5 END"
+END

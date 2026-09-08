@@ -46,14 +46,21 @@
 ;		writes the allocated block's address into NSMantissa0/1,x -- the very bytes the index
 ;		arrived in. Read it first or it is gone.
 ;
-;		GPBSTRBANK IS WRITTEN BY THE PROGRAM'S BOOTSTRAP, not assembled in: the runtime is
-;		SHARED, so one image serves every program and cannot know which bank any of them chose.
-;		The bootstrap extension page (application/compiler/bootstrap2.asm) sets it on the way in,
-;		beside the region copies it already does.
+;		THE TEXT IS IN ONE OF SIXTEEN BANKS AND THE CONSTANT SAYS WHICH. The top four bits of the
+;		index are a SLOT, and GPBSTRBANKS turns the slot into the RAM bank -- so a program's text
+;		is no longer capped at one 8K bank, and it costs the call site nothing at all: the
+;		constant was already being pushed and the bits were already spare.
 ;
-;		It is a FIXED address from common.inc and not a label in this file, because this file is
-;		linked into two images with gp.library at opposite ends and a label lands somewhere
-;		different in each. See the note beside GPBSTRBANK.
+;		TWELVE BITS ARE LEFT FOR THE INDEX, and they cap nothing. An 8K bank holds at most 2,730
+;		strings -- two directory bytes and a length byte each -- so the compiler's 8K region check
+;		stops a bank long before 4,096 could.
+;
+;		GPBSTRBANKS IS WRITTEN BY THE COMPILER AND READ WHERE IT LIES: it is the top sixteen
+;		bytes of the program's bootstrap extension page, filled in as that page is built. The
+;		runtime is SHARED, so one image serves every program and cannot know which banks any of
+;		them chose -- and it is a FIXED address from common.inc, not a label in this file,
+;		because this file is linked into two images with gp.library at opposite ends and a label
+;		lands somewhere different in each. See the note beside GPBSTRBANKS.
 ;
 ; ************************************************************************************************
 
@@ -67,7 +74,29 @@ UnaryGPBStr: ;; [!gp.bstr]
 		;		crash a long way from here. GP.ARRPTR can read the slot raw because its argument
 		;		is an array reference and is int16 by construction; this one cannot.
 		;
-		jsr 	GetInteger16Bit 			; the flat index, into zTemp0
+		jsr 	GetInteger16Bit 			; slot<<12 + the index within that slot's bank, into zTemp0
+		;
+		;		THE SLOT COMES OFF THE TOP FIRST, because everything below wants the index alone.
+		;
+		;		AND X GOES ON THE STACK ACROSS IT, because X is the EVALUATION STACK SLOT -- the same
+		;		X the note above says StringAllocTemp writes NSMantissa0/1,x with. Indexing the bank
+		;		table with it destroys it, and the value it destroys it with is the slot: text in the
+		;		program's SECOND text bank then lands in the right place by coincidence and text in
+		;		the first does not, which is what it did.
+		;
+		phx
+		lda 	zTemp0+1
+		lsr 	a
+		lsr 	a
+		lsr 	a
+		lsr 	a
+		tax
+		lda 	GPBSTRBANKS,x 				; ...and which RAM bank that slot's text is in
+		sta 	gpbsBank
+		plx
+		lda 	zTemp0+1
+		and 	#$0F 						; leaving twelve bits of index
+		sta 	zTemp0+1
 		;
 		;		The directory entry for it: $A002 + index*2.
 		;
@@ -83,7 +112,7 @@ UnaryGPBStr: ;; [!gp.bstr]
 		;
 		lda 	SelectRAMBank 				; from here to the restore below, $A000-$BFFF is text
 		sta 	gpbsSaved
-		lda 	GPBSTRBANK
+		lda 	gpbsBank
 		sta 	SelectRAMBank
 		;
 		;		...and the record it points at. The stored offset is from $A000 and a bank is 8K,
@@ -134,6 +163,8 @@ _GBSRestore:
 
 		.section storage
 gpbsSaved: 									; the caller's bank, held across the fetch
+		.fill 	1
+gpbsBank: 									; the slot's text bank, read before the index is unpacked
 		.fill 	1
 gpbsLen: 									; the record's length, held across StringAllocTemp
 		.fill 	1

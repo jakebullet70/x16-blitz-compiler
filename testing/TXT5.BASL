@@ -1,0 +1,16 @@
+#SAVEAS "@:TXT5.SRC.PRG"
+#REM 0
+#INCLUDE "GPB.INC.BL"
+
+## ONE text bank, and bank 6 -- the control for TXT3, and the shape every program had before
+## this pass over the code.
+
+GP.BANKEDSTR 6 G.A
+  "A0"
+  "A1"
+GP.ENDBANKEDSTR
+
+PRINT "T1 " + GP.BSTR(G.A, 0)
+PRINT "T2 " + GP.BSTR(G.A, 1)
+PRINT "T5 END"
+END

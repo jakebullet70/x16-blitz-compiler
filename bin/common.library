@@ -316,7 +316,7 @@ RT_ENTRY = RTBASE+4 						; 4-byte magic at RTBASE, then jmp StartRuntime
 RTGPMAGIC = RTBASE-4 						; 4-byte "handlers are loaded too" magic
 
 ;
-;		GP.BSTR's text bank, one byte, handed from the program's bootstrap to the runtime.
+;		GP.BSTR's text banks: SIXTEEN, one to a slot, handed from the program to the runtime.
 ;
 ;		A FIXED ADDRESS AND NOT A STORAGE LABEL, and the reason is worth writing down. The runtime
 ;		is linked TWICE with gp.library at opposite ends -- last in the application's embedded
@@ -325,11 +325,27 @@ RTGPMAGIC = RTBASE-4 						; 4-byte "handlers are loaded too" magic
 ;		bootstrap was told about and reads a stale byte in the other: here it was $05E5 against
 ;		$0400, and the program ran, printed garbage, and blamed the handler.
 ;
-;		It sits in the divider's padding, immediately below RTGPMAGIC. A core-only program's
-;		workspace runs up to RTBASE and overwrites it, which is correct -- such a program has no
-;		GPB handlers and so cannot call GP.BSTR.
+;		IT IS READ WHERE IT LIES AND NOT COPIED, which is what makes sixteen banks cost less than
+;		one did. The one bank was a byte in the runtime's divider padding, written on the way in
+;		by the bootstrap extension page; the table lives IN that extension page instead, at its
+;		very top, so the compiler fills it in as it builds the page and nothing at run time moves
+;		it at all. The old handover's five bytes are gone and the sixteen come out of the page's
+;		spare, which was measured at 32.
 ;
-GPBSTRBANK = RTGPMAGIC-1 					; the RAM bank a GP.BANKEDSTR program keeps its text in
+;		THE ADDRESS IS PINNED BY THIS CONSTANT AND CHECKED AT BOTH ENDS -- bootstrap2.asm pads up
+;		to it and .cerrors if its loader has grown into it. A program with NO region has no
+;		extension page at all and its p-code starts at $0900, so $09F0 is p-code there; that is
+;		correct and not a hazard, because such a program has no GP.BANKEDSTR and so nothing that
+;		can call GP.BSTR.
+;
+;		SIXTEEN, because the slot is the top FOUR BITS of the constant every GP.BSTR call site
+;		already pushes -- see compiler/commands/gpbstr.asm. Four bits leaves twelve for the index,
+;		and 4,096 is above the 2,730 strings an 8K bank can physically hold (two directory bytes
+;		and a length byte each), so the region's own 8K check always fires first and the index
+;		field caps nothing.
+;
+BSTR_MAX_BANKS = 16 						; text banks a program may have, = the slot field's range
+GPBSTRBANKS = $0A00 - BSTR_MAX_BANKS 		; the table, at the top of the extension page ($09F0)
 PCODE_PAGE = $09 							; shared-mode p-code base page ($0900, page-aligned)
 MIN_WS_PAGES = 16 							; smallest workspace a shared program keeps (4K)
 ;

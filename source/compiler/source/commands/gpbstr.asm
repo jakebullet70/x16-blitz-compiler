@@ -129,9 +129,14 @@ CommandGPEndBankedStrCompile:
 ;
 ;		The header:  GP.BANKEDSTR <bank> <name>
 ;
-;		ONE BANK FOR THE WHOLE PROGRAM, so the second and later blocks must name the same one. It
-;		is written on every block rather than only the first because a block should be readable
-;		where it sits: a reader must not have to find the first one to know where the text lives.
+;		ANY BANK, AND AS MANY AS SIXTEEN. A block names the bank its text goes to and blocks need
+;		not agree: each distinct bank becomes a SLOT, in first appearance order, and each slot
+;		becomes a region and an overlay file of its own. It was one bank for the whole program,
+;		which capped a program's literal text at the 8K one bank holds.
+;
+;		THE BANK IS STILL WRITTEN ON EVERY BLOCK, and now it has to be: a block should be readable
+;		where it sits, and which bank this one goes to is no longer answerable by finding the
+;		first block in the file.
 ;
 ;		THE NAME MAY NOT CARRY A TYPE. A group is not a variable, so a $, a % or a ( on it is a
 ;		syntax error rather than something quietly ignored -- NSSString, NSSIInt16 and NSSArray
@@ -141,16 +146,8 @@ CommandGPEndBankedStrCompile:
 
 BStrReadHeader:
 		jsr 	GPBankReadNumber 			; the bank, into gpBankNumber -- shared with GP.BANKED
-		lda 	bstrGroupCount
-		bne 	_BRHSameBank
-		lda 	gpBankNumber 				; the first block names the bank for all of them
-		sta 	bstrBank
-		bra 	_BRHName
-_BRHSameBank:
-		lda 	gpBankNumber
-		cmp 	bstrBank
-		bne 	_BRHStructure 				; ...and every later one must agree with it
-_BRHName:
+		lda 	gpBankNumber 				; find it among this program's text banks or add it, and make
+		jsr 	BStrSelectBank 				; it the one the groups below go to
 		jsr 	GetNextNonSpace 			; a name starts with a letter
 		jsr 	CharIsAlpha
 		bcc 	_BRHSyntax
@@ -195,6 +192,13 @@ _BREBad:
 ;		plus I plus the keyword; the letters M-E-N-U cost nothing at run time. That is the whole
 ;		reason the lookup is here and not in the bank.
 ;
+;		AND NEITHER DOES THE BANK. The constant is slot<<12 + the group's first index IN ITS OWN
+;		BANK, so which of the program's sixteen text banks to read comes out of bits that were
+;		already spare -- the runtime turns the slot into a bank through GPBSTRBANKS. Sixteen text
+;		banks therefore cost a call site NOTHING, and there are 250 of them in GPBMODS and 347 in
+;		GPBFILES: a second operand would have been ~500 and ~700 bytes of RESIDENT p-code, which
+;		is the side that is short of room.
+;
 ;		THEY MUST NOT FALL THROUGH TO THE VARIABLE TABLE. A mistyped group name has to be a hard
 ;		error: silently finding a variable of the same name would compile clean and read the
 ;		wrong string, or string zero, for ever.
@@ -211,10 +215,18 @@ BankedStrGroupCompile:
 		lda 	BStrBases,x
 		sta 	bstrTemp
 		lda 	BStrBases+1,x
+		sta 	bstrTemp+1
+		ldy 	bstrGroupIdx 				; ...and which text bank it is in, as a slot
+		lda 	BStrSlots,y
 		.bstr_release
+		asl 	a 							; THE SLOT GOES IN THE TOP FOUR BITS, where the index cannot
+		asl 	a 							; reach it: an 8K bank holds at most 2,730 strings and the
+		asl 	a 							; twelve bits left over address 4,096, so the region's own 8K
+		asl 	a 							; check always fires first
+		ora 	bstrTemp+1
 		tay
 		lda 	bstrTemp
-		jsr 	PushIntegerYA 				; the group's first index in the flat list
+		jsr 	PushIntegerYA 				; slot<<12 + the group's first index in THAT BANK's flat list
 		clc 								; carry CLEAR or the "N" after the X: is dropped
 		rts
 

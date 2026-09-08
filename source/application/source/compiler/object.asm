@@ -505,7 +505,9 @@ _WOCSBootNoHi:
 		;		same job -- a page on its way into OBJECT.PRG.
 		;
 		lda 	gpBankActive
-		beq 	_WOCSCodePart
+		bne 	_WOCSExtPage 				; jmp: the page is built and patched below, which the two
+		jmp 	_WOCSCodePart 				; tables put out of a branch's reach
+_WOCSExtPage:
 		.set16 	zTemp0,ProgramBootExt
 		.set16 	zTemp1,imageBuffer
 		ldy 	#0 							; 256 bytes exactly, so Y wraps to end it
@@ -527,8 +529,19 @@ _WOCSExtCopy:
 		;		AND THE NAME THE LOADER ASKS FOR, once, with "B00" on the end -- the extension
 		;		page pokes the bank's two digits into it per region. See ObjBuildOverlayName.
 		;
-		lda 	bstrBank 					; which bank GP.BSTR reads its text out of. Zero when
-		sta 	imageBuffer+BootExtBStrOffset 	; the program has none, and then never read
+		;
+		;		AND WHICH BANK EACH GP.BSTR SLOT READS ITS TEXT OUT OF -- the whole table, not the
+		;		slots in use, because a slot the program never filled is zero and never read: the
+		;		compiler only ever emits a slot it has filled in. Copying all of it means nothing
+		;		here has to know how many there are.
+		;
+		ldx 	#BSTR_MAX_BANKS-1
+_WOCSExtBStr:
+		lda 	bstrBankNums,x
+		sta 	imageBuffer+BootExtBStrOffset,x
+		dex
+		bpl 	_WOCSExtBStr
+		;
 		ldx 	#0
 _WOCSExtTable:
 		lda 	gpBankBanks,x

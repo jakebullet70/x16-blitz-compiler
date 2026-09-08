@@ -285,8 +285,8 @@ _SCEClosed:
 											; two is handed that and writes them there directly
 		;
 		;		AND THE TEXT GOES ON BEFORE THE LAYOUT IS SAVED, which is not an ordering nicety:
-		;		the text is a REGION, in its own bank, with its own layout slot, and the layout is
-		;		how pass two and ObjStreamClose both find it. Written as low code instead, its
+		;		each text bank is a REGION, in a bank of its own, with its own layout slot, and
+		;		the layout is how pass two and ObjStreamClose find them. Written as low code, its
 		;		bytes stream through the low buffer at an objPtr above everything the buffer has
 		;		reached, and the streamer pads forward across the whole span the GP.BANKED regions
 		;		occupy -- 65,535 bytes of filler in a 22K program, invisible to every check here
@@ -472,8 +472,10 @@ ResetPassState:
 		stz 	bstrPoolLen
 		stz 	bstrPoolLen+1
 		stz 	bstrState 					; no GP.BANKEDSTR block open
-											; bstrBank is NOT cleared: the bootstrap extension page
-											; carries it and goes out before pass two reads a block
+		jsr 	BStrResetPass 				; ...and every text bank's own counters, back to slot 0
+											; THE SLOT -> BANK LIST IS NOT CLEARED HERE: the bootstrap
+											; extension page carries it and goes out before pass two
+											; reads a block
 		;
 		stz 	nextRegion 					; ...and pass two's place in the region layout
 		stz 	regionOpen
@@ -486,17 +488,17 @@ ResetPassState:
 		;
 		lda 	passNumber
 		bne 	_RPSPassTwo
-		stz 	bstrPages 					; PASS ONE STARTS WITH NO BANKED TEXT. Both of these
-		stz 	bstrBank 					; are cleared HERE and not with the rest above,
-											; because pass two has to inherit pass one's answers:
-											; the bootstrap extension page carries the bank byte
-											; and goes out before pass two reads a block.
+		stz 	bstrPages 					; PASS ONE STARTS WITH NO BANKED TEXT. The slot -> bank
+		jsr 	BStrResetBankList 			; list is cleared HERE and not with the rest above,
+											; because pass two has to inherit pass one's answer:
+											; the bootstrap extension page carries the list and
+											; goes out before pass two reads a block.
 											;
-											; bstrBank matters even to a program with no
-											; GP.BANKEDSTR at all -- object.asm pokes it into
-											; every bootstrap, so left uninitialised it puts a
-											; different stale byte in each build and two compiles
-											; of one source stop matching.
+											; It matters even to a program with no GP.BANKEDSTR
+											; at all -- object.asm pokes the whole list into
+											; every bootstrap, so left uninitialised it puts
+											; different stale bytes in each build and two
+											; compiles of one source stop matching.
 		rts
 _RPSPassTwo:
 		;
@@ -715,9 +717,10 @@ _RLDone:
 ;		Pass one's length is that top, so take it back, or WriteObjectCode would stream the low
 ;		code and stop.
 ;
-;		UNLESS THERE IS BANKED TEXT, because then pass one's length is one region FURTHER on:
-;		BStrFlush appends the text above every GP.BANKED region, so pass1Len is the top of the
-;		TEXT, not the top of the regions -- and the text is the very next thing pass two writes.
+;		UNLESS THERE IS BANKED TEXT, because then pass one's length is one region FURTHER on --
+;		or several. BStrFlush appends a region per text bank above every GP.BANKED one, so
+;		pass1Len is the top of the LAST of them, not the top of the regions, and the FIRST of them
+;		is the very next thing pass two writes.
 ;		Claiming the text's own top left BStrFlush winding the cursor BACKWARDS over its own
 ;		region, and the object stream answers a backward move by padding forward to it: 65,535
 ;		bytes of filler in a 22K program, with the length check none the wiser because both
@@ -727,7 +730,7 @@ _RLDone:
 ; ************************************************************************************************
 
 ClaimRegionTop:
-		lda 	bstrPages
+		lda 	bstrBankCount 				; a program has as many text regions as it names banks
 		bne 	_CRTBankedText
 		lda 	layoutCount
 		beq 	_CRTDone 					; no regions, so the cursor is already the top
