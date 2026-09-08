@@ -49,22 +49,29 @@
 ;		Everything reaches everything else the way it already does -- out to a low-memory shim
 ;		and back in.
 ;
-;		SIXTEEN IS THE LIMIT, and the 1K storage hole is where it comes from -- not the bootstrap
-;		extension page, which now holds one byte a region and has room for over a hundred. The
-;		tables at the foot of this file and the layout copy in main/compiler.asm come to 17 bytes
-;		a region out of $0400-$0801, which leaves 133 bytes in hand at sixteen and 14 at the
-;		twenty-three the hole would actually allow. A seventeenth GP.BANKED is refused BY NAME.
+;		SIXTY-THREE IS THE LIMIT, AND IT IS THE MACHINE'S -- banks 1 to 63 on a 512K X16, with 0
+;		the KERNAL's. It is not a compiler table size any more, which is the point of it.
+;
+;		IT WAS THE 1K STORAGE HOLE. The tables at the foot of this file and the layout copy in
+;		main/compiler.asm come to 17 bytes a region out of $0400-$0801, so the hole capped the
+;		count at 23, and 16 was as far as it could go while leaving room for anything else. 63
+;		needs 1,071 bytes, more than the whole hole, so no amount of trimming reaches it. Both
+;		tables are in the CODE section now -- the region table below has the reasoning.
+;
+;		A SIXTY-FOURTH GP.BANKED IS REFUSED BY NAME, and what binds after that is the bootstrap
+;		extension page at 95: one byte a region there, with 79 spare at sixteen. A 512K machine
+;		has 63 banks, so the compiler has stopped capping and the machine caps.
 ;
 ; ************************************************************************************************
 
-GPBANK_MAXREGIONS = 16 						; the 1K storage hole caps it, not the extension page
+GPBANK_MAXREGIONS = 63 						; every bank a 512K X16 has, bank 0 being the KERNAL's
 
 ; ************************************************************************************************
 ;
 ;		PASS TWO NEITHER RECORDS NOR RE-VALIDATES. It is handed pass one's finished region table
 ;		before it starts -- it is being steered by it, main/compiler.asm moves the write cursor
 ;		from it -- so recording would overwrite the very thing in use. Re-validating would be
-;		worse than useless: the count is already final, so a program with the full sixteen regions
+;		worse than useless: the count is already final, so a program with every region it can have
 ;		would fail the max-regions test, and this region's own bank is already in the list, which
 ;		reads as a duplicate. Pass one checked both, on the same source, and refused there.
 ;
@@ -932,10 +939,15 @@ _GBFBADone:
 ;		TWO REGIONS IN ONE BANK would put the second at $A000 on top of the first, and the only
 ;		symptom would be the first one's code running as whatever the second one's is. The bank
 ;		is a constant read at compile time, so this costs one walk of a table that is at most
-;		eight long, once per GP.BANKED.
+;		GPBANK_MAXREGIONS long, once per GP.BANKED.
 ;
 ;		BAD VALUE, reported at the GP.BANKED whose operand is the repeat -- which is the second
 ;		of the two, and the one the user can move.
+;
+;		IT DOES NOT SEE THE GP.BANKEDSTR TEXT BANK, and cannot: a text region does not enter
+;		gpBankBanks until BStrRegister runs, at the end of pass one, long after the last
+;		GP.BANKED was parsed. That collision is checked in BStrRegister instead, which is the
+;		one place that can see both -- commands/gpbstrflush.asm.
 ;
 ; ************************************************************************************************
 
@@ -1252,7 +1264,9 @@ gpBankTemp2:									; ...and a second, for the table walks
 		.fill 	1
 gpBankSideTo:									; which region a branch points AT, 0 for low memory
 		.fill 	1
+		.send 	storage
 
+; ************************************************************************************************
 ;
 ;		THE REGION TABLE. One entry a GP.BANKED, in SOURCE order. Everything above is either
 ;		global to the compile or the WORKING COPY of whichever region GPBankRelocate has in
@@ -1260,9 +1274,26 @@ gpBankSideTo:									; which region a branch points AT, 0 for low memory
 ;		single-region version always wanted, so the pass loads them out of here and puts the
 ;		results back.
 ;
-;		SIXTEEN, because seventeen bytes a region is what the 1K storage hole will carry. A
-;		seventeenth GP.BANKED is refused rather than overrunning these.
+;		IT IS IN THE CODE SECTION, NOT IN STORAGE, and that is what lets the count be 63. These
+;		are 11 bytes a region and the layout copy in main/compiler.asm is another 6, so 63 costs
+;		1,071 -- against a 1K storage hole that already holds everything else the compiler keeps
+;		between statements. They could never have fitted there.
 ;
+;		THE CODE SECTION IS THE COMPILER'S OWN IMAGE, above ObjectBase, and it is thrown away
+;		when the object code is written -- so a compiled program pays nothing for these, exactly
+;		as it pays nothing for the compiler around them. It is what the hole's own .cerror tells
+;		you to do when it overflows, and IONameBuffer (application/source/file-io/read.asm) is
+;		the same move made for the same reason.
+;
+;		WHAT IT COSTS IS GPC.BIN, and nothing else. FreeMemory is page aligned after the code
+;		(main/zzfree.footer) and is only the ORIGIN objPtr counts from -- the object itself has
+;		lived in a bank since the compiler went two-pass. Moving FreeMemory up moves the
+;		numbering with it, so every length, offset and page delta derived from it comes out
+;		unchanged.
+;
+; ************************************************************************************************
+
+		.section code
 gpBankCount:									; how many regions the program has
 		.fill 	1
 gpBankPass:										; which one GPBankRelocate is moving
@@ -1281,7 +1312,7 @@ gpBankPageCounts:								; pages of each, for the bootstrap's table
 		.fill 	GPBANK_MAXREGIONS
 gpBankCrossings:								; what a branch crossing INTO each one is out by
 		.fill 	GPBANK_MAXREGIONS
-		.send 	storage
+		.send 	code
 
 ; ************************************************************************************************
 ;

@@ -114,10 +114,12 @@ PAIRS = [("BANKA", "BANKE"), ("BANKB", "BANKF"), ("BANKH", "BANKI"), ("BANKJ", "
 BAD = [("BANKC", "BLOCK MISMATCH"), ("BANKD", "BLOCK MISMATCH"),
        ("BANKG", "BLOCK MISMATCH"), ("BANKL", "VALUE"), ("BANKM", "VALUE"),
        ("BANKX", "BAD VALUE"), ("BANKY", "NOT IMPLEMENTED"),
-       #   The region COUNT is a checked limit, not a crash.  BNK17 is seventeen trivial
-       #   regions in banks 5 up; the message names the seventeenth GP.BANKED, and it is a
-       #   compiler-space one, so this test is also what proves the scan above reaches them.
-       ("BNK17", "TOO MANY GP.BANKED REGIONS")]
+       #   The region COUNT is a checked limit, not a crash.  BNK64 is sixty-four trivial
+       #   regions in banks 1 up -- one more than a 512K X16 has -- and the message names the
+       #   sixty-fourth GP.BANKED.  It is a compiler-space message, so this test is also what
+       #   proves the scan above reaches them.  It was BNK17 until the tables left the 1K
+       #   storage hole and the count became the machine's.
+       ("BNK64", "TOO MANY GP.BANKED REGIONS")]
 BADNAMES = [b[0] for b in BAD]
 
 results = {}

@@ -1,0 +1,20 @@
+#SAVEAS "@:BSTRZ.SRC.PRG"
+#REM 0
+#INCLUDE "GPB.INC.BL"
+
+## THE CONTROL for BSTRX and BSTRY: the same program in two DIFFERENT banks, which is
+## what GPBMODS does and must keep compiling.
+
+PRINT "Z1 BEFORE"
+
+GP.BANKED 5
+PRINT "Z2 IN"
+GP.ENDBANKED
+
+GP.BANKEDSTR 6 G.ONE
+  " Open "
+  " Save "
+GP.ENDBANKEDSTR
+
+PRINT "Z3 " + GP.BSTR(G.ONE, 0)
+END

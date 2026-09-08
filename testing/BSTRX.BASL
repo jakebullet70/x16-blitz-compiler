@@ -1,0 +1,21 @@
+#SAVEAS "@:BSTRX.SRC.PRG"
+#REM 0
+#INCLUDE "GPB.INC.BL"
+
+## GP.BANKEDSTR AND GP.BANKED IN THE SAME BANK, text first.  Both land at $A000, so
+## one would be sitting on top of the other with nothing to show for it but the wrong
+## bytes running.  Refused.
+
+GP.BANKEDSTR 5 G.ONE
+  " Open "
+  " Save "
+GP.ENDBANKEDSTR
+
+PRINT "X1 BEFORE"
+
+GP.BANKED 5
+PRINT "X2 IN"
+GP.ENDBANKED
+
+PRINT "X3 " + GP.BSTR(G.ONE, 0)
+END

@@ -253,6 +253,34 @@ BStrRegister:
 		ldx 	gpBankCount
 		cpx 	#GPBANK_MAXREGIONS
 		bcs 	_BRTooMany
+		;
+		;		AND THE BANK IS NOT ONE A GP.BANKED ALREADY HAS. Both land at $A000, so the
+		;		text and the region would sit on top of each other and the only symptom would
+		;		be one of them reading or running as the other -- at run time, in a program
+		;		that compiled clean.
+		;
+		;		HERE, NOT AT EITHER KEYWORD, because here is the only place that can see both.
+		;		GPBankCheckBankFree walks gpBankBanks as each GP.BANKED is parsed, but a text
+		;		region does not enter that table until pass one is over -- so a GP.BANKEDSTR
+		;		BELOW the GP.BANKED it collides with is invisible to it, and one ABOVE is
+		;		invisible to the check at the GP.BANKEDSTR header. This runs after the whole
+		;		source has been read, so the order in the file cannot hide it either way.
+		;
+		;		Y, because X is gpBankCount and the register walk below wants it kept.
+		;
+		ldy 	#0
+_BRBankNext:
+		cpy 	gpBankCount
+		bcs 	_BRBankFree
+		lda 	gpBankBanks,y
+		cmp 	bstrBank
+		bne 	_BRBankStep
+		jmp 	_BRBankTaken 				; jmp: the message is past the end of the routine, which
+											; is further than a branch reaches
+_BRBankStep:
+		iny
+		bra 	_BRBankNext
+_BRBankFree:
 		lda 	bstrPages
 		sta 	gpBankPageCounts,x
 		lda 	bstrBank
@@ -331,6 +359,17 @@ _BRDone:
 _BRTooMany:
 		jsr 	CallErrorHandler
 		.text 	"NO REGION LEFT FOR GP.BANKEDSTR TEXT", 0
+
+;
+;		AND ITS OWN MESSAGE TOO, for the same reason. It names both keywords because that
+;		is the whole of the identification a programmer needs: there is one text bank in a
+;		program, so which GP.BANKEDSTR is never in question, and the GP.BANKED to move is
+;		the one that names the same number. The line is beside the point -- this fires from
+;		BStrFlush at the end of pass one, where currentLineNumber is the end of the source.
+;
+_BRBankTaken:
+		jsr 	CallErrorHandler
+		.text 	"GP.BANKEDSTR AND GP.BANKED SHARE A BANK", 0
 
 ;
 ;		Up to the next page boundary. It ADVANCES THE CURSOR RATHER THAN WRITING, and that is the

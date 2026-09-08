@@ -51,9 +51,9 @@
 ;
 ; ************************************************************************************************
 
-BXMAXREGIONS = 16 							; GPBANK_MAXREGIONS, and the compiler is what caps it --
-											; one byte a region here, so this page has room for far
-											; more than the storage hole will carry
+BXMAXREGIONS = 63 							; GPBANK_MAXREGIONS -- the machine's bank count now. One
+											; byte a region here, and this page is what binds NEXT: the
+											; pad below had 79 spare at sixteen, so 95 is its ceiling
 BXNAMEMAX = 48 								; the overlay name the compiler bakes in below. The
 											; compiler refuses a longer one rather than truncating
 											; it -- see ObjBuildOverlayName.
@@ -164,7 +164,7 @@ BXErrDone:
 ;		IT LOST ITS PAGE COUNTS when the regions became files. LOAD knows how long a file is, so
 ;		the only thing left to say is where it goes, and bank 0 is refused everywhere else in the
 ;		compiler -- it is the KERNAL's -- which is what makes it free to use as the terminator.
-;		Sixteen regions would cost 17 bytes here, still fewer than the 18 that eight used to.
+;		Sixty-three regions cost 64 bytes here; eight used to cost 18, with their page counts.
 ; ------------------------------------------------------------------------------------------------
 BXTable:
 		.fill 	BXMAXREGIONS + 1, 0

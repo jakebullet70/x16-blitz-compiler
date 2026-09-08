@@ -60,9 +60,12 @@ file arrived whole for free.
 
 Region bytes stopped counting against the file, which is what made raising the region count worth
 doing at all — do it the other way round and you only move where `PROGRAM TOO BIG` fires.
-`GPBANK_MAXREGIONS` is **16** now, capped by the 1K compiler storage hole rather than by the
-extension page (which holds a byte a region and has room for over a hundred). See
-[[compiler-must-not-cap-program-size]].
+`GPBANK_MAXREGIONS` is **63** now — every bank a 512K X16 has, so the number is the machine's
+rather than a compiler table's. The 1K storage hole capped it at 16 until the region tables moved
+into the **code section**, which is the compiler's own image and is thrown away when the object is
+written: they cost a compiled program nothing there, and no access site had to change. The
+bootstrap extension page binds next, at 95. Measured: `BNK63` is a region in every bank from 1 to
+63, a 1,375 byte object with 63 overlays beside it. See [[compiler-must-not-cap-program-size]].
 
 **Resident p-code is still capped by the workspace test** — this never touched that, and GPBMODS
 proves it: its object fell by 13K while its free-memory figure did not move.

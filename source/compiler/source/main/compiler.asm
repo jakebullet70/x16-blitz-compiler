@@ -832,10 +832,17 @@ passSum: 									; Fletcher-16 over what this pass emitted
 		.fill 	2
 sumSkip: 									; ...and how many bytes it is stepping over
 		.fill 	2
+		.send storage
+
 ;
 ;		The GP.BANKED layout, carried from pass one into pass two. The tables mirror the ones in
-;		commands/gpbank.asm they are copied from.
+;		commands/gpbank.asm they are copied from, and they are in the CODE section for the same
+;		reason: 6 bytes a region here and 11 there is 1,071 at 63 regions, and storage is a 1K
+;		hole holding everything else besides. The code section is the compiler's own image and
+;		is thrown away when the object is written, so a compiled program pays nothing for them.
+;		The region table in commands/gpbank.asm carries the whole of the reasoning.
 ;
+		.section code
 layoutCount:								; regions pass one found and placed
 		.fill 	1
 layoutStart:								; where each one ended up
@@ -848,6 +855,9 @@ layoutCross:								; what a branch crossing into each one is out by
 		.fill 	GPBANK_MAXREGIONS
 layoutRunBase:								; the page the whole run of them starts at
 		.fill 	1
+		.send code
+
+		.section storage
 nextRegion:									; which region pass two is looking for next
 		.fill 	1
 regionOpen:									; nonzero while pass two is writing into one
