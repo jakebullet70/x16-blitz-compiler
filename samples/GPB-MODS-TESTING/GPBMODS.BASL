@@ -7,7 +7,6 @@
 #INCLUDE "STASHFILE.INC.BL"
 #INCLUDE "STRCASE.INC.BL"
 #INCLUDE "STRINGS.INC.BL"
-#INCLUDE "SORT.INC.BL"
 #INCLUDE "LIBBANK.INC.BL"
 
 ## ---- THE PROGRAM'S LITERAL TEXT LIVES IN A BANK. Every GP.BANKEDSTR block below
@@ -47,9 +46,12 @@ GM.LIBEND:
 ## **
 ## **  Eight bar items, one dropdown each, one row a library entry point.
 ## **
-## **  TWO PANELS ARE BUILT -- DIALOG and SCREEN. Every row in those calls the
-## **  library for real. The remaining six open GUI.SAY naming the row, which is
-## **  what a row does until its panel is written.
+## **  SIX PANELS ARE BUILT -- DIALOG, LISTS, INPUT, SCREEN, STRINGS and
+## **  THEME. Every row in those calls the library for real.
+## **
+## **  DATA and ABOUT are stubs bar one row each: BANK MAP, which both of them
+## **  reach because it belongs under either heading. A stub row opens GUI.SAY
+## **  naming itself, which is what a row does until its panel is written.
 ## **
 ## **  The shell is itself a test of three modules: MENUBAR drives the bar,
 ## **  MENUVERT every dropdown, and STASH puts the screen back under a closed one.
@@ -88,6 +90,11 @@ GM.LIBEND:
 ## dropdown, and the twenty-four row list GUI.LISTBOX is shown with. Do not
 ## also leave it implicit.
 DIM MENUVERT.ITEM$(32)
+
+## STR.SPLIT's fields, and STR.MAX is set to match at every call site. GPC's implicit
+## DIM is documented to give 0..10 and does not reach this one: without the DIM the
+## first STR.SPLIT writes wild and the string heap comes back as machine code.
+DIM STR.FIELD$(10)
 
 ## APPSYS.STARTUP first, before any SCREEN of our own: it records the screen
 ## the user had, and that is what APPSYS.RESTORE puts back.
@@ -164,8 +171,8 @@ END
 
 GP.BANKEDSTR GM.TEXTBANK BS.CHROME
   "GPB-MODS-TESTING -- THE GPC-BASIC LIBRARY UNDER A BAR"
-  "DIALOG AND SCREEN ARE BUILT -- EVERY ROW IN THEM RUNS THE"
-  "REAL LIBRARY CALL. THE OTHER SIX JUST NAME THE ROW YOU PICK."
+  "SIX PANELS RUN THE REAL LIBRARY CALL."
+  "DATA AND ABOUT ONLY NAME THE ROW."
   "<- ->  BAR     DOWN  OPEN     RETURN  CHOOSE     ESC  BACK / QUIT"
 GP.ENDBANKEDSTR
 GMX.CHROME:
@@ -466,6 +473,12 @@ GMX.DISPATCH:
   IF GM.SEL = 2 THEN GOSUB GMX.LISTS : GM.DONE = 1
   IF GM.SEL = 3 THEN GOSUB GMX.INPUT : GM.DONE = 1
   IF GM.SEL = 4 THEN GOSUB GMX.SCREEN : GM.DONE = 1
+  IF GM.SEL = 5 THEN GOSUB GMX.STRINGS : GM.DONE = 1
+  IF GM.SEL = 7 THEN GOSUB GMX.THEME : GM.DONE = 1
+
+## BANK MAP is row 3 of DATA and row 3 of ABOUT, and it is the same panel. Both
+## lines are needed: a false IF skips the WHOLE line, so neither can carry the other.
+  IF GM.SEL = 6 THEN IF MENUVERT.SEL = 3 THEN GOSUB GMX.BANKMAP : GM.DONE = 1
   IF GM.SEL = 8 THEN IF MENUVERT.SEL = 3 THEN GOSUB GMX.BANKMAP : GM.DONE = 1
   IF GM.DONE = 0 THEN GOSUB GMX.STUB
   RETURN
@@ -971,10 +984,10 @@ GP.BANKEDSTR GM.TEXTBANK BS.S.FILL
   "GP.FILL X,Y,W,H,CHAR,COL"
   "THE CHAR IS PETSCII, SO IT"
   "IS WRITTEN ASC OF SOMETHING."
-  "A SPACE FILL IS THE WAY TO"
-  "BLANK A REGION, AND IT IS"
+  "A SPACE FILL BLANKS A"
+  "REGION, AND IT IS"
   "RIGHT IN ISO MODE TOO."
-  "THREE RECTANGLES, THE LAST ONE BLANK. PRESS A KEY."
+  "THREE RECTANGLES, THE LAST BLANK. PRESS A KEY."
   "GP.FILL  THREE RECTANGLES"
 GP.ENDBANKEDSTR
 GMX.S.FILL:
@@ -1007,12 +1020,12 @@ GMX.S.FILL:
 
 GP.BANKEDSTR GM.TEXTBANK BS.S.PRINTAT
   "GP.PRINTAT WRITES STRAIGHT TO VERA."
-  "NO KERNAL CALL PER CHARACTER, WHICH IS WHY IT IS"
+  "NO KERNAL CALL PER CHARACTER, SO IT IS"
   "SEVERAL TIMES FASTER THAN PRINT."
-  "IT DOES NOT MOVE THE CURSOR PRINT USES, SO THE TWO"
-  "DO NOT MIX WITHOUT A LOCATE BETWEEN THEM."
-  "NOTHING IS CLIPPED. PAST THE RIGHT EDGE WRAPS ONTO"
-  "THE NEXT ROW, AND PAST THE BOTTOM IS OFF THE MAP."
+  "IT DOES NOT MOVE THE CURSOR PRINT USES, SO"
+  "THEY NEED A LOCATE BETWEEN THEM."
+  "NOTHING IS CLIPPED. THE RIGHT EDGE WRAPS ONTO"
+  "THE NEXT ROW, AND THE BOTTOM OFF THE MAP."
   "PRESS A KEY."
   "GP.PRINTAT  SEVEN LINES IN THREE COLOURS"
 GP.ENDBANKEDSTR
@@ -1172,10 +1185,10 @@ GMX.S.MOVE:
 
 GP.BANKEDSTR GM.TEXTBANK BS.S.FILE
   "@:PANEL.BIN"
-  "WRITTEN TO PANEL.BIN. PRESS A KEY TO BLANK IT."
+  "WRITTEN. PRESS A KEY TO BLANK IT."
   "BLANK. PRESS A KEY TO LOAD IT BACK."
   "PANEL.BIN"
-  "BACK. PRESS A KEY TO STAMP THE FILE SOMEWHERE ELSE."
+  "BACK. PRESS A KEY TO STAMP IT ELSEWHERE."
   "PRESS A KEY."
   "STASHFILE OK"
   "   BANK AFTER"
@@ -1373,7 +1386,7 @@ GP.BANKEDSTR GM.TEXTBANK BS.L.ROW
   "MENUBAR AIMS THIS SAME"
   "ROUTINE SIDEWAYS, WHICH IS"
   "THE WHOLE OF THAT MODULE."
-  "ROWS 2 AND 5 REPAINTED ON THEIR OWN. PRESS A KEY."
+  "ROWS 2 AND 5 REPAINTED. PRESS A KEY."
   "MENUVERT.ROW  TWO ROWS REPAINTED IN PLACE"
 GP.ENDBANKEDSTR
 GMX.L.ROW:
@@ -1414,10 +1427,10 @@ GP.BANKEDSTR GM.TEXTBANK BS.L.BAR
   " EDIT "
   " SEARCH "
   " HELP "
-  "AN ITEM IS AS WIDE AS ITS OWN TEXT -- THERE IS NO"
-  "COLUMN WIDTH -- WHICH IS WHY THE PADDING SPACES ARE"
+  "AN ITEM IS AS WIDE AS ITS TEXT. THERE IS NO"
+  "COLUMN WIDTH, SO THE PADDING SPACES ARE"
   "INSIDE THE STRINGS."
-  "LEFT RIGHT MOVE, RETURN CHOOSES, ESC CANCELS."
+  "LEFT RIGHT MOVE, RETURN PICKS, ESC EXITS."
   "MENUBAR.RUN  SEL "
   "  COLUMN "
   "  WIDTH "
@@ -1505,11 +1518,11 @@ GP.BANKEDSTR GM.TEXTBANK BS.L.FLAGS
   "NOWRAP STOPS AT THE ENDS,"
   "FOR A LIST THAT READS AS A"
   "RANGE."
-  "KEEPMARK LEAVES THE CHOSEN"
-  "ROW LIT AFTER IT RETURNS."
-  "THE ROW IS STILL LIT. THAT IS KEEPMARK. PRESS A KEY."
-  "MUSTSEL TAKES ESC AWAY, FOR"
-  "A MENU WITH NOTHING BEHIND"
+  "KEEPMARK LEAVES THE ROW"
+  "LIT AFTER IT RETURNS."
+  "STILL LIT. THAT IS KEEPMARK. PRESS A KEY."
+  "MUSTSEL TAKES ESC AWAY,"
+  "FOR A MENU WITH NO WAY OUT"
   "TRY ESC. IT WILL NOT LEAVE"
   "UNTIL A ROW IS CHOSEN."
   "FLAGS  KEEPMARK SEL "
@@ -1722,8 +1735,8 @@ GMX.I.FORM:
 
 
 GP.BANKEDSTR GM.TEXTBANK BS.I.LIMITS
-  "FULL, A FIELD REFUSES THE KEY. IT NEVER SCROLLS."
-  "UP DOWN AND TAB MOVE, RETURN ACCEPTS, ESC ABANDONS."
+  "FULL, A FIELD REFUSES THE KEY. NO SCROLL."
+  "UP DOWN TAB MOVE, RETURN ACCEPTS, ESC QUITS."
   "LEN 4"
   "LEN 30"
   "MASKED"
@@ -1756,6 +1769,251 @@ GMX.I.LIMITS:
   GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.I.LIMITS, 6) + MID$(STR$(LEN(GM.FLD$(2))), 2)
   GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.I.LIMITS, 7) + GM.FLD$(3) + "]"
   IF GM.FKEY = 27 THEN GM.RESULT$ = GP.BSTR(BS.I.LIMITS, 8)
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.STRINGS -- one row a STRINGS.INC.BL routine.
+## **
+## **  Every row does the call on a real string and shows what came back.
+## **  The prose is two lines a row and printed by GMX.G.SAY: banked text is
+## **  free of low RAM but NOT of the object, and this program is close to
+## **  the ceiling the file itself has. See the note above GMX.G.SAY.
+## ***********************************************************************
+
+GMX.STRINGS:
+  GP.SELECT MENUVERT.SEL
+  GP.CASE 1
+    GOSUB GMX.G.PADR
+  GP.CASE 2
+    GOSUB GMX.G.PADL
+  GP.CASE 3
+    GOSUB GMX.G.PADC
+  GP.CASE 4
+    GOSUB GMX.G.SPLIT
+  GP.CASE 5
+    GOSUB GMX.G.REPLACE
+  GP.OTHER
+    GOSUB GMX.G.CASE
+  GP.ENDSEL
+  GOSUB GMX.CHROME
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.G.SAY -- a heading and a line under it, from one group.
+## **
+## **   in   GM.GRP   the group's first index, as GP.BSTR would take it
+## **
+## **  IT TAKES A FLAT INDEX AND NOT A GROUP NAME, which is the one place in
+## **  this program that does. A group name is resolved while the program
+## **  compiles, so it cannot be passed to a shared routine -- and five panels
+## **  each spelling out four GP.PRINTATs cost more than the indirection does.
+## **  BS.G.SAY is the group every panel below reads through it.
+## ***********************************************************************
+
+## ---- Three lines a panel -- heading, then two of explanation -- and the
+## ---- three shared tails every one of them ends with.
+
+GP.BANKEDSTR GM.TEXTBANK BS.G.SAY
+  "STR.PADR  PAD ON THE RIGHT"
+  "STR.WIDTH IS A FIELD, NOT AN AMOUNT."
+  "STR.PADL  PAD ON THE LEFT"
+  "STR.WIDTH IS A FIELD, NOT AN AMOUNT."
+  "STR.PADC  PAD BOTH ENDS"
+  "AN ODD GAP FAVOURS THE RIGHT."
+  "STR.SPLIT  ONE STRING INTO A FIELD ARRAY"
+  "COUNT IN STR.N, FIELDS FROM STR.FIELD$(1)."
+  "STR.REPLACE  EVERY OCCURRENCE, IN ONE PASS"
+  "SHORTER, LONGER, OR EMPTY. CASE SENSITIVE."
+  "STRCASE.GO  CASE, IN PLACE"
+  "IT REWRITES IN PLACE, SO IT TAKES AN ADDRESS."
+GP.ENDBANKEDSTR
+
+##  The strings the STRINGS rows work ON, and the labels they print with.
+##  Kept apart from BS.G.SAY so the panel prose can change length without
+##  renumbering any of this.
+GP.BANKEDSTR GM.TEXTBANK BS.G.DATA
+  "GPC-BASIC"
+  "ALPHA,BRAVO,CHARLIE,DELTA"
+  "ONE FISH TWO FISH RED FISH"
+  "FISH"
+  "BIRD"
+  "GPC BASIC"
+  "PRESS A KEY."
+  "  FOUR FIELD WIDTHS"
+  "STR.SPLIT  FIELDS: "
+  "STR.REPLACE  THREE OCCURRENCES"
+  "STRCASE.GO  DOWN AND BACK, UNCHANGED"
+  "LOWER IS NOT DRAWN: THE FONT PUTS IT ON THE"
+  "GRAPHICS HALF. THE BYTE VALUES ARE THE PROOF."
+  "FIRST BYTE  START "
+  "  LOWER "
+  "  UPPER "
+GP.ENDBANKEDSTR
+GMX.G.SAY:
+  GOSUB GMX.CLEARPANEL
+  GP.PRINTAT 4, 9, GP.BSTR(BS.G.SAY, GM.GRP), THEME.CLR(THEME.TITLE)
+  GP.PRINTAT 4, 11, GP.BSTR(BS.G.SAY, GM.GRP + 1), THEME.CLR(THEME.DIMMED)
+  RETURN
+
+
+
+## The three pads differ only in the routine they call, so they share a body.
+
+GMX.G.PADR:
+  GM.PADOP = 0
+  GOTO GMX.G.PADS
+
+GMX.G.PADL:
+  GM.PADOP = 1
+  GOTO GMX.G.PADS
+
+GMX.G.PADC:
+  GM.PADOP = 2
+
+GMX.G.PADS:
+  GM.GRP = GM.PADOP * 2
+  GOSUB GMX.G.SAY
+  FOR GM.I = 1 TO 4
+    STR.STR$ = GP.BSTR(BS.G.DATA, 0)
+    STR.WIDTH = 6 + GM.I * 4
+    IF GM.PADOP = 0 THEN GOSUB STR.PADR
+    IF GM.PADOP = 1 THEN GOSUB STR.PADL
+    IF GM.PADOP = 2 THEN GOSUB STR.PADC
+    GP.PRINTAT 6, 14 + GM.I, "[" + STR.STR$ + "]", THEME.CLR(THEME.TEXT)
+  NEXT GM.I
+  GM.TELL$ = GP.BSTR(BS.G.DATA, 6)
+  GOSUB GMX.TELL
+  GM.RESULT$ = GP.BSTR(BS.G.SAY, GM.GRP) + GP.BSTR(BS.G.DATA, 7)
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.G.SPLIT -- one string into STR.FIELD$, and the count in STR.N.
+## ***********************************************************************
+
+GMX.G.SPLIT:
+  GM.GRP = 6
+  GOSUB GMX.G.SAY
+  STR.STR$ = GP.BSTR(BS.G.DATA, 1)
+  STR.DELIM$ = ","
+  STR.MAX = 8
+  GOSUB STR.SPLIT
+  GP.PRINTAT 4, 14, STR.STR$, THEME.CLR(THEME.WARN)
+  FOR GM.I = 1 TO STR.N
+    GP.PRINTAT 6, 15 + GM.I, "[" + STR.FIELD$(GM.I) + "]", THEME.CLR(THEME.TEXT)
+  NEXT GM.I
+  GM.TELL$ = GP.BSTR(BS.G.DATA, 6)
+  GOSUB GMX.TELL
+  GM.RESULT$ = GP.BSTR(BS.G.DATA, 8) + MID$(STR$(STR.N), 2)
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.G.REPLACE -- every occurrence, in one pass.
+## ***********************************************************************
+
+GMX.G.REPLACE:
+  GM.GRP = 8
+  GOSUB GMX.G.SAY
+  STR.STR$ = GP.BSTR(BS.G.DATA, 2)
+  GP.PRINTAT 6, 15, STR.STR$, THEME.CLR(THEME.WARN)
+  STR.FIND$ = GP.BSTR(BS.G.DATA, 3)
+  STR.REPL$ = GP.BSTR(BS.G.DATA, 4)
+  GOSUB STR.REPLACE
+  GP.PRINTAT 6, 17, STR.STR$, THEME.CLR(THEME.TEXT)
+  GM.TELL$ = GP.BSTR(BS.G.DATA, 6)
+  GOSUB GMX.TELL
+  GM.RESULT$ = GP.BSTR(BS.G.DATA, 9)
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.G.CASE -- STRCASE, which rewrites the block where it lies.
+## **
+## **  SHOWN AS BYTE VALUES AND NOT AS TEXT, because the default font draws
+## **  lower case on its graphics half: a lower-cased string prints as symbols
+## **  even though its bytes are perfectly right. So the round trip is proved
+## **  with ASC and only the upper form is put on the screen.
+## **
+## **  The string is a VARIABLE, never a literal. GP.STRPTR of a literal is an
+## **  address inside the p-code, and rewriting it edits the program.
+## ***********************************************************************
+
+GMX.G.CASE:
+  GM.GRP = 10
+  GOSUB GMX.G.SAY
+  GP.PRINTAT 4, 14, GP.BSTR(BS.G.DATA, 11), THEME.CLR(THEME.DIMMED)
+  GP.PRINTAT 4, 15, GP.BSTR(BS.G.DATA, 12), THEME.CLR(THEME.DIMMED)
+
+  GM.CASE$ = GP.BSTR(BS.G.DATA, 5)
+  STRCASE.PTR = GP.STRPTR(GM.CASE$)
+  GM.SHOW$ = GP.BSTR(BS.G.DATA, 13) + MID$(STR$(ASC(GM.CASE$)), 2)
+  STRCASE.MODE = STRCASE.LOWER
+  GOSUB STRCASE.GO
+  GM.SHOW$ = GM.SHOW$ + GP.BSTR(BS.G.DATA, 14) + MID$(STR$(ASC(GM.CASE$)), 2)
+  STRCASE.MODE = STRCASE.UPPER
+  GOSUB STRCASE.GO
+  GM.SHOW$ = GM.SHOW$ + GP.BSTR(BS.G.DATA, 15) + MID$(STR$(ASC(GM.CASE$)), 2)
+  GP.PRINTAT 6, 17, GM.SHOW$, THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 6, 18, GM.CASE$, THEME.CLR(THEME.WARN)
+
+  GM.TELL$ = GP.BSTR(BS.G.DATA, 6)
+  GOSUB GMX.TELL
+  GM.RESULT$ = GP.BSTR(BS.G.DATA, 10)
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.THEME -- select a theme, and repaint the program under it.
+## **
+## **  THE REPAINT IS THE DEMONSTRATION. Every colour in this program is read
+## **  from THEME.CLR, so filling that array and drawing again is the whole of
+## **  changing theme -- there is nothing else to tell.
+## **
+## **  The roles are then listed twice, once in THEME.TEXT and once each in
+## **  its own attribute, because a repaint shows that something moved without
+## **  saying which role moved where. Twice rather than a blank swatch: an
+## **  attribute is a background AND a foreground, and a run of spaces only
+## **  ever shows the background half.
+## **
+## **  CHROME IS REPAINTED BEFORE the panel rather than after it, unlike every
+## **  other panel here. The point is to be looking at the new colours while
+## **  the swatches explain them.
+## ***********************************************************************
+
+GP.BANKEDSTR GM.TEXTBANK BS.THEME
+  "THEME.SELECT "
+  "THE SEVEN ROLES, EACH IN ITS OWN ATTRIBUTE"
+  "EVERY COLOUR IS READ FROM THEME.CLR, SO"
+  "FILLING IT AND DRAWING AGAIN IS ALL OF IT."
+  "PAGE"
+  "TEXT"
+  "TITLE"
+  "BORDER"
+  "HILITE"
+  "DIMMED"
+  "WARN"
+GP.ENDBANKEDSTR
+GMX.THEME:
+  THEME.ID = MENUVERT.SEL - 1
+  GOSUB THEME.SELECT
+  GM.RESULT$ = GP.BSTR(BS.THEME, 0) + GP.BSTR(BS.DD.THEME, MENUVERT.SEL)
+  GOSUB GMX.CHROME
+
+  GOSUB GMX.CLEARPANEL
+  GP.PRINTAT 4, 9, GP.BSTR(BS.THEME, 1), THEME.CLR(THEME.TITLE)
+  GP.PRINTAT 4, 11, GP.BSTR(BS.THEME, 2), THEME.CLR(THEME.DIMMED)
+  GP.PRINTAT 4, 12, GP.BSTR(BS.THEME, 3), THEME.CLR(THEME.DIMMED)
+
+  FOR GM.I = 0 TO THEME.SLOTS - 1
+    GP.PRINTAT 6, 14 + GM.I, GP.BSTR(BS.THEME, 4 + GM.I), THEME.CLR(THEME.TEXT)
+    GP.PRINTAT 20, 14 + GM.I, GP.BSTR(BS.THEME, 4 + GM.I), THEME.CLR(GM.I)
+  NEXT GM.I
+
+  GM.TELL$ = GP.BSTR(BS.G.DATA, 6)
+  GOSUB GMX.TELL
   RETURN
 
 
