@@ -359,7 +359,8 @@ _AFPGo:
 		cmp 	AsmPoolBase+1
 		beq 	_AFPBase 					; the pool is already resolved: every reference was
 _AFPDiverged: 								; written into it as it was made
-		.error_internal
+		jsr 	CallErrorHandler
+		.text 	"INTERNAL ERROR GP.ASM POOL BASE", 0
 _AFPBase:
 		lda 	objPtr 						; where the pool starts, in the buffer
 		sta 	AsmPoolBase

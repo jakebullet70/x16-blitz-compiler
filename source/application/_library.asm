@@ -122,7 +122,7 @@ _CACloseIn:
 ; ************************************************************************************************
 
 _CAResetOut:
-		.set16 	objPtr,FreeMemory
+		.set16 	objPtr,ObjectOrigin
 		rts
 
 _CACloseOut:
@@ -1247,7 +1247,7 @@ GPScanReset:
 		stz 	gpUsed
 		stz 	gpScanState
 		stz 	gpScanStop
-		.set16 	gpScanAt,FreeMemory
+		.set16 	gpScanAt,ObjectOrigin
 		rts
 
 GPScanByte:
@@ -1450,10 +1450,10 @@ PrintMemoryReport:
 		jsr 	PrintMessage
 		sec
 		lda 	objPtr
-		sbc 	#FreeMemory & $FF
+		sbc 	#ObjectOrigin & $FF
 		sta 	reportValue
 		lda 	objPtr+1
-		sbc 	#FreeMemory >> 8
+		sbc 	#ObjectOrigin >> 8
 		sta 	reportValue+1
 		jsr 	PrintDecimal
 		;
@@ -1705,10 +1705,10 @@ _WOCCutSet:
 		;
 		sec
 		lda 	objPtr
-		sbc 	#FreeMemory & $FF
+		sbc 	#ObjectOrigin & $FF
 		sta 	zTemp1
 		lda 	objPtr+1
-		sbc 	#FreeMemory >> 8
+		sbc 	#ObjectOrigin >> 8
 		sta 	zTemp1+1
 		;
 		;		Round that up to whole pages.
@@ -1917,10 +1917,10 @@ ObjectPrepareShared:
 		ldy 	gpBankStart+1
 _WOCSLength:
 		sec
-		sbc 	#FreeMemory & $FF
+		sbc 	#ObjectOrigin & $FF
 		sta 	zTemp1
 		tya
-		sbc 	#FreeMemory >> 8
+		sbc 	#ObjectOrigin >> 8
 		sta 	zTemp1+1
 		lda 	zTemp1
 		beq 	_WOCSWhole
@@ -2264,9 +2264,9 @@ OBJ_BUF_SIZE = $2000
 ; ************************************************************************************************
 
 ObjStreamReset:
-		.set16 	objBufBase, FreeMemory
-		.set16 	objBufTop, FreeMemory
-		.set16 	objStmtAt, FreeMemory
+		.set16 	objBufBase, ObjectOrigin
+		.set16 	objBufTop, ObjectOrigin
+		.set16 	objStmtAt, ObjectOrigin
 		stz 	objHold
 		rts
 
@@ -2386,7 +2386,8 @@ _OSWLow:
 ;		produce: a tokenised source line is 252 bytes at most.
 ;
 _OSWLost:
-		.error_internal
+		jsr 	CallErrorHandler
+		.text 	"INTERNAL ERROR OBJ LOW BUFFER", 0
 ;
 ;		Inside a region, which is a bank of its own -- random access, so a rollback here is
 ;		simply written over and there is nothing to hold back.
@@ -2402,9 +2403,9 @@ _OSWRegion:
 		lda 	objPtr+1
 		sbc 	layoutStart+1,x
 		sta 	objBufIdx+1
-		bcc 	_OSWDiverged 				; below the region, or past $BFFF -- and neither happens
-		cmp 	#OBJ_BUF_SIZE >> 8 			; unless pass two wrote more than pass one did
-		bcs 	_OSWDiverged
+		bcc 	_OSWBelow 					; the cursor wrapped past $FFFF -- the object is full
+		cmp 	#OBJ_BUF_SIZE >> 8 			; past $BFFF: pass two wrote more than pass one did
+		bcs 	_OSWPast
 		lda 	#OBJ_RGN_BANK 				; one bank, shared -- only one region is ever open
 		jsr 	ObjStreamWindow
 		lda 	objByte
@@ -2427,8 +2428,30 @@ _OSWClose:
 ;		handler, ExitCompiler, caller -- in the wrong bank. ObjStreamOffset tests in the same
 ;		place, for the same reason.
 ;
-_OSWDiverged:
-		.error_internal
+_OSWBelow:
+;
+;		THE OBJECT IS FULL. A region byte cannot legitimately be below its own region base, so
+;		the borrow means objPtr has run off the top of sixteen bits and come back at $0000. That
+;		is 65,536 bytes of low code plus regions -- see ObjectOrigin in start.asm, which is what
+;		the cursor counts from.
+;
+;		IT HAS HAPPENED, at 37,632 bytes, when the cursor still counted from FreeMemory ($6D00).
+;		GPBMODS laid its last text region at $F700 and wrapped partway through writing it: five
+;		regions started at $A200 $B200 $CE00 $D800 $F700 and the sixth store came out at $0000.
+;		Nothing was inconsistent between the passes -- bstrStart matched its layout entry exactly
+;		-- the program had simply outgrown the counter, and this is where it showed.
+;
+;		SO A REAL "PROGRAM TOO BIG" BELONGS AT LAYOUT TIME, not here. Pass one knows every
+;		region's base and length and could see the carry out before a byte is written, and could
+;		name the region rather than an internal error four thousand lines in. This message is
+;		what is left over for a cursor that got here some other way.
+;
+		jsr 	CallErrorHandler
+		.text 	"INTERNAL ERROR OBJ REGION BELOW", 0
+
+_OSWPast:
+		jsr 	CallErrorHandler
+		.text 	"INTERNAL ERROR OBJ REGION PAST 8K", 0
 
 ;
 ;		objBufIdx = objPtr - objBufBase, with carry set if that is inside the window.
@@ -2964,11 +2987,11 @@ _WMFWriteEntry:
 		ldy 	#2 							; offset = stored address - FreeMemory (page aligned)
 		lda 	(zTemp0),y
 		sec
-		sbc 	#FreeMemory & $FF
+		sbc 	#ObjectOrigin & $FF
 		sta 	mapOff
 		ldy 	#3
 		lda 	(zTemp0),y
-		sbc 	#FreeMemory >> 8
+		sbc 	#ObjectOrigin >> 8
 		sta 	mapOff+1
 		.storage_release
 		lda 	mapOff+1 					; hex offset, high byte then low.
@@ -3089,7 +3112,7 @@ mapLead:
 AsmSetBases:
 		sec 								; embedded: it runs at runtimeEndPage, it sits at
 		lda 	runtimeEndPage 				; FreeMemory, and the difference is what every blob
-		sbc 	#FreeMemory >> 8 			; address and label target has to move by
+		sbc 	#ObjectOrigin >> 8 			; address and label target has to move by
 		sta 	AsmPageDelta
 		lda 	newWorkspacePage
 		sta 	AsmWorkspacePage
@@ -3097,7 +3120,7 @@ AsmSetBases:
 
 AsmSetBasesShared:
 		clc
-		lda 	#(PCODE_PAGE - (FreeMemory >> 8)) & $FF
+		lda 	#(PCODE_PAGE - (ObjectOrigin >> 8)) & $FF
 		adc 	gpBankActive 				; shared p-code lands at $0900, or $0A00 for a banked
 		sta 	AsmPageDelta 				; program -- the extension page is below it
 		lda 	newWorkspacePage 			; ObjectPrepareShared carries WS_START in this byte
@@ -3496,7 +3519,7 @@ CompileCode:
 		;		there is no bootstrap there to copy the region either, so gpbank.asm refuses a
 		;		region rather than guessing.
 		;
-		lda 	#(PCODE_PAGE - (FreeMemory >> 8)) & $FF
+		lda 	#(PCODE_PAGE - (ObjectOrigin >> 8)) & $FF
 		sta 	gpBankRunPage
 		stz 	gpBankShared
 		lda 	ModeText 					; GPC.INPUT line 4 -- 'S' is SHARED
@@ -3569,9 +3592,35 @@ _CCNoControlFile: 							; a compiler that guesses at what it was asked to
 ;
 ; ************************************************************************************************
 
-ObjectCeiling           = $9F00 			; object code may occupy FreeMemory..ObjectCeiling-1
+ObjectCeiling           = $9F00 			; embedded: the RUN address the object may grow to
+ObjectOrigin            = $0000 			; ...and where objPtr counts FROM -- see below
 CompilerWorkspaceStart  = $A000 			; banked RAM: variable name table, grows up
 CompilerWorkspaceEnd    = $C000 			; banked RAM: line number table, grows down
+
+; ************************************************************************************************
+;
+;		WHY THE OBJECT COUNTS FROM $0000 AND NOT FROM FreeMemory.
+;
+;		objPtr is the compile-time cursor: where the next object byte belongs. It used to start
+;		at FreeMemory ($6D00) because the object was BUILT there, in low RAM, and objPtr was a
+;		real address you could store through. Since the compiler went two-pass nothing is stored:
+;		pass one counts and pass two streams straight to the file. So the cursor is a position in
+;		the object, and every reader of it -- the map file, the memory report, the fit checks,
+;		gpBankRunPage -- immediately subtracted FreeMemory again to get back to that position.
+;
+;		WHAT THE OLD BASE COST WAS THE TOP OF THE CURSOR. objPtr is sixteen bits and a GP.BANKED
+;		or GP.BANKEDSTR region is laid out ABOVE the low code in the same counter, so the object
+;		plus every region had to fit in $FFFF-$6D00 = 37,632 bytes. GPBMODS reached it: its last
+;		text region was based at $F700, the cursor wrapped to $0000 partway through writing it,
+;		and ObjStoreWrite raised an internal error because the byte now looked to be BELOW its
+;		own region. Counting from zero gives the whole 65,536 back -- 27,904 bytes more object,
+;		for the price of subtracting nothing instead of subtracting $6D00.
+;
+;		THIS IS NOT ObjectCeiling. That one is a RUN address and still binds: an embedded object
+;		must fit below the I/O page, and a shared one below the runtime. Those checks are
+;		unchanged. This constant only says where the compiler starts counting.
+;
+; ************************************************************************************************
 
 APIDesc:
 		.word 	CompilerAPI 				; the compiler API Implementeation

@@ -1419,7 +1419,8 @@ _SCECompare:
 		;		anyone running.
 		;
 _SCEDiverged:
-		.error_internal
+		jsr 	CallErrorHandler
+		.text 	"INTERNAL ERROR PASS COMPARE", 0
 
 _SCEAgreed:
 		lda 	#BLC_CLOSEOUT 				; close output store, which is already resolved
@@ -5231,7 +5232,8 @@ BlockEndCompare:
 		cmp 	blockCheck+1
 		beq 	_BECAgreed
 _BECDiverged:
-		.error_internal
+		jsr 	CallErrorHandler
+		.text 	"INTERNAL ERROR BLOCK END", 0
 _BECAgreed:
 		rts
 
@@ -6036,7 +6038,8 @@ _AFPGo:
 		cmp 	AsmPoolBase+1
 		beq 	_AFPBase 					; the pool is already resolved: every reference was
 _AFPDiverged: 								; written into it as it was made
-		.error_internal
+		jsr 	CallErrorHandler
+		.text 	"INTERNAL ERROR GP.ASM POOL BASE", 0
 _AFPBase:
 		lda 	objPtr 						; where the pool starts, in the buffer
 		sta 	AsmPoolBase
@@ -11741,7 +11744,8 @@ _SMLRoom:
 		bra 	_SMLWrite
 _SMLDiverged:
 		.storage_release 					; never raise inside the window: the error handler
-		.error_internal 					; prints, and that is bank 0
+		jsr 	CallErrorHandler 					; prints, and that is bank 0
+		.text 	"INTERNAL ERROR LINE ADDRESS", 0
 _SMLWrite:
 		pla
 		sta 	(zTemp0) 					; line # save it in +0,+1
@@ -11824,7 +11828,8 @@ _STRSearch:
 		lda 	lineRec+1 					; next table entry, until off the bottom of what was
 		cmp 	#$FF 						; ever written. Should not be required !
 		bne 	_STRSearch
-		.error_internal
+		jsr 	CallErrorHandler
+		.text 	"INTERNAL ERROR LINE NOT FOUND", 0
 
 _STRFound:
 		lda 	lineWalk 					; remember WHICH record matched, so STRLineDepth can

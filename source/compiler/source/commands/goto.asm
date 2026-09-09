@@ -282,7 +282,8 @@ BlockEndCompare:
 		cmp 	blockCheck+1
 		beq 	_BECAgreed
 _BECDiverged:
-		.error_internal
+		jsr 	CallErrorHandler
+		.text 	"INTERNAL ERROR BLOCK END", 0
 _BECAgreed:
 		rts
 

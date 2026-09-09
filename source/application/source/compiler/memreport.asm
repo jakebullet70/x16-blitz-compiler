@@ -43,10 +43,10 @@ PrintMemoryReport:
 		jsr 	PrintMessage
 		sec
 		lda 	objPtr
-		sbc 	#FreeMemory & $FF
+		sbc 	#ObjectOrigin & $FF
 		sta 	reportValue
 		lda 	objPtr+1
-		sbc 	#FreeMemory >> 8
+		sbc 	#ObjectOrigin >> 8
 		sta 	reportValue+1
 		jsr 	PrintDecimal
 		;

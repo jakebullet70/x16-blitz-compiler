@@ -95,7 +95,8 @@ _SMLRoom:
 		bra 	_SMLWrite
 _SMLDiverged:
 		.storage_release 					; never raise inside the window: the error handler
-		.error_internal 					; prints, and that is bank 0
+		jsr 	CallErrorHandler 					; prints, and that is bank 0
+		.text 	"INTERNAL ERROR LINE ADDRESS", 0
 _SMLWrite:
 		pla
 		sta 	(zTemp0) 					; line # save it in +0,+1
@@ -178,7 +179,8 @@ _STRSearch:
 		lda 	lineRec+1 					; next table entry, until off the bottom of what was
 		cmp 	#$FF 						; ever written. Should not be required !
 		bne 	_STRSearch
-		.error_internal
+		jsr 	CallErrorHandler
+		.text 	"INTERNAL ERROR LINE NOT FOUND", 0
 
 _STRFound:
 		lda 	lineWalk 					; remember WHICH record matched, so STRLineDepth can

@@ -397,7 +397,8 @@ _SCECompare:
 		;		anyone running.
 		;
 _SCEDiverged:
-		.error_internal
+		jsr 	CallErrorHandler
+		.text 	"INTERNAL ERROR PASS COMPARE", 0
 
 _SCEAgreed:
 		lda 	#BLC_CLOSEOUT 				; close output store, which is already resolved

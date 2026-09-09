@@ -38,7 +38,7 @@ CompileCode:
 		;		there is no bootstrap there to copy the region either, so gpbank.asm refuses a
 		;		region rather than guessing.
 		;
-		lda 	#(PCODE_PAGE - (FreeMemory >> 8)) & $FF
+		lda 	#(PCODE_PAGE - (ObjectOrigin >> 8)) & $FF
 		sta 	gpBankRunPage
 		stz 	gpBankShared
 		lda 	ModeText 					; GPC.INPUT line 4 -- 'S' is SHARED
@@ -111,9 +111,35 @@ _CCNoControlFile: 							; a compiler that guesses at what it was asked to
 ;
 ; ************************************************************************************************
 
-ObjectCeiling           = $9F00 			; object code may occupy FreeMemory..ObjectCeiling-1
+ObjectCeiling           = $9F00 			; embedded: the RUN address the object may grow to
+ObjectOrigin            = $0000 			; ...and where objPtr counts FROM -- see below
 CompilerWorkspaceStart  = $A000 			; banked RAM: variable name table, grows up
 CompilerWorkspaceEnd    = $C000 			; banked RAM: line number table, grows down
+
+; ************************************************************************************************
+;
+;		WHY THE OBJECT COUNTS FROM $0000 AND NOT FROM FreeMemory.
+;
+;		objPtr is the compile-time cursor: where the next object byte belongs. It used to start
+;		at FreeMemory ($6D00) because the object was BUILT there, in low RAM, and objPtr was a
+;		real address you could store through. Since the compiler went two-pass nothing is stored:
+;		pass one counts and pass two streams straight to the file. So the cursor is a position in
+;		the object, and every reader of it -- the map file, the memory report, the fit checks,
+;		gpBankRunPage -- immediately subtracted FreeMemory again to get back to that position.
+;
+;		WHAT THE OLD BASE COST WAS THE TOP OF THE CURSOR. objPtr is sixteen bits and a GP.BANKED
+;		or GP.BANKEDSTR region is laid out ABOVE the low code in the same counter, so the object
+;		plus every region had to fit in $FFFF-$6D00 = 37,632 bytes. GPBMODS reached it: its last
+;		text region was based at $F700, the cursor wrapped to $0000 partway through writing it,
+;		and ObjStoreWrite raised an internal error because the byte now looked to be BELOW its
+;		own region. Counting from zero gives the whole 65,536 back -- 27,904 bytes more object,
+;		for the price of subtracting nothing instead of subtracting $6D00.
+;
+;		THIS IS NOT ObjectCeiling. That one is a RUN address and still binds: an embedded object
+;		must fit below the I/O page, and a shared one below the runtime. Those checks are
+;		unchanged. This constant only says where the compiler starts counting.
+;
+; ************************************************************************************************
 
 APIDesc:
 		.word 	CompilerAPI 				; the compiler API Implementeation

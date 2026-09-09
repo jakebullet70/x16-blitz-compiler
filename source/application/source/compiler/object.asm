@@ -89,10 +89,10 @@ _WOCCutSet:
 		;
 		sec
 		lda 	objPtr
-		sbc 	#FreeMemory & $FF
+		sbc 	#ObjectOrigin & $FF
 		sta 	zTemp1
 		lda 	objPtr+1
-		sbc 	#FreeMemory >> 8
+		sbc 	#ObjectOrigin >> 8
 		sta 	zTemp1+1
 		;
 		;		Round that up to whole pages.
@@ -301,10 +301,10 @@ ObjectPrepareShared:
 		ldy 	gpBankStart+1
 _WOCSLength:
 		sec
-		sbc 	#FreeMemory & $FF
+		sbc 	#ObjectOrigin & $FF
 		sta 	zTemp1
 		tya
-		sbc 	#FreeMemory >> 8
+		sbc 	#ObjectOrigin >> 8
 		sta 	zTemp1+1
 		lda 	zTemp1
 		beq 	_WOCSWhole
@@ -648,9 +648,9 @@ OBJ_BUF_SIZE = $2000
 ; ************************************************************************************************
 
 ObjStreamReset:
-		.set16 	objBufBase, FreeMemory
-		.set16 	objBufTop, FreeMemory
-		.set16 	objStmtAt, FreeMemory
+		.set16 	objBufBase, ObjectOrigin
+		.set16 	objBufTop, ObjectOrigin
+		.set16 	objStmtAt, ObjectOrigin
 		stz 	objHold
 		rts
 
@@ -770,7 +770,8 @@ _OSWLow:
 ;		produce: a tokenised source line is 252 bytes at most.
 ;
 _OSWLost:
-		.error_internal
+		jsr 	CallErrorHandler
+		.text 	"INTERNAL ERROR OBJ LOW BUFFER", 0
 ;
 ;		Inside a region, which is a bank of its own -- random access, so a rollback here is
 ;		simply written over and there is nothing to hold back.
@@ -786,9 +787,9 @@ _OSWRegion:
 		lda 	objPtr+1
 		sbc 	layoutStart+1,x
 		sta 	objBufIdx+1
-		bcc 	_OSWDiverged 				; below the region, or past $BFFF -- and neither happens
-		cmp 	#OBJ_BUF_SIZE >> 8 			; unless pass two wrote more than pass one did
-		bcs 	_OSWDiverged
+		bcc 	_OSWBelow 					; the cursor wrapped past $FFFF -- the object is full
+		cmp 	#OBJ_BUF_SIZE >> 8 			; past $BFFF: pass two wrote more than pass one did
+		bcs 	_OSWPast
 		lda 	#OBJ_RGN_BANK 				; one bank, shared -- only one region is ever open
 		jsr 	ObjStreamWindow
 		lda 	objByte
@@ -811,8 +812,30 @@ _OSWClose:
 ;		handler, ExitCompiler, caller -- in the wrong bank. ObjStreamOffset tests in the same
 ;		place, for the same reason.
 ;
-_OSWDiverged:
-		.error_internal
+_OSWBelow:
+;
+;		THE OBJECT IS FULL. A region byte cannot legitimately be below its own region base, so
+;		the borrow means objPtr has run off the top of sixteen bits and come back at $0000. That
+;		is 65,536 bytes of low code plus regions -- see ObjectOrigin in start.asm, which is what
+;		the cursor counts from.
+;
+;		IT HAS HAPPENED, at 37,632 bytes, when the cursor still counted from FreeMemory ($6D00).
+;		GPBMODS laid its last text region at $F700 and wrapped partway through writing it: five
+;		regions started at $A200 $B200 $CE00 $D800 $F700 and the sixth store came out at $0000.
+;		Nothing was inconsistent between the passes -- bstrStart matched its layout entry exactly
+;		-- the program had simply outgrown the counter, and this is where it showed.
+;
+;		SO A REAL "PROGRAM TOO BIG" BELONGS AT LAYOUT TIME, not here. Pass one knows every
+;		region's base and length and could see the carry out before a byte is written, and could
+;		name the region rather than an internal error four thousand lines in. This message is
+;		what is left over for a cursor that got here some other way.
+;
+		jsr 	CallErrorHandler
+		.text 	"INTERNAL ERROR OBJ REGION BELOW", 0
+
+_OSWPast:
+		jsr 	CallErrorHandler
+		.text 	"INTERNAL ERROR OBJ REGION PAST 8K", 0
 
 ;
 ;		objBufIdx = objPtr - objBufBase, with carry set if that is inside the window.
@@ -1348,11 +1371,11 @@ _WMFWriteEntry:
 		ldy 	#2 							; offset = stored address - FreeMemory (page aligned)
 		lda 	(zTemp0),y
 		sec
-		sbc 	#FreeMemory & $FF
+		sbc 	#ObjectOrigin & $FF
 		sta 	mapOff
 		ldy 	#3
 		lda 	(zTemp0),y
-		sbc 	#FreeMemory >> 8
+		sbc 	#ObjectOrigin >> 8
 		sta 	mapOff+1
 		.storage_release
 		lda 	mapOff+1 					; hex offset, high byte then low.
@@ -1473,7 +1496,7 @@ mapLead:
 AsmSetBases:
 		sec 								; embedded: it runs at runtimeEndPage, it sits at
 		lda 	runtimeEndPage 				; FreeMemory, and the difference is what every blob
-		sbc 	#FreeMemory >> 8 			; address and label target has to move by
+		sbc 	#ObjectOrigin >> 8 			; address and label target has to move by
 		sta 	AsmPageDelta
 		lda 	newWorkspacePage
 		sta 	AsmWorkspacePage
@@ -1481,7 +1504,7 @@ AsmSetBases:
 
 AsmSetBasesShared:
 		clc
-		lda 	#(PCODE_PAGE - (FreeMemory >> 8)) & $FF
+		lda 	#(PCODE_PAGE - (ObjectOrigin >> 8)) & $FF
 		adc 	gpBankActive 				; shared p-code lands at $0900, or $0A00 for a banked
 		sta 	AsmPageDelta 				; program -- the extension page is below it
 		lda 	newWorkspacePage 			; ObjectPrepareShared carries WS_START in this byte

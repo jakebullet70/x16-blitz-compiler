@@ -119,7 +119,7 @@ _CACloseIn:
 ; ************************************************************************************************
 
 _CAResetOut:
-		.set16 	objPtr,FreeMemory
+		.set16 	objPtr,ObjectOrigin
 		rts
 
 _CACloseOut:

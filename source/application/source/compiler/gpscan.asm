@@ -110,7 +110,7 @@ GPScanReset:
 		stz 	gpUsed
 		stz 	gpScanState
 		stz 	gpScanStop
-		.set16 	gpScanAt,FreeMemory
+		.set16 	gpScanAt,ObjectOrigin
 		rts
 
 GPScanByte:
