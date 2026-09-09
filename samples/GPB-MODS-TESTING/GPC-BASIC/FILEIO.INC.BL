@@ -156,7 +156,7 @@ FILE.EXISTS.BODY:  FILE.OK = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
 ## **  and either way FILE.OK comes back beside the count -- which is the only
 ## **  thing that tells a real 0-block file from one that is not there.
 ## **
-## **  THE GP.DEFPROC DECLARATION IS IN LIBUTIL.INC.BL, not here, because a
+## **  THE GP.DEFPROC DECLARATION IS IN LIB.UTILBANK.INC.BL, not here, because a
 ## **  verb's call site is compiled into a jump to its body and a jump out of
 ## **  low memory has to select the bank first. See that file's header. Being
 ## **  a verb, FILE.SIZE is a name and not a label, so GOSUB FILE.SIZE is not

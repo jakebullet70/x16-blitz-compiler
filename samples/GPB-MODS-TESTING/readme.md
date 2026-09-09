@@ -95,9 +95,9 @@ three places p-code can live, which is why the total is far larger than the resi
 |---|---:|---|---|---:|---|---|---:|
 | `STASH` | 431 | | `THEME` | 479 | | `APPSYS` | 114 |
 | `STASHFILE` | 171 | | `MENUVERT` | 1,104 | | `BANKMGR` | 586 |
-| `LIBBANK` | 184 | | `MENUBAR` | 826 | | `STRCASE` | 54 |
-| `LIBBANKFD` | 34 | | `LINEINPUT` | 780 | | `STRINGS` | 511 |
-| `LIBUTIL` | 359 | | `GUI` | 1,857 | | `STRUSING` | 726 |
+| `LIB.GUIBANK` | 184 | | `MENUBAR` | 826 | | `STRCASE` | 54 |
+| `LIB.FUTILBANK` | 34 | | `LINEINPUT` | 780 | | `STRINGS` | 511 |
+| `LIB.UTILBANK` | 359 | | `GUI` | 1,857 | | `STRUSING` | 726 |
 | `GPBMODS.BASL` | 11,537 | | `GUI2` | 1,360 | | `SORT` | 189 |
 | | | | `FILEDIR` | 431 | | `STASHVRAM` | 1,681 |
 | | | | | | | `FILEIO` | 1,007 |
@@ -179,11 +179,11 @@ and proved here, then copied whole into the root — never merged by hand, and t
 
 **EIGHT OF THEM CAN NO LONGER BE COPIED TO ROOT AS THEY STAND, and that is the price of bank 7.**
 `APPSYS`, `BANKMGR`, `STRCASE`, `STRINGS`, `STRUSING`, `SORT`, `STASHVRAM` and `FILEIO` have had
-their public entry points renamed to `.BODY` so `LIBUTIL.INC.BL` can own the plain names — the
-same surgery `LIBBANK` already did to the seven GUI modules, and the same surgery any program
+their public entry points renamed to `.BODY` so `LIB.UTILBANK.INC.BL` can own the plain names — the
+same surgery `LIB.GUIBANK.INC.BL` already did to the seven GUI modules, and the same surgery any program
 banking them would have to repeat. A program that wants them in low memory wants the root copies;
 a program that wants them banked wants these. `STRCASE` is the one that changed shape as well as
-name: its two `GP.DEFPROC` declarations moved into `LIBUTIL`, because a verb's call site is
+name: its two `GP.DEFPROC` declarations moved into `LIB.UTILBANK.INC.BL`, because a verb's call site is
 compiled into a jump to the body and a jump out of low memory has to select the bank first.
 
 Port a fix by hand in either direction, and mind that `FILEIO.INC.BL` does not exist in root at
@@ -195,14 +195,15 @@ does the same demonstration as the `STASH` row above it so the two can be read a
 other. `BMX` is out: it needs a bitmap file and a screen-mode change and is not GUI, and
 `GPC-BASIC/BMXVIEW.EXP.BL` already covers it. `KB` is newer than the shell — it sits in the
 folder, it has its own test, and no panel calls it yet. `GPB.INC.BL` is the keyword
-ABI and is not edited here; `LIBBANK.INC.BL` and `LIBBANKFD.INC.BL` are this sample's own front
-door to the banked library, not library modules; `LIBUTIL.INC.BL` is the same thing for bank 7.
+ABI and is not edited here; `LIB.GUIBANK.INC.BL` and `LIB.FUTILBANK.INC.BL` are this sample's own front
+door to the banked library, not library modules; `LIB.UTILBANK.INC.BL` is the same thing for bank 7.
 
 `THEME.INC.BL` here has **diverged from the root copy** and is not a straight overwrite either
 way: this one renames `THEME.LOAD` to `THEME.SELECT` and carries the comments swept down in
 `377dd7c`, while the root copy keeps the old name and is what `samples/editor`,
 `samples/color-test` and `samples/GPC-HELP` build against. Port a fix across by hand.
 
-`LIBBANKFD` is separate from `LIBBANK` because BASLOAD resolves every label in every file it
-reads, so a `FILE.DIR` shim in `LIBBANK` stops the build with `LABEL NOT FOUND` in any program
-that does not also include `FILEDIR` — which is every program here but `GPBFILES`.
+`LIB.FUTILBANK.INC.BL` is separate from `LIB.GUIBANK.INC.BL` because BASLOAD resolves every label in
+every file it reads, so a `FILE.DIR` shim in `LIB.GUIBANK.INC.BL` stops the build with `LABEL NOT FOUND` in any program
+that does not also include `FILEDIR` — which is `PICKDEMO` and `SPIKE`. `GPBMODS`
+includes both.

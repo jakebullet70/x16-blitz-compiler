@@ -1,0 +1,108 @@
+## ***********************************************************************
+## **
+## **  LIB.FUTILBANK.INC.BL -- the low memory front door to the banked FILE
+## **  modules, FILEDIR and FILEIO. Both run in LIB.FUTILBANK, which this file
+## **  owns. The FD in the name was FILEDIR's alone until FILEIO joined it.
+## **
+## **      FILE.DIR.INIT   FILE.DIR.OPEN   FILE.DIR.NEXT
+## **      FILE.STATUS     FILE.EXISTS     FILE.DELETE     FILE.RENAME
+## **      FILE.MKDIR      FILE.RMDIR      FILE.CHDIR      FILE.UP
+## **      FILE.CURDIR     FILE.SAVEARRAY  FILE.LOADARRAY  FILE.SIZE
+## **
+## **  Shims of exactly the kind LIB.GUIBANK.INC.BL holds, and they are in a file
+## **  of their own for one reason: BASLOAD resolves every label in every file
+## **  it reads, so a shim naming FILE.DIR.OPEN.BODY stops the build with
+## **  LABEL NOT FOUND in any program that does not also include FILEDIR.
+## **  They lived in LIB.GUIBANK for a day and PICKDEMO -- which banks the same six
+## **  modules and has no use for a directory reader -- could not be tokenised
+## **  at all. THE SAME NOW GOES FOR FILEIO: include this file and you must
+## **  include both modules, or the FILE.RMDIR.BODY shim below fails the same
+## **  way. Split this file in two the day a program wants only one of them.
+## **
+## **  #IFDEF cannot answer it either: LIB.GUIBANK's whole body is already inside
+## **  an #IFNDEF and BASLOAD does not nest them.
+## **
+## **  THE FILE MODULES GET A REGION OF THEIR OWN. FILEDIR shared LIB.GUIBANK
+## **  with the GUI until 2026-09-09 and was moved out to make room: bank 4 was
+## **  at 7,424 of its 8,192 bytes with FILEDIR still in it, and GUI.FORM has
+## **  to fit. FILEIO followed it out of LIB.UTILBANK the same day, which frees
+## **  no low RAM -- it was already banked -- but puts the two file modules in
+## **  one bank and hands their bytes back to bank 7 for whatever has to leave
+## **  the GUI's next.
+## **
+## **  A REGION MAY NOT CALL ANOTHER REGION, so check both directions before
+## **  moving a routine in or out of here. What made these two legal: nothing
+## **  in the GUI calls FILE.DIR and FILEDIR calls nothing in the GUI; nothing
+## **  in LIB.UTILBANK calls FILE.ANYTHING and FILEIO calls nothing but its own
+## **  labels; and FILEDIR reads FILEIO's FILE.CHAN, which is a variable and
+## **  not a call, so it was legal before they shared a bank and still is.
+## **
+## **  Usage -- each front door sits directly above the region it opens, so a
+## **  bank reads as one unit and its file list is the copy list:
+## **      GOTO MY.LIBEND
+## **      #INCLUDE "LIB.GUIBANK.INC.BL"
+## **      GP.BANKED LIB.GUIBANK
+## **      ...the six GUI modules...
+## **      GP.ENDBANKED
+## **      #INCLUDE "LIB.FUTILBANK.INC.BL"
+## **      GP.BANKED LIB.FUTILBANK
+## **      #INCLUDE "FILEIO.INC.BL"        ' FIRST: it supplies FILE.CHAN
+## **      #INCLUDE "FILEDIR.INC.BL"
+## **      GP.ENDBANKED
+## **      MY.LIBEND:
+## **
+## **  FILEIO GOES FIRST. It supplies #DEFINE FILE.CHAN and FILEDIR uses it,
+## **  and BASLOAD substitutes a #DEFINE where it stands, so the file that
+## **  supplies one has to be read before the file that wants it.
+## **
+## **  Claim the bank as well, or something else will hand it out:
+## **      BANKMGR.SET.BANK = LIB.FUTILBANK : GOSUB BANKMGR.CLAIM
+## **
+## **  FILE STATEMENTS ARE NOT A REASON to keep a module out of a region: OPEN,
+## **  INPUT#, PRINT# and CLOSE all work inside one, measured on FILEDIR, which
+## **  has opened the directory from a bank since 2026-09-07. A BANK statement
+## **  is the only disqualifier.
+## **
+## ***********************************************************************
+#IFNDEF LIB.FUTILBANK.DEFS
+#DEFINE LIB.FUTILBANK.DEFS 1
+
+## The bank the file modules run in. Not LIB.GUIBANK -- that is the GUI's -- and
+## not a scratch bank: BANKMGR.GET.FREE.BANK hands out the LOWEST free one, so 8
+## sits above the library's block (4 the GUI, 5 and 6 the text, 7 the utilities)
+## and leaves 1..3 to the run-time allocator. GP.BANKED takes a decimal constant
+## and #DEFINE substitutes at translation time, so this and the BANK in each shim
+## below cannot drift apart.
+#DEFINE LIB.FUTILBANK 8
+
+GOTO LIB.FUTILBANK.MODULE.END
+
+## ---- FILEDIR ----
+FILE.DIR.INIT:  BANK LIB.FUTILBANK :  GOSUB FILE.DIR.INIT.BODY :  RETURN
+FILE.DIR.OPEN:  BANK LIB.FUTILBANK :  GOSUB FILE.DIR.OPEN.BODY :  RETURN
+FILE.DIR.NEXT:  BANK LIB.FUTILBANK :  GOSUB FILE.DIR.NEXT.BODY :  RETURN
+
+## ---- FILEIO ----
+FILE.STATUS:     BANK LIB.FUTILBANK :  GOSUB FILE.STATUS.BODY     :  RETURN
+FILE.EXISTS:     BANK LIB.FUTILBANK :  GOSUB FILE.EXISTS.BODY     :  RETURN
+FILE.DELETE:     BANK LIB.FUTILBANK :  GOSUB FILE.DELETE.BODY     :  RETURN
+FILE.RENAME:     BANK LIB.FUTILBANK :  GOSUB FILE.RENAME.BODY     :  RETURN
+FILE.MKDIR:      BANK LIB.FUTILBANK :  GOSUB FILE.MKDIR.BODY      :  RETURN
+FILE.RMDIR:      BANK LIB.FUTILBANK :  GOSUB FILE.RMDIR.BODY      :  RETURN
+FILE.CHDIR:      BANK LIB.FUTILBANK :  GOSUB FILE.CHDIR.BODY      :  RETURN
+FILE.UP:         BANK LIB.FUTILBANK :  GOSUB FILE.UP.BODY         :  RETURN
+FILE.CURDIR:     BANK LIB.FUTILBANK :  GOSUB FILE.CURDIR.BODY     :  RETURN
+FILE.SAVEARRAY:  BANK LIB.FUTILBANK :  GOSUB FILE.SAVEARRAY.BODY  :  RETURN
+FILE.LOADARRAY:  BANK LIB.FUTILBANK :  GOSUB FILE.LOADARRAY.BODY  :  RETURN
+
+## FILE.SIZE is a VERB, not a shim. GP.DEFPROC compiles the call site into a jump
+## to the body, and a call site in low memory jumping to $A000 does not select the
+## bank first, so the declaration has to be the shim -- it is the one place a BANK
+## can go. Being a verb its name is a NAME and cannot also be a label, which is
+## what removes GOSUB FILE.SIZE as a way to call it. FILE.OK is still set beside
+## the count, which is what tells a real 0-block file from a missing one.
+GP.DEFPROC FILE.SIZE, FILE.NAME$ RETURNS FILE.BLOCKS : BANK LIB.FUTILBANK : GOSUB FILE.SIZE.BODY
+RETURN
+
+LIB.FUTILBANK.MODULE.END:
+#ENDIF

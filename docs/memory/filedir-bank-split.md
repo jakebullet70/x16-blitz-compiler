@@ -40,7 +40,7 @@ selected would have the interpreter fetch its next byte from it.
 `FILE.DIR.BNK%` carries the bank into the assembly because `{FILE.DIR.BANK}` is an untyped variable
 — a 6-byte float slot, where `LDA` would read the mantissa's low byte and work only by accident.
 
-The three entry points became `.BODY` and got shims in `LIBBANK.INC.BL`, exactly as `MENUVERT` in
+The three entry points became `.BODY` and got shims in `LIB.GUIBANK.INC.BL`, exactly as `MENUVERT` in
 the same directory already does.
 
 ## Numbers
@@ -65,7 +65,7 @@ That extends [[kernal-preserves-ram-bank]], which covered only the screen calls.
 ## The one behaviour change
 
 **A banked build no longer preserves the caller's RAM bank across a `FILE.DIR` call.** That is the
-shim's doing, not the module's — a `LIBBANK` shim deliberately leaves its own bank selected, see
+shim's doing, not the module's — a `LIB.GUIBANK` shim deliberately leaves its own bank selected, see
 [[gp-banked-call-out-loses-the-bank]]. The blobs preserve the bank they are entered with. Callers
 in low memory do not care; a caller that did would have to re-select.
 

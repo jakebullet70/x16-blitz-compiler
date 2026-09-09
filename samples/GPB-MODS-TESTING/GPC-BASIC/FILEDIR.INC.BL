@@ -9,12 +9,12 @@
 ## **  Requires GPB.INC.BL and FILEIO.INC.BL, and #INCLUDEs neither.
 ## **
 ## **  THE THREE ENTRY POINTS ARE SPELLED .BODY HERE, and the names above are the
-## **  shims in LIBBANK.INC.BL. This copy of the module lives in a GP.BANKED region
+## **  shims in LIB.GUIBANK.INC.BL. This copy of the module lives in a GP.BANKED region
 ## **  -- MENUVERT.INC.BL beside it is written the same way for the same reason. A
 ## **  program that wants it in low memory calls the .BODY labels directly and needs
 ## **  no shim.
 ## **
-## **  A shim leaves ITS bank selected on return, by LIBBANK's design, so a banked
+## **  A shim leaves ITS bank selected on return, by LIB.GUIBANK's design, so a banked
 ## **  build does not preserve the caller's RAM bank across a call here. The blobs
 ## **  preserve the bank they are entered with; the shim in front of them does not.
 ## **

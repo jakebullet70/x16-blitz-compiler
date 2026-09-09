@@ -80,7 +80,7 @@
 ## **  a nested call. Low memory callers do not care; a caller inside ANOTHER
 ## **  region does, and cannot fix it, since a region may not contain BANK.
 ## **
-## **  WARNING: DB.CODEBANK is not GUI.BANK, and it is not LIB.CODEBANK.
+## **  WARNING: DB.CODEBANK is not GUI.BANK, and it is not LIB.GUIBANK.
 ## **  Point two of them at one bank and the dialog writes the screen over the
 ## **  engine's code.
 ## **

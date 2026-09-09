@@ -9,7 +9,7 @@ metadata:
 **BUILT 2026-09-08.** `samples/GPB-MODS-TESTING` grew a **second** `GP.BANKED` region, bank 7, and
 put `APPSYS`, `BANKMGR`, `STRCASE`, `STRINGS`, `STRUSING`, `SORT`, `STASHVRAM` and `FILEIO` in it.
 Resident object **15,254 -> 14,001 while gaining two modules and three panels**; workspace
-6,656 -> 7,680. `LIBUTIL.INC.BL` is the low-memory front door, 359 bytes for 35 shims.
+6,656 -> 7,680. `LIB.UTILBANK.INC.BL` is the low-memory front door, 359 bytes for 35 shims.
 
 ## What actually disqualifies a module, and it is one thing
 
@@ -26,8 +26,8 @@ So the rule is not "anything that touches banks" and not "anything that does I/O
 - **`PEEK`/`POKE` are fine**, and this is the same fact from the other side: they save the selected
   bank, switch, access and restore, which is why `BANK` is the only statement that needs the guard.
 
-What stayed down: `STASH` and `STASHFILE` (four `BANK`s and one), and `LIBBANK`, `LIBBANKFD` and
-`LIBUTIL`, which are the shim layer itself.
+What stayed down: `STASH` and `STASHFILE` (four `BANK`s and one), and `LIB.GUIBANK`, `LIB.FUTILBANK` and
+`LIB.UTILBANK`, which are the shim layer itself.
 
 ## Several regions, and the two rules that shape them
 
@@ -49,7 +49,7 @@ A verb's call site is compiled into a jump to the body, and a call site in low m
     GP.DEFPROC STR.UCASE, STRCASE.S$ RETURNS STRCASE.S$ : BANK LIB.UTILBANK : GOSUB STR.UCASE.BODY
     RETURN
 
-so `STRCASE.INC.BL` keeps only `STR.UCASE.BODY` and `LIBUTIL.INC.BL` carries both declarations.
+so `STRCASE.INC.BL` keeps only `STR.UCASE.BODY` and `LIB.UTILBANK.INC.BL` carries both declarations.
 
 ## The cost, and who pays it
 

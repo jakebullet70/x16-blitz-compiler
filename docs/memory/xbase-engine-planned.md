@@ -17,15 +17,15 @@ plan, in `samples/XBASE/readme.md`.
 of it is that every `GOSUB` and `GOTO` target resolves.
 
 **The GUI is already banked; the engine is not.** `THEME`, `MENUVERT`, `MENUBAR`, `LINEINPUT`, `GUI`
-and `GUI2` sit in a `GP.BANKED LIB.CODEBANK` region — bank 4 — reached through the eighteen low
-memory shims of `LIBBANK.INC.BL`, exactly the arrangement `GPBMODS.BASL` already runs. `STASH` stays
+and `GUI2` sit in a `GP.BANKED LIB.GUIBANK` region — bank 4 — reached through the eighteen low
+memory shims of `LIB.GUIBANK.INC.BL`, exactly the arrangement `GPBMODS.BASL` already runs. `STASH` stays
 low because a region may not hold the `STASH` statement, `STRINGS` stays because `DB.JOIN` calls it
 per record and a region cannot call a region, and `DBFORM` stays because it calls `LINEINPUT`.
-`GUI2` has to be included even though nothing calls it: `LIBBANK` shims `GUI.LISTBOX`. Bank 4 and
+`GUI2` has to be included even though nothing calls it: `LIB.GUIBANK` shims `GUI.LISTBOX`. Bank 4 and
 bank 8 are both `BANKMGR.CLAIM`ed at startup, with an `XB.BANKSTOP` exit if either is taken.
 
 **THE BUILD PULLS FROM TWO DIRECTORIES AND THAT IS NOT A MISTAKE.** The library modules come from
-`samples/GPB-MODS-TESTING/GPC-BASIC/`, because that is where the `.BODY` renames, `LIBBANK` and
+`samples/GPB-MODS-TESTING/GPC-BASIC/`, because that is where the `.BODY` renames, `LIB.GUIBANK` and
 `BANKMGR` live. `GPB.INC.BL` is the one exception and comes from root. See
 [[library-working-copy-then-root]] for the skew.
 

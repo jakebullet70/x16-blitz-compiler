@@ -218,7 +218,7 @@ three readmes and `color-demo.bat`. Copy the working copy over the root modules 
 in one pass; the two naming decisions below are already taken.
 
 **Proven by running it, not by reading it.** `testing/GPBTRN.BASL` builds the renamed modules the
-way `GPBMODS` does — the library in bank 4 behind `LIBBANK`'s shims — and pushes its keys through
+way `GPBMODS` does — the library in bank 4 behind `LIB.GUIBANK`'s shims — and pushes its keys through
 `kbdbuf_put`. `THEME.SELECT` fills the palette and `THEME.NEXT` still falls into it; `GUI.INPUT`
 comes back with `GUI.TEXT$` = `GPC` and `GUI.OK` 1 on RETURN, and puts `KEEP ME` back with
 `GUI.OK` 0 on ESC. **The rename costs no p-code**: `GPBMODS` compiles to the same `OK CODE 19730
@@ -228,7 +228,7 @@ It needs the renamed modules copied into `testing/`, so run it after the sweep, 
 ### `GUI.TEXT` should be `GUI.INPUT` — DONE here, AND ITS STRING MOVED WITH IT
 
 It asks for a line of text and gives it back; `GUI.TEXT` reads like it draws some. Every caller and
-every shim in `LIBBANK.INC.BL` changes with it. Nothing depends on the old name outside this repo.
+every shim in `LIB.GUIBANK.INC.BL` changes with it. Nothing depends on the old name outside this repo.
 
 **The routine's own in/out string was already `GUI.INPUT$`, so the obvious rename does not compile.**
 BASLOAD will not have a label and a variable of one name, and the `$` does not separate them, so a
@@ -261,7 +261,7 @@ just created. Rename the branches to `THEME.SELECT.*` in the same pass, which is
 here. Counted 2026-09-06,
 excluding `TODO.md` and the `testing/` mirror: **72 bare `THEME.LOAD` references, 131 including the
 label family**, across the library, six samples, `GP-BASIC.md` and `GP-BASIC.GLOBALS.md`.
-`LIBBANK.INC.BL` carries a shim, as it does for `GUI.INPUT`.
+`LIB.GUIBANK.INC.BL` carries a shim, as it does for `GUI.INPUT`.
 
 **The drift between the five copies of `THEME.INC.BL` was one line** — the `GPB-MODS-TESTING`
 variant's `.BODY` suffix, which its banked build needs. The other four are identical, so the sweep
@@ -1269,7 +1269,7 @@ the programs that do not include it.
 **Shipped** as `LINEINPUT.ALLOW$` and `LINEINPUT.DENY$`, in all four copies of the module, with
 `GP-BASIC.md` §4.4, `GP-BASIC.GLOBALS.md` and the regenerated `HELP-TXT`. `FORM.EXP.BL`'s LANDING
 PAD field takes digits only, set per field from a `FORM.ALLOW$()` array beside the width and the
-mask. `LIBBANK.INC.BL` needed nothing, as expected.
+mask. `LIB.GUIBANK.INC.BL` needed nothing, as expected.
 
 **The two guards are nested, not the one-line `AND` sketched below.** Written as one line each,
 `DENY$` would still be asked after `ALLOW$` passed a character, so a caller that set both would get
@@ -1283,7 +1283,7 @@ No token, no runtime byte, nothing in `GPC.BIN`.
 **Six cases, twice.** `work/rename/LINTST.BASL` runs them against the banked working copy, calling
 `LINEINPUT.TYPED` directly with a code and a character — no field, no keyboard, no blink — and then
 once more live through `GUI.INPUT` with keys pushed by `kbdbuf_put`, because the filter runs per
-keystroke inside `LIB.CODEBANK`. `work/lineinput/LINTST2.BASL` is the same six against the unbanked
+keystroke inside `LIB.GUIBANK`. `work/lineinput/LINTST2.BASL` is the same six against the unbanked
 root library. No filter set leaves the field as it was; `ALLOW$` refuses without moving the caret;
 `DENY$` passes everything else; both set gives `ALLOW$`; a full field still refuses; and RETURN is
 still refused by the three older guards, which the filter never sees.
@@ -1325,7 +1325,7 @@ so `ALLOW$` carries both cases. Case folding is a separate question — PETSCII 
 case, and `STRCASE.INC.BL` is the whole-string answer.
 
 Also touched: the header's `in` block, `GP-BASIC.GLOBALS.md`, `GP-BASIC.md` §4.4, and one field in
-`FORM.EXP.BL` given a digits-only `ALLOW$` so the example exercises it. `LIBBANK.INC.BL` needs
+`FORM.EXP.BL` given a digits-only `ALLOW$` so the example exercises it. `LIB.GUIBANK.INC.BL` needs
 nothing — no new entry point, so the shim table is unchanged.
 
 **BASL only.** No token, no p-code, no runtime byte, nothing in `GPC.BIN`. Roughly 30 bytes of
@@ -1335,7 +1335,7 @@ p-code, and only in programs that include the module.
 `LINEINPUT.CODE`, `GOSUB LINEINPUT.TYPED`, read `LINEINPUT.TEXT$` back. A `DATA` list of codes covers
 accept, refuse, the full-field refusal and the caret position with no emulator interaction, which is
 the way past `paste cannot drive a running program`. Run the banked build once afterwards, since the
-filter runs per keystroke inside `LIB.CODEBANK`.
+filter runs per keystroke inside `LIB.GUIBANK`.
 
 ### `STRINGS.INC.BL` wants `STR.CENTRE`
 
@@ -1487,7 +1487,7 @@ data bank at entry and put the caller's back at every exit. `FILE.DIR.BANKHOLD` 
   occupies a region either way.
 - **The restore is load bearing, not tidiness.** Control returns to banked p-code at `$A000`, so a
   blob leaving the data bank selected would have the interpreter fetch its next byte from it.
-- **A banked build does not preserve the caller's RAM bank**, because a `LIBBANK` shim leaves its
+- **A banked build does not preserve the caller's RAM bank**, because a `LIB.GUIBANK` shim leaves its
   own selected. The blobs preserve the bank they are entered with; the shim in front does not.
 - `FILE.DIR.BNK%` carries the bank into the assembly, because `{FILE.DIR.BANK}` is an untyped
   variable — a 6-byte float slot, where `LDA` reads the mantissa and works only by accident.

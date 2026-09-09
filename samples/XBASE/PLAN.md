@@ -92,7 +92,7 @@ Net low-RAM cost of the engine is about 1 KB: shims, globals, the field arrays.
 **Bank map**
 
 ```
-bank 4   LIB.CODEBANK    GUI library region        existing
+bank 4   LIB.GUIBANK    GUI library region        existing
 bank 5   DB.CODEBANK     engine region + schemas   new
 bank 6   DB.IDXBANK      index                     v2
 bank 7   ---             OBJ_BUF_BANK, never claim
@@ -106,7 +106,7 @@ Each needs `BANKMGR.SET.BANK = n : GOSUB BANKMGR.CLAIM` before the first ALLOC.
 |---|---|---|
 | `DBFILE.INC.BL` | 5 | channels, `P` and `T`, block read and write, header read and write |
 | `DB.INC.BL` | 5 | schema, field arrays, navigate, split and join, find, del, pack |
-| `DBBANK.INC.BL` | low | one shim per public entry, LIBBANK pattern |
+| `DBBANK.INC.BL` | low | one shim per public entry, LIB.GUIBANK pattern |
 | `DBFORM.INC.BL` | 4 or low | the one-record screen |
 | `XBASE.BASL` | low | the admin front end |
 

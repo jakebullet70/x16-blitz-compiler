@@ -122,7 +122,7 @@ STRCASE.GO.BODY:
     RETURN
 
 ## The verbs' bodies. THE GP.DEFPROC DECLARATIONS ARE NOT HERE -- they are in
-## LIBUTIL.INC.BL, which is in low memory, because a verb's call site is compiled
+## LIB.UTILBANK.INC.BL, which is in low memory, because a verb's call site is compiled
 ## into a jump to the body and a jump out of low memory has to select the bank
 ## first. See that file's header. The third verb was never built:
 ## GP.DEFPROC STRCASE.APPLY, STRCASE.PTR, STRCASE.MODE : GOSUB STRCASE.GO

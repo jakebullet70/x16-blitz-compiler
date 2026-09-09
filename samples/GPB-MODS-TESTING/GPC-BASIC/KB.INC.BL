@@ -6,6 +6,12 @@
 ## **
 ## **  Requires GPB.INC.BL, and does not #INCLUDE it for you.
 ## **
+## **  THIS IS THE LOW MEMORY ONE. GUI.INC.BL carries a private twin,
+## **  GUI.CLEARKB, because code inside a GP.BANKED region may not call another
+## **  bank and survive the return. Fix one and fix the other; there are only
+## **  the two, and a second #INCLUDE of this file cannot supply the twin --
+## **  #IFNDEF KB.DEFS makes it produce nothing.
+## **
 ## ***********************************************************************
 #IFNDEF KB.DEFS
 #DEFINE KB.DEFS 1

@@ -21,14 +21,14 @@
 #INCLUDE "GPB.INC.BL"
 #INCLUDE "STASH.INC.BL"
 
-## ---- MENUBAR IS HERE AND NEVER CALLED. LIBBANK.INC.BL shims all five
+## ---- MENUBAR IS HERE AND NEVER CALLED. LIB.GUIBANK.INC.BL shims all five
 ## ---- modules, and BASLOAD resolves every label in a file rather than the
 ## ---- ones a path reaches -- so leaving one out stops the build with LABEL
 ## ---- NOT FOUND. It costs bank space, not low memory.
 ## ----
 ## ---- THE FRONT DOOR GOES IN LOW MEMORY, THE GUI GOES IN THE BANK.
 ## ----
-## ---- LIBBANK.INC.BL is seventeen shims: each selects LIB.CODEBANK and calls
+## ---- LIB.GUIBANK.INC.BL is seventeen shims: each selects LIB.GUIBANK and calls
 ## ---- the body. A banked routine cannot select its own bank -- by the time its
 ## ---- first instruction is fetched the wrong bank is already selected -- so
 ## ---- something in low memory has to do it first.
@@ -39,10 +39,11 @@
 ## ---- that means every module's GOTO ... MODULE.END runs from the bank for no
 ## ---- reason, and stops working the day anything selects another bank first.
 
-#INCLUDE "LIBBANK.INC.BL"
-
 GOTO PD.LIBEND
-GP.BANKED LIB.CODEBANK
+
+## ---- THE GUI. Copy LIB.GUIBANK.INC.BL and these six, and nothing else.
+#INCLUDE "LIB.GUIBANK.INC.BL"
+GP.BANKED LIB.GUIBANK
 #INCLUDE "THEME.INC.BL"
 #INCLUDE "MENUVERT.INC.BL"
 #INCLUDE "MENUBAR.INC.BL"

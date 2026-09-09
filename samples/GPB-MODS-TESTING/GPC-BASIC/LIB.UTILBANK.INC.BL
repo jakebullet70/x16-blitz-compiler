@@ -1,6 +1,6 @@
 ## ***********************************************************************
 ## **
-## **  LIBUTIL.INC.BL -- the low memory front door to a banked utility set.
+## **  LIB.UTILBANK.INC.BL -- the low memory front door to a banked utility set.
 ## **
 ## **      APPSYS.STARTUP  APPSYS.RESTORE
 ## **      BANKMGR.INIT    BANKMGR.CLAIM   BANKMGR.GET.FREE.BANK
@@ -12,18 +12,16 @@
 ## **      SORT.RUN
 ## **      SV.INIT         SV.RESET        SV.SAVE         SV.RESTORE
 ## **      SV.PUT          SV.GET          SV.FREE
-## **      FILE.STATUS     FILE.EXISTS     FILE.DELETE     FILE.RENAME
-## **      FILE.MKDIR      FILE.RMDIR      FILE.CHDIR      FILE.UP
-## **      FILE.CURDIR     FILE.SAVEARRAY  FILE.LOADARRAY
 ## **
-## **  The same twenty-six-shim trick LIBBANK.INC.BL plays on the GUI, played
-## **  on the six modules that had nothing keeping them in low memory. Each
+## **  The same shim trick LIB.GUIBANK.INC.BL plays on the GUI, played on the seven
+## **  modules that had nothing keeping them in low memory. Each
 ## **  shim selects the bank and calls the body, which lives at $A000 in that
 ## **  bank under a .BODY name.
 ## **
-## **  Usage:
-## **      #INCLUDE "LIBUTIL.INC.BL"       ' before the region
+## **  Usage -- this file sits directly above the region it opens, so the bank
+## **  reads as one unit and its file list is the copy list:
 ## **      GOTO MY.UTILEND
+## **      #INCLUDE "LIB.UTILBANK.INC.BL"
 ## **      GP.BANKED LIB.UTILBANK
 ## **      #INCLUDE "APPSYS.INC.BL"
 ## **      #INCLUDE "BANKMGR.INC.BL"
@@ -32,36 +30,40 @@
 ## **      #INCLUDE "STRUSING.INC.BL"
 ## **      #INCLUDE "SORT.INC.BL"
 ## **      #INCLUDE "STASHVRAM.INC.BL"
-## **      #INCLUDE "FILEIO.INC.BL"
 ## **      GP.ENDBANKED
 ## **      MY.UTILEND:
 ## **
 ## **  Claim the bank as well, or something else will hand it out:
 ## **      BANKMGR.SET.BANK = LIB.UTILBANK : GOSUB BANKMGR.CLAIM
 ## **
-## **  ALL EIGHT MODULES ARE REQUIRED, for the reason LIBBANK's header gives:
+## **  ALL SEVEN MODULES ARE REQUIRED, for the reason LIB.GUIBANK's header gives:
 ## **  BASLOAD resolves every label in every file it reads, so a shim naming
-## **  FILE.RMDIR.BODY stops the build with LABEL NOT FOUND in a program with
-## **  no FILEIO. Split this file per module the day a program wants a subset.
+## **  SV.FREE.BODY stops the build with LABEL NOT FOUND in a program with no
+## **  STASHVRAM. Split this file per module the day a program wants a subset.
 ## **
-## **  A SEPARATE BANK FROM LIB.CODEBANK, and it has to be: two regions live at
+## **  FILEIO WAS THE EIGHTH until 2026-09-09, when it moved to LIB.FUTILBANK to
+## **  sit with FILEDIR. Its eleven shims and the FILE.SIZE verb went with it,
+## **  into LIB.FUTILBANK.INC.BL. Nothing here called it, which is what made the
+## **  move a straight lift.
+## **
+## **  A SEPARATE BANK FROM LIB.GUIBANK, and it has to be: two regions live at
 ## **  the same $A000 in different banks, so one may not call the other, and
 ## **  GUI.INC.BL is already up there. Nothing in the GUI bank calls anything
 ## **  shimmed here -- the only call it makes downwards is to STASH, which is
 ## **  in low memory -- so the two sets are genuinely independent.
 ## **
-## **  WHY THESE SIX AND NOT THE REST. What keeps a module in low memory is a
+## **  WHY THESE AND NOT THE REST. What keeps a module in low memory is a
 ## **  BANK statement, which the compiler refuses inside a region: that is
-## **  STASH and STASHFILE, and LIBBANK, LIBBANKFD and this file, which are the
+## **  STASH and STASHFILE, and LIB.GUIBANK, LIB.FUTILBANK and this file, which are the
 ## **  shim layer itself. Nothing else disqualified anything. In particular:
 ## **
-## **      FILEIO's file statements are fine. OPEN, INPUT#, PRINT# and CLOSE
-## **      on device 8 leave $00 alone -- measured for FILEDIR, which has been
-## **      banked since 2026-09-07 and opens the directory from up there.
+## **      File statements are fine. OPEN, INPUT#, PRINT# and CLOSE on device 8
+## **      leave $00 alone -- measured for FILEDIR, which has been banked since
+## **      2026-09-07 and opens the directory from up there.
 ## **
 ## **      A GP.ASM blob is fine. Its body never sits in a region either way;
 ## **      the pool is appended at the object tail in low RAM and the call is
-## **      an absolute .word. FILEIO, SORT, STRCASE and STRINGS each hold one.
+## **      an absolute .word. SORT, STRCASE and STRINGS each hold one.
 ## **
 ## **      BANKMGR names banks but never selects one. It is a bitmap and an
 ## **      array, and the array is in the workspace like every other.
@@ -70,31 +72,31 @@
 ## **      BANK for exactly this reason, and the two VERA data ports it drives
 ## **      are I/O at $9F20, not banked RAM.
 ## **
-## **  THE VERBS ARE DECLARED HERE, not in their modules -- STRCASE's two and
-## **  FILEIO's FILE.SIZE. GP.DEFPROC compiles the verb's call site into a jump
-## **  to the body, and a call site in low memory jumping to $A000 does not
-## **  select the bank first. So the declaration is the shim -- it is the one
-## **  place a BANK can go -- and the modules keep only the .BODY labels.
+## **  THE VERBS ARE DECLARED HERE, not in their modules -- STRCASE's two.
+## **  GP.DEFPROC compiles the verb's call site into a jump to the body, and a
+## **  call site in low memory jumping to $A000 does not select the bank first.
+## **  So the declaration is the shim -- it is the one place a BANK can go --
+## **  and the modules keep only the .BODY labels.
 ## **
 ## **  A verb's name is a NAME, so it cannot also be a label: declaring
-## **  FILE.SIZE here is what removes GOSUB FILE.SIZE as a way to call it.
+## **  STR.UCASE here is what removes GOSUB STR.UCASE as a way to call it.
 ## **
 ## **  A call leaves this bank selected, and the shims do not put the caller's
-## **  back -- see LIBBANK.INC.BL, which says why a holding variable cannot
+## **  back -- see LIB.GUIBANK.INC.BL, which says why a holding variable cannot
 ## **  work. BANK is the runtime's PEEK/POKE bank as well as the hardware one,
 ## **  so a caller that has selected a data bank must re-select it after any
 ## **  call through here.
 ## **
 ## ***********************************************************************
-#IFNDEF LIBUTIL.DEFS
-#DEFINE LIBUTIL.DEFS 1
+#IFNDEF LIB.UTILBANK.DEFS
+#DEFINE LIB.UTILBANK.DEFS 1
 
-## The bank the utilities run in. Not LIB.CODEBANK, and not a scratch bank either:
+## The bank the utilities run in. Not LIB.GUIBANK, and not a scratch bank either:
 ## GP.BANKED takes a decimal constant and #DEFINE substitutes at translation time, so
 ## this and the BANK in every shim below cannot drift apart.
 #DEFINE LIB.UTILBANK 7
 
-GOTO LIBUTIL.MODULE.END
+GOTO LIB.UTILBANK.MODULE.END
 
 ## ---- APPSYS ----
 APPSYS.STARTUP:  BANK LIB.UTILBANK :  GOSUB APPSYS.STARTUP.BODY :  RETURN
@@ -138,24 +140,5 @@ SV.PUT:      BANK LIB.UTILBANK :  GOSUB SV.PUT.BODY      :  RETURN
 SV.GET:      BANK LIB.UTILBANK :  GOSUB SV.GET.BODY      :  RETURN
 SV.FREE:     BANK LIB.UTILBANK :  GOSUB SV.FREE.BODY     :  RETURN
 
-## ---- FILEIO ----
-FILE.STATUS:     BANK LIB.UTILBANK :  GOSUB FILE.STATUS.BODY     :  RETURN
-FILE.EXISTS:     BANK LIB.UTILBANK :  GOSUB FILE.EXISTS.BODY     :  RETURN
-FILE.DELETE:     BANK LIB.UTILBANK :  GOSUB FILE.DELETE.BODY     :  RETURN
-FILE.RENAME:     BANK LIB.UTILBANK :  GOSUB FILE.RENAME.BODY     :  RETURN
-FILE.MKDIR:      BANK LIB.UTILBANK :  GOSUB FILE.MKDIR.BODY      :  RETURN
-FILE.RMDIR:      BANK LIB.UTILBANK :  GOSUB FILE.RMDIR.BODY      :  RETURN
-FILE.CHDIR:      BANK LIB.UTILBANK :  GOSUB FILE.CHDIR.BODY      :  RETURN
-FILE.UP:         BANK LIB.UTILBANK :  GOSUB FILE.UP.BODY         :  RETURN
-FILE.CURDIR:     BANK LIB.UTILBANK :  GOSUB FILE.CURDIR.BODY     :  RETURN
-FILE.SAVEARRAY:  BANK LIB.UTILBANK :  GOSUB FILE.SAVEARRAY.BODY  :  RETURN
-FILE.LOADARRAY:  BANK LIB.UTILBANK :  GOSUB FILE.LOADARRAY.BODY  :  RETURN
-
-## FILE.SIZE is a VERB, not a shim, for the reason in the header -- and being one
-## it cannot also be a label, so there is no GOSUB FILE.SIZE. FILE.OK is still set
-## beside the count, which is what tells a real 0-block file from a missing one.
-GP.DEFPROC FILE.SIZE, FILE.NAME$ RETURNS FILE.BLOCKS : BANK LIB.UTILBANK : GOSUB FILE.SIZE.BODY
-RETURN
-
-LIBUTIL.MODULE.END:
+LIB.UTILBANK.MODULE.END:
 #ENDIF

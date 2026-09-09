@@ -1,6 +1,6 @@
 ## ***********************************************************************
 ## **
-## **  LIBBANK.INC.BL -- the low memory front door to a banked library.
+## **  LIB.GUIBANK.INC.BL -- the low memory front door to a banked library.
 ## **
 ## **      THEME.SELECT
 ## **      MENUVERT.RUN    MENUVERT.DRAW   MENUVERT.ROW
@@ -15,10 +15,12 @@
 ## **  its own bank -- by its first instruction fetch the window is already wrong
 ## **  -- so something in low memory has to.
 ## **
-## **  Usage:
-## **      #INCLUDE "LIBBANK.INC.BL"        ' before the region
+## **  Usage -- this file sits directly above the region it opens, so that the
+## **  bank reads as one unit and a programmer lifting it into another program
+## **  can see exactly which files to copy:
 ## **      GOTO MY.LIBEND
-## **      GP.BANKED LIB.CODEBANK
+## **      #INCLUDE "LIB.GUIBANK.INC.BL"
+## **      GP.BANKED LIB.GUIBANK
 ## **      #INCLUDE "THEME.INC.BL"
 ## **      #INCLUDE "MENUVERT.INC.BL"
 ## **      #INCLUDE "MENUBAR.INC.BL"
@@ -28,27 +30,32 @@
 ## **      GP.ENDBANKED
 ## **      MY.LIBEND:
 ## **
-## **  Claim the bank as well, or something else will hand it out:
-## **      BANKMGR.SET.BANK = LIB.CODEBANK : GOSUB BANKMGR.CLAIM
+## **  It may sit inside the jumped span because it opens with a GOTO of its
+## **  own, over its shims to LIB.GUIBANK.MODULE.END. Either jump alone is
+## **  enough; both is what lets the file travel.
 ## **
-## **  All seven modules are required, even by a program that calls one of them.
+## **  Claim the bank as well, or something else will hand it out:
+## **      BANKMGR.SET.BANK = LIB.GUIBANK : GOSUB BANKMGR.CLAIM
+## **
+## **  All six modules are required, even by a program that calls one of them.
 ## **  This file shims every entry point and BASLOAD resolves every label in a
 ## **  file, so leaving MENUBAR out stops the build with LABEL NOT FOUND.
 ## **
 ## **  Order inside the region is the order the modules already want: THEME
 ## **  first, MENUVERT before MENUBAR, both before GUI.
 ## **
-## **  FILEDIR IS SHIMMED BY LIBBANKFD.INC.BL, not by this file, and that split
+## **  FILEDIR IS SHIMMED BY LIB.FUTILBANK.INC.BL, not by this file, and that split
 ## **  is not tidiness: BASLOAD resolves every label in every file it reads, so
 ## **  a FILE.DIR shim here stops the build with LABEL NOT FOUND in any program
 ## **  that does not also include FILEDIR. Include both when you bank a
-## **  directory reader, and FILEDIR goes last inside the region.
+## **  directory reader -- and FILEDIR gets a REGION of its own now, in
+## **  LIB.FUTILBANK, which LIB.FUTILBANK.INC.BL owns. It is not in this one.
 ## **
 ## **  The GOTO over the region is not optional. Falling in through the bridge
 ## **  GP.BANKED leaves works at program start and stops working the day
 ## **  anything selects another bank first.
 ## **
-## **  WARNING: LIB.CODEBANK is not GUI.BANK. That one is scratch, where
+## **  WARNING: LIB.GUIBANK is not GUI.BANK. That one is scratch, where
 ## **  GUI.OPEN stashes the cells a dialog covers. Point both at one bank and
 ## **  the dialog writes the screen over its own code.
 ## **
@@ -64,43 +71,43 @@
 ## **  does, and cannot fix it, since a region may not contain BANK.
 ## **
 ## ***********************************************************************
-#IFNDEF LIBBANK.DEFS
-#DEFINE LIBBANK.DEFS 1
+#IFNDEF LIB.GUIBANK.DEFS
+#DEFINE LIB.GUIBANK.DEFS 1
 
 ## The bank the library runs in. One of the 63 a 512K machine has. GP.BANKED takes a
 ## decimal constant and #DEFINE substitutes at translation time, so this and the BANK in
 ## every shim below cannot drift apart.
-#DEFINE LIB.CODEBANK 4
+#DEFINE LIB.GUIBANK 4
 
-GOTO LIBBANK.MODULE.END
+GOTO LIB.GUIBANK.MODULE.END
 
 ## ---- THEME ----
-THEME.SELECT:  BANK LIB.CODEBANK :  GOSUB THEME.SELECT.BODY :  RETURN
+THEME.SELECT:  BANK LIB.GUIBANK :  GOSUB THEME.SELECT.BODY :  RETURN
 
 ## ---- MENUVERT ----
-MENUVERT.RUN:   BANK LIB.CODEBANK  : GOSUB MENUVERT.RUN.BODY  :  RETURN
-MENUVERT.DRAW:  BANK LIB.CODEBANK  : GOSUB MENUVERT.DRAW.BODY :  RETURN
-MENUVERT.ROW:   BANK LIB.CODEBANK  : GOSUB MENUVERT.ROW.BODY  :  RETURN
+MENUVERT.RUN:   BANK LIB.GUIBANK  : GOSUB MENUVERT.RUN.BODY  :  RETURN
+MENUVERT.DRAW:  BANK LIB.GUIBANK  : GOSUB MENUVERT.DRAW.BODY :  RETURN
+MENUVERT.ROW:   BANK LIB.GUIBANK  : GOSUB MENUVERT.ROW.BODY  :  RETURN
 
 ## ---- MENUBAR ----
-MENUBAR.RUN:    BANK LIB.CODEBANK :  GOSUB MENUBAR.RUN.BODY   :  RETURN
-MENUBAR.DRAW:   BANK LIB.CODEBANK :  GOSUB MENUBAR.DRAW.BODY  :  RETURN
-MENUBAR.ITEM:   BANK LIB.CODEBANK :  GOSUB MENUBAR.ITEM.BODY  :  RETURN
-MENUBAR.MARK:   BANK LIB.CODEBANK :  GOSUB MENUBAR.MARK.BODY  :  RETURN
-MENUBAR.WHERE:  BANK LIB.CODEBANK :  GOSUB MENUBAR.WHERE.BODY :  RETURN
+MENUBAR.RUN:    BANK LIB.GUIBANK :  GOSUB MENUBAR.RUN.BODY   :  RETURN
+MENUBAR.DRAW:   BANK LIB.GUIBANK :  GOSUB MENUBAR.DRAW.BODY  :  RETURN
+MENUBAR.ITEM:   BANK LIB.GUIBANK :  GOSUB MENUBAR.ITEM.BODY  :  RETURN
+MENUBAR.MARK:   BANK LIB.GUIBANK :  GOSUB MENUBAR.MARK.BODY  :  RETURN
+MENUBAR.WHERE:  BANK LIB.GUIBANK :  GOSUB MENUBAR.WHERE.BODY :  RETURN
 
 ## ---- LINEINPUT ----
-LINEINPUT.GET:   BANK LIB.CODEBANK :  GOSUB LINEINPUT.GET.BODY :  RETURN
-LINEINPUT.ASK:   BANK LIB.CODEBANK :  GOSUB LINEINPUT.ASK.BODY :  RETURN
+LINEINPUT.GET:   BANK LIB.GUIBANK :  GOSUB LINEINPUT.GET.BODY :  RETURN
+LINEINPUT.ASK:   BANK LIB.GUIBANK :  GOSUB LINEINPUT.ASK.BODY :  RETURN
 
 ## ---- GUI and GUI2 ----
-GUI.SAY:      BANK LIB.CODEBANK :  GOSUB GUI.SAY.BODY     :  RETURN
-GUI.YN:       BANK LIB.CODEBANK :  GOSUB GUI.YN.BODY      :  RETURN
-GUI.MENU:     BANK LIB.CODEBANK :  GOSUB GUI.MENU.BODY    :  RETURN
-GUI.INPUT:    BANK LIB.CODEBANK :  GOSUB GUI.INPUT.BODY   :  RETURN
-GUI.OPEN:     BANK LIB.CODEBANK :  GOSUB GUI.OPEN.BODY    :  RETURN
-GUI.CLOSE:    BANK LIB.CODEBANK :  GOSUB GUI.CLOSE.BODY   :  RETURN
-GUI.LISTBOX:  BANK LIB.CODEBANK :  GOSUB GUI.LISTBOX.BODY :  RETURN
+GUI.SAY:      BANK LIB.GUIBANK :  GOSUB GUI.SAY.BODY     :  RETURN
+GUI.YN:       BANK LIB.GUIBANK :  GOSUB GUI.YN.BODY      :  RETURN
+GUI.MENU:     BANK LIB.GUIBANK :  GOSUB GUI.MENU.BODY    :  RETURN
+GUI.INPUT:    BANK LIB.GUIBANK :  GOSUB GUI.INPUT.BODY   :  RETURN
+GUI.OPEN:     BANK LIB.GUIBANK :  GOSUB GUI.OPEN.BODY    :  RETURN
+GUI.CLOSE:    BANK LIB.GUIBANK :  GOSUB GUI.CLOSE.BODY   :  RETURN
+GUI.LISTBOX:  BANK LIB.GUIBANK :  GOSUB GUI.LISTBOX.BODY :  RETURN
 
-LIBBANK.MODULE.END:
+LIB.GUIBANK.MODULE.END:
 #ENDIF

@@ -10,7 +10,7 @@ metadata:
 
 ```basic
 GOSUB BANKMGR.INIT
-BANKMGR.WANT = LIB.CODEBANK : GOSUB BANKMGR.CLAIM
+BANKMGR.WANT = LIB.GUIBANK : GOSUB BANKMGR.CLAIM
 BANKMGR.WANT = GM.TEXTBANK  : GOSUB BANKMGR.CLAIM
 GOSUB BANKMGR.ALLOC                                ' only now
 ```
@@ -27,7 +27,7 @@ startup block, and each is checked -- `IF BANKMGR.OK = 0 THEN` a message, becaus
 fail if two owners named the same number, which is a bug worth naming rather than surviving.
 
 **Status 2026-09-08:** the two programs in `samples/GPB-MODS-TESTING/` already do this -- GPBMODS
-and GPBFILES both claim `LIB.CODEBANK` and `GM.TEXTBANK`. The rule is written up in the
+and GPBFILES both claim `LIB.GUIBANK` and `GM.TEXTBANK`. The rule is written up in the
 `GP.BANKEDSTR` section of `GPC-BASIC/GP-BASIC.md`. **It is the OTHER programs that still have to
 be checked**, as each is converted to the new runtime: anything that gains a banked region or
 banked text also gains a claim, and anything that already uses `BANKMGR.ALLOC` without one is a

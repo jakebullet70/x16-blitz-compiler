@@ -21,7 +21,7 @@
 
 | bank | what | claimed by |
 |---|---|---|
-| 4 | `THEME`, `MENUVERT`, `MENUBAR`, `LINEINPUT`, `GUI`, `GUI2` -- everything that draws | `BANKMGR.CLAIM` at startup, as `LIB.CODEBANK` |
+| 4 | `THEME`, `MENUVERT`, `MENUBAR`, `LINEINPUT`, `GUI`, `GUI2` -- everything that draws | `BANKMGR.CLAIM` at startup, as `LIB.GUIBANK` |
 | 5 | the record keeper, at step 6 | not yet -- `DBBANK.INC.BL` is not included |
 | 6 | the v2 index | not yet |
 | 8 | the cells a dialog covers, as `XB.GUIBANK` | `BANKMGR.CLAIM` at startup |
@@ -156,7 +156,7 @@ and nothing in the design survives the answer being no.
 Nothing is built. When it is:
 
 **The library modules come from `samples/GPB-MODS-TESTING/GPC-BASIC/`, not from the root library.**
-That is where the banked copies live: their entry points are renamed to `.BODY` and `LIBBANK.INC.BL`
+That is where the banked copies live: their entry points are renamed to `.BODY` and `LIB.GUIBANK.INC.BL`
 carries the eighteen low memory shims. The root copies are the unbanked, expanded ones and have
 neither. `GPB.INC.BL` is the one exception, and it goes the other way -- the root copy is the newer,
 and it is the only one with the `#TOKEN` lines for `GP.DEFPROC`, `GP.SUB`, `GP.FN` and `RETURNS`,
@@ -165,7 +165,7 @@ which step 6 needs.
 ```
 copy GPB.INC.BL                                        from GPC-BASIC/
 copy BANKMGR.INC.BL APPSYS.INC.BL KB.INC.BL
-     STRINGS.INC.BL STASH.INC.BL LIBBANK.INC.BL
+     STRINGS.INC.BL STASH.INC.BL LIB.GUIBANK.INC.BL
      THEME.INC.BL MENUVERT.INC.BL MENUBAR.INC.BL
      LINEINPUT.INC.BL GUI.INC.BL GUI2.INC.BL           from GPB-MODS-TESTING/GPC-BASIC/
 copy DBFILE.INC.BL DB.INC.BL DBFORM.INC.BL             from XBASE/GPC-BASIC/
@@ -180,7 +180,7 @@ Then compile each `.PRG` with `GPC.BIN`, SHARED. `MKFIX` first: it makes the fix
 and it is the measurement.
 
 `STASH.INC.BL` is in the list because `GUI.OPEN` calls it, not because anything here does.
-`GUI2.INC.BL` is in it because `LIBBANK.INC.BL` shims `GUI.LISTBOX` and BASLOAD resolves every label
+`GUI2.INC.BL` is in it because `LIB.GUIBANK.INC.BL` shims `GUI.LISTBOX` and BASLOAD resolves every label
 in a file it reads, so leaving it out stops the build with LABEL NOT FOUND. Nothing here calls it.
 `MKFIX.BASL` needs none of the screen modules -- `GPB`, `STRINGS`, `DBFILE` and `DB`, and no bank.
 

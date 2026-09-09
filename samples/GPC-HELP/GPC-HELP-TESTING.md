@@ -57,8 +57,8 @@ python samples/GPC-HELP/MKHELP.PY --mods samples/GPB-MODS-TESTING/GPC-BASIC --md
   - [FILEDIR.INC.BL -- a directory, into a bank or into low RAM.](#filedirincbl----a-directory-into-a-bank-or-into-low-ram)
   - [FILEIO.INC.BL -- the drive: status, files, directories.](#fileioincbl----the-drive-status-files-directories)
   - [KB.INC.BL -- the keyboard buffer, emptied.](#kbincbl----the-keyboard-buffer-emptied)
-  - [LIBBANK.INC.BL -- the low memory front door to a banked library.](#libbankincbl----the-low-memory-front-door-to-a-banked-library)
-  - [LIBBANKFD.INC.BL -- the low memory front door to a banked FILEDIR.](#libbankfdincbl----the-low-memory-front-door-to-a-banked-filedir)
+  - [LIB.GUIBANK.INC.BL -- the low memory front door to a banked library.](#libbankincbl----the-low-memory-front-door-to-a-banked-library)
+  - [LIB.FUTILBANK.INC.BL -- the low memory front door to a banked FILEDIR.](#libbankfdincbl----the-low-memory-front-door-to-a-banked-filedir)
   - [STASHVRAM.INC.BL -- screen rectangles and byte blobs, kept in VRAM.](#stashvramincbl----screen-rectangles-and-byte-blobs-kept-in-vram)
   - [STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store.](#stashvramgcincbl----close-the-holes-in-a-stashvram-store)
 - **GLOBALS AND NAMING**
@@ -2090,12 +2090,12 @@ the result is a field, so a right answer in the wrong number of columns still br
   Requires GPB.INC.BL and FILEIO.INC.BL, and #INCLUDEs neither.
 
   THE THREE ENTRY POINTS ARE SPELLED .BODY HERE, and the names above are the
-  shims in LIBBANK.INC.BL. This copy of the module lives in a GP.BANKED region
+  shims in LIB.GUIBANK.INC.BL. This copy of the module lives in a GP.BANKED region
   -- MENUVERT.INC.BL beside it is written the same way for the same reason. A
   program that wants it in low memory calls the .BODY labels directly and needs
   no shim.
 
-  A shim leaves ITS bank selected on return, by LIBBANK's design, so a banked
+  A shim leaves ITS bank selected on return, by LIB.GUIBANK's design, so a banked
   build does not preserve the caller's RAM bank across a call here. The blobs
   preserve the bank they are entered with; the shim in front of them does not.
 
@@ -2190,7 +2190,7 @@ the result is a field, so a right answer in the wrong number of columns still br
   does not own.
 ```
 
-*See also: FILEIO.INC.BL -- the drive: status, files, directories., LIBBANK.INC.BL -- the low memory front door to a banked library., 4.6 MENUVERT.INC.BL -- a vertical menu*
+*See also: FILEIO.INC.BL -- the drive: status, files, directories., LIB.GUIBANK.INC.BL -- the low memory front door to a banked library., 4.6 MENUVERT.INC.BL -- a vertical menu*
 
 ## FILEIO.INC.BL -- the drive: status, files, directories.
 
@@ -2302,10 +2302,10 @@ the result is a field, so a right answer in the wrong number of columns still br
   Requires GPB.INC.BL, and does not #INCLUDE it for you.
 ```
 
-## LIBBANK.INC.BL -- the low memory front door to a banked library.
+## LIB.GUIBANK.INC.BL -- the low memory front door to a banked library.
 
 
-*From the banner header of `LIBBANK.INC.BL`.*
+*From the banner header of `LIB.GUIBANK.INC.BL`.*
 
 ```
 
@@ -2323,9 +2323,9 @@ the result is a field, so a right answer in the wrong number of columns still br
   -- so something in low memory has to.
 
   Usage:
-      #INCLUDE "LIBBANK.INC.BL"        ' before the region
+      #INCLUDE "LIB.GUIBANK.INC.BL"        ' before the region
       GOTO MY.LIBEND
-      GP.BANKED LIB.CODEBANK
+      GP.BANKED LIB.GUIBANK
       #INCLUDE "THEME.INC.BL"
       #INCLUDE "MENUVERT.INC.BL"
       #INCLUDE "MENUBAR.INC.BL"
@@ -2336,7 +2336,7 @@ the result is a field, so a right answer in the wrong number of columns still br
       MY.LIBEND:
 
   Claim the bank as well, or something else will hand it out:
-      BANKMGR.WANT = LIB.CODEBANK : GOSUB BANKMGR.CLAIM
+      BANKMGR.WANT = LIB.GUIBANK : GOSUB BANKMGR.CLAIM
 
   All seven modules are required, even by a program that calls one of them.
   This file shims every entry point and BASLOAD resolves every label in a
@@ -2345,7 +2345,7 @@ the result is a field, so a right answer in the wrong number of columns still br
   Order inside the region is the order the modules already want: THEME
   first, MENUVERT before MENUBAR, both before GUI.
 
-  FILEDIR IS SHIMMED BY LIBBANKFD.INC.BL, not by this file, and that split
+  FILEDIR IS SHIMMED BY LIB.FUTILBANK.INC.BL, not by this file, and that split
   is not tidiness: BASLOAD resolves every label in every file it reads, so
   a FILE.DIR shim here stops the build with LABEL NOT FOUND in any program
   that does not also include FILEDIR. Include both when you bank a
@@ -2355,7 +2355,7 @@ the result is a field, so a right answer in the wrong number of columns still br
   GP.BANKED leaves works at program start and stops working the day
   anything selects another bank first.
 
-  WARNING: LIB.CODEBANK is not GUI.BANK. That one is scratch, where
+  WARNING: LIB.GUIBANK is not GUI.BANK. That one is scratch, where
   GUI.OPEN stashes the cells a dialog covers. Point both at one bank and
   the dialog writes the screen over its own code.
 
@@ -2371,40 +2371,40 @@ the result is a field, so a right answer in the wrong number of columns still br
   does, and cannot fix it, since a region may not contain BANK.
 ```
 
-*See also: 4.1 THEME.INC.BL -- named colour roles, 4.6 MENUVERT.INC.BL -- a vertical menu, MENUBAR.INC.BL -- a horizontal menu, in BASIC., 4.4 LINEINPUT.INC.BL -- a positioned entry field, GUI.INC.BL -- four dialogs, in a box that puts the screen back., GUI2.INC.BL -- a listbox, single or multi select., LIBBANKFD.INC.BL -- the low memory front door to a banked FILEDIR.*
+*See also: 4.1 THEME.INC.BL -- named colour roles, 4.6 MENUVERT.INC.BL -- a vertical menu, MENUBAR.INC.BL -- a horizontal menu, in BASIC., 4.4 LINEINPUT.INC.BL -- a positioned entry field, GUI.INC.BL -- four dialogs, in a box that puts the screen back., GUI2.INC.BL -- a listbox, single or multi select., LIB.FUTILBANK.INC.BL -- the low memory front door to a banked FILEDIR.*
 
-## LIBBANKFD.INC.BL -- the low memory front door to a banked FILEDIR.
+## LIB.FUTILBANK.INC.BL -- the low memory front door to a banked FILEDIR.
 
 
-*From the banner header of `LIBBANKFD.INC.BL`.*
+*From the banner header of `LIB.FUTILBANK.INC.BL`.*
 
 ```
 
       FILE.DIR.INIT   FILE.DIR.OPEN   FILE.DIR.NEXT
 
-  Three more shims of exactly the kind LIBBANK.INC.BL holds, and they are
+  Three more shims of exactly the kind LIB.GUIBANK.INC.BL holds, and they are
   in a file of their own for one reason: BASLOAD resolves every label in
   every file it reads, so a shim naming FILE.DIR.OPEN.BODY stops the build
   with LABEL NOT FOUND in any program that does not also include FILEDIR.
-  They lived in LIBBANK for a day and GPBMODS -- which banks the same seven
+  They lived in LIB.GUIBANK for a day and GPBMODS -- which banks the same seven
   modules and has no use for a directory reader -- could not be tokenised
   at all.
 
-  #IFDEF cannot answer it either: LIBBANK's whole body is already inside
+  #IFDEF cannot answer it either: LIB.GUIBANK's whole body is already inside
   an #IFNDEF and BASLOAD does not nest them.
 
-  Usage, beside LIBBANK and before the region:
-      #INCLUDE "LIBBANK.INC.BL"
-      #INCLUDE "LIBBANKFD.INC.BL"
+  Usage, beside LIB.GUIBANK and before the region:
+      #INCLUDE "LIB.GUIBANK.INC.BL"
+      #INCLUDE "LIB.FUTILBANK.INC.BL"
       #INCLUDE "FILEIO.INC.BL"        ' FILEDIR reaches it by variables
       GOTO MY.LIBEND
-      GP.BANKED LIB.CODEBANK
+      GP.BANKED LIB.GUIBANK
       ...the seven modules...
-      #INCLUDE "FILEDIR.INC.BL"       ' last -- see LIBBANK's header
+      #INCLUDE "FILEDIR.INC.BL"       ' last -- see LIB.GUIBANK's header
       GP.ENDBANKED
       MY.LIBEND:
 
-  LIB.CODEBANK comes from LIBBANK, so that has to be included first.
+  LIB.GUIBANK comes from LIB.GUIBANK.INC.BL, so that has to be included first.
 
   FILEIO STAYS IN LOW MEMORY. FILEDIR reaches it through variables only,
   never by a call, which is what lets the two be split -- and it has to be
@@ -2412,7 +2412,7 @@ the result is a field, so a right answer in the wrong number of columns still br
   region.
 ```
 
-*See also: LIBBANK.INC.BL -- the low memory front door to a banked library., FILEIO.INC.BL -- the drive: status, files, directories., FILEDIR.INC.BL -- a directory, into a bank or into low RAM.*
+*See also: LIB.GUIBANK.INC.BL -- the low memory front door to a banked library., FILEIO.INC.BL -- the drive: status, files, directories., FILEDIR.INC.BL -- a directory, into a bank or into low RAM.*
 
 ## STASHVRAM.INC.BL -- screen rectangles and byte blobs, kept in VRAM.
 

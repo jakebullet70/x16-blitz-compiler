@@ -7,6 +7,9 @@
 ## **      GUI.MENU     a question, and a row chosen from a list
 ## **      GUI.INPUT    a question, and a line of typed text
 ## **
+## **  and one internal routine, called from inside this bank and not shimmed:
+## **      GUI.CLEARKB  empty the keyboard buffer. KB.CLEARKB's twin
+## **
 ## **  Requires, and #INCLUDEs none of them, in this order:
 ## **      GPB.INC.BL        GP.BOX, GP.FILL, GP.PRINTAT, GP.CALL
 ## **      STASH.INC.BL      saves the covered cells; wants a #SYMFILE
@@ -110,6 +113,31 @@
 #DEFINE GUI.BTN.GAP 4
 
 GOTO GUI.MODULE.END
+
+## ***********************************************************************
+## **  GUI.CLEARKB -- throw away whatever is already typed.
+## **
+## **  THE BANK'S OWN DRAIN, AND A DUPLICATE ON PURPOSE. KB.CLEARKB does the
+## **  same six lines in low memory, and this file cannot call it: a region may
+## **  not call another bank and survive the return, so every dialog here would
+## **  have to go out through a shim to empty a queue. Thirty bytes is cheaper
+## **  than that, and cheaper than the wrong-bank jump the shim invites.
+## **
+## **  KB.INC.BL stays the public one -- an application in low RAM calls
+## **  KB.CLEARKB. Fix one and fix the other; there are only the two.
+## **
+## **  Call it before opening a dialog, and after a keystroke that redraws. A
+## **  dialog opened with a key still queued reads it, answers itself and
+## **  closes; a held arrow repeats faster than a page can be drawn.
+## ***********************************************************************
+
+GUI.CLEARKB:
+    GP.DO
+        GET GUI.CLR.K$
+        IF GP.ISEMPTY(GUI.CLR.K$) THEN GP.EXITDO
+    GP.LOOP
+    RETURN
+
 
 ## ***********************************************************************
 ## **  GUI.YN -- a question, and a Y or N answer.
