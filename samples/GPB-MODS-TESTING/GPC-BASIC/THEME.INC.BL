@@ -32,6 +32,12 @@
 #DEFINE THEME.DEFS 1
 
 ## The roles. Add one here and to ALL FIVE palettes below, and raise SLOTS.
+##
+## FOCUS IS NOT HILITE, and it exists because it could not be. HILITE is the
+## text colour reversed in three of the four palettes, and a GUI button is drawn
+## as the panel reversed, so a focused button came out identical to a plain one.
+## FOCUS is yellow-backed in every theme for that reason: whatever a palette
+## does, nothing else in it is yellow.
 
 #DEFINE THEME.PAGE 0
 #DEFINE THEME.TEXT 1
@@ -40,7 +46,8 @@
 #DEFINE THEME.HILITE 4
 #DEFINE THEME.DIMMED 5
 #DEFINE THEME.WARN 6
-#DEFINE THEME.SLOTS 7
+#DEFINE THEME.FOCUS 7
+#DEFINE THEME.SLOTS 8
 
 ## How many themes THEME.NEXT cycles through.
 #DEFINE THEME.COUNT 5
@@ -74,6 +81,7 @@ THEME.SELECT.X16:
     THEME.CLR(THEME.HILITE) = 1 * 16 + 6
     THEME.CLR(THEME.DIMMED) = 6 * 16 + 12
     THEME.CLR(THEME.WARN)   = 6 * 16 + 13
+    THEME.CLR(THEME.FOCUS)  = 7 * 16 + 6
     RETURN
 
 THEME.SELECT.DARK:
@@ -84,6 +92,7 @@ THEME.SELECT.DARK:
     THEME.CLR(THEME.HILITE) = 15 * 16 + 0
     THEME.CLR(THEME.DIMMED) = 0 * 16 + 12
     THEME.CLR(THEME.WARN)   = 0 * 16 + 8
+    THEME.CLR(THEME.FOCUS)  = 7 * 16 + 0
     RETURN
 
 ## A white page. DIMMED is mid grey rather than dark grey so that reversing it
@@ -96,6 +105,7 @@ THEME.SELECT.LIGHT:
     THEME.CLR(THEME.HILITE) = 0 * 16 + 1
     THEME.CLR(THEME.DIMMED) = 1 * 16 + 12
     THEME.CLR(THEME.WARN)   = 1 * 16 + 2
+    THEME.CLR(THEME.FOCUS)  = 7 * 16 + 0
     RETURN
 
 ## From the XFMGR file manager's theme module. DIMMED and WARN are not in it.
@@ -111,6 +121,7 @@ THEME.SELECT.GRAY:
     THEME.CLR(THEME.HILITE) = 14 * 16 + 1
     THEME.CLR(THEME.DIMMED) = 11 * 16 + 12
     THEME.CLR(THEME.WARN)   = 11 * 16 + 10
+    THEME.CLR(THEME.FOCUS)  = 7 * 16 + 11
     RETURN
 
 ## THEME.FIRST is set only when THEME.SELECT created the array, the one case with

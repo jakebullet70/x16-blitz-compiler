@@ -1,6 +1,7 @@
 # GUI refactor — a CUA focus model
 
-**Nothing is built. This file is the plan only.**
+**Phases 1 and 2 are built. Phases 3, 4 and 5 are still plan.** §8's questions have been
+answered by building them rather than by argument; the answers are written back into §8.
 
 The dialogs in `GUI.INC.BL` and `GUI2.INC.BL` each own a private key loop. They agree on how a box
 is drawn and on nothing else: `GUI.INPUT` throws TAB away, `GUI.YN` has no focus at all, and
@@ -181,14 +182,26 @@ The two states are independent, so they need two independent cues. Both already 
 |---|---|
 | plain | `< OK >` in `GUI.BTN.ATTR` |
 | the default | `<<OK>>` — the doubled bracket, built 2026-09-09 |
-| focused | drawn in `THEME.HILITE` |
-| both | `<<OK>>` in `THEME.HILITE` |
+| focused | drawn in `THEME.FOCUS` |
+| both | `<<OK>>` in `THEME.FOCUS` |
 
 The doubling takes the padding space rather than a new cell, so a default button is exactly as wide
 as a plain one and no width anywhere has to know which is which. Colour on top of it is orthogonal
 and costs no cells at all. **This is why the earlier colour-only default failed and this will not:**
 one cue was carrying two meanings, in the accelerator's own colour, on buttons that all had
 brackets already.
+
+**`THEME.FOCUS` is a role of its own, and `THEME.HILITE` could not do the job.** This was
+tried first, as §8 asked, and the first build drew a focused button identical to an unfocused
+one — because `HILITE` is the text colour reversed in three of the four palettes, and a plain
+button is *already* the panel reversed. Slot 7 was free and already inside `DIM THEME.CLR`, so
+the role cost four palette lines and no memory. It is yellow-backed in every theme, because
+nothing else in any of them is.
+
+The marked letter needed a second answer with it: `WARN`'s foreground is light green, and light
+green on yellow is legible in the palette and invisible on the screen. On a focused button the
+mark is the button's own two colours **swapped** for that one cell — guaranteed to contrast,
+whatever a palette does.
 
 A **field** shows focus with the cursor `LINEINPUT` already blinks. Unfocused it needs a static
 paint — `GUI.FIELD.DRAW`, text and frame, no cursor, no loop — which does not exist yet and is the
@@ -244,11 +257,11 @@ these, and a refactor that also rewrites every call site cannot be bisected when
 
 Each phase ends in a build and a screenshot. None of them leaves the demo unrunnable.
 
-1. **The banks, first and alone.** Three regions: `FILEDIR` out on its own, `THEME` / `LINEINPUT` /
+1. **DONE — the banks, first and alone.** Three regions: `FILEDIR` out on its own, `THEME` / `LINEINPUT` /
    `MENUVERT` / `MENUBAR` / `GUI` / `GUI2` into `LIB.GUIBANK`, `GUI.CLEARKB` written. No behaviour
    changes at all. This is the phase most likely to break in a way that is hard to read, so it gets a
    build to itself and the BANK MAP panel is the check.
-2. **The control block and the dispatcher, on buttons only.** `GUI.SAY` and `GUI.YN` rebuilt on
+2. **DONE — the control block and the dispatcher, on buttons only.** `GUI.SAY` and `GUI.YN` rebuilt on
    `GUI.FORM`. Visible change: TAB moves between YES and NO. The two simplest dialogs prove the
    dispatcher before a field or a list is involved.
 3. **The field.** `GUI.INPUT` rebuilt; `GUI.FIELD.DRAW` written; accelerators returned to its
@@ -260,21 +273,32 @@ Each phase ends in a build and a screenshot. None of them leaves the demo unrunn
 
 ## 8. To verify before building, not assumed
 
-- **Does a third region build?** 63 are allowed and nothing structural is in the way, but every
-  program to date has had two. Confirm it in phase 1 — the third `.B` overlay on disk and its
-  `BANKMGR.CLAIM` in place — before anything depends on it.
-- **Does the X16 send a distinct code for Shift+TAB?** The whole reverse half of the cycle depends
-  on it. If it sends plain TAB, reverse navigation falls back to LEFT and UP only, and that is a
-  worse dialog — worth knowing in phase 2, not phase 4. Probe it with a three-line `GET` program.
+- **Does a third region build? YES.** `GPBMODS` writes five overlays, `.B04` to `.B08`, and
+  `FILEIO` + `FILEDIR` live in `LIB.FUTILBANK` at bank 8. The build that proved it also found the
+  compiler's 37,632-byte object ceiling, fixed in `58c635b`.
+- **Does the X16 send a distinct code for Shift+TAB? STILL OPEN, and no longer blocking.** The
+  Editor's own key table gives `$18`, and `GUI.FORM.DO.BUTTON` treats 24 as PREV — `GUIFRMT`'s T4
+  proves the dispatcher handles the code, and proves nothing about what a keyboard sends, because
+  `kbdbuf_put` sets no modifiers. LEFT and UP also mean PREV, so reverse navigation works either
+  way. **This one needs a human at a real keyboard**; it is a three-line `GET` program.
 - **Does the listbox's scroller survive being one control among several?** It was written as the only
   thing on screen and repaints on its own terms. Splitting it is phase 4's whole job, so try the
   split before phase 4 is planned in detail.
-- **Does `THEME` need a slot for "focused", or is `THEME.HILITE` enough?** Adding a theme role
-  touches every theme and every module that reads one. Try `HILITE` first, and add a slot only if a
-  real palette makes it unreadable.
-- **What is actually in `LIB.GUIBANK` when it is full?** Measure after phase 1 and record it. A bank
-  is 8,192 bytes; bank 4 holds 7,424 today, `MENUBAR` is arriving and `FILEDIR` is leaving, and the
-  plan assumes that trade is favourable rather than knowing it.
+- **Does `THEME` need a slot for "focused"? YES, and `THEME.HILITE` was not enough.** Not because
+  a palette made it unreadable — because it made it *identical*. See §4. The fear that a role
+  touches every module was misplaced: only the GUI reads this one, so it is four palette lines,
+  two `#DEFINE`s and one row in `GPBMODS`' theme panel.
+- **What is actually in `LIB.GUIBANK`? MEASURED, and it is tighter than the plan assumed.**
+
+  | | `.B04` on disk | code at `$A000` | free of 8,192 |
+  |---|---:|---:|---:|
+  | after phase 1 | 7,170 | 7,168 | 1,024 |
+  | after phase 2 | 7,682 | 7,680 | **512** |
+
+  `GUI.FORM` cost 512 bytes and half the remaining headroom, and phases 3 and 4 have 512 bytes
+  left to put a field and a list split into. **That is the number to plan phase 3 against**, and
+  it is the reason `FILEDIR` and `FILEIO` left. If it will not fit, the next thing to move out is
+  `MENUBAR` — but it cannot go alone, see §1.
 
 ## 9. What this does not do
 

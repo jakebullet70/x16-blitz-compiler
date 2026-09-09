@@ -7,7 +7,9 @@
 ## **      GUI.MENU     a question, and a row chosen from a list
 ## **      GUI.INPUT    a question, and a line of typed text
 ## **
-## **  and one internal routine, called from inside this bank and not shimmed:
+## **  and two internal things, used from inside this bank and not shimmed:
+## **      GUI.FORM     the control block and the one key loop the dialogs
+## **                   share. A dialog is a list of controls and a wrapper
 ## **      GUI.CLEARKB  empty the keyboard buffer. KB.CLEARKB's twin
 ## **
 ## **  Requires, and #INCLUDEs none of them, in this order:
@@ -49,12 +51,15 @@
 ## **                        and the two columns right of it. Trimmed to the
 ## **                        screen, so a box against an edge keeps what fits
 ## **        GUI.SHADOW.ATTR its attribute. 0 is black on black
-## **        GUI.BTN.ONE$    the answers, drawn as buttons. GUI.SAY takes one
-## **        GUI.BTN.TWO$    and GUI.YN two; "" on either takes the default.
-## **                        "&" marks the key -- see GUI.BUTTON
-## **        GUI.DEFAULT     which button RETURN presses. 2 is the second one,
-## **                        anything else the first. The default button is
-## **                        drawn <<LIKE THIS>>
+## **        GUI.BTN.ONE$    GUI.SAY's answer, drawn as a button. "" takes
+## **                        "&OK", and "&" marks the key -- see GUI.BUTTON.
+## **                        GUI.YN and GUI.INPUT set their own labels and
+## **                        overwrite whatever is here
+## **        GUI.BTN.TWO$    the second button. GUI.SAY leaves it empty
+## **        GUI.DEFAULT     which button is the default, and so which one has
+## **                        the focus when the dialog opens. 2 is the second,
+## **                        anything else the first. The default is drawn
+## **                        <<LIKE THIS>> and the focused one in THEME.HILITE
 ## **
 ## **   out  GUI.KEY         the key that ended it, whichever call
 ## **        GUI.STASHED     -1 if the covered cells were saved
@@ -72,6 +77,11 @@
 ## **  GUI.HINT$ IS GONE, and it is the one interface this takes away -- "the
 ## **  first Y and the first N in the line are lit" has nothing to light when
 ## **  the row is two buttons. Set GUI.BTN.ONE$ and GUI.BTN.TWO$ instead.
+## **
+## **  EVERY BUTTON HAS A FOCUS, AND TAB MOVES IT. The dialogs no longer own
+## **  their key loops: each states its buttons, GUI.BUTTON.ROW records them as
+## **  controls, and GUI.FORM runs them. A caller that never presses TAB sees
+## **  what it saw before.
 ## **
 ## **  GUI.LISTBOX.* is GUI2.INC.BL, its own #INCLUDE.
 ## ***********************************************************************
@@ -92,17 +102,6 @@
 #DEFINE GUI.PADX 2
 #DEFINE GUI.PADY 1
 
-## GUI.YN's keys. Y and N without case; ESC and STOP answer NO.
-#DEFINE GUI.UY 89
-#DEFINE GUI.LY 121
-#DEFINE GUI.UN 78
-#DEFINE GUI.LN 110
-
-## ...and GUI.OKCANCEL's. O and C.
-#DEFINE GUI.UO 79
-#DEFINE GUI.LO 111
-#DEFINE GUI.UC 67
-#DEFINE GUI.LC 99
 #DEFINE GUI.ESCAPE 27
 #DEFINE GUI.STOP 3
 #DEFINE GUI.RETURN 13
@@ -111,6 +110,37 @@
 ## Cells between two buttons in a row. Four, so "< OK >    < CANCEL >" reads as
 ## two things rather than one wide one.
 #DEFINE GUI.BTN.GAP 4
+
+## GUI.FORM's control block. Eight controls is generous for a dialog and the
+## seven arrays cost well under 200 bytes at that size.
+#DEFINE GUI.FORM.MAX 8
+
+## What a control is, and what is true of it.
+#DEFINE GUI.CT.BUTTON 1
+#DEFINE GUI.CT.FIELD 2
+#DEFINE GUI.CT.LIST 3
+#DEFINE GUI.CF.DEFAULT 1
+#DEFINE GUI.CF.NOFOCUS 2
+
+## The six verdicts a control may return. Every control type translates its
+## keys into these, which is what keeps the dispatcher one loop.
+#DEFINE GUI.NAV.STAY 0
+#DEFINE GUI.NAV.NEXT 1
+#DEFINE GUI.NAV.PREV 2
+#DEFINE GUI.NAV.PRESS 3
+#DEFINE GUI.NAV.DEFAULT 4
+#DEFINE GUI.NAV.CANCEL 5
+
+## Navigation keys. GUI.K.* and not GUI.LEFT, because GUI.LEFT is the box's
+## column and a #DEFINE of that name would be substituted into every use of it.
+## SHIFT+TAB is $18 from the Editor's key table and has not been probed on a
+## real keyboard; LEFT and UP mean PREV as well, so reverse works without it.
+#DEFINE GUI.K.TAB 9
+#DEFINE GUI.K.SHTAB 24
+#DEFINE GUI.K.DOWN 17
+#DEFINE GUI.K.UP 145
+#DEFINE GUI.K.RIGHT 29
+#DEFINE GUI.K.LEFT 157
 
 GOTO GUI.MODULE.END
 
@@ -142,72 +172,46 @@ GUI.CLEARKB:
 ## ***********************************************************************
 ## **  GUI.YN -- a question, and a Y or N answer.
 ## **
-## **   in   GUI.BTN.ONE$  the yes label, "" for the default. "&YES" draws
-## **        GUI.BTN.TWO$  < YES > and answers to Y or y -- see GUI.BUTTON
-## **        GUI.OKCANCEL  0 asks YES/NO on Y and N. Non-zero asks OK/CANCEL
+## **   in   GUI.OKCANCEL  0 asks YES/NO on Y and N. Non-zero asks OK/CANCEL
 ## **                      on O and C
+## **        GUI.DEFAULT   2 starts on the second button, anything else the first
 ## **
 ## **   out  GUI.ANSWER    -1 for yes or OK, 0 for no or cancel
 ## **        GUI.KEY       the key itself, so a caller can tell an ESC from an N
 ## **
-## **  RETURN PRESSES THE DEFAULT BUTTON: YES unless GUI.DEFAULT is 2, and
-## **  then NO. ESC and STOP always answer NO -- cancelling is not a default.
-## **  A destructive question wants GUI.DEFAULT = 2.
+## **  THE LABELS ARE FIXED, and GUI.BTN.ONE$ and GUI.BTN.TWO$ are overwritten
+## **  rather than read. They are the only place the answer keys are written
+## **  down -- the accelerator scan folds each label's "&" letter itself -- so
+## **  a caller's label would silently change which key answers yes.
 ## **
-## **  GUI.HINT$ IS NOT READ HERE. It was "whatever the line says, the first Y
-## **  and the first N in it are lit", and a row of two buttons has nothing to
-## **  light. The labels are the answers now.
+## **  TAB MOVES BETWEEN THE TWO. RETURN presses whichever button has the
+## **  focus, which starts on the default one, so a caller that never presses
+## **  TAB sees exactly what it saw before. ESC and STOP always answer NO --
+## **  cancelling is not a default. A destructive question wants GUI.DEFAULT = 2.
 ## ***********************************************************************
 
 GUI.YN.BODY:
-
-## ---- Both modes work off GUI.YES/GUI.NO, so they differ in four assignments
-## ---- and a pair of labels rather than in two routines.
-    GUI.YES = GUI.UY : GUI.YES.ALT = GUI.LY : GUI.NO = GUI.UN : GUI.NO.ALT = GUI.LN
-    GUI.BTN.ONE$ = "&YES" : GUI.BTN.TWO$ = "&NO"
-    IF GUI.OKCANCEL = 0 THEN GOTO GUI.YN.SET
-    GUI.YES = GUI.UO : GUI.YES.ALT = GUI.LO : GUI.NO = GUI.UC : GUI.NO.ALT = GUI.LC
-    GUI.BTN.ONE$ = "&OK" : GUI.BTN.TWO$ = "&CANCEL"
-
-GUI.YN.SET:
+    GUI.BTN.ONE$ = "&YES"
+    GUI.BTN.TWO$ = "&NO"
+    GP.IF GUI.OKCANCEL <> 0 THEN
+        GUI.BTN.ONE$ = "&OK"
+        GUI.BTN.TWO$ = "&CANCEL"
+    GP.ENDIF
     GOSUB GUI.BUTTON.SIZE
-    GUI.BODY.ROWS = 1 : GUI.BODY.WIDTH = GUI.BTN.TOTAL
+    GUI.BODY.ROWS = 1
+    GUI.BODY.WIDTH = GUI.BTN.TOTAL
     GOSUB GUI.OPEN
     GUI.BTN.Y = GUI.INNER.TOP
     GOSUB GUI.BUTTON.ROW
-
-## ---- THE LABEL IS NOW THE ONLY PLACE THE KEY IS WRITTEN DOWN. The four
-## ---- assignments above are the defaults; whatever "&" the drawn button
-## ---- actually marked wins, so "&SAVE" / "&DISCARD" answers to S and D with
-## ---- nothing here to keep in step.
-    GP.IF GUI.BTN.KEY.ONE <> 0 THEN
-        GUI.BTN.OF = GUI.BTN.KEY.ONE : GOSUB GUI.BTN.PAIR
-        GUI.YES = GUI.BTN.UC : GUI.YES.ALT = GUI.BTN.LC
-    GP.ENDIF
-    GP.IF GUI.BTN.KEY.TWO <> 0 THEN
-        GUI.BTN.OF = GUI.BTN.KEY.TWO : GOSUB GUI.BTN.PAIR
-        GUI.NO = GUI.BTN.UC : GUI.NO.ALT = GUI.BTN.LC
-    GP.ENDIF
+    GOSUB GUI.FORM.RUN
+    GUI.KEY = GUI.FORM.KEY
     GUI.ANSWER = 0
 
-GUI.YN.WAIT:
-    GET GUI.PRESSED$ : IF GUI.PRESSED$ = "" THEN GOTO GUI.YN.WAIT
-    GUI.KEY = ASC(GUI.PRESSED$) : GUI.DONE = 0
-    GP.SELECT GUI.KEY
-        GP.CASE GUI.YES, GUI.YES.ALT
-            GUI.ANSWER = -1 : GUI.DONE = -1
-        GP.CASE GUI.NO, GUI.NO.ALT, GUI.ESCAPE, GUI.STOP
-            GUI.DONE = -1
-
-## ---- RETURN is the only key whose answer the CALLER picks, so it is the
-## ---- only one that reads GUI.DEFAULT. ESC is not a default: it cancels.
-        GP.CASE GUI.RETURN
-            GUI.DONE = -1 : IF GUI.DEFAULT <> 2 THEN GUI.ANSWER = -1
-    GP.ENDSEL
-    IF GUI.DONE = 0 THEN GOTO GUI.YN.WAIT
-
-GUI.YN.DONE:
-    GOSUB GUI.CLOSE : RETURN
+## ---- Control 1 is the yes button. A cancel is GUI.FORM.HIT 0, and so
+## ---- answers no without ESC being named here.
+    IF GUI.FORM.HIT = 1 THEN GUI.ANSWER = -1
+    GOSUB GUI.CLOSE
+    RETURN
 
 
 ## ***********************************************************************
@@ -353,21 +357,11 @@ GUI.BUTTON.WIDE:
 ## ***********************************************************************
 
 GUI.BUTTON.ROW:
-
-## ---- THE COLOUR IS THE PANEL'S OWN, SWAPPED -- foreground and background
-## ---- traded, not a new theme role. That is what makes it work in every
-## ---- palette without THEME.INC.BL growing a slot: whatever the box is drawn
-## ---- in, the button is its opposite, so the contrast is the panel's contrast
-## ---- and cannot come out invisible. GUI.PANEL is background * 16 + foreground.
-    GUI.BTN.ATTR = (GUI.PANEL AND 15) * 16 + INT(GUI.PANEL / 16)
-
-## ---- The marked letter keeps the button's BACKGROUND and takes WARN's
-## ---- foreground, so it reads as part of the button rather than a hole in it.
-## ---- If that palette happens to make the two equal the letter would vanish,
-## ---- so it falls back to the panel itself -- which contrasts by construction,
-## ---- the button being the panel reversed.
-    GUI.BTN.HI = INT(GUI.BTN.ATTR / 16) * 16 + (THEME.CLR(THEME.WARN) AND 15)
-    IF (GUI.BTN.HI AND 15) = INT(GUI.BTN.HI / 16) THEN GUI.BTN.HI = GUI.PANEL
+    GOSUB GUI.FORM.INIT
+    GUI.CTRL.N = 0
+    GUI.FOCUS = 1
+    GUI.BTN.FOCUSED = 0
+    GOSUB GUI.BTN.COLOURS
     GUI.BTN.X = GUI.INNER.LEFT + INT((GUI.INNER.WIDTH - GUI.BTN.TOTAL) / 2)
     IF GUI.BTN.X < GUI.INNER.LEFT THEN GUI.BTN.X = GUI.INNER.LEFT
 
@@ -378,15 +372,302 @@ GUI.BUTTON.ROW:
     IF GUI.BTN.TWO$ = "" THEN GUI.DEFAULT = 1
     GUI.BTN.DEF = -1
     IF GUI.DEFAULT = 2 THEN GUI.BTN.DEF = 0
-    GUI.BTN.TEXT$ = GUI.BTN.ONE$ : GOSUB GUI.BUTTON
-    GUI.BTN.KEY.ONE = GUI.BTN.KEY : GUI.BTN.KEY.TWO = 0
+    GUI.BTN.TEXT$ = GUI.BTN.ONE$
+    GOSUB GUI.BUTTON
+    GUI.BTN.KEY.ONE = GUI.BTN.KEY
+    GUI.BTN.KEY.TWO = 0
+    GUI.ADD.W = GUI.BTN.W.ONE
+    GOSUB GUI.FORM.ADD.BUTTON
     IF GUI.BTN.TWO$ = "" THEN RETURN
     GUI.BTN.X = GUI.BTN.X + GUI.BTN.W.ONE + GUI.BTN.GAP
     GUI.BTN.DEF = 0
     IF GUI.DEFAULT = 2 THEN GUI.BTN.DEF = -1
-    GUI.BTN.TEXT$ = GUI.BTN.TWO$ : GOSUB GUI.BUTTON
+    GUI.BTN.TEXT$ = GUI.BTN.TWO$
+    GOSUB GUI.BUTTON
     GUI.BTN.KEY.TWO = GUI.BTN.KEY
+    GUI.ADD.W = GUI.BTN.W.TWO
+    GOSUB GUI.FORM.ADD.BUTTON
     RETURN
+
+
+## ***********************************************************************
+## **  GUI.BTN.COLOURS -- what one button is drawn in.
+## **
+## **   in   GUI.BTN.FOCUSED  non-zero for the control the eye is on
+## **   out  GUI.BTN.ATTR     the button. GUI.BTN.HI the marked letter
+## **
+## **  PLAIN IS THE PANEL'S OWN COLOUR, SWAPPED -- foreground and background
+## **  traded, not a new theme role. That is what makes it work in every palette
+## **  without THEME.INC.BL growing a slot: whatever the box is drawn in, the
+## **  button is its opposite, so the contrast is the panel's contrast and
+## **  cannot come out invisible. GUI.PANEL is background * 16 + foreground.
+## **
+## **  FOCUSED IS THEME.FOCUS, and it is a role of its own because HILITE
+## **  cannot do the job: HILITE is the panel reversed in three of the four
+## **  themes, and so is a plain button, so the two came out the same cell for
+## **  cell. Measured, not assumed -- the first build of this drew a focused
+## **  button identical to an unfocused one. The colour is the second cue and
+## **  independent of the first: the doubled bracket says default, the colour
+## **  says focused, and a button can be either, both or neither.
+## **
+## **  ON A PLAIN BUTTON the marked letter keeps the button's BACKGROUND and
+## **  takes WARN's foreground, falling back to the panel if a palette makes
+## **  those two equal and the letter would vanish.
+## **
+## **  ON A FOCUSED ONE it is the focus colour REVERSED, because no fixed
+## **  foreground can be promised to read on THEME.FOCUS -- WARN's light green
+## **  on FOCUS's yellow is legible in the palette and not on the screen. The
+## **  button's own two colours always contrast with each other, so swapping
+## **  them for the one cell is the mark that cannot come out unreadable.
+## ***********************************************************************
+
+GUI.BTN.COLOURS:
+    GUI.BTN.ATTR = (GUI.PANEL AND 15) * 16 + INT(GUI.PANEL / 16)
+    GP.IF GUI.BTN.FOCUSED <> 0 THEN
+        GUI.BTN.ATTR = THEME.CLR(THEME.FOCUS)
+        GUI.BTN.HI = (GUI.BTN.ATTR AND 15) * 16 + INT(GUI.BTN.ATTR / 16)
+        RETURN
+    GP.ENDIF
+    GUI.BTN.HI = INT(GUI.BTN.ATTR / 16) * 16 + (THEME.CLR(THEME.WARN) AND 15)
+    IF (GUI.BTN.HI AND 15) = INT(GUI.BTN.HI / 16) THEN GUI.BTN.HI = GUI.PANEL
+    RETURN
+
+## ***********************************************************************
+## **  GUI.FORM -- one key loop, and every control has a focus.
+## **
+## **  A control is one index into seven parallel arrays. BASIC has no record
+## **  type; this is how one is spelled. GUI.BUTTON.ROW fills them as it draws,
+## **  so a dialog still states its buttons once and gets a form for nothing.
+## **
+## **   in   GUI.CTRL.N          how many controls, 1..GUI.FORM.MAX
+## **        GUI.CTRL.TYPE%(n)   GUI.CT.BUTTON, .FIELD or .LIST
+## **        GUI.CTRL.X%(n)      where it was drawn, and GUI.CTRL.Y%(n)
+## **        GUI.CTRL.W%(n)      how wide
+## **        GUI.CTRL.TEXT$(n)   a button's label, its "&" included
+## **        GUI.CTRL.KEY%(n)    the marked letter's code, 0 if it marked none
+## **        GUI.CTRL.FLAGS%(n)  GUI.CF.DEFAULT, GUI.CF.NOFOCUS
+## **        GUI.FOCUS           which control starts with it
+## **
+## **   out  GUI.FORM.HIT        the control that ended it. 0 is a cancel
+## **        GUI.FORM.KEY        the key that ended it
+## **
+## **  THE DEFAULT AND THE FOCUS ARE TWO DIFFERENT THINGS, which is the point
+## **  of the model: GUI.CF.DEFAULT is the button RETURN presses from a control
+## **  that wants RETURN for itself, and GUI.FOCUS is where the eye is. They
+## **  start on the same button and separate on the first TAB.
+## **
+## **  BUTTONS ONLY SO FAR. GUI.CT.FIELD and GUI.CT.LIST have numbers and no
+## **  arm in GUI.FORM.STEP; a form of one type needs no GP.SELECT to pick it.
+## ***********************************************************************
+
+## ***********************************************************************
+## **  GUI.FORM.INIT -- the arrays, once for the whole program.
+## **
+## **  DIM cannot run twice on one array, so this returns immediately when it
+## **  already has. What resets per dialog is GUI.CTRL.N, not the arrays.
+## ***********************************************************************
+
+GUI.FORM.INIT:
+    IF GUI.FORM.DIMMED <> 0 THEN RETURN
+    DIM GUI.CTRL.TYPE%(GUI.FORM.MAX)
+    DIM GUI.CTRL.X%(GUI.FORM.MAX)
+    DIM GUI.CTRL.Y%(GUI.FORM.MAX)
+    DIM GUI.CTRL.W%(GUI.FORM.MAX)
+    DIM GUI.CTRL.KEY%(GUI.FORM.MAX)
+    DIM GUI.CTRL.FLAGS%(GUI.FORM.MAX)
+    DIM GUI.CTRL.TEXT$(GUI.FORM.MAX)
+    GUI.FORM.DIMMED = -1
+    RETURN
+
+
+## ***********************************************************************
+## **  GUI.FORM.ADD.BUTTON -- record the button GUI.BUTTON just drew.
+## **
+## **   in   GUI.BTN.X GUI.BTN.Y GUI.BTN.TEXT$ GUI.BTN.KEY GUI.BTN.DEF
+## **        GUI.ADD.W   the width GUI.BUTTON.SIZE measured
+## **
+## **  The default button is also where focus starts, so the two are set here
+## **  together and part company only when GUI.FORM.MOVE runs.
+## ***********************************************************************
+
+GUI.FORM.ADD.BUTTON:
+    IF GUI.CTRL.N >= GUI.FORM.MAX THEN RETURN
+    GUI.CTRL.N = GUI.CTRL.N + 1
+    GUI.CTRL.TYPE%(GUI.CTRL.N) = GUI.CT.BUTTON
+    GUI.CTRL.X%(GUI.CTRL.N) = GUI.BTN.X
+    GUI.CTRL.Y%(GUI.CTRL.N) = GUI.BTN.Y
+    GUI.CTRL.W%(GUI.CTRL.N) = GUI.ADD.W
+    GUI.CTRL.TEXT$(GUI.CTRL.N) = GUI.BTN.TEXT$
+    GUI.CTRL.KEY%(GUI.CTRL.N) = GUI.BTN.KEY
+    GUI.CTRL.FLAGS%(GUI.CTRL.N) = 0
+    IF GUI.BTN.DEF = 0 THEN RETURN
+    GUI.CTRL.FLAGS%(GUI.CTRL.N) = GUI.CF.DEFAULT
+    GUI.FOCUS = GUI.CTRL.N
+    RETURN
+
+
+## ***********************************************************************
+## **  GUI.FORM.PAINT -- one control, in the colours its state asks for.
+## **
+## **   in   GUI.PAINT.N   which control
+## ***********************************************************************
+
+GUI.FORM.PAINT:
+    GUI.BTN.X = GUI.CTRL.X%(GUI.PAINT.N)
+    GUI.BTN.Y = GUI.CTRL.Y%(GUI.PAINT.N)
+    GUI.BTN.TEXT$ = GUI.CTRL.TEXT$(GUI.PAINT.N)
+    GUI.BTN.DEF = GUI.CTRL.FLAGS%(GUI.PAINT.N) AND GUI.CF.DEFAULT
+    GUI.BTN.FOCUSED = 0
+    IF GUI.PAINT.N = GUI.FOCUS THEN GUI.BTN.FOCUSED = -1
+    GOSUB GUI.BTN.COLOURS
+    GOSUB GUI.BUTTON
+    RETURN
+
+
+## ***********************************************************************
+## **  GUI.FORM.RUN -- the loop, until a control ends the form.
+## **
+## **  GUI.BUTTON.ROW has already drawn the row plain, so only the focused
+## **  control is painted here, and only two are repainted per TAB after that.
+## **  A whole-box redraw under an open dialog flickers.
+## ***********************************************************************
+
+GUI.FORM.RUN:
+    GOSUB GUI.FORM.INIT
+    GUI.FORM.HIT = 0
+    GUI.FORM.DONE = 0
+    IF GUI.FOCUS < 1 THEN GUI.FOCUS = 1
+    IF GUI.FOCUS > GUI.CTRL.N THEN GUI.FOCUS = 1
+    GUI.PAINT.N = GUI.FOCUS
+    GOSUB GUI.FORM.PAINT
+
+GUI.FORM.LOOP:
+    GOSUB GUI.FORM.STEP
+    IF GUI.FORM.DONE = 0 THEN GOTO GUI.FORM.LOOP
+    RETURN
+
+
+## ***********************************************************************
+## **  GUI.FORM.STEP -- hand the key to the focused control, then act.
+## ***********************************************************************
+
+GUI.FORM.STEP:
+    GOSUB GUI.FORM.DO.BUTTON
+    GOSUB GUI.FORM.ACT
+    RETURN
+
+
+## ***********************************************************************
+## **  GUI.FORM.DO.BUTTON -- a button's keys, translated to a verdict.
+## **
+## **  A button consumes no printable key, so an unclaimed one is offered to
+## **  the accelerators. That is the rule that makes a bare letter safe: a
+## **  field or a list would have eaten it before this ran.
+## ***********************************************************************
+
+GUI.FORM.DO.BUTTON:
+    GOSUB GUI.FORM.GETKEY
+    GUI.FORM.NAV = GUI.NAV.STAY
+    GP.SELECT GUI.FORM.KEY
+        GP.CASE GUI.K.TAB, GUI.K.RIGHT, GUI.K.DOWN
+            GUI.FORM.NAV = GUI.NAV.NEXT
+        GP.CASE GUI.K.SHTAB, GUI.K.LEFT, GUI.K.UP
+            GUI.FORM.NAV = GUI.NAV.PREV
+        GP.CASE GUI.RETURN, GUI.SPACE
+            GUI.FORM.NAV = GUI.NAV.PRESS
+        GP.CASE GUI.ESCAPE, GUI.STOP
+            GUI.FORM.NAV = GUI.NAV.CANCEL
+    GP.ENDSEL
+    IF GUI.FORM.NAV = GUI.NAV.STAY THEN GOSUB GUI.FORM.ACCEL
+    RETURN
+
+
+## ***********************************************************************
+## **  GUI.FORM.GETKEY -- block until something is typed.
+## ***********************************************************************
+
+GUI.FORM.GETKEY:
+    GET GUI.PRESSED$
+    IF GP.ISEMPTY(GUI.PRESSED$) THEN GOTO GUI.FORM.GETKEY
+    GUI.FORM.KEY = ASC(GUI.PRESSED$)
+    RETURN
+
+
+## ***********************************************************************
+## **  GUI.FORM.ACCEL -- a bare letter presses the button that marked it.
+## **
+## **  Both cases, and the first control that marked the letter wins. A label
+## **  is the only place a key is written down, so "&SAVE" answers to S with
+## **  nothing anywhere else to keep in step.
+## ***********************************************************************
+
+GUI.FORM.ACCEL:
+    IF GUI.CTRL.N < 1 THEN RETURN
+    FOR GUI.SCAN = 1 TO GUI.CTRL.N
+        GP.IF GUI.CTRL.KEY%(GUI.SCAN) <> 0 AND GUI.FORM.NAV = GUI.NAV.STAY THEN
+            GUI.BTN.OF = GUI.CTRL.KEY%(GUI.SCAN)
+            GOSUB GUI.BTN.PAIR
+            GP.IF GUI.FORM.KEY = GUI.BTN.UC OR GUI.FORM.KEY = GUI.BTN.LC THEN
+                GUI.FOCUS = GUI.SCAN
+                GUI.FORM.NAV = GUI.NAV.PRESS
+            GP.ENDIF
+        GP.ENDIF
+    NEXT GUI.SCAN
+    RETURN
+
+
+## ***********************************************************************
+## **  GUI.FORM.ACT -- the movement, written once.
+## ***********************************************************************
+
+GUI.FORM.ACT:
+    GP.SELECT GUI.FORM.NAV
+        GP.CASE GUI.NAV.NEXT
+            GUI.MOVE.BY = 1
+            GOSUB GUI.FORM.MOVE
+        GP.CASE GUI.NAV.PREV
+            GUI.MOVE.BY = -1
+            GOSUB GUI.FORM.MOVE
+        GP.CASE GUI.NAV.PRESS
+            GUI.FORM.HIT = GUI.FOCUS
+            GUI.FORM.DONE = -1
+        GP.CASE GUI.NAV.CANCEL
+            GUI.FORM.HIT = 0
+            GUI.FORM.DONE = -1
+    GP.ENDSEL
+    RETURN
+
+
+## ***********************************************************************
+## **  GUI.FORM.MOVE -- focus one control on, or one back, and wrap.
+## **
+## **   in   GUI.MOVE.BY   1 forward, -1 back
+## **
+## **  GUI.CF.NOFOCUS controls are stepped over. GUI.MOVE.TRIES is what stops a
+## **  form whose controls all refuse focus from spinning here for ever.
+## ***********************************************************************
+
+GUI.FORM.MOVE:
+    IF GUI.CTRL.N < 2 THEN RETURN
+    GUI.MOVE.WAS = GUI.FOCUS
+    GUI.MOVE.TRIES = 0
+
+GUI.FORM.MOVE.ON:
+    GUI.FOCUS = GUI.FOCUS + GUI.MOVE.BY
+    IF GUI.FOCUS > GUI.CTRL.N THEN GUI.FOCUS = 1
+    IF GUI.FOCUS < 1 THEN GUI.FOCUS = GUI.CTRL.N
+    GUI.MOVE.TRIES = GUI.MOVE.TRIES + 1
+    IF GUI.MOVE.TRIES >= GUI.CTRL.N THEN GOTO GUI.FORM.MOVE.DONE
+    IF (GUI.CTRL.FLAGS%(GUI.FOCUS) AND GUI.CF.NOFOCUS) <> 0 THEN GOTO GUI.FORM.MOVE.ON
+
+GUI.FORM.MOVE.DONE:
+    IF GUI.FOCUS = GUI.MOVE.WAS THEN RETURN
+    GUI.PAINT.N = GUI.MOVE.WAS
+    GOSUB GUI.FORM.PAINT
+    GUI.PAINT.N = GUI.FOCUS
+    GOSUB GUI.FORM.PAINT
+    RETURN
+
 
 ## ***********************************************************************
 ## **  GUI.SAY -- something to say, and one way out.
@@ -405,29 +686,15 @@ GUI.SAY.BODY:
     IF GUI.BTN.ONE$ = "" THEN GUI.BTN.ONE$ = "&OK"
     GUI.BTN.TWO$ = ""
     GOSUB GUI.BUTTON.SIZE
-    GUI.BODY.ROWS = 1 : GUI.BODY.WIDTH = GUI.BTN.TOTAL
+    GUI.BODY.ROWS = 1
+    GUI.BODY.WIDTH = GUI.BTN.TOTAL
     GOSUB GUI.OPEN
     GUI.BTN.Y = GUI.INNER.TOP
     GOSUB GUI.BUTTON.ROW
-
-GUI.SAY.WAIT:
-    GET GUI.PRESSED$ : IF GUI.PRESSED$ = "" THEN GOTO GUI.SAY.WAIT
-    GUI.KEY = ASC(GUI.PRESSED$) : GUI.DONE = 0
-    GP.SELECT GUI.KEY
-        GP.CASE GUI.RETURN, GUI.SPACE, GUI.ESCAPE, GUI.STOP
-            GUI.DONE = -1
-    GP.ENDSEL
-
-## ---- The marked letter closes it too, in either case. GP.SELECT cannot take a
-## ---- variable in a GP.CASE, so this is tested outside it -- and only when the
-## ---- label actually marked one, or "" would match every key.
-    GP.IF GUI.BTN.KEY.ONE <> 0 THEN
-        GUI.BTN.OF = GUI.BTN.KEY.ONE : GOSUB GUI.BTN.PAIR
-        IF GUI.KEY = GUI.BTN.UC THEN GUI.DONE = -1
-        IF GUI.KEY = GUI.BTN.LC THEN GUI.DONE = -1
-    GP.ENDIF
-    IF GUI.DONE = 0 THEN GOTO GUI.SAY.WAIT
-    GOSUB GUI.CLOSE : RETURN
+    GOSUB GUI.FORM.RUN
+    GUI.KEY = GUI.FORM.KEY
+    GOSUB GUI.CLOSE
+    RETURN
 
 ## ***********************************************************************
 ## **  GUI.MENU -- a question, and a row chosen from a list.

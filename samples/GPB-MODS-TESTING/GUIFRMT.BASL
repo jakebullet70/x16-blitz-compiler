@@ -1,0 +1,234 @@
+#SAVEAS "@:GUIFRMT.SRC.PRG"
+#REM 0
+#SYMFILE "@:GUIFRMT.SRC.SYM"
+
+## ***********************************************************************
+## **
+## **  GUIFRMT.BASL -- GUI.FORM's focus model, checked without a keyboard.
+## **
+## **  Eight assertions against GUI.YN and GUI.SAY, with the keys pushed into
+## **  the KERNAL's buffer by kbdbuf_put. That is the only way to drive a GET
+## **  loop headlessly, and it sets no modifiers -- so SHIFT+TAB is tested as
+## **  the CODE 24, which proves the dispatcher handles it and proves nothing
+## **  about what a real keyboard sends.
+## **
+## **  Each line is "Tn PASS" or "Tn FAIL want got", and the verdict line is
+## **  "ALL EIGHT PASS" -- stop an automated run on that. AFTER it, one more
+## **  dialog is opened and left waiting on a key, so a -gif run has something
+## **  to photograph.
+## **
+## **      python source/gpc/build_basl.py     GUIFRMT.BASL    GUIFRMT.SRC.PRG
+## **      python source/gpc/compile_shared.py GUIFRMT.SRC.PRG GUIFRMT.PRG
+## **
+## ***********************************************************************
+
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "STASH.INC.BL"
+
+#DEFINE KBDBUF.PUT $F09F
+
+#DEFINE K.TAB 9
+#DEFINE K.SHTAB 24
+#DEFINE K.RETURN 13
+#DEFINE K.ESC 27
+
+GOTO GF.LIBEND
+
+#INCLUDE "LIB.GUIBANK.INC.BL"
+GP.BANKED LIB.GUIBANK
+#INCLUDE "THEME.INC.BL"
+#INCLUDE "MENUVERT.INC.BL"
+#INCLUDE "MENUBAR.INC.BL"
+#INCLUDE "LINEINPUT.INC.BL"
+#INCLUDE "GUI.INC.BL"
+#INCLUDE "GUI2.INC.BL"
+GP.ENDBANKED
+GF.LIBEND:
+
+DIM MENUVERT.ITEM$(4)
+
+## Bank 4 is the GUI's code. GUI.BANK is scratch for the covered cells and
+## must not be the same one.
+GUI.BANK = 3
+
+THEME.ID = 0
+GOSUB THEME.SELECT
+SCREEN 1
+GP.FILL 0, 0, 80, 30, ASC(" "), THEME.CLR(THEME.PAGE)
+
+GF.FAILED = 0
+
+## ---- T1  RETURN presses the button focus opened on, which is the default.
+
+GOSUB GF.RESET
+GF.KEY = K.RETURN
+GOSUB GF.SEND
+GUI.MSG$ = "T1 RETURN ON THE DEFAULT"
+GOSUB GUI.YN
+GF.NAME$ = "T1"
+GF.WANT = -1
+GF.GOT = GUI.ANSWER
+GOSUB GF.CHECK
+
+## ---- T2  TAB moves the focus off the default, so RETURN answers NO.
+
+GOSUB GF.RESET
+GF.KEY = K.TAB
+GOSUB GF.SEND
+GF.KEY = K.RETURN
+GOSUB GF.SEND
+GUI.MSG$ = "T2 TAB THEN RETURN"
+GOSUB GUI.YN
+GF.NAME$ = "T2"
+GF.WANT = 0
+GF.GOT = GUI.ANSWER
+GOSUB GF.CHECK
+
+## ---- T3  TAB twice wraps a row of two back to where it started.
+
+GOSUB GF.RESET
+GF.KEY = K.TAB
+GOSUB GF.SEND
+GOSUB GF.SEND
+GF.KEY = K.RETURN
+GOSUB GF.SEND
+GUI.MSG$ = "T3 TAB TWICE WRAPS"
+GOSUB GUI.YN
+GF.NAME$ = "T3"
+GF.WANT = -1
+GF.GOT = GUI.ANSWER
+GOSUB GF.CHECK
+
+## ---- T4  SHIFT+TAB goes the other way, and wraps at the near end.
+
+GOSUB GF.RESET
+GF.KEY = K.SHTAB
+GOSUB GF.SEND
+GF.KEY = K.RETURN
+GOSUB GF.SEND
+GUI.MSG$ = "T4 SHIFT TAB WRAPS BACK"
+GOSUB GUI.YN
+GF.NAME$ = "T4"
+GF.WANT = 0
+GF.GOT = GUI.ANSWER
+GOSUB GF.CHECK
+
+## ---- T5  A bare letter presses its own button, wherever the focus is.
+
+GOSUB GF.RESET
+GF.KEY = ASC("N")
+GOSUB GF.SEND
+GUI.MSG$ = "T5 THE N ACCELERATOR"
+GOSUB GUI.YN
+GF.NAME$ = "T5"
+GF.WANT = 0
+GF.GOT = GUI.ANSWER
+GOSUB GF.CHECK
+
+## ---- T6  GUI.DEFAULT 2 opens with the focus on the second button.
+
+GOSUB GF.RESET
+GUI.DEFAULT = 2
+GF.KEY = K.RETURN
+GOSUB GF.SEND
+GUI.MSG$ = "T6 DEFAULT TWO"
+GOSUB GUI.YN
+GF.NAME$ = "T6"
+GF.WANT = 0
+GF.GOT = GUI.ANSWER
+GOSUB GF.CHECK
+
+## ---- T7  ESC cancels from anywhere, and a cancel is NO.
+
+GOSUB GF.RESET
+GF.KEY = K.TAB
+GOSUB GF.SEND
+GF.KEY = K.ESC
+GOSUB GF.SEND
+GUI.MSG$ = "T7 ESC AFTER A TAB"
+GOSUB GUI.YN
+GF.NAME$ = "T7"
+GF.WANT = 0
+GF.GOT = GUI.ANSWER
+GOSUB GF.CHECK
+
+## ---- T8  A row of ONE has nowhere to move to, and TAB must not hang it.
+
+GOSUB GF.RESET
+GF.KEY = K.TAB
+GOSUB GF.SEND
+GF.KEY = K.RETURN
+GOSUB GF.SEND
+GUI.MSG$ = "T8 TAB IN A ROW OF ONE"
+GUI.BTN.ONE$ = "&OK"
+GOSUB GUI.SAY
+GF.NAME$ = "T8"
+GF.WANT = K.RETURN
+GF.GOT = GUI.KEY
+GOSUB GF.CHECK
+
+PRINT
+IF GF.FAILED = 0 THEN PRINT "ALL EIGHT PASS"
+IF GF.FAILED <> 0 THEN PRINT "FAILURES:"; GF.FAILED
+
+## ---- THE PICTURE. One more dialog with the focus TABbed onto the second
+## ---- button, left open so a -gif run catches what the two cues look like
+## ---- together: <<YES>> is still the default, NO is the one in THEME.HILITE.
+## ---- The assertions above have already printed, so an automated run stops
+## ---- on their line and never reaches this.
+
+GOSUB GF.RESET
+GF.KEY = K.TAB
+GOSUB GF.SEND
+GUI.TITLE$ = " FOCUS "
+GUI.MSG$ = "THE DEFAULT IS DOUBLED, THE FOCUS IS COLOURED."
+GUI.MSG2$ = "TAB MOVED THE FOCUS OFF THE DEFAULT."
+GOSUB GUI.YN
+END
+
+
+## ***********************************************************************
+## **  GF.RESET -- the sticky inputs, back to a known state.
+## **
+## **  Every GUI input is sticky by design, so a test that did not set one
+## **  would inherit the previous test's value and pass for the wrong reason.
+## ***********************************************************************
+
+GF.RESET:
+    GUI.TITLE$ = " GUI.FORM "
+    GUI.MSG2$ = ""
+    GUI.MSG3$ = ""
+    GUI.DEFAULT = 1
+    GUI.OKCANCEL = 0
+    GUI.BTN.ONE$ = ""
+    GUI.BTN.TWO$ = ""
+    GUI.PLACE = 0
+    GUI.SHADOW = 0
+    GUI.STYLE = 0
+    RETURN
+
+
+## ***********************************************************************
+## **  GF.SEND -- one key into the KERNAL's buffer.
+## **
+## **  kbdbuf_put lives in ROM bank 0 and compiled code runs in bank 4, hence
+## **  the two POKEs.
+## ***********************************************************************
+
+GF.SEND:
+    POKE 1, 0
+    GP.CALL KBDBUF.PUT, GF.KEY
+    POKE 1, 4
+    RETURN
+
+
+## ***********************************************************************
+## **  GF.CHECK -- one assertion, printed.
+## ***********************************************************************
+
+GF.CHECK:
+    IF GF.GOT = GF.WANT THEN PRINT GF.NAME$ + " PASS"
+    IF GF.GOT = GF.WANT THEN RETURN
+    PRINT GF.NAME$ + " FAIL WANT"; GF.WANT; "GOT"; GF.GOT
+    GF.FAILED = GF.FAILED + 1
+    RETURN
