@@ -6,14 +6,19 @@
 ## **
 ## **  GUIFRMT.BASL -- GUI.FORM's focus model, checked without a keyboard.
 ## **
-## **  Eight assertions against GUI.YN and GUI.SAY, with the keys pushed into
-## **  the KERNAL's buffer by kbdbuf_put. That is the only way to drive a GET
-## **  loop headlessly, and it sets no modifiers -- so SHIFT+TAB is tested as
-## **  the CODE 24, which proves the dispatcher handles it and proves nothing
-## **  about what a real keyboard sends.
+## **  Fifteen assertions against GUI.YN, GUI.SAY and GUI.INPUT, with the keys
+## **  pushed into the KERNAL's buffer by kbdbuf_put. That is the only way to
+## **  drive a GET loop headlessly, and it sets no modifiers -- so SHIFT+TAB is
+## **  tested as the CODE 24, which proves the dispatcher handles it and proves
+## **  nothing about what a real keyboard sends.
+## **
+## **  T1 TO T8 ARE THE BUTTON ROW, T9 TO T15 THE FIELD. The pair that matters
+## **  is T14 and T15: the same C is text inside the field and the CANCEL
+## **  accelerator on the row, which is the rule that lets a button carry a
+## **  marked letter beside a field at all.
 ## **
 ## **  Each line is "Tn PASS" or "Tn FAIL want got", and the verdict line is
-## **  "ALL EIGHT PASS" -- stop an automated run on that. AFTER it, one more
+## **  "ALL FIFTEEN PASS" -- stop an automated run on that. AFTER it, one more
 ## **  dialog is opened and left waiting on a key, so a -gif run has something
 ## **  to photograph.
 ## **
@@ -167,23 +172,117 @@ GF.WANT = K.RETURN
 GF.GOT = GUI.KEY
 GOSUB GF.CHECK
 
-PRINT
-IF GF.FAILED = 0 THEN PRINT "ALL EIGHT PASS"
-IF GF.FAILED <> 0 THEN PRINT "FAILURES:"; GF.FAILED
+## ---- T9   RETURN typed straight into the field is OK, wherever the eye is:
+## ---- the field has nothing to press, so RETURN means the default button.
+## ---- T10  and what was typed comes back with it.
 
-## ---- THE PICTURE. One more dialog with the focus TABbed onto the second
-## ---- button, left open so a -gif run catches what the two cues look like
-## ---- together: <<YES>> is still the default, NO is the one in THEME.HILITE.
-## ---- The assertions above have already printed, so an automated run stops
-## ---- on their line and never reaches this.
+GOSUB GF.RESET
+GF.KEY = ASC("A")
+GOSUB GF.SEND
+GF.KEY = ASC("B")
+GOSUB GF.SEND
+GF.KEY = K.RETURN
+GOSUB GF.SEND
+GUI.MSG$ = "T9 TYPE THEN RETURN"
+GOSUB GUI.INPUT
+GF.NAME$ = "T9"
+GF.WANT = -1
+GF.GOT = GUI.OK
+GOSUB GF.CHECK
+GF.NAME$ = "T10"
+GF.SWANT$ = "AB"
+GF.SGOT$ = GUI.TEXT$
+GOSUB GF.SCHECK
+
+## ---- T11  TAB leaves the field for OK, and RETURN presses it.
 
 GOSUB GF.RESET
 GF.KEY = K.TAB
 GOSUB GF.SEND
+GF.KEY = K.RETURN
+GOSUB GF.SEND
+GUI.MSG$ = "T11 TAB TO OK"
+GOSUB GUI.INPUT
+GF.NAME$ = "T11"
+GF.WANT = -1
+GF.GOT = GUI.OK
+GOSUB GF.CHECK
+
+## ---- T12  TAB twice reaches CANCEL, which is not the default.
+
+GOSUB GF.RESET
+GF.KEY = K.TAB
+GOSUB GF.SEND
+GF.KEY = K.TAB
+GOSUB GF.SEND
+GF.KEY = K.RETURN
+GOSUB GF.SEND
+GUI.MSG$ = "T12 TAB TO CANCEL"
+GOSUB GUI.INPUT
+GF.NAME$ = "T12"
+GF.WANT = 0
+GF.GOT = GUI.OK
+GOSUB GF.CHECK
+
+## ---- T13  ESC cancels from inside the field.
+
+GOSUB GF.RESET
+GF.KEY = K.ESC
+GOSUB GF.SEND
+GUI.MSG$ = "T13 ESC IN THE FIELD"
+GOSUB GUI.INPUT
+GF.NAME$ = "T13"
+GF.WANT = 0
+GF.GOT = GUI.OK
+GOSUB GF.CHECK
+
+## ---- T14  A BARE C IN THE FIELD IS TEXT. CANCEL marks the same letter, and
+## ---- the field is what has the focus, so nothing is pressed.
+
+GOSUB GF.RESET
+GF.KEY = ASC("C")
+GOSUB GF.SEND
+GF.KEY = K.RETURN
+GOSUB GF.SEND
+GUI.MSG$ = "T14 C IS TEXT IN THE FIELD"
+GOSUB GUI.INPUT
+GF.NAME$ = "T14"
+GF.SWANT$ = "C"
+GF.SGOT$ = GUI.TEXT$
+GOSUB GF.SCHECK
+
+## ---- T15  AND THE SAME C ON THE ROW IS THE ACCELERATOR. One TAB is the whole
+## ---- difference between this and T14.
+
+GOSUB GF.RESET
+GF.KEY = K.TAB
+GOSUB GF.SEND
+GF.KEY = ASC("C")
+GOSUB GF.SEND
+GUI.MSG$ = "T15 C ON THE BUTTON ROW"
+GOSUB GUI.INPUT
+GF.NAME$ = "T15"
+GF.WANT = 0
+GF.GOT = GUI.OK
+GOSUB GF.CHECK
+
+PRINT
+IF GF.FAILED = 0 THEN PRINT "ALL FIFTEEN PASS"
+IF GF.FAILED <> 0 THEN PRINT "FAILURES:"; GF.FAILED
+
+## ---- THE PICTURE. GUI.INPUT left open with the focus still in the field and
+## ---- no key waiting, so a -gif run catches all three states at once: the
+## ---- cursor is in the field, <<OK>> is doubled because it is the DEFAULT,
+## ---- and nothing is in THEME.FOCUS because the eye is not on a button. That
+## ---- separation is the whole of what phase 3 added. The assertions above have
+## ---- already printed, so an automated run stops on their line and never
+## ---- reaches this.
+
+GOSUB GF.RESET
 GUI.TITLE$ = " FOCUS "
-GUI.MSG$ = "THE DEFAULT IS DOUBLED, THE FOCUS IS COLOURED."
-GUI.MSG2$ = "TAB MOVED THE FOCUS OFF THE DEFAULT."
-GOSUB GUI.YN
+GUI.MSG$ = "THE CURSOR IS THE FIELD. <<OK>> IS THE DEFAULT."
+GUI.TEXT$ = "GPC"
+GOSUB GUI.INPUT
 END
 
 
@@ -205,6 +304,9 @@ GF.RESET:
     GUI.PLACE = 0
     GUI.SHADOW = 0
     GUI.STYLE = 0
+    GUI.TEXT$ = ""
+    GUI.LEN = 20
+    GUI.MASK = 0
     RETURN
 
 
@@ -230,5 +332,19 @@ GF.CHECK:
     IF GF.GOT = GF.WANT THEN PRINT GF.NAME$ + " PASS"
     IF GF.GOT = GF.WANT THEN RETURN
     PRINT GF.NAME$ + " FAIL WANT"; GF.WANT; "GOT"; GF.GOT
+    GF.FAILED = GF.FAILED + 1
+    RETURN
+
+
+## ***********************************************************************
+## **  GF.SCHECK -- the same assertion on a string.
+## **
+## **  What a field gives back is text, and GF.CHECK compares numbers.
+## ***********************************************************************
+
+GF.SCHECK:
+    IF GF.SGOT$ = GF.SWANT$ THEN PRINT GF.NAME$ + " PASS"
+    IF GF.SGOT$ = GF.SWANT$ THEN RETURN
+    PRINT GF.NAME$ + " FAIL WANT [" + GF.SWANT$ + "] GOT [" + GF.SGOT$ + "]"
     GF.FAILED = GF.FAILED + 1
     RETURN

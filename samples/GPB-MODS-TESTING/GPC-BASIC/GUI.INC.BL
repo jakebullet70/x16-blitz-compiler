@@ -59,7 +59,7 @@
 ## **        GUI.DEFAULT     which button is the default, and so which one has
 ## **                        the focus when the dialog opens. 2 is the second,
 ## **                        anything else the first. The default is drawn
-## **                        <<LIKE THIS>> and the focused one in THEME.HILITE
+## **                        <<LIKE THIS>> and the focused one in THEME.FOCUS
 ## **
 ## **   out  GUI.KEY         the key that ended it, whichever call
 ## **        GUI.STASHED     -1 if the covered cells were saved
@@ -78,10 +78,10 @@
 ## **  first Y and the first N in the line are lit" has nothing to light when
 ## **  the row is two buttons. Set GUI.BTN.ONE$ and GUI.BTN.TWO$ instead.
 ## **
-## **  EVERY BUTTON HAS A FOCUS, AND TAB MOVES IT. The dialogs no longer own
-## **  their key loops: each states its buttons, GUI.BUTTON.ROW records them as
-## **  controls, and GUI.FORM runs them. A caller that never presses TAB sees
-## **  what it saw before.
+## **  EVERY CONTROL HAS A FOCUS, AND TAB MOVES IT. The dialogs no longer own
+## **  their key loops: each states its controls, GUI.BUTTON.ROW and
+## **  GUI.FORM.ADD.FIELD record them as they are drawn, and GUI.FORM runs them.
+## **  A caller that never presses TAB sees what it saw before.
 ## **
 ## **  GUI.LISTBOX.* is GUI2.INC.BL, its own #INCLUDE.
 ## ***********************************************************************
@@ -201,6 +201,7 @@ GUI.YN.BODY:
     GUI.BODY.ROWS = 1
     GUI.BODY.WIDTH = GUI.BTN.TOTAL
     GOSUB GUI.OPEN
+    GOSUB GUI.FORM.BEGIN
     GUI.BTN.Y = GUI.INNER.TOP
     GOSUB GUI.BUTTON.ROW
     GOSUB GUI.FORM.RUN
@@ -354,12 +355,13 @@ GUI.BUTTON.WIDE:
 ## **        GUI.INNER.LEFT GUI.INNER.WIDTH   from GUI.OPEN
 ## **        GUI.DEFAULT   2 marks the second button, anything else the first
 ## **   out  GUI.BTN.KEY.ONE  GUI.BTN.KEY.TWO   what each label marked, 0 for none
+## **
+## **  IT APPENDS, and GUI.FORM.BEGIN is what empties the list. That is why a
+## **  dialog calls BEGIN itself: GUI.INPUT adds its field FIRST, so the row
+## **  cannot be the thing that clears what came before it.
 ## ***********************************************************************
 
 GUI.BUTTON.ROW:
-    GOSUB GUI.FORM.INIT
-    GUI.CTRL.N = 0
-    GUI.FOCUS = 1
     GUI.BTN.FOCUSED = 0
     GOSUB GUI.BTN.COLOURS
     GUI.BTN.X = GUI.INNER.LEFT + INT((GUI.INNER.WIDTH - GUI.BTN.TOTAL) / 2)
@@ -456,8 +458,9 @@ GUI.BTN.COLOURS:
 ## **  that wants RETURN for itself, and GUI.FOCUS is where the eye is. They
 ## **  start on the same button and separate on the first TAB.
 ## **
-## **  BUTTONS ONLY SO FAR. GUI.CT.FIELD and GUI.CT.LIST have numbers and no
-## **  arm in GUI.FORM.STEP; a form of one type needs no GP.SELECT to pick it.
+## **  BUTTONS AND FIELDS. GUI.CT.LIST has a number and no arm in
+## **  GUI.FORM.STEP yet, so a list control would be driven as a button until
+## **  phase 4 writes one.
 ## ***********************************************************************
 
 ## ***********************************************************************
@@ -477,6 +480,71 @@ GUI.FORM.INIT:
     DIM GUI.CTRL.FLAGS%(GUI.FORM.MAX)
     DIM GUI.CTRL.TEXT$(GUI.FORM.MAX)
     GUI.FORM.DIMMED = -1
+    RETURN
+
+
+## ***********************************************************************
+## **  GUI.FORM.BEGIN -- an empty control list, before anything is added.
+## **
+## **  Every dialog calls this once, after GUI.OPEN and before it draws a
+## **  control. The arrays are not cleared, only GUI.CTRL.N -- a control above
+## **  the count is not read, so clearing seven arrays would buy nothing.
+## ***********************************************************************
+
+GUI.FORM.BEGIN:
+    GOSUB GUI.FORM.INIT
+    GUI.CTRL.N = 0
+    GUI.FOCUS = 1
+    RETURN
+
+
+## ***********************************************************************
+## **  GUI.FORM.ADD.FIELD -- record and draw a LINEINPUT field as a control.
+## **
+## **   in   LINEINPUT.X LINEINPUT.Y LINEINPUT.LEN and the rest of the field's
+## **        inputs, set as they would be for a bare GOSUB LINEINPUT.GET
+## **
+## **  The field is painted STATIC here, because GUI.FORM.RUN paints only the
+## **  control that has the focus and a field that never gets it would
+## **  otherwise be an unmarked hole in the panel.
+## ***********************************************************************
+
+GUI.FORM.ADD.FIELD:
+    IF GUI.CTRL.N >= GUI.FORM.MAX THEN RETURN
+    GUI.CTRL.N = GUI.CTRL.N + 1
+    GUI.CTRL.TYPE%(GUI.CTRL.N) = GUI.CT.FIELD
+    GUI.CTRL.X%(GUI.CTRL.N) = LINEINPUT.X
+    GUI.CTRL.Y%(GUI.CTRL.N) = LINEINPUT.Y
+    GUI.CTRL.W%(GUI.CTRL.N) = LINEINPUT.LEN
+    GUI.CTRL.TEXT$(GUI.CTRL.N) = ""
+    GUI.CTRL.KEY%(GUI.CTRL.N) = 0
+    GUI.CTRL.FLAGS%(GUI.CTRL.N) = 0
+    GUI.PAINT.N = GUI.CTRL.N
+    GOSUB GUI.FIELD.DRAW
+    RETURN
+
+
+## ***********************************************************************
+## **  GUI.FIELD.DRAW -- a field with no cursor in it.
+## **
+## **   in   GUI.PAINT.N   which control
+## **
+## **  THE CURSOR IS THE FIELD'S FOCUS CUE, so an unfocused field is the same
+## **  cells without it. LINEINPUT.GET already leaves one drawn this way on its
+## **  way out; this is for a field that has not been entered yet.
+## **
+## **  LINEINPUT.RENDER rather than the text itself, so a masked field shows
+## **  asterisks here as well -- one rule for what a field displays, in the
+## **  module that owns it.
+## ***********************************************************************
+
+GUI.FIELD.DRAW:
+    LINEINPUT.X = GUI.CTRL.X%(GUI.PAINT.N)
+    LINEINPUT.Y = GUI.CTRL.Y%(GUI.PAINT.N)
+    LINEINPUT.LEN = GUI.CTRL.W%(GUI.PAINT.N)
+    GOSUB LINEINPUT.RENDER
+    GP.FILL LINEINPUT.X, LINEINPUT.Y, LINEINPUT.LEN, 1, GUI.SPACE, LINEINPUT.ATTR
+    IF LINEINPUT.SHOW$ <> "" THEN GP.PRINTAT LINEINPUT.X, LINEINPUT.Y, LINEINPUT.SHOW$, LINEINPUT.ATTR
     RETURN
 
 
@@ -510,9 +578,13 @@ GUI.FORM.ADD.BUTTON:
 ## **  GUI.FORM.PAINT -- one control, in the colours its state asks for.
 ## **
 ## **   in   GUI.PAINT.N   which control
+## **
+## **  A FIELD IS HANDED ON WITH GOTO, NOT GOSUB: GUI.FIELD.DRAW's RETURN goes
+## **  back to whoever called PAINT, which is the whole of what is left to do.
 ## ***********************************************************************
 
 GUI.FORM.PAINT:
+    IF GUI.CTRL.TYPE%(GUI.PAINT.N) = GUI.CT.FIELD THEN GOTO GUI.FIELD.DRAW
     GUI.BTN.X = GUI.CTRL.X%(GUI.PAINT.N)
     GUI.BTN.Y = GUI.CTRL.Y%(GUI.PAINT.N)
     GUI.BTN.TEXT$ = GUI.CTRL.TEXT$(GUI.PAINT.N)
@@ -549,11 +621,57 @@ GUI.FORM.LOOP:
 
 ## ***********************************************************************
 ## **  GUI.FORM.STEP -- hand the key to the focused control, then act.
+## **
+## **  The control reads the key and answers with a verdict; GUI.FORM.ACT is
+## **  the only place a verdict is acted on. That split is what keeps three
+## **  control types from each growing their own navigation.
+## **
+## **  THE TYPE IS READ INTO A SCALAR FIRST. GP.SELECT refuses an array
+## **  element: every alternative re-reads the selector, and the subscript is
+## **  not re-issued with it, so the index would be whatever was left on the
+## **  stack. One read here, and the alternatives re-read a fixed slot.
 ## ***********************************************************************
 
 GUI.FORM.STEP:
-    GOSUB GUI.FORM.DO.BUTTON
+    GUI.STEP.TYPE = GUI.CTRL.TYPE%(GUI.FOCUS)
+    GP.SELECT GUI.STEP.TYPE
+        GP.CASE GUI.CT.FIELD : GOSUB GUI.FORM.DO.FIELD
+        GP.OTHER : GOSUB GUI.FORM.DO.BUTTON
+    GP.ENDSEL
     GOSUB GUI.FORM.ACT
+    RETURN
+
+
+## ***********************************************************************
+## **  GUI.FORM.DO.FIELD -- the field's keys, translated to a verdict.
+## **
+## **  LINEINPUT.GET is the loop; it already leaves on TAB, UP and DOWN with
+## **  the text kept, and its own header says a form is meant to call it and
+## **  look at LINEINPUT.KEY. So this is the translation and nothing else.
+## **
+## **  RETURN IS NAV.DEFAULT, NOT NAV.PRESS. The focus is in the field, and a
+## **  field has nothing to press -- RETURN means the default button, wherever
+## **  the eye is. That is the one verdict only a field and a list produce.
+## **
+## **  NO ACCELERATOR SCAN, deliberately: every printable key belongs to the
+## **  field. That is the rule that lets the buttons carry a marked letter at
+## **  all -- see GUI.FORM.ACCEL.
+## ***********************************************************************
+
+GUI.FORM.DO.FIELD:
+    GOSUB LINEINPUT.GET
+    GUI.FORM.KEY = LINEINPUT.KEY
+    GUI.FORM.NAV = GUI.NAV.STAY
+    GP.SELECT GUI.FORM.KEY
+        GP.CASE LINEINPUT.TAB, LINEINPUT.DOWN
+            GUI.FORM.NAV = GUI.NAV.NEXT
+        GP.CASE LINEINPUT.UP
+            GUI.FORM.NAV = GUI.NAV.PREV
+        GP.CASE GUI.RETURN
+            GUI.FORM.NAV = GUI.NAV.DEFAULT
+        GP.CASE GUI.ESCAPE, GUI.STOP
+            GUI.FORM.NAV = GUI.NAV.CANCEL
+    GP.ENDSEL
     RETURN
 
 
@@ -618,6 +736,10 @@ GUI.FORM.ACCEL:
 
 ## ***********************************************************************
 ## **  GUI.FORM.ACT -- the movement, written once.
+## **
+## **  NAV.DEFAULT SEARCHES rather than remembering an index: the default is a
+## **  flag on a control, and a form that set none ends with GUI.FORM.HIT 0 --
+## **  a cancel, which is the safe way for RETURN to mean nothing.
 ## ***********************************************************************
 
 GUI.FORM.ACT:
@@ -630,6 +752,12 @@ GUI.FORM.ACT:
             GOSUB GUI.FORM.MOVE
         GP.CASE GUI.NAV.PRESS
             GUI.FORM.HIT = GUI.FOCUS
+            GUI.FORM.DONE = -1
+        GP.CASE GUI.NAV.DEFAULT
+            GUI.FORM.HIT = 0
+            FOR GUI.SCAN = 1 TO GUI.CTRL.N
+                IF (GUI.CTRL.FLAGS%(GUI.SCAN) AND GUI.CF.DEFAULT) <> 0 THEN GUI.FORM.HIT = GUI.SCAN
+            NEXT GUI.SCAN
             GUI.FORM.DONE = -1
         GP.CASE GUI.NAV.CANCEL
             GUI.FORM.HIT = 0
@@ -689,6 +817,7 @@ GUI.SAY.BODY:
     GUI.BODY.ROWS = 1
     GUI.BODY.WIDTH = GUI.BTN.TOTAL
     GOSUB GUI.OPEN
+    GOSUB GUI.FORM.BEGIN
     GUI.BTN.Y = GUI.INNER.TOP
     GOSUB GUI.BUTTON.ROW
     GOSUB GUI.FORM.RUN
@@ -740,16 +869,22 @@ GUI.MENU.BODY:
 ## **  label, and BASLOAD will not have a label and a variable of one name --
 ## **  the $ does not separate them, so GUI.INPUT$ is DUPLICATE SYMBOL.
 ## **
-## **  Cursor up, down and TAB do NOT leave this dialog. Only RETURN and ESC
-## **  end it.
+## **  THREE CONTROLS AND ONE LOOP: the field, then OK, then CANCEL. TAB and
+## **  DOWN leave the field for the buttons, UP goes back, and the cycle wraps.
+## **  RETURN in the field presses OK wherever the eye is; RETURN on a button
+## **  presses that button. ESC cancels from anywhere.
+## **
+## **  THE BUTTONS CARRY THEIR MARKED LETTERS NOW. They could not before,
+## **  because the field owned every printable key for the whole dialog; an
+## **  accelerator is live only while the focused control does not eat
+## **  printables, so O works on the button row and types an O in the field.
+## **  It is marked from the moment the box opens and inert until then, which
+## **  is accepted: marking it only sometimes teaches the mark as a focus cue.
 ## ***********************************************************************
 
 GUI.INPUT.BODY:
     IF GUI.LEN = 0 THEN GUI.LEN = 20
-## ---- NO "&" ON EITHER LABEL, deliberately. Every printable key belongs to the
-## ---- field, so an O could not close the dialog -- it types an O. Marking a
-## ---- letter that does nothing is worse than marking none.
-    GUI.BTN.ONE$ = "OK" : GUI.BTN.TWO$ = "CANCEL" : GUI.DEFAULT = 1
+    GUI.BTN.ONE$ = "&OK" : GUI.BTN.TWO$ = "&CANCEL" : GUI.DEFAULT = 1
     GOSUB GUI.BUTTON.SIZE
     GUI.BODY.ROWS = 3 : GUI.BODY.WIDTH = GUI.LEN
     IF GUI.BTN.TOTAL > GUI.BODY.WIDTH THEN GUI.BODY.WIDTH = GUI.BTN.TOTAL
@@ -762,26 +897,27 @@ GUI.INPUT.BODY:
     LINEINPUT.LEN = GUI.LEN : LINEINPUT.ATTR = THEME.CLR(THEME.HILITE)
     LINEINPUT.TEXT$ = GUI.TEXT$ : LINEINPUT.MASK = GUI.MASK
 
-## ---- OK and CANCEL as buttons, two rows under the field. This used to print
-## ---- "ENTER = OK    ESC = CANCEL" dimmed with the two key names lit at fixed
-## ---- offsets; the buttons say the same thing in the same place and leave the
-## ---- keys to be the keys.
+## ---- The field is control 1 and the buttons are 2 and 3, so BEGIN comes
+## ---- first and the row appends to it. Focus starts on the field, which is
+## ---- not where the default button is -- that is the whole point of the two
+## ---- being separate.
+    GOSUB GUI.FORM.BEGIN
+    GOSUB GUI.FORM.ADD.FIELD
     GUI.BTN.Y = GUI.INNER.TOP + 2
     GOSUB GUI.BUTTON.ROW
+    GUI.FOCUS = 1
+    GOSUB GUI.FORM.RUN
 
-## ---- Up, down and TAB leave a LINEINPUT field without cancelling it, which
-## ---- is how a form moves between fields. With one field there is nowhere to
-## ---- go, so re-enter it: only RETURN and ESC end this.
-GUI.INPUT.FIELD:  GOSUB LINEINPUT.GET
-    IF LINEINPUT.KEY = LINEINPUT.DOWN THEN GOTO GUI.INPUT.FIELD
-    IF LINEINPUT.KEY = LINEINPUT.UP THEN GOTO GUI.INPUT.FIELD
-    IF LINEINPUT.KEY = LINEINPUT.TAB THEN GOTO GUI.INPUT.FIELD
+    GUI.TEXT$ = LINEINPUT.TEXT$ : GUI.KEY = GUI.FORM.KEY : GUI.OK = 0
 
-    GUI.TEXT$ = LINEINPUT.TEXT$ : GUI.KEY = LINEINPUT.KEY : GUI.OK = 0
-    IF GUI.KEY = GUI.RETURN THEN GUI.OK = -1
+## ---- OK IS THE DEFAULT BUTTON, asked by its flag rather than by its index,
+## ---- so a wrapper that ordered its controls differently still reads right.
+## ---- A cancel is GUI.FORM.HIT 0 and needs no test of its own: element 0 of
+## ---- the flags array is never written, so it answers 0 and falls through.
+    IF (GUI.CTRL.FLAGS%(GUI.FORM.HIT) AND GUI.CF.DEFAULT) <> 0 THEN GUI.OK = -1
 
 ## ---- A cancel gives back what was passed IN. LINEINPUT restores to the value
-## ---- at ITS last call, which after an arrow key is not the same thing.
+## ---- at ITS last call, which after a TAB out and back is not the same thing.
 ## ---- WARNING: GOSUB GUI.CLOSE must not ride on that IF. A false IF skips the
 ## ---- whole line, so the OK path would leave the box painted.
     IF GUI.OK = 0 THEN GUI.TEXT$ = GUI.WAS$
