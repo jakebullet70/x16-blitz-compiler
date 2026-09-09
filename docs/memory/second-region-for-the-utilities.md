@@ -1,6 +1,6 @@
 ---
 name: second-region-for-the-utilities
-description: "BUILT: a program can carry several GP.BANKED regions, and a module qualifies for one unless it holds a BANK statement -- file I/O, GP.ASM blobs and DIM are all fine. GPBMODS put eight modules in bank 7 for 359 bytes of shims"
+description: "BUILT: a program can carry several GP.BANKED regions -- THREE of them now -- and a module qualifies for one unless it holds a BANK statement. File I/O, GP.ASM blobs and DIM are all fine"
 metadata:
   node_type: memory
   type: project
@@ -10,6 +10,18 @@ metadata:
 put `APPSYS`, `BANKMGR`, `STRCASE`, `STRINGS`, `STRUSING`, `SORT`, `STASHVRAM` and `FILEIO` in it.
 Resident object **15,254 -> 14,001 while gaining two modules and three panels**; workspace
 6,656 -> 7,680. `LIB.UTILBANK.INC.BL` is the low-memory front door, 359 bytes for 35 shims.
+
+**A THIRD REGION 2026-09-09, and the layout below is the current one:**
+
+    LIB.GUIBANK    bank 4   THEME MENUVERT MENUBAR LINEINPUT GUI GUI2
+    LIB.UTILBANK   bank 7   APPSYS BANKMGR STRCASE STRINGS STRUSING SORT STASHVRAM
+    LIB.FUTILBANK  bank 8   FILEIO FILEDIR
+
+`FILEDIR` left bank 4 and `FILEIO` left bank 7 to share one of their own, which frees no low RAM
+-- both were banked already -- but empties bank 4 for the `GUI.FORM` of the CUA refactor. Bank 4
+was at 7,424 of its 8,192 with `FILEDIR` still in it. Three regions had never been built before
+this; they build, five overlays and all. The build is also what found the 37,632-byte `objPtr`
+ceiling.
 
 ## What actually disqualifies a module, and it is one thing
 
@@ -36,9 +48,11 @@ region**: both live at `$A000`, so `GPBankMakeOffset` refuses the branch. Check 
 call graph before splitting, and note it is cheap to check -- here the only call the GUI bank made
 downwards was to `STASH`, which is in low memory and stayed there.
 
-**Include order still binds across regions.** `FILEDIR` (bank 4) reads `FILEIO`'s
-`#DEFINE FILE.CHAN`, and BASLOAD substitutes a definition where it stands, so the utility region
-has to be written ABOVE the GUI region in the source. Getting it wrong gives
+**Include order still binds across regions, and inside one.** `FILEDIR` reads `FILEIO`'s
+`#DEFINE FILE.CHAN`, and BASLOAD substitutes a definition where it stands, so the file that
+supplies one is written ABOVE the file that wants it -- which was a cross-region rule while they
+sat in bank 4 and bank 7, and is now the order of two `#INCLUDE` lines inside `LIB.FUTILBANK`.
+Getting it wrong gives
 `SYMBOL NOT IN SCOPE IN FILEDIR.INC.BL:148` -- a line that has nothing to do with the definition.
 
 ## GP.DEFPROC cannot be banked with its body
