@@ -42,3 +42,15 @@ splitting, then fold the following statement onto the next line instead -- the b
 diff the lists: same count, same order means only the grouping moved. That settled 86 statements in
 `STRUSING` and 216 in `GUI` in seconds. See [[gpc-if-semantics]] and
 [[folding-onto-a-label-line-saves-nothing]].
+
+## A source file that changed and I did not change it
+
+**Check it for line crunching, and if that is all it is, carry on without a word.** Standing note,
+2026-09-09. The user crunches sources between turns, and a working copy that moved underneath a
+session is his pass, not a conflict or a lost edit. Diff it the mechanical way above — same
+statements, same order, fewer lines — and keep going.
+
+**Why:** stopping to report "this file changed" on every crunch is noise, and re-expanding it would
+undo his work. Only a difference that is NOT a crunch — a statement gone, an order changed, an `IF`
+no longer last on its line — is worth raising. See [[user-runs-concurrent-agents-here]] for the case
+where the change came from another agent instead.

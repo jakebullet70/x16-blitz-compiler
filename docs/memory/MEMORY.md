@@ -15,7 +15,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [Answer the question asked](answer-the-question-asked.md) — lead with the number asked for; no adjacent easier problem, no edge cases nobody writes
 - [Measure before changing code](measure-before-changing-code.md) — FRE probes found in 2 minutes what 2 rounds of edits missed
 - [Prose style is flat reference](prose-style-is-flat-reference.md) — the five settled rules for comments and help text; the `doc-style` agent owns them
-- [Write readable code, user crunches](write-readable-code-user-crunches.md) — one statement a line, plain IF for one statement, never a statement on a label line
+- [Write readable code, user crunches](write-readable-code-user-crunches.md) — one statement a line, plain IF for one statement, never a statement on a label line; and an unexplained SRC edit is his crunch pass, so carry on
 - [Comments light, code should flow](comments-light-code-should-flow.md) — a note or two, not essays; heavy REMs mean bad naming
 - [No ship language, no unasked builds](no-ship-language-this-is-dev.md) — dev and test work only; "commit and push" does not include a build
 - [Commit to main directly](commit-to-main-directly.md) — do not branch first; solo repo, no review step
