@@ -264,8 +264,9 @@ Each phase ends in a build and a screenshot. None of them leaves the demo unrunn
 2. **DONE — the control block and the dispatcher, on buttons only.** `GUI.SAY` and `GUI.YN` rebuilt on
    `GUI.FORM`. Visible change: TAB moves between YES and NO. The two simplest dialogs prove the
    dispatcher before a field or a list is involved.
-3. **The field.** `GUI.INPUT` rebuilt; `GUI.FIELD.DRAW` written; accelerators returned to its
-   buttons. This is the phase the screenshot that started this asks for.
+3. **DONE -- the field.** `GUI.INPUT` rebuilt; `GUI.FIELD.DRAW` written; accelerators returned to
+   its buttons. `GUIFRMT` grew to fifteen assertions and all fifteen pass. This is the phase the
+   screenshot that started this asks for.
 4. **The list.** `GUI.LISTBOX`'s loop split into paint-and-scroll and a verdict, and a button row
    added. Multi-select still works, and that is the check.
 5. **Demo panels, `GP-BASIC.GLOBALS.md`, and the help text.** Including the rows already owed for
@@ -293,7 +294,8 @@ Each phase ends in a build and a screenshot. None of them leaves the demo unrunn
   | | `.B04` on disk | code at `$A000` | free of 8,192 |
   |---|---:|---:|---:|
   | after phase 1 | 7,170 | 7,168 | 1,024 |
-  | after phase 2 | 7,682 | 7,680 | **512** |
+  | after phase 2 | 7,682 | 7,680 | 512 |
+  | after phase 3 | 7,938 | 7,936 | **256** |
 
   `GUI.FORM` cost 512 bytes and half the remaining headroom, and phases 3 and 4 have 512 bytes
   left to put a field and a list split into. **That is the number to plan phase 3 against**, and
