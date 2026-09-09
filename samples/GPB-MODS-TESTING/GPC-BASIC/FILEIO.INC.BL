@@ -258,21 +258,18 @@ FILE.UP.BODY:  FILE.CMDSTR$ = "CD:" + CHR$(95) : GOTO FILE.CMD
 ## The first line is skipped and the path rebuilt from the components: it is
 ## padded to a fixed width and truncates a long path.
 
-FILE.CURDIR.BODY:
-    FILE.PATH$ = "" : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
+FILE.CURDIR.BODY:  FILE.PATH$ = "" : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
     OPEN 15, FILE.DEVICE, 15
     OPEN FILE.CHAN, FILE.DEVICE, 0, "$=C"
     INPUT#15, FILE.ERR, FILE.MSG$, FILE.TRK, FILE.SEC
     IF FILE.ERR < FILE.OKMAX THEN GOSUB FILE.PATHWALK
-    CLOSE FILE.CHAN : CLOSE 15
-    IF FILE.PATH$ = "" THEN FILE.PATH$ = "/"
+    CLOSE FILE.CHAN : CLOSE 15 : IF FILE.PATH$ = "" THEN FILE.PATH$ = "/"
     RETURN
 
 ## Delimiter 34 is the quote. Reads alternate: one swallows up to an opening
 ## quote, the next takes the name. The first pair lands on the header line.
 ## Entries arrive innermost first, so each goes on the front.
-FILE.PATHWALK:
-    LINPUT# FILE.CHAN, FILE.ROW$, 34 : LINPUT# FILE.CHAN, FILE.ROW$, 34
+FILE.PATHWALK:  LINPUT# FILE.CHAN, FILE.ROW$, 34 : LINPUT# FILE.CHAN, FILE.ROW$, 34
     GP.DO
         LINPUT# FILE.CHAN, FILE.ROW$, 34 : IF ST <> 0 THEN GP.EXITDO
         LINPUT# FILE.CHAN, FILE.ROW$, 34 : IF ST <> 0 THEN GP.EXITDO
@@ -286,8 +283,7 @@ FILE.PATHWALK:
 ## ***********************************************************************
 ## **  A string array to a file and back
 ## ***********************************************************************
-FILE.SAVEARRAY.BODY:
-    IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
+FILE.SAVEARRAY.BODY:  IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
     GOSUB FILE.PETNAME : OPEN 15, FILE.DEVICE, 15
     OPEN FILE.CHAN, FILE.DEVICE, FILE.CHAN, "@:" + FILE.OUT$ + ",S,W"
     IF FILE.ROWS > 0 THEN GOSUB FILE.WRITEROWS
@@ -302,8 +298,7 @@ FILE.WRITEROWS:
 
 ## FILE.ROWS = FILE.MAX on return means the file may hold more.
 
-FILE.LOADARRAY.BODY:
-    FILE.ROWS = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
+FILE.LOADARRAY.BODY:  FILE.ROWS = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
     IF FILE.MAX = 0 THEN FILE.MAX = 10
     GOSUB FILE.PETNAME : OPEN 15, FILE.DEVICE, 15
     OPEN FILE.CHAN, FILE.DEVICE, FILE.CHAN, FILE.OUT$ + ",S,R"
@@ -335,8 +330,7 @@ FILE.READROWS:
 ## Row, or end of file. Past the end the KERNAL gives nothing or a single NUL.
 ## The length tests are separate statements: AND does not stop evaluating once
 ## it knows the answer, so ASC would still reach the empty string.
-FILE.ROWREAL:
-    FILE.KEEP = -1 : IF (FILE.ST AND 66) = 0 THEN RETURN
+FILE.ROWREAL:  FILE.KEEP = -1 : IF (FILE.ST AND 66) = 0 THEN RETURN
     IF LEN(FILE.ROW$) = 0 THEN GOTO FILE.ROWDROP
     IF LEN(FILE.ROW$) > 1 THEN RETURN
     IF ASC(FILE.ROW$) = 0 THEN GOTO FILE.ROWDROP
@@ -363,8 +357,7 @@ FILE.KEEPROW:
 
 FILE.PETNAME:  FILE.RAW$ = FILE.NAME$ : GOTO FILE.TOPET
 FILE.PETNEW:   FILE.RAW$ = FILE.NEW$
-FILE.TOPET:
-    FILE.OUT$ = FILE.RAW$ : IF FILE.ISO = 0 THEN RETURN
+FILE.TOPET:    FILE.OUT$ = FILE.RAW$ : IF FILE.ISO = 0 THEN RETURN
     IF LEN(FILE.OUT$) = 0 THEN RETURN
     FILE.PETP% = GP.STRPTR(FILE.OUT$)
     #REM 1

@@ -142,12 +142,10 @@ GOTO FILEDIR.MODULE.END
 ## **  fallout rather than the cause.
 ## ***********************************************************************
 
-FILE.DIR.INIT.BODY:
-    FILE.NAME$ = RPT$(32, FILE.DIR.NAMEMAX) : FILE.TYPE$ = RPT$(32, 3)
+FILE.DIR.INIT.BODY:  : FILE.NAME$ = RPT$(32, FILE.DIR.NAMEMAX) : FILE.TYPE$ = RPT$(32, 3)
     FILE.DIR.NAMEA% = GP.STRPTR(FILE.NAME$) : FILE.DIR.TYPEA% = GP.STRPTR(FILE.TYPE$)
     FILE.DIR.ADDR% = 0 : FILE.DIR.ROOM% = 0 : FILE.DIR.LFN% = FILE.CHAN : FILE.DIR.BYTES% = 0 : FILE.DIR.CNT% = 0 : FILE.DIR.OFF% = 0
-    FILE.DIR.WAS% = 0 : FILE.DIR.BNK% = 0
-    FILE.DIR.SLOW = 0
+    FILE.DIR.WAS% = 0 : FILE.DIR.BNK% = 0 : FILE.DIR.SLOW = 0
     FILE.DIR.BLK% = 0 : FILE.DIR.OK% = 0 : FILE.DIR.SLOW% = 0 : FILE.DIR.AT = 0 : FILE.DIR.GOT = 0 : FILE.DIR.MORE = 0 : FILE.DIR.FULL = 0  
     RETURN
 
@@ -162,15 +160,12 @@ FILE.DIR.INIT.BODY:
 ## **  FILE.EXISTS uses, so FILE.ERR means something when the listing is empty.
 ## ***********************************************************************
 
-FILE.DIR.OPEN.BODY:
-    FILE.DIR.GOT = 0 : FILE.DIR.FULL = 0 : FILE.DIR.MORE = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
-    FILE.DIR.BNK% = FILE.DIR.BANK
-    GOSUB FILE.DIR.WHERE : GOSUB FILE.DIR.ASKFOR : OPEN 15, FILE.DEVICE, 15
+FILE.DIR.OPEN.BODY:  FILE.DIR.GOT = 0 : FILE.DIR.FULL = 0 : FILE.DIR.MORE = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
+    FILE.DIR.BNK% = FILE.DIR.BANK : GOSUB FILE.DIR.WHERE : GOSUB FILE.DIR.ASKFOR : OPEN 15, FILE.DEVICE, 15
     OPEN FILE.CHAN, FILE.DEVICE, 0, FILE.DIR.ASK$
     INPUT#15, FILE.ERR, FILE.MSG$, FILE.TRK, FILE.SEC
     IF FILE.ERR < FILE.OKMAX THEN GOSUB FILE.DIR.SUCK
-    CLOSE FILE.CHAN : CLOSE 15
-    FILE.DIR.AT = 4 : GOSUB FILE.DIR.SKIPDISK
+    CLOSE FILE.CHAN : CLOSE 15 : FILE.DIR.AT = 4 : GOSUB FILE.DIR.SKIPDISK
     RETURN
 
 ## ***********************************************************************
@@ -185,8 +180,7 @@ FILE.DIR.OPEN.BODY:
 ## ***********************************************************************
 
 FILE.DIR.SKIPDISK:  IF FILE.DIR.GOT = 0 THEN RETURN
-    GOSUB FILE.DIR.NEXT.BODY : FILE.DIR.MORE = 0
-    RETURN
+    GOSUB FILE.DIR.NEXT.BODY : FILE.DIR.MORE = 0 : RETURN
 
 
 ## Where the bytes land. A bank is always the same address and size; low RAM is
@@ -200,8 +194,7 @@ FILE.DIR.WHERE:  IF FILE.DIR.BANK = 0 THEN GOTO FILE.DIR.LOWRAM
 ## safe, because no room ends the read at once; forgetting only the address is
 ## not, so no address means no room either.
 
-FILE.DIR.LOWRAM:  FILE.DIR.ADDR% = FILE.DIR.PTR : FILE.DIR.ROOM% = FILE.DIR.CAP
-    IF FILE.DIR.PTR = 0 THEN FILE.DIR.ROOM% = 0
+FILE.DIR.LOWRAM:  FILE.DIR.ADDR% = FILE.DIR.PTR : FILE.DIR.ROOM% = FILE.DIR.CAP : IF FILE.DIR.PTR = 0 THEN FILE.DIR.ROOM% = 0
     RETURN
 
 ## "$", "$:PATTERN", "$:*=P", "$:PATTERN=D" -- the pattern and the filter are
@@ -218,8 +211,7 @@ FILE.DIR.ASKFOR:
 ## No bank statement here. FILE.DIR.FILL's blob takes the data bank and gives the
 ## caller's back, so this routine and its caller stay on whatever bank they had.
 
-FILE.DIR.SUCK:
-    GOSUB FILE.DIR.FILL : FILE.DIR.GOT = FILE.DIR.BYTES% : FILE.DIR.SLOW = FILE.DIR.SLOW%
+FILE.DIR.SUCK:  GOSUB FILE.DIR.FILL : FILE.DIR.GOT = FILE.DIR.BYTES% : FILE.DIR.SLOW = FILE.DIR.SLOW%
     IF FILE.DIR.BYTES% >= FILE.DIR.ROOM% THEN FILE.DIR.FULL = -1
     RETURN
 
@@ -236,9 +228,7 @@ FILE.DIR.SUCK:
 ## **  EVER WRITTEN, so the high byte is zeroed in FILE.DIR.INIT and left alone.
 ## ***********************************************************************
 
-FILE.DIR.FILL:
-    FILE.DIR.BYTES% = 0
-    FILE.DIR.SLOW% = 0
+FILE.DIR.FILL:  FILE.DIR.BYTES% = 0 : FILE.DIR.SLOW% = 0
     #REM 1
     GP.ASM
     REM CLD                          ; SYS enters with the caller's flags
@@ -349,10 +339,8 @@ FILE.DIR.FILL:
 ## domain and anything above 32767 is one sign extension from negative. BASIC
 ## holds the offset; the assembly adds it to the base.
 
-FILE.DIR.NEXT.BODY:
-    FILE.DIR.MORE = 0 : IF FILE.DIR.GOT = 0 THEN RETURN
-    FILE.DIR.OFF% = FILE.DIR.AT : FILE.DIR.BNK% = FILE.DIR.BANK
-    GOSUB FILE.DIR.STEP
+FILE.DIR.NEXT.BODY:  FILE.DIR.MORE = 0 : IF FILE.DIR.GOT = 0 THEN RETURN
+    FILE.DIR.OFF% = FILE.DIR.AT : FILE.DIR.BNK% = FILE.DIR.BANK : GOSUB FILE.DIR.STEP
     IF FILE.DIR.OK% = 0 THEN RETURN
     FILE.DIR.AT = FILE.DIR.OFF% : FILE.BLOCKS = FILE.DIR.BLK% : FILE.DIR.MORE = -1
     RETURN
@@ -379,8 +367,7 @@ FILE.DIR.NEXT.BODY:
 ## **  string block that cannot grow.
 ## ***********************************************************************
 
-FILE.DIR.STEP:
-    FILE.DIR.OK% = 0
+FILE.DIR.STEP:  FILE.DIR.OK% = 0
     #REM 1
     GP.ASM
     REM CLD
