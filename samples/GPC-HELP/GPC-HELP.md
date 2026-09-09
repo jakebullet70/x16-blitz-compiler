@@ -22,6 +22,7 @@ python samples/GPC-HELP/MKHELP.PY
   - [6. The documents](#6-the-documents)
 - **GP.* CORE KEYWORDS**
   - [3. Command reference](#3-command-reference)
+  - [3. Command reference (2)](#3-command-reference-2)
   - [3.1 Loops](#31-loops)
   - [3.2 Multi-way branch](#32-multi-way-branch)
   - [3.3 Machine code](#33-machine-code)
@@ -37,17 +38,24 @@ python samples/GPC-HELP/MKHELP.PY
   - [3.8 Block IF](#38-block-if)
   - [3.9 Inline assembly](#39-inline-assembly)
   - [3.9 Inline assembly (2)](#39-inline-assembly-2)
+  - [3.10 Text in a bank](#310-text-in-a-bank)
+  - [3.11 Calling a routine in one statement](#311-calling-a-routine-in-one-statement)
+  - [3.11.1 GP.DEFPROC -- declare a verb and its arguments](#3111-gpdefproc----declare-a-verb-and-its-arguments)
+  - [3.11.2 GP.SUB -- call a verb](#3112-gpsub----call-a-verb)
+  - [3.11.3 GP.FN -- call a verb from inside an expression](#3113-gpfn----call-a-verb-from-inside-an-expression)
 - **BASL MODULES**
   - [4. Module reference -- the BASL library](#4-module-reference----the-basl-library)
   - [4.1 THEME.INC.BL -- named colour roles](#41-themeincbl----named-colour-roles)
   - [4.2 STRINGS.INC.BL -- string helpers](#42-stringsincbl----string-helpers)
+  - [4.2 STRINGS.INC.BL -- string helpers (2)](#42-stringsincbl----string-helpers-2)
   - [4.3 APPSYS.INC.BL -- start politely, leave it as you found it](#43-appsysincbl----start-politely-leave-it-as-you-found-it)
   - [4.4 LINEINPUT.INC.BL -- a positioned entry field](#44-lineinputincbl----a-positioned-entry-field)
   - [4.5 BMX.INC.BL -- a BMX bitmap into VERA](#45-bmxincbl----a-bmx-bitmap-into-vera)
   - [4.6 MENUVERT.INC.BL -- a vertical menu](#46-menuvertincbl----a-vertical-menu)
   - [4.6 MENUVERT.INC.BL -- a vertical menu (2)](#46-menuvertincbl----a-vertical-menu-2)
   - [4.7 SORT.INC.BL -- shell sort a string array](#47-sortincbl----shell-sort-a-string-array)
-  - [4.8 STRCASE.INC.BL -- case and trim, in place](#48-strcaseincbl----case-and-trim-in-place)
+  - [4.8 STRCASE.INC.BL -- case, in place](#48-strcaseincbl----case-in-place)
+  - [4.10 STRUSING.INC.BL -- a number to a template](#410-strusingincbl----a-number-to-a-template)
   - [GUI.INC.BL -- four dialogs, in a box that puts the screen back.](#guiincbl----four-dialogs-in-a-box-that-puts-the-screen-back)
   - [GUI2.INC.BL -- a listbox, single or multi select.](#gui2incbl----a-listbox-single-or-multi-select)
   - [MENUBAR.INC.BL -- a horizontal menu, in BASIC.](#menubarincbl----a-horizontal-menu-in-basic)
@@ -60,6 +68,7 @@ python samples/GPC-HELP/MKHELP.PY
   - [3. The modules](#3-the-modules)
   - [3. The modules (2)](#3-the-modules-2)
   - [3. The modules (3)](#3-the-modules-3)
+  - [3. The modules (4)](#3-the-modules-4)
   - [4. Labels are global too](#4-labels-are-global-too)
   - [5. TRUE IS -1](#5-true-is--1)
   - [6. Two more naming rules that are not about collisions](#6-two-more-naming-rules-that-are-not-about-collisions)
@@ -105,11 +114,11 @@ into opcodes that already exist. No handler, no vector slot, nothing in the bloc
 
 **The library.** `GPC-BASIC/`: 14 `.INC.BL` modules, 22 `.EXP.BL` examples. Ordinary BASL,
 `#INCLUDE`d by path, called with `GOSUB`. Zero runtime bytes — a module costs its own p-code, in the
-programs that include it. Menus vertical and bar, panels, themes, entry fields, in-place case and
-trim, shell sort, a screen rectangle to a RAM bank or a file, BMX into VERA.
+programs that include it. Menus vertical and bar, panels, themes, entry fields, in-place case, trim
+and splice, shell sort, a screen rectangle to a RAM bank or a file, BMX into VERA.
 
-`STASH.INC.BL`, `SORT.INC.BL` and `STRCASE.INC.BL` are `GP.ASM` and still modules: as keywords their
-925 bytes (329, 408, 188) would sit in the block, paid by every GP program. `GP.ARRPTR` and
+`STASH.INC.BL`, `SORT.INC.BL`, `STRCASE.INC.BL` and `STRINGS.INC.BL` are `GP.ASM` and still
+modules: as keywords their bytes would sit in the block, paid by every GP program. `GP.ARRPTR` and
 `GP.STRPTR` are what lets them out — a BASL subroutine takes an address, not an array or a string.
 
 The division is assembly for loops and bulk moves, BASIC for everything else. `LINEINPUT.GET`
@@ -118,7 +127,7 @@ waits on the keyboard, so speed does not apply to it; writing it in BASL saved 1
 ---
 
 
-*See also: STASH.INC.BL -- save a text rectangle, and put it back., 4.7 SORT.INC.BL -- shell sort a string array, 4.8 STRCASE.INC.BL -- case and trim, in place*
+*See also: STASH.INC.BL -- save a text rectangle, and put it back., 4.7 SORT.INC.BL -- shell sort a string array, 4.8 STRCASE.INC.BL -- case, in place, 4.2 STRINGS.INC.BL -- string helpers*
 
 ## 2. Using it
 
@@ -272,13 +281,16 @@ elimination: including a module costs its whole size whether or not it is called
 | `APPSYS.INC.BL` | start an application politely, and leave the machine as it was found |
 | `STASH.INC.BL` | save a text rectangle to a RAM bank, and put it back |
 | `STASHFILE.INC.BL` | the same rectangle, through a file |
+| `STASHVRAM.INC.BL` | rectangles and byte blobs in spare VRAM, addressed by handle. No `GP.ASM`, so no `#SYMFILE` |
+| `STASHVRAMGC.INC.BL` | closes the holes a `STASHVRAM` freed out of order. Its own file, so it costs nothing unless called |
 | `LINEINPUT.INC.BL` | a positioned, length-limited entry field |
 | `MENUVERT.INC.BL` | a vertical menu |
 | `MENUBAR.INC.BL` | a horizontal menu bar |
 | `GUI.INC.BL` | four dialogs — ask, say, type, choose — in a box that puts the screen back |
 | `GUI2.INC.BL` | a listbox, single or multi select |
-| `STRINGS.INC.BL` | the string helpers that belong in BASIC rather than assembly |
-| `STRCASE.INC.BL` | case and trim, rewriting a string in place, in assembly |
+| `STRINGS.INC.BL` | the string helpers: BASIC where BASIC is enough, assembly where it is not |
+| `STRCASE.INC.BL` | case, rewriting a string in place, in assembly |
+| `STRUSING.INC.BL` | a number to a template: PRINT USING's mask, in BASIC |
 | `SORT.INC.BL` | shell sort a string array in place, in assembly |
 | `BMX.INC.BL` | load a BMX bitmap into VERA |
 
@@ -287,7 +299,7 @@ What each one costs in bytes is in the command reference, under *At a glance*.
 ---
 
 
-*See also: 4.1 THEME.INC.BL -- named colour roles, 4.3 APPSYS.INC.BL -- start politely, leave it as you found it, STASH.INC.BL -- save a text rectangle, and put it back., STASHFILE.INC.BL -- a saved text rectangle, through a file., 4.4 LINEINPUT.INC.BL -- a positioned entry field, 4.6 MENUVERT.INC.BL -- a vertical menu, MENUBAR.INC.BL -- a horizontal menu, in BASIC., GUI.INC.BL -- four dialogs, in a box that puts the screen back., GUI2.INC.BL -- a listbox, single or multi select., 4.2 STRINGS.INC.BL -- string helpers, 4.8 STRCASE.INC.BL -- case and trim, in place, 4.7 SORT.INC.BL -- shell sort a string array*
+*See also: 4.1 THEME.INC.BL -- named colour roles, 4.3 APPSYS.INC.BL -- start politely, leave it as you found it, STASH.INC.BL -- save a text rectangle, and put it back., STASHFILE.INC.BL -- a saved text rectangle, through a file., 4.4 LINEINPUT.INC.BL -- a positioned entry field, 4.6 MENUVERT.INC.BL -- a vertical menu, MENUBAR.INC.BL -- a horizontal menu, in BASIC., GUI.INC.BL -- four dialogs, in a box that puts the screen back., GUI2.INC.BL -- a listbox, single or multi select., 4.2 STRINGS.INC.BL -- string helpers, 4.8 STRCASE.INC.BL -- case, in place, 4.10 STRUSING.INC.BL -- a number to a template*
 
 ## 5. GPC-BASIC/ -- the examples
 
@@ -302,6 +314,7 @@ One `.EXP.BL` per topic. Several are also the regression test for the module the
 | `SELECT.EXP.BL` | `GP.SELECT` / `GP.CASE` / `GP.OTHER` / `GP.ENDSEL` |
 | `UNWIND.EXP.BL` | a `GOTO` may leave a `GP.SELECT` or a `GP.DO` |
 | `STRINGS.EXP.BL` | the GP.BASIC string set |
+| `STRUSING.EXP.BL` | one value through six masks, a column, and the overflows |
 | `ARRAYS.EXP.BL` | the GP.BASIC array set |
 | `SCREEN.EXP.BL` | the GP.BASIC text drawing set |
 | `ISO.EXP.BL` | `GP.PRINTAT` and `GP.BOX` in ISO mode |
@@ -310,10 +323,12 @@ One `.EXP.BL` per topic. Several are also the regression test for the module the
 | `MENU.EXP.BL` | a whole small application, in the shape the GP set is for |
 | `MENUDEMO.EXP.BL` | `MENUVERT` drawn the way an application would draw it |
 | `GUI.EXP.BL` | the four dialogs, over a screen they have to put back |
+| `STASHVRAM.EXP.BL` | three panels nested in VRAM, a blob, and the compactor. Needs no `#SYMFILE`, which is the point |
 | `FORM.EXP.BL` | three fields you can move between, `LINEINPUT` style |
 | `BMXVIEW.EXP.BL` | a BMX bitmap viewer, in about thirty lines |
 | `BMXPAL.EXP.BL` `BMXSPD.EXP.BL` | the palette question, and the speed of each path |
-| `SORT.EXP.BL` `STRCTST.EXP.BL` `SPLITT.EXP.BL` | the regression tests for `SORT`, `STRCASE` and `STR.SPLIT` |
+| `SORT.EXP.BL` `STRCTST.EXP.BL` `STRTST.EXP.BL` `SPLITT.EXP.BL` | the regression tests for `SORT`, `STRCASE`, the `STRINGS` assembly and `STR.SPLIT` |
+| `USINGT.EXP.BL` | the regression test for `STR.USING`, thirty-nine cases |
 | `MENUTST.EXP.BL` `GUI2TST.EXP.BL` | the same for the menu and the listbox, driven through the keyboard buffer |
 
 ---
@@ -342,8 +357,8 @@ works both in the repository and in an unzipped release.
 
 #### 3. Command reference
 
-30 keywords, encoded `$CE7F` down to `$CE58` and allocated downward. Ten of the forty slots are
-holes and stay holes: the byte values are the ABI and are never renumbered.
+38 keywords, encoded `$CE7F` down to `$CE50` and allocated downward. Ten of the forty-eight slots
+are holes and stay holes: the byte values are the ABI and are never renumbered.
 
 ##### At a glance — where each part comes from
 
@@ -367,10 +382,13 @@ Three implementations, and what each costs:
 | **Strings** | COMPOSITE | `GP.CONTAINS` `GP.ISEMPTY` — free, see §3.4 |
 | **Addresses** | COMPOSITE | `GP.HIBYTE` `GP.LOBYTE` — free, see §3.3 |
 | **Arrays** | ASM | `GP.ARRPTR` |
+| **Banked text** | ASM | `GP.BANKEDSTR` `GP.ENDBANKEDSTR` `GP.BSTR` · `GP.BSTRCOUNT` is COMPOSITE — see §3.10 |
+| **Routine calls** | COMPOSITE | `GP.DEFPROC` `GP.SUB` — free, and stays GP-BASIC OUT, see §3.11 |
+| **Routine calls** | ASM | `GP.FN` — the same call as a value, and it brings the GP block in |
 | **Screen** | ASM | `GP.BOX` `GP.FILL` `GP.PRINTAT` |
 | **Screen** | COMPOSITE | `GP.CHAR` — free, one cell in `GP.PRINTAT`'s shape running `GP.FILL`'s handler |
 | **Colour roles** | BASIC | `THEME.INC.BL` — `THEME.LOAD`, `THEME.CLR()` · §4.1 |
-| **String helpers** | BASIC | `STRINGS.INC.BL` — `PADR` `PADL` `PADC` `SPLIT` `REPLACE` `PET2SCR` · §4.2 |
+| **String helpers** | BASIC+ASM | `STRINGS.INC.BL` — `PADR` `PADL` `PADC` `SPLIT` `REPLACE` `SPLICE` `PET2SCR` `TRIM` `LTRIM` `RTRIM` · §4.2 |
 | **Screen etiquette, panels** | BASIC | `APPSYS.INC.BL` — `STARTUP` `RESTORE` `PANEL.SAVE/LOAD/PUT` `ISEMU` · §4.3 |
 | **Entry fields** | BASIC | `LINEINPUT.INC.BL` — `LINEINPUT.GET`, `LINEINPUT.ASK` · §4.4 |
 | **Bitmaps** | BASIC | `BMX.INC.BL` — `BMX.SHOW`, `BMX.RESTORE` · §4.5 |
@@ -387,7 +405,10 @@ The keywords in detail. Square brackets mean optional. Optionals cannot be skipp
 `GP.BOX X,Y,W,H,,7` is a syntax error — write out the default you are passing through.
 
 
-*See also: 4. Module reference -- the BASL library, 3.8 Block IF, 3.9 Inline assembly, 3.4 Strings, 3.3 Machine code, 4.1 THEME.INC.BL -- named colour roles, 4.2 STRINGS.INC.BL -- string helpers, 4.3 APPSYS.INC.BL -- start politely, leave it as you found it, 4.4 LINEINPUT.INC.BL -- a positioned entry field, 4.5 BMX.INC.BL -- a BMX bitmap into VERA, 4.6 MENUVERT.INC.BL -- a vertical menu, 1. What GP.BASIC is*
+## 3. Command reference (2)
+
+
+*See also: 4. Module reference -- the BASL library, 3.8 Block IF, 3.9 Inline assembly, 3.4 Strings, 3.3 Machine code, 3.10 Text in a bank, 3.11 Calling a routine in one statement, 4.1 THEME.INC.BL -- named colour roles, 4.2 STRINGS.INC.BL -- string helpers, 4.3 APPSYS.INC.BL -- start politely, leave it as you found it, 4.4 LINEINPUT.INC.BL -- a positioned entry field, 4.5 BMX.INC.BL -- a BMX bitmap into VERA*
 
 ## 3.1 Loops
 
@@ -558,21 +579,22 @@ comment.
 
 Five keywords. `GP.INSTR` is the only string search GPC has; without it there is none.
 
-Trimming, padding and case folding are modules, not keywords: `STRCASE.INC.BL` (§4.8) for case and
-trim in place, `STRINGS.INC.BL` (§4.2) for padding. They cost 188 bytes of p-code in the programs
-that `#INCLUDE` them and nothing in the GP block. `GP.STRPTR` is the keyword they are built on.
+Trimming, padding, splicing and case folding are modules, not keywords: `STRCASE.INC.BL` (§4.8)
+for case, `STRINGS.INC.BL` (§4.2) for everything else. They cost p-code only in the programs that
+`#INCLUDE` them and nothing in the GP block. `GP.STRPTR` is the keyword they are built on.
 
-The in-place statements in `STRCASE.INC.BL` take a string variable, never a literal or an
-expression. The compiler rejects those. Case conversion leaves digits, punctuation and PETSCII
-graphics unchanged.
+The in-place routines take an ADDRESS, `GP.STRPTR(a$)`, and never a literal: `GP.STRPTR("hello")`
+is an address inside the p-code, so trimming it edits the running program. Case conversion leaves
+digits, punctuation and PETSCII graphics unchanged.
 
-There is no `GP.PAD`. In-place statements cannot grow a string past the capacity it was created
-with. `STR.PADR` / `PADL` / `PADC` (§4.2) are BASIC assignments and do reallocate.
+There is no `GP.PAD`. In-place work cannot grow a string past the capacity it was created with,
+which is what decides which side of `STRINGS.INC.BL` a routine lands on: the pads and `STR.SPLICE`
+grow, so they are BASIC assignments and reallocate; the trims only shrink, so they are assembly.
 
 Example: [`STRINGS.EXP.BL`](STRINGS.EXP.BL)
 
 
-*See also: 3.4.1 GP.INSTR -- position of a substring, 3.4.2 GP.CONTAINS -- test for a substring, 3.4.3 GP.ISEMPTY -- test for a zero-length string, 3.4.4 GP.COMP -- compare two strings, ignoring case, 3.4.5 GP.STRPTR -- address of a string block, 4.8 STRCASE.INC.BL -- case and trim, in place, 4.2 STRINGS.INC.BL -- string helpers*
+*See also: 3.4.1 GP.INSTR -- position of a substring, 3.4.2 GP.CONTAINS -- test for a substring, 3.4.3 GP.ISEMPTY -- test for a zero-length string, 3.4.4 GP.COMP -- compare two strings, ignoring case, 3.4.5 GP.STRPTR -- address of a string block, 4.8 STRCASE.INC.BL -- case, in place, 4.2 STRINGS.INC.BL -- string helpers*
 
 ## 3.4.1 GP.INSTR -- position of a substring
 
@@ -625,7 +647,7 @@ Example: [`STRINGS.EXP.BL`](STRINGS.EXP.BL)
   Syntax    GP.ISEMPTY(a$)
   Returns   -1 if a$ has zero length, 0 if not.
   Kind      COMPOSITE. Expands to LEN(a$) = 0.
-  Notes     A string of spaces is not empty. STRCASE.TRIM first if
+  Notes     A string of spaces is not empty. STR.TRIM first if
             that is the intent.
             GP.ISEMPTY(a$), LEN(a$) = 0 and a$ = "" are the same four
             bytes. Use whichever reads better.
@@ -726,6 +748,19 @@ GOSUB STASH.RESTORE
 `STASHFILE.INC.BL` is the same rectangle through a file. It is a separate module because BASL has
 no dead code elimination: everything a module holds is compiled into every program that includes it,
 called or not.
+
+**More than one rectangle in a bank.** `STASH.SLOT` is a byte offset into the bank, default 0, and
+`STASH.NEXT` comes back as the offset just past what was written. Feed one into the other and the
+bank holds a stack of rectangles — which is what nested dialogs want, one bank for the lot rather
+than one bank a level. Nothing checks that two saves do not overlap: the header describes a
+rectangle's size, not its identity, so the offsets are yours to keep straight.
+
+**`STASHVRAM.INC.BL` keeps rectangles in spare VRAM instead**, addressed by handle so a program can
+hold many at once without counting offsets. It needs **no `#SYMFILE`**, because there is no
+`GP.ASM` in it: the cells never leave VRAM, so one data port reads, the other writes, and
+`memory_copy` moves between them. It executes no `BANK` either, so unlike `STASH` it runs inside a
+`GP.BANKED` region. `STASHVRAMGC.INC.BL` closes the holes if a caller frees out of order, and is a
+third file for the same dead-code reason.
 
 ---
 
@@ -979,10 +1014,258 @@ GP.ENDASM
 
 Example: [`ASM.EXP.BL`](ASM.EXP.BL)
 
+
+## 3.9 Inline assembly (2)
+
+
+## 3.10 Text in a bank
+
+##### 3.10 Text in a bank
+
+```basic
+GP.BANKEDSTR <bank> <NAME>
+  "first"
+  "second"
+GP.ENDBANKEDSTR
+
+  A$ = GP.BSTR(<NAME>, n)
+  N  = GP.BSTRCOUNT(<NAME>)
+```
+
+Moves a program's literal text out of low RAM and into a RAM bank, at compile time. A string
+constant costs `2 + LEN` bytes of p-code wherever it appears; `GP.BSTR(NAME, n)` costs **5**, so
+text of four characters or more is cheaper read from the bank than written in the line. Over half
+of a menu-driven program's own code is usually literal text, and text is the one thing in a
+program with no reason to be resident: it is never executed, never indexed, and read one item at a
+time.
+
+**The body is bare quoted lines.** One string a line, nothing else on the line, and they pass
+through byte for byte — case, leading spaces and trailing spaces included. They are not `REM`
+lines and must not be: BASLOAD upper-cases `REM` text.
+
+**Blocks are named, and you may write as many as you like.** Each is indexed from zero within
+itself, so inserting a line in one group moves nothing outside it. All the groups in a program
+share one bank, which is why every block names the same one — written on each block rather than
+only the first so a block can be read where it sits.
+
+**The name costs nothing at run time.** It is resolved while the program compiles, into the
+group's first index, and the compiler adds that to your index for you. No letter of the name
+reaches the object, which is the whole reason the lookup is not in the bank.
+
+`GP.BSTRCOUNT(NAME)` is a composite: it compiles to a plain number, so
+`FOR I = 0 TO GP.BSTRCOUNT(MENU.FILE) - 1` costs no more than writing the count out.
+
+```basic
+#DEFINE GM.TEXTBANK 5
+
+GP.BANKEDSTR GM.TEXTBANK MENU.FILE
+  " OPEN "
+  " SAVE "
+  " QUIT "
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR GM.TEXTBANK MENU.EDIT
+  " CUT "
+  " PASTE "
+GP.ENDBANKEDSTR
+
+  FOR I = 0 TO GP.BSTRCOUNT(MENU.EDIT) - 1
+    PRINT GP.BSTR(MENU.EDIT, I)
+  NEXT I
+```
+
+**Claim the bank**, exactly as a `GP.BANKED` code region's bank is claimed. The compiler picks it
+while the object is written, so `BANKMGR` has to be told rather than asked:
+
+```basic
+BANKMGR.WANT = GM.TEXTBANK : GOSUB BANKMGR.CLAIM
+```
+
+**Compile SHARED.** The text is copied into its bank by the program's bootstrap, and an embedded
+program has none — the same rule `GP.BANKED` works to. An embedded build is refused rather than
+compiled into a program that reads an empty bank.
+
+**A group name is not a variable.** No `$`, no `%`, no `(` — any of those is a syntax error rather
+than something quietly ignored. A name that no block declared is a syntax error at the line that
+used it, and so is a second block claiming a name already taken. An empty block is refused too: a
+group of no strings would make `GP.BSTRCOUNT` zero and every `GP.BSTR` on it read the next group's
+text.
+
+**There is no run-time bounds check.** The compiler knows every index it emits and nothing a
+program does can produce one out of range, so an index past the end of a group reads whatever
+follows it. That is the same bargain the array fast path makes.
+
+One bank of text a program, up to 8 KB of it, up to 128 groups. `GP.BSTR` is an ordinary GP
+keyword, so it pulls in the 1 KB GP block; the two block keywords do not, and neither does
+`GP.BSTRCOUNT`.
+
+Reading it from inside a `GP.BANKED` region works: the handler puts the caller's bank back before
+it returns.
+
 ---
 
 
-## 3.9 Inline assembly (2)
+## 3.11 Calling a routine in one statement
+
+##### 3.11 Calling a routine in one statement
+
+Three keywords. `GP.DEFPROC` names a `GOSUB` target and the variables its callers fill in, `GP.SUB`
+fills them and calls it in one statement, and `GP.FN` does the same from inside an expression and
+gives back a value.
+
+```basic
+    DB.A = 1 : GOSUB DB.SELECT
+
+    GP.SUB DBSELECT, 1
+```
+
+The two lines compile to the same p-code: an assignment per formal, then the call. A call site
+costs what the long spelling costs. A declaration on a line of its own costs one byte, the line
+marker every source line emits. Folded onto the routine's own first statement it costs nothing. A
+bare label is not a line, so folding onto one costs the byte anyway.
+
+`GP.DEFPROC` and `GP.SUB` have no machine code of their own, so a program whose only GP.BASIC
+keywords are those two stays GP OUT and carries none of the GP block. `GP.FN` has two runtime
+opcodes and brings the block in.
+
+###### The formals are ordinary variables
+
+A verb's formals and its `RETURNS` variable are plain variables in the program's one variable list.
+Every call writes the same ones, and the body can read and write them like any other. That is what
+makes the call cost nothing, and it is also the whole of the rule about nesting:
+
+- **A verb may appear inside its own argument list.** `GP.FN(AREA, 2, GP.FN(AREA, 3, 4))` is
+  correct, because a call list is evaluated in full before any of it is stored into a formal. The
+  inner call runs and finishes before the outer writes `A.W`. The values wait on the 4K frame
+  stack while the rest of the list is read, so neither the number of arguments nor the depth of
+  any one of them is a limit.
+- **A verb's body may not call the verb.** There is one set of formals, so a routine that calls
+  itself — directly, or round through another verb — writes over the arguments it is still using.
+  Nothing detects this: it compiles, both passes agree, and the answer is wrong.
+
+The refusals, all at compile time:
+
+```
+    GP.DEFPROC VERB IS NOT A PLAIN NAME     a $, % or subscript on the verb
+    GP.DEFPROC VERB ALREADY DECLARED        a second declaration of that verb
+    GP.DEFPROC FORMAL IS NOT A VARIABLE     an array, or something that is not a name
+    GP.DEFPROC RETURNS IS NOT A VARIABLE    an array element or a literal after RETURNS
+    TOO MANY GP.DEFPROC FORMALS             a thirteenth formal
+    GP.SUB BEFORE ITS GP.DEFPROC            the call sits above the declaration
+    GP.SUB DOES NOT MATCH ITS GP.DEFPROC    the wrong number of arguments
+    GP.FN BEFORE ITS GP.DEFPROC             the call sits above the declaration
+    GP.FN NEEDS A VERB DECLARED RETURNS     the verb has no result variable
+    ARGUMENTS DO NOT MATCH THE GP.DEFPROC   the wrong number of arguments
+    TYPE MISMATCH                           a string for a number, or a number for a string
+```
+
+
+*See also: 3.11.1 GP.DEFPROC -- declare a verb and its arguments, 3.11.2 GP.SUB -- call a verb, 3.11.3 GP.FN -- call a verb from inside an expression*
+
+## 3.11.1 GP.DEFPROC -- declare a verb and its arguments
+
+###### 3.11.1 `GP.DEFPROC` — declare a verb and its arguments
+
+```entry
+  Syntax    GP.DEFPROC verb [, formal ...] [RETURNS variable]
+  Does      Names the routine that follows it, the variables a caller
+            fills in, and the one its result comes back in. Emits no
+            code.
+  Kind      COMPOSITE. Records a position, a formal list and a result
+            variable at compile time.
+  Notes     The routine starts at the next statement, on the same
+            line or on the line below. GOSUB to its label still
+            works.
+            A verb is a bare name: no $, no %, no subscript. Verbs
+            are their own namespace, so a verb and a variable may
+            share a name. One verb costs one variable record.
+            A formal is a plain scalar variable, numeric or string.
+            Up to 12 of them.
+            RETURNS names a plain scalar variable too, and it is what
+            GP.FN reads after the call. Its type is the type of the
+            call. Without it the verb is GP.SUB-only.
+  WARNING   An array or an array element cannot be a formal, and it
+            cannot be the RETURNS variable either. A module whose
+            arguments are array elements takes the verb and no
+            formals, and its caller sets the array first.
+  Example
+```
+```basic
+            DB.SELECT:
+              GP.DEFPROC DBSELECT, DB.A : BANK DB.CODEBANK
+              GOSUB DB.SELECT.BODY
+              RETURN
+
+            AREA:
+              GP.DEFPROC AREA, A.W, A.H RETURNS A.R
+              A.R = A.W * A.H
+              RETURN
+```
+
+
+## 3.11.2 GP.SUB -- call a verb
+
+###### 3.11.2 `GP.SUB` — call a verb
+
+```entry
+  Syntax    GP.SUB verb [, expression ...]
+  Does      Assigns each expression to the matching formal, in order,
+            then calls the routine.
+  Kind      COMPOSITE. Expands to an assignment per formal and a
+            GOSUB.
+  Notes     The count and the types must match the declaration.
+            A call into a GP.BANKED region works, and so does a call
+            out of one. The address is corrected in both directions.
+  WARNING   The call must sit below its GP.DEFPROC. It carries an
+            address and not a line number, so a forward call is
+            refused rather than compiled.
+  Example
+```
+```basic
+            GP.SUB DBSELECT, 1
+            GP.SUB DBFIND, PRICE, "ACME", TRUE
+            GP.SUB DBWRITE
+```
+
+
+## 3.11.3 GP.FN -- call a verb from inside an expression
+
+###### 3.11.3 `GP.FN` — call a verb from inside an expression
+
+```entry
+  Syntax    GP.FN(verb [, expression ...])
+  Does      Assigns each expression to the matching formal, calls the
+            routine, and gives back the variable the declaration
+            named after RETURNS.
+  Kind      FUNCTION. Two runtime opcodes bracket the call.
+  Notes     The verb must be declared RETURNS. Its type is the type
+            of the term, so a verb returning a string is a string
+            term and concatenates.
+            The body may be as long as it likes and may print, read
+            files, open blocks and call other verbs. The caller's
+            half-built expression and its string temporaries are
+            carried across it.
+            Costs 5 bytes of p-code at the call site against GP.SUB's
+            3, plus the read of the RETURNS variable that the long
+            spelling pays anyway, plus 2 bytes for each argument
+            after the first -- an argument waits on the frame stack
+            until the call, so the number of formals is not a limit.
+  WARNING   The call must sit below its GP.DEFPROC, as GP.SUB's does.
+            The body must not call its own verb: there is one set of
+            formals and it would write over the arguments in use.
+            An argument may be as deep an expression as any other,
+            and however many there are only one of them is on the
+            evaluation stack at a time.
+  Example
+```
+```basic
+            PRINT "AREA "; GP.FN(AREA, 3, 4)
+            T = A + GP.FN(AREA, 3, 4) * 2
+            PRINT "X" + GP.FN(TAG, "AB") + "Y"
+            PRINT GP.FN(AREA, 2, GP.FN(AREA, 3, 4))
+```
+
+---
 
 
 ---
@@ -1049,8 +1332,11 @@ The readable name costs no variable and no lookup.
 
 `THEME.CLR` is `DIM`med by the module. Do not `DIM` it in your own program.
 
+Formatting a NUMBER into a column is `STRUSING.INC.BL` (§4.10), a separate
+module: it needs no `#SYMFILE` and neither module depends on the other.
 
-*See also: 4.1 THEME.INC.BL -- named colour roles*
+
+*See also: 4.10 STRUSING.INC.BL -- a number to a template, 4.1 THEME.INC.BL -- named colour roles*
 
 ## 4.2 STRINGS.INC.BL -- string helpers
 
@@ -1064,9 +1350,25 @@ The readable name costs no variable and no lookup.
 | `STR.SPLIT` | `STR.STR$` `STR.DELIM$` `STR.MAX` | `STR.N`, `STR.FIELD$(1..N)` |
 | `STR.REPLACE` | `STR.STR$` `STR.FIND$` `STR.REPL$` | `STR.STR$`, every occurrence replaced |
 | `STR.PET2SCR` | `STR.PET` | `STR.SCR` |
+| `STR.SPLICE` | `STR.STR$` `STR.AT` `STR.CUT` `STR.SUB$` | `STR.STR$`, edited at that position |
+| `STR.TRIM` | `STR.PTR` | *(the string itself)*, spaces off both ends |
+| `STR.LTRIM` | same | spaces off the **leading** end |
+| `STR.RTRIM` | same | spaces off the **trailing** end |
 
+**The module needs a `#SYMFILE`, and so does every program that includes it**, before the
+`#INCLUDE`s and named after the source PRG. The three trims are `GP.ASM` and reach BASIC's
+variables through `{VAR}`; without a symbol file the compile stops with `NO SYMBOL FILE FOR {}`.
+This is new — the module was pure BASIC until the trims moved here out of `STRCASE.INC.BL`.
+
+**The two halves take their argument differently, and one question decides which:** does the
+routine GROW the string. The pads and `SPLICE` do, so they are BASIC — they take the string by
+value in `STR.STR$` and hand it back there, and an assignment reallocates for free. The trims only
+ever shrink, so they are assembly — they take its ADDRESS in `STR.PTR` and rewrite the block where
+it lies, which is the only way a `GOSUB` can edit a caller's string without two allocations and two
+copies a call. Never pass a literal to those: `GP.STRPTR("hello")` is an address inside the
+p-code.
 The three pad routines leave a string that is already at or past the width unchanged. They pad and
-never truncate; use `STRCASE.RTRIM` (§4.8) to shorten.
+never truncate; use `STR.RTRIM` to shorten.
 
 `SPLIT` reads `STR.STR$` without modifying it. `STR.MAX` of 0 means 10. Empty fields are preserved:
 `"A,,C"` is three fields and `"A,"` is two. Splitting an empty string gives one empty field, never
@@ -1091,10 +1393,35 @@ checked: a longer replacement can push the result past 255 characters.
 `PET2SCR` converts a PETSCII code to the screen code the tile map holds, for `TILE`, `TDATA` and
 `VPOKE`. `GP.PRINTAT` and `GP.FILL` do this internally.
 
-Examples: [`SPLITT.EXP.BL`](SPLITT.EXP.BL)
+The three trims are three entry labels sharing one blob, so there is no mode to forget to set. A
+zero-length string and an all-spaces string are not special cases: the walk counts down and
+reaching zero is the answer.
+
+`SPLICE` edits by POSITION where `REPLACE` edits by content: it replaces `STR.CUT` characters at
+`STR.AT` with `STR.SUB$`. One routine covers all three of insert, overwrite and delete, because
+they are the same operation with a different count — `STR.CUT` of 0 inserts, `LEN(STR.SUB$)`
+overwrites, and an empty `STR.SUB$` deletes. `STR.AT` is 1-based, matching `GP.INSTR`.
+
+Past the end appends and below 1 clamps to 1, both falling out of `LEFT$` and `MID$` rather than
+being tested for; a cut running past the end takes the rest of the string. It is not length
+checked, like `REPLACE` and the pads. `SPLICE` clamps `STR.AT` and `STR.CUT` in place, so read them
+back rather than assuming what you set survived the call.
+
+It was written in `GP.ASM` first and rewritten in BASIC, which is worth knowing because the reason
+generalises: the assembly could overwrite and delete but never insert, because in-place work cannot
+grow a string, and it cost about 280 bytes of p-code where the one BASIC line costs about 40.
+
+Examples: [`SPLITT.EXP.BL`](SPLITT.EXP.BL), [`STRINGS.EXP.BL`](STRINGS.EXP.BL). Regression test:
+[`STRTST.EXP.BL`](STRTST.EXP.BL), thirty-three cases — the trim edges, every splice mode, both
+clamps, appending past the end, splicing an empty string, growing a 200-character string past the
+block it was born with, and guard strings either side to catch an off-by-one write into the
+neighbouring block.
 
 
-*See also: 4.8 STRCASE.INC.BL -- case and trim, in place, 4.2 STRINGS.INC.BL -- string helpers*
+## 4.2 STRINGS.INC.BL -- string helpers (2)
+
+
+*See also: 4.2 STRINGS.INC.BL -- string helpers, 4.8 STRCASE.INC.BL -- case, in place*
 
 ## 4.3 APPSYS.INC.BL -- start politely, leave it as you found it
 
@@ -1104,12 +1431,11 @@ Examples: [`SPLITT.EXP.BL`](SPLITT.EXP.BL)
 |---|---|---|
 | `APPSYS.STARTUP` | — | `APPSYS.MODE` `APPSYS.COLS` `APPSYS.ROWS` `APPSYS.COLOUR` |
 | `APPSYS.RESTORE` | those | screen mode and colour put back |
-| `APPSYS.PANEL.SAVE` | `APPSYS.FILE$` `.BANK` `.X` `.Y` `.W` `.H` [`.DEV`] | a file |
-| `APPSYS.PANEL.LOAD` | `APPSYS.FILE$` `.BANK` | back where it came from |
-| `APPSYS.PANEL.PUT` | `APPSYS.FILE$` `.BANK` `.X` `.Y` | pasted somewhere else |
 | `APPSYS.ISEMU` | — | `APPSYS.IS.EMULATOR` — -1 under x16emu, 0 otherwise |
 
 ```basic
+A screen rectangle through a file is `STASH.FILE.SAVE` / `.LOAD` / `.PUT` in `STASHFILE.INC.BL`.
+
 GOSUB APPSYS.STARTUP
 ' ... the application, laid out with APPSYS.COLS / APPSYS.ROWS ...
 GOSUB APPSYS.RESTORE : END
@@ -1442,9 +1768,9 @@ array in order with a string duplicated.
 
 *See also: 4.7 SORT.INC.BL -- shell sort a string array*
 
-## 4.8 STRCASE.INC.BL -- case and trim, in place
+## 4.8 STRCASE.INC.BL -- case, in place
 
-##### 4.8 `STRCASE.INC.BL` — case and trim, in place
+##### 4.8 `STRCASE.INC.BL` — case, in place
 
 | Routine | in | out |
 |---|---|---|
@@ -1455,7 +1781,7 @@ array in order with a string duplicated.
 #INCLUDE "STRCASE.INC.BL"
 
 STRCASE.PTR = GP.STRPTR(LINE$)
-STRCASE.MODE = STRCASE.RTRIM
+STRCASE.MODE = STRCASE.UPPER
 GOSUB STRCASE.GO
 ```
 
@@ -1463,14 +1789,16 @@ GOSUB STRCASE.GO
 |---|---|
 | `STRCASE.UPPER` | a–z → A–Z, everything else untouched |
 | `STRCASE.LOWER` | A–Z → a–z, everything else untouched |
-| `STRCASE.TRIM` | spaces off **both** ends |
-| `STRCASE.LTRIM` | spaces off the **leading** end |
-| `STRCASE.RTRIM` | spaces off the **trailing** end |
 
 One blob, with the mode tested once at entry rather than inside the loop, where the byte count is
 the whole cost.
 
 The argument is an address because a BASL subroutine cannot be passed a variable. Copying the
+**`TRIM`, `LTRIM` and `RTRIM` were here** and are `STR.TRIM` / `STR.LTRIM` / `STR.RTRIM` in
+`STRINGS.INC.BL` (§4.2) now. They are string editing rather than case work, and every other
+string routine already lived in that one module. A program that only trims does not need this file
+at all; one that only folds case saves 113 bytes of p-code by the move.
+
 caller's string in and back out would be two allocations and two copies per call — the heap traffic
 this module exists to avoid. `GP.STRPTR` gives the block and the assembly rewrites it in place.
 
@@ -1486,14 +1814,95 @@ There is no pad routine here. Padding grows a string, and nothing working on the
 grow one past the capacity it was created with. Use `STR.PADR` (§4.2).
 
 Example: [`STRINGS.EXP.BL`](STRINGS.EXP.BL). Regression test:
-[`STRCTST.EXP.BL`](STRCTST.EXP.BL), twenty cases — empty, all spaces, a single space, one character,
-a single leading space (the boundary in the slide), 200 characters, and guard strings either side to
-catch an off-by-one write into the neighbouring block.
+[`STRCTST.EXP.BL`](STRCTST.EXP.BL), eight cases — empty, one character, 200 characters, and guard
+strings either side to catch an off-by-one write into the neighbouring block. The trim cases moved
+with the trims, to [`STRTST.EXP.BL`](STRTST.EXP.BL).
 
 ---
 
 
-*See also: 4.2 STRINGS.INC.BL -- string helpers, 4.8 STRCASE.INC.BL -- case and trim, in place*
+*See also: 4.2 STRINGS.INC.BL -- string helpers, 4.8 STRCASE.INC.BL -- case, in place*
+
+## 4.10 STRUSING.INC.BL -- a number to a template
+
+##### 4.10 `STRUSING.INC.BL` — a number to a template
+
+| Routine | in | out |
+|---|---|---|
+| `STR.USING` | `STR.USING.NUM` `STR.USING.MASK$` | `STR.USING.STR$`, a field |
+| `STR.USING.FIX` | `STR.USING.NUM` `STR.USING.DP` | `STR.USING.STR$`, digits only |
+
+```basic
+#INCLUDE "STRUSING.INC.BL"
+
+STR.USING.NUM = 1234.5 : STR.USING.MASK$ = "#,##0.00"
+GOSUB STR.USING
+PRINT STR.USING.STR$                    ' 1,234.50
+```
+
+Pure BASIC. It needs no `#SYMFILE` and depends on no other module, so a program can take it
+without taking `STRINGS.INC.BL` (§4.2) — and the other way round.
+
+| In the mask | Means |
+|---|---|
+| `#` | a digit position, **space** if the number does not reach it |
+| `0` | a digit position, **zero** if the number does not reach it |
+| `.` | the decimal point everything aligns on |
+| `,` | anywhere in the mask, groups the integer part in threes |
+| `+` | first character only: a sign column, `+` or `-` |
+| `-` | first character only: a sign column, `-` or a space |
+
+`PRINT USING`'s mask, from BASIC 7.0, less the four characters that earn nothing here: `$`
+floating currency, a trailing sign, `^^^^` exponential, and `=` / `>` — those last two justify a
+**string**, which is `STR.PADC` and `STR.PADL` (§4.2).
+
+**The result is exactly `LEN(STR.USING.MASK$)` characters, right justified**, so a column of them
+lines up on the point. Everything after the point prints, so `#` and `0` do not differ there. A
+point with no digit positions after it is ignored.
+
+```
+"###0.00"    12.5    ->  "  12.50"        "#,##0.00"   1234.5  ->  "1,234.50"
+"0000.00"    12.5    ->  "0012.50"        "+##0.00"      -1.5  ->  "-  1.50"
+"##000"        42    ->  "  042"          "##0"         12345  ->  "***"
+```
+
+**Too wide fills the whole field with `*`.** That is deliberate and visible; overflowing the width
+instead would push the rest of the row along and misalign every column after it. A negative value
+with **no** sign column spends one digit position on its minus, and stars when there is none to
+spend — `"##0"` holds `-12` but not `-123`.
+
+**Rounding is half away from zero**, done on the absolute value before the sign goes back on.
+`INT` alone floors toward minus infinity, which rounds `-1.5` and `1.5` in opposite directions.
+`-0.004` to two places is `"0.00"`, not `"-0.00"`: a signed zero in a column reads as a real
+negative.
+
+**WARNING: the value must scale to under 1,000,000,000.** The digits are built by multiplying up
+by `10 ^ DP` and rounding, and `STR$` turns over to E notation at 1e9 — so two decimal places
+reach `9,999,999.99` and five reach `9,999.99999`. Past that the field fills with `*` rather than
+printing something wrong.
+
+`STR.USING.FIX` is the same digits with no field over them: `STR.USING.NUM` to `STR.USING.DP`
+places, sign attached, no leading space. Right justify it with `STR.PADL` if you want a column.
+
+**The digits do not come out of `STR$`'s fraction, and cannot.** `STR$` trims trailing zeros, so
+`12.30` comes back as `"12.3"`; it drops the leading zero of a pure fraction, so a half is `" .5"`;
+and it takes *significant digits*, never decimal places — `FloatToString` records that a
+fixed-decimal mode was tried and printed `12345678.9` as `12345678.8984375`. So a scaled integer is
+the only exact route, and the 1e9 ceiling above is its price.
+
+Cost: **726 bytes** of p-code, of which `STR.USING.FIX` alone is **205**. Its own module rather
+than a routine in `STRINGS.INC.BL` for that reason — a program wanting `STR.PADL` and a split
+should not carry a mask parser.
+
+Example: [`STRUSING.EXP.BL`](STRUSING.EXP.BL). Regression test:
+[`USINGT.EXP.BL`](USINGT.EXP.BL), thirty-nine cases — both entry points, every mask character,
+the rounding traps, the sign column and both overflows. Text and length are compared every time:
+the result is a field, so a right answer in the wrong number of columns still breaks the table.
+
+---
+
+
+*See also: 4.2 STRINGS.INC.BL -- string helpers, 4.10 STRUSING.INC.BL -- a number to a template*
 
 ## GUI.INC.BL -- four dialogs, in a box that puts the screen back.
 
@@ -1936,14 +2345,17 @@ after a change.
 |---|---|---|
 | `GP.` | `GPB.INC.BL` | **keywords, not variables** — see §2, this one is different |
 | `STR.` | `STRINGS.INC.BL` | string helpers |
+| `STR.USING.` | `STRUSING.INC.BL` | a number to a template, kept apart from the rest of `STR.` |
 | `THEME.` | `THEME.INC.BL` | colour roles |
 | `APPSYS.` | `APPSYS.INC.BL` | screen save/restore, panels to disk |
 | `LINEINPUT.` | `LINEINPUT.INC.BL` | entry fields |
+| `KB.` | `KB.INC.BL` | the keyboard drain |
 | `MENUVERT.` | `MENUVERT.INC.BL` | vertical menus |
 | `BMX.` | `BMX.INC.BL` | BMX bitmap loading |
 | `BMXK.` | `BMX.INC.BL` | its KERNAL/VERA constants, kept apart from its variables |
 | `FILE.` | `FILEIO.INC.BL` | the drive: status, exists, delete, rename, directories |
 | `FILE.DIR.` | `FILEDIR.INC.BL` | reading a directory, kept apart from the rest of `FILE.` |
+| `SV.` | `STASHVRAM.INC.BL` | the VRAM store. `SVGC.` is `STASHVRAMGC.INC.BL`'s one constant |
 
 Pick anything else for your own program. `AIRLIFT.`, `GAME.`, `MAP.` — a prefix costs nothing at
 runtime because BASLOAD crunches every identifier down to a short BASIC variable, so a long
@@ -1955,7 +2367,7 @@ free today; it is one library update away from not being.
 ---
 
 
-*See also: 2. Using it, 4.2 STRINGS.INC.BL -- string helpers, 4.1 THEME.INC.BL -- named colour roles, 4.3 APPSYS.INC.BL -- start politely, leave it as you found it, 4.4 LINEINPUT.INC.BL -- a positioned entry field, 4.6 MENUVERT.INC.BL -- a vertical menu, 4.5 BMX.INC.BL -- a BMX bitmap into VERA*
+*See also: 2. Using it, 4.2 STRINGS.INC.BL -- string helpers, 4.10 STRUSING.INC.BL -- a number to a template, 4.1 THEME.INC.BL -- named colour roles, 4.3 APPSYS.INC.BL -- start politely, leave it as you found it, 4.4 LINEINPUT.INC.BL -- a positioned entry field, 4.6 MENUVERT.INC.BL -- a vertical menu, 4.5 BMX.INC.BL -- a BMX bitmap into VERA*
 
 ## 2. GP.* is keywords, not variables -- and the difference bites
 
@@ -2015,15 +2427,44 @@ the X16 boots there but `SCREEN 0` is 40×30, and someone who prefers larger tex
 
 | | |
 |---|---|
-| in | `STR.STR$` — the string, in and out<br>`STR.WIDTH` — field width, the pad routines<br>`STR.DELIM$` `STR.MAX` — `SPLIT` (`MAX` 0 means 10)<br>`STR.FIND$` `STR.REPL$` — `REPLACE`<br>`STR.PET` — a PETSCII code, `PET2SCR` |
-| out | `STR.STR$` — padded, or replaced, in place<br>`STR.N` — how many fields `SPLIT` found, always ≥ 1<br>`STR.FIELD$(1..N)` — the fields themselves<br>`STR.SCR` — the screen code from `PET2SCR` |
-| internal | `STR.GAP` `STR.HALF` `STR.REST$` `STR.AT` `STR.LIM` `STR.OUT$` |
+| in | `STR.STR$` — the string, in and out<br>`STR.WIDTH` — field width, the pad routines<br>`STR.DELIM$` `STR.MAX` — `SPLIT` (`MAX` 0 means 10)<br>`STR.FIND$` `STR.REPL$` — `REPLACE`<br>`STR.PET` — a PETSCII code, `PET2SCR`<br>`STR.AT` `STR.CUT` `STR.SUB$` — `SPLICE`, and `AT`/`CUT` are CLAMPED in place<br>`STR.PTR` — `GP.STRPTR` of the string, the three trims |
+| out | `STR.STR$` — padded, or replaced, in place<br>`STR.N` — how many fields `SPLIT` found, always ≥ 1<br>`STR.FIELD$(1..N)` — the fields themselves<br>`STR.SCR` — the screen code from `PET2SCR`<br>`STR.STR$` — spliced, when it was `SPLICE` that was called |
+| internal | `STR.GAP` `STR.HALF` `STR.REST$` `STR.AT` `STR.LIM` `STR.OUT$`<br>`STR.ADDR%` `STR.OP%` `STR.KEEP%` — the `{VAR}` slots the trim blob reads |
 
 `STR.FIELD$` is the one array the library does not `DIM`. Left alone, GPC's implicit `DIM` gives
 0..10. For more, `DIM` it before the first call and set
 `STR.MAX` to match — `DIM`ming an array GPC has already auto-dimensioned is an error, so it is
 one or the other. This is the opposite of `THEME.CLR`, which the module owns outright; the two are
 worth keeping straight.
+
+##### `STRUSING.INC.BL`
+
+| | |
+|---|---|
+| in | `STR.USING.NUM` — the value, both routines<br>`STR.USING.MASK$` — the template, `STR.USING`<br>`STR.USING.DP` — decimal places, `STR.USING.FIX` |
+| out | `STR.USING.STR$` — the result: a field from `STR.USING`, digits from `STR.USING.FIX`<br>`STR.USING.OVR` — −1 when the value scaled past 1e9 and the digits are unusable<br>`STR.USING.SGN` — −1 when the ROUNDED value is negative |
+| internal | `STR.USING.INT$` `STR.USING.FRC$` `STR.USING.SIGN$` `STR.USING.OUT$` `STR.USING.C$`<br>`STR.USING.IW` `STR.USING.ZW` `STR.USING.Z` `STR.USING.W` `STR.USING.F`<br>`STR.USING.GRP` `STR.USING.PT` `STR.USING.I` `STR.USING.V` |
+
+**`STR.USING.DP` is an output of `STR.USING` and an input to `STR.USING.FIX`.** The mask carries
+the decimal count, so `STR.USING` overwrites whatever was there. A program alternating the two
+routines must set `STR.USING.DP` again before every `FIX`.
+
+`STR.USING.INT$` and `STR.USING.FRC$` survive a call and are the two halves of the digits, without
+sign, point or field. They are listed internal because their width is the routine's business, not
+the caller's — read `STR.USING.STR$`.
+
+The prefix is `STR.USING.`, a sub-prefix of `STRINGS.INC.BL`'s `STR.`, on the same footing as
+`FILE.DIR.` inside `FILE.`. Nothing here is written by `STRINGS.INC.BL` and nothing there is
+written by this module, so either can be included alone.
+
+##### `KB.INC.BL`
+
+| | |
+|---|---|
+| out | — |
+| internal | `KB.K$` |
+
+One routine, `KB.CLEARKB`, and one variable it drains into. Nothing else is in the prefix.
 
 ##### `LINEINPUT.INC.BL`
 
@@ -2078,11 +2519,16 @@ Needs a `#SYMFILE` — `FILE.TOPET` is a `GP.ASM` blob.
 
 Needs `FILEIO.INC.BL`, and a `#SYMFILE` — it is two `GP.ASM` blobs.
 
+**It executes no `BANK` statement**, which is what lets it live in a `GP.BANKED` region: the two
+blobs take the data bank at entry and put the caller's back at every exit, so no BASIC line here
+ever runs with a foreign bank selected. `FILE.DIR.BNK%` carries the bank number to the assembly —
+`{FILE.DIR.BANK}` would read a float's mantissa, and `FILE.DIR.WAS%` is the blobs' save slot.
+
 | | |
 |---|---|
-| in | `FILE.DIR.BANK` — the bank to read into, or 0 for low RAM<br>`FILE.DIR.PTR` `FILE.DIR.CAP` — the low-RAM buffer, when `BANK` is 0<br>`FILE.DIR.PAT$` — a name pattern, or empty<br>`FILE.DIR.ONLY` — `FILE.DIR.ALL`, `.FILES` or `.DIRS` |
-| out | `FILE.DIR.GOT` — bytes read<br>`FILE.DIR.FULL` — the buffer filled before the listing ended<br>`FILE.DIR.MORE` — 1 while `NEXT` produced an entry<br>`FILE.NAME$` `FILE.BLOCKS` `FILE.TYPE$` — the entry itself |
-| internal | `FILE.DIR.AT` `FILE.DIR.ASK$` `FILE.DIR.ADDR%` `FILE.DIR.ROOM%` `FILE.DIR.OFF%` `FILE.DIR.BYTES%` `FILE.DIR.CNT%` `FILE.DIR.BLK%` `FILE.DIR.OK%` `FILE.DIR.SLOW%` `FILE.DIR.LFN%` `FILE.DIR.NAMEA%` `FILE.DIR.TYPEA%` |
+| in | `FILE.DIR.BANK` — the bank to read into, or 0 for low RAM<br>`FILE.DIR.PTR` `FILE.DIR.CAP` — the low-RAM buffer, when `BANK` is 0<br>`FILE.DIR.PATTERN$` — a name pattern, or empty<br>`FILE.DIR.ONLY` — `FILE.DIR.ALL`, `.FILES` or `.DIRS` |
+| out | `FILE.DIR.GOT` — bytes read<br>`FILE.DIR.FULL` — the buffer filled before the listing ended<br>`FILE.DIR.MORE` — −1 while `NEXT` produced an entry<br>`FILE.NAME$` `FILE.BLOCKS` `FILE.TYPE$` — the entry itself |
+| internal | `FILE.DIR.AT` `FILE.DIR.ASK$` `FILE.DIR.ADDR%` `FILE.DIR.ROOM%` `FILE.DIR.OFF%` `FILE.DIR.BYTES%` `FILE.DIR.CNT%` `FILE.DIR.BLK%` `FILE.DIR.OK%` `FILE.DIR.SLOW%` `FILE.DIR.LFN%` `FILE.DIR.NAMEA%` `FILE.DIR.TYPEA%` `FILE.DIR.WAS%` `FILE.DIR.BNK%` |
 | constants | `FILE.DIR.ALL` `FILE.DIR.FILES` `FILE.DIR.DIRS` `FILE.DIR.NAMEMAX` `FILE.DIR.BANKROOM` `FILE.DIR.BANKBASE` |
 
 `FILE.DIR.INIT` must run once before anything else: it sizes `FILE.NAME$` and `FILE.TYPE$` for the
@@ -2091,6 +2537,31 @@ assembly to write into, and creates every `{VAR}` slot. **Do not assign `FILE.NA
 
 `FILE.NAME$` is shared with `FILEIO` on purpose: the name a picker chose is the name `FILE.EXISTS`
 and `FILE.DELETE` want.
+
+##### `STASHVRAM.INC.BL`
+
+Needs `GPB.INC.BL`, and **no `#SYMFILE`** — there is no `GP.ASM` in it. The cells never leave
+VRAM: one data port reads, the other writes, and `memory_copy` moves between them without
+stepping either.
+
+**It executes no `BANK`**, so it can live in a `GP.BANKED` region — measured, `work/stashvram/SVB.BASL`.
+That is the difference from `STASH.INC.BL`, which cannot.
+
+| | |
+|---|---|
+| in | `SV.BASE` `SV.TOP` — the VRAM window in bytes. Default `$04000`/`$1AFFF`<br>`SV.MAX` — how many handles. **The caller `DIM`s `SV.PAGE%` and `SV.PAGES%` to it**<br>`SV.X` `SV.Y` `SV.W` `SV.H` — the rectangle, for `SV.SAVE`<br>`SV.MOVE` — non-zero restores at `SV.X` `SV.Y` rather than where it came from<br>`SV.ADDR` `SV.LEN` — low RAM address and count, for `SV.PUT` and `SV.GET`<br>`SV.HND` — the handle, for `RESTORE`, `GET` and `FREE` |
+| out | `SV.HND` — 1..`SV.MAX`, or 0 if it did not fit<br>`SV.OK` — −1 done, 0 refused<br>`SV.ERROR$` — why, when something is refused<br>`SV.MOVED` — `SV.COMPACT` only: how many blocks moved |
+| arrays | `SV.PAGE%()` `SV.PAGES%()` — the handle table, `DIM`med by the caller |
+| internal | `SV.READY` `SV.NEXT` `SV.BASEPG` `SV.TOPPG` `SV.I` `SV.PG` `SV.NP` `SV.N` `SV.BYTES` `SV.MAPW` `SV.MAPBASE` `SV.STRIDE` `SV.ROW` `SV.CELL` `SV.SRC` `SV.DST` `SV.VA` `SV.ADR` `SV.BNK` `SV.REST` `SV.MID` `SV.LO` `SV.MODE` `SV.RX` `SV.RY`<br>`SV.COMPACT` adds `SV.PICK` `SV.BEST` `SV.J` `SV.TO` `SV.GCS` `SV.GCD` `SV.LEFT` `SV.CH` |
+| constants | `SV.VLO` `SV.VMID` `SV.VHI` `SV.DATA` `SV.VCTRL` `SV.LCONFIG` `SV.LMAPBASE` `SV.PORTLO` `SV.PORTLO.B` `SV.PORTHI` `SV.MEMCOPY` `SV.UP` `SV.HEADER` `SVGC.CHUNK` |
+
+`SV.INIT` must run once before anything else, and the two arrays must be `DIM`med before it.
+
+**Blocks are whole 256-byte pages**, which is what lets a handle's address live in an ordinary
+`%`: a page number reaches 511 where a VRAM address is 17 bits and would not.
+
+**WARNING: `BMX.STASH` defaults to `$13000`, inside the default window.** A program using both
+must move one of them. There is one allocator and no collision check.
 
 ##### `MENUVERT.INC.BL`
 
@@ -2118,7 +2589,10 @@ you. `MENUVERT.HOTFIND` reads the first two and answers in `MENUVERT.HOTAT`.
 ## 3. The modules (3)
 
 
-*See also: 4.1 THEME.INC.BL -- named colour roles, 4.3 APPSYS.INC.BL -- start politely, leave it as you found it, 4.2 STRINGS.INC.BL -- string helpers, 4.4 LINEINPUT.INC.BL -- a positioned entry field, 4.5 BMX.INC.BL -- a BMX bitmap into VERA, 4.6 MENUVERT.INC.BL -- a vertical menu*
+## 3. The modules (4)
+
+
+*See also: 4.1 THEME.INC.BL -- named colour roles, 4.3 APPSYS.INC.BL -- start politely, leave it as you found it, 4.2 STRINGS.INC.BL -- string helpers, 4.10 STRUSING.INC.BL -- a number to a template, 4.4 LINEINPUT.INC.BL -- a positioned entry field, 4.5 BMX.INC.BL -- a BMX bitmap into VERA, STASH.INC.BL -- save a text rectangle, and put it back., 4.6 MENUVERT.INC.BL -- a vertical menu*
 
 ## 4. Labels are global too
 
@@ -2141,10 +2615,11 @@ callable names are `FILE.STATUS`, `EXISTS`, `DELETE`, `RENAME`, `COPY`, `MKDIR`,
 `.SKIPDISK`, `.FILL` and `.STEP` are not. `FILE.DIR.FILL` and `FILE.DIR.STEP` are the two
 assembly blobs and enter with no arguments set up at all.
 
-`STRINGS` has two of its own, both loop continuations rather than entry points:
-**`STR.SPLIT.NEXT`** and **`STR.REPLACE.NEXT`**. Enter either one directly and you resume a
-loop whose accumulators were never initialised. The callable names are `STR.PADR`, `PADL`,
-`PADC`, `SPLIT`, `REPLACE` and `PET2SCR`.
+`STRINGS` has three of its own. **`STR.SPLIT.NEXT`** and **`STR.REPLACE.NEXT`** are loop
+continuations rather than entry points: enter either directly and you resume a loop whose
+accumulators were never initialised. **`STR.TRIM.GO`** is the shared body of the three trims and
+runs with whatever `STR.OP%` last held. The callable names are `STR.PADR`, `PADL`, `PADC`,
+`SPLIT`, `REPLACE`, `PET2SCR`, `TRIM`, `LTRIM`, `RTRIM` and `SPLICE`.
 
 Each module also has a skip label it jumps over itself with — `THEME.SKIP`, `APPSYS.SKIP`,
 `STR.SKIP`, `BMX.MODULE.END`, `LINEINPUT.MODULE.END`, `MENUVERT.MODULE.END`. Those exist so an
@@ -2198,6 +2673,10 @@ ordinary variable and not a `#DEFINE`. Every VRAM address past `$FFFF` has the s
 *undotted* one does not: `POS`, `MB`, `ST`, `LEN` and `CHAR` cannot be variables at all. This is the
 main reason the library is dotted throughout.
 
+`RETURNS` joined that list on 08/09/26 -- it is `GP.DEFPROC`'s result clause and has a token
+of its own, so a bare `RETURNS` is no longer a name. `RETURN` is untouched, and so is anything
+dotted.
+
 One rule applies only outside BASL: BASLOAD gives 64 significant characters, the built-in BASIC
 gives two. Write the same code as a hand-typed `.bas` for the PC-side converter and
 `THEME.CLR` and `THEME.COUNT` become the same variable. That is a silent wrong answer — it cost two
@@ -2225,6 +2704,9 @@ Each of these has cost a debugging session at least once.
 | `SCREEN` after `BMX.PAINT` | reloads the default palette and throws the image's colours away | set the mode first |
 | `STR.FIELD$` wanted bigger | auto-`DIM`ed at 0..10 on first use, and you cannot `DIM` it after | `DIM` it **before** the first call, set `STR.MAX` |
 | `#DEFINE X 129536` | `#DEFINE` takes an INT16 — `ERROR: INVALID PARAMETER` | an ordinary variable |
+| `GP.SUB` above its `GP.DEFPROC` | the call carries an address, not a line number — `GP.SUB BEFORE ITS GP.DEFPROC` | declare the routine above every caller |
+| an array element as a `GP.DEFPROC` formal | `GP.DEFPROC FORMAL IS NOT A VARIABLE` | plain scalar formals, and set the array before the call |
+| a `GP.DEFPROC` body calling its own verb | one set of formals, so it writes over the arguments in use — wrong answer, no error | recursion needs its own saved copies, or a different shape |
 | a variable called `LEN`, `ST`, `POS`, `MB` or `CHAR` | the name is a reserved word on its own | dot it — BASLOAD matches the whole identifier, so `LINEINPUT.LEN` works |
 
 ---

@@ -1,0 +1,585 @@
+#SAVEAS "@:XBASE.PRG"
+#SYMFILE "@:XBASE.SYM"
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "BANKMGR.INC.BL"
+#INCLUDE "APPSYS.INC.BL"
+#INCLUDE "KB.INC.BL"
+#INCLUDE "STRINGS.INC.BL"
+#INCLUDE "STASH.INC.BL"
+#INCLUDE "LIBBANK.INC.BL"
+#INCLUDE "DBFILE.INC.BL"
+#INCLUDE "DB.INC.BL"
+#INCLUDE "DBFORM.INC.BL"
+
+## ---- THE GUI RUNS FROM A RAM BANK. LIBBANK.INC.BL above is the low memory
+## ---- front door: eighteen shims that select LIB.CODEBANK and call the body
+## ---- at $A000. Everything reaching the screen through a dialog, a bar or a
+## ---- dropdown is in here; the record keeper is not, and step 6 of PLAN.md
+## ---- section 9 puts that in a bank of its own.
+## ----
+## ---- ALL SIX MODULES GO IN, even the two nothing here calls. LIBBANK shims
+## ---- every entry point and BASLOAD resolves every label in a file it reads,
+## ---- so leaving GUI2 out stops the build with LABEL NOT FOUND.
+## ----
+## ---- WHAT STAYS IN LOW MEMORY, and why. STASH holds the STASH statement and
+## ---- the compiler refuses that inside a region, so GUI.OPEN reaches it by an
+## ---- ordinary GOSUB downwards -- which works, because low memory does not
+## ---- care which bank is selected. STRINGS stays because DB.JOIN calls it on
+## ---- every record and a region cannot call another region. DBFORM stays
+## ---- because it calls LINEINPUT, which is now in this one.
+## ----
+## ---- THE GOTO OVER THE REGION IS NOT OPTIONAL. Falling in through the bridge
+## ---- GP.BANKED leaves works at program start and stops working the day
+## ---- anything selects another bank first.
+GOTO XB.LIBEND
+GP.BANKED LIB.CODEBANK
+#INCLUDE "THEME.INC.BL"
+#INCLUDE "MENUVERT.INC.BL"
+#INCLUDE "MENUBAR.INC.BL"
+#INCLUDE "LINEINPUT.INC.BL"
+#INCLUDE "GUI.INC.BL"
+#INCLUDE "GUI2.INC.BL"
+GP.ENDBANKED
+XB.LIBEND:
+
+## ============================================================================
+## XBASE.BASL -- a dBase II / XBase record keeper for the X16.
+##
+## SKELETON. NOTHING HERE HAS BEEN COMPILED OR RUN. Every routine is written
+## out so the shape is visible; the ones marked below say so and do nothing.
+##
+## The design is in PLAN.md. The admin is Clipper's DBU: eight bar titles, each
+## dropping two to six items, and every item carrying an enable rule. DBU makes
+## each title a function key as well; that part is not copied, and ESC opens the
+## bar instead. The menu layer is XBMENUS.BASL, #INCLUDEd at the bottom like
+## the editor's ED-MENUS.BASL, so it shares this one global symbol table.
+##
+## The data lives on disk and one record is in memory at a time. Two areas, two
+## data channels, one command channel. The whole database is never loaded.
+##
+## THE GUI IS IN A BANK AND THE ENGINE IS NOT. The library modules that draw
+## -- THEME, MENUVERT, MENUBAR, LINEINPUT, GUI, GUI2 -- run from LIB.CODEBANK
+## behind LIBBANK.INC.BL's shims, which is the arrangement GPBMODS.BASL already
+## runs. DBFILE, DB and DBFORM are still low memory, deliberately: that is step
+## 2 and 3 of PLAN.md section 9, and DBBANK.INC.BL moves the engine into bank 5
+## at step 6. Banking a region that misbehaves is a silent hang with no line
+## number, so the engine goes last, after it works where it can be seen.
+##
+## BEFORE ANY OF THIS RUNS, four things are measured -- PLAN.md section 8. The
+## two that matter: whether a write in ",M" overwrites in place rather than
+## truncating, and what one seek plus one BINPUT# costs.
+##
+## Build:  copy GPC-BASIC/*.INC.BL from the root library and from XBASE/GPC-BASIC
+##         into testing/, then
+##           python source/gpc/build_basl.py XBASE.BASL XBASE.PRG
+##         and compile XBASE.PRG with GPC.BIN, SHARED.
+##
+## NO #AUTONUM. The directive sets the STEP between generated line numbers, and
+## the default step of 1 is the only one STRCASE.INC.BL survives.
+## ============================================================================
+
+## Screen rows. Row 0 is the title, 1 the bar, 2 a rule, and the view screen
+## runs from 3 down to the message line.
+#DEFINE XB.TITLEROW 0
+#DEFINE XB.VIEWROW 3
+#DEFINE XB.AREAH 8
+
+## The panel the one record form opens in.
+#DEFINE XB.FORMX 20
+#DEFINE XB.FORMY 4
+#DEFINE XB.FORMW 40
+
+## How many rows the table browse shows at once.
+#DEFINE XB.BROWSEROWS 16
+
+## The scratch bank GUI.OPEN stashes the cells a dialog covers in. NOT 4, NOT 5
+## and NOT 6: those are the GUI's own code, the engine's and the v2 index's, and
+## a dialog pointed at any of them writes the screen over their contents.
+#DEFINE XB.GUIBANK 8
+
+
+## ---------------------------------------------------------------- start up
+GOSUB APPSYS.STARTUP
+
+## BOTH BANKS ARE CLAIMED, NOT ALLOCATED, and that is not a style choice.
+## GP.BANKED takes a decimal constant the compiler reads while the object is
+## written, so the manager has to be TOLD which bank went rather than asked for
+## one. Skip either claim and a later BANKMGR.GET.FREE.BANK hands the number
+## out again -- the code bank to a dialog that writes screen cells over the
+## GUI's own code, or the scratch bank to something that overwrites what a
+## dialog is holding to put back.
+XB.BANKFAIL$ = ""
+GOSUB BANKMGR.INIT
+
+BANKMGR.SET.BANK = LIB.CODEBANK : GOSUB BANKMGR.CLAIM
+IF BANKMGR.OK = 0 THEN XB.BANKFAIL$ = "GUI CODE BANK IS ALREADY TAKEN"
+
+BANKMGR.SET.BANK = XB.GUIBANK : GOSUB BANKMGR.CLAIM
+IF BANKMGR.OK = 0 THEN XB.BANKFAIL$ = "GUI SCRATCH BANK IS ALREADY TAKEN"
+
+IF XB.BANKFAIL$ <> "" THEN GOTO XB.BANKSTOP
+
+## THEME.SELECT, not THEME.LOAD. The banked library renamed it: the low memory
+## label is LIBBANK's shim and the body it calls is THEME.SELECT.BODY.
+THEME.ID = 0
+GOSUB THEME.SELECT
+
+XB.MSGROW  = APPSYS.ROWS - 2 : XB.HINTROW = APPSYS.ROWS - 1
+XB.QUIT = 0
+
+GUI.BANK = XB.GUIBANK
+GOSUB KB.CLEARKB
+DBFILE.DEVICE = 8
+GOSUB DB.INIT : GOSUB XB.MENU.SETUP
+
+## The header's date field. There is no clock, so it is what the user last
+## said it was, and 0 until they do.
+DB.TODAY$ = "00000000"
+
+GOSUB XB.SCREEN
+GOSUB XB.VIEW.DRAW
+GOSUB XB.RENDER.MENUBAR
+
+
+## ------------------------------------------------------------- the key loop
+## The view screen. ESC opens the menu at File and the arrows walk the bar from
+## there, TAB changes area, the arrows skip a record.
+##
+## THE FUNCTION KEYS ARE GONE and so is the CTRL-C shortcut. DBU names its
+## eight titles F1 to F8 and this followed it until the keys were taken out;
+## the bar is reached the one way EDITOR.BASL reaches its own. Leaving is File
+## Exit and there is no second way to it.
+XB.MAIN:
+    GET XB.IN$
+    IF XB.IN$ = "" THEN GOTO XB.MAIN
+    XB.KEY = ASC(XB.IN$)
+
+    GP.SELECT XB.KEY
+        GP.CASE 27
+            XB.ACTIVE = 0
+            GOSUB XB.OPEN.MENUBAR
+        GP.CASE 9
+            GOSUB XB.CMD.AREA
+        GP.CASE 17
+            GOSUB XB.SKIP.NEXT
+        GP.CASE 145
+            GOSUB XB.SKIP.PREV
+    GP.ENDSEL
+
+    IF XB.QUIT THEN GOTO XB.LEAVE
+    GOTO XB.MAIN
+
+XB.LEAVE:
+    GOSUB DB.CLOSEALL
+    GOSUB APPSYS.RESTORE
+    PRINT "XBASE"
+    END
+
+## A bank the program needs by number was already handed out. There is no
+## screen up yet and no database open, so this leaves by the short way.
+XB.BANKSTOP:
+    GOSUB APPSYS.RESTORE
+    PRINT XB.BANKFAIL$
+    END
+
+
+## ------------------------------------------------------------- the screen
+## Drawn once. Everything after this repaints a part of it.
+XB.SCREEN:
+    GP.FILL 0, 0, APPSYS.COLS, APPSYS.ROWS, 32, THEME.CLR(THEME.PAGE)
+    GP.FILL 0, XB.TITLEROW, APPSYS.COLS, 1, 32, THEME.CLR(THEME.TITLE)
+    GP.PRINTAT 2, XB.TITLEROW, "XBASE -- X16 RECORD KEEPER", THEME.CLR(THEME.TITLE)
+    GP.PRINTAT 2, XB.HINTROW, "ESC MENU   TAB AREA   UP/DOWN SKIP   FILE EXIT TO LEAVE", THEME.CLR(THEME.DIMMED)
+    RETURN
+
+## The two areas, side by side, in DBU's spirit: what is open, how big it is,
+## and where the record pointer stands. The selected area is marked with ">".
+XB.VIEW.DRAW:
+    GP.FILL 0, XB.VIEWROW, APPSYS.COLS, XB.AREAH, 32, THEME.CLR(THEME.PAGE)
+    XB.SAVEA = DB.A
+    FOR DB.A = 0 TO DB.LASTA
+        XB.PX = 2 + DB.A * 39
+        GOSUB XB.AREA.PANEL
+    NEXT DB.A
+    DB.A = XB.SAVEA
+    GOSUB XB.STATUS
+    XB.DIRTY = 0
+    RETURN
+
+## One area's panel. DB.A names it, XB.PX is its left column.
+XB.AREA.PANEL:
+    GP.BOX XB.PX, XB.VIEWROW, 36, XB.AREAH - 1, 1, THEME.CLR(THEME.BORDER)
+    XB.MARK$ = " "
+    IF DB.A = XB.SAVEA THEN XB.MARK$ = ">"
+    GP.PRINTAT XB.PX + 2, XB.VIEWROW, XB.MARK$ + " AREA " + MID$(STR$(DB.A), 2) + " ", THEME.CLR(THEME.TITLE)
+
+    IF DB.ISOPEN(DB.A) = 0 THEN GP.PRINTAT XB.PX + 2, XB.VIEWROW + 2, "<empty>", THEME.CLR(THEME.DIMMED)
+    IF DB.ISOPEN(DB.A) = 0 THEN RETURN
+
+    GP.PRINTAT XB.PX + 2, XB.VIEWROW + 1, "FILE   " + DB.FILE$(DB.A), THEME.CLR(THEME.TEXT)
+    GP.PRINTAT XB.PX + 2, XB.VIEWROW + 2, "TITLE  " + DB.TITLE$(DB.A), THEME.CLR(THEME.TEXT)
+    GP.PRINTAT XB.PX + 2, XB.VIEWROW + 3, "FIELDS " + MID$(STR$(DB.NFLD(DB.A)), 2), THEME.CLR(THEME.TEXT)
+    GP.PRINTAT XB.PX + 2, XB.VIEWROW + 4, "STRIDE " + MID$(STR$(DB.STRIDE(DB.A)), 2), THEME.CLR(THEME.TEXT)
+    GP.PRINTAT XB.PX + 2, XB.VIEWROW + 5, "RECS   " + MID$(STR$(DB.COUNT(DB.A)), 2), THEME.CLR(THEME.TEXT)
+    RETURN
+
+## The status line. DBU keeps the position in view at all times and so does
+## this: the record number is one based for the user, which is why DB.DATA0
+## comes off it.
+XB.STATUS:
+    GP.FILL 0, XB.MSGROW, APPSYS.COLS, 1, 32, THEME.CLR(THEME.DIMMED)
+    XB.LINE$ = ""
+    FOR XB.I = 0 TO DB.LASTA
+        XB.NAME$ = "<empty>"
+        IF DB.ISOPEN(XB.I) THEN XB.NAME$ = DB.TITLE$(XB.I)
+        XB.MARK$ = " "
+        IF XB.I = DB.A THEN XB.MARK$ = ">"
+        STR.STR$ = XB.MARK$ + XB.NAME$
+        STR.WIDTH = 10
+        GOSUB STR.PADR
+        XB.LINE$ = XB.LINE$ + STR.STR$
+    NEXT XB.I
+    IF DB.ISOPEN(DB.A) THEN XB.LINE$ = XB.LINE$ + "  Rec " + MID$(STR$(DB.RECNO(DB.A) - DB.DATA0(DB.A) + 1), 2) + "/" + MID$(STR$(DB.COUNT(DB.A)), 2)
+    IF DB.DELETED THEN XB.LINE$ = XB.LINE$ + "  DEL"
+    GP.PRINTAT 1, XB.MSGROW, XB.LINE$, THEME.CLR(THEME.DIMMED)
+    RETURN
+
+## One line of news, in place of the status line until the next redraw.
+XB.SAY:
+    GP.FILL 0, XB.MSGROW, APPSYS.COLS, 1, 32, THEME.CLR(THEME.HILITE)
+    GP.PRINTAT 1, XB.MSGROW, XB.MSG$, THEME.CLR(THEME.HILITE)
+    RETURN
+
+
+## ------------------------------------------------------------------- ask
+## A one line prompt in a small box. LINEINPUT.GET does the typing; this only
+## puts a frame round it and takes it away again.
+##
+##   in   XB.PROMPT$, XB.ANSWER$, XB.ANSWERW
+##   out  XB.ANSWER$, XB.OK
+
+XB.ASK:
+    XB.AW = LEN(XB.PROMPT$) + XB.ANSWERW + 6
+    XB.AX = INT((APPSYS.COLS - XB.AW) / 2)
+    XB.AY = INT(APPSYS.ROWS / 2)
+    GP.BOX XB.AX, XB.AY, XB.AW, 3, 1, THEME.CLR(THEME.BORDER)
+    GP.FILL XB.AX + 1, XB.AY + 1, XB.AW - 2, 1, 32, THEME.CLR(THEME.TEXT)
+    GP.PRINTAT XB.AX + 2, XB.AY + 1, XB.PROMPT$, THEME.CLR(THEME.TEXT)
+    LINEINPUT.X = XB.AX + 3 + LEN(XB.PROMPT$)
+    LINEINPUT.Y = XB.AY + 1
+    LINEINPUT.LEN = XB.ANSWERW
+    LINEINPUT.ATTR = THEME.CLR(THEME.HILITE)
+    LINEINPUT.MASK = 0
+    LINEINPUT.ALLOW$ = XB.ALLOW$
+    LINEINPUT.TEXT$ = XB.ANSWER$
+    GOSUB LINEINPUT.GET
+    XB.ANSWER$ = LINEINPUT.TEXT$
+    XB.OK = -1
+    IF LINEINPUT.KEY = 27 THEN XB.OK = 0
+    IF LINEINPUT.KEY = 3 THEN XB.OK = 0
+    XB.ALLOW$ = ""
+    GOSUB XB.VIEW.DRAW
+    RETURN
+
+
+## ============================================================================
+## THE COMMANDS. One label per dropdown item, in menu order, because
+## XB.MENU.DISPATCH names them all in eight ON ... GOSUB lines and BASLOAD
+## resolves every one of them.
+##
+## The ones that say NOT WRITTEN are the ones v1 does not do. They are here and
+## not left out because a missing label stops the build with LABEL NOT FOUND.
+## ============================================================================
+
+## ---- File ----
+XB.CMD.OPENDB:
+    XB.PROMPT$ = "FILE"
+    XB.ANSWER$ = ""
+    XB.ANSWERW = 16
+    GOSUB XB.ASK
+    IF XB.OK = 0 THEN RETURN
+    IF XB.ANSWER$ = "" THEN RETURN
+    IF DB.ISOPEN(DB.A) THEN GOSUB DB.CLOSE
+    DB.FILE$(DB.A) = XB.ANSWER$
+    GOSUB DB.OPEN
+    IF DB.ERR <> 0 THEN XB.MSG$ = "CANNOT OPEN " + XB.ANSWER$ + " -- " + DBFILE.MSG$
+    IF DB.ERR <> 0 THEN GOSUB XB.SAY : RETURN
+    IF DB.FIXED THEN XB.MSG$ = "HEADER REPAIRED FROM THE FILE SIZE"
+    IF DB.FIXED THEN GOSUB XB.SAY : RETURN
+    GOSUB XB.VIEW.DRAW
+    RETURN
+
+## Opens an .NDX beside the database and makes it the controlling order. v2.
+XB.CMD.OPENIX:
+    XB.MSG$ = "INDEXES ARE V2 -- SEE PLAN.MD SECTION 9"
+    GOSUB XB.SAY
+    RETURN
+
+XB.CMD.CLOSEDB:
+    GOSUB DB.CLOSE : GOSUB XB.VIEW.DRAW
+    RETURN
+
+XB.CMD.QUIT:
+    GUI.TITLE$ = "EXIT"
+    GUI.MSG$ = "LEAVE XBASE?"
+    GUI.MSG2$ = "OPEN DATABASES ARE CLOSED AND THEIR HEADERS WRITTEN."
+    GUI.HINT$ = ""
+    GUI.OKCANCEL = 0
+    GOSUB GUI.YN
+    IF GUI.ANSWER THEN XB.QUIT = -1
+    IF XB.QUIT = 0 THEN GOSUB XB.VIEW.DRAW
+    RETURN
+
+## ---- Create ----
+## NOT WRITTEN. This is DBU's MODIFY STRUCTURE screen: a grid of name, type,
+## width and decimals that adds, deletes and reorders rows, then calls
+## DB.CREATE. DBUSTRU.PRG is 1,346 lines and does exactly this.
+##
+## MKFIX.BASL builds PARTS.DBF and SUPPLR.DBF in the meantime, from a schema
+## written out in BASIC, which is enough to get the engine tested.
+XB.CMD.CREATEDB:
+    XB.MSG$ = "CREATE IS NOT WRITTEN -- RUN MKFIX.PRG FOR THE FIXTURES"
+    GOSUB XB.SAY
+    RETURN
+
+XB.CMD.CREATEIX:
+    XB.MSG$ = "INDEXES ARE V2 -- SEE PLAN.MD SECTION 9"
+    GOSUB XB.SAY
+    RETURN
+
+## ---- Save ----
+## NOT WRITTEN. Writes the schema out as a readable text file, the way dBASE
+## LIST STRUCTURE does. One PRINT# per field off DB.NAME$(), DB.TYPE$(),
+## DB.WID%() and DB.DEC%(), so it is small; it needs a free channel, and
+## 12, 13 and 15 are all spoken for while a database is open.
+XB.CMD.SAVESTRU:
+    XB.MSG$ = "SAVE STRUCTURE IS NOT WRITTEN"
+    GOSUB XB.SAY
+    RETURN
+
+## ---- Browse ----
+## The table view: one record a row, the fields across. Read only in v1 --
+## editing in the grid is DBUVIEW.PRG's 3,270 lines and DBFORM does the job
+## one record at a time.
+##
+## IT RE-READS EVERY ROW ON EVERY SCROLL, exactly as GPC-HELP did before it was
+## measured. If that is too slow the answer is the same one: keep the rows in a
+## bank. Measure before deciding.
+XB.CMD.BROWSE:
+    XB.TOP = DB.RECNO(DB.A)
+XB.BROWSE.DRAW:
+    GP.FILL 0, XB.VIEWROW, APPSYS.COLS, XB.BROWSEROWS + 1, 32, THEME.CLR(THEME.TEXT)
+    XB.SAVEREC = DB.RECNO(DB.A)
+    XB.LAST = DB.DATA0(DB.A) + DB.COUNT(DB.A) - 1
+    FOR XB.I = 0 TO XB.BROWSEROWS - 1
+        XB.R = XB.TOP + XB.I
+        IF XB.R <= XB.LAST THEN GOSUB XB.BROWSE.ROW
+    NEXT XB.I
+    DB.RECNO(DB.A) = XB.SAVEREC
+    GOSUB DB.GOTO
+
+XB.BROWSE.KEY:
+    GET XB.IN$
+    IF XB.IN$ = "" THEN GOTO XB.BROWSE.KEY
+    XB.KEY = ASC(XB.IN$)
+    IF XB.KEY = 27 THEN GOSUB XB.VIEW.DRAW : RETURN
+    IF XB.KEY = 3 THEN GOSUB XB.VIEW.DRAW : RETURN
+    IF XB.KEY = 17 THEN XB.TOP = XB.TOP + 1
+    IF XB.KEY = 145 THEN XB.TOP = XB.TOP - 1
+    IF XB.TOP < DB.DATA0(DB.A) THEN XB.TOP = DB.DATA0(DB.A)
+    IF XB.TOP > XB.LAST THEN XB.TOP = XB.LAST
+    GOTO XB.BROWSE.DRAW
+
+## One row. The record is read, split and printed field by field, and the
+## column each field lands in is its own cached offset.
+XB.BROWSE.ROW:
+    DB.RECNO(DB.A) = XB.R
+    GOSUB DB.GOTO
+    XB.LINE$ = ""
+    IF DB.DELETED THEN XB.LINE$ = "*"
+    IF DB.DELETED = 0 THEN XB.LINE$ = " "
+    FOR XB.J = 0 TO DB.NFLD(DB.A) - 1
+        XB.LINE$ = XB.LINE$ + DB.FLD$(DB.A, XB.J) + " "
+    NEXT XB.J
+    GP.PRINTAT 1, XB.VIEWROW + XB.I, LEFT$(XB.LINE$, APPSYS.COLS - 2), THEME.CLR(THEME.TEXT)
+    RETURN
+
+## The one record form. DBFORM leaves the edited values in DB.FLD$() and says
+## nothing to disk; the write is here, so ESC really does cancel.
+XB.CMD.RECORD:
+    DBFORM.X = XB.FORMX
+    DBFORM.Y = XB.FORMY
+    DBFORM.W = XB.FORMW
+    GOSUB DBFORM.SHOW : GOSUB DBFORM.EDIT
+    IF DBFORM.OK THEN GOSUB DB.PUT
+    IF DBFORM.OK = 0 THEN GOSUB DB.GOTO
+    GOSUB XB.VIEW.DRAW
+    RETURN
+
+## ---- Utility ----
+## NOT WRITTEN. DBU's COPY writes a second database from the current one, with
+## the field list and the filter applied. Without either of those it is
+## DB.CREATE followed by a DB.NEW per record, which is worth writing only once
+## Set Fields exists.
+XB.CMD.COPY:
+    XB.MSG$ = "COPY IS NOT WRITTEN -- IT WANTS SET FIELDS FIRST"
+    GOSUB XB.SAY
+    RETURN
+
+## Append is DB.NEW and then the form, which is the whole of it.
+XB.CMD.APPEND:
+    GOSUB DB.NEW
+    GOSUB XB.CMD.RECORD
+    RETURN
+
+## NOT WRITTEN. dBASE REPLACE ALL: walk every record and put a value in one
+## field. It is a DB.TOP, a loop of DB.NEXT, an assignment and a DB.PUT, and
+## the only reason it is not here is that it wants a filter to be useful.
+XB.CMD.REPLACE:
+    XB.MSG$ = "REPLACE IS NOT WRITTEN"
+    GOSUB XB.SAY
+    RETURN
+
+XB.CMD.PACK:
+    GUI.TITLE$ = "PACK"
+    GUI.MSG$ = "REMOVE EVERY DELETED RECORD?"
+    GUI.MSG2$ = "THE FILE DOES NOT GET SHORTER."
+    GUI.HINT$ = ""
+    GUI.OKCANCEL = 0
+    GOSUB GUI.YN
+    IF GUI.ANSWER = 0 THEN GOSUB XB.VIEW.DRAW : RETURN
+    GOSUB DB.PACK
+    GOSUB XB.VIEW.DRAW
+    RETURN
+
+XB.CMD.ZAP:
+    GUI.TITLE$ = "ZAP"
+    GUI.MSG$ = "THROW AWAY EVERY RECORD IN " + DB.TITLE$(DB.A) + "?"
+    GUI.MSG2$ = "THE STRUCTURE STAYS. THIS CANNOT BE UNDONE."
+    GUI.HINT$ = ""
+    GUI.OKCANCEL = 0
+    GOSUB GUI.YN
+    IF GUI.ANSWER = 0 THEN GOSUB XB.VIEW.DRAW : RETURN
+    GOSUB DB.ZAP
+    GOSUB XB.VIEW.DRAW
+    RETURN
+
+## ---- Move ----
+XB.CMD.SEEK:
+    XB.MSG$ = "SEEK NEEDS THE INDEX -- IT IS V2"
+    GOSUB XB.SAY
+    RETURN
+
+XB.CMD.GOTO:
+    XB.PROMPT$ = "RECORD"
+    XB.ANSWER$ = ""
+    XB.ANSWERW = 6
+    XB.ALLOW$ = "0123456789"
+    GOSUB XB.ASK
+    IF XB.OK = 0 THEN RETURN
+    DB.RECNO(DB.A) = DB.DATA0(DB.A) + VAL(XB.ANSWER$) - 1
+    GOSUB DB.GOTO
+    GOSUB XB.VIEW.DRAW
+    RETURN
+
+## dBASE LOCATE: the full scan, on one field, from here forward. DB.FIND is
+## the whole of it, and it is the routine PLAN.md section 6 says a MACPTR blob
+## would speed up if a measurement asks for one.
+XB.CMD.LOCATE:
+    XB.PROMPT$ = "FIELD"
+    XB.ANSWER$ = ""
+    XB.ANSWERW = 10
+    GOSUB XB.ASK
+    IF XB.OK = 0 THEN RETURN
+    DB.KEY$ = XB.ANSWER$
+    GOSUB DB.FINDFLD
+    IF DB.F < 0 THEN XB.MSG$ = "NO FIELD CALLED " + XB.ANSWER$
+    IF DB.F < 0 THEN GOSUB XB.SAY : RETURN
+    XB.PROMPT$ = "FOR"
+    XB.ANSWER$ = ""
+    XB.ANSWERW = 20
+    GOSUB XB.ASK
+    IF XB.OK = 0 THEN RETURN
+    DB.KEY$ = XB.ANSWER$
+    DB.EXACT = 0
+    GOSUB DB.FIND
+    IF DB.OK = 0 THEN XB.MSG$ = "NOT FOUND"
+    IF DB.OK = 0 THEN GOSUB XB.SAY : RETURN
+    GOSUB XB.VIEW.DRAW
+    RETURN
+
+XB.CMD.SKIP:
+    XB.PROMPT$ = "SKIP"
+    XB.ANSWER$ = "1"
+    XB.ANSWERW = 5
+    XB.ALLOW$ = "0123456789-"
+    GOSUB XB.ASK
+    IF XB.OK = 0 THEN RETURN
+    XB.N = VAL(XB.ANSWER$)
+    IF XB.N > 0 THEN FOR XB.I = 1 TO XB.N : GOSUB DB.NEXT : NEXT XB.I
+    IF XB.N < 0 THEN FOR XB.I = 1 TO 0 - XB.N : GOSUB DB.PREV : NEXT XB.I
+    GOSUB XB.VIEW.DRAW
+    RETURN
+
+## The arrows on the view screen, which are Skip 1 without the prompt.
+XB.SKIP.NEXT:
+    IF DB.ISOPEN(DB.A) = 0 THEN RETURN
+    GOSUB DB.NEXT
+    GOSUB XB.STATUS
+    RETURN
+
+XB.SKIP.PREV:
+    IF DB.ISOPEN(DB.A) = 0 THEN RETURN
+    GOSUB DB.PREV
+    GOSUB XB.STATUS
+    RETURN
+
+## ---- Set ----
+## NOT WRITTEN, and PLAN.md section 7 says why it is not faked: a relation
+## without an index is a full child scan on every parent move. Until the index
+## lands, Move Locate in the other area is the honest version of it.
+XB.CMD.RELATION:
+    XB.MSG$ = "SET RELATION NEEDS THE INDEX -- IT IS V2"
+    GOSUB XB.SAY
+    RETURN
+
+## NOT WRITTEN. A filter is an expression, and an expression needs a parser.
+XB.CMD.FILTER:
+    XB.MSG$ = "SET FILTER IS NOT WRITTEN"
+    GOSUB XB.SAY
+    RETURN
+
+## NOT WRITTEN. Which fields Browse shows and in what order. It is a flag per
+## field plus a column list, and Browse and Copy both read it.
+XB.CMD.FIELDS:
+    XB.MSG$ = "SET FIELDS IS NOT WRITTEN"
+    GOSUB XB.SAY
+    RETURN
+
+XB.CMD.AREA:
+    DB.A = DB.A + 1
+    IF DB.A > DB.LASTA THEN DB.A = 0
+    GOSUB DB.SELECT
+    GOSUB XB.VIEW.DRAW
+    RETURN
+
+
+## ---- Help ----
+XB.CMD.ABOUT:
+    GUI.TITLE$ = "XBASE"
+    GUI.MSG$ = "A DBASE II RECORD KEEPER FOR THE X16."
+    GUI.MSG2$ = "TWO AREAS, DATA ON DISK, ONE RECORD IN MEMORY."
+    GUI.HINT$ = ""
+    GOSUB GUI.SAY : GOSUB XB.VIEW.DRAW
+    RETURN
+
+XB.CMD.KEYS:
+    GUI.TITLE$ = "KEYS"
+    GUI.MSG$ = "ESC OPENS THE MENU. LEFT AND RIGHT WALK THE BAR."
+    GUI.MSG2$ = "TAB CHANGES AREA. UP AND DOWN SKIP A RECORD. FILE EXIT LEAVES."
+    GUI.HINT$ = ""
+    GOSUB GUI.SAY : GOSUB XB.VIEW.DRAW
+    RETURN
+
+
+#INCLUDE "XBMENUS.BASL"

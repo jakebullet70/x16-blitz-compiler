@@ -29,15 +29,15 @@ Eight bar items, one dropdown each. The shape is itself a test: `MENUBAR` drives
 
 | bar item | dropdown | modules exercised |
 |---|---|---|
-| `DIALOG` | SAY · YN · MENU · TEXT · LISTBOX single · LISTBOX multi · OPEN/CLOSE panel · box styles 0-5 | `GUI`, `GUI2` |
+| `DIALOG` | SAY · YN · MENU · TEXT · LISTBOX single · LISTBOX multi · OPEN/CLOSE panel · box styles 0-3 · GUI.SHADOW | `GUI`, `GUI2` |
 | `LISTS` | MENUVERT.RUN · .DRAW · .ROW · MENUBAR.RUN · .DRAW · .ITEM · hotkeys · NOWRAP · MUSTSEL · KEEPMARK · GAMEPAD | `MENUVERT`, `MENUBAR` |
 | `INPUT` | LINEINPUT.GET · .ASK · three-field form · length and insert limits | `LINEINPUT` |
 | `SCREEN` | GP.BOX styles · GP.FILL · GP.PRINTAT · GP.CHAR · STASH save/restore · STASH move · STASHFILE save/load/put · STASHVRAM save/stamp | `STASH`, `STASHFILE`, `STASHVRAM`, `GPB` |
 | `STRINGS` | STR.PADR/PADL/PADC · STR.SPLIT · STR.REPLACE · STRCASE up/down · STR.USING · STR.USING.FIX | `STRINGS`, `STRCASE`, `STRUSING` |
-| `DATA` | SORT.RUN on a fixture · array set · BMX.SHOW · BANKMGR alloc/free/claim | `SORT`, `BMX`, `BANKMGR` |
+| `DATA` | SORT.RUN on a fixture · GP.ARRPTR and the array header | `SORT` |
 | `THEME` | the five themes live · THEME.NEXT · THEME.SET · THEME.HI · colour readout | `THEME` |
 | `ABOUT` | FREE, p-code size, build number, per-module byte table, the bank map | `BANKMGR` |
-| `FILES` | DIR open/pattern/directories · STATUS · EXISTS · CURDIR and UP · SAVEARRAY and LOADARRAY · RENAME and DELETE · MKDIR and CHDIR | `FILEIO`, `FILEDIR` |
+| `FILES` | DIR open/pattern/directories · STATUS · EXISTS · SAVEARRAY and LOADARRAY · RENAME and DELETE · MKDIR and CHDIR, which walks with CURDIR and UP | `FILEIO`, `FILEDIR` |
 
 Bar and dropdown join through `MENUBAR.DOWNEXIT` (DOWN ends the bar so the caller opens the panel)
 and `MENUVERT.KEYEXIT` (LEFT and RIGHT end the dropdown so the caller walks the bar).

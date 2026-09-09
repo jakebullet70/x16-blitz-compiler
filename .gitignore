@@ -289,3 +289,9 @@ source/*/build/rtimage.lbl
 # (the two-byte GETKEY probe), work/lineinput/KBTST.BASL (the undrained kbdbuf_put case),
 # work/rename/LINTST.BASL and work/lineinput/LINTST2.BASL (the same six cases banked and unbanked).
 /work/
+
+# tmp-test/ is another throwaway emulator drive, made to build SVARS.BASL away from
+# testing/: its own GPC.BIN, BASLOAD-GPC.BIN, runtimes and a handful of T*.BASL probes.
+# Same class as /work above -- regenerable, all binaries, and one "git add -A" from being
+# committed. The masters it was built from (SVARS.BASL, SVARS-TEST.BASL) ARE tracked.
+tmp-test/

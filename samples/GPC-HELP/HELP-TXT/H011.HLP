@@ -1,78 +1,39 @@
-@3.2 Multi-way branch
+@3.1 Loops
 .
-=3.2 MULTI-WAY BRANCH
+=3.1 LOOPS
 .
 =SYNTAX
 .
-:GP.SELECT <var>
-:GP.CASE <expr> [,<expr> ...]
+:GP.DO [count]
 :    ...
-:GP.OTHER
-:    ...
-:GP.ENDSEL
+:GP.LOOP
 .
 =WHAT IT COSTS
 .
-.  ASM: GP.SELECT GP.CASE GP.OTHER GP.ENDSEL
+.  ASM: GP.DO GP.LOOP GP.EXITDO
 .    ASM -- a keyword, run by machine code in the GP runtime block. A program
 .    using ANY GP keyword pays for the whole block.
 .
 =DESCRIPTION
 .
-.The selector must be a plain numeric variable. It is re-read at each
-.GP.CASE, the tests run in the order written, and the first match wins.
-.GP.OTHER is optional; if nothing matches and there is no GP.OTHER the select
-.is skipped, which is not an error.
+.Counted loop, modelled on prog8's repeat. A count of 0, or no count, loops
+.forever. Loops nest.
 .
-.An expression, a constant or an array element is refused at compile time.
-.Assign to a scalar first: T = RND(1)*3 : GP.SELECT T. A scalar is a fixed
-.slot, so the re-read yields the same value every time. The restriction is
-.what lets the construct compile to core opcodes only -- a program whose one
-.GP keyword is a select does not carry the GP block, as with GP.IF.
+:GP.EXITDO
 .
-.Case values are numeric expressions, not only constants. prog8's when
-.requires compile-time integers.
+.Leaves the innermost GP.DO, closing its stack frame. A GOTO out of a GP.DO
+.closes its frames too -- see SEC 3.2 -- but GP.EXITDO is two bytes and needs
+.no branch target.
 .
-.GP.ENDSEL is required. Nothing needs cleaning up; the requirement is
-.structural. The compiler has no symbol table, the emitted keywords are the
-.block, and every case branch resolves by scanning forward to it.
-.
-.A case body may take its statements on the same line, after a colon:
-.
-:GP.SELECT ED.KEY
-:  GP.CASE 157 : GOSUB ED.MOVE.LEFT
-:  GP.CASE 29  : GOSUB ED.MOVE.RIGHT
-:  GP.CASE 27  : MENU.ACTIVE = 0 : GOSUB ED.OPEN.MENUBAR
-:  GP.OTHER    : GOSUB ED.KEY.RANGE
-:GP.ENDSEL
-.
-.More than one statement after the colon is allowed, and so is GP.OTHER. The
-.body may also go on the following lines. Both forms compile to the same
-.code.
-.
-.GOTO out of a select is safe: a select holds nothing open. GP.DO is the one
-.block that opens a stack frame, and a GOTO leaving one is handled -- the
-.compiler emits an .unwind before it and FixBranches fills in how many loop
-.frames it closes. No runtime bytes; two p-code bytes at the GOTO. The case
-.it cannot handle is a GOTO from inside one GP.DO into another at the same
-.depth: the depth difference is zero, nothing is closed, and the frame
-.survives.
-.
-.GP.SELECT does not replace ON x GOTO/GOSUB, which is a jump table and
-.remains correct for a dense 1..n index. Use GP.SELECT for a sparse selector
-.-- key codes, state machines, bit depths -- where ON does not apply.
-.
-:GP.SELECT BMX.DEPTH
-:    GP.CASE 8
-:    GP.CASE 1, 2, 4
-:        BMX.ERROR$ = "NEEDS ANOTHER SCREEN MODE"
-:    GP.OTHER
-:        BMX.ERROR$ = "BAD BIT DEPTH"
-:GP.ENDSEL
-.
-.An empty case body, 8 above, matches and falls out of the select. It is the
-.cheapest way to say that a value is acceptable.
+:GP.DO
+:  TICK = TICK + 1
+:  IF TICK = 9 THEN GP.EXITDO
+:GP.LOOP
 .
 =EXAMPLE PROGRAM
 .
-.  SELECT.EXP.BL -- runnable, in the GPC-BASIC folder
+.  LOOPS.EXP.BL -- runnable, in the GPC-BASIC folder
+.
+=SEE ALSO
+.
+>19|3.2 Multi-way branch

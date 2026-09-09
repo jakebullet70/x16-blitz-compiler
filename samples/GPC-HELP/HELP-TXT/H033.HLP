@@ -1,56 +1,121 @@
-@4.7 SORT.INC.BL -- shell sort a string array
+@4.2 STRINGS.INC.BL -- string helpers
 .
-=4.7 SORT.INC.BL -- SHELL SORT A STRING ARRAY
+=4.2 STRINGS.INC.BL -- STRING HELPERS
+.
+=WHAT IT COSTS
+.
+.  ASM: GP.INSTR GP.STRPTR GP.COMP
+.    ASM -- a keyword, run by machine code in the GP runtime block. A program
+.    using ANY GP keyword pays for the whole block.
+.  COMPOSITE: GP.CONTAINS GP.ISEMPTY
+.    COMPOSITE -- a keyword with no machine code of its own. The compiler
+.    expands it into keywords that already exist, so it costs the runtime
+.    nothing at all.
 .
 =DESCRIPTION
 .
-.  SORT.RUN
-.      IN: SORT.PTR SORT.DESCEND SORT.NOCASE
-.      OUT: SORT.OK SORT.COUNT
+.  STR.PADR
+.      IN: STR.STR$ STR.WIDTH
+.      OUT: STR.STR$ left-justified
 .
-:#SYMFILE "@:MYPROG.SYM"
-:#INCLUDE "SORT.INC.BL"
-:
-:SORT.PTR = GP.ARRPTR(NAME$())
-:SORT.DESCEND = 0 : SORT.NOCASE = 0
-:GOSUB SORT.RUN
+.  STR.PADL
+.      IN: same
+.      OUT: right-justified
 .
-.Shell sort with Ciura's gap sequence -- 132, 57, 23, 10, 4, 1 -- moving the
-.2-byte element pointers rather than string data. A swap costs the same
-.whatever the strings are: no temporary, no copy, no heap traffic.
+.  STR.PADC
+.      IN: same
+.      OUT: centred (odd gap goes right)
 .
-.The array is passed as an address because a BASL subroutine cannot be passed
-.an array; GP.ARRPTR is a keyword for this purpose. The empty parentheses in
-.GP.ARRPTR(A$()) are required -- A$ and A$() are different variables.
+.  STR.SPLIT
+.      IN: STR.STR$ STR.DELIM$ STR.MAX
+.      OUT: STR.N, STR.FIELD$(1..N)
 .
-.SORT.OK is -1 when it sorted and 0 if the sort was refused: more than 255
-.elements, so DIM A$(254) is the largest accepted (DIM A$(255) is 256
-.elements), or an array whose elements are not strings. The element count and
-.the type are read from the array's own header, three bytes below what
-.GP.ARRPTR returns, so a wrong count cannot be passed in.
+.  STR.REPLACE
+.      IN: STR.STR$ STR.FIND$ STR.REPL$
+.      OUT: STR.STR$, every occurrence replaced
 .
-.Never-assigned elements are empty strings, not garbage. A DIM A$(20) with
-.five entries filled sorts its fifteen empties to the front; a null pointer
-.reads as "", as it does elsewhere in the runtime.
+.  STR.PET2SCR
+.      IN: STR.PET
+.      OUT: STR.SCR
 .
-.SORT.DESCEND and SORT.NOCASE are ordinary variables rather than arguments,
-.so they are sticky. Set both on every call.
+.  STR.SPLICE
+.      IN: STR.STR$ STR.AT STR.CUT STR.SUB$
+.      OUT: STR.STR$, edited at that position
 .
-.The program must have a #SYMFILE, placed before the #INCLUDEs. The assembly
-.reaches BASIC's variables through {VAR}, and BASLOAD crunches every name
-.before the compiler sees it; without the mapping the compile stops with NO
-.SYMBOL FILE FOR {}.
+.  STR.TRIM
+.      IN: STR.PTR
+.      OUT: (the string itself), spaces off both ends
 .
-.Example: ARRAYS.EXP.BL. Regression test: SORT.EXP.BL, eight cases including
-.a 200-element array -- element 128 is where the doubled index stops fitting
-.in a byte. Every case checks content as well as order: a sort that reads the
-.wrong element leaves the array in order with a string duplicated.
+.  STR.LTRIM
+.      IN: same
+.      OUT: spaces off the leading end
 .
-=EXAMPLE PROGRAM
+.  STR.RTRIM
+.      IN: same
+.      OUT: spaces off the trailing end
 .
-.  ARRAYS.EXP.BL -- runnable, in the GPC-BASIC folder
-.  SORT.EXP.BL -- runnable, in the GPC-BASIC folder
+.The module needs a #SYMFILE, and so does every program that includes it,
+.before the #INCLUDEs and named after the source PRG. The three trims are
+.GP.ASM and reach BASIC's variables through {VAR}; without a symbol file the
+.compile stops with NO SYMBOL FILE FOR {}. This is new -- the module was pure
+.BASIC until the trims moved here out of STRCASE.INC.BL.
 .
-=SEE ALSO
+.The two halves take their argument differently, and one question decides
+.which: does the routine GROW the string. The pads and SPLICE do, so they are
+.BASIC -- they take the string by value in STR.STR$ and hand it back there,
+.and an assignment reallocates for free. The trims only ever shrink, so they
+.are assembly -- they take its ADDRESS in STR.PTR and rewrite the block where
+.it lies, which is the only way a GOSUB can edit a caller's string without
+.two allocations and two copies a call. Never pass a literal to those:
+.GP.STRPTR("hello") is an address inside the p-code. The three pad routines
+.leave a string that is already at or past the width unchanged. They pad and
+.never truncate; use STR.RTRIM to shorten.
 .
->48|4.7 SORT.INC.BL -- shell sort a string array
+.SPLIT reads STR.STR$ without modifying it. STR.MAX of 0 means 10. Empty
+.fields are preserved: "A,,C" is three fields and "A," is two. Splitting an
+.empty string gives one empty field, never zero. Reaching the limit is not an
+.error and loses nothing -- the last field receives the unsplit remainder,
+.delimiters included.
+.
+.STR.FIELD$ is the one array the library does not DIM. Left alone, GPC's
+.implicit DIM gives 0..10. For more, DIM it before the first call and set
+.STR.MAX to match. DIMming an array GPC has already auto-dimensioned is an
+.error, so it is one or the other. Note that this is the reverse of
+.THEME.CLR, which the module DIMs.
+.
+.REPLACE swaps every occurrence of STR.FIND$ for STR.REPL$, modifying
+.STR.STR$ in place. The replacement may be shorter, longer, or "" to delete.
+.It is case sensitive, because GP.INSTR compares raw bytes.
+.
+.A replacement that contains the search text is safe: "A" to "AA" terminates
+.and doubles the As, where a naive in-place version would not. The routine
+.builds a new string and never re-scans what it has emitted. An empty
+.STR.FIND$ leaves the string unchanged rather than hanging, because GP.INSTR
+.reports not-found for a zero-length needle. Like the pad routines it is not
+.length checked: a longer replacement can push the result past 255
+.characters.
+.
+.PET2SCR converts a PETSCII code to the screen code the tile map holds, for
+.TILE, TDATA and VPOKE. GP.PRINTAT and GP.FILL do this internally.
+.
+.The three trims are three entry labels sharing one blob, so there is no mode
+.to forget to set. A zero-length string and an all-spaces string are not
+.special cases: the walk counts down and reaching zero is the answer.
+.
+.SPLICE edits by POSITION where REPLACE edits by content: it replaces STR.CUT
+.characters at STR.AT with STR.SUB$. One routine covers all three of insert,
+.overwrite and delete, because they are the same operation with a different
+.count -- STR.CUT of 0 inserts, LEN(STR.SUB$) overwrites, and an empty
+.STR.SUB$ deletes. STR.AT is 1-based, matching GP.INSTR.
+.
+.Past the end appends and below 1 clamps to 1, both falling out of LEFT$ and
+.MID$ rather than being tested for; a cut running past the end takes the rest
+.of the string. It is not length checked, like REPLACE and the pads. SPLICE
+.clamps STR.AT and STR.CUT in place, so read them back rather than assuming
+.what you set survived the call.
+.
+.It was written in GP.ASM first and rewritten in BASIC, which is worth
+.knowing because the reason generalises: the assembly could overwrite and
+.delete but never insert, because in-place work cannot grow a string, and it
+.cost about 280 bytes of p-code where the one BASIC line costs about 40.
+.

@@ -1,0 +1,149 @@
+## ***********************************************************************
+## **
+## **  SVARS.BASL -- the shared variable block, as two arrays.
+## **
+## **      SVARS.INIT      make the arrays, set the defaults
+## **      SVARS.SAVE      SV() and SV$() out to a SEQ file
+## **      SVARS.LOAD      and back
+## **
+## **  SV() holds the numbers and SV$() the three names, one slot each.
+## **  The #DEFINEs below name every slot and give the golden RAM address
+## **  it mirrors. Golden RAM itself is the caller's -- PEEK and POKE it
+## **  directly; nothing here touches it.
+## **
+## **  Interpreted BASIC only. BASLOAD tokenises it, the compiler is not
+## **  involved at the moment.
+## **
+## **   in   SV.FILE$       the file. SVARS.INIT sets SVARS.DAT
+## **        SV.DEVICE      the drive. 0 means 8
+## **
+## **   out  SV.OK          -1 on success
+## **        SV.ERR         the drive's error number. Under 20 is success
+## **        SV.MSG$        its text
+## **
+## **   internal  SV.I  SV.TRK  SV.SEC
+## **
+## **  #INCLUDE it once; the guard makes a second one free. The caller
+## **  owns its own preamble:
+## **
+## **      #SAVEAS "@:MYPROG.PRG"
+## **
+## ** ---- traps ----
+## **
+## **  Each name is written in QUOTES. Without them an empty name is a
+## **  blank line, INPUT# skips blank lines, and every later field reads
+## **  back one slot early -- measured, not assumed. The quotes also keep
+## **  a comma inside a name from splitting it. A name containing a quote
+## **  is the one thing this cannot carry.
+## **
+## **  SVARS.LOAD reads the command channel BEFORE its first INPUT#, so a
+## **  missing file comes back as 62 rather than as a row of zeroes.
+## **
+## **  This module takes logical file 5 and secondary address 5.
+## **
+## ***********************************************************************
+
+#IFNDEF SVARS.DEFS
+#DEFINE SVARS.DEFS 1
+
+## ---- numeric slots, SV(n) ----
+## $0400  entry reason: 0 cold start, 1-15 calling module
+#DEFINE SV.MODE 0
+## $0401  calls today
+#DEFINE SV.CALLS 1
+## $0402  user count
+#DEFINE SV.USERCOUNT 2
+## $0403  access level
+#DEFINE SV.LEVEL 3
+## $0404  terminal type: 0 ASCII, 1 ANSI, 2 PETSCII
+#DEFINE SV.TERM 4
+## $0405  sysop flag
+#DEFINE SV.SYSOP 5
+## $0406  user's record number in USERS.DAT
+#DEFINE SV.RECNO 6
+## $0407  screen width, 40 or 80
+#DEFINE SV.WIDTH 7
+## $0408-$0409  message base number, low/high
+#DEFINE SV.MBASE 8
+## $040A-$040B  reply target message number, low/high
+#DEFINE SV.REPLYTO 9
+## $040C  reply outcome: 1 posted, 0 aborted
+#DEFINE SV.REPLYOK 10
+## $040D  free
+#DEFINE SV.SPAREA 11
+## $040E  free
+#DEFINE SV.SPAREB 12
+#DEFINE SV.NUMTOP 12
+
+## ---- string slots, SV$(n) -- 15 chars each ----
+## $0410-$041E  last caller name, terminator at $041F
+#DEFINE SV.LASTCALLER 0
+## $0421-$042F  current username, terminator at $0430
+#DEFINE SV.USERNAME 1
+## $0431-$043F  caller IP, terminator at $0440
+#DEFINE SV.CALLERIP 2
+#DEFINE SV.STRTOP 2
+
+## ---- the file ----
+#DEFINE SV.CHAN 5
+#DEFINE SV.OKMAX 20
+#DEFINE SV.QUOTE 34
+
+GOTO SVARS.MODULE.END
+
+## ***********************************************************************
+## **  Make the arrays. Call once, before any load or save; override
+## **  SV.FILE$ or SV.DEVICE after it.
+## ***********************************************************************
+SVARS.INIT:  
+    DIM SV(SV.NUMTOP) : DIM SV$(SV.STRTOP) : SV.FILE$ = "SVARS.DAT" : SV.DEVICE = 8
+    RETURN
+
+## ***********************************************************************
+## **  The arrays out to a SEQ file, one value a line. Overwrites.
+## ***********************************************************************
+SVARS.SAVE:
+    SV.OK = 0 : REM -1 is success, 0 is not yet 
+    IF SV.DEVICE = 0 THEN SV.DEVICE = 8
+    OPEN 15, SV.DEVICE, 15
+    OPEN SV.CHAN, SV.DEVICE, SV.CHAN, "@:" + SV.FILE$ + ",S,W"
+    FOR SV.I = 0 TO SV.NUMTOP
+        PRINT# SV.CHAN, SV(SV.I)
+    NEXT
+    FOR SV.I = 0 TO SV.STRTOP
+        PRINT# SV.CHAN, CHR$(SV.QUOTE) + SV$(SV.I) + CHR$(SV.QUOTE)
+    NEXT
+    CLOSE SV.CHAN : INPUT#15, SV.ERR, SV.MSG$, SV.TRK, SV.SEC : CLOSE 15
+    IF SV.ERR < SV.OKMAX THEN SV.OK = -1
+    RETURN
+
+
+
+## ***********************************************************************
+## **  The SEQ file back into the arrays.
+## ***********************************************************************
+SVARS.LOAD:
+    SV.OK = 0 : IF SV.DEVICE = 0 THEN SV.DEVICE = 8
+    OPEN 15, SV.DEVICE, 15
+    OPEN SV.CHAN, SV.DEVICE, SV.CHAN, SV.FILE$ + ",S,R"
+    INPUT#15, SV.ERR, SV.MSG$, SV.TRK, SV.SEC
+    IF SV.ERR < SV.OKMAX THEN GOSUB SVARS.READALL : REM - DO THE READ
+    CLOSE SV.CHAN : CLOSE 15
+    IF SV.ERR < SV.OKMAX THEN SV.OK = -1
+    RETURN
+
+
+# ***********************************************************************
+## **  Helper methid.
+## ***********************************************************************
+SVARS.READALL:
+    FOR SV.I = 0 TO SV.NUMTOP
+        INPUT# SV.CHAN, SV(SV.I)
+    NEXT
+    FOR SV.I = 0 TO SV.STRTOP
+        INPUT# SV.CHAN, SV$(SV.I)
+    NEXT
+    RETURN
+
+SVARS.MODULE.END:
+#ENDIF

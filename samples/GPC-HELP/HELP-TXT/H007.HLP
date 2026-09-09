@@ -20,6 +20,9 @@
 .  STRINGS.EXP.BL
 .      the GP.BASIC string set
 .
+.  STRUSING.EXP.BL
+.      one value through six masks, a column, and the overflows
+.
 .  ARRAYS.EXP.BL
 .      the GP.BASIC array set
 .
@@ -44,6 +47,10 @@
 .  GUI.EXP.BL
 .      the four dialogs, over a screen they have to put back
 .
+.  STASHVRAM.EXP.BL
+.      three panels nested in VRAM, a blob, and the compactor. Needs no
+.        #SYMFILE, which is the point
+.
 .  FORM.EXP.BL
 .      three fields you can move between, LINEINPUT style
 .
@@ -53,8 +60,12 @@
 .  BMXPAL.EXP.BL BMXSPD.EXP.BL
 .      the palette question, and the speed of each path
 .
-.  SORT.EXP.BL STRCTST.EXP.BL SPLITT.EXP.BL
-.      the regression tests for SORT, STRCASE and STR.SPLIT
+.  SORT.EXP.BL STRCTST.EXP.BL STRTST.EXP.BL SPLITT.EXP.BL
+.      the regression tests for SORT, STRCASE, the STRINGS assembly and
+.        STR.SPLIT
+.
+.  USINGT.EXP.BL
+.      the regression test for STR.USING, thirty-nine cases
 .
 .  MENUTST.EXP.BL GUI2TST.EXP.BL
 .      the same for the menu and the listbox, driven through the keyboard
@@ -67,6 +78,7 @@
 .  SELECT.EXP.BL -- runnable, in the GPC-BASIC folder
 .  UNWIND.EXP.BL -- runnable, in the GPC-BASIC folder
 .  STRINGS.EXP.BL -- runnable, in the GPC-BASIC folder
+.  STRUSING.EXP.BL -- runnable, in the GPC-BASIC folder
 .  ARRAYS.EXP.BL -- runnable, in the GPC-BASIC folder
 .  SCREEN.EXP.BL -- runnable, in the GPC-BASIC folder
 .  ISO.EXP.BL -- runnable, in the GPC-BASIC folder
@@ -75,12 +87,15 @@
 .  MENU.EXP.BL -- runnable, in the GPC-BASIC folder
 .  MENUDEMO.EXP.BL -- runnable, in the GPC-BASIC folder
 .  GUI.EXP.BL -- runnable, in the GPC-BASIC folder
+.  STASHVRAM.EXP.BL -- runnable, in the GPC-BASIC folder
 .  FORM.EXP.BL -- runnable, in the GPC-BASIC folder
 .  BMXVIEW.EXP.BL -- runnable, in the GPC-BASIC folder
 .  BMXPAL.EXP.BL -- runnable, in the GPC-BASIC folder
 .  BMXSPD.EXP.BL -- runnable, in the GPC-BASIC folder
 .  SORT.EXP.BL -- runnable, in the GPC-BASIC folder
 .  STRCTST.EXP.BL -- runnable, in the GPC-BASIC folder
+.  STRTST.EXP.BL -- runnable, in the GPC-BASIC folder
 .  SPLITT.EXP.BL -- runnable, in the GPC-BASIC folder
+.  USINGT.EXP.BL -- runnable, in the GPC-BASIC folder
 .  MENUTST.EXP.BL -- runnable, in the GPC-BASIC folder
 .  GUI2TST.EXP.BL -- runnable, in the GPC-BASIC folder

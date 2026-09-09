@@ -1,61 +1,84 @@
-@3.8 Block IF
+@3.7 Screen -- drawing
 .
-=3.8 BLOCK IF
+=3.7 SCREEN -- DRAWING
 .
 =SYNTAX
 .
-:GP.IF <expr> THEN
-:    ...
-:GP.ELSEIF <expr> THEN
-:    ...
-:GP.ELSE
-:    ...
-:GP.ENDIF
+:GP.BOX x, y, w, h [,style] [,col]
+:GP.FILL x, y, w, h, char [,col]
+:GP.PRINTAT x, y, text$ [,col]
 .
 =WHAT IT COSTS
 .
-.  ASM: GP.IF GP.ELSEIF GP.ELSE GP.ENDIF
+.  ASM: GP.BOX GP.FILL GP.PRINTAT
 .    ASM -- a keyword, run by machine code in the GP runtime block. A program
 .    using ANY GP keyword pays for the whole block.
+.  COMPOSITE: GP.CHAR GP.PRINTAT GP.FILL
+.    COMPOSITE -- a keyword with no machine code of its own. The compiler
+.    expands it into keywords that already exist, so it costs the runtime
+.    nothing at all.
 .
 =DESCRIPTION
 .
-.Each of the four keywords is alone on its line, and THEN is required. There
-.is no one-line form: GP.IF X > 5 THEN PRINT is a syntax error. Allowing it
-.would mean a block that swallowed every line down to the next GP.ENDIF.
-.Stock IF ... THEN is unchanged and remains the one-line form.
+.All three write directly to VERA and call no KERNAL routine, which is why
+.they are several times faster than PRINT. GPC's character output makes two
+.KERNAL calls per character, and BSOUT carries scroll, quote mode and cursor
+.handling.
 .
-.GP.ELSEIF may repeat any number of times; GP.ELSE is optional. The first
-.true condition wins and nothing below it runs, so there is no break to omit.
-.If nothing matches and there is no GP.ELSE the block is skipped, which is
-.not an error. Conditions are numeric expressions.
+.GP.BOX draws the frame only. Styles: 0 solid block, 1 single line, 2 single
+.line with rounded corners, 3 thick line. A style of 256 or more is an
+.ADDRESS, not a style: eight screen codes of the caller's own, in the table's
+.order -- see the custom glyph note below. char in GP.FILL is PETSCII, e.g.
+.ASC(" ").
 .
-.GP.IF and GP.SELECT cover different cases. A select fetches one value and
-.compares it against each alternative -- a sparse key code, a state machine.
-.A block IF tests a different condition in every branch: ranges, compound
-.conditions, a string in one arm and a number in the next.
+.The colour argument is optional. Omitted, it uses whatever COLOR last set,
+.read from the KERNAL's $0376 -- the colour a PRINT would have used.
+.Supplied, it is one byte packed as the X16 packs it: background * 16 +
+.foreground. 255 is a real colour (light grey on light grey), not a
+.leave-unchanged marker.
 .
-.GP.ENDIF is required, but unlike GP.ENDSEL it does no work: the condition is
-.evaluated and consumed on the line it is written, so there is no frame to
-.release and a GOTO out of a GP.IF is safe. Omitting GP.ENDIF stops the
-.compile with STRUCTURE IMBALANCE.
+.These calls do not move the cursor PRINT uses. A PRINT after a GP.PRINTAT
+.continues from wherever the KERNAL's cursor was, not after the text just
+.drawn. Use LOCATE first, or stay in one world or the other.
 .
-:GP.IF N < 0 THEN
-:    PRINT "NEGATIVE"
-:GP.ELSEIF N = 0 THEN
-:    PRINT "ZERO"
-:GP.ELSE
-:    PRINT "POSITIVE"
-:GP.ENDIF
+.Nothing is clipped. Drawing off the right edge wraps to the next row; off
+.the bottom writes past the end of the screen map. Zero width or height draws
+.nothing, which is what a computed size reaches when it collapses.
 .
-.IFs nest freely -- inside each other, inside a GP.CASE body, and inside a
-.GP.DO loop.
+=ISO mode is handled for you
 .
-.It costs 14 runtime bytes, none of them code. All four p-code opcodes reuse
-.existing handlers: the two branches are .goto.z and .goto under different
-.names, and the two markers share one four-byte no-op. See SEC 11 of
-.docs/blitz/GP-BASIC.TIERS.md.
+.In ISO mode -- PRINT CHR$(15), or Ctrl+O -- the VERA tile index is the
+.character code, so translating PETSCII to a screen code is wrong rather than
+.merely wasteful: A would be written as $01. GP.PRINTAT reads the KERNAL's
+.ISO flag (bit 6 of $0372) per character and skips the translation when it is
+.set. A program that switches charset needs no source change and nothing to
+.declare. The test costs 7 cycles a cell in PETSCII mode and saves 34 in ISO.
+.
+.GP.FILL needs no test: it converts its single character before the loop, and
+.$20 is a fixed point of the translation, so a space fill -- padding and
+.blanking -- is correct in both modes.
+.
+.GP.BOX is the one case that needs the caller to act. It does no translation
+.at all; its glyphs go to VERA as tile indices, so the four built-in styles
+.are PETSCII screen codes and appear as letters in ISO mode. Translation
+.cannot fix this, because ISO-8859-15 has no box-drawing characters to
+.translate to. A style value of 256 or more is instead the address of eight
+.glyphs, and in ISO mode a tile index is a character code, so ASCII + - |
+.make a usable frame:
+.
+:ISO.GLYPH$ = "++++--||"                        ' TR TL BR BL TOP BOTTOM LEFT
+:GP.BOX 50, 26, 4, 3, GP.STRPTR(ISO.GLYPH$) + 1, 1
+.
+.GP.STRPTR returns the address of the string block and the text starts at +1,
+.so a string literal is the cheapest way to carry the eight bytes. This costs
+.no runtime bytes; the pointer form already exists, and samples/editor uses
+.the same mechanism to draw frames from a re-ordered font.
+.
+.ISO.EXP.BL tests all of this, reading cells back with VPEEK rather than
+.trusting the display. The ISO box corner, top edge and side read back as 43,
+.45 and 124.
 .
 =EXAMPLE PROGRAM
 .
-.  IF.EXP.BL -- runnable, in the GPC-BASIC folder
+.  ISO.EXP.BL -- runnable, in the GPC-BASIC folder
+.  SCREEN.EXP.BL -- runnable, in the GPC-BASIC folder

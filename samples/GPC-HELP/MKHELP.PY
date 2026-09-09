@@ -53,7 +53,19 @@
 #  LINE ENDINGS ARE LF and the viewer strips a trailing CR, so a checkout that
 #  converts them still reads. .gitattributes marks them -text anyway.
 #
+#  --MODS TAKES THE MODULE BANNERS FROM ELSEWHERE, and then writes up every
+#  .INC.BL in that folder the manual does not already document, not just the
+#  five in BANNER_ONLY. A working library folder holds modules GP-BASIC.md has
+#  never heard of, and this is how they get an entry. A plain run does not
+#  sweep, so the topic numbering the shipped .HLP files use does not move.
+#
+#  --MD-ONLY WRITES THE MARKDOWN AND NOTHING ELSE -- the PC-side reference on
+#  its own, no .HLP files and no index. That is the pairing --mods wants: the
+#  X16 help ships with the library it was built from, while the PC file can
+#  document a working copy without disturbing it.
+#
 #  Usage:  python samples/GPC-HELP/MKHELP.PY  [--src DIR] [--out DIR]
+#          [--mods DIR] [--md-only] [--md-name NAME]
 # ---------------------------------------------------------------------------
 
 import argparse
@@ -95,6 +107,11 @@ BANNER_ONLY = [
     "STASH.INC.BL",
     "STASHFILE.INC.BL",
 ]
+
+# Not a module: GPB.INC.BL is the keyword definitions BASLOAD reads, and the
+# keywords are section 3 of the manual. Its banner documents the ABI, not a
+# library routine.
+MOD_SKIP = ["GPB.INC.BL"]
 
 TIER_NOTE = {
     "ASM": "ASM -- a keyword, run by machine code in the GP runtime block. "
@@ -763,7 +780,15 @@ def build_banner_topic(name, path):
     body = banner_text(path)
     if not body:
         return None
-    first = inline(body[0])
+    # THE TITLE LINE IS THE ONE NAMING THE MODULE, and it is not always the
+    # first: BANKMGR opens with a note about being crunched, which took the
+    # whole entry's title. Find the name, and leave what came before it as body.
+    hi = 0
+    for i, raw in enumerate(body):
+        if name in inline(raw):
+            hi = i
+            break
+    first = inline(body[hi])
     summary = first.split("--", 1)[1].strip() if "--" in first else first
     t = Topic("mods", name, name + " -- " + summary)
     e = Emit()
@@ -781,7 +806,7 @@ def build_banner_topic(name, path):
             del para[:]
 
     md = ["", "*From the banner header of `%s`.*" % name, "", "```"]
-    for raw in body[1:]:
+    for raw in body[:hi] + body[hi + 1:]:
         md.append(raw)
         s = inline(raw)
         if not s:
@@ -807,10 +832,25 @@ def build_banner_topic(name, path):
     return t
 
 
-def build_banners(src):
+def banner_names(mods, documented):
+    """The modules to write up from their banner alone, in index order.
+
+    BANNER_ONLY first, then every other .INC.BL in the folder the manual does
+    not already reach. A WORKING LIBRARY FOLDER HOLDS MODULES GP-BASIC.MD HAS
+    NEVER HEARD OF -- they are the reason --mods exists, and a fixed list would
+    miss every one of them.
+    """
+    names = [n for n in BANNER_ONLY if n not in documented]
+    names += [n for n in sorted(os.listdir(mods))
+              if n.endswith(".INC.BL") and n not in names
+              and n not in documented and n not in MOD_SKIP]
+    return names
+
+
+def build_banners(mods, names):
     out = []
-    for name in BANNER_ONLY:
-        path = os.path.join(src, name)
+    for name in names:
+        path = os.path.join(mods, name)
         if not os.path.exists(path):
             sys.stderr.write("  skipped, not found: %s\n" % name)
             continue
@@ -1063,20 +1103,31 @@ def anchor(s):
     return re.sub(r"\s+", "-", a).strip("-")
 
 
-def write_md(out, files, topics):
+def write_md(out, files, topics, mdname="GPC-HELP.md", cmdline=None, mods=None):
     L = []
-    L.append("# GPC-HELP")
+    L.append("# " + mdname[:-3])
     L.append("")
-    L.append("The GP.BASIC and BASL reference that `GPB.HELP.PRG` shows on the X16, "
-             "in one file you can read on a PC.")
+    if mods:
+        L.append("The GP.BASIC and BASL reference, in one file you can read on a PC. "
+                 "The module entries are the banner headers of `%s`, so this file "
+                 "documents THAT copy of the library -- not the one the shipped "
+                 "`.HLP` files were built from." % mods)
+    else:
+        L.append("The GP.BASIC and BASL reference that `GPB.HELP.PRG` shows on the "
+                 "X16, in one file you can read on a PC.")
     L.append("")
-    L.append("**Generated. Do not edit.** `MKHELP.PY` builds it and the `.HLP` "
-             "files together from `GPC-BASIC/` -- the manual, the name register "
-             "and the module banner headers. Fix anything wrong at the source "
-             "and rebuild:")
+    if mods:
+        L.append("**Generated. Do not edit.** `MKHELP.PY` builds it from the "
+                 "manual, the name register and the module banner headers. Fix "
+                 "anything wrong at the source and rebuild:")
+    else:
+        L.append("**Generated. Do not edit.** `MKHELP.PY` builds it and the "
+                 "`.HLP` files together from `GPC-BASIC/` -- the manual, the "
+                 "name register and the module banner headers. Fix anything "
+                 "wrong at the source and rebuild:")
     L.append("")
     L.append("```")
-    L.append("python samples/GPC-HELP/MKHELP.PY")
+    L.append(cmdline or "python samples/GPC-HELP/MKHELP.PY")
     L.append("```")
     L.append("")
     L.append("## Contents")
@@ -1107,11 +1158,11 @@ def write_md(out, files, topics):
                 L.append("*See also: " +
                          ", ".join(ln.split("|", 1)[1] for ln in refs) + "*")
                 L.append("")
-    path = os.path.join(out, "GPC-HELP.md")
+    path = os.path.join(out, mdname)
     with open(path, "w", encoding="utf-8", newline="\n") as fh:
         fh.write("\n".join(L) + "\n")
-    print("  %-12s %5d lines  %6d bytes"
-          % ("GPC-HELP.md", len(L), os.path.getsize(path)))
+    print("  %-22s %5d lines  %6d bytes"
+          % (mdname, len(L), os.path.getsize(path)))
 
 
 # ---------------------------------------------------------------------------
@@ -1120,6 +1171,17 @@ def main():
     ap = argparse.ArgumentParser(description="Build GPC-HELP content from GPC-BASIC.")
     ap.add_argument("--src", default=DEFAULT_SRC, help="the master GPC-BASIC folder")
     ap.add_argument("--out", default=HERE, help="where to write the .HLP files")
+    ap.add_argument("--mods", default=None,
+                    help="take the module banner headers from HERE instead of "
+                         "--src, and write up EVERY .INC.BL in it the manual "
+                         "does not already document. Point it at a working "
+                         "library folder to get the modules GP-BASIC.md has "
+                         "never heard of")
+    ap.add_argument("--md-only", action="store_true",
+                    help="write the Markdown and nothing else -- no .HLP files "
+                         "and no index. The PC-side reference on its own")
+    ap.add_argument("--md-name", default="GPC-HELP.md",
+                    help="the Markdown file to write, beside --out")
     ap.add_argument("--maxpage", type=int, default=MAXPAGE,
                     help="split a topic longer than this many lines. The viewer "
                          "holds one topic in a string array, so this is a memory "
@@ -1129,8 +1191,12 @@ def main():
     args = ap.parse_args()
 
     src, out = os.path.abspath(args.src), os.path.abspath(args.out)
+    mods = os.path.abspath(args.mods) if args.mods else src
     if not os.path.isdir(src):
         sys.stderr.write("no such folder: %s\n" % src)
+        return 2
+    if not os.path.isdir(mods):
+        sys.stderr.write("no such folder: %s\n" % mods)
         return 2
     if not os.path.exists(os.path.join(src, "GP-BASIC.md")):
         sys.stderr.write("not a GPC-BASIC folder (no GP-BASIC.md): %s\n" % src)
@@ -1140,6 +1206,8 @@ def main():
 
     print("GPC-HELP content")
     print("  source  %s" % src)
+    if mods != src:
+        print("  modules %s" % mods)
     print("  output  %s" % out)
     print("")
 
@@ -1147,12 +1215,28 @@ def main():
     tiers = parse_tiers(secs)
 
     topics = build_manual(src, tiers)
-    topics += build_banners(src)
+
+    # The manual reaches a module through the section 4 heading that names it.
+    # Anything else in the folder is documented by its banner alone -- but only
+    # sweep for those when --mods says the folder is not the manual's own, so a
+    # plain run keeps producing the topic numbering the shipped .HLP files use.
+    documented = set()
+    for t in topics:
+        m = MOD_RE.search(t.title)
+        if m:
+            documented.add(m.group(1))
+    names = (banner_names(mods, documented) if mods != src
+             else [n for n in BANNER_ONLY if n not in documented])
+    topics += build_banners(mods, names)
     topics += build_globals(src)
     topics += build_files(src)
 
     add_tails(topics)
-    topics = split_long(topics, args.maxpage)
+    # SPLITTING IS THE VIEWER'S MEMORY BUDGET, and part two of a split carries
+    # no Markdown -- the manual text goes with part one. So do not split for a
+    # file nothing is going to page through, or the .md grows empty sections.
+    if not args.md_only:
+        topics = split_long(topics, args.maxpage)
     byord = resolve_module_keys(topics)
     files = layout(topics)
     rows = build_index(files, topics, args.nosections)
@@ -1160,20 +1244,26 @@ def main():
 
     # The see-also substitution changed text, never line counts, so the layout
     # computed above still holds.
-    write_hlp(out, files)
-    write_idx(out, rows)
-    write_md(out, files, topics)
+    cmdline = "python " + " ".join(
+        [os.path.relpath(os.path.abspath(__file__)).replace("\\", "/")] +
+        sys.argv[1:])
+    if not args.md_only:
+        write_hlp(out, files)
+        write_idx(out, rows)
+    write_md(out, files, topics, args.md_name, cmdline,
+             os.path.relpath(mods).replace("\\", "/") if mods != src else None)
     print("")
     print("  %d topics, %d index rows" % (len(topics), len(rows)))
 
     # WHAT THE VIEWER HAS TO HOLD, which is the only budget that binds. Blitz's
     # string heap costs about 1.67 bytes a character -- measured, not assumed --
     # and the viewer holds the whole index plus one whole topic at once.
-    idx_chars = sum(len(r[4]) for r in rows)
-    big = max(len(t.lines) for t in topics)
-    print("  index %d chars, longest topic %d lines" % (idx_chars, big))
-    print("  string heap needed: about %d bytes -- the index, and nothing else"
-          % int(idx_chars * 1.67))
+    if not args.md_only:
+        idx_chars = sum(len(r[4]) for r in rows)
+        big = max(len(t.lines) for t in topics)
+        print("  index %d chars, longest topic %d lines" % (idx_chars, big))
+        print("  string heap needed: about %d bytes -- the index, and nothing "
+              "else" % int(idx_chars * 1.67))
 
     if DROPPED:
         print("")

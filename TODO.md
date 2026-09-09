@@ -278,6 +278,40 @@ Two decisions to take at the keyboard:
 
 ## Bugs
 
+### `GP.FN` on a string-returning verb aliases — OPEN, found 2026-09-08
+
+**The only open bug on this list.** Two `GP.FN` calls on the **same** verb, with nothing between them
+in one expression, both read that verb's single `RETURNS` variable, so both terms come out as the
+second call's answer. Silently, with both compiler passes agreeing.
+
+```basl
+D$ = "one"
+E$ = "two"
+PRINT GP.FN(STR.UCASE, D$) + GP.FN(STR.UCASE, E$)
+```
+
+prints `TWOTWO` where `ONETWO` is intended. The case is line `D1` in `testing/SCASE.BASL`.
+
+**Why.** A string term is a REFERENCE, not a value. `ReadStringCommand`
+(`source/runtime/source/memory/read_string.asm`) pushes the block ADDRESS into `NSMantissa0/1,x`, and
+`GPFNCompile` (`source/compiler/source/commands/gpdefproc.asm:556-566`) ends with a plain
+`GetSetVariable` read of the `RETURNS` variable. Two calls therefore leave two references to one
+variable, and the second overwrites what the first pointed at.
+
+**Numeric verbs are safe** — the value itself goes on the evaluation stack, and that is why
+`FILE.SIZE` (added 2026-09-09, `RETURNS FILE.BLOCKS`) is not exposed to this.
+
+**Two shapes escape it, neither of them a rule to rely on.** `GP.FN(V,A$) + "-" + GP.FN(V,B$)` works
+because `+` is left-associative and the first concatenation concretes A into a temporary before the
+second call runs. Two DIFFERENT verbs in one expression work because they have different `RETURNS`
+variables.
+
+**Fix, at the call site:** after `.fnrestore`, when `procRetType` is a string, emit whatever concretes
+the reference into a temporary. It costs p-code on every string `GP.FN` and nothing on numeric ones —
+and resident p-code is the side that is short of room, which is the one argument for documenting it in
+`GP-BASIC.md` §3.11 beside the recursion rule instead. **Fix it.** A wrong answer with no diagnostic is
+the worst failure mode there is, and the verb mechanism is being built on.
+
 ### A RETIRED KEYWORD COMPILES CLEAN AND EXPLODES AT RUN TIME — FIXED 2026-09-03
 
 Retiring a keyword is now routine — `GP.SORT`, the five in-place string statements, `GP.STASH` and
@@ -810,6 +844,41 @@ green.
   `2147483647`, stock prints `2.14748365E+09`. This is deliberate — we hold it exactly, so printing it
   exactly is *more* precise, not less. Only mentioning it because it is a visible difference.
 
+## Compiler work — what is next, ranked
+
+Written 2026-09-09. **An index, not a second copy** — each item points at the section or memory note
+that holds the detail, so this list cannot drift away from the work it names. One defect and three
+features; everything else under `## Bugs` is fixed.
+
+**0. Fix the `GP.FN` string aliasing.** See `## Bugs` above. Small, known, and the only thing here
+that produces a wrong answer rather than a large program. Do it first.
+
+**1. Banked `GP.ASM`.** Costed 2026-09-08 and waiting on a decision, not on analysis. About **58 bytes**
+of new runtime — roughly 55 for a bank-aware SYS handler, 2 for a `vectors.asm` entry, 1 for
+`pcodesize.asm` — against **511 bytes of headroom** under the `$9F00` guard in
+`source/runtime/source/main/zzrt.footer`. So it is free: no `RTBASE` move, no `RT_ABI` bump, no
+per-program workspace cost. **+1 byte of p-code per call site**, +9 across the nine blobs in the
+library today.
+
+What it buys: `STRINGS` (107 bytes measured), `STRCASE`, `SORT` and `FILEIO` become eligible to leave
+low RAM. `STASH`'s three blobs and `FILEDIR`'s two never can — they drive the bank register itself.
+
+This is 65C02 work in the runtime and needs saying yes to explicitly. See
+`docs/memory/gpasm-blob-may-use-ztemp.md` and
+`docs/memory/pcode-runs-from-a-bank-proven.md`.
+
+**2. Selective handler inclusion.** The largest lever on program size and the largest job. The runtime
+is **10,956 bytes copied verbatim into every program**, so `10 PRINT"HI"` ships the sprite engine, the
+disk loader and the transcendental library. The compiler already knows which tokens a program's p-code
+uses, so it has everything it needs to emit only the handlers referenced — see
+`## Shrinking the runtime` below, which has the measurements, the `.def`-file mechanism and the
+open question of an explicit switch versus inference.
+
+**3. Dead-code elimination in the library, not the compiler.** Measured and parked: **1,212 resident
+bytes** are never called in GPBMODS, and **691 of them come free by deleting two `#INCLUDE` lines** —
+no compiler change at all. Only the remaining ~521 would need one. See
+`docs/memory/basl-dead-code-elimination-measured.md`. Worth doing the free half before building anything.
+
 ## Performance
 
 `02_floatmath` is **1.73×** (was 1.25× — see `bench/RESULTS.md`), and no longer the outlier. What is
@@ -860,6 +929,27 @@ in the **middle** of it, so dropping one means either repointing its dead vector
 reclaims nothing — the bytes stay) or a per-program relocating link (which reclaims them but is a real
 linker). The honest first cut is to **group the optional hardware handlers at the tail** of the image,
 in dependency order, so an unused group truncates with `ObjectBase` lowered to match — no relocator.
+
+### A TEXT-MODE-ONLY compile option
+
+Requested 08/09/26. The section above is the analysis; this is the switch the user wants out of it —
+a compile option that says *this program is text and math only*, and drops the graphics, sprite, tile
+and mouse handlers from the image it ships. On the numbers above that is `graphics.asm` 280 B,
+`SPRITE`/`MOVSPR` 463 B, `TILE`/`TDATA`/`TATTR` 244 B and `MOUSE` 107 B — a little over **1 KB**, and
+close to 2 KB if the sound handlers go with it.
+
+Two things to settle before building it:
+
+- **Explicit switch or inferred?** The compiler already knows which tokens the p-code uses, so it
+  could decide by itself and never ask. An explicit option is worth having anyway as the thing that
+  makes the choice visible in the end-of-compile report, and as an assertion — compiling text-only
+  and then using `SPRITE` should be an error, not a silent re-inclusion.
+- **What happens to a dropped keyword.** Its `VectorTable` slot has to point somewhere. A stub that
+  raises a runtime error is the honest answer, but it only ever fires if the p-code scan was wrong.
+
+It wants the tail-grouping from the section above first: the handlers sit in the middle of the image
+today, so dropping one reclaims nothing until they are grouped at the end and the image truncates with
+`ObjectBase` lowered to match.
 
 ### Runtime on X16 ROM floats
 
@@ -1073,6 +1163,53 @@ image for all 12,031 bytes of the GP-BASIC OUT cut, with the only differences th
 
 ## Wanted
 
+### One shared `TMP$`, instead of a scratch string per module — OPEN, raised 2026-09-09
+
+The library declares **84 string variables**, and **eight of them are the same variable**: a
+one-character landing pad for `GET`, written once and read once, in eight different modules.
+
+| module | the variable |
+|---|---|
+| `FILEIO.INC.BL` | `FILE.CH$` |
+| `GUI.INC.BL` | `GUI.PRESSED$` |
+| `GUI2.INC.BL` | `GUI.LISTBOX.IN$` |
+| `KB.INC.BL` | `KB.K$` |
+| `LINEINPUT.INC.BL` | `LINEINPUT.K$` |
+| `MENUBAR.INC.BL` | `MENUBAR.IN$` |
+| `MENUVERT.INC.BL` | `MENUVERT.INCHAR$` |
+
+Each costs a descriptor in the variable table plus whatever the string heap holds for it, and none
+of them carries a value across a call — the key is turned into a code on the next statement and the
+string is never looked at again.
+
+A single `TMP$`, declared once and documented as "yours until the next statement, nobody's after
+that", would delete seven of them. The same argument reaches further than `GET`: `GUI.BTN.HEAD$`,
+`GUI.BTN.MARK$` and `GUI.BTN.TAIL$` live and die inside `GUI.BUTTON`, and `GUI.GLYPH$` inside
+`GUI.GLYPHS`.
+
+**What makes it more than a tidy-up:** a scratch name that says which module owns it is a *promise*
+that the value survives, and none of these do. Naming it `TMP$` is the honest version and it is
+also the cheap one.
+
+**What has to be settled first**, because getting it wrong is a silent corruption rather than an
+error:
+
+- **The scope rule has to be one sentence and it has to be obeyed.** "Valid until the next
+  statement" is enforceable by reading; "valid until you call something" is not, because a routine
+  cannot see who its caller is. A `TMP$` held across a `GOSUB` that also uses `TMP$` is the whole
+  risk, and `GUI.BUTTON`'s three are exactly that shape — they span a `GOSUB GUI.BTN.EDGES`.
+- **It cannot be banked.** Variables are global and low-memory, so this is not affected by which
+  region a module sits in — but a module in a region and a module in low RAM sharing `TMP$` is
+  still two callers of one variable, and the region boundary hides the collision from a reader.
+- **Measure before doing it.** Per
+  [`docs/memory/measure-before-changing-code.md`](docs/memory/measure-before-changing-code.md):
+  the saving is a variable-table entry each, which is small. Do the count first and decide whether
+  seven of them is worth the shared-mutable-state risk, rather than assuming it is.
+
+Related: the GUI refactor in [`samples/GPB-MODS-TESTING/GUI-CUA-PLAN.md`](samples/GPB-MODS-TESTING/GUI-CUA-PLAN.md)
+touches five of these seven modules, so the two want to be sequenced — not done at once.
+
+
 ### `IsEmulator()` — BUILT 06/09/26, as `APPSYS.ISEMU`
 
 **Shipped** in all five copies of `APPSYS.INC.BL`, with `GP-BASIC.md` §4.3, `GP-BASIC.GLOBALS.md`
@@ -1093,7 +1230,7 @@ and a 0 means "not x16emu", which is a real machine OR another emulator — and 
 is expansion card I/O on the real machine, a card at I/O5 could in principle answer `"16"` too.
 The header says a 1 is strong and a 0 is certain rather than pretending otherwise.
 
-`work-lineinput/EMUTST.BASL` is the check: it prints the two bytes beside the answer, so a 0 can
+`work/lineinput/EMUTST.BASL` is the check: it prints the two bytes beside the answer, so a 0 can
 be told from a wrong read. **Run it both ways**: point `APPSYS.EMUSIG` at a byte that does not
 read 49 and the not-an-emulator path is exercised on the emulator, which is the only way to test
 it here. That caught a crunched version whose `RETURN` had ended up on the `IF` line — true on
@@ -1143,10 +1280,10 @@ the keystroke path of every field in the tree that sets no filter, which is all 
 against an estimate of 30 here. Tokenised source grew 76 bytes, leaving 703 under BASLOAD's 38,655.
 No token, no runtime byte, nothing in `GPC.BIN`.
 
-**Six cases, twice.** `work-rename/LINTST.BASL` runs them against the banked working copy, calling
+**Six cases, twice.** `work/rename/LINTST.BASL` runs them against the banked working copy, calling
 `LINEINPUT.TYPED` directly with a code and a character — no field, no keyboard, no blink — and then
 once more live through `GUI.INPUT` with keys pushed by `kbdbuf_put`, because the filter runs per
-keystroke inside `LIB.CODEBANK`. `work-lineinput/LINTST2.BASL` is the same six against the unbanked
+keystroke inside `LIB.CODEBANK`. `work/lineinput/LINTST2.BASL` is the same six against the unbanked
 root library. No filter set leaves the field as it was; `ALLOW$` refuses without moving the caret;
 `DENY$` passes everything else; both set gives `ALLOW$`; a full field still refuses; and RETURN is
 still refused by the three older guards, which the filter never sees.
@@ -1601,7 +1738,36 @@ Consistency: `GUI.YN` needs nothing (its labels ARE the keys, Y and N lit), `GUI
 label from `GUI.HINT$`, so if A lands it should probably serve all three. Whatever is chosen belongs
 in the diverged copy AND the master.
 
-### A shared keyboard drain — yes. A shared `GETKEY` — no
+### A shared keyboard drain — BUILT 06/09/26, as `KB.INC.BL`. A shared `GETKEY` — no
+
+**Shipped** as `KB.INC.BL`, a module of one routine, with `GP-BASIC.md` §4.9, the globals
+register and the regenerated `HELP-TXT`. `GPC-HELP` and the cruncher both call it; their own
+`HELP.CLEAR.KB` and `CX.CLEARKB` are gone.
+
+**It went into `APPSYS` first, and came back out the same afternoon.** The entry below argues
+for `APPSYS` over `GUI`, and that part is right — but `APPSYS` is the SCREEN module, a drain is
+not screen, and putting it there taxed all eight `APPSYS` includers 24 bytes while still leaving
+the two programs that actually wanted it unable to reach it cheaply. A module of its own is
+reachable by anything: `CRUNCH.BASL` includes `GPB.INC.BL` and now `KB.INC.BL`, and nothing
+else.
+
+**Two corrections to the entry below.** There were only TWO copies, not three: `CX.FLUSH` in
+`CRUNCHER.BASL` is not a keyboard drain at all, it flushes a pending output line to disk. And the
+reason `GPC-HELP` carried one is not the modal dialog: a HELD ARROW repeats faster than a page is
+drawn, so without the drain the queue keeps scrolling after the key has been let go. Both reasons
+are in the header now.
+
+**Measured, and it is free.** `GPC-HELP` compiles to `OK CODE 11173`, the same as before the
+routine moved anywhere; `CRUNCH.BASL` is byte for byte what it was, `OK CODE 1733` both ways.
+The module costs a program that includes it and never calls it about 24 bytes of p-code, and
+nothing at all to a program that does not include it — which is the whole argument for a module
+of one routine over a routine in a module of eight.
+
+`work/lineinput/KBTST.BASL` is the test: a key pushed with `kbdbuf_put` and NOT drained comes
+back from `GET` (the control, without which the rest proves nothing), three pushed and drained
+leave `GET` empty, and a drain of an already empty buffer returns rather than waiting.
+
+The original entry follows.
 
 **`CLEARKB` is worth it.** Three copies exist already and they are the same four lines:
 `CX.CLEARKB` and `CX.FLUSH` in the cruncher, `HELP.CLEAR.KB` in `GPC-HELP`. It has no per-caller
@@ -2521,6 +2687,14 @@ code -- and that is a keyword reference doing its job. What came out of it was t
 it was N bytes of the all-or-nothing block" lecture written four times over, for `GP.SORT`,
 `GP.STASH`, `GP.MENU` and the string statements.
 
+**IT CAME BACK IN `STRINGS` AND `STRCASE`, 2026-09-07, and was cut again.** Writing the trims,
+`STR.SPLICE` and the new headers took `STRINGS.INC.BL` to 371 lines and `STRCASE.INC.BL` to 149 --
+past where either started. Re-cut to **275 and 102**, prose 138 and 42, with `STRCASE` back to half
+its post-sweep 80. What went in was exactly what rule 5 forbids: the same "BASIC, not ASM, and it
+has to be" argument written three times, the history of what the routine used to be, and the
+byte-count arithmetic behind a decision already made. Both rebuilt to the same object -- `STRCTST`
+`OK CODE 825`, `STRTST` 33/33 -- and `GPBMODS` tokenised 38,226 -> 37,197 for it.
+
 **AND THE EXAMPLES**, 948 -> 847 prose lines across 21 `.EXP.BL` files. A smaller cut than the
 library's, and honestly so: most were already under one comment line per line of code, because an
 example's comments largely ARE the example. The work was concentrated in `SORT` 137 -> 102,
@@ -2550,14 +2724,6 @@ can sit side by side on the disk.
 There is **no fallback**: without a readable `GPC.INPUT` the compiler prints `NO GPC.INPUT FILE` and
 stops. A compiler that guesses at what it was asked to build is worse than one that refuses. Every
 caller in the tree — `source/application/Makefile`, `bench/run-bench.sh`, the reproductions under
-**IT CAME BACK IN `STRINGS` AND `STRCASE`, 2026-09-07, and was cut again.** Writing the trims,
-`STR.SPLICE` and the new headers took `STRINGS.INC.BL` to 371 lines and `STRCASE.INC.BL` to 149 --
-past where either started. Re-cut to **275 and 102**, prose 138 and 42, with `STRCASE` back to half
-its post-sweep 80. What went in was exactly what rule 5 forbids: the same "BASIC, not ASM, and it
-has to be" argument written three times, the history of what the routine used to be, and the
-byte-count arithmetic behind a decision already made. Both rebuilt to the same object -- `STRCTST`
-`OK CODE 825`, `STRTST` 33/33 -- and `GPBMODS` tokenised 38,226 -> 37,197 for it.
-
 `fixes/` — therefore writes one.
 
 `GPC.PRG` (`source/gpc/GPC.BASL`, BASLOAD source) is the front end: it asks for the two names, writes
@@ -2586,6 +2752,49 @@ Two things fall out of it:
   assignments plus a branch, and dead code is not free here (see the module-level elimination item
   under *A MASTER COMPILER* below). Four palettes roughly doubles `THEME`'s 45 lines. If that reads
   as too much, the alternative is one indexed table rather than four branches of assignments.
+
+### The end-of-compile report wants more than three numbers — BEFORE RELEASE
+
+`source/application/source/compiler/memreport.asm` prints one line after OK:
+
+    CODE 1234 FREE 20480 RT 12031 GP-BASIC OUT
+
+That is the p-code size, what is left above it, and the embedded runtime — the three numbers that
+existed when `PROGRAM TOO BIG` was the only feedback anyone got. It is no longer the whole picture.
+A program that banks has most of its cost somewhere the line does not mention at all, and nothing
+reports how big the source was.
+
+Wanted, at minimum:
+
+- **Lines compiled.** The one number every other compiler prints and this one does not. It is also
+  the number that makes the rest divide into something meaningful — bytes of p-code per line.
+- **Banks used, and bytes used in each.** `GP.BANKED` regions and `GP.BANKEDSTR` groups both consume
+  8K banks, and today the only way to see what they cost is the map file. `nextRegion` and
+  `gpBankStart` already hold what is needed; the string groups are resolved at compile time, so
+  their sizes are known too. Per-bank, not just a total: a bank that is 90% full is the thing worth
+  knowing before the next `#INCLUDE` goes in.
+- **Memory in one shape rather than three.** `CODE` and `FREE` are already there and `RT` is
+  conditional; a program with regions has a fourth number and there is nowhere to put it. Decide
+  whether the report stays one line and grows, or becomes a short block. A block is the honest
+  answer once banks are in it, and the compiler is not printing this in a loop.
+
+`FREE` already excludes the 4K frame stack gap, which is correct and should stay — but the report
+should say so, because a number that is deliberately 4,096 short of the arithmetic looks like a bug
+to anyone checking it. See [Blitz runtime slack and limits](docs/memory/gpc-blitz-runtime-slack-and-limits.md)
+for what the ceilings actually are, and the standing rule that a build-side cap is a bug, not a spec.
+
+### `BASLOAD-GPC` wants the same report — BEFORE RELEASE, once it is done
+
+The new BASLOAD in `BASLOAD-GPC/` is the `.BASL` → `.PRG` step, and when it lands it needs the same
+end-of-run treatment as the compiler above: **lines processed**, the size of what it wrote, and what
+memory it had to work in. Today's BASLOAD says almost nothing, and its failures are quiet — a
+truncated output looks exactly like a successful one, which is why the streaming fork carries an
+explicit SUCCESS check (see [BASLOAD streams to a file](docs/memory/basload-streams-to-a-file.md)).
+A line count and a byte count at the end are the cheapest version of that check the user can see for
+themselves.
+
+Not a duplicate of the compiler's report — different tool, different numbers — but it should read
+like the same program printed it. Settle the compiler's shape first, then follow it.
 
 ### `BASLOAD-GPC` has no way to be told what to compile — DONE
 
@@ -2967,6 +3176,22 @@ Two numbers from the same afternoon: `STRCASE.INC.BL` cost **200 bytes** and the
 its five modes; compiling the self-check out of the editor moved it **16,497 -> 12,882 bytes and the
 workspace 4,608 -> 8,192**. Dead code is not free here, it is the scarcest thing there is.
 
+**And one from 07/09/26, which is the sharpest case in the tree.** Moving the three trims out of
+`STRCASE.INC.BL` into `STRINGS.INC.BL` left `STRCASE` at **87 bytes** (from 200) and `STRINGS` at
+**633** (from 438, the trims plus the new `STR.SPLICE`). Every program that only folds case got
+**113 bytes back** -- `GPC-HELP` measured 11,173 -> 11,060 -- and `GPBMODS`, which carries both
+modules, came out at **19,804 either way, exactly break-even**. But `CRUNCHER.BASL` calls two trims
+and nothing else in `STRINGS`, and paid **4,400 -> 4,893, +493 bytes**, for `PADR`, `PADL`, `PADC`,
+`SPLIT`, `REPLACE`, `SPLICE` and `PET2SCR` that it never calls. That is a tenth of the program, and
+per-routine elimination is the whole of the fix.
+
+**A second lesson from the same afternoon, about where the p-code goes.** `STR.SPLICE` was built in
+`GP.ASM` first: **~280 bytes**, and it could overwrite and delete but never INSERT, because in-place
+work only ever gets the block and cannot grow a string. Rewritten as the one BASIC line it replaces
+-- `LEFT$ + SUB$ + MID$` -- it does all three in **~40 bytes**. Assembly earns its place on a loop
+or a bulk move, not on an operation BASIC already spells in one statement; the trims stay assembly
+because they only ever SHRINK, which is the half in-place can do.
+
 **The scan is reliable because of the house style, which was not designed for this but pays for it.**
 Every module owns a dotted namespace -- `STRCASE.*`, `MENUVERT.*`, `STR.*`, `GUI.*` -- so "is this
 module used" is "does any identifier with its prefix appear outside its own file". Include guards
@@ -2999,22 +3224,6 @@ Related, and the reason it matters: [[program-too-big-fires-early]] and the rele
   memory from compiled programs"). What is *not* done is the in-memory "RUN the compiler a second time"
   path, which still runs the object where it was generated (up at `FreeMemory`, workspace hardcoded at
   `$8000`). **Parked as a low-value dev-path cleanup:** it only affects testing a program in the
-**And one from 07/09/26, which is the sharpest case in the tree.** Moving the three trims out of
-`STRCASE.INC.BL` into `STRINGS.INC.BL` left `STRCASE` at **87 bytes** (from 200) and `STRINGS` at
-**633** (from 438, the trims plus the new `STR.SPLICE`). Every program that only folds case got
-**113 bytes back** -- `GPC-HELP` measured 11,173 -> 11,060 -- and `GPBMODS`, which carries both
-modules, came out at **19,804 either way, exactly break-even**. But `CRUNCHER.BASL` calls two trims
-and nothing else in `STRINGS`, and paid **4,400 -> 4,893, +493 bytes**, for `PADR`, `PADL`, `PADC`,
-`SPLIT`, `REPLACE`, `SPLICE` and `PET2SCR` that it never calls. That is a tenth of the program, and
-per-routine elimination is the whole of the fix.
-
-**A second lesson from the same afternoon, about where the p-code goes.** `STR.SPLICE` was built in
-`GP.ASM` first: **~280 bytes**, and it could overwrite and delete but never INSERT, because in-place
-work only ever gets the block and cannot grow a string. Rewritten as the one BASIC line it replaces
--- `LEFT$ + SUB$ + MID$` -- it does all three in **~40 bytes**. Assembly earns its place on a loop
-or a bulk move, not on an operation BASIC already spells in one statement; the trims stay assembly
-because they only ever SHRINK, which is the half in-place can do.
-
   compiler's own memory without reloading the saved file — the shipped `OBJECT.PRG` is unaffected. The
   one real wrinkle is a size ceiling on that path (object code over ~14K grows past `$8000` and the
   in-memory run's workspace stomps it, even though the saved file is fine). If it is ever worth doing:
@@ -3029,6 +3238,132 @@ because they only ever SHRINK, which is the half in-place can do.
   the assembler had already succeeded, which reads like a build break but is not one. It is copied
   only if present now. Same class as the five blockers that once made this repo unbuildable anywhere:
   a recipe asserting on a file nothing guarantees.
+
+## String heap reclaim — PARKED 2026-09-09, measured
+
+**Can we force garbage collection? Measured: there is almost nothing to collect.** The heap
+reaches a steady-state working set and stops. In a 20-variable churn test (8 rounds x 20
+reassignments, lengths 1..80) the floor stopped descending at round 4 and never moved again
+through rounds 5-8, nor through 240 pathological long/short alternations after that. Dead
+blocks stabilised at 12 / 503 B. `StringConcrete`'s scavenger is doing its job.
+
+Where the heap actually goes, three workloads (the probe walks the block chain; blocks tile the
+heap exactly from `stringHighMemory` up to `storeEndHigh:00`):
+
+| workload | heap | in use | live slack | dead | headers |
+|---|---|---|---|---|---|
+| editor, CORE self-check | 704 B | 32.5% | **57.1%** | 10.4% | 8.9% |
+| editor, OPT self-check (find/goto/new) | 1,240 B | 46.5% | **53.5%** | **0.0%** | 10.9% |
+| churn plateau | 2,737 B | 30.5% | **47.5%** | 18.4% | 3.6% |
+| churn after alternation | 2,863 B | 60.1% | 19.4% | 20.4% | 3.6% |
+
+**On the editor's FIND path the heap grew 590 -> 1,240 B with ZERO dead blocks.** Every one of
+those 650 bytes went into live blocks. A collector would have returned nothing at all. Live
+slack — capacity a live variable holds and will never use again — is the bigger number in every
+run, and no GC can touch it.
+
+So the goal is not "make FRE go back up" (FRE only rises if the floor rises, and that is worth
+0-503 B). It is **lower the plateau**.
+
+### The runtime plan, if it is ever worth doing
+
+Costed against ~200 usable bytes of page cushion below `GPBase $3800` (last core symbol is
+`FloatTangent` at `$36f5`, so 267 B minus its body). Under the cushion these cost every compiled
+program *nothing*; cross it and every program loses 256 B, which wipes out the gain. That is why
+they should land as one change, and why the cushion must be re-measured first.
+
+| | RT bytes | Gain |
+|---|---|---|
+| Tune the expansion constants (`lsr a` = 1.5x, `cmp #10` = min, in `strings/concrete.asm`) | **0** | unknown until A/B'd; slack is 48-57% of the heap |
+| Coalesce + split dead blocks in the scavenger walk | ~50 | 585 B reusable instead of 13 scraps |
+| `A$ = ""` frees the block | ~15 | ~340 B on the editor, ~556 B on churn |
+| Pop dead blocks off the bottom of the heap | ~15 | 0 alone; with the above, this is what makes FRE rise |
+| Compaction | ~200+ | 0-503 B. **Not worth it.** |
+
+**Coalescing is the surprise.** In a synthetic grow-every-third pattern the corpses were all
+isolated. Under realistic churn they cluster hard — runs of **[5, 4, 4]**, with 100% of dead
+bytes in runs of 2+:
+
+```
+5 corpses -> one free block of 233 B   (largest member alone:  79)
+4 corpses -> one free block of 192 B   (largest member alone:  72)
+4 corpses -> one free block of 160 B   (largest member alone:  64)
+```
+
+Today the largest reusable corpse is 79 B; merged it would be 230. An ask for 100 B has to take
+the ceiling down even though 585 B of corpses sit there in three contiguous lumps. Constraint:
+`MaxLen` is one byte, so a merged block caps at **255 usable** — the merge loop must stop there.
+Splitting has to land with coalescing, or first-fit hands a 230 B block to a 12-char string.
+
+**`A$ = ""` freeing needs no compiler change and no new keyword.** `WriteStringZTemp0Sub` already
+holds the owner slot in `zTemp0`; if the incoming length is zero, set control bit 7 and store
+`$0000`. `read_string.asm` already renders a null slot as `""`. (A `GP.FREE` *statement* would be
+the wrong shape — it needs the string-variable-address compile deliberately deleted on 01/09/26
+for 188 B plus a page of `ObjectBase`.) Risk: `A$ = "" : FOR ... : A$ = A$ + CHR$(c)` would free
+and regrow every pass; if that matters, free only when `MaxLen >= 32`.
+
+**Pop-the-bottom measured worthless alone** — 0 B in all four dumps, the bottom block was live
+every time. It only earns its place after coalescing and freeing exist, when a freed buffer *is*
+the bottom run.
+
+**Compaction is ruled out**, not deferred: 503 B at the churn plateau, 0 B on the editor's real
+path, against 2 bytes a block of back-pointers, a safe-point statement (the numeric stack holds
+`block+2` pointers mid-expression), and invalidating every `GP.STRPTR` address the modules hold.
+Revisit only if a workload shows a lot of dead space *and* no room to lower the plateau.
+
+### What a program can do today, with no compiler change
+
+**Give every string variable its longest value once, at startup.** Measured on the same churn
+workload:
+
+| | FRE | blocks | dead |
+|---|---|---|---|
+| natural growth | 20,054 | 34 | 13 blocks / 585 B |
+| pre-sized first | **20,271** | **21** | **0** |
+
+**+217 B and zero corpses ever**, stable from the first statement. Why: a variable first assigned
+5 chars gets a 10-byte block, then grows 10 -> 30 -> 75 -> 123, abandoning each one. That chain is
+~124 B of corpses per variable and it is the whole `[5,4,4]` dead-run pattern.
+
+**Pre-size to the REAL max, not the theoretical max.** Corpses are reusable; permanently-held
+slack is not. Oversizing loses. And there is no `RPT$`/`STRING$` in this BASIC (only `CHR$ STR$
+LEFT$ RIGHT$ MID$`), so the pre-size must be a literal, which costs its length in object bytes.
+
+Swept the tree: 57 string variables have a short first assignment, but the ones that cost are the
+**11 per-character growth loops**, and 4 of those are test-only.
+
+Shipped, worth fixing (memory *and* speed — one allocation per character):
+
+| file | line | variable |
+|---|---|---|
+| `samples/editor/ED-STORE.BASL` | 143 | `LINE.TEXT$ + CHR$()` per char (loader) |
+| `samples/editor/ED-STORE.BASL` | 349 | `DOC.OUT$ + CHR$()` per char (saver) |
+| `samples/XBASE/GPC-BASIC/DBFILE.INC.BL` | 129 | `DBFILE.S$ + CHR$()` per byte |
+| `samples/XBASE/GPC-BASIC/DB.INC.BL` | 460 | `DB.BUF$ + STR.STR$` |
+| `samples/XBASE/XBASE.BASL` | 240, 402 | `XB.LINE$ +` |
+| `samples/prg2basload/prg2basload.basl` | 919 | `INDENT$ + " "` (small) |
+
+Ignore `EDITOR.BASL` 1095 / 1113 / 1294 / 1298 — all inside `#IFNDEF ED.RELEASE`, they do not
+ship. **Next step when this is picked up:** do the editor's two, measure the delta, and only then
+decide about the rest.
+
+### How to reproduce the measurements
+
+The probe walks the block chain and prints one line per block; a Python pass turns that into the
+tables above. The harness lived in `tmp-heap/` (untracked) driven by `source/unit-tests/devprobe.py`
+with `GPCWORK` pointed at that directory, per the "do not build in `testing/`" rule.
+
+Three things that cost cycles and will again:
+
+- **A SHARED build's heap pointers are `$0411`/`$0419`** (`stringHighMemory`, `storeEndHigh`),
+  *not* the runtime image's `$0400`/`$0408`. `availableMemory` is `$26` in both. Have the probe
+  identify them itself by checking which candidate satisfies `FRE = ceiling - availableMemory`.
+- **`samples/editor/EDITOR.BASL` is committed in RELEASE mode** — all three of `ED.RELEASE`,
+  `ED.NOCORE`, `ED.NOOPT` defined. A headless run then prints *nothing* and sits in the
+  interactive loop, which reads exactly like a hang. Comment out `ED.RELEASE` plus one of the
+  other two and set `DEBUG.MODE = 1`.
+- **`MOD` is a function, not an operator.** `X MOD 79` compiles to `NOT IMPLEMENTED @ <line>`;
+  `source/runtime/source/system-specific/x16/unary/mod.asm` is `MOD(dividend, divisor)`.
 
 ## Notes that are easy to lose
 

@@ -1,100 +1,109 @@
-@3. The modules
+@GUI.INC.BL -- four dialogs, in a box that puts the screen back.
 .
-=3. THE MODULES
+=GUI.INC.BL
 .
-.Each table is in (set before the GOSUB), out (read after it), and internal
-.(do not read, do not write, do not rely on).
+.  four dialogs, in a box that puts the screen back.
 .
-=THEME.INC.BL
+=MODULE HEADER
 .
-.  in
-.      THEME.ID -- 0 x16, 1 dark, 2 light, 3 gray, 4 custom, read by
-.        THEME.LOAD<br>THEME.ATTR -- a packed attribute, for THEME.SET and
-.        THEME.HI
+:      GUI.SAY     something to say, and one way out
+:      GUI.YN      a question, and a Y or N answer
+:      GUI.MENU    a question, and a row chosen from a list
+:      GUI.TEXT    a question, and a line of typed text
 .
-.  out
-.      THEME.CLR(role) -- the colour array, DIMmed to
-.        THEME.SLOTS<br>THEME.INV -- the inverse attribute, from THEME.HI
+.  What they share is the BOX: measure it against the text, centre it, save
+.  what it covers, draw a frame, give the pixels back on the way out. That is
+.  GUI.OPEN and GUI.CLOSE, and the three entry points are thin. GUI.MENU is
+.  MENUVERT.RUN inside a frame and GUI.TEXT is LINEINPUT.GET inside one, so
+.  only GUI.YN -- four keys -- reads the keyboard itself.
 .
-.  internal
-.      THEME.READY
+.  REQUIRES, and does not #INCLUDE for you, in this order:
+:      GPB.INC.BL        GP.BOX, GP.FILL, GP.PRINTAT, GP.CALL
+:      STASH.INC.BL      saves the cells the box covers -- and wants a
+:                        #SYMFILE in your program, see its own header
+:      THEME.INC.BL      the colour roles, and GOSUB THEME.LOAD first
+:      MENUVERT.INC.BL   drawn on by GUI.MENU
+:      LINEINPUT.INC.BL  drawn on by GUI.TEXT
 .
-.  constants
-.      THEME.PAGE THEME.TEXT THEME.TITLE THEME.BORDER THEME.HILITE
-.        THEME.DIMMED THEME.WARN THEME.SLOTS THEME.COUNT
+=BOTH ARE REQUIRED EVEN IF YOU ONLY CALL GUI.YN
 .
-.THEME.CLR is the array this module DIMs. Do not DIM it yourself -- the
-.module owns it, and DIMming an array GPC has already dimensioned is an
-.error.
+.  BASLOAD resolves every label in the file, not the ones a path reaches, so
+.  leaving either out stops BASLOAD with LABEL NOT FOUND rather than
+.  compiling a smaller program.
 .
-=APPSYS.INC.BL
+.  Usage, the whole of it:
+:      THEME.ID = 0 : GOSUB THEME.LOAD
+:      GUI.BANK = 8
+:      GUI.MSG$ = "Delete the file?"
+:      GOSUB GUI.YN
+:      IF GUI.ANSWER THEN <yes>
 .
-.  in
-.      APPSYS.FILE$ APPSYS.BANK APPSYS.X APPSYS.Y APPSYS.W APPSYS.H
-.        APPSYS.DEV -- the panel routines
+:   in   GUI.MSG$        the question. "" for none
+:        GUI.MSG2$       a second line, for detail that does not fit. "" for
+:                        none, and then there is no gap
+:        GUI.TITLE$      a name in the top edge of the frame. "" for none
+:        GUI.BANK        a spare RAM bank to save the covered cells in.
+:                        0 MEANS DO NOT SAVE, and then the box is still on
+:                        the screen when the call returns
+:        GUI.STYLE       0, the default, draws the rounded single line box.
+:                        1 to 3 are GP.BOX's other styles
+:        GUI.PANEL.IN    the panel: the box's background AND the colour the
+:                        message lines are written in. 0 takes THEME.TEXT
+:        GUI.BORDER.IN   the frame's attribute. 0 takes THEME.BORDER
+:        GUI.GLYPH       non-zero frames the box from six glyphs of the
+:                        CALLER'S, and GUI.STYLE is then not consulted.
+:                        They are TILE INDICES: GUI.FRAME hands them to
+:                        GP.BOX as a custom set, which does not convert
+:                            GUI.EDGE.H      the horizontal run
+:                            GUI.EDGE.V      the vertical run
+:                            GUI.CORNER.TL   .TR  .BL  .BR
+:        GUI.PLACE       0 centres the box. Non-zero uses GUI.X, GUI.Y
+:        GUI.X  GUI.Y    top left, when GUI.PLACE says so
+:        GUI.ROW.OFFSET  added to the row the box lands on, however it was
+:                        placed. 0 for almost everybody -- see below
 .
-.  out
-.      APPSYS.MODE APPSYS.COLS APPSYS.ROWS APPSYS.COLOUR -- set by
-.        APPSYS.STARTUP<br>APPSYS.IS.EMULATOR -- set by APPSYS.ISEMU
+:   out  GUI.KEY         the key that ended it, whichever call
+:        GUI.LEFT GUI.TOP GUI.WIDTH GUI.HEIGHT   where the box went, and
+:                        how big it turned out
 .
-.  internal
-.      APPSYS.LAST
+=GUI.ROW.OFFSET IS FOR HARDWARE SCROLLING
 .
-.  constants
-.      APPSYS.SCRMODE APPSYS.COLREG APPSYS.SETCHR APPSYS.CHRREG APPSYS.EMUSIG
+.  The GP commands address the text MAP, and VERA's L1_VSCROLL decides which
+.  map row shows as screen row 0. A caller scrolling that way sets
+.  GUI.ROW.OFFSET to VSCROLL/8 and is centred against what the user can see.
+.  Everyone else leaves it 0.
 .
-.Lay the screen out from APPSYS.COLS and APPSYS.ROWS. Do not assume 80x60 --
-.the X16 boots there but SCREEN 0 is 40x30, and someone who prefers larger
-.text is running one.
+=UPPER CASE, ON THE DEFAULT CHARSET
 .
-=STRINGS.INC.BL
+.  GP.PRINTAT converts PETSCII and BASLOAD passes literals through as source
+.  bytes, so on charset 2 ASCII lower case lands on the graphics half of the
+.  font -- "Confirm" measured as tiles 3, 79, 78, 70, 73, 82, 77. ISO mode
+.  fixes the text and breaks the frame, GP.BOX's $40-$7D being letters in
+.  that order: so it is upper case with a frame, or mixed case without one,
+.  unless the caller re-orders the font and says where the glyphs went with
+.  GUI.GLYPH. That is what samples/editor does, and the whole reason the
+.  frame is overridable.
 .
-.  in
-.      STR.STR$ -- the string, in and out<br>STR.WIDTH -- field width, the
-.        pad routines<br>STR.DELIM$ STR.MAX -- SPLIT (MAX 0 means
-.        10)<br>STR.FIND$ STR.REPL$ -- REPLACE<br>STR.PET -- a PETSCII code,
-.        PET2SCR
+=A BOX OVER 4094 CELLS WILL NOT FIT ONE BANK
 .
-.  out
-.      STR.STR$ -- padded, or replaced, in place<br>STR.N -- how many fields
-.        SPLIT found, always >= 1<br>STR.FIELD$(1..N) -- the fields
-.        themselves<br>STR.SCR -- the screen code from PET2SCR
+.  and that is not an error: the save is skipped, the dialog still runs, and
+.  GUI.STASHED comes back 0 so the caller knows it must repaint. Same when
+.  GUI.BANK is 0.
 .
-.  internal
-.      STR.GAP STR.HALF STR.REST$ STR.AT STR.LIM STR.OUT$
+.  .IN IS "WHAT THE CALLER ASKED FOR" -- GUI.PANEL and GUI.BORDER are what
+.  GUI.OPEN settled on, and those are what everything downstream draws with.
+.  Both requests are 0-means-default: attribute 0 is black on black, legal
+.  and no use to anybody, so it is free to spend as "I did not choose".
 .
-.STR.FIELD$ is the one array the library does not DIM. Left alone, GPC's
-.implicit DIM gives 0..10. For more, DIM it before the first call and set
-.STR.MAX to match -- DIMming an array GPC has already auto-dimensioned is an
-.error, so it is one or the other. This is the opposite of THEME.CLR, which
-.the module owns outright; the two are worth keeping straight.
+.  The whole GUI. name space belongs to this file, except GUI.LISTBOX., which
+.  is GUI2.INC.BL -- a listbox is a GUI dialog and reads like one, but it is
+.  the only one that scrolls and the only one that marks, so it is its own
+.  #INCLUDE and you pay for it only when you want it.
 .
-=LINEINPUT.INC.BL
+=SEE ALSO
 .
-.  in
-.      LINEINPUT.X LINEINPUT.Y -- top left of the field<br>LINEINPUT.LEN --
-.        how many characters fit<br>LINEINPUT.ATTR -- packed
-.        attribute<br>LINEINPUT.TEXT$ -- the starting value<br>LINEINPUT.MASK
-.        -- non-zero shows asterisks<br>LINEINPUT.ALLOW$ -- the only
-.        characters accepted<br>LINEINPUT.DENY$ -- characters
-.        refused<br>LINEINPUT.LABEL$ -- LINEINPUT.ASK only
-.
-.  out
-.      LINEINPUT.TEXT$ -- what was typed<br>LINEINPUT.KEY -- the key that
-.        ended it
-.
-.  internal
-.      LINEINPUT.SHOW$ LINEINPUT.WAS$ LINEINPUT.K$ LINEINPUT.CELL$
-.        LINEINPUT.CODE LINEINPUT.CX LINEINPUT.CA LINEINPUT.INV LINEINPUT.LIT
-.        LINEINPUT.TICK LINEINPUT.DONE LINEINPUT.FILLED LINEINPUT.HOME
-.        LINEINPUT.BAR
-.
-.  constants
-.      LINEINPUT.RETURN LINEINPUT.DELETE LINEINPUT.ESCAPE LINEINPUT.STOP
-.        LINEINPUT.DOWN LINEINPUT.UP LINEINPUT.TAB LINEINPUT.SPACE
-.        LINEINPUT.STAR LINEINPUT.BLINK
-.
-.LINEINPUT.SHOW$ is listed internal but is the one exception worth knowing:
-.it holds what the field displayed, which is what you want if you are
-.repainting a masked field yourself. FORM.EXP.BL uses it for exactly that.
-.
+>78|STASH.INC.BL -- save a text rectangle, and put it back.
+>47|4.1 THEME.INC.BL -- named colour roles
+>53|4.6 MENUVERT.INC.BL -- a vertical menu
+>51|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>65|GUI2.INC.BL -- a listbox, single or multi select.

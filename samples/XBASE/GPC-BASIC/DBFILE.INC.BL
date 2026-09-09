@@ -1,0 +1,224 @@
+## ***********************************************************************
+## **
+## **  DBFILE.INC.BL -- byte level random access to a CMDR-DOS file.
+## **
+## **      DBFILE.CMDOPEN  DBFILE.CMDCLOSE   the shared command channel
+## **      DBFILE.OPEN     DBFILE.CLOSE      one data channel
+## **      DBFILE.SEEK     DBFILE.TELL       position, and position plus size
+## **      DBFILE.READ     DBFILE.WRITE      one fixed length block
+## **      DBFILE.STATUS   DBFILE.HEX        the error line, and a hex parser
+## **
+## **  SKELETON. Nothing here has run. Every routine is written out, and the
+## **  four measurements in ../PLAN.md section 8 decide whether it is right.
+## **
+## **  There are no REL files. Random access is two command channel calls,
+## **  and they work on any file.
+## **
+## **      position   "P" + CHR$(sa) + four binary bytes, little endian
+## **      tell       "T" + CHR$(sa), replies 07,pppppppp ssssssss,00,00
+## **
+## **  The sa argument is the data channel's SECONDARY ADDRESS, not its logical
+## **  file number. This file opens every channel with the two equal, so one
+## **  number serves as both.
+## **
+## **  Open mode ",M" is read and write, and is what lets a record be
+## **  overwritten where it lies.
+## **
+## **  REQUIRES, and does not #INCLUDE for you:
+## **      GPB.INC.BL      GP.STRPTR is not used here, but MOD is
+## **
+## **  IT DOES NOT CALL FILEIO. FILE.STATUS closes channel 15, and a database
+## **  holds its command channel open for its whole life. The P and T code is
+## **  duplicated here rather than shared.
+## **
+## **  WARNING: DBFILE.SEEK sends CHR$(0) inside a PRINT# string whenever an
+## **  offset byte is zero, which is most of them. Whether the KERNAL passes a
+## **  NUL through to the command channel unchanged is measurement 2 in
+## **  ../PLAN.md, and the whole file format rests on the answer.
+## **
+## **  WARNING: the KERNAL manual parses the T reply with VAL("$" + MID$(A$,10)).
+## **  That returns 0. VAL stops at the first character that is not a digit.
+## **  DBFILE.HEX reads the eight digits by hand instead.
+## **
+## **  T is R48 and later.
+## **
+## **  The whole DBFILE.* name space belongs to this file.
+## **
+## ***********************************************************************
+#IFNDEF DBFILE.DEFS
+#DEFINE DBFILE.DEFS 1
+
+## The command channel. Shared by both data channels, because P and T take the
+## target channel as an argument. 2 and 3 belong to the editor, GPC-HELP and the
+## cruncher; 14 belongs to FILEIO.
+#DEFINE DBFILE.CMD 15
+
+## Reply offsets in "07,pppppppp ssssssss,00,00". One based, for MID$.
+#DEFINE DBFILE.POSAT 4
+#DEFINE DBFILE.SIZEAT 13
+#DEFINE DBFILE.HEXLEN 8
+
+GOTO DBFILE.MODULE.END
+
+
+## ---------------------------------------------------------------- command
+## The command channel is opened once, before the first database, and closed
+## after the last. Both areas use it.
+##
+##   in   DBFILE.DEVICE   8 unless something says otherwise
+
+DBFILE.CMDOPEN:
+    OPEN DBFILE.CMD, DBFILE.DEVICE, DBFILE.CMD
+    RETURN
+
+DBFILE.CMDCLOSE:
+    CLOSE DBFILE.CMD
+    RETURN
+
+
+## ------------------------------------------------------------------- open
+## Mode ",M" opens for read and write. The secondary address is the channel
+## number, so DBFILE.CH is the only number a caller carries.
+##
+##   in   DBFILE.CH       12 for area 0, 13 for area 1
+##        DBFILE.NAME$    "PARTS.DBF"
+##        DBFILE.DEVICE
+##   out  DBFILE.ERR      0 on success
+
+DBFILE.OPEN:
+    OPEN DBFILE.CH, DBFILE.DEVICE, DBFILE.CH, DBFILE.NAME$ + ",M"
+    GOSUB DBFILE.STATUS
+    RETURN
+
+DBFILE.CLOSE:
+    CLOSE DBFILE.CH
+    RETURN
+
+
+## ----------------------------------------------------------------- create
+## Makes the file empty, then gets out of the way. The caller reopens it with
+## DBFILE.OPEN, because a channel opened for write is not a channel that can
+## be positioned backwards.
+##
+## ",S,W" is a new sequential file. It fails if one of that name exists, which
+## is what the caller wants to hear about.
+##
+##   in   DBFILE.CH, DBFILE.NAME$, DBFILE.DEVICE
+##   out  DBFILE.ERR
+
+DBFILE.CREATE:
+    OPEN DBFILE.CH, DBFILE.DEVICE, DBFILE.CH, DBFILE.NAME$ + ",S,W"
+    GOSUB DBFILE.STATUS
+    CLOSE DBFILE.CH
+    RETURN
+
+
+## ------------------------------------------------------------------- seek
+## The offset is 32 bits, low byte first, as four BINARY bytes. A BASL float is
+## exact to 16,777,215, so a 16 MB file is addressable and the arithmetic below
+## never loses a bit.
+##
+##   in   DBFILE.CH       the channel to move
+##        DBFILE.POS      byte offset from the start of the file
+
+DBFILE.SEEK:
+    DBFILE.WORK = DBFILE.POS
+    DBFILE.S$ = "P" + CHR$(DBFILE.CH)
+    FOR DBFILE.I = 0 TO 3
+        DBFILE.BYTE = MOD(DBFILE.WORK, 256)
+        DBFILE.S$ = DBFILE.S$ + CHR$(DBFILE.BYTE)
+        DBFILE.WORK = (DBFILE.WORK - DBFILE.BYTE) / 256
+    NEXT DBFILE.I
+    PRINT# DBFILE.CMD, DBFILE.S$;
+    RETURN
+
+
+## ------------------------------------------------------------------- tell
+## T answers with the position AND the file size, eight hexadecimal digits
+## each. The size is what DB.FIX checks the stored record count against.
+##
+##   in   DBFILE.CH
+##   out  DBFILE.POS      where that channel is
+##        DBFILE.SIZE     how long the file is
+##        DBFILE.ERR      0 on success
+
+DBFILE.TELL:
+    PRINT# DBFILE.CMD, "T" + CHR$(DBFILE.CH);
+    LINEINPUT# DBFILE.CMD, DBFILE.REPLY$
+    DBFILE.ERR = 0
+    IF LEN(DBFILE.REPLY$) < DBFILE.SIZEAT + DBFILE.HEXLEN - 1 THEN DBFILE.ERR = 1
+    IF DBFILE.ERR <> 0 THEN RETURN
+    DBFILE.HEX$ = MID$(DBFILE.REPLY$, DBFILE.POSAT, DBFILE.HEXLEN)
+    GOSUB DBFILE.HEX
+    DBFILE.POS = DBFILE.HEXV
+    DBFILE.HEX$ = MID$(DBFILE.REPLY$, DBFILE.SIZEAT, DBFILE.HEXLEN)
+    GOSUB DBFILE.HEX
+    DBFILE.SIZE = DBFILE.HEXV
+    RETURN
+
+
+## -------------------------------------------------------------- hex parser
+## Eight digits, most significant first. Upper and lower case both.
+##
+##   in   DBFILE.HEX$
+##   out  DBFILE.HEXV
+
+DBFILE.HEX:
+    DBFILE.HEXV = 0
+    FOR DBFILE.I = 1 TO LEN(DBFILE.HEX$)
+        DBFILE.BYTE = ASC(MID$(DBFILE.HEX$, DBFILE.I, 1))
+        IF DBFILE.BYTE >= 97 THEN DBFILE.BYTE = DBFILE.BYTE - 32
+        IF DBFILE.BYTE >= 65 THEN DBFILE.BYTE = DBFILE.BYTE - 55
+        IF DBFILE.BYTE < 65 THEN DBFILE.BYTE = DBFILE.BYTE - 48
+        DBFILE.HEXV = DBFILE.HEXV * 16 + DBFILE.BYTE
+    NEXT DBFILE.I
+    RETURN
+
+
+## ------------------------------------------------------------ read a block
+## BINPUT# takes a fixed count in one call. ST AND 64 is end of file, and a
+## short read at the end of the file is not an error.
+##
+##   in   DBFILE.CH
+##        DBFILE.LEN      bytes wanted
+##   out  DBFILE.BUF$
+##        DBFILE.EOF      true if the read hit the end
+
+DBFILE.READ:
+    BINPUT# DBFILE.CH, DBFILE.BUF$, DBFILE.LEN
+    DBFILE.EOF = 0
+    IF (ST AND 64) <> 0 THEN DBFILE.EOF = -1
+    RETURN
+
+
+## ----------------------------------------------------------- write a block
+## In ",M" this overwrites in place and does not truncate. That is measurement
+## 1 in ../PLAN.md and it is the pivot of the whole format: a fixed stride
+## exists so that a record never has to move.
+##
+## The trailing semicolon matters. Without it PRINT# appends a carriage return
+## and every record is one byte longer than the stride.
+##
+##   in   DBFILE.CH
+##        DBFILE.BUF$     exactly one stride of bytes
+
+DBFILE.WRITE:
+    PRINT# DBFILE.CH, DBFILE.BUF$;
+    RETURN
+
+
+## ----------------------------------------------------------------- status
+## Reads the error line. This is the only place the command channel is read
+## other than DBFILE.TELL, and it does NOT close the channel.
+##
+##   out  DBFILE.ERR      the DOS error number
+##        DBFILE.MSG$     the whole line
+
+DBFILE.STATUS:
+    LINEINPUT# DBFILE.CMD, DBFILE.MSG$
+    DBFILE.ERR = VAL(LEFT$(DBFILE.MSG$, 2))
+    RETURN
+
+
+DBFILE.MODULE.END:
+#ENDIF

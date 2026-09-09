@@ -1,0 +1,610 @@
+## ***********************************************************************
+## **
+## **  DB.INC.BL -- the record keeper. Schema, navigation, read and write.
+## **
+## **      DB.INIT     DB.SELECT                       set up, pick an area
+## **      DB.OPEN     DB.CREATE   DB.CLOSE            a file in an area
+## **      DB.CLOSEALL DB.FIX
+## **      DB.GOTO     DB.NEXT     DB.PREV
+## **      DB.TOP      DB.BOTTOM
+## **      DB.PUT      DB.NEW      DB.DEL     DB.UNDEL
+## **      DB.PACK     DB.ZAP
+## **      DB.FIND     DB.FINDFLD  DB.BLANK
+## **
+## **  SKELETON. Nothing here has run.
+## **
+## **  A RECORD IS AN ARRAY, NOT A CALL. DB.GOTO splits the record into
+## **  DB.FLD$(), and DB.PUT joins it back. Between the two a field is read and
+## **  written as an array element, in plain BASIC:
+## **
+## **      DB.KEY$ = "PRICE" : GOSUB DB.FINDFLD
+## **      PRICE = DB.F
+## **      P = VAL(DB.FLD$(DB.A, PRICE))
+## **      DB.FLD$(DB.A, PRICE) = STR$(P * 2)
+## **      GOSUB DB.PUT
+## **
+## **  Naming the area in the subscript is what makes the other area's buffer
+## **  free to read: DB.FLD$(1, SUPPNAME) is dBASE's SUPP->NAME and costs one
+## **  array index, because the record is already in hand.
+## **
+## **  REQUIRES, and does not #INCLUDE for you:
+## **      GPB.INC.BL      MOD
+## **      STRINGS.INC.BL  STR.PADL, STR.PADR, STR.RTRIM
+## **      DBFILE.INC.BL   every disk touch goes through it
+## **
+## **  RECORD 0 IS THE HEADER, so the byte offset of record N is N * stride
+## **  with nothing added, and DB.GOTO 0 is legal. Records 1..DB.NFLD are the
+## **  field descriptors, one each. Data starts at DB.DATA0.
+## **
+## **  DB.COUNT IS THE PHYSICAL RECORD COUNT, deleted records included. It has
+## **  to be, because the only thing that can check it is the file size T
+## **  reports. A live count is a scan and is not stored.
+## **
+## **  Everything on disk is text. Numbers are right justified and space
+## **  padded, so one byte comparison orders any field, and VAL skips the
+## **  leading spaces on the way back.
+## **
+## **  WARNING: nothing detects an assignment, so there is no dirty flag.
+## **  DB.NEXT discards an uncommitted edit without asking. DB.PUT before
+## **  every move.
+## **
+## **  The whole DB.* name space belongs to this file.
+## **
+## ***********************************************************************
+#IFNDEF DB.DEFS
+#DEFINE DB.DEFS 1
+
+## Two areas, dBASE III's thirty-two fields. The arrays are DIMmed once at
+## these bounds. An element never assigned costs nothing -- the runtime hands
+## out a static empty string for it.
+#DEFINE DB.AREAS 2
+#DEFINE DB.MAXF 32
+#DEFINE DB.LASTA 1
+#DEFINE DB.LASTF 31
+
+## Data channels. The command channel is DBFILE's.
+#DEFINE DB.CH0 12
+#DEFINE DB.CH1 13
+
+## Record 0, the header. Offsets are zero based; MID$ is one based, so every
+## read below adds one.
+#DEFINE DBH.MAGIC 1
+#DEFINE DBH.STRIDE 5
+#DEFINE DBH.NFLD 8
+#DEFINE DBH.DATA0 10
+#DEFINE DBH.COUNT 13
+#DEFINE DBH.DATE 19
+#DEFINE DBH.TITLE 27
+#DEFINE DBH.TITLEW 16
+
+## Records 1..NFLD, one field descriptor each.
+#DEFINE DBD.NAME 1
+#DEFINE DBD.NAMEW 10
+#DEFINE DBD.TYPE 11
+#DEFINE DBD.WIDTH 12
+#DEFINE DBD.DEC 15
+#DEFINE DBD.OFF 17
+
+## The stride the header and the descriptors are written at before the real
+## one is known. A descriptor needs 20 bytes, so no database has a stride
+## below this.
+#DEFINE DB.MINSTRIDE 32
+
+GOTO DB.MODULE.END
+
+
+## ------------------------------------------------------------------- init
+## Called once, before anything else. DIMs every array and opens the shared
+## command channel.
+##
+##   in   DBFILE.DEVICE
+
+DB.INIT:
+    DIM DB.FLD$(DB.LASTA, DB.LASTF)
+    DIM DB.NAME$(DB.LASTA, DB.LASTF)
+    DIM DB.TYPE$(DB.LASTA, DB.LASTF)
+    DIM DB.OFF%(DB.LASTA, DB.LASTF)
+    DIM DB.WID%(DB.LASTA, DB.LASTF)
+    DIM DB.DEC%(DB.LASTA, DB.LASTF)
+    DIM DB.ISOPEN(DB.LASTA)
+    DIM DB.CH(DB.LASTA)
+    DIM DB.FILE$(DB.LASTA)
+    DIM DB.TITLE$(DB.LASTA)
+    DIM DB.STRIDE(DB.LASTA)
+    DIM DB.NFLD(DB.LASTA)
+    DIM DB.DATA0(DB.LASTA)
+    DIM DB.COUNT(DB.LASTA)
+    DIM DB.RECNO(DB.LASTA)
+    DB.CH(0) = DB.CH0 : DB.CH(1) = DB.CH1
+    DB.A = 0 : DB.SHOWDEL = 0 : GOSUB DBFILE.CMDOPEN
+    RETURN
+
+
+## ----------------------------------------------------------------- select
+## Every other verb acts on the selection. Nothing is read or written here.
+##
+##   in   DB.A    0 or 1
+
+DB.SELECT:
+    RETURN
+
+
+## ------------------------------------------------------------------- open
+## Reads the header and every descriptor, caches the schema, and lands on the
+## first record.
+##
+##   in   DB.FILE$(DB.A)   set by the caller before the call
+##   out  DB.ERR           0 on success
+
+DB.OPEN:
+    DBFILE.CH = DB.CH(DB.A) : DBFILE.NAME$ = DB.FILE$(DB.A)
+    GOSUB DBFILE.OPEN
+    DB.ERR = DBFILE.ERR
+    IF DB.ERR <> 0 THEN RETURN
+    GOSUB DB.RDHDR
+    IF DB.ERR <> 0 THEN GOTO DB.OPEN.FAIL
+    GOSUB DB.RDSCHEMA
+    IF DB.ERR <> 0 THEN GOTO DB.OPEN.FAIL
+    DB.ISOPEN(DB.A) = -1
+    GOSUB DB.FIX
+    GOSUB DB.TOP
+    RETURN
+
+DB.OPEN.FAIL:
+    DBFILE.CH = DB.CH(DB.A) : GOSUB DBFILE.CLOSE : DB.ISOPEN(DB.A) = 0
+    RETURN
+
+
+## ----------------------------------------------------------------- create
+## Builds an empty file from the schema already in the arrays, then opens it.
+## The caller fills DB.NAME$(), DB.TYPE$(), DB.WID%() and DB.DEC%() for the
+## selected area and sets DB.NFLD(DB.A); DB.CREATE computes DB.OFF%() and the
+## stride itself.
+##
+## THIS IS THE ONE PLACE THE SCHEMA ARRAYS ARE AN INPUT. Everywhere else they
+## are what DB.OPEN cached.
+##
+##   in   DB.FILE$(DB.A), DB.TITLE$(DB.A), DB.NFLD(DB.A), the schema arrays
+##   out  DB.ERR
+
+DB.CREATE:
+    ## Byte 0 of a data record is the delete flag, so the first field starts
+    ## at 1 and the stride is one more than the widths add up to.
+    DB.OFF = 1
+    FOR DB.I = 0 TO DB.NFLD(DB.A) - 1
+        DB.OFF%(DB.A, DB.I) = DB.OFF
+        DB.OFF = DB.OFF + DB.WID%(DB.A, DB.I)
+    NEXT DB.I
+    DB.STRIDE(DB.A) = DB.OFF
+    IF DB.STRIDE(DB.A) < DB.MINSTRIDE THEN DB.STRIDE(DB.A) = DB.MINSTRIDE
+    DB.DATA0(DB.A) = DB.NFLD(DB.A) + 1
+    DB.COUNT(DB.A) = 0
+
+    ## Create truncates. The file has to be made, closed and reopened in ",M",
+    ## because a file opened for write is not a file that can be positioned
+    ## backwards.
+    DBFILE.CH = DB.CH(DB.A) : DBFILE.NAME$ = DB.FILE$(DB.A)
+    GOSUB DBFILE.CREATE : DB.ERR = DBFILE.ERR
+    IF DB.ERR <> 0 THEN RETURN
+
+    GOSUB DBFILE.OPEN
+    DB.ERR = DBFILE.ERR
+    IF DB.ERR <> 0 THEN RETURN
+    DB.ISOPEN(DB.A) = -1
+
+    GOSUB DB.WRHDR
+    FOR DB.I = 0 TO DB.NFLD(DB.A) - 1
+        DB.F = DB.I
+        GOSUB DB.WRDESC
+    NEXT DB.I
+    GOSUB DB.BLANK
+    RETURN
+
+
+## ------------------------------------------------------------------ close
+## Flushes the header, because DB.COUNT may have moved since the open.
+
+DB.CLOSE:
+    IF DB.ISOPEN(DB.A) = 0 THEN RETURN
+    GOSUB DB.WRHDR : DBFILE.CH = DB.CH(DB.A)
+    GOSUB DBFILE.CLOSE
+    DB.ISOPEN(DB.A) = 0 : DB.FILE$(DB.A) = "" : DB.NFLD(DB.A) = 0
+    RETURN
+
+DB.CLOSEALL:
+    DB.SAVEA = DB.A
+    FOR DB.A = 0 TO DB.LASTA
+        GOSUB DB.CLOSE
+    NEXT DB.A
+    DB.A = DB.SAVEA
+    GOSUB DBFILE.CMDCLOSE
+    RETURN
+
+
+## -------------------------------------------------------------------- fix
+## The stored count against the file size. When they disagree the last
+## session died mid write: the file size is the truth and the header is
+## rewritten from it.
+##
+##   out  DB.FIXED    true if the header was repaired
+
+DB.FIX:
+    DB.FIXED = 0 : DBFILE.CH = DB.CH(DB.A)
+    GOSUB DBFILE.TELL
+    IF DBFILE.ERR <> 0 THEN RETURN
+    DB.N = INT(DBFILE.SIZE / DB.STRIDE(DB.A)) - DB.DATA0(DB.A)
+    IF DB.N < 0 THEN DB.N = 0
+    IF DB.N = DB.COUNT(DB.A) THEN RETURN
+    DB.COUNT(DB.A) = DB.N
+    GOSUB DB.WRHDR : DB.FIXED = -1
+    RETURN
+
+
+## --------------------------------------------------------------- navigate
+## Each leaves the record split into DB.FLD$() and the number in DB.RECNO().
+## DB.EOF and DB.BOF are the flags.
+##
+## DB.RECNO() IS A PHYSICAL RECORD NUMBER, counted from record 0 of the file.
+## The first data record is DB.DATA0(DB.A) and the last is DB.DATA0 + DB.COUNT
+## - 1. The admin displays it as one based by subtracting DB.DATA0.
+
+## DB.END IS RECOMPUTED HERE ON EVERY CALL and used by nothing that survives
+## across one. DB.NEXT and DB.PREV do not hold it over their own GOSUB DB.GOTO,
+## because this line would overwrite it under them.
+DB.GOTO:
+    DB.EOF = 0 : DB.BOF = 0
+    IF DB.COUNT(DB.A) = 0 THEN DB.EOF = -1
+    IF DB.COUNT(DB.A) = 0 THEN DB.BOF = -1
+    IF DB.COUNT(DB.A) = 0 THEN RETURN
+    DB.END = DB.DATA0(DB.A) + DB.COUNT(DB.A) - 1
+    IF DB.RECNO(DB.A) < DB.DATA0(DB.A) THEN DB.BOF = -1
+    IF DB.RECNO(DB.A) < DB.DATA0(DB.A) THEN DB.RECNO(DB.A) = DB.DATA0(DB.A)
+    IF DB.RECNO(DB.A) > DB.END THEN DB.EOF = -1
+    IF DB.RECNO(DB.A) > DB.END THEN DB.RECNO(DB.A) = DB.END
+    DB.REC = DB.RECNO(DB.A)
+    GOSUB DB.RDREC : GOSUB DB.SPLIT
+    RETURN
+
+DB.TOP:
+    DB.RECNO(DB.A) = DB.DATA0(DB.A) : GOSUB DB.GOTO
+    IF DB.SHOWDEL THEN RETURN
+    IF DB.DELETED THEN GOSUB DB.NEXT
+    RETURN
+
+DB.BOTTOM:
+    DB.RECNO(DB.A) = DB.DATA0(DB.A) + DB.COUNT(DB.A) - 1 : GOSUB DB.GOTO
+    IF DB.SHOWDEL THEN RETURN
+    IF DB.DELETED THEN GOSUB DB.PREV
+    RETURN
+
+## Skips deleted records unless DB.SHOWDEL is true. That switch is what makes
+## DB.UNDEL usable: without it a deleted record can never be landed on.
+DB.NEXT:
+    DB.EOF = 0
+DB.NEXT.STEP:
+    IF DB.RECNO(DB.A) >= DB.DATA0(DB.A) + DB.COUNT(DB.A) - 1 THEN DB.EOF = -1
+    IF DB.EOF THEN RETURN
+    DB.RECNO(DB.A) = DB.RECNO(DB.A) + 1 : GOSUB DB.GOTO
+    IF DB.SHOWDEL THEN RETURN
+    IF DB.DELETED THEN GOTO DB.NEXT.STEP
+    RETURN
+
+DB.PREV:
+    DB.BOF = 0
+DB.PREV.STEP:
+    IF DB.RECNO(DB.A) <= DB.DATA0(DB.A) THEN DB.BOF = -1
+    IF DB.BOF THEN RETURN
+    DB.RECNO(DB.A) = DB.RECNO(DB.A) - 1 : GOSUB DB.GOTO
+    IF DB.SHOWDEL THEN RETURN
+    IF DB.DELETED THEN GOTO DB.PREV.STEP
+    RETURN
+
+
+## ------------------------------------------------------------------ write
+## DB.PUT joins DB.FLD$() and writes it at DB.RECNO(), in place. This is the
+## routine measurement 1 in ../PLAN.md is about: in ",M" the write must
+## overwrite and not truncate.
+
+DB.PUT:
+    GOSUB DB.JOIN : DB.REC = DB.RECNO(DB.A) : GOSUB DB.WRREC
+    RETURN
+
+## Reuses the first deleted slot, else appends. The buffer is blanked either
+## way, so DB.NEW is always followed by an edit and a DB.PUT.
+DB.NEW:
+    DB.LAST = DB.DATA0(DB.A) + DB.COUNT(DB.A) - 1
+    DB.SLOT = 0 : DB.I = DB.DATA0(DB.A) - 1
+
+DB.NEW.STEP:
+    DB.I = DB.I + 1
+    IF DB.I > DB.LAST THEN GOTO DB.NEW.APPEND
+    DB.REC = DB.I
+    GOSUB DB.RDREC
+    IF LEFT$(DB.BUF$, 1) <> "*" THEN GOTO DB.NEW.STEP
+    DB.SLOT = DB.I
+
+DB.NEW.APPEND:
+    IF DB.SLOT = 0 THEN DB.SLOT = DB.DATA0(DB.A) + DB.COUNT(DB.A)
+    IF DB.SLOT > DB.LAST THEN DB.COUNT(DB.A) = DB.COUNT(DB.A) + 1
+    DB.RECNO(DB.A) = DB.SLOT
+    GOSUB DB.BLANK : DB.DELETED = 0
+    GOSUB DB.PUT
+    RETURN
+
+## Marks and unmarks. Byte 0 only, so neither reads or writes a whole record
+## through DB.FLD$() and neither can lose an edit.
+DB.DEL:  DB.MARK$ = "*"   : GOSUB DB.WRMARK : RETURN
+DB.UNDEL:  DB.MARK$ = " " : GOSUB DB.WRMARK : RETURN
+
+DB.WRMARK:
+    DB.REC = DB.RECNO(DB.A) : GOSUB DB.RDREC
+    DB.BUF$ = DB.MARK$ + MID$(DB.BUF$, 2)
+    GOSUB DB.WRREC : DB.DELETED = 0
+    IF DB.MARK$ = "*" THEN DB.DELETED = -1
+    RETURN
+
+## Rewrites the file without the deleted records, then drops DB.COUNT.
+##
+## IT DOES NOT SHORTEN THE FILE. CMDR-DOS cannot truncate one, and the plan
+## does not need it to: navigation is bounded by DB.COUNT, so the records left
+## past the new end are invisible, and DB.NEW appends over them.
+DB.PACK:
+    DB.LAST = DB.DATA0(DB.A) + DB.COUNT(DB.A) - 1
+    DB.SLOT = DB.DATA0(DB.A)
+    FOR DB.I = DB.DATA0(DB.A) TO DB.LAST
+        DB.REC = DB.I
+        GOSUB DB.RDREC
+        IF LEFT$(DB.BUF$, 1) <> "*" THEN GOSUB DB.PACK.KEEP
+    NEXT DB.I
+    DB.COUNT(DB.A) = DB.SLOT - DB.DATA0(DB.A)
+    GOSUB DB.WRHDR : GOSUB DB.TOP
+    RETURN
+
+DB.PACK.KEEP:
+    IF DB.SLOT <> DB.I THEN DB.REC = DB.SLOT
+    IF DB.SLOT <> DB.I THEN GOSUB DB.WRREC
+    DB.SLOT = DB.SLOT + 1
+    RETURN
+
+## Empties the file and keeps the schema. The records stay on disk and the
+## count says there are none.
+DB.ZAP:
+    DB.COUNT(DB.A) = 0
+    GOSUB DB.WRHDR : GOSUB DB.BLANK
+    DB.RECNO(DB.A) = DB.DATA0(DB.A)
+    RETURN
+
+
+## ----------------------------------------------------------------- search
+## Forward from the record after the current one. DB.OK says whether it hit,
+## and on a hit the record is the one landed on.
+##
+##   in   DB.F        field index
+##        DB.KEY$     what to look for
+##        DB.EXACT    true for the whole field, false for a leading match
+##   out  DB.OK
+
+## NOT A FOR LOOP, because it has to stop on the hit. A FOR that guards its
+## body with a found flag still runs a seek and a read per remaining record,
+## and this is the routine PLAN.md section 6 says is the slow one.
+DB.FIND:
+    DB.OK = 0
+    DB.LAST = DB.DATA0(DB.A) + DB.COUNT(DB.A) - 1
+    DB.KEYLEN = LEN(DB.KEY$)
+    DB.I = DB.RECNO(DB.A)
+
+DB.FIND.STEP:
+    DB.I = DB.I + 1
+    IF DB.I > DB.LAST THEN RETURN
+    DB.REC = DB.I
+    GOSUB DB.RDREC : GOSUB DB.FIND.TEST
+    IF DB.OK = 0 THEN GOTO DB.FIND.STEP
+    DB.RECNO(DB.A) = DB.I
+    GOSUB DB.GOTO
+    RETURN
+
+## The field is compared where it lies, out of DB.BUF$, without splitting the
+## record. Only the hit is split, by the DB.GOTO above.
+DB.FIND.TEST:
+    IF DB.SHOWDEL = 0 THEN IF LEFT$(DB.BUF$, 1) = "*" THEN RETURN
+    DB.TEXT$ = MID$(DB.BUF$, DB.OFF%(DB.A, DB.F) + 1, DB.WID%(DB.A, DB.F))
+    IF DB.EXACT = 0 THEN DB.TEXT$ = LEFT$(DB.TEXT$, DB.KEYLEN)
+    IF DB.TEXT$ = DB.KEY$ THEN DB.OK = -1
+    RETURN
+
+## Field name to field index, in the selected area. Names were trimmed and
+## folded on the way out of the descriptor, so the caller's key is compared as
+## it arrives.
+##
+##   in   DB.KEY$
+##   out  DB.F        0..NFLD-1, or 0 - 1 when there is no such field
+
+DB.FINDFLD:
+    DB.F = 0 - 1
+    FOR DB.I = 0 TO DB.NFLD(DB.A) - 1
+        IF DB.NAME$(DB.A, DB.I) = DB.KEY$ THEN DB.F = DB.I
+    NEXT DB.I
+    RETURN
+
+
+## ------------------------------------------------------- split and join
+## The two halves of "a record is an array". Nothing else touches DB.BUF$.
+
+DB.SPLIT:
+    DB.DELETED = 0
+    IF LEFT$(DB.BUF$, 1) = "*" THEN DB.DELETED = -1
+    FOR DB.I = 0 TO DB.NFLD(DB.A) - 1
+        DB.FLD$(DB.A, DB.I) = MID$(DB.BUF$, DB.OFF%(DB.A, DB.I) + 1, DB.WID%(DB.A, DB.I))
+    NEXT DB.I
+    RETURN
+
+## An assignment from application code may be any length. This is where it is
+## padded, truncated and justified: text left, numbers right, logicals folded
+## to T or F.
+##
+## IT BUILDS BY CONCATENATION, which is O(n squared) in the field count and
+## leaves a dead heap block at every step. With four fields that is four dead
+## blocks the scavenger takes back. Point this at a thirty-two field record
+## and the RPT$ plus GP.STRPTR idiom in ED-MENUS.BASL is the answer: one
+## allocation of the stride, overwritten where it lies.
+DB.JOIN:
+    DB.MARK$ = " "
+    IF DB.DELETED THEN DB.MARK$ = "*"
+    DB.BUF$ = DB.MARK$
+    FOR DB.I = 0 TO DB.NFLD(DB.A) - 1
+        STR.STR$ = DB.FLD$(DB.A, DB.I)
+        STR.WIDTH = DB.WID%(DB.A, DB.I)
+        IF LEN(STR.STR$) > STR.WIDTH THEN STR.STR$ = LEFT$(STR.STR$, STR.WIDTH)
+        IF DB.TYPE$(DB.A, DB.I) = "N" THEN GOSUB STR.PADL
+        IF DB.TYPE$(DB.A, DB.I) <> "N" THEN GOSUB STR.PADR
+        DB.BUF$ = DB.BUF$ + STR.STR$
+    NEXT DB.I
+    STR.STR$ = DB.BUF$
+    STR.WIDTH = DB.STRIDE(DB.A)
+    GOSUB STR.PADR
+    DB.BUF$ = STR.STR$
+    RETURN
+
+## An empty record in the buffer, at the right widths, without touching disk.
+DB.BLANK:
+    FOR DB.I = 0 TO DB.NFLD(DB.A) - 1
+        DB.FLD$(DB.A, DB.I) = RPT$(32, DB.WID%(DB.A, DB.I))
+    NEXT DB.I
+    DB.DELETED = 0
+    RETURN
+
+
+## ------------------------------------------------------- record and disk
+## One seek and one block, both ways. DB.REC is the physical record number.
+
+DB.RDREC:
+    DBFILE.CH = DB.CH(DB.A)
+    DBFILE.POS = DB.REC * DB.STRIDE(DB.A)
+    GOSUB DBFILE.SEEK : DBFILE.LEN = DB.STRIDE(DB.A)
+    GOSUB DBFILE.READ : DB.BUF$ = DBFILE.BUF$
+    RETURN
+
+DB.WRREC:
+    DBFILE.CH = DB.CH(DB.A)
+    DBFILE.POS = DB.REC * DB.STRIDE(DB.A)
+    GOSUB DBFILE.SEEK : DBFILE.BUF$ = DB.BUF$ : GOSUB DBFILE.WRITE
+    RETURN
+
+
+## ------------------------------------------------------------ the header
+## Record 0. Read before anything else, because it is what says how long a
+## record is -- so it is read at DB.MINSTRIDE and the real stride comes out of
+## it.
+
+DB.RDHDR:
+    DB.ERR = 0
+    DBFILE.CH = DB.CH(DB.A)
+    DBFILE.POS = 0
+    GOSUB DBFILE.SEEK : DBFILE.LEN = DB.MINSTRIDE
+    GOSUB DBFILE.READ : DB.BUF$ = DBFILE.BUF$
+    IF MID$(DB.BUF$, DBH.MAGIC + 1, 4) <> "XDB1" THEN DB.ERR = 1
+    IF DB.ERR <> 0 THEN RETURN
+    DB.STRIDE(DB.A) = VAL(MID$(DB.BUF$, DBH.STRIDE + 1, 3))
+    DB.NFLD(DB.A) = VAL(MID$(DB.BUF$, DBH.NFLD + 1, 2))
+    DB.DATA0(DB.A) = VAL(MID$(DB.BUF$, DBH.DATA0 + 1, 3))
+    DB.COUNT(DB.A) = VAL(MID$(DB.BUF$, DBH.COUNT + 1, 6))
+    STR.STR$ = MID$(DB.BUF$, DBH.TITLE + 1, DBH.TITLEW)
+    GOSUB STR.RTRIM
+    DB.TITLE$(DB.A) = STR.STR$
+    IF DB.STRIDE(DB.A) < DB.MINSTRIDE THEN DB.ERR = 1
+    IF DB.NFLD(DB.A) > DB.MAXF THEN DB.ERR = 1
+    RETURN
+
+DB.WRHDR:
+    DB.BUF$ = " XDB1"
+    DB.NUM = DB.STRIDE(DB.A)
+    DB.WIDE = 3
+    GOSUB DB.PUTNUM
+    DB.NUM = DB.NFLD(DB.A)
+    DB.WIDE = 2
+    GOSUB DB.PUTNUM
+    DB.NUM = DB.DATA0(DB.A)
+    DB.WIDE = 3
+    GOSUB DB.PUTNUM
+    DB.NUM = DB.COUNT(DB.A)
+    DB.WIDE = 6
+    GOSUB DB.PUTNUM
+    DB.BUF$ = DB.BUF$ + DB.TODAY$
+    STR.STR$ = DB.TITLE$(DB.A)
+    STR.WIDTH = DBH.TITLEW
+    GOSUB STR.PADR
+    DB.BUF$ = DB.BUF$ + LEFT$(STR.STR$, DBH.TITLEW)
+    STR.STR$ = DB.BUF$
+    STR.WIDTH = DB.STRIDE(DB.A)
+    GOSUB STR.PADR
+    DB.BUF$ = STR.STR$
+    DB.REC = 0
+    GOSUB DB.WRREC
+    RETURN
+
+
+## ------------------------------------------------- the field descriptors
+## Records 1..NFLD. The byte offset is stored rather than summed, which makes
+## a field one MID$; without it every access runs a loop over the preceding
+## widths.
+
+DB.RDSCHEMA:
+    DB.ERR = 0
+    FOR DB.I = 0 TO DB.NFLD(DB.A) - 1
+        DB.F = DB.I
+        GOSUB DB.RDDESC
+    NEXT DB.I
+    RETURN
+
+DB.RDDESC:
+    DB.REC = DB.F + 1 : GOSUB DB.RDREC
+    STR.STR$ = MID$(DB.BUF$, DBD.NAME + 1, DBD.NAMEW)
+    GOSUB STR.RTRIM
+    DB.NAME$(DB.A, DB.F) = STR.STR$
+    DB.TYPE$(DB.A, DB.F) = MID$(DB.BUF$, DBD.TYPE + 1, 1)
+    DB.WID%(DB.A, DB.F) = VAL(MID$(DB.BUF$, DBD.WIDTH + 1, 3))
+    DB.DEC%(DB.A, DB.F) = VAL(MID$(DB.BUF$, DBD.DEC + 1, 2))
+    DB.OFF%(DB.A, DB.F) = VAL(MID$(DB.BUF$, DBD.OFF + 1, 3))
+    RETURN
+
+DB.WRDESC:
+    DB.BUF$ = " " : STR.STR$ = DB.NAME$(DB.A, DB.F)
+    STR.WIDTH = DBD.NAMEW
+    GOSUB STR.PADR
+    DB.BUF$ = DB.BUF$ + LEFT$(STR.STR$, DBD.NAMEW)
+    DB.BUF$ = DB.BUF$ + DB.TYPE$(DB.A, DB.F)
+    DB.NUM = DB.WID%(DB.A, DB.F)
+    DB.WIDE = 3
+    GOSUB DB.PUTNUM
+    DB.NUM = DB.DEC%(DB.A, DB.F)
+    DB.WIDE = 2
+    GOSUB DB.PUTNUM
+    DB.NUM = DB.OFF%(DB.A, DB.F)
+    DB.WIDE = 3
+    GOSUB DB.PUTNUM
+    STR.STR$ = DB.BUF$
+    STR.WIDTH = DB.STRIDE(DB.A)
+    GOSUB STR.PADR
+    DB.BUF$ = STR.STR$
+    DB.REC = DB.F + 1
+    GOSUB DB.WRREC
+    RETURN
+
+
+## ---------------------------------------------------------------- number
+## Appends DB.NUM to DB.BUF$, right justified and zero filled at DB.WIDE.
+## Zero filled and not space filled, because these are header fields read
+## back by VAL and an all space field would read as 0 either way -- but a
+## zero filled one is visible in a hex dump as a number.
+##
+## MID$(STR$(N), 2) drops the sign space STR$ puts in front of a positive.
+
+DB.PUTNUM:
+    STR.STR$ = MID$(STR$(INT(DB.NUM)), 2)
+    IF LEN(STR.STR$) < DB.WIDE THEN STR.STR$ = RPT$(48, DB.WIDE - LEN(STR.STR$)) + STR.STR$
+    DB.BUF$ = DB.BUF$ + RIGHT$(STR.STR$, DB.WIDE)
+    RETURN
+
+
+DB.MODULE.END:
+#ENDIF

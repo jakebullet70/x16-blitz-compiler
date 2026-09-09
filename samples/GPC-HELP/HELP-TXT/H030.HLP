@@ -1,92 +1,34 @@
-@4.5 BMX.INC.BL -- a BMX bitmap into VERA
+@3.11.3 GP.FN -- call a verb from inside an expression
 .
-=4.5 BMX.INC.BL -- A BMX BITMAP INTO VERA
+=3.11.3 GP.FN
 .
-=DESCRIPTION
+.  Syntax    GP.FN(verb [, expression ...])
+.  Does      Assigns each expression to the matching formal, calls the
+.            routine, and gives back the variable the declaration
+.            named after RETURNS.
+.  Kind      FUNCTION. Two runtime opcodes bracket the call.
+.  Notes     The verb must be declared RETURNS. Its type is the type
+.            of the term, so a verb returning a string is a string
+.            term and concatenates.
+.            The body may be as long as it likes and may print, read
+.            files, open blocks and call other verbs. The caller's
+.            half-built expression and its string temporaries are
+.            carried across it.
+.            Costs 5 bytes of p-code at the call site against GP.SUB's
+.            3, plus the read of the RETURNS variable that the long
+.            spelling pays anyway, plus 2 bytes for each argument
+.            after the first -- an argument waits on the frame stack
+.            until the call, so the number of formals is not a limit.
+.  WARNING   The call must sit below its GP.DEFPROC, as GP.SUB's does.
+.            The body must not call its own verb: there is one set of
+.            formals and it would write over the arguments in use.
+.            An argument may be as deep an expression as any other,
+.            and however many there are only one of them is on the
+.            evaluation stack at a time.
+.  Example
 .
-.  BMX.OPEN
-.      IN: BMX.FILE$
-.      OUT: BMX.ERROR$, and the header -- BMX.WIDTH .HEIGHT .DEPTH .VERSION
-.        .PALUSED .PALFIRST .DATAOFF .PACKED
+:            PRINT "AREA "; GP.FN(AREA, 3, 4)
+:            T = A + GP.FN(AREA, 3, 4) * 2
+:            PRINT "X" + GP.FN(TAG, "AB") + "Y"
+:            PRINT GP.FN(AREA, 2, GP.FN(AREA, 3, 4))
 .
-.  BMX.PAINT
-.      IN: an open file
-.      OUT: palette and pixels in VRAM, file closed
-.
-.  BMX.SHOW
-.      IN: BMX.FILE$
-.      OUT: both of the above
-.
-.  BMX.CLOSE
-.      IN: --
-.      OUT: abandons a file opened by BMX.OPEN
-.
-.  BMX.RESTORE
-.      IN: --
-.      OUT: puts the machine's own palette back
-.
-.BMX.ERROR$ empty means it worked.
-.
-:BMX.FILE$ = "TITLE.BMX"
-:SCREEN 128
-:GOSUB BMX.SHOW
-:IF BMX.ERROR$ <> "" THEN PRINT BMX.ERROR$
-.
-.Use the long form to read the size before committing to a screen mode, or to
-.report a bad file before the display is torn down:
-.
-:BMX.FILE$ = F$
-:GOSUB BMX.OPEN
-:IF BMX.ERROR$ <> "" THEN GOTO COMPLAIN
-:' ... BMX.WIDTH, BMX.HEIGHT, BMX.PALUSED readable here ...
-:SCREEN 128
-:GOSUB BMX.PAINT
-.
-.Set the screen mode before BMX.PAINT, not after. SCREEN reloads the default
-.palette, so a mode change after painting discards the image's colours:
-.correct pixels, wrong palette.
-.
-.BMX.PAINT writes the image's colours over the machine's palette, and nothing
-.on the X16 restores them -- not SCREEN, not the KERNAL's screen_mode.
-.BMX.PAINT therefore stashes all 256 entries in spare VRAM first, and
-.BMX.RESTORE writes them back:
-.
-:BMX.FILE$ = "TITLE.BMX"
-:SCREEN 128
-:GOSUB BMX.SHOW
-:' ... the title screen ...
-:GOSUB BMX.RESTORE
-.
-.A program that keeps the machine need never call it. A program that returns
-.the machine to BASIC or chains to another calls it once. It is safe to call
-.at any time: with nothing stashed there is nothing to do, so a program whose
-.image failed to load can still call it on the way out. All 256 entries are
-.kept, not the range the file claims, and they are kept once per run -- so a
-.slideshow restores the machine's own palette rather than the previous
-.image's.
-.
-.BMX.STASH is the VRAM address they go to, $13000 by default, which is free
-.above the 320x240 framebuffer in the mode this module paints into. A caller
-.using tiles, sprites or a second bitmap there must move it or switch it off
-.with BMX.STASH = -1. The address is checked: a stash inside the bitmap or
-.overlapping the PSG registers is reported and nothing is painted.
-.
-.Use -1 to switch it off, not 0. Zero is what the variable holds before it is
-.set, and BMX.INIT runs at the first BMX.OPEN, after a caller would have set
-.it, so 0 has to keep meaning unset.
-.
-.The module handles 8 bits per pixel, uncompressed, which is what SCREEN 128
-.displays without a decompressor. Anything else is reported rather than
-.attempted. The image is centred, and anything larger than 320x240 is
-.clipped.
-.
-.Examples: BMXVIEW.EXP.BL, and BMXPAL.EXP.BL for the palette
-.
-=EXAMPLE PROGRAM
-.
-.  BMXVIEW.EXP.BL -- runnable, in the GPC-BASIC folder
-.  BMXPAL.EXP.BL -- runnable, in the GPC-BASIC folder
-.
-=SEE ALSO
-.
->44|4.5 BMX.INC.BL -- a BMX bitmap into VERA

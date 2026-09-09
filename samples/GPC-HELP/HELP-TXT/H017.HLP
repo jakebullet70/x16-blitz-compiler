@@ -1,14 +1,11 @@
-@3.4.4 GP.COMP -- compare two strings, ignoring case
+@3.4.3 GP.ISEMPTY -- test for a zero-length string
 .
-=3.4.4 GP.COMP
+=3.4.3 GP.ISEMPTY
 .
-.  Syntax    GP.COMP(a$, b$)
-.  Returns   -1 if a$ sorts before b$, 0 the same, 1 after.
-.  Kind      ASM. Needs the GP block.
-.  Notes     Case is ignored. GP.COMP(A$, B$) = 0 is the case-blind
-.            equality test that = cannot do, and the same call orders
-.            a sort.
-.            Length breaks a tie: "abc" sorts before "ABCD".
-.  Example
-.
-:            IF GP.COMP(N$, "QUIT") = 0 THEN GOTO BYE
+.  Syntax    GP.ISEMPTY(a$)
+.  Returns   -1 if a$ has zero length, 0 if not.
+.  Kind      COMPOSITE. Expands to LEN(a$) = 0.
+.  Notes     A string of spaces is not empty. STR.TRIM first if
+.            that is the intent.
+.            GP.ISEMPTY(a$), LEN(a$) = 0 and a$ = "" are the same four
+.            bytes. Use whichever reads better.

@@ -2,9 +2,9 @@
 .
 =3. COMMAND REFERENCE
 .
-.30 keywords, encoded $CE7F down to $CE58 and allocated downward. Ten of the
-.forty slots are holes and stay holes: the byte values are the ABI and are
-.never renumbered.
+.38 keywords, encoded $CE7F down to $CE50 and allocated downward. Ten of the
+.forty-eight slots are holes and stay holes: the byte values are the ABI and
+.are never renumbered.
 .
 =At a glance -- where each part comes from
 .
@@ -56,6 +56,19 @@
 .      ASM
 .      GP.ARRPTR
 .
+.  Banked text
+.      ASM
+.      GP.BANKEDSTR GP.ENDBANKEDSTR GP.BSTR - GP.BSTRCOUNT is COMPOSITE --
+.        see SEC 3.10
+.
+.  Routine calls
+.      COMPOSITE
+.      GP.DEFPROC GP.SUB -- free, and stays GP-BASIC OUT, see SEC 3.11
+.
+.  Routine calls
+.      ASM
+.      GP.FN -- the same call as a value, and it brings the GP block in
+.
 .  Screen
 .      ASM
 .      GP.BOX GP.FILL GP.PRINTAT
@@ -70,8 +83,9 @@
 .      THEME.INC.BL -- THEME.LOAD, THEME.CLR() - SEC 4.1
 .
 .  String helpers
-.      BASIC
-.      STRINGS.INC.BL -- PADR PADL PADC SPLIT REPLACE PET2SCR - SEC 4.2
+.      BASIC+ASM
+.      STRINGS.INC.BL -- PADR PADL PADC SPLIT REPLACE SPLICE PET2SCR TRIM
+.        LTRIM RTRIM - SEC 4.2
 .
 .  Screen etiquette, panels
 .      BASIC
@@ -99,17 +113,3 @@
 .skipped over: GP.BOX X,Y,W,H,,7 is a syntax error -- write out the default
 .you are passing through.
 .
-=SEE ALSO
-.
->39|4. Module reference -- the BASL library
->31|3.8 Block IF
->32|3.9 Inline assembly
->21|3.4 Strings
->19|3.3 Machine code
->40|4.1 THEME.INC.BL -- named colour roles
->41|4.2 STRINGS.INC.BL -- string helpers
->42|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
->43|4.4 LINEINPUT.INC.BL -- a positioned entry field
->44|4.5 BMX.INC.BL -- a BMX bitmap into VERA
->45|4.6 MENUVERT.INC.BL -- a vertical menu
->2|1. What GP.BASIC is

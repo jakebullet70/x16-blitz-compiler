@@ -1,88 +1,20 @@
-@4.4 LINEINPUT.INC.BL -- a positioned entry field
+@3.11.2 GP.SUB -- call a verb
 .
-=4.4 LINEINPUT.INC.BL -- A POSITIONED ENTRY FIELD
+=3.11.2 GP.SUB
 .
-=DESCRIPTION
+.  Syntax    GP.SUB verb [, expression ...]
+.  Does      Assigns each expression to the matching formal, in order,
+.            then calls the routine.
+.  Kind      COMPOSITE. Expands to an assignment per formal and a
+.            GOSUB.
+.  Notes     The count and the types must match the declaration.
+.            A call into a GP.BANKED region works, and so does a call
+.            out of one. The address is corrected in both directions.
+.  WARNING   The call must sit below its GP.DEFPROC. It carries an
+.            address and not a line number, so a forward call is
+.            refused rather than compiled.
+.  Example
 .
-.  LINEINPUT.GET
-.      IN: LINEINPUT.X .Y .LEN .ATTR .TEXT$ .MASK .ALLOW$ .DENY$
-.      OUT: LINEINPUT.TEXT$ LINEINPUT.KEY
-.
-.  LINEINPUT.ASK
-.      IN: the same plus LINEINPUT.LABEL$
-.      OUT: the same; LINEINPUT.X restored
-.
-:LINEINPUT.X = 10 : LINEINPUT.Y = 6
-:LINEINPUT.LEN = 20
-:LINEINPUT.ATTR = THEME.CLR(THEME.TEXT)
-:LINEINPUT.TEXT$ = ""
-:GOSUB LINEINPUT.GET
-:IF LINEINPUT.KEY = 27 THEN GOTO CANCELLED
-.
-.INPUT and LINPUT cannot be used on a drawn screen: both take the bottom of
-.the screen, scroll it, echo in the current colour, and accept any length. A
-.LINEINPUT field stays at the given position, in the given colour, and stops
-.at the given width.
-.
-.LINEINPUT.KEY is the key that ended the field, which is what makes a
-.multi-field form possible:
-.
-.  13
-.      RETURN -- finished
-.
-.  27 / 3
-.      ESC / STOP -- cancelled, and LINEINPUT.TEXT$ is put back to what it
-.        was
-.
-.  17 / 145 / 9
-.      cursor down / up / TAB -- left the field, text kept
-.
-.A form is therefore a loop over fields rather than a sequence of prompts,
-.and the user can return to an earlier field without restarting.
-.
-.LINEINPUT.MASK non-zero displays asterisks while holding the real string.
-.The field does not scroll: when it is full, further characters are refused
-.and the cursor inverts the last character rather than sitting past the end.
-.The cursor blinks off TI rather than a delay loop; a delay loop would
-.swallow keys pressed during it.
-.
-.LINEINPUT.ALLOW$ and LINEINPUT.DENY$ restrict what may be typed. Both are
-.empty by default, and the field then takes any printable character, as it
-.always has. ALLOW$ lists the characters accepted and DENY$ the ones refused;
-.a caller that sets both gets ALLOW$, and DENY$ is not consulted. A refused
-.key changes nothing -- not the text, and not the caret.
-.
-.They compare raw bytes, so a set of LETTERS depends on the charset: PETSCII
-.shifted letters arrive as $C1-$DA and ISO ones as $41-$5A, and an ALLOW$
-.written for one silently refuses every capital in the other. Digits are
-.48-57 in both. Use ALLOW$ for a closed set short enough to write out, DENY$
-.for everything-except:
-.
-.  Digits only
-.      SPELLING: ALLOW$ = "0123456789"
-.
-.  Number with sign and point
-.      SPELLING: ALLOW$ = "0123456789.-"
-.
-.  Yes or no
-.      SPELLING: ALLOW$ = "YyNn"
-.
-.  Letters, no digits
-.      SPELLING: DENY$ = "0123456789"
-.
-.  Filename, no punctuation
-.      SPELLING: DENY$ = ",:=*?"
-.
-.Both are sticky, like every other input in the library, so a form sets them
-.on the way into each field rather than once at the top.
-.
-.Example: FORM.EXP.BL -- three fields, one masked and one digits-only, in a
-.themed panel.
-.
-=EXAMPLE PROGRAM
-.
-.  FORM.EXP.BL -- runnable, in the GPC-BASIC folder
-.
-=SEE ALSO
-.
->43|4.4 LINEINPUT.INC.BL -- a positioned entry field
+:            GP.SUB DBSELECT, 1
+:            GP.SUB DBFIND, PRICE, "ACME", TRUE
+:            GP.SUB DBWRITE

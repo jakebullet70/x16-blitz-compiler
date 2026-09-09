@@ -29,11 +29,13 @@ running it before would not have.
 per-turn read 558K -> 70K, an **8x** cut, and the tail of that session would have been nearly free on
 the other side of it.
 
-**A phase boundary is the cadence to use.** Asked for 2026-09-08: on a staged plan, remind the user
-to `/compact` **between phases** — after a phase lands and before the next one is picked up. It is
-the natural point, because the context that mattered for the phase just finished is exactly what
-compaction should drop, and the plan document carries forward what the next phase needs anyway.
-**Prompt for it; do not wait to be asked.**
+**Every step is the cadence.** Asked for 2026-09-08 as "between phases", and **widened 2026-09-09 to
+EVERY step**: whenever a discrete piece of work lands — a phase, a build, a measurement, a file
+written — close by reminding the user to `/compact` before the next one is picked up. It is the
+natural point, because the context that mattered for the step just finished is exactly what
+compaction should drop, and the plan document carries forward what the next step needs anyway.
+**Prompt for it every time; do not wait to be asked, and do not skip a step because it felt small.**
+A small step in a large context is precisely the expensive case.
 
 Two specific traps:
 

@@ -1,99 +1,108 @@
-@3. The modules (2)
-=BMX.INC.BL
+@GUI2.INC.BL -- a listbox, single or multi select.
 .
-.  in
-.      BMX.FILE$
+=GUI2.INC.BL
 .
-.  out
-.      BMX.ERROR$ -- empty means it worked<br>BMX.WIDTH BMX.HEIGHT BMX.DEPTH
-.        BMX.VERSION BMX.PALUSED BMX.PALFIRST BMX.DATAOFF BMX.PACKED -- the
-.        header, readable after BMX.OPEN
+.  a listbox, single or multi select.
 .
-.  in, optional
-.      BMX.STASH -- where BMX.PAINT keeps the machine's palette; VRAM $13000
-.        by default, -1 to keep nothing
+=MODULE HEADER
 .
-.  internal
-.      BMX.PTR BMX.HEADER$ BMX.SCRATCH BMX.SCRATCH$ BMX.PALBASE BMX.ADDR
-.        BMX.LO BMX.HI BMX.BANK BMX.REST BMX.COUNT BMX.CHUNK BMX.GOT BMX.STEP
-.        BMX.SKIP BMX.ROW BMX.ROWS BMX.X0 BMX.Y0 BMX.BAD BMX.KEPT BMX.SRC
-.        BMX.DST
+:      GUI.LISTBOX   a WINDOW onto a list longer than the box, and
+:                    optionally more than one answer
 .
-.  constants
-.      BMXK.MACPTR BMXK.CHKIN BMXK.CLRCHN BMXK.MEMCOPY BMXK.VCTRL BMXK.VLO
-.        BMXK.VMID BMXK.VHI BMXK.PORTLO BMXK.PORTLO.B BMXK.PORTHI BMXK.LFN
+=SEPARATE FROM GUI.INC.BL ON PURPOSE
 .
-.BMX.PTR doubles as the "have I initialised" flag -- it is zero until
-.BMX.INIT has run. Zeroing it yourself would leak a string block and
-.re-allocate.
+.  This is the only dialog that needs a scrolling window and a set of marks,
+.  and nothing else in the library wants either. #INCLUDE it when you want a
+.  listbox and pay nothing when you do not.
 .
-.BMX.STASH is the one variable here a caller may want to set, and it has to
-.be set before the first BMX.OPEN -- BMX.INIT runs then, and fills in the
-.default only if you have not. That is why -1 rather than 0 switches the
-.stash off: 0 already means "never set". BMX.KEPT is the once-per-run guard
-.that makes a slideshow restore the machine's palette rather than the
-.previous picture's.
+.  GUI.MENU is not this and should not be stretched into it: that is
+.  MENUVERT.RUN in a frame, so the list must fit the screen and it returns
+.  one row. This is the two things it does not do.
 .
-=FILEIO.INC.BL
+.  REQUIRES, and does not #INCLUDE for you, in this order:
+:      GPB.INC.BL        GP.FILL, GP.PRINTAT, GP.STRPTR, GP.SELECT
+:      STASH.INC.BL      via GUI.OPEN -- and wants a #SYMFILE, see its header
+:      THEME.INC.BL      the colour roles, and GOSUB THEME.LOAD first
+:      MENUVERT.INC.BL   MENUVERT.ROW draws the rows
+:      GUI.INC.BL        GUI.OPEN and GUI.CLOSE are the box
 .
-.Needs a #SYMFILE -- FILE.TOPET is a GP.ASM blob.
+.  Usage:
+:      DIM MENUVERT.ITEM$(200)
+:      ... fill 1..N ...
+:      GUI.LISTBOX.COUNT = N : GUI.LISTBOX.ROWS = 8 : GUI.LISTBOX.MULTI = 1
+:      GUI.MSG$ = "PICK FILES" : GUI.BANK = 8
+:      GOSUB GUI.LISTBOX
+:      IF GUI.LISTBOX.SEL = 0 THEN <cancelled>
 .
-.  in
-.      FILE.NAME$ -- the file every routine acts on<br>FILE.NEW$ -- the
-.        second name, RENAME and COPY<br>FILE.DEVICE -- the drive; 0 means
-.        8<br>FILE.ISO -- non-zero converts names to PETSCII on the way
-.        out<br>FILE.N -- rows to write, SAVEARRAY<br>FILE.MAX -- rows that
-.        will fit, LOADARRAY; 0 means 10<br>FILE.LINE$() -- the rows; the
-.        caller owns the DIM
+:   in   GUI.LISTBOX.COUNT   how many items. 0 or less returns cancelled
+:        MENUVERT.ITEM$()    the items, 1..COUNT. THE CALLER OWNS THE DIM,
+:                            for MENUVERT's reason: a module cannot be handed
+:                            an array, and DIMming one means guessing a bound
+:        GUI.LISTBOX.ROWS    rows visible at once. 0 takes 10, and it is
+:                            always cut to COUNT and to what the screen holds
+:        GUI.LISTBOX.MULTI   0 chooses one row. 1 marks a set with SPACE
+:        GUI.LISTBOX.MARKS$  multi only, IN as well as out: COUNT characters,
+:                            "1" marked. Anything else -- "" included --
+:                            starts with none marked
+:        GUI.LISTBOX.SEL     the item to start on. 0 starts at 1
+:        plus everything GUI.OPEN reads: GUI.MSG$, GUI.MSG2$, GUI.TITLE$,
+:        GUI.BANK, GUI.STYLE, GUI.GLYPH, GUI.PLACE and the rest
 .
-.  out
-.      FILE.ERR FILE.MSG$ FILE.TRK FILE.SEC -- the command channel<br>FILE.OK
-.        -- FILE.EXISTS<br>FILE.N -- rows read, LOADARRAY<br>FILE.PATH$ --
-.        FILE.CURDIR
+:   out  GUI.LISTBOX.SEL     the item under the highlight, 1..COUNT, or 0 if
+:                            cancelled. In multi that is where the cursor was
+:                            not the answer -- the marks are the answer
+:        GUI.LISTBOX.MARKS$  multi only: COUNT characters, "1" marked
+:        GUI.LISTBOX.MARKED  multi only: how many are marked
+:        GUI.KEY             13 accepted, 27 or 3 cancelled
 .
-.  internal
-.      FILE.CMDSTR$ FILE.OUT$ FILE.RAW$ FILE.ROW$ FILE.ST FILE.KEEP FILE.I
-.        FILE.PETP%
+.  THE BOTTOM FRAME EDGE says nothing it does not have to. In multi it is "2
+.  SELECTED OF 20" and follows every SPACE; otherwise it is "20 ITEMS" for a
+.  list too long to see at once, and blank for one that fits.
 .
-.  constants
-.      FILE.OKMAX FILE.NOTFOUND FILE.EXISTSERR FILE.PROTECTED FILE.CHAN
+.  KEYS: up and down move, PgUp and PgDn page, HOME and END jump, SPACE
+.  toggles a mark in multi, RETURN accepts, ESC and STOP cancel. The codes
+.  are the ones samples/editor dispatches on, so they are known good.
 .
-.This module is the missing DS and DS$. FILE.ERR is DS and FILE.MSG$ is DS$.
-.ST is not a disk status -- it is the KERNAL's serial bus status and cannot
-.report FILE NOT FOUND.
+=THE LAST TWO ARE ON THE BOX
 .
-.FILE.N is both an input and an output, the way MENUVERT.SEL is. FILE.LINE$()
-.is the caller's DIM, like MENUVERT.ITEM$ and unlike THEME.CLR.
+.  in a dimmed row under the list with ENTER and ESC picked out -- GUI.TEXT's
+.  hint, in GUI.TEXT's words, at GUI.TEXT's two offsets, because a dialog
+.  that answers OK or CANCEL should say so the same way wherever you meet it.
+.  It costs the body a spacer row and a hint row, and the box a minimum width
+.  of 26.
 .
-=FILEDIR.INC.BL
+=THE MARKS ARE A STRING AND ARE TOGGLED IN PLACE
 .
-.Needs FILEIO.INC.BL, and a #SYMFILE -- it is two GP.ASM blobs.
+.  GP.STRPTR gives the address of the characters, so SPACE POKEs one byte and
+.  allocates nothing -- where LEFT$ + CHR$ + MID$ would build a whole new
+.  string per keypress, and the old block is dead for good. It also means no
+.  second array to DIM and no bound to guess. THE PRICE IS 250 ITEMS, which
+.  is a string.
 .
-.  in
-.      FILE.DIR.BANK -- the bank to read into, or 0 for low
-.        RAM<br>FILE.DIR.PTR FILE.DIR.CAP -- the low-RAM buffer, when BANK is
-.        0<br>FILE.DIR.PAT$ -- a name pattern, or empty<br>FILE.DIR.ONLY --
-.        FILE.DIR.ALL, .FILES or .DIRS
+=THE WINDOW IS MENUVERT.SCROLL
 .
-.  out
-.      FILE.DIR.GOT -- bytes read<br>FILE.DIR.FULL -- the buffer filled
-.        before the listing ended<br>FILE.DIR.MORE -- 1 while NEXT produced
-.        an entry<br>FILE.NAME$ FILE.BLOCKS FILE.TYPE$ -- the entry itself
+.  Screen row R draws ITEM$(SCROLL + R), so the drawing is MENUVERT.ROW
+.  unchanged and this file only decides what SCROLL is. That input is an
+.  offset defaulting to 0 precisely so every menu that never heard of it is
+.  unaffected.
 .
-.  internal
-.      FILE.DIR.AT FILE.DIR.ASK$ FILE.DIR.ADDR% FILE.DIR.ROOM% FILE.DIR.OFF%
-.        FILE.DIR.BYTES% FILE.DIR.CNT% FILE.DIR.BLK% FILE.DIR.OK%
-.        FILE.DIR.SLOW% FILE.DIR.LFN% FILE.DIR.NAMEA% FILE.DIR.TYPEA%
+=THE MARK COLUMNS ARE THIS FILE'S
 .
-.  constants
-.      FILE.DIR.ALL FILE.DIR.FILES FILE.DIR.DIRS FILE.DIR.NAMEMAX
-.        FILE.DIR.BANKROOM FILE.DIR.BANKBASE
+.  NOT MENUVERT'S. In multi the rows are indented by two columns and MENUVERT
+.  owns only the text columns, so the caller's array is never touched to add
+.  a marker to it.
 .
-.FILE.DIR.INIT must run once before anything else: it sizes FILE.NAME$ and
-.FILE.TYPE$ for the assembly to write into, and creates every {VAR} slot. Do
-.not assign FILE.NAME$ or FILE.TYPE$ afterwards -- an assignment reallocates
-.and the block the assembly holds goes stale.
+.  NO #DEFINEs AND NO INCLUDE GUARD IN HERE, ON PURPOSE. BASLOAD rejects a
+.  DIGIT in a #DEFINE or #IFNDEF name, so a GUI.LISTBOX.* constant cannot
+.  exist and a GUILIST.* one would be a second name space for one module. The
+.  numbers are written where they are used, next to the comment that names
+.  them. #INCLUDE this file once.
 .
-.FILE.NAME$ is shared with FILEIO on purpose: the name a picker chose is the
-.name FILE.EXISTS and FILE.DELETE want.
+.  The whole GUI.LISTBOX.* name space belongs to this file.
 .
+=SEE ALSO
+.
+>59|GUI.INC.BL -- four dialogs, in a box that puts the screen back.
+>78|STASH.INC.BL -- save a text rectangle, and put it back.
+>47|4.1 THEME.INC.BL -- named colour roles
+>53|4.6 MENUVERT.INC.BL -- a vertical menu

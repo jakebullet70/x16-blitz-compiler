@@ -1,81 +1,61 @@
-@4.2 STRINGS.INC.BL -- string helpers
+@3.11 Calling a routine in one statement
 .
-=4.2 STRINGS.INC.BL -- STRING HELPERS
-.
-=WHAT IT COSTS
-.
-.  ASM: GP.INSTR GP.STRPTR GP.COMP
-.    ASM -- a keyword, run by machine code in the GP runtime block. A program
-.    using ANY GP keyword pays for the whole block.
-.  COMPOSITE: GP.CONTAINS GP.ISEMPTY
-.    COMPOSITE -- a keyword with no machine code of its own. The compiler
-.    expands it into keywords that already exist, so it costs the runtime
-.    nothing at all.
-.    BASIC -- a .INC.BL module of ordinary BASL, called with GOSUB. Costs
-.    nothing unless you #INCLUDE it.
+=3.11 CALLING A ROUTINE IN ONE STATEMENT
 .
 =DESCRIPTION
 .
-.  STR.PADR
-.      IN: STR.STR$ STR.WIDTH
-.      OUT: STR.STR$ left-justified
+.Three keywords. GP.DEFPROC names a GOSUB target and the variables its
+.callers fill in, GP.SUB fills them and calls it in one statement, and GP.FN
+.does the same from inside an expression and gives back a value.
 .
-.  STR.PADL
-.      IN: same
-.      OUT: right-justified
+:    DB.A = 1 : GOSUB DB.SELECT
+:
+:    GP.SUB DBSELECT, 1
 .
-.  STR.PADC
-.      IN: same
-.      OUT: centred (odd gap goes right)
+.The two lines compile to the same p-code: an assignment per formal, then the
+.call. A call site costs what the long spelling costs. A declaration on a
+.line of its own costs one byte, the line marker every source line emits.
+.Folded onto the routine's own first statement it costs nothing. A bare label
+.is not a line, so folding onto one costs the byte anyway.
 .
-.  STR.SPLIT
-.      IN: STR.STR$ STR.DELIM$ STR.MAX
-.      OUT: STR.N, STR.FIELD$(1..N)
+.GP.DEFPROC and GP.SUB have no machine code of their own, so a program whose
+.only GP.BASIC keywords are those two stays GP OUT and carries none of the GP
+.block. GP.FN has two runtime opcodes and brings the block in.
 .
-.  STR.REPLACE
-.      IN: STR.STR$ STR.FIND$ STR.REPL$
-.      OUT: STR.STR$, every occurrence replaced
+=IN THIS SECTION
 .
-.  STR.PET2SCR
-.      IN: STR.PET
-.      OUT: STR.SCR
+>42|3.11.1 GP.DEFPROC -- declare a verb and its arguments
+>43|3.11.2 GP.SUB -- call a verb
+>44|3.11.3 GP.FN -- call a verb from inside an expression
 .
-.The three pad routines leave a string that is already at or past the width
-.unchanged. They pad and never truncate; use STRCASE.RTRIM (SEC 4.8) to
-.shorten.
+=The formals are ordinary variables
 .
-.SPLIT reads STR.STR$ without modifying it. STR.MAX of 0 means 10. Empty
-.fields are preserved: "A,,C" is three fields and "A," is two. Splitting an
-.empty string gives one empty field, never zero. Reaching the limit is not an
-.error and loses nothing -- the last field receives the unsplit remainder,
-.delimiters included.
+.A verb's formals and its RETURNS variable are plain variables in the
+.program's one variable list. Every call writes the same ones, and the body
+.can read and write them like any other. That is what makes the call cost
+.nothing, and it is also the whole of the rule about nesting:
 .
-.STR.FIELD$ is the one array the library does not DIM. Left alone, GPC's
-.implicit DIM gives 0..10. For more, DIM it before the first call and set
-.STR.MAX to match. DIMming an array GPC has already auto-dimensioned is an
-.error, so it is one or the other. Note that this is the reverse of
-.THEME.CLR, which the module DIMs.
+.  - A verb may appear inside its own argument list. GP.FN(AREA, 2,
+.    GP.FN(AREA, 3, 4)) is correct, because a call list is evaluated in full
+.    before any of it is stored into a formal. The inner call runs and
+.    finishes before the outer writes A.W. The values wait on the 4K frame
+.    stack while the rest of the list is read, so neither the number of
+.    arguments nor the depth of any one of them is a limit.
+.  - A verb's body may not call the verb. There is one set of formals, so a
+.    routine that calls itself -- directly, or round through another verb --
+.    writes over the arguments it is still using. Nothing detects this: it
+.    compiles, both passes agree, and the answer is wrong.
 .
-.REPLACE swaps every occurrence of STR.FIND$ for STR.REPL$, modifying
-.STR.STR$ in place. The replacement may be shorter, longer, or "" to delete.
-.It is case sensitive, because GP.INSTR compares raw bytes.
+.The refusals, all at compile time:
 .
-.A replacement that contains the search text is safe: "A" to "AA" terminates
-.and doubles the As, where a naive in-place version would not. The routine
-.builds a new string and never re-scans what it has emitted. An empty
-.STR.FIND$ leaves the string unchanged rather than hanging, because GP.INSTR
-.reports not-found for a zero-length needle. Like the pad routines it is not
-.length checked: a longer replacement can push the result past 255
-.characters.
-.
-.PET2SCR converts a PETSCII code to the screen code the tile map holds, for
-.TILE, TDATA and VPOKE. GP.PRINTAT and GP.FILL do this internally.
-.
-=EXAMPLE PROGRAM
-.
-.  SPLITT.EXP.BL -- runnable, in the GPC-BASIC folder
-.
-=SEE ALSO
-.
->49|4.8 STRCASE.INC.BL -- case and trim, in place
->41|4.2 STRINGS.INC.BL -- string helpers
+:    GP.DEFPROC VERB IS NOT A PLAIN NAME     a $, % or subscript on the verb
+:    GP.DEFPROC VERB ALREADY DECLARED        a second declaration of that ver
+:    GP.DEFPROC FORMAL IS NOT A VARIABLE     an array, or something that is n
+:    GP.DEFPROC RETURNS IS NOT A VARIABLE    an array element or a literal af
+:    TOO MANY GP.DEFPROC FORMALS             a thirteenth formal
+:    GP.SUB BEFORE ITS GP.DEFPROC            the call sits above the declarat
+:    GP.SUB DOES NOT MATCH ITS GP.DEFPROC    the wrong number of arguments
+:    GP.FN BEFORE ITS GP.DEFPROC             the call sits above the declarat
+:    GP.FN NEEDS A VERB DECLARED RETURNS     the verb has no result variable
+:    ARGUMENTS DO NOT MATCH THE GP.DEFPROC   the wrong number of arguments
+:    TYPE MISMATCH                           a string for a number, or a numb

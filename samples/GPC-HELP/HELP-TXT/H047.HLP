@@ -1,26 +1,54 @@
-@5. TRUE IS -1
+@STASHFILE.INC.BL -- a saved text rectangle, through a file.
 .
-=5. TRUE IS -1
+=STASHFILE.INC.BL
 .
-.Every flag the library hands back is -1 for true and 0 for false, and
-.anything written against it should be too. GUI.OK GUI.ANSWER GUI.STASHED
-.STASH.OK SORT.OK MENUVERT.HOTHIT FILE.OK BANKMGR.OK APPSYS.IS.EMULATOR --
-.all of them.
+.  a saved text rectangle, through a file.
 .
-.That is what a comparison in this compiler evaluates to, so a flag and a
-.test read the same way, and it is the value NOT wants: NOT is -x-1, so NOT
-.-1 is 0 while NOT 1 is -2, which is still true. IF itself tests non-zero, so
-.IF FLAG THEN works either way and IF FLAG = 1 THEN is the spelling that
-.breaks.
+=MODULE HEADER
 .
-:IF GUI.OK THEN <accepted>            ' yes
-:IF NOT GUI.OK THEN <cancelled>       ' yes
-:IF GUI.OK = 0 THEN <cancelled>       ' yes
-:IF GUI.OK = 1 THEN <accepted>        ' NO -- it is -1
+:      STASH.FILE.SAVE   a rectangle of the screen, out to a file
+:      STASH.FILE.LOAD   a saved file, back where it came from
+:      STASH.FILE.PUT    a saved file, pasted somewhere else
 .
-.A flag the CALLER sets is read as non-zero, so LINEINPUT.MASK = 1 and
-.STASH.MOVE = 1 still work. Write -1 in new code all the same.
+.  REQUIRES, and does not #INCLUDE for you:
+:      GPB.INC.BL      GP.ASM
+:      STASH.INC.BL    which does the actual copying
 .
-.Printing one needs STR$ whole. The MID$(STR$(N), 2) idiom strips the leading
-.space STR$ puts on a positive number; -1 has no leading space, so that idiom
-.eats the minus and prints 1.
+.  and, like it, a #SYMFILE in your program. See that file's header.
+.
+.  Usage:
+:      STASH.BANK = 8 : STASH.FILE$ = "PANEL.BIN"
+:      STASH.X = 10 : STASH.Y = 4 : STASH.W = 30 : STASH.H = 8
+:      GOSUB STASH.FILE.SAVE
+:      ...
+:      GOSUB STASH.FILE.LOAD
+.
+:   in   STASH.FILE$    the name
+:        STASH.DEV      the device. 0 means 8, the usual drive
+:        STASH.BANK     the bank to stage through
+:        and, for SAVE, the geometry STASH.SAVE wants
+.
+=A SEPARATE FILE FROM STASH.INC.BL ON PURPOSE
+.
+.  a BASL module has no dead code elimination, and these three are 127 bytes.
+.  A dialog that stashes to a bank and puts it back never goes near a disk
+.  and should not pay for one.
+.
+=THE FILE IS SELF-DESCRIBING BECAUSE THE STASH IS
+.
+.  the four header bytes go out with the cells, so loading one back needs
+.  nothing but the name. That is the flaw dotBASIC admits to in its own
+.  .CUT/.PASTE, which "requires correctly re-describing the width and height
+.  of each cut".
+.
+.  BSAVE's end address is EXCLUSIVE, so this writes the header and the cells
+.  and no padding. The length is w h 2 + 4, which BASIC works out for itself
+.  -- which is why no GP.END keyword was ever spent on telling BSAVE where a
+.  stash ended.
+.
+.  The STASH.FILE. names belong to this file; the rest of STASH. is
+.  STASH.INC.BL's.
+.
+=SEE ALSO
+.
+>78|STASH.INC.BL -- save a text rectangle, and put it back.

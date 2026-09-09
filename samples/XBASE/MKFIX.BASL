@@ -1,0 +1,152 @@
+#SAVEAS "@:MKFIX.PRG"
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "STRINGS.INC.BL"
+#INCLUDE "DBFILE.INC.BL"
+#INCLUDE "DB.INC.BL"
+
+## ============================================================================
+## MKFIX.BASL -- build the two fixture databases.
+##
+## SKELETON. Nothing here has run.
+##
+## PARTS.DBF and SUPPLR.DBF, the pair PLAN.md section 7 asks for. XBASE.BASL
+## has no structure editor yet, so the schema is written out in BASIC here and
+## DB.CREATE does the rest.
+##
+## IT IS ALSO THE FIRST TEST OF THE ENGINE. Everything the format rests on is
+## exercised in order: create a file, write a header, write a descriptor per
+## field, append records, read them back and check they came back the same.
+## Run it before anything else, and if it prints MISMATCH the answer to
+## measurement 1 in PLAN.md is that ",M" does not overwrite in place.
+##
+## IT DELETES NOTHING. DB.CREATE opens ",S,W", which fails when the file
+## already exists, and that error is reported rather than worked around. Erase
+## the old fixtures by hand.
+##
+## WARNING: never scratch a fixture with a wildcard. S0:PARTS.* also matches
+## PARTS.BASL.
+##
+## Build:  copy GPB.INC.BL, STRINGS.INC.BL, DBFILE.INC.BL and DB.INC.BL into
+##         testing/ beside this file, then
+##           python source/gpc/build_basl.py MKFIX.BASL MKFIX.PRG
+##         and compile MKFIX.PRG with GPC.BIN.
+## ============================================================================
+
+DBFILE.DEVICE = 8
+GOSUB DB.INIT
+DB.TODAY$ = "20260908"
+
+PRINT "MKFIX"
+PRINT
+
+GOSUB MK.PARTS
+GOSUB MK.SUPPLR
+GOSUB MK.VERIFY
+
+GOSUB DB.CLOSEALL
+PRINT
+PRINT "DONE"
+END
+
+
+## ------------------------------------------------------------------ PARTS
+## Five fields, stride 1 + 8 + 20 + 6 + 8 + 6 = 49.
+MK.PARTS:
+    DB.A = 0
+    GOSUB DB.SELECT
+    DB.FILE$(DB.A) = "PARTS.DBF"
+    DB.TITLE$(DB.A) = "PARTS"
+    DB.NFLD(DB.A) = 5
+
+    DB.NAME$(0, 0) = "PARTNO"  : DB.TYPE$(0, 0) = "C" : DB.WID%(0, 0) =  8 : DB.DEC%(0, 0) = 0
+    DB.NAME$(0, 1) = "DESC"    : DB.TYPE$(0, 1) = "C" : DB.WID%(0, 1) = 20 : DB.DEC%(0, 1) = 0
+    DB.NAME$(0, 2) = "QTY"     : DB.TYPE$(0, 2) = "N" : DB.WID%(0, 2) =  6 : DB.DEC%(0, 2) = 0
+    DB.NAME$(0, 3) = "PRICE"   : DB.TYPE$(0, 3) = "N" : DB.WID%(0, 3) =  8 : DB.DEC%(0, 3) = 2
+    DB.NAME$(0, 4) = "SUPP"    : DB.TYPE$(0, 4) = "C" : DB.WID%(0, 4) =  6 : DB.DEC%(0, 4) = 0
+
+    GOSUB DB.CREATE
+    IF DB.ERR <> 0 THEN PRINT "PARTS: ";DBFILE.MSG$ : RETURN
+    PRINT "PARTS.DBF  STRIDE";DB.STRIDE(DB.A);" DATA0";DB.DATA0(DB.A)
+
+    MK.P$ = "A1000" : MK.D$ = "HEX BOLT M6"      : MK.Q = 240 : MK.C = 0.12 : MK.S$ = "ACME"
+    GOSUB MK.PART.ADD
+    MK.P$ = "A1001" : MK.D$ = "HEX NUT M6"       : MK.Q = 500 : MK.C = 0.04 : MK.S$ = "ACME"
+    GOSUB MK.PART.ADD
+    MK.P$ = "B2000" : MK.D$ = "BALL BEARING 608" : MK.Q =  60 : MK.C = 1.35 : MK.S$ = "NORTH"
+    GOSUB MK.PART.ADD
+    MK.P$ = "C3000" : MK.D$ = "DRIVE BELT 400"   : MK.Q =  12 : MK.C = 7.5  : MK.S$ = "NORTH"
+    GOSUB MK.PART.ADD
+    RETURN
+
+## A field is an array element. The engine pads and justifies on the way out,
+## so nothing here has to know a width.
+MK.PART.ADD:
+    GOSUB DB.NEW
+    DB.FLD$(0, 0) = MK.P$
+    DB.FLD$(0, 1) = MK.D$
+    DB.FLD$(0, 2) = MID$(STR$(MK.Q), 2)
+    DB.FLD$(0, 3) = MID$(STR$(MK.C), 2)
+    DB.FLD$(0, 4) = MK.S$
+    GOSUB DB.PUT
+    RETURN
+
+
+## ----------------------------------------------------------------- SUPPLR
+MK.SUPPLR:
+    DB.A = 1
+    GOSUB DB.SELECT
+    DB.FILE$(DB.A) = "SUPPLR.DBF"
+    DB.TITLE$(DB.A) = "SUPPLR"
+    DB.NFLD(DB.A) = 3
+
+    DB.NAME$(1, 0) = "CODE"    : DB.TYPE$(1, 0) = "C" : DB.WID%(1, 0) =  6 : DB.DEC%(1, 0) = 0
+    DB.NAME$(1, 1) = "NAME"    : DB.TYPE$(1, 1) = "C" : DB.WID%(1, 1) = 20 : DB.DEC%(1, 1) = 0
+    DB.NAME$(1, 2) = "CITY"    : DB.TYPE$(1, 2) = "C" : DB.WID%(1, 2) = 12 : DB.DEC%(1, 2) = 0
+
+    GOSUB DB.CREATE
+    IF DB.ERR <> 0 THEN PRINT "SUPPLR: ";DBFILE.MSG$ : RETURN
+    PRINT "SUPPLR.DBF STRIDE";DB.STRIDE(DB.A);" DATA0";DB.DATA0(DB.A)
+
+    MK.C$ = "ACME"  : MK.N$ = "ACME FASTENERS"   : MK.T$ = "DERBY"
+    GOSUB MK.SUPP.ADD
+    MK.C$ = "NORTH" : MK.N$ = "NORTHERN SUPPLY"  : MK.T$ = "LEEDS"
+    GOSUB MK.SUPP.ADD
+    RETURN
+
+MK.SUPP.ADD:
+    GOSUB DB.NEW
+    DB.FLD$(1, 0) = MK.C$
+    DB.FLD$(1, 1) = MK.N$
+    DB.FLD$(1, 2) = MK.T$
+    GOSUB DB.PUT
+    RETURN
+
+
+## ----------------------------------------------------------------- verify
+## THIS IS THE MEASUREMENT, not a formality. Every record was written by
+## seeking to N * stride and printing one block. Reading them back in a
+## different order is what proves the seek landed where it said and that the
+## write did not truncate the file behind it.
+MK.VERIFY:
+    PRINT
+    PRINT "VERIFY"
+    DB.A = 0
+    GOSUB DB.SELECT
+    GOSUB DB.FIX
+    IF DB.FIXED THEN PRINT "  MISMATCH: HEADER COUNT DID NOT AGREE WITH THE FILE SIZE"
+    IF DB.FIXED = 0 THEN PRINT "  COUNT AGREES WITH THE FILE SIZE"
+
+    ## Backwards, so no read follows the write that made the record.
+    FOR MK.I = DB.COUNT(0) - 1 TO 0 STEP 0 - 1
+        DB.RECNO(0) = DB.DATA0(0) + MK.I
+        GOSUB DB.GOTO
+        PRINT "  ";DB.FLD$(0, 0);" ";DB.FLD$(0, 1);" ";DB.FLD$(0, 3)
+    NEXT MK.I
+
+    ## The other area's buffer, read while this one is still in hand. This is
+    ## what SUPP->NAME costs: one array index.
+    DB.A = 1
+    GOSUB DB.SELECT
+    GOSUB DB.TOP
+    PRINT "  AREA 1 TOP: ";DB.FLD$(1, 1)
+    RETURN

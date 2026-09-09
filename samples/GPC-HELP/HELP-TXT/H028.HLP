@@ -1,68 +1,36 @@
-@4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+@3.11.1 GP.DEFPROC -- declare a verb and its arguments
 .
-=4.3 APPSYS.INC.BL -- START POLITELY, LEAVE IT AS YOU FOUND IT
+=3.11.1 GP.DEFPROC
 .
-=DESCRIPTION
+.  Syntax    GP.DEFPROC verb [, formal ...] [RETURNS variable]
+.  Does      Names the routine that follows it, the variables a caller
+.            fills in, and the one its result comes back in. Emits no
+.            code.
+.  Kind      COMPOSITE. Records a position, a formal list and a result
+.            variable at compile time.
+.  Notes     The routine starts at the next statement, on the same
+.            line or on the line below. GOSUB to its label still
+.            works.
+.            A verb is a bare name: no $, no %, no subscript. Verbs
+.            are their own namespace, so a verb and a variable may
+.            share a name. One verb costs one variable record.
+.            A formal is a plain scalar variable, numeric or string.
+.            Up to 12 of them.
+.            RETURNS names a plain scalar variable too, and it is what
+.            GP.FN reads after the call. Its type is the type of the
+.            call. Without it the verb is GP.SUB-only.
+.  WARNING   An array or an array element cannot be a formal, and it
+.            cannot be the RETURNS variable either. A module whose
+.            arguments are array elements takes the verb and no
+.            formals, and its caller sets the array first.
+.  Example
 .
-.  APPSYS.STARTUP
-.      IN: --
-.      OUT: APPSYS.MODE APPSYS.COLS APPSYS.ROWS APPSYS.COLOUR
-.
-.  APPSYS.RESTORE
-.      IN: those
-.      OUT: screen mode and colour put back
-.
-.  APPSYS.PANEL.SAVE
-.      IN: APPSYS.FILE$ .BANK .X .Y .W .H [.DEV]
-.      OUT: a file
-.
-.  APPSYS.PANEL.LOAD
-.      IN: APPSYS.FILE$ .BANK
-.      OUT: back where it came from
-.
-.  APPSYS.PANEL.PUT
-.      IN: APPSYS.FILE$ .BANK .X .Y
-.      OUT: pasted somewhere else
-.
-.  APPSYS.ISEMU
-.      IN: --
-.      OUT: APPSYS.IS.EMULATOR -- -1 under x16emu, 0 otherwise
-.
-:GOSUB APPSYS.STARTUP
-:' ... the application, laid out with APPSYS.COLS / APPSYS.ROWS ...
-:GOSUB APPSYS.RESTORE : END
-.
-.Call STARTUP before any SCREEN or COLOR of your own. It records the state as
-.it finds it, so anything changed beforehand is what gets restored.
-.
-.Lay out from APPSYS.COLS / APPSYS.ROWS rather than assuming 80x60. The X16
-.boots 80x60, but SCREEN 0 is 40x30 and a user who prefers larger text is
-.running one.
-.
-.APPSYS.DEV defaults to 8. The panel routines are implemented in
-.STASHFILE.INC.BL. A panel file is self-describing -- it carries the stash's
-.4-byte header -- so loading one needs only its name.
-.
-.APPSYS.ISEMU answers the question a timing loop has to ask. $9FBE and $9FBF
-.are the last of the emulator's own I/O registers and read as "1" and "6"
-.under x16emu, with the debugger on or off; the routine is those two PEEKs
-.and a comparison.
-.
-:GOSUB APPSYS.ISEMU
-:IF APPSYS.IS.EMULATOR THEN PRINT "EMULATED"
-:IF NOT APPSYS.IS.EMULATOR THEN PRINT "NOT x16emu"
-.
-.The flag is -1, not 1, so NOT works on it: NOT is -x-1 here, so NOT -1 is 0
-.while NOT 1 is -2 -- still true. -1 is also what a comparison hands back, so
-.the flag reads like one. IF itself tests non-zero, so either value would
-.have worked with the plain form.
-.
-.It answers for x16emu and nothing else. A 0 means "not x16emu" -- a real
-.machine, or another emulator that does not carry those registers. And
-.$9FA0-$9FBF is expansion card I/O on the real machine, so a card at I/O5
-.could in principle answer "16" as well: a 1 is strong, a 0 is certain.
-.
-=SEE ALSO
-.
->42|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
->77|STASHFILE.INC.BL -- a saved text rectangle, through a file.
+:            DB.SELECT:
+:              GP.DEFPROC DBSELECT, DB.A : BANK DB.CODEBANK
+:              GOSUB DB.SELECT.BODY
+:              RETURN
+:
+:            AREA:
+:              GP.DEFPROC AREA, A.W, A.H RETURNS A.R
+:              A.R = A.W * A.H
+:              RETURN

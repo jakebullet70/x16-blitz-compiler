@@ -30,8 +30,8 @@
 ## **                            characters, "1" marked. Any other length --
 ## **                            "" included -- starts with none marked
 ## **        GUI.LISTBOX.SEL     the item to start on. 0 starts at 1
-## **        plus everything GUI.OPEN reads: GUI.MSG$, GUI.MSG2$, GUI.TITLE$,
-## **        GUI.BANK, GUI.STYLE, GUI.GLYPH, GUI.PLACE and the rest
+## **        plus everything GUI.OPEN reads: GUI.MSG$, GUI.MSG2$, GUI.MSG3$,
+## **        GUI.TITLE$, GUI.BANK, GUI.STYLE, GUI.GLYPH, GUI.PLACE and the rest
 ## **
 ## **   out  GUI.LISTBOX.SEL     the item under the highlight, 1..COUNT, or 0
 ## **                            if cancelled. In multi that is where the cursor

@@ -32,12 +32,12 @@
 .The library. GPC-BASIC/: 14 .INC.BL modules, 22 .EXP.BL examples. Ordinary
 .BASL, #INCLUDEd by path, called with GOSUB. Zero runtime bytes -- a module
 .costs its own p-code, in the programs that include it. Menus vertical and
-.bar, panels, themes, entry fields, in-place case and trim, shell sort, a
-.screen rectangle to a RAM bank or a file, BMX into VERA.
+.bar, panels, themes, entry fields, in-place case, trim and splice, shell
+.sort, a screen rectangle to a RAM bank or a file, BMX into VERA.
 .
-.STASH.INC.BL, SORT.INC.BL and STRCASE.INC.BL are GP.ASM and still modules:
-.as keywords their 925 bytes (329, 408, 188) would sit in the block, paid by
-.every GP program. GP.ARRPTR and GP.STRPTR are what lets them out -- a BASL
+.STASH.INC.BL, SORT.INC.BL, STRCASE.INC.BL and STRINGS.INC.BL are GP.ASM and
+.still modules: as keywords their bytes would sit in the block, paid by every
+.GP program. GP.ARRPTR and GP.STRPTR are what lets them out -- a BASL
 .subroutine takes an address, not an array or a string.
 .
 .The division is assembly for loops and bulk moves, BASIC for everything
@@ -46,6 +46,7 @@
 .
 =SEE ALSO
 .
->69|STASH.INC.BL -- save a text rectangle, and put it back.
->48|4.7 SORT.INC.BL -- shell sort a string array
->49|4.8 STRCASE.INC.BL -- case and trim, in place
+>78|STASH.INC.BL -- save a text rectangle, and put it back.
+>56|4.7 SORT.INC.BL -- shell sort a string array
+>57|4.8 STRCASE.INC.BL -- case, in place
+>48|4.2 STRINGS.INC.BL -- string helpers

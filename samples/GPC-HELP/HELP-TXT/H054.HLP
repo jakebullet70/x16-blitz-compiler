@@ -1,0 +1,56 @@
+@3. The modules (4)
+=MENUVERT.INC.BL
+.
+.  in
+.      MENUVERT.X MENUVERT.Y -- top left of the first row<br>MENUVERT.WIDTH
+.        -- cells wide, which is the width of the highlight<br>MENUVERT.COUNT
+.        -- how many rows<br>MENUVERT.ITEM$() -- the rows, 1..COUNT; the
+.        caller owns the DIM<br>MENUVERT.ATTR -- packed
+.        attribute<br>MENUVERT.HIATTR -- the highlighted row; 0 inverts
+.        MENUVERT.ATTR<br>MENUVERT.HOT$ -- one hotkey character a
+.        row<br>MENUVERT.HOTATTR -- tint for the hotkey letter; 0 is
+.        off<br>MENUVERT.FLAGS -- added together<br>MENUVERT.SEL -- the row
+.        to start on
+.
+.  out
+.      MENUVERT.SEL -- 1..COUNT, or 0 if cancelled<br>MENUVERT.KEY -- the key
+.        that ended it
+.
+.  internal
+.      MENUVERT.SCAN MENUVERT.EACH MENUVERT.DONE MENUVERT.CODE
+.        MENUVERT.INCHAR$ MENUVERT.PREVSEL MENUVERT.HIGHLIGHT
+.        MENUVERT.DRAWROW MENUVERT.DRAWATTR MENUVERT.DRAWTEXT$ MENUVERT.DRAWY
+.        MENUVERT.HOTCODE MENUVERT.HOTLAST MENUVERT.WANTCODE MENUVERT.HOTAT
+.        MENUVERT.HOTWANT MENUVERT.HOTHERE MENUVERT.HOTSCAN MENUVERT.PADNOW
+.        MENUVERT.PADNEW MENUVERT.PADHELD MENUVERT.PADRAW
+.
+.  constants
+.      MENUVERT.MUSTSEL MENUVERT.KEEPMARK MENUVERT.NOWRAP MENUVERT.GAMEPAD
+.        MENUVERT.UP MENUVERT.DOWN MENUVERT.ENTER MENUVERT.ESCAPE
+.        MENUVERT.STOP MENUVERT.SPACE MENUVERT.PORT MENUVERT.PAD.UP
+.        MENUVERT.PAD.DOWN MENUVERT.PAD.B MENUVERT.PAD.START
+.
+.MENUVERT.SEL is both an input and an output: the row to start on going in,
+.and the row chosen coming out, so a menu reopened without clearing it
+.reopens where it was. That is usually what you want; set it to 0 when it is
+.not.
+.
+.MENUVERT.DRAWROW, MENUVERT.DRAWATTR and MENUVERT.DRAWTEXT$ are listed
+.internal but are the documented arguments to MENUVERT.ROW, which is public:
+.they are internal to MENUVERT.RUN, not to you. MENUVERT.HOTFIND reads the
+.first two and answers in MENUVERT.HOTAT.
+.
+=EXAMPLE PROGRAM
+.
+.  FORM.EXP.BL -- runnable, in the GPC-BASIC folder
+.
+=SEE ALSO
+.
+>47|4.1 THEME.INC.BL -- named colour roles
+>50|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>48|4.2 STRINGS.INC.BL -- string helpers
+>58|4.10 STRUSING.INC.BL -- a number to a template
+>51|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>52|4.5 BMX.INC.BL -- a BMX bitmap into VERA
+>78|STASH.INC.BL -- save a text rectangle, and put it back.
+>53|4.6 MENUVERT.INC.BL -- a vertical menu

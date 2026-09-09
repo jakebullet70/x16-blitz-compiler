@@ -1,0 +1,139 @@
+## ***********************************************************************
+## **
+## **  DBFORM.INC.BL -- one record on the screen, from the schema.
+## **
+## **      DBFORM.SHOW     draw the labels and the values
+## **      DBFORM.EDIT     drive them, straight into DB.FLD$()
+## **
+## **  SKELETON. Nothing here has run.
+## **
+## **  This is FORM.EXP.BL's loop with the arrays supplied by the engine.
+## **  DB.NAME$() is the label, DB.WID%() is the field width, DB.TYPE$() gives
+## **  LINEINPUT.ALLOW$, and DB.FLD$() is both the value in and the value out.
+## **  There is no per field array to fill in: the database already is one.
+## **
+## **  REQUIRES, and does not #INCLUDE for you:
+## **      GPB.INC.BL      GP.FILL, GP.BOX, GP.PRINTAT, GP.SELECT
+## **      THEME.INC.BL    THEME.CLR
+## **      LINEINPUT.INC.BL
+## **      DB.INC.BL       the schema and the record
+## **
+## **  A FORM IS A LOOP, not a sequence of prompts. LINEINPUT.GET hands back
+## **  the key that ended the field, so up and down move the focus, RETURN off
+## **  the last field accepts, and ESC cancels the lot.
+## **
+## **  IT DOES NOT WRITE. DBFORM.EDIT leaves the edited values in DB.FLD$() and
+## **  the caller decides whether to GOSUB DB.PUT. Cancelling means the caller
+## **  reads the record back with DB.GOTO.
+## **
+## **  IT CANNOT LIVE IN THE ENGINE'S BANK. It calls LINEINPUT, which is in the
+## **  GUI library's region, and a region cannot call another region. Put this
+## **  beside the GUI in bank 4 or leave it in low memory.
+## **
+## **  A record wider than the panel is not handled. Thirty-two fields do not
+## **  fit on thirty rows and v1 shows the first DBFORM.ROWS of them.
+## **
+## **  The whole DBFORM.* name space belongs to this file.
+## **
+## ***********************************************************************
+#IFNDEF DBFORM.DEFS
+#DEFINE DBFORM.DEFS 1
+
+## Where the value column starts inside the panel, and how many fields fit.
+#DEFINE DBFORM.LABELW 12
+#DEFINE DBFORM.ROWS 20
+
+GOTO DBFORM.MODULE.END
+
+
+## ------------------------------------------------------------------- show
+## Labels down the left, values down the right, one row a field.
+##
+##   in   DBFORM.X  DBFORM.Y    top left of the frame
+##        DBFORM.W              frame width
+##        DB.A                  the area, and everything it names
+
+DBFORM.SHOW:
+    DBFORM.N = DB.NFLD(DB.A)
+    IF DBFORM.N > DBFORM.ROWS THEN DBFORM.N = DBFORM.ROWS
+    GP.BOX DBFORM.X, DBFORM.Y, DBFORM.W, DBFORM.N + 2, 1, THEME.CLR(THEME.BORDER)
+    GP.FILL DBFORM.X + 1, DBFORM.Y + 1, DBFORM.W - 2, DBFORM.N, 32, THEME.CLR(THEME.TEXT)
+    FOR DBFORM.I = 0 TO DBFORM.N - 1
+        GP.PRINTAT DBFORM.X + 2, DBFORM.Y + 1 + DBFORM.I, DB.NAME$(DB.A, DBFORM.I), THEME.CLR(THEME.TEXT)
+        DBFORM.F = DBFORM.I
+        GOSUB DBFORM.VALUE
+    NEXT DBFORM.I
+    RETURN
+
+## One value, in the ordinary colour. Also what the edit loop calls to put a
+## field back after the focus leaves it.
+DBFORM.VALUE:
+    GP.PRINTAT DBFORM.X + DBFORM.LABELW, DBFORM.Y + 1 + DBFORM.F, DB.FLD$(DB.A, DBFORM.F), THEME.CLR(THEME.TEXT)
+    RETURN
+
+
+## ------------------------------------------------------------------- edit
+## The loop. DBFORM.AT is the focused field and the key that ended the last
+## one decides where it goes next.
+##
+##   out  DBFORM.OK   true if RETURN accepted, false if ESC cancelled
+
+DBFORM.EDIT:
+    DBFORM.N = DB.NFLD(DB.A)
+    IF DBFORM.N > DBFORM.ROWS THEN DBFORM.N = DBFORM.ROWS
+    DBFORM.AT = 0
+    DBFORM.OK = 0
+
+DBFORM.LOOP:
+    DBFORM.F = DBFORM.AT
+    GOSUB DBFORM.ALLOW
+    LINEINPUT.X = DBFORM.X + DBFORM.LABELW
+    LINEINPUT.Y = DBFORM.Y + 1 + DBFORM.AT
+    LINEINPUT.LEN = DB.WID%(DB.A, DBFORM.AT)
+    LINEINPUT.ATTR = THEME.CLR(THEME.HILITE)
+    LINEINPUT.MASK = 0
+    LINEINPUT.ALLOW$ = DBFORM.ALLOW$
+    LINEINPUT.TEXT$ = DB.FLD$(DB.A, DBFORM.AT)
+    GOSUB LINEINPUT.GET
+    DB.FLD$(DB.A, DBFORM.AT) = LINEINPUT.TEXT$
+
+    ## Put the field back in the ordinary colour, so only the focused one is
+    ## highlighted.
+    GP.FILL LINEINPUT.X, LINEINPUT.Y, LINEINPUT.LEN, 1, 32, THEME.CLR(THEME.TEXT)
+    GOSUB DBFORM.VALUE
+
+    GP.SELECT LINEINPUT.KEY
+        GP.CASE 27, 3
+            RETURN
+        GP.CASE 145
+            DBFORM.AT = DBFORM.AT - 1
+        GP.CASE 13, 17, 9
+            DBFORM.AT = DBFORM.AT + 1
+    GP.ENDSEL
+
+    IF DBFORM.AT < 0 THEN DBFORM.AT = DBFORM.N - 1
+    IF DBFORM.AT >= DBFORM.N THEN DBFORM.OK = -1
+    IF DBFORM.OK THEN RETURN
+    GOTO DBFORM.LOOP
+
+
+## ------------------------------------------------------------- the filter
+## The type decides which keys the field takes. A character field takes
+## everything, which is the empty filter.
+##
+## THE FILTER IS SET ON THE WAY INTO EVERY FIELD, never once outside the loop:
+## a field that left it alone would inherit the last one's.
+##
+##   in   DBFORM.F
+##   out  DBFORM.ALLOW$
+
+DBFORM.ALLOW:
+    DBFORM.ALLOW$ = ""
+    IF DB.TYPE$(DB.A, DBFORM.F) = "N" THEN DBFORM.ALLOW$ = "0123456789.-"
+    IF DB.TYPE$(DB.A, DBFORM.F) = "D" THEN DBFORM.ALLOW$ = "0123456789"
+    IF DB.TYPE$(DB.A, DBFORM.F) = "L" THEN DBFORM.ALLOW$ = "TFYNtfyn"
+    RETURN
+
+
+DBFORM.MODULE.END:
+#ENDIF

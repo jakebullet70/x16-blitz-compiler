@@ -26,7 +26,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [User runs concurrent agents here](user-runs-concurrent-agents-here.md) — default to read-only research; re-read before any write
 - [Compile shared, not embedded](compile-shared-not-embedded.md) — standing: SHARED is the p-code number; GPC-HELP stays uncrunched
 - [Library working copy, then root](library-working-copy-then-root.md) — edit modules in samples/GPB-MODS-TESTING/GPC-BASIC/, copy to root only when they pass; and the drift runs BOTH ways
-- [Compact early, not at the end](compact-early-not-at-the-end.md) — cost is context size x turns; 75% of a window went in 18 minutes on a 558K-token context
+- [Compact early, not at the end](compact-early-not-at-the-end.md) — remind the user to /compact after EVERY step, not just between phases; cost is context size x turns
 
 ## Build and toolchain
 - **Build setup** — *(note missing: linked by the index but never committed)* how to build it, and the 5 blockers that made a fresh clone unbuildable on any OS. See docs/BUILDING.md.
@@ -138,6 +138,7 @@ not about GPC's internals. The rest are recoverable from git history (commit `0f
 - [Dead-code elimination, measured](basl-dead-code-elimination-measured.md) — PARKED; 1,212 resident bytes are never called, but 691 of them are free by deleting two #INCLUDE lines
 - [VRAM-to-VRAM memory_copy limits](vram-to-vram-memory-copy-limits.md) — MEASURED; the auto-increment carries into bit 16, 15,360 in one call, and a descending overlap is safe
 - [Array element sizes, measured](array-element-sizes-measured.md) — a `%` array is TWO bytes an element and an untyped one SIX; FILEDIR's header had it wrong
+- [Byte data type feasibility](byte-data-type-feasibility.md) — STUDY ONLY; `$60` is the free type code and `$7B`/`$7F` the free array opcodes, but the opcode space refuses byte SCALARS
 - [KERNAL preserves the RAM bank](kernal-preserves-ram-bank.md) — CHROUT, GETIN, scroll, CLS and screen_mode all leave $00 alone; measure it in asm, PEEK(0) cannot see it
 - [X16 ROM internal calls](x16-rom-internal-calls.md) — verified R49 dispatcher/GC addresses + ZP pointers
 - [X16 toolchain](x16-toolchain.md) — 64tass / emulator paths on this machine

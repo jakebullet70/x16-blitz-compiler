@@ -1,0 +1,241 @@
+#SAVEAS "@:SVARS-TEST.PRG"
+#REM 0
+#INCLUDE "SVARS.BASL"
+
+## ***********************************************************************
+## **
+## **  SVARS-TEST.BASL -- the harness for SVARS.BASL.
+## **
+## **  Populates both arrays, writes them to SVTEST.DAT, wipes the arrays,
+## **  reads the file back and compares every slot. Then three cases that
+## **  have each been a real defect: an empty name, a comma inside a name,
+## **  and a missing file.
+## **
+## **  Prints one line per failure and RESULT PASS or RESULT FAIL at the
+## **  end, so it reads the same on screen and in a headless echo log.
+## **
+## **  Interpreted. BASLOAD "SVARS-TEST.BASL", then RUN the PRG.
+## **
+## ***********************************************************************
+
+#DEFINE SVT.SCRATCH 15
+
+GOSUB SVT.SETUP
+
+GOSUB SVT.CASE.ROUNDTRIP
+GOSUB SVT.CASE.OVERWRITE
+GOSUB SVT.CASE.MISSING
+GOSUB SVT.CASE.DEFDEVICE
+
+PRINT
+PRINT SVT.RUN;"CHECKS,";SVT.BAD;"FAILED"
+IF SVT.BAD = 0 THEN PRINT "RESULT PASS"
+IF SVT.BAD > 0 THEN PRINT "RESULT FAIL"
+END
+
+## ***********************************************************************
+## **  Case 1 -- fill, save, wipe, load, compare all sixteen slots.
+## **  The reference values carry the two edge cases: slot 1 of SV$() is
+## **  EMPTY and slot 2 holds a COMMA. A bare empty line makes INPUT# skip
+## **  to the next one, which used to shift every later field by a slot.
+## ***********************************************************************
+SVT.CASE.ROUNDTRIP:
+PRINT "-- ROUND TRIP"
+GOSUB SVT.SCRATCHFILE
+GOSUB SVT.LOADREF
+GOSUB SVT.FILL
+GOSUB SVARS.SAVE
+SVT.NAME$ = "SAVE OK"
+SVT.GOT = SV.OK
+SVT.WANT = -1
+GOSUB SVT.NUM
+SVT.NAME$ = "SAVE ERR"
+SVT.GOT = SV.ERR
+SVT.WANT = 0
+GOSUB SVT.NUM
+GOSUB SVT.WIPE
+GOSUB SVARS.LOAD
+SVT.NAME$ = "LOAD OK"
+SVT.GOT = SV.OK
+SVT.WANT = -1
+GOSUB SVT.NUM
+GOSUB SVT.COMPARE
+RETURN
+
+## ***********************************************************************
+## **  Case 2 -- a second save must REPLACE the file, not append to it or
+## **  fail with FILE EXISTS. SVARS.SAVE opens with @: for exactly this.
+## ***********************************************************************
+SVT.CASE.OVERWRITE:
+PRINT "-- OVERWRITE"
+SVT.REFN(SV.MODE) = 3
+SVT.REFN(SV.CALLS) = 1
+SVT.REFS$(SV.LASTCALLER) = "GRACE"
+SVT.REFS$(SV.USERNAME) = "KEN"
+SVT.REFS$(SV.CALLERIP) = ""
+GOSUB SVT.FILL
+GOSUB SVARS.SAVE
+SVT.NAME$ = "RESAVE ERR"
+SVT.GOT = SV.ERR
+SVT.WANT = 0
+GOSUB SVT.NUM
+GOSUB SVT.WIPE
+GOSUB SVARS.LOAD
+GOSUB SVT.COMPARE
+RETURN
+
+## ***********************************************************************
+## **  Case 3 -- a missing file reports 62 and leaves the arrays ALONE.
+## **  The command channel is read before the first INPUT# so this cannot
+## **  come back as a silent row of zeroes.
+## ***********************************************************************
+SVT.CASE.MISSING:
+PRINT "-- MISSING FILE"
+SV.FILE$ = "NOSUCH.DAT"
+GOSUB SVARS.LOAD
+SVT.NAME$ = "MISSING OK"
+SVT.GOT = SV.OK
+SVT.WANT = 0
+GOSUB SVT.NUM
+SVT.NAME$ = "MISSING ERR"
+SVT.GOT = SV.ERR
+SVT.WANT = 62
+GOSUB SVT.NUM
+GOSUB SVT.COMPARE
+SV.FILE$ = "SVTEST.DAT"
+RETURN
+
+## ***********************************************************************
+## **  Case 4 -- SV.DEVICE 0 means 8, and the routine writes it back.
+## ***********************************************************************
+SVT.CASE.DEFDEVICE:
+PRINT "-- DEFAULT DEVICE"
+SV.DEVICE = 0
+GOSUB SVARS.LOAD
+SVT.NAME$ = "DEVICE FILLED IN"
+SVT.GOT = SV.DEVICE
+SVT.WANT = 8
+GOSUB SVT.NUM
+SVT.NAME$ = "STILL LOADS"
+SVT.GOT = SV.OK
+SVT.WANT = -1
+GOSUB SVT.NUM
+RETURN
+
+## ***********************************************************************
+## **  The reference values, and the labels a failure is reported under.
+## ***********************************************************************
+SVT.LOADREF:
+SVT.REFN(SV.MODE) = 7
+SVT.REFN(SV.CALLS) = 33
+SVT.REFN(SV.USERCOUNT) = 210
+SVT.REFN(SV.LEVEL) = 9
+SVT.REFN(SV.TERM) = 2
+SVT.REFN(SV.SYSOP) = 1
+SVT.REFN(SV.RECNO) = 88
+SVT.REFN(SV.WIDTH) = 80
+SVT.REFN(SV.MBASE) = 4660
+SVT.REFN(SV.REPLYTO) = 65535
+SVT.REFN(SV.REPLYOK) = 1
+SVT.REFN(SV.SPAREA) = 5
+SVT.REFN(SV.SPAREB) = 6
+SVT.REFS$(SV.LASTCALLER) = "ADA"
+SVT.REFS$(SV.USERNAME) = ""
+SVT.REFS$(SV.CALLERIP) = "192.168,001.007"
+RETURN
+
+SVT.LABELS:
+SVT.LBLN$(SV.MODE) = "MODE"
+SVT.LBLN$(SV.CALLS) = "CALLS"
+SVT.LBLN$(SV.USERCOUNT) = "USERCOUNT"
+SVT.LBLN$(SV.LEVEL) = "LEVEL"
+SVT.LBLN$(SV.TERM) = "TERM"
+SVT.LBLN$(SV.SYSOP) = "SYSOP"
+SVT.LBLN$(SV.RECNO) = "RECNO"
+SVT.LBLN$(SV.WIDTH) = "WIDTH"
+SVT.LBLN$(SV.MBASE) = "MBASE"
+SVT.LBLN$(SV.REPLYTO) = "REPLYTO"
+SVT.LBLN$(SV.REPLYOK) = "REPLYOK"
+SVT.LBLN$(SV.SPAREA) = "SPAREA"
+SVT.LBLN$(SV.SPAREB) = "SPAREB"
+SVT.LBLS$(SV.LASTCALLER) = "LASTCALLER"
+SVT.LBLS$(SV.USERNAME) = "USERNAME"
+SVT.LBLS$(SV.CALLERIP) = "CALLERIP"
+RETURN
+
+## ***********************************************************************
+## **  The arrays under test: reference in, junk in, compare.
+## ***********************************************************************
+SVT.FILL:
+FOR SVT.I = 0 TO SV.NUMTOP
+SV(SVT.I) = SVT.REFN(SVT.I)
+NEXT
+FOR SVT.I = 0 TO SV.STRTOP
+SV$(SVT.I) = SVT.REFS$(SVT.I)
+NEXT
+RETURN
+
+## Junk, not zero. Zeroing would let a routine that never wrote a slot
+## pass whenever the reference value happened to be zero too.
+SVT.WIPE:
+FOR SVT.I = 0 TO SV.NUMTOP
+SV(SVT.I) = 999
+NEXT
+FOR SVT.I = 0 TO SV.STRTOP
+SV$(SVT.I) = "?"
+NEXT
+RETURN
+
+SVT.COMPARE:
+FOR SVT.I = 0 TO SV.NUMTOP
+SVT.NAME$ = SVT.LBLN$(SVT.I)
+SVT.GOT = SV(SVT.I)
+SVT.WANT = SVT.REFN(SVT.I)
+GOSUB SVT.NUM
+NEXT
+FOR SVT.I = 0 TO SV.STRTOP
+SVT.NAME$ = SVT.LBLS$(SVT.I)
+SVT.GOT$ = SV$(SVT.I)
+SVT.WANT$ = SVT.REFS$(SVT.I)
+GOSUB SVT.EQ
+NEXT
+RETURN
+
+## ***********************************************************************
+## **  Checks. SVT.EQ takes strings, SVT.NUM converts and defers to it.
+## ***********************************************************************
+SVT.NUM:
+SVT.GOT$ = STR$(SVT.GOT)
+SVT.WANT$ = STR$(SVT.WANT)
+GOSUB SVT.EQ
+RETURN
+
+SVT.EQ:
+SVT.RUN = SVT.RUN + 1
+IF SVT.GOT$ = SVT.WANT$ THEN RETURN
+SVT.BAD = SVT.BAD + 1
+PRINT "FAIL ";SVT.NAME$;" GOT [";SVT.GOT$;"] WANT [";SVT.WANT$;"]"
+RETURN
+
+## ***********************************************************************
+## **  Setup, and a clean drive.
+## ***********************************************************************
+SVT.SETUP:
+GOSUB SVARS.INIT
+DIM SVT.REFN(SV.NUMTOP)
+DIM SVT.REFS$(SV.STRTOP)
+DIM SVT.LBLN$(SV.NUMTOP)
+DIM SVT.LBLS$(SV.STRTOP)
+GOSUB SVT.LABELS
+SV.FILE$ = "SVTEST.DAT"
+SVT.RUN = 0
+SVT.BAD = 0
+PRINT CHR$(147);"SVARS HARNESS"
+RETURN
+
+## An exact name, never a pattern: S:SV* would scratch the sources too.
+SVT.SCRATCHFILE:
+OPEN SVT.SCRATCH, SV.DEVICE, SVT.SCRATCH, "S:" + SV.FILE$
+INPUT# SVT.SCRATCH, SVT.E, SVT.M$, SVT.T, SVT.S
+CLOSE SVT.SCRATCH
+RETURN

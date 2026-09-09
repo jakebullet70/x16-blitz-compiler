@@ -70,11 +70,14 @@
 ## **      BANK for exactly this reason, and the two VERA data ports it drives
 ## **      are I/O at $9F20, not banked RAM.
 ## **
-## **  STRCASE'S TWO VERBS ARE DECLARED HERE, not in the module. GP.DEFPROC
-## **  compiles the verb's call site into a jump to the body, and a call site
-## **  in low memory jumping to $A000 does not select the bank first. So the
-## **  declaration is the shim -- it is the one place a BANK can go -- and
-## **  STRCASE.INC.BL keeps only STR.UCASE.BODY and STR.LCASE.BODY.
+## **  THE VERBS ARE DECLARED HERE, not in their modules -- STRCASE's two and
+## **  FILEIO's FILE.SIZE. GP.DEFPROC compiles the verb's call site into a jump
+## **  to the body, and a call site in low memory jumping to $A000 does not
+## **  select the bank first. So the declaration is the shim -- it is the one
+## **  place a BANK can go -- and the modules keep only the .BODY labels.
+## **
+## **  A verb's name is a NAME, so it cannot also be a label: declaring
+## **  FILE.SIZE here is what removes GOSUB FILE.SIZE as a way to call it.
 ## **
 ## **  A call leaves this bank selected, and the shims do not put the caller's
 ## **  back -- see LIBBANK.INC.BL, which says why a holding variable cannot
@@ -147,6 +150,12 @@ FILE.UP:         BANK LIB.UTILBANK :  GOSUB FILE.UP.BODY         :  RETURN
 FILE.CURDIR:     BANK LIB.UTILBANK :  GOSUB FILE.CURDIR.BODY     :  RETURN
 FILE.SAVEARRAY:  BANK LIB.UTILBANK :  GOSUB FILE.SAVEARRAY.BODY  :  RETURN
 FILE.LOADARRAY:  BANK LIB.UTILBANK :  GOSUB FILE.LOADARRAY.BODY  :  RETURN
+
+## FILE.SIZE is a VERB, not a shim, for the reason in the header -- and being one
+## it cannot also be a label, so there is no GOSUB FILE.SIZE. FILE.OK is still set
+## beside the count, which is what tells a real 0-block file from a missing one.
+GP.DEFPROC FILE.SIZE, FILE.NAME$ RETURNS FILE.BLOCKS : BANK LIB.UTILBANK : GOSUB FILE.SIZE.BODY
+RETURN
 
 LIBUTIL.MODULE.END:
 #ENDIF

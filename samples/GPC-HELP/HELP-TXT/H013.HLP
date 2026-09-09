@@ -1,48 +1,67 @@
-@3.4 Strings
+@3.3 Machine code
 .
-=3.4 STRINGS
+=3.3 MACHINE CODE
+.
+=SYNTAX
+.
+:GP.CALL address [,a] [,x] [,y] [,carry]
+:GP.A   GP.X   GP.Y   GP.C
 .
 =WHAT IT COSTS
 .
-.  ASM: GP.INSTR GP.STRPTR GP.COMP
+.  ASM: GP.CALL GP.A GP.X GP.Y GP.C
 .    ASM -- a keyword, run by machine code in the GP runtime block. A program
 .    using ANY GP keyword pays for the whole block.
-.  COMPOSITE: GP.CONTAINS GP.ISEMPTY
-.    COMPOSITE -- a keyword with no machine code of its own. The compiler
-.    expands it into keywords that already exist, so it costs the runtime
-.    nothing at all.
 .
 =DESCRIPTION
 .
-.Five keywords. GP.INSTR is the only string search GPC has; without it there
-.is none.
+.Calls machine code with the registers set. All four arguments are optional
+.and default to 0. The four value words read the registers back afterwards.
 .
-.Trimming, padding and case folding are modules, not keywords: STRCASE.INC.BL
-.(SEC 4.8) for case and trim in place, STRINGS.INC.BL (SEC 4.2) for padding.
-.They cost 188 bytes of p-code in the programs that #INCLUDE them and nothing
-.in the GP block. GP.STRPTR is the keyword they are built on.
+.They are keywords, not variables: X = GP.A reads, GP.A = 5 is a syntax
+.error. They share SYS's $030C-$030F, so they also read what a plain SYS left
+.behind.
 .
-.The in-place statements in STRCASE.INC.BL take a string variable, never a
-.literal or an expression. The compiler rejects those. Case conversion leaves
-.digits, punctuation and PETSCII graphics unchanged.
+:GP.CALL $FF5F, 0, 0, 0, 1          ' KERNAL screen_mode, carry set = report
+:COLS = GP.X : ROWS = GP.Y
 .
-.There is no GP.PAD. In-place statements cannot grow a string past the
-.capacity it was created with. STR.PADR / PADL / PADC (SEC 4.2) are BASIC
-.assignments and do reallocate.
+.Put machine code in banked RAM, $A000-$BFFF, not at $0400. Stock X16 BASIC
+.leaves $0400 free for the user; a compiled GPC program does not. That page
+.holds runtime state (stringHighMemory, storeStartHigh, variableStartPage),
+.and code POKEd over it corrupts the program without raising an error.
 .
-=IN THIS SECTION
+=Splitting an address -- GP.HIBYTE / GP.LOBYTE
 .
->22|3.4.1 GP.INSTR -- position of a substring
->23|3.4.2 GP.CONTAINS -- test for a substring
->24|3.4.3 GP.ISEMPTY -- test for a zero-length string
->25|3.4.4 GP.COMP -- compare two strings, ignoring case
->26|3.4.5 GP.STRPTR -- address of a string block
+.  GP.HIBYTE(n)
+.      DOES: INT(n / 256) -- which 256-byte page. Composite
+.
+.  GP.LOBYTE(n)
+.      DOES: MOD(n, 256) -- the offset within it. Composite
+.
+.A 6502 address is sixteen bits and everything that consumes one takes eight
+.bits at a time: GP.CALL's registers, VERA's $9F20/$9F21. Every address
+.passed from BASIC to machine code is therefore split. GP.STRPTR and
+.GP.ARRPTR produce the addresses to pass:
+.
+:P = GP.STRPTR(A$)
+:GP.CALL $A000, GP.LOBYTE(P), GP.HIBYTE(P)
+.
+.Do not write P AND 255 for the low byte. AND is 16-bit signed in GPC, and
+.any address worth splitting is above 32,767 (the string heap always is), so
+.it raises OUT OF RANGE rather than masking. GP.LOBYTE is built on MOD, which
+.uses the full 32-bit divide.
+.
+.Range is 0-65,535, which covers every address on the machine. Both are
+.composite: no runtime code, compiling to INT(n/256) and MOD(n,256).
+.
+.For anything longer than a few bytes use GP.ASM (SEC 3.9) instead of GP.CALL
+.and a POKE loop. It assembles into the program: no bank to reserve, and no
+.list of numbers to keep in step with a comment.
 .
 =EXAMPLE PROGRAM
 .
-.  STRINGS.EXP.BL -- runnable, in the GPC-BASIC folder
+.  MLCALL.EXP.BL -- runnable, in the GPC-BASIC folder
 .
 =SEE ALSO
 .
->49|4.8 STRCASE.INC.BL -- case and trim, in place
->41|4.2 STRINGS.INC.BL -- string helpers
+>33|3.9 Inline assembly

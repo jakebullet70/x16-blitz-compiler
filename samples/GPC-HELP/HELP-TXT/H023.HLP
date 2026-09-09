@@ -1,119 +1,61 @@
-@3.9 Inline assembly
+@3.8 Block IF
 .
-=3.9 INLINE ASSEMBLY
+=3.8 BLOCK IF
 .
 =SYNTAX
 .
-:GP.ASM
-:REM <instruction>
-:...
-:GP.ENDASM
+:GP.IF <expr> THEN
+:    ...
+:GP.ELSEIF <expr> THEN
+:    ...
+:GP.ELSE
+:    ...
+:GP.ENDIF
 .
 =WHAT IT COSTS
 .
-.  COMPOSITE: GP.ASM GP.ENDASM
-.    COMPOSITE -- a keyword with no machine code of its own. The compiler
-.    expands it into keywords that already exist, so it costs the runtime
-.    nothing at all.
+.  ASM: GP.IF GP.ELSEIF GP.ELSE GP.ENDIF
+.    ASM -- a keyword, run by machine code in the GP runtime block. A program
+.    using ANY GP keyword pays for the whole block.
 .
 =DESCRIPTION
 .
-.65C02 assembly, assembled by GPC at compile time, with the bytes placed in
-.the program.
+.Each of the four keywords is alone on its line, and THEN is required. There
+.is no one-line form: GP.IF X > 5 THEN PRINT is a syntax error. Allowing it
+.would mean a block that swallowed every line down to the next GP.ENDIF.
+.Stock IF ... THEN is unchanged and remains the one-line form.
 .
-.The alternative is to assemble by hand: work out the opcode for each
-.instruction, POKE the numbers into memory nothing else is using, and point
-.GP.CALL at that address. These two do the same thing -- increment A, then X,
-.then Y:
+.GP.ELSEIF may repeat any number of times; GP.ELSE is optional. The first
+.true condition wins and nothing below it runs, so there is no break to omit.
+.If nothing matches and there is no GP.ELSE the block is skipped, which is
+.not an error. Conditions are numeric expressions.
 .
-:## by hand: 26, 232 and 200 ARE inc a / inx / iny, and ML has to be somewher
-:POKE ML+0,26 : POKE ML+1,232 : POKE ML+2,200 : GP.CALL ML,10,20,30
+.GP.IF and GP.SELECT cover different cases. A select fetches one value and
+.compares it against each alternative -- a sparse key code, a state machine.
+.A block IF tests a different condition in every branch: ranges, compound
+.conditions, a string in one arm and a number in the next.
 .
-:## assembled: the bytes land in the program, and there is no address to find
-:GP.ASM
-:REM inc a
-:REM inx
-:REM iny
-:GP.ENDASM
+.GP.ENDIF is required, but unlike GP.ENDSEL it does no work: the condition is
+.evaluated and consumed on the line it is written, so there is no frame to
+.release and a GOTO out of a GP.IF is safe. Omitting GP.ENDIF stops the
+.compile with STRUCTURE IMBALANCE.
 .
-.It costs no runtime bytes. A block is five bytes of p-code plus the
-.assembled instructions, and every handler it uses is already in every
-.compiled program. A program whose only GP.BASIC keyword is GP.ASM compiles
-.GP-BASIC OUT, without the 1 KB block: measured RT 12031, the same as a
-.program using no GP keyword.
+:GP.IF N < 0 THEN
+:    PRINT "NEGATIVE"
+:GP.ELSEIF N = 0 THEN
+:    PRINT "ZERO"
+:GP.ELSE
+:    PRINT "POSITIVE"
+:GP.ENDIF
 .
-=#REM 1 is required
+.IFs nest freely -- inside each other, inside a GP.CASE body, and inside a
+.GP.DO loop.
 .
-.The body rides in REM statements because BASLOAD stores REM text byte for
-.byte. Outside a REM, ORA, AND, EOR and ROR are BASIC keywords and the text
-.is destroyed; inside one it arrives intact, braces included. Lower case is
-.accepted and upshifted.
+.It costs 14 runtime bytes, none of them code. All four p-code opcodes reuse
+.existing handlers: the two branches are .goto.z and .goto under different
+.names, and the two markers share one four-byte no-op. See SEC 11 of
+.docs/blitz/GP-BASIC.TIERS.md.
 .
-.#REM 0 is BASLOAD's default and strips the body before the compiler runs.
-.GP.ASM and GP.ENDASM are real keywords rather than REMs so that the block is
-.still found, empty, and GPC reports BLOCK MISMATCH rather than compiling a
-.program that contains no code. Set #REM 0 again after GP.ENDASM.
+=EXAMPLE PROGRAM
 .
-=Labels and branches
-.
-.A label is name:, alone on a line or in front of an instruction; six
-.characters are significant. Labels belong to their block -- the same name in
-.two blocks is two different labels, and neither can branch to the other.
-.
-:GP.ASM
-:REM ldx #5
-:REM loop: lda #42
-:REM jsr $ffd2
-:REM dex
-:REM bne loop
-:GP.ENDASM
-.
-.BNE, BEQ, BRA and the rest take a label, as do JMP and JSR. A branch further
-.than 127 bytes is OUT OF RANGE at compile time, reported on its own line,
-.rather than a wrong address at run time.
-.
-={VAR} -- a BASIC variable's slot
-.
-.{VAR} is the address of the variable's slot, so reading and writing use the
-.same form: LDA {N%} reads it, STA {N%} writes it, in the slot BASIC itself
-.uses.
-.
-.  {N} {N%} {N$}
-.      IS: the scalar's slot
-.
-.  {N()}
-.      IS: the array's slot, which holds the base address of its data -- an
-.        element is two steps, as through GP.ARRPTR
-.
-.A name is letters, digits and dots, starting with a letter, up to 64
-.characters -- the same limit as BASLOAD. {DOC.GOT.OFF} works, so the dotted
-.names used throughout the library are reachable from assembly. Underscore is
-.not accepted: BASLOAD allows it in a name, this does not, and {A_B} reads
-.the name as A.
-.
-.{VAR} requires #SYMFILE. BASLOAD renames variables -- N% becomes A%, which
-.is how it provides 64 significant characters on a two-character BASIC -- and
-.it does not rename REM text with them, so the code says A% while the REM
-.still says {N%}. #SYMFILE is BASLOAD's record of that mapping and the
-.compiler reads it:
-.
-:#SYMFILE "@:PROG.SYM"
-.
-.Put it at the top of the source, named to match the PRG: compiling PROG.PRG
-.reads PROG.SYM. Nothing else changes -- {N%} is still written with the name
-.as authored.
-.
-.Two compile-time errors, both naming the line:
-.
-.  NO SYMBOL FILE FOR {}
-.      MEANS: no #SYMFILE, or it is not beside the PRG under the matching
-.        name
-.
-.  UNKNOWN VARIABLE IN {}
-.      MEANS: the name is not a variable of this program
-.
-.{VAR} never creates a variable, unlike an ordinary BASIC reference. Assign
-.the variable once in BASIC first, even M% = 0. A name that does not exist
-.otherwise resolves to a slot BASIC never reads, and the block runs, stores,
-.and changes nothing observable.
-.
+.  IF.EXP.BL -- runnable, in the GPC-BASIC folder

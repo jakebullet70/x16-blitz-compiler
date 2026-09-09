@@ -1,0 +1,209 @@
+## ***********************************************************************
+## **
+## **  DBBANK.INC.BL -- the low memory front door to the banked engine.
+## **
+## **      DB.INIT      DB.SELECT   DB.OPEN     DB.CREATE
+## **      DB.CLOSE     DB.CLOSEALL DB.FIX
+## **      DB.GOTO      DB.NEXT     DB.PREV     DB.TOP      DB.BOTTOM
+## **      DB.PUT       DB.NEW      DB.DEL      DB.UNDEL
+## **      DB.PACK      DB.ZAP
+## **      DB.FIND      DB.FINDFLD  DB.BLANK
+## **
+## **  SKELETON, AND NOT YET USABLE. The shims call DB.*.BODY, and DB.INC.BL
+## **  today defines plain DB.* labels. Banking is step 4 of ../PLAN.md, after
+## **  the engine works in low memory, and renaming those labels is part of it.
+## **  #INCLUDE this file before then and the build stops with LABEL NOT FOUND.
+## **
+## **  Twenty-one shims. Each selects the code bank and calls the body, which
+## **  lives at $A000 in that bank. A banked routine cannot select its own
+## **  bank -- by its first instruction fetch the window is already wrong -- so
+## **  something in low memory has to.
+## **
+## **  EVERY SHIM ALSO DECLARES A VERB, so a caller reaches it in one statement:
+## **  GP.SUB DBNEXT for GOSUB DB.NEXT. The declaration is folded onto the BANK
+## **  line, which is a line that exists already, so it costs the compiled
+## **  program nothing -- and the call site is the same p-code the GOSUB
+## **  compiled to. A verb is the routine name with the dot taken out.
+## **  GPB.INC.BL carries the two #TOKEN lines.
+## **
+## **  ONLY THREE CARRY FORMALS, and the reason is this module's own design. A
+## **  formal must be a plain scalar variable, and a record here is an array
+## **  element -- DB.FILE$(DB.A), DB.FLD$(0, 2), DB.RECNO(DB.A) -- so there is
+## **  nothing for a formal to bind to. The three that read scalars:
+## **
+## **      GP.SUB DBSELECT, 1
+## **      GP.SUB DBFINDFLD, "PRICE"
+## **      GP.SUB DBFIND, PRICE, "ACME", TRUE
+## **
+## **  The other eighteen take a verb and no arguments, which buys the caller
+## **  nothing over the GOSUB it replaces. They are declared so the whole front
+## **  door reads one way, and because a declaration is free.
+## **
+## **  A GP.SUB MUST BE COMPILED BELOW ITS GP.DEFPROC, because the call carries
+## **  an address and not a line number. This file at the top, above the code
+## **  that calls it, is what the usage below already does.
+## **
+## **  Usage:
+## **      #INCLUDE "DBBANK.INC.BL"         ' before the region
+## **      GOTO XB.DBEND
+## **      GP.BANKED DB.CODEBANK
+## **      #INCLUDE "STRINGS.INC.BL"
+## **      #INCLUDE "DBFILE.INC.BL"
+## **      #INCLUDE "DB.INC.BL"
+## **      GP.ENDBANKED
+## **      XB.DBEND:
+## **
+## **  Claim the bank as well, or something else will hand it out:
+## **      BANKMGR.SET.BANK = DB.CODEBANK : GOSUB BANKMGR.CLAIM
+## **
+## **  STRINGS.INC.BL GOES INSIDE THE REGION, and that is a second copy of it
+## **  if the GUI's region already holds one. DB.JOIN calls STR.PADL, STR.PADR
+## **  and STR.RTRIM on every record, and a region cannot call another region.
+## **  The alternative is to leave STRINGS in low memory and let both regions
+## **  call down to it, which is what the GOTO over the region already assumes.
+## **  Measure both before choosing.
+## **
+## **  DBFORM IS NOT SHIMMED HERE and cannot be in this bank. It calls
+## **  LINEINPUT, which is in the GUI library's region. Put DBFORM beside the
+## **  GUI in bank 4, or leave it in low memory.
+## **
+## **  The GOTO over the region is not optional. Falling in through the bridge
+## **  GP.BANKED leaves works at program start and stops working the day
+## **  anything selects another bank first.
+## **
+## **  WARNING: a region may not contain BANK, BLOAD, BSAVE or STASH. DBFILE
+## **  holds OPEN, CLOSE, PRINT#, BINPUT# and LINEINPUT# only, and FILEDIR
+## **  already proves those run from $A000.
+## **
+## **  WARNING: a call leaves the code bank selected, and these shims do not
+## **  put the caller's back. A single holding variable would be overwritten by
+## **  a nested call. Low memory callers do not care; a caller inside ANOTHER
+## **  region does, and cannot fix it, since a region may not contain BANK.
+## **
+## **  WARNING: DB.CODEBANK is not GUI.BANK, and it is not LIB.CODEBANK.
+## **  Point two of them at one bank and the dialog writes the screen over the
+## **  engine's code.
+## **
+## ***********************************************************************
+#IFNDEF DBBANK.DEFS
+#DEFINE DBBANK.DEFS 1
+
+## Bank 4 is the GUI library's. Bank 7 is OBJ_BUF_BANK and is never claimed.
+## Bank 6 is reserved for the v2 index.
+#DEFINE DB.CODEBANK 5
+#DEFINE DB.IDXBANK 6
+
+GOTO DBBANK.MODULE.END
+
+## ---- set up and areas ----
+DB.INIT:
+    GP.DEFPROC DBINIT : BANK DB.CODEBANK
+    GOSUB DB.INIT.BODY
+    RETURN
+
+DB.SELECT:
+    GP.DEFPROC DBSELECT, DB.A : BANK DB.CODEBANK
+    GOSUB DB.SELECT.BODY
+    RETURN
+
+## ---- a file in an area ----
+DB.OPEN:
+    GP.DEFPROC DBOPEN : BANK DB.CODEBANK
+    GOSUB DB.OPEN.BODY
+    RETURN
+
+DB.CREATE:
+    GP.DEFPROC DBCREATE : BANK DB.CODEBANK
+    GOSUB DB.CREATE.BODY
+    RETURN
+
+DB.CLOSE:
+    GP.DEFPROC DBCLOSE : BANK DB.CODEBANK
+    GOSUB DB.CLOSE.BODY
+    RETURN
+
+DB.CLOSEALL:
+    GP.DEFPROC DBCLOSEALL : BANK DB.CODEBANK
+    GOSUB DB.CLOSEALL.BODY
+    RETURN
+
+DB.FIX:
+    GP.DEFPROC DBFIX : BANK DB.CODEBANK
+    GOSUB DB.FIX.BODY
+    RETURN
+
+## ---- navigate ----
+DB.GOTO:
+    GP.DEFPROC DBGOTO : BANK DB.CODEBANK
+    GOSUB DB.GOTO.BODY
+    RETURN
+
+DB.NEXT:
+    GP.DEFPROC DBNEXT : BANK DB.CODEBANK
+    GOSUB DB.NEXT.BODY
+    RETURN
+
+DB.PREV:
+    GP.DEFPROC DBPREV : BANK DB.CODEBANK
+    GOSUB DB.PREV.BODY
+    RETURN
+
+DB.TOP:
+    GP.DEFPROC DBTOP : BANK DB.CODEBANK
+    GOSUB DB.TOP.BODY
+    RETURN
+
+DB.BOTTOM:
+    GP.DEFPROC DBBOTTOM : BANK DB.CODEBANK
+    GOSUB DB.BOTTOM.BODY
+    RETURN
+
+## ---- write ----
+DB.PUT:
+    GP.DEFPROC DBPUT : BANK DB.CODEBANK
+    GOSUB DB.PUT.BODY
+    RETURN
+
+DB.NEW:
+    GP.DEFPROC DBNEW : BANK DB.CODEBANK
+    GOSUB DB.NEW.BODY
+    RETURN
+
+DB.DEL:
+    GP.DEFPROC DBDEL : BANK DB.CODEBANK
+    GOSUB DB.DEL.BODY
+    RETURN
+
+DB.UNDEL:
+    GP.DEFPROC DBUNDEL : BANK DB.CODEBANK
+    GOSUB DB.UNDEL.BODY
+    RETURN
+
+DB.PACK:
+    GP.DEFPROC DBPACK : BANK DB.CODEBANK
+    GOSUB DB.PACK.BODY
+    RETURN
+
+DB.ZAP:
+    GP.DEFPROC DBZAP : BANK DB.CODEBANK
+    GOSUB DB.ZAP.BODY
+    RETURN
+
+## ---- search and buffer ----
+DB.FIND:
+    GP.DEFPROC DBFIND, DB.F, DB.KEY$, DB.EXACT : BANK DB.CODEBANK
+    GOSUB DB.FIND.BODY
+    RETURN
+
+DB.FINDFLD:
+    GP.DEFPROC DBFINDFLD, DB.KEY$ : BANK DB.CODEBANK
+    GOSUB DB.FINDFLD.BODY
+    RETURN
+
+DB.BLANK:
+    GP.DEFPROC DBBLANK : BANK DB.CODEBANK
+    GOSUB DB.BLANK.BODY
+    RETURN
+
+DBBANK.MODULE.END:
+#ENDIF

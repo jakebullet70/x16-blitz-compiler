@@ -9,7 +9,7 @@
 ## **  Parameters, since a BASL subroutine takes no arguments:
 ## **
 ## **      STR.STR$    the string, in and out
-## **      STR.WIDTH   field width          PADR PADL PADC
+## **      STR.WIDTH   the width padded TO  PADR PADL PADC
 ## **      STR.DELIM$  the separator        SPLIT
 ## **      STR.MAX     field array size     SPLIT, 0 means 10
 ## **      STR.FIND$   what to look for     REPLACE

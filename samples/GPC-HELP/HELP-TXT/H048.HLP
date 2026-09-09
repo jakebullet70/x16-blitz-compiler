@@ -1,21 +1,69 @@
-@6. Two more naming rules that are not about collisions
+@5. Variables
 .
-=6. TWO MORE NAMING RULES THAT ARE NOT ABOUT COLLISIONS
+=5. VARIABLES
 .
-.#DEFINE takes an INT16 (BASLOAD.MD:313). A constant above 65535 is ERROR:
-.INVALID PARAMETER, not a warning -- which is why BMX.PALBASE (VRAM $1FA00,
-.129536) is an ordinary variable and not a #DEFINE. Every VRAM address past
-.$FFFF has the same problem.
+.BASL has one flat namespace. There are no locals, no scoping and no
+.parameters. Every variable in every #INCLUDEd module is visible to your
+.program and the reverse, and nothing warns you: a collision is a wrong
+.answer, not an error.
 .
-.A dotted name whose tail is a reserved word is fine. MENUVERT.COUNT,
-.THEME.CLR, LINEINPUT.LEN and LINEINPUT.RETURN all contain keywords and all
-.work, because BASLOAD matches the whole identifier. An undotted one does
-.not: POS, MB, ST, LEN and CHAR cannot be variables at all. This is the main
-.reason the library is dotted throughout.
+.The convention is one dotted prefix per module, and nothing writes outside
+.its own prefix.
 .
-.One rule applies only outside BASL: BASLOAD gives 64 significant characters,
-.the built-in BASIC gives two. Write the same code as a hand-typed .bas for
-.the PC-side converter and THEME.CLR and THEME.COUNT become the same
-.variable. That is a silent wrong answer -- it cost two test cycles during
-.tier 6, both times looking exactly like a compiler bug. Inside BASL you are
-.safe; in a raw .bas, give every variable a distinct first two characters.
+=Prefixes already taken
+.
+.  GP.
+.      OWNER: keywords, not variables -- see below
+.
+.  STR.
+.      OWNER: STRINGS.INC.BL
+.
+.  THEME.
+.      OWNER: THEME.INC.BL
+.
+.  APPSYS.
+.      OWNER: APPSYS.INC.BL
+.
+.  LINEINPUT.
+.      OWNER: LINEINPUT.INC.BL
+.
+.  MENUVERT.
+.      OWNER: MENUVERT.INC.BL
+.
+.  BMX. / BMXK.
+.      OWNER: BMX.INC.BL (variables / its KERNAL constants)
+.
+.Use any other prefix for your own program: GAME., MAP., AIRLIFT.. A prefix
+.costs nothing at runtime -- BASLOAD crunches every identifier to a short
+.BASIC variable, so a long readable name and a two-letter one compile to the
+.same thing.
+.
+.Do not reuse a taken prefix for a name the module has not defined.
+.THEME.MINE is free today and is one library update from not being.
+.
+=GP.* is keywords, not variables
+.
+.GPB.INC.BL defines no variables. It is 27 keyword declarations and nothing
+.else.
+.
+:GP.A = 5          ' SYNTAX ERROR -- GP.A is a keyword
+:X = GP.A          ' correct
+.
+.The value words are GP.A GP.X GP.Y GP.C, the registers after GP.CALL, and
+.that is all of them. They are keywords rather than variables because nothing
+.in the runtime can write a BASIC variable by name, so a command that returns
+.a value must return it through a keyword. X16's own ST, MX and MY work the
+.same way.
+.
+.The complete per-module in / out / internal register is GP-BASIC.GLOBALS.md,
+.with a script in SEC 6 of that file for re-checking it after a change.
+.
+=SEE ALSO
+.
+>115|6. The traps, collected
+>48|4.2 STRINGS.INC.BL -- string helpers
+>47|4.1 THEME.INC.BL -- named colour roles
+>50|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>51|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>53|4.6 MENUVERT.INC.BL -- a vertical menu
+>52|4.5 BMX.INC.BL -- a BMX bitmap into VERA

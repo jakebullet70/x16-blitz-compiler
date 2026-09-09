@@ -54,6 +54,8 @@ distinction the library is built on and it belongs next to the keyword, not in a
 screens away.
 
 [`GPC-HELP.md`](GPC-HELP.md) is the same content in one file, for reading on a PC. Also generated.
+[`GPC-HELP-TESTING.md`](GPC-HELP-TESTING.md) is the PC file again, built over the working library in
+`samples/GPB-MODS-TESTING/GPC-BASIC/` — see below.
 
 ## Rebuilding the content
 
@@ -71,6 +73,26 @@ not port. A run that produces fewer topics than the last one deletes the orphans
 **It exits non-zero if a character had no ASCII mapping**, listing the code points. That check
 exists because `−1` (U+2212, not the ASCII hyphen) shipped as `?1` — a substitution no eye catches
 in 90 KB of generated text.
+
+### The PC file, over the working library
+
+```
+python samples/GPC-HELP/MKHELP.PY --mods samples/GPB-MODS-TESTING/GPC-BASIC --md-only --md-name GPC-HELP-TESTING.md
+```
+
+`--mods` takes the module banner headers from somewhere else, and writes up **every** `.INC.BL` in
+that folder the manual does not already document — not just the five in `BANNER_ONLY`. The working
+library holds modules `GP-BASIC.md` has never heard of (`BANKMGR`, `FILEDIR`, `FILEIO`, `KB`,
+`LIBBANK`, `LIBBANKFD`, `STASHVRAM`, `STASHVRAMGC`), and this is how they get an entry. A plain run
+does not sweep, so the topic numbering the shipped `.HLP` files use does not move.
+
+`--md-only` writes the Markdown and nothing else: no `.HLP` files, no index. That is the pairing
+`--mods` wants — **the X16 help ships with the library it was built from, while the PC file can
+document a working copy without disturbing it.** `--md-name` picks the file.
+
+Sections 1–3, 5–7 and the name register still come from `--src`, because the manual is the manual;
+only the module entries move. Splitting is off in `--md-only`, since the page budget is the viewer's
+and part two of a split carries no Markdown.
 
 ## Rebuilding the program
 

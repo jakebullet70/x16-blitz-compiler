@@ -76,15 +76,13 @@ GM.LIBEND:
 
 ## ***********************************************************************
 ## **
-## **  GPBMODS.BASL -- the GPC-BASIC library, under a menu bar.
+## **  GPBMODS.BASL -- a development harness for the GPC-BASIC library.
 ## **
-## **  Nine bar items, one dropdown each, one row a library entry point.
+## **  Nine bar items, one dropdown each, and every item in a dropdown is one
+## **  library entry point.
 ## **
-## **  THERE ARE NO STUBS. Every row calls the library for real and shows what
+## **  THERE ARE NO STUBS. Every menu item calls the library for real and shows what
 ## **  came back, on the panel and again on the LAST line of the page.
-## **
-## **  BANK MAP is reached from DATA and from ABOUT both, because it belongs
-## **  under either heading. It is the same panel, named twice.
 ## **
 ## **  FILES WRITES TO THE DRIVE. Four of its rows do, everything they make is
 ## **  named GPBFILE.* or GPBDIR, and the two files are scratched by the row
@@ -141,6 +139,17 @@ DIM STR.FIELD$(10)
 ## header of. Ten because the panel gives it one row each under a heading.
 DIM GM.SORT$(9)
 
+## THE INPUT PANELS' FIELD TABLE. Four entries, three of them used: an
+## undimensioned array is 0..10 whatever it holds, and an untyped element is
+## SIX bytes, so leaving these four implicit spent 220 bytes of the string
+## heap on eleven slots to hold three fields. Dimensioned and typed they are
+## 32. % rather than plain because a screen row, a length and a flag are all
+## small whole numbers -- see GMX.I.RUNFORM.
+DIM GM.FY%(3)
+DIM GM.FLEN%(3)
+DIM GM.FMASK%(3)
+DIM GM.FLD$(3)
+
 ## FILE.LINE$() is the caller's DIM, like MENUVERT.ITEM$. Sixteen because
 ## FILES / SAVEARRAY + LOADARRAY sets FILE.MAX to 16 to show a load coming
 ## back short; the implicit DIM would only give 10.
@@ -180,14 +189,14 @@ IF BANKMGR.OK = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 3)
 BANKMGR.SET.BANK = LIB.UTILBANK : GOSUB BANKMGR.CLAIM
 IF BANKMGR.OK = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 5)
 
-GOSUB BANKMGR.GET.FREE.BANK : GM.DDBANK = BANKMGR.BANK
-GOSUB BANKMGR.GET.FREE.BANK : GM.GUIBANK = BANKMGR.BANK
-IF GM.GUIBANK = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 1)
+GOSUB BANKMGR.GET.FREE.BANK : GM.DDBANK% = BANKMGR.BANK
+GOSUB BANKMGR.GET.FREE.BANK : GM.GUIBANK% = BANKMGR.BANK
+IF GM.GUIBANK% = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 1)
 
 ## A whole bank for one directory listing, read in one go and then walked
 ## without going near the drive again. See FILES / FILE.DIR.OPEN.
-GOSUB BANKMGR.GET.FREE.BANK : GM.DIRBANK = BANKMGR.BANK
-IF GM.DIRBANK = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 4)
+GOSUB BANKMGR.GET.FREE.BANK : GM.DIRBANK% = BANKMGR.BANK
+IF GM.DIRBANK% = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 4)
 
 IF GM.BANKFAIL$ <> "" THEN GOTO GM.BANKSTOP
 
@@ -205,37 +214,37 @@ IF SV.OK = 0 THEN GM.BANKFAIL$ = SV.ERROR$
 ## after FILE.DIR.INIT".
 GOSUB FILE.DIR.INIT
 
-GM.SEL = 1 : GM.OPEN = 0
+GM.SEL% = 1 : GM.OPEN% = 0
 
 ## Where a panel writes what it got back, and what stands there before one has run.
-GM.RESY = APPSYS.ROWS - 3 : GM.RESULT$ = GP.BSTR(BS.LIBEND, 2)
+GM.RESY% = APPSYS.ROWS - 3 : GM.RESULT$ = GP.BSTR(BS.LIBEND, 2)
 
 GOSUB GMX.CHROME
 
-## ---- The shell. GM.OPEN is set by a dropdown that ended on LEFT or RIGHT,
+## ---- The shell. GM.OPEN% is set by a dropdown that ended on LEFT or RIGHT,
 ## ---- and it means "the bar has already moved, go straight back down".
 ## ----
-## ---- GM.DODROP IS WHAT A REFUSED QUIT NEEDS. ESC on the bar returns SEL 0,
-## ---- and answering NO to the prompt leaves that 0 standing -- so GM.SEL must
+## ---- GM.DODROP% IS WHAT A REFUSED QUIT NEEDS. ESC on the bar returns SEL 0,
+## ---- and answering NO to the prompt leaves that 0 standing -- so GM.SEL% must
 ## ---- not be written from it, and the dropdown must not open on it. The flag
 ## ---- is the only thing that separates "chose nothing" from "chose item n".
 
 GP.DO
-  GM.DODROP = 1
-  GP.IF GM.OPEN = 0 THEN
+  GM.DODROP% = 1
+  GP.IF GM.OPEN% = 0 THEN
     GOSUB GMX.BAR
     GP.IF MENUBAR.SEL = 0 THEN
       GOSUB GMX.QUIT
-      GP.IF GM.QUIT <> 0 THEN
+      GP.IF GM.QUIT% <> 0 THEN
         GP.EXITDO
       GP.ENDIF
-      GM.DODROP = 0
+      GM.DODROP% = 0
     GP.ELSE
-      GM.SEL = MENUBAR.SEL
+      GM.SEL% = MENUBAR.SEL
     GP.ENDIF
   GP.ENDIF
-  GM.OPEN = 0
-  GP.IF GM.DODROP = 1 THEN
+  GM.OPEN% = 0
+  GP.IF GM.DODROP% = 1 THEN
     GOSUB GMX.DROP
   GP.ENDIF
 GP.LOOP
@@ -267,7 +276,7 @@ GMX.QUIT:
   GUI.MSG$ = GP.BSTR(BS.QUIT, 1)
   GUI.MSG2$ = GP.BSTR(BS.QUIT, 2)
   GOSUB GUI.YN
-  GM.QUIT = GUI.ANSWER
+  GM.QUIT% = GUI.ANSWER
   RETURN
 
 
@@ -285,40 +294,65 @@ GMX.QUIT:
 
 
 GP.BANKEDSTR GM.TEXTBANK BS.CHROME
-  "GPB-MODS-TESTING -- THE GPC-BASIC LIBRARY UNDER A BAR"
-  "EVERY ROW RUNS THE REAL LIBRARY CALL."
-  "NOTHING HERE IS A STUB."
+  "GPB-MODS-TESTING -- A DEVELOPMENT HARNESS FOR THE GPC-BASIC LIBRARY"
   "<- ->  BAR     DOWN  OPEN     RETURN  CHOOSE     ESC  BACK / QUIT"
+GP.ENDBANKEDSTR
+GP.BANKEDSTR GM.TEXTBANK BS.HEAP
+  "HEAP  FRE(0) "
+  "   LOWEST THIS RUN "
 GP.ENDBANKEDSTR
 GMX.CHROME:
   GP.FILL 0, 0, APPSYS.COLS, APPSYS.ROWS, ASC(" "), THEME.CLR(THEME.PAGE)
   GP.FILL 0, 0, APPSYS.COLS, 1, ASC(" "), THEME.CLR(THEME.TITLE)
   GP.PRINTAT 2, 2, GP.BSTR(BS.CHROME, 0), THEME.CLR(THEME.TEXT)
-  GP.PRINTAT 2, 4, GP.BSTR(BS.CHROME, 1), THEME.CLR(THEME.DIMMED)
-  GP.PRINTAT 2, 5, GP.BSTR(BS.CHROME, 2), THEME.CLR(THEME.DIMMED)
-  GM.KEYS$ = GP.BSTR(BS.CHROME, 3)
+  GM.KEYS$ = GP.BSTR(BS.CHROME, 1)
   GP.PRINTAT 2, APPSYS.ROWS - 1, GM.KEYS$, THEME.CLR(THEME.DIMMED)
   GOSUB GMX.BARDRAW
   GOSUB GMX.RESULT
+  GOSUB GMX.HEAP
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.HEAP -- the string heap, on the footer, in the title colour.
+## **
+## **  FRE(0) IS THE STRING HEAP AND NOT MUCH ELSE. The p-code, the workspace
+## **  and the arrays are all fixed at compile or DIM time; what moves while
+## **  the program runs is string blocks, and a concrete one is never freed --
+## **  only flagged dead and re-fitted. So a panel that builds long temporaries
+## **  can spend the heap and never give it back, and OUT OF MEMORY arrives at
+## **  whatever routine next asks for one rather than at the one that spent it.
+## **
+## **  LOW IS THE POINT. A single figure says nothing; the lowest seen this
+## **  session is what shows a panel eating the heap and not returning it.
+## ***********************************************************************
+
+GMX.HEAP:
+  GM.FRE = FRE(0)
+  IF GM.FRELOW = 0 THEN GM.FRELOW = GM.FRE
+  IF GM.FRE < GM.FRELOW THEN GM.FRELOW = GM.FRE
+  GM.HEAP$ = GP.BSTR(BS.HEAP, 0) + MID$(STR$(GM.FRE), 2) + GP.BSTR(BS.HEAP, 1) + MID$(STR$(GM.FRELOW), 2)
+  GP.FILL 2, APPSYS.ROWS - 2, APPSYS.COLS - 4, 1, ASC(" "), THEME.CLR(THEME.PAGE)
+  GP.PRINTAT 2, APPSYS.ROWS - 2, GM.HEAP$, THEME.CLR(THEME.TITLE)
   RETURN
 
 
 ## ---- GMX.BARDRAW -- every bar item, and the highlight if there is one to
-## ---- put. GM.BARWAS is what is highlighted ON SCREEN right now, which is
+## ---- put. GM.BARWAS% is what is highlighted ON SCREEN right now, which is
 ## ---- what lets GMX.DROP repaint two items instead of nine. Cleared first,
 ## ---- so a GP.STOP between the two draws leaves it honest.
 ## ----
-## ---- GM.SEL is 0 before the first pass round the shell, and MENUBAR.MARK on
+## ---- GM.SEL% is 0 before the first pass round the shell, and MENUBAR.MARK on
 ## ---- item 0 would read MENUVERT.ITEM$(0), which nothing fills.
 
 GMX.BARDRAW:
   GOSUB GMX.BAR.LOAD
-  GM.BARWAS = 0
+  GM.BARWAS% = 0
   GOSUB MENUBAR.DRAW
-  GP.IF GM.SEL > 0 THEN
-    MENUBAR.SEL = GM.SEL
+  GP.IF GM.SEL% > 0 THEN
+    MENUBAR.SEL = GM.SEL%
     GOSUB MENUBAR.MARK
-    GM.BARWAS = GM.SEL
+    GM.BARWAS% = GM.SEL%
   GP.ENDIF
   RETURN
 
@@ -327,16 +361,15 @@ GMX.BARDRAW:
 ## **  GMX.RESULT -- what the last panel came back with.
 ## **
 ## **  Its own row, so a panel says what it returned without opening a second
-## **  dialog to say it. GMX.CHROME calls it, so a repaint keeps it.
+## **  dialog to say it. GMX.CHROME calls it, so a repaint keeps it. No label
+## **  in front of it -- the row is always the last answer and never anything
+## **  else, so naming it only ate six columns.
 ## ***********************************************************************
 
 
-GP.BANKEDSTR GM.TEXTBANK BS.RESULT
-  "LAST: "
-GP.ENDBANKEDSTR
 GMX.RESULT:
-  GP.FILL 2, GM.RESY, APPSYS.COLS - 4, 1, ASC(" "), THEME.CLR(THEME.PAGE)
-  GP.PRINTAT 2, GM.RESY, GP.BSTR(BS.RESULT, 0) + GM.RESULT$, THEME.CLR(THEME.WARN)
+  GP.FILL 2, GM.RESY%, APPSYS.COLS - 4, 1, ASC(" "), THEME.CLR(THEME.PAGE)
+  GP.PRINTAT 2, GM.RESY%, GM.RESULT$, THEME.CLR(THEME.WARN)
   RETURN
 
 
@@ -353,8 +386,8 @@ GMX.RESULT:
 GMX.BAR:
   GOSUB GMX.BAR.LOAD
   MENUBAR.FLAGS = MENUBAR.DOWNEXIT + MENUBAR.KEEPMARK
-  MENUBAR.SEL = GM.SEL : GOSUB MENUBAR.RUN
-  GM.BARWAS = MENUBAR.SEL
+  MENUBAR.SEL = GM.SEL% : GOSUB MENUBAR.RUN
+  GM.BARWAS% = MENUBAR.SEL
   RETURN
 
 
@@ -383,9 +416,9 @@ GMX.BAR.LOAD:
   MENUVERT.HOT$ = GP.BSTR(BS.BAR.LOAD, 0)
   MENUVERT.COUNT = GP.BSTRCOUNT(BS.BAR.LOAD) - 1
 
-## GM.BARN is the same number, kept. MENUVERT.COUNT is the dropdown's by the time
+## GM.BARN% is the same number, kept. MENUVERT.COUNT is the dropdown's by the time
 ## GMX.DROP walks sideways off one, so the bar's own count has to survive that.
-  GM.BARN = MENUVERT.COUNT
+  GM.BARN% = MENUVERT.COUNT
   FOR GM.I = 1 TO MENUVERT.COUNT
     MENUVERT.ITEM$(GM.I) = GP.BSTR(BS.BAR.LOAD, GM.I)
   NEXT GM.I
@@ -405,7 +438,7 @@ GMX.BAR.LOAD:
 ## **
 ## **  TWO ITEMS, NOT NINE. A sideways exit comes straight back here, so this
 ## **  is the walk when a dropdown is open, and redrawing the whole bar a step
-## **  makes it crawl. GM.BARWAS says what the highlight is sitting on, so the
+## **  makes it crawl. GM.BARWAS% says what the highlight is sitting on, so the
 ## **  bar only has to be drawn whole when nothing is on it.
 ## **
 ## **  KEYEXIT hands LEFT and RIGHT back instead of swallowing them, which is
@@ -414,53 +447,53 @@ GMX.BAR.LOAD:
 
 GMX.DROP:
   GOSUB GMX.BAR.LOAD
-  MENUBAR.SEL = GM.SEL
-  GP.IF GM.BARWAS = 0 THEN
+  MENUBAR.SEL = GM.SEL%
+  GP.IF GM.BARWAS% = 0 THEN
     GOSUB MENUBAR.DRAW
   GP.ELSE
-    MENUBAR.DRAWN = GM.BARWAS : MENUBAR.PAINT = MENUVERT.ATTR
+    MENUBAR.DRAWN = GM.BARWAS% : MENUBAR.PAINT = MENUVERT.ATTR
     GOSUB MENUBAR.ITEM
   GP.ENDIF
   GOSUB MENUBAR.MARK
-  GM.BARWAS = GM.SEL
+  GM.BARWAS% = GM.SEL%
   GOSUB MENUBAR.WHERE
   GOSUB GMX.DD.LOAD
 
 ## ---- the highlight is one cell wider than the longest row ----
-  GM.DDW = 0
+  GM.DDW% = 0
   FOR GM.I = 1 TO MENUVERT.COUNT
-    IF LEN(MENUVERT.ITEM$(GM.I)) > GM.DDW THEN GM.DDW = LEN(MENUVERT.ITEM$(GM.I))
+    IF LEN(MENUVERT.ITEM$(GM.I)) > GM.DDW% THEN GM.DDW% = LEN(MENUVERT.ITEM$(GM.I))
   NEXT GM.I
-  GM.DDW = GM.DDW + 1
+  GM.DDW% = GM.DDW% + 1
 
-  GM.DDX = MENUBAR.SELX : GM.DDY = 1
-  IF GM.DDX + GM.DDW + 2 > APPSYS.COLS THEN GM.DDX = APPSYS.COLS - GM.DDW - 2
+  GM.DDX% = MENUBAR.SELX : GM.DDY% = 1
+  IF GM.DDX% + GM.DDW% + 2 > APPSYS.COLS THEN GM.DDX% = APPSYS.COLS - GM.DDW% - 2
 
 ## ---- what the frame and the rows will cover, saved before either is drawn ----
-  STASH.BANK = GM.DDBANK
-  STASH.X = GM.DDX : STASH.Y = GM.DDY
-  STASH.W = GM.DDW + 2 : STASH.H = MENUVERT.COUNT + 2
+  STASH.BANK = GM.DDBANK%
+  STASH.X = GM.DDX% : STASH.Y = GM.DDY%
+  STASH.W = GM.DDW% + 2 : STASH.H = MENUVERT.COUNT + 2
   GOSUB STASH.SAVE
 
-  GP.FILL GM.DDX, GM.DDY, GM.DDW + 2, MENUVERT.COUNT + 2, ASC(" "), THEME.CLR(THEME.TEXT)
-  GP.BOX GM.DDX, GM.DDY, GM.DDW + 2, MENUVERT.COUNT + 2, 2, THEME.CLR(THEME.BORDER)
+  GP.FILL GM.DDX%, GM.DDY%, GM.DDW% + 2, MENUVERT.COUNT + 2, ASC(" "), THEME.CLR(THEME.TEXT)
+  GP.BOX GM.DDX%, GM.DDY%, GM.DDW% + 2, MENUVERT.COUNT + 2, 2, THEME.CLR(THEME.BORDER)
 
-  MENUVERT.X = GM.DDX + 1 :MENUVERT.Y = GM.DDY + 1
-  MENUVERT.WIDTH = GM.DDW : MENUVERT.FLAGS = MENUVERT.KEYEXIT
+  MENUVERT.X = GM.DDX% + 1 :MENUVERT.Y = GM.DDY% + 1
+  MENUVERT.WIDTH = GM.DDW% : MENUVERT.FLAGS = MENUVERT.KEYEXIT
   MENUVERT.SEL = 0
   GOSUB MENUVERT.RUN
 
 ## ---- the screen back, before anything else draws on it ----
-  STASH.BANK = GM.DDBANK : STASH.MOVE = 0
+  STASH.BANK = GM.DDBANK% : STASH.MOVE = 0
   GOSUB STASH.RESTORE
 
   GP.SELECT MENUVERT.KEY
   GP.CASE GM.LEFT
-    GM.SEL = GM.SEL - 1 : IF GM.SEL < 1 THEN GM.SEL = GM.BARN
-    GM.OPEN = 1
+    GM.SEL% = GM.SEL% - 1 : IF GM.SEL% < 1 THEN GM.SEL% = GM.BARN%
+    GM.OPEN% = 1
   GP.CASE GM.RIGHT
-    GM.SEL = GM.SEL + 1 : IF GM.SEL > GM.BARN THEN GM.SEL = 1
-    GM.OPEN = 1
+    GM.SEL% = GM.SEL% + 1 : IF GM.SEL% > GM.BARN% THEN GM.SEL% = 1
+    GM.OPEN% = 1
   GP.OTHER
     IF MENUVERT.SEL > 0 THEN GOSUB GMX.DISPATCH
   GP.ENDSEL
@@ -485,6 +518,7 @@ GMX.DROP:
 GP.BANKEDSTR GM.TEXTBANK BS.DD.DIALOG
   "DIALOG"
   " GUI.SAY"
+  " OK MESSAGE BOX"
   " GUI.YN"
   " GUI.MENU"
   " GUI.INPUT"
@@ -492,6 +526,7 @@ GP.BANKEDSTR GM.TEXTBANK BS.DD.DIALOG
   " GUI.LISTBOX  MANY"
   " GUI.OPEN + GUI.CLOSE"
   " BOX STYLES 0-3"
+  " GUI.SHADOW"
 GP.ENDBANKEDSTR
 
 GP.BANKEDSTR GM.TEXTBANK BS.DD.LISTS
@@ -540,7 +575,6 @@ GP.BANKEDSTR GM.TEXTBANK BS.DD.DATA
   "DATA"
   " SORT.RUN"
   " ARRAYS"
-  " BANK MAP"
 GP.ENDBANKEDSTR
 
 GP.BANKEDSTR GM.TEXTBANK BS.DD.THEME
@@ -554,6 +588,7 @@ GP.ENDBANKEDSTR
 
 GP.BANKEDSTR GM.TEXTBANK BS.DD.ABOUT
   "ABOUT"
+  " PROGRAM"
   " MEMORY"
   " MODULE SIZES"
   " BANK MAP"
@@ -566,7 +601,6 @@ GP.BANKEDSTR GM.TEXTBANKB BS.DD.FILES
   " DIR  DIRECTORIES"
   " FILE.STATUS"
   " FILE.EXISTS"
-  " FILE.CURDIR + UP"
   " SAVEARRAY + LOADARRAY"
   " RENAME + DELETE"
   " MKDIR + CHDIR"
@@ -576,7 +610,7 @@ GMX.DD.LOAD:
   MENUVERT.ATTR = THEME.CLR(THEME.TEXT)
   MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
 
-  GP.SELECT GM.SEL
+  GP.SELECT GM.SEL%
   GP.CASE 1
     MENUVERT.COUNT = GP.BSTRCOUNT(BS.DD.DIALOG) - 1
     FOR GM.I = 1 TO MENUVERT.COUNT
@@ -632,12 +666,11 @@ GMX.DD.LOAD:
 ## **  ONE SELECT ON ONE COORDINATE. A panel is identified by BAR ITEM and
 ## **  ROW, and this half only knows the item: each bar item has a router of
 ## **  its own that reads MENUVERT.SEL. Two shallow selects rather than one
-## **  nested on both, and BANK MAP -- row 3 of DATA and row 3 of ABOUT --
-## **  is simply named by both routers.
+## **  nested on both.
 ## ***********************************************************************
 
 GMX.DISPATCH:
-  GP.SELECT GM.SEL
+  GP.SELECT GM.SEL%
   GP.CASE 1
     GOSUB GMX.DIALOG
   GP.CASE 2
@@ -663,40 +696,58 @@ GMX.DISPATCH:
 ## ***********************************************************************
 ## **  GMX.BANKMAP -- ABOUT / BANK MAP. What BANKMGR thinks it owns.
 ## **
-## **  THE THREE BANKS NAMED ARE THE ONES ASKED FOR AT RUN TIME, and the second
-## **  line says what each is for rather than only its number: one holds the
-## **  screen under an open dropdown, one the screen under a dialog, and one is
-## **  the buffer a directory listing is read into. The compile-time three --
-## **  the code bank and the two text banks -- are on ABOUT / MEMORY instead,
-## **  because nothing chose them.
+## **  SEVEN BANKS ARE SPOKEN FOR AND THE PANEL SPLITS THEM BY WHO CHOSE.
+## **
+## **  AT RUN TIME are the three BANKMGR handed out, and each is named for what
+## **  it holds rather than only numbered: SCREEN keeps the screen under an open
+## **  dropdown, DIALOG the screen under a dialog, DIR the buffer a directory
+## **  listing is read into. Ask on a different machine and the numbers differ.
+## **
+## **  COMPILED IN are the four written into the source as constants. CODE is
+## **  the two GP.BANKED regions -- LIB.CODEBANK carries the GUI, LIB.UTILBANK
+## **  the utilities -- and TEXT the two GP.BANKEDSTR pools, GM.TEXTBANK and
+## **  GM.TEXTBANKB. Nothing chooses these: GP.BANKED takes a decimal constant,
+## **  so they are the same numbers in every run. They still need a
+## **  BANKMGR.CLAIM, which is what keeps the run-time three off them.
+## **
+## **  ONE WORD EACH, not the sentences they stand for: GUI.SAY sizes the box
+## **  to its longest line, and spelling them out ran it off the right edge.
 ## **
 ## **  MID$(STR$(N), 2) drops the leading space STR$ puts on a positive number.
+## **  It is ONLY for a value that cannot be negative: STR$ puts no leading space
+## **  on one that is, so the same MID$ eats the minus and -1 prints as 1. Use
+## **  GMX.SIGNED for anything that can go below zero, every -1 flag included.
 ## ***********************************************************************
 
 
 GP.BANKEDSTR GM.TEXTBANK BS.BANKMAP
   " BANK MAP "
-  "BANKS "
-  "   FREE "
-  "SCREEN STASHED IN "
-  "   DIALOG STASHED IN "
-  "   DIR BUFFER IN "
+  "TOTAL BANKS "
+  "   UNUSED "
+  "AT RUN TIME  SCREEN #"
+  "   DIALOG #"
+  "   DIR #"
+  "COMPILED IN  CODE #"
+  " #"
+  "   TEXT #"
 GP.ENDBANKEDSTR
 GMX.BANKMAP:
   GOSUB BANKMGR.COUNT : GOSUB GMX.D.RESET
   GUI.TITLE$ = GP.BSTR(BS.BANKMAP, 0)
   GUI.MSG$ = GP.BSTR(BS.BANKMAP, 1) + MID$(STR$(BANKMGR.BANKS), 2) + GP.BSTR(BS.BANKMAP, 2) + MID$(STR$(BANKMGR.SPARE), 2)
-  GUI.MSG2$ = GP.BSTR(BS.BANKMAP, 3) + MID$(STR$(GM.DDBANK), 2) + GP.BSTR(BS.BANKMAP, 4) + MID$(STR$(GM.GUIBANK), 2)
-  GUI.MSG2$ = GUI.MSG2$ + GP.BSTR(BS.BANKMAP, 5) + MID$(STR$(GM.DIRBANK), 2)
+  GUI.MSG2$ = GP.BSTR(BS.BANKMAP, 3) + MID$(STR$(GM.DDBANK%), 2) + GP.BSTR(BS.BANKMAP, 4) + MID$(STR$(GM.GUIBANK%), 2)
+  GUI.MSG2$ = GUI.MSG2$ + GP.BSTR(BS.BANKMAP, 5) + MID$(STR$(GM.DIRBANK%), 2)
+  GUI.MSG3$ = GP.BSTR(BS.BANKMAP, 6) + MID$(STR$(LIB.CODEBANK), 2) + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(LIB.UTILBANK), 2)
+  GUI.MSG3$ = GUI.MSG3$ + GP.BSTR(BS.BANKMAP, 8) + MID$(STR$(GM.TEXTBANK), 2) + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(GM.TEXTBANKB), 2)
   GOSUB GUI.SAY
   RETURN
 
 
 ## ***********************************************************************
-## **  GMX.DIALOG -- the DIALOG dropdown, one row a demonstration.
+## **  GMX.DIALOG -- the DIALOG dropdown, one item a demonstration.
 ## **
-## **  Every row leaves its answer in GM.RESULT$, and the page is repainted
-## **  afterwards because the box styles row draws on the page rather than in
+## **  Every item leaves its answer in GM.RESULT$, and the page is repainted
+## **  afterwards because the box styles item draws on the page rather than in
 ## **  a dialog that puts the screen back for itself.
 ## ***********************************************************************
 
@@ -705,19 +756,23 @@ GMX.DIALOG:
   GP.CASE 1
     GOSUB GMX.D.SAY
   GP.CASE 2
-    GOSUB GMX.D.YN
+    GOSUB GMX.D.SAYOK
   GP.CASE 3
-    GOSUB GMX.D.MENU
+    GOSUB GMX.D.YN
   GP.CASE 4
-    GOSUB GMX.D.INPUT
+    GOSUB GMX.D.MENU
   GP.CASE 5
-    GOSUB GMX.D.LIST.ONE
+    GOSUB GMX.D.INPUT
   GP.CASE 6
-    GOSUB GMX.D.LIST.MANY
+    GOSUB GMX.D.LIST.ONE
   GP.CASE 7
+    GOSUB GMX.D.LIST.MANY
+  GP.CASE 8
     GOSUB GMX.D.PANEL
-  GP.OTHER
+  GP.CASE 9
     GOSUB GMX.D.STYLES
+  GP.OTHER
+    GOSUB GMX.D.SHADOW
   GP.ENDSEL
   GOSUB GMX.CHROME
   RETURN
@@ -732,11 +787,26 @@ GMX.DIALOG:
 ## ***********************************************************************
 
 GMX.D.RESET:
-  GUI.BANK = GM.GUIBANK
-  GUI.MSG$ = "" : GUI.MSG2$ = "" : GUI.TITLE$ = "" : GUI.HINT$ = ""
+  GUI.BANK = GM.GUIBANK%
+  GUI.MSG$ = "" : GUI.MSG2$ = "" : GUI.MSG3$ = "" : GUI.TITLE$ = "" : GUI.BTN.ONE$ = "" : GUI.BTN.TWO$ = ""
   GUI.STYLE = 0 : GUI.GLYPH = 0 : GUI.PLACE = 0 : GUI.X = 0 : GUI.Y = 0
   GUI.ROW.OFFSET = 0 : GUI.PANEL.IN = 0 : GUI.BORDER.IN = 0 : GUI.OKCANCEL = 0
+  GUI.DEFAULT = 1
+  GUI.SHADOW = 0 : GUI.SHADOW.ATTR = 0
   GUI.LEN = 0 : GUI.MASK = 0 : GUI.FLAGS = 0 : GUI.SEL = 0 : GUI.COUNT = 0
+  RETURN
+
+
+## ---- GMX.SIGNED -- a number as text, MINUS SIGN AND ALL.
+## ----
+## ---- MID$(STR$(N), 2) drops the leading SPACE that STR$ puts on a POSITIVE
+## ---- number. On a negative one there is no leading space and it drops the
+## ---- MINUS instead, so -1 prints as 1 -- and every boolean in this library is
+## ---- -1 for true, which is exactly the value a panel wants to show.
+
+GMX.SIGNED:
+  GM.NUM$ = MID$(STR$(GM.NUM%), 2)
+  IF GM.NUM% < 0 THEN GM.NUM$ = "-" + GM.NUM$
   RETURN
 
 
@@ -779,9 +849,37 @@ GMX.D.SAY:
   GUI.TITLE$ = GP.BSTR(BS.D.SAY, 0)
   GUI.MSG$ = GP.BSTR(BS.D.SAY, 1)
   GUI.MSG2$ = GP.BSTR(BS.D.SAY, 2)
-  GUI.HINT$ = "OK"
+  GUI.BTN.ONE$ = "&OK"
   GOSUB GUI.SAY
   GM.RESULT$ = GP.BSTR(BS.D.SAY, 3) + MID$(STR$(GUI.KEY), 2)
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.D.SAYOK -- the smallest message box there is.
+## **
+## **  GUI.BTN.ONE$ IS LEFT EMPTY ON PURPOSE, which is the whole point of this
+## **  one next to GMX.D.SAY above. GUI.SAY takes "&OK" when the label is "",
+## **  so the button, its brackets, its lit letter and its key all arrive
+## **  without being asked for -- and being the only button it is the default,
+## **  so its brackets come out doubled too.
+## **
+## **  RETURN, SPACE, ESC, STOP and O all close it, and GUI.KEY says which.
+## ***********************************************************************
+
+GP.BANKEDSTR GM.TEXTBANK BS.D.SAYOK
+  " NOTICE "
+  "ONE MESSAGE, ONE BUTTON, NOTHING SET."
+  "RETURN, SPACE, ESC, STOP OR O CLOSES IT."
+  "CLOSED ON KEY "
+GP.ENDBANKEDSTR
+GMX.D.SAYOK:
+  GOSUB GMX.D.RESET
+  GUI.TITLE$ = GP.BSTR(BS.D.SAYOK, 0)
+  GUI.MSG$ = GP.BSTR(BS.D.SAYOK, 1)
+  GUI.MSG2$ = GP.BSTR(BS.D.SAYOK, 2)
+  GOSUB GUI.SAY
+  GM.RESULT$ = GP.BSTR(BS.D.SAYOK, 3) + MID$(STR$(GUI.KEY), 2)
   RETURN
 
 
@@ -793,10 +891,10 @@ GMX.D.SAY:
 GP.BANKEDSTR GM.TEXTBANK BS.D.YN
   " GUI.YN "
   "DELETE THE FILE?"
-  "ESC AND STOP BOTH ANSWER NO."
+  "RETURN PRESSES THE <<DOUBLED>> BUTTON."
   " GUI.YN - OKCANCEL "
   "THE SAME DIALOG, ASKING OK OR CANCEL."
-  "RETURN ACCEPTS THIS ONE AS WELL."
+  "RETURN ACCEPTS, ESC AND STOP CANCEL."
   "GUI.YN  YESNO"
   "   OKCANCEL"
 GP.ENDBANKEDSTR
@@ -805,8 +903,12 @@ GMX.D.YN:
   GUI.TITLE$ = GP.BSTR(BS.D.YN, 0)
   GUI.MSG$ = GP.BSTR(BS.D.YN, 1)
   GUI.MSG2$ = GP.BSTR(BS.D.YN, 2)
+
+## ---- THE DESTRUCTIVE ANSWER IS NOT THE DEFAULT. RETURN on a question that
+## ---- deletes something should say no, and this is the flag that says so.
+  GUI.DEFAULT = 2
   GOSUB GUI.YN
-  GM.YESNO = GUI.ANSWER
+  GM.YESNO% = GUI.ANSWER
 
   GOSUB GMX.D.RESET
   GUI.TITLE$ = GP.BSTR(BS.D.YN, 3)
@@ -816,7 +918,7 @@ GMX.D.YN:
   GOSUB GUI.YN
 ## ---- STR$ WHOLE, not MID$(STR$(N), 2). That idiom drops the leading space STR$ puts
 ## ---- on a POSITIVE number, and a flag is -1: it would print the minus away and say 1.
-  GM.RESULT$ = GP.BSTR(BS.D.YN, 6) + STR$(GM.YESNO) + GP.BSTR(BS.D.YN, 7) + STR$(GUI.ANSWER)
+  GM.RESULT$ = GP.BSTR(BS.D.YN, 6) + STR$(GM.YESNO%) + GP.BSTR(BS.D.YN, 7) + STR$(GUI.ANSWER)
   RETURN
 
 
@@ -883,7 +985,8 @@ GMX.D.INPUT:
   GUI.TEXT$ = ""
   GUI.MASK = 1
   GOSUB GUI.INPUT
-  GM.RESULT$ = GP.BSTR(BS.D.INPUT, 4) + MID$(STR$(GM.TYPED.OK), 2) + "  [" + GM.TYPED$ + "]"
+  GM.NUM% = GM.TYPED.OK : GOSUB GMX.SIGNED
+  GM.RESULT$ = GP.BSTR(BS.D.INPUT, 4) + GM.NUM$ + "  [" + GM.TYPED$ + "]"
   RETURN
 
 
@@ -993,9 +1096,9 @@ GP.ENDBANKEDSTR
 GMX.D.STYLES:
   GP.FILL 0, 7, APPSYS.COLS, 11, ASC(" "), THEME.CLR(THEME.PAGE)
   FOR GM.I = 0 TO 3
-    GM.BOXX = 4 + GM.I * 18
-    GP.BOX GM.BOXX, 8, 14, 6, GM.I, THEME.CLR(THEME.BORDER)
-    GP.PRINTAT GM.BOXX + 4, 10, GP.BSTR(BS.D.STYLES, 0) + MID$(STR$(GM.I), 2), THEME.CLR(THEME.TEXT)
+    GM.BOXX% = 4 + GM.I * 18
+    GP.BOX GM.BOXX%, 8, 14, 6, GM.I, THEME.CLR(THEME.BORDER)
+    GP.PRINTAT GM.BOXX% + 4, 10, GP.BSTR(BS.D.STYLES, 0) + MID$(STR$(GM.I), 2), THEME.CLR(THEME.TEXT)
   NEXT GM.I
   GP.PRINTAT 4, 16, GP.BSTR(BS.D.STYLES, 1), THEME.CLR(THEME.WARN)
   GOSUB GMX.WAIT
@@ -1004,9 +1107,54 @@ GMX.D.STYLES:
 
 
 ## ***********************************************************************
+## **  GMX.D.SHADOW -- GUI.SHADOW. The same dialog twice, off and then on.
+## **
+## **  THE PAGE IS FILLED FIRST, and that is the whole demonstration. A shadow
+## **  is drawn OUTSIDE the box, so it is also the one part a stash of the box
+## **  alone would not put back -- the dots coming back under BOTH dialogs is
+## **  what says GUI.OPEN grew its saved rectangle to match.
+## ***********************************************************************
+
+
+GP.BANKEDSTR GM.TEXTBANKB BS.D.SHADOW
+  " GUI.SHADOW = 0 "
+  "THE PLAIN BOX, ON SOMETHING WORTH COVERING."
+  "LOOK AT ITS RIGHT EDGE AND ITS BOTTOM."
+  " GUI.SHADOW = 1 "
+  "THE SAME BOX, LIFTED OFF THE PAGE."
+  "ONE ROW UNDER IT AND TWO COLUMNS RIGHT."
+  "GUI.SHADOW  DRAWN, THEN PUT BACK"
+GP.ENDBANKEDSTR
+GMX.D.SHADOW:
+  GOSUB GMX.CLEARPANEL
+  GP.FILL 2, GM.PANELTOP%, APPSYS.COLS - 4, GM.PANELROWS% - 2, ASC("."), THEME.CLR(THEME.DIMMED)
+
+  GOSUB GMX.D.RESET
+  GUI.TITLE$ = GP.BSTR(BS.D.SHADOW, 0)
+  GUI.MSG$ = GP.BSTR(BS.D.SHADOW, 1)
+  GUI.MSG2$ = GP.BSTR(BS.D.SHADOW, 2)
+  GUI.BTN.ONE$ = "&OK"
+  GOSUB GUI.SAY
+
+## ---- The only line that differs. Everything else is set the same way twice
+## ---- so that the two boxes are the same box.
+
+  GOSUB GMX.D.RESET
+  GUI.SHADOW = 1
+  GUI.TITLE$ = GP.BSTR(BS.D.SHADOW, 3)
+  GUI.MSG$ = GP.BSTR(BS.D.SHADOW, 4)
+  GUI.MSG2$ = GP.BSTR(BS.D.SHADOW, 5)
+  GUI.BTN.ONE$ = "&OK"
+  GOSUB GUI.SAY
+
+  GM.RESULT$ = GP.BSTR(BS.D.SHADOW, 6)
+  RETURN
+
+
+## ***********************************************************************
 ## **  GMX.SCREEN -- the SCREEN dropdown. The drawing keywords, then STASH.
 ## **
-## **  Every row repaints the page afterwards. These draw ON the page rather
+## **  Every item repaints the page afterwards. These draw ON the page rather
 ## **  than in a dialog that puts the screen back for itself.
 ## ***********************************************************************
 
@@ -1034,23 +1182,23 @@ GMX.SCREEN:
 
 
 ## ---- GMX.CLEARPANEL -- blank the rows a SCREEN panel draws in, and say
-## ---- where they are. Rows 0 to 6 are chrome; the bottom five carry GM.RESY
+## ---- where they are. Rows 0 to 6 are chrome; the bottom five carry GM.RESY%
 ## ---- -- ROWS-3 -- and the key line. So a panel owns 7 to ROWS-6, which is
-## ---- the 7 and the ROWS-12 below. GM.PANELTOP and GM.PANELROWS are left set
+## ---- the 7 and the ROWS-12 below. GM.PANELTOP% and GM.PANELROWS% are left set
 ## ---- for GMX.TELL, whose prompt goes on the last row of the panel.
 
 GMX.CLEARPANEL:
-  GM.PANELTOP = 7
-  GM.PANELROWS = APPSYS.ROWS - 12
-  GP.FILL 0, GM.PANELTOP, APPSYS.COLS, GM.PANELROWS, ASC(" "), THEME.CLR(THEME.PAGE)
+  GM.PANELTOP% = 7
+  GM.PANELROWS% = APPSYS.ROWS - 12
+  GP.FILL 0, GM.PANELTOP%, APPSYS.COLS, GM.PANELROWS%, ASC(" "), THEME.CLR(THEME.PAGE)
   RETURN
 
 
 ## ---- A prompt on the last row of the work area, then a key ----
 
 GMX.TELL:
-  GP.FILL 0, GM.PANELTOP + GM.PANELROWS - 1, APPSYS.COLS, 1, ASC(" "), THEME.CLR(THEME.PAGE)
-  GP.PRINTAT 4, GM.PANELTOP + GM.PANELROWS - 1, GM.TELL$, THEME.CLR(THEME.WARN)
+  GP.FILL 0, GM.PANELTOP% + GM.PANELROWS% - 1, APPSYS.COLS, 1, ASC(" "), THEME.CLR(THEME.PAGE)
+  GP.PRINTAT 4, GM.PANELTOP% + GM.PANELROWS% - 1, GM.TELL$, THEME.CLR(THEME.WARN)
   GOSUB GMX.WAIT
   RETURN
 
@@ -1070,7 +1218,7 @@ GMX.TELL:
 
 GMX.BANKNOW:
   GOSUB STASH.BANK.HOLD
-  GM.BANKNOW = STASH.WAS%
+  GM.BANKNOW% = STASH.WAS%
   RETURN
 
 
@@ -1242,7 +1390,7 @@ GMX.S.CHAR:
 ## **  GMX.S.STASH -- STASH.SAVE and STASH.RESTORE, over a scribble.
 ## **
 ## **  THE DROPDOWN BANK IS FREE HERE. GMX.DROP restores the screen under the
-## **  dropdown BEFORE it dispatches, so nothing in bank GM.DDBANK is wanted
+## **  dropdown BEFORE it dispatches, so nothing in bank GM.DDBANK% is wanted
 ## **  by the time a panel runs.
 ## **
 ## **  The bank is read back at the end because STASH selects one and used to
@@ -1262,10 +1410,10 @@ GMX.S.STASH:
   GOSUB GMX.CLEARPANEL
   GOSUB GMX.S.PATTERN
 
-  STASH.BANK = GM.DDBANK
+  STASH.BANK = GM.DDBANK%
   STASH.X = 10 : STASH.Y = 9 : STASH.W = 30 : STASH.H = 8
   GOSUB STASH.SAVE
-  GM.SOK = STASH.OK
+  GM.SOK% = STASH.OK
 
   GM.TELL$ = GP.BSTR(BS.S.STASH, 0)
   GOSUB GMX.TELL
@@ -1273,16 +1421,16 @@ GMX.S.STASH:
 
   GM.TELL$ = GP.BSTR(BS.S.STASH, 1)
   GOSUB GMX.TELL
-  STASH.BANK = GM.DDBANK
+  STASH.BANK = GM.DDBANK%
   STASH.MOVE = 0
   GOSUB STASH.RESTORE
   GOSUB GMX.BANKNOW
 
   GM.TELL$ = GP.BSTR(BS.S.STASH, 2)
   GOSUB GMX.TELL
-  GM.RESULT$ = GP.BSTR(BS.S.STASH, 3) + STR$(GM.SOK)
-  GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.S.STASH, 4) + MID$(STR$(GM.BANKNOW), 2)
-  GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.S.STASH, 5) + MID$(STR$(GM.DDBANK), 2) + ")"
+  GM.RESULT$ = GP.BSTR(BS.S.STASH, 3) + STR$(GM.SOK%)
+  GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.S.STASH, 4) + MID$(STR$(GM.BANKNOW%), 2)
+  GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.S.STASH, 5) + MID$(STR$(GM.DDBANK%), 2) + ")"
   RETURN
 
 
@@ -1309,7 +1457,7 @@ GMX.S.MOVE:
   GP.PRINTAT 6, 10, GP.BSTR(BS.S.MOVE, 0), THEME.CLR(THEME.WARN)
   GP.PRINTAT 6, 11, GP.BSTR(BS.S.MOVE, 1), THEME.CLR(THEME.TEXT)
 
-  STASH.BANK = GM.DDBANK
+  STASH.BANK = GM.DDBANK%
   STASH.X = 4 : STASH.Y = 9 : STASH.W = 12 : STASH.H = 4
   GOSUB STASH.SAVE
 
@@ -1317,7 +1465,7 @@ GMX.S.MOVE:
   GOSUB GMX.TELL
 
   FOR GM.I = 1 TO 5
-    STASH.BANK = GM.DDBANK
+    STASH.BANK = GM.DDBANK%
     STASH.MOVE = 1
     STASH.X = 20 + GM.I * 9
     STASH.Y = 9 + GM.I * 2
@@ -1328,7 +1476,7 @@ GMX.S.MOVE:
 
   GM.TELL$ = GP.BSTR(BS.S.MOVE, 3)
   GOSUB GMX.TELL
-  GM.RESULT$ = GP.BSTR(BS.S.MOVE, 4) + MID$(STR$(GM.BANKNOW), 2)
+  GM.RESULT$ = GP.BSTR(BS.S.MOVE, 4) + MID$(STR$(GM.BANKNOW%), 2)
   RETURN
 
 
@@ -1338,7 +1486,7 @@ GMX.S.MOVE:
 ## **  BANK 1 FIRST, AND IT IS THE POINT OF THE ROW. BLOAD and BSAVE write the
 ## **  RAM bank register directly and leave it where the transfer ended, so
 ## **  each of the three is asked afterwards which bank is selected. All three
-## **  must answer 1 -- the bank this row chose -- and not GM.DDBANK, which is
+## **  must answer 1 -- the bank this row chose -- and not GM.DDBANK%, which is
 ## **  the one the file was staged through.
 ## **
 ## **  THE NAME CARRIES @: so a second run overwrites rather than failing on an
@@ -1365,14 +1513,14 @@ GMX.S.FILE:
   GOSUB GMX.S.PATTERN
   BANK 1
 
-  STASH.BANK = GM.DDBANK
+  STASH.BANK = GM.DDBANK%
   STASH.DEV = 8
   STASH.FILE$ = GP.BSTR(BS.S.FILE, 0)
   STASH.X = 10 : STASH.Y = 9 : STASH.W = 30 : STASH.H = 8
   GOSUB STASH.FILE.SAVE
-  GM.SOK = STASH.OK
+  GM.SOK% = STASH.OK
   GOSUB GMX.BANKNOW
-  GM.BSAVE = GM.BANKNOW
+  GM.BSAVE% = GM.BANKNOW%
 
   GM.TELL$ = GP.BSTR(BS.S.FILE, 1)
   GOSUB GMX.TELL
@@ -1383,7 +1531,7 @@ GMX.S.FILE:
   STASH.FILE$ = GP.BSTR(BS.S.FILE, 3)
   GOSUB STASH.FILE.LOAD
   GOSUB GMX.BANKNOW
-  GM.BLOAD = GM.BANKNOW
+  GM.BLOAD% = GM.BANKNOW%
 
   GM.TELL$ = GP.BSTR(BS.S.FILE, 4)
   GOSUB GMX.TELL
@@ -1393,10 +1541,10 @@ GMX.S.FILE:
 
   GM.TELL$ = GP.BSTR(BS.S.FILE, 5)
   GOSUB GMX.TELL
-  GM.RESULT$ = GP.BSTR(BS.S.FILE, 6) + STR$(GM.SOK) + GP.BSTR(BS.S.FILE, 7)
-  GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.S.FILE, 8) + MID$(STR$(GM.BSAVE), 2)
-  GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.S.FILE, 9) + MID$(STR$(GM.BLOAD), 2)
-  GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.S.FILE, 10) + MID$(STR$(GM.BANKNOW), 2)
+  GM.RESULT$ = GP.BSTR(BS.S.FILE, 6) + STR$(GM.SOK%) + GP.BSTR(BS.S.FILE, 7)
+  GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.S.FILE, 8) + MID$(STR$(GM.BSAVE%), 2)
+  GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.S.FILE, 9) + MID$(STR$(GM.BLOAD%), 2)
+  GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.S.FILE, 10) + MID$(STR$(GM.BANKNOW%), 2)
   GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.S.FILE, 11)
   RETURN
 
@@ -1438,9 +1586,9 @@ GMX.S.VRAM:
 
   SV.X = 10 : SV.Y = 9 : SV.W = 30 : SV.H = 8
   GOSUB SV.SAVE
-  GM.SOK = SV.OK
-  GM.SHND = SV.HND
-  GM.SPAGES = SV.PAGES%(SV.HND)
+  GM.SOK% = SV.OK
+  GM.SHND% = SV.HND
+  GM.SPAGES% = SV.PAGES%(SV.HND)
 
   GM.TELL$ = GP.BSTR(BS.S.VRAM, 0)
   GOSUB GMX.TELL
@@ -1448,26 +1596,26 @@ GMX.S.VRAM:
 
   GM.TELL$ = GP.BSTR(BS.S.VRAM, 1)
   GOSUB GMX.TELL
-  SV.HND = GM.SHND
+  SV.HND = GM.SHND%
   SV.MOVE = 0
   GOSUB SV.RESTORE
 
   GM.TELL$ = GP.BSTR(BS.S.VRAM, 2)
   GOSUB GMX.TELL
-  SV.HND = GM.SHND
+  SV.HND = GM.SHND%
   SV.MOVE = -1
   SV.X = 44 : SV.Y = 13
   GOSUB SV.RESTORE
   SV.MOVE = 0
 
-  SV.HND = GM.SHND
+  SV.HND = GM.SHND%
   GOSUB SV.FREE
 
   GM.TELL$ = GP.BSTR(BS.S.VRAM, 3)
   GOSUB GMX.TELL
-  GM.RESULT$ = GP.BSTR(BS.S.VRAM, 4) + STR$(GM.SOK)
-  GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.S.VRAM, 5) + MID$(STR$(GM.SHND), 2)
-  GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.S.VRAM, 6) + MID$(STR$(GM.SPAGES), 2)
+  GM.RESULT$ = GP.BSTR(BS.S.VRAM, 4) + STR$(GM.SOK%)
+  GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.S.VRAM, 5) + MID$(STR$(GM.SHND%), 2)
+  GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.S.VRAM, 6) + MID$(STR$(GM.SPAGES%), 2)
   RETURN
 
 
@@ -1743,21 +1891,24 @@ GMX.L.HOT:
 ## **
 ## **  MUSTSEL IS SHOWN SECOND AND ON ITS OWN because it is the one that
 ## **  changes what the user can do rather than how it looks: ESC stops
-## **  working, and a menu is not leaving until a row is chosen.
+## **  working, and a menu is not leaving until an item is chosen.
 ## ***********************************************************************
 
 
 GP.BANKEDSTR GM.TEXTBANK BS.L.FLAGS
-  "NOWRAP STOPS AT THE ENDS,"
-  "FOR A LIST THAT READS AS A"
-  "RANGE."
-  "KEEPMARK LEAVES THE ROW"
-  "LIT AFTER IT RETURNS."
-  "STILL LIT. THAT IS KEEPMARK. PRESS A KEY."
-  "MUSTSEL TAKES ESC AWAY,"
-  "FOR A MENU WITH NO WAY OUT"
+  "THIS MENU HAS TWO FLAGS SET."
+  "NOWRAP -- THE HIGHLIGHT STOPS AT"
+  "THE ENDS INSTEAD OF WRAPPING."
+  "KEEPMARK -- THE CHOSEN ITEM STAYS"
+  "LIT AFTER THE MENU RETURNS."
+  " IS STILL LIT. THAT IS KEEPMARK. PRESS A KEY."
+  "ESC CHOSE NOTHING, SO KEEPMARK HAS NOTHING TO LEAVE LIT. PRESS A KEY."
+  "THIS MENU HAS ONE FLAG SET, ON ITS OWN."
+  "MUSTSEL -- ESC STOPS WORKING, SO"
+  "THE MENU CANNOT BE LEFT WITHOUT"
+  "CHOOSING SOMETHING."
   "TRY ESC. IT WILL NOT LEAVE"
-  "UNTIL A ROW IS CHOSEN."
+  "UNTIL AN ITEM IS CHOSEN."
   "FLAGS  KEEPMARK SEL "
   "   MUSTSEL SEL "
 GP.ENDBANKEDSTR
@@ -1766,29 +1917,39 @@ GMX.L.FLAGS:
   GOSUB GMX.L.LOAD
   MENUVERT.FLAGS = MENUVERT.NOWRAP + MENUVERT.KEEPMARK
   GOSUB GMX.L.FRAME
-  GP.PRINTAT 32, 10, GP.BSTR(BS.L.FLAGS, 0), THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 32, 9, GP.BSTR(BS.L.FLAGS, 0), THEME.CLR(THEME.TITLE)
   GP.PRINTAT 32, 11, GP.BSTR(BS.L.FLAGS, 1), THEME.CLR(THEME.TEXT)
   GP.PRINTAT 32, 12, GP.BSTR(BS.L.FLAGS, 2), THEME.CLR(THEME.TEXT)
   GP.PRINTAT 32, 14, GP.BSTR(BS.L.FLAGS, 3), THEME.CLR(THEME.TEXT)
   GP.PRINTAT 32, 15, GP.BSTR(BS.L.FLAGS, 4), THEME.CLR(THEME.TEXT)
   GOSUB MENUVERT.RUN
-  GM.KEPT = MENUVERT.SEL
-  GM.TELL$ = GP.BSTR(BS.L.FLAGS, 5)
+  GM.KEPT% = MENUVERT.SEL
+
+## ---- KEEPMARK only has something to keep if something was chosen. ESC sets
+## ---- MENUVERT.SEL to 0 and takes the highlight off with it, which is right --
+## ---- nothing was picked, so nothing should still be claiming attention. The
+## ---- prompt said STILL LIT either way, over a menu with nothing lit on it.
+  GP.IF GM.KEPT% > 0 THEN
+    GM.TELL$ = MID$(MENUVERT.ITEM$(GM.KEPT%), 2) + GP.BSTR(BS.L.FLAGS, 5)
+  GP.ELSE
+    GM.TELL$ = GP.BSTR(BS.L.FLAGS, 6)
+  GP.ENDIF
   GOSUB GMX.TELL
 
   GOSUB GMX.CLEARPANEL
   GOSUB GMX.L.LOAD
   MENUVERT.FLAGS = MENUVERT.MUSTSEL
   GOSUB GMX.L.FRAME
-  GP.PRINTAT 32, 10, GP.BSTR(BS.L.FLAGS, 6), THEME.CLR(THEME.TEXT)
-  GP.PRINTAT 32, 11, GP.BSTR(BS.L.FLAGS, 7), THEME.CLR(THEME.TEXT)
-  GP.PRINTAT 32, 12, "IT.", THEME.CLR(THEME.TEXT)
-  GP.PRINTAT 32, 14, GP.BSTR(BS.L.FLAGS, 8), THEME.CLR(THEME.WARN)
-  GP.PRINTAT 32, 15, GP.BSTR(BS.L.FLAGS, 9), THEME.CLR(THEME.WARN)
+  GP.PRINTAT 32, 9, GP.BSTR(BS.L.FLAGS, 7), THEME.CLR(THEME.TITLE)
+  GP.PRINTAT 32, 11, GP.BSTR(BS.L.FLAGS, 8), THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 32, 12, GP.BSTR(BS.L.FLAGS, 9), THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 32, 13, GP.BSTR(BS.L.FLAGS, 10), THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 32, 15, GP.BSTR(BS.L.FLAGS, 11), THEME.CLR(THEME.WARN)
+  GP.PRINTAT 32, 16, GP.BSTR(BS.L.FLAGS, 12), THEME.CLR(THEME.WARN)
   GOSUB MENUVERT.RUN
 
-  GM.RESULT$ = GP.BSTR(BS.L.FLAGS, 10) + MID$(STR$(GM.KEPT), 2)
-  GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.L.FLAGS, 11) + MID$(STR$(MENUVERT.SEL), 2)
+  GM.RESULT$ = GP.BSTR(BS.L.FLAGS, 13) + MID$(STR$(GM.KEPT%), 2)
+  GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.L.FLAGS, 14) + MID$(STR$(MENUVERT.SEL), 2)
   RETURN
 
 
@@ -1822,6 +1983,7 @@ GMX.I.RESET:
   LINEINPUT.ATTR = THEME.CLR(THEME.HILITE)
   LINEINPUT.MASK = 0
   LINEINPUT.LABEL$ = ""
+  LINEINPUT.LABELATTR = 0
   LINEINPUT.TEXT$ = ""
   RETURN
 
@@ -1878,6 +2040,7 @@ GMX.I.ASK:
   LINEINPUT.X = 6
   LINEINPUT.LEN = 16
   LINEINPUT.LABEL$ = GP.BSTR(BS.I.ASK, 1)
+  LINEINPUT.LABELATTR = THEME.CLR(THEME.TEXT)
   GOSUB LINEINPUT.ASK
   GOSUB GMX.I.SAID
   GM.RESULT$ = GP.BSTR(BS.I.ASK, 2) + GM.SAID$
@@ -1896,32 +2059,33 @@ GMX.I.ASK:
 ## **  three plain calls treat every exit key as "next", so UP goes forward,
 ## **  ESC goes forward, and DOWN on the last field falls out of the panel.
 ## **
-## **   in   GM.FCOUNT   how many fields
-## **        GM.FY()  GM.FLEN()  GM.FMASK()   one entry a field
+## **   in   GM.FCOUNT%   how many fields
+## **        GM.FY%()  GM.FLEN%()  GM.FMASK%()   one entry a field
 ## **        GM.FLD$()   the text, edited in place
-## **   out  GM.FLD$()   what was typed, and GM.FKEY 13 accepted / 27 abandoned
+## **   out  GM.FLD$()   what was typed, and GM.FKEY% 13 accepted / 27 abandoned
 ## **
-## **  THE FOUR ARRAYS ARE LEFT UNDIMENSIONED -- an implicit array is 0..10 and
-## **  three fields fit. DIMming them as well is the one thing that breaks it.
+## **  THE FOUR ARRAYS ARE DIMMED AT THE TOP, with the others. They were left
+## **  implicit, which works and costs 220 bytes of string heap for eleven
+## **  slots holding three fields.
 ## ***********************************************************************
 
 GMX.I.RUNFORM:
-  GM.FOCUS = 1
+  GM.FOCUS% = 1
   GP.DO
     GOSUB GMX.I.RESET
-    LINEINPUT.Y = GM.FY(GM.FOCUS)
-    LINEINPUT.LEN = GM.FLEN(GM.FOCUS)
-    LINEINPUT.MASK = GM.FMASK(GM.FOCUS)
-    LINEINPUT.TEXT$ = GM.FLD$(GM.FOCUS)
+    LINEINPUT.Y = GM.FY%(GM.FOCUS%)
+    LINEINPUT.LEN = GM.FLEN%(GM.FOCUS%)
+    LINEINPUT.MASK = GM.FMASK%(GM.FOCUS%)
+    LINEINPUT.TEXT$ = GM.FLD$(GM.FOCUS%)
     GOSUB LINEINPUT.GET
-    GM.FLD$(GM.FOCUS) = LINEINPUT.TEXT$
-    GM.FKEY = LINEINPUT.KEY
-    IF GM.FKEY = 13 THEN GP.EXITDO
-    IF GM.FKEY = 27 THEN GP.EXITDO
-    IF GM.FKEY = 145 THEN GM.FOCUS = GM.FOCUS - 1
-    IF GM.FKEY <> 145 THEN GM.FOCUS = GM.FOCUS + 1
-    IF GM.FOCUS < 1 THEN GM.FOCUS = GM.FCOUNT
-    IF GM.FOCUS > GM.FCOUNT THEN GM.FOCUS = 1
+    GM.FLD$(GM.FOCUS%) = LINEINPUT.TEXT$
+    GM.FKEY% = LINEINPUT.KEY
+    IF GM.FKEY% = 13 THEN GP.EXITDO
+    IF GM.FKEY% = 27 THEN GP.EXITDO
+    IF GM.FKEY% = 145 THEN GM.FOCUS% = GM.FOCUS% - 1
+    IF GM.FKEY% <> 145 THEN GM.FOCUS% = GM.FOCUS% + 1
+    IF GM.FOCUS% < 1 THEN GM.FOCUS% = GM.FCOUNT%
+    IF GM.FOCUS% > GM.FCOUNT% THEN GM.FOCUS% = 1
   GP.LOOP
   RETURN
 
@@ -1945,17 +2109,17 @@ GMX.I.FORM:
   GP.PRINTAT 6, 13, "CITY", THEME.CLR(THEME.TEXT)
   GP.PRINTAT 6, 14, "CODE", THEME.CLR(THEME.TEXT)
 
-  GM.FCOUNT = 3
-  FOR GM.I = 1 TO GM.FCOUNT
+  GM.FCOUNT% = 3
+  FOR GM.I = 1 TO GM.FCOUNT%
     GM.FLD$(GM.I) = ""
-    GM.FY(GM.I) = 11 + GM.I
-    GM.FLEN(GM.I) = 18
-    GM.FMASK(GM.I) = 0
+    GM.FY%(GM.I) = 11 + GM.I
+    GM.FLEN%(GM.I) = 18
+    GM.FMASK%(GM.I) = 0
   NEXT GM.I
   GOSUB GMX.I.RUNFORM
 
   GM.RESULT$ = GP.BSTR(BS.I.FORM, 2) + GM.FLD$(1) + "] [" + GM.FLD$(2) + "] [" + GM.FLD$(3) + "]"
-  IF GM.FKEY = 27 THEN GM.RESULT$ = GP.BSTR(BS.I.FORM, 3)
+  IF GM.FKEY% = 27 THEN GM.RESULT$ = GP.BSTR(BS.I.FORM, 3)
   RETURN
 
 
@@ -1986,30 +2150,30 @@ GMX.I.LIMITS:
   GP.PRINTAT 6, 13, GP.BSTR(BS.I.LIMITS, 3), THEME.CLR(THEME.TEXT)
   GP.PRINTAT 6, 14, GP.BSTR(BS.I.LIMITS, 4), THEME.CLR(THEME.TEXT)
 
-  GM.FCOUNT = 3
-  FOR GM.I = 1 TO GM.FCOUNT
+  GM.FCOUNT% = 3
+  FOR GM.I = 1 TO GM.FCOUNT%
     GM.FLD$(GM.I) = ""
-    GM.FY(GM.I) = 11 + GM.I
-    GM.FMASK(GM.I) = 0
+    GM.FY%(GM.I) = 11 + GM.I
+    GM.FMASK%(GM.I) = 0
   NEXT GM.I
-  GM.FLEN(1) = 4
-  GM.FLEN(2) = 30
-  GM.FLEN(3) = 12
-  GM.FMASK(3) = 1
+  GM.FLEN%(1) = 4
+  GM.FLEN%(2) = 30
+  GM.FLEN%(3) = 12
+  GM.FMASK%(3) = 1
   GOSUB GMX.I.RUNFORM
 
   GM.RESULT$ = GP.BSTR(BS.I.LIMITS, 5) + GM.FLD$(1) + "]"
   GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.I.LIMITS, 6) + MID$(STR$(LEN(GM.FLD$(2))), 2)
   GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.I.LIMITS, 7) + GM.FLD$(3) + "]"
-  IF GM.FKEY = 27 THEN GM.RESULT$ = GP.BSTR(BS.I.LIMITS, 8)
+  IF GM.FKEY% = 27 THEN GM.RESULT$ = GP.BSTR(BS.I.LIMITS, 8)
   RETURN
 
 
 ## ***********************************************************************
-## **  GMX.STRINGS -- one row a STRINGS.INC.BL routine.
+## **  GMX.STRINGS -- one item a STRINGS.INC.BL routine.
 ## **
-## **  Every row does the call on a real string and shows what came back.
-## **  The prose is two lines a row and printed by GMX.G.SAY: banked text is
+## **  Every item does the call on a real string and shows what came back.
+## **  The prose is two lines an item and printed by GMX.G.SAY: banked text is
 ## **  free of low RAM but NOT of the object, and this program is close to
 ## **  the ceiling the file itself has. See the note above GMX.G.SAY.
 ## ***********************************************************************
@@ -2040,7 +2204,7 @@ GMX.STRINGS:
 ## ***********************************************************************
 ## **  GMX.G.SAY -- a heading and a line under it, from one group.
 ## **
-## **   in   GM.GRP   the group's first index, as GP.BSTR would take it
+## **   in   GM.GRP%   the group's first index, as GP.BSTR would take it
 ## **
 ## **  IT TAKES A FLAT INDEX AND NOT A GROUP NAME, which is the one place in
 ## **  this program that does. A group name is resolved while the program
@@ -2061,24 +2225,24 @@ GMX.STRINGS:
 
 GP.BANKEDSTR GM.TEXTBANKB BS.G.SAY
   "STR.PADR  PAD ON THE RIGHT"
-  "STR.WIDTH IS A FIELD, NOT AN AMOUNT."
+  "STR.WIDTH IS HOW WIDE THE ANSWER IS."
   "STR.PADL  PAD ON THE LEFT"
-  "STR.WIDTH IS A FIELD, NOT AN AMOUNT."
+  "STR.WIDTH IS HOW WIDE THE ANSWER IS."
   "STR.PADC  PAD BOTH ENDS"
   "AN ODD GAP FAVOURS THE RIGHT."
   "STR.SPLIT  ONE STRING INTO A FIELD ARRAY"
-  "COUNT IN STR.N, FIELDS FROM STR.FIELD$(1)."
+  ""
   "STR.REPLACE  EVERY OCCURRENCE, IN ONE PASS"
   "SHORTER, LONGER, OR EMPTY. CASE SENSITIVE."
   "STRCASE.GO  CASE, IN PLACE"
   "IT REWRITES IN PLACE, SO IT TAKES AN ADDRESS."
   "SORT.RUN  A STRING ARRAY, IN PLACE"
-  "THE COUNT COMES FROM THE ARRAY HEADER."
+  ""
   "GP.ARRPTR  THE ADDRESS OF ELEMENT ZERO"
-  "THE THREE HEADER BYTES SIT BELOW IT."
+  "THE COUNT AND THE TYPE ARE THE THREE BYTES BELOW IT."
   "MEMORY  WHAT IS LEFT, RIGHT NOW"
-  "P-CODE SIZE IS A COMPILE-TIME FACT."
-  "MODULE SIZES  P-CODE BYTES AN INCLUDE"
+  "FRE(0) IS READ NOW. THE P-CODE SIZES ARE FROM THE BUILD."
+  "MODULE SIZES  P-CODE BYTES PER MODULE"
   "FROM THE MAP FILE AGAINST THE SYM."
   "STR.USING  A NUMBER THROUGH A MASK"
   "THE RESULT IS THE MASK'S WIDTH, ALWAYS."
@@ -2101,16 +2265,22 @@ GP.BANKEDSTR GM.TEXTBANK BS.G.DATA
   "STR.SPLIT  FIELDS: "
   "STR.REPLACE  THREE OCCURRENCES"
   "STRCASE.GO  DOWN AND BACK, UNCHANGED"
-  "LOWER IS NOT DRAWN: THE FONT PUTS IT ON THE"
-  "GRAPHICS HALF. THE BYTE VALUES ARE THE PROOF."
+  "THE FONT HAS NO LOWER CASE, SO ONLY THE BYTES SHOW IT."
   "FIRST BYTE  START "
   "  LOWER "
   "  UPPER "
 GP.ENDBANKEDSTR
 GMX.G.SAY:
   GOSUB GMX.CLEARPANEL
-  GP.PRINTAT 4, 9, GP.BSTR(BS.G.SAY, GM.GRP), THEME.CLR(THEME.TITLE)
-  GP.PRINTAT 4, 11, GP.BSTR(BS.G.SAY, GM.GRP + 1), THEME.CLR(THEME.DIMMED)
+  GP.PRINTAT 4, 9, GP.BSTR(BS.G.SAY, GM.GRP%), THEME.CLR(THEME.TITLE)
+
+## ---- The second line is OPTIONAL, and left empty where the panel below it already
+## ---- shows what the sentence would have said. The pair stays either way: GM.GRP% is
+## ---- the ordinal doubled, written as a constant at nine call sites, so dropping a
+## ---- string would renumber all of them.
+
+  GM.SAY2$ = GP.BSTR(BS.G.SAY, GM.GRP% + 1)
+  IF GM.SAY2$ <> "" THEN GP.PRINTAT 4, 11, GM.SAY2$, THEME.CLR(THEME.DIMMED)
   RETURN
 
 
@@ -2118,30 +2288,32 @@ GMX.G.SAY:
 ## The three pads differ only in the routine they call, so they share a body.
 
 GMX.G.PADR:
-  GM.PADOP = 0
+  GM.PADOP% = 0
   GOTO GMX.G.PADS
 
 GMX.G.PADL:
-  GM.PADOP = 1
+  GM.PADOP% = 1
   GOTO GMX.G.PADS
 
 GMX.G.PADC:
-  GM.PADOP = 2
+  GM.PADOP% = 2
 
 GMX.G.PADS:
-  GM.GRP = GM.PADOP * 2
+  GM.GRP% = GM.PADOP% * 2
   GOSUB GMX.G.SAY
   FOR GM.I = 1 TO 4
     STR.STR$ = GP.BSTR(BS.G.DATA, 0)
-    STR.WIDTH = 6 + GM.I * 4
-    IF GM.PADOP = 0 THEN GOSUB STR.PADR
-    IF GM.PADOP = 1 THEN GOSUB STR.PADL
-    IF GM.PADOP = 2 THEN GOSUB STR.PADC
-    GP.PRINTAT 6, 14 + GM.I, "[" + STR.STR$ + "]", THEME.CLR(THEME.TEXT)
+    GM.PADW% = 6 + GM.I * 4
+    STR.WIDTH = GM.PADW%
+    IF GM.PADOP% = 0 THEN GOSUB STR.PADR
+    IF GM.PADOP% = 1 THEN GOSUB STR.PADL
+    IF GM.PADOP% = 2 THEN GOSUB STR.PADC
+    GM.PADSHOW$ = MID$(STR$(GM.PADW%), 2) + "  [" + STR.STR$ + "]"
+    GP.PRINTAT 6, 14 + GM.I, GM.PADSHOW$, THEME.CLR(THEME.TEXT)
   NEXT GM.I
   GM.TELL$ = GP.BSTR(BS.G.DATA, 6)
   GOSUB GMX.TELL
-  GM.RESULT$ = GP.BSTR(BS.G.SAY, GM.GRP) + GP.BSTR(BS.G.DATA, 7)
+  GM.RESULT$ = GP.BSTR(BS.G.SAY, GM.GRP%) + GP.BSTR(BS.G.DATA, 7)
   RETURN
 
 
@@ -2150,7 +2322,7 @@ GMX.G.PADS:
 ## ***********************************************************************
 
 GMX.G.SPLIT:
-  GM.GRP = 6
+  GM.GRP% = 6
   GOSUB GMX.G.SAY
   STR.STR$ = GP.BSTR(BS.G.DATA, 1)
   STR.DELIM$ = ","
@@ -2171,7 +2343,7 @@ GMX.G.SPLIT:
 ## ***********************************************************************
 
 GMX.G.REPLACE:
-  GM.GRP = 8
+  GM.GRP% = 8
   GOSUB GMX.G.SAY
   STR.STR$ = GP.BSTR(BS.G.DATA, 2)
   GP.PRINTAT 6, 15, STR.STR$, THEME.CLR(THEME.WARN)
@@ -2198,20 +2370,19 @@ GMX.G.REPLACE:
 ## ***********************************************************************
 
 GMX.G.CASE:
-  GM.GRP = 10
+  GM.GRP% = 10
   GOSUB GMX.G.SAY
   GP.PRINTAT 4, 14, GP.BSTR(BS.G.DATA, 11), THEME.CLR(THEME.DIMMED)
-  GP.PRINTAT 4, 15, GP.BSTR(BS.G.DATA, 12), THEME.CLR(THEME.DIMMED)
 
   GM.CASE$ = GP.BSTR(BS.G.DATA, 5)
   STRCASE.PTR = GP.STRPTR(GM.CASE$)
-  GM.SHOW$ = GP.BSTR(BS.G.DATA, 13) + MID$(STR$(ASC(GM.CASE$)), 2)
+  GM.SHOW$ = GP.BSTR(BS.G.DATA, 12) + MID$(STR$(ASC(GM.CASE$)), 2)
   STRCASE.MODE = STRCASE.LOWER
   GOSUB STRCASE.GO
-  GM.SHOW$ = GM.SHOW$ + GP.BSTR(BS.G.DATA, 14) + MID$(STR$(ASC(GM.CASE$)), 2)
+  GM.SHOW$ = GM.SHOW$ + GP.BSTR(BS.G.DATA, 13) + MID$(STR$(ASC(GM.CASE$)), 2)
   STRCASE.MODE = STRCASE.UPPER
   GOSUB STRCASE.GO
-  GM.SHOW$ = GM.SHOW$ + GP.BSTR(BS.G.DATA, 15) + MID$(STR$(ASC(GM.CASE$)), 2)
+  GM.SHOW$ = GM.SHOW$ + GP.BSTR(BS.G.DATA, 14) + MID$(STR$(ASC(GM.CASE$)), 2)
   GP.PRINTAT 6, 17, GM.SHOW$, THEME.CLR(THEME.TEXT)
   GP.PRINTAT 6, 18, GM.CASE$, THEME.CLR(THEME.WARN)
 
@@ -2246,20 +2417,20 @@ GP.BANKEDSTR GM.TEXTBANKB BS.G.USING
   "STR.USING.FIX  FIVE WIDTHS OF ONE VALUE"
 GP.ENDBANKEDSTR
 GMX.G.USING:
-  GM.GRP = 20
+  GM.GRP% = 20
   GOSUB GMX.G.SAY
   GP.PRINTAT 4, 12, GP.BSTR(BS.G.USING, 1), THEME.CLR(THEME.DIMMED)
 
   STR.USING.MASK$ = GP.BSTR(BS.G.USING, 0)
   GM.UVAL = 0.5
-  GM.SROW = 14
+  GM.SROW% = 14
   FOR GM.I = 1 TO 6
     STR.USING.NUM = GM.UVAL
     GOSUB STR.USING
-    GP.PRINTAT 6, GM.SROW, STR.USING.MASK$, THEME.CLR(THEME.DIMMED)
-    GP.PRINTAT 20, GM.SROW, MID$(STR$(GM.UVAL), 2), THEME.CLR(THEME.TEXT)
-    GP.PRINTAT 40, GM.SROW, STR.USING.STR$, THEME.CLR(THEME.TITLE)
-    GM.SROW = GM.SROW + 1
+    GP.PRINTAT 6, GM.SROW%, STR.USING.MASK$, THEME.CLR(THEME.DIMMED)
+    GP.PRINTAT 20, GM.SROW%, MID$(STR$(GM.UVAL), 2), THEME.CLR(THEME.TEXT)
+    GP.PRINTAT 40, GM.SROW%, STR.USING.STR$, THEME.CLR(THEME.TITLE)
+    GM.SROW% = GM.SROW% + 1
     GM.UVAL = GM.UVAL * 10 + GM.I
   NEXT GM.I
 
@@ -2281,16 +2452,16 @@ GMX.G.USING:
 ## ***********************************************************************
 
 GMX.G.USINGFIX:
-  GM.GRP = 22
+  GM.GRP% = 22
   GOSUB GMX.G.SAY
-  GM.SROW = 14
+  GM.SROW% = 14
   FOR GM.I = 0 TO 4
     STR.USING.NUM = 1234.56789
     STR.USING.DP = GM.I
     GOSUB STR.USING.FIX
-    GP.PRINTAT 6, GM.SROW, GP.BSTR(BS.G.USING, 4) + MID$(STR$(GM.I), 2), THEME.CLR(THEME.DIMMED)
-    GP.PRINTAT 24, GM.SROW, STR.USING.STR$, THEME.CLR(THEME.TITLE)
-    GM.SROW = GM.SROW + 1
+    GP.PRINTAT 6, GM.SROW%, GP.BSTR(BS.G.USING, 4) + MID$(STR$(GM.I), 2), THEME.CLR(THEME.DIMMED)
+    GP.PRINTAT 24, GM.SROW%, STR.USING.STR$, THEME.CLR(THEME.TITLE)
+    GM.SROW% = GM.SROW% + 1
   NEXT GM.I
 
   GM.TELL$ = GP.BSTR(BS.G.USING, 2)
@@ -2301,19 +2472,14 @@ GMX.G.USINGFIX:
 
 ## ***********************************************************************
 ## **  GMX.DATA -- the DATA dropdown.
-## **
-## **  BANK MAP is here and in GMX.ABOUT, and it is the same routine: the row
-## **  is listed twice because it answers a question each dropdown asks.
 ## ***********************************************************************
 
 GMX.DATA:
   GP.SELECT MENUVERT.SEL
   GP.CASE 1
     GOSUB GMX.A.SORT
-  GP.CASE 2
-    GOSUB GMX.A.ARRAY
   GP.OTHER
-    GOSUB GMX.BANKMAP
+    GOSUB GMX.A.ARRAY
   GP.ENDSEL
   GOSUB GMX.CHROME
   RETURN
@@ -2353,22 +2519,22 @@ GP.BANKEDSTR GM.TEXTBANK BS.A.SORT
   "SORT.RUN  REFUSED THE ARRAY"
 GP.ENDBANKEDSTR
 GMX.A.SORT:
-  GM.GRP = 12
+  GM.GRP% = 12
   GOSUB GMX.G.SAY
   SORT.PTR = GP.ARRPTR(GM.SORT$())
   SORT.NOCASE = 0
 
-  GM.COLX = 6 : GM.COLG = 10
+  GM.COLX% = 6 : GM.COLG% = 10
   GOSUB GMX.A.LOAD
   GOSUB GMX.A.COL
 
-  GM.COLX = 26 : GM.COLG = 11
+  GM.COLX% = 26 : GM.COLG% = 11
   GOSUB GMX.A.LOAD
   SORT.DESCEND = 0
   GOSUB SORT.RUN
   GOSUB GMX.A.COL
 
-  GM.COLX = 46 : GM.COLG = 12
+  GM.COLX% = 46 : GM.COLG% = 12
   GOSUB GMX.A.LOAD
   SORT.DESCEND = -1
   GOSUB SORT.RUN
@@ -2390,9 +2556,9 @@ GMX.A.LOAD:
   RETURN
 
 GMX.A.COL:
-  GP.PRINTAT GM.COLX, 12, GP.BSTR(BS.A.SORT, GM.COLG), THEME.CLR(THEME.WARN)
+  GP.PRINTAT GM.COLX%, 12, GP.BSTR(BS.A.SORT, GM.COLG%), THEME.CLR(THEME.WARN)
   FOR GM.I = 0 TO 9
-    GP.PRINTAT GM.COLX, 13 + GM.I, GM.SORT$(GM.I), THEME.CLR(THEME.TEXT)
+    GP.PRINTAT GM.COLX%, 13 + GM.I, GM.SORT$(GM.I), THEME.CLR(THEME.TEXT)
   NEXT GM.I
   RETURN
 
@@ -2404,20 +2570,28 @@ GMX.A.COL:
 ## **  count and the type are PEEKed back out of the array and printed as
 ## **  found -- which is the same reading SORT.RUN does to decide whether it
 ## **  will touch the array at all.
+## **
+## **  The type byte off the screen: bit 7 set marks a SUB-ARRAY. It is left out
+## **  of the panel because 128 sitting beside the 64 this array reports reads as
+## **  a contradiction rather than a second fact.
 ## ***********************************************************************
 
 
 GP.BANKEDSTR GM.TEXTBANK BS.A.ARRAY
-  "ELEMENT ZERO AT "
-  "COUNT LOW   -3  "
-  "COUNT HIGH  -2  "
-  "TYPE        -1  "
-  "COUNT "
-  "TYPE 64 IS A STRING ELEMENT, 0 A NUMBER, BIT 7 A SUB-ARRAY."
-  "STRIDE IS THE CALLER'S: 2 BYTES A STRING ELEMENT, 6 A NUMBER."
+  "GM.SORT$()  ELEMENT ZERO AT "
+  "COUNT LOW   AT "
+  "COUNT HIGH  AT "
+  "TYPE        AT "
+  "  IS "
+  "COUNT IS "
+  " + "
+  " * 256 = "
+  " ELEMENTS"
+  "TYPE 64 IS A STRING ARRAY. A NUMBER ARRAY IS 0."
+  "AN ELEMENT IS 2 BYTES FOR $ AND %, 6 FOR A PLAIN DIM."
 GP.ENDBANKEDSTR
 GMX.A.ARRAY:
-  GM.GRP = 14
+  GM.GRP% = 14
   GOSUB GMX.G.SAY
   GM.PTR = GP.ARRPTR(GM.SORT$())
   GM.B0 = PEEK(GM.PTR - 3)
@@ -2425,12 +2599,12 @@ GMX.A.ARRAY:
   GM.B2 = PEEK(GM.PTR - 1)
 
   GP.PRINTAT 4, 13, GP.BSTR(BS.A.ARRAY, 0) + MID$(STR$(GM.PTR), 2), THEME.CLR(THEME.WARN)
-  GP.PRINTAT 6, 15, GP.BSTR(BS.A.ARRAY, 1) + MID$(STR$(GM.B0), 2), THEME.CLR(THEME.TEXT)
-  GP.PRINTAT 6, 16, GP.BSTR(BS.A.ARRAY, 2) + MID$(STR$(GM.B1), 2), THEME.CLR(THEME.TEXT)
-  GP.PRINTAT 6, 17, GP.BSTR(BS.A.ARRAY, 3) + MID$(STR$(GM.B2), 2), THEME.CLR(THEME.TEXT)
-  GP.PRINTAT 6, 19, GP.BSTR(BS.A.ARRAY, 4) + MID$(STR$(GM.B0 + GM.B1 * 256), 2), THEME.CLR(THEME.HILITE)
-  GP.PRINTAT 4, 21, GP.BSTR(BS.A.ARRAY, 5), THEME.CLR(THEME.DIMMED)
-  GP.PRINTAT 4, 22, GP.BSTR(BS.A.ARRAY, 6), THEME.CLR(THEME.DIMMED)
+  GP.PRINTAT 6, 15, GP.BSTR(BS.A.ARRAY, 1) + MID$(STR$(GM.PTR - 3), 2) + GP.BSTR(BS.A.ARRAY, 4) + MID$(STR$(GM.B0), 2), THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 6, 16, GP.BSTR(BS.A.ARRAY, 2) + MID$(STR$(GM.PTR - 2), 2) + GP.BSTR(BS.A.ARRAY, 4) + MID$(STR$(GM.B1), 2), THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 6, 17, GP.BSTR(BS.A.ARRAY, 3) + MID$(STR$(GM.PTR - 1), 2) + GP.BSTR(BS.A.ARRAY, 4) + MID$(STR$(GM.B2), 2), THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 6, 19, GP.BSTR(BS.A.ARRAY, 5) + MID$(STR$(GM.B0), 2) + GP.BSTR(BS.A.ARRAY, 6) + MID$(STR$(GM.B1), 2) + GP.BSTR(BS.A.ARRAY, 7) + MID$(STR$(GM.B0 + GM.B1 * 256), 2) + GP.BSTR(BS.A.ARRAY, 8), THEME.CLR(THEME.HILITE)
+  GP.PRINTAT 4, 21, GP.BSTR(BS.A.ARRAY, 9), THEME.CLR(THEME.DIMMED)
+  GP.PRINTAT 4, 22, GP.BSTR(BS.A.ARRAY, 10), THEME.CLR(THEME.DIMMED)
 
   GM.TELL$ = GP.BSTR(BS.G.DATA, 6)
   GOSUB GMX.TELL
@@ -2497,13 +2671,56 @@ GMX.THEME:
 GMX.ABOUT:
   GP.SELECT MENUVERT.SEL
   GP.CASE 1
-    GOSUB GMX.B.MEMORY
+    GOSUB GMX.B.PROGRAM
   GP.CASE 2
+    GOSUB GMX.B.MEMORY
+  GP.CASE 3
     GOSUB GMX.B.SIZES
   GP.OTHER
     GOSUB GMX.BANKMAP
   GP.ENDSEL
   GOSUB GMX.CHROME
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.B.PROGRAM -- what this is and how big it is on the drive.
+## **
+## **  THE SIZE IS ASKED FOR, NOT WRITTEN DOWN. ABOUT / MODULE SIZES and the
+## **  last two rows of ABOUT / MEMORY are literals that go stale on the next
+## **  build; GP.FN(FILE.SIZE, ...) asks the drive, so this one is right by
+## **  construction. Blocks, not bytes -- see its header for why there is no
+## **  byte count to be had.
+## **
+## **  THE NAME IS PULLED OUT OF THE BANK FIRST, into GM.PNAME$, rather than
+## **  written inline as GP.FN(FILE.SIZE, GP.BSTR(...)). Every GP.BSTR selects
+## **  the text bank and the verb selects its own, so keeping them in separate
+## **  statements keeps them from arguing over an argument -- and the panel
+## **  needs the name a second time anyway.
+## **
+## **  NOT FINDING IT IS NOT AN ERROR. A program started from a build directory
+## **  that has since moved still runs, and the panel says so instead.
+## ***********************************************************************
+
+GP.BANKEDSTR GM.TEXTBANK BS.B.PROGRAM
+  " PROGRAM "
+  "GPBMODS.PRG"
+  "FILE     "
+  "SIZE     "
+  " BLOCKS"
+  "NOT ON THE DRIVE"
+  "VERSION  1.0.0"
+GP.ENDBANKEDSTR
+GMX.B.PROGRAM:
+  GOSUB GMX.D.RESET
+  GM.PNAME$ = GP.BSTR(BS.B.PROGRAM, 1)
+  GM.PBLK% = GP.FN(FILE.SIZE, GM.PNAME$)
+  GUI.TITLE$ = GP.BSTR(BS.B.PROGRAM, 0)
+  GUI.MSG$ = GP.BSTR(BS.B.PROGRAM, 2) + GM.PNAME$
+  GUI.MSG2$ = GP.BSTR(BS.B.PROGRAM, 3) + GP.BSTR(BS.B.PROGRAM, 5)
+  IF GM.PBLK% > 0 THEN GUI.MSG2$ = GP.BSTR(BS.B.PROGRAM, 3) + MID$(STR$(GM.PBLK%), 2) + GP.BSTR(BS.B.PROGRAM, 4)
+  GUI.MSG3$ = GP.BSTR(BS.B.PROGRAM, 6)
+  GOSUB GUI.SAY
   RETURN
 
 
@@ -2535,24 +2752,24 @@ GMX.ABOUT:
 
 GP.BANKEDSTR GM.TEXTBANK BS.B.MEM
   "FRE(0)  BYTES FREE  "
-  "BANKS "
-  "  SPARE "
-  "CODE BANKS "
-  "  TEXT BANKS "
-  "BANK SELECTED NOW  "
-  "RESIDENT P-CODE  13994    MAP TOTAL  23819"
-  "OVERLAYS 4  .B04 6658 .B05 7426 .B06 3074 .B07 4866"
+  "TOTAL BANKS "
+  "   UNUSED "
+  "CODE BANKS #"
+  "  TEXT BANKS #"
+  "BANK SELECTED NOW  #"
+  "RESIDENT P-CODE  14080    MAP TOTAL  24421"
+  "OVERLAYS 4  .B04 6914 .B05 7682 .B06 3330 .B07 4866"
 GP.ENDBANKEDSTR
 GMX.B.MEMORY:
-  GM.GRP = 16
+  GM.GRP% = 16
   GOSUB GMX.G.SAY
   GOSUB GMX.BANKNOW
   GOSUB BANKMGR.COUNT
 
   GP.PRINTAT 4, 13, GP.BSTR(BS.B.MEM, 0) + MID$(STR$(FRE(0)), 2), THEME.CLR(THEME.WARN)
   GP.PRINTAT 4, 15, GP.BSTR(BS.B.MEM, 1) + MID$(STR$(BANKMGR.BANKS), 2) + GP.BSTR(BS.B.MEM, 2) + MID$(STR$(BANKMGR.SPARE), 2), THEME.CLR(THEME.TEXT)
-  GP.PRINTAT 4, 16, GP.BSTR(BS.B.MEM, 3) + MID$(STR$(LIB.CODEBANK), 2) + " " + MID$(STR$(LIB.UTILBANK), 2) + GP.BSTR(BS.B.MEM, 4) + MID$(STR$(GM.TEXTBANK), 2) + " " + MID$(STR$(GM.TEXTBANKB), 2), THEME.CLR(THEME.TEXT)
-  GP.PRINTAT 4, 17, GP.BSTR(BS.B.MEM, 5) + MID$(STR$(GM.BANKNOW), 2), THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 4, 16, GP.BSTR(BS.B.MEM, 3) + MID$(STR$(LIB.CODEBANK), 2) + " #" + MID$(STR$(LIB.UTILBANK), 2) + GP.BSTR(BS.B.MEM, 4) + MID$(STR$(GM.TEXTBANK), 2) + " #" + MID$(STR$(GM.TEXTBANKB), 2), THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 4, 17, GP.BSTR(BS.B.MEM, 5) + MID$(STR$(GM.BANKNOW%), 2), THEME.CLR(THEME.TEXT)
   GP.PRINTAT 4, 19, GP.BSTR(BS.B.MEM, 6), THEME.CLR(THEME.TEXT)
   GP.PRINTAT 4, 20, GP.BSTR(BS.B.MEM, 7), THEME.CLR(THEME.TEXT)
 
@@ -2563,7 +2780,7 @@ GMX.B.MEMORY:
 
 
 ## ***********************************************************************
-## **  GMX.B.SIZES -- p-code bytes an #INCLUDE.
+## **  GMX.B.SIZES -- p-code bytes per module.
 ## **
 ## **  A STATIC TABLE, AND IT HAS TO BE. The p-code is written while the
 ## **  program compiles and nothing is left in the object saying which include
@@ -2571,9 +2788,6 @@ GMX.B.MEMORY:
 ## **  come from differencing GPBMODS.MAP against GPBMODS.SRC.SYM -- see
 ## **  docs/memory/measure-pcode-per-module.md -- and they are only true of the
 ## **  build they were taken from. REMEASURE AFTER EDITING ANY OF IT.
-## **
-## **  The rows are pre-formatted rather than a name and a number joined here:
-## **  the column is already aligned in the source, where it is easy to see.
 ## **
 ## **  THE THREE COLUMNS ARE THE THREE PLACES P-CODE CAN LIVE, which is the
 ## **  whole point of the panel. The left column is resident: it is loaded at
@@ -2593,72 +2807,130 @@ GMX.B.MEMORY:
 ## ***********************************************************************
 
 
+## ---- THREE HEADINGS, then the names on their own. The numbers are a group of
+## ---- their own beside them, in step, which is what lets the panel LAY THE
+## ---- COLUMN OUT rather than have it typed in: the alignment used to be spaces
+## ---- inside each literal, so a name one character longer bent the column and a
+## ---- figure gaining a digit pushed past it.
+
 GP.BANKEDSTR GM.TEXTBANK BS.B.SIZES
-  "FROM THE MAP FILE AGAINST THE SYM"
   "IN LOW RAM  --  AT $0801"
-  "STASH        431"
-  "STASHFILE    171"
-  "LIBBANK      184"
-  "LIBBANKFD     34"
-  "LIBUTIL      359"
-  "GPBMODS    11165"
   "IN BANK 4  --  .B04"
-  "THEME        479"
-  "MENUVERT    1104"
-  "MENUBAR      826"
-  "LINEINPUT    762"
-  "GUI         1647"
-  "GUI2        1360"
-  "FILEDIR      433"
   "IN BANK 7  --  .B07"
-  "APPSYS       114"
-  "BANKMGR      586"
-  "STRCASE       54"
-  "STRINGS      511"
-  "STRUSING     726"
-  "SORT         189"
-  "STASHVRAM   1681"
-  "FILEIO      1003"
-  "TOTAL      23819"
+  "TOTAL"
+  "STASH"
+  "STASHFILE"
+  "LIBBANK"
+  "LIBBANKFD"
+  "LIBUTIL"
+  "GPBMODS"
+  "THEME"
+  "MENUVERT"
+  "MENUBAR"
+  "LINEINPUT"
+  "GUI"
+  "GUI2"
+  "FILEDIR"
+  "APPSYS"
+  "BANKMGR"
+  "STRCASE"
+  "STRINGS"
+  "STRUSING"
+  "SORT"
+  "STASHVRAM"
+  "FILEIO"
+GP.ENDBANKEDSTR
+
+## ---- The same order, and the ONLY thing that changes between builds. Read off
+## ---- GPBMODS.MAP against GPBMODS.SRC.SYM -- readme.md gives the method, and
+## ---- the trap: charge a module from its own first label to the next module's
+## ---- WITHIN one region, because an overlay file is padded up to a whole page
+## ---- and the padding lands on whichever module came last.
+
+GP.BANKEDSTR GM.TEXTBANK BS.B.NUMS
+  "431"
+  "171"
+  "184"
+  "34"
+  "359"
+  "11537"
+  "479"
+  "1104"
+  "826"
+  "780"
+  "1857"
+  "1360"
+  "431"
+  "114"
+  "586"
+  "54"
+  "511"
+  "726"
+  "189"
+  "1681"
+  "1007"
+  "24421"
 GP.ENDBANKEDSTR
 GMX.B.SIZES:
-  GM.GRP = 18
+  GM.GRP% = 18
   GOSUB GMX.G.SAY
-  GP.PRINTAT 4, 12, GP.BSTR(BS.B.SIZES, 0), THEME.CLR(THEME.DIMMED)
 
-  GP.PRINTAT 4, 13, GP.BSTR(BS.B.SIZES, 1), THEME.CLR(THEME.WARN)
-  GM.SROW = 14
-  FOR GM.I = 2 TO 7
-    GP.PRINTAT 4, GM.SROW, GP.BSTR(BS.B.SIZES, GM.I), THEME.CLR(THEME.TEXT)
-    GM.SROW = GM.SROW + 1
-  NEXT GM.I
+  ## ---- THE TWO GROUPS ARE FOUR APART, NOT LEVEL. BS.B.SIZES opens with the
+  ## ---- three column headings and TOTAL, so the first module name is index 4
+  ## ---- while its figure is index 0. Leaving both at 0 printed every name
+  ## ---- against the figure four modules along, headings and all.
+  GM.SNAME% = 4 : GM.SNUM% = 0
 
-  GP.PRINTAT 30, 13, GP.BSTR(BS.B.SIZES, 8), THEME.CLR(THEME.WARN)
-  GM.SROW = 14
-  FOR GM.I = 9 TO 15
-    GP.PRINTAT 30, GM.SROW, GP.BSTR(BS.B.SIZES, GM.I), THEME.CLR(THEME.TITLE)
-    GM.SROW = GM.SROW + 1
-  NEXT GM.I
+  GM.SX% = 4  : GM.SHEAD% = 0 : GM.SN% = 6 : GM.SATTR% = THEME.CLR(THEME.TEXT)  : GOSUB GMX.B.COL
+  GM.SX% = 30 : GM.SHEAD% = 1 : GM.SN% = 7 : GM.SATTR% = THEME.CLR(THEME.TITLE) : GOSUB GMX.B.COL
+  GM.SX% = 54 : GM.SHEAD% = 2 : GM.SN% = 8 : GM.SATTR% = THEME.CLR(THEME.TITLE) : GOSUB GMX.B.COL
 
-  GP.PRINTAT 54, 13, GP.BSTR(BS.B.SIZES, 16), THEME.CLR(THEME.WARN)
-  GM.SROW = 14
-  FOR GM.I = 17 TO 24
-    GP.PRINTAT 54, GM.SROW, GP.BSTR(BS.B.SIZES, GM.I), THEME.CLR(THEME.TITLE)
-    GM.SROW = GM.SROW + 1
-  NEXT GM.I
-
-  GP.PRINTAT 4, 23, GP.BSTR(BS.B.SIZES, 25), THEME.CLR(THEME.WARN)
+  GM.SNAME% = 3 : GM.SX% = 4 : GM.SROW% = 23 : GM.SATTR% = THEME.CLR(THEME.WARN)
+  GOSUB GMX.B.ROW
+  GM.RESULT$ = GM.SLINE$
 
   GM.TELL$ = GP.BSTR(BS.G.DATA, 6)
   GOSUB GMX.TELL
-  GM.RESULT$ = GP.BSTR(BS.B.SIZES, 25)
+  RETURN
+
+
+## ---- ONE COLUMN. GM.SNAME% and GM.SNUM% each walk on by one a row, so the four
+## ---- places between them hold across all three columns and the total falls out
+## ---- at the end, with GM.SNUM% already standing on it.
+
+GMX.B.COL:
+  GP.PRINTAT GM.SX%, 13, GP.BSTR(BS.B.SIZES, GM.SHEAD%), THEME.CLR(THEME.WARN)
+  GM.SROW% = 14
+  FOR GM.I = 1 TO GM.SN%
+    GOSUB GMX.B.ROW
+    GM.SROW% = GM.SROW% + 1
+  NEXT GM.I
+  RETURN
+
+
+## ---- ONE ROW, laid out by the library this program exists to exercise:
+## ---- STR.PADR takes the name to a fixed column and STR.USING right justifies
+## ---- the figure in five, which is what makes the digits line up whatever the
+## ---- name beside them is. GM.SNAME% is left where it stops, so the caller can
+## ---- point it at the TOTAL row and call this again.
+
+GMX.B.ROW:
+  STR.STR$ = GP.BSTR(BS.B.SIZES, GM.SNAME%)
+  STR.WIDTH = 11
+  GOSUB STR.PADR
+  STR.USING.NUM = VAL(GP.BSTR(BS.B.NUMS, GM.SNUM%))
+  STR.USING.MASK$ = "#####"
+  GOSUB STR.USING
+  GM.SLINE$ = STR.STR$ + STR.USING.STR$
+  GP.PRINTAT GM.SX%, GM.SROW%, GM.SLINE$, GM.SATTR%
+  GM.SNAME% = GM.SNAME% + 1 : GM.SNUM% = GM.SNUM% + 1
   RETURN
 
 
 ## ***********************************************************************
-## **  GMX.FILES -- the FILES dropdown. FILEIO and FILEDIR, one row each.
+## **  GMX.FILES -- the FILES dropdown. FILEIO and FILEDIR, one item each.
 ## **
-## **  THE DRIVE IS REAL, and four of these rows write to it. Everything they
+## **  THE DRIVE IS REAL, and four of these write to it. Everything they
 ## **  make is named GPBFILE.* or GPBDIR, and every one of them is removed by
 ## **  the row that made it -- the directory by FILE.RMDIR, after the drive
 ## **  has come back up out of it.
@@ -2684,10 +2956,8 @@ GMX.FILES:
   GP.CASE 5
     GOSUB GMX.F.EXISTS
   GP.CASE 6
-    GOSUB GMX.F.CURDIR
-  GP.CASE 7
     GOSUB GMX.F.ARRAY
-  GP.CASE 8
+  GP.CASE 7
     GOSUB GMX.F.RENAME
   GP.OTHER
     GOSUB GMX.F.MKDIR
@@ -2699,8 +2969,8 @@ GMX.FILES:
 ## ---- A line in the work area, and the row after it ----
 
 GMX.F.SAY:
-  GP.PRINTAT 6, GM.FROW, GM.FTXT$, THEME.CLR(THEME.TEXT)
-  GM.FROW = GM.FROW + 1
+  GP.PRINTAT 6, GM.FROW%, GM.FTXT$, THEME.CLR(THEME.TEXT)
+  GM.FROW% = GM.FROW% + 1
   RETURN
 
 
@@ -2721,9 +2991,9 @@ GMX.F.DRIVE:
 ## **  GMX.F.READ -- one listing, walked into MENUVERT.ITEM$ for a listbox.
 ## **
 ## **   in   GM.FPAT$    the drive's pattern, or empty for everything
-## **        GM.FONLY    FILE.DIR.ALL, FILE.DIR.FILES or FILE.DIR.DIRS
-## **   out  GM.FSEEN    entries in the listing
-## **        GM.FSHOWN   how many of them reached the array
+## **        GM.FONLY%    FILE.DIR.ALL, FILE.DIR.FILES or FILE.DIR.DIRS
+## **   out  GM.FSEEN%    entries in the listing
+## **        GM.FSHOWN%   how many of them reached the array
 ## **
 ## **  READ ONCE, WALK ONCE. The whole listing comes back in one go into the
 ## **  bank BANKMGR handed out -- 8,192 bytes at $A000, about 250 entries --
@@ -2733,22 +3003,22 @@ GMX.F.DRIVE:
 ## **  the name is copied into the array here rather than kept a pointer to.
 ## **
 ## **  The walk stops FILLING at 24 because MENUVERT.ITEM$ is DIMmed 32 and
-## **  GUI.LISTBOX reads that array. GM.FSEEN keeps counting past it, so the
+## **  GUI.LISTBOX reads that array. GM.FSEEN% keeps counting past it, so the
 ## **  panel can still say how many entries were left out.
 ## ***********************************************************************
 
 GMX.F.READ:
-  FILE.DIR.BANK = GM.DIRBANK
+  FILE.DIR.BANK = GM.DIRBANK%
   FILE.DIR.PATTERN$ = GM.FPAT$
-  FILE.DIR.ONLY = GM.FONLY
+  FILE.DIR.ONLY = GM.FONLY%
   GOSUB FILE.DIR.OPEN
-  GM.FSEEN = 0
-  GM.FSHOWN = 0
+  GM.FSEEN% = 0
+  GM.FSHOWN% = 0
   GP.DO
     GOSUB FILE.DIR.NEXT
     IF FILE.DIR.MORE = 0 THEN GP.EXITDO
-    GM.FSEEN = GM.FSEEN + 1
-    IF GM.FSHOWN < 24 THEN GOSUB GMX.F.KEEP
+    GM.FSEEN% = GM.FSEEN% + 1
+    IF GM.FSHOWN% < 24 THEN GOSUB GMX.F.KEEP
   GP.LOOP
   RETURN
 
@@ -2763,8 +3033,8 @@ GMX.F.KEEP:
   STR.STR$ = STR.STR$ + STR$(FILE.BLOCKS)
   STR.WIDTH = 32
   GOSUB STR.PADR
-  GM.FSHOWN = GM.FSHOWN + 1
-  MENUVERT.ITEM$(GM.FSHOWN) = " " + STR.STR$ + "  " + FILE.TYPE$
+  GM.FSHOWN% = GM.FSHOWN% + 1
+  MENUVERT.ITEM$(GM.FSHOWN%) = " " + STR.STR$ + "  " + FILE.TYPE$
   RETURN
 
 
@@ -2786,17 +3056,17 @@ GP.BANKEDSTR GM.TEXTBANKB BS.F.LIST
   "  BUFFER FULL"
 GP.ENDBANKEDSTR
 GMX.F.LIST:
-  IF GM.FSHOWN = 0 THEN GOTO GMX.F.NONE
+  IF GM.FSHOWN% = 0 THEN GOTO GMX.F.NONE
   GOSUB GMX.D.RESET
   GUI.TITLE$ = GM.FTITLE$
-  GUI.MSG$ = MID$(STR$(GM.FSEEN), 2) + GP.BSTR(BS.F.LIST, 0) + MID$(STR$(GM.FSHOWN), 2) + GP.BSTR(BS.F.LIST, 1)
+  GUI.MSG$ = MID$(STR$(GM.FSEEN%), 2) + GP.BSTR(BS.F.LIST, 0) + MID$(STR$(GM.FSHOWN%), 2) + GP.BSTR(BS.F.LIST, 1)
   GUI.MSG2$ = GP.BSTR(BS.F.LIST, 2)
-  GUI.LISTBOX.COUNT = GM.FSHOWN
+  GUI.LISTBOX.COUNT = GM.FSHOWN%
   GUI.LISTBOX.ROWS = 12
   GUI.LISTBOX.MULTI = 0
   GUI.LISTBOX.SEL = 0
   GOSUB GUI.LISTBOX
-  GM.RESULT$ = GP.BSTR(BS.F.LIST, 3) + MID$(STR$(GM.FSEEN), 2) + GP.BSTR(BS.F.LIST, 4) + MID$(STR$(FILE.DIR.GOT), 2) + GP.BSTR(BS.F.LIST, 5)
+  GM.RESULT$ = GP.BSTR(BS.F.LIST, 3) + MID$(STR$(GM.FSEEN%), 2) + GP.BSTR(BS.F.LIST, 4) + MID$(STR$(FILE.DIR.GOT), 2) + GP.BSTR(BS.F.LIST, 5)
   IF FILE.DIR.FULL = 1 THEN GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.F.LIST, 6)
   RETURN
 
@@ -2825,7 +3095,7 @@ GP.BANKEDSTR GM.TEXTBANKB BS.F.DIR
 GP.ENDBANKEDSTR
 GMX.F.DIR:
   GM.FPAT$ = ""
-  GM.FONLY = FILE.DIR.ALL
+  GM.FONLY% = FILE.DIR.ALL
   GOSUB GMX.F.READ
   GM.FTITLE$ = GP.BSTR(BS.F.DIR, 0)
   GOSUB GMX.F.LIST
@@ -2844,7 +3114,7 @@ GMX.F.DIR:
 GP.BANKEDSTR GM.TEXTBANKB BS.F.PATTERN
   " DIRECTORY PATTERN "
   "A PATTERN FOR THE DRIVE TO MATCH."
-  "FILE.DIR.ONLY IS SET TO FILES, SO NO DIRECTORY ANSWERS IT."
+  "FILE.DIR.ONLY IS SET TO FILES, SO NO DIRECTORIES ARE RETURNED."
   "*.PRG"
   " PATTERN "
 GP.ENDBANKEDSTR
@@ -2858,7 +3128,7 @@ GMX.F.PATTERN:
   GOSUB GUI.INPUT
   IF GUI.OK = 0 THEN GOTO GMX.F.PATOFF
   GM.FPAT$ = GUI.TEXT$
-  GM.FONLY = FILE.DIR.FILES
+  GM.FONLY% = FILE.DIR.FILES
   GOSUB GMX.F.READ
   GM.FTITLE$ = GP.BSTR(BS.F.PATTERN, 4) + GM.FPAT$ + " "
   GOSUB GMX.F.LIST
@@ -2886,7 +3156,7 @@ GP.BANKEDSTR GM.TEXTBANKB BS.F.DIRS
 GP.ENDBANKEDSTR
 GMX.F.DIRS:
   GM.FPAT$ = ""
-  GM.FONLY = FILE.DIR.DIRS
+  GM.FONLY% = FILE.DIR.DIRS
   GOSUB GMX.F.READ
   GM.FTITLE$ = GP.BSTR(BS.F.DIRS, 0)
   GOSUB GMX.F.LIST
@@ -2915,10 +3185,10 @@ GP.BANKEDSTR GM.TEXTBANKB BS.F.STATUS
 GP.ENDBANKEDSTR
 GMX.F.STATUS:
   GOSUB GMX.CLEARPANEL
-  GM.FROW = 8
+  GM.FROW% = 8
   GM.FTXT$ = GP.BSTR(BS.F.STATUS, 0)
   GOSUB GMX.F.SAY
-  GM.FROW = GM.FROW + 1
+  GM.FROW% = GM.FROW% + 1
   GOSUB FILE.STATUS
   GM.FSTEP$ = GP.BSTR(BS.F.STATUS, 1)
   GOSUB GMX.F.DRIVE
@@ -2966,10 +3236,11 @@ GMX.F.EXISTS:
   GOSUB GMX.D.RESET
   GUI.TITLE$ = GP.BSTR(BS.F.EXISTS, 0)
   GUI.MSG$ = GM.FNAME$ + GP.BSTR(BS.F.EXISTS, 3)
-  IF FILE.OK = 1 THEN GUI.MSG$ = GM.FNAME$ + GP.BSTR(BS.F.EXISTS, 4)
-  GUI.MSG2$ = GP.BSTR(BS.F.EXISTS, 5) + MID$(STR$(FILE.OK), 2) + GP.BSTR(BS.F.EXISTS, 6) + MID$(STR$(FILE.ERR), 2) + "  " + FILE.MSG$
+  IF FILE.OK <> 0 THEN GUI.MSG$ = GM.FNAME$ + GP.BSTR(BS.F.EXISTS, 4)
+  GM.NUM% = FILE.OK : GOSUB GMX.SIGNED
+  GUI.MSG2$ = GP.BSTR(BS.F.EXISTS, 5) + GM.NUM$ + GP.BSTR(BS.F.EXISTS, 6) + MID$(STR$(FILE.ERR), 2) + "  " + FILE.MSG$
   GOSUB GUI.SAY
-  GM.RESULT$ = GP.BSTR(BS.F.EXISTS, 7) + GM.FNAME$ + GP.BSTR(BS.F.EXISTS, 8) + MID$(STR$(FILE.OK), 2)
+  GM.RESULT$ = GP.BSTR(BS.F.EXISTS, 7) + GM.FNAME$ + GP.BSTR(BS.F.EXISTS, 8) + GM.NUM$
   RETURN
 
 
@@ -2982,36 +3253,11 @@ GMX.F.EXOFF:
 
 
 ## ***********************************************************************
-## **  GMX.F.CURDIR -- FILE.CURDIR. Where the drive is, as a path.
-## **
-## **  $=C lists the current directory and then each parent, innermost first,
-## **  and the routine rebuilds the path out of those components. The root
-## **  reads back as a bare /.
-## ***********************************************************************
-
-
-GP.BANKEDSTR GM.TEXTBANKB BS.F.CURDIR
-  " FILE.CURDIR "
-  "THE DRIVE IS IN  "
-  "FILE.CURDIR  "
-GP.ENDBANKEDSTR
-GMX.F.CURDIR:
-  GOSUB FILE.CURDIR
-  GOSUB GMX.D.RESET
-  GUI.TITLE$ = GP.BSTR(BS.F.CURDIR, 0)
-  GUI.MSG$ = GP.BSTR(BS.F.CURDIR, 1) + FILE.PATH$
-  GUI.MSG2$ = "ERR " + MID$(STR$(FILE.ERR), 2) + "  " + FILE.MSG$
-  GOSUB GUI.SAY
-  GM.RESULT$ = GP.BSTR(BS.F.CURDIR, 2) + FILE.PATH$
-  RETURN
-
-
-## ***********************************************************************
 ## **  GMX.F.ARRAY -- FILE.SAVEARRAY and FILE.LOADARRAY, out and back.
 ## **
-## **  FILE.N IS AN INPUT TO THE SAVE AND AN OUTPUT FROM THE LOAD, which is
+## **  FILE.ROWS IS AN INPUT TO THE SAVE AND AN OUTPUT FROM THE LOAD, which is
 ## **  the one thing about this pair worth carrying away. FILE.MAX is how many
-## **  rows the array can hold, and FILE.N coming back equal to it means the
+## **  rows the array can hold, and FILE.ROWS coming back equal to it means the
 ## **  file may have held more.
 ## **
 ## **  A BLANK LAST ROW WOULD NOT SURVIVE THE TRIP. The CR that ends the last
@@ -3021,30 +3267,38 @@ GMX.F.CURDIR:
 ## ***********************************************************************
 
 
+## ---- NO COUNT IS SPELLED INTO A LITERAL HERE. "SAVEARRAY 5 ROWS" was, and it
+## ---- said five whatever happened, which is exactly the line you would read to
+## ---- find out which half of a round trip went wrong.
+
 GP.BANKEDSTR GM.TEXTBANKB BS.F.ARRAY
   "THREE"
   "GPBFILE.DAT"
-  "SAVEARRAY  5 ROWS TO GPBFILE.DAT"
+  "SAVEARRAY  "
+  " ROWS TO "
   "LOADARRAY  "
   " ROWS BACK"
   "PRESS A KEY TO SCRATCH GPBFILE.DAT."
   "DELETE"
   "PRESS A KEY."
-  "ARRAY  5 ROWS OUT, "
+  "ARRAY  "
+  " ROWS OUT, "
   " BACK"
+  "  ST "
 GP.ENDBANKEDSTR
 GMX.F.ARRAY:
   GOSUB GMX.CLEARPANEL
-  GM.FROW = 8
+  GM.FROW% = 8
   FILE.LINE$(1) = "ONE"
   FILE.LINE$(2) = "TWO"
   FILE.LINE$(3) = GP.BSTR(BS.F.ARRAY, 0)
   FILE.LINE$(4) = "FOUR"
   FILE.LINE$(5) = "FIVE"
-  FILE.N = 5
+  FILE.ROWS = 5
   FILE.NAME$ = GP.BSTR(BS.F.ARRAY, 1)
   GOSUB FILE.SAVEARRAY
-  GM.FSTEP$ = GP.BSTR(BS.F.ARRAY, 2)
+  GM.FSENT% = FILE.ROWS
+  GM.FSTEP$ = GP.BSTR(BS.F.ARRAY, 2) + MID$(STR$(GM.FSENT%), 2) + GP.BSTR(BS.F.ARRAY, 3) + FILE.NAME$
   GOSUB GMX.F.DRIVE
 
 ## ---- emptied, so what comes back can only have come off the drive ----
@@ -3054,22 +3308,28 @@ GMX.F.ARRAY:
 
   FILE.MAX = 16
   GOSUB FILE.LOADARRAY
-  GM.FSTEP$ = GP.BSTR(BS.F.ARRAY, 3) + MID$(STR$(FILE.N), 2) + GP.BSTR(BS.F.ARRAY, 4)
+## ---- DIAGNOSTIC, AND IT COMES OUT AGAIN. FILE.ST is the ST the read loop
+## ---- stopped on. Five rows on the drive coming back as one says the loop
+## ---- was told end of file after the first, and this is the number that
+## ---- said so. 64 is a real end of file and would mean the fault is not
+## ---- the test at all.
+  GM.FSTEP$ = GP.BSTR(BS.F.ARRAY, 4) + MID$(STR$(FILE.ROWS), 2) + GP.BSTR(BS.F.ARRAY, 5)
+  GM.FSTEP$ = GM.FSTEP$ + GP.BSTR(BS.F.ARRAY, 12) + MID$(STR$(FILE.ST), 2)
   GOSUB GMX.F.DRIVE
-  GM.FROW = GM.FROW + 1
-  FOR GM.I = 1 TO FILE.N
+  GM.FROW% = GM.FROW% + 1
+  FOR GM.I = 1 TO FILE.ROWS
     GM.FTXT$ = "  " + MID$(STR$(GM.I), 2) + "   [" + FILE.LINE$(GM.I) + "]"
     GOSUB GMX.F.SAY
   NEXT GM.I
 
-  GM.TELL$ = GP.BSTR(BS.F.ARRAY, 5)
+  GM.TELL$ = GP.BSTR(BS.F.ARRAY, 6)
   GOSUB GMX.TELL
   GOSUB FILE.DELETE
-  GM.FSTEP$ = GP.BSTR(BS.F.ARRAY, 6)
+  GM.FSTEP$ = GP.BSTR(BS.F.ARRAY, 7)
   GOSUB GMX.F.DRIVE
-  GM.TELL$ = GP.BSTR(BS.F.ARRAY, 7)
+  GM.TELL$ = GP.BSTR(BS.F.ARRAY, 8)
   GOSUB GMX.TELL
-  GM.RESULT$ = GP.BSTR(BS.F.ARRAY, 8) + MID$(STR$(FILE.N), 2) + GP.BSTR(BS.F.ARRAY, 9)
+  GM.RESULT$ = GP.BSTR(BS.F.ARRAY, 9) + MID$(STR$(GM.FSENT%), 2) + GP.BSTR(BS.F.ARRAY, 10) + MID$(STR$(FILE.ROWS), 2) + GP.BSTR(BS.F.ARRAY, 11)
   RETURN
 
 
@@ -3104,9 +3364,9 @@ GP.BANKEDSTR GM.TEXTBANKB BS.F.RENAME
 GP.ENDBANKEDSTR
 GMX.F.RENAME:
   GOSUB GMX.CLEARPANEL
-  GM.FROW = 8
+  GM.FROW% = 8
   FILE.LINE$(1) = GP.BSTR(BS.F.RENAME, 0)
-  FILE.N = 1
+  FILE.ROWS = 1
 
   FILE.NAME$ = GP.BSTR(BS.F.RENAME, 1)
   GOSUB FILE.DELETE
@@ -3116,7 +3376,8 @@ GMX.F.RENAME:
   GOSUB GMX.F.DRIVE
 
   GOSUB FILE.EXISTS
-  GM.FTXT$ = GP.BSTR(BS.F.RENAME, 4) + MID$(STR$(FILE.OK), 2) + GP.BSTR(BS.F.RENAME, 5)
+  GM.NUM% = FILE.OK : GOSUB GMX.SIGNED
+  GM.FTXT$ = GP.BSTR(BS.F.RENAME, 4) + GM.NUM$ + GP.BSTR(BS.F.RENAME, 5)
   GOSUB GMX.F.SAY
 
   FILE.NEW$ = GP.BSTR(BS.F.RENAME, 1)
@@ -3125,11 +3386,13 @@ GMX.F.RENAME:
   GOSUB GMX.F.DRIVE
 
   GOSUB FILE.EXISTS
-  GM.FTXT$ = GP.BSTR(BS.F.RENAME, 4) + MID$(STR$(FILE.OK), 2) + GP.BSTR(BS.F.RENAME, 7)
+  GM.NUM% = FILE.OK : GOSUB GMX.SIGNED
+  GM.FTXT$ = GP.BSTR(BS.F.RENAME, 4) + GM.NUM$ + GP.BSTR(BS.F.RENAME, 7)
   GOSUB GMX.F.SAY
   FILE.NAME$ = GP.BSTR(BS.F.RENAME, 1)
   GOSUB FILE.EXISTS
-  GM.FTXT$ = GP.BSTR(BS.F.RENAME, 8) + MID$(STR$(FILE.OK), 2) + GP.BSTR(BS.F.RENAME, 5)
+  GM.NUM% = FILE.OK : GOSUB GMX.SIGNED
+  GM.FTXT$ = GP.BSTR(BS.F.RENAME, 8) + GM.NUM$ + GP.BSTR(BS.F.RENAME, 5)
   GOSUB GMX.F.SAY
 
   GM.TELL$ = GP.BSTR(BS.F.RENAME, 9)
@@ -3170,7 +3433,7 @@ GP.BANKEDSTR GM.TEXTBANKB BS.F.MKDIR
 GP.ENDBANKEDSTR
 GMX.F.MKDIR:
   GOSUB GMX.CLEARPANEL
-  GM.FROW = 8
+  GM.FROW% = 8
   GOSUB FILE.CURDIR
   GM.FTXT$ = GP.BSTR(BS.F.MKDIR, 0) + FILE.PATH$
   GOSUB GMX.F.SAY

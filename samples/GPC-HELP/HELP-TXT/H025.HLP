@@ -1,8 +1,28 @@
-@4. Module reference -- the BASL library
+@3.9 Inline assembly (2)
+=What is not there
 .
-=4. MODULE REFERENCE -- THE BASL LIBRARY
+.No expressions: {N%}+1 and LABEL+2 are not understood. Use an index
+.register.
 .
-.Called with GOSUB. Arguments go into named variables before the call,
-.results come back in named variables after it. Every module is
-.position-independent -- each jumps over itself -- so #INCLUDE it anywhere,
-.including the top of the program.
+.Zero page or absolute is decided by the operand. $34 is zero page, $0034 is
+.absolute, and a decimal under 256 is zero page. Every 65C02 addressing mode
+.is available, including the two the NMOS 6502 lacks -- LDA ($34) and JMP
+.($1234,X) -- except BBR, BBS, RMB and SMB.
+.
+.Registers come back through GP.A / GP.X / GP.Y / GP.C as they do from
+.GP.CALL; a block uses the same $030C-$030F slots. Those four are GP block
+.keywords, so reading one pulls in the 1 KB block that GP.ASM alone avoids.
+.{VAR} does not.
+.
+.A body can come from a file. #INCLUDE splices it in verbatim, and BASLOAD's
+.REM #nn-mm attribution makes an error inside it name the file:
+.
+:#REM 1
+:GP.ASM
+:#INCLUDE "MACPTR.ASM"
+:GP.ENDASM
+:#REM 0
+.
+=EXAMPLE PROGRAM
+.
+.  ASM.EXP.BL -- runnable, in the GPC-BASIC folder

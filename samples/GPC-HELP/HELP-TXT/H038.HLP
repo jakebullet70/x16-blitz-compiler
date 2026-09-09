@@ -1,84 +1,121 @@
-@STASH.INC.BL -- save a text rectangle, and put it back.
+@4.6 MENUVERT.INC.BL -- a vertical menu
 .
-=STASH.INC.BL
+=4.6 MENUVERT.INC.BL -- A VERTICAL MENU
 .
-.  save a text rectangle, and put it back.
+=DESCRIPTION
 .
-=MODULE HEADER
+.  MENUVERT.RUN
+.      IN: the variables below
+.      OUT: MENUVERT.SEL MENUVERT.KEY
 .
-:      STASH.SAVE      copy a rectangle of the screen into a RAM bank
-:      STASH.RESTORE   copy it back, where it was or somewhere else
+.  MENUVERT.DRAW
+.      IN: the same
+.      OUT: draws the menu without driving it
 .
-.  For the same rectangle through a FILE see STASHFILE.INC.BL, built on this
-.  and kept separate so a program wanting only the bank does not carry the
-.  disk half -- a BASL module has no dead code elimination, and those three
-.  routines are 127 bytes.
+.  MENUVERT.ROW
+.      IN: MENUVERT.DRAWROW MENUVERT.DRAWATTR
+.      OUT: one row, in the attribute you name
 .
-=A MODULE, NOT A RUNTIME KEYWORD
+.  MENUVERT.HOTFIND
+.      IN: MENUVERT.DRAWROW MENUVERT.DRAWTEXT$
+.      OUT: MENUVERT.HOTAT -- where that row's hotkey letter sits, 1-based,
+.        or 0 for "do not tint"
 .
-.  so it costs its bytes only in the programs that ask for it: as a keyword
-.  it would be 329 bytes carried by every program that never stashed
-.  anything.
+.The menu is BASIC rather than assembly, which keeps 462 bytes of code and 11
+.of storage out of the block every GP program carries. Assembly would only be
+.needed to move the highlight without knowing the text underneath it, by
+.swapping the cell's attribute nibbles instead of redrawing. A BASIC menu
+.owns the item array and can reprint the row.
 .
-=YOUR PROGRAM MUST HAVE A #SYMFILE
+.The difference is not visible: a nibble swap is 59 cycles a cell, GP.FILL 31
+.and GP.PRINTAT 94, so redrawing two rows costs about a millisecond against
+.the swap's half, in a 16.7 ms frame.
 .
-.  The assembly reaches BASIC's variables through {VAR} and BASLOAD crunches
-.  every name first -- STASH.VADDR% is some two-letter name by then. Without
-.  it the compile stops with "NO SYMBOL FILE FOR {}", naming the cause but
-.  not the file. Name it to match the PRG:
+.  MENUVERT.X .Y
+.      top left of the first row, not of a frame -- draw the border yourself
+.        with GP.BOX, so the menu owes nothing to one style of border
 .
-:      #SAVEAS "@:MYPROG.PRG"
-:      #SYMFILE "@:MYPROG.SYM"
-:      #INCLUDE "GPB.INC.BL"
-:      #INCLUDE "STASH.INC.BL"
+.  MENUVERT.WIDTH
+.      cells wide. This is the width of the highlight, so it is the width of
+.        the menu whatever the text happens to do
 .
-.  Both directives go BEFORE the includes.
+.  MENUVERT.COUNT
+.      how many rows
 .
-.  Usage:
-:      STASH.BANK = 8
-:      STASH.X = 10 : STASH.Y = 4 : STASH.W = 30 : STASH.H = 8
-:      GOSUB STASH.SAVE
-:      ... draw over it ...
-:      GOSUB STASH.RESTORE
+.  MENUVERT.ITEM$()
+.      the rows, 1..COUNT -- the caller owns the DIM, see below
 .
-:   in   STASH.BANK     the RAM bank to keep the cells in. 1..255, and
-:                       it is yours: this writes the whole of it
-:        STASH.X  STASH.Y     top left, in CELLS
-:        STASH.W  STASH.H     size, in cells
+.  MENUVERT.ATTR
+.      packed attribute, background * 16 + foreground
 .
-:   out  STASH.OK       -1 if it fitted and was saved, 0 if not
+.  MENUVERT.HIATTR
+.      the same for the highlighted row. 0 means invert MENUVERT.ATTR
 .
-=RESTORE NEEDS ONLY THE BANK
+.  MENUVERT.HOT$
+.      one character a row, "" for none
 .
-.  four header bytes go in first -- w, h, x, y -- so the rectangle describes
-.  itself and cannot be put back at the wrong size. STASH.MOVE = 1 with
-.  STASH.X / STASH.Y pastes it somewhere else instead.
+.  MENUVERT.HOTATTR
+.      paint the hotkey letter in this attribute. 0 is off, and off is the
+.        default
 .
-=A BANK IS 8,192 BYTES AND A CELL IS TWO
+.  MENUVERT.FLAGS
+.      added together, below
 .
-.  so 4,094 cells fit -- 63x63, larger than any dialog and NOT a whole 80x60
-.  screen (9,600 bytes). Too big is refused before the first write, with
-.  STASH.OK = 0, rather than running on into the next bank.
+.  MENUVERT.SEL
+.      the row to start on; 0 starts at 1
 .
-=WHY THE SPLIT IS WHERE IT IS
+.  MENUVERT.SEL
+.      1..COUNT, or 0 if cancelled
 .
-.  the address of a row is worked out in BASIC, once a row, and the 160 bytes
-.  are copied in assembly. That keeps the assembly free of any pointer
-.  needing zero page -- and there is none to have, because a GP.ASM blob runs
-.  with the interpreter live and codePtr, zTemp0, NSStatus and the mantissas
-.  must all survive it. The destination goes into the OPERAND of the
-.  instruction that uses it, which is the idiom samples/editor's renderers
-.  are built on.
+.  MENUVERT.KEY
+.      the key that ended it -- 13 chose, 27 cancelled, or the hotkey itself
 .
-=EACH BLOCK IS WRAPPED IN #REM 1 / #REM 0
+:MENUVERT.X = 8 : MENUVERT.Y = 6
+:MENUVERT.WIDTH = 24 : MENUVERT.COUNT = 4
+:MENUVERT.ITEM$(1) = " NEW GAME"           ' ... and so on
+:MENUVERT.ATTR = THEME.CLR(THEME.TEXT)
+:MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
+:MENUVERT.HOT$ = "NLOQ"
+:GOSUB MENUVERT.RUN
+:IF MENUVERT.SEL = 0 THEN GOTO CANCELLED
 .
-.  Without it BASLOAD's default strips the body and the block reaches the
-.  compiler EMPTY, which gpasm.asm deliberately refuses as "block mismatch"
-.  rather than compiling a program that quietly contains none of the code.
-.  The #REM 0 after each block restores BASLOAD's default.
+.  cursor up / down
+.      move
 .
-.  The whole STASH.* name space belongs to this file.
+.  RETURN
+.      choose
 .
-=SEE ALSO
+.  ESC or STOP
+.      cancel
 .
->77|STASHFILE.INC.BL -- a saved text rectangle, through a file.
+.  a hotkey
+.      chooses its row at once
+.
+.  1
+.      must select -- ESC does not cancel
+.
+.  2
+.      keep mark -- leave the chosen row highlighted on the way out
+.
+.  4
+.      no wrap -- stop at the ends instead of wrapping round
+.
+.  8
+.      gamepad -- drive it from the SNES pad in port 1 as well as the
+.        keyboard
+.
+.The constants MENUVERT.MUSTSEL, .KEEPMARK, .NOWRAP and .GAMEPAD are defined;
+.add those rather than the numbers.
+.
+.A hotkey chooses its row rather than moving to it. MENUVERT.HOT$ is one
+.character per row in order, matched without case. It may be shorter than
+.MENUVERT.COUNT, in which case the later rows have no hotkey.
+.
+.MENUVERT.HOTATTR paints the hotkey letter in a second attribute. The letter
+.is located in the row's own text -- the first case-insensitive match for
+.that row's MENUVERT.HOT$ character -- so nothing extra is passed in and "
+.START" with hotkey S needs no markup. A row whose text does not contain its
+.hotkey is left untinted rather than reported; the hotkey still works. Only
+.rows in the normal attribute are tinted: on the selected row the highlight
+.carries the meaning.
+.

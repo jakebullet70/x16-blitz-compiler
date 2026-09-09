@@ -1,39 +1,15 @@
-@3.1 Loops
-.
-=3.1 LOOPS
-.
-=SYNTAX
-.
-:GP.DO [count]
-:    ...
-:GP.LOOP
-.
-=WHAT IT COSTS
-.
-.  ASM: GP.DO GP.LOOP GP.EXITDO
-.    ASM -- a keyword, run by machine code in the GP runtime block. A program
-.    using ANY GP keyword pays for the whole block.
-.
-=DESCRIPTION
-.
-.Counted loop, modelled on prog8's repeat. A count of 0, or no count, loops
-.forever. Loops nest.
-.
-:GP.EXITDO
-.
-.Leaves the innermost GP.DO, closing its stack frame. A GOTO out of a GP.DO
-.closes its frames too -- see SEC 3.2 -- but GP.EXITDO is two bytes and needs
-.no branch target.
-.
-:GP.DO
-:  TICK = TICK + 1
-:  IF TICK = 9 THEN GP.EXITDO
-:GP.LOOP
-.
-=EXAMPLE PROGRAM
-.
-.  LOOPS.EXP.BL -- runnable, in the GPC-BASIC folder
-.
+@3. Command reference (2)
 =SEE ALSO
 .
->18|3.2 Multi-way branch
+>46|4. Module reference -- the BASL library
+>32|3.8 Block IF
+>33|3.9 Inline assembly
+>22|3.4 Strings
+>20|3.3 Machine code
+>39|3.10 Text in a bank
+>40|3.11 Calling a routine in one statement
+>47|4.1 THEME.INC.BL -- named colour roles
+>48|4.2 STRINGS.INC.BL -- string helpers
+>50|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>51|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>52|4.5 BMX.INC.BL -- a BMX bitmap into VERA

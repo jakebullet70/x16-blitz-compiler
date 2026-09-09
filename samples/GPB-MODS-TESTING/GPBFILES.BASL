@@ -2143,9 +2143,9 @@ GMX.F.CURDIR:
 ## ***********************************************************************
 ## **  GMX.F.ARRAY -- FILE.SAVEARRAY and FILE.LOADARRAY, out and back.
 ## **
-## **  FILE.N IS AN INPUT TO THE SAVE AND AN OUTPUT FROM THE LOAD, which is
+## **  FILE.ROWS IS AN INPUT TO THE SAVE AND AN OUTPUT FROM THE LOAD, which is
 ## **  the one thing about this pair worth carrying away. FILE.MAX is how many
-## **  rows the array can hold, and FILE.N coming back equal to it means the
+## **  rows the array can hold, and FILE.ROWS coming back equal to it means the
 ## **  file may have held more.
 ## **
 ## **  A BLANK LAST ROW WOULD NOT SURVIVE THE TRIP. The CR that ends the last
@@ -2175,7 +2175,7 @@ GMX.F.ARRAY:
   FILE.LINE$(3) = GP.BSTR(BS.F.ARRAY, 0)
   FILE.LINE$(4) = "FOUR"
   FILE.LINE$(5) = "FIVE"
-  FILE.N = 5
+  FILE.ROWS = 5
   FILE.NAME$ = GP.BSTR(BS.F.ARRAY, 1)
   GOSUB FILE.SAVEARRAY
   GM.FSTEP$ = GP.BSTR(BS.F.ARRAY, 2)
@@ -2188,10 +2188,10 @@ GMX.F.ARRAY:
 
   FILE.MAX = 16
   GOSUB FILE.LOADARRAY
-  GM.FSTEP$ = GP.BSTR(BS.F.ARRAY, 3) + MID$(STR$(FILE.N), 2) + GP.BSTR(BS.F.ARRAY, 4)
+  GM.FSTEP$ = GP.BSTR(BS.F.ARRAY, 3) + MID$(STR$(FILE.ROWS), 2) + GP.BSTR(BS.F.ARRAY, 4)
   GOSUB GMX.F.DRIVE
   GM.FROW = GM.FROW + 1
-  FOR GM.I = 1 TO FILE.N
+  FOR GM.I = 1 TO FILE.ROWS
     GM.FTXT$ = "  " + MID$(STR$(GM.I), 2) + "   [" + FILE.LINE$(GM.I) + "]"
     GOSUB GMX.F.SAY
   NEXT GM.I
@@ -2203,7 +2203,7 @@ GMX.F.ARRAY:
   GOSUB GMX.F.DRIVE
   GM.TELL$ = GP.BSTR(BS.F.ARRAY, 7)
   GOSUB GMX.TELL
-  GM.RESULT$ = GP.BSTR(BS.F.ARRAY, 8) + MID$(STR$(FILE.N), 2) + GP.BSTR(BS.F.ARRAY, 9)
+  GM.RESULT$ = GP.BSTR(BS.F.ARRAY, 8) + MID$(STR$(FILE.ROWS), 2) + GP.BSTR(BS.F.ARRAY, 9)
   RETURN
 
 
@@ -2240,7 +2240,7 @@ GMX.F.RENAME:
   GOSUB GMX.CLEARPANEL
   GM.FROW = 8
   FILE.LINE$(1) = GP.BSTR(BS.F.RENAME, 0)
-  FILE.N = 1
+  FILE.ROWS = 1
 
   FILE.NAME$ = GP.BSTR(BS.F.RENAME, 1)
   GOSUB FILE.DELETE

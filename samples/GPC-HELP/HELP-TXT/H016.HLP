@@ -1,11 +1,18 @@
-@3.4.3 GP.ISEMPTY -- test for a zero-length string
+@3.4.2 GP.CONTAINS -- test for a substring
 .
-=3.4.3 GP.ISEMPTY
+=3.4.2 GP.CONTAINS
 .
-.  Syntax    GP.ISEMPTY(a$)
-.  Returns   -1 if a$ has zero length, 0 if not.
-.  Kind      COMPOSITE. Expands to LEN(a$) = 0.
-.  Notes     A string of spaces is not empty. STRCASE.TRIM first if
-.            that is the intent.
-.            GP.ISEMPTY(a$), LEN(a$) = 0 and a$ = "" are the same four
-.            bytes. Use whichever reads better.
+.  Syntax    GP.CONTAINS(hay$, needle$)
+.  Returns   -1 if needle$ occurs anywhere in hay$, 0 if not.
+.  Kind      COMPOSITE. Expands to GP.INSTR(hay$, needle$) <> 0, and
+.            compiles to the same object. Use whichever reads better.
+.  Notes     Case sensitive, as SEC 3.4.1 is.
+.            An empty needle$ returns 0, not -1, because GP.INSTR
+.            reports not-found for one.
+.  Example
+.
+:            IF GP.CONTAINS(F$, ".BAS") THEN GOSUB LOAD.IT
+.
+=SEE ALSO
+.
+>23|3.4.1 GP.INSTR -- position of a substring

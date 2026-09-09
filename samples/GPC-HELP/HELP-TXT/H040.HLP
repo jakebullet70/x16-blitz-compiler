@@ -1,69 +1,56 @@
-@5. Variables
+@4.7 SORT.INC.BL -- shell sort a string array
 .
-=5. VARIABLES
+=4.7 SORT.INC.BL -- SHELL SORT A STRING ARRAY
 .
-.BASL has one flat namespace. There are no locals, no scoping and no
-.parameters. Every variable in every #INCLUDEd module is visible to your
-.program and the reverse, and nothing warns you: a collision is a wrong
-.answer, not an error.
+=DESCRIPTION
 .
-.The convention is one dotted prefix per module, and nothing writes outside
-.its own prefix.
+.  SORT.RUN
+.      IN: SORT.PTR SORT.DESCEND SORT.NOCASE
+.      OUT: SORT.OK SORT.COUNT
 .
-=Prefixes already taken
+:#SYMFILE "@:MYPROG.SYM"
+:#INCLUDE "SORT.INC.BL"
+:
+:SORT.PTR = GP.ARRPTR(NAME$())
+:SORT.DESCEND = 0 : SORT.NOCASE = 0
+:GOSUB SORT.RUN
 .
-.  GP.
-.      OWNER: keywords, not variables -- see below
+.Shell sort with Ciura's gap sequence -- 132, 57, 23, 10, 4, 1 -- moving the
+.2-byte element pointers rather than string data. A swap costs the same
+.whatever the strings are: no temporary, no copy, no heap traffic.
 .
-.  STR.
-.      OWNER: STRINGS.INC.BL
+.The array is passed as an address because a BASL subroutine cannot be passed
+.an array; GP.ARRPTR is a keyword for this purpose. The empty parentheses in
+.GP.ARRPTR(A$()) are required -- A$ and A$() are different variables.
 .
-.  THEME.
-.      OWNER: THEME.INC.BL
+.SORT.OK is -1 when it sorted and 0 if the sort was refused: more than 255
+.elements, so DIM A$(254) is the largest accepted (DIM A$(255) is 256
+.elements), or an array whose elements are not strings. The element count and
+.the type are read from the array's own header, three bytes below what
+.GP.ARRPTR returns, so a wrong count cannot be passed in.
 .
-.  APPSYS.
-.      OWNER: APPSYS.INC.BL
+.Never-assigned elements are empty strings, not garbage. A DIM A$(20) with
+.five entries filled sorts its fifteen empties to the front; a null pointer
+.reads as "", as it does elsewhere in the runtime.
 .
-.  LINEINPUT.
-.      OWNER: LINEINPUT.INC.BL
+.SORT.DESCEND and SORT.NOCASE are ordinary variables rather than arguments,
+.so they are sticky. Set both on every call.
 .
-.  MENUVERT.
-.      OWNER: MENUVERT.INC.BL
+.The program must have a #SYMFILE, placed before the #INCLUDEs. The assembly
+.reaches BASIC's variables through {VAR}, and BASLOAD crunches every name
+.before the compiler sees it; without the mapping the compile stops with NO
+.SYMBOL FILE FOR {}.
 .
-.  BMX. / BMXK.
-.      OWNER: BMX.INC.BL (variables / its KERNAL constants)
+.Example: ARRAYS.EXP.BL. Regression test: SORT.EXP.BL, eight cases including
+.a 200-element array -- element 128 is where the doubled index stops fitting
+.in a byte. Every case checks content as well as order: a sort that reads the
+.wrong element leaves the array in order with a string duplicated.
 .
-.Use any other prefix for your own program: GAME., MAP., AIRLIFT.. A prefix
-.costs nothing at runtime -- BASLOAD crunches every identifier to a short
-.BASIC variable, so a long readable name and a two-letter one compile to the
-.same thing.
+=EXAMPLE PROGRAM
 .
-.Do not reuse a taken prefix for a name the module has not defined.
-.THEME.MINE is free today and is one library update from not being.
-.
-=GP.* is keywords, not variables
-.
-.GPB.INC.BL defines no variables. It is 27 keyword declarations and nothing
-.else.
-.
-:GP.A = 5          ' SYNTAX ERROR -- GP.A is a keyword
-:X = GP.A          ' correct
-.
-.The value words are GP.A GP.X GP.Y GP.C, the registers after GP.CALL, and
-.that is all of them. They are keywords rather than variables because nothing
-.in the runtime can write a BASIC variable by name, so a command that returns
-.a value must return it through a keyword. X16's own ST, MX and MY work the
-.same way.
-.
-.The complete per-module in / out / internal register is GP-BASIC.GLOBALS.md,
-.with a script in SEC 6 of that file for re-checking it after a change.
+.  ARRAYS.EXP.BL -- runnable, in the GPC-BASIC folder
+.  SORT.EXP.BL -- runnable, in the GPC-BASIC folder
 .
 =SEE ALSO
 .
->102|6. The traps, collected
->41|4.2 STRINGS.INC.BL -- string helpers
->40|4.1 THEME.INC.BL -- named colour roles
->42|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
->43|4.4 LINEINPUT.INC.BL -- a positioned entry field
->45|4.6 MENUVERT.INC.BL -- a vertical menu
->44|4.5 BMX.INC.BL -- a BMX bitmap into VERA
+>56|4.7 SORT.INC.BL -- shell sort a string array

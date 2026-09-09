@@ -1,108 +1,88 @@
-@GUI2.INC.BL -- a listbox, single or multi select.
+@4.4 LINEINPUT.INC.BL -- a positioned entry field
 .
-=GUI2.INC.BL
+=4.4 LINEINPUT.INC.BL -- A POSITIONED ENTRY FIELD
 .
-.  a listbox, single or multi select.
+=DESCRIPTION
 .
-=MODULE HEADER
+.  LINEINPUT.GET
+.      IN: LINEINPUT.X .Y .LEN .ATTR .TEXT$ .MASK .ALLOW$ .DENY$
+.      OUT: LINEINPUT.TEXT$ LINEINPUT.KEY
 .
-:      GUI.LISTBOX   a WINDOW onto a list longer than the box, and
-:                    optionally more than one answer
+.  LINEINPUT.ASK
+.      IN: the same plus LINEINPUT.LABEL$
+.      OUT: the same; LINEINPUT.X restored
 .
-=SEPARATE FROM GUI.INC.BL ON PURPOSE
+:LINEINPUT.X = 10 : LINEINPUT.Y = 6
+:LINEINPUT.LEN = 20
+:LINEINPUT.ATTR = THEME.CLR(THEME.TEXT)
+:LINEINPUT.TEXT$ = ""
+:GOSUB LINEINPUT.GET
+:IF LINEINPUT.KEY = 27 THEN GOTO CANCELLED
 .
-.  This is the only dialog that needs a scrolling window and a set of marks,
-.  and nothing else in the library wants either. #INCLUDE it when you want a
-.  listbox and pay nothing when you do not.
+.INPUT and LINPUT cannot be used on a drawn screen: both take the bottom of
+.the screen, scroll it, echo in the current colour, and accept any length. A
+.LINEINPUT field stays at the given position, in the given colour, and stops
+.at the given width.
 .
-.  GUI.MENU is not this and should not be stretched into it: that is
-.  MENUVERT.RUN in a frame, so the list must fit the screen and it returns
-.  one row. This is the two things it does not do.
+.LINEINPUT.KEY is the key that ended the field, which is what makes a
+.multi-field form possible:
 .
-.  REQUIRES, and does not #INCLUDE for you, in this order:
-:      GPB.INC.BL        GP.FILL, GP.PRINTAT, GP.STRPTR, GP.SELECT
-:      STASH.INC.BL      via GUI.OPEN -- and wants a #SYMFILE, see its header
-:      THEME.INC.BL      the colour roles, and GOSUB THEME.LOAD first
-:      MENUVERT.INC.BL   MENUVERT.ROW draws the rows
-:      GUI.INC.BL        GUI.OPEN and GUI.CLOSE are the box
+.  13
+.      RETURN -- finished
 .
-.  Usage:
-:      DIM MENUVERT.ITEM$(200)
-:      ... fill 1..N ...
-:      GUI.LISTBOX.COUNT = N : GUI.LISTBOX.ROWS = 8 : GUI.LISTBOX.MULTI = 1
-:      GUI.MSG$ = "PICK FILES" : GUI.BANK = 8
-:      GOSUB GUI.LISTBOX
-:      IF GUI.LISTBOX.SEL = 0 THEN <cancelled>
+.  27 / 3
+.      ESC / STOP -- cancelled, and LINEINPUT.TEXT$ is put back to what it
+.        was
 .
-:   in   GUI.LISTBOX.COUNT   how many items. 0 or less returns cancelled
-:        MENUVERT.ITEM$()    the items, 1..COUNT. THE CALLER OWNS THE DIM,
-:                            for MENUVERT's reason: a module cannot be handed
-:                            an array, and DIMming one means guessing a bound
-:        GUI.LISTBOX.ROWS    rows visible at once. 0 takes 10, and it is
-:                            always cut to COUNT and to what the screen holds
-:        GUI.LISTBOX.MULTI   0 chooses one row. 1 marks a set with SPACE
-:        GUI.LISTBOX.MARKS$  multi only, IN as well as out: COUNT characters,
-:                            "1" marked. Anything else -- "" included --
-:                            starts with none marked
-:        GUI.LISTBOX.SEL     the item to start on. 0 starts at 1
-:        plus everything GUI.OPEN reads: GUI.MSG$, GUI.MSG2$, GUI.TITLE$,
-:        GUI.BANK, GUI.STYLE, GUI.GLYPH, GUI.PLACE and the rest
+.  17 / 145 / 9
+.      cursor down / up / TAB -- left the field, text kept
 .
-:   out  GUI.LISTBOX.SEL     the item under the highlight, 1..COUNT, or 0 if
-:                            cancelled. In multi that is where the cursor was
-:                            not the answer -- the marks are the answer
-:        GUI.LISTBOX.MARKS$  multi only: COUNT characters, "1" marked
-:        GUI.LISTBOX.MARKED  multi only: how many are marked
-:        GUI.KEY             13 accepted, 27 or 3 cancelled
+.A form is therefore a loop over fields rather than a sequence of prompts,
+.and the user can return to an earlier field without restarting.
 .
-.  THE BOTTOM FRAME EDGE says nothing it does not have to. In multi it is "2
-.  SELECTED OF 20" and follows every SPACE; otherwise it is "20 ITEMS" for a
-.  list too long to see at once, and blank for one that fits.
+.LINEINPUT.MASK non-zero displays asterisks while holding the real string.
+.The field does not scroll: when it is full, further characters are refused
+.and the cursor inverts the last character rather than sitting past the end.
+.The cursor blinks off TI rather than a delay loop; a delay loop would
+.swallow keys pressed during it.
 .
-.  KEYS: up and down move, PgUp and PgDn page, HOME and END jump, SPACE
-.  toggles a mark in multi, RETURN accepts, ESC and STOP cancel. The codes
-.  are the ones samples/editor dispatches on, so they are known good.
+.LINEINPUT.ALLOW$ and LINEINPUT.DENY$ restrict what may be typed. Both are
+.empty by default, and the field then takes any printable character, as it
+.always has. ALLOW$ lists the characters accepted and DENY$ the ones refused;
+.a caller that sets both gets ALLOW$, and DENY$ is not consulted. A refused
+.key changes nothing -- not the text, and not the caret.
 .
-=THE LAST TWO ARE ON THE BOX
+.They compare raw bytes, so a set of LETTERS depends on the charset: PETSCII
+.shifted letters arrive as $C1-$DA and ISO ones as $41-$5A, and an ALLOW$
+.written for one silently refuses every capital in the other. Digits are
+.48-57 in both. Use ALLOW$ for a closed set short enough to write out, DENY$
+.for everything-except:
 .
-.  in a dimmed row under the list with ENTER and ESC picked out -- GUI.TEXT's
-.  hint, in GUI.TEXT's words, at GUI.TEXT's two offsets, because a dialog
-.  that answers OK or CANCEL should say so the same way wherever you meet it.
-.  It costs the body a spacer row and a hint row, and the box a minimum width
-.  of 26.
+.  Digits only
+.      SPELLING: ALLOW$ = "0123456789"
 .
-=THE MARKS ARE A STRING AND ARE TOGGLED IN PLACE
+.  Number with sign and point
+.      SPELLING: ALLOW$ = "0123456789.-"
 .
-.  GP.STRPTR gives the address of the characters, so SPACE POKEs one byte and
-.  allocates nothing -- where LEFT$ + CHR$ + MID$ would build a whole new
-.  string per keypress, and the old block is dead for good. It also means no
-.  second array to DIM and no bound to guess. THE PRICE IS 250 ITEMS, which
-.  is a string.
+.  Yes or no
+.      SPELLING: ALLOW$ = "YyNn"
 .
-=THE WINDOW IS MENUVERT.SCROLL
+.  Letters, no digits
+.      SPELLING: DENY$ = "0123456789"
 .
-.  Screen row R draws ITEM$(SCROLL + R), so the drawing is MENUVERT.ROW
-.  unchanged and this file only decides what SCROLL is. That input is an
-.  offset defaulting to 0 precisely so every menu that never heard of it is
-.  unaffected.
+.  Filename, no punctuation
+.      SPELLING: DENY$ = ",:=*?"
 .
-=THE MARK COLUMNS ARE THIS FILE'S
+.Both are sticky, like every other input in the library, so a form sets them
+.on the way into each field rather than once at the top.
 .
-.  NOT MENUVERT'S. In multi the rows are indented by two columns and MENUVERT
-.  owns only the text columns, so the caller's array is never touched to add
-.  a marker to it.
+.Example: FORM.EXP.BL -- three fields, one masked and one digits-only, in a
+.themed panel.
 .
-.  NO #DEFINEs AND NO INCLUDE GUARD IN HERE, ON PURPOSE. BASLOAD rejects a
-.  DIGIT in a #DEFINE or #IFNDEF name, so a GUI.LISTBOX.* constant cannot
-.  exist and a GUILIST.* one would be a second name space for one module. The
-.  numbers are written where they are used, next to the comment that names
-.  them. #INCLUDE this file once.
+=EXAMPLE PROGRAM
 .
-.  The whole GUI.LISTBOX.* name space belongs to this file.
+.  FORM.EXP.BL -- runnable, in the GPC-BASIC folder
 .
 =SEE ALSO
 .
->50|GUI.INC.BL -- four dialogs, in a box that puts the screen back.
->69|STASH.INC.BL -- save a text rectangle, and put it back.
->40|4.1 THEME.INC.BL -- named colour roles
->45|4.6 MENUVERT.INC.BL -- a vertical menu
+>51|4.4 LINEINPUT.INC.BL -- a positioned entry field

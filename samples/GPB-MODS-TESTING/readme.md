@@ -1,7 +1,7 @@
 # Sample — GPB-MODS-TESTING
 
-The GPC-BASIC library under a menu bar. Development harness for the modules, and the one program
-that holds all of them at once.
+A development harness for the GPC-BASIC library: a menu bar whose dropdowns reach every public
+entry point, and the one program that holds all seventeen modules at once.
 
 `PLAN.md` is the design; this file is how to build and drive it.
 
@@ -38,8 +38,7 @@ dropdown, and `STASH` puts the screen back under a closed one.
 `GMX.DISPATCH` is one `GP.SELECT` on the bar item and nothing else. Each item has a router of its
 own — `GMX.DIALOG`, `GMX.LISTS`, `GMX.INPUT`, `GMX.SCREEN`, `GMX.STRINGS`, `GMX.DATA`, `GMX.THEME`,
 `GMX.ABOUT`, `GMX.FILES` — which selects on `MENUVERT.SEL` and ends by repainting the chrome. Two
-shallow selects rather than one nested on both coordinates, which is also how BANK MAP is simply
-named by the two routers that both list it.
+shallow selects rather than one nested on both coordinates.
 
 **Six banks.** Three are named by the compiler: 4 holds the banked library, 5 and 6 the program's
 own literal text. Three more are allocated at run time — the cells a dropdown covers, the cells a
@@ -82,8 +81,8 @@ about the file name.
 
 ## Where the bytes go
 
-Built 2026-09-09 with all seventeen modules and every panel written. `GPBMODS.PRG` is 14,001
-bytes, `GPBMODS.B04` 6,658, `GPBMODS.B05` 7,426, `GPBMODS.B06` 3,074 and `GPBMODS.B07` 4,866 —
+Built 2026-09-09 with all seventeen modules and every panel written. `GPBMODS.PRG` is 14,287
+bytes, `GPBMODS.B04` 6,914, `GPBMODS.B05` 7,682, `GPBMODS.B06` 3,330 and `GPBMODS.B07` 4,866 —
 **four overlay files, because the source names four banks.** One `.Bnn` is written per bank, not per some
 size threshold: the two `GP.BANKED` regions make `.B04` and `.B07`, and the two `GP.BANKEDSTR`
 banks make `.B05` and `.B06`. Each is loaded to `$A000` in its own bank, which is why none counts
@@ -97,12 +96,12 @@ three places p-code can live, which is why the total is far larger than the resi
 | `STASH` | 431 | | `THEME` | 479 | | `APPSYS` | 114 |
 | `STASHFILE` | 171 | | `MENUVERT` | 1,104 | | `BANKMGR` | 586 |
 | `LIBBANK` | 184 | | `MENUBAR` | 826 | | `STRCASE` | 54 |
-| `LIBBANKFD` | 34 | | `LINEINPUT` | 762 | | `STRINGS` | 511 |
-| `LIBUTIL` | 359 | | `GUI` | 1,647 | | `STRUSING` | 726 |
-| `GPBMODS.BASL` | 11,165 | | `GUI2` | 1,360 | | `SORT` | 189 |
-| | | | `FILEDIR` | 433 | | `STASHVRAM` | 1,681 |
-| | | | | | | `FILEIO` | 1,003 |
-| **12,344** | | | **6,611** | | | **4,864** | |
+| `LIBBANKFD` | 34 | | `LINEINPUT` | 780 | | `STRINGS` | 511 |
+| `LIBUTIL` | 359 | | `GUI` | 1,857 | | `STRUSING` | 726 |
+| `GPBMODS.BASL` | 11,537 | | `GUI2` | 1,360 | | `SORT` | 189 |
+| | | | `FILEDIR` | 431 | | `STASHVRAM` | 1,681 |
+| | | | | | | `FILEIO` | 1,007 |
+| **12,716** | | | **6,837** | | | **4,868** | |
 
 **Six entries in the left column against fifteen on the right is the point of bank 7.** What is left in low RAM is what could
 not go: `STASH` and `STASHFILE` hold `BANK` statements, which `CommandBankGuard` refuses inside a
@@ -116,7 +115,7 @@ branch has no distance to travel and `GPBankMakeOffset` refuses it. They are ind
 the only call the GUI bank makes downwards is to `STASH`, which is in low memory.
 
 Bank 5 **filled**, and `BS.G.SAY` was moved to bank 6 to answer it — the overlay went 8,194 ->
-7,426 and bank 6 1,794 -> 3,074. Which bank a group is in costs the call site nothing, so moving
+7,682 and bank 6 1,794 -> 3,330. Which bank a group is in costs the call site nothing, so moving
 one is the whole of the fix. It is a hard wall rather than a budget: `BStrPoolWrite` stops the
 compile with `.error_memory` when a pool fills, so an overrun cannot pass silently, and the next
 group of text to be added belongs in bank 6. `ABOUT / MODULE SIZES` carries the module table on screen, and the
@@ -156,9 +155,21 @@ a dozen frames deep. It is 8 now, and every shared program gets those 2,048 byte
 **Bank 7 was the second half of it, and it is this program's own doing.** Every include that
 could go, went: `APPSYS`, `BANKMGR`, `STRCASE`, `STRINGS`, `SORT` and `FILEIO` first, then
 `STRUSING` and `STASHVRAM` as they were added. The shims cost 359 bytes of low RAM and the region
-holds 4,864, so the resident object fell 15,254 -> 14,001 **while gaining two modules and three
-panels**, and the workspace rose 6,656 -> 7,680. Against the ~1,440 bytes of listbox rows that
-started this, the heap is no longer the binding constraint.
+holds 4,868, so the resident object fell 15,254 -> 14,001 **while gaining two modules and three
+panels**, and the workspace rose 6,656 -> 7,680.
+
+**Where it stands now.** The panels written since put the object at 14,287, which costs a page:
+the workspace starts at the page after the object plus the 8-page frame stack, so it is
+`$4900`..`$6600` = **7,424**, and 208 bytes off the object would put it back to `$4800` and
+**7,680**. Inside that, `.varspace` — every scalar, plus one pointer slot an array — is **2,812**,
+and the rest is arrays and the string heap.
+
+**Typing costs nothing and a float costs six bytes.** `AllocateBytesForType` gives an untyped
+scalar 6 bytes and an `%` or `$` one 2, and an undimensioned array is 0..10 whatever it holds. The
+harness's own 45 small integers are `%`, and its four `LINEINPUT` field arrays are dimensioned to
+the three fields they hold rather than left implicit: 380 bytes of string heap between them, for
+no change to what the program does. `FOR` will not take an `%` index — `for.asm` refuses it, as
+stock BASIC does — so loop counters stay float.
 
 ## The modules
 

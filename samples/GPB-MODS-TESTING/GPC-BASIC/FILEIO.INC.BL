@@ -4,6 +4,9 @@
 ## **
 ## **      FILE.STATUS     read the command channel
 ## **      FILE.EXISTS     is FILE.NAME$ on the drive
+## **      FILE.SIZE       how big it is, in blocks. A VERB, not a GOSUB:
+## **                          GP.SUB FILE.SIZE, "MYFILE.DAT"
+## **                          N = GP.FN(FILE.SIZE, "MYFILE.DAT")
 ## **      FILE.DELETE     scratch it, pattern allowed
 ## **      FILE.RENAME     FILE.NAME$ -> FILE.NEW$
 ## **      FILE.COPY       one drive only
@@ -26,23 +29,24 @@
 ## **        FILE.NEW$      the second name, RENAME and COPY
 ## **        FILE.DEVICE       the drive. 0 means 8
 ## **        FILE.ISO       non-zero folds names to PETSCII on the way out
-## **        FILE.N         rows to write, SAVEARRAY
+## **        FILE.ROWS      rows to write, SAVEARRAY
 ## **        FILE.MAX       rows that fit, LOADARRAY. 0 means 10
 ## **        FILE.LINE$()   the rows. The caller owns the DIM
 ## **
 ## **   out  FILE.ERR       error number. Under 20 is success
 ## **        FILE.MSG$      the drive's text
 ## **        FILE.TRK       FILE.SEC   the two trailing fields
-## **        FILE.OK        FILE.EXISTS
-## **        FILE.N         rows read, LOADARRAY
+## **        FILE.OK        FILE.EXISTS, and FILE.SIZE
+## **        FILE.BLOCKS    FILE.SIZE. 0 when FILE.OK is 0
+## **        FILE.ROWS      rows read, LOADARRAY
 ## **        FILE.PATH$     FILE.CURDIR
 ## **
 ## **  internal  FILE.CMDSTR$ FILE.OUT$ FILE.RAW$ FILE.ROW$ FILE.ST FILE.KEEP
-## **            FILE.I FILE.PETP%
+## **            FILE.I FILE.PETP% FILE.CH$ FILE.BYTE FILE.LINENO FILE.QUOTED
 ## **
 ## **  FILE.ERR is DS and FILE.MSG$ is DS$. The X16 has neither.
 ## **
-## **  FILE.N is an input to SAVEARRAY and an output from LOADARRAY.
+## **  FILE.ROWS is an input to SAVEARRAY and an output from LOADARRAY.
 ## **  FILE.LINE$() is the caller's DIM, like MENUVERT.ITEM$. Left alone the
 ## **  implicit DIM gives 0..10.
 ## **
@@ -121,8 +125,7 @@ FILE.STATUS.BODY:  FILE.CMDSTR$ = ""
 
 ## FILE.CMD sends FILE.CMDSTR$ and reads the answer. The command rides on the
 ## OPEN, so nothing in this file uses PRINT# for a command.
-FILE.CMD:
-    IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
+FILE.CMD:  IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
     OPEN 15, FILE.DEVICE, 15, FILE.CMDSTR$
     INPUT#15, FILE.ERR, FILE.MSG$, FILE.TRK, FILE.SEC
     CLOSE 15 : FILE.CMDSTR$ = ""
@@ -130,8 +133,7 @@ FILE.CMD:
 
 ## Channel 15 is opened first and read while the file is still open: the answer
 ## being read is the drive's answer to that open.
-FILE.EXISTS.BODY:
-    FILE.OK = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
+FILE.EXISTS.BODY:  FILE.OK = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
     GOSUB FILE.PETNAME : OPEN 15, FILE.DEVICE, 15
     OPEN FILE.CHAN, FILE.DEVICE, FILE.CHAN, FILE.OUT$ + ",S,R"
     INPUT#15, FILE.ERR, FILE.MSG$, FILE.TRK, FILE.SEC
@@ -140,6 +142,80 @@ FILE.EXISTS.BODY:
     RETURN
 
 
+## ***********************************************************************
+## **  FILE.SIZE -- how big FILE.NAME$ is.
+## **
+## **      GP.SUB FILE.SIZE, "MYFILE.DAT"     : PRINT FILE.BLOCKS
+## **      N = GP.FN(FILE.SIZE, "MYFILE.DAT")
+## **
+## **   in   FILE.NAME$   the file, and the verb's one argument
+## **   out  FILE.BLOCKS  its size, 0 if not found, and what GP.FN returns
+## **        FILE.OK      -1 found, 0 not
+## **
+## **  BOTH FORMS, ONE BODY. GP.SUB is the statement and GP.FN the expression,
+## **  and either way FILE.OK comes back beside the count -- which is the only
+## **  thing that tells a real 0-block file from one that is not there.
+## **
+## **  THE GP.DEFPROC DECLARATION IS IN LIBUTIL.INC.BL, not here, because a
+## **  verb's call site is compiled into a jump to its body and a jump out of
+## **  low memory has to select the bank first. See that file's header. Being
+## **  a verb, FILE.SIZE is a name and not a label, so GOSUB FILE.SIZE is not
+## **  a way to call it -- unlike every other entry in this module.
+## **
+## **  BLOCKS, AND THERE IS NO BYTE COUNT TO BE HAD. A directory counts blocks
+## **  and a 254-byte block is only ever mostly full, so the last one holds
+## **  between 1 and 254 bytes and nothing in the listing says which. Multiply
+## **  and you have invented a number. A caller that needs the true length has
+## **  to read the file and count.
+## **
+## **  A ONE-NAME DIRECTORY IS THE WHOLE IMPLEMENTATION. "$:NAME" lists just
+## **  that file, so the answer is the second line of a two-line listing and
+## **  there is nothing to search. FILE.EXISTS cannot be extended to do it:
+## **  opening a file tells you it opened and nothing about its length.
+## **
+## **  FILEDIR.INC.BL is not needed and not called. That module exists to read
+## **  a WHOLE directory fast, into a bank, with assembly; one entry wants none
+## **  of that, and a program should not have to carry it to ask one question.
+## ***********************************************************************
+
+FILE.SIZE.BODY:  FILE.BLOCKS = 0 : FILE.OK = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
+    GOSUB FILE.PETNAME
+    OPEN 15, FILE.DEVICE, 15
+    OPEN FILE.CHAN, FILE.DEVICE, 0, "$:" + FILE.OUT$
+    INPUT#15, FILE.ERR, FILE.MSG$, FILE.TRK, FILE.SEC
+    IF FILE.ERR < FILE.OKMAX THEN GOSUB FILE.SIZEWALK
+    CLOSE FILE.CHAN : CLOSE 15
+    RETURN
+
+## A listing is a fake BASIC program: two bytes of load address, then a line
+## each -- two link bytes, two more holding the block count where a line number
+## would go, and text to a zero. The volume line comes first and parses like
+## any other, so it is read and dropped. See FILE.PATHWALK, which walks the
+## same shape for a different field.
+FILE.SIZEWALK:  GOSUB FILE.SIZEBYTE : GOSUB FILE.SIZEBYTE : GOSUB FILE.SIZELINE : GOSUB FILE.SIZELINE
+    IF FILE.QUOTED = 0 THEN RETURN
+    FILE.OK = -1 : FILE.BLOCKS = FILE.LINENO
+    RETURN
+
+## One line. THE QUOTE IS WHAT MAKES IT AN ENTRY: a name is quoted and the
+## BLOCKS FREE line that ends a listing is not, so a listing with no match
+## falls out here with FILE.QUOTED still 0 rather than reporting the trailer's
+## own number as a size.
+FILE.SIZELINE:  FILE.QUOTED = 0 : GOSUB FILE.SIZEBYTE : GOSUB FILE.SIZEBYTE
+    GOSUB FILE.SIZEBYTE : FILE.LINENO = FILE.BYTE : GOSUB FILE.SIZEBYTE : FILE.LINENO = FILE.LINENO + FILE.BYTE * 256
+    GP.DO
+        GOSUB FILE.SIZEBYTE
+        IF FILE.BYTE = 0 THEN GP.EXITDO
+        IF (FILE.ST AND 66) <> 0 THEN GP.EXITDO
+        IF FILE.BYTE = 34 THEN FILE.QUOTED = -1
+    GP.LOOP
+    RETURN
+
+## GET# HANDS BACK "" FOR A ZERO BYTE, and a zero byte is exactly what ends
+## every line here, so ASC on it unguarded would stop the program on the one
+## value the walk is looking for.
+FILE.SIZEBYTE:  GET# FILE.CHAN, FILE.CH$ : FILE.ST = ST : FILE.BYTE = 0 : IF FILE.CH$ <> "" THEN FILE.BYTE = ASC(FILE.CH$)
+    RETURN
 
 
 ## ***********************************************************************
@@ -188,8 +264,7 @@ FILE.CURDIR.BODY:
     OPEN FILE.CHAN, FILE.DEVICE, 0, "$=C"
     INPUT#15, FILE.ERR, FILE.MSG$, FILE.TRK, FILE.SEC
     IF FILE.ERR < FILE.OKMAX THEN GOSUB FILE.PATHWALK
-    CLOSE FILE.CHAN
-    CLOSE 15
+    CLOSE FILE.CHAN : CLOSE 15
     IF FILE.PATH$ = "" THEN FILE.PATH$ = "/"
     RETURN
 
@@ -215,17 +290,20 @@ FILE.SAVEARRAY.BODY:
     IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
     GOSUB FILE.PETNAME : OPEN 15, FILE.DEVICE, 15
     OPEN FILE.CHAN, FILE.DEVICE, FILE.CHAN, "@:" + FILE.OUT$ + ",S,W"
-    IF FILE.N > 0 THEN GOSUB FILE.WRITEROWS
+    IF FILE.ROWS > 0 THEN GOSUB FILE.WRITEROWS
     CLOSE FILE.CHAN : INPUT#15, FILE.ERR, FILE.MSG$, FILE.TRK, FILE.SEC : CLOSE 15
     RETURN
 
-FILE.WRITEROWS:  FOR FILE.I = 1 TO FILE.N : PRINT# FILE.CHAN, FILE.LINE$(FILE.I) : NEXT FILE.I
+FILE.WRITEROWS:
+    FOR FILE.I = 1 TO FILE.ROWS
+        PRINT# FILE.CHAN, FILE.LINE$(FILE.I)
+    NEXT FILE.I
     RETURN
 
-## FILE.N = FILE.MAX on return means the file may hold more.
+## FILE.ROWS = FILE.MAX on return means the file may hold more.
 
 FILE.LOADARRAY.BODY:
-    FILE.N = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
+    FILE.ROWS = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
     IF FILE.MAX = 0 THEN FILE.MAX = 10
     GOSUB FILE.PETNAME : OPEN 15, FILE.DEVICE, 15
     OPEN FILE.CHAN, FILE.DEVICE, FILE.CHAN, FILE.OUT$ + ",S,R"
@@ -237,13 +315,20 @@ FILE.LOADARRAY.BODY:
 ## ST is taken into a variable before anything else touches the channel. The
 ## row is stored before the loop ends: the CR that completes the last row is
 ## the last byte of the file, so that read is also end of file.
+##
+## ---- ONLY TWO BITS END THE LOOP: 64 is end of file and 2 is READ ERROR.
+## ---- Any other bit is not this channel talking. Reading five rows back gave
+## ---- one, the first, with its text intact -- so the read worked and then
+## ---- something set a bit that "ST <> 0" read as end of file. The file on the
+## ---- drive was all five rows, which is what ruled the writer out. The
+## ---- missing-file trap still stops: that returns 66, and 66 has bit 6.
 FILE.READROWS:
     GP.DO
         LINPUT# FILE.CHAN, FILE.ROW$
         FILE.ST = ST : GOSUB FILE.ROWREAL
         IF FILE.KEEP = -1 THEN GOSUB FILE.KEEPROW
-        IF FILE.ST <> 0 THEN GP.EXITDO
-        IF FILE.N >= FILE.MAX THEN GP.EXITDO
+        IF (FILE.ST AND 66) <> 0 THEN GP.EXITDO
+        IF FILE.ROWS >= FILE.MAX THEN GP.EXITDO
     GP.LOOP
     RETURN
 
@@ -251,7 +336,7 @@ FILE.READROWS:
 ## The length tests are separate statements: AND does not stop evaluating once
 ## it knows the answer, so ASC would still reach the empty string.
 FILE.ROWREAL:
-    FILE.KEEP = -1 : IF FILE.ST = 0 THEN RETURN
+    FILE.KEEP = -1 : IF (FILE.ST AND 66) = 0 THEN RETURN
     IF LEN(FILE.ROW$) = 0 THEN GOTO FILE.ROWDROP
     IF LEN(FILE.ROW$) > 1 THEN RETURN
     IF ASC(FILE.ROW$) = 0 THEN GOTO FILE.ROWDROP
@@ -260,8 +345,8 @@ FILE.ROWREAL:
 FILE.ROWDROP:  FILE.KEEP = 0 : RETURN
 
 FILE.KEEPROW:
-    IF FILE.N >= FILE.MAX THEN RETURN
-    FILE.N = FILE.N + 1 : FILE.LINE$(FILE.N) = FILE.ROW$
+    IF FILE.ROWS >= FILE.MAX THEN RETURN
+    FILE.ROWS = FILE.ROWS + 1 : FILE.LINE$(FILE.ROWS) = FILE.ROW$
     RETURN
 
 ## ***********************************************************************
