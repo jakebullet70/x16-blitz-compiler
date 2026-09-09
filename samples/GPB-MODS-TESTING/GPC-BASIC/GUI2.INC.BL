@@ -72,8 +72,7 @@ GOTO GUI.LISTBOX.MODULE.END
 ## **  GUI.LISTBOX -- the whole thing.
 ## ***********************************************************************
 
-GUI.LISTBOX.BODY:
-    GUI.KEY = 0
+GUI.LISTBOX.BODY:  GUI.KEY = 0
     IF GUI.LISTBOX.COUNT < 1 THEN GUI.LISTBOX.SEL = 0 : RETURN
 
 ## ---- The window: what was asked for, ten rows if nothing was, then cut to the
@@ -165,8 +164,7 @@ GUI.LISTBOX.NOMARKS:
 ## **  The key loop.
 ## ***********************************************************************
 
-GUI.LISTBOX.WAIT:
-    GET GUI.LISTBOX.IN$
+GUI.LISTBOX.WAIT:  GET GUI.LISTBOX.IN$
     IF GUI.LISTBOX.IN$ = "" THEN GOTO GUI.LISTBOX.WAIT
     GUI.LISTBOX.CODE = ASC(GUI.LISTBOX.IN$)
     GUI.LISTBOX.DONE = 0 : GUI.LISTBOX.PREV = GUI.LISTBOX.SEL : GUI.LISTBOX.PREVSCROLL = MENUVERT.SCROLL
@@ -175,22 +173,14 @@ GUI.LISTBOX.WAIT:
 ## ---- samples/editor dispatches on. The rest are GUI's own.
 
     GP.SELECT GUI.LISTBOX.CODE
-        GP.CASE 145
-            GUI.LISTBOX.SEL = GUI.LISTBOX.SEL - 1
-        GP.CASE 17
-            GUI.LISTBOX.SEL = GUI.LISTBOX.SEL + 1
-        GP.CASE 130
-            GUI.LISTBOX.SEL = GUI.LISTBOX.SEL - GUI.LISTBOX.ROWS.USE
-        GP.CASE 2
-            GUI.LISTBOX.SEL = GUI.LISTBOX.SEL + GUI.LISTBOX.ROWS.USE
-        GP.CASE 19
-            GUI.LISTBOX.SEL = 1
-        GP.CASE 4
-            GUI.LISTBOX.SEL = GUI.LISTBOX.COUNT
-        GP.CASE GUI.SPACE
-            IF GUI.LISTBOX.MULTI <> 0 THEN GOSUB GUI.LISTBOX.TOGGLE
-        GP.CASE GUI.RETURN
-            GUI.LISTBOX.DONE = -1
+        GP.CASE 145 : GUI.LISTBOX.SEL = GUI.LISTBOX.SEL - 1
+        GP.CASE 17  : GUI.LISTBOX.SEL = GUI.LISTBOX.SEL + 1
+        GP.CASE 130 : GUI.LISTBOX.SEL = GUI.LISTBOX.SEL - GUI.LISTBOX.ROWS.USE
+        GP.CASE 2   : GUI.LISTBOX.SEL = GUI.LISTBOX.SEL + GUI.LISTBOX.ROWS.USE
+        GP.CASE 19  : GUI.LISTBOX.SEL = 1
+        GP.CASE 4   : GUI.LISTBOX.SEL = GUI.LISTBOX.COUNT
+        GP.CASE GUI.SPACE  : IF GUI.LISTBOX.MULTI <> 0 THEN GOSUB GUI.LISTBOX.TOGGLE
+        GP.CASE GUI.RETURN : GUI.LISTBOX.DONE = -1
         GP.CASE GUI.ESCAPE, GUI.STOP
             GUI.LISTBOX.SEL = 0 : GUI.LISTBOX.DONE = -1
     GP.ENDSEL
@@ -223,10 +213,7 @@ GUI.LISTBOX.WAIT:
 ## **  sets it, and so the only thing that can break it.
 ## ***********************************************************************
 
-GUI.LISTBOX.FINISH:
-    MENUVERT.SCROLL = 0
-    GUI.KEY = GUI.LISTBOX.CODE
-    GOSUB GUI.CLOSE
+GUI.LISTBOX.FINISH:  MENUVERT.SCROLL = 0 : GUI.KEY = GUI.LISTBOX.CODE : GOSUB GUI.CLOSE
     RETURN
 
 ## ***********************************************************************
@@ -284,8 +271,7 @@ GUI.LISTBOX.REPAINT:
 ## **  which is as many items as a marks string holds.
 ## ***********************************************************************
 
-GUI.LISTBOX.FOOT:
-    IF GUI.LISTBOX.NOTEW = 0 THEN RETURN
+GUI.LISTBOX.FOOT:  IF GUI.LISTBOX.NOTEW = 0 THEN RETURN
     GUI.LISTBOX.EDGE$ = GUI.LISTBOX.NOTE$
     IF GUI.LISTBOX.MULTI = 0 THEN GOTO GUI.LISTBOX.FOOT.DRAW
     GUI.LISTBOX.NUM$ = MID$(STR$(GUI.LISTBOX.MARKED), 2)
@@ -307,8 +293,7 @@ GUI.LISTBOX.FOOT.DRAW:
 ## **  than a GP.PRINTAT into the frame.
 ## ***********************************************************************
 
-GUI.LISTBOX.PAINT.ROW:
-    IF GUI.LISTBOX.ROW < 1 THEN RETURN
+GUI.LISTBOX.PAINT.ROW:  IF GUI.LISTBOX.ROW < 1 THEN RETURN
     IF GUI.LISTBOX.ROW > GUI.LISTBOX.ROWS.USE THEN RETURN
     MENUVERT.DRAWROW = GUI.LISTBOX.ROW : MENUVERT.DRAWATTR = GUI.LISTBOX.ATTR
     GOSUB MENUVERT.ROW
