@@ -25,6 +25,13 @@
 ## compile stops with "NO SYMBOL FILE FOR {}".
 #SYMFILE "@:MENU.SYM"
 #INCLUDE "GPB.INC.BL"
+## THE LIBRARY'S PUBLIC NAMES. A module defines GUI.SAY.BODY, never GUI.SAY:
+## a banked routine cannot select its own bank, so the entry point has to be a
+## label in low memory. These files are that entry point for a program that
+## does not bank. A banked one takes the same names from LIB.GUIBANK.INC.BL
+## instead -- one or the other, never both.
+#INCLUDE "THEME.PLAIN.INC.BL"
+#INCLUDE "MENUVERT.PLAIN.INC.BL"
 #INCLUDE "THEME.INC.BL"
 #INCLUDE "APPSYS.INC.BL"
 #INCLUDE "MENUVERT.INC.BL"
@@ -45,7 +52,7 @@
 GOSUB APPSYS.STARTUP
 
 THEME.ID = 0
-GOSUB THEME.LOAD
+GOSUB THEME.SELECT
 
 DIM MENUVERT.ITEM$(MENU.COUNT)
 MENUVERT.ITEM$(1) = " NEW GAME"

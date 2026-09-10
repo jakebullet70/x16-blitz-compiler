@@ -16,6 +16,16 @@
 ## after them BASLOAD stops with SYMFILE NOT ALLOWED.
 #SYMFILE "@:GUI.SYM"
 #INCLUDE "GPB.INC.BL"
+## THE LIBRARY'S PUBLIC NAMES. A module defines GUI.SAY.BODY, never GUI.SAY:
+## a banked routine cannot select its own bank, so the entry point has to be a
+## label in low memory. These files are that entry point for a program that
+## does not bank. A banked one takes the same names from LIB.GUIBANK.INC.BL
+## instead -- one or the other, never both.
+#INCLUDE "THEME.PLAIN.INC.BL"
+#INCLUDE "MENUVERT.PLAIN.INC.BL"
+#INCLUDE "LINEINPUT.PLAIN.INC.BL"
+#INCLUDE "GUI.PLAIN.INC.BL"
+#INCLUDE "GUI2.PLAIN.INC.BL"
 #INCLUDE "THEME.INC.BL"
 ## STASH is not optional even though nothing here names it: GUI.OPEN calls
 ## STASH.SAVE, and BASLOAD resolves every label in the build, not the ones a
@@ -32,7 +42,7 @@
 #DEFINE DEMO.BANK 8
 
 GOSUB APPSYS.STARTUP
-THEME.ID = 0 : GOSUB THEME.LOAD
+THEME.ID = 0 : GOSUB THEME.SELECT
 GUI.BANK = DEMO.BANK
 
 DIM MENUVERT.ITEM$(20)
@@ -61,15 +71,15 @@ GOSUB GUI.YN
 DEMO.OKC = GUI.ANSWER
 GUI.OKCANCEL = 0
 
-## ---- 2. GUI.TEXT -- a question and a line of typing -----------------
+## ---- 2. GUI.INPUT -- a question and a line of typing ----------------
 
 GUI.TITLE$ = "OPEN"
 GUI.MSG$ = "NAME OF THE FILE TO OPEN:"
 GUI.MSG2$ = ""
 GUI.LEN = 24
-GUI.INPUT$ = "TEST.MD"
-GOSUB GUI.TEXT
-DEMO.NAME$ = GUI.INPUT$ : DEMO.OK = GUI.OK
+GUI.TEXT$ = "TEST.MD"
+GOSUB GUI.INPUT
+DEMO.NAME$ = GUI.TEXT$ : DEMO.OK = GUI.OK
 
 ## ---- 3. GUI.MENU -- a question and a list ---------------------------
 ##
@@ -160,7 +170,7 @@ END
 DEMO.PAGE:
     GP.FILL 0, 0, 80, 30, ASC(" "), THEME.CLR(THEME.PAGE)
     GP.FILL 0, 0, 80, 1, ASC(" "), THEME.CLR(THEME.TITLE)
-    GP.PRINTAT 2, 0, "GUI.YN, GUI.TEXT, GUI.MENU, GUI.LISTBOX", THEME.CLR(THEME.TITLE)
+    GP.PRINTAT 2, 0, "GUI.YN, GUI.INPUT, GUI.MENU, GUI.LISTBOX", THEME.CLR(THEME.TITLE)
     FOR DEMO.R = 2 TO 18
         DEMO.LINE$ = ""
         FOR DEMO.C = 0 TO 8

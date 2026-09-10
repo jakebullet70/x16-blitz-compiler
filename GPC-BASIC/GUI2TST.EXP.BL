@@ -12,11 +12,21 @@
 #SAVEAS "@:GUI2TST.PRG"
 #SYMFILE "@:GUI2TST.SYM"
 #INCLUDE "GPB.INC.BL"
+## THE LIBRARY'S PUBLIC NAMES. A module defines GUI.SAY.BODY, never GUI.SAY:
+## a banked routine cannot select its own bank, so the entry point has to be a
+## label in low memory. These files are that entry point for a program that
+## does not bank. A banked one takes the same names from LIB.GUIBANK.INC.BL
+## instead -- one or the other, never both.
+#INCLUDE "THEME.PLAIN.INC.BL"
+#INCLUDE "MENUVERT.PLAIN.INC.BL"
+#INCLUDE "LINEINPUT.PLAIN.INC.BL"
+#INCLUDE "GUI.PLAIN.INC.BL"
+#INCLUDE "GUI2.PLAIN.INC.BL"
 #INCLUDE "THEME.INC.BL"
 #INCLUDE "STASH.INC.BL"
 #INCLUDE "MENUVERT.INC.BL"
 ## LINEINPUT is here even though nothing below types anything: GUI.INC.BL calls
-## LINEINPUT.GET from GUI.TEXT, and BASLOAD resolves every label whether the path
+## LINEINPUT.GET from GUI.INPUT, and BASLOAD resolves every label whether the path
 ## runs or not -- without it the tokenise stops at LABEL NOT FOUND IN GUI.INC.BL.
 #INCLUDE "LINEINPUT.INC.BL"
 #INCLUDE "GUI.INC.BL"
@@ -36,7 +46,7 @@
 
 CLS
 COLOR 1,0
-THEME.ID = 0 : GOSUB THEME.LOAD
+THEME.ID = 0 : GOSUB THEME.SELECT
 
 ## ---- twenty items, a five row window: every case below needs a list longer
 ## ---- than the box, because that is the thing GUI.MENU cannot do.

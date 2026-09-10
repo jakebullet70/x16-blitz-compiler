@@ -1,0 +1,54 @@
+## ***********************************************************************
+## **
+## **  GUI.PLAIN.INC.BL -- the four dialogs and the box, unbanked.
+## **
+## **      GUI.SAY
+## **      GUI.YN
+## **      GUI.MENU
+## **      GUI.INPUT
+## **      GUI.OPEN
+## **      GUI.CLOSE
+## **
+## **  A .BODY name is not an accident and not a rename waiting to happen: a
+## **  banked routine cannot select its own bank, so the public name has to be
+## **  a label in low memory and the code has to be a label of its own. This
+## **  file is that public name for a program that does NOT bank -- the same
+## **  eighteen entry points LIB.GUIBANK.INC.BL provides, minus the BANK.
+## **
+## **  ONE FILE PER MODULE, and that is the same split LIB.GUIBANK.INC.BL and
+## **  LIB.FUTILBANK.INC.BL make, for the same reason: BASLOAD resolves every
+## **  label in every file it reads, so a shim for a module you did not
+## **  #INCLUDE stops the build with LABEL NOT FOUND. One file holding all
+## **  eighteen would make a MENUVERT test carry the whole GUI.
+## **
+## **  NEVER BOTH. LIB.GUIBANK.INC.BL defines these same labels, so a program
+## **  that banks the library must not #INCLUDE this one -- BASLOAD stops with
+## **  DUPLICATE SYMBOL. Bank the library or run it from low memory; the
+## **  callers read identically either way, which is the point of the split.
+## **
+## **  THE NAME CHANGED WITH THE CUA WORK: the typing dialog was GUI.TEXT and
+## **  its string was GUI.INPUT$. They are GUI.INPUT and GUI.TEXT$ now -- the
+## **  two swapped, which a program written against the older library will not
+## **  notice until it reads the wrong one back.
+## **
+## **  REQUIRES, and does not #INCLUDE for you:
+## **      GUI.INC.BL        the bodies
+## **      THEME.INC.BL  MENUVERT.INC.BL  LINEINPUT.INC.BL
+## **                        GUI calls all three through their public names,
+## **                        so their PLAIN files are wanted as well
+## **
+## ***********************************************************************
+#IFNDEF GUI.PLAIN.DEFS
+#DEFINE GUI.PLAIN.DEFS 1
+
+GOTO GUI.PLAIN.MODULE.END
+
+GUI.SAY:     GOSUB GUI.SAY.BODY : RETURN
+GUI.YN:      GOSUB GUI.YN.BODY : RETURN
+GUI.MENU:    GOSUB GUI.MENU.BODY : RETURN
+GUI.INPUT:   GOSUB GUI.INPUT.BODY : RETURN
+GUI.OPEN:    GOSUB GUI.OPEN.BODY : RETURN
+GUI.CLOSE:   GOSUB GUI.CLOSE.BODY : RETURN
+
+GUI.PLAIN.MODULE.END:
+#ENDIF

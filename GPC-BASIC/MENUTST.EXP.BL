@@ -7,6 +7,12 @@
 ## call GP.FILL and GP.PRINTAT, which are shipped and verified, so reading
 ## the attribute back out of VERA would be testing tier 6 all over again.
 #INCLUDE "GPB.INC.BL"
+## THE LIBRARY'S PUBLIC NAMES. A module defines GUI.SAY.BODY, never GUI.SAY:
+## a banked routine cannot select its own bank, so the entry point has to be a
+## label in low memory. These files are that entry point for a program that
+## does not bank. A banked one takes the same names from LIB.GUIBANK.INC.BL
+## instead -- one or the other, never both.
+#INCLUDE "MENUVERT.PLAIN.INC.BL"
 #INCLUDE "MENUVERT.INC.BL"
 #SAVEAS "@:MENUTST.PRG"
 
