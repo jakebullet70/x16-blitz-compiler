@@ -20,7 +20,8 @@
 ## **  Each line is "Tn PASS" or "Tn FAIL want got", and the verdict line is
 ## **  "ALL FIFTEEN PASS" -- stop an automated run on that. AFTER it, one more
 ## **  dialog is opened and left waiting on a key, so a -gif run has something
-## **  to photograph.
+## **  to photograph; the digit in SHOT.TXT says how many TABs away from the
+## **  field that picture is taken.
 ## **
 ## **      python source/gpc/build_basl.py     GUIFRMT.BASL    GUIFRMT.SRC.PRG
 ## **      python source/gpc/compile_shared.py GUIFRMT.SRC.PRG GUIFRMT.PRG
@@ -31,6 +32,7 @@
 #INCLUDE "STASH.INC.BL"
 
 #DEFINE KBDBUF.PUT $F09F
+#DEFINE GIF.CTL $9FB5
 
 #DEFINE K.TAB 9
 #DEFINE K.SHTAB 24
@@ -270,20 +272,63 @@ PRINT
 IF GF.FAILED = 0 THEN PRINT "ALL FIFTEEN PASS"
 IF GF.FAILED <> 0 THEN PRINT "FAILURES:"; GF.FAILED
 
-## ---- THE PICTURE. GUI.INPUT left open with the focus still in the field and
-## ---- no key waiting, so a -gif run catches all three states at once: the
-## ---- cursor is in the field, <<OK>> is doubled because it is the DEFAULT,
-## ---- and nothing is in THEME.FOCUS because the eye is not on a button. That
-## ---- separation is the whole of what phase 3 added. The assertions above have
-## ---- already printed, so an automated run stops on their line and never
-## ---- reaches this.
+## ---- THE PICTURE. GUI.INPUT is opened last and left waiting on a key, so a
+## ---- -gif run photographs a REAL form state and not a reconstruction of one.
+## ---- Which state is the digit in SHOT.TXT, counted in TABs away from the
+## ---- field: 0 leaves the cursor in the field, 1 puts the focus on OK, 2 on
+## ---- CANCEL. <<OK>> stays doubled in all three, because only the focus moved
+## ---- and the default did not -- which is the whole of what phase 3 added.
+## ----
+## ---- The assertions have already printed, so an automated run stops on their
+## ---- verdict line and never reaches any of this.
+
+GOSUB GF.PICKSHOT
 
 GOSUB GF.RESET
 GUI.TITLE$ = " FOCUS "
-GUI.MSG$ = "THE CURSOR IS THE FIELD. <<OK>> IS THE DEFAULT."
 GUI.TEXT$ = "GPC"
+GUI.MSG$ = "THE CURSOR IS IN THE FIELD. NO BUTTON IS LIT."
+IF GF.SHOT = 1 THEN GUI.MSG$ = "ONE TAB IN. THE FOCUS IS ON THE DEFAULT."
+IF GF.SHOT = 2 THEN GUI.MSG$ = "TWO TABS IN. THE FOCUS LEFT THE DEFAULT."
+GUI.MSG2$ = "<<OK>> IS DOUBLED BECAUSE IT IS THE DEFAULT."
+
+IF GF.SHOT >= 1 THEN GOSUB GF.TAB
+IF GF.SHOT >= 2 THEN GOSUB GF.TAB
+
+POKE GIF.CTL, 2
 GOSUB GUI.INPUT
 END
+
+
+## ***********************************************************************
+## **  GF.PICKSHOT -- which picture this run is for.
+## **
+## **  A missing SHOT.TXT is not an error: GET# hands back "" and the shot is
+## **  the field, which is the one worth having.
+## ***********************************************************************
+
+GF.PICKSHOT:
+    GF.SHOT = 0
+    OPEN 1, 8, 2, "SHOT.TXT,S,R"
+    GET# 1, GF.CH$
+    CLOSE 1
+    IF GF.CH$ <> "" THEN GF.SHOT = ASC(GF.CH$) - 48
+    IF GF.SHOT < 0 THEN GF.SHOT = 0
+    IF GF.SHOT > 2 THEN GF.SHOT = 0
+    RETURN
+
+
+## ***********************************************************************
+## **  GF.TAB -- one TAB into the buffer, before the dialog opens.
+## **
+## **  Not a FOR loop: FOR 1 TO 0 runs once here, so a shot of 0 would move
+## **  the focus it is meant to photograph.
+## ***********************************************************************
+
+GF.TAB:
+    GF.KEY = K.TAB
+    GOSUB GF.SEND
+    RETURN
 
 
 ## ***********************************************************************
