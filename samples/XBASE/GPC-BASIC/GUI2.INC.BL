@@ -1,0 +1,173 @@
+## ***********************************************************************
+## **  GUI2.INC.BL -- a listbox, single or multi select.
+## **
+## **      GUI.LISTBOX   a window onto a list longer than the box, and
+## **                    optionally more than one answer
+## **
+## **  Separate from GUI.INC.BL: nothing else in the library wants a set of
+## **  marks or a footer counting them. #INCLUDE it only when you want a
+## **  listbox. THE SCROLLING LIST ITSELF IS NOT IN HERE -- it is GUI.CT.LIST,
+## **  one of GUI.FORM's three control types, and this file is the DIALOG
+## **  around it: measure the box, open it, hand the control its geometry, add
+## **  a button row, run the form, answer.
+## **
+## **  Requires, and #INCLUDEs none of them, in this order:
+## **      GPB.INC.BL        GP.FILL, GP.PRINTAT, GP.STRPTR, GP.SELECT
+## **      STASH.INC.BL      via GUI.OPEN; wants a #SYMFILE
+## **      THEME.INC.BL      GOSUB THEME.SELECT first
+## **      MENUVERT.INC.BL   MENUVERT.ROW draws the rows
+## **      GUI.INC.BL        GUI.OPEN, GUI.FORM and the list control
+## **
+## **      DIM MENUVERT.ITEM$(200)
+## **      ... fill 1..N ...
+## **      GUI.LISTBOX.COUNT = N : GUI.LISTBOX.ROWS = 8 : GUI.LISTBOX.MULTI = 1
+## **      GUI.MSG$ = "PICK FILES" : GUI.BANK = 8
+## **      GOSUB GUI.LISTBOX
+## **      IF GUI.LISTBOX.SEL = 0 THEN <cancelled>
+## **
+## **   in   GUI.LISTBOX.COUNT   how many items. 0 or less returns cancelled
+## **        MENUVERT.ITEM$()    the items, 1..COUNT, and the caller DIMs it
+## **        GUI.LISTBOX.ROWS    rows visible at once. 0 takes 10, and it is
+## **                            cut to COUNT and to what the screen holds
+## **        GUI.LISTBOX.MULTI   0 chooses one row. 1 marks a set with SPACE
+## **        GUI.LISTBOX.MARKS$  multi only, in as well as out: COUNT
+## **                            characters, "1" marked. Any other length --
+## **                            "" included -- starts with none marked
+## **        GUI.LISTBOX.SEL     the item to start on. 0 starts at 1
+## **        plus everything GUI.OPEN reads: GUI.MSG$, GUI.MSG2$, GUI.MSG3$,
+## **        GUI.TITLE$, GUI.BANK, GUI.STYLE, GUI.GLYPH, GUI.PLACE and the rest
+## **
+## **   out  GUI.LISTBOX.SEL     the item under the highlight, 1..COUNT, or 0
+## **                            if cancelled. In multi that is where the cursor
+## **                            was, not the answer -- the marks are the answer
+## **        GUI.LISTBOX.MARKS$  multi only: COUNT characters, "1" marked
+## **        GUI.LISTBOX.MARKED  multi only: how many are marked
+## **        GUI.KEY             13 accepted, 27 cancelled
+## **
+## **  Keys: up and down move, PgUp and PgDn page, HOME and END jump, SPACE
+## **  toggles a mark in multi. TAB moves the focus to the buttons and back,
+## **  RETURN takes <<OK>> from anywhere, ESC and STOP cancel -- and O and C
+## **  press their buttons while the eye is still in the list, which a list
+## **  can offer and a typing field cannot.
+## **
+## **  The bottom frame edge is "2 SELECTED OF 20" in multi, "20 ITEMS" for a
+## **  single list too long to see at once, and blank for one that fits. It is
+## **  GUI.LIST.FOOT that writes it; the width is measured here.
+## **
+## **  The way out is a row of <<OK>> and <CANCEL> under the list, which costs
+## **  the body a spacer row and a button row, and the box a minimum width of
+## **  20. IT USED TO BE A LINE OF TEXT naming the two keys, at GUI.INPUT's
+## **  offsets -- the buttons say the same thing and can be pressed.
+## **
+## **  The marks are one string, toggled in place through GP.STRPTR, so SPACE
+## **  POKEs a byte and allocates nothing. WARNING: that caps the list at 250
+## **  items, which is what a string holds.
+## **
+## **  WARNING: no #DEFINEs and no include guard in here. BASLOAD rejects a
+## **  digit in a #DEFINE or #IFNDEF name, so a GUI.LISTBOX.* constant cannot
+## **  exist. The numbers are written where they are used. #INCLUDE this once.
+## ***********************************************************************
+
+GOTO GUI.LISTBOX.MODULE.END
+
+## ***********************************************************************
+## **  GUI.LISTBOX -- the whole thing.
+## ***********************************************************************
+
+GUI.LISTBOX.BODY:  GUI.KEY = 0
+    IF GUI.LISTBOX.COUNT < 1 THEN GUI.LISTBOX.SEL = 0 : RETURN
+
+## ---- The window: what was asked for, ten rows if nothing was, then cut to the
+## ---- list and to the screen. Eight rows go to the frame, the message, the
+## ---- spacer and the button row, so the list may have the rest.
+
+    GUI.LIST.COUNT = GUI.LISTBOX.COUNT
+    GUI.LIST.ROWS = GUI.LISTBOX.ROWS
+    IF GUI.LIST.ROWS < 1 THEN GUI.LIST.ROWS = 10
+    IF GUI.LIST.ROWS > GUI.LIST.COUNT THEN GUI.LIST.ROWS = GUI.LIST.COUNT
+    GOSUB GUI.SCREEN
+    IF GUI.LIST.ROWS > GUI.SCREEN.ROWS - 8 THEN GUI.LIST.ROWS = GUI.SCREEN.ROWS - 8
+    IF GUI.LIST.ROWS < 1 THEN GUI.LIST.ROWS = 1
+
+## ---- Measured over the WHOLE list, not the first window: the frame is stashed,
+## ---- so a box that grew when you scrolled would have to be redrawn.
+
+    GUI.LISTBOX.TEXTW = 0
+    FOR GUI.LISTBOX.I = 1 TO GUI.LIST.COUNT
+        IF LEN(MENUVERT.ITEM$(GUI.LISTBOX.I)) > GUI.LISTBOX.TEXTW THEN GUI.LISTBOX.TEXTW = LEN(MENUVERT.ITEM$(GUI.LISTBOX.I))
+    NEXT GUI.LISTBOX.I
+
+## ---- THE MARKS, SETTLED BEFORE ANYTHING IS MEASURED. A string of the wrong
+## ---- length is not an error and not trusted: COUNT may have changed since, so
+## ---- anything that does not measure up is replaced with a fresh set of "0" --
+## ---- 48, and 49 is a mark. The pointer is taken here rather than after
+## ---- GUI.OPEN because it is what tells the control, and GUI.LIST.MEASURE,
+## ---- that there is a mark column at all -- and that is two cells of box width.
+
+    GUI.LIST.MARKP = 0
+    GUI.LISTBOX.MARKOFF = 0
+    GP.IF GUI.LISTBOX.MULTI <> 0 THEN
+        IF LEN(GUI.LISTBOX.MARKS$) <> GUI.LIST.COUNT THEN GUI.LISTBOX.MARKS$ = RPT$(48, GUI.LIST.COUNT)
+        GUI.LIST.MARKP = GP.STRPTR(GUI.LISTBOX.MARKS$)
+        GUI.LISTBOX.MARKOFF = 2
+    GP.ENDIF
+
+## ---- Everything the box has to be wide enough for: the widest item plus its
+## ---- mark column, the footer at its longest, and the button row.
+
+    GUI.BTN.ONE$ = "&OK"
+    GUI.BTN.TWO$ = "&CANCEL"
+    GUI.DEFAULT = 1
+    GOSUB GUI.BUTTON.SIZE
+    GOSUB GUI.LIST.MEASURE
+    GUI.BODY.WIDTH = GUI.LISTBOX.TEXTW + GUI.LISTBOX.MARKOFF
+    IF GUI.LIST.NOTEW + 2 > GUI.BODY.WIDTH THEN GUI.BODY.WIDTH = GUI.LIST.NOTEW + 2
+    IF GUI.BTN.TOTAL > GUI.BODY.WIDTH THEN GUI.BODY.WIDTH = GUI.BTN.TOTAL
+    GUI.BODY.ROWS = GUI.LIST.ROWS + 2
+    GOSUB GUI.OPEN
+
+## ---- The list is control 1 and the buttons are 2 and 3, so BEGIN comes first
+## ---- and the row appends to it. Focus starts on the list, which is not where
+## ---- the default button is -- that is the whole point of the two being
+## ---- separate, and it is why RETURN in the list still means <<OK>>.
+
+    GUI.LIST.X = GUI.INNER.LEFT + GUI.LISTBOX.MARKOFF
+    GUI.LIST.Y = GUI.INNER.TOP
+    GUI.LIST.W = GUI.INNER.WIDTH - GUI.LISTBOX.MARKOFF
+    GUI.LIST.SEL = GUI.LISTBOX.SEL
+    GOSUB GUI.FORM.BEGIN
+    GOSUB GUI.FORM.ADD.LIST
+    GUI.BTN.Y = GUI.INNER.TOP + GUI.LIST.ROWS + 1
+    GOSUB GUI.BUTTON.ROW
+    GUI.FOCUS = 1
+    GOSUB GUI.FORM.RUN
+
+## ---- OK IS THE DEFAULT BUTTON, asked by its flag rather than by its index, so
+## ---- a wrapper that ordered its controls differently still reads right. A
+## ---- cancel is GUI.FORM.HIT 0 and needs no test of its own: element 0 of the
+## ---- flags array is never written, so it answers 0 and falls through.
+## ----
+## ---- GUI.KEY is the two codes it has always been, not the key that actually
+## ---- closed the box: a caller that reads 13 or 27 should not have to learn
+## ---- about "C" the day the way out became a button.
+
+    GUI.LISTBOX.SEL = GUI.LIST.SEL
+    GUI.LISTBOX.MARKED = GUI.LIST.MARKED
+    GUI.KEY = GUI.RETURN
+    GP.IF (GUI.CTRL.FLAGS%(GUI.FORM.HIT) AND GUI.CF.DEFAULT) = 0 THEN
+        GUI.LISTBOX.SEL = 0
+        GUI.KEY = GUI.ESCAPE
+    GP.ENDIF
+
+## ---- WARNING: MENUVERT.SCROLL goes back to 0, and that is not tidiness.
+## ---- MENUVERT.ROW draws ITEM$(SCROLL + R) and MENUBAR aims that same routine
+## ---- sideways, so a scroll left behind here makes the NEXT menu -- any menu,
+## ---- in any file -- draw the rows above the ones it asked for, each cut to
+## ---- the width of the row it replaced. A listbox is the only thing that ever
+## ---- sets it, and so the only thing that can break it.
+
+    MENUVERT.SCROLL = 0
+    GOSUB GUI.CLOSE
+    RETURN
+
+GUI.LISTBOX.MODULE.END:

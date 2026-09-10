@@ -1,109 +1,103 @@
-@GUI.INC.BL -- four dialogs, in a box that puts the screen back.
+@4.10 STRUSING.INC.BL -- a number to a template
 .
-=GUI.INC.BL
+=4.10 STRUSING.INC.BL -- A NUMBER TO A TEMPLATE
 .
-.  four dialogs, in a box that puts the screen back.
+=DESCRIPTION
 .
-=MODULE HEADER
+.  STR.USING
+.      IN: STR.USING.NUM STR.USING.MASK$
+.      OUT: STR.USING.STR$, a field
 .
-:      GUI.SAY     something to say, and one way out
-:      GUI.YN      a question, and a Y or N answer
-:      GUI.MENU    a question, and a row chosen from a list
-:      GUI.TEXT    a question, and a line of typed text
+.  STR.USING.FIX
+.      IN: STR.USING.NUM STR.USING.DP
+.      OUT: STR.USING.STR$, digits only
 .
-.  What they share is the BOX: measure it against the text, centre it, save
-.  what it covers, draw a frame, give the pixels back on the way out. That is
-.  GUI.OPEN and GUI.CLOSE, and the three entry points are thin. GUI.MENU is
-.  MENUVERT.RUN inside a frame and GUI.TEXT is LINEINPUT.GET inside one, so
-.  only GUI.YN -- four keys -- reads the keyboard itself.
+:#INCLUDE "STRUSING.INC.BL"
+:
+:STR.USING.NUM = 1234.5 : STR.USING.MASK$ = "#,##0.00"
+:GOSUB STR.USING
+:PRINT STR.USING.STR$                    ' 1,234.50
 .
-.  REQUIRES, and does not #INCLUDE for you, in this order:
-:      GPB.INC.BL        GP.BOX, GP.FILL, GP.PRINTAT, GP.CALL
-:      STASH.INC.BL      saves the cells the box covers -- and wants a
-:                        #SYMFILE in your program, see its own header
-:      THEME.INC.BL      the colour roles, and GOSUB THEME.LOAD first
-:      MENUVERT.INC.BL   drawn on by GUI.MENU
-:      LINEINPUT.INC.BL  drawn on by GUI.TEXT
+.Pure BASIC. It needs no #SYMFILE and depends on no other module, so a
+.program can take it without taking STRINGS.INC.BL (SEC 4.2) -- and the other
+.way round.
 .
-=BOTH ARE REQUIRED EVEN IF YOU ONLY CALL GUI.YN
+.  #
+.      MEANS: a digit position, space if the number does not reach it
 .
-.  BASLOAD resolves every label in the file, not the ones a path reaches, so
-.  leaving either out stops BASLOAD with LABEL NOT FOUND rather than
-.  compiling a smaller program.
+.  0
+.      MEANS: a digit position, zero if the number does not reach it
 .
-.  Usage, the whole of it:
-:      THEME.ID = 0 : GOSUB THEME.LOAD
-:      GUI.BANK = 8
-:      GUI.MSG$ = "Delete the file?"
-:      GOSUB GUI.YN
-:      IF GUI.ANSWER THEN <yes>
+.  .
+.      MEANS: the decimal point everything aligns on
 .
-:   in   GUI.MSG$        the question. "" for none
-:        GUI.MSG2$       a second line, for detail that does not fit. "" for
-:                        none, and then there is no gap
-:        GUI.TITLE$      a name in the top edge of the frame. "" for none
-:        GUI.BANK        a spare RAM bank to save the covered cells in.
-:                        0 MEANS DO NOT SAVE, and then the box is still on
-:                        the screen when the call returns
-:        GUI.STYLE       0, the default, draws the rounded single line box.
-:                        1 to 3 are GP.BOX's other styles
-:        GUI.PANEL.IN    the panel: the box's background AND the colour the
-:                        message lines are written in. 0 takes THEME.TEXT
-:        GUI.BORDER.IN   the frame's attribute. 0 takes THEME.BORDER
-:        GUI.GLYPH       non-zero frames the box from six glyphs of the
-:                        CALLER'S, and GUI.STYLE is then not consulted.
-:                        They are TILE INDICES: GUI.FRAME hands them to
-:                        GP.BOX as a custom set, which does not convert
-:                            GUI.EDGE.H      the horizontal run
-:                            GUI.EDGE.V      the vertical run
-:                            GUI.CORNER.TL   .TR  .BL  .BR
-:        GUI.PLACE       0 centres the box. Non-zero uses GUI.X, GUI.Y
-:        GUI.X  GUI.Y    top left, when GUI.PLACE says so
-:        GUI.ROW.OFFSET  added to the row the box lands on, however it was
-:                        placed. 0 for almost everybody -- see below
+.  ,
+.      MEANS: anywhere in the mask, groups the integer part in threes
 .
-:   out  GUI.KEY         the key that ended it, whichever call
-:        GUI.LEFT GUI.TOP GUI.WIDTH GUI.HEIGHT   where the box went, and
-:                        how big it turned out
+.  +
+.      MEANS: first character only: a sign column, + or -
 .
-=GUI.ROW.OFFSET IS FOR HARDWARE SCROLLING
+.  -
+.      MEANS: first character only: a sign column, - or a space
 .
-.  The GP commands address the text MAP, and VERA's L1_VSCROLL decides which
-.  map row shows as screen row 0. A caller scrolling that way sets
-.  GUI.ROW.OFFSET to VSCROLL/8 and is centred against what the user can see.
-.  Everyone else leaves it 0.
+.PRINT USING's mask, from BASIC 7.0, less the four characters that earn
+.nothing here: $ floating currency, a trailing sign, ^^^^ exponential, and =
+./ > -- those last two justify a string, which is STR.PADC and STR.PADL (SEC
+.4.2).
 .
-=UPPER CASE, ON THE DEFAULT CHARSET
+.The result is exactly LEN(STR.USING.MASK$) characters, right justified, so a
+.column of them lines up on the point. Everything after the point prints, so
+.# and 0 do not differ there. A point with no digit positions after it is
+.ignored.
 .
-.  GP.PRINTAT converts PETSCII and BASLOAD passes literals through as source
-.  bytes, so on charset 2 ASCII lower case lands on the graphics half of the
-.  font -- "Confirm" measured as tiles 3, 79, 78, 70, 73, 82, 77. ISO mode
-.  fixes the text and breaks the frame, GP.BOX's $40-$7D being letters in
-.  that order: so it is upper case with a frame, or mixed case without one,
-.  unless the caller re-orders the font and says where the glyphs went with
-.  GUI.GLYPH. That is what samples/editor does, and the whole reason the
-.  frame is overridable.
+:"###0.00"    12.5    ->  "  12.50"        "#,##0.00"   1234.5  ->  "1,234.50
+:"0000.00"    12.5    ->  "0012.50"        "+##0.00"      -1.5  ->  "-  1.50"
+:"##000"        42    ->  "  042"          "##0"         12345  ->  "***"
 .
-=A BOX OVER 4094 CELLS WILL NOT FIT ONE BANK
+.Too wide fills the whole field with *. That is deliberate and visible;
+.overflowing the width instead would push the rest of the row along and
+.misalign every column after it. A negative value with no sign column spends
+.one digit position on its minus, and stars when there is none to spend --
+."##0" holds -12 but not -123.
 .
-.  and that is not an error: the save is skipped, the dialog still runs, and
-.  GUI.STASHED comes back 0 so the caller knows it must repaint. Same when
-.  GUI.BANK is 0.
+.Rounding is half away from zero, done on the absolute value before the sign
+.goes back on. INT alone floors toward minus infinity, which rounds -1.5 and
+.1.5 in opposite directions. -0.004 to two places is "0.00", not "-0.00": a
+.signed zero in a column reads as a real negative.
 .
-.  .IN IS "WHAT THE CALLER ASKED FOR" -- GUI.PANEL and GUI.BORDER are what
-.  GUI.OPEN settled on, and those are what everything downstream draws with.
-.  Both requests are 0-means-default: attribute 0 is black on black, legal
-.  and no use to anybody, so it is free to spend as "I did not choose".
+.WARNING: the value must scale to under 1,000,000,000. The digits are built
+.by multiplying up by 10 ^ DP and rounding, and STR$ turns over to E notation
+.at 1e9 -- so two decimal places reach 9,999,999.99 and five reach
+.9,999.99999. Past that the field fills with * rather than printing something
+.wrong.
 .
-.  The whole GUI. name space belongs to this file, except GUI.LISTBOX., which
-.  is GUI2.INC.BL -- a listbox is a GUI dialog and reads like one, but it is
-.  the only one that scrolls and the only one that marks, so it is its own
-.  #INCLUDE and you pay for it only when you want it.
+.STR.USING.FIX is the same digits with no field over them: STR.USING.NUM to
+.STR.USING.DP places, sign attached, no leading space. Right justify it with
+.STR.PADL if you want a column.
+.
+.The digits do not come out of STR$'s fraction, and cannot. STR$ trims
+.trailing zeros, so 12.30 comes back as "12.3"; it drops the leading zero of
+.a pure fraction, so a half is " .5"; and it takes significant digits, never
+.decimal places -- FloatToString records that a fixed-decimal mode was tried
+.and printed 12345678.9 as 12345678.8984375. So a scaled integer is the only
+.exact route, and the 1e9 ceiling above is its price.
+.
+.Cost: 726 bytes of p-code, of which STR.USING.FIX alone is 205. Its own
+.module rather than a routine in STRINGS.INC.BL for that reason -- a program
+.wanting STR.PADL and a split should not carry a mask parser.
+.
+.Example: STRUSING.EXP.BL. Regression test: USINGT.EXP.BL, thirty-nine cases
+.-- both entry points, every mask character, the rounding traps, the sign
+.column and both overflows. Text and length are compared every time: the
+.result is a field, so a right answer in the wrong number of columns still
+.breaks the table.
+.
+=EXAMPLE PROGRAM
+.
+.  STRUSING.EXP.BL -- runnable, in the GPC-BASIC folder
+.  USINGT.EXP.BL -- runnable, in the GPC-BASIC folder
 .
 =SEE ALSO
 .
->78|STASH.INC.BL -- save a text rectangle, and put it back.
->47|4.1 THEME.INC.BL -- named colour roles
->53|4.6 MENUVERT.INC.BL -- a vertical menu
->51|4.4 LINEINPUT.INC.BL -- a positioned entry field
->65|GUI2.INC.BL -- a listbox, single or multi select.
+>48|4.2 STRINGS.INC.BL -- string helpers
+>59|4.10 STRUSING.INC.BL -- a number to a template

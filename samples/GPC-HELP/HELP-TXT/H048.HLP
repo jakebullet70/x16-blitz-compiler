@@ -30,6 +30,24 @@
 .  MENUVERT.
 .      OWNER: MENUVERT.INC.BL
 .
+.  MENUBAR.
+.      OWNER: MENUBAR.INC.BL
+.
+.  GUI.
+.      OWNER: GUI.INC.BL
+.
+.  GUI.LISTBOX.
+.      OWNER: GUI2.INC.BL, kept apart from the rest of GUI.
+.
+.  STASH. / STASH.FILE.
+.      OWNER: STASH.INC.BL / STASHFILE.INC.BL
+.
+.  SORT.
+.      OWNER: SORT.INC.BL
+.
+.  STRCASE.
+.      OWNER: STRCASE.INC.BL
+.
 .  BMX. / BMXK.
 .      OWNER: BMX.INC.BL (variables / its KERNAL constants)
 .
@@ -60,10 +78,15 @@
 .
 =SEE ALSO
 .
->115|6. The traps, collected
+>109|6. The traps, collected
 >48|4.2 STRINGS.INC.BL -- string helpers
 >47|4.1 THEME.INC.BL -- named colour roles
 >50|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
 >51|4.4 LINEINPUT.INC.BL -- a positioned entry field
 >53|4.6 MENUVERT.INC.BL -- a vertical menu
->52|4.5 BMX.INC.BL -- a BMX bitmap into VERA
+>58|4.9 MENUBAR.INC.BL -- a horizontal menu
+>60|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
+>61|4.12 GUI2.INC.BL -- a listbox, single or multi select
+>62|STASH.INC.BL -- save a text rectangle, and put it back.
+>70|STASHFILE.INC.BL -- a saved text rectangle, through a file.
+>56|4.7 SORT.INC.BL -- shell sort a string array

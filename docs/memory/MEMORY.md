@@ -14,7 +14,7 @@ sibling project: what is kept is a fact about **X16 BASIC or the X16 itself**, n
 - [Prose style is flat reference](prose-style-is-flat-reference.md) — the five settled rules; `doc-style` owns them
 - [Write readable code, user crunches](write-readable-code-user-crunches.md) — one statement a line; an unexplained SRC edit is his crunch pass
 - [Comments light, code should flow](comments-light-code-should-flow.md) — heavy REMs mean bad naming
-- [No ship language, no unasked builds](no-ship-language-this-is-dev.md) — "commit and push" does not include a build
+- [No ship language, no unasked builds](no-ship-language-this-is-dev.md) — no build, no help regen, unless asked
 - [Commit to main directly](commit-to-main-directly.md) — solo repo, no branch, no review
 - [Compiler must not cap program size](compiler-must-not-cap-program-size.md) — a build-side wall is a bug; compiler growth now costs a program zero
 - [No backward compatibility needed](no-backward-compatibility-needed.md) — forced recompiles cost nothing

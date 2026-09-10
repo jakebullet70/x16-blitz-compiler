@@ -46,7 +46,7 @@
 .
 =SEE ALSO
 .
->78|STASH.INC.BL -- save a text rectangle, and put it back.
+>62|STASH.INC.BL -- save a text rectangle, and put it back.
 >56|4.7 SORT.INC.BL -- shell sort a string array
 >57|4.8 STRCASE.INC.BL -- case, in place
 >48|4.2 STRINGS.INC.BL -- string helpers

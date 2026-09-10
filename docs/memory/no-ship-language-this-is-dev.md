@@ -22,4 +22,6 @@ Describe a checked-in artifact as *checked in*, not *shipped*.
 build? just commit and push."* "Commit and push" means exactly that; refreshing a
 checked-in binary is a separate request. Offer it in one line, do not do it.
 
+**Nor regenerate the help text.** Corrected 2026-09-10: *"stop updating the help text, wait until the final design is done and bugs are fixed. U can ask me if I want but wait for me to tell u."* `samples/GPC-HELP/MKHELP.PY` rewrites 27 tracked files from the markdown, so running it mid-design buries the real diff under regenerated output and publishes an interface that is still moving. It is the LAST step of a design, not a step inside one -- ask, then wait for a yes.
+
 Related: [[answer-the-question-asked]], [[user-runs-concurrent-agents-here]].

@@ -9,7 +9,7 @@
 .
 =DESCRIPTION
 .
-.  THEME.LOAD
+.  THEME.SELECT
 .      IN: THEME.ID
 .      OUT: fills THEME.CLR()
 .
@@ -61,13 +61,24 @@
 .selected before any other theme has been loaded -- where there is nothing to
 .keep and it takes X16's values. THEME.RESET goes back to those.
 .
-.samples/color-test edits all seven roles against a mock of the GUI and
-.prints the THEME.CLR() lines to paste back in here.
+.samples/color-test edits the roles against a mock of the GUI and prints the
+.THEME.CLR() lines to paste back in here. It carries its own GPC-BASIC folder
+.and is still at seven roles, so it does not yet offer THEME.FOCUS.
 .
 .Roles, for indexing THEME.CLR(): THEME.PAGE THEME.TEXT THEME.TITLE
-.THEME.BORDER THEME.HILITE THEME.DIMMED THEME.WARN, and THEME.SLOTS = 7.
+.THEME.BORDER THEME.HILITE THEME.DIMMED THEME.WARN THEME.FOCUS, and
+.THEME.SLOTS = 8.
 .
-:THEME.ID = 1 : GOSUB THEME.LOAD
+.THEME.FOCUS is the eighth and newest: what a focused control wears while
+.GUI.FORM has the keyboard (SEC 4.11). It is a separate role from
+.THEME.HILITE because a dialog shows both at once -- the highlighted row of a
+.list, and the control the TAB key has landed on.
+.
+.The routine used to be THEME.LOAD. It became THEME.SELECT when the library
+.split into banked bodies and unbanked front doors, and a program still
+.calling the old name stops at LABEL NOT FOUND.
+.
+:THEME.ID = 1 : GOSUB THEME.SELECT
 :GP.BOX 4,2,30,8, 2, THEME.CLR(THEME.BORDER)
 :GP.PRINTAT 6,3, "TITLE", THEME.CLR(THEME.TITLE)
 .
@@ -85,5 +96,6 @@
 .
 =SEE ALSO
 .
->58|4.10 STRUSING.INC.BL -- a number to a template
+>60|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
+>59|4.10 STRUSING.INC.BL -- a number to a template
 >47|4.1 THEME.INC.BL -- named colour roles

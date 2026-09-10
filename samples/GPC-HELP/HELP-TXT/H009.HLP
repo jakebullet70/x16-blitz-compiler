@@ -80,7 +80,7 @@
 .
 .  Colour roles
 .      BASIC
-.      THEME.INC.BL -- THEME.LOAD, THEME.CLR() - SEC 4.1
+.      THEME.INC.BL -- THEME.SELECT, THEME.CLR() - SEC 4.1
 .
 .  String helpers
 .      BASIC+ASM
@@ -103,13 +103,19 @@
 .      BASIC
 .      MENUVERT.INC.BL -- RUN DRAW ROW HOTFIND - SEC 4.6
 .
+.  Menus
+.      BASIC
+.      MENUBAR.INC.BL -- RUN DRAW ITEM MARK WHERE, the other axis - SEC 4.9
+.
+.  Dialogs
+.      BASIC
+.      GUI.INC.BL -- GUI.SAY GUI.YN GUI.MENU GUI.INPUT GUI.OPEN GUI.CLOSE -
+.        SEC 4.11
+.
+.  Dialogs
+.      BASIC
+.      GUI2.INC.BL -- GUI.LISTBOX, single or multi select - SEC 4.12
+.
 .The rule is in SEC 1: assembly for tight loops and bulk data moves, BASIC
 .for everything else, and a composite for anything that is only a spelling of
 .keywords already present. A menu waits on a human, so MENUVERT is BASIC; as
-.a keyword it would cost every GP program 462 bytes whether or not it used a
-.menu.
-.
-.The keywords in detail. Square brackets mean optional. Optionals cannot be
-.skipped over: GP.BOX X,Y,W,H,,7 is a syntax error -- write out the default
-.you are passing through.
-.

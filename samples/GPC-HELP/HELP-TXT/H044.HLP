@@ -1,108 +1,109 @@
-@GUI2.INC.BL -- a listbox, single or multi select.
+@4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
 .
-=GUI2.INC.BL
+=4.11 GUI.INC.BL -- FOUR DIALOGS, IN A BOX THAT PUTS THE SCREEN BACK
 .
-.  a listbox, single or multi select.
+=WHAT IT COSTS
 .
-=MODULE HEADER
+.  ASM: GP.BOX GP.FILL GP.PRINTAT
+.    ASM -- a keyword, run by machine code in the GP runtime block. A program
+.    using ANY GP keyword pays for the whole block.
+.  COMPOSITE: GP.CHAR GP.PRINTAT GP.FILL
+.    COMPOSITE -- a keyword with no machine code of its own. The compiler
+.    expands it into keywords that already exist, so it costs the runtime
+.    nothing at all.
+.    BASIC -- a .INC.BL module of ordinary BASL, called with GOSUB. Costs
+.    nothing unless you #INCLUDE it.
 .
-:      GUI.LISTBOX   a WINDOW onto a list longer than the box, and
-:                    optionally more than one answer
+=DESCRIPTION
 .
-=SEPARATE FROM GUI.INC.BL ON PURPOSE
+.  GUI.SAY
+.      IN: GUI.MSG$
+.      OUT: GUI.KEY -- something to say, and one way out
 .
-.  This is the only dialog that needs a scrolling window and a set of marks,
-.  and nothing else in the library wants either. #INCLUDE it when you want a
-.  listbox and pay nothing when you do not.
+.  GUI.YN
+.      IN: GUI.MSG$
+.      OUT: GUI.ANSWER, -1 for yes
 .
-.  GUI.MENU is not this and should not be stretched into it: that is
-.  MENUVERT.RUN in a frame, so the list must fit the screen and it returns
-.  one row. This is the two things it does not do.
+.  GUI.MENU
+.      IN: GUI.COUNT GUI.SEL GUI.FLAGS, over MENUVERT.ITEM$()
+.      OUT: GUI.SEL, or 0 if cancelled
 .
-.  REQUIRES, and does not #INCLUDE for you, in this order:
-:      GPB.INC.BL        GP.FILL, GP.PRINTAT, GP.STRPTR, GP.SELECT
-:      STASH.INC.BL      via GUI.OPEN -- and wants a #SYMFILE, see its header
-:      THEME.INC.BL      the colour roles, and GOSUB THEME.LOAD first
-:      MENUVERT.INC.BL   MENUVERT.ROW draws the rows
-:      GUI.INC.BL        GUI.OPEN and GUI.CLOSE are the box
+.  GUI.INPUT
+.      IN: GUI.LEN GUI.TEXT$ GUI.MASK
+.      OUT: GUI.TEXT$ GUI.OK
 .
-.  Usage:
-:      DIM MENUVERT.ITEM$(200)
-:      ... fill 1..N ...
-:      GUI.LISTBOX.COUNT = N : GUI.LISTBOX.ROWS = 8 : GUI.LISTBOX.MULTI = 1
-:      GUI.MSG$ = "PICK FILES" : GUI.BANK = 8
-:      GOSUB GUI.LISTBOX
-:      IF GUI.LISTBOX.SEL = 0 THEN <cancelled>
+.  GUI.OPEN
+.      IN: GUI.BODY.ROWS GUI.BODY.WIDTH
+.      OUT: GUI.INNER.LEFT .TOP .WIDTH -- the box on its own, for a dialog of
+.        your own
 .
-:   in   GUI.LISTBOX.COUNT   how many items. 0 or less returns cancelled
-:        MENUVERT.ITEM$()    the items, 1..COUNT. THE CALLER OWNS THE DIM,
-:                            for MENUVERT's reason: a module cannot be handed
-:                            an array, and DIMming one means guessing a bound
-:        GUI.LISTBOX.ROWS    rows visible at once. 0 takes 10, and it is
-:                            always cut to COUNT and to what the screen holds
-:        GUI.LISTBOX.MULTI   0 chooses one row. 1 marks a set with SPACE
-:        GUI.LISTBOX.MARKS$  multi only, IN as well as out: COUNT characters,
-:                            "1" marked. Anything else -- "" included --
-:                            starts with none marked
-:        GUI.LISTBOX.SEL     the item to start on. 0 starts at 1
-:        plus everything GUI.OPEN reads: GUI.MSG$, GUI.MSG2$, GUI.TITLE$,
-:        GUI.BANK, GUI.STYLE, GUI.GLYPH, GUI.PLACE and the rest
+.  GUI.CLOSE
+.      IN: --
+.      OUT: the screen as it was
 .
-:   out  GUI.LISTBOX.SEL     the item under the highlight, 1..COUNT, or 0 if
-:                            cancelled. In multi that is where the cursor was
-:                            not the answer -- the marks are the answer
-:        GUI.LISTBOX.MARKS$  multi only: COUNT characters, "1" marked
-:        GUI.LISTBOX.MARKED  multi only: how many are marked
-:        GUI.KEY             13 accepted, 27 or 3 cancelled
+:THEME.ID = 0 : GOSUB THEME.SELECT
+:GUI.BANK = 8
+:GUI.MSG$ = "DELETE THE FILE?"
+:GOSUB GUI.YN
+:IF GUI.ANSWER THEN <yes>
 .
-.  THE BOTTOM FRAME EDGE says nothing it does not have to. In multi it is "2
-.  SELECTED OF 20" and follows every SPACE; otherwise it is "20 ITEMS" for a
-.  list too long to see at once, and blank for one that fits.
+.Requires GPB.INC.BL, STASH.INC.BL, THEME.INC.BL, MENUVERT.INC.BL and
+.LINEINPUT.INC.BL, and #INCLUDEs none of them. All five, whichever dialog you
+.call -- BASLOAD resolves every label in the file, so leaving one out is
+.LABEL NOT FOUND. It wants a #SYMFILE, because STASH does.
 .
-.  KEYS: up and down move, PgUp and PgDn page, HOME and END jump, SPACE
-.  toggles a mark in multi, RETURN accepts, ESC and STOP cancel. The codes
-.  are the ones samples/editor dispatches on, so they are known good.
+.Everything the box takes -- three message lines, a title, the style, the
+.placement, the shadow, the frame glyphs, the bank the covered cells go to --
+.is listed in full in GP-BASIC.GLOBALS.md SEC 3. GUI.BANK = 0 does not save
+.the cells, and then the box is still on screen when the call returns.
 .
-=THE LAST TWO ARE ON THE BOX
+.Every control has a focus, and TAB moves it. The dialogs no longer own their
+.key loops: each states its controls and GUI.FORM runs them. A control is a
+.button, a field or a list; it hands back one of six verdicts -- stay, next,
+.previous, press, default, cancel -- and the dispatcher stays one loop
+.whatever the mix. A caller that never presses TAB sees what it always saw.
 .
-.  in a dimmed row under the list with ENTER and ESC picked out -- GUI.TEXT's
-.  hint, in GUI.TEXT's words, at GUI.TEXT's two offsets, because a dialog
-.  that answers OK or CANCEL should say so the same way wherever you meet it.
-.  It costs the body a spacer row and a hint row, and the box a minimum width
-.  of 26.
+.The default button and the focused control are different things. The default
+.is what RETURN presses from anywhere and is drawn <<LIKE THIS>>; the focus
+.is where TAB has got to and is drawn in THEME.FOCUS. GUI.INPUT opens with
+.the default on OK and the focus in the field -- which is the point of
+.keeping the two apart, and GUI.DEFAULT sets only the first.
 .
-=THE MARKS ARE A STRING AND ARE TOGGLED IN PLACE
+.The answers are buttons. GUI.BTN.ONE$ and GUI.BTN.TWO$ carry them, and &
+.marks the accelerator: "&CANCEL" lights the C. An accelerator is live only
+.while the focused control does not eat printable keys, so C presses CANCEL
+.from the button row or from inside a list, and types a C in a field. That is
+.the whole rule, and GUIFRMT's T14, T15 and T22 are the three assertions that
+.hold it.
 .
-.  GP.STRPTR gives the address of the characters, so SPACE POKEs one byte and
-.  allocates nothing -- where LEFT$ + CHR$ + MID$ would build a whole new
-.  string per keypress, and the old block is dead for good. It also means no
-.  second array to DIM and no bound to guess. THE PRICE IS 250 ITEMS, which
-.  is a string.
+.GUI.HINT$ is gone -- the dimmed line naming two keys became the button row,
+.and it is the one interface this took away.
 .
-=THE WINDOW IS MENUVERT.SCROLL
+.The typing dialog and its string swapped names: it was GUI.TEXT returning
+.GUI.INPUT$, and it is GUI.INPUT returning GUI.TEXT$. BASLOAD will not have a
+.label and a variable of one name and the $ does not separate them. A program
+.written against the older library compiles clean and reads the wrong one
+.back.
 .
-.  Screen row R draws ITEM$(SCROLL + R), so the drawing is MENUVERT.ROW
-.  unchanged and this file only decides what SCROLL is. That input is an
-.  offset defaulting to 0 precisely so every menu that never heard of it is
-.  unaffected.
+.Upper case, on the default charset. GP.PRINTAT converts PETSCII and BASLOAD
+.passes literals through as source bytes, so charset 2 lands lower case on
+.the graphics half of the font. ISO mode fixes the text and breaks the frame,
+.GP.BOX's $40-$7D being letters. Upper case with a frame, mixed case without
+.one, or re-order the font and set GUI.GLYPH.
 .
-=THE MARK COLUMNS ARE THIS FILE'S
+.Example: GUI.EXP.BL. Regression test: samples/GPB-MODS-TESTING/GUIFRMT.BASL,
+.twenty-four assertions driven by keys pushed into the KERNAL buffer -- the
+.only way to drive a GET loop headlessly.
 .
-.  NOT MENUVERT'S. In multi the rows are indented by two columns and MENUVERT
-.  owns only the text columns, so the caller's array is never touched to add
-.  a marker to it.
+=EXAMPLE PROGRAM
 .
-.  NO #DEFINEs AND NO INCLUDE GUARD IN HERE, ON PURPOSE. BASLOAD rejects a
-.  DIGIT in a #DEFINE or #IFNDEF name, so a GUI.LISTBOX.* constant cannot
-.  exist and a GUILIST.* one would be a second name space for one module. The
-.  numbers are written where they are used, next to the comment that names
-.  them. #INCLUDE this file once.
-.
-.  The whole GUI.LISTBOX.* name space belongs to this file.
+.  GUI.EXP.BL -- runnable, in the GPC-BASIC folder
 .
 =SEE ALSO
 .
->59|GUI.INC.BL -- four dialogs, in a box that puts the screen back.
->78|STASH.INC.BL -- save a text rectangle, and put it back.
+>15|3. Command reference
+>60|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
+>62|STASH.INC.BL -- save a text rectangle, and put it back.
 >47|4.1 THEME.INC.BL -- named colour roles
 >53|4.6 MENUVERT.INC.BL -- a vertical menu
+>51|4.4 LINEINPUT.INC.BL -- a positioned entry field

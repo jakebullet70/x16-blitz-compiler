@@ -6,3 +6,13 @@
 .results come back in named variables after it. Every module is
 .position-independent -- each jumps over itself -- so #INCLUDE it anywhere,
 .including the top of the program.
+.
+.Six of them need a front door. THEME, MENUVERT, MENUBAR, LINEINPUT, GUI and
+.GUI2 are built to run from a RAM bank, and a banked routine cannot select
+.its own bank -- so each defines THEME.SELECT.BODY rather than THEME.SELECT,
+.and the public name comes from a separate file that banks and then calls it.
+.#INCLUDE "LIB.GUIBANK.INC.BL" to run the library in a bank, or the six
+.<MODULE>.PLAIN.INC.BL files to run it from low memory -- one or the other,
+.never both, and only the ones whose modules you actually included. The front
+.doors go before the bodies in the file, and the GOSUBs in this section read
+.identically either way. See GP-BASIC.GLOBALS.md SEC 4.

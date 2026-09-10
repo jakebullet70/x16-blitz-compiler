@@ -51,4 +51,4 @@
 .
 =SEE ALSO
 .
->78|STASH.INC.BL -- save a text rectangle, and put it back.
+>62|STASH.INC.BL -- save a text rectangle, and put it back.

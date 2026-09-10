@@ -1118,7 +1118,7 @@ GMX.D.SHADOW:
 ## ***********************************************************************
 
 
-GP.BANKEDSTR GM.TEXTBANK BS.D.FOCUS
+GP.BANKEDSTR GM.TEXTBANKB BS.D.FOCUS
   " THE FOCUS "
   "TAB MOVES THE FOCUS, SHIFT+TAB GOES BACK."
   "THE DEFAULT IS DRAWN <<LIKE THIS>>, AND RETURN"

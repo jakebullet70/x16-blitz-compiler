@@ -1,0 +1,67 @@
+## ***********************************************************************
+## **
+## **  APPSYS.INC.BL -- start an application politely, and leave it the
+## **  way you found it.
+## **
+## **      APPSYS.STARTUP     remember the screen the user had
+## **      APPSYS.RESTORE     put it back, on the way out
+## **      APPSYS.ISEMU       am I running on the emulator?
+## **
+## **  Usage:
+## **      GOSUB APPSYS.STARTUP
+## **      ... the application, laid out with APPSYS.COLS / APPSYS.ROWS
+## **      GOSUB APPSYS.RESTORE : END
+## **
+## **  A screen rectangle through a file is STASH.FILE.SAVE / .LOAD / .PUT in
+## **  STASHFILE.INC.BL. Draining the keyboard is KB.CLEARKB in KB.INC.BL.
+## **
+## ***********************************************************************
+#IFNDEF APPSYS.DEFS
+#DEFINE APPSYS.DEFS 1
+
+## screen_mode. Carry set reports: mode in .A, width .X, height .Y.
+#DEFINE APPSYS.SCRMODE $FF5F
+
+## Text colour, packed background * 16 + foreground.
+#DEFINE APPSYS.COLREG $0376
+
+## screen_set_charset, and the byte holding the charset number.
+##
+## WARNING: $FF62 does not clear bit 6 of $0372, so restoring the charset alone
+## leaves the machine in ISO mode. The whole byte goes back.
+#DEFINE APPSYS.SETCHR $FF62
+#DEFINE APPSYS.CHRREG $0372
+
+## $9FBE and $9FBF read 49 and 54 -- "1" and "6" -- under x16emu.
+#DEFINE APPSYS.EMUSIG $9FBE
+
+GOTO APPSYS.SKIP
+
+## APPSYS.STARTUP -- remember what the user had, and report the size.
+## Call it before any SCREEN or COLOR of your own.
+##
+##   out  APPSYS.MODE    the screen mode, for APPSYS.RESTORE
+##        APPSYS.CHARSET the charset number, likewise
+##        APPSYS.COLS    columns
+##        APPSYS.ROWS    rows
+##        APPSYS.COLOUR  the packed text colour
+
+APPSYS.STARTUP.BODY:  GP.CALL APPSYS.SCRMODE, 0, 0, 0, 1 : APPSYS.MODE = GP.A : APPSYS.COLS = GP.X : APPSYS.ROWS = GP.Y
+    APPSYS.COLOUR = PEEK(APPSYS.COLREG) : APPSYS.CHARSET = PEEK(APPSYS.CHRREG)
+    RETURN
+
+## APPSYS.RESTORE -- the screen as it was, for whatever runs next.
+
+APPSYS.RESTORE.BODY:  GP.CALL APPSYS.SCRMODE, APPSYS.MODE, 0, 0, 0 : GP.CALL APPSYS.SETCHR, APPSYS.CHARSET AND 63, 0, 0, 0
+    POKE APPSYS.CHRREG, APPSYS.CHARSET : COLOR APPSYS.COLOUR AND 15, INT(APPSYS.COLOUR / 16)
+    RETURN
+
+## APPSYS.ISEMU -- x16emu, or the machine?
+##
+##   out  APPSYS.IS.EMULATOR   -1 under x16emu, 0 otherwise
+
+APPSYS.ISEMU:  APPSYS.IS.EMULATOR = 0 : IF PEEK(APPSYS.EMUSIG) = 49 THEN IF PEEK(APPSYS.EMUSIG + 1) = 54 THEN APPSYS.IS.EMULATOR = -1
+    RETURN
+
+APPSYS.SKIP:
+#ENDIF

@@ -1,4 +1,15 @@
 @3. The modules (2)
+=KB.INC.BL
+.
+.  out
+.      --
+.
+.  internal
+.      KB.K$
+.
+.One routine, KB.CLEARKB, and one variable it drains into. Nothing else is in
+.the prefix.
+.
 =LINEINPUT.INC.BL
 .
 .  in

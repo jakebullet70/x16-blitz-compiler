@@ -9,7 +9,7 @@
 .
 .  in
 .      THEME.ID -- 0 x16, 1 dark, 2 light, 3 gray, 4 custom, read by
-.        THEME.LOAD<br>THEME.ATTR -- a packed attribute, for THEME.SET and
+.        THEME.SELECT<br>THEME.ATTR -- a packed attribute, for THEME.SET and
 .        THEME.HI
 .
 .  out
@@ -21,11 +21,21 @@
 .
 .  constants
 .      THEME.PAGE THEME.TEXT THEME.TITLE THEME.BORDER THEME.HILITE
-.        THEME.DIMMED THEME.WARN THEME.SLOTS THEME.COUNT
+.        THEME.DIMMED THEME.WARN THEME.FOCUS THEME.SLOTS THEME.COUNT
 .
 .THEME.CLR is the array this module DIMs. Do not DIM it yourself -- the
 .module owns it, and DIMming an array GPC has already dimensioned is an
 .error.
+.
+.The routine is THEME.SELECT, and it used to be THEME.LOAD. The name changed
+.when the library split into banked bodies and unbanked front doors; a
+.program written against the older library calls THEME.LOAD and stops with
+.LABEL NOT FOUND, which is the good kind of failure.
+.
+.THEME.FOCUS is the eighth role and the newest: the attribute a focused
+.control wears while GUI.FORM has the keyboard. THEME.SLOTS is 8 because of
+.it, and THEME.COUNT stays 5 -- the first is how many roles there are, the
+.second how many themes.
 .
 =APPSYS.INC.BL
 .
@@ -103,15 +113,4 @@
 .footing as FILE.DIR. inside FILE.. Nothing here is written by STRINGS.INC.BL
 .and nothing there is written by this module, so either can be included
 .alone.
-.
-=KB.INC.BL
-.
-.  out
-.      --
-.
-.  internal
-.      KB.K$
-.
-.One routine, KB.CLEARKB, and one variable it drains into. Nothing else is in
-.the prefix.
 .

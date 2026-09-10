@@ -55,4 +55,4 @@
 =SEE ALSO
 .
 >50|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
->86|STASHFILE.INC.BL -- a saved text rectangle, through a file.
+>70|STASHFILE.INC.BL -- a saved text rectangle, through a file.

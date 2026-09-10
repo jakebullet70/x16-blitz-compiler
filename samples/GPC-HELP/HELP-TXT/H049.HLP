@@ -35,6 +35,36 @@
 .      OWNER: MENUVERT.INC.BL
 .      WHAT IT IS: vertical menus
 .
+.  MENUBAR.
+.      OWNER: MENUBAR.INC.BL
+.      WHAT IT IS: the other axis -- a horizontal menu bar
+.
+.  GUI.
+.      OWNER: GUI.INC.BL
+.      WHAT IT IS: the dialogs, the box they sit in, and the form that runs
+.        them
+.
+.  GUI.LISTBOX.
+.      OWNER: GUI2.INC.BL
+.      WHAT IT IS: the listbox dialog, kept apart from the rest of GUI.
+.
+.  STASH.
+.      OWNER: STASH.INC.BL
+.      WHAT IT IS: a text rectangle into a RAM bank, and back
+.
+.  STASH.FILE.
+.      OWNER: STASHFILE.INC.BL
+.      WHAT IT IS: the same rectangle through a file, kept apart from the
+.        rest of STASH.
+.
+.  SORT.
+.      OWNER: SORT.INC.BL
+.      WHAT IT IS: shell sort a string array in place
+.
+.  STRCASE.
+.      OWNER: STRCASE.INC.BL
+.      WHAT IT IS: case, rewriting a string in place
+.
 .  BMX.
 .      OWNER: BMX.INC.BL
 .      WHAT IT IS: BMX bitmap loading
@@ -67,9 +97,13 @@
 .
 >3|2. Using it
 >48|4.2 STRINGS.INC.BL -- string helpers
->58|4.10 STRUSING.INC.BL -- a number to a template
+>59|4.10 STRUSING.INC.BL -- a number to a template
 >47|4.1 THEME.INC.BL -- named colour roles
 >50|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
 >51|4.4 LINEINPUT.INC.BL -- a positioned entry field
 >53|4.6 MENUVERT.INC.BL -- a vertical menu
->52|4.5 BMX.INC.BL -- a BMX bitmap into VERA
+>58|4.9 MENUBAR.INC.BL -- a horizontal menu
+>60|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
+>61|4.12 GUI2.INC.BL -- a listbox, single or multi select
+>62|STASH.INC.BL -- save a text rectangle, and put it back.
+>70|STASHFILE.INC.BL -- a saved text rectangle, through a file.

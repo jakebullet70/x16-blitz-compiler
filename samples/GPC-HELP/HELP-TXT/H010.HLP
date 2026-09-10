@@ -1,4 +1,11 @@
 @3. Command reference (2)
+.a keyword it would cost every GP program 462 bytes whether or not it used a
+.menu.
+.
+.The keywords in detail. Square brackets mean optional. Optionals cannot be
+.skipped over: GP.BOX X,Y,W,H,,7 is a syntax error -- write out the default
+.you are passing through.
+.
 =SEE ALSO
 .
 >46|4. Module reference -- the BASL library

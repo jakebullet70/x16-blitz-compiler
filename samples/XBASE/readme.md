@@ -173,7 +173,7 @@ copy XBASE.BASL XBMENUS.BASL MKFIX.BASL                from XBASE/
                                                        into testing/
 
 python source/gpc/build_basl.py MKFIX.BASL MKFIX.PRG
-python source/gpc/build_basl.py XBASE.BASL XBASE.PRG
+python source/gpc/build_basl.py XBASE.BASL XBASE.SRC.PRG
 ```
 
 Then compile each `.PRG` with `GPC.BIN`, SHARED. `MKFIX` first: it makes the fixtures `XBASE` opens,
