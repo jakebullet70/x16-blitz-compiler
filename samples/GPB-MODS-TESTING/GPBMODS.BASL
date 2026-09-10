@@ -301,7 +301,7 @@ GMX.QUIT:
 
 GP.BANKEDSTR GM.TEXTBANK BS.CHROME
   "GPB-MODS-TESTING -- A DEVELOPMENT HARNESS FOR THE GPC-BASIC LIBRARY"
-  "<- ->  BAR     DOWN  OPEN     RETURN  CHOOSE     ESC  BACK / QUIT"
+  "<- ->  BAR   DOWN  OPEN   TAB  FOCUS   RETURN  CHOOSE   ESC  BACK / QUIT"
 GP.ENDBANKEDSTR
 GP.BANKEDSTR GM.TEXTBANK BS.HEAP
   "HEAP  FRE(0) "
@@ -523,6 +523,7 @@ GP.BANKEDSTR GM.TEXTBANK BS.DD.DIALOG
   " GUI.OPEN + GUI.CLOSE"
   " BOX STYLES 0-3"
   " GUI.SHADOW"
+  " TAB AND THE FOCUS"
 GP.ENDBANKEDSTR
 
 GP.BANKEDSTR GM.TEXTBANK BS.DD.LISTS
@@ -749,7 +750,8 @@ GMX.DIALOG:
   GP.CASE 7 : GOSUB GMX.D.LIST.MANY
   GP.CASE 8 : GOSUB GMX.D.PANEL
   GP.CASE 9 : GOSUB GMX.D.STYLES
-  GP.OTHER  : GOSUB GMX.D.SHADOW
+  GP.CASE 10 : GOSUB GMX.D.SHADOW
+  GP.OTHER  : GOSUB GMX.D.FOCUS
   GP.ENDSEL
   GOSUB GMX.CHROME
   RETURN
@@ -1089,6 +1091,80 @@ GMX.D.SHADOW:
   GOSUB GUI.SAY
 
   GM.RESULT$ = GP.BSTR(BS.D.SHADOW, 6)
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.D.FOCUS -- TAB, the focus, and the default button.
+## **
+## **  THREE BOXES, ONE RULE EACH, and each one is the rule live rather than a
+## **  sentence about it:
+## **
+## **    1  the model, in words, so the two that follow have something to be
+## **       measured against
+## **    2  GUI.YN with GUI.DEFAULT = 2, so <<NO>> carries the double brackets
+## **       and RETURN answers no. Nothing else about the call changes
+## **    3  GUI.INPUT, where the focus opens in the FIELD and the default sits
+## **       on OK -- the two are not the same thing, and this is the only
+## **       shape in the library that shows it
+## **
+## **  GUI.INPUT WRITES GUI.DEFAULT ITSELF, to 1. That is why box 2 is a
+## **  GUI.YN: a dialog with a field always defaults to OK, so the moved
+## **  default and the split focus have to be two different boxes.
+## **
+## **  The accelerators are live in box 2 and dead in box 3 while the eye is in
+## **  the field, which is the whole accelerator rule and is why Y and N are
+## **  marked in one and O and C are marked but inert in the other.
+## ***********************************************************************
+
+
+GP.BANKEDSTR GM.TEXTBANK BS.D.FOCUS
+  " THE FOCUS "
+  "TAB MOVES THE FOCUS, SHIFT+TAB GOES BACK."
+  "THE DEFAULT IS DRAWN <<LIKE THIS>>, AND RETURN"
+  "PRESSES IT FROM WHEREVER THE FOCUS IS."
+  " A MOVED DEFAULT "
+  "GUI.DEFAULT = 2, SO NO IS THE DEFAULT HERE."
+  "RETURN ANSWERS NO. Y AND N STILL WORK."
+  " FOCUS IS NOT DEFAULT "
+  "THE FOCUS OPENS IN THE FIELD. THE DEFAULT IS"
+  "OK. TAB TO REACH THE BUTTONS; O AND C ARE"
+  "MARKED BUT INERT WHILE THE FIELD HAS THE KEYS."
+  "ANSWER "
+  "   GUI.OK "
+  "   TEXT ["
+  "]"
+GP.ENDBANKEDSTR
+GMX.D.FOCUS:
+  GOSUB GMX.D.RESET
+  GUI.TITLE$ = GP.BSTR(BS.D.FOCUS, 0)
+  GUI.MSG$ = GP.BSTR(BS.D.FOCUS, 1)
+  GUI.MSG2$ = GP.BSTR(BS.D.FOCUS, 2)
+  GUI.MSG3$ = GP.BSTR(BS.D.FOCUS, 3)
+  GOSUB GUI.SAY
+
+## ---- The default moves, and nothing else does.
+
+  GOSUB GMX.D.RESET
+  GUI.TITLE$ = GP.BSTR(BS.D.FOCUS, 4)
+  GUI.MSG$ = GP.BSTR(BS.D.FOCUS, 5)
+  GUI.MSG2$ = GP.BSTR(BS.D.FOCUS, 6)
+  GUI.DEFAULT = 2
+  GOSUB GUI.YN
+  GM.NUM% = GUI.ANSWER : GOSUB GMX.SIGNED
+  GM.FOCUS$ = GP.BSTR(BS.D.FOCUS, 11) + GM.NUM$
+
+## ---- And the focus starts somewhere the default is not.
+
+  GOSUB GMX.D.RESET
+  GUI.TITLE$ = GP.BSTR(BS.D.FOCUS, 7)
+  GUI.MSG$ = GP.BSTR(BS.D.FOCUS, 8)
+  GUI.MSG2$ = GP.BSTR(BS.D.FOCUS, 9)
+  GUI.MSG3$ = GP.BSTR(BS.D.FOCUS, 10)
+  GUI.LEN = 16 : GUI.TEXT$ = ""
+  GOSUB GUI.INPUT
+  GM.NUM% = GUI.OK : GOSUB GMX.SIGNED
+  GM.RESULT$ = GM.FOCUS$ + GP.BSTR(BS.D.FOCUS, 12) + GM.NUM$ + GP.BSTR(BS.D.FOCUS, 13) + GUI.TEXT$ + GP.BSTR(BS.D.FOCUS, 14)
   RETURN
 
 

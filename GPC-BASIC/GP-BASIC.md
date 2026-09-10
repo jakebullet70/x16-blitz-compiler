@@ -153,12 +153,15 @@ Three implementations, and what each costs:
 | **Routine calls** | ASM | `GP.FN` — the same call as a value, and it brings the GP block in |
 | **Screen** | ASM | `GP.BOX` `GP.FILL` `GP.PRINTAT` |
 | **Screen** | COMPOSITE | `GP.CHAR` — free, one cell in `GP.PRINTAT`'s shape running `GP.FILL`'s handler |
-| **Colour roles** | BASIC | `THEME.INC.BL` — `THEME.LOAD`, `THEME.CLR()` · §4.1 |
+| **Colour roles** | BASIC | `THEME.INC.BL` — `THEME.SELECT`, `THEME.CLR()` · §4.1 |
 | **String helpers** | BASIC+ASM | `STRINGS.INC.BL` — `PADR` `PADL` `PADC` `SPLIT` `REPLACE` `SPLICE` `PET2SCR` `TRIM` `LTRIM` `RTRIM` · §4.2 |
 | **Screen etiquette, panels** | BASIC | `APPSYS.INC.BL` — `STARTUP` `RESTORE` `PANEL.SAVE/LOAD/PUT` `ISEMU` · §4.3 |
 | **Entry fields** | BASIC | `LINEINPUT.INC.BL` — `LINEINPUT.GET`, `LINEINPUT.ASK` · §4.4 |
 | **Bitmaps** | BASIC | `BMX.INC.BL` — `BMX.SHOW`, `BMX.RESTORE` · §4.5 |
 | **Menus** | BASIC | `MENUVERT.INC.BL` — `RUN` `DRAW` `ROW` `HOTFIND` · §4.6 |
+| **Menus** | BASIC | `MENUBAR.INC.BL` — `RUN` `DRAW` `ITEM` `MARK` `WHERE`, the other axis · §4.9 |
+| **Dialogs** | BASIC | `GUI.INC.BL` — `GUI.SAY` `GUI.YN` `GUI.MENU` `GUI.INPUT` `GUI.OPEN` `GUI.CLOSE` · §4.11 |
+| **Dialogs** | BASIC | `GUI2.INC.BL` — `GUI.LISTBOX`, single or multi select · §4.12 |
 
 The rule is in §1: assembly for tight loops and bulk data moves, BASIC for everything else, and a
 composite for anything that is only a spelling of keywords already present. A menu waits on a human,
@@ -956,11 +959,20 @@ Called with `GOSUB`. Arguments go into named variables before the call, results 
 variables after it. Every module is position-independent — each jumps over itself — so `#INCLUDE` it
 anywhere, including the top of the program.
 
+**Six of them need a front door.** `THEME`, `MENUVERT`, `MENUBAR`, `LINEINPUT`, `GUI` and `GUI2`
+are built to run from a RAM bank, and a banked routine cannot select its own bank — so each defines
+`THEME.SELECT.BODY` rather than `THEME.SELECT`, and the public name comes from a separate file that
+banks and then calls it. `#INCLUDE "LIB.GUIBANK.INC.BL"` to run the library in a bank, or the six
+`<MODULE>.PLAIN.INC.BL` files to run it from low memory — **one or the other, never both**, and
+only the ones whose modules you actually included. The front doors go before the bodies in the
+file, and the `GOSUB`s in this section read identically either way. See
+[GP-BASIC.GLOBALS.md](GP-BASIC.GLOBALS.md) §4.
+
 ### 4.1 `THEME.INC.BL` — named colour roles
 
 | Routine | in | out |
 |---|---|---|
-| `THEME.LOAD` | `THEME.ID` | fills `THEME.CLR()` |
+| `THEME.SELECT` | `THEME.ID` | fills `THEME.CLR()` |
 | `THEME.NEXT` | `THEME.ID` | the following theme, loaded |
 | `THEME.RESET` | `THEME.ID` | the selected theme's shipped values, reloaded |
 | `THEME.SET` | `THEME.ATTR` | issues `COLOR` — makes it the colour `PRINT` uses |
@@ -985,14 +997,23 @@ the user change colours carries those changes into `CUSTOM` rather than discardi
 exception is a cold start — `CUSTOM` selected before any other theme has been loaded — where there
 is nothing to keep and it takes `X16`'s values. `THEME.RESET` goes back to those.
 
-`samples/color-test` edits all seven roles against a mock of the GUI and prints the
-`THEME.CLR()` lines to paste back in here.
+`samples/color-test` edits the roles against a mock of the GUI and prints the `THEME.CLR()` lines
+to paste back in here. **It carries its own `GPC-BASIC` folder and is still at seven roles**, so it
+does not yet offer `THEME.FOCUS`.
 
 Roles, for indexing `THEME.CLR()`: `THEME.PAGE` `THEME.TEXT` `THEME.TITLE` `THEME.BORDER`
-`THEME.HILITE` `THEME.DIMMED` `THEME.WARN`, and `THEME.SLOTS` = 7.
+`THEME.HILITE` `THEME.DIMMED` `THEME.WARN` `THEME.FOCUS`, and `THEME.SLOTS` = 8.
+
+`THEME.FOCUS` is the eighth and newest: what a focused control wears while `GUI.FORM` has the
+keyboard (§4.11). It is a separate role from `THEME.HILITE` because a dialog shows both at once —
+the highlighted row of a list, and the control the TAB key has landed on.
+
+**The routine used to be `THEME.LOAD`.** It became `THEME.SELECT` when the library split into
+banked bodies and unbanked front doors, and a program still calling the old name stops at
+`LABEL NOT FOUND`.
 
 ```basic
-THEME.ID = 1 : GOSUB THEME.LOAD
+THEME.ID = 1 : GOSUB THEME.SELECT
 GP.BOX 4,2,30,8, 2, THEME.CLR(THEME.BORDER)
 GP.PRINTAT 6,3, "TITLE", THEME.CLR(THEME.TITLE)
 ```
@@ -1452,6 +1473,35 @@ with the trims, to [`STRTST.EXP.BL`](STRTST.EXP.BL).
 
 ---
 
+### 4.9 `MENUBAR.INC.BL` — a horizontal menu
+
+| Routine | in | out |
+|---|---|---|
+| `MENUBAR.RUN` | `MENUBAR.X` `MENUBAR.Y` `MENUBAR.GAP` `MENUBAR.FLAGS` `MENUBAR.SEL`, and `MENUVERT.COUNT` `MENUVERT.ITEM$()` `MENUVERT.ATTR` `MENUVERT.HIATTR` `MENUVERT.HOT$` `MENUVERT.HOTATTR` | `MENUBAR.SEL` `MENUBAR.KEY` `MENUBAR.SELX` `MENUBAR.SELW` |
+| `MENUBAR.DRAW` | the same | the bar on screen, undriven |
+| `MENUBAR.ITEM` | `MENUBAR.FIND` and an attribute | one item, repainted |
+| `MENUBAR.MARK` | `MENUBAR.FIND` | that item highlighted |
+| `MENUBAR.WHERE` | `MENUBAR.FIND` | `MENUBAR.AT` `MENUBAR.WIDE` |
+
+`MENUVERT` is the vertical menu; this is the other axis. **It reads `MENUVERT`'s items, attributes
+and hotkeys rather than defining its own**, because a bar and the dropdown under it are one thing to
+the user — so it does not build without `MENUVERT.INC.BL`, and the caller refills
+`MENUVERT.ITEM$()` between drawing the bar and opening the menu.
+
+**An item is as wide as its own text.** There is no `MENUBAR.WIDTH` and no column width; the air
+goes in the item string, so `" FILE "` is how a highlight gets padding. `MENUBAR.GAP` is the space
+*between* two items and defaults to 0 for the same reason.
+
+**Up and down are optional exits, off by default.** `MENUBAR.DOWNEXIT` ends the bar on DOWN and
+`MENUBAR.UPEXIT` on UP, handing the key back in `MENUBAR.KEY` so the caller can open the panel
+under `MENUBAR.SELX`. A bar that is only a bar leaves both off and arrows across the grain do
+nothing. `MENUVERT`'s `MENUHELP.KEYEXIT` is the other half of that handshake.
+
+Flags, added together: `MENUBAR.MUSTSEL` `MENUBAR.KEEPMARK` `MENUBAR.NOWRAP` `MENUBAR.GAMEPAD`
+`MENUBAR.DOWNEXIT` `MENUBAR.UPEXIT`.
+
+---
+
 ### 4.10 `STRUSING.INC.BL` — a number to a template
 
 | Routine | in | out |
@@ -1528,6 +1578,106 @@ the result is a field, so a right answer in the wrong number of columns still br
 
 ---
 
+### 4.11 `GUI.INC.BL` — four dialogs, in a box that puts the screen back
+
+| Routine | in | out |
+|---|---|---|
+| `GUI.SAY` | `GUI.MSG$` | `GUI.KEY` — something to say, and one way out |
+| `GUI.YN` | `GUI.MSG$` | `GUI.ANSWER`, -1 for yes |
+| `GUI.MENU` | `GUI.COUNT` `GUI.SEL` `GUI.FLAGS`, over `MENUVERT.ITEM$()` | `GUI.SEL`, or 0 if cancelled |
+| `GUI.INPUT` | `GUI.LEN` `GUI.TEXT$` `GUI.MASK` | `GUI.TEXT$` `GUI.OK` |
+| `GUI.OPEN` | `GUI.BODY.ROWS` `GUI.BODY.WIDTH` | `GUI.INNER.LEFT` `.TOP` `.WIDTH` — the box on its own, for a dialog of your own |
+| `GUI.CLOSE` | — | the screen as it was |
+
+```basic
+THEME.ID = 0 : GOSUB THEME.SELECT
+GUI.BANK = 8
+GUI.MSG$ = "DELETE THE FILE?"
+GOSUB GUI.YN
+IF GUI.ANSWER THEN <yes>
+```
+
+Requires `GPB.INC.BL`, `STASH.INC.BL`, `THEME.INC.BL`, `MENUVERT.INC.BL` and `LINEINPUT.INC.BL`,
+and `#INCLUDE`s none of them. **All five, whichever dialog you call** — BASLOAD resolves every
+label in the file, so leaving one out is `LABEL NOT FOUND`. It wants a `#SYMFILE`, because
+`STASH` does.
+
+Everything the box takes — three message lines, a title, the style, the placement, the shadow, the
+frame glyphs, the bank the covered cells go to — is listed in full in
+[GP-BASIC.GLOBALS.md](GP-BASIC.GLOBALS.md) §3. `GUI.BANK = 0` does not save the cells, and then the
+box is still on screen when the call returns.
+
+**Every control has a focus, and TAB moves it.** The dialogs no longer own their key loops: each
+states its controls and `GUI.FORM` runs them. A control is a button, a field or a list; it hands
+back one of six verdicts — stay, next, previous, press, default, cancel — and the dispatcher stays
+one loop whatever the mix. A caller that never presses TAB sees what it always saw.
+
+**The default button and the focused control are different things.** The default is what RETURN
+presses from anywhere and is drawn `<<LIKE THIS>>`; the focus is where TAB has got to and is drawn
+in `THEME.FOCUS`. `GUI.INPUT` opens with the default on OK and the focus in the field — which is
+the point of keeping the two apart, and `GUI.DEFAULT` sets only the first.
+
+**The answers are buttons.** `GUI.BTN.ONE$` and `GUI.BTN.TWO$` carry them, and `&` marks the
+accelerator: `"&CANCEL"` lights the C. **An accelerator is live only while the focused control does
+not eat printable keys**, so C presses CANCEL from the button row or from inside a list, and types
+a C in a field. That is the whole rule, and `GUIFRMT`'s T14, T15 and T22 are the three assertions
+that hold it.
+
+`GUI.HINT$` is gone — the dimmed line naming two keys became the button row, and it is the one
+interface this took away.
+
+**The typing dialog and its string swapped names**: it was `GUI.TEXT` returning `GUI.INPUT$`, and it
+is `GUI.INPUT` returning `GUI.TEXT$`. BASLOAD will not have a label and a variable of one name and
+the `$` does not separate them. A program written against the older library **compiles clean and
+reads the wrong one back**.
+
+**Upper case, on the default charset.** `GP.PRINTAT` converts PETSCII and BASLOAD passes literals
+through as source bytes, so charset 2 lands lower case on the graphics half of the font. ISO mode
+fixes the text and breaks the frame, `GP.BOX`'s `$40`–`$7D` being letters. Upper case with a frame,
+mixed case without one, or re-order the font and set `GUI.GLYPH`.
+
+Example: [`GUI.EXP.BL`](GUI.EXP.BL). Regression test: `samples/GPB-MODS-TESTING/GUIFRMT.BASL`,
+twenty-four assertions driven by keys pushed into the KERNAL buffer — the only way to drive a `GET`
+loop headlessly.
+
+---
+
+### 4.12 `GUI2.INC.BL` — a listbox, single or multi select
+
+| Routine | in | out |
+|---|---|---|
+| `GUI.LISTBOX` | `GUI.LISTBOX.COUNT` `.ROWS` `.MULTI` `.MARKS$` `.SEL`, over `MENUVERT.ITEM$()` | `GUI.LISTBOX.SEL` `.MARKS$` `.MARKED` `GUI.KEY` |
+
+```basic
+DIM MENUVERT.ITEM$(200)
+GUI.LISTBOX.COUNT = N : GUI.LISTBOX.ROWS = 8 : GUI.LISTBOX.MULTI = 1
+GUI.MSG$ = "PICK FILES" : GUI.BANK = 8
+GOSUB GUI.LISTBOX
+IF GUI.LISTBOX.SEL = 0 THEN <cancelled>
+```
+
+Its own `#INCLUDE` on top of `GUI.INC.BL`, because nothing else in the library wants a set of marks
+or a footer counting them. **The caller owns the `DIM`** of `MENUVERT.ITEM$()`.
+
+Up and down move, PgUp and PgDn page, HOME and END jump, SPACE toggles a mark in multi. TAB moves
+to the buttons and back, RETURN takes `<<OK>>` from anywhere, ESC and STOP cancel — and O and C
+press their buttons while the eye is still in the list, which a list can offer and a typing field
+cannot.
+
+**In multi, `GUI.LISTBOX.SEL` is not the answer** — it is where the cursor was left. The marks are:
+`GUI.LISTBOX.MARKS$` is `COUNT` characters with `"1"` for marked, and it goes in as well as out, so
+a list reopens with its marks. Any other length, `""` included, starts with none.
+
+The bottom frame edge reads `2 SELECTED OF 20` in multi, `20 ITEMS` for a single list too long to
+see at once, and is blank for one that fits.
+
+**The scrolling list itself is not in this module.** It is `GUI.CT.LIST`, one of `GUI.FORM`'s three
+control types, and lives in `GUI.INC.BL` beside the field; this file is the dialog around it.
+
+Example: [`GUI2TST.EXP.BL`](GUI2TST.EXP.BL).
+
+---
+
 ## 5. Variables
 
 BASL has one flat namespace. There are no locals, no scoping and no parameters. Every variable in
@@ -1546,6 +1696,12 @@ The convention is one dotted prefix per module, and nothing writes outside its o
 | `APPSYS.` | `APPSYS.INC.BL` |
 | `LINEINPUT.` | `LINEINPUT.INC.BL` |
 | `MENUVERT.` | `MENUVERT.INC.BL` |
+| `MENUBAR.` | `MENUBAR.INC.BL` |
+| `GUI.` | `GUI.INC.BL` |
+| `GUI.LISTBOX.` | `GUI2.INC.BL`, kept apart from the rest of `GUI.` |
+| `STASH.` / `STASH.FILE.` | `STASH.INC.BL` / `STASHFILE.INC.BL` |
+| `SORT.` | `SORT.INC.BL` |
+| `STRCASE.` | `STRCASE.INC.BL` |
 | `BMX.` / `BMXK.` | `BMX.INC.BL` (variables / its KERNAL constants) |
 
 Use any other prefix for your own program: `GAME.`, `MAP.`, `AIRLIFT.`. A prefix costs nothing at
