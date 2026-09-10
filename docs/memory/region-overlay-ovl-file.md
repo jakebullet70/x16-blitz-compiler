@@ -70,5 +70,19 @@ bootstrap extension page binds next, at 95. Measured: `BNK63` is a region in eve
 **Resident p-code is still capped by the workspace test** — this never touched that, and GPBMODS
 proves it: its object fell by 13K while its free-memory figure did not move.
 
+## A .Bnn FILE SIZE IS A PAGE COUNT, NOT A BYTE COUNT
+
+**Only the topmost region is unpadded.** Every other one is rounded up to a whole page, so its
+`.Bnn` is always a multiple of 256 plus the 2-byte load address and says NOTHING about the bytes
+inside its last page. `GPBMODS` has five regions and its `.B04` read 7,168 / 7,680 / 7,936 / 8,192
+across four phases of the GUI refactor -- four exact page counts, quoted in the plan for three
+phases as if they were code sizes, with a "free of 8,192" column derived from them. They were the
+padding. The same six modules built into `GUIFRMT`, which has ONE region and no padding, measured
+7,852 and then 8,033.
+
+**To measure a region, build it in a program where it is the only one**, or where it is topmost.
+The ceiling is **8,188**, not 8,192: `gpbank.asm:582` refuses a 33rd page and counts four bytes of
+bridges into the length.
+
 Related: [[gp-bankedstr-literal-text-in-a-bank]], [[object-writer-regions-vs-low-code]],
 [[load-chain-strands-array-strings]] (a LOAD-chained set needs its own overlays per program).
