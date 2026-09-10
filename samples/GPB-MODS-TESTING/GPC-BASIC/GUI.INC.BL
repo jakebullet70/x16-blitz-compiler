@@ -9,7 +9,9 @@
 ## **
 ## **  and two internal things, used from inside this bank and not shimmed:
 ## **      GUI.FORM     the control block and the one key loop the dialogs
-## **                   share. A dialog is a list of controls and a wrapper
+## **                   share. A dialog is a list of controls and a wrapper,
+## **                   and a control is a button, a field or a list --
+## **                   GUI2.INC.BL's listbox is built on the third
 ## **      GUI.CLEARKB  empty the keyboard buffer. KB.CLEARKB's twin
 ## **
 ## **  Requires, and #INCLUDEs none of them, in this order:
@@ -458,9 +460,10 @@ GUI.BTN.COLOURS:
 ## **  that wants RETURN for itself, and GUI.FOCUS is where the eye is. They
 ## **  start on the same button and separate on the first TAB.
 ## **
-## **  BUTTONS AND FIELDS. GUI.CT.LIST has a number and no arm in
-## **  GUI.FORM.STEP yet, so a list control would be driven as a button until
-## **  phase 4 writes one.
+## **  THREE CONTROL TYPES, and each one owns two routines: a DRAW that PAINT
+## **  hands off to, and a DO that turns keys into one of the six verdicts.
+## **  Adding a fourth is those two routines and two arms, and nothing else in
+## **  here has to know about it.
 ## ***********************************************************************
 
 ## ***********************************************************************
@@ -549,6 +552,210 @@ GUI.FIELD.DRAW:
 
 
 ## ***********************************************************************
+## **  GUI.LIST.MEASURE -- how wide the bottom frame edge wants to be.
+## **
+## **   in   GUI.LIST.COUNT GUI.LIST.ROWS GUI.LIST.MARKP
+## **   out  GUI.LIST.NOTE$ GUI.LIST.NOTEW GUI.LIST.DIGITS
+## **
+## **  BEFORE GUI.OPEN, because the note is measured into the box width and the
+## **  box cannot grow afterwards -- the frame is stashed. Built at its WIDEST:
+## **  COUNT stands in for the marked count as well, because a field measured
+## **  on "2 SELECTED" is too narrow for "20 SELECTED".
+## ***********************************************************************
+
+GUI.LIST.MEASURE:
+    GUI.LIST.DIGITS = LEN(MID$(STR$(GUI.LIST.COUNT), 2))
+    GUI.LIST.NOTE$ = ""
+    IF GUI.LIST.COUNT > GUI.LIST.ROWS THEN GUI.LIST.NOTE$ = " " + MID$(STR$(GUI.LIST.COUNT), 2) + " ITEMS "
+    IF GUI.LIST.MARKP <> 0 THEN GUI.LIST.NOTE$ = " " + MID$(STR$(GUI.LIST.COUNT), 2) + " SELECTED OF " + MID$(STR$(GUI.LIST.COUNT), 2) + " "
+    GUI.LIST.NOTEW = LEN(GUI.LIST.NOTE$)
+    RETURN
+
+
+## ***********************************************************************
+## **  GUI.FORM.ADD.LIST -- record and draw a scrolling list as a control.
+## **
+## **   in   GUI.LIST.X GUI.LIST.Y   the top left of the ROWS, inside the box
+## **        GUI.LIST.W              how wide the text columns are
+## **        GUI.LIST.ROWS           how many rows are visible at once
+## **        GUI.LIST.COUNT          how many items there are
+## **        GUI.LIST.SEL            the item to start on, 1..COUNT
+## **        GUI.LIST.MARKP          0 for a list that chooses one row. For one
+## **                                that marks a set, GP.STRPTR of a string of
+## **                                COUNT "0"s and "1"s -- and the CALLER owns
+## **                                that string and its length
+## **        MENUVERT.ITEM$()        the items, and the caller DIMs it
+## **        GUI.LIST.MEASURE        already called, before GUI.OPEN
+## **
+## **  MENUVERT OWNS THE TEXT COLUMNS and this file owns the mark column two
+## **  to their left, which is how the caller's array is never touched.
+## **
+## **  MENUVERT.SCROLL IS THE WINDOW: screen row R draws ITEM$(SCROLL + R), so
+## **  the drawing is MENUVERT.ROW unchanged and this file only decides what
+## **  SCROLL is. WARNING: it is global and MENUBAR aims the same routine
+## **  sideways, so whoever runs the form puts it back to 0 on the way out.
+## ***********************************************************************
+
+GUI.FORM.ADD.LIST:
+    IF GUI.CTRL.N >= GUI.FORM.MAX THEN RETURN
+    GUI.CTRL.N = GUI.CTRL.N + 1
+    GUI.CTRL.TYPE%(GUI.CTRL.N) = GUI.CT.LIST
+    GUI.CTRL.X%(GUI.CTRL.N) = GUI.LIST.X
+    GUI.CTRL.Y%(GUI.CTRL.N) = GUI.LIST.Y
+    GUI.CTRL.W%(GUI.CTRL.N) = GUI.LIST.W
+    GUI.CTRL.TEXT$(GUI.CTRL.N) = ""
+    GUI.CTRL.KEY%(GUI.CTRL.N) = 0
+    GUI.CTRL.FLAGS%(GUI.CTRL.N) = 0
+
+## ---- MENUVERT is aimed once. Nothing else moves it while a dialog is open,
+## ---- so the paint routines below set only the row and the attribute.
+
+    MENUVERT.X = GUI.LIST.X
+    MENUVERT.Y = GUI.LIST.Y
+    MENUVERT.WIDTH = GUI.LIST.W
+    MENUVERT.COUNT = GUI.LIST.ROWS
+    MENUVERT.ATTR = GUI.PANEL
+    MENUVERT.HOTATTR = 0
+    MENUVERT.HOT$ = ""
+    MENUVERT.SCROLL = 0
+
+    IF GUI.LIST.SEL < 1 THEN GUI.LIST.SEL = 1
+    IF GUI.LIST.SEL > GUI.LIST.COUNT THEN GUI.LIST.SEL = GUI.LIST.COUNT
+    GUI.LIST.NOTE.LEFT = GUI.LEFT + INT((GUI.WIDTH - GUI.LIST.NOTEW) / 2)
+    GOSUB GUI.LIST.COUNTMARKS
+    GOSUB GUI.LIST.FOOT
+    GOSUB GUI.LIST.FOLLOW
+    GUI.PAINT.N = GUI.CTRL.N
+    GOSUB GUI.LIST.DRAW
+    RETURN
+
+
+## ***********************************************************************
+## **  GUI.LIST.DRAW -- every visible row, in the colours its state asks for.
+## **
+## **   in   GUI.PAINT.N   which control
+## **
+## **  THE HIGHLIGHT IS ALWAYS DRAWN, because a list without one has lost its
+## **  place. What changes is the colour: THEME.FOCUS while the eye is on it,
+## **  THEME.HILITE while the eye is elsewhere. Same rule as a button -- the
+## **  second cue is colour and colour alone.
+## ***********************************************************************
+
+GUI.LIST.DRAW:
+    GUI.LIST.HI = THEME.CLR(THEME.HILITE)
+    IF GUI.PAINT.N = GUI.FOCUS THEN GUI.LIST.HI = THEME.CLR(THEME.FOCUS)
+    FOR GUI.LIST.EACH = 1 TO GUI.LIST.ROWS
+        GUI.LIST.ROW = GUI.LIST.EACH
+        GUI.LIST.ATTR = MENUVERT.ATTR
+        IF MENUVERT.SCROLL + GUI.LIST.EACH = GUI.LIST.SEL THEN GUI.LIST.ATTR = GUI.LIST.HI
+        GOSUB GUI.LIST.PAINT.ROW
+    NEXT GUI.LIST.EACH
+    RETURN
+
+
+## ***********************************************************************
+## **  GUI.LIST.PAINT.ROW -- one screen row: the mark cell, then the text.
+## **
+## **   in   GUI.LIST.ROW    the SCREEN row, 1..GUI.LIST.ROWS
+## **        GUI.LIST.ATTR   the attribute to draw it in
+## **
+## **  Guarded rather than trusted: callers work a screen row out by
+## **  subtracting SCROLL, and a row off the window is a no-op here rather
+## **  than a GP.PRINTAT into the frame.
+## ***********************************************************************
+
+GUI.LIST.PAINT.ROW:
+    IF GUI.LIST.ROW < 1 THEN RETURN
+    IF GUI.LIST.ROW > GUI.LIST.ROWS THEN RETURN
+    MENUVERT.DRAWROW = GUI.LIST.ROW
+    MENUVERT.DRAWATTR = GUI.LIST.ATTR
+    GOSUB MENUVERT.ROW
+    IF GUI.LIST.MARKP = 0 THEN RETURN
+
+## ---- The mark cell carries the row's own attribute, so the highlight reads as
+## ---- one band across the mark and the text. 42 is "*", on both charsets.
+
+    GUI.LIST.MARKY = MENUVERT.Y + GUI.LIST.ROW - 1
+    GP.FILL GUI.LIST.X - 2, GUI.LIST.MARKY, 2, 1, GUI.SPACE, GUI.LIST.ATTR
+    IF PEEK(GUI.LIST.MARKP + MENUVERT.SCROLL + GUI.LIST.ROW) <> 49 THEN RETURN
+    GP.FILL GUI.LIST.X - 2, GUI.LIST.MARKY, 1, 1, 42, GUI.LIST.ATTR
+    RETURN
+
+
+## ***********************************************************************
+## **  GUI.LIST.FOLLOW -- the window moves the least it can to show the item.
+## ***********************************************************************
+
+GUI.LIST.FOLLOW:
+    IF GUI.LIST.SEL - MENUVERT.SCROLL < 1 THEN MENUVERT.SCROLL = GUI.LIST.SEL - 1
+    IF GUI.LIST.SEL - MENUVERT.SCROLL > GUI.LIST.ROWS THEN MENUVERT.SCROLL = GUI.LIST.SEL - GUI.LIST.ROWS
+    IF MENUVERT.SCROLL > GUI.LIST.COUNT - GUI.LIST.ROWS THEN MENUVERT.SCROLL = GUI.LIST.COUNT - GUI.LIST.ROWS
+    IF MENUVERT.SCROLL < 0 THEN MENUVERT.SCROLL = 0
+    RETURN
+
+
+## ***********************************************************************
+## **  GUI.LIST.COUNTMARKS -- how many are marked, counted once.
+## **
+## **  Counted at the start and then kept in step by GUI.LIST.TOGGLE, because
+## **  the footer shows it while the box is open and a caller may hand marks IN.
+## ***********************************************************************
+
+GUI.LIST.COUNTMARKS:
+    GUI.LIST.MARKED = 0
+    IF GUI.LIST.MARKP = 0 THEN RETURN
+    FOR GUI.LIST.I = 1 TO GUI.LIST.COUNT
+        IF PEEK(GUI.LIST.MARKP + GUI.LIST.I) = 49 THEN GUI.LIST.MARKED = GUI.LIST.MARKED + 1
+    NEXT GUI.LIST.I
+    RETURN
+
+
+## ***********************************************************************
+## **  GUI.LIST.TOGGLE -- one mark, POKEd where it lies.
+## **
+## **  97 - c turns 48 into 49 and 49 into 48. GUI.LIST.MARKP was taken by the
+## **  caller before GUI.OPEN: a GPC string owns its block and the block does
+## **  not move, and nothing here ever reassigns the string, so it stays good.
+## **
+## **  Down for the unmark, back up twice for the mark: one PEEK either way,
+## **  and the count never walks the string again.
+## ***********************************************************************
+
+GUI.LIST.TOGGLE:
+    POKE GUI.LIST.MARKP + GUI.LIST.SEL, 97 - PEEK(GUI.LIST.MARKP + GUI.LIST.SEL)
+    GUI.LIST.MARKED = GUI.LIST.MARKED - 1
+    IF PEEK(GUI.LIST.MARKP + GUI.LIST.SEL) = 49 THEN GUI.LIST.MARKED = GUI.LIST.MARKED + 2
+    GUI.LIST.ROW = GUI.LIST.SEL - MENUVERT.SCROLL
+    GUI.LIST.ATTR = GUI.LIST.HI
+    GOSUB GUI.LIST.PAINT.ROW
+    GOSUB GUI.LIST.FOOT
+    RETURN
+
+
+## ***********************************************************************
+## **  GUI.LIST.FOOT -- the count, written into the bottom frame edge.
+## **
+## **  The number is padded to the width of COUNT rather than the string
+## **  centred: the field was measured at its widest, so a shorter text drawn
+## **  centred would leave the last character of the longer one on the frame.
+## **  Two IFs cover 250, which is as many items as a marks string holds.
+## ***********************************************************************
+
+GUI.LIST.FOOT:
+    IF GUI.LIST.NOTEW = 0 THEN RETURN
+    GUI.LIST.EDGE$ = GUI.LIST.NOTE$
+    IF GUI.LIST.MARKP = 0 THEN GOTO GUI.LIST.FOOT.DRAW
+    GUI.LIST.NUM$ = MID$(STR$(GUI.LIST.MARKED), 2)
+    IF LEN(GUI.LIST.NUM$) < GUI.LIST.DIGITS THEN GUI.LIST.NUM$ = " " + GUI.LIST.NUM$
+    IF LEN(GUI.LIST.NUM$) < GUI.LIST.DIGITS THEN GUI.LIST.NUM$ = " " + GUI.LIST.NUM$
+    GUI.LIST.EDGE$ = " " + GUI.LIST.NUM$ + " SELECTED OF " + MID$(STR$(GUI.LIST.COUNT), 2) + " "
+
+GUI.LIST.FOOT.DRAW:
+    GP.PRINTAT GUI.LIST.NOTE.LEFT, GUI.TOP + GUI.HEIGHT - 1, GUI.LIST.EDGE$, GUI.BORDER
+    RETURN
+
+
+## ***********************************************************************
 ## **  GUI.FORM.ADD.BUTTON -- record the button GUI.BUTTON just drew.
 ## **
 ## **   in   GUI.BTN.X GUI.BTN.Y GUI.BTN.TEXT$ GUI.BTN.KEY GUI.BTN.DEF
@@ -579,12 +786,14 @@ GUI.FORM.ADD.BUTTON:
 ## **
 ## **   in   GUI.PAINT.N   which control
 ## **
-## **  A FIELD IS HANDED ON WITH GOTO, NOT GOSUB: GUI.FIELD.DRAW's RETURN goes
-## **  back to whoever called PAINT, which is the whole of what is left to do.
+## **  A FIELD AND A LIST ARE HANDED ON WITH GOTO, NOT GOSUB: the draw
+## **  routine's RETURN goes back to whoever called PAINT, which is the whole
+## **  of what is left to do.
 ## ***********************************************************************
 
 GUI.FORM.PAINT:
     IF GUI.CTRL.TYPE%(GUI.PAINT.N) = GUI.CT.FIELD THEN GOTO GUI.FIELD.DRAW
+    IF GUI.CTRL.TYPE%(GUI.PAINT.N) = GUI.CT.LIST THEN GOTO GUI.LIST.DRAW
     GUI.BTN.X = GUI.CTRL.X%(GUI.PAINT.N)
     GUI.BTN.Y = GUI.CTRL.Y%(GUI.PAINT.N)
     GUI.BTN.TEXT$ = GUI.CTRL.TEXT$(GUI.PAINT.N)
@@ -636,6 +845,7 @@ GUI.FORM.STEP:
     GUI.STEP.TYPE = GUI.CTRL.TYPE%(GUI.FOCUS)
     GP.SELECT GUI.STEP.TYPE
         GP.CASE GUI.CT.FIELD : GOSUB GUI.FORM.DO.FIELD
+        GP.CASE GUI.CT.LIST : GOSUB GUI.FORM.DO.LIST
         GP.OTHER : GOSUB GUI.FORM.DO.BUTTON
     GP.ENDSEL
     GOSUB GUI.FORM.ACT
@@ -673,6 +883,77 @@ GUI.FORM.DO.FIELD:
             GUI.FORM.NAV = GUI.NAV.CANCEL
     GP.ENDSEL
     RETURN
+
+
+## ***********************************************************************
+## **  GUI.FORM.DO.LIST -- the list's keys, and a verdict when it is done.
+## **
+## **  PAINT-AND-SCROLL IS IN HERE, THE VERDICT IS NOT. Moving the cursor and
+## **  moving the window are the list's own business and never leave this
+## **  loop; what comes out is one of the six verdicts, and GUI.FORM.ACT is
+## **  still the only place one is acted on.
+## **
+## **  RETURN IS NAV.DEFAULT, NOT NAV.PRESS, for the same reason it is in a
+## **  field: the eye is on the list, and a list has nothing to press.
+## **
+## **  UP AND DOWN BELONG TO THE LIST, so TAB is the only way forward out of
+## **  it -- unlike a button, where LEFT and RIGHT move the focus too. A key
+## **  the list does not claim is offered to the accelerators, which is what
+## **  lets <OK> and <CANCEL> answer to their marked letters while the eye is
+## **  still in the list. A FIELD cannot do that, and that is the difference:
+## **  a list eats SPACE and nothing else printable.
+## ***********************************************************************
+
+GUI.FORM.DO.LIST:
+    GUI.FORM.NAV = GUI.NAV.STAY
+
+GUI.FORM.DO.LIST.KEY:
+    GOSUB GUI.FORM.GETKEY
+    GUI.LIST.WAS = GUI.LIST.SEL
+    GUI.LIST.WAS.SCROLL = MENUVERT.SCROLL
+
+## ---- 145 up, 17 down, 130 PgUp, 2 PgDn, 19 HOME, 4 END -- the codes
+## ---- samples/editor dispatches on. The rest are GUI's own.
+
+    GP.SELECT GUI.FORM.KEY
+        GP.CASE GUI.K.UP : GUI.LIST.SEL = GUI.LIST.SEL - 1
+        GP.CASE GUI.K.DOWN : GUI.LIST.SEL = GUI.LIST.SEL + 1
+        GP.CASE 130 : GUI.LIST.SEL = GUI.LIST.SEL - GUI.LIST.ROWS
+        GP.CASE 2 : GUI.LIST.SEL = GUI.LIST.SEL + GUI.LIST.ROWS
+        GP.CASE 19 : GUI.LIST.SEL = 1
+        GP.CASE 4 : GUI.LIST.SEL = GUI.LIST.COUNT
+        GP.CASE GUI.SPACE
+            IF GUI.LIST.MARKP <> 0 THEN GOSUB GUI.LIST.TOGGLE
+        GP.CASE GUI.K.TAB
+            GUI.FORM.NAV = GUI.NAV.NEXT
+        GP.CASE GUI.K.SHTAB
+            GUI.FORM.NAV = GUI.NAV.PREV
+        GP.CASE GUI.RETURN
+            GUI.FORM.NAV = GUI.NAV.DEFAULT
+        GP.CASE GUI.ESCAPE, GUI.STOP
+            GUI.FORM.NAV = GUI.NAV.CANCEL
+        GP.OTHER : GOSUB GUI.FORM.ACCEL
+    GP.ENDSEL
+    IF GUI.FORM.NAV <> GUI.NAV.STAY THEN RETURN
+
+## ---- No wrap: running off the bottom of a 200 item list to the top is
+## ---- disorienting rather than convenient.
+
+    IF GUI.LIST.SEL < 1 THEN GUI.LIST.SEL = 1
+    IF GUI.LIST.SEL > GUI.LIST.COUNT THEN GUI.LIST.SEL = GUI.LIST.COUNT
+    GOSUB GUI.LIST.FOLLOW
+
+## ---- A scroll repaints the window; a move inside it repaints TWO rows.
+
+    IF MENUVERT.SCROLL <> GUI.LIST.WAS.SCROLL THEN GOSUB GUI.LIST.DRAW : GOTO GUI.FORM.DO.LIST.KEY
+    IF GUI.LIST.SEL = GUI.LIST.WAS THEN GOTO GUI.FORM.DO.LIST.KEY
+    GUI.LIST.ROW = GUI.LIST.WAS - MENUVERT.SCROLL
+    GUI.LIST.ATTR = MENUVERT.ATTR
+    GOSUB GUI.LIST.PAINT.ROW
+    GUI.LIST.ROW = GUI.LIST.SEL - MENUVERT.SCROLL
+    GUI.LIST.ATTR = GUI.LIST.HI
+    GOSUB GUI.LIST.PAINT.ROW
+    GOTO GUI.FORM.DO.LIST.KEY
 
 
 ## ***********************************************************************
