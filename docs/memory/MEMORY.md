@@ -1,149 +1,147 @@
 # Memory Index
 
-Knowledge base for the Blitz-X16 compiler. The `gpc-*` notes are what survived the prune of the
-abandoned sibling project (GPC): everything kept here is a fact about **X16 BASIC or the X16 itself**,
-not about GPC's internals. The rest are recoverable from git history (commit `0f3f82b`).
+Knowledge base for the Blitz-X16 compiler. `gpc-*` notes survived the prune of the abandoned
+sibling project: what is kept is a fact about **X16 BASIC or the X16 itself**, not GPC internals.
 
-> **This folder is the live auto-memory**, reached through a directory junction from
-> `~/.claude/projects/c--dev-CmdrX16-dos-tools-x16-blitz-compiler/memory`. The junction broke when
-> the project was renamed from `X16-GPCompiler`, so 44 notes accumulated untracked between
-> 2026-08-30 and 2026-09-04 before being merged back in here. See
-> [Memory is git-tracked](memory-is-git-tracked.md) — **if a rename ever moves the project again,
-> re-make the junction first.**
+> **This folder is the live auto-memory**, reached by a directory junction from
+> `~/.claude/projects/c--dev-CmdrX16-dos-tools-x16-blitz-compiler/memory`. The junction broke
+> when the project was renamed once already — **if a rename moves it again, re-make the junction
+> first.** See [memory-is-git-tracked](memory-is-git-tracked.md).
 
 ## How to work in this repo
-- [Answer the question asked](answer-the-question-asked.md) — lead with the number asked for; no adjacent easier problem, no edge cases nobody writes
-- [Measure before changing code](measure-before-changing-code.md) — FRE probes found in 2 minutes what 2 rounds of edits missed
-- [Prose style is flat reference](prose-style-is-flat-reference.md) — the five settled rules for comments and help text; the `doc-style` agent owns them
-- [Write readable code, user crunches](write-readable-code-user-crunches.md) — one statement a line, plain IF for one statement, never a statement on a label line; and an unexplained SRC edit is his crunch pass, so carry on
-- [Comments light, code should flow](comments-light-code-should-flow.md) — a note or two, not essays; heavy REMs mean bad naming
-- [No ship language, no unasked builds](no-ship-language-this-is-dev.md) — dev and test work only; "commit and push" does not include a build
-- [Commit to main directly](commit-to-main-directly.md) — do not branch first; solo repo, no review step
-- [Compiler must not cap program size](compiler-must-not-cap-program-size.md) — standing rule: a build-side wall is a bug — but since two-pass, compiler growth costs a program ZERO; 14,336 bytes of low RAM headroom, 404 of storage
-- [No backward compatibility needed](no-backward-compatibility-needed.md) — sole user; token renumbering and forced recompiles cost nothing
-- [Ask before writing asm](ask-before-writing-asm.md) — standing order: no GP.ASM or 64tass without agreeing it first
-- [The compiler is GPC](name-the-compiler-gpc.md) — "Blitz" is a heritage nod to the C64 compiler; all the code here is the user's own
-- [User runs concurrent agents here](user-runs-concurrent-agents-here.md) — default to read-only research; re-read before any write
-- [Compile shared, not embedded](compile-shared-not-embedded.md) — standing: SHARED is the p-code number; GPC-HELP stays uncrunched
-- [Library working copy, then root](library-working-copy-then-root.md) — edit modules in samples/GPB-MODS-TESTING/GPC-BASIC/, copy to root only when they pass; and the drift runs BOTH ways
-- [Compact early, not at the end](compact-early-not-at-the-end.md) — remind the user to /compact after EVERY step, not just between phases; cost is context size x turns
+- [Answer the question asked](answer-the-question-asked.md) — lead with the number asked for
+- [Measure before changing code](measure-before-changing-code.md) — probes beat edit-and-see
+- [Prose style is flat reference](prose-style-is-flat-reference.md) — the five settled rules; `doc-style` owns them
+- [Write readable code, user crunches](write-readable-code-user-crunches.md) — one statement a line; an unexplained SRC edit is his crunch pass
+- [Comments light, code should flow](comments-light-code-should-flow.md) — heavy REMs mean bad naming
+- [No ship language, no unasked builds](no-ship-language-this-is-dev.md) — "commit and push" does not include a build
+- [Commit to main directly](commit-to-main-directly.md) — solo repo, no branch, no review
+- [Compiler must not cap program size](compiler-must-not-cap-program-size.md) — a build-side wall is a bug; compiler growth now costs a program zero
+- [No backward compatibility needed](no-backward-compatibility-needed.md) — forced recompiles cost nothing
+- [Ask before writing asm](ask-before-writing-asm.md) — standing order: agree GP.ASM or 64tass first
+- [The compiler is GPC](name-the-compiler-gpc.md) — "Blitz" is a heritage nod; the code is the user's own
+- [User runs concurrent agents here](user-runs-concurrent-agents-here.md) — re-read before any write
+- [Compile shared, not embedded](compile-shared-not-embedded.md) — SHARED is the p-code number
+- [Library working copy, then root](library-working-copy-then-root.md) — edit in samples/GPB-MODS-TESTING/GPC-BASIC/; drift runs BOTH ways
+- [Compact early, not at the end](compact-early-not-at-the-end.md) — after every step; cost is context size x turns
 
 ## Build and toolchain
-- **Build setup** — *(note missing: linked by the index but never committed)* how to build it, and the 5 blockers that made a fresh clone unbuildable on any OS. See docs/BUILDING.md.
-- [Build toolchain location](build-toolchain-location.md) — make, 64tass and python are off-PATH in C:\8bitProgramming
-- [App make skips compiler.library](app-make-does-not-rebuild-compiler-library.md) — a change under source/compiler/ silently misses GPC.BIN; use `make libs`
-- [make libs does not install the runtime](make-libs-does-not-install-the-runtime.md) — a new runtime opcode dispatches into garbage; `make -C source/runtime gpc-rt` is the other half
-- [Baseline compiler is the application copy](baseline-compiler-is-the-application-copy.md) — testing/GPC.BIN can be committed stale; A/B against source/application/GPC.BIN or invent regressions
-- [Measure p-code per module](measure-pcode-per-module.md) — the map file plus the SYM give exact bytes per include and per routine
-- [A compile timeout faked success](compile-shared-timeout-fakes-success.md) — 513 bytes and no map, reported as "compiled"; the banner is the finish line, not the file size
-- [Headless BASL build recipe](headless-basl-build-recipe.md) — the three emulator runs and the stop conditions that keep a cycle to ~70s
-- [GPC.ERR builds shared, in the main dir](gpcerr-build-shared-in-main-dir.md) — never standalone; the headless harness builds the wrong kind
-- [Tests share the product's memory](tests-share-the-products-memory.md) — the harness was 3,615 B of workspace; and BASLOAD does not nest #IFNDEF
-- [Paste can't drive a running program](paste-cannot-drive-a-running-program.md) — test an interactive front end with a generated fixed-answer variant
-- [File I/O dies in a GP.DO key loop](file-io-error-in-gpdo-key-loop.md) — writes the file, then INPUT/OUTPUT ERROR; the seven shapes already ruled out
-- [Retired keyword defers to runtime](retired-keyword-defers-to-runtime.md) — stale callers compile clean and explode; grep testing/ too
-- **Emulator split** — *(note missing: linked by the index but never committed)* x16emu r49 runs the tests, Box16 is for debugging.
+- **Build setup** — *(note missing)* see docs/BUILDING.md
+- [Build toolchain location](build-toolchain-location.md) — make, 64tass, python are off-PATH in C:\8bitProgramming
+- [App make skips compiler.library](app-make-does-not-rebuild-compiler-library.md) — use `make libs`
+- [make libs does not install the runtime](make-libs-does-not-install-the-runtime.md) — `make -C source/runtime gpc-rt` is the other half
+- [Baseline compiler is the application copy](baseline-compiler-is-the-application-copy.md) — testing/GPC.BIN can be stale
+- [Measure p-code per module](measure-pcode-per-module.md) — map plus SYM gives bytes per include and routine
+- [A compile timeout faked success](compile-shared-timeout-fakes-success.md) — the banner is the finish line, not the file size
+- [Headless BASL build recipe](headless-basl-build-recipe.md) — the three emulator runs and their stop conditions
+- [GPC.ERR builds shared, in the main dir](gpcerr-build-shared-in-main-dir.md) — never standalone
+- [Tests share the product's memory](tests-share-the-products-memory.md) — the harness costs workspace; BASLOAD does not nest #IFNDEF
+- [Paste can't drive a running program](paste-cannot-drive-a-running-program.md) — use a fixed-answer variant
+- [File I/O dies in a GP.DO key loop](file-io-error-in-gpdo-key-loop.md) — the seven shapes already ruled out
+- [Retired keyword defers to runtime](retired-keyword-defers-to-runtime.md) — stale callers compile clean and explode
+- **Emulator split** — *(note missing)* x16emu r49 runs tests, Box16 debugs
 
 ## GP.BASIC — the GP block and inline assembly
-- [GP.DEFPROC one-line calls](gp-defproc-one-line-calls.md) — BUILT incl. GP.FN: the verb is a NAME in the variable list, no proc table; the formals are shared, so a body must not call its own verb
-- [GP.FN string RETURNS aliases](gp-fn-string-returns-aliases.md) — OPEN BUG: two calls on the SAME verb, adjacent in one expression, both give the second answer
-- [Block GP.IF design](gpb-block-if-design.md) — SHIPPED at 14 runtime bytes; why it was 14 not 12, and the headless emulator test recipe
-- [Block openers must not defer](gpb-block-openers-must-not-defer.md) — .error_syntax rolls a statement back and silently corrupts enclosing block nesting
-- [GOTO out of a GP block](gpb-goto-out-of-block-design.md) — BUILT: .unwind opcode, zero runtime bytes, and the four traps each build cost
-- [RETURN unwinds frames](gpc-return-unwinds-frames.md) — StackFindFrame closes what it passes, so RETURN out of a FOR/GP.DO/GP.SELECT is safe
-- [GP.ASM fixups retired by two passes](gpasm-fixups-retired-by-two-passes.md) — the 128-reference cap was a single-pass habit; pass two knows every base while it assembles
-- [GP.ASM implementation status](gpasm-implementation-status.md) — shipped; dotted {VAR} names, the self-patching-operand idiom, and the 123x editor render numbers
-- [GP.ASM inline assembly research](gpasm-inline-assembly-research.md) — where the research doc lives, what was decided, what is still open
-- [GP.ASM blobs may use zTemp0/1/2](gpasm-blob-may-use-ztemp.md) — SYS already clobbers zTemp0 to get there, so `(ptr),y` is available
-- [GP.STRPTR points at the length byte](gp-strptr-points-at-the-length-byte.md) — text starts at +1; forgetting it corrupts only the short lines
-- [GP draw under a re-ordered font](gp-draw-under-a-reordered-font.md) — only GP.BOX style 0 survives, and GP.FILL converts its glyph argument (+$40)
+- [GP.DEFPROC one-line calls](gp-defproc-one-line-calls.md) — BUILT; formals are shared, so a body must not call its own verb
+- [GP.FN string RETURNS aliases](gp-fn-string-returns-aliases.md) — OPEN BUG: two calls on one verb in an expression both give the second answer
+- [Block GP.IF design](gpb-block-if-design.md) — SHIPPED at 14 runtime bytes
+- [Block openers must not defer](gpb-block-openers-must-not-defer.md) — .error_syntax silently corrupts enclosing nesting
+- [GOTO out of a GP block](gpb-goto-out-of-block-design.md) — BUILT: .unwind opcode, zero runtime bytes
+- [RETURN unwinds frames](gpc-return-unwinds-frames.md) — RETURN out of FOR/GP.DO/GP.SELECT is safe
+- [GP.ASM fixups retired by two passes](gpasm-fixups-retired-by-two-passes.md) — the 128-reference cap is gone
+- [GP.ASM implementation status](gpasm-implementation-status.md) — shipped; dotted {VAR} names, self-patching operands
+- [GP.ASM inline assembly research](gpasm-inline-assembly-research.md) — where the doc is, what is still open
+- [GP.ASM blobs may use zTemp0/1/2](gpasm-blob-may-use-ztemp.md) — SYS already clobbers zTemp0
+- [GP.STRPTR points at the length byte](gp-strptr-points-at-the-length-byte.md) — text starts at +1
+- [GP draw under a re-ordered font](gp-draw-under-a-reordered-font.md) — only GP.BOX style 0 survives
 
 ## Compiler limits, memory and banking
-- [PROGRAM TOO BIG was the workspace](program-too-big-fires-early.md) — FIXED with a RAM bank per table, then a second bank under the line table for 4,096 lines; the raise sites, and the real max program size
-- [SHARED p-code cap is RTBASE](gpc-shared-pcode-cap-is-rtbase.md) - ~17,920 bytes, not $9F00; and PROGRAM TOO BIG proves the source was read in full
-- [GPC Blitz runtime slack and limits](gpc-blitz-runtime-slack-and-limits.md) — measured memory layout; the run-side ceiling, quotable as FREE minus 4096
-- [Run-side workspace, read from the PRG](run-side-workspace-read-from-the-prg.md) — the two bootstrap page numbers and .varspace give the whole budget; and a run-time OUT OF MEMORY names the messenger
-- [Core page cushion below GPBase](gpc-core-page-cushion-below-gpbase.md) — only ~40 B of padding; cross it and every program grows 256 B
-- [Runtime footprint](blitz-x16-runtime-footprint.md) — the 10,956 B runtime copied into every program, and how to shrink it
-- [String heap scavenger](string-heap-scavenger.md) — SHIPPED: dead blocks reused, +1 page RT; the intermittent OOM was no-reclaim plus a garbage line-0 read
-- [BINPUT# caps at 255 bytes](binput-caps-at-255-bytes.md) — three separate caps land on the same number, and it is a CHRIN loop not a block read
-- [String blocks never shrink](gpc-string-blocks-never-shrink.md) — a big temporary must not be built; freeing it is not a thing
-- [LOAD chain strands array strings](load-chain-strands-array-strings.md) — chaining skips ClearMemory, so the string ceiling never falls; bounded for scalars, an UNBOUNDED leak for string arrays
-- [Compile is write-only](compile-is-write-only.md) — one instruction touches the object during a compile and it is a store; the premise the two-pass work rests on
-- [Two-pass compiler](two-pass-compiler.md) — DONE: neither pass stores an object, so the compiler's own size bounds nothing; GPBMODS compiles
-- [Compiler overlay into a bank](compiler-overlay-into-a-bank.md) — REVERTED, but the 64tass mechanism works and is measured at +2,560 bytes of object buffer
-- [Banking strings: length, not count](banking-strings-scales-with-length.md) — the menus broke even at 249 saved vs 245 spent
-- [BANK, not POKE 0](gpc-bank-statement-not-poke-zero.md) — PEEK/POKE restore the bank around every access, so POKE 0 can never select one
-- [Claim every compile-time bank](claim-every-compile-time-bank.md) - every GP.BANKED / GP.BANKEDSTR number needs a BANKMGR.CLAIM before the first ALLOC; check each program as it moves to the new runtime
-- [STASH leaves its bank selected — FIXED](stash-leaves-its-bank-selected.md) — it now restores the caller's bank; what the symptom looked like, and why it named the wrong routine
-
-- [color-test sample state](color-test-sample-state.md) — parked 2026-09-06; the four loose ends, incl. an unverified X16 colour pair
-- [XBase engine planned](xbase-engine-planned.md) — skeleton on disk, GUI already in bank 4, no function keys, and 255 bytes a record has to go
+- [PROGRAM TOO BIG was the workspace](program-too-big-fires-early.md) — FIXED; a bank per table, 4,096 lines
+- [SHARED p-code cap is RTBASE](gpc-shared-pcode-cap-is-rtbase.md) — ~17,920 bytes, not $9F00
+- [GPC Blitz runtime slack and limits](gpc-blitz-runtime-slack-and-limits.md) — the run-side ceiling is FREE minus 4096
+- [Run-side workspace, read from the PRG](run-side-workspace-read-from-the-prg.md) — two bootstrap page numbers give the budget
+- [Core page cushion below GPBase](gpc-core-page-cushion-below-gpbase.md) — ~40 B; cross it and every program grows 256 B
+- [Runtime footprint](blitz-x16-runtime-footprint.md) — 10,956 B in every program, and how to shrink it
+- [String heap scavenger](string-heap-scavenger.md) — SHIPPED: dead blocks reused, +1 page RT
+- [BINPUT# caps at 255 bytes](binput-caps-at-255-bytes.md) — three caps land on one number; it is a CHRIN loop
+- [String blocks never shrink](gpc-string-blocks-never-shrink.md) — never build a big temporary
+- [LOAD chain strands array strings](load-chain-strands-array-strings.md) — UNBOUNDED leak for string arrays
+- [Compile is write-only](compile-is-write-only.md) — the premise two-pass rests on
+- [Two-pass compiler](two-pass-compiler.md) — DONE; the compiler's own size bounds nothing
+- [Compiler overlay into a bank](compiler-overlay-into-a-bank.md) — REVERTED, but the mechanism works
+- [Banking strings: length, not count](banking-strings-scales-with-length.md) — the menus barely broke even
+- [BANK, not POKE 0](gpc-bank-statement-not-poke-zero.md) — PEEK/POKE restore the bank around every access
+- [Claim every compile-time bank](claim-every-compile-time-bank.md) — BANKMGR.CLAIM before the first ALLOC
+- [STASH leaves its bank selected — FIXED](stash-leaves-its-bank-selected.md) — it now restores the caller's bank
+- [color-test sample state](color-test-sample-state.md) — parked 2026-09-06; four loose ends
+- [XBase engine planned](xbase-engine-planned.md) — skeleton on disk, GUI in bank 4, 255 bytes a record to find
 
 ## The editor sample
 - [Editor branch state, GUI next](gpc-editor-branch-and-gui-next.md) — the self-check lines to keep green
-- [The editor's slow RETURN](editor-return-is-the-line-table.md) — FIXED at 87x with a GP.ASM memmove; the 2048-entry segment boundary is the trap
-- [LINPUT# loader, and its NUL trap](gpc-editor-loader-linput-and-blob.md) — 10.5x over GET#; ST=66 on a missing file, for ever
+- [The editor's slow RETURN](editor-return-is-the-line-table.md) — FIXED at 87x; the 2048-entry boundary is the trap
+- [LINPUT# loader, and its NUL trap](gpc-editor-loader-linput-and-blob.md) — 10.5x over GET#; ST=66 on a missing file
 - [Editor: ASCII inside, PETSCII outside](gpc-editor-is-ascii-inside-petscii-outside.md) — why the font is re-ordered in VRAM
-- [ALT keys need the keymap](gpc-editor-alt-keys-need-the-keymap.md) — in ISO mode ALT+F sends nothing; rewrite the layout table at $A000 bank 0
-- [VERA FX cache writes are aligned](vera-fx-cache-write-is-aligned.md) — the row renderer needs an EVEN text column
-- [GPC-HELP scroll cost is the file read](gpc-help-scroll-cost-is-the-file-read.md) — the cell move was 4%; the .HLP is re-read every keypress
-- [Bar and dropdown drive each other](menubar-menuhelp-cross-axis-exits.md) — MENUBAR.DOWNEXIT and MENUHELP.KEYEXIT are the two halves
-- [MENUHELP: use the whole interface](menuhelp-use-the-whole-interface.md) — build the library's own example headlessly before blaming it
+- [ALT keys need the keymap](gpc-editor-alt-keys-need-the-keymap.md) — in ISO mode ALT+F sends nothing
+- [VERA FX cache writes are aligned](vera-fx-cache-write-is-aligned.md) — the row renderer needs an EVEN column
+- [GPC-HELP scroll cost is the file read](gpc-help-scroll-cost-is-the-file-read.md) — the .HLP is re-read every keypress
+- [Bar and dropdown drive each other](menubar-menuhelp-cross-axis-exits.md) — DOWNEXIT and KEYEXIT are the two halves
+- [MENUHELP: use the whole interface](menuhelp-use-the-whole-interface.md) — build the library's own example first
+
+## The CUA GUI library
+- [GUI-CUA phase 5 state](gui-cua-phase5-state.md) — written not verified; what is owed and what still drifts
 
 ## The BASL cruncher
-- [Folding onto a label line saves nothing](folding-onto-a-label-line-saves-nothing.md) — a bare label is not a BASIC line; only merging real statements buys bytes
-- [BASL cruncher built](basl-cruncher-built.md) — samples/cruncher: 255 lines, 255 bytes on the editor; and the three guesses it disproved
-- [BASL cruncher internals](basl-cruncher-internals.md) — routine map, the two join properties, the build cycle; the harness is NOT in the repo
-- [All three line endings](basl-sources-use-all-three-line-endings.md) — how to sniff, and why a short CR file reads as CRLF
+- [Folding onto a label line saves nothing](folding-onto-a-label-line-saves-nothing.md) — a bare label is not a BASIC line
+- [BASL cruncher built](basl-cruncher-built.md) — samples/cruncher; 255 bytes on the editor
+- [BASL cruncher internals](basl-cruncher-internals.md) — routine map and build cycle; the harness is NOT in the repo
+- [All three line endings](basl-sources-use-all-three-line-endings.md) — how to sniff; a short CR file reads as CRLF
 
 ## BASLOAD
-- [BASIC RAM was the tokenise ceiling](basload-basic-ram-is-the-tokenise-ceiling.md) — REMOVED for build_basl.py; still binds the BASIC prompt and the work-* harnesses
-- [BASLOAD streams to a file](basload-streams-to-a-file.md) — SHIPPED: the fork, its 2-bytes-shorter invariant, the partial-output defect the SUCCESS check guards, and the BASLOAD-GPC.PRG front end over the BASLOAD-GPC.BIN engine
-- [BASLOAD runs from RAM unmodified](basload-runs-from-ram-unmodified.md) — the ROM source builds as a plain PRG with no source changes; cc65 is installed
-- [BASLOAD #DEFINE rejects digits](basload-define-rejects-digits.md) — GUI2.DEFS is INVALID PARAMETER but GUI2.SEL is fine; and no #INCLUDE is ever optional
-- [Labels and variables collide](basload-label-and-variable-collide.md) — DUPLICATE SYMBOL, and the $ does not separate FOO from FOO$
-- [#AUTONUM breaks STRCASE](basload-autonum-breaks-strcase.md) — do not write it; it sets the STEP, and only the default 1 survives STRCASE
-
-- [TRUE is -1](gpc-basl-true-is-minus-one.md) — the library's booleans, why NOT needs -1, and the two spellings that break
+- [BASIC RAM was the tokenise ceiling](basload-basic-ram-is-the-tokenise-ceiling.md) — REMOVED for build_basl.py only
+- [BASLOAD streams to a file](basload-streams-to-a-file.md) — SHIPPED; the fork and its partial-output defect
+- [BASLOAD runs from RAM unmodified](basload-runs-from-ram-unmodified.md) — the ROM source builds as a plain PRG
+- [BASLOAD #DEFINE rejects digits](basload-define-rejects-digits.md) — GUI2.DEFS is INVALID PARAMETER; no #INCLUDE is optional
+- [Labels and variables collide](basload-label-and-variable-collide.md) — DUPLICATE SYMBOL; the $ does not separate them
+- [#AUTONUM breaks STRCASE](basload-autonum-breaks-strcase.md) — do not write it
+- [TRUE is -1](gpc-basl-true-is-minus-one.md) — why NOT needs -1, and the two spellings that break
 
 ## X16 BASIC semantics (ROM-verified — apply to any compiler)
-- [IF semantics](gpc-if-semantics.md) — a false IF skips the WHOLE line, not just the first statement. Blitz gets this right.
-- [FOR STEP 0 semantics](gpc-for-step0-semantics.md) — NEXT exits iff sign(loopvar−limit)==sign(step); STEP 0 needs EXACT equality. **Blitz gets this wrong.**
-- [FOR 1 TO 0 runs once](gpc-basic-for-loop-runs-once.md) — the string-walk idiom turns an empty string into CHR$(0); guard every FOR 1 TO LEN()
-- [X16 BASIC conformance](blitz-x16-basic-conformance.md) — Blitz vs stock BASIC: 4 real defects (float literals, STEP 0, sci notation, reversed relops)
-- [X16 BASIC coverage](gpc-x16-basic-coverage.md) — the 7 lexer blockers on valid X16 BASIC (hex, binary, .5, >=65536, 9.2E5, long names, `=<` `=>` `><`)
-- [R44+ keywords](blitz-x16-r44-plus-keywords.md) — CLOSED: all 10 are in and implemented, `MOD` included; do not re-fix
+- [IF semantics](gpc-if-semantics.md) — a false IF skips the WHOLE line. Blitz gets this right.
+- [FOR STEP 0 semantics](gpc-for-step0-semantics.md) — STEP 0 needs EXACT equality. **Blitz gets this wrong.**
+- [FOR 1 TO 0 runs once](gpc-basic-for-loop-runs-once.md) — guard every FOR 1 TO LEN()
+- [X16 BASIC conformance](blitz-x16-basic-conformance.md) — 4 real defects vs stock BASIC
+- [X16 BASIC coverage](gpc-x16-basic-coverage.md) — the 7 lexer blockers on valid X16 BASIC
+- [R44+ keywords](blitz-x16-r44-plus-keywords.md) — CLOSED: all 10 are in; do not re-fix
 
 ## Performance
-- [C64 Blitz benchmark yardstick](blitz-c64-benchmark-yardstick.md) — real C64 Blitz ≈2.6× vs stock BASIC; the bar to beat
-- [Arrays share the workspace](blitz-arrays-share-the-workspace.md) — no array heap; DIM raises OUT OF MEMORY, and the old 409/512 figures were the dead Prog8 GPC
-- [Array index fast path](gpc-array-index-fastpath.md) — 1-D indexing fast path was worth ~31%; incl. the OOB short-circuit gotcha
+- [C64 Blitz benchmark yardstick](blitz-c64-benchmark-yardstick.md) — real C64 Blitz is ~2.6x stock
+- [Arrays share the workspace](blitz-arrays-share-the-workspace.md) — no array heap; DIM raises OUT OF MEMORY
+- [Array index fast path](gpc-array-index-fastpath.md) — worth ~31%; watch the OOB short-circuit
+- [STRCASE call overhead, measured](strcase-call-overhead-measured.md) — ~2,570 cycles a call
 
 ## X16 platform / toolchain
-- [MACPTR wraps banks itself](macptr-wraps-banks-itself.md) — a block read crossing $BFFF needs no banking code; the caller that wants it is STASH, not FILEDIR
-- [Scrolling a screen region](scrolling-a-screen-region.md) — no GP command for it; STASH moved, VERA-to-VERA memcopy, or a masked layer
-- [GP drawing targets layer 1](gp-drawing-targets-layer-1.md) — only layer 1, but no row clamp and L1_MAPBASE is POKEable
-- [P-code runs from a bank, PROVEN](pcode-runs-from-a-bank-proven.md) — executed at $A000 with two GP.ASM blobs and no ABI change; RETURN out needs no bank restore
-- [GP.BANKED region relocation](gp-banked-region-relocation.md) — the region moves to the end of the object with a rotation and two GOTOs to line numbers; the three things holding a buffer address
-- [GP.BANKEDSTR: literal text in a bank](gp-bankedstr-literal-text-in-a-bank.md) — BUILT: named groups resolved at compile time, +3,840 B on GPBMODS, and GPBFILES compiles at last
-- [Object file must fit under the runtime](object-file-must-fit-under-the-runtime.md) — a shared object is LOADED whole at $0801; regions were invisible to the fit check, so GPBMODS and GPBFILES both compiled into programs that ate the resident runtime
-- [Wildcard scratch eats the source](wildcard-scratch-eats-the-source.md) — S0:NAME.B* matches NAME.BASL; it deleted 17 test sources, never send one through IOScratchFile
-- [Every region gets its own .Bnn file](region-overlay-ovl-file.md) — BUILT; secondary address 1 lands each overlay at $A000, so regions never enter low RAM or the 24,063-byte file ceiling
-- [Object writer: regions vs low code](object-writer-regions-vs-low-code.md) — write above the buffer's reach and the streamer pads forward 65,535 bytes, with both passes agreeing and no check firing
-- [A second region for the utilities](second-region-for-the-utilities.md) — BUILT; a BANK statement is the ONLY disqualifier, file I/O and GP.ASM blobs are fine, and GP.DEFPROC must leave its declaration behind
-- [Banked code loses the bank on a call out](gp-banked-call-out-loses-the-bank.md) — a region cannot call another bank and survive the return, and may not BANK itself back
-- [FILEDIR banks whole](filedir-bank-split.md) — BUILT; the bank switch moved into its two blobs, and the "78% cannot move" was a line count of REM assembly
-- [GPBMODS resident p-code breakdown](gpbmods-resident-pcode-breakdown.md) — MEASURED; the shell is 79%, all eight modules are 21%, the map cannot see GP.ASM blobs, and grep for BANK with comments STRIPPED
-- [Dead-code elimination, measured](basl-dead-code-elimination-measured.md) — PARKED; 1,212 resident bytes are never called, but 691 of them are free by deleting two #INCLUDE lines
-- [VRAM-to-VRAM memory_copy limits](vram-to-vram-memory-copy-limits.md) — MEASURED; the auto-increment carries into bit 16, 15,360 in one call, and a descending overlap is safe
-- [Array element sizes, measured](array-element-sizes-measured.md) — a `%` array is TWO bytes an element and an untyped one SIX; FILEDIR's header had it wrong
-- [Byte data type feasibility](byte-data-type-feasibility.md) — STUDY ONLY; `$60` is the free type code and `$7B`/`$7F` the free array opcodes, but the opcode space refuses byte SCALARS
-- [KERNAL preserves the RAM bank](kernal-preserves-ram-bank.md) — CHROUT, GETIN, scroll, CLS and screen_mode all leave $00 alone; measure it in asm, PEEK(0) cannot see it
-- [X16 ROM internal calls](x16-rom-internal-calls.md) — verified R49 dispatcher/GC addresses + ZP pointers
-- [X16 toolchain](x16-toolchain.md) — 64tass / emulator paths on this machine
+- [MACPTR wraps banks itself](macptr-wraps-banks-itself.md) — the caller that wants it is STASH, not FILEDIR
+- [Scrolling a screen region](scrolling-a-screen-region.md) — no GP command; three ways to do it by hand
+- [GP drawing targets layer 1](gp-drawing-targets-layer-1.md) — no row clamp, and L1_MAPBASE is POKEable
+- [P-code runs from a bank, PROVEN](pcode-runs-from-a-bank-proven.md) — no ABI change; RETURN out needs no bank restore
+- [GP.BANKED region relocation](gp-banked-region-relocation.md) — the rotation and two GOTOs that move it
+- [GP.BANKEDSTR: literal text in a bank](gp-bankedstr-literal-text-in-a-bank.md) — BUILT; +3,840 B on GPBMODS
+- [Object file must fit under the runtime](object-file-must-fit-under-the-runtime.md) — regions were invisible to the fit check
+- [Wildcard scratch eats the source](wildcard-scratch-eats-the-source.md) — S0:NAME.B* matches NAME.BASL
+- [Every region gets its own .Bnn file](region-overlay-ovl-file.md) — BUILT; a .Bnn size is a PAGE COUNT unless topmost
+- [Object writer: regions vs low code](object-writer-regions-vs-low-code.md) — the streamer pads forward 65,535 bytes with no check firing
+- [A second region for the utilities](second-region-for-the-utilities.md) — BUILT; a BANK statement is the ONLY disqualifier
+- [Banked code loses the bank on a call out](gp-banked-call-out-loses-the-bank.md) — and may not BANK itself back
+- [FILEDIR banks whole](filedir-bank-split.md) — BUILT; the switch moved into its two blobs
+- [GPBMODS resident p-code breakdown](gpbmods-resident-pcode-breakdown.md) — the shell is 79%, all eight modules 21%
+- [Dead-code elimination, measured](basl-dead-code-elimination-measured.md) — PARKED; 691 B free by deleting two #INCLUDEs
+- [VRAM-to-VRAM memory_copy limits](vram-to-vram-memory-copy-limits.md) — 15,360 in one call; descending overlap is safe
+- [Array element sizes, measured](array-element-sizes-measured.md) — a `%` array is TWO bytes an element, untyped SIX
+- [Byte data type feasibility](byte-data-type-feasibility.md) — STUDY ONLY; the opcode space refuses byte SCALARS
+- [KERNAL preserves the RAM bank](kernal-preserves-ram-bank.md) — measure it in asm, PEEK(0) cannot see it
+- [X16 ROM internal calls](x16-rom-internal-calls.md) — verified R49 dispatcher/GC addresses and ZP pointers
+- [X16 toolchain](x16-toolchain.md) — 64tass and emulator paths on this machine
 - [x16emu -echo doubling](x16emu-echo-doubling.md) — non-warp `-echo raw` prints every char TWICE
-- [Memory is git-tracked](memory-is-git-tracked.md) — this folder versions with the project, via a junction that must survive renames
-- [Blitz-X16 prior attempt](blitz-x16-prior-attempt.md) — the earlier Prog8 self-hosted compiler (now deleted from disk)
-- [Prog8 PETSCII char literals](prog8-petscii-charlits.md) — legacy; only relevant if Prog8 comes back
-- [STRCASE call overhead, measured](strcase-call-overhead-measured.md) — ~2,570 cycles a call, and 1.3% of the editor line it rides on.
+- [Memory is git-tracked](memory-is-git-tracked.md) — versions with the project, via a junction that must survive renames
+- [Blitz-X16 prior attempt](blitz-x16-prior-attempt.md) — the earlier Prog8 self-hosted compiler, now deleted
+- [Prog8 PETSCII char literals](prog8-petscii-charlits.md) — legacy; only if Prog8 comes back
