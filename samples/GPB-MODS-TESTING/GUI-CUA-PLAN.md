@@ -267,8 +267,11 @@ Each phase ends in a build and a screenshot. None of them leaves the demo unrunn
 3. **DONE -- the field.** `GUI.INPUT` rebuilt; `GUI.FIELD.DRAW` written; accelerators returned to
    its buttons. `GUIFRMT` grew to fifteen assertions and all fifteen pass. This is the phase the
    screenshot that started this asks for.
-4. **The list.** `GUI.LISTBOX`'s loop split into paint-and-scroll and a verdict, and a button row
-   added. Multi-select still works, and that is the check.
+4. **DONE — the list.** `GUI.CT.LIST` got its two routines and its two arms, and the
+   scrolling list moved out of `GUI2` and in beside the field: `GUI.FORM.ADD.LIST`,
+   `GUI.LIST.DRAW`, `GUI.FORM.DO.LIST`. What is left in `GUI2` is the dialog around it. The hint
+   row naming ENTER and ESC became a real `<<OK>> <CANCEL>` row. `GUIFRMT` grew to twenty-four
+   assertions and all twenty-four pass, multi-select included.
 5. **Demo panels, `GP-BASIC.GLOBALS.md`, and the help text.** Including the rows already owed for
    `GUI.MSG3$`, `GUI.DEFAULT`, `GUI.BTN.DEF` and the `GUI.BTN.*` set.
 
@@ -282,25 +285,40 @@ Each phase ends in a build and a screenshot. None of them leaves the demo unrunn
   proves the dispatcher handles the code, and proves nothing about what a keyboard sends, because
   `kbdbuf_put` sets no modifiers. LEFT and UP also mean PREV, so reverse navigation works either
   way. **This one needs a human at a real keyboard**; it is a three-line `GET` program.
-- **Does the listbox's scroller survive being one control among several?** It was written as the only
-  thing on screen and repaints on its own terms. Splitting it is phase 4's whole job, so try the
-  split before phase 4 is planned in detail.
+- **Does the listbox's scroller survive being one control among several? YES, and it needed no
+  arbitration.** It only ever writes inside `GUI.INNER` and the bottom frame edge, and nothing else
+  on the form touches those cells. The one real coupling is `MENUVERT.SCROLL`, which is global and
+  which `MENUBAR` aims sideways — so whoever runs the form still puts it back to 0 on the
+  way out. The move cost no new dependency either: `GUI.INC.BL` already required `MENUVERT` for
+  `GUI.MENU`, and the editor and GPC-HELP — the two programs that include `GUI` without
+  `GUI2` — already include `MENUVERT` as well.
 - **Does `THEME` need a slot for "focused"? YES, and `THEME.HILITE` was not enough.** Not because
   a palette made it unreadable — because it made it *identical*. See §4. The fear that a role
   touches every module was misplaced: only the GUI reads this one, so it is four palette lines,
   two `#DEFINE`s and one row in `GPBMODS`' theme panel.
 - **What is actually in `LIB.GUIBANK`? MEASURED, and it is tighter than the plan assumed.**
 
-  | | `.B04` on disk | code at `$A000` | free of 8,192 |
+  | | `GPBMODS.B04` | pages | `GUIFRMT.B04` |
   |---|---:|---:|---:|
-  | after phase 1 | 7,170 | 7,168 | 1,024 |
-  | after phase 2 | 7,682 | 7,680 | 512 |
-  | after phase 3 | 7,938 | 7,936 | **256** |
+  | after phase 1 | 7,170 | 28 | —— |
+  | after phase 2 | 7,682 | 30 | —— |
+  | after phase 3 | 7,938 | 31 | 7,854 |
+  | after phase 4 | 8,194 | 32 | 8,035 |
 
-  `GUI.FORM` cost 512 bytes and half the remaining headroom, and phases 3 and 4 have 512 bytes
-  left to put a field and a list split into. **That is the number to plan phase 3 against**, and
-  it is the reason `FILEDIR` and `FILEIO` left. If it will not fit, the next thing to move out is
-  `MENUBAR` — but it cannot go alone, see §1.
+  **READ THE `GUIFRMT` COLUMN, NOT THE `GPBMODS` ONE.** A region that is not the topmost is padded
+  to a whole page, and `GPBMODS` has five, so its `.B04` only ever reports a PAGE COUNT: every
+  figure in that column is a multiple of 256 and says nothing about the bytes inside the last page.
+  `GUIFRMT` has one region, is not padded, and holds the same six modules — so it is the
+  one that measures. That also retires the "`GUIFRMT` builds it 84 bytes smaller" line that used to
+  sit here: the two builds are the same region byte for byte, and the 84 was the padding.
+
+  So, minus the 2-byte load address, **the region is 8,033 bytes and the ceiling is 8,188** —
+  `gpbank.asm:582` refuses a 33rd page, and the four bytes of bridges are counted into it.
+  **155 bytes free**, and phase 5 adds no code to this bank. The list cost 181 bytes, measured. The
+  earlier phases were only ever measured to the page, so the "each phase takes half the room"
+  reading of them was the padding talking, and there is more room here than that predicted. If
+  something does have to move out, the next one is `MENUBAR` — but it cannot go alone,
+  see §1.
 
 ## 9. What this does not do
 
