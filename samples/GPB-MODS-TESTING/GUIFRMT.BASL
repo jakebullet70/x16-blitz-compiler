@@ -6,19 +6,21 @@
 ## **
 ## **  GUIFRMT.BASL -- GUI.FORM's focus model, checked without a keyboard.
 ## **
-## **  Fifteen assertions against GUI.YN, GUI.SAY and GUI.INPUT, with the keys
-## **  pushed into the KERNAL's buffer by kbdbuf_put. That is the only way to
-## **  drive a GET loop headlessly, and it sets no modifiers -- so SHIFT+TAB is
-## **  tested as the CODE 24, which proves the dispatcher handles it and proves
-## **  nothing about what a real keyboard sends.
+## **  Twenty-four assertions against GUI.YN, GUI.SAY, GUI.INPUT and
+## **  GUI.LISTBOX, with the keys pushed into the KERNAL's buffer by
+## **  kbdbuf_put. That is the only way to drive a GET loop headlessly, and it
+## **  sets no modifiers -- so SHIFT+TAB is tested as the CODE 24, which proves
+## **  the dispatcher handles it and proves nothing about what a real keyboard
+## **  sends.
 ## **
-## **  T1 TO T8 ARE THE BUTTON ROW, T9 TO T15 THE FIELD. The pair that matters
-## **  is T14 and T15: the same C is text inside the field and the CANCEL
-## **  accelerator on the row, which is the rule that lets a button carry a
-## **  marked letter beside a field at all.
+## **  T1 TO T8 ARE THE BUTTON ROW, T9 TO T15 THE FIELD, T16 TO T24 THE LIST.
+## **  The three that matter are T14, T15 and T22: the same C is text inside a
+## **  field, the CANCEL accelerator one TAB away from it, and the CANCEL
+## **  accelerator from INSIDE a list -- because a list eats SPACE and nothing
+## **  else printable, and a field eats everything.
 ## **
 ## **  Each line is "Tn PASS" or "Tn FAIL want got", and the verdict line is
-## **  "ALL FIFTEEN PASS" -- stop an automated run on that. AFTER it, one more
+## **  "ALL TWENTY-FOUR PASS" -- stop an automated run on that. AFTER it, one more
 ## **  dialog is opened and left waiting on a key, so a -gif run has something
 ## **  to photograph; the digit in SHOT.TXT says how many TABs away from the
 ## **  field that picture is taken.
@@ -38,6 +40,9 @@
 #DEFINE K.SHTAB 24
 #DEFINE K.RETURN 13
 #DEFINE K.ESC 27
+#DEFINE K.DOWN 17
+#DEFINE K.END 4
+#DEFINE K.SPACE 32
 
 GOTO GF.LIBEND
 
@@ -52,7 +57,18 @@ GP.BANKED LIB.GUIBANK
 GP.ENDBANKED
 GF.LIBEND:
 
-DIM MENUVERT.ITEM$(4)
+DIM MENUVERT.ITEM$(12)
+
+## ---- Eight items in a four row window, so every list test scrolls.
+
+MENUVERT.ITEM$(1) = "ALPHA"
+MENUVERT.ITEM$(2) = "BRAVO"
+MENUVERT.ITEM$(3) = "CHARLIE"
+MENUVERT.ITEM$(4) = "DELTA"
+MENUVERT.ITEM$(5) = "ECHO"
+MENUVERT.ITEM$(6) = "FOXTROT"
+MENUVERT.ITEM$(7) = "GOLF"
+MENUVERT.ITEM$(8) = "HOTEL"
 
 ## Bank 4 is the GUI's code. GUI.BANK is scratch for the covered cells and
 ## must not be the same one.
@@ -268,8 +284,136 @@ GF.WANT = 0
 GF.GOT = GUI.OK
 GOSUB GF.CHECK
 
+## ---- T16  THE LIST OPENS WITH THE FOCUS ON ITSELF, and RETURN there means
+## ---- the default button, exactly as it does in a field.
+
+GOSUB GF.RESET
+GF.KEY = K.RETURN
+GOSUB GF.SEND
+GUI.MSG$ = "T16 RETURN IN THE LIST"
+GOSUB GUI.LISTBOX
+GF.NAME$ = "T16"
+GF.WANT = 1
+GF.GOT = GUI.LISTBOX.SEL
+GOSUB GF.CHECK
+
+## ---- T17  DOWN belongs to the list, not to the form. Two of them move the
+## ---- cursor and leave the focus where it was.
+
+GOSUB GF.RESET
+GF.KEY = K.DOWN
+GOSUB GF.SEND
+GOSUB GF.SEND
+GF.KEY = K.RETURN
+GOSUB GF.SEND
+GUI.MSG$ = "T17 DOWN TWICE"
+GOSUB GUI.LISTBOX
+GF.NAME$ = "T17"
+GF.WANT = 3
+GF.GOT = GUI.LISTBOX.SEL
+GOSUB GF.CHECK
+
+## ---- T18  ESC cancels from inside the list.
+
+GOSUB GF.RESET
+GF.KEY = K.ESC
+GOSUB GF.SEND
+GUI.MSG$ = "T18 ESC IN THE LIST"
+GOSUB GUI.LISTBOX
+GF.NAME$ = "T18"
+GF.WANT = 0
+GF.GOT = GUI.LISTBOX.SEL
+GOSUB GF.CHECK
+
+## ---- T19  END jumps past the bottom of a four row window, which is the
+## ---- scroller doing its job with three controls on the form instead of one.
+
+GOSUB GF.RESET
+GF.KEY = K.END
+GOSUB GF.SEND
+GF.KEY = K.RETURN
+GOSUB GF.SEND
+GUI.MSG$ = "T19 END SCROLLS"
+GOSUB GUI.LISTBOX
+GF.NAME$ = "T19"
+GF.WANT = 8
+GF.GOT = GUI.LISTBOX.SEL
+GOSUB GF.CHECK
+
+## ---- T20  TAB moves the focus off the list and onto OK, and RETURN presses
+## ---- the button it is standing on. The answer is the row it left behind.
+
+GOSUB GF.RESET
+GF.KEY = K.TAB
+GOSUB GF.SEND
+GF.KEY = K.RETURN
+GOSUB GF.SEND
+GUI.MSG$ = "T20 TAB TO OK"
+GOSUB GUI.LISTBOX
+GF.NAME$ = "T20"
+GF.WANT = 1
+GF.GOT = GUI.LISTBOX.SEL
+GOSUB GF.CHECK
+
+## ---- T21  One TAB further is CANCEL.
+
+GOSUB GF.RESET
+GF.KEY = K.TAB
+GOSUB GF.SEND
+GOSUB GF.SEND
+GF.KEY = K.RETURN
+GOSUB GF.SEND
+GUI.MSG$ = "T21 TAB TO CANCEL"
+GOSUB GUI.LISTBOX
+GF.NAME$ = "T21"
+GF.WANT = 0
+GF.GOT = GUI.LISTBOX.SEL
+GOSUB GF.CHECK
+
+## ---- T22  AND THE PAIR THAT MATTERS FOR A LIST. A bare C with the focus
+## ---- still IN the list presses CANCEL, because a list eats SPACE and
+## ---- nothing else printable. T14 is the same key against a field, where it
+## ---- is text -- the two together are the whole accelerator rule.
+
+GOSUB GF.RESET
+GF.KEY = ASC("C")
+GOSUB GF.SEND
+GUI.MSG$ = "T22 C FROM INSIDE THE LIST"
+GOSUB GUI.LISTBOX
+GF.NAME$ = "T22"
+GF.WANT = 0
+GF.GOT = GUI.LISTBOX.SEL
+GOSUB GF.CHECK
+
+## ---- T23  MULTI SELECT STILL WORKS, which is what phase 4 is checked on.
+## ---- SPACE marks, DOWN moves, SPACE marks again, RETURN accepts.
+
+GOSUB GF.RESET
+GUI.LISTBOX.MULTI = 1
+GF.KEY = K.SPACE
+GOSUB GF.SEND
+GF.KEY = K.DOWN
+GOSUB GF.SEND
+GF.KEY = K.SPACE
+GOSUB GF.SEND
+GF.KEY = K.RETURN
+GOSUB GF.SEND
+GUI.MSG$ = "T23 TWO MARKS"
+GOSUB GUI.LISTBOX
+GF.NAME$ = "T23"
+GF.WANT = 2
+GF.GOT = GUI.LISTBOX.MARKED
+GOSUB GF.CHECK
+
+## ---- T24  and the marks are where they were put, not just counted.
+
+GF.NAME$ = "T24"
+GF.SWANT$ = "11000000"
+GF.SGOT$ = GUI.LISTBOX.MARKS$
+GOSUB GF.SCHECK
+
 PRINT
-IF GF.FAILED = 0 THEN PRINT "ALL FIFTEEN PASS"
+IF GF.FAILED = 0 THEN PRINT "ALL TWENTY-FOUR PASS"
 IF GF.FAILED <> 0 THEN PRINT "FAILURES:"; GF.FAILED
 
 ## ---- THE PICTURE. GUI.INPUT is opened last and left waiting on a key, so a
@@ -352,6 +496,11 @@ GF.RESET:
     GUI.TEXT$ = ""
     GUI.LEN = 20
     GUI.MASK = 0
+    GUI.LISTBOX.COUNT = 8
+    GUI.LISTBOX.ROWS = 4
+    GUI.LISTBOX.MULTI = 0
+    GUI.LISTBOX.MARKS$ = ""
+    GUI.LISTBOX.SEL = 0
     RETURN
 
 
