@@ -66,11 +66,12 @@
 ## **  WARNING: no #DEFINEs and no include guard in here. BASLOAD rejects a
 ## **  digit in a #DEFINE or #IFNDEF name, so a GUI.LISTBOX.* constant cannot
 ## **  exist. The numbers are written where they are used. #INCLUDE this once.
-## **  THIS IS THE LOW MEMORY FORM. Every entry point is a plain name, so a
-## **  caller reaches it with one GOSUB and nothing sits in between. Use it
-## **  when the module runs in low memory, which is the ordinary case.
+## **  THIS IS THE BANKED FORM. Every entry point carries a .BODY suffix,
+## **  because a banked routine cannot select its own bank: the public name
+## **  has to be a shim in low memory, and SHIM.GUIBANK.INC.BL holds it.
+## **  Put this file inside the GP.BANKED region, with that shim above it.
 ## **
-## **  The banked twin is GUI2.BANK.INC.BL. Include one or the other,
+## **  The low memory twin is GUI2.INC.BL. Include one or the other,
 ## **  never both. GPC-BASIC/BANKED-OR-NOT.md says how to choose.
 ## **
 ## ***********************************************************************
@@ -81,7 +82,7 @@ GOTO GUI.LISTBOX.MODULE.END
 ## **  GUI.LISTBOX -- the whole thing.
 ## ***********************************************************************
 
-GUI.LISTBOX:  GUI.KEY = 0
+GUI.LISTBOX.BODY:  GUI.KEY = 0
     IF GUI.LISTBOX.COUNT < 1 THEN GUI.LISTBOX.SEL = 0 : RETURN
 
 ## ---- The window: what was asked for, ten rows if nothing was, then cut to the
@@ -125,7 +126,7 @@ GUI.LISTBOX:  GUI.KEY = 0
     GUI.BTN.ONE$ = "&OK"
     GUI.BTN.TWO$ = "&CANCEL"
     GUI.DEFAULT = 1
-    GOSUB GUI.BUTTON.SIZE
+    GOSUB GUI.BUTTON.SIZE.BODY
     GOSUB GUI.LIST.MEASURE
     GUI.BODY.WIDTH = GUI.LISTBOX.TEXTW + GUI.LISTBOX.MARKOFF
     IF GUI.LIST.NOTEW + 2 > GUI.BODY.WIDTH THEN GUI.BODY.WIDTH = GUI.LIST.NOTEW + 2
@@ -142,12 +143,12 @@ GUI.LISTBOX:  GUI.KEY = 0
     GUI.LIST.Y = GUI.INNER.TOP
     GUI.LIST.W = GUI.INNER.WIDTH - GUI.LISTBOX.MARKOFF
     GUI.LIST.SEL = GUI.LISTBOX.SEL
-    GOSUB GUI.FORM.BEGIN
+    GOSUB GUI.FORM.BEGIN.BODY
     GOSUB GUI.FORM.ADD.LIST
     GUI.BTN.Y = GUI.INNER.TOP + GUI.LIST.ROWS + 1
-    GOSUB GUI.BUTTON.ROW
+    GOSUB GUI.BUTTON.ROW.BODY
     GUI.FOCUS = 1
-    GOSUB GUI.FORM.RUN
+    GOSUB GUI.FORM.RUN.BODY
 
 ## ---- OK IS THE DEFAULT BUTTON, asked by its flag rather than by its index, so
 ## ---- a wrapper that ordered its controls differently still reads right. A

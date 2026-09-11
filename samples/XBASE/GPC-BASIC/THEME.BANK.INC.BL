@@ -27,11 +27,12 @@
 ## **  drawing commands take them. For COLOR, which wants the halves separately,
 ## **  use THEME.SET.
 ## **
-## **  THIS IS THE LOW MEMORY FORM. Every entry point is a plain name, so a
-## **  caller reaches it with one GOSUB and nothing sits in between. Use it
-## **  when the module runs in low memory, which is the ordinary case.
+## **  THIS IS THE BANKED FORM. Every entry point carries a .BODY suffix,
+## **  because a banked routine cannot select its own bank: the public name
+## **  has to be a shim in low memory, and SHIM.THEMEBANK.INC.BL holds it.
+## **  Put this file inside the GP.BANKED region, with that shim above it.
 ## **
-## **  The banked twin is THEME.BANK.INC.BL. Include one or the other,
+## **  The low memory twin is THEME.INC.BL. Include one or the other,
 ## **  never both. GPC-BASIC/BANKED-OR-NOT.md says how to choose.
 ## **
 ## ***********************************************************************
@@ -72,7 +73,7 @@ GOTO THEME.SKIP
 ## is an error. No DATA statement, because READ walks every DATA in the whole program
 ## in order and a library owning one would derail the caller's READs.
 
-THEME.SELECT:
+THEME.SELECT.BODY:
     THEME.FIRST = 0
     IF THEME.READY = 0 THEN DIM THEME.CLR(THEME.SLOTS) : THEME.READY = -1 : THEME.FIRST = -1
     IF THEME.ID = 1 THEN GOTO THEME.SELECT.DARK
@@ -136,15 +137,15 @@ THEME.SELECT.GRAY:
 THEME.SELECT.CUSTOM:  IF THEME.FIRST = 0 THEN RETURN
     GOTO THEME.SELECT.X16
 
-## THEME.NEXT -- the following theme, selected. It GOTOs THEME.SELECT rather than
-## GOSUBing it, so THEME.SELECT's RETURN is the one the caller gets.
-THEME.NEXT:  THEME.ID = THEME.ID + 1 : IF THEME.ID >= THEME.COUNT THEN THEME.ID = 0
-    GOTO THEME.SELECT
+## THEME.NEXT -- the following theme, selected. It GOTOs the selector rather than
+## GOSUBing it, so the selector's RETURN is the one the caller gets.
+THEME.NEXT.BODY:  THEME.ID = THEME.ID + 1 : IF THEME.ID >= THEME.COUNT THEN THEME.ID = 0
+    GOTO THEME.SELECT.BODY
 
 ## THEME.RESET -- the selected theme's shipped values, throwing away any changes.
 ## CUSTOM has none of its own, so it resets to X16.
-THEME.RESET:  IF THEME.ID = 4 THEN GOTO THEME.SELECT.X16
-    GOTO THEME.SELECT
+THEME.RESET.BODY:  IF THEME.ID = 4 THEN GOTO THEME.SELECT.X16
+    GOTO THEME.SELECT.BODY
 
 ## THEME.SET -- make THEME.ATTR the colour PRINT uses.
 ##
@@ -153,14 +154,14 @@ THEME.RESET:  IF THEME.ID = 4 THEN GOTO THEME.SELECT.X16
 ## WARNING: AND 15 is safe only because a packed attribute is 0..255. AND is 16-bit
 ## signed and raises OUT OF RANGE above 32767.
 
-THEME.SET:  COLOR THEME.ATTR AND 15, INT(THEME.ATTR / 16) : RETURN
+THEME.SET.BODY:  COLOR THEME.ATTR AND 15, INT(THEME.ATTR / 16) : RETURN
 
 ## THEME.HI -- the inverse of a packed attribute, for pre-drawing a row that should
 ## already look selected.
 ##
 ##   in   THEME.ATTR   packed attribute      out  THEME.INV
 
-THEME.HI:  THEME.INV = (THEME.ATTR AND 15) * 16 + INT(THEME.ATTR / 16) : RETURN
+THEME.HI.BODY:  THEME.INV = (THEME.ATTR AND 15) * 16 + INT(THEME.ATTR / 16) : RETURN
 
 THEME.SKIP:
 #ENDIF

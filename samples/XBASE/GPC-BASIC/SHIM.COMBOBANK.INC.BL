@@ -1,0 +1,114 @@
+## ***********************************************************************
+## **
+## **  SHIM.COMBOBANK.INC.BL -- the low memory front door to a banked COMBO.
+## **
+## **      COMBO.ADD       COMBO.DRAW      COMBO.KEY
+## **
+## **  Three shims. Each keeps the caller's bank, selects the combo bank, calls
+## **  the body and puts the caller's bank back. The body lives at $A000 in that
+## **  bank under a .BODY name. A banked routine cannot select its own bank --
+## **  by its first instruction fetch the window is already wrong -- so
+## **  something in low memory has to.
+## **
+## **  Usage -- this file sits directly above the region it opens, so that the
+## **  bank reads as one unit:
+## **      GOTO MY.COMBOEND
+## **      #INCLUDE "SHIM.COMBOBANK.INC.BL"
+## **      GP.BANKED SHIM.COMBOBANK
+## **      #INCLUDE "COMBO.BANK.INC.BL"
+## **      GP.ENDBANKED
+## **      MY.COMBOEND:
+## **
+## **  Claim the bank as well, or something else will hand it out:
+## **      BANKMGR.SET.BANK = SHIM.COMBOBANK : GOSUB BANKMGR.CLAIM
+## **
+## **  COMBO.ADD IS THE ONE AN APPLICATION CALLS. The other two are reached by
+## **  GUI.FORM, from inside SHIM.GUIBANK, which is a region calling a region and
+## **  is the whole reason this file keeps a bank stack. COMBO.GETKEY and
+## **  COMBO.OPEN are not shimmed: they are called only from inside the region.
+## **
+## **  IT MUST BE INCLUDED AFTER THE GUI. The bodies read GUI.CT.COMBO and the
+## **  GUI.NAV constants, and BASLOAD resolves a #DEFINE only once it has read
+## **  it. The labels handed back -- COMBO.DRAW and COMBO.KEY, named inside
+## **  GUI.FORM.PAINT and GUI.FORM.STEP -- are resolved across the whole
+## **  program and do not care about order.
+## **
+## **  THE DROPDOWN CALLS BACK INTO THE GUI'S BANK. COMBO.OPEN runs MENUVERT,
+## **  so with a dialog on screen three banks are live at once: the GUI's, this
+## **  one, and the GUI's again underneath the menu. Each front door keeps a
+## **  stack of its own and the levels interleave correctly.
+## **
+## ***********************************************************************
+#IFNDEF SHIM.COMBOBANK.DEFS
+#DEFINE SHIM.COMBOBANK.DEFS 1
+
+## The bank COMBO runs in. One of the 63 a 512K machine has. GP.BANKED takes a decimal
+## constant and #DEFINE substitutes at translation time, so this and the BANK in the
+## shims below cannot drift apart.
+#DEFINE SHIM.COMBOBANK 10
+
+## How deep the shims may nest. See COMBO.SHIM.PUSH below.
+#DEFINE COMBO.SHIM.MAX 8
+
+GOTO SHIM.COMBOBANK.MODULE.END
+
+## ***********************************************************************
+## **  COMBO.SHIM.PUSH / COMBO.SHIM.POP -- the caller's bank, kept and put back.
+## **
+## **  The pair SHIM.GUIBANK.INC.BL carries, for this bank. Its header is the
+## **  long explanation; the short one is that a region calling in here has to
+## **  get its own bank returned to it, or the instruction after the call is
+## **  fetched from the wrong 8K and the machine stops somewhere else entirely.
+## **
+## **  IT IS A STACK AND NOT ONE VARIABLE because the calls nest: GUI.FORM
+## **  calls COMBO.KEY here, which opens a dropdown that runs MENUVERT back in
+## **  the GUI's bank. A single holding variable would be overwritten by the
+## **  inner call.
+## **
+## **  A STACK OF ITS OWN AND NOT THE GUI'S. Pushes and pops pair up inside one
+## **  file whatever the other files are doing, and a file that carries its own
+## **  can be lifted into a program that has no GUI in it.
+## **
+## **  POP IS REACHED BY GOTO, NOT GOSUB. The shim's own GOSUB frame is still
+## **  on the stack, so POP's RETURN is the shim's return.
+## ***********************************************************************
+
+## The array, once for the whole program, and COMBO.SHIM.WAS% named before the
+## blob that writes it -- GP.ASM resolves {} against variables the compiler has
+## already met, and one named only inside a blob stops the build with
+## UNKNOWN VARIABLE IN {}.
+
+COMBO.SHIM.INIT:
+    DIM COMBO.SHIM.STK%(COMBO.SHIM.MAX)
+    COMBO.SHIM.WAS% = 0
+    COMBO.SHIM.DIMMED = -1
+    RETURN
+
+COMBO.SHIM.PUSH:
+    IF COMBO.SHIM.DIMMED = 0 THEN GOSUB COMBO.SHIM.INIT
+    #REM 1
+    GP.ASM
+    REM LDA $00
+    REM STA {COMBO.SHIM.WAS%}
+    REM LDX #1
+    REM LDA #0
+    REM STA {COMBO.SHIM.WAS%},X
+    GP.ENDASM
+    #REM 0
+    COMBO.SHIM.STK%(COMBO.SHIM.SP) = COMBO.SHIM.WAS%
+    COMBO.SHIM.SP = COMBO.SHIM.SP + 1
+    BANK SHIM.COMBOBANK
+    RETURN
+
+COMBO.SHIM.POP:
+    COMBO.SHIM.SP = COMBO.SHIM.SP - 1
+    BANK COMBO.SHIM.STK%(COMBO.SHIM.SP)
+    RETURN
+
+## ---- COMBO ----
+COMBO.ADD:   GOSUB COMBO.SHIM.PUSH : GOSUB COMBO.ADD.BODY  : GOTO COMBO.SHIM.POP
+COMBO.DRAW:  GOSUB COMBO.SHIM.PUSH : GOSUB COMBO.DRAW.BODY : GOTO COMBO.SHIM.POP
+COMBO.KEY:   GOSUB COMBO.SHIM.PUSH : GOSUB COMBO.KEY.BODY  : GOTO COMBO.SHIM.POP
+
+SHIM.COMBOBANK.MODULE.END:
+#ENDIF

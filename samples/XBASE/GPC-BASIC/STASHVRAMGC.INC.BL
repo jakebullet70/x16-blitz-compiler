@@ -1,0 +1,91 @@
+## ***********************************************************************
+## **  STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store.
+## **
+## **      SV.COMPACT   slide every live block down, and rewrite the table
+## **
+## **  ITS OWN FILE BECAUSE A BASL MODULE HAS NO DEAD CODE ELIMINATION. A
+## **  compactor nobody calls would otherwise be compiled into every program
+## **  that includes the store. #INCLUDE this one only if something in the
+## **  program calls it, and NEVER call it automatically.
+## **
+## **  Requires STASHVRAM.INC.BL, and #INCLUDEs it not.
+## **
+## **  IT IS NOT A GARBAGE COLLECTOR. Liveness is known from the handle table
+## **  rather than discovered, so there is no mark phase and nothing traces
+## **  anything: the live blocks are read off in page order, each is slid down
+## **  to the low-water mark, and the table is rewritten as it goes.
+## **
+## **  HANDLES SURVIVE IT. A block's page number changes; the handle that
+## **  names it does not. Anything holding a raw VRAM address across a call
+## **  here is holding a stale one -- but nothing outside the table has one,
+## **  which is the whole reason the store is addressed by handle.
+## **
+## **   out  SV.MOVED   how many blocks actually moved, 0 if it was already
+## **                   tight -- which is what LIFO release leaves behind
+## **        SV.OK      -1 done
+## **
+## **  The slide is downward, so a block's destination is always below its
+## **  source. That the overlap is safe at the hardware is measured, not
+## **  assumed -- work/stashvram/SVGATE.BASL, G06B.
+## ***********************************************************************
+#IFNDEF SVGC.DEFS
+#DEFINE SVGC.DEFS 1
+
+## memory_copy counts in 16 bits, and a block may be bigger than that. A #DEFINE
+## is a SIGNED int16, so $8000 would arrive as -32768 and clamp the count to a
+## negative; $4000 is the largest round chunk that stays positive.
+#DEFINE SVGC.CHUNK $4000
+
+GOTO SVGC.MODULE.END
+
+## ***********************************************************************
+## **  SV.COMPACT -- every live block down to the low-water mark.
+## ***********************************************************************
+
+SV.COMPACT:  SV.OK = 0 : SV.MOVED = 0 : SV.ERROR$ = ""
+    IF SV.READY = 0 THEN SV.ERROR$ = "SV.INIT HAS NOT RUN" : RETURN
+
+    SV.TO = SV.BASEPG
+
+## ---- Take the lowest live block at or above the mark, place it, and move the
+## ---- mark past it. A selection pass rather than a sort: the table is a few
+## ---- dozen entries and this needs no second array to hold an order in.
+SV.GC.NEXT:  SV.PICK = 0 : SV.BEST = 0
+    FOR SV.J = 1 TO SV.MAX
+        IF SV.PAGE%(SV.J) >= SV.TO THEN GOSUB SV.GC.OFFER
+    NEXT SV.J
+    IF SV.PICK = 0 THEN GOTO SV.GC.DONE
+
+    IF SV.PAGE%(SV.PICK) > SV.TO THEN GOSUB SV.GC.SLIDE
+    SV.TO = SV.TO + SV.PAGES%(SV.PICK)
+    GOTO SV.GC.NEXT
+
+SV.GC.DONE:  SV.NEXT = SV.TO : SV.OK = -1 : RETURN
+
+## ---- A free slot holds page 0, which is never >= SV.TO because SV.INIT
+## ---- refuses a base under one page. So this sees live blocks only.
+SV.GC.OFFER:
+    IF SV.PICK <> 0 AND SV.PAGE%(SV.J) >= SV.BEST THEN RETURN
+    SV.PICK = SV.J : SV.BEST = SV.PAGE%(SV.J)
+    RETURN
+
+## ***********************************************************************
+## **  SV.GC.SLIDE -- one block down, in chunks memory_copy can count.
+## ***********************************************************************
+
+SV.GC.SLIDE:  SV.GCS = SV.PAGE%(SV.PICK) * 256
+    SV.GCD = SV.TO * 256 : SV.LEFT = SV.PAGES%(SV.PICK) * 256
+
+SV.GC.CHUNK:
+    IF SV.LEFT < 1 THEN GOTO SV.GC.SLID
+    SV.CH = SV.LEFT
+    IF SV.CH > SVGC.CHUNK THEN SV.CH = SVGC.CHUNK
+    SV.SRC = SV.GCS : SV.DST = SV.GCD : SV.N = SV.CH
+    GOSUB SV.COPY : SV.GCS = SV.GCS + SV.CH : SV.GCD = SV.GCD + SV.CH
+    SV.LEFT = SV.LEFT - SV.CH : GOTO SV.GC.CHUNK
+
+SV.GC.SLID:  SV.PAGE%(SV.PICK) = SV.TO : SV.MOVED = SV.MOVED + 1
+    RETURN
+
+SVGC.MODULE.END:
+#ENDIF

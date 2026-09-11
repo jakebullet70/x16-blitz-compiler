@@ -4,12 +4,22 @@
 ##
 ## SKELETON. Nothing here has run.
 ##
-## THE SHAPE IS CLIPPER'S DBU, not dBASE III's ASSIST. Eight titles, each
-## dropping two to six items. ASSIST's dropdowns build a command line at the
+## THE SHAPE IS CLIPPER'S DBU, not dBASE III's ASSIST. Seven titles, each
+## dropping one to eight rows. ASSIST's dropdowns build a command line at the
 ## bottom of the screen and that is a lot of machinery to arrive at a verb the
 ## bar already named.
 ##
-##      File   Create   Save   Browse   Utility   Move   Set   Help
+##      File   Modify   Browse   Utility   Move   Help   Test
+##
+## FILE CARRIES ALL SIX FILE VERBS, in two groups of three: open, create and
+## close a database, then the same three for an index. DBU spreads them over
+## File, Create and Set; one menu holding the pairs is shorter to read and it
+## is where a user looks for them.
+##
+## TEST IS NOT DBU'S. XBase is the first real application the CUA library runs
+## inside, so a seventh title opens the dialogs the record keeper never reaches
+## and cycles the palette over them. It is a development column, which is why
+## it sits after Help rather than in DBU's order.
 ##
 ## DBU MAKES EVERY TITLE A FUNCTION KEY AS WELL, and that part is not copied.
 ## ESC opens the bar and the arrows walk it, the way EDITOR.BASL does it. The
@@ -25,19 +35,24 @@
 ## chosen. MENUVERT has no notion of a dead row, and giving it one is a library
 ## change, not a change here.
 ##
+## A SEPARATOR IS A ROW WHOSE TEXT IS ONE HYPHEN, and that one MENUVERT does
+## know: it draws the row as a line, the highlight steps over it and no hotkey
+## can reach it. It still counts as a row, so it needs an entry in the hotkey
+## string and a slot in the dispatch, both of which are placeholders.
+##
 ## The menu text is in low memory. ED-MENUS.BASL moves its own into a bank and
 ## measures the win at 249 bytes; that is worth doing here only if low memory
 ## runs short, and the win scales with the LENGTH of the text, not the count.
 ## These items are four to eight characters.
 ## ============================================================================
 
-## The bar. Eight titles, and the widest dropdown is five items. XB.MAXI is
-## six anyway, because MENUVERT.ITEM$ below is sized from it and the BAR needs
-## nine slots to hold eight titles from index 1.
-#DEFINE XB.MENUS 8
-#DEFINE XB.LASTM 7
-#DEFINE XB.MAXI 6
-#DEFINE XB.LASTI 5
+## The bar. Seven titles, and the deepest dropdown is File's eight rows, so
+## XB.MAXI is now the longer of the two and one DIM off it sizes both sides of
+## MENUVERT.ITEM$.
+#DEFINE XB.MENUS 7
+#DEFINE XB.LASTM 6
+#DEFINE XB.MAXI 8
+#DEFINE XB.LASTI 7
 
 ## Enable rules. XB.ITEMOK turns one of these into true or false.
 #DEFINE XB.ALWAYS 0
@@ -45,14 +60,97 @@
 #DEFINE XB.HASBOTH 2
 #DEFINE XB.NOTYET 3
 
-## Screen furniture. Row 0 is the title, row 1 the bar, row 2 a rule, and the
-## dropdowns hang from row 3.
-#DEFINE XB.BARROW 1
-#DEFINE XB.DROPROW 3
+## Screen furniture. The bar is row 0, row 1 carries the top border of an open
+## panel, and the dropdown items hang from row 2.
+#DEFINE XB.BARROW 0
+#DEFINE XB.DROPROW 2
 
 
-## ---------------------------------------------------------------- the table
-## Titles, items and the rule per item. Called once at startup.
+## ---------------------------------------------------------------- the text
+## THE MENU TEXT LIVES IN A BANK, not in the program. A string constant costs
+## 2 + LEN bytes of resident p-code wherever it is written and GP.BSTR costs 5,
+## so every name here pays its way from four characters up.
+##
+## ONE GROUP A MENU, so a row added to one moves nothing in another, and the
+## count comes from GP.BSTRCOUNT rather than a number written beside it: the
+## two cannot drift apart. The bar's own two lists are flat, one entry a menu.
+
+GP.BANKEDSTR XB.TEXTBANK BS.TITLES
+  "FILE"
+  "MODIFY"
+  "BROWSE"
+  "UTILITY"
+  "MOVE"
+  "HELP"
+  "TEST"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR XB.TEXTBANK BS.HOTS
+  "OCLIND X"
+  "S"
+  "TR"
+  "CARPZ"
+  "EGLS"
+  "AM"
+  "MCILBT"
+GP.ENDBANKEDSTR
+
+## FILE'S HOTKEYS, which are the FIRST entry in BS.HOTS above: the database
+## trio take a letter from their own verb, O C L, the index trio take one from
+## the word INDEX, I N D, and Exit takes X because every menu bar ever written
+## has put X on Exit. The seventh character is a space, the separator's
+## placeholder -- MENUVERT never matches it, but the string has to stay one
+## character a row or every letter after it lands on the wrong item.
+GP.BANKEDSTR XB.TEXTBANK BS.I.FILE
+  "OPEN DATABASE"
+  "CREATE DATABASE"
+  "CLOSE DATABASE"
+  "OPEN INDEX"
+  "CREATE INDEX"
+  "CLOSE INDEX"
+  "-"
+  "EXIT"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR XB.TEXTBANK BS.I.MODIFY
+  "STRUCT"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR XB.TEXTBANK BS.I.BROWSE
+  "TABLE"
+  "RECORD"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR XB.TEXTBANK BS.I.UTIL
+  "COPY"
+  "APPEND"
+  "REPLACE"
+  "PACK"
+  "ZAP"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR XB.TEXTBANK BS.I.MOVE
+  "SEEK"
+  "GOTO"
+  "LOCATE"
+  "SKIP"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR XB.TEXTBANK BS.I.HELP
+  "ABOUT"
+  "MEMORY"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR XB.TEXTBANK BS.I.TEST
+  "MESSAGE"
+  "CONFIRM"
+  "INPUT"
+  "LISTBOX"
+  "COMBO"
+  "THEME"
+GP.ENDBANKEDSTR
+
+
 XB.MENU.SETUP:
     DIM XB.MNAME$(XB.LASTM)
     DIM XB.MITEMS(XB.LASTM)
@@ -63,64 +161,81 @@ XB.MENU.SETUP:
 
     ## The one menu array that cannot move -- MENUVERT reads it directly. It
     ## carries the bar as well as the dropdowns, so it is sized for whichever is
-    ## longer, and today that is the bar.
-    DIM MENUVERT.ITEM$(XB.MAXI + 2)
+    ## longer, and today that is File: eight rows, held from index 1.
+    ## GUI.LISTBOX borrows the same array, and Test Listbox fills six rows of it.
+    DIM MENUVERT.ITEM$(XB.MAXI)
 
-    XB.MNAME$(0) = "File"
-    XB.MITEMS(0) = 4
-    XB.MHOT$(0) = "DICE"
-    XB.ITEM$(0, 0) = "Database"     : XB.RULE(0, 0) = XB.ALWAYS
-    XB.ITEM$(0, 1) = "Index"        : XB.RULE(0, 1) = XB.NOTYET
-    XB.ITEM$(0, 2) = "Close"        : XB.RULE(0, 2) = XB.HASDB
-    XB.ITEM$(0, 3) = "Exit"         : XB.RULE(0, 3) = XB.ALWAYS
+    ## The bar, in one pass over both flat groups.
+    FOR XB.I = 0 TO XB.LASTM
+        XB.MNAME$(XB.I) = GP.BSTR(BS.TITLES, XB.I)
+        XB.MHOT$(XB.I) = GP.BSTR(BS.HOTS, XB.I)
+    NEXT XB.I
 
-    XB.MNAME$(1) = "Create"
-    XB.MITEMS(1) = 2
-    XB.MHOT$(1) = "DI"
-    XB.ITEM$(1, 0) = "Database"     : XB.RULE(1, 0) = XB.ALWAYS
-    XB.ITEM$(1, 1) = "Index"        : XB.RULE(1, 1) = XB.NOTYET
+    ## Then a dropdown at a time. The rules stay written out: they are the one
+    ## part of the table that is not text and they read as a column.
 
-    XB.MNAME$(2) = "Save"
-    XB.MITEMS(2) = 1
-    XB.MHOT$(2) = "S"
-    XB.ITEM$(2, 0) = "Struct"       : XB.RULE(2, 0) = XB.HASDB
+    XB.MITEMS(0) = GP.BSTRCOUNT(BS.I.FILE)
+    FOR XB.J = 0 TO XB.MITEMS(0) - 1
+        XB.ITEM$(0, XB.J) = GP.BSTR(BS.I.FILE, XB.J)
+    NEXT XB.J
+    XB.RULE(0, 0) = XB.ALWAYS
+    XB.RULE(0, 1) = XB.ALWAYS
+    XB.RULE(0, 2) = XB.HASDB
+    XB.RULE(0, 3) = XB.NOTYET
+    XB.RULE(0, 4) = XB.NOTYET
+    XB.RULE(0, 5) = XB.NOTYET
+    XB.RULE(0, 6) = XB.ALWAYS
+    XB.RULE(0, 7) = XB.ALWAYS
 
-    XB.MNAME$(3) = "Browse"
-    XB.MITEMS(3) = 2
-    XB.MHOT$(3) = "TR"
-    XB.ITEM$(3, 0) = "Table"        : XB.RULE(3, 0) = XB.HASDB
-    XB.ITEM$(3, 1) = "Record"       : XB.RULE(3, 1) = XB.HASDB
+    XB.MITEMS(1) = GP.BSTRCOUNT(BS.I.MODIFY)
+    FOR XB.J = 0 TO XB.MITEMS(1) - 1
+        XB.ITEM$(1, XB.J) = GP.BSTR(BS.I.MODIFY, XB.J)
+    NEXT XB.J
+    XB.RULE(1, 0) = XB.HASDB
 
-    XB.MNAME$(4) = "Utility"
-    XB.MITEMS(4) = 5
-    XB.MHOT$(4) = "CARPZ"
-    XB.ITEM$(4, 0) = "Copy"         : XB.RULE(4, 0) = XB.HASDB
-    XB.ITEM$(4, 1) = "Append"       : XB.RULE(4, 1) = XB.HASDB
-    XB.ITEM$(4, 2) = "Replace"      : XB.RULE(4, 2) = XB.HASDB
-    XB.ITEM$(4, 3) = "Pack"         : XB.RULE(4, 3) = XB.HASDB
-    XB.ITEM$(4, 4) = "Zap"          : XB.RULE(4, 4) = XB.HASDB
+    XB.MITEMS(2) = GP.BSTRCOUNT(BS.I.BROWSE)
+    FOR XB.J = 0 TO XB.MITEMS(2) - 1
+        XB.ITEM$(2, XB.J) = GP.BSTR(BS.I.BROWSE, XB.J)
+    NEXT XB.J
+    XB.RULE(2, 0) = XB.HASDB
+    XB.RULE(2, 1) = XB.HASDB
 
-    XB.MNAME$(5) = "Move"
-    XB.MITEMS(5) = 4
-    XB.MHOT$(5) = "EGLS"
-    XB.ITEM$(5, 0) = "Seek"         : XB.RULE(5, 0) = XB.NOTYET
-    XB.ITEM$(5, 1) = "Goto"         : XB.RULE(5, 1) = XB.HASDB
-    XB.ITEM$(5, 2) = "Locate"       : XB.RULE(5, 2) = XB.HASDB
-    XB.ITEM$(5, 3) = "Skip"         : XB.RULE(5, 3) = XB.HASDB
+    XB.MITEMS(3) = GP.BSTRCOUNT(BS.I.UTIL)
+    FOR XB.J = 0 TO XB.MITEMS(3) - 1
+        XB.ITEM$(3, XB.J) = GP.BSTR(BS.I.UTIL, XB.J)
+    NEXT XB.J
+    XB.RULE(3, 0) = XB.HASDB
+    XB.RULE(3, 1) = XB.HASDB
+    XB.RULE(3, 2) = XB.HASDB
+    XB.RULE(3, 3) = XB.HASDB
+    XB.RULE(3, 4) = XB.HASDB
 
-    XB.MNAME$(6) = "Set"
-    XB.MITEMS(6) = 4
-    XB.MHOT$(6) = "RTFA"
-    XB.ITEM$(6, 0) = "Relation"     : XB.RULE(6, 0) = XB.NOTYET
-    XB.ITEM$(6, 1) = "Filter"       : XB.RULE(6, 1) = XB.NOTYET
-    XB.ITEM$(6, 2) = "Fields"       : XB.RULE(6, 2) = XB.HASDB
-    XB.ITEM$(6, 3) = "Area"         : XB.RULE(6, 3) = XB.ALWAYS
+    XB.MITEMS(4) = GP.BSTRCOUNT(BS.I.MOVE)
+    FOR XB.J = 0 TO XB.MITEMS(4) - 1
+        XB.ITEM$(4, XB.J) = GP.BSTR(BS.I.MOVE, XB.J)
+    NEXT XB.J
+    XB.RULE(4, 0) = XB.NOTYET
+    XB.RULE(4, 1) = XB.HASDB
+    XB.RULE(4, 2) = XB.HASDB
+    XB.RULE(4, 3) = XB.HASDB
 
-    XB.MNAME$(7) = "Help"
-    XB.MITEMS(7) = 2
-    XB.MHOT$(7) = "AK"
-    XB.ITEM$(7, 0) = "About"        : XB.RULE(7, 0) = XB.ALWAYS
-    XB.ITEM$(7, 1) = "Keys"         : XB.RULE(7, 1) = XB.ALWAYS
+    XB.MITEMS(5) = GP.BSTRCOUNT(BS.I.HELP)
+    FOR XB.J = 0 TO XB.MITEMS(5) - 1
+        XB.ITEM$(5, XB.J) = GP.BSTR(BS.I.HELP, XB.J)
+    NEXT XB.J
+    XB.RULE(5, 0) = XB.ALWAYS
+    XB.RULE(5, 1) = XB.ALWAYS
+
+    XB.MITEMS(6) = GP.BSTRCOUNT(BS.I.TEST)
+    FOR XB.J = 0 TO XB.MITEMS(6) - 1
+        XB.ITEM$(6, XB.J) = GP.BSTR(BS.I.TEST, XB.J)
+    NEXT XB.J
+    XB.RULE(6, 0) = XB.ALWAYS
+    XB.RULE(6, 1) = XB.ALWAYS
+    XB.RULE(6, 2) = XB.ALWAYS
+    XB.RULE(6, 3) = XB.ALWAYS
+    XB.RULE(6, 4) = XB.ALWAYS
+    XB.RULE(6, 5) = XB.ALWAYS
 
     ## Dropdown widths, measured once and kept as numbers.
     FOR XB.I = 0 TO XB.LASTM
@@ -133,7 +248,6 @@ XB.MENU.SETUP:
 
     XB.ACTIVE = 0 - 1
     RETURN
-
 
 ## ------------------------------------------------------------ enable rules
 ## DBU's parallel boolean arrays, as a number. XB.RULE(m, i) picks one.
@@ -178,7 +292,7 @@ XB.MENU.BAR.ITEMS:
     MENUVERT.COUNT = XB.MENUS
     MENUVERT.X = 0
     MENUVERT.Y = XB.BARROW
-    MENUVERT.ATTR = THEME.CLR(THEME.TITLE)
+    MENUVERT.ATTR = THEME.CLR(THEME.TEXT)
     MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
     MENUVERT.HOT$ = ""
     MENUVERT.HOTATTR = 0
@@ -188,8 +302,14 @@ XB.MENU.BAR.ITEMS:
     RETURN
 
 ## The whole bar, unhighlighted.
+##
+## THE BAR IS THE PAGE'S OWN COLOURS AND THE SELECTED TITLE IS THE REVERSED
+## PAIR, which is GPBMODS.BASL's GMX.BAR.LOAD and every bar menu ever written.
+## The row is filled with the item colour rather than left alone so the columns
+## past the last title are clean; GPBMODS does not fill because its shell has
+## already painted that row.
 XB.RENDER.MENUBAR:
-    GP.FILL 0, XB.BARROW, APPSYS.COLS, 1, 32, THEME.CLR(THEME.TITLE)
+    GP.FILL 0, XB.BARROW, APPSYS.COLS, 1, 32, THEME.CLR(THEME.TEXT)
     GOSUB XB.MENU.BAR.ITEMS
     GOSUB MENUBAR.DRAW
     IF XB.ACTIVE >= 0 THEN MENUBAR.SEL = XB.ACTIVE + 1
@@ -210,13 +330,55 @@ XB.DRAW.DROPDOWN:
     XB.DD.N = XB.MITEMS(XB.ACTIVE)
     IF XB.DD.X + XB.DD.W > APPSYS.COLS THEN XB.DD.X = APPSYS.COLS - XB.DD.W
 
-    GP.BOX XB.DD.X - 1, XB.DROPROW - 1, XB.DD.W + 2, XB.DD.N + 2, 1, THEME.CLR(THEME.BORDER)
+    ## THE CELLS FIRST, THEN THE PANEL OVER THEM. XB.ERASE.DROPDOWN puts them
+    ## back, and that put-back is the whole of the repaint: walking the bar no
+    ## longer leaves a hole in whatever the last panel stood on.
+    XB.DD.BX = XB.DD.X - 1
+    XB.DD.BY = XB.DROPROW - 1
+    XB.DD.BW = XB.DD.W + 2
+    XB.DD.BH = XB.DD.N + 2
+
+    ## THE SHADOW IS WORKED OUT BEFORE THE SAVE, because it is drawn outside
+    ## the panel: a save of the panel alone would put the panel back and leave
+    ## the shadow standing as a dark L where a menu used to be. GP.FILL clips
+    ## nothing, so the two arms are trimmed to the screen rather than the panel
+    ## being moved to make room for them. Two columns and one row, the same
+    ## offsets GUI.SHADOW.DRAW uses, so a dropdown and a dialog cast the same
+    ## shadow.
+    XB.DD.SW = APPSYS.COLS - XB.DD.BX - XB.DD.BW
+    IF XB.DD.SW > 2 THEN XB.DD.SW = 2
+    IF XB.DD.SW < 0 THEN XB.DD.SW = 0
+    XB.DD.SH = 1
+    IF XB.DD.BY + XB.DD.BH >= APPSYS.ROWS THEN XB.DD.SH = 0
+
+    SV.X = XB.DD.BX
+    SV.Y = XB.DD.BY
+    SV.W = XB.DD.BW + XB.DD.SW
+    SV.H = XB.DD.BH + XB.DD.SH
+    GOSUB SV.SAVE
+    IF SV.HND = 0 THEN GOSUB XB.PANEL.TIGHTEN
+    XB.DD.HND = SV.HND
+
+    ## Attribute 0 is black on black. The fill is solid, not a recolour, so the
+    ## shadow rubs out what it covers -- acceptable only because the put-back
+    ## above restores it.
+    IF XB.DD.SW > 0 THEN GP.FILL XB.DD.BX + XB.DD.BW, XB.DD.BY + 1, XB.DD.SW, XB.DD.BH - 1, 32, 0
+    IF XB.DD.SH > 0 THEN GP.FILL XB.DD.BX + 2, XB.DD.BY + XB.DD.BH, XB.DD.BW + XB.DD.SW - 2, 1, 32, 0
+
+    GP.BOX XB.DD.BX, XB.DD.BY, XB.DD.BW, XB.DD.BH, 1, THEME.CLR(THEME.BORDER)
     MENUVERT.X = XB.DD.X
     MENUVERT.Y = XB.DROPROW
     MENUVERT.WIDTH = XB.DD.W
     MENUVERT.COUNT = XB.DD.N
+    ## The selected row is the reversed pair, the same one the bar's open title
+    ## wears, because a dropdown and the bar it hangs off are one menu.
     MENUVERT.ATTR = THEME.CLR(THEME.TEXT)
-    MENUVERT.HIATTR = THEME.CLR(THEME.TITLE)
+    MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
+
+    ## The separator is the frame's colour, not the text's. It runs the full
+    ## width of the dropdown in the same stroke GP.BOX just drew the border
+    ## with, so in any other attribute it reads as a row of its own.
+    MENUVERT.SEPATTR = THEME.CLR(THEME.BORDER)
 
     ## BEFORE the rows are drawn: MENUVERT.ROW tints from MENUVERT.HOT$ as it
     ## prints each one.
@@ -225,19 +387,48 @@ XB.DRAW.DROPDOWN:
 
     ## MENUVERT.ITEM$ is 1 based, XB.SEL is 0 based off the table. Converted
     ## here and nowhere else.
+    ## A SEPARATOR GOES IN WITHOUT THE LEADING SPACE. MENUVERT tests for the
+    ## hyphen alone, so " -" would be an ordinary row whose text is a hyphen.
     FOR XB.I = 0 TO XB.DD.N - 1
         MENUVERT.ITEM$(XB.I + 1) = " " + XB.ITEM$(XB.ACTIVE, XB.I)
+        IF XB.ITEM$(XB.ACTIVE, XB.I) = "-" THEN MENUVERT.ITEM$(XB.I + 1) = "-"
     NEXT XB.I
-    GOSUB MENUVERT.DRAW
-    MENUVERT.DRAWROW = XB.SEL + 1
-    MENUVERT.DRAWATTR = MENUVERT.HIATTR
-    GOSUB MENUVERT.ROW
+
+    ## THE ROWS ARE NOT DRAWN HERE. MENUVERT.RUN draws every row and then the
+    ## highlighted one as its first act, so drawing them here painted the whole
+    ## panel a second time on every open. The frame, the shadow and the item
+    ## text are set up above; the rows land when the key loop starts.
     RETURN
 
-## Take the panel away. The view screen underneath is redrawn by the caller.
+## Take the panel away, by putting back the cells it covered. It works from the
+## XB.DD.* geometry the last XB.DRAW.DROPDOWN left behind, so it has to run
+## while XB.ACTIVE still names the panel that is on screen.
+##
+## The store can refuse, and then this falls back to what it did before: blank
+## the rectangle and mark the view dirty for the caller to redraw.
 XB.ERASE.DROPDOWN:
-    GP.FILL XB.DD.X - 1, XB.DROPROW - 1, XB.DD.W + 2, XB.DD.N + 2, 32, THEME.CLR(THEME.PAGE)
+    IF XB.DD.HND = 0 THEN GOTO XB.ERASE.BLANK
+    SV.HND = XB.DD.HND
+    SV.MOVE = 0
+    GOSUB SV.RESTORE
+    XB.PUTBACK = SV.OK
+    SV.HND = XB.DD.HND
+    GOSUB SV.FREE
+    XB.DD.HND = 0
+    IF XB.PUTBACK THEN RETURN
+
+XB.ERASE.BLANK:
+    GP.FILL XB.DD.BX, XB.DD.BY, XB.DD.BW + XB.DD.SW, XB.DD.BH + XB.DD.SH, 32, THEME.CLR(THEME.PAGE)
     XB.DIRTY = -1
+    RETURN
+
+## The store had no room. A hole can only appear in it when something frees out
+## of order, so this is the one place the compactor belongs: asked for, on a
+## refusal, and never on a timer. SV.SAVE is retried once; if it refuses again
+## the panel is drawn anyway and the erase falls back to a repaint.
+XB.PANEL.TIGHTEN:
+    GOSUB SV.COMPACT
+    GOSUB SV.SAVE
     RETURN
 
 
@@ -256,6 +447,13 @@ XB.OPEN.MENUBAR:
 
 XB.MENU.OPEN:
     GOSUB XB.DRAW.DROPDOWN
+
+## A KEY NOBODY CLAIMED COMES BACK TO XB.MENU.KEYS, NOT TO XB.MENU.OPEN. Going
+## back to the open would run XB.DRAW.DROPDOWN over a panel already on screen:
+## SV.SAVE would store the panel as what lies underneath it, and the handle from
+## the first save would never be freed. LEFT and RIGHT still go to the open,
+## because they erase first and the panel moves.
+XB.MENU.KEYS:
     MENUVERT.SEL = XB.SEL + 1
     MENUVERT.FLAGS = MENUVERT.KEYEXIT
     GOSUB MENUVERT.RUN
@@ -265,13 +463,14 @@ XB.MENU.OPEN:
     IF MENUVERT.KEY = 13 THEN GOSUB XB.MENU.SELECT : RETURN
     IF MENUVERT.KEY = 157 THEN GOSUB XB.MENU.LEFT : GOTO XB.MENU.OPEN
     IF MENUVERT.KEY = 29 THEN GOSUB XB.MENU.RIGHT : GOTO XB.MENU.OPEN
-    GOTO XB.MENU.OPEN
+    GOTO XB.MENU.KEYS
 
 ## ERASE BEFORE MOVING. XB.ERASE.DROPDOWN works from the XB.DD.* geometry the
 ## last XB.DRAW.DROPDOWN left behind -- the panel actually on screen -- so it
 ## has to run while XB.ACTIVE still names that panel.
 XB.MENU.LEFT:
     GOSUB XB.ERASE.DROPDOWN
+    IF XB.DIRTY THEN GOSUB XB.VIEW.DRAW
     XB.WAS = XB.ACTIVE
     XB.ACTIVE = XB.ACTIVE - 1
     IF XB.ACTIVE < 0 THEN XB.ACTIVE = XB.LASTM
@@ -281,6 +480,7 @@ XB.MENU.LEFT:
 
 XB.MENU.RIGHT:
     GOSUB XB.ERASE.DROPDOWN
+    IF XB.DIRTY THEN GOSUB XB.VIEW.DRAW
     XB.WAS = XB.ACTIVE
     XB.ACTIVE = XB.ACTIVE + 1
     IF XB.ACTIVE > XB.LASTM THEN XB.ACTIVE = 0
@@ -327,18 +527,16 @@ XB.MENU.CLOSE:
 ## --------------------------------------------------------------- dispatch
 ## Two levels, both ON ... GOSUB. The commands themselves are in XBASE.BASL.
 XB.MENU.DISPATCH:
-    ON XB.PICK.M + 1 GOSUB XB.DISP.FILE, XB.DISP.CREATE, XB.DISP.SAVE, XB.DISP.BROWSE, XB.DISP.UTIL, XB.DISP.MOVE, XB.DISP.SET, XB.DISP.HELP
+    ON XB.PICK.M + 1 GOSUB XB.DISP.FILE, XB.DISP.MODIFY, XB.DISP.BROWSE, XB.DISP.UTIL, XB.DISP.MOVE, XB.DISP.HELP, XB.DISP.TEST
     RETURN
 
+## THE SEVENTH NAME IS THE SEPARATOR'S. ON ... GOSUB counts its names, so the
+## row needs one even though nothing can select it; XB.CMD.NOP is a RETURN.
 XB.DISP.FILE:
-    ON XB.PICK.I + 1 GOSUB XB.CMD.OPENDB, XB.CMD.OPENIX, XB.CMD.CLOSEDB, XB.CMD.QUIT
+    ON XB.PICK.I + 1 GOSUB XB.CMD.OPENDB, XB.CMD.CREATEDB, XB.CMD.CLOSEDB, XB.CMD.OPENIX, XB.CMD.CREATEIX, XB.CMD.CLOSEIX, XB.CMD.NOP, XB.CMD.QUIT
     RETURN
 
-XB.DISP.CREATE:
-    ON XB.PICK.I + 1 GOSUB XB.CMD.CREATEDB, XB.CMD.CREATEIX
-    RETURN
-
-XB.DISP.SAVE:
+XB.DISP.MODIFY:
     ON XB.PICK.I + 1 GOSUB XB.CMD.SAVESTRU
     RETURN
 
@@ -354,10 +552,10 @@ XB.DISP.MOVE:
     ON XB.PICK.I + 1 GOSUB XB.CMD.SEEK, XB.CMD.GOTO, XB.CMD.LOCATE, XB.CMD.SKIP
     RETURN
 
-XB.DISP.SET:
-    ON XB.PICK.I + 1 GOSUB XB.CMD.RELATION, XB.CMD.FILTER, XB.CMD.FIELDS, XB.CMD.AREA
+XB.DISP.HELP:
+    ON XB.PICK.I + 1 GOSUB XB.CMD.ABOUT, XB.CMD.MEMORY
     RETURN
 
-XB.DISP.HELP:
-    ON XB.PICK.I + 1 GOSUB XB.CMD.ABOUT, XB.CMD.KEYS
+XB.DISP.TEST:
+    ON XB.PICK.I + 1 GOSUB XB.CMD.TESTSAY, XB.CMD.TESTYN, XB.CMD.TESTINPUT, XB.CMD.TESTLIST, XB.CMD.TESTCOMBO, XB.CMD.TESTTHEME
     RETURN

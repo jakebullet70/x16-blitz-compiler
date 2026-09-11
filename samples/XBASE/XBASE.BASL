@@ -1,24 +1,92 @@
 #SAVEAS "@:XBASE.SRC.PRG"
 #SYMFILE "@:XBASE.SRC.SYM"
 #INCLUDE "GPB.INC.BL"
-#INCLUDE "BANKMGR.INC.BL"
-#INCLUDE "APPSYS.INC.BL"
-#INCLUDE "KB.INC.BL"
-#INCLUDE "STRINGS.INC.BL"
 #INCLUDE "STASH.INC.BL"
-#INCLUDE "DBFILE.INC.BL"
-#INCLUDE "DB.INC.BL"
-#INCLUDE "DBFORM.INC.BL"
 
-## ---- THE GUI RUNS FROM A RAM BANK. LIB.GUIBANK.INC.BL, included directly
+## ---- THE UTILITIES RUN FROM A SECOND RAM BANK, and it has to be a second
+## ---- one: two regions sit at the same $A000, so a region may not call
+## ---- another region, and the GUI is already up there. Nothing in here calls
+## ---- the GUI and the GUI calls nothing in here -- its only downward call is
+## ---- STASH -- so the two sets are genuinely independent.
+## ----
+## ---- WHAT IS IN IT. APPSYS, BANKMGR, KB, STRINGS, and the panel store with
+## ---- its compactor. None of them draws, and none of them holds a BANK
+## ---- statement, which is the one and only disqualifier.
+## ----
+## ---- WHAT STAYED BEHIND. STASH holds BANK itself. DBFORM calls LINEINPUT
+## ---- and the GUI, so banking it would be region to region, and bank 4 has
+## ---- no room to take it in beside them.
+## ----
+## ---- THE RECORD KEEPER USED TO BE IN HERE and is now a region of its own,
+## ---- directly below. It still calls in for STR.PADL, STR.PADR and STR.RTRIM.
+## ----
+## ---- THE GOTO OVER THE REGION IS NOT OPTIONAL, for the reason the GUI
+## ---- region's own comment gives below.
+GOTO XB.UTILEND
+#INCLUDE "SHIM.UTILBANK.INC.BL"
+GP.BANKED SHIM.UTILBANK
+#INCLUDE "APPSYS.BANK.INC.BL"
+#INCLUDE "BANKMGR.BANK.INC.BL"
+#INCLUDE "KB.BANK.INC.BL"
+#INCLUDE "STRINGS.BANK.INC.BL"
+#INCLUDE "STASHVRAM.BANK.INC.BL"
+#INCLUDE "STASHVRAMGC.BANK.INC.BL"
+GP.ENDBANKED
+XB.UTILEND:
+
+## ---- THE RECORD KEEPER HAS A BANK TO ITSELF. It was the bottom of the
+## ---- utility bank until the database work was held back from this release.
+## ---- On its own it can grow without pushing APPSYS and the panel store out,
+## ---- and a program that wants the utilities without a database does not pay
+## ---- for it.
+## ----
+## ---- IT CALLS THE UTILITY BANK ABOVE, which is one region reaching another
+## ---- and is what the push and pop shims were added for. DB.JOIN and DB.SPLIT
+## ---- want STR.PADL and STR.PADR on every record, and the header readers want
+## ---- STR.RTRIM. All three go through SHIM.UTILBANK's front doors.
+## ----
+## ---- IT COMES BEFORE EVERYTHING THAT READS ITS CONSTANTS. DB.AREAS, DB.MAXF
+## ---- and the DBH and DBD offsets are #DEFINEs inside DB.BANK.INC.BL, DBFORM
+## ---- and the command handlers below read them, and BASLOAD resolves a
+## ---- constant only if it has already read it.
+## ----
+## ---- DBFILE GOES IN WITHOUT A TWIN. DB is its only caller and DB is in the
+## ---- same region, so an ordinary GOSUB reaches it and it has no public name
+## ---- that needs a shim. SHIM.DBBANK.INC.BL's header says how to give it one
+## ---- the day something outside the region wants it.
+GOTO XB.DBEND
+#INCLUDE "SHIM.DBBANK.INC.BL"
+GP.BANKED SHIM.DBBANK
+#INCLUDE "DBFILE.INC.BL"
+#INCLUDE "DB.BANK.INC.BL"
+GP.ENDBANKED
+XB.DBEND:
+
+## ---- THEME HAS A BANK TO ITSELF. It used to be the first file in the GUI
+## ---- region and that region reached the 8K a region may hold, which stops a
+## ---- build with GP.BANKED REGION OVER 8K. Moving it to SHIM.UTILBANK would
+## ---- have worked too; it is here instead so the room it gave back stays
+## ---- available to the GUI, which is the part still growing.
+## ----
+## ---- IT COMES FIRST BECAUSE OF THE #DEFINEs. THEME.PAGE, THEME.TEXT and the
+## ---- rest are constants, and BASLOAD resolves a constant only if it has
+## ---- already read it. Every module below reads them.
+GOTO XB.THEMEEND
+#INCLUDE "SHIM.THEMEBANK.INC.BL"
+GP.BANKED SHIM.THEMEBANK
+#INCLUDE "THEME.BANK.INC.BL"
+GP.ENDBANKED
+XB.THEMEEND:
+
+## ---- THE GUI RUNS FROM A RAM BANK. SHIM.GUIBANK.INC.BL, included directly
 ## ---- above the region so the bank reads as one unit and its file list is the
-## ---- copy list, is the low memory front door: eighteen shims that select
-## ---- LIB.GUIBANK and call the body
+## ---- copy list, is the low memory front door: seventeen shims that select
+## ---- SHIM.GUIBANK and call the body
 ## ---- at $A000. Everything reaching the screen through a dialog, a bar or a
 ## ---- dropdown is in here; the record keeper is not, and step 6 of PLAN.md
 ## ---- section 9 puts that in a bank of its own.
 ## ----
-## ---- ALL SIX MODULES GO IN, even the two nothing here calls. LIB.GUIBANK shims
+## ---- ALL FIVE MODULES GO IN, even the two nothing here calls. SHIM.GUIBANK shims
 ## ---- every entry point and BASLOAD resolves every label in a file it reads,
 ## ---- so leaving GUI2 out stops the build with LABEL NOT FOUND.
 ## ----
@@ -33,16 +101,41 @@
 ## ---- GP.BANKED leaves works at program start and stops working the day
 ## ---- anything selects another bank first.
 GOTO XB.LIBEND
-#INCLUDE "LIB.GUIBANK.INC.BL"
-GP.BANKED LIB.GUIBANK
-#INCLUDE "THEME.INC.BL"
-#INCLUDE "MENUVERT.INC.BL"
-#INCLUDE "MENUBAR.INC.BL"
-#INCLUDE "LINEINPUT.INC.BL"
-#INCLUDE "GUI.INC.BL"
-#INCLUDE "GUI2.INC.BL"
+#INCLUDE "SHIM.GUIBANK.INC.BL"
+GP.BANKED SHIM.GUIBANK
+#INCLUDE "MENUVERT.BANK.INC.BL"
+#INCLUDE "MENUBAR.BANK.INC.BL"
+#INCLUDE "LINEINPUT.BANK.INC.BL"
+#INCLUDE "GUI.BANK.INC.BL"
+#INCLUDE "GUI2.BANK.INC.BL"
 GP.ENDBANKED
 XB.LIBEND:
+
+## ---- THE FORM PAINTER, IN LOW MEMORY, AND IT HAS TO COME AFTER THE GUI
+## ---- REGION. DBFORM reads THEME.BORDER and THEME.TEXT, which are #DEFINEs
+## ---- inside THEME.BANK.INC.BL, and BASLOAD resolves a #DEFINE only if it has
+## ---- already read it -- a label it will find anywhere, a constant it will
+## ---- not. Move this back above the region and the build stops with
+## ---- SYMBOL NOT IN SCOPE IN DBFORM.INC.BL.
+#INCLUDE "DBFORM.INC.BL"
+
+## ---- THE COMBO BOX GETS A REGION OF ITS OWN, and it comes after the GUI for
+## ---- the same reason DBFORM does: it reads GUI.CT.COMBO and the GUI.NAV
+## ---- constants out of GUI.BANK.INC.BL above.
+## ----
+## ---- IT IS A REGION CALLING A REGION, in both directions. GUI.FORM names
+## ---- COMBO.DRAW and COMBO.KEY from inside bank 4, and COMBO.OPEN runs
+## ---- MENUVERT back in bank 4 from inside this one. That was fatal until the
+## ---- shims started putting the caller's bank back -- SHIM.GUIBANK.INC.BL's
+## ---- GUI.SHIM.PUSH says how, and SHIM.COMBOBANK.INC.BL carries the same pair
+## ---- for this bank. The return now lands with the caller's own 8K in the
+## ---- window, which is what makes this region possible at all.
+GOTO XB.COMBOEND
+#INCLUDE "SHIM.COMBOBANK.INC.BL"
+GP.BANKED SHIM.COMBOBANK
+#INCLUDE "COMBO.BANK.INC.BL"
+GP.ENDBANKED
+XB.COMBOEND:
 
 ## ============================================================================
 ## XBASE.BASL -- a dBase II / XBase record keeper for the X16.
@@ -60,9 +153,9 @@ XB.LIBEND:
 ## data channels, one command channel. The whole database is never loaded.
 ##
 ## THE GUI IS IN A BANK AND THE ENGINE IS NOT. The library modules that draw
-## -- THEME, MENUVERT, MENUBAR, LINEINPUT, GUI, GUI2 -- run from LIB.GUIBANK
-## behind LIB.GUIBANK.INC.BL's shims, which is the arrangement GPBMODS.BASL already
-## runs. DBFILE, DB and DBFORM are still low memory, deliberately: that is step
+## -- MENUVERT, MENUBAR, LINEINPUT, GUI, GUI2 -- run from SHIM.GUIBANK behind
+## SHIM.GUIBANK.INC.BL's shims, which is the arrangement GPBMODS.BASL already
+## runs, and THEME runs from a region of its own behind SHIM.THEMEBANK.INC.BL. DBFILE, DB and DBFORM are still low memory, deliberately: that is step
 ## 2 and 3 of PLAN.md section 9, and DBBANK.INC.BL moves the engine into bank 5
 ## at step 6. Banking a region that misbehaves is a silent hang with no line
 ## number, so the engine goes last, after it works where it can be seen.
@@ -80,10 +173,10 @@ XB.LIBEND:
 ## the default step of 1 is the only one STRCASE.INC.BL survives.
 ## ============================================================================
 
-## Screen rows. Row 0 is the title, 1 the bar, 2 a rule, and the view screen
-## runs from 3 down to the message line.
-#DEFINE XB.TITLEROW 0
-#DEFINE XB.VIEWROW 3
+## Screen rows. Row 0 is the menu bar, row 1 a rule, and the view screen runs
+## from 2 down to the message line. There is no title row: the bar is the top
+## line of the screen, which is where a CUA application puts it.
+#DEFINE XB.VIEWROW 2
 #DEFINE XB.AREAH 8
 
 ## The panel the one record form opens in.
@@ -94,42 +187,100 @@ XB.LIBEND:
 ## How many rows the table browse shows at once.
 #DEFINE XB.BROWSEROWS 16
 
-## The scratch bank GUI.OPEN stashes the cells a dialog covers in. NOT 4, NOT 5
-## and NOT 6: those are the GUI's own code, the engine's and the v2 index's, and
-## a dialog pointed at any of them writes the screen over their contents.
+## The scratch bank GUI.OPEN stashes the cells a dialog covers in. NOT 4, NOT 5,
+## NOT 6, NOT 7 and NOT 9: those are the GUI's own code, the menu text, the v2
+## index's, the utilities' and THEME's code, and a dialog pointed at any of them
+## writes the screen over their contents.
 #DEFINE XB.GUIBANK 8
+
+## The menu text pool. GP.BANKEDSTR builds it while the object is written and the
+## bootstrap copies it in, so the number has to be one the COMPILER leaves alone:
+## 7 is its object buffer and 8 upwards are its region banks. 5 and 6 are the two
+## it is known to leave, and 5 is the one taken here. DBBANK.INC.BL reserves both
+## for the DB engine, which is not built yet -- whichever lands second renumbers.
+#DEFINE XB.TEXTBANK 5
+
+## Handles in the panel store. One dropdown is open at a time, so one is the
+## working number and the second is slack for a caller that nests.
+#DEFINE XB.SVMAX 2
+
+## The screen mode the program runs in. 1 is 80x30: the same 80 columns the
+## panels are laid out for, at half the rows, so the layout fills the screen
+## instead of sitting in the top quarter of it.
+#DEFINE XB.SCRMODE 1
 
 
 ## ---------------------------------------------------------------- start up
 GOSUB APPSYS.STARTUP
 
-## BOTH BANKS ARE CLAIMED, NOT ALLOCATED, and that is not a style choice.
+## APPSYS.STARTUP has already remembered the mode the user arrived in, so
+## APPSYS.RESTORE still puts that one back on the way out. The size is read a
+## second time because every row in the layout is measured from APPSYS.ROWS.
+GP.CALL APPSYS.SCRMODE, XB.SCRMODE, 0, 0, 0
+GP.CALL APPSYS.SCRMODE, 0, 0, 0, 1
+APPSYS.COLS = GP.X
+APPSYS.ROWS = GP.Y
+
+## ALL FIVE BANKS ARE CLAIMED, NOT ALLOCATED, and that is not a style choice.
 ## GP.BANKED takes a decimal constant the compiler reads while the object is
 ## written, so the manager has to be TOLD which bank went rather than asked for
-## one. Skip either claim and a later BANKMGR.GET.FREE.BANK hands the number
-## out again -- the code bank to a dialog that writes screen cells over the
-## GUI's own code, or the scratch bank to something that overwrites what a
-## dialog is holding to put back.
+## one. Skip a claim and a later BANKMGR.GET.FREE.BANK hands the number out
+## again -- a code bank to a dialog that writes screen cells over the GUI's or
+## the utilities' own code, the scratch bank to something that overwrites what a
+## dialog is holding to put back, or the text bank to anything at all, which
+## loses the menus.
 XB.BANKFAIL$ = ""
 GOSUB BANKMGR.INIT
 
-BANKMGR.SET.BANK = LIB.GUIBANK : GOSUB BANKMGR.CLAIM
+BANKMGR.SET.BANK = SHIM.THEMEBANK : GOSUB BANKMGR.CLAIM
+IF BANKMGR.OK = 0 THEN XB.BANKFAIL$ = "THEME CODE BANK IS ALREADY TAKEN"
+
+BANKMGR.SET.BANK = SHIM.GUIBANK : GOSUB BANKMGR.CLAIM
 IF BANKMGR.OK = 0 THEN XB.BANKFAIL$ = "GUI CODE BANK IS ALREADY TAKEN"
 
 BANKMGR.SET.BANK = XB.GUIBANK : GOSUB BANKMGR.CLAIM
 IF BANKMGR.OK = 0 THEN XB.BANKFAIL$ = "GUI SCRATCH BANK IS ALREADY TAKEN"
 
+BANKMGR.SET.BANK = SHIM.UTILBANK : GOSUB BANKMGR.CLAIM
+IF BANKMGR.OK = 0 THEN XB.BANKFAIL$ = "UTILITY CODE BANK IS ALREADY TAKEN"
+
+BANKMGR.SET.BANK = SHIM.DBBANK : GOSUB BANKMGR.CLAIM
+IF BANKMGR.OK = 0 THEN XB.BANKFAIL$ = "DATABASE CODE BANK IS ALREADY TAKEN"
+
+BANKMGR.SET.BANK = XB.TEXTBANK : GOSUB BANKMGR.CLAIM
+IF BANKMGR.OK = 0 THEN XB.BANKFAIL$ = "MENU TEXT BANK IS ALREADY TAKEN"
+
+BANKMGR.SET.BANK = SHIM.COMBOBANK : GOSUB BANKMGR.CLAIM
+IF BANKMGR.OK = 0 THEN XB.BANKFAIL$ = "COMBO CODE BANK IS ALREADY TAKEN"
+
 IF XB.BANKFAIL$ <> "" THEN GOTO XB.BANKSTOP
 
 ## THEME.SELECT, not THEME.LOAD. The banked library renamed it: the low memory
-## label is LIB.GUIBANK's shim and the body it calls is THEME.SELECT.BODY.
-THEME.ID = 0
+## label is SHIM.THEMEBANK's shim and the body it calls is THEME.SELECT.BODY.
+THEME.ID = 3
 GOSUB THEME.SELECT
+
+
+## The panel store, in VRAM. The default window is $04000 to $1AFFF, which is
+## clear here: the text map and the charset sit above it and nothing in this
+## program draws a bitmap. The caller dims the table, which is why these two
+## lines are here and not inside SV.INIT.
+DIM SV.PAGE%(XB.SVMAX)
+DIM SV.PAGES%(XB.SVMAX)
+SV.MAX = XB.SVMAX
+GOSUB SV.INIT
+IF SV.OK = 0 THEN XB.BANKFAIL$ = "PANEL STORE: " + SV.ERROR$ : GOTO XB.BANKSTOP
 
 XB.MSGROW  = APPSYS.ROWS - 2 : XB.HINTROW = APPSYS.ROWS - 1
 XB.QUIT = 0
 
 GUI.BANK = XB.GUIBANK
+
+## Every dialog the library opens gets a drop shadow. GUI.OPEN works out how
+## much of it is on screen before it stashes, so the put-back covers the
+## shadow as well as the box. GUI.SHADOW.ATTR stays 0, which is black on
+## black.
+GUI.SHADOW = 1
 GOSUB KB.CLEARKB
 DBFILE.DEVICE = 8
 GOSUB DB.INIT : GOSUB XB.MENU.SETUP
@@ -157,15 +308,11 @@ XB.MAIN:
     XB.KEY = ASC(XB.IN$)
 
     GP.SELECT XB.KEY
-        GP.CASE 27
+        GP.CASE 27 
             XB.ACTIVE = 0
             GOSUB XB.OPEN.MENUBAR
-        GP.CASE 9
-            GOSUB XB.CMD.AREA
-        GP.CASE 17
-            GOSUB XB.SKIP.NEXT
-        GP.CASE 145
-            GOSUB XB.SKIP.PREV
+        GP.CASE 17  : GOSUB XB.SKIP.NEXT
+        GP.CASE 145 : GOSUB XB.SKIP.PREV
     GP.ENDSEL
 
     IF XB.QUIT THEN GOTO XB.LEAVE
@@ -174,7 +321,7 @@ XB.MAIN:
 XB.LEAVE:
     GOSUB DB.CLOSEALL
     GOSUB APPSYS.RESTORE
-    PRINT "XBASE"
+    PRINT "XBASE... BYE!"
     END
 
 ## A bank the program needs by number was already handed out. There is no
@@ -189,61 +336,37 @@ XB.BANKSTOP:
 ## Drawn once. Everything after this repaints a part of it.
 XB.SCREEN:
     GP.FILL 0, 0, APPSYS.COLS, APPSYS.ROWS, 32, THEME.CLR(THEME.PAGE)
-    GP.FILL 0, XB.TITLEROW, APPSYS.COLS, 1, 32, THEME.CLR(THEME.TITLE)
-    GP.PRINTAT 2, XB.TITLEROW, "XBASE -- X16 RECORD KEEPER", THEME.CLR(THEME.TITLE)
-    GP.PRINTAT 2, XB.HINTROW, "ESC MENU   TAB AREA   UP/DOWN SKIP   FILE EXIT TO LEAVE", THEME.CLR(THEME.DIMMED)
     RETURN
 
-## The two areas, side by side, in DBU's spirit: what is open, how big it is,
-## and where the record pointer stands. The selected area is marked with ">".
+## The work area, which is empty until Browse fills it. THE DATABASE PANEL IS
+## GONE: what it said is now in the footer, one line instead of a box six rows
+## deep, and the space it held is where a browse grid belongs.
 XB.VIEW.DRAW:
     GP.FILL 0, XB.VIEWROW, APPSYS.COLS, XB.AREAH, 32, THEME.CLR(THEME.PAGE)
-    XB.SAVEA = DB.A
-    FOR DB.A = 0 TO DB.LASTA
-        XB.PX = 2 + DB.A * 39
-        GOSUB XB.AREA.PANEL
-    NEXT DB.A
-    DB.A = XB.SAVEA
     GOSUB XB.STATUS
     XB.DIRTY = 0
     RETURN
 
-## One area's panel. DB.A names it, XB.PX is its left column.
-XB.AREA.PANEL:
-    GP.BOX XB.PX, XB.VIEWROW, 36, XB.AREAH - 1, 1, THEME.CLR(THEME.BORDER)
-    XB.MARK$ = " "
-    IF DB.A = XB.SAVEA THEN XB.MARK$ = ">"
-    GP.PRINTAT XB.PX + 2, XB.VIEWROW, XB.MARK$ + " AREA " + MID$(STR$(DB.A), 2) + " ", THEME.CLR(THEME.TITLE)
-
-    IF DB.ISOPEN(DB.A) = 0 THEN GP.PRINTAT XB.PX + 2, XB.VIEWROW + 2, "<empty>", THEME.CLR(THEME.DIMMED)
-    IF DB.ISOPEN(DB.A) = 0 THEN RETURN
-
-    GP.PRINTAT XB.PX + 2, XB.VIEWROW + 1, "FILE   " + DB.FILE$(DB.A), THEME.CLR(THEME.TEXT)
-    GP.PRINTAT XB.PX + 2, XB.VIEWROW + 2, "TITLE  " + DB.TITLE$(DB.A), THEME.CLR(THEME.TEXT)
-    GP.PRINTAT XB.PX + 2, XB.VIEWROW + 3, "FIELDS " + MID$(STR$(DB.NFLD(DB.A)), 2), THEME.CLR(THEME.TEXT)
-    GP.PRINTAT XB.PX + 2, XB.VIEWROW + 4, "STRIDE " + MID$(STR$(DB.STRIDE(DB.A)), 2), THEME.CLR(THEME.TEXT)
-    GP.PRINTAT XB.PX + 2, XB.VIEWROW + 5, "RECS   " + MID$(STR$(DB.COUNT(DB.A)), 2), THEME.CLR(THEME.TEXT)
-    RETURN
-
-## The status line. DBU keeps the position in view at all times and so does
-## this: the record number is one based for the user, which is why DB.DATA0
-## comes off it.
+## The footer, and it is the whole of the status now: the one key that opens the
+## menu on the left, what is open on the right.
+##
+## DATABASE AND INDEX ARE ONE STRING, right justified together, so the gap
+## between them is fixed and the pair moves as a block when a name changes
+## length. INDEX is always empty in v1 -- see PLAN.MD section 9 -- and says so
+## rather than being left off, because an absent line reads as a missing
+## feature where an empty one reads as an empty slot.
+##
+## THE MESSAGE ROW IS CLEARED HERE, and that is what takes an XB.SAY message
+## away on the next redraw.
 XB.STATUS:
-    GP.FILL 0, XB.MSGROW, APPSYS.COLS, 1, 32, THEME.CLR(THEME.DIMMED)
-    XB.LINE$ = ""
-    FOR XB.I = 0 TO DB.LASTA
-        XB.NAME$ = "<empty>"
-        IF DB.ISOPEN(XB.I) THEN XB.NAME$ = DB.TITLE$(XB.I)
-        XB.MARK$ = " "
-        IF XB.I = DB.A THEN XB.MARK$ = ">"
-        STR.STR$ = XB.MARK$ + XB.NAME$
-        STR.WIDTH = 10
-        GOSUB STR.PADR
-        XB.LINE$ = XB.LINE$ + STR.STR$
-    NEXT XB.I
-    IF DB.ISOPEN(DB.A) THEN XB.LINE$ = XB.LINE$ + "  Rec " + MID$(STR$(DB.RECNO(DB.A) - DB.DATA0(DB.A) + 1), 2) + "/" + MID$(STR$(DB.COUNT(DB.A)), 2)
-    IF DB.DELETED THEN XB.LINE$ = XB.LINE$ + "  DEL"
-    GP.PRINTAT 1, XB.MSGROW, XB.LINE$, THEME.CLR(THEME.DIMMED)
+    GP.FILL 0, XB.MSGROW, APPSYS.COLS, 1, 32, THEME.CLR(THEME.PAGE)
+    GP.FILL 0, XB.HINTROW, APPSYS.COLS, 1, 32, THEME.CLR(THEME.DIMMED)
+    GP.PRINTAT 1, XB.HINTROW, "ESC = MENU", THEME.CLR(THEME.DIMMED)
+
+    XB.DBN$ = "<EMPTY>"
+    IF DB.ISOPEN(DB.A) THEN XB.DBN$ = DB.FILE$(DB.A)
+    XB.LINE$ = "DATABASE = " + XB.DBN$ + "    INDEX = <EMPTY>"
+    GP.PRINTAT APPSYS.COLS - LEN(XB.LINE$) - 1, XB.HINTROW, XB.LINE$, THEME.CLR(THEME.DIMMED)
     RETURN
 
 ## One line of news, in place of the status line until the next redraw.
@@ -294,6 +417,15 @@ XB.ASK:
 ## ============================================================================
 
 ## ---- File ----
+## The File menu is two groups of three -- open, create and close a database,
+## then the same three for an index -- a separator, and Exit.
+##
+## XB.CMD.NOP is the separator's slot in XB.DISP.FILE. ON ... GOSUB counts its
+## names, so the row needs one; nothing can select a separator, so it is a
+## RETURN and nothing else.
+XB.CMD.NOP:
+    RETURN
+
 XB.CMD.OPENDB:
     XB.PROMPT$ = "FILE"
     XB.ANSWER$ = ""
@@ -319,6 +451,11 @@ XB.CMD.OPENIX:
 
 XB.CMD.CLOSEDB:
     GOSUB DB.CLOSE : GOSUB XB.VIEW.DRAW
+    RETURN
+
+XB.CMD.CLOSEIX:
+    XB.MSG$ = "INDEXES ARE V2 -- SEE PLAN.MD SECTION 9"
+    GOSUB XB.SAY
     RETURN
 
 XB.CMD.QUIT:
@@ -349,7 +486,7 @@ XB.CMD.CREATEIX:
     GOSUB XB.SAY
     RETURN
 
-## ---- Save ----
+## ---- Modify ----
 ## NOT WRITTEN. Writes the schema out as a readable text file, the way dBASE
 ## LIST STRUCTURE does. One PRINT# per field off DB.NAME$(), DB.TYPE$(),
 ## DB.WID%() and DB.DEC%(), so it is small; it needs a free channel, and
@@ -536,52 +673,98 @@ XB.SKIP.PREV:
     GOSUB XB.STATUS
     RETURN
 
-## ---- Set ----
-## NOT WRITTEN, and PLAN.md section 7 says why it is not faked: a relation
-## without an index is a full child scan on every parent move. Until the index
-## lands, Move Locate in the other area is the honest version of it.
-XB.CMD.RELATION:
-    XB.MSG$ = "SET RELATION NEEDS THE INDEX -- IT IS V2"
-    GOSUB XB.SAY
-    RETURN
-
-## NOT WRITTEN. A filter is an expression, and an expression needs a parser.
-XB.CMD.FILTER:
-    XB.MSG$ = "SET FILTER IS NOT WRITTEN"
-    GOSUB XB.SAY
-    RETURN
-
-## NOT WRITTEN. Which fields Browse shows and in what order. It is a flag per
-## field plus a column list, and Browse and Copy both read it.
-XB.CMD.FIELDS:
-    XB.MSG$ = "SET FIELDS IS NOT WRITTEN"
-    GOSUB XB.SAY
-    RETURN
-
-XB.CMD.AREA:
-    DB.A = DB.A + 1
-    IF DB.A > DB.LASTA THEN DB.A = 0
-    GOSUB DB.SELECT
-    GOSUB XB.VIEW.DRAW
-    RETURN
-
-
 ## ---- Help ----
 XB.CMD.ABOUT:
     GUI.TITLE$ = "XBASE"
     GUI.MSG$ = "A DBASE II RECORD KEEPER FOR THE X16."
-    GUI.MSG2$ = "TWO AREAS, DATA ON DISK, ONE RECORD IN MEMORY."
+    GUI.MSG2$ = "DATA ON DISK, ONE RECORD IN MEMORY."
     GUI.HINT$ = ""
     GOSUB GUI.SAY : GOSUB XB.VIEW.DRAW
     RETURN
 
-XB.CMD.KEYS:
-    GUI.TITLE$ = "KEYS"
-    GUI.MSG$ = "ESC OPENS THE MENU. LEFT AND RIGHT WALK THE BAR."
-    GUI.MSG2$ = "TAB CHANGES AREA. UP AND DOWN SKIP A RECORD. FILE EXIT LEAVES."
+## Where the program's own size is written down, and it is not written down
+## here. Every number below is read out of the running image: the bootstrap
+## bytes still sit at $0801 where BASIC's SYS left them, and a banked program
+## carries an extension page below its p-code.
+##
+##   $086A  the p-code base page -- the operand of the bootstrap's LDA. 9 for a
+##          flat shared program, 10 for one with GP.BANKED regions, because the
+##          extension page takes $0900 and the p-code starts at $0A00
+##   $08D7  the workspace start page. The compiler patches it to
+##          base + pages(p-code) + FrameStackPages
+##   $08D8  the workspace end page, RTBASE or RTGPBASE
+##   $0960  the region table: ONE BYTE A REGION, the bank it loaded into,
+##          terminated by a zero. Two things cannot be had from it. It carries
+##          no sizes -- the page counts came out when regions became .Bnn files,
+##          on the grounds that LOAD knows how long a file is. And the loader
+##          zeroes its FIRST entry once the regions are in, so that a second RUN
+##          finds a terminator and does not reload them; the entry is gone by
+##          the time any p-code runs. So the count below starts at one -- a base
+##          page of 10 is itself proof that a region exists -- and walks from
+##          entry 1. The banks are deliberately not listed: naming all but the
+##          first would read as the whole set
+##   $09F0  the GP.BSTR slot table: one byte a slot, the bank its text is in.
+##          Untouched by the loader, so it can be read in full
+#DEFINE XB.BOOT.BASE   $086A
+#DEFINE XB.BOOT.WS     $08D7
+#DEFINE XB.BOOT.WSEND  $08D8
+#DEFINE XB.RGN.TABLE   $0960
+#DEFINE XB.BSTR.TABLE  $09F0
+#DEFINE XB.FRAME.PAGES 8
+#DEFINE XB.BSTR.SLOTS  16
+#DEFINE XB.RGN.MAX     64
+
+XB.CMD.MEMORY:
+    XB.MEM.BASE = PEEK(XB.BOOT.BASE)
+    XB.MEM.WS = PEEK(XB.BOOT.WS)
+    XB.MEM.PAGES = XB.MEM.WS - XB.MEM.BASE - XB.FRAME.PAGES
+    XB.MEM.LOW = XB.MEM.PAGES * 256
+    XB.MEM.WORK = (PEEK(XB.BOOT.WSEND) - XB.MEM.WS) * 256
+
+## ---- The regions. A flat program has no table to read, and reading the
+## ---- address anyway would report p-code bytes as bank numbers.
+    XB.MEM.RGN = 0
+    IF XB.MEM.BASE < 10 THEN GOTO XB.MEM.POOLS
+    XB.MEM.RGN = 1
+    XB.I = 1
+XB.MEM.RGNSCAN:
+    IF PEEK(XB.RGN.TABLE + XB.I) = 0 THEN GOTO XB.MEM.POOLS
+    XB.MEM.RGN = XB.MEM.RGN + 1
+    XB.I = XB.I + 1
+    IF XB.I < XB.RGN.MAX THEN GOTO XB.MEM.RGNSCAN
+
+## ---- The text pools. Several slots share one bank, so a bank is named once:
+## ---- the table is written in slot order and the compiler fills a bank before
+## ---- it opens another, so remembering the last one seen is enough.
+XB.MEM.POOLS:
+    XB.MEM.POOL$ = ""
+    XB.MEM.LAST = 0
+    IF XB.MEM.BASE < 10 THEN GOTO XB.MEM.SHOW
+    FOR XB.I = 0 TO XB.BSTR.SLOTS - 1
+        XB.MEM.B = PEEK(XB.BSTR.TABLE + XB.I)
+        IF XB.MEM.B <> 0 AND XB.MEM.B <> XB.MEM.LAST THEN XB.MEM.POOL$ = XB.MEM.POOL$ + MID$(STR$(XB.MEM.B), 2) + " " : XB.MEM.LAST = XB.MEM.B
+    NEXT XB.I
+
+## ---- Three short lines on purpose. GUI.SAY sizes the box to the longest of
+## ---- them, and a line that names every bank grew the box to the full width of
+## ---- the screen.
+XB.MEM.SHOW:
+    IF XB.MEM.POOL$ = "" THEN XB.MEM.POOL$ = "NONE"
+    GOSUB BANKMGR.COUNT
+
+    GUI.TITLE$ = "MEMORY"
+    GUI.MSG$ = "LOW P-CODE " + MID$(STR$(XB.MEM.LOW), 2) + " IN " + MID$(STR$(XB.MEM.PAGES), 2) + " PAGES"
+    GUI.MSG2$ = "WORKSPACE " + MID$(STR$(XB.MEM.WORK), 2) + "  REGIONS " + MID$(STR$(XB.MEM.RGN), 2) + "  TEXT BANK " + XB.MEM.POOL$
+    GUI.MSG3$ = "RAM BANKS " + MID$(STR$(BANKMGR.BANKS), 2) + "  " + MID$(STR$(BANKMGR.BANKS - BANKMGR.SPARE), 2) + " USED  " + MID$(STR$(BANKMGR.SPARE), 2) + " FREE"
     GUI.HINT$ = ""
-    GOSUB GUI.SAY : GOSUB XB.VIEW.DRAW
+    GOSUB GUI.SAY
+    GUI.MSG3$ = ""
+    GOSUB XB.VIEW.DRAW
     RETURN
 
+
+## ---- Test ----
+## The TEST column's dialogs. Not the record keeper; see the file's header.
+#INCLUDE "XBASE.GUI.TEST.BASL"
 
 #INCLUDE "XBMENUS.BASL"

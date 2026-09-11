@@ -1,0 +1,152 @@
+## ***********************************************************************
+## **  XBASE.GUI.TEST.BASL -- the TEST column of the bar.
+## **
+## **  NONE OF THIS IS THE RECORD KEEPER. XBase is the first real application
+## **  the CUA library runs inside, so this column opens the dialogs the
+## **  database work never reaches and cycles the palette over them. Each one
+## **  hands the screen back the way it found it.
+## **
+## **  It is a separate file so that dropping the column is deleting one
+## **  #INCLUDE from XBASE.BASL and one line from XB.DISP.TEST. The routines
+## **  are GOSUBbed from XBMENUS.BASL, the symbol table being one flat table
+## **  across every included file.
+## ***********************************************************************
+
+XB.CMD.TESTSAY:
+    GUI.TITLE$ = "MESSAGE"
+    GUI.MSG$ = "GUI.SAY IS ONE PANEL AND ONE BUTTON."
+    GUI.MSG2$ = "RETURN OR ESC CLOSES IT."
+    GUI.MSG3$ = ""
+    GUI.HINT$ = ""
+    GOSUB GUI.SAY
+    GOSUB XB.VIEW.DRAW
+    RETURN
+
+XB.CMD.TESTYN:
+    GUI.TITLE$ = "CONFIRM"
+    GUI.MSG$ = "GUI.YN ASKS, AND TAB WALKS THE TWO BUTTONS."
+    GUI.MSG2$ = "NOTHING HAPPENS EITHER WAY."
+    GUI.MSG3$ = ""
+    GUI.HINT$ = ""
+    GUI.OKCANCEL = 0
+    GOSUB GUI.YN
+    GOSUB XB.VIEW.DRAW
+    XB.MSG$ = "CONFIRM ANSWERED NO"
+    IF GUI.ANSWER THEN XB.MSG$ = "CONFIRM ANSWERED YES"
+    GOSUB XB.SAY
+    RETURN
+
+XB.CMD.TESTINPUT:
+    GUI.TITLE$ = "INPUT"
+    GUI.MSG$ = "GUI.INPUT EDITS A LINE IN PLACE."
+    GUI.MSG2$ = ""
+    GUI.MSG3$ = ""
+    GUI.HINT$ = ""
+    GUI.LEN = 20
+    GUI.MASK = 0
+    GUI.TEXT$ = "TYPE HERE"
+    GOSUB GUI.INPUT
+    GOSUB XB.VIEW.DRAW
+    XB.MSG$ = "INPUT CANCELLED"
+    IF GUI.OK THEN XB.MSG$ = "INPUT READ " + CHR$(34) + GUI.TEXT$ + CHR$(34)
+    GOSUB XB.SAY
+    RETURN
+
+## The rows go into MENUVERT.ITEM$, which is the bar's array as well. Nothing
+## has to put them back: XB.MENU.BAR.ITEMS refills it on every bar draw.
+XB.CMD.TESTLIST:
+    FOR XB.I = 1 TO 6
+        MENUVERT.ITEM$(XB.I) = "ROW " + MID$(STR$(XB.I), 2)
+    NEXT XB.I
+    GUI.TITLE$ = "LISTBOX"
+    GUI.MSG$ = "PICK A ROW"
+    GUI.MSG2$ = ""
+    GUI.MSG3$ = ""
+    GUI.HINT$ = ""
+    GUI.LISTBOX.COUNT = 6
+    GUI.LISTBOX.ROWS = 4
+    GUI.LISTBOX.MULTI = 0
+    GUI.LISTBOX.SEL = 0
+    GOSUB GUI.LISTBOX
+    GOSUB XB.VIEW.DRAW
+    XB.MSG$ = "LISTBOX CANCELLED"
+    IF GUI.LISTBOX.SEL > 0 THEN XB.MSG$ = "LISTBOX CHOSE ROW " + MID$(STR$(GUI.LISTBOX.SEL), 2)
+    GOSUB XB.SAY
+    RETURN
+
+## ***********************************************************************
+## **  A COMBO IS A CONTROL AND NOT A DIALOG, so there is no GUI.COMBOBOX to
+## **  call and this one is assembled by hand. That is the point of the test:
+## **  the six lines below are the whole of what an application does to put a
+## **  combo on a panel of its own -- measure the buttons, open the box, start
+## **  a control list, add the combo, draw the button row, run the form.
+## **
+## **  The four GUI.FORM entry points it uses are shimmed in SHIM.GUIBANK.INC.BL
+## **  and COMBO.ADD is in low memory beside this file, so nothing here reaches
+## **  into the bank except through a front door.
+## **
+## **  THE ITEMS GO IN MENUVERT.ITEM$, which is also the menu bar's array. The
+## **  chosen row's text is taken BEFORE XB.VIEW.DRAW, because redrawing the
+## **  screen refills that array with the bar's own items.
+## ***********************************************************************
+XB.CMD.TESTCOMBO:
+    MENUVERT.ITEM$(1) = " TEXAS"
+    MENUVERT.ITEM$(2) = " OREGON"
+    MENUVERT.ITEM$(3) = " FLORIDA"
+    MENUVERT.ITEM$(4) = " NEW YORK"
+    XB.COMBO.W = 16
+
+    GUI.TITLE$ = "COMBO"
+    GUI.MSG$ = "RETURN OR SPACE OPENS THE LIST."
+    GUI.MSG2$ = "ESC IN IT KEEPS THE VALUE."
+    GUI.MSG3$ = ""
+    GUI.HINT$ = ""
+    GUI.BTN.ONE$ = "&OK"
+    GUI.BTN.TWO$ = "&CANCEL"
+    GUI.DEFAULT = 1
+    GOSUB GUI.BUTTON.SIZE
+    GUI.BODY.ROWS = 3
+    GUI.BODY.WIDTH = XB.COMBO.W
+    IF GUI.BTN.TOTAL > GUI.BODY.WIDTH THEN GUI.BODY.WIDTH = GUI.BTN.TOTAL
+    GOSUB GUI.OPEN
+
+    COMBO.X = GUI.INNER.LEFT + INT((GUI.INNER.WIDTH - XB.COMBO.W) / 2)
+    IF COMBO.X < GUI.INNER.LEFT THEN COMBO.X = GUI.INNER.LEFT
+    COMBO.Y = GUI.INNER.TOP
+    COMBO.W = XB.COMBO.W
+    COMBO.COUNT = 4
+    COMBO.BANK = 0
+    GOSUB GUI.FORM.BEGIN
+    GOSUB COMBO.ADD
+    GUI.BTN.Y = GUI.INNER.TOP + 2
+    GOSUB GUI.BUTTON.ROW
+    GUI.FOCUS = 1
+    GOSUB GUI.FORM.RUN
+
+## The default button is <<OK>>, asked by its flag the way GUI.INPUT asks it.
+## A cancel is GUI.FORM.HIT 0, and element 0 of the flags array is never
+## written, so it answers 0 and falls through.
+    XB.COMBO.OK = 0
+    IF (GUI.CTRL.FLAGS%(GUI.FORM.HIT) AND GUI.CF.DEFAULT) <> 0 THEN XB.COMBO.OK = -1
+    XB.COMBO$ = MENUVERT.ITEM$(COMBO.SEL)
+    GOSUB GUI.CLOSE
+    GOSUB XB.VIEW.DRAW
+    XB.MSG$ = "COMBO CANCELLED"
+    IF XB.COMBO.OK THEN XB.MSG$ = "COMBO CHOSE" + XB.COMBO$
+    GOSUB XB.SAY
+    RETURN
+
+## THEME.NEXT is not one of SHIM.GUIBANK's shims, so the step is taken here and
+## THEME.SELECT, which is shimmed, loads the result. ID 4 is CUSTOM and loads
+## nothing, and that is worth walking through rather than skipping: it shows
+## that the palette already in THEME.CLR survives a selection that writes none.
+XB.CMD.TESTTHEME:
+    THEME.ID = THEME.ID + 1
+    IF THEME.ID >= THEME.COUNT THEN THEME.ID = 0
+    GOSUB THEME.SELECT
+    GOSUB XB.SCREEN
+    GOSUB XB.VIEW.DRAW
+    GOSUB XB.RENDER.MENUBAR
+    XB.MSG$ = "THEME " + MID$(STR$(THEME.ID), 2)
+    GOSUB XB.SAY
+    RETURN

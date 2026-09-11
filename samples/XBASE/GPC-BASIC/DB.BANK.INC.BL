@@ -29,7 +29,9 @@
 ## **
 ## **  REQUIRES, and does not #INCLUDE for you:
 ## **      GPB.INC.BL      MOD
-## **      STRINGS.INC.BL  STR.PADL, STR.PADR, STR.RTRIM
+## **      STRINGS.INC.BL  STR.PADL, STR.PADR, STR.RTRIM -- all three by their
+## **                      public names, because this file runs in a bank of
+## **                      its own and STRINGS runs in another
 ## **      DBFILE.INC.BL   every disk touch goes through it
 ## **
 ## **  RECORD 0 IS THE HEADER, so the byte offset of record N is N * stride
@@ -49,6 +51,15 @@
 ## **  every move.
 ## **
 ## **  The whole DB.* name space belongs to this file.
+## **
+## **  THIS IS THE BANKED FORM. Every entry point carries a .BODY suffix,
+## **  because a banked routine cannot select its own bank: the public name
+## **  has to be a shim in low memory, and SHIM.UTILBANK.INC.BL holds it.
+## **  Put this file inside the GP.BANKED region, with that shim above it.
+## **
+## **  The low memory twin is DB.INC.BL. Include one or the other, never both:
+## **  the #IFNDEF guard is the same name in each, so the second one read
+## **  produces nothing and the labels it was wanted for are missing.
 ## **
 ## ***********************************************************************
 #IFNDEF DB.DEFS
@@ -100,7 +111,7 @@ GOTO DB.MODULE.END
 ##
 ##   in   DBFILE.DEVICE
 
-DB.INIT:
+DB.INIT.BODY:
     DIM DB.FLD$(DB.LASTA, DB.LASTF)
     DIM DB.NAME$(DB.LASTA, DB.LASTF)
     DIM DB.TYPE$(DB.LASTA, DB.LASTF)
@@ -126,7 +137,7 @@ DB.INIT:
 ##
 ##   in   DB.A    0 or 1
 
-DB.SELECT:
+DB.SELECT.BODY:
     RETURN
 
 
@@ -137,7 +148,7 @@ DB.SELECT:
 ##   in   DB.FILE$(DB.A)   set by the caller before the call
 ##   out  DB.ERR           0 on success
 
-DB.OPEN:
+DB.OPEN.BODY:
     DBFILE.CH = DB.CH(DB.A) : DBFILE.NAME$ = DB.FILE$(DB.A)
     GOSUB DBFILE.OPEN
     DB.ERR = DBFILE.ERR
@@ -147,8 +158,8 @@ DB.OPEN:
     GOSUB DB.RDSCHEMA
     IF DB.ERR <> 0 THEN GOTO DB.OPEN.FAIL
     DB.ISOPEN(DB.A) = -1
-    GOSUB DB.FIX
-    GOSUB DB.TOP
+    GOSUB DB.FIX.BODY
+    GOSUB DB.TOP.BODY
     RETURN
 
 DB.OPEN.FAIL:
@@ -168,7 +179,7 @@ DB.OPEN.FAIL:
 ##   in   DB.FILE$(DB.A), DB.TITLE$(DB.A), DB.NFLD(DB.A), the schema arrays
 ##   out  DB.ERR
 
-DB.CREATE:
+DB.CREATE.BODY:
     ## Byte 0 of a data record is the delete flag, so the first field starts
     ## at 1 and the stride is one more than the widths add up to.
     DB.OFF = 1
@@ -198,24 +209,24 @@ DB.CREATE:
         DB.F = DB.I
         GOSUB DB.WRDESC
     NEXT DB.I
-    GOSUB DB.BLANK
+    GOSUB DB.BLANK.BODY
     RETURN
 
 
 ## ------------------------------------------------------------------ close
 ## Flushes the header, because DB.COUNT may have moved since the open.
 
-DB.CLOSE:
+DB.CLOSE.BODY:
     IF DB.ISOPEN(DB.A) = 0 THEN RETURN
     GOSUB DB.WRHDR : DBFILE.CH = DB.CH(DB.A)
     GOSUB DBFILE.CLOSE
     DB.ISOPEN(DB.A) = 0 : DB.FILE$(DB.A) = "" : DB.NFLD(DB.A) = 0
     RETURN
 
-DB.CLOSEALL:
+DB.CLOSEALL.BODY:
     DB.SAVEA = DB.A
     FOR DB.A = 0 TO DB.LASTA
-        GOSUB DB.CLOSE
+        GOSUB DB.CLOSE.BODY
     NEXT DB.A
     DB.A = DB.SAVEA
     GOSUB DBFILE.CMDCLOSE
@@ -229,7 +240,7 @@ DB.CLOSEALL:
 ##
 ##   out  DB.FIXED    true if the header was repaired
 
-DB.FIX:
+DB.FIX.BODY:
     DB.FIXED = 0 : DBFILE.CH = DB.CH(DB.A)
     GOSUB DBFILE.TELL
     IF DBFILE.ERR <> 0 THEN RETURN
@@ -252,7 +263,7 @@ DB.FIX:
 ## DB.END IS RECOMPUTED HERE ON EVERY CALL and used by nothing that survives
 ## across one. DB.NEXT and DB.PREV do not hold it over their own GOSUB DB.GOTO,
 ## because this line would overwrite it under them.
-DB.GOTO:
+DB.GOTO.BODY:
     DB.EOF = 0 : DB.BOF = 0
     IF DB.COUNT(DB.A) = 0 THEN DB.EOF = -1
     IF DB.COUNT(DB.A) = 0 THEN DB.BOF = -1
@@ -266,36 +277,36 @@ DB.GOTO:
     GOSUB DB.RDREC : GOSUB DB.SPLIT
     RETURN
 
-DB.TOP:
-    DB.RECNO(DB.A) = DB.DATA0(DB.A) : GOSUB DB.GOTO
+DB.TOP.BODY:
+    DB.RECNO(DB.A) = DB.DATA0(DB.A) : GOSUB DB.GOTO.BODY
     IF DB.SHOWDEL THEN RETURN
-    IF DB.DELETED THEN GOSUB DB.NEXT
+    IF DB.DELETED THEN GOSUB DB.NEXT.BODY
     RETURN
 
-DB.BOTTOM:
-    DB.RECNO(DB.A) = DB.DATA0(DB.A) + DB.COUNT(DB.A) - 1 : GOSUB DB.GOTO
+DB.BOTTOM.BODY:
+    DB.RECNO(DB.A) = DB.DATA0(DB.A) + DB.COUNT(DB.A) - 1 : GOSUB DB.GOTO.BODY
     IF DB.SHOWDEL THEN RETURN
-    IF DB.DELETED THEN GOSUB DB.PREV
+    IF DB.DELETED THEN GOSUB DB.PREV.BODY
     RETURN
 
 ## Skips deleted records unless DB.SHOWDEL is true. That switch is what makes
 ## DB.UNDEL usable: without it a deleted record can never be landed on.
-DB.NEXT:
+DB.NEXT.BODY:
     DB.EOF = 0
 DB.NEXT.STEP:
     IF DB.RECNO(DB.A) >= DB.DATA0(DB.A) + DB.COUNT(DB.A) - 1 THEN DB.EOF = -1
     IF DB.EOF THEN RETURN
-    DB.RECNO(DB.A) = DB.RECNO(DB.A) + 1 : GOSUB DB.GOTO
+    DB.RECNO(DB.A) = DB.RECNO(DB.A) + 1 : GOSUB DB.GOTO.BODY
     IF DB.SHOWDEL THEN RETURN
     IF DB.DELETED THEN GOTO DB.NEXT.STEP
     RETURN
 
-DB.PREV:
+DB.PREV.BODY:
     DB.BOF = 0
 DB.PREV.STEP:
     IF DB.RECNO(DB.A) <= DB.DATA0(DB.A) THEN DB.BOF = -1
     IF DB.BOF THEN RETURN
-    DB.RECNO(DB.A) = DB.RECNO(DB.A) - 1 : GOSUB DB.GOTO
+    DB.RECNO(DB.A) = DB.RECNO(DB.A) - 1 : GOSUB DB.GOTO.BODY
     IF DB.SHOWDEL THEN RETURN
     IF DB.DELETED THEN GOTO DB.PREV.STEP
     RETURN
@@ -306,13 +317,13 @@ DB.PREV.STEP:
 ## routine measurement 1 in ../PLAN.md is about: in ",M" the write must
 ## overwrite and not truncate.
 
-DB.PUT:
+DB.PUT.BODY:
     GOSUB DB.JOIN : DB.REC = DB.RECNO(DB.A) : GOSUB DB.WRREC
     RETURN
 
 ## Reuses the first deleted slot, else appends. The buffer is blanked either
 ## way, so DB.NEW is always followed by an edit and a DB.PUT.
-DB.NEW:
+DB.NEW.BODY:
     DB.LAST = DB.DATA0(DB.A) + DB.COUNT(DB.A) - 1
     DB.SLOT = 0 : DB.I = DB.DATA0(DB.A) - 1
 
@@ -328,14 +339,14 @@ DB.NEW.APPEND:
     IF DB.SLOT = 0 THEN DB.SLOT = DB.DATA0(DB.A) + DB.COUNT(DB.A)
     IF DB.SLOT > DB.LAST THEN DB.COUNT(DB.A) = DB.COUNT(DB.A) + 1
     DB.RECNO(DB.A) = DB.SLOT
-    GOSUB DB.BLANK : DB.DELETED = 0
-    GOSUB DB.PUT
+    GOSUB DB.BLANK.BODY : DB.DELETED = 0
+    GOSUB DB.PUT.BODY
     RETURN
 
 ## Marks and unmarks. Byte 0 only, so neither reads or writes a whole record
 ## through DB.FLD$() and neither can lose an edit.
-DB.DEL:  DB.MARK$ = "*"   : GOSUB DB.WRMARK : RETURN
-DB.UNDEL:  DB.MARK$ = " " : GOSUB DB.WRMARK : RETURN
+DB.DEL.BODY:  DB.MARK$ = "*"   : GOSUB DB.WRMARK : RETURN
+DB.UNDEL.BODY:  DB.MARK$ = " " : GOSUB DB.WRMARK : RETURN
 
 DB.WRMARK:
     DB.REC = DB.RECNO(DB.A) : GOSUB DB.RDREC
@@ -349,7 +360,7 @@ DB.WRMARK:
 ## IT DOES NOT SHORTEN THE FILE. CMDR-DOS cannot truncate one, and the plan
 ## does not need it to: navigation is bounded by DB.COUNT, so the records left
 ## past the new end are invisible, and DB.NEW appends over them.
-DB.PACK:
+DB.PACK.BODY:
     DB.LAST = DB.DATA0(DB.A) + DB.COUNT(DB.A) - 1
     DB.SLOT = DB.DATA0(DB.A)
     FOR DB.I = DB.DATA0(DB.A) TO DB.LAST
@@ -358,7 +369,7 @@ DB.PACK:
         IF LEFT$(DB.BUF$, 1) <> "*" THEN GOSUB DB.PACK.KEEP
     NEXT DB.I
     DB.COUNT(DB.A) = DB.SLOT - DB.DATA0(DB.A)
-    GOSUB DB.WRHDR : GOSUB DB.TOP
+    GOSUB DB.WRHDR : GOSUB DB.TOP.BODY
     RETURN
 
 DB.PACK.KEEP:
@@ -369,9 +380,9 @@ DB.PACK.KEEP:
 
 ## Empties the file and keeps the schema. The records stay on disk and the
 ## count says there are none.
-DB.ZAP:
+DB.ZAP.BODY:
     DB.COUNT(DB.A) = 0
-    GOSUB DB.WRHDR : GOSUB DB.BLANK
+    GOSUB DB.WRHDR : GOSUB DB.BLANK.BODY
     DB.RECNO(DB.A) = DB.DATA0(DB.A)
     RETURN
 
@@ -388,7 +399,7 @@ DB.ZAP:
 ## NOT A FOR LOOP, because it has to stop on the hit. A FOR that guards its
 ## body with a found flag still runs a seek and a read per remaining record,
 ## and this is the routine PLAN.md section 6 says is the slow one.
-DB.FIND:
+DB.FIND.BODY:
     DB.OK = 0
     DB.LAST = DB.DATA0(DB.A) + DB.COUNT(DB.A) - 1
     DB.KEYLEN = LEN(DB.KEY$)
@@ -401,7 +412,7 @@ DB.FIND.STEP:
     GOSUB DB.RDREC : GOSUB DB.FIND.TEST
     IF DB.OK = 0 THEN GOTO DB.FIND.STEP
     DB.RECNO(DB.A) = DB.I
-    GOSUB DB.GOTO
+    GOSUB DB.GOTO.BODY
     RETURN
 
 ## The field is compared where it lies, out of DB.BUF$, without splitting the
@@ -420,7 +431,7 @@ DB.FIND.TEST:
 ##   in   DB.KEY$
 ##   out  DB.F        0..NFLD-1, or 0 - 1 when there is no such field
 
-DB.FINDFLD:
+DB.FINDFLD.BODY:
     DB.F = 0 - 1
     FOR DB.I = 0 TO DB.NFLD(DB.A) - 1
         IF DB.NAME$(DB.A, DB.I) = DB.KEY$ THEN DB.F = DB.I
@@ -467,7 +478,7 @@ DB.JOIN:
     RETURN
 
 ## An empty record in the buffer, at the right widths, without touching disk.
-DB.BLANK:
+DB.BLANK.BODY:
     FOR DB.I = 0 TO DB.NFLD(DB.A) - 1
         DB.FLD$(DB.A, DB.I) = RPT$(32, DB.WID%(DB.A, DB.I))
     NEXT DB.I

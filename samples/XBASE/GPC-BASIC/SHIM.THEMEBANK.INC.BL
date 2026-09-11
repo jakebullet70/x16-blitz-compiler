@@ -1,0 +1,145 @@
+## ***********************************************************************
+## **
+## **  SHIM.THEMEBANK.INC.BL -- the low memory front door to a banked THEME.
+## **
+## **      THEME.SELECT    THEME.NEXT      THEME.RESET
+## **      THEME.SET       THEME.HI
+## **
+## **  Five shims. Each selects the theme bank and calls the body, which lives at
+## **  $A000 in that bank under a .BODY name. A banked routine cannot select its
+## **  own bank -- by its first instruction fetch the window is already wrong --
+## **  so something in low memory has to.
+## **
+## **  Usage -- this file sits directly above the region it opens, so that the
+## **  bank reads as one unit:
+## **      GOTO MY.THEMEEND
+## **      #INCLUDE "SHIM.THEMEBANK.INC.BL"
+## **      GP.BANKED SHIM.THEMEBANK
+## **      #INCLUDE "THEME.BANK.INC.BL"
+## **      GP.ENDBANKED
+## **      MY.THEMEEND:
+## **
+## **  It may sit inside the jumped span because it opens with a GOTO of its
+## **  own, over its shim to SHIM.THEMEBANK.MODULE.END. Either jump alone is
+## **  enough; both is what lets the file travel.
+## **
+## **  Claim the bank as well, or something else will hand it out:
+## **      BANKMGR.SET.BANK = SHIM.THEMEBANK : GOSUB BANKMGR.CLAIM
+## **
+## **  THEME USED TO RIDE IN SHIM.GUIBANK, and it moved out because that region
+## **  reached the 8K a region may hold. It is on its own here rather than
+## **  folded into SHIM.UTILBANK so that the room it gave back stays available
+## **  to the GUI, which is the part still growing.
+## **
+## **  EVERY DOCUMENTED ENTRY POINT IS SHIMMED. THEME.NEXT, THEME.RESET,
+## **  THEME.SET and THEME.HI are commands in their own right, so a program
+## **  reaches them by name from anywhere, exactly as it reaches THEME.SELECT.
+## **  THEME.SELECT.DARK and its three companions are not: they are the middle
+## **  of THEME.SELECT and have no name outside the region.
+## **
+## **  THEME.NEXT AND THEME.RESET GO TO THEME.SELECT.BODY, not to the shim above
+## **  them. They are already in the bank, so the second trip through low memory
+## **  would cost two bank switches and buy nothing.
+## **
+## **  Everything else reads THEME.CLR, which is an ordinary array in BASIC's
+## **  own memory and does not care which bank is selected. Only the code that
+## **  fills it moved.
+## **
+## **  THEME.CLR IS STILL THE CALLER'S TO DIM. The body fills it; nothing here
+## **  creates it. That is unchanged by the move.
+## **
+## **  THE SHIM PUTS THE CALLER'S BANK BACK. THEME.SHIM.PUSH keeps it and
+## **  THEME.SHIM.POP restores it, so a caller inside ANOTHER region may reach
+## **  THEME.SELECT. The region itself cannot fix that, since a region may not
+## **  contain BANK; the shim is in low memory and can.
+## **
+## ***********************************************************************
+#IFNDEF SHIM.THEMEBANK.DEFS
+#DEFINE SHIM.THEMEBANK.DEFS 1
+
+## The bank THEME runs in. One of the 63 a 512K machine has. GP.BANKED takes a decimal
+## constant and #DEFINE substitutes at translation time, so this and the BANK in the shim
+## below cannot drift apart.
+#DEFINE SHIM.THEMEBANK 9
+
+## How deep the shims may nest. See THEME.SHIM.PUSH below.
+#DEFINE THEME.SHIM.MAX 8
+
+GOTO SHIM.THEMEBANK.MODULE.END
+
+## ***********************************************************************
+## **  THEME.SHIM.PUSH / THEME.SHIM.POP -- the caller's bank, kept and put back.
+## **
+## **  Every shim is PUSH, the body, POP. PUSH remembers which bank the caller
+## **  had selected and selects this library's; POP puts the caller's back. A
+## **  region calling in through a shim therefore gets its own bank returned to
+## **  it, and the instruction after the call is fetched from the right place.
+## **  Without this, a call from one region into another was a silent hang
+## **  nowhere near the call.
+## **
+## **  IT IS A STACK AND NOT ONE VARIABLE, because the calls nest and can come
+## **  back round. Three banks can be live at once and each level has a
+## **  different one to return to; a single holding variable would be
+## **  overwritten by the innermost call and the outermost would put back the
+## **  wrong bank.
+## **
+## **  A STACK PER SHIM FILE IS ENOUGH. Pushes and pops pair up inside one file
+## **  whatever the other files are doing, so each front door has a stack of its
+## **  own rather than sharing one, and they interleave correctly.
+## **
+## **  POP IS REACHED BY GOTO, NOT GOSUB. The shim's own GOSUB frame is still on
+## **  the stack, so POP's RETURN is the shim's return.
+## **
+## **  THE CAPTURE IS A BLOB because BASIC cannot see the register: PEEK selects
+## **  and restores the bank around every access, so PEEK(0) answers with the
+## **  compiler's shadow copy and not with the hardware. Four instructions read
+## **  $00 and fill both bytes of an integer.
+## **
+## **  THEME.SHIM.MAX IS NOT CHECKED. Going past it is an array error naming
+## **  THEME.SHIM.STK%, which says plainly enough that something recursed.
+## ***********************************************************************
+
+## The array, once for the whole program. DIM cannot run twice, and no program
+## should have to remember to call an init, so the first shim call does it.
+##
+## IT IS ABOVE THE BLOB AND NOT BELOW IT because GP.ASM resolves {THEME.SHIM.WAS%}
+## against the variables the compiler has already met. Named first here, the
+## blob can write it; named only inside the blob, the build stops with
+## UNKNOWN VARIABLE IN {}.
+
+THEME.SHIM.INIT:
+    DIM THEME.SHIM.STK%(THEME.SHIM.MAX)
+    THEME.SHIM.WAS% = 0
+    THEME.SHIM.DIMMED = -1
+    RETURN
+
+THEME.SHIM.PUSH:
+    IF THEME.SHIM.DIMMED = 0 THEN GOSUB THEME.SHIM.INIT
+    #REM 1
+    GP.ASM
+    REM LDA $00
+    REM STA {THEME.SHIM.WAS%}
+    REM LDX #1
+    REM LDA #0
+    REM STA {THEME.SHIM.WAS%},X
+    GP.ENDASM
+    #REM 0
+    THEME.SHIM.STK%(THEME.SHIM.SP) = THEME.SHIM.WAS%
+    THEME.SHIM.SP = THEME.SHIM.SP + 1
+    BANK SHIM.THEMEBANK
+    RETURN
+
+THEME.SHIM.POP:
+    THEME.SHIM.SP = THEME.SHIM.SP - 1
+    BANK THEME.SHIM.STK%(THEME.SHIM.SP)
+    RETURN
+
+## ---- THEME ----
+THEME.SELECT:  GOSUB THEME.SHIM.PUSH : GOSUB THEME.SELECT.BODY  : GOTO THEME.SHIM.POP
+THEME.NEXT:    GOSUB THEME.SHIM.PUSH : GOSUB THEME.NEXT.BODY    : GOTO THEME.SHIM.POP
+THEME.RESET:   GOSUB THEME.SHIM.PUSH : GOSUB THEME.RESET.BODY   : GOTO THEME.SHIM.POP
+THEME.SET:     GOSUB THEME.SHIM.PUSH : GOSUB THEME.SET.BODY     : GOTO THEME.SHIM.POP
+THEME.HI:      GOSUB THEME.SHIM.PUSH : GOSUB THEME.HI.BODY      : GOTO THEME.SHIM.POP
+
+SHIM.THEMEBANK.MODULE.END:
+#ENDIF

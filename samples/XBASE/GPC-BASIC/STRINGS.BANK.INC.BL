@@ -46,11 +46,12 @@
 ## **  WARNING: pass the trims a variable, never a literal. GP.STRPTR("hello") is an
 ## **  address inside the p-code, and trimming it EDITS THE PROGRAM.
 ## **
-## **  THIS IS THE LOW MEMORY FORM. Every entry point is a plain name, so a
-## **  caller reaches it with one GOSUB and nothing sits in between. Use it
-## **  when the module runs in low memory, which is the ordinary case.
+## **  THIS IS THE BANKED FORM. Every entry point carries a .BODY suffix,
+## **  because a banked routine cannot select its own bank: the public name
+## **  has to be a shim in low memory, and SHIM.UTILBANK.INC.BL holds it.
+## **  Put this file inside the GP.BANKED region, with that shim above it.
 ## **
-## **  The banked twin is STRINGS.BANK.INC.BL. Include one or the other,
+## **  The low memory twin is STRINGS.INC.BL. Include one or the other,
 ## **  never both. GPC-BASIC/BANKED-OR-NOT.md says how to choose.
 ## **
 ## ***********************************************************************
@@ -63,12 +64,12 @@ GOTO STR.SKIP
 ## The pads pad only: a string at or past the width is left alone, and the result is
 ## not length checked.
 
-STR.PADR:  IF LEN(STR.STR$) < STR.WIDTH THEN STR.STR$ = STR.STR$ + RPT$(32, STR.WIDTH - LEN(STR.STR$))
+STR.PADR.BODY:  IF LEN(STR.STR$) < STR.WIDTH THEN STR.STR$ = STR.STR$ + RPT$(32, STR.WIDTH - LEN(STR.STR$))
     RETURN
 
 ## STR.PADL -- pad on the LEFT to STR.WIDTH. Right justify.
 
-STR.PADL:  IF LEN(STR.STR$) < STR.WIDTH THEN STR.STR$ = RPT$(32, STR.WIDTH - LEN(STR.STR$)) + STR.STR$
+STR.PADL.BODY:  IF LEN(STR.STR$) < STR.WIDTH THEN STR.STR$ = RPT$(32, STR.WIDTH - LEN(STR.STR$)) + STR.STR$
     RETURN
 
 ## STR.PADC -- pad BOTH sides to STR.WIDTH. An odd gap puts the extra space right.
@@ -76,7 +77,7 @@ STR.PADL:  IF LEN(STR.STR$) < STR.WIDTH THEN STR.STR$ = RPT$(32, STR.WIDTH - LEN
 ## The two guards are load bearing: RPT$ raises ILLEGAL QUANTITY on a count of zero, so
 ## a gap of 1 makes STR.HALF zero and fails the left call.
 
-STR.PADC:  STR.GAP = STR.WIDTH - LEN(STR.STR$)
+STR.PADC.BODY:  STR.GAP = STR.WIDTH - LEN(STR.STR$)
     IF STR.GAP < 1 THEN RETURN
     STR.HALF = INT(STR.GAP / 2) : IF STR.HALF > 0 THEN STR.STR$ = RPT$(32, STR.HALF) + STR.STR$
     STR.STR$ = STR.STR$ + RPT$(32, STR.WIDTH - LEN(STR.STR$))
@@ -99,7 +100,7 @@ STR.PADC:  STR.GAP = STR.WIDTH - LEN(STR.STR$)
 ## gives one empty field. Reaching STR.MAX loses nothing -- the last field takes the
 ## whole unsplit remainder.
 
-STR.SPLIT:  STR.N = 0 : STR.LIM = STR.MAX
+STR.SPLIT.BODY:  STR.N = 0 : STR.LIM = STR.MAX
     IF STR.LIM < 1 THEN STR.LIM = 10
     STR.REST$ = STR.STR$
 STR.SPLIT.NEXT:
@@ -122,7 +123,7 @@ STR.SPLIT.NEXT:
 ##
 ## Not length checked. A result past 255 characters is the caller's problem.
 
-STR.REPLACE:  STR.OUT$ = "" : STR.REST$ = STR.STR$
+STR.REPLACE.BODY:  STR.OUT$ = "" : STR.REST$ = STR.STR$
 STR.REPLACE.NEXT:
     STR.AT = GP.INSTR(STR.REST$, STR.FIND$)
     IF STR.AT = 0 THEN STR.STR$ = STR.OUT$ + STR.REST$ : RETURN
@@ -204,9 +205,13 @@ STR.PET2SCR:
 ## #REM 1 is load bearing: without it BASLOAD strips the body and the block reaches the
 ## compiler empty, refused as "block mismatch". #REM 0 restores the default.
 
-STR.TRIM:   STR.OP% = 0 : GOTO STR.TRIM.GO
-STR.LTRIM:  STR.OP% = 1 : GOTO STR.TRIM.GO
-STR.RTRIM:  STR.OP% = 2
+## ALL THREE CARRY A .BODY, because all three are commands a program calls by
+## name. The names themselves are shims in SHIM.UTILBANK.INC.BL; what follows is
+## the code behind them. One blob, three ways in, as before.
+
+STR.TRIM.BODY:   STR.OP% = 0 : GOTO STR.TRIM.GO
+STR.LTRIM.BODY:  STR.OP% = 1 : GOTO STR.TRIM.GO
+STR.RTRIM.BODY:  STR.OP% = 2
 STR.TRIM.GO:
     STR.ADDR% = STR.PTR
     STR.KEEP% = 0

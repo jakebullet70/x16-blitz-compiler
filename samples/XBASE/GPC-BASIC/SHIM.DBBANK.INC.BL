@@ -1,0 +1,168 @@
+## ***********************************************************************
+## **
+## **  SHIM.DBBANK.INC.BL -- the low memory front door to the record keeper.
+## **
+## **      DB.INIT         DB.SELECT
+## **      DB.OPEN         DB.CREATE       DB.CLOSE        DB.CLOSEALL
+## **      DB.FIX
+## **      DB.GOTO         DB.NEXT         DB.PREV
+## **      DB.TOP          DB.BOTTOM
+## **      DB.PUT          DB.NEW          DB.DEL          DB.UNDEL
+## **      DB.PACK         DB.ZAP
+## **      DB.FIND         DB.FINDFLD      DB.BLANK
+## **
+## **  Twenty-one shims. Each keeps the caller's bank, selects the engine's and
+## **  calls the body, which lives at $A000 in that bank under a .BODY name.
+## **
+## **  Usage -- this file sits directly above the region it opens, so the bank
+## **  reads as one unit and its file list is the copy list:
+## **      GOTO MY.DBEND
+## **      #INCLUDE "SHIM.DBBANK.INC.BL"
+## **      GP.BANKED SHIM.DBBANK
+## **      #INCLUDE "DBFILE.INC.BL"
+## **      #INCLUDE "DB.BANK.INC.BL"
+## **      GP.ENDBANKED
+## **      MY.DBEND:
+## **
+## **  Claim the bank as well, or something else will hand it out:
+## **      BANKMGR.SET.BANK = SHIM.DBBANK : GOSUB BANKMGR.CLAIM
+## **
+## **  THE ENGINE USED TO LIVE IN SHIM.UTILBANK and was lifted out of it, so the
+## **  utility bank carries only what a program without a database still wants.
+## **  Nothing in the utility bank calls the engine, so the lift was one way.
+## **
+## **  THE ENGINE CALLS THE UTILITY BANK, which is a region reaching another
+## **  region and works only because the shims put the caller's bank back.
+## **  DB.JOIN and DB.SPLIT want STR.PADL and STR.PADR on every record, and the
+## **  header readers want STR.RTRIM. All three are front doors in
+## **  SHIM.UTILBANK.INC.BL and all three are safe to call from in here.
+## **
+## **  DBFILE GOES IN THE REGION WITHOUT A TWIN AND WITHOUT SHIMS. DB is its
+## **  only caller and DB is in this same region, so an ordinary GOSUB reaches
+## **  it and there is no public name to put in low memory. The day something
+## **  outside the region wants DBFILE.SEEK, make DBFILE.BANK.INC.BL the way
+## **  the others were made -- .BODY on the ten documented entry points -- and
+## **  add the ten shims here.
+## **
+## **  BOTH FILES ARE REQUIRED. BASLOAD resolves every label in every file it
+## **  reads, so a shim naming DB.FIND.BODY stops the build with LABEL NOT
+## **  FOUND in a program that left DB.BANK.INC.BL out.
+## **
+## **  THIS FILE REPLACES DBBANK.INC.BL, which was written for the same job
+## **  before the region machinery existed and was never included anywhere.
+## **
+## ***********************************************************************
+#IFNDEF SHIM.DBBANK.DEFS
+#DEFINE SHIM.DBBANK.DEFS 1
+
+## The bank the record keeper runs in. Not 4, 7, 9 or 10, which the other four
+## regions hold, and not 5 or 6, which XBase's menu text pool and the v2 index
+## have. GP.BANKED takes a decimal constant and #DEFINE substitutes at
+## translation time, so this and the BANK in DB.SHIM.PUSH cannot drift apart.
+#DEFINE SHIM.DBBANK 11
+
+## How deep the shims may nest. See DB.SHIM.PUSH below.
+#DEFINE DB.SHIM.MAX 8
+
+GOTO SHIM.DBBANK.MODULE.END
+
+## ***********************************************************************
+## **  DB.SHIM.PUSH / DB.SHIM.POP -- the caller's bank, kept and put back.
+## **
+## **  Every shim is PUSH, the body, POP. PUSH remembers which bank the caller
+## **  had selected and selects this library's; POP puts the caller's back. A
+## **  region calling in through a shim therefore gets its own bank returned to
+## **  it, and the instruction after the call is fetched from the right place.
+## **  Without this, a call from one region into another was a silent hang
+## **  nowhere near the call.
+## **
+## **  IT IS A STACK AND NOT ONE VARIABLE, because the calls nest and can come
+## **  back round. Three banks can be live at once and each level has a
+## **  different one to return to; a single holding variable would be
+## **  overwritten by the innermost call and the outermost would put back the
+## **  wrong bank.
+## **
+## **  A STACK PER SHIM FILE IS ENOUGH. Pushes and pops pair up inside one file
+## **  whatever the other files are doing, so each front door has a stack of its
+## **  own rather than sharing one, and they interleave correctly.
+## **
+## **  POP IS REACHED BY GOTO, NOT GOSUB. The shim's own GOSUB frame is still on
+## **  the stack, so POP's RETURN is the shim's return.
+## **
+## **  THE CAPTURE IS A BLOB because BASIC cannot see the register: PEEK selects
+## **  and restores the bank around every access, so PEEK(0) answers with the
+## **  compiler's shadow copy and not with the hardware. Four instructions read
+## **  $00 and fill both bytes of an integer.
+## **
+## **  DB.SHIM.MAX IS NOT CHECKED. Going past it is an array error naming
+## **  DB.SHIM.STK%, which says plainly enough that something recursed.
+## ***********************************************************************
+
+## The array, once for the whole program. DIM cannot run twice, and no program
+## should have to remember to call an init, so the first shim call does it.
+##
+## IT IS ABOVE THE BLOB AND NOT BELOW IT because GP.ASM resolves {DB.SHIM.WAS%}
+## against the variables the compiler has already met. Named first here, the
+## blob can write it; named only inside the blob, the build stops with
+## UNKNOWN VARIABLE IN {}.
+
+DB.SHIM.INIT:
+    DIM DB.SHIM.STK%(DB.SHIM.MAX)
+    DB.SHIM.WAS% = 0
+    DB.SHIM.DIMMED = -1
+    RETURN
+
+DB.SHIM.PUSH:
+    IF DB.SHIM.DIMMED = 0 THEN GOSUB DB.SHIM.INIT
+    #REM 1
+    GP.ASM
+    REM LDA $00
+    REM STA {DB.SHIM.WAS%}
+    REM LDX #1
+    REM LDA #0
+    REM STA {DB.SHIM.WAS%},X
+    GP.ENDASM
+    #REM 0
+    DB.SHIM.STK%(DB.SHIM.SP) = DB.SHIM.WAS%
+    DB.SHIM.SP = DB.SHIM.SP + 1
+    BANK SHIM.DBBANK
+    RETURN
+
+DB.SHIM.POP:
+    DB.SHIM.SP = DB.SHIM.SP - 1
+    BANK DB.SHIM.STK%(DB.SHIM.SP)
+    RETURN
+
+## ---- set up and areas ----
+DB.INIT:      GOSUB DB.SHIM.PUSH : GOSUB DB.INIT.BODY      : GOTO DB.SHIM.POP
+DB.SELECT:    GOSUB DB.SHIM.PUSH : GOSUB DB.SELECT.BODY    : GOTO DB.SHIM.POP
+
+## ---- a file in an area ----
+DB.OPEN:      GOSUB DB.SHIM.PUSH : GOSUB DB.OPEN.BODY      : GOTO DB.SHIM.POP
+DB.CREATE:    GOSUB DB.SHIM.PUSH : GOSUB DB.CREATE.BODY    : GOTO DB.SHIM.POP
+DB.CLOSE:     GOSUB DB.SHIM.PUSH : GOSUB DB.CLOSE.BODY     : GOTO DB.SHIM.POP
+DB.CLOSEALL:  GOSUB DB.SHIM.PUSH : GOSUB DB.CLOSEALL.BODY  : GOTO DB.SHIM.POP
+DB.FIX:       GOSUB DB.SHIM.PUSH : GOSUB DB.FIX.BODY       : GOTO DB.SHIM.POP
+
+## ---- moving about ----
+DB.GOTO:      GOSUB DB.SHIM.PUSH : GOSUB DB.GOTO.BODY      : GOTO DB.SHIM.POP
+DB.NEXT:      GOSUB DB.SHIM.PUSH : GOSUB DB.NEXT.BODY      : GOTO DB.SHIM.POP
+DB.PREV:      GOSUB DB.SHIM.PUSH : GOSUB DB.PREV.BODY      : GOTO DB.SHIM.POP
+DB.TOP:       GOSUB DB.SHIM.PUSH : GOSUB DB.TOP.BODY       : GOTO DB.SHIM.POP
+DB.BOTTOM:    GOSUB DB.SHIM.PUSH : GOSUB DB.BOTTOM.BODY    : GOTO DB.SHIM.POP
+
+## ---- changing a record ----
+DB.PUT:       GOSUB DB.SHIM.PUSH : GOSUB DB.PUT.BODY       : GOTO DB.SHIM.POP
+DB.NEW:       GOSUB DB.SHIM.PUSH : GOSUB DB.NEW.BODY       : GOTO DB.SHIM.POP
+DB.DEL:       GOSUB DB.SHIM.PUSH : GOSUB DB.DEL.BODY       : GOTO DB.SHIM.POP
+DB.UNDEL:     GOSUB DB.SHIM.PUSH : GOSUB DB.UNDEL.BODY     : GOTO DB.SHIM.POP
+DB.PACK:      GOSUB DB.SHIM.PUSH : GOSUB DB.PACK.BODY      : GOTO DB.SHIM.POP
+DB.ZAP:       GOSUB DB.SHIM.PUSH : GOSUB DB.ZAP.BODY       : GOTO DB.SHIM.POP
+
+## ---- looking things up ----
+DB.FIND:      GOSUB DB.SHIM.PUSH : GOSUB DB.FIND.BODY      : GOTO DB.SHIM.POP
+DB.FINDFLD:   GOSUB DB.SHIM.PUSH : GOSUB DB.FINDFLD.BODY   : GOTO DB.SHIM.POP
+DB.BLANK:     GOSUB DB.SHIM.PUSH : GOSUB DB.BLANK.BODY     : GOTO DB.SHIM.POP
+
+SHIM.DBBANK.MODULE.END:
+#ENDIF

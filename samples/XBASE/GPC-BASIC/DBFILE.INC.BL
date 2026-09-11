@@ -6,7 +6,7 @@
 ## **      DBFILE.OPEN     DBFILE.CLOSE      one data channel
 ## **      DBFILE.SEEK     DBFILE.TELL       position, and position plus size
 ## **      DBFILE.READ     DBFILE.WRITE      one fixed length block
-## **      DBFILE.STATUS   DBFILE.HEX        the error line, and a hex parser
+## **      DBFILE.STATUS   DBFILE.PARSEHEX   the error line, and a hex parser
 ## **
 ## **  SKELETON. Nothing here has run. Every routine is written out, and the
 ## **  four measurements in ../PLAN.md section 8 decide whether it is right.
@@ -38,7 +38,7 @@
 ## **
 ## **  WARNING: the KERNAL manual parses the T reply with VAL("$" + MID$(A$,10)).
 ## **  That returns 0. VAL stops at the first character that is not a digit.
-## **  DBFILE.HEX reads the eight digits by hand instead.
+## **  DBFILE.PARSEHEX reads the eight digits by hand instead.
 ## **
 ## **  T is R48 and later.
 ## **
@@ -149,10 +149,10 @@ DBFILE.TELL:
     IF LEN(DBFILE.REPLY$) < DBFILE.SIZEAT + DBFILE.HEXLEN - 1 THEN DBFILE.ERR = 1
     IF DBFILE.ERR <> 0 THEN RETURN
     DBFILE.HEX$ = MID$(DBFILE.REPLY$, DBFILE.POSAT, DBFILE.HEXLEN)
-    GOSUB DBFILE.HEX
+    GOSUB DBFILE.PARSEHEX
     DBFILE.POS = DBFILE.HEXV
     DBFILE.HEX$ = MID$(DBFILE.REPLY$, DBFILE.SIZEAT, DBFILE.HEXLEN)
-    GOSUB DBFILE.HEX
+    GOSUB DBFILE.PARSEHEX
     DBFILE.SIZE = DBFILE.HEXV
     RETURN
 
@@ -163,7 +163,7 @@ DBFILE.TELL:
 ##   in   DBFILE.HEX$
 ##   out  DBFILE.HEXV
 
-DBFILE.HEX:
+DBFILE.PARSEHEX:
     DBFILE.HEXV = 0
     FOR DBFILE.I = 1 TO LEN(DBFILE.HEX$)
         DBFILE.BYTE = ASC(MID$(DBFILE.HEX$, DBFILE.I, 1))

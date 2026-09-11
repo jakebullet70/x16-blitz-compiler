@@ -1,0 +1,210 @@
+## ***********************************************************************
+## **
+## **  SHIM.GUIBANK.INC.BL -- the low memory front door to a banked library.
+## **
+## **      MENUVERT.RUN    MENUVERT.DRAW   MENUVERT.ROW
+## **      MENUBAR.RUN     MENUBAR.DRAW    MENUBAR.ITEM
+## **      MENUBAR.MARK    MENUBAR.WHERE
+## **      LINEINPUT.GET   LINEINPUT.ASK
+## **      GUI.SAY         GUI.YN          GUI.MENU        GUI.INPUT
+## **      GUI.OPEN        GUI.CLOSE       GUI.LISTBOX
+## **      GUI.BUTTON.SIZE GUI.BUTTON.ROW
+## **      GUI.FORM.BEGIN  GUI.FORM.RUN
+## **
+## **  Twenty-one shims. Each keeps the caller's bank, selects the code bank,
+## **  calls the body and puts the caller's bank back. The body lives at $A000
+## **  in that bank under a .BODY name. A banked routine cannot select its own
+## **  bank -- by its first instruction fetch the window is already wrong -- so
+## **  something in low memory has to.
+## **
+## **  Usage -- this file sits directly above the region it opens, so that the
+## **  bank reads as one unit and a programmer lifting it into another program
+## **  can see exactly which files to copy:
+## **      GOTO MY.LIBEND
+## **      #INCLUDE "SHIM.GUIBANK.INC.BL"
+## **      GP.BANKED SHIM.GUIBANK
+## **      #INCLUDE "MENUVERT.BANK.INC.BL"
+## **      #INCLUDE "MENUBAR.BANK.INC.BL"
+## **      #INCLUDE "LINEINPUT.BANK.INC.BL"
+## **      #INCLUDE "GUI.BANK.INC.BL"
+## **      #INCLUDE "GUI2.BANK.INC.BL"
+## **      GP.ENDBANKED
+## **      MY.LIBEND:
+## **
+## **  It may sit inside the jumped span because it opens with a GOTO of its
+## **  own, over its shims to SHIM.GUIBANK.MODULE.END. Either jump alone is
+## **  enough; both is what lets the file travel.
+## **
+## **  Claim the bank as well, or something else will hand it out:
+## **      BANKMGR.SET.BANK = SHIM.GUIBANK : GOSUB BANKMGR.CLAIM
+## **
+## **  THE LAST FOUR ARE THERE SO A PROGRAM CAN BUILD ITS OWN DIALOG. GUI.SAY
+## **  and the rest are whole dialogs; these four are the pieces they are made
+## **  of, and with them a caller in low memory does what GUI.LISTBOX does --
+## **  measure the buttons, open the box, start a control list, add controls,
+## **  draw the button row, run the form. The control it adds is COMBO.ADD,
+## **  which is in low memory already. GUI.FORM.ADD.FIELD and GUI.FORM.ADD.LIST
+## **  are NOT shimmed: a field or a list wants half a dozen more entry points
+## **  with it, and until something asks for them the four are the cheaper
+## **  answer.
+## **
+## **  All five modules are required, even by a program that calls one of them.
+## **  This file shims every entry point and BASLOAD resolves every label in a
+## **  file, so leaving MENUBAR out stops the build with LABEL NOT FOUND.
+## **
+## **  Order inside the region is the order the modules already want: MENUVERT
+## **  before MENUBAR, both before GUI.
+## **
+## **  THEME IS NOT IN THIS REGION and its shim is not in this file. It has one
+## **  of its own, SHIM.THEMEBANK.INC.BL, because this region reached the 8K a
+## **  region may hold. Include that above this one: the modules here read
+## **  THEME.CLR, which is an ordinary array, but the #DEFINEs for the role
+## **  numbers have to be read before the code that uses them.
+## **
+## **  FILEDIR IS SHIMMED BY SHIM.FUTILBANK.INC.BL, not by this file, and that split
+## **  is not tidiness: BASLOAD resolves every label in every file it reads, so
+## **  a FILE.DIR shim here stops the build with LABEL NOT FOUND in any program
+## **  that does not also include FILEDIR. Include both when you bank a
+## **  directory reader -- and FILEDIR gets a REGION of its own now, in
+## **  SHIM.FUTILBANK, which SHIM.FUTILBANK.INC.BL owns. It is not in this one.
+## **
+## **  The GOTO over the region is not optional. Falling in through the bridge
+## **  GP.BANKED leaves works at program start and stops working the day
+## **  anything selects another bank first.
+## **
+## **  WARNING: SHIM.GUIBANK is not GUI.BANK. That one is scratch, where
+## **  GUI.OPEN stashes the cells a dialog covers. Point both at one bank and
+## **  the dialog writes the screen over its own code.
+## **
+## **  WARNING: anything holding a BANK, BLOAD or BSAVE stays in low memory --
+## **  the compiler refuses them inside a region, because code fetched from the
+## **  window cannot be running when the window changes. That is STASH and
+## **  STASHFILE here. The GUI reaches both by an ordinary GOSUB downwards,
+## **  which works because low memory does not care which bank is selected.
+## **
+## **  THE SHIMS PUT THE CALLER'S BANK BACK. GUI.SHIM.PUSH keeps it and
+## **  GUI.SHIM.POP restores it, so a caller inside ANOTHER region may call in
+## **  here -- which it could not before, because the return landed with this
+## **  bank selected and the next instruction came out of the wrong one. The
+## **  region itself still cannot fix that, since a region may not contain
+## **  BANK; the shim is in low memory and can.
+## **
+## ***********************************************************************
+#IFNDEF SHIM.GUIBANK.DEFS
+#DEFINE SHIM.GUIBANK.DEFS 1
+
+## The bank the library runs in. One of the 63 a 512K machine has. GP.BANKED takes a
+## decimal constant and #DEFINE substitutes at translation time, so this and the BANK in
+## every shim below cannot drift apart.
+#DEFINE SHIM.GUIBANK 4
+
+## How deep the shims may nest. See GUI.SHIM.PUSH below.
+#DEFINE GUI.SHIM.MAX 8
+
+GOTO SHIM.GUIBANK.MODULE.END
+
+## ***********************************************************************
+## **  GUI.SHIM.PUSH / GUI.SHIM.POP -- the caller's bank, kept and put back.
+## **
+## **  Every shim is PUSH, the body, POP. PUSH remembers which bank the caller
+## **  had selected and selects the library's; POP puts the caller's back. A
+## **  region calling in through a shim therefore gets its own bank returned to
+## **  it, and the instruction after the call is fetched from the right place.
+## **  Without this, a call from one region into another was a silent hang
+## **  nowhere near the call.
+## **
+## **  IT IS A STACK AND NOT ONE VARIABLE, because the calls nest and can come
+## **  back round. A dialog in this bank draws a control that lives in a bank of
+## **  its own, and that control opens a menu, which is back in this one. Three
+## **  banks are live at once and each level has a different one to return to.
+## **  A single holding variable would be overwritten by the innermost call and
+## **  the outermost would put back the wrong bank.
+## **
+## **  A STACK PER SHIM FILE IS ENOUGH. Pushes and pops pair up inside one file
+## **  whatever the other files are doing, so another front door gets a stack of
+## **  its own rather than sharing this one, and the two interleave correctly.
+## **  SHIM.UTILBANK.INC.BL, SHIM.THEMEBANK.INC.BL and SHIM.COMBOBANK.INC.BL each
+## **  carry their own pair for that reason.
+## **
+## **  POP IS REACHED BY GOTO, NOT GOSUB. The shim's own GOSUB frame is still on
+## **  the stack, so POP's RETURN is the shim's return.
+## **
+## **  THE CAPTURE IS A BLOB because BASIC cannot see the register: PEEK selects
+## **  and restores the bank around every access, so PEEK(0) answers with the
+## **  compiler's shadow copy and not with the hardware. Four instructions read
+## **  $00 and fill both bytes of an integer. STASH.BANK.HOLD does the same
+## **  thing for the same reason.
+## **
+## **  GUI.SHIM.MAX IS NOT CHECKED. Eight is far past the three the library can
+## **  reach; going past it is an array error naming GUI.SHIM.STK%, which says
+## **  plainly enough that something recursed.
+## ***********************************************************************
+
+## The array, once for the whole program. DIM cannot run twice, and no program
+## should have to remember to call an init, so the first shim call does it.
+##
+## IT IS ABOVE THE BLOB AND NOT BELOW IT because GP.ASM resolves {GUI.SHIM.WAS%}
+## against the variables the compiler has already met. Named first here, the
+## blob can write it; named only inside the blob, the build stops with
+## UNKNOWN VARIABLE IN {}.
+
+GUI.SHIM.INIT:
+    DIM GUI.SHIM.STK%(GUI.SHIM.MAX)
+    GUI.SHIM.WAS% = 0
+    GUI.SHIM.DIMMED = -1
+    RETURN
+
+GUI.SHIM.PUSH:
+    IF GUI.SHIM.DIMMED = 0 THEN GOSUB GUI.SHIM.INIT
+    #REM 1
+    GP.ASM
+    REM LDA $00
+    REM STA {GUI.SHIM.WAS%}
+    REM LDX #1
+    REM LDA #0
+    REM STA {GUI.SHIM.WAS%},X
+    GP.ENDASM
+    #REM 0
+    GUI.SHIM.STK%(GUI.SHIM.SP) = GUI.SHIM.WAS%
+    GUI.SHIM.SP = GUI.SHIM.SP + 1
+    BANK SHIM.GUIBANK
+    RETURN
+
+GUI.SHIM.POP:
+    GUI.SHIM.SP = GUI.SHIM.SP - 1
+    BANK GUI.SHIM.STK%(GUI.SHIM.SP)
+    RETURN
+
+## ---- MENUVERT ----
+MENUVERT.RUN:    GOSUB GUI.SHIM.PUSH : GOSUB MENUVERT.RUN.BODY    : GOTO GUI.SHIM.POP
+MENUVERT.DRAW:   GOSUB GUI.SHIM.PUSH : GOSUB MENUVERT.DRAW.BODY   : GOTO GUI.SHIM.POP
+MENUVERT.ROW:    GOSUB GUI.SHIM.PUSH : GOSUB MENUVERT.ROW.BODY    : GOTO GUI.SHIM.POP
+
+## ---- MENUBAR ----
+MENUBAR.RUN:     GOSUB GUI.SHIM.PUSH : GOSUB MENUBAR.RUN.BODY     : GOTO GUI.SHIM.POP
+MENUBAR.DRAW:    GOSUB GUI.SHIM.PUSH : GOSUB MENUBAR.DRAW.BODY    : GOTO GUI.SHIM.POP
+MENUBAR.ITEM:    GOSUB GUI.SHIM.PUSH : GOSUB MENUBAR.ITEM.BODY    : GOTO GUI.SHIM.POP
+MENUBAR.MARK:    GOSUB GUI.SHIM.PUSH : GOSUB MENUBAR.MARK.BODY    : GOTO GUI.SHIM.POP
+MENUBAR.WHERE:   GOSUB GUI.SHIM.PUSH : GOSUB MENUBAR.WHERE.BODY   : GOTO GUI.SHIM.POP
+
+## ---- LINEINPUT ----
+LINEINPUT.GET:   GOSUB GUI.SHIM.PUSH : GOSUB LINEINPUT.GET.BODY   : GOTO GUI.SHIM.POP
+LINEINPUT.ASK:   GOSUB GUI.SHIM.PUSH : GOSUB LINEINPUT.ASK.BODY   : GOTO GUI.SHIM.POP
+
+## ---- GUI and GUI2 ----
+GUI.SAY:         GOSUB GUI.SHIM.PUSH : GOSUB GUI.SAY.BODY         : GOTO GUI.SHIM.POP
+GUI.YN:          GOSUB GUI.SHIM.PUSH : GOSUB GUI.YN.BODY          : GOTO GUI.SHIM.POP
+GUI.MENU:        GOSUB GUI.SHIM.PUSH : GOSUB GUI.MENU.BODY        : GOTO GUI.SHIM.POP
+GUI.INPUT:       GOSUB GUI.SHIM.PUSH : GOSUB GUI.INPUT.BODY       : GOTO GUI.SHIM.POP
+GUI.OPEN:        GOSUB GUI.SHIM.PUSH : GOSUB GUI.OPEN.BODY        : GOTO GUI.SHIM.POP
+GUI.CLOSE:       GOSUB GUI.SHIM.PUSH : GOSUB GUI.CLOSE.BODY       : GOTO GUI.SHIM.POP
+GUI.LISTBOX:     GOSUB GUI.SHIM.PUSH : GOSUB GUI.LISTBOX.BODY     : GOTO GUI.SHIM.POP
+
+## ---- GUI.FORM, for a dialog the caller assembles itself ----
+GUI.BUTTON.SIZE: GOSUB GUI.SHIM.PUSH : GOSUB GUI.BUTTON.SIZE.BODY : GOTO GUI.SHIM.POP
+GUI.BUTTON.ROW:  GOSUB GUI.SHIM.PUSH : GOSUB GUI.BUTTON.ROW.BODY  : GOTO GUI.SHIM.POP
+GUI.FORM.BEGIN:  GOSUB GUI.SHIM.PUSH : GOSUB GUI.FORM.BEGIN.BODY  : GOTO GUI.SHIM.POP
+GUI.FORM.RUN:    GOSUB GUI.SHIM.PUSH : GOSUB GUI.FORM.RUN.BODY    : GOTO GUI.SHIM.POP
+
+SHIM.GUIBANK.MODULE.END:
+#ENDIF

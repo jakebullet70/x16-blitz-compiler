@@ -15,11 +15,12 @@
 ## **  A screen rectangle through a file is STASH.FILE.SAVE / .LOAD / .PUT in
 ## **  STASHFILE.INC.BL. Draining the keyboard is KB.CLEARKB in KB.INC.BL.
 ## **
-## **  THIS IS THE LOW MEMORY FORM. Every entry point is a plain name, so a
-## **  caller reaches it with one GOSUB and nothing sits in between. Use it
-## **  when the module runs in low memory, which is the ordinary case.
+## **  THIS IS THE BANKED FORM. Every entry point carries a .BODY suffix,
+## **  because a banked routine cannot select its own bank: the public name
+## **  has to be a shim in low memory, and SHIM.UTILBANK.INC.BL holds it.
+## **  Put this file inside the GP.BANKED region, with that shim above it.
 ## **
-## **  The banked twin is APPSYS.BANK.INC.BL. Include one or the other,
+## **  The low memory twin is APPSYS.INC.BL. Include one or the other,
 ## **  never both. GPC-BASIC/BANKED-OR-NOT.md says how to choose.
 ## **
 ## ***********************************************************************
@@ -53,13 +54,13 @@ GOTO APPSYS.SKIP
 ##        APPSYS.ROWS    rows
 ##        APPSYS.COLOUR  the packed text colour
 
-APPSYS.STARTUP:  GP.CALL APPSYS.SCRMODE, 0, 0, 0, 1 : APPSYS.MODE = GP.A : APPSYS.COLS = GP.X : APPSYS.ROWS = GP.Y
+APPSYS.STARTUP.BODY:  GP.CALL APPSYS.SCRMODE, 0, 0, 0, 1 : APPSYS.MODE = GP.A : APPSYS.COLS = GP.X : APPSYS.ROWS = GP.Y
     APPSYS.COLOUR = PEEK(APPSYS.COLREG) : APPSYS.CHARSET = PEEK(APPSYS.CHRREG)
     RETURN
 
 ## APPSYS.RESTORE -- the screen as it was, for whatever runs next.
 
-APPSYS.RESTORE:  GP.CALL APPSYS.SCRMODE, APPSYS.MODE, 0, 0, 0 : GP.CALL APPSYS.SETCHR, APPSYS.CHARSET AND 63, 0, 0, 0
+APPSYS.RESTORE.BODY:  GP.CALL APPSYS.SCRMODE, APPSYS.MODE, 0, 0, 0 : GP.CALL APPSYS.SETCHR, APPSYS.CHARSET AND 63, 0, 0, 0
     POKE APPSYS.CHRREG, APPSYS.CHARSET : COLOR APPSYS.COLOUR AND 15, INT(APPSYS.COLOUR / 16)
     RETURN
 
