@@ -1,7 +1,7 @@
 ## ***********************************************************************
 ## **
-## **  LIB.FUTILBANK.INC.BL -- the low memory front door to the banked FILE
-## **  modules, FILEDIR and FILEIO. Both run in LIB.FUTILBANK, which this file
+## **  SHIM.FUTILBANK.INC.BL -- the low memory front door to the banked FILE
+## **  modules, FILEDIR and FILEIO. Both run in SHIM.FUTILBANK, which this file
 ## **  owns. The FD in the name was FILEDIR's alone until FILEIO joined it.
 ## **
 ## **      FILE.DIR.INIT   FILE.DIR.OPEN   FILE.DIR.NEXT
@@ -9,45 +9,54 @@
 ## **      FILE.MKDIR      FILE.RMDIR      FILE.CHDIR      FILE.UP
 ## **      FILE.CURDIR     FILE.SAVEARRAY  FILE.LOADARRAY  FILE.SIZE
 ## **
-## **  Shims of exactly the kind LIB.GUIBANK.INC.BL holds, and they are in a file
+## **  Shims of exactly the kind SHIM.GUIBANK.INC.BL holds, and they are in a file
 ## **  of their own for one reason: BASLOAD resolves every label in every file
 ## **  it reads, so a shim naming FILE.DIR.OPEN.BODY stops the build with
 ## **  LABEL NOT FOUND in any program that does not also include FILEDIR.
-## **  They lived in LIB.GUIBANK for a day and PICKDEMO -- which banks the same six
+## **  They lived in SHIM.GUIBANK for a day and PICKDEMO -- which banks the same six
 ## **  modules and has no use for a directory reader -- could not be tokenised
 ## **  at all. THE SAME NOW GOES FOR FILEIO: include this file and you must
 ## **  include both modules, or the FILE.RMDIR.BODY shim below fails the same
 ## **  way. Split this file in two the day a program wants only one of them.
 ## **
-## **  #IFDEF cannot answer it either: LIB.GUIBANK's whole body is already inside
+## **  #IFDEF cannot answer it either: SHIM.GUIBANK's whole body is already inside
 ## **  an #IFNDEF and BASLOAD does not nest them.
 ## **
-## **  THE FILE MODULES GET A REGION OF THEIR OWN. FILEDIR shared LIB.GUIBANK
+## **  THE FILE MODULES GET A REGION OF THEIR OWN. FILEDIR shared SHIM.GUIBANK
 ## **  with the GUI until 2026-09-09 and was moved out to make room: bank 4 was
 ## **  at 7,424 of its 8,192 bytes with FILEDIR still in it, and GUI.FORM has
-## **  to fit. FILEIO followed it out of LIB.UTILBANK the same day, which frees
+## **  to fit. FILEIO followed it out of SHIM.UTILBANK the same day, which frees
 ## **  no low RAM -- it was already banked -- but puts the two file modules in
 ## **  one bank and hands their bytes back to bank 7 for whatever has to leave
 ## **  the GUI's next.
 ## **
-## **  A REGION MAY NOT CALL ANOTHER REGION, so check both directions before
-## **  moving a routine in or out of here. What made these two legal: nothing
-## **  in the GUI calls FILE.DIR and FILEDIR calls nothing in the GUI; nothing
-## **  in LIB.UTILBANK calls FILE.ANYTHING and FILEIO calls nothing but its own
-## **  labels; and FILEDIR reads FILEIO's FILE.CHAN, which is a variable and
-## **  not a call, so it was legal before they shared a bank and still is.
+## **  THE SHIMS PUT THE CALLER'S BANK BACK. FUTIL.SHIM.PUSH keeps it and
+## **  FUTIL.SHIM.POP restores it, so a call through here returns with whatever
+## **  bank the caller had selected, and a caller inside ANOTHER region may use
+## **  these front doors. SHIM.UTILBANK.INC.BL's header holds the full account
+## **  of why it is a stack, why POP is reached by GOTO and why the capture has
+## **  to be a blob; this file's copy is the same code under its own names.
+## **
+## **  A REGION MAY NOT REACH INTO ANOTHER REGION DIRECTLY. Every region lives
+## **  at $A000, so a GOSUB to FILE.DIR.OPEN.BODY from outside this bank lands
+## **  on whatever the caller's bank holds at that address. The front doors
+## **  below are the only way in, and they are in low memory, which is what
+## **  lets them hold the BANK a region may not contain.
+## **
+## **  FILEDIR READS FILEIO'S FILE.CHAN, which is a variable and not a call, so
+## **  the two were legal in one bank before any of this and still are.
 ## **
 ## **  Usage -- each front door sits directly above the region it opens, so a
 ## **  bank reads as one unit and its file list is the copy list:
 ## **      GOTO MY.LIBEND
-## **      #INCLUDE "LIB.GUIBANK.INC.BL"
-## **      GP.BANKED LIB.GUIBANK
+## **      #INCLUDE "SHIM.GUIBANK.INC.BL"
+## **      GP.BANKED SHIM.GUIBANK
 ## **      ...the six GUI modules...
 ## **      GP.ENDBANKED
-## **      #INCLUDE "LIB.FUTILBANK.INC.BL"
-## **      GP.BANKED LIB.FUTILBANK
-## **      #INCLUDE "FILEIO.INC.BL"        ' FIRST: it supplies FILE.CHAN
-## **      #INCLUDE "FILEDIR.INC.BL"
+## **      #INCLUDE "SHIM.FUTILBANK.INC.BL"
+## **      GP.BANKED SHIM.FUTILBANK
+## **      #INCLUDE "FILEIO.BANK.INC.BL"        ' FIRST: it supplies FILE.CHAN
+## **      #INCLUDE "FILEDIR.BANK.INC.BL"
 ## **      GP.ENDBANKED
 ## **      MY.LIBEND:
 ## **
@@ -56,7 +65,7 @@
 ## **  supplies one has to be read before the file that wants it.
 ## **
 ## **  Claim the bank as well, or something else will hand it out:
-## **      BANKMGR.SET.BANK = LIB.FUTILBANK : GOSUB BANKMGR.CLAIM
+## **      BANKMGR.SET.BANK = SHIM.FUTILBANK : GOSUB BANKMGR.CLAIM
 ## **
 ## **  FILE STATEMENTS ARE NOT A REASON to keep a module out of a region: OPEN,
 ## **  INPUT#, PRINT# and CLOSE all work inside one, measured on FILEDIR, which
@@ -64,45 +73,102 @@
 ## **  is the only disqualifier.
 ## **
 ## ***********************************************************************
-#IFNDEF LIB.FUTILBANK.DEFS
-#DEFINE LIB.FUTILBANK.DEFS 1
+#IFNDEF SHIM.FUTILBANK.DEFS
+#DEFINE SHIM.FUTILBANK.DEFS 1
 
-## The bank the file modules run in. Not LIB.GUIBANK -- that is the GUI's -- and
+## The bank the file modules run in. Not SHIM.GUIBANK -- that is the GUI's -- and
 ## not a scratch bank: BANKMGR.GET.FREE.BANK hands out the LOWEST free one, so 8
 ## sits above the library's block (4 the GUI, 5 and 6 the text, 7 the utilities)
 ## and leaves 1..3 to the run-time allocator. GP.BANKED takes a decimal constant
 ## and #DEFINE substitutes at translation time, so this and the BANK in each shim
 ## below cannot drift apart.
-#DEFINE LIB.FUTILBANK 8
+#DEFINE SHIM.FUTILBANK 8
 
-GOTO LIB.FUTILBANK.MODULE.END
+## How deep the shims may nest. See FUTIL.SHIM.PUSH below.
+#DEFINE FUTIL.SHIM.MAX 8
+
+GOTO SHIM.FUTILBANK.MODULE.END
+
+## ***********************************************************************
+## **  FUTIL.SHIM.PUSH / FUTIL.SHIM.POP -- the caller's bank, kept and put back.
+## **
+## **  Every shim is PUSH, the body, POP. PUSH remembers which bank the caller
+## **  had selected and selects this library's; POP puts the caller's back, so
+## **  the instruction after the call is fetched from the right place.
+## **
+## **  A STACK PER SHIM FILE, and this is that file's. Pushes and pops pair up
+## **  inside one file whatever the others are doing, so the front doors
+## **  interleave correctly without sharing anything.
+## **
+## **  POP IS REACHED BY GOTO, NOT GOSUB. The shim's own GOSUB frame is still on
+## **  the stack, so POP's RETURN is the shim's return.
+## **
+## **  SHIM.UTILBANK.INC.BL CARRIES THE REASONING in full -- why one holding
+## **  variable is not enough, and why the capture is a blob rather than
+## **  PEEK(0). Read it there; this is the same code under its own names.
+## ***********************************************************************
+
+## The array, once for the whole program. DIM cannot run twice, and no program
+## should have to remember to call an init, so the first shim call does it.
+##
+## IT IS ABOVE THE BLOB AND NOT BELOW IT because GP.ASM resolves {FUTIL.SHIM.WAS%}
+## against the variables the compiler has already met. Named first here, the
+## blob can write it; named only inside the blob, the build stops with
+## UNKNOWN VARIABLE IN {}.
+
+FUTIL.SHIM.INIT:
+    DIM FUTIL.SHIM.STK%(FUTIL.SHIM.MAX)
+    FUTIL.SHIM.WAS% = 0
+    FUTIL.SHIM.DIMMED = -1
+    RETURN
+
+FUTIL.SHIM.PUSH:
+    IF FUTIL.SHIM.DIMMED = 0 THEN GOSUB FUTIL.SHIM.INIT
+    #REM 1
+    GP.ASM
+    REM LDA $00
+    REM STA {FUTIL.SHIM.WAS%}
+    REM LDX #1
+    REM LDA #0
+    REM STA {FUTIL.SHIM.WAS%},X
+    GP.ENDASM
+    #REM 0
+    FUTIL.SHIM.STK%(FUTIL.SHIM.SP) = FUTIL.SHIM.WAS%
+    FUTIL.SHIM.SP = FUTIL.SHIM.SP + 1
+    BANK SHIM.FUTILBANK
+    RETURN
+
+FUTIL.SHIM.POP:
+    FUTIL.SHIM.SP = FUTIL.SHIM.SP - 1
+    BANK FUTIL.SHIM.STK%(FUTIL.SHIM.SP)
+    RETURN
 
 ## ---- FILEDIR ----
-FILE.DIR.INIT:  BANK LIB.FUTILBANK :  GOSUB FILE.DIR.INIT.BODY :  RETURN
-FILE.DIR.OPEN:  BANK LIB.FUTILBANK :  GOSUB FILE.DIR.OPEN.BODY :  RETURN
-FILE.DIR.NEXT:  BANK LIB.FUTILBANK :  GOSUB FILE.DIR.NEXT.BODY :  RETURN
+FILE.DIR.INIT:  GOSUB FUTIL.SHIM.PUSH : GOSUB FILE.DIR.INIT.BODY  : GOTO FUTIL.SHIM.POP
+FILE.DIR.OPEN:  GOSUB FUTIL.SHIM.PUSH : GOSUB FILE.DIR.OPEN.BODY  : GOTO FUTIL.SHIM.POP
+FILE.DIR.NEXT:  GOSUB FUTIL.SHIM.PUSH : GOSUB FILE.DIR.NEXT.BODY  : GOTO FUTIL.SHIM.POP
 
 ## ---- FILEIO ----
-FILE.STATUS:     BANK LIB.FUTILBANK :  GOSUB FILE.STATUS.BODY     :  RETURN
-FILE.EXISTS:     BANK LIB.FUTILBANK :  GOSUB FILE.EXISTS.BODY     :  RETURN
-FILE.DELETE:     BANK LIB.FUTILBANK :  GOSUB FILE.DELETE.BODY     :  RETURN
-FILE.RENAME:     BANK LIB.FUTILBANK :  GOSUB FILE.RENAME.BODY     :  RETURN
-FILE.MKDIR:      BANK LIB.FUTILBANK :  GOSUB FILE.MKDIR.BODY      :  RETURN
-FILE.RMDIR:      BANK LIB.FUTILBANK :  GOSUB FILE.RMDIR.BODY      :  RETURN
-FILE.CHDIR:      BANK LIB.FUTILBANK :  GOSUB FILE.CHDIR.BODY      :  RETURN
-FILE.UP:         BANK LIB.FUTILBANK :  GOSUB FILE.UP.BODY         :  RETURN
-FILE.CURDIR:     BANK LIB.FUTILBANK :  GOSUB FILE.CURDIR.BODY     :  RETURN
-FILE.SAVEARRAY:  BANK LIB.FUTILBANK :  GOSUB FILE.SAVEARRAY.BODY  :  RETURN
-FILE.LOADARRAY:  BANK LIB.FUTILBANK :  GOSUB FILE.LOADARRAY.BODY  :  RETURN
+FILE.STATUS:    GOSUB FUTIL.SHIM.PUSH : GOSUB FILE.STATUS.BODY    : GOTO FUTIL.SHIM.POP
+FILE.EXISTS:    GOSUB FUTIL.SHIM.PUSH : GOSUB FILE.EXISTS.BODY    : GOTO FUTIL.SHIM.POP
+FILE.DELETE:    GOSUB FUTIL.SHIM.PUSH : GOSUB FILE.DELETE.BODY    : GOTO FUTIL.SHIM.POP
+FILE.RENAME:    GOSUB FUTIL.SHIM.PUSH : GOSUB FILE.RENAME.BODY    : GOTO FUTIL.SHIM.POP
+FILE.MKDIR:     GOSUB FUTIL.SHIM.PUSH : GOSUB FILE.MKDIR.BODY     : GOTO FUTIL.SHIM.POP
+FILE.RMDIR:     GOSUB FUTIL.SHIM.PUSH : GOSUB FILE.RMDIR.BODY     : GOTO FUTIL.SHIM.POP
+FILE.CHDIR:     GOSUB FUTIL.SHIM.PUSH : GOSUB FILE.CHDIR.BODY     : GOTO FUTIL.SHIM.POP
+FILE.UP:        GOSUB FUTIL.SHIM.PUSH : GOSUB FILE.UP.BODY        : GOTO FUTIL.SHIM.POP
+FILE.CURDIR:    GOSUB FUTIL.SHIM.PUSH : GOSUB FILE.CURDIR.BODY    : GOTO FUTIL.SHIM.POP
+FILE.SAVEARRAY: GOSUB FUTIL.SHIM.PUSH : GOSUB FILE.SAVEARRAY.BODY : GOTO FUTIL.SHIM.POP
+FILE.LOADARRAY: GOSUB FUTIL.SHIM.PUSH : GOSUB FILE.LOADARRAY.BODY : GOTO FUTIL.SHIM.POP
 
 ## FILE.SIZE is a VERB, not a shim. GP.DEFPROC compiles the call site into a jump
 ## to the body, and a call site in low memory jumping to $A000 does not select the
-## bank first, so the declaration has to be the shim -- it is the one place a BANK
-## can go. Being a verb its name is a NAME and cannot also be a label, which is
-## what removes GOSUB FILE.SIZE as a way to call it. FILE.OK is still set beside
-## the count, which is what tells a real 0-block file from a missing one.
-GP.DEFPROC FILE.SIZE, FILE.NAME$ RETURNS FILE.BLOCKS : BANK LIB.FUTILBANK : GOSUB FILE.SIZE.BODY
-RETURN
+## bank first, so the declaration has to carry the bank change -- it is the one
+## place the PUSH can go. Being a verb its name is a NAME and cannot also be a
+## label, which is what removes GOSUB FILE.SIZE as a way to call it. FILE.OK is
+## still set beside the count, which tells a real 0-block file from a missing one.
+GP.DEFPROC FILE.SIZE, FILE.NAME$ RETURNS FILE.BLOCKS : GOSUB FUTIL.SHIM.PUSH : GOSUB FILE.SIZE.BODY
+GOTO FUTIL.SHIM.POP
 
-LIB.FUTILBANK.MODULE.END:
+SHIM.FUTILBANK.MODULE.END:
 #ENDIF

@@ -33,7 +33,7 @@ Six more, settled the same day when the plan was read back and the holes found:
 
 ## 1. The GUI bank
 
-`GP.BANKED LIB.GUIBANK` holds the whole user interface and its supporting code:
+`GP.BANKED SHIM.GUIBANK` holds the whole user interface and its supporting code:
 
     THEME  LINEINPUT  MENUVERT  MENUBAR  GUI  GUI2  GUI.FORM
 
@@ -71,9 +71,19 @@ including `KB.INC.BL` a second time: the file guards itself with `#IFNDEF KB.DEF
 
 `FILEDIR` moves out on its own:
 
-    GP.BANKED LIB.UTILBANK    APPSYS BANKMGR STRCASE STRINGS STRUSING SORT STASHVRAM FILEIO
-    GP.BANKED LIB.GUIBANK     THEME LINEINPUT MENUVERT MENUBAR GUI GUI2 GUI.FORM GUI.CLEARKB
-    GP.BANKED LIB.CODEBANK    FILEDIR
+    GP.BANKED SHIM.UTILBANK    APPSYS BANKMGR STRCASE STRINGS STRUSING SORT STASHVRAM
+    GP.BANKED SHIM.GUIBANK     THEME LINEINPUT MENUVERT MENUBAR GUI GUI2 GUI.FORM GUI.CLEARKB
+    GP.BANKED SHIM.FUTILBANK   FILEIO FILEDIR
+
+It ended up as five, not three. THEME and COMBO each took one of their own once
+the GUI region reached the 8K a region may hold:
+
+    GP.BANKED SHIM.UTILBANK    7   APPSYS BANKMGR KB STRCASE STRINGS STRUSING SORT
+                                   STASHVRAM STASHVRAMGC
+    GP.BANKED SHIM.GUIBANK     4   LINEINPUT MENUVERT MENUBAR GUI GUI2
+    GP.BANKED SHIM.FUTILBANK   8   FILEIO FILEDIR
+    GP.BANKED SHIM.THEMEBANK   9   THEME
+    GP.BANKED SHIM.COMBOBANK  10   COMBO
 
 Two regions was a habit, not a limit: `GPBANK_MAXREGIONS = 63` in
 [`source/compiler/source/commands/gpbank.asm`](../../source/compiler/source/commands/gpbank.asm) —
@@ -258,7 +268,7 @@ these, and a refactor that also rewrites every call site cannot be bisected when
 Each phase ends in a build and a screenshot. None of them leaves the demo unrunnable.
 
 1. **DONE — the banks, first and alone.** Three regions: `FILEDIR` out on its own, `THEME` / `LINEINPUT` /
-   `MENUVERT` / `MENUBAR` / `GUI` / `GUI2` into `LIB.GUIBANK`, `GUI.CLEARKB` written. No behaviour
+   `MENUVERT` / `MENUBAR` / `GUI` / `GUI2` into `SHIM.GUIBANK`, `GUI.CLEARKB` written. No behaviour
    changes at all. This is the phase most likely to break in a way that is hard to read, so it gets a
    build to itself and the BANK MAP panel is the check.
 2. **DONE — the control block and the dispatcher, on buttons only.** `GUI.SAY` and `GUI.YN` rebuilt on
@@ -278,7 +288,7 @@ Each phase ends in a build and a screenshot. None of them leaves the demo unrunn
 ## 8. To verify before building, not assumed
 
 - **Does a third region build? YES.** `GPBMODS` writes five overlays, `.B04` to `.B08`, and
-  `FILEIO` + `FILEDIR` live in `LIB.FUTILBANK` at bank 8. The build that proved it also found the
+  `FILEIO` + `FILEDIR` live in `SHIM.FUTILBANK` at bank 8. The build that proved it also found the
   compiler's 37,632-byte object ceiling, fixed in `58c635b`.
 - **Does the X16 send a distinct code for Shift+TAB? STILL OPEN, and no longer blocking.** The
   Editor's own key table gives `$18`, and `GUI.FORM.DO.BUTTON` treats 24 as PREV — `GUIFRMT`'s T4
@@ -296,7 +306,7 @@ Each phase ends in a build and a screenshot. None of them leaves the demo unrunn
   a palette made it unreadable — because it made it *identical*. See §4. The fear that a role
   touches every module was misplaced: only the GUI reads this one, so it is four palette lines,
   two `#DEFINE`s and one row in `GPBMODS`' theme panel.
-- **What is actually in `LIB.GUIBANK`? MEASURED, and it is tighter than the plan assumed.**
+- **What is actually in `SHIM.GUIBANK`? MEASURED, and it is tighter than the plan assumed.**
 
   | | `GPBMODS.B04` | pages | `GUIFRMT.B04` |
   |---|---:|---:|---:|

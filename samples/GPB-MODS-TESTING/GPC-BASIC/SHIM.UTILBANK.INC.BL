@@ -1,144 +1,208 @@
 ## ***********************************************************************
 ## **
-## **  LIB.UTILBANK.INC.BL -- the low memory front door to a banked utility set.
+## **  SHIM.UTILBANK.INC.BL -- the low memory front door to a banked utility set.
 ## **
 ## **      APPSYS.STARTUP  APPSYS.RESTORE
 ## **      BANKMGR.INIT    BANKMGR.CLAIM   BANKMGR.GET.FREE.BANK
 ## **      BANKMGR.COUNT
+## **      KB.CLEARKB
 ## **      STRCASE.GO      STR.UCASE       STR.LCASE
 ## **      STR.PADR        STR.PADL        STR.PADC
 ## **      STR.SPLIT       STR.REPLACE
+## **      STR.TRIM        STR.LTRIM       STR.RTRIM
 ## **      STR.USING       STR.USING.FIX
 ## **      SORT.RUN
 ## **      SV.INIT         SV.RESET        SV.SAVE         SV.RESTORE
-## **      SV.PUT          SV.GET          SV.FREE
+## **      SV.PUT          SV.GET          SV.FREE         SV.COMPACT
 ## **
-## **  The same shim trick LIB.GUIBANK.INC.BL plays on the GUI, played on the seven
-## **  modules that had nothing keeping them in low memory. Each
-## **  shim selects the bank and calls the body, which lives at $A000 in that
-## **  bank under a .BODY name.
+## **  The same shim trick SHIM.GUIBANK.INC.BL plays on the GUI, played on the
+## **  nine modules that had nothing keeping them in low memory. Each shim
+## **  selects the bank and calls the body, which lives at $A000 in that bank
+## **  under a .BODY name.
 ## **
 ## **  Usage -- this file sits directly above the region it opens, so the bank
 ## **  reads as one unit and its file list is the copy list:
 ## **      GOTO MY.UTILEND
-## **      #INCLUDE "LIB.UTILBANK.INC.BL"
-## **      GP.BANKED LIB.UTILBANK
-## **      #INCLUDE "APPSYS.INC.BL"
-## **      #INCLUDE "BANKMGR.INC.BL"
-## **      #INCLUDE "STRCASE.INC.BL"
-## **      #INCLUDE "STRINGS.INC.BL"
-## **      #INCLUDE "STRUSING.INC.BL"
-## **      #INCLUDE "SORT.INC.BL"
-## **      #INCLUDE "STASHVRAM.INC.BL"
+## **      #INCLUDE "SHIM.UTILBANK.INC.BL"
+## **      GP.BANKED SHIM.UTILBANK
+## **      #INCLUDE "APPSYS.BANK.INC.BL"
+## **      #INCLUDE "BANKMGR.BANK.INC.BL"
+## **      #INCLUDE "KB.BANK.INC.BL"
+## **      #INCLUDE "STRCASE.BANK.INC.BL"
+## **      #INCLUDE "STRINGS.BANK.INC.BL"
+## **      #INCLUDE "STRUSING.BANK.INC.BL"
+## **      #INCLUDE "SORT.BANK.INC.BL"
+## **      #INCLUDE "STASHVRAM.BANK.INC.BL"
+## **      #INCLUDE "STASHVRAMGC.BANK.INC.BL"
 ## **      GP.ENDBANKED
 ## **      MY.UTILEND:
 ## **
 ## **  Claim the bank as well, or something else will hand it out:
-## **      BANKMGR.SET.BANK = LIB.UTILBANK : GOSUB BANKMGR.CLAIM
+## **      BANKMGR.SET.BANK = SHIM.UTILBANK : GOSUB BANKMGR.CLAIM
 ## **
-## **  ALL SEVEN MODULES ARE REQUIRED, for the reason LIB.GUIBANK's header gives:
-## **  BASLOAD resolves every label in every file it reads, so a shim naming
-## **  SV.FREE.BODY stops the build with LABEL NOT FOUND in a program with no
-## **  STASHVRAM. Split this file per module the day a program wants a subset.
+## **  ALL NINE MODULES ARE REQUIRED, for the reason SHIM.GUIBANK's header
+## **  gives: BASLOAD resolves every label in every file it reads, so a shim
+## **  naming SV.FREE.BODY stops the build with LABEL NOT FOUND in a program
+## **  with no STASHVRAM. Split this file per module the day a program wants a
+## **  subset.
 ## **
-## **  FILEIO WAS THE EIGHTH until 2026-09-09, when it moved to LIB.FUTILBANK to
-## **  sit with FILEDIR. Its eleven shims and the FILE.SIZE verb went with it,
-## **  into LIB.FUTILBANK.INC.BL. Nothing here called it, which is what made the
-## **  move a straight lift.
+## **  THIS IS NOT THE SAME FILE AS samples/XBASE's SHIM.UTILBANK. That one
+## **  serves a record keeper in a bank of its own and knows nothing of
+## **  STRCASE, STRUSING or SORT. The two share a name because they do the same
+## **  job for different module sets; do not copy either one over the other.
 ## **
-## **  A SEPARATE BANK FROM LIB.GUIBANK, and it has to be: two regions live at
+## **  THE FILE UTILITIES CALL IN HERE, from SHIM.FUTILBANK's own region, for
+## **  the string verbs a directory listing needs. That is one region reaching
+## **  another and is safe only because the shims put the caller's bank back;
+## **  it was the reason the push and pop pair was added.
+## **
+## **  A SEPARATE BANK FROM SHIM.GUIBANK, and it has to be: two regions live at
 ## **  the same $A000 in different banks, so one may not call the other, and
-## **  GUI.INC.BL is already up there. Nothing in the GUI bank calls anything
-## **  shimmed here -- the only call it makes downwards is to STASH, which is
-## **  in low memory -- so the two sets are genuinely independent.
+## **  the GUI is already up there. The two sets are independent -- the only
+## **  call the GUI bank makes downwards is to STASH, which is in low memory,
+## **  and nothing here calls the GUI. DBFORM does, which is why DBFORM stays
+## **  in low memory and is not in this list.
 ## **
-## **  WHY THESE AND NOT THE REST. What keeps a module in low memory is a
-## **  BANK statement, which the compiler refuses inside a region: that is
-## **  STASH and STASHFILE, and LIB.GUIBANK, LIB.FUTILBANK and this file, which are the
-## **  shim layer itself. Nothing else disqualified anything. In particular:
+## **  THE SHIMS PUT THE CALLER'S BANK BACK. UTIL.SHIM.PUSH keeps it and
+## **  UTIL.SHIM.POP restores it, so a call through here returns with whatever
+## **  bank the caller had selected, and a caller inside ANOTHER region may
+## **  use these front doors. The region itself cannot fix that, since a region
+## **  may not contain BANK; the shim is in low memory and can.
 ## **
-## **      File statements are fine. OPEN, INPUT#, PRINT# and CLOSE on device 8
-## **      leave $00 alone -- measured for FILEDIR, which has been banked since
-## **      2026-09-07 and opens the directory from up there.
-## **
-## **      A GP.ASM blob is fine. Its body never sits in a region either way;
-## **      the pool is appended at the object tail in low RAM and the call is
-## **      an absolute .word. SORT, STRCASE and STRINGS each hold one.
-## **
-## **      BANKMGR names banks but never selects one. It is a bitmap and an
-## **      array, and the array is in the workspace like every other.
-## **
-## **      STASHVRAM never leaves VRAM. Its own header says it executes no
-## **      BANK for exactly this reason, and the two VERA data ports it drives
-## **      are I/O at $9F20, not banked RAM.
-## **
-## **  THE VERBS ARE DECLARED HERE, not in their modules -- STRCASE's two.
-## **  GP.DEFPROC compiles the verb's call site into a jump to the body, and a
-## **  call site in low memory jumping to $A000 does not select the bank first.
-## **  So the declaration is the shim -- it is the one place a BANK can go --
-## **  and the modules keep only the .BODY labels.
-## **
-## **  A verb's name is a NAME, so it cannot also be a label: declaring
-## **  STR.UCASE here is what removes GOSUB STR.UCASE as a way to call it.
-## **
-## **  A call leaves this bank selected, and the shims do not put the caller's
-## **  back -- see LIB.GUIBANK.INC.BL, which says why a holding variable cannot
-## **  work. BANK is the runtime's PEEK/POKE bank as well as the hardware one,
-## **  so a caller that has selected a data bank must re-select it after any
-## **  call through here.
+## **  BANK IS THE RUNTIME'S PEEK/POKE BANK as well as the hardware one, and
+## **  that is now taken care of too: a caller that had a data bank selected
+## **  gets it back rather than having to re-select it.
 ## **
 ## ***********************************************************************
-#IFNDEF LIB.UTILBANK.DEFS
-#DEFINE LIB.UTILBANK.DEFS 1
+#IFNDEF SHIM.UTILBANK.DEFS
+#DEFINE SHIM.UTILBANK.DEFS 1
 
-## The bank the utilities run in. Not LIB.GUIBANK, and not a scratch bank either:
-## GP.BANKED takes a decimal constant and #DEFINE substitutes at translation time, so
-## this and the BANK in every shim below cannot drift apart.
-#DEFINE LIB.UTILBANK 7
+## The bank the utilities run in. Not SHIM.GUIBANK, not the menu text pool and not a
+## scratch bank: GP.BANKED takes a decimal constant and #DEFINE substitutes at
+## translation time, so this and the BANK in every shim below cannot drift apart.
+#DEFINE SHIM.UTILBANK 7
 
-GOTO LIB.UTILBANK.MODULE.END
+## How deep the shims may nest. See UTIL.SHIM.PUSH below.
+#DEFINE UTIL.SHIM.MAX 8
+
+GOTO SHIM.UTILBANK.MODULE.END
+
+## ***********************************************************************
+## **  UTIL.SHIM.PUSH / UTIL.SHIM.POP -- the caller's bank, kept and put back.
+## **
+## **  Every shim is PUSH, the body, POP. PUSH remembers which bank the caller
+## **  had selected and selects this library's; POP puts the caller's back. A
+## **  region calling in through a shim therefore gets its own bank returned to
+## **  it, and the instruction after the call is fetched from the right place.
+## **  Without this, a call from one region into another was a silent hang
+## **  nowhere near the call.
+## **
+## **  IT IS A STACK AND NOT ONE VARIABLE, because the calls nest and can come
+## **  back round. Three banks can be live at once and each level has a
+## **  different one to return to; a single holding variable would be
+## **  overwritten by the innermost call and the outermost would put back the
+## **  wrong bank.
+## **
+## **  A STACK PER SHIM FILE IS ENOUGH. Pushes and pops pair up inside one file
+## **  whatever the other files are doing, so each front door has a stack of its
+## **  own rather than sharing one, and they interleave correctly.
+## **
+## **  POP IS REACHED BY GOTO, NOT GOSUB. The shim's own GOSUB frame is still on
+## **  the stack, so POP's RETURN is the shim's return.
+## **
+## **  THE CAPTURE IS A BLOB because BASIC cannot see the register: PEEK selects
+## **  and restores the bank around every access, so PEEK(0) answers with the
+## **  compiler's shadow copy and not with the hardware. Four instructions read
+## **  $00 and fill both bytes of an integer.
+## **
+## **  UTIL.SHIM.MAX IS NOT CHECKED. Going past it is an array error naming
+## **  UTIL.SHIM.STK%, which says plainly enough that something recursed.
+## ***********************************************************************
+
+## The array, once for the whole program. DIM cannot run twice, and no program
+## should have to remember to call an init, so the first shim call does it.
+##
+## IT IS ABOVE THE BLOB AND NOT BELOW IT because GP.ASM resolves {UTIL.SHIM.WAS%}
+## against the variables the compiler has already met. Named first here, the
+## blob can write it; named only inside the blob, the build stops with
+## UNKNOWN VARIABLE IN {}.
+
+UTIL.SHIM.INIT:
+    DIM UTIL.SHIM.STK%(UTIL.SHIM.MAX)
+    UTIL.SHIM.WAS% = 0
+    UTIL.SHIM.DIMMED = -1
+    RETURN
+
+UTIL.SHIM.PUSH:
+    IF UTIL.SHIM.DIMMED = 0 THEN GOSUB UTIL.SHIM.INIT
+    #REM 1
+    GP.ASM
+    REM LDA $00
+    REM STA {UTIL.SHIM.WAS%}
+    REM LDX #1
+    REM LDA #0
+    REM STA {UTIL.SHIM.WAS%},X
+    GP.ENDASM
+    #REM 0
+    UTIL.SHIM.STK%(UTIL.SHIM.SP) = UTIL.SHIM.WAS%
+    UTIL.SHIM.SP = UTIL.SHIM.SP + 1
+    BANK SHIM.UTILBANK
+    RETURN
+
+UTIL.SHIM.POP:
+    UTIL.SHIM.SP = UTIL.SHIM.SP - 1
+    BANK UTIL.SHIM.STK%(UTIL.SHIM.SP)
+    RETURN
 
 ## ---- APPSYS ----
-APPSYS.STARTUP:  BANK LIB.UTILBANK :  GOSUB APPSYS.STARTUP.BODY :  RETURN
-APPSYS.RESTORE:  BANK LIB.UTILBANK :  GOSUB APPSYS.RESTORE.BODY :  RETURN
+APPSYS.STARTUP:        GOSUB UTIL.SHIM.PUSH : GOSUB APPSYS.STARTUP.BODY        : GOTO UTIL.SHIM.POP
+APPSYS.RESTORE:        GOSUB UTIL.SHIM.PUSH : GOSUB APPSYS.RESTORE.BODY        : GOTO UTIL.SHIM.POP
 
 ## ---- BANKMGR ----
-BANKMGR.INIT:           BANK LIB.UTILBANK :  GOSUB BANKMGR.INIT.BODY          :  RETURN
-BANKMGR.CLAIM:          BANK LIB.UTILBANK :  GOSUB BANKMGR.CLAIM.BODY         :  RETURN
-BANKMGR.GET.FREE.BANK:  BANK LIB.UTILBANK :  GOSUB BANKMGR.GET.FREE.BANK.BODY :  RETURN
-BANKMGR.COUNT:          BANK LIB.UTILBANK :  GOSUB BANKMGR.COUNT.BODY         :  RETURN
+BANKMGR.INIT:          GOSUB UTIL.SHIM.PUSH : GOSUB BANKMGR.INIT.BODY          : GOTO UTIL.SHIM.POP
+BANKMGR.CLAIM:         GOSUB UTIL.SHIM.PUSH : GOSUB BANKMGR.CLAIM.BODY         : GOTO UTIL.SHIM.POP
+BANKMGR.GET.FREE.BANK: GOSUB UTIL.SHIM.PUSH : GOSUB BANKMGR.GET.FREE.BANK.BODY : GOTO UTIL.SHIM.POP
+BANKMGR.COUNT:         GOSUB UTIL.SHIM.PUSH : GOSUB BANKMGR.COUNT.BODY         : GOTO UTIL.SHIM.POP
+
+## ---- KB ----
+KB.CLEARKB:            GOSUB UTIL.SHIM.PUSH : GOSUB KB.CLEARKB.BODY            : GOTO UTIL.SHIM.POP
 
 ## ---- STRCASE. The two verbs are declared here for the reason in the header. ----
-STRCASE.GO:  BANK LIB.UTILBANK :  GOSUB STRCASE.GO.BODY :  RETURN
+STRCASE.GO:            GOSUB UTIL.SHIM.PUSH : GOSUB STRCASE.GO.BODY            : GOTO UTIL.SHIM.POP
 
-GP.DEFPROC STR.UCASE, STRCASE.S$ RETURNS STRCASE.S$ : BANK LIB.UTILBANK : GOSUB STR.UCASE.BODY
-RETURN
+GP.DEFPROC STR.UCASE, STRCASE.S$ RETURNS STRCASE.S$ : GOSUB UTIL.SHIM.PUSH : GOSUB STR.UCASE.BODY
+GOTO UTIL.SHIM.POP
 
-GP.DEFPROC STR.LCASE, STRCASE.S$ RETURNS STRCASE.S$ : BANK LIB.UTILBANK : GOSUB STR.LCASE.BODY
-RETURN
+GP.DEFPROC STR.LCASE, STRCASE.S$ RETURNS STRCASE.S$ : GOSUB UTIL.SHIM.PUSH : GOSUB STR.LCASE.BODY
+GOTO UTIL.SHIM.POP
 
 ## ---- STRINGS ----
-STR.PADR:     BANK LIB.UTILBANK :  GOSUB STR.PADR.BODY    :  RETURN
-STR.PADL:     BANK LIB.UTILBANK :  GOSUB STR.PADL.BODY    :  RETURN
-STR.PADC:     BANK LIB.UTILBANK :  GOSUB STR.PADC.BODY    :  RETURN
-STR.SPLIT:    BANK LIB.UTILBANK :  GOSUB STR.SPLIT.BODY   :  RETURN
-STR.REPLACE:  BANK LIB.UTILBANK :  GOSUB STR.REPLACE.BODY :  RETURN
+STR.PADR:              GOSUB UTIL.SHIM.PUSH : GOSUB STR.PADR.BODY              : GOTO UTIL.SHIM.POP
+STR.PADL:              GOSUB UTIL.SHIM.PUSH : GOSUB STR.PADL.BODY              : GOTO UTIL.SHIM.POP
+STR.PADC:              GOSUB UTIL.SHIM.PUSH : GOSUB STR.PADC.BODY              : GOTO UTIL.SHIM.POP
+STR.SPLIT:             GOSUB UTIL.SHIM.PUSH : GOSUB STR.SPLIT.BODY             : GOTO UTIL.SHIM.POP
+STR.REPLACE:           GOSUB UTIL.SHIM.PUSH : GOSUB STR.REPLACE.BODY           : GOTO UTIL.SHIM.POP
+STR.TRIM:              GOSUB UTIL.SHIM.PUSH : GOSUB STR.TRIM.BODY              : GOTO UTIL.SHIM.POP
+STR.LTRIM:             GOSUB UTIL.SHIM.PUSH : GOSUB STR.LTRIM.BODY             : GOTO UTIL.SHIM.POP
+STR.RTRIM:             GOSUB UTIL.SHIM.PUSH : GOSUB STR.RTRIM.BODY             : GOTO UTIL.SHIM.POP
 
 ## ---- STRUSING ----
-STR.USING:      BANK LIB.UTILBANK :  GOSUB STR.USING.BODY     :  RETURN
-STR.USING.FIX:  BANK LIB.UTILBANK :  GOSUB STR.USING.FIX.BODY :  RETURN
+STR.USING:             GOSUB UTIL.SHIM.PUSH : GOSUB STR.USING.BODY             : GOTO UTIL.SHIM.POP
+STR.USING.FIX:         GOSUB UTIL.SHIM.PUSH : GOSUB STR.USING.FIX.BODY         : GOTO UTIL.SHIM.POP
 
 ## ---- SORT ----
-SORT.RUN:  BANK LIB.UTILBANK :  GOSUB SORT.RUN.BODY :  RETURN
+SORT.RUN:              GOSUB UTIL.SHIM.PUSH : GOSUB SORT.RUN.BODY              : GOTO UTIL.SHIM.POP
 
-## ---- STASHVRAM ----
-SV.INIT:     BANK LIB.UTILBANK :  GOSUB SV.INIT.BODY     :  RETURN
-SV.RESET:    BANK LIB.UTILBANK :  GOSUB SV.RESET.BODY    :  RETURN
-SV.SAVE:     BANK LIB.UTILBANK :  GOSUB SV.SAVE.BODY     :  RETURN
-SV.RESTORE:  BANK LIB.UTILBANK :  GOSUB SV.RESTORE.BODY  :  RETURN
-SV.PUT:      BANK LIB.UTILBANK :  GOSUB SV.PUT.BODY      :  RETURN
-SV.GET:      BANK LIB.UTILBANK :  GOSUB SV.GET.BODY      :  RETURN
-SV.FREE:     BANK LIB.UTILBANK :  GOSUB SV.FREE.BODY     :  RETURN
+## ---- STASHVRAM, and its compactor ----
+SV.INIT:               GOSUB UTIL.SHIM.PUSH : GOSUB SV.INIT.BODY               : GOTO UTIL.SHIM.POP
+SV.RESET:              GOSUB UTIL.SHIM.PUSH : GOSUB SV.RESET.BODY              : GOTO UTIL.SHIM.POP
+SV.SAVE:               GOSUB UTIL.SHIM.PUSH : GOSUB SV.SAVE.BODY               : GOTO UTIL.SHIM.POP
+SV.RESTORE:            GOSUB UTIL.SHIM.PUSH : GOSUB SV.RESTORE.BODY            : GOTO UTIL.SHIM.POP
+SV.PUT:                GOSUB UTIL.SHIM.PUSH : GOSUB SV.PUT.BODY                : GOTO UTIL.SHIM.POP
+SV.GET:                GOSUB UTIL.SHIM.PUSH : GOSUB SV.GET.BODY                : GOTO UTIL.SHIM.POP
+SV.FREE:               GOSUB UTIL.SHIM.PUSH : GOSUB SV.FREE.BODY               : GOTO UTIL.SHIM.POP
+SV.COMPACT:            GOSUB UTIL.SHIM.PUSH : GOSUB SV.COMPACT.BODY            : GOTO UTIL.SHIM.POP
 
-LIB.UTILBANK.MODULE.END:
+
+SHIM.UTILBANK.MODULE.END:
 #ENDIF

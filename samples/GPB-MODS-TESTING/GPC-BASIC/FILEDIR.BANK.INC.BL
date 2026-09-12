@@ -8,6 +8,10 @@
 ## **
 ## **  Requires GPB.INC.BL and FILEIO.INC.BL, and #INCLUDEs neither.
 ## **
+## **  A shim leaves ITS bank selected on return, by SHIM.FUTILBANK's design, so a
+## **  banked build does not preserve the caller's RAM bank across a call here. The
+## **  blobs preserve the bank they are entered with; the shim in front of them does not.
+## **
 ## **      #SYMFILE "@:MYPROG.SYM"   <- required, before the #INCLUDEs.
 ## **
 ## **   in   FILE.DIR.BANK     the bank to read into, or 0 for low RAM
@@ -99,11 +103,12 @@
 ## **  stops at the end of its one bank, so a listing cannot spill into a bank it
 ## **  does not own.
 ## **
-## **  THIS IS THE LOW MEMORY FORM. Every entry point is a plain name, so a
-## **  caller reaches it with one GOSUB and nothing sits in between. Use it
-## **  when the module runs in low memory, which is the ordinary case.
+## **  THIS IS THE BANKED FORM. Every entry point carries a .BODY suffix,
+## **  because a banked routine cannot select its own bank: the public name
+## **  has to be a shim in low memory, and SHIM.FUTILBANK.INC.BL holds it.
+## **  Put this file inside the GP.BANKED region, with that shim above it.
 ## **
-## **  The banked twin is FILEDIR.BANK.INC.BL. Include one or the other,
+## **  The low memory twin is FILEDIR.INC.BL. Include one or the other,
 ## **  never both. GPC-BASIC/BANKED-OR-NOT.md says how to choose.
 ## **
 ## ***********************************************************************
@@ -139,7 +144,7 @@ GOTO FILEDIR.MODULE.END
 ## **  fallout rather than the cause.
 ## ***********************************************************************
 
-FILE.DIR.INIT:  : FILE.NAME$ = RPT$(32, FILE.DIR.NAMEMAX) : FILE.TYPE$ = RPT$(32, 3)
+FILE.DIR.INIT.BODY:  : FILE.NAME$ = RPT$(32, FILE.DIR.NAMEMAX) : FILE.TYPE$ = RPT$(32, 3)
     FILE.DIR.NAMEA% = GP.STRPTR(FILE.NAME$) : FILE.DIR.TYPEA% = GP.STRPTR(FILE.TYPE$)
     FILE.DIR.ADDR% = 0 : FILE.DIR.ROOM% = 0 : FILE.DIR.LFN% = FILE.CHAN : FILE.DIR.BYTES% = 0 : FILE.DIR.CNT% = 0 : FILE.DIR.OFF% = 0
     FILE.DIR.WAS% = 0 : FILE.DIR.BNK% = 0 : FILE.DIR.SLOW = 0
@@ -157,7 +162,7 @@ FILE.DIR.INIT:  : FILE.NAME$ = RPT$(32, FILE.DIR.NAMEMAX) : FILE.TYPE$ = RPT$(32
 ## **  FILE.EXISTS uses, so FILE.ERR means something when the listing is empty.
 ## ***********************************************************************
 
-FILE.DIR.OPEN:  FILE.DIR.GOT = 0 : FILE.DIR.FULL = 0 : FILE.DIR.MORE = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
+FILE.DIR.OPEN.BODY:  FILE.DIR.GOT = 0 : FILE.DIR.FULL = 0 : FILE.DIR.MORE = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
     FILE.DIR.BNK% = FILE.DIR.BANK : GOSUB FILE.DIR.WHERE : GOSUB FILE.DIR.ASKFOR : OPEN 15, FILE.DEVICE, 15
     OPEN FILE.CHAN, FILE.DEVICE, 0, FILE.DIR.ASK$
     INPUT#15, FILE.ERR, FILE.MSG$, FILE.TRK, FILE.SEC
@@ -177,7 +182,7 @@ FILE.DIR.OPEN:  FILE.DIR.GOT = 0 : FILE.DIR.FULL = 0 : FILE.DIR.MORE = 0 : IF FI
 ## ***********************************************************************
 
 FILE.DIR.SKIPDISK:  IF FILE.DIR.GOT = 0 THEN RETURN
-    GOSUB FILE.DIR.NEXT : FILE.DIR.MORE = 0 : RETURN
+    GOSUB FILE.DIR.NEXT.BODY : FILE.DIR.MORE = 0 : RETURN
 
 
 ## Where the bytes land. A bank is always the same address and size; low RAM is
@@ -336,7 +341,7 @@ FILE.DIR.FILL:  FILE.DIR.BYTES% = 0 : FILE.DIR.SLOW% = 0
 ## domain and anything above 32767 is one sign extension from negative. BASIC
 ## holds the offset; the assembly adds it to the base.
 
-FILE.DIR.NEXT:  FILE.DIR.MORE = 0 : IF FILE.DIR.GOT = 0 THEN RETURN
+FILE.DIR.NEXT.BODY:  FILE.DIR.MORE = 0 : IF FILE.DIR.GOT = 0 THEN RETURN
     FILE.DIR.OFF% = FILE.DIR.AT : FILE.DIR.BNK% = FILE.DIR.BANK : GOSUB FILE.DIR.STEP
     IF FILE.DIR.OK% = 0 THEN RETURN
     FILE.DIR.AT = FILE.DIR.OFF% : FILE.BLOCKS = FILE.DIR.BLK% : FILE.DIR.MORE = -1

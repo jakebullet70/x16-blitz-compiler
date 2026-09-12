@@ -15,10 +15,14 @@ rem  file and directory it makes is removed by the row that made it.
 rem
 rem  THE DRIVE IS testing\, NOT the sample directory, and it needs more than
 rem  the PRG. GPBMODS.PRG is compiled SHARED, so it loads the resident
-rem  GPC.RT.nnn.BIN rather than carrying a copy; and it has four overlays --
-rem  GPBMODS.B04, .B05, .B06 and .B07 -- which the bootstrap LOADs into their
-rem  banks at startup. A missing one stops with ?OVL. All of them live in
-rem  testing\ beside the PRG.
+rem  GPC.RT.nnn.BIN rather than carrying a copy; and it has eight overlays --
+rem  GPBMODS.B04 through .B11 -- which the bootstrap LOADs into their banks at
+rem  startup. A missing one stops with ?OVL. All of them live in testing\
+rem  beside the PRG.
+rem
+rem  THE BANKS: 4 the GUI, 5 and 6 the literal text, 7 the utilities, 8 the
+rem  file modules, 9 THEME, 10 the combo box, 11 this program's own STRINGS
+rem  and FILES dropdowns.
 rem
 rem  Source: samples\GPB-MODS-TESTING\GPBMODS.BASL, on the seventeen modules
 rem  shipped in samples\GPB-MODS-TESTING\GPC-BASIC\ beside it. See that

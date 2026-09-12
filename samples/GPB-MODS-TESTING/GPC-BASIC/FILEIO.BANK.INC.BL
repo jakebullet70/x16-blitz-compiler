@@ -97,11 +97,12 @@
 ## **  the manual returns 0 here: VAL stops at the first non-numeric character,
 ## **  so parse the eight hex digits by hand.
 ## **
-## **  THIS IS THE LOW MEMORY FORM. Every entry point is a plain name, so a
-## **  caller reaches it with one GOSUB and nothing sits in between. Use it
-## **  when the module runs in low memory, which is the ordinary case.
+## **  THIS IS THE BANKED FORM. Every entry point carries a .BODY suffix,
+## **  because a banked routine cannot select its own bank: the public name
+## **  has to be a shim in low memory, and SHIM.FUTILBANK.INC.BL holds it.
+## **  Put this file inside the GP.BANKED region, with that shim above it.
 ## **
-## **  The banked twin is FILEIO.BANK.INC.BL. Include one or the other,
+## **  The low memory twin is FILEIO.INC.BL. Include one or the other,
 ## **  never both. GPC-BASIC/BANKED-OR-NOT.md says how to choose.
 ## **
 ## ***********************************************************************
@@ -128,7 +129,7 @@ GOTO FILEIO.MODULE.END
 ## FILE.STATUS falls into FILE.CMD with an empty command: SETNAM with a length
 ## of zero opens the channel and reads it without asking for anything.
 
-FILE.STATUS:  FILE.CMDSTR$ = ""
+FILE.STATUS.BODY:  FILE.CMDSTR$ = ""
 
 ## FILE.CMD sends FILE.CMDSTR$ and reads the answer. The command rides on the
 ## OPEN, so nothing in this file uses PRINT# for a command.
@@ -140,7 +141,7 @@ FILE.CMD:  IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
 
 ## Channel 15 is opened first and read while the file is still open: the answer
 ## being read is the drive's answer to that open.
-FILE.EXISTS:  FILE.OK = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
+FILE.EXISTS.BODY:  FILE.OK = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
     GOSUB FILE.PETNAME : OPEN 15, FILE.DEVICE, 15
     OPEN FILE.CHAN, FILE.DEVICE, FILE.CHAN, FILE.OUT$ + ",S,R"
     INPUT#15, FILE.ERR, FILE.MSG$, FILE.TRK, FILE.SEC
@@ -185,7 +186,7 @@ FILE.EXISTS:  FILE.OK = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
 ## **  of that, and a program should not have to carry it to ask one question.
 ## ***********************************************************************
 
-FILE.SIZE:  FILE.BLOCKS = 0 : FILE.OK = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
+FILE.SIZE.BODY:  FILE.BLOCKS = 0 : FILE.OK = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
     GOSUB FILE.PETNAME
     OPEN 15, FILE.DEVICE, 15
     OPEN FILE.CHAN, FILE.DEVICE, 0, "$:" + FILE.OUT$
@@ -231,22 +232,22 @@ FILE.SIZEBYTE:  GET# FILE.CHAN, FILE.CH$ : FILE.ST = ST : FILE.BYTE = 0 : IF FIL
 
 ## All of these tail-call FILE.CMD, whose RETURN is the caller's.
 
-FILE.DELETE:  GOSUB FILE.PETNAME : FILE.CMDSTR$ = "S:" + FILE.OUT$ : GOTO FILE.CMD
+FILE.DELETE.BODY:  GOSUB FILE.PETNAME : FILE.CMDSTR$ = "S:" + FILE.OUT$ : GOTO FILE.CMD
 
 ## FILE.OUT$ holds one name at a time, so the new name is taken first and kept
 ## in the part-built command.
-FILE.RENAME:  GOSUB FILE.PETNEW : FILE.CMDSTR$ = "R:" + FILE.OUT$ + "=" : GOSUB FILE.PETNAME : FILE.CMDSTR$ = FILE.CMDSTR$ + FILE.OUT$ : GOTO FILE.CMD
+FILE.RENAME.BODY:  GOSUB FILE.PETNEW : FILE.CMDSTR$ = "R:" + FILE.OUT$ + "=" : GOSUB FILE.PETNAME : FILE.CMDSTR$ = FILE.CMDSTR$ + FILE.OUT$ : GOTO FILE.CMD
 FILE.COPY:  GOSUB FILE.PETNEW : FILE.CMDSTR$ = "C:" + FILE.OUT$ + "=" : GOSUB FILE.PETNAME : FILE.CMDSTR$ = FILE.CMDSTR$ + FILE.OUT$ : GOTO FILE.CMD
-FILE.MKDIR:  GOSUB FILE.PETNAME : FILE.CMDSTR$ = "MD:" + FILE.OUT$ : GOTO FILE.CMD
+FILE.MKDIR.BODY:  GOSUB FILE.PETNAME : FILE.CMDSTR$ = "MD:" + FILE.OUT$ : GOTO FILE.CMD
 
 ## RD only removes an EMPTY directory, and only one you are not standing in.
 ## CMDR-DOS answers 63 FILE EXISTS on a directory with anything in it.
-FILE.RMDIR:  GOSUB FILE.PETNAME : FILE.CMDSTR$ = "RD:" + FILE.OUT$ : GOTO FILE.CMD
-FILE.CHDIR:  GOSUB FILE.PETNAME : FILE.CMDSTR$ = "CD:" + FILE.OUT$ : GOTO FILE.CMD
+FILE.RMDIR.BODY:  GOSUB FILE.PETNAME : FILE.CMDSTR$ = "RD:" + FILE.OUT$ : GOTO FILE.CMD
+FILE.CHDIR.BODY:  GOSUB FILE.PETNAME : FILE.CMDSTR$ = "CD:" + FILE.OUT$ : GOTO FILE.CMD
 
 ## CHR$(95) is the left arrow, spelled by code so the source does not depend on
 ## its encoding.
-FILE.UP:  FILE.CMDSTR$ = "CD:" + CHR$(95) : GOTO FILE.CMD
+FILE.UP.BODY:  FILE.CMDSTR$ = "CD:" + CHR$(95) : GOTO FILE.CMD
 
 
 
@@ -265,7 +266,7 @@ FILE.UP:  FILE.CMDSTR$ = "CD:" + CHR$(95) : GOTO FILE.CMD
 ## The first line is skipped and the path rebuilt from the components: it is
 ## padded to a fixed width and truncates a long path.
 
-FILE.CURDIR:  FILE.PATH$ = "" : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
+FILE.CURDIR.BODY:  FILE.PATH$ = "" : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
     OPEN 15, FILE.DEVICE, 15
     OPEN FILE.CHAN, FILE.DEVICE, 0, "$=C"
     INPUT#15, FILE.ERR, FILE.MSG$, FILE.TRK, FILE.SEC
@@ -290,7 +291,7 @@ FILE.PATHWALK:  LINPUT# FILE.CHAN, FILE.ROW$, 34 : LINPUT# FILE.CHAN, FILE.ROW$,
 ## ***********************************************************************
 ## **  A string array to a file and back
 ## ***********************************************************************
-FILE.SAVEARRAY:  IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
+FILE.SAVEARRAY.BODY:  IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
     GOSUB FILE.PETNAME : OPEN 15, FILE.DEVICE, 15
     OPEN FILE.CHAN, FILE.DEVICE, FILE.CHAN, "@:" + FILE.OUT$ + ",S,W"
     IF FILE.ROWS > 0 THEN GOSUB FILE.WRITEROWS
@@ -305,7 +306,7 @@ FILE.WRITEROWS:
 
 ## FILE.ROWS = FILE.MAX on return means the file may hold more.
 
-FILE.LOADARRAY:  FILE.ROWS = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
+FILE.LOADARRAY.BODY:  FILE.ROWS = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
     IF FILE.MAX = 0 THEN FILE.MAX = 10
     GOSUB FILE.PETNAME : OPEN 15, FILE.DEVICE, 15
     OPEN FILE.CHAN, FILE.DEVICE, FILE.CHAN, FILE.OUT$ + ",S,R"

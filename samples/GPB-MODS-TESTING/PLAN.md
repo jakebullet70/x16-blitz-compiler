@@ -502,8 +502,8 @@ one-off proofs named above.
    **`STASH` restoring the caller's bank is what makes it work.** Banked code calls STASH in
    low RAM and has to return to a fetch in bank 4.
 
-**PROVEN 2026-09-05, ahead of the panels: p-code executes from a RAM bank.** `SPIKE.BASL` in this
-folder does it with two `GP.ASM` blobs and a copy loop, changing nothing -- no ABI change, no
+**PROVEN 2026-09-05, ahead of the panels: p-code executes from a RAM bank.** `spike/SPIKE.BASL`
+does it with two `GP.ASM` blobs and a copy loop, changing nothing -- no ABI change, no
 runtime change, no compiler change. `GOSUB SPIKE.CAPTURE` runs `SPIKE.MARK = 111 : RETURN` in low
 RAM while a blob records `codePtr + Y`; 64 bytes are copied to bank 7 at `$A000` with the `111`
 patched to `222`; a second blob points `codePtr` at the window; `MARK` comes back **222**.
@@ -515,7 +515,7 @@ Two things it settled that the design needs:
   frame is about RE-ENTERING a banked routine, not about leaving one.
 - **A blob cannot set Y by loading it.** `CommandSYS` restores Y from the 6502 stack after the call,
   so a blob must write the saved copy at `$0103 + S` (`tsx`, then `sta $0103,x`). That stack offset
-  is why `SPIKE.BASL` is a spike: it depends on `CommandSYS`'s exact prologue, which a real opcode
+  is why `spike/SPIKE.BASL` is a spike: it depends on `CommandSYS`'s exact prologue, which a real opcode
   would not.
 
 `codePtr` is `$28`, and `objPtr` `$2A`, `zTemp0` `$2C` follow it.

@@ -59,11 +59,12 @@
 ## **
 ## **   also out  LINEINPUT.POS   where the caret ended up, 0..LEN(TEXT$)
 ## **
-## **  THIS IS THE LOW MEMORY FORM. Every entry point is a plain name, so a
-## **  caller reaches it with one GOSUB and nothing sits in between. Use it
-## **  when the module runs in low memory, which is the ordinary case.
+## **  THIS IS THE BANKED FORM. Every entry point carries a .BODY suffix,
+## **  because a banked routine cannot select its own bank: the public name
+## **  has to be a shim in low memory, and SHIM.GUIBANK.INC.BL holds it.
+## **  Put this file inside the GP.BANKED region, with that shim above it.
 ## **
-## **  The banked twin is LINEINPUT.BANK.INC.BL. Include one or the other,
+## **  The low memory twin is LINEINPUT.INC.BL. Include one or the other,
 ## **  never both. GPC-BASIC/BANKED-OR-NOT.md says how to choose.
 ## **
 ## ***********************************************************************
@@ -100,7 +101,7 @@ GOTO LINEINPUT.MODULE.END
 ## **  LINEINPUT.GET -- the field.
 ## ***********************************************************************
 
-LINEINPUT.GET:
+LINEINPUT.GET.BODY:
     LINEINPUT.INV = (LINEINPUT.ATTR AND 15) * 16 + INT(LINEINPUT.ATTR / 16)
     LINEINPUT.WAS$ = LINEINPUT.TEXT$ : LINEINPUT.POS = LEN(LINEINPUT.TEXT$)
     LINEINPUT.DONE = 0 : LINEINPUT.KEY = 0 : LINEINPUT.LIT = 1  : LINEINPUT.TICK = TI
@@ -160,7 +161,7 @@ LINEINPUT.KEYED:
 ## ---- LINEINPUT.SAVEX, NOT LINEINPUT.HOME: that name is #DEFINEd as 19, so this line
 ## ---- compiled as "19 = LINEINPUT.X" -- a syntax error, which DEFERS. The compile said
 ## ---- OK CODE and ASK would have thrown SYNTAX ERROR the first time it was called.
-LINEINPUT.ASK:
+LINEINPUT.ASK.BODY:
     LINEINPUT.LABELPAINT = LINEINPUT.LABELATTR
     IF LINEINPUT.LABELPAINT = 0 THEN LINEINPUT.LABELPAINT = LINEINPUT.ATTR
     LINEINPUT.SAVEX = LINEINPUT.X : GP.PRINTAT LINEINPUT.X, LINEINPUT.Y, LINEINPUT.LABEL$, LINEINPUT.LABELPAINT

@@ -55,11 +55,12 @@
 ## **  back on. INT alone floors toward minus infinity, which rounds -1.5 and 1.5 in
 ## **  opposite directions.
 ## **
-## **  THIS IS THE LOW MEMORY FORM. Every entry point is a plain name, so a
-## **  caller reaches it with one GOSUB and nothing sits in between. Use it
-## **  when the module runs in low memory, which is the ordinary case.
+## **  THIS IS THE BANKED FORM. Every entry point carries a .BODY suffix,
+## **  because a banked routine cannot select its own bank: the public name
+## **  has to be a shim in low memory, and SHIM.UTILBANK.INC.BL holds it.
+## **  Put this file inside the GP.BANKED region, with that shim above it.
 ## **
-## **  The banked twin is STRUSING.BANK.INC.BL. Include one or the other,
+## **  The low memory twin is STRUSING.INC.BL. Include one or the other,
 ## **  never both. GPC-BASIC/BANKED-OR-NOT.md says how to choose.
 ## **
 ## ***********************************************************************
@@ -77,7 +78,7 @@ GOTO STR.USING.SKIP
 ## Reads the mask, formats the digits, then fits them to the field. An empty mask gives
 ## an empty result.
 
-STR.USING:  STR.USING.W = LEN(STR.USING.MASK$) : STR.USING.STR$ = "" : IF STR.USING.W = 0 THEN RETURN
+STR.USING.BODY:  STR.USING.W = LEN(STR.USING.MASK$) : STR.USING.STR$ = "" : IF STR.USING.W = 0 THEN RETURN
     STR.USING.DP = 0 : STR.USING.IW = 0 : STR.USING.ZW = 0 : STR.USING.GRP = 0 : STR.USING.PT = 0 : STR.USING.SIGN$ = "" : STR.USING.I = 1 : STR.USING.C$ = LEFT$(STR.USING.MASK$, 1)
     IF STR.USING.C$ = "+" THEN STR.USING.SIGN$ = "+" : STR.USING.I = 2
     IF STR.USING.C$ = "-" THEN STR.USING.SIGN$ = "-" : STR.USING.I = 2
@@ -101,7 +102,7 @@ STR.USING.SCAN:
 ## ---- finished string against the field -- the second catches a minus with nowhere to go.
 
 STR.USING.READY:
-    GOSUB STR.USING.FIX : IF STR.USING.OVR THEN GOTO STR.USING.STAR
+    GOSUB STR.USING.FIX.BODY : IF STR.USING.OVR THEN GOTO STR.USING.STAR
     IF LEN(STR.USING.INT$) > STR.USING.IW THEN GOTO STR.USING.STAR
     STR.USING.Z = 0 : IF STR.USING.ZW > 0 THEN STR.USING.Z = STR.USING.IW - STR.USING.ZW + 1
     IF LEN(STR.USING.INT$) < STR.USING.Z THEN STR.USING.INT$ = RPT$(48, STR.USING.Z - LEN(STR.USING.INT$)) + STR.USING.INT$
@@ -139,7 +140,7 @@ STR.USING.STAR:  STR.USING.STR$ = RPT$(42, STR.USING.W) : RETURN
 ## -0.004 to two places is "0.00", not "-0.00" -- the sign is dropped when the rounded
 ## value is zero, because a signed zero in a column reads as a real negative.
 
-STR.USING.FIX:
+STR.USING.FIX.BODY:
     STR.USING.SGN = 0 : STR.USING.OVR = 0 : STR.USING.V = ABS(STR.USING.NUM)
     IF STR.USING.NUM < 0 THEN STR.USING.SGN = -1
     IF STR.USING.DP > 0 THEN STR.USING.V = STR.USING.V * 10 ^ STR.USING.DP

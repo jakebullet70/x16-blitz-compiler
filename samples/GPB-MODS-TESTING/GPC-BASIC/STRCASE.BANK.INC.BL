@@ -59,11 +59,12 @@
 ## **  The whole STRCASE.* name space belongs to this file, except the two verbs
 ## **  STR.UCASE and STR.LCASE, named for STRINGS.INC.BL, which they merge into later.
 ## **
-## **  THIS IS THE LOW MEMORY FORM. Every entry point is a plain name, so a
-## **  caller reaches it with one GOSUB and nothing sits in between. Use it
-## **  when the module runs in low memory, which is the ordinary case.
+## **  THIS IS THE BANKED FORM. Every entry point carries a .BODY suffix,
+## **  because a banked routine cannot select its own bank: the public name
+## **  has to be a shim in low memory, and SHIM.UTILBANK.INC.BL holds it.
+## **  Put this file inside the GP.BANKED region, with that shim above it.
 ## **
-## **  The banked twin is STRCASE.BANK.INC.BL. Include one or the other,
+## **  The low memory twin is STRCASE.INC.BL. Include one or the other,
 ## **  never both. GPC-BASIC/BANKED-OR-NOT.md says how to choose.
 ## **
 ## ***********************************************************************
@@ -79,7 +80,7 @@ GOTO STRCASE.MODULE.END
 ## from STRCASE.PTR / STRCASE.MODE because BASLOAD's symbol file does not record the
 ## sigil -- X and X% would be one entry.
 
-STRCASE.GO:
+STRCASE.GO.BODY:
     STRCASE.ADDR% = STRCASE.PTR
     STRCASE.OP% = STRCASE.MODE
     #REM 1
@@ -136,16 +137,16 @@ STRCASE.GO:
 
 ## STRCASE.S$ is the argument AND the result. The argument copy is the working copy,
 ## so a second string variable would only be a second copy of the same bytes.
-STR.UCASE:
+STR.UCASE.BODY:
     STRCASE.PTR = GP.STRPTR(STRCASE.S$)
     STRCASE.MODE = STRCASE.UPPER
-    GOSUB STRCASE.GO
+    GOSUB STRCASE.GO.BODY
     RETURN
 
-STR.LCASE:
+STR.LCASE.BODY:
     STRCASE.PTR = GP.STRPTR(STRCASE.S$)
     STRCASE.MODE = STRCASE.LOWER
-    GOSUB STRCASE.GO
+    GOSUB STRCASE.GO.BODY
     RETURN
 
 STRCASE.MODULE.END:

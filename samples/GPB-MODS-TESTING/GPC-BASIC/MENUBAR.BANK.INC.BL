@@ -56,11 +56,12 @@
 ## **  to end it so the caller can open the panel, and a bar that is only a bar wants
 ## **  it ignored. Off means an arrow across the grain does nothing.
 ## **
-## **  THIS IS THE LOW MEMORY FORM. Every entry point is a plain name, so a
-## **  caller reaches it with one GOSUB and nothing sits in between. Use it
-## **  when the module runs in low memory, which is the ordinary case.
+## **  THIS IS THE BANKED FORM. Every entry point carries a .BODY suffix,
+## **  because a banked routine cannot select its own bank: the public name
+## **  has to be a shim in low memory, and SHIM.GUIBANK.INC.BL holds it.
+## **  Put this file inside the GP.BANKED region, with that shim above it.
 ## **
-## **  The banked twin is MENUBAR.BANK.INC.BL. Include one or the other,
+## **  The low memory twin is MENUBAR.INC.BL. Include one or the other,
 ## **  never both. GPC-BASIC/BANKED-OR-NOT.md says how to choose.
 ## **
 ## ***********************************************************************
@@ -103,7 +104,7 @@ GOTO MENUBAR.MODULE.END
 
 ## MENUBAR.RUN -- the whole thing.
 
-MENUBAR.RUN:
+MENUBAR.RUN.BODY:
     IF MENUBAR.SEL < 1 THEN MENUBAR.SEL = 1
     IF MENUBAR.SEL > MENUVERT.COUNT THEN MENUBAR.SEL = MENUVERT.COUNT
     MENUBAR.KEY = 0 : GOSUB MENUBAR.DRAW : GOSUB MENUBAR.MARK
@@ -199,7 +200,7 @@ MENUBAR.PADREAD:  MENUBAR.PAD = JOY(MENUBAR.PORT) AND 255 : RETURN
 
 ## MENUBAR.DRAW -- every item, unhighlighted.
 
-MENUBAR.DRAW:
+MENUBAR.DRAW.BODY:
     FOR MENUBAR.EACH = 1 TO MENUVERT.COUNT
         MENUBAR.DRAWN = MENUBAR.EACH : MENUBAR.PAINT = MENUVERT.ATTR
         GOSUB MENUBAR.ITEM
@@ -209,7 +210,7 @@ MENUBAR.DRAW:
 ## ---- the highlight, on whatever MENUBAR.SEL now is. HIATTR of 0 means "invert ATTR",
 ## ---- as MENUVERT does.
 
-MENUBAR.MARK:  MENUBAR.PAINT = MENUVERT.HIATTR
+MENUBAR.MARK.BODY:  MENUBAR.PAINT = MENUVERT.HIATTR
     IF MENUBAR.PAINT = 0 THEN MENUBAR.PAINT = (MENUVERT.ATTR AND 15) * 16 + INT(MENUVERT.ATTR / 16)
     MENUBAR.DRAWN = MENUBAR.SEL : GOSUB MENUBAR.ITEM
     RETURN
@@ -223,7 +224,7 @@ MENUBAR.MARK:  MENUBAR.PAINT = MENUVERT.HIATTR
 ## that routine is DRAWY = Y + DRAWROW - 1, so this sets MENUVERT.Y to make that sum
 ## land on the bar's row. Change that line and this breaks on the first draw.
 
-MENUBAR.ITEM:  MENUBAR.FIND = MENUBAR.DRAWN : GOSUB MENUBAR.COLUMN
+MENUBAR.ITEM.BODY:  MENUBAR.FIND = MENUBAR.DRAWN : GOSUB MENUBAR.COLUMN
     MENUVERT.X = MENUBAR.AT : MENUVERT.WIDTH = MENUBAR.WIDE : MENUVERT.Y = MENUBAR.Y - MENUBAR.DRAWN + 1
     MENUVERT.DRAWROW = MENUBAR.DRAWN : MENUVERT.DRAWATTR = MENUBAR.PAINT : GOSUB MENUVERT.ROW
     RETURN
@@ -252,7 +253,7 @@ MENUBAR.COLUMN:  MENUBAR.AT = MENUBAR.X : MENUBAR.WIDE = LEN(MENUVERT.ITEM$(MENU
 ## ---- where the chosen item sits, for a caller about to open something under it. Set
 ## ---- on the way out of MENUBAR.CHOSE, so it survives the highlight being lifted.
 
-MENUBAR.WHERE:  MENUBAR.FIND = MENUBAR.SEL : GOSUB MENUBAR.COLUMN
+MENUBAR.WHERE.BODY:  MENUBAR.FIND = MENUBAR.SEL : GOSUB MENUBAR.COLUMN
     MENUBAR.SELX = MENUBAR.AT : MENUBAR.SELW = MENUBAR.WIDE : RETURN
 
 MENUBAR.MODULE.END:

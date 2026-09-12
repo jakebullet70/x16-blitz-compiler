@@ -48,11 +48,12 @@
 ## **  reaches the compiler empty, refused as "block mismatch". #REM 0 restores the
 ## **  default.
 ## **
-## **  THIS IS THE LOW MEMORY FORM. Every entry point is a plain name, so a
-## **  caller reaches it with one GOSUB and nothing sits in between. Use it
-## **  when the module runs in low memory, which is the ordinary case.
+## **  THIS IS THE BANKED FORM. Every entry point carries a .BODY suffix,
+## **  because a banked routine cannot select its own bank: the public name
+## **  has to be a shim in low memory, and SHIM.UTILBANK.INC.BL holds it.
+## **  Put this file inside the GP.BANKED region, with that shim above it.
 ## **
-## **  The banked twin is SORT.BANK.INC.BL. Include one or the other,
+## **  The low memory twin is SORT.INC.BL. Include one or the other,
 ## **  never both. GPC-BASIC/BANKED-OR-NOT.md says how to choose.
 ## **
 ## ***********************************************************************
@@ -70,7 +71,7 @@ GOTO SORT.MODULE.END
 ## A gap larger than the array needs no guard: the pass starts i at the gap and
 ## falls straight out.
 
-SORT.RUN:  SORT.OK = 0 : SORT.COUNT = PEEK(SORT.PTR - 3) + PEEK(SORT.PTR - 2) * 256 : SORT.TYPE = PEEK(SORT.PTR - 1)
+SORT.RUN.BODY:  SORT.OK = 0 : SORT.COUNT = PEEK(SORT.PTR - 3) + PEEK(SORT.PTR - 2) * 256 : SORT.TYPE = PEEK(SORT.PTR - 1)
     IF SORT.TYPE >= 128 THEN RETURN
     IF (SORT.TYPE AND 64) = 0 THEN RETURN
     IF SORT.COUNT > 255 THEN RETURN

@@ -1,0 +1,44 @@
+## ***********************************************************************
+## **
+## **  KB.INC.BL -- the keyboard buffer, emptied.
+## **
+## **      KB.CLEARKB     throw away whatever is already typed
+## **
+## **  Requires GPB.INC.BL, and does not #INCLUDE it for you.
+## **
+## **  THIS IS THE LOW MEMORY ONE. GUI.INC.BL carries a private twin,
+## **  GUI.CLEARKB, because code inside a GP.BANKED region may not call another
+## **  bank and survive the return. Fix one and fix the other; there are only
+## **  the two, and a second #INCLUDE of this file cannot supply the twin --
+## **  #IFNDEF KB.DEFS makes it produce nothing.
+## **
+## **  THIS IS THE BANKED FORM. Every entry point carries a .BODY suffix,
+## **  because a banked routine cannot select its own bank: the public name
+## **  has to be a shim in low memory, and SHIM.UTILBANK.INC.BL holds it.
+## **  Put this file inside the GP.BANKED region, with that shim above it.
+## **
+## **  The low memory twin is KB.INC.BL. Include one or the other, never both:
+## **  the #IFNDEF guard is the same name in each, so the second one read
+## **  produces nothing and the labels it was wanted for are missing.
+## **
+## ***********************************************************************
+#IFNDEF KB.DEFS
+#DEFINE KB.DEFS 1
+
+GOTO KB.MODULE.END
+
+## KB.CLEARKB -- throw away whatever is already typed.
+##
+## Call it before opening a dialog, and after a keystroke that redraws. A dialog opened
+## with a key still queued reads it, answers itself and closes; a held arrow repeats
+## faster than a page can be drawn and scrolls on after the key is let go.
+
+KB.CLEARKB.BODY:
+    GP.DO
+        GET KB.K$
+        IF GP.ISEMPTY(KB.K$) THEN GP.EXITDO
+    GP.LOOP
+    RETURN
+
+KB.MODULE.END:
+#ENDIF
