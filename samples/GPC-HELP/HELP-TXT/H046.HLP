@@ -1,84 +1,109 @@
-@STASH.INC.BL -- save a text rectangle, and put it back.
+@4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
 .
-=STASH.INC.BL
+=4.11 GUI.INC.BL -- FOUR DIALOGS, IN A BOX THAT PUTS THE SCREEN BACK
 .
-.  save a text rectangle, and put it back.
+=WHAT IT COSTS
 .
-=MODULE HEADER
+.  ASM: GP.BOX GP.FILL GP.PRINTAT
+.    ASM -- a keyword, run by machine code in the GP runtime block. A program
+.    using ANY GP keyword pays for the whole block.
+.  COMPOSITE: GP.CHAR GP.PRINTAT GP.FILL
+.    COMPOSITE -- a keyword with no machine code of its own. The compiler
+.    expands it into keywords that already exist, so it costs the runtime
+.    nothing at all.
+.    BASIC -- a .INC.BL module of ordinary BASL, called with GOSUB. Costs
+.    nothing unless you #INCLUDE it.
 .
-:      STASH.SAVE      copy a rectangle of the screen into a RAM bank
-:      STASH.RESTORE   copy it back, where it was or somewhere else
+=DESCRIPTION
 .
-.  For the same rectangle through a FILE see STASHFILE.INC.BL, built on this
-.  and kept separate so a program wanting only the bank does not carry the
-.  disk half -- a BASL module has no dead code elimination, and those three
-.  routines are 127 bytes.
+.  GUI.SAY
+.      IN: GUI.MSG$
+.      OUT: GUI.KEY -- something to say, and one way out
 .
-=A MODULE, NOT A RUNTIME KEYWORD
+.  GUI.YN
+.      IN: GUI.MSG$
+.      OUT: GUI.ANSWER, -1 for yes
 .
-.  so it costs its bytes only in the programs that ask for it: as a keyword
-.  it would be 329 bytes carried by every program that never stashed
-.  anything.
+.  GUI.MENU
+.      IN: GUI.COUNT GUI.SEL GUI.FLAGS, over MENUVERT.ITEM$()
+.      OUT: GUI.SEL, or 0 if cancelled
 .
-=YOUR PROGRAM MUST HAVE A #SYMFILE
+.  GUI.INPUT
+.      IN: GUI.LEN GUI.TEXT$ GUI.MASK
+.      OUT: GUI.TEXT$ GUI.OK
 .
-.  The assembly reaches BASIC's variables through {VAR} and BASLOAD crunches
-.  every name first -- STASH.VADDR% is some two-letter name by then. Without
-.  it the compile stops with "NO SYMBOL FILE FOR {}", naming the cause but
-.  not the file. Name it to match the PRG:
+.  GUI.OPEN
+.      IN: GUI.BODY.ROWS GUI.BODY.WIDTH
+.      OUT: GUI.INNER.LEFT .TOP .WIDTH -- the box on its own, for a dialog of
+.        your own
 .
-:      #SAVEAS "@:MYPROG.PRG"
-:      #SYMFILE "@:MYPROG.SYM"
-:      #INCLUDE "GPB.INC.BL"
-:      #INCLUDE "STASH.INC.BL"
+.  GUI.CLOSE
+.      IN: --
+.      OUT: the screen as it was
 .
-.  Both directives go BEFORE the includes.
+:THEME.ID = 0 : GOSUB THEME.SELECT
+:GUI.BANK = 8
+:GUI.MSG$ = "DELETE THE FILE?"
+:GOSUB GUI.YN
+:IF GUI.ANSWER THEN <yes>
 .
-.  Usage:
-:      STASH.BANK = 8
-:      STASH.X = 10 : STASH.Y = 4 : STASH.W = 30 : STASH.H = 8
-:      GOSUB STASH.SAVE
-:      ... draw over it ...
-:      GOSUB STASH.RESTORE
+.Requires GPB.INC.BL, STASH.INC.BL, THEME.INC.BL, MENUVERT.INC.BL and
+.LINEINPUT.INC.BL, and #INCLUDEs none of them. All five, whichever dialog you
+.call -- BASLOAD resolves every label in the file, so leaving one out is
+.LABEL NOT FOUND. It wants a #SYMFILE, because STASH does.
 .
-:   in   STASH.BANK     the RAM bank to keep the cells in. 1..255, and
-:                       it is yours: this writes the whole of it
-:        STASH.X  STASH.Y     top left, in CELLS
-:        STASH.W  STASH.H     size, in cells
+.Everything the box takes -- three message lines, a title, the style, the
+.placement, the shadow, the frame glyphs, the bank the covered cells go to --
+.is listed in full in GP-BASIC.GLOBALS.md SEC 3. GUI.BANK = 0 does not save
+.the cells, and then the box is still on screen when the call returns.
 .
-:   out  STASH.OK       -1 if it fitted and was saved, 0 if not
+.Every control has a focus, and TAB moves it. The dialogs no longer own their
+.key loops: each states its controls and GUI.FORM runs them. A control is a
+.button, a field or a list; it hands back one of six verdicts -- stay, next,
+.previous, press, default, cancel -- and the dispatcher stays one loop
+.whatever the mix. A caller that never presses TAB sees what it always saw.
 .
-=RESTORE NEEDS ONLY THE BANK
+.The default button and the focused control are different things. The default
+.is what RETURN presses from anywhere and is drawn <<LIKE THIS>>; the focus
+.is where TAB has got to and is drawn in THEME.FOCUS. GUI.INPUT opens with
+.the default on OK and the focus in the field -- which is the point of
+.keeping the two apart, and GUI.DEFAULT sets only the first.
 .
-.  four header bytes go in first -- w, h, x, y -- so the rectangle describes
-.  itself and cannot be put back at the wrong size. STASH.MOVE = 1 with
-.  STASH.X / STASH.Y pastes it somewhere else instead.
+.The answers are buttons. GUI.BTN.ONE$ and GUI.BTN.TWO$ carry them, and &
+.marks the accelerator: "&CANCEL" lights the C. An accelerator is live only
+.while the focused control does not eat printable keys, so C presses CANCEL
+.from the button row or from inside a list, and types a C in a field. That is
+.the whole rule, and GUIFRMT's T14, T15 and T22 are the three assertions that
+.hold it.
 .
-=A BANK IS 8,192 BYTES AND A CELL IS TWO
+.GUI.HINT$ is gone -- the dimmed line naming two keys became the button row,
+.and it is the one interface this took away.
 .
-.  so 4,094 cells fit -- 63x63, larger than any dialog and NOT a whole 80x60
-.  screen (9,600 bytes). Too big is refused before the first write, with
-.  STASH.OK = 0, rather than running on into the next bank.
+.The typing dialog and its string swapped names: it was GUI.TEXT returning
+.GUI.INPUT$, and it is GUI.INPUT returning GUI.TEXT$. BASLOAD will not have a
+.label and a variable of one name and the $ does not separate them. A program
+.written against the older library compiles clean and reads the wrong one
+.back.
 .
-=WHY THE SPLIT IS WHERE IT IS
+.Upper case, on the default charset. GP.PRINTAT converts PETSCII and BASLOAD
+.passes literals through as source bytes, so charset 2 lands lower case on
+.the graphics half of the font. ISO mode fixes the text and breaks the frame,
+.GP.BOX's $40-$7D being letters. Upper case with a frame, mixed case without
+.one, or re-order the font and set GUI.GLYPH.
 .
-.  the address of a row is worked out in BASIC, once a row, and the 160 bytes
-.  are copied in assembly. That keeps the assembly free of any pointer
-.  needing zero page -- and there is none to have, because a GP.ASM blob runs
-.  with the interpreter live and codePtr, zTemp0, NSStatus and the mantissas
-.  must all survive it. The destination goes into the OPERAND of the
-.  instruction that uses it, which is the idiom samples/editor's renderers
-.  are built on.
+.Example: GUI.EXP.BL. Regression test: samples/GPB-MODS-TESTING/GUIFRMT.BASL,
+.twenty-four assertions driven by keys pushed into the KERNAL buffer -- the
+.only way to drive a GET loop headlessly.
 .
-=EACH BLOCK IS WRAPPED IN #REM 1 / #REM 0
+=EXAMPLE PROGRAM
 .
-.  Without it BASLOAD's default strips the body and the block reaches the
-.  compiler EMPTY, which gpasm.asm deliberately refuses as "block mismatch"
-.  rather than compiling a program that quietly contains none of the code.
-.  The #REM 0 after each block restores BASLOAD's default.
-.
-.  The whole STASH.* name space belongs to this file.
+.  GUI.EXP.BL -- runnable, in the GPC-BASIC folder
 .
 =SEE ALSO
 .
->70|STASHFILE.INC.BL -- a saved text rectangle, through a file.
+>21|3. Command reference
+>72|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
+>86|STASH.INC.BL -- save a text rectangle, and put it back.
+>59|4.1 THEME.INC.BL -- named colour roles
+>65|4.6 MENUVERT.INC.BL -- a vertical menu
+>63|4.4 LINEINPUT.INC.BL -- a positioned entry field

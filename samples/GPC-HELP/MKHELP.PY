@@ -95,6 +95,7 @@ CATS = [
     ("mods",    "BASL MODULES"),
     ("globals", "GLOBALS AND NAMING"),
     ("traps",   "THE TRAPS"),
+    ("bugs",    "COMPILER KNOWN BUGS"),
     ("memory",  "MEMORY AND LIMITS"),
 ]
 
@@ -504,7 +505,8 @@ def build_manual(src, tiers):
 
     # Which top level section a heading belongs to, and therefore which file.
     top_of = {"1": "start", "2": "start", "3": "core",
-              "4": "mods", "5": "globals", "6": "traps", "7": "memory"}
+              "4": "mods", "5": "globals", "6": "traps", "7": "memory",
+              "8": "bugs"}
 
     i = 0
     while i < len(secs):

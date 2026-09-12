@@ -1,52 +1,56 @@
-@4.9 MENUBAR.INC.BL -- a horizontal menu
+@4.7 SORT.INC.BL -- shell sort a string array
 .
-=4.9 MENUBAR.INC.BL -- A HORIZONTAL MENU
+=4.7 SORT.INC.BL -- SHELL SORT A STRING ARRAY
 .
 =DESCRIPTION
 .
-.  MENUBAR.RUN
-.      IN: MENUBAR.X MENUBAR.Y MENUBAR.GAP MENUBAR.FLAGS MENUBAR.SEL, and
-.        MENUVERT.COUNT MENUVERT.ITEM$() MENUVERT.ATTR MENUVERT.HIATTR
-.        MENUVERT.HOT$ MENUVERT.HOTATTR
-.      OUT: MENUBAR.SEL MENUBAR.KEY MENUBAR.SELX MENUBAR.SELW
+.  SORT.RUN
+.      IN: SORT.PTR SORT.DESCEND SORT.NOCASE
+.      OUT: SORT.OK SORT.COUNT
 .
-.  MENUBAR.DRAW
-.      IN: the same
-.      OUT: the bar on screen, undriven
+:#SYMFILE "@:MYPROG.SYM"
+:#INCLUDE "SORT.INC.BL"
+:
+:SORT.PTR = GP.ARRPTR(NAME$())
+:SORT.DESCEND = 0 : SORT.NOCASE = 0
+:GOSUB SORT.RUN
 .
-.  MENUBAR.ITEM
-.      IN: MENUBAR.FIND and an attribute
-.      OUT: one item, repainted
+.Shell sort with Ciura's gap sequence -- 132, 57, 23, 10, 4, 1 -- moving the
+.2-byte element pointers rather than string data. A swap costs the same
+.whatever the strings are: no temporary, no copy, no heap traffic.
 .
-.  MENUBAR.MARK
-.      IN: MENUBAR.FIND
-.      OUT: that item highlighted
+.The array is passed as an address because a BASL subroutine cannot be passed
+.an array; GP.ARRPTR is a keyword for this purpose. The empty parentheses in
+.GP.ARRPTR(A$()) are required -- A$ and A$() are different variables.
 .
-.  MENUBAR.WHERE
-.      IN: MENUBAR.FIND
-.      OUT: MENUBAR.AT MENUBAR.WIDE
+.SORT.OK is -1 when it sorted and 0 if the sort was refused: more than 255
+.elements, so DIM A$(254) is the largest accepted (DIM A$(255) is 256
+.elements), or an array whose elements are not strings. The element count and
+.the type are read from the array's own header, three bytes below what
+.GP.ARRPTR returns, so a wrong count cannot be passed in.
 .
-.MENUVERT is the vertical menu; this is the other axis. It reads MENUVERT's
-.items, attributes and hotkeys rather than defining its own, because a bar
-.and the dropdown under it are one thing to the user -- so it does not build
-.without MENUVERT.INC.BL, and the caller refills MENUVERT.ITEM$() between
-.drawing the bar and opening the menu.
+.Never-assigned elements are empty strings, not garbage. A DIM A$(20) with
+.five entries filled sorts its fifteen empties to the front; a null pointer
+.reads as "", as it does elsewhere in the runtime.
 .
-.An item is as wide as its own text. There is no MENUBAR.WIDTH and no column
-.width; the air goes in the item string, so " FILE " is how a highlight gets
-.padding. MENUBAR.GAP is the space between two items and defaults to 0 for
-.the same reason.
+.SORT.DESCEND and SORT.NOCASE are ordinary variables rather than arguments,
+.so they are sticky. Set both on every call.
 .
-.Up and down are optional exits, off by default. MENUBAR.DOWNEXIT ends the
-.bar on DOWN and MENUBAR.UPEXIT on UP, handing the key back in MENUBAR.KEY so
-.the caller can open the panel under MENUBAR.SELX. A bar that is only a bar
-.leaves both off and arrows across the grain do nothing. MENUVERT's
-.MENUHELP.KEYEXIT is the other half of that handshake.
+.The program must have a #SYMFILE, placed before the #INCLUDEs. The assembly
+.reaches BASIC's variables through {VAR}, and BASLOAD crunches every name
+.before the compiler sees it; without the mapping the compile stops with NO
+.SYMBOL FILE FOR {}.
 .
-.Flags, added together: MENUBAR.MUSTSEL MENUBAR.KEEPMARK MENUBAR.NOWRAP
-.MENUBAR.GAMEPAD MENUBAR.DOWNEXIT MENUBAR.UPEXIT.
+.Example: ARRAYS.EXP.BL. Regression test: SORT.EXP.BL, eight cases including
+.a 200-element array -- element 128 is where the doubled index stops fitting
+.in a byte. Every case checks content as well as order: a sort that reads the
+.wrong element leaves the array in order with a string duplicated.
+.
+=EXAMPLE PROGRAM
+.
+.  ARRAYS.EXP.BL -- runnable, in the GPC-BASIC folder
+.  SORT.EXP.BL -- runnable, in the GPC-BASIC folder
 .
 =SEE ALSO
 .
->58|4.9 MENUBAR.INC.BL -- a horizontal menu
->53|4.6 MENUVERT.INC.BL -- a vertical menu
+>68|4.7 SORT.INC.BL -- shell sort a string array

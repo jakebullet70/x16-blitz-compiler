@@ -1,28 +1,80 @@
-@3.9 Inline assembly (2)
-=What is not there
+@3.9 Inline assembly
 .
-.No expressions: {N%}+1 and LABEL+2 are not understood. Use an index
-.register.
+=3.9 INLINE ASSEMBLY
 .
-.Zero page or absolute is decided by the operand. $34 is zero page, $0034 is
-.absolute, and a decimal under 256 is zero page. Every 65C02 addressing mode
-.is available, including the two the NMOS 6502 lacks -- LDA ($34) and JMP
-.($1234,X) -- except BBR, BBS, RMB and SMB.
-.
-.Registers come back through GP.A / GP.X / GP.Y / GP.C as they do from
-.GP.CALL; a block uses the same $030C-$030F slots. Those four are GP block
-.keywords, so reading one pulls in the 1 KB block that GP.ASM alone avoids.
-.{VAR} does not.
-.
-.A body can come from a file. #INCLUDE splices it in verbatim, and BASLOAD's
-.REM #nn-mm attribution makes an error inside it name the file:
+=SYNTAX
 .
 :#REM 1
 :GP.ASM
-:#INCLUDE "MACPTR.ASM"
+:REM <instruction>
+:...
 :GP.ENDASM
 :#REM 0
 .
-=EXAMPLE PROGRAM
+=WHAT IT COSTS
 .
-.  ASM.EXP.BL -- runnable, in the GPC-BASIC folder
+.  COMPOSITE: GP.ASM GP.ENDASM
+.    COMPOSITE -- a keyword with no machine code of its own. The compiler
+.    expands it into keywords that already exist, so it costs the runtime
+.    nothing at all.
+.
+=DESCRIPTION
+.
+.65C02 assembly, assembled by GPC at compile time, with the bytes placed in
+.the program.
+.
+.The alternative is to assemble by hand: work out the opcode for each
+.instruction, POKE the numbers into memory nothing else is using, and point
+.GP.CALL at that address. These two do the same thing -- increment A, then X,
+.then Y:
+.
+:## by hand: 26, 232 and 200 ARE inc a / inx / iny, and ML has to be somewher
+:POKE ML+0,26 : POKE ML+1,232 : POKE ML+2,200 : GP.CALL ML,10,20,30
+.
+:## assembled: the bytes land in the program, and there is no address to find
+:#REM 1
+:GP.ASM
+:REM inc a
+:REM inx
+:REM iny
+:GP.ENDASM
+:#REM 0
+.
+.It costs no runtime bytes. A block is five bytes of p-code plus the
+.assembled instructions, and every handler it uses is already in every
+.compiled program. A program whose only GP.BASIC keyword is GP.ASM compiles
+.GP-BASIC OUT, without the 1 KB block: measured RT 12031, the same as a
+.program using no GP keyword.
+.
+=#REM 1 is required
+.
+.The body rides in REM statements because BASLOAD stores REM text byte for
+.byte. Outside a REM, ORA, AND, EOR and ROR are BASIC keywords and the text
+.is destroyed; inside one it arrives intact, braces included. Lower case is
+.accepted and upshifted.
+.
+.#REM 0 is BASLOAD's default and strips the body before the compiler runs.
+.GP.ASM and GP.ENDASM are real keywords rather than REMs so that the block is
+.still found, empty, and GPC reports BLOCK MISMATCH rather than compiling a
+.program that contains no code. Set #REM 0 again after GP.ENDASM.
+.
+=Labels and branches
+.
+.A label is name:, alone on a line or in front of an instruction; six
+.characters are significant. Labels belong to their block -- the same name in
+.two blocks is two different labels, and neither can branch to the other.
+.
+:#REM 1
+:GP.ASM
+:REM ldx #5
+:REM loop: lda #42
+:REM jsr $ffd2
+:REM dex
+:REM bne loop
+:GP.ENDASM
+:#REM 0
+.
+.BNE, BEQ, BRA and the rest take a label, as do JMP and JSR. A branch further
+.than 127 bytes is OUT OF RANGE at compile time, reported on its own line,
+.rather than a wrong address at run time.
+.

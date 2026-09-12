@@ -1,20 +1,36 @@
-@3.11.2 GP.SUB -- call a verb
+@3.11.1 GP.DEFPROC -- declare a verb and its arguments
 .
-=3.11.2 GP.SUB
+=3.11.1 GP.DEFPROC
 .
-.  Syntax    GP.SUB verb [, expression ...]
-.  Does      Assigns each expression to the matching formal, in order,
-.            then calls the routine.
-.  Kind      COMPOSITE. Expands to an assignment per formal and a
-.            GOSUB.
-.  Notes     The count and the types must match the declaration.
-.            A call into a GP.BANKED region works, and so does a call
-.            out of one. The address is corrected in both directions.
-.  WARNING   The call must sit below its GP.DEFPROC. It carries an
-.            address and not a line number, so a forward call is
-.            refused rather than compiled.
+.  Syntax    GP.DEFPROC verb [, formal ...] [RETURNS variable]
+.  Does      Names the routine that follows it, the variables a caller
+.            fills in, and the one its result comes back in. Emits no
+.            code.
+.  Kind      COMPOSITE. Records a position, a formal list and a result
+.            variable at compile time.
+.  Notes     The routine starts at the next statement, on the same
+.            line or on the line below. GOSUB to its label still
+.            works.
+.            A verb is a bare name: no $, no %, no subscript. Verbs
+.            are their own namespace, so a verb and a variable may
+.            share a name. One verb costs one variable record.
+.            A formal is a plain scalar variable, numeric or string.
+.            Up to 12 of them.
+.            RETURNS names a plain scalar variable too, and it is what
+.            GP.FN reads after the call. Its type is the type of the
+.            call. Without it the verb is GP.SUB-only.
+.  WARNING   An array or an array element cannot be a formal, and it
+.            cannot be the RETURNS variable either. A module whose
+.            arguments are array elements takes the verb and no
+.            formals, and its caller sets the array first.
 .  Example
 .
-:            GP.SUB DBSELECT, 1
-:            GP.SUB DBFIND, PRICE, "ACME", TRUE
-:            GP.SUB DBWRITE
+:            DB.SELECT:
+:              GP.DEFPROC DBSELECT, DB.A : BANK DB.CODEBANK
+:              GOSUB DB.SELECT.BODY
+:              RETURN
+:
+:            AREA:
+:              GP.DEFPROC AREA, A.W, A.H RETURNS A.R
+:              A.R = A.W * A.H
+:              RETURN

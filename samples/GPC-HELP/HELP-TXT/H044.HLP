@@ -1,109 +1,52 @@
-@4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
+@4.9 MENUBAR.INC.BL -- a horizontal menu
 .
-=4.11 GUI.INC.BL -- FOUR DIALOGS, IN A BOX THAT PUTS THE SCREEN BACK
-.
-=WHAT IT COSTS
-.
-.  ASM: GP.BOX GP.FILL GP.PRINTAT
-.    ASM -- a keyword, run by machine code in the GP runtime block. A program
-.    using ANY GP keyword pays for the whole block.
-.  COMPOSITE: GP.CHAR GP.PRINTAT GP.FILL
-.    COMPOSITE -- a keyword with no machine code of its own. The compiler
-.    expands it into keywords that already exist, so it costs the runtime
-.    nothing at all.
-.    BASIC -- a .INC.BL module of ordinary BASL, called with GOSUB. Costs
-.    nothing unless you #INCLUDE it.
+=4.9 MENUBAR.INC.BL -- A HORIZONTAL MENU
 .
 =DESCRIPTION
 .
-.  GUI.SAY
-.      IN: GUI.MSG$
-.      OUT: GUI.KEY -- something to say, and one way out
+.  MENUBAR.RUN
+.      IN: MENUBAR.X MENUBAR.Y MENUBAR.GAP MENUBAR.FLAGS MENUBAR.SEL, and
+.        MENUVERT.COUNT MENUVERT.ITEM$() MENUVERT.ATTR MENUVERT.HIATTR
+.        MENUVERT.HOT$ MENUVERT.HOTATTR
+.      OUT: MENUBAR.SEL MENUBAR.KEY MENUBAR.SELX MENUBAR.SELW
 .
-.  GUI.YN
-.      IN: GUI.MSG$
-.      OUT: GUI.ANSWER, -1 for yes
+.  MENUBAR.DRAW
+.      IN: the same
+.      OUT: the bar on screen, undriven
 .
-.  GUI.MENU
-.      IN: GUI.COUNT GUI.SEL GUI.FLAGS, over MENUVERT.ITEM$()
-.      OUT: GUI.SEL, or 0 if cancelled
+.  MENUBAR.ITEM
+.      IN: MENUBAR.FIND and an attribute
+.      OUT: one item, repainted
 .
-.  GUI.INPUT
-.      IN: GUI.LEN GUI.TEXT$ GUI.MASK
-.      OUT: GUI.TEXT$ GUI.OK
+.  MENUBAR.MARK
+.      IN: MENUBAR.FIND
+.      OUT: that item highlighted
 .
-.  GUI.OPEN
-.      IN: GUI.BODY.ROWS GUI.BODY.WIDTH
-.      OUT: GUI.INNER.LEFT .TOP .WIDTH -- the box on its own, for a dialog of
-.        your own
+.  MENUBAR.WHERE
+.      IN: MENUBAR.FIND
+.      OUT: MENUBAR.AT MENUBAR.WIDE
 .
-.  GUI.CLOSE
-.      IN: --
-.      OUT: the screen as it was
+.MENUVERT is the vertical menu; this is the other axis. It reads MENUVERT's
+.items, attributes and hotkeys rather than defining its own, because a bar
+.and the dropdown under it are one thing to the user -- so it does not build
+.without MENUVERT.INC.BL, and the caller refills MENUVERT.ITEM$() between
+.drawing the bar and opening the menu.
 .
-:THEME.ID = 0 : GOSUB THEME.SELECT
-:GUI.BANK = 8
-:GUI.MSG$ = "DELETE THE FILE?"
-:GOSUB GUI.YN
-:IF GUI.ANSWER THEN <yes>
+.An item is as wide as its own text. There is no MENUBAR.WIDTH and no column
+.width; the air goes in the item string, so " FILE " is how a highlight gets
+.padding. MENUBAR.GAP is the space between two items and defaults to 0 for
+.the same reason.
 .
-.Requires GPB.INC.BL, STASH.INC.BL, THEME.INC.BL, MENUVERT.INC.BL and
-.LINEINPUT.INC.BL, and #INCLUDEs none of them. All five, whichever dialog you
-.call -- BASLOAD resolves every label in the file, so leaving one out is
-.LABEL NOT FOUND. It wants a #SYMFILE, because STASH does.
+.Up and down are optional exits, off by default. MENUBAR.DOWNEXIT ends the
+.bar on DOWN and MENUBAR.UPEXIT on UP, handing the key back in MENUBAR.KEY so
+.the caller can open the panel under MENUBAR.SELX. A bar that is only a bar
+.leaves both off and arrows across the grain do nothing. MENUVERT's
+.MENUHELP.KEYEXIT is the other half of that handshake.
 .
-.Everything the box takes -- three message lines, a title, the style, the
-.placement, the shadow, the frame glyphs, the bank the covered cells go to --
-.is listed in full in GP-BASIC.GLOBALS.md SEC 3. GUI.BANK = 0 does not save
-.the cells, and then the box is still on screen when the call returns.
-.
-.Every control has a focus, and TAB moves it. The dialogs no longer own their
-.key loops: each states its controls and GUI.FORM runs them. A control is a
-.button, a field or a list; it hands back one of six verdicts -- stay, next,
-.previous, press, default, cancel -- and the dispatcher stays one loop
-.whatever the mix. A caller that never presses TAB sees what it always saw.
-.
-.The default button and the focused control are different things. The default
-.is what RETURN presses from anywhere and is drawn <<LIKE THIS>>; the focus
-.is where TAB has got to and is drawn in THEME.FOCUS. GUI.INPUT opens with
-.the default on OK and the focus in the field -- which is the point of
-.keeping the two apart, and GUI.DEFAULT sets only the first.
-.
-.The answers are buttons. GUI.BTN.ONE$ and GUI.BTN.TWO$ carry them, and &
-.marks the accelerator: "&CANCEL" lights the C. An accelerator is live only
-.while the focused control does not eat printable keys, so C presses CANCEL
-.from the button row or from inside a list, and types a C in a field. That is
-.the whole rule, and GUIFRMT's T14, T15 and T22 are the three assertions that
-.hold it.
-.
-.GUI.HINT$ is gone -- the dimmed line naming two keys became the button row,
-.and it is the one interface this took away.
-.
-.The typing dialog and its string swapped names: it was GUI.TEXT returning
-.GUI.INPUT$, and it is GUI.INPUT returning GUI.TEXT$. BASLOAD will not have a
-.label and a variable of one name and the $ does not separate them. A program
-.written against the older library compiles clean and reads the wrong one
-.back.
-.
-.Upper case, on the default charset. GP.PRINTAT converts PETSCII and BASLOAD
-.passes literals through as source bytes, so charset 2 lands lower case on
-.the graphics half of the font. ISO mode fixes the text and breaks the frame,
-.GP.BOX's $40-$7D being letters. Upper case with a frame, mixed case without
-.one, or re-order the font and set GUI.GLYPH.
-.
-.Example: GUI.EXP.BL. Regression test: samples/GPB-MODS-TESTING/GUIFRMT.BASL,
-.twenty-four assertions driven by keys pushed into the KERNAL buffer -- the
-.only way to drive a GET loop headlessly.
-.
-=EXAMPLE PROGRAM
-.
-.  GUI.EXP.BL -- runnable, in the GPC-BASIC folder
+.Flags, added together: MENUBAR.MUSTSEL MENUBAR.KEEPMARK MENUBAR.NOWRAP
+.MENUBAR.GAMEPAD MENUBAR.DOWNEXIT MENUBAR.UPEXIT.
 .
 =SEE ALSO
 .
->15|3. Command reference
->60|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
->62|STASH.INC.BL -- save a text rectangle, and put it back.
->47|4.1 THEME.INC.BL -- named colour roles
->53|4.6 MENUVERT.INC.BL -- a vertical menu
->51|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>70|4.9 MENUBAR.INC.BL -- a horizontal menu
+>65|4.6 MENUVERT.INC.BL -- a vertical menu

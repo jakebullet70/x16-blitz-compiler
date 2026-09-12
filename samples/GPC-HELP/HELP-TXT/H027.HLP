@@ -1,61 +1,90 @@
-@3.11 Calling a routine in one statement
+@3.10 Text in a bank
 .
-=3.11 CALLING A ROUTINE IN ONE STATEMENT
+=3.10 TEXT IN A BANK
+.
+=SYNTAX
+.
+:GP.BANKEDSTR <bank> <NAME>
+:  "first"
+:  "second"
+:GP.ENDBANKEDSTR
+:
+:  A$ = GP.BSTR(<NAME>, n)
+:  N  = GP.BSTRCOUNT(<NAME>)
 .
 =DESCRIPTION
 .
-.Three keywords. GP.DEFPROC names a GOSUB target and the variables its
-.callers fill in, GP.SUB fills them and calls it in one statement, and GP.FN
-.does the same from inside an expression and gives back a value.
+.Moves a program's literal text out of low RAM and into a RAM bank, at
+.compile time. A string constant costs 2 + LEN bytes of p-code wherever it
+.appears; GP.BSTR(NAME, n) costs 5, so text of four characters or more is
+.cheaper read from the bank than written in the line. Over half of a
+.menu-driven program's own code is usually literal text, and text is the one
+.thing in a program with no reason to be resident: it is never executed,
+.never indexed, and read one item at a time.
 .
-:    DB.A = 1 : GOSUB DB.SELECT
+.The body is bare quoted lines. One string a line, nothing else on the line,
+.and they pass through byte for byte -- case, leading spaces and trailing
+.spaces included. They are not REM lines and must not be: BASLOAD upper-cases
+.REM text.
+.
+.Blocks are named, and you may write as many as you like. Each is indexed
+.from zero within itself, so inserting a line in one group moves nothing
+.outside it. All the groups in a program share one bank, which is why every
+.block names the same one -- written on each block rather than only the first
+.so a block can be read where it sits.
+.
+.The name costs nothing at run time. It is resolved while the program
+.compiles, into the group's first index, and the compiler adds that to your
+.index for you. No letter of the name reaches the object, which is the whole
+.reason the lookup is not in the bank.
+.
+.GP.BSTRCOUNT(NAME) is a composite: it compiles to a plain number, so FOR I =
+.0 TO GP.BSTRCOUNT(MENU.FILE) - 1 costs no more than writing the count out.
+.
+:#DEFINE GM.TEXTBANK 5
 :
-:    GP.SUB DBSELECT, 1
+:GP.BANKEDSTR GM.TEXTBANK MENU.FILE
+:  " OPEN "
+:  " SAVE "
+:  " QUIT "
+:GP.ENDBANKEDSTR
+:
+:GP.BANKEDSTR GM.TEXTBANK MENU.EDIT
+:  " CUT "
+:  " PASTE "
+:GP.ENDBANKEDSTR
+:
+:  FOR I = 0 TO GP.BSTRCOUNT(MENU.EDIT) - 1
+:    PRINT GP.BSTR(MENU.EDIT, I)
+:  NEXT I
 .
-.The two lines compile to the same p-code: an assignment per formal, then the
-.call. A call site costs what the long spelling costs. A declaration on a
-.line of its own costs one byte, the line marker every source line emits.
-.Folded onto the routine's own first statement it costs nothing. A bare label
-.is not a line, so folding onto one costs the byte anyway.
+.Claim the bank, exactly as a GP.BANKED code region's bank is claimed. The
+.compiler picks it while the object is written, so BANKMGR has to be told
+.rather than asked:
 .
-.GP.DEFPROC and GP.SUB have no machine code of their own, so a program whose
-.only GP.BASIC keywords are those two stays GP OUT and carries none of the GP
-.block. GP.FN has two runtime opcodes and brings the block in.
+:BANKMGR.WANT = GM.TEXTBANK : GOSUB BANKMGR.CLAIM
 .
-=IN THIS SECTION
+.Compile SHARED. The text is copied into its bank by the program's bootstrap,
+.and an embedded program has none -- the same rule GP.BANKED works to. An
+.embedded build is refused rather than compiled into a program that reads an
+.empty bank.
 .
->42|3.11.1 GP.DEFPROC -- declare a verb and its arguments
->43|3.11.2 GP.SUB -- call a verb
->44|3.11.3 GP.FN -- call a verb from inside an expression
+.A group name is not a variable. No $, no %, no ( -- any of those is a syntax
+.error rather than something quietly ignored. A name that no block declared
+.is a syntax error at the line that used it, and so is a second block
+.claiming a name already taken. An empty block is refused too: a group of no
+.strings would make GP.BSTRCOUNT zero and every GP.BSTR on it read the next
+.group's text.
 .
-=The formals are ordinary variables
+.There is no run-time bounds check. The compiler knows every index it emits
+.and nothing a program does can produce one out of range, so an index past
+.the end of a group reads whatever follows it. That is the same bargain the
+.array fast path makes.
 .
-.A verb's formals and its RETURNS variable are plain variables in the
-.program's one variable list. Every call writes the same ones, and the body
-.can read and write them like any other. That is what makes the call cost
-.nothing, and it is also the whole of the rule about nesting:
+.One bank of text a program, up to 8 KB of it, up to 128 groups. GP.BSTR is
+.an ordinary GP keyword, so it pulls in the 1 KB GP block; the two block
+.keywords do not, and neither does GP.BSTRCOUNT.
 .
-.  - A verb may appear inside its own argument list. GP.FN(AREA, 2,
-.    GP.FN(AREA, 3, 4)) is correct, because a call list is evaluated in full
-.    before any of it is stored into a formal. The inner call runs and
-.    finishes before the outer writes A.W. The values wait on the 4K frame
-.    stack while the rest of the list is read, so neither the number of
-.    arguments nor the depth of any one of them is a limit.
-.  - A verb's body may not call the verb. There is one set of formals, so a
-.    routine that calls itself -- directly, or round through another verb --
-.    writes over the arguments it is still using. Nothing detects this: it
-.    compiles, both passes agree, and the answer is wrong.
+.Reading it from inside a GP.BANKED region works: the handler puts the
+.caller's bank back before it returns.
 .
-.The refusals, all at compile time:
-.
-:    GP.DEFPROC VERB IS NOT A PLAIN NAME     a $, % or subscript on the verb
-:    GP.DEFPROC VERB ALREADY DECLARED        a second declaration of that ver
-:    GP.DEFPROC FORMAL IS NOT A VARIABLE     an array, or something that is n
-:    GP.DEFPROC RETURNS IS NOT A VARIABLE    an array element or a literal af
-:    TOO MANY GP.DEFPROC FORMALS             a thirteenth formal
-:    GP.SUB BEFORE ITS GP.DEFPROC            the call sits above the declarat
-:    GP.SUB DOES NOT MATCH ITS GP.DEFPROC    the wrong number of arguments
-:    GP.FN BEFORE ITS GP.DEFPROC             the call sits above the declarat
-:    GP.FN NEEDS A VERB DECLARED RETURNS     the verb has no result variable
-:    ARGUMENTS DO NOT MATCH THE GP.DEFPROC   the wrong number of arguments
-:    TYPE MISMATCH                           a string for a number, or a numb

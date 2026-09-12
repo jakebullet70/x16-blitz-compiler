@@ -1,0 +1,99 @@
+@4. Labels are global too
+.
+=4. LABELS ARE GLOBAL TOO
+.
+.Every NAME: in every module is a jump target in one flat space, including
+.the ones you were never meant to call. BMX.STREAM.MORE, LINEINPUT.REDRAW,
+.THEME.SELECT.DARK and most of MENUVERT.* are internal, and a GOSUB to one
+.will do something, just not something useful.
+.
+.MENUVERT is the module with the most of them, because driving a menu is
+.mostly branching: MENUVERT.RUN, MENUVERT.DRAW and MENUVERT.ROW are the three
+.you may call, and MENUVERT.HOTFIND is a fourth only in an unbanked build --
+.see the .BODY note below. MENUVERT.WAIT, .KEYED, .SETTLE, .WRAPTOP,
+..WRAPBOT, .CANCEL, .HOTKEY, .PADKEY, .PADREAD and the three FOLD helpers are
+.not.
+.
+.FILE.* has a great many, because most of the module is one routine feeding
+.another: the callable names are FILE.STATUS, EXISTS, DELETE, RENAME, COPY,
+.MKDIR, CHDIR, UP, GETPATH, SAVEARRAY and LOADARRAY, plus FILE.DIR.INIT,
+..OPEN and .NEXT. FILE.CMD, .DONE, .PETNAME, .PETNEW, .TOPET, .PATHWALK,
+..WRITEROWS, .READROWS, .ROWREAL, .ROWDROP, .KEEPROW, FILE.DIR.WHERE,
+..LOWRAM, .ASKFOR, .SUCK, .SKIPDISK, .FILL and .STEP are not. FILE.DIR.FILL
+.and FILE.DIR.STEP are the two assembly blobs and enter with no arguments set
+.up at all.
+.
+.STRINGS has three of its own. STR.SPLIT.NEXT and STR.REPLACE.NEXT are loop
+.continuations rather than entry points: enter either directly and you resume
+.a loop whose accumulators were never initialised. STR.TRIM.GO is the shared
+.body of the three trims and runs with whatever STR.OP% last held. The
+.callable names are STR.PADR, PADL, PADC, SPLIT, REPLACE, PET2SCR, TRIM,
+.LTRIM, RTRIM and SPLICE.
+.
+.GUI.INC.BL has more internal labels than anything else in the library,
+.because GUI.FORM is a dispatcher and every arm of it is one. The callable
+.names are GUI.SAY, GUI.YN, GUI.MENU, GUI.INPUT, GUI.OPEN and GUI.CLOSE, plus
+.GUI.LISTBOX from GUI2.INC.BL. GUI.FORM and GUI.CLEARKB are usable and
+.undocumented -- they are the module's own, called from inside the bank and
+.not shimmed. Everything else, the whole of GUI.FORM., GUI.BUTTON, GUI.BTN.,
+.GUI.LIST., GUI.FIELD.DRAW, GUI.FRAME, GUI.GLYPHS, GUI.SHADOW.*, GUI.SIZE,
+.GUI.PLACE.BOX, GUI.PLACE.SCROLL and GUI.SCREEN, is not.
+.
+.MENUBAR mirrors MENUVERT exactly: MENUBAR.RUN, MENUBAR.DRAW, MENUBAR.ITEM,
+.MENUBAR.MARK and MENUBAR.WHERE are the five you may call. MENUBAR.WAIT,
+..KEYED, .SETTLE, .SETTLE.GO, .WRAPLEFT, .WRAPRIGHT, .CANCEL, .CHOSE,
+..HOTKEY, .HOTDONE, .PADKEY, .PADRELEASE, .PADREAD and .COLUMN are not.
+.
+=A public name and its .BODY are two labels
+.
+.The six modules the GUI is built from -- THEME, MENUVERT, MENUBAR,
+.LINEINPUT, GUI, GUI2 -- come in two files, and which one you #INCLUDE
+.decides where the module runs. A banked routine cannot select its own bank,
+.so in the banked file the code has to be a label of its own and the public
+.name has to be a label in low memory that banks and then calls it.
+.
+.  the library in low memory
+.      THEME.INC.BL defines THEME.SELECT itself. Nothing else is needed, and
+.        a call costs nothing
+.
+.  the library in a bank
+.      THEME.BANK.INC.BL defines THEME.SELECT.BODY, and SHIM.GUIBANK.INC.BL
+.        -- twenty-one shims, each PUSH then GOSUB then POP -- defines the
+.        twenty-one public names
+.
+.One or the other, never both, and a banked build has to include every module
+.its shim file names: BASLOAD resolves every label in every file it reads, so
+.a shim standing in front of a body that is not there is LABEL NOT FOUND.
+.Both files of one module at once is DUPLICATE SYMBOL where the module has no
+.#IFNDEF guard and a silent first-one-wins where it has. BANKED-OR-NOT.md
+.says how to choose.
+.
+.The shims go before the bodies in the file. A caller reads identically
+.either way, which is the point of the split.
+.
+.Only eighteen names are shimmed, and a name that is not shimmed is not
+.callable from outside the bank. THEME.NEXT, THEME.RESET, THEME.SET,
+.THEME.HI, MENUVERT.HOTFIND, GUI.FORM and GUI.CLEARKB keep their plain names
+.and no .BODY, so in an unbanked build they are ordinary labels you can GOSUB
+.-- and in a banked one they sit inside the region with everything else,
+.where only the module itself can reach them. Nothing warns you: the GOSUB
+.compiles and jumps into whatever the bank happens to hold. MENUVERT.HOTFIND
+.is the one this catches, because SEC 4 has always listed it as callable and
+.it was, before the split.
+.
+.Each module also has a skip label it jumps over itself with -- THEME.SKIP,
+.APPSYS.SKIP, STR.SKIP, BMX.MODULE.END, LINEINPUT.MODULE.END,
+.MENUVERT.MODULE.END, MENUBAR.MODULE.END, GUI.MODULE.END,
+.GUI.LISTBOX.MODULE.END, STASH.MODULE.END, STASHFILE.MODULE.END,
+.SORT.MODULE.END and STRCASE.MODULE.END. Those exist so an include can sit
+.anywhere in the file, the top included. Do not branch to one.
+.
+.BASLOAD refuses a name used as both a label and a variable (BASLOAD.MD:319).
+.BMX.SKIP is the byte-skip counter, so the module's skip label had to be
+.BMX.MODULE.END -- a name is either a label or a variable, never both.
+.
+=SEE ALSO
+.
+>72|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
+>73|4.12 GUI2.INC.BL -- a listbox, single or multi select
+>59|4.1 THEME.INC.BL -- named colour roles

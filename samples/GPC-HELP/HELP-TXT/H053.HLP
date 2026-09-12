@@ -1,89 +1,75 @@
-@3. The modules (3)
-=FILEDIR.INC.BL
+@4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
 .
-.Needs FILEIO.INC.BL, and a #SYMFILE -- it is two GP.ASM blobs.
+=4.18 STASHVRAM.INC.BL -- RECTANGLES AND BLOBS, KEPT IN VRAM
 .
-.It executes no BANK statement, which is what lets it live in a GP.BANKED
-.region: the two blobs take the data bank at entry and put the caller's back
-.at every exit, so no BASIC line here ever runs with a foreign bank selected.
-.FILE.DIR.BNK% carries the bank number to the assembly -- {FILE.DIR.BANK}
-.would read a float's mantissa, and FILE.DIR.WAS% is the blobs' save slot.
+=DESCRIPTION
 .
-.  in
-.      FILE.DIR.BANK -- the bank to read into, or 0 for low
-.        RAM<br>FILE.DIR.PTR FILE.DIR.CAP -- the low-RAM buffer, when BANK is
-.        0<br>FILE.DIR.PATTERN$ -- a name pattern, or empty<br>FILE.DIR.ONLY
-.        -- FILE.DIR.ALL, .FILES or .DIRS
+.  SV.INIT
+.      IN: SV.BASE SV.TOP SV.MAX
+.      OUT: SV.OK
 .
-.  out
-.      FILE.DIR.GOT -- bytes read<br>FILE.DIR.FULL -- the buffer filled
-.        before the listing ended<br>FILE.DIR.MORE -- -1 while NEXT produced
-.        an entry<br>FILE.NAME$ FILE.BLOCKS FILE.TYPE$ -- the entry itself
+.  SV.SAVE
+.      IN: SV.X SV.Y SV.W SV.H
+.      OUT: SV.HND SV.OK
 .
-.  internal
-.      FILE.DIR.AT FILE.DIR.ASK$ FILE.DIR.ADDR% FILE.DIR.ROOM% FILE.DIR.OFF%
-.        FILE.DIR.BYTES% FILE.DIR.CNT% FILE.DIR.BLK% FILE.DIR.OK%
-.        FILE.DIR.SLOW% FILE.DIR.LFN% FILE.DIR.NAMEA% FILE.DIR.TYPEA%
-.        FILE.DIR.WAS% FILE.DIR.BNK%
+.  SV.RESTORE
+.      IN: SV.HND SV.MOVE SV.X SV.Y
+.      OUT: SV.OK
 .
-.  constants
-.      FILE.DIR.ALL FILE.DIR.FILES FILE.DIR.DIRS FILE.DIR.NAMEMAX
-.        FILE.DIR.BANKROOM FILE.DIR.BANKBASE
+.  SV.PUT
+.      IN: SV.ADDR SV.LEN
+.      OUT: SV.HND SV.OK
 .
-.FILE.DIR.INIT must run once before anything else: it sizes FILE.NAME$ and
-.FILE.TYPE$ for the assembly to write into, and creates every {VAR} slot. Do
-.not assign FILE.NAME$ or FILE.TYPE$ afterwards -- an assignment reallocates
-.and the block the assembly holds goes stale.
+.  SV.GET
+.      IN: SV.HND SV.ADDR
+.      OUT: SV.OK
 .
-.FILE.NAME$ is shared with FILEIO on purpose: the name a picker chose is the
-.name FILE.EXISTS and FILE.DELETE want.
+.  SV.FREE
+.      IN: SV.HND
+.      OUT: SV.OK
 .
-=STASHVRAM.INC.BL
+.  SV.RESET
+.      IN: --
+.      OUT: SV.OK
 .
-.Needs GPB.INC.BL, and no #SYMFILE -- there is no GP.ASM in it. The cells
-.never leave VRAM: one data port reads, the other writes, and memory_copy
-.moves between them without stepping either.
+:#INCLUDE "STASHVRAM.INC.BL"
+:
+:SV.MAX = 16 : DIM SV.PAGE%(16), SV.PAGES%(16)
+:GOSUB SV.INIT
+:SV.X = 10 : SV.Y = 5 : SV.W = 40 : SV.H = 12 : GOSUB SV.SAVE
+:IF SV.HND = 0 THEN <it did not fit>
+:' ... draw over it ...
+:GOSUB SV.RESTORE
 .
-.It executes no BANK, so it can live in a GP.BANKED region -- measured,
-.work/stashvram/SVB.BASL. That is the difference from STASH.INC.BL, which
-.cannot.
+.No GP.ASM, and so no #SYMFILE. The cells never leave VRAM: one data port
+.reads, the other writes, and the KERNAL's memory_copy moves between them
+.without stepping either. That is what STASH.INC.BL cannot do, and the reason
+.to reach for this one. It also executes no BANK, so unlike STASH it may live
+.inside a GP.BANKED region.
 .
-.  in
-.      SV.BASE SV.TOP -- the VRAM window in bytes. Default
-.        $04000/$1AFFF<br>SV.MAX -- how many handles. The caller DIMs
-.        SV.PAGE% and SV.PAGES% to it<br>SV.X SV.Y SV.W SV.H -- the
-.        rectangle, for SV.SAVE<br>SV.MOVE -- non-zero restores at SV.X SV.Y
-.        rather than where it came from<br>SV.ADDR SV.LEN -- low RAM address
-.        and count, for SV.PUT and SV.GET<br>SV.HND -- the handle, for
-.        RESTORE, GET and FREE
+.SV.BASE and SV.TOP are the VRAM window in bytes, rounded in to whole
+.256-byte pages, and default to $04000 and $1AFFF. The caller DIMs the two
+.arrays to SV.MAX. SV.MOVE works as STASH.MOVE does: SV.RESTORE puts the
+.rectangle back where it came from when 0, at SV.X SV.Y when not. SV.HND is 1
+.to SV.MAX, or 0 if it did not fit. SV.ERROR$ says why when something is
+.refused, and is "" otherwise.
 .
-.  out
-.      SV.HND -- 1..SV.MAX, or 0 if it did not fit<br>SV.OK -- -1 done, 0
-.        refused<br>SV.ERROR$ -- why, when something is refused<br>SV.MOVED
-.        -- SV.COMPACT only: how many blocks moved
+.Allocation is a bump pointer on 256-byte pages, released LIFO. Panels nest
+.and close in reverse and a log is append-only, so a hole only appears if a
+.caller frees out of order -- and then STASHVRAMGC.INC.BL (SEC 4.19) closes
+.it. Pages rather than bytes are what let a handle's address live in an
+.ordinary %: a page number reaches 511 where a 17-bit VRAM address would not.
 .
-.  arrays
-.      SV.PAGE%() SV.PAGES%() -- the handle table, DIMmed by the caller
+.There is one allocator and it is this one. SV.BASE and SV.TOP are the
+.caller's contract, checked only against the layer 1 map and the charset.
+.BMX.STASH defaults to $13000, inside the default window -- a program using
+.both must move one of them.
 .
-.  internal
-.      SV.READY SV.NEXT SV.BASEPG SV.TOPPG SV.I SV.PG SV.NP SV.N SV.BYTES
-.        SV.MAPW SV.MAPBASE SV.STRIDE SV.ROW SV.CELL SV.SRC SV.DST SV.VA
-.        SV.ADR SV.BNK SV.REST SV.MID SV.LO SV.MODE SV.RX SV.RY<br>SV.COMPACT
-.        adds SV.PICK SV.BEST SV.J SV.TO SV.GCS SV.GCD SV.LEFT SV.CH
+.A screen-mode change re-uploads the charset and can re-lay the map. Held
+.handles do not survive it; call SV.RESET after one.
 .
-.  constants
-.      SV.VLO SV.VMID SV.VHI SV.DATA SV.VCTRL SV.LCONFIG SV.LMAPBASE
-.        SV.PORTLO SV.PORTLO.B SV.PORTHI SV.MEMCOPY SV.UP SV.HEADER
-.        SVGC.CHUNK
+=SEE ALSO
 .
-.SV.INIT must run once before anything else, and the two arrays must be
-.DIMmed before it.
-.
-.Blocks are whole 256-byte pages, which is what lets a handle's address live
-.in an ordinary %: a page number reaches 511 where a VRAM address is 17 bits
-.and would not.
-.
-.WARNING: BMX.STASH defaults to $13000, inside the default window. A program
-.using both must move one of them. There is one allocator and no collision
-.check.
-.
+>80|4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store
+>79|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+>86|STASH.INC.BL -- save a text rectangle, and put it back.

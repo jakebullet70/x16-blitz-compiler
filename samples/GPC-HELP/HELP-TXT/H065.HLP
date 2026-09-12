@@ -1,0 +1,86 @@
+@3. The modules (4)
+=MENUVERT.INC.BL
+.
+.  in
+.      MENUVERT.X MENUVERT.Y -- top left of the first row<br>MENUVERT.WIDTH
+.        -- cells wide, which is the width of the highlight<br>MENUVERT.COUNT
+.        -- how many rows<br>MENUVERT.ITEM$() -- the rows, 1..COUNT; the
+.        caller owns the DIM<br>MENUVERT.ATTR -- packed
+.        attribute<br>MENUVERT.HIATTR -- the highlighted row; 0 inverts
+.        MENUVERT.ATTR<br>MENUVERT.HOT$ -- one hotkey character a
+.        row<br>MENUVERT.HOTATTR -- tint for the hotkey letter; 0 is
+.        off<br>MENUVERT.FLAGS -- added together<br>MENUVERT.SEL -- the row
+.        to start on
+.
+.  out
+.      MENUVERT.SEL -- 1..COUNT, or 0 if cancelled<br>MENUVERT.KEY -- the key
+.        that ended it
+.
+.  internal
+.      MENUVERT.SCAN MENUVERT.EACH MENUVERT.DONE MENUVERT.CODE
+.        MENUVERT.INCHAR$ MENUVERT.PREVSEL MENUVERT.HIGHLIGHT
+.        MENUVERT.DRAWROW MENUVERT.DRAWATTR MENUVERT.DRAWTEXT$ MENUVERT.DRAWY
+.        MENUVERT.HOTCODE MENUVERT.HOTLAST MENUVERT.WANTCODE MENUVERT.HOTAT
+.        MENUVERT.HOTWANT MENUVERT.HOTHERE MENUVERT.HOTSCAN MENUVERT.PADNOW
+.        MENUVERT.PADNEW MENUVERT.PADHELD MENUVERT.PADRAW
+.
+.  constants
+.      MENUVERT.MUSTSEL MENUVERT.KEEPMARK MENUVERT.NOWRAP MENUVERT.GAMEPAD
+.        MENUVERT.UP MENUVERT.DOWN MENUVERT.ENTER MENUVERT.ESCAPE
+.        MENUVERT.STOP MENUVERT.SPACE MENUVERT.PORT MENUVERT.PAD.UP
+.        MENUVERT.PAD.DOWN MENUVERT.PAD.B MENUVERT.PAD.START
+.
+.MENUVERT.SEL is both an input and an output: the row to start on going in,
+.and the row chosen coming out, so a menu reopened without clearing it
+.reopens where it was. That is usually what you want; set it to 0 when it is
+.not.
+.
+.MENUVERT.DRAWROW, MENUVERT.DRAWATTR and MENUVERT.DRAWTEXT$ are listed
+.internal but are the documented arguments to MENUVERT.ROW, which is public:
+.they are internal to MENUVERT.RUN, not to you. MENUVERT.HOTFIND reads the
+.first two and answers in MENUVERT.HOTAT.
+.
+=MENUBAR.INC.BL
+.
+.  in
+.      MENUBAR.X MENUBAR.Y -- where the bar starts<br>MENUBAR.GAP -- cells
+.        BETWEEN items. 0 is the default, because the air belongs in the item
+.        text<br>MENUBAR.FLAGS -- added together<br>MENUBAR.SEL -- the item
+.        to start on; 0 starts at 1<br>and MENUVERT.COUNT, MENUVERT.ITEM$(),
+.        MENUVERT.ATTR, MENUVERT.HIATTR, MENUVERT.HOT$, MENUVERT.HOTATTR
+.
+.  out
+.      MENUBAR.SEL -- 1..COUNT, or 0 if cancelled<br>MENUBAR.KEY -- 13 chose,
+.        27 cancelled, 17 or 145 on a cross-axis exit, or the hotkey
+.        itself<br>MENUBAR.SELX MENUBAR.SELW -- the column the chosen item
+.        starts at and how wide it is, so a caller can drop a panel under
+.        it<br>MENUBAR.AT MENUBAR.WIDE -- the same two for whichever item
+.        MENUBAR.FIND named, from MENUBAR.WHERE
+.
+.  internal
+.      MENUBAR.CI MENUBAR.CODE MENUBAR.DRAWN MENUBAR.EACH MENUBAR.FIND
+.        MENUBAR.HC MENUBAR.HIT MENUBAR.HK MENUBAR.IN$ MENUBAR.PAD
+.        MENUBAR.PAINT MENUBAR.WANT MENUBAR.WAS
+.
+.  constants
+.      MENUBAR.MUSTSEL MENUBAR.KEEPMARK MENUBAR.NOWRAP MENUBAR.GAMEPAD
+.        MENUBAR.DOWNEXIT MENUBAR.UPEXIT MENUBAR.LEFT MENUBAR.RIGHT
+.        MENUBAR.UP MENUBAR.DOWN MENUBAR.ENTER MENUBAR.ESCAPE MENUBAR.STOP
+.        MENUBAR.PORT MENUBAR.PAD.LEFT MENUBAR.PAD.RIGHT MENUBAR.PAD.B
+.        MENUBAR.PAD.START
+.
+.It has no items array, no attributes and no hotkeys of its own -- it reads
+.MENUVERT's. A bar and a dropdown are one thing to the user, so the two
+.modules share the whole of that half of the interface, and the caller
+.refills MENUVERT.ITEM$() between drawing the bar and opening the menu under
+.it. Nothing else in the library reaches across a prefix like this, and
+.MENUBAR.INC.BL therefore does not build without MENUVERT.INC.BL.
+.
+.There is no MENUBAR.WIDTH. An item is as wide as its own text, which is the
+.difference from a vertical menu.
+.
+.MENUBAR.DOWNEXIT and MENUBAR.UPEXIT are the cross-axis exits: they end the
+.bar on a key rather than swallowing it, so the caller can open the dropdown
+.and hand control on. MENUVERT's MENUHELP.KEYEXIT is the other half of the
+.same handshake.
+.

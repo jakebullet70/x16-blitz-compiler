@@ -1,54 +1,47 @@
-@STASHFILE.INC.BL -- a saved text rectangle, through a file.
+@4.12 GUI2.INC.BL -- a listbox, single or multi select
 .
-=STASHFILE.INC.BL
+=4.12 GUI2.INC.BL -- A LISTBOX, SINGLE OR MULTI SELECT
 .
-.  a saved text rectangle, through a file.
+=DESCRIPTION
 .
-=MODULE HEADER
+.  GUI.LISTBOX
+.      IN: GUI.LISTBOX.COUNT .ROWS .MULTI .MARKS$ .SEL, over MENUVERT.ITEM$()
+.      OUT: GUI.LISTBOX.SEL .MARKS$ .MARKED GUI.KEY
 .
-:      STASH.FILE.SAVE   a rectangle of the screen, out to a file
-:      STASH.FILE.LOAD   a saved file, back where it came from
-:      STASH.FILE.PUT    a saved file, pasted somewhere else
+:DIM MENUVERT.ITEM$(200)
+:GUI.LISTBOX.COUNT = N : GUI.LISTBOX.ROWS = 8 : GUI.LISTBOX.MULTI = 1
+:GUI.MSG$ = "PICK FILES" : GUI.BANK = 8
+:GOSUB GUI.LISTBOX
+:IF GUI.LISTBOX.SEL = 0 THEN <cancelled>
 .
-.  REQUIRES, and does not #INCLUDE for you:
-:      GPB.INC.BL      GP.ASM
-:      STASH.INC.BL    which does the actual copying
+.Its own #INCLUDE on top of GUI.INC.BL, because nothing else in the library
+.wants a set of marks or a footer counting them. The caller owns the DIM of
+.MENUVERT.ITEM$().
 .
-.  and, like it, a #SYMFILE in your program. See that file's header.
+.Up and down move, PgUp and PgDn page, HOME and END jump, SPACE toggles a
+.mark in multi. TAB moves to the buttons and back, RETURN takes <<OK>> from
+.anywhere, ESC and STOP cancel -- and O and C press their buttons while the
+.eye is still in the list, which a list can offer and a typing field cannot.
 .
-.  Usage:
-:      STASH.BANK = 8 : STASH.FILE$ = "PANEL.BIN"
-:      STASH.X = 10 : STASH.Y = 4 : STASH.W = 30 : STASH.H = 8
-:      GOSUB STASH.FILE.SAVE
-:      ...
-:      GOSUB STASH.FILE.LOAD
+.In multi, GUI.LISTBOX.SEL is not the answer -- it is where the cursor was
+.left. The marks are: GUI.LISTBOX.MARKS$ is COUNT characters with "1" for
+.marked, and it goes in as well as out, so a list reopens with its marks. Any
+.other length, "" included, starts with none.
 .
-:   in   STASH.FILE$    the name
-:        STASH.DEV      the device. 0 means 8, the usual drive
-:        STASH.BANK     the bank to stage through
-:        and, for SAVE, the geometry STASH.SAVE wants
+.The bottom frame edge reads 2 SELECTED OF 20 in multi, 20 ITEMS for a single
+.list too long to see at once, and is blank for one that fits.
 .
-=A SEPARATE FILE FROM STASH.INC.BL ON PURPOSE
+.The scrolling list itself is not in this module. It is GUI.CT.LIST, one of
+.GUI.FORM's three control types, and lives in GUI.INC.BL beside the field;
+.this file is the dialog around it.
 .
-.  a BASL module has no dead code elimination, and these three are 127 bytes.
-.  A dialog that stashes to a bank and puts it back never goes near a disk
-.  and should not pay for one.
+.Example: GUI2TST.EXP.BL.
 .
-=THE FILE IS SELF-DESCRIBING BECAUSE THE STASH IS
+=EXAMPLE PROGRAM
 .
-.  the four header bytes go out with the cells, so loading one back needs
-.  nothing but the name. That is the flaw dotBASIC admits to in its own
-.  .CUT/.PASTE, which "requires correctly re-describing the width and height
-.  of each cut".
-.
-.  BSAVE's end address is EXCLUSIVE, so this writes the header and the cells
-.  and no padding. The length is w h 2 + 4, which BASIC works out for itself
-.  -- which is why no GP.END keyword was ever spent on telling BSAVE where a
-.  stash ended.
-.
-.  The STASH.FILE. names belong to this file; the rest of STASH. is
-.  STASH.INC.BL's.
+.  GUI2TST.EXP.BL -- runnable, in the GPC-BASIC folder
 .
 =SEE ALSO
 .
->62|STASH.INC.BL -- save a text rectangle, and put it back.
+>73|4.12 GUI2.INC.BL -- a listbox, single or multi select
+>72|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back

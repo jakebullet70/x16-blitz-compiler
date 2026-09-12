@@ -1,0 +1,107 @@
+@8. Known bugs
+.
+=8. KNOWN BUGS
+.
+.Five, all live on 12th September 2026 and all reproducible. Each says what
+.happens, what causes it, and what to do instead. A bug leaves this list when
+.it is fixed, not when it is understood.
+.
+=GP.FN string aliasing
+.
+.Two GP.FN calls on the same string-returning verb, with nothing between them
+.in one expression, both give the second call's answer.
+.
+:D$ = "one"
+:E$ = "two"
+:PRINT GP.FN(STR.UCASE, D$) + GP.FN(STR.UCASE, E$)
+.
+.prints TWOTWO, not ONETWO. No error, and both compiler passes agree.
+.
+.A string term is a reference, not a value. The call pushes the block address
+.of the verb's single RETURNS variable, so two calls leave two references to
+.one variable and the second overwrites what the first pointed at. Numeric
+.verbs are safe -- the value itself goes on the stack.
+.
+.Two things escape it by accident. A term between the two calls concretes the
+.first into a temporary, so GP.FN(V,A$) + "-" + GP.FN(V,B$) is right; and two
+.different verbs have two different RETURNS variables. Neither is a rule to
+.build on.
+.
+.Do this -- give each call its own variable first.
+.
+:A$ = GP.FN(STR.UCASE, D$)
+:B$ = GP.FN(STR.UCASE, E$)
+:PRINT A$ + B$
+.
+=A string never gives memory back
+.
+.A$ = "" frees nothing. A string variable owns its block: the assignment sets
+.the length to zero and keeps the capacity. The heap scavenger reclaims only
+.a block a string outgrew and abandoned, never one a variable still holds. A
+.working buffer that has once held a 250-character line is spoken for until
+.the program ends.
+.
+.So a big temporary cannot be built and then freed. It has to not be built.
+.
+.Measured 2026-09-02. The editor's find folded the needle and every line it
+.scanned into new strings and compared with MID$ per position: 579 bytes gone
+.for the rest of the run, from a workspace with 1,489 free, and the GUI
+.dialogs then died on what was left. Rewritten to fold in place through
+.GP.STRPTR with one GP.INSTR per line, a find costs 81 bytes, and the program
+.came out 59 bytes smaller.
+.
+.Do this -- PRINT FRE(0) at eight points down the run and read the descent.
+.It is a high-water ceiling, so it only falls, and the step that falls is the
+.culprit.
+.
+=LOAD chaining leaks array strings
+.
+.A LOAD chain keeps its variables by skipping ClearMemory, which is the whole
+.reason to chain rather than RUN. ClearMemory is also the only thing that
+.lowers the string ceiling, so the ceiling never comes back down.
+.
+.For scalars that is bounded. A block is reused in place whenever the new
+.string fits, so ten hops assigning the same five variables settle at five
+.blocks.
+.
+.For string arrays it is unbounded. A block is marked dead only when its
+.variable is reassigned to something longer, never when the pointer is simply
+.dropped, and the chained program's DIM zeroes every element. Every block the
+.previous program's array held loses its only pointer while keeping a live
+.control byte: invisible to the scavenger, and unreusable. Ten hops with a
+.50-element array strand 500 blocks.
+.
+.FRE(0) is the instrument. Print it on entry to each program in the chain and
+.watch it fall.
+.
+.Do this -- CLR on entry, when the program does not need the carry. There is
+.no way to keep the carry and reclaim the array blocks.
+.
+=BINPUT# stops at 255 bytes
+.
+.BINPUT# n, A$, len cannot read more than 255 bytes. Three independent caps
+.land on that one number, so there is no single constant to raise.
+.
+.  the read buffer is 255 bytes
+.      WHERE: ReadBuffer: .fill 255
+.
+.  the count argument is 8 bit, and unchecked
+.      WHERE: GetInteger8Bit takes mantissa byte 0 and returns
+.
+.  a BASIC string is 255 characters
+.      WHERE: nowhere to put a longer record in any case
+.
+.The second is the trap. BINPUT# 12, A$, 256 sets the count to 0 and hands
+.back an empty string, silently. 300 gives 44 bytes.
+.
+.It is also not a block read. It is a CHRIN loop, one KERNAL call per byte
+.with an EOF check on top of that. BINPUT# is one statement, not one
+.transfer, so anything costing a BINPUT# per record pays that stride per
+.record.
+.
+.LINPUT# shares the same buffer and stops at 255 too, but runs on to the
+.delimiter afterwards, so the next read starts at a line boundary.
+.
+.Do this -- a record cannot be one string. Make it N strings of 255, or keep
+.it in a bank and copy out the part that is needed.
+.

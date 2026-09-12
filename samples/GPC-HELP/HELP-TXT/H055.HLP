@@ -1,112 +1,115 @@
-@3. The modules (5)
-=GUI.INC.BL
+@4.20 GPBMODS -- the harness that drives every module
 .
-.  in
-.      GUI.MSG$ GUI.MSG2$ GUI.MSG3$ -- up to three message lines. "" for
-.        none, and no gap left behind<br>GUI.TITLE$ -- a name in the top
-.        edge<br>GUI.BANK -- a spare RAM bank for the covered cells. 0 does
-.        not save<br>GUI.STYLE -- GP.BOX style 0..3<br>GUI.PANEL.IN
-.        GUI.BORDER.IN -- attributes. 0 takes THEME.TEXT and
-.        THEME.BORDER<br>GUI.GLYPH -- non-zero frames from GUI.EDGE.H
-.        GUI.EDGE.V GUI.CORNER.TL .TR .BL .BR<br>GUI.PLACE GUI.X GUI.Y
-.        GUI.ROW.OFFSET -- where the box goes<br>GUI.SHADOW GUI.SHADOW.ATTR
-.        -- the drop shadow<br>GUI.BTN.ONE$ GUI.BTN.TWO$ -- the button
-.        labels, & marking the accelerator<br>GUI.DEFAULT -- which button is
-.        the default. 2 is the second, anything else the first<br>GUI.COUNT
-.        GUI.SEL GUI.FLAGS -- GUI.MENU, over MENUVERT.ITEM$()<br>GUI.LEN
-.        GUI.TEXT$ GUI.MASK -- GUI.INPUT<br>GUI.BODY.ROWS GUI.BODY.WIDTH --
-.        GUI.OPEN, when you call it yourself
+=4.20 GPBMODS -- THE HARNESS THAT DRIVES EVERY MODULE
 .
-.  out
-.      GUI.KEY -- the key that ended it, whichever call<br>GUI.ANSWER --
-.        GUI.YN<br>GUI.OK -- GUI.INPUT: -1 accepted, 0 cancelled<br>GUI.TEXT$
-.        -- what was typed<br>GUI.SEL -- the row chosen, or 0<br>GUI.STASHED
-.        -- -1 if the covered cells were saved<br>GUI.LEFT GUI.TOP GUI.WIDTH
-.        GUI.HEIGHT -- where the box went<br>GUI.INNER.LEFT GUI.INNER.TOP
-.        GUI.INNER.WIDTH -- the usable area, from GUI.OPEN<br>GUI.PANEL
-.        GUI.BORDER -- the attributes it settled on
+=DESCRIPTION
 .
-.  internal
-.      GUI.ADD.W GUI.BOTTOM GUI.BOX.STYLE GUI.CLR.K$ GUI.FIELD.LEFT
-.        GUI.GAP.ROWS GUI.GLYPH$ GUI.HEAD.ROWS GUI.INDEX GUI.MOVE.BY
-.        GUI.MOVE.TRIES GUI.MOVE.WAS GUI.OKCANCEL GUI.PAINT.N GUI.PRESSED$
-.        GUI.RIGHT GUI.SAVE.W GUI.SAVE.H GUI.SCAN GUI.SCREEN.COLS
-.        GUI.SCREEN.ROWS GUI.SH.BW GUI.SH.W GUI.SH.H GUI.STEP.TYPE
-.        GUI.TITLE.LEFT GUI.WAS$<br>the button row: GUI.BTN.AMP .AT .ATTR
-.        .DEF .FOCUSED .HEAD$ .HI .KEY .KEY.ONE .KEY.TWO .LC .MARK$ .OF
-.        .RIGHT .TAIL$ .TEXT$ .TOTAL .UC .W.ONE .W.TWO .WIDE .X .Y<br>the
-.        form: GUI.CTRL.TYPE% .X% .Y% .W% .FLAGS% .KEY% GUI.CTRL.TEXT$
-.        GUI.CTRL.N GUI.FOCUS GUI.FORM.DIMMED .DONE .HIT .KEY .NAV<br>the
-.        list control: GUI.LIST.ATTR .COUNT .DIGITS .EACH .EDGE$ .HI .I
-.        .MARKED .MARKP .MARKY .NOTE$ .NOTE.LEFT .NOTEW .NUM$ .ROW .ROWS .SEL
-.        .W .WAS .WAS.SCROLL .X .Y
+.samples/GPB-MODS-TESTING/GPBMODS.BASL. A menu bar of nine dropdowns whose
+.rows reach nearly every public entry point in this section. It is the one
+.program that holds all twenty modules at once, and the worked example of
+.GP.BANKED, GP.BANKEDSTR and BANKMGR in one place.
 .
-.  constants
-.      GUI.SCRMODE GUI.LINEBOX GUI.MAXCELLS GUI.PADX GUI.PADY GUI.ESCAPE
-.        GUI.STOP GUI.RETURN GUI.SPACE GUI.BTN.GAP
-.        GUI.FORM.MAX<br>GUI.CT.BUTTON GUI.CT.FIELD GUI.CT.LIST -- what a
-.        control is<br>GUI.CF.DEFAULT GUI.CF.NOFOCUS -- what is true of
-.        it<br>GUI.NAV.STAY .NEXT .PREV .PRESS .DEFAULT .CANCEL -- the six
-.        verdicts<br>GUI.K.TAB GUI.K.SHTAB GUI.K.DOWN GUI.K.UP GUI.K.RIGHT
-.        GUI.K.LEFT
+:gpbmods-demo.bat
 .
-.GUI.DEFAULT and the focus are two different things. The default button is
-.the one RETURN presses from anywhere and the one drawn <<LIKE THIS>>; the
-.focus is where TAB has got to, and it is drawn in THEME.FOCUS. GUI.INPUT
-.opens with the default on OK and the focus in the field, so neither is the
-.other's shorthand.
+.The drive is testing/, not the sample folder. The object is compiled SHARED
+.and loads GPC.RT.nnn.BIN from there.
 .
-.GUI.BTN.DEF is not GUI.DEFAULT. It is internal -- which button
-.GUI.BUTTON.ROW is painting the double brackets on as it draws -- and setting
-.it does nothing, because the row recomputes it from GUI.DEFAULT every time
-.it paints. The near-miss is worth knowing about; the rest of GUI.BTN.* is
-.scratch for one button's text, width and accelerator and is rewritten twice
-.a row.
+.No row is a stub. A chosen row calls the library for real and shows what
+.came back, on the panel and on the LAST line at the foot of the page. Three
+.modules are under test before any row is chosen: MENUBAR draws the bar,
+.MENUVERT every dropdown, and STASH puts the screen back under a closed one.
 .
-.GUI.HINT$ is gone, and it is the one interface the CUA work took away. The
-.dimmed line naming two keys became a real button row, and "the first Y and
-.the first N in the line are lit" has nothing to light when the row is two
-.buttons. Set GUI.BTN.ONE$ and GUI.BTN.TWO$ instead.
+.  DIALOG -- D
+.      GUI GUI2
 .
-.The typing dialog and its string swapped names. It was GUI.TEXT returning
-.GUI.INPUT$; it is GUI.INPUT returning GUI.TEXT$. BASLOAD will not have a
-.label and a variable of one name and the $ does not separate them, so
-.GUI.INPUT the routine forbids GUI.INPUT$ the variable. A program written
-.against the older library compiles clean and reads the wrong one back --
-.this is the one rename here that fails silently.
+.  LISTS -- L
+.      MENUBAR MENUVERT
 .
-.GUI.CTRL.* are the seven parallel arrays that are the control block: one
-.element a control, up to GUI.FORM.MAX. GUI.INC.BL DIMs them. Do not DIM them
-.yourself.
+.  INPUT -- I
+.      LINEINPUT
 .
-=GUI2.INC.BL
+.  SCREEN -- S
+.      STASH STASHFILE STASHVRAM
 .
-.  in
-.      GUI.LISTBOX.COUNT -- how many items. 0 or less returns
-.        cancelled<br>MENUVERT.ITEM$() -- the items, 1..COUNT, and the caller
-.        owns the DIM<br>GUI.LISTBOX.ROWS -- rows visible at once. 0 takes
-.        10, then cut to COUNT and to the screen<br>GUI.LISTBOX.MULTI -- 0
-.        chooses one row, 1 marks a set with SPACE<br>GUI.LISTBOX.MARKS$ --
-.        multi only, in as well as out: COUNT characters, "1" marked. Any
-.        other length, "" included, starts with none<br>GUI.LISTBOX.SEL --
-.        the item to start on. 0 starts at 1<br>plus everything GUI.OPEN
-.        reads
+.  STRINGS -- G
+.      STRINGS STRCASE STRUSING
 .
-.  out
-.      GUI.LISTBOX.SEL -- the item under the highlight, or 0 if
-.        cancelled<br>GUI.LISTBOX.MARKS$ -- multi only: which are
-.        marked<br>GUI.LISTBOX.MARKED -- multi only: how many<br>GUI.KEY --
-.        13 accepted, 27 cancelled
+.  DATA -- A
+.      SORT
 .
-.  internal
-.      GUI.LISTBOX.I GUI.LISTBOX.MARKOFF GUI.LISTBOX.TEXTW
+.  THEME -- T
+.      THEME
 .
-.In multi-select GUI.LISTBOX.SEL is not the answer -- it is where the cursor
-.was left. The marks are the answer.
+.  ABOUT -- B
+.      BANKMGR
 .
-.The scrolling list is not in this module. It is GUI.CT.LIST, one of
-.GUI.FORM's three control types, and lives in GUI.INC.BL beside the field.
-.GUI2.INC.BL is the dialog around it: measure, open, hand the control its
-.geometry, add a button row, run the form, answer. That is why the internals
-.here are three variables and not thirty -- the GUI.LIST.* set does the work.
+.  FILES -- F
+.      FILEIO FILEDIR
+.
+.APPSYS runs at startup and at exit rather than from a row. STRINGS answers
+.to G because SCREEN has taken S: a hotkey need not be an item's initial, and
+.MENUVERT.HOTATTR tints whichever letter it finds.
+.
+.Twenty modules are included and seventeen are driven. COMBO, KB and
+.STASHVRAMGC are compiled in and have front doors -- COMBO.ADD, KB.CLEARKB,
+.SV.COMPACT -- that no panel calls. BMX (SEC 4.5) is not included: it wants a
+.bitmap file and a screen mode of its own, and the BMXVIEW example in
+.GPC-BASIC/ covers it.
+.
+.WARNING: FILES writes to the drive. Four of its rows do. Everything they
+.make is named GPBFILE.* or GPBDIR, and the row that makes each one removes
+.it.
+.
+=Eleven banks
+.
+.Eight are named at compile time and claimed from BANKMGR (SEC 4.13) at
+.startup, because the compiler picks them while the object is written and the
+.manager is told rather than asked. Three more are allocated at run time: the
+.cells a dropdown covers, the cells a dialog covers, and FILEDIR's directory
+.buffer.
+.
+.  bank 4, GPBMODS.B04, 7,938 bytes
+.      MENUVERT MENUBAR LINEINPUT GUI GUI2
+.
+.  bank 5, GPBMODS.B05, 7,426 bytes
+.      literal text, pool one
+.
+.  bank 6, GPBMODS.B06, 4,610 bytes
+.      literal text, pool two
+.
+.  bank 7, GPBMODS.B07, 4,354 bytes
+.      APPSYS BANKMGR KB SORT STASHVRAM STASHVRAMGC STRCASE STRINGS STRUSING
+.
+.  bank 8, GPBMODS.B08, 1,538 bytes
+.      FILEIO FILEDIR
+.
+.  bank 9, GPBMODS.B09, 770 bytes
+.      THEME
+.
+.  bank 10, GPBMODS.B10, 770 bytes
+.      COMBO
+.
+.  bank 11, GPBMODS.B11, 3,074 bytes
+.      the two biggest dropdown handlers, this program's own code
+.
+.Six of those are GP.BANKED code regions (SEC 3.12) and two are GP.BANKEDSTR
+.text pools (SEC 3.10). One .Bnn file is written per bank. Each loads to
+.$A000 in its own bank and carries a two-byte load address like any PRG, so a
+.payload is the file size less two. The resident object is 12,885 bytes and
+.the overlays are 30,480 between them.
+.
+.Only what holds a BANK statement stays in low RAM, and the front doors.
+.STASH and STASHFILE execute BANK, which the compiler refuses inside a
+.region; STASHVRAM (SEC 4.18) is the one to reach for from inside one. The
+.five SHIM.*BANK.INC.BL files are the doors to the five library regions, and
+.bank 11's door is in GPBMODS.BASL itself.
+.
+.Six regions and not one, because a region holds at most 8,192 bytes and the
+.GUI fills its own. A region may call another: every front door puts the
+.caller's bank back before returning.
+.
+.A nearly empty region still costs a whole page count. Bank 9 holds 502 bytes
+.of THEME in a 768-byte overlay, and bank 10 holds 704 bytes of COMBO in
+.another 768. Below about a page and a half of p-code, a region gives back
+.less than it looks like.
 .

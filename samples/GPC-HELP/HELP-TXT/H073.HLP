@@ -1,0 +1,37 @@
+@8. Known bugs (2)
+=File I/O in a GP.DO key loop
+.
+.A save routine reached from inside a program's own GP.DO key loop writes its
+.file completely and correctly, and then the program stops with
+.
+:INPUT/OUTPUT ERROR @ $005B
+.
+.The address is identical in every failing build, which says a clobbered
+.instruction pointer rather than a real device error.
+.
+.Seven shapes have been compiled and probed. Do not bisect them again.
+.
+.  OPEN/PRINT#/CLOSE at top level
+.      RESULT: passes
+.
+.  four consecutive PRINT#, no PRINT between
+.      RESULT: passes
+.
+.  the same inside GP.DO ... GP.EXITDO
+.      RESULT: passes
+.
+.  the same behind a GOSUB inside a GP.DO
+.      RESULT: passes
+.
+.  the same behind GP.SELECT then GOSUB inside a GP.DO
+.      RESULT: passes
+.
+.  the real routine called from the top level of the same program
+.      RESULT: passes
+.
+.  the real routine reached from the program's own GP.DO key loop
+.      RESULT: fails
+.
+.Do this -- a plain PRINT immediately after the CLOSE makes it pass. Channel
+.0 output runs CLRCHN; a non-zero channel runs CHKOUT and READST instead, so
+.the suspect is channel state left behind rather than the file I/O.

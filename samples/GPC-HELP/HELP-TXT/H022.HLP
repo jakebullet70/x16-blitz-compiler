@@ -1,12 +1,6 @@
-@3.7 Screen -- drawing
+@3.6 Screen -- stash and restore
 .
-=3.7 SCREEN -- DRAWING
-.
-=SYNTAX
-.
-:GP.BOX x, y, w, h [,style] [,col]
-:GP.FILL x, y, w, h, char [,col]
-:GP.PRINTAT x, y, text$ [,col]
+=3.6 SCREEN -- STASH AND RESTORE
 .
 =WHAT IT COSTS
 .
@@ -20,65 +14,42 @@
 .
 =DESCRIPTION
 .
-.All three write directly to VERA and call no KERNAL routine, which is why
-.they are several times faster than PRINT. GPC's character output makes two
-.KERNAL calls per character, and BSOUT carries scroll, quote mode and cursor
-.handling.
+.Stashing a rectangle is STASH.INC.BL, written in GP.ASM, rather than a
+.keyword. It writes a 4-byte self-describing header and holds at most 4,094
+.cells: a bank is 8K and a cell is two bytes, so a full 80x60 screen at 9,600
+.bytes does not fit. As keywords it would take 329 bytes of the
+.all-or-nothing GP block in every program, stashing or not.
 .
-.GP.BOX draws the frame only. Styles: 0 solid block, 1 single line, 2 single
-.line with rounded corners, 3 thick line. A style of 256 or more is an
-.ADDRESS, not a style: eight screen codes of the caller's own, in the table's
-.order -- see the custom glyph note below. char in GP.FILL is PETSCII, e.g.
-.ASC(" ").
+:#SYMFILE "@:MYPROG.SYM"
+:#INCLUDE "STASH.INC.BL"
+:STASH.BANK = 8 : STASH.X = 10 : STASH.Y = 4 : STASH.W = 30 : STASH.H = 8
+:GOSUB STASH.SAVE
+:...
+:GOSUB STASH.RESTORE
 .
-.The colour argument is optional. Omitted, it uses whatever COLOR last set,
-.read from the KERNAL's $0376 -- the colour a PRINT would have used.
-.Supplied, it is one byte packed as the X16 packs it: background * 16 +
-.foreground. 255 is a real colour (light grey on light grey), not a
-.leave-unchanged marker.
+.STASHFILE.INC.BL is the same rectangle through a file. It is a separate
+.module because BASL has no dead code elimination: everything a module holds
+.is compiled into every program that includes it, called or not.
 .
-.These calls do not move the cursor PRINT uses. A PRINT after a GP.PRINTAT
-.continues from wherever the KERNAL's cursor was, not after the text just
-.drawn. Use LOCATE first, or stay in one world or the other.
+.More than one rectangle in a bank. STASH.SLOT is a byte offset into the
+.bank, default 0, and STASH.NEXT comes back as the offset just past what was
+.written. Feed one into the other and the bank holds a stack of rectangles --
+.which is what nested dialogs want, one bank for the lot rather than one bank
+.a level. Nothing checks that two saves do not overlap: the header describes
+.a rectangle's size, not its identity, so the offsets are yours to keep
+.straight.
 .
-.Nothing is clipped. Drawing off the right edge wraps to the next row; off
-.the bottom writes past the end of the screen map. Zero width or height draws
-.nothing, which is what a computed size reaches when it collapses.
+.STASHVRAM.INC.BL keeps rectangles in spare VRAM instead, addressed by handle
+.so a program can hold many at once without counting offsets. It needs no
+.#SYMFILE, because there is no GP.ASM in it: the cells never leave VRAM, so
+.one data port reads, the other writes, and memory_copy moves between them.
+.It executes no BANK either, so unlike STASH it runs inside a GP.BANKED
+.region. STASHVRAMGC.INC.BL closes the holes if a caller frees out of order,
+.and is a third file for the same dead-code reason.
 .
-=ISO mode is handled for you
+=SEE ALSO
 .
-.In ISO mode -- PRINT CHR$(15), or Ctrl+O -- the VERA tile index is the
-.character code, so translating PETSCII to a screen code is wrong rather than
-.merely wasteful: A would be written as $01. GP.PRINTAT reads the KERNAL's
-.ISO flag (bit 6 of $0372) per character and skips the translation when it is
-.set. A program that switches charset needs no source change and nothing to
-.declare. The test costs 7 cycles a cell in PETSCII mode and saves 34 in ISO.
-.
-.GP.FILL needs no test: it converts its single character before the loop, and
-.$20 is a fixed point of the translation, so a space fill -- padding and
-.blanking -- is correct in both modes.
-.
-.GP.BOX is the one case that needs the caller to act. It does no translation
-.at all; its glyphs go to VERA as tile indices, so the four built-in styles
-.are PETSCII screen codes and appear as letters in ISO mode. Translation
-.cannot fix this, because ISO-8859-15 has no box-drawing characters to
-.translate to. A style value of 256 or more is instead the address of eight
-.glyphs, and in ISO mode a tile index is a character code, so ASCII + - |
-.make a usable frame:
-.
-:ISO.GLYPH$ = "++++--||"                        ' TR TL BR BL TOP BOTTOM LEFT
-:GP.BOX 50, 26, 4, 3, GP.STRPTR(ISO.GLYPH$) + 1, 1
-.
-.GP.STRPTR returns the address of the string block and the text starts at +1,
-.so a string literal is the cheapest way to carry the eight bytes. This costs
-.no runtime bytes; the pointer form already exists, and samples/editor uses
-.the same mechanism to draw frames from a re-ordered font.
-.
-.ISO.EXP.BL tests all of this, reading cells back with VPEEK rather than
-.trusting the display. The ISO box corner, top edge and side read back as 43,
-.45 and 124.
-.
-=EXAMPLE PROGRAM
-.
-.  ISO.EXP.BL -- runnable, in the GPC-BASIC folder
-.  SCREEN.EXP.BL -- runnable, in the GPC-BASIC folder
+>86|STASH.INC.BL -- save a text rectangle, and put it back.
+>94|STASHFILE.INC.BL -- a saved text rectangle, through a file.
+>79|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+>80|4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store

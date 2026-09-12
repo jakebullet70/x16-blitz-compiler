@@ -1,23 +1,101 @@
-@6. The documents
+@6. GPC-BASIC/ -- the examples
 .
-=6. THE DOCUMENTS
+=6. GPC-BASIC/ -- THE EXAMPLES
 .
-.  GP-BASIC.md
-.      the manual -- the keyword reference and the module reference
+.One .EXP.BL per topic. Several are also the regression test for the module
+.they sit beside.
 .
-.  GP-BASIC.GLOBALS.md
-.      every global name each module owns, and the prefixes you may not use
+.  LOOPS.EXP.BL
+.      GP.DO / GP.LOOP / GP.EXITDO
 .
-.  GP-BASIC.FILES.md
-.      this page
+.  IF.EXP.BL
+.      GP.IF / GP.ELSEIF / GP.ELSE / GP.ENDIF
 .
-.  README.md
-.      how to run the compiler, and what its answers mean
+.  SELECT.EXP.BL
+.      GP.SELECT / GP.CASE / GP.OTHER / GP.ENDSEL
 .
-.  SRC/
-.      the BASLOAD source of the tools. Reference only -- nothing in it is
-.        needed to run
+.  UNWIND.EXP.BL
+.      a GOTO may leave a GP.SELECT or a GP.DO
 .
-.The library's documents live beside the includes they describe, in this
-.folder, so a relative link works both in the repository and in an unzipped
-.release.
+.  STRINGS.EXP.BL
+.      the GP.BASIC string set
+.
+.  STRUSING.EXP.BL
+.      one value through six masks, a column, and the overflows
+.
+.  ARRAYS.EXP.BL
+.      the GP.BASIC array set
+.
+.  SCREEN.EXP.BL
+.      the GP.BASIC text drawing set
+.
+.  ISO.EXP.BL
+.      GP.PRINTAT and GP.BOX in ISO mode
+.
+.  MLCALL.EXP.BL
+.      GP.CALL with GP.A / GP.X / GP.Y / GP.C
+.
+.  ASM.EXP.BL
+.      GP.ASM / GP.ENDASM, inline 65C02
+.
+.  MENU.EXP.BL
+.      a whole small application, in the shape the GP set is for
+.
+.  MENUDEMO.EXP.BL
+.      MENUVERT drawn the way an application would draw it
+.
+.  GUI.EXP.BL
+.      the four dialogs, over a screen they have to put back
+.
+.  STASHVRAM.EXP.BL
+.      three panels nested in VRAM, a blob, and the compactor. Needs no
+.        #SYMFILE, which is the point
+.
+.  FORM.EXP.BL
+.      three fields you can move between, LINEINPUT style
+.
+.  BMXVIEW.EXP.BL
+.      a BMX bitmap viewer, in about thirty lines
+.
+.  BMXPAL.EXP.BL BMXSPD.EXP.BL
+.      the palette question, and the speed of each path
+.
+.  SORT.EXP.BL STRCTST.EXP.BL STRTST.EXP.BL SPLITT.EXP.BL
+.      the regression tests for SORT, STRCASE, the STRINGS assembly and
+.        STR.SPLIT
+.
+.  USINGT.EXP.BL
+.      the regression test for STR.USING, thirty-nine cases
+.
+.  MENUTST.EXP.BL GUI2TST.EXP.BL
+.      the same for the menu and the listbox, driven through the keyboard
+.        buffer
+.
+=EXAMPLE PROGRAM
+.
+.  LOOPS.EXP.BL -- runnable, in the GPC-BASIC folder
+.  IF.EXP.BL -- runnable, in the GPC-BASIC folder
+.  SELECT.EXP.BL -- runnable, in the GPC-BASIC folder
+.  UNWIND.EXP.BL -- runnable, in the GPC-BASIC folder
+.  STRINGS.EXP.BL -- runnable, in the GPC-BASIC folder
+.  STRUSING.EXP.BL -- runnable, in the GPC-BASIC folder
+.  ARRAYS.EXP.BL -- runnable, in the GPC-BASIC folder
+.  SCREEN.EXP.BL -- runnable, in the GPC-BASIC folder
+.  ISO.EXP.BL -- runnable, in the GPC-BASIC folder
+.  MLCALL.EXP.BL -- runnable, in the GPC-BASIC folder
+.  ASM.EXP.BL -- runnable, in the GPC-BASIC folder
+.  MENU.EXP.BL -- runnable, in the GPC-BASIC folder
+.  MENUDEMO.EXP.BL -- runnable, in the GPC-BASIC folder
+.  GUI.EXP.BL -- runnable, in the GPC-BASIC folder
+.  STASHVRAM.EXP.BL -- runnable, in the GPC-BASIC folder
+.  FORM.EXP.BL -- runnable, in the GPC-BASIC folder
+.  BMXVIEW.EXP.BL -- runnable, in the GPC-BASIC folder
+.  BMXPAL.EXP.BL -- runnable, in the GPC-BASIC folder
+.  BMXSPD.EXP.BL -- runnable, in the GPC-BASIC folder
+.  SORT.EXP.BL -- runnable, in the GPC-BASIC folder
+.  STRCTST.EXP.BL -- runnable, in the GPC-BASIC folder
+.  STRTST.EXP.BL -- runnable, in the GPC-BASIC folder
+.  SPLITT.EXP.BL -- runnable, in the GPC-BASIC folder
+.  USINGT.EXP.BL -- runnable, in the GPC-BASIC folder
+.  MENUTST.EXP.BL -- runnable, in the GPC-BASIC folder
+.  GUI2TST.EXP.BL -- runnable, in the GPC-BASIC folder

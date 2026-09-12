@@ -1,109 +1,41 @@
-@3. The modules (6)
-=STASH.INC.BL
+@4.20 GPBMODS -- the harness that drives every module (2)
+=The text is in a bank
 .
-.  in
-.      STASH.BANK -- the RAM bank to keep the cells in, 1..255, and it is
-.        yours: this writes the whole of it<br>STASH.X STASH.Y STASH.W
-.        STASH.H -- the rectangle, in cells, for STASH.SAVE<br>STASH.MOVE --
-.        non-zero pastes to STASH.X/STASH.Y instead of where it came from
+.552 strings in 72 named groups, 12,032 bytes across two pools, none of it in
+.low RAM. Every string the shell says sits in a GP.BANKEDSTR block in front
+.of the routine that says it and is read back with GP.BSTR. Two pools,
+.because one pool is a hard 8,192 bytes and BStrPoolWrite stops the compile
+.when one fills. Which pool a group is in costs the call site nothing, so
+.moving a group is the whole of the answer to a full one.
 .
-.  out
-.      STASH.OK -- -1 if it fitted and was saved, 0 if not
+.Every menu is a block of its own, index 0 the dropdown's title and 1 upwards
+.the rows. MENUVERT.COUNT comes from GP.BSTRCOUNT and a loop reads the rows,
+.so a row is added by adding a line to the block, and no other menu moves.
 .
-.  internal
-.      STASH.AT STASH.BASE STASH.BYTES STASH.HI STASH.MAPW STASH.MODE
-.        STASH.ROW STASH.STRIDE<br>STASH.DEST% STASH.NBYTES% STASH.VADDR%
-.        STASH.VCTRL% STASH.WAS% -- the {VAR} slots the blobs read
+.The numbers under ABOUT / BANK MEMORY and ABOUT / MODULE SIZES are typed
+.into GP.BANKEDSTR blocks, so they are only true of the build they were taken
+.from.
 .
-.  constants
-.      STASH.LCONFIG STASH.LMAPBASE STASH.WINDOW STASH.HEADER STASH.MAXBYTES
+=The room it runs in
 .
-.STASH.RESTORE needs only the bank. Four header bytes -- w, h, x, y -- go in
-.first, so the rectangle describes itself and cannot be put back at the wrong
-.size.
+.The workspace is what is left between the program's own p-code and the
+.resident runtime: $4500 to $6600, 8,448 bytes. The first p-code opcode is
+..varspace and its operand is what the scalars take -- 3,436 here, leaving
+.about 5,012 for the string arrays and the whole string heap.
 .
-.A bank is 8,192 bytes and a cell is two, so 4,094 cells fit: 63x63, larger
-.than any dialog and not a whole 80x60 screen. Too big is refused before the
-.first write with STASH.OK = 0, rather than running on into the next bank.
+.Moving code into a bank moves no scalars. A banked routine's variables are
+.the same workspace variables its shim sees, so .varspace grows as panels are
+.added whatever bank they run from.
 .
-.It needs a #SYMFILE in your program, because it reads its arguments through
-.{VAR} names. It restores the caller's RAM bank on the way out -- it did not
-.always, and a caller that worked around that can stop.
-.
-.STASH.SLOT and STASH.NEXT are not in this copy. GP-BASIC.md SEC 3.6
-.describes them -- a byte offset into the bank, and the offset just past what
-.was written, so one bank holds a stack of rectangles instead of one a level.
-.They are in samples/GPB-MODS-TESTING/GPC-BASIC/STASH.INC.BL and have not
-.reached the root library yet. Until they do, one rectangle a bank.
-.
-=STASHFILE.INC.BL
-.
-.STASH.FILE.SAVE, STASH.FILE.LOAD and STASH.FILE.PUT, and no variables of its
-.own -- it sets STASH.* and calls through. The prefix exists to keep the
-.three routine names apart from the rest of STASH., not to hold state. Kept a
-.separate #INCLUDE because a BASL module has no dead code elimination and the
-.disk half is 127 bytes a program that never writes one would still carry.
-.
-=SORT.INC.BL
-.
-.  in
-.      SORT.PTR -- GP.ARRPTR of the array, element zero, the 3-byte header
-.        already skipped. A BASL subroutine cannot be passed an array, so the
-.        caller takes its address and this sorts through that<br>SORT.DESCEND
-.        -- non-zero, largest first<br>SORT.NOCASE -- non-zero folds case
-.        while comparing
-.
-.  out
-.      SORT.OK -- -1 if it sorted, 0 if it refused<br>SORT.COUNT -- elements
-.        found in the array header
-.
-.  internal
-.      SORT.TYPE -- the type byte it read back<br>SORT.BASE% SORT.CHR%
-.        SORT.CNT% SORT.DESC% SORT.FOLD% SORT.GAP% SORT.I% SORT.J% SORT.LL%
-.        SORT.LR% SORT.RN% SORT.TMP% -- every one a {VAR} slot
-.
-.Note SORT.COUNT is an output, read out of the array header, not a size you
-.hand in -- and SORT.PTR is GP.ARRPTR, not GP.STRPTR like the rest of the
-.library's pointer arguments. Both are easy to write the other way round.
-.
-.Also needs a #SYMFILE. 255 elements, so DIM A$(254) is the largest; beyond
-.that SORT.OK is 0 rather than a wrong answer. String arrays only. It moves
-.2-byte pointers rather than string data, so a swap is cheap and the array's
-.own storage never moves.
-.
-=STRCASE.INC.BL
-.
-.  in
-.      STRCASE.PTR -- GP.STRPTR of the string<br>STRCASE.MODE --
-.        STRCASE.UPPER or STRCASE.LOWER
-.
-.  out
-.      the string itself, rewritten in place
-.
-.  internal
-.      STRCASE.ADDR% STRCASE.OP%
-.
-.  constants
-.      STRCASE.UPPER STRCASE.LOWER
-.
-.#SYMFILE again. Do not write #AUTONUM in a program that includes this -- it
-.sets the STEP, and only the default 1 survives.
-.
-=EXAMPLE PROGRAM
-.
-.  FORM.EXP.BL -- runnable, in the GPC-BASIC folder
+.GPC-BASIC/ inside the sample folder is the library working copy and it is
+.ahead of the root copy. A module is proved here and copied whole into root.
+.GPB.INC.BL runs the other way: root is upstream for it, and the build copies
+.root's over this folder's every time.
 .
 =SEE ALSO
 .
->29|3.6 Screen -- stash and restore
->47|4.1 THEME.INC.BL -- named colour roles
->50|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
->48|4.2 STRINGS.INC.BL -- string helpers
->59|4.10 STRUSING.INC.BL -- a number to a template
->51|4.4 LINEINPUT.INC.BL -- a positioned entry field
->52|4.5 BMX.INC.BL -- a BMX bitmap into VERA
->62|STASH.INC.BL -- save a text rectangle, and put it back.
->53|4.6 MENUVERT.INC.BL -- a vertical menu
->58|4.9 MENUBAR.INC.BL -- a horizontal menu
->60|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
->61|4.12 GUI2.INC.BL -- a listbox, single or multi select
+>64|4.5 BMX.INC.BL -- a BMX bitmap into VERA
+>74|4.13 BANKMGR.INC.BL -- who owns which RAM bank
+>51|3.12 Code in a bank
+>45|3.10 Text in a bank
+>79|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM

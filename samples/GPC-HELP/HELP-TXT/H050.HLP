@@ -1,19 +1,115 @@
-@2. GP.* is keywords, not variables -- and the difference bites
+@4.15 FILEIO.INC.BL -- the drive: status, files, directories
 .
-=2. GP.* IS KEYWORDS, NOT VARIABLES -- AND THE DIFFERENCE BITES
+=4.15 FILEIO.INC.BL -- THE DRIVE: STATUS, FILES, DIRECTORIES
 .
-.GPB.INC.BL defines no variables. It is 31 keyword declarations and nothing
-.else. Everything spelled GP.something is a BASIC keyword, so:
+=WHAT IT COSTS
 .
-:GP.A = 5          <- SYNTAX ERROR. GP.A is a keyword; you cannot assign to i
-:X = GP.A          <- correct. It reads the accumulator after the last GP.CAL
+.    BASIC -- a .INC.BL module of ordinary BASL, called with GOSUB. Costs
+.    nothing unless you #INCLUDE it.
 .
-.The value words are GP.A, GP.X, GP.Y and GP.C -- the registers after
-.GP.CALL, and now the whole list of them. They are keywords rather than
-.variables because nothing in the runtime can write a BASIC variable by name,
-.so a command that returns a value has to hand it back through a keyword.
-.X16's own ST, MX and MY exist for the same reason.
+=DESCRIPTION
 .
-.The full keyword list lives in GPC-BASIC/GPB.INC.BL, and the byte values
-.mirror getGP() in source/common-scripts/c64tokens.py.
+.  FILE.STATUS
+.      IN: --
+.      OUT: FILE.ERR FILE.MSG$ FILE.TRK FILE.SEC
 .
+.  FILE.EXISTS
+.      IN: FILE.NAME$
+.      OUT: FILE.OK
+.
+.  FILE.SIZE
+.      IN: a name -- a verb, not a GOSUB
+.      OUT: FILE.OK FILE.BLOCKS
+.
+.  FILE.DELETE
+.      IN: FILE.NAME$, pattern allowed
+.      OUT: FILE.ERR FILE.TRK
+.
+.  FILE.RENAME
+.      IN: FILE.NAME$ FILE.NEW$
+.      OUT: FILE.ERR
+.
+.  FILE.COPY
+.      IN: FILE.NAME$ FILE.NEW$
+.      OUT: FILE.ERR
+.
+.  FILE.MKDIR FILE.RMDIR FILE.CHDIR
+.      IN: FILE.NAME$
+.      OUT: FILE.ERR
+.
+.  FILE.UP
+.      IN: --
+.      OUT: FILE.ERR
+.
+.  FILE.CURDIR
+.      IN: --
+.      OUT: FILE.PATH$
+.
+.  FILE.SAVEARRAY
+.      IN: FILE.NAME$ FILE.ROWS FILE.LINE$()
+.      OUT: FILE.ERR
+.
+.  FILE.LOADARRAY
+.      IN: FILE.NAME$ FILE.MAX
+.      OUT: FILE.ROWS FILE.LINE$()
+.
+:#SYMFILE "@:MYPROG.SYM"
+:#INCLUDE "FILEIO.INC.BL"
+:
+:FILE.NAME$ = "SCORES.DAT" : GOSUB FILE.EXISTS
+:IF FILE.OK THEN N = GP.FN(FILE.SIZE, "SCORES.DAT")
+.
+.The #SYMFILE is required, before the #INCLUDEs. FILE.TOPET is GP.ASM and
+.reaches FILE.PETP% through {VAR}; without a symbol file the compile stops at
+.NO SYMBOL FILE FOR {}.
+.
+.FILE.SIZE is declared with GP.DEFPROC, so it is called as a verb -- GP.SUB
+.FILE.SIZE, "MYFILE.DAT" or N = GP.FN(FILE.SIZE, "MYFILE.DAT") -- and not
+.with a GOSUB. Everything else in the table is a plain GOSUB.
+.
+.FILE.DEVICE is the drive and 0 means 8. FILE.ISO non-zero folds names to
+.PETSCII on the way out. FILE.LINE$() is the caller's DIM, as MENUVERT.ITEM$
+.is; left alone the implicit DIM gives 0 to 10. FILE.ROWS is an input to
+.SAVEARRAY and an output from LOADARRAY.
+.
+.FILE.ERR under 20 is success. 0 is OK. 1 is files scratched and carries the
+.count in FILE.TRK. 62 is FILE NOT FOUND, 63 FILE EXISTS, 26 WRITE PROTECT.
+.FILE.ERR is DS and FILE.MSG$ is DS$ -- the X16 has neither.
+.
+.This module takes logical file 14 and secondary address 14. Not 2 or 3:
+.those belong to the editor, GPC-HELP and the cruncher. The two are equal so
+.a later seek needs no reopen.
+.
+.ST is not a disk status. LINPUT# on a channel whose OPEN found nothing
+.returns CHR$(0) with ST = 66, and keeps doing so. ST is 64 before a
+.program's first statement, because LOAD leaves bit 6 set.
+.
+.The traps, each one measured on the drive:
+.
+.  - Read the command channel or the next OPEN misbehaves. The drive holds
+.    its error state until channel 15 is read. Every routine here ends by
+.    reading it.
+.  - FILE.RENAME onto a name that exists returns 62, not 63 -- which is what
+.    a missing source also returns. Test with FILE.EXISTS first.
+.  - FILE.COPY is one drive. C:new=old cannot cross devices. It takes a comma
+.    list, so it also concatenates.
+.  - FILE.SAVEARRAY overwrites, with @: on the open.
+.  - FILE.DELETE takes a pattern. S:*.BAK scratches every match.
+.  - The last row of a file arrives with ST already set, so a row is stored
+.    before the loop ends. A blank final line is indistinguishable from end
+.    of file and is dropped.
+.
+.CMDR-DOS has no REL files. For random access use ,M open mode with P and T
+.on channel 15:
+.
+:OPEN 1,8,2,"LEVEL.DAT,S,R"
+:OPEN 15,8,15,"P"+CHR$(2)+CHR$(0)+CHR$(1)+CHR$(0)+CHR$(0)
+.
+.T returns the position and the file size. The data channel's secondary
+.address must equal the P or T channel argument. VAL("$"+MID$(A$,10)) from
+.the manual returns 0 here -- VAL stops at the first non-numeric character,
+.so parse the eight hex digits by hand.
+.
+=SEE ALSO
+.
+>76|4.15 FILEIO.INC.BL -- the drive: status, files, directories

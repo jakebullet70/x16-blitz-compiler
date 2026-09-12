@@ -1,39 +1,59 @@
-@3.1 Loops
+@3. Command reference (2)
+.        4.17
 .
-=3.1 LOOPS
+.  Code in a bank
+.      ASM
+.      GP.BANKED GP.ENDBANKED -- p-code at $A000, out of the low-memory
+.        budget, see SEC 3.12
 .
-=SYNTAX
+.  Bank ownership
+.      BASIC
+.      BANKMGR.INC.BL -- INIT CLAIM GET.FREE.BANK RELEASE COUNT - SEC 4.13
 .
-:GP.DO [count]
-:    ...
-:GP.LOOP
+.  Keyboard
+.      BASIC
+.      KB.INC.BL -- KB.CLEARKB - SEC 4.14
 .
-=WHAT IT COSTS
+.  The drive
+.      BASIC
+.      FILEIO.INC.BL -- STATUS EXISTS SIZE DELETE RENAME COPY MKDIR CHDIR
+.        SAVEARRAY LOADARRAY - SEC 4.15
 .
-.  ASM: GP.DO GP.LOOP GP.EXITDO
-.    ASM -- a keyword, run by machine code in the GP runtime block. A program
-.    using ANY GP keyword pays for the whole block.
+.  The drive
+.      BASIC
+.      FILEDIR.INC.BL -- FILE.DIR.INIT OPEN NEXT, into a bank or low RAM -
+.        SEC 4.16
 .
-=DESCRIPTION
+.  Screen -- stash
+.      BASIC
+.      STASHVRAM.INC.BL -- SV.SAVE SV.RESTORE SV.PUT SV.GET, kept in VRAM -
+.        SEC 4.18
 .
-.Counted loop, modelled on prog8's repeat. A count of 0, or no count, loops
-.forever. Loops nest.
+.  Screen -- stash
+.      BASIC
+.      STASHVRAMGC.INC.BL -- SV.COMPACT - SEC 4.19
 .
-:GP.EXITDO
+.The rule is in SEC 1: assembly for tight loops and bulk data moves, BASIC
+.for everything else, and a composite for anything that is only a spelling of
+.keywords already present. A menu waits on a human, so MENUVERT is BASIC; as
+.a keyword it would cost every GP program 462 bytes whether or not it used a
+.menu.
 .
-.Leaves the innermost GP.DO, closing its stack frame. A GOTO out of a GP.DO
-.closes its frames too -- see SEC 3.2 -- but GP.EXITDO is two bytes and needs
-.no branch target.
-.
-:GP.DO
-:  TICK = TICK + 1
-:  IF TICK = 9 THEN GP.EXITDO
-:GP.LOOP
-.
-=EXAMPLE PROGRAM
-.
-.  LOOPS.EXP.BL -- runnable, in the GPC-BASIC folder
+.The keywords in detail. Square brackets mean optional. Optionals cannot be
+.skipped over: GP.BOX X,Y,W,H,,7 is a syntax error -- write out the default
+.you are passing through.
 .
 =SEE ALSO
 .
->19|3.2 Multi-way branch
+>57|4. Module reference -- the BASL library
+>38|3.8 Block IF
+>39|3.9 Inline assembly
+>28|3.4 Strings
+>26|3.3 Machine code
+>45|3.10 Text in a bank
+>46|3.11 Calling a routine in one statement
+>59|4.1 THEME.INC.BL -- named colour roles
+>60|4.2 STRINGS.INC.BL -- string helpers
+>62|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>63|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>64|4.5 BMX.INC.BL -- a BMX bitmap into VERA

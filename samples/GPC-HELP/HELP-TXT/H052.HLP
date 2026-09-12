@@ -1,107 +1,46 @@
-@3. The modules (2)
-=KB.INC.BL
+@4.17 COMBO.INC.BL -- a drop-down list that folds into one row
 .
-.  out
-.      --
+=4.17 COMBO.INC.BL -- A DROP-DOWN LIST THAT FOLDS INTO ONE ROW
 .
-.  internal
-.      KB.K$
+=DESCRIPTION
 .
-.One routine, KB.CLEARKB, and one variable it drains into. Nothing else is in
-.the prefix.
+.  COMBO.ADD
+.      IN: COMBO.X COMBO.Y COMBO.W COMBO.COUNT COMBO.SEL COMBO.BANK, over
+.        MENUVERT.ITEM$()
+.      OUT: COMBO.SEL
 .
-=LINEINPUT.INC.BL
+:MENUVERT.ITEM$(1) = " TEXAS"
+:MENUVERT.ITEM$(2) = " UTAH"
+:COMBO.X = GUI.INNER.LEFT : COMBO.Y = GUI.INNER.TOP
+:COMBO.W = 16 : COMBO.COUNT = 2 : COMBO.SEL = 1
+:GOSUB COMBO.ADD
+:' ... run the form ... the answer is in COMBO.SEL
 .
-.  in
-.      LINEINPUT.X LINEINPUT.Y -- top left of the field<br>LINEINPUT.LEN --
-.        how many characters fit<br>LINEINPUT.ATTR -- packed
-.        attribute<br>LINEINPUT.TEXT$ -- the starting value<br>LINEINPUT.MASK
-.        -- non-zero shows asterisks<br>LINEINPUT.ALLOW$ -- the only
-.        characters accepted<br>LINEINPUT.DENY$ -- characters
-.        refused<br>LINEINPUT.LABEL$ -- LINEINPUT.ASK only
+.Only COMBO.ADD is called by an application. COMBO.DRAW, COMBO.KEY and
+.COMBO.OPEN are reached by GUI.FORM, which dispatches a GUI.CT.COMBO control
+.to them by name. The call goes between GUI.OPEN and GUI.FORM.RUN.
 .
-.  out
-.      LINEINPUT.TEXT$ -- what was typed<br>LINEINPUT.KEY -- the key that
-.        ended it
+.COMBO.W is the width in cells, brackets included; 5 is the floor and
+.anything less is raised to it. COMBO.BANK is where the dropdown saves the
+.cells it covers, and 0 takes GUI.BANK -- which is what the dialog around it
+.is already using. The caller owns the DIM of MENUVERT.ITEM$().
 .
-.  internal
-.      LINEINPUT.SHOW$ LINEINPUT.WAS$ LINEINPUT.K$ LINEINPUT.CELL$
-.        LINEINPUT.CODE LINEINPUT.CX LINEINPUT.CA LINEINPUT.INV LINEINPUT.LIT
-.        LINEINPUT.TICK LINEINPUT.DONE LINEINPUT.FILLED LINEINPUT.HOME
-.        LINEINPUT.BAR
+.One combo to a dialog. The items are read out of MENUVERT.ITEM$ when the
+.dropdown opens and not when the control is added, because copying them would
+.mean a second array the same size. A second combo on the same form would
+.find the first one's items there.
 .
-.  constants
-.      LINEINPUT.RETURN LINEINPUT.DELETE LINEINPUT.ESCAPE LINEINPUT.STOP
-.        LINEINPUT.DOWN LINEINPUT.UP LINEINPUT.TAB LINEINPUT.SPACE
-.        LINEINPUT.STAR LINEINPUT.BLINK
+.A long list belongs in GUI.LISTBOX (SEC 4.12). The dropdown shows every item
+.at once: MENUVERT.RUN does not scroll, its own header says so, and a
+.scrolling key loop is the listbox's job rather than this one's.
 .
-.LINEINPUT.SHOW$ is listed internal but is the one exception worth knowing:
-.it holds what the field displayed, which is what you want if you are
-.repainting a masked field yourself. FORM.EXP.BL uses it for exactly that.
+.It is required by GUI.INC.BL, which names COMBO.DRAW and COMBO.KEY. BASLOAD
+.resolves every label in a file, so a program that includes the GUI and
+.leaves this one out stops with LABEL NOT FOUND whether it ever draws a combo
+.or not.
 .
-=BMX.INC.BL
+=SEE ALSO
 .
-.  in
-.      BMX.FILE$
-.
-.  out
-.      BMX.ERROR$ -- empty means it worked<br>BMX.WIDTH BMX.HEIGHT BMX.DEPTH
-.        BMX.VERSION BMX.PALUSED BMX.PALFIRST BMX.DATAOFF BMX.PACKED -- the
-.        header, readable after BMX.OPEN
-.
-.  in, optional
-.      BMX.STASH -- where BMX.PAINT keeps the machine's palette; VRAM $13000
-.        by default, -1 to keep nothing
-.
-.  internal
-.      BMX.PTR BMX.HEADER$ BMX.SCRATCH BMX.SCRATCH$ BMX.PALBASE BMX.ADDR
-.        BMX.LO BMX.HI BMX.BANK BMX.REST BMX.COUNT BMX.CHUNK BMX.GOT BMX.STEP
-.        BMX.SKIP BMX.ROW BMX.ROWS BMX.X0 BMX.Y0 BMX.BAD BMX.KEPT BMX.SRC
-.        BMX.DST
-.
-.  constants
-.      BMXK.MACPTR BMXK.CHKIN BMXK.CLRCHN BMXK.MEMCOPY BMXK.VCTRL BMXK.VLO
-.        BMXK.VMID BMXK.VHI BMXK.PORTLO BMXK.PORTLO.B BMXK.PORTHI BMXK.LFN
-.
-.BMX.PTR doubles as the "have I initialised" flag -- it is zero until
-.BMX.INIT has run. Zeroing it yourself would leak a string block and
-.re-allocate.
-.
-.BMX.STASH is the one variable here a caller may want to set, and it has to
-.be set before the first BMX.OPEN -- BMX.INIT runs then, and fills in the
-.default only if you have not. That is why -1 rather than 0 switches the
-.stash off: 0 already means "never set". BMX.KEPT is the once-per-run guard
-.that makes a slideshow restore the machine's palette rather than the
-.previous picture's.
-.
-=FILEIO.INC.BL
-.
-.Needs a #SYMFILE -- FILE.TOPET is a GP.ASM blob.
-.
-.  in
-.      FILE.NAME$ -- the file every routine acts on<br>FILE.NEW$ -- the
-.        second name, RENAME and COPY<br>FILE.DEVICE -- the drive; 0 means
-.        8<br>FILE.ISO -- non-zero converts names to PETSCII on the way
-.        out<br>FILE.N -- rows to write, SAVEARRAY<br>FILE.MAX -- rows that
-.        will fit, LOADARRAY; 0 means 10<br>FILE.LINE$() -- the rows; the
-.        caller owns the DIM
-.
-.  out
-.      FILE.ERR FILE.MSG$ FILE.TRK FILE.SEC -- the command channel<br>FILE.OK
-.        -- FILE.EXISTS<br>FILE.N -- rows read, LOADARRAY<br>FILE.PATH$ --
-.        FILE.CURDIR
-.
-.  internal
-.      FILE.CMDSTR$ FILE.OUT$ FILE.RAW$ FILE.ROW$ FILE.ST FILE.KEEP FILE.I
-.        FILE.PETP%
-.
-.  constants
-.      FILE.OKMAX FILE.NOTFOUND FILE.EXISTSERR FILE.PROTECTED FILE.CHAN
-.
-.This module is the missing DS and DS$. FILE.ERR is DS and FILE.MSG$ is DS$.
-.ST is not a disk status -- it is the KERNAL's serial bus status and cannot
-.report FILE NOT FOUND.
-.
-.FILE.N is both an input and an output, the way MENUVERT.SEL is. FILE.LINE$()
-.is the caller's DIM, like MENUVERT.ITEM$ and unlike THEME.CLR.
-.
+>73|4.12 GUI2.INC.BL -- a listbox, single or multi select
+>78|4.17 COMBO.INC.BL -- a drop-down list that folds into one row
+>72|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back

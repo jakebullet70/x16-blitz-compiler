@@ -1,0 +1,107 @@
+@3. The modules (2)
+=KB.INC.BL
+.
+.  out
+.      --
+.
+.  internal
+.      KB.K$
+.
+.One routine, KB.CLEARKB, and one variable it drains into. Nothing else is in
+.the prefix.
+.
+=LINEINPUT.INC.BL
+.
+.  in
+.      LINEINPUT.X LINEINPUT.Y -- top left of the field<br>LINEINPUT.LEN --
+.        how many characters fit<br>LINEINPUT.ATTR -- packed
+.        attribute<br>LINEINPUT.TEXT$ -- the starting value<br>LINEINPUT.MASK
+.        -- non-zero shows asterisks<br>LINEINPUT.ALLOW$ -- the only
+.        characters accepted<br>LINEINPUT.DENY$ -- characters
+.        refused<br>LINEINPUT.LABEL$ -- LINEINPUT.ASK only
+.
+.  out
+.      LINEINPUT.TEXT$ -- what was typed<br>LINEINPUT.KEY -- the key that
+.        ended it
+.
+.  internal
+.      LINEINPUT.SHOW$ LINEINPUT.WAS$ LINEINPUT.K$ LINEINPUT.CELL$
+.        LINEINPUT.CODE LINEINPUT.CX LINEINPUT.CA LINEINPUT.INV LINEINPUT.LIT
+.        LINEINPUT.TICK LINEINPUT.DONE LINEINPUT.FILLED LINEINPUT.HOME
+.        LINEINPUT.BAR
+.
+.  constants
+.      LINEINPUT.RETURN LINEINPUT.DELETE LINEINPUT.ESCAPE LINEINPUT.STOP
+.        LINEINPUT.DOWN LINEINPUT.UP LINEINPUT.TAB LINEINPUT.SPACE
+.        LINEINPUT.STAR LINEINPUT.BLINK
+.
+.LINEINPUT.SHOW$ is listed internal but is the one exception worth knowing:
+.it holds what the field displayed, which is what you want if you are
+.repainting a masked field yourself. FORM.EXP.BL uses it for exactly that.
+.
+=BMX.INC.BL
+.
+.  in
+.      BMX.FILE$
+.
+.  out
+.      BMX.ERROR$ -- empty means it worked<br>BMX.WIDTH BMX.HEIGHT BMX.DEPTH
+.        BMX.VERSION BMX.PALUSED BMX.PALFIRST BMX.DATAOFF BMX.PACKED -- the
+.        header, readable after BMX.OPEN
+.
+.  in, optional
+.      BMX.STASH -- where BMX.PAINT keeps the machine's palette; VRAM $13000
+.        by default, -1 to keep nothing
+.
+.  internal
+.      BMX.PTR BMX.HEADER$ BMX.SCRATCH BMX.SCRATCH$ BMX.PALBASE BMX.ADDR
+.        BMX.LO BMX.HI BMX.BANK BMX.REST BMX.COUNT BMX.CHUNK BMX.GOT BMX.STEP
+.        BMX.SKIP BMX.ROW BMX.ROWS BMX.X0 BMX.Y0 BMX.BAD BMX.KEPT BMX.SRC
+.        BMX.DST
+.
+.  constants
+.      BMXK.MACPTR BMXK.CHKIN BMXK.CLRCHN BMXK.MEMCOPY BMXK.VCTRL BMXK.VLO
+.        BMXK.VMID BMXK.VHI BMXK.PORTLO BMXK.PORTLO.B BMXK.PORTHI BMXK.LFN
+.
+.BMX.PTR doubles as the "have I initialised" flag -- it is zero until
+.BMX.INIT has run. Zeroing it yourself would leak a string block and
+.re-allocate.
+.
+.BMX.STASH is the one variable here a caller may want to set, and it has to
+.be set before the first BMX.OPEN -- BMX.INIT runs then, and fills in the
+.default only if you have not. That is why -1 rather than 0 switches the
+.stash off: 0 already means "never set". BMX.KEPT is the once-per-run guard
+.that makes a slideshow restore the machine's palette rather than the
+.previous picture's.
+.
+=FILEIO.INC.BL
+.
+.Needs a #SYMFILE -- FILE.TOPET is a GP.ASM blob.
+.
+.  in
+.      FILE.NAME$ -- the file every routine acts on<br>FILE.NEW$ -- the
+.        second name, RENAME and COPY<br>FILE.DEVICE -- the drive; 0 means
+.        8<br>FILE.ISO -- non-zero converts names to PETSCII on the way
+.        out<br>FILE.N -- rows to write, SAVEARRAY<br>FILE.MAX -- rows that
+.        will fit, LOADARRAY; 0 means 10<br>FILE.LINE$() -- the rows; the
+.        caller owns the DIM
+.
+.  out
+.      FILE.ERR FILE.MSG$ FILE.TRK FILE.SEC -- the command channel<br>FILE.OK
+.        -- FILE.EXISTS<br>FILE.N -- rows read, LOADARRAY<br>FILE.PATH$ --
+.        FILE.CURDIR
+.
+.  internal
+.      FILE.CMDSTR$ FILE.OUT$ FILE.RAW$ FILE.ROW$ FILE.ST FILE.KEEP FILE.I
+.        FILE.PETP%
+.
+.  constants
+.      FILE.OKMAX FILE.NOTFOUND FILE.EXISTSERR FILE.PROTECTED FILE.CHAN
+.
+.This module is the missing DS and DS$. FILE.ERR is DS and FILE.MSG$ is DS$.
+.ST is not a disk status -- it is the KERNAL's serial bus status and cannot
+.report FILE NOT FOUND.
+.
+.FILE.N is both an input and an output, the way MENUVERT.SEL is. FILE.LINE$()
+.is the caller's DIM, like MENUVERT.ITEM$ and unlike THEME.CLR.
+.

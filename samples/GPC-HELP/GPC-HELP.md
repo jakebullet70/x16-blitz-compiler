@@ -5,7 +5,7 @@ The GP.BASIC and BASL reference that `GPB.HELP.PRG` shows on the X16, in one fil
 **Generated. Do not edit.** `MKHELP.PY` builds it and the `.HLP` files together from `GPC-BASIC/` -- the manual, the name register and the module banner headers. Fix anything wrong at the source and rebuild:
 
 ```
-python MKHELP.PY
+python samples/GPC-HELP/MKHELP.PY
 ```
 
 ## Contents
@@ -16,10 +16,11 @@ python MKHELP.PY
 - **WHAT IS IN GPC**
   - [1. What has to be on the drive to compile](#1-what-has-to-be-on-the-drive-to-compile)
   - [2. The compiler](#2-the-compiler)
-  - [3. The tools](#3-the-tools)
-  - [4. GPC-BASIC/ -- the library](#4-gpc-basic----the-library)
-  - [5. GPC-BASIC/ -- the examples](#5-gpc-basic----the-examples)
-  - [6. The documents](#6-the-documents)
+  - [3. BASLOAD -- the tokeniser, and why it is forked](#3-basload----the-tokeniser-and-why-it-is-forked)
+  - [4. The tools](#4-the-tools)
+  - [5. GPC-BASIC/ -- the library](#5-gpc-basic----the-library)
+  - [6. GPC-BASIC/ -- the examples](#6-gpc-basic----the-examples)
+  - [7. The documents](#7-the-documents)
 - **GP.* CORE KEYWORDS**
   - [3. Command reference](#3-command-reference)
   - [3. Command reference (2)](#3-command-reference-2)
@@ -43,6 +44,7 @@ python MKHELP.PY
   - [3.11.1 GP.DEFPROC -- declare a verb and its arguments](#3111-gpdefproc----declare-a-verb-and-its-arguments)
   - [3.11.2 GP.SUB -- call a verb](#3112-gpsub----call-a-verb)
   - [3.11.3 GP.FN -- call a verb from inside an expression](#3113-gpfn----call-a-verb-from-inside-an-expression)
+  - [3.12 Code in a bank](#312-code-in-a-bank)
 - **BASL MODULES**
   - [4. Module reference -- the BASL library](#4-module-reference----the-basl-library)
   - [4.1 THEME.INC.BL -- named colour roles](#41-themeincbl----named-colour-roles)
@@ -59,6 +61,15 @@ python MKHELP.PY
   - [4.10 STRUSING.INC.BL -- a number to a template](#410-strusingincbl----a-number-to-a-template)
   - [4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back](#411-guiincbl----four-dialogs-in-a-box-that-puts-the-screen-back)
   - [4.12 GUI2.INC.BL -- a listbox, single or multi select](#412-gui2incbl----a-listbox-single-or-multi-select)
+  - [4.13 BANKMGR.INC.BL -- who owns which RAM bank](#413-bankmgrincbl----who-owns-which-ram-bank)
+  - [4.14 KB.INC.BL -- the keyboard buffer, emptied](#414-kbincbl----the-keyboard-buffer-emptied)
+  - [4.15 FILEIO.INC.BL -- the drive: status, files, directories](#415-fileioincbl----the-drive-status-files-directories)
+  - [4.16 FILEDIR.INC.BL -- a directory, into a bank or into low RAM](#416-filedirincbl----a-directory-into-a-bank-or-into-low-ram)
+  - [4.17 COMBO.INC.BL -- a drop-down list that folds into one row](#417-comboincbl----a-drop-down-list-that-folds-into-one-row)
+  - [4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM](#418-stashvramincbl----rectangles-and-blobs-kept-in-vram)
+  - [4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store](#419-stashvramgcincbl----close-the-holes-in-a-stashvram-store)
+  - [4.20 GPBMODS -- the harness that drives every module](#420-gpbmods----the-harness-that-drives-every-module)
+  - [4.20 GPBMODS -- the harness that drives every module (2)](#420-gpbmods----the-harness-that-drives-every-module-2)
   - [STASH.INC.BL -- save a text rectangle, and put it back.](#stashincbl----save-a-text-rectangle-and-put-it-back)
   - [STASHFILE.INC.BL -- a saved text rectangle, through a file.](#stashfileincbl----a-saved-text-rectangle-through-a-file)
 - **GLOBALS AND NAMING**
@@ -76,6 +87,9 @@ python MKHELP.PY
   - [6. Two more naming rules that are not about collisions](#6-two-more-naming-rules-that-are-not-about-collisions)
 - **THE TRAPS**
   - [6. The traps, collected](#6-the-traps-collected)
+- **COMPILER KNOWN BUGS**
+  - [8. Known bugs](#8-known-bugs)
+  - [8. Known bugs (2)](#8-known-bugs-2)
 - **MEMORY AND LIMITS**
   - [7. Memory, and what the compiler tells you](#7-memory-and-what-the-compiler-tells-you)
 
@@ -87,17 +101,17 @@ python MKHELP.PY
 
 #### 1. What GP.BASIC is
 
-Three layers, innermost first.
-
-**Core keywords.** 30 of them, compiled to p-code and handled by assembly in the runtime:
+**Core keywords.** 29 of them, compiled to p-code and handled by assembly in the runtime:
 
     GP.DO GP.LOOP GP.EXITDO
     GP.IF GP.ELSEIF GP.ELSE GP.ENDIF
     GP.SELECT GP.CASE GP.OTHER GP.ENDSEL
     GP.INSTR GP.COMP GP.STRPTR GP.ARRPTR
-    GP.BOX GP.FILL GP.CHAR GP.PRINTAT
+    GP.BOX GP.FILL GP.PRINTAT
     GP.CALL GP.A GP.X GP.Y GP.C
-    GP.ASM GP.ENDASM
+    GP.FN
+    GP.BANKEDSTR GP.ENDBANKEDSTR GP.BSTR
+    GP.BANKED GP.ENDBANKED
 
 They are assembly because BASIC is slow at per-character string scans, screen fills and VERA writes.
 
@@ -111,12 +125,17 @@ runtime image is written out, where the p-code lands, and where the workspace st
 p-code is 17,152 bytes with the block and 18,176 without: `ObjectBase` to `$9F00`, less the 4K
 frame stack and the 4K minimum workspace.
 
-**Composites.** `GP.CONTAINS`, `GP.ISEMPTY`, `GP.HIBYTE`, `GP.LOBYTE`. The compiler expands each
-into opcodes that already exist. No handler, no vector slot, nothing in the block.
+**Composites.** `GP.ASM`, `GP.ENDASM`, `GP.CHAR`, `GP.CONTAINS`, `GP.ISEMPTY`, `GP.HIBYTE`,
+`GP.LOBYTE`, `GP.BSTRCOUNT`, `GP.DEFPROC`, `GP.SUB`. The compiler expands each into opcodes that
+already exist. No handler, no vector slot, nothing in the block. Whether the block comes in is then
+the expansion's business, not the composite's: `GP.CHAR` runs `GP.FILL`'s handler and brings it in,
+while `GP.ASM`, `GP.ENDASM`, `GP.DEFPROC` and `GP.SUB` leave a program GP-BASIC OUT.
 
-**The library.** `GPC-BASIC/`: 14 `.INC.BL` modules, 22 `.EXP.BL` examples. Ordinary BASL,
+**The library.** `GPC-BASIC/`: 17 `.INC.BL` modules, 25 `.EXP.BL` examples. Ordinary BASL,
 `#INCLUDE`d by path, called with `GOSUB`. Zero runtime bytes — a module costs its own p-code, in the
-programs that include it. Menus vertical and bar, panels, themes, entry fields, in-place case, trim
+programs that include it. Six of the modules have a banked twin named `.BANK.INC.BL`, reached
+through one of three `SHIM.` front doors, for a program that has run out of low memory; §3.12 is
+where those are explained. Menus vertical and bar, panels, themes, entry fields, in-place case, trim
 and splice, shell sort, a screen rectangle to a RAM bank or a file, BMX into VERA.
 
 `STASH.INC.BL`, `SORT.INC.BL`, `STRCASE.INC.BL` and `STRINGS.INC.BL` are `GP.ASM` and still
@@ -129,7 +148,7 @@ waits on the keyboard, so speed does not apply to it; writing it in BASL saved 1
 ---
 
 
-*See also: STASH.INC.BL -- save a text rectangle, and put it back., 4.7 SORT.INC.BL -- shell sort a string array, 4.8 STRCASE.INC.BL -- case, in place, 4.2 STRINGS.INC.BL -- string helpers*
+*See also: 3.12 Code in a bank, STASH.INC.BL -- save a text rectangle, and put it back., 4.7 SORT.INC.BL -- shell sort a string array, 4.8 STRCASE.INC.BL -- case, in place, 4.2 STRINGS.INC.BL -- string helpers*
 
 ## 2. Using it
 
@@ -141,9 +160,7 @@ Every BASL source that uses a `GP.` keyword must declare the keyword set:
 #INCLUDE "GPB.INC.BL"
 ```
 
-BASLOAD knows only the ROM's keywords. Without that line `GP.DO 5` is a syntax error. The
-PC-side converter for hand-written `.bas` needs no such declaration; it reads the same keyword
-list from `c64tokens.py` at build time.
+BASLOAD knows only the ROM's keywords. Without that line `GP.DO 5` is a syntax error.
 
 ##### Where the library lives
 
@@ -252,9 +269,90 @@ A compiled program identifies itself: `LIST` one and the BASIC stub reads `SYS 2
 ---
 
 
-## 3. The tools
+## 3. BASLOAD -- the tokeniser, and why it is forked
 
-#### 3. The tools
+#### 3. BASLOAD — the tokeniser, and why it is forked
+
+`BASLOAD` is the first thing every build runs. It turns `.BASL` source — labels, long variable
+names, `#INCLUDE`, `#DEFINE` — into a tokenised BASIC program with line numbers, which is what the
+compiler reads. GPC never sees a label.
+
+**The X16 ships BASLOAD in ROM, and this project does not use that one.** `BASLOAD-GPC.BIN` is the
+same program built from the same upstream source as an ordinary PRG, with a handful of changes in
+`BASLOAD-GPC/src/`. The build drives that one and stages it into `testing/` beside `GPC.BIN`.
+
+##### Why
+
+**The ROM version built the tokenised program in BASIC RAM**, so 38,655 bytes was the ceiling on a
+`.BASL` *plus every `#INCLUDE` it pulls in*. Two-pass compilation had just moved GPC's own size
+wall; this one was then the next thing in front of it, and
+`samples/GPB-MODS-TESTING/GPBMODS.BASL` came within 783 bytes of it.
+
+It also failed badly. Over the ceiling it printed `SAVING` and wrote a short PRG *before* reporting
+`ERROR: BASIC RAM FULL`, so the file existed, was not empty, and loaded at `$0801`. GPC then died a
+stage later on a label whose line had never been written — `UNKNOWN LINE NUMBER @ nnnn` — naming
+neither the file nor the cause.
+
+Changing that looked like it meant shipping a custom `rom.bin` and flashing real hardware. **It does
+not.** The upstream source builds and runs as a RAM-resident PRG with no source changes at all, only
+a linker config, and that is what made the rest possible.
+
+**The fork streams.** Each line is written to an open file as it is finished, so one line — a
+260-byte staging buffer — is all that is ever resident, and the output is bounded by the disk
+instead of by BASIC RAM. A source that died at 38,421 bytes now tokenises to 47,765 and compiles.
+`GPC.BASL` comes out byte-identical to the ROM's output.
+
+##### The two files
+
+| file | what it is | size |
+|---|---|---|
+| `BASLOAD-GPC.BIN` | the engine. Its only interface is an ABI at `$bf00` | 9,003 bytes, loads `$6000` |
+| `BASLOAD-GPC.PRG` | the front end — the thing a person runs | 971 bytes |
+
+The same division as `GPC.BIN` and `GPC.PRG`: the name a person types belongs to the front end. The
+front end asks for a source file, hands it to the engine, prints what comes back and asks again; an
+empty answer quits. It is plain X16 BASIC rather than GP.BASIC, because it has to run from `READY.`
+with nothing on the disk but itself and the engine.
+
+##### A failed run deletes its own output
+
+Streaming created one failure the ROM never had. A run that died partway through pass 2 still wrote
+the end-of-program link and closed the file, so what stayed on disk was a **structurally perfect
+BASIC program that stopped where the error did** — and nothing downstream could tell it from a whole
+one. The compiler was handed one and died on the first forward reference past the cut.
+
+The fork now scratches the file when a run fails. Two things it deliberately does not do: it never
+runs unless *this* run created the file, so a `FILE EXISTS` failure cannot destroy a previous good
+build; and it never reads the drive status afterwards, because that would replace
+`LABEL NOT FOUND IN DB.INC.BL:459` with a generic file error and lose the only useful thing the run
+produced.
+
+##### `#GPC` — a directive channel BASLOAD never has to understand
+
+`#GPC` passes the rest of its line through into the tokenised program as a `REM`, verbatim, and
+BASLOAD never learns what any of it means:
+
+```
+#GPC OBJECT "GPBMODS.PRG"        ->   1 REM#GPC OBJECT "GPBMODS.PRG"
+#GPC SHARED                      ->   2 REM#GPC SHARED
+```
+
+**The `#` is kept and there is no space after the `REM` token.** That is what a reader matches on:
+`$8f` then `#GPC`, which no ordinary comment produces by accident. One table entry buys the compiler
+an unlimited directive namespace, so every future compiler directive is a GPC-side change alone.
+
+##### Where the old ceiling still binds
+
+**Anything that types `BASLOAD "X"` at the BASIC prompt uses the ROM, and still stops at 38,655
+bytes.** That is the interactive path and the dev harnesses in `work/`. Only the build drives the
+fork.
+
+---
+
+
+## 4. The tools
+
+#### 4. The tools
 
 `GPC.ERR.PRG` turns a runtime error's `@ $XXXX` into a source line, using the debug map the
 compiler writes when `MAKE A DEBUG MAP?` is answered yes. Without the map the address cannot be
@@ -269,9 +367,9 @@ themes, `?` is the about box. `ESC` goes back a step, and quits from the index.
 ---
 
 
-## 4. GPC-BASIC/ -- the library
+## 5. GPC-BASIC/ -- the library
 
-#### 4. `GPC-BASIC/` — the library
+#### 5. `GPC-BASIC/` — the library
 
 Text-mode building blocks, in BASL, `#INCLUDE`d into your source. BASL has no dead code
 elimination: including a module costs its whole size whether or not it is called.
@@ -301,11 +399,11 @@ What each one costs in bytes is in the command reference, under *At a glance*.
 ---
 
 
-*See also: 4.1 THEME.INC.BL -- named colour roles, 4.3 APPSYS.INC.BL -- start politely, leave it as you found it, STASH.INC.BL -- save a text rectangle, and put it back., STASHFILE.INC.BL -- a saved text rectangle, through a file., 4.4 LINEINPUT.INC.BL -- a positioned entry field, 4.6 MENUVERT.INC.BL -- a vertical menu, 4.9 MENUBAR.INC.BL -- a horizontal menu, 4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back, 4.12 GUI2.INC.BL -- a listbox, single or multi select, 4.2 STRINGS.INC.BL -- string helpers, 4.8 STRCASE.INC.BL -- case, in place, 4.10 STRUSING.INC.BL -- a number to a template*
+*See also: 4.1 THEME.INC.BL -- named colour roles, 4.3 APPSYS.INC.BL -- start politely, leave it as you found it, STASH.INC.BL -- save a text rectangle, and put it back., STASHFILE.INC.BL -- a saved text rectangle, through a file., 4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM, 4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store, 4.4 LINEINPUT.INC.BL -- a positioned entry field, 4.6 MENUVERT.INC.BL -- a vertical menu, 4.9 MENUBAR.INC.BL -- a horizontal menu, 4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back, 4.12 GUI2.INC.BL -- a listbox, single or multi select, 4.2 STRINGS.INC.BL -- string helpers*
 
-## 5. GPC-BASIC/ -- the examples
+## 6. GPC-BASIC/ -- the examples
 
-#### 5. `GPC-BASIC/` — the examples
+#### 6. `GPC-BASIC/` — the examples
 
 One `.EXP.BL` per topic. Several are also the regression test for the module they sit beside.
 
@@ -336,9 +434,9 @@ One `.EXP.BL` per topic. Several are also the regression test for the module the
 ---
 
 
-## 6. The documents
+## 7. The documents
 
-#### 6. The documents
+#### 7. The documents
 
 | | |
 |---|---|
@@ -398,6 +496,14 @@ Three implementations, and what each costs:
 | **Menus** | BASIC | `MENUBAR.INC.BL` — `RUN` `DRAW` `ITEM` `MARK` `WHERE`, the other axis · §4.9 |
 | **Dialogs** | BASIC | `GUI.INC.BL` — `GUI.SAY` `GUI.YN` `GUI.MENU` `GUI.INPUT` `GUI.OPEN` `GUI.CLOSE` · §4.11 |
 | **Dialogs** | BASIC | `GUI2.INC.BL` — `GUI.LISTBOX`, single or multi select · §4.12 |
+| **Dialogs** | BASIC | `COMBO.INC.BL` — `COMBO.ADD`, a drop-down that folds into one row · §4.17 |
+| **Code in a bank** | ASM | `GP.BANKED` `GP.ENDBANKED` — p-code at `$A000`, out of the low-memory budget, see §3.12 |
+| **Bank ownership** | BASIC | `BANKMGR.INC.BL` — `INIT` `CLAIM` `GET.FREE.BANK` `RELEASE` `COUNT` · §4.13 |
+| **Keyboard** | BASIC | `KB.INC.BL` — `KB.CLEARKB` · §4.14 |
+| **The drive** | BASIC | `FILEIO.INC.BL` — `STATUS` `EXISTS` `SIZE` `DELETE` `RENAME` `COPY` `MKDIR` `CHDIR` `SAVEARRAY` `LOADARRAY` · §4.15 |
+| **The drive** | BASIC | `FILEDIR.INC.BL` — `FILE.DIR.INIT` `OPEN` `NEXT`, into a bank or low RAM · §4.16 |
+| **Screen — stash** | BASIC | `STASHVRAM.INC.BL` — `SV.SAVE` `SV.RESTORE` `SV.PUT` `SV.GET`, kept in VRAM · §4.18 |
+| **Screen — stash** | BASIC | `STASHVRAMGC.INC.BL` — `SV.COMPACT` · §4.19 |
 
 The rule is in §1: assembly for tight loops and bulk data moves, BASIC for everything else, and a
 composite for anything that is only a spelling of keywords already present. A menu waits on a human,
@@ -770,7 +876,7 @@ third file for the same dead-code reason.
 ---
 
 
-*See also: STASH.INC.BL -- save a text rectangle, and put it back., STASHFILE.INC.BL -- a saved text rectangle, through a file.*
+*See also: STASH.INC.BL -- save a text rectangle, and put it back., STASHFILE.INC.BL -- a saved text rectangle, through a file., 4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM, 4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store*
 
 ## 3.7 Screen -- drawing
 
@@ -895,10 +1001,12 @@ Example: [`IF.EXP.BL`](IF.EXP.BL)
 ##### 3.9 Inline assembly
 
 ```
+#REM 1
 GP.ASM
 REM <instruction>
 ...
 GP.ENDASM
+#REM 0
 ```
 
 65C02 assembly, assembled by GPC at compile time, with the bytes placed in the program.
@@ -913,11 +1021,13 @@ POKE ML+0,26 : POKE ML+1,232 : POKE ML+2,200 : GP.CALL ML,10,20,30
 ```
 ```basic
 #### assembled: the bytes land in the program, and there is no address to find
+#REM 1
 GP.ASM
 REM inc a
 REM inx
 REM iny
 GP.ENDASM
+#REM 0
 ```
 
 It costs no runtime bytes. A block is five bytes of p-code plus the assembled instructions, and
@@ -943,6 +1053,7 @@ Labels belong to their block — the same name in two blocks is two different la
 branch to the other.
 
 ```basic
+#REM 1
 GP.ASM
 REM ldx #5
 REM loop: lda #42
@@ -950,6 +1061,7 @@ REM jsr $ffd2
 REM dex
 REM bne loop
 GP.ENDASM
+#REM 0
 ```
 
 `BNE`, `BEQ`, `BRA` and the rest take a label, as do `JMP` and `JSR`. A branch further than 127
@@ -1273,6 +1385,112 @@ The refusals, all at compile time:
 ---
 
 
+## 3.12 Code in a bank
+
+##### 3.12 Code in a bank
+
+```
+GP.BANKED <bank>
+    ... p-code ...
+GP.ENDBANKED
+```
+
+Marks a run of p-code as belonging at `$A000` in that RAM bank rather than in low memory. Both
+keywords are alone on their line and the bank is a decimal constant.
+
+**They are compile-time markers and select nothing.** `BANK` is the statement that selects a bank,
+and these are deliberately not spelled like it. Nothing happens at run time where the `GP.BANKED`
+line is.
+
+This is how a program gets past the shared p-code ceiling. Low-memory p-code has to fit under the
+runtime — about 17,920 bytes, §7 — and a region does not count against it. Each region becomes its
+own overlay file, `NAME.B04` for bank 4, written beside the `.PRG` and loaded with it.
+
+```basic
+GOTO MY.LIBEND
+#INCLUDE "SHIM.GUIBANK.INC.BL"        ' the shims, in LOW memory
+GP.BANKED SHIM.GUIBANK
+#INCLUDE "MENUVERT.BANK.INC.BL"       ' the bodies, in the bank
+#INCLUDE "MENUBAR.BANK.INC.BL"
+#INCLUDE "LINEINPUT.BANK.INC.BL"
+#INCLUDE "GUI.BANK.INC.BL"
+#INCLUDE "GUI2.BANK.INC.BL"
+GP.ENDBANKED
+MY.LIBEND:
+```
+
+**The `GOTO` over the region is not optional.** Falling in through the bridge `GP.BANKED` leaves
+works at program start and stops working the day anything selects another bank first.
+
+**Claim the bank**, or something else hands it out:
+
+```basic
+BANKMGR.SET.BANK = SHIM.GUIBANK : GOSUB BANKMGR.CLAIM
+```
+
+###### What fits
+
+**32 pages — the whole of `$A000`–`$BFFF`, 8,192 bytes.** The entry bridge, the alignment padding,
+the exit bridge and the end marker are part of what has to fit, so the usable payload is a little
+under the window. Past it the compiler stops and names the region's `GP.BANKED` line, not the line
+it happened to be on when it ran out.
+
+**Sixty-three regions, and that is the machine's limit rather than the compiler's** — banks 1 to 63
+on a 512 K X16, with 0 the KERNAL's. **No two regions may share a bank**: the second would land at
+`$A000` on top of the first.
+
+###### What a region may not contain
+
+**`BANK`, `BLOAD` and `BSAVE` are refused inside a region.** Code fetched from the window cannot be
+running when the window changes. A `BANK` statement is the only disqualifier — that is what keeps
+`STASH` and `STASHFILE` in low memory, and what lets `STASHVRAM` (§4.18) go in.
+
+`GP.BANKEDSTR` (§3.10) inside a region is free: it emits no p-code at all, so a text group costs the
+region nothing.
+
+###### Calling in, and calling out
+
+**A region cannot branch to another region.** Two regions live at the same `$A000` in different
+banks, so a branch from one to the other has no distance to travel and the compiler refuses it.
+
+**Calling out, down into low memory, is safe.** Low memory does not care which bank is selected, so
+an ordinary `GOSUB` downwards works from inside a region.
+
+Everything else crosses through a low-memory shim. A banked routine cannot select its own bank — by
+its first instruction fetch the window is already wrong — so the public name is a low-memory label
+and the real code takes a `.BODY` name:
+
+```basic
+GUI.SAY:  GOSUB GUI.SHIM.PUSH : GOSUB GUI.SAY.BODY : GOTO GUI.SHIM.POP
+```
+
+**`PUSH` keeps the caller's bank and selects the library's; `POP` puts the caller's back.** So a
+caller that is itself inside another region may call in here and get its own bank returned to it,
+and the instruction after the call is fetched from the right place. The region cannot do this for
+itself, because a region may not contain `BANK`; the shim is in low memory and can.
+
+**It is a stack, not one variable**, because the calls nest and come back round: a dialog in one
+bank draws a control that lives in a bank of its own, and that control opens a menu back in the
+first. Three banks are live at once and each level has a different one to return to. `GUI.SHIM.MAX`
+is 8 deep.
+
+`GOTO` to `POP`, not `GOSUB` — the shim's own `RETURN` is the one the caller is waiting on.
+
+**Never call a `.BODY` from outside its region.** It is the half of the pair that does not bank.
+
+###### The overlay files
+
+Each region is written out as `NAME.Bnn`, `nn` being the bank in decimal. The file carries a
+two-byte load address like any PRG, so **the payload is the file size less two**, and the size is
+the page-padded region rather than the p-code in it.
+
+A program's `.Bnn` files ship beside its `.PRG` and must travel with it.
+
+---
+
+
+*See also: 7. Memory, and what the compiler tells you, 4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM, 3.10 Text in a bank*
+
 ---
 
 # BASL MODULES
@@ -1285,15 +1503,77 @@ Called with `GOSUB`. Arguments go into named variables before the call, results 
 variables after it. Every module is position-independent — each jumps over itself — so `#INCLUDE` it
 anywhere, including the top of the program.
 
-**Six of them need a front door.** `THEME`, `MENUVERT`, `MENUBAR`, `LINEINPUT`, `GUI` and `GUI2`
-are built to run from a RAM bank, and a banked routine cannot select its own bank — so each defines
-`THEME.SELECT.BODY` rather than `THEME.SELECT`, and the public name comes from a separate file that
-banks and then calls it. `#INCLUDE "LIB.GUIBANK.INC.BL"` to run the library in a bank, or the six
-`<MODULE>.PLAIN.INC.BL` files to run it from low memory — **one or the other, never both**, and
-only the ones whose modules you actually included. The front doors go before the bodies in the
-file, and the `GOSUB`s in this section read identically either way. See
+**Eighteen of them come in two files.** `APPSYS`, `BANKMGR`, `COMBO`, `FILEDIR`, `FILEIO`, `GUI`,
+`GUI2`, `KB`, `LINEINPUT`, `MENUBAR`, `MENUVERT`, `SORT`, `STASHVRAM`, `STASHVRAMGC`, `STRCASE`,
+`STRINGS`, `STRUSING` and `THEME` can run from a RAM bank, and a banked routine cannot select its
+own bank — so the banked copy defines `THEME.SELECT.BODY` rather than `THEME.SELECT`, and the public
+name comes from a shim file that banks and then calls it. `#INCLUDE "THEME.INC.BL"` for the low
+memory form, whose entry points are plain names and which costs nothing, or
+`#INCLUDE "THEME.BANK.INC.BL"` inside a `GP.BANKED` region with a `SHIM.*BANK.INC.BL` file above it
+— **one or the other, never both**. The `GOSUB`s in this section read identically either way.
+
+`STASH` and `STASHFILE` have no banked twin: both execute `BANK`, and a `GP.BANKED` region may not
+contain that statement. `STASHVRAM` (§4.18) is the one to reach for inside a region. See [BANKED-OR-NOT.md](BANKED-OR-NOT.md) and
 [GP-BASIC.GLOBALS.md](GP-BASIC.GLOBALS.md) §4.
 
+##### Plain and banked — what differs between the two files
+
+A module that comes in two files ships the same code twice. `X.INC.BL` puts it in low memory.
+`X.BANK.INC.BL` puts it in a RAM bank. The `GOSUB` at the call site is the same either way.
+
+Low memory is the one that runs out. A SHARED program has about 17,920 bytes of p-code under the
+runtime and every `#INCLUDE` spends it; a region spends 8,192 bytes of a RAM bank the program was
+not using. Bank what you can. What stays low is the module called inside a loop, where the shim on
+every call is the whole cost.
+
+The banked form needs the program built SHARED. `GP.BANKED` reports `NOT IMPLEMENTED` in an
+embedded build, because the copy into the bank is the shared bootstrap's work and an embedded
+object has no bootstrap.
+
+`samples/GPB-MODS-TESTING/PICKDEMO.BASL` is a complete program in this shape, in 104 lines.
+
+| | `X.INC.BL` | `X.BANK.INC.BL` |
+|---|---|---|
+| Entry label | `THEME.SELECT` | `THEME.SELECT.BODY` |
+| Sits in | low memory | a `GP.BANKED` region |
+| Also needs | nothing | `SHIM.*BANK.INC.BL`, above the region |
+| Costs per call | one `GOSUB` | a bank select and a restore |
+| Low memory used | the whole module | the shims only |
+
+The code between the entry label and its `RETURN` is identical in the two files.
+They are hand-maintained, so a bug fixed in one is still in the other.
+
+The banked form takes three includes, not one:
+
+```basic
+GOTO MY.LIBEND
+#INCLUDE "SHIM.GUIBANK.INC.BL"
+GP.BANKED SHIM.GUIBANK
+#INCLUDE "MENUVERT.BANK.INC.BL"
+#INCLUDE "GUI.BANK.INC.BL"
+GP.ENDBANKED
+MY.LIBEND:
+```
+
+`SHIM.GUIBANK.INC.BL` carries twenty-one shims over four modules: `GUI`,
+`MENUVERT`, `MENUBAR` and `LINEINPUT`. `GUI2` rides in the same region with no
+shim of its own, because nothing outside the region calls it. BASLOAD resolves
+every label in every file it reads, so including a shim file obliges every body
+behind it even when the program calls one of them. A body left out is
+`LABEL NOT FOUND`.
+
+**THEME and COMBO have regions and shim files of their own**,
+`SHIM.THEMEBANK.INC.BL` and `SHIM.COMBOBANK.INC.BL`, and a program that wants
+either of them banked includes that pair as well. THEME rode in `SHIM.GUIBANK`
+until that region ran out of room. A region is 8,192 bytes and
+that is the whole of the constraint: the modules are grouped to fit, not by what
+they have in common.
+
+§3.12 has the shim mechanism,
+what a region may not contain, and the `.Bnn` files a banked program ships.
+
+
+*See also: 4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM, 3.12 Code in a bank, 4.1 THEME.INC.BL -- named colour roles*
 
 ## 4.1 THEME.INC.BL -- named colour roles
 
@@ -2071,6 +2351,471 @@ Example: [`GUI2TST.EXP.BL`](GUI2TST.EXP.BL).
 
 *See also: 4.12 GUI2.INC.BL -- a listbox, single or multi select, 4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back*
 
+## 4.13 BANKMGR.INC.BL -- who owns which RAM bank
+
+##### 4.13 `BANKMGR.INC.BL` — who owns which RAM bank
+
+| Routine | in | out |
+|---|---|---|
+| `BANKMGR.INIT` | — | `BANKMGR.BANKS` |
+| `BANKMGR.CLAIM` | `BANKMGR.SET.BANK` | `BANKMGR.OK` |
+| `BANKMGR.GET.FREE.BANK` | — | `BANKMGR.BANK` |
+| `BANKMGR.RELEASE` | `BANKMGR.SET.BANK` | — |
+| `BANKMGR.COUNT` | — | `BANKMGR.BANKS` `BANKMGR.SPARE` |
+
+```basic
+#INCLUDE "BANKMGR.INC.BL"
+
+GOSUB BANKMGR.INIT
+BANKMGR.SET.BANK = SHIM.GUIBANK : GOSUB BANKMGR.CLAIM
+IF BANKMGR.OK = 0 THEN <bank was already taken>
+GOSUB BANKMGR.GET.FREE.BANK
+IF BANKMGR.BANK = 0 THEN <none left>
+```
+
+For a program with several owners of banked RAM, none of which can see the others' numbers. The
+order matters: `BANKMGR.INIT` first, and every `CLAIM` before the first `GET.FREE.BANK`, or the
+allocator hands out a bank a compile-time region is already sitting in.
+
+**It tracks, it does not select.** Nothing in this module executes `BANK`. A claim is a promise
+between the program's own modules, and an accessor still sets its own bank on every access.
+
+**0 is not a bank.** It is the KERNAL's, reserved by `INIT`, and it is what `GET.FREE.BANK` returns
+for *none left*.
+
+`BANKMGR.OK` is `-1` if `CLAIM` took the bank, `0` if it was already taken or out of range.
+`BANKMGR.BANKS` is how many the machine has, 64 or 256. `BANKMGR.SPARE` is what `COUNT` found free.
+
+**`MEMTOP` returns `$00` on a 2 MB machine.** The count is one byte and 256 does not fit, so 512 K
+reads `$40` = 64 and 2 MB reads `$00`, meaning 256. `INIT` reads 0 as 256. A manager that took `$00`
+at face value would report no banks at all on exactly the larger machine. Values that are not a
+multiple of 8 are legal — the reference names `$42` — and mean some banked RAM is bad.
+
+The bitmap is 32 bytes, eight banks to the byte.
+
+---
+
+
+*See also: 4.13 BANKMGR.INC.BL -- who owns which RAM bank*
+
+## 4.14 KB.INC.BL -- the keyboard buffer, emptied
+
+##### 4.14 `KB.INC.BL` — the keyboard buffer, emptied
+
+| Routine | in | out |
+|---|---|---|
+| `KB.CLEARKB` | — | — |
+
+```basic
+#INCLUDE "KB.INC.BL"
+
+GOSUB KB.CLEARKB
+GOSUB GUI.YN
+```
+
+Call it before opening a dialog, and after a keystroke that redraws. A dialog opened with a key
+still queued reads it, answers itself and closes; a held arrow repeats faster than a page can be
+drawn and scrolls on after the key is let go.
+
+**`GUI.INC.BL` carries a private twin, `GUI.CLEARKB`**, because code inside a `GP.BANKED` region may
+not call another bank and survive the return. Fix one and fix the other. There are only the two, and
+a second `#INCLUDE` of this file cannot supply the twin — the `#IFNDEF` guard makes it produce
+nothing.
+
+---
+
+
+*See also: 4.14 KB.INC.BL -- the keyboard buffer, emptied, 4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back*
+
+## 4.15 FILEIO.INC.BL -- the drive: status, files, directories
+
+##### 4.15 `FILEIO.INC.BL` — the drive: status, files, directories
+
+| Routine | in | out |
+|---|---|---|
+| `FILE.STATUS` | — | `FILE.ERR` `FILE.MSG$` `FILE.TRK` `FILE.SEC` |
+| `FILE.EXISTS` | `FILE.NAME$` | `FILE.OK` |
+| `FILE.SIZE` | a name — **a verb, not a `GOSUB`** | `FILE.OK` `FILE.BLOCKS` |
+| `FILE.DELETE` | `FILE.NAME$`, pattern allowed | `FILE.ERR` `FILE.TRK` |
+| `FILE.RENAME` | `FILE.NAME$` `FILE.NEW$` | `FILE.ERR` |
+| `FILE.COPY` | `FILE.NAME$` `FILE.NEW$` | `FILE.ERR` |
+| `FILE.MKDIR` `FILE.RMDIR` `FILE.CHDIR` | `FILE.NAME$` | `FILE.ERR` |
+| `FILE.UP` | — | `FILE.ERR` |
+| `FILE.CURDIR` | — | `FILE.PATH$` |
+| `FILE.SAVEARRAY` | `FILE.NAME$` `FILE.ROWS` `FILE.LINE$()` | `FILE.ERR` |
+| `FILE.LOADARRAY` | `FILE.NAME$` `FILE.MAX` | `FILE.ROWS` `FILE.LINE$()` |
+
+```basic
+#SYMFILE "@:MYPROG.SYM"
+#INCLUDE "FILEIO.INC.BL"
+
+FILE.NAME$ = "SCORES.DAT" : GOSUB FILE.EXISTS
+IF FILE.OK THEN N = GP.FN(FILE.SIZE, "SCORES.DAT")
+```
+
+**The `#SYMFILE` is required, before the `#INCLUDE`s.** `FILE.TOPET` is `GP.ASM` and reaches
+`FILE.PETP%` through `{VAR}`; without a symbol file the compile stops at `NO SYMBOL FILE FOR {}`.
+
+`FILE.SIZE` is declared with `GP.DEFPROC`, so it is called as a verb —
+`GP.SUB FILE.SIZE, "MYFILE.DAT"` or `N = GP.FN(FILE.SIZE, "MYFILE.DAT")` — and not with a `GOSUB`.
+Everything else in the table is a plain `GOSUB`.
+
+`FILE.DEVICE` is the drive and 0 means 8. `FILE.ISO` non-zero folds names to PETSCII on the way out.
+`FILE.LINE$()` is the caller's `DIM`, as `MENUVERT.ITEM$` is; left alone the implicit `DIM` gives
+0 to 10. `FILE.ROWS` is an input to `SAVEARRAY` and an output from `LOADARRAY`.
+
+**`FILE.ERR` under 20 is success.** 0 is OK. 1 is *files scratched* and carries the count in
+`FILE.TRK`. 62 is FILE NOT FOUND, 63 FILE EXISTS, 26 WRITE PROTECT. `FILE.ERR` is `DS` and
+`FILE.MSG$` is `DS$` — the X16 has neither.
+
+This module takes logical file 14 and secondary address 14. Not 2 or 3: those belong to the editor,
+GPC-HELP and the cruncher. The two are equal so a later seek needs no reopen.
+
+**`ST` is not a disk status.** `LINPUT#` on a channel whose `OPEN` found nothing returns `CHR$(0)`
+with `ST = 66`, and keeps doing so. `ST` is 64 before a program's first statement, because `LOAD`
+leaves bit 6 set.
+
+The traps, each one measured on the drive:
+
+- **Read the command channel or the next `OPEN` misbehaves.** The drive holds its error state until
+  channel 15 is read. Every routine here ends by reading it.
+- `FILE.RENAME` onto a name that exists returns 62, not 63 — which is what a missing source also
+  returns. Test with `FILE.EXISTS` first.
+- `FILE.COPY` is one drive. `C:new=old` cannot cross devices. It takes a comma list, so it also
+  concatenates.
+- `FILE.SAVEARRAY` overwrites, with `@:` on the open.
+- `FILE.DELETE` takes a pattern. `S:*.BAK` scratches every match.
+- The last row of a file arrives with `ST` already set, so a row is stored before the loop ends. **A
+  blank final line is indistinguishable from end of file and is dropped.**
+
+**CMDR-DOS has no REL files.** For random access use `,M` open mode with `P` and `T` on channel 15:
+
+```basic
+OPEN 1,8,2,"LEVEL.DAT,S,R"
+OPEN 15,8,15,"P"+CHR$(2)+CHR$(0)+CHR$(1)+CHR$(0)+CHR$(0)
+```
+
+`T` returns the position and the file size. The data channel's secondary address must equal the `P`
+or `T` channel argument. `VAL("$"+MID$(A$,10))` from the manual returns 0 here — `VAL` stops at the
+first non-numeric character, so parse the eight hex digits by hand.
+
+---
+
+
+*See also: 4.15 FILEIO.INC.BL -- the drive: status, files, directories*
+
+## 4.16 FILEDIR.INC.BL -- a directory, into a bank or into low RAM
+
+##### 4.16 `FILEDIR.INC.BL` — a directory, into a bank or into low RAM
+
+| Routine | in | out |
+|---|---|---|
+| `FILE.DIR.INIT` | — | — |
+| `FILE.DIR.OPEN` | `FILE.DIR.BANK` `FILE.DIR.PTR` `FILE.DIR.CAP` `FILE.DIR.PATTERN$` `FILE.DIR.ONLY` | `FILE.DIR.GOT` `FILE.DIR.FULL` `FILE.DIR.SLOW` |
+| `FILE.DIR.NEXT` | — | `FILE.DIR.MORE` `FILE.NAME$` `FILE.BLOCKS` `FILE.TYPE$` |
+
+```basic
+#SYMFILE "@:MYPROG.SYM"
+#INCLUDE "FILEIO.INC.BL"
+#INCLUDE "FILEDIR.INC.BL"
+
+GOSUB BANKMGR.GET.FREE.BANK
+FILE.DIR.BANK = BANKMGR.BANK
+FILE.DIR.PATTERN$ = "*.BASL" : FILE.DIR.ONLY = FILE.DIR.FILES
+GOSUB FILE.DIR.OPEN
+GP.DO
+    GOSUB FILE.DIR.NEXT
+    IF FILE.DIR.MORE = 0 THEN GP.EXITDO
+    PRINT FILE.NAME$, FILE.BLOCKS, FILE.TYPE$
+GP.LOOP
+```
+
+Requires `GPB.INC.BL` and `FILEIO.INC.BL`, and `#INCLUDE`s neither. The `#SYMFILE` is required, for
+the same reason `FILEIO` needs one.
+
+`FILE.DIR.ONLY` takes `FILE.DIR.ALL`, `FILE.DIR.FILES` or `FILE.DIR.DIRS`. `FILE.DIR.MORE` is `-1`
+while `NEXT` produced an entry and 0 at the end. `FILE.DIR.GOT` is bytes read, 0 for an empty or
+failed listing. `FILE.DIR.FULL` says the buffer filled before the listing ended, and
+`FILE.DIR.SLOW` is 1 if the device had no `MACPTR` and the read fell back to `CHRIN` a byte at a
+time.
+
+**Two destinations, one code path**: the reader takes an address and a size.
+
+```basic
+' a bank -- 8,192 bytes at $A000, about 250 entries
+FILE.DIR.BANK = BANKMGR.BANK
+
+' low RAM
+FILE.DIR.BANK = 0
+DIM FD.BUF%(1022)
+FILE.DIR.PTR = GP.ARRPTR(FD.BUF%())
+FILE.DIR.CAP = 1023 * 2
+```
+
+**A `%` array is TWO bytes an element, not six.** The recipe above said six until it was measured,
+and sized a 682-byte buffer as 2,046: a caller following it handed the assembly three times the room
+it had, and the reader would have run 1,364 bytes off the end of the array and into whatever the
+workspace put after it. An untyped array is the six.
+
+`FILE.DIR.BANKBASE` and `FILE.DIR.BANKROOM` are the hardware window, not an allocation — every bank
+appears at `$A000` and every bank is 8,192 bytes. **The bank number is the resource.** Take it from
+`BANKMGR.GET.FREE.BANK` and put it in `FILE.DIR.BANK`. This module claims no bank and executes no
+`BANK` statement.
+
+---
+
+
+*See also: 4.16 FILEDIR.INC.BL -- a directory, into a bank or into low RAM, 4.15 FILEIO.INC.BL -- the drive: status, files, directories*
+
+## 4.17 COMBO.INC.BL -- a drop-down list that folds into one row
+
+##### 4.17 `COMBO.INC.BL` — a drop-down list that folds into one row
+
+| Routine | in | out |
+|---|---|---|
+| `COMBO.ADD` | `COMBO.X` `COMBO.Y` `COMBO.W` `COMBO.COUNT` `COMBO.SEL` `COMBO.BANK`, over `MENUVERT.ITEM$()` | `COMBO.SEL` |
+
+```basic
+MENUVERT.ITEM$(1) = " TEXAS"
+MENUVERT.ITEM$(2) = " UTAH"
+COMBO.X = GUI.INNER.LEFT : COMBO.Y = GUI.INNER.TOP
+COMBO.W = 16 : COMBO.COUNT = 2 : COMBO.SEL = 1
+GOSUB COMBO.ADD
+' ... run the form ... the answer is in COMBO.SEL
+```
+
+**Only `COMBO.ADD` is called by an application.** `COMBO.DRAW`, `COMBO.KEY` and `COMBO.OPEN` are
+reached by `GUI.FORM`, which dispatches a `GUI.CT.COMBO` control to them by name. The call goes
+between `GUI.OPEN` and `GUI.FORM.RUN`.
+
+`COMBO.W` is the width in cells, brackets included; 5 is the floor and anything less is raised to
+it. `COMBO.BANK` is where the dropdown saves the cells it covers, and 0 takes `GUI.BANK` — which is
+what the dialog around it is already using. **The caller owns the `DIM`** of `MENUVERT.ITEM$()`.
+
+**One combo to a dialog.** The items are read out of `MENUVERT.ITEM$` when the dropdown opens and
+not when the control is added, because copying them would mean a second array the same size. A
+second combo on the same form would find the first one's items there.
+
+**A long list belongs in `GUI.LISTBOX`** (§4.12). The dropdown shows every item at once:
+`MENUVERT.RUN` does not scroll, its own header says so, and a scrolling key loop is the listbox's
+job rather than this one's.
+
+**It is required by `GUI.INC.BL`**, which names `COMBO.DRAW` and `COMBO.KEY`. BASLOAD resolves every
+label in a file, so a program that includes the GUI and leaves this one out stops with
+`LABEL NOT FOUND` whether it ever draws a combo or not.
+
+---
+
+
+*See also: 4.12 GUI2.INC.BL -- a listbox, single or multi select, 4.17 COMBO.INC.BL -- a drop-down list that folds into one row, 4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back*
+
+## 4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+
+##### 4.18 `STASHVRAM.INC.BL` — rectangles and blobs, kept in VRAM
+
+| Routine | in | out |
+|---|---|---|
+| `SV.INIT` | `SV.BASE` `SV.TOP` `SV.MAX` | `SV.OK` |
+| `SV.SAVE` | `SV.X` `SV.Y` `SV.W` `SV.H` | `SV.HND` `SV.OK` |
+| `SV.RESTORE` | `SV.HND` `SV.MOVE` `SV.X` `SV.Y` | `SV.OK` |
+| `SV.PUT` | `SV.ADDR` `SV.LEN` | `SV.HND` `SV.OK` |
+| `SV.GET` | `SV.HND` `SV.ADDR` | `SV.OK` |
+| `SV.FREE` | `SV.HND` | `SV.OK` |
+| `SV.RESET` | — | `SV.OK` |
+
+```basic
+#INCLUDE "STASHVRAM.INC.BL"
+
+SV.MAX = 16 : DIM SV.PAGE%(16), SV.PAGES%(16)
+GOSUB SV.INIT
+SV.X = 10 : SV.Y = 5 : SV.W = 40 : SV.H = 12 : GOSUB SV.SAVE
+IF SV.HND = 0 THEN <it did not fit>
+' ... draw over it ...
+GOSUB SV.RESTORE
+```
+
+**No `GP.ASM`, and so no `#SYMFILE`.** The cells never leave VRAM: one data port reads, the other
+writes, and the KERNAL's `memory_copy` moves between them without stepping either. That is what
+`STASH.INC.BL` cannot do, and the reason to reach for this one. It also executes no `BANK`, so
+unlike `STASH` it may live inside a `GP.BANKED` region.
+
+`SV.BASE` and `SV.TOP` are the VRAM window in bytes, rounded in to whole 256-byte pages, and default
+to `$04000` and `$1AFFF`. **The caller `DIM`s the two arrays** to `SV.MAX`. `SV.MOVE` works as
+`STASH.MOVE` does: `SV.RESTORE` puts the rectangle back where it came from when 0, at `SV.X` `SV.Y`
+when not. `SV.HND` is 1 to `SV.MAX`, or 0 if it did not fit. `SV.ERROR$` says why when something is
+refused, and is `""` otherwise.
+
+**Allocation is a bump pointer on 256-byte pages, released LIFO.** Panels nest and close in reverse
+and a log is append-only, so a hole only appears if a caller frees out of order — and then
+`STASHVRAMGC.INC.BL` (§4.19) closes it. Pages rather than bytes are what let a handle's address live
+in an ordinary `%`: a page number reaches 511 where a 17-bit VRAM address would not.
+
+**There is one allocator and it is this one.** `SV.BASE` and `SV.TOP` are the caller's contract,
+checked only against the layer 1 map and the charset. `BMX.STASH` defaults to `$13000`, *inside* the
+default window — a program using both must move one of them.
+
+A screen-mode change re-uploads the charset and can re-lay the map. Held handles do not survive it;
+call `SV.RESET` after one.
+
+---
+
+
+*See also: 4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store, 4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM, STASH.INC.BL -- save a text rectangle, and put it back.*
+
+## 4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store
+
+##### 4.19 `STASHVRAMGC.INC.BL` — close the holes in a STASHVRAM store
+
+| Routine | in | out |
+|---|---|---|
+| `SV.COMPACT` | — | `SV.MOVED` `SV.OK` |
+
+```basic
+#INCLUDE "STASHVRAM.INC.BL"
+#INCLUDE "STASHVRAMGC.INC.BL"
+
+GOSUB SV.COMPACT
+IF SV.MOVED = 0 THEN <it was already tight>
+```
+
+**Its own file because a BASL module has no dead code elimination.** A compactor nobody calls would
+otherwise be compiled into every program that includes the store. `#INCLUDE` this one only if
+something in the program calls it, and **never call it automatically**.
+
+**It is not a garbage collector.** Liveness is known from the handle table rather than discovered,
+so there is no mark phase and nothing traces anything: the live blocks are read off in page order,
+each is slid down to the low-water mark, and the table is rewritten as it goes.
+
+**Handles survive it.** A block's page number changes; the handle that names it does not. Anything
+holding a raw VRAM address across a call here is holding a stale one — but nothing outside the table
+has one, which is the whole reason the store is addressed by handle.
+
+`SV.MOVED` is how many blocks actually moved, 0 if it was already tight — which is what LIFO release
+leaves behind.
+
+The slide is downward, so a block's destination is always below its source. That the overlap is safe
+at the hardware is measured, not assumed.
+
+---
+
+
+*See also: 4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store, 4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM*
+
+## 4.20 GPBMODS -- the harness that drives every module
+
+##### 4.20 `GPBMODS` — the harness that drives every module
+
+`samples/GPB-MODS-TESTING/GPBMODS.BASL`. A menu bar of nine dropdowns whose rows reach nearly every
+public entry point in this section. It is the one program that holds all twenty modules at once, and
+the worked example of `GP.BANKED`, `GP.BANKEDSTR` and `BANKMGR` in one place.
+
+```
+gpbmods-demo.bat
+```
+
+The drive is `testing/`, not the sample folder. The object is compiled SHARED and loads
+`GPC.RT.nnn.BIN` from there.
+
+**No row is a stub.** A chosen row calls the library for real and shows what came back, on the panel
+and on the LAST line at the foot of the page. Three modules are under test before any row is chosen:
+`MENUBAR` draws the bar, `MENUVERT` every dropdown, and `STASH` puts the screen back under a closed
+one.
+
+| | |
+|---|---|
+| DIALOG — **D** | `GUI` `GUI2` |
+| LISTS — **L** | `MENUBAR` `MENUVERT` |
+| INPUT — **I** | `LINEINPUT` |
+| SCREEN — **S** | `STASH` `STASHFILE` `STASHVRAM` |
+| STRINGS — **G** | `STRINGS` `STRCASE` `STRUSING` |
+| DATA — **A** | `SORT` |
+| THEME — **T** | `THEME` |
+| ABOUT — **B** | `BANKMGR` |
+| FILES — **F** | `FILEIO` `FILEDIR` |
+
+`APPSYS` runs at startup and at exit rather than from a row. STRINGS answers to **G** because SCREEN
+has taken S: a hotkey need not be an item's initial, and `MENUVERT.HOTATTR` tints whichever letter
+it finds.
+
+**Twenty modules are included and seventeen are driven.** `COMBO`, `KB` and `STASHVRAMGC` are
+compiled in and have front doors — `COMBO.ADD`, `KB.CLEARKB`, `SV.COMPACT` — that no panel calls.
+`BMX` (§4.5) is not included: it wants a bitmap file and a screen mode of its own, and the
+`BMXVIEW` example in `GPC-BASIC/` covers it.
+
+**WARNING: FILES writes to the drive.** Four of its rows do. Everything they make is named
+`GPBFILE.*` or `GPBDIR`, and the row that makes each one removes it.
+
+###### Eleven banks
+
+Eight are named at compile time and claimed from `BANKMGR` (§4.13) at startup, because the compiler
+picks them while the object is written and the manager is told rather than asked. Three more are
+allocated at run time: the cells a dropdown covers, the cells a dialog covers, and `FILEDIR`'s
+directory buffer.
+
+| | |
+|---|---|
+| bank 4, `GPBMODS.B04`, 7,938 bytes | `MENUVERT` `MENUBAR` `LINEINPUT` `GUI` `GUI2` |
+| bank 5, `GPBMODS.B05`, 7,426 bytes | literal text, pool one |
+| bank 6, `GPBMODS.B06`, 4,610 bytes | literal text, pool two |
+| bank 7, `GPBMODS.B07`, 4,354 bytes | `APPSYS` `BANKMGR` `KB` `SORT` `STASHVRAM` `STASHVRAMGC` `STRCASE` `STRINGS` `STRUSING` |
+| bank 8, `GPBMODS.B08`, 1,538 bytes | `FILEIO` `FILEDIR` |
+| bank 9, `GPBMODS.B09`, 770 bytes | `THEME` |
+| bank 10, `GPBMODS.B10`, 770 bytes | `COMBO` |
+| bank 11, `GPBMODS.B11`, 3,074 bytes | the two biggest dropdown handlers, this program's own code |
+
+Six of those are `GP.BANKED` code regions (§3.12) and two are `GP.BANKEDSTR` text pools (§3.10). One
+`.Bnn` file is written per bank. Each loads to `$A000` in its own bank and carries a two-byte load
+address like any PRG, so a payload is the file size less two. The resident object is 12,885 bytes
+and the overlays are 30,480 between them.
+
+**Only what holds a `BANK` statement stays in low RAM**, and the front doors. `STASH` and
+`STASHFILE` execute `BANK`, which the compiler refuses inside a region; `STASHVRAM` (§4.18) is the
+one to reach for from inside one. The five `SHIM.*BANK.INC.BL` files are the doors to the five
+library regions, and bank 11's door is in `GPBMODS.BASL` itself.
+
+**Six regions and not one**, because a region holds at most 8,192 bytes and the GUI fills its own.
+A region may call another: every front door puts the caller's bank back before returning.
+
+**A nearly empty region still costs a whole page count.** Bank 9 holds 502 bytes of `THEME` in a
+768-byte overlay, and bank 10 holds 704 bytes of `COMBO` in another 768. Below about a page and a
+half of p-code, a region gives back less than it looks like.
+
+###### The text is in a bank
+
+552 strings in 72 named groups, 12,032 bytes across two pools, none of it in low RAM. Every string
+the shell says sits in a `GP.BANKEDSTR` block in front of the routine that says it and is read back
+with `GP.BSTR`. Two pools, because one pool is a hard 8,192 bytes and `BStrPoolWrite` stops the
+compile when one fills. Which pool a group is in costs the call site nothing, so moving a group is
+the whole of the answer to a full one.
+
+**Every menu is a block of its own**, index 0 the dropdown's title and 1 upwards the rows.
+`MENUVERT.COUNT` comes from `GP.BSTRCOUNT` and a loop reads the rows, so a row is added by adding a
+line to the block, and no other menu moves.
+
+The numbers under `ABOUT / BANK MEMORY` and `ABOUT / MODULE SIZES` are typed into `GP.BANKEDSTR`
+blocks, so they are only true of the build they were taken from.
+
+###### The room it runs in
+
+The workspace is what is left between the program's own p-code and the resident runtime: `$4500` to
+`$6600`, 8,448 bytes. The first p-code opcode is `.varspace` and its operand is what the scalars
+take — 3,436 here, leaving about 5,012 for the string arrays and the whole string heap.
+
+**Moving code into a bank moves no scalars.** A banked routine's variables are the same workspace
+variables its shim sees, so `.varspace` grows as panels are added whatever bank they run from.
+
+`GPC-BASIC/` inside the sample folder is the library working copy and it is ahead of the root copy.
+A module is proved here and copied whole into root. `GPB.INC.BL` runs the other way: root is
+upstream for it, and the build copies root's over this folder's every time.
+
+---
+
+
+## 4.20 GPBMODS -- the harness that drives every module (2)
+
+
+*See also: 4.5 BMX.INC.BL -- a BMX bitmap into VERA, 4.13 BANKMGR.INC.BL -- who owns which RAM bank, 3.12 Code in a bank, 3.10 Text in a bank, 4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM*
+
 ## STASH.INC.BL -- save a text rectangle, and put it back.
 
 
@@ -2286,7 +3031,7 @@ free today; it is one library update away from not being.
 ---
 
 
-*See also: 2. Using it, 4.2 STRINGS.INC.BL -- string helpers, 4.10 STRUSING.INC.BL -- a number to a template, 4.1 THEME.INC.BL -- named colour roles, 4.3 APPSYS.INC.BL -- start politely, leave it as you found it, 4.4 LINEINPUT.INC.BL -- a positioned entry field, 4.6 MENUVERT.INC.BL -- a vertical menu, 4.9 MENUBAR.INC.BL -- a horizontal menu, 4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back, 4.12 GUI2.INC.BL -- a listbox, single or multi select, STASH.INC.BL -- save a text rectangle, and put it back., STASHFILE.INC.BL -- a saved text rectangle, through a file.*
+*See also: 2. Using it, 4.2 STRINGS.INC.BL -- string helpers, 4.10 STRUSING.INC.BL -- a number to a template, 4.1 THEME.INC.BL -- named colour roles, 4.3 APPSYS.INC.BL -- start politely, leave it as you found it, 4.4 LINEINPUT.INC.BL -- a positioned entry field, 4.14 KB.INC.BL -- the keyboard buffer, emptied, 4.6 MENUVERT.INC.BL -- a vertical menu, 4.9 MENUBAR.INC.BL -- a horizontal menu, 4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back, 4.12 GUI2.INC.BL -- a listbox, single or multi select, STASH.INC.BL -- save a text rectangle, and put it back.*
 
 ## 2. GP.* is keywords, not variables -- and the difference bites
 
@@ -2305,8 +3050,7 @@ whole list of them. They are keywords rather than variables because nothing in t
 a BASIC variable by name, so a command that returns a value has to
 hand it back through a keyword. X16's own `ST`, `MX` and `MY` exist for the same reason.
 
-The full keyword list lives in `GPC-BASIC/GPB.INC.BL`, and the byte values mirror `getGP()` in
-`source/common-scripts/c64tokens.py`.
+The full keyword list lives in `GPC-BASIC/GPB.INC.BL`.
 
 ---
 
@@ -2655,7 +3399,7 @@ and only the default 1 survives.
 ## 3. The modules (6)
 
 
-*See also: 3.6 Screen -- stash and restore, 4.1 THEME.INC.BL -- named colour roles, 4.3 APPSYS.INC.BL -- start politely, leave it as you found it, 4.2 STRINGS.INC.BL -- string helpers, 4.10 STRUSING.INC.BL -- a number to a template, 4.4 LINEINPUT.INC.BL -- a positioned entry field, 4.5 BMX.INC.BL -- a BMX bitmap into VERA, STASH.INC.BL -- save a text rectangle, and put it back., 4.6 MENUVERT.INC.BL -- a vertical menu, 4.9 MENUBAR.INC.BL -- a horizontal menu, 4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back, 4.12 GUI2.INC.BL -- a listbox, single or multi select*
+*See also: 3.6 Screen -- stash and restore, 4.1 THEME.INC.BL -- named colour roles, 4.3 APPSYS.INC.BL -- start politely, leave it as you found it, 4.2 STRINGS.INC.BL -- string helpers, 4.10 STRUSING.INC.BL -- a number to a template, 4.14 KB.INC.BL -- the keyboard buffer, emptied, 4.4 LINEINPUT.INC.BL -- a positioned entry field, 4.5 BMX.INC.BL -- a BMX bitmap into VERA, 4.15 FILEIO.INC.BL -- the drive: status, files, directories, 4.16 FILEDIR.INC.BL -- a directory, into a bank or into low RAM, 4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM, STASH.INC.BL -- save a text rectangle, and put it back.*
 
 ## 4. Labels are global too
 
@@ -2701,24 +3445,22 @@ and not shimmed. Everything else, the whole of `GUI.FORM.*`, `GUI.BUTTON*`, `GUI
 ##### A public name and its `.BODY` are two labels
 
 The six modules the GUI is built from — `THEME`, `MENUVERT`, `MENUBAR`, `LINEINPUT`, `GUI`, `GUI2` —
-define **`THEME.SELECT.BODY`, not `THEME.SELECT`**. A banked routine cannot select its own bank, so
-the code has to be a label of its own and the public name has to be a label in low memory that
-banks and then calls it.
-
-That public name comes from a separate file, and which one depends on how you build:
+come in two files, and which one you `#INCLUDE` decides where the module runs. A banked routine
+cannot select its own bank, so in the banked file the code has to be a label of its own and the
+public name has to be a label in low memory that banks and then calls it.
 
 | | |
 |---|---|
-| the library in a bank | `LIB.GUIBANK.INC.BL` — eighteen shims, each `BANK` then `GOSUB` |
-| the library in low memory | `THEME.PLAIN.INC.BL`, `MENUVERT.PLAIN`, `MENUBAR.PLAIN`, `LINEINPUT.PLAIN`, `GUI.PLAIN`, `GUI2.PLAIN` — the same eighteen names, minus the `BANK` |
+| the library in low memory | `THEME.INC.BL` defines `THEME.SELECT` itself. Nothing else is needed, and a call costs nothing |
+| the library in a bank | `THEME.BANK.INC.BL` defines `THEME.SELECT.BODY`, and `SHIM.GUIBANK.INC.BL` — twenty-one shims, each `PUSH` then `GOSUB` then `POP` — defines the twenty-one public names |
 
-**One or the other, never both**, and never a `.PLAIN` file for a module you did not `#INCLUDE`:
-BASLOAD resolves every label in every file it reads, so a shim standing in front of a body that is
-not there is `LABEL NOT FOUND`, and both front doors at once is `DUPLICATE SYMBOL`. That is why the
-unbanked side is six files and not one — a `MENUVERT`-only program would otherwise have to carry
-the whole `GUI`.
+**One or the other, never both**, and a banked build has to include every module its shim file
+names: BASLOAD resolves every label in every file it reads, so a shim standing in front of a body
+that is not there is `LABEL NOT FOUND`. Both files of one module at once is `DUPLICATE SYMBOL` where
+the module has no `#IFNDEF` guard and a silent first-one-wins where it has.
+[BANKED-OR-NOT.md](BANKED-OR-NOT.md) says how to choose.
 
-The front doors go **before** the bodies in the file. A caller reads identically either way, which
+The shims go **before** the bodies in the file. A caller reads identically either way, which
 is the point of the split.
 
 **Only eighteen names are shimmed, and a name that is not shimmed is not callable from outside the
@@ -2732,7 +3474,7 @@ always listed it as callable and it was, before the split.
 Each module also has a skip label it jumps over itself with — `THEME.SKIP`, `APPSYS.SKIP`,
 `STR.SKIP`, `BMX.MODULE.END`, `LINEINPUT.MODULE.END`, `MENUVERT.MODULE.END`,
 `MENUBAR.MODULE.END`, `GUI.MODULE.END`, `GUI.LISTBOX.MODULE.END`, `STASH.MODULE.END`,
-`STASHFILE.MODULE.END`, `SORT.MODULE.END`, `STRCASE.MODULE.END`, and one per `.PLAIN` file.
+`STASHFILE.MODULE.END`, `SORT.MODULE.END` and `STRCASE.MODULE.END`.
 Those exist so an include can sit anywhere in the file, the top included. **Do not branch to one.**
 
 BASLOAD refuses a name used as both a label and a variable (`BASLOAD.MD:319`). `BMX.SKIP` is the
@@ -2742,7 +3484,7 @@ be `BMX.MODULE.END` — a name is either a label or a variable, never both.
 ---
 
 
-*See also: 4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back, 4.12 GUI2.INC.BL -- a listbox, single or multi select*
+*See also: 4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back, 4.12 GUI2.INC.BL -- a listbox, single or multi select, 4.1 THEME.INC.BL -- named colour roles*
 
 ## 5. TRUE IS -1
 
@@ -2828,6 +3570,139 @@ Each of these has cost a debugging session at least once.
 
 ---
 
+# COMPILER KNOWN BUGS
+
+## 8. Known bugs
+
+#### 8. Known bugs
+
+Five, all live on 12th September 2026 and all reproducible. Each says what happens, what causes
+it, and what to do instead. A bug leaves this list when it is fixed, not when it is understood.
+
+##### GP.FN string aliasing
+
+Two `GP.FN` calls on the **same** string-returning verb, with nothing between them in one
+expression, both give the second call's answer.
+
+```basl
+D$ = "one"
+E$ = "two"
+PRINT GP.FN(STR.UCASE, D$) + GP.FN(STR.UCASE, E$)
+```
+
+prints `TWOTWO`, not `ONETWO`. No error, and both compiler passes agree.
+
+A string term is a reference, not a value. The call pushes the block address of the verb's single
+`RETURNS` variable, so two calls leave two references to one variable and the second overwrites
+what the first pointed at. **Numeric verbs are safe** — the value itself goes on the stack.
+
+Two things escape it by accident. A term between the two calls concretes the first into a
+temporary, so `GP.FN(V,A$) + "-" + GP.FN(V,B$)` is right; and two different verbs have two
+different `RETURNS` variables. Neither is a rule to build on.
+
+**Do this** — give each call its own variable first.
+
+```basl
+A$ = GP.FN(STR.UCASE, D$)
+B$ = GP.FN(STR.UCASE, E$)
+PRINT A$ + B$
+```
+
+##### A string never gives memory back
+
+`A$ = ""` frees nothing. A string variable owns its block: the assignment sets the length to zero
+and keeps the capacity. The heap scavenger reclaims only a block a string outgrew and abandoned,
+never one a variable still holds. A working buffer that has once held a 250-character line is
+spoken for until the program ends.
+
+So a big temporary cannot be built and then freed. It has to not be built.
+
+Measured 2026-09-02. The editor's find folded the needle *and every line it scanned* into new
+strings and compared with `MID$` per position: **579 bytes gone for the rest of the run**, from a
+workspace with 1,489 free, and the GUI dialogs then died on what was left. Rewritten to fold in
+place through `GP.STRPTR` with one `GP.INSTR` per line, a find costs **81 bytes**, and the program
+came out 59 bytes smaller.
+
+**Do this** — `PRINT FRE(0)` at eight points down the run and read the descent. It is a high-water
+ceiling, so it only falls, and the step that falls is the culprit.
+
+##### LOAD chaining leaks array strings
+
+A `LOAD` chain keeps its variables by skipping `ClearMemory`, which is the whole reason to chain
+rather than `RUN`. `ClearMemory` is also the only thing that lowers the string ceiling, so the
+ceiling never comes back down.
+
+For **scalars** that is bounded. A block is reused in place whenever the new string fits, so ten
+hops assigning the same five variables settle at five blocks.
+
+For **string arrays it is unbounded**. A block is marked dead only when its variable is reassigned
+to something longer, never when the pointer is simply dropped, and the chained program's `DIM`
+zeroes every element. Every block the previous program's array held loses its only pointer while
+keeping a live control byte: invisible to the scavenger, and unreusable. Ten hops with a
+50-element array strand 500 blocks.
+
+`FRE(0)` is the instrument. Print it on entry to each program in the chain and watch it fall.
+
+**Do this** — `CLR` on entry, when the program does not need the carry. There is no way to keep
+the carry and reclaim the array blocks.
+
+##### BINPUT# stops at 255 bytes
+
+`BINPUT# n, A$, len` cannot read more than 255 bytes. Three independent caps land on that one
+number, so there is no single constant to raise.
+
+| Cap | Where |
+|---|---|
+| the read buffer is 255 bytes | `ReadBuffer: .fill 255` |
+| the count argument is 8 bit, and unchecked | `GetInteger8Bit` takes mantissa byte 0 and returns |
+| a BASIC string is 255 characters | nowhere to put a longer record in any case |
+
+The second is the trap. **`BINPUT# 12, A$, 256` sets the count to 0 and hands back an empty
+string, silently.** 300 gives 44 bytes.
+
+It is also **not a block read**. It is a `CHRIN` loop, one KERNAL call per byte with an EOF check
+on top of that. `BINPUT#` is one statement, not one transfer, so anything costing a `BINPUT#` per
+record pays that stride per record.
+
+`LINPUT#` shares the same buffer and stops at 255 too, but runs on to the delimiter afterwards, so
+the next read starts at a line boundary.
+
+**Do this** — a record cannot be one string. Make it N strings of 255, or keep it in a bank and
+copy out the part that is needed.
+
+##### File I/O in a GP.DO key loop
+
+A save routine reached from inside a program's own `GP.DO` key loop **writes its file completely
+and correctly**, and then the program stops with
+
+```
+INPUT/OUTPUT ERROR @ $005B
+```
+
+The address is identical in every failing build, which says a clobbered instruction pointer rather
+than a real device error.
+
+Seven shapes have been compiled and probed. Do not bisect them again.
+
+| Shape | Result |
+|---|---|
+| `OPEN`/`PRINT#`/`CLOSE` at top level | passes |
+| four consecutive `PRINT#`, no `PRINT` between | passes |
+| the same inside `GP.DO` ... `GP.EXITDO` | passes |
+| the same behind a `GOSUB` inside a `GP.DO` | passes |
+| the same behind `GP.SELECT` then `GOSUB` inside a `GP.DO` | passes |
+| the real routine called from the top level of the same program | passes |
+| the real routine reached from the program's own `GP.DO` key loop | **fails** |
+
+**Do this** — a plain `PRINT` immediately after the `CLOSE` makes it pass. Channel 0 output runs
+`CLRCHN`; a non-zero channel runs `CHKOUT` and `READST` instead, so the suspect is channel state
+left behind rather than the file I/O.
+
+## 8. Known bugs (2)
+
+
+---
+
 # MEMORY AND LIMITS
 
 ## 7. Memory, and what the compiler tells you
@@ -2878,6 +3753,25 @@ The error itself comes from the runtime library and names an address in it, not 
 program: `OUT OF MEMORY @ $03A5 library`. It tells you the allocator refused, and nothing about
 which of your strings was asking.
 
+##### A region does not come out of it
+
+`CODE` and `FREE` describe low memory only. **P-code inside a `GP.BANKED` region (§3.12) is not in
+either figure** — it lives at `$A000` in a RAM bank and is written to its own `NAME.Bnn` overlay
+file, so moving a module into a region takes its bytes off `CODE` and gives them to `FREE`. That is
+what regions are for.
+
+What a region costs instead:
+
+- **A whole bank, and 32 pages is the ceiling.** `$A000`–`$BFFF`, 8,192 bytes, with the bridges and
+  the padding counted in. No two regions may share a bank.
+- **A shim in low memory for every public entry point.** The shim is what selects the bank, so it
+  cannot be banked itself.
+- **A file that has to travel.** The `.Bnn` files ship beside the `.PRG`. A program whose overlays
+  are missing loads and then fails where it first calls into one.
+
+Banked text is the same bargain on the data side: a `GP.BANKEDSTR` group (§3.10) is out of the
+workspace, and inside a region it costs no p-code at all.
+
 ##### Staying inside it
 
 - **Quote `FREE` when you change anything.** It is one line of build output and it is the only
@@ -2891,5 +3785,8 @@ which of your strings was asking.
 - **A big temporary cannot be built and then freed.** Freeing is not a thing that happens on
   demand: build it in a bank, or in pieces.
 
-*See also: 4.5 BMX.INC.BL -- a BMX bitmap into VERA, STASH.INC.BL -- save a text rectangle, and put it back.*
+---
+
+
+*See also: 3.12 Code in a bank, 3.10 Text in a bank, 4.5 BMX.INC.BL -- a BMX bitmap into VERA, STASH.INC.BL -- save a text rectangle, and put it back.*
 

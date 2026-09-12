@@ -2,14 +2,13 @@
 .
 =1. WHAT GP.BASIC IS
 .
-.Three layers, innermost first.
-.
-.Core keywords. 30 of them, compiled to p-code and handled by assembly in the
+.Core keywords. 29 of them, compiled to p-code and handled by assembly in the
 .runtime:
 .
 .GP.DO GP.LOOP GP.EXITDO GP.IF GP.ELSEIF GP.ELSE GP.ENDIF GP.SELECT GP.CASE
 .GP.OTHER GP.ENDSEL GP.INSTR GP.COMP GP.STRPTR GP.ARRPTR GP.BOX GP.FILL
-.GP.CHAR GP.PRINTAT GP.CALL GP.A GP.X GP.Y GP.C GP.ASM GP.ENDASM
+.GP.PRINTAT GP.CALL GP.A GP.X GP.Y GP.C GP.FN GP.BANKEDSTR GP.ENDBANKEDSTR
+.GP.BSTR GP.BANKED GP.ENDBANKED
 .
 .They are assembly because BASIC is slow at per-character string scans,
 .screen fills and VERA writes.
@@ -25,15 +24,21 @@
 .is 17,152 bytes with the block and 18,176 without: ObjectBase to $9F00, less
 .the 4K frame stack and the 4K minimum workspace.
 .
-.Composites. GP.CONTAINS, GP.ISEMPTY, GP.HIBYTE, GP.LOBYTE. The compiler
-.expands each into opcodes that already exist. No handler, no vector slot,
-.nothing in the block.
+.Composites. GP.ASM, GP.ENDASM, GP.CHAR, GP.CONTAINS, GP.ISEMPTY, GP.HIBYTE,
+.GP.LOBYTE, GP.BSTRCOUNT, GP.DEFPROC, GP.SUB. The compiler expands each into
+.opcodes that already exist. No handler, no vector slot, nothing in the
+.block. Whether the block comes in is then the expansion's business, not the
+.composite's: GP.CHAR runs GP.FILL's handler and brings it in, while GP.ASM,
+.GP.ENDASM, GP.DEFPROC and GP.SUB leave a program GP-BASIC OUT.
 .
-.The library. GPC-BASIC/: 14 .INC.BL modules, 22 .EXP.BL examples. Ordinary
+.The library. GPC-BASIC/: 17 .INC.BL modules, 25 .EXP.BL examples. Ordinary
 .BASL, #INCLUDEd by path, called with GOSUB. Zero runtime bytes -- a module
-.costs its own p-code, in the programs that include it. Menus vertical and
-.bar, panels, themes, entry fields, in-place case, trim and splice, shell
-.sort, a screen rectangle to a RAM bank or a file, BMX into VERA.
+.costs its own p-code, in the programs that include it. Six of the modules
+.have a banked twin named .BANK.INC.BL, reached through one of three SHIM.
+.front doors, for a program that has run out of low memory; SEC 3.12 is where
+.those are explained. Menus vertical and bar, panels, themes, entry fields,
+.in-place case, trim and splice, shell sort, a screen rectangle to a RAM bank
+.or a file, BMX into VERA.
 .
 .STASH.INC.BL, SORT.INC.BL, STRCASE.INC.BL and STRINGS.INC.BL are GP.ASM and
 .still modules: as keywords their bytes would sit in the block, paid by every
@@ -46,7 +51,8 @@
 .
 =SEE ALSO
 .
->62|STASH.INC.BL -- save a text rectangle, and put it back.
->56|4.7 SORT.INC.BL -- shell sort a string array
->57|4.8 STRCASE.INC.BL -- case, in place
->48|4.2 STRINGS.INC.BL -- string helpers
+>51|3.12 Code in a bank
+>86|STASH.INC.BL -- save a text rectangle, and put it back.
+>68|4.7 SORT.INC.BL -- shell sort a string array
+>69|4.8 STRCASE.INC.BL -- case, in place
+>60|4.2 STRINGS.INC.BL -- string helpers

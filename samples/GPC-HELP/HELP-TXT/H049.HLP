@@ -1,109 +1,34 @@
-@1. The prefixes that are taken
+@4.14 KB.INC.BL -- the keyboard buffer, emptied
 .
-=1. THE PREFIXES THAT ARE TAKEN
+=4.14 KB.INC.BL -- THE KEYBOARD BUFFER, EMPTIED
 .
-.  GP.
-.      OWNER: GPB.INC.BL
-.      WHAT IT IS: keywords, not variables -- see SEC 2, this one is
-.        different
+=WHAT IT COSTS
 .
-.  STR.
-.      OWNER: STRINGS.INC.BL
-.      WHAT IT IS: string helpers
+.    BASIC -- a .INC.BL module of ordinary BASL, called with GOSUB. Costs
+.    nothing unless you #INCLUDE it.
 .
-.  STR.USING.
-.      OWNER: STRUSING.INC.BL
-.      WHAT IT IS: a number to a template, kept apart from the rest of STR.
+=DESCRIPTION
 .
-.  THEME.
-.      OWNER: THEME.INC.BL
-.      WHAT IT IS: colour roles
+.  KB.CLEARKB
+.      IN: --
+.      OUT: --
 .
-.  APPSYS.
-.      OWNER: APPSYS.INC.BL
-.      WHAT IT IS: screen save/restore, panels to disk
+:#INCLUDE "KB.INC.BL"
+:
+:GOSUB KB.CLEARKB
+:GOSUB GUI.YN
 .
-.  LINEINPUT.
-.      OWNER: LINEINPUT.INC.BL
-.      WHAT IT IS: entry fields
+.Call it before opening a dialog, and after a keystroke that redraws. A
+.dialog opened with a key still queued reads it, answers itself and closes; a
+.held arrow repeats faster than a page can be drawn and scrolls on after the
+.key is let go.
 .
-.  KB.
-.      OWNER: KB.INC.BL
-.      WHAT IT IS: the keyboard drain
-.
-.  MENUVERT.
-.      OWNER: MENUVERT.INC.BL
-.      WHAT IT IS: vertical menus
-.
-.  MENUBAR.
-.      OWNER: MENUBAR.INC.BL
-.      WHAT IT IS: the other axis -- a horizontal menu bar
-.
-.  GUI.
-.      OWNER: GUI.INC.BL
-.      WHAT IT IS: the dialogs, the box they sit in, and the form that runs
-.        them
-.
-.  GUI.LISTBOX.
-.      OWNER: GUI2.INC.BL
-.      WHAT IT IS: the listbox dialog, kept apart from the rest of GUI.
-.
-.  STASH.
-.      OWNER: STASH.INC.BL
-.      WHAT IT IS: a text rectangle into a RAM bank, and back
-.
-.  STASH.FILE.
-.      OWNER: STASHFILE.INC.BL
-.      WHAT IT IS: the same rectangle through a file, kept apart from the
-.        rest of STASH.
-.
-.  SORT.
-.      OWNER: SORT.INC.BL
-.      WHAT IT IS: shell sort a string array in place
-.
-.  STRCASE.
-.      OWNER: STRCASE.INC.BL
-.      WHAT IT IS: case, rewriting a string in place
-.
-.  BMX.
-.      OWNER: BMX.INC.BL
-.      WHAT IT IS: BMX bitmap loading
-.
-.  BMXK.
-.      OWNER: BMX.INC.BL
-.      WHAT IT IS: its KERNAL/VERA constants, kept apart from its variables
-.
-.  FILE.
-.      OWNER: FILEIO.INC.BL
-.      WHAT IT IS: the drive: status, exists, delete, rename, directories
-.
-.  FILE.DIR.
-.      OWNER: FILEDIR.INC.BL
-.      WHAT IT IS: reading a directory, kept apart from the rest of FILE.
-.
-.  SV.
-.      OWNER: STASHVRAM.INC.BL
-.      WHAT IT IS: the VRAM store. SVGC. is STASHVRAMGC.INC.BL's one constant
-.
-.Pick anything else for your own program. AIRLIFT., GAME., MAP. -- a prefix
-.costs nothing at runtime because BASLOAD crunches every identifier down to a
-.short BASIC variable, so a long readable name and a two-letter one compile
-.to exactly the same thing.
-.
-.Do not reuse a taken prefix for a name the module has not defined.
-.THEME.MINE looks free today; it is one library update away from not being.
+.GUI.INC.BL carries a private twin, GUI.CLEARKB, because code inside a
+.GP.BANKED region may not call another bank and survive the return. Fix one
+.and fix the other. There are only the two, and a second #INCLUDE of this
+.file cannot supply the twin -- the #IFNDEF guard makes it produce nothing.
 .
 =SEE ALSO
 .
->3|2. Using it
->48|4.2 STRINGS.INC.BL -- string helpers
->59|4.10 STRUSING.INC.BL -- a number to a template
->47|4.1 THEME.INC.BL -- named colour roles
->50|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
->51|4.4 LINEINPUT.INC.BL -- a positioned entry field
->53|4.6 MENUVERT.INC.BL -- a vertical menu
->58|4.9 MENUBAR.INC.BL -- a horizontal menu
->60|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
->61|4.12 GUI2.INC.BL -- a listbox, single or multi select
->62|STASH.INC.BL -- save a text rectangle, and put it back.
->70|STASHFILE.INC.BL -- a saved text rectangle, through a file.
+>75|4.14 KB.INC.BL -- the keyboard buffer, emptied
+>72|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back

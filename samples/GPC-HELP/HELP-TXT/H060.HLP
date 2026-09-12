@@ -1,71 +1,109 @@
-@6. The traps, collected
+@1. The prefixes that are taken
 .
-=6. THE TRAPS, COLLECTED
+=1. THE PREFIXES THAT ARE TAKEN
 .
-.Each of these has cost a debugging session at least once.
+.  GP.
+.      OWNER: GPB.INC.BL
+.      WHAT IT IS: keywords, not variables -- see SEC 2, this one is
+.        different
 .
-.  P AND 255 on a heap or VRAM address
-.      WHAT HAPPENS: AND is 16-bit signed; above 32,767 it raises OUT OF
-.        RANGE instead of masking
-.      DO THIS: H = INT(P/256) : L = P - H*256
+.  STR.
+.      OWNER: STRINGS.INC.BL
+.      WHAT IT IS: string helpers
 .
-.  an address in an A% variable
-.      WHAT HAPPENS: % is signed 16-bit and truncates without error -- A% =
-.        49152 reads back -16,384
-.      DO THIS: untyped variable, or split into page and offset
+.  STR.USING.
+.      OWNER: STRUSING.INC.BL
+.      WHAT IT IS: a number to a template, kept apart from the rest of STR.
 .
-.  $0400 for machine code
-.      WHAT HAPPENS: stock BASIC leaves it free, a compiled GPC program does
-.        not -- runtime state lives there, and it is corrupted with no error
-.      DO THIS: banked RAM, $A000-$BFFF
+.  THEME.
+.      OWNER: THEME.INC.BL
+.      WHAT IT IS: colour roles
 .
-.  PRINT after GP.PRINTAT
-.      WHAT HAPPENS: GP drawing never calls the KERNAL, so the cursor is
-.        wherever it was
-.      DO THIS: LOCATE first, or stay in one world
+.  APPSYS.
+.      OWNER: APPSYS.INC.BL
+.      WHAT IT IS: screen save/restore, panels to disk
 .
-.  SORT.INC.BL with no #SYMFILE
-.      WHAT HAPPENS: {VAR} cannot resolve a crunched name -- NO SYMBOL FILE
-.        FOR {}
-.      DO THIS: #SYMFILE "@:PROG.SYM", before the #INCLUDEs
+.  LINEINPUT.
+.      OWNER: LINEINPUT.INC.BL
+.      WHAT IT IS: entry fields
 .
-.  GP.BOX X,Y,W,H,,7
-.      WHAT HAPPENS: optionals cannot be skipped over
-.      DO THIS: GP.BOX X,Y,W,H,0,7
+.  KB.
+.      OWNER: KB.INC.BL
+.      WHAT IT IS: the keyboard drain
 .
-.  SCREEN after BMX.PAINT
-.      WHAT HAPPENS: reloads the default palette and throws the image's
-.        colours away
-.      DO THIS: set the mode first
+.  MENUVERT.
+.      OWNER: MENUVERT.INC.BL
+.      WHAT IT IS: vertical menus
 .
-.  STR.FIELD$ wanted bigger
-.      WHAT HAPPENS: auto-DIMed at 0..10 on first use, and you cannot DIM it
-.        after
-.      DO THIS: DIM it before the first call, set STR.MAX
+.  MENUBAR.
+.      OWNER: MENUBAR.INC.BL
+.      WHAT IT IS: the other axis -- a horizontal menu bar
 .
-.  #DEFINE X 129536
-.      WHAT HAPPENS: #DEFINE takes an INT16 -- ERROR: INVALID PARAMETER
-.      DO THIS: an ordinary variable
+.  GUI.
+.      OWNER: GUI.INC.BL
+.      WHAT IT IS: the dialogs, the box they sit in, and the form that runs
+.        them
 .
-.  GP.SUB above its GP.DEFPROC
-.      WHAT HAPPENS: the call carries an address, not a line number -- GP.SUB
-.        BEFORE ITS GP.DEFPROC
-.      DO THIS: declare the routine above every caller
+.  GUI.LISTBOX.
+.      OWNER: GUI2.INC.BL
+.      WHAT IT IS: the listbox dialog, kept apart from the rest of GUI.
 .
-.  an array element as a GP.DEFPROC formal
-.      WHAT HAPPENS: GP.DEFPROC FORMAL IS NOT A VARIABLE
-.      DO THIS: plain scalar formals, and set the array before the call
+.  STASH.
+.      OWNER: STASH.INC.BL
+.      WHAT IT IS: a text rectangle into a RAM bank, and back
 .
-.  a GP.DEFPROC body calling its own verb
-.      WHAT HAPPENS: one set of formals, so it writes over the arguments in
-.        use -- wrong answer, no error
-.      DO THIS: recursion needs its own saved copies, or a different shape
+.  STASH.FILE.
+.      OWNER: STASHFILE.INC.BL
+.      WHAT IT IS: the same rectangle through a file, kept apart from the
+.        rest of STASH.
 .
-.  a variable called LEN, ST, POS, MB or CHAR
-.      WHAT HAPPENS: the name is a reserved word on its own
-.      DO THIS: dot it -- BASLOAD matches the whole identifier, so
-.        LINEINPUT.LEN works
+.  SORT.
+.      OWNER: SORT.INC.BL
+.      WHAT IT IS: shell sort a string array in place
+.
+.  STRCASE.
+.      OWNER: STRCASE.INC.BL
+.      WHAT IT IS: case, rewriting a string in place
+.
+.  BMX.
+.      OWNER: BMX.INC.BL
+.      WHAT IT IS: BMX bitmap loading
+.
+.  BMXK.
+.      OWNER: BMX.INC.BL
+.      WHAT IT IS: its KERNAL/VERA constants, kept apart from its variables
+.
+.  FILE.
+.      OWNER: FILEIO.INC.BL
+.      WHAT IT IS: the drive: status, exists, delete, rename, directories
+.
+.  FILE.DIR.
+.      OWNER: FILEDIR.INC.BL
+.      WHAT IT IS: reading a directory, kept apart from the rest of FILE.
+.
+.  SV.
+.      OWNER: STASHVRAM.INC.BL
+.      WHAT IT IS: the VRAM store. SVGC. is STASHVRAMGC.INC.BL's one constant
+.
+.Pick anything else for your own program. AIRLIFT., GAME., MAP. -- a prefix
+.costs nothing at runtime because BASLOAD crunches every identifier down to a
+.short BASIC variable, so a long readable name and a two-letter one compile
+.to exactly the same thing.
+.
+.Do not reuse a taken prefix for a name the module has not defined.
+.THEME.MINE looks free today; it is one library update away from not being.
 .
 =SEE ALSO
 .
->56|4.7 SORT.INC.BL -- shell sort a string array
+>3|2. Using it
+>60|4.2 STRINGS.INC.BL -- string helpers
+>71|4.10 STRUSING.INC.BL -- a number to a template
+>59|4.1 THEME.INC.BL -- named colour roles
+>62|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>63|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>75|4.14 KB.INC.BL -- the keyboard buffer, emptied
+>65|4.6 MENUVERT.INC.BL -- a vertical menu
+>70|4.9 MENUBAR.INC.BL -- a horizontal menu
+>72|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
+>73|4.12 GUI2.INC.BL -- a listbox, single or multi select
+>86|STASH.INC.BL -- save a text rectangle, and put it back.

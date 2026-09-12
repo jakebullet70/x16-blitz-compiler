@@ -7,8 +7,7 @@
 :#INCLUDE "GPB.INC.BL"
 .
 .BASLOAD knows only the ROM's keywords. Without that line GP.DO 5 is a syntax
-.error. The PC-side converter for hand-written .bas needs no such
-.declaration; it reads the same keyword list from c64tokens.py at build time.
+.error.
 .
 =Where the library lives
 .
@@ -71,4 +70,4 @@
 .
 =SEE ALSO
 .
->109|6. The traps, collected
+>133|6. The traps, collected

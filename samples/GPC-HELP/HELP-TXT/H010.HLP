@@ -1,22 +1,121 @@
-@3. Command reference (2)
-.a keyword it would cost every GP program 462 bytes whether or not it used a
-.menu.
+@3. Command reference
 .
-.The keywords in detail. Square brackets mean optional. Optionals cannot be
-.skipped over: GP.BOX X,Y,W,H,,7 is a syntax error -- write out the default
-.you are passing through.
+=3. COMMAND REFERENCE
 .
-=SEE ALSO
+.38 keywords, encoded $CE7F down to $CE50 and allocated downward. Ten of the
+.forty-eight slots are holes and stay holes: the byte values are the ABI and
+.are never renumbered.
 .
->46|4. Module reference -- the BASL library
->32|3.8 Block IF
->33|3.9 Inline assembly
->22|3.4 Strings
->20|3.3 Machine code
->39|3.10 Text in a bank
->40|3.11 Calling a routine in one statement
->47|4.1 THEME.INC.BL -- named colour roles
->48|4.2 STRINGS.INC.BL -- string helpers
->50|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
->51|4.4 LINEINPUT.INC.BL -- a positioned entry field
->52|4.5 BMX.INC.BL -- a BMX bitmap into VERA
+=At a glance -- where each part comes from
+.
+.Three implementations, and what each costs:
+.
+.  - ASM -- a keyword run by machine code in the runtime. Costs runtime
+.    bytes, and one GP keyword anywhere in a program pays for the whole
+.    1,024-byte block. Documented in SEC 3.
+.  - BASIC -- a .INC.BL module of ordinary BASL, called with GOSUB. Costs
+.    nothing unless #INCLUDEd, and then only its own p-code. Documented in
+.    SEC 4.
+.  - COMPOSITE -- a keyword with no machine code of its own; the compiler
+.    expands it into keywords that already exist. Costs the runtime nothing.
+.    Documented in SEC 3 with the ASM keywords.
+.
+.  Loops
+.      ASM
+.      GP.DO GP.LOOP GP.EXITDO
+.
+.  Multi-way branch
+.      ASM
+.      GP.SELECT GP.CASE GP.OTHER GP.ENDSEL
+.
+.  Block IF
+.      ASM
+.      GP.IF GP.ELSEIF GP.ELSE GP.ENDIF -- see SEC 3.8
+.
+.  Machine code
+.      ASM
+.      GP.CALL GP.A GP.X GP.Y GP.C
+.
+.  Inline assembly
+.      COMPOSITE
+.      GP.ASM GP.ENDASM -- free, and stays GP-BASIC OUT, see SEC 3.9
+.
+.  Strings
+.      ASM
+.      GP.INSTR GP.STRPTR GP.COMP
+.
+.  Strings
+.      COMPOSITE
+.      GP.CONTAINS GP.ISEMPTY -- free, see SEC 3.4
+.
+.  Addresses
+.      COMPOSITE
+.      GP.HIBYTE GP.LOBYTE -- free, see SEC 3.3
+.
+.  Arrays
+.      ASM
+.      GP.ARRPTR
+.
+.  Banked text
+.      ASM
+.      GP.BANKEDSTR GP.ENDBANKEDSTR GP.BSTR - GP.BSTRCOUNT is COMPOSITE --
+.        see SEC 3.10
+.
+.  Routine calls
+.      COMPOSITE
+.      GP.DEFPROC GP.SUB -- free, and stays GP-BASIC OUT, see SEC 3.11
+.
+.  Routine calls
+.      ASM
+.      GP.FN -- the same call as a value, and it brings the GP block in
+.
+.  Screen
+.      ASM
+.      GP.BOX GP.FILL GP.PRINTAT
+.
+.  Screen
+.      COMPOSITE
+.      GP.CHAR -- free, one cell in GP.PRINTAT's shape running GP.FILL's
+.        handler
+.
+.  Colour roles
+.      BASIC
+.      THEME.INC.BL -- THEME.SELECT, THEME.CLR() - SEC 4.1
+.
+.  String helpers
+.      BASIC+ASM
+.      STRINGS.INC.BL -- PADR PADL PADC SPLIT REPLACE SPLICE PET2SCR TRIM
+.        LTRIM RTRIM - SEC 4.2
+.
+.  Screen etiquette, panels
+.      BASIC
+.      APPSYS.INC.BL -- STARTUP RESTORE PANEL.SAVE/LOAD/PUT ISEMU - SEC 4.3
+.
+.  Entry fields
+.      BASIC
+.      LINEINPUT.INC.BL -- LINEINPUT.GET, LINEINPUT.ASK - SEC 4.4
+.
+.  Bitmaps
+.      BASIC
+.      BMX.INC.BL -- BMX.SHOW, BMX.RESTORE - SEC 4.5
+.
+.  Menus
+.      BASIC
+.      MENUVERT.INC.BL -- RUN DRAW ROW HOTFIND - SEC 4.6
+.
+.  Menus
+.      BASIC
+.      MENUBAR.INC.BL -- RUN DRAW ITEM MARK WHERE, the other axis - SEC 4.9
+.
+.  Dialogs
+.      BASIC
+.      GUI.INC.BL -- GUI.SAY GUI.YN GUI.MENU GUI.INPUT GUI.OPEN GUI.CLOSE -
+.        SEC 4.11
+.
+.  Dialogs
+.      BASIC
+.      GUI2.INC.BL -- GUI.LISTBOX, single or multi select - SEC 4.12
+.
+.  Dialogs
+.      BASIC
+.      COMBO.INC.BL -- COMBO.ADD, a drop-down that folds into one row - SEC

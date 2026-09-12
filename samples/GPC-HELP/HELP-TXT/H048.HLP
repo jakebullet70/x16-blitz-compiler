@@ -1,92 +1,61 @@
-@5. Variables
+@4.13 BANKMGR.INC.BL -- who owns which RAM bank
 .
-=5. VARIABLES
+=4.13 BANKMGR.INC.BL -- WHO OWNS WHICH RAM BANK
 .
-.BASL has one flat namespace. There are no locals, no scoping and no
-.parameters. Every variable in every #INCLUDEd module is visible to your
-.program and the reverse, and nothing warns you: a collision is a wrong
-.answer, not an error.
+=DESCRIPTION
 .
-.The convention is one dotted prefix per module, and nothing writes outside
-.its own prefix.
+.  BANKMGR.INIT
+.      IN: --
+.      OUT: BANKMGR.BANKS
 .
-=Prefixes already taken
+.  BANKMGR.CLAIM
+.      IN: BANKMGR.SET.BANK
+.      OUT: BANKMGR.OK
 .
-.  GP.
-.      OWNER: keywords, not variables -- see below
+.  BANKMGR.GET.FREE.BANK
+.      IN: --
+.      OUT: BANKMGR.BANK
 .
-.  STR.
-.      OWNER: STRINGS.INC.BL
+.  BANKMGR.RELEASE
+.      IN: BANKMGR.SET.BANK
+.      OUT: --
 .
-.  THEME.
-.      OWNER: THEME.INC.BL
+.  BANKMGR.COUNT
+.      IN: --
+.      OUT: BANKMGR.BANKS BANKMGR.SPARE
 .
-.  APPSYS.
-.      OWNER: APPSYS.INC.BL
+:#INCLUDE "BANKMGR.INC.BL"
+:
+:GOSUB BANKMGR.INIT
+:BANKMGR.SET.BANK = SHIM.GUIBANK : GOSUB BANKMGR.CLAIM
+:IF BANKMGR.OK = 0 THEN <bank was already taken>
+:GOSUB BANKMGR.GET.FREE.BANK
+:IF BANKMGR.BANK = 0 THEN <none left>
 .
-.  LINEINPUT.
-.      OWNER: LINEINPUT.INC.BL
+.For a program with several owners of banked RAM, none of which can see the
+.others' numbers. The order matters: BANKMGR.INIT first, and every CLAIM
+.before the first GET.FREE.BANK, or the allocator hands out a bank a
+.compile-time region is already sitting in.
 .
-.  MENUVERT.
-.      OWNER: MENUVERT.INC.BL
+.It tracks, it does not select. Nothing in this module executes BANK. A claim
+.is a promise between the program's own modules, and an accessor still sets
+.its own bank on every access.
 .
-.  MENUBAR.
-.      OWNER: MENUBAR.INC.BL
+.0 is not a bank. It is the KERNAL's, reserved by INIT, and it is what
+.GET.FREE.BANK returns for none left.
 .
-.  GUI.
-.      OWNER: GUI.INC.BL
+.BANKMGR.OK is -1 if CLAIM took the bank, 0 if it was already taken or out of
+.range. BANKMGR.BANKS is how many the machine has, 64 or 256. BANKMGR.SPARE
+.is what COUNT found free.
 .
-.  GUI.LISTBOX.
-.      OWNER: GUI2.INC.BL, kept apart from the rest of GUI.
+.MEMTOP returns $00 on a 2 MB machine. The count is one byte and 256 does not
+.fit, so 512 K reads $40 = 64 and 2 MB reads $00, meaning 256. INIT reads 0
+.as 256. A manager that took $00 at face value would report no banks at all
+.on exactly the larger machine. Values that are not a multiple of 8 are legal
+.-- the reference names $42 -- and mean some banked RAM is bad.
 .
-.  STASH. / STASH.FILE.
-.      OWNER: STASH.INC.BL / STASHFILE.INC.BL
-.
-.  SORT.
-.      OWNER: SORT.INC.BL
-.
-.  STRCASE.
-.      OWNER: STRCASE.INC.BL
-.
-.  BMX. / BMXK.
-.      OWNER: BMX.INC.BL (variables / its KERNAL constants)
-.
-.Use any other prefix for your own program: GAME., MAP., AIRLIFT.. A prefix
-.costs nothing at runtime -- BASLOAD crunches every identifier to a short
-.BASIC variable, so a long readable name and a two-letter one compile to the
-.same thing.
-.
-.Do not reuse a taken prefix for a name the module has not defined.
-.THEME.MINE is free today and is one library update from not being.
-.
-=GP.* is keywords, not variables
-.
-.GPB.INC.BL defines no variables. It is 27 keyword declarations and nothing
-.else.
-.
-:GP.A = 5          ' SYNTAX ERROR -- GP.A is a keyword
-:X = GP.A          ' correct
-.
-.The value words are GP.A GP.X GP.Y GP.C, the registers after GP.CALL, and
-.that is all of them. They are keywords rather than variables because nothing
-.in the runtime can write a BASIC variable by name, so a command that returns
-.a value must return it through a keyword. X16's own ST, MX and MY work the
-.same way.
-.
-.The complete per-module in / out / internal register is GP-BASIC.GLOBALS.md,
-.with a script in SEC 6 of that file for re-checking it after a change.
+.The bitmap is 32 bytes, eight banks to the byte.
 .
 =SEE ALSO
 .
->109|6. The traps, collected
->48|4.2 STRINGS.INC.BL -- string helpers
->47|4.1 THEME.INC.BL -- named colour roles
->50|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
->51|4.4 LINEINPUT.INC.BL -- a positioned entry field
->53|4.6 MENUVERT.INC.BL -- a vertical menu
->58|4.9 MENUBAR.INC.BL -- a horizontal menu
->60|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
->61|4.12 GUI2.INC.BL -- a listbox, single or multi select
->62|STASH.INC.BL -- save a text rectangle, and put it back.
->70|STASHFILE.INC.BL -- a saved text rectangle, through a file.
->56|4.7 SORT.INC.BL -- shell sort a string array
+>74|4.13 BANKMGR.INC.BL -- who owns which RAM bank

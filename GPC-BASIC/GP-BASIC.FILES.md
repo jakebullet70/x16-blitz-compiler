@@ -51,7 +51,85 @@ A compiled program identifies itself: `LIST` one and the BASIC stub reads `SYS 2
 
 ---
 
-## 3. The tools
+## 3. BASLOAD — the tokeniser, and why it is forked
+
+`BASLOAD` is the first thing every build runs. It turns `.BASL` source — labels, long variable
+names, `#INCLUDE`, `#DEFINE` — into a tokenised BASIC program with line numbers, which is what the
+compiler reads. GPC never sees a label.
+
+**The X16 ships BASLOAD in ROM, and this project does not use that one.** `BASLOAD-GPC.BIN` is the
+same program built from the same upstream source as an ordinary PRG, with a handful of changes in
+`BASLOAD-GPC/src/`. The build drives that one and stages it into `testing/` beside `GPC.BIN`.
+
+### Why
+
+**The ROM version built the tokenised program in BASIC RAM**, so 38,655 bytes was the ceiling on a
+`.BASL` *plus every `#INCLUDE` it pulls in*. Two-pass compilation had just moved GPC's own size
+wall; this one was then the next thing in front of it, and
+`samples/GPB-MODS-TESTING/GPBMODS.BASL` came within 783 bytes of it.
+
+It also failed badly. Over the ceiling it printed `SAVING` and wrote a short PRG *before* reporting
+`ERROR: BASIC RAM FULL`, so the file existed, was not empty, and loaded at `$0801`. GPC then died a
+stage later on a label whose line had never been written — `UNKNOWN LINE NUMBER @ nnnn` — naming
+neither the file nor the cause.
+
+Changing that looked like it meant shipping a custom `rom.bin` and flashing real hardware. **It does
+not.** The upstream source builds and runs as a RAM-resident PRG with no source changes at all, only
+a linker config, and that is what made the rest possible.
+
+**The fork streams.** Each line is written to an open file as it is finished, so one line — a
+260-byte staging buffer — is all that is ever resident, and the output is bounded by the disk
+instead of by BASIC RAM. A source that died at 38,421 bytes now tokenises to 47,765 and compiles.
+`GPC.BASL` comes out byte-identical to the ROM's output.
+
+### The two files
+
+| file | what it is | size |
+|---|---|---|
+| `BASLOAD-GPC.BIN` | the engine. Its only interface is an ABI at `$bf00` | 9,003 bytes, loads `$6000` |
+| `BASLOAD-GPC.PRG` | the front end — the thing a person runs | 971 bytes |
+
+The same division as `GPC.BIN` and `GPC.PRG`: the name a person types belongs to the front end. The
+front end asks for a source file, hands it to the engine, prints what comes back and asks again; an
+empty answer quits. It is plain X16 BASIC rather than GP.BASIC, because it has to run from `READY.`
+with nothing on the disk but itself and the engine.
+
+### A failed run deletes its own output
+
+Streaming created one failure the ROM never had. A run that died partway through pass 2 still wrote
+the end-of-program link and closed the file, so what stayed on disk was a **structurally perfect
+BASIC program that stopped where the error did** — and nothing downstream could tell it from a whole
+one. The compiler was handed one and died on the first forward reference past the cut.
+
+The fork now scratches the file when a run fails. Two things it deliberately does not do: it never
+runs unless *this* run created the file, so a `FILE EXISTS` failure cannot destroy a previous good
+build; and it never reads the drive status afterwards, because that would replace
+`LABEL NOT FOUND IN DB.INC.BL:459` with a generic file error and lose the only useful thing the run
+produced.
+
+### `#GPC` — a directive channel BASLOAD never has to understand
+
+`#GPC` passes the rest of its line through into the tokenised program as a `REM`, verbatim, and
+BASLOAD never learns what any of it means:
+
+```
+#GPC OBJECT "GPBMODS.PRG"        ->   1 REM#GPC OBJECT "GPBMODS.PRG"
+#GPC SHARED                      ->   2 REM#GPC SHARED
+```
+
+**The `#` is kept and there is no space after the `REM` token.** That is what a reader matches on:
+`$8f` then `#GPC`, which no ordinary comment produces by accident. One table entry buys the compiler
+an unlimited directive namespace, so every future compiler directive is a GPC-side change alone.
+
+### Where the old ceiling still binds
+
+**Anything that types `BASLOAD "X"` at the BASIC prompt uses the ROM, and still stops at 38,655
+bytes.** That is the interactive path and the dev harnesses in `work/`. Only the build drives the
+fork.
+
+---
+
+## 4. The tools
 
 `GPC.ERR.PRG` turns a runtime error's `@ $XXXX` into a source line, using the debug map the
 compiler writes when `MAKE A DEBUG MAP?` is answered yes. Without the map the address cannot be
@@ -65,7 +143,7 @@ themes, `?` is the about box. `ESC` goes back a step, and quits from the index.
 
 ---
 
-## 4. `GPC-BASIC/` — the library
+## 5. `GPC-BASIC/` — the library
 
 Text-mode building blocks, in BASL, `#INCLUDE`d into your source. BASL has no dead code
 elimination: including a module costs its whole size whether or not it is called.
@@ -94,7 +172,7 @@ What each one costs in bytes is in the command reference, under *At a glance*.
 
 ---
 
-## 5. `GPC-BASIC/` — the examples
+## 6. `GPC-BASIC/` — the examples
 
 One `.EXP.BL` per topic. Several are also the regression test for the module they sit beside.
 
@@ -124,7 +202,7 @@ One `.EXP.BL` per topic. Several are also the regression test for the module the
 
 ---
 
-## 6. The documents
+## 7. The documents
 
 | | |
 |---|---|

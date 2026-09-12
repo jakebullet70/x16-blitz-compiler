@@ -1,101 +1,120 @@
-@4.1 THEME.INC.BL -- named colour roles
+@3.12 Code in a bank
 .
-=4.1 THEME.INC.BL -- NAMED COLOUR ROLES
+=3.12 CODE IN A BANK
+.
+=SYNTAX
+.
+:GP.BANKED <bank>
+:    ... p-code ...
+:GP.ENDBANKED
 .
 =WHAT IT COSTS
 .
-.    BASIC -- a .INC.BL module of ordinary BASL, called with GOSUB. Costs
-.    nothing unless you #INCLUDE it.
+.  ASM: GP.BANKED GP.ENDBANKED
+.    ASM -- a keyword, run by machine code in the GP runtime block. A program
+.    using ANY GP keyword pays for the whole block.
 .
 =DESCRIPTION
 .
-.  THEME.SELECT
-.      IN: THEME.ID
-.      OUT: fills THEME.CLR()
+.Marks a run of p-code as belonging at $A000 in that RAM bank rather than in
+.low memory. Both keywords are alone on their line and the bank is a decimal
+.constant.
 .
-.  THEME.NEXT
-.      IN: THEME.ID
-.      OUT: the following theme, loaded
+.They are compile-time markers and select nothing. BANK is the statement that
+.selects a bank, and these are deliberately not spelled like it. Nothing
+.happens at run time where the GP.BANKED line is.
 .
-.  THEME.RESET
-.      IN: THEME.ID
-.      OUT: the selected theme's shipped values, reloaded
+.This is how a program gets past the shared p-code ceiling. Low-memory p-code
+.has to fit under the runtime -- about 17,920 bytes, SEC 7 -- and a region
+.does not count against it. Each region becomes its own overlay file,
+.NAME.B04 for bank 4, written beside the .PRG and loaded with it.
 .
-.  THEME.SET
-.      IN: THEME.ATTR
-.      OUT: issues COLOR -- makes it the colour PRINT uses
+:GOTO MY.LIBEND
+:#INCLUDE "SHIM.GUIBANK.INC.BL"        ' the shims, in LOW memory
+:GP.BANKED SHIM.GUIBANK
+:#INCLUDE "MENUVERT.BANK.INC.BL"       ' the bodies, in the bank
+:#INCLUDE "MENUBAR.BANK.INC.BL"
+:#INCLUDE "LINEINPUT.BANK.INC.BL"
+:#INCLUDE "GUI.BANK.INC.BL"
+:#INCLUDE "GUI2.BANK.INC.BL"
+:GP.ENDBANKED
+:MY.LIBEND:
 .
-.  THEME.HI
-.      IN: THEME.ATTR
-.      OUT: THEME.INV, the inverse attribute
+.The GOTO over the region is not optional. Falling in through the bridge
+.GP.BANKED leaves works at program start and stops working the day anything
+.selects another bank first.
 .
-.Five themes, THEME.COUNT of them:
+.Claim the bank, or something else hands it out:
 .
-.  0
-.      X16
-.      blue page, white text, cyan headings. The default
+:BANKMGR.SET.BANK = SHIM.GUIBANK : GOSUB BANKMGR.CLAIM
 .
-.  1
-.      DARK
-.      black page, light grey text
+=What fits
 .
-.  2
-.      LIGHT
-.      white page, black text
+.32 pages -- the whole of $A000-$BFFF, 8,192 bytes. The entry bridge, the
+.alignment padding, the exit bridge and the end marker are part of what has
+.to fit, so the usable payload is a little under the window. Past it the
+.compiler stops and names the region's GP.BANKED line, not the line it
+.happened to be on when it ran out.
 .
-.  3
-.      GRAY
-.      dark grey page, light blue frames. From the XFMGR file manager
+.Sixty-three regions, and that is the machine's limit rather than the
+.compiler's -- banks 1 to 63 on a 512 K X16, with 0 the KERNAL's. No two
+.regions may share a bank: the second would land at $A000 on top of the
+.first.
 .
-.  4
-.      CUSTOM
-.      whatever THEME.CLR() already holds
+=What a region may not contain
 .
-.THEME.NEXT moves to the following one and wraps, which is what a program
-.binds to a key. A cached attribute does not follow it: work out anything
-.derived from THEME.CLR(), a reversed bar included, after every load.
+.BANK, BLOAD and BSAVE are refused inside a region. Code fetched from the
+.window cannot be running when the window changes. A BANK statement is the
+.only disqualifier -- that is what keeps STASH and STASHFILE in low memory,
+.and what lets STASHVRAM (SEC 4.18) go in.
 .
-.CUSTOM loads nothing. Selecting it leaves THEME.CLR() as it stands, so a
-.program that lets the user change colours carries those changes into CUSTOM
-.rather than discarding them. The one exception is a cold start -- CUSTOM
-.selected before any other theme has been loaded -- where there is nothing to
-.keep and it takes X16's values. THEME.RESET goes back to those.
+.GP.BANKEDSTR (SEC 3.10) inside a region is free: it emits no p-code at all,
+.so a text group costs the region nothing.
 .
-.samples/color-test edits the roles against a mock of the GUI and prints the
-.THEME.CLR() lines to paste back in here. It carries its own GPC-BASIC folder
-.and is still at seven roles, so it does not yet offer THEME.FOCUS.
+=Calling in, and calling out
 .
-.Roles, for indexing THEME.CLR(): THEME.PAGE THEME.TEXT THEME.TITLE
-.THEME.BORDER THEME.HILITE THEME.DIMMED THEME.WARN THEME.FOCUS, and
-.THEME.SLOTS = 8.
+.A region cannot branch to another region. Two regions live at the same $A000
+.in different banks, so a branch from one to the other has no distance to
+.travel and the compiler refuses it.
 .
-.THEME.FOCUS is the eighth and newest: what a focused control wears while
-.GUI.FORM has the keyboard (SEC 4.11). It is a separate role from
-.THEME.HILITE because a dialog shows both at once -- the highlighted row of a
-.list, and the control the TAB key has landed on.
+.Calling out, down into low memory, is safe. Low memory does not care which
+.bank is selected, so an ordinary GOSUB downwards works from inside a region.
 .
-.The routine used to be THEME.LOAD. It became THEME.SELECT when the library
-.split into banked bodies and unbanked front doors, and a program still
-.calling the old name stops at LABEL NOT FOUND.
+.Everything else crosses through a low-memory shim. A banked routine cannot
+.select its own bank -- by its first instruction fetch the window is already
+.wrong -- so the public name is a low-memory label and the real code takes a
+..BODY name:
 .
-:THEME.ID = 1 : GOSUB THEME.SELECT
-:GP.BOX 4,2,30,8, 2, THEME.CLR(THEME.BORDER)
-:GP.PRINTAT 6,3, "TITLE", THEME.CLR(THEME.TITLE)
+:GUI.SAY:  GOSUB GUI.SHIM.PUSH : GOSUB GUI.SAY.BODY : GOTO GUI.SHIM.POP
 .
-.The values are packed attributes, background * 16 + foreground, which is
-.what GP.BOX, GP.FILL and GP.PRINTAT take. For COLOR, which takes the halves
-.separately, use THEME.SET.
+.PUSH keeps the caller's bank and selects the library's; POP puts the
+.caller's back. So a caller that is itself inside another region may call in
+.here and get its own bank returned to it, and the instruction after the call
+.is fetched from the right place. The region cannot do this for itself,
+.because a region may not contain BANK; the shim is in low memory and can.
 .
-.#DEFINE substitutes at translation time, so THEME.CLR(THEME.TITLE) compiles
-.to THEME.CLR(2). The readable name costs no variable and no lookup.
+.It is a stack, not one variable, because the calls nest and come back round:
+.a dialog in one bank draws a control that lives in a bank of its own, and
+.that control opens a menu back in the first. Three banks are live at once
+.and each level has a different one to return to. GUI.SHIM.MAX is 8 deep.
 .
-.THEME.CLR is DIMmed by the module. Do not DIM it in your own program.
+.GOTO to POP, not GOSUB -- the shim's own RETURN is the one the caller is
+.waiting on.
 .
-.Formatting a NUMBER into a column is STRUSING.INC.BL (SEC 4.10), a separate
-.module: it needs no #SYMFILE and neither module depends on the other.
+.Never call a .BODY from outside its region. It is the half of the pair that
+.does not bank.
+.
+=The overlay files
+.
+.Each region is written out as NAME.Bnn, nn being the bank in decimal. The
+.file carries a two-byte load address like any PRG, so the payload is the
+.file size less two, and the size is the page-padded region rather than the
+.p-code in it.
+.
+.A program's .Bnn files ship beside its .PRG and must travel with it.
 .
 =SEE ALSO
 .
->60|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
->59|4.10 STRUSING.INC.BL -- a number to a template
->47|4.1 THEME.INC.BL -- named colour roles
+>143|7. Memory, and what the compiler tells you
+>79|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+>45|3.10 Text in a bank

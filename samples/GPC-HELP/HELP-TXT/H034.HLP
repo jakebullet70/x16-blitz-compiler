@@ -1,17 +1,101 @@
-@4.2 STRINGS.INC.BL -- string helpers (2)
-.Examples: SPLITT.EXP.BL, STRINGS.EXP.BL. Regression test: STRTST.EXP.BL,
-.thirty-three cases -- the trim edges, every splice mode, both clamps,
-.appending past the end, splicing an empty string, growing a 200-character
-.string past the block it was born with, and guard strings either side to
-.catch an off-by-one write into the neighbouring block.
+@4.1 THEME.INC.BL -- named colour roles
 .
-=EXAMPLE PROGRAM
+=4.1 THEME.INC.BL -- NAMED COLOUR ROLES
 .
-.  SPLITT.EXP.BL -- runnable, in the GPC-BASIC folder
-.  STRINGS.EXP.BL -- runnable, in the GPC-BASIC folder
-.  STRTST.EXP.BL -- runnable, in the GPC-BASIC folder
+=WHAT IT COSTS
+.
+.    BASIC -- a .INC.BL module of ordinary BASL, called with GOSUB. Costs
+.    nothing unless you #INCLUDE it.
+.
+=DESCRIPTION
+.
+.  THEME.SELECT
+.      IN: THEME.ID
+.      OUT: fills THEME.CLR()
+.
+.  THEME.NEXT
+.      IN: THEME.ID
+.      OUT: the following theme, loaded
+.
+.  THEME.RESET
+.      IN: THEME.ID
+.      OUT: the selected theme's shipped values, reloaded
+.
+.  THEME.SET
+.      IN: THEME.ATTR
+.      OUT: issues COLOR -- makes it the colour PRINT uses
+.
+.  THEME.HI
+.      IN: THEME.ATTR
+.      OUT: THEME.INV, the inverse attribute
+.
+.Five themes, THEME.COUNT of them:
+.
+.  0
+.      X16
+.      blue page, white text, cyan headings. The default
+.
+.  1
+.      DARK
+.      black page, light grey text
+.
+.  2
+.      LIGHT
+.      white page, black text
+.
+.  3
+.      GRAY
+.      dark grey page, light blue frames. From the XFMGR file manager
+.
+.  4
+.      CUSTOM
+.      whatever THEME.CLR() already holds
+.
+.THEME.NEXT moves to the following one and wraps, which is what a program
+.binds to a key. A cached attribute does not follow it: work out anything
+.derived from THEME.CLR(), a reversed bar included, after every load.
+.
+.CUSTOM loads nothing. Selecting it leaves THEME.CLR() as it stands, so a
+.program that lets the user change colours carries those changes into CUSTOM
+.rather than discarding them. The one exception is a cold start -- CUSTOM
+.selected before any other theme has been loaded -- where there is nothing to
+.keep and it takes X16's values. THEME.RESET goes back to those.
+.
+.samples/color-test edits the roles against a mock of the GUI and prints the
+.THEME.CLR() lines to paste back in here. It carries its own GPC-BASIC folder
+.and is still at seven roles, so it does not yet offer THEME.FOCUS.
+.
+.Roles, for indexing THEME.CLR(): THEME.PAGE THEME.TEXT THEME.TITLE
+.THEME.BORDER THEME.HILITE THEME.DIMMED THEME.WARN THEME.FOCUS, and
+.THEME.SLOTS = 8.
+.
+.THEME.FOCUS is the eighth and newest: what a focused control wears while
+.GUI.FORM has the keyboard (SEC 4.11). It is a separate role from
+.THEME.HILITE because a dialog shows both at once -- the highlighted row of a
+.list, and the control the TAB key has landed on.
+.
+.The routine used to be THEME.LOAD. It became THEME.SELECT when the library
+.split into banked bodies and unbanked front doors, and a program still
+.calling the old name stops at LABEL NOT FOUND.
+.
+:THEME.ID = 1 : GOSUB THEME.SELECT
+:GP.BOX 4,2,30,8, 2, THEME.CLR(THEME.BORDER)
+:GP.PRINTAT 6,3, "TITLE", THEME.CLR(THEME.TITLE)
+.
+.The values are packed attributes, background * 16 + foreground, which is
+.what GP.BOX, GP.FILL and GP.PRINTAT take. For COLOR, which takes the halves
+.separately, use THEME.SET.
+.
+.#DEFINE substitutes at translation time, so THEME.CLR(THEME.TITLE) compiles
+.to THEME.CLR(2). The readable name costs no variable and no lookup.
+.
+.THEME.CLR is DIMmed by the module. Do not DIM it in your own program.
+.
+.Formatting a NUMBER into a column is STRUSING.INC.BL (SEC 4.10), a separate
+.module: it needs no #SYMFILE and neither module depends on the other.
 .
 =SEE ALSO
 .
->48|4.2 STRINGS.INC.BL -- string helpers
->57|4.8 STRCASE.INC.BL -- case, in place
+>72|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
+>71|4.10 STRUSING.INC.BL -- a number to a template
+>59|4.1 THEME.INC.BL -- named colour roles

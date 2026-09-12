@@ -1,19 +1,50 @@
-@3.4.1 GP.INSTR -- position of a substring
+@3.4 Strings
 .
-=3.4.1 GP.INSTR
+=3.4 STRINGS
 .
-.  Syntax    GP.INSTR(hay$, needle$ [, start])
-.  Returns   Position of needle$ in hay$, 1-based. 0 if not found.
-.  Kind      ASM. Needs the GP block.
-.  Notes     start is the position to begin at. Default 1.
-.            Case sensitive. It compares raw bytes; SEC 3.4.4 is the
-.            case-blind test.
-.            An empty needle$ returns 0.
-.  Example
+=WHAT IT COSTS
 .
-:            P = GP.INSTR(F$, ".BAS", 1)
-:            IF P > 0 THEN PRINT "FOUND AT"; P
+.  ASM: GP.INSTR GP.STRPTR GP.COMP
+.    ASM -- a keyword, run by machine code in the GP runtime block. A program
+.    using ANY GP keyword pays for the whole block.
+.  COMPOSITE: GP.CONTAINS GP.ISEMPTY
+.    COMPOSITE -- a keyword with no machine code of its own. The compiler
+.    expands it into keywords that already exist, so it costs the runtime
+.    nothing at all.
+.
+=DESCRIPTION
+.
+.Five keywords. GP.INSTR is the only string search GPC has; without it there
+.is none.
+.
+.Trimming, padding, splicing and case folding are modules, not keywords:
+.STRCASE.INC.BL (SEC 4.8) for case, STRINGS.INC.BL (SEC 4.2) for everything
+.else. They cost p-code only in the programs that #INCLUDE them and nothing
+.in the GP block. GP.STRPTR is the keyword they are built on.
+.
+.The in-place routines take an ADDRESS, GP.STRPTR(a$), and never a literal:
+.GP.STRPTR("hello") is an address inside the p-code, so trimming it edits the
+.running program. Case conversion leaves digits, punctuation and PETSCII
+.graphics unchanged.
+.
+.There is no GP.PAD. In-place work cannot grow a string past the capacity it
+.was created with, which is what decides which side of STRINGS.INC.BL a
+.routine lands on: the pads and STR.SPLICE grow, so they are BASIC
+.assignments and reallocate; the trims only shrink, so they are assembly.
+.
+=IN THIS SECTION
+.
+>29|3.4.1 GP.INSTR -- position of a substring
+>30|3.4.2 GP.CONTAINS -- test for a substring
+>31|3.4.3 GP.ISEMPTY -- test for a zero-length string
+>32|3.4.4 GP.COMP -- compare two strings, ignoring case
+>33|3.4.5 GP.STRPTR -- address of a string block
+.
+=EXAMPLE PROGRAM
+.
+.  STRINGS.EXP.BL -- runnable, in the GPC-BASIC folder
 .
 =SEE ALSO
 .
->26|3.4.4 GP.COMP -- compare two strings, ignoring case
+>69|4.8 STRCASE.INC.BL -- case, in place
+>60|4.2 STRINGS.INC.BL -- string helpers

@@ -1,92 +1,58 @@
-@4.5 BMX.INC.BL -- a BMX bitmap into VERA
+@4.3 APPSYS.INC.BL -- start politely, leave it as you found it
 .
-=4.5 BMX.INC.BL -- A BMX BITMAP INTO VERA
+=4.3 APPSYS.INC.BL -- START POLITELY, LEAVE IT AS YOU FOUND IT
 .
 =DESCRIPTION
 .
-.  BMX.OPEN
-.      IN: BMX.FILE$
-.      OUT: BMX.ERROR$, and the header -- BMX.WIDTH .HEIGHT .DEPTH .VERSION
-.        .PALUSED .PALFIRST .DATAOFF .PACKED
-.
-.  BMX.PAINT
-.      IN: an open file
-.      OUT: palette and pixels in VRAM, file closed
-.
-.  BMX.SHOW
-.      IN: BMX.FILE$
-.      OUT: both of the above
-.
-.  BMX.CLOSE
+.  APPSYS.STARTUP
 .      IN: --
-.      OUT: abandons a file opened by BMX.OPEN
+.      OUT: APPSYS.MODE APPSYS.COLS APPSYS.ROWS APPSYS.COLOUR
 .
-.  BMX.RESTORE
+.  APPSYS.RESTORE
+.      IN: those
+.      OUT: screen mode and colour put back
+.
+.  APPSYS.ISEMU
 .      IN: --
-.      OUT: puts the machine's own palette back
+.      OUT: APPSYS.IS.EMULATOR -- -1 under x16emu, 0 otherwise
 .
-.BMX.ERROR$ empty means it worked.
+:A screen rectangle through a file is `STASH.FILE.SAVE` / `.LOAD` / `.PUT` in
+:
+:GOSUB APPSYS.STARTUP
+:' ... the application, laid out with APPSYS.COLS / APPSYS.ROWS ...
+:GOSUB APPSYS.RESTORE : END
 .
-:BMX.FILE$ = "TITLE.BMX"
-:SCREEN 128
-:GOSUB BMX.SHOW
-:IF BMX.ERROR$ <> "" THEN PRINT BMX.ERROR$
+.Call STARTUP before any SCREEN or COLOR of your own. It records the state as
+.it finds it, so anything changed beforehand is what gets restored.
 .
-.Use the long form to read the size before committing to a screen mode, or to
-.report a bad file before the display is torn down:
+.Lay out from APPSYS.COLS / APPSYS.ROWS rather than assuming 80x60. The X16
+.boots 80x60, but SCREEN 0 is 40x30 and a user who prefers larger text is
+.running one.
 .
-:BMX.FILE$ = F$
-:GOSUB BMX.OPEN
-:IF BMX.ERROR$ <> "" THEN GOTO COMPLAIN
-:' ... BMX.WIDTH, BMX.HEIGHT, BMX.PALUSED readable here ...
-:SCREEN 128
-:GOSUB BMX.PAINT
+.APPSYS.DEV defaults to 8. The panel routines are implemented in
+.STASHFILE.INC.BL. A panel file is self-describing -- it carries the stash's
+.4-byte header -- so loading one needs only its name.
 .
-.Set the screen mode before BMX.PAINT, not after. SCREEN reloads the default
-.palette, so a mode change after painting discards the image's colours:
-.correct pixels, wrong palette.
+.APPSYS.ISEMU answers the question a timing loop has to ask. $9FBE and $9FBF
+.are the last of the emulator's own I/O registers and read as "1" and "6"
+.under x16emu, with the debugger on or off; the routine is those two PEEKs
+.and a comparison.
 .
-.BMX.PAINT writes the image's colours over the machine's palette, and nothing
-.on the X16 restores them -- not SCREEN, not the KERNAL's screen_mode.
-.BMX.PAINT therefore stashes all 256 entries in spare VRAM first, and
-.BMX.RESTORE writes them back:
+:GOSUB APPSYS.ISEMU
+:IF APPSYS.IS.EMULATOR THEN PRINT "EMULATED"
+:IF NOT APPSYS.IS.EMULATOR THEN PRINT "NOT x16emu"
 .
-:BMX.FILE$ = "TITLE.BMX"
-:SCREEN 128
-:GOSUB BMX.SHOW
-:' ... the title screen ...
-:GOSUB BMX.RESTORE
+.The flag is -1, not 1, so NOT works on it: NOT is -x-1 here, so NOT -1 is 0
+.while NOT 1 is -2 -- still true. -1 is also what a comparison hands back, so
+.the flag reads like one. IF itself tests non-zero, so either value would
+.have worked with the plain form.
 .
-.A program that keeps the machine need never call it. A program that returns
-.the machine to BASIC or chains to another calls it once. It is safe to call
-.at any time: with nothing stashed there is nothing to do, so a program whose
-.image failed to load can still call it on the way out. All 256 entries are
-.kept, not the range the file claims, and they are kept once per run -- so a
-.slideshow restores the machine's own palette rather than the previous
-.image's.
-.
-.BMX.STASH is the VRAM address they go to, $13000 by default, which is free
-.above the 320x240 framebuffer in the mode this module paints into. A caller
-.using tiles, sprites or a second bitmap there must move it or switch it off
-.with BMX.STASH = -1. The address is checked: a stash inside the bitmap or
-.overlapping the PSG registers is reported and nothing is painted.
-.
-.Use -1 to switch it off, not 0. Zero is what the variable holds before it is
-.set, and BMX.INIT runs at the first BMX.OPEN, after a caller would have set
-.it, so 0 has to keep meaning unset.
-.
-.The module handles 8 bits per pixel, uncompressed, which is what SCREEN 128
-.displays without a decompressor. Anything else is reported rather than
-.attempted. The image is centred, and anything larger than 320x240 is
-.clipped.
-.
-.Examples: BMXVIEW.EXP.BL, and BMXPAL.EXP.BL for the palette
-.
-=EXAMPLE PROGRAM
-.
-.  BMXVIEW.EXP.BL -- runnable, in the GPC-BASIC folder
-.  BMXPAL.EXP.BL -- runnable, in the GPC-BASIC folder
+.It answers for x16emu and nothing else. A 0 means "not x16emu" -- a real
+.machine, or another emulator that does not carry those registers. And
+.$9FA0-$9FBF is expansion card I/O on the real machine, so a card at I/O5
+.could in principle answer "16" as well: a 1 is strong, a 0 is certain.
 .
 =SEE ALSO
 .
->52|4.5 BMX.INC.BL -- a BMX bitmap into VERA
+>62|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>94|STASHFILE.INC.BL -- a saved text rectangle, through a file.

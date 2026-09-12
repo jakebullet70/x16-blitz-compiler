@@ -1,18 +1,19 @@
-@3.4.2 GP.CONTAINS -- test for a substring
+@3.4.1 GP.INSTR -- position of a substring
 .
-=3.4.2 GP.CONTAINS
+=3.4.1 GP.INSTR
 .
-.  Syntax    GP.CONTAINS(hay$, needle$)
-.  Returns   -1 if needle$ occurs anywhere in hay$, 0 if not.
-.  Kind      COMPOSITE. Expands to GP.INSTR(hay$, needle$) <> 0, and
-.            compiles to the same object. Use whichever reads better.
-.  Notes     Case sensitive, as SEC 3.4.1 is.
-.            An empty needle$ returns 0, not -1, because GP.INSTR
-.            reports not-found for one.
+.  Syntax    GP.INSTR(hay$, needle$ [, start])
+.  Returns   Position of needle$ in hay$, 1-based. 0 if not found.
+.  Kind      ASM. Needs the GP block.
+.  Notes     start is the position to begin at. Default 1.
+.            Case sensitive. It compares raw bytes; SEC 3.4.4 is the
+.            case-blind test.
+.            An empty needle$ returns 0.
 .  Example
 .
-:            IF GP.CONTAINS(F$, ".BAS") THEN GOSUB LOAD.IT
+:            P = GP.INSTR(F$, ".BAS", 1)
+:            IF P > 0 THEN PRINT "FOUND AT"; P
 .
 =SEE ALSO
 .
->23|3.4.1 GP.INSTR -- position of a substring
+>32|3.4.4 GP.COMP -- compare two strings, ignoring case

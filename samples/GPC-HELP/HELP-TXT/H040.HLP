@@ -1,56 +1,121 @@
-@4.7 SORT.INC.BL -- shell sort a string array
+@4.6 MENUVERT.INC.BL -- a vertical menu
 .
-=4.7 SORT.INC.BL -- SHELL SORT A STRING ARRAY
+=4.6 MENUVERT.INC.BL -- A VERTICAL MENU
 .
 =DESCRIPTION
 .
-.  SORT.RUN
-.      IN: SORT.PTR SORT.DESCEND SORT.NOCASE
-.      OUT: SORT.OK SORT.COUNT
+.  MENUVERT.RUN
+.      IN: the variables below
+.      OUT: MENUVERT.SEL MENUVERT.KEY
 .
-:#SYMFILE "@:MYPROG.SYM"
-:#INCLUDE "SORT.INC.BL"
-:
-:SORT.PTR = GP.ARRPTR(NAME$())
-:SORT.DESCEND = 0 : SORT.NOCASE = 0
-:GOSUB SORT.RUN
+.  MENUVERT.DRAW
+.      IN: the same
+.      OUT: draws the menu without driving it
 .
-.Shell sort with Ciura's gap sequence -- 132, 57, 23, 10, 4, 1 -- moving the
-.2-byte element pointers rather than string data. A swap costs the same
-.whatever the strings are: no temporary, no copy, no heap traffic.
+.  MENUVERT.ROW
+.      IN: MENUVERT.DRAWROW MENUVERT.DRAWATTR
+.      OUT: one row, in the attribute you name
 .
-.The array is passed as an address because a BASL subroutine cannot be passed
-.an array; GP.ARRPTR is a keyword for this purpose. The empty parentheses in
-.GP.ARRPTR(A$()) are required -- A$ and A$() are different variables.
+.  MENUVERT.HOTFIND
+.      IN: MENUVERT.DRAWROW MENUVERT.DRAWTEXT$
+.      OUT: MENUVERT.HOTAT -- where that row's hotkey letter sits, 1-based,
+.        or 0 for "do not tint"
 .
-.SORT.OK is -1 when it sorted and 0 if the sort was refused: more than 255
-.elements, so DIM A$(254) is the largest accepted (DIM A$(255) is 256
-.elements), or an array whose elements are not strings. The element count and
-.the type are read from the array's own header, three bytes below what
-.GP.ARRPTR returns, so a wrong count cannot be passed in.
+.The menu is BASIC rather than assembly, which keeps 462 bytes of code and 11
+.of storage out of the block every GP program carries. Assembly would only be
+.needed to move the highlight without knowing the text underneath it, by
+.swapping the cell's attribute nibbles instead of redrawing. A BASIC menu
+.owns the item array and can reprint the row.
 .
-.Never-assigned elements are empty strings, not garbage. A DIM A$(20) with
-.five entries filled sorts its fifteen empties to the front; a null pointer
-.reads as "", as it does elsewhere in the runtime.
+.The difference is not visible: a nibble swap is 59 cycles a cell, GP.FILL 31
+.and GP.PRINTAT 94, so redrawing two rows costs about a millisecond against
+.the swap's half, in a 16.7 ms frame.
 .
-.SORT.DESCEND and SORT.NOCASE are ordinary variables rather than arguments,
-.so they are sticky. Set both on every call.
+.  MENUVERT.X .Y
+.      top left of the first row, not of a frame -- draw the border yourself
+.        with GP.BOX, so the menu owes nothing to one style of border
 .
-.The program must have a #SYMFILE, placed before the #INCLUDEs. The assembly
-.reaches BASIC's variables through {VAR}, and BASLOAD crunches every name
-.before the compiler sees it; without the mapping the compile stops with NO
-.SYMBOL FILE FOR {}.
+.  MENUVERT.WIDTH
+.      cells wide. This is the width of the highlight, so it is the width of
+.        the menu whatever the text happens to do
 .
-.Example: ARRAYS.EXP.BL. Regression test: SORT.EXP.BL, eight cases including
-.a 200-element array -- element 128 is where the doubled index stops fitting
-.in a byte. Every case checks content as well as order: a sort that reads the
-.wrong element leaves the array in order with a string duplicated.
+.  MENUVERT.COUNT
+.      how many rows
 .
-=EXAMPLE PROGRAM
+.  MENUVERT.ITEM$()
+.      the rows, 1..COUNT -- the caller owns the DIM, see below
 .
-.  ARRAYS.EXP.BL -- runnable, in the GPC-BASIC folder
-.  SORT.EXP.BL -- runnable, in the GPC-BASIC folder
+.  MENUVERT.ATTR
+.      packed attribute, background * 16 + foreground
 .
-=SEE ALSO
+.  MENUVERT.HIATTR
+.      the same for the highlighted row. 0 means invert MENUVERT.ATTR
 .
->56|4.7 SORT.INC.BL -- shell sort a string array
+.  MENUVERT.HOT$
+.      one character a row, "" for none
+.
+.  MENUVERT.HOTATTR
+.      paint the hotkey letter in this attribute. 0 is off, and off is the
+.        default
+.
+.  MENUVERT.FLAGS
+.      added together, below
+.
+.  MENUVERT.SEL
+.      the row to start on; 0 starts at 1
+.
+.  MENUVERT.SEL
+.      1..COUNT, or 0 if cancelled
+.
+.  MENUVERT.KEY
+.      the key that ended it -- 13 chose, 27 cancelled, or the hotkey itself
+.
+:MENUVERT.X = 8 : MENUVERT.Y = 6
+:MENUVERT.WIDTH = 24 : MENUVERT.COUNT = 4
+:MENUVERT.ITEM$(1) = " NEW GAME"           ' ... and so on
+:MENUVERT.ATTR = THEME.CLR(THEME.TEXT)
+:MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
+:MENUVERT.HOT$ = "NLOQ"
+:GOSUB MENUVERT.RUN
+:IF MENUVERT.SEL = 0 THEN GOTO CANCELLED
+.
+.  cursor up / down
+.      move
+.
+.  RETURN
+.      choose
+.
+.  ESC or STOP
+.      cancel
+.
+.  a hotkey
+.      chooses its row at once
+.
+.  1
+.      must select -- ESC does not cancel
+.
+.  2
+.      keep mark -- leave the chosen row highlighted on the way out
+.
+.  4
+.      no wrap -- stop at the ends instead of wrapping round
+.
+.  8
+.      gamepad -- drive it from the SNES pad in port 1 as well as the
+.        keyboard
+.
+.The constants MENUVERT.MUSTSEL, .KEEPMARK, .NOWRAP and .GAMEPAD are defined;
+.add those rather than the numbers.
+.
+.A hotkey chooses its row rather than moving to it. MENUVERT.HOT$ is one
+.character per row in order, matched without case. It may be shorter than
+.MENUVERT.COUNT, in which case the later rows have no hotkey.
+.
+.MENUVERT.HOTATTR paints the hotkey letter in a second attribute. The letter
+.is located in the row's own text -- the first case-insensitive match for
+.that row's MENUVERT.HOT$ character -- so nothing extra is passed in and "
+.START" with hotkey S needs no markup. A row whose text does not contain its
+.hotkey is left untinted rather than reported; the hotkey still works. Only
+.rows in the normal attribute are tinted: on the selected row the highlight
+.carries the meaning.
+.

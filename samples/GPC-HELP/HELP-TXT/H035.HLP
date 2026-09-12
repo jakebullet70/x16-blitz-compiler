@@ -1,58 +1,121 @@
-@4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+@4.2 STRINGS.INC.BL -- string helpers
 .
-=4.3 APPSYS.INC.BL -- START POLITELY, LEAVE IT AS YOU FOUND IT
+=4.2 STRINGS.INC.BL -- STRING HELPERS
+.
+=WHAT IT COSTS
+.
+.  ASM: GP.INSTR GP.STRPTR GP.COMP
+.    ASM -- a keyword, run by machine code in the GP runtime block. A program
+.    using ANY GP keyword pays for the whole block.
+.  COMPOSITE: GP.CONTAINS GP.ISEMPTY
+.    COMPOSITE -- a keyword with no machine code of its own. The compiler
+.    expands it into keywords that already exist, so it costs the runtime
+.    nothing at all.
 .
 =DESCRIPTION
 .
-.  APPSYS.STARTUP
-.      IN: --
-.      OUT: APPSYS.MODE APPSYS.COLS APPSYS.ROWS APPSYS.COLOUR
+.  STR.PADR
+.      IN: STR.STR$ STR.WIDTH
+.      OUT: STR.STR$ left-justified
 .
-.  APPSYS.RESTORE
-.      IN: those
-.      OUT: screen mode and colour put back
+.  STR.PADL
+.      IN: same
+.      OUT: right-justified
 .
-.  APPSYS.ISEMU
-.      IN: --
-.      OUT: APPSYS.IS.EMULATOR -- -1 under x16emu, 0 otherwise
+.  STR.PADC
+.      IN: same
+.      OUT: centred (odd gap goes right)
 .
-:A screen rectangle through a file is `STASH.FILE.SAVE` / `.LOAD` / `.PUT` in
-:
-:GOSUB APPSYS.STARTUP
-:' ... the application, laid out with APPSYS.COLS / APPSYS.ROWS ...
-:GOSUB APPSYS.RESTORE : END
+.  STR.SPLIT
+.      IN: STR.STR$ STR.DELIM$ STR.MAX
+.      OUT: STR.N, STR.FIELD$(1..N)
 .
-.Call STARTUP before any SCREEN or COLOR of your own. It records the state as
-.it finds it, so anything changed beforehand is what gets restored.
+.  STR.REPLACE
+.      IN: STR.STR$ STR.FIND$ STR.REPL$
+.      OUT: STR.STR$, every occurrence replaced
 .
-.Lay out from APPSYS.COLS / APPSYS.ROWS rather than assuming 80x60. The X16
-.boots 80x60, but SCREEN 0 is 40x30 and a user who prefers larger text is
-.running one.
+.  STR.PET2SCR
+.      IN: STR.PET
+.      OUT: STR.SCR
 .
-.APPSYS.DEV defaults to 8. The panel routines are implemented in
-.STASHFILE.INC.BL. A panel file is self-describing -- it carries the stash's
-.4-byte header -- so loading one needs only its name.
+.  STR.SPLICE
+.      IN: STR.STR$ STR.AT STR.CUT STR.SUB$
+.      OUT: STR.STR$, edited at that position
 .
-.APPSYS.ISEMU answers the question a timing loop has to ask. $9FBE and $9FBF
-.are the last of the emulator's own I/O registers and read as "1" and "6"
-.under x16emu, with the debugger on or off; the routine is those two PEEKs
-.and a comparison.
+.  STR.TRIM
+.      IN: STR.PTR
+.      OUT: (the string itself), spaces off both ends
 .
-:GOSUB APPSYS.ISEMU
-:IF APPSYS.IS.EMULATOR THEN PRINT "EMULATED"
-:IF NOT APPSYS.IS.EMULATOR THEN PRINT "NOT x16emu"
+.  STR.LTRIM
+.      IN: same
+.      OUT: spaces off the leading end
 .
-.The flag is -1, not 1, so NOT works on it: NOT is -x-1 here, so NOT -1 is 0
-.while NOT 1 is -2 -- still true. -1 is also what a comparison hands back, so
-.the flag reads like one. IF itself tests non-zero, so either value would
-.have worked with the plain form.
+.  STR.RTRIM
+.      IN: same
+.      OUT: spaces off the trailing end
 .
-.It answers for x16emu and nothing else. A 0 means "not x16emu" -- a real
-.machine, or another emulator that does not carry those registers. And
-.$9FA0-$9FBF is expansion card I/O on the real machine, so a card at I/O5
-.could in principle answer "16" as well: a 1 is strong, a 0 is certain.
+.The module needs a #SYMFILE, and so does every program that includes it,
+.before the #INCLUDEs and named after the source PRG. The three trims are
+.GP.ASM and reach BASIC's variables through {VAR}; without a symbol file the
+.compile stops with NO SYMBOL FILE FOR {}. This is new -- the module was pure
+.BASIC until the trims moved here out of STRCASE.INC.BL.
 .
-=SEE ALSO
+.The two halves take their argument differently, and one question decides
+.which: does the routine GROW the string. The pads and SPLICE do, so they are
+.BASIC -- they take the string by value in STR.STR$ and hand it back there,
+.and an assignment reallocates for free. The trims only ever shrink, so they
+.are assembly -- they take its ADDRESS in STR.PTR and rewrite the block where
+.it lies, which is the only way a GOSUB can edit a caller's string without
+.two allocations and two copies a call. Never pass a literal to those:
+.GP.STRPTR("hello") is an address inside the p-code. The three pad routines
+.leave a string that is already at or past the width unchanged. They pad and
+.never truncate; use STR.RTRIM to shorten.
 .
->50|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
->70|STASHFILE.INC.BL -- a saved text rectangle, through a file.
+.SPLIT reads STR.STR$ without modifying it. STR.MAX of 0 means 10. Empty
+.fields are preserved: "A,,C" is three fields and "A," is two. Splitting an
+.empty string gives one empty field, never zero. Reaching the limit is not an
+.error and loses nothing -- the last field receives the unsplit remainder,
+.delimiters included.
+.
+.STR.FIELD$ is the one array the library does not DIM. Left alone, GPC's
+.implicit DIM gives 0..10. For more, DIM it before the first call and set
+.STR.MAX to match. DIMming an array GPC has already auto-dimensioned is an
+.error, so it is one or the other. Note that this is the reverse of
+.THEME.CLR, which the module DIMs.
+.
+.REPLACE swaps every occurrence of STR.FIND$ for STR.REPL$, modifying
+.STR.STR$ in place. The replacement may be shorter, longer, or "" to delete.
+.It is case sensitive, because GP.INSTR compares raw bytes.
+.
+.A replacement that contains the search text is safe: "A" to "AA" terminates
+.and doubles the As, where a naive in-place version would not. The routine
+.builds a new string and never re-scans what it has emitted. An empty
+.STR.FIND$ leaves the string unchanged rather than hanging, because GP.INSTR
+.reports not-found for a zero-length needle. Like the pad routines it is not
+.length checked: a longer replacement can push the result past 255
+.characters.
+.
+.PET2SCR converts a PETSCII code to the screen code the tile map holds, for
+.TILE, TDATA and VPOKE. GP.PRINTAT and GP.FILL do this internally.
+.
+.The three trims are three entry labels sharing one blob, so there is no mode
+.to forget to set. A zero-length string and an all-spaces string are not
+.special cases: the walk counts down and reaching zero is the answer.
+.
+.SPLICE edits by POSITION where REPLACE edits by content: it replaces STR.CUT
+.characters at STR.AT with STR.SUB$. One routine covers all three of insert,
+.overwrite and delete, because they are the same operation with a different
+.count -- STR.CUT of 0 inserts, LEN(STR.SUB$) overwrites, and an empty
+.STR.SUB$ deletes. STR.AT is 1-based, matching GP.INSTR.
+.
+.Past the end appends and below 1 clamps to 1, both falling out of LEFT$ and
+.MID$ rather than being tested for; a cut running past the end takes the rest
+.of the string. It is not length checked, like REPLACE and the pads. SPLICE
+.clamps STR.AT and STR.CUT in place, so read them back rather than assuming
+.what you set survived the call.
+.
+.It was written in GP.ASM first and rewritten in BASIC, which is worth
+.knowing because the reason generalises: the assembly could overwrite and
+.delete but never insert, because in-place work cannot grow a string, and it
+.cost about 280 bytes of p-code where the one BASIC line costs about 40.
+.

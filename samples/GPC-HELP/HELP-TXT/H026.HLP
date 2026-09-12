@@ -1,90 +1,73 @@
-@3.10 Text in a bank
+@3.9 Inline assembly (2)
+={VAR} -- a BASIC variable's slot
 .
-=3.10 TEXT IN A BANK
+.{VAR} is the address of the variable's slot, so reading and writing use the
+.same form: LDA {N%} reads it, STA {N%} writes it, in the slot BASIC itself
+.uses.
 .
-=SYNTAX
+.  {N} {N%} {N$}
+.      IS: the scalar's slot
 .
-:GP.BANKEDSTR <bank> <NAME>
-:  "first"
-:  "second"
-:GP.ENDBANKEDSTR
-:
-:  A$ = GP.BSTR(<NAME>, n)
-:  N  = GP.BSTRCOUNT(<NAME>)
+.  {N()}
+.      IS: the array's slot, which holds the base address of its data -- an
+.        element is two steps, as through GP.ARRPTR
 .
-=DESCRIPTION
+.A name is letters, digits and dots, starting with a letter, up to 64
+.characters -- the same limit as BASLOAD. {DOC.GOT.OFF} works, so the dotted
+.names used throughout the library are reachable from assembly. Underscore is
+.not accepted: BASLOAD allows it in a name, this does not, and {A_B} reads
+.the name as A.
 .
-.Moves a program's literal text out of low RAM and into a RAM bank, at
-.compile time. A string constant costs 2 + LEN bytes of p-code wherever it
-.appears; GP.BSTR(NAME, n) costs 5, so text of four characters or more is
-.cheaper read from the bank than written in the line. Over half of a
-.menu-driven program's own code is usually literal text, and text is the one
-.thing in a program with no reason to be resident: it is never executed,
-.never indexed, and read one item at a time.
+.{VAR} requires #SYMFILE. BASLOAD renames variables -- N% becomes A%, which
+.is how it provides 64 significant characters on a two-character BASIC -- and
+.it does not rename REM text with them, so the code says A% while the REM
+.still says {N%}. #SYMFILE is BASLOAD's record of that mapping and the
+.compiler reads it:
 .
-.The body is bare quoted lines. One string a line, nothing else on the line,
-.and they pass through byte for byte -- case, leading spaces and trailing
-.spaces included. They are not REM lines and must not be: BASLOAD upper-cases
-.REM text.
+:#SYMFILE "@:PROG.SYM"
 .
-.Blocks are named, and you may write as many as you like. Each is indexed
-.from zero within itself, so inserting a line in one group moves nothing
-.outside it. All the groups in a program share one bank, which is why every
-.block names the same one -- written on each block rather than only the first
-.so a block can be read where it sits.
+.Put it at the top of the source, named to match the PRG: compiling PROG.PRG
+.reads PROG.SYM. Nothing else changes -- {N%} is still written with the name
+.as authored.
 .
-.The name costs nothing at run time. It is resolved while the program
-.compiles, into the group's first index, and the compiler adds that to your
-.index for you. No letter of the name reaches the object, which is the whole
-.reason the lookup is not in the bank.
+.Two compile-time errors, both naming the line:
 .
-.GP.BSTRCOUNT(NAME) is a composite: it compiles to a plain number, so FOR I =
-.0 TO GP.BSTRCOUNT(MENU.FILE) - 1 costs no more than writing the count out.
+.  NO SYMBOL FILE FOR {}
+.      MEANS: no #SYMFILE, or it is not beside the PRG under the matching
+.        name
 .
-:#DEFINE GM.TEXTBANK 5
-:
-:GP.BANKEDSTR GM.TEXTBANK MENU.FILE
-:  " OPEN "
-:  " SAVE "
-:  " QUIT "
-:GP.ENDBANKEDSTR
-:
-:GP.BANKEDSTR GM.TEXTBANK MENU.EDIT
-:  " CUT "
-:  " PASTE "
-:GP.ENDBANKEDSTR
-:
-:  FOR I = 0 TO GP.BSTRCOUNT(MENU.EDIT) - 1
-:    PRINT GP.BSTR(MENU.EDIT, I)
-:  NEXT I
+.  UNKNOWN VARIABLE IN {}
+.      MEANS: the name is not a variable of this program
 .
-.Claim the bank, exactly as a GP.BANKED code region's bank is claimed. The
-.compiler picks it while the object is written, so BANKMGR has to be told
-.rather than asked:
+.{VAR} never creates a variable, unlike an ordinary BASIC reference. Assign
+.the variable once in BASIC first, even M% = 0. A name that does not exist
+.otherwise resolves to a slot BASIC never reads, and the block runs, stores,
+.and changes nothing observable.
 .
-:BANKMGR.WANT = GM.TEXTBANK : GOSUB BANKMGR.CLAIM
+=What is not there
 .
-.Compile SHARED. The text is copied into its bank by the program's bootstrap,
-.and an embedded program has none -- the same rule GP.BANKED works to. An
-.embedded build is refused rather than compiled into a program that reads an
-.empty bank.
+.No expressions: {N%}+1 and LABEL+2 are not understood. Use an index
+.register.
 .
-.A group name is not a variable. No $, no %, no ( -- any of those is a syntax
-.error rather than something quietly ignored. A name that no block declared
-.is a syntax error at the line that used it, and so is a second block
-.claiming a name already taken. An empty block is refused too: a group of no
-.strings would make GP.BSTRCOUNT zero and every GP.BSTR on it read the next
-.group's text.
+.Zero page or absolute is decided by the operand. $34 is zero page, $0034 is
+.absolute, and a decimal under 256 is zero page. Every 65C02 addressing mode
+.is available, including the two the NMOS 6502 lacks -- LDA ($34) and JMP
+.($1234,X) -- except BBR, BBS, RMB and SMB.
 .
-.There is no run-time bounds check. The compiler knows every index it emits
-.and nothing a program does can produce one out of range, so an index past
-.the end of a group reads whatever follows it. That is the same bargain the
-.array fast path makes.
+.Registers come back through GP.A / GP.X / GP.Y / GP.C as they do from
+.GP.CALL; a block uses the same $030C-$030F slots. Those four are GP block
+.keywords, so reading one pulls in the 1 KB block that GP.ASM alone avoids.
+.{VAR} does not.
 .
-.One bank of text a program, up to 8 KB of it, up to 128 groups. GP.BSTR is
-.an ordinary GP keyword, so it pulls in the 1 KB GP block; the two block
-.keywords do not, and neither does GP.BSTRCOUNT.
+.A body can come from a file. #INCLUDE splices it in verbatim, and BASLOAD's
+.REM #nn-mm attribution makes an error inside it name the file:
 .
-.Reading it from inside a GP.BANKED region works: the handler puts the
-.caller's bank back before it returns.
+:#REM 1
+:GP.ASM
+:#INCLUDE "MACPTR.ASM"
+:GP.ENDASM
+:#REM 0
 .
+=EXAMPLE PROGRAM
+.
+.  ASM.EXP.BL -- runnable, in the GPC-BASIC folder

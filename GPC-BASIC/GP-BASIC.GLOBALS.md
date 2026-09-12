@@ -64,8 +64,7 @@ whole list of them. They are keywords rather than variables because nothing in t
 a BASIC variable by name, so a command that returns a value has to
 hand it back through a keyword. X16's own `ST`, `MX` and `MY` exist for the same reason.
 
-The full keyword list lives in `GPC-BASIC/GPB.INC.BL`, and the byte values mirror `getGP()` in
-`source/common-scripts/c64tokens.py`.
+The full keyword list lives in `GPC-BASIC/GPB.INC.BL`.
 
 ---
 
@@ -437,24 +436,22 @@ and not shimmed. Everything else, the whole of `GUI.FORM.*`, `GUI.BUTTON*`, `GUI
 ### A public name and its `.BODY` are two labels
 
 The six modules the GUI is built from — `THEME`, `MENUVERT`, `MENUBAR`, `LINEINPUT`, `GUI`, `GUI2` —
-define **`THEME.SELECT.BODY`, not `THEME.SELECT`**. A banked routine cannot select its own bank, so
-the code has to be a label of its own and the public name has to be a label in low memory that
-banks and then calls it.
-
-That public name comes from a separate file, and which one depends on how you build:
+come in two files, and which one you `#INCLUDE` decides where the module runs. A banked routine
+cannot select its own bank, so in the banked file the code has to be a label of its own and the
+public name has to be a label in low memory that banks and then calls it.
 
 | | |
 |---|---|
-| the library in a bank | `LIB.GUIBANK.INC.BL` — eighteen shims, each `BANK` then `GOSUB` |
-| the library in low memory | `THEME.PLAIN.INC.BL`, `MENUVERT.PLAIN`, `MENUBAR.PLAIN`, `LINEINPUT.PLAIN`, `GUI.PLAIN`, `GUI2.PLAIN` — the same eighteen names, minus the `BANK` |
+| the library in low memory | `THEME.INC.BL` defines `THEME.SELECT` itself. Nothing else is needed, and a call costs nothing |
+| the library in a bank | `THEME.BANK.INC.BL` defines `THEME.SELECT.BODY`, and `SHIM.GUIBANK.INC.BL` — twenty-one shims, each `PUSH` then `GOSUB` then `POP` — defines the twenty-one public names |
 
-**One or the other, never both**, and never a `.PLAIN` file for a module you did not `#INCLUDE`:
-BASLOAD resolves every label in every file it reads, so a shim standing in front of a body that is
-not there is `LABEL NOT FOUND`, and both front doors at once is `DUPLICATE SYMBOL`. That is why the
-unbanked side is six files and not one — a `MENUVERT`-only program would otherwise have to carry
-the whole `GUI`.
+**One or the other, never both**, and a banked build has to include every module its shim file
+names: BASLOAD resolves every label in every file it reads, so a shim standing in front of a body
+that is not there is `LABEL NOT FOUND`. Both files of one module at once is `DUPLICATE SYMBOL` where
+the module has no `#IFNDEF` guard and a silent first-one-wins where it has.
+[BANKED-OR-NOT.md](BANKED-OR-NOT.md) says how to choose.
 
-The front doors go **before** the bodies in the file. A caller reads identically either way, which
+The shims go **before** the bodies in the file. A caller reads identically either way, which
 is the point of the split.
 
 **Only eighteen names are shimmed, and a name that is not shimmed is not callable from outside the
@@ -468,7 +465,7 @@ always listed it as callable and it was, before the split.
 Each module also has a skip label it jumps over itself with — `THEME.SKIP`, `APPSYS.SKIP`,
 `STR.SKIP`, `BMX.MODULE.END`, `LINEINPUT.MODULE.END`, `MENUVERT.MODULE.END`,
 `MENUBAR.MODULE.END`, `GUI.MODULE.END`, `GUI.LISTBOX.MODULE.END`, `STASH.MODULE.END`,
-`STASHFILE.MODULE.END`, `SORT.MODULE.END`, `STRCASE.MODULE.END`, and one per `.PLAIN` file.
+`STASHFILE.MODULE.END`, `SORT.MODULE.END` and `STRCASE.MODULE.END`.
 Those exist so an include can sit anywhere in the file, the top included. **Do not branch to one.**
 
 BASLOAD refuses a name used as both a label and a variable (`BASLOAD.MD:319`). `BMX.SKIP` is the

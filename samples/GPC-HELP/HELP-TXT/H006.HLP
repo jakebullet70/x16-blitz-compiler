@@ -1,80 +1,15 @@
-@4. GPC-BASIC/ -- the library
+@4. The tools
 .
-=4. GPC-BASIC/ -- THE LIBRARY
+=4. THE TOOLS
 .
-.Text-mode building blocks, in BASL, #INCLUDEd into your source. BASL has no
-.dead code elimination: including a module costs its whole size whether or
-.not it is called.
+.GPC.ERR.PRG turns a runtime error's @ $XXXX into a source line, using the
+.debug map the compiler writes when MAKE A DEBUG MAP? is answered yes.
+.Without the map the address cannot be resolved.
 .
-.  GPB.INC.BL
-.      the GP.* keyword definitions for BASLOAD. Every source using a GP
-.        keyword needs this one, and no other include is ever optional either
+.GPB.HELP.PRG is this reference, on the machine. It reads HELP-TXT/ beside it
+.-- GPB.HELP.IDX and one .HLP per topic -- and shows 49 topics at 80x30.
+.Arrows, PgUp / PgDn, HOME and END move. RETURN opens the highlighted index
+.row. / finds and N repeats the search. L follows a topic's cross references,
+.X writes its code out as a .BL where it has any, T cycles the colour themes,
+.? is the about box. ESC goes back a step, and quits from the index.
 .
-.  THEME.INC.BL
-.      named colour roles, in three themes
-.
-.  APPSYS.INC.BL
-.      start an application politely, and leave the machine as it was found
-.
-.  STASH.INC.BL
-.      save a text rectangle to a RAM bank, and put it back
-.
-.  STASHFILE.INC.BL
-.      the same rectangle, through a file
-.
-.  STASHVRAM.INC.BL
-.      rectangles and byte blobs in spare VRAM, addressed by handle. No
-.        GP.ASM, so no #SYMFILE
-.
-.  STASHVRAMGC.INC.BL
-.      closes the holes a STASHVRAM freed out of order. Its own file, so it
-.        costs nothing unless called
-.
-.  LINEINPUT.INC.BL
-.      a positioned, length-limited entry field
-.
-.  MENUVERT.INC.BL
-.      a vertical menu
-.
-.  MENUBAR.INC.BL
-.      a horizontal menu bar
-.
-.  GUI.INC.BL
-.      four dialogs -- ask, say, type, choose -- in a box that puts the
-.        screen back
-.
-.  GUI2.INC.BL
-.      a listbox, single or multi select
-.
-.  STRINGS.INC.BL
-.      the string helpers: BASIC where BASIC is enough, assembly where it is
-.        not
-.
-.  STRCASE.INC.BL
-.      case, rewriting a string in place, in assembly
-.
-.  STRUSING.INC.BL
-.      a number to a template: PRINT USING's mask, in BASIC
-.
-.  SORT.INC.BL
-.      shell sort a string array in place, in assembly
-.
-.  BMX.INC.BL
-.      load a BMX bitmap into VERA
-.
-.What each one costs in bytes is in the command reference, under At a glance.
-.
-=SEE ALSO
-.
->47|4.1 THEME.INC.BL -- named colour roles
->50|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
->62|STASH.INC.BL -- save a text rectangle, and put it back.
->70|STASHFILE.INC.BL -- a saved text rectangle, through a file.
->51|4.4 LINEINPUT.INC.BL -- a positioned entry field
->53|4.6 MENUVERT.INC.BL -- a vertical menu
->58|4.9 MENUBAR.INC.BL -- a horizontal menu
->60|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
->61|4.12 GUI2.INC.BL -- a listbox, single or multi select
->48|4.2 STRINGS.INC.BL -- string helpers
->57|4.8 STRCASE.INC.BL -- case, in place
->59|4.10 STRUSING.INC.BL -- a number to a template

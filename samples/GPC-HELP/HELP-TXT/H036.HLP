@@ -1,88 +1,17 @@
-@4.4 LINEINPUT.INC.BL -- a positioned entry field
-.
-=4.4 LINEINPUT.INC.BL -- A POSITIONED ENTRY FIELD
-.
-=DESCRIPTION
-.
-.  LINEINPUT.GET
-.      IN: LINEINPUT.X .Y .LEN .ATTR .TEXT$ .MASK .ALLOW$ .DENY$
-.      OUT: LINEINPUT.TEXT$ LINEINPUT.KEY
-.
-.  LINEINPUT.ASK
-.      IN: the same plus LINEINPUT.LABEL$
-.      OUT: the same; LINEINPUT.X restored
-.
-:LINEINPUT.X = 10 : LINEINPUT.Y = 6
-:LINEINPUT.LEN = 20
-:LINEINPUT.ATTR = THEME.CLR(THEME.TEXT)
-:LINEINPUT.TEXT$ = ""
-:GOSUB LINEINPUT.GET
-:IF LINEINPUT.KEY = 27 THEN GOTO CANCELLED
-.
-.INPUT and LINPUT cannot be used on a drawn screen: both take the bottom of
-.the screen, scroll it, echo in the current colour, and accept any length. A
-.LINEINPUT field stays at the given position, in the given colour, and stops
-.at the given width.
-.
-.LINEINPUT.KEY is the key that ended the field, which is what makes a
-.multi-field form possible:
-.
-.  13
-.      RETURN -- finished
-.
-.  27 / 3
-.      ESC / STOP -- cancelled, and LINEINPUT.TEXT$ is put back to what it
-.        was
-.
-.  17 / 145 / 9
-.      cursor down / up / TAB -- left the field, text kept
-.
-.A form is therefore a loop over fields rather than a sequence of prompts,
-.and the user can return to an earlier field without restarting.
-.
-.LINEINPUT.MASK non-zero displays asterisks while holding the real string.
-.The field does not scroll: when it is full, further characters are refused
-.and the cursor inverts the last character rather than sitting past the end.
-.The cursor blinks off TI rather than a delay loop; a delay loop would
-.swallow keys pressed during it.
-.
-.LINEINPUT.ALLOW$ and LINEINPUT.DENY$ restrict what may be typed. Both are
-.empty by default, and the field then takes any printable character, as it
-.always has. ALLOW$ lists the characters accepted and DENY$ the ones refused;
-.a caller that sets both gets ALLOW$, and DENY$ is not consulted. A refused
-.key changes nothing -- not the text, and not the caret.
-.
-.They compare raw bytes, so a set of LETTERS depends on the charset: PETSCII
-.shifted letters arrive as $C1-$DA and ISO ones as $41-$5A, and an ALLOW$
-.written for one silently refuses every capital in the other. Digits are
-.48-57 in both. Use ALLOW$ for a closed set short enough to write out, DENY$
-.for everything-except:
-.
-.  Digits only
-.      SPELLING: ALLOW$ = "0123456789"
-.
-.  Number with sign and point
-.      SPELLING: ALLOW$ = "0123456789.-"
-.
-.  Yes or no
-.      SPELLING: ALLOW$ = "YyNn"
-.
-.  Letters, no digits
-.      SPELLING: DENY$ = "0123456789"
-.
-.  Filename, no punctuation
-.      SPELLING: DENY$ = ",:=*?"
-.
-.Both are sticky, like every other input in the library, so a form sets them
-.on the way into each field rather than once at the top.
-.
-.Example: FORM.EXP.BL -- three fields, one masked and one digits-only, in a
-.themed panel.
+@4.2 STRINGS.INC.BL -- string helpers (2)
+.Examples: SPLITT.EXP.BL, STRINGS.EXP.BL. Regression test: STRTST.EXP.BL,
+.thirty-three cases -- the trim edges, every splice mode, both clamps,
+.appending past the end, splicing an empty string, growing a 200-character
+.string past the block it was born with, and guard strings either side to
+.catch an off-by-one write into the neighbouring block.
 .
 =EXAMPLE PROGRAM
 .
-.  FORM.EXP.BL -- runnable, in the GPC-BASIC folder
+.  SPLITT.EXP.BL -- runnable, in the GPC-BASIC folder
+.  STRINGS.EXP.BL -- runnable, in the GPC-BASIC folder
+.  STRTST.EXP.BL -- runnable, in the GPC-BASIC folder
 .
 =SEE ALSO
 .
->51|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>60|4.2 STRINGS.INC.BL -- string helpers
+>69|4.8 STRCASE.INC.BL -- case, in place

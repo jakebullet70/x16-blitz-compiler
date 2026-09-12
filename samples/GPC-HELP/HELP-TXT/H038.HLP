@@ -1,121 +1,88 @@
-@4.6 MENUVERT.INC.BL -- a vertical menu
+@4.4 LINEINPUT.INC.BL -- a positioned entry field
 .
-=4.6 MENUVERT.INC.BL -- A VERTICAL MENU
+=4.4 LINEINPUT.INC.BL -- A POSITIONED ENTRY FIELD
 .
 =DESCRIPTION
 .
-.  MENUVERT.RUN
-.      IN: the variables below
-.      OUT: MENUVERT.SEL MENUVERT.KEY
+.  LINEINPUT.GET
+.      IN: LINEINPUT.X .Y .LEN .ATTR .TEXT$ .MASK .ALLOW$ .DENY$
+.      OUT: LINEINPUT.TEXT$ LINEINPUT.KEY
 .
-.  MENUVERT.DRAW
-.      IN: the same
-.      OUT: draws the menu without driving it
+.  LINEINPUT.ASK
+.      IN: the same plus LINEINPUT.LABEL$
+.      OUT: the same; LINEINPUT.X restored
 .
-.  MENUVERT.ROW
-.      IN: MENUVERT.DRAWROW MENUVERT.DRAWATTR
-.      OUT: one row, in the attribute you name
+:LINEINPUT.X = 10 : LINEINPUT.Y = 6
+:LINEINPUT.LEN = 20
+:LINEINPUT.ATTR = THEME.CLR(THEME.TEXT)
+:LINEINPUT.TEXT$ = ""
+:GOSUB LINEINPUT.GET
+:IF LINEINPUT.KEY = 27 THEN GOTO CANCELLED
 .
-.  MENUVERT.HOTFIND
-.      IN: MENUVERT.DRAWROW MENUVERT.DRAWTEXT$
-.      OUT: MENUVERT.HOTAT -- where that row's hotkey letter sits, 1-based,
-.        or 0 for "do not tint"
+.INPUT and LINPUT cannot be used on a drawn screen: both take the bottom of
+.the screen, scroll it, echo in the current colour, and accept any length. A
+.LINEINPUT field stays at the given position, in the given colour, and stops
+.at the given width.
 .
-.The menu is BASIC rather than assembly, which keeps 462 bytes of code and 11
-.of storage out of the block every GP program carries. Assembly would only be
-.needed to move the highlight without knowing the text underneath it, by
-.swapping the cell's attribute nibbles instead of redrawing. A BASIC menu
-.owns the item array and can reprint the row.
+.LINEINPUT.KEY is the key that ended the field, which is what makes a
+.multi-field form possible:
 .
-.The difference is not visible: a nibble swap is 59 cycles a cell, GP.FILL 31
-.and GP.PRINTAT 94, so redrawing two rows costs about a millisecond against
-.the swap's half, in a 16.7 ms frame.
+.  13
+.      RETURN -- finished
 .
-.  MENUVERT.X .Y
-.      top left of the first row, not of a frame -- draw the border yourself
-.        with GP.BOX, so the menu owes nothing to one style of border
+.  27 / 3
+.      ESC / STOP -- cancelled, and LINEINPUT.TEXT$ is put back to what it
+.        was
 .
-.  MENUVERT.WIDTH
-.      cells wide. This is the width of the highlight, so it is the width of
-.        the menu whatever the text happens to do
+.  17 / 145 / 9
+.      cursor down / up / TAB -- left the field, text kept
 .
-.  MENUVERT.COUNT
-.      how many rows
+.A form is therefore a loop over fields rather than a sequence of prompts,
+.and the user can return to an earlier field without restarting.
 .
-.  MENUVERT.ITEM$()
-.      the rows, 1..COUNT -- the caller owns the DIM, see below
+.LINEINPUT.MASK non-zero displays asterisks while holding the real string.
+.The field does not scroll: when it is full, further characters are refused
+.and the cursor inverts the last character rather than sitting past the end.
+.The cursor blinks off TI rather than a delay loop; a delay loop would
+.swallow keys pressed during it.
 .
-.  MENUVERT.ATTR
-.      packed attribute, background * 16 + foreground
+.LINEINPUT.ALLOW$ and LINEINPUT.DENY$ restrict what may be typed. Both are
+.empty by default, and the field then takes any printable character, as it
+.always has. ALLOW$ lists the characters accepted and DENY$ the ones refused;
+.a caller that sets both gets ALLOW$, and DENY$ is not consulted. A refused
+.key changes nothing -- not the text, and not the caret.
 .
-.  MENUVERT.HIATTR
-.      the same for the highlighted row. 0 means invert MENUVERT.ATTR
+.They compare raw bytes, so a set of LETTERS depends on the charset: PETSCII
+.shifted letters arrive as $C1-$DA and ISO ones as $41-$5A, and an ALLOW$
+.written for one silently refuses every capital in the other. Digits are
+.48-57 in both. Use ALLOW$ for a closed set short enough to write out, DENY$
+.for everything-except:
 .
-.  MENUVERT.HOT$
-.      one character a row, "" for none
+.  Digits only
+.      SPELLING: ALLOW$ = "0123456789"
 .
-.  MENUVERT.HOTATTR
-.      paint the hotkey letter in this attribute. 0 is off, and off is the
-.        default
+.  Number with sign and point
+.      SPELLING: ALLOW$ = "0123456789.-"
 .
-.  MENUVERT.FLAGS
-.      added together, below
+.  Yes or no
+.      SPELLING: ALLOW$ = "YyNn"
 .
-.  MENUVERT.SEL
-.      the row to start on; 0 starts at 1
+.  Letters, no digits
+.      SPELLING: DENY$ = "0123456789"
 .
-.  MENUVERT.SEL
-.      1..COUNT, or 0 if cancelled
+.  Filename, no punctuation
+.      SPELLING: DENY$ = ",:=*?"
 .
-.  MENUVERT.KEY
-.      the key that ended it -- 13 chose, 27 cancelled, or the hotkey itself
+.Both are sticky, like every other input in the library, so a form sets them
+.on the way into each field rather than once at the top.
 .
-:MENUVERT.X = 8 : MENUVERT.Y = 6
-:MENUVERT.WIDTH = 24 : MENUVERT.COUNT = 4
-:MENUVERT.ITEM$(1) = " NEW GAME"           ' ... and so on
-:MENUVERT.ATTR = THEME.CLR(THEME.TEXT)
-:MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
-:MENUVERT.HOT$ = "NLOQ"
-:GOSUB MENUVERT.RUN
-:IF MENUVERT.SEL = 0 THEN GOTO CANCELLED
+.Example: FORM.EXP.BL -- three fields, one masked and one digits-only, in a
+.themed panel.
 .
-.  cursor up / down
-.      move
+=EXAMPLE PROGRAM
 .
-.  RETURN
-.      choose
+.  FORM.EXP.BL -- runnable, in the GPC-BASIC folder
 .
-.  ESC or STOP
-.      cancel
+=SEE ALSO
 .
-.  a hotkey
-.      chooses its row at once
-.
-.  1
-.      must select -- ESC does not cancel
-.
-.  2
-.      keep mark -- leave the chosen row highlighted on the way out
-.
-.  4
-.      no wrap -- stop at the ends instead of wrapping round
-.
-.  8
-.      gamepad -- drive it from the SNES pad in port 1 as well as the
-.        keyboard
-.
-.The constants MENUVERT.MUSTSEL, .KEEPMARK, .NOWRAP and .GAMEPAD are defined;
-.add those rather than the numbers.
-.
-.A hotkey chooses its row rather than moving to it. MENUVERT.HOT$ is one
-.character per row in order, matched without case. It may be shorter than
-.MENUVERT.COUNT, in which case the later rows have no hotkey.
-.
-.MENUVERT.HOTATTR paints the hotkey letter in a second attribute. The letter
-.is located in the row's own text -- the first case-insensitive match for
-.that row's MENUVERT.HOT$ character -- so nothing extra is passed in and "
-.START" with hotkey S needs no markup. A row whose text does not contain its
-.hotkey is left untinted rather than reported; the hotkey still works. Only
-.rows in the normal attribute are tinted: on the selected row the highlight
-.carries the meaning.
-.
+>63|4.4 LINEINPUT.INC.BL -- a positioned entry field
