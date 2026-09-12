@@ -17,19 +17,13 @@
 .aligned, all or nothing. ScanGPUsage walks the finished p-code and drops the
 .whole block from the object if nothing in it is reached.
 .
-.The block costs those 1,024 bytes once. The bytes in the object and the
-.bytes off the workspace floor are the same bytes -- runtimeEndPage is a
-.single page number that decides how much of the runtime image is written
-.out, where the p-code lands, and where the workspace starts. Maximum p-code
-.is 17,152 bytes with the block and 18,176 without: ObjectBase to $9F00, less
-.the 4K frame stack and the 4K minimum workspace.
+.The block costs those 1,024 bytes. Maximum p-code is 17,152 bytes with 
+.the block and 18,176 without: ObjectBase to $9F00, less the 4K frame
+.stack and the 4K minimum workspace.
 .
 .Composites. GP.ASM, GP.ENDASM, GP.CHAR, GP.CONTAINS, GP.ISEMPTY, GP.HIBYTE,
 .GP.LOBYTE, GP.BSTRCOUNT, GP.DEFPROC, GP.SUB. The compiler expands each into
-.opcodes that already exist. No handler, no vector slot, nothing in the
-.block. Whether the block comes in is then the expansion's business, not the
-.composite's: GP.CHAR runs GP.FILL's handler and brings it in, while GP.ASM,
-.GP.ENDASM, GP.DEFPROC and GP.SUB leave a program GP-BASIC OUT.
+.opcodes that already exist.
 .
 .The library. GPC-BASIC/: 17 .INC.BL modules, 25 .EXP.BL examples. Ordinary
 .BASL, #INCLUDEd by path, called with GOSUB. Zero runtime bytes -- a module

@@ -35,6 +35,7 @@ LINE_CHARCODE = 20
     out_addr: .res 2                ; where the current line WOULD live in BASIC RAM
     out_link: .res 2                ; and where the next one would
     out_open_flag: .res 1
+    out_created: .res 1             ; this run created the output file, so this run owns it
     out_buf: .res 260               ; one line: 4 header bytes + up to 255 body
     ;=== GPC end ===
 .CODE
@@ -78,6 +79,7 @@ LINE_CHARCODE = 20
     sta out_addr+1
 
     stz out_open_flag               ; loader_run can exit before out_open runs
+    stz out_created                 ; and a run that never opened owes the disk nothing
     ;=== GPC end ===
 
     ; Set default options
@@ -1416,6 +1418,7 @@ OUT_LFN = 12
 
 :   lda #1
     sta out_open_flag
+    sta out_created                 ; from here on, a failure owes the disk a delete
 
     ;   A PRG BEGINS WITH ITS LOAD ADDRESS, and GPC's ValidateSourceFile
     ;   checks for exactly $01 $08. It is content, not decoration.
@@ -1551,6 +1554,100 @@ done:
     jsr file_set_status_as_response
 
 done:
+    rts
+.endproc
+
+;******************************************************************************
+;Function name: out_scratch
+;Purpose......: Deletes the output file. Called when the run failed, so that a
+;               half written program cannot be mistaken for a whole one
+;Input........: Nothing
+;Output.......: Nothing
+;Errors.......: None -- the run has already failed and its response code is set,
+;               so a drive complaint here must not overwrite the real message
+.proc out_scratch
+    lda out_created                 ; a file this run never created belongs to a
+    bne :+                          ; previous, good build: leave it alone
+    rts
+:   stz out_created                 ; one attempt, whatever comes of it
+
+    lda RAM_SEL                     ; the name lives in bank 1, and the KERNAL
+    pha                             ; reads it at OPEN, not at SETNAM
+    lda #BASLOAD_RAM1
+    sta RAM_SEL
+
+    ;   THE COMMAND IS "S:" PLUS THE BARE NAME. Every #SAVEAS name in this
+    ;   project carries the overwrite prefix -- #SAVEAS "@:XBASE.SRC.PRG" --
+    ;   and @ is not valid inside an S: command, so the prefix comes off first.
+    lda #'S'
+    sta out_name
+    lda #':'
+    sta out_name+1
+    ldx #2                          ; X indexes the command being built
+    ldy #0                          ; Y indexes the #SAVEAS name
+
+    lda saveas_len
+    bne :+
+
+bail:                               ; nothing named, or nothing left of the name
+    pla                             ; once the prefix came off
+    sta RAM_SEL
+    rts
+
+:   lda saveas_name
+    cmp #'@'
+    bne copy
+    iny
+    cpy saveas_len
+    bcs bail                        ; the name was "@" and nothing else
+    lda saveas_name,y
+    cmp #':'
+    bne copy                        ; a bare @ with no colon
+    iny
+
+copy:
+    cpy saveas_len
+    bcs send
+    lda saveas_name,y
+    sta out_name,x
+    iny
+    inx
+    bra copy
+
+send:
+    cpx #2
+    beq bail                        ; the prefix was the whole name
+    stx out_len
+
+    bridge_setaddr KERNAL_CLOSE     ; the command channel has to be free
+    lda #15
+    bridge_call
+
+    bridge_setaddr KERNAL_SETNAM    ; the macro clobbers A, so it goes first
+    ldx #<out_name
+    ldy #>out_name
+    lda out_len
+    bridge_call
+
+    bridge_setaddr KERNAL_SETLFS
+    lda #15
+    ldx file_device
+    ldy #15
+    bridge_call
+
+    bridge_setaddr KERNAL_OPEN      ; opening the command channel is what sends it
+    bridge_call
+
+    bridge_setaddr KERNAL_CLOSE
+    lda #15
+    bridge_call
+
+    ;   NO file_set_status_as_response HERE. The run's real response code and
+    ;   its $bf00 message are the diagnosis the user needs, and reading the
+    ;   drive would replace LABEL NOT FOUND IN DB.INC.BL:459 with a generic
+    ;   file error. If the scratch itself fails the file simply stays.
+    pla
+    sta RAM_SEL
     rts
 .endproc
 ;=== GPC end ===

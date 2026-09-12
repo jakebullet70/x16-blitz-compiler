@@ -48,9 +48,8 @@ failure this must not have.
 ## The fact worth keeping on its own
 
 **LOAD into banked RAM auto-increments the bank crossing `$BFFF`**, so setting the bank IS the whole
-of the bank handling — `source/runtime/_library.asm:4403`, `docs/x16/X16 Reference - 04 - BASIC.md`
-line 417, and `samples/prg2basload/prg2basload.basl:76` which BLOADs through as many banks as it
-needs. Per-region files never cross `$BFFF`, so this is not relied on here any more, but it is true
+of the bank handling — `source/runtime/_library.asm:4403` and `docs/x16/X16 Reference - 04 - BASIC.md`
+line 417. Per-region files never cross `$BFFF`, so this is not relied on here any more, but it is true
 and [[macptr-wraps-banks-itself]] is its neighbour.
 
 `$030D/$030E` hold the end address after a LOAD and `$00` the ending bank, so a caller can check a
@@ -85,4 +84,4 @@ The ceiling is **8,188**, not 8,192: `gpbank.asm:582` refuses a 33rd page and co
 bridges into the length.
 
 Related: [[gp-bankedstr-literal-text-in-a-bank]], [[object-writer-regions-vs-low-code]],
-[[load-chain-strands-array-strings]] (a LOAD-chained set needs its own overlays per program).
+[[load-chain-clears-memory]] (a LOAD-chained set needs its own overlays per program).

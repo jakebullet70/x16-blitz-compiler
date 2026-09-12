@@ -4,8 +4,7 @@
 .
 .BASL has one flat namespace. There are no locals, no scoping and no
 .parameters. Every variable in every #INCLUDEd module is visible to your
-.program and the reverse, and nothing warns you: a collision is a wrong
-.answer, not an error.
+.program and the reverse, and nothing warns you.
 .
 .The convention is one dotted prefix per module, and nothing writes outside
 .its own prefix.

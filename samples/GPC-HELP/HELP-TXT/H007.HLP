@@ -11,7 +11,7 @@
 .        keyword needs this one, and no other include is ever optional either
 .
 .  THEME.INC.BL
-.      named colour roles, in three themes
+.      named colour roles, in four themes
 .
 .  APPSYS.INC.BL
 .      start an application politely, and leave the machine as it was found
@@ -40,21 +40,21 @@
 .      a horizontal menu bar
 .
 .  GUI.INC.BL
-.      four dialogs -- ask, say, type, choose -- in a box that puts the
-.        screen back
+.      four dialogs -- ask, say, type, choose -- in a box that saves 
+.        and restores the screen
 .
 .  GUI2.INC.BL
 .      a listbox, single or multi select
 .
 .  STRINGS.INC.BL
-.      the string helpers: BASIC where BASIC is enough, assembly where it is
+.      string helpers: BASIC where BASIC is enough, assembly where it is
 .        not
 .
 .  STRCASE.INC.BL
 .      case, rewriting a string in place, in assembly
 .
 .  STRUSING.INC.BL
-.      a number to a template: PRINT USING's mask, in BASIC
+.      formating numbers: PRINT USING's mask, in BASIC
 .
 .  SORT.INC.BL
 .      shell sort a string array in place, in assembly

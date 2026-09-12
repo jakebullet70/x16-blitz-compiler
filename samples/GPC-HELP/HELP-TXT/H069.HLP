@@ -7,12 +7,6 @@
 .STASH.OK SORT.OK MENUVERT.HOTHIT FILE.OK BANKMGR.OK APPSYS.IS.EMULATOR --
 .all of them.
 .
-.That is what a comparison in this compiler evaluates to, so a flag and a
-.test read the same way, and it is the value NOT wants: NOT is -x-1, so NOT
-.-1 is 0 while NOT 1 is -2, which is still true. IF itself tests non-zero, so
-.IF FLAG THEN works either way and IF FLAG = 1 THEN is the spelling that
-.breaks.
-.
 :IF GUI.OK THEN <accepted>            ' yes
 :IF NOT GUI.OK THEN <cancelled>       ' yes
 :IF GUI.OK = 0 THEN <cancelled>       ' yes
@@ -20,7 +14,3 @@
 .
 .A flag the CALLER sets is read as non-zero, so LINEINPUT.MASK = 1 and
 .STASH.MOVE = 1 still work. Write -1 in new code all the same.
-.
-.Printing one needs STR$ whole. The MID$(STR$(N), 2) idiom strips the leading
-.space STR$ puts on a positive number; -1 has no leading space, so that idiom
-.eats the minus and prints 1.

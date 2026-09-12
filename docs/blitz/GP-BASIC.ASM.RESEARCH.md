@@ -311,10 +311,9 @@ and it is where the p-code architecture bites hardest. Traced end to end:
 - `GetReferenceTerm` (`variables/refterm.asm`) documents it in as many words:
   *"returning **offset** in YX"*.
 
-This is what `samples/shared-vars/readme.md` means by *"The compiler assigns each
-variable a fixed address by order of first appearance"* — and why its rule 1 is
-that both programs in a chain must **first touch the shared variables in the same
-order**, or the offsets do not line up.
+So the compiler assigns each variable a fixed address by order of first
+appearance, and that address is only ever an offset into a block whose base the
+runtime works out at startup.
 
 ### 3.2 The reference is folded into the opcode
 
@@ -342,7 +341,7 @@ So there is no absolute address anywhere in the object.
 
 **Therefore: a variable's absolute address is not known until the program runs,
 and it differs between embedded and shared-runtime builds and with the program's
-own size.** The `~$8100` in the shared-vars readme is an observation about one
+own size.** A `~$8100` seen in one build is an observation about that
 build, not a constant to assemble against.
 
 ### 3.4 What that means for `{A}`
@@ -1622,9 +1621,9 @@ the `POKE`-per-byte idiom it replaces (§14.8).
 > in force until changed. **The default value is 0 (off).**"*
 
 Confirmed in the tree: every `.BASL` here sets `#REM 0` explicitly
-(`samples/shared-vars/PRG1.BASL:3`, `testing/GPC.BASL:4`,
-`testing/GPC.ERR.BASL:5`), and `samples/shared-vars/PRG1.PRG` contains **no `$8F`
-byte at all** — the REMs really are stripped.
+(`testing/GPC.BASL:4`, `testing/GPC.ERR.BASL:5`, `OASIS/tmp-test/T1.BASL:2`), and
+a `.PRG` built with it in force was measured to contain **no `$8F` byte at all**
+— the REMs really are stripped.
 
 **Crucially, the option can be toggled per region**, so only an ASM block's REMs
 need be emitted.

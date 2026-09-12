@@ -42,21 +42,13 @@ StartRuntime:
 		;		runaway recursion carried straight on into the object code, overwrote the program
 		;		and then executed what it had written. Work the floor out once, here.
 		;
-		;		Here and not in ClearMemory: a LOAD chain skips ClearMemory (see below) to keep the
-		;		previous program's variables, but it still arrives through this entry point, and it
-		;		still has a stack that can overflow.
+		;		Here and not in ClearMemory: the floor follows where this program was loaded, not
+		;		the variable space CLR empties, so CommandClr must not disturb it.
 		;
 		txa
 		sec
 		sbc 	#FrameStackPages
 		sta 	stackFloorHigh
-		;
-		;		Same argument for the stack pointer itself, and for the same reason it is here and
-		;		not in ClearMemory: a chained program must start with an EMPTY stack of its OWN.
-		;		The chain carries variables, never frames -- it re-enters through the ROM's RUN, so
-		;		the loader's frames are gone whatever this says. See ResetRuntimeStack in clr.asm.
-		;
-		jsr 	ResetRuntimeStack
 
 		tsx 								; save the stack.
 		stx 	Runtime6502SP 
@@ -65,29 +57,7 @@ StartRuntime:
 		ldx 	#RuntimeErrorHandler & $FF
 		jsr 	SetErrorHandler
 
-		;
-		;		Fresh start clears the variable space; a LOAD chain does NOT, so the loaded
-		;		program inherits this one's variables and strings. LOAD (load.asm) arms a
-		;		signature in low RAM before it chains -- it survives the load (it is below the
-		;		program) and RUN's CLR. If it is set, disarm it and keep the variables.
-		;
-		ldx 	#3
-_SRChainCheck:
-		lda 	loadChainSig,x
-		cmp 	LoadChainMagic,x
-		bne 	_SRFreshStart
-		dex
-		bpl 	_SRChainCheck
-		lda 	#0 							; matched: disarm the signature and preserve memory
-		ldx 	#3
-_SRDisarm:
-		sta 	loadChainSig,x
-		dex
-		bpl 	_SRDisarm
-		bra 	_SRAfterClear
-_SRFreshStart:
 		jsr 	ClearMemory 				; clear memory.
-_SRAfterClear:
 		jsr 	XRuntimeSetup 				; initialise the runtime stuff.
 	 	jsr		SetDefaultChannel			; set default input/output channel.
 
@@ -238,25 +208,11 @@ _NoCPCarry:
 		pla
 		rts
 
-; ************************************************************************************************
-;
-;		The signature LOAD writes to loadChainSig to say "this is a chain -- keep the variables".
-;		Four bytes so a cold-boot random match is a non-event; shared with load.asm so both ends
-;		agree on it.
-;
-; ************************************************************************************************
-
-LoadChainMagic:
-		.text 	"GPCL"
-
 		.send code
 
 		.section storage
 runtimeHigh:								; high byte of runtime start.
 		.fill 	1
-
-loadChainSig: 								; LOAD arms this before chaining; StartRuntime disarms it
-		.fill 	4 							; and skips the memory clear so variables survive the chain
 
 storeStartHigh:								; p-code run space.
 		.fill 	1
@@ -285,6 +241,9 @@ breakCount: 								; counter so don't check break every instruction.
 ;
 ;		Date			Notes
 ;		==== 			=====
+;		12/09/26		LOAD chain variable carry removed (build 121): the chain test, loadChainSig
+;						and LoadChainMagic are gone, ClearMemory is unconditional, and the second
+;						ResetRuntimeStack call goes with it -- ClearMemory always makes that call.
 ;		02/08/26		Reset runtimeStackPtr on both paths, chain included; ClearMemory is skipped
 ;						on a chain and took the stack reset with it.
 ;

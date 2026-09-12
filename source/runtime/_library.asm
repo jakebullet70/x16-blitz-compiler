@@ -602,21 +602,13 @@ StartRuntime:
 		;		runaway recursion carried straight on into the object code, overwrote the program
 		;		and then executed what it had written. Work the floor out once, here.
 		;
-		;		Here and not in ClearMemory: a LOAD chain skips ClearMemory (see below) to keep the
-		;		previous program's variables, but it still arrives through this entry point, and it
-		;		still has a stack that can overflow.
+		;		Here and not in ClearMemory: the floor follows where this program was loaded, not
+		;		the variable space CLR empties, so CommandClr must not disturb it.
 		;
 		txa
 		sec
 		sbc 	#FrameStackPages
 		sta 	stackFloorHigh
-		;
-		;		Same argument for the stack pointer itself, and for the same reason it is here and
-		;		not in ClearMemory: a chained program must start with an EMPTY stack of its OWN.
-		;		The chain carries variables, never frames -- it re-enters through the ROM's RUN, so
-		;		the loader's frames are gone whatever this says. See ResetRuntimeStack in clr.asm.
-		;
-		jsr 	ResetRuntimeStack
 
 		tsx 								; save the stack.
 		stx 	Runtime6502SP 
@@ -625,29 +617,7 @@ StartRuntime:
 		ldx 	#RuntimeErrorHandler & $FF
 		jsr 	SetErrorHandler
 
-		;
-		;		Fresh start clears the variable space; a LOAD chain does NOT, so the loaded
-		;		program inherits this one's variables and strings. LOAD (load.asm) arms a
-		;		signature in low RAM before it chains -- it survives the load (it is below the
-		;		program) and RUN's CLR. If it is set, disarm it and keep the variables.
-		;
-		ldx 	#3
-_SRChainCheck:
-		lda 	loadChainSig,x
-		cmp 	LoadChainMagic,x
-		bne 	_SRFreshStart
-		dex
-		bpl 	_SRChainCheck
-		lda 	#0 							; matched: disarm the signature and preserve memory
-		ldx 	#3
-_SRDisarm:
-		sta 	loadChainSig,x
-		dex
-		bpl 	_SRDisarm
-		bra 	_SRAfterClear
-_SRFreshStart:
 		jsr 	ClearMemory 				; clear memory.
-_SRAfterClear:
 		jsr 	XRuntimeSetup 				; initialise the runtime stuff.
 	 	jsr		SetDefaultChannel			; set default input/output channel.
 
@@ -798,25 +768,11 @@ _NoCPCarry:
 		pla
 		rts
 
-; ************************************************************************************************
-;
-;		The signature LOAD writes to loadChainSig to say "this is a chain -- keep the variables".
-;		Four bytes so a cold-boot random match is a non-event; shared with load.asm so both ends
-;		agree on it.
-;
-; ************************************************************************************************
-
-LoadChainMagic:
-		.text 	"GPCL"
-
 		.send code
 
 		.section storage
 runtimeHigh:								; high byte of runtime start.
 		.fill 	1
-
-loadChainSig: 								; LOAD arms this before chaining; StartRuntime disarms it
-		.fill 	4 							; and skips the memory clear so variables survive the chain
 
 storeStartHigh:								; p-code run space.
 		.fill 	1
@@ -845,6 +801,9 @@ breakCount: 								; counter so don't check break every instruction.
 ;
 ;		Date			Notes
 ;		==== 			=====
+;		12/09/26		LOAD chain variable carry removed (build 121): the chain test, loadChainSig
+;						and LoadChainMagic are gone, ClearMemory is unconditional, and the second
+;						ResetRuntimeStack call goes with it -- ClearMemory always makes that call.
 ;		02/08/26		Reset runtimeStackPtr on both paths, chain included; ClearMemory is skipped
 ;						on a chain and took the stack reset with it.
 ;
@@ -1675,20 +1634,12 @@ _ClearLoop1:
 ;
 ; ************************************************************************************************
 ;
-;		Two callers, and the second one is the point of factoring this out.
+;		One caller: ClearMemory, which throws the call stack away along with the variables.
 ;
-;		ClearMemory does it because CLR is meant to throw the call stack away. But ClearMemory is
-;		SKIPPED on a LOAD chain -- deliberately, so the loaded program inherits the variables --
-;		and this went with it, so a chained program ran on the LOADER's stack pointer.
-;
-;		A chain cannot carry a call stack. The new program is entered through the ROM's RUN and
-;		starts at its first line, so every frame the loader had is meaningless. Worse, the pointer
-;		is derived from the LOADER's storeStartHigh: a small loader chaining to a bigger program
-;		leaves it pointing inside the new program's OBJECT CODE, and each GOSUB wrote a frame over
-;		it. That was silent until the frame-stack floor guard landed in build 114, which turned it
-;		into an immediate OUT OF MEMORY on the first GOSUB -- louder, but still wrong.
-;
-;		StartRuntime therefore calls this on BOTH paths, before the chain test.
+;		The pointer is derived from storeStartHigh, so it is only ever right for the program that
+;		is actually running. Build 114's frame-stack floor guard turned getting that wrong into an
+;		immediate OUT OF MEMORY on the first GOSUB, which is how the old LOAD chain's inherited
+;		stack pointer was caught.
 ;
 ; ************************************************************************************************
 
@@ -1711,6 +1662,8 @@ ResetRuntimeStack:
 ;
 ;		Date			Notes
 ;		==== 			=====
+;		12/09/26		ResetRuntimeStack has one caller again; the LOAD chain no longer skips
+;						ClearMemory (build 121).
 ;		02/08/26		Stack reset factored out as ResetRuntimeStack, so StartRuntime can do it on
 ;						the LOAD-chain path too -- a chained program was running on the loader's
 ;						stack pointer.
@@ -4252,13 +4205,10 @@ liCount:
 ;		program here never touches the code doing the writing; and by the time RUN's LOAD
 ;		overwrites $0801 we are running in the ROM.
 ;
-;		Variables carry across the chain, like stock's LOAD-in-a-program. RUN would normally CLR,
-;		but the compiled runtime keeps its variables and strings in high RAM ($8100+), not BASIC's
-;		variable space, and RUN's CLR does not touch that. What WOULD wipe them is the loaded
-;		program's own StartRuntime, which clears memory -- so LOAD arms a signature (see below and
-;		00runtime.asm) that tells StartRuntime this is a chain and to skip that clear. This only
-;		makes sense when the two programs share a variable layout (the compiler assigns addresses
-;		by first appearance, so declare the shared variables in the same order in both).
+;		The loaded program starts clean. Its own StartRuntime clears the variable space and the
+;		string heap, exactly as a fresh RUN does -- and exactly as the interpreter does, where a
+;		program-mode LOAD on the X16 does not preserve variables either (measured on R49). A
+;		chain that wants to pass state passes it through a disk file or a bank.
 ;
 ;		Zero page is clear: the runtime's ZP tops out around $79, well below txttab ($DF) and the
 ;		CHRGET/TXTPTR area ($E7/$EE), and it never touches $0200-$0800 or $03E1/$03EB.
@@ -4283,17 +4233,6 @@ Command_LOAD: ;; [!load]
 		sta 	zTemp0
 		lda 	NSMantissa1+0
 		sta 	zTemp0+1
-		;
-		;		Arm the chain signature. The loaded program's StartRuntime sees it and skips its
-		;		memory clear, so our variables (and strings) carry across the chain. It lives in
-		;		low RAM, below $0801, so neither the load nor RUN's CLR disturbs it.
-		;
-		ldx 	#3
-_LDArm:
-		lda 	LoadChainMagic,x
-		sta 	loadChainSig,x
-		dex
-		bpl 	_LDArm
 		;
 		;		Fixed part of the little program.
 		;
@@ -4380,6 +4319,8 @@ ldNameLen: 									; filename length, held across the copy loop
 ;
 ;		Date			Notes
 ;		==== 			=====
+;		12/09/26		LOAD chain variable carry removed (build 121): the arm loop is gone and the
+;						loaded program starts clean. Pass state through a file or a bank.
 ;
 ; ************************************************************************************************
 ; ************************************************************************************************

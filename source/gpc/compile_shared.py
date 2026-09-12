@@ -45,13 +45,34 @@ ROM       = os.path.join(EMUDIR, "rom.bin")
 GPC_INPUT = os.path.join(TESTING, "GPC.INPUT")
 ENGINE    = "GPC.BIN"
 
-TIMEOUT = 420			# generous: the engine compiles on an emulated 8 MHz 65C02.
-						# GPBMODS at 2,200 lines and two GP.BANKED regions takes about
-						# 200 s, so 180 was under the biggest thing in the tree.
+TIMEOUT = 900			# generous: the engine compiles on an emulated 8 MHz 65C02.
+						# GPBMODS at 2,200 lines and two GP.BANKED regions took about
+						# 200 s, so 180 was under the biggest thing in the tree.  It has
+						# seven regions now, and 26 KB of overlay files are written one
+						# after the other at the end of pass two: on 11th Sep 2026 that
+						# run needed about 450 s, and 420 killed it mid-overlay, leaving
+						# the same 513 byte object a warp-mode lull used to leave.
+
+
+BANNER = b"GPC SQUEALING"	# the engine's first line of output, above its error table
+READY  = b"READY."			# BASIC's prompt: one at boot, one more if the engine stops
 
 
 def die(msg):
 	sys.exit("compile_shared.py: " + msg)
+
+
+#
+#		The compiler's account of a failure, taken from the log between its banner and the
+#		READY. that follows it. The banner line and the two file names are dropped -- the
+#		build printed those itself -- and what is left is the message that matters.
+#
+def report(raw):
+	text = raw.decode("latin-1").replace("\r", "\n")
+	lines = [ln.strip() for ln in text.split("\n") if ln.strip()]
+	kept = [ln for ln in lines if not ln.startswith("GPC SQUEALING")
+			and not ln.startswith("IN:") and not ln.startswith("OUT:")]
+	return "\n".join("    " + ln for ln in kept[-8:]) or "    (no message)"
 
 
 def compile_one(source, obj, mapfile="", shared=True):
@@ -107,10 +128,19 @@ def compile_one(source, obj, mapfile="", shared=True):
 				#		Do not widen this to match an error word. GPC echoes its whole
 				#		error-message TABLE just after its banner -- OUT OF RANGE, SYNTAX ERROR,
 				#		TYPE MISMATCH are all in the log of a perfect build -- so anything
-				#		looser fires on success. A real failure waits out TIMEOUT and is caught
-				#		by the missing object below.
+				#		looser fires on success.
+				#
+				#		FAILING FAST IS THE OTHER HALF. A compile that cannot go on prints its
+				#		message and drops BASIC back to READY., and nothing further is ever
+				#		written: waiting out TIMEOUT there costs seven minutes and tells you
+				#		nothing the log did not already say. So the second stop condition is a
+				#		READY. AFTER THE BANNER -- the one BASIC prints at boot sits above it,
+				#		and a successful run is claimed by "OK CODE" in the test above before
+				#		this one is reached. The lines between the banner and that READY. are
+				#		the compiler's own account of the failure, so they go in the message.
 				#
 				finished = False
+				stopped = None
 				deadline = time.time() + TIMEOUT
 				while time.time() < deadline:
 					time.sleep(0.5)
@@ -122,6 +152,10 @@ def compile_one(source, obj, mapfile="", shared=True):
 					if b"OK CODE" in echo:
 						finished = True
 						time.sleep(1.5)			# let the last write and the map land
+						break
+					at = echo.find(BANNER)
+					if at >= 0 and READY in echo[at:]:
+						stopped = echo[at:echo.index(READY, at)]
 						break
 			finally:
 				p.kill()
@@ -141,6 +175,9 @@ def compile_one(source, obj, mapfile="", shared=True):
 	#		to the end, and the map is what says the object was finished; a build asking for a
 	#		map and not getting one did not succeed, whatever is sitting in the object file.
 	#
+	if stopped is not None:
+		die("%s stopped compiling %s -- see testing/GPCCOMP.LOG\n%s"
+			% (ENGINE, source, report(stopped)))
 	if not finished:
 		die("%s did not finish %s within %ds -- see testing/GPCCOMP.LOG"
 			% (ENGINE, source, TIMEOUT))

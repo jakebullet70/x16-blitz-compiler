@@ -295,3 +295,17 @@ source/*/build/rtimage.lbl
 # Same class as /work above -- regenerable, all binaries, and one "git add -A" from being
 # committed. The masters it was built from (SVARS.BASL, SVARS-TEST.BASL) ARE tracked.
 tmp-test/
+
+# GPB.HELP is compiled SHARED and help-demo.bat mounts samples/GPC-HELP as its drive, so
+# samplesbuild.py copies the current GPB/GPC.RT.nnn.BIN in beside the object -- the bootstrap
+# looks for it at the drive root. Build output, build-numbered, cleared and re-copied on every
+# build: the same reasoning that keeps the testing/ copies out. GPB.HELP.PRG itself IS tracked.
+samples/GPC-HELP/GPB.RT.*.BIN
+samples/GPC-HELP/GPC.RT.*.BIN
+samples/GPC-HELP/GPC.RC.*.BIN
+
+# release/ is TRACKED so the drop folder exists in a fresh clone, but its two products
+# are not. release/TMP/ is the staging tree -- the release unpacked, wiped and rebuilt by
+# "release.sh stage" -- and it also holds XFMGR and XT, which are the developer's own
+# tools and never go in the zip. The zip itself matches the gpc-release-*.zip rule below.
+release/TMP/

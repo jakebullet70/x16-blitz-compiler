@@ -9,6 +9,8 @@ routine, every variable name they take, and the traps collected in one table.
 matters because BASL has one flat namespace: a collision is a wrong answer, not an error.
 [GP-BASIC.FILES.md](GP-BASIC.FILES.md) says what every file that comes with GPC is for,
 including the four the compiler will not run without.
+[BANKED-OR-NOT.md](BANKED-OR-NOT.md) explains the two forms some modules come in —
+`X.INC.BL` for low memory and `X.BANK.INC.BL` for a `GP.BANKED` region — and how to choose.
 
 ## Using it
 

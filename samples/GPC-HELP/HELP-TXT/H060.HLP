@@ -4,8 +4,7 @@
 .
 .  GP.
 .      OWNER: GPB.INC.BL
-.      WHAT IT IS: keywords, not variables -- see SEC 2, this one is
-.        different
+.      WHAT IT IS: keywords, not variables -- see SEC 2.
 .
 .  STR.
 .      OWNER: STRINGS.INC.BL
@@ -13,11 +12,11 @@
 .
 .  STR.USING.
 .      OWNER: STRUSING.INC.BL
-.      WHAT IT IS: a number to a template, kept apart from the rest of STR.
+.      WHAT IT IS: number formating, kept apart from the rest of STR.
 .
 .  THEME.
 .      OWNER: THEME.INC.BL
-.      WHAT IT IS: colour roles
+.      WHAT IT IS: color roles
 .
 .  APPSYS.
 .      OWNER: APPSYS.INC.BL
@@ -29,7 +28,7 @@
 .
 .  KB.
 .      OWNER: KB.INC.BL
-.      WHAT IT IS: the keyboard drain
+.      WHAT IT IS: clear the keyboard buffer
 .
 .  MENUVERT.
 .      OWNER: MENUVERT.INC.BL
@@ -37,7 +36,7 @@
 .
 .  MENUBAR.
 .      OWNER: MENUBAR.INC.BL
-.      WHAT IT IS: the other axis -- a horizontal menu bar
+.      WHAT IT IS: a horizontal menu bar
 .
 .  GUI.
 .      OWNER: GUI.INC.BL
@@ -50,11 +49,11 @@
 .
 .  STASH.
 .      OWNER: STASH.INC.BL
-.      WHAT IT IS: a text rectangle into a RAM bank, and back
+.      WHAT IT IS: save - restore screen into a RAM bank, and back
 .
 .  STASH.FILE.
 .      OWNER: STASHFILE.INC.BL
-.      WHAT IT IS: the same rectangle through a file, kept apart from the
+.      WHAT IT IS: save - restore screen into a file, kept apart from the
 .        rest of STASH.
 .
 .  SORT.
@@ -79,7 +78,7 @@
 .
 .  FILE.DIR.
 .      OWNER: FILEDIR.INC.BL
-.      WHAT IT IS: reading a directory, kept apart from the rest of FILE.
+.      WHAT IT IS: reading a directory
 .
 .  SV.
 .      OWNER: STASHVRAM.INC.BL

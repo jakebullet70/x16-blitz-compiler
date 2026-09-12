@@ -190,7 +190,7 @@ def tokenise(basl_name, prg_name, also_clean=()):
             os.remove(p)
 
     env = dict(os.environ); env["SDL_VIDEODRIVER"] = "dummy"
-    args = [EMU, "-rom", ROM, "-fsroot", ".", "-warp", "-pastewarp", "-echo", "-bas", DRIVER]
+    args = [EMU, "-rom", ROM, "-fsroot", ".", "-warp", "-pastewarp", "-sound", "none", "-echo", "-bas", DRIVER]
     logpath  = os.path.join(TESTING, LOG)
     donepath = os.path.join(TESTING, DONE)
     target   = os.path.join(TESTING, prg_name)
@@ -228,14 +228,15 @@ def tokenise(basl_name, prg_name, also_clean=()):
             try: os.remove(p)
             except OSError: pass
 
-    #   Checked BEFORE the "did a file appear" test, because on a failure partway through one did,
-    #   and it is a complete, valid, WRONG program.
+    #   THE MESSAGE IS THE TEST, not whether a file appeared. BASLOAD-GPC now deletes its
+    #   output when the run fails, so a file is no longer evidence of the wrong thing -- but
+    #   the order stays: a scratch that the drive refuses would put the fragment back in play.
     if not response:
         die("BASLOAD never reported back within 180s -- it crashed, hung, or never reached the\n"
             "               SYS. No %s was produced. Echo log tail:\n%s"
             % (prg_name, log[-400:].decode("latin-1", "replace")))
     if response != "SUCCESS":
-        die("BASLOAD said %s -- %s stops where the error did, do not compile it"
+        die("BASLOAD said %s -- no %s was written"
             % (response, prg_name))
 
     if not os.path.exists(target) or os.path.getsize(target) == 0:

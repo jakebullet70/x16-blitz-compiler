@@ -88,20 +88,12 @@ _ClearLoop1:
 ;
 ; ************************************************************************************************
 ;
-;		Two callers, and the second one is the point of factoring this out.
+;		One caller: ClearMemory, which throws the call stack away along with the variables.
 ;
-;		ClearMemory does it because CLR is meant to throw the call stack away. But ClearMemory is
-;		SKIPPED on a LOAD chain -- deliberately, so the loaded program inherits the variables --
-;		and this went with it, so a chained program ran on the LOADER's stack pointer.
-;
-;		A chain cannot carry a call stack. The new program is entered through the ROM's RUN and
-;		starts at its first line, so every frame the loader had is meaningless. Worse, the pointer
-;		is derived from the LOADER's storeStartHigh: a small loader chaining to a bigger program
-;		leaves it pointing inside the new program's OBJECT CODE, and each GOSUB wrote a frame over
-;		it. That was silent until the frame-stack floor guard landed in build 114, which turned it
-;		into an immediate OUT OF MEMORY on the first GOSUB -- louder, but still wrong.
-;
-;		StartRuntime therefore calls this on BOTH paths, before the chain test.
+;		The pointer is derived from storeStartHigh, so it is only ever right for the program that
+;		is actually running. Build 114's frame-stack floor guard turned getting that wrong into an
+;		immediate OUT OF MEMORY on the first GOSUB, which is how the old LOAD chain's inherited
+;		stack pointer was caught.
 ;
 ; ************************************************************************************************
 
@@ -124,6 +116,8 @@ ResetRuntimeStack:
 ;
 ;		Date			Notes
 ;		==== 			=====
+;		12/09/26		ResetRuntimeStack has one caller again; the LOAD chain no longer skips
+;						ClearMemory (build 121).
 ;		02/08/26		Stack reset factored out as ResetRuntimeStack, so StartRuntime can do it on
 ;						the LOAD-chain path too -- a chained program was running on the loader's
 ;						stack pointer.

@@ -1,0 +1,108 @@
+BASLOAD 0.2.1 SYMBOL FILE
+
+
+
+LABELS
+------
+
+FILE: STRCASE.INC.BL
+
+ 000052 STRCASE.GO                                          =2;
+ 000101 STRCASE.MODULE.END                                  =47;
+
+FILE: APPSYS.INC.BL
+
+ 000049 APPSYS.STARTUP                                      =48;
+ 000055 APPSYS.RESTORE                                      =51;
+ 000063 APPSYS.ISEMU                                        =54;
+ 000066 APPSYS.SKIP                                         =56;
+
+FILE: BMX.INC.BL
+
+ 000115 BMX.INIT                                            =57;
+ 000143 BMX.OPEN                                            =65;
+ 000168 BMX.PAINT                                           =77;
+ 000212 BMX.PAINT.ROWS                                      =101;
+ 000221 BMX.PAINT.END                                       =108;
+ 000228 BMX.SHOW                                            =109;
+ 000236 BMX.CLOSE                                           =112;
+ 000252 BMX.KEEP                                            =113;
+ 000277 BMX.RESTORE                                         =123;
+ 000297 BMX.PALCOPY                                         =128;
+ 000327 BMX.PARSE                                           =145;
+ 000373 BMX.SPLIT                                           =172;
+ 000381 BMX.VERA                                            =175;
+ 000397 BMX.STREAM                                          =181;
+ 000399 BMX.STREAM.MORE                                     =182;
+ 000413 BMX.DISCARD                                         =191;
+ 000416 BMX.DISCARD.MORE                                    =193;
+ 000426 BMX.MODULE.END                                      =201;
+
+FILE: BMXVIEW.EXP.BL
+
+ 000042 VIEW.MAIN                                           =202;
+ 000065 VIEW.COMPLAIN                                       =217;
+ 000069 VIEW.QUIT                                           =219;
+ 000074 VIEW.ANYKEY                                         =222;
+
+
+
+VARIABLES
+---------
+
+FILE: STRCASE.INC.BL
+
+ 000053 STRCASE.ADDR                                        =A;
+ 000053 STRCASE.PTR                                         =A0;
+ 000054 STRCASE.OP                                          =A1;
+ 000054 STRCASE.MODE                                        =A2;
+
+FILE: APPSYS.INC.BL
+
+ 000049 APPSYS.MODE                                         =A3;
+ 000049 APPSYS.COLS                                         =A4;
+ 000049 APPSYS.ROWS                                         =A5;
+ 000050 APPSYS.COLOUR                                       =A6;
+ 000050 APPSYS.CHARSET                                      =A7;
+ 000063 APPSYS.IS.EMULATOR                                  =A8;
+
+FILE: BMX.INC.BL
+
+ 000116 BMX.PALBASE                                         =A9;
+ 000117 BMX.KEPT                                            =AA;
+ 000123 BMX.STASH                                           =AB;
+ 000124 BMX.HEADER                                          =AC;
+ 000125 BMX.PTR                                             =AD;
+ 000126 BMX.SCRATCH                                         =AE;
+ 000145 BMX.ERROR                                           =AF;
+ 000146 BMX.FILE                                            =AG;
+ 000148 BMX.ADDR                                            =AH;
+ 000150 BMX.LO                                              =AI;
+ 000150 BMX.HI                                              =AJ;
+ 000151 BMX.STEP                                            =AK;
+ 000172 BMX.PALFIRST                                        =AL;
+ 000174 BMX.COUNT                                           =AM;
+ 000174 BMX.PALUSED                                         =AN;
+ 000181 BMX.SKIP                                            =AO;
+ 000181 BMX.DATAOFF                                         =AP;
+ 000184 BMX.X0                                              =AQ;
+ 000184 BMX.WIDTH                                           =AR;
+ 000186 BMX.Y0                                              =AS;
+ 000186 BMX.HEIGHT                                          =AT;
+ 000188 BMX.ROWS                                            =AU;
+ 000201 BMX.ONEBLOCK                                        =AV;
+ 000213 BMX.ROW                                             =AW;
+ 000265 BMX.SRC                                             =AX;
+ 000265 BMX.DST                                             =AY;
+ 000306 BMX.BANK                                            =AZ;
+ 000328 BMX.VERSION                                         =B;
+ 000329 BMX.DEPTH                                           =B0;
+ 000336 BMX.PACKED                                          =B1;
+ 000338 BMX.BAD                                             =B2;
+ 000374 BMX.REST                                            =B3;
+ 000398 BMX.GOT                                             =B4;
+ 000400 BMX.CHUNK                                           =B5;
+
+FILE: BMXVIEW.EXP.BL
+
+ 000075 VIEW.KEY                                            =B6;

@@ -66,6 +66,13 @@
 ## **  WARNING: no #DEFINEs and no include guard in here. BASLOAD rejects a
 ## **  digit in a #DEFINE or #IFNDEF name, so a GUI.LISTBOX.* constant cannot
 ## **  exist. The numbers are written where they are used. #INCLUDE this once.
+## **  THIS IS THE LOW MEMORY FORM. Every entry point is a plain name, so a
+## **  caller reaches it with one GOSUB and nothing sits in between. Use it
+## **  when the module runs in low memory, which is the ordinary case.
+## **
+## **  The banked twin is GUI2.BANK.INC.BL. Include one or the other,
+## **  never both. GPC-BASIC/BANKED-OR-NOT.md says how to choose.
+## **
 ## ***********************************************************************
 
 GOTO GUI.LISTBOX.MODULE.END
@@ -74,7 +81,7 @@ GOTO GUI.LISTBOX.MODULE.END
 ## **  GUI.LISTBOX -- the whole thing.
 ## ***********************************************************************
 
-GUI.LISTBOX.BODY:  GUI.KEY = 0
+GUI.LISTBOX:  GUI.KEY = 0
     IF GUI.LISTBOX.COUNT < 1 THEN GUI.LISTBOX.SEL = 0 : RETURN
 
 ## ---- The window: what was asked for, ten rows if nothing was, then cut to the

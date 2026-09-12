@@ -8,7 +8,7 @@ metadata:
   modified: 2026-09-05T14:37:51.632Z
 ---
 
-**GPC p-code executes from a RAM bank.** Proven on x16emu R49 with `samples/GPB-MODS-TESTING/SPIKE.BASL`,
+**GPC p-code executes from a RAM bank.** Proven on x16emu R49 with `samples/GPB-MODS-TESTING/spike/SPIKE.BASL`,
 which changes nothing: no ABI change, no runtime change, no compiler change, two `GP.ASM` blobs and
 a copy loop.
 

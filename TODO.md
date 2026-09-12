@@ -218,7 +218,7 @@ three readmes and `color-demo.bat`. Copy the working copy over the root modules 
 in one pass; the two naming decisions below are already taken.
 
 **Proven by running it, not by reading it.** `testing/GPBTRN.BASL` builds the renamed modules the
-way `GPBMODS` does — the library in bank 4 behind `LIB.GUIBANK`'s shims — and pushes its keys through
+way `GPBMODS` does — the library in bank 4 behind `SHIM.GUIBANK`'s shims — and pushes its keys through
 `kbdbuf_put`. `THEME.SELECT` fills the palette and `THEME.NEXT` still falls into it; `GUI.INPUT`
 comes back with `GUI.TEXT$` = `GPC` and `GUI.OK` 1 on RETURN, and puts `KEEP ME` back with
 `GUI.OK` 0 on ESC. **The rename costs no p-code**: `GPBMODS` compiles to the same `OK CODE 19730
@@ -228,7 +228,7 @@ It needs the renamed modules copied into `testing/`, so run it after the sweep, 
 ### `GUI.TEXT` should be `GUI.INPUT` — DONE here, AND ITS STRING MOVED WITH IT
 
 It asks for a line of text and gives it back; `GUI.TEXT` reads like it draws some. Every caller and
-every shim in `LIB.GUIBANK.INC.BL` changes with it. Nothing depends on the old name outside this repo.
+every shim in `SHIM.GUIBANK.INC.BL` changes with it. Nothing depends on the old name outside this repo.
 
 **The routine's own in/out string was already `GUI.INPUT$`, so the obvious rename does not compile.**
 BASLOAD will not have a label and a variable of one name, and the `$` does not separate them, so a
@@ -261,7 +261,7 @@ just created. Rename the branches to `THEME.SELECT.*` in the same pass, which is
 here. Counted 2026-09-06,
 excluding `TODO.md` and the `testing/` mirror: **72 bare `THEME.LOAD` references, 131 including the
 label family**, across the library, six samples, `GP-BASIC.md` and `GP-BASIC.GLOBALS.md`.
-`LIB.GUIBANK.INC.BL` carries a shim, as it does for `GUI.INPUT`.
+`SHIM.GUIBANK.INC.BL` carries a shim, as it does for `GUI.INPUT`.
 
 **The drift between the five copies of `THEME.INC.BL` was one line** — the `GPB-MODS-TESTING`
 variant's `.BODY` suffix, which its banked build needs. The other four are identical, so the sweep
@@ -847,7 +847,7 @@ green.
 ## Compiler work — what is next, ranked
 
 Written 2026-09-09. **An index, not a second copy** — each item points at the section or memory note
-that holds the detail, so this list cannot drift away from the work it names. One defect and three
+that holds the detail, so this list cannot drift away from the work it names. One defect and five
 features; everything else under `## Bugs` is fixed.
 
 **0. Fix the `GP.FN` string aliasing.** See `## Bugs` above. Small, known, and the only thing here
@@ -878,6 +878,54 @@ open question of an explicit switch versus inference.
 bytes** are never called in GPBMODS, and **691 of them come free by deleting two `#INCLUDE` lines** —
 no compiler change at all. Only the remaining ~521 would need one. See
 `docs/memory/basl-dead-code-elimination-measured.md`. Worth doing the free half before building anything.
+
+**4. Let the compiler emit the bank switch, and delete the two-file split.** Banked-or-not is a
+property of the **program**, not of the module, but today the answer is baked into the module's own
+label text: `THEME.SELECT:` in the low-memory copy, `THEME.SELECT.BODY:` plus a shim in
+`SHIM.GUIBANK.INC.BL` in the banked one. `GPC-BASIC/BANKED-OR-NOT.md` describes the split as it stands,
+and it stands only because there is nowhere else to put the decision. Two hand-maintained copies of
+every bankable module is the cost, and they will drift.
+
+The compiler already has what it needs. `GP.BANKED` names the region, and two passes mean pass 1
+knows which region every label is in before pass 2 emits a single call. So `GOSUB THEME.SELECT` can
+compile to a plain call when the target is in low memory and to a bank-switching call when it is not
+— **zero extra bytes in the common case**, which is what the shim files cost today. One file per
+module, no `.BODY`, no `LIB.*BANK.INC.BL`, no "one or the other, never both", and neither
+`LABEL NOT FOUND` nor `DUPLICATE SYMBOL` can happen again.
+
+Three things have to be settled, and the first one decides the shape of the other two:
+
+1. **The return bank.** Today the shim sits in low memory, so `RETURN` always lands somewhere that
+   is mapped whatever the bank register holds. A compiler-emitted call loses that: the caller's bank
+   has to ride on the `GOSUB` frame and be restored by `RETURN`. That is a frame-layout change to the
+   most load-bearing thing in the runtime — `RETURN` already unwinds `FOR`, `GP.DO` and `GP.SELECT`
+   frames, see `docs/memory/gpc-return-unwinds-frames.md`. Settle this first.
+2. **Indirect targets.** `ON n GOSUB` and any computed target cannot be resolved to a region at
+   compile time. Either the runtime looks the bank up, or a banked routine may never be an indirect
+   target. The second is cheaper and is a **new rule**, which is the thing this item exists to delete.
+3. **Runtime bytes.** A new call opcode plus the bank save in `RETURN` lands in the core, and the core
+   page cushion below `GPBase` is about **40 bytes** — see
+   `docs/memory/gpc-core-page-cushion-below-gpbase.md`. Cross it and every program grows 256 bytes,
+   banked or not.
+
+This subsumes item 1: once the compiler places calls, a banked `GP.ASM` blob is the same question
+answered in the same place. It does not block the split that is committed today — by the time this
+lands, `.BODY` exists only inside generated text, so removing it touches no hand-written source.
+
+**5. Pass one has to say something.** Added 2026-09-11. The compiler prints its banner, the input and
+output names, and then nothing at all until pass two starts writing the object. On GPBMODS that is
+**about four and a half minutes of silence** on an emulated 8 MHz 65C02, and the silence is
+indistinguishable from a hang: on 11th Sep 2026 a build that was working normally was killed by a
+420 s cap, and the only evidence of how far it had got was the modification time of the overlay files.
+Pass two is not much better — it writes the object through CHROUT, so with `-echo` the log fills with
+the object's own bytes rather than with progress.
+
+What is wanted is a line per source line, or per hundred source lines, with the line number — the same
+thing the old single-pass engine gave, which is what made a stall visible. It also gives
+`compile_shared.py` something to watch other than the object file, whose growth was already retired as
+a stop condition because pass two writes in bursts. Cheap, and it turns every future stall into a
+number instead of a guess.
+
 
 ## Performance
 
@@ -1163,6 +1211,83 @@ image for all 12,031 bytes of the GP-BASIC OUT cut, with the only differences th
 
 ## Wanted
 
+### Banked scratch strings — a `GP.BANKEDSTR` group used as writable storage — MAYBE, raised 2026-09-11
+
+A GUI page carries a dozen or more `LINEINPUT` fields and only one is ever being edited. Their text
+does not have to sit in low RAM. Declare a `GP.BANKEDSTR` group whose literals are nothing but
+spaces, one per field, each as wide as its field, and treat the records as fixed-capacity slots the
+program writes into and reads back with `GP.BSTR`.
+
+**The length byte is content; the slot width is capacity.** Poke a length of 7 into a 100-byte slot
+and `GP.BSTR` allocates 7 and copies 7. Variable-length strings in a fixed slot, and no new metadata
+anywhere.
+
+**Why a BSTR group rather than a raw claimed bank:** the read is the half that cannot be hand-rolled.
+Pulling a string out of a bank by hand means `A$ = A$ + CHR$(PEEK(...))` in a loop, which is the
+worst pattern this string heap has — a new block per character, per
+[`docs/memory/gpc-string-blocks-never-shrink.md`](docs/memory/gpc-string-blocks-never-shrink.md).
+`GP.BSTR` does it in one `StringAllocTemp` and one backwards copy. Writing is the cheap direction:
+`GP.STRPTR` gives the source's length byte, and a `PEEK`/`POKE` byte loop moves it. One loop per
+field exit is a human-speed event even with the bank restore `PEEK`/`POKE` pay per access.
+
+**It depends on one property**: never more than one field's text live as a string at once. That has
+to hold through validation and save, not just editing — loop the fields one at a time on OK rather
+than pulling them all into variables. If any path wants them all at once, the idea gains nothing.
+
+**What it saves.** Fifteen fields at 40 characters is roughly 600 bytes of heap plus the array.
+Modest for one page; several form pages multiply it and all of them are resident. The other half of
+the argument is that the banked footprint is exactly what was declared and stays constant, where a
+heap holding fifteen repeatedly-reassigned strings drifts its high-water mark up as lengths vary.
+
+#### The prototype, and what would push it to a compiler command
+
+No compiler change is needed to try it. Give the scratch group **its own bank**: then the flat index
+`GP.BSTR` takes is the group index, the count at `$A000` is the slot count, and directory entry *n*
+is at `$A002 + n*2`. `BANK`, `PEEK` the two bytes, add `$A0` to the high byte, and that is the
+record — poke the length, then the characters.
+
+Two things would retire the prototype in favour of a `GP.BSTRSET NAME, n, A$`:
+
+- **A `BANK` statement disqualifies code from a `GP.BANKED` region**, per
+  [`docs/memory/second-region-for-the-utilities.md`](docs/memory/second-region-for-the-utilities.md).
+  So the hand-rolled loop cannot live in banked code — and banking the GUI library is the whole
+  reason low RAM was worth protecting in the first place. `GP.BSTR` is safe there because its
+  handler saves and restores the bank itself; the byte loop cannot.
+- **The own-bank rule breaks as soon as the group shares a bank**, because then the flat index is no
+  longer the group index and the group base is a compile-time fact the program cannot see. A GUI
+  library that also uses BSTR for its labels lands in exactly that case.
+
+A write handler is a mirror of
+[`source/gp-runtime/source/commands/gpbstr.asm`](source/gp-runtime/source/commands/gpbstr.asm) run
+backwards and needs no `StringAllocTemp`, so it is smaller than the read side — but the GP block has
+already spent a 256-byte crossing on `UnaryGPBStr`, so it is not free. It should fold the slot
+capacity in as a compiler-emitted constant the way the group base already is: the read side skips
+bounds checking because "the compiler knows every index it emits", and that reasoning does not carry
+to a write whose string arrives at run time.
+
+#### Two facts already settled
+
+- **The compiler does not deduplicate.** `BStrAppendString`
+  ([`source/compiler/source/commands/gpbstrpool.asm:186`](source/compiler/source/commands/gpbstrpool.asm#L186))
+  appends every literal unconditionally — placeholder length byte, characters to the closing quote,
+  patch, bump the count. No scan, no compare, no offset reuse. So identical space-filled literals
+  are distinct records and need no distinguishing character. The `" BANK MAP"` aliasing recorded in
+  [`docs/memory/gp-bankedstr-literal-text-in-a-bank.md`](docs/memory/gp-bankedstr-literal-text-in-a-bank.md)
+  was the conversion script's doing, not the compiler's.
+- **A literal caps at 255 characters** — `inc bstrLength` / `beq _BASTooLong` in the same routine.
+
+#### The failure mode to guard
+
+Overflowing slot *n* overwrites slot *n+1*'s length byte, and the directory still points there, so
+the next `GP.BSTR` on *n+1* allocates a garbage-sized temp and copies garbage into it. With hand
+pokes the caller checks `LEN()` himself; a `GP.BSTRSET` should clamp.
+
+#### The alternative that stores nothing
+
+For a form where every field is fully visible, the screen already holds the text and it could be
+read back off the layer with a `VPEEK` loop — no storage at all. It breaks the moment a field
+scrolls wider than its display, and it still builds the string the expensive way.
+
 ### One shared `TMP$`, instead of a scratch string per module — OPEN, raised 2026-09-09
 
 The library declares **84 string variables**, and **eight of them are the same variable**: a
@@ -1269,7 +1394,7 @@ the programs that do not include it.
 **Shipped** as `LINEINPUT.ALLOW$` and `LINEINPUT.DENY$`, in all four copies of the module, with
 `GP-BASIC.md` §4.4, `GP-BASIC.GLOBALS.md` and the regenerated `HELP-TXT`. `FORM.EXP.BL`'s LANDING
 PAD field takes digits only, set per field from a `FORM.ALLOW$()` array beside the width and the
-mask. `LIB.GUIBANK.INC.BL` needed nothing, as expected.
+mask. `SHIM.GUIBANK.INC.BL` needed nothing, as expected.
 
 **The two guards are nested, not the one-line `AND` sketched below.** Written as one line each,
 `DENY$` would still be asked after `ALLOW$` passed a character, so a caller that set both would get
@@ -1283,7 +1408,7 @@ No token, no runtime byte, nothing in `GPC.BIN`.
 **Six cases, twice.** `work/rename/LINTST.BASL` runs them against the banked working copy, calling
 `LINEINPUT.TYPED` directly with a code and a character — no field, no keyboard, no blink — and then
 once more live through `GUI.INPUT` with keys pushed by `kbdbuf_put`, because the filter runs per
-keystroke inside `LIB.GUIBANK`. `work/lineinput/LINTST2.BASL` is the same six against the unbanked
+keystroke inside `SHIM.GUIBANK`. `work/lineinput/LINTST2.BASL` is the same six against the unbanked
 root library. No filter set leaves the field as it was; `ALLOW$` refuses without moving the caret;
 `DENY$` passes everything else; both set gives `ALLOW$`; a full field still refuses; and RETURN is
 still refused by the three older guards, which the filter never sees.
@@ -1325,7 +1450,7 @@ so `ALLOW$` carries both cases. Case folding is a separate question — PETSCII 
 case, and `STRCASE.INC.BL` is the whole-string answer.
 
 Also touched: the header's `in` block, `GP-BASIC.GLOBALS.md`, `GP-BASIC.md` §4.4, and one field in
-`FORM.EXP.BL` given a digits-only `ALLOW$` so the example exercises it. `LIB.GUIBANK.INC.BL` needs
+`FORM.EXP.BL` given a digits-only `ALLOW$` so the example exercises it. `SHIM.GUIBANK.INC.BL` needs
 nothing — no new entry point, so the shim table is unchanged.
 
 **BASL only.** No token, no p-code, no runtime byte, nothing in `GPC.BIN`. Roughly 30 bytes of
@@ -1335,7 +1460,7 @@ p-code, and only in programs that include the module.
 `LINEINPUT.CODE`, `GOSUB LINEINPUT.TYPED`, read `LINEINPUT.TEXT$` back. A `DATA` list of codes covers
 accept, refuse, the full-field refusal and the caret position with no emulator interaction, which is
 the way past `paste cannot drive a running program`. Run the banked build once afterwards, since the
-filter runs per keystroke inside `LIB.GUIBANK`.
+filter runs per keystroke inside `SHIM.GUIBANK`.
 
 ### `STRINGS.INC.BL` wants `STR.CENTRE`
 
@@ -1487,7 +1612,7 @@ data bank at entry and put the caller's back at every exit. `FILE.DIR.BANKHOLD` 
   occupies a region either way.
 - **The restore is load bearing, not tidiness.** Control returns to banked p-code at `$A000`, so a
   blob leaving the data bank selected would have the interpreter fetch its next byte from it.
-- **A banked build does not preserve the caller's RAM bank**, because a `LIB.GUIBANK` shim leaves its
+- **A banked build does not preserve the caller's RAM bank**, because a `SHIM.GUIBANK` shim leaves its
   own selected. The blobs preserve the bank they are entered with; the shim in front does not.
 - `FILE.DIR.BNK%` carries the bank into the assembly, because `{FILE.DIR.BANK}` is an untyped
   variable — a 6-byte float slot, where `LDA` reads the mantissa and works only by accident.
@@ -2834,35 +2959,30 @@ A `samples/` tree of real programs that show off what the compiler buys you, one
 with its own `readme.md`. `make samples` mirrors the whole tree into `testing/samples/` (the emulator
 drive and the root of the release zip), so every sample is runnable in the emulator and ships in the
 release; `samples/` is the tracked master and `testing/samples/` is a wiped-and-recopied build
-artifact. Three exist:
+artifact. Two exist:
 
 - **`samples/prg2basload/`** — the X16 ROM BASLOAD detokenizer written as BASLOAD source, whose own
   header measures the win: the 919-line, 17,883-byte paint program converts in 12:22 interpreted and
   1:51 compiled, ~6.7x. The template: a genuinely useful program, plus a readme that names the speed
   number rather than asserting "it's faster".
-- **`samples/shared-vars/`** — two programs (`PRG1`/`PRG2`) chained by `LOAD`, sharing variables across
-  the chain, compiled in SHARED mode. Built and verified 2026-07-21 (see the findings below).
 - **`samples/editor/`** — GPC EDIT, an MS-DOS-EDIT-styled text/Markdown editor whose two renderers are
   inline `GP.ASM`. The speed number it names: a text row 2320 → **18.8** jiffies/1000 renders, a chrome
   field 2538 → **23.3** — a full-screen repaint from ~1.2 s to ~10 ms. Unshelved and shipped 2026-08-30
   (see the findings below).
 
-### Shared-vars sample — findings from building it (verified in emu, R49)
+### LOAD chaining — what outlived the variable carry
 
-Measured while building `samples/shared-vars/`, worth keeping:
+`samples/shared-vars/` was deleted on 2026-09-12 along with the carry it demonstrated; a chained
+program now clears memory on entry. See [[load-chain-clears-memory]]. Three of its measurements
+outlive it:
 
-- **Interpreted, variables do NOT survive a program-mode `LOAD` on the X16** (they come back zero/empty).
-  This is NOT the old C64 chain behaviour — so the sample is inherently a *compiled-only* demo. This
-  contradicts the earlier assumption that CBM chaining preserves variables here; it does not.
-- **Compiled, string and numeric *scalars* carry across cleanly** via [[blitz-load-chain]] (runtime keeps
-  vars/strings in high RAM ~`$8100`, the loaded program skips its clear on the chain signature).
-- **A string ARRAY does not carry.** The loaded program needs a `DIM` to use the array and that `DIM`
-  re-initialises it, wiping the carried data; omitting the `DIM` leaves the array with no descriptor on
-  the loaded side (crashes/hangs). The sample uses scalars and documents this. Open question if ever
-  worth chasing: can an array descriptor be made to survive the chain like a scalar does?
-- **Both programs must first-touch the shared variables in the same order** — the compiler assigns
-  addresses by first appearance, so a differing order silently misaligns them.
-- SHARED-mode compiled programs are tiny (~0.5K each here) because they share one `GPC.RT.nnn.BIN` (~11K).
+- **Interpreted, variables do NOT survive a program-mode `LOAD` on the X16** (they come back
+  zero/empty). Compiled now matches the interpreter, which is the whole point of the removal.
+- **The compiler assigns variable addresses by first appearance**, so two programs that first touch
+  the same variables in a different order lay them out differently. Nothing crosses a chain now,
+  but the rule still governs `{VAR}` in `GP.ASM`.
+- SHARED-mode compiled programs are tiny (~0.5K each) because they share one `GPC.RT.nnn.BIN` (~11K).
+  `samples/cruncher/` is the chaining example that remains; it passes state through `CRUNCH.INPUT`.
 
 ### Editor sample — DONE, and it closed the prog8 render question
 
@@ -2933,12 +3053,6 @@ Opening something authored on the host shows every letter case-swapped. Detectin
 (no byte in `$61-$7A` is a decent PETSCII tell, since that run is graphics) or offering it as a
 command would fix it. `TEST.MD` was converted in place; `git show HEAD~1:samples/editor/TEST.MD` is
 the ASCII original and the swap is its own inverse.
-
-### Shared-runtime, THREE programs sharing variables — TODO
-
-Extend the two-program `samples/shared-vars/` to **three** programs A→B→C that accumulate state (A sets,
-B reads and adds, C prints the total) — the original ask. Same rules as above (scalars, identical
-first-appearance order, all compiled SHARED). See [[blitz-shared-runtime]] and [[blitz-load-chain]].
 
 ### Ideas for more samples — TODO
 

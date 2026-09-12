@@ -23,7 +23,7 @@ the stash.
 **What actually diagnosed it**: building the PREVIOUS compiler in a `git worktree` and running the
 SAME source through it. Clean there, broken here ⇒ the compiler moved under the source, not the
 source under the compiler. `git ls-tree <old> testing/` first — `GPC.BIN` is tracked but
-`GPC.IMG.120.BIN` is not, so the old compiler needs a real `make` in the worktree.
+`GPC.IMG.121.BIN` is not, so the old compiler needs a real `make` in the worktree.
 
 **So: after retiring ANY keyword, grep the whole tree for it — `GPC-BASIC`, `samples`, AND
 `testing`.** Casualties found this way: `GUI.INC.BL` (editor branch only, so the shrink branch never

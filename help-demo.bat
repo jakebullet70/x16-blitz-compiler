@@ -3,7 +3,7 @@ rem ---------------------------------------------------------------------------
 rem  help-demo.bat -- GPB.HELP, the GP.BASIC and BASL reference, in a VISIBLE
 rem  window.
 rem
-rem  A scrolling master index over 43 topics, built from GPC-BASIC/ -- the
+rem  A scrolling master index over 74 topics, built from GPC-BASIC/ -- the
 rem  manual, the name register and the module banner headers -- so the help
 rem  cannot drift from the library it documents.
 rem
@@ -27,11 +27,21 @@ rem
 rem  NOTE THAT THE DRIVE IS samples\GPC-HELP, so an "X" export lands in the repo
 rem  beside the sources. git clean -f samples/GPC-HELP/ tidies up.
 rem
+rem  XFMGR IS ON THE DRIVE TOO, for looking at what an export actually wrote.
+rem  Quit the help to READY, then:
+rem
+rem      RUN "XT"                  XFMGR, the file manager -- XT is a shim that
+rem                                LOADs /XFMGR/XFMGR.PRG
+rem
+rem  XFMGR and XT are DEV ONLY, the same way tmp-emu.bat has them: they are
+rem  staged here for this bat and are no part of what ships.
+rem
 rem  Source: samples\GPC-HELP\GPB.HELP.BASL on GPB, THEME, STASH, STRCASE, APPSYS,
-rem  MENUVERT, LINEINPUT and GUI, all shipped in samples\GPC-HELP\GPC-BASIC\
-rem  beside the sample so a rebuild needs nothing from GPC-BASIC\. The object is
-rem  EMBEDDED and checked in. See samples\GPC-HELP\readme.md for the rebuild,
-rem  and for the measurements behind the three design decisions.
+rem  KB, MENUVERT, LINEINPUT, GUI and COMBO, all shipped in
+rem  samples\GPC-HELP\GPC-BASIC\ beside the sample so a rebuild needs nothing
+rem  from GPC-BASIC\. The object is SHARED, so GPB.RT.121.BIN has to sit beside
+rem  the PRG on the drive. See samples\GPC-HELP\readme.md for the rebuild, and
+rem  for the measurements behind the three design decisions.
 rem ---------------------------------------------------------------------------
 setlocal
 set "ROOT=%~dp0"

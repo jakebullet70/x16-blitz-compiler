@@ -1101,6 +1101,7 @@ StartCompiler:
 
 CompilePass:
 		jsr 	ResetPassState 				; every counter and table this pass will fill
+		jsr 	PrintPassHeader 			; "PASS 1"/"PASS 2", then a dot per 64 lines
 
 		lda 	#BLC_OPENIN					; reset data input
 		jsr 	CallAPIHandler
@@ -1147,6 +1148,7 @@ MainCompileLoop:
 		jsr 	CallAPIHandler
 
 		bcc 	SaveCodeAndExit 			; end of source.
+		jsr 	ShowProgress 				; X and Y carry the line address, so this preserves both
 		jsr 	ProcessNewLine 				; set up pointer and line number.
 		;
 		jsr 	GetLineNumber 				; get line # (=> A low, Y high)
@@ -1254,6 +1256,8 @@ DeferStatementToRuntime:
 										; stub is unreachable (it throws first), so read the next line.
 
 SaveCodeAndExit:
+		lda 	#13 						; end the line of dots this pass drew
+		jsr 	PrintCharacter
 		lda 	#BLC_CLOSEIN				; finish input.
 		jsr 	CallAPIHandler
 		;
@@ -1781,6 +1785,60 @@ CallAPIHandler:
 
 ; ************************************************************************************************
 ;
+;									Showing that it is working
+;
+;		A compile is minutes of silence otherwise, and the two passes look identical from the
+;		outside, so each one names itself and then draws a dot every 64 source lines.
+;
+;		PRINTED THROUGH PrintCharacter, NEVER THROUGH CHROUT. During pass two the object file
+;		is the selected output channel, so a bare $FFD2 would write these dots into the program
+;		being compiled. BLC_PRINTCHAR selects the screen first -- see file-io/read.asm.
+;
+; ************************************************************************************************
+
+PrintPassHeader:
+		stz 	progressTick 				; each pass counts its own lines
+		ldx 	#0
+_PPHText:
+		lda 	PassText,x
+		beq 	_PPHNumber
+		jsr 	PrintCharacter
+		inx
+		bra 	_PPHText
+_PPHNumber:
+		lda 	passNumber 					; 0 and 1 on the inside, 1 and 2 on the screen
+		clc
+		adc 	#'1'
+		jsr 	PrintCharacter
+		lda 	#' '
+		jmp 	PrintCharacter
+
+; ************************************************************************************************
+;
+;		One dot per 64 source lines. A 4,000 line program draws 62 of them, which is a line and
+;		a half in 40 columns -- often enough to look alive, rare enough not to fill the screen
+;		or to cost anything measurable against compiling the line itself.
+;
+;		PRESERVES X AND Y. They hold the address of the line just read, which the caller hands
+;		straight to ProcessNewLine.
+;
+; ************************************************************************************************
+
+ShowProgress:
+		inc 	progressTick
+		lda 	progressTick
+		and 	#63
+		bne 	_SPDone
+		lda 	#'.'
+		jmp 	PrintCharacter
+_SPDone:
+		rts
+
+PassText:									; no CR in front: the banner and the previous pass both
+		.text 	'PASS ',0 					; leave the cursor at column 0
+
+; ************************************************************************************************
+;
 ;		Emit the runtime code that dimensions every registered undimensioned array to bound 10
 ;		(11 elements, 0..10) in each dimension -- exactly what interpreted BASIC does on first
 ;		use. Emitted once, into the prologue. Each list entry is 4 bytes: slot addr lo, slot addr
@@ -1851,6 +1909,13 @@ compilerEndHigh:							; MSB of workspace end address
 ;		construction and by the checks listed at the head of this file.
 ;
 passNumber:								; 0 = first pass, 1 = second
+		.fill 	1
+;
+;		The progress dots. One goes to the screen every 64 source lines, so a pass that runs
+;		for minutes shows that it is still moving rather than sitting there. Reset at the top
+;		of each pass, and only the low six bits are ever looked at.
+;
+progressTick:								; source lines this pass has read
 		.fill 	1
 lineMarkerAt: 								; where the current line's PCD_NEWCMD_LINE byte went
 		.fill 	2

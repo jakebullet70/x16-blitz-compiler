@@ -6,7 +6,7 @@ rem  Type a file name at the prompt and press RETURN. The .BMX is optional.
 rem  Any key returns from the picture; RETURN on its own quits and puts your
 rem  screen mode and colour back.
 rem
-rem      CAT1   TREE1   XMASCARD   SNOWMAN   PIZZACAT   ROBOCAT
+rem      XMASCARD   CANDLE   CAT1   BEARDGUY   TREE7   ROBOSPIDER
 rem
 rem  Source: GPC-BASIC\BMXVIEW.EXP.BL, on GPC-BASIC\BMX.INC.BL
 rem
@@ -17,7 +17,7 @@ rem    2. python source\gpc\build_basl.py BMXVIEW.EXP.BL BMXVIEW.PRG
 rem    3. compile testing\BMXVIEW.PRG with GPC.BIN, and put the object
 rem       in demo\ as C.BMXVIEW.PRG
 rem    4. copy any .BMX files you want into demo\ -- samples\BMXVIEWER\SAMPLES
-rem       has about thirty
+rem       has eight, one for each header shape the viewer has to handle
 rem ---------------------------------------------------------------------------
 setlocal
 set "ROOT=%~dp0"

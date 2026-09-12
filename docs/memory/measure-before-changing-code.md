@@ -15,7 +15,7 @@ user asked, fairly, how many hours had gone to it.
 
 **How to apply:** for memory, `PRINT FRE(0)` at bisecting points and read the descent (it is a
 high-water ceiling, so it only falls). For speed, put the old and new code in ONE program on ONE
-fixture and time both -- `samples/editor/LOADBEN.BASL` and `SLOTBEN.BASL` are the pattern. Then
+fixture and time both -- `samples/editor/bench/LOADBEN.BASL` and `SLOTBEN.BASL` are the pattern. Then
 bisect a behaviour change by BUILDING the halves (old file + new file, and the reverse), rather than
 reasoning about which half did it.
 

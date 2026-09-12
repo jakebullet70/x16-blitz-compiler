@@ -11,7 +11,7 @@ metadata:
 **FIXED 2026-09-02.** "Inserting a blank line scrolls slowly" was never the scrolling: 75% of a
 RETURN was `DOC.INSERT.SLOT` walking the line table one entry at a time in BASIC.
 
-**Measured old against new in ONE program on ONE fixture** (`samples/editor/SLOTBEN.BASL`, which
+**Measured old against new in ONE program on ONE fixture** (`samples/editor/bench/SLOTBEN.BASL`, which
 carries a verbatim copy of the old loops so the comparison owes nothing to two builds). 100 lines,
 at index 1, ten reps, `--nowarp`:
 
@@ -37,7 +37,7 @@ compiler link — two different numbers, which is reason enough not to hardcode 
 selected for a whole copy, so the single entry whose destination lands in the NEXT bank cannot go
 through the block — those go the old per-entry way, at most two per shift. **A document under 2048
 lines never crosses one**, so a naive block passes every casual test and corrupts the first long
-file it meets. `samples/editor/SLOTTST.BASL` is the guard: 2,100 entries, **every slot checked, not
+file it meets. `samples/editor/bench/SLOTTST.BASL` is the guard: 2,100 entries, **every slot checked, not
 a sample**, twelve cases at 5 / 0 / 2040 / 2047 / 2048 / last.
 
 **It cost 481 bytes** (object 15,086 -> 15,567). Unlike the renderers, which came out smaller, this

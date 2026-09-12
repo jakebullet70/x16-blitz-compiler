@@ -5,9 +5,9 @@ metadata:
   type: project
 ---
 
-**The rule for a program with more than one code bank.** A `LIB.GUIBANK`-style shim is
+**The rule for a program with more than one code bank.** A `SHIM.GUIBANK`-style shim is
 `LABEL: BANK CODEBANK : GOSUB LABEL.BODY : RETURN`, and it deliberately does **not** restore the
-caller's bank -- `LIB.GUIBANK.INC.BL` says why: a single holding variable would be overwritten by a
+caller's bank -- `SHIM.GUIBANK.INC.BL` says why: a single holding variable would be overwritten by a
 nested call and the outer one would put back the wrong bank.
 
 That is harmless when the caller is in **low memory**, which does not care which bank is selected.

@@ -1,6 +1,6 @@
 ---
 name: basload-streams-to-a-file
-description: "SHIPPED: BASLOAD-GPC is a forked BASLOAD built as a PRG that streams each line to the output file, killing the 38,655-byte ceiling. Output is 2 bytes shorter than the ROM's and deterministic. Adds #GPC."
+description: "SHIPPED: BASLOAD-GPC is a forked BASLOAD built as a PRG that streams each line to the output file, killing the 38,655-byte ceiling. Output is 2 bytes shorter than the ROM's and deterministic, and a failed run deletes it. Adds #GPC."
 metadata:
   type: project
 ---
@@ -56,23 +56,44 @@ one of the nineteen messages.
 in a `;=== GPC begin/end ===` banner. The `rom` target builds from `upstream/` **alone** and must
 still come out 7 bytes from `rom.bin` at $fff0-$fff6.
 
-Changed: `line.inc` (staging buffer, `eol_mark`, five `out_*` routines, `mem_top` gone),
-`loader.inc` (open before pass 2, close at exit, `SAVE` gone), `response.inc` (**an upstream bug** --
+Changed: `line.inc` (staging buffer, `eol_mark`, six `out_*` routines, `mem_top` gone),
+`loader.inc` (open before pass 2, close at exit, scratch on failure, `SAVE` gone), `response.inc` (**an upstream bug** --
 message 15 pointed at `SYMFILE IO ERR`, so a `#SAVEAS` with no argument always reported the wrong
 error).
 
-## KNOWN DEFECT -- a failed tokenise leaves a valid-looking partial program
+## FIXED 2026-09-11 -- a failed tokenise now deletes its output
 
-A run that fails partway still writes the `$00 $00` terminator and closes, so the output is a
-*syntactically perfect* BASIC program that stops halfway through the source. GPC compiles it
-happily. `#SAVEAS "@:NAME"` already truncated the previous good build at OPEN.
+It used to leave one. A run that failed partway still wrote the `$00 $00` terminator and closed, so
+the output was a *syntactically perfect* BASIC program that stopped halfway through the source, and
+GPC compiled it happily -- which is exactly what cost the XBase build 420 seconds on 11th Sep 2026.
 
-**`build_basl.py`'s SUCCESS check is the entire guard.** It reads BASLOAD's `$bf00` message out of a
-sentinel file the driver writes, and only the literal `SUCCESS` continues.
+`out_scratch` (`BASLOAD-GPC/src/line.inc`) sends `S:` plus the bare name on channel 15, and
+`loader_run` calls it at `exit:` when `KERNAL_R1` is non-zero. Four things about it are load-bearing:
 
-The fix is a temp file plus rename; `S:NAME` then `R:NAME=TMP` on channel 15 is **measured working
-on the emulator host FS**. ~90 lines, modelled on `IOScratchFile` (`file-io/write.asm:106`). One
-wrinkle: strip a leading `@:` before it goes into an `S:` or `R:` command.
+- **`out_created`, not `out_open_flag`.** `out_close` clears the open flag, and a `FILE EXISTS` or
+  `WRITE PROTECT ON` at OPEN means the file on disk is a **previous good build** this run never
+  touched. `out_created` is set only after OPEN succeeded *and* the drive came back clean, and
+  nothing clears it but `line_init`.
+- **Strip the `@:`.** Every `#SAVEAS` here carries the overwrite prefix and `@` is not valid inside
+  an `S:` command. A bare `@` with no colon is stripped too.
+- **No `file_set_status_as_response` afterwards.** It would replace `LABEL NOT FOUND IN
+  DB.INC.BL:459` with a generic drive error and destroy the only useful output of a failed run.
+- **`out_close` runs first, then the test.** The file has to be closed before the drive will scratch
+  it, and `out_close` ends by reading the drive status, so a disk that filled mid-stream is caught
+  by the same test.
+
+Engine cost: **9,003 -> 9,185 bytes**. Verified three ways: a 200-line source with an unresolved
+label leaves no `.PRG` (the old engine left 3,080 plausible bytes), a good source tokenises
+**byte-identical** to the old engine's output, and a pre-existing file under a `#SAVEAS` with no
+`@:` survives the `FILE EXISTS` failure intact.
+
+`build_basl.py`'s SUCCESS check is still there and still the first guard: a scratch the drive
+refuses would put the fragment back in play.
+
+Still open, and strictly stronger: a **temp file plus rename** would also protect the previous good
+build, which `out_open` truncates at the start of pass 2 either way. `S:NAME` then `R:NAME=TMP` on
+channel 15 is **measured working on the emulator host FS**; ~90 lines, modelled on `IOScratchFile`
+(`file-io/write.asm:106`).
 
 ## Traps already paid for
 

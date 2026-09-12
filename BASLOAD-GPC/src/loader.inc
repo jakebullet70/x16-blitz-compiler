@@ -131,6 +131,17 @@ eof2:
 
 exit:
     jsr out_close                   ;=== GPC === also closes on the error paths
+    ;=== GPC begin === a failed run must not leave a plausible object behind
+    ;
+    ;   OUT_CLOSE FIRST, AND THE TEST AFTER IT. The file has to be closed
+    ;   before the drive will scratch it, and out_close ends by reading the
+    ;   drive status, so a disk that filled up mid stream is caught by the
+    ;   same test and its half file goes too.
+    ;
+    lda KERNAL_R1                   ; zero only if nothing called response_set
+    beq :+
+    jsr out_scratch
+:   ;=== GPC end ===
     jsr symfile_close
     jsr file_init
     bridge_setaddr KERNAL_CLRCHN

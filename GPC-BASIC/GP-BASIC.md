@@ -2435,7 +2435,7 @@ workspace, and inside a region it costs no p-code at all.
 
 ## 8. Known bugs
 
-Five, all live on 12th September 2026 and all reproducible. Each says what happens, what causes
+Four, all live on 12th September 2026 and all reproducible. Each says what happens, what causes
 it, and what to do instead. A bug leaves this list when it is fixed, not when it is understood.
 
 ### GP.FN string aliasing
@@ -2484,26 +2484,6 @@ came out 59 bytes smaller.
 
 **Do this** — `PRINT FRE(0)` at eight points down the run and read the descent. It is a high-water
 ceiling, so it only falls, and the step that falls is the culprit.
-
-### LOAD chaining leaks array strings
-
-A `LOAD` chain keeps its variables by skipping `ClearMemory`, which is the whole reason to chain
-rather than `RUN`. `ClearMemory` is also the only thing that lowers the string ceiling, so the
-ceiling never comes back down.
-
-For **scalars** that is bounded. A block is reused in place whenever the new string fits, so ten
-hops assigning the same five variables settle at five blocks.
-
-For **string arrays it is unbounded**. A block is marked dead only when its variable is reassigned
-to something longer, never when the pointer is simply dropped, and the chained program's `DIM`
-zeroes every element. Every block the previous program's array held loses its only pointer while
-keeping a live control byte: invisible to the scavenger, and unreusable. Ten hops with a
-50-element array strand 500 blocks.
-
-`FRE(0)` is the instrument. Print it on entry to each program in the chain and watch it fall.
-
-**Do this** — `CLR` on entry, when the program does not need the carry. There is no way to keep
-the carry and reclaim the array blocks.
 
 ### BINPUT# stops at 255 bytes
 

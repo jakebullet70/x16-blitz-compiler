@@ -37,13 +37,10 @@
 ;		program here never touches the code doing the writing; and by the time RUN's LOAD
 ;		overwrites $0801 we are running in the ROM.
 ;
-;		Variables carry across the chain, like stock's LOAD-in-a-program. RUN would normally CLR,
-;		but the compiled runtime keeps its variables and strings in high RAM ($8100+), not BASIC's
-;		variable space, and RUN's CLR does not touch that. What WOULD wipe them is the loaded
-;		program's own StartRuntime, which clears memory -- so LOAD arms a signature (see below and
-;		00runtime.asm) that tells StartRuntime this is a chain and to skip that clear. This only
-;		makes sense when the two programs share a variable layout (the compiler assigns addresses
-;		by first appearance, so declare the shared variables in the same order in both).
+;		The loaded program starts clean. Its own StartRuntime clears the variable space and the
+;		string heap, exactly as a fresh RUN does -- and exactly as the interpreter does, where a
+;		program-mode LOAD on the X16 does not preserve variables either (measured on R49). A
+;		chain that wants to pass state passes it through a disk file or a bank.
 ;
 ;		Zero page is clear: the runtime's ZP tops out around $79, well below txttab ($DF) and the
 ;		CHRGET/TXTPTR area ($E7/$EE), and it never touches $0200-$0800 or $03E1/$03EB.
@@ -68,17 +65,6 @@ Command_LOAD: ;; [!load]
 		sta 	zTemp0
 		lda 	NSMantissa1+0
 		sta 	zTemp0+1
-		;
-		;		Arm the chain signature. The loaded program's StartRuntime sees it and skips its
-		;		memory clear, so our variables (and strings) carry across the chain. It lives in
-		;		low RAM, below $0801, so neither the load nor RUN's CLR disturbs it.
-		;
-		ldx 	#3
-_LDArm:
-		lda 	LoadChainMagic,x
-		sta 	loadChainSig,x
-		dex
-		bpl 	_LDArm
 		;
 		;		Fixed part of the little program.
 		;
@@ -165,5 +151,7 @@ ldNameLen: 									; filename length, held across the copy loop
 ;
 ;		Date			Notes
 ;		==== 			=====
+;		12/09/26		LOAD chain variable carry removed (build 121): the arm loop is gone and the
+;						loaded program starts clean. Pass state through a file or a bank.
 ;
 ; ************************************************************************************************

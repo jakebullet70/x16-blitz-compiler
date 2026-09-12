@@ -83,7 +83,7 @@ python samples/GPC-HELP/MKHELP.PY --mods samples/GPB-MODS-TESTING/GPC-BASIC --md
 `--mods` takes the module banner headers from somewhere else, and writes up **every** `.INC.BL` in
 that folder the manual does not already document — not just the five in `BANNER_ONLY`. The working
 library holds modules `GP-BASIC.md` has never heard of (`BANKMGR`, `FILEDIR`, `FILEIO`, `KB`,
-`LIB.GUIBANK`, `LIB.FUTILBANK`, `STASHVRAM`, `STASHVRAMGC`), and this is how they get an entry. A plain run
+`COMBO`, `STASHVRAM`, `STASHVRAMGC`), and this is how they get an entry. A plain run
 does not sweep, so the topic numbering the shipped `.HLP` files use does not move.
 
 `--md-only` writes the Markdown and nothing else: no `.HLP` files, no index. That is the pairing

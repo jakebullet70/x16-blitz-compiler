@@ -9,6 +9,7 @@
 #INCLUDE "MENUVERT.INC.BL"
 #INCLUDE "LINEINPUT.INC.BL"
 #INCLUDE "GUI.INC.BL"
+#INCLUDE "COMBO.INC.BL"
 
 ## ============================================================================
 ## GPB.HELP.BASL -- the GP.BASIC and BASL reference, on the machine.
@@ -197,6 +198,11 @@ HELP.BOOT:
     GUI.CORNER.BL = HELP.GL.BL : GUI.CORNER.BR = HELP.GL.BR
     GUI.BANK = HELP.BANK
 
+    ## Every dialog the library opens gets a drop shadow. GUI.OPEN measures how
+    ## much of it is on screen before it stashes, so the put-back covers the
+    ## shadow as well as the box. GUI.SHADOW.ATTR stays 0, black on black.
+    GUI.SHADOW = 1
+
     ## ONE ROW AT A TIME, out of the bank and into a string that is allocated
     ## here and never reallocated: HELP.IXTEXT pokes the length byte and the
     ## characters through GP.STRPTR, so a row costs the heap nothing. The
@@ -218,6 +224,9 @@ HELP.BOOT:
     HELP.DIR$ = "//HELP-TXT/:"
 
     HELP.FIND$ = ""
+
+    ## The index read is the only wait before the first screen.
+    PRINT "GPB-HELP. READING INDEX..."
     GOSUB HELP.IDXLOAD
     RETURN
 
@@ -400,6 +409,10 @@ HELP.INDEX.LOOP:
 
     IF HELP.DONE <> 0 THEN RETURN
     GOSUB HELP.IX.SHOW
+    ## A FULL REDRAW IS ALREADY OWED -- a dialog closed, or a topic was read --
+    ## so the repaint below would be painted over a moment later. Let the top of
+    ## the loop draw it once.
+    IF HELP.FULL <> 0 THEN GOTO HELP.INDEX.LOOP
     ## A one row move slides, exactly as a topic page does; a move inside the page
     ## repaints two rows. A page jump or HOME repaints: there is nothing to keep.
     GP.IF HELP.IX.TOP <> HELP.TOP.WAS THEN
@@ -1006,11 +1019,11 @@ HELP.EXPORT:
     IF HELP.HASCODE = 0 THEN RETURN
     GUI.TITLE$ = "EXPORT" : GUI.MSG2$ = ""
     GUI.MSG$ = "Write this topic's code to:"
-    GUI.INPUT$ = "EXAMPLE.BL" : GUI.LEN = 24 : GUI.MASK = 0
-    GOSUB GUI.TEXT
+    GUI.TEXT$ = "EXAMPLE.BL" : GUI.LEN = 24 : GUI.MASK = 0
+    GOSUB GUI.INPUT
     HELP.REDRAW = 1
     IF GUI.OK = 0 THEN RETURN
-    HELP.OUTNAME$ = GUI.INPUT$
+    HELP.OUTNAME$ = GUI.TEXT$
     IF HELP.OUTNAME$ = "" THEN RETURN
 
     ## Channel 2 reads the topic and channel 3 writes the export. "@:" replaces.
@@ -1055,15 +1068,15 @@ HELP.EXPORT.WRITE:
 HELP.FIND.ASK:
     GUI.TITLE$ = "FIND" : GUI.MSG2$ = ""
     GUI.MSG$ = "Find in the index:"
-    GUI.INPUT$ = HELP.FIND$ : GUI.LEN = 30 : GUI.MASK = 0
-    GOSUB GUI.TEXT
+    GUI.TEXT$ = HELP.FIND$ : GUI.LEN = 30 : GUI.MASK = 0
+    GOSUB GUI.INPUT
     HELP.FULL = 1
     IF GUI.OK = 0 THEN RETURN
     ## THE "" IS WHAT MAKES IT A COPY. Assigning one string variable to another
     ## can hand over the same block, and STRCASE rewrites the bytes where they
-    ## lie -- so without the concatenation this would upper case GUI.INPUT$
+    ## lie -- so without the concatenation this would upper case GUI.TEXT$
     ## itself, and the field would show it that way for ever after.
-    HELP.FIND$ = GUI.INPUT$ + ""
+    HELP.FIND$ = GUI.TEXT$ + ""
     IF HELP.FIND$ = "" THEN RETURN
     STRCASE.PTR = GP.STRPTR(HELP.FIND$) : STRCASE.MODE = STRCASE.UPPER
     GOSUB STRCASE.GO
@@ -1147,7 +1160,7 @@ HELP.THEME.NEXT:
     GOTO HELP.THEME.BARS
 
 HELP.THEME.SET:
-    GOSUB THEME.LOAD
+    GOSUB THEME.SELECT
 HELP.THEME.BARS:
     THEME.ATTR = THEME.CLR(THEME.TITLE)  : GOSUB THEME.HI : HELP.BAR.TOP = THEME.INV
     THEME.ATTR = THEME.CLR(THEME.DIMMED) : GOSUB THEME.HI : HELP.BAR.BOT = THEME.INV

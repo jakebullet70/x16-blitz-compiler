@@ -25,13 +25,10 @@
 ## **
 ## ***********************************************************************
 #INCLUDE "GPB.INC.BL"
-## THE LIBRARY'S PUBLIC NAMES. A module defines GUI.SAY.BODY, never GUI.SAY:
-## a banked routine cannot select its own bank, so the entry point has to be a
-## label in low memory. These files are that entry point for a program that
-## does not bank. A banked one takes the same names from LIB.GUIBANK.INC.BL
-## instead -- one or the other, never both.
-#INCLUDE "THEME.PLAIN.INC.BL"
-#INCLUDE "LINEINPUT.PLAIN.INC.BL"
+## THE LOW MEMORY FORM OF THE LIBRARY. Every module below has a banked twin
+## named XXX.BANK.INC.BL, whose entry points are .BODY labels reached through
+## the shims in SHIM.GUIBANK.INC.BL. One form or the other, never both --
+## BANKED-OR-NOT.md says how to choose.
 #INCLUDE "THEME.INC.BL"
 #INCLUDE "APPSYS.INC.BL"
 #INCLUDE "LINEINPUT.INC.BL"

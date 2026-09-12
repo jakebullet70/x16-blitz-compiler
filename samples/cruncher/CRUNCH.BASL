@@ -109,8 +109,8 @@ PRINT#1, ""
 CLOSE 1
 
 GOSUB KB.CLEARKB
-REM No ",8" here. A compiled LOAD takes the name and nothing else and chain-loads
-REM exactly as stock BASIC does inside a running program.
+REM No ",8" here. A compiled LOAD takes the name and nothing else. The loaded
+REM program starts clean, so CRUNCH.INPUT above is how the two halves talk.
 LOAD "CRUNCH.BIN"
 END : REM THIS LINE DOES NOT MATTER
 

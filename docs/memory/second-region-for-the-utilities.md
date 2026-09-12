@@ -9,13 +9,13 @@ metadata:
 **BUILT 2026-09-08.** `samples/GPB-MODS-TESTING` grew a **second** `GP.BANKED` region, bank 7, and
 put `APPSYS`, `BANKMGR`, `STRCASE`, `STRINGS`, `STRUSING`, `SORT`, `STASHVRAM` and `FILEIO` in it.
 Resident object **15,254 -> 14,001 while gaining two modules and three panels**; workspace
-6,656 -> 7,680. `LIB.UTILBANK.INC.BL` is the low-memory front door, 359 bytes for 35 shims.
+6,656 -> 7,680. `SHIM.UTILBANK.INC.BL` is the low-memory front door, 359 bytes for 35 shims.
 
 **A THIRD REGION 2026-09-09, and the layout below is the current one:**
 
-    LIB.GUIBANK    bank 4   THEME MENUVERT MENUBAR LINEINPUT GUI GUI2
-    LIB.UTILBANK   bank 7   APPSYS BANKMGR STRCASE STRINGS STRUSING SORT STASHVRAM
-    LIB.FUTILBANK  bank 8   FILEIO FILEDIR
+    SHIM.GUIBANK    bank 4   THEME MENUVERT MENUBAR LINEINPUT GUI GUI2
+    SHIM.UTILBANK   bank 7   APPSYS BANKMGR STRCASE STRINGS STRUSING SORT STASHVRAM
+    SHIM.FUTILBANK  bank 8   FILEIO FILEDIR
 
 `FILEDIR` left bank 4 and `FILEIO` left bank 7 to share one of their own, which frees no low RAM
 -- both were banked already -- but empties bank 4 for the `GUI.FORM` of the CUA refactor. Bank 4
@@ -38,8 +38,8 @@ So the rule is not "anything that touches banks" and not "anything that does I/O
 - **`PEEK`/`POKE` are fine**, and this is the same fact from the other side: they save the selected
   bank, switch, access and restore, which is why `BANK` is the only statement that needs the guard.
 
-What stayed down: `STASH` and `STASHFILE` (four `BANK`s and one), and `LIB.GUIBANK`, `LIB.FUTILBANK` and
-`LIB.UTILBANK`, which are the shim layer itself.
+What stayed down: `STASH` and `STASHFILE` (four `BANK`s and one), and `SHIM.GUIBANK`, `SHIM.FUTILBANK` and
+`SHIM.UTILBANK`, which are the shim layer itself.
 
 ## Several regions, and the two rules that shape them
 
@@ -51,7 +51,7 @@ downwards was to `STASH`, which is in low memory and stayed there.
 **Include order still binds across regions, and inside one.** `FILEDIR` reads `FILEIO`'s
 `#DEFINE FILE.CHAN`, and BASLOAD substitutes a definition where it stands, so the file that
 supplies one is written ABOVE the file that wants it -- which was a cross-region rule while they
-sat in bank 4 and bank 7, and is now the order of two `#INCLUDE` lines inside `LIB.FUTILBANK`.
+sat in bank 4 and bank 7, and is now the order of two `#INCLUDE` lines inside `SHIM.FUTILBANK`.
 Getting it wrong gives
 `SYMBOL NOT IN SCOPE IN FILEDIR.INC.BL:148` -- a line that has nothing to do with the definition.
 
@@ -60,10 +60,10 @@ Getting it wrong gives
 A verb's call site is compiled into a jump to the body, and a call site in low memory jumping to
 `$A000` selects no bank. **The declaration is the shim** -- it is the one place a `BANK` can go:
 
-    GP.DEFPROC STR.UCASE, STRCASE.S$ RETURNS STRCASE.S$ : BANK LIB.UTILBANK : GOSUB STR.UCASE.BODY
+    GP.DEFPROC STR.UCASE, STRCASE.S$ RETURNS STRCASE.S$ : BANK SHIM.UTILBANK : GOSUB STR.UCASE.BODY
     RETURN
 
-so `STRCASE.INC.BL` keeps only `STR.UCASE.BODY` and `LIB.UTILBANK.INC.BL` carries both declarations.
+so `STRCASE.INC.BL` keeps only `STR.UCASE.BODY` and `SHIM.UTILBANK.INC.BL` carries both declarations.
 
 ## The cost, and who pays it
 

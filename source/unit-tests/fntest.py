@@ -74,7 +74,7 @@ def tokenise(name):
 def compile_one(name, mode="SHARED"):
     #   SHARED, not embedded: GP.BANKED only works there. The bootstrap is what moves the
     #   region into the bank, and an embedded program has no bootstrap -- gpbank.asm
-    #   refuses a region rather than guessing. GPC/GPB.RT.120.BIN are in testing/.
+    #   refuses a region rather than guessing. GPC/GPB.RT.121.BIN are in testing/.
     open(os.path.join(T, "GPC.INPUT"), "w", newline="\n").write(
         "%s.SRC.PRG\n%s.PRG\n%s.MAP\n%s\n" % (name, name, name, mode))
     p = os.path.join(T, name + ".PRG")

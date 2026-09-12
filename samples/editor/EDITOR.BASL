@@ -70,7 +70,7 @@ REM the DOC.* and EDMNU.* layers -- ED-STORE.BASL and ED-MENUS.BASL, both #INCLU
 REM bottom.
 REM
 REM THE TWO RENDERERS ARE INLINE ASSEMBLY: ED.RENDER.ROW draws text, ED.PUT.FIELD chrome,
-REM each one GP.ASM block reaching BASIC's variables through {VAR}. BENCHROWS.BASL measures
+REM each one GP.ASM block reaching BASIC's variables through {VAR}. bench/BENCHROWS measures
 REM both against their BASIC versions. GP.ASM itself costs no runtime bytes; GP.SELECT in the
 REM key dispatch does -- one core keyword pulls in the whole 2 KB GP block, which is why this
 REM compiles GP-BASIC IN. Readability, bought knowingly.

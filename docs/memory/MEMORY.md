@@ -15,6 +15,7 @@ sibling project: what is kept is a fact about **X16 BASIC or the X16 itself**, n
 - [Write readable code, user crunches](write-readable-code-user-crunches.md) — one statement a line; an unexplained SRC edit is his crunch pass
 - [Comments light, code should flow](comments-light-code-should-flow.md) — heavy REMs mean bad naming
 - [No ship language, no unasked builds](no-ship-language-this-is-dev.md) — no build, no help regen, unless asked
+- [Never build PICKDEMO](never-build-pickdemo.md) — standing order; not even to verify a banked build
 - [Commit to main directly](commit-to-main-directly.md) — solo repo, no branch, no review
 - [Compiler must not cap program size](compiler-must-not-cap-program-size.md) — a build-side wall is a bug; compiler growth now costs a program zero
 - [No backward compatibility needed](no-backward-compatibility-needed.md) — forced recompiles cost nothing
@@ -23,6 +24,8 @@ sibling project: what is kept is a fact about **X16 BASIC or the X16 itself**, n
 - [User runs concurrent agents here](user-runs-concurrent-agents-here.md) — re-read before any write
 - [Compile shared, not embedded](compile-shared-not-embedded.md) — SHARED is the p-code number
 - [Library working copy, then root](library-working-copy-then-root.md) — edit in samples/GPB-MODS-TESTING/GPC-BASIC/; drift runs BOTH ways
+- [Build, report, hand it back](build-report-dont-investigate.md) — a remark about speed is not a request to profile
+- [Run builds in the background](run-builds-in-background.md) — a typed message cancels an in-flight tool
 - [Compact early, not at the end](compact-early-not-at-the-end.md) — after every step; cost is context size x turns
 
 ## Build and toolchain
@@ -65,7 +68,7 @@ sibling project: what is kept is a fact about **X16 BASIC or the X16 itself**, n
 - [String heap scavenger](string-heap-scavenger.md) — SHIPPED: dead blocks reused, +1 page RT
 - [BINPUT# caps at 255 bytes](binput-caps-at-255-bytes.md) — three caps land on one number; it is a CHRIN loop
 - [String blocks never shrink](gpc-string-blocks-never-shrink.md) — never build a big temporary
-- [LOAD chain strands array strings](load-chain-strands-array-strings.md) — UNBOUNDED leak for string arrays
+- [LOAD chain clears memory](load-chain-clears-memory.md) — the variable carry is GONE; no leak, no CLR needed
 - [Compile is write-only](compile-is-write-only.md) — the premise two-pass rests on
 - [Two-pass compiler](two-pass-compiler.md) — DONE; the compiler's own size bounds nothing
 - [Compiler overlay into a bank](compiler-overlay-into-a-bank.md) — REVERTED, but the mechanism works
@@ -98,7 +101,7 @@ sibling project: what is kept is a fact about **X16 BASIC or the X16 itself**, n
 
 ## BASLOAD
 - [BASIC RAM was the tokenise ceiling](basload-basic-ram-is-the-tokenise-ceiling.md) — REMOVED for build_basl.py only
-- [BASLOAD streams to a file](basload-streams-to-a-file.md) — SHIPPED; the fork and its partial-output defect
+- [BASLOAD streams to a file](basload-streams-to-a-file.md) — SHIPPED; a failed run now deletes its own output
 - [BASLOAD runs from RAM unmodified](basload-runs-from-ram-unmodified.md) — the ROM source builds as a plain PRG
 - [BASLOAD #DEFINE rejects digits](basload-define-rejects-digits.md) — GUI2.DEFS is INVALID PARAMETER; no #INCLUDE is optional
 - [Labels and variables collide](basload-label-and-variable-collide.md) — DUPLICATE SYMBOL; the $ does not separate them

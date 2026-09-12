@@ -18,9 +18,9 @@ afternoon. The pre-clean state is `../testing-archive-2026-09-09.zip`.
 |---|---|
 | `GPC.BIN` | the compiler engine. `source/gpc/compile_shared.py` runs it. `source/application/GPC.BIN` is the master; this copy can go stale, which is the point -- see `docs/memory/baseline-compiler-is-the-application-copy.md` |
 | `BASLOAD-GPC.BIN` `BASLOAD-GPC.PRG` | the tokeniser, and its front end. `source/gpc/build_basl.py` runs them |
-| `GPC.RT.120.BIN` | the resident runtime a SHARED object loads instead of carrying a copy |
-| `GPB.RT.120.BIN` | the same, for a program that uses a GPB keyword |
-| `GPC.IMG.120.BIN` | the runtime image the compiler embeds for `--embedded` |
+| `GPC.RT.121.BIN` | the resident runtime a SHARED object loads instead of carrying a copy |
+| `GPB.RT.121.BIN` | the same, for a program that uses a GPB keyword |
+| `GPC.IMG.121.BIN` | the runtime image the compiler embeds for `--embedded` |
 | `GPC.BASL` `GPC.PRG` | the compiler's own BASL front end. `source/gpc/GPC.BASL` is the master |
 
 **The three `*.RT.*` / `*.IMG.*` files are INSTALLED, not built here.** `make libs` does not put

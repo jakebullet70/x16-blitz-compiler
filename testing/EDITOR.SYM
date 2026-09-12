@@ -1,0 +1,673 @@
+BASLOAD 0.2.1 SYMBOL FILE
+
+
+
+LABELS
+------
+
+FILE: THEME.INC.BL
+
+ 000069 THEME.LOAD                                          =2;
+ 000077 THEME.LOAD.X16                                      =8;
+ 000087 THEME.LOAD.DARK                                     =16;
+ 000099 THEME.LOAD.LIGHT                                    =24;
+ 000112 THEME.LOAD.GRAY                                     =32;
+ 000125 THEME.LOAD.CUSTOM                                   =40;
+ 000131 THEME.NEXT                                          =42;
+ 000138 THEME.RESET                                         =45;
+ 000150 THEME.SET                                           =47;
+ 000159 THEME.HI                                            =49;
+ 000163 THEME.SKIP                                          =51;
+
+FILE: APPSYS.INC.BL
+
+ 000049 APPSYS.STARTUP                                      =52;
+ 000055 APPSYS.RESTORE                                      =55;
+ 000063 APPSYS.ISEMU                                        =58;
+ 000066 APPSYS.SKIP                                         =60;
+
+FILE: STASH.INC.BL
+
+ 000092 STASH.SAVE                                          =61;
+ 000111 STASH.RESTORE                                       =68;
+ 000117 STASH.RESTORE.GO                                    =73;
+ 000137 STASH.DONE                                          =76;
+ 000149 STASH.BANK.HOLD                                     =78;
+ 000170 STASH.SETUP                                         =86;
+ 000197 STASH.WALK                                          =95;
+ 000218 STASH.ROW.IN                                        =105;
+ 000252 STASH.ROW.OUT                                       =128;
+ 000278 STASH.MODULE.END                                    =150;
+
+FILE: MENUVERT.INC.BL
+
+ 000121 MENUVERT.RUN                                        =151;
+ 000141 MENUVERT.WAIT                                       =160;
+ 000153 MENUVERT.KEYED                                      =165;
+ 000183 MENUVERT.SETTLE                                     =189;
+ 000202 MENUVERT.WRAPTOP                                    =196;
+ 000207 MENUVERT.WRAPBOT                                    =199;
+ 000215 MENUVERT.CANCEL                                     =202;
+ 000228 MENUVERT.KEYBACK                                    =204;
+ 000242 MENUVERT.HOTKEY                                     =206;
+ 000259 MENUVERT.FOLDWANT                                   =217;
+ 000263 MENUVERT.FOLDHC                                     =219;
+ 000277 MENUVERT.PADKEY                                     =221;
+ 000297 MENUVERT.PADREAD                                    =229;
+ 000310 MENUVERT.DRAW                                       =233;
+ 000331 MENUVERT.ROW                                        =238;
+ 000369 MENUVERT.HOTFIND                                    =251;
+ 000387 MENUVERT.FOLDHOTWANT                                =265;
+ 000391 MENUVERT.FOLDHOTHERE                                =267;
+ 000395 MENUVERT.MODULE.END                                 =269;
+
+FILE: MENUBAR.INC.BL
+
+ 000107 MENUBAR.RUN                                         =270;
+ 000112 MENUBAR.WAIT                                        =273;
+ 000121 MENUBAR.KEYED                                       =277;
+ 000139 MENUBAR.SETTLE                                      =288;
+ 000142 MENUBAR.SETTLE.GO                                   =290;
+ 000147 MENUBAR.WRAPLEFT                                    =293;
+ 000152 MENUBAR.WRAPRIGHT                                   =296;
+ 000158 MENUBAR.CANCEL                                      =298;
+ 000166 MENUBAR.CHOSE                                       =301;
+ 000180 MENUBAR.HOTKEY                                      =305;
+ 000190 MENUBAR.HOTDONE                                     =314;
+ 000201 MENUBAR.PADKEY                                      =315;
+ 000209 MENUBAR.PADRELEASE                                  =322;
+ 000213 MENUBAR.PADREAD                                     =324;
+ 000220 MENUBAR.DRAW                                        =325;
+ 000230 MENUBAR.MARK                                        =330;
+ 000249 MENUBAR.ITEM                                        =334;
+ 000268 MENUBAR.COLUMN                                      =338;
+ 000284 MENUBAR.WHERE                                       =344;
+ 000288 MENUBAR.MODULE.END                                  =346;
+
+FILE: LINEINPUT.INC.BL
+
+ 000094 LINEINPUT.GET                                       =347;
+ 000099 LINEINPUT.REDRAW                                    =350;
+ 000108 LINEINPUT.WAIT                                      =354;
+ 000119 LINEINPUT.KEYED                                     =359;
+ 000151 LINEINPUT.ASK                                       =378;
+ 000174 LINEINPUT.TYPED                                     =382;
+ 000204 LINEINPUT.RUBOUT                                    =390;
+ 000213 LINEINPUT.RENDER                                    =394;
+ 000228 LINEINPUT.CURSOR                                    =397;
+ 000244 LINEINPUT.MODULE.END                                =407;
+
+FILE: GUI.INC.BL
+
+ 000140 GUI.YN                                              =408;
+ 000153 GUI.YN.SET                                          =415;
+ 000171 GUI.YN.WAIT                                         =425;
+ 000190 GUI.YN.DONE                                         =437;
+ 000204 GUI.YN.MARK                                         =438;
+ 000231 GUI.MENU                                            =442;
+ 000273 GUI.TEXT                                            =456;
+ 000300 GUI.TEXT.FIELD                                      =472;
+ 000331 GUI.OPEN                                            =483;
+ 000349 GUI.OPEN.DRAW                                       =491;
+ 000361 GUI.OPEN.TITLE                                      =500;
+ 000387 GUI.FRAME                                           =506;
+ 000405 GUI.GLYPHS                                          =513;
+ 000414 GUI.CLOSE                                           =516;
+ 000427 GUI.SIZE                                            =519;
+ 000448 GUI.PLACE.BOX                                       =530;
+ 000459 GUI.PLACE.SCROLL                                    =536;
+ 000472 GUI.SCREEN                                          =538;
+ 000479 GUI.MODULE.END                                      =543;
+
+FILE: STRCASE.INC.BL
+
+ 000052 STRCASE.GO                                          =544;
+ 000101 STRCASE.MODULE.END                                  =589;
+
+FILE: EDITOR.BASL
+
+ 000112 ED.DISPATCH.KEY                                     =606;
+ 000138 ED.READ.MODS                                        =626;
+ 000144 ED.KEY.RANGE                                        =630;
+ 000151 ED.QUIT                                             =632;
+ 000195 ED.GUI.SETUP                                        =640;
+ 000212 ED.PETFONT                                          =650;
+ 000236 ED.FCOPY                                            =663;
+ 000257 ED.THEME                                            =670;
+ 000272 ED.THEME.DARK                                       =681;
+ 000286 ED.INIT                                             =689;
+ 000339 ED.LAYERS                                           =720;
+ 000351 ED.L0.ON                                            =727;
+ 000356 ED.CLEAR.OVERLAY                                    =729;
+ 000378 ED.ALTKEYS                                          =731;
+ 000397 ED.ALTKEY.SET                                       =748;
+ 000403 ED.ALTKEYS.OFF                                      =752;
+ 000412 ED.OPEN.DONE                                        =759;
+ 000421 ED.LOAD.LIVE                                        =762;
+ 000426 ED.COMMIT.LIVE                                      =765;
+ 000432 ED.CLAMP.COL                                        =769;
+ 000440 ED.MOVE.LEFT                                        =771;
+ 000448 ED.MOVE.RIGHT                                       =777;
+ 000456 ED.MOVE.UP                                          =783;
+ 000463 ED.MOVE.DOWN                                        =788;
+ 000470 ED.MOVE.HOME                                        =793;
+ 000474 ED.MOVE.END                                         =795;
+ 000478 ED.MOVE.PAGEUP                                      =797;
+ 000484 ED.MOVE.PAGEDOWN                                    =801;
+ 000493 ED.DO.INSERT                                        =805;
+ 000499 ED.INS.OVER                                         =810;
+ 000501 ED.INS.DONE                                         =811;
+ 000506 ED.DO.BACKSPACE                                     =814;
+ 000513 ED.BS.JOIN                                          =819;
+ 000523 ED.DO.DELETE                                        =827;
+ 000533 ED.DEL.CHAR                                         =835;
+ 000538 ED.DO.ENTER                                         =838;
+ 000549 ED.TOGGLE.INSERT                                    =847;
+ 000557 ED.CMD.NEW                                          =849;
+ 000566 ED.OPEN.FILE                                        =856;
+ 000573 ED.CMD.OPEN                                         =861;
+ 000582 ED.SAVE.FILE                                        =868;
+ 000586 ED.CMD.SAVE                                         =870;
+ 000592 ED.CMD.SAVEAS                                       =874;
+ 000600 ED.CMD.EXIT                                         =880;
+ 000604 ED.CMD.EXIT.GO                                      =883;
+ 000607 ED.CMD.ABOUT                                        =885;
+ 000611 ED.CONFIRM.DISCARD                                  =887;
+ 000618 ED.CMD.FIND                                         =892;
+ 000624 ED.CMD.GOTO                                         =896;
+ 000642 ED.FIND.NEXT                                        =906;
+ 000649 ED.FN.LOOP                                          =911;
+ 000659 ED.FN.HIT                                           =920;
+ 000665 ED.FN.NONE                                          =924;
+ 000677 ED.PROMPT                                           =926;
+ 000690 ED.PROMPT.YN                                        =933;
+ 000702 ED.INFO.MSG                                         =939;
+ 000708 ED.ERR.MSG                                          =943;
+ 000718 ED.REFRESH.FULL                                     =947;
+ 000722 ED.REFRESH.INTRA                                    =950;
+ 000732 ED.CARET.REFRESH                                    =956;
+ 000739 ED.ENSURE.VISIBLE                                   =961;
+ 000753 ED.DO.SCROLL                                        =970;
+ 000762 ED.HW.SCROLL.DOWN                                   =976;
+ 000771 ED.HW.SCROLL.UP                                     =982;
+ 000779 ED.SET.VSCROLL                                      =988;
+ 000785 ED.RENDER.ALL                                       =992;
+ 000811 ED.RENDER.ROW                                       =999;
+ 000822 ED.ROW.GEOM                                         =1006;
+ 000834 ED.ROW.LIVE                                         =1016;
+ 000838 ED.ROW.STREAM                                       =1019;
+ 000931 ED.PLACE.CARET                                      =1106;
+ 000941 ED.UNCARET                                          =1114;
+ 000955 ED.RENDER.MENUBAR                                   =1117;
+ 000960 ED.MB.DRAW                                          =1121;
+ 000972 ED.RENDER.STATUS                                    =1130;
+ 000990 ED.PUT.FIELD                                        =1136;
+
+FILE: ED-MENUS.BASL
+
+ 000036 EDMNU.PUT                                           =1173;
+ 000052 EDMNU.GET                                           =1182;
+ 000065 ED.MENU.SETUP                                       =1190;
+ 000111 ED.MENU.BAR.ITEMS                                   =1218;
+ 000127 ED.DRAW.DROPDOWN                                    =1227;
+ 000173 ED.ALT.MENU                                         =1251;
+ 000207 ED.OPEN.MENUBAR                                     =1263;
+ 000209 ED.MENU.OPEN                                        =1264;
+ 000233 ED.MENU.LETTER                                      =1275;
+ 000249 ED.MENU.SELECT                                      =1287;
+ 000254 ED.MENU.CANCEL                                      =1290;
+ 000260 ED.MENU.CLOSE                                       =1292;
+ 000270 ED.MENU.LEFT                                        =1294;
+ 000277 ED.MENU.RIGHT                                       =1299;
+ 000289 ED.MENU.BAR.MOVE                                    =1305;
+ 000300 ED.ERASE.DROPDOWN                                   =1309;
+ 000307 ED.MENU.DISPATCH                                    =1314;
+ 000311 ED.DISP.FILE                                        =1316;
+ 000315 ED.DISP.SEARCH                                      =1318;
+
+FILE: ED-STORE.BASL
+
+ 000023 DOC.INIT                                            =1320;
+ 000041 DOC.ALLOC                                           =1328;
+ 000045 DOC.ALLOC.PLACE                                     =1331;
+ 000051 DOC.SLOT.LOCATE                                     =1334;
+ 000057 DOC.SLOT.WRITE                                      =1337;
+ 000065 DOC.SLOT.READ                                       =1342;
+ 000072 DOC.STORE                                           =1346;
+ 000086 DOC.STORE.CHARS                                     =1352;
+ 000132 DOC.LOAD                                            =1393;
+ 000141 DOC.LOAD.CHARS                                      =1398;
+ 000155 DOC.LOADFILE                                        =1402;
+ 000159 DOC.READ.LOOP                                       =1405;
+ 000171 DOC.READ.DONE                                       =1412;
+ 000175 DOC.PUSH.LINE                                       =1414;
+ 000199 DOC.INSERT.SLOT                                     =1417;
+ 000201 DOC.INS.LOOP                                        =1418;
+ 000209 DOC.INS.CHUNK                                       =1425;
+ 000217 DOC.INS.RUNDONE                                     =1432;
+ 000221 DOC.INS.CROSS                                       =1434;
+ 000227 DOC.INS.DONE                                        =1439;
+ 000233 DOC.DELETE.SLOT                                     =1441;
+ 000235 DOC.DEL.LOOP                                        =1442;
+ 000244 DOC.DEL.CHUNK                                       =1450;
+ 000250 DOC.DEL.RUNDONE                                     =1455;
+ 000254 DOC.DEL.CROSS                                       =1457;
+ 000260 DOC.DEL.DONE                                        =1462;
+ 000268 DOC.MV.DOWN                                         =1464;
+ 000297 DOC.MV.UP                                           =1487;
+ 000327 DOC.SAVEFILE                                        =1510;
+ 000340 DOC.TOPETSCII                                       =1518;
+
+
+
+VARIABLES
+---------
+
+FILE: THEME.INC.BL
+
+ 000070 THEME.FIRST                                         =A;
+ 000071 THEME.READY                                         =A0;
+ 000071 THEME.CLR                                           =A1;
+ 000072 THEME.ID                                            =A2;
+ 000151 THEME.ATTR                                          =A3;
+ 000160 THEME.INV                                           =A4;
+
+FILE: APPSYS.INC.BL
+
+ 000049 APPSYS.MODE                                         =A5;
+ 000049 APPSYS.COLS                                         =A6;
+ 000049 APPSYS.ROWS                                         =A7;
+ 000050 APPSYS.COLOUR                                       =A8;
+ 000050 APPSYS.CHARSET                                      =A9;
+ 000063 APPSYS.IS.EMULATOR                                  =AA;
+
+FILE: STASH.INC.BL
+
+ 000094 STASH.MODE                                          =AB;
+ 000095 STASH.OK                                            =AC;
+ 000098 STASH.BANK                                          =AD;
+ 000098 STASH.W                                             =AE;
+ 000098 STASH.H                                             =AF;
+ 000099 STASH.X                                             =AG;
+ 000099 STASH.Y                                             =AH;
+ 000115 STASH.MOVE                                          =AI;
+ 000138 STASH.WAS                                           =AJ;
+ 000179 STASH.BYTES                                         =AK;
+ 000181 STASH.MAPW                                          =AL;
+ 000182 STASH.BASE                                          =AM;
+ 000182 STASH.STRIDE                                        =AN;
+ 000198 STASH.DEST                                          =AO;
+ 000198 STASH.NBYTES                                        =AP;
+ 000199 STASH.ROW                                           =AQ;
+ 000200 STASH.AT                                            =AR;
+ 000201 STASH.HI                                            =AS;
+ 000201 STASH.VADDR                                         =AT;
+ 000202 STASH.VCTRL                                         =AU;
+
+FILE: MENUVERT.INC.BL
+
+ 000122 MENUVERT.KEY                                        =AV;
+ 000123 MENUVERT.COUNT                                      =AW;
+ 000123 MENUVERT.SEL                                        =AX;
+ 000127 MENUVERT.HIGHLIGHT                                  =AY;
+ 000127 MENUVERT.HIATTR                                     =AZ;
+ 000128 MENUVERT.ATTR                                       =B;
+ 000133 MENUVERT.PADHELD                                    =B0;
+ 000134 MENUVERT.DRAWROW                                    =B1;
+ 000134 MENUVERT.DRAWATTR                                   =B2;
+ 000142 MENUVERT.INCHAR                                     =B3;
+ 000143 MENUVERT.CODE                                       =B4;
+ 000144 MENUVERT.FLAGS                                      =B5;
+ 000154 MENUVERT.DONE                                       =B6;
+ 000154 MENUVERT.HOTHIT                                     =B7;
+ 000155 MENUVERT.PREVSEL                                    =B8;
+ 000243 MENUVERT.HOT                                        =B9;
+ 000244 MENUVERT.HOTLAST                                    =BA;
+ 000246 MENUVERT.WANTCODE                                   =BB;
+ 000248 MENUVERT.SCAN                                       =BC;
+ 000249 MENUVERT.HOTCODE                                    =BD;
+ 000279 MENUVERT.PADNEW                                     =BE;
+ 000279 MENUVERT.PADNOW                                     =BF;
+ 000298 MENUVERT.PADRAW                                     =BG;
+ 000311 MENUVERT.EACH                                       =BH;
+ 000332 MENUVERT.DRAWY                                      =BI;
+ 000332 MENUVERT.Y                                          =BJ;
+ 000333 MENUVERT.DRAWITEM                                   =BK;
+ 000333 MENUVERT.SCROLL                                     =BL;
+ 000334 MENUVERT.X                                          =BM;
+ 000334 MENUVERT.WIDTH                                      =BN;
+ 000335 MENUVERT.DRAWTEXT                                   =BO;
+ 000335 MENUVERT.ITEM                                       =BP;
+ 000344 MENUVERT.HOTATTR                                    =BQ;
+ 000347 MENUVERT.HOTAT                                      =BR;
+ 000370 MENUVERT.HOTANY                                     =BS;
+ 000370 MENUVERT.HOTPREV                                    =BT;
+ 000373 MENUVERT.HOTWANT                                    =BU;
+ 000375 MENUVERT.HOTSCAN                                    =BV;
+ 000376 MENUVERT.HOTHERE                                    =BW;
+
+FILE: MENUBAR.INC.BL
+
+ 000108 MENUBAR.SEL                                         =BX;
+ 000110 MENUBAR.KEY                                         =BY;
+ 000113 MENUBAR.IN                                          =BZ;
+ 000114 MENUBAR.CODE                                        =C;
+ 000115 MENUBAR.FLAGS                                       =C0;
+ 000122 MENUBAR.WAS                                         =C1;
+ 000134 MENUBAR.HIT                                         =C2;
+ 000144 MENUBAR.DRAWN                                       =C3;
+ 000144 MENUBAR.PAINT                                       =C4;
+ 000182 MENUBAR.WANT                                        =C5;
+ 000184 MENUBAR.HK                                          =C6;
+ 000186 MENUBAR.HC                                          =C7;
+ 000203 MENUBAR.PAD                                         =C8;
+ 000221 MENUBAR.EACH                                        =C9;
+ 000250 MENUBAR.FIND                                        =CA;
+ 000251 MENUBAR.AT                                          =CB;
+ 000251 MENUBAR.WIDE                                        =CC;
+ 000251 MENUBAR.Y                                           =CD;
+ 000269 MENUBAR.X                                           =CE;
+ 000276 MENUBAR.CI                                          =CF;
+ 000277 MENUBAR.GAP                                         =CG;
+ 000286 MENUBAR.SELX                                        =CH;
+ 000286 MENUBAR.SELW                                        =CI;
+
+FILE: LINEINPUT.INC.BL
+
+ 000095 LINEINPUT.INV                                       =CJ;
+ 000095 LINEINPUT.ATTR                                      =CK;
+ 000096 LINEINPUT.WAS                                       =CL;
+ 000096 LINEINPUT.TEXT                                      =CM;
+ 000096 LINEINPUT.POS                                       =CN;
+ 000097 LINEINPUT.DONE                                      =CO;
+ 000097 LINEINPUT.KEY                                       =CP;
+ 000097 LINEINPUT.LIT                                       =CQ;
+ 000097 LINEINPUT.TICK                                      =CR;
+ 000101 LINEINPUT.X                                         =CS;
+ 000101 LINEINPUT.Y                                         =CT;
+ 000101 LINEINPUT.LEN                                       =CU;
+ 000102 LINEINPUT.SHOW                                      =CV;
+ 000109 LINEINPUT.K                                         =CW;
+ 000120 LINEINPUT.CODE                                      =CX;
+ 000152 LINEINPUT.SAVEX                                     =CY;
+ 000152 LINEINPUT.LABEL                                     =CZ;
+ 000183 LINEINPUT.ALLOW                                     =D;
+ 000184 LINEINPUT.DENY                                      =D0;
+ 000214 LINEINPUT.MASK                                      =D1;
+ 000229 LINEINPUT.FILLED                                    =D2;
+ 000230 LINEINPUT.CP                                        =D3;
+ 000231 LINEINPUT.CX                                        =D4;
+ 000231 LINEINPUT.CELL                                      =D5;
+ 000239 LINEINPUT.CA                                        =D6;
+
+FILE: GUI.INC.BL
+
+ 000145 GUI.YES                                             =D7;
+ 000145 GUI.YES.ALT                                         =D8;
+ 000146 GUI.NO                                              =D9;
+ 000146 GUI.NO.ALT                                          =DB;
+ 000147 GUI.HINT.DEFAULT                                    =DC;
+ 000148 GUI.OKCANCEL                                        =DD;
+ 000154 GUI.HINT.LINE                                       =DE;
+ 000154 GUI.HINT                                            =DF;
+ 000156 GUI.BODY.ROWS                                       =DG;
+ 000156 GUI.BODY.WIDTH                                      =DH;
+ 000158 GUI.HINT.LEFT                                       =DI;
+ 000158 GUI.INNER.LEFT                                      =DJ;
+ 000158 GUI.INNER.WIDTH                                     =DK;
+ 000160 GUI.INNER.TOP                                       =DL;
+ 000161 GUI.MARK.CH                                         =DM;
+ 000163 GUI.ANSWER                                          =DN;
+ 000172 GUI.PRESSED                                         =DO;
+ 000174 GUI.KEY                                             =DP;
+ 000174 GUI.DONE                                            =DQ;
+ 000205 GUI.INDEX                                           =DR;
+ 000232 GUI.COUNT                                           =DS;
+ 000243 GUI.PANEL                                           =DT;
+ 000244 GUI.FLAGS                                           =DU;
+ 000244 GUI.SEL                                             =DV;
+ 000274 GUI.LEN                                             =DW;
+ 000278 GUI.WAS                                             =DX;
+ 000278 GUI.INPUT                                           =DY;
+ 000282 GUI.FIELD.LEFT                                      =DZ;
+ 000286 GUI.MASK                                            =E;
+ 000308 GUI.OK                                              =E0;
+ 000338 GUI.STASHED                                         =E1;
+ 000339 GUI.BANK                                            =E2;
+ 000340 GUI.WIDTH                                           =E3;
+ 000340 GUI.HEIGHT                                          =E4;
+ 000342 GUI.LEFT                                            =E5;
+ 000342 GUI.TOP                                             =E6;
+ 000350 GUI.BOX.STYLE                                       =E7;
+ 000350 GUI.STYLE                                           =E8;
+ 000354 GUI.PANEL.IN                                        =E9;
+ 000356 GUI.BORDER                                          =EA;
+ 000356 GUI.BORDER.IN                                       =EB;
+ 000359 GUI.GLYPH                                           =EC;
+ 000362 GUI.TITLE                                           =ED;
+ 000362 GUI.TITLE.LEFT                                      =EE;
+ 000368 GUI.MSG                                             =EF;
+ 000369 GUI.MSG2                                            =EG;
+ 000370 GUI.HEAD.ROWS                                       =EH;
+ 000390 GUI.RIGHT                                           =EI;
+ 000391 GUI.BOTTOM                                          =EJ;
+ 000406 GUI.CORNER.TR                                       =EK;
+ 000406 GUI.CORNER.TL                                       =EL;
+ 000406 GUI.CORNER.BR                                       =EM;
+ 000406 GUI.CORNER.BL                                       =EN;
+ 000407 GUI.EDGE.H                                          =EO;
+ 000407 GUI.EDGE.V                                          =EP;
+ 000435 GUI.GAP.ROWS                                        =EQ;
+ 000450 GUI.PLACE                                           =ER;
+ 000450 GUI.X                                               =ES;
+ 000450 GUI.Y                                               =ET;
+ 000451 GUI.SCREEN.COLS                                     =EU;
+ 000452 GUI.SCREEN.ROWS                                     =EV;
+ 000460 GUI.ROW.OFFSET                                      =EW;
+
+FILE: STRCASE.INC.BL
+
+ 000053 STRCASE.ADDR                                        =EX;
+ 000053 STRCASE.PTR                                         =EY;
+ 000054 STRCASE.OP                                          =EZ;
+ 000054 STRCASE.MODE                                        =F;
+
+FILE: EDITOR.BASL
+
+ 000082 DEBUG.MODE                                          =F0;
+ 000083 ED.SCREEN.MODE                                      =F1;
+ 000084 ED.DARK                                             =F2;
+ 000087 DOC.FILE.NAME                                       =F3;
+ 000103 ED.KEY                                              =F4;
+ 000115 ED.MODS.ALT                                         =F5;
+ 000117 MENU.ACTIVE                                         =F6;
+ 000140 ED.MODS                                             =F7;
+ 000155 ED.PAL5.LO                                          =F8;
+ 000155 ED.PAL5.HI                                          =F9;
+ 000213 ED.FONT                                             =FA;
+ 000218 ED.FS                                               =FB;
+ 000218 ED.FD                                               =FC;
+ 000218 ED.FN                                               =FD;
+ 000237 ED.FCOUNT                                           =FE;
+ 000238 ED.FI                                               =FF;
+ 000307 SCREEN.COLS                                         =FG;
+ 000307 SCREEN.ROWS                                         =FH;
+ 000310 ED.TEXT.WIDTH                                       =FI;
+ 000311 ED.TEXT.BOTTOM                                      =FJ;
+ 000312 ED.TEXT.ROWS                                        =FK;
+ 000313 ED.ATTR.TEXT                                        =FL;
+ 000314 ED.ATTR.CARET                                       =FM;
+ 000315 ED.ASM.GATTR                                        =FO;
+ 000316 ED.QUIET                                            =FP;
+ 000316 ED.SIM.MODE                                         =FQ;
+ 000316 ED.EXIT.FLAG                                        =FR;
+ 000316 ED.LAST.MSG                                         =FS;
+ 000322 ED.MAP.TOP                                          =FT;
+ 000324 ED.MAP.CFG                                          =FU;
+ 000324 ED.MAP.HB                                           =FV;
+ 000324 ED.MAP.H                                            =FW;
+ 000328 ED.MAP.MAXTOP                                       =FX;
+ 000329 ED.HW.OK                                            =FY;
+ 000331 ED.ALTK                                             =FZ;
+ 000331 ED.ALTV                                             =G;
+ 000379 ED.NALT                                             =G0;
+ 000381 ED.TPLAIN                                           =G1;
+ 000381 ED.TALT                                             =G2;
+ 000382 ED.TI                                               =G3;
+ 000383 ED.TB                                               =G4;
+ 000389 MENU.I                                              =G5;
+ 000389 MENU.COUNT                                          =G6;
+ 000390 ED.WANT                                             =G7;
+ 000390 MENU.HOT                                            =G8;
+ 000391 ED.KI                                               =G9;
+ 000406 ED.AI                                               =GA;
+ 000413 ED.TOP.LINE                                         =GB;
+ 000413 ED.LEFT.COL                                         =GC;
+ 000413 ED.CUR.ROW                                          =GD;
+ 000413 ED.CUR.COL                                          =GE;
+ 000413 ED.INSERT.MODE                                      =GF;
+ 000413 ED.DOC.DIRTY                                        =GG;
+ 000422 LINE.INDEX                                          =GH;
+ 000423 ED.CUR.LINE                                         =GI;
+ 000423 LINE.TEXT                                           =GJ;
+ 000423 ED.CUR.DIRTY                                        =GK;
+ 000450 LINE.COUNT                                          =GL;
+ 000495 ED.CH                                               =GM;
+ 000516 ED.JOIN.COL                                         =GN;
+ 000539 ED.LEFT.HALF                                        =GP;
+ 000540 ED.RIGHT.HALF                                       =GQ;
+ 000559 ED.DISCARD.OK                                       =GR;
+ 000562 ED.MB.FORCE                                         =GS;
+ 000576 ED.PROMPT.MSG                                       =GT;
+ 000577 ED.PROMPT.OK                                        =GU;
+ 000578 ED.INPUT                                            =GV;
+ 000589 ED.MSG                                              =GW;
+ 000603 ED.YN                                               =GX;
+ 000621 ED.FIND                                             =GY;
+ 000627 ED.GOTO.N                                           =GZ;
+ 000645 ED.NEEDLE                                           =H;
+ 000648 ED.FR                                               =H0;
+ 000648 ED.FROM                                             =H1;
+ 000648 ED.SCANNED                                          =H2;
+ 000653 ED.FOUND.AT                                         =H3;
+ 000678 ED.SIM.INPUT                                        =H4;
+ 000691 ED.SIM.YN                                           =H5;
+ 000704 ED.PS.ROW                                           =H6;
+ 000704 ED.PS.COL                                           =H7;
+ 000704 ED.PS.WIDTH                                         =H8;
+ 000705 ED.PS                                               =H9;
+ 000705 ED.PS.ATTR                                          =HA;
+ 000725 ED.SCROLLED                                         =HB;
+ 000726 ED.SCREEN.ROW                                       =HC;
+ 000726 ED.DOC.LINE                                         =HD;
+ 000740 ED.HSCROLLED                                        =HE;
+ 000740 ED.EV.OLDTOP                                        =HF;
+ 000745 ED.VDELTA                                           =HG;
+ 000780 ED.VSP                                              =HH;
+ 000815 ED.GD0                                              =HI;
+ 000815 ED.GD1                                              =HJ;
+ 000815 ED.GD2                                              =HK;
+ 000815 ED.GD3                                              =HL;
+ 000817 ED.GN                                               =HM;
+ 000818 ED.GT                                               =HN;
+ 000823 ED.ASM.BASE                                         =HO;
+ 000825 ED.ASM.ATTR                                         =HP;
+ 000825 ED.ASM.WIDTH                                        =HQ;
+ 000825 ED.ASM.MODE                                         =HR;
+ 000825 ED.ASM.VIS                                          =HS;
+ 000829 DOC.GOT.BANK                                        =HT;
+ 000830 ED.VIS                                              =HU;
+ 000830 DOC.GOT.OFF                                         =HV;
+ 000832 ED.ASM.SRC                                          =HW;
+ 000837 ED.ASM.OFS                                          =HX;
+ 000932 ED.CARET.SROW                                       =HY;
+ 000933 ED.CARET.SCOL                                       =HZ;
+ 000934 ED.CARET.VALID                                      =I;
+ 000937 ED.CARET.ADDR                                       =I0;
+ 000957 ED.MB.D                                             =I1;
+ 000958 ED.MB.M                                             =I2;
+ 000966 ED.NAME                                             =I3;
+ 000967 ED.NCOL                                             =I4;
+ 000973 ED.MARK                                             =I5;
+ 000974 ED.MODE                                             =I6;
+ 000975 ED.BAR                                              =I7;
+
+FILE: ED-MENUS.BASL
+
+ 000037 EDMNU.ADDR                                          =I8;
+ 000037 EDMNU.SLOT                                          =I9;
+ 000037 EDMNU.LEN                                           =IA;
+ 000037 EDMNU.TEXT                                          =IB;
+ 000039 EDMNU.PTR                                           =IC;
+ 000044 EDMNU.I                                             =ID;
+ 000067 MENU.ITEMS                                          =IE;
+ 000067 MENU.WIDTH                                          =IG;
+ 000097 MENU.W                                              =IH;
+ 000098 MENU.J                                              =II;
+ 000128 ED.DD.N                                             =IJ;
+ 000130 ED.DD.COL                                           =IK;
+ 000130 ED.DD.W                                             =IL;
+ 000132 ED.DD.BX                                            =IM;
+ 000133 ED.DD.FW                                            =IN;
+ 000133 ED.DD.FH                                            =IO;
+ 000134 ED.DD.TY                                            =IP;
+ 000134 ED.DD.BY                                            =IQ;
+ 000135 ED.DD.RX                                            =IR;
+ 000135 ED.DD.FC                                            =IS;
+ 000161 ED.DD.I                                             =IT;
+ 000165 MENU.SEL                                            =IU;
+ 000176 ED.ALT.CH                                           =IV;
+ 000234 ED.ML.CH                                            =IW;
+ 000236 ED.ML.HIT                                           =IX;
+ 000244 ED.MENU.WAS                                         =IY;
+ 000250 MENU.CHOICE.MENU                                    =IZ;
+ 000250 MENU.CHOICE.ITEM                                    =J;
+ 000301 ED.DDE.LAST                                         =J0;
+
+FILE: ED-STORE.BASL
+
+ 000024 DOC.WIN.START                                       =J1;
+ 000025 DOC.WIN.END                                         =J2;
+ 000026 DOC.TABLE.PER.BANK                                  =J3;
+ 000026 DOC.TABLE.BASE.BANK                                 =J4;
+ 000031 DOC.FIRST.BANK                                      =J5;
+ 000032 DOC.CUR.BANK                                        =J6;
+ 000032 DOC.CUR.PTR                                         =J7;
+ 000033 DOC.HIGH.BANK                                       =J8;
+ 000037 DOC.CP.SWAP                                         =J9;
+ 000042 DOC.ALLOC.SIZE                                      =JA;
+ 000046 DOC.RESULT.BANK                                     =JB;
+ 000046 DOC.RESULT.OFF                                      =JC;
+ 000052 DOC.SEGMENT                                         =JD;
+ 000052 DOC.SLOT.BANK                                       =JE;
+ 000053 DOC.SLOT.ADDR                                       =JF;
+ 000059 DOC.PUT.BANK                                        =JG;
+ 000059 DOC.OFF.HIGH                                        =JH;
+ 000059 DOC.PUT.OFF                                         =JI;
+ 000073 DOC.LEN                                             =JJ;
+ 000087 DOC.CP.BANK                                         =JK;
+ 000087 DOC.CP.SRC                                          =JL;
+ 000088 DOC.CP.DST                                          =JM;
+ 000088 DOC.CP.LEN                                          =JN;
+ 000142 DOC.CHAR.INDEX                                      =JO;
+ 000156 DOC.OPEN.NAME                                       =JP;
+ 000160 DOC.STATUS                                          =JQ;
+ 000160 DOC.RAW                                             =JR;
+ 000200 DOC.INS.AT                                          =JS;
+ 000200 DOC.SH.J                                            =JT;
+ 000203 DOC.SH.SEG                                          =JU;
+ 000205 DOC.SH.LO                                           =JV;
+ 000207 DOC.MV.BANK                                         =JW;
+ 000207 DOC.SH.ADDR                                         =JX;
+ 000208 DOC.SH.P                                            =JY;
+ 000211 DOC.SH.K                                            =JZ;
+ 000212 DOC.MV.SRC                                          =K;
+ 000212 DOC.MV.DST                                          =K0;
+ 000213 DOC.MV.LEN                                          =K1;
+ 000234 DOC.DEL.AT                                          =K2;
+ 000239 DOC.SH.HI                                           =K3;
+ 000243 DOC.SH.N                                            =K4;
+ 000330 DOC.SAVE.INDEX                                      =K5;
+ 000332 DOC.OUT                                             =K6;
+ 000345 DOC.TI                                              =K7;
+ 000346 DOC.TC                                              =K8;

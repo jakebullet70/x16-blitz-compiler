@@ -93,7 +93,7 @@ plenty for one converted from its own literals: GPBMODS wants 37 groups and GPBF
   label: the runtime is linked twice with `gp.library` at opposite ends, so a label lands at
   `$05E5` in the application image and `$0400` in the standalone one. `RT_ABI` 22 → 23.
 - **`make -C source/runtime gpc-rt` is a separate target** that neither `make libs` nor the
-  application build runs. A two-day-stale `GPB.RT.120.BIN` with no `gp.bstr` vector cost a long
+  application build runs. A two-day-stale `GPB.RT.nnn.BIN` with no `gp.bstr` vector cost a long
   detour; the ABI bump now catches it.
 - **`bstrBank` is poked into EVERY object's bootstrap**, banked text or not, so leaving it
   uninitialised made two compiles of one source differ. Cleared for pass one now. The checksum

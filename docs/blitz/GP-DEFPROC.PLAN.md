@@ -69,7 +69,7 @@ GP.DEFPROC DBFIND, DB.F, DB.KEY$, DB.EXACT RETURNS DB.FOUND
 DB.FIND:  BANK DB.CODEBANK : GOSUB DB.FIND.BODY : RETURN
 ```
 
-The shim line is unchanged from `LIB.GUIBANK.INC.BL`. Declarations may also be folded onto the shim
+The shim line is unchanged from `SHIM.GUIBANK.INC.BL`. Declarations may also be folded onto the shim
 line; the binding rule is the same either way.
 
 Call sites:
@@ -273,7 +273,7 @@ is crunched as a variable and collides with the label -- `DUPLICATE SYMBOL`. Thi
 binding is positional and why `GP.DEFPROC DBOPEN, DB.OPEN, ...` is impossible.
 
 **GP.DEFPROC must be compiled before any call to it.** `.fngosub` carries an absolute address, and
-`CompileFN` refuses a forward reference for that reason. The `LIB.GUIBANK` pattern already satisfies
+`CompileFN` refuses a forward reference for that reason. The `SHIM.GUIBANK` pattern already satisfies
 this: shim files are `#INCLUDE`d at the top, above the code that calls them. An out-of-order call
 must be an error naming the verb, not a wrong branch.
 
@@ -377,7 +377,7 @@ All three questions are settled:
 1. **The compiler size delta is +672 bytes** — see §3, which now carries the breakdown. 0 bytes
    of runtime, 0 of program size, 0 of the 1K storage hole.
 2. **`WriteBranchToAddress` corrects a shim call, in both directions.** `DEFP2` is the
-   `LIB.GUIBANK.INC.BL` shape: `DP.PUT` is a low memory shim that selects bank 5 and calls a body at
+   `SHIM.GUIBANK.INC.BL` shape: `DP.PUT` is a low memory shim that selects bank 5 and calls a body at
    `$A000`, and the declaration binds to the shim. The body then calls the OTHER way — a `GP.SUB`
    INSIDE the region reaching a low memory routine — so both ends of the correction are
    exercised. It compiles to a 609 byte object plus `DEFP2.B05` and prints `P1 START / P3 IN BANK
@@ -459,7 +459,7 @@ deferral cost was evaluation stack -- N formals in N of the twelve slots where o
 that is the hazard §10 closes.
 
 **Every GP.FN program wedged with `OUT OF MEMORY` and a runaway PC, and no code was wrong.**
-`testing/GPB.RT.120.BIN` was three and a half hours stale: `make libs` builds `gp.library` and
+`testing/GPB.RT.nnn.BIN` was three and a half hours stale: `make libs` builds `gp.library` and
 `GPC.BIN` but never installs the runtime, which is `make -C source/runtime gpc-rt`. The compiler
 emitted `$F1`/`$F2` correctly and the loaded runtime's vector table had no entries for them.
 Bisecting the handlers "changed nothing" because the gutted file was not the one being loaded. See

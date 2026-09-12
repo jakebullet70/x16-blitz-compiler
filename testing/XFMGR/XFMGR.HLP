@@ -1,12 +1,13 @@
 ==============================================================================
- XFMGR2 - an XTree-style file manager for the Commander X16    (Build 185)
+ XFMGR2 - an XTree-style file manager for the Commander X16    (Build 195)
 ==============================================================================
 
  A dual-pane, keyboard-driven file manager. A collapsible DIRECTORY tree on
  the left, the selected directory's FILES on the right, with file tagging, a
- banked text/hex viewer, a BMX image viewer, a whole-disk Find, and a full set
- of file operations - copy, move, rename, delete, mkdir and prune - plus edit
- via the ROM X16 Edit and switchable colour themes.
+ banked text/hex viewer with BASIC/Markdown syntax coloring, a BMX image
+ viewer, a whole-disk Find, and a full set of file operations - copy, move,
+ rename, delete, mkdir and prune - plus edit via the ROM X16 Edit and
+ switchable color themes.
 
  The bottom command menu is MODIFIER-DRIVEN. By default it shows MENU (plain
  keys). Hold CTRL for the CTRL menu, hold ALT (the Commodore key) for the ALT
@@ -18,7 +19,10 @@
 ------------------------------------------------------------------------------
    Up / Dn     Move the cursor within the focused pane
    TAB         Switch focus between the DIRECTORY and FILE panes
-   Right       Focus the FILE pane (logs the dir's files on the fly)
+   Right       Focus the FILE pane (logs the dir's files on the fly).
+               On a folder that holds no files, expands it instead -
+               there is nothing to step sideways into, so Right does
+               the other thing it means in a tree.
    Left        Focus the DIRECTORY pane
    F1          Show this help
    Q           Quit, leaving the shell in the LAUNCH directory
@@ -30,10 +34,17 @@
    M           Make a new subdirectory in the selected folder
    R           Rename the selected directory
    D           Delete the selected folder (empty folders only)
-   P           Prune - recursively delete the folder and all its contents
-               (type 'prune' to confirm)
-   F3          Re-log sub-folders (picks up folders made since logging)
+   S           Showall - list every logged file on the DISK as one flat
+               file window (see SCOPED FILE VIEWS below)
+   B           Branch - the same, but only this folder and everything
+               logged below it
+   G           Global - in XTree this widens Showall from the current
+               disk to EVERY logged disk. XFMGR drives one volume, so
+               there is nothing further to widen to and G does exactly
+               what S does. It is here so the menu matches XTree's.
    A           About box (version, banked-RAM usage, credits)
+
+   (Prune and Re-log are ALT commands - Alt-P and Alt-F3 - see the ALT menu.)
 
 ------------------------------------------------------------------------------
  FILE pane (plain keys)
@@ -50,13 +61,58 @@
    F           Set the file-spec filter (e.g. *.prg, Enter = * = all)
 
 ------------------------------------------------------------------------------
+ SCOPED FILE VIEWS - Showall (S), Branch (B) and Global (G)
+------------------------------------------------------------------------------
+ From the DIRECTORY pane, these widen the file pane to the whole screen
+ and fill it from more than one folder:
+
+   S  Showall   every logged file on the disk, as one flat list
+   B  Branch    the selected folder and everything logged below it
+   G  Global    every logged DISK - identical to S on a single-drive
+                machine, which is what the X16 is here
+
+ It is the SAME file window with the SAME commands, not a separate screen.
+ Tag, Untag, View, Play, Edit, Copy, Move, Rename, Delete and the Ctrl
+ commands all work exactly as they do in a normal listing - each file is
+ acted on IN ITS OWN FOLDER, so Ctrl-C and Ctrl-M gather tagged files from
+ all over the disk into one destination, and Ctrl-S searches their contents
+ wherever they live.
+
+ Because the rows come from many folders, the Path line at the top follows
+ the HIGHLIGHTED FILE rather than the tree cursor - it is the only thing
+ telling you which folder the row under the bar belongs to. The title bar
+ shows the scope and the active filespec; the counts on the right are for
+ the whole list.
+
+ Only files in LOGGED directories appear - log more of the tree (Enter on
+ a folder) to widen what Showall can see. The FileSpec (F) still applies,
+ so "F *.prg" then S lists every program on the disk. The list holds up to
+ 2048 files; past that the title shows (partial) and the count reads
+ "2048 of N".
+
+ Esc (or TAB back to the tree) returns to the normal two-pane view.
+
+------------------------------------------------------------------------------
  CTRL menu (acts on the current directory / all tagged)
 ------------------------------------------------------------------------------
    Ctrl-T      Tag all files in this directory
    Ctrl-U      Untag all files in this directory
    Ctrl-I      Invert tags in this directory
    Ctrl-W      Tag files matching a wildcard
-   Ctrl-G      ShowAll - modal list of every tagged file across all dirs
+   Ctrl-V      View every TAGGED file in turn, starting at the first.
+               In the viewer, + moves to the next tagged file and -
+               back to the previous (paging past the end also moves
+               on); the footer shows "File n/m" so you can see where
+               you are. Esc/Q ends the walk on the file you are on.
+               If you ran a Ctrl-S search first, each file opens ON
+               its first hit with the text highlighted. N or SPACE
+               then walks the hits, and once a file's hits run out it
+               rolls straight on to the next file - so you can read
+               every occurrence across the whole set with one key.
+               (Ctrl-L in the emulator, Ctrl-V on hardware)
+   Ctrl-S      Search the TAGGED files for text; the ones that do NOT
+               contain it are untagged, so the tags collapse to the hits
+               (Ctrl-E in the emulator, Ctrl-S on hardware)
    Ctrl-F      Find files across the whole disk
                (Ctrl-N in the emulator, Ctrl-F on hardware)
    Ctrl-C      Copy all tagged files (from all dirs) to one destination
@@ -65,14 +121,37 @@
    Ctrl-X      Delete all tagged files in this directory
                (Ctrl-X in the emulator, Ctrl-D on hardware)
 
+   The XTree working loop: tag the files you care about (T one at a time,
+   or Ctrl-T for all), narrow them with Ctrl-S until only the interesting
+   ones are still tagged, then Ctrl-V to read through exactly those.
+
 ------------------------------------------------------------------------------
  ALT menu  (ALT = the Commodore key)
 ------------------------------------------------------------------------------
-   Alt-S       Cycle sort order: name -> extension -> size
+   Alt-J       Jump to dir - type a path and go there, logging every
+               level on the way down (XTree's Treespec). Works for a
+               folder that has never been logged, which is how you widen
+               what Showall and Branch can see. F2 picks from the tree.
+   Alt-R       Release - un-log the current folder to free its memory
+   Alt-T       Tag branch - tag every logged file in this folder AND
+               everything below it, without entering the Branch view.
+               Honours the FileSpec, so "F *.prg" then Alt-T tags every
+               program in the branch.
+   Alt-U       Untag all - clear every tag on the DISK. Ctrl-U only
+               reaches the current listing; after a Showall session the
+               tags are spread over folders you are no longer looking
+               at, and this is how you start clean. Ignores the FileSpec
+               and the 1024-row list cap on purpose - a tag you cannot
+               see is still a tag.
+   Alt-S       Pick sort order: name -> extension -> size. Each tap moves
+               the highlighted order in the ALT menu; the list is re-sorted
+               once, when you let ALT back up.
    Alt-X       Execute - quit XFMGR and chain-run the selected program
    Alt-Q       Quit, leaving the shell in the CURRENTLY SELECTED directory
    Alt-F3      Re-log the current context (sub-folders in DIR, files in FILE)
-   Alt-F10     Open the colour-theme setup (quits to XFSETUP.PRG)
+   Alt-P       Prune - recursively delete the selected folder and everything
+               under it (DIR pane; type 'prune' to confirm)
+   Alt-F10     Open the color-theme setup (quits to XFSETUP.PRG)
 
 ------------------------------------------------------------------------------
  In text prompts (Copy, Move, Rename, Mkdir, Filespec, Tag-spec, Find)
@@ -84,11 +163,11 @@
    Esc         Cancel
 
 ------------------------------------------------------------------------------
- In the ShowAll / Find / directory-picker modals
+ In the Find / directory-picker modals
 ------------------------------------------------------------------------------
    Up / Dn     Move          Enter  Select / jump to the file
    +           Expand (picker, logs on demand)     - Collapse
-   Esc / Q     Cancel        U      Untag the highlighted entry (ShowAll)
+   Esc / Q     Cancel
 
 ------------------------------------------------------------------------------
  File formats the viewer handles
@@ -103,6 +182,21 @@
                the BMX image viewer; any key returns to the file list.
 
    Big files that are too large for the pager fall back to the ROM X16 Edit.
+
+------------------------------------------------------------------------------
+ Syntax coloring in the viewer (C)
+------------------------------------------------------------------------------
+   Auto        BASIC / BASLOAD source (.bas, .bas.txt, .basl, .bl) and
+               Markdown (.md) are colored automatically when opened.
+   BASIC       Statement keywords, built-in functions, "strings", numbers,
+               and REM / ## comments each get their own color. A dotted
+               BASLOAD label (DIR.READ.BIN) stays plain - it is one name.
+   Markdown    A leading # is a heading, ## or deeper a subheading.
+   C           Toggles coloring on / off. Switching back on uses the mode
+               for the file's extension, or BASIC if the extension was not
+               recognised - so C also colors a listing saved under any name.
+   Needs       xsyntax.ovl beside the program; without it the viewer simply
+               shows plain text and the C key is not offered.
 
 ------------------------------------------------------------------------------
  Music playback (P)
@@ -122,8 +216,32 @@
 ------------------------------------------------------------------------------
    PgDn/PgUp   Page          T  Top        B  Bottom
    H           Toggle hex / text
-   F           Find a string
-   N / Space    Repeat the search (find next)
+   F           Find a string (always searches from the top)
+   N / Space   Repeat the search. At end-of-file it wraps back to the top
+               and reports "wrapped to top", so a search cycles round.
+   C           Toggle syntax coloring on / off (see below)
+   I           Read the file as ASCII/ISO or as PETSCII. The viewer
+               already GUESSES this from the file's own bytes when it
+               opens - text saved through the KERNAL (BASLOAD sources,
+               MSEDIT buffers, .SEQ files) is PETSCII, and read as ASCII
+               every letter of it shows as '.'. The footer says which
+               reading you are in: ISO or I PET. This key overrides the
+               guess; glyphs only - nothing is re-encoded, and the file
+               is never written.
+   W           Cycle how long lines are laid out:
+                 Wrap off   one file line = one screen row, cut at the
+                            right edge; Left/Right pan across it. The
+                            DEFAULT, because it is the only mode that
+                            does not invent line breaks the file has not
+                            got - a wrapped line reads as two.
+                 Wrap char  break anywhere, so every byte is on screen
+                 Wrap word  break at spaces, for prose
+               Changing this keeps your place, but PgUp cannot go back
+               past the point where you changed it.
+               Syntax coloring switches off while a line is panned
+               sideways, and on word-wrapped lines wider than the
+               screen: in both cases the colors could not be put on the
+               right characters, so they are left off rather than wrong.
    Q / Esc     Exit back to the file list
 
 ------------------------------------------------------------------------------
@@ -137,9 +255,11 @@
      Delete tagged    Ctrl-X       Ctrl-D
      Find files       Ctrl-N       Ctrl-F
      Move tagged      Ctrl-O       Ctrl-M
+     Search tagged    Ctrl-E       Ctrl-S
+     View tagged      Ctrl-L       Ctrl-V
 
-   Ctrl-S is also swallowed by the emulator, so Tag-by-wildcard is Ctrl-W in
-   both environments. ALT is the Commodore (C=) key on a real X16; in the
+   The emulator also swallows Ctrl-S, so Tag-by-wildcard is Ctrl-W in both
+   environments. ALT is the Commodore (C=) key on a real X16; in the
    emulator it is the left Alt key. Everything else - plain keys, function
    keys, arrows - behaves identically in both.
 
@@ -151,7 +271,7 @@
                holds, but only logs the folders that CONTAIN a match. If one
                search's matches are spread across more than 254 folders,
                logging stops there and the results are marked "(partial)".
-   Find/ShowAll At most 255 matching files are collected; beyond that the list
+   Find/ShowAll At most 2048 matching files are collected; beyond that the list
                is marked "(partial)". Very deep folder paths may be skipped
                (also shown as "(partial)").
 
@@ -166,7 +286,7 @@
      +-- XFMGR/            everything else lives here
           +-- XFMGR.PRG        the main program
           +-- *.OVL            banked overlays (viewer, image, music, ui, misc)
-          +-- XFSETUP.PRG      the colour-theme setup (Alt-F10)
+          +-- XFSETUP.PRG      the color-theme setup (Alt-F10)
           +-- ZSMKIT.BIN       the ZSM music engine
           +-- XFMGR.HLP        this help file
           +-- XFMGR.CFG        your saved theme (kept across updates)

@@ -38,33 +38,9 @@
 .        colours away
 .      DO THIS: set the mode first
 .
-.  STR.FIELD$ wanted bigger
-.      WHAT HAPPENS: auto-DIMed at 0..10 on first use, and you cannot DIM it
-.        after
-.      DO THIS: DIM it before the first call, set STR.MAX
-.
 .  #DEFINE X 129536
 .      WHAT HAPPENS: #DEFINE takes an INT16 -- ERROR: INVALID PARAMETER
 .      DO THIS: an ordinary variable
-.
-.  GP.SUB above its GP.DEFPROC
-.      WHAT HAPPENS: the call carries an address, not a line number -- GP.SUB
-.        BEFORE ITS GP.DEFPROC
-.      DO THIS: declare the routine above every caller
-.
-.  an array element as a GP.DEFPROC formal
-.      WHAT HAPPENS: GP.DEFPROC FORMAL IS NOT A VARIABLE
-.      DO THIS: plain scalar formals, and set the array before the call
-.
-.  a GP.DEFPROC body calling its own verb
-.      WHAT HAPPENS: one set of formals, so it writes over the arguments in
-.        use -- wrong answer, no error
-.      DO THIS: recursion needs its own saved copies, or a different shape
-.
-.  a variable called LEN, ST, POS, MB or CHAR
-.      WHAT HAPPENS: the name is a reserved word on its own
-.      DO THIS: dot it -- BASLOAD matches the whole identifier, so
-.        LINEINPUT.LEN works
 .
 =SEE ALSO
 .

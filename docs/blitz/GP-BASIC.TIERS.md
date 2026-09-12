@@ -505,7 +505,7 @@ registers load afterwards without disturbing it.
 > **Put the machine code in banked RAM (`$A000`–`$BFFF`). NOT `$0400`–`$07FF`.**
 > Stock X16 BASIC leaves that page free for the user. A **compiled GPC program does not**:
 > `MemoryStorage = $400` (`common.inc`), and `$0400` onwards holds `stringHighMemory`,
-> `runtimeHigh`, `loadChainSig`, `storeStartHigh`, `stackFloorHigh`, `variableStartPage`…
+> `runtimeHigh`, `storeStartHigh`, `stackFloorHigh`, `variableStartPage`…
 > The first version of the `GP.CALL` test POKEd its routine there, **passed all four assertions**,
 > and was silently corrupting three runtime variables — it only survived because nothing used them
 > afterwards. Adding one string to the program was enough to expose it.
@@ -944,8 +944,8 @@ KEEPMARK, empty hotkeys, zero rows, the GAMEPAD flag with no pad, and the `HIATT
 the cost of a menu.
 
 **`RTGPBASE` moved $6400 -> $6600 as well**, or shared mode would have kept the 512 bytes as
-padding -- the block is a fixed boundary, so it does not shrink by itself. `GPC.RT.120.BIN` is
-14,002 bytes against 14,516, and a shared GPB program's workspace gains the same 512. The file
+padding -- the block is a fixed boundary, so it does not shrink by itself. The GPB runtime was
+14,002 bytes against 14,516 when that landed, and a shared GPB program's workspace gains the same 512. The file
 NAMES do not change: the name carries the build number, the magic (now `GP20`/`GB20`) carries the
 ABI.
 

@@ -1,0 +1,114 @@
+BASLOAD 0.2.1 SYMBOL FILE
+
+
+
+LABELS
+------
+
+FILE: APPSYS.INC.BL
+
+ 000049 APPSYS.STARTUP                                      =2;
+ 000055 APPSYS.RESTORE                                      =5;
+ 000063 APPSYS.ISEMU                                        =8;
+ 000066 APPSYS.SKIP                                         =10;
+
+FILE: THEME.INC.BL
+
+ 000069 THEME.LOAD                                          =11;
+ 000077 THEME.LOAD.X16                                      =17;
+ 000087 THEME.LOAD.DARK                                     =25;
+ 000099 THEME.LOAD.LIGHT                                    =33;
+ 000112 THEME.LOAD.GRAY                                     =41;
+ 000125 THEME.LOAD.CUSTOM                                   =49;
+ 000131 THEME.NEXT                                          =51;
+ 000138 THEME.RESET                                         =54;
+ 000150 THEME.SET                                           =56;
+ 000159 THEME.HI                                            =58;
+ 000163 THEME.SKIP                                          =60;
+
+FILE: COLORTST.BASL
+
+ 000124 CTX.ROLES                                           =101;
+ 000144 CTX.DRAW                                            =113;
+ 000176 CTX.SWATCH                                          =133;
+ 000190 CTX.MENU                                            =142;
+ 000205 CTX.MROW                                            =151;
+ 000215 CTX.PLINE                                           =155;
+ 000231 CTX.CNAME                                           =166;
+ 000238 CTX.THNAME                                          =170;
+ 000256 CTX.NUM                                             =183;
+ 000267 CTX.KEY                                             =186;
+ 000302 CTX.MOVE                                            =216;
+ 000313 CTX.FROMTHEME                                       =221;
+ 000324 CTX.TOTHEME                                         =229;
+
+
+
+VARIABLES
+---------
+
+FILE: APPSYS.INC.BL
+
+ 000049 APPSYS.MODE                                         =A;
+ 000049 APPSYS.COLS                                         =A0;
+ 000049 APPSYS.ROWS                                         =A1;
+ 000050 APPSYS.COLOUR                                       =A2;
+ 000050 APPSYS.CHARSET                                      =A3;
+ 000063 APPSYS.IS.EMULATOR                                  =A4;
+
+FILE: THEME.INC.BL
+
+ 000070 THEME.FIRST                                         =A5;
+ 000071 THEME.READY                                         =A6;
+ 000071 THEME.CLR                                           =A7;
+ 000072 THEME.ID                                            =A8;
+ 000151 THEME.ATTR                                          =A9;
+ 000160 THEME.INV                                           =AA;
+
+FILE: COLORTST.BASL
+
+ 000052 CT.CLR                                              =AB;
+ 000054 CT.HEX                                              =AC;
+ 000055 CT.BAR                                              =AD;
+ 000059 CT.LIGHT                                            =AE;
+ 000062 CT.NAMES                                            =AF;
+ 000065 CT.LABS                                             =AG;
+ 000068 CT.LHS                                              =AH;
+ 000084 CT.SEL                                              =AI;
+ 000088 CT.CHY                                              =AJ;
+ 000089 CT.SWY                                              =AK;
+ 000090 CT.CURY                                             =AL;
+ 000091 CT.MNY                                              =AM;
+ 000092 CT.KYY                                              =AN;
+ 000094 CT.SWX                                              =AO;
+ 000095 CT.SWW                                              =AP;
+ 000096 CT.PSX                                              =AQ;
+ 000098 CT.DW                                               =AR;
+ 000099 CT.DH                                               =AS;
+ 000100 CT.DX                                               =AT;
+ 000101 CT.DY                                               =AU;
+ 000107 CT.K                                                =AV;
+ 000110 CT.QUIT                                             =AW;
+ 000125 CT.BG                                               =AX;
+ 000126 CT.PAGE                                             =AY;
+ 000127 CT.TEXT                                             =AZ;
+ 000128 CT.TITLE                                            =B;
+ 000129 CT.BORDER                                           =B0;
+ 000130 CT.DIMMED                                           =B1;
+ 000131 CT.WARN                                             =B2;
+ 000132 CT.HB                                               =B3;
+ 000133 CT.HF                                               =B4;
+ 000135 CT.HILITE                                           =B5;
+ 000170 CT.TH                                               =B6;
+ 000177 CT.CUR                                              =B7;
+ 000179 CT.N                                                =B8;
+ 000180 CT.SWFG                                             =B9;
+ 000193 CT.FA                                               =BA;
+ 000195 CT.ROW                                              =BB;
+ 000197 CT.PL                                               =BC;
+ 000206 CT.C                                                =BD;
+ 000208 CT.CN                                               =BE;
+ 000216 CT.PB                                               =BF;
+ 000217 CT.PF                                               =BG;
+ 000220 CT.V                                                =BH;
+ 000279 CT.STEP                                             =BI;

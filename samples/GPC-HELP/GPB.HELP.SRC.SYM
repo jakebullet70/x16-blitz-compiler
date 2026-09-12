@@ -1,0 +1,592 @@
+BASLOAD 0.2.1 SYMBOL FILE
+
+
+
+LABELS
+------
+
+FILE: THEME.INC.BL
+
+ 000075 THEME.SELECT                                        =2;
+ 000083 THEME.SELECT.X16                                    =8;
+ 000094 THEME.SELECT.DARK                                   =17;
+ 000107 THEME.SELECT.LIGHT                                  =26;
+ 000123 THEME.SELECT.GRAY                                   =35;
+ 000136 THEME.SELECT.CUSTOM                                 =44;
+ 000141 THEME.NEXT                                          =46;
+ 000146 THEME.RESET                                         =48;
+ 000156 THEME.SET                                           =50;
+ 000163 THEME.HI                                            =51;
+ 000165 THEME.SKIP                                          =52;
+
+FILE: STASH.INC.BL
+
+ 000092 STASH.SAVE                                          =53;
+ 000111 STASH.RESTORE                                       =60;
+ 000117 STASH.RESTORE.GO                                    =65;
+ 000137 STASH.DONE                                          =68;
+ 000149 STASH.BANK.HOLD                                     =70;
+ 000170 STASH.SETUP                                         =78;
+ 000197 STASH.WALK                                          =87;
+ 000218 STASH.ROW.IN                                        =97;
+ 000252 STASH.ROW.OUT                                       =120;
+ 000278 STASH.MODULE.END                                    =142;
+
+FILE: STRCASE.INC.BL
+
+ 000052 STRCASE.GO                                          =143;
+ 000101 STRCASE.MODULE.END                                  =188;
+
+FILE: APPSYS.INC.BL
+
+ 000049 APPSYS.STARTUP                                      =189;
+ 000055 APPSYS.RESTORE                                      =192;
+ 000063 APPSYS.ISEMU                                        =195;
+ 000066 APPSYS.SKIP                                         =197;
+
+FILE: KB.INC.BL
+
+ 000036 KB.CLEARKB                                          =198;
+ 000043 KB.MODULE.END                                       =203;
+
+FILE: MENUVERT.INC.BL
+
+ 000126 MENUVERT.RUN                                        =204;
+ 000142 MENUVERT.WAIT                                       =210;
+ 000152 MENUVERT.KEYED                                      =214;
+ 000173 MENUVERT.SETTLE                                     =229;
+ 000190 MENUVERT.WRAPTOP                                    =235;
+ 000193 MENUVERT.WRAPBOT                                    =237;
+ 000199 MENUVERT.CANCEL                                     =239;
+ 000212 MENUVERT.KEYBACK                                    =242;
+ 000225 MENUVERT.HOTKEY                                     =244;
+ 000240 MENUVERT.FOLDWANT                                   =253;
+ 000243 MENUVERT.FOLDHC                                     =255;
+ 000256 MENUVERT.PADKEY                                     =257;
+ 000273 MENUVERT.PADREAD                                    =263;
+ 000284 MENUVERT.DRAW                                       =266;
+ 000305 MENUVERT.ROW                                        =271;
+ 000339 MENUVERT.HOTFIND                                    =281;
+ 000356 MENUVERT.FOLDHOTWANT                                =295;
+ 000359 MENUVERT.FOLDHOTHERE                                =297;
+ 000362 MENUVERT.MODULE.END                                 =299;
+
+FILE: LINEINPUT.INC.BL
+
+ 000103 LINEINPUT.GET                                       =300;
+ 000108 LINEINPUT.REDRAW                                    =303;
+ 000116 LINEINPUT.WAIT                                      =307;
+ 000127 LINEINPUT.KEYED                                     =312;
+ 000163 LINEINPUT.ASK                                       =331;
+ 000187 LINEINPUT.TYPED                                     =337;
+ 000217 LINEINPUT.RUBOUT                                    =345;
+ 000225 LINEINPUT.RENDER                                    =349;
+ 000239 LINEINPUT.CURSOR                                    =352;
+ 000254 LINEINPUT.MODULE.END                                =362;
+
+FILE: GUI.INC.BL
+
+ 000173 GUI.CLEARKB                                         =363;
+ 000202 GUI.YN                                              =368;
+ 000251 GUI.BUTTON                                          =387;
+ 000300 GUI.BTN.EDGES                                       =404;
+ 000320 GUI.BTN.PAIR                                        =410;
+ 000339 GUI.BUTTON.SIZE                                     =414;
+ 000353 GUI.BUTTON.WIDE                                     =423;
+ 000373 GUI.BUTTON.ROW                                      =426;
+ 000435 GUI.BTN.COLOURS                                     =449;
+ 000483 GUI.FORM.INIT                                       =458;
+ 000504 GUI.FORM.BEGIN                                      =468;
+ 000522 GUI.FORM.ADD.FIELD                                  =472;
+ 000551 GUI.FIELD.DRAW                                      =484;
+ 000573 GUI.LIST.MEASURE                                    =491;
+ 000606 GUI.FORM.ADD.LIST                                   =497;
+ 000651 GUI.LIST.DRAW                                       =523;
+ 000674 GUI.LIST.PAINT.ROW                                  =532;
+ 000696 GUI.LIST.FOLLOW                                     =543;
+ 000711 GUI.LIST.COUNTMARKS                                 =548;
+ 000731 GUI.LIST.TOGGLE                                     =554;
+ 000751 GUI.LIST.FOOT                                       =562;
+ 000760 GUI.LIST.FOOT.DRAW                                  =569;
+ 000775 GUI.FORM.ADD.BUTTON                                 =571;
+ 000801 GUI.FORM.PAINT                                      =584;
+ 000823 GUI.FORM.RUN                                        =595;
+ 000832 GUI.FORM.LOOP                                       =602;
+ 000851 GUI.FORM.STEP                                       =605;
+ 000878 GUI.FORM.DO.FIELD                                   =613;
+ 000914 GUI.FORM.DO.LIST                                    =627;
+ 000917 GUI.FORM.DO.LIST.KEY                                =628;
+ 000974 GUI.FORM.DO.BUTTON                                  =663;
+ 000995 GUI.FORM.GETKEY                                     =677;
+ 001010 GUI.FORM.ACCEL                                      =681;
+ 001033 GUI.FORM.ACT                                        =693;
+ 001066 GUI.FORM.MOVE                                       =714;
+ 001071 GUI.FORM.MOVE.ON                                    =717;
+ 001079 GUI.FORM.MOVE.DONE                                  =723;
+ 001101 GUI.SAY                                             =729;
+ 001132 GUI.MENU                                            =742;
+ 001173 GUI.INPUT                                           =751;
+ 001227 GUI.OPEN                                            =772;
+ 001253 GUI.OPEN.DRAW                                       =780;
+ 001263 GUI.OPEN.TITLE                                      =788;
+ 001289 GUI.SHADOW.FIT                                      =795;
+ 001309 GUI.SHADOW.DRAW                                     =801;
+ 001334 GUI.FRAME                                           =807;
+ 001350 GUI.GLYPHS                                          =813;
+ 001358 GUI.CLOSE                                           =816;
+ 001368 GUI.SIZE                                            =819;
+ 001388 GUI.PLACE.BOX                                       =831;
+ 001395 GUI.PLACE.SCROLL                                    =836;
+ 001405 GUI.SCREEN                                          =837;
+ 001411 GUI.MODULE.END                                      =842;
+
+FILE: GPB.HELP.BASL
+
+ 000168 HELP.BOOT                                           =856;
+ 000232 HELP.IDXLOAD                                        =882;
+ 000235 HELP.IDXLOAD.LOOP                                   =884;
+ 000249 HELP.IDXLOAD.DONE                                   =889;
+ 000256 HELP.STRIP                                          =892;
+ 000263 HELP.SPLIT                                          =895;
+ 000278 HELP.IDXROW                                         =908;
+ 000318 HELP.IXREAD                                         =942;
+ 000332 HELP.IXTEXT                                         =951;
+ 000347 HELP.FILENAME                                       =960;
+ 000357 HELP.INDEX                                          =963;
+ 000359 HELP.INDEX.FIRST                                    =964;
+ 000366 HELP.INDEX.LOOP                                     =968;
+ 000433 HELP.INDEX.DRAW                                     =1021;
+ 000444 HELP.INDEX.SLIDE                                    =1026;
+ 000450 HELP.INDEX.ROWS                                     =1030;
+ 000458 HELP.INDEX.ROW                                      =1036;
+ 000473 HELP.INDEX.STATUS                                   =1049;
+ 000483 HELP.IX.STEP                                        =1056;
+ 000485 HELP.IX.STEP.SCAN                                   =1057;
+ 000493 HELP.IX.PAGE                                        =1063;
+ 000502 HELP.IX.SNAP                                        =1069;
+ 000505 HELP.IX.SNAP.SCAN                                   =1071;
+ 000512 HELP.IX.SNAP.TURN                                   =1077;
+ 000519 HELP.IX.SHOW                                        =1082;
+ 000537 HELP.OPEN.SEL                                       =1091;
+ 000547 HELP.START.AT                                       =1097;
+ 000554 HELP.PG.CLAMP                                       =1102;
+ 000564 HELP.TOPIC                                          =1107;
+ 000565 HELP.TOPIC.ENTER                                    =1107;
+ 000570 HELP.PAGE.LOOP                                      =1109;
+ 000637 HELP.PAGE.LOAD                                      =1148;
+ 000660 HELP.LOAD.READ                                      =1164;
+ 000699 HELP.LOAD.CLOSE                                     =1188;
+ 000706 HELP.LOAD.STORE                                     =1190;
+ 000751 HELP.STORE.ASM                                      =1205;
+ 000803 HELP.PAGE.LOADING                                   =1251;
+ 000814 HELP.PAGE.DRAW                                      =1257;
+ 000842 HELP.PAGE.SHIFT                                     =1272;
+ 000875 HELP.SC.PORTA                                       =1295;
+ 000882 HELP.SC.PORTB                                       =1300;
+ 000892 HELP.SC.SPLIT                                       =1306;
+ 000901 HELP.PAGE.REF                                       =1311;
+ 000918 HELP.PAGE.ROW                                       =1323;
+ 000957 HELP.PAGE.STATUS                                    =1351;
+ 000973 HELP.LINKS                                          =1360;
+ 000988 HELP.BACK.PUSH                                      =1371;
+ 000997 HELP.BACK.POP                                       =1376;
+ 001010 HELP.EXPORT                                         =1382;
+ 001033 HELP.EXPORT.LOOP                                    =1399;
+ 001041 HELP.EXPORT.DONE                                    =1404;
+ 001052 HELP.EXPORT.WRITE                                   =1412;
+ 001062 HELP.FIND.ASK                                       =1415;
+ 001080 HELP.FIND.NEXT                                      =1427;
+ 001087 HELP.FIND.RUN                                       =1430;
+ 001090 HELP.FIND.SCAN                                      =1432;
+ 001106 HELP.FIND.MISS                                      =1447;
+ 001118 HELP.SAY                                            =1452;
+ 001130 HELP.ABOUT                                          =1457;
+ 001137 HELP.ASKQUIT                                        =1462;
+ 001152 HELP.THEME.NEXT                                     =1469;
+ 001156 HELP.THEME.SET                                      =1471;
+ 001158 HELP.THEME.BARS                                     =1472;
+ 001170 HELP.PAGE.FRAME                                     =1475;
+ 001179 HELP.TITLEBAR                                       =1479;
+ 001185 HELP.STATUSBAR                                      =1483;
+ 001198 HELP.NUMSTR                                         =1490;
+ 001203 HELP.GETKEY                                         =1493;
+ 001205 HELP.GETKEY.WAIT                                    =1494;
+
+
+
+VARIABLES
+---------
+
+FILE: THEME.INC.BL
+
+ 000076 THEME.FIRST                                         =A;
+ 000077 THEME.READY                                         =A0;
+ 000077 THEME.CLR                                           =A1;
+ 000078 THEME.ID                                            =A2;
+ 000156 THEME.ATTR                                          =A3;
+ 000163 THEME.INV                                           =A4;
+
+FILE: STASH.INC.BL
+
+ 000094 STASH.MODE                                          =A5;
+ 000095 STASH.OK                                            =A6;
+ 000098 STASH.BANK                                          =A7;
+ 000098 STASH.W                                             =A8;
+ 000098 STASH.H                                             =A9;
+ 000099 STASH.X                                             =AA;
+ 000099 STASH.Y                                             =AB;
+ 000115 STASH.MOVE                                          =AC;
+ 000138 STASH.WAS                                           =AD;
+ 000179 STASH.BYTES                                         =AE;
+ 000181 STASH.MAPW                                          =AF;
+ 000182 STASH.BASE                                          =AG;
+ 000182 STASH.STRIDE                                        =AH;
+ 000198 STASH.DEST                                          =AI;
+ 000198 STASH.NBYTES                                        =AJ;
+ 000199 STASH.ROW                                           =AK;
+ 000200 STASH.AT                                            =AL;
+ 000201 STASH.HI                                            =AM;
+ 000201 STASH.VADDR                                         =AN;
+ 000202 STASH.VCTRL                                         =AO;
+
+FILE: STRCASE.INC.BL
+
+ 000053 STRCASE.ADDR                                        =AP;
+ 000053 STRCASE.PTR                                         =AQ;
+ 000054 STRCASE.OP                                          =AR;
+ 000054 STRCASE.MODE                                        =AS;
+
+FILE: APPSYS.INC.BL
+
+ 000049 APPSYS.MODE                                         =AT;
+ 000049 APPSYS.COLS                                         =AU;
+ 000049 APPSYS.ROWS                                         =AV;
+ 000050 APPSYS.COLOUR                                       =AW;
+ 000050 APPSYS.CHARSET                                      =AX;
+ 000063 APPSYS.IS.EMULATOR                                  =AY;
+
+FILE: KB.INC.BL
+
+ 000038 KB.K                                                =AZ;
+
+FILE: MENUVERT.INC.BL
+
+ 000126 MENUVERT.KEY                                        =B;
+ 000127 MENUVERT.COUNT                                      =B0;
+ 000127 MENUVERT.SEL                                        =B1;
+ 000131 MENUVERT.HIGHLIGHT                                  =B2;
+ 000131 MENUVERT.HIATTR                                     =B3;
+ 000131 MENUVERT.ATTR                                       =B4;
+ 000136 MENUVERT.PADHELD                                    =B5;
+ 000136 MENUVERT.DRAWROW                                    =B6;
+ 000136 MENUVERT.DRAWATTR                                   =B7;
+ 000142 MENUVERT.INCHAR                                     =B8;
+ 000143 MENUVERT.CODE                                       =B9;
+ 000144 MENUVERT.FLAGS                                      =BA;
+ 000153 MENUVERT.DONE                                       =BB;
+ 000153 MENUVERT.HOTHIT                                     =BC;
+ 000153 MENUVERT.PREVSEL                                    =BD;
+ 000226 MENUVERT.HOT                                        =BE;
+ 000227 MENUVERT.HOTLAST                                    =BF;
+ 000228 MENUVERT.WANTCODE                                   =BG;
+ 000229 MENUVERT.SCAN                                       =BH;
+ 000230 MENUVERT.HOTCODE                                    =BI;
+ 000256 MENUVERT.PADNEW                                     =BJ;
+ 000256 MENUVERT.PADNOW                                     =BK;
+ 000273 MENUVERT.PADRAW                                     =BL;
+ 000285 MENUVERT.EACH                                       =BM;
+ 000305 MENUVERT.DRAWY                                      =BN;
+ 000305 MENUVERT.Y                                          =BO;
+ 000305 MENUVERT.DRAWITEM                                   =BP;
+ 000305 MENUVERT.SCROLL                                     =BQ;
+ 000306 MENUVERT.X                                          =BR;
+ 000306 MENUVERT.WIDTH                                      =BS;
+ 000307 MENUVERT.DRAWTEXT                                   =BT;
+ 000307 MENUVERT.ITEM                                       =BU;
+ 000315 MENUVERT.HOTATTR                                    =BV;
+ 000317 MENUVERT.HOTAT                                      =BW;
+ 000339 MENUVERT.HOTANY                                     =BX;
+ 000339 MENUVERT.HOTPREV                                    =BY;
+ 000342 MENUVERT.HOTWANT                                    =BZ;
+ 000344 MENUVERT.HOTSCAN                                    =C;
+ 000345 MENUVERT.HOTHERE                                    =C0;
+
+FILE: LINEINPUT.INC.BL
+
+ 000104 LINEINPUT.INV                                       =C1;
+ 000104 LINEINPUT.ATTR                                      =C2;
+ 000105 LINEINPUT.WAS                                       =C3;
+ 000105 LINEINPUT.TEXT                                      =C4;
+ 000105 LINEINPUT.POS                                       =C5;
+ 000106 LINEINPUT.DONE                                      =C6;
+ 000106 LINEINPUT.KEY                                       =C7;
+ 000106 LINEINPUT.LIT                                       =C8;
+ 000106 LINEINPUT.TICK                                      =C9;
+ 000109 LINEINPUT.X                                         =CA;
+ 000109 LINEINPUT.Y                                         =CB;
+ 000109 LINEINPUT.LEN                                       =CC;
+ 000110 LINEINPUT.SHOW                                      =CD;
+ 000117 LINEINPUT.K                                         =CE;
+ 000128 LINEINPUT.CODE                                      =CF;
+ 000164 LINEINPUT.LABELPAINT                                =CG;
+ 000164 LINEINPUT.LABELATTR                                 =CH;
+ 000166 LINEINPUT.SAVEX                                     =CI;
+ 000166 LINEINPUT.LABEL                                     =CJ;
+ 000196 LINEINPUT.ALLOW                                     =CK;
+ 000197 LINEINPUT.DENY                                      =CL;
+ 000225 LINEINPUT.MASK                                      =CM;
+ 000239 LINEINPUT.FILLED                                    =CN;
+ 000240 LINEINPUT.CP                                        =CO;
+ 000241 LINEINPUT.CX                                        =CP;
+ 000241 LINEINPUT.CELL                                      =CQ;
+ 000249 LINEINPUT.CA                                        =CR;
+
+FILE: GUI.INC.BL
+
+ 000175 GUI.CLR.K                                           =CS;
+ 000203 GUI.BTN.ONE                                         =CT;
+ 000204 GUI.BTN.TWO                                         =CU;
+ 000205 GUI.OKCANCEL                                        =CV;
+ 000210 GUI.BODY.ROWS                                       =CW;
+ 000211 GUI.BODY.WIDTH                                      =CX;
+ 000211 GUI.BTN.TOTAL                                       =CY;
+ 000214 GUI.BTN.Y                                           =CZ;
+ 000214 GUI.INNER.TOP                                       =D;
+ 000217 GUI.KEY                                             =D0;
+ 000217 GUI.FORM.KEY                                        =D1;
+ 000218 GUI.ANSWER                                          =D2;
+ 000222 GUI.FORM.HIT                                        =D3;
+ 000252 GUI.BTN.KEY                                         =D4;
+ 000253 GUI.BTN.AMP                                         =D5;
+ 000253 GUI.BTN.TEXT                                        =D6;
+ 000255 GUI.BTN.X                                           =D7;
+ 000255 GUI.BTN.ATTR                                        =D8;
+ 000259 GUI.BTN.HEAD                                        =D9;
+ 000260 GUI.BTN.MARK                                        =DB;
+ 000261 GUI.BTN.TAIL                                        =DC;
+ 000269 GUI.BTN.AT                                          =DD;
+ 000270 GUI.BTN.HI                                          =DE;
+ 000301 GUI.BTN.DEF                                         =DF;
+ 000302 GUI.BTN.RIGHT                                       =DG;
+ 000321 GUI.BTN.UC                                          =DH;
+ 000321 GUI.BTN.OF                                          =DI;
+ 000321 GUI.BTN.LC                                          =DJ;
+ 000341 GUI.BTN.W.ONE                                       =DK;
+ 000341 GUI.BTN.WIDE                                        =DL;
+ 000342 GUI.BTN.W.TWO                                       =DM;
+ 000374 GUI.BTN.FOCUSED                                     =DN;
+ 000376 GUI.INNER.LEFT                                      =DO;
+ 000376 GUI.INNER.WIDTH                                     =DP;
+ 000383 GUI.DEFAULT                                         =DQ;
+ 000388 GUI.BTN.KEY.ONE                                     =DR;
+ 000389 GUI.BTN.KEY.TWO                                     =DS;
+ 000390 GUI.ADD.W                                           =DT;
+ 000436 GUI.PANEL                                           =DU;
+ 000484 GUI.FORM.DIMMED                                     =DV;
+ 000485 GUI.CTRL.TYPE                                       =DW;
+ 000486 GUI.CTRL.X                                          =DX;
+ 000487 GUI.CTRL.Y                                          =DY;
+ 000488 GUI.CTRL.W                                          =DZ;
+ 000489 GUI.CTRL.KEY                                        =E;
+ 000490 GUI.CTRL.FLAGS                                      =E0;
+ 000491 GUI.CTRL.TEXT                                       =E1;
+ 000506 GUI.CTRL.N                                          =E2;
+ 000507 GUI.FOCUS                                           =E3;
+ 000532 GUI.PAINT.N                                         =E4;
+ 000574 GUI.LIST.DIGITS                                     =E5;
+ 000574 GUI.LIST.COUNT                                      =E6;
+ 000575 GUI.LIST.NOTE                                       =E7;
+ 000576 GUI.LIST.ROWS                                       =E8;
+ 000577 GUI.LIST.MARKP                                      =E9;
+ 000578 GUI.LIST.NOTEW                                      =EA;
+ 000610 GUI.LIST.X                                          =EB;
+ 000611 GUI.LIST.Y                                          =EC;
+ 000612 GUI.LIST.W                                          =ED;
+ 000629 GUI.LIST.SEL                                        =EE;
+ 000631 GUI.LIST.NOTE.LEFT                                  =EF;
+ 000631 GUI.LEFT                                            =EG;
+ 000631 GUI.WIDTH                                           =EH;
+ 000652 GUI.LIST.HI                                         =EI;
+ 000654 GUI.LIST.EACH                                       =EJ;
+ 000655 GUI.LIST.ROW                                        =EK;
+ 000656 GUI.LIST.ATTR                                       =EL;
+ 000685 GUI.LIST.MARKY                                      =EM;
+ 000712 GUI.LIST.MARKED                                     =EN;
+ 000714 GUI.LIST.I                                          =EO;
+ 000753 GUI.LIST.EDGE                                       =EP;
+ 000755 GUI.LIST.NUM                                        =EQ;
+ 000761 GUI.TOP                                             =ER;
+ 000761 GUI.HEIGHT                                          =ES;
+ 000761 GUI.BORDER                                          =ET;
+ 000826 GUI.FORM.DONE                                       =EU;
+ 000852 GUI.STEP.TYPE                                       =EV;
+ 000881 GUI.FORM.NAV                                        =EW;
+ 000919 GUI.LIST.WAS                                        =EX;
+ 000920 GUI.LIST.WAS.SCROLL                                 =EY;
+ 000996 GUI.PRESSED                                         =EZ;
+ 001012 GUI.SCAN                                            =F;
+ 001036 GUI.MOVE.BY                                         =F0;
+ 001068 GUI.MOVE.WAS                                        =F1;
+ 001069 GUI.MOVE.TRIES                                      =F2;
+ 001133 GUI.COUNT                                           =F3;
+ 001134 GUI.INDEX                                           =F4;
+ 001141 GUI.FLAGS                                           =F5;
+ 001141 GUI.SEL                                             =F6;
+ 001174 GUI.LEN                                             =F7;
+ 001179 GUI.WAS                                             =F8;
+ 001179 GUI.TEXT                                            =F9;
+ 001182 GUI.FIELD.LEFT                                      =FA;
+ 001186 GUI.MASK                                            =FB;
+ 001199 GUI.OK                                              =FC;
+ 001239 GUI.SH.W                                            =FD;
+ 001239 GUI.SH.H                                            =FE;
+ 001240 GUI.SHADOW                                          =FF;
+ 001245 GUI.STASHED                                         =FG;
+ 001245 GUI.BANK                                            =FH;
+ 001246 GUI.SAVE.W                                          =FI;
+ 001246 GUI.SAVE.H                                          =FJ;
+ 001253 GUI.BOX.STYLE                                       =FK;
+ 001253 GUI.STYLE                                           =FL;
+ 001257 GUI.PANEL.IN                                        =FM;
+ 001258 GUI.BORDER.IN                                       =FO;
+ 001261 GUI.GLYPH                                           =FP;
+ 001264 GUI.TITLE                                           =FQ;
+ 001264 GUI.TITLE.LEFT                                      =FR;
+ 001269 GUI.MSG                                             =FS;
+ 001270 GUI.MSG2                                            =FT;
+ 001271 GUI.MSG3                                            =FU;
+ 001272 GUI.HEAD.ROWS                                       =FV;
+ 001289 GUI.SCREEN.COLS                                     =FW;
+ 001293 GUI.SCREEN.ROWS                                     =FX;
+ 001310 GUI.SHADOW.ATTR                                     =FY;
+ 001316 GUI.SH.BW                                           =FZ;
+ 001337 GUI.RIGHT                                           =G;
+ 001337 GUI.BOTTOM                                          =G0;
+ 001350 GUI.CORNER.TR                                       =G1;
+ 001350 GUI.CORNER.TL                                       =G2;
+ 001350 GUI.CORNER.BR                                       =G3;
+ 001350 GUI.CORNER.BL                                       =G4;
+ 001351 GUI.EDGE.H                                          =G5;
+ 001351 GUI.EDGE.V                                          =G6;
+ 001377 GUI.GAP.ROWS                                        =G7;
+ 001389 GUI.PLACE                                           =G8;
+ 001389 GUI.X                                               =G9;
+ 001389 GUI.Y                                               =GA;
+ 001395 GUI.ROW.OFFSET                                      =GB;
+
+FILE: GPB.HELP.BASL
+
+ 000142 HELP.OK                                             =GC;
+ 000176 HELP.COLS                                           =GD;
+ 000176 HELP.ROWS                                           =GE;
+ 000180 HELP.VIEW                                           =GF;
+ 000204 HELP.ROW                                            =GG;
+ 000205 HELP.IXFREE                                         =GH;
+ 000206 HELP.PICK                                           =GI;
+ 000207 HELP.BACK.GO                                        =GJ;
+ 000208 HELP.BACK.AT                                        =GK;
+ 000209 HELP.FLD                                            =GL;
+ 000218 HELP.DIR                                            =GM;
+ 000220 HELP.FIND                                           =GN;
+ 000233 HELP.IX.N                                           =GP;
+ 000236 HELP.LINE                                           =GQ;
+ 000236 HELP.ST                                             =GR;
+ 000264 HELP.REST                                           =GS;
+ 000265 HELP.FI                                             =GT;
+ 000266 HELP.CUT                                            =GU;
+ 000280 HELP.TAG                                            =GV;
+ 000286 HELP.KIND                                           =GW;
+ 000289 HELP.T                                              =GX;
+ 000290 HELP.TL                                             =GY;
+ 000295 HELP.REC                                            =GZ;
+ 000296 HELP.LN2                                            =H;
+ 000297 HELP.HI                                             =H0;
+ 000307 HELP.SP                                             =H1;
+ 000309 HELP.I                                              =H2;
+ 000320 HELP.IXR                                            =H3;
+ 000321 HELP.IXOFF                                          =H4;
+ 000322 HELP.IXLEN                                          =H5;
+ 000323 HELP.IXTYPE                                         =H6;
+ 000324 HELP.IXTOPIC                                        =H7;
+ 000325 HELP.IXSEC                                          =H8;
+ 000326 HELP.IXLINES                                        =H9;
+ 000333 HELP.RP                                             =HA;
+ 000348 HELP.NUMV                                           =HB;
+ 000348 HELP.TOPICNUM                                       =HC;
+ 000349 HELP.NAME                                           =HD;
+ 000349 HELP.NUM                                            =HE;
+ 000358 HELP.IX.SEL                                         =HF;
+ 000363 HELP.IX.TOP                                         =HG;
+ 000364 HELP.FULL                                           =HH;
+ 000373 HELP.SEL.WAS                                        =HI;
+ 000373 HELP.TOP.WAS                                        =HJ;
+ 000374 HELP.DONE                                           =HK;
+ 000377 HELP.KEY                                            =HL;
+ 000413 HELP.IXD                                            =HM;
+ 000414 HELP.SHIFT                                          =HN;
+ 000424 HELP.ROWI                                           =HO;
+ 000435 HELP.TITLE                                          =HP;
+ 000446 HELP.ONLY                                           =HQ;
+ 000452 HELP.R                                              =HR;
+ 000462 HELP.Y                                              =HS;
+ 000464 HELP.ATTR                                           =HT;
+ 000474 HELP.HINT                                           =HU;
+ 000476 HELP.NOTE                                           =HV;
+ 000484 HELP.J                                              =HW;
+ 000503 HELP.TURNED                                         =HX;
+ 000538 HELP.GO                                             =HY;
+ 000539 HELP.BACK.N                                         =HZ;
+ 000548 HELP.PG.FROM                                        =I;
+ 000556 HELP.PG.MAX                                         =I0;
+ 000569 HELP.REDRAW                                         =I1;
+ 000575 HELP.PG.LINES                                       =I2;
+ 000578 HELP.FROM.WAS                                       =I3;
+ 000579 HELP.NAV                                            =I4;
+ 000618 HELP.DELTA                                          =I5;
+ 000639 HELP.HASCODE                                        =I6;
+ 000640 HELP.LINKN                                          =I7;
+ 000640 HELP.ATTOPIC                                        =I8;
+ 000641 HELP.PG.P                                           =I9;
+ 000642 HELP.RECP                                           =IA;
+ 000672 HELP.LP                                             =IB;
+ 000673 HELP.LL                                             =IC;
+ 000675 HELP.MARKC                                          =ID;
+ 000685 HELP.BODY                                           =IE;
+ 000687 HELP.W                                              =IG;
+ 000726 HELP.AS.SRC                                         =IH;
+ 000727 HELP.AS.DST                                         =II;
+ 000728 HELP.AS.LEN                                         =IJ;
+ 000729 HELP.AS.BANK                                        =IK;
+ 000730 HELP.AS.REC                                         =IL;
+ 000731 HELP.AS.OFF                                         =IM;
+ 000732 HELP.AS.KIND                                        =IN;
+ 000824 HELP.LN                                             =IO;
+ 000844 HELP.SC.MAPW                                        =IP;
+ 000845 HELP.SC.STRIDE                                      =IQ;
+ 000846 HELP.SC.BASE                                        =IR;
+ 000847 HELP.SC.N                                           =IS;
+ 000849 HELP.SC.SRC                                         =IT;
+ 000850 HELP.SC.DST                                         =IU;
+ 000851 HELP.SC.STEP                                        =IV;
+ 000860 HELP.SC.ADDR                                        =IW;
+ 000864 HELP.SC.HI                                          =IX;
+ 000878 HELP.SC.LO                                          =IY;
+ 000878 HELP.SC.MID                                         =IZ;
+ 000879 HELP.SC.BANK                                        =J;
+ 000894 HELP.SC.REST                                        =J0;
+ 000905 HELP.TREF                                           =J1;
+ 000926 HELP.A                                              =J2;
+ 000930 HELP.INDENT                                         =J3;
+ 000944 HELP.WMAX                                           =J4;
+ 001020 HELP.OUTNAME                                        =J5;
+ 001027 HELP.CNT                                            =J6;
+ 001046 HELP.MSG.ONE                                        =J7;
+ 001047 HELP.MSG.TWO                                        =J8;
+ 001089 HELP.TRIES                                          =J9;
+ 001098 HELP.HAY                                            =JA;
+ 001123 GUI.HINT                                            =JB;
+ 001159 HELP.BAR.TOP                                        =JC;
+ 001160 HELP.BAR.BOT                                        =JD;
+ 001181 HELP.X                                              =JE;
+ 001188 HELP.NX                                             =JF;
+ 001206 HELP.IN                                             =JG;

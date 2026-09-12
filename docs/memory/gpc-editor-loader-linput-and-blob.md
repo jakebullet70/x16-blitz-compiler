@@ -11,7 +11,7 @@ then running on to the delimiter so the next read still starts at a line boundar
 reads a fixed count. Both check ST *before* each read, so the byte that sets ST is kept.
 
 **Reading a 2,432-byte file line by line instead of byte by byte: 365 -> 35 jiffies, 10.5x**
-(`samples/editor/LOADBEN.BASL` times the old loader against the new one in ONE program, so no
+(`samples/editor/bench/LOADBEN.BASL` times the old loader against the new one in ONE program, so no
 two-build comparison is involved). Most of the rest went with a `GP.ASM` block that copies the
 string into the bank window and does the PETSCII->ASCII swap in the SAME pass.
 

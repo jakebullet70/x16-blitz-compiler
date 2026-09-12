@@ -182,8 +182,8 @@ can never leave the vendored tree dirty.
 
 | file | what changed |
 |---|---|
-| `line.inc` | `line_meta` points at a 260-byte staging buffer for the whole run; `eol_mark` streams the finished line, and `out_addr` carries the address it *would* have had; the five `out_*` routines that own the output file; `gpc_emit`; the BASIC RAM ceiling test and `mem_top` are gone |
-| `loader.inc` | opens the file before pass 2, closes it at exit; the `SAVE` at the end is gone, and with it the `VARTAB`/`ARYTAB`/`STREND` stores |
+| `line.inc` | `line_meta` points at a 260-byte staging buffer for the whole run; `eol_mark` streams the finished line, and `out_addr` carries the address it *would* have had; the six `out_*` routines that own the output file; `gpc_emit`; the BASIC RAM ceiling test and `mem_top` are gone |
+| `loader.inc` | opens the file before pass 2, closes it at exit and deletes it if the run failed; the `SAVE` at the end is gone, and with it the `VARTAB`/`ARYTAB`/`STREND` stores |
 | `option.inc` | one directive, `#GPC` — see below |
 | `response.inc` | one word: message 15 was `SYMFILE IO ERR`, so a stock BASLOAD reports the wrong error for a `#SAVEAS` with no argument |
 
@@ -196,6 +196,18 @@ needs no compiler change at all.
 listable when the `SAVE` failed; today a file that will not open costs the whole run. `out_open`
 reports a missing `#SAVEAS` name, a KERNAL error, and a drive that refuses; `out_close` asks the
 drive how it went, because a disk that fills mid-stream says nothing until it is asked.
+
+**A failed run deletes its own output.** Streaming gave the fork one failure the ROM never had: a
+run that died partway through pass 2 still wrote the end-of-program link and closed the file, so
+what stayed on disk was a structurally perfect BASIC program that stopped where the error did.
+Nothing downstream could tell it from a whole one, and on 11th Sep 2026 the compiler was handed
+one and died on the first forward reference past the cut. `out_scratch` sends `S:` plus the bare
+name — the `@:` overwrite prefix comes off, because `@` is not valid in that command — and
+`loader_run` calls it at `exit:` whenever `KERNAL_R1` is non-zero, which is exactly when something
+called `response_set`. Two things it deliberately does not do: it never runs unless `out_created`
+says *this* run created the file, so a `FILE EXISTS` failure cannot destroy a previous good build;
+and it never reads the drive status afterwards, because that would replace `LABEL NOT FOUND IN
+DB.INC.BL:459` with a generic file error and lose the only useful thing the run produced.
 
 ## `#GPC` — a directive channel BASLOAD never has to understand
 
