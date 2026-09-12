@@ -93,11 +93,12 @@
 ## **  A caller that never presses TAB sees what it saw before.
 ## **
 ## **  GUI.LISTBOX.* is GUI2.INC.BL, its own #INCLUDE.
-## **  THIS IS THE LOW MEMORY FORM. Every entry point is a plain name, so a
-## **  caller reaches it with one GOSUB and nothing sits in between. Use it
-## **  when the module runs in low memory, which is the ordinary case.
+## **  THIS IS THE BANKED FORM. Every entry point carries a .BODY suffix,
+## **  because a banked routine cannot select its own bank: the public name
+## **  has to be a shim in low memory, and SHIM.GUIBANK.INC.BL holds it.
+## **  Put this file inside the GP.BANKED region, with that shim above it.
 ## **
-## **  The banked twin is GUI.BANK.INC.BL. Include one or the other,
+## **  The low memory twin is GUI.INC.BL. Include one or the other,
 ## **  never both. GPC-BASIC/BANKED-OR-NOT.md says how to choose.
 ## **
 ## ***********************************************************************
@@ -207,21 +208,21 @@ GUI.CLEARKB:
 ## **  cancelling is not a default. A destructive question wants GUI.DEFAULT = 2.
 ## ***********************************************************************
 
-GUI.YN:
+GUI.YN.BODY:
     GUI.BTN.ONE$ = "&YES"
     GUI.BTN.TWO$ = "&NO"
     GP.IF GUI.OKCANCEL <> 0 THEN
         GUI.BTN.ONE$ = "&OK"
         GUI.BTN.TWO$ = "&CANCEL"
     GP.ENDIF
-    GOSUB GUI.BUTTON.SIZE
+    GOSUB GUI.BUTTON.SIZE.BODY
     GUI.BODY.ROWS = 1
     GUI.BODY.WIDTH = GUI.BTN.TOTAL
     GOSUB GUI.OPEN
-    GOSUB GUI.FORM.BEGIN
+    GOSUB GUI.FORM.BEGIN.BODY
     GUI.BTN.Y = GUI.INNER.TOP
-    GOSUB GUI.BUTTON.ROW
-    GOSUB GUI.FORM.RUN
+    GOSUB GUI.BUTTON.ROW.BODY
+    GOSUB GUI.FORM.RUN.BODY
     GUI.KEY = GUI.FORM.KEY
     GUI.ANSWER = 0
 
@@ -344,7 +345,7 @@ GUI.BTN.PAIR:
 ## **  part of the body.
 ## ***********************************************************************
 
-GUI.BUTTON.SIZE:
+GUI.BUTTON.SIZE.BODY:
     GUI.BTN.TEXT$ = GUI.BTN.ONE$ : GOSUB GUI.BUTTON.WIDE
     GUI.BTN.W.ONE = GUI.BTN.WIDE
     GUI.BTN.W.TWO = 0
@@ -378,7 +379,7 @@ GUI.BUTTON.WIDE:
 ## **  cannot be the thing that clears what came before it.
 ## ***********************************************************************
 
-GUI.BUTTON.ROW:
+GUI.BUTTON.ROW.BODY:
     GUI.BTN.FOCUSED = 0
     GOSUB GUI.BTN.COLOURS
     GUI.BTN.X = GUI.INNER.LEFT + INT((GUI.INNER.WIDTH - GUI.BTN.TOTAL) / 2)
@@ -525,7 +526,7 @@ GUI.FORM.INIT:
 ## **  the count is not read, so clearing seven arrays would buy nothing.
 ## ***********************************************************************
 
-GUI.FORM.BEGIN:
+GUI.FORM.BEGIN.BODY:
     GOSUB GUI.FORM.INIT
     GUI.CTRL.N = 0
     GUI.FORM.DEFN = 0
@@ -870,7 +871,7 @@ GUI.FORM.PAINT:
 ## **  A whole-box redraw under an open dialog flickers.
 ## ***********************************************************************
 
-GUI.FORM.RUN:
+GUI.FORM.RUN.BODY:
     GOSUB GUI.FORM.INIT
     GUI.FORM.HIT = 0
     GUI.FORM.DONE = 0
@@ -1160,17 +1161,17 @@ GUI.FORM.MOVE.DONE:
 ## **  after a GUI.YN that set one inherits it. Set it, or clear it, every call.
 ## ***********************************************************************
 
-GUI.SAY:
+GUI.SAY.BODY:
     IF GUI.BTN.ONE$ = "" THEN GUI.BTN.ONE$ = "&OK"
     GUI.BTN.TWO$ = ""
-    GOSUB GUI.BUTTON.SIZE
+    GOSUB GUI.BUTTON.SIZE.BODY
     GUI.BODY.ROWS = 1
     GUI.BODY.WIDTH = GUI.BTN.TOTAL
     GOSUB GUI.OPEN
-    GOSUB GUI.FORM.BEGIN
+    GOSUB GUI.FORM.BEGIN.BODY
     GUI.BTN.Y = GUI.INNER.TOP
-    GOSUB GUI.BUTTON.ROW
-    GOSUB GUI.FORM.RUN
+    GOSUB GUI.BUTTON.ROW.BODY
+    GOSUB GUI.FORM.RUN.BODY
     GUI.KEY = GUI.FORM.KEY
     GOSUB GUI.CLOSE
     RETURN
@@ -1191,7 +1192,7 @@ GUI.SAY:
 ## **  highlight, so a leading space in the item is what insets the bar.
 ## ***********************************************************************
 
-GUI.MENU:
+GUI.MENU.BODY:
     GUI.BODY.ROWS = GUI.COUNT : GUI.BODY.WIDTH = 0
     FOR GUI.INDEX = 1 TO GUI.COUNT
         IF LEN(MENUVERT.ITEM$(GUI.INDEX)) > GUI.BODY.WIDTH THEN GUI.BODY.WIDTH = LEN(MENUVERT.ITEM$(GUI.INDEX))
@@ -1235,10 +1236,10 @@ GUI.MENU:
 ## **  is accepted: marking it only sometimes teaches the mark as a focus cue.
 ## ***********************************************************************
 
-GUI.INPUT:
+GUI.INPUT.BODY:
     IF GUI.LEN = 0 THEN GUI.LEN = 20
     GUI.BTN.ONE$ = "&OK" : GUI.BTN.TWO$ = "&CANCEL" : GUI.DEFAULT = 1
-    GOSUB GUI.BUTTON.SIZE
+    GOSUB GUI.BUTTON.SIZE.BODY
     GUI.BODY.ROWS = 3 : GUI.BODY.WIDTH = GUI.LEN
     IF GUI.BTN.TOTAL > GUI.BODY.WIDTH THEN GUI.BODY.WIDTH = GUI.BTN.TOTAL
     GUI.WAS$ = GUI.TEXT$ : GOSUB GUI.OPEN
@@ -1254,12 +1255,12 @@ GUI.INPUT:
 ## ---- first and the row appends to it. Focus starts on the field, which is
 ## ---- not where the default button is -- that is the whole point of the two
 ## ---- being separate.
-    GOSUB GUI.FORM.BEGIN
+    GOSUB GUI.FORM.BEGIN.BODY
     GOSUB GUI.FORM.ADD.FIELD
     GUI.BTN.Y = GUI.INNER.TOP + 2
-    GOSUB GUI.BUTTON.ROW
+    GOSUB GUI.BUTTON.ROW.BODY
     GUI.FOCUS = 1
-    GOSUB GUI.FORM.RUN
+    GOSUB GUI.FORM.RUN.BODY
 
     GUI.TEXT$ = LINEINPUT.TEXT$ : GUI.KEY = GUI.FORM.KEY : GUI.OK = 0
 
@@ -1289,7 +1290,7 @@ GUI.INPUT:
 ## **  Public: build a fourth kind of dialog on this, not on a copy of it.
 ## ***********************************************************************
 
-GUI.OPEN:
+GUI.OPEN.BODY:
     GOSUB GUI.SIZE : GOSUB GUI.PLACE.BOX
 
 ## ---- How far the shadow actually reaches, worked out BEFORE the save. It is
@@ -1420,7 +1421,7 @@ GUI.GLYPHS:  GUI.GLYPH$ = CHR$(GUI.CORNER.TR) + CHR$(GUI.CORNER.TL) + CHR$(GUI.C
 ## **  GUI.CLOSE -- give the pixels back, if we took a copy.
 ## ***********************************************************************
 
-GUI.CLOSE:  IF GUI.STASHED = 0 THEN RETURN
+GUI.CLOSE.BODY:  IF GUI.STASHED = 0 THEN RETURN
     STASH.BANK = GUI.BANK : STASH.MOVE = 0 : GOSUB STASH.RESTORE
     RETURN
 

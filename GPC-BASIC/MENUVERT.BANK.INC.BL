@@ -75,11 +75,12 @@
 ## **  more. Leave MENUVERT.ITEM$ undimensioned and GPC's implicit DIM gives 0..10 -- a
 ## **  ten row menu free. DIM it for more. What you must NOT do is both.
 ## **
-## **  THIS IS THE LOW MEMORY FORM. Every entry point is a plain name, so a
-## **  caller reaches it with one GOSUB and nothing sits in between. Use it
-## **  when the module runs in low memory, which is the ordinary case.
+## **  THIS IS THE BANKED FORM. Every entry point carries a .BODY suffix,
+## **  because a banked routine cannot select its own bank: the public name
+## **  has to be a shim in low memory, and SHIM.GUIBANK.INC.BL holds it.
+## **  Put this file inside the GP.BANKED region, with that shim above it.
 ## **
-## **  The banked twin is MENUVERT.BANK.INC.BL. Include one or the other,
+## **  The low memory twin is MENUVERT.INC.BL. Include one or the other,
 ## **  never both. GPC-BASIC/BANKED-OR-NOT.md says how to choose.
 ## **
 ## ***********************************************************************
@@ -140,7 +141,7 @@ GOTO MENUVERT.MODULE.END
 ## **  MENUVERT.RUN -- the whole thing.
 ## ***********************************************************************
 
-MENUVERT.RUN:  MENUVERT.KEY = 0
+MENUVERT.RUN.BODY:  MENUVERT.KEY = 0
     IF MENUVERT.COUNT < 1 THEN MENUVERT.SEL = 0 : RETURN
 
 ## ---- 0 for the highlight means "invert the normal attribute".
@@ -320,7 +321,7 @@ MENUVERT.PADREAD:  MENUVERT.PADNOW = 0 : MENUVERT.PADRAW = JOY(MENUVERT.PORT) : 
 ## **  underneath. ROWS ONLY, never a frame, so calling it again cannot damage a border.
 ## ***********************************************************************
 
-MENUVERT.DRAW:
+MENUVERT.DRAW.BODY:
     FOR MENUVERT.EACH = 1 TO MENUVERT.COUNT
         MENUVERT.DRAWROW = MENUVERT.EACH : MENUVERT.DRAWATTR = MENUVERT.ATTR
         GOSUB MENUVERT.ROW
@@ -341,7 +342,7 @@ MENUVERT.DRAW:
 ## **  cells, which is the next line of the screen.
 ## ***********************************************************************
 
-MENUVERT.ROW:  MENUVERT.DRAWY = MENUVERT.Y + MENUVERT.DRAWROW - 1 : MENUVERT.DRAWITEM = MENUVERT.SCROLL + MENUVERT.DRAWROW
+MENUVERT.ROW.BODY:  MENUVERT.DRAWY = MENUVERT.Y + MENUVERT.DRAWROW - 1 : MENUVERT.DRAWITEM = MENUVERT.SCROLL + MENUVERT.DRAWROW
     GP.FILL MENUVERT.X, MENUVERT.DRAWY, MENUVERT.WIDTH, 1, MENUVERT.SPACE, MENUVERT.DRAWATTR
     MENUVERT.DRAWTEXT$ = MENUVERT.ITEM$(MENUVERT.DRAWITEM) : IF MENUVERT.DRAWTEXT$ = "" THEN RETURN
     IF MENUVERT.DRAWTEXT$ = "-" THEN GOTO MENUVERT.SEPLINE

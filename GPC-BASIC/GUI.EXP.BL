@@ -16,16 +16,10 @@
 ## after them BASLOAD stops with SYMFILE NOT ALLOWED.
 #SYMFILE "@:GUI.SYM"
 #INCLUDE "GPB.INC.BL"
-## THE LIBRARY'S PUBLIC NAMES. A module defines GUI.SAY.BODY, never GUI.SAY:
-## a banked routine cannot select its own bank, so the entry point has to be a
-## label in low memory. These files are that entry point for a program that
-## does not bank. A banked one takes the same names from LIB.GUIBANK.INC.BL
-## instead -- one or the other, never both.
-#INCLUDE "THEME.PLAIN.INC.BL"
-#INCLUDE "MENUVERT.PLAIN.INC.BL"
-#INCLUDE "LINEINPUT.PLAIN.INC.BL"
-#INCLUDE "GUI.PLAIN.INC.BL"
-#INCLUDE "GUI2.PLAIN.INC.BL"
+## THE LOW MEMORY FORM OF THE LIBRARY. Every module below has a banked twin
+## named XXX.BANK.INC.BL, whose entry points are .BODY labels reached through
+## the shims in SHIM.GUIBANK.INC.BL. One form or the other, never both --
+## BANKED-OR-NOT.md says how to choose.
 #INCLUDE "THEME.INC.BL"
 ## STASH is not optional even though nothing here names it: GUI.OPEN calls
 ## STASH.SAVE, and BASLOAD resolves every label in the build, not the ones a
@@ -36,6 +30,7 @@
 #INCLUDE "LINEINPUT.INC.BL"
 #INCLUDE "GUI.INC.BL"
 #INCLUDE "GUI2.INC.BL"
+#INCLUDE "COMBO.INC.BL"
 
 ## A spare RAM bank for the saved cells. Bank 0 belongs to the KERNAL --
 ## the keyboard layout lives there -- so a program picks anything above it.
