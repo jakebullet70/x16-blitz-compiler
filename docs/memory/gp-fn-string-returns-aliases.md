@@ -1,39 +1,31 @@
 ---
 name: gp-fn-string-returns-aliases
-description: OPEN BUG -- two GP.FN calls on the same string-returning verb, adjacent in one expression, both give the second answer
+description: FIXED 2026-09-13 -- two GP.FN calls on one string verb in one expression gave the second answer twice; a string GP.FN now concats "" into a temporary
 metadata:
   type: project
 ---
 
-**OPEN BUG, found and confirmed 08/09/26. To fix.** Two `GP.FN` calls on the **same** verb, with
-nothing between them in one expression, both read that verb's single `RETURNS` variable, so both
-terms come out as the second call's answer. Silently, with both passes agreeing.
+**FIXED 2026-09-13, in the compiler only.** `GPFNCompile`
+(`source/compiler/source/commands/gpdefproc.asm`) ends with a `GetSetVariable` read of the
+`RETURNS` variable. A string term is a reference to that variable, so
+`GP.FN(V,A$) + GP.FN(V,B$)` left two references to one variable and printed the second answer
+twice. When the `RETURNS` type is a string, the compiler now emits `PCD_CMD_STRING`, `0`,
+`PCD_CONCAT` after the read: concatenating `""` copies the value into a temporary. `.fnsave`
+moves the temporary base below the caller's live temporaries, so the copy survives the next call.
 
-```basl
-D$ = "one"
-E$ = "two"
-PRINT GP.FN(STR.UCASE, D$) + GP.FN(STR.UCASE, E$)
-```
+**Cost:** 3 bytes of p-code per string `GP.FN` call site, 0 on numeric verbs, 0 runtime bytes.
+`GPC.BIN` 28,911 to 28,932 B.
 
-prints `TWOTWO` where `ONETWO` is intended. Recorded as line `D1` in `testing/SCASE.BASL`.
+**Verified:** `work/gpfnalias/FNALIAS.BASL` compiled with the old and new `GPC.BIN`. The old
+compiler printed `D1 TWO!TWO!` and `D2 -1`, the new one `D1 ONE!TWO!` and `D2 0`. The nested,
+assignment, numeric and `+ "-" +` cases printed the same with both. Object 519 to 546 B, nine call
+sites. `gpctest.py quick` PASS in 113 s: no program in the set changed, because GPBMODS's only
+`GP.FN` is the numeric `FILE.SIZE`.
 
-**Why:** a string term is a REFERENCE, not a value. `ReadStringCommand`
-(`source/runtime/source/memory/read_string.asm`) pushes the block ADDRESS into `NSMantissa0/1,x`,
-and `GPFNCompile` (`source/compiler/source/commands/gpdefproc.asm:556-566`) ends with a plain
-`GetSetVariable` read of the `RETURNS` variable. Two calls therefore leave two references to one
-variable, and the second call overwrites what the first one pointed at.
-
-**Numeric verbs are safe** -- the value itself goes on the evaluation stack.
-
-**These escape it:**
-
-- `GP.FN(V,A$) + "-" + GP.FN(V,B$)` -- `+` is left-associative, so the first concat concretes A
-  into a string temporary before the second call runs. An accident, not a rule to hold.
-- Two DIFFERENT verbs in one expression -- they have different `RETURNS` variables.
-
-**Two ways out.** Document it in `GP-BASIC.md` §3.11 beside the recursion rule; or fix it at the
-call site -- after `.fnrestore`, when `procRetType` is a string, emit whatever concretes it into a
-temporary. The fix costs p-code on every string `GP.FN` call and nothing on numeric ones, and
-resident p-code is the side that is short of room.
+**Docs updated the same day:** the `GP-BASIC.md` section 8 entry is gone (four known bugs became
+three), the one-call-per-expression WARNING is out of both `STRCASE` headers, and the `TODO.md`
+bug entry and ranked item 0 read FIXED. The generated `GPC-HELP.md` copies still carry the old
+entry until the help is regenerated. `fntest.py` cannot run: its `DEFFN*` sources are gone from
+`testing/`.
 
 Related: [[gp-defproc-one-line-calls]], [[gpc-string-blocks-never-shrink]].

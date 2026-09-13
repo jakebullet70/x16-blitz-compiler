@@ -2435,37 +2435,8 @@ workspace, and inside a region it costs no p-code at all.
 
 ## 8. Known bugs
 
-Four, all live on 12th September 2026 and all reproducible. Each says what happens, what causes
+Three, all live on 12th September 2026 and all reproducible. Each says what happens, what causes
 it, and what to do instead. A bug leaves this list when it is fixed, not when it is understood.
-
-### GP.FN string aliasing
-
-Two `GP.FN` calls on the **same** string-returning verb, with nothing between them in one
-expression, both give the second call's answer.
-
-```basl
-D$ = "one"
-E$ = "two"
-PRINT GP.FN(STR.UCASE, D$) + GP.FN(STR.UCASE, E$)
-```
-
-prints `TWOTWO`, not `ONETWO`. No error, and both compiler passes agree.
-
-A string term is a reference, not a value. The call pushes the block address of the verb's single
-`RETURNS` variable, so two calls leave two references to one variable and the second overwrites
-what the first pointed at. **Numeric verbs are safe** — the value itself goes on the stack.
-
-Two things escape it by accident. A term between the two calls concretes the first into a
-temporary, so `GP.FN(V,A$) + "-" + GP.FN(V,B$)` is right; and two different verbs have two
-different `RETURNS` variables. Neither is a rule to build on.
-
-**Do this** — give each call its own variable first.
-
-```basl
-A$ = GP.FN(STR.UCASE, D$)
-B$ = GP.FN(STR.UCASE, E$)
-PRINT A$ + B$
-```
 
 ### A string never gives memory back
 

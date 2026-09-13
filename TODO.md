@@ -278,39 +278,23 @@ Two decisions to take at the keyboard:
 
 ## Bugs
 
-### `GP.FN` on a string-returning verb aliases — OPEN, found 2026-09-08
+### `GP.FN` on a string-returning verb aliases — FIXED 2026-09-13, found 2026-09-08
 
-**The only open bug on this list.** Two `GP.FN` calls on the **same** verb, with nothing between them
-in one expression, both read that verb's single `RETURNS` variable, so both terms come out as the
-second call's answer. Silently, with both compiler passes agreeing.
+Two `GP.FN` calls on the **same** verb, with nothing between them in one expression, both read that
+verb's single `RETURNS` variable, so both terms came out as the second call's answer:
+`PRINT GP.FN(STR.UCASE, D$) + GP.FN(STR.UCASE, E$)` printed `TWOTWO`. A string term is a reference,
+and two calls left two references to one variable.
 
-```basl
-D$ = "one"
-E$ = "two"
-PRINT GP.FN(STR.UCASE, D$) + GP.FN(STR.UCASE, E$)
-```
+**Fix, at the call site.** `GPFNCompile` (`source/compiler/source/commands/gpdefproc.asm`) follows the
+`RETURNS` read of a string verb with `""` and a concatenation, which copies the value into a temporary;
+`.fnsave` keeps that temporary clear of the next call. 3 bytes of p-code on each string `GP.FN`, none on
+a numeric one, no runtime change. `GPC.BIN` grew 21 bytes.
 
-prints `TWOTWO` where `ONETWO` is intended. The case is line `D1` in `testing/SCASE.BASL`.
-
-**Why.** A string term is a REFERENCE, not a value. `ReadStringCommand`
-(`source/runtime/source/memory/read_string.asm`) pushes the block ADDRESS into `NSMantissa0/1,x`, and
-`GPFNCompile` (`source/compiler/source/commands/gpdefproc.asm:556-566`) ends with a plain
-`GetSetVariable` read of the `RETURNS` variable. Two calls therefore leave two references to one
-variable, and the second overwrites what the first pointed at.
-
-**Numeric verbs are safe** — the value itself goes on the evaluation stack, and that is why
-`FILE.SIZE` (added 2026-09-09, `RETURNS FILE.BLOCKS`) is not exposed to this.
-
-**Two shapes escape it, neither of them a rule to rely on.** `GP.FN(V,A$) + "-" + GP.FN(V,B$)` works
-because `+` is left-associative and the first concatenation concretes A into a temporary before the
-second call runs. Two DIFFERENT verbs in one expression work because they have different `RETURNS`
-variables.
-
-**Fix, at the call site:** after `.fnrestore`, when `procRetType` is a string, emit whatever concretes
-the reference into a temporary. It costs p-code on every string `GP.FN` and nothing on numeric ones —
-and resident p-code is the side that is short of room, which is the one argument for documenting it in
-`GP-BASIC.md` §3.11 beside the recursion rule instead. **Fix it.** A wrong answer with no diagnostic is
-the worst failure mode there is, and the verb mechanism is being built on.
+**Verified** with a test program compiled by the old and the new `GPC.BIN`. The old printed `TWO!TWO!`
+for two calls on one verb and `-1` for `GP.FN(TAG,"A") = GP.FN(TAG,"B")`; the new prints `ONE!TWO!` and
+`0`. Nested calls, assignment, a numeric verb and `+ "-" +` are unchanged. The `gpctest.py` quick tier
+passes with every object identical, since GPBMODS has no string `GP.FN`. See
+`docs/memory/gp-fn-string-returns-aliases.md`.
 
 ### A RETIRED KEYWORD COMPILES CLEAN AND EXPLODES AT RUN TIME — FIXED 2026-09-03
 
@@ -846,12 +830,13 @@ green.
 
 ## Compiler work — what is next, ranked
 
-Written 2026-09-09. **An index, not a second copy** — each item points at the section or memory note
-that holds the detail, so this list cannot drift away from the work it names. One defect and four
-open features, item 5 being done; everything else under `## Bugs` is fixed.
+Written 2026-09-09, updated 2026-09-13. **An index, not a second copy** — each item points at the
+section or memory note that holds the detail, so this list cannot drift away from the work it names.
+Three open features; items 0, 3 and 5 are done. Three unranked report items follow item 5.
+Everything under `## Bugs` is fixed.
 
-**0. Fix the `GP.FN` string aliasing.** See `## Bugs` above. Small, known, and the only thing here
-that produces a wrong answer rather than a large program. Do it first.
+**0. Fix the `GP.FN` string aliasing — DONE 2026-09-13.** See `## Bugs` above. 3 bytes of p-code on
+each string `GP.FN` call; verified in the emulator and by the quick tier.
 
 **1. Banked `GP.ASM`.** Costed 2026-09-08 and waiting on a decision, not on analysis. About **58 bytes**
 of new runtime — roughly 55 for a bank-aware SYS handler, 2 for a `vectors.asm` entry, 1 for
@@ -874,10 +859,10 @@ uses, so it has everything it needs to emit only the handlers referenced — see
 `## Shrinking the runtime` below, which has the measurements, the `.def`-file mechanism and the
 open question of an explicit switch versus inference.
 
-**3. Dead-code elimination, as a compiler option.** Measured: **1,212 resident
-bytes** are never called in GPBMODS, and **691 of them come free by deleting two `#INCLUDE` lines** —
-no compiler change at all. Only the remaining ~521 would need one. See
-`docs/memory/basl-dead-code-elimination-measured.md`. Worth doing the free half before building anything.
+**3. Dead-code elimination, as a compiler option — DONE, built in V1.1.** `GPC.INPUT` line 5 names
+the removed-line file; the banner then prints `DEAD CODE: N LINES REMOVED, B BYTES SAVED` on a line
+of its own. Tests DC1–DC12 run in both tiers of `source/unit-tests/gpctest.py`. The GPBMODS
+measurement: `docs/memory/basl-dead-code-elimination-measured.md`.
 How Prog8 does it, and where the pass can live in GPC: `docs/blitz/DEAD-CODE-ELIMINATION.RESEARCH.md`.
 The handoff plan for the generic compiler option, rules and keep markers included:
 `docs/blitz/DEAD-CODE-ELIMINATION.PLAN.md`.
@@ -929,6 +914,19 @@ thing the old single-pass engine gave, which is what made a stall visible. It al
 `compile_shared.py` something to watch other than the object file, whose growth was already retired as
 a stop condition because pass two writes in bursts. Cheap, and it turns every future stall into a
 number instead of a guess.
+
+**Unranked — the report items, all under `## Wanted`:**
+
+- **End-of-compile report: lines compiled, banks used per bank.** BEFORE RELEASE.
+  `### The end-of-compile report wants more than three numbers`.
+- **Show removed lines as source file and line.** Not started. The bullet under the same heading.
+  Method, self-check and prototype: section 5 of `source/application/COMPILER-HANDOFF.md`.
+- **`BASLOAD-GPC` end-of-run report in the same shape.** BEFORE RELEASE, after the compiler's report
+  is settled. `### BASLOAD-GPC wants the same report`.
+
+**Done 2026-09-13, outside the ranking:** compiler tests in two tiers
+(`docs/blitz/COMPILER-TESTS.PLAN.md`); `GP.ASM` `{VAR}` lookup reads the symbol file once a compile,
+GPBMODS 317 s to 19.8 s (`docs/memory/gpasm-var-lookup-rescans-symfile.md`).
 
 
 ## Performance
@@ -2914,6 +2912,16 @@ Wanted, at minimum:
 
   Still only when `GPC.INPUT` line 5 turned the option on. The numbers are `dcListCount` and pass
   zero's length less pass one's, as now.
+- **Show which lines were removed, as source file and line — host tool, not started.** The D file
+  holds tokenised line numbers only, and a big `.SRC.PRG` cannot be LISTed. No de-tokenised file
+  and no asm are needed: every label in the `.SRC.SYM` has its source file, source line and BASIC
+  line, so a script can take the nearest label above a D number and count forward through the
+  `.BASL` or `.INC.BL`. That gives the original text, long names kept. A prototype
+  (`dclines.py`) was tried on GPB.HELP: 176 of 185 label pairs agreed, and the 9 exceptions were
+  labels on the last line of an include, which the self-test counts wrongly. Plan: add it to the
+  repo, run it from `build_basl.py` / `compile_shared.py` after a dead-code build, and group the
+  output by routine (`LINEINPUT.ASK  LINEINPUT.INC.BL 164-169  6 lines`). A stale `.SYM` shifts the
+  lines; the self-test catches that. Prog8 has no such util.
 
 `FREE` already excludes the 4K frame stack gap, which is correct and should stay — but the report
 should say so, because a number that is deliberately 4,096 short of the arithmetic looks like a bug

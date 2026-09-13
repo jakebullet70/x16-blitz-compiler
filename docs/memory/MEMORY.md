@@ -48,7 +48,7 @@ sibling project: what is kept is a fact about **X16 BASIC or the X16 itself**, n
 
 ## GP.BASIC — the GP block and inline assembly
 - [GP.DEFPROC one-line calls](gp-defproc-one-line-calls.md) — BUILT; formals are shared, so a body must not call its own verb
-- [GP.FN string RETURNS aliases](gp-fn-string-returns-aliases.md) — OPEN BUG: two calls on one verb in an expression both give the second answer
+- [GP.FN string RETURNS aliased, FIXED](gp-fn-string-returns-aliases.md) — FIXED 2026-09-13: a string GP.FN concats "" into a temporary, 3 B a call site
 - [Block GP.IF design](gpb-block-if-design.md) — SHIPPED at 14 runtime bytes
 - [Block openers must not defer](gpb-block-openers-must-not-defer.md) — .error_syntax silently corrupts enclosing nesting
 - [GOTO out of a GP block](gpb-goto-out-of-block-design.md) — BUILT: .unwind opcode, zero runtime bytes

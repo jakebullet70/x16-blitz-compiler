@@ -562,6 +562,22 @@ _GPFReadDone:
 		jsr 	GetSetVariable
 		lda 	procRetType
 		and 	#NSSTypeMask
+		cmp 	#NSSString
+		bne 	_GPFExit
+		;
+		;		A STRING TERM IS A REFERENCE TO THE RETURNS VARIABLE, so a second call on the same
+		;		verb in one expression would overwrite the first term's value. Concatenating ""
+		;		copies it into a temporary, which .fnsave keeps clear of the next call.
+		;		3 bytes of p-code on a string GP.FN, none on a numeric one.
+		;
+		lda 	#PCD_CMD_STRING
+		jsr 	WriteCodeByte
+		lda 	#0
+		jsr 	WriteCodeByte
+		lda 	#PCD_CONCAT
+		jsr 	WriteCodeByte
+		lda 	#NSSString
+_GPFExit:
 		sec
 		rts
 

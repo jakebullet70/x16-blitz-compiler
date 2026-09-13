@@ -35,11 +35,6 @@
 ## **  into the formal on the way in and the copy is what gets rewritten -- where it
 ## **  is not safe in STRCASE.APPLY, which is handed an address.
 ## **
-## **  WARNING: one call to the SAME verb per expression. A string result is passed
-## **  by address, so GP.FN(STR.UCASE,A$) + GP.FN(STR.UCASE,B$) reads one variable
-## **  twice and gives the second answer both times. Two DIFFERENT verbs are fine, so
-## **  UCASE and LCASE may be mixed in one expression.
-## **
 ## **  The verbs need GPB.INC.BL, and a program that has no GP block does not want
 ## **  them; STRCASE.GO is the whole module without them.
 ## **
