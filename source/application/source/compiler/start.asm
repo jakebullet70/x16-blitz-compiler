@@ -51,6 +51,7 @@ _CCNotShared:
 		beq 	_CCKeepAll
 		inc 	dcEnabled
 _CCKeepAll:
+		stz 	symCacheState 				; the first {VAR} reads the symbol file (symfile.asm)
 		jsr 	GPScanReset 				; before a byte is written, because pass one decides
 											; gpUsed as it writes them
 		ldx 	#APIDesc & $FF

@@ -76,6 +76,8 @@ CompilerRAMBankReg	= $0000
 ;			10	the BLOCK DEPTH, second half. It follows the line table's split exactly.
 ;			11	DEAD-CODE REMOVAL's bit planes and swallow list (main/deadcode.asm), pass zero only.
 ;			12	...and its edge list.
+;			13	the #SYMFILE's variables, for GP.ASM {VAR} -- the application's, like bank 7.
+;			14	...and their second 8K. Both are application/source/compiler/symfile.asm.
 ;			63	the GP.BANKEDSTR pool, growing DOWN from the top bank a 512K machine has.
 ;
 ;		BANKS 2 AND 4 WERE ONE BANK, and that was the wall. The two tables shared 8K, growing

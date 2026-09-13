@@ -10,7 +10,8 @@
 #   keep-marker tests are .BASL: tokenise.zip turns the END in REM GP.ENDKEEP into a token.
 #   A NAME.SYM beside the source goes in as its symbol file. Each is
 #   compiled with GPC.INPUT line 5 set, in a drive of its own under work/dctest/. The compile
-#   writes the removed-line list D.NAME, and its OK line ends DEAD <lines> <bytes>.
+#   writes the removed-line list D.NAME, and the OK line is followed by
+#   DEAD CODE: <lines> LINES REMOVED, <bytes> BYTES SAVED.
 #
 #   The runtime images come from work/dcref/inputs/, the fixed copy dcref.py keeps.
 #   dcstrip.py builds the same programs through make_source for the identity test.

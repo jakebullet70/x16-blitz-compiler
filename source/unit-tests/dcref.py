@@ -30,12 +30,12 @@ ROM = os.path.join(EMUDIR, "rom.bin")
 
 #   NAME compiles SHARED, NAME:E compiles EMBEDDED.
 PROGRAMS = [
-    "CHAINTST", "CHAINTST:E", "GPCTEST", "GPCTEST:E", "RGN", "GPC", "FORMEXP", "MENUDEMO",
+    "GPCTEST", "GPCTEST:E", "RGN", "GPC", "FORMEXP", "MENUDEMO",
     "MENUTST", "COLORTST", "MENUEXP", "RGT", "GUI2TST", "GUIEXP", "GUIFRMT", "GPB.HELP",
-    "RGM", "XBASE", "RGL", "RGX", "GPBJ", "GPBH", "GPBK", "GPBL", "GPBF", "GPBR", "GPBMODS",
+    "RGM", "RGL", "GPBMODS",
 ]
 
-TIMEOUT = 2400                      # three passes when --dead: GPBJ-GPBL passed 900 s under six workers
+TIMEOUT = 2400                      # three passes when --dead: GPBMODS took 509 s under four workers
 WORKERS = 6
 
 

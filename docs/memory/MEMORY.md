@@ -123,6 +123,7 @@ sibling project: what is kept is a fact about **X16 BASIC or the X16 itself**, n
 - [Arrays share the workspace](blitz-arrays-share-the-workspace.md) — no array heap; DIM raises OUT OF MEMORY
 - [Array index fast path](gpc-array-index-fastpath.md) — worth ~31%; watch the OOB short-circuit
 - [STRCASE call overhead, measured](strcase-call-overhead-measured.md) — ~2,570 cycles a call
+- [GP.ASM {VAR} symbol lookup, FIXED](gpasm-var-lookup-rescans-symfile.md) — was 95% of GPBMODS compile; now read once into banks 13-14, 317 s to 20 s
 
 ## X16 platform / toolchain
 - [MACPTR wraps banks itself](macptr-wraps-banks-itself.md) — the caller that wants it is STASH, not FILEDIR

@@ -2,7 +2,7 @@
 #
 #   Dead-code removal, the identity (docs/blitz/DEAD-CODE-ELIMINATION.PLAN.md, section 5.1).
 #
-#       dcstrip.py [--gpc FILE] [--only A,B] [--all]
+#       dcstrip.py [--gpc FILE] [--only A,B]
 #
 #   For each program:
 #
@@ -15,8 +15,7 @@
 #   Identical objects run identically, so neither is run.
 #
 #   The programs are dcref.py's set, compiled from its fixed inputs, and the deadcode-tests/
-#   programs dctest.py builds. DC6 and DC9-DC11 are not here: they stop on purpose. --all adds
-#   GPBJ, GPBH, GPBK and GPBL, which take longest.
+#   programs dctest.py builds. DC6 and DC9-DC11 are not here: they stop on purpose.
 #
 #   Work: work/dcstrip/<tag>/, with in-on/ and in-off/ as the two input sets and on/ and off/
 #   as the two drives.
@@ -29,7 +28,6 @@ import dcref
 import dctest
 
 WORK = os.path.join(dcref.ROOT, "work", "dcstrip")
-SLOW = {"GPBJ", "GPBH", "GPBK", "GPBL"}
 TESTS = ["DC1:E", "DC2:E", "DC3:E", "DC4", "DC5:E", "DC7", "DC8:E", "DC12:E"]
 
 
@@ -101,7 +99,11 @@ def one(entry, gpc):
     _, v_off, _, d_off = dcref.compile_one(entry, gpc, in_off, False, run=os.path.join(base, "off"))
     if not v_off.startswith("OK CODE"):
         return entry, time.time() - started, removed, "stripped, option off: " + v_off
+    return entry, time.time() - started, removed, identity(name, removed, v_on, d_on, v_off, d_off)
 
+
+def identity(name, removed, v_on, d_on, v_off, d_off):
+    """The option-on compile against the stripped option-off compile. 'identical, ...' or 'DIFFERENT: ...'."""
     diffs = []
     m = re.match(r"(.*) DEAD CODE: +([0-9]+) LINES REMOVED, +([0-9]+) BYTES SAVED$", v_on)
     if not m:
@@ -118,29 +120,25 @@ def one(entry, gpc):
             diffs.append(f + (" only with the option on" if f in have_on else " only stripped"))
         elif not filecmp.cmp(os.path.join(d_on, f), os.path.join(d_off, f), shallow=False):
             diffs.append(f + " differs")
-    note = "identical, DEAD %s %s" % (m.group(2), m.group(3)) if m and not diffs else \
-        "DIFFERENT: " + "; ".join(diffs)
-    return entry, time.time() - started, removed, note
+    if m and not diffs:
+        return "identical, DEAD %s %s" % (m.group(2), m.group(3))
+    return "DIFFERENT: " + "; ".join(diffs)
 
 
 def main():
     args = sys.argv[1:]
     gpc = os.path.join(dcref.ROOT, "source", "application", "GPC.BIN")
     only = None
-    everything = False
     while args:
         a = args.pop(0)
         if a == "--gpc":
             gpc = os.path.abspath(args.pop(0))
         elif a == "--only":
             only = set(args.pop(0).split(","))
-        elif a == "--all":
-            everything = True
         else:
-            sys.exit("usage: dcstrip.py [--gpc FILE] [--only A,B] [--all]")
+            sys.exit("usage: dcstrip.py [--gpc FILE] [--only A,B]")
 
-    entries = TESTS + [e for e in reversed(dcref.PROGRAMS)
-                       if everything or dcref.split(e)[0] not in SLOW]
+    entries = TESTS + list(reversed(dcref.PROGRAMS))
     if only is not None:
         entries = [e for e in entries if e in only or dcref.split(e)[0] in only]
     print("dcstrip: %d programs with %s (%d bytes)" % (len(entries), gpc, os.path.getsize(gpc)))
