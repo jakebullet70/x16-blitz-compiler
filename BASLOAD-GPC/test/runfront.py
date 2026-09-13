@@ -22,7 +22,9 @@
 #		return, the message read-back, and the loop that comes round for the next file. The key
 #		reader is the one lifted verbatim from GPC.BASL.
 #
-#		THE ANSWERS ARE A MISSING FILE, THEN A GOOD ONE, THEN NOTHING. The engine replies in the
+#		THE ANSWERS ARE A MISSING FILE, A FILE WHOSE #INCLUDE IS MISSING, A GOOD ONE, THEN NOTHING.
+#		The second proves a failed include is reported on the right line and leaves the engine
+#		able to tokenise the next file. The engine replies in the
 #		buffer it was asked in -- the message at $bf00 overwrites the name -- so a front end that
 #		poked the name once would hand its own error text to the engine as the next file name.
 #		Only a bad file followed by a good one can catch that, and it costs one extra pass.
@@ -46,6 +48,7 @@
 # ************************************************************************************************
 
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -66,7 +69,8 @@ DRIVE  = os.path.join(BUILD, "fronttest")
 VARIANT = "BASLOADT.BASL"           # the fixed-answer front end
 VARPRG  = "BASLOADT.PRG"            # ...and what it tokenises to
 MISSING = "NOSUCH.BASL"             # the first answer: a file that is deliberately not there
-SAMPLE  = "HELLO.BASL"              # the second, the one that should tokenise
+NOINC   = "NOINC.BASL"              # the second: its line-3 #INCLUDE is deliberately not there
+SAMPLE  = "HELLO.BASL"              # the third, the one that should tokenise
 OUTPUT  = "HELLO.PRG"               # ...and what HELLO.BASL's own #SAVEAS calls its output
 DONE    = "BASLDONE"
 
@@ -106,8 +110,9 @@ def make_variant():
     #	Its own output name, so a test run can never overwrite the shipped front end.
     src = swap('#SAVEAS "@:BASLOAD-GPC.PRG"', '#SAVEAS "@:%s"' % VARPRG, "#SAVEAS line")
 
-    #	The prompt itself. NF is the pass counter, and the three answers are the whole test:
-    #	a name that is not there, a name that is, and an empty one to quit.
+    #	The prompt itself. NF is the pass counter, and the four answers are the whole test:
+    #	a name that is not there, a name whose include is not there, a name that is, and an
+    #	empty one to quit.
     #
     #	THE MISSING FILE GOES FIRST ON PURPOSE. The engine answers in the buffer it was asked in
     #	-- the message at $bf00 overwrites the name -- so a front end that poked the name once
@@ -118,7 +123,8 @@ def make_variant():
            'NM$=""\n'
            'IF NF=0 THEN NM$="%s"\n'
            'IF NF=1 THEN NM$="%s"\n'
-           'NF=NF+1\n' % (MISSING, SAMPLE))
+           'IF NF=2 THEN NM$="%s"\n'
+           'NF=NF+1\n' % (MISSING, NOINC, SAMPLE))
     src = swap(old, new, "prompt block")
 
     with open(os.path.join(DRIVE, VARIANT), "w", newline="\n", encoding="utf-8") as f:
@@ -156,7 +162,7 @@ def emulate(driver_text, seconds, until=None):
 
 
 def main():
-    for need in (EMU, ROMBIN, ENGINE, SOURCE, os.path.join(HERE, SAMPLE)):
+    for need in (EMU, ROMBIN, ENGINE, SOURCE, os.path.join(HERE, NOINC), os.path.join(HERE, SAMPLE)):
         if not os.path.exists(need):
             die("missing %s%s" % (need, "  -- run build.py all first" if need == ENGINE else ""))
 
@@ -164,6 +170,7 @@ def main():
         shutil.rmtree(DRIVE)
     os.makedirs(DRIVE)
     shutil.copy(ENGINE, DRIVE)
+    shutil.copy(os.path.join(HERE, NOINC), DRIVE)
     shutil.copy(os.path.join(HERE, SAMPLE), DRIVE)
     make_variant()
 
@@ -194,9 +201,17 @@ def main():
     #	failure mode streaming has no fallback for. The engine hands back the drive's own status
     #	line for this one -- "62, FILE NOT FOUND,00,00" -- rather than one of its own messages,
     #	which is why the test looks for that and not for the word ERROR.
-    if "FILE NOT FOUND" not in log.split("SUCCESS")[0]:
+    before = log.split("SUCCESS")[0]
+    if "FILE NOT FOUND" not in before:
         die("%s was not reported before the good file. Echo log:\n%s"
             % (MISSING, log[-800:]))
+    #	A missing #INCLUDE is reported against the file and line that asked for it. The front
+    #	end once appended R1H..R2H to a message that already ended in the number, so line 3
+    #	came out as 33.
+    lines = re.findall(r"NOINC\.BASL:(\d+)", before)
+    if lines != ["3"]:
+        die("%s's missing include should read NOINC.BASL:3, got %s. Echo log:\n%s"
+            % (NOINC, lines or "nothing", log[-800:]))
     if "SUCCESS" not in log:
         die("the front end ran but the engine did not report SUCCESS -- so the name was not\n"
             "               re-poked, and the second file was never tokenised. Echo log tail:\n%s"
