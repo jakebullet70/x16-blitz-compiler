@@ -128,11 +128,12 @@ GOTO FILEIO.MODULE.END
 ## FILE.STATUS falls into FILE.CMD with an empty command: SETNAM with a length
 ## of zero opens the channel and reads it without asking for anything.
 
-FILE.STATUS:  FILE.CMDSTR$ = ""
+FILE.STATUS:  
+    FILE.CMDSTR$ = ""
 
-## FILE.CMD sends FILE.CMDSTR$ and reads the answer. The command rides on the
-## OPEN, so nothing in this file uses PRINT# for a command.
-FILE.CMD:  IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
+## FILE.CMD sends FILE.CMDSTR$ and reads the answer. 
+FILE.CMD:  
+    IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
     OPEN 15, FILE.DEVICE, 15, FILE.CMDSTR$
     INPUT#15, FILE.ERR, FILE.MSG$, FILE.TRK, FILE.SEC
     CLOSE 15 : FILE.CMDSTR$ = ""
