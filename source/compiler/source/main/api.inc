@@ -88,6 +88,12 @@ BLC_REGIONOPEN = 10
 ;		code and BStrFlush for banked text -- after regionOpen has been cleared.
 ;
 BLC_REGIONDONE = 11
+;
+;		End of PASS ZERO, which runs only when GPC.INPUT asks for dead code to be removed. Pass
+;		zero compiled every line, and whatever the application settled from that has to start
+;		again before pass one.
+;
+BLC_ENDPASS0 = 12
 
 ; ************************************************************************************************
 ;

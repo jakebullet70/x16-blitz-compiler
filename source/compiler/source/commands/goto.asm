@@ -463,6 +463,7 @@ _CBCSyntax:
 
 WriteBranchTo:
 		sta 	branchOpcode
+		jsr 	DCRecordLineBranch 			; pass zero: an edge
 		lda 	passNumber
 		beq 	EmitBranch 					; pass one: the line number goes out as it stands
 		;
@@ -502,6 +503,7 @@ _WBTNoLine:
 
 WriteBranchToAddress:
 		sta 	branchOpcode
+		jsr 	DCRecordAddressBranch 		; pass zero: an edge
 		lda 	passNumber
 		beq 	EmitBranch 					; pass one: the address goes out as it stands
 		lda 	branchTarget

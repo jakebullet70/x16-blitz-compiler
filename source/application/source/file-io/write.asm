@@ -72,9 +72,19 @@ IODeleteOutputs:
 		;		no way to tell. The two files are written together and they go together.
 		;
 		lda 	OptionsText
-		beq 	_IODODone
+		beq 	_IODONoMap
 		ldx 	#OptionsText & $FF
 		ldy 	#OptionsText >> 8
+		jsr 	IOScratchFile
+_IODONoMap:
+		;
+		;		And the removed-line list, if GPC.INPUT line 5 names one. A list left from an
+		;		earlier run names the lines of a program that has since changed.
+		;
+		lda 	DeadListFile
+		beq 	_IODODone
+		ldx 	#DeadListFile & $FF
+		ldy 	#DeadListFile >> 8
 		jsr 	IOScratchFile
 _IODODone:
 		rts

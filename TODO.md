@@ -847,8 +847,8 @@ green.
 ## Compiler work — what is next, ranked
 
 Written 2026-09-09. **An index, not a second copy** — each item points at the section or memory note
-that holds the detail, so this list cannot drift away from the work it names. One defect and five
-features; everything else under `## Bugs` is fixed.
+that holds the detail, so this list cannot drift away from the work it names. One defect and four
+open features, item 5 being done; everything else under `## Bugs` is fixed.
 
 **0. Fix the `GP.FN` string aliasing.** See `## Bugs` above. Small, known, and the only thing here
 that produces a wrong answer rather than a large program. Do it first.
@@ -874,10 +874,13 @@ uses, so it has everything it needs to emit only the handlers referenced — see
 `## Shrinking the runtime` below, which has the measurements, the `.def`-file mechanism and the
 open question of an explicit switch versus inference.
 
-**3. Dead-code elimination in the library, not the compiler.** Measured and parked: **1,212 resident
+**3. Dead-code elimination, as a compiler option.** Measured: **1,212 resident
 bytes** are never called in GPBMODS, and **691 of them come free by deleting two `#INCLUDE` lines** —
 no compiler change at all. Only the remaining ~521 would need one. See
 `docs/memory/basl-dead-code-elimination-measured.md`. Worth doing the free half before building anything.
+How Prog8 does it, and where the pass can live in GPC: `docs/blitz/DEAD-CODE-ELIMINATION.RESEARCH.md`.
+The handoff plan for the generic compiler option, rules and keep markers included:
+`docs/blitz/DEAD-CODE-ELIMINATION.PLAN.md`.
 
 **4. Let the compiler emit the bank switch, and delete the two-file split.** Banked-or-not is a
 property of the **program**, not of the module, but today the answer is baked into the module's own
@@ -912,8 +915,9 @@ This subsumes item 1: once the compiler places calls, a banked `GP.ASM` blob is 
 answered in the same place. It does not block the split that is committed today — by the time this
 lands, `.BODY` exists only inside generated text, so removing it touches no hand-written source.
 
-**5. Pass one has to say something.** Added 2026-09-11. The compiler prints its banner, the input and
-output names, and then nothing at all until pass two starts writing the object. On GPBMODS that is
+**5. Pass one has to say something — DONE, closed 2026-09-13.** Added 2026-09-11. The record of why
+follows. The compiler printed its banner, the input and
+output names, and then nothing at all until pass two started writing the object. On GPBMODS that is
 **about four and a half minutes of silence** on an emulated 8 MHz 65C02, and the silence is
 indistinguishable from a hang: on 11th Sep 2026 a build that was working normally was killed by a
 420 s cap, and the only evidence of how far it had got was the modification time of the overlay files.

@@ -45,6 +45,9 @@ StartCompiler:
 		stz 	passNumber 					; the first of the two
 		stz 	pass1VarSpace 				; nothing known yet, so pass one emits zeroes into the
 		stz 	pass1VarSpace+1 			; _variable.space operand and pass two emits the answer
+		lda 	dcEnabled 					; and pass zero ahead of them both, when GPC.INPUT
+		sta 	dcPass 						; asks for dead code to be removed
+		stz 	dcSkip 						; and nothing is left out until pass zero says so
 
 ; ************************************************************************************************
 ;
@@ -54,6 +57,12 @@ StartCompiler:
 ;		ends up, how much space the variables need, where each block's forward branches land.
 ;		Pass two then compiles the same source again knowing all of it, so nothing has to be
 ;		written down and gone back to.
+;
+;		WITH DEAD-CODE REMOVAL ON IT IS COMPILED THREE TIMES. Pass zero is pass one with dcPass
+;		set: passNumber is 0, so every generator does what it does in pass one, and the pass
+;		ends in SaveCodeAndExit before anything is placed. It works out which lines nothing
+;		reaches, and passes one and two then compile the program without them. See
+;		docs/blitz/DEAD-CODE-ELIMINATION.PLAN.md.
 ;
 ;
 ;		THE TWO PASSES AGREEING IS A LOAD-BEARING ASSUMPTION and nothing in the structure
@@ -122,10 +131,11 @@ CompilePass:
 		;		Main compilation loop
 		;
 MainCompileLoop:
-		lda 	#BLC_READIN 				; read next line into the buffer.		
-		jsr 	CallAPIHandler
-
-		bcc 	SaveCodeAndExit 			; end of source.
+		jsr 	DCLineBoundary 				; pass zero: close the line just compiled
+		jsr 	ReadSourceLine 				; read next line into the buffer.
+		bcs 	_MCLLineRead
+		jmp 	SaveCodeAndExit 			; end of source -- out of branch range since the
+_MCLLineRead: 								; dead-code hooks went in
 		jsr 	ShowProgress 				; X and Y carry the line address, so this preserves both
 		jsr 	ProcessNewLine 				; set up pointer and line number.
 		;
@@ -137,6 +147,10 @@ MainCompileLoop:
 		sta 	implicitDimFirst
 		sty 	implicitDimFirst+1
 _MCLHaveFirst:
+		jsr 	DCSkipLine 					; passes one and two: a line pass zero found nothing
+		bcc 	_MCLKeepLine 				; reaches is read past, with the lines it swallowed,
+		jmp 	MainCompileLoop 			; before it is marked
+_MCLKeepLine:
 		jsr 	RegionSwitch 				; pass two: if this line opens or closes a GP.BANKED
 											; region, move the write cursor BEFORE the line is
 											; marked, so the marker and its table entry land on
@@ -156,6 +170,7 @@ _MCLSameLine:
 		beq 	_MCLSameLine
 		cmp 	#";" 						; a stray ; between statements (e.g. GOSUB 970;) is
 		beq 	_MCLSameLine 				; tolerated by BASIC, so skip it like a colon.
+		jsr 	DCStatement 				; pass zero: what the statement starts with
 
 		;
 		;		A real statement follows. Checkpoint it for defer-to-runtime: remember the
@@ -228,6 +243,7 @@ _MCLCheckAssignment:
 ; ************************************************************************************************
 
 DeferStatementToRuntime:
+		stz 	dcLastToken 				; a throw-stub falls through, whatever it replaced
 		lda 	#PCD_CMD_DEFERROR
 		jsr 	WriteCodeByte
 		jmp 	MainCompileLoop 			; drop the rest of this source line: everything after the
@@ -282,8 +298,11 @@ _SCEClosed:
 		;
 		jsr 	AsmFlushPool 				; append the GP.ASM blob pool AFTER the $FF end marker,
 											; where nothing walks -- see commands/gpasmcode.asm
+		lda 	dcPass 						; pass zero ends here, before anything is placed or
+		bne 	_SCEPassZero 				; measured against the runtime
 		lda 	passNumber
 		bne 	_SCEPlaced
+		jsr 	DCMeasure 					; pass one: how much shorter it came out than pass zero
 		jsr 	GPBankRelocate 				; PASS ONE ONLY. It lifts each region out to the end
 											; of the object and works out where they all go; pass
 											; two is handed that and writes them there directly
@@ -366,6 +385,18 @@ _SCEPassOne:
 		jmp 	CompilePass
 
 		;
+		;		Pass zero. It opened no object and was never measured against the runtime, so
+		;		nothing it laid out is kept: pass one starts again from ResetPassState, and the
+		;		application clears the GP usage marks pass zero made.
+		;
+_SCEPassZero:
+		jsr 	DCSolve 					; which lines nothing reaches
+		stz 	dcPass
+		lda 	#BLC_ENDPASS0
+		jsr 	CallAPIHandler
+		jmp 	CompilePass
+
+		;
 		;		Pass two. The line table, the block tables and the pool base were checked where
 		;		they were read, so by here they already agree; what is left is the length, the
 		;		sum of what was emitted, and the variable space.
@@ -429,6 +460,7 @@ ExitCompiler:
 
 ResetPassState:
 		jsr 	STRReset 					; line number table, variable list, free variable memory
+		jsr 	DCResetPass 				; the dead-code counts, and in pass zero its tables
 
 		stz 	passSum 					; the sum of what this pass emits, and how many bytes
 		stz 	passSum+1 					; of it are being stepped over
@@ -784,9 +816,13 @@ _PPHText:
 		inx
 		bra 	_PPHText
 _PPHNumber:
+		lda 	#'0' 						; pass zero, when dead code is being removed
+		ldx 	dcPass
+		bne 	_PPHShow
 		lda 	passNumber 					; 0 and 1 on the inside, 1 and 2 on the screen
 		clc
 		adc 	#'1'
+_PPHShow:
 		jsr 	PrintCharacter
 		lda 	#' '
 		jmp 	PrintCharacter
@@ -924,6 +960,13 @@ layoutCross:								; what a branch crossing into each one is out by
 		.fill 	GPBANK_MAXREGIONS
 layoutRunBase:								; the page the whole run of them starts at
 		.fill 	1
+;
+;		Dead-code removal, in the code section for the same reason.
+;
+dcEnabled:									; nonzero when GPC.INPUT line 5 names a removed-line
+		.fill 	1 							; list. Set by CompileCode, like gpBankShared
+dcPass:										; nonzero while pass zero runs: pass one's work, with
+		.fill 	1 							; recording on
 		.send code
 
 		.section storage

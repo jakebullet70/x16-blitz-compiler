@@ -79,8 +79,8 @@ CommandGPBankedStrCompile:
 		sta 	bstrState
 
 _CBSNextLine:
-		lda 	#BLC_READIN 				; pull the next source line ourselves -- the main
-		jsr 	CallAPIHandler 				; compile loop has no swallow-until-terminator mode
+		jsr 	ReadSourceLine 				; pull the next source line ourselves -- the main
+										; compile loop has no swallow-until-terminator mode
 		bcc 	_CBSNoEnd 					; source ran out with the block still open
 		jsr 	ProcessNewLine 				; srcPtr and currentLineNumber for the line just read
 

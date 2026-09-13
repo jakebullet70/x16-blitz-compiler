@@ -19,10 +19,12 @@
 ; ************************************************************************************************
 
 CommandREM: 
+		jsr 	DCKeepMarker 				; pass zero: a dead-code keep marker (main/deadcode.asm)
+_CRNext:
 		jsr 	LookNext
 		beq 	_CRExit
 		jsr 	GetNext
-		bra 	CommandREM
+		bra 	_CRNext
 _CRExit:		
 		rts
 
@@ -37,5 +39,6 @@ _CRExit:
 ;
 ;		Date			Notes
 ;		==== 			=====
+;		13/09/26		Reads a dead-code keep marker in pass zero.
 ;
 ; ************************************************************************************************

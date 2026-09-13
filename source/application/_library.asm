@@ -46,6 +46,8 @@ CompilerAPI:
 		beq 	_CARegionOpen
 		cmp 	#BLC_REGIONDONE
 		beq 	_CARegionDone
+		cmp 	#BLC_ENDPASS0
+		beq 	_CAEndPass0
 		.debug
 
 ; ************************************************************************************************
@@ -67,6 +69,17 @@ _CAEndPass1:
 
 _CAEndPass2:
 		jmp 	ObjStreamClose
+
+; ************************************************************************************************
+;
+;		End of pass zero, which runs only when dead code is being removed. The GP usage scan
+;		marked handlers for every line pass zero compiled, and pass one may leave some of those
+;		lines out, so the scan starts again.
+;
+; ************************************************************************************************
+
+_CAEndPass0:
+		jmp 	GPScanReset
 
 ; ************************************************************************************************
 ;
@@ -797,11 +810,15 @@ BootExtEntry = BXEntry 						; the address the bootstrap's jmp is patched to
 ;
 ;		The compiler had SOURCE.PRG and OBJECT.PRG built into it, so the only way to point it at
 ;		a program was to rename files around it. It now reads GPC.INPUT, a plain text file of
-;		three lines, which is what lets another program drive it:
+;		five lines, which is what lets another program drive it:
 ;
 ;			DIR.PRG				line 1	the tokenised BASIC to compile
 ;			C.DIR.PRG			line 2	the object file to write
-;								line 3	options. Read, but ignored for now.
+;			M.DIR.PRG			line 3	the debug map, or empty for none
+;			SHARED				line 4	the compile mode, or empty for embedded
+;			D.DIR.PRG			line 5	the removed-line list, or empty to keep every line
+;
+;		A shorter file reads its missing lines as empty.
 ;
 ;		A line ends at CR, at LF, or at anything else below a space, and an empty line is
 ;		skipped -- so a control file written on a CRLF host is as good as one written on the X16.
@@ -816,14 +833,16 @@ BootExtEntry = BXEntry 						; the address the bootstrap's jmp is patched to
 ;
 ; ************************************************************************************************
 
-CFLineSize = 64 							; each line is a fixed 64-byte slot; the four lines are one
-CFLineCount = 4 							; contiguous 256-byte block (source, object, map, mode).
+CFLineSize = 64 							; each line is a fixed 64-byte slot; the first four lines are
+CFLineCount = 5 							; one contiguous 256-byte block (source, object, map, mode).
 											; ReadControlFile counts lines (cfLine) and tracks CR/LF,
 											; so an EMPTY line still advances -- an empty line 3 (no
 											; map) must not mis-slot line 4 (the mode). Fixed slots
 											; mean a single index walks the block with no pointer,
 											; which matters because the KERNAL calls here are free
-											; to trash zero page.
+											; to trash zero page. Line 5 starts at offset 256, where
+											; the eight-bit index is back at 0, so it has a store of
+											; its own.
 
 		.section code
 
@@ -836,12 +855,17 @@ CFLineCount = 4 							; contiguous 256-byte block (source, object, map, mode).
 ; ************************************************************************************************
 
 ReadControlFile:
-		lda 	#0 							; blank all FOUR lines (256 bytes). This zero-terminates
-		tax 								; each of them and leaves a short control file holding
-_RCFBlank: 									; empty strings rather than whatever was in memory.
-		sta 	SourceFile,x
+		lda 	#0 							; blank all FIVE lines. This zero-terminates each of
+		tax 								; them and leaves a short control file holding empty
+_RCFBlank: 									; strings rather than whatever was in memory.
+		sta 	SourceFile,x 				; the first four, 256 bytes
 		inx
 		bne 	_RCFBlank
+		ldx 	#CFLineSize
+_RCFBlankList:
+		sta 	DeadListFile-1,x 			; and the fifth
+		dex
+		bne 	_RCFBlankList
 
 		ldy 	#ControlFile >> 8
 		ldx 	#ControlFile & $FF
@@ -878,7 +902,14 @@ _RCFStore:
 		cmp 	#CFLineSize-1 				; rather than running on into the next line.
 		pla
 		bcs 	_RCFRead
+		ldy 	cfLine 						; line 5 is past the eight-bit index
+		cpy 	#CFLineCount-1
+		bcs 	_RCFStoreList
 		sta 	SourceFile,x
+		inx
+		bra 	_RCFRead
+_RCFStoreList:
+		sta 	DeadListFile,x
 		inx
 		bra 	_RCFRead
 
@@ -897,8 +928,9 @@ _RCFSetCR:
 		inc 	cfLine 						; advance even on an empty line -- so an empty line 3 (no
 		lda 	cfLine 						; map) does not mis-slot line 4 (the mode), which the old
 		cmp 	#CFLineCount 				; positional walker got wrong.
-		bcs 	_RCFClose 					; captured all four lines -> stop, ignore any more
-		asl 	a 							; X = cfLine * CFLineSize (64) = start of the next line
+		bcs 	_RCFClose 					; captured all five lines -> stop, ignore any more
+		asl 	a 							; X = cfLine * CFLineSize (64) = start of the next line,
+											; modulo 256: line 5 starts at 0 in DeadListFile
 		asl 	a
 		asl 	a
 		asl 	a
@@ -1099,7 +1131,7 @@ NotProgramText:
 
 ; ************************************************************************************************
 ;
-;		The three lines of GPC.INPUT, laid out as one contiguous block -- see CFLineSize above.
+;		The five lines of GPC.INPUT, laid out as one contiguous block -- see CFLineSize above.
 ;
 ;		These are buffers, but they are deliberately NOT in the storage section. That section is
 ;		a .dsection at $0400 (common.inc) and the code starts at $0801, so it is a 1K hole -- and
@@ -1118,7 +1150,9 @@ OptionsText: 								; line 3 : the debug map file name, or empty for none
 ModeText: 									; line 4 : compile mode -- first byte 'S' (SHARED) selects
 		.fill 	CFLineSize 					; the resident runtime (GPC.RT.nnn.BIN); empty/anything else
 											; = the default self-contained (embedded) runtime.
-cfLine: 									; ReadControlFile scratch: current line, 0..3
+DeadListFile: 								; line 5 : the removed-line list, or empty to keep every
+		.fill 	CFLineSize 					; line. Past the 256-byte block, see ReadControlFile.
+cfLine: 									; ReadControlFile scratch: current line, 0..4
 		.fill 	1
 cfJustCR: 									; ReadControlFile scratch: nonzero if the last byte was a CR
 		.fill 	1
@@ -1133,6 +1167,96 @@ cfJustCR: 									; ReadControlFile scratch: nonzero if the last byte was a CR
 ;
 ;		Date			Notes
 ;		==== 			=====
+;
+; ************************************************************************************************
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		Name:		deadlist.asm
+;		Purpose:	Write the removed-line list GPC.INPUT line 5 names
+;		Created:	13th September 2026
+;		Reviewed: 	No
+;		Author : 	Steven De George SR
+;
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		One decimal line number a line, LF-terminated like the map, in source order. The list
+;		is every line the compile left out: each line nothing reaches, and the lines a GP.ASM
+;		or GP.BANKEDSTR block read for itself when its opener was left out with it. Deleting
+;		exactly these lines from the source and compiling with the option off gives the same
+;		object -- source/unit-tests/dcstrip.py is that test.
+;
+;		Pass one wrote the numbers into the edge bank as it skipped each line (deadcode.asm,
+;		DCListLine). The edges were finished with at the end of pass zero, and nothing else
+;		uses that bank.
+;
+;		An empty file when nothing was removed, including when a table filled: the file says
+;		the option ran.
+;
+; ************************************************************************************************
+
+		.section code
+
+WriteDeadList:
+		lda 	DeadListFile 				; no fifth line -> no list asked for
+		bne 	_WDLStart
+		rts
+_WDLStart:
+		ldx 	#DeadListFile & $FF
+		ldy 	#DeadListFile >> 8
+		jsr 	IOOpenWrite
+		stz 	deadWalk
+		stz 	deadWalk+1
+_WDLLoop:
+		lda 	deadWalk
+		cmp 	dcListCount
+		lda 	deadWalk+1
+		sbc 	dcListCount+1
+		bcs 	_WDLDone
+		;
+		;		Two bytes a number, so the index doubled. The list holds at most 4,096, so the
+		;		doubled high byte is under $20 and the carry into the page add is clear.
+		;
+		lda 	deadWalk
+		asl 	a
+		sta 	zTemp0
+		lda 	deadWalk+1
+		rol 	a
+		clc
+		adc 	#DCListTable >> 8
+		sta 	zTemp0+1
+		.dcedge_access
+		lda 	(zTemp0)
+		sta 	mapValue
+		ldy 	#1
+		lda 	(zTemp0),y
+		sta 	mapValue+1
+		.dcedge_release
+		jsr 	IOWriteDecimal 				; the map writer's decimal, which writes mapValue
+		lda 	#10
+		jsr 	IOWriteByte
+		inc 	deadWalk
+		bne 	_WDLLoop
+		inc 	deadWalk+1
+		bra 	_WDLLoop
+_WDLDone:
+		jmp 	IOWriteClose
+
+deadWalk: 									; the number being written
+		.fill 	2
+
+		.send code
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;		13/09/26		Written.
 ;
 ; ************************************************************************************************
 ; ************************************************************************************************
@@ -1432,6 +1556,9 @@ gpScanStop: 								; nonzero once the answer is in, or the end marker seen
 ;				IN if some keyword reached it and the whole runtime had to go in. Named for the
 ;				language, not abbreviated to "GP": the block it is reporting on is the GP.BASIC
 ;				one, and the line is read by people who know the language by that name.
+;		DEAD	only when GPC.INPUT line 5 turned dead-code removal on: the source lines left
+;				out, then the bytes that saved -- pass zero's length less pass one's.
+
 ;
 ;		All three are computed here rather than stashed by WriteObjectCode: objPtr,
 ;		newWorkspacePage and runtimeEndPage all survive it unchanged, and WriteMapFile touches
@@ -1518,6 +1645,24 @@ _PMREmbedded:
 _PMRGP:
 		jsr 	PrintMessage
 _PMRDone:
+		lda 	dcEnabled 					; DEAD -- only when dead code was being removed
+		beq 	_PMREnd
+		ldx 	#DeadText & $FF
+		ldy 	#DeadText >> 8
+		jsr 	PrintMessage
+		lda 	dcListCount 				; the lines left out
+		sta 	reportValue
+		lda 	dcListCount+1
+		sta 	reportValue+1
+		jsr 	PrintDecimal
+		lda 	#' '
+		jsr 	$FFD2
+		lda 	dcRemovedBytes 				; ...and the bytes that saved
+		sta 	reportValue
+		lda 	dcRemovedBytes+1
+		sta 	reportValue+1
+		jsr 	PrintDecimal
+_PMREnd:
 		lda 	#13
 		jsr 	$FFD2
 		jmp 	PrintBankReport 			; ...and a line of its own for the banks, if there are any
@@ -1699,6 +1844,8 @@ BanksText:
 		.text 	"BANKS ",0
 MaxText:
 		.text 	" MAX ",0
+DeadText:
+		.text 	" DEAD ",0
 
 reportValue: 								; code section, not storage -- these belong to the
 		.fill 	3 							; 24 bit: the banked total passes 65,535 at eight banks
@@ -3109,7 +3256,7 @@ _WMFWriteEntry:
 		jsr 	_WMFHexByte
 		lda 	#' '
 		jsr 	IOWriteByte
-		jsr 	_WMFDecimal 				; decimal line number.
+		jsr 	IOWriteDecimal 				; decimal line number.
 		lda 	#10 						; LF ends the line -- this file is read on the host (grep,
 		jmp 	IOWriteByte 				; VS Code), not the X16, so a Unix newline suits it best.
 
@@ -3136,46 +3283,47 @@ _WMFDigit:
 ;
 ;		mapValue (16 bit) as decimal, leading zeros suppressed but always at least one digit.
 ;		Subtract each power of ten as many times as it goes; the count is the digit.
+;		Global, because the removed-line list (deadlist.asm) writes its numbers with it too.
 ;
-_WMFDecimal:
+IOWriteDecimal:
 		stz 	mapLead 					; 0 while we are still dropping leading zeros
 		ldx 	#0
-_WMFDPow:
+_IWDPow:
 		ldy 	#48 						; '0' + number of subtractions = the digit
-_WMFDSub:
+_IWDSub:
 		sec
 		lda 	mapValue
-		sbc 	_WMFPow10L,x
+		sbc 	_IWDPow10L,x
 		sta 	mapTemp
 		lda 	mapValue+1
-		sbc 	_WMFPow10H,x
-		bcc 	_WMFDUnder 					; borrow -> this power no longer goes
+		sbc 	_IWDPow10H,x
+		bcc 	_IWDUnder 					; borrow -> this power no longer goes
 		sta 	mapValue+1
 		lda 	mapTemp
 		sta 	mapValue
 		iny
-		bra 	_WMFDSub
-_WMFDUnder:
+		bra 	_IWDSub
+_IWDUnder:
 		cpy 	#48 						; a zero digit ...
-		bne 	_WMFDEmit
+		bne 	_IWDEmit
 		lda 	mapLead 					; ... is dropped while still leading
-		beq 	_WMFDNext
-_WMFDEmit:
+		beq 	_IWDNext
+_IWDEmit:
 		lda 	#1
 		sta 	mapLead
 		tya
 		jsr 	IOWriteByte
-_WMFDNext:
+_IWDNext:
 		inx
 		cpx 	#4 							; 10000, 1000, 100, 10
-		bne 	_WMFDPow
+		bne 	_IWDPow
 		lda 	mapValue 					; the units digit is always written
 		ora 	#48
 		jmp 	IOWriteByte
 
-_WMFPow10L:
+_IWDPow10L:
 		.byte 	<10000, <1000, <100, <10
-_WMFPow10H:
+_IWDPow10H:
 		.byte 	>10000, >1000, >100, >10
 
 BootPatchTable: 							; six (addr lo, addr hi, value) triples, built per program
@@ -3636,6 +3784,11 @@ CompileCode:
 		bne 	_CCNotShared
 		inc 	gpBankShared
 _CCNotShared:
+		stz 	dcEnabled
+		lda 	DeadListFile 				; GPC.INPUT line 5 -- a name turns on dead-code removal
+		beq 	_CCKeepAll
+		inc 	dcEnabled
+_CCKeepAll:
 		jsr 	GPScanReset 				; before a byte is written, because pass one decides
 											; gpUsed as it writes them
 		ldx 	#APIDesc & $FF
@@ -3649,6 +3802,7 @@ _CCNotShared:
 									; with no GP.LOOP -- therefore wrote out a half-resolved object,
 									; truncated at the branch it could not fix, and then printed OK.
 		jsr 	WriteMapFile 				; and the line#->offset map, if GPC.INPUT asked for one
+		jsr 	WriteDeadList 				; and the removed-line list, if line 5 named one
 		lda 	#"O" 						; the only other thing it prints, and the only way a
 		jsr 	$FFD2 						; caller can tell a compile that worked from one that
 		lda 	#"K" 						; stopped on an error, so it stays.
@@ -4102,12 +4256,12 @@ SymFileName:
 ;
 ;	This file is automatically generated by scripts/bumpbuild.py
 ;
-BuildNumber = 121
+BuildNumber = 122
 		.section code
 VersionText:
-		.text	'V1.0.0',13,0
+		.text	'V1.1.0',13,0
 RTImageFileText:
-		.text	'GPC.IMG.121.BIN',0
+		.text	'GPC.IMG.122.BIN',0
 		.send code
 ; ************************************************************************************************
 ; ************************************************************************************************
@@ -4183,9 +4337,19 @@ IODeleteOutputs:
 		;		no way to tell. The two files are written together and they go together.
 		;
 		lda 	OptionsText
-		beq 	_IODODone
+		beq 	_IODONoMap
 		ldx 	#OptionsText & $FF
 		ldy 	#OptionsText >> 8
+		jsr 	IOScratchFile
+_IODONoMap:
+		;
+		;		And the removed-line list, if GPC.INPUT line 5 names one. A list left from an
+		;		earlier run names the lines of a program that has since changed.
+		;
+		lda 	DeadListFile
+		beq 	_IODODone
+		ldx 	#DeadListFile & $FF
+		ldy 	#DeadListFile >> 8
 		jsr 	IOScratchFile
 _IODODone:
 		rts

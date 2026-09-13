@@ -1384,7 +1384,7 @@ _WMFWriteEntry:
 		jsr 	_WMFHexByte
 		lda 	#' '
 		jsr 	IOWriteByte
-		jsr 	_WMFDecimal 				; decimal line number.
+		jsr 	IOWriteDecimal 				; decimal line number.
 		lda 	#10 						; LF ends the line -- this file is read on the host (grep,
 		jmp 	IOWriteByte 				; VS Code), not the X16, so a Unix newline suits it best.
 
@@ -1411,46 +1411,47 @@ _WMFDigit:
 ;
 ;		mapValue (16 bit) as decimal, leading zeros suppressed but always at least one digit.
 ;		Subtract each power of ten as many times as it goes; the count is the digit.
+;		Global, because the removed-line list (deadlist.asm) writes its numbers with it too.
 ;
-_WMFDecimal:
+IOWriteDecimal:
 		stz 	mapLead 					; 0 while we are still dropping leading zeros
 		ldx 	#0
-_WMFDPow:
+_IWDPow:
 		ldy 	#48 						; '0' + number of subtractions = the digit
-_WMFDSub:
+_IWDSub:
 		sec
 		lda 	mapValue
-		sbc 	_WMFPow10L,x
+		sbc 	_IWDPow10L,x
 		sta 	mapTemp
 		lda 	mapValue+1
-		sbc 	_WMFPow10H,x
-		bcc 	_WMFDUnder 					; borrow -> this power no longer goes
+		sbc 	_IWDPow10H,x
+		bcc 	_IWDUnder 					; borrow -> this power no longer goes
 		sta 	mapValue+1
 		lda 	mapTemp
 		sta 	mapValue
 		iny
-		bra 	_WMFDSub
-_WMFDUnder:
+		bra 	_IWDSub
+_IWDUnder:
 		cpy 	#48 						; a zero digit ...
-		bne 	_WMFDEmit
+		bne 	_IWDEmit
 		lda 	mapLead 					; ... is dropped while still leading
-		beq 	_WMFDNext
-_WMFDEmit:
+		beq 	_IWDNext
+_IWDEmit:
 		lda 	#1
 		sta 	mapLead
 		tya
 		jsr 	IOWriteByte
-_WMFDNext:
+_IWDNext:
 		inx
 		cpx 	#4 							; 10000, 1000, 100, 10
-		bne 	_WMFDPow
+		bne 	_IWDPow
 		lda 	mapValue 					; the units digit is always written
 		ora 	#48
 		jmp 	IOWriteByte
 
-_WMFPow10L:
+_IWDPow10L:
 		.byte 	<10000, <1000, <100, <10
-_WMFPow10H:
+_IWDPow10H:
 		.byte 	>10000, >1000, >100, >10
 
 BootPatchTable: 							; six (addr lo, addr hi, value) triples, built per program

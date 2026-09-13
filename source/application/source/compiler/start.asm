@@ -46,6 +46,11 @@ CompileCode:
 		bne 	_CCNotShared
 		inc 	gpBankShared
 _CCNotShared:
+		stz 	dcEnabled
+		lda 	DeadListFile 				; GPC.INPUT line 5 -- a name turns on dead-code removal
+		beq 	_CCKeepAll
+		inc 	dcEnabled
+_CCKeepAll:
 		jsr 	GPScanReset 				; before a byte is written, because pass one decides
 											; gpUsed as it writes them
 		ldx 	#APIDesc & $FF
@@ -59,6 +64,7 @@ _CCNotShared:
 									; with no GP.LOOP -- therefore wrote out a half-resolved object,
 									; truncated at the branch it could not fix, and then printed OK.
 		jsr 	WriteMapFile 				; and the line#->offset map, if GPC.INPUT asked for one
+		jsr 	WriteDeadList 				; and the removed-line list, if line 5 named one
 		lda 	#"O" 						; the only other thing it prints, and the only way a
 		jsr 	$FFD2 						; caller can tell a compile that worked from one that
 		lda 	#"K" 						; stopped on an error, so it stays.

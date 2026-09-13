@@ -25,6 +25,9 @@
 ;				IN if some keyword reached it and the whole runtime had to go in. Named for the
 ;				language, not abbreviated to "GP": the block it is reporting on is the GP.BASIC
 ;				one, and the line is read by people who know the language by that name.
+;		DEAD	only when GPC.INPUT line 5 turned dead-code removal on: the source lines left
+;				out, then the bytes that saved -- pass zero's length less pass one's.
+
 ;
 ;		All three are computed here rather than stashed by WriteObjectCode: objPtr,
 ;		newWorkspacePage and runtimeEndPage all survive it unchanged, and WriteMapFile touches
@@ -111,6 +114,24 @@ _PMREmbedded:
 _PMRGP:
 		jsr 	PrintMessage
 _PMRDone:
+		lda 	dcEnabled 					; DEAD -- only when dead code was being removed
+		beq 	_PMREnd
+		ldx 	#DeadText & $FF
+		ldy 	#DeadText >> 8
+		jsr 	PrintMessage
+		lda 	dcListCount 				; the lines left out
+		sta 	reportValue
+		lda 	dcListCount+1
+		sta 	reportValue+1
+		jsr 	PrintDecimal
+		lda 	#' '
+		jsr 	$FFD2
+		lda 	dcRemovedBytes 				; ...and the bytes that saved
+		sta 	reportValue
+		lda 	dcRemovedBytes+1
+		sta 	reportValue+1
+		jsr 	PrintDecimal
+_PMREnd:
 		lda 	#13
 		jsr 	$FFD2
 		jmp 	PrintBankReport 			; ...and a line of its own for the banks, if there are any
@@ -292,6 +313,8 @@ BanksText:
 		.text 	"BANKS ",0
 MaxText:
 		.text 	" MAX ",0
+DeadText:
+		.text 	" DEAD ",0
 
 reportValue: 								; code section, not storage -- these belong to the
 		.fill 	3 							; 24 bit: the banked total passes 65,535 at eight banks

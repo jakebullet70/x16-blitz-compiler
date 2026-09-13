@@ -39,7 +39,7 @@ rem
 rem  Source: samples\GPC-HELP\GPB.HELP.BASL on GPB, THEME, STASH, STRCASE, APPSYS,
 rem  KB, MENUVERT, LINEINPUT, GUI and COMBO, all shipped in
 rem  samples\GPC-HELP\GPC-BASIC\ beside the sample so a rebuild needs nothing
-rem  from GPC-BASIC\. The object is SHARED, so GPB.RT.121.BIN has to sit beside
+rem  from GPC-BASIC\. The object is SHARED, so GPB.RT.122.BIN has to sit beside
 rem  the PRG on the drive. See samples\GPC-HELP\readme.md for the rebuild, and
 rem  for the measurements behind the three design decisions.
 rem ---------------------------------------------------------------------------

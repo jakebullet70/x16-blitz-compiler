@@ -74,6 +74,8 @@ CompilerRAMBankReg	= $0000
 ;				emptied to that region's own .Bnn file as it closes.
 ;			9	the LINE NUMBER TABLE, second half.
 ;			10	the BLOCK DEPTH, second half. It follows the line table's split exactly.
+;			11	DEAD-CODE REMOVAL's bit planes and swallow list (main/deadcode.asm), pass zero only.
+;			12	...and its edge list.
 ;			63	the GP.BANKEDSTR pool, growing DOWN from the top bank a 512K machine has.
 ;
 ;		BANKS 2 AND 4 WERE ONE BANK, and that was the wall. The two tables shared 8K, growing
@@ -104,6 +106,8 @@ CompilerDepthBank	= 5 					; block depth per line, alongside the line table
 CompilerBlockBank	= 6 					; where each block ends, and its alternatives
 CompilerStorageBank2 = 9 					; the second 8K the line table runs on down into
 CompilerDepthBank2	= 10 					; ...and the second 8K of depth bytes shadowing it
+CompilerDeadBank	= 11 					; dead-code removal: bit planes and swallow list
+CompilerEdgeBank	= 12 					; ...and the edges between lines
 
 ;
 ;		THE FLOOR OF THE LINE TABLE'S VIRTUAL ADDRESS SPACE. It starts at compilerEndHigh:$00,
@@ -267,6 +271,52 @@ blockSavedBank: 							; caller's RAM bank, saved across a block window
 		.fill 	1
 		.send 	storage
 
+;
+;		And two for DEAD-CODE REMOVAL (main/deadcode.asm): the bit planes and the swallow list in
+;		bank 11, the edge list in bank 12. Pass zero writes them, and only its end reads them
+;		back. Same rules. The saved-bank bytes are in deadcode.asm's code section, because the
+;		storage section is full.
+;
+dcplane_access .macro
+		php
+		pha
+		lda 	CompilerRAMBankReg
+		sta 	dcPlaneSavedBank
+		lda 	#CompilerDeadBank
+		sta 	CompilerRAMBankReg
+		pla
+		plp
+		.endm
+
+dcplane_release .macro
+		php
+		pha
+		lda 	dcPlaneSavedBank
+		sta 	CompilerRAMBankReg
+		pla
+		plp
+		.endm
+
+dcedge_access .macro
+		php
+		pha
+		lda 	CompilerRAMBankReg
+		sta 	dcEdgeSavedBank
+		lda 	#CompilerEdgeBank
+		sta 	CompilerRAMBankReg
+		pla
+		plp
+		.endm
+
+dcedge_release .macro
+		php
+		pha
+		lda 	dcEdgeSavedBank
+		sta 	CompilerRAMBankReg
+		pla
+		plp
+		.endm
+
 ; ************************************************************************************************
 ;
 ;									Changes and Updates
@@ -282,6 +332,7 @@ blockSavedBank: 							; caller's RAM bank, saved across a block window
 ;						end tables (the two-pass compiler).
 ;		08/09/26		Banks 9 and 10 added: a second half for the line table and for the
 ;						depth table, reached through STRPageLine. 4,096 lines.
+;		13/09/26		Banks 11 and 12 added for dead-code removal.
 ;
 ; ************************************************************************************************
 

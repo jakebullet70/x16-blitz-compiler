@@ -68,7 +68,7 @@ each stage printing elapsed time and the size of the files being written.
 | `x16emu.exe`, `rom.bin` | `bin/x16emu/` | both scripts die immediately |
 | `GPC.BIN` | `testing/` | the compiler engine — `make -C source/gpc` |
 | `BASLOAD-GPC.BIN`, `BASLOAD-GPC.PRG` | `testing/` | the tokeniser; `build_basl.py` stages it from `BASLOAD-GPC/build/` if that is newer |
-| `GPB.RT.121.BIN`, `GPC.RT.121.BIN` | `testing/` | `make -C source/runtime gpc-rt` |
+| `GPB.RT.122.BIN`, `GPC.RT.122.BIN` | `testing/` | `make -C source/runtime gpc-rt` |
 
 `121` is the **runtime** build number from `source/application/rtbuild.txt`. It is pinned
 and does not auto-bump, and moving it strands every SHARED object built against the old one

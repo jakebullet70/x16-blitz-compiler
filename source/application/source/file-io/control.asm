@@ -11,11 +11,15 @@
 ;
 ;		The compiler had SOURCE.PRG and OBJECT.PRG built into it, so the only way to point it at
 ;		a program was to rename files around it. It now reads GPC.INPUT, a plain text file of
-;		three lines, which is what lets another program drive it:
+;		five lines, which is what lets another program drive it:
 ;
 ;			DIR.PRG				line 1	the tokenised BASIC to compile
 ;			C.DIR.PRG			line 2	the object file to write
-;								line 3	options. Read, but ignored for now.
+;			M.DIR.PRG			line 3	the debug map, or empty for none
+;			SHARED				line 4	the compile mode, or empty for embedded
+;			D.DIR.PRG			line 5	the removed-line list, or empty to keep every line
+;
+;		A shorter file reads its missing lines as empty.
 ;
 ;		A line ends at CR, at LF, or at anything else below a space, and an empty line is
 ;		skipped -- so a control file written on a CRLF host is as good as one written on the X16.
@@ -30,14 +34,16 @@
 ;
 ; ************************************************************************************************
 
-CFLineSize = 64 							; each line is a fixed 64-byte slot; the four lines are one
-CFLineCount = 4 							; contiguous 256-byte block (source, object, map, mode).
+CFLineSize = 64 							; each line is a fixed 64-byte slot; the first four lines are
+CFLineCount = 5 							; one contiguous 256-byte block (source, object, map, mode).
 											; ReadControlFile counts lines (cfLine) and tracks CR/LF,
 											; so an EMPTY line still advances -- an empty line 3 (no
 											; map) must not mis-slot line 4 (the mode). Fixed slots
 											; mean a single index walks the block with no pointer,
 											; which matters because the KERNAL calls here are free
-											; to trash zero page.
+											; to trash zero page. Line 5 starts at offset 256, where
+											; the eight-bit index is back at 0, so it has a store of
+											; its own.
 
 		.section code
 
@@ -50,12 +56,17 @@ CFLineCount = 4 							; contiguous 256-byte block (source, object, map, mode).
 ; ************************************************************************************************
 
 ReadControlFile:
-		lda 	#0 							; blank all FOUR lines (256 bytes). This zero-terminates
-		tax 								; each of them and leaves a short control file holding
-_RCFBlank: 									; empty strings rather than whatever was in memory.
-		sta 	SourceFile,x
+		lda 	#0 							; blank all FIVE lines. This zero-terminates each of
+		tax 								; them and leaves a short control file holding empty
+_RCFBlank: 									; strings rather than whatever was in memory.
+		sta 	SourceFile,x 				; the first four, 256 bytes
 		inx
 		bne 	_RCFBlank
+		ldx 	#CFLineSize
+_RCFBlankList:
+		sta 	DeadListFile-1,x 			; and the fifth
+		dex
+		bne 	_RCFBlankList
 
 		ldy 	#ControlFile >> 8
 		ldx 	#ControlFile & $FF
@@ -92,7 +103,14 @@ _RCFStore:
 		cmp 	#CFLineSize-1 				; rather than running on into the next line.
 		pla
 		bcs 	_RCFRead
+		ldy 	cfLine 						; line 5 is past the eight-bit index
+		cpy 	#CFLineCount-1
+		bcs 	_RCFStoreList
 		sta 	SourceFile,x
+		inx
+		bra 	_RCFRead
+_RCFStoreList:
+		sta 	DeadListFile,x
 		inx
 		bra 	_RCFRead
 
@@ -111,8 +129,9 @@ _RCFSetCR:
 		inc 	cfLine 						; advance even on an empty line -- so an empty line 3 (no
 		lda 	cfLine 						; map) does not mis-slot line 4 (the mode), which the old
 		cmp 	#CFLineCount 				; positional walker got wrong.
-		bcs 	_RCFClose 					; captured all four lines -> stop, ignore any more
-		asl 	a 							; X = cfLine * CFLineSize (64) = start of the next line
+		bcs 	_RCFClose 					; captured all five lines -> stop, ignore any more
+		asl 	a 							; X = cfLine * CFLineSize (64) = start of the next line,
+											; modulo 256: line 5 starts at 0 in DeadListFile
 		asl 	a
 		asl 	a
 		asl 	a
@@ -313,7 +332,7 @@ NotProgramText:
 
 ; ************************************************************************************************
 ;
-;		The three lines of GPC.INPUT, laid out as one contiguous block -- see CFLineSize above.
+;		The five lines of GPC.INPUT, laid out as one contiguous block -- see CFLineSize above.
 ;
 ;		These are buffers, but they are deliberately NOT in the storage section. That section is
 ;		a .dsection at $0400 (common.inc) and the code starts at $0801, so it is a 1K hole -- and
@@ -332,7 +351,9 @@ OptionsText: 								; line 3 : the debug map file name, or empty for none
 ModeText: 									; line 4 : compile mode -- first byte 'S' (SHARED) selects
 		.fill 	CFLineSize 					; the resident runtime (GPC.RT.nnn.BIN); empty/anything else
 											; = the default self-contained (embedded) runtime.
-cfLine: 									; ReadControlFile scratch: current line, 0..3
+DeadListFile: 								; line 5 : the removed-line list, or empty to keep every
+		.fill 	CFLineSize 					; line. Past the 256-byte block, see ReadControlFile.
+cfLine: 									; ReadControlFile scratch: current line, 0..4
 		.fill 	1
 cfJustCR: 									; ReadControlFile scratch: nonzero if the last byte was a CR
 		.fill 	1

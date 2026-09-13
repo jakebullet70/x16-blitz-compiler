@@ -63,8 +63,7 @@ CommandAsmCompile:
 		jsr 	AsmRequireEOL 				; GP.ASM is alone on its line
 
 _CACNextLine:
-		lda 	#BLC_READIN 				; pull the next source line ourselves
-		jsr 	CallAPIHandler
+		jsr 	ReadSourceLine 				; pull the next source line ourselves
 		bcc 	_CACNoEnd 					; source ran out with the block still open
 		jsr 	ProcessNewLine 				; srcPtr and currentLineNumber for the line just read
 

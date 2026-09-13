@@ -43,6 +43,8 @@ CompilerAPI:
 		beq 	_CARegionOpen
 		cmp 	#BLC_REGIONDONE
 		beq 	_CARegionDone
+		cmp 	#BLC_ENDPASS0
+		beq 	_CAEndPass0
 		.debug
 
 ; ************************************************************************************************
@@ -64,6 +66,17 @@ _CAEndPass1:
 
 _CAEndPass2:
 		jmp 	ObjStreamClose
+
+; ************************************************************************************************
+;
+;		End of pass zero, which runs only when dead code is being removed. The GP usage scan
+;		marked handlers for every line pass zero compiled, and pass one may leave some of those
+;		lines out, so the scan starts again.
+;
+; ************************************************************************************************
+
+_CAEndPass0:
+		jmp 	GPScanReset
 
 ; ************************************************************************************************
 ;
