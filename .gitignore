@@ -309,3 +309,6 @@ samples/GPC-HELP/GPC.RC.*.BIN
 # "release.sh stage" -- and it also holds XFMGR and XT, which are the developer's own
 # tools and never go in the zip. The zip itself matches the gpc-release-*.zip rule below.
 release/TMP/
+
+# OASIS/ is not part of this repository and never goes in git.
+OASIS/
