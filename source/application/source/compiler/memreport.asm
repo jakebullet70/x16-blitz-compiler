@@ -25,8 +25,13 @@
 ;				IN if some keyword reached it and the whole runtime had to go in. Named for the
 ;				language, not abbreviated to "GP": the block it is reporting on is the GP.BASIC
 ;				one, and the line is read by people who know the language by that name.
-;		DEAD	only when GPC.INPUT line 5 turned dead-code removal on: the source lines left
-;				out, then the bytes that saved -- pass zero's length less pass one's.
+;
+;		DEAD CODE, a second line and only when GPC.INPUT line 5 turned dead-code removal on:
+;
+;			DEAD CODE:   74 LINES REMOVED,  646 BYTES SAVED
+;
+;				the source lines left out, then the bytes that saved -- pass zero's length less
+;				pass one's. Both numbers are right-aligned four wide (PrintDecimalField).
 
 ;
 ;		All three are computed here rather than stashed by WriteObjectCode: objPtr,
@@ -114,7 +119,12 @@ _PMREmbedded:
 _PMRGP:
 		jsr 	PrintMessage
 _PMRDone:
-		lda 	dcEnabled 					; DEAD -- only when dead code was being removed
+		lda 	#13
+		jsr 	$FFD2
+		;
+		;		DEAD CODE -- a line of its own, and only when dead code was being removed.
+		;
+		lda 	dcEnabled
 		beq 	_PMREnd
 		ldx 	#DeadText & $FF
 		ldy 	#DeadText >> 8
@@ -123,17 +133,23 @@ _PMRDone:
 		sta 	reportValue
 		lda 	dcListCount+1
 		sta 	reportValue+1
-		jsr 	PrintDecimal
-		lda 	#' '
-		jsr 	$FFD2
+		lda 	#4
+		jsr 	PrintDecimalField
+		ldx 	#LinesRemovedText & $FF
+		ldy 	#LinesRemovedText >> 8
+		jsr 	PrintMessage
 		lda 	dcRemovedBytes 				; ...and the bytes that saved
 		sta 	reportValue
 		lda 	dcRemovedBytes+1
 		sta 	reportValue+1
-		jsr 	PrintDecimal
-_PMREnd:
+		lda 	#4
+		jsr 	PrintDecimalField
+		ldx 	#BytesSavedText & $FF
+		ldy 	#BytesSavedText >> 8
+		jsr 	PrintMessage
 		lda 	#13
 		jsr 	$FFD2
+_PMREnd:
 		jmp 	PrintBankReport 			; ...and a line of its own for the banks, if there are any
 
 ; ************************************************************************************************
@@ -238,8 +254,18 @@ _PBRNotMax:
 
 
 PrintDecimal:
-		stz 	reportValue+2 				; the 16 bit entry: two bytes set, third assumed zero
+		lda 	#1 							; no field: one digit wide pads nothing
+PrintDecimalField: 							; A = field width, the number right-aligned in spaces
+		stz 	reportValue+2 				; the 16 bit entries: two bytes set, third assumed zero
+		bra 	PrintDecimalWidth
 PrintDecimal24:
+		lda 	#1
+PrintDecimalWidth:
+		sta 	reportTemp 					; six digit positions, so a leading zero is a space from
+		lda 	#6 							; power 6 - width on. reportTemp only holds the width
+		sec 								; here; the subtraction loop writes over it
+		sbc 	reportTemp
+		sta 	reportPadFrom
 		stz 	reportLead 					; 0 while we are still dropping leading zeros
 		ldx 	#0
 _PDPow:
@@ -265,11 +291,16 @@ _PDSub:
 _PDUnder:
 		cpy 	#48 						; a zero digit ...
 		bne 	_PDEmit
-		lda 	reportLead 					; ... is dropped while still leading
-		beq 	_PDNext
+		lda 	reportLead
+		bne 	_PDEmit
+		cpx 	reportPadFrom 				; ... is dropped while still leading, or written as a
+		bcc 	_PDNext 					; space once it is inside the field
+		ldy 	#' '
+		bra 	_PDWrite
 _PDEmit:
 		lda 	#1
 		sta 	reportLead
+_PDWrite:
 		phx
 		tya
 		jsr 	$FFD2 						; CHROUT makes no promise about X
@@ -314,13 +345,19 @@ BanksText:
 MaxText:
 		.text 	" MAX ",0
 DeadText:
-		.text 	" DEAD ",0
+		.text 	"DEAD CODE: ",0
+LinesRemovedText:
+		.text 	" LINES REMOVED, ",0
+BytesSavedText:
+		.text 	" BYTES SAVED",0
 
 reportValue: 								; code section, not storage -- these belong to the
 		.fill 	3 							; 24 bit: the banked total passes 65,535 at eight banks
 reportTemp: 								; written, so they cost a compiled program nothing.
 		.fill 	2 							; See the note in file-io/read.asm.
 reportLead:
+		.fill 	1
+reportPadFrom: 								; the first power whose leading zero is a space, not dropped
 		.fill 	1
 bankPages: 									; pages across every region, and the widest single one
 		.fill 	2

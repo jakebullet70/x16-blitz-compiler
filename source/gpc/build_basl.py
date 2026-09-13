@@ -296,11 +296,19 @@ def build_tool(basl_name, prg_name):
 
 
 def main():
+    global TESTING, BASLOAD_DRIVE
+    args = sys.argv[1:]
+    #   --drive DIR tokenises where a sample lives rather than in testing/. Its #INCLUDEs name
+    #   the module folder beside it, so nothing is staged first.
+    if len(args) >= 2 and args[0] == "--drive":
+        TESTING = os.path.abspath(args[1])
+        BASLOAD_DRIVE = os.path.join(TESTING, "BASLOAD-GPC.BIN")
+        args = args[2:]
     for f, what in ((EMU, "x16emu.exe"), (ROM, "rom.bin")):
         if not os.path.exists(f):
             die("missing %s (%s)" % (what, f))
-    if len(sys.argv) >= 3:
-        build_tool(sys.argv[1], sys.argv[2])
+    if len(args) >= 2:
+        build_tool(args[0], args[1])
     else:
         build_front_end()
     sys.exit(0)

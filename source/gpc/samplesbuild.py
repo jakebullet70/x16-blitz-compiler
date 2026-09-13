@@ -32,6 +32,8 @@ ROOTLIB = os.path.join(ROOT, "GPC-BASIC")
 #       install  where the object goes and under what name -- None leaves it in testing\,
 #                which is already the drive its demo bat mounts
 #       data     further files the install folder needs beside the object
+#       inplace  build in the src folder, which is the drive: its #INCLUDEs name GPC-BASIC/,
+#                so nothing is staged into testing\ (the folder needs GPC.BIN beside it)
 #
 PROGRAMS = [
     dict(name="GPBMODS",
@@ -42,7 +44,7 @@ PROGRAMS = [
     dict(name="GPB.HELP",
          src=("samples/GPC-HELP", "GPB.HELP.BASL"),
          lib="samples/GPC-HELP/GPC-BASIC",
-         extras=[], shared=True,
+         extras=[], shared=True, inplace=True,
          install=("samples/GPC-HELP", "GPB.HELP.PRG"), data=["runtimes"]),
 
     dict(name="COLORTST",
@@ -134,7 +136,7 @@ def stage_sources(prog):
         shutil.copy(os.path.join(srcdir, extra), os.path.join(TESTING, extra))
 
 
-def install(prog, stem):
+def install(prog, stem, drive):
     #   No install folder means the object already sits on the drive its demo bat mounts.
     if not prog["install"]:
         print("   stays in testing\\", flush=True)
@@ -143,12 +145,16 @@ def install(prog, stem):
     folder, asname = prog["install"]
     dest = os.path.join(ROOT, *folder.split("/"))
     os.makedirs(dest, exist_ok=True)
-    shutil.copy(os.path.join(TESTING, stem + ".PRG"), os.path.join(dest, asname))
+    #   an in-place build compiled straight into its install folder
+    same = os.path.normcase(os.path.abspath(drive)) == os.path.normcase(os.path.abspath(dest))
+    if not (same and asname == stem + ".PRG"):
+        shutil.copy(os.path.join(drive, stem + ".PRG"), os.path.join(dest, asname))
     print("   installed:", os.path.join(folder, asname), flush=True)
 
-    for f in sorted(os.listdir(TESTING)):
+    for f in sorted(os.listdir(drive)):
         if f.startswith(stem + ".B") and f[len(stem) + 2:].isdigit():
-            shutil.copy(os.path.join(TESTING, f), os.path.join(dest, f))
+            if not same:
+                shutil.copy(os.path.join(drive, f), os.path.join(dest, f))
             print("   installed:", os.path.join(folder, f), flush=True)
 
     if "runtimes" in prog["data"]:
@@ -199,17 +205,22 @@ def build(prog):
     print("=" * 70, flush=True)
     print("==", name, "(%s)" % ("SHARED" if prog["shared"] else "EMBEDDED"), flush=True)
 
-    stage_sources(prog)
+    if prog.get("inplace"):
+        drive = os.path.join(ROOT, *prog["src"][0].split("/"))
+    else:
+        drive = TESTING
+        stage_sources(prog)
     #   a changed .INC.BL is invisible to build_basl.py's up-to-date check
     for junk in (stem + ".SRC.PRG", stem + ".PRG", stem + ".MAP", stem + ".SRC.SYM"):
-        p = os.path.join(TESTING, junk)
+        p = os.path.join(drive, junk)
         if os.path.exists(p):
             os.remove(p)
 
     started = time.time() - 2          # a small allowance for clock granularity
 
-    src = os.path.join(TESTING, stem + ".SRC.PRG")
-    if run([os.path.join(GPCDIR, "build_basl.py"), prog["src"][1], stem + ".SRC.PRG"], name, src):
+    src = os.path.join(drive, stem + ".SRC.PRG")
+    if run([os.path.join(GPCDIR, "build_basl.py"), "--drive", drive,
+            prog["src"][1], stem + ".SRC.PRG"], name, src):
         print("!! tokenise FAILED for", name, "-- nothing was compiled", flush=True)
         return False
     if not os.path.exists(src):
@@ -220,31 +231,31 @@ def build(prog):
     #   THE EXIT STATUS IS THE ANSWER, not whether an output file turned up.  A stage that
     #   fails partway can still leave a plausible file behind; on 11th Sep 2026 one was
     #   taken for a good tokenise and handed to the compiler, which spent 420 seconds on it.
-    cmd = [os.path.join(GPCDIR, "compile_shared.py")]
+    cmd = [os.path.join(GPCDIR, "compile_shared.py"), "--drive", drive]
     if not prog["shared"]:
         cmd.append("--embedded")
     cmd += [stem + ".SRC.PRG", stem + ".PRG", stem + ".MAP"]
-    rc = run(cmd, name, [os.path.join(TESTING, "GPCCOMP.LOG"),
-                         os.path.join(TESTING, stem + ".PRG"),
-                         os.path.join(TESTING, stem + ".MAP")])
+    rc = run(cmd, name, [os.path.join(drive, "GPCCOMP.LOG"),
+                         os.path.join(drive, stem + ".PRG"),
+                         os.path.join(drive, stem + ".MAP")])
 
-    obj = os.path.join(TESTING, stem + ".PRG")
+    obj = os.path.join(drive, stem + ".PRG")
     if rc or not os.path.exists(obj):
         print("   -- compile FAILED; the real message is in",
-              os.path.join(TESTING, "GPCCOMP.LOG"), flush=True)
+              os.path.join(drive, "GPCCOMP.LOG"), flush=True)
         return False
     print("   compiled:", format(os.path.getsize(obj), ","), "bytes", flush=True)
 
     #   ONLY overlays this build wrote.  A failed compile used to report the PREVIOUS build's
     #   overlays as if they were new.  The suffix is .Bnn and nn reaches 63, not .B0n.
-    for f in sorted(os.listdir(TESTING)):
+    for f in sorted(os.listdir(drive)):
         if f.startswith(stem + ".B") and f[len(stem) + 2:].isdigit():
-            p = os.path.join(TESTING, f)
+            p = os.path.join(drive, f)
             fresh = os.path.getmtime(p) >= started
             print("   overlay", f, format(os.path.getsize(p), ","),
                   "" if fresh else "<-- STALE, not from this build", flush=True)
 
-    install(prog, stem)
+    install(prog, stem, drive)
     return True
 
 

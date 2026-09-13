@@ -2906,6 +2906,14 @@ Wanted, at minimum:
   conditional; a program with regions has a fourth number and there is nowhere to put it. Decide
   whether the report stays one line and grows, or becomes a short block. A block is the honest
   answer once banks are in it, and the compiler is not printing this in a loop.
+- **Dead code on its own line, in words — WRITTEN 2026-09-13, not yet run.** It was two bare numbers on the end of the line,
+  `... RT SHARED RT DEAD 74 646`, and nothing said the first was lines and the second bytes. It now
+  prints on a new line:
+
+      DEAD CODE:   74 LINES REMOVED,  646 BYTES SAVED
+
+  Still only when `GPC.INPUT` line 5 turned the option on. The numbers are `dcListCount` and pass
+  zero's length less pass one's, as now.
 
 `FREE` already excludes the 4K frame stack gap, which is correct and should stay — but the report
 should say so, because a number that is deliberately 4,096 short of the arithmetic looks like a bug

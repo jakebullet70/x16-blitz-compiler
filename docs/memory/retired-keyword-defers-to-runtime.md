@@ -5,8 +5,14 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 5591d6bc-636d-4001-b0b0-d858156d6ec0
-  modified: 2026-09-01T16:20:40.265Z
+  modified: 2026-09-12T19:50:38.110Z
 ---
+
+> **PARTLY SUPERSEDED (checked 2026-09-12).** A statement-position TOKEN that no generator claims
+> no longer defers: `_MCLNoHandler` (`compiler/main/compiler.asm:188-205`) raises `NOT IMPLEMENTED @
+> <line>` and aborts. That is how `DOS` stops OASIS's MKFILL in pass 1. What still defers is a
+> genuine SYNTAX error, e.g. `IF X THEN NAME` where NAME is not a resolved label -- deferscan.py
+> is still the check for those.
 
 **Confirmed twice on 2026-09-01, both times after a keyword left the GP block for a `GP.ASM` module.**
 

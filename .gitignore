@@ -312,3 +312,7 @@ release/TMP/
 
 # OASIS/ is not part of this repository and never goes in git.
 OASIS/
+samples/GPC-HELP/GPB.HELP.SRC.SYM
+samples/GPC-HELP/GPC.INPUT
+samples/GPC-HELP/M.GPB.HELP.SRC.PRG
+samples/GPC-HELP/GPC.INPUT

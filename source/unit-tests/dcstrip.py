@@ -103,7 +103,7 @@ def one(entry, gpc):
         return entry, time.time() - started, removed, "stripped, option off: " + v_off
 
     diffs = []
-    m = re.match(r"(.*) DEAD ([0-9]+) ([0-9]+)$", v_on)
+    m = re.match(r"(.*) DEAD CODE: +([0-9]+) LINES REMOVED, +([0-9]+) BYTES SAVED$", v_on)
     if not m:
         diffs.append("no DEAD figures in [%s]" % v_on)
     else:

@@ -17,6 +17,7 @@ sibling project: what is kept is a fact about **X16 BASIC or the X16 itself**, n
 - [No ship language, no unasked builds](no-ship-language-this-is-dev.md) — no build, no help regen, unless asked
 - [Never build PICKDEMO](never-build-pickdemo.md) — standing order; not even to verify a banked build
 - [Commit to main directly](commit-to-main-directly.md) — solo repo, no branch, no review
+- [Never commit OASIS](never-commit-oasis.md) — stage by name; OASIS/ is ignored and purged from history
 - [Compiler must not cap program size](compiler-must-not-cap-program-size.md) — a build-side wall is a bug; compiler growth now costs a program zero
 - [No backward compatibility needed](no-backward-compatibility-needed.md) — forced recompiles cost nothing
 - [Ask before writing asm](ask-before-writing-asm.md) — standing order: agree GP.ASM or 64tass first
@@ -24,6 +25,7 @@ sibling project: what is kept is a fact about **X16 BASIC or the X16 itself**, n
 - [User runs concurrent agents here](user-runs-concurrent-agents-here.md) — re-read before any write
 - [Compile shared, not embedded](compile-shared-not-embedded.md) — SHARED is the p-code number
 - [Library working copy, then root](library-working-copy-then-root.md) — edit in samples/GPB-MODS-TESTING/GPC-BASIC/; drift runs BOTH ways
+- [Samples build in place](samples-build-in-place.md) — never stage a sample into testing/; --drive and inplace=True, GPB.HELP first
 - [Build, report, hand it back](build-report-dont-investigate.md) — a remark about speed is not a request to profile
 - [Run builds in the background](run-builds-in-background.md) — a typed message cancels an in-flight tool
 - [Compact early, not at the end](compact-early-not-at-the-end.md) — after every step; cost is context size x turns
@@ -137,9 +139,10 @@ sibling project: what is kept is a fact about **X16 BASIC or the X16 itself**, n
 - [Banked code loses the bank on a call out](gp-banked-call-out-loses-the-bank.md) — and may not BANK itself back
 - [FILEDIR banks whole](filedir-bank-split.md) — BUILT; the switch moved into its two blobs
 - [GPBMODS resident p-code breakdown](gpbmods-resident-pcode-breakdown.md) — the shell is 79%, all eight modules 21%
-- [Dead-code elimination, measured](basl-dead-code-elimination-measured.md) — PARKED; 691 B free by deleting two #INCLUDEs
+- [Dead-code elimination, measured](basl-dead-code-elimination-measured.md) — 691 B free by deleting two #INCLUDEs; compiler-option plan in docs/blitz/DEAD-CODE-ELIMINATION.PLAN.md
 - [VRAM-to-VRAM memory_copy limits](vram-to-vram-memory-copy-limits.md) — 15,360 in one call; descending overlap is safe
 - [Array element sizes, measured](array-element-sizes-measured.md) — a `%` array is TWO bytes an element, untyped SIX
+- [INT16 conversion planned](int16-conversion-planned.md) — not started; handoff in GPB-MODS-TESTING, int16scan.py is the check
 - [Byte data type feasibility](byte-data-type-feasibility.md) — STUDY ONLY; the opcode space refuses byte SCALARS
 - [KERNAL preserves the RAM bank](kernal-preserves-ram-bank.md) — measure it in asm, PEEK(0) cannot see it
 - [X16 ROM internal calls](x16-rom-internal-calls.md) — verified R49 dispatcher/GC addresses and ZP pointers

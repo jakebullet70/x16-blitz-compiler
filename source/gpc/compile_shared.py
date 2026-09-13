@@ -191,13 +191,22 @@ def compile_one(source, obj, mapfile="", shared=True):
 
 
 def main():
+	global TESTING, GPC_INPUT
 	args = sys.argv[1:]
 	shared = True
-	if args and args[0] == "--embedded":
-		shared = False
-		args = args[1:]
+	#		--drive DIR compiles where a sample lives rather than in testing/.
+	while args and args[0] in ("--embedded", "--drive"):
+		if args[0] == "--embedded":
+			shared = False
+			args = args[1:]
+		elif len(args) >= 2:
+			TESTING = os.path.abspath(args[1])
+			GPC_INPUT = os.path.join(TESTING, "GPC.INPUT")
+			args = args[2:]
+		else:
+			break
 	if len(args) not in (2, 3):
-		die("usage: compile_shared.py [--embedded] <source.prg> <object.prg> [map]")
+		die("usage: compile_shared.py [--drive DIR] [--embedded] <source.prg> <object.prg> [map]")
 	compile_one(args[0], args[1], args[2] if len(args) == 3 else "", shared)
 
 

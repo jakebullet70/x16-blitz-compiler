@@ -102,8 +102,11 @@ def compile_one(entry, gpc, inputs, dead, run="run"):
                         time.sleep(0.5)
                     time.sleep(1.0)
                     echo = open(logpath, "rb").read()
-                    line = echo[ok:].split(b"\r")[0].split(b"\n")[0]
-                    verdict = line.decode("latin-1").strip()
+                    lines = echo[ok:].decode("latin-1").replace("\r", "\n").split("\n")
+                    lines = [s.strip() for s in lines if s.strip()]
+                    verdict = lines[0]
+                    if len(lines) > 1 and lines[1].startswith("DEAD CODE:"):
+                        verdict += " " + lines[1]
                     break
                 at = echo.find(b"GPC SQUEALING")
                 if at >= 0 and b"READY." in echo[at:]:

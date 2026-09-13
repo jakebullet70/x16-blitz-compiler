@@ -196,7 +196,11 @@ def compile_one(name, gpc, shared, dead):
                 if ok >= 0:
                     time.sleep(1.0)
                     echo = open(logpath, "rb").read()
-                    verdict = echo[ok:].split(b"\r")[0].split(b"\n")[0].decode("latin-1").strip()
+                    lines = echo[ok:].decode("latin-1").replace("\r", "\n").split("\n")
+                    lines = [s.strip() for s in lines if s.strip()]
+                    verdict = lines[0]
+                    if len(lines) > 1 and lines[1].startswith("DEAD CODE:"):
+                        verdict += " " + lines[1]
                     break
                 at = echo.find(b"GPC SQUEALING")
                 if at >= 0 and b"READY." in echo[at:]:
@@ -227,7 +231,7 @@ def check(name, gpc):
         if not off.startswith("OK CODE"):
             problems.append("option off: " + off)
         return verdict, problems
-    m = re.search(r" DEAD ([0-9]+) ([0-9]+)$", verdict)
+    m = re.search(r" DEAD CODE: +([0-9]+) LINES REMOVED, +([0-9]+) BYTES SAVED$", verdict)
     if not verdict.startswith("OK CODE"):
         problems.append("did not compile")
     elif not m or removed is None or int(m.group(1)) != len(removed):

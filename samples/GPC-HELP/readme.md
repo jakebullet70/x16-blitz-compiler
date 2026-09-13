@@ -96,17 +96,16 @@ and part two of a split carries no Markdown.
 
 ## Rebuilding the program
 
-`BASLOAD` resolves `#INCLUDE` off the drive and `build_basl.py` uses `testing\` as the emulator's
-filesystem root, so everything stages there first. `python` and `make` are off PATH; see
-`documents/local.make`.
+It builds in this folder, with nothing staged into `testing\`. The source includes its modules as
+`GPC-BASIC/NAME.INC.BL`, and `GPC.BIN` and `BASLOAD-GPC.BIN` sit beside it. `python` and `make`
+are off PATH; see `documents/local.make`.
 
 ```
-copy samples\GPC-HELP\GPB.HELP.BASL       testing\
-copy samples\GPC-HELP\GPC-BASIC\*.INC.BL  testing\
-xcopy /e /i samples\GPC-HELP\HELP-TXT     testing\HELP-TXT
-python source\gpc\build_basl.py      GPB.HELP.BASL GPB.HELP.SRC.PRG
-python source\gpc\compile_shared.py --embedded GPB.HELP.SRC.PRG GPB.HELP.PRG
+python source\gpc\build_basl.py     --drive samples\GPC-HELP GPB.HELP.BASL GPB.HELP.SRC.PRG
+python source\gpc\compile_shared.py --drive samples\GPC-HELP --embedded GPB.HELP.SRC.PRG GPB.HELP.PRG
 ```
+
+`python source\gpc\samplesbuild.py GPB.HELP` runs the same two steps.
 
 then copy `GPB.HELP.PRG` back here. **EMBEDDED, not shared**, so this directory stands on its own
 without a `GPB.RT.nnn.BIN` whose name carries a build number. 23,772 bytes.

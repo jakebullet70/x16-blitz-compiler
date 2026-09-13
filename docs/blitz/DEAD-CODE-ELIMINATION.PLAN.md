@@ -369,8 +369,9 @@ them after pass one.
 ### 3.8 Report
 
 - Pass zero prints `PASS 0` and its dots, as the other passes do.
-- The `OK` line gains `DEAD <lines> <bytes>` (`application/source/compiler/memreport.asm`). The bytes
-  are pass zero's length less pass one's.
+- A second line follows the `OK` line, `DEAD CODE:   74 LINES REMOVED,  646 BYTES SAVED`
+  (`application/source/compiler/memreport.asm`), both numbers right-aligned four wide. The bytes are
+  pass zero's length less pass one's.
 - The debug map needs no change. A removed line has no entry in it.
 
 ## 4. Build order
