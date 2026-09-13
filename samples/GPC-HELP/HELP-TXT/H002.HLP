@@ -6,8 +6,8 @@
 .
 :#INCLUDE "GPB.INC.BL"
 .
-.BASLOAD knows only the ROM's keywords. Without that line GP.DO 5 is a syntax
-.error.
+.BASLOAD knows only the X16 ROM's keywords. Without that line above 
+.in your program GP.DO 5 is a syntax error.
 .
 =Where the library lives
 .
@@ -20,24 +20,9 @@
 .absolute (/GPC-BASIC/GPB.INC.BL) and relative (GPC-BASIC/GPB.INC.BL) forms.
 .Use the leading slash: it is absolute from the drive root and still resolves
 .when the program sits in a subdirectory. ../ and // are not understood by
-.the filesystem, so a path descends and never rises.
-.
-.Then BASLOAD and GPC as usual: BASLOAD "MYPROG.BL", then compile the
-.resulting PRG with GPC.PRG.
-.
-=A program that uses GP.BASIC is compile-only
-.
-.One GP.BASIC keyword is enough. BASLOAD encodes them as the byte pairs
-.$CE58-$CE7F and stock BASIC has no handler behind them, so the ROM can
-.neither LIST nor RUN the result. It is compiler input.
-.
-.Run GPC.PRG on BASLOAD's .PRG, then run the object it writes.
+.the filesystem.
 .
 =Numbers, and what a variable holds
-.
-.One numeric type on the evaluation stack: a 4-byte mantissa, a 1-byte
-.exponent and a status byte carrying the sign. Exponent 0 means the value is
-.an exact integer.
 .
 .  A A()
 .      BYTES: 6

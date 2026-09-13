@@ -24,12 +24,10 @@
 .stale runtime under a fixed name would still be found, and the mismatch
 .would not show until something ran wrong.
 .
-.Both shared runtimes are needed. Which one a program wants is decided when
-.it is compiled, not when it runs, so a drive carrying only one works for
-.half the programs built against it. A program that cannot find its runtime
-.prints ?RT and stops.
+.Both shared runtimes are needed for compiling. Which one a program needs
+.is decided when it is compiled, not when it runs. A program that cannot
+.find its runtime prints ?RT and stops.
 .
 .The front end needs GPB.RT.nnn.BIN for itself: GPC.PRG is a compiled
-.GP.BASIC program built in shared mode. The compiler front end is written in
-.the language it compiles. The engine behind it, GPC.BIN, is 100% assembly.
+.GP.BASIC program built in shared mode. GPC.BIN, is 100% assembly.
 .

@@ -33,11 +33,6 @@
 .      BASIC
 .      STASHVRAMGC.INC.BL -- SV.COMPACT - SEC 4.19
 .
-.The rule is in SEC 1: assembly for tight loops and bulk data moves, BASIC
-.for everything else, and a composite for anything that is only a spelling of
-.keywords already present. A menu waits on a human, so MENUVERT is BASIC; as
-.a keyword it would cost every GP program 462 bytes whether or not it used a
-.menu.
 .
 .The keywords in detail. Square brackets mean optional. Optionals cannot be
 .skipped over: GP.BOX X,Y,W,H,,7 is a syntax error -- write out the default

@@ -10,8 +10,7 @@
 =WHAT IT COSTS
 .
 .  ASM: GP.CALL GP.A GP.X GP.Y GP.C
-.    ASM -- a keyword, run by machine code in the GP runtime block. A program
-.    using ANY GP keyword pays for the whole block.
+.    ASM -- a keyword, run by machine code in the GP runtime block.
 .
 =DESCRIPTION
 .

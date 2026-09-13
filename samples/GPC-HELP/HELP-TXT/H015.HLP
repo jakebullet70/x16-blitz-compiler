@@ -5,8 +5,6 @@
 =WHAT IT COSTS
 .
 .  ASM: GP.INSTR GP.STRPTR GP.COMP
-.    ASM -- a keyword, run by machine code in the GP runtime block. A program
-.    using ANY GP keyword pays for the whole block.
 .  COMPOSITE: GP.CONTAINS GP.ISEMPTY
 .    COMPOSITE -- a keyword with no machine code of its own. The compiler
 .    expands it into keywords that already exist, so it costs the runtime

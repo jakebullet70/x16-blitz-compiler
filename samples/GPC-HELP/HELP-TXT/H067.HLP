@@ -86,8 +86,7 @@
 .  constants
 .      STRCASE.UPPER STRCASE.LOWER
 .
-.#SYMFILE again. Do not write #AUTONUM in a program that includes this -- it
-.sets the STEP, and only the default 1 survives.
+.#SYMFILE again. Do not use #AUTONUM in a program that includes this!
 .
 =EXAMPLE PROGRAM
 .
