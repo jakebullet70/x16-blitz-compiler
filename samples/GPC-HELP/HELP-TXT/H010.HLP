@@ -38,7 +38,7 @@
 .
 .  Inline assembly
 .      COMPOSITE
-.      GP.ASM GP.ENDASM -- free, and stays GP-BASIC OUT, see SEC 3.9
+.      GP.ASM GP.ENDASM -- free, and leaves the block out, see SEC 3.9
 .
 .  Strings
 .      ASM
@@ -63,7 +63,7 @@
 .
 .  Routine calls
 .      COMPOSITE
-.      GP.DEFPROC GP.SUB -- free, and stays GP-BASIC OUT, see SEC 3.11
+.      GP.DEFPROC GP.SUB -- free, and leaves the block out, see SEC 3.11
 .
 .  Routine calls
 .      ASM

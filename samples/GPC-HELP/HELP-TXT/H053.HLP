@@ -1,75 +1,46 @@
-@4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+@4.17 COMBO.INC.BL -- a drop-down list that folds into one row
 .
-=4.18 STASHVRAM.INC.BL -- RECTANGLES AND BLOBS, KEPT IN VRAM
+=4.17 COMBO.INC.BL -- A DROP-DOWN LIST THAT FOLDS INTO ONE ROW
 .
 =DESCRIPTION
 .
-.  SV.INIT
-.      IN: SV.BASE SV.TOP SV.MAX
-.      OUT: SV.OK
+.  COMBO.ADD
+.      IN: COMBO.X COMBO.Y COMBO.W COMBO.COUNT COMBO.SEL COMBO.BANK, over
+.        MENUVERT.ITEM$()
+.      OUT: COMBO.SEL
 .
-.  SV.SAVE
-.      IN: SV.X SV.Y SV.W SV.H
-.      OUT: SV.HND SV.OK
+:MENUVERT.ITEM$(1) = " TEXAS"
+:MENUVERT.ITEM$(2) = " UTAH"
+:COMBO.X = GUI.INNER.LEFT : COMBO.Y = GUI.INNER.TOP
+:COMBO.W = 16 : COMBO.COUNT = 2 : COMBO.SEL = 1
+:GOSUB COMBO.ADD
+:' ... run the form ... the answer is in COMBO.SEL
 .
-.  SV.RESTORE
-.      IN: SV.HND SV.MOVE SV.X SV.Y
-.      OUT: SV.OK
+.Only COMBO.ADD is called by an application. COMBO.DRAW, COMBO.KEY and
+.COMBO.OPEN are reached by GUI.FORM, which dispatches a GUI.CT.COMBO control
+.to them by name. The call goes between GUI.OPEN and GUI.FORM.RUN.
 .
-.  SV.PUT
-.      IN: SV.ADDR SV.LEN
-.      OUT: SV.HND SV.OK
+.COMBO.W is the width in cells, brackets included; 5 is the floor and
+.anything less is raised to it. COMBO.BANK is where the dropdown saves the
+.cells it covers, and 0 takes GUI.BANK -- which is what the dialog around it
+.is already using. The caller owns the DIM of MENUVERT.ITEM$().
 .
-.  SV.GET
-.      IN: SV.HND SV.ADDR
-.      OUT: SV.OK
+.One combo to a dialog. The items are read out of MENUVERT.ITEM$ when the
+.dropdown opens and not when the control is added, because copying them would
+.mean a second array the same size. A second combo on the same form would
+.find the first one's items there.
 .
-.  SV.FREE
-.      IN: SV.HND
-.      OUT: SV.OK
+.A long list belongs in GUI.LISTBOX (SEC 4.12). The dropdown shows every item
+.at once: MENUVERT.RUN does not scroll, its own header says so, and a
+.scrolling key loop is the listbox's job rather than this one's.
 .
-.  SV.RESET
-.      IN: --
-.      OUT: SV.OK
-.
-:#INCLUDE "STASHVRAM.INC.BL"
-:
-:SV.MAX = 16 : DIM SV.PAGE%(16), SV.PAGES%(16)
-:GOSUB SV.INIT
-:SV.X = 10 : SV.Y = 5 : SV.W = 40 : SV.H = 12 : GOSUB SV.SAVE
-:IF SV.HND = 0 THEN <it did not fit>
-:' ... draw over it ...
-:GOSUB SV.RESTORE
-.
-.No GP.ASM, and so no #SYMFILE. The cells never leave VRAM: one data port
-.reads, the other writes, and the KERNAL's memory_copy moves between them
-.without stepping either. That is what STASH.INC.BL cannot do, and the reason
-.to reach for this one. It also executes no BANK, so unlike STASH it may live
-.inside a GP.BANKED region.
-.
-.SV.BASE and SV.TOP are the VRAM window in bytes, rounded in to whole
-.256-byte pages, and default to $04000 and $1AFFF. The caller DIMs the two
-.arrays to SV.MAX. SV.MOVE works as STASH.MOVE does: SV.RESTORE puts the
-.rectangle back where it came from when 0, at SV.X SV.Y when not. SV.HND is 1
-.to SV.MAX, or 0 if it did not fit. SV.ERROR$ says why when something is
-.refused, and is "" otherwise.
-.
-.Allocation is a bump pointer on 256-byte pages, released LIFO. Panels nest
-.and close in reverse and a log is append-only, so a hole only appears if a
-.caller frees out of order -- and then STASHVRAMGC.INC.BL (SEC 4.19) closes
-.it. Pages rather than bytes are what let a handle's address live in an
-.ordinary %: a page number reaches 511 where a 17-bit VRAM address would not.
-.
-.There is one allocator and it is this one. SV.BASE and SV.TOP are the
-.caller's contract, checked only against the layer 1 map and the charset.
-.BMX.STASH defaults to $13000, inside the default window -- a program using
-.both must move one of them.
-.
-.A screen-mode change re-uploads the charset and can re-lay the map. Held
-.handles do not survive it; call SV.RESET after one.
+.It is required by GUI.INC.BL, which names COMBO.DRAW and COMBO.KEY. BASLOAD
+.resolves every label in a file, so a program that includes the GUI and
+.leaves this one out stops with LABEL NOT FOUND whether it ever draws a combo
+.or not.
 .
 =SEE ALSO
 .
->80|4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store
->79|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
->86|STASH.INC.BL -- save a text rectangle, and put it back.
+>75|4.12 GUI2.INC.BL -- a listbox, single or multi select
+>80|4.17 COMBO.INC.BL -- a drop-down list that folds into one row
+>74|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back

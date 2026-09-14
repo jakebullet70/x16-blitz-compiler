@@ -43,8 +43,8 @@
 .It costs no runtime bytes. A block is five bytes of p-code plus the
 .assembled instructions, and every handler it uses is already in every
 .compiled program. A program whose only GP.BASIC keyword is GP.ASM compiles
-.GP-BASIC OUT, without the 1 KB block: measured RT 12031, the same as a
-.program using no GP keyword.
+.without the 1 KB block: measured EMBEDDED CORE and RUNTIME 12031, the same
+.as a program using no GP keyword.
 .
 =#REM 1 is required
 .

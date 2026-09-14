@@ -32,7 +32,7 @@
 .
 .Two compile-time errors, both naming the line:
 .
-.  NO SYMBOL FILE FOR {}
+.  {} NEEDS #SYMFILE
 .      MEANS: no #SYMFILE, or it is not beside the PRG under the matching
 .        name
 .
@@ -43,6 +43,45 @@
 .the variable once in BASIC first, even M% = 0. A name that does not exist
 .otherwise resolves to a slot BASIC never reads, and the block runs, stores,
 .and changes nothing observable.
+.
+=In a GP.BANKED region
+.
+.A block inside a GP.BANKED region (SEC 3.12) is assembled into the region's
+.bank, after the region's p-code, and runs from there with that bank
+.selected. Its bytes count against the region's 8,192 and not against low
+.memory.
+.
+.GP.ASM LOW keeps a block in low memory inside a region. Outside a region the
+.word changes nothing.
+.
+:#REM 1
+:GP.ASM LOW
+:REM <instruction>
+:...
+:GP.ENDASM
+:#REM 0
+.
+.Use LOW for a block that writes $00, the RAM bank register. A block running
+.from a bank cannot select another: the next instruction is fetched from the
+.bank it selected. FILEDIR.INC.BL (SEC 4.16) writes both of its blocks this
+.way.
+.
+.LOW needs a #SYMFILE. BASLOAD crunches LOW like any name, and the compiler
+.reads it back through the symbol file.
+.
+.A block inside a region without LOW is checked for a store to $00: STA, STX,
+.STY or STZ to $00 or $0000. The check does not see an indexed or indirect
+.store, or a JSR to code that changes the bank. Those compile, and the
+.program fetches its next instruction from the wrong bank.
+.
+.Two compile-time errors, both naming the line:
+.
+.  GP.ASM LOW NEEDS #SYMFILE
+.      MEANS: no #SYMFILE, or it is not beside the PRG under the matching
+.        name
+.
+.  BANKED GP.ASM WRITES $00, USE GP.ASM LOW
+.      MEANS: a block inside a region, without LOW, stores to $00
 .
 =What is not there
 .
@@ -71,3 +110,8 @@
 =EXAMPLE PROGRAM
 .
 .  ASM.EXP.BL -- runnable, in the GPC-BASIC folder
+.
+=SEE ALSO
+.
+>52|3.12 Code in a bank
+>79|4.16 FILEDIR.INC.BL -- a directory, into a bank or into low RAM

@@ -46,7 +46,7 @@ frame stack and the 4K minimum workspace.
 `GP.LOBYTE`, `GP.BSTRCOUNT`, `GP.DEFPROC`, `GP.SUB`. The compiler expands each into opcodes that
 already exist. No handler, no vector slot, nothing in the block. Whether the block comes in is then
 the expansion's business, not the composite's: `GP.CHAR` runs `GP.FILL`'s handler and brings it in,
-while `GP.ASM`, `GP.ENDASM`, `GP.DEFPROC` and `GP.SUB` leave a program GP-BASIC OUT.
+while `GP.ASM`, `GP.ENDASM`, `GP.DEFPROC` and `GP.SUB` leave it out, and the report says `CORE`.
 
 **The library.** `GPC-BASIC/`: 17 `.INC.BL` modules, 25 `.EXP.BL` examples. Ordinary BASL,
 `#INCLUDE`d by path, called with `GOSUB`. Zero runtime bytes — a module costs its own p-code, in the
@@ -146,13 +146,13 @@ Three implementations, and what each costs:
 | **Multi-way branch** | ASM | `GP.SELECT` `GP.CASE` `GP.OTHER` `GP.ENDSEL` |
 | **Block IF** | ASM | `GP.IF` `GP.ELSEIF` `GP.ELSE` `GP.ENDIF` — see §3.8 |
 | **Machine code** | ASM | `GP.CALL` `GP.A` `GP.X` `GP.Y` `GP.C` |
-| **Inline assembly** | COMPOSITE | `GP.ASM` `GP.ENDASM` — free, and stays GP-BASIC OUT, see §3.9 |
+| **Inline assembly** | COMPOSITE | `GP.ASM` `GP.ENDASM` — free, and leaves the block out, see §3.9 |
 | **Strings** | ASM | `GP.INSTR` `GP.STRPTR` `GP.COMP` |
 | **Strings** | COMPOSITE | `GP.CONTAINS` `GP.ISEMPTY` — free, see §3.4 |
 | **Addresses** | COMPOSITE | `GP.HIBYTE` `GP.LOBYTE` — free, see §3.3 |
 | **Arrays** | ASM | `GP.ARRPTR` |
 | **Banked text** | ASM | `GP.BANKEDSTR` `GP.ENDBANKEDSTR` `GP.BSTR` · `GP.BSTRCOUNT` is COMPOSITE — see §3.10 |
-| **Routine calls** | COMPOSITE | `GP.DEFPROC` `GP.SUB` — free, and stays GP-BASIC OUT, see §3.11 |
+| **Routine calls** | COMPOSITE | `GP.DEFPROC` `GP.SUB` — free, and leaves the block out, see §3.11 |
 | **Routine calls** | ASM | `GP.FN` — the same call as a value, and it brings the GP block in |
 | **Screen** | ASM | `GP.BOX` `GP.FILL` `GP.PRINTAT` |
 | **Screen** | COMPOSITE | `GP.CHAR` — free, one cell in `GP.PRINTAT`'s shape running `GP.FILL`'s handler |
@@ -638,8 +638,8 @@ GP.ENDASM
 
 It costs no runtime bytes. A block is five bytes of p-code plus the assembled instructions, and
 every handler it uses is already in every compiled program. A program whose only GP.BASIC keyword is
-`GP.ASM` compiles GP-BASIC OUT, without the 1 KB block: measured `RT 12031`, the same as a program
-using no GP keyword.
+`GP.ASM` compiles without the 1 KB block: measured `EMBEDDED CORE` and `RUNTIME 12031`, the same as
+a program using no GP keyword.
 
 #### `#REM 1` is required
 
@@ -705,12 +705,47 @@ Two compile-time errors, both naming the line:
 
 | | means |
 |---|---|
-| `NO SYMBOL FILE FOR {}` | no `#SYMFILE`, or it is not beside the PRG under the matching name |
+| `{} NEEDS #SYMFILE` | no `#SYMFILE`, or it is not beside the PRG under the matching name |
 | `UNKNOWN VARIABLE IN {}` | the name is not a variable of this program |
 
 `{VAR}` never creates a variable, unlike an ordinary BASIC reference. Assign the variable once in
 BASIC first, even `M% = 0`. A name that does not exist otherwise resolves to a slot BASIC never
 reads, and the block runs, stores, and changes nothing observable.
+
+#### In a `GP.BANKED` region
+
+A block inside a `GP.BANKED` region (§3.12) is assembled into the region's bank, after the region's
+p-code, and runs from there with that bank selected. Its bytes count against the region's 8,192 and
+not against low memory.
+
+`GP.ASM LOW` keeps a block in low memory inside a region. Outside a region the word changes nothing.
+
+```
+#REM 1
+GP.ASM LOW
+REM <instruction>
+...
+GP.ENDASM
+#REM 0
+```
+
+Use `LOW` for a block that writes `$00`, the RAM bank register. A block running from a bank cannot
+select another: the next instruction is fetched from the bank it selected. `FILEDIR.INC.BL` (§4.16)
+writes both of its blocks this way.
+
+`LOW` needs a `#SYMFILE`. BASLOAD crunches `LOW` like any name, and the compiler reads it back
+through the symbol file.
+
+A block inside a region without `LOW` is checked for a store to `$00`: `STA`, `STX`, `STY` or `STZ`
+to `$00` or `$0000`. The check does not see an indexed or indirect store, or a `JSR` to code that
+changes the bank. Those compile, and the program fetches its next instruction from the wrong bank.
+
+Two compile-time errors, both naming the line:
+
+| | means |
+|---|---|
+| `GP.ASM LOW NEEDS #SYMFILE` | no `#SYMFILE`, or it is not beside the PRG under the matching name |
+| `BANKED GP.ASM WRITES $00, USE GP.ASM LOW` | a block inside a region, without `LOW`, stores to `$00` |
 
 #### What is not there
 
@@ -850,7 +885,7 @@ makes the call cost nothing, and it is also the whole of the rule about nesting:
 
 - **A verb may appear inside its own argument list.** `GP.FN(AREA, 2, GP.FN(AREA, 3, 4))` is
   correct, because a call list is evaluated in full before any of it is stored into a formal. The
-  inner call runs and finishes before the outer writes `A.W`. The values wait on the 4K frame
+  inner call runs and finishes before the outer writes `A.W`. The values wait on the frame
   stack while the rest of the list is read, so neither the number of arguments nor the depth of
   any one of them is a limit.
 - **A verb's body may not call the verb.** There is one set of formals, so a routine that calls
@@ -920,9 +955,9 @@ The refusals, all at compile time:
   Kind      COMPOSITE. Expands to an assignment per formal and a
             GOSUB.
   Notes     The count and the types must match the declaration.
-            A call into a GP.BANKED region selects its bank, and
-            RETURN puts the caller's back. A call out of one works
-            too.
+            A call into a GP.BANKED region selects its bank. A call
+            into or out of a region comes back with the caller's
+            bank selected.
   WARNING   The call must sit below its GP.DEFPROC. It carries an
             address and not a line number, so a forward call is
             refused rather than compiled.
@@ -1022,8 +1057,8 @@ BANKMGR.SET.BANK = MY.GUICODE : GOSUB BANKMGR.CLAIM
 #### What fits
 
 **32 pages — the whole of `$A000`–`$BFFF`, 8,192 bytes.** The entry bridge, the alignment padding,
-the exit bridge and the end marker are part of what has to fit, so the usable payload is a little
-under the window. Past it the compiler stops and names the region's `GP.BANKED` line, not the line
+the exit bridge, the end marker and every `GP.ASM` block in the region are part of what has to fit,
+so the usable payload is a little under the window. Past it the compiler stops and names the region's `GP.BANKED` line, not the line
 it happened to be on when it ran out.
 
 **Sixty-three regions, and that is the machine's limit rather than the compiler's** — banks 1 to 63
@@ -1040,6 +1075,9 @@ keeps `STASH` and `STASHFILE` in low memory; `STASHVRAM` (§4.18) has none, so i
 `GP.BANKEDSTR` (§3.10) inside a region is free: it emits no p-code at all, so a text group costs the
 region nothing.
 
+A `GP.ASM` block inside a region goes into the region's bank. A block that writes `$00`, the RAM
+bank register, must be `GP.ASM LOW` (§3.9). The compiler refuses a direct store to `$00` without it.
+
 #### Calling in, and calling out
 
 **A call into a region selects the region's bank.** A `GOSUB`, `GP.SUB`, `GP.FN` or `FN` whose
@@ -1048,20 +1086,25 @@ selected bank, selects the region's, and `RETURN` selects the kept one again. Th
 low memory or in another region, and the calls nest like any `GOSUB`. A call that stays inside one
 region is an ordinary `GOSUB`.
 
+**A call out of a region to low memory is a banked call too.** A `GOSUB`, `GP.SUB`, `GP.FN` or `FN`
+from inside a region to a target in low memory compiles to `.bgosub` with the region's own bank.
+`RETURN` selects that bank again, so a low routine that executes `BANK` returns into the region
+under the right bank.
+
 **A `GOTO` selects nothing, so a `GOTO` into a region from outside it is refused** with
 `NOT IMPLEMENTED`, from low memory or from another region. `IF ... GOTO`, `IF ... THEN <line>` and
-`ON ... GOTO` are refused the same way. Enter a region by a call. `ON ... GOSUB` to a label in a
-region is refused too: an `ON` entry is three bytes and a `.bgosub` is four. A `GOTO` that stays
-inside one region, or leaves one for low memory, compiles.
+`ON ... GOTO` are refused the same way. Enter a region by a call. A `GOTO` that stays inside one
+region, or leaves one for low memory, compiles.
 
-**Calling out, down into low memory, is an ordinary `GOSUB`.** Low memory does not care which bank is
-selected. The routine called must leave the region's bank selected when it returns, or the next
-instruction is fetched from the wrong bank. A call from there into another region is safe, because
-its `RETURN` puts the bank back.
+**`ON ... GOSUB` makes no banked call.** An `ON` entry is three bytes and a `.bgosub` is four.
+`ON ... GOSUB` compiles when the caller and every target are in low memory, or all in the same
+region. Into a region, out of a region to low memory, or from one region to another, the compile
+stops with `ON GOSUB IN OR OUT OF GP.BANKED`. Write a `GP.SELECT` or one `IF ... GOSUB` a case
+instead. A plain `GOSUB` makes the banked call.
 
-**A call from outside costs a byte and two bank switches.** `.bgosub` is a `GOSUB` with the bank
-after the address. A module called inside a tight loop belongs in low memory or in its caller's
-region.
+**A call between a region and anywhere outside it costs a byte and two bank switches.** `.bgosub` is
+a `GOSUB` with the bank after the address. Put a module called inside a tight loop in the same place
+as the loop.
 
 #### The overlay files
 
@@ -1095,8 +1138,8 @@ either way.
 
 Low memory is the one that runs out. A SHARED program has about 17,920 bytes of p-code under the
 runtime and every `#INCLUDE` spends it; a region spends 8,192 bytes of a RAM bank the program was
-not using. Bank what you can. What stays low is the module called inside a loop, where the bank
-switch on every call is the whole cost.
+not using. Bank what you can. A module called inside a loop goes where the loop is: a call between
+a region and anywhere outside it switches the bank twice.
 
 The banked form needs the program built SHARED. `GP.BANKED` reports `NOT IMPLEMENTED` in an
 embedded build, because the copy into the bank is the shared bootstrap's work and an embedded
@@ -1108,7 +1151,7 @@ object has no bootstrap.
 |---|---|---|
 | Include | `#INCLUDE "X.INC.BL"` | the same, inside `GP.BANKED` |
 | Entry label | `THEME.SELECT` | `THEME.SELECT` |
-| Costs per call | one `GOSUB` | from outside the region, one byte more and two bank switches |
+| Costs per call | one `GOSUB`; from a region, one byte more and two bank switches | from outside the region, one byte more and two bank switches |
 | Low memory used | the whole module | none |
 
 ```basic
@@ -1215,8 +1258,7 @@ module: it needs no `#SYMFILE` and neither module depends on the other.
 
 **The module needs a `#SYMFILE`, and so does every program that includes it**, before the
 `#INCLUDE`s and named after the source PRG. The three trims are `GP.ASM` and reach BASIC's
-variables through `{VAR}`; without a symbol file the compile stops with `NO SYMBOL FILE FOR {}`.
-This is new — the module was pure BASIC until the trims moved here out of `STRCASE.INC.BL`.
+variables through `{VAR}`; without a symbol file the compile stops with `{} NEEDS #SYMFILE`.
 
 **The two halves take their argument differently, and one question decides which:** does the
 routine GROW the string. The pads and `SPLICE` do, so they are BASIC — they take the string by
@@ -1583,7 +1625,7 @@ Set both on every call.
 
 The program must have a `#SYMFILE`, placed before the `#INCLUDE`s. The assembly reaches BASIC's
 variables through `{VAR}`, and BASLOAD crunches every name before the compiler sees it; without the
-mapping the compile stops with `NO SYMBOL FILE FOR {}`.
+mapping the compile stops with `{} NEEDS #SYMFILE`.
 
 Example: [`ARRAYS.EXP.BL`](ARRAYS.EXP.BL). Regression test: [`SORT.EXP.BL`](SORT.EXP.BL), eight
 cases including a 200-element array — element 128 is where the doubled index stops fitting in a
@@ -1944,7 +1986,7 @@ IF FILE.OK THEN N = GP.FN(FILE.SIZE, "SCORES.DAT")
 ```
 
 **The `#SYMFILE` is required, before the `#INCLUDE`s.** `FILE.TOPET` is `GP.ASM` and reaches
-`FILE.PETP%` through `{VAR}`; without a symbol file the compile stops at `NO SYMBOL FILE FOR {}`.
+`FILE.PETP%` through `{VAR}`; without a symbol file the compile stops at `{} NEEDS #SYMFILE`.
 
 `FILE.SIZE` is declared with `GP.DEFPROC`, so it is called as a verb —
 `GP.SUB FILE.SIZE, "MYFILE.DAT"` or `N = GP.FN(FILE.SIZE, "MYFILE.DAT")` — and not with a `GOSUB`.
@@ -2045,7 +2087,8 @@ workspace put after it. An untyped array is the six.
 `FILE.DIR.BANKBASE` and `FILE.DIR.BANKROOM` are the hardware window, not an allocation — every bank
 appears at `$A000` and every bank is 8,192 bytes. **The bank number is the resource.** Take it from
 `BANKMGR.GET.FREE.BANK` and put it in `FILE.DIR.BANK`. This module claims no bank and executes no
-`BANK` statement.
+`BANK` statement. Its two `GP.ASM` blocks write `$00`, so both are `GP.ASM LOW` (§3.9) and stay in
+low memory when the module is in a region.
 
 ---
 
@@ -2337,7 +2380,7 @@ Each of these has cost a debugging session at least once.
 | an address in an `A%` variable | `%` is signed 16-bit and truncates without error — `A% = 49152` reads back -16,384 | untyped variable, or split into page and offset |
 | `$0400` for machine code | stock BASIC leaves it free, a compiled GPC program does not — runtime state lives there, and it is corrupted with no error | banked RAM, `$A000`–`$BFFF` |
 | `PRINT` after `GP.PRINTAT` | GP drawing never calls the KERNAL, so the cursor is wherever it was | `LOCATE` first, or stay in one world |
-| `SORT.INC.BL` with no `#SYMFILE` | `{VAR}` cannot resolve a crunched name — `NO SYMBOL FILE FOR {}` | `#SYMFILE "@:PROG.SYM"`, before the `#INCLUDE`s |
+| `SORT.INC.BL` with no `#SYMFILE` | `{VAR}` cannot resolve a crunched name — `{} NEEDS #SYMFILE` | `#SYMFILE "@:PROG.SYM"`, before the `#INCLUDE`s |
 | `GP.BOX X,Y,W,H,,7` | optionals cannot be skipped over | `GP.BOX X,Y,W,H,0,7` |
 | `SCREEN` after `BMX.PAINT` | reloads the default palette and throws the image's colours away | set the mode first |
 | `STR.FIELD$` wanted bigger | auto-`DIM`ed at 0..10 on first use, and you cannot `DIM` it after | `DIM` it **before** the first call, set `STR.MAX` |
@@ -2351,30 +2394,56 @@ Each of these has cost a debugging session at least once.
 
 ## 7. Memory, and what the compiler tells you
 
-### The line GPC prints when it finishes
+### What GPC prints when it finishes
+
+One item a line. `GPBMODS`, built shared with dead code removed:
 
 ```
-OK CODE 10734 FREE 10496 RT 13311 GP-BASIC IN
-OK CODE 1234 FREE 19200 RT SHARED RT
-DEAD CODE:   74 LINES REMOVED,  646 BYTES SAVED
+OK LOW CODE 11264, SHARED GPBASIC
+LOW FREE 10240, FRAME STACK 2048
+LINES 3690
+DEAD CODE:  202 LINES REMOVED, 1305 BYTES SAVED
+BANK  7 CODE  3840 USED  4352 FREE
+BANK  9 CODE   512 USED  7680 FREE
+BANK  4 CODE  7936 USED   256 FREE
+BANK 10 CODE   768 USED  7424 FREE
+BANK  8 CODE  1792 USED  6400 FREE
+BANK 11 CODE  3072 USED  5120 FREE
+BANK  5 TEXT  7424 USED   768 FREE
+BANK  6 TEXT  4352 USED  3840 FREE
+TOTAL BANKS 8, 29696 USED
+```
+
+An embedded build prints a `RUNTIME` line second. `GPCTEST-E`:
+
+```
+OK LOW CODE 969, EMBEDDED GPBASIC
+RUNTIME 13567
+LOW FREE 22016, FRAME STACK 2048
 ```
 
 | | |
 |---|---|
-| `CODE` | the p-code. What the program *is*, in bytes |
-| `FREE` | what is left above it for variables, strings and arrays. **This is the number that runs out.** It already excludes the 4K frame stack, which is reserved rather than available |
-| `RT` | the runtime bytes carried inside the object, or `SHARED` when the program loads the runtime at run time instead. `SHARED RC` asks for the core alone, in `GPC.RT.nnn.BIN`, and `SHARED RT` for the core and the `GP.` handlers, in `GPB.RT.nnn.BIN` |
-| `GP-BASIC` | embedded builds only. `IN` if a `GP.` keyword reached the 1,024-byte handler block and it had to go in the object, `OUT` if `ScanGPUsage` dropped it |
-| `DEAD CODE` | a second line, printed only when dead code is removed: the source lines left out, and the p-code bytes they would have taken. `CODE` is already without them |
+| `LOW CODE` | the p-code in low memory, in bytes. P-code and `GP.ASM` blocks in a `GP.BANKED` region are not in it |
+| `SHARED` `EMBEDDED` | `SHARED` loads a resident runtime file at run time. `EMBEDDED` carries the runtime in the object |
+| `GPBASIC` `CORE` | `GPBASIC` when a `GP.` keyword reached the 1,024-byte handler block: shared, the program loads `GPB.RT.nnn.BIN`; embedded, the block is in the object. `CORE` when none did: shared, it loads `GPC.RT.nnn.BIN`; embedded, `ScanGPUsage` dropped the block |
+| `RUNTIME` | embedded only. The runtime bytes carried in the object |
+| `LOW FREE` | what is left in low memory for variables, strings and arrays. **This is the number that runs out.** It ends at `$9F00` embedded, and at the resident runtime shared |
+| `FRAME STACK` | the 2,048 bytes reserved between the p-code and the workspace for `GOSUB` and `FOR` frames. `LOW FREE` does not include them |
+| `LINES` | the source lines compiled, the lines of `GP.ASM` and `GP.BANKEDSTR` blocks included. Lines left out as dead code are not counted |
+| `DEAD CODE` | printed only when dead code is removed: the source lines left out, and the p-code bytes they would have taken. `LOW CODE` is already without them |
+| `BANK` | printed only when the program has a region or banked text. One line a bank: `CODE` for a `GP.BANKED` region, `TEXT` for `GP.BANKEDSTR`, then the bytes used and free of its 8,192. Both are whole pages, so `FREE` is room that is certainly there |
+| `TOTAL BANKS` | after the `BANK` lines: how many, and the bytes they use |
 
-Two different budgets come off one figure, so read it twice:
+Two budgets come off `LOW FREE`:
 
-- **`FREE` is the workspace** the running program has for its data.
-- **`FREE` minus 4,096 is how much more p-code will fit.** `WriteObjectCode` refuses to leave less
-  than 4K of workspace, so a build reporting `FREE 4096` is one page from `PROGRAM TOO BIG`.
+- **`LOW FREE` is the workspace** the running program has for its data.
+- **`LOW FREE` minus 4,096 is how much more low-memory p-code will fit.** `WriteObjectCode` refuses
+  to leave less than 4K of workspace, so a build reporting `LOW FREE 4096` is one page from
+  `PROGRAM TOO BIG`.
 
-A program can be comfortable on one and out of room on the other. `CODE 17406 FREE 4096` has 4K to
-run in and nowhere left to grow; `CODE 10734 FREE 10496` has both.
+A program can be comfortable on one and out of room on the other. `LOW FREE 4096` is 4K to run in
+and nowhere left to grow; `GPBMODS` at `LOW FREE 10240` has both.
 
 ### Removing dead code
 
@@ -2428,7 +2497,7 @@ variable in live code or in a keep region.
 
 ### `OUT OF MEMORY`
 
-Everything the program allocates comes out of the one `FREE` pool: scalars, arrays, and the string
+Everything the program allocates comes out of the one `LOW FREE` pool: scalars, arrays, and the string
 heap. There is no separate heap to run out of.
 
 - **A `DIM` costs its full size whether the entries are used or not.** `DIM A$(120)` is 121 string
@@ -2449,18 +2518,18 @@ which of your strings was asking.
 
 ### A region does not come out of it
 
-`CODE` and `FREE` describe low memory only. **P-code inside a `GP.BANKED` region (§3.12) is not in
-either figure** — it lives at `$A000` in a RAM bank and is written to its own `NAME.Bnn` overlay
-file, so moving a module into a region takes its bytes off `CODE` and gives them to `FREE`. That is
-what regions are for.
+`LOW CODE` and `LOW FREE` describe low memory only. **P-code inside a `GP.BANKED` region (§3.12) is
+not in either figure**, and neither is a `GP.ASM` block in the region without `LOW`. The region is
+reported on its own `BANK` line and written to its own `NAME.Bnn` overlay file. Moving a module into
+a region takes its bytes off `LOW CODE` and gives them to `LOW FREE`.
 
 What a region costs instead:
 
-- **A whole bank, and 32 pages is the ceiling.** `$A000`–`$BFFF`, 8,192 bytes, with the bridges and
-  the padding counted in. No two regions may share a bank.
-- **A byte a call site, and two bank switches a call.** A call from outside the region is a
-  `.bgosub`, one byte longer than a `GOSUB`. It selects the region's bank, and `RETURN` selects the
-  caller's.
+- **A whole bank, and 32 pages is the ceiling.** `$A000`–`$BFFF`, 8,192 bytes, with the bridges,
+  the padding and the region's `GP.ASM` blocks counted in. No two regions may share a bank.
+- **A byte a call site, and two bank switches a call.** A call into the region from outside it, or
+  out of it to low memory, is a `.bgosub`, one byte longer than a `GOSUB`. `RETURN` selects the
+  caller's bank again.
 - **A file that has to travel.** The `.Bnn` files ship beside the `.PRG`. A program whose overlays
   are missing loads and then fails where it first calls into one.
 
@@ -2469,7 +2538,7 @@ workspace, and inside a region it costs no p-code at all.
 
 ### Staying inside it
 
-- **Quote `FREE` when you change anything.** It is one line of build output and it is the only
+- **Quote `LOW FREE` when you change anything.** It is one line of the report and it is the only
   early warning; `PROGRAM TOO BIG` arrives once it is already too late.
 - **Size a `DIM` to what is used, not to a round number.** The cost is paid on the first line of
   the program, forever.

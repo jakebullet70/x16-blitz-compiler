@@ -1,86 +1,91 @@
-@3. The modules (4)
-=MENUVERT.INC.BL
+@3. The modules (3)
+=FILEDIR.INC.BL
+.
+.Needs FILEIO.INC.BL, and a #SYMFILE -- it is two GP.ASM blobs.
+.
+.It executes no BANK statement, which is what lets it live in a GP.BANKED
+.region: the two blobs take the data bank at entry and put the caller's back
+.at every exit, so no BASIC line here ever runs with a foreign bank selected.
+.Both blobs write $00, so both are GP.ASM LOW and run from low memory when
+.the module is in a region. FILE.DIR.BNK% carries the bank number to the
+.assembly -- {FILE.DIR.BANK} would read a float's mantissa, and FILE.DIR.WAS%
+.is the blobs' save slot.
 .
 .  in
-.      MENUVERT.X MENUVERT.Y -- top left of the first row<br>MENUVERT.WIDTH
-.        -- cells wide, which is the width of the highlight<br>MENUVERT.COUNT
-.        -- how many rows<br>MENUVERT.ITEM$() -- the rows, 1..COUNT; the
-.        caller owns the DIM<br>MENUVERT.ATTR -- packed
-.        attribute<br>MENUVERT.HIATTR -- the highlighted row; 0 inverts
-.        MENUVERT.ATTR<br>MENUVERT.HOT$ -- one hotkey character a
-.        row<br>MENUVERT.HOTATTR -- tint for the hotkey letter; 0 is
-.        off<br>MENUVERT.FLAGS -- added together<br>MENUVERT.SEL -- the row
-.        to start on
+.      FILE.DIR.BANK -- the bank to read into, or 0 for low
+.        RAM<br>FILE.DIR.PTR FILE.DIR.CAP -- the low-RAM buffer, when BANK is
+.        0<br>FILE.DIR.PATTERN$ -- a name pattern, or empty<br>FILE.DIR.ONLY
+.        -- FILE.DIR.ALL, .FILES or .DIRS
 .
 .  out
-.      MENUVERT.SEL -- 1..COUNT, or 0 if cancelled<br>MENUVERT.KEY -- the key
-.        that ended it
+.      FILE.DIR.GOT -- bytes read<br>FILE.DIR.FULL -- the buffer filled
+.        before the listing ended<br>FILE.DIR.MORE -- -1 while NEXT produced
+.        an entry<br>FILE.NAME$ FILE.BLOCKS FILE.TYPE$ -- the entry itself
 .
 .  internal
-.      MENUVERT.SCAN MENUVERT.EACH MENUVERT.DONE MENUVERT.CODE
-.        MENUVERT.INCHAR$ MENUVERT.PREVSEL MENUVERT.HIGHLIGHT
-.        MENUVERT.DRAWROW MENUVERT.DRAWATTR MENUVERT.DRAWTEXT$ MENUVERT.DRAWY
-.        MENUVERT.HOTCODE MENUVERT.HOTLAST MENUVERT.WANTCODE MENUVERT.HOTAT
-.        MENUVERT.HOTWANT MENUVERT.HOTHERE MENUVERT.HOTSCAN MENUVERT.PADNOW
-.        MENUVERT.PADNEW MENUVERT.PADHELD MENUVERT.PADRAW
+.      FILE.DIR.AT FILE.DIR.ASK$ FILE.DIR.ADDR% FILE.DIR.ROOM% FILE.DIR.OFF%
+.        FILE.DIR.BYTES% FILE.DIR.CNT% FILE.DIR.BLK% FILE.DIR.OK%
+.        FILE.DIR.SLOW% FILE.DIR.LFN% FILE.DIR.NAMEA% FILE.DIR.TYPEA%
+.        FILE.DIR.WAS% FILE.DIR.BNK%
 .
 .  constants
-.      MENUVERT.MUSTSEL MENUVERT.KEEPMARK MENUVERT.NOWRAP MENUVERT.GAMEPAD
-.        MENUVERT.UP MENUVERT.DOWN MENUVERT.ENTER MENUVERT.ESCAPE
-.        MENUVERT.STOP MENUVERT.SPACE MENUVERT.PORT MENUVERT.PAD.UP
-.        MENUVERT.PAD.DOWN MENUVERT.PAD.B MENUVERT.PAD.START
+.      FILE.DIR.ALL FILE.DIR.FILES FILE.DIR.DIRS FILE.DIR.NAMEMAX
+.        FILE.DIR.BANKROOM FILE.DIR.BANKBASE
 .
-.MENUVERT.SEL is both an input and an output: the row to start on going in,
-.and the row chosen coming out, so a menu reopened without clearing it
-.reopens where it was. That is usually what you want; set it to 0 when it is
-.not.
+.FILE.DIR.INIT must run once before anything else: it sizes FILE.NAME$ and
+.FILE.TYPE$ for the assembly to write into, and creates every {VAR} slot. Do
+.not assign FILE.NAME$ or FILE.TYPE$ afterwards -- an assignment reallocates
+.and the block the assembly holds goes stale.
 .
-.MENUVERT.DRAWROW, MENUVERT.DRAWATTR and MENUVERT.DRAWTEXT$ are listed
-.internal but are the documented arguments to MENUVERT.ROW, which is public:
-.they are internal to MENUVERT.RUN, not to you. MENUVERT.HOTFIND reads the
-.first two and answers in MENUVERT.HOTAT.
+.FILE.NAME$ is shared with FILEIO on purpose: the name a picker chose is the
+.name FILE.EXISTS and FILE.DELETE want.
 .
-=MENUBAR.INC.BL
+=STASHVRAM.INC.BL
+.
+.Needs GPB.INC.BL, and no #SYMFILE -- there is no GP.ASM in it. The cells
+.never leave VRAM: one data port reads, the other writes, and memory_copy
+.moves between them without stepping either.
+.
+.It executes no BANK, so it can live in a GP.BANKED region -- measured,
+.work/stashvram/SVB.BASL. That is the difference from STASH.INC.BL, which
+.cannot.
 .
 .  in
-.      MENUBAR.X MENUBAR.Y -- where the bar starts<br>MENUBAR.GAP -- cells
-.        BETWEEN items. 0 is the default, because the air belongs in the item
-.        text<br>MENUBAR.FLAGS -- added together<br>MENUBAR.SEL -- the item
-.        to start on; 0 starts at 1<br>and MENUVERT.COUNT, MENUVERT.ITEM$(),
-.        MENUVERT.ATTR, MENUVERT.HIATTR, MENUVERT.HOT$, MENUVERT.HOTATTR
+.      SV.BASE SV.TOP -- the VRAM window in bytes. Default
+.        $04000/$1AFFF<br>SV.MAX -- how many handles. The caller DIMs
+.        SV.PAGE% and SV.PAGES% to it<br>SV.X SV.Y SV.W SV.H -- the
+.        rectangle, for SV.SAVE<br>SV.MOVE -- non-zero restores at SV.X SV.Y
+.        rather than where it came from<br>SV.ADDR SV.LEN -- low RAM address
+.        and count, for SV.PUT and SV.GET<br>SV.HND -- the handle, for
+.        RESTORE, GET and FREE
 .
 .  out
-.      MENUBAR.SEL -- 1..COUNT, or 0 if cancelled<br>MENUBAR.KEY -- 13 chose,
-.        27 cancelled, 17 or 145 on a cross-axis exit, or the hotkey
-.        itself<br>MENUBAR.SELX MENUBAR.SELW -- the column the chosen item
-.        starts at and how wide it is, so a caller can drop a panel under
-.        it<br>MENUBAR.AT MENUBAR.WIDE -- the same two for whichever item
-.        MENUBAR.FIND named, from MENUBAR.WHERE
+.      SV.HND -- 1..SV.MAX, or 0 if it did not fit<br>SV.OK -- -1 done, 0
+.        refused<br>SV.ERROR$ -- why, when something is refused<br>SV.MOVED
+.        -- SV.COMPACT only: how many blocks moved
+.
+.  arrays
+.      SV.PAGE%() SV.PAGES%() -- the handle table, DIMmed by the caller
 .
 .  internal
-.      MENUBAR.CI MENUBAR.CODE MENUBAR.DRAWN MENUBAR.EACH MENUBAR.FIND
-.        MENUBAR.HC MENUBAR.HIT MENUBAR.HK MENUBAR.IN$ MENUBAR.PAD
-.        MENUBAR.PAINT MENUBAR.WANT MENUBAR.WAS
+.      SV.READY SV.NEXT SV.BASEPG SV.TOPPG SV.I SV.PG SV.NP SV.N SV.BYTES
+.        SV.MAPW SV.MAPBASE SV.STRIDE SV.ROW SV.CELL SV.SRC SV.DST SV.VA
+.        SV.ADR SV.BNK SV.REST SV.MID SV.LO SV.MODE SV.RX SV.RY<br>SV.COMPACT
+.        adds SV.PICK SV.BEST SV.J SV.TO SV.GCS SV.GCD SV.LEFT SV.CH
 .
 .  constants
-.      MENUBAR.MUSTSEL MENUBAR.KEEPMARK MENUBAR.NOWRAP MENUBAR.GAMEPAD
-.        MENUBAR.DOWNEXIT MENUBAR.UPEXIT MENUBAR.LEFT MENUBAR.RIGHT
-.        MENUBAR.UP MENUBAR.DOWN MENUBAR.ENTER MENUBAR.ESCAPE MENUBAR.STOP
-.        MENUBAR.PORT MENUBAR.PAD.LEFT MENUBAR.PAD.RIGHT MENUBAR.PAD.B
-.        MENUBAR.PAD.START
+.      SV.VLO SV.VMID SV.VHI SV.DATA SV.VCTRL SV.LCONFIG SV.LMAPBASE
+.        SV.PORTLO SV.PORTLO.B SV.PORTHI SV.MEMCOPY SV.UP SV.HEADER
+.        SVGC.CHUNK
 .
-.It has no items array, no attributes and no hotkeys of its own -- it reads
-.MENUVERT's. A bar and a dropdown are one thing to the user, so the two
-.modules share the whole of that half of the interface, and the caller
-.refills MENUVERT.ITEM$() between drawing the bar and opening the menu under
-.it. Nothing else in the library reaches across a prefix like this, and
-.MENUBAR.INC.BL therefore does not build without MENUVERT.INC.BL.
+.SV.INIT must run once before anything else, and the two arrays must be
+.DIMmed before it.
 .
-.There is no MENUBAR.WIDTH. An item is as wide as its own text, which is the
-.difference from a vertical menu.
+.Blocks are whole 256-byte pages, which is what lets a handle's address live
+.in an ordinary %: a page number reaches 511 where a VRAM address is 17 bits
+.and would not.
 .
-.MENUBAR.DOWNEXIT and MENUBAR.UPEXIT are the cross-axis exits: they end the
-.bar on a key rather than swallowing it, so the caller can open the dropdown
-.and hand control on. MENUVERT's MENUHELP.KEYEXIT is the other half of the
-.same handshake.
+.WARNING: BMX.STASH defaults to $13000, inside the default window. A program
+.using both must move one of them. There is one allocator and no collision
+.check.
 .

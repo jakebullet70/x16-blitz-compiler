@@ -1,70 +1,83 @@
-@7. Memory, and what the compiler tells you (2)
-=OUT OF MEMORY
+@7. Memory, and what the compiler tells you
 .
-.Everything the program allocates comes out of the one FREE pool: scalars,
-.arrays, and the string heap. There is no separate heap to run out of.
+=7. MEMORY, AND WHAT THE COMPILER TELLS YOU
 .
-.  - A DIM costs its full size whether the entries are used or not. DIM
-.    A$(120) is 121 string slots from the moment it runs. Five arrays
-.    dimensioned to the same 120 is 1,210 bytes gone before a single row
-.    exists.
-.  - A string block never shrinks. Assigning a shorter string to a variable
-.    that already holds a longer one reuses the block it has; assigning a
-.    longer one allocates a new block and abandons the old. The abandoned
-.    blocks are reclaimed by the heap scavenger when one of the right size is
-.    wanted again, not immediately.
-.  - What fails is therefore a high-water mark, not a total. The allocation
-.    that raises OUT OF MEMORY is rarely the large one -- it is an ordinary
-.    one that arrives after the heap has been churned. The same key on the
-.    same screen can work or not depending on what was visited first, which
-.    is what makes it read as intermittent.
+=What GPC prints when it finishes
 .
-.The error itself comes from the runtime library and names an address in it,
-.not a line in your program: OUT OF MEMORY @ $03A5 library. It tells you the
-.allocator refused, and nothing about which of your strings was asking.
+.One item a line. GPBMODS, built shared with dead code removed:
 .
-=A region does not come out of it
+:OK LOW CODE 11264, SHARED GPBASIC
+:LOW FREE 10240, FRAME STACK 2048
+:LINES 3690
+:DEAD CODE:  202 LINES REMOVED, 1305 BYTES SAVED
+:BANK  7 CODE  3840 USED  4352 FREE
+:BANK  9 CODE   512 USED  7680 FREE
+:BANK  4 CODE  7936 USED   256 FREE
+:BANK 10 CODE   768 USED  7424 FREE
+:BANK  8 CODE  1792 USED  6400 FREE
+:BANK 11 CODE  3072 USED  5120 FREE
+:BANK  5 TEXT  7424 USED   768 FREE
+:BANK  6 TEXT  4352 USED  3840 FREE
+:TOTAL BANKS 8, 29696 USED
 .
-.CODE and FREE describe low memory only. P-code inside a GP.BANKED region
-.(SEC 3.12) is not in either figure -- it lives at $A000 in a RAM bank and is
-.written to its own NAME.Bnn overlay file, so moving a module into a region
-.takes its bytes off CODE and gives them to FREE. That is what regions are
-.for.
+.An embedded build prints a RUNTIME line second. GPCTEST-E:
 .
-.What a region costs instead:
+:OK LOW CODE 969, EMBEDDED GPBASIC
+:RUNTIME 13567
+:LOW FREE 22016, FRAME STACK 2048
 .
-.  - A whole bank, and 32 pages is the ceiling. $A000-$BFFF, 8,192 bytes,
-.    with the bridges and the padding counted in. No two regions may share a
-.    bank.
-.  - A byte a call site, and two bank switches a call. A call from outside
-.    the region is a .bgosub, one byte longer than a GOSUB. It selects the
-.    region's bank, and RETURN selects the caller's.
-.  - A file that has to travel. The .Bnn files ship beside the .PRG. A
-.    program whose overlays are missing loads and then fails where it first
-.    calls into one.
+.  LOW CODE
+.      the p-code in low memory, in bytes. P-code and GP.ASM blocks in a
+.        GP.BANKED region are not in it
 .
-.Banked text is the same bargain on the data side: a GP.BANKEDSTR group (SEC
-.3.10) is out of the workspace, and inside a region it costs no p-code at
-.all.
+.  SHARED EMBEDDED
+.      SHARED loads a resident runtime file at run time. EMBEDDED carries the
+.        runtime in the object
 .
-=Staying inside it
+.  GPBASIC CORE
+.      GPBASIC when a GP. keyword reached the 1,024-byte handler block:
+.        shared, the program loads GPB.RT.nnn.BIN; embedded, the block is in
+.        the object. CORE when none did: shared, it loads GPC.RT.nnn.BIN;
+.        embedded, ScanGPUsage dropped the block
 .
-.  - Quote FREE when you change anything. It is one line of build output and
-.    it is the only early warning; PROGRAM TOO BIG arrives once it is already
-.    too late.
-.  - Size a DIM to what is used, not to a round number. The cost is paid on
-.    the first line of the program, forever.
-.  - Put bulk in a RAM bank. A bank is 8,192 bytes that cost the workspace
-.    nothing. Anything held from start to finish and read a row at a time --
-.    a file's worth of text, a table, a screen -- is better in a bank with an
-.    offset table at the front, read back with PEEK under BANK. See SEC 4.5
-.    and STASH.INC.BL for the pattern.
-.  - A big temporary cannot be built and then freed. Freeing is not a thing
-.    that happens on demand: build it in a bank, or in pieces.
+.  RUNTIME
+.      embedded only. The runtime bytes carried in the object
 .
-=SEE ALSO
+.  LOW FREE
+.      what is left in low memory for variables, strings and arrays. This is
+.        the number that runs out. It ends at $9F00 embedded, and at the
+.        resident runtime shared
 .
->51|3.12 Code in a bank
->45|3.10 Text in a bank
->64|4.5 BMX.INC.BL -- a BMX bitmap into VERA
->86|STASH.INC.BL -- save a text rectangle, and put it back.
+.  FRAME STACK
+.      the 2,048 bytes reserved between the p-code and the workspace for
+.        GOSUB and FOR frames. LOW FREE does not include them
+.
+.  LINES
+.      the source lines compiled, the lines of GP.ASM and GP.BANKEDSTR blocks
+.        included. Lines left out as dead code are not counted
+.
+.  DEAD CODE
+.      printed only when dead code is removed: the source lines left out, and
+.        the p-code bytes they would have taken. LOW CODE is already without
+.        them
+.
+.  BANK
+.      printed only when the program has a region or banked text. One line a
+.        bank: CODE for a GP.BANKED region, TEXT for GP.BANKEDSTR, then the
+.        bytes used and free of its 8,192. Both are whole pages, so FREE is
+.        room that is certainly there
+.
+.  TOTAL BANKS
+.      after the BANK lines: how many, and the bytes they use
+.
+.Two budgets come off LOW FREE:
+.
+.  - LOW FREE is the workspace the running program has for its data.
+.  - LOW FREE minus 4,096 is how much more low-memory p-code will fit.
+.    WriteObjectCode refuses to leave less than 4K of workspace, so a build
+.    reporting LOW FREE 4096 is one page from PROGRAM TOO BIG.
+.
+.A program can be comfortable on one and out of room on the other. LOW FREE
+.4096 is 4K to run in and nowhere left to grow; GPBMODS at LOW FREE 10240 has
+.both.
+.

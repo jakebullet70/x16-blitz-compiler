@@ -1,68 +1,115 @@
-@4.16 FILEDIR.INC.BL -- a directory, into a bank or into low RAM
+@4.15 FILEIO.INC.BL -- the drive: status, files, directories
 .
-=4.16 FILEDIR.INC.BL -- A DIRECTORY, INTO A BANK OR INTO LOW RAM
+=4.15 FILEIO.INC.BL -- THE DRIVE: STATUS, FILES, DIRECTORIES
+.
+=WHAT IT COSTS
+.
+.    BASIC -- a .INC.BL module of ordinary BASL, called with GOSUB. Costs
+.    nothing unless you #INCLUDE it.
 .
 =DESCRIPTION
 .
-.  FILE.DIR.INIT
+.  FILE.STATUS
 .      IN: --
-.      OUT: --
+.      OUT: FILE.ERR FILE.MSG$ FILE.TRK FILE.SEC
 .
-.  FILE.DIR.OPEN
-.      IN: FILE.DIR.BANK FILE.DIR.PTR FILE.DIR.CAP FILE.DIR.PATTERN$
-.        FILE.DIR.ONLY
-.      OUT: FILE.DIR.GOT FILE.DIR.FULL FILE.DIR.SLOW
+.  FILE.EXISTS
+.      IN: FILE.NAME$
+.      OUT: FILE.OK
 .
-.  FILE.DIR.NEXT
+.  FILE.SIZE
+.      IN: a name -- a verb, not a GOSUB
+.      OUT: FILE.OK FILE.BLOCKS
+.
+.  FILE.DELETE
+.      IN: FILE.NAME$, pattern allowed
+.      OUT: FILE.ERR FILE.TRK
+.
+.  FILE.RENAME
+.      IN: FILE.NAME$ FILE.NEW$
+.      OUT: FILE.ERR
+.
+.  FILE.COPY
+.      IN: FILE.NAME$ FILE.NEW$
+.      OUT: FILE.ERR
+.
+.  FILE.MKDIR FILE.RMDIR FILE.CHDIR
+.      IN: FILE.NAME$
+.      OUT: FILE.ERR
+.
+.  FILE.UP
 .      IN: --
-.      OUT: FILE.DIR.MORE FILE.NAME$ FILE.BLOCKS FILE.TYPE$
+.      OUT: FILE.ERR
+.
+.  FILE.CURDIR
+.      IN: --
+.      OUT: FILE.PATH$
+.
+.  FILE.SAVEARRAY
+.      IN: FILE.NAME$ FILE.ROWS FILE.LINE$()
+.      OUT: FILE.ERR
+.
+.  FILE.LOADARRAY
+.      IN: FILE.NAME$ FILE.MAX
+.      OUT: FILE.ROWS FILE.LINE$()
 .
 :#SYMFILE "@:MYPROG.SYM"
 :#INCLUDE "FILEIO.INC.BL"
-:#INCLUDE "FILEDIR.INC.BL"
 :
-:GOSUB BANKMGR.GET.FREE.BANK
-:FILE.DIR.BANK = BANKMGR.BANK
-:FILE.DIR.PATTERN$ = "*.BASL" : FILE.DIR.ONLY = FILE.DIR.FILES
-:GOSUB FILE.DIR.OPEN
-:GP.DO
-:    GOSUB FILE.DIR.NEXT
-:    IF FILE.DIR.MORE = 0 THEN GP.EXITDO
-:    PRINT FILE.NAME$, FILE.BLOCKS, FILE.TYPE$
-:GP.LOOP
+:FILE.NAME$ = "SCORES.DAT" : GOSUB FILE.EXISTS
+:IF FILE.OK THEN N = GP.FN(FILE.SIZE, "SCORES.DAT")
 .
-.Requires GPB.INC.BL and FILEIO.INC.BL, and #INCLUDEs neither. The #SYMFILE
-.is required, for the same reason FILEIO needs one.
+.The #SYMFILE is required, before the #INCLUDEs. FILE.TOPET is GP.ASM and
+.reaches FILE.PETP% through {VAR}; without a symbol file the compile stops at
+.{} NEEDS #SYMFILE.
 .
-.FILE.DIR.ONLY takes FILE.DIR.ALL, FILE.DIR.FILES or FILE.DIR.DIRS.
-.FILE.DIR.MORE is -1 while NEXT produced an entry and 0 at the end.
-.FILE.DIR.GOT is bytes read, 0 for an empty or failed listing. FILE.DIR.FULL
-.says the buffer filled before the listing ended, and FILE.DIR.SLOW is 1 if
-.the device had no MACPTR and the read fell back to CHRIN a byte at a time.
+.FILE.SIZE is declared with GP.DEFPROC, so it is called as a verb -- GP.SUB
+.FILE.SIZE, "MYFILE.DAT" or N = GP.FN(FILE.SIZE, "MYFILE.DAT") -- and not
+.with a GOSUB. Everything else in the table is a plain GOSUB.
 .
-.Two destinations, one code path: the reader takes an address and a size.
+.FILE.DEVICE is the drive and 0 means 8. FILE.ISO non-zero folds names to
+.PETSCII on the way out. FILE.LINE$() is the caller's DIM, as MENUVERT.ITEM$
+.is; left alone the implicit DIM gives 0 to 10. FILE.ROWS is an input to
+.SAVEARRAY and an output from LOADARRAY.
 .
-:' a bank -- 8,192 bytes at $A000, about 250 entries
-:FILE.DIR.BANK = BANKMGR.BANK
-:
-:' low RAM
-:FILE.DIR.BANK = 0
-:DIM FD.BUF%(1022)
-:FILE.DIR.PTR = GP.ARRPTR(FD.BUF%())
-:FILE.DIR.CAP = 1023 * 2
+.FILE.ERR under 20 is success. 0 is OK. 1 is files scratched and carries the
+.count in FILE.TRK. 62 is FILE NOT FOUND, 63 FILE EXISTS, 26 WRITE PROTECT.
+.FILE.ERR is DS and FILE.MSG$ is DS$ -- the X16 has neither.
 .
-.A % array is TWO bytes an element, not six. The recipe above said six until
-.it was measured, and sized a 682-byte buffer as 2,046: a caller following it
-.handed the assembly three times the room it had, and the reader would have
-.run 1,364 bytes off the end of the array and into whatever the workspace put
-.after it. An untyped array is the six.
+.This module takes logical file 14 and secondary address 14. Not 2 or 3:
+.those belong to the editor, GPC-HELP and the cruncher. The two are equal so
+.a later seek needs no reopen.
 .
-.FILE.DIR.BANKBASE and FILE.DIR.BANKROOM are the hardware window, not an
-.allocation -- every bank appears at $A000 and every bank is 8,192 bytes. The
-.bank number is the resource. Take it from BANKMGR.GET.FREE.BANK and put it
-.in FILE.DIR.BANK. This module claims no bank and executes no BANK statement.
+.ST is not a disk status. LINPUT# on a channel whose OPEN found nothing
+.returns CHR$(0) with ST = 66, and keeps doing so. ST is 64 before a
+.program's first statement, because LOAD leaves bit 6 set.
+.
+.The traps, each one measured on the drive:
+.
+.  - Read the command channel or the next OPEN misbehaves. The drive holds
+.    its error state until channel 15 is read. Every routine here ends by
+.    reading it.
+.  - FILE.RENAME onto a name that exists returns 62, not 63 -- which is what
+.    a missing source also returns. Test with FILE.EXISTS first.
+.  - FILE.COPY is one drive. C:new=old cannot cross devices. It takes a comma
+.    list, so it also concatenates.
+.  - FILE.SAVEARRAY overwrites, with @: on the open.
+.  - FILE.DELETE takes a pattern. S:*.BAK scratches every match.
+.  - The last row of a file arrives with ST already set, so a row is stored
+.    before the loop ends. A blank final line is indistinguishable from end
+.    of file and is dropped.
+.
+.CMDR-DOS has no REL files. For random access use ,M open mode with P and T
+.on channel 15:
+.
+:OPEN 1,8,2,"LEVEL.DAT,S,R"
+:OPEN 15,8,15,"P"+CHR$(2)+CHR$(0)+CHR$(1)+CHR$(0)+CHR$(0)
+.
+.T returns the position and the file size. The data channel's secondary
+.address must equal the P or T channel argument. VAL("$"+MID$(A$,10)) from
+.the manual returns 0 here -- VAL stops at the first non-numeric character,
+.so parse the eight hex digits by hand.
 .
 =SEE ALSO
 .
->77|4.16 FILEDIR.INC.BL -- a directory, into a bank or into low RAM
->76|4.15 FILEIO.INC.BL -- the drive: status, files, directories
+>78|4.15 FILEIO.INC.BL -- the drive: status, files, directories

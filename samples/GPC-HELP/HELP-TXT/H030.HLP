@@ -8,9 +8,9 @@
 .  Kind      COMPOSITE. Expands to an assignment per formal and a
 .            GOSUB.
 .  Notes     The count and the types must match the declaration.
-.            A call into a GP.BANKED region selects its bank, and
-.            RETURN puts the caller's back. A call out of one works
-.            too.
+.            A call into a GP.BANKED region selects its bank. A call
+.            into or out of a region comes back with the caller's
+.            bank selected.
 .  WARNING   The call must sit below its GP.DEFPROC. It carries an
 .            address and not a line number, so a forward call is
 .            refused rather than compiled.

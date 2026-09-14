@@ -204,7 +204,8 @@ Needs `FILEIO.INC.BL`, and a `#SYMFILE` — it is two `GP.ASM` blobs.
 
 **It executes no `BANK` statement**, which is what lets it live in a `GP.BANKED` region: the two
 blobs take the data bank at entry and put the caller's back at every exit, so no BASIC line here
-ever runs with a foreign bank selected. `FILE.DIR.BNK%` carries the bank number to the assembly —
+ever runs with a foreign bank selected. Both blobs write `$00`, so both are `GP.ASM LOW` and run
+from low memory when the module is in a region. `FILE.DIR.BNK%` carries the bank number to the assembly —
 `{FILE.DIR.BANK}` would read a float's mantissa, and `FILE.DIR.WAS%` is the blobs' save slot.
 
 | | |

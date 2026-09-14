@@ -1,89 +1,107 @@
-@3. The modules (3)
-=FILEDIR.INC.BL
-.
-.Needs FILEIO.INC.BL, and a #SYMFILE -- it is two GP.ASM blobs.
-.
-.It executes no BANK statement, which is what lets it live in a GP.BANKED
-.region: the two blobs take the data bank at entry and put the caller's back
-.at every exit, so no BASIC line here ever runs with a foreign bank selected.
-.FILE.DIR.BNK% carries the bank number to the assembly -- {FILE.DIR.BANK}
-.would read a float's mantissa, and FILE.DIR.WAS% is the blobs' save slot.
-.
-.  in
-.      FILE.DIR.BANK -- the bank to read into, or 0 for low
-.        RAM<br>FILE.DIR.PTR FILE.DIR.CAP -- the low-RAM buffer, when BANK is
-.        0<br>FILE.DIR.PATTERN$ -- a name pattern, or empty<br>FILE.DIR.ONLY
-.        -- FILE.DIR.ALL, .FILES or .DIRS
+@3. The modules (2)
+=KB.INC.BL
 .
 .  out
-.      FILE.DIR.GOT -- bytes read<br>FILE.DIR.FULL -- the buffer filled
-.        before the listing ended<br>FILE.DIR.MORE -- -1 while NEXT produced
-.        an entry<br>FILE.NAME$ FILE.BLOCKS FILE.TYPE$ -- the entry itself
+.      --
 .
 .  internal
-.      FILE.DIR.AT FILE.DIR.ASK$ FILE.DIR.ADDR% FILE.DIR.ROOM% FILE.DIR.OFF%
-.        FILE.DIR.BYTES% FILE.DIR.CNT% FILE.DIR.BLK% FILE.DIR.OK%
-.        FILE.DIR.SLOW% FILE.DIR.LFN% FILE.DIR.NAMEA% FILE.DIR.TYPEA%
-.        FILE.DIR.WAS% FILE.DIR.BNK%
+.      KB.K$
 .
-.  constants
-.      FILE.DIR.ALL FILE.DIR.FILES FILE.DIR.DIRS FILE.DIR.NAMEMAX
-.        FILE.DIR.BANKROOM FILE.DIR.BANKBASE
+.One routine, KB.CLEARKB, and one variable it drains into. Nothing else is in
+.the prefix.
 .
-.FILE.DIR.INIT must run once before anything else: it sizes FILE.NAME$ and
-.FILE.TYPE$ for the assembly to write into, and creates every {VAR} slot. Do
-.not assign FILE.NAME$ or FILE.TYPE$ afterwards -- an assignment reallocates
-.and the block the assembly holds goes stale.
-.
-.FILE.NAME$ is shared with FILEIO on purpose: the name a picker chose is the
-.name FILE.EXISTS and FILE.DELETE want.
-.
-=STASHVRAM.INC.BL
-.
-.Needs GPB.INC.BL, and no #SYMFILE -- there is no GP.ASM in it. The cells
-.never leave VRAM: one data port reads, the other writes, and memory_copy
-.moves between them without stepping either.
-.
-.It executes no BANK, so it can live in a GP.BANKED region -- measured,
-.work/stashvram/SVB.BASL. That is the difference from STASH.INC.BL, which
-.cannot.
+=LINEINPUT.INC.BL
 .
 .  in
-.      SV.BASE SV.TOP -- the VRAM window in bytes. Default
-.        $04000/$1AFFF<br>SV.MAX -- how many handles. The caller DIMs
-.        SV.PAGE% and SV.PAGES% to it<br>SV.X SV.Y SV.W SV.H -- the
-.        rectangle, for SV.SAVE<br>SV.MOVE -- non-zero restores at SV.X SV.Y
-.        rather than where it came from<br>SV.ADDR SV.LEN -- low RAM address
-.        and count, for SV.PUT and SV.GET<br>SV.HND -- the handle, for
-.        RESTORE, GET and FREE
+.      LINEINPUT.X LINEINPUT.Y -- top left of the field<br>LINEINPUT.LEN --
+.        how many characters fit<br>LINEINPUT.ATTR -- packed
+.        attribute<br>LINEINPUT.TEXT$ -- the starting value<br>LINEINPUT.MASK
+.        -- non-zero shows asterisks<br>LINEINPUT.ALLOW$ -- the only
+.        characters accepted<br>LINEINPUT.DENY$ -- characters
+.        refused<br>LINEINPUT.LABEL$ -- LINEINPUT.ASK only
 .
 .  out
-.      SV.HND -- 1..SV.MAX, or 0 if it did not fit<br>SV.OK -- -1 done, 0
-.        refused<br>SV.ERROR$ -- why, when something is refused<br>SV.MOVED
-.        -- SV.COMPACT only: how many blocks moved
-.
-.  arrays
-.      SV.PAGE%() SV.PAGES%() -- the handle table, DIMmed by the caller
+.      LINEINPUT.TEXT$ -- what was typed<br>LINEINPUT.KEY -- the key that
+.        ended it
 .
 .  internal
-.      SV.READY SV.NEXT SV.BASEPG SV.TOPPG SV.I SV.PG SV.NP SV.N SV.BYTES
-.        SV.MAPW SV.MAPBASE SV.STRIDE SV.ROW SV.CELL SV.SRC SV.DST SV.VA
-.        SV.ADR SV.BNK SV.REST SV.MID SV.LO SV.MODE SV.RX SV.RY<br>SV.COMPACT
-.        adds SV.PICK SV.BEST SV.J SV.TO SV.GCS SV.GCD SV.LEFT SV.CH
+.      LINEINPUT.SHOW$ LINEINPUT.WAS$ LINEINPUT.K$ LINEINPUT.CELL$
+.        LINEINPUT.CODE LINEINPUT.CX LINEINPUT.CA LINEINPUT.INV LINEINPUT.LIT
+.        LINEINPUT.TICK LINEINPUT.DONE LINEINPUT.FILLED LINEINPUT.HOME
+.        LINEINPUT.BAR
 .
 .  constants
-.      SV.VLO SV.VMID SV.VHI SV.DATA SV.VCTRL SV.LCONFIG SV.LMAPBASE
-.        SV.PORTLO SV.PORTLO.B SV.PORTHI SV.MEMCOPY SV.UP SV.HEADER
-.        SVGC.CHUNK
+.      LINEINPUT.RETURN LINEINPUT.DELETE LINEINPUT.ESCAPE LINEINPUT.STOP
+.        LINEINPUT.DOWN LINEINPUT.UP LINEINPUT.TAB LINEINPUT.SPACE
+.        LINEINPUT.STAR LINEINPUT.BLINK
 .
-.SV.INIT must run once before anything else, and the two arrays must be
-.DIMmed before it.
+.LINEINPUT.SHOW$ is listed internal but is the one exception worth knowing:
+.it holds what the field displayed, which is what you want if you are
+.repainting a masked field yourself. FORM.EXP.BL uses it for exactly that.
 .
-.Blocks are whole 256-byte pages, which is what lets a handle's address live
-.in an ordinary %: a page number reaches 511 where a VRAM address is 17 bits
-.and would not.
+=BMX.INC.BL
 .
-.WARNING: BMX.STASH defaults to $13000, inside the default window. A program
-.using both must move one of them. There is one allocator and no collision
-.check.
+.  in
+.      BMX.FILE$
+.
+.  out
+.      BMX.ERROR$ -- empty means it worked<br>BMX.WIDTH BMX.HEIGHT BMX.DEPTH
+.        BMX.VERSION BMX.PALUSED BMX.PALFIRST BMX.DATAOFF BMX.PACKED -- the
+.        header, readable after BMX.OPEN
+.
+.  in, optional
+.      BMX.STASH -- where BMX.PAINT keeps the machine's palette; VRAM $13000
+.        by default, -1 to keep nothing
+.
+.  internal
+.      BMX.PTR BMX.HEADER$ BMX.SCRATCH BMX.SCRATCH$ BMX.PALBASE BMX.ADDR
+.        BMX.LO BMX.HI BMX.BANK BMX.REST BMX.COUNT BMX.CHUNK BMX.GOT BMX.STEP
+.        BMX.SKIP BMX.ROW BMX.ROWS BMX.X0 BMX.Y0 BMX.BAD BMX.KEPT BMX.SRC
+.        BMX.DST
+.
+.  constants
+.      BMXK.MACPTR BMXK.CHKIN BMXK.CLRCHN BMXK.MEMCOPY BMXK.VCTRL BMXK.VLO
+.        BMXK.VMID BMXK.VHI BMXK.PORTLO BMXK.PORTLO.B BMXK.PORTHI BMXK.LFN
+.
+.BMX.PTR doubles as the "have I initialised" flag -- it is zero until
+.BMX.INIT has run. Zeroing it yourself would leak a string block and
+.re-allocate.
+.
+.BMX.STASH is the one variable here a caller may want to set, and it has to
+.be set before the first BMX.OPEN -- BMX.INIT runs then, and fills in the
+.default only if you have not. That is why -1 rather than 0 switches the
+.stash off: 0 already means "never set". BMX.KEPT is the once-per-run guard
+.that makes a slideshow restore the machine's palette rather than the
+.previous picture's.
+.
+=FILEIO.INC.BL
+.
+.Needs a #SYMFILE -- FILE.TOPET is a GP.ASM blob.
+.
+.  in
+.      FILE.NAME$ -- the file every routine acts on<br>FILE.NEW$ -- the
+.        second name, RENAME and COPY<br>FILE.DEVICE -- the drive; 0 means
+.        8<br>FILE.ISO -- non-zero converts names to PETSCII on the way
+.        out<br>FILE.N -- rows to write, SAVEARRAY<br>FILE.MAX -- rows that
+.        will fit, LOADARRAY; 0 means 10<br>FILE.LINE$() -- the rows; the
+.        caller owns the DIM
+.
+.  out
+.      FILE.ERR FILE.MSG$ FILE.TRK FILE.SEC -- the command channel<br>FILE.OK
+.        -- FILE.EXISTS<br>FILE.N -- rows read, LOADARRAY<br>FILE.PATH$ --
+.        FILE.CURDIR
+.
+.  internal
+.      FILE.CMDSTR$ FILE.OUT$ FILE.RAW$ FILE.ROW$ FILE.ST FILE.KEEP FILE.I
+.        FILE.PETP%
+.
+.  constants
+.      FILE.OKMAX FILE.NOTFOUND FILE.EXISTSERR FILE.PROTECTED FILE.CHAN
+.
+.This module is the missing DS and DS$. FILE.ERR is DS and FILE.MSG$ is DS$.
+.ST is not a disk status -- it is the KERNAL's serial bus status and cannot
+.report FILE NOT FOUND.
+.
+.FILE.N is both an input and an output, the way MENUVERT.SEL is. FILE.LINE$()
+.is the caller's DIM, like MENUVERT.ITEM$ and unlike THEME.CLR.
 .

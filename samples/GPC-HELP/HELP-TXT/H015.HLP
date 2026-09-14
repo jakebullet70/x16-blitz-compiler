@@ -44,5 +44,5 @@
 .
 =SEE ALSO
 .
->69|4.8 STRCASE.INC.BL -- case, in place
->60|4.2 STRINGS.INC.BL -- string helpers
+>71|4.8 STRCASE.INC.BL -- case, in place
+>62|4.2 STRINGS.INC.BL -- string helpers

@@ -1,107 +1,117 @@
-@3. The modules (2)
-=KB.INC.BL
+@3. The modules
 .
-.  out
-.      --
+=3. THE MODULES
 .
-.  internal
-.      KB.K$
+.Each table is in (set before the GOSUB), out (read after it), and internal
+.(do not read, do not write, do not rely on).
 .
-.One routine, KB.CLEARKB, and one variable it drains into. Nothing else is in
-.the prefix.
-.
-=LINEINPUT.INC.BL
+=THEME.INC.BL
 .
 .  in
-.      LINEINPUT.X LINEINPUT.Y -- top left of the field<br>LINEINPUT.LEN --
-.        how many characters fit<br>LINEINPUT.ATTR -- packed
-.        attribute<br>LINEINPUT.TEXT$ -- the starting value<br>LINEINPUT.MASK
-.        -- non-zero shows asterisks<br>LINEINPUT.ALLOW$ -- the only
-.        characters accepted<br>LINEINPUT.DENY$ -- characters
-.        refused<br>LINEINPUT.LABEL$ -- LINEINPUT.ASK only
+.      THEME.ID -- 0 x16, 1 dark, 2 light, 3 gray, 4 custom, read by
+.        THEME.SELECT<br>THEME.ATTR -- a packed attribute, for THEME.SET and
+.        THEME.HI
 .
 .  out
-.      LINEINPUT.TEXT$ -- what was typed<br>LINEINPUT.KEY -- the key that
-.        ended it
+.      THEME.CLR(role) -- the colour array, DIMmed to
+.        THEME.SLOTS<br>THEME.INV -- the inverse attribute, from THEME.HI
 .
 .  internal
-.      LINEINPUT.SHOW$ LINEINPUT.WAS$ LINEINPUT.K$ LINEINPUT.CELL$
-.        LINEINPUT.CODE LINEINPUT.CX LINEINPUT.CA LINEINPUT.INV LINEINPUT.LIT
-.        LINEINPUT.TICK LINEINPUT.DONE LINEINPUT.FILLED LINEINPUT.HOME
-.        LINEINPUT.BAR
+.      THEME.READY
 .
 .  constants
-.      LINEINPUT.RETURN LINEINPUT.DELETE LINEINPUT.ESCAPE LINEINPUT.STOP
-.        LINEINPUT.DOWN LINEINPUT.UP LINEINPUT.TAB LINEINPUT.SPACE
-.        LINEINPUT.STAR LINEINPUT.BLINK
+.      THEME.PAGE THEME.TEXT THEME.TITLE THEME.BORDER THEME.HILITE
+.        THEME.DIMMED THEME.WARN THEME.FOCUS THEME.SLOTS THEME.COUNT
 .
-.LINEINPUT.SHOW$ is listed internal but is the one exception worth knowing:
-.it holds what the field displayed, which is what you want if you are
-.repainting a masked field yourself. FORM.EXP.BL uses it for exactly that.
+.THEME.CLR is the array this module DIMs. Do not DIM it yourself -- the
+.module owns it, and DIMming an array GPC has already dimensioned is an
+.error.
 .
-=BMX.INC.BL
+.The routine is THEME.SELECT, and it used to be THEME.LOAD. The name changed
+.when the library was split into banked and low-memory files, and it stayed
+.when they were merged again; a program written against the older library
+.calls THEME.LOAD and stops with LABEL NOT FOUND, which is the good kind of
+.failure.
+.
+.THEME.FOCUS is the eighth role and the newest: the attribute a focused
+.control wears while GUI.FORM has the keyboard. THEME.SLOTS is 8 because of
+.it, and THEME.COUNT stays 5 -- the first is how many roles there are, the
+.second how many themes.
+.
+=APPSYS.INC.BL
 .
 .  in
-.      BMX.FILE$
+.      APPSYS.FILE$ APPSYS.BANK APPSYS.X APPSYS.Y APPSYS.W APPSYS.H
+.        APPSYS.DEV -- the panel routines
 .
 .  out
-.      BMX.ERROR$ -- empty means it worked<br>BMX.WIDTH BMX.HEIGHT BMX.DEPTH
-.        BMX.VERSION BMX.PALUSED BMX.PALFIRST BMX.DATAOFF BMX.PACKED -- the
-.        header, readable after BMX.OPEN
-.
-.  in, optional
-.      BMX.STASH -- where BMX.PAINT keeps the machine's palette; VRAM $13000
-.        by default, -1 to keep nothing
+.      APPSYS.MODE APPSYS.COLS APPSYS.ROWS APPSYS.COLOUR -- set by
+.        APPSYS.STARTUP<br>APPSYS.IS.EMULATOR -- set by APPSYS.ISEMU
 .
 .  internal
-.      BMX.PTR BMX.HEADER$ BMX.SCRATCH BMX.SCRATCH$ BMX.PALBASE BMX.ADDR
-.        BMX.LO BMX.HI BMX.BANK BMX.REST BMX.COUNT BMX.CHUNK BMX.GOT BMX.STEP
-.        BMX.SKIP BMX.ROW BMX.ROWS BMX.X0 BMX.Y0 BMX.BAD BMX.KEPT BMX.SRC
-.        BMX.DST
+.      APPSYS.LAST
 .
 .  constants
-.      BMXK.MACPTR BMXK.CHKIN BMXK.CLRCHN BMXK.MEMCOPY BMXK.VCTRL BMXK.VLO
-.        BMXK.VMID BMXK.VHI BMXK.PORTLO BMXK.PORTLO.B BMXK.PORTHI BMXK.LFN
+.      APPSYS.SCRMODE APPSYS.COLREG APPSYS.SETCHR APPSYS.CHRREG APPSYS.EMUSIG
 .
-.BMX.PTR doubles as the "have I initialised" flag -- it is zero until
-.BMX.INIT has run. Zeroing it yourself would leak a string block and
-.re-allocate.
+.Lay the screen out from APPSYS.COLS and APPSYS.ROWS. Do not assume 80x60 --
+.the X16 boots there but SCREEN 0 is 40x30, and someone who prefers larger
+.text is running one.
 .
-.BMX.STASH is the one variable here a caller may want to set, and it has to
-.be set before the first BMX.OPEN -- BMX.INIT runs then, and fills in the
-.default only if you have not. That is why -1 rather than 0 switches the
-.stash off: 0 already means "never set". BMX.KEPT is the once-per-run guard
-.that makes a slideshow restore the machine's palette rather than the
-.previous picture's.
-.
-=FILEIO.INC.BL
-.
-.Needs a #SYMFILE -- FILE.TOPET is a GP.ASM blob.
+=STRINGS.INC.BL
 .
 .  in
-.      FILE.NAME$ -- the file every routine acts on<br>FILE.NEW$ -- the
-.        second name, RENAME and COPY<br>FILE.DEVICE -- the drive; 0 means
-.        8<br>FILE.ISO -- non-zero converts names to PETSCII on the way
-.        out<br>FILE.N -- rows to write, SAVEARRAY<br>FILE.MAX -- rows that
-.        will fit, LOADARRAY; 0 means 10<br>FILE.LINE$() -- the rows; the
-.        caller owns the DIM
+.      STR.STR$ -- the string, in and out<br>STR.WIDTH -- field width, the
+.        pad routines<br>STR.DELIM$ STR.MAX -- SPLIT (MAX 0 means
+.        10)<br>STR.FIND$ STR.REPL$ -- REPLACE<br>STR.PET -- a PETSCII code,
+.        PET2SCR<br>STR.AT STR.CUT STR.SUB$ -- SPLICE, and AT/CUT are CLAMPED
+.        in place<br>STR.PTR -- GP.STRPTR of the string, the three trims
 .
 .  out
-.      FILE.ERR FILE.MSG$ FILE.TRK FILE.SEC -- the command channel<br>FILE.OK
-.        -- FILE.EXISTS<br>FILE.N -- rows read, LOADARRAY<br>FILE.PATH$ --
-.        FILE.CURDIR
+.      STR.STR$ -- padded, or replaced, in place<br>STR.N -- how many fields
+.        SPLIT found, always >= 1<br>STR.FIELD$(1..N) -- the fields
+.        themselves<br>STR.SCR -- the screen code from PET2SCR<br>STR.STR$ --
+.        spliced, when it was SPLICE that was called
 .
 .  internal
-.      FILE.CMDSTR$ FILE.OUT$ FILE.RAW$ FILE.ROW$ FILE.ST FILE.KEEP FILE.I
-.        FILE.PETP%
+.      STR.GAP STR.HALF STR.REST$ STR.AT STR.LIM STR.OUT$<br>STR.ADDR%
+.        STR.OP% STR.KEEP% -- the {VAR} slots the trim blob reads
 .
-.  constants
-.      FILE.OKMAX FILE.NOTFOUND FILE.EXISTSERR FILE.PROTECTED FILE.CHAN
+.STR.FIELD$ is the one array the library does not DIM. Left alone, GPC's
+.implicit DIM gives 0..10. For more, DIM it before the first call and set
+.STR.MAX to match -- DIMming an array GPC has already auto-dimensioned is an
+.error, so it is one or the other. This is the opposite of THEME.CLR, which
+.the module owns outright; the two are worth keeping straight.
 .
-.This module is the missing DS and DS$. FILE.ERR is DS and FILE.MSG$ is DS$.
-.ST is not a disk status -- it is the KERNAL's serial bus status and cannot
-.report FILE NOT FOUND.
+=STRUSING.INC.BL
 .
-.FILE.N is both an input and an output, the way MENUVERT.SEL is. FILE.LINE$()
-.is the caller's DIM, like MENUVERT.ITEM$ and unlike THEME.CLR.
+.  in
+.      STR.USING.NUM -- the value, both routines<br>STR.USING.MASK$ -- the
+.        template, STR.USING<br>STR.USING.DP -- decimal places, STR.USING.FIX
+.
+.  out
+.      STR.USING.STR$ -- the result: a field from STR.USING, digits from
+.        STR.USING.FIX<br>STR.USING.OVR -- -1 when the value scaled past 1e9
+.        and the digits are unusable<br>STR.USING.SGN -- -1 when the ROUNDED
+.        value is negative
+.
+.  internal
+.      STR.USING.INT$ STR.USING.FRC$ STR.USING.SIGN$ STR.USING.OUT$
+.        STR.USING.C$<br>STR.USING.IW STR.USING.ZW STR.USING.Z STR.USING.W
+.        STR.USING.F<br>STR.USING.GRP STR.USING.PT STR.USING.I STR.USING.V
+.
+.STR.USING.DP is an output of STR.USING and an input to STR.USING.FIX. The
+.mask carries the decimal count, so STR.USING overwrites whatever was there.
+.A program alternating the two routines must set STR.USING.DP again before
+.every FIX.
+.
+.STR.USING.INT$ and STR.USING.FRC$ survive a call and are the two halves of
+.the digits, without sign, point or field. They are listed internal because
+.their width is the routine's business, not the caller's -- read
+.STR.USING.STR$.
+.
+.The prefix is STR.USING., a sub-prefix of STRINGS.INC.BL's STR., on the same
+.footing as FILE.DIR. inside FILE.. Nothing here is written by STRINGS.INC.BL
+.and nothing there is written by this module, so either can be included
+.alone.
 .

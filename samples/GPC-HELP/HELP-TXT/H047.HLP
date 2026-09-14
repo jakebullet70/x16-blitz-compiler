@@ -1,47 +1,109 @@
-@4.12 GUI2.INC.BL -- a listbox, single or multi select
+@4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
 .
-=4.12 GUI2.INC.BL -- A LISTBOX, SINGLE OR MULTI SELECT
+=4.11 GUI.INC.BL -- FOUR DIALOGS, IN A BOX THAT PUTS THE SCREEN BACK
+.
+=WHAT IT COSTS
+.
+.  ASM: GP.BOX GP.FILL GP.PRINTAT
+.    ASM -- a keyword, run by machine code in the GP runtime block. A program
+.    using ANY GP keyword pays for the whole block.
+.  COMPOSITE: GP.CHAR GP.PRINTAT GP.FILL
+.    COMPOSITE -- a keyword with no machine code of its own. The compiler
+.    expands it into keywords that already exist, so it costs the runtime
+.    nothing at all.
+.    BASIC -- a .INC.BL module of ordinary BASL, called with GOSUB. Costs
+.    nothing unless you #INCLUDE it.
 .
 =DESCRIPTION
 .
-.  GUI.LISTBOX
-.      IN: GUI.LISTBOX.COUNT .ROWS .MULTI .MARKS$ .SEL, over MENUVERT.ITEM$()
-.      OUT: GUI.LISTBOX.SEL .MARKS$ .MARKED GUI.KEY
+.  GUI.SAY
+.      IN: GUI.MSG$
+.      OUT: GUI.KEY -- something to say, and one way out
 .
-:DIM MENUVERT.ITEM$(200)
-:GUI.LISTBOX.COUNT = N : GUI.LISTBOX.ROWS = 8 : GUI.LISTBOX.MULTI = 1
-:GUI.MSG$ = "PICK FILES" : GUI.BANK = 8
-:GOSUB GUI.LISTBOX
-:IF GUI.LISTBOX.SEL = 0 THEN <cancelled>
+.  GUI.YN
+.      IN: GUI.MSG$
+.      OUT: GUI.ANSWER, -1 for yes
 .
-.Its own #INCLUDE on top of GUI.INC.BL, because nothing else in the library
-.wants a set of marks or a footer counting them. The caller owns the DIM of
-.MENUVERT.ITEM$().
+.  GUI.MENU
+.      IN: GUI.COUNT GUI.SEL GUI.FLAGS, over MENUVERT.ITEM$()
+.      OUT: GUI.SEL, or 0 if cancelled
 .
-.Up and down move, PgUp and PgDn page, HOME and END jump, SPACE toggles a
-.mark in multi. TAB moves to the buttons and back, RETURN takes <<OK>> from
-.anywhere, ESC and STOP cancel -- and O and C press their buttons while the
-.eye is still in the list, which a list can offer and a typing field cannot.
+.  GUI.INPUT
+.      IN: GUI.LEN GUI.TEXT$ GUI.MASK
+.      OUT: GUI.TEXT$ GUI.OK
 .
-.In multi, GUI.LISTBOX.SEL is not the answer -- it is where the cursor was
-.left. The marks are: GUI.LISTBOX.MARKS$ is COUNT characters with "1" for
-.marked, and it goes in as well as out, so a list reopens with its marks. Any
-.other length, "" included, starts with none.
+.  GUI.OPEN
+.      IN: GUI.BODY.ROWS GUI.BODY.WIDTH
+.      OUT: GUI.INNER.LEFT .TOP .WIDTH -- the box on its own, for a dialog of
+.        your own
 .
-.The bottom frame edge reads 2 SELECTED OF 20 in multi, 20 ITEMS for a single
-.list too long to see at once, and is blank for one that fits.
+.  GUI.CLOSE
+.      IN: --
+.      OUT: the screen as it was
 .
-.The scrolling list itself is not in this module. It is GUI.CT.LIST, one of
-.GUI.FORM's three control types, and lives in GUI.INC.BL beside the field;
-.this file is the dialog around it.
+:THEME.ID = 0 : GOSUB THEME.SELECT
+:GUI.BANK = 8
+:GUI.MSG$ = "DELETE THE FILE?"
+:GOSUB GUI.YN
+:IF GUI.ANSWER THEN <yes>
 .
-.Example: GUI2TST.EXP.BL.
+.Requires GPB.INC.BL, STASH.INC.BL, THEME.INC.BL, MENUVERT.INC.BL and
+.LINEINPUT.INC.BL, and #INCLUDEs none of them. All five, whichever dialog you
+.call -- BASLOAD resolves every label in the file, so leaving one out is
+.LABEL NOT FOUND. It wants a #SYMFILE, because STASH does.
+.
+.Everything the box takes -- three message lines, a title, the style, the
+.placement, the shadow, the frame glyphs, the bank the covered cells go to --
+.is listed in full in GP-BASIC.GLOBALS.md SEC 3. GUI.BANK = 0 does not save
+.the cells, and then the box is still on screen when the call returns.
+.
+.Every control has a focus, and TAB moves it. The dialogs no longer own their
+.key loops: each states its controls and GUI.FORM runs them. A control is a
+.button, a field or a list; it hands back one of six verdicts -- stay, next,
+.previous, press, default, cancel -- and the dispatcher stays one loop
+.whatever the mix. A caller that never presses TAB sees what it always saw.
+.
+.The default button and the focused control are different things. The default
+.is what RETURN presses from anywhere and is drawn <<LIKE THIS>>; the focus
+.is where TAB has got to and is drawn in THEME.FOCUS. GUI.INPUT opens with
+.the default on OK and the focus in the field -- which is the point of
+.keeping the two apart, and GUI.DEFAULT sets only the first.
+.
+.The answers are buttons. GUI.BTN.ONE$ and GUI.BTN.TWO$ carry them, and &
+.marks the accelerator: "&CANCEL" lights the C. An accelerator is live only
+.while the focused control does not eat printable keys, so C presses CANCEL
+.from the button row or from inside a list, and types a C in a field. That is
+.the whole rule, and GUIFRMT's T14, T15 and T22 are the three assertions that
+.hold it.
+.
+.GUI.HINT$ is gone -- the dimmed line naming two keys became the button row,
+.and it is the one interface this took away.
+.
+.The typing dialog and its string swapped names: it was GUI.TEXT returning
+.GUI.INPUT$, and it is GUI.INPUT returning GUI.TEXT$. BASLOAD will not have a
+.label and a variable of one name and the $ does not separate them. A program
+.written against the older library compiles clean and reads the wrong one
+.back.
+.
+.Upper case, on the default charset. GP.PRINTAT converts PETSCII and BASLOAD
+.passes literals through as source bytes, so charset 2 lands lower case on
+.the graphics half of the font. ISO mode fixes the text and breaks the frame,
+.GP.BOX's $40-$7D being letters. Upper case with a frame, mixed case without
+.one, or re-order the font and set GUI.GLYPH.
+.
+.Example: GUI.EXP.BL. Regression test: samples/GPB-MODS-TESTING/GUIFRMT.BASL,
+.twenty-four assertions driven by keys pushed into the KERNAL buffer -- the
+.only way to drive a GET loop headlessly.
 .
 =EXAMPLE PROGRAM
 .
-.  GUI2TST.EXP.BL -- runnable, in the GPC-BASIC folder
+.  GUI.EXP.BL -- runnable, in the GPC-BASIC folder
 .
 =SEE ALSO
 .
->73|4.12 GUI2.INC.BL -- a listbox, single or multi select
->72|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
+>21|3. Command reference
+>74|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
+>88|STASH.INC.BL -- save a text rectangle, and put it back.
+>61|4.1 THEME.INC.BL -- named colour roles
+>67|4.6 MENUVERT.INC.BL -- a vertical menu
+>65|4.4 LINEINPUT.INC.BL -- a positioned entry field

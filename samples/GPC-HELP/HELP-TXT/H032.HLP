@@ -41,7 +41,7 @@
 .
 .The GOTO over the region is not optional. Falling in through the bridge
 .GP.BANKED leaves works at program start and stops working the day anything
-.selects another bank first.
+.selects another bank first. The compiler does not catch a fall-in.
 .
 .#DEFINE the bank above the GP.BANKED line. BASLOAD replaces a name only once
 .it has read its #DEFINE, and the number is then fixed when the program
@@ -54,10 +54,10 @@
 =What fits
 .
 .32 pages -- the whole of $A000-$BFFF, 8,192 bytes. The entry bridge, the
-.alignment padding, the exit bridge and the end marker are part of what has
-.to fit, so the usable payload is a little under the window. Past it the
-.compiler stops and names the region's GP.BANKED line, not the line it
-.happened to be on when it ran out.
+.alignment padding, the exit bridge, the end marker and every GP.ASM block in
+.the region are part of what has to fit, so the usable payload is a little
+.under the window. Past it the compiler stops and names the region's
+.GP.BANKED line, not the line it happened to be on when it ran out.
 .
 .Sixty-three regions, and that is the machine's limit rather than the
 .compiler's -- banks 1 to 63 on a 512 K X16, with 0 the KERNAL's. No two
@@ -75,6 +75,10 @@
 .GP.BANKEDSTR (SEC 3.10) inside a region is free: it emits no p-code at all,
 .so a text group costs the region nothing.
 .
+.A GP.ASM block inside a region goes into the region's bank. A block that
+.writes $00, the RAM bank register, must be GP.ASM LOW (SEC 3.9). The
+.compiler refuses a direct store to $00 without it.
+.
 =Calling in, and calling out
 .
 .A call into a region selects the region's bank. A GOSUB, GP.SUB, GP.FN or FN
@@ -84,21 +88,27 @@
 .region, and the calls nest like any GOSUB. A call that stays inside one
 .region is an ordinary GOSUB.
 .
-.A GOTO selects nothing. Two regions live at the same $A000 in different
-.banks, so a GOTO from one into another is refused. So is ON ... GOSUB to a
-.label in a region: an ON entry is three bytes and a .bgosub is four. A GOTO
-.from low memory into a region compiles, and lands in whatever bank is
-.selected.
+.A call out of a region to low memory is a banked call too. A GOSUB, GP.SUB,
+.GP.FN or FN from inside a region to a target in low memory compiles to
+..bgosub with the region's own bank. RETURN selects that bank again, so a low
+.routine that executes BANK returns into the region under the right bank.
 .
-.Calling out, down into low memory, is an ordinary GOSUB. Low memory does not
-.care which bank is selected. The routine called must leave the region's bank
-.selected when it returns, or the next instruction is fetched from the wrong
-.bank. A call from there into another region is safe, because its RETURN puts
-.the bank back.
+.A GOTO selects nothing, so a GOTO into a region from outside it is refused
+.with NOT IMPLEMENTED, from low memory or from another region. IF ... GOTO,
+.IF ... THEN <line> and ON ... GOTO are refused the same way. Enter a region
+.by a call. A GOTO that stays inside one region, or leaves one for low
+.memory, compiles.
 .
-.A call from outside costs a byte and two bank switches. .bgosub is a GOSUB
-.with the bank after the address. A module called inside a tight loop belongs
-.in low memory or in its caller's region.
+.ON ... GOSUB makes no banked call. An ON entry is three bytes and a .bgosub
+.is four. ON ... GOSUB compiles when the caller and every target are in low
+.memory, or all in the same region. Into a region, out of a region to low
+.memory, or from one region to another, the compile stops with ON GOSUB IN OR
+.OUT OF GP.BANKED. Write a GP.SELECT or one IF ... GOSUB a case instead. A
+.plain GOSUB makes the banked call.
+.
+.A call between a region and anywhere outside it costs a byte and two bank
+.switches. .bgosub is a GOSUB with the bank after the address. Put a module
+.called inside a tight loop in the same place as the loop.
 .
 =The overlay files
 .
@@ -109,12 +119,3 @@
 .
 .A program's .Bnn files ship beside its .PRG and must travel with it.
 .
-=SEE ALSO
-.
->140|7. Memory, and what the compiler tells you
->79|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
->45|3.10 Text in a bank
->65|4.6 MENUVERT.INC.BL -- a vertical menu
->63|4.4 LINEINPUT.INC.BL -- a positioned entry field
->72|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
->73|4.12 GUI2.INC.BL -- a listbox, single or multi select

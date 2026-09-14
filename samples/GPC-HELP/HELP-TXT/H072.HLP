@@ -1,93 +1,47 @@
-@8. Known bugs
+@6. The traps, collected
 .
-=8. KNOWN BUGS
+=6. THE TRAPS, COLLECTED
 .
-.Three, all live on 12th September 2026 and all reproducible. Each says what
-.happens, what causes it, and what to do instead. A bug leaves this list when
-.it is fixed, not when it is understood.
+.Each of these has cost a debugging session at least once.
 .
-=A string never gives memory back
+.  P AND 255 on a heap or VRAM address
+.      WHAT HAPPENS: AND is 16-bit signed; above 32,767 it raises OUT OF
+.        RANGE instead of masking
+.      DO THIS: H = INT(P/256) : L = P - H*256
 .
-.A$ = "" frees nothing. A string variable owns its block: the assignment sets
-.the length to zero and keeps the capacity. The heap scavenger reclaims only
-.a block a string outgrew and abandoned, never one a variable still holds. A
-.working buffer that has once held a 250-character line is spoken for until
-.the program ends.
+.  an address in an A% variable
+.      WHAT HAPPENS: % is signed 16-bit and truncates without error -- A% =
+.        49152 reads back -16,384
+.      DO THIS: untyped variable, or split into page and offset
 .
-.So a big temporary cannot be built and then freed. It has to not be built.
+.  $0400 for machine code
+.      WHAT HAPPENS: stock BASIC leaves it free, a compiled GPC program does
+.        not -- runtime state lives there, and it is corrupted with no error
+.      DO THIS: banked RAM, $A000-$BFFF
 .
-.Measured 2026-09-02. The editor's find folded the needle and every line it
-.scanned into new strings and compared with MID$ per position: 579 bytes gone
-.for the rest of the run, from a workspace with 1,489 free, and the GUI
-.dialogs then died on what was left. Rewritten to fold in place through
-.GP.STRPTR with one GP.INSTR per line, a find costs 81 bytes, and the program
-.came out 59 bytes smaller.
+.  PRINT after GP.PRINTAT
+.      WHAT HAPPENS: GP drawing never calls the KERNAL, so the cursor is
+.        wherever it was
+.      DO THIS: LOCATE first, or stay in one world
 .
-.Do this -- PRINT FRE(0) at eight points down the run and read the descent.
-.It is a high-water ceiling, so it only falls, and the step that falls is the
-.culprit.
+.  SORT.INC.BL with no #SYMFILE
+.      WHAT HAPPENS: {VAR} cannot resolve a crunched name -- {} NEEDS
+.        #SYMFILE
+.      DO THIS: #SYMFILE "@:PROG.SYM", before the #INCLUDEs
 .
-=BINPUT# stops at 255 bytes
+.  GP.BOX X,Y,W,H,,7
+.      WHAT HAPPENS: optionals cannot be skipped over
+.      DO THIS: GP.BOX X,Y,W,H,0,7
 .
-.BINPUT# n, A$, len cannot read more than 255 bytes. Three independent caps
-.land on that one number, so there is no single constant to raise.
+.  SCREEN after BMX.PAINT
+.      WHAT HAPPENS: reloads the default palette and throws the image's
+.        colours away
+.      DO THIS: set the mode first
 .
-.  the read buffer is 255 bytes
-.      WHERE: ReadBuffer: .fill 255
+.  #DEFINE X 129536
+.      WHAT HAPPENS: #DEFINE takes an INT16 -- ERROR: INVALID PARAMETER
+.      DO THIS: an ordinary variable
 .
-.  the count argument is 8 bit, and unchecked
-.      WHERE: GetInteger8Bit takes mantissa byte 0 and returns
+=SEE ALSO
 .
-.  a BASIC string is 255 characters
-.      WHERE: nowhere to put a longer record in any case
-.
-.The second is the trap. BINPUT# 12, A$, 256 sets the count to 0 and hands
-.back an empty string, silently. 300 gives 44 bytes.
-.
-.It is also not a block read. It is a CHRIN loop, one KERNAL call per byte
-.with an EOF check on top of that. BINPUT# is one statement, not one
-.transfer, so anything costing a BINPUT# per record pays that stride per
-.record.
-.
-.LINPUT# shares the same buffer and stops at 255 too, but runs on to the
-.delimiter afterwards, so the next read starts at a line boundary.
-.
-.Do this -- a record cannot be one string. Make it N strings of 255, or keep
-.it in a bank and copy out the part that is needed.
-.
-=File I/O in a GP.DO key loop
-.
-.A save routine reached from inside a program's own GP.DO key loop writes its
-.file completely and correctly, and then the program stops with
-.
-:INPUT/OUTPUT ERROR @ $005B
-.
-.The address is identical in every failing build, which says a clobbered
-.instruction pointer rather than a real device error.
-.
-.Seven shapes have been compiled and probed. Do not bisect them again.
-.
-.  OPEN/PRINT#/CLOSE at top level
-.      RESULT: passes
-.
-.  four consecutive PRINT#, no PRINT between
-.      RESULT: passes
-.
-.  the same inside GP.DO ... GP.EXITDO
-.      RESULT: passes
-.
-.  the same behind a GOSUB inside a GP.DO
-.      RESULT: passes
-.
-.  the same behind GP.SELECT then GOSUB inside a GP.DO
-.      RESULT: passes
-.
-.  the real routine called from the top level of the same program
-.      RESULT: passes
-.
-.  the real routine reached from the program's own GP.DO key loop
-.      RESULT: fails
-.
-.Do this -- a plain PRINT immediately after the CLOSE makes it pass. Channel
-.0 output runs CLRCHN; a non-zero channel runs CHKOUT and READST instead, so
-.the suspect is channel state left behind rather than the file I/O.
+>70|4.7 SORT.INC.BL -- shell sort a string array

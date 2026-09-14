@@ -66,15 +66,15 @@
 .
 =SEE ALSO
 .
->59|4.1 THEME.INC.BL -- named colour roles
->62|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
->86|STASH.INC.BL -- save a text rectangle, and put it back.
->94|STASHFILE.INC.BL -- a saved text rectangle, through a file.
->79|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
->80|4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store
->63|4.4 LINEINPUT.INC.BL -- a positioned entry field
->65|4.6 MENUVERT.INC.BL -- a vertical menu
->70|4.9 MENUBAR.INC.BL -- a horizontal menu
->72|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
->73|4.12 GUI2.INC.BL -- a listbox, single or multi select
->60|4.2 STRINGS.INC.BL -- string helpers
+>61|4.1 THEME.INC.BL -- named colour roles
+>64|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>88|STASH.INC.BL -- save a text rectangle, and put it back.
+>96|STASHFILE.INC.BL -- a saved text rectangle, through a file.
+>81|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+>82|4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store
+>65|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>67|4.6 MENUVERT.INC.BL -- a vertical menu
+>72|4.9 MENUBAR.INC.BL -- a horizontal menu
+>74|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
+>75|4.12 GUI2.INC.BL -- a listbox, single or multi select
+>62|4.2 STRINGS.INC.BL -- string helpers

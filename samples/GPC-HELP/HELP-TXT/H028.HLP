@@ -24,9 +24,9 @@
 .
 =IN THIS SECTION
 .
->48|3.11.1 GP.DEFPROC -- declare a verb and its arguments
->49|3.11.2 GP.SUB -- call a verb
->50|3.11.3 GP.FN -- call a verb from inside an expression
+>49|3.11.1 GP.DEFPROC -- declare a verb and its arguments
+>50|3.11.2 GP.SUB -- call a verb
+>51|3.11.3 GP.FN -- call a verb from inside an expression
 .
 =The formals are ordinary variables
 .
@@ -38,9 +38,9 @@
 .  - A verb may appear inside its own argument list. GP.FN(AREA, 2,
 .    GP.FN(AREA, 3, 4)) is correct, because a call list is evaluated in full
 .    before any of it is stored into a formal. The inner call runs and
-.    finishes before the outer writes A.W. The values wait on the 4K frame
-.    stack while the rest of the list is read, so neither the number of
-.    arguments nor the depth of any one of them is a limit.
+.    finishes before the outer writes A.W. The values wait on the frame stack
+.    while the rest of the list is read, so neither the number of arguments
+.    nor the depth of any one of them is a limit.
 .  - A verb's body may not call the verb. There is one set of formals, so a
 .    routine that calls itself -- directly, or round through another verb --
 .    writes over the arguments it is still using. Nothing detects this: it

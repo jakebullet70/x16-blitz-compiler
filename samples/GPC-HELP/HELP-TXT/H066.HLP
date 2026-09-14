@@ -1,112 +1,86 @@
-@3. The modules (5)
-=GUI.INC.BL
+@3. The modules (4)
+=MENUVERT.INC.BL
 .
 .  in
-.      GUI.MSG$ GUI.MSG2$ GUI.MSG3$ -- up to three message lines. "" for
-.        none, and no gap left behind<br>GUI.TITLE$ -- a name in the top
-.        edge<br>GUI.BANK -- a spare RAM bank for the covered cells. 0 does
-.        not save<br>GUI.STYLE -- GP.BOX style 0..3<br>GUI.PANEL.IN
-.        GUI.BORDER.IN -- attributes. 0 takes THEME.TEXT and
-.        THEME.BORDER<br>GUI.GLYPH -- non-zero frames from GUI.EDGE.H
-.        GUI.EDGE.V GUI.CORNER.TL .TR .BL .BR<br>GUI.PLACE GUI.X GUI.Y
-.        GUI.ROW.OFFSET -- where the box goes<br>GUI.SHADOW GUI.SHADOW.ATTR
-.        -- the drop shadow<br>GUI.BTN.ONE$ GUI.BTN.TWO$ -- the button
-.        labels, & marking the accelerator<br>GUI.DEFAULT -- which button is
-.        the default. 2 is the second, anything else the first<br>GUI.COUNT
-.        GUI.SEL GUI.FLAGS -- GUI.MENU, over MENUVERT.ITEM$()<br>GUI.LEN
-.        GUI.TEXT$ GUI.MASK -- GUI.INPUT<br>GUI.BODY.ROWS GUI.BODY.WIDTH --
-.        GUI.OPEN, when you call it yourself
+.      MENUVERT.X MENUVERT.Y -- top left of the first row<br>MENUVERT.WIDTH
+.        -- cells wide, which is the width of the highlight<br>MENUVERT.COUNT
+.        -- how many rows<br>MENUVERT.ITEM$() -- the rows, 1..COUNT; the
+.        caller owns the DIM<br>MENUVERT.ATTR -- packed
+.        attribute<br>MENUVERT.HIATTR -- the highlighted row; 0 inverts
+.        MENUVERT.ATTR<br>MENUVERT.HOT$ -- one hotkey character a
+.        row<br>MENUVERT.HOTATTR -- tint for the hotkey letter; 0 is
+.        off<br>MENUVERT.FLAGS -- added together<br>MENUVERT.SEL -- the row
+.        to start on
 .
 .  out
-.      GUI.KEY -- the key that ended it, whichever call<br>GUI.ANSWER --
-.        GUI.YN<br>GUI.OK -- GUI.INPUT: -1 accepted, 0 cancelled<br>GUI.TEXT$
-.        -- what was typed<br>GUI.SEL -- the row chosen, or 0<br>GUI.STASHED
-.        -- -1 if the covered cells were saved<br>GUI.LEFT GUI.TOP GUI.WIDTH
-.        GUI.HEIGHT -- where the box went<br>GUI.INNER.LEFT GUI.INNER.TOP
-.        GUI.INNER.WIDTH -- the usable area, from GUI.OPEN<br>GUI.PANEL
-.        GUI.BORDER -- the attributes it settled on
+.      MENUVERT.SEL -- 1..COUNT, or 0 if cancelled<br>MENUVERT.KEY -- the key
+.        that ended it
 .
 .  internal
-.      GUI.ADD.W GUI.BOTTOM GUI.BOX.STYLE GUI.CLR.K$ GUI.FIELD.LEFT
-.        GUI.GAP.ROWS GUI.GLYPH$ GUI.HEAD.ROWS GUI.INDEX GUI.MOVE.BY
-.        GUI.MOVE.TRIES GUI.MOVE.WAS GUI.OKCANCEL GUI.PAINT.N GUI.PRESSED$
-.        GUI.RIGHT GUI.SAVE.W GUI.SAVE.H GUI.SCAN GUI.SCREEN.COLS
-.        GUI.SCREEN.ROWS GUI.SH.BW GUI.SH.W GUI.SH.H GUI.STEP.TYPE
-.        GUI.TITLE.LEFT GUI.WAS$<br>the button row: GUI.BTN.AMP .AT .ATTR
-.        .DEF .FOCUSED .HEAD$ .HI .KEY .KEY.ONE .KEY.TWO .LC .MARK$ .OF
-.        .RIGHT .TAIL$ .TEXT$ .TOTAL .UC .W.ONE .W.TWO .WIDE .X .Y<br>the
-.        form: GUI.CTRL.TYPE% .X% .Y% .W% .FLAGS% .KEY% GUI.CTRL.TEXT$
-.        GUI.CTRL.N GUI.FOCUS GUI.FORM.DIMMED .DONE .HIT .KEY .NAV<br>the
-.        list control: GUI.LIST.ATTR .COUNT .DIGITS .EACH .EDGE$ .HI .I
-.        .MARKED .MARKP .MARKY .NOTE$ .NOTE.LEFT .NOTEW .NUM$ .ROW .ROWS .SEL
-.        .W .WAS .WAS.SCROLL .X .Y
+.      MENUVERT.SCAN MENUVERT.EACH MENUVERT.DONE MENUVERT.CODE
+.        MENUVERT.INCHAR$ MENUVERT.PREVSEL MENUVERT.HIGHLIGHT
+.        MENUVERT.DRAWROW MENUVERT.DRAWATTR MENUVERT.DRAWTEXT$ MENUVERT.DRAWY
+.        MENUVERT.HOTCODE MENUVERT.HOTLAST MENUVERT.WANTCODE MENUVERT.HOTAT
+.        MENUVERT.HOTWANT MENUVERT.HOTHERE MENUVERT.HOTSCAN MENUVERT.PADNOW
+.        MENUVERT.PADNEW MENUVERT.PADHELD MENUVERT.PADRAW
 .
 .  constants
-.      GUI.SCRMODE GUI.LINEBOX GUI.MAXCELLS GUI.PADX GUI.PADY GUI.ESCAPE
-.        GUI.STOP GUI.RETURN GUI.SPACE GUI.BTN.GAP
-.        GUI.FORM.MAX<br>GUI.CT.BUTTON GUI.CT.FIELD GUI.CT.LIST -- what a
-.        control is<br>GUI.CF.DEFAULT GUI.CF.NOFOCUS -- what is true of
-.        it<br>GUI.NAV.STAY .NEXT .PREV .PRESS .DEFAULT .CANCEL -- the six
-.        verdicts<br>GUI.K.TAB GUI.K.SHTAB GUI.K.DOWN GUI.K.UP GUI.K.RIGHT
-.        GUI.K.LEFT
+.      MENUVERT.MUSTSEL MENUVERT.KEEPMARK MENUVERT.NOWRAP MENUVERT.GAMEPAD
+.        MENUVERT.UP MENUVERT.DOWN MENUVERT.ENTER MENUVERT.ESCAPE
+.        MENUVERT.STOP MENUVERT.SPACE MENUVERT.PORT MENUVERT.PAD.UP
+.        MENUVERT.PAD.DOWN MENUVERT.PAD.B MENUVERT.PAD.START
 .
-.GUI.DEFAULT and the focus are two different things. The default button is
-.the one RETURN presses from anywhere and the one drawn <<LIKE THIS>>; the
-.focus is where TAB has got to, and it is drawn in THEME.FOCUS. GUI.INPUT
-.opens with the default on OK and the focus in the field, so neither is the
-.other's shorthand.
+.MENUVERT.SEL is both an input and an output: the row to start on going in,
+.and the row chosen coming out, so a menu reopened without clearing it
+.reopens where it was. That is usually what you want; set it to 0 when it is
+.not.
 .
-.GUI.BTN.DEF is not GUI.DEFAULT. It is internal -- which button
-.GUI.BUTTON.ROW is painting the double brackets on as it draws -- and setting
-.it does nothing, because the row recomputes it from GUI.DEFAULT every time
-.it paints. The near-miss is worth knowing about; the rest of GUI.BTN.* is
-.scratch for one button's text, width and accelerator and is rewritten twice
-.a row.
+.MENUVERT.DRAWROW, MENUVERT.DRAWATTR and MENUVERT.DRAWTEXT$ are listed
+.internal but are the documented arguments to MENUVERT.ROW, which is public:
+.they are internal to MENUVERT.RUN, not to you. MENUVERT.HOTFIND reads the
+.first two and answers in MENUVERT.HOTAT.
 .
-.GUI.HINT$ is gone, and it is the one interface the CUA work took away. The
-.dimmed line naming two keys became a real button row, and "the first Y and
-.the first N in the line are lit" has nothing to light when the row is two
-.buttons. Set GUI.BTN.ONE$ and GUI.BTN.TWO$ instead.
-.
-.The typing dialog and its string swapped names. It was GUI.TEXT returning
-.GUI.INPUT$; it is GUI.INPUT returning GUI.TEXT$. BASLOAD will not have a
-.label and a variable of one name and the $ does not separate them, so
-.GUI.INPUT the routine forbids GUI.INPUT$ the variable. A program written
-.against the older library compiles clean and reads the wrong one back --
-.this is the one rename here that fails silently.
-.
-.GUI.CTRL.* are the seven parallel arrays that are the control block: one
-.element a control, up to GUI.FORM.MAX. GUI.INC.BL DIMs them. Do not DIM them
-.yourself.
-.
-=GUI2.INC.BL
+=MENUBAR.INC.BL
 .
 .  in
-.      GUI.LISTBOX.COUNT -- how many items. 0 or less returns
-.        cancelled<br>MENUVERT.ITEM$() -- the items, 1..COUNT, and the caller
-.        owns the DIM<br>GUI.LISTBOX.ROWS -- rows visible at once. 0 takes
-.        10, then cut to COUNT and to the screen<br>GUI.LISTBOX.MULTI -- 0
-.        chooses one row, 1 marks a set with SPACE<br>GUI.LISTBOX.MARKS$ --
-.        multi only, in as well as out: COUNT characters, "1" marked. Any
-.        other length, "" included, starts with none<br>GUI.LISTBOX.SEL --
-.        the item to start on. 0 starts at 1<br>plus everything GUI.OPEN
-.        reads
+.      MENUBAR.X MENUBAR.Y -- where the bar starts<br>MENUBAR.GAP -- cells
+.        BETWEEN items. 0 is the default, because the air belongs in the item
+.        text<br>MENUBAR.FLAGS -- added together<br>MENUBAR.SEL -- the item
+.        to start on; 0 starts at 1<br>and MENUVERT.COUNT, MENUVERT.ITEM$(),
+.        MENUVERT.ATTR, MENUVERT.HIATTR, MENUVERT.HOT$, MENUVERT.HOTATTR
 .
 .  out
-.      GUI.LISTBOX.SEL -- the item under the highlight, or 0 if
-.        cancelled<br>GUI.LISTBOX.MARKS$ -- multi only: which are
-.        marked<br>GUI.LISTBOX.MARKED -- multi only: how many<br>GUI.KEY --
-.        13 accepted, 27 cancelled
+.      MENUBAR.SEL -- 1..COUNT, or 0 if cancelled<br>MENUBAR.KEY -- 13 chose,
+.        27 cancelled, 17 or 145 on a cross-axis exit, or the hotkey
+.        itself<br>MENUBAR.SELX MENUBAR.SELW -- the column the chosen item
+.        starts at and how wide it is, so a caller can drop a panel under
+.        it<br>MENUBAR.AT MENUBAR.WIDE -- the same two for whichever item
+.        MENUBAR.FIND named, from MENUBAR.WHERE
 .
 .  internal
-.      GUI.LISTBOX.I GUI.LISTBOX.MARKOFF GUI.LISTBOX.TEXTW
+.      MENUBAR.CI MENUBAR.CODE MENUBAR.DRAWN MENUBAR.EACH MENUBAR.FIND
+.        MENUBAR.HC MENUBAR.HIT MENUBAR.HK MENUBAR.IN$ MENUBAR.PAD
+.        MENUBAR.PAINT MENUBAR.WANT MENUBAR.WAS
 .
-.In multi-select GUI.LISTBOX.SEL is not the answer -- it is where the cursor
-.was left. The marks are the answer.
+.  constants
+.      MENUBAR.MUSTSEL MENUBAR.KEEPMARK MENUBAR.NOWRAP MENUBAR.GAMEPAD
+.        MENUBAR.DOWNEXIT MENUBAR.UPEXIT MENUBAR.LEFT MENUBAR.RIGHT
+.        MENUBAR.UP MENUBAR.DOWN MENUBAR.ENTER MENUBAR.ESCAPE MENUBAR.STOP
+.        MENUBAR.PORT MENUBAR.PAD.LEFT MENUBAR.PAD.RIGHT MENUBAR.PAD.B
+.        MENUBAR.PAD.START
 .
-.The scrolling list is not in this module. It is GUI.CT.LIST, one of
-.GUI.FORM's three control types, and lives in GUI.INC.BL beside the field.
-.GUI2.INC.BL is the dialog around it: measure, open, hand the control its
-.geometry, add a button row, run the form, answer. That is why the internals
-.here are three variables and not thirty -- the GUI.LIST.* set does the work.
+.It has no items array, no attributes and no hotkeys of its own -- it reads
+.MENUVERT's. A bar and a dropdown are one thing to the user, so the two
+.modules share the whole of that half of the interface, and the caller
+.refills MENUVERT.ITEM$() between drawing the bar and opening the menu under
+.it. Nothing else in the library reaches across a prefix like this, and
+.MENUBAR.INC.BL therefore does not build without MENUVERT.INC.BL.
+.
+.There is no MENUBAR.WIDTH. An item is as wide as its own text, which is the
+.difference from a vertical menu.
+.
+.MENUBAR.DOWNEXIT and MENUBAR.UPEXIT are the cross-axis exits: they end the
+.bar on a key rather than swallowing it, so the caller can open the dropdown
+.and hand control on. MENUVERT's MENUHELP.KEYEXIT is the other half of the
+.same handshake.
 .
