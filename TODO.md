@@ -924,12 +924,13 @@ number instead of a guess.
   Method, self-check and prototype: section 5 of `source/application/COMPILER-STATUS.md`.
 - **`BASLOAD-GPC` end-of-run report in the same shape.** BEFORE RELEASE, after the compiler's report
   is settled. `### BASLOAD-GPC wants the same report`.
-- **The help does not know about dead-code elimination.** Not started.
-  `### The help does not know about dead-code elimination`.
 
 **Done 2026-09-13, outside the ranking:** compiler tests in two tiers
 (`docs/blitz/COMPILER-TESTS.PLAN.md`); `GP.ASM` `{VAR}` lookup reads the symbol file once a compile,
 GPBMODS 317 s to 19.8 s (`docs/memory/gpasm-var-lookup-rescans-symfile.md`).
+
+**Done 2026-09-14, outside the ranking:** the help knows about dead-code elimination, in e9d11cf.
+`### The help does not know about dead-code elimination`.
 
 
 ## Performance
@@ -2944,9 +2945,16 @@ themselves.
 Not a duplicate of the compiler's report — different tool, different numbers — but it should read
 like the same program printed it. Settle the compiler's shape first, then follow it.
 
-### The help does not know about dead-code elimination — added 2026-09-13
+### The help does not know about dead-code elimination — DONE
 
-GPC V1.1 removes unreached lines when `GPC.INPUT` line 5 names a removed-line file, and the banner
+**DONE 2026-09-14, in e9d11cf.** `GP-BASIC.FILES.md` says `GPC.INPUT` is up to five lines, and
+`GP-BASIC.md` §7 has `### Removing dead code` and the `DEAD CODE` banner line. Every reason below now
+reads "unless the compile removes dead code" or is gone, in the root library and the working copy
+alike; `MENUBAR.BANK.INC.BL` went with the twins. The `GPC-HELP` copies and `.HLP` pages are patched
+from the render delta and no longer list the `GP.FN` aliasing bug. The sample-local copies under
+`samples/editor/GPC-BASIC/` and `samples/XBASE/GPC-BASIC/` took the same wording the same day.
+
+Added 2026-09-13. GPC V1.1 removes unreached lines when `GPC.INPUT` line 5 names a removed-line file, and the banner
 then prints `DEAD CODE: N LINES REMOVED, B BYTES SAVED`. The help sources in `GPC-BASIC/`, which build
 GPB.HELP and the `samples/GPC-HELP/GPC-HELP*.md` copies, say neither.
 
@@ -2986,8 +2994,6 @@ Found so far, by grep:
   first.
 - `samples/GPC-HELP/GPC-BASIC/` names banked twins in `COMBO.INC.BL:54` and `:181`, `GUI.INC.BL:100`,
   `LINEINPUT.INC.BL:66`, `MENUVERT.INC.BL:70` and `THEME.INC.BL:34`.
-- `samples/editor/GPC-BASIC/MENUBAR.INC.BL:17` and `STASH.INC.BL:10` still say a BASL module has no
-  dead code elimination.
 - `FORM`, `GUI`, `GUI2TST`, `MENU`, `MENUDEMO` and `MENUTST.EXP.BL` each hold a `BANK` or
   `GP.BANKED` line. Check whether each is still needed.
 

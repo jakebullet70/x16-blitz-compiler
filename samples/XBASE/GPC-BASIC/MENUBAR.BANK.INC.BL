@@ -14,9 +14,9 @@
 ## **      MENUVERT.INC.BL   MENUVERT.ROW draws the items and tints the
 ## **                        hotkeys; this file owns the layout and the keys
 ## **
-## **  A separate file rather than a flag on MENUVERT: there is no dead code
-## **  elimination, so a horizontal path inside MENUVERT would be carried by every
-## **  vertical menu.
+## **  A separate file rather than a flag on MENUVERT: a flag is tested at run time,
+## **  so even a compile that removes dead code would keep a horizontal path inside
+## **  MENUVERT in every vertical menu.
 ## **
 ## **  IT SHARES MENUVERT'S ARRAY AND COLOURS -- MENUVERT.ITEM$, .ATTR, .HIATTR,
 ## **  .HOTATTR, .HOT$ -- so a program with a bar and a dropdown has one convention.

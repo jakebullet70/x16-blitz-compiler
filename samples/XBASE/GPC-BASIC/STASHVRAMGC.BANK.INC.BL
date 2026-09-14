@@ -3,9 +3,9 @@
 ## **
 ## **      SV.COMPACT   slide every live block down, and rewrite the table
 ## **
-## **  ITS OWN FILE BECAUSE A BASL MODULE HAS NO DEAD CODE ELIMINATION. A
-## **  compactor nobody calls would otherwise be compiled into every program
-## **  that includes the store. #INCLUDE this one only if something in the
+## **  ITS OWN FILE, SO A COMPACTOR NOBODY CALLS COSTS NOTHING. Unless the
+## **  compile removes dead code, it would otherwise be compiled into every
+## **  program that includes the store. #INCLUDE this one only if something in the
 ## **  program calls it, and NEVER call it automatically.
 ## **
 ## **  Requires STASHVRAM.INC.BL, and #INCLUDEs it not.

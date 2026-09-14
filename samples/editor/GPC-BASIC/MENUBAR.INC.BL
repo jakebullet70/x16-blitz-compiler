@@ -14,9 +14,9 @@
 ## **      MENUVERT.INC.BL   MENUVERT.ROW draws the items and tints the
 ## **                        hotkeys; this file owns the layout and the keys
 ## **
-## **  A SEPARATE FILE, NOT A FLAG ON MENUVERT: a BASL module has no dead code
-## **  elimination, so a horizontal path inside MENUVERT would be carried by every
-## **  vertical menu ever written. STASHFILE.INC.BL was split off for the same reason.
+## **  A SEPARATE FILE, NOT A FLAG ON MENUVERT: a flag is tested at run time, so even a
+## **  compile that removes dead code would keep a horizontal path inside MENUVERT in
+## **  every vertical menu.
 ## **
 ## **  IT SHARES MENUVERT'S ARRAY AND COLOURS -- MENUVERT.ITEM$, .ATTR, .HIATTR,
 ## **  .HOTATTR, .HOT$ -- because a program with a bar and a dropdown wants one
