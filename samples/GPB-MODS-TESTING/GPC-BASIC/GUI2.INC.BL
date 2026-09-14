@@ -79,15 +79,15 @@ GOTO GUI.LISTBOX.MODULE.END
 ## **  GUI.LISTBOX -- the whole thing.
 ## ***********************************************************************
 
-GUI.LISTBOX:  GUI.KEY = 0
+GUI.LISTBOX:  
+    GUI.KEY = 0
     IF GUI.LISTBOX.COUNT < 1 THEN GUI.LISTBOX.SEL = 0 : RETURN
 
 ## ---- The window: what was asked for, ten rows if nothing was, then cut to the
 ## ---- list and to the screen. Eight rows go to the frame, the message, the
 ## ---- spacer and the button row, so the list may have the rest.
 
-    GUI.LIST.COUNT = GUI.LISTBOX.COUNT
-    GUI.LIST.ROWS = GUI.LISTBOX.ROWS
+    GUI.LIST.COUNT = GUI.LISTBOX.COUNT : GUI.LIST.ROWS = GUI.LISTBOX.ROWS
     IF GUI.LIST.ROWS < 1 THEN GUI.LIST.ROWS = 10
     IF GUI.LIST.ROWS > GUI.LIST.COUNT THEN GUI.LIST.ROWS = GUI.LIST.COUNT
     GOSUB GUI.SCREEN
@@ -109,8 +109,7 @@ GUI.LISTBOX:  GUI.KEY = 0
 ## ---- GUI.OPEN because it is what tells the control, and GUI.LIST.MEASURE,
 ## ---- that there is a mark column at all -- and that is two cells of box width.
 
-    GUI.LIST.MARKP = 0
-    GUI.LISTBOX.MARKOFF = 0
+    GUI.LIST.MARKP = 0 : GUI.LISTBOX.MARKOFF = 0
     GP.IF GUI.LISTBOX.MULTI <> 0 THEN
         IF LEN(GUI.LISTBOX.MARKS$) <> GUI.LIST.COUNT THEN GUI.LISTBOX.MARKS$ = RPT$(48, GUI.LIST.COUNT)
         GUI.LIST.MARKP = GP.STRPTR(GUI.LISTBOX.MARKS$)
@@ -120,11 +119,8 @@ GUI.LISTBOX:  GUI.KEY = 0
 ## ---- Everything the box has to be wide enough for: the widest item plus its
 ## ---- mark column, the footer at its longest, and the button row.
 
-    GUI.BTN.ONE$ = "&OK"
-    GUI.BTN.TWO$ = "&CANCEL"
-    GUI.DEFAULT = 1
-    GOSUB GUI.BUTTON.SIZE
-    GOSUB GUI.LIST.MEASURE
+    GUI.BTN.ONE$ = "&OK" : GUI.BTN.TWO$ = "&CANCEL" : GUI.DEFAULT = 1
+    GOSUB GUI.BUTTON.SIZE : GOSUB GUI.LIST.MEASURE
     GUI.BODY.WIDTH = GUI.LISTBOX.TEXTW + GUI.LISTBOX.MARKOFF
     IF GUI.LIST.NOTEW + 2 > GUI.BODY.WIDTH THEN GUI.BODY.WIDTH = GUI.LIST.NOTEW + 2
     IF GUI.BTN.TOTAL > GUI.BODY.WIDTH THEN GUI.BODY.WIDTH = GUI.BTN.TOTAL
@@ -140,12 +136,9 @@ GUI.LISTBOX:  GUI.KEY = 0
     GUI.LIST.Y = GUI.INNER.TOP
     GUI.LIST.W = GUI.INNER.WIDTH - GUI.LISTBOX.MARKOFF
     GUI.LIST.SEL = GUI.LISTBOX.SEL
-    GOSUB GUI.FORM.BEGIN
-    GOSUB GUI.FORM.ADD.LIST
+    GOSUB GUI.FORM.BEGIN : GOSUB GUI.FORM.ADD.LIST
     GUI.BTN.Y = GUI.INNER.TOP + GUI.LIST.ROWS + 1
-    GOSUB GUI.BUTTON.ROW
-    GUI.FOCUS = 1
-    GOSUB GUI.FORM.RUN
+    GOSUB GUI.BUTTON.ROW : GUI.FOCUS = 1 : GOSUB GUI.FORM.RUN
 
 ## ---- OK IS THE DEFAULT BUTTON, asked by its flag rather than by its index, so
 ## ---- a wrapper that ordered its controls differently still reads right. A
@@ -160,8 +153,7 @@ GUI.LISTBOX:  GUI.KEY = 0
     GUI.LISTBOX.MARKED = GUI.LIST.MARKED
     GUI.KEY = GUI.RETURN
     GP.IF (GUI.CTRL.FLAGS%(GUI.FORM.HIT) AND GUI.CF.DEFAULT) = 0 THEN
-        GUI.LISTBOX.SEL = 0
-        GUI.KEY = GUI.ESCAPE
+        GUI.LISTBOX.SEL = 0 : GUI.KEY = GUI.ESCAPE
     GP.ENDIF
 
 ## ---- WARNING: MENUVERT.SCROLL goes back to 0, and that is not tidiness.
@@ -171,8 +163,7 @@ GUI.LISTBOX:  GUI.KEY = 0
 ## ---- the width of the row it replaced. A listbox is the only thing that ever
 ## ---- sets it, and so the only thing that can break it.
 
-    MENUVERT.SCROLL = 0
-    GOSUB GUI.CLOSE
+    MENUVERT.SCROLL = 0 : GOSUB GUI.CLOSE
     RETURN
 
 GUI.LISTBOX.MODULE.END:

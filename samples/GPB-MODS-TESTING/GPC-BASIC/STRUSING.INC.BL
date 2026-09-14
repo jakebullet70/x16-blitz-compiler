@@ -75,7 +75,8 @@ GOTO STR.USING.SKIP
 ## Reads the mask, formats the digits, then fits them to the field. An empty mask gives
 ## an empty result.
 
-STR.USING:  STR.USING.W = LEN(STR.USING.MASK$) : STR.USING.STR$ = "" : IF STR.USING.W = 0 THEN RETURN
+STR.USING:  
+    STR.USING.W = LEN(STR.USING.MASK$) : STR.USING.STR$ = "" : IF STR.USING.W = 0 THEN RETURN
     STR.USING.DP = 0 : STR.USING.IW = 0 : STR.USING.ZW = 0 : STR.USING.GRP = 0 : STR.USING.PT = 0 : STR.USING.SIGN$ = "" : STR.USING.I = 1 : STR.USING.C$ = LEFT$(STR.USING.MASK$, 1)
     IF STR.USING.C$ = "+" THEN STR.USING.SIGN$ = "+" : STR.USING.I = 2
     IF STR.USING.C$ = "-" THEN STR.USING.SIGN$ = "-" : STR.USING.I = 2
@@ -115,7 +116,9 @@ STR.USING.READY:
     STR.USING.STR$ = " " + STR.USING.STR$
     RETURN
 
-STR.USING.STAR:  STR.USING.STR$ = RPT$(42, STR.USING.W) : RETURN
+STR.USING.STAR:  
+    STR.USING.STR$ = RPT$(42, STR.USING.W) 
+    RETURN
 
 ## STR.USING.FIX -- the value to STR.USING.DP decimal places, and nothing else.
 ##
@@ -159,8 +162,10 @@ STR.USING.FIX:
 ## Walked from the right, because that is the end the grouping is anchored to. Three or
 ## fewer digits are returned untouched, so it is safe on any width.
 
-STR.USING.GROUP:  STR.USING.OUT$ = "" : STR.USING.I = LEN(STR.USING.INT$)
-STR.USING.GROUP.NEXT:  IF STR.USING.I <= 3 THEN STR.USING.INT$ = LEFT$(STR.USING.INT$, STR.USING.I) + STR.USING.OUT$ : RETURN
+STR.USING.GROUP:  
+    STR.USING.OUT$ = "" : STR.USING.I = LEN(STR.USING.INT$)
+STR.USING.GROUP.NEXT:  
+    IF STR.USING.I <= 3 THEN STR.USING.INT$ = LEFT$(STR.USING.INT$, STR.USING.I) + STR.USING.OUT$ : RETURN
     STR.USING.OUT$ = "," + MID$(STR.USING.INT$, STR.USING.I - 2, 3) + STR.USING.OUT$
     STR.USING.I = STR.USING.I - 3 : GOTO STR.USING.GROUP.NEXT
 

@@ -61,12 +61,14 @@ GOTO STR.SKIP
 ## The pads pad only: a string at or past the width is left alone, and the result is
 ## not length checked.
 
-STR.PADR:  IF LEN(STR.STR$) < STR.WIDTH THEN STR.STR$ = STR.STR$ + RPT$(32, STR.WIDTH - LEN(STR.STR$))
+STR.PADR: 
+    IF LEN(STR.STR$) < STR.WIDTH THEN STR.STR$ = STR.STR$ + RPT$(32, STR.WIDTH - LEN(STR.STR$))
     RETURN
 
 ## STR.PADL -- pad on the LEFT to STR.WIDTH. Right justify.
 
-STR.PADL:  IF LEN(STR.STR$) < STR.WIDTH THEN STR.STR$ = RPT$(32, STR.WIDTH - LEN(STR.STR$)) + STR.STR$
+STR.PADL:  
+    IF LEN(STR.STR$) < STR.WIDTH THEN STR.STR$ = RPT$(32, STR.WIDTH - LEN(STR.STR$)) + STR.STR$
     RETURN
 
 ## STR.PADC -- pad BOTH sides to STR.WIDTH. An odd gap puts the extra space right.
@@ -74,7 +76,8 @@ STR.PADL:  IF LEN(STR.STR$) < STR.WIDTH THEN STR.STR$ = RPT$(32, STR.WIDTH - LEN
 ## The two guards are load bearing: RPT$ raises ILLEGAL QUANTITY on a count of zero, so
 ## a gap of 1 makes STR.HALF zero and fails the left call.
 
-STR.PADC:  STR.GAP = STR.WIDTH - LEN(STR.STR$)
+STR.PADC:  
+    STR.GAP = STR.WIDTH - LEN(STR.STR$)
     IF STR.GAP < 1 THEN RETURN
     STR.HALF = INT(STR.GAP / 2) : IF STR.HALF > 0 THEN STR.STR$ = RPT$(32, STR.HALF) + STR.STR$
     STR.STR$ = STR.STR$ + RPT$(32, STR.WIDTH - LEN(STR.STR$))
@@ -97,7 +100,8 @@ STR.PADC:  STR.GAP = STR.WIDTH - LEN(STR.STR$)
 ## gives one empty field. Reaching STR.MAX loses nothing -- the last field takes the
 ## whole unsplit remainder.
 
-STR.SPLIT:  STR.N = 0 : STR.LIM = STR.MAX
+STR.SPLIT:  
+    STR.N = 0 : STR.LIM = STR.MAX
     IF STR.LIM < 1 THEN STR.LIM = 10
     STR.REST$ = STR.STR$
 STR.SPLIT.NEXT:
@@ -120,7 +124,8 @@ STR.SPLIT.NEXT:
 ##
 ## Not length checked. A result past 255 characters is the caller's problem.
 
-STR.REPLACE:  STR.OUT$ = "" : STR.REST$ = STR.STR$
+STR.REPLACE:  
+    STR.OUT$ = "" : STR.REST$ = STR.STR$
 STR.REPLACE.NEXT:
     STR.AT = GP.INSTR(STR.REST$, STR.FIND$)
     IF STR.AT = 0 THEN STR.STR$ = STR.OUT$ + STR.REST$ : RETURN
@@ -202,9 +207,12 @@ STR.PET2SCR:
 ## #REM 1 is load bearing: without it BASLOAD strips the body and the block reaches the
 ## compiler empty, refused as "block mismatch". #REM 0 restores the default.
 
-STR.TRIM:   STR.OP% = 0 : GOTO STR.TRIM.GO
-STR.LTRIM:  STR.OP% = 1 : GOTO STR.TRIM.GO
-STR.RTRIM:  STR.OP% = 2
+STR.TRIM:   
+    STR.OP% = 0 : GOTO STR.TRIM.GO
+STR.LTRIM:  
+    STR.OP% = 1 : GOTO STR.TRIM.GO
+STR.RTRIM:  
+    STR.OP% = 2
 STR.TRIM.GO:
     STR.ADDR% = STR.PTR
     STR.KEEP% = 0

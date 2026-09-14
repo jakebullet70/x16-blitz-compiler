@@ -87,7 +87,8 @@ GOTO STASH.MODULE.END
 
 ## STASH.SAVE -- the screen into the bank.
 
-STASH.SAVE:  GOSUB STASH.BANK.HOLD
+STASH.SAVE:  
+    GOSUB STASH.BANK.HOLD
     STASH.MODE = 0 : GOSUB STASH.SETUP
     IF STASH.OK = 0 THEN GOTO STASH.DONE
 
@@ -101,12 +102,14 @@ STASH.SAVE:  GOSUB STASH.BANK.HOLD
 ## The size comes out of the header, so the only input is the bank. STASH.MOVE = 1
 ## uses the caller's STASH.X / STASH.Y instead of the saved ones.
 
-STASH.RESTORE:  GOSUB STASH.BANK.HOLD
+STASH.RESTORE:  
+    GOSUB STASH.BANK.HOLD
     STASH.ORG = STASH.WINDOW + STASH.SLOT
     BANK STASH.BANK : STASH.W = PEEK(STASH.ORG) :  STASH.H = PEEK(STASH.ORG + 1)
     IF STASH.MOVE <> 0 THEN GOTO STASH.RESTORE.GO
     STASH.X = PEEK(STASH.ORG + 2) : STASH.Y = PEEK(STASH.ORG + 3)
-STASH.RESTORE.GO:  STASH.MODE = 1  : GOSUB STASH.SETUP
+STASH.RESTORE.GO:  
+    STASH.MODE = 1  : GOSUB STASH.SETUP
     IF STASH.OK = 0 THEN GOTO STASH.DONE
     BANK STASH.BANK : GOSUB STASH.WALK
 
@@ -116,7 +119,8 @@ STASH.RESTORE.GO:  STASH.MODE = 1  : GOSUB STASH.SETUP
 ## there, so a STASH followed by a call into GP.BANKED code would fetch its next
 ## instruction out of the stash bank -- a silent hang, nowhere near the STASH.
 
-STASH.DONE:  BANK STASH.WAS% : RETURN
+STASH.DONE:  
+    BANK STASH.WAS% : RETURN
 
 ## STASH.BANK.HOLD -- remember the bank the caller had selected. A blob, because BASIC
 ## cannot see the register: PEEK selects and restores around every access.

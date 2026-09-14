@@ -42,7 +42,8 @@ GOTO SVGC.MODULE.END
 ## **  SV.COMPACT -- every live block down to the low-water mark.
 ## ***********************************************************************
 
-SV.COMPACT:  SV.OK = 0 : SV.MOVED = 0 : SV.ERROR$ = ""
+SV.COMPACT:  
+    SV.OK = 0 : SV.MOVED = 0 : SV.ERROR$ = ""
     IF SV.READY = 0 THEN SV.ERROR$ = "SV.INIT HAS NOT RUN" : RETURN
 
     SV.TO = SV.BASEPG
@@ -50,7 +51,8 @@ SV.COMPACT:  SV.OK = 0 : SV.MOVED = 0 : SV.ERROR$ = ""
 ## ---- Take the lowest live block at or above the mark, place it, and move the
 ## ---- mark past it. A selection pass rather than a sort: the table is a few
 ## ---- dozen entries and this needs no second array to hold an order in.
-SV.GC.NEXT:  SV.PICK = 0 : SV.BEST = 0
+SV.GC.NEXT:  
+    SV.PICK = 0 : SV.BEST = 0
     FOR SV.J = 1 TO SV.MAX
         IF SV.PAGE%(SV.J) >= SV.TO THEN GOSUB SV.GC.OFFER
     NEXT SV.J
@@ -60,7 +62,8 @@ SV.GC.NEXT:  SV.PICK = 0 : SV.BEST = 0
     SV.TO = SV.TO + SV.PAGES%(SV.PICK)
     GOTO SV.GC.NEXT
 
-SV.GC.DONE:  SV.NEXT = SV.TO : SV.OK = -1 : RETURN
+SV.GC.DONE:  
+    SV.NEXT = SV.TO : SV.OK = -1 : RETURN
 
 ## ---- A free slot holds page 0, which is never >= SV.TO because SV.INIT
 ## ---- refuses a base under one page. So this sees live blocks only.
@@ -73,7 +76,8 @@ SV.GC.OFFER:
 ## **  SV.GC.SLIDE -- one block down, in chunks memory_copy can count.
 ## ***********************************************************************
 
-SV.GC.SLIDE:  SV.GCS = SV.PAGE%(SV.PICK) * 256
+SV.GC.SLIDE:  
+    SV.GCS = SV.PAGE%(SV.PICK) * 256
     SV.GCD = SV.TO * 256 : SV.LEFT = SV.PAGES%(SV.PICK) * 256
 
 SV.GC.CHUNK:
@@ -84,7 +88,8 @@ SV.GC.CHUNK:
     GOSUB SV.COPY : SV.GCS = SV.GCS + SV.CH : SV.GCD = SV.GCD + SV.CH
     SV.LEFT = SV.LEFT - SV.CH : GOTO SV.GC.CHUNK
 
-SV.GC.SLID:  SV.PAGE%(SV.PICK) = SV.TO : SV.MOVED = SV.MOVED + 1
+SV.GC.SLID:  
+    SV.PAGE%(SV.PICK) = SV.TO : SV.MOVED = SV.MOVED + 1
     RETURN
 
 SVGC.MODULE.END:

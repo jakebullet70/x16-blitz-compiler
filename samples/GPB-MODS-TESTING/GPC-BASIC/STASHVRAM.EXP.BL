@@ -22,14 +22,10 @@
 ## THE CALLER DIMS THE HANDLE TABLE, like MENUVERT.ITEM$ -- a module cannot be
 ## handed an array and must not guess a bound. Two % arrays, and a % array is TWO
 ## bytes an element, so this is 68 bytes of workspace.
-DIM SV.PAGE%(16)
-DIM SV.PAGES%(16)
-DIM E.BUF%(400)
-DIM E.SUM(30)
-DIM E.WANT(30)
+DIM SV.PAGE%(16) : DIM SV.PAGES%(16)
+DIM E.BUF%(400) : DIM E.SUM(30) : DIM E.WANT(30)
 
-SV.MAX = 16
-GOSUB SV.INIT
+SV.MAX = 16 : GOSUB SV.INIT
 IF SV.OK = 0 THEN PRINT "SV.INIT: "; SV.ERROR$ : END
 
 PRINT "STASHVRAM -- WINDOW PAGES"; SV.BASEPG; " TO"; SV.TOPPG

@@ -183,31 +183,36 @@ FILE.EXISTS:  FILE.OK = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
 ## **  of that, and a program should not have to carry it to ask one question.
 ## ***********************************************************************
 
+
+## ** Function style, FileSize
 GP.DEFPROC FILE.SIZE, FILE.NAME$ RETURNS FILE.BLOCKS
     FILE.BLOCKS = 0 : FILE.OK = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
-    GOSUB FILE.PETNAME
-    OPEN 15, FILE.DEVICE, 15
+    GOSUB FILE.PETNAME : OPEN 15, FILE.DEVICE, 15
     OPEN FILE.CHAN, FILE.DEVICE, 0, "$:" + FILE.OUT$
     INPUT#15, FILE.ERR, FILE.MSG$, FILE.TRK, FILE.SEC
     IF FILE.ERR < FILE.OKMAX THEN GOSUB FILE.SIZEWALK
     CLOSE FILE.CHAN : CLOSE 15
     RETURN
 
+
 ## A listing is a fake BASIC program: two bytes of load address, then a line
 ## each -- two link bytes, two more holding the block count where a line number
 ## would go, and text to a zero. The volume line comes first and parses like
 ## any other, so it is read and dropped. See FILE.PATHWALK, which walks the
 ## same shape for a different field.
-FILE.SIZEWALK:  GOSUB FILE.SIZEBYTE : GOSUB FILE.SIZEBYTE : GOSUB FILE.SIZELINE : GOSUB FILE.SIZELINE
+FILE.SIZEWALK:  
+    GOSUB FILE.SIZEBYTE : GOSUB FILE.SIZEBYTE : GOSUB FILE.SIZELINE : GOSUB FILE.SIZELINE
     IF FILE.QUOTED = 0 THEN RETURN
     FILE.OK = -1 : FILE.BLOCKS = FILE.LINENO
     RETURN
+
 
 ## One line. THE QUOTE IS WHAT MAKES IT AN ENTRY: a name is quoted and the
 ## BLOCKS FREE line that ends a listing is not, so a listing with no match
 ## falls out here with FILE.QUOTED still 0 rather than reporting the trailer's
 ## own number as a size.
-FILE.SIZELINE:  FILE.QUOTED = 0 : GOSUB FILE.SIZEBYTE : GOSUB FILE.SIZEBYTE
+FILE.SIZELINE:  
+    FILE.QUOTED = 0 : GOSUB FILE.SIZEBYTE : GOSUB FILE.SIZEBYTE
     GOSUB FILE.SIZEBYTE : FILE.LINENO = FILE.BYTE : GOSUB FILE.SIZEBYTE : FILE.LINENO = FILE.LINENO + FILE.BYTE * 256
     GP.DO
         GOSUB FILE.SIZEBYTE
@@ -217,10 +222,12 @@ FILE.SIZELINE:  FILE.QUOTED = 0 : GOSUB FILE.SIZEBYTE : GOSUB FILE.SIZEBYTE
     GP.LOOP
     RETURN
 
+
 ## GET# HANDS BACK "" FOR A ZERO BYTE, and a zero byte is exactly what ends
 ## every line here, so ASC on it unguarded would stop the program on the one
 ## value the walk is looking for.
-FILE.SIZEBYTE:  GET# FILE.CHAN, FILE.CH$ : FILE.ST = ST : FILE.BYTE = 0 : IF FILE.CH$ <> "" THEN FILE.BYTE = ASC(FILE.CH$)
+FILE.SIZEBYTE:  
+    GET# FILE.CHAN, FILE.CH$ : FILE.ST = ST : FILE.BYTE = 0 : IF FILE.CH$ <> "" THEN FILE.BYTE = ASC(FILE.CH$)
     RETURN
 
 
@@ -229,7 +236,6 @@ FILE.SIZEBYTE:  GET# FILE.CHAN, FILE.CH$ : FILE.ST = ST : FILE.BYTE = 0 : IF FIL
 ## ***********************************************************************
 
 ## All of these tail-call FILE.CMD, whose RETURN is the caller's.
-
 FILE.DELETE:  GOSUB FILE.PETNAME : FILE.CMDSTR$ = "S:" + FILE.OUT$ : GOTO FILE.CMD
 
 ## FILE.OUT$ holds one name at a time, so the new name is taken first and kept
@@ -253,7 +259,6 @@ FILE.UP:  FILE.CMDSTR$ = "CD:" + CHR$(95) : GOTO FILE.CMD
 ## ***********************************************************************
 ## **  The current directory
 ## ***********************************************************************
-
 ## $=C lists the current directory, then each parent, ending at /. It arrives
 ## as a fake BASIC program.
 ##
@@ -263,8 +268,8 @@ FILE.UP:  FILE.CMDSTR$ = "CD:" + CHR$(95) : GOTO FILE.CMD
 ##
 ## The first line is skipped and the path rebuilt from the components: it is
 ## padded to a fixed width and truncates a long path.
-
-FILE.CURDIR:  FILE.PATH$ = "" : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
+FILE.CURDIR:  
+    FILE.PATH$ = "" : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
     OPEN 15, FILE.DEVICE, 15
     OPEN FILE.CHAN, FILE.DEVICE, 0, "$=C"
     INPUT#15, FILE.ERR, FILE.MSG$, FILE.TRK, FILE.SEC
@@ -272,10 +277,12 @@ FILE.CURDIR:  FILE.PATH$ = "" : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
     CLOSE FILE.CHAN : CLOSE 15 : IF FILE.PATH$ = "" THEN FILE.PATH$ = "/"
     RETURN
 
+
 ## Delimiter 34 is the quote. Reads alternate: one swallows up to an opening
 ## quote, the next takes the name. The first pair lands on the header line.
 ## Entries arrive innermost first, so each goes on the front.
-FILE.PATHWALK:  LINPUT# FILE.CHAN, FILE.ROW$, 34 : LINPUT# FILE.CHAN, FILE.ROW$, 34
+FILE.PATHWALK:  
+    LINPUT# FILE.CHAN, FILE.ROW$, 34 : LINPUT# FILE.CHAN, FILE.ROW$, 34
     GP.DO
         LINPUT# FILE.CHAN, FILE.ROW$, 34 : IF ST <> 0 THEN GP.EXITDO
         LINPUT# FILE.CHAN, FILE.ROW$, 34 : IF ST <> 0 THEN GP.EXITDO
@@ -289,7 +296,8 @@ FILE.PATHWALK:  LINPUT# FILE.CHAN, FILE.ROW$, 34 : LINPUT# FILE.CHAN, FILE.ROW$,
 ## ***********************************************************************
 ## **  A string array to a file and back
 ## ***********************************************************************
-FILE.SAVEARRAY:  IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
+FILE.SAVEARRAY:  
+    IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
     GOSUB FILE.PETNAME : OPEN 15, FILE.DEVICE, 15
     OPEN FILE.CHAN, FILE.DEVICE, FILE.CHAN, "@:" + FILE.OUT$ + ",S,W"
     IF FILE.ROWS > 0 THEN GOSUB FILE.WRITEROWS
@@ -303,8 +311,8 @@ FILE.WRITEROWS:
     RETURN
 
 ## FILE.ROWS = FILE.MAX on return means the file may hold more.
-
-FILE.LOADARRAY:  FILE.ROWS = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
+FILE.LOADARRAY:  
+    FILE.ROWS = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
     IF FILE.MAX = 0 THEN FILE.MAX = 10
     GOSUB FILE.PETNAME : OPEN 15, FILE.DEVICE, 15
     OPEN FILE.CHAN, FILE.DEVICE, FILE.CHAN, FILE.OUT$ + ",S,R"
@@ -336,13 +344,15 @@ FILE.READROWS:
 ## Row, or end of file. Past the end the KERNAL gives nothing or a single NUL.
 ## The length tests are separate statements: AND does not stop evaluating once
 ## it knows the answer, so ASC would still reach the empty string.
-FILE.ROWREAL:  FILE.KEEP = -1 : IF (FILE.ST AND 66) = 0 THEN RETURN
+FILE.ROWREAL:  
+    FILE.KEEP = -1 : IF (FILE.ST AND 66) = 0 THEN RETURN
     IF LEN(FILE.ROW$) = 0 THEN GOTO FILE.ROWDROP
     IF LEN(FILE.ROW$) > 1 THEN RETURN
     IF ASC(FILE.ROW$) = 0 THEN GOTO FILE.ROWDROP
     RETURN
 
-FILE.ROWDROP:  FILE.KEEP = 0 : RETURN
+FILE.ROWDROP:  
+    FILE.KEEP = 0 : RETURN
 
 FILE.KEEPROW:
     IF FILE.ROWS >= FILE.MAX THEN RETURN
@@ -361,9 +371,12 @@ FILE.KEEPROW:
 ## SAVEARRAY writes. The copy is made in BASIC and folded in place.
 ##
 
-FILE.PETNAME:  FILE.RAW$ = FILE.NAME$ : GOTO FILE.TOPET
-FILE.PETNEW:   FILE.RAW$ = FILE.NEW$
-FILE.TOPET:    FILE.OUT$ = FILE.RAW$ : IF FILE.ISO = 0 THEN RETURN
+FILE.PETNAME:  
+    FILE.RAW$ = FILE.NAME$ : GOTO FILE.TOPET
+FILE.PETNEW:   
+    FILE.RAW$ = FILE.NEW$
+FILE.TOPET:    
+    FILE.OUT$ = FILE.RAW$ : IF FILE.ISO = 0 THEN RETURN
     IF LEN(FILE.OUT$) = 0 THEN RETURN
     FILE.PETP% = GP.STRPTR(FILE.OUT$)
     #REM 1
