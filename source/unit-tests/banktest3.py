@@ -32,6 +32,9 @@ for _d in ("compiler", "application"):
                     r'CallErrorHandler\s*\.text\s+"([^"]+)"',
                     open(os.path.join(_root, _f), encoding="latin-1").read())
 
+#   Any of those messages with its " @ line", which is how a compile ends when it is refused.
+ERR_RE = re.compile("(?:" + "|".join(re.escape(e) for e in GPC_ERRORS) + r") @ *[0-9]+")
+
 env = dict(os.environ)
 env["SDL_VIDEODRIVER"] = "dummy"
 
@@ -47,6 +50,13 @@ def emu(args, secs, stop=None, log="BT.LOG"):
             time.sleep(1)
             t = open(lp, "rb").read().decode("latin-1")
             if stop and stop in t:
+                time.sleep(1.5)
+                break
+            #   A refused compile never prints the stop text, so every refusal test used to wait
+            #   out the whole timeout, 90 s each. A compiler error after the "OUT:" line ends the
+            #   wait too. A program run prints no "OUT:", so this never cuts one short.
+            i = t.rfind("OUT:")
+            if i >= 0 and ERR_RE.search(t, i):
                 time.sleep(1.5)
                 break
         p.kill()
@@ -109,11 +119,24 @@ def run_one(name):
     return out
 
 
-PAIRS = [("BANKA", "BANKE"), ("BANKB", "BANKF"), ("BANKH", "BANKI"), ("BANKJ", "BANKK"),
-         ("BANKN", "BANKO")]
+#   BNKGC is a GOTO and an IF .. GOTO inside one region and a GOTO out of it, against its
+#   control BNKGD.  BANKH, a GOTO into a region from low memory, was a pair with BANKI until
+#   the compiler refused it; it ran only because the bootstrap leaves the last region it
+#   loaded selected.
+PAIRS = [("BANKA", "BANKE"), ("BANKB", "BANKF"), ("BANKJ", "BANKK"),
+         ("BANKN", "BANKO"), ("BNKGC", "BNKGD"), ("BGA", "BGB")]
 BAD = [("BANKC", "BLOCK MISMATCH"), ("BANKD", "BLOCK MISMATCH"),
        ("BANKG", "BLOCK MISMATCH"), ("BANKL", "VALUE"), ("BANKM", "VALUE"),
        ("BANKX", "BAD VALUE"),
+       #   A GOTO selects no bank, so every form of one into a region from outside it is
+       #   refused: GOTO (BANKH), IF .. GOTO (BNKGA), ON .. GOTO (BNKGB), IF .. THEN <line>
+       #   (BNKGE), and a GOTO from one region into another (BGD).
+       ("BANKH", "NOT IMPLEMENTED"), ("BNKGA", "NOT IMPLEMENTED"),
+       ("BNKGB", "NOT IMPLEMENTED"), ("BNKGE", "NOT IMPLEMENTED"),
+       ("BGD", "NOT IMPLEMENTED"),
+       #   ON .. GOSUB into a region: an ON entry is 3 bytes and a .bgosub 4.  BGA/BGB above
+       #   call into a region by GOSUB, GP.SUB, GP.FN and FN with no BANK statement.
+       ("BGC", "NOT IMPLEMENTED"),
        #   The region COUNT is a checked limit, not a crash.  BNK64 is sixty-four trivial
        #   regions in banks 1 up -- one more than a 512K X16 has -- and the message names the
        #   sixty-fourth GP.BANKED.  It is a compiler-space message, so this test is also what

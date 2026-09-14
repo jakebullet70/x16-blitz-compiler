@@ -1,6 +1,6 @@
 ---
 name: compiler-emitted-bank-switch
-description: TODO ranked item 4 -- steps 1-2 (runtime .bgosub, compiler emits it) BUILT and tested 2026-09-13; step 3 (twin modules merged, shims deleted) DONE the same day; step 4 built and tested 2026-09-14, gpctest full PASS on the merged GPBMODS and GUIFRMT, banktest3 ALL PASS; all committed
+description: TODO ranked item 4 -- steps 1-2 (runtime .bgosub, compiler emits it) BUILT and tested 2026-09-13; step 3 (twin modules merged, shims deleted) DONE the same day; step 4 built and tested 2026-09-14, gpctest full PASS on the merged GPBMODS and GUIFRMT, banktest3 ALL PASS; all committed. 2026-09-14 after cd57bab: GPBankGotoGuard refuses a GOTO into a region from outside it, in pass one
 metadata:
   type: project
 ---
@@ -42,7 +42,8 @@ the caller's bank back. No `BANK` statement and no shim is needed.
   of the caller's line, the opcode becomes `.bgosub`, and `EmitBranch` writes `branchBank` after
   the offset. FN, GP.SUB and GP.FN use the same `.bgosub`; there is no separate banked `.fngosub`.
 - `GPBankMakeOffset` allows a region-to-region crossing only for `.bgosub`. **A GOTO from one region
-  into another is still `NOT IMPLEMENTED`**. A GOTO that selected a bank would break the plain
+  into another is still `NOT IMPLEMENTED`**, and since 2026-09-14 `GPBankGotoGuard` refuses it in
+  pass one, with a GOTO from low memory (see the end of this note). A GOTO that selected a bank would break the plain
   GOSUBs already open on the stack: they save no bank, so their RETURN would land at `$A0xx` in the
   wrong bank. The compiler cannot see what is open when a GOTO runs. "No frame to restore from" is
   the short form of this, and on its own it misled the user.
@@ -53,7 +54,7 @@ the caller's bank back. No `BANK` statement and no shim is needed.
 - `GP.BANKEDSTR` shares the same three tables. `BStrRegister` appends its text regions at
   `gpBankCount` only after pass one ends, which is never below `gpScanCount`, so the scanned code
   regions are not overwritten.
-- `source/application/GPC.BIN` is 29,201 B.
+- `source/application/GPC.BIN` was 29,201 B at `cd57bab`, and is 29,252 B with the GOTO guard.
 
 ## Tests
 
@@ -158,8 +159,54 @@ compile succeeds and prints 0. Write `DEF FN T(X)` and `FN T(1)` with the space.
 **Possible extra:** a region routine calling low memory could use `.bgosub` with its own bank, so a
 low-memory routine that changes the bank no longer breaks the caller.
 
-**Undecided:** a GOTO from low memory into a region compiles, and works only if that bank is already
-selected. Refusing it too is the user's call.
+**Decided 2026-09-14: a GOTO into a region from outside it is refused.** `GOTO`, `GO TO`,
+`IF .. GOTO`, `IF .. THEN <line>` and `ON .. GOTO`, from low memory or from another region, stop the
+compile with `NOT IMPLEMENTED`. `GPBankGotoGuard` (`gpbank.asm`) compares the bank of the target
+line with the bank of the current line, both from `GPBankLineBank`, so pass one refuses it before
+anything is written. `CommandGOTO` calls it, and `CompileBranchCommand` calls it for `.goto` and
+`.gotonz`. The compiler's own GOTOs, the two bridges and the jump to the `$FFFF` prologue, call
+`WriteBranchTo` directly and are never checked. Compiler only: `GPC.BIN` went from 29,201 to
+29,252 B, and the runtime is unchanged. The user chose this over writing a `BANK n` before the GOTO,
+which would break every plain GOSUB still open whose return address is in another region.
+
+Still not caught: falling into a region from the line above it, which goes through the entry
+bridge, and a false `IF` on that line, whose `.gotoz` lands on the `GP.BANKED` line. Both work only
+when the region's bank is already selected. Not checked either: `RESTORE` to a DATA line inside a
+region.
+
+The facts that decided it:
+
+- The bootstrap's load loop (`BXEntry`, `source/application/_library.asm`) writes each region's bank
+  to `$00` and does not restore it, so a program starts with the last region it loaded selected. A
+  one-region program therefore starts in its region's bank. That is why `BANKH`, a deliberate GOTO
+  into a region, and `BANKA`, `BANKD`, `BANKG`, `BANKJ`, `BANKL` and `BANKM`, which fall into their
+  region from line 1, all pass.
+- The relocation bridge is itself a GOTO from low memory to the `GP.BANKED` line, so falling into a
+  region is the same case. A refusal has to exempt the bridge, and so cannot catch a fall-through.
+- A token scan of the `.SRC.PRG` files found no GOTO into a region in the merged GPBMODS or GUIFRMT.
+  RGL, RGN and the pre-merge inputs of GPBF, GPBH, GPBJ, GPBK, GPBL, GPBR, RGM, RGX and XBASE each
+  have one `GOTO X.END` a region: it jumps over the old shims onto the `GP.BANKED` line. In RGN that
+  code is unreachable, because line 1 jumps past the library.
+
+What the guard changed in the tests:
+
+- `banktest3.py`: `BANKH` moved from a pair with `BANKI` to the refusals, with `BNKGA`
+  (`IF .. GOTO`), `BNKGB` (`ON .. GOTO`), `BNKGE` (`IF .. THEN <line>`) and `BGD` (copied from
+  `work/bgosub/`). The new pair `BNKGC`/`BNKGD` keeps a GOTO and an `IF .. GOTO` inside a region, and
+  a GOTO out of a region to a low-memory `RETURN`, running. `BGA`/`BGB` and `BGC` moved in from
+  the scratch `.bgosub` harness, so `banktest3` alone covers item 4.
+- `banktest3.py`'s `emu()` now also stops on a compiler error after the `OUT:` line. Before, a
+  refusal test never saw `OK CODE` and waited out the 90 s timeout, so the five new refusals added
+  about eight minutes to a run.
+
+Results with the guard build (`GPC.BIN` MD5 `2647c404`): `gpctest.py full` PASS in 181 s, and
+`banktest3.py` ALL PASS in 190 s: 6 pairs the same, 13 refusals, `BANKY` runs. Not committed yet.
+- `testing/RGL.BASL` and `RGN.BASL`: each `GOTO X.END` now goes to `X.BODY.END`, the line before
+  `GP.ENDBANKED`, so it lands in low memory past the region.
+- `testing/RGM.BASL` no longer tokenised at all (`DUPLICATE SYMBOL IN APPSYS.INC.BL:54`: its
+  `LIB.*BANK.INC.BL` shims clash with the merged modules). It is rebuilt in GPBMODS's five-region
+  merged shape. The three old sources and inputs are in `work/dcref/inputs-preguard/`, and the
+  new references were built with the previous compiler, `acf427f1`.
 
 Related: [[gp-banked-call-out-loses-the-bank]], [[gpc-core-page-cushion-below-gpbase]],
 [[pcode-runs-from-a-bank-proven]], [[gpc-return-unwinds-frames]], [[gp-banked-region-relocation]].

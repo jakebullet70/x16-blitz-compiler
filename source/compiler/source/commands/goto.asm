@@ -51,6 +51,7 @@ CommandGOTO:
 		bcc 	_CGSyntax
 		sta 	branchTarget
 		sty 	branchTarget+1
+		jsr 	GPBankGotoGuard 			; not into a GP.BANKED region from outside it
 		;
 		lda 	blockDepth
 		beq 	_CGNoUnwind
@@ -434,6 +435,14 @@ CompileBranchCommand:
 		bcc 	_CBCSyntax
 		sta 	branchTarget
 		sty 	branchTarget+1
+		lda 	branchOpcode 				; IF .. THEN <line> and ON .. GOTO jump as a GOTO does,
+		cmp 	#PCD_CMD_GOTO 				; and are refused into a region just the same
+		beq 	_CBCGuard
+		cmp 	#PCD_CMD_GOTOCMD_NZ
+		bne 	_CBCWrite
+_CBCGuard:
+		jsr 	GPBankGotoGuard
+_CBCWrite:
 		lda 	branchOpcode
 		jmp 	WriteBranchTo
 
@@ -601,5 +610,7 @@ unwindTarget: 								; the block depth at that line
 ;		Date			Notes
 ;		==== 			=====
 ;		13/09/26		A GOSUB or an FN call into a GP.BANKED region is written as a .bgosub.
+;		14/09/26		GOTO, IF .. THEN <line> and ON .. GOTO into a region from outside it are
+;						refused.
 ;
 ; ************************************************************************************************

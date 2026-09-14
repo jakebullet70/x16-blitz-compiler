@@ -6542,6 +6542,7 @@ CommandGOTO:
 		bcc 	_CGSyntax
 		sta 	branchTarget
 		sty 	branchTarget+1
+		jsr 	GPBankGotoGuard 			; not into a GP.BANKED region from outside it
 		;
 		lda 	blockDepth
 		beq 	_CGNoUnwind
@@ -6925,6 +6926,14 @@ CompileBranchCommand:
 		bcc 	_CBCSyntax
 		sta 	branchTarget
 		sty 	branchTarget+1
+		lda 	branchOpcode 				; IF .. THEN <line> and ON .. GOTO jump as a GOTO does,
+		cmp 	#PCD_CMD_GOTO 				; and are refused into a region just the same
+		beq 	_CBCGuard
+		cmp 	#PCD_CMD_GOTOCMD_NZ
+		bne 	_CBCWrite
+_CBCGuard:
+		jsr 	GPBankGotoGuard
+_CBCWrite:
 		lda 	branchOpcode
 		jmp 	WriteBranchTo
 
@@ -7092,6 +7101,8 @@ unwindTarget: 								; the block depth at that line
 ;		Date			Notes
 ;		==== 			=====
 ;		13/09/26		A GOSUB or an FN call into a GP.BANKED region is written as a .bgosub.
+;		14/09/26		GOTO, IF .. THEN <line> and ON .. GOTO into a region from outside it are
+;						refused.
 ;
 ; ************************************************************************************************
 ; ************************************************************************************************
@@ -10324,6 +10335,46 @@ _CBGInside:
 
 ; ************************************************************************************************
 ;
+;		A GOTO INTO A GP.BANKED REGION FROM OUTSIDE IT IS REFUSED. branchTarget is the line it
+;		goes to. Called for GOTO, GO TO, IF .. THEN <line> and ON .. GOTO. Corrupts X and Y.
+;
+;		A GOTO selects no bank, so it lands at $A0xx in whatever bank is selected. From low
+;		memory that is the region's bank only by luck -- the bootstrap leaves the last region it
+;		loaded selected, which is why a GOTO into a one-region program ran. Selecting the bank
+;		here instead would break every plain GOSUB still open whose RETURN lands in another
+;		region, so a region is entered by a call or not at all.
+;
+;		DECIDED FROM LINE NUMBERS, which GPBankScanLines read before the first pass, so pass one
+;		refuses it before anything is written. That covers a GOTO from one region into another
+;		as well, which GPBankMakeOffset used to catch only in pass two.
+;
+;		THE COMPILER'S OWN GOTOs NEVER COME HERE: the two bridges round a region and the jump
+;		to the implicit-DIM prologue go straight to WriteBranchTo. So falling into a region from
+;		the line above it is not caught -- it goes through the entry bridge -- and neither is a
+;		false IF on that line, whose .gotoz lands on the GP.BANKED line.
+;
+; ************************************************************************************************
+
+GPBankGotoGuard:
+		lda 	branchTarget 				; the bank of the line it goes to
+		ldy 	branchTarget+1
+		jsr 	GPBankLineBank
+		beq 	_GBGGDone 					; low memory: any line may GOTO it
+		pha
+		lda 	currentLineNumber 			; ...against the bank of the line it is on
+		ldy 	currentLineNumber+1
+		jsr 	GPBankLineBank
+		sta 	gpBankTemp
+		pla
+		cmp 	gpBankTemp
+		bne 	_GBGGRefused 				; not the region this line is in already
+_GBGGDone:
+		rts
+_GBGGRefused:
+		.error_unimplemented
+
+; ************************************************************************************************
+;
 ;		A CALL INTO A REGION SELECTS THE REGION'S BANK. The call is written as .bgosub <offset>
 ;		<bank>, and RETURN puts the caller's bank back, so no low-memory shim has to do either.
 ;
@@ -10623,6 +10674,8 @@ gpBankCrossings:								; what a branch crossing INTO each one is out by
 ;						and onto a page boundary, and the object walkers hop over the pool.
 ;		13/09/26		A GOSUB or an FN call into a region from outside it is a .bgosub, and may
 ;						come from another region. GPBankScanLines reads the line ranges first.
+;		14/09/26		GPBankGotoGuard: a GOTO into a region from outside it is refused in pass
+;						one, from line numbers.
 ;
 ; ************************************************************************************************
 ; ************************************************************************************************

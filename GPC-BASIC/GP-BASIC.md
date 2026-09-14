@@ -1007,7 +1007,8 @@ MY.LIBEND:
 ```
 
 **The `GOTO` over the region is not optional.** Falling in through the bridge `GP.BANKED` leaves
-works at program start and stops working the day anything selects another bank first.
+works at program start and stops working the day anything selects another bank first. The compiler
+does not catch a fall-in.
 
 **`#DEFINE` the bank above the `GP.BANKED` line.** BASLOAD replaces a name only once it has read its
 `#DEFINE`, and the number is then fixed when the program compiles.
@@ -1047,10 +1048,11 @@ selected bank, selects the region's, and `RETURN` selects the kept one again. Th
 low memory or in another region, and the calls nest like any `GOSUB`. A call that stays inside one
 region is an ordinary `GOSUB`.
 
-**A `GOTO` selects nothing.** Two regions live at the same `$A000` in different banks, so a `GOTO`
-from one into another is refused. So is `ON ... GOSUB` to a label in a region: an `ON` entry is
-three bytes and a `.bgosub` is four. A `GOTO` from low memory into a region compiles, and lands in
-whatever bank is selected.
+**A `GOTO` selects nothing, so a `GOTO` into a region from outside it is refused** with
+`NOT IMPLEMENTED`, from low memory or from another region. `IF ... GOTO`, `IF ... THEN <line>` and
+`ON ... GOTO` are refused the same way. Enter a region by a call. `ON ... GOSUB` to a label in a
+region is refused too: an `ON` entry is three bytes and a `.bgosub` is four. A `GOTO` that stays
+inside one region, or leaves one for low memory, compiles.
 
 **Calling out, down into low memory, is an ordinary `GOSUB`.** Low memory does not care which bank is
 selected. The routine called must leave the region's bank selected when it returns, or the next

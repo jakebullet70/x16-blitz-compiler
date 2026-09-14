@@ -881,9 +881,9 @@ How the three questions were settled:
 1. **The return bank** rides on a frame of its own, `FRAME_BGOSUB` (`$E5`). It differs from the
    `GOSUB` frame in bit 0 alone, so `RETURN` restores the bank and `NEXT` does not see the change.
 2. **Indirect targets are refused.** `ON n GOSUB` to a label in a region is `NOT IMPLEMENTED`: an
-   `ON` entry is 3 bytes and a `.bgosub` is 4. So is a `GOTO` from one region into another, which
-   has no frame to restore a bank from. A `GOTO` from low memory into a region compiles and selects
-   nothing.
+   `ON` entry is 3 bytes and a `.bgosub` is 4. So is any `GOTO` into a region from outside it, from
+   low memory or from another region, because a `GOTO` selects no bank. `IF .. GOTO`,
+   `IF .. THEN <line>` and `ON .. GOTO` are refused the same way.
 3. **Runtime bytes:** the embedded core grew 12 B and has **4 B** left before `GPBase` moves off
    `$3700` (`docs/memory/gpc-core-page-cushion-below-gpbase.md`). SHARED has 542 B of core free.
 
@@ -892,8 +892,10 @@ with 3,538 B (was 4,098). `gpctest.py`'s inputs for both are now the merged sour
 are rebuilt, and `gpctest.py full` passes in 147 s: GPBMODS is CODE 41,984 FREE 9,728 with 202 dead
 lines (1,413 B), GUIFRMT CODE 12,748 FREE 18,176 with 129 (1,275 B), and both stripped identities
 hold. `BS.B.NUMS` and `GP-BASIC.md` §4.20 are remeasured. `banktest3.py` runs on `work/banktest3`
-and passes, BANKY included. **Open:** whether a `GOTO` from low memory into a region should be
-refused. **Possible extra:** a region routine calling low memory could use `.bgosub` with its
+and passes, BANKY included. **GOTO settled, 2026-09-14:** a `GOTO` into a region from outside it
+is refused in pass one by `GPBankGotoGuard`, from line numbers. It costs no runtime bytes, and
+`GPC.BIN` is 29,252 B. Falling into a region from the line above it, and `RESTORE` to a `DATA` line
+inside one, are not caught. **Possible extra:** a region routine calling low memory could use `.bgosub` with its
 own bank, so a low-memory routine that changes the bank no longer breaks its caller.
 
 Item 1 is still a question of its own: `.bgosub` banks p-code, and a `SYS` into a banked blob selects
@@ -919,7 +921,7 @@ number instead of a guess.
 - **End-of-compile report: lines compiled, banks used per bank.** BEFORE RELEASE.
   `### The end-of-compile report wants more than three numbers`.
 - **Show removed lines as source file and line.** Not started. The bullet under the same heading.
-  Method, self-check and prototype: section 5 of `source/application/COMPILER-HANDOFF.md`.
+  Method, self-check and prototype: section 5 of `source/application/COMPILER-STATUS.md`.
 - **`BASLOAD-GPC` end-of-run report in the same shape.** BEFORE RELEASE, after the compiler's report
   is settled. `### BASLOAD-GPC wants the same report`.
 - **The help does not know about dead-code elimination.** Not started.

@@ -29,9 +29,9 @@ MY.LIBEND:
 - **A call into a region selects its bank.** `GOSUB`, `GP.SUB`, `GP.FN` and `FN` into a region
   from outside it compile to `.bgosub`, which saves the selected bank and selects the region's.
   `RETURN` puts the saved bank back. The caller may be in low memory or in another region.
-- **A `GOTO` from one region into another is refused**, and so is `ON ... GOSUB` to a label inside
-  a region. A `GOTO` carries no bank to select. A `GOTO` from low memory into a region compiles,
-  and lands in whatever bank is selected.
+- **A `GOTO` into a region from outside it is refused**, from low memory or from another region,
+  and so is `ON ... GOSUB` to a label inside a region. A `GOTO` carries no bank to select.
+  `IF ... GOTO`, `IF ... THEN <line>` and `ON ... GOTO` are refused the same way.
 - **Jump over the region with a `GOTO`.** `GP.BANKED` leaves a bridge, so falling into a region
   works while the bootstrap's code bank is still selected, and fails once anything selects another.
 - **`#DEFINE` the bank number above the `GP.BANKED` line.** BASLOAD resolves a `#DEFINE` only if it

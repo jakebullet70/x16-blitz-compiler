@@ -118,7 +118,7 @@ check that the dots reach the file as they print and not in 4 KB blocks. If they
 go to M3.
 
 **M2. Map dots to source.** Turn each 64-line span into a file and line range with the
-`dclines.py` method (`source/application/COMPILER-HANDOFF.md` section 5). Output: seconds per span
+`dclines.py` method (`source/application/COMPILER-STATUS.md` section 5). Output: seconds per span
 for each pass, and seconds per include file, highest first.
 
 **M3. Fallback: bisect.** Split RGM's `#INCLUDE` list in halves. Tokenise and compile each half in
