@@ -118,6 +118,7 @@ sibling project: what is kept is a fact about **X16 BASIC or the X16 itself**, n
 - [FOR STEP 0 semantics](gpc-for-step0-semantics.md) — STEP 0 needs EXACT equality. **Blitz gets this wrong.**
 - [FOR 1 TO 0 runs once](gpc-basic-for-loop-runs-once.md) — guard every FOR 1 TO LEN()
 - [X16 BASIC conformance](blitz-x16-basic-conformance.md) — 4 real defects vs stock BASIC
+- [No END crashes at exit](program-without-end-crashes.md) — runs off the last line into $ffff; end every test program with END
 - [X16 BASIC coverage](gpc-x16-basic-coverage.md) — the 7 lexer blockers on valid X16 BASIC
 - [R44+ keywords](blitz-x16-r44-plus-keywords.md) — CLOSED: all 10 are in; do not re-fix
 

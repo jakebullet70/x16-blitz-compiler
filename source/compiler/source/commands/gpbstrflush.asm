@@ -66,16 +66,6 @@ BStrFlush:
 		bne 	_BFGo
 		rts
 _BFGo:
-		;
-		;		SHARED MODE ONLY, the same rule GP.BANKED has and for the same reason: the region
-		;		is moved into its bank by the program's BOOTSTRAP, and an embedded program has
-		;		none. Refusing is honest; compiling it would produce a program whose text never
-		;		reaches $A000 and which reads an empty bank at run time.
-		;
-		lda 	gpBankShared
-		bne 	_BFShared
-		.error_unimplemented
-_BFShared:
 		lda 	#0 							; the first slot, and A carries the next one round the loop
 _BFSlotLoop:
 		jsr 	BStrSelectSlot 				; ...which brings its counters and its pool bank with it

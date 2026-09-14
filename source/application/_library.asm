@@ -3906,10 +3906,10 @@ CompileCode:
 		;
 		;		GP.BANKED needs to know where the p-code will RUN, and it needs it INSIDE the
 		;		compile: pass two resolves the branches that cross into the bank as it writes
-		;		them. In shared mode that is the constant PCODE_PAGE, so it can be handed over
-		;		now. Embedded, it depends on how much of the runtime the program needs -- and
-		;		there is no bootstrap there to copy the region either, so gpbank.asm refuses a
-		;		region rather than guessing.
+		;		them. That is the shared constant PCODE_PAGE, because only a shared program can
+		;		bank: an embedded object is one file, and every region is a .Bnn file of its own.
+		;		GP.BANKED and GP.BANKEDSTR refuse an embedded compile at their own line, from
+		;		gpBankShared.
 		;
 		lda 	#(PCODE_PAGE - (ObjectOrigin >> 8)) & $FF
 		sta 	gpBankRunPage

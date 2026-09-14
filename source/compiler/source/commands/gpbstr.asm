@@ -71,6 +71,10 @@ CommandGPBankedStrCompile:
 		stz 	deferErrors 				; a block opener must never defer -- a rolled back
 											; opener leaves its closer behind and corrupts the
 											; nesting of any block enclosing it, silently.
+		lda 	gpBankShared 				; an embedded object is one file, and text in a bank
+		bne 	_CBSShared 					; is a .Bnn file of its own
+		jmp 	BStrNeedsShared
+_CBSShared:
 		lda 	bstrState
 		bne 	_CBSStructure 				; a GP.BANKEDSTR inside one still open
 		stz 	bstrBodyLines
@@ -124,6 +128,15 @@ _CBSNoEnd: 									; GP.BANKEDSTR with no GP.ENDBANKEDSTR
 CommandGPEndBankedStrCompile:
 		stz 	deferErrors
 		.error_structure
+
+;
+;		EMBEDDED IS ONE FILE, GPBankNeedsShared's rule (gpbank.asm) for the same reason: text in
+;		a bank is LOADed from a .Bnn file by the shared bootstrap. In compiler space, like
+;		BStrTooManyBanks.
+;
+BStrNeedsShared:
+		jsr 	CallErrorHandler
+		.text 	"GP.BANKEDSTR NEEDS SHARED", 0
 
 ; ************************************************************************************************
 ;
@@ -296,4 +309,6 @@ BankedStrAddCompile:
 ;		Date			Notes
 ;		==== 			=====
 ;		07/09/26		Written.
+;		14/09/26		An embedded compile stops at the first GP.BANKEDSTR with GP.BANKEDSTR NEEDS
+;						SHARED, at its own line rather than NOT IMPLEMENTED in BStrFlush.
 ;

@@ -9480,6 +9480,10 @@ GPBANK_MAXREGIONS = 63 						; every bank a 512K X16 has, bank 0 being the KERNA
 
 CommandGPBankedCompile:
 		stz 	deferErrors 				; a block opener must never defer -- see the header
+		lda 	gpBankShared 				; an embedded object is one file, and a region is a
+		bne 	_CGBCShared 				; .Bnn file of its own
+		jmp 	GPBankNeedsShared
+_CGBCShared:
 		lda 	gpBankState 				; 0 = never seen, 1 = open, 2 = closed
 		cmp 	#1
 		beq 	GPBankStructure 			; a GP.BANKED inside a region that is still open
@@ -9735,15 +9739,6 @@ GPBankRelocate:
 _GBRUnclosed:
 		jmp 	GPBankStructure
 _GBRHaveRegion:
-		;
-		;		SHARED MODE ONLY. The correction below needs to know where the p-code will RUN,
-		;		and in shared mode that is the constant PCODE_PAGE. Embedded, it depends on
-		;		the GP usage scan, which has not finished yet -- and there is no bootstrap there to do
-		;		the copying either. Refusing is honest; guessing would miscompile silently.
-		;
-		lda 	gpBankShared
-		bne 	_GBRPasses
-		.error_unimplemented
 ;
 ;		ONE PASS A REGION, LAST REGION FIRST, AND EACH ONE LANDS BELOW THE LAST. gpBankCeiling
 ;		is the bottom of what earlier passes have already placed, and no pass touches a byte
@@ -9759,7 +9754,6 @@ _GBRHaveRegion:
 ;		bootstrap would copy it from the wrong address. The block is lifted by a multiple of 256
 ;		here precisely so that cannot happen.
 ;
-_GBRPasses:
 		lda 	objPtr 						; nothing is placed yet, so the ceiling is the top
 		sta 	gpBankCeiling
 		lda 	objPtr+1
@@ -10404,6 +10398,16 @@ GPBankTooMany:
 		jsr 	CallErrorHandler
 		.text 	"TOO MANY GP.BANKED REGIONS", 0
 
+;
+;		EMBEDDED IS ONE FILE. A region is LOADed into its bank from a .Bnn file of its own by the
+;		shared bootstrap, so a banked program is never one file, and an embedded compile of one
+;		stops at the first GP.BANKED. gpBankShared comes from GPC.INPUT line 4, set by CompileCode.
+;		In compiler space, like the message above. GP.BANKEDSTR has its own, in gpbstr.asm.
+;
+GPBankNeedsShared:
+		jsr 	CallErrorHandler
+		.text 	"GP.BANKED NEEDS SHARED", 0
+
 ; ************************************************************************************************
 
 GPBankCheckBankNumber:
@@ -10946,9 +10950,9 @@ gpBankHigh:										; ...and one past the region once it has moved
 gpBankWalk:										; cursor into the line number table
 		.fill 	2
 gpBankShared:									; 1 in SHARED mode. Set by CompileCode before the
-		.fill 	1 								; compile, because the relocator needs it
-gpBankRunPage:									; buffer page -> run page, which shared mode knows
-		.fill 	1 								; up front and embedded mode does not
+		.fill 	1 								; compile: embedded refuses GP.BANKED and GP.BANKEDSTR
+gpBankRunPage:									; buffer page -> run page, the shared constant, set
+		.fill 	1 								; up front by CompileCode
 gpBankRunBase:									; the page the region would have run at in low memory
 		.fill 	1
 gpBankPages:									; pages for the bootstrap to move into the bank
@@ -11038,6 +11042,8 @@ gpBankAsmLen:									; ...and the one GPBankRelocate is moving
 ;						come from another region. GPBankScanLines reads the line ranges first.
 ;		14/09/26		GPBankGotoGuard: a GOTO into a region from outside it is refused in pass
 ;						one, from line numbers.
+;		14/09/26		An embedded compile stops at the first GP.BANKED with GP.BANKED NEEDS
+;						SHARED, at its own line rather than NOT IMPLEMENTED at the last one.
 ;
 ; ************************************************************************************************
 ; ************************************************************************************************
@@ -11113,6 +11119,10 @@ CommandGPBankedStrCompile:
 		stz 	deferErrors 				; a block opener must never defer -- a rolled back
 											; opener leaves its closer behind and corrupts the
 											; nesting of any block enclosing it, silently.
+		lda 	gpBankShared 				; an embedded object is one file, and text in a bank
+		bne 	_CBSShared 					; is a .Bnn file of its own
+		jmp 	BStrNeedsShared
+_CBSShared:
 		lda 	bstrState
 		bne 	_CBSStructure 				; a GP.BANKEDSTR inside one still open
 		stz 	bstrBodyLines
@@ -11166,6 +11176,15 @@ _CBSNoEnd: 									; GP.BANKEDSTR with no GP.ENDBANKEDSTR
 CommandGPEndBankedStrCompile:
 		stz 	deferErrors
 		.error_structure
+
+;
+;		EMBEDDED IS ONE FILE, GPBankNeedsShared's rule (gpbank.asm) for the same reason: text in
+;		a bank is LOADed from a .Bnn file by the shared bootstrap. In compiler space, like
+;		BStrTooManyBanks.
+;
+BStrNeedsShared:
+		jsr 	CallErrorHandler
+		.text 	"GP.BANKEDSTR NEEDS SHARED", 0
 
 ; ************************************************************************************************
 ;
@@ -11338,6 +11357,8 @@ BankedStrAddCompile:
 ;		Date			Notes
 ;		==== 			=====
 ;		07/09/26		Written.
+;		14/09/26		An embedded compile stops at the first GP.BANKEDSTR with GP.BANKEDSTR NEEDS
+;						SHARED, at its own line rather than NOT IMPLEMENTED in BStrFlush.
 ;
 ; ************************************************************************************************
 ; ************************************************************************************************
@@ -11407,16 +11428,6 @@ BStrFlush:
 		bne 	_BFGo
 		rts
 _BFGo:
-		;
-		;		SHARED MODE ONLY, the same rule GP.BANKED has and for the same reason: the region
-		;		is moved into its bank by the program's BOOTSTRAP, and an embedded program has
-		;		none. Refusing is honest; compiling it would produce a program whose text never
-		;		reaches $A000 and which reads an empty bank at run time.
-		;
-		lda 	gpBankShared
-		bne 	_BFShared
-		.error_unimplemented
-_BFShared:
 		lda 	#0 							; the first slot, and A carries the next one round the loop
 _BFSlotLoop:
 		jsr 	BStrSelectSlot 				; ...which brings its counters and its pool bank with it

@@ -23,12 +23,11 @@ is how the compiler's own messages get out.
 2. **Compile**: write `GPC.INPUT` with **FOUR** lines -- source, object, mapfile, `SHARED` -- and
    run `-warp -prg GPC.BIN -run -echo`. **Stop on `OK CODE`** and nothing else.
 
-   **THREE LINES IS THE EMBEDDED BUILD, and it is not an error until the very end.** A program
-   with a `GP.BANKED` region compiles all the way through and then stops with
-   `NOT IMPLEMENTED @ <the program's LAST line>`, because `GPBankRelocate` is shared-mode only
-   (`commands/gpbank.asm:344`) and runs after the last line is compiled. The line number names a
-   `RETURN` or an `END` that is perfectly good, so the message points at the wrong file entirely.
-   Cost most of an evening on 09/09/26. Just use `compile_shared.py`, which writes the mode line.
+   **THREE LINES IS THE EMBEDDED BUILD.** An embedded compile of a program with a `GP.BANKED`
+   region or `GP.BANKEDSTR` text stops at that line with `GP.BANKED NEEDS SHARED` or
+   `GP.BANKEDSTR NEEDS SHARED` and writes no file (built 2026-09-14). Before that it compiled
+   all the way through and stopped with `NOT IMPLEMENTED @ <the program's LAST line>`, naming a
+   `RETURN` or `END` that was perfectly good. Cost most of an evening on 09/09/26. Just use `compile_shared.py`, which writes the mode line.
 
    **Stop on `OK CODE` and nothing looser.** GPC echoes its entire error-message *table* right
    after the banner — `OUT OF RANGE`, `SYNTAX ERROR`, `TYPE MISMATCH` are all present in the log

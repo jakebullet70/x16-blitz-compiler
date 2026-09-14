@@ -75,7 +75,15 @@ high half. `GPBankMakeOffset` replaces `STRMakeOffset` in FixBranches' two patch
 into `BBTryLoad`). ONCE PER LOAD: it zeroes its own page count, because the workspace starts where
 the region was and a second RUN would otherwise copy variables into the bank.
 
-**SHARED mode only** -- embedded has no bootstrap, and `NOT IMPLEMENTED` says so against the line.
+**Shared only, and embedded is refused at the line.** The user's rule, 2026-09-14: *the whole point
+of EMBEDDED is a single file*, and a region is a `.Bnn` file, so a banked program is never
+embedded. An embedded compile stops at the first `GP.BANKED` with `GP.BANKED NEEDS SHARED`, or the
+first `GP.BANKEDSTR` with `GP.BANKEDSTR NEEDS SHARED`, from `gpBankShared` (set by `CompileCode`
+from `GPC.INPUT` line 4). Built and tested 2026-09-14: BANKA, RGN and BSTRA stop at the right
+line and write no file, their shared builds run, BANKE stays `EMBEDDED CORE`. **Do not bring back the
+auto-switch:** earlier that day an embedded compile built shared instead and reported
+`SHARED (BANKED)`; it was built, tested byte-identical, and reverted on that rule. Before both,
+embedded raised `NOT IMPLEMENTED` at the program's last line.
 
 **The bank must stay selected at every fetch inside the region.** `PEEK`/`POKE` are safe (they save
 and restore); `BANK` inside a region is refused at compile time; `BANK`/`BLOAD`/`BSAVE` in LOW memory

@@ -833,9 +833,9 @@ while the object is written, so `BANKMGR` has to be told rather than asked:
 BANKMGR.WANT = GM.TEXTBANK : GOSUB BANKMGR.CLAIM
 ```
 
-**Compile SHARED.** The text is copied into its bank by the program's bootstrap, and an embedded
-program has none — the same rule `GP.BANKED` works to. An embedded build is refused rather than
-compiled into a program that reads an empty bank.
+**Compile SHARED.** The text is a `.Bnn` file, which the shared bootstrap LOADs into its bank. An
+embedded program is one file, so an embedded compile stops at the first `GP.BANKEDSTR` with
+`GP.BANKEDSTR NEEDS SHARED`.
 
 **A group name is not a variable.** No `$`, no `%`, no `(` — any of those is a syntax error rather
 than something quietly ignored. A name that no block declared is a syntax error at the line that
@@ -1141,9 +1141,9 @@ runtime and every `#INCLUDE` spends it; a region spends 8,192 bytes of a RAM ban
 not using. Bank what you can. A module called inside a loop goes where the loop is: a call between
 a region and anywhere outside it switches the bank twice.
 
-The banked form needs the program built SHARED. `GP.BANKED` reports `NOT IMPLEMENTED` in an
-embedded build, because the copy into the bank is the shared bootstrap's work and an embedded
-object has no bootstrap.
+The banked form needs the program built SHARED. Each region is a `.Bnn` file, which the shared
+bootstrap LOADs into its bank. An embedded program is one file, so an embedded compile stops at the
+first `GP.BANKED` with `GP.BANKED NEEDS SHARED`.
 
 `samples/GPB-MODS-TESTING/PICKDEMO.BASL` is a complete program in this shape, in 99 lines.
 

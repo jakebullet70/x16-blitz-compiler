@@ -56,7 +56,9 @@ MY.LIBEND:
   the modules across two regions.
 - **Include a module that reads another's `#DEFINE`s after it.** The GUI modules read `THEME`'s
   role numbers, so `THEME` comes first.
-- **Build shared.** `GP.BANKED` refuses an embedded build with `NOT IMPLEMENTED`.
+- **Build shared.** Each region is a `.Bnn` file and an embedded program is one file, so an
+  embedded compile stops at the first `GP.BANKED` with `GP.BANKED NEEDS SHARED`. Ship the runtime
+  file with the `.Bnn` files.
 
 `samples/GPB-MODS-TESTING/GPBMODS.BASL` banks the utilities, the file modules, `THEME`, the GUI,
 the combo box and two of its own dropdown handlers, in six regions.
