@@ -83,7 +83,7 @@ def one(entry, gpc):
 
     started = time.time()
     _, v_on, _, d_on = dcref.compile_one(entry, gpc, in_on, True, run=os.path.join(base, "on"))
-    if not v_on.startswith("OK CODE"):
+    if not v_on.startswith("OK LOW CODE"):
         return entry, time.time() - started, None, "option on: " + v_on
     listed = os.path.join(d_on, "D." + name)
     if not os.path.exists(listed):
@@ -97,7 +97,7 @@ def one(entry, gpc):
         return entry, time.time() - started, removed, "listed lines not in the source: %s" % missing[:8]
 
     _, v_off, _, d_off = dcref.compile_one(entry, gpc, in_off, False, run=os.path.join(base, "off"))
-    if not v_off.startswith("OK CODE"):
+    if not v_off.startswith("OK LOW CODE"):
         return entry, time.time() - started, removed, "stripped, option off: " + v_off
     return entry, time.time() - started, removed, identity(name, removed, v_on, d_on, v_off, d_off)
 

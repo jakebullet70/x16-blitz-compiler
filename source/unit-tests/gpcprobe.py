@@ -9,7 +9,7 @@
 #   the compile runs in DRIVE, work/gpcprobe/NAME/ by default.
 #
 #   CMP.LOG is polled every 0.1 s. The probe records each growth of the file, the time each
-#   pass-1 progress dot first appears, and when PASS 1, PASS 2 and OK CODE are seen.
+#   pass-1 progress dot first appears, and when PASS 1, PASS 2 and OK LOW CODE are seen.
 #   DRIVE/probe.json keeps the record for gpcspans.py. The last line compares the outputs with
 #   work/gpctest/ref/off/NAME/.
 #
@@ -52,13 +52,13 @@ with open(logpath, "wb") as log:
             growth.append((round(t, 2), n))
             size = n
             b = open(logpath, "rb").read()
-            for key, pat in (("pass1", b"PASS 1 "), ("pass2", b"PASS 2 "), ("ok", b"OK CODE"),
+            for key, pat in (("pass1", b"PASS 1 "), ("pass2", b"PASS 2 "), ("ok", b"OK LOW CODE"),
                              ("ready_after_ok", None)):
                 if key in marks:
                     continue
                 if pat is not None and pat in b:
                     marks[key] = round(t, 2)
-                elif key == "ready_after_ok" and "ok" in marks and b"READY." in b[b.rfind(b"OK CODE"):]:
+                elif key == "ready_after_ok" and "ok" in marks and b"READY." in b[b.rfind(b"OK LOW CODE"):]:
                     marks[key] = round(t, 2)
             at = b.find(b"PASS 1 ")
             if at >= 0:
@@ -72,7 +72,7 @@ with open(logpath, "wb") as log:
         p.wait(timeout=5)
 
 b = open(logpath, "rb").read()
-ok = b.rfind(b"OK CODE")
+ok = b.rfind(b"OK LOW CODE")
 verdict = b[ok:].split(b"\r")[0].decode("latin-1") if ok >= 0 else "NO OK"
 steps = [growth[i][1] - (growth[i - 1][1] if i else 0) for i in range(len(growth))]
 out = dict(name=NAME, verdict=verdict, marks=marks, dots1=dots1, growth=growth)

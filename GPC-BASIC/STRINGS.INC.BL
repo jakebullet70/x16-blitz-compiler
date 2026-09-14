@@ -38,7 +38,7 @@
 ## **
 ## **  The module needs a #SYMFILE, and so does every program that includes it, before
 ## **  the #INCLUDEs and named after the source PRG. Without one the compile stops with
-## **  "NO SYMBOL FILE FOR {}", which names the cause but not the file.
+## **  "{} NEEDS #SYMFILE", which names the cause but not the file.
 ## **
 ## **      #SYMFILE "@:MYPROG.SYM"
 ## **      #INCLUDE "STRINGS.INC.BL"

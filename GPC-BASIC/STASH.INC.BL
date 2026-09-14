@@ -15,7 +15,7 @@
 ## **
 ## **  YOUR PROGRAM MUST HAVE A #SYMFILE. The assembly reaches BASIC's variables through
 ## **  {VAR} and BASLOAD crunches every name first -- STASH.VADDR% is some two-letter
-## **  name by then. Without it the compile stops with "NO SYMBOL FILE FOR {}", naming
+## **  name by then. Without it the compile stops with "{} NEEDS #SYMFILE", naming
 ## **  the cause but not the file. Name it to match the PRG:
 ## **
 ## **      #SAVEAS "@:MYPROG.PRG"

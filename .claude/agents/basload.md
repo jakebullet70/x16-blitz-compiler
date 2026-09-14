@@ -53,7 +53,7 @@ Including throwaway test files. BASLOAD does **not** derive the output name from
 - **`#SYMFILE` must come BEFORE the `#INCLUDE`s.** After them, BASLOAD stops with
   `SYMFILE NOT ALLOWED IN <file>:<line>` and writes the same 6-byte PRG.
 - **`#SYMFILE` is not optional** whenever any included module uses a `{VAR}` operand in `GP.ASM` —
-  `SORT`, `STASH` and `STRCASE` all do. Without it GPC stops at `NO SYMBOL FILE FOR {} @ <line>`,
+  `SORT`, `STASH` and `STRCASE` all do. Without it GPC stops at `{} NEEDS #SYMFILE @ <line>`,
   prints an empty `OUT:`, and falls out to BASIC with a **`?STRING TOO LONG ERROR` that names
   neither the file nor the cause**. The real message is two lines above the BASIC error in
   `CMP.LOG`.

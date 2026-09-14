@@ -177,6 +177,7 @@ AsmOpenBlock:
 AsmCloseBlock:
 		lda 	#$60 						; RTS
 		jsr 	AsmPoolWrite
+		jsr 	AsmRunBase 					; where this blob runs, which its label references need
 		jsr 	AsmResolveLocals 			; every branch and label reference in this block
 
 		lda 	#PCD_CMD_WORD 				; .word <blob address>
@@ -202,27 +203,23 @@ AsmCloseBlock:
 		jsr 	WriteCodeByte
 
 		.keyword PCD_SYS 					; $DD $B0 -- call it
-		clc
-		rts
+		jmp 	AsmBankBlob
 ;
 ;		PASS TWO KNOWS THE ANSWER HERE. The pool's base was settled at the end of pass one and
 ;		so was the page the object runs at, so the blob's run address is arithmetic rather than
 ;		something to come back to -- which is what matters, because pass two's object goes
 ;		straight out and there is nothing to come back to.
 ;
-;		AN ABSOLUTE ADDRESS, NOT AN OFFSET, so a call from inside a GP.BANKED region needs no
-;		correction: the pool stays in low memory and the region reaches it from $A000 exactly as
-;		low code does.
+;		AN ABSOLUTE ADDRESS, NOT AN OFFSET. A low blob is reached from $A000 exactly as from low
+;		code, and a banked blob sits in the same bank as the p-code calling it -- AsmRunBase.
 ;
 _ACBResolve:
 		clc
-		lda 	AsmPoolBase
-		adc 	AsmBlobStart
+		lda 	AsmBlobStart
+		adc 	AsmRunAdj
 		sta 	AsmBlobAddr
-		lda 	AsmPoolBase+1
-		adc 	AsmBlobStart+1
-		clc
-		adc 	AsmPageDelta
+		lda 	AsmBlobStart+1
+		adc 	AsmRunAdj+1
 		sta 	AsmBlobAddr+1
 		lda 	AsmBlobAddr
 		jsr 	WriteCodeByte
@@ -230,6 +227,158 @@ _ACBResolve:
 		jsr 	WriteCodeByte
 
 		.keyword PCD_SYS 					; $DD $B0 -- call it
+		jmp 	AsmBankBlob
+
+; ************************************************************************************************
+;
+;		A BLOB INSIDE A GP.BANKED REGION RUNS FROM THE REGION'S OWN BANK, unless it says
+;		GP.ASM LOW. The region's p-code does the SYS with its bank already selected, so the blob
+;		costs no runtime bytes to reach.
+;
+;		IT GOES IN AFTER THE REGION'S END MARKER, blob after blob in source order. AsmRgnLen is
+;		how much of that the open region has so far, which is where this one starts.
+;
+;		IT LEAVES THE POOL, so the pool only ever holds low blobs and AsmFlushPool is unchanged.
+;		Pass one only needs its length: GPBankRelocate makes room for all of them at once.
+;		Pass two copies it into the region's bank, which is random access, and puts the cursor
+;		back where the region's p-code is up to. The bytes are skipped from the sum, as the room
+;		pass one made for them is.
+;
+; ************************************************************************************************
+
+AsmBankBlob:
+		lda 	AsmBanked
+		bne 	_ABBBanked 					; a low blob stays in the pool
+		rts
+_ABBBanked:
+		sec
+		lda 	AsmPoolLen
+		sbc 	AsmBlobStart
+		sta 	AsmCopyLen
+		lda 	AsmPoolLen+1
+		sbc 	AsmBlobStart+1
+		sta 	AsmCopyLen+1
+		lda 	passNumber
+		bne 	_ABBWrite
+		jmp 	_ABBCount 					; pass one: only the length
+_ABBWrite:
+		lda 	objPtr
+		sta 	AsmSaveObj
+		lda 	objPtr+1
+		sta 	AsmSaveObj+1
+		lda 	nextRegion 					; one past the end marker, plus the blobs before it
+		asl 	a
+		tax
+		sec
+		lda 	gpBankEnds,x
+		adc 	AsmRgnLen
+		sta 	objPtr
+		lda 	gpBankEnds+1,x
+		adc 	AsmRgnLen+1
+		sta 	objPtr+1
+		lda 	AsmCopyLen
+		ldy 	AsmCopyLen+1
+		jsr 	SumSkipYA
+		clc
+		lda 	#AsmPool & $FF
+		adc 	AsmBlobStart
+		sta 	zTemp2
+		lda 	#AsmPool >> 8
+		adc 	AsmBlobStart+1
+		sta 	zTemp2+1
+		stz 	AsmCopyIdx
+		stz 	AsmCopyIdx+1
+_ABBLoop:
+		lda 	AsmCopyIdx
+		cmp 	AsmCopyLen
+		lda 	AsmCopyIdx+1
+		sbc 	AsmCopyLen+1
+		bcs 	_ABBCopied
+		.asm_access 						; the window closes before WriteCodeByte, as in
+		lda 	(zTemp2) 					; AsmFlushPool
+		sta 	AsmByte
+		.asm_release
+		lda 	AsmByte
+		jsr 	WriteCodeByte
+		inc 	zTemp2
+		bne 	_ABBNoCarry
+		inc 	zTemp2+1
+_ABBNoCarry:
+		inc 	AsmCopyIdx
+		bne 	_ABBLoop
+		inc 	AsmCopyIdx+1
+		bra 	_ABBLoop
+_ABBCopied:
+		lda 	AsmSaveObj
+		sta 	objPtr
+		lda 	AsmSaveObj+1
+		sta 	objPtr+1
+_ABBCount:
+		clc
+		lda 	AsmRgnLen
+		adc 	AsmCopyLen
+		sta 	AsmRgnLen
+		lda 	AsmRgnLen+1
+		adc 	AsmCopyLen+1
+		sta 	AsmRgnLen+1
+		lda 	AsmBlobStart
+		sta 	AsmPoolLen
+		lda 	AsmBlobStart+1
+		sta 	AsmPoolLen+1
+		rts
+
+; ************************************************************************************************
+;
+;		Pass two: AsmRunAdj is what a pool offset in this blob adds to become its run address.
+;
+;			low 		the pool's base in the object, plus the page delta to where it runs
+;			banked 		$A000, plus the region's p-code and end marker, plus AsmRgnLen, less
+;						where the blob starts in the pool
+;
+;		gpBankEnds is one past the region's exit bridge, and the end marker is the byte after.
+;
+; ************************************************************************************************
+
+AsmRunBase:
+		lda 	passNumber
+		beq 	_ARBDone
+		lda 	AsmBanked
+		bne 	_ARBBanked
+		lda 	AsmPoolBase
+		sta 	AsmRunAdj
+		clc
+		lda 	AsmPoolBase+1
+		adc 	AsmPageDelta
+		sta 	AsmRunAdj+1
+		rts
+_ARBBanked:
+		lda 	nextRegion
+		asl 	a
+		tax
+		sec
+		lda 	gpBankEnds,x
+		sbc 	gpBankStarts,x
+		sta 	AsmRunAdj
+		lda 	gpBankEnds+1,x
+		sbc 	gpBankStarts+1,x
+		sta 	AsmRunAdj+1
+		sec 								; +1, the end marker
+		lda 	AsmRunAdj
+		adc 	AsmRgnLen
+		sta 	AsmRunAdj
+		lda 	AsmRunAdj+1
+		adc 	AsmRgnLen+1
+		sta 	AsmRunAdj+1
+		sec
+		lda 	AsmRunAdj
+		sbc 	AsmBlobStart
+		sta 	AsmRunAdj
+		lda 	AsmRunAdj+1
+		sbc 	AsmBlobStart+1
+		clc
+		adc 	#$A0
+		sta 	AsmRunAdj+1
+_ARBDone:
 		rts
 
 ; ************************************************************************************************
@@ -258,13 +407,11 @@ AsmResolveRef:
 		cmp 	#AFIX_VAR
 		beq 	_ARRVariable
 		clc
-		lda 	AsmPoolBase
+		lda 	AsmRunAdj 					; low pool or region bank -- see AsmRunBase
 		adc 	AsmNewValue
 		sta 	AsmNewValue
-		lda 	AsmPoolBase+1
+		lda 	AsmRunAdj+1
 		adc 	AsmNewValue+1
-		clc
-		adc 	AsmPageDelta
 		sta 	AsmNewValue+1
 		bra 	_ARRTarget
 _ARRVariable:
@@ -889,6 +1036,7 @@ _AFMEFound:
 ; ************************************************************************************************
 
 AsmEmitInstruction:
+		jsr 	AsmBankWriteCheck
 		lda 	AsmOpcode
 		jsr 	AsmPoolWrite
 		ldx 	AsmMode
@@ -967,6 +1115,47 @@ _AEIBranch:
 
 _AEINotAddress:
 		jmp 	AsmBadSyntax
+
+; ************************************************************************************************
+;
+;		A BANKED BLOB MAY NOT WRITE THE RAM BANK REGISTER. It runs from $A000 in its region's
+;		bank, so the instruction after a store to $00 is fetched from whatever bank that
+;		selected. Only a direct STA, STX, STY or STZ to $00 or $0000 is caught.
+;
+; ************************************************************************************************
+
+AsmBankWriteCheck:
+		lda 	AsmBanked
+		beq 	_ABWCOk
+		lda 	AsmIsLabel
+		ora 	AsmIsVar
+		ora 	AsmValue
+		ora 	AsmValue+1
+		bne 	_ABWCOk
+		lda 	AsmMode
+		cmp 	#AMODE_ZP
+		beq 	_ABWCStore
+		cmp 	#AMODE_ABS
+		bne 	_ABWCOk
+_ABWCStore:
+		lda 	AsmOpcode
+		cmp 	#$64 						; STZ zp
+		beq 	_ABWCRefused
+		cmp 	#$9C 						; STZ abs
+		beq 	_ABWCRefused
+		and 	#$FC
+		cmp 	#$84 						; STY STA STX zp
+		beq 	_ABWCRefused
+		cmp 	#$8C 						; STY STA STX abs
+		beq 	_ABWCRefused
+_ABWCOk:
+		rts
+;
+;		In compiler space, like _APBUnknown: errors.asm is copied into every compiled program.
+;
+_ABWCRefused:
+		jsr 	CallErrorHandler
+		.text 	"BANKED GP.ASM WRITES $00, USE GP.ASM LOW", 0
 
 ; ************************************************************************************************
 ;
@@ -1439,7 +1628,7 @@ _APBSymFailed:
 		cmp 	#0
 		bne 	_APBUnknown
 		jsr 	CallErrorHandler
-		.text 	"NO SYMBOL FILE FOR {}", 0
+		.text 	"{} NEEDS #SYMFILE", 0
 
 _APBUnknown:
 		jsr 	CallErrorHandler
@@ -1570,6 +1759,18 @@ AsmChoiceLeft:
 		.fill 	1
 AsmScratch:
 		.fill 	2
+AsmBanked: 								; nonzero while a blob inside a region, without LOW,
+		.fill 	1 						; is being assembled -- set by CommandAsmCompile
+AsmLowText:
+		.fill 	4 						; the word after GP.ASM, as written
+AsmRunAdj:
+		.fill 	2 						; pass two: pool offset -> run address, for this blob
+AsmRgnLen: 								; the open region's banked blobs so far. Zeroed at each
+		.fill 	2 						; GP.ENDBANKED, where pass one records it
+AsmCopyLen:
+		.fill 	2
+AsmSaveObj:
+		.fill 	2 						; objPtr, while a banked blob goes into its region
 
 		.send code
 

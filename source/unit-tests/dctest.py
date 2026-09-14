@@ -193,15 +193,16 @@ def compile_one(name, gpc, shared, dead):
             while time.time() < deadline:
                 time.sleep(0.5)
                 echo = open(logpath, "rb").read()
-                ok = echo.rfind(b"OK CODE")
+                ok = echo.rfind(b"OK LOW CODE")
                 if ok >= 0:
                     time.sleep(1.0)
                     echo = open(logpath, "rb").read()
                     lines = echo[ok:].decode("latin-1").replace("\r", "\n").split("\n")
                     lines = [s.strip() for s in lines if s.strip()]
                     verdict = lines[0]
-                    if len(lines) > 1 and lines[1].startswith("DEAD CODE:"):
-                        verdict += " " + lines[1]
+                    dead = [s for s in lines[1:] if s.startswith("DEAD CODE:")]
+                    if dead:
+                        verdict += " " + dead[0]
                     break
                 at = echo.find(b"GPC SQUEALING")
                 if at >= 0 and b"READY." in echo[at:]:
@@ -229,11 +230,11 @@ def check(name, gpc):
         if not (verdict.startswith("STOPPED") and expect in verdict):
             problems.append("should stop with " + expect)
         off, _, _ = compile_one(name, gpc, shared, False)
-        if not off.startswith("OK CODE"):
+        if not off.startswith("OK LOW CODE"):
             problems.append("option off: " + off)
         return verdict, problems
     m = re.search(r" DEAD CODE: +([0-9]+) LINES REMOVED, +([0-9]+) BYTES SAVED$", verdict)
-    if not verdict.startswith("OK CODE"):
+    if not verdict.startswith("OK LOW CODE"):
         problems.append("did not compile")
     elif not m or removed is None or int(m.group(1)) != len(removed):
         problems.append("DEAD figures and the list disagree")

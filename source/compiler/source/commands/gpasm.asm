@@ -59,6 +59,7 @@ CommandAsmCompile:
 											; opener leaves its closer behind and corrupts the
 											; nesting of any block enclosing it, silently.
 		stz 	AsmBodyLines
+		jsr 	AsmReadLow 					; LOW, and so whether the blob goes into a region's bank
 		jsr 	AsmOpenBlock 				; remember where this blob starts in the pool
 		jsr 	AsmRequireEOL 				; GP.ASM is alone on its line
 
@@ -118,6 +119,82 @@ AsmRequireEOL:
 		rts
 _ARENotEOL:
 		.error_syntax
+
+;
+;		GP.ASM LOW keeps the blob in the low pool. Without it a blob inside a GP.BANKED region
+;		goes into the region's bank (AsmBankBlob, gpasmcode.asm). Outside a region LOW does
+;		nothing.
+;
+;		BASLOAD CRUNCHES THE WORD like any other name, so it arrives as whatever #SYMFILE says
+;		LOW became. A tokeniser that does not crunch leaves it as written. Both are accepted.
+;		Without a #SYMFILE the crunched name cannot be read back, and that stops the compile.
+;
+AsmReadLow:
+		stz 	AsmBanked
+		ldx 	#0
+		jsr 	LookNextNonSpace
+		beq 	_ARLNotLow 					; GP.ASM alone
+		jsr 	CharIsAlpha
+		bcc 	_ARLNotLow 					; not a word: AsmRequireEOL refuses it
+_ARLChar:
+		jsr 	LookNext
+		jsr 	CharIsAlpha
+		bcs 	_ARLTake
+		jsr 	CharIsDigit
+		bcc 	_ARLEnd
+_ARLTake:
+		cpx 	#3
+		bcs 	_ARLBad 					; longer than LOW
+		sta 	AsmLowText,x
+		inx
+		jsr 	GetNext
+		bra 	_ARLChar
+_ARLEnd:
+		stz 	AsmLowText,x
+		ldx 	#3
+_ARLLiteral:
+		lda 	AsmLowText,x
+		cmp 	AsmLowWord,x
+		bne 	_ARLCrunched
+		dex
+		bpl 	_ARLLiteral
+		rts 								; LOW as written
+_ARLCrunched:
+		ldx 	#3
+_ARLName:
+		lda 	AsmLowWord,x
+		sta 	AsmSymName,x
+		dex
+		bpl 	_ARLName
+		lda 	#BLC_SYMLOOKUP
+		jsr 	CallAPIHandler
+		bcs 	_ARLNoSym
+		lda 	AsmLowText+2 				; a crunched name is one or two characters
+		bne 	_ARLBad
+		lda 	AsmLowText
+		cmp 	AsmSymCrunched
+		bne 	_ARLBad
+		lda 	AsmLowText+1
+		cmp 	AsmSymCrunched+1
+		bne 	_ARLBad
+		rts 								; LOW, crunched
+_ARLNotLow:
+		lda 	gpBankState 				; 1 = inside a GP.BANKED region
+		cmp 	#1
+		bne 	_ARLDone
+		inc 	AsmBanked
+_ARLDone:
+		rts
+_ARLNoSym:
+		cmp 	#0 							; A = 0: no symbol file, 1: LOW is not in it
+		bne 	_ARLBad
+		jsr 	CallErrorHandler
+		.text 	"GP.ASM LOW NEEDS #SYMFILE", 0
+_ARLBad:
+		.error_syntax
+
+AsmLowWord:
+		.text 	"LOW", 0
 
 		.send code
 

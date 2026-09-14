@@ -500,6 +500,8 @@ ResetPassState:
 		;
 		stz 	AsmPoolLen
 		stz 	AsmPoolLen+1
+		stz 	AsmRgnLen 					; ...and the banked blobs of the region open, if any
+		stz 	AsmRgnLen+1
 		;
 		;		GP.BANKEDSTR, the same way: the group tables and the string pool are rebuilt from
 		;		scratch by each pass and must come out identical, because the constants pass one

@@ -33,7 +33,7 @@ APPSYS/SORT/STASH/STASHFILE/STRINGS/STRUSING, and `STASH.SLOT`/`STASH.NEXT` whic
 verification and the sync scope are the expensive parts to re-derive.
 
 **How to apply:** resume at the rebuild. `#SYMFILE` is named after the SOURCE PRG —
-`X.SRC.PRG` needs `X.SRC.SYM`, or the compile dies with `NO SYMBOL FILE FOR {}` only
+`X.SRC.PRG` needs `X.SRC.SYM`, or the compile dies with `{} NEEDS #SYMFILE` only
 after the 420 s timeout. A `\` inside a `<<'PY'` heredoc reaches Python as one
 backslash — use `chr(92)`. And the user has twice rejected heredoc scripts that patch
 another script; prefer plain `sed -i` or Edit. See [[library-working-copy-then-root]].

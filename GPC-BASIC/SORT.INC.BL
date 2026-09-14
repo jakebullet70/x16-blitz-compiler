@@ -33,7 +33,7 @@
 ## **
 ## **  YOUR PROGRAM MUST HAVE A #SYMFILE, BEFORE THE INCLUDES. The assembly reaches
 ## **  BASIC's variables through {VAR} and BASLOAD crunches every name first; without it
-## **  the compile stops with "NO SYMBOL FILE FOR {}", naming the cause but not the file:
+## **  the compile stops with "{} NEEDS #SYMFILE", naming the cause but not the file:
 ## **
 ## **      #SAVEAS "@:MYPROG.PRG"
 ## **      #SYMFILE "@:MYPROG.SYM"

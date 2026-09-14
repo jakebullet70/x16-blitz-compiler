@@ -96,7 +96,7 @@ with the GUI in a bank.
 
 **The SYM is named after the source PRG, not after the program.** `#SAVEAS "@:GPBMODS.SRC.PRG"`
 needs `#SYMFILE "@:GPBMODS.SRC.SYM"`. Get it wrong and the tokenise succeeds, the SYM is written,
-and the compile stops with `NO SYMBOL FILE FOR {} @ 98` — a line in `STASH.INC.BL`, saying nothing
+and the compile stops with `{} NEEDS #SYMFILE @ 98` — a line in `STASH.INC.BL`, saying nothing
 about the file name.
 
 ## Where the bytes go

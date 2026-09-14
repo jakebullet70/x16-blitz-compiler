@@ -24,7 +24,7 @@ source. That is the point of the sample, and the numbers below are what it bough
 > `#SYMFILE` record, because BASLOAD renames every variable (`ED.ASM.VIS%` becomes something like
 > `A7%`) while storing REM text byte for byte — so the assembly says one name and the code uses
 > another. The compiler reads the mapping from `EDITOR.SYM`, which must sit beside `EDITOR.PRG`
-> under the matching name. Delete it and the compile stops with `NO SYMBOL FILE FOR {}`.
+> under the matching name. Delete it and the compile stops with `{} NEEDS #SYMFILE`.
 
 ## The speed story
 

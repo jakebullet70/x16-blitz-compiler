@@ -86,7 +86,7 @@ def store(kind, entry, verdict, drive):
     for f in dcref.outputs(drive, name) + ["CMP.LOG"]:
         shutil.copy2(os.path.join(drive, f), dest)
     open(os.path.join(dest, "VERDICT"), "w").write(verdict + "\n")
-    if verdict.startswith("OK CODE"):
+    if verdict.startswith("OK LOW CODE"):
         return True, "stored"
     return False, "stored, DID NOT COMPILE"
 
@@ -97,7 +97,7 @@ def against(kind, entry, verdict, drive):
     if not os.path.isdir(ref):
         return False, "NO REFERENCE"
     diffs = []
-    if not verdict.startswith("OK CODE"):
+    if not verdict.startswith("OK LOW CODE"):
         diffs.append("did not compile")
     was = open(os.path.join(ref, "VERDICT")).read().strip()
     if was != verdict:
@@ -139,7 +139,7 @@ def on_job(mode, entry, gpc, inputs, stripped):
         checks.append(("stripped", t, 0, "", False, why))
         return checks, None
 
-    if not v_on.startswith("OK CODE"):
+    if not v_on.startswith("OK LOW CODE"):
         return fail("not run: option on did not compile")
     listed = os.path.join(d_on, "D." + name)
     if not os.path.exists(listed):
@@ -165,7 +165,7 @@ def on_job(mode, entry, gpc, inputs, stripped):
 
     _, v_off, secs, d_off = dcref.compile_one(entry, gpc, source, False,
                                               run=os.path.join(WORK, "stripped"))
-    if not v_off.startswith("OK CODE"):
+    if not v_off.startswith("OK LOW CODE"):
         return fail("stripped, option off: " + v_off)
     note = dcstrip.identity(name, removed, v_on, d_on, v_off, d_off)
     checks.append(("stripped", t, secs, v_off, note.startswith("identical"), note))

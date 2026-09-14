@@ -18,7 +18,7 @@
 ## THE TWO DIRECTIVES COME FIRST. STASH.INC.BL reaches BASIC's variables
 ## from inside GP.ASM through {VAR}, and the compiler resolves those out of
 ## BASLOAD's #SYMFILE -- which has to be declared before the #INCLUDEs that
-## need it, or the compile stops with NO SYMBOL FILE FOR {}.
+## need it, or the compile stops with {} NEEDS #SYMFILE.
 #SAVEAS "@:SCREEN.PRG"
 #SYMFILE "@:SCREEN.SYM"
 #INCLUDE "GPB.INC.BL"

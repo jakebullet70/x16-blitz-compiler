@@ -128,7 +128,7 @@ Preamble, in this order, or the build fails in ways that name neither the file n
 ```
 
 `#SYMFILE` comes **before** the `#INCLUDE`s, and it is not optional: `STASH.INC.BL` uses `{VAR}`
-operands in `GP.ASM`, and without it GPC stops with `NO SYMBOL FILE FOR {} @ <line>` and falls out
+operands in `GP.ASM`, and without it GPC stops with `{} NEEDS #SYMFILE @ <line>` and falls out
 to BASIC with a `?STRING TOO LONG ERROR`.
 
 WARNING: THE SYM IS NAMED AFTER THE SOURCE PRG, NOT AFTER THE PROGRAM. `SymBuildName` replaces the

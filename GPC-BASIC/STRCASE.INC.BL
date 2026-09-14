@@ -39,7 +39,7 @@
 ## **  them; STRCASE.GO is the whole module without them.
 ## **
 ## **  The module needs a #SYMFILE, before the #INCLUDEs and named after the source PRG.
-## **  Without one the compile stops with "NO SYMBOL FILE FOR {}", which names the cause
+## **  Without one the compile stops with "{} NEEDS #SYMFILE", which names the cause
 ## **  but not the file.
 ## **
 ## **      #SYMFILE "@:MYPROG.SYM"

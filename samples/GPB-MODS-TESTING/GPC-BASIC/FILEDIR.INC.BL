@@ -225,7 +225,7 @@ FILE.DIR.SUCK:  GOSUB FILE.DIR.FILL : FILE.DIR.GOT = FILE.DIR.BYTES% : FILE.DIR.
 
 FILE.DIR.FILL:  FILE.DIR.BYTES% = 0 : FILE.DIR.SLOW% = 0
     #REM 1
-    GP.ASM
+    GP.ASM LOW
     REM CLD                          ; SYS enters with the caller's flags
     REM LDA $00                      ; the caller's window, for the exit below
     REM STA {FILE.DIR.WAS%}
@@ -364,7 +364,7 @@ FILE.DIR.NEXT:  FILE.DIR.MORE = 0 : IF FILE.DIR.GOT = 0 THEN RETURN
 
 FILE.DIR.STEP:  FILE.DIR.OK% = 0
     #REM 1
-    GP.ASM
+    GP.ASM LOW
     REM CLD
     REM LDA $00                      ; the caller's window, for FDSEND
     REM STA {FILE.DIR.WAS%}

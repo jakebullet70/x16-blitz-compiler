@@ -67,10 +67,10 @@ open(os.path.join(T, "GPC.INPUT"), "w", newline="\n").write(
 prg = os.path.join(T, NAME + ".PRG")
 if os.path.exists(prg):
     os.remove(prg)
-t = emu(["-warp", "-prg", "GPC.BIN", "-run"], 120, "OK CODE", "CMP.LOG")
+t = emu(["-warp", "-prg", "GPC.BIN", "-run"], 120, "OK LOW CODE", "CMP.LOG")
 i = t.rfind("OUT:")
 tail = (t[i:] if i >= 0 else t)
-j = tail.find("OK CODE")
+j = tail.find("OK LOW CODE")
 print("COMPILE:", tail[j:j + 60].split("\r")[0] if j >= 0 else tail[:180].replace("\r\n", " | "))
 if not os.path.exists(prg):
     sys.exit("COMPILE FAILED -- read %s/CMP.LOG" % T)

@@ -66,14 +66,14 @@ def compile_one(name, mode="SHARED"):
     p = os.path.join(T, name + ".PRG")
     if os.path.exists(p):
         os.remove(p)
-    t = emu(["-warp", "-prg", "GPC.BIN", "-run"], 90, "OK CODE")
+    t = emu(["-warp", "-prg", "GPC.BIN", "-run"], 90, "OK LOW CODE")
     #   GPC echoes its whole error-message TABLE right after the banner, so nothing
     #   before the "OUT:" line is a result.
     i = t.rfind("OUT:")
     tail = t[i:] if i >= 0 else t
-    j = tail.find("OK CODE")
+    j = tail.find("OK LOW CODE")
     if j >= 0:
-        return "OK", tail[j:j + 30].split("\r")[0].strip()
+        return "OK", tail[j:j + 40].split("\r")[0].strip()
     #   The object bytes are echoed too -- that is what -echo does to the output channel --
     #   so a compile error arrives GLUED to binary with no newline in front of it. Search
     #   the text; splitting it into lines and using startswith() finds nothing here.

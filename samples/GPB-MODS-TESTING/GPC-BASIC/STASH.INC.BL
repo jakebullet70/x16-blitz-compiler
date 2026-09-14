@@ -9,7 +9,7 @@
 ## **
 ## **  The program needs a #SYMFILE, before the includes and named after the source
 ## **  PRG. The assembly reaches BASIC's variables through {VAR} and BASLOAD crunches
-## **  every name first; without one the compile stops with "NO SYMBOL FILE FOR {}".
+## **  every name first; without one the compile stops with "{} NEEDS #SYMFILE".
 ## **
 ## **      #SAVEAS "@:MYPROG.PRG"
 ## **      #SYMFILE "@:MYPROG.SYM"

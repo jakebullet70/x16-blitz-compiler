@@ -832,25 +832,20 @@ green.
 
 Written 2026-09-09, updated 2026-09-14. **An index, not a second copy** — each item points at the
 section or memory note that holds the detail, so this list cannot drift away from the work it names.
-Three open features; items 0, 3 and 5 are done, and item 4 is built and tested, its test references aside. Four unranked items follow item 5.
+One open feature, item 2; items 0, 1, 3, 4 and 5 are done. Two open unranked items follow item 5.
 Everything under `## Bugs` is fixed.
 
 **0. Fix the `GP.FN` string aliasing — DONE 2026-09-13.** See `## Bugs` above. 3 bytes of p-code on
 each string `GP.FN` call; verified in the emulator and by the quick tier.
 
-**1. Banked `GP.ASM`.** Costed 2026-09-08 and waiting on a decision, not on analysis. About **58 bytes**
-of new runtime — roughly 55 for a bank-aware SYS handler, 2 for a `vectors.asm` entry, 1 for
-`pcodesize.asm` — against **511 bytes of headroom** under the `$9F00` guard in
-`source/runtime/source/main/zzrt.footer`. So it is free: no `RTBASE` move, no `RT_ABI` bump, no
-per-program workspace cost. **+1 byte of p-code per call site**, +9 across the nine blobs in the
-library today.
-
-What it buys: `STRINGS` (107 bytes measured), `STRCASE`, `SORT` and `FILEIO` become eligible to leave
-low RAM. `STASH`'s three blobs and `FILEDIR`'s two never can — they drive the bank register itself.
-
-This is 65C02 work in the runtime and needs saying yes to explicitly. See
-`docs/memory/gpasm-blob-may-use-ztemp.md` and
-`docs/memory/pcode-runs-from-a-bank-proven.md`.
+**1. Banked `GP.ASM` — DONE 2026-09-14.** A `GP.ASM` block inside a `GP.BANKED` region is
+assembled into the region's bank and runs from it, with no runtime bytes (`gpasm.asm`,
+`gpasmcode.asm`). `GP.ASM LOW` keeps a block in low memory, for a blob that drives the bank register
+itself; `FILEDIR`'s two are `GP.ASM LOW`. `LOW` needs `#SYMFILE`, and without one the compile stops
+with `GP.ASM LOW NEEDS #SYMFILE`. A banked block with a direct store to `$00` stops with
+`BANKED GP.ASM WRITES $00, USE GP.ASM LOW`; an indexed or indirect store, or a `JSR` that writes it,
+is not seen. The runtime SYS handler costed on 2026-09-08 was not needed. Manual: `GP-BASIC.md`
+§3.9, "In a `GP.BANKED` region".
 
 **2. Selective handler inclusion.** The largest lever on program size and the largest job. The runtime
 is **10,956 bytes copied verbatim into every program**, so `10 PRINT"HI"` ships the sprite engine, the
@@ -880,9 +875,11 @@ How the three questions were settled:
 
 1. **The return bank** rides on a frame of its own, `FRAME_BGOSUB` (`$E5`). It differs from the
    `GOSUB` frame in bit 0 alone, so `RETURN` restores the bank and `NEXT` does not see the change.
-2. **Indirect targets are refused.** `ON n GOSUB` to a label in a region is `NOT IMPLEMENTED`: an
-   `ON` entry is 3 bytes and a `.bgosub` is 4. So is any `GOTO` into a region from outside it, from
-   low memory or from another region, because a `GOTO` selects no bank. `IF .. GOTO`,
+2. **Indirect targets are refused.** `ON n GOSUB` into a region, out of one to low memory, or
+   between two regions stops with `ON GOSUB IN OR OUT OF GP.BANKED`: an `ON` entry is 3 bytes and a
+   `.bgosub` is 4. Any `GOTO` into a region from outside it, from
+   low memory or from another region, is refused with `NOT IMPLEMENTED`, because a `GOTO` selects
+   no bank. `IF .. GOTO`,
    `IF .. THEN <line>` and `ON .. GOTO` are refused the same way.
 3. **Runtime bytes:** the embedded core grew 12 B and has **4 B** left before `GPBase` moves off
    `$3700` (`docs/memory/gpc-core-page-cushion-below-gpbase.md`). SHARED has 542 B of core free.
@@ -895,11 +892,9 @@ hold. `BS.B.NUMS` and `GP-BASIC.md` §4.20 are remeasured. `banktest3.py` runs o
 and passes, BANKY included. **GOTO settled, 2026-09-14:** a `GOTO` into a region from outside it
 is refused in pass one by `GPBankGotoGuard`, from line numbers. It costs no runtime bytes, and
 `GPC.BIN` is 29,252 B. Falling into a region from the line above it, and `RESTORE` to a `DATA` line
-inside one, are not caught. **Possible extra:** a region routine calling low memory could use `.bgosub` with its
-own bank, so a low-memory routine that changes the bank no longer breaks its caller.
-
-Item 1 is still a question of its own: `.bgosub` banks p-code, and a `SYS` into a banked blob selects
-nothing. The record is `docs/memory/compiler-emitted-bank-switch.md`.
+inside one, are not caught. **Call out, 2026-09-14:** a call out of a region to low memory is a
+`.bgosub` with the region's own bank, so a low-memory routine that changes the bank no longer breaks
+its caller. The record is `docs/memory/compiler-emitted-bank-switch.md`.
 
 **5. Pass one has to say something — DONE, closed 2026-09-13.** Added 2026-09-11. The record of why
 follows. The compiler printed its banner, the input and
@@ -918,12 +913,13 @@ number instead of a guess.
 
 **Unranked, all under `## Wanted`:**
 
-- **End-of-compile report: lines compiled, banks used per bank.** BEFORE RELEASE.
+- **End-of-compile report: lines compiled, banks used per bank — DONE 2026-09-14.** One item a
+  line, with `LOW CODE`, `LOW FREE` and a line per bank.
   `### The end-of-compile report wants more than three numbers`.
 - **Show removed lines as source file and line.** Not started. The bullet under the same heading.
   Method, self-check and prototype: section 5 of `source/application/COMPILER-STATUS.md`.
-- **`BASLOAD-GPC` end-of-run report in the same shape.** BEFORE RELEASE, after the compiler's report
-  is settled. `### BASLOAD-GPC wants the same report`.
+- **`BASLOAD-GPC` end-of-run report in the same shape.** BEFORE RELEASE. The compiler's report it
+  follows is settled. `### BASLOAD-GPC wants the same report`.
 
 **Done 2026-09-13, outside the ranking:** compiler tests in two tiers
 (`docs/blitz/COMPILER-TESTS.PLAN.md`); `GP.ASM` `{VAR}` lookup reads the symbol file once a compile,
@@ -2259,9 +2255,10 @@ size. Sparse code (many short lines) still meets the line table at 2,048 first.
 
 **What could be done next, if the ceiling ever needs raising**, in increasing order of work: drop
 `MIN_WS_PAGES` for a program that provably needs little workspace (it is a policy, not a hardware
-limit); shrink the 4K frame stack, which is ~250 frames; or the runtime-shrinking items above, since
+limit), or the runtime-shrinking items above, since
 every byte off the runtime is a byte `ObjectBase` moves down. None is urgent -- the editor has room
-for another 200 lines and the honest number is now reported.
+for another 200 lines and the honest number is now reported. The frame stack is already 2K
+(`FrameStackPages = 8`), down from 4K.
 
 ### Save As accepts a BLANK name, and the editor then writes to nothing
 
@@ -2474,95 +2471,7 @@ that we do not is which transforms bite.
 `deferscan.py` and `PRG2BASLOAD`, and it must be optional: crunched source is materially harder to
 read, and this repo's own rule is that code should flow.
 
-### A per-program FRAME STACK SIZE — the biggest lever left on max program size
-
-Asked 2026-09-02: can the 4K frame stack be a compiler option? **Yes, and it is worth more than
-anything else on this list** -- 4K is 16 of the 68 pages a program gets, so dropping it to 1K takes
-the ceiling from **17,408 to 20,480**, more than the ~1.4 KB the cheap runtime-trim step buys.
-
-**It cannot be a constant only the compiler knows**, and `common.inc` already says why beside
-`FrameStackPages`: both ends need the number and they must agree. The compiler SPENDS the gap
-(`object.asm` adds it when working out where the workspace starts, in BOTH the embedded and shared
-paths) and the runtime POLICES it -- `StartRuntime` computes `stackFloorHigh = storeStartHigh -
-FrameStackPages` and `StackOpenFrame` refuses to open a frame below it, six cycles a GOSUB. Make it
-a per-program option with the runtime still assembled at 16 and a program with a smaller gap gets a
-floor BELOW its own gap: the check passes, recursion carries on into the object code, and the
-program overwrites itself and runs what it wrote. That is the exact failure the floor was added to
-catch.
-
-**So the runtime has to be TOLD the number, not built with it:**
-
-- `StartRuntime` already takes the workspace page in X per program. Turn `sbc #FrameStackPages`
-  into a patched byte alongside `RunCodePage`/`RunWorkspacePage` -- one extra runtime byte, or none
-  if it lands in zero page.
-- **Embedded mode is free**: every object carries its own copy of the runtime image, so patching is
-  per-program by construction.
-- **Shared mode is the work.** One resident runtime at `RTBASE` serves many chained p-code
-  programs, so the value must ride in WITH the program rather than be patched into the resident
-  image -- and `_WOCShared` spends `FrameStackPages` the same way, so both halves move together.
-- **Bump `RT_ABI`.** The entry contract changes, and a stale resident runtime paired with a new
-  program is precisely the mismatch above.
-
-**How small is safe?** A frame is GOSUB 4 bytes, `GP.DO` 6, `GP.SELECT` 7, `FOR` 19 -- so 4K is
-~215 nested FORs or ~1,000 GOSUBs, and 1K is still ~62 FORs deep. `samples/editor` nests nowhere
-near that. Default should stay 16; the option is for a program that has measured its own depth.
-`OUT OF MEMORY` is already the error when it is exceeded, which is what stock reports for too many
-nested GOSUBs, so the failure mode needs no new spelling.
-
-#### Researched 2026-09-03: still the right lever, but MEASURE FIRST -- and not `MIN_WS_PAGES`
-
-**The cheaper lever beside it is worth nothing here, and the ordering at the end of "THE REAL
-MAXIMUM PROGRAM SIZE" above is by WORK, not by VALUE.** `FrameStackPages` and `MIN_WS_PAGES` are
-both 16 pages in the same arithmetic, so twelve pages off either is the same **+3,072 bytes**. But:
-
-- **`MIN_WS_PAGES` is a REFUSAL THRESHOLD, not an allocation.** The compiler reserves nothing; it
-  declines to emit an object leaving less than 4K, and the program gets whatever is left. That is
-  why `FREE` IS the workspace. The workspace is a two-ended heap -- variables and arrays growing UP
-  from `storeStartHigh`, strings growing DOWN from `storeEndHigh` (`clr.asm`, `ClearMemory`) -- and
-  **the editor genuinely uses it**: `FREE 6144`, with a documented history of string-heap `OUT OF
-  MEMORY`. Lowering the floor frees nothing. It removes a guard rail, turning a clean compile-time
-  `PROGRAM TOO BIG` into a run-time `OUT OF MEMORY` further down the road. It is the right lever
-  for a program **big in code and small in data**, which the editor is not.
-- **The frame stack is where the DEAD space is.** Eight deep through dispatch -> command ->
-  `GUI.OPEN` -> `STASH.SAVE`, plus a few nested FORs, is a couple of hundred bytes against 4,096 --
-  roughly **3.8 KB idle**, converted directly into code space.
-
-**MEASURE IT FIRST, BY PAINTING THE GAP.** Nothing measures frame depth today, so every "1 KB is
-plenty" claim here is arithmetic about frame sizes, not observation -- and that is the entire risk
-of the option. A high-water mark would tax every `StackOpenFrame`; **painting does not**. Fill the
-gap with a known byte in `ResetRuntimeStack` (`clr.asm`), which already knows both ends, and report
-the untouched run. One-time cost at start, nothing per GOSUB, and it turns the judgement call into
-a number. Worth having on its own.
-
-**The fourth value needs a channel, because `A`/`X`/`Y` are all spent.** `bootstrap.asm` hands over
-`A` = p-code page, `X` = workspace start, `Y` = workspace end, then `jmp RT_ENTRY`. A fixed byte at
-a known offset from `RTBASE` settles it -- the magic is `RTBASE+0..3` and `jmp StartRuntime` is
-`RTBASE+4..6`, so **`RTBASE+7` is free** -- and the bootstrap can store there before the jump
-without touching the register contract. `StartRuntime` then reads it instead of `sbc
-#FrameStackPages`.
-
-**The `RT_ABI` bump is the SAFETY MECHANISM, not bookkeeping.** It is the only thing stopping a
-small-gap program entering a runtime assembled at 16 and getting `stackFloorHigh` twelve pages
-INSIDE its own object code -- check passes, recursion descends into the program, it overwrites
-itself and executes what it wrote.
-
-**Two numbers to re-measure before quoting either.** `ObjectBase` is **`$3c00`** now, not the
-`$3b00` the arithmetic above uses -- `source/application/rtimage.gen.asm` is regenerated on every
-runtime build and says so. `$9F00 - $3c00` is 99 pages, less 16 + 16, so the ceiling is **67 pages,
-17,152 bytes**, one page below the 17,408 stated above. The measured filler-line table was taken
-before that moved.
-
-**Also missing: a runaway-recursion fixture.** The floor guard has no test. Whatever value the
-option ends up allowing, "a deep enough recursion still reports `OUT OF MEMORY` and does not
-corrupt the object" is the test that matters, and it does not exist yet.
-
-Other files this touches: `common.inc` (the constant), `object.asm` (both `adc #FrameStackPages`
-sites), `control.asm` -- note `CFLineCount = 4` and `ReadControlFile`'s blanking loop depends on
-the four lines being exactly 256 bytes, so a fifth line means reworking it or overloading line 4
-beside the mode -- `GPC.BASL` for the prompt, and `source/unit-tests/shared-runtime/shared_test.py`,
-which hardcodes `FRAME_STACK_PAGES = 16` and checks the handoff opcodes byte by byte.
-
-### Arrays into a bank — the other lever on max program size
+### Arrays into a bank — a lever on max program size
 
 Asked 2026-09-06, out of the Paradoxon Basic question: the C64 trick of paging a ROM away to reach
 the RAM underneath has no analogue here, because nothing is under `$C000`-`$FFFF` but more ROM. The
@@ -2884,7 +2793,12 @@ Two things fall out of it:
   under *A MASTER COMPILER* below). Four palettes roughly doubles `THEME`'s 45 lines. If that reads
   as too much, the alternative is one indexed table rather than four branches of assignments.
 
-### The end-of-compile report wants more than three numbers — BEFORE RELEASE
+### The end-of-compile report wants more than three numbers — DONE 2026-09-14
+
+Built in `memreport.asm`. The report is a short block, one item a line: `LOW CODE`, `LOW FREE` with the
+frame stack beside it, the runtime, `LINES`, `DEAD CODE`, a `BANK` line for each bank, and
+`TOTAL BANKS`. `GP-BASIC.md` §7 shows it. The request below is kept as written; only the removed-lines
+bullet is still open.
 
 `source/application/source/compiler/memreport.asm` prints one line after OK:
 
@@ -2908,7 +2822,7 @@ Wanted, at minimum:
   conditional; a program with regions has a fourth number and there is nowhere to put it. Decide
   whether the report stays one line and grows, or becomes a short block. A block is the honest
   answer once banks are in it, and the compiler is not printing this in a loop.
-- **Dead code on its own line, in words — WRITTEN 2026-09-13, not yet run.** It was two bare numbers on the end of the line,
+- **Dead code on its own line, in words — DONE.** It was two bare numbers on the end of the line,
   `... RT SHARED RT DEAD 74 646`, and nothing said the first was lines and the second bytes. It now
   prints on a new line:
 
@@ -2927,9 +2841,7 @@ Wanted, at minimum:
   output by routine (`LINEINPUT.ASK  LINEINPUT.INC.BL 164-169  6 lines`). A stale `.SYM` shifts the
   lines; the self-test catches that. Prog8 has no such util.
 
-`FREE` already excludes the 4K frame stack gap, which is correct and should stay — but the report
-should say so, because a number that is deliberately 4,096 short of the arithmetic looks like a bug
-to anyone checking it. See [Blitz runtime slack and limits](docs/memory/gpc-blitz-runtime-slack-and-limits.md)
+`LOW FREE` excludes the 2K frame stack, and the report prints the frame stack beside it. See [Blitz runtime slack and limits](docs/memory/gpc-blitz-runtime-slack-and-limits.md)
 for what the ceilings actually are, and the standing rule that a build-side cap is a bug, not a spec.
 
 ### `BASLOAD-GPC` wants the same report — BEFORE RELEASE, once it is done

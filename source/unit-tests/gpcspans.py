@@ -118,7 +118,7 @@ print("%s: %d BASIC lines, %d labels, self-check %d of %d pairs, %d lines unmapp
       % (name, total, len(anchors), agree, pairs, len(unmapped)))
 
 #   The dots.
-p1, p2, ok = log.find(b"PASS 1 "), log.find(b"PASS 2 "), log.find(b"OK CODE")
+p1, p2, ok = log.find(b"PASS 1 "), log.find(b"PASS 2 "), log.find(b"OK LOW CODE")
 t_p1, t_p2, t_ok = arrival(p1), arrival(p2), arrival(ok)
 run = re.match(rb"\.*", log[p1 + 7:]).group(0)
 dots = [arrival(p1 + 7 + i) for i in range(len(run))]

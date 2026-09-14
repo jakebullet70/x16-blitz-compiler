@@ -119,7 +119,7 @@ def compile_one(source, obj, mapfile="", shared=True):
 								 cwd=TESTING, stdout=log, stderr=subprocess.STDOUT, env=env)
 			try:
 				#
-				#		STOP ON "OK CODE" AND NOTHING ELSE.
+				#		STOP ON "OK LOW CODE" AND NOTHING ELSE.
 				#
 				#		The old stop condition was "the object exists and has not grown for 0.6s",
 				#		and the TWO-PASS COMPILER retired it: pass two writes the object AS it
@@ -137,7 +137,7 @@ def compile_one(source, obj, mapfile="", shared=True):
 				#		written: waiting out TIMEOUT there costs seven minutes and tells you
 				#		nothing the log did not already say. So the second stop condition is a
 				#		READY. AFTER THE BANNER -- the one BASIC prints at boot sits above it,
-				#		and a successful run is claimed by "OK CODE" in the test above before
+				#		and a successful run is claimed by "OK LOW CODE" in the test above before
 				#		this one is reached. The lines between the banner and that READY. are
 				#		the compiler's own account of the failure, so they go in the message.
 				#
@@ -151,7 +151,7 @@ def compile_one(source, obj, mapfile="", shared=True):
 							echo = r.read()
 					except OSError:
 						continue
-					if b"OK CODE" in echo:
+					if b"OK LOW CODE" in echo:
 						finished = True
 						time.sleep(1.5)			# let the last write and the map land
 						break

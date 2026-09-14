@@ -1,6 +1,6 @@
 # Compiler work — status
 
-Updated 14 September 2026, on `main` after commit `cd57bab`. GPC is V1.1 on runtime 122. This file replaces `COMPILER-HANDOFF.md`, written at `3804728`.
+Updated 14 September 2026, on `main` at the banked `GP.ASM` commit, after `d9693da`. GPC is V1.1 on runtime 122. This file replaces `COMPILER-HANDOFF.md`, written at `3804728`.
 
 Read this, then `## Compiler work — what is next, ranked` in `TODO.md` (line ~831). That list is
 the index of what comes next; this file is the state of the tree and how to work in it.
@@ -9,7 +9,14 @@ the index of what comes next; this file is the state of the tree and how to work
 
 ## 1. State of the tree
 
-- **Last compiler change: a GOTO into a region from outside it is refused.** `GOTO`, `GO TO`,
+- **Built, tested and committed 2026-09-14.** A `GP.ASM` blob inside a `GP.BANKED` region is assembled
+  into the region's bank, and `GP.ASM LOW` keeps one in low memory (`gpasm.asm`, `gpasmcode.asm`).
+  A banked blob with a direct store to `$00` stops the compile. A call out of a region to low
+  memory is a `.bgosub` with the region's own bank (`GPBankCallInto`), and an `ON n GOSUB` that
+  would need a `.bgosub` is refused (`on.asm`). The end-of-compile report prints one item a line
+  (`memreport.asm`). `NO SYMBOL FILE FOR {}` is renamed `{} NEEDS #SYMFILE`. The frame stack is
+  2K (`FrameStackPages = 8`).
+- **The compiler change before it: a GOTO into a region from outside it is refused.** `GOTO`, `GO TO`,
   `IF .. GOTO`, `IF .. THEN <line>` and `ON .. GOTO` into a `GP.BANKED` region, from low memory or
   from another region, stop the compile with `NOT IMPLEMENTED` in pass one. `GPBankGotoGuard` in
   `gpbank.asm` compares the bank of the target line with the bank of the current line;
@@ -24,22 +31,25 @@ the index of what comes next; this file is the state of the tree and how to work
   in `source/compiler/source/commands/gpbank.asm`. The `X.BANK.INC.BL` twins and the
   `SHIM.*BANK.INC.BL` files are deleted from both library copies. Record:
   `docs/memory/compiler-emitted-bank-switch.md`.
-- **Refused with `NOT IMPLEMENTED`:** `ON n GOSUB` to a label in a region, because an `ON` entry is
-  3 bytes and a `.bgosub` 4, and any `GOTO` into a region from outside it. `RESTORE` to a `DATA`
-  line inside a region is not checked.
-- **Sizes:** `GPC.BIN` is 29,252 B. The embedded core grew 12 B and has 4 B left before `GPBase`
-  moves off `$3700`. GPBMODS builds with an 11,619 B resident object (was 12,885), GUIFRMT with
-  3,538 B (was 4,098).
+- **Refused:** any `GOTO` into a region from outside it, with `NOT IMPLEMENTED`. `ON n GOSUB` into
+  a region, out of one to low memory, or between two regions, with
+  `ON GOSUB IN OR OUT OF GP.BANKED`, because an `ON` entry is 3 bytes and a `.bgosub` 4. `RESTORE`
+  to a `DATA` line inside a region is not checked.
+- **Sizes:** `GPC.BIN` is 30,345 B (29,252 B at the GOTO guard). The embedded core grew 12 B at
+  `cd57bab` and has 4 B left before `GPBase` moves off `$3700`. GPBMODS reports `LOW CODE 11264`
+  with 202 dead lines (1,305 B) and 8 banks, 29,696 B used (`GP-BASIC.md` §7). At the merge,
+  GPBMODS's resident object was 11,619 B (was 12,885) and GUIFRMT's 3,538 B (was 4,098).
 - **Before that:** the `GP.FN` string fix (`c55831e`), and `GP.ASM` reading the symbol file once a
   compile into RAM banks 13 and 14 (`798cfa7`, GPBMODS 317 s to 19.8 s). A slow GPBMODS or RGM
   compile now has a new cause; do not re-profile the symbol lookup first.
-- **GPC.BIN copies:** `source/application/`, `testing/` and `samples/GPC-HELP/` hold the guard build,
-  29,252 B, MD5 `2647c404…`. The runtime files built with it on 13 September (`GPC.RT.122.BIN`,
+- **GPC.BIN copies:** `source/application/` and `testing/` hold the current build, 30,345 B, MD5
+  `bf14df40…`. `samples/GPC-HELP/` still holds the guard build, 29,252 B, MD5 `2647c404…`. The runtime files built with it on 13 September (`GPC.RT.122.BIN`,
   `GPB.RT.122.BIN` and `GPC.IMG.122.BIN`) are in `testing/` and `samples/GPC-HELP/`.
   `samples/GPC-HELP/GPB.HELP.PRG` has not been rebuilt since. The copies under `release/TMP/` and
   `work/` are older, and both places are ignored.
-- **Test references:** `gpctest.py full` passed on 14 September with the GOTO guard build in 181 s,
-  and `banktest3.py` ALL PASS in 190 s.
+- **Test references:** `gpctest.py full` passed on 14 September with the banked `GP.ASM` build in
+  152 s, all 34 references matching. The two `#SYMFILE` messages changed after it, text only.
+  `banktest3.py` last passed, ALL PASS in 190 s, on the GOTO guard build.
   The GPBMODS and GUIFRMT inputs in `work/dcref/inputs/` are the merged sources, and their
   references were rebuilt with `acf427f1…`. The pre-merge inputs are kept in
   `work/dcref/inputs-premerge/`. The RGL, RGN and RGM inputs were refreshed for the guard and their
@@ -58,16 +68,16 @@ From the ranked list in `TODO.md`, with anything added since:
 | # | item | state |
 |---|---|---|
 | 0 | `GP.FN` string aliasing | FIXED 2026-09-13: `""` concatenated into a temporary, 3 B a string call site |
-| 1 | Banked `GP.ASM` | costed at ~58 runtime bytes against 511 of headroom; waiting on a yes. `.bgosub` banks p-code only, and a `SYS` into a banked blob selects nothing |
+| 1 | Banked `GP.ASM` | DONE 2026-09-14. A blob inside a region runs from the region's bank with no runtime change; `GP.ASM LOW` keeps one in low memory |
 | 2 | Selective handler inclusion | largest lever on program size; `## Shrinking the runtime` |
 | 3 | Dead-code elimination | BUILT in V1.1. Plan: `docs/blitz/DEAD-CODE-ELIMINATION.PLAN.md` |
-| 4 | Compiler emits the bank switch; delete the two-file module split | DONE 2026-09-14, `cd57bab`. A `GOTO` into a region from outside it is refused since, by `GPBankGotoGuard`. Possible extra: a call out of a region as `.bgosub` with its own bank |
+| 4 | Compiler emits the bank switch; delete the two-file module split | DONE 2026-09-14, `cd57bab`. A `GOTO` into a region from outside it is refused since, by `GPBankGotoGuard`. A call out of a region to low memory is a `.bgosub` with the region's own bank, also 2026-09-14 |
 | 5 | Pass one progress output | DONE 2026-09-13 |
 | — | Compiler tests in two tiers | DONE 2026-09-13. `docs/blitz/COMPILER-TESTS.PLAN.md` |
 | — | GP.ASM `{VAR}` lookup speed | FIXED 2026-09-13 |
-| — | End-of-compile report: lines compiled, banks used per bank | `TODO.md` line ~919, BEFORE RELEASE |
-| — | Show removed lines as source file and line | not started; `TODO.md` line ~921 and section 5 below |
-| — | `BASLOAD-GPC` end-of-run report in the same shape | `TODO.md` line ~923, after the compiler's report is settled |
+| — | End-of-compile report: lines compiled, banks used per bank | DONE 2026-09-14. `memreport.asm` |
+| — | Show removed lines as source file and line | not started; the unranked items in `TODO.md`'s ranked list, and section 5 below |
+| — | `BASLOAD-GPC` end-of-run report in the same shape | not started; `TODO.md` `### BASLOAD-GPC wants the same report` |
 
 ## 3. Building
 

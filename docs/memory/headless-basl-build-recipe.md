@@ -73,7 +73,7 @@ which reads exactly like a missing BASLOAD or a broken harness. Three cycles wen
 **`#SYMFILE` MUST COME BEFORE THE `#INCLUDE`s.** After them BASLOAD stops with `SYMFILE NOT
 ALLOWED IN <file>:<line>` and writes the same 6-byte PRG. And it is not optional whenever any
 included module uses a `{VAR}` operand in `GP.ASM` -- STASH does -- or GPC stops at
-`NO SYMBOL FILE FOR {} @ <line>`, prints an empty `OUT:` and falls out to BASIC with a
+`{} NEEDS #SYMFILE @ <line>`, prints an empty `OUT:` and falls out to BASIC with a
 `?STRING TOO LONG ERROR`, which names neither the file nor the cause. Found 03/09/26 on
 `GPC-BASIC/GUI.EXP.BL`, which had **never** been buildable since GUI.OPEN started calling
 STASH.SAVE: no `#SYMFILE` and no `#INCLUDE "STASH.INC.BL"`. Read the raw `CMP.LOG`, not the
@@ -83,7 +83,7 @@ summary -- the real message is two lines above the BASIC error.
 the source's `.PRG` with `.SYM`, so `#SAVEAS "@:X.SRC.PRG"` needs `#SYMFILE "@:X.SRC.SYM"` --
 `GPB.HELP.BASL` is the model, `COLORTST.BASL` has the mismatch and only escapes it by using no
 `{VAR}`. Get it wrong and the tokenise succeeds and writes the SYM; the COMPILE then stops with
-`NO SYMBOL FILE FOR {} @ 98`, naming a line inside `STASH.INC.BL` and saying nothing about a file
+`{} NEEDS #SYMFILE @ 98`, naming a line inside `STASH.INC.BL` and saying nothing about a file
 name. Cost the first build of `samples/GPB-MODS-TESTING`, 05/09/26.
 
 **`cp GPC-BASIC/*.INC.BL testing/` CAN OVERWRITE THE KEYWORD FILE WITH A STALE ONE.**

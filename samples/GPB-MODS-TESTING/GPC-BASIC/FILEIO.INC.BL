@@ -23,7 +23,7 @@
 ## **      #SYMFILE "@:MYPROG.SYM"   <- required, before the #INCLUDEs.
 ## **
 ## **  FILE.TOPET is GP.ASM and reaches FILE.PETP% through {VAR}. Without a
-## **  #SYMFILE the compile stops at NO SYMBOL FILE FOR {}.
+## **  #SYMFILE the compile stops at {} NEEDS #SYMFILE.
 ## **
 ## **   in   FILE.NAME$     the file acted on
 ## **        FILE.NEW$      the second name, RENAME and COPY

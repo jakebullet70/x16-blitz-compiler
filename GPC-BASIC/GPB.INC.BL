@@ -358,7 +358,7 @@
 ## >>
 ## >>   #SYMFILE "@:PROG.SYM"        named to match the PRG -- PROG.PRG reads PROG.SYM
 ## >>
-## >> Miss it and the compile stops with NO SYMBOL FILE FOR {}. And {VAR} never CREATES
+## >> Miss it and the compile stops with {} NEEDS #SYMFILE. And {VAR} never CREATES
 ## >> a variable, so assign it in BASIC first, even M% = 0, or you get UNKNOWN VARIABLE
 ## >> IN {}. See ASM.EXP.BL.
 ##

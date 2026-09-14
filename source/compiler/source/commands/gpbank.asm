@@ -124,6 +124,7 @@ CommandGPEndBankedCompile:
 		jsr 	GPBankCheckAlone
 		lda 	#2
 		sta 	gpBankState
+		jsr 	GPBankAsmClose 				; the GP.ASM this region carries in its own bank
 		lda 	passNumber 					; pass two keeps pass one's table -- see the note on
 		bne 	GPBankClosePassTwo 			; CommandGPBankedCompile above
 		lda 	gpBankCount
@@ -441,6 +442,8 @@ _GBRPass:
 		clc
 		lda 	gpBankLength
 		adc 	#4
+		clc 								; ...and its GP.ASM, above the end marker
+		adc 	gpBankAsmLen
 		sta 	gpBankTemp
 		sec
 		lda 	#0
@@ -473,6 +476,13 @@ _GBRNoFill:
 		sta 	gpBankRoom
 		lda 	gpBankRoom+1
 		adc 	#0
+		sta 	gpBankRoom+1
+		clc 								; and the region's GP.ASM, which pass two copies in as
+		lda 	gpBankRoom 					; each blob closes
+		adc 	gpBankAsmLen
+		sta 	gpBankRoom
+		lda 	gpBankRoom+1
+		adc 	gpBankAsmLen+1
 		sta 	gpBankRoom+1
 		lda 	gpBankRoom 					; PASS ONE'S BOOKKEEPING, not p-code: pass two writes
 		ldy 	gpBankRoom+1 				; the bridges and the markers instead, and neither is
@@ -566,6 +576,13 @@ _GBRoomDone:
 		sta 	gpBankTemp
 		lda 	gpBankLength+1
 		adc 	#0
+		sta 	gpBankPages
+		clc 								; the region's GP.ASM is in its pages too
+		lda 	gpBankTemp
+		adc 	gpBankAsmLen
+		sta 	gpBankTemp
+		lda 	gpBankPages
+		adc 	gpBankAsmLen+1
 		sta 	gpBankPages
 		lda 	gpBankTemp 					; a part page needs one more
 		beq 	_GBRWholePages
@@ -692,6 +709,10 @@ _GBRLoadRegion:
 		sta 	gpBankLineOut
 		lda 	gpBankLinesOut+1,x
 		sta 	gpBankLineOut+1
+		lda 	gpBankAsmLens,x
+		sta 	gpBankAsmLen
+		lda 	gpBankAsmLens+1,x
+		sta 	gpBankAsmLen+1
 		rts
 
 _GBRSaveRegion:
@@ -1067,6 +1088,29 @@ _GBADone:
 
 ; ************************************************************************************************
 ;
+;		GP.ENDBANKED: the region's banked GP.ASM is complete. Pass one records its length for
+;		GPBankRelocate, which puts it above the region's end marker; both passes start the next
+;		region's count from zero. See AsmBankBlob in commands/gpasmcode.asm.
+;
+; ************************************************************************************************
+
+GPBankAsmClose:
+		lda 	passNumber
+		bne 	_GBAKZero
+		lda 	gpBankCount
+		asl 	a
+		tax
+		lda 	AsmRgnLen
+		sta 	gpBankAsmLens,x
+		lda 	AsmRgnLen+1
+		sta 	gpBankAsmLens+1,x
+_GBAKZero:
+		stz 	AsmRgnLen
+		stz 	AsmRgnLen+1
+		rts
+
+; ************************************************************************************************
+;
 ;		STRMakeOffset, plus the correction a branch needs when exactly one of its ends is in the
 ;		banked region. YA is the target on the way in and the finished offset on the way out, so
 ;		it drops straight into the branch writer in place of STRMakeOffset.
@@ -1271,7 +1315,11 @@ _GBGGRefused:
 ;
 ;		Either one leaves branchOpcode as PCD_CMD_BGOSUB and the bank in branchBank, or changes
 ;		nothing. NOTHING CHANGES FOR A CALL INSIDE ONE REGION: its bank is selected already, and
-;		a plain call is a byte shorter. A call out of a region to low memory stays plain too.
+;		a plain call is a byte shorter.
+;
+;		A CALL OUT OF A REGION TO LOW MEMORY IS A .bgosub WITH THE REGION'S OWN BANK. Selecting
+;		it costs nothing, and RETURN puts it back, so a low routine that does BANK n returns
+;		into the region under the right bank.
 ;
 ;		THE CALLER'S REGION IS FOUND BY ITS LINE NUMBER, in the same table, and not by
 ;		gpBankState and gpBankNumber. GP.BANKEDSTR reads its own bank into gpBankNumber, so a
@@ -1298,19 +1346,49 @@ GPBankAddressCall:
 		ldy 	branchTarget+1
 		jsr 	GPBankSide 					; the region + 1, or 0
 		tax
-		beq 	GPBankCallOut
+		beq 	_GBACOpen
 		lda 	gpBankBanks-1,x
+		bra 	GPBankCallInto
 ;
-;		A is the target's bank, 0 for low memory, and the flags are still A's.
+;		PASS ONE CANNOT SEE THE REGION STILL OPEN, so GPBankSide calls a body in it low memory.
+;		Pass two sees every region, so a body at or above the open region's start is in it.
+;
+_GBACOpen:
+		lda 	passNumber
+		bne 	_GBACLow
+		lda 	gpBankState
+		cmp 	#1
+		bne 	_GBACLow
+		lda 	gpBankCount
+		asl 	a
+		tax
+		lda 	branchTarget+1
+		cmp 	gpBankStarts+1,x
+		bcc 	_GBACLow
+		bne 	_GBACInOpen
+		lda 	branchTarget
+		cmp 	gpBankStarts,x
+		bcc 	_GBACLow
+_GBACInOpen:
+		ldx 	gpBankCount
+		lda 	gpBankBanks,x
+		bra 	GPBankCallInto
+_GBACLow:
+		lda 	#0
+;
+;		A is the target's bank, 0 for low memory.
 ;
 GPBankCallInto:
-		beq 	GPBankCallOut 				; a call to low memory stays plain
 		sta 	branchBank
 		lda 	currentLineNumber 			; the caller's own region, whose bank is already the
 		ldy 	currentLineNumber+1 		; one selected
 		jsr 	GPBankLineBank
 		cmp 	branchBank
-		beq 	GPBankCallOut
+		beq 	GPBankCallOut 				; the same bank, or low memory to low memory
+		ldx 	branchBank
+		bne 	_GBCIBank 					; into a region: its bank
+		sta 	branchBank 					; out of a region into low memory: the caller's own
+_GBCIBank:
 		lda 	#PCD_CMD_BGOSUB
 		sta 	branchOpcode
 GPBankCallOut:
@@ -1539,6 +1617,10 @@ gpBankPageCounts:								; pages of each, for the bootstrap's table
 		.fill 	GPBANK_MAXREGIONS
 gpBankCrossings:								; what a branch crossing INTO each one is out by
 		.fill 	GPBANK_MAXREGIONS
+gpBankAsmLens:									; bytes of GP.ASM each carries above its end marker
+		.fill 	GPBANK_MAXREGIONS * 2
+gpBankAsmLen:									; ...and the one GPBankRelocate is moving
+		.fill 	2
 		.send 	code
 
 ; ************************************************************************************************

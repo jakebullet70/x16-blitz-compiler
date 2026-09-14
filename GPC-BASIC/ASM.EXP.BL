@@ -57,7 +57,7 @@ PRINT
 ## character names on a two character BASIC -- but keeps REM text byte for byte, the
 ## very property that lets an assembly body survive. So the code says A% and the REM
 ## still says {N%}; #SYMFILE writes that mapping down. Name it to match the PRG, ASM.PRG
-## reading ASM.SYM, or the compile stops with NO SYMBOL FILE FOR {}.
+## reading ASM.SYM, or the compile stops with {} NEEDS #SYMFILE.
 ##
 ## M% IS ASSIGNED FIRST ON PURPOSE: {VAR} never CREATES a variable, the opposite of an
 ## ordinary BASIC reference, so an unused name is UNKNOWN VARIABLE IN {}.

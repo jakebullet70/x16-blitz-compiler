@@ -22,7 +22,7 @@
 ## ***********************************************************************
 ## STASH.INC.BL reaches BASIC's variables from assembly through {VAR}, and
 ## that needs BASLOAD's record of the crunched names. Without this line the
-## compile stops with "NO SYMBOL FILE FOR {}".
+## compile stops with "{} NEEDS #SYMFILE".
 #SYMFILE "@:MENU.SYM"
 #INCLUDE "GPB.INC.BL"
 ## THE LIBRARY IN LOW MEMORY. To run a module below from a RAM bank instead,

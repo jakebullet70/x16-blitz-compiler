@@ -1581,6 +1581,8 @@ ResetPassState:
 		;
 		stz 	AsmPoolLen
 		stz 	AsmPoolLen+1
+		stz 	AsmRgnLen 					; ...and the banked blobs of the region open, if any
+		stz 	AsmRgnLen+1
 		;
 		;		GP.BANKEDSTR, the same way: the group tables and the string pool are rebuilt from
 		;		scratch by each pass and must come out identical, because the constants pass one
@@ -7166,6 +7168,7 @@ CommandAsmCompile:
 											; opener leaves its closer behind and corrupts the
 											; nesting of any block enclosing it, silently.
 		stz 	AsmBodyLines
+		jsr 	AsmReadLow 					; LOW, and so whether the blob goes into a region's bank
 		jsr 	AsmOpenBlock 				; remember where this blob starts in the pool
 		jsr 	AsmRequireEOL 				; GP.ASM is alone on its line
 
@@ -7225,6 +7228,82 @@ AsmRequireEOL:
 		rts
 _ARENotEOL:
 		.error_syntax
+
+;
+;		GP.ASM LOW keeps the blob in the low pool. Without it a blob inside a GP.BANKED region
+;		goes into the region's bank (AsmBankBlob, gpasmcode.asm). Outside a region LOW does
+;		nothing.
+;
+;		BASLOAD CRUNCHES THE WORD like any other name, so it arrives as whatever #SYMFILE says
+;		LOW became. A tokeniser that does not crunch leaves it as written. Both are accepted.
+;		Without a #SYMFILE the crunched name cannot be read back, and that stops the compile.
+;
+AsmReadLow:
+		stz 	AsmBanked
+		ldx 	#0
+		jsr 	LookNextNonSpace
+		beq 	_ARLNotLow 					; GP.ASM alone
+		jsr 	CharIsAlpha
+		bcc 	_ARLNotLow 					; not a word: AsmRequireEOL refuses it
+_ARLChar:
+		jsr 	LookNext
+		jsr 	CharIsAlpha
+		bcs 	_ARLTake
+		jsr 	CharIsDigit
+		bcc 	_ARLEnd
+_ARLTake:
+		cpx 	#3
+		bcs 	_ARLBad 					; longer than LOW
+		sta 	AsmLowText,x
+		inx
+		jsr 	GetNext
+		bra 	_ARLChar
+_ARLEnd:
+		stz 	AsmLowText,x
+		ldx 	#3
+_ARLLiteral:
+		lda 	AsmLowText,x
+		cmp 	AsmLowWord,x
+		bne 	_ARLCrunched
+		dex
+		bpl 	_ARLLiteral
+		rts 								; LOW as written
+_ARLCrunched:
+		ldx 	#3
+_ARLName:
+		lda 	AsmLowWord,x
+		sta 	AsmSymName,x
+		dex
+		bpl 	_ARLName
+		lda 	#BLC_SYMLOOKUP
+		jsr 	CallAPIHandler
+		bcs 	_ARLNoSym
+		lda 	AsmLowText+2 				; a crunched name is one or two characters
+		bne 	_ARLBad
+		lda 	AsmLowText
+		cmp 	AsmSymCrunched
+		bne 	_ARLBad
+		lda 	AsmLowText+1
+		cmp 	AsmSymCrunched+1
+		bne 	_ARLBad
+		rts 								; LOW, crunched
+_ARLNotLow:
+		lda 	gpBankState 				; 1 = inside a GP.BANKED region
+		cmp 	#1
+		bne 	_ARLDone
+		inc 	AsmBanked
+_ARLDone:
+		rts
+_ARLNoSym:
+		cmp 	#0 							; A = 0: no symbol file, 1: LOW is not in it
+		bne 	_ARLBad
+		jsr 	CallErrorHandler
+		.text 	"GP.ASM LOW NEEDS #SYMFILE", 0
+_ARLBad:
+		.error_syntax
+
+AsmLowWord:
+		.text 	"LOW", 0
 
 		.send code
 
@@ -7424,6 +7503,7 @@ AsmOpenBlock:
 AsmCloseBlock:
 		lda 	#$60 						; RTS
 		jsr 	AsmPoolWrite
+		jsr 	AsmRunBase 					; where this blob runs, which its label references need
 		jsr 	AsmResolveLocals 			; every branch and label reference in this block
 
 		lda 	#PCD_CMD_WORD 				; .word <blob address>
@@ -7449,27 +7529,23 @@ AsmCloseBlock:
 		jsr 	WriteCodeByte
 
 		.keyword PCD_SYS 					; $DD $B0 -- call it
-		clc
-		rts
+		jmp 	AsmBankBlob
 ;
 ;		PASS TWO KNOWS THE ANSWER HERE. The pool's base was settled at the end of pass one and
 ;		so was the page the object runs at, so the blob's run address is arithmetic rather than
 ;		something to come back to -- which is what matters, because pass two's object goes
 ;		straight out and there is nothing to come back to.
 ;
-;		AN ABSOLUTE ADDRESS, NOT AN OFFSET, so a call from inside a GP.BANKED region needs no
-;		correction: the pool stays in low memory and the region reaches it from $A000 exactly as
-;		low code does.
+;		AN ABSOLUTE ADDRESS, NOT AN OFFSET. A low blob is reached from $A000 exactly as from low
+;		code, and a banked blob sits in the same bank as the p-code calling it -- AsmRunBase.
 ;
 _ACBResolve:
 		clc
-		lda 	AsmPoolBase
-		adc 	AsmBlobStart
+		lda 	AsmBlobStart
+		adc 	AsmRunAdj
 		sta 	AsmBlobAddr
-		lda 	AsmPoolBase+1
-		adc 	AsmBlobStart+1
-		clc
-		adc 	AsmPageDelta
+		lda 	AsmBlobStart+1
+		adc 	AsmRunAdj+1
 		sta 	AsmBlobAddr+1
 		lda 	AsmBlobAddr
 		jsr 	WriteCodeByte
@@ -7477,6 +7553,158 @@ _ACBResolve:
 		jsr 	WriteCodeByte
 
 		.keyword PCD_SYS 					; $DD $B0 -- call it
+		jmp 	AsmBankBlob
+
+; ************************************************************************************************
+;
+;		A BLOB INSIDE A GP.BANKED REGION RUNS FROM THE REGION'S OWN BANK, unless it says
+;		GP.ASM LOW. The region's p-code does the SYS with its bank already selected, so the blob
+;		costs no runtime bytes to reach.
+;
+;		IT GOES IN AFTER THE REGION'S END MARKER, blob after blob in source order. AsmRgnLen is
+;		how much of that the open region has so far, which is where this one starts.
+;
+;		IT LEAVES THE POOL, so the pool only ever holds low blobs and AsmFlushPool is unchanged.
+;		Pass one only needs its length: GPBankRelocate makes room for all of them at once.
+;		Pass two copies it into the region's bank, which is random access, and puts the cursor
+;		back where the region's p-code is up to. The bytes are skipped from the sum, as the room
+;		pass one made for them is.
+;
+; ************************************************************************************************
+
+AsmBankBlob:
+		lda 	AsmBanked
+		bne 	_ABBBanked 					; a low blob stays in the pool
+		rts
+_ABBBanked:
+		sec
+		lda 	AsmPoolLen
+		sbc 	AsmBlobStart
+		sta 	AsmCopyLen
+		lda 	AsmPoolLen+1
+		sbc 	AsmBlobStart+1
+		sta 	AsmCopyLen+1
+		lda 	passNumber
+		bne 	_ABBWrite
+		jmp 	_ABBCount 					; pass one: only the length
+_ABBWrite:
+		lda 	objPtr
+		sta 	AsmSaveObj
+		lda 	objPtr+1
+		sta 	AsmSaveObj+1
+		lda 	nextRegion 					; one past the end marker, plus the blobs before it
+		asl 	a
+		tax
+		sec
+		lda 	gpBankEnds,x
+		adc 	AsmRgnLen
+		sta 	objPtr
+		lda 	gpBankEnds+1,x
+		adc 	AsmRgnLen+1
+		sta 	objPtr+1
+		lda 	AsmCopyLen
+		ldy 	AsmCopyLen+1
+		jsr 	SumSkipYA
+		clc
+		lda 	#AsmPool & $FF
+		adc 	AsmBlobStart
+		sta 	zTemp2
+		lda 	#AsmPool >> 8
+		adc 	AsmBlobStart+1
+		sta 	zTemp2+1
+		stz 	AsmCopyIdx
+		stz 	AsmCopyIdx+1
+_ABBLoop:
+		lda 	AsmCopyIdx
+		cmp 	AsmCopyLen
+		lda 	AsmCopyIdx+1
+		sbc 	AsmCopyLen+1
+		bcs 	_ABBCopied
+		.asm_access 						; the window closes before WriteCodeByte, as in
+		lda 	(zTemp2) 					; AsmFlushPool
+		sta 	AsmByte
+		.asm_release
+		lda 	AsmByte
+		jsr 	WriteCodeByte
+		inc 	zTemp2
+		bne 	_ABBNoCarry
+		inc 	zTemp2+1
+_ABBNoCarry:
+		inc 	AsmCopyIdx
+		bne 	_ABBLoop
+		inc 	AsmCopyIdx+1
+		bra 	_ABBLoop
+_ABBCopied:
+		lda 	AsmSaveObj
+		sta 	objPtr
+		lda 	AsmSaveObj+1
+		sta 	objPtr+1
+_ABBCount:
+		clc
+		lda 	AsmRgnLen
+		adc 	AsmCopyLen
+		sta 	AsmRgnLen
+		lda 	AsmRgnLen+1
+		adc 	AsmCopyLen+1
+		sta 	AsmRgnLen+1
+		lda 	AsmBlobStart
+		sta 	AsmPoolLen
+		lda 	AsmBlobStart+1
+		sta 	AsmPoolLen+1
+		rts
+
+; ************************************************************************************************
+;
+;		Pass two: AsmRunAdj is what a pool offset in this blob adds to become its run address.
+;
+;			low 		the pool's base in the object, plus the page delta to where it runs
+;			banked 		$A000, plus the region's p-code and end marker, plus AsmRgnLen, less
+;						where the blob starts in the pool
+;
+;		gpBankEnds is one past the region's exit bridge, and the end marker is the byte after.
+;
+; ************************************************************************************************
+
+AsmRunBase:
+		lda 	passNumber
+		beq 	_ARBDone
+		lda 	AsmBanked
+		bne 	_ARBBanked
+		lda 	AsmPoolBase
+		sta 	AsmRunAdj
+		clc
+		lda 	AsmPoolBase+1
+		adc 	AsmPageDelta
+		sta 	AsmRunAdj+1
+		rts
+_ARBBanked:
+		lda 	nextRegion
+		asl 	a
+		tax
+		sec
+		lda 	gpBankEnds,x
+		sbc 	gpBankStarts,x
+		sta 	AsmRunAdj
+		lda 	gpBankEnds+1,x
+		sbc 	gpBankStarts+1,x
+		sta 	AsmRunAdj+1
+		sec 								; +1, the end marker
+		lda 	AsmRunAdj
+		adc 	AsmRgnLen
+		sta 	AsmRunAdj
+		lda 	AsmRunAdj+1
+		adc 	AsmRgnLen+1
+		sta 	AsmRunAdj+1
+		sec
+		lda 	AsmRunAdj
+		sbc 	AsmBlobStart
+		sta 	AsmRunAdj
+		lda 	AsmRunAdj+1
+		sbc 	AsmBlobStart+1
+		clc
+		adc 	#$A0
+		sta 	AsmRunAdj+1
+_ARBDone:
 		rts
 
 ; ************************************************************************************************
@@ -7505,13 +7733,11 @@ AsmResolveRef:
 		cmp 	#AFIX_VAR
 		beq 	_ARRVariable
 		clc
-		lda 	AsmPoolBase
+		lda 	AsmRunAdj 					; low pool or region bank -- see AsmRunBase
 		adc 	AsmNewValue
 		sta 	AsmNewValue
-		lda 	AsmPoolBase+1
+		lda 	AsmRunAdj+1
 		adc 	AsmNewValue+1
-		clc
-		adc 	AsmPageDelta
 		sta 	AsmNewValue+1
 		bra 	_ARRTarget
 _ARRVariable:
@@ -8136,6 +8362,7 @@ _AFMEFound:
 ; ************************************************************************************************
 
 AsmEmitInstruction:
+		jsr 	AsmBankWriteCheck
 		lda 	AsmOpcode
 		jsr 	AsmPoolWrite
 		ldx 	AsmMode
@@ -8214,6 +8441,47 @@ _AEIBranch:
 
 _AEINotAddress:
 		jmp 	AsmBadSyntax
+
+; ************************************************************************************************
+;
+;		A BANKED BLOB MAY NOT WRITE THE RAM BANK REGISTER. It runs from $A000 in its region's
+;		bank, so the instruction after a store to $00 is fetched from whatever bank that
+;		selected. Only a direct STA, STX, STY or STZ to $00 or $0000 is caught.
+;
+; ************************************************************************************************
+
+AsmBankWriteCheck:
+		lda 	AsmBanked
+		beq 	_ABWCOk
+		lda 	AsmIsLabel
+		ora 	AsmIsVar
+		ora 	AsmValue
+		ora 	AsmValue+1
+		bne 	_ABWCOk
+		lda 	AsmMode
+		cmp 	#AMODE_ZP
+		beq 	_ABWCStore
+		cmp 	#AMODE_ABS
+		bne 	_ABWCOk
+_ABWCStore:
+		lda 	AsmOpcode
+		cmp 	#$64 						; STZ zp
+		beq 	_ABWCRefused
+		cmp 	#$9C 						; STZ abs
+		beq 	_ABWCRefused
+		and 	#$FC
+		cmp 	#$84 						; STY STA STX zp
+		beq 	_ABWCRefused
+		cmp 	#$8C 						; STY STA STX abs
+		beq 	_ABWCRefused
+_ABWCOk:
+		rts
+;
+;		In compiler space, like _APBUnknown: errors.asm is copied into every compiled program.
+;
+_ABWCRefused:
+		jsr 	CallErrorHandler
+		.text 	"BANKED GP.ASM WRITES $00, USE GP.ASM LOW", 0
 
 ; ************************************************************************************************
 ;
@@ -8686,7 +8954,7 @@ _APBSymFailed:
 		cmp 	#0
 		bne 	_APBUnknown
 		jsr 	CallErrorHandler
-		.text 	"NO SYMBOL FILE FOR {}", 0
+		.text 	"{} NEEDS #SYMFILE", 0
 
 _APBUnknown:
 		jsr 	CallErrorHandler
@@ -8817,6 +9085,18 @@ AsmChoiceLeft:
 		.fill 	1
 AsmScratch:
 		.fill 	2
+AsmBanked: 								; nonzero while a blob inside a region, without LOW,
+		.fill 	1 						; is being assembled -- set by CommandAsmCompile
+AsmLowText:
+		.fill 	4 						; the word after GP.ASM, as written
+AsmRunAdj:
+		.fill 	2 						; pass two: pool offset -> run address, for this blob
+AsmRgnLen: 								; the open region's banked blobs so far. Zeroed at each
+		.fill 	2 						; GP.ENDBANKED, where pass one records it
+AsmCopyLen:
+		.fill 	2
+AsmSaveObj:
+		.fill 	2 						; objPtr, while a banked blob goes into its region
 
 		.send code
 
@@ -9242,6 +9522,7 @@ CommandGPEndBankedCompile:
 		jsr 	GPBankCheckAlone
 		lda 	#2
 		sta 	gpBankState
+		jsr 	GPBankAsmClose 				; the GP.ASM this region carries in its own bank
 		lda 	passNumber 					; pass two keeps pass one's table -- see the note on
 		bne 	GPBankClosePassTwo 			; CommandGPBankedCompile above
 		lda 	gpBankCount
@@ -9559,6 +9840,8 @@ _GBRPass:
 		clc
 		lda 	gpBankLength
 		adc 	#4
+		clc 								; ...and its GP.ASM, above the end marker
+		adc 	gpBankAsmLen
 		sta 	gpBankTemp
 		sec
 		lda 	#0
@@ -9591,6 +9874,13 @@ _GBRNoFill:
 		sta 	gpBankRoom
 		lda 	gpBankRoom+1
 		adc 	#0
+		sta 	gpBankRoom+1
+		clc 								; and the region's GP.ASM, which pass two copies in as
+		lda 	gpBankRoom 					; each blob closes
+		adc 	gpBankAsmLen
+		sta 	gpBankRoom
+		lda 	gpBankRoom+1
+		adc 	gpBankAsmLen+1
 		sta 	gpBankRoom+1
 		lda 	gpBankRoom 					; PASS ONE'S BOOKKEEPING, not p-code: pass two writes
 		ldy 	gpBankRoom+1 				; the bridges and the markers instead, and neither is
@@ -9684,6 +9974,13 @@ _GBRoomDone:
 		sta 	gpBankTemp
 		lda 	gpBankLength+1
 		adc 	#0
+		sta 	gpBankPages
+		clc 								; the region's GP.ASM is in its pages too
+		lda 	gpBankTemp
+		adc 	gpBankAsmLen
+		sta 	gpBankTemp
+		lda 	gpBankPages
+		adc 	gpBankAsmLen+1
 		sta 	gpBankPages
 		lda 	gpBankTemp 					; a part page needs one more
 		beq 	_GBRWholePages
@@ -9810,6 +10107,10 @@ _GBRLoadRegion:
 		sta 	gpBankLineOut
 		lda 	gpBankLinesOut+1,x
 		sta 	gpBankLineOut+1
+		lda 	gpBankAsmLens,x
+		sta 	gpBankAsmLen
+		lda 	gpBankAsmLens+1,x
+		sta 	gpBankAsmLen+1
 		rts
 
 _GBRSaveRegion:
@@ -10185,6 +10486,29 @@ _GBADone:
 
 ; ************************************************************************************************
 ;
+;		GP.ENDBANKED: the region's banked GP.ASM is complete. Pass one records its length for
+;		GPBankRelocate, which puts it above the region's end marker; both passes start the next
+;		region's count from zero. See AsmBankBlob in commands/gpasmcode.asm.
+;
+; ************************************************************************************************
+
+GPBankAsmClose:
+		lda 	passNumber
+		bne 	_GBAKZero
+		lda 	gpBankCount
+		asl 	a
+		tax
+		lda 	AsmRgnLen
+		sta 	gpBankAsmLens,x
+		lda 	AsmRgnLen+1
+		sta 	gpBankAsmLens+1,x
+_GBAKZero:
+		stz 	AsmRgnLen
+		stz 	AsmRgnLen+1
+		rts
+
+; ************************************************************************************************
+;
 ;		STRMakeOffset, plus the correction a branch needs when exactly one of its ends is in the
 ;		banked region. YA is the target on the way in and the finished offset on the way out, so
 ;		it drops straight into the branch writer in place of STRMakeOffset.
@@ -10389,7 +10713,11 @@ _GBGGRefused:
 ;
 ;		Either one leaves branchOpcode as PCD_CMD_BGOSUB and the bank in branchBank, or changes
 ;		nothing. NOTHING CHANGES FOR A CALL INSIDE ONE REGION: its bank is selected already, and
-;		a plain call is a byte shorter. A call out of a region to low memory stays plain too.
+;		a plain call is a byte shorter.
+;
+;		A CALL OUT OF A REGION TO LOW MEMORY IS A .bgosub WITH THE REGION'S OWN BANK. Selecting
+;		it costs nothing, and RETURN puts it back, so a low routine that does BANK n returns
+;		into the region under the right bank.
 ;
 ;		THE CALLER'S REGION IS FOUND BY ITS LINE NUMBER, in the same table, and not by
 ;		gpBankState and gpBankNumber. GP.BANKEDSTR reads its own bank into gpBankNumber, so a
@@ -10416,19 +10744,49 @@ GPBankAddressCall:
 		ldy 	branchTarget+1
 		jsr 	GPBankSide 					; the region + 1, or 0
 		tax
-		beq 	GPBankCallOut
+		beq 	_GBACOpen
 		lda 	gpBankBanks-1,x
+		bra 	GPBankCallInto
 ;
-;		A is the target's bank, 0 for low memory, and the flags are still A's.
+;		PASS ONE CANNOT SEE THE REGION STILL OPEN, so GPBankSide calls a body in it low memory.
+;		Pass two sees every region, so a body at or above the open region's start is in it.
+;
+_GBACOpen:
+		lda 	passNumber
+		bne 	_GBACLow
+		lda 	gpBankState
+		cmp 	#1
+		bne 	_GBACLow
+		lda 	gpBankCount
+		asl 	a
+		tax
+		lda 	branchTarget+1
+		cmp 	gpBankStarts+1,x
+		bcc 	_GBACLow
+		bne 	_GBACInOpen
+		lda 	branchTarget
+		cmp 	gpBankStarts,x
+		bcc 	_GBACLow
+_GBACInOpen:
+		ldx 	gpBankCount
+		lda 	gpBankBanks,x
+		bra 	GPBankCallInto
+_GBACLow:
+		lda 	#0
+;
+;		A is the target's bank, 0 for low memory.
 ;
 GPBankCallInto:
-		beq 	GPBankCallOut 				; a call to low memory stays plain
 		sta 	branchBank
 		lda 	currentLineNumber 			; the caller's own region, whose bank is already the
 		ldy 	currentLineNumber+1 		; one selected
 		jsr 	GPBankLineBank
 		cmp 	branchBank
-		beq 	GPBankCallOut
+		beq 	GPBankCallOut 				; the same bank, or low memory to low memory
+		ldx 	branchBank
+		bne 	_GBCIBank 					; into a region: its bank
+		sta 	branchBank 					; out of a region into low memory: the caller's own
+_GBCIBank:
 		lda 	#PCD_CMD_BGOSUB
 		sta 	branchOpcode
 GPBankCallOut:
@@ -10657,6 +11015,10 @@ gpBankPageCounts:								; pages of each, for the bootstrap's table
 		.fill 	GPBANK_MAXREGIONS
 gpBankCrossings:								; what a branch crossing INTO each one is out by
 		.fill 	GPBANK_MAXREGIONS
+gpBankAsmLens:									; bytes of GP.ASM each carries above its end marker
+		.fill 	GPBANK_MAXREGIONS * 2
+gpBankAsmLen:									; ...and the one GPBankRelocate is moving
+		.fill 	2
 		.send 	code
 
 ; ************************************************************************************************
@@ -13885,9 +14247,9 @@ _COCreateLoop:
 		phx
 		jsr 	CompileBranchCommand
 		plx
-		lda 	branchOpcode 				; ON steps over three bytes an entry at run time, so a
-		cmp 	#PCD_CMD_BGOSUB 			; GOSUB into a GP.BANKED region, which is four, is
-		beq 	_COBanked 					; refused
+		lda 	branchOpcode				; ON steps over three bytes an entry at run time, so a
+		cmp 	#PCD_CMD_BGOSUB 			; .bgosub, which is four, is refused
+		beq 	_COBanked
 		jsr 	LookNextNonSpace			; ',' follows
 		cmp 	#"," 						
 		bne 	_COComplete 				; if so, more line numbers
@@ -13900,8 +14262,14 @@ _COComplete:
 		pla 								; throw GOTO/GOSUB
 		rts
 
+;
+;		A GOSUB INTO A REGION IS A .bgosub, AND SO IS ONE OUT OF A REGION TO LOW MEMORY. The way
+;		out matters as much as the way in: a low routine that does BANK n would RETURN into the
+;		region under that bank. GP.SELECT or IF .. GOSUB compiles each call as a .bgosub.
+;
 _COBanked:
-		.error_unimplemented
+		jsr 	CallErrorHandler
+		.text 	"ON GOSUB IN OR OUT OF GP.BANKED", 0
 
 		.send code
 

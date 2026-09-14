@@ -1,7 +1,7 @@
 """deferscan.py -- did anything DEFER?
 
 A statement that fails to compile with a SYNTAX error is not an error: errorhandler.asm rolls it
-back and writes a .deferror throw-stub in its place, so the compile prints OK CODE and the program
+back and writes a .deferror throw-stub in its place, so the compile prints OK LOW CODE and the program
 raises SYNTAX ERROR at run time, at an address, the first time it reaches that statement. A retired
 keyword does this to every stale caller at once.
 
@@ -11,7 +11,7 @@ of the debug map GPC writes beside the object.
 
     python deferscan.py <C.NAME.PRG> <codelen> [M.NAME]
 
-codelen is the "OK CODE nnnn" the compiler printed.
+codelen is the "OK LOW CODE nnnn" the compiler printed.
 """
 import io, re, sys, os
 

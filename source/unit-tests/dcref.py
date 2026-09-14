@@ -95,7 +95,7 @@ def compile_one(entry, gpc, inputs, dead, run="run"):
             while time.time() < deadline:
                 time.sleep(0.5)
                 echo = open(logpath, "rb").read()
-                ok = echo.rfind(b"OK CODE")
+                ok = echo.rfind(b"OK LOW CODE")
                 if ok >= 0:
                     settle = time.time() + 20
                     while time.time() < settle and b"READY." not in open(logpath, "rb").read()[ok:]:
@@ -105,8 +105,9 @@ def compile_one(entry, gpc, inputs, dead, run="run"):
                     lines = echo[ok:].decode("latin-1").replace("\r", "\n").split("\n")
                     lines = [s.strip() for s in lines if s.strip()]
                     verdict = lines[0]
-                    if len(lines) > 1 and lines[1].startswith("DEAD CODE:"):
-                        verdict += " " + lines[1]
+                    dead = [s for s in lines[1:] if s.startswith("DEAD CODE:")]
+                    if dead:
+                        verdict += " " + dead[0]
                     break
                 at = echo.find(b"GPC SQUEALING")
                 if at >= 0 and b"READY." in echo[at:]:

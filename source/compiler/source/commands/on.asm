@@ -35,9 +35,9 @@ _COCreateLoop:
 		phx
 		jsr 	CompileBranchCommand
 		plx
-		lda 	branchOpcode 				; ON steps over three bytes an entry at run time, so a
-		cmp 	#PCD_CMD_BGOSUB 			; GOSUB into a GP.BANKED region, which is four, is
-		beq 	_COBanked 					; refused
+		lda 	branchOpcode				; ON steps over three bytes an entry at run time, so a
+		cmp 	#PCD_CMD_BGOSUB 			; .bgosub, which is four, is refused
+		beq 	_COBanked
 		jsr 	LookNextNonSpace			; ',' follows
 		cmp 	#"," 						
 		bne 	_COComplete 				; if so, more line numbers
@@ -50,8 +50,14 @@ _COComplete:
 		pla 								; throw GOTO/GOSUB
 		rts
 
+;
+;		A GOSUB INTO A REGION IS A .bgosub, AND SO IS ONE OUT OF A REGION TO LOW MEMORY. The way
+;		out matters as much as the way in: a low routine that does BANK n would RETURN into the
+;		region under that bank. GP.SELECT or IF .. GOSUB compiles each call as a .bgosub.
+;
 _COBanked:
-		.error_unimplemented
+		jsr 	CallErrorHandler
+		.text 	"ON GOSUB IN OR OUT OF GP.BANKED", 0
 
 		.send code
 
