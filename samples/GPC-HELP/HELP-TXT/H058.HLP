@@ -30,9 +30,9 @@
 .
 =A SEPARATE FILE FROM STASH.INC.BL ON PURPOSE
 .
-.  a BASL module has no dead code elimination, and these three are 127 bytes.
-.  A dialog that stashes to a bank and puts it back never goes near a disk
-.  and should not pay for one.
+.  uncalled code stays in unless the compile removes it, and these three are
+.  127 bytes. A dialog that stashes to a bank and puts it back never goes
+.  near a disk and should not pay for one.
 .
 =THE FILE IS SELF-DESCRIBING BECAUSE THE STASH IS
 .

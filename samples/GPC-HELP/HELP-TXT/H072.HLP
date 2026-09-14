@@ -2,36 +2,9 @@
 .
 =8. KNOWN BUGS
 .
-.Five, all live on 12th September 2026 and all reproducible. Each says what
+.Three, all live on 12th September 2026 and all reproducible. Each says what
 .happens, what causes it, and what to do instead. A bug leaves this list when
 .it is fixed, not when it is understood.
-.
-=GP.FN string aliasing
-.
-.Two GP.FN calls on the same string-returning verb, with nothing between them
-.in one expression, both give the second call's answer.
-.
-:D$ = "one"
-:E$ = "two"
-:PRINT GP.FN(STR.UCASE, D$) + GP.FN(STR.UCASE, E$)
-.
-.prints TWOTWO, not ONETWO. No error, and both compiler passes agree.
-.
-.A string term is a reference, not a value. The call pushes the block address
-.of the verb's single RETURNS variable, so two calls leave two references to
-.one variable and the second overwrites what the first pointed at. Numeric
-.verbs are safe -- the value itself goes on the stack.
-.
-.Two things escape it by accident. A term between the two calls concretes the
-.first into a temporary, so GP.FN(V,A$) + "-" + GP.FN(V,B$) is right; and two
-.different verbs have two different RETURNS variables. Neither is a rule to
-.build on.
-.
-.Do this -- give each call its own variable first.
-.
-:A$ = GP.FN(STR.UCASE, D$)
-:B$ = GP.FN(STR.UCASE, E$)
-:PRINT A$ + B$
 .
 =A string never gives memory back
 .
@@ -53,29 +26,6 @@
 .Do this -- PRINT FRE(0) at eight points down the run and read the descent.
 .It is a high-water ceiling, so it only falls, and the step that falls is the
 .culprit.
-.
-=LOAD chaining leaks array strings
-.
-.A LOAD chain keeps its variables by skipping ClearMemory, which is the whole
-.reason to chain rather than RUN. ClearMemory is also the only thing that
-.lowers the string ceiling, so the ceiling never comes back down.
-.
-.For scalars that is bounded. A block is reused in place whenever the new
-.string fits, so ten hops assigning the same five variables settle at five
-.blocks.
-.
-.For string arrays it is unbounded. A block is marked dead only when its
-.variable is reassigned to something longer, never when the pointer is simply
-.dropped, and the chained program's DIM zeroes every element. Every block the
-.previous program's array held loses its only pointer while keeping a live
-.control byte: invisible to the scavenger, and unreusable. Ten hops with a
-.50-element array strand 500 blocks.
-.
-.FRE(0) is the instrument. Print it on entry to each program in the chain and
-.watch it fall.
-.
-.Do this -- CLR on entry, when the program does not need the carry. There is
-.no way to keep the carry and reclaim the array blocks.
 .
 =BINPUT# stops at 255 bytes
 .
@@ -105,3 +55,39 @@
 .Do this -- a record cannot be one string. Make it N strings of 255, or keep
 .it in a bank and copy out the part that is needed.
 .
+=File I/O in a GP.DO key loop
+.
+.A save routine reached from inside a program's own GP.DO key loop writes its
+.file completely and correctly, and then the program stops with
+.
+:INPUT/OUTPUT ERROR @ $005B
+.
+.The address is identical in every failing build, which says a clobbered
+.instruction pointer rather than a real device error.
+.
+.Seven shapes have been compiled and probed. Do not bisect them again.
+.
+.  OPEN/PRINT#/CLOSE at top level
+.      RESULT: passes
+.
+.  four consecutive PRINT#, no PRINT between
+.      RESULT: passes
+.
+.  the same inside GP.DO ... GP.EXITDO
+.      RESULT: passes
+.
+.  the same behind a GOSUB inside a GP.DO
+.      RESULT: passes
+.
+.  the same behind GP.SELECT then GOSUB inside a GP.DO
+.      RESULT: passes
+.
+.  the real routine called from the top level of the same program
+.      RESULT: passes
+.
+.  the real routine reached from the program's own GP.DO key loop
+.      RESULT: fails
+.
+.Do this -- a plain PRINT immediately after the CLOSE makes it pass. Channel
+.0 output runs CLRCHN; a non-zero channel runs CHKOUT and READST instead, so
+.the suspect is channel state left behind rather than the file I/O.

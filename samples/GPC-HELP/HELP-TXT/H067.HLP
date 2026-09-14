@@ -41,8 +41,8 @@
 .STASH.FILE.SAVE, STASH.FILE.LOAD and STASH.FILE.PUT, and no variables of its
 .own -- it sets STASH.* and calls through. The prefix exists to keep the
 .three routine names apart from the rest of STASH., not to hold state. Kept a
-.separate #INCLUDE because a BASL module has no dead code elimination and the
-.disk half is 127 bytes a program that never writes one would still carry.
+.separate #INCLUDE: unless the compile removes dead code, the disk half is
+.127 bytes a program that never writes one would still carry.
 .
 =SORT.INC.BL
 .
@@ -80,11 +80,19 @@
 .  out
 .      the string itself, rewritten in place
 .
+.  verbs
+.      STR.UCASE STR.LCASE -- a string in, a cased copy back, through
+.        STRCASE.S$
+.
 .  internal
-.      STRCASE.ADDR% STRCASE.OP%
+.      STRCASE.ADDR% STRCASE.OP% STRCASE.S$
 .
 .  constants
 .      STRCASE.UPPER STRCASE.LOWER
+.
+.STR.UCASE and STR.LCASE are the two STR. names this file owns. The rest of
+.STR. is STRINGS.INC.BL's, and the two verbs are named for the module they
+.are to move into.
 .
 .#SYMFILE again. Do not use #AUTONUM in a program that includes this!
 .

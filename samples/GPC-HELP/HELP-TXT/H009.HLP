@@ -14,6 +14,9 @@
 .  README.md
 .      how to run the compiler, and what its answers mean
 .
+.  BANKED-OR-NOT.md
+.      how to run a module from a RAM bank
+.
 .  SRC/
 .      the BASLOAD source of the tools. Reference only -- nothing in it is
 .        needed to run

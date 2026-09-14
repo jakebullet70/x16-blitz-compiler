@@ -1,37 +1,102 @@
-@8. Known bugs (2)
-=File I/O in a GP.DO key loop
+@7. Memory, and what the compiler tells you
 .
-.A save routine reached from inside a program's own GP.DO key loop writes its
-.file completely and correctly, and then the program stops with
+=7. MEMORY, AND WHAT THE COMPILER TELLS YOU
 .
-:INPUT/OUTPUT ERROR @ $005B
+=The line GPC prints when it finishes
 .
-.The address is identical in every failing build, which says a clobbered
-.instruction pointer rather than a real device error.
+:OK CODE 10734 FREE 10496 RT 13311 GP-BASIC IN
+:OK CODE 1234 FREE 19200 RT SHARED RT
+:DEAD CODE:   74 LINES REMOVED,  646 BYTES SAVED
 .
-.Seven shapes have been compiled and probed. Do not bisect them again.
+.  CODE
+.      the p-code. What the program is, in bytes
 .
-.  OPEN/PRINT#/CLOSE at top level
-.      RESULT: passes
+.  FREE
+.      what is left above it for variables, strings and arrays. This is the
+.        number that runs out. It already excludes the 4K frame stack, which
+.        is reserved rather than available
 .
-.  four consecutive PRINT#, no PRINT between
-.      RESULT: passes
+.  RT
+.      the runtime bytes carried inside the object, or SHARED when the
+.        program loads the runtime at run time instead. SHARED RC asks for
+.        the core alone, in GPC.RT.nnn.BIN, and SHARED RT for the core and
+.        the GP. handlers, in GPB.RT.nnn.BIN
 .
-.  the same inside GP.DO ... GP.EXITDO
-.      RESULT: passes
+.  GP-BASIC
+.      embedded builds only. IN if a GP. keyword reached the 1,024-byte
+.        handler block and it had to go in the object, OUT if ScanGPUsage
+.        dropped it
 .
-.  the same behind a GOSUB inside a GP.DO
-.      RESULT: passes
+.  DEAD CODE
+.      a second line, printed only when dead code is removed: the source
+.        lines left out, and the p-code bytes they would have taken. CODE is
+.        already without them
 .
-.  the same behind GP.SELECT then GOSUB inside a GP.DO
-.      RESULT: passes
+.Two different budgets come off one figure, so read it twice:
 .
-.  the real routine called from the top level of the same program
-.      RESULT: passes
+.  - FREE is the workspace the running program has for its data.
+.  - FREE minus 4,096 is how much more p-code will fit. WriteObjectCode
+.    refuses to leave less than 4K of workspace, so a build reporting FREE
+.    4096 is one page from PROGRAM TOO BIG.
 .
-.  the real routine reached from the program's own GP.DO key loop
-.      RESULT: fails
+.A program can be comfortable on one and out of room on the other. CODE 17406
+.FREE 4096 has 4K to run in and nowhere left to grow; CODE 10734 FREE 10496
+.has both.
 .
-.Do this -- a plain PRINT immediately after the CLOSE makes it pass. Channel
-.0 output runs CLRCHN; a non-zero channel runs CHKOUT and READST instead, so
-.the suspect is channel state left behind rather than the file I/O.
+=Removing dead code
+.
+.With REMOVE DEAD CODE? answered Y in GPC.PRG, or a file named on line 5 of
+.GPC.INPUT, the compiler leaves out every source line that no path from the
+.first line reaches. It writes the numbers of those lines to the file, one a
+.line. GPC.PRG names it D. and the source name. The numbers are the BASIC
+.line numbers BASLOAD gave, not lines of the .BASL file.
+.
+.The option adds one pass, PASS 0. With it off, the passes and the object are
+.unchanged.
+.
+.A line is reached through:
+.
+.  - GOTO, GOSUB, IF ... THEN a line number, ON ... GOTO, ON ... GOSUB,
+.    RESTORE a line number
+.  - FN, GP.SUB and GP.FN
+.  - the line before, unless that line's last statement is GOTO, RETURN, END
+.    or STOP. A line holding IF ... THEN and a statement always reaches the
+.    next.
+.
+.Kept although nothing reaches them:
+.
+.  - a line holding DATA, DIM or GP.DEFPROC
+.  - the GP.BANKED and GP.ENDBANKED lines, and a whole GP.BANKEDSTR group
+.  - every line of a GP.IF, GP.DO, GP.SELECT or GP.ASM block when any line of
+.    it is kept
+.
+.A variable that only removed lines use is not in the object. If the
+.compiler's tables fill, it prints DEAD CODE TABLE FULL, NOTHING REMOVED and
+.compiles every line.
+.
+.A keep region makes every line between its two marker lines reached.
+.
+:#REM 1
+:REM GP.KEEP
+:#REM 0
+:DEBUG.DUMP:
+:  PRINT A,B
+:  RETURN
+:#REM 1
+:REM GP.ENDKEEP
+:#REM 0
+.
+.  - BASLOAD drops a REM unless #REM 1 is in force. A dropped marker leaves
+.    no region and no error.
+.  - BASLOAD-GPC also takes #GPC KEEP and #GPC ENDKEEP, one line each.
+.  - The words match in either case. The marker lines are judged like any
+.    other line.
+.  - A KEEP inside a region, an ENDKEEP outside one, or a region open at the
+.    end of the source stops the compile with BLOCK MISMATCH.
+.  - With the option off, the markers are ordinary REMs.
+.
+.{VAR} on a removed variable. A GP.ASM {VAR} naming a variable that only
+.removed lines create stops the compile with UNKNOWN VARIABLE IN {}. With the
+.option off it compiles. Create the variable in live code or in a keep
+.region.
+.

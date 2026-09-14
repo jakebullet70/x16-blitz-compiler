@@ -7,94 +7,83 @@
 .position-independent -- each jumps over itself -- so #INCLUDE it anywhere,
 .including the top of the program.
 .
-.Eighteen of them come in two files. APPSYS, BANKMGR, COMBO, FILEDIR, FILEIO,
-.GUI, GUI2, KB, LINEINPUT, MENUBAR, MENUVERT, SORT, STASHVRAM, STASHVRAMGC,
-.STRCASE, STRINGS, STRUSING and THEME can run from a RAM bank, and a banked
-.routine cannot select its own bank -- so the banked copy defines
-.THEME.SELECT.BODY rather than THEME.SELECT, and the public name comes from a
-.shim file that banks and then calls it. #INCLUDE "THEME.INC.BL" for the low
-.memory form, whose entry points are plain names and which costs nothing, or
-.#INCLUDE "THEME.BANK.INC.BL" inside a GP.BANKED region with a
-.SHIM.*BANK.INC.BL file above it -- one or the other, never both. The GOSUBs
-.in this section read identically either way.
+.Any of them can run from a RAM bank. Put its #INCLUDE between GP.BANKED and
+.GP.ENDBANKED (SEC 3.12). A call into the region selects its bank, so the
+.GOSUBs in this section read the same either way.
 .
-.STASH and STASHFILE have no banked twin: both execute BANK, and a GP.BANKED
-.region may not contain that statement. STASHVRAM (SEC 4.18) is the one to
-.reach for inside a region. See BANKED-OR-NOT.md and GP-BASIC.GLOBALS.md SEC
-.4.
+.STASH and STASHFILE are the two that cannot: both execute BANK, and a
+.GP.BANKED region may not contain that statement. STASHVRAM (SEC 4.18) is the
+.one to reach for inside a region. See BANKED-OR-NOT.md and
+.GP-BASIC.GLOBALS.md SEC 4.
 .
-=Plain and banked -- what differs between the two files
+=Low memory or a bank -- what differs
 .
-.A module that comes in two files ships the same code twice. X.INC.BL puts it
-.in low memory. X.BANK.INC.BL puts it in a RAM bank. The GOSUB at the call
-.site is the same either way.
+.A module is one file. #INCLUDE "X.INC.BL" puts it in low memory, and the
+.same line between GP.BANKED and GP.ENDBANKED puts it in a RAM bank. The
+.GOSUB at the call site is the same either way.
 .
 .Low memory is the one that runs out. A SHARED program has about 17,920 bytes
 .of p-code under the runtime and every #INCLUDE spends it; a region spends
 .8,192 bytes of a RAM bank the program was not using. Bank what you can. What
-.stays low is the module called inside a loop, where the shim on every call
-.is the whole cost.
+.stays low is the module called inside a loop, where the bank switch on every
+.call is the whole cost.
 .
 .The banked form needs the program built SHARED. GP.BANKED reports NOT
 .IMPLEMENTED in an embedded build, because the copy into the bank is the
 .shared bootstrap's work and an embedded object has no bootstrap.
 .
 .samples/GPB-MODS-TESTING/PICKDEMO.BASL is a complete program in this shape,
-.in 104 lines.
+.in 99 lines.
+.
+.  Include
+.      LOW MEMORY: #INCLUDE "X.INC.BL"
+.      A RAM BANK: the same, inside GP.BANKED
 .
 .  Entry label
-.      X.INC.BL: THEME.SELECT
-.      X.BANK.INC.BL: THEME.SELECT.BODY
-.
-.  Sits in
-.      X.INC.BL: low memory
-.      X.BANK.INC.BL: a GP.BANKED region
-.
-.  Also needs
-.      X.INC.BL: nothing
-.      X.BANK.INC.BL: SHIM.*BANK.INC.BL, above the region
+.      LOW MEMORY: THEME.SELECT
+.      A RAM BANK: THEME.SELECT
 .
 .  Costs per call
-.      X.INC.BL: one GOSUB
-.      X.BANK.INC.BL: a bank select and a restore
+.      LOW MEMORY: one GOSUB
+.      A RAM BANK: from outside the region, one byte more and two bank
+.        switches
 .
 .  Low memory used
-.      X.INC.BL: the whole module
-.      X.BANK.INC.BL: the shims only
+.      LOW MEMORY: the whole module
+.      A RAM BANK: none
 .
-.The code between the entry label and its RETURN is identical in the two
-.files. They are hand-maintained, so a bug fixed in one is still in the
-.other.
-.
-.The banked form takes three includes, not one:
-.
+:#DEFINE MY.GUICODE 4
+:#DEFINE MY.THEMECODE 9
 :GOTO MY.LIBEND
-:#INCLUDE "SHIM.GUIBANK.INC.BL"
-:GP.BANKED SHIM.GUIBANK
-:#INCLUDE "MENUVERT.BANK.INC.BL"
-:#INCLUDE "GUI.BANK.INC.BL"
+:GP.BANKED MY.THEMECODE
+:#INCLUDE "THEME.INC.BL"
+:GP.ENDBANKED
+:GP.BANKED MY.GUICODE
+:#INCLUDE "MENUVERT.INC.BL"
+:#INCLUDE "LINEINPUT.INC.BL"
+:#INCLUDE "GUI.INC.BL"
+:#INCLUDE "GUI2.INC.BL"
 :GP.ENDBANKED
 :MY.LIBEND:
 .
-.SHIM.GUIBANK.INC.BL carries twenty-one shims over four modules: GUI,
-.MENUVERT, MENUBAR and LINEINPUT. GUI2 rides in the same region with no shim
-.of its own, because nothing outside the region calls it. BASLOAD resolves
-.every label in every file it reads, so including a shim file obliges every
-.body behind it even when the program calls one of them. A body left out is
-.LABEL NOT FOUND.
+.A region is 8,192 bytes, and that is the whole of the grouping. The GUI
+.modules fill one, so THEME has its own. THEME comes first because the GUI
+.modules read its #DEFINEs. A call from one region to the other costs the
+.same bank switches as a call from low memory.
 .
-.THEME and COMBO have regions and shim files of their own,
-.SHIM.THEMEBANK.INC.BL and SHIM.COMBOBANK.INC.BL, and a program that wants
-.either of them banked includes that pair as well. THEME rode in SHIM.GUIBANK
-.until that region ran out of room. A region is 8,192 bytes and that is the
-.whole of the constraint: the modules are grouped to fit, not by what they
-.have in common.
+.Include a module once. One #INCLUDE in low memory and another in a region is
+.DUPLICATE SYMBOL where the module has no #IFNDEF guard. Where it has one,
+.the module lands at the first #INCLUDE and the second produces nothing.
 .
-.SEC 3.12 has the shim mechanism, what a region may not contain, and the .Bnn
-.files a banked program ships.
+.SEC 3.12 has the rules, what a region may not contain, and the .Bnn files a
+.banked program ships.
 .
 =SEE ALSO
 .
->79|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
 >51|3.12 Code in a bank
+>79|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
 >59|4.1 THEME.INC.BL -- named colour roles
+>65|4.6 MENUVERT.INC.BL -- a vertical menu
+>63|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>72|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
+>73|4.12 GUI2.INC.BL -- a listbox, single or multi select

@@ -18,9 +18,9 @@
 ;				$9F00 embedded, or up to RTBASE in shared mode where the resident runtime sits on
 ;				top. This is the number that actually runs out, and nothing printed it before:
 ;				PROGRAM TOO BIG was the only feedback, and it arrives only once it is too late.
-;				It EXCLUDES the 4K frame stack gap, which is reserved, not available.
+;				It EXCLUDES the 2K frame stack gap, which is reserved, not available.
 ;		RT		the runtime bytes carried in the object, or SHARED when there are none because
-;				the program loads GPC.RT.nnn.BIN instead.
+;				the program loads GPB.RT.nnn.BIN or GPC.RT.nnn.BIN instead.
 ;		GP-BASIC  embedded only -- OUT if the GP.BASIC handler block was dropped (gpscan.asm),
 ;				IN if some keyword reached it and the whole runtime had to go in. Named for the
 ;				language, not abbreviated to "GP": the block it is reporting on is the GP.BASIC
@@ -333,9 +333,9 @@ RTText:
 SharedText:
 		.text 	"SHARED",0
 CoreText: 									; which resident runtime file this program will ask for
-		.text 	" RC",0 					; GPC.RC.nnn.BIN -- core only, no GPB handlers
+		.text 	" RC",0 					; GPC.RT.nnn.BIN -- core only, no GPB handlers
 FullText:
-		.text 	" RT",0 					; GPC.RT.nnn.BIN -- handlers and core
+		.text 	" RT",0 					; GPB.RT.nnn.BIN -- handlers and core
 GPOutText:
 		.text 	" GP-BASIC OUT",0
 GPInText:

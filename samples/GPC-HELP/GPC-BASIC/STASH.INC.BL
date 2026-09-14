@@ -7,7 +7,7 @@
 ## **
 ## **  For the same rectangle through a FILE see STASHFILE.INC.BL, built on this and
 ## **  kept separate so a program wanting only the bank does not carry the disk half --
-## **  a BASL module has no dead code elimination, and those three routines are 127 bytes.
+## **  uncalled code stays in unless the compile removes it, and those three are 127 bytes.
 ## **
 ## **  A MODULE, NOT A RUNTIME KEYWORD, so it costs its bytes only in the programs that
 ## **  ask for it: as a keyword it would be 329 bytes carried by every program that never

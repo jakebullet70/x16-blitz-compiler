@@ -27,10 +27,10 @@
 .
 .The library. GPC-BASIC/: 17 .INC.BL modules, 25 .EXP.BL examples. Ordinary
 .BASL, #INCLUDEd by path, called with GOSUB. Zero runtime bytes -- a module
-.costs its own p-code, in the programs that include it. Six of the modules
-.have a banked twin named .BANK.INC.BL, reached through one of three SHIM.
-.front doors, for a program that has run out of low memory; SEC 3.12 is where
-.those are explained. Menus vertical and bar, panels, themes, entry fields,
+.costs its own p-code, in the programs that include it. A program that has
+.run out of low memory can put a module's #INCLUDE inside a GP.BANKED region
+.and run it from a RAM bank, with no change to its callers; SEC 3.12 is where
+.that is explained. Menus vertical and bar, panels, themes, entry fields,
 .in-place case, trim and splice, shell sort, a screen rectangle to a RAM bank
 .or a file, BMX into VERA.
 .

@@ -23,10 +23,10 @@
 .held arrow repeats faster than a page can be drawn and scrolls on after the
 .key is let go.
 .
-.GUI.INC.BL carries a private twin, GUI.CLEARKB, because code inside a
-.GP.BANKED region may not call another bank and survive the return. Fix one
-.and fix the other. There are only the two, and a second #INCLUDE of this
-.file cannot supply the twin -- the #IFNDEF guard makes it produce nothing.
+.GUI.INC.BL carries a private copy, GUI.CLEARKB, from when code inside a
+.GP.BANKED region could not call another bank. Fix one and fix the other.
+.There are only the two, and a second #INCLUDE of this file cannot supply the
+.copy -- the #IFNDEF guard makes it produce nothing.
 .
 =SEE ALSO
 .

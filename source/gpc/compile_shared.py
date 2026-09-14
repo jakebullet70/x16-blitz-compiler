@@ -17,12 +17,14 @@
 #		There is no host-side compiler: GPC is a native X16 program. So, like build_basl.py,
 #		this boots the bundled emulator and drives the real thing. GPC.PRG (the front end) is
 #		INTERACTIVE, so it is the wrong thing to script -- run the ENGINE, GPC.BIN, which
-#		reads its four-line GPC.INPUT (source, object, map, mode) straight off the drive.
+#		reads GPC.INPUT straight off the drive. GPC.INPUT is five lines: source, object,
+#		map, SHARED or blank, and the removed-line list or blank. This script writes the
+#		first three, and SHARED on a fourth for a SHARED build, so it never removes dead code.
 #
 #		GPC.INPUT is a tracked working file, so it is snapshotted and restored: a build must not
 #		leave the tree different from how it found it.
 #
-#			compile_shared.py [--embedded] <source.prg> <object.prg> [map]
+#			compile_shared.py [--drive DIR] [--embedded] <source.prg> <object.prg> [map]
 #
 #		Both programs the build compiles -- GPC.PRG and GPC.ERR -- are SHARED, so they use
 #		the resident runtime rather than carrying a ~12K copy each. GPC.PRG needs the GPB
@@ -88,10 +90,10 @@ def compile_one(source, obj, mapfile="", shared=True):
 
 	try:
 		#
-		#		Four CR-terminated lines -- source, object, map, mode -- and an EMBEDDED build
-		#		writes only THREE. That is not a shortcut: GPC.BASL omits the line rather than
-		#		writing an empty one ("GP.IF SH=1 THEN PRINT#1,SHARED"), so a three-line file
-		#		is exactly what the engine is handed in the interactive case.
+		#		Three lines, and SHARED on a fourth for a SHARED build. The engine reads a line
+		#		the file stops short of as blank, so an EMBEDDED build needs no empty fourth line
+		#		and no build here has a fifth: dead code is never removed. GPC.PRG writes all
+		#		five, blank where an option is off.
 		#
 		control = "%s\n%s\n%s\n" % (source, obj, mapfile)
 		if shared:

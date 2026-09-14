@@ -34,14 +34,16 @@ shared mode. The compiler front end is written in the language it compiles. The 
 
 ## 2. The compiler
 
-`GPC.PRG` asks four questions — input file, output file, debug map, shared runtime — writes the
-answers to `GPC.INPUT`, and chain-loads the engine. Writing that file is all it does.
+`GPC.PRG` asks five questions — input file, output file, debug map, shared runtime, remove dead
+code — writes the answers to `GPC.INPUT`, and chain-loads the engine. Writing that file is all it
+does.
 
 `GPC.BIN` takes its whole job from `GPC.INPUT` and asks nothing. One program can therefore drive
 another: write the control file and `RUN GPC.BIN`. That is how this project's test harness compiles,
 and how to get a build if the front end itself is broken.
 
-`GPC.INPUT` is up to four text lines: source, object, map file, and the word `SHARED`. It is
+`GPC.INPUT` is up to five text lines: source, object, map file, the word `SHARED`, and the name of
+the removed-line list. An empty line, or one the file stops short of, leaves that option off. It is
 per-user state and is not shipped; the front end rewrites it on every compile.
 
 `GPC.IMG.nnn.BIN` is the runtime streamed into every self-contained object as it is written. The
@@ -136,7 +138,7 @@ compiler writes when `MAKE A DEBUG MAP?` is answered yes. Without the map the ad
 resolved.
 
 `GPB.HELP.PRG` is this reference, on the machine. It reads `HELP-TXT/` beside it — `GPB.HELP.IDX`
-and one `.HLP` per topic — and shows 49 topics at 80x30. Arrows, `PgUp` / `PgDn`, `HOME` and `END`
+and one `.HLP` per topic — and shows 74 topics at 80x30. Arrows, `PgUp` / `PgDn`, `HOME` and `END`
 move. `RETURN` opens the highlighted index row. `/` finds and `N` repeats the search. `L` follows a
 topic's cross references, `X` writes its code out as a `.BL` where it has any, `T` cycles the colour
 themes, `?` is the about box. `ESC` goes back a step, and quits from the index.
@@ -145,13 +147,13 @@ themes, `?` is the about box. `ESC` goes back a step, and quits from the index.
 
 ## 5. `GPC-BASIC/` — the library
 
-Text-mode building blocks, in BASL, `#INCLUDE`d into your source. BASL has no dead code
-elimination: including a module costs its whole size whether or not it is called.
+Text-mode building blocks, in BASL, `#INCLUDE`d into your source. Unless the compile
+removes dead code, including a module costs its whole size whether or not it is called.
 
 | | |
 |---|---|
 | `GPB.INC.BL` | the `GP.*` keyword definitions for BASLOAD. **Every source using a GP keyword needs this one**, and no other include is ever optional either |
-| `THEME.INC.BL` | named colour roles, in three themes |
+| `THEME.INC.BL` | named colour roles, in five themes |
 | `APPSYS.INC.BL` | start an application politely, and leave the machine as it was found |
 | `STASH.INC.BL` | save a text rectangle to a RAM bank, and put it back |
 | `STASHFILE.INC.BL` | the same rectangle, through a file |
@@ -210,6 +212,7 @@ One `.EXP.BL` per topic. Several are also the regression test for the module the
 | `GP-BASIC.GLOBALS.md` | every global name each module owns, and the prefixes you may not use |
 | `GP-BASIC.FILES.md` | this page |
 | `README.md` | how to run the compiler, and what its answers mean |
+| `BANKED-OR-NOT.md` | how to run a module from a RAM bank |
 | `SRC/` | the BASLOAD source of the tools. Reference only — nothing in it is needed to run |
 
 The library's documents live beside the includes they describe, in this folder, so a relative link

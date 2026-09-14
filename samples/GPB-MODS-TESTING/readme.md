@@ -101,14 +101,14 @@ about the file name.
 
 ## Where the bytes go
 
-Built 2026-09-12 with all twenty modules and every panel written. `GPBMODS.PRG` is **12,885**
-bytes and **eight overlay files** come with it, 30,480 bytes between them:
+Built 2026-09-14 with all twenty modules and every panel written. `GPBMODS.PRG` is **11,619**
+bytes and **eight overlay files** come with it, 30,224 bytes between them:
 
 | file | bank | what is in it | bytes |
 |---|---:|---|---:|
 | `GPBMODS.B04` | 4 | the GUI — `MENUVERT` `MENUBAR` `LINEINPUT` `GUI` `GUI2` | 7,938 |
 | `GPBMODS.B05` | 5 | literal text, pool one | 7,426 |
-| `GPBMODS.B06` | 6 | literal text, pool two | 4,610 |
+| `GPBMODS.B06` | 6 | literal text, pool two | 4,354 |
 | `GPBMODS.B07` | 7 | the utilities — nine modules | 4,354 |
 | `GPBMODS.B08` | 8 | the file modules — `FILEIO` `FILEDIR` | 1,538 |
 | `GPBMODS.B09` | 9 | `THEME` | 770 |
@@ -125,64 +125,58 @@ memory and all six regions, which is why the total is far larger than the reside
 
 | where | module | p-code |
 |---|---|---:|
-| low | `GPBMODS.BASL` | 9,454 |
+| low | `GPBMODS.BASL` | 9,431 |
 | low | `STASH` | 431 |
-| low | `SHIM.UTILBANK` | 376 |
-| low | `SHIM.GUIBANK` | 294 |
-| low | `SHIM.FUTILBANK` | 235 |
-| low | `STASHFILE` | 175 |
-| low | `SHIM.THEMEBANK` | 134 |
-| low | `SHIM.COMBOBANK` | 114 |
-| low | the six region exit bridges | 22 |
-| | **low RAM total** | **11,235** |
-| `.B04` | `GUI` | 4,472 |
+| low | `STASHFILE` | 174 |
+| low | the region exit bridges | 18 |
+| | **low RAM total** | **10,054** |
+| `.B04` | `GUI` | 4,474 |
 | `.B04` | `MENUVERT` | 1,306 |
 | `.B04` | `MENUBAR` | 826 |
 | `.B04` | `LINEINPUT` | 780 |
 | `.B04` | `GUI2` | 366 |
-| `.B04` | entry bridge and page padding | 186 |
+| `.B04` | entry bridge and page padding | 184 |
 | | **bank 4 payload** | **7,936** |
 | `.B07` | `STASHVRAM` | 1,681 |
 | `.B07` | `STRUSING` | 726 |
-| `.B07` | `BANKMGR` | 590 |
+| `.B07` | `BANKMGR` | 586 |
 | `.B07` | `STRINGS` | 511 |
 | `.B07` | `STASHVRAMGC` | 304 |
 | `.B07` | `SORT` | 189 |
 | `.B07` | `APPSYS` | 114 |
-| `.B07` | `STRCASE` | 54 |
+| `.B07` | `STRCASE` | 56 |
 | `.B07` | `KB` | 28 |
-| `.B07` | entry bridge and page padding | 155 |
+| `.B07` | entry bridge and page padding | 157 |
 | | **bank 7 payload** | **4,352** |
-| `.B08` | `FILEIO` | 1,089 |
+| `.B08` | `FILEIO` | 1,090 |
 | `.B08` | `FILEDIR` | 422 |
-| `.B08` | entry bridge and page padding | 25 |
+| `.B08` | entry bridge and page padding | 24 |
 | | **bank 8 payload** | **1,536** |
 | `.B09` | `THEME` | 502 |
 | `.B09` | entry bridge and page padding | 266 |
 | | **bank 9 payload** | **768** |
-| `.B10` | `COMBO` | 704 |
-| `.B10` | entry bridge and page padding | 64 |
+| `.B10` | `COMBO` | 705 |
+| `.B10` | entry bridge and page padding | 63 |
 | | **bank 10 payload** | **768** |
-| `.B11` | `GMX.STRINGS`, `GMX.FILES` and what they call | 2,867 |
-| `.B11` | entry bridge and page padding | 205 |
+| `.B11` | `GMX.STRINGS`, `GMX.FILES` and what they call | 2,904 |
+| `.B11` | entry bridge and page padding | 168 |
 | | **bank 11 payload** | **3,072** |
 
-Banks 5 and 6 hold no p-code at all: 7,424 and 4,608 bytes of payload, all of it literal text.
+Measured 2026-09-14, after the shims were deleted. Banks 5 and 6 hold no p-code at all: 7,424 and
+4,352 bytes of payload, all of it literal text.
 
 **Two modules in low memory against eighteen in banks, and that is the point of the regions.**
 What is left in low RAM is what could not go: `STASH` and `STASHFILE` hold `BANK` statements, which
-`CommandBankGuard` refuses inside a region, and the five `SHIM.*` files are the front doors to the
-five library regions — bank 11's front door is in `GPBMODS.BASL` itself, because the code behind it
-is the program's own. Nothing else disqualified anything — `FILEIO`'s `OPEN`, `INPUT#` and `CLOSE`
+`CommandBankGuard` refuses inside a region. Nothing else disqualified anything — `FILEIO`'s `OPEN`, `INPUT#` and `CLOSE`
 leave `$00` alone (measured for `FILEDIR`, banked since 2026-09-07), a `GP.ASM` blob's body never
 occupies a region either way, and `BANKMGR` names banks without ever selecting one.
 
-**Six regions and not one**, because a region may not call another: all six live at `$A000`, so the
-branch has no distance to travel and `GPBankMakeOffset` refuses it. Every call between them goes
-down through a low-memory shim, which is what the 1,153 bytes of `SHIM.*` in the table buy.
+**Six regions and not one**, because a region holds at most 8,192 bytes and the GUI fills its own.
+A call from one region into another compiles to `.bgosub`, which selects the other bank, and
+`RETURN` puts the caller's back.
 
 **A region that is nearly empty still costs a whole page count.** Bank 9 holds 502 bytes of `THEME`
-in a 768-byte overlay and bank 10 704 bytes of `COMBO` in another 768; the entry bridge, the
+in a 768-byte overlay and bank 10 705 bytes of `COMBO` in another 768; the entry bridge, the
 alignment padding and the exit bridge are part of what has to fit, and the region is rounded up to
 a page. Below about a page and a half of p-code a region gives back less than it looks like.
 
@@ -194,9 +188,8 @@ cannot pass silently, and the next group of text to be added belongs in bank 6, 
 
 `ABOUT / BANK MEMORY` and `ABOUT / MODULE SIZES` carry these numbers on screen, and **they are
 typed into `GP.BANKEDSTR` blocks, so they are only true of the build they were taken from.**
-Changing a number changes the program's size, which changes the number — `GPBMODS.BASL:2487-2488`
-currently says `RESIDENT P-CODE 12755`, `.B05 8194` and `.B06 3842` against the 12,885, 7,426 and
-4,610 above.
+Their number fields are a fixed width, so correcting a figure after a rebuild changes no size. They
+were last corrected on 2026-09-14, to this table and to the 11,619-byte resident object.
 
 **This is the program that needed the compiler line table doubled.** It marked 2,156 lines and the
 table held 2,048 — one 8K bank at 4 bytes an entry — so the compile stopped with
@@ -207,7 +200,7 @@ table runs on two banks now and holds 4,096; this build marks **2,902**. See `ST
 `PLAN.md` §3 has how the measurement is done, and the method is in
 `docs/memory/measure-pcode-per-module.md`. **Split the map into its two address spaces before
 differencing anything.** Low-memory p-code runs upward from `$0006` and the six regions are laid
-out in one block above it — from `$3300` in this build — so the map is not monotonic by line, and a
+out in one block above it, so the map is not monotonic by line, and a
 naive walk down it charges a module the jump between the two spaces. Difference within each space,
 charge each module by its own first label to the next module's, and give each region's tail padding
 a row of its own; every region column above then sums to its overlay payload exactly.
@@ -215,13 +208,13 @@ a row of its own; every region column above then sums to its overlay payload exa
 ## The room it has to RUN in, which is the tighter budget
 
 **A shared program's workspace is what is left between its own p-code and the resident runtime**,
-and for this one that is `$4500`..`$6600` — **8,448 bytes**, all of it read straight out of the
+and for this one that is `$4000`..`$6600` — **9,728 bytes**, all of it read straight out of the
 built `.PRG`. The start page is `PCODE_PAGE` (`$0A`), plus one for the bootstrap extension a banked
 program carries, plus the object's p-code page count, plus `FrameStackPages`; `ObjectWriteShared`
 computes it and the bootstrap then carries the pair as the operands of `ldx`/`ldy` at `BBBasePage`,
 so it can be read back rather than recomputed. The first p-code opcode is `.varspace`, whose
-operand says how much of the workspace the scalars take. Here that is **3,436**, leaving about
-**5,012** for the string arrays (2 bytes an element) and the whole string heap.
+operand says how much of the workspace the scalars take. Here that is **3,292**, leaving about
+**6,436** for the string arrays (2 bytes an element) and the whole string heap.
 
 **That is the number FILES/DIR OPEN ran out of once.** It builds twenty-four listbox rows of ~38
 characters, and a concrete block is `length x 1.5 + 3`, so the rows alone want ~1,440 bytes --
@@ -237,11 +230,12 @@ a dozen frames deep. It is 8 now, and every shared program gets those 2,048 byte
 **The regions were the other half, and they are this program's own doing.** Every include that
 could go, went. On 2026-09-08 one region took eight modules out of low RAM and the object fell
 15,254 -> 14,001. Four more regions since — the file modules on bank 8, `THEME` on 9, the combo box
-on 10, and this program's own two biggest dropdown handlers on 11 — took it from **14,287 to
-12,885**, and the workspace from `$4900`..`$6600` (7,424) to `$4500`..`$6600` (**8,448**), while
-three modules and several panels were added on top. `.varspace` went the other way, 2,812 -> 3,436:
-moving code into a bank moves no scalars, because a banked routine's variables are the same
-workspace variables its shim sees.
+on 10, and this program's own two biggest dropdown handlers on 11 — took it from 14,287 to 12,885.
+Deleting the shims, once a call into a region selected the bank itself, took it to **11,619**. The
+workspace went from `$4900`..`$6600` (7,424) to `$4000`..`$6600` (**9,728**), while three modules
+and several panels were added on top. `.varspace` went from 2,812 to 3,292: moving code into a bank
+moves no scalars, because a banked routine's variables are the same workspace variables low memory
+sees.
 
 **Typing costs nothing and a float costs six bytes.** `AllocateBytesForType` gives an untyped
 scalar 6 bytes and an `%` or `$` one 2, and an undimensioned array is 0..10 whatever it holds. The
@@ -256,40 +250,33 @@ stock BASIC does — so loop counters stay float.
 and proved here, then copied whole into the root — never merged by hand, and the root copy is what
 `samples/GPC-HELP` and `samples/editor` build against.
 
-**Every banked module is a twin, and the plain file is untouched.** `STRINGS.INC.BL` holds
-`STR.PADR` and goes in low memory; `STRINGS.BANK.INC.BL` holds `STR.PADR.BODY` and goes in a
-region, and `SHIM.UTILBANK.INC.BL` owns the plain name in between. Eighteen of the twenty modules
-have a `.BANK` twin — every one except `STASH` and `STASHFILE`, which hold `BANK` statements and
-cannot be banked at all. **So the plain copy is still a straight overwrite into root**, which the
-earlier `.PLAIN` scheme was not: nothing has to be renamed back on the way out.
+**A module is one file, and the program decides where it goes.** `STRINGS.INC.BL` holds `STR.PADR`
+whether its `#INCLUDE` is in low memory or inside a `GP.BANKED` region. A call into a region
+selects the region's bank and `RETURN` puts the caller's back (`GP-BASIC.md` §3.12), so no module
+has a banked twin and no call needs a shim. Eighteen of the twenty modules are in a region here;
+`STASH` and `STASHFILE` hold `BANK` statements and stay in low memory. **So a module is still a
+straight overwrite into root.**
 
-`STRCASE` is the one that changed shape as well as name: its two `GP.DEFPROC` declarations live in
-`SHIM.UTILBANK.INC.BL`, because a verb's call site is compiled into a jump to the body and a jump
-out of low memory has to select the bank first.
+`STRCASE` declares `STR.UCASE` and `STR.LCASE` with `GP.DEFPROC` on the line above each body, and
+`FILEIO` declares `FILE.SIZE` the same way. None of the three has a label: a label with a verb's
+name is `DUPLICATE SYMBOL`.
 
-Copy a twin and it brings its front door with it. To lift a bank into another program, take the
-one `SHIM.*BANK.INC.BL` and the `.BANK.INC.BL` files listed under it in `GPBMODS.BASL`, and nothing
-else.
+To lift a bank into another program, take the `.INC.BL` files between its `GP.BANKED` and
+`GP.ENDBANKED` in `GPBMODS.BASL`, and the `#DEFINE` that names its bank.
 
-**Against root, this folder is ahead.** Six modules do not exist in root at all — `BANKMGR`,
-`COMBO`, `FILEDIR`, `FILEIO`, `STASHVRAM`, `STASHVRAMGC` — and ten more differ: `APPSYS`, `GUI`,
-`KB`, `MENUVERT`, `SORT`, `STASH`, `STASHFILE`, `STRCASE`, `STRINGS` and `STRUSING`. Four are
-identical: `GUI2`, `LINEINPUT`, `MENUBAR` and `THEME`. Port a fix by hand in either direction.
+**Against root, this folder is ahead.** Five modules do not exist in root at all — `BANKMGR`,
+`FILEDIR`, `FILEIO`, `STASHVRAM`, `STASHVRAMGC` — and seven more differ: `APPSYS`, `KB`, `SORT`,
+`STASH`, `STASHFILE`, `STRINGS` and `STRUSING`. Eight are identical: `COMBO`, `GUI`, `GUI2`,
+`LINEINPUT`, `MENUBAR`, `MENUVERT`, `STRCASE` and `THEME`. Port a fix by hand in either direction.
 
 **`GPB.INC.BL` is the exception that runs the other way.** It is the keyword ABI, root is upstream
 for it, and `modsbuild.py` copies root's over this folder's on every build. Never copy this one
 outward.
 
 **Twenty are included, and seventeen are exercised.** `COMBO`, `KB` and `STASHVRAMGC` are compiled
-in and shimmed — `COMBO.ADD`, `KB.CLEARKB` and `SV.COMPACT` all have front doors — but no panel
-calls any of them, so nothing on screen drives them. That is 1,036 bytes of banked p-code — `COMBO`
-704, `STASHVRAMGC` 304, `KB` 28 — and bank 10 exists for the first of the three alone. Rows for
+in, but no panel calls `COMBO.ADD`, `KB.CLEARKB` or `SV.COMPACT`, so nothing on screen drives
+them. That is 1,037 bytes of banked p-code — `COMBO` 705, `STASHVRAMGC` 304, `KB` 28 — and bank 10 exists for the first of the three alone. Rows for
 them are the next thing the shell owes.
 
 `BMX` is out: it needs a bitmap file and a screen-mode change and is not GUI, and
 `GPC-BASIC/BMXVIEW.EXP.BL` already covers it.
-
-`SHIM.FUTILBANK.INC.BL` is separate from `SHIM.GUIBANK.INC.BL` because BASLOAD resolves every label
-in every file it reads, so a `FILE.DIR` shim in `SHIM.GUIBANK.INC.BL` stops the build with
-`LABEL NOT FOUND` in any program that does not also include `FILEDIR` — which is `PICKDEMO` and
-`SPIKE`. `GPBMODS` includes both.

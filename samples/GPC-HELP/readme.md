@@ -1,8 +1,8 @@
 # GPB.HELP
 
-The GP.BASIC and BASL reference, on the machine. A scrolling master index over 43 topics, written
-in GP.BASIC and built from `GPC-BASIC/` — the manual, the name register and the module banner
-headers — by a script, so the help cannot drift from the library it documents.
+The GP.BASIC and BASL reference, on the machine. A scrolling master index over 74 topics, written
+in GP.BASIC and built from `GPC-BASIC/` — the manual, the name register, the file list and the
+module banner headers — by a script, so the help cannot drift from the library it documents.
 
 Run it:
 
@@ -25,12 +25,13 @@ topics are indented under them, sections under those.
 | `N` | find the next match | |
 | `L` | | the cross references, as a list |
 | `X` | | write this topic's code out as a `.BL` |
+| `T` | the next theme | the next theme |
 | `?` | about | |
 | ESC | quit | back — one link at a time, then the index |
 
-**Find is case-insensitive and searches the index, not the text.** It runs against what is
-already in memory, so it costs no disk at all; `STRCASE.GO` folds a *copy* of each entry, because
-folding in place would rewrite the index itself.
+**Find is case-insensitive and searches the index, not the text.** It reads the index out of its
+bank and opens no file. `STRCASE.GO` folds a *copy* of each entry, because folding in place would
+rewrite the index itself.
 
 **`X` writes ASCII, not a program.** It pulls the `:` lines out of the topic — the syntax block and
 every example in it — and writes them with a header naming where they came from. `BASLOAD` it.
@@ -40,10 +41,15 @@ every example in it — and writes them with a header naming where they came fro
 | category | topics | from |
 |---|---:|---|
 | Getting started | 2 | `GP-BASIC.md` §1–2 |
-| GP.* core keywords | 11 | `GP-BASIC.md` §3 |
-| BASL modules | 15 | `GP-BASIC.md` §4, plus the banner headers of `GUI`, `GUI2`, `MENUBAR`, `STASH` and `STASHFILE` |
-| Globals and naming | 9 | `GP-BASIC.GLOBALS.md` |
+| What is in GPC | 7 | `GP-BASIC.FILES.md` |
+| GP.* core keywords | 23 | `GP-BASIC.md` §3 |
+| BASL modules | 26 | `GP-BASIC.md` §4, plus the banner headers of `GUI`, `GUI2`, `MENUBAR`, `STASH` and `STASHFILE` |
+| Globals and naming | 12 | `GP-BASIC.md` §5 and `GP-BASIC.GLOBALS.md` |
 | The traps | 1 | `GP-BASIC.md` §6 |
+| Compiler known bugs | 1 | `GP-BASIC.md` §8 |
+| Memory and limits | 2 | `GP-BASIC.md` §7 |
+
+A topic longer than 120 lines is split, and each part counts as a topic.
 
 The five banner-only modules matter: **none of them appear in `GP-BASIC.md`'s tables**, so without
 that pass they would be missing from the help entirely.
@@ -53,26 +59,42 @@ what that buys you), **DESCRIPTION**, **EXAMPLE PROGRAM**, **SEE ALSO** — beca
 distinction the library is built on and it belongs next to the keyword, not in a table three
 screens away.
 
-[`GPC-HELP.md`](GPC-HELP.md) is the same content in one file, for reading on a PC. Also generated.
-[`GPC-HELP-TESTING.md`](GPC-HELP-TESTING.md) is the PC file again, built over the working library in
-`samples/GPB-MODS-TESTING/GPC-BASIC/` — see below.
+[`GPC-HELP.md`](GPC-HELP.md) is the same content in one file, for reading on a PC.
+[`GPC-HELP.WIN.md`](GPC-HELP.WIN.md) is that file with the page splits joined, one contents list,
+and the cross references as links. [`GPC-HELP-TESTING.md`](GPC-HELP-TESTING.md) is the PC file
+built over the working library in `samples/GPB-MODS-TESTING/GPC-BASIC/` — see below. All three are
+generated.
 
 ## Rebuilding the content
 
 ```
 python samples/GPC-HELP/MKHELP.PY
+python samples/GPC-HELP/MKHELPWIN.PY
 ```
 
-Reads `GPC-BASIC/` and writes `HELP-TXT/H001.HLP`…`H043.HLP` and `HELP-TXT/GPB.HELP.IDX`, plus
-`GPC-HELP.md` beside itself. **Everything the viewer reads is in the one subfolder**, opened
-through the CMD path syntax `//HELP-TXT/:NAME` — what CMDR-DOS documents, and what a real SD
-card wants; the emulator would also take a plain `HELP-TXT/NAME`, which is the form that would
-not port. A run that produces fewer topics than the last one deletes the orphans.
-`--src` and `--out` move either end; `--maxpage` changes where a long topic is split.
+`MKHELP.PY` reads `GPC-BASIC/` and writes `HELP-TXT/H001.HLP`…`H074.HLP`, `HELP-TXT/GPB.HELP.IDX`
+and `GPC-HELP.md`. `MKHELPWIN.PY` reads `GPC-HELP.md` and writes `GPC-HELP.WIN.md`.
+
+**Everything the viewer reads is in the one subfolder**, opened through the CMD path syntax
+`//HELP-TXT/:NAME` — what CMDR-DOS documents, and what a real SD card wants; the emulator would
+also take a plain `HELP-TXT/NAME`, which is the form that would not port. A run that produces fewer
+topics than the last one deletes the orphans. `--src` and `--out` move either end. `--maxpage`
+changes where a long topic is split, 120 lines by default. `--nosections` leaves the section rows
+out of the index.
 
 **It exits non-zero if a character had no ASCII mapping**, listing the code points. That check
-exists because `−1` (U+2212, not the ASCII hyphen) shipped as `?1` — a substitution no eye catches
-in 90 KB of generated text.
+exists because `−1` (U+2212, not the ASCII hyphen) came out as `?1` — a substitution no eye catches
+in generated text.
+
+**WARNING: the committed `.HLP` files carry hand edits the masters lack.** A plain run puts the
+longer master text back. To carry a master change into them, render the old masters and the new
+into two scratch folders with `--src` and `--out`, `diff -u` the two renders, and `patch` the
+committed files. Take a whole file only where the committed copy equals the render of the old
+masters.
+
+Thirteen hand-edited topics no longer match their index line counts: H001, H002, H003, H011, H013,
+H014, H015, H022, H059, H060, H067, H069 and H071. The viewer's scroll limit and END come from the
+index count. H007 is also hand-edited, and its line count still matches the index.
 
 ### The PC file, over the working library
 
@@ -80,40 +102,66 @@ in 90 KB of generated text.
 python samples/GPC-HELP/MKHELP.PY --mods samples/GPB-MODS-TESTING/GPC-BASIC --md-only --md-name GPC-HELP-TESTING.md
 ```
 
-`--mods` takes the module banner headers from somewhere else, and writes up **every** `.INC.BL` in
-that folder the manual does not already document — not just the five in `BANNER_ONLY`. The working
-library holds modules `GP-BASIC.md` has never heard of (`BANKMGR`, `FILEDIR`, `FILEIO`, `KB`,
-`COMBO`, `STASHVRAM`, `STASHVRAMGC`), and this is how they get an entry. A plain run
-does not sweep, so the topic numbering the shipped `.HLP` files use does not move.
+`--mods` takes the module banner headers from another folder, and writes up **every** `.INC.BL` in
+it that the manual does not document — not just the five in `BANNER_ONLY`. That is how a working
+module `GP-BASIC.md` does not describe gets an entry. A plain run does not sweep, so the topic
+numbering of the `.HLP` files does not move.
 
 `--md-only` writes the Markdown and nothing else: no `.HLP` files, no index. That is the pairing
-`--mods` wants — **the X16 help ships with the library it was built from, while the PC file can
-document a working copy without disturbing it.** `--md-name` picks the file.
+`--mods` wants: the X16 help stays built from the master library, and the PC file can document a
+working copy beside it. `--md-name` picks the file.
 
-Sections 1–3, 5–7 and the name register still come from `--src`, because the manual is the manual;
-only the module entries move. Splitting is off in `--md-only`, since the page budget is the viewer's
-and part two of a split carries no Markdown.
+Everything except the module entries still comes from `--src`. Splitting is off in `--md-only`,
+since the page budget is the viewer's and part two of a split carries no Markdown.
 
 ## Rebuilding the program
 
 It builds in this folder, with nothing staged into `testing\`. The source includes its modules as
 `GPC-BASIC/NAME.INC.BL`, and `GPC.BIN` and `BASLOAD-GPC.BIN` sit beside it. `python` and `make`
-are off PATH; see `documents/local.make`.
+are off PATH; see `docs/BUILDING.md`.
+
+```
+python source\gpc\samplesbuild.py GPB.HELP
+```
+
+That runs the two steps below, then copies `GPB.RT.nnn.BIN` and `GPC.RT.nnn.BIN` from `testing\`
+into this folder. Git ignores the copies.
 
 ```
 python source\gpc\build_basl.py     --drive samples\GPC-HELP GPB.HELP.BASL GPB.HELP.SRC.PRG
-python source\gpc\compile_shared.py --drive samples\GPC-HELP --embedded GPB.HELP.SRC.PRG GPB.HELP.PRG
+python source\gpc\compile_shared.py --drive samples\GPC-HELP GPB.HELP.SRC.PRG GPB.HELP.PRG GPB.HELP.MAP
 ```
 
-`python source\gpc\samplesbuild.py GPB.HELP` runs the same two steps.
-
-then copy `GPB.HELP.PRG` back here. **EMBEDDED, not shared**, so this directory stands on its own
-without a `GPB.RT.nnn.BIN` whose name carries a build number. 23,772 bytes.
+The object is SHARED: it loads `GPB.RT.nnn.BIN` off the drive when it runs. 14,595 bytes.
 
 **No `#AUTONUM`.** The directive sets the *step* between generated line numbers, not whether lines
 are numbered, and the default step of 1 is the only one `STRCASE.INC.BL` survives. At any other step
 its label jumps resolve to lines that were never generated: BASLOAD tokenises happily and GPC stops
 with `UNKNOWN LINE NUMBER`.
+
+### Removing dead code
+
+`compile_shared.py` never removes dead code. `GPC.PRG` removes it when `REMOVE DEAD CODE?` is
+answered `Y`. `GPC.BIN` removes it when line 5 of `GPC.INPUT` names a file. `GPC.INPUT` here is set
+up for this program:
+
+```
+GPB.HELP.SRC.PRG
+C.GPB.HELP.SRC.PRG
+M.GPB.HELP.SRC.PRG
+SHARED
+D.GPB.HELP.SRC.PRG
+```
+
+The five lines are source, object, map, `SHARED`, and the removed-line list. Tokenise first, then run
+the engine on this folder from the repository root:
+
+```
+bin\x16emu\x16emu.exe -rom bin\x16emu\rom.bin -fsroot samples\GPC-HELP -prg samples\GPC-HELP\GPC.BIN -run
+```
+
+It removes 74 lines and 646 bytes. `D.GPB.HELP.SRC.PRG` lists the removed BASIC line numbers. Git
+ignores the three outputs. `GP-BASIC.md` §7, under Removing dead code, has the rules.
 
 ## The decisions, and the measurements behind them
 
@@ -130,31 +178,27 @@ Measured on the X16, against a 41 KB `MODS.HLP`:
 | 1000 | **204** | 7 |
 
 **3.4 seconds to turn to a page near the end, growing with depth.** The skip was the entire cost;
-the reading was free. So there is now nothing to skip — 38 files, and every open is the same price.
+the reading was free. So there is nothing to skip: one file a topic, and every open costs the same.
 
-### The topic lives in a bank, and it is read once
+### The topic and the index live in banks
 
-A topic is read once, into RAM bank 9, and every repaint comes out of that. Only the index is on
-the string heap.
+A topic is read once, into RAM bank 9 (`HELP.TBANK`), and every repaint comes out of that. The index
+is read once at startup, into bank 10 (`HELP.IBANK`). Bank 8 is `GUI.BANK` and holds the cells under
+an open dialog.
 
-Not the heap, because there is no room on it. Blitz's string heap costs **about 1.67 bytes per
-character** (measured: 88 strings of 38 characters cost 5,280 bytes), and a program carrying this
-much of the GUI library has about a kilobyte of workspace left over:
+Neither goes on the string heap. Blitz's string heap costs **about 1.67 bytes per character**
+(measured: 88 strings of 38 characters cost 5,280 bytes). With a topic on the heap, the first build
+died with `OUT OF MEMORY` opening a 120-line topic. With the index on the heap, a twelve-link SEE
+ALSO did the same. Moving the index into a bank gave back about 6,400 bytes of workspace for 432
+bytes of p-code.
 
-| | object bytes |
-|---|---:|
-| `GPB.INC.BL` alone | 12,331 |
-| `+ THEME + STASH + MENUVERT + LINEINPUT + GUI` | 17,399 |
-| `+ STRCASE + APPSYS` | 17,688 |
-| `+ GUI2` (the listbox) | 19,306 |
+**The topic bank** holds a line table at the front, four bytes a line — offset low, offset high,
+length, kind — for up to 140 lines, and the text above it. A line is truncated at 78 characters,
+because no row can show more.
 
-The index alone is ~5,000 bytes of heap. A 120-line topic beside it is another ~7,000, and the
-first build died with `OUT OF MEMORY` doing exactly that. A bank costs the workspace nothing.
-
-**The line table is in the bank too**, at the front: four bytes a line — offset low, offset high,
-length, kind — and the text above it, truncated at 78 characters because no row can show more.
-Three BASIC arrays of 140 entries would have been 840 bytes of workspace, which is most of what
-there is. Bank 9 is `HELP.TBANK`; bank 8 is `GUI.BANK` and holds the cells under an open dialog.
+**The index bank** holds eight bytes a row at the front — text offset low and high, length, type,
+topic, section line, topic length low and high — and the text above them. `HELP.MAXIX` is 250 rows:
+2,000 bytes of records and 6,192 for text. Rows past the end are dropped.
 
 `GUI2.INC.BL` went for the same reason: the section and cross-reference pickers are at most 12
 items, which fit a screen, so `GUI.MENU` does the job and the listbox's 1,618 bytes buy nothing.
@@ -217,8 +261,8 @@ Three things here were measured because guessing them got them wrong:
 
 - **The per-line string work costs nothing.** Peeling the marker off each line with `LEFT$` and
   `MID$` looked like the obvious next target. Reading it through `GP.STRPTR` with `PEEK` instead
-  changed the time not at all — 62/59 against 60/61. It stayed in regardless: it is about five
-  fewer heap allocations a line, and the self-check build runs a kilobyte from `OUT OF MEMORY`.
+  changed the time not at all — 62/59 against 60/61. It stayed in: it is about five fewer heap
+  allocations a line.
 - **`memory_copy` cannot do the load**, though it does the slide. It takes no bank argument, and
   `BANK` in BASL applies only around a `PEEK` or a `POKE` — a raw `GP.CALL` runs with whatever
   BASIC left in `$00`. It loaded in 91 jiffies and got 214 of 218 test bytes wrong. Holding a bank
@@ -230,11 +274,7 @@ Three things here were measured because guessing them got them wrong:
 
 The slide is verified rather than eyeballed: the same offset reached two ways — five single-line
 slides against one full repaint, and ten down plus ten back up against the same — compared cell by
-cell. **Rows 1–28 are byte-identical, characters and attributes.** `STASH` was the first
-implementation and is worth one warning if it ever comes back: `STASH.SAVE` and `STASH.RESTORE`
-each select their own bank and do not put it back, so the row painter read the stash buffer as
-text and the screen filled with `#G#U#I#`. `HELP.PAGE.ROW` re-selects `HELP.TBANK` every time for
-that reason.
+cell. **Rows 1–28 are byte-identical, characters and attributes.**
 
 ### `&` in a button label marks the key
 
@@ -260,8 +300,9 @@ There is **no escape for a literal `&`**; a label that needs one cannot have an 
 
 `THEME.HI` trades an attribute's two nibbles, which is what turns white-on-black text into a
 black-on-white **bar** — the same thing the buttons in `GPC-BASIC/GUI.INC.BL` do to the panel
-colour. Header `16`, footer `192`, worked out once at boot rather than per draw, because both are
-painted on every page turn. Section headers inside a page are still white on black.
+colour. The header bar is `THEME.TITLE` reversed and the footer `THEME.DIMMED` reversed. Both are
+worked out on a theme change, not at every page turn. `T` cycles CLASSIC, DARK and LIGHT. Section
+headers inside a page are not reversed.
 
 ### CP437
 
@@ -283,70 +324,59 @@ also uploads the ISO font, throwing the line drawing away.
 `APPSYS.RESTORE` hands the user's whole `$0372` byte back on the way out — charset number *and* the
 flag, because `screen_set_charset` does not clear bit 6 on its own.
 
-## `GPC-BASIC/` here has diverged, on purpose
+## `GPC-BASIC/` here
 
-`GPC-BASIC/GUI.INC.BL` in this directory draws the answers as **buttons** — `< OK >` in the panel's
-own attribute with the nibbles swapped — where the library still prints a dimmed hint line with one
-letter lit. `GUI.BUTTON`, `GUI.BUTTON.SIZE`, `GUI.BUTTON.WIDE`, `GUI.BUTTON.ROW` and `GUI.BTN.PAIR` are the
-new routines. `GUI.YN.MARK` went the other way: the hint line it repainted no longer exists here.
-
-It is here rather than in the master `GPC-BASIC/` so the look can be seen running before every
-dialog in the tree changes; nothing else compiles against this copy. See TODO.md, "Buttons — decide
-whether the library adopts them". The one thing it takes away is `GUI.YN`'s `GUI.HINT$`: "the first
-Y and the first N in the line are lit as the keys" has nothing to light when the row is two buttons.
-
-`GUI.SAY` — a message and one way out — **is** in the master library, and is what the three
-"wrote 34 lines" / "not found" / "nothing to export" boxes use.
+The ten modules `GPB.HELP.BASL` includes, so a rebuild needs nothing from the master library. The
+build reads them from this folder. They are copies and are not kept in step: `MENUVERT.INC.BL` here
+lacks the separator rows `GPC-BASIC/MENUVERT.INC.BL` has. Their headers still name `.BANK.INC.BL` twins and
+`SHIM.*` files, which the master library no longer has.
 
 ## The self-check
 
 `GPB.HELP.BASL` carries a headless harness behind one flat symbol. **Comment out `#DEFINE
 HELP.RELEASE 1`** and build as above; it runs instead of the viewer, prints to the log, and stops.
-A BASL module has no dead code elimination, so leaving it in would be p-code every user carries.
+With the symbol defined, the harness is not compiled at all.
 
-**IT NO LONGER FINISHES, and that is the harness running out and not the viewer.** The `WHAT IS IN
-GPC` category added six topics and seven index rows, and the check build — which carries its harness
-on top of everything the viewer holds — now dies with `OUT OF MEMORY` partway through. The release
-build has about 2,100 bytes free and is unaffected.
+It checks that every index row still reaches the topic `MKHELP.PY` meant it to. It opens the file
+behind each topic and section row, and prints:
 
-Two things make it run further, and the first is enough to reach the assertions that matter:
+| line | on a pass |
+|---|---|
+| `INDEX ROWS` | 146 |
+| `ROWS WITHOUT A TOPIC OR LENGTH` | 0 |
+| `ROWS OPENED` | 138, every row but the eight category headings |
+| `ROWS WITH NO TOPIC RECORD` | 0 |
+| `ROWS WHOSE LENGTH DISAGREES` | 0 |
+| `SECTIONS PAST THE END` | 0 |
+| `LINES READ` | the topic lines, summed over every row opened |
+| `CROSS REFERENCES RESOLVED` | the cross references, summed the same way |
 
-- **Build the check with a smaller `HELP.MAXIX`.** A row costs ten bytes of workspace whether it is
-  used or not, so 120 against today's 95 is 250 bytes of headroom the check cannot spare. At 96 it
-  gets through the whole index-and-topics pass. This is legitimate rather than a fudge: the check
-  verifies the index that EXISTS, and the headroom is a release concern.
-- **Do not stack another check on top of it.** Extra harnesses go in their own build.
+It then searches the index for `strptr` and prints `FIND STRPTR LANDED ON ROW`, `FRE AT THE END`
+and `SELFCHECK DONE`.
 
-Even at 96 it stops before the cross-reference and slide passes. **The fix is the standing one** —
-move the index text into a bank the way the topic already is, which ends the workspace pressure
-rather than trading against it. Until then the check proves the part that catches real damage.
-
-It asserts the thing that cannot be checked by looking — that every row in the index still reaches
-the topic `MKHELP.PY` meant it to:
-
-```
-INDEX ROWS 95                     ROWS WITH NO TOPIC RECORD 0
-ROWS WITHOUT A TOPIC OR LENGTH 0  ROWS WHOSE LENGTH DISAGREES 0
-ROWS OPENED 89                    LINES READ 6681
-```
-
-Every one of the 89 selectable rows opens a file in `HELP-TXT/` whose line 1 is a topic record, and
-every line count in the index matches the file. Get any of those wrong by one and **the viewer shows
-the wrong page rather than failing**, which is the failure nobody notices. The cross-reference and
-search assertions come after this point and are where the memory runs out today.
-
-The interactive loop is driven too, by pushing keys through the KERNAL's `kbdbuf_put` the way
-`GPC-BASIC/MENUTST.EXP.BL` does — down, RETURN, PgDn, ESC, ESC, Y — through `HELP.INDEX` itself,
-not a test double.
+A length that disagrees does not stop the viewer. The thirteen hand-edited topics listed under
+Rebuilding the content disagree today.
 
 ## Files
 
 | | |
 |---|---|
 | `GPB.HELP.BASL` | the viewer |
-| `GPB.HELP.PRG` | compiled, embedded, 23,563 bytes — what `help-demo.bat` runs |
+| `GPB.HELP.PRG` | compiled SHARED, 14,595 bytes — what `help-demo.bat` runs |
+| `GPC-BASIC/` | the ten modules the viewer includes |
+| `HELP-TXT/GPB.HELP.IDX` | the master index, 146 rows |
+| `HELP-TXT/H001.HLP`…`H074.HLP` | one topic each |
 | `MKHELP.PY` | the content build |
-| `HELP-TXT/GPB.HELP.IDX` | the master index, 95 rows |
-| `HELP-TXT/H001.HLP`…`H043.HLP` | one topic each |
-| `GPC-HELP.md` | the same content, for a PC |
-| `GPC-BASIC/` | the eight modules a rebuild needs, so it needs nothing from the master |
+| `MKHELPWIN.PY` | `GPC-HELP.md` to `GPC-HELP.WIN.md` |
+| `GPC-HELP.md`, `GPC-HELP.WIN.md` | the same content, for a PC |
+| `GPC-HELP-TESTING.md` | the PC file, over the working library |
+| `GPC.PRG`, `GPC.BIN` | the compiler's front end and engine, for building in this folder |
+| `GPC.INPUT` | the engine's five lines for this program, with dead code removed |
+| `GPC.ERR.PRG` | turns a runtime error's address into a source line, using the map |
+| `GPC.IMG.122.BIN` | the runtime a self-contained object carries |
+| `BASLOAD-GPC.PRG`, `BASLOAD-GPC.BIN` | the tokeniser's front end and engine |
+| `XT`, `XFMGR/` | the XFMGR file manager, for looking at an export. Dev only, not part of the sample |
+| `.gitattributes` | keeps the `.HLP` and `.IDX` bytes as built |
+
+Build outputs, ignored by git: `GPB.RT.nnn.BIN`, `GPC.RT.nnn.BIN`, `GPB.HELP.SRC.PRG`,
+`GPB.HELP.SRC.SYM`, and the `C.`, `M.` and `D.` files a dead-code compile writes.

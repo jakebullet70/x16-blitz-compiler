@@ -75,8 +75,8 @@
 .list, and the control the TAB key has landed on.
 .
 .The routine used to be THEME.LOAD. It became THEME.SELECT when the library
-.split into banked bodies and unbanked front doors, and a program still
-.calling the old name stops at LABEL NOT FOUND.
+.was split into banked and low-memory files, and it stayed when they were
+.merged again. A program still calling the old name stops at LABEL NOT FOUND.
 .
 :THEME.ID = 1 : GOSUB THEME.SELECT
 :GP.BOX 4,2,30,8, 2, THEME.CLR(THEME.BORDER)

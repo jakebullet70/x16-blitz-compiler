@@ -10,11 +10,13 @@ sibling project: what is kept is a fact about **X16 BASIC or the X16 itself**, n
 
 ## How to work in this repo
 - [Answer the question asked](answer-the-question-asked.md) — lead with the number asked for
+- [Review findings must be reachable](review-findings-must-be-reachable.md) — drop anything only invalid source or a typo triggers
 - [Measure before changing code](measure-before-changing-code.md) — probes beat edit-and-see
 - [Prose style is flat reference](prose-style-is-flat-reference.md) — the five settled rules; `doc-style` owns them
 - [Write readable code, user crunches](write-readable-code-user-crunches.md) — one statement a line; an unexplained SRC edit is his crunch pass
 - [Comments light, code should flow](comments-light-code-should-flow.md) — heavy REMs mean bad naming
 - [No ship language, no unasked builds](no-ship-language-this-is-dev.md) — no build, no help regen, unless asked
+- [HLP files carry hand edits](hlp-files-carry-hand-edits.md) — a plain MKHELP.PY run reverts them; patch the render delta
 - [Never build PICKDEMO](never-build-pickdemo.md) — standing order; not even to verify a banked build
 - [Commit to main directly](commit-to-main-directly.md) — solo repo, no branch, no review
 - [Never commit OASIS](never-commit-oasis.md) — stage by name; OASIS/ is ignored and purged from history
@@ -65,7 +67,8 @@ sibling project: what is kept is a fact about **X16 BASIC or the X16 itself**, n
 - [SHARED p-code cap is RTBASE](gpc-shared-pcode-cap-is-rtbase.md) — ~17,920 bytes, not $9F00
 - [GPC Blitz runtime slack and limits](gpc-blitz-runtime-slack-and-limits.md) — the run-side ceiling is FREE minus 4096
 - [Run-side workspace, read from the PRG](run-side-workspace-read-from-the-prg.md) — two bootstrap page numbers give the budget
-- [Core page cushion below GPBase](gpc-core-page-cushion-below-gpbase.md) — ~40 B; cross it and every program grows 256 B
+- [Core page cushion below GPBase](gpc-core-page-cushion-below-gpbase.md) — 4 B left in the embedded image; measure from rtimage.lbl
+- [Compiler-emitted bank switch](compiler-emitted-bank-switch.md) — TODO item 4: .bgosub emitted, twins merged and shims deleted; built and tested 2026-09-14, docs committed, compiler code not
 - [Runtime footprint](blitz-x16-runtime-footprint.md) — 10,956 B in every program, and how to shrink it
 - [String heap scavenger](string-heap-scavenger.md) — SHIPPED: dead blocks reused, +1 page RT
 - [BINPUT# caps at 255 bytes](binput-caps-at-255-bytes.md) — three caps land on one number; it is a CHRIN loop
@@ -137,7 +140,7 @@ sibling project: what is kept is a fact about **X16 BASIC or the X16 itself**, n
 - [Every region gets its own .Bnn file](region-overlay-ovl-file.md) — BUILT; a .Bnn size is a PAGE COUNT unless topmost
 - [Object writer: regions vs low code](object-writer-regions-vs-low-code.md) — the streamer pads forward 65,535 bytes with no check firing
 - [A second region for the utilities](second-region-for-the-utilities.md) — BUILT; a BANK statement is the ONLY disqualifier
-- [Banked code loses the bank on a call out](gp-banked-call-out-loses-the-bank.md) — and may not BANK itself back
+- [Banked code loses the bank on a call out](gp-banked-call-out-loses-the-bank.md) — a region may not BANK itself back; every call into a region is now .bgosub, library shims gone
 - [FILEDIR banks whole](filedir-bank-split.md) — BUILT; the switch moved into its two blobs
 - [GPBMODS resident p-code breakdown](gpbmods-resident-pcode-breakdown.md) — the shell is 79%, all eight modules 21%
 - [Dead-code elimination, measured](basl-dead-code-elimination-measured.md) — 691 B free by deleting two #INCLUDEs; compiler-option plan in docs/blitz/DEAD-CODE-ELIMINATION.PLAN.md

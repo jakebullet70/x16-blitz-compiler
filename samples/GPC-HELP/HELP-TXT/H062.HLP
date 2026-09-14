@@ -28,9 +28,10 @@
 .error.
 .
 .The routine is THEME.SELECT, and it used to be THEME.LOAD. The name changed
-.when the library split into banked bodies and unbanked front doors; a
-.program written against the older library calls THEME.LOAD and stops with
-.LABEL NOT FOUND, which is the good kind of failure.
+.when the library was split into banked and low-memory files, and it stayed
+.when they were merged again; a program written against the older library
+.calls THEME.LOAD and stops with LABEL NOT FOUND, which is the good kind of
+.failure.
 .
 .THEME.FOCUS is the eighth role and the newest: the attribute a focused
 .control wears while GUI.FORM has the keyboard. THEME.SLOTS is 8 because of

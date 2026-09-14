@@ -19,6 +19,9 @@
 .            spelling pays anyway, plus 2 bytes for each argument
 .            after the first -- an argument waits on the frame stack
 .            until the call, so the number of formals is not a limit.
+.            A string result costs 3 bytes more: it is copied into a
+.            temporary, so two calls to one verb may share an
+.            expression.
 .  WARNING   The call must sit below its GP.DEFPROC, as GP.SUB's does.
 .            The body must not call its own verb: there is one set of
 .            formals and it would write over the arguments in use.
@@ -30,5 +33,6 @@
 :            PRINT "AREA "; GP.FN(AREA, 3, 4)
 :            T = A + GP.FN(AREA, 3, 4) * 2
 :            PRINT "X" + GP.FN(TAG, "AB") + "Y"
+:            PRINT GP.FN(TAG, "AB") + GP.FN(TAG, "CD")
 :            PRINT GP.FN(AREA, 2, GP.FN(AREA, 3, 4))
 .

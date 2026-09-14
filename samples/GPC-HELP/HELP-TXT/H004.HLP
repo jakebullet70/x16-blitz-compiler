@@ -2,18 +2,19 @@
 .
 =2. THE COMPILER
 .
-.GPC.PRG asks four questions -- input file, output file, debug map, shared
-.runtime -- writes the answers to GPC.INPUT, and chain-loads the engine.
-.Writing that file is all it does.
+.GPC.PRG asks five questions -- input file, output file, debug map, shared
+.runtime, remove dead code -- writes the answers to GPC.INPUT, and
+.chain-loads the engine. Writing that file is all it does.
 .
 .GPC.BIN takes its whole job from GPC.INPUT and asks nothing. One program can
 .therefore drive another: write the control file and RUN GPC.BIN. That is how
 .this project's test harness compiles, and how to get a build if the front
 .end itself is broken.
 .
-.GPC.INPUT is up to four text lines: source, object, map file, and the word
-.SHARED. It is per-user state and is not shipped; the front end rewrites it
-.on every compile.
+.GPC.INPUT is up to five text lines: source, object, map file, the word
+.SHARED, and the name of the removed-line list. An empty line, or one the
+.file stops short of, leaves that option off. It is per-user state and is not
+.shipped; the front end rewrites it on every compile.
 .
 .GPC.IMG.nnn.BIN is the runtime streamed into every self-contained object as
 .it is written. The engine cannot compile without it.

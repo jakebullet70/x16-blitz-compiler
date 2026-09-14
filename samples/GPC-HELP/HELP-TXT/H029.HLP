@@ -26,8 +26,8 @@
 .  Example
 .
 :            DB.SELECT:
-:              GP.DEFPROC DBSELECT, DB.A : BANK DB.CODEBANK
-:              GOSUB DB.SELECT.BODY
+:              GP.DEFPROC DBSELECT, DB.A
+:              DB.ROW = DB.A : GOSUB DB.READ
 :              RETURN
 :
 :            AREA:

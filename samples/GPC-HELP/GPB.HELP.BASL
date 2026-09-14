@@ -125,9 +125,9 @@
 #DEFINE HELP.GL.BR 217
 
 ## TWO BUILD MODES, ONE FLAT SYMBOL. Defined, the self-check does not compile
-## at all -- a BASL module has no dead code elimination, so a harness left in
-## is p-code every user carries. Comment this line out to build the headless
-## check instead of the viewer; samples/GPC-HELP/readme.md has the recipe.
+## at all, so the viewer carries none of it. Comment this line out to build the
+## headless check instead of the viewer; samples/GPC-HELP/readme.md has the
+## recipe.
 #DEFINE HELP.RELEASE 1
 
 ## 145 up, 17 down, 130 PgUp, 2 PgDn, 19 HOME, 4 END. samples/editor

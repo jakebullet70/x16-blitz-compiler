@@ -86,8 +86,9 @@ read, do not write, do not rely on).
 `DIM`ming an array GPC has already dimensioned is an error.
 
 **The routine is `THEME.SELECT`, and it used to be `THEME.LOAD`.** The name changed when the
-library split into banked bodies and unbanked front doors; a program written against the older
-library calls `THEME.LOAD` and stops with `LABEL NOT FOUND`, which is the good kind of failure.
+library was split into banked and low-memory files, and it stayed when they were merged again; a
+program written against the older library calls `THEME.LOAD` and stops with `LABEL NOT FOUND`,
+which is the good kind of failure.
 
 `THEME.FOCUS` is the eighth role and the newest: the attribute a focused control wears while
 `GUI.FORM` has the keyboard. `THEME.SLOTS` is 8 because of it, and `THEME.COUNT` stays 5 — the
@@ -361,8 +362,8 @@ and have not reached the root library yet. Until they do, one rectangle a bank.
 
 `STASH.FILE.SAVE`, `STASH.FILE.LOAD` and `STASH.FILE.PUT`, and **no variables of its own** — it sets
 `STASH.*` and calls through. The prefix exists to keep the three routine names apart from the rest
-of `STASH.`, not to hold state. Kept a separate `#INCLUDE` because a BASL module has no dead code
-elimination and the disk half is 127 bytes a program that never writes one would still carry.
+of `STASH.`, not to hold state. Kept a separate `#INCLUDE`: unless the compile removes dead code, the
+disk half is 127 bytes a program that never writes one would still carry.
 
 ### `SORT.INC.BL`
 
@@ -386,8 +387,12 @@ data, so a swap is cheap and the array's own storage never moves.
 |---|---|
 | in | `STRCASE.PTR` — `GP.STRPTR` of the string<br>`STRCASE.MODE` — `STRCASE.UPPER` or `STRCASE.LOWER` |
 | out | the string itself, rewritten in place |
-| internal | `STRCASE.ADDR%` `STRCASE.OP%` |
+| verbs | `STR.UCASE` `STR.LCASE` — a string in, a cased copy back, through `STRCASE.S$` |
+| internal | `STRCASE.ADDR%` `STRCASE.OP%` `STRCASE.S$` |
 | constants | `STRCASE.UPPER` `STRCASE.LOWER` |
+
+**`STR.UCASE` and `STR.LCASE` are the two `STR.` names this file owns.** The rest of `STR.` is
+`STRINGS.INC.BL`'s, and the two verbs are named for the module they are to move into.
 
 `#SYMFILE` again. **Do not write `#AUTONUM` in a program that includes this** — it sets the STEP,
 and only the default 1 survives.
@@ -402,7 +407,7 @@ are internal, and a `GOSUB` to one will do something, just not something useful.
 
 `MENUVERT` is the module with the most of them, because driving a menu is mostly branching:
 **`MENUVERT.RUN`, `MENUVERT.DRAW` and `MENUVERT.ROW` are the three you may call**, and
-`MENUVERT.HOTFIND` is a fourth only in an unbanked build — see the `.BODY` note below.
+`MENUVERT.HOTFIND` is a fourth.
 `MENUVERT.WAIT`, `.KEYED`, `.SETTLE`, `.WRAPTOP`, `.WRAPBOT`, `.CANCEL`, `.HOTKEY`, `.PADKEY`,
 `.PADREAD` and the three `FOLD` helpers are not.
 
@@ -423,8 +428,7 @@ runs with whatever `STR.OP%` last held. The callable names are `STR.PADR`, `PADL
 `GUI.INC.BL` has more internal labels than anything else in the library, because `GUI.FORM` is a
 dispatcher and every arm of it is one. **The callable names are `GUI.SAY`, `GUI.YN`, `GUI.MENU`,
 `GUI.INPUT`, `GUI.OPEN` and `GUI.CLOSE`**, plus `GUI.LISTBOX` from `GUI2.INC.BL`. `GUI.FORM` and
-`GUI.CLEARKB` are usable and undocumented — they are the module's own, called from inside the bank
-and not shimmed. Everything else, the whole of `GUI.FORM.*`, `GUI.BUTTON*`, `GUI.BTN.*`,
+`GUI.CLEARKB` are usable and undocumented — they are the module's own. Everything else, the whole of `GUI.FORM.*`, `GUI.BUTTON*`, `GUI.BTN.*`,
 `GUI.LIST.*`, `GUI.FIELD.DRAW`, `GUI.FRAME`, `GUI.GLYPHS`, `GUI.SHADOW.*`, `GUI.SIZE`,
 `GUI.PLACE.BOX`, `GUI.PLACE.SCROLL` and `GUI.SCREEN`, is not.
 
@@ -433,34 +437,20 @@ and not shimmed. Everything else, the whole of `GUI.FORM.*`, `GUI.BUTTON*`, `GUI
 `.SETTLE`, `.SETTLE.GO`, `.WRAPLEFT`, `.WRAPRIGHT`, `.CANCEL`, `.CHOSE`, `.HOTKEY`, `.HOTDONE`,
 `.PADKEY`, `.PADRELEASE`, `.PADREAD` and `.COLUMN` are not.
 
-### A public name and its `.BODY` are two labels
+### A module in a bank keeps its names
 
-The six modules the GUI is built from — `THEME`, `MENUVERT`, `MENUBAR`, `LINEINPUT`, `GUI`, `GUI2` —
-come in two files, and which one you `#INCLUDE` decides where the module runs. A banked routine
-cannot select its own bank, so in the banked file the code has to be a label of its own and the
-public name has to be a label in low memory that banks and then calls it.
+Where a module's `#INCLUDE` sits changes none of its names. `THEME.SELECT` is `THEME.SELECT` in low
+memory and inside a `GP.BANKED` region, and a `GOSUB` to it compiles to what reaches it: an ordinary
+`GOSUB` from inside the same region, and a `.bgosub` that selects the region's bank from anywhere
+else. [BANKED-OR-NOT.md](BANKED-OR-NOT.md) has the rules.
 
-| | |
-|---|---|
-| the library in low memory | `THEME.INC.BL` defines `THEME.SELECT` itself. Nothing else is needed, and a call costs nothing |
-| the library in a bank | `THEME.BANK.INC.BL` defines `THEME.SELECT.BODY`, and `SHIM.GUIBANK.INC.BL` — twenty-one shims, each `PUSH` then `GOSUB` then `POP` — defines the twenty-one public names |
+**So a name is callable from anywhere, in any build.** An older library gave some modules a
+banked `.BODY` and a low-memory front door, and a program that calls a `.BODY` name stops with
+`LABEL NOT FOUND`. What this section calls internal is still internal.
 
-**One or the other, never both**, and a banked build has to include every module its shim file
-names: BASLOAD resolves every label in every file it reads, so a shim standing in front of a body
-that is not there is `LABEL NOT FOUND`. Both files of one module at once is `DUPLICATE SYMBOL` where
-the module has no `#IFNDEF` guard and a silent first-one-wins where it has.
-[BANKED-OR-NOT.md](BANKED-OR-NOT.md) says how to choose.
-
-The shims go **before** the bodies in the file. A caller reads identically either way, which
-is the point of the split.
-
-**Only eighteen names are shimmed, and a name that is not shimmed is not callable from outside the
-bank.** `THEME.NEXT`, `THEME.RESET`, `THEME.SET`, `THEME.HI`, `MENUVERT.HOTFIND`, `GUI.FORM` and
-`GUI.CLEARKB` keep their plain names and no `.BODY`, so in an unbanked build they are ordinary
-labels you can `GOSUB` — and in a banked one they sit inside the region with everything else, where
-only the module itself can reach them. Nothing warns you: the `GOSUB` compiles and jumps into
-whatever the bank happens to hold. `MENUVERT.HOTFIND` is the one this catches, because §4 has
-always listed it as callable and it was, before the split.
+**Include a module once.** One `#INCLUDE` in low memory and another in a region is
+`DUPLICATE SYMBOL` where the module has no `#IFNDEF` guard. Where it has one, the module lands at
+the first `#INCLUDE` and the second produces nothing.
 
 Each module also has a skip label it jumps over itself with — `THEME.SKIP`, `APPSYS.SKIP`,
 `STR.SKIP`, `BMX.MODULE.END`, `LINEINPUT.MODULE.END`, `MENUVERT.MODULE.END`,

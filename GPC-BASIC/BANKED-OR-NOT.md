@@ -1,56 +1,51 @@
-# Two files per module: `X.INC.BL` and `X.BANK.INC.BL`
+# Running a module from a RAM bank
 
-Some modules come in two forms. Same code, same public names; the only difference is how a
-caller reaches the entry points.
+Every module is one file, `X.INC.BL`. The program that includes it decides whether its p-code runs
+in low memory or from a RAM bank. Nothing in the module or in its callers changes.
 
-| file | entry points | needs | costs |
-| --- | --- | --- | --- |
-| `X.INC.BL` | `THEME.SELECT:` | nothing | nothing — one `GOSUB`, straight in |
-| `X.BANK.INC.BL` | `THEME.SELECT.BODY:` | `SHIM.*BANK.INC.BL` above the region | a shim per entry point, plus a bank select and a restore on every call |
-
-**Include one or the other, never both.** Both define the same module, so BASLOAD either takes
-whichever it reads first and silently ignores the second, or stops with `DUPLICATE SYMBOL` where
-the module has no `#IFNDEF` guard. Neither is a diagnosis.
+| where | how | what a call costs |
+| --- | --- | --- |
+| low memory | `#INCLUDE "X.INC.BL"` | one `GOSUB` |
+| a RAM bank | the same `#INCLUDE` between `GP.BANKED n` and `GP.ENDBANKED` | from outside the region, a bank select on the call and a restore on `RETURN` |
 
 ## Which one
 
-`X.INC.BL` is the default. Use it unless the program is short of low memory.
-
-Reach for `X.BANK.INC.BL` when the p-code no longer fits under the runtime, and bank the modules
-the program calls *least often* first — a banked call goes out to a low-memory shim, selects the
-bank and comes back. **A region cannot branch to another region** — two regions live at the same `$A000` in
-different banks, so the branch has no distance to travel and the compiler refuses it. It can still
-*call* one, through the low-memory shim: `SHIM.PUSH` keeps the caller's bank and `SHIM.POP` puts it
-back, so the return lands with the right bank selected. What that costs is the shim on every call,
-which is why `STRINGS` stays low in XBase: `DB.JOIN` calls it on every record.
-
-The banked form needs three things, not one:
+Low memory is the default. Bank a module when the program's p-code no longer fits under the
+runtime, and bank the modules the program calls least often first. A call from inside the region
+costs nothing extra. A call from low memory or from another region switches the bank twice.
 
 ```basic
+#DEFINE MY.GUICODE 4
 GOTO MY.LIBEND
-#INCLUDE "SHIM.GUIBANK.INC.BL"     ' the shims, in low memory
-GP.BANKED SHIM.GUIBANK
-#INCLUDE "THEME.BANK.INC.BL"      ' the bodies, in the bank
-#INCLUDE "MENUVERT.BANK.INC.BL"
+GP.BANKED MY.GUICODE
+#INCLUDE "THEME.INC.BL"
+#INCLUDE "MENUVERT.INC.BL"
 GP.ENDBANKED
 MY.LIBEND:
 ```
 
-A shim file covers every entry point it knows and BASLOAD resolves every label in every file it
-reads, so `SHIM.GUIBANK.INC.BL` obliges you to include all six GUI bodies even if you call one.
-Leave one out and the build stops with `LABEL NOT FOUND`.
+## The rules
 
-## Why `.BODY` exists
+- **A call into a region selects its bank.** `GOSUB`, `GP.SUB`, `GP.FN` and `FN` into a region
+  from outside it compile to `.bgosub`, which saves the selected bank and selects the region's.
+  `RETURN` puts the saved bank back. The caller may be in low memory or in another region.
+- **A `GOTO` from one region into another is refused**, and so is `ON ... GOSUB` to a label inside
+  a region. A `GOTO` carries no bank to select. A `GOTO` from low memory into a region compiles,
+  and lands in whatever bank is selected.
+- **Jump over the region with a `GOTO`.** `GP.BANKED` leaves a bridge, so falling into a region
+  works while the bootstrap's code bank is still selected, and fails once anything selects another.
+- **`#DEFINE` the bank number above the `GP.BANKED` line.** BASLOAD resolves a `#DEFINE` only if it
+  has already read it. `GP.BANKED` takes a decimal constant, so the number is fixed when the
+  program compiles.
+- **Claim the bank.** Call `BANKMGR.CLAIM` on each code bank before anything asks `BANKMGR` for a
+  free one, or the program can be handed its own code as scratch.
+- **A module that holds a `BANK` statement stays in low memory.** The compiler refuses `BANK`
+  inside a region, so `STASH` and `STASHFILE` cannot be banked.
+- **A region holds at most 8K.** Past that the build stops with `GP.BANKED REGION OVER 8K`. Split
+  the modules across two regions.
+- **Include a module that reads another's `#DEFINE`s after it.** The GUI modules read `THEME`'s
+  role numbers, so `THEME` comes first.
+- **Build shared.** `GP.BANKED` refuses an embedded build with `NOT IMPLEMENTED`.
 
-A banked routine cannot select its own bank — by its first instruction fetch the window is already
-wrong. So the public name must be a low-memory label that selects the bank and calls the real code,
-and the real code needs a name of its own. That is `X.BODY`. Never call it from outside the region.
-
-## This split is meant to be temporary
-
-Banked-or-not is a property of the **program**, not the module, yet today the answer is baked into
-the module's label text. The compiler already knows which region a label is in, so it could emit the
-bank switch itself and both files could collapse back into one — see item 4 under
-`## Compiler work — what is next, ranked` in `TODO.md`. Until then the twins are hand-maintained:
-**fix a bug in both**, or a program that banks and a program that does not will disagree about what
-the library does.
+`samples/GPB-MODS-TESTING/GPBMODS.BASL` banks the utilities, the file modules, `THEME`, the GUI,
+the combo box and two of its own dropdown handlers, in six regions.

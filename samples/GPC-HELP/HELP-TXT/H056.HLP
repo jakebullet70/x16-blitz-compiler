@@ -1,7 +1,7 @@
 @4.20 GPBMODS -- the harness that drives every module (2)
 =The text is in a bank
 .
-.552 strings in 72 named groups, 12,032 bytes across two pools, none of it in
+.542 strings in 72 named groups, 11,776 bytes across two pools, none of it in
 .low RAM. Every string the shell says sits in a GP.BANKEDSTR block in front
 .of the routine that says it and is read back with GP.BSTR. Two pools,
 .because one pool is a hard 8,192 bytes and BStrPoolWrite stops the compile
@@ -19,13 +19,13 @@
 =The room it runs in
 .
 .The workspace is what is left between the program's own p-code and the
-.resident runtime: $4500 to $6600, 8,448 bytes. The first p-code opcode is
-..varspace and its operand is what the scalars take -- 3,436 here, leaving
-.about 5,012 for the string arrays and the whole string heap.
+.resident runtime: $4000 to $6600, 9,728 bytes. The first p-code opcode is
+..varspace and its operand is what the scalars take -- 3,292 here, leaving
+.about 6,436 for the string arrays and the whole string heap.
 .
 .Moving code into a bank moves no scalars. A banked routine's variables are
-.the same workspace variables its shim sees, so .varspace grows as panels are
-.added whatever bank they run from.
+.the same workspace variables low memory sees, so .varspace grows as panels
+.are added whatever bank they run from.
 .
 .GPC-BASIC/ inside the sample folder is the library working copy and it is
 .ahead of the root copy. A module is proved here and copied whole into root.

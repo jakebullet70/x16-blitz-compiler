@@ -8,6 +8,10 @@
 .      IN: STRCASE.PTR STRCASE.MODE
 .      OUT: (the string itself)
 .
+.  STR.UCASE STR.LCASE
+.      IN: a string -- a verb, not a GOSUB
+.      OUT: a cased copy
+.
 :#SYMFILE "@:MYPROG.SYM"
 :#INCLUDE "STRCASE.INC.BL"
 :
@@ -21,19 +25,27 @@
 .  STRCASE.LOWER
 .      DOES: A-Z -> a-z, everything else untouched
 .
+.STR.UCASE and STR.LCASE are verbs (SEC 3.11), declared with GP.DEFPROC, so
+.they are called with GP.FN or GP.SUB and not with a GOSUB. Each takes a
+.string and gives back a cased copy, so A$ = GP.FN(STR.UCASE, A$) is what
+.changes A$. A literal is safe in them: the argument is copied into
+.STRCASE.S$ and the copy is what gets rewritten. That copy is the heap
+.traffic STRCASE.GO avoids, so a loop over many strings wants STRCASE.GO. The
+.verbs need GPB.INC.BL above this file.
+.
 .One blob, with the mode tested once at entry rather than inside the loop,
 .where the byte count is the whole cost.
 .
 .The argument is an address because a BASL subroutine cannot be passed a
-.variable. Copying the TRIM, LTRIM and RTRIM were here and are STR.TRIM /
-.STR.LTRIM / STR.RTRIM in STRINGS.INC.BL (SEC 4.2) now. They are string
-.editing rather than case work, and every other string routine already lived
-.in that one module. A program that only trims does not need this file at
-.all; one that only folds case saves 113 bytes of p-code by the move.
+.variable. Copying the caller's string in and back out would be two
+.allocations and two copies per call -- the heap traffic this module exists
+.to avoid. GP.STRPTR gives the block and the assembly rewrites it in place.
 .
-.caller's string in and back out would be two allocations and two copies per
-.call -- the heap traffic this module exists to avoid. GP.STRPTR gives the
-.block and the assembly rewrites it in place.
+.TRIM, LTRIM and RTRIM were here and are STR.TRIM / STR.LTRIM / STR.RTRIM in
+.STRINGS.INC.BL (SEC 4.2) now. They are string editing rather than case work,
+.and every other string routine already lived in that one module. A program
+.that only trims does not need this file at all; one that only folds case
+.saves 113 bytes of p-code by the move.
 .
 .Do not pass a literal. GP.STRPTR("hello") is the address of that text inside
 .the p-code, so upper-casing it edits the running program, and the edit
@@ -62,5 +74,6 @@
 .
 =SEE ALSO
 .
+>46|3.11 Calling a routine in one statement
 >60|4.2 STRINGS.INC.BL -- string helpers
 >69|4.8 STRCASE.INC.BL -- case, in place

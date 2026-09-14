@@ -830,9 +830,9 @@ green.
 
 ## Compiler work — what is next, ranked
 
-Written 2026-09-09, updated 2026-09-13. **An index, not a second copy** — each item points at the
+Written 2026-09-09, updated 2026-09-14. **An index, not a second copy** — each item points at the
 section or memory note that holds the detail, so this list cannot drift away from the work it names.
-Three open features; items 0, 3 and 5 are done. Three unranked report items follow item 5.
+Three open features; items 0, 3 and 5 are done, and item 4 is built and tested, its test references aside. Four unranked items follow item 5.
 Everything under `## Bugs` is fixed.
 
 **0. Fix the `GP.FN` string aliasing — DONE 2026-09-13.** See `## Bugs` above. 3 bytes of p-code on
@@ -867,38 +867,36 @@ How Prog8 does it, and where the pass can live in GPC: `docs/blitz/DEAD-CODE-ELI
 The handoff plan for the generic compiler option, rules and keep markers included:
 `docs/blitz/DEAD-CODE-ELIMINATION.PLAN.md`.
 
-**4. Let the compiler emit the bank switch, and delete the two-file split.** Banked-or-not is a
-property of the **program**, not of the module, but today the answer is baked into the module's own
-label text: `THEME.SELECT:` in the low-memory copy, `THEME.SELECT.BODY:` plus a shim in
-`SHIM.GUIBANK.INC.BL` in the banked one. `GPC-BASIC/BANKED-OR-NOT.md` describes the split as it stands,
-and it stands only because there is nowhere else to put the decision. Two hand-maintained copies of
-every bankable module is the cost, and they will drift.
+**4. Let the compiler emit the bank switch, and delete the two-file split — steps 1 to 4 DONE
+2026-09-14; the test references are not regenerated.** A `GOSUB`, `GP.SUB`, `GP.FN` or `FN` into a `GP.BANKED` region from
+outside it compiles to `.bgosub` (`$F5`), which selects the region's bank, and `RETURN` puts the
+caller's back. Step 1 is the runtime handler, `bankgosub.asm` in the GP block. Step 2 is the
+compiler: `GPBankScanLines`, `GPBankLineCall` and `GPBankAddressCall` in `gpbank.asm`, tested with
+the programs in `work/bgosub/`. Step 3 merged the library: the `X.BANK.INC.BL` twins and the
+`SHIM.*BANK.INC.BL` files are deleted from both library copies, each program `#DEFINE`s its own bank
+numbers, and `GPC-BASIC/BANKED-OR-NOT.md` and the help say how to bank a module. Nothing is
+committed.
 
-The compiler already has what it needs. `GP.BANKED` names the region, and two passes mean pass 1
-knows which region every label is in before pass 2 emits a single call. So `GOSUB THEME.SELECT` can
-compile to a plain call when the target is in low memory and to a bank-switching call when it is not
-— **zero extra bytes in the common case**, which is what the shim files cost today. One file per
-module, no `.BODY`, no `LIB.*BANK.INC.BL`, no "one or the other, never both", and neither
-`LABEL NOT FOUND` nor `DUPLICATE SYMBOL` can happen again.
+How the three questions were settled:
 
-Three things have to be settled, and the first one decides the shape of the other two:
+1. **The return bank** rides on a frame of its own, `FRAME_BGOSUB` (`$E5`). It differs from the
+   `GOSUB` frame in bit 0 alone, so `RETURN` restores the bank and `NEXT` does not see the change.
+2. **Indirect targets are refused.** `ON n GOSUB` to a label in a region is `NOT IMPLEMENTED`: an
+   `ON` entry is 3 bytes and a `.bgosub` is 4. So is a `GOTO` from one region into another, which
+   has no frame to restore a bank from. A `GOTO` from low memory into a region compiles and selects
+   nothing.
+3. **Runtime bytes:** the embedded core grew 12 B and has **4 B** left before `GPBase` moves off
+   `$3700` (`docs/memory/gpc-core-page-cushion-below-gpbase.md`). SHARED has 542 B of core free.
 
-1. **The return bank.** Today the shim sits in low memory, so `RETURN` always lands somewhere that
-   is mapped whatever the bank register holds. A compiler-emitted call loses that: the caller's bank
-   has to ride on the `GOSUB` frame and be restored by `RETURN`. That is a frame-layout change to the
-   most load-bearing thing in the runtime — `RETURN` already unwinds `FOR`, `GP.DO` and `GP.SELECT`
-   frames, see `docs/memory/gpc-return-unwinds-frames.md`. Settle this first.
-2. **Indirect targets.** `ON n GOSUB` and any computed target cannot be resolved to a region at
-   compile time. Either the runtime looks the bank up, or a banked routine may never be an indirect
-   target. The second is cheaper and is a **new rule**, which is the thing this item exists to delete.
-3. **Runtime bytes.** A new call opcode plus the bank save in `RETURN` lands in the core, and the core
-   page cushion below `GPBase` is about **40 bytes** — see
-   `docs/memory/gpc-core-page-cushion-below-gpbase.md`. Cross it and every program grows 256 bytes,
-   banked or not.
+**Step 4, 2026-09-14:** GPBMODS builds with an 11,619 B resident object (was 12,885) and GUIFRMT
+compiles; `gpctest.py full` passes every check except the byte compare against the old references.
+`BS.B.NUMS` and `GP-BASIC.md` §4.20 are remeasured. `banktest3` passes on its own drive except BANKY,
+which it still expects refused. **Open:** `gpctest.py ref`, and `banktest3.py` still names `testing/`
+as its drive. **Possible extra:** a region routine calling low memory could use `.bgosub` with its
+own bank, so a low-memory routine that changes the bank no longer breaks its caller.
 
-This subsumes item 1: once the compiler places calls, a banked `GP.ASM` blob is the same question
-answered in the same place. It does not block the split that is committed today — by the time this
-lands, `.BODY` exists only inside generated text, so removing it touches no hand-written source.
+Item 1 is still a question of its own: `.bgosub` banks p-code, and a `SYS` into a banked blob selects
+nothing. The record is `docs/memory/compiler-emitted-bank-switch.md`.
 
 **5. Pass one has to say something — DONE, closed 2026-09-13.** Added 2026-09-11. The record of why
 follows. The compiler printed its banner, the input and
@@ -915,7 +913,7 @@ thing the old single-pass engine gave, which is what made a stall visible. It al
 a stop condition because pass two writes in bursts. Cheap, and it turns every future stall into a
 number instead of a guess.
 
-**Unranked — the report items, all under `## Wanted`:**
+**Unranked, all under `## Wanted`:**
 
 - **End-of-compile report: lines compiled, banks used per bank.** BEFORE RELEASE.
   `### The end-of-compile report wants more than three numbers`.
@@ -923,6 +921,8 @@ number instead of a guess.
   Method, self-check and prototype: section 5 of `source/application/COMPILER-HANDOFF.md`.
 - **`BASLOAD-GPC` end-of-run report in the same shape.** BEFORE RELEASE, after the compiler's report
   is settled. `### BASLOAD-GPC wants the same report`.
+- **The help does not know about dead-code elimination.** Not started.
+  `### The help does not know about dead-code elimination`.
 
 **Done 2026-09-13, outside the ranking:** compiler tests in two tiers
 (`docs/blitz/COMPILER-TESTS.PLAN.md`); `GP.ASM` `{VAR}` lookup reads the symbol file once a compile,
@@ -2940,6 +2940,56 @@ themselves.
 
 Not a duplicate of the compiler's report — different tool, different numbers — but it should read
 like the same program printed it. Settle the compiler's shape first, then follow it.
+
+### The help does not know about dead-code elimination — added 2026-09-13
+
+GPC V1.1 removes unreached lines when `GPC.INPUT` line 5 names a removed-line file, and the banner
+then prints `DEAD CODE: N LINES REMOVED, B BYTES SAVED`. The help sources in `GPC-BASIC/`, which build
+GPB.HELP and the `samples/GPC-HELP/GPC-HELP*.md` copies, say neither.
+
+- `GP-BASIC.FILES.md:44` says `GPC.INPUT` is "up to four text lines". It is five: document line 5,
+  what the removed-line file holds, and the banner line.
+- "BASL has no dead code elimination" is given as the reason for a module split or a warning in
+  `GP-BASIC.FILES.md:148`, `GP-BASIC.md:477`, `:491` and `:2154`, `GP-BASIC.GLOBALS.md:364`,
+  `README.md:97`, and the banner headers of `STASH.INC.BL`, `STASHFILE.INC.BL`, `MENUBAR.INC.BL` and
+  `MENUBAR.BANK.INC.BL`. Each is now true only with the option off. Check each against what the option
+  removes, and reword rather than delete where the split still pays for a build without it.
+- Banner headers are edited in the library working copy first, then copied to the root.
+- Regenerate the help once the sources are done. The generated copies also still list the `GP.FN`
+  string aliasing bug, fixed 2026-09-13.
+
+### The example BASLOAD files want the same review as the help — added 2026-09-14
+
+The help is being brought in line with GPC V1.1, the `GP.FN` fix and `.bgosub`. The example programs
+are documentation too, and nothing has checked them against those changes. The set is the 26
+`.EXP.BL` files in `GPC-BASIC/` and `samples/GPB-MODS-TESTING/GPC-BASIC/`, and the `.BASL` programs
+under `samples/`: editor 7, XBASE 4, GPB-MODS-TESTING 4, cruncher 3, GPC-HELP 1, color-test 1.
+
+Check each for:
+
+- A `BANK` statement, a shim or a `.BANK.INC.BL` twin used to call into a `GP.BANKED` region. A call
+  from outside a region now selects its bank itself, and the twins and shims are deleted.
+- `ON n GOSUB` into a region, or a `GOTO` from one region into another. Both are refused with
+  `NOT IMPLEMENTED`.
+- A copy of a `GP.FN` string result taken to dodge the aliasing bug. It is no longer needed.
+- "BASL has no dead code elimination" given as a reason. It is true only with the option off.
+- `FNT(1)` written for `FN T(1)`. BASLOAD tokenises it as the array `FNT`, and the compile succeeds.
+
+Found so far, by grep:
+
+- `samples/XBASE/XBASE.BASL` lines 26 to 136 include `SHIM.*` files and `X.BANK.INC.BL` twins from
+  its own `GPC-BASIC/` copies, and lines 235 to 259 claim bank numbers by shim name.
+  `XBASE.GUI.TEST.BASL:84` and `:139` name `SHIM.GUIBANK`. XBASE is to be dropped, so decide that
+  first.
+- `samples/GPC-HELP/GPC-BASIC/` names banked twins in `COMBO.INC.BL:54` and `:181`, `GUI.INC.BL:100`,
+  `LINEINPUT.INC.BL:66`, `MENUVERT.INC.BL:70` and `THEME.INC.BL:34`.
+- `samples/editor/GPC-BASIC/MENUBAR.INC.BL:17` and `STASH.INC.BL:10` still say a BASL module has no
+  dead code elimination.
+- `FORM`, `GUI`, `GUI2TST`, `MENU`, `MENUDEMO` and `MENUTST.EXP.BL` each hold a `BANK` or
+  `GP.BANKED` line. Check whether each is still needed.
+
+A review reads the text. Whether each example still tokenises and compiles is
+`### NOTHING BUILDS THE EXAMPLES` under `## Build / infrastructure`.
 
 ### `BASLOAD-GPC` has no way to be told what to compile — DONE
 

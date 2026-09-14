@@ -25,8 +25,8 @@
 :GOSUB STASH.RESTORE
 .
 .STASHFILE.INC.BL does the same but uses a file. It is a separate
-.module because BASL has no dead code elimination: everything a module holds
-.is compiled into every program that includes it, called or not.
+.module because, unless the compile removes dead code (SEC 7), everything a
+.module holds is compiled into every program that includes it, called or not.
 .
 .More than one rectangle in a bank. STASH.SLOT is a byte offset into the
 .bank, default 0, and STASH.NEXT comes back as the offset just past what was
@@ -46,6 +46,7 @@
 .
 =SEE ALSO
 .
+>140|7. Memory, and what the compiler tells you
 >86|STASH.INC.BL -- save a text rectangle, and put it back.
 >94|STASHFILE.INC.BL -- a saved text rectangle, through a file.
 >79|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM

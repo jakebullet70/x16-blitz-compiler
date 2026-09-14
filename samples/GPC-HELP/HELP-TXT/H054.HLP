@@ -14,10 +14,10 @@
 :GOSUB SV.COMPACT
 :IF SV.MOVED = 0 THEN <it was already tight>
 .
-.Its own file because a BASL module has no dead code elimination. A compactor
-.nobody calls would otherwise be compiled into every program that includes
-.the store. #INCLUDE this one only if something in the program calls it, and
-.never call it automatically.
+.Its own file, so a compactor nobody calls costs nothing. Unless the compile
+.removes dead code (SEC 7), it would otherwise be compiled into every program
+.that includes the store. #INCLUDE this one only if something in the program
+.calls it, and never call it automatically.
 .
 .It is not a garbage collector. Liveness is known from the handle table
 .rather than discovered, so there is no mark phase and nothing traces
@@ -37,5 +37,6 @@
 .
 =SEE ALSO
 .
+>140|7. Memory, and what the compiler tells you
 >80|4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store
 >79|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM

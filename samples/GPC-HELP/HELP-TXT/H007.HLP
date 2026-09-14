@@ -2,16 +2,16 @@
 .
 =5. GPC-BASIC/ -- THE LIBRARY
 .
-.Text-mode building blocks, in BASL, #INCLUDEd into your source. BASL has no
-.dead code elimination: including a module costs its whole size whether or
-.not it is called.
+.Text-mode building blocks, in BASL, #INCLUDEd into your source. Unless the
+.compile removes dead code, including a module costs its whole size whether
+.or not it is called.
 .
 .  GPB.INC.BL
 .      the GP.* keyword definitions for BASLOAD. Every source using a GP
 .        keyword needs this one, and no other include is ever optional either
 .
 .  THEME.INC.BL
-.      named colour roles, in four themes
+.      named colour roles, in five themes
 .
 .  APPSYS.INC.BL
 .      start an application politely, and leave the machine as it was found

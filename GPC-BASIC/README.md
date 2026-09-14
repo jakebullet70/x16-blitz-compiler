@@ -8,9 +8,9 @@ routine, every variable name they take, and the traps collected in one table.
 [GP-BASIC.GLOBALS.md](GP-BASIC.GLOBALS.md) lists every global each module owns, which
 matters because BASL has one flat namespace: a collision is a wrong answer, not an error.
 [GP-BASIC.FILES.md](GP-BASIC.FILES.md) says what every file that comes with GPC is for,
-including the four the compiler will not run without.
-[BANKED-OR-NOT.md](BANKED-OR-NOT.md) explains the two forms some modules come in —
-`X.INC.BL` for low memory and `X.BANK.INC.BL` for a `GP.BANKED` region — and how to choose.
+including the five the compiler will not run without.
+[BANKED-OR-NOT.md](BANKED-OR-NOT.md) says how to run a module from a RAM bank: the same
+`#INCLUDE`, inside a `GP.BANKED` region.
 
 ## Using it
 
@@ -93,8 +93,8 @@ program in the tree. Written in `GP.ASM` and `#INCLUDE`d they cost their own byt
 that ask for them, and nothing at all in the ones that do not — which is what keeps the block at
 1,024 bytes rather than 2,048.
 
-**`STASHFILE.INC.BL` is the file half of `STASH.INC.BL`,** and a separate file on purpose: a BASL
-module has no dead code elimination, so everything it holds is compiled into every program that
+**`STASHFILE.INC.BL` is the file half of `STASH.INC.BL`,** and a separate file on purpose: unless
+the compile removes dead code, everything a module holds is compiled into every program that
 includes it, called or not. `STASH.FILE.SAVE` stashes and `BSAVE`s, `STASH.FILE.LOAD` `BLOAD`s and
 restores it where it came from, and `STASH.FILE.PUT` drops it somewhere else.
 

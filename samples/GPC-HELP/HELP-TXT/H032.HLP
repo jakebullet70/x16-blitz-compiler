@@ -29,14 +29,13 @@
 .does not count against it. Each region becomes its own overlay file,
 .NAME.B04 for bank 4, written beside the .PRG and loaded with it.
 .
+:#DEFINE MY.GUICODE 4
 :GOTO MY.LIBEND
-:#INCLUDE "SHIM.GUIBANK.INC.BL"        ' the shims, in LOW memory
-:GP.BANKED SHIM.GUIBANK
-:#INCLUDE "MENUVERT.BANK.INC.BL"       ' the bodies, in the bank
-:#INCLUDE "MENUBAR.BANK.INC.BL"
-:#INCLUDE "LINEINPUT.BANK.INC.BL"
-:#INCLUDE "GUI.BANK.INC.BL"
-:#INCLUDE "GUI2.BANK.INC.BL"
+:GP.BANKED MY.GUICODE
+:#INCLUDE "MENUVERT.INC.BL"
+:#INCLUDE "LINEINPUT.INC.BL"
+:#INCLUDE "GUI.INC.BL"
+:#INCLUDE "GUI2.INC.BL"
 :GP.ENDBANKED
 :MY.LIBEND:
 .
@@ -44,9 +43,13 @@
 .GP.BANKED leaves works at program start and stops working the day anything
 .selects another bank first.
 .
+.#DEFINE the bank above the GP.BANKED line. BASLOAD replaces a name only once
+.it has read its #DEFINE, and the number is then fixed when the program
+.compiles.
+.
 .Claim the bank, or something else hands it out:
 .
-:BANKMGR.SET.BANK = SHIM.GUIBANK : GOSUB BANKMGR.CLAIM
+:BANKMGR.SET.BANK = MY.GUICODE : GOSUB BANKMGR.CLAIM
 .
 =What fits
 .
@@ -63,46 +66,39 @@
 .
 =What a region may not contain
 .
-.BANK, BLOAD and BSAVE are refused inside a region. Code fetched from the
-.window cannot be running when the window changes. A BANK statement is the
-.only disqualifier -- that is what keeps STASH and STASHFILE in low memory,
-.and what lets STASHVRAM (SEC 4.18) go in.
+.BANK is the one statement refused inside a region. Code fetched from the
+.window cannot be running when the window changes, and BANK changes it and
+.leaves it changed. PEEK and POKE put the bank back after each access, and
+.BLOAD and BSAVE are not refused. A BANK statement keeps STASH and STASHFILE
+.in low memory; STASHVRAM (SEC 4.18) has none, so it goes in.
 .
 .GP.BANKEDSTR (SEC 3.10) inside a region is free: it emits no p-code at all,
 .so a text group costs the region nothing.
 .
 =Calling in, and calling out
 .
-.A region cannot branch to another region. Two regions live at the same $A000
-.in different banks, so a branch from one to the other has no distance to
-.travel and the compiler refuses it.
+.A call into a region selects the region's bank. A GOSUB, GP.SUB, GP.FN or FN
+.whose target is inside a region, from anywhere outside that region, compiles
+.to .bgosub. It keeps the selected bank, selects the region's, and RETURN
+.selects the kept one again. The caller may be in low memory or in another
+.region, and the calls nest like any GOSUB. A call that stays inside one
+.region is an ordinary GOSUB.
 .
-.Calling out, down into low memory, is safe. Low memory does not care which
-.bank is selected, so an ordinary GOSUB downwards works from inside a region.
+.A GOTO selects nothing. Two regions live at the same $A000 in different
+.banks, so a GOTO from one into another is refused. So is ON ... GOSUB to a
+.label in a region: an ON entry is three bytes and a .bgosub is four. A GOTO
+.from low memory into a region compiles, and lands in whatever bank is
+.selected.
 .
-.Everything else crosses through a low-memory shim. A banked routine cannot
-.select its own bank -- by its first instruction fetch the window is already
-.wrong -- so the public name is a low-memory label and the real code takes a
-..BODY name:
+.Calling out, down into low memory, is an ordinary GOSUB. Low memory does not
+.care which bank is selected. The routine called must leave the region's bank
+.selected when it returns, or the next instruction is fetched from the wrong
+.bank. A call from there into another region is safe, because its RETURN puts
+.the bank back.
 .
-:GUI.SAY:  GOSUB GUI.SHIM.PUSH : GOSUB GUI.SAY.BODY : GOTO GUI.SHIM.POP
-.
-.PUSH keeps the caller's bank and selects the library's; POP puts the
-.caller's back. So a caller that is itself inside another region may call in
-.here and get its own bank returned to it, and the instruction after the call
-.is fetched from the right place. The region cannot do this for itself,
-.because a region may not contain BANK; the shim is in low memory and can.
-.
-.It is a stack, not one variable, because the calls nest and come back round:
-.a dialog in one bank draws a control that lives in a bank of its own, and
-.that control opens a menu back in the first. Three banks are live at once
-.and each level has a different one to return to. GUI.SHIM.MAX is 8 deep.
-.
-.GOTO to POP, not GOSUB -- the shim's own RETURN is the one the caller is
-.waiting on.
-.
-.Never call a .BODY from outside its region. It is the half of the pair that
-.does not bank.
+.A call from outside costs a byte and two bank switches. .bgosub is a GOSUB
+.with the bank after the address. A module called inside a tight loop belongs
+.in low memory or in its caller's region.
 .
 =The overlay files
 .
@@ -115,6 +111,10 @@
 .
 =SEE ALSO
 .
->143|7. Memory, and what the compiler tells you
+>140|7. Memory, and what the compiler tells you
 >79|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
 >45|3.10 Text in a bank
+>65|4.6 MENUVERT.INC.BL -- a vertical menu
+>63|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>72|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
+>73|4.12 GUI2.INC.BL -- a listbox, single or multi select

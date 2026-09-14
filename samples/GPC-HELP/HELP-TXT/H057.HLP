@@ -11,8 +11,8 @@
 .
 .  For the same rectangle through a FILE see STASHFILE.INC.BL, built on this
 .  and kept separate so a program wanting only the bank does not carry the
-.  disk half -- a BASL module has no dead code elimination, and those three
-.  routines are 127 bytes.
+.  disk half -- uncalled code stays in unless the compile removes it, and
+.  those three are 127 bytes.
 .
 =A MODULE, NOT A RUNTIME KEYWORD
 .
