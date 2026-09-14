@@ -459,11 +459,16 @@ _CBCSyntax:
 ;		no argument compiles as RESTORE 0. Both mean "the first line at or after this", which is
 ;		what STRFindLine returns with the carry set.
 ;
+;		A GOSUB INTO A GP.BANKED REGION COMES OUT AS A .bgosub, a byte longer, carrying the bank
+;		the region runs in. GPBankLineCall decides it from line numbers read before the first
+;		pass, so pass one counts the same bytes pass two writes -- see commands/gpbank.asm.
+;
 ; ************************************************************************************************
 
 WriteBranchTo:
 		sta 	branchOpcode
 		jsr 	DCRecordLineBranch 			; pass zero: an edge
+		jsr 	GPBankLineCall 				; a GOSUB into a region selects its bank
 		lda 	passNumber
 		beq 	EmitBranch 					; pass one: the line number goes out as it stands
 		;
@@ -483,8 +488,7 @@ _WBTFound:
 		sta 	branchTarget 				; which is exactly an FN call's problem
 		lda 	branchAddress+1
 		sta 	branchTarget+1
-		lda 	branchOpcode
-		bra 	WriteBranchToAddress
+		bra 	WriteBranchResolve 			; the call was decided above, by its line
 
 _WBTNoLine:
 		lda 	branchTarget 				; name the line that is missing
@@ -504,6 +508,8 @@ _WBTNoLine:
 WriteBranchToAddress:
 		sta 	branchOpcode
 		jsr 	DCRecordAddressBranch 		; pass zero: an edge
+		jsr 	GPBankAddressCall 			; an FN call into a region selects its bank
+WriteBranchResolve:
 		lda 	passNumber
 		beq 	EmitBranch 					; pass one: the address goes out as it stands
 		lda 	branchTarget
@@ -514,7 +520,7 @@ WriteBranchToAddress:
 
 ; ************************************************************************************************
 ;
-;						Opcode in branchOpcode, operand in branchTarget
+;			Opcode in branchOpcode, operand in branchTarget, and a .bgosub's bank in branchBank
 ;
 ; ************************************************************************************************
 
@@ -528,6 +534,12 @@ EmitBranch:
 		jsr 	WriteCodeByte
 		lda 	branchTarget+1
 		jsr 	WriteCodeByte
+		lda 	branchOpcode 				; a .bgosub carries the bank it selects, which both
+		cmp 	#PCD_CMD_BGOSUB 			; passes know, so it is summed
+		bne 	_EBDone
+		lda 	branchBank
+		jsr 	WriteCodeByte
+_EBDone:
 		rts
 
 BLOCK_MAX_NEST = 16 						; GP.DOs open at once, on SELECT_MAX_NEST's reasoning:
@@ -562,6 +574,8 @@ ifPending: 									; ...and the alternative inside it still waiting for
 		.fill 	2*BLOCK_MAX_NEST 			; a target, or $FFFF
 ifDepth: 									; how many GP.IFs are open right now
 		.fill 	1
+branchBank: 								; the bank a .bgosub selects, beside branchOpcode
+		.fill 	1
 
 		.send code
 
@@ -586,5 +600,6 @@ unwindTarget: 								; the block depth at that line
 ;
 ;		Date			Notes
 ;		==== 			=====
+;		13/09/26		A GOSUB or an FN call into a GP.BANKED region is written as a .bgosub.
 ;
 ; ************************************************************************************************

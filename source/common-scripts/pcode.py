@@ -109,6 +109,9 @@ class PCode(object):
 											# evaluation stack on their own. Appended.
 		self.extra(".fnpop",0) 				# ...and one back, in front of the store that consumes it.
 											# Appended.
+		self.extra(".bgosub",3) 			# A GOSUB into a GP.BANKED region: .gosub's two offset
+											# bytes, then the bank the target runs in, which the
+											# call selects. Appended.
 		self.define("PCD_ENDSYSTEM")
 		self.endCommands = self.currentID	
 

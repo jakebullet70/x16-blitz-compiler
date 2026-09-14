@@ -76,6 +76,7 @@ stringHighMemory: 							; string heap ceiling; allocations grow DOWN from here
 ; ************************************************************************************************
 
 FRAME_GOSUB = $E4 							; Gosub has 4 bytes
+FRAME_BGOSUB = $E0+5 						; ...and a .bgosub 5, the caller's bank at +1
 FRAME_FOR = $C0+19 							; For has 19 bytes
 FRAME_LOOP = $A0+6 							; GP.DO has 6 bytes
 FRAME_SELECT = $80+7 						; GP.SELECT has 7 bytes
@@ -87,6 +88,11 @@ FRAME_FNSLOT = $40+7 					; ...and one saved evaluation stack slot has 7
 ;		7 GOSUB, 6 FOR, 5 GP.DO, 4 GP.SELECT, 3 GP.FN state, 2 GP.FN slot. $FF is the
 ;		stack-empty fail marker StackFindFrame stops on -- it is id 7 size 31, which no real
 ;		frame can be, so it can never be mistaken for a GOSUB.
+;
+;		A .bgosub frame is $E5, GOSUB's marker with bit 0 set, and no other two markers differ
+;		in bit 0 alone. StackFindFrame ignores that bit, so RETURN's one search finds either
+;		frame, and hands the bit back in carry for RETURN to test. The fifth byte is unused:
+;		it is there only because the size field is what carries the bit.
 ;
 ;		GP.SELECT no longer opens one (01/09/26) but keeps its id, since nothing needs it.
 ;		A GP.FN call opens ONE state frame and ONE slot frame per live evaluation stack slot,
@@ -2716,7 +2722,8 @@ _SFFLoop:
 		lda 	(runtimeStackPtr) 			; get TOS
 		cmp 	#$FF 						; if found $FF then this is a fail.
 		beq 	SCFFail 			
-		cmp 	requiredFrame 				; found this type ?
+		eor 	requiredFrame 				; found this type ? Bit 0 is ignored and comes back in
+		lsr 	a 							; carry, set when RETURN has found a .bgosub frame
 		beq 	_SFFFound
 		jsr 	StackCloseFrame 			; close the top frame
 		bra 	_SFFLoop 					; and try te next.
@@ -2751,6 +2758,8 @@ requiredFrame:
 ;
 ;		Date			Notes
 ;		==== 			=====
+;		13/09/26		StackFindFrame ignores bit 0 of the marker and returns it in carry, so
+;						RETURN finds a .bgosub frame ($E5) and can tell it from a GOSUB ($E4).
 ;		02/08/26		StackOpenFrame now refuses to grow the frame stack below stackFloorHigh; it
 ;						used to run on into the object code.
 ;		22/06/23 		Added StackFindFrame which looks for a frame of this type and throws
@@ -2916,8 +2925,13 @@ CommandXGosub: ;; [.gosub]
 CommandReturn: ;; [return]
 		.entercmd
 		lda 	#FRAME_GOSUB
-		jsr 	StackFindFrame
-		jsr 	StackLoadCurrentPosition
+		jsr 	StackFindFrame 				; carry set: it found a .bgosub frame (bankgosub.asm)
+		jsr 	StackLoadCurrentPosition 	; Y = 0, and carry untouched
+		bcc 	_CRPlain
+		ldy 	#1 							; put the caller's bank back. Y = 1 also steps over
+		lda 	(runtimeStackPtr),y 		; the bank byte after that call's offset
+		sta 	SelectRAMBank
+_CRPlain:
 		iny
 		iny
 		jsr 	StackCloseFrame
@@ -2935,6 +2949,7 @@ CommandReturn: ;; [return]
 ;		Date			Notes
 ;		==== 			=====
 ;		22/06/23 		Uses FindFrame on Return, so will throw any incomplete NEXTs.
+;		13/09/26		RETURN from a .bgosub puts the caller's bank back.
 ;
 ; ************************************************************************************************
 ; ************************************************************************************************
@@ -8626,6 +8641,7 @@ VectorTable:
 	.word	CommandXFnRestore        ; $f2 .fnrestore
 	.word	CommandXFnPush           ; $f3 .fnpush
 	.word	CommandXFnPop            ; $f4 .fnpop
+	.word	CommandXBankGosub        ; $f5 .bgosub
 
 
 ShiftVectorTable:

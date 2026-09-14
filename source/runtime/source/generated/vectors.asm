@@ -120,6 +120,7 @@ VectorTable:
 	.word	CommandXFnRestore        ; $f2 .fnrestore
 	.word	CommandXFnPush           ; $f3 .fnpush
 	.word	CommandXFnPop            ; $f4 .fnpop
+	.word	CommandXBankGosub        ; $f5 .bgosub
 
 
 ShiftVectorTable:

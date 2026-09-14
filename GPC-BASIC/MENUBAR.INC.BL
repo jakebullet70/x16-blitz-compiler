@@ -14,9 +14,9 @@
 ## **      MENUVERT.INC.BL   MENUVERT.ROW draws the items and tints the
 ## **                        hotkeys; this file owns the layout and the keys
 ## **
-## **  A separate file rather than a flag on MENUVERT: there is no dead code
-## **  elimination, so a horizontal path inside MENUVERT would be carried by every
-## **  vertical menu.
+## **  A separate file rather than a flag on MENUVERT: a flag is tested at run time,
+## **  so even a compile that removes dead code would keep a horizontal path inside
+## **  MENUVERT in every vertical menu.
 ## **
 ## **  IT SHARES MENUVERT'S ARRAY AND COLOURS -- MENUVERT.ITEM$, .ATTR, .HIATTR,
 ## **  .HOTATTR, .HOT$ -- so a program with a bar and a dropdown has one convention.
@@ -56,12 +56,10 @@
 ## **  to end it so the caller can open the panel, and a bar that is only a bar wants
 ## **  it ignored. Off means an arrow across the grain does nothing.
 ## **
-## **  THIS IS THE LOW MEMORY FORM. Every entry point is a plain name, so a
-## **  caller reaches it with one GOSUB and nothing sits in between. Use it
-## **  when the module runs in low memory, which is the ordinary case.
-## **
-## **  The banked twin is MENUBAR.BANK.INC.BL. Include one or the other,
-## **  never both. GPC-BASIC/BANKED-OR-NOT.md says how to choose.
+## **  TO RUN IT FROM A RAM BANK, put the #INCLUDE between GP.BANKED and
+## **  GP.ENDBANKED. A call from outside the region selects the region's bank
+## **  and RETURN puts the caller's back, so a caller is written the same
+## **  either way. GPC-BASIC/BANKED-OR-NOT.md has the rules.
 ## **
 ## ***********************************************************************
 #IFNDEF MENUBAR.DEFS

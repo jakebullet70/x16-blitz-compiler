@@ -46,12 +46,10 @@
 ## **  WARNING: pass the trims a variable, never a literal. GP.STRPTR("hello") is an
 ## **  address inside the p-code, and trimming it EDITS THE PROGRAM.
 ## **
-## **  THIS IS THE LOW MEMORY FORM. Every entry point is a plain name, so a
-## **  caller reaches it with one GOSUB and nothing sits in between. Use it
-## **  when the module runs in low memory, which is the ordinary case.
-## **
-## **  The banked twin is STRINGS.BANK.INC.BL. Include one or the other,
-## **  never both. GPC-BASIC/BANKED-OR-NOT.md says how to choose.
+## **  TO RUN IT FROM A RAM BANK, put the #INCLUDE between GP.BANKED and
+## **  GP.ENDBANKED. A call from outside the region selects the region's bank
+## **  and RETURN puts the caller's back, so a caller is written the same
+## **  either way. GPC-BASIC/BANKED-OR-NOT.md has the rules.
 ## **
 ## ***********************************************************************
 #IFNDEF STR.DEFS

@@ -107,8 +107,8 @@ PRINT
 ## down and rewrites the table. HANDLES SURVIVE IT -- a block's page changes,
 ## the handle naming it does not.
 ##
-## It is a separate #INCLUDE because a BASL module has no dead code elimination:
-## a compactor nobody calls would otherwise be compiled into every program.
+## It is a separate #INCLUDE, so a compactor nobody calls costs nothing: unless the
+## compile removes dead code, it would otherwise be compiled into every program.
 ## =======================================================================
 SV.ADDR = E.ADDR : SV.LEN = 600 : GOSUB SV.PUT : E.C1 = SV.HND
 SV.ADDR = E.ADDR : SV.LEN = 900 : GOSUB SV.PUT : E.C2 = SV.HND

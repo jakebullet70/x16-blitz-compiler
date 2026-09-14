@@ -35,8 +35,13 @@ CommandXGosub: ;; [.gosub]
 CommandReturn: ;; [return]
 		.entercmd
 		lda 	#FRAME_GOSUB
-		jsr 	StackFindFrame
-		jsr 	StackLoadCurrentPosition
+		jsr 	StackFindFrame 				; carry set: it found a .bgosub frame (bankgosub.asm)
+		jsr 	StackLoadCurrentPosition 	; Y = 0, and carry untouched
+		bcc 	_CRPlain
+		ldy 	#1 							; put the caller's bank back. Y = 1 also steps over
+		lda 	(runtimeStackPtr),y 		; the bank byte after that call's offset
+		sta 	SelectRAMBank
+_CRPlain:
 		iny
 		iny
 		jsr 	StackCloseFrame
@@ -54,5 +59,6 @@ CommandReturn: ;; [return]
 ;		Date			Notes
 ;		==== 			=====
 ;		22/06/23 		Uses FindFrame on Return, so will throw any incomplete NEXTs.
+;		13/09/26		RETURN from a .bgosub puts the caller's bank back.
 ;
 ; ************************************************************************************************

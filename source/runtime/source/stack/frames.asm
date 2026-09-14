@@ -81,7 +81,8 @@ _SFFLoop:
 		lda 	(runtimeStackPtr) 			; get TOS
 		cmp 	#$FF 						; if found $FF then this is a fail.
 		beq 	SCFFail 			
-		cmp 	requiredFrame 				; found this type ?
+		eor 	requiredFrame 				; found this type ? Bit 0 is ignored and comes back in
+		lsr 	a 							; carry, set when RETURN has found a .bgosub frame
 		beq 	_SFFFound
 		jsr 	StackCloseFrame 			; close the top frame
 		bra 	_SFFLoop 					; and try te next.
@@ -116,6 +117,8 @@ requiredFrame:
 ;
 ;		Date			Notes
 ;		==== 			=====
+;		13/09/26		StackFindFrame ignores bit 0 of the marker and returns it in carry, so
+;						RETURN finds a .bgosub frame ($E5) and can tell it from a GOSUB ($E4).
 ;		02/08/26		StackOpenFrame now refuses to grow the frame stack below stackFloorHigh; it
 ;						used to run on into the object code.
 ;		22/06/23 		Added StackFindFrame which looks for a frame of this type and throws

@@ -278,14 +278,14 @@
 ## expression to the matching formal and calls the routine, in one statement.
 ##
 ##   GP.DEFPROC DBOPEN, DB.NAME$, DB.DEVICE
-##   DB.OPEN:  BANK DB.CODEBANK : GOSUB DB.OPEN.BODY : RETURN
+##   DB.OPEN:  OPEN 2, DB.DEVICE, 2, DB.NAME$ : RETURN
 ##
 ##   GP.SUB DBOPEN, "PARTS.DBF", 8
 ##
 ## The verb is an ordinary name and lives beside the variables, so it may not be
 ## a label and may not carry a $ or % suffix. The declaration must be COMPILED
 ## BEFORE any call to it -- the call carries an address, not a line number -- so
-## shim files belong at the top, above the code that calls them. GOSUB DB.OPEN
+## a module that declares one goes above the code that calls it. GOSUB DB.OPEN
 ## still works and still means the same thing; adoption is per call site.
 ##
 ## The p-code is the assignments and the GOSUB a programmer would have written by

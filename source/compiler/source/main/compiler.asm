@@ -48,6 +48,8 @@ StartCompiler:
 		lda 	dcEnabled 					; and pass zero ahead of them both, when GPC.INPUT
 		sta 	dcPass 						; asks for dead code to be removed
 		stz 	dcSkip 						; and nothing is left out until pass zero says so
+		jsr 	GPBankScanLines 			; the lines each GP.BANKED region holds, before any
+											; pass decides how long a GOSUB into one is
 
 ; ************************************************************************************************
 ;

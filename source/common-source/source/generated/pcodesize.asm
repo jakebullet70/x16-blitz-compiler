@@ -27,4 +27,5 @@ MOFSizeTable:
 	.byte	0         	; $f2 .fnrestore
 	.byte	0         	; $f3 .fnpush
 	.byte	0         	; $f4 .fnpop
+	.byte	3         	; $f5 .bgosub
 .send code

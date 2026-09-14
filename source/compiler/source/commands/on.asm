@@ -33,8 +33,11 @@ CommandON:
 _COCreateLoop:
 		txa 								; compile a goto/gosub somewhere
 		phx
-		jsr 	CompileBranchCommand		
+		jsr 	CompileBranchCommand
 		plx
+		lda 	branchOpcode 				; ON steps over three bytes an entry at run time, so a
+		cmp 	#PCD_CMD_BGOSUB 			; GOSUB into a GP.BANKED region, which is four, is
+		beq 	_COBanked 					; refused
 		jsr 	LookNextNonSpace			; ',' follows
 		cmp 	#"," 						
 		bne 	_COComplete 				; if so, more line numbers
@@ -47,6 +50,9 @@ _COComplete:
 		pla 								; throw GOTO/GOSUB
 		rts
 
+_COBanked:
+		.error_unimplemented
+
 		.send code
 
 
@@ -58,5 +64,6 @@ _COComplete:
 ;
 ;		Date			Notes
 ;		==== 			=====
+;		13/09/26		ON ... GOSUB refuses a target inside a GP.BANKED region.
 ;
 ; ************************************************************************************************

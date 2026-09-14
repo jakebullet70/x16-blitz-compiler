@@ -7,7 +7,7 @@
 ## **      GUI.MENU     a question, and a row chosen from a list
 ## **      GUI.INPUT    a question, and a line of typed text
 ## **
-## **  and two internal things, used from inside this bank and not shimmed:
+## **  and two internal things, used by the GUI modules themselves:
 ## **      GUI.FORM     the control block and the one key loop the dialogs
 ## **                   share. A dialog is a list of controls and a wrapper,
 ## **                   and a control is a button, a field or a list --
@@ -93,12 +93,10 @@
 ## **  A caller that never presses TAB sees what it saw before.
 ## **
 ## **  GUI.LISTBOX.* is GUI2.INC.BL, its own #INCLUDE.
-## **  THIS IS THE LOW MEMORY FORM. Every entry point is a plain name, so a
-## **  caller reaches it with one GOSUB and nothing sits in between. Use it
-## **  when the module runs in low memory, which is the ordinary case.
-## **
-## **  The banked twin is GUI.BANK.INC.BL. Include one or the other,
-## **  never both. GPC-BASIC/BANKED-OR-NOT.md says how to choose.
+## **  TO RUN IT FROM A RAM BANK, put the #INCLUDE between GP.BANKED and
+## **  GP.ENDBANKED. A call from outside the region selects the region's bank
+## **  and RETURN puts the caller's back, so a caller is written the same
+## **  either way. GPC-BASIC/BANKED-OR-NOT.md has the rules.
 ## **
 ## ***********************************************************************
 #IFNDEF GUI.DEFS
@@ -164,11 +162,10 @@ GOTO GUI.MODULE.END
 ## ***********************************************************************
 ## **  GUI.CLEARKB -- throw away whatever is already typed.
 ## **
-## **  THE BANK'S OWN DRAIN, AND A DUPLICATE ON PURPOSE. KB.CLEARKB does the
-## **  same six lines in low memory, and this file cannot call it: a region may
-## **  not call another bank and survive the return, so every dialog here would
-## **  have to go out through a shim to empty a queue. Thirty bytes is cheaper
-## **  than that, and cheaper than the wrong-bank jump the shim invites.
+## **  THE GUI'S OWN DRAIN, AND A DUPLICATE. KB.CLEARKB does the same six
+## **  lines. The copy dates from when a region could not call another bank and
+## **  survive the return. A call now selects the bank itself, so what the copy
+## **  saves is the KB.INC.BL include and a bank switch on every call.
 ## **
 ## **  KB.INC.BL stays the public one -- an application in low RAM calls
 ## **  KB.CLEARKB. Fix one and fix the other; there are only the two.

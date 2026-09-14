@@ -868,14 +868,13 @@ The handoff plan for the generic compiler option, rules and keep markers include
 `docs/blitz/DEAD-CODE-ELIMINATION.PLAN.md`.
 
 **4. Let the compiler emit the bank switch, and delete the two-file split — steps 1 to 4 DONE
-2026-09-14; the test references are not regenerated.** A `GOSUB`, `GP.SUB`, `GP.FN` or `FN` into a `GP.BANKED` region from
+2026-09-14.** A `GOSUB`, `GP.SUB`, `GP.FN` or `FN` into a `GP.BANKED` region from
 outside it compiles to `.bgosub` (`$F5`), which selects the region's bank, and `RETURN` puts the
 caller's back. Step 1 is the runtime handler, `bankgosub.asm` in the GP block. Step 2 is the
 compiler: `GPBankScanLines`, `GPBankLineCall` and `GPBankAddressCall` in `gpbank.asm`, tested with
 the programs in `work/bgosub/`. Step 3 merged the library: the `X.BANK.INC.BL` twins and the
 `SHIM.*BANK.INC.BL` files are deleted from both library copies, each program `#DEFINE`s its own bank
-numbers, and `GPC-BASIC/BANKED-OR-NOT.md` and the help say how to bank a module. Nothing is
-committed.
+numbers, and `GPC-BASIC/BANKED-OR-NOT.md` and the help say how to bank a module.
 
 How the three questions were settled:
 
@@ -888,11 +887,13 @@ How the three questions were settled:
 3. **Runtime bytes:** the embedded core grew 12 B and has **4 B** left before `GPBase` moves off
    `$3700` (`docs/memory/gpc-core-page-cushion-below-gpbase.md`). SHARED has 542 B of core free.
 
-**Step 4, 2026-09-14:** GPBMODS builds with an 11,619 B resident object (was 12,885) and GUIFRMT
-compiles; `gpctest.py full` passes every check except the byte compare against the old references.
-`BS.B.NUMS` and `GP-BASIC.md` §4.20 are remeasured. `banktest3` passes on its own drive except BANKY,
-which it still expects refused. **Open:** `gpctest.py ref`, and `banktest3.py` still names `testing/`
-as its drive. **Possible extra:** a region routine calling low memory could use `.bgosub` with its
+**Step 4, 2026-09-14:** GPBMODS builds with an 11,619 B resident object (was 12,885), and GUIFRMT
+with 3,538 B (was 4,098). `gpctest.py`'s inputs for both are now the merged sources, their references
+are rebuilt, and `gpctest.py full` passes in 147 s: GPBMODS is CODE 41,984 FREE 9,728 with 202 dead
+lines (1,413 B), GUIFRMT CODE 12,748 FREE 18,176 with 129 (1,275 B), and both stripped identities
+hold. `BS.B.NUMS` and `GP-BASIC.md` §4.20 are remeasured. `banktest3.py` runs on `work/banktest3`
+and passes, BANKY included. **Open:** whether a `GOTO` from low memory into a region should be
+refused. **Possible extra:** a region routine calling low memory could use `.bgosub` with its
 own bank, so a low-memory routine that changes the bank no longer breaks its caller.
 
 Item 1 is still a question of its own: `.bgosub` banks p-code, and a `SYS` into a banked blob selects

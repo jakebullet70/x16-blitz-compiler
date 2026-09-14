@@ -21,52 +21,47 @@
 #INCLUDE "GPB.INC.BL"
 #INCLUDE "STASH.INC.BL"
 
-## ---- MENUBAR IS HERE AND NEVER CALLED. SHIM.GUIBANK.INC.BL shims all five
-## ---- modules, and BASLOAD resolves every label in a file rather than the
-## ---- ones a path reaches -- so leaving one out stops the build with LABEL
-## ---- NOT FOUND. It costs bank space, not low memory.
-## ----
-## ---- THE FRONT DOOR GOES IN LOW MEMORY, THE GUI GOES IN THE BANK.
-## ----
-## ---- SHIM.GUIBANK.INC.BL is seventeen shims: each selects SHIM.GUIBANK and calls
-## ---- the body. A banked routine cannot select its own bank -- by the time its
-## ---- first instruction is fetched the wrong bank is already selected -- so
-## ---- something in low memory has to do it first.
+## ---- THE GUI GOES IN A BANK, AND NOTHING THAT CALLS IT CHANGES. A GOSUB
+## ---- from low memory into a region selects the region's bank, and RETURN
+## ---- puts the caller's back.
 ## ----
 ## ---- THE GOTO OVER THE REGION IS NOT OPTIONAL. GP.BANKED leaves a bridge so
 ## ---- that falling into the region still works, and at program start it does
 ## ---- work, because the bootstrap leaves the code bank selected. Relying on
 ## ---- that means every module's GOTO ... MODULE.END runs from the bank for no
 ## ---- reason, and stops working the day anything selects another bank first.
+## ----
+## ---- THE BANK NUMBERS COME FIRST. BASLOAD resolves a #DEFINE only if it has
+## ---- already read it, and GP.BANKED names them.
+
+#DEFINE PD.GUICODE 4
+#DEFINE PD.THEMECODE 9
+#DEFINE PD.COMBOCODE 10
 
 GOTO PD.LIBEND
 
-## ---- THE GUI. Copy SHIM.GUIBANK.INC.BL and these six, and nothing else.
-#INCLUDE "SHIM.THEMEBANK.INC.BL"
-GP.BANKED SHIM.THEMEBANK
-#INCLUDE "THEME.BANK.INC.BL"
+## ---- THE GUI. Copy the three #DEFINEs and the three regions, and nothing else.
+GP.BANKED PD.THEMECODE
+#INCLUDE "THEME.INC.BL"
 GP.ENDBANKED
 
-#INCLUDE "SHIM.GUIBANK.INC.BL"
-GP.BANKED SHIM.GUIBANK
-#INCLUDE "MENUVERT.BANK.INC.BL"
-#INCLUDE "MENUBAR.BANK.INC.BL"
-#INCLUDE "LINEINPUT.BANK.INC.BL"
-#INCLUDE "GUI.BANK.INC.BL"
-#INCLUDE "GUI2.BANK.INC.BL"
+GP.BANKED PD.GUICODE
+#INCLUDE "MENUVERT.INC.BL"
+#INCLUDE "LINEINPUT.INC.BL"
+#INCLUDE "GUI.INC.BL"
+#INCLUDE "GUI2.INC.BL"
 GP.ENDBANKED
 
-#INCLUDE "SHIM.COMBOBANK.INC.BL"
-GP.BANKED SHIM.COMBOBANK
-#INCLUDE "COMBO.BANK.INC.BL"
+GP.BANKED PD.COMBOCODE
+#INCLUDE "COMBO.INC.BL"
 GP.ENDBANKED
 PD.LIBEND:
 
 ## The caller owns the DIM -- a module cannot be handed an array.
 DIM MENUVERT.ITEM$(20)
 
-## TWO DIFFERENT BANKS, AND THEY MUST NOT BE THE SAME ONE. GUI.CODEBANK (4,
-## from GUIBANK.INC.BL) holds the GUI's CODE for the life of the program.
+## TWO DIFFERENT BANKS, AND THEY MUST NOT BE THE SAME ONE. PD.GUICODE (4)
+## holds the GUI's CODE for the life of the program.
 ## GUI.BANK is scratch: GUI.OPEN stashes the cells the dialog covers there and
 ## GUI.CLOSE puts them back. Point GUI.BANK at 4 and the dialog would write
 ## the screen over its own code.

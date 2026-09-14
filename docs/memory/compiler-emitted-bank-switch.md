@@ -1,11 +1,11 @@
 ---
 name: compiler-emitted-bank-switch
-description: TODO ranked item 4 -- steps 1-2 (runtime .bgosub, compiler emits it) BUILT and tested 2026-09-13; step 3 (twin modules merged, shims deleted) DONE the same day; step 4 built and tested 2026-09-14, gpctest ref PASS and banktest3 ALL PASS; docs committed, compiler code not
+description: TODO ranked item 4 -- steps 1-2 (runtime .bgosub, compiler emits it) BUILT and tested 2026-09-13; step 3 (twin modules merged, shims deleted) DONE the same day; step 4 built and tested 2026-09-14, gpctest full PASS on the merged GPBMODS and GUIFRMT, banktest3 ALL PASS; all committed
 metadata:
   type: project
 ---
 
-**Steps 1 to 4 are done and tested. The docs are committed; the compiler code is not.** A GOSUB, GP.SUB, GP.FN or FN
+**Steps 1 to 4 are done, tested and committed.** A GOSUB, GP.SUB, GP.FN or FN
 into a `GP.BANKED` region from outside it now selects the region's bank itself, and `RETURN` puts
 the caller's bank back. No `BANK` statement and no shim is needed.
 
@@ -114,18 +114,14 @@ compile succeeds and prints 0. Write `DEF FN T(X)` and `FN T(1)` with the space.
 - `gpctest.py full --only GPBMODS,GUIFRMT`: every compile OK and both stripped identities hold
   (GPBMODS 218 lines, 1,600 B; GUIFRMT 148 lines, 1,463 B). The only failures are the byte compares
   against references that predate steps 2 and 3. GPBMODS off is still CODE 43,776 FREE 8,192, as
-  after step 2, because gpctest compiles a frozen 2026-09-12 copy of the source (see Closed below).
-  That `full` run did not test the merged GPBMODS.
+  after step 2, because gpctest compiled a frozen 2026-09-12 copy of the source. That `full` run did
+  not test the merged GPBMODS; the run on the refreshed inputs is under Closed below.
 - Sizes remeasured with `gpbsizes.py` (scratchpad, not in the repo): the MAP is split into low
   memory and regions, and each line is charged to the file of the label above it, in a space where
   that file has a label of its own. `BS.B.NUMS`, `BS.B.MEM`, `GP-BASIC.md` §4.20 (and the help) and
   the table in `samples/GPB-MODS-TESTING/readme.md` carry the figures; a rebuild after the edit gave
   the same sizes.
-- **`banktest3.py` is stale twice over.** `T` is `testing/`, but its 27 sources are in
-  `work/banktest3`, so every test is TOKFAIL. And `BANKY` is still in its reject list, though step 2
-  made it compile. A scratch copy pointed at `work/banktest3` with `build_basl.py --drive`: 5 pairs
-  SAME OUTPUT, 7 of 8 rejections hold, BANKY the one failure. That drive's `GPC.BIN` was the old
-  `a76c0cdf` build and is now the current one.
+- `banktest3.py` pointed at `testing/` and still expected BANKY refused; fixed below.
 
 ## Closed 2026-09-14
 
@@ -134,6 +130,19 @@ compile succeeds and prints 0. Write `DEF FN T(X)` and `FN T(1)` with the space.
   `work/dcref/inputs` only when the copy is missing, so gpctest's GPBMODS is the 2026-09-12 source,
   shims and all (77,062 B against 73,953 now). That is why its dead-code count stayed 1,600 B and
   its FREE stayed 8,192 through step 4. Delete an input to refresh it.
+- **Inputs refreshed.** GPBMODS's input is `testing/GPBMODS.SRC.PRG` and `.SYM` from the step 4
+  build. GUIFRMT was tokenised and compiled in `work/guifrmt`, a drive holding the merged
+  `GUIFRMT.BASL`, the library working copy flattened, the current `GPC.BIN` and the runtime files.
+  The pre-merge inputs are kept in `work/dcref/inputs-premerge/`. `gpctest.py ref --only
+  GUIFRMT,GPBMODS` rebuilt their references in 32 s, then `gpctest.py full` passed in 147 s:
+  - GPBMODS: CODE 41,984 FREE 9,728, object 11,619 B; dead code 202 lines, 1,413 B.
+  - GUIFRMT: CODE 12,748 FREE 18,176, object 3,538 B (was 4,098), B04 7,938, B09 770, B10 718;
+    dead code 129 lines, 1,275 B.
+  - Both stripped identities hold.
+- `samples/GPB-MODS-TESTING/GPC-BASIC/GPB.INC.BL` (2,577 B, 2026-09-08) has drifted from the root
+  copy (18,436 B), which is the one `testing/` holds. Only the comments and the order of the four
+  `GP.DEFPROC`..`RETURNS` `#TOKEN` lines differ, and the token values are the same, so both give the
+  same tokenised program.
 - The current GPBMODS (`testing/GPBMODS.PRG`, 11,619 B): workspace `$4000`..`$6600`, 9,728 B;
   `.varspace` 3,292. §4.20, H056 and the readme carry it.
 - `banktest3.py`: `T` is `work/banktest3`, `build_basl.py` gets `--drive`, the current `GPC.BIN`

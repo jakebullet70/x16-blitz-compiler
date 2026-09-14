@@ -43,11 +43,11 @@
 ;		BOTH MUST RETURN CARRY CLEAR. A .def helper returning carry set makes the generator drop
 ;		every table element after it, with no error and no clue.
 ;
-;		SEVERAL REGIONS A PROGRAM, each in its own bank, up to GPBANK_MAXREGIONS. What they may
-;		NOT do is call each other: two regions live at the same $A000 in different banks, so a
-;		branch from one to the other has no distance to travel and GPBankMakeOffset refuses it.
-;		Everything reaches everything else the way it already does -- out to a low-memory shim
-;		and back in.
+;		SEVERAL REGIONS A PROGRAM, each in its own bank, up to GPBANK_MAXREGIONS. A GOSUB or an
+;		FN call into a region from outside it is written as a .bgosub, which selects the region's
+;		bank on the way in, and RETURN puts the caller's bank back -- see GPBankLineCall. That
+;		holds from low memory and from another region alike. A GOTO has no bank to select, so a
+;		GOTO from one region into another is still refused, in GPBankMakeOffset.
 ;
 ;		SIXTY-THREE IS THE LIMIT, AND IT IS THE MACHINE'S -- banks 1 to 63 on a 512K X16, with 0
 ;		the KERNAL's. It is not a compiler table size any more, which is the point of it.
@@ -1086,33 +1086,39 @@ GPBankMakeOffset:
 		beq 	_GBMOOut
 		lda 	objPtr 						; which side is the branch on ?
 		ldy 	objPtr+1
-		jsr 	_GBMOSide
+		jsr 	GPBankSide
 		sta 	gpBankSideFrom
 		lda 	gpBankTarget 				; ...and the target ?
 		ldy 	gpBankTarget+1
-		jsr 	_GBMOSide
+		jsr 	GPBankSide
 		sta 	gpBankSideTo
 		cmp 	gpBankSideFrom
 		beq 	_GBMOOut 					; the same side: the deltas cancel as they always did
 		;
-		;		ONE END IN A REGION AND THE OTHER IN LOW MEMORY is what the correction is for.
-		;		ONE END IN EACH OF TWO REGIONS cannot be corrected at all: both regions run at
-		;		$A000, in different banks, so the branch has no distance to travel and no offset
-		;		describes it. Refused here rather than miscompiled -- and it is the same rule the
-		;		library already works to, where everything reaches everything else by going out
-		;		to a low-memory shim and back in.
+		;		EACH END IN A REGION IS OUT BY THAT REGION'S CROSSING, a whole number of pages:
+		;		the branch's own is taken off and the target's is put on. Low memory has none.
+		;
+		;		ONE END IN EACH OF TWO REGIONS IS FOR A .bgosub ONLY. Both regions run at $A000,
+		;		so the offset is right only once the target's bank is selected, and a .bgosub is
+		;		the branch that selects it. Any other branch would land in the caller's own bank,
+		;		so it is refused here rather than miscompiled.
 		;
 		lda 	gpBankSideFrom
 		beq 	_GBMOInto 					; 0 = low memory, so this one goes INTO a region
-		ldx 	gpBankSideTo
-		bne 	_GBMOCross 					; both ends in regions, and not the same one
-		ldx 	gpBankSideFrom 				; out of a region, into low memory
+		lda 	gpBankSideTo
+		beq 	_GBMOOutOf 					; out of a region, into low memory
+		lda 	branchOpcode 				; out of one region and into another
+		cmp 	#PCD_CMD_BGOSUB
+		bne 	_GBMOCross
+_GBMOOutOf:
+		ldx 	gpBankSideFrom
 		dex
 		sec
 		lda 	gpBankOffset+1
 		sbc 	gpBankCrossings,x
 		sta 	gpBankOffset+1
-		bra 	_GBMOOut
+		lda 	gpBankSideTo
+		beq 	_GBMOOut
 _GBMOInto:
 		ldx 	gpBankSideTo 				; out of low memory, into a region
 		dex
@@ -1137,7 +1143,11 @@ _GBMOCross:
 ;		filler between them. Nothing branches at filler, so an address in none of them is in
 ;		low memory.
 ;
-_GBMOSide:
+;		IN PASS ONE ONLY THE REGIONS ALREADY CLOSED ARE COUNTED, and they are still where pass
+;		one compiled them, which is where its addresses are too. An address in the region still
+;		open comes back as low memory. Corrupts X and Y.
+;
+GPBankSide:
 		sta 	gpBankTemp
 		sty 	gpBankTemp2
 		ldx 	#0
@@ -1205,6 +1215,176 @@ CommandBankGuard:
 _CBGInside:
 		.error_unimplemented
 
+; ************************************************************************************************
+;
+;		A CALL INTO A REGION SELECTS THE REGION'S BANK. The call is written as .bgosub <offset>
+;		<bank>, and RETURN puts the caller's bank back, so no low-memory shim has to do either.
+;
+;		GPBankLineCall 		a GOSUB, whose target is a LINE. It is decided from the line ranges
+;							GPBankScanLines read before the first pass, so pass one decides a
+;							forward GOSUB exactly as pass two does.
+;		GPBankAddressCall 	a DEF FN, GP.FN or GP.SUB call, whose target is an ADDRESS. The body is
+;							always behind the call, so every pass already knows which region
+;							holds it. In pass one the region still open reads as low memory, and
+;							only a call from inside that same region can reach it, which is left
+;							plain anyway.
+;
+;		Either one leaves branchOpcode as PCD_CMD_BGOSUB and the bank in branchBank, or changes
+;		nothing. NOTHING CHANGES FOR A CALL INSIDE ONE REGION: its bank is selected already, and
+;		a plain call is a byte shorter. A call out of a region to low memory stays plain too.
+;
+;		THE CALLER'S REGION IS FOUND BY ITS LINE NUMBER, in the same table, and not by
+;		gpBankState and gpBankNumber. GP.BANKEDSTR reads its own bank into gpBankNumber, so a
+;		text block inside a region would leave the wrong bank there.
+;
+;		ON ... GOSUB refuses the result -- see CommandON.
+;
+; ************************************************************************************************
+
+GPBankLineCall:
+		lda 	branchOpcode
+		cmp 	#PCD_CMD_GOSUB
+		bne 	GPBankCallOut
+		lda 	branchTarget
+		ldy 	branchTarget+1
+		jsr 	GPBankLineBank
+		bra 	GPBankCallInto
+
+GPBankAddressCall:
+		lda 	branchOpcode
+		cmp 	#PCD_CMD_FNGOSUB
+		bne 	GPBankCallOut
+		lda 	branchTarget
+		ldy 	branchTarget+1
+		jsr 	GPBankSide 					; the region + 1, or 0
+		tax
+		beq 	GPBankCallOut
+		lda 	gpBankBanks-1,x
+;
+;		A is the target's bank, 0 for low memory, and the flags are still A's.
+;
+GPBankCallInto:
+		beq 	GPBankCallOut 				; a call to low memory stays plain
+		sta 	branchBank
+		lda 	currentLineNumber 			; the caller's own region, whose bank is already the
+		ldy 	currentLineNumber+1 		; one selected
+		jsr 	GPBankLineBank
+		cmp 	branchBank
+		beq 	GPBankCallOut
+		lda 	#PCD_CMD_BGOSUB
+		sta 	branchOpcode
+GPBankCallOut:
+		rts
+
+; ************************************************************************************************
+;
+;		YA is a line number. A comes back as the bank of the region that holds it, or 0 if no
+;		region does. A region holds its GP.BANKED line and every line after it, up to but not
+;		including its GP.ENDBANKED line. Corrupts X and Y.
+;
+; ************************************************************************************************
+
+GPBankLineBank:
+		sta 	gpBankTemp
+		sty 	gpBankTemp2
+		ldx 	#0
+_GBLBNext:
+		cpx 	gpScanCount
+		bcs 	_GBLBLow
+		txa
+		asl 	a
+		tay
+		lda 	gpBankTemp2 				; before the GP.BANKED line ? then not this region
+		cmp 	gpBankLinesIn+1,y
+		bcc 	_GBLBSkip
+		bne 	_GBLBNotBelow
+		lda 	gpBankTemp
+		cmp 	gpBankLinesIn,y
+		bcc 	_GBLBSkip
+_GBLBNotBelow:
+		lda 	gpBankTemp2 				; ...and before the GP.ENDBANKED line ?
+		cmp 	gpBankLinesOut+1,y
+		bcc 	_GBLBInside
+		bne 	_GBLBSkip
+		lda 	gpBankTemp
+		cmp 	gpBankLinesOut,y
+		bcc 	_GBLBInside
+_GBLBSkip:
+		inx
+		bra 	_GBLBNext
+_GBLBInside:
+		lda 	gpBankBanks,x
+		rts
+_GBLBLow:
+		lda 	#0
+		rts
+
+; ************************************************************************************************
+;
+;		WHICH LINES EVERY REGION HOLDS, read once, before the first pass compiles anything.
+;
+;		A .bgosub is a byte longer than a .gosub, and every pass must emit the same bytes. Pass
+;		one reaches a forward GOSUB before it reaches the GP.BANKED line that holds its target,
+;		so the line ranges have to be known before pass one starts. Pass zero needs them too,
+;		because it lays the program out the same way.
+;
+;		THE RANGES GO INTO gpBankLinesIn, gpBankLinesOut and gpBankBanks, the tables the
+;		GP.BANKED generator fills. Every pass writes the same values over them in the same
+;		order, so what is read here still stands. gpScanCount is how many there are: gpBankCount
+;		is cleared for every pass, and the text regions are added past the code regions at the
+;		end of pass one.
+;
+;		ONLY THE FIRST STATEMENT OF A LINE IS LOOKED AT, because that is the only place pass one
+;		accepts either keyword. Anything malformed is left for pass one to refuse, except a bank
+;		number GPBankReadNumber cannot read, which it refuses here with the same message.
+;
+; ************************************************************************************************
+
+GPBankScanLines:
+		stz 	deferErrors 				; nothing read here may defer
+		stz 	gpScanCount
+		lda 	#BLC_OPENIN
+		jsr 	CallAPIHandler
+_GBSLLine:
+		jsr 	ReadSourceLine 				; CS = a line, in YX
+		bcc 	_GBSLDone
+		jsr 	ProcessNewLine
+_GBSLFirst:
+		jsr 	GetNextNonSpace
+		cmp 	#":" 						; leading colons, which the main loop skips too
+		beq 	_GBSLFirst
+		cmp 	#$CE 						; a GP keyword, whose second byte is still unread
+		bne 	_GBSLLine
+		lda 	gpScanCount 				; the tables are full, and pass one says so by name
+		cmp 	#GPBANK_MAXREGIONS
+		bcs 	_GBSLLine
+		asl 	a
+		tax
+		lda 	(srcPtr)
+		cmp 	#GP_TOKEN_ENDBANKED
+		beq 	_GBSLClose
+		cmp 	#GP_TOKEN_BANKED
+		bne 	_GBSLLine
+		lda 	currentLineNumber
+		sta 	gpBankLinesIn,x
+		lda 	currentLineNumber+1
+		sta 	gpBankLinesIn+1,x
+		jsr 	GetNext 					; past the keyword's second byte
+		jsr 	GPBankReadNumber 			; the bank, into gpBankNumber
+		ldx 	gpScanCount
+		lda 	gpBankNumber
+		sta 	gpBankBanks,x
+		bra 	_GBSLLine
+_GBSLClose:
+		lda 	currentLineNumber 			; a region is counted once it is closed
+		sta 	gpBankLinesOut,x
+		lda 	currentLineNumber+1
+		sta 	gpBankLinesOut+1,x
+		inc 	gpScanCount
+		bra 	_GBSLLine
+_GBSLDone:
+		lda 	#BLC_CLOSEIN
+		jmp 	CallAPIHandler
 
 		.send 	code
 
@@ -1303,6 +1483,8 @@ gpBankCount:									; how many regions the program has
 		.fill 	1
 gpBankPass:										; which one GPBankRelocate is moving
 		.fill 	1
+gpScanCount:									; the regions GPBankScanLines found before the
+		.fill 	1 								; first pass
 gpBankBanks:									; the bank each one named
 		.fill 	GPBANK_MAXREGIONS
 gpBankStarts:									; where each starts -- in the object buffer while
@@ -1332,5 +1514,7 @@ gpBankCrossings:								; what a branch crossing INTO each one is out by
 ;						with two GOTOs, and every recorded address is corrected.
 ;		05/09/26		GP.BANKED takes the bank number. The region now moves PAST the GP.ASM pool
 ;						and onto a page boundary, and the object walkers hop over the pool.
+;		13/09/26		A GOSUB or an FN call into a region from outside it is a .bgosub, and may
+;						come from another region. GPBankScanLines reads the line ranges first.
 ;
 ; ************************************************************************************************

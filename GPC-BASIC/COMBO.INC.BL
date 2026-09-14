@@ -47,12 +47,10 @@
 ## **  GUI and leaves this out stops with LABEL NOT FOUND whether it ever draws
 ## **  a combo or not.
 ## **
-## **  THIS IS THE LOW MEMORY FORM. Every entry point is a plain name, so a
-## **  caller reaches it with one GOSUB and nothing sits in between. Use it
-## **  when the module runs in low memory, which is the ordinary case.
-## **
-## **  The banked twin is COMBO.BANK.INC.BL. Include one or the other,
-## **  never both. GPC-BASIC/BANKED-OR-NOT.md says how to choose.
+## **  TO RUN IT FROM A RAM BANK, put the #INCLUDE between GP.BANKED and
+## **  GP.ENDBANKED. A call from outside the region selects the region's bank
+## **  and RETURN puts the caller's back, so a caller is written the same
+## **  either way. GPC-BASIC/BANKED-OR-NOT.md has the rules.
 ## **
 ## ***********************************************************************
 #IFNDEF COMBO.DEFS
@@ -149,10 +147,10 @@ COMBO.DRAW:
 ## **  scrolling never leaves GUI.FORM.DO.LIST. What comes out is one of the
 ## **  six verdicts and GUI.FORM.ACT is still the only place one is acted on.
 ## **
-## **  NO ACCELERATOR SCAN, for the reason a field has none: GUI.FORM.ACCEL
-## **  lives in the GUI's bank with no shim in front of it, and this file is
-## **  not in that bank. A letter typed at a closed combo therefore does
-## **  nothing. If it should jump to the item starting with it, that goes here.
+## **  NO ACCELERATOR SCAN, so a letter typed at a closed combo does nothing.
+## **  GUI.FORM.ACCEL can be called from here, because a call into another
+## **  region selects that region's bank. If a letter should jump to the item
+## **  starting with it, that goes here.
 ## **
 ## **  RETURN OPENS IT rather than pressing the default button, which is where
 ## **  a combo parts company with a field. A field has nothing to open.
@@ -177,9 +175,9 @@ COMBO.KEY:
 ## ***********************************************************************
 ## **  COMBO.GETKEY -- block until something is typed.
 ## **
-## **  GUI.FORM.GETKEY is these same three lines and cannot be called: it is
-## **  inside the GUI's bank and SHIM.GUIBANK does not shim it. Three lines is
-## **  cheaper than adding a shim for something this small.
+## **  GUI.FORM.GETKEY is these same three lines. It is GUI.FORM's own, and
+## **  from another region a call to it would switch the bank twice for three
+## **  lines of work.
 ## ***********************************************************************
 
 COMBO.GETKEY:

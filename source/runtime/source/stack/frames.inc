@@ -17,6 +17,7 @@
 ; ************************************************************************************************
 
 FRAME_GOSUB = $E4 							; Gosub has 4 bytes
+FRAME_BGOSUB = $E0+5 						; ...and a .bgosub 5, the caller's bank at +1
 FRAME_FOR = $C0+19 							; For has 19 bytes
 FRAME_LOOP = $A0+6 							; GP.DO has 6 bytes
 FRAME_SELECT = $80+7 						; GP.SELECT has 7 bytes
@@ -28,6 +29,11 @@ FRAME_FNSLOT = $40+7 					; ...and one saved evaluation stack slot has 7
 ;		7 GOSUB, 6 FOR, 5 GP.DO, 4 GP.SELECT, 3 GP.FN state, 2 GP.FN slot. $FF is the
 ;		stack-empty fail marker StackFindFrame stops on -- it is id 7 size 31, which no real
 ;		frame can be, so it can never be mistaken for a GOSUB.
+;
+;		A .bgosub frame is $E5, GOSUB's marker with bit 0 set, and no other two markers differ
+;		in bit 0 alone. StackFindFrame ignores that bit, so RETURN's one search finds either
+;		frame, and hands the bit back in carry for RETURN to test. The fifth byte is unused:
+;		it is there only because the size field is what carries the bit.
 ;
 ;		GP.SELECT no longer opens one (01/09/26) but keeps its id, since nothing needs it.
 ;		A GP.FN call opens ONE state frame and ONE slot frame per live evaluation stack slot,

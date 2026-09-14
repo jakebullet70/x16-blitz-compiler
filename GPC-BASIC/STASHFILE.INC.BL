@@ -23,8 +23,8 @@
 ## **        STASH.BANK     the bank to stage through
 ## **        and, for SAVE, the geometry STASH.SAVE wants
 ## **
-## **  A SEPARATE FILE FROM STASH.INC.BL ON PURPOSE: a BASL module has no dead code
-## **  elimination, and these three are 127 bytes. A dialog that stashes to a bank and
+## **  A SEPARATE FILE FROM STASH.INC.BL ON PURPOSE: uncalled code stays in unless the
+## **  compile removes it, and these three are 127 bytes. A dialog that stashes to a bank and
 ## **  puts it back never goes near a disk and should not pay for one.
 ## **
 ## **  THE FILE IS SELF-DESCRIBING BECAUSE THE STASH IS -- the four header bytes go out

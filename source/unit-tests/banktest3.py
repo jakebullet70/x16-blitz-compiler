@@ -4,10 +4,10 @@
 #   output against its unmarked control.  Increment 2 moves code, so a byte compare of
 #   the objects is no longer the test -- what has to match is what the program prints.
 #
-import os, re, subprocess, time, sys
+import glob, os, re, shutil, subprocess, time, sys
 
 ROOT = r"C:\dev\CmdrX16\dos_tools\x16-blitz-compiler"
-T = os.path.join(ROOT, "testing")
+T = os.path.join(ROOT, "work", "banktest3")
 E = os.path.join(ROOT, "bin", "x16emu")
 PY = r"C:\Users\Admin\AppData\Local\Programs\Python\Python313\python.exe"
 #   GPC's OWN error vocabulary, read out of the generator's output so it cannot drift.
@@ -62,7 +62,7 @@ def tokenise(name):
     if os.path.exists(src):
         os.remove(src)
     subprocess.run([PY, os.path.join(ROOT, "source", "gpc", "build_basl.py"),
-                    name + ".BASL", name + ".SRC.PRG"],
+                    "--drive", T, name + ".BASL", name + ".SRC.PRG"],
                    cwd=ROOT, capture_output=True, text=True)
     return os.path.exists(src)
 
@@ -70,7 +70,7 @@ def tokenise(name):
 def compile_one(name, mode="SHARED"):
     #   SHARED, not embedded: GP.BANKED only works there. The bootstrap is what moves the
     #   region into the bank, and an embedded program has no bootstrap -- gpbank.asm
-    #   refuses a region rather than guessing. GPC/GPB.RT.122.BIN are in testing/.
+    #   refuses a region rather than guessing.
     open(os.path.join(T, "GPC.INPUT"), "w", newline="\n").write(
         "%s.SRC.PRG\n%s.PRG\n%s.MAP\n%s\n" % (name, name, name, mode))
     p = os.path.join(T, name + ".PRG")
@@ -113,7 +113,7 @@ PAIRS = [("BANKA", "BANKE"), ("BANKB", "BANKF"), ("BANKH", "BANKI"), ("BANKJ", "
          ("BANKN", "BANKO")]
 BAD = [("BANKC", "BLOCK MISMATCH"), ("BANKD", "BLOCK MISMATCH"),
        ("BANKG", "BLOCK MISMATCH"), ("BANKL", "VALUE"), ("BANKM", "VALUE"),
-       ("BANKX", "BAD VALUE"), ("BANKY", "NOT IMPLEMENTED"),
+       ("BANKX", "BAD VALUE"),
        #   The region COUNT is a checked limit, not a crash.  BNK64 is sixty-four trivial
        #   regions in banks 1 up -- one more than a 512K X16 has -- and the message names the
        #   sixty-fourth GP.BANKED.  It is a compiler-space message, so this test is also what
@@ -121,9 +121,19 @@ BAD = [("BANKC", "BLOCK MISMATCH"), ("BANKD", "BLOCK MISMATCH"),
        #   storage hole and the count became the machine's.
        ("BNK64", "TOO MANY GP.BANKED REGIONS")]
 BADNAMES = [b[0] for b in BAD]
+#   No control: what the program prints is the test. BANKY calls from one region into
+#   another, which the compiler refused until .bgosub.
+RUNS = [("BANKY", ["Q1", "Q2", "Q3"])]
+
+#   The drive keeps its own compiler and runtime, and they went stale once. Copy the
+#   current ones over them first.
+shutil.copy2(os.path.join(ROOT, "source", "application", "GPC.BIN"), T)
+for pattern in ("GPC.IMG.*.BIN", "GPB.RT.*.BIN", "GPC.RT.*.BIN"):
+    for f in glob.glob(os.path.join(ROOT, "testing", pattern)):
+        shutil.copy2(f, T)
 
 results = {}
-for n in [x for p in PAIRS for x in p] + BADNAMES:
+for n in [x for p in PAIRS for x in p] + [r[0] for r in RUNS] + BADNAMES:
     ok = tokenise(n)
     kind, msg = compile_one(n) if ok else ("TOKFAIL", "")
     results[n] = (kind, msg, [])
@@ -147,6 +157,13 @@ for n, want in BAD:
     k, m, _ = results[n]
     good = (k == "ERR" and want in m)
     print("%-6s rejected     %s   (%s)" % (n, "YES" if good else "*** NO ***", m))
+    if not good:
+        fails += 1
+
+for n, want in RUNS:
+    k, m, out = results[n]
+    good = (k == "OK" and out == want)
+    print("%-6s runs         %s   (%s)" % (n, "YES" if good else "*** NO ***", " / ".join(out) or m))
     if not good:
         fails += 1
 

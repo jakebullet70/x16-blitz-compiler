@@ -68,7 +68,7 @@ sibling project: what is kept is a fact about **X16 BASIC or the X16 itself**, n
 - [GPC Blitz runtime slack and limits](gpc-blitz-runtime-slack-and-limits.md) — the run-side ceiling is FREE minus 4096
 - [Run-side workspace, read from the PRG](run-side-workspace-read-from-the-prg.md) — two bootstrap page numbers give the budget
 - [Core page cushion below GPBase](gpc-core-page-cushion-below-gpbase.md) — 4 B left in the embedded image; measure from rtimage.lbl
-- [Compiler-emitted bank switch](compiler-emitted-bank-switch.md) — TODO item 4: .bgosub emitted, twins merged and shims deleted; built and tested 2026-09-14, docs committed, compiler code not
+- [Compiler-emitted bank switch](compiler-emitted-bank-switch.md) — TODO item 4: .bgosub emitted, twins merged and shims deleted; built, tested and committed 2026-09-14; GOTO from low memory into a region still undecided
 - [Runtime footprint](blitz-x16-runtime-footprint.md) — 10,956 B in every program, and how to shrink it
 - [String heap scavenger](string-heap-scavenger.md) — SHIPPED: dead blocks reused, +1 page RT
 - [BINPUT# caps at 255 bytes](binput-caps-at-255-bytes.md) — three caps land on one number; it is a CHRIN loop

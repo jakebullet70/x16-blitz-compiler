@@ -11,61 +11,56 @@
 ## ---- A SECOND TEXT BANK
 #DEFINE GM.TEXTBANKB 6
 
-## ---- THE TWO BIGGEST DROPDOWN HANDLERS RUN FROM A BANK. GMX.STRINGS and
-## ---- GMX.FILES, and everything they call, are one GP.BANKED region down at
-## ---- the end of this file behind two front doors. The bank is named here
-## ---- rather than in a front-door file because the code it holds is this
-## ---- program's own, not the library's. 11 is the first bank above the
-## ---- library block: 4 the GUI, 5 and 6 the text, 7 the utilities, 8 the
-## ---- file modules, 9 THEME, 10 the combo box.
-#DEFINE SHIM.MODSBANK 11
+## ---- THE CODE BANKS, one a GP.BANKED region. BANKMGR claims each at startup
+## ---- for the same reason it claims the text banks. They are all here, above
+## ---- the regions, because BASLOAD resolves a #DEFINE only if it has already
+## ---- read it. GM.MODSCODE is this program's own code, not the library's:
+## ---- the two biggest dropdown handlers, GMX.STRINGS and GMX.FILES, and
+## ---- everything they call, in one region at the end of this file.
+#DEFINE GM.GUICODE 4
+#DEFINE GM.UTILCODE 7
+#DEFINE GM.FUTILCODE 8
+#DEFINE GM.THEMECODE 9
+#DEFINE GM.COMBOCODE 10
+#DEFINE GM.MODSCODE 11
 
 ## ---- THE GUI RUNS FROM A RAM BANK, AND SO DO THE UTILITIES AND THE FILE
-## ---- MODULES. Each region below is preceded by the one file that opens it:
-## ---- SHIM.UTILBANK, SHIM.THEMEBANK, SHIM.GUIBANK, SHIM.COMBOBANK and
-## ---- SHIM.FUTILBANK, each .INC.BL and each naming its own bank. A front
-## ---- door is a shim an entry point, selecting the bank and calling the body,
-## ---- and it names the bank as well -- the #DEFINE lives there, not here. To
-## ---- lift a bank into another program, copy the front door and the modules
-## ---- listed under it, and nothing else.
+## ---- MODULES. Each region below is the modules' ordinary .INC.BL files
+## ---- between GP.BANKED and GP.ENDBANKED, and nothing else: a call into a
+## ---- region from outside it selects the region's bank, and RETURN puts the
+## ---- caller's back. To lift a bank into another program, copy its #DEFINE
+## ---- and its region.
 ## ----
 ## ---- FIVE REGIONS AND NOT ONE, because a region holds at most 8K and the
 ## ---- GUI filled its own. THEME and COMBO were lifted out into banks of their
 ## ---- own for that reason and no other.
 ## ----
-## ---- A REGION MAY CALL ANOTHER, and that is what the push and pop shims
-## ---- bought. Every region lives at $A000, so the branch out is only safe
-## ---- because the front door puts the caller's bank back before returning:
-## ---- GUI.FORM GOSUBs COMBO.DRAW and COMBO.KEY across banks on that basis.
-## ---- ALL FIVE FRONT DOORS DO IT NOW. SHIM.FUTILBANK was the last one still
-## ---- selecting the bank and RETURNing without putting the caller's back,
-## ---- which held only while nothing in a region called FILE.ANYTHING. It
-## ---- carries its own push and pop pair since 2026-09-11, so a region may
-## ---- call the file modules like any other.
+## ---- A REGION MAY CALL ANOTHER. Every region lives at $A000, and the call
+## ---- works because it carries the bank it selects: GUI.FORM GOSUBs
+## ---- COMBO.DRAW and COMBO.KEY across banks on that basis. A GOTO from one
+## ---- region into another is refused.
 ## ----
 ## ---- THE GOTO JUMPS EACH REGION rather than falling into it through the
-## ---- bridge GP.BANKED leaves; see the front doors for why that matters. The
-## ---- shims sit inside the jumped span too, and each front door repeats the
-## ---- jump internally, so they are skipped either way.
+## ---- bridge GP.BANKED leaves. The bridge works at program start only because
+## ---- the bootstrap leaves the code bank selected.
 ## ----
 ## ---- WHAT STAYS IN LOW RAM is what holds a BANK statement, which the
-## ---- compiler refuses inside a region: STASH, STASHFILE, and the five
-## ---- front doors themselves. GPB.INC.BL is definitions and no code.
+## ---- compiler refuses inside a region: STASH and STASHFILE. GPB.INC.BL is
+## ---- definitions and no code.
 
 GOTO GM.LIBEND
 
-## ---- THE UTILITIES. Copy SHIM.UTILBANK.INC.BL and these nine.
-#INCLUDE "SHIM.UTILBANK.INC.BL"
-GP.BANKED SHIM.UTILBANK
-#INCLUDE "APPSYS.BANK.INC.BL"
-#INCLUDE "BANKMGR.BANK.INC.BL"
-#INCLUDE "KB.BANK.INC.BL"
-#INCLUDE "STRCASE.BANK.INC.BL"
-#INCLUDE "STRINGS.BANK.INC.BL"
-#INCLUDE "STRUSING.BANK.INC.BL"
-#INCLUDE "SORT.BANK.INC.BL"
-#INCLUDE "STASHVRAM.BANK.INC.BL"
-#INCLUDE "STASHVRAMGC.BANK.INC.BL"
+## ---- THE UTILITIES. Copy these nine.
+GP.BANKED GM.UTILCODE
+#INCLUDE "APPSYS.INC.BL"
+#INCLUDE "BANKMGR.INC.BL"
+#INCLUDE "KB.INC.BL"
+#INCLUDE "STRCASE.INC.BL"
+#INCLUDE "STRINGS.INC.BL"
+#INCLUDE "STRUSING.INC.BL"
+#INCLUDE "SORT.INC.BL"
+#INCLUDE "STASHVRAM.INC.BL"
+#INCLUDE "STASHVRAMGC.INC.BL"
 GP.ENDBANKED
 
 ## ---- THEME HAS A BANK TO ITSELF. It was the top of the GUI region until that
@@ -76,38 +71,34 @@ GP.ENDBANKED
 ## ---- THEME role numbers, which are #DEFINEs, and BASLOAD resolves a #DEFINE
 ## ---- only if it has already read it. THEME.CLR itself is an ordinary array
 ## ---- and would not care.
-#INCLUDE "SHIM.THEMEBANK.INC.BL"
-GP.BANKED SHIM.THEMEBANK
-#INCLUDE "THEME.BANK.INC.BL"
+GP.BANKED GM.THEMECODE
+#INCLUDE "THEME.INC.BL"
 GP.ENDBANKED
 
-## ----  GUI crap in a bank! Copy SHIM.GUIBANK.INC.BL and these five
-#INCLUDE "SHIM.GUIBANK.INC.BL"
-GP.BANKED SHIM.GUIBANK
-#INCLUDE "MENUVERT.BANK.INC.BL"
-#INCLUDE "MENUBAR.BANK.INC.BL"
-#INCLUDE "LINEINPUT.BANK.INC.BL"
-#INCLUDE "GUI.BANK.INC.BL"
-#INCLUDE "GUI2.BANK.INC.BL"
+## ----  GUI crap in a bank! Copy these five
+GP.BANKED GM.GUICODE
+#INCLUDE "MENUVERT.INC.BL"
+#INCLUDE "MENUBAR.INC.BL"
+#INCLUDE "LINEINPUT.INC.BL"
+#INCLUDE "GUI.INC.BL"
+#INCLUDE "GUI2.INC.BL"
 GP.ENDBANKED
 
 ## ---- THE COMBO BOX IS A REGION OF ITS OWN, for the same reason THEME is: the
 ## ---- GUI region has no room left. GUI.FORM draws and keys a combo control by
 ## ---- GOSUBbing COMBO.DRAW and COMBO.KEY, which is one region calling another
-## ---- and works because the shims put the caller's bank back.
+## ---- and works because RETURN puts the caller's bank back.
 ## ----
 ## ---- IT COMES AFTER THE GUI REGION because it reads GUI.CT.COMBO and the
-## ---- control-table offsets, all #DEFINEs in GUI.BANK.INC.BL.
-#INCLUDE "SHIM.COMBOBANK.INC.BL"
-GP.BANKED SHIM.COMBOBANK
-#INCLUDE "COMBO.BANK.INC.BL"
+## ---- control-table offsets, all #DEFINEs in GUI.INC.BL.
+GP.BANKED GM.COMBOCODE
+#INCLUDE "COMBO.INC.BL"
 GP.ENDBANKED
 
-## ---- File utils in a bank! Copy SHIM.FUTILBANK.INC.BL and these two.
-#INCLUDE "SHIM.FUTILBANK.INC.BL"
-GP.BANKED SHIM.FUTILBANK
-#INCLUDE "FILEIO.BANK.INC.BL"
-#INCLUDE "FILEDIR.BANK.INC.BL"
+## ---- File utils in a bank! Copy these two.
+GP.BANKED GM.FUTILCODE
+#INCLUDE "FILEIO.INC.BL"
+#INCLUDE "FILEDIR.INC.BL"
 GP.ENDBANKED
 
 
@@ -228,7 +219,7 @@ THEME.ID = 0 : GOSUB THEME.SELECT
 ## the program runs, so nothing names them. They are whatever is free.
 GOSUB BANKMGR.INIT : GM.BANKFAIL$ = ""
 
-BANKMGR.SET.BANK = SHIM.GUIBANK : GOSUB BANKMGR.CLAIM
+BANKMGR.SET.BANK = GM.GUICODE : GOSUB BANKMGR.CLAIM
 IF BANKMGR.OK = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 0)
 
 BANKMGR.SET.BANK = GM.TEXTBANK : GOSUB BANKMGR.CLAIM
@@ -237,19 +228,19 @@ IF BANKMGR.OK = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 3)
 BANKMGR.SET.BANK = GM.TEXTBANKB : GOSUB BANKMGR.CLAIM
 IF BANKMGR.OK = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 3)
 
-BANKMGR.SET.BANK = SHIM.UTILBANK : GOSUB BANKMGR.CLAIM
+BANKMGR.SET.BANK = GM.UTILCODE : GOSUB BANKMGR.CLAIM
 IF BANKMGR.OK = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 5)
 
-BANKMGR.SET.BANK = SHIM.FUTILBANK : GOSUB BANKMGR.CLAIM
+BANKMGR.SET.BANK = GM.FUTILCODE : GOSUB BANKMGR.CLAIM
 IF BANKMGR.OK = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 6)
 
-BANKMGR.SET.BANK = SHIM.THEMEBANK : GOSUB BANKMGR.CLAIM
+BANKMGR.SET.BANK = GM.THEMECODE : GOSUB BANKMGR.CLAIM
 IF BANKMGR.OK = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 7)
 
-BANKMGR.SET.BANK = SHIM.COMBOBANK : GOSUB BANKMGR.CLAIM
+BANKMGR.SET.BANK = GM.COMBOCODE : GOSUB BANKMGR.CLAIM
 IF BANKMGR.OK = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 8)
 
-BANKMGR.SET.BANK = SHIM.MODSBANK : GOSUB BANKMGR.CLAIM
+BANKMGR.SET.BANK = GM.MODSCODE : GOSUB BANKMGR.CLAIM
 IF BANKMGR.OK = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 9)
 
 GOSUB BANKMGR.GET.FREE.BANK : GM.DDBANK% = BANKMGR.BANK
@@ -737,9 +728,9 @@ GMX.DISPATCH:
 ## **  listing is read into. Ask on a different machine and the numbers differ.
 ## **
 ## **  COMPILED IN are the eight written into the source as constants. CODE is
-## **  the six GP.BANKED regions -- SHIM.GUIBANK carries the GUI, SHIM.UTILBANK
-## **  the utilities, SHIM.FUTILBANK the file modules, SHIM.THEMEBANK the theme,
-## **  SHIM.COMBOBANK the combo box and SHIM.MODSBANK this program's own two
+## **  the six GP.BANKED regions -- GM.GUICODE carries the GUI, GM.UTILCODE
+## **  the utilities, GM.FUTILCODE the file modules, GM.THEMECODE the theme,
+## **  GM.COMBOCODE the combo box and GM.MODSCODE this program's own two
 ## **  biggest dropdowns -- and TEXT the two GP.BANKEDSTR pools, GM.TEXTBANK and
 ## **  GM.TEXTBANKB. Nothing chooses these: GP.BANKED takes a decimal constant,
 ## **  so they are the same numbers in every run. They still need a
@@ -772,9 +763,9 @@ GMX.BANKMAP:
   GUI.MSG$ = GP.BSTR(BS.BANKMAP, 1) + MID$(STR$(BANKMGR.BANKS), 2) + GP.BSTR(BS.BANKMAP, 2) + MID$(STR$(BANKMGR.SPARE), 2)
   GUI.MSG2$ = GP.BSTR(BS.BANKMAP, 3) + MID$(STR$(GM.DDBANK%), 2) + GP.BSTR(BS.BANKMAP, 4) + MID$(STR$(GM.GUIBANK%), 2)
   GUI.MSG2$ = GUI.MSG2$ + GP.BSTR(BS.BANKMAP, 5) + MID$(STR$(GM.DIRBANK%), 2)
-  GUI.MSG3$ = GP.BSTR(BS.BANKMAP, 6) + MID$(STR$(SHIM.GUIBANK), 2) + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(SHIM.UTILBANK), 2) + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(SHIM.FUTILBANK), 2)
-  GUI.MSG3$ = GUI.MSG3$ + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(SHIM.THEMEBANK), 2) + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(SHIM.COMBOBANK), 2)
-  GUI.MSG3$ = GUI.MSG3$ + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(SHIM.MODSBANK), 2)
+  GUI.MSG3$ = GP.BSTR(BS.BANKMAP, 6) + MID$(STR$(GM.GUICODE), 2) + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(GM.UTILCODE), 2) + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(GM.FUTILCODE), 2)
+  GUI.MSG3$ = GUI.MSG3$ + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(GM.THEMECODE), 2) + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(GM.COMBOCODE), 2)
+  GUI.MSG3$ = GUI.MSG3$ + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(GM.MODSCODE), 2)
   GUI.MSG3$ = GUI.MSG3$ + GP.BSTR(BS.BANKMAP, 8) + MID$(STR$(GM.TEXTBANK), 2) + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(GM.TEXTBANKB), 2)
   GOSUB GUI.SAY
   RETURN
@@ -2484,8 +2475,8 @@ GP.BANKEDSTR GM.TEXTBANKB BS.B.MEM
   "CODE BANKS #"
   "  TEXT BANKS #"
   "BANK SELECTED NOW  #"
-  "RESIDENT P-CODE  12755    MAP TOTAL  28602"
-  "OVERLAYS 8   .B04 7938  .B05 8194  .B06 3842  .B07 4354"
+  "RESIDENT P-CODE  11619    MAP TOTAL  27624"
+  "OVERLAYS 8   .B04 7938  .B05 7426  .B06 4354  .B07 4354"
   "             .B08 1538  .B09  770  .B10  770  .B11 3074"
 GP.ENDBANKEDSTR
 GMX.B.MEMORY:
@@ -2498,8 +2489,8 @@ GMX.B.MEMORY:
   GP.PRINTAT 4, 15, GP.BSTR(BS.B.MEM, 1) + MID$(STR$(BANKMGR.BANKS), 2) + GP.BSTR(BS.B.MEM, 2) + MID$(STR$(BANKMGR.SPARE), 2), THEME.CLR(THEME.TEXT)
 ## Six code banks and two text ones, built in three pieces: one line naming all
 ## eight runs past BASLOAD's line length.
-  GM.BMEM$ = GP.BSTR(BS.B.MEM, 3) + MID$(STR$(SHIM.GUIBANK), 2) + " #" + MID$(STR$(SHIM.UTILBANK), 2) + " #" + MID$(STR$(SHIM.FUTILBANK), 2)
-  GM.BMEM$ = GM.BMEM$ + " #" + MID$(STR$(SHIM.THEMEBANK), 2) + " #" + MID$(STR$(SHIM.COMBOBANK), 2) + " #" + MID$(STR$(SHIM.MODSBANK), 2)
+  GM.BMEM$ = GP.BSTR(BS.B.MEM, 3) + MID$(STR$(GM.GUICODE), 2) + " #" + MID$(STR$(GM.UTILCODE), 2) + " #" + MID$(STR$(GM.FUTILCODE), 2)
+  GM.BMEM$ = GM.BMEM$ + " #" + MID$(STR$(GM.THEMECODE), 2) + " #" + MID$(STR$(GM.COMBOCODE), 2) + " #" + MID$(STR$(GM.MODSCODE), 2)
   GM.BMEM$ = GM.BMEM$ + GP.BSTR(BS.B.MEM, 4) + MID$(STR$(GM.TEXTBANK), 2) + " #" + MID$(STR$(GM.TEXTBANKB), 2)
   GP.PRINTAT 4, 16, GM.BMEM$, THEME.CLR(THEME.TEXT)
   GP.PRINTAT 4, 17, GP.BSTR(BS.B.MEM, 5) + MID$(STR$(GM.BANKNOW%), 2), THEME.CLR(THEME.TEXT)
@@ -2536,10 +2527,9 @@ GMX.B.MEMORY:
 ## **  modules apiece -- four headings over four near-empty lists. Those four
 ## **  share the last column instead, each row prefixed with its bank.
 ## **
-## **  EIGHT ENTRIES IN THE LEFT COLUMN AGAINST NINETEEN ACROSS THE OTHER
+## **  THREE ENTRIES IN THE LEFT COLUMN AGAINST NINETEEN ACROSS THE OTHER
 ## **  THREE. What is left down there is what could not go: STASH and STASHFILE
-## **  hold BANK statements, which the compiler refuses inside a region, and the
-## **  five SHIM files are the front-door layer that reaches the other columns.
+## **  hold BANK statements, which the compiler refuses inside a region.
 ## **  GPBMODS ITSELF IS IN TWO COLUMNS AT ONCE -- the shell in low RAM, and its
 ## **  two biggest dropdown handlers in bank 11.
 ## **
@@ -2562,11 +2552,6 @@ GP.BANKEDSTR GM.TEXTBANKB BS.B.SIZES
   "TOTAL"
   "STASH"
   "STASHFILE"
-  "SHIM.UTIL"
-  "SHIM.THEME"
-  "SHIM.GUI"
-  "SHIM.COMBO"
-  "SHIM.FUTIL"
   "GPBMODS"
   "APPSYS"
   "BANKMGR"
@@ -2597,17 +2582,12 @@ GP.ENDBANKEDSTR
 
 GP.BANKEDSTR GM.TEXTBANKB BS.B.NUMS
   "431"
-  "175"
-  "381"
-  "139"
-  "299"
-  "119"
-  "237"
-  "9291"
+  "174"
+  "9431"
   "114"
-  "590"
+  "586"
   "28"
-  "54"
+  "56"
   "511"
   "726"
   "189"
@@ -2616,14 +2596,14 @@ GP.BANKEDSTR GM.TEXTBANKB BS.B.NUMS
   "1306"
   "826"
   "780"
-  "4472"
+  "4474"
   "366"
-  "1089"
+  "1090"
   "422"
   "502"
-  "704"
-  "2866"
-  "28602"
+  "705"
+  "2904"
+  "27624"
 GP.ENDBANKEDSTR
 GMX.B.SIZES:
   GM.GRP% = 18
@@ -2638,7 +2618,7 @@ GMX.B.SIZES:
   ## ---- NINETEEN COLUMNS APART, not twenty-six. A name padded to 11 and a
   ## ---- figure right justified in 5 is 16 wide, and four of those plus the
   ## ---- left margin is 76 of the 80.
-  GM.SX% = 4  : GM.SHEAD% = 0 : GM.SN% = 8 : GM.SATTR% = THEME.CLR(THEME.TEXT)  : GOSUB GMX.B.COL
+  GM.SX% = 4  : GM.SHEAD% = 0 : GM.SN% = 3 : GM.SATTR% = THEME.CLR(THEME.TEXT)  : GOSUB GMX.B.COL
   GM.SX% = 23 : GM.SHEAD% = 1 : GM.SN% = 9 : GM.SATTR% = THEME.CLR(THEME.TITLE) : GOSUB GMX.B.COL
   GM.SX% = 42 : GM.SHEAD% = 2 : GM.SN% = 5 : GM.SATTR% = THEME.CLR(THEME.TITLE) : GOSUB GMX.B.COL
   GM.SX% = 61 : GM.SHEAD% = 3 : GM.SN% = 5 : GM.SATTR% = THEME.CLR(THEME.TITLE) : GOSUB GMX.B.COL
@@ -2689,30 +2669,24 @@ GMX.B.ROW:
 
 ## ***********************************************************************
 ## **
-## **  SHIM.MODSBANK -- the low memory front door to the two biggest dropdown
-## **  handlers, GMX.STRINGS and GMX.FILES.
+## **  THE MODS REGION -- the two biggest dropdown handlers, GMX.STRINGS and
+## **  GMX.FILES, in bank GM.MODSCODE.
 ## **
 ## **  BOTH HANDLERS AND EVERY ROW UNDER THEM RUN IN BANK 11, in the one
 ## **  GP.BANKED region below this. Together they are around 2,900 bytes of
 ## **  p-code, and that is what this hands back to low RAM -- where the arrays
 ## **  and the string heap live, and where FILES was the row that ran out.
 ## **
-## **  THE SHIM IS SHIM.UTILBANK.INC.BL'S CODE UNDER ITS OWN NAMES. That
-## **  file's header carries the reasoning in full: why the caller's bank has
-## **  to go on a stack rather than into one variable, why POP is reached by
-## **  GOTO rather than GOSUB, and why the capture has to be a GP.ASM blob and
-## **  not PEEK(0). Nothing here differs from it but the names and the bank.
-## **
-## **  IT IS WRITTEN HERE AND NOT IN A .INC.BL because the code it opens is
-## **  this program's own. A library module gets a front-door file so another
-## **  program can copy the pair; a program's own region has nobody to copy it.
+## **  THE WAY IN IS AN ORDINARY GOSUB. GMX.DISPATCH calls both from low
+## **  memory, and a call into a region from outside it selects the region's
+## **  bank and RETURN puts the caller's back.
 ## **
 ## **  WHAT STAYED IN LOW RAM, and why:
 ## **
 ## **      GMX.G.SAY       four rows OUTSIDE the region call it -- GMX.A.SORT,
-## **                      GMX.A.ARRAY, GMX.B.MEMORY and GMX.B.SIZES. A call into
-## **                      a region anywhere but through a front door lands on
-## **                      whatever the caller's bank holds at $A000.
+## **                      GMX.A.ARRAY, GMX.B.MEMORY and GMX.B.SIZES. Down
+## **                      here each is a plain GOSUB; in the region each
+## **                      would switch the bank twice.
 ## **      GMX.CHROME      the region calls out to these five. Calling OUT is
 ## **      GMX.CLEARPANEL  safe: low memory is visible whatever bank is
 ## **      GMX.TELL        selected, and none of them holds a BANK statement,
@@ -2725,51 +2699,8 @@ GMX.B.ROW:
 ## **
 ## ***********************************************************************
 
-## How deep the front doors may nest. See MODS.SHIM.PUSH.
-#DEFINE MODS.SHIM.MAX 8
 
-## The stack, dimmed once by the first call through either door. DIM cannot
-## run twice and nothing should have to remember to call an init.
-##
-## IT IS ABOVE THE BLOB AND NOT BELOW IT because GP.ASM resolves
-## {MODS.SHIM.WAS%} against the variables the compiler has already met. Named
-## first here the blob can write it; named only inside the blob the build
-## stops with UNKNOWN VARIABLE IN {}.
-
-MODS.SHIM.INIT:
-  DIM MODS.SHIM.STK%(MODS.SHIM.MAX)
-  MODS.SHIM.WAS% = 0
-  MODS.SHIM.DIMMED = -1
-  RETURN
-
-MODS.SHIM.PUSH:
-  IF MODS.SHIM.DIMMED = 0 THEN GOSUB MODS.SHIM.INIT
-  #REM 1
-  GP.ASM
-  REM LDA $00
-  REM STA {MODS.SHIM.WAS%}
-  REM LDX #1
-  REM LDA #0
-  REM STA {MODS.SHIM.WAS%},X
-  GP.ENDASM
-  #REM 0
-  MODS.SHIM.STK%(MODS.SHIM.SP) = MODS.SHIM.WAS%
-  MODS.SHIM.SP = MODS.SHIM.SP + 1
-  BANK SHIM.MODSBANK
-  RETURN
-
-MODS.SHIM.POP:
-  MODS.SHIM.SP = MODS.SHIM.SP - 1
-  BANK MODS.SHIM.STK%(MODS.SHIM.SP)
-  RETURN
-
-## The two doors. One entry point each, one call site each, both in the
-## dropdown dispatch at GMX.DISPATCH.
-GMX.STRINGS: GOSUB MODS.SHIM.PUSH : GOSUB GMX.STRINGS.BODY : GOTO MODS.SHIM.POP
-GMX.FILES:   GOSUB MODS.SHIM.PUSH : GOSUB GMX.FILES.BODY   : GOTO MODS.SHIM.POP
-
-
-GP.BANKED SHIM.MODSBANK
+GP.BANKED GM.MODSCODE
 
 ## ***********************************************************************
 ## **  GMX.STRINGS -- one item a STRINGS.INC.BL routine.
@@ -2780,7 +2711,7 @@ GP.BANKED SHIM.MODSBANK
 ## **  the ceiling the file itself has. See the note above GMX.G.SAY.
 ## ***********************************************************************
 
-GMX.STRINGS.BODY:
+GMX.STRINGS:
   GP.SELECT MENUVERT.SEL
   GP.CASE 1 : GOSUB GMX.G.PADR
   GP.CASE 2 : GOSUB GMX.G.PADL
@@ -3009,7 +2940,7 @@ GMX.G.USINGFIX:
 ## **  typed field is GUI.LEN 24 for that reason and not for the look of it.
 ## ***********************************************************************
 
-GMX.FILES.BODY:
+GMX.FILES:
   GP.SELECT MENUVERT.SEL
   GP.CASE 1
     GOSUB GMX.F.DIR

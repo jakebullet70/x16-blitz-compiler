@@ -97,12 +97,10 @@
 ## **  the manual returns 0 here: VAL stops at the first non-numeric character,
 ## **  so parse the eight hex digits by hand.
 ## **
-## **  THIS IS THE LOW MEMORY FORM. Every entry point is a plain name, so a
-## **  caller reaches it with one GOSUB and nothing sits in between. Use it
-## **  when the module runs in low memory, which is the ordinary case.
-## **
-## **  The banked twin is FILEIO.BANK.INC.BL. Include one or the other,
-## **  never both. GPC-BASIC/BANKED-OR-NOT.md says how to choose.
+## **  TO RUN IT FROM A RAM BANK, put the #INCLUDE between GP.BANKED and
+## **  GP.ENDBANKED. A call from outside the region selects the region's bank
+## **  and RETURN puts the caller's back, so a caller is written the same
+## **  either way. GPC-BASIC/BANKED-OR-NOT.md has the rules.
 ## **
 ## ***********************************************************************
 #IFNDEF FILEIO.DEFS
@@ -164,11 +162,10 @@ FILE.EXISTS:  FILE.OK = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
 ## **  and either way FILE.OK comes back beside the count -- which is the only
 ## **  thing that tells a real 0-block file from one that is not there.
 ## **
-## **  THE GP.DEFPROC DECLARATION IS IN SHIM.UTILBANK.INC.BL, not here, because a
-## **  verb's call site is compiled into a jump to its body and a jump out of
-## **  low memory has to select the bank first. See that file's header. Being
-## **  a verb, FILE.SIZE is a name and not a label, so GOSUB FILE.SIZE is not
-## **  a way to call it -- unlike every other entry in this module.
+## **  A VERB, SO IT HAS NO LABEL. The GP.DEFPROC declaration names the
+## **  statement under it as the body, and a verb is a NAME: a label of the
+## **  same name would stop BASLOAD with DUPLICATE SYMBOL. GOSUB FILE.SIZE is
+## **  not a way to call it -- unlike every other entry in this module.
 ## **
 ## **  BLOCKS, AND THERE IS NO BYTE COUNT TO BE HAD. A directory counts blocks
 ## **  and a 254-byte block is only ever mostly full, so the last one holds
@@ -186,7 +183,8 @@ FILE.EXISTS:  FILE.OK = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
 ## **  of that, and a program should not have to carry it to ask one question.
 ## ***********************************************************************
 
-FILE.SIZE:  FILE.BLOCKS = 0 : FILE.OK = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
+GP.DEFPROC FILE.SIZE, FILE.NAME$ RETURNS FILE.BLOCKS
+    FILE.BLOCKS = 0 : FILE.OK = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
     GOSUB FILE.PETNAME
     OPEN 15, FILE.DEVICE, 15
     OPEN FILE.CHAN, FILE.DEVICE, 0, "$:" + FILE.OUT$

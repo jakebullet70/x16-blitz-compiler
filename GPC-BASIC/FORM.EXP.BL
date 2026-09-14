@@ -25,10 +25,8 @@
 ## **
 ## ***********************************************************************
 #INCLUDE "GPB.INC.BL"
-## THE LOW MEMORY FORM OF THE LIBRARY. Every module below has a banked twin
-## named XXX.BANK.INC.BL, whose entry points are .BODY labels reached through
-## the shims in SHIM.GUIBANK.INC.BL. One form or the other, never both --
-## BANKED-OR-NOT.md says how to choose.
+## THE LIBRARY IN LOW MEMORY. To run a module below from a RAM bank instead,
+## put its #INCLUDE inside a GP.BANKED region -- BANKED-OR-NOT.md has the rules.
 #INCLUDE "THEME.INC.BL"
 #INCLUDE "APPSYS.INC.BL"
 #INCLUDE "LINEINPUT.INC.BL"

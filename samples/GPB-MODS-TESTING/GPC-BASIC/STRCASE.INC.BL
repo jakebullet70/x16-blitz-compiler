@@ -54,12 +54,10 @@
 ## **  The whole STRCASE.* name space belongs to this file, except the two verbs
 ## **  STR.UCASE and STR.LCASE, named for STRINGS.INC.BL, which they merge into later.
 ## **
-## **  THIS IS THE LOW MEMORY FORM. Every entry point is a plain name, so a
-## **  caller reaches it with one GOSUB and nothing sits in between. Use it
-## **  when the module runs in low memory, which is the ordinary case.
-## **
-## **  The banked twin is STRCASE.BANK.INC.BL. Include one or the other,
-## **  never both. GPC-BASIC/BANKED-OR-NOT.md says how to choose.
+## **  TO RUN IT FROM A RAM BANK, put the #INCLUDE between GP.BANKED and
+## **  GP.ENDBANKED. A call from outside the region selects the region's bank
+## **  and RETURN puts the caller's back, so a caller is written the same
+## **  either way. GPC-BASIC/BANKED-OR-NOT.md has the rules.
 ## **
 ## ***********************************************************************
 #IFNDEF STRCASE.DEFS
@@ -123,21 +121,21 @@ STRCASE.GO:
     #REM 0
     RETURN
 
-## The verbs' bodies. THE GP.DEFPROC DECLARATIONS ARE NOT HERE -- they are in
-## SHIM.UTILBANK.INC.BL, which is in low memory, because a verb's call site is compiled
-## into a jump to the body and a jump out of low memory has to select the bank
-## first. See that file's header. The third verb was never built:
+## The two verbs. Each GP.DEFPROC names the statement under it as the body, so
+## neither has a label: a verb is a NAME, and a label of the same name stops
+## BASLOAD with DUPLICATE SYMBOL. GOSUB STR.UCASE is not a way to call them.
+## The third verb was never built:
 ## GP.DEFPROC STRCASE.APPLY, STRCASE.PTR, STRCASE.MODE : GOSUB STRCASE.GO
 
 ## STRCASE.S$ is the argument AND the result. The argument copy is the working copy,
 ## so a second string variable would only be a second copy of the same bytes.
-STR.UCASE:
+GP.DEFPROC STR.UCASE, STRCASE.S$ RETURNS STRCASE.S$
     STRCASE.PTR = GP.STRPTR(STRCASE.S$)
     STRCASE.MODE = STRCASE.UPPER
     GOSUB STRCASE.GO
     RETURN
 
-STR.LCASE:
+GP.DEFPROC STR.LCASE, STRCASE.S$ RETURNS STRCASE.S$
     STRCASE.PTR = GP.STRPTR(STRCASE.S$)
     STRCASE.MODE = STRCASE.LOWER
     GOSUB STRCASE.GO
