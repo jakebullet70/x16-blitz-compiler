@@ -168,6 +168,7 @@ Three implementations, and what each costs:
 | **Dialogs** | BASIC | `COMBO.INC.BL` — `COMBO.ADD`, a drop-down that folds into one row · §4.17 |
 | **Code in a bank** | ASM | `GP.BANKED` `GP.ENDBANKED` — p-code at `$A000`, out of the low-memory budget, see §3.12 |
 | **Bank ownership** | BASIC | `BANKMGR.INC.BL` — `INIT` `CLAIM` `GET.FREE.BANK` `RELEASE` `COUNT` · §4.13 |
+| **Key-value store** | BASIC | `KV.INC.BL` — `INIT` `GET` `PUT` `DEL` `FIND` `AT` `WIPE` `SAVE` `LOAD`, strings in one RAM bank · §4.20 |
 | **Keyboard** | BASIC | `KB.INC.BL` — `KB.CLEARKB` · §4.14 |
 | **The drive** | BASIC | `FILEIO.INC.BL` — `STATUS` `EXISTS` `SIZE` `DELETE` `RENAME` `COPY` `MKDIR` `CHDIR` `SAVEARRAY` `LOADARRAY` · §4.15 |
 | **The drive** | BASIC | `FILEDIR.INC.BL` — `FILE.DIR.INIT` `OPEN` `NEXT`, into a bank or low RAM · §4.16 |
@@ -2211,7 +2212,106 @@ at the hardware is measured, not assumed.
 
 ---
 
-### 4.20 `GPBMODS` — the harness that drives every module
+### 4.20 `KV.INC.BL` — keys and values in one RAM bank
+
+| Routine | in | out |
+|---|---|---|
+| `KV.INIT` | — | `KV.OK` |
+| `KV.FIND` | `KV.KEY$` | `KV.SLOT` |
+| `KV.GET` | `KV.KEY$` | `KV.VALUE$` `KV.SLOT` `KV.OK` |
+| `KV.AT` | `KV.SLOT` | `KV.KEY$` `KV.VALUE$` `KV.OK` |
+| `KV.PUT` | `KV.KEY$` `KV.VALUE$` | `KV.SLOT` `KV.OK` |
+| `KV.DEL` | `KV.KEY$` | `KV.OK` |
+| `KV.WIPE` | — | `KV.OK` |
+| `KV.SAVE` | `KV.FNAME$` | — |
+| `KV.LOAD` | `KV.FNAME$` | `KV.OK` |
+| `KV.PUTNUM` `KV.GETNUM` | — | `KV.OK`, always 0 |
+
+```basic
+#INCLUDE "KV.INC.BL"
+
+GOSUB KV.INIT
+KV.KEY$ = "COLOR"
+KV.VALUE$ = "RED"
+GOSUB KV.PUT
+KV.KEY$ = "COLOR"
+GOSUB KV.GET
+IF KV.OK THEN PRINT KV.VALUE$
+KV.FNAME$ = "SETTINGS.KV"
+GOSUB KV.SAVE
+```
+
+Strings stored by key in RAM bank 40. `KV.INIT` runs before any other routine. Every routine is a
+plain `GOSUB`, and `KV.OK` is -1 for success and 0 for failure.
+
+**Plain BASL.** No `GP.*` keyword and no `GP.ASM`, so it needs neither `GPB.INC.BL` nor a
+`#SYMFILE`, and the same source tokenises for stock BASIC.
+
+**`KV.INIT` formats the bank only when slot 0 holds no header.** A bank that already holds a store is
+kept, keys and all. A header with another version or slot count is left alone, and `KV.OK` is 0.
+`KV.WIPE` formats the bank whatever it holds.
+
+**Keys** are `A`-`Z`, `0`-`9` and `.`, cut to 8 characters. The module checks none of this. A key
+compares byte for byte, and `KV.AT` reads a key back up to its first space.
+
+`KV.PUT` refuses an empty key. It rewrites the slot of a key that exists and takes the first free slot
+for one that does not. When all 63 slots are in use, `KV.OK` and `KV.SLOT` are 0.
+
+**Values** hold up to 119 characters, and `KV.PUT` cuts a longer one. An empty value is stored and
+reads back as `""`. A missing key gives `KV.OK = 0`, `KV.SLOT = 0` and `KV.VALUE$ = ""`.
+
+`KV.FIND` sets `KV.SLOT` and nothing else. Slots never move, so a program can keep a slot number for
+the rest of the run and read it with `KV.AT`, which does not scan. A delete frees the slot. `KV.AT`
+on every slot lists the store:
+
+```basic
+FOR SLOT.NUMBER = 1 TO 63
+    KV.SLOT = SLOT.NUMBER
+    GOSUB KV.AT
+    IF KV.OK THEN PRINT KV.KEY$; " = "; KV.VALUE$
+NEXT SLOT.NUMBER
+```
+
+**`KV.PUTNUM` and `KV.GETNUM` are stubs.** Each sets `KV.OK = 0` and returns. Store a number as
+text: `STR$(N)` with `KV.PUT`, and `VAL(KV.VALUE$)` after `KV.GET`.
+
+**It selects a bank.** Every routine selects bank 40 and ends with `BANK KV.HOMEBANK`. The first
+`KV.INIT` sets `KV.HOMEBANK` to 1, the bank selected at startup, and a program that keeps another bank
+selected sets it after `KV.INIT`. A call from a `GP.BANKED` region needs nothing: it is a banked
+call, and its `RETURN` selects the region's bank again (§3.12). The module cannot go inside a region,
+because the compiler refuses `BANK` there.
+
+A program that uses `BANKMGR` (§4.13) claims the bank after `BANKMGR.INIT` and before the first
+`GET.FREE.BANK`:
+
+```basic
+BANKMGR.SET.BANK = KV.BANK
+GOSUB BANKMGR.CLAIM
+```
+
+**`KV.SAVE` writes the whole bank**, all 8,192 bytes, to `KV.FNAME$` on device 8, and replaces a file
+of that name. A disk error stops the program.
+
+**`KV.LOAD` returns `KV.OK = 0` for a missing file** and leaves the bank alone. It also returns 0 for a
+file that loads but holds no matching header, and then the bank already holds that file: run
+`KV.WIPE` before the next `KV.PUT`. It opens logical files 14 and 15 to test for the file and closes
+both, so neither may be open when it is called.
+
+The layout, for a program that reads the bank without this module:
+
+```
+slot n = $A000 + n*128, n = 0-63
++0..+7    the key, padded with spaces. $00 at +0 is a free slot
++8        the value's length, 0-119
++9..      the value
+slot 0    "*KVSTORE", 2, the version (1), the slot count (64)
+```
+
+`KV.EXP.BL`, in `samples/GPB-MODS-TESTING/GPC-BASIC/`, calls every routine.
+
+---
+
+### 4.21 `GPBMODS` — the harness that drives every module
 
 `samples/GPB-MODS-TESTING/GPBMODS.BASL`. A menu bar of nine dropdowns whose rows reach nearly every
 public entry point in this section. It is the one program that holds all twenty modules at once, and
@@ -2342,6 +2442,7 @@ The convention is one dotted prefix per module, and nothing writes outside its o
 | `SORT.` | `SORT.INC.BL` |
 | `STRCASE.` | `STRCASE.INC.BL` |
 | `BMX.` / `BMXK.` | `BMX.INC.BL` (variables / its KERNAL constants) |
+| `KV.` | `KV.INC.BL` |
 
 Use any other prefix for your own program: `GAME.`, `MAP.`, `AIRLIFT.`. A prefix costs nothing at
 runtime — BASLOAD crunches every identifier to a short BASIC variable, so a long readable name and a

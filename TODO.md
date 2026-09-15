@@ -830,9 +830,10 @@ green.
 
 ## Compiler work — what is next, ranked
 
-Written 2026-09-09, updated 2026-09-14. **An index, not a second copy** — each item points at the
+Written 2026-09-09, updated 2026-09-15. **An index, not a second copy** — each item points at the
 section or memory note that holds the detail, so this list cannot drift away from the work it names.
-One open feature, item 2; items 0, 1, 3, 4 and 5 are done. Two open unranked items follow item 5.
+One open feature, item 2, and one open bug, item 6; items 0, 1, 3, 4 and 5 are done. Two open
+unranked items follow item 6.
 Everything under `## Bugs` is fixed.
 
 **0. Fix the `GP.FN` string aliasing — DONE 2026-09-13.** See `## Bugs` above. 3 bytes of p-code on
@@ -910,6 +911,25 @@ thing the old single-pass engine gave, which is what made a stall visible. It al
 `compile_shared.py` something to watch other than the object file, whose growth was already retired as
 a stop condition because pass two writes in bursts. Cheap, and it turns every future stall into a
 number instead of a guess.
+
+**6. `VAL` does not read an exponent sign written as text — OPEN, found 2026-09-15.** `STR$` writes
+the exponent with an ASCII sign, `1E+10` and `1E-07`
+(`source/ifloat32/source/utility/float/tostring.asm:489-497`). `VAL` hands the string's bytes to
+`FloatEncode` unchanged (`source/runtime/source/functions/strings/val.asm:77-79`). `FloatEncode`
+takes only the tokens `$AA` and `$AB` as the sign after `E`
+(`source/ifloat32/source/utility/float/tofloat.asm:92-95` and `316-318`), because `ParseConstant`
+feeds it tokenised source. An ASCII sign ends the number at the `E`, so `VAL(STR$(1E10))` and
+`VAL("1E-07")` are both 1. Stock BASIC reads both. `INPUT` and `READ` call the same routine
+(`input.asm:28`, `read.asm:27`); whether `DATA` text reaches `READ` tokenised is not checked.
+
+Traced in source, not run. The probe, compiled SHARED:
+`PRINT VAL("1E+10"), VAL(STR$(1E10)), VAL("1E-07") : END`.
+
+The fix: compare ASCII `+` and `-` beside the two tokens in both places. `_ENExponentSign`
+(`tofloat.asm:108-114`) already refuses a sign outside the exponent-sign state, so `VAL("5-3")` stays
+5. Tokenised source carries no ASCII sign, so compiled constants do not change. Agree the assembly
+before writing it. `KV.PUTNUM` and `KV.GETNUM` are stubs until this is done
+(`docs/blitz/KV-STORE.PLAN.md` §3).
 
 **Unranked, all under `## Wanted`:**
 
@@ -1290,6 +1310,130 @@ For a form where every field is fully visible, the screen already holds the text
 read back off the layer with a `VPEEK` loop — no storage at all. It breaks the moment a field
 scrolls wider than its display, and it still builds the string the expensive way.
 
+### A shared key-value bank — strings any program can store, read and save to disk — WRITTEN, not run, raised 2026-09-15
+
+A key-value store for strings, kept in one RAM bank that every program uses, whether it is written
+in stock BASIC, GPC or Prog8. A program stores a value under a key, and the next program in a
+`LOAD` chain reads it back. A save to disk makes the
+store outlive the session.
+
+**Written 2026-09-15.** `KV.INC.BL` is in `GPC-BASIC/` and `samples/GPB-MODS-TESTING/GPC-BASIC/`,
+and `GP-BASIC.md` §4.20 documents it. The plan is
+[`docs/blitz/KV-STORE.PLAN.md`](docs/blitz/KV-STORE.PLAN.md). Its test, `KV.EXP.BL`, has not run.
+The items under *Open* below are settled there: 64 slots of 128 bytes, bank 40, a `BSAVE` image
+only, and no stub.
+
+**Why a bank.** A chain carries nothing in low RAM: `ClearMemory` runs on entry, so today the only
+way to pass state is a disk file, per
+[`docs/memory/load-chain-clears-memory.md`](docs/memory/load-chain-clears-memory.md). Banked RAM is
+outside that clear.
+
+**Why `GP.BANKEDSTR` does not already do this.** Its text is read-only, and it is found through
+facts only the compiling program has: a group base the compiler pushes as a constant, and a slot
+table in the program's own bootstrap extension page
+([`source/gp-runtime/_library.asm:458-472`](source/gp-runtime/_library.asm#L458-L472)).
+
+#### Decided 2026-09-15
+
+- **Rewritable.** A key can be stored again with a new value.
+- **An include in each program**, not a runtime handler: a plain BASL include that runs under stock
+  BASIC and GPC alike, and a Prog8 module. A GPC version with a faster read can follow.
+- **The bank number is fixed in advance.** `BANKMGR` only marks it used: a GPC program claims it at
+  startup with `BANKMGR.CLAIM`, so the program's own modules cannot take it. `BANKMGR` is written in
+  GP commands, so a stock BASIC or Prog8 program only keeps clear of the number.
+- **No stub. The bank layout is the contract.** The three languages hand over strings in three
+  ways: GPC's `GP.STRPTR` gives the length byte with the text after it, stock BASIC's `POINTER`
+  gives the variable's internal structure rather than the text, and a Prog8 string ends in a zero
+  byte. A machine-code stub that takes string addresses would need a calling convention for each.
+  Each include reads and writes the bank itself instead, so no assembly is needed.
+- **Fixed slots, no garbage collection.** The bank is cut into slots of one size. A rewrite
+  overwrites its slot in place and slots never move, so nothing compacts.
+- **Keys are 8 characters, padded with spaces**, not `#DEFINE` numbers. `#DEFINE` belongs to
+  BASLOAD, so Prog8 would keep its own copy of the numbers and the two lists would drift. A slot
+  number also means nothing in a saved file, and every new key would need an edit to a shared list.
+
+#### The shape
+
+- **A slot**, drafted as 64 slots of 128 bytes:
+  ```
+  slot n = $A000 + n*128
+  +0..+7    key, padded with spaces; $00 at +0 marks the slot free
+  +8        value length, 0-119
+  +9..+127  value
+  ```
+- **A key** is always compared as 8 bytes and its value always starts at +8, so a slot needs no key
+  length byte, and a dump of the bank is readable. The caller pads it, as in
+  `K$=LEFT$(K$+"        ",8)`. A longer name is cut to 8 without warning, so `FILENAME1` and
+  `FILENAME2` are the same key.
+- **Key characters** are `A`-`Z`, `0`-`9` and `.`: bytes `$41`-`$5A`, `$30`-`$39` and `$2E`, which
+  are the same in PETSCII and ASCII. No padded key starts with `$00`, so `$00` marks a free slot and
+  a delete writes one byte.
+- **Keys stay in the bank.** The include compares them there, so the store costs no index in low
+  RAM. That is the cost the text import entry below spends a one-byte hash per key to reduce.
+- **A lookup** compares the first byte of each slot and runs the whole 8-byte compare only on a
+  match. It returns the slot number. Slots never move, so a program can keep the number and skip the
+  scan for the rest of the run. A delete frees the slot, so a key is looked up again after one.
+- **A store** looks for the key first and takes the first free slot when the key is missing. It
+  clamps the value to 119 characters. When no slot is free, the store is refused and the include
+  returns a failure flag.
+- **Slot 0 is a header.** Its key is `*KVSTORE`, which no real key matches because `*` is not a key
+  character. Its value holds a version byte and the slot size, so a program can tell the bank holds
+  a store, and refuses one laid out for another slot size. 63 slots are left for data.
+- **Save and load are one command each.** `BSAVE "KV.DAT",8,n,$A000,$C000` saves the whole bank in
+  both BASICs. The stock BASIC reference says the save stops one byte before the end address
+  (`docs/x16/X16 Reference - 04 - BASIC.md`, under `BSAVE`), and GPC's `BSAVE` does the same and
+  puts the bank back afterwards
+  ([`loadsave.asm:142-161`](source/runtime/source/system-specific/x16/commands/loadsave.asm#L142-L161)).
+  `BLOAD "KV.DAT",8,n,$A000` restores it. GPC's `BLOAD` leaves the bank where LOAD stopped
+  ([`loadsave.asm:87-88`](source/runtime/source/system-specific/x16/commands/loadsave.asm#L87-L88)),
+  so the include selects the bank again after a load, then checks the header. Nothing runs in the
+  bank, so a load cannot return into the wrong bank.
+
+#### The includes
+
+- **BASL, for stock BASIC and GPC.** `BANK n`, then `PEEK` and `POKE` on `$A000`-`$BFFF`. The stock
+  BASIC reference says `BANK` sets the RAM bank for `PEEK`, `POKE` and `SYS`. The include uses no GP
+  commands, so it compiles under GPC unchanged. It reads a value with a `CHR$(PEEK())` loop.
+- **A faster read for GPC.** Under GPC that loop costs a heap block per character, per
+  [`docs/memory/gpc-string-blocks-never-shrink.md`](docs/memory/gpc-string-blocks-never-shrink.md).
+  A GPC version fills a buffer string in place instead. `GP.STRPTR` gives the length byte, with the
+  block capacity at -2, and §3.4.5 of `GP-BASIC.md` documents filling a string and setting its
+  length as supported. The fill clamps to the capacity.
+- **Prog8.** A module that selects the bank and reads it directly. A Prog8 string ends in a zero
+  byte, so the module converts to and from the length byte.
+
+#### Open
+
+- **32 slots or 64.** Both fill the 8,192 bytes of the bank exactly, with the 9-byte key and length
+  at the head of each slot and the header in slot 0.
+  - 64 slots of 128 bytes, as drafted above. Slot n starts on page `$A0`+n/2, at offset `$80` when
+    n is odd. A value holds 119 characters, and 63 slots are left.
+  - 32 slots of 256 bytes. Slot n starts on page `$A0`+n. A value holds 247 characters, and 31
+    slots are left.
+  - Neither holds a full 255-character string.
+- **Which bank number.** Below 64, so a 512K machine has it. Not bank 1, which the runtime keeps. No
+  program in the chain may name it in `GP.BANKED` or `GP.BANKEDSTR`, and nothing checks that. Check
+  it against the banks the compiler uses while compiling, or a compile mid-session overwrites the
+  store.
+- **The disk format.** A `BSAVE` image of the bank is fast and cannot be edited by hand. The text
+  format the text import entry settles on is the reverse. An import from text could serve both.
+- **A stub, only if a lookup is too slow in stock BASIC.** The scan is the cost a stub would remove.
+  It would take the key and value as bytes written into a transfer slot in the bank, not as string
+  addresses, so one stub would serve all three languages. Agree `GP.ASM` or 64tass first, per
+  [`docs/memory/ask-before-writing-asm.md`](docs/memory/ask-before-writing-asm.md).
+
+#### Unverified
+
+- Whether anything between one program's `END` and the next program's first statement writes to the
+  fixed bank.
+- Whether code in a `GP.BANKED` region can call the include. The include changes `BANK`, and a
+  region loses its bank on a call out, per
+  [`docs/memory/gp-banked-call-out-loses-the-bank.md`](docs/memory/gp-banked-call-out-loses-the-bank.md).
+  Answered from the manual: a call out of a region is now a banked call, and its `RETURN` selects the
+  region's bank again (`GP-BASIC.md` §3.12). Plan test T5 runs it.
+- Which Prog8 string encoding writes the same key bytes as PETSCII and ASCII.
+- Whether Prog8's `diskio` saves and loads a whole bank image once `cx16.rambank` selects the bank.
+
 ### One shared `TMP$`, instead of a scratch string per module — OPEN, raised 2026-09-09
 
 The library declares **84 string variables**, and **eight of them are the same variable**: a
@@ -1658,12 +1802,19 @@ data bank at entry and put the caller's back at every exit. `FILE.DIR.BANKHOLD` 
 - **The split, if `FILEIO` is ever too heavy**: `SAVEARRAY`/`LOADARRAY` are 364 of its 1,075 bytes.
 - **`FILEDIR`'s no-MACPTR fallback is untested** — no device on this machine refuses `MACPTR`.
 
-### `KV.INC.BL` — text out of low RAM, an index in it
+### A text import for the key-value bank — text out of low RAM, an index in it
+
+The name `KV.INC.BL` went to the shared key-value bank above (2026-09-15). This entry is now its
+text import, done later with the `INI.INC.BL` work.
 
 Asked 2026-09-06. **A program's string constants are the one thing it pays for twice**: once as
 p-code, and again as a heap block the moment they are assigned, at `max(10, len * 1.5) + 3` bytes
 each. A program with a lot of text — prompts, help, messages, tables — spends its workspace on
 words. The module holds the text somewhere else and hands back one value at a time, keyed by name.
+
+**See the shared key-value bank entry above** (raised 2026-09-15). It is the same store kept in one
+bank for a whole `LOAD` chain, with the keys kept in the bank so they cost no low RAM. If it
+lands, this module becomes its loader for text files.
 
 **Read it ONCE, into a bank, and serve from the bank.** `GPC-HELP` is the cautionary tale and the
 measurement already exists: its `.HLP` is re-read from disk on **every keypress**, and that read IS

@@ -169,6 +169,7 @@ removes dead code, including a module costs its whole size whether or not it is 
 | `STRUSING.INC.BL` | a number to a template: PRINT USING's mask, in BASIC |
 | `SORT.INC.BL` | shell sort a string array in place, in assembly |
 | `BMX.INC.BL` | load a BMX bitmap into VERA |
+| `KV.INC.BL` | strings by key in one RAM bank, saved and loaded as one file. No `GP.ASM`, so no `#SYMFILE` |
 
 What each one costs in bytes is in the command reference, under *At a glance*.
 

@@ -84,6 +84,7 @@ All of it needs `#INCLUDE "GPB.INC.BL"`, and nothing else.
 | `STRCASE.INC.BL` | case, in place, in `GP.ASM` | `STRINGS.EXP.BL` `STRCTST.EXP.BL` |
 | `STRUSING.INC.BL` | a number to a template: `STR.USING` through a `"#,##0.00"` mask, `STR.USING.FIX` to a decimal count | `STRUSING.EXP.BL` `USINGT.EXP.BL` |
 | `BMX.INC.BL` | a BMX bitmap straight into VERA | `BMXVIEW.EXP.BL` |
+| `KV.INC.BL` | keys and values in one RAM bank: `PUT` and `GET` by key, `SAVE` and `LOAD` the whole bank as one file | — |
 
 **Five of those modules are deliberately not keywords.** The menu, the stash, the sort and the five
 in-place string statements would all sit in the GP runtime block, which is **all or nothing**: every

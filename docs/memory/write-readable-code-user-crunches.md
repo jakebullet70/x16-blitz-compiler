@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 75714395-f705-4d27-8da6-af4a832a1e0b
-  modified: 2026-09-05T14:15:32.485Z
+  modified: 2026-09-15T08:44:12.470Z
 ---
 
 **Write readable code first. Do not pre-crunch BASL to save lines or bytes.** Said 2026-09-05 after
@@ -20,6 +20,12 @@ Three specifics settled at the same time:
 3. **NEVER put a statement on a label's line** — `BANKMGR.INIT: IF ...` is out. The user saw the
    idiom in the crunch program, dislikes it, and may still apply it himself in a final review.
    Nothing in the shipped library does it; every module gives a label its own line.
+4. **Long, descriptive variable names.** BASLOAD maps long names down, so a short name saves
+   nothing in the PRG. Raised 2026-09-15 on `KV.INC.BL`: *"what are KV.K$ & KV.V$, you can make
+   LONG var names. You know this"*. It became `KV.KEY$`, `KV.VALUE$`, `KV.SLOT`, `KV.FNAME$`,
+   `KV.HOMEBANK`, `KV.INDEX`, `KV.ADDR`, `KV.LENGTH`. Internals and loop counters too, not only the
+   public in/out names. A long variable can collide with a label (`KV.KEY$` against `KV.KEY:`), so
+   rename the label to a verb (`KV.ENCODE`) — see [[basload-label-and-variable-collide]].
 
 **Why:** dense lines are what he reads to review the logic, and crunching is a separate, later,
 deliberate pass that belongs to him. Line-joining is also nearly free in p-code — the `BANKMGR`

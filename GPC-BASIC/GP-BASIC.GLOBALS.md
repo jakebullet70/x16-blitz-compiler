@@ -39,6 +39,7 @@ The convention is one dotted prefix per module, and nothing writes outside its o
 | `FILE.` | `FILEIO.INC.BL` | the drive: status, exists, delete, rename, directories |
 | `FILE.DIR.` | `FILEDIR.INC.BL` | reading a directory, kept apart from the rest of `FILE.` |
 | `SV.` | `STASHVRAM.INC.BL` | the VRAM store. `SVGC.` is `STASHVRAMGC.INC.BL`'s one constant |
+| `KV.` | `KV.INC.BL` | keys and values in one RAM bank |
 
 Pick anything else for your own program. `AIRLIFT.`, `GAME.`, `MAP.` — a prefix costs nothing at
 runtime because BASLOAD crunches every identifier down to a short BASIC variable, so a long
@@ -246,6 +247,20 @@ That is the difference from `STASH.INC.BL`, which cannot.
 
 **WARNING: `BMX.STASH` defaults to `$13000`, inside the default window.** A program using both
 must move one of them. There is one allocator and no collision check.
+
+### `KV.INC.BL`
+
+Plain BASL: no `GP.*` keyword and no `GP.ASM`, so it needs neither `GPB.INC.BL` nor a `#SYMFILE`.
+
+| | |
+|---|---|
+| in | `KV.KEY$` — the key, for `FIND` `GET` `PUT` `DEL`<br>`KV.VALUE$` — the value, for `PUT`<br>`KV.SLOT` — the slot, for `AT`<br>`KV.FNAME$` — the file, for `SAVE` and `LOAD`<br>`KV.HOMEBANK` — the bank every routine selects on its way out. The first `KV.INIT` sets 1 |
+| out | `KV.OK` — −1 done, 0 refused<br>`KV.SLOT` — the slot `FIND`, `GET` and `PUT` found, 0 if none<br>`KV.VALUE$` — `GET` and `AT`<br>`KV.KEY$` — `AT`, without its padding |
+| internal | `KV.READY` `KV.CODE%()` `KV.HIT` `KV.ADDR` `KV.INDEX` `KV.PADDED$` `KV.LENGTH` `KV.BYTE` `KV.MAGIC$` `KV.ERR` `KV.MSG$` `KV.TRACK` `KV.SECTOR` |
+| constants | `KV.BANK` `KV.BASE` `KV.TOP` `KV.SLOTS` `KV.SIZE` `KV.MAXLEN` `KV.VERSION` `KV.DEFS` |
+
+`KV.SLOT` is both an input and an output, the way `FILE.N` is. `KV.AT` writes `KV.KEY$`, so a loop
+over the slots keeps its own key in a variable of its own.
 
 ### `MENUVERT.INC.BL`
 

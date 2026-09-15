@@ -1,0 +1,247 @@
+## ***********************************************************************
+## **  Plain BASL. It tokenises for stock BASIC and compiles under GPC
+## **  unchanged. So, BOTH GPC and plain BASLOAD
+## **
+## **  KV.INC.BL -- keys and values in one RAM bank.
+## **
+## **      KV.INIT     call first. Formats the bank when it holds no store
+## **      KV.FIND     the slot a key is in
+## **      KV.GET      a value by key
+## **      KV.AT       a key and its value by slot
+## **      KV.PUT      write a value by key
+## **      KV.PUTNUM   stub. KV.OK = 0, no bank selected
+## **      KV.GETNUM   stub. KV.OK = 0, no bank selected
+## **      KV.DEL      remove a key
+## **      KV.WIPE     remove every key
+## **      KV.SAVE     the bank to a file
+## **      KV.LOAD     a file to the bank
+## **
+## **
+## **  Usage:
+## **      GOSUB KV.INIT
+## **      KV.KEY$ = "COLOR" : KV.VALUE$ = "RED" : GOSUB KV.PUT
+## **      KV.KEY$ = "COLOR" : GOSUB KV.GET : IF KV.OK THEN PRINT KV.VALUE$
+## **
+## **   in   KV.KEY$       the key: A-Z, 0-9 and ".". Cut to 8 characters
+## **        KV.VALUE$     the value for PUT. Cut to 119 characters
+## **        KV.SLOT       the slot for AT, 1-63
+## **        KV.FNAME$     the file for SAVE and LOAD, on device 8
+## **        KV.HOMEBANK   the bank every routine selects on return. INIT sets 1
+## **
+## **   out  KV.SLOT       the slot FIND, GET and PUT found. 0 MEANS MISSING
+## **        KV.VALUE$     what GET and AT read
+## **        KV.KEY$       what AT read, without the padding
+## **        KV.OK         -1 success, 0 failure
+## **
+## **  Slot n starts at $A000 + n * 128 in bank KV.BANK:
+## **      +0..+7   the key, padded with spaces. $00 at +0 is a free slot
+## **      +8       the value's length, 0-119
+## **      +9..     the value
+## **  Slot 0 is the header: "*KVSTORE", 2, the version, the slot count.
+## **
+## **  A caller that keeps another bank selected sets KV.HOMEBANK after INIT.
+## **  A call from a GP.BANKED region needs nothing: its RETURN selects the
+## **  region's bank again. This file cannot go inside a region: the compiler
+## **  refuses BANK there.
+## **
+## **  KV.LOAD opens channels 14 and 15 and closes them again.
+## ***********************************************************************
+#IFNDEF KV.DEFS
+#DEFINE KV.DEFS 1
+
+#DEFINE KV.BANK 40
+#DEFINE KV.BASE $A000
+#DEFINE KV.TOP $C000
+#DEFINE KV.SLOTS 64
+#DEFINE KV.SIZE 128
+#DEFINE KV.MAXLEN 119
+#DEFINE KV.VERSION 1
+
+GOTO KV.MODULE.END
+
+## ***********************************************************************
+## **  KV.INIT -- the store, ready. Call it before any other routine.
+## **
+## **  A bank with no header is formatted. A header with another version or
+## **  slot count is left alone, and KV.OK is 0.
+## ***********************************************************************
+
+KV.INIT:
+    IF KV.READY = 0 THEN GOSUB KV.FIRST
+    BANK KV.BANK : GOSUB KV.CHECK
+    IF KV.HIT = 0 THEN GOSUB KV.FORMAT
+    GOTO KV.EXIT
+
+## ---- once a run: the array, and the home bank a low-memory caller wants.
+KV.FIRST:
+    DIM KV.CODE%(7) : KV.HOMEBANK = 1 : KV.READY = -1
+    RETURN
+
+KV.FIND:
+    GOSUB KV.ENCODE : BANK KV.BANK : GOSUB KV.SCAN
+    GOTO KV.EXIT
+
+KV.GET:
+    GOSUB KV.ENCODE : BANK KV.BANK : GOSUB KV.SCAN : GOSUB KV.READ.VALUE
+    GOTO KV.EXIT
+
+KV.AT:
+    KV.KEY$ = "" : BANK KV.BANK : GOSUB KV.READ.VALUE
+    IF KV.OK THEN GOSUB KV.READ.KEY
+    GOTO KV.EXIT
+
+## ---- a rewrite keeps the key's slot. A new key takes the first free one.
+KV.PUT:
+    KV.OK = 0 : KV.SLOT = 0
+    IF KV.KEY$ = "" THEN RETURN
+    GOSUB KV.ENCODE : BANK KV.BANK : GOSUB KV.SCAN
+    IF KV.SLOT = 0 THEN GOSUB KV.FREE
+    IF KV.SLOT = 0 THEN GOTO KV.EXIT
+    GOSUB KV.WRITE : KV.OK = -1
+    GOTO KV.EXIT
+
+KV.PUTNUM:
+    KV.OK = 0
+    RETURN
+
+KV.GETNUM:
+    KV.OK = 0
+    RETURN
+
+KV.DEL:
+    GOSUB KV.ENCODE : BANK KV.BANK : GOSUB KV.SCAN : KV.OK = 0
+    IF KV.SLOT = 0 THEN GOTO KV.EXIT
+    POKE KV.BASE + KV.SLOT * KV.SIZE, 0 : KV.OK = -1
+    GOTO KV.EXIT
+
+KV.WIPE:
+    BANK KV.BANK : GOSUB KV.FORMAT
+    GOTO KV.EXIT
+
+## ---- BSAVE's end address is exclusive: KV.TOP writes all 8,192 bytes. A disk
+## ---- error stops the program.
+KV.SAVE:
+    BSAVE "@:" + KV.FNAME$, 8, KV.BANK, KV.BASE, KV.TOP
+    GOTO KV.EXIT
+
+## ---- channel 15 is read while the file is open, as FILE.EXISTS does. BLOAD
+## ---- leaves the bank where the load stopped, so KV.BANK is selected again
+## ---- before the header is checked.
+KV.LOAD:
+    KV.OK = 0 : OPEN 15, 8, 15 : OPEN 14, 8, 14, KV.FNAME$ + ",S,R"
+    INPUT#15, KV.ERR, KV.MSG$, KV.TRACK, KV.SECTOR
+    CLOSE 14 : CLOSE 15
+    IF KV.ERR >= 20 THEN RETURN
+    BLOAD KV.FNAME$, 8, KV.BANK, KV.BASE
+    BANK KV.BANK : GOSUB KV.CHECK
+    GOTO KV.EXIT
+
+## ***********************************************************************
+## **  Internals. None of them selects a bank.
+## ***********************************************************************
+
+## ---- KV.KEY$, padded to 8, into KV.CODE%(0..7) as byte codes.
+KV.ENCODE:
+    KV.PADDED$ = LEFT$(KV.KEY$ + "        ", 8)
+    FOR KV.INDEX = 0 TO 7
+        KV.CODE%(KV.INDEX) = ASC(MID$(KV.PADDED$, KV.INDEX + 1, 1))
+    NEXT KV.INDEX
+    RETURN
+
+## ---- the slot whose key is KV.CODE%() into KV.SLOT, 0 if none. +0 is
+## ---- compared first, and the other 7 only on a match.
+KV.SCAN:
+    FOR KV.SLOT = 1 TO KV.SLOTS - 1
+        KV.ADDR = KV.BASE + KV.SLOT * KV.SIZE : KV.HIT = 0
+        IF PEEK(KV.ADDR) = KV.CODE%(0) THEN GOSUB KV.REST
+        IF KV.HIT THEN RETURN
+    NEXT KV.SLOT
+    KV.SLOT = 0
+    RETURN
+
+KV.REST:
+    FOR KV.INDEX = 1 TO 7
+        IF PEEK(KV.ADDR + KV.INDEX) <> KV.CODE%(KV.INDEX) THEN RETURN
+    NEXT KV.INDEX
+    KV.HIT = -1
+    RETURN
+
+## ---- the first free slot into KV.SLOT, 0 if none.
+KV.FREE:
+    FOR KV.SLOT = 1 TO KV.SLOTS - 1
+        IF PEEK(KV.BASE + KV.SLOT * KV.SIZE) = 0 THEN RETURN
+    NEXT KV.SLOT
+    KV.SLOT = 0
+    RETURN
+
+## ---- slot KV.SLOT's value into KV.VALUE$, and its address into KV.ADDR.
+## ---- KV.OK = 0 when KV.SLOT is outside 1-63 or the slot is free.
+KV.READ.VALUE:
+    KV.OK = 0 : KV.VALUE$ = ""
+    IF KV.SLOT < 1 THEN RETURN
+    IF KV.SLOT > KV.SLOTS - 1 THEN RETURN
+    KV.ADDR = KV.BASE + KV.SLOT * KV.SIZE
+    IF PEEK(KV.ADDR) = 0 THEN RETURN
+    KV.OK = -1 : KV.LENGTH = PEEK(KV.ADDR + 8)
+    IF KV.LENGTH = 0 THEN RETURN
+    FOR KV.INDEX = 1 TO KV.LENGTH
+        KV.VALUE$ = KV.VALUE$ + CHR$(PEEK(KV.ADDR + 8 + KV.INDEX))
+    NEXT KV.INDEX
+    RETURN
+
+## ---- the key at KV.ADDR into KV.KEY$, up to the first space.
+KV.READ.KEY:
+    FOR KV.INDEX = 0 TO 7
+        KV.BYTE = PEEK(KV.ADDR + KV.INDEX)
+        IF KV.BYTE = 32 THEN RETURN
+        KV.KEY$ = KV.KEY$ + CHR$(KV.BYTE)
+    NEXT KV.INDEX
+    RETURN
+
+## ---- KV.CODE%() and KV.VALUE$ into slot KV.SLOT. The value is cut to 119.
+KV.WRITE:
+    KV.ADDR = KV.BASE + KV.SLOT * KV.SIZE
+    FOR KV.INDEX = 0 TO 7
+        POKE KV.ADDR + KV.INDEX, KV.CODE%(KV.INDEX)
+    NEXT KV.INDEX
+    KV.LENGTH = LEN(KV.VALUE$)
+    IF KV.LENGTH > KV.MAXLEN THEN KV.LENGTH = KV.MAXLEN
+    POKE KV.ADDR + 8, KV.LENGTH
+    IF KV.LENGTH = 0 THEN RETURN
+    FOR KV.INDEX = 1 TO KV.LENGTH
+        POKE KV.ADDR + 8 + KV.INDEX, ASC(MID$(KV.VALUE$, KV.INDEX, 1))
+    NEXT KV.INDEX
+    RETURN
+
+## ---- KV.HIT = -1 when slot 0 holds "*KVSTORE". KV.OK = -1 when the rest of
+## ---- the header matches as well.
+KV.CHECK:
+    KV.MAGIC$ = "*KVSTORE" : KV.HIT = -1
+    FOR KV.INDEX = 0 TO 7
+        IF PEEK(KV.BASE + KV.INDEX) <> ASC(MID$(KV.MAGIC$, KV.INDEX + 1, 1)) THEN KV.HIT = 0
+    NEXT KV.INDEX
+    KV.OK = KV.HIT
+    IF PEEK(KV.BASE + 8) <> 2 THEN KV.OK = 0
+    IF PEEK(KV.BASE + 9) <> KV.VERSION THEN KV.OK = 0
+    IF PEEK(KV.BASE + 10) <> KV.SLOTS THEN KV.OK = 0
+    RETURN
+
+## ---- the header, and slots 1-63 free.
+KV.FORMAT:
+    KV.MAGIC$ = "*KVSTORE"
+    FOR KV.INDEX = 0 TO 7
+        POKE KV.BASE + KV.INDEX, ASC(MID$(KV.MAGIC$, KV.INDEX + 1, 1))
+    NEXT KV.INDEX
+    POKE KV.BASE + 8, 2 : POKE KV.BASE + 9, KV.VERSION : POKE KV.BASE + 10, KV.SLOTS
+    FOR KV.SLOT = 1 TO KV.SLOTS - 1
+        POKE KV.BASE + KV.SLOT * KV.SIZE, 0
+    NEXT KV.SLOT
+    KV.OK = -1
+    RETURN
+
+KV.EXIT:
+    BANK KV.HOMEBANK
+    RETURN
+
+KV.MODULE.END:
+#ENDIF
