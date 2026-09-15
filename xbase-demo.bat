@@ -21,7 +21,7 @@ rem  this launch exercises.
 rem
 rem  THE DRIVE IS testing\, NOT the sample directory, and it needs more than the
 rem  PRG. XBASE.PRG is compiled SHARED, so it loads the resident GPC.RT.nnn.BIN
-rem  rather than carrying a copy; and it has one overlay, XBASE.B04, the CUA GUI
+rem  rather than carrying a copy; and it has one overlay, XBASE.004, the CUA GUI
 rem  library, which the bootstrap LOADs into bank 4 at startup. A missing one
 rem  stops with ?OVL. Both live in testing\ beside the PRG.
 rem
@@ -52,9 +52,9 @@ if not exist "%DRIVE%\XBASE.PRG" (
 	echo.
 	exit /b 1
 )
-if not exist "%DRIVE%\XBASE.B04" (
+if not exist "%DRIVE%\XBASE.004" (
 	echo.
-	echo   testing\XBASE.B04 is missing -- that is the GUI library overlay, and
+	echo   testing\XBASE.004 is missing -- that is the GUI library overlay, and
 	echo   XBASE stops with ?OVL without it. Rebuild:
 	echo     python source\gpc\xbasebuild.py XBASE
 	echo.
