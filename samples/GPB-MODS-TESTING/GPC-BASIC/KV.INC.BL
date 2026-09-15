@@ -49,7 +49,7 @@
 #IFNDEF KV.DEFS
 #DEFINE KV.DEFS 1
 
-#DEFINE KV.BANK 40
+#DEFINE KV.DEFBANK 40
 #DEFINE KV.BASE $A000
 #DEFINE KV.TOP $C000
 #DEFINE KV.SLOTS 64
@@ -67,8 +67,13 @@ GOTO KV.MODULE.END
 ## ***********************************************************************
 
 KV.INIT:
-    IF KV.READY = 0 THEN GOSUB KV.FIRST
+    ## SET KV.BANK TO WHATEVER, IF NOT SET THEN WILL USE KV.DEFBANK
+    ## ** Will use def bank and tell the bankmgr it is in use
     ## if GPC then BANKMGR.SET.BANK = KV.BANK : GOSUB BANKMGR.CLAIM
+    ## Grabs a free bank and set it
+    ## GOSUB BANKMGR.GET.FREE.BANK : KV.BANK = BANKMGR.BANK
+    IF KV.READY = 0 THEN GOSUB KV.FIRST
+    IF KV.BANK = 0 THEN KB.BANK = KV.DEFBANK
     BANK KV.BANK : GOSUB KV.CHECK
     IF KV.HIT = 0 THEN GOSUB KV.FORMAT
     GOTO KV.EXIT
