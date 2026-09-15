@@ -23,8 +23,14 @@ prelim:
 	$(PYTHON) $(CSCRIPTS)build.py
 	$(CCOPY) _library.asm $(BINDIR)polynomials.library
 
+#
+#		The polynomials run from bank 1 in the runtime, so their code is in the banked section.
+#		The test runs code.prg in the emulator with nothing in bank 1, and zzlowbank.footer places
+#		that section in low RAM.
+#
 build: prelim
-	$(ASM) testing$(S)testing.asm $(BINDIR)ifloat32.library $(BINDIR)polynomials.library $(BINDIR)common.library
+	$(ASM) testing$(S)testing.asm $(BINDIR)ifloat32.library $(BINDIR)polynomials.library $(BINDIR)common.library \
+		$(SRCDIR)runtime$(S)source$(S)main$(S)zzlowbank.footer
 
 run: build
 	$(EXECUTE) $(FAST)

@@ -9,8 +9,8 @@ FMVIB       #,# T N
 FMFREQ      #,# T N
 FMVOL       #,# T N
 FMPAN       #,# T N
-FMPLAY      #,$ T N
-FMCHORD     #,$ T N
+FMPLAY      #,@ T N
+FMCHORD     #,@ T N
 FMPOKE      #,# T N
 PSGINIT      T N
 PSGNOTE     #,# T N
@@ -18,5 +18,5 @@ PSGVOL      #,# T N
 PSGWAV      #,# T N
 PSGFREQ     #,# T N
 PSGPAN      #,# T N
-PSGPLAY     #,$ T N
-PSGCHORD    #,$ T N
+PSGPLAY     #,@ T N
+PSGCHORD    #,@ T N

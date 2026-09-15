@@ -22,46 +22,12 @@
 ;		$1B000, so a row is 256 bytes and the cell is $1B000 + y*256 + x*2 -- but nothing here
 ;		depends on that.
 ;
+;		TileSetAddress stays in low RAM for the GP block's drawing (gpdraw.asm). TILE, TDATA and
+;		TATTR run from bank 1 (HANDLER_BANK).
+;
 ; ************************************************************************************************
 
 		.section 	code
-
-; ************************************************************************************************
-;
-;						TILE <x>,<y>,<tile/screen code>[,<attribute>]
-;
-; ************************************************************************************************
-
-Command_TILE: ;; [!tile]
-		.entercmd
-		phy
-		ldx 	#3
-_CTLInteger:
-		.floatinteger
-		dex
-		bpl 	_CTLInteger
-
-		lda 	NSMantissa0+0
-		sta 	tileX
-		lda 	NSMantissa1+0
-		sta 	tileX+1
-		lda 	NSMantissa0+1
-		sta 	tileY
-		lda 	NSMantissa1+1
-		sta 	tileY+1
-		jsr 	TileSetAddress
-
-		lda 	NSMantissa0+2 				; the tile or screen code, and the auto-increment
-		sta 	VRAMData0 					; then steps on to the attribute
-
-		lda 	NSMantissa0+3 				; the attribute is optional. 255 means it was not
-		cmp 	#255 						; supplied, and the cell keeps the colours it had.
-		beq 	_CTLNoAttribute
-		sta 	VRAMData0
-_CTLNoAttribute:
-		ply
-		ldx 	#$FF
-		.exitcmd
 
 ; ************************************************************************************************
 ;
@@ -134,6 +100,47 @@ _TSARow:
 		rts
 
 		.send 	code
+
+		.section 	banked
+
+; ************************************************************************************************
+;
+;						TILE <x>,<y>,<tile/screen code>[,<attribute>]
+;
+; ************************************************************************************************
+
+Command_TILE: ;; [!tile]
+		.entercmd
+		phy
+		ldx 	#3
+_CTLInteger:
+		.floatinteger
+		dex
+		bpl 	_CTLInteger
+
+		lda 	NSMantissa0+0
+		sta 	tileX
+		lda 	NSMantissa1+0
+		sta 	tileX+1
+		lda 	NSMantissa0+1
+		sta 	tileY
+		lda 	NSMantissa1+1
+		sta 	tileY+1
+		jsr 	TileSetAddress
+
+		lda 	NSMantissa0+2 				; the tile or screen code, and the auto-increment
+		sta 	VRAMData0 					; then steps on to the attribute
+
+		lda 	NSMantissa0+3 				; the attribute is optional. 255 means it was not
+		cmp 	#255 						; supplied, and the cell keeps the colours it had.
+		beq 	_CTLNoAttribute
+		sta 	VRAMData0
+_CTLNoAttribute:
+		ply
+		ldx 	#$FF
+		.exitbank
+
+		.send 	banked
 
 		.section storage
 tileX:

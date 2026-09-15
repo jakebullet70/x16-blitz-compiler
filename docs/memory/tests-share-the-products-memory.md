@@ -5,8 +5,8 @@ metadata:
   type: project
 ---
 
-**P-code and the runtime workspace come out of ONE pot** -- `$3b00`..`$9F00`, 25,600 bytes, split
-between object code, the fixed 4K frame stack, and whatever is left for variables, arrays and the
+**P-code and the runtime workspace come out of ONE pot** -- `$3d00`..`$9F00`, 25,088 bytes, split
+between object code, the fixed 2K frame stack, and whatever is left for variables, arrays and the
 string heap. So a byte of test code is a byte the running program does not get, in 256-byte pages.
 
 **The editor's self-check was 3,615 bytes and `DEBUG.MODE` is a RUN-TIME test, so it shipped in every

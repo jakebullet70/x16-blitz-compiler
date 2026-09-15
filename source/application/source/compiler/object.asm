@@ -40,8 +40,11 @@
 ;		importantly, lets the workspace start just above the object code instead of at a
 ;		hardcoded $8000 -- which is most of the useable memory a compiled program gets.
 ;
-;		The two immediates in StartCode are patched as they stream past, rather than in RAM,
+;		The three immediates in StartCode are patched as they stream past, rather than in RAM,
 ;		so the copy still in memory (RUN a second time) keeps running from FreeMemory.
+;
+;		An embedded object has a third piece after the object code, from the next page: the bank
+;		code, which StartCode copies to bank 1. See ObjReadBankCode.
 ;
 ; ************************************************************************************************
 
@@ -149,12 +152,15 @@ ObjStreamOpen:
 		jmp 	ObjectWriteShared
 _WOCEmbedded:
 		;
-		;		THE RUNTIME IMAGE IS OPENED FIRST, before the object file is created. It is the
-		;		one thing here that can fail for a reason outside this program, and a compile
-		;		that dies after creating OBJECT.PRG leaves a truncated file that looks like a
-		;		program. IODeleteOutputs has already removed the old one, so failing here leaves
-		;		no object at all -- the only state that cannot be mistaken for a good one.
+		;		THE BANK CODE AND THE RUNTIME IMAGE ARE READ FIRST, before the object file is
+		;		created. They are the two things here that can fail for a reason outside this
+		;		program, and a compile that dies after creating OBJECT.PRG leaves a truncated file
+		;		that looks like a program. IODeleteOutputs has already removed the old one, so
+		;		failing here leaves no object at all -- the only state that cannot be mistaken for
+		;		a good one.
 		;
+		jsr 	ObjReadBankCode 			; into its bank, to go out after the p-code
+		bcs 	_WOCImgBadFar
 		ldx 	#RTImageFileText & $FF
 		ldy 	#RTImageFileText >> 8
 		jsr 	IOOpenImage
@@ -226,9 +232,9 @@ _WOCImgRead:
 		cpy 	imgCount
 		bne 	_WOCImgRead
 		;
-		;		The two immediates. Chunks start on page boundaries of the STREAM (the load
+		;		The three immediates. Chunks start on page boundaries of the STREAM (the load
 		;		address was consumed before the first one), so "is this offset in this chunk"
-		;		is a page compare and the offset within it is the low byte. Both live in the
+		;		is a page compare and the offset within it is the low byte. All three live in the
 		;		first page in practice; the test does not assume it.
 		;
 		lda 	imgPage
@@ -245,6 +251,15 @@ _WOCImgNoCode:
 		lda 	newWorkspacePage 			; so the workspace can start much lower
 		sta 	imageBuffer,y
 _WOCImgNoWS:
+		lda 	imgPage
+		cmp 	#RTIMG_BANKPOFS >> 8
+		bne 	_WOCImgNoBank
+		ldy 	#RTIMG_BANKPOFS & $FF
+		sec 								; the page ObjEmitBankCode pads to, after the
+		lda 	newWorkspacePage 			; p-code and below the frame stack gap
+		sbc 	#FrameStackPages
+		sta 	imageBuffer,y
+_WOCImgNoBank:
 		jsr 	IOObjectOut 				; and write it out
 		ldy 	#0
 _WOCImgWrite:
@@ -269,8 +284,9 @@ _WOCImgSubN:
 _WOCImgMore:
 		lda 	imgLeft
 		ora 	imgLeft+1
-		bne 	_WOCImgChunk
-
+		beq 	_WOCImgDone
+		jmp 	_WOCImgChunk 				; out of branch range since the third patch
+_WOCImgDone:
 		jsr 	IOCloseImage 				; CLRCHNs, so the object file has to be reselected
 		jmp 	ObjStreamReady
 
@@ -332,7 +348,7 @@ _WOCSCeiling:
 		;		THE REGIONS ARE NO LONGER IN IT. They used to be -- compiled into the object,
 		;		loaded at $0801 with everything else, copied up to $A000 from there -- so the file
 		;		test had to count them and the workspace test did not, and the two measured
-		;		different lengths. Now each region is a .Bnn file of its own that loads straight
+		;		different lengths. Now each region is a .nnn file of its own that loads straight
 		;		into its bank, so the file ends where the low code ends, which is exactly what the
 		;		workspace test already measured into zTemp1. THAT IS THE WHOLE RETURN on the
 		;		overlays: a banked byte stops paying file price to arrive.
@@ -495,10 +511,9 @@ _WOCSBootNoHi:
 		;		It lands at $0900 and copies every region into its bank before handing over.
 		;
 		;		BUILT IN A BUFFER RATHER THAN PATCHED IN FLIGHT, unlike the bootstrap above. What
-		;		goes into it is a TABLE -- two bytes a region -- so the address/value list the
-		;		streaming loop asks would have to be as long as the table it was writing. Copying
-		;		the template into a page of compiler RAM and poking it costs the compiled program
-		;		nothing and stays one line of code per region.
+		;		goes into it is a MAP -- a bit a bank -- so the address/value list the streaming
+		;		loop asks would have to be as long as the map it was writing. Copying the template
+		;		into a page of compiler RAM and poking it costs the compiled program nothing.
 		;
 		;		imageBuffer IS THE RUNTIME IMAGE'S PAGE IN TRANSIT, and it is dead in shared mode:
 		;		a shared object carries no runtime, which is the whole point of it. Same buffer,
@@ -517,17 +532,20 @@ _WOCSExtCopy:
 		iny
 		bne 	_WOCSExtCopy
 		;
-		;		The bank table -- ONE BYTE A REGION now, and no page counts: each region is a file
-		;		of its own and LOAD knows how long a file is. The terminating zero is already
-		;		there, because the template's table is a .fill of zeroes and bank 0 is refused
-		;		everywhere else in the compiler.
+		;		The bank map -- ONE BIT A BANK, bank n in byte n/8 at bit (n AND 7), bit 0 worth 1:
+		;		the order BANKMGR uses. A set bit is a file to load, whatever put it there, because
+		;		gpBankBanks holds the text banks as well as the code regions. The template's map is
+		;		a .fill of zeroes, so nothing needs clearing.
 		;
-		;		ORDER DOES NOT MATTER ANY MORE, which it used to: the copy loop ran on from one
-		;		region into the next and so needed the pages in the order they sat in. Each file
-		;		carries its own load address now, so the table is only a list of banks.
+		;		AND THE HIGHEST OF THEM, which is where the page's walk stops and what it checks
+		;		against MEMTOP. The template's byte is 0 and bank 0 is refused everywhere else in
+		;		the compiler, so the first region always replaces it.
 		;
-		;		AND THE NAME THE LOADER ASKS FOR, once, with "B00" on the end -- the extension
-		;		page pokes the bank's two digits into it per region. See ObjBuildOverlayName.
+		;		ORDER DOES NOT MATTER, which it used to: each file carries its own load address,
+		;		so all the page needs to know is which banks.
+		;
+		;		AND THE NAME THE LOADER ASKS FOR, once, with "000" on the end -- the extension
+		;		page pokes the bank's three digits into it per region. See ObjBuildOverlayName.
 		;
 		;
 		;		AND WHICH BANK EACH GP.BSTR SLOT READS ITS TEXT OUT OF -- the whole table, not the
@@ -543,14 +561,29 @@ _WOCSExtBStr:
 		bpl 	_WOCSExtBStr
 		;
 		ldx 	#0
-_WOCSExtTable:
+_WOCSExtMap:
 		lda 	gpBankBanks,x
-		sta 	imageBuffer+BootExtTableOffset,x
+		and 	#7
+		tay
+		lda 	_WOCSExtBits,y 				; the bank's bit within its byte
+		sta 	zTemp0 						; free -- the template copy is done with it
+		lda 	gpBankBanks,x
+		cmp 	imageBuffer+BootExtHighOffset
+		bcc 	_WOCSExtByte
+		sta 	imageBuffer+BootExtHighOffset 	; the highest bank so far
+_WOCSExtByte:
+		lsr 	a
+		lsr 	a
+		lsr 	a
+		tay 								; and its byte, bank / 8
+		lda 	imageBuffer+BootExtMapOffset,y
+		ora 	zTemp0
+		sta 	imageBuffer+BootExtMapOffset,y
 		inx
 		cpx 	gpBankCount
-		bcc 	_WOCSExtTable
+		bcc 	_WOCSExtMap
 		;
-		lda 	#0 							; bank 0, so the template comes out as "...B00"
+		lda 	#0 							; bank 0, so the template comes out as "...000"
 		jsr 	ObjBuildOverlayName
 		ldx 	ovlNameLen
 		cpx 	#BXNAMEMAX+1
@@ -577,6 +610,8 @@ _WOCSExtName:
 _WOCSExtNameLong:
 		jsr 	CallErrorHandler
 		.text 	"OBJECT NAME TOO LONG FOR AN OVERLAY", 0
+_WOCSExtBits: 								; out of the way here: the error handler never returns
+		.byte 	1, 2, 4, 8, 16, 32, 64, 128
 _WOCSExtWrite2:
 		ldy 	#0
 _WOCSExtWrite:
@@ -626,7 +661,7 @@ ObjStreamReady:
 ;		it closes either -- the exit bridge and the $FF end marker go in while the cursor is
 ;		still inside it, the entry bridge lands in low memory before the cursor moves, and pass
 ;		two never goes back over what it has written. So the bank is cleared as a region opens
-;		and emptied to the region's own .Bnn as it closes, and the next region has it.
+;		and emptied to the region's own .nnn as it closes, and the next region has it.
 ;
 ;		THE OBJECT GOES OUT IN FILE ORDER: the low code and the GP.ASM pool as they are
 ;		compiled, then the alignment padding, then each region out of its bank. That is what
@@ -637,6 +672,8 @@ ObjStreamReady:
 
 OBJ_BUF_BANK = 7 							; the low code, waiting to go out
 OBJ_RGN_BANK = 8 							; ...and the one scratch bank every region shares
+OBJ_BANKCODE_BANK = 15 						; the embedded bank code, from GP1.IMG.nnn.BIN to the object
+OBJ_BANKCODE_LOAD = $A000 					; ...and the address it runs at, in bank 1
 OBJ_WINDOW   = $A000
 OBJ_BUF_SIZE = $2000
 
@@ -1053,7 +1090,7 @@ _OERSpan:
 
 ; ************************************************************************************************
 ;
-;		Region objRgnNo, objSpan bytes of it, out to <object>.Bnn -- nn being the bank it will
+;		Region objRgnNo, objSpan bytes of it, out to <object>.nnn -- nnn being the bank it will
 ;		load into. Two bytes of header saying $A000 and then the bytes, so the KERNAL's LOAD
 ;		with secondary address 1 puts it where it belongs and the bootstrap does no arithmetic
 ;		at all.
@@ -1106,17 +1143,128 @@ _OEODone:
 
 ; ************************************************************************************************
 ;
-;		ObjectFile with its extension replaced by ".Bnn", nn being the bank in A. Modelled on
+;		THE EMBEDDED BANK CODE, GP1.IMG.nnn.BIN, goes after the p-code from the next page, and
+;		StartCode copies it to bank 1 as the program starts. It sits in the frame stack gap and
+;		the workspace, which are unused until then, and it is under MIN_WS_PAGES pages
+;		(genrtimage.py checks), so PrepareObjectCode's room for the workspace is room for it.
+;
+;		IT IS READ INTO A BANK BEFORE THE OBJECT IS CREATED, as the image is opened first, and
+;		written at BLC_CLOSEOUT. The compiler library ignores the carry from both end hooks, so
+;		a file that failed there could not stop the OK.
+;
+;		ObjReadBankCode: carry set if the file is missing, does not load at $A000, is shorter
+;		than RTIMG_BANKLEN or does not open with the embedded magic "GE". The caller's failure
+;		path closes it.
+;
+; ************************************************************************************************
+
+ObjReadBankCode:
+		ldx 	#RTBankFileText & $FF
+		ldy 	#RTBankFileText >> 8
+		jsr 	IOOpenImage 				; the image's logical file, which opens after this closes
+		bcs 	_ORBFail
+		jsr 	IOImageIn
+		jsr 	IOReadByte 					; its own load address, not part of the bank code
+		bcs 	_ORBFail
+		cmp 	#OBJ_BANKCODE_LOAD & $FF
+		bne 	_ORBFail
+		jsr 	IOReadByte
+		bcs 	_ORBFail
+		cmp 	#OBJ_BANKCODE_LOAD >> 8
+		bne 	_ORBFail
+		stz 	objBufIdx
+		stz 	objBufIdx+1
+_ORBByte:
+		jsr 	IOReadByte
+		bcs 	_ORBFail
+		sta 	objByte
+		lda 	#OBJ_BANKCODE_BANK
+		jsr 	ObjStreamWindow
+		lda 	objByte
+		sta 	(zTemp0)
+		lda 	objSaveBank
+		sta 	CompilerRAMBankReg
+		inc 	objBufIdx
+		bne 	_ORBCount
+		inc 	objBufIdx+1
+_ORBCount:
+		lda 	objBufIdx
+		cmp 	#RTIMG_BANKLEN & $FF
+		bne 	_ORBByte
+		lda 	objBufIdx+1
+		cmp 	#RTIMG_BANKLEN >> 8
+		bne 	_ORBByte
+		;
+		lda 	#OBJ_BANKCODE_BANK 			; "GE", not the shared bank code's "GP"
+		jsr 	ObjStreamBank
+		lda 	OBJ_WINDOW
+		ldx 	OBJ_WINDOW+1
+		ldy 	objSaveBank
+		sty 	CompilerRAMBankReg
+		cmp 	#'G'
+		bne 	_ORBFail
+		cpx 	#'E'
+		bne 	_ORBFail
+		jsr 	IOCloseImage
+		clc
+		rts
+_ORBFail:
+		sec
+		rts
+
+;
+;		BLC_CLOSEOUT, embedded only: zero bytes up to the next page, then the bank code. The two
+;		passes have been compared by now, so none of it is in the checksum.
+;
+ObjEmitBankCode:
+		lda 	ModeText
+		cmp 	#'S'
+		beq 	_OEBDone 					; the bootstrap loads GP1.RT.nnn.BIN instead
+		jsr 	IOSelectObject
+		.cerror (ObjectOrigin & $FF) != 0, "the padding counts from objPtr's low byte"
+		ldx 	objPtr
+		beq 	_OEBPadded
+_OEBPad:
+		lda 	#0
+		jsr 	IOWriteByte
+		inx
+		bne 	_OEBPad
+_OEBPadded:
+		stz 	objBufIdx
+		stz 	objBufIdx+1
+_OEBByte:
+		lda 	#OBJ_BANKCODE_BANK 			; the window closes again before every write: the
+		jsr 	ObjStreamWindow 			; KERNAL's own buffers live in bank 0
+		lda 	(zTemp0)
+		ldx 	objSaveBank
+		stx 	CompilerRAMBankReg
+		jsr 	IOWriteByte
+		inc 	objBufIdx
+		bne 	_OEBCount
+		inc 	objBufIdx+1
+_OEBCount:
+		lda 	objBufIdx
+		cmp 	#RTIMG_BANKLEN & $FF
+		bne 	_OEBByte
+		lda 	objBufIdx+1
+		cmp 	#RTIMG_BANKLEN >> 8
+		bne 	_OEBByte
+_OEBDone:
+		rts
+
+; ************************************************************************************************
+;
+;		ObjectFile with its extension replaced by ".nnn", nnn being the bank in A. Modelled on
 ;		SymBuildName, which does the same job for the .SYM -- and like it, a name with no dot at
 ;		all gets the suffix appended rather than nothing.
 ;
-;		BOTH DIGITS, ALWAYS, and that is not cosmetic: the bootstrap holds ONE name and pokes the
-;		bank into the last two characters of it, because sixteen names at sixteen characters
-;		would be 256 bytes of a page with under 200 spare. A fixed width is what lets one
-;		template serve every region.
+;		THREE DIGITS, ALWAYS, and that is not cosmetic: the bootstrap holds ONE name and pokes the
+;		bank into the last three characters of it, because a name a region would not fit in its
+;		page. A fixed width is what lets one template serve every region. Three cover every
+;		bank: GPBankReadNumber reads one byte, so nothing past 255 gets this far.
 ;
-;		WHICH IS WHY THE BANK STOPS AT 99. GPBankReadNumber refuses higher and says so, rather
-;		than letting bank 100 come out as ".B:0" -- see commands/gpbank.asm.
+;		THE PAGE COUNTS ITS DIGITS THE SAME WAY, in bootstrap2.asm. There are two copies because
+;		this one is in GPC.BIN and that one runs inside the compiled program.
 ;
 ;		NO LENGTH CHECK HERE. It is the extension page's TEMPLATE that the page has to hold, so
 ;		that is where the bound is tested -- see _WOCSExtNameLong. This buffer is CFLineSize+8
@@ -1143,7 +1291,7 @@ _OBONNext:
 		bne 	_OBONCopy
 _OBONEnd:
 		cpy 	#0
-		beq 	_OBONAppend 				; no dot at all -- append ".Bnn" to the whole name
+		beq 	_OBONAppend 				; no dot at all -- append ".nnn" to the whole name
 		tya
 		tax
 		bra 	_OBONSuffix
@@ -1152,32 +1300,31 @@ _OBONAppend:
 		sta 	OvlFileName,x
 		inx
 _OBONSuffix:
-		lda 	#'B'
+		ldy 	#0 							; Y walks 100, 10 and 1, and X the name
+_OBONDigit:
+		lda 	#'0'
 		sta 	OvlFileName,x
+		lda 	ovlBank
+_OBONCount:
+		cmp 	_OBONPow10,y
+		bcc 	_OBONPlaced
+		sbc 	_OBONPow10,y 				; carry is set -- the compare above put it there
+		inc 	OvlFileName,x
+		bra 	_OBONCount
+_OBONPlaced:
+		sta 	ovlBank 					; what the lower places have left to write
 		inx
-		lda 	ovlBank 					; the bank in decimal, tens in Y and units in A
-		ldy 	#'0'
-_OBONTens:
-		cmp 	#10
-		bcc 	_OBONUnits
-		sbc 	#10 						; carry is set -- the compare above put it there
 		iny
-		bra 	_OBONTens
-_OBONUnits:
-		clc
-		adc 	#'0'
-		pha
-		tya
-		sta 	OvlFileName,x
-		inx
-		pla
-		sta 	OvlFileName,x
-		inx
+		cpy 	#3
+		bne 	_OBONDigit
 		stz 	OvlFileName,x 				; ASCIIZ, for IOScratchFile and IOSetFileName
 		stx 	ovlNameLen
 		rts
 
-ovlBank: 									; the region's bank, across the name build
+_OBONPow10:
+		.byte 	100, 10, 1
+
+ovlBank: 									; the region's bank, less a place each digit
 		.fill 	1
 ovlNameLen: 								; ...and how long the name came out
 		.fill 	1
@@ -1251,8 +1398,8 @@ ObjectTooBig:
 		bra 	ObjectFail
 
 ;
-;		The runtime image is missing, or is not the file its name claims. Either way there is
-;		no object: the image is opened before OBJECT.PRG is created precisely so that this
+;		The runtime image or the bank code is missing, or is not the file its name claims. Either
+;		way there is no object: both are read before OBJECT.PRG is created precisely so that this
 ;		leaves nothing behind. The name carries the runtime build number, so "missing" is also
 ;		what a stale image from an older release looks like -- which is the point of numbering
 ;		it rather than trusting a fixed name to be the right one.

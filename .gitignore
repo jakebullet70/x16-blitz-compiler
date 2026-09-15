@@ -33,6 +33,7 @@ source/common-source/scripts/
 source/*/build/code.lbl
 source/*/build/code.lst
 source/*/build/code.prg
+source/*/build/bank.prg
 source/*/build/dump.bin
 source/*/build/*.pcode
 source/*/build/*.tokenised
@@ -126,7 +127,7 @@ testing/archive/
 # GPC.IMG.nnn.BIN joins the GPB/GPC.RT.nnn.BIN runtimes in being ignored rather
 # than tracked. It is build-numbered, so every engine bump orphaned the previous
 # one; make libs rebuilds it, and release.sh already says "build first" if it is
-# not there.
+# not there. GP1.IMG.nnn.BIN, the bank code installed beside it, goes the same way.
 # ---------------------------------------------------------------------------
 testing/OBJECT.PRG
 testing/SOURCE.PRG
@@ -135,6 +136,7 @@ testing/C.*.PRG
 testing/M.*
 testing/*.LOG
 testing/GPC.IMG.*.BIN
+testing/GP1.IMG.*.BIN
 
 # The resident runtimes, GPC.RT.<build>.BIN (with the GPB handlers) and
 # GPC.RC.<build>.BIN (without them -- both are slices of one build, see common.inc).
@@ -149,8 +151,10 @@ testing/GPC.IMG.*.BIN
 #   Two files now, and the names swapped at RT_ABI 20: GPB.RT is the FULL image (handlers
 #   AND core, loading at RTGPBASE) and GPC.RT is the core alone. GPC.RC is the name the full
 #   one used to have; kept here so an old one lying about in a working tree stays ignored.
+#   GP1.RT is the third, the bank code both load into bank 1 (HANDLER-BANK).
 testing/GPB.RT.*.BIN
 testing/GPC.RT.*.BIN
+testing/GP1.RT.*.BIN
 testing/GPC.RC.*.BIN
 
 # The GP.BASIC library is MASTERED in GPC-BASIC/ (see its README). BASLOAD resolves
@@ -253,11 +257,12 @@ testing/*.SRC.SYM
 testing/*.MAP
 testing/BANK*.PRG
 
-# ...and the region overlays, <name>.B01 upwards -- one file per GP.BANKED region, written
-# beside the object by the same compile. The same omission as above, one feature later: the
-# overlays arrived after this section was written, so 120 of them had accumulated untracked
-# by 8th Sep 2026. A region's count follows the source, so these can never be listed by name.
-testing/*.B[0-9][0-9]
+# ...and the region overlays, <name>.nnn -- one file per GP.BANKED region, written beside
+# the object by the same compile and named for its bank in three digits, .002 to .255. The
+# same omission as above, one feature later: the overlays arrived after this section was
+# written, so 120 of them had accumulated untracked by 8th Sep 2026. A region's count follows
+# the source, so these can never be listed by name. Until 14th Sep 2026 the suffix was .Bnn.
+testing/*.[0-9][0-9][0-9]
 
 # Claude Code local settings (personal, not team config)
 .claude/settings.local.json
@@ -302,6 +307,7 @@ tmp-test/
 # build: the same reasoning that keeps the testing/ copies out. GPB.HELP.PRG itself IS tracked.
 samples/GPC-HELP/GPB.RT.*.BIN
 samples/GPC-HELP/GPC.RT.*.BIN
+samples/GPC-HELP/GP1.RT.*.BIN
 samples/GPC-HELP/GPC.RC.*.BIN
 
 # release/ is TRACKED so the drop folder exists in a fresh clone, but its two products

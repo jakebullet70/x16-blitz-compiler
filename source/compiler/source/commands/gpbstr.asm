@@ -72,7 +72,7 @@ CommandGPBankedStrCompile:
 											; opener leaves its closer behind and corrupts the
 											; nesting of any block enclosing it, silently.
 		lda 	gpBankShared 				; an embedded object is one file, and text in a bank
-		bne 	_CBSShared 					; is a .Bnn file of its own
+		bne 	_CBSShared 					; is a .nnn file of its own
 		jmp 	BStrNeedsShared
 _CBSShared:
 		lda 	bstrState
@@ -131,7 +131,7 @@ CommandGPEndBankedStrCompile:
 
 ;
 ;		EMBEDDED IS ONE FILE, GPBankNeedsShared's rule (gpbank.asm) for the same reason: text in
-;		a bank is LOADed from a .Bnn file by the shared bootstrap. In compiler space, like
+;		a bank is LOADed from a .nnn file by the shared bootstrap. In compiler space, like
 ;		BStrTooManyBanks.
 ;
 BStrNeedsShared:

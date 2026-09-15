@@ -34,13 +34,13 @@
 ;
 	.byte	$08,$ce,$a0,$ea,$e2,48093 & $FF,48093 >> 8,$06
 ;
-;	FMPLAY      #,$ T N
+;	FMPLAY      #,@ T N
 ;
-	.byte	$08,$ce,$a1,$ea,$f2,48349 & $FF,48349 >> 8,$06
+	.byte	$08,$ce,$a1,$ea,$d2,48349 & $FF,48349 >> 8,$06
 ;
-;	FMCHORD     #,$ T N
+;	FMCHORD     #,@ T N
 ;
-	.byte	$08,$ce,$a2,$ea,$f2,48605 & $FF,48605 >> 8,$06
+	.byte	$08,$ce,$a2,$ea,$d2,48605 & $FF,48605 >> 8,$06
 ;
 ;	FMPOKE      #,# T N
 ;
@@ -70,10 +70,10 @@
 ;
 	.byte	$08,$ce,$a9,$ea,$e2,50397 & $FF,50397 >> 8,$06
 ;
-;	PSGPLAY     #,$ T N
+;	PSGPLAY     #,@ T N
 ;
-	.byte	$08,$ce,$aa,$ea,$f2,50653 & $FF,50653 >> 8,$06
+	.byte	$08,$ce,$aa,$ea,$d2,50653 & $FF,50653 >> 8,$06
 ;
-;	PSGCHORD    #,$ T N
+;	PSGCHORD    #,@ T N
 ;
-	.byte	$08,$ce,$ab,$ea,$f2,50909 & $FF,50909 >> 8,$06
+	.byte	$08,$ce,$ab,$ea,$d2,50909 & $FF,50909 >> 8,$06

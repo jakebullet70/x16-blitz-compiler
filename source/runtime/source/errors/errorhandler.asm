@@ -16,6 +16,16 @@ Unimplemented:
 		jmp 	ErrorV_unimplemented
 		
 RuntimeErrorHandler:
+		;
+		;		Bank 1 (HANDLER_BANK) at an error means a handler in bank 1 was running. Select the
+		;		program's bank, saved by BankEnter, so READY does not leave the handler code selected.
+		;
+		lda 	SelectRAMBank
+		cmp 	#HANDLER_BANK
+		bne 	_EHProgramBank
+		lda 	handlerBank
+		sta 	SelectRAMBank
+_EHProgramBank:
 		tya
 		clc
 		adc 	codePtr

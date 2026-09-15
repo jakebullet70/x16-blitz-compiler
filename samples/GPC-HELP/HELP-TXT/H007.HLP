@@ -62,14 +62,18 @@
 .  BMX.INC.BL
 .      load a BMX bitmap into VERA
 .
+.  KV.INC.BL
+.      strings by key in one RAM bank, saved and loaded as one file. No
+.        GP.ASM, so no #SYMFILE
+.
 .What each one costs in bytes is in the command reference, under At a glance.
 .
 =SEE ALSO
 .
 >61|4.1 THEME.INC.BL -- named colour roles
 >64|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
->88|STASH.INC.BL -- save a text rectangle, and put it back.
->96|STASHFILE.INC.BL -- a saved text rectangle, through a file.
+>90|STASH.INC.BL -- save a text rectangle, and put it back.
+>98|STASHFILE.INC.BL -- a saved text rectangle, through a file.
 >81|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
 >82|4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store
 >65|4.4 LINEINPUT.INC.BL -- a positioned entry field

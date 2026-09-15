@@ -26,10 +26,10 @@ OBJECT.PRG as it compiles. `samples/GPB-MODS-TESTING/GPBMODS.BASL` compiles: **O
 ## WHAT BOUNDS A PROGRAM NOW
 
 Not the compiler. `PrepareObjectCode` asks, at the end of pass one, whether the thing can RUN --
-p-code base page + pages + the 4K frame stack gap, against the runtime's base less `MIN_WS_PAGES`.
-Shared mode: **15,360 bytes** of low p-code with the GPB handlers, 17,664 without, PLUS up to
-8 x 8,192 in banks -- so a maximal object is about 80,896. Embedded: 17,152 / 18,176 and no
-regions. The other two limits are the line table (2,048 lines) and the variable list (1,365).
+p-code base page + pages + the 2K frame stack gap, against the runtime's base less `MIN_WS_PAGES`.
+Shared mode, since build 123: **19,712 bytes** of low p-code for a banked program with the GPB
+handlers, 22,016 without, PLUS up to 127 regions in banks 2 to 255. Embedded: 20,992 / 22,528 and
+no regions. The other two limits are the line table (2,048 lines) and the variable list (1,365).
 
 ## THE INVARIANT, and how it changed
 

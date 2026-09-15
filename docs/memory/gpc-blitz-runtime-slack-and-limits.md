@@ -8,7 +8,7 @@ metadata:
   modified: 2026-08-30T14:06:52.989Z
 ---
 
-**Figures below predate the shrink work. As of 2026-09-01 the GP block is `$3700`..`ObjectBase
+**The current ceilings are in the last section, measured 2026-09-15.** **Figures below predate the shrink work. As of 2026-09-01 the GP block is `$3700`..`ObjectBase
 $3b00` = 1,024 bytes (1,010 used, 14 free), the GP-IN image is 13,055 and a GP-OUT program's RT is
 12,031 -- `TODO.md` "Shrinking the runtime" holds the current table. The DERIVATIONS below are what
 to keep; re-measure any number before quoting it.**
@@ -125,3 +125,25 @@ it was nearly as big as the thing it protected, and `FILES / DIR OPEN` ran out o
 `FrameStackPages = 8` in `common.inc`; GPBMODS went 4,608 -> 6,656. Both the compiler and the
 runtime read that constant, so it takes `make libs` and `make -C source/runtime gpc-rt` together.
 See [[run-side-workspace-read-from-the-prg]] for how to read a program's budget off its `.PRG`.
+
+**THE CEILINGS NOW, 2026-09-15 (build 123), from the fit checks in `object.asm`, checked against
+two real reports.** Build 123 moved the rarely used handlers to bank 1, and every base moved with
+them. An embedded program fits while `runtimeEndPage + pages + FrameStackPages` is at most `$8F`,
+which leaves `MIN_WS_PAGES` (16) under `$9F00`. `runtimeEndPage` is `GPBase` `$2F` for a CORE
+program and `ObjectBase` `$35` when the GP block goes in, so the block is still 1,536 bytes
+(`FloatIsZero $2EC3` is the last core symbol, `CommandXUnwind $345D` the last in the block). A
+shared program fits while `PCODE_PAGE $09`, plus the bootstrap extension page a banked program
+carries, plus pages, plus 8, is at most the resident runtime's page less 16: `RTBASE $77` for CORE,
+`RTGPBASE $6F` with the GPB handlers.
+
+| mode | max low p-code | build 122 |
+|---|---|---|
+| embedded, CORE | 22,528 (88 pages) | 20,480 |
+| embedded, GP.BASIC | 20,992 (82) | 18,944 |
+| shared, CORE | 22,016 (86) | 19,712 |
+| shared, GP.BASIC | 19,968 (78), 19,712 with a banked region | 17,664, 17,408 |
+
+Checked: GPBMODS (shared, banked) at `LOW CODE 11520` reports `LOW FREE 12288`, and GPCTEST-E
+(embedded, GP.BASIC) at `LOW CODE 969` reports `LOW FREE 24064`, both as the formulas give.
+**`LOW FREE - 4096` is how much more p-code fits**, in whole pages; `LOW FREE` already leaves the
+frame stack out.

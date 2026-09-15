@@ -62,11 +62,10 @@ for stem in sys.argv[1:]:
     # ONLY overlays this build wrote.  The old loop printed any .B0* it found, so a
     # failed compile reported the PREVIOUS build's overlays as if they were new.
     #
-    # THE SUFFIX IS .Bnn AND nn REACHES 63, not .B0n.  Matching the leading zero
-    # printed four of the five overlays and said nothing about XBASE.B10, which
-    # reads exactly like a region that was never written.
+    # THE SUFFIX IS .nnn, the bank in three digits from 002 to 255.  Nothing else a
+    # build writes beside the program ends in three digits.
     for f in sorted(os.listdir(TESTING)):
-        if f.startswith(stem + ".B") and f[len(stem) + 2:].isdigit():
+        if f.startswith(stem + ".") and len(f) == len(stem) + 4 and f[-3:].isdigit():
             p = os.path.join(TESTING, f)
             fresh = os.path.getmtime(p) >= started
             print("   overlay", f, os.path.getsize(p), "" if fresh else "<-- STALE, not from this build")

@@ -1,6 +1,6 @@
 ---
 name: gpc-shared-pcode-cap-is-rtbase
-description: "A SHARED non-GPB program is capped at ~17,920 bytes of p-code by RTBASE, not by $9F00 -- and PROGRAM TOO BIG is raised at END OF PASS 1, which is why it proves the whole source was read."
+description: "A SHARED non-GPB program is capped at 22,016 bytes of p-code by RTBASE, not by $9F00 -- and PROGRAM TOO BIG is raised at END OF PASS 1, which is why it proves the whole source was read."
 metadata:
   type: project
 ---
@@ -8,12 +8,14 @@ metadata:
 **The SHARED ceiling is the resident runtime, not the I/O page.** `ObjectPrepareShared`
 (`source/application/source/compiler/object.asm:286`) requires
 
-    PCODE_PAGE + pages(p-code) + FrameStackPages  <  sharedCeilPage - MIN_WS_PAGES + 1
+    PCODE_PAGE + banked + pages(p-code) + FrameStackPages  <  sharedCeilPage - MIN_WS_PAGES + 1
 
-with `PCODE_PAGE = $09`, `FrameStackPages = 16`, `MIN_WS_PAGES = 16` and `sharedCeilPage` =
-**`RTBASE` $6E00** for a program using no GPB keyword, **`RTGPBASE` $6600** for one that does
-(`source/common-source/source/common.inc:113`). That works out at **70 pages, ~17,920 bytes of
-p-code** — nothing like the $9F00 `ObjectCeiling`, which bounds the object *buffer*, not the fit.
+with `PCODE_PAGE = $09`, `banked` 1 for a program with regions (its bootstrap extension page), `FrameStackPages = 8`, `MIN_WS_PAGES = 16` and `sharedCeilPage` =
+**`RTBASE` $7700** for a program using no GPB keyword, **`RTGPBASE` $6F00** for one that does
+(`source/common-source/source/common.inc:113-114`). That works out at **86 pages, 22,016 bytes of
+p-code** with no GPB keyword, and 78 pages, 19,968 bytes with one (a page less when banked) — nothing like the $9F00 `ObjectCeiling`, which bounds the object *buffer*, not the fit.
+Build 123 moved both bases up when the rarely used handlers went to bank 1 (2026-09-15); build 122
+gave 19,712 and 17,664.
 
 This is why GPBMODS needs `GP.BANKED`: at ~30 KB of p-code it clears the cap only by moving the
 region into a bank. See [[gp-banked-region-relocation]] and [[pcode-runs-from-a-bank-proven]].

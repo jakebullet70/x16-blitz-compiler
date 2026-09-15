@@ -70,7 +70,7 @@ also 12, so a twelve-formal verb sat on the edge of it. `.fnpush` `$F3` sends ea
 argument to the frame stack as a `FRAME_FNSLOT` — the frame `.fnsave` already uses, because that
 is what an argument waiting for a call is — and `.fnpop` `$F4` brings it back in front of the
 store that consumes it. A call then holds ONE argument at a time however many it has, so the
-formal count caps nothing and the 4K frame stack, which `StackOpenFrame` checks, is what a long
+formal count caps nothing and the 2K frame stack, which `StackOpenFrame` checks, is what a long
 list runs into. **The last argument is never pushed**: evaluated last, stored first, nothing
 between — so a one-formal verb emits neither opcode. **2 bytes of p-code an argument after the
 first** (`DEFP3` 528 → 532, its one three-formal call site) and **~360 cycles**, or ~80 for an

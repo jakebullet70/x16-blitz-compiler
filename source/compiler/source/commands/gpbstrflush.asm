@@ -21,7 +21,7 @@
 ;
 ;		ONE REGION EACH AND NOT ONE BETWEEN THEM, which is the whole of Phase 3 down here: a
 ;		region is a bank, so several text banks are several regions, and each one then gets its
-;		own .Bnn overlay file with no further arrangement -- the region machinery does it. The
+;		own .nnn overlay file with no further arrangement -- the region machinery does it. The
 ;		loop runs in SLOT order, so the layout slots they take are contiguous and last, which is
 ;		how pass two finds each of them again.
 ;

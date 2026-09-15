@@ -18,12 +18,14 @@ afternoon. The pre-clean state is `../testing-archive-2026-09-09.zip`.
 |---|---|
 | `GPC.BIN` | the compiler engine. `source/gpc/compile_shared.py` runs it. `source/application/GPC.BIN` is the master; this copy can go stale, which is the point -- see `docs/memory/baseline-compiler-is-the-application-copy.md` |
 | `BASLOAD-GPC.BIN` `BASLOAD-GPC.PRG` | the tokeniser, and its front end. `source/gpc/build_basl.py` runs them |
-| `GPC.RT.122.BIN` | the resident runtime a SHARED object loads instead of carrying a copy |
-| `GPB.RT.122.BIN` | the same, for a program that uses a GPB keyword |
-| `GPC.IMG.122.BIN` | the runtime image the compiler embeds for `--embedded` |
+| `GPC.RT.123.BIN` | the resident runtime a SHARED object loads instead of carrying a copy |
+| `GPB.RT.123.BIN` | the same, for a program that uses a GPB keyword |
+| `GP1.RT.123.BIN` | the handlers a SHARED object runs from bank 1, loaded with either file above |
+| `GPC.IMG.123.BIN` | the runtime image the compiler embeds for `--embedded` |
+| `GP1.IMG.123.BIN` | the bank 1 handlers the compiler writes after the p-code for `--embedded` |
 | `GPC.BASL` `GPC.PRG` | the compiler's own BASL front end. `source/gpc/GPC.BASL` is the master |
 
-**The three `*.RT.*` / `*.IMG.*` files are INSTALLED, not built here.** `make libs` does not put
+**The five `*.RT.*` / `*.IMG.*` files are INSTALLED, not built here.** `make libs` does not put
 them in place; `make -C source/runtime gpc-rt` does. Delete them and the next compile fails.
 
 ### Reference, not machinery
@@ -43,7 +45,7 @@ them in place; `make -C source/runtime gpc-rt` does. Delete them and the next co
 |---|---|
 | `*.INC.BL`, `<PROGRAM>.BASL` | copied in from `samples/<name>/GPC-BASIC/` and `GPC-BASIC/` before a build. The tracked copy is the master; one here that outlives a build is stale |
 | `*.SRC.PRG` `*.SRC.SYM` | `build_basl.py` |
-| `*.PRG` `*.B04`..`*.Bnn` `*.MAP` | `compile_shared.py` -- the object, its region overlays, and the map |
+| `*.PRG` `*.nnn` `*.MAP` | `compile_shared.py` -- the object, its region overlays, and the map |
 | `GPC.INPUT` `GPCCOMP.LOG` `RUN.LOG` | the headless harness's scratch |
 | `samples/` | `make samples`, mirroring the tracked `samples/` tree |
 | `HELP-TXT/` | xcopied from `samples/GPC-HELP/HELP-TXT/` so `GPB.HELP.PRG` can read it off the drive |

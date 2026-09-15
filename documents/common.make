@@ -60,6 +60,13 @@ CSOURCE =  $(SRCDIR)common-source$(S)
 TASS ?= 64tass
 ASM = $(TASS) -q -c -Wall -o build$(S)code.prg -L build$(S)code.lst -l build$(S)code.lbl
 #
+#		ASMBANK links the runtime. code.prg takes the code section only, and the banked section at
+#		$A000 goes to bank.prg. With one output 64tass fills the gap between the two, and code.prg
+#		would run on to $A000. 00rtbank.header (shared) or 00rtimgbank.header (embedded) opens
+#		every such link and places the banked section.
+#
+ASMBANK = $(TASS) -q -c -Wall --output-section=code -o build$(S)code.prg --output-section=banked -o build$(S)bank.prg -L build$(S)code.lst -l build$(S)code.lbl
+#
 #		The front end GPC.PRG is BASLOAD source now (source/gpc/GPC.BASL), tokenised by
 #		source/gpc/build_basl.py driving the emulator -- no Java, no prog8c.jar. The old Prog8
 #		front end is kept in source/gpc/old-archive/ for reference.

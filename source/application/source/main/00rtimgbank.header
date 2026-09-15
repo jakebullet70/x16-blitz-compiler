@@ -1,0 +1,46 @@
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		Name:		00rtimgbank.header
+;		Purpose:	First bytes of the runtime image's bank code -- the magic at $A000.
+;		Created:	15th September 2026
+;
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		Linked FIRST in link one, ahead of 00rtimage.header. It places the banked section at
+;		$A000 and opens it with "GE" and RT_ABI. $(ASMBANK) writes that section to build/bank.prg,
+;		and code.prg keeps the code section alone. The links that run tests in the emulator
+;		place the banked section in low RAM instead (runtime/source/main/zzlowbank.footer).
+;
+;		"GE" is not the shared runtime's "GP" (runtime/source/main/00rtbank.header). Each copy
+;		jumps into low RAM at its own link's addresses, so neither may be taken for the other.
+;
+;		A .header, not .asm, so build.py leaves it out of the library.
+;
+; ************************************************************************************************
+
+		* = $A000
+		.dsection banked
+
+		.section banked
+
+RTImgBankHeader:
+		.cerror RTImgBankHeader != $A000, "bank code magic not at $A000 - this header must open the banked section"
+		.cerror RT_ABI > 99, "RT_ABI > 99: the magic's last two bytes are ASCII digits - widen it here too"
+		.text 	"GE"						; magic ($A000..$A001)
+		.byte 	(RT_ABI / 10) + '0' 		; ABI ordinal as two digits ($A002..$A003)
+		.byte 	(RT_ABI - (RT_ABI / 10) * 10) + '0'
+
+		.send banked
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;
+; ************************************************************************************************

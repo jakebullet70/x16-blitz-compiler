@@ -81,7 +81,7 @@ _CAEndPass0:
 ; ************************************************************************************************
 ;
 ;		A region is opening, and closing. One scratch bank serves them all, so it is cleared to the
-;		padding byte as each one opens and emptied to the region's own .Bnn as each one closes.
+;		padding byte as each one opens and emptied to the region's own .nnn as each one closes.
 ;
 ; ************************************************************************************************
 
@@ -136,6 +136,7 @@ _CAResetOut:
 		rts
 
 _CACloseOut:
+		jsr 	ObjEmitBankCode 			; embedded: the bank code, after the p-code
 		stz 	objStreamLive 				; the compile worked and the object is complete, so
 		jmp 	IOObjectClose 				; there is nothing left to tidy away
 

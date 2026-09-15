@@ -15,8 +15,8 @@
 ;			LOW FREE 9728, FRAME STACK 2048
 ;			LINES 2744
 ;			DEAD CODE:  202 LINES REMOVED, 1413 BYTES SAVED 		only with removal on
-;			BANK  7 CODE  3328 USED  4864 FREE 				a line a bank, only if any
-;			BANK 12 TEXT  3840 USED  4352 FREE
+;			BANK   7 CODE  3328 USED  4864 FREE 				a line a bank, only if any
+;			BANK  12 TEXT  3840 USED  4352 FREE
 ;			TOTAL BANKS 2, 7168 USED
 ;
 ;		LOW CODE  the p-code that stays in low memory: FreeMemory up to objPtr, or up to
@@ -205,7 +205,7 @@ _PMREnd:
 ;		ONE LAYOUT ENTRY IS ONE BANK. GPBankCheckBankFree refuses a second GP.BANKED on a bank,
 ;		BStrRegister refuses text on a bank a GP.BANKED owns, and BStrSelectBank keeps the text
 ;		banks distinct. BStrRegister enters each text bank's number in gpBankBanks too, so that
-;		one table names every bank, as it names every .Bnn file. The text entries are the last
+;		one table names every bank, as it names every .nnn file. The text entries are the last
 ;		bstrBankCount of the layout, in slot order (commands/gpbstrflush.asm).
 ;
 ;		USED IS WHOLE PAGES. A region is padded to a page boundary, layoutPages is what the
@@ -231,7 +231,7 @@ _PBRSome:
 		stz 	bankPages+1
 		stz 	bankIndex
 		;
-		;		BANK nn, and CODE or TEXT.
+		;		BANK nnn, and CODE or TEXT.
 		;
 _PBRLine:
 		ldx 	#BankText & $FF
@@ -241,7 +241,7 @@ _PBRLine:
 		lda 	gpBankBanks,x
 		sta 	reportValue
 		stz 	reportValue+1
-		lda 	#2
+		lda 	#3
 		jsr 	PrintDecimalField
 		ldx 	#BankCodeText & $FF
 		ldy 	#BankCodeText >> 8
@@ -295,8 +295,8 @@ _PBRNoCarry:
 		bne 	_PBRLine
 		;
 		;		TOTAL BANKS -- the count of the lines above, then the bytes between them. The
-		;		page sum moves up a byte as before, which is why it needs 24 bits: sixty-three
-		;		banks of 8K is 516,096 bytes.
+		;		page sum moves up a byte as before, which is why it needs 24 bits: 127
+		;		banks of 8K is 1,040,384 bytes.
 		;
 		ldx 	#TotalBanksText & $FF
 		ldy 	#TotalBanksText >> 8
@@ -328,11 +328,11 @@ _PBRNoCarry:
 ;		to CHROUT. They are kept apart rather than sharing an indirect output vector: two tiny
 ;		routines are easier to be sure of than one with a mode.
 ;
-;		PrintDecimalField takes a field width in A, up to 6, and right-aligns the number in
+;		PrintDecimalField takes a field width in A, up to 7, and right-aligns the number in
 ;		spaces. PrintDecimal is the same with no field.
 ;
-;		TWENTY-FOUR BITS, because the banked total does not fit in sixteen: sixty-three banks of
-;		8K is 516,096 bytes. Enter at PrintDecimal with a 16 bit value in the first two bytes and
+;		TWENTY-FOUR BITS, because the banked total does not fit in sixteen: 127 banks of 8K
+;		is 1,040,384 bytes. Enter at PrintDecimal with a 16 bit value in the first two bytes and
 ;		the third is cleared for you, which is what every caller but the bank total wants.
 ;
 ; ************************************************************************************************
@@ -345,8 +345,8 @@ PrintDecimalField: 							; A = field width, the number right-aligned in spaces
 PrintDecimal24:
 		lda 	#1
 PrintDecimalWidth:
-		sta 	reportTemp 					; six digit positions, so a leading zero is a space from
-		lda 	#6 							; power 6 - width on. reportTemp only holds the width
+		sta 	reportTemp 					; seven digit positions, so a leading zero is a space from
+		lda 	#7 							; power 7 - width on. reportTemp only holds the width
 		sec 								; here; the subtraction loop writes over it
 		sbc 	reportTemp
 		sta 	reportPadFrom
@@ -391,18 +391,18 @@ _PDWrite:
 		plx
 _PDNext:
 		inx
-		cpx 	#5 							; 100000, 10000, 1000, 100, 10
+		cpx 	#6 							; 1000000, 100000, 10000, 1000, 100, 10
 		bne 	_PDPow
 		lda 	reportValue 				; the units digit is always written
 		ora 	#48
 		jmp 	$FFD2
 
 _PDPow10L:
-		.byte 	<100000, <10000, <1000, <100, <10
+		.byte 	<1000000, <100000, <10000, <1000, <100, <10
 _PDPow10H:
-		.byte 	>100000, >10000, >1000, >100, >10
-_PDPow10B: 									; only 100000 reaches this far, but the loop reads it every
-		.byte 	(100000 >> 16) & 255, 0, 0, 0, 0 	; time round, so all five are here
+		.byte 	>1000000, >100000, >10000, >1000, >100, >10
+_PDPow10B: 									; only the top two reach this far, but the loop reads it every
+		.byte 	(1000000 >> 16) & 255, (100000 >> 16) & 255, 0, 0, 0, 0 	; time round, so all six are here
 
 ;
 ;		Uppercase throughout: the X16 boots in PETSCII upper/graphics, where lowercase bytes

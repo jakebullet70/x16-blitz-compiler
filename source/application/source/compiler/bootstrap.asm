@@ -14,11 +14,14 @@
 ;		255 bytes ($0801..$08FF), followed by the p-code at $0900. On RUN, BASIC's SYS 2069 enters
 ;		BootEntry, which:
 ;
-;			1. checks the 4-byte magic at RTBASE -- is the shared runtime already resident?
-;			2. if not, LOADs GPB/GPC.RT.nnn.BIN to its own home with secondary address 1,
-;			   trying the current directory first and then the root of the SD card;
+;			1. checks the 4-byte magic at RTBASE, and the same 4 bytes at $A000 in bank 1 -- are
+;			   the shared runtime and its bank code already resident?
+;			2. if not, LOADs GPB/GPC.RT.nnn.BIN to its own home and GP1.RT.nnn.BIN into bank 1,
+;			   both with secondary address 1 and both from one place, the current directory or
+;			   else the root of the SD card;
 ;			3. enters the resident runtime at RT_ENTRY, handing it this program's p-code page,
-;			   workspace start (patched per program) and workspace end.
+;			   workspace start (patched per program) and workspace end, with BASIC's RAM bank
+;			   selected again.
 ;
 ;		So any program brings the runtime up if it is missing, and reuses it if it is already
 ;		there -- one runtime on disk, loaded once in memory.
@@ -57,11 +60,26 @@ ProgramBootstrap: 							; PHYSICAL label (compiler space) -- object.asm streams
 BootEntry:
 		.cerror BootEntry != $0815, "bootstrap SYS entry is not at $0815 -- BASIC stub size drifted"
 		;
-		;		Is the shared runtime already resident? Compare the 4 magic bytes at RTBASE.
+		;		BANK 1 IS SELECTED FOR THE WHOLE BOOTSTRAP: the check reads $A000 and the cold path
+		;		loads into it. BASIC's bank goes on the stack here and comes back before either exit,
+		;		so a POKE to $A000 with no BANK still writes the bank BASIC left selected. The runtime
+		;		saves and restores that bank around every bank 1 handler.
+		;
+		lda 	$00
+		pha
+		lda 	#HANDLER_BANK
+		sta 	$00
+		;
+		;		Is the shared runtime already resident? Compare the core's 4 magic bytes at RTBASE and
+		;		the same 4 at $A000, where the bank code starts, in one loop. The embedded bank code
+		;		has "GE" there, so a shared program never enters it.
 		;
 		ldx 	#3
 _BBCheck:
 		lda 	RTBASE,x
+		cmp 	BBMagic,x
+		bne 	_BBCold
+		lda 	$A000,x
 		cmp 	BBMagic,x
 		bne 	_BBCold
 		dex
@@ -94,28 +112,45 @@ _BBCold:
 		;		beside it, and otherwise falls back to one copy kept at the root, so every folder
 		;		on the card does not need its own 11K duplicate. A leading "/" is what addresses
 		;		the root (measured on R49 from inside a subdirectory: "GPC.RT.001.BIN" is not
-		;		found, "/GPC.RT.001.BIN" loads). The two names overlap in one string -- BBNameRoot
-		;		is just BBName with the "/" in front of it.
-		;
+		;		found, "/GPC.RT.001.BIN" loads).
 		;
 		;		Which file: the FULL one (handlers + core, loads at RTGPBASE) if this program uses a
 		;		GPB keyword, the CORE-ONLY one (loads at RTBASE) if it does not. Loading the full one
 		;		always restores both magics, so a program that wanted handlers and found none simply
 		;		loads over whatever core was there.
 		;
-		ldy 	#0 							; which triple: 0 = core only, 3 = full
-		lda 	BBNeedGP 					; the same flag the warm check reads
-		beq 	_BBPickName
-		ldy 	#3
-_BBPickName:
-		sty 	BBNameIdx
-		jsr 	BBLoadLocal
-		bcc 	_BBEnter 					; carry clear = loaded OK
-		jsr 	BBLoadRoot 					; else the copy at the root of the card
-		bcc 	_BBEnter
+		;		THEN THE BANK CODE, GP1.RT.nnn.BIN, into bank 1 from the SAME place. The three names
+		;		differ only in their third character, so there is one name and that character is
+		;		patched before each load. A bank code file missing beside a core that loaded is ?RT,
+		;		not a search of the root: the two files are one build.
 		;
-		;		Neither copy is on the disk. Print a short notice and drop back to BASIC READY --
-		;		no runtime is up, so there is no runtime error path to take.
+		;		$A000 IS ZEROED FIRST. A core that loads beside a missing bank code file would
+		;		otherwise leave an older bank code's magic standing, and the next run would enter
+		;		this core with that code.
+		;
+		stz 	$A000
+		lda 	#'C' 						; core only
+		ldx 	BBNeedGP 					; the same flag the warm check reads
+		beq 	_BBName
+		lda 	#'B' 						; handlers and core
+_BBName:
+		sta 	BBName+2
+		lda 	#<BBName 					; the local form of the name
+		sta 	BBNameLo
+		jsr 	BBLoad
+		bcc 	_BBBank 					; carry clear = loaded OK
+		dec 	BBNameLo 					; else the root form, one byte earlier with its "/"
+		jsr 	BBLoad
+		bcs 	_BBFail
+_BBBank:
+		lda 	#'1' 						; the bank code, from wherever the core came from
+		sta 	BBName+2
+		jsr 	BBLoad
+		bcc 	_BBEnter
+_BBFail:
+		;
+		;		Not on the disk. Print a short notice and drop back to BASIC READY with BASIC's bank
+		;		selected again -- no runtime is up, so there is no runtime error path to take.
 		;
 		ldx 	#0
 _BBErr:
@@ -127,6 +162,8 @@ _BBErr:
 		inx
 		bne 	_BBErr
 _BBErrDone:
+		pla 								; BASIC's bank, saved at BootEntry
+		sta 	$00
 		rts 								; return to the SYS caller -> BASIC READY
 
 ; ------------------------------------------------------------------------------------------------
@@ -162,6 +199,8 @@ _BBZap:
 		dex 								; the padding below is where GP.BANKED's copy loop went
 		bpl 	_BBZap
 _BBGo:
+		pla 								; BASIC's bank again, saved at BootEntry
+		sta 	$00
 		;
 		;		HAND OVER. Three values the runtime wants, and a jmp -- and BOTH the base page
 		;		and the jmp target are PATCHED, because a GP.BANKED program does not come
@@ -193,41 +232,31 @@ BBRunJmp:
 											; bytes, to $0900 when there is an extension page
 
 ; ------------------------------------------------------------------------------------------------
-;		Try to LOAD the runtime under the name in A (length) / X,Y (address). Secondary address 1
-;		makes the KERNAL honour the file's own load address (RTBASE), ignoring the address in X/Y.
-;		Logical file 0 (file 1 has been seen to hang a later OPEN). Loading high never touches
-;		$0801 or the p-code, so this bootstrap survives its own load. Returns carry clear on
-;		success, set if the file is not there -- so the caller can just try the next name.
+;		LOAD a file with secondary address 1, which makes the KERNAL honour the file's own load
+;		address -- RTGPBASE, RTBASE, or $A000 in the bank selected -- and ignore the one in X/Y.
+;		BBTryLoad takes the name as SETNAM does, length in A and address in X/Y, and bootstrap2.asm
+;		calls it for the regions; BBLoad sets those three up for the runtime's name first. Logical
+;		file 0 (file 1 has been seen to hang a later OPEN). Loading high never touches $0801 or the
+;		p-code, so this bootstrap survives its own load. Returns carry clear on success, set if the
+;		file is not there -- so the caller can just try the next name.
 ;
 ;		Sits BELOW _BBEnter deliberately: labels beginning with "_" are local to the enclosing
 ;		scope in 64tass, and a global label placed between _BBCold and _BBEnter would split that
 ;		scope in two, leaving the earlier branches referring to an _BBEnter they can no longer see.
 ; ------------------------------------------------------------------------------------------------
 ;
-;		The four names live in ONE table of (length, lo, hi) triples -- local core, local full,
-;		root core, root full -- so picking the file costs one patched byte instead of four copies
-;		of the load sequence. X selects local (0) or root (6); BBNameSel adds 0 for core-only or
-;		3 for full.
+;		BBNameLo is the low byte of the name's address: BBName for the local form, one less for the
+;		root form and its "/". Both end at BBNameEnd on the same page, so the length is BBNameEnd's
+;		low byte less BBNameLo.
 ;
-BBLoadLocal:
-		ldx 	#0
-		bra 	BBLoadX
-BBLoadRoot:
-		ldx 	#6
-BBLoadX:
-		txa
-		clc
-		adc 	BBNameIdx 					; 0 = core only, 3 = full -- set by the cold path above
-		tax
-		ldy 	BBNameTab+2,x 				; Y = name address high
-		lda 	BBNameTab+1,x 				; stash the low byte while A is needed for the length
-		pha
-		lda 	BBNameTab,x 				; A = name length
-		plx 								; X = name address low
+BBLoad:
+		ldx 	BBNameLo 					; X = name address low
+		lda 	#<BBNameEnd 				; A = name length
+		sec
+		sbc 	BBNameLo
+		ldy 	#>BBName 					; Y = name address high
 											; ...and fall straight through: A/X/Y are now exactly what
-											; SETNAM wants. The table used to sit between the two, and
-											; the "bra BBTryLoad" that jumped it was two of the bytes
-											; GP.BANKED's copy loop needed.
+											; SETNAM wants.
 BBTryLoad:
 		jsr 	X16_SETNAM 					; SETNAM(length in A, name in X/Y)
 		lda 	#0 							; SETLFS(logical file 0, device 8, secondary 1)
@@ -238,12 +267,6 @@ BBTryLoad:
 		ldx 	#<RTBASE 					; load address (ignored under SA=1, but pass the home)
 		ldy 	#>RTBASE
 		jmp 	X16_LOAD 					; its carry is our carry
-
-BBNameTab:
-			.byte 	BBCoreEnd-BBCore, <BBCore, >BBCore 					; 0  local, core only
-			.byte 	BBFullEnd-BBFull, <BBFull, >BBFull 					; 3  local, full
-			.byte 	BBCoreEnd-BBCoreRoot, <BBCoreRoot, >BBCoreRoot 	; 6  root, core only
-			.byte 	BBFullEnd-BBFullRoot, <BBFullRoot, >BBFullRoot 	; 9  root, full
 
 		;
 		;		TWO different numbers here, deliberately, because they answer two questions:
@@ -275,25 +298,22 @@ BBGPMagic:
 		.byte 	(RT_ABI / 10) + '0' 		; same ordinal -- the two halves are one image and one ABI
 		.byte 	(RT_ABI - (RT_ABI / 10) * 10) + '0'
 		;
-		;		One string, two names: the root form is the local form with a "/" in front, so the
-		;		fallback costs a single byte rather than a second copy of the name. The name is
-		;		formatted, not spelled out, so a build number of any width still comes out right.
+		;		One string, every name. The root form is the local form with a "/" in front, so the
+		;		fallback costs a single byte, and the third character is patched to B, C or 1 before
+		;		each load, so the three files cost one name. The name is formatted, not spelled out,
+		;		so a build number of any width still comes out right.
 		;
-BBFullRoot:
+BBNameRoot:
 		.text 	"/"
-BBFull:
-		.text 	format("GPB.RT.%03d.BIN", BuildNumber) 	; handlers AND core, loads at RTGPBASE
-BBFullEnd:
-BBCoreRoot:
-		.text 	"/"
-BBCore:
-		.text 	format("GPC.RT.%03d.BIN", BuildNumber) 	; core only, loads at RTBASE
-BBCoreEnd:
+BBName:
+		.text 	format("GPC.RT.%03d.BIN", BuildNumber) 	; third character PATCHED at run time: B, C or 1
+BBNameEnd:
+		.cerror (>BBNameRoot) != (>BBNameEnd), "bootstrap runtime name crosses a page -- BBLoad subtracts low bytes"
 BBErrText:
 		.text 	"?RT", 13, 0 				; brief -- a full line would wrap in 40 columns
 
 ;		The per-program bytes. DATA, not immediates -- see the note at the warm check. The first
-;		three are written by WriteObjectCode as the template streams past; BBNameIdx is working
+;		three are written by WriteObjectCode as the template streams past; BBNameLo is working
 ;		state the bootstrap sets itself.
 BBWSStart:
 		.byte 	$FF 						; workspace start page -- PATCHED
@@ -301,8 +321,8 @@ BBWSEnd:
 		.byte 	$FF 						; workspace end page (RTBASE or RTGPBASE) -- PATCHED
 BBNeedGP:
 		.byte 	$FF 						; 0 = no GPB keyword, 1 = uses them -- PATCHED
-BBNameIdx:
-		.byte 	0 							; which name triple (0 or 3), chosen at run time
+BBNameLo:
+		.byte 	0 							; the name's low address byte, local or root form -- set on the cold path
 
 		.fill 	$0900 - *, 0 				; pad through $08FF so the p-code starts exactly at $0900
 

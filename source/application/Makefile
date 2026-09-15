@@ -57,9 +57,14 @@ prelim:
 #		handlers are then the tail of the image, which is the only place they can ever be
 #		truncated out of an object that uses none of them (../gp-runtime/Makefile explains).
 #
-#		genrtimage.py then hands four facts across to link two: GPBase, ObjectBase, the two
-#		patch offsets, and the GP-usage bitmap that replaced ScanGPUsage's VectorTable read. It
-#		also installs the image under its build-numbered name.
+#		00rtimgbank.header goes in front of 00rtimage.header and places the bank code at $A000,
+#		with the "GE" magic. $(ASMBANK) writes it to build/bank.prg, so the image is code.prg as
+#		before.
+#
+#		genrtimage.py then hands five facts across to link two: GPBase, ObjectBase, the three
+#		patch offsets, the bank code length from build/bank.prg, and the GP-usage bitmap that
+#		replaced ScanGPUsage's VectorTable read. It also installs the image and the bank code
+#		under their build-numbered names, GPC.IMG.nnn.BIN and GP1.IMG.nnn.BIN.
 #
 #		LINK TWO is the compiler. It takes common.library and ifloat32.library because the
 #		compiler calls into both (errors, MoveObjectForward, constant folding) -- and NOT
@@ -71,13 +76,14 @@ prelim:
 #		two overwrites them.
 #
 build: prelim
-	$(ASM) 	source$(S)main$(S)00rtimage.header \
+	$(ASMBANK) source$(S)main$(S)00rtimgbank.header \
+			source$(S)main$(S)00rtimage.header \
 			$(BINDIR)runtime.library $(BINDIR)common.library $(BINDIR)ifloat32.library $(BINDIR)polynomials.library \
 			$(BINDIR)gp.library \
 			source$(S)main$(S)10object.divider
 	$(CCOPY) build$(S)code.prg build$(S)rtimage.prg
 	$(CCOPY) build$(S)code.lbl build$(S)rtimage.lbl
-	$(PYTHON) scripts$(S)genrtimage.py build$(S)rtimage.lbl build$(S)rtimage.prg rtimage.gen.asm $(RELEASEDIR)
+	$(PYTHON) scripts$(S)genrtimage.py build$(S)rtimage.lbl build$(S)rtimage.prg build$(S)bank.prg rtimage.gen.asm $(RELEASEDIR)
 	$(ASM) 	source$(S)main$(S)00main.header \
 			$(BINDIR)common.library $(BINDIR)ifloat32.library \
 			$(SRCDIR)runtime$(S)source$(S)system-specific$(S)x16$(S)addresses$(S)x16_include.inc \

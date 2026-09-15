@@ -1,83 +1,47 @@
-@7. Memory, and what the compiler tells you
+@6. The traps, collected
 .
-=7. MEMORY, AND WHAT THE COMPILER TELLS YOU
+=6. THE TRAPS, COLLECTED
 .
-=What GPC prints when it finishes
+.Each of these has cost a debugging session at least once.
 .
-.One item a line. GPBMODS, built shared with dead code removed:
+.  P AND 255 on a heap or VRAM address
+.      WHAT HAPPENS: AND is 16-bit signed; above 32,767 it raises OUT OF
+.        RANGE instead of masking
+.      DO THIS: H = INT(P/256) : L = P - H*256
 .
-:OK LOW CODE 11264, SHARED GPBASIC
-:LOW FREE 10240, FRAME STACK 2048
-:LINES 3690
-:DEAD CODE:  202 LINES REMOVED, 1305 BYTES SAVED
-:BANK  7 CODE  3840 USED  4352 FREE
-:BANK  9 CODE   512 USED  7680 FREE
-:BANK  4 CODE  7936 USED   256 FREE
-:BANK 10 CODE   768 USED  7424 FREE
-:BANK  8 CODE  1792 USED  6400 FREE
-:BANK 11 CODE  3072 USED  5120 FREE
-:BANK  5 TEXT  7424 USED   768 FREE
-:BANK  6 TEXT  4352 USED  3840 FREE
-:TOTAL BANKS 8, 29696 USED
+.  an address in an A% variable
+.      WHAT HAPPENS: % is signed 16-bit and truncates without error -- A% =
+.        49152 reads back -16,384
+.      DO THIS: untyped variable, or split into page and offset
 .
-.An embedded build prints a RUNTIME line second. GPCTEST-E:
+.  $0400 for machine code
+.      WHAT HAPPENS: stock BASIC leaves it free, a compiled GPC program does
+.        not -- runtime state lives there, and it is corrupted with no error
+.      DO THIS: banked RAM, $A000-$BFFF
 .
-:OK LOW CODE 969, EMBEDDED GPBASIC
-:RUNTIME 13567
-:LOW FREE 22016, FRAME STACK 2048
+.  PRINT after GP.PRINTAT
+.      WHAT HAPPENS: GP drawing never calls the KERNAL, so the cursor is
+.        wherever it was
+.      DO THIS: LOCATE first, or stay in one world
 .
-.  LOW CODE
-.      the p-code in low memory, in bytes. P-code and GP.ASM blocks in a
-.        GP.BANKED region are not in it
+.  SORT.INC.BL with no #SYMFILE
+.      WHAT HAPPENS: {VAR} cannot resolve a crunched name -- {} NEEDS
+.        #SYMFILE
+.      DO THIS: #SYMFILE "@:PROG.SYM", before the #INCLUDEs
 .
-.  SHARED EMBEDDED
-.      SHARED loads a resident runtime file at run time. EMBEDDED carries the
-.        runtime in the object
+.  GP.BOX X,Y,W,H,,7
+.      WHAT HAPPENS: optionals cannot be skipped over
+.      DO THIS: GP.BOX X,Y,W,H,0,7
 .
-.  GPBASIC CORE
-.      GPBASIC when a GP. keyword reached the 1,024-byte handler block:
-.        shared, the program loads GPB.RT.nnn.BIN; embedded, the block is in
-.        the object. CORE when none did: shared, it loads GPC.RT.nnn.BIN;
-.        embedded, ScanGPUsage dropped the block
+.  SCREEN after BMX.PAINT
+.      WHAT HAPPENS: reloads the default palette and throws the image's
+.        colours away
+.      DO THIS: set the mode first
 .
-.  RUNTIME
-.      embedded only. The runtime bytes carried in the object
+.  #DEFINE X 129536
+.      WHAT HAPPENS: #DEFINE takes an INT16 -- ERROR: INVALID PARAMETER
+.      DO THIS: an ordinary variable
 .
-.  LOW FREE
-.      what is left in low memory for variables, strings and arrays. This is
-.        the number that runs out. It ends at $9F00 embedded, and at the
-.        resident runtime shared
+=SEE ALSO
 .
-.  FRAME STACK
-.      the 2,048 bytes reserved between the p-code and the workspace for
-.        GOSUB and FOR frames. LOW FREE does not include them
-.
-.  LINES
-.      the source lines compiled, the lines of GP.ASM and GP.BANKEDSTR blocks
-.        included. Lines left out as dead code are not counted
-.
-.  DEAD CODE
-.      printed only when dead code is removed: the source lines left out, and
-.        the p-code bytes they would have taken. LOW CODE is already without
-.        them
-.
-.  BANK
-.      printed only when the program has a region or banked text. One line a
-.        bank: CODE for a GP.BANKED region, TEXT for GP.BANKEDSTR, then the
-.        bytes used and free of its 8,192. Both are whole pages, so FREE is
-.        room that is certainly there
-.
-.  TOTAL BANKS
-.      after the BANK lines: how many, and the bytes they use
-.
-.Two budgets come off LOW FREE:
-.
-.  - LOW FREE is the workspace the running program has for its data.
-.  - LOW FREE minus 4,096 is how much more low-memory p-code will fit.
-.    WriteObjectCode refuses to leave less than 4K of workspace, so a build
-.    reporting LOW FREE 4096 is one page from PROGRAM TOO BIG.
-.
-.A program can be comfortable on one and out of room on the other. LOW FREE
-.4096 is 4K to run in and nowhere left to grow; GPBMODS at LOW FREE 10240 has
-.both.
-.
+>70|4.7 SORT.INC.BL -- shell sort a string array

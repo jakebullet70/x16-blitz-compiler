@@ -37,9 +37,105 @@
 ;		where SPRITE omits the colour depth. Defaulting it to 0 would silently undo the 8bpp
 ;		that SPRMEM just set on the line before.
 ;
+;		MOVSPR and the address routines stay in low RAM, so a game that moves sprites every
+;		frame pays no bank switch. SPRITE and SPRMEM run from bank 1 (HANDLER_BANK).
+;
 ; ************************************************************************************************
 
 		.section 	code
+
+; ************************************************************************************************
+;
+;								MOVSPR <idx>,<x>,<y>
+;
+; ************************************************************************************************
+
+Command_MOVSPR: ;; [!movspr]
+		.entercmd
+		phy
+		;
+		;		x and y are signed, and the manual says they "wrap every 1024 values" -- -10 and
+		;		1014 are the same place. VERA's X and Y are 10 bit fields, so taking the low ten
+		;		bits of the two's complement value IS that wrap, with nothing to special-case.
+		;		GetInteger16Bit hands back exactly that two's complement value.
+		;
+		ldx 	#2
+		jsr 	GetInteger16Bit 			; y
+		lda 	zTemp0
+		sta 	spriteY
+		lda 	zTemp0+1
+		and 	#3
+		sta 	spriteY+1
+
+		dex
+		jsr 	GetInteger16Bit 			; x
+		lda 	zTemp0
+		sta 	spriteX
+		lda 	zTemp0+1
+		and 	#3
+		sta 	spriteX+1
+
+		lda 	NSMantissa0+0 				; sprite index; bytes 2..5 are written in order so
+		ldy 	#2 							; the auto-increment can walk them
+		jsr 	SpriteSetAddressInc
+		lda 	spriteX
+		sta 	VRAMData0 					; byte 2 : X (7:0)
+		lda 	spriteX+1
+		sta 	VRAMData0 					; byte 3 : X (9:8)
+		lda 	spriteY
+		sta 	VRAMData0 					; byte 4 : Y (7:0)
+		lda 	spriteY+1
+		sta 	VRAMData0 					; byte 5 : Y (9:8)
+		ply
+		ldx 	#$FF
+		.exitcmd
+
+; ************************************************************************************************
+;
+;		Point VERA data port 0 at byte Y of sprite A's attribute block. A is the sprite index
+;		and Y the offset 0-7. The float stack pointer X is not touched.
+;
+; ************************************************************************************************
+
+SpriteSetAddress: 							; leave the address alone after each access
+		pha
+		lda 	#VRAMBank1
+		bra 	SpriteSetAddressCommon
+
+SpriteSetAddressInc: 						; step it on by one, to walk a run of bytes
+		pha
+		lda 	#VRAMBank1 | VRAMIncrement1
+
+;		This scratches spriteLow/spriteMed/spriteHigh and NOTHING else. It must not touch
+;		spriteTemp: SPRMEM works out an attribute byte and only then calls this to point at
+;		where the byte goes, so anything this borrowed would be destroyed on the way.
+
+SpriteSetAddressCommon: 					; global, not a cheap local: SpriteSetAddress branches
+		sta 	spriteHigh 					; in from its own scope, and _locals do not cross one
+		pla
+		and 	#$7F 						; sprite index is 0-127
+		stz 	spriteMed
+		asl 	a 							; spriteMed:A = index x 8, the block's byte offset
+		rol 	spriteMed 					; from $1FC00. The top comes out at index >> 5, which
+		asl 	a 							; is at most 3.
+		rol 	spriteMed
+		asl 	a
+		rol 	spriteMed
+		sta 	spriteLow
+		tya 								; the low three bits of index x 8 are clear and Y is
+		ora 	spriteLow 					; 0-7, so the byte offset just ORs in
+		sta 	VRAMLow0
+		lda 	spriteMed
+		clc
+		adc 	#SpriteAttributeBase 		; never carries: 3 + $FC = $FF
+		sta 	VRAMMed0
+		lda 	spriteHigh
+		sta 	VRAMHigh0
+		rts
+
+		.send 	code
+
+		.section 	banked
 
 ; ************************************************************************************************
 ;
@@ -162,7 +258,7 @@ _CSPNoDepth:
 											; command is called, the sprite layer will be enabled"
 		ply
 		ldx 	#$FF
-		.exitcmd
+		.exitbank
 
 ; ************************************************************************************************
 ;
@@ -233,96 +329,7 @@ _CSMInteger:
 		sta 	VRAMData0
 		ply
 		ldx 	#$FF
-		.exitcmd
-
-; ************************************************************************************************
-;
-;								MOVSPR <idx>,<x>,<y>
-;
-; ************************************************************************************************
-
-Command_MOVSPR: ;; [!movspr]
-		.entercmd
-		phy
-		;
-		;		x and y are signed, and the manual says they "wrap every 1024 values" -- -10 and
-		;		1014 are the same place. VERA's X and Y are 10 bit fields, so taking the low ten
-		;		bits of the two's complement value IS that wrap, with nothing to special-case.
-		;		GetInteger16Bit hands back exactly that two's complement value.
-		;
-		ldx 	#2
-		jsr 	GetInteger16Bit 			; y
-		lda 	zTemp0
-		sta 	spriteY
-		lda 	zTemp0+1
-		and 	#3
-		sta 	spriteY+1
-
-		dex
-		jsr 	GetInteger16Bit 			; x
-		lda 	zTemp0
-		sta 	spriteX
-		lda 	zTemp0+1
-		and 	#3
-		sta 	spriteX+1
-
-		lda 	NSMantissa0+0 				; sprite index; bytes 2..5 are written in order so
-		ldy 	#2 							; the auto-increment can walk them
-		jsr 	SpriteSetAddressInc
-		lda 	spriteX
-		sta 	VRAMData0 					; byte 2 : X (7:0)
-		lda 	spriteX+1
-		sta 	VRAMData0 					; byte 3 : X (9:8)
-		lda 	spriteY
-		sta 	VRAMData0 					; byte 4 : Y (7:0)
-		lda 	spriteY+1
-		sta 	VRAMData0 					; byte 5 : Y (9:8)
-		ply
-		ldx 	#$FF
-		.exitcmd
-
-; ************************************************************************************************
-;
-;		Point VERA data port 0 at byte Y of sprite A's attribute block. A is the sprite index
-;		and Y the offset 0-7. The float stack pointer X is not touched.
-;
-; ************************************************************************************************
-
-SpriteSetAddress: 							; leave the address alone after each access
-		pha
-		lda 	#VRAMBank1
-		bra 	SpriteSetAddressCommon
-
-SpriteSetAddressInc: 						; step it on by one, to walk a run of bytes
-		pha
-		lda 	#VRAMBank1 | VRAMIncrement1
-
-;		This scratches spriteLow/spriteMed/spriteHigh and NOTHING else. It must not touch
-;		spriteTemp: SPRMEM works out an attribute byte and only then calls this to point at
-;		where the byte goes, so anything this borrowed would be destroyed on the way.
-
-SpriteSetAddressCommon: 					; global, not a cheap local: SpriteSetAddress branches
-		sta 	spriteHigh 					; in from its own scope, and _locals do not cross one
-		pla
-		and 	#$7F 						; sprite index is 0-127
-		stz 	spriteMed
-		asl 	a 							; spriteMed:A = index x 8, the block's byte offset
-		rol 	spriteMed 					; from $1FC00. The top comes out at index >> 5, which
-		asl 	a 							; is at most 3.
-		rol 	spriteMed
-		asl 	a
-		rol 	spriteMed
-		sta 	spriteLow
-		tya 								; the low three bits of index x 8 are clear and Y is
-		ora 	spriteLow 					; 0-7, so the byte offset just ORs in
-		sta 	VRAMLow0
-		lda 	spriteMed
-		clc
-		adc 	#SpriteAttributeBase 		; never carries: 3 + $FC = $FF
-		sta 	VRAMMed0
-		lda 	spriteHigh
-		sta 	VRAMHigh0
-		rts
+		.exitbank
 
 ; ************************************************************************************************
 ;
@@ -360,7 +367,7 @@ SpriteEnableLayer:
 		sta 	VERACtrl
 		rts
 
-		.send 	code
+		.send 	banked
 
 		.section storage
 spriteLow: 									; SpriteSetAddress's private scratch -- see the note

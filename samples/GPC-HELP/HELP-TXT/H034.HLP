@@ -76,7 +76,7 @@
 .DUPLICATE SYMBOL where the module has no #IFNDEF guard. Where it has one,
 .the module lands at the first #INCLUDE and the second produces nothing.
 .
-.SEC 3.12 has the rules, what a region may not contain, and the .Bnn files a
+.SEC 3.12 has the rules, what a region may not contain, and the .nnn files a
 .banked program ships.
 .
 =SEE ALSO

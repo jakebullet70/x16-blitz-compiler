@@ -1,8 +1,11 @@
 ---
 name: compact-early-not-at-the-end
 description: "A long session's cost is the context re-read on EVERY turn, not the work done; /compact late spends the whole window at the high rate, and resuming a huge session re-caches it before doing anything"
-metadata:
+metadata: 
+  node_type: memory
   type: feedback
+  originSessionId: c95b19c9-6122-4f0f-b70e-b6d5d25377da
+  modified: 2026-09-14T10:02:49.137Z
 ---
 
 **Measured 2026-09-08.** 75% of a 5-hour window went in **18 minutes** — and the window had been
@@ -36,6 +39,10 @@ natural point, because the context that mattered for the step just finished is e
 compaction should drop, and the plan document carries forward what the next step needs anyway.
 **Prompt for it every time; do not wait to be asked, and do not skip a step because it felt small.**
 A small step in a large context is precisely the expensive case.
+
+**Repeated 2026-09-14** ("remember to remind about compacting") after a turn that read a 256-line
+file and closed with no reminder. A file read, a lookup answered, a memory written: each is a step.
+The last line of the turn is the reminder.
 
 Two specific traps:
 

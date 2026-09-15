@@ -22,7 +22,7 @@
 CommandTables:
 		#include 	"commands.defc"
 		#include "../system-specific/x16/generation/x16_command.defc"
-		#include "../system-specific/x16/generated/x16_sound.defc"
+		#include "../system-specific/x16/generation/x16_sound.defc"
 		.byte 	0
 
 UnaryTables:

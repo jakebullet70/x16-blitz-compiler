@@ -46,8 +46,8 @@
 .
 =SEE ALSO
 .
->142|7. Memory, and what the compiler tells you
->88|STASH.INC.BL -- save a text rectangle, and put it back.
->96|STASHFILE.INC.BL -- a saved text rectangle, through a file.
+>145|7. Memory, and what the compiler tells you
+>90|STASH.INC.BL -- save a text rectangle, and put it back.
+>98|STASHFILE.INC.BL -- a saved text rectangle, through a file.
 >81|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
 >82|4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store

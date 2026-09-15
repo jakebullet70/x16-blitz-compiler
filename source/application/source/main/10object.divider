@@ -42,3 +42,11 @@
 ObjectBase:
 
 		.send code
+
+;
+;		The end of the bank code, for the length StartCode copies. This file is linked last, so
+;		nothing follows it in the banked section either.
+;
+		.section banked
+RTImgBankEnd:
+		.send banked

@@ -13,13 +13,13 @@
 .They are assembly because BASIC is slow at per-character string scans,
 .screen fills and VERA writes.
 .
-.The handlers occupy GPBase $3800 to ObjectBase $3c00: 1,024 bytes, page
+.The handlers occupy GPBase $2F00 to ObjectBase $3500: 1,536 bytes, page
 .aligned, all or nothing. ScanGPUsage walks the finished p-code and drops the
 .whole block from the object if nothing in it is reached.
 .
-.The block costs those 1,024 bytes. Maximum p-code is 17,152 bytes with 
-.the block and 18,176 without: ObjectBase to $9F00, less the 4K frame
-.stack and the 4K minimum workspace.
+.The block costs those 1,536 bytes. Maximum p-code is 20,992 bytes with 
+.the block and 22,528 without: ObjectBase or GPBase to $9F00, less the
+.2K frame stack and the 4K minimum workspace.
 .
 .Composites. GP.ASM, GP.ENDASM, GP.CHAR, GP.CONTAINS, GP.ISEMPTY, GP.HIBYTE,
 .GP.LOBYTE, GP.BSTRCOUNT, GP.DEFPROC, GP.SUB. The compiler expands each into
@@ -46,7 +46,7 @@
 =SEE ALSO
 .
 >52|3.12 Code in a bank
->88|STASH.INC.BL -- save a text rectangle, and put it back.
+>90|STASH.INC.BL -- save a text rectangle, and put it back.
 >70|4.7 SORT.INC.BL -- shell sort a string array
 >71|4.8 STRCASE.INC.BL -- case, in place
 >62|4.2 STRINGS.INC.BL -- string helpers

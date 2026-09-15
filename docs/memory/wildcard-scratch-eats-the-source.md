@@ -13,14 +13,15 @@ was supposed to be tidying up after itself.
 They came back with `git restore testing/` — but only because they were tracked. An untracked
 `.BASL` would simply have been gone.
 
-**There is no safer spelling here.** Every extension this project uses starts with B: `.BASL`,
-`.BAS`, `.BIN`, and the `.Bnn` overlays themselves. A wildcard cannot separate them.
+**There was no safer spelling while the overlays were `.Bnn`.** `.BASL`, `.BAS` and `.BIN` start
+with B as well, so a wildcard could not separate them. Since 2026-09-14 the overlays are `.nnn`
+and start with a digit, which no other extension here does. The rule below stands anyway.
 
 **So the compiler sends no wildcard through `IOScratchFile`, ever.** What the sweep was for is done
 by exact names instead: `ObjEmitOverlay` scratches each overlay by its full name immediately before
 writing it (which `"name,S,W"` needs anyway — it refuses to open over a file that exists), and
 `ObjStreamAbort` removes the one that was in flight if the compile stopped. What is left unswept is
-an orphan `.Bnn` from an earlier run whose `GP.BANKED` has since changed bank or gone; nothing loads
+an orphan `.nnn` from an earlier run whose `GP.BANKED` has since changed bank or gone; nothing loads
 it, and [[region-overlay-ovl-file]] records that the programmer owns stale overlays by decision.
 
 **The general rule: `IOScratchFile` has no undo and reads no status.** It refuses only one name —

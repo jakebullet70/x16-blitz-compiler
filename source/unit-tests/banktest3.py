@@ -39,11 +39,13 @@ env = dict(os.environ)
 env["SDL_VIDEODRIVER"] = "dummy"
 
 
-def emu(args, secs, stop=None, log="BT.LOG"):
+#   ram is the machine's banked RAM in K: 512 is a stock X16 and bank 63 its highest,
+#   2048 has every bank to 255.
+def emu(args, secs, stop=None, log="BT.LOG", ram=512):
     lp = os.path.join(T, log)
     with open(lp, "wb") as lf:
         p = subprocess.Popen([os.path.join(E, "x16emu.exe"), "-rom", os.path.join(E, "rom.bin"),
-                              "-fsroot", "."] + args + ["-sound", "none", "-echo"],
+                              "-fsroot", ".", "-ram", str(ram)] + args + ["-sound", "none", "-echo"],
                              cwd=T, stdout=lf, stderr=subprocess.STDOUT, env=env)
         dl = time.time() + secs
         while time.time() < dl:
@@ -77,6 +79,12 @@ def tokenise(name):
     return os.path.exists(src)
 
 
+#   The banks of the .nnn overlays beside a program, as their three-digit suffixes.
+def overlays(name):
+    return sorted(f[-3:] for f in os.listdir(T)
+                  if f.startswith(name + ".") and len(f) == len(name) + 4 and f[-3:].isdigit())
+
+
 def compile_one(name, mode="SHARED"):
     #   SHARED, not embedded: GP.BANKED only works there. The bootstrap is what moves the
     #   region into the bank, and an embedded program has no bootstrap -- gpbank.asm
@@ -86,6 +94,9 @@ def compile_one(name, mode="SHARED"):
     p = os.path.join(T, name + ".PRG")
     if os.path.exists(p):
         os.remove(p)
+    #   The overlays go too, or a failed compile leaves the last run's for the checks to find.
+    for b in overlays(name):
+        os.remove(os.path.join(T, name + "." + b))
     t = emu(["-warp", "-prg", "GPC.BIN", "-run"], 90, "OK LOW CODE")
     #   The error TABLE is echoed right after the banner, so nothing before the "OUT:"
     #   line is a result.  Only look after it.
@@ -106,9 +117,10 @@ def compile_one(name, mode="SHARED"):
     return "???", tail[:100].replace("\r\n", " | ")
 
 
-def run_one(name):
+def run_one(name, ram=512):
     #   Longer than the embedded runs took: a shared program LOADs its runtime first.
-    t = emu(["-warp", "-prg", name + ".PRG", "-run"], 60, "READY.", log=name + ".RUN.LOG")
+    t = emu(["-warp", "-prg", name + ".PRG", "-run"], 60, "READY.",
+            log="%s.RUN%d.LOG" % (name, ram), ram=ram)
     #   x16emu -echo doubles every character in non-warp; this is warp, so it does not.
     #   Keep the lines between the RUN and the final READY.
     out = []
@@ -116,6 +128,9 @@ def run_one(name):
         s = line.strip()
         if re.match(r"^[A-Z]+[0-9]", s):
             out.append(s)
+        #   The bootstrap's own two messages, which stop a program before it prints anything.
+        elif re.search(r"\?(?:RAM|OVL)$", s):
+            out.append(s[-4:])
     return out
 
 
@@ -125,6 +140,7 @@ def run_one(name):
 #   loaded selected.
 PAIRS = [("BANKA", "BANKE"), ("BANKB", "BANKF"), ("BANKJ", "BANKK"),
          ("BANKN", "BANKO"), ("BNKGC", "BNKGD"), ("BGA", "BGB")]
+PAIRNAMES = [x for p in PAIRS for x in p]
 BAD = [("BANKC", "BLOCK MISMATCH"), ("BANKD", "BLOCK MISMATCH"),
        ("BANKG", "BLOCK MISMATCH"), ("BANKL", "VALUE"), ("BANKM", "VALUE"),
        ("BANKX", "BAD VALUE"),
@@ -136,33 +152,47 @@ BAD = [("BANKC", "BLOCK MISMATCH"), ("BANKD", "BLOCK MISMATCH"),
        ("BGD", "NOT IMPLEMENTED"),
        #   ON .. GOSUB into a region: an ON entry is 3 bytes and a .bgosub 4.  BGA/BGB above
        #   call into a region by GOSUB, GP.SUB, GP.FN and FN with no BANK statement.
-       ("BGC", "NOT IMPLEMENTED"),
-       #   The region COUNT is a checked limit, not a crash.  BNK64 is sixty-four trivial
-       #   regions in banks 1 up -- one more than a 512K X16 has -- and the message names the
-       #   sixty-fourth GP.BANKED.  It is a compiler-space message, so this test is also what
-       #   proves the scan above reaches them.  It was BNK17 until the tables left the 1K
-       #   storage hole and the count became the machine's.
-       ("BNK64", "TOO MANY GP.BANKED REGIONS")]
+       ("BGC", "ON GOSUB IN OR OUT OF GP.BANKED"),
+       #   Bank 1 holds the runtime's rarely used handlers: a region there (BNK1) and text
+       #   there (BSTR1) are refused.  Both read the bank through GPBankReadNumber.  This and
+       #   BGC's are compiler-space messages, so these tests also prove the scan above reaches
+       #   them.
+       ("BNK1", "BANK 1 IS RESERVED"), ("BSTR1", "BANK 1 IS RESERVED")]
 BADNAMES = [b[0] for b in BAD]
 #   No control: what the program prints is the test. BANKY calls from one region into
 #   another, which the compiler refused until .bgosub.
-RUNS = [("BANKY", ["Q1", "Q2", "Q3"])]
+#
+#   BNK255 has code in banks 255, 100 and 2 and text in 254, so the bootstrap page walks its
+#   bank map to the last byte. At 2048K it prints all four; at 512K the page stops with ?RAM
+#   before the program starts. BNKOVL is BNK255 with its .100 deleted, and stops with ?OVL.
+RUNS = [("BANKY", 512, ["Q1", "Q2", "Q3"]),
+        ("BNK255", 2048, ["H254", "H255", "H100", "H2"]),
+        ("BNK255", 512, ["?RAM"]),
+        ("BNKOVL", 2048, ["?OVL"])]
+RUNNAMES = list(dict.fromkeys(r[0] for r in RUNS))
+#   The overlays a compile must leave beside the program, checked before any is deleted.
+OVERLAYS = [("BNK255", ["002", "100", "254", "255"]), ("BNKOVL", ["002", "100", "254", "255"])]
+DELETE = [("BNKOVL", "100")]
 
 #   The drive keeps its own compiler and runtime, and they went stale once. Copy the
 #   current ones over them first.
 shutil.copy2(os.path.join(ROOT, "source", "application", "GPC.BIN"), T)
-for pattern in ("GPC.IMG.*.BIN", "GPB.RT.*.BIN", "GPC.RT.*.BIN"):
+for pattern in ("GPC.IMG.*.BIN", "GP1.IMG.*.BIN",
+                "GPB.RT.*.BIN", "GPC.RT.*.BIN", "GP1.RT.*.BIN"):
     for f in glob.glob(os.path.join(ROOT, "testing", pattern)):
         shutil.copy2(f, T)
 
+#   BNKOVL is BNK255 under another name, made fresh each run so the two cannot drift.
+open(os.path.join(T, "BNKOVL.BASL"), "w", newline="").write(
+    open(os.path.join(T, "BNK255.BASL"), newline="").read().replace("BNK255", "BNKOVL"))
+
 results = {}
-for n in [x for p in PAIRS for x in p] + [r[0] for r in RUNS] + BADNAMES:
+for n in PAIRNAMES + RUNNAMES + BADNAMES:
     ok = tokenise(n)
     kind, msg = compile_one(n) if ok else ("TOKFAIL", "")
-    results[n] = (kind, msg, [])
-    if kind == "OK" and n not in BADNAMES:
-        results[n] = (kind, msg, run_one(n))
-    print("%-6s tok=%-5s %-4s %-28s %s" % (n, ok, kind, msg, " / ".join(results[n][2])))
+    out = run_one(n) if kind == "OK" and n in PAIRNAMES else []
+    results[n] = (kind, msg, out)
+    print("%-6s tok=%-5s %-4s %-28s %s" % (n, ok, kind, msg, " / ".join(out)))
 
 print()
 fails = 0
@@ -183,10 +213,23 @@ for n, want in BAD:
     if not good:
         fails += 1
 
-for n, want in RUNS:
-    k, m, out = results[n]
-    good = (k == "OK" and out == want)
-    print("%-6s runs         %s   (%s)" % (n, "YES" if good else "*** NO ***", " / ".join(out) or m))
+for n, want in OVERLAYS:
+    got = overlays(n)
+    good = (results[n][0] == "OK" and got == want)
+    print("%-6s overlays     %s   (%s)" % (n, "YES" if good else "*** NO ***", " ".join(got)))
+    if not good:
+        fails += 1
+
+for n, bank in DELETE:
+    p = os.path.join(T, n + "." + bank)
+    if os.path.exists(p):
+        os.remove(p)
+
+for n, ram, want in RUNS:
+    k, m, _ = results[n]
+    out = run_one(n, ram) if k == "OK" else []
+    good = (out == want)
+    print("%-6s runs %4dK   %s   (%s)" % (n, ram, "YES" if good else "*** NO ***", " / ".join(out) or m))
     if not good:
         fails += 1
 

@@ -17,7 +17,7 @@
 #  The full build runs:
 #     make libs                        the libraries + the compiler engine GPC.BIN
 #     make release                     stage the engine + samples into testing/
-#     make -C source/runtime gpc-rt    both shared runtimes, GPB/GPC.RT.nnn.BIN
+#     make -C source/runtime gpc-rt    both shared runtimes and their bank code, GPB/GPC/GP1.RT.nnn.BIN
 #     make -C source/gpc release       GPC.PRG + GPC.ERR (tokenised, then compiled)
 #     source/gpc/samplesbuild.py       the five sample programs, each tokenised
 #                                      then compiled
@@ -54,7 +54,7 @@ if [ "$DO_BUILD" = 1 ]; then
     make libs
     echo "== make release =="
     make release
-    echo "== make -C source/runtime gpc-rt  (GPB/GPC.RT.nnn.BIN shared runtimes) =="
+    echo "== make -C source/runtime gpc-rt  (GPB/GPC/GP1.RT.nnn.BIN shared runtimes) =="
     make -C source/runtime gpc-rt
     echo "== make -C source/gpc release  (GPC.PRG + GPC.ERR, tokenised and compiled) =="
     make -C source/gpc release
@@ -95,18 +95,17 @@ if not version:
 
 # The runtime's file name carries the runtime build number; import the one definition of it.
 sys.path.insert(0, os.path.join(root, "source", "runtime", "scripts"))
-from rtname import rt_filename, rc_filename         # noqa: E402
-# ...and the runtime IMAGE's name likewise, from the script that builds it.
-sys.path.insert(0, os.path.join(root, "source", "application", "scripts"))
-from genrtimage import imageName                    # noqa: E402
+from rtname import rt_filename, rc_filename, bank_filename  # noqa: E402
+# ...and the runtime IMAGE's two names likewise, from the script that installs them.
+from genrtimage import imageName, bankImageName     # noqa: E402
 
 # ===========================================================================
 #  THE LAYOUT -- what a release is, in one place
 # ===========================================================================
 #
 #  release/TMP/
-#     GPC.PRG GPC.BIN GPC.IMG.nnn.BIN      the compiler
-#     GPB.RT.nnn.BIN GPC.RT.nnn.BIN        both shared runtimes
+#     GPC.PRG GPC.BIN GPC/GP1.IMG.nnn.BIN  the compiler
+#     GPB/GPC/GP1.RT.nnn.BIN               both shared runtimes and their bank code
 #     GPC.ERR.PRG  GPB.HELP.PRG            the two companion programs
 #     README.md LICENSE MANIFEST.TXT
 #     HELP-TXT/       the help viewer's index and topics
@@ -116,11 +115,12 @@ from genrtimage import imageName                    # noqa: E402
 #     SAMPLES/<PROG>/ one folder per sample program
 #
 #  A sample in its own folder still resolves both of the things it loads. A region
-#  overlay (.Bnn) is LOADed from BESIDE THE PROGRAM, and the shared runtime is fetched
+#  overlay (.nnn) is LOADed from BESIDE THE PROGRAM, and the shared runtime is fetched
 #  from the DRIVE ROOT with a LEADING SLASH (bootstrap.asm:285), which works from any
 #  depth. SHARED vs EMBEDDED is not a preference: a SHARED object carries no runtime and
 #  asks for GPB.RT.nnn.BIN when it uses a GP keyword and GPC.RT.nnn.BIN when it does not.
-#  The choice is made at compile time and flips silently, so BOTH runtimes ship.
+#  The choice is made at compile time and flips silently, so BOTH runtimes ship, and either
+#  one loads GP1.RT.nnn.BIN, the bank code, from the same place.
 #
 #  The help content folder keeps the name HELP-TXT. The viewer opens its files as
 #  //HELP-TXT/:NAME (GPB.HELP.BASL:218), so the name is not ours to choose here.
@@ -140,6 +140,9 @@ from genrtimage import imageName                    # noqa: E402
 #                   used to live inside the engine and moved out so that the object buffer
 #                   could have the low RAM. Build-numbered like the shared runtimes, and
 #                   for the same reason: a stale one under a fixed name would still be found.
+#   GP1.IMG.nnn.BIN the bank code built with that image, which a self-contained object carries
+#                   after its p-code and copies to bank 1 as it starts. It jumps into the
+#                   image at fixed addresses, so the two install together from one link.
 #   GPC.ERR.PRG     the error-address-to-line helper. In the tree it is C.GPC.ERR.PRG (the
 #                   "C." prefix distinguishes compiler output from the GPC.ERR.PRG that is
 #                   its input); the release drops the prefix, because a user should not have
@@ -151,8 +154,10 @@ ROOTFILES = [
     ("testing/GPC.PRG",                     "GPC.PRG"),
     ("testing/GPC.BIN",                     "GPC.BIN"),
     ("testing/" + imageName(),              imageName()),
+    ("testing/" + bankImageName(),          bankImageName()),
     ("testing/" + rt_filename(),            rt_filename()),
     ("testing/" + rc_filename(),            rc_filename()),
+    ("testing/" + bank_filename(),          bank_filename()),
     ("testing/C.GPC.ERR.PRG",               "GPC.ERR.PRG"),
     ("samples/GPC-HELP/GPB.HELP.PRG",       "GPB.HELP.PRG"),
     ("README.md",                           "README.md"),
@@ -200,7 +205,7 @@ SAMPLES = [
         "dir":   "GPBMODS",
         "files": [("testing/GPBMODS.PRG",                    "GPBMODS.PRG"),
                   ("samples/GPB-MODS-TESTING/GPBMODS.BASL",  "GPBMODS.BASL")],
-        "globs": [("testing", lambda n: n.startswith("GPBMODS.B") and n[9:].isdigit())],
+        "globs": [("testing", lambda n: n.startswith("GPBMODS.") and len(n) == 11 and n[8:].isdigit())],
         "fake":  "GPBMODS.PRG",
     },
     {
@@ -258,9 +263,10 @@ SRC_README = (
     "It is here for reference only -- you do NOT need anything in this folder to\n"
     "run GPC. The ready-to-run programs are in the parent folder.\n"
     "\n"
-    "To compile, run GPC.PRG, with GPC.BIN, the GPC.IMG.nnn.BIN image and the\n"
-    "GPB.RT.nnn.BIN runtime beside it. To turn a runtime error's \"@ $XXXX\" into a\n"
-    "source line, run GPC.ERR.PRG. The .BASL sources are never loaded at run time.\n"
+    "To compile, run GPC.PRG, with GPC.BIN, the GPC.IMG.nnn.BIN and GP1.IMG.nnn.BIN\n"
+    "images and the GPB.RT.nnn.BIN and GP1.RT.nnn.BIN runtime files beside it. To\n"
+    "turn a runtime error's \"@ $XXXX\" into a source line, run GPC.ERR.PRG. The\n"
+    ".BASL sources are never loaded at run time.\n"
     "\n"
     "BOTH TOOLS ARE WRITTEN IN GP.BASIC, so rebuilding either is a TWO step job and\n"
     "BASLOAD on its own is not enough. BASLOAD (built into every R49 ROM) does the\n"

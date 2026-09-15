@@ -59,7 +59,8 @@ def snapshot():
             dst = os.path.join(inputs, name + ext)
             if os.path.exists(src) and not os.path.exists(dst):
                 shutil.copy2(src, dst)
-    for pattern in ("GPC.IMG.*.BIN", "GPB.RT.*.BIN", "GPC.RT.*.BIN"):
+    for pattern in ("GPC.IMG.*.BIN", "GP1.IMG.*.BIN",
+                    "GPB.RT.*.BIN", "GPC.RT.*.BIN", "GP1.RT.*.BIN"):
         for f in glob.glob(os.path.join(TESTING, pattern)):
             dst = os.path.join(inputs, os.path.basename(f))
             if not os.path.exists(dst):
@@ -128,7 +129,7 @@ def outputs(drive, name):
     found = []
     for f in sorted(os.listdir(drive)):
         if f in (name + ".PRG", name + ".MAP", "D." + name) or \
-                (f.startswith(name + ".B") and f[len(name) + 2:].isdigit()):
+                (f.startswith(name + ".") and len(f) == len(name) + 4 and f[-3:].isdigit()):
             found.append(f)
     return found
 

@@ -16,7 +16,7 @@ rem
 rem  THE DRIVE IS testing\, NOT the sample directory, and it needs more than
 rem  the PRG. GPBMODS.PRG is compiled SHARED, so it loads the resident
 rem  GPC.RT.nnn.BIN rather than carrying a copy; and it has eight overlays --
-rem  GPBMODS.B04 through .B11 -- which the bootstrap LOADs into their banks at
+rem  GPBMODS.004 through .011 -- which the bootstrap LOADs into their banks at
 rem  startup. A missing one stops with ?OVL. All of them live in testing\
 rem  beside the PRG.
 rem

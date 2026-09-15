@@ -1,54 +1,41 @@
-@STASHFILE.INC.BL -- a saved text rectangle, through a file.
+@4.21 GPBMODS -- the harness that drives every module (2)
+=The text is in a bank
 .
-=STASHFILE.INC.BL
+.542 strings in 72 named groups, 11,776 bytes across two pools, none of it in
+.low RAM. Every string the shell says sits in a GP.BANKEDSTR block in front
+.of the routine that says it and is read back with GP.BSTR. Two pools,
+.because one pool is a hard 8,192 bytes and BStrPoolWrite stops the compile
+.when one fills. Which pool a group is in costs the call site nothing, so
+.moving a group is the whole of the answer to a full one.
 .
-.  a saved text rectangle, through a file.
+.Every menu is a block of its own, index 0 the dropdown's title and 1 upwards
+.the rows. MENUVERT.COUNT comes from GP.BSTRCOUNT and a loop reads the rows,
+.so a row is added by adding a line to the block, and no other menu moves.
 .
-=MODULE HEADER
+.The numbers under ABOUT / BANK MEMORY and ABOUT / MODULE SIZES are typed
+.into GP.BANKEDSTR blocks, so they are only true of the build they were taken
+.from.
 .
-:      STASH.FILE.SAVE   a rectangle of the screen, out to a file
-:      STASH.FILE.LOAD   a saved file, back where it came from
-:      STASH.FILE.PUT    a saved file, pasted somewhere else
+=The room it runs in
 .
-.  REQUIRES, and does not #INCLUDE for you:
-:      GPB.INC.BL      GP.ASM
-:      STASH.INC.BL    which does the actual copying
+.The workspace is what is left between the program's own p-code and the
+.resident runtime: $4000 to $6600, 9,728 bytes. The first p-code opcode is
+..varspace and its operand is what the scalars take -- 3,292 here, leaving
+.about 6,436 for the string arrays and the whole string heap.
 .
-.  and, like it, a #SYMFILE in your program. See that file's header.
+.Moving code into a bank moves no scalars. A banked routine's variables are
+.the same workspace variables low memory sees, so .varspace grows as panels
+.are added whatever bank they run from.
 .
-.  Usage:
-:      STASH.BANK = 8 : STASH.FILE$ = "PANEL.BIN"
-:      STASH.X = 10 : STASH.Y = 4 : STASH.W = 30 : STASH.H = 8
-:      GOSUB STASH.FILE.SAVE
-:      ...
-:      GOSUB STASH.FILE.LOAD
-.
-:   in   STASH.FILE$    the name
-:        STASH.DEV      the device. 0 means 8, the usual drive
-:        STASH.BANK     the bank to stage through
-:        and, for SAVE, the geometry STASH.SAVE wants
-.
-=A SEPARATE FILE FROM STASH.INC.BL ON PURPOSE
-.
-.  uncalled code stays in unless the compile removes it, and these three are
-.  127 bytes. A dialog that stashes to a bank and puts it back never goes
-.  near a disk and should not pay for one.
-.
-=THE FILE IS SELF-DESCRIBING BECAUSE THE STASH IS
-.
-.  the four header bytes go out with the cells, so loading one back needs
-.  nothing but the name. That is the flaw dotBASIC admits to in its own
-.  .CUT/.PASTE, which "requires correctly re-describing the width and height
-.  of each cut".
-.
-.  BSAVE's end address is EXCLUSIVE, so this writes the header and the cells
-.  and no padding. The length is w h 2 + 4, which BASIC works out for itself
-.  -- which is why no GP.END keyword was ever spent on telling BSAVE where a
-.  stash ended.
-.
-.  The STASH.FILE. names belong to this file; the rest of STASH. is
-.  STASH.INC.BL's.
+.GPC-BASIC/ inside the sample folder is the library working copy and it is
+.ahead of the root copy. A module is proved here and copied whole into root.
+.GPB.INC.BL runs the other way: root is upstream for it, and the build copies
+.root's over this folder's every time.
 .
 =SEE ALSO
 .
->88|STASH.INC.BL -- save a text rectangle, and put it back.
+>66|4.5 BMX.INC.BL -- a BMX bitmap into VERA
+>76|4.13 BANKMGR.INC.BL -- who owns which RAM bank
+>52|3.12 Code in a bank
+>46|3.10 Text in a bank
+>81|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM

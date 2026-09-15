@@ -37,6 +37,6 @@
 .
 =SEE ALSO
 .
->142|7. Memory, and what the compiler tells you
+>145|7. Memory, and what the compiler tells you
 >82|4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store
 >81|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM

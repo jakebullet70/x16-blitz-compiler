@@ -187,10 +187,10 @@ class Atn(Evaluator):
 if __name__ == "__main__":
 	h = open("source/generated/coefficients.asm","w")
 	h.write(";\n;\tAutomatically generated.\n;\n")
-	h.write("\t.section code\n")
+	h.write("\t.section banked\n")
 	Exp().test().dump(h,"Exp")
 	Sin().test().dump(h,"Sin")
 	Log().test().dump(h,"Log")
 	Atn().test().dump(h,"Atn")
-	h.write("\t.send code\n")
+	h.write("\t.send banked\n")
 	h.close()

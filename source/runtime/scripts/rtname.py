@@ -8,7 +8,7 @@
 # *******************************************************************************************
 # *******************************************************************************************
 #
-#		The standalone runtime ships as GPB/GPC.RT.nnn.BIN, where nnn is the RUNTIME BUILD NUMBER --
+#		The standalone runtime ships as GPB/GPC/GP1.RT.nnn.BIN, where nnn is the RUNTIME BUILD NUMBER --
 #		source/application/rtbuild.txt. bootstrap.asm formats the identical number into the name
 #		every compiled program looks for (via BuildNumber in the generated version.asm), so the
 #		two cannot disagree unless the runtime is built from a different stamp than the engine.
@@ -25,7 +25,7 @@
 #		RTBASE, and answers the different question of whether an already-resident runtime can
 #		be entered. The file name says WHICH runtime; the magic says whether it FITS.
 #
-#		Usage:	rtname.py <built.prg> <dest-dir>	copy, named from the build number
+#		Usage:	rtname.py <code.prg> <bank.prg> <dest-dir>	copy, named from the build number
 #				rtname.py --name					print just the file name
 #
 # *******************************************************************************************
@@ -68,6 +68,13 @@ def rc_filename():
 	return "GPC.RT.%03d.BIN" % build_number()
 
 
+def bank_filename():
+	"""The SHARED BANK CODE: the rarely used handlers, loaded into bank 1 at $A000 beside either
+	   runtime above. Same width again, so one name with its third character patched covers all
+	   three."""
+	return "GP1.RT.%03d.BIN" % build_number()
+
+
 #	RTGPBASE and RTBASE are read out of common.inc rather than repeated here. Getting either
 #	wrong would produce a file that loads to the wrong address -- which is not a build failure,
 #	it is a program that jumps into the middle of something at run time.
@@ -90,12 +97,13 @@ def main():
 		print(rt_filename())
 		return
 
-	if len(sys.argv) != 3:
-		sys.exit("usage: rtname.py <built.prg> <dest-dir>   |   rtname.py --name")
+	if len(sys.argv) != 4:
+		sys.exit("usage: rtname.py <code.prg> <bank.prg> <dest-dir>   |   rtname.py --name")
 
-	src, dest_dir = sys.argv[1], sys.argv[2]
-	if not os.path.isfile(src):
-		sys.exit("rtname.py: %s was not built" % src)
+	src, bank_src, dest_dir = sys.argv[1], sys.argv[2], sys.argv[3]
+	for f in (src, bank_src):
+		if not os.path.isfile(f):
+			sys.exit("rtname.py: %s was not built" % f)
 
 	#
 	#	TWO FILES, SLICED FROM THE ONE IMAGE -- not two builds. The image assembles from
@@ -111,8 +119,20 @@ def main():
 	if cut <= 0 or cut >= len(image):
 		sys.exit("rtname.py: RTBASE-RTGPBASE = %d is outside the %d byte image" % (cut, len(image)))
 
+	#
+	#	THE THIRD FILE is bank.prg, the bank code, which the link writes with its own load address,
+	#	$A000, already in front. Its first four bytes must be the core's magic, "GP" and RT_ABI:
+	#	that is what the bootstrap compares at $A000, and a file that fails it here would fail it
+	#	on the machine.
+	#
+	bank = open(bank_src, "rb").read()
+	magic = image[cut:cut + 4]
+	if bank[:2] != b"\x00\xA0" or bank[2:6] != magic:
+		sys.exit("rtname.py: %s does not load at $A000 with the core's magic %r" % (bank_src, magic))
+
 	for name, addr, body in ((rt_filename(), gpbase, image),
-	                         (rc_filename(), rtbase, image[cut:])):
+	                         (rc_filename(), rtbase, image[cut:]),
+	                         (bank_filename(), 0xA000, bank[2:])):
 		with open(os.path.join(dest_dir, name), "wb") as h:
 			h.write(bytes((addr & 0xFF, addr >> 8)))
 			h.write(body)

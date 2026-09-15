@@ -10,6 +10,11 @@
 .      BASIC
 .      BANKMGR.INC.BL -- INIT CLAIM GET.FREE.BANK RELEASE COUNT - SEC 4.13
 .
+.  Key-value store
+.      BASIC
+.      KV.INC.BL -- INIT GET PUT DEL FIND AT WIPE SAVE LOAD, strings in one
+.        RAM bank - SEC 4.20
+.
 .  Keyboard
 .      BASIC
 .      KB.INC.BL -- KB.CLEARKB - SEC 4.14

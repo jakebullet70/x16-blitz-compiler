@@ -10,7 +10,7 @@
 ; ************************************************************************************************
 ; ************************************************************************************************
 
-		.section 	code
+		.section 	banked
 
 ; ************************************************************************************************
 ;
@@ -31,7 +31,7 @@ XCommandMouse: ;; [!mouse]
 		jsr 	X16_mouse_config 			; config the mouse
 		ply
 		plx
-		.exitcmd
+		.exitbank
 
 ; ************************************************************************************************
 ;
@@ -45,7 +45,7 @@ XUnaryMB: ;; [!mb]
 		lda 	zTemp2
 		inx
 		jsr 	FloatSetByte
-		.exitcmd
+		.exitbank
 
 XUnaryMX: ;; [!mx]
 		.entercmd
@@ -55,7 +55,7 @@ XUnaryMX: ;; [!mx]
 		jsr 	FloatSetByte
 		lda 	zTemp0+1
 		sta 	NSMantissa1,x
-		.exitcmd
+		.exitbank
 
 XUnaryMY: ;; [!my]
 		.entercmd
@@ -65,7 +65,7 @@ XUnaryMY: ;; [!my]
 		jsr 	FloatSetByte
 		lda 	zTemp1+1
 		sta 	NSMantissa1,x
-		.exitcmd
+		.exitbank
 
 XUnaryMWheel: ;; [!mwheel]
 		.entercmd
@@ -82,7 +82,7 @@ _XUMNotNegative:
 		bpl 	_XUMNotNegative2
 		jsr 	FloatNegate
 _XUMNotNegative2:
-		.exitcmd
+		.exitbank
 
 XUnaryMouseCommon:
 		phx
@@ -95,7 +95,7 @@ XUnaryMouseCommon:
 		plx
 		rts
 
-		.send 	code
+		.send 	banked
 		
 ; ************************************************************************************************
 ;

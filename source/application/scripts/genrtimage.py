@@ -18,18 +18,24 @@
 #		now (GPC.IMG.nnn.BIN), streamed from disk at write time, and the compiler links on its
 #		own at $0801.
 #
-#		Which leaves the compiler needing four facts about an image it can no longer see:
+#		Which leaves the compiler needing five facts about an image it can no longer see:
 #
 #			GPBase / ObjectBase		the two possible cut points. ScanGPUsage decides which,
 #									and both are LINK-DERIVED in the image -- GPBase is a label
 #									in gp-runtime, ObjectBase is 10object.divider's .align.
 #
-#			the two patch offsets	RunCodePage+1 and RunWorkspacePage+1, as offsets from
-#									$0801, because the streamer patches them by position in the
-#									file rather than by address in RAM.
+#			the three patch offsets	RunCodePage+1, RunWorkspacePage+1 and RunBankPage+1, as
+#									offsets from $0801, because the streamer patches them by
+#									position in the file rather than by address in RAM.
 #
 #			GPUsageBits				32 bytes: one bit per opcode, set if that opcode's handler
 #									lives at or above GPBase.
+#
+#			RTIMG_BANKLEN			the bytes of bank code in bank.prg, less its load address.
+#									An embedded object carries them after the p-code, where they
+#									sit in the workspace until StartCode copies them to bank 1,
+#									so a .cerror keeps them within MIN_WS_PAGES. StartCode
+#									copies up to the image's RTImgBankEnd, which must agree.
 #
 #		THE BITMAP IS WHY THIS SCRIPT EXISTS AT ALL. ScanGPUsage used to read the runtime's
 #		VectorTable directly and compare each handler address against GPBase -- fine when the
@@ -44,7 +50,12 @@
 #		and a stale image produces a program that loads and then misbehaves; a numbered one is
 #		simply absent, and WriteObjectCode says NO RUNTIME IMAGE instead of writing the object.
 #
-#		Usage:	genrtimage.py <image.lbl> <image.prg> <out.asm> [dest-dir]
+#		The bank code goes beside it as GP1.IMG.nnn.BIN, whole, with its $A000 load address. It
+#		jumps into this image at fixed addresses, so the two install from the one link, and both
+#		are checked before either is written. Its name is the image's with the third character
+#		changed, as GP1.RT.nnn.BIN is to GPC.RT.nnn.BIN.
+#
+#		Usage:	genrtimage.py <image.lbl> <image.prg> <bank.prg> <out.asm> [dest-dir]
 #
 # *******************************************************************************************
 
@@ -53,6 +64,7 @@ import re
 import sys
 
 LOAD = 0x0801									# where the image is linked, and loads, and runs
+BANK = 0xA000									# where the bank code is linked, in bank 1
 
 
 def die(msg):
@@ -87,6 +99,21 @@ def readImage(path):
 	load = data[0] | (data[1] << 8)
 	if load != LOAD:
 		die("%s loads at $%04x, not $%04x" % (path, load, LOAD))
+	return data[2:]
+
+
+def readBank(path):
+	"""The linked banked section, minus its load address. It opens with the embedded magic,
+	   "GE" and RT_ABI, which the shared bootstrap tells from its own "GP"."""
+	if not os.path.isfile(path):
+		die("%s is missing -- the runtime-image link must run first" % path)
+	data = open(path, "rb").read()
+	if len(data) < 6 or data[0] | (data[1] << 8) != BANK:
+		die("%s does not load at $%04x" % (path, BANK))
+	if data[2:4] != b"GE":
+		die("%s opens with %r, not the embedded magic GE" % (path, data[2:4]))
+	if len(data) - 2 > 0x2000:
+		die("%s is %d bytes, more than a bank holds" % (path, len(data) - 2))
 	return data[2:]
 
 
@@ -126,13 +153,20 @@ def imageName():
 	return "GPC.IMG.%03d.BIN" % int(build)
 
 
+def bankImageName():
+	"""The embedded bank code, installed beside the image. The same width, with the third
+	   character changed, as GP1.RT.nnn.BIN is to GPC.RT.nnn.BIN."""
+	return "GP1" + imageName()[3:]
+
+
 def main():
-	if len(sys.argv) not in (4, 5):
-		die("usage: genrtimage.py <image.lbl> <image.prg> <out.asm> [dest-dir]")
-	lblPath, prgPath, outPath = sys.argv[1:4]
+	if len(sys.argv) not in (5, 6):
+		die("usage: genrtimage.py <image.lbl> <image.prg> <bank.prg> <out.asm> [dest-dir]")
+	lblPath, prgPath, bankPath, outPath = sys.argv[1:5]
 
 	labels = readLabels(lblPath)
 	image = readImage(prgPath)
+	bank = readBank(bankPath)
 
 	gpbase = need(labels, "GPBase")
 	objectbase = need(labels, "ObjectBase")
@@ -140,6 +174,8 @@ def main():
 	shiftvec = need(labels, "ShiftVectorTable")
 	codepage = need(labels, "RunCodePage") + 1				# the operand, not the opcode
 	wspage = need(labels, "RunWorkspacePage") + 1
+	bankpage = need(labels, "RunBankPage") + 1
+	bankend = need(labels, "RTImgBankEnd")
 
 	#
 	#		Sanity, because every one of these being wrong produces a program that loads and
@@ -152,9 +188,11 @@ def main():
 	if len(image) != objectbase - LOAD:
 		die("image is %d bytes, ObjectBase says it should be %d"
 			% (len(image), objectbase - LOAD))
-	for name, ofs in (("RunCodePage+1", codepage), ("RunWorkspacePage+1", wspage)):
+	for name, ofs in (("RunCodePage+1", codepage), ("RunWorkspacePage+1", wspage), ("RunBankPage+1", bankpage)):
 		if not LOAD <= ofs < gpbase:
 			die("%s at $%04x is outside the part of the image that is always written" % (name, ofs))
+	if bankend - BANK != len(bank):
+		die("RTImgBankEnd is $%04x, but %s holds %d bytes of bank code" % (bankend, bankPath, len(bank)))
 
 	#
 	#		The tables are contiguous in vectors.asm, so ShiftVectorTable's start is
@@ -177,6 +215,10 @@ def main():
 		h.write("RTIMG_LENGTH    = $%04x\n" % (objectbase - LOAD))
 		h.write("RTIMG_CODEPOFS  = $%04x\n" % (codepage - LOAD))
 		h.write("RTIMG_WSPAGEOFS = $%04x\n" % (wspage - LOAD))
+		h.write("RTIMG_BANKPOFS  = $%04x\n" % (bankpage - LOAD))
+		h.write("RTIMG_BANKLEN   = $%04x\n" % len(bank))
+		h.write("\t\t.cerror RTIMG_BANKLEN > (MIN_WS_PAGES << 8), "
+				"\"embedded bank code over MIN_WS_PAGES pages - its copy above the p-code has no room\"\n")
 		h.write("\n\t\t.section code\n")
 		h.write(";\n;\tOne bit per opcode, set when that opcode's handler is at or above\n")
 		h.write(";\tGPBase. Bytes 0-15 are VectorTable, 16-31 ShiftVectorTable.\n;\n")
@@ -185,19 +227,20 @@ def main():
 		h.write("\t\t.send code\n")
 
 	installed = ""
-	if len(sys.argv) == 5:
-		dest = os.path.join(sys.argv[4], imageName())
-		os.makedirs(sys.argv[4], exist_ok=True)
-		with open(dest, "wb") as h:					# the load address goes WITH it: the streamer
-			h.write(open(prgPath, "rb").read())		# reads and checks those two bytes
-		installed = " -> " + imageName()
+	if len(sys.argv) == 6:
+		os.makedirs(sys.argv[5], exist_ok=True)
+		#	Both go whole, load address and all: the streamer reads and checks the image's two bytes.
+		for name, path in ((imageName(), prgPath), (bankImageName(), bankPath)):
+			with open(os.path.join(sys.argv[5], name), "wb") as h:
+				h.write(open(path, "rb").read())
+		installed = " -> %s, %s" % (imageName(), bankImageName())
 
-	print("  genrtimage: image %d bytes, GPBase $%04x, ObjectBase $%04x, %d/%d GP vectors%s"
-		  % (len(image), gpbase, objectbase,
+	print("  genrtimage: image %d bytes, bank code %d, GPBase $%04x, ObjectBase $%04x, %d/%d GP vectors%s"
+		  % (len(image), len(bank), gpbase, objectbase,
 			 sum(bin(b).count("1") for b in bits), plainCount + shiftCount, installed))
 
 
-#	Guarded so release.sh can import imageName() instead of spelling the build number
-#	out a third time -- the same reason rtname.py is guarded.
+#	Guarded so release.sh can import imageName() and bankImageName() instead of spelling the
+#	build number out a third time -- the same reason rtname.py is guarded.
 if __name__ == "__main__":
 	main()

@@ -1,113 +1,121 @@
-@4.20 GPBMODS -- the harness that drives every module
+@4.20 KV.INC.BL -- keys and values in one RAM bank
 .
-=4.20 GPBMODS -- THE HARNESS THAT DRIVES EVERY MODULE
+=4.20 KV.INC.BL -- KEYS AND VALUES IN ONE RAM BANK
 .
 =DESCRIPTION
 .
-.samples/GPB-MODS-TESTING/GPBMODS.BASL. A menu bar of nine dropdowns whose
-.rows reach nearly every public entry point in this section. It is the one
-.program that holds all twenty modules at once, and the worked example of
-.GP.BANKED, GP.BANKEDSTR and BANKMGR in one place.
+.  KV.INIT
+.      IN: --
+.      OUT: KV.OK
 .
-:gpbmods-demo.bat
+.  KV.FIND
+.      IN: KV.KEY$
+.      OUT: KV.SLOT
 .
-.The drive is testing/, not the sample folder. The object is compiled SHARED
-.and loads GPB.RT.nnn.BIN from there.
+.  KV.GET
+.      IN: KV.KEY$
+.      OUT: KV.VALUE$ KV.SLOT KV.OK
 .
-.No row is a stub. A chosen row calls the library for real and shows what
-.came back, on the panel and on the LAST line at the foot of the page. Three
-.modules are under test before any row is chosen: MENUBAR draws the bar,
-.MENUVERT every dropdown, and STASH puts the screen back under a closed one.
+.  KV.AT
+.      IN: KV.SLOT
+.      OUT: KV.KEY$ KV.VALUE$ KV.OK
 .
-.  DIALOG -- D
-.      GUI GUI2
+.  KV.PUT
+.      IN: KV.KEY$ KV.VALUE$
+.      OUT: KV.SLOT KV.OK
 .
-.  LISTS -- L
-.      MENUBAR MENUVERT
+.  KV.DEL
+.      IN: KV.KEY$
+.      OUT: KV.OK
 .
-.  INPUT -- I
-.      LINEINPUT
+.  KV.WIPE
+.      IN: --
+.      OUT: KV.OK
 .
-.  SCREEN -- S
-.      STASH STASHFILE STASHVRAM
+.  KV.SAVE
+.      IN: KV.FNAME$
+.      OUT: --
 .
-.  STRINGS -- G
-.      STRINGS STRCASE STRUSING
+.  KV.LOAD
+.      IN: KV.FNAME$
+.      OUT: KV.OK
 .
-.  DATA -- A
-.      SORT
+.  KV.PUTNUM KV.GETNUM
+.      IN: --
+.      OUT: KV.OK, always 0
 .
-.  THEME -- T
-.      THEME
+:#INCLUDE "KV.INC.BL"
+:
+:GOSUB KV.INIT
+:KV.KEY$ = "COLOR"
+:KV.VALUE$ = "RED"
+:GOSUB KV.PUT
+:KV.KEY$ = "COLOR"
+:GOSUB KV.GET
+:IF KV.OK THEN PRINT KV.VALUE$
+:KV.FNAME$ = "SETTINGS.KV"
+:GOSUB KV.SAVE
 .
-.  ABOUT -- B
-.      BANKMGR
+.Strings stored by key in RAM bank 40. KV.INIT runs before any other routine.
+.Every routine is a plain GOSUB, and KV.OK is -1 for success and 0 for
+.failure.
 .
-.  FILES -- F
-.      FILEIO FILEDIR
+.Plain BASL. No GP.* keyword and no GP.ASM, so it needs neither GPB.INC.BL
+.nor a #SYMFILE, and the same source tokenises for stock BASIC.
 .
-.APPSYS runs at startup and at exit rather than from a row. STRINGS answers
-.to G because SCREEN has taken S: a hotkey need not be an item's initial, and
-.MENUVERT.HOTATTR tints whichever letter it finds.
+.KV.INIT formats the bank only when slot 0 holds no header. A bank that
+.already holds a store is kept, keys and all. A header with another version
+.or slot count is left alone, and KV.OK is 0. KV.WIPE formats the bank
+.whatever it holds.
 .
-.Twenty modules are included and seventeen are driven. COMBO, KB and
-.STASHVRAMGC are compiled in and have entry points -- COMBO.ADD, KB.CLEARKB,
-.SV.COMPACT -- that no panel calls. BMX (SEC 4.5) is not included: it wants a
-.bitmap file and a screen mode of its own, and the BMXVIEW example in
-.GPC-BASIC/ covers it.
+.Keys are A-Z, 0-9 and ., cut to 8 characters. The module checks none of
+.this. A key compares byte for byte, and KV.AT reads a key back up to its
+.first space.
 .
-.WARNING: FILES writes to the drive. Four of its rows do. Everything they
-.make is named GPBFILE.* or GPBDIR, and the row that makes each one removes
-.it.
+.KV.PUT refuses an empty key. It rewrites the slot of a key that exists and
+.takes the first free slot for one that does not. When all 63 slots are in
+.use, KV.OK and KV.SLOT are 0.
 .
-=Eleven banks
+.Values hold up to 119 characters, and KV.PUT cuts a longer one. An empty
+.value is stored and reads back as "". A missing key gives KV.OK = 0, KV.SLOT
+.= 0 and KV.VALUE$ = "".
 .
-.Eight are named at compile time and claimed from BANKMGR (SEC 4.13) at
-.startup, because the compiler picks them while the object is written and the
-.manager is told rather than asked. Three more are allocated at run time: the
-.cells a dropdown covers, the cells a dialog covers, and FILEDIR's directory
-.buffer.
+.KV.FIND sets KV.SLOT and nothing else. Slots never move, so a program can
+.keep a slot number for the rest of the run and read it with KV.AT, which
+.does not scan. A delete frees the slot. KV.AT on every slot lists the store:
 .
-.  bank 4, GPBMODS.B04, 7,938 bytes
-.      MENUVERT MENUBAR LINEINPUT GUI GUI2
+:FOR SLOT.NUMBER = 1 TO 63
+:    KV.SLOT = SLOT.NUMBER
+:    GOSUB KV.AT
+:    IF KV.OK THEN PRINT KV.KEY$; " = "; KV.VALUE$
+:NEXT SLOT.NUMBER
 .
-.  bank 5, GPBMODS.B05, 7,426 bytes
-.      literal text, pool one
+.KV.PUTNUM and KV.GETNUM are stubs. Each sets KV.OK = 0 and returns. Store a
+.number as text: STR$(N) with KV.PUT, and VAL(KV.VALUE$) after KV.GET.
 .
-.  bank 6, GPBMODS.B06, 4,354 bytes
-.      literal text, pool two
+.It selects a bank. Every routine selects bank 40 and ends with BANK
+.KV.HOMEBANK. The first KV.INIT sets KV.HOMEBANK to 1, the bank selected at
+.startup, and a program that keeps another bank selected sets it after
+.KV.INIT. A call from a GP.BANKED region needs nothing: it is a banked call,
+.and its RETURN selects the region's bank again (SEC 3.12). The module cannot
+.go inside a region, because the compiler refuses BANK there.
 .
-.  bank 7, GPBMODS.B07, 4,354 bytes
-.      APPSYS BANKMGR KB SORT STASHVRAM STASHVRAMGC STRCASE STRINGS STRUSING
+.A program that uses BANKMGR (SEC 4.13) claims the bank after BANKMGR.INIT
+.and before the first GET.FREE.BANK:
 .
-.  bank 8, GPBMODS.B08, 1,538 bytes
-.      FILEIO FILEDIR
+:BANKMGR.SET.BANK = KV.BANK
+:GOSUB BANKMGR.CLAIM
 .
-.  bank 9, GPBMODS.B09, 770 bytes
-.      THEME
+.KV.SAVE writes the whole bank, all 8,192 bytes, to KV.FNAME$ on device 8,
+.and replaces a file of that name. A disk error stops the program.
 .
-.  bank 10, GPBMODS.B10, 770 bytes
-.      COMBO
+.KV.LOAD returns KV.OK = 0 for a missing file and leaves the bank alone. It
+.also returns 0 for a file that loads but holds no matching header, and then
+.the bank already holds that file: run KV.WIPE before the next KV.PUT. It
+.opens logical files 14 and 15 to test for the file and closes both, so
+.neither may be open when it is called.
 .
-.  bank 11, GPBMODS.B11, 3,074 bytes
-.      the two biggest dropdown handlers, this program's own code
+.The layout, for a program that reads the bank without this module:
 .
-.Six of those are GP.BANKED code regions (SEC 3.12) and two are GP.BANKEDSTR
-.text pools (SEC 3.10). One .Bnn file is written per bank. Each loads to
-.$A000 in its own bank and carries a two-byte load address like any PRG, so a
-.payload is the file size less two. The resident object is 11,619 bytes and
-.the overlays are 30,224 between them.
-.
-.Only what holds a BANK statement stays in low RAM. STASH and STASHFILE
-.execute BANK, which the compiler refuses inside a region; STASHVRAM (SEC
-.4.18) is the one to reach for from inside one.
-.
-.Six regions and not one, because a region holds at most 8,192 bytes and the
-.GUI fills its own. A region may call another: the call selects the other
-.bank and its RETURN puts the caller's back.
-.
-.A nearly empty region still costs a whole page count. Bank 9 holds 502 bytes
-.of THEME in a 768-byte overlay, and bank 10 holds 705 bytes of COMBO in
-.another 768. Below about a page and a half of p-code, a region gives back
-.less than it looks like.
-.
+:slot n = $A000 + n*128, n = 0-63
+:+0..+7    the key, padded with spaces. $00 at +0 is a free slot

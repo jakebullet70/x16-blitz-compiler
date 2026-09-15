@@ -167,6 +167,14 @@ exitcmd 	.macro
 		jmp 	NextCommand
 		.endm
 
+;
+;		A handler in bank 1 (HANDLER_BANK) ends with .exitbank, never .exitcmd. BankedExit is in
+;		low RAM, selects the program's bank again and runs on into NextCommand.
+;
+exitbank 	.macro
+		jmp 	BankedExit
+		.endm
+
 		
 ; ************************************************************************************************
 ;
@@ -631,7 +639,8 @@ StartRuntime:
 		;
 		;		Main Run Loop
 		;
-		bra 	NXStartLoop 				; step over the out-of-line break check below
+		ldy 	#0
+		bra 	NextCommand 				; step over the break check and the bank routines below
 		;
 		;		The Ctrl+C poll, lifted out of the dispatch path. It runs once every 16 p-code
 		;		words; the counter test in front of it runs on EVERY word, which makes it the
@@ -657,8 +666,32 @@ NXBreakCheck:
 		lda 	#16 						; re-arm the counter for the next 16 words
 		sta 	breakCount
 		bra 	NXDispatch
-NXStartLoop:
-		ldy 	#0
+		;
+		;		A handler in bank 1 (HANDLER_BANK) has BankEnter as its vector entry, or BankEnterShift in
+		;		the shifted table. It saves the program's bank, selects bank 1 and jumps through the copy of
+		;		the table in bank 1 with the X the dispatcher left (generated/vectors.asm). The handler reads
+		;		no A on entry, and its .entercmd pulls the X the dispatcher pushed.
+		;
+BankEnter:
+		lda 	SelectRAMBank
+		sta 	handlerBank
+		lda 	#HANDLER_BANK
+		sta 	SelectRAMBank
+		jmp 	(BankVectors,x)
+
+BankEnterShift:
+		lda 	SelectRAMBank
+		sta 	handlerBank
+		lda 	#HANDLER_BANK
+		sta 	SelectRAMBank
+		jmp 	(BankShiftVectors,x)
+		;
+		;		A handler in bank 1 leaves through .exitbank, which selects the program's bank again, saved
+		;		by BankEnter, before NextCommand.
+		;
+BankedExit:
+		lda 	handlerBank
+		sta 	SelectRAMBank
 NextCommand:
 		dec 	breakCount 					; only check every 16 instructions.
 		beq 	NXBreakCheck
@@ -797,6 +830,9 @@ Runtime6502SP: 								; 6502 stack on start.
 		
 breakCount: 								; counter so don't check break every instruction.
 		.fill 	1		
+
+handlerBank: 								; the program's RAM bank while a bank 1 handler runs
+		.fill 	1
 		.send storage
 
 ; ************************************************************************************************
@@ -2312,6 +2348,16 @@ Unimplemented:
 		jmp 	ErrorV_unimplemented
 		
 RuntimeErrorHandler:
+		;
+		;		Bank 1 (HANDLER_BANK) at an error means a handler in bank 1 was running. Select the
+		;		program's bank, saved by BankEnter, so READY does not leave the handler code selected.
+		;
+		lda 	SelectRAMBank
+		cmp 	#HANDLER_BANK
+		bne 	_EHProgramBank
+		lda 	handlerBank
+		sta 	SelectRAMBank
+_EHProgramBank:
 		tya
 		clc
 		adc 	codePtr
@@ -3102,115 +3148,14 @@ CommandXEndSelect: ;; [gp.endsel]
 ;
 ; ************************************************************************************************
 ; ************************************************************************************************
+;
+;		CHAR stays in low RAM. Its string can be a literal in a GP.BANKED region, whose bank
+;		bank 1 would hide, so the three routines it calls stay with it. The other commands run
+;		from bank 1 (HANDLER_BANK).
+;
+; ************************************************************************************************
 
 		.section 	code
-
-; ************************************************************************************************
-;
-;										PSET Command
-;
-; ************************************************************************************************
-
-Command_PSET: ;; [pset]
-		.entercmd
-		phy
-		jsr 	GetInteger8Bit 				; get the colour
-		pha
-		ldx 	#0 							; copy 0/1 to r0,r1
-		ldy 	#X16_r0
-		jsr 	GraphicsCopy2
-		jsr 	X16_FB_cursor_position 		; set position.
-		pla 								; set pixel.
-		jsr 	X16_FB_set_pixel
-		ply
-		ldx 	#$FF
-		.exitcmd
-
-; ************************************************************************************************
-;
-;										LINE Command
-;
-; ************************************************************************************************
-
-Command_LINE: ;; [line]
-		.entercmd
-		phy
-		jsr 	GraphicsColourOptional 		; LINE's colour is optional (keeps current if omitted)
-		ldx 	#0 							; copy 0/1/2/3 to r0,1,2,3
-		ldy 	#X16_r0
-		jsr 	GraphicsCopy4
-		jsr 	X16_GRAPH_draw_line
-		ply
-		ldx 	#$FF
-		.exitcmd
-
-; ************************************************************************************************
-;
-;										RECT Command
-;
-; ************************************************************************************************
-
-Command_RECT: ;; [rect]
-		.entercmd
-		phy
-		jsr 	GraphicsRectCoords
-		sec
-		jsr 	X16_GRAPH_draw_rect
-		ply
-		ldx 	#$FF
-		.exitcmd
-
-; ************************************************************************************************
-;
-;										FRAME Command
-;
-; ************************************************************************************************
-
-Command_FRAME: ;; [frame]
-		.entercmd
-		phy
-		jsr 	GraphicsRectCoords
-		clc
-		jsr 	X16_GRAPH_draw_rect
-		ply
-		ldx 	#$FF
-		.exitcmd
-
-; ************************************************************************************************
-;
-;										OVAL Command
-;
-;		OVAL and RING are RECT and FRAME with the ellipse renderer in place of the rectangle
-;		one. GRAPH_draw_oval takes its bounding box in r0..r3 and the fill flag in carry,
-;		exactly as GRAPH_draw_rect does, so GraphicsRectCoords sets up both unchanged.
-;
-; ************************************************************************************************
-
-Command_OVAL: ;; [oval]
-		.entercmd
-		phy
-		jsr 	GraphicsRectCoords
-		sec 								; carry set = filled
-		jsr 	X16_GRAPH_draw_oval
-		ply
-		ldx 	#$FF
-		.exitcmd
-
-; ************************************************************************************************
-;
-;										RING Command
-;
-; ************************************************************************************************
-
-Command_RING: ;; [ring]
-		.entercmd
-		phy
-		jsr 	GraphicsRectCoords
-		clc 								; carry clear = outline
-		jsr 	X16_GRAPH_draw_oval
-		ply
-		ldx 	#$FF
-		.exitcmd
 
 ; ************************************************************************************************
 ;
@@ -3255,17 +3200,6 @@ _CCExit:
 ;
 ; ************************************************************************************************
 
-GraphicsColourOptional:
-		.floatinteger 						; integer form of the colour argument.
-		lda 	NSMantissa1,x 				; high byte is non-zero only for the 256 "omitted"
-		bne 	_GCOKeep 					; marker OptionalColourCompile pushes -- so leave the
-		lda 	NSMantissa0,x 				; current draw colour. Otherwise it is a real 0..255
-		tax 								; colour (an explicit ",255" still lands here), set it.
-		ldy 	#0
-		jsr 	X16_GRAPH_set_colors
-_GCOKeep:
-		rts
-
 GraphicsColour:
 		jsr 	GetInteger8Bit
 		tax
@@ -3279,8 +3213,6 @@ GraphicsColour:
 ;
 ; ************************************************************************************************
 
-GraphicsCopy4:
-		jsr 	GraphicsCopy2
 GraphicsCopy2:
 		jsr 	GraphicsCopy1
 GraphicsCopy1:		
@@ -3293,6 +3225,144 @@ GraphicsCopy1:
 		iny
 		iny
 		rts
+
+		.send 	code
+
+		.section 	banked
+
+; ************************************************************************************************
+;
+;										PSET Command
+;
+; ************************************************************************************************
+
+Command_PSET: ;; [pset]
+		.entercmd
+		phy
+		jsr 	GetInteger8Bit 				; get the colour
+		pha
+		ldx 	#0 							; copy 0/1 to r0,r1
+		ldy 	#X16_r0
+		jsr 	GraphicsCopy2
+		jsr 	X16_FB_cursor_position 		; set position.
+		pla 								; set pixel.
+		jsr 	X16_FB_set_pixel
+		ply
+		ldx 	#$FF
+		.exitbank
+
+; ************************************************************************************************
+;
+;										LINE Command
+;
+; ************************************************************************************************
+
+Command_LINE: ;; [line]
+		.entercmd
+		phy
+		jsr 	GraphicsColourOptional 		; LINE's colour is optional (keeps current if omitted)
+		ldx 	#0 							; copy 0/1/2/3 to r0,1,2,3
+		ldy 	#X16_r0
+		jsr 	GraphicsCopy4
+		jsr 	X16_GRAPH_draw_line
+		ply
+		ldx 	#$FF
+		.exitbank
+
+; ************************************************************************************************
+;
+;										RECT Command
+;
+; ************************************************************************************************
+
+Command_RECT: ;; [rect]
+		.entercmd
+		phy
+		jsr 	GraphicsRectCoords
+		sec
+		jsr 	X16_GRAPH_draw_rect
+		ply
+		ldx 	#$FF
+		.exitbank
+
+; ************************************************************************************************
+;
+;										FRAME Command
+;
+; ************************************************************************************************
+
+Command_FRAME: ;; [frame]
+		.entercmd
+		phy
+		jsr 	GraphicsRectCoords
+		clc
+		jsr 	X16_GRAPH_draw_rect
+		ply
+		ldx 	#$FF
+		.exitbank
+
+; ************************************************************************************************
+;
+;										OVAL Command
+;
+;		OVAL and RING are RECT and FRAME with the ellipse renderer in place of the rectangle
+;		one. GRAPH_draw_oval takes its bounding box in r0..r3 and the fill flag in carry,
+;		exactly as GRAPH_draw_rect does, so GraphicsRectCoords sets up both unchanged.
+;
+; ************************************************************************************************
+
+Command_OVAL: ;; [oval]
+		.entercmd
+		phy
+		jsr 	GraphicsRectCoords
+		sec 								; carry set = filled
+		jsr 	X16_GRAPH_draw_oval
+		ply
+		ldx 	#$FF
+		.exitbank
+
+; ************************************************************************************************
+;
+;										RING Command
+;
+; ************************************************************************************************
+
+Command_RING: ;; [ring]
+		.entercmd
+		phy
+		jsr 	GraphicsRectCoords
+		clc 								; carry clear = outline
+		jsr 	X16_GRAPH_draw_oval
+		ply
+		ldx 	#$FF
+		.exitbank
+
+; ************************************************************************************************
+;
+;								Set colour to stack X
+;
+; ************************************************************************************************
+
+GraphicsColourOptional:
+		.floatinteger 						; integer form of the colour argument.
+		lda 	NSMantissa1,x 				; high byte is non-zero only for the 256 "omitted"
+		bne 	_GCOKeep 					; marker OptionalColourCompile pushes -- so leave the
+		lda 	NSMantissa0,x 				; current draw colour. Otherwise it is a real 0..255
+		tax 								; colour (an explicit ",255" still lands here), set it.
+		ldy 	#0
+		jsr 	X16_GRAPH_set_colors
+_GCOKeep:
+		rts
+
+; ************************************************************************************************
+;
+;								Copy stack X,X+n to rY,Y+n
+;
+; ************************************************************************************************
+
+GraphicsCopy4: 								; GraphicsCopy2 is in low RAM, so the second pair
+		jsr 	GraphicsCopy2 				; jumps to it rather than falling through
+		jmp 	GraphicsCopy2
 
 ; ************************************************************************************************
 ;
@@ -3347,7 +3417,7 @@ _GRCSwapByte:
 		pla
 		sta 	0,x
 		rts		
-		.send 	code
+		.send 	banked
 		
 ; ************************************************************************************************
 ;
@@ -3847,18 +3917,24 @@ LinkFloatAdd: ;; [+]
 	jsr	FloatAdd
 	ply
 	.exitcmd
+	.send code
+	.section code
 LinkFloatSubtract: ;; [-]
 	.entercmd
 	phy
 	jsr	FloatSubtract
 	ply
 	.exitcmd
+	.send code
+	.section code
 LinkFloatMultiply: ;; [*]
 	.entercmd
 	phy
 	jsr	FloatMultiply
 	ply
 	.exitcmd
+	.send code
+	.section code
 LinkFloatDivide: ;; [/]
 	.entercmd
 	phy
@@ -3866,110 +3942,154 @@ LinkFloatDivide: ;; [/]
 	bcs	DivZeroError
 	ply
 	.exitcmd
+	.send code
+	.section banked
 LinkFloatPower: ;; [^]
 	.entercmd
 	phy
 	jsr	FloatPower
-	bcs	MapRangeError
+	bcc	_Result
+	jmp	MapRangeError
+_Result:
 	ply
-	.exitcmd
+	.exitbank
+	.send banked
+	.section code
 LinkCompareGreater: ;; [>]
 	.entercmd
 	phy
 	jsr	CompareGreater
 	ply
 	.exitcmd
+	.send code
+	.section code
 LinkCompareEqual: ;; [=]
 	.entercmd
 	phy
 	jsr	CompareEqual
 	ply
 	.exitcmd
+	.send code
+	.section code
 LinkCompareLess: ;; [<]
 	.entercmd
 	phy
 	jsr	CompareLess
 	ply
 	.exitcmd
+	.send code
+	.section code
 LinkCompareGreaterEqual: ;; [>=]
 	.entercmd
 	phy
 	jsr	CompareGreaterEqual
 	ply
 	.exitcmd
+	.send code
+	.section code
 LinkCompareNotEqual: ;; [<>]
 	.entercmd
 	phy
 	jsr	CompareNotEqual
 	ply
 	.exitcmd
+	.send code
+	.section code
 LinkCompareLessEqual: ;; [<=]
 	.entercmd
 	phy
 	jsr	CompareLessEqual
 	ply
 	.exitcmd
+	.send code
+	.section code
 LinkFloatIntegerPartDown: ;; [!int]
 	.entercmd
 	phy
 	jsr	FloatIntegerPartDown
 	ply
 	.exitcmd
+	.send code
+	.section banked
 LinkFloatSquareRoot: ;; [!sqr]
 	.entercmd
 	phy
 	jsr	FloatSquareRoot
-	bcs	MapRangeError
+	bcc	_Result
+	jmp	MapRangeError
+_Result:
 	ply
-	.exitcmd
+	.exitbank
+	.send banked
+	.section code
 MapRangeError:
 	.error_range
 DivZeroError:
 	.error_divzero
+	.send code
+	.section banked
 LinkFloatLogarithm: ;; [!log]
 	.entercmd
 	phy
 	jsr	FloatLogarithm
-	bcs	MapRangeError
+	bcc	_Result
+	jmp	MapRangeError
+_Result:
 	ply
-	.exitcmd
+	.exitbank
+	.send banked
+	.section banked
 LinkFloatExponent: ;; [!exp]
 	.entercmd
 	phy
 	jsr	FloatExponent
 	ply
-	.exitcmd
+	.exitbank
+	.send banked
+	.section banked
 LinkFloatCosine: ;; [!cos]
 	.entercmd
 	phy
 	jsr	FloatCosine
 	ply
-	.exitcmd
+	.exitbank
+	.send banked
+	.section banked
 LinkFloatSine: ;; [!sin]
 	.entercmd
 	phy
 	jsr	FloatSine
 	ply
-	.exitcmd
+	.exitbank
+	.send banked
+	.section banked
 LinkFloatTangent: ;; [!tan]
 	.entercmd
 	phy
 	jsr	FloatTangent
 	ply
-	.exitcmd
+	.exitbank
+	.send banked
+	.section banked
 LinkFloatArcTan: ;; [!atn]
 	.entercmd
 	phy
 	jsr	FloatArcTan
-	bcs	MapRangeError
+	bcc	_Result
+	jmp	MapRangeError
+_Result:
 	ply
-	.exitcmd
+	.exitbank
+	.send banked
+	.section code
 LinkFloatCompare: ;; [f.cmp]
 	.entercmd
 	phy
 	jsr	FloatCompare
 	ply
 	.exitcmd
+	.send code
+	.section code
 LinkDivideInt32: ;; [int.div]
 	.entercmd
 	phy
@@ -4857,7 +4977,7 @@ _UMDivideByZero:
 ; ************************************************************************************************
 ; ************************************************************************************************
 
-		.section 	code
+		.section 	banked
 
 ; ************************************************************************************************
 ;
@@ -4878,7 +4998,7 @@ XCommandMouse: ;; [!mouse]
 		jsr 	X16_mouse_config 			; config the mouse
 		ply
 		plx
-		.exitcmd
+		.exitbank
 
 ; ************************************************************************************************
 ;
@@ -4892,7 +5012,7 @@ XUnaryMB: ;; [!mb]
 		lda 	zTemp2
 		inx
 		jsr 	FloatSetByte
-		.exitcmd
+		.exitbank
 
 XUnaryMX: ;; [!mx]
 		.entercmd
@@ -4902,7 +5022,7 @@ XUnaryMX: ;; [!mx]
 		jsr 	FloatSetByte
 		lda 	zTemp0+1
 		sta 	NSMantissa1,x
-		.exitcmd
+		.exitbank
 
 XUnaryMY: ;; [!my]
 		.entercmd
@@ -4912,7 +5032,7 @@ XUnaryMY: ;; [!my]
 		jsr 	FloatSetByte
 		lda 	zTemp1+1
 		sta 	NSMantissa1,x
-		.exitcmd
+		.exitbank
 
 XUnaryMWheel: ;; [!mwheel]
 		.entercmd
@@ -4929,7 +5049,7 @@ _XUMNotNegative:
 		bpl 	_XUMNotNegative2
 		jsr 	FloatNegate
 _XUMNotNegative2:
-		.exitcmd
+		.exitbank
 
 XUnaryMouseCommon:
 		phx
@@ -4942,7 +5062,7 @@ XUnaryMouseCommon:
 		plx
 		rts
 
-		.send 	code
+		.send 	banked
 		
 ; ************************************************************************************************
 ;
@@ -5467,7 +5587,7 @@ UnaryPeek:	;; [peek]
 ; ************************************************************************************************
 ; ************************************************************************************************
 
-		.section 	code
+		.section 	banked
 
 ; ************************************************************************************************
 ;
@@ -5480,9 +5600,9 @@ UnaryPI: ;; [pi]
 		lda 	#Const_pi-Const_base
 		jsr 	LoadConstant
 		inx
-		.exitcmd
+		.exitbank
 
-		.send 	code
+		.send 	banked
 		
 ; ************************************************************************************************
 ;
@@ -6901,9 +7021,105 @@ _PSExit:
 ;		where SPRITE omits the colour depth. Defaulting it to 0 would silently undo the 8bpp
 ;		that SPRMEM just set on the line before.
 ;
+;		MOVSPR and the address routines stay in low RAM, so a game that moves sprites every
+;		frame pays no bank switch. SPRITE and SPRMEM run from bank 1 (HANDLER_BANK).
+;
 ; ************************************************************************************************
 
 		.section 	code
+
+; ************************************************************************************************
+;
+;								MOVSPR <idx>,<x>,<y>
+;
+; ************************************************************************************************
+
+Command_MOVSPR: ;; [!movspr]
+		.entercmd
+		phy
+		;
+		;		x and y are signed, and the manual says they "wrap every 1024 values" -- -10 and
+		;		1014 are the same place. VERA's X and Y are 10 bit fields, so taking the low ten
+		;		bits of the two's complement value IS that wrap, with nothing to special-case.
+		;		GetInteger16Bit hands back exactly that two's complement value.
+		;
+		ldx 	#2
+		jsr 	GetInteger16Bit 			; y
+		lda 	zTemp0
+		sta 	spriteY
+		lda 	zTemp0+1
+		and 	#3
+		sta 	spriteY+1
+
+		dex
+		jsr 	GetInteger16Bit 			; x
+		lda 	zTemp0
+		sta 	spriteX
+		lda 	zTemp0+1
+		and 	#3
+		sta 	spriteX+1
+
+		lda 	NSMantissa0+0 				; sprite index; bytes 2..5 are written in order so
+		ldy 	#2 							; the auto-increment can walk them
+		jsr 	SpriteSetAddressInc
+		lda 	spriteX
+		sta 	VRAMData0 					; byte 2 : X (7:0)
+		lda 	spriteX+1
+		sta 	VRAMData0 					; byte 3 : X (9:8)
+		lda 	spriteY
+		sta 	VRAMData0 					; byte 4 : Y (7:0)
+		lda 	spriteY+1
+		sta 	VRAMData0 					; byte 5 : Y (9:8)
+		ply
+		ldx 	#$FF
+		.exitcmd
+
+; ************************************************************************************************
+;
+;		Point VERA data port 0 at byte Y of sprite A's attribute block. A is the sprite index
+;		and Y the offset 0-7. The float stack pointer X is not touched.
+;
+; ************************************************************************************************
+
+SpriteSetAddress: 							; leave the address alone after each access
+		pha
+		lda 	#VRAMBank1
+		bra 	SpriteSetAddressCommon
+
+SpriteSetAddressInc: 						; step it on by one, to walk a run of bytes
+		pha
+		lda 	#VRAMBank1 | VRAMIncrement1
+
+;		This scratches spriteLow/spriteMed/spriteHigh and NOTHING else. It must not touch
+;		spriteTemp: SPRMEM works out an attribute byte and only then calls this to point at
+;		where the byte goes, so anything this borrowed would be destroyed on the way.
+
+SpriteSetAddressCommon: 					; global, not a cheap local: SpriteSetAddress branches
+		sta 	spriteHigh 					; in from its own scope, and _locals do not cross one
+		pla
+		and 	#$7F 						; sprite index is 0-127
+		stz 	spriteMed
+		asl 	a 							; spriteMed:A = index x 8, the block's byte offset
+		rol 	spriteMed 					; from $1FC00. The top comes out at index >> 5, which
+		asl 	a 							; is at most 3.
+		rol 	spriteMed
+		asl 	a
+		rol 	spriteMed
+		sta 	spriteLow
+		tya 								; the low three bits of index x 8 are clear and Y is
+		ora 	spriteLow 					; 0-7, so the byte offset just ORs in
+		sta 	VRAMLow0
+		lda 	spriteMed
+		clc
+		adc 	#SpriteAttributeBase 		; never carries: 3 + $FC = $FF
+		sta 	VRAMMed0
+		lda 	spriteHigh
+		sta 	VRAMHigh0
+		rts
+
+		.send 	code
+
+		.section 	banked
 
 ; ************************************************************************************************
 ;
@@ -7026,7 +7242,7 @@ _CSPNoDepth:
 											; command is called, the sprite layer will be enabled"
 		ply
 		ldx 	#$FF
-		.exitcmd
+		.exitbank
 
 ; ************************************************************************************************
 ;
@@ -7097,96 +7313,7 @@ _CSMInteger:
 		sta 	VRAMData0
 		ply
 		ldx 	#$FF
-		.exitcmd
-
-; ************************************************************************************************
-;
-;								MOVSPR <idx>,<x>,<y>
-;
-; ************************************************************************************************
-
-Command_MOVSPR: ;; [!movspr]
-		.entercmd
-		phy
-		;
-		;		x and y are signed, and the manual says they "wrap every 1024 values" -- -10 and
-		;		1014 are the same place. VERA's X and Y are 10 bit fields, so taking the low ten
-		;		bits of the two's complement value IS that wrap, with nothing to special-case.
-		;		GetInteger16Bit hands back exactly that two's complement value.
-		;
-		ldx 	#2
-		jsr 	GetInteger16Bit 			; y
-		lda 	zTemp0
-		sta 	spriteY
-		lda 	zTemp0+1
-		and 	#3
-		sta 	spriteY+1
-
-		dex
-		jsr 	GetInteger16Bit 			; x
-		lda 	zTemp0
-		sta 	spriteX
-		lda 	zTemp0+1
-		and 	#3
-		sta 	spriteX+1
-
-		lda 	NSMantissa0+0 				; sprite index; bytes 2..5 are written in order so
-		ldy 	#2 							; the auto-increment can walk them
-		jsr 	SpriteSetAddressInc
-		lda 	spriteX
-		sta 	VRAMData0 					; byte 2 : X (7:0)
-		lda 	spriteX+1
-		sta 	VRAMData0 					; byte 3 : X (9:8)
-		lda 	spriteY
-		sta 	VRAMData0 					; byte 4 : Y (7:0)
-		lda 	spriteY+1
-		sta 	VRAMData0 					; byte 5 : Y (9:8)
-		ply
-		ldx 	#$FF
-		.exitcmd
-
-; ************************************************************************************************
-;
-;		Point VERA data port 0 at byte Y of sprite A's attribute block. A is the sprite index
-;		and Y the offset 0-7. The float stack pointer X is not touched.
-;
-; ************************************************************************************************
-
-SpriteSetAddress: 							; leave the address alone after each access
-		pha
-		lda 	#VRAMBank1
-		bra 	SpriteSetAddressCommon
-
-SpriteSetAddressInc: 						; step it on by one, to walk a run of bytes
-		pha
-		lda 	#VRAMBank1 | VRAMIncrement1
-
-;		This scratches spriteLow/spriteMed/spriteHigh and NOTHING else. It must not touch
-;		spriteTemp: SPRMEM works out an attribute byte and only then calls this to point at
-;		where the byte goes, so anything this borrowed would be destroyed on the way.
-
-SpriteSetAddressCommon: 					; global, not a cheap local: SpriteSetAddress branches
-		sta 	spriteHigh 					; in from its own scope, and _locals do not cross one
-		pla
-		and 	#$7F 						; sprite index is 0-127
-		stz 	spriteMed
-		asl 	a 							; spriteMed:A = index x 8, the block's byte offset
-		rol 	spriteMed 					; from $1FC00. The top comes out at index >> 5, which
-		asl 	a 							; is at most 3.
-		rol 	spriteMed
-		asl 	a
-		rol 	spriteMed
-		sta 	spriteLow
-		tya 								; the low three bits of index x 8 are clear and Y is
-		ora 	spriteLow 					; 0-7, so the byte offset just ORs in
-		sta 	VRAMLow0
-		lda 	spriteMed
-		clc
-		adc 	#SpriteAttributeBase 		; never carries: 3 + $FC = $FF
-		sta 	VRAMMed0
-		lda 	spriteHigh
-		sta 	VRAMHigh0
-		rts
+		.exitbank
 
 ; ************************************************************************************************
 ;
@@ -7224,7 +7351,7 @@ SpriteEnableLayer:
 		sta 	VERACtrl
 		rts
 
-		.send 	code
+		.send 	banked
 
 		.section storage
 spriteLow: 									; SpriteSetAddress's private scratch -- see the note
@@ -7958,7 +8085,7 @@ TIPushClock:
 ;
 ; ************************************************************************************************
 
-		.section 	code
+		.section 	banked
 
 ; ************************************************************************************************
 ;
@@ -7999,9 +8126,9 @@ _TRRead:
 		lda 	VRAMData0
 		jsr 	FloatSetByte
 		ply
-		.exitcmd
+		.exitbank
 
-		.send 	code
+		.send 	banked
 
 ; ************************************************************************************************
 ;
@@ -8037,46 +8164,12 @@ _TRRead:
 ;		$1B000, so a row is 256 bytes and the cell is $1B000 + y*256 + x*2 -- but nothing here
 ;		depends on that.
 ;
+;		TileSetAddress stays in low RAM for the GP block's drawing (gpdraw.asm). TILE, TDATA and
+;		TATTR run from bank 1 (HANDLER_BANK).
+;
 ; ************************************************************************************************
 
 		.section 	code
-
-; ************************************************************************************************
-;
-;						TILE <x>,<y>,<tile/screen code>[,<attribute>]
-;
-; ************************************************************************************************
-
-Command_TILE: ;; [!tile]
-		.entercmd
-		phy
-		ldx 	#3
-_CTLInteger:
-		.floatinteger
-		dex
-		bpl 	_CTLInteger
-
-		lda 	NSMantissa0+0
-		sta 	tileX
-		lda 	NSMantissa1+0
-		sta 	tileX+1
-		lda 	NSMantissa0+1
-		sta 	tileY
-		lda 	NSMantissa1+1
-		sta 	tileY+1
-		jsr 	TileSetAddress
-
-		lda 	NSMantissa0+2 				; the tile or screen code, and the auto-increment
-		sta 	VRAMData0 					; then steps on to the attribute
-
-		lda 	NSMantissa0+3 				; the attribute is optional. 255 means it was not
-		cmp 	#255 						; supplied, and the cell keeps the colours it had.
-		beq 	_CTLNoAttribute
-		sta 	VRAMData0
-_CTLNoAttribute:
-		ply
-		ldx 	#$FF
-		.exitcmd
 
 ; ************************************************************************************************
 ;
@@ -8149,6 +8242,47 @@ _TSARow:
 		rts
 
 		.send 	code
+
+		.section 	banked
+
+; ************************************************************************************************
+;
+;						TILE <x>,<y>,<tile/screen code>[,<attribute>]
+;
+; ************************************************************************************************
+
+Command_TILE: ;; [!tile]
+		.entercmd
+		phy
+		ldx 	#3
+_CTLInteger:
+		.floatinteger
+		dex
+		bpl 	_CTLInteger
+
+		lda 	NSMantissa0+0
+		sta 	tileX
+		lda 	NSMantissa1+0
+		sta 	tileX+1
+		lda 	NSMantissa0+1
+		sta 	tileY
+		lda 	NSMantissa1+1
+		sta 	tileY+1
+		jsr 	TileSetAddress
+
+		lda 	NSMantissa0+2 				; the tile or screen code, and the auto-increment
+		sta 	VRAMData0 					; then steps on to the attribute
+
+		lda 	NSMantissa0+3 				; the attribute is optional. 255 means it was not
+		cmp 	#255 						; supplied, and the cell keeps the colours it had.
+		beq 	_CTLNoAttribute
+		sta 	VRAMData0
+_CTLNoAttribute:
+		ply
+		ldx 	#$FF
+		.exitbank
+
+		.send 	banked
 
 		.section storage
 tileX:
@@ -8528,7 +8662,7 @@ VectorTable:
 	.word	LinkFloatSubtract        ; $81 -
 	.word	LinkFloatMultiply        ; $82 *
 	.word	LinkFloatDivide          ; $83 /
-	.word	LinkFloatPower           ; $84 ^
+	.word	BankEnter                ; $84 ^, LinkFloatPower in bank 1
 	.word	BinaryAnd                ; $85 and
 	.word	BinaryOr                 ; $86 or
 	.word	LinkCompareGreater       ; $87 >
@@ -8564,13 +8698,13 @@ VectorTable:
 	.word	UnaryGPC                 ; $a5 gp.c
 	.word	UnaryGPInstr             ; $a6 gp.instr
 	.word	UnaryGPStrPtr            ; $a7 gp.strptr
-	.word	Command_PSET             ; $a8 pset
-	.word	Command_LINE             ; $a9 line
-	.word	Command_RECT             ; $aa rect
-	.word	Command_FRAME            ; $ab frame
-	.word	Command_OVAL             ; $ac oval
-	.word	Command_RING             ; $ad ring
-	.word	Command_CHAR             ; $ae char
+	.word	Command_CHAR             ; $a8 char
+	.word	BankEnter                ; $a9 pset, Command_PSET in bank 1
+	.word	BankEnter                ; $aa line, Command_LINE in bank 1
+	.word	BankEnter                ; $ab rect, Command_RECT in bank 1
+	.word	BankEnter                ; $ac frame, Command_FRAME in bank 1
+	.word	BankEnter                ; $ad oval, Command_OVAL in bank 1
+	.word	BankEnter                ; $ae ring, Command_RING in bank 1
 	.word	Unary16Hex               ; $af hex$
 	.word	CommandXInput            ; $b0 input
 	.word	CommandInputString       ; $b1 input$
@@ -8586,7 +8720,7 @@ VectorTable:
 	.word	CommandXOn               ; $bb on
 	.word	CommandMoreOn            ; $bc moreon
 	.word	UnaryPeek                ; $bd peek
-	.word	UnaryPI                  ; $be pi
+	.word	BankEnter                ; $be pi, UnaryPI in bank 1
 	.word	CommandPOKE              ; $bf poke
 	.word	UnaryPos                 ; $c0 pos
 	.word	GetChannel               ; $c1 getchannel
@@ -8657,13 +8791,13 @@ ShiftVectorTable:
 	.word	UnaryGPComp              ; $dd89 gp.comp
 	.word	UnaryJoy                 ; $dd8a joy
 	.word	LinkFloatIntegerPartDown ; $dd8b int
-	.word	LinkFloatSquareRoot      ; $dd8c sqr
-	.word	LinkFloatLogarithm       ; $dd8d log
-	.word	LinkFloatExponent        ; $dd8e exp
-	.word	LinkFloatCosine          ; $dd8f cos
-	.word	LinkFloatSine            ; $dd90 sin
-	.word	LinkFloatTangent         ; $dd91 tan
-	.word	LinkFloatArcTan          ; $dd92 atn
+	.word	BankEnterShift           ; $dd8c sqr, LinkFloatSquareRoot in bank 1
+	.word	BankEnterShift           ; $dd8d log, LinkFloatLogarithm in bank 1
+	.word	BankEnterShift           ; $dd8e exp, LinkFloatExponent in bank 1
+	.word	BankEnterShift           ; $dd8f cos, LinkFloatCosine in bank 1
+	.word	BankEnterShift           ; $dd90 sin, LinkFloatSine in bank 1
+	.word	BankEnterShift           ; $dd91 tan, LinkFloatTangent in bank 1
+	.word	BankEnterShift           ; $dd92 atn, LinkFloatArcTan in bank 1
 	.word	CommandXLinput           ; $dd93 linput
 	.word	CommandXBinput           ; $dd94 binput
 	.word	Command_LOAD             ; $dd95 load
@@ -8675,21 +8809,21 @@ ShiftVectorTable:
 	.word	X16CommandPowerOff       ; $dd9b poweroff
 	.word	X16CommandReset          ; $dd9c reset
 	.word	X16CommandReboot         ; $dd9d reboot
-	.word	XCommandMouse            ; $dd9e mouse
-	.word	XUnaryMB                 ; $dd9f mb
-	.word	XUnaryMX                 ; $dda0 mx
-	.word	XUnaryMY                 ; $dda1 my
-	.word	XUnaryMWheel             ; $dda2 mwheel
+	.word	BankEnterShift           ; $dd9e mouse, XCommandMouse in bank 1
+	.word	BankEnterShift           ; $dd9f mb, XUnaryMB in bank 1
+	.word	BankEnterShift           ; $dda0 mx, XUnaryMX in bank 1
+	.word	BankEnterShift           ; $dda1 my, XUnaryMY in bank 1
+	.word	BankEnterShift           ; $dda2 mwheel, XUnaryMWheel in bank 1
 	.word	UnaryRPT                 ; $dda3 rpt$
-	.word	Command_SPRITE           ; $dda4 sprite
-	.word	Command_SPRMEM           ; $dda5 sprmem
-	.word	Command_MOVSPR           ; $dda6 movspr
+	.word	Command_MOVSPR           ; $dda4 movspr
+	.word	BankEnterShift           ; $dda5 sprite, Command_SPRITE in bank 1
+	.word	BankEnterShift           ; $dda6 sprmem, Command_SPRMEM in bank 1
 	.word	UnaryST                  ; $dda7 st
 	.word	CommandStop              ; $dda8 stop
 	.word	CommandSYS               ; $dda9 sys
-	.word	UnaryTDATA               ; $ddaa tdata
-	.word	UnaryTATTR               ; $ddab tattr
-	.word	Command_TILE             ; $ddac tile
+	.word	BankEnterShift           ; $ddaa tdata, UnaryTDATA in bank 1
+	.word	BankEnterShift           ; $ddab tattr, UnaryTATTR in bank 1
+	.word	BankEnterShift           ; $ddac tile, Command_TILE in bank 1
 	.word	CommandTIWriteN          ; $ddad ti.write
 	.word	CommandTIWriteS          ; $ddae ti$.write
 	.word	CommandXWAIT             ; $ddaf wait
@@ -8697,6 +8831,135 @@ ShiftVectorTable:
 	.word	X16I2CPeek               ; $ddb1 i2cpeek
 	.word	CommandBank              ; $ddb2 bank
 	.word	XCommandSleep            ; $ddb3 sleep
+	.word	BankEnterShift           ; $ddb4 fminit, X16_Audio_FMINIT in bank 1
+	.word	BankEnterShift           ; $ddb5 fmnote, X16_Audio_FMNOTE in bank 1
+	.word	BankEnterShift           ; $ddb6 fmdrum, X16_Audio_FMDRUM in bank 1
+	.word	BankEnterShift           ; $ddb7 fminst, X16_Audio_FMINST in bank 1
+	.word	BankEnterShift           ; $ddb8 fmvib, X16_Audio_FMVIB in bank 1
+	.word	BankEnterShift           ; $ddb9 fmfreq, X16_Audio_FMFREQ in bank 1
+	.word	BankEnterShift           ; $ddba fmvol, X16_Audio_FMVOL in bank 1
+	.word	BankEnterShift           ; $ddbb fmpan, X16_Audio_FMPAN in bank 1
+	.word	X16_Audio_FMPLAY         ; $ddbc fmplay
+	.word	X16_Audio_FMCHORD        ; $ddbd fmchord
+	.word	BankEnterShift           ; $ddbe fmpoke, X16_Audio_FMPOKE in bank 1
+	.word	BankEnterShift           ; $ddbf psginit, X16_Audio_PSGINIT in bank 1
+	.word	BankEnterShift           ; $ddc0 psgnote, X16_Audio_PSGNOTE in bank 1
+	.word	BankEnterShift           ; $ddc1 psgvol, X16_Audio_PSGVOL in bank 1
+	.word	BankEnterShift           ; $ddc2 psgwav, X16_Audio_PSGWAV in bank 1
+	.word	BankEnterShift           ; $ddc3 psgfreq, X16_Audio_PSGFREQ in bank 1
+	.word	BankEnterShift           ; $ddc4 psgpan, X16_Audio_PSGPAN in bank 1
+	.word	X16_Audio_PSGPLAY        ; $ddc5 psgplay
+	.word	X16_Audio_PSGCHORD       ; $ddc6 psgchord
+	.word	CommandCls               ; $ddc7 cls
+	.word	CommandLocate            ; $ddc8 locate
+	.word	CommandColor             ; $ddc9 color
+	.send code
+
+	.section banked
+
+BankVectorTable:
+	.word	LinkFloatPower           ; $84 ^
+	.word	Unimplemented            ; $85 and
+	.word	Unimplemented            ; $86 or
+	.word	Unimplemented            ; $87 >
+	.word	Unimplemented            ; $88 =
+	.word	Unimplemented            ; $89 <
+	.word	Unimplemented            ; $8a >=
+	.word	Unimplemented            ; $8b <>
+	.word	Unimplemented            ; $8c <=
+	.word	Unimplemented            ; $8d abs
+	.word	Unimplemented            ; $8e array1
+	.word	Unimplemented            ; $8f array
+	.word	Unimplemented            ; $90 asc
+	.word	Unimplemented            ; $91 assert
+	.word	Unimplemented            ; $92 bin$
+	.word	Unimplemented            ; $93 print.chr
+	.word	Unimplemented            ; $94 chr$
+	.word	Unimplemented            ; $95 s.cmp
+	.word	Unimplemented            ; $96 gp.do
+	.word	Unimplemented            ; $97 gp.loop
+	.word	Unimplemented            ; $98 for
+	.word	Unimplemented            ; $99 fre
+	.word	Unimplemented            ; $9a get
+	.word	Unimplemented            ; $9b return
+	.word	Unimplemented            ; $9c gp.if
+	.word	Unimplemented            ; $9d gp.endif
+	.word	Unimplemented            ; $9e gp.select
+	.word	Unimplemented            ; $9f gp.case
+	.word	Unimplemented            ; $a0 gp.other
+	.word	Unimplemented            ; $a1 gp.endsel
+	.word	Unimplemented            ; $a2 gp.a
+	.word	Unimplemented            ; $a3 gp.x
+	.word	Unimplemented            ; $a4 gp.y
+	.word	Unimplemented            ; $a5 gp.c
+	.word	Unimplemented            ; $a6 gp.instr
+	.word	Unimplemented            ; $a7 gp.strptr
+	.word	Unimplemented            ; $a8 char
+	.word	Command_PSET             ; $a9 pset
+	.word	Command_LINE             ; $aa line
+	.word	Command_RECT             ; $ab rect
+	.word	Command_FRAME            ; $ac frame
+	.word	Command_OVAL             ; $ad oval
+	.word	Command_RING             ; $ae ring
+	.word	Unimplemented            ; $af hex$
+	.word	Unimplemented            ; $b0 input
+	.word	Unimplemented            ; $b1 input$
+	.word	Unimplemented            ; $b2 input.start
+	.word	Unimplemented            ; $b3 len
+	.word	Unimplemented            ; $b4 f.cmp
+	.word	Unimplemented            ; $b5 int.div
+	.word	Unimplemented            ; $b6 mod
+	.word	Unimplemented            ; $b7 negate
+	.word	Unimplemented            ; $b8 new.line
+	.word	Unimplemented            ; $b9 next
+	.word	Unimplemented            ; $ba not
+	.word	Unimplemented            ; $bb on
+	.word	Unimplemented            ; $bc moreon
+	.word	Unimplemented            ; $bd peek
+	.word	UnaryPI                  ; $be pi
+BankVectors = BankVectorTable - $08
+
+BankShiftVectorTable:
+	.word	LinkFloatSquareRoot      ; $dd8c sqr
+	.word	LinkFloatLogarithm       ; $dd8d log
+	.word	LinkFloatExponent        ; $dd8e exp
+	.word	LinkFloatCosine          ; $dd8f cos
+	.word	LinkFloatSine            ; $dd90 sin
+	.word	LinkFloatTangent         ; $dd91 tan
+	.word	LinkFloatArcTan          ; $dd92 atn
+	.word	Unimplemented            ; $dd93 linput
+	.word	Unimplemented            ; $dd94 binput
+	.word	Unimplemented            ; $dd95 load
+	.word	Unimplemented            ; $dd96 bload
+	.word	Unimplemented            ; $dd97 bvload
+	.word	Unimplemented            ; $dd98 vload
+	.word	Unimplemented            ; $dd99 bsave
+	.word	Unimplemented            ; $dd9a bverify
+	.word	Unimplemented            ; $dd9b poweroff
+	.word	Unimplemented            ; $dd9c reset
+	.word	Unimplemented            ; $dd9d reboot
+	.word	XCommandMouse            ; $dd9e mouse
+	.word	XUnaryMB                 ; $dd9f mb
+	.word	XUnaryMX                 ; $dda0 mx
+	.word	XUnaryMY                 ; $dda1 my
+	.word	XUnaryMWheel             ; $dda2 mwheel
+	.word	Unimplemented            ; $dda3 rpt$
+	.word	Unimplemented            ; $dda4 movspr
+	.word	Command_SPRITE           ; $dda5 sprite
+	.word	Command_SPRMEM           ; $dda6 sprmem
+	.word	Unimplemented            ; $dda7 st
+	.word	Unimplemented            ; $dda8 stop
+	.word	Unimplemented            ; $dda9 sys
+	.word	UnaryTDATA               ; $ddaa tdata
+	.word	UnaryTATTR               ; $ddab tattr
+	.word	Command_TILE             ; $ddac tile
+	.word	Unimplemented            ; $ddad ti.write
+	.word	Unimplemented            ; $ddae ti$.write
+	.word	Unimplemented            ; $ddaf wait
+	.word	Unimplemented            ; $ddb0 i2cpoke
+	.word	Unimplemented            ; $ddb1 i2cpeek
+	.word	Unimplemented            ; $ddb2 bank
+	.word	Unimplemented            ; $ddb3 sleep
 	.word	X16_Audio_FMINIT         ; $ddb4 fminit
 	.word	X16_Audio_FMNOTE         ; $ddb5 fmnote
 	.word	X16_Audio_FMDRUM         ; $ddb6 fmdrum
@@ -8705,8 +8968,8 @@ ShiftVectorTable:
 	.word	X16_Audio_FMFREQ         ; $ddb9 fmfreq
 	.word	X16_Audio_FMVOL          ; $ddba fmvol
 	.word	X16_Audio_FMPAN          ; $ddbb fmpan
-	.word	X16_Audio_FMPLAY         ; $ddbc fmplay
-	.word	X16_Audio_FMCHORD        ; $ddbd fmchord
+	.word	Unimplemented            ; $ddbc fmplay
+	.word	Unimplemented            ; $ddbd fmchord
 	.word	X16_Audio_FMPOKE         ; $ddbe fmpoke
 	.word	X16_Audio_PSGINIT        ; $ddbf psginit
 	.word	X16_Audio_PSGNOTE        ; $ddc0 psgnote
@@ -8714,12 +8977,8 @@ ShiftVectorTable:
 	.word	X16_Audio_PSGWAV         ; $ddc2 psgwav
 	.word	X16_Audio_PSGFREQ        ; $ddc3 psgfreq
 	.word	X16_Audio_PSGPAN         ; $ddc4 psgpan
-	.word	X16_Audio_PSGPLAY        ; $ddc5 psgplay
-	.word	X16_Audio_PSGCHORD       ; $ddc6 psgchord
-	.word	CommandCls               ; $ddc7 cls
-	.word	CommandLocate            ; $ddc8 locate
-	.word	CommandColor             ; $ddc9 color
-	.send code
+BankShiftVectors = BankShiftVectorTable - $18
+	.send banked
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;
@@ -9712,7 +9971,7 @@ _XCWait:
 ;
 ;	This file is automatically generated.
 ;
-	.section code
+	.section banked
 X16_Audio_FMINIT: ;; [!FMINIT]
 	.entercmd
 	phy
@@ -9721,9 +9980,11 @@ X16_Audio_FMINIT: ;; [!FMINIT]
 	.byte	X16_AudioCodeBank
 	ldx	#$FF
 	ply
-	.exitcmd
+	.exitbank
+	.send banked
 
 
+	.section banked
 X16_Audio_FMNOTE: ;; [!FMNOTE]
 	.entercmd
 	phy
@@ -9734,9 +9995,11 @@ X16_Audio_FMNOTE: ;; [!FMNOTE]
 	.byte	X16_AudioCodeBank
 	ldx	#$FF
 	ply
-	.exitcmd
+	.exitbank
+	.send banked
 
 
+	.section banked
 X16_Audio_FMDRUM: ;; [!FMDRUM]
 	.entercmd
 	phy
@@ -9747,9 +10010,11 @@ X16_Audio_FMDRUM: ;; [!FMDRUM]
 	.byte	X16_AudioCodeBank
 	ldx	#$FF
 	ply
-	.exitcmd
+	.exitbank
+	.send banked
 
 
+	.section banked
 X16_Audio_FMINST: ;; [!FMINST]
 	.entercmd
 	phy
@@ -9760,9 +10025,11 @@ X16_Audio_FMINST: ;; [!FMINST]
 	.byte	X16_AudioCodeBank
 	ldx	#$FF
 	ply
-	.exitcmd
+	.exitbank
+	.send banked
 
 
+	.section banked
 X16_Audio_FMVIB: ;; [!FMVIB]
 	.entercmd
 	phy
@@ -9773,9 +10040,11 @@ X16_Audio_FMVIB: ;; [!FMVIB]
 	.byte	X16_AudioCodeBank
 	ldx	#$FF
 	ply
-	.exitcmd
+	.exitbank
+	.send banked
 
 
+	.section banked
 X16_Audio_FMFREQ: ;; [!FMFREQ]
 	.entercmd
 	phy
@@ -9785,9 +10054,11 @@ X16_Audio_FMFREQ: ;; [!FMFREQ]
 	.byte	X16_AudioCodeBank
 	ldx	#$FF
 	ply
-	.exitcmd
+	.exitbank
+	.send banked
 
 
+	.section banked
 X16_Audio_FMVOL: ;; [!FMVOL]
 	.entercmd
 	phy
@@ -9798,9 +10069,11 @@ X16_Audio_FMVOL: ;; [!FMVOL]
 	.byte	X16_AudioCodeBank
 	ldx	#$FF
 	ply
-	.exitcmd
+	.exitbank
+	.send banked
 
 
+	.section banked
 X16_Audio_FMPAN: ;; [!FMPAN]
 	.entercmd
 	phy
@@ -9811,9 +10084,11 @@ X16_Audio_FMPAN: ;; [!FMPAN]
 	.byte	X16_AudioCodeBank
 	ldx	#$FF
 	ply
-	.exitcmd
+	.exitbank
+	.send banked
 
 
+	.section code
 X16_Audio_FMPLAY: ;; [!FMPLAY]
 	.entercmd
 	phy
@@ -9824,8 +10099,10 @@ X16_Audio_FMPLAY: ;; [!FMPLAY]
 	ldx	#$FF
 	ply
 	.exitcmd
+	.send code
 
 
+	.section code
 X16_Audio_FMCHORD: ;; [!FMCHORD]
 	.entercmd
 	phy
@@ -9836,8 +10113,10 @@ X16_Audio_FMCHORD: ;; [!FMCHORD]
 	ldx	#$FF
 	ply
 	.exitcmd
+	.send code
 
 
+	.section banked
 X16_Audio_FMPOKE: ;; [!FMPOKE]
 	.entercmd
 	phy
@@ -9848,9 +10127,11 @@ X16_Audio_FMPOKE: ;; [!FMPOKE]
 	.byte	X16_AudioCodeBank
 	ldx	#$FF
 	ply
-	.exitcmd
+	.exitbank
+	.send banked
 
 
+	.section banked
 X16_Audio_PSGINIT: ;; [!PSGINIT]
 	.entercmd
 	phy
@@ -9859,9 +10140,11 @@ X16_Audio_PSGINIT: ;; [!PSGINIT]
 	.byte	X16_AudioCodeBank
 	ldx	#$FF
 	ply
-	.exitcmd
+	.exitbank
+	.send banked
 
 
+	.section banked
 X16_Audio_PSGNOTE: ;; [!PSGNOTE]
 	.entercmd
 	phy
@@ -9872,9 +10155,11 @@ X16_Audio_PSGNOTE: ;; [!PSGNOTE]
 	.byte	X16_AudioCodeBank
 	ldx	#$FF
 	ply
-	.exitcmd
+	.exitbank
+	.send banked
 
 
+	.section banked
 X16_Audio_PSGVOL: ;; [!PSGVOL]
 	.entercmd
 	phy
@@ -9885,9 +10170,11 @@ X16_Audio_PSGVOL: ;; [!PSGVOL]
 	.byte	X16_AudioCodeBank
 	ldx	#$FF
 	ply
-	.exitcmd
+	.exitbank
+	.send banked
 
 
+	.section banked
 X16_Audio_PSGWAV: ;; [!PSGWAV]
 	.entercmd
 	phy
@@ -9898,9 +10185,11 @@ X16_Audio_PSGWAV: ;; [!PSGWAV]
 	.byte	X16_AudioCodeBank
 	ldx	#$FF
 	ply
-	.exitcmd
+	.exitbank
+	.send banked
 
 
+	.section banked
 X16_Audio_PSGFREQ: ;; [!PSGFREQ]
 	.entercmd
 	phy
@@ -9910,9 +10199,11 @@ X16_Audio_PSGFREQ: ;; [!PSGFREQ]
 	.byte	X16_AudioCodeBank
 	ldx	#$FF
 	ply
-	.exitcmd
+	.exitbank
+	.send banked
 
 
+	.section banked
 X16_Audio_PSGPAN: ;; [!PSGPAN]
 	.entercmd
 	phy
@@ -9923,9 +10214,11 @@ X16_Audio_PSGPAN: ;; [!PSGPAN]
 	.byte	X16_AudioCodeBank
 	ldx	#$FF
 	ply
-	.exitcmd
+	.exitbank
+	.send banked
 
 
+	.section code
 X16_Audio_PSGPLAY: ;; [!PSGPLAY]
 	.entercmd
 	phy
@@ -9936,8 +10229,10 @@ X16_Audio_PSGPLAY: ;; [!PSGPLAY]
 	ldx	#$FF
 	ply
 	.exitcmd
+	.send code
 
 
+	.section code
 X16_Audio_PSGCHORD: ;; [!PSGCHORD]
 	.entercmd
 	phy
@@ -9948,9 +10243,9 @@ X16_Audio_PSGCHORD: ;; [!PSGCHORD]
 	ldx	#$FF
 	ply
 	.exitcmd
-
-
 	.send code
+
+
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;

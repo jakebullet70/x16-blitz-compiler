@@ -23,7 +23,7 @@
 ## heap top, store/stack limits, the variable page -- and machine code POKEd
 ## over it corrupts the program with no error at all.
 
-#DEFINE ML.BANK 1
+#DEFINE ML.BANK 2
 #DEFINE ML.INCS 40960
 #DEFINE ML.CARRY 40976
 

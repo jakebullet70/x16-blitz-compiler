@@ -3,44 +3,15 @@ rem ---------------------------------------------------------------------------
 rem  help-demo.bat -- GPB.HELP, the GP.BASIC and BASL reference, in a VISIBLE
 rem  window.
 rem
-rem  A scrolling master index over 74 topics, built from GPC-BASIC/ -- the
-rem  manual, the name register and the module banner headers -- so the help
-rem  cannot drift from the library it documents.
-rem
-rem      up/down  PgUp/PgDn  HOME/END    move
-rem      RETURN                          open a topic (index only)
-rem      /  or F                         find in the index, N for the next
-rem      L                               this topic's cross references
-rem      X                               write this topic's code out as a .BL
-rem      ?                               about
-rem      ESC                             back, then quit
-rem
-rem  IT RUNS IN CP437 (charset 7, ROM R47+) at 80x30: the low half is ASCII so
-rem  the text is mixed case with no re-ordered font, and the high half has real
-rem  line drawing for the dialog frames. APPSYS.RESTORE hands the screen mode
-rem  and the whole $0372 charset byte back on the way out.
-rem
 rem  EVERYTHING IT READS IS IN samples\GPC-HELP\HELP-TXT -- the index and the
 rem  topics alike -- opened through the CMD path syntax "//HELP-TXT/:NAME", which
 rem  is what CMDR-DOS documents and what a real SD card wants.
 rem
-rem  NOTE THAT THE DRIVE IS samples\GPC-HELP, so an "X" export lands in the repo
-rem  beside the sources. git clean -f samples/GPC-HELP/ tidies up.
-rem
-rem  XFMGR IS ON THE DRIVE TOO, for looking at what an export actually wrote.
-rem  Quit the help to READY, then:
-rem
-rem      RUN "XT"                  XFMGR, the file manager -- XT is a shim that
-rem                                LOADs /XFMGR/XFMGR.PRG
-rem
-rem  XFMGR and XT are DEV ONLY, the same way tmp-emu.bat has them: they are
-rem  staged here for this bat and are no part of what ships.
-rem
 rem  Source: samples\GPC-HELP\GPB.HELP.BASL on GPB, THEME, STASH, STRCASE, APPSYS,
 rem  KB, MENUVERT, LINEINPUT, GUI and COMBO, all shipped in
 rem  samples\GPC-HELP\GPC-BASIC\ beside the sample so a rebuild needs nothing
-rem  from GPC-BASIC\. The object is SHARED, so GPB.RT.122.BIN has to sit beside
-rem  the PRG on the drive. See samples\GPC-HELP\readme.md for the rebuild, and
+rem  from GPC-BASIC\. The object is SHARED, so the GPB.RT and GP1.RT files of
+rem  its build have to sit beside the PRG on the drive. See samples\GPC-HELP\readme.md for the rebuild, and
 rem  for the measurements behind the three design decisions.
 rem ---------------------------------------------------------------------------
 setlocal

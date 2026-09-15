@@ -1,7 +1,7 @@
 ;
 ;	Automatically generated.
 ;
-	.section code
+	.section banked
 
 ExpCoefficients:
 	.byte	7
@@ -113,4 +113,4 @@ AtnCoefficients:
 	.dword	$00000000 ; 0.0
 	.byte	$00
 	.byte	$00
-	.send code
+	.send banked

@@ -27,7 +27,7 @@
 .This is how a program gets past the shared p-code ceiling. Low-memory p-code
 .has to fit under the runtime -- about 17,920 bytes, SEC 7 -- and a region
 .does not count against it. Each region becomes its own overlay file,
-.NAME.B04 for bank 4, written beside the .PRG and loaded with it.
+.NAME.004 for bank 4, written beside the .PRG and loaded with it.
 .
 :#DEFINE MY.GUICODE 4
 :GOTO MY.LIBEND
@@ -59,10 +59,14 @@
 .under the window. Past it the compiler stops and names the region's
 .GP.BANKED line, not the line it happened to be on when it ran out.
 .
-.Sixty-three regions, and that is the machine's limit rather than the
-.compiler's -- banks 1 to 63 on a 512 K X16, with 0 the KERNAL's. No two
-.regions may share a bank: the second would land at $A000 on top of the
-.first.
+.Banks 2 to 255, and at most 127 regions. Bank 0 is the KERNAL's and bank 1
+.is reserved for the runtime; the compiler refuses both. A 512 K X16 has
+.banks up to 63 and a 2 MB one up to 255, and a program that names a bank the
+.machine does not have prints ?RAM and returns to READY before it loads
+.anything. GP.BANKEDSTR banks count toward the 127: one region over it stops
+.the compile with TOO MANY GP.BANKED REGIONS, and one text bank over it with
+.NO REGION LEFT FOR GP.BANKEDSTR TEXT. No two regions may share a bank: the
+.second would land at $A000 on top of the first.
 .
 =What a region may not contain
 .
@@ -109,13 +113,4 @@
 .A call between a region and anywhere outside it costs a byte and two bank
 .switches. .bgosub is a GOSUB with the bank after the address. Put a module
 .called inside a tight loop in the same place as the loop.
-.
-=The overlay files
-.
-.Each region is written out as NAME.Bnn, nn being the bank in decimal. The
-.file carries a two-byte load address like any PRG, so the payload is the
-.file size less two, and the size is the page-padded region rather than the
-.p-code in it.
-.
-.A program's .Bnn files ship beside its .PRG and must travel with it.
 .

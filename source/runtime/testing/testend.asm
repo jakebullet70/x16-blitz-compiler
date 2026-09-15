@@ -13,7 +13,11 @@
 
 		.section code
 
-		nextPage = (* + $FF) & $FF00 		; so I can include with that f*****g header.
+		;
+		;		The + 2 is the pre-header. Without it, code that ended in the last 2 bytes of a page had
+		;		those bytes overwritten by the object.
+		;
+		nextPage = (* + 2 + $FF) & $FF00 		; so I can include with that f*****g header.
 		* = nextPage - 2		 			; I hate that bloody thing.
 											; Either have a proper format or dump it and have a file just be the file.
 

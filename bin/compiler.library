@@ -271,13 +271,14 @@ CompilerRAMBankReg	= $0000
 ;			6	WHERE EACH BLOCK ENDS, and where each of its alternatives goes next.
 ;			7	the OBJECT BUFFER -- the application's, not the compiler's.
 ;			8	the ONE scratch bank EVERY region shares -- cleared as each one opens, and
-;				emptied to that region's own .Bnn file as it closes.
+;				emptied to that region's own .nnn file as it closes.
 ;			9	the LINE NUMBER TABLE, second half.
 ;			10	the BLOCK DEPTH, second half. It follows the line table's split exactly.
 ;			11	DEAD-CODE REMOVAL's bit planes and swallow list (main/deadcode.asm), pass zero only.
 ;			12	...and its edge list.
 ;			13	the #SYMFILE's variables, for GP.ASM {VAR} -- the application's, like bank 7.
 ;			14	...and their second 8K. Both are application/source/compiler/symfile.asm.
+;			15	the embedded BANK CODE, held for the object -- the application's, like bank 7.
 ;			63	the GP.BANKEDSTR pool, growing DOWN from the top bank a 512K machine has.
 ;
 ;		BANKS 2 AND 4 WERE ONE BANK, and that was the wall. The two tables shared 8K, growing
@@ -2027,7 +2028,7 @@ sumSkip: 									; ...and how many bytes it is stepping over
 ;
 ;		The GP.BANKED layout, carried from pass one into pass two. The tables mirror the ones in
 ;		commands/gpbank.asm they are copied from, and they are in the CODE section for the same
-;		reason: 6 bytes a region here and 11 there is 1,071 at 63 regions, and storage is a 1K
+;		reason: 6 bytes a region here and 13 there is 2,413 at 127 regions, and storage is a 1K
 ;		hole holding everything else besides. The code section is the compiler's own image and
 ;		is thrown away when the object is written, so a compiled program pays nothing for them.
 ;		The region table in commands/gpbank.asm carries the whole of the reasoning.
@@ -5115,43 +5116,43 @@ CommandTables:
 ;
 ;	PSET    #,#,# T N
 ;
-	.byte	$08,$ce,$87,$ea,$ea,$e1,168,$06
+	.byte	$08,$ce,$87,$ea,$ea,$e1,169,$06
 ;
 ;	LINE    #,#,#,# X:OptionalColourCompile T N
 ;
-	.byte	$0c,$ce,$88,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,169,$06
+	.byte	$0c,$ce,$88,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,170,$06
 ;
 ;	RECT    #,#,#,# X:OptionalColourCompile T N
 ;
-	.byte	$0c,$ce,$8a,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,170,$06
+	.byte	$0c,$ce,$8a,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,171,$06
 ;
 ;	FRAME    #,#,#,# X:OptionalColourCompile T N
 ;
-	.byte	$0c,$ce,$89,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,171,$06
+	.byte	$0c,$ce,$89,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,172,$06
 ;
 ;	OVAL    #,#,#,# X:OptionalColourCompile T N
 ;
-	.byte	$0c,$ce,$bf,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,172,$06
+	.byte	$0c,$ce,$bf,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,173,$06
 ;
 ;	RING    #,#,#,# X:OptionalColourCompile T N
 ;
-	.byte	$0c,$ce,$c0,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,173,$06
+	.byte	$0c,$ce,$c0,$ea,$ea,$ea,$e3,OptionalColourCompile & $FF,OptionalColourCompile >> 8,$10,174,$06
 ;
 ;	CHAR    #,#,#,$ T N
 ;
-	.byte	$09,$ce,$8b,$ea,$ea,$ea,$f1,174,$06
+	.byte	$09,$ce,$8b,$ea,$ea,$ea,$f1,168,$06
 ;
 ;	SPRITE    #,# X:OptionalParameterCompile X:OptionalParameterCompile X:OptionalParameterCompile X:OptionalParameterCompile X:OptionalParameterCompile T N
 ;
-	.byte	$17,$ce,$bb,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,42205 & $FF,42205 >> 8,$06
+	.byte	$17,$ce,$bb,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$03,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,42461 & $FF,42461 >> 8,$06
 ;
 ;	SPRMEM    #,#,# X:OptionalParameterCompile T N
 ;
-	.byte	$0c,$ce,$bc,$ea,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,42461 & $FF,42461 >> 8,$06
+	.byte	$0c,$ce,$bc,$ea,$ea,$e3,OptionalParameterCompile & $FF,OptionalParameterCompile >> 8,$20,42717 & $FF,42717 >> 8,$06
 ;
 ;	MOVSPR    #,#,# T N
 ;
-	.byte	$09,$ce,$bd,$ea,$ea,$e2,42717 & $FF,42717 >> 8,$06
+	.byte	$09,$ce,$bd,$ea,$ea,$e2,42205 & $FF,42205 >> 8,$06
 ;
 ;	TILE    #,#,# X:OptionalParameterCompile T N
 ;
@@ -5248,13 +5249,13 @@ CommandTables:
 ;
 	.byte	$08,$ce,$a0,$ea,$e2,48093 & $FF,48093 >> 8,$06
 ;
-;	FMPLAY      #,$ T N
+;	FMPLAY      #,@ T N
 ;
-	.byte	$08,$ce,$a1,$ea,$f2,48349 & $FF,48349 >> 8,$06
+	.byte	$08,$ce,$a1,$ea,$d2,48349 & $FF,48349 >> 8,$06
 ;
-;	FMCHORD     #,$ T N
+;	FMCHORD     #,@ T N
 ;
-	.byte	$08,$ce,$a2,$ea,$f2,48605 & $FF,48605 >> 8,$06
+	.byte	$08,$ce,$a2,$ea,$d2,48605 & $FF,48605 >> 8,$06
 ;
 ;	FMPOKE      #,# T N
 ;
@@ -5284,13 +5285,13 @@ CommandTables:
 ;
 	.byte	$08,$ce,$a9,$ea,$e2,50397 & $FF,50397 >> 8,$06
 ;
-;	PSGPLAY     #,$ T N
+;	PSGPLAY     #,@ T N
 ;
-	.byte	$08,$ce,$aa,$ea,$f2,50653 & $FF,50653 >> 8,$06
+	.byte	$08,$ce,$aa,$ea,$d2,50653 & $FF,50653 >> 8,$06
 ;
-;	PSGCHORD    #,$ T N
+;	PSGCHORD    #,@ T N
 ;
-	.byte	$08,$ce,$ab,$ea,$f2,50909 & $FF,50909 >> 8,$06
+	.byte	$08,$ce,$ab,$ea,$d2,50909 & $FF,50909 >> 8,$06
 		.byte 	0
 
 UnaryTables:
@@ -5692,7 +5693,7 @@ _GEExecuteVectors:
 		.word 	_GEXComma					; A  check , follows
 		.word 	_GEXNop 					; B
 		.word 	_GEXNop 					; C
-		.word 	_GEXNop 					; D  
+		.word 	_GEXLowString 				; D  compile get any string, copied low in a region
 		.word 	_GEXNumber 					; E  compile get any number
 		.word 	_GEXString 					; F  compile get any string
 
@@ -5775,6 +5776,27 @@ _GEXString:
 
 _GEXType:
 		.error_type
+
+; ------------------------------------------------------------------------------------------------
+;		A string for the audio ROM, which selects RAM bank 0 before it reads the text. A literal
+;		in a GP.BANKED region points into the region's bank, so concatenating "" copies it into
+;		a low temporary first. 3 bytes of p-code a call site, and only inside a region.
+; ------------------------------------------------------------------------------------------------
+
+_GEXLowString:
+		jsr 	_GEXString
+		lda 	gpBankState 				; 1 = inside a GP.BANKED region
+		cmp 	#1
+		bne 	_GEXLSDone
+		lda 	#PCD_CMD_STRING
+		jsr 	WriteCodeByte
+		lda 	#0
+		jsr 	WriteCodeByte
+		lda 	#PCD_CONCAT
+		jsr 	WriteCodeByte
+_GEXLSDone:
+		clc
+		rts
 
 ; ------------------------------------------------------------------------------------------------
 ;							Execute 6502 code with Channel Redirect
@@ -9447,22 +9469,22 @@ AsmModeTable:
 ;		holds from low memory and from another region alike. A GOTO has no bank to select, so a
 ;		GOTO from one region into another is still refused, in GPBankMakeOffset.
 ;
-;		SIXTY-THREE IS THE LIMIT, AND IT IS THE MACHINE'S -- banks 1 to 63 on a 512K X16, with 0
-;		the KERNAL's. It is not a compiler table size any more, which is the point of it.
+;		BANKS 2 TO 255, every bank a 2MB X16 has less bank 0, the KERNAL's, and bank 1,
+;		HANDLER_BANK. The number a program writes is the bank its region loads into, so a program
+;		may count down from 255. A machine without that bank stops in the bootstrap with ?RAM.
 ;
-;		IT WAS THE 1K STORAGE HOLE. The tables at the foot of this file and the layout copy in
-;		main/compiler.asm come to 17 bytes a region out of $0400-$0801, so the hole capped the
-;		count at 23, and 16 was as far as it could go while leaving room for anything else. 63
-;		needs 1,071 bytes, more than the whole hole, so no amount of trimming reaches it. Both
-;		tables are in the CODE section now -- the region table below has the reasoning.
+;		THE TABLES ARE IN THE CODE SECTION, not the 1K storage hole at $0400-$0801, which once
+;		capped the count at 23. Here and in the layout copy in main/compiler.asm they come to 19
+;		bytes a region, 2,413 at the cap. The region table below has the reasoning.
 ;
-;		A SIXTY-FOURTH GP.BANKED IS REFUSED BY NAME, and what binds after that is the bootstrap
-;		extension page at 95: one byte a region there, with 79 spare at sixteen. A 512K machine
-;		has 63 banks, so the compiler has stopped capping and the machine caps.
+;		127 IS THE CAP, AND THE BANKS DO NOT SET IT. Seven of the tables are two bytes a region
+;		and are read with the region doubled into X or Y, and 127 is the most that fits doubled
+;		in a byte. A 128th region, code or text, is refused by name. Past it each of those tables
+;		would need a low half and a high half, indexed by the region itself.
 ;
 ; ************************************************************************************************
 
-GPBANK_MAXREGIONS = 63 						; every bank a 512K X16 has, bank 0 being the KERNAL's
+GPBANK_MAXREGIONS = 127 					; the most a doubled subscript reaches in a byte
 
 ; ************************************************************************************************
 ;
@@ -9481,7 +9503,7 @@ GPBANK_MAXREGIONS = 63 						; every bank a 512K X16 has, bank 0 being the KERNA
 CommandGPBankedCompile:
 		stz 	deferErrors 				; a block opener must never defer -- see the header
 		lda 	gpBankShared 				; an embedded object is one file, and a region is a
-		bne 	_CGBCShared 				; .Bnn file of its own
+		bne 	_CGBCShared 				; .nnn file of its own
 		jmp 	GPBankNeedsShared
 _CGBCShared:
 		lda 	gpBankState 				; 0 = never seen, 1 = open, 2 = closed
@@ -9575,19 +9597,13 @@ GPBankClosePassTwo:
 
 ; ************************************************************************************************
 ;
-;		Read GP.BANKED's operand: a decimal constant, 1 to 99.
+;		Read GP.BANKED's operand: a decimal constant, 2 to 255.
 ;
 ;		BANK 0 IS REFUSED. It is the KERNAL's -- its FAT32 buffers live there -- so a program
 ;		that put its code in it would work until the first file operation and then not.
 ;
-;		AND 100 UP, because of the overlay's NAME. A region is a file called <object>.Bnn, and
-;		the bootstrap holds one name template with the bank poked into its last two characters:
-;		one name rather than one a region, which is what makes it fit a page with under 200
-;		bytes spare. Bank 100 would come out as ".B:0" -- ':' is '0'+10 -- and load nothing.
-;
-;		A 512K MACHINE HAS BANKS 0..63, so this bounds nothing anyone can currently run; only a
-;		2MB machine reaches 100. Widening it is a third digit here, in the extension page's
-;		template and in ObjBuildOverlayName, and nothing else.
+;		AND BANK 1, HANDLER_BANK, where the runtime keeps its rarely used handlers. GP.BANKEDSTR
+;		reads its bank here too, so the check in GPBankCheckBankNumber refuses both.
 ;
 ; ************************************************************************************************
 
@@ -9623,16 +9639,16 @@ _GBRNDigit:
 		jsr 	GetNext
 		bra 	_GBRNDigit
 ;
-;		THE UPPER CHECK IS A jmp TO THE BOTTOM OF THE FILE, and it is worth knowing why rather
+;		THE BANK 1 CHECK IS A jmp TO THE BOTTOM OF THE FILE, and it is worth knowing why rather
 ;		than tidying it back inline. GPBankStructure sits above here and GPBankCheckAlone below,
 ;		and three of its branches reach BACK to it -- so anything added between the two costs
-;		branch range. The message and its test inline were 40 bytes and broke all three. Two is
+;		branch range. A test and its message inline were 40 bytes and broke all three. Two is
 ;		what a jmp costs over the rts it replaced.
 ;
 _GBRNDone:
 		lda 	gpBankNumber
 		beq 	GPBankBadNumber 			; bank 0 belongs to the KERNAL
-		jmp 	GPBankCheckBankNumber 		; ...and 100 up has no two-digit overlay name
+		jmp 	GPBankCheckBankNumber 		; ...and bank 1 is HANDLER_BANK's
 
 GPBankBadNumber:
 		.error_value
@@ -10369,20 +10385,13 @@ _GBFBADone:
 ;
 ; ************************************************************************************************
 
-;		THE BANK HAS TO HAVE AN OVERLAY NAME. A region is a file called <object>.Bnn beside the
-;		program, and the bootstrap holds ONE name template with the bank poked into its last two
-;		characters -- one name rather than one a region, which is what makes it fit a page with
-;		under 200 bytes spare. Bank 100 would come out as ".B:0", ':' being '0'+10, and load
-;		nothing.
+;		THE MESSAGES BELOW ARE IN COMPILER SPACE rather than errors.asm: that table links below
+;		GPBase and is copied into every compiled program, so a message there would cost bytes to
+;		every program that never writes a GP.BANKED.
 ;
-;		A 512K MACHINE HAS BANKS 0..63, so this bounds nothing anyone can currently run; only a
-;		2MB machine reaches 100. Widening it is a third digit here, in the extension page's
-;		template and in ObjBuildOverlayName, and nothing else.
-;
-;		ITS OWN MESSAGE, in compiler space rather than errors.asm: that table links below GPBase
-;		and is copied into every compiled program, so a message there would cost bytes to every
-;		program that never writes a GP.BANKED. BAD VALUE on its own would send the programmer
-;		hunting for a syntax mistake in a bank number that is perfectly well formed.
+;		EVERY BANK FROM 2 TO 255 HAS AN OVERLAY NAME, <object>.002 to <object>.255, so the bank
+;		number check refuses only HANDLER_BANK. ObjBuildOverlayName writes the three digits, and
+;		the bootstrap extension page pokes them into its one name template.
 ;
 ; ************************************************************************************************
 
@@ -10399,7 +10408,7 @@ GPBankTooMany:
 		.text 	"TOO MANY GP.BANKED REGIONS", 0
 
 ;
-;		EMBEDDED IS ONE FILE. A region is LOADed into its bank from a .Bnn file of its own by the
+;		EMBEDDED IS ONE FILE. A region is LOADed into its bank from a .nnn file of its own by the
 ;		shared bootstrap, so a banked program is never one file, and an embedded compile of one
 ;		stops at the first GP.BANKED. gpBankShared comes from GPC.INPUT line 4, set by CompileCode.
 ;		In compiler space, like the message above. GP.BANKEDSTR has its own, in gpbstr.asm.
@@ -10412,12 +10421,12 @@ GPBankNeedsShared:
 
 GPBankCheckBankNumber:
 		lda 	gpBankNumber
-		cmp 	#100
-		bcs 	_GBCBNNoName
+		cmp 	#HANDLER_BANK
+		beq 	_GBCBNReserved
 		rts
-_GBCBNNoName:
+_GBCBNReserved:
 		jsr 	CallErrorHandler
-		.text 	"BANK OVER 99 HAS NO OVERLAY NAME", 0
+		.text 	"BANK 1 IS RESERVED", 0
 
 ; ************************************************************************************************
 
@@ -10979,9 +10988,9 @@ gpBankSideTo:									; which region a branch points AT, 0 for low memory
 ;		single-region version always wanted, so the pass loads them out of here and puts the
 ;		results back.
 ;
-;		IT IS IN THE CODE SECTION, NOT IN STORAGE, and that is what lets the count be 63. These
-;		are 11 bytes a region and the layout copy in main/compiler.asm is another 6, so 63 costs
-;		1,071 -- against a 1K storage hole that already holds everything else the compiler keeps
+;		IT IS IN THE CODE SECTION, NOT IN STORAGE, and that is what lets the count be 127. These
+;		are 13 bytes a region and the layout copy in main/compiler.asm is another 6, so 127 costs
+;		2,413 -- against a 1K storage hole that already holds everything else the compiler keeps
 ;		between statements. They could never have fitted there.
 ;
 ;		THE CODE SECTION IS THE COMPILER'S OWN IMAGE, above ObjectBase, and it is thrown away
@@ -11120,7 +11129,7 @@ CommandGPBankedStrCompile:
 											; opener leaves its closer behind and corrupts the
 											; nesting of any block enclosing it, silently.
 		lda 	gpBankShared 				; an embedded object is one file, and text in a bank
-		bne 	_CBSShared 					; is a .Bnn file of its own
+		bne 	_CBSShared 					; is a .nnn file of its own
 		jmp 	BStrNeedsShared
 _CBSShared:
 		lda 	bstrState
@@ -11179,7 +11188,7 @@ CommandGPEndBankedStrCompile:
 
 ;
 ;		EMBEDDED IS ONE FILE, GPBankNeedsShared's rule (gpbank.asm) for the same reason: text in
-;		a bank is LOADed from a .Bnn file by the shared bootstrap. In compiler space, like
+;		a bank is LOADed from a .nnn file by the shared bootstrap. In compiler space, like
 ;		BStrTooManyBanks.
 ;
 BStrNeedsShared:
@@ -11383,7 +11392,7 @@ BankedStrAddCompile:
 ;
 ;		ONE REGION EACH AND NOT ONE BETWEEN THEM, which is the whole of Phase 3 down here: a
 ;		region is a bank, so several text banks are several regions, and each one then gets its
-;		own .Bnn overlay file with no further arrangement -- the region machinery does it. The
+;		own .nnn overlay file with no further arrangement -- the region machinery does it. The
 ;		loop runs in SLOT order, so the layout slots they take are contiguous and last, which is
 ;		how pass two finds each of them again.
 ;

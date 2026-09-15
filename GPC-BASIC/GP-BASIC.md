@@ -32,15 +32,15 @@ routine, and every variable each one reads and writes.
 
 They are assembly because BASIC is slow at per-character string scans, screen fills and VERA writes.
 
-The handlers occupy `GPBase $3800` to `ObjectBase $3c00`: 1,024 bytes, page aligned, all or nothing.
+The handlers occupy `GPBase $2F00` to `ObjectBase $3500`: 1,536 bytes, page aligned, all or nothing.
 `ScanGPUsage` walks the finished p-code and drops the whole block from the object if nothing in it
 is reached.
 
-The block costs those 1,024 bytes once. The bytes in the object and the bytes off the workspace
+The block costs those 1,536 bytes once. The bytes in the object and the bytes off the workspace
 floor are the same bytes — `runtimeEndPage` is a single page number that decides how much of the
 runtime image is written out, where the p-code lands, and where the workspace starts. Maximum
-p-code is 17,152 bytes with the block and 18,176 without: `ObjectBase` to `$9F00`, less the 4K
-frame stack and the 4K minimum workspace.
+p-code is 20,992 bytes with the block and 22,528 without: `ObjectBase` or `GPBase` to `$9F00`, less
+the 2K frame stack and the 4K minimum workspace.
 
 **Composites.** `GP.ASM`, `GP.ENDASM`, `GP.CHAR`, `GP.CONTAINS`, `GP.ISEMPTY`, `GP.HIBYTE`,
 `GP.LOBYTE`, `GP.BSTRCOUNT`, `GP.DEFPROC`, `GP.SUB`. The compiler expands each into opcodes that
@@ -834,7 +834,7 @@ while the object is written, so `BANKMGR` has to be told rather than asked:
 BANKMGR.WANT = GM.TEXTBANK : GOSUB BANKMGR.CLAIM
 ```
 
-**Compile SHARED.** The text is a `.Bnn` file, which the shared bootstrap LOADs into its bank. An
+**Compile SHARED.** The text is a `.nnn` file, which the shared bootstrap LOADs into its bank. An
 embedded program is one file, so an embedded compile stops at the first `GP.BANKEDSTR` with
 `GP.BANKEDSTR NEEDS SHARED`.
 
@@ -1028,7 +1028,7 @@ line is.
 
 This is how a program gets past the shared p-code ceiling. Low-memory p-code has to fit under the
 runtime — about 17,920 bytes, §7 — and a region does not count against it. Each region becomes its
-own overlay file, `NAME.B04` for bank 4, written beside the `.PRG` and loaded with it.
+own overlay file, `NAME.004` for bank 4, written beside the `.PRG` and loaded with it.
 
 ```basic
 #DEFINE MY.GUICODE 4
@@ -1062,9 +1062,13 @@ the exit bridge, the end marker and every `GP.ASM` block in the region are part 
 so the usable payload is a little under the window. Past it the compiler stops and names the region's `GP.BANKED` line, not the line
 it happened to be on when it ran out.
 
-**Sixty-three regions, and that is the machine's limit rather than the compiler's** — banks 1 to 63
-on a 512 K X16, with 0 the KERNAL's. **No two regions may share a bank**: the second would land at
-`$A000` on top of the first.
+**Banks 2 to 255, and at most 127 regions.** Bank 0 is the KERNAL's and bank 1 is reserved for the
+runtime; the compiler refuses both. A 512 K X16 has banks up to 63 and a 2 MB one up to 255, and a
+program that names a bank the machine does not have prints `?RAM` and returns to `READY` before it
+loads anything. `GP.BANKEDSTR` banks count toward the 127: one region over it stops the compile
+with `TOO MANY GP.BANKED REGIONS`, and one text bank over it with
+`NO REGION LEFT FOR GP.BANKEDSTR TEXT`. **No two regions may share a bank**: the second would
+land at `$A000` on top of the first.
 
 #### What a region may not contain
 
@@ -1109,11 +1113,12 @@ as the loop.
 
 #### The overlay files
 
-Each region is written out as `NAME.Bnn`, `nn` being the bank in decimal. The file carries a
-two-byte load address like any PRG, so **the payload is the file size less two**, and the size is
-the page-padded region rather than the p-code in it.
+Each region is written out as `NAME.nnn`, `nnn` being the bank in three decimal digits, so bank 4
+is `NAME.004` and bank 122 is `NAME.122`. The file carries a two-byte load address like any PRG, so
+**the payload is the file size less two**, and the size is the page-padded region rather than the
+p-code in it.
 
-A program's `.Bnn` files ship beside its `.PRG` and must travel with it.
+A program's `.nnn` files ship beside its `.PRG` and must travel with it.
 
 ---
 
@@ -1142,7 +1147,7 @@ runtime and every `#INCLUDE` spends it; a region spends 8,192 bytes of a RAM ban
 not using. Bank what you can. A module called inside a loop goes where the loop is: a call between
 a region and anywhere outside it switches the bank twice.
 
-The banked form needs the program built SHARED. Each region is a `.Bnn` file, which the shared
+The banked form needs the program built SHARED. Each region is a `.nnn` file, which the shared
 bootstrap LOADs into its bank. An embedded program is one file, so an embedded compile stops at the
 first `GP.BANKED` with `GP.BANKED NEEDS SHARED`.
 
@@ -1179,7 +1184,7 @@ one region to the other costs the same bank switches as a call from low memory.
 `DUPLICATE SYMBOL` where the module has no `#IFNDEF` guard. Where it has one, the module lands at
 the first `#INCLUDE` and the second produces nothing.
 
-§3.12 has the rules, what a region may not contain, and the `.Bnn` files a banked program ships.
+§3.12 has the rules, what a region may not contain, and the `.nnn` files a banked program ships.
 
 ### 4.1 `THEME.INC.BL` — named colour roles
 
@@ -1925,7 +1930,8 @@ allocator hands out a bank a compile-time region is already sitting in.
 between the program's own modules, and an accessor still sets its own bank on every access.
 
 **0 is not a bank.** It is the KERNAL's, reserved by `INIT`, and it is what `GET.FREE.BANK` returns
-for *none left*.
+for *none left*. `INIT` reserves bank 1 as well, for the runtime (§3.12), so `GET.FREE.BANK`
+hands out bank 2 or higher.
 
 `BANKMGR.OK` is `-1` if `CLAIM` took the bank, `0` if it was already taken or out of range.
 `BANKMGR.BANKS` is how many the machine has, 64 or 256. `BANKMGR.SPARE` is what `COUNT` found free.
@@ -2362,19 +2368,19 @@ directory buffer.
 
 | | |
 |---|---|
-| bank 4, `GPBMODS.B04`, 7,938 bytes | `MENUVERT` `MENUBAR` `LINEINPUT` `GUI` `GUI2` |
-| bank 5, `GPBMODS.B05`, 7,426 bytes | literal text, pool one |
-| bank 6, `GPBMODS.B06`, 4,354 bytes | literal text, pool two |
-| bank 7, `GPBMODS.B07`, 4,354 bytes | `APPSYS` `BANKMGR` `KB` `SORT` `STASHVRAM` `STASHVRAMGC` `STRCASE` `STRINGS` `STRUSING` |
-| bank 8, `GPBMODS.B08`, 1,538 bytes | `FILEIO` `FILEDIR` |
-| bank 9, `GPBMODS.B09`, 770 bytes | `THEME` |
-| bank 10, `GPBMODS.B10`, 770 bytes | `COMBO` |
-| bank 11, `GPBMODS.B11`, 3,074 bytes | the two biggest dropdown handlers, this program's own code |
+| bank 4, `GPBMODS.004`, 7,682 bytes | `MENUVERT` `MENUBAR` `LINEINPUT` `GUI` `GUI2` |
+| bank 5, `GPBMODS.005`, 7,426 bytes | literal text, pool one |
+| bank 6, `GPBMODS.006`, 4,354 bytes | literal text, pool two |
+| bank 7, `GPBMODS.007`, 4,866 bytes | `APPSYS` `BANKMGR` `KB` `SORT` `STASHVRAM` `STASHVRAMGC` `STRCASE` `STRINGS` `STRUSING` |
+| bank 8, `GPBMODS.008`, 1,794 bytes | `FILEIO` `FILEDIR` |
+| bank 9, `GPBMODS.009`, 770 bytes | `THEME` |
+| bank 10, `GPBMODS.010`, 770 bytes | `COMBO` |
+| bank 11, `GPBMODS.011`, 3,074 bytes | the two biggest dropdown handlers, this program's own code |
 
 Six of those are `GP.BANKED` code regions (§3.12) and two are `GP.BANKEDSTR` text pools (§3.10). One
-`.Bnn` file is written per bank. Each loads to `$A000` in its own bank and carries a two-byte load
-address like any PRG, so a payload is the file size less two. The resident object is 11,619 bytes
-and the overlays are 30,224 between them.
+`.nnn` file is written per bank. Each loads to `$A000` in its own bank and carries a two-byte load
+address like any PRG, so a payload is the file size less two. The resident object is 11,087 bytes
+and the overlays are 30,736 between them.
 
 **Only what holds a `BANK` statement stays in low RAM.** `STASH` and `STASHFILE` execute `BANK`,
 which the compiler refuses inside a region; `STASHVRAM` (§4.18) is the one to reach for from inside
@@ -2497,30 +2503,29 @@ Each of these has cost a debugging session at least once.
 
 ### What GPC prints when it finishes
 
-One item a line. `GPBMODS`, built shared with dead code removed:
+One item a line. `GPBMODS`, built shared:
 
 ```
-OK LOW CODE 11264, SHARED GPBASIC
-LOW FREE 10240, FRAME STACK 2048
-LINES 3690
-DEAD CODE:  202 LINES REMOVED, 1305 BYTES SAVED
-BANK  7 CODE  3840 USED  4352 FREE
-BANK  9 CODE   512 USED  7680 FREE
-BANK  4 CODE  7936 USED   256 FREE
-BANK 10 CODE   768 USED  7424 FREE
-BANK  8 CODE  1792 USED  6400 FREE
-BANK 11 CODE  3072 USED  5120 FREE
-BANK  5 TEXT  7424 USED   768 FREE
-BANK  6 TEXT  4352 USED  3840 FREE
-TOTAL BANKS 8, 29696 USED
+OK LOW CODE 11520, SHARED GPBASIC
+LOW FREE 12288, FRAME STACK 2048
+LINES 3795
+BANK   7 CODE  4864 USED  3328 FREE
+BANK   9 CODE   768 USED  7424 FREE
+BANK   4 CODE  7680 USED   512 FREE
+BANK  10 CODE   768 USED  7424 FREE
+BANK   8 CODE  1792 USED  6400 FREE
+BANK  11 CODE  3072 USED  5120 FREE
+BANK   5 TEXT  7424 USED   768 FREE
+BANK   6 TEXT  4352 USED  3840 FREE
+TOTAL BANKS 8, 30720 USED
 ```
 
 An embedded build prints a `RUNTIME` line second. `GPCTEST-E`:
 
 ```
 OK LOW CODE 969, EMBEDDED GPBASIC
-RUNTIME 13567
-LOW FREE 22016, FRAME STACK 2048
+RUNTIME 11519
+LOW FREE 24064, FRAME STACK 2048
 ```
 
 | | |
@@ -2544,7 +2549,7 @@ Two budgets come off `LOW FREE`:
   `PROGRAM TOO BIG`.
 
 A program can be comfortable on one and out of room on the other. `LOW FREE 4096` is 4K to run in
-and nowhere left to grow; `GPBMODS` at `LOW FREE 10240` has both.
+and nowhere left to grow; `GPBMODS` at `LOW FREE 12288` has both.
 
 ### Removing dead code
 
@@ -2621,7 +2626,7 @@ which of your strings was asking.
 
 `LOW CODE` and `LOW FREE` describe low memory only. **P-code inside a `GP.BANKED` region (§3.12) is
 not in either figure**, and neither is a `GP.ASM` block in the region without `LOW`. The region is
-reported on its own `BANK` line and written to its own `NAME.Bnn` overlay file. Moving a module into
+reported on its own `BANK` line and written to its own `NAME.nnn` overlay file. Moving a module into
 a region takes its bytes off `LOW CODE` and gives them to `LOW FREE`.
 
 What a region costs instead:
@@ -2631,7 +2636,7 @@ What a region costs instead:
 - **A byte a call site, and two bank switches a call.** A call into the region from outside it, or
   out of it to low memory, is a `.bgosub`, one byte longer than a `GOSUB`. `RETURN` selects the
   caller's bank again.
-- **A file that has to travel.** The `.Bnn` files ship beside the `.PRG`. A program whose overlays
+- **A file that has to travel.** The `.nnn` files ship beside the `.PRG`. A program whose overlays
   are missing loads and then fails where it first calls into one.
 
 Banked text is the same bargain on the data side: a `GP.BANKEDSTR` group (§3.10) is out of the

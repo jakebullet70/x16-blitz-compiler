@@ -57,8 +57,9 @@ Every panel returns to the bar. `APPSYS.STARTUP` and `APPSYS.RESTORE` bracket th
 > program as it is built now. What still holds is the method, and the conclusion the estimates
 > were wrong in both directions.
 
-Shared mode: p-code runs from `PCODE_PAGE $0900` to `RTGPBASE $6600`, 23,808 bytes, less the 4K
-frame stack and the 4K minimum workspace. **15,616 bytes of p-code is the ceiling.**
+Shared mode: p-code runs from `PCODE_PAGE $0900` to `RTGPBASE $6F00`, 26,112 bytes, less the 2K
+frame stack and the 4K minimum workspace. **19,968 bytes of p-code is the ceiling**, and 19,712 for a
+banked program, which carries a bootstrap extension page.
 
 The shell was built with all twelve modules and a stub driver: **`OK CODE 10047 FREE 9472`**.
 Per-module bytes, differenced out of `GPBMODS.MAP` against `GPBMODS.SRC.SYM` -- exact, no
@@ -172,7 +173,7 @@ library fits in a bank?*
 
 | what | |
 |---|---|
-| arithmetic, `IF`, `FOR`/`NEXT`, `GP.DO`, `GP.SELECT`, `GP.IF` | frames sit on the frame stack, 4K below the workspace in low RAM |
+| arithmetic, `IF`, `FOR`/`NEXT`, `GP.DO`, `GP.SELECT`, `GP.IF` | frames sit on the frame stack, 2K below the workspace in low RAM |
 | variables, arrays, the string heap, `DIM` | all in the low-RAM workspace |
 | `GOSUB`/`RETURN` inside the module | PC-relative, and the module is contiguous |
 | calls out to low-RAM routines, and back | the low-RAM routine banks freely; `RETURN` restores from the frame |

@@ -8,18 +8,24 @@ LinkFloatAdd: ;; [+]
 	jsr	FloatAdd
 	ply
 	.exitcmd
+	.send code
+	.section code
 LinkFloatSubtract: ;; [-]
 	.entercmd
 	phy
 	jsr	FloatSubtract
 	ply
 	.exitcmd
+	.send code
+	.section code
 LinkFloatMultiply: ;; [*]
 	.entercmd
 	phy
 	jsr	FloatMultiply
 	ply
 	.exitcmd
+	.send code
+	.section code
 LinkFloatDivide: ;; [/]
 	.entercmd
 	phy
@@ -27,110 +33,154 @@ LinkFloatDivide: ;; [/]
 	bcs	DivZeroError
 	ply
 	.exitcmd
+	.send code
+	.section banked
 LinkFloatPower: ;; [^]
 	.entercmd
 	phy
 	jsr	FloatPower
-	bcs	MapRangeError
+	bcc	_Result
+	jmp	MapRangeError
+_Result:
 	ply
-	.exitcmd
+	.exitbank
+	.send banked
+	.section code
 LinkCompareGreater: ;; [>]
 	.entercmd
 	phy
 	jsr	CompareGreater
 	ply
 	.exitcmd
+	.send code
+	.section code
 LinkCompareEqual: ;; [=]
 	.entercmd
 	phy
 	jsr	CompareEqual
 	ply
 	.exitcmd
+	.send code
+	.section code
 LinkCompareLess: ;; [<]
 	.entercmd
 	phy
 	jsr	CompareLess
 	ply
 	.exitcmd
+	.send code
+	.section code
 LinkCompareGreaterEqual: ;; [>=]
 	.entercmd
 	phy
 	jsr	CompareGreaterEqual
 	ply
 	.exitcmd
+	.send code
+	.section code
 LinkCompareNotEqual: ;; [<>]
 	.entercmd
 	phy
 	jsr	CompareNotEqual
 	ply
 	.exitcmd
+	.send code
+	.section code
 LinkCompareLessEqual: ;; [<=]
 	.entercmd
 	phy
 	jsr	CompareLessEqual
 	ply
 	.exitcmd
+	.send code
+	.section code
 LinkFloatIntegerPartDown: ;; [!int]
 	.entercmd
 	phy
 	jsr	FloatIntegerPartDown
 	ply
 	.exitcmd
+	.send code
+	.section banked
 LinkFloatSquareRoot: ;; [!sqr]
 	.entercmd
 	phy
 	jsr	FloatSquareRoot
-	bcs	MapRangeError
+	bcc	_Result
+	jmp	MapRangeError
+_Result:
 	ply
-	.exitcmd
+	.exitbank
+	.send banked
+	.section code
 MapRangeError:
 	.error_range
 DivZeroError:
 	.error_divzero
+	.send code
+	.section banked
 LinkFloatLogarithm: ;; [!log]
 	.entercmd
 	phy
 	jsr	FloatLogarithm
-	bcs	MapRangeError
+	bcc	_Result
+	jmp	MapRangeError
+_Result:
 	ply
-	.exitcmd
+	.exitbank
+	.send banked
+	.section banked
 LinkFloatExponent: ;; [!exp]
 	.entercmd
 	phy
 	jsr	FloatExponent
 	ply
-	.exitcmd
+	.exitbank
+	.send banked
+	.section banked
 LinkFloatCosine: ;; [!cos]
 	.entercmd
 	phy
 	jsr	FloatCosine
 	ply
-	.exitcmd
+	.exitbank
+	.send banked
+	.section banked
 LinkFloatSine: ;; [!sin]
 	.entercmd
 	phy
 	jsr	FloatSine
 	ply
-	.exitcmd
+	.exitbank
+	.send banked
+	.section banked
 LinkFloatTangent: ;; [!tan]
 	.entercmd
 	phy
 	jsr	FloatTangent
 	ply
-	.exitcmd
+	.exitbank
+	.send banked
+	.section banked
 LinkFloatArcTan: ;; [!atn]
 	.entercmd
 	phy
 	jsr	FloatArcTan
-	bcs	MapRangeError
+	bcc	_Result
+	jmp	MapRangeError
+_Result:
 	ply
-	.exitcmd
+	.exitbank
+	.send banked
+	.section code
 LinkFloatCompare: ;; [f.cmp]
 	.entercmd
 	phy
 	jsr	FloatCompare
 	ply
 	.exitcmd
+	.send code
+	.section code
 LinkDivideInt32: ;; [int.div]
 	.entercmd
 	phy

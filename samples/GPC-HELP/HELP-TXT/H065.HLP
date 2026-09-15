@@ -1,91 +1,117 @@
-@3. The modules (3)
-=FILEDIR.INC.BL
+@3. The modules
 .
-.Needs FILEIO.INC.BL, and a #SYMFILE -- it is two GP.ASM blobs.
+=3. THE MODULES
 .
-.It executes no BANK statement, which is what lets it live in a GP.BANKED
-.region: the two blobs take the data bank at entry and put the caller's back
-.at every exit, so no BASIC line here ever runs with a foreign bank selected.
-.Both blobs write $00, so both are GP.ASM LOW and run from low memory when
-.the module is in a region. FILE.DIR.BNK% carries the bank number to the
-.assembly -- {FILE.DIR.BANK} would read a float's mantissa, and FILE.DIR.WAS%
-.is the blobs' save slot.
+.Each table is in (set before the GOSUB), out (read after it), and internal
+.(do not read, do not write, do not rely on).
+.
+=THEME.INC.BL
 .
 .  in
-.      FILE.DIR.BANK -- the bank to read into, or 0 for low
-.        RAM<br>FILE.DIR.PTR FILE.DIR.CAP -- the low-RAM buffer, when BANK is
-.        0<br>FILE.DIR.PATTERN$ -- a name pattern, or empty<br>FILE.DIR.ONLY
-.        -- FILE.DIR.ALL, .FILES or .DIRS
+.      THEME.ID -- 0 x16, 1 dark, 2 light, 3 gray, 4 custom, read by
+.        THEME.SELECT<br>THEME.ATTR -- a packed attribute, for THEME.SET and
+.        THEME.HI
 .
 .  out
-.      FILE.DIR.GOT -- bytes read<br>FILE.DIR.FULL -- the buffer filled
-.        before the listing ended<br>FILE.DIR.MORE -- -1 while NEXT produced
-.        an entry<br>FILE.NAME$ FILE.BLOCKS FILE.TYPE$ -- the entry itself
+.      THEME.CLR(role) -- the colour array, DIMmed to
+.        THEME.SLOTS<br>THEME.INV -- the inverse attribute, from THEME.HI
 .
 .  internal
-.      FILE.DIR.AT FILE.DIR.ASK$ FILE.DIR.ADDR% FILE.DIR.ROOM% FILE.DIR.OFF%
-.        FILE.DIR.BYTES% FILE.DIR.CNT% FILE.DIR.BLK% FILE.DIR.OK%
-.        FILE.DIR.SLOW% FILE.DIR.LFN% FILE.DIR.NAMEA% FILE.DIR.TYPEA%
-.        FILE.DIR.WAS% FILE.DIR.BNK%
+.      THEME.READY
 .
 .  constants
-.      FILE.DIR.ALL FILE.DIR.FILES FILE.DIR.DIRS FILE.DIR.NAMEMAX
-.        FILE.DIR.BANKROOM FILE.DIR.BANKBASE
+.      THEME.PAGE THEME.TEXT THEME.TITLE THEME.BORDER THEME.HILITE
+.        THEME.DIMMED THEME.WARN THEME.FOCUS THEME.SLOTS THEME.COUNT
 .
-.FILE.DIR.INIT must run once before anything else: it sizes FILE.NAME$ and
-.FILE.TYPE$ for the assembly to write into, and creates every {VAR} slot. Do
-.not assign FILE.NAME$ or FILE.TYPE$ afterwards -- an assignment reallocates
-.and the block the assembly holds goes stale.
+.THEME.CLR is the array this module DIMs. Do not DIM it yourself -- the
+.module owns it, and DIMming an array GPC has already dimensioned is an
+.error.
 .
-.FILE.NAME$ is shared with FILEIO on purpose: the name a picker chose is the
-.name FILE.EXISTS and FILE.DELETE want.
+.The routine is THEME.SELECT, and it used to be THEME.LOAD. The name changed
+.when the library was split into banked and low-memory files, and it stayed
+.when they were merged again; a program written against the older library
+.calls THEME.LOAD and stops with LABEL NOT FOUND, which is the good kind of
+.failure.
 .
-=STASHVRAM.INC.BL
+.THEME.FOCUS is the eighth role and the newest: the attribute a focused
+.control wears while GUI.FORM has the keyboard. THEME.SLOTS is 8 because of
+.it, and THEME.COUNT stays 5 -- the first is how many roles there are, the
+.second how many themes.
 .
-.Needs GPB.INC.BL, and no #SYMFILE -- there is no GP.ASM in it. The cells
-.never leave VRAM: one data port reads, the other writes, and memory_copy
-.moves between them without stepping either.
-.
-.It executes no BANK, so it can live in a GP.BANKED region -- measured,
-.work/stashvram/SVB.BASL. That is the difference from STASH.INC.BL, which
-.cannot.
+=APPSYS.INC.BL
 .
 .  in
-.      SV.BASE SV.TOP -- the VRAM window in bytes. Default
-.        $04000/$1AFFF<br>SV.MAX -- how many handles. The caller DIMs
-.        SV.PAGE% and SV.PAGES% to it<br>SV.X SV.Y SV.W SV.H -- the
-.        rectangle, for SV.SAVE<br>SV.MOVE -- non-zero restores at SV.X SV.Y
-.        rather than where it came from<br>SV.ADDR SV.LEN -- low RAM address
-.        and count, for SV.PUT and SV.GET<br>SV.HND -- the handle, for
-.        RESTORE, GET and FREE
+.      APPSYS.FILE$ APPSYS.BANK APPSYS.X APPSYS.Y APPSYS.W APPSYS.H
+.        APPSYS.DEV -- the panel routines
 .
 .  out
-.      SV.HND -- 1..SV.MAX, or 0 if it did not fit<br>SV.OK -- -1 done, 0
-.        refused<br>SV.ERROR$ -- why, when something is refused<br>SV.MOVED
-.        -- SV.COMPACT only: how many blocks moved
-.
-.  arrays
-.      SV.PAGE%() SV.PAGES%() -- the handle table, DIMmed by the caller
+.      APPSYS.MODE APPSYS.COLS APPSYS.ROWS APPSYS.COLOUR -- set by
+.        APPSYS.STARTUP<br>APPSYS.IS.EMULATOR -- set by APPSYS.ISEMU
 .
 .  internal
-.      SV.READY SV.NEXT SV.BASEPG SV.TOPPG SV.I SV.PG SV.NP SV.N SV.BYTES
-.        SV.MAPW SV.MAPBASE SV.STRIDE SV.ROW SV.CELL SV.SRC SV.DST SV.VA
-.        SV.ADR SV.BNK SV.REST SV.MID SV.LO SV.MODE SV.RX SV.RY<br>SV.COMPACT
-.        adds SV.PICK SV.BEST SV.J SV.TO SV.GCS SV.GCD SV.LEFT SV.CH
+.      APPSYS.LAST
 .
 .  constants
-.      SV.VLO SV.VMID SV.VHI SV.DATA SV.VCTRL SV.LCONFIG SV.LMAPBASE
-.        SV.PORTLO SV.PORTLO.B SV.PORTHI SV.MEMCOPY SV.UP SV.HEADER
-.        SVGC.CHUNK
+.      APPSYS.SCRMODE APPSYS.COLREG APPSYS.SETCHR APPSYS.CHRREG APPSYS.EMUSIG
 .
-.SV.INIT must run once before anything else, and the two arrays must be
-.DIMmed before it.
+.Lay the screen out from APPSYS.COLS and APPSYS.ROWS. Do not assume 80x60 --
+.the X16 boots there but SCREEN 0 is 40x30, and someone who prefers larger
+.text is running one.
 .
-.Blocks are whole 256-byte pages, which is what lets a handle's address live
-.in an ordinary %: a page number reaches 511 where a VRAM address is 17 bits
-.and would not.
+=STRINGS.INC.BL
 .
-.WARNING: BMX.STASH defaults to $13000, inside the default window. A program
-.using both must move one of them. There is one allocator and no collision
-.check.
+.  in
+.      STR.STR$ -- the string, in and out<br>STR.WIDTH -- field width, the
+.        pad routines<br>STR.DELIM$ STR.MAX -- SPLIT (MAX 0 means
+.        10)<br>STR.FIND$ STR.REPL$ -- REPLACE<br>STR.PET -- a PETSCII code,
+.        PET2SCR<br>STR.AT STR.CUT STR.SUB$ -- SPLICE, and AT/CUT are CLAMPED
+.        in place<br>STR.PTR -- GP.STRPTR of the string, the three trims
+.
+.  out
+.      STR.STR$ -- padded, or replaced, in place<br>STR.N -- how many fields
+.        SPLIT found, always >= 1<br>STR.FIELD$(1..N) -- the fields
+.        themselves<br>STR.SCR -- the screen code from PET2SCR<br>STR.STR$ --
+.        spliced, when it was SPLICE that was called
+.
+.  internal
+.      STR.GAP STR.HALF STR.REST$ STR.AT STR.LIM STR.OUT$<br>STR.ADDR%
+.        STR.OP% STR.KEEP% -- the {VAR} slots the trim blob reads
+.
+.STR.FIELD$ is the one array the library does not DIM. Left alone, GPC's
+.implicit DIM gives 0..10. For more, DIM it before the first call and set
+.STR.MAX to match -- DIMming an array GPC has already auto-dimensioned is an
+.error, so it is one or the other. This is the opposite of THEME.CLR, which
+.the module owns outright; the two are worth keeping straight.
+.
+=STRUSING.INC.BL
+.
+.  in
+.      STR.USING.NUM -- the value, both routines<br>STR.USING.MASK$ -- the
+.        template, STR.USING<br>STR.USING.DP -- decimal places, STR.USING.FIX
+.
+.  out
+.      STR.USING.STR$ -- the result: a field from STR.USING, digits from
+.        STR.USING.FIX<br>STR.USING.OVR -- -1 when the value scaled past 1e9
+.        and the digits are unusable<br>STR.USING.SGN -- -1 when the ROUNDED
+.        value is negative
+.
+.  internal
+.      STR.USING.INT$ STR.USING.FRC$ STR.USING.SIGN$ STR.USING.OUT$
+.        STR.USING.C$<br>STR.USING.IW STR.USING.ZW STR.USING.Z STR.USING.W
+.        STR.USING.F<br>STR.USING.GRP STR.USING.PT STR.USING.I STR.USING.V
+.
+.STR.USING.DP is an output of STR.USING and an input to STR.USING.FIX. The
+.mask carries the decimal count, so STR.USING overwrites whatever was there.
+.A program alternating the two routines must set STR.USING.DP again before
+.every FIX.
+.
+.STR.USING.INT$ and STR.USING.FRC$ survive a call and are the two halves of
+.the digits, without sign, point or field. They are listed internal because
+.their width is the routine's business, not the caller's -- read
+.STR.USING.STR$.
+.
+.The prefix is STR.USING., a sub-prefix of STRINGS.INC.BL's STR., on the same
+.footing as FILE.DIR. inside FILE.. Nothing here is written by STRINGS.INC.BL
+.and nothing there is written by this module, so either can be included
+.alone.
 .

@@ -18,6 +18,14 @@ exitcmd 	.macro
 		jmp 	NextCommand
 		.endm
 
+;
+;		A handler in bank 1 (HANDLER_BANK) ends with .exitbank, never .exitcmd. BankedExit is in
+;		low RAM, selects the program's bank again and runs on into NextCommand.
+;
+exitbank 	.macro
+		jmp 	BankedExit
+		.endm
+
 		
 ; ************************************************************************************************
 ;

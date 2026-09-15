@@ -86,8 +86,8 @@ p-code in `GP.BANKED` regions the fit check does not see, reaches the line table
 15,209 bytes resident with 2,156 lines, and that is what got there.
 
 To raise it further, in order of work: relax `MIN_WS_PAGES` for a program that needs little
-workspace (policy, not hardware); shrink the 4K frame stack (~250 frames); or shrink the runtime,
-since every byte off it moves `ObjectBase` down.
+workspace (policy, not hardware), or shrink the runtime, since every byte off it moves `ObjectBase`
+down. The frame stack is already 2K, down from 4K.
 
 Related: [[compiler-must-not-cap-program-size]], [[gpc-blitz-runtime-slack-and-limits]],
 [[headless-basl-build-recipe]].

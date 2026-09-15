@@ -58,7 +58,7 @@ _GEExecuteVectors:
 		.word 	_GEXComma					; A  check , follows
 		.word 	_GEXNop 					; B
 		.word 	_GEXNop 					; C
-		.word 	_GEXNop 					; D  
+		.word 	_GEXLowString 				; D  compile get any string, copied low in a region
 		.word 	_GEXNumber 					; E  compile get any number
 		.word 	_GEXString 					; F  compile get any string
 
@@ -141,6 +141,27 @@ _GEXString:
 
 _GEXType:
 		.error_type
+
+; ------------------------------------------------------------------------------------------------
+;		A string for the audio ROM, which selects RAM bank 0 before it reads the text. A literal
+;		in a GP.BANKED region points into the region's bank, so concatenating "" copies it into
+;		a low temporary first. 3 bytes of p-code a call site, and only inside a region.
+; ------------------------------------------------------------------------------------------------
+
+_GEXLowString:
+		jsr 	_GEXString
+		lda 	gpBankState 				; 1 = inside a GP.BANKED region
+		cmp 	#1
+		bne 	_GEXLSDone
+		lda 	#PCD_CMD_STRING
+		jsr 	WriteCodeByte
+		lda 	#0
+		jsr 	WriteCodeByte
+		lda 	#PCD_CONCAT
+		jsr 	WriteCodeByte
+_GEXLSDone:
+		clc
+		rts
 
 ; ------------------------------------------------------------------------------------------------
 ;							Execute 6502 code with Channel Redirect

@@ -24,7 +24,7 @@ the thing you want always has a name to grep for. The same applies to the
 ## Build output
 
 The headless emulator runs print long transcripts. Keep the last ~20 lines and the
-numbers that matter (object size, the overlay `.Bnn` sizes, the PASS count); do not
+numbers that matter (object size, the overlay `.nnn` sizes, the PASS count); do not
 echo the whole log.
 
 ## Compact

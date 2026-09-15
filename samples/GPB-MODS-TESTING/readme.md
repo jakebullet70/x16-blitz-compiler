@@ -106,16 +106,16 @@ bytes and **eight overlay files** come with it, 30,224 bytes between them:
 
 | file | bank | what is in it | bytes |
 |---|---:|---|---:|
-| `GPBMODS.B04` | 4 | the GUI — `MENUVERT` `MENUBAR` `LINEINPUT` `GUI` `GUI2` | 7,938 |
-| `GPBMODS.B05` | 5 | literal text, pool one | 7,426 |
-| `GPBMODS.B06` | 6 | literal text, pool two | 4,354 |
-| `GPBMODS.B07` | 7 | the utilities — nine modules | 4,354 |
-| `GPBMODS.B08` | 8 | the file modules — `FILEIO` `FILEDIR` | 1,538 |
-| `GPBMODS.B09` | 9 | `THEME` | 770 |
-| `GPBMODS.B10` | 10 | `COMBO` | 770 |
-| `GPBMODS.B11` | 11 | `GMX.STRINGS` and `GMX.FILES`, this program's own code | 3,074 |
+| `GPBMODS.004` | 4 | the GUI — `MENUVERT` `MENUBAR` `LINEINPUT` `GUI` `GUI2` | 7,938 |
+| `GPBMODS.005` | 5 | literal text, pool one | 7,426 |
+| `GPBMODS.006` | 6 | literal text, pool two | 4,354 |
+| `GPBMODS.007` | 7 | the utilities — nine modules | 4,354 |
+| `GPBMODS.008` | 8 | the file modules — `FILEIO` `FILEDIR` | 1,538 |
+| `GPBMODS.009` | 9 | `THEME` | 770 |
+| `GPBMODS.010` | 10 | `COMBO` | 770 |
+| `GPBMODS.011` | 11 | `GMX.STRINGS` and `GMX.FILES`, this program's own code | 3,074 |
 
-**One `.Bnn` is written per bank, not per some size threshold.** Six are `GP.BANKED` code regions
+**One `.nnn` is written per bank, not per some size threshold.** Six are `GP.BANKED` code regions
 and two are `GP.BANKEDSTR` text pools. Each is loaded to `$A000` in its own bank, which is why none
 of it counts against low RAM or the file ceiling, and each carries a two-byte load address like any
 PRG, so **the payload is the file size less two**.
@@ -130,36 +130,36 @@ memory and all six regions, which is why the total is far larger than the reside
 | low | `STASHFILE` | 174 |
 | low | the region exit bridges | 18 |
 | | **low RAM total** | **10,054** |
-| `.B04` | `GUI` | 4,474 |
-| `.B04` | `MENUVERT` | 1,306 |
-| `.B04` | `MENUBAR` | 826 |
-| `.B04` | `LINEINPUT` | 780 |
-| `.B04` | `GUI2` | 366 |
-| `.B04` | entry bridge and page padding | 184 |
+| `.004` | `GUI` | 4,474 |
+| `.004` | `MENUVERT` | 1,306 |
+| `.004` | `MENUBAR` | 826 |
+| `.004` | `LINEINPUT` | 780 |
+| `.004` | `GUI2` | 366 |
+| `.004` | entry bridge and page padding | 184 |
 | | **bank 4 payload** | **7,936** |
-| `.B07` | `STASHVRAM` | 1,681 |
-| `.B07` | `STRUSING` | 726 |
-| `.B07` | `BANKMGR` | 586 |
-| `.B07` | `STRINGS` | 511 |
-| `.B07` | `STASHVRAMGC` | 304 |
-| `.B07` | `SORT` | 189 |
-| `.B07` | `APPSYS` | 114 |
-| `.B07` | `STRCASE` | 56 |
-| `.B07` | `KB` | 28 |
-| `.B07` | entry bridge and page padding | 157 |
+| `.007` | `STASHVRAM` | 1,681 |
+| `.007` | `STRUSING` | 726 |
+| `.007` | `BANKMGR` | 586 |
+| `.007` | `STRINGS` | 511 |
+| `.007` | `STASHVRAMGC` | 304 |
+| `.007` | `SORT` | 189 |
+| `.007` | `APPSYS` | 114 |
+| `.007` | `STRCASE` | 56 |
+| `.007` | `KB` | 28 |
+| `.007` | entry bridge and page padding | 157 |
 | | **bank 7 payload** | **4,352** |
-| `.B08` | `FILEIO` | 1,090 |
-| `.B08` | `FILEDIR` | 422 |
-| `.B08` | entry bridge and page padding | 24 |
+| `.008` | `FILEIO` | 1,090 |
+| `.008` | `FILEDIR` | 422 |
+| `.008` | entry bridge and page padding | 24 |
 | | **bank 8 payload** | **1,536** |
-| `.B09` | `THEME` | 502 |
-| `.B09` | entry bridge and page padding | 266 |
+| `.009` | `THEME` | 502 |
+| `.009` | entry bridge and page padding | 266 |
 | | **bank 9 payload** | **768** |
-| `.B10` | `COMBO` | 705 |
-| `.B10` | entry bridge and page padding | 63 |
+| `.010` | `COMBO` | 705 |
+| `.010` | entry bridge and page padding | 63 |
 | | **bank 10 payload** | **768** |
-| `.B11` | `GMX.STRINGS`, `GMX.FILES` and what they call | 2,904 |
-| `.B11` | entry bridge and page padding | 168 |
+| `.011` | `GMX.STRINGS`, `GMX.FILES` and what they call | 2,904 |
+| `.011` | entry bridge and page padding | 168 |
 | | **bank 11 payload** | **3,072** |
 
 Measured 2026-09-14, after the shims were deleted. Banks 5 and 6 hold no p-code at all: 7,424 and

@@ -21,7 +21,7 @@ compiled 100's and 100's of times over the last month"*. He is retired and wants
 finished; his time is the scarce resource, not the CPU's.
 
 **How to apply:** a remark about speed is not a request to profile. Run the build, print the three
-or four numbers that matter (tokenised bytes, SHARED bytes, the `.Bnn` overlay sizes), and stop.
+or four numbers that matter (tokenised bytes, SHARED bytes, the `.nnn` overlay sizes), and stop.
 If a real speed idea exists, state it in one line and let him ask for it. Do not measure what a
 month of builds has already answered.
 

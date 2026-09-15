@@ -26,7 +26,8 @@
 ## **        BANKMGR.SPARE     what COUNT found free
 ## **
 ## **  0 is not a bank. It is the KERNAL's, reserved by INIT, and it is what
-## **  GET.FREE.BANK returns for "none left".
+## **  GET.FREE.BANK returns for "none left". INIT reserves 1 as well: the
+## **  runtime keeps it, and the compiler refuses GP.BANKED 1.
 ## **
 ## **  WARNING: MEMTOP RETURNS $00 ON A 2MB MACHINE. The count is one byte and 256
 ## **  does not fit, so 512K reads $40 = 64 and 2MB reads $00, meaning 256. INIT
@@ -65,7 +66,11 @@ GOTO BANKMGR.SKIP
 ## **  array is 0..10, and DIMming one GPC auto-dimensioned is an error.
 ## ***********************************************************************
 
-BANKMGR.INIT: IF BANKMGR.READY = 0 THEN DIM BANKMGR.MAP%(BANKMGR.BYTES) : DIM BANKMGR.BIT%(7) : BANKMGR.READY = -1
+BANKMGR.INIT: 
+    GP.IF BANKMGR.READY = 0 THEN 
+        DIM BANKMGR.MAP%(BANKMGR.BYTES) : DIM BANKMGR.BIT%(7) 
+        BANKMGR.READY = -1
+    GP.ENDIF
 
 ## ---- 1, 2, 4 .. 128. GPC has no shift.
     BANKMGR.BIT%(0) = 1
@@ -85,8 +90,9 @@ BANKMGR.INIT: IF BANKMGR.READY = 0 THEN DIM BANKMGR.MAP%(BANKMGR.BYTES) : DIM BA
 ## ---- the byte the count falls inside, when it is not a multiple of 8 ----
     IF (BANKMGR.BANKS AND 7) <> 0 THEN GOSUB BANKMGR.INIT.PART
 
-## ---- bank 0 is the KERNAL's ----
+## ---- bank 0 is the KERNAL's, bank 1 the runtime's ----
     BANKMGR.SET.BANK = 0 : GOSUB BANKMGR.SET
+    BANKMGR.SET.BANK = 1 : GOSUB BANKMGR.SET
     RETURN
 
 ## ---- Only reached when the count is not a multiple of 8. The loop cannot be empty
@@ -184,16 +190,20 @@ BANKMGR.COUNT.NEXT:
 ## **  known set before the subtraction, which makes it the same answer.
 ## ***********************************************************************
 
-BANKMGR.LOCATE: BANKMGR.SLOT = INT(BANKMGR.SET.BANK / 8) : BANKMGR.MASK = BANKMGR.BIT%(BANKMGR.SET.BANK - BANKMGR.SLOT * 8) 
+BANKMGR.LOCATE: 
+    BANKMGR.SLOT = INT(BANKMGR.SET.BANK / 8) : BANKMGR.MASK = BANKMGR.BIT%(BANKMGR.SET.BANK - BANKMGR.SLOT * 8) 
     RETURN
 
-BANKMGR.SET: GOSUB BANKMGR.LOCATE : BANKMGR.MAP%(BANKMGR.SLOT) = BANKMGR.MAP%(BANKMGR.SLOT) OR BANKMGR.MASK 
+BANKMGR.SET: 
+    GOSUB BANKMGR.LOCATE : BANKMGR.MAP%(BANKMGR.SLOT) = BANKMGR.MAP%(BANKMGR.SLOT) OR BANKMGR.MASK 
     RETURN
 
-BANKMGR.CLR: GOSUB BANKMGR.LOCATE : IF (BANKMGR.MAP%(BANKMGR.SLOT) AND BANKMGR.MASK) <> 0 THEN BANKMGR.MAP%(BANKMGR.SLOT) = BANKMGR.MAP%(BANKMGR.SLOT) - BANKMGR.MASK 
+BANKMGR.CLR: 
+    GOSUB BANKMGR.LOCATE : IF (BANKMGR.MAP%(BANKMGR.SLOT) AND BANKMGR.MASK) <> 0 THEN BANKMGR.MAP%(BANKMGR.SLOT) = BANKMGR.MAP%(BANKMGR.SLOT) - BANKMGR.MASK 
     RETURN
 
-BANKMGR.TEST: GOSUB BANKMGR.LOCATE : BANKMGR.USED = 0 : IF (BANKMGR.MAP%(BANKMGR.SLOT) AND BANKMGR.MASK) <> 0 THEN BANKMGR.USED = 1
+BANKMGR.TEST: 
+    GOSUB BANKMGR.LOCATE : BANKMGR.USED = 0 : IF (BANKMGR.MAP%(BANKMGR.SLOT) AND BANKMGR.MASK) <> 0 THEN BANKMGR.USED = 1
     RETURN
 
 BANKMGR.SKIP:

@@ -1,0 +1,50 @@
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		Name:		00rtbank.header
+;		Purpose:	First bytes of the shared runtime's bank code -- the magic at $A000.
+;		Created:	15th September 2026
+;
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		Linked FIRST in the "gpc-rt" target. It places the banked section at $A000, the address
+;		the handlers in HANDLER_BANK run at, and opens it with the magic. $(ASMBANK) writes that
+;		section to build/bank.prg, and code.prg keeps the code section alone.
+;
+;		The magic is the core's, "GP" and RT_ABI, the same four bytes 00rt.header lays at RTBASE.
+;		The embedded link opens its bank code with "GE" (application/source/main/00rtimgbank.header).
+;		Each copy jumps into low RAM at its own link's addresses, so neither may be taken for the
+;		other.
+;
+;		A link that assembles banked code without one of the two headers, or zzlowbank.footer,
+;		stops with "not defined 'banked'".
+;
+;		A .header, not .asm, so build.py leaves it out of the library.
+;
+; ************************************************************************************************
+
+		* = $A000
+		.dsection banked
+
+		.section banked
+
+RTBankHeader:
+		.cerror RTBankHeader != $A000, "bank code magic not at $A000 - this header must open the banked section"
+		.cerror RT_ABI > 99, "RT_ABI > 99: the magic's last two bytes are ASCII digits - widen it here too"
+		.text 	"GP"						; magic ($A000..$A001)
+		.byte 	(RT_ABI / 10) + '0' 		; ABI ordinal as two digits ($A002..$A003)
+		.byte 	(RT_ABI - (RT_ABI / 10) * 10) + '0'
+
+		.send banked
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;
+; ************************************************************************************************

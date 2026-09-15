@@ -76,7 +76,7 @@ into `BBTryLoad`). ONCE PER LOAD: it zeroes its own page count, because the work
 the region was and a second RUN would otherwise copy variables into the bank.
 
 **Shared only, and embedded is refused at the line.** The user's rule, 2026-09-14: *the whole point
-of EMBEDDED is a single file*, and a region is a `.Bnn` file, so a banked program is never
+of EMBEDDED is a single file*, and a region is a `.nnn` file, so a banked program is never
 embedded. An embedded compile stops at the first `GP.BANKED` with `GP.BANKED NEEDS SHARED`, or the
 first `GP.BANKEDSTR` with `GP.BANKEDSTR NEEDS SHARED`, from `gpBankShared` (set by `CompileCode`
 from `GPC.INPUT` line 4). Built and tested 2026-09-14: BANKA, RGN and BSTRA stop at the right

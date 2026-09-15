@@ -64,7 +64,8 @@ python samples/GPC-HELP/MKHELP.PY --mods samples/GPB-MODS-TESTING/GPC-BASIC --md
   - [4.17 COMBO.INC.BL -- a drop-down list that folds into one row](#417-comboincbl----a-drop-down-list-that-folds-into-one-row)
   - [4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM](#418-stashvramincbl----rectangles-and-blobs-kept-in-vram)
   - [4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store](#419-stashvramgcincbl----close-the-holes-in-a-stashvram-store)
-  - [4.20 GPBMODS -- the harness that drives every module](#420-gpbmods----the-harness-that-drives-every-module)
+  - [4.20 KV.INC.BL -- keys and values in one RAM bank](#420-kvincbl----keys-and-values-in-one-ram-bank)
+  - [4.21 GPBMODS -- the harness that drives every module](#421-gpbmods----the-harness-that-drives-every-module)
   - [STASH.INC.BL -- save a text rectangle, and put it back.](#stashincbl----save-a-text-rectangle-and-put-it-back)
   - [STASHFILE.INC.BL -- a saved text rectangle, through a file.](#stashfileincbl----a-saved-text-rectangle-through-a-file)
 - **GLOBALS AND NAMING**
@@ -104,15 +105,15 @@ python samples/GPC-HELP/MKHELP.PY --mods samples/GPB-MODS-TESTING/GPC-BASIC --md
 
 They are assembly because BASIC is slow at per-character string scans, screen fills and VERA writes.
 
-The handlers occupy `GPBase $3800` to `ObjectBase $3c00`: 1,024 bytes, page aligned, all or nothing.
+The handlers occupy `GPBase $2F00` to `ObjectBase $3500`: 1,536 bytes, page aligned, all or nothing.
 `ScanGPUsage` walks the finished p-code and drops the whole block from the object if nothing in it
 is reached.
 
-The block costs those 1,024 bytes once. The bytes in the object and the bytes off the workspace
+The block costs those 1,536 bytes once. The bytes in the object and the bytes off the workspace
 floor are the same bytes — `runtimeEndPage` is a single page number that decides how much of the
 runtime image is written out, where the p-code lands, and where the workspace starts. Maximum
-p-code is 17,152 bytes with the block and 18,176 without: `ObjectBase` to `$9F00`, less the 4K
-frame stack and the 4K minimum workspace.
+p-code is 20,992 bytes with the block and 22,528 without: `ObjectBase` or `GPBase` to `$9F00`, less
+the 2K frame stack and the 4K minimum workspace.
 
 **Composites.** `GP.ASM`, `GP.ENDASM`, `GP.CHAR`, `GP.CONTAINS`, `GP.ISEMPTY`, `GP.HIBYTE`,
 `GP.LOBYTE`, `GP.BSTRCOUNT`, `GP.DEFPROC`, `GP.SUB`. The compiler expands each into opcodes that
@@ -384,6 +385,7 @@ removes dead code, including a module costs its whole size whether or not it is 
 | `STRUSING.INC.BL` | a number to a template: PRINT USING's mask, in BASIC |
 | `SORT.INC.BL` | shell sort a string array in place, in assembly |
 | `BMX.INC.BL` | load a BMX bitmap into VERA |
+| `KV.INC.BL` | strings by key in one RAM bank, saved and loaded as one file. No `GP.ASM`, so no `#SYMFILE` |
 
 What each one costs in bytes is in the command reference, under *At a glance*.
 
@@ -491,6 +493,7 @@ Three implementations, and what each costs:
 | **Dialogs** | BASIC | `COMBO.INC.BL` — `COMBO.ADD`, a drop-down that folds into one row · §4.17 |
 | **Code in a bank** | ASM | `GP.BANKED` `GP.ENDBANKED` — p-code at `$A000`, out of the low-memory budget, see §3.12 |
 | **Bank ownership** | BASIC | `BANKMGR.INC.BL` — `INIT` `CLAIM` `GET.FREE.BANK` `RELEASE` `COUNT` · §4.13 |
+| **Key-value store** | BASIC | `KV.INC.BL` — `INIT` `GET` `PUT` `DEL` `FIND` `AT` `WIPE` `SAVE` `LOAD`, strings in one RAM bank · §4.20 |
 | **Keyboard** | BASIC | `KB.INC.BL` — `KB.CLEARKB` · §4.14 |
 | **The drive** | BASIC | `FILEIO.INC.BL` — `STATUS` `EXISTS` `SIZE` `DELETE` `RENAME` `COPY` `MKDIR` `CHDIR` `SAVEARRAY` `LOADARRAY` · §4.15 |
 | **The drive** | BASIC | `FILEDIR.INC.BL` — `FILE.DIR.INIT` `OPEN` `NEXT`, into a bank or low RAM · §4.16 |
@@ -1221,9 +1224,9 @@ while the object is written, so `BANKMGR` has to be told rather than asked:
 BANKMGR.WANT = GM.TEXTBANK : GOSUB BANKMGR.CLAIM
 ```
 
-**Compile SHARED.** The text is copied into its bank by the program's bootstrap, and an embedded
-program has none — the same rule `GP.BANKED` works to. An embedded build is refused rather than
-compiled into a program that reads an empty bank.
+**Compile SHARED.** The text is a `.nnn` file, which the shared bootstrap LOADs into its bank. An
+embedded program is one file, so an embedded compile stops at the first `GP.BANKEDSTR` with
+`GP.BANKEDSTR NEEDS SHARED`.
 
 **A group name is not a variable.** No `$`, no `%`, no `(` — any of those is a syntax error rather
 than something quietly ignored. A name that no block declared is a syntax error at the line that
@@ -1432,7 +1435,7 @@ line is.
 
 This is how a program gets past the shared p-code ceiling. Low-memory p-code has to fit under the
 runtime — about 17,920 bytes, §7 — and a region does not count against it. Each region becomes its
-own overlay file, `NAME.B04` for bank 4, written beside the `.PRG` and loaded with it.
+own overlay file, `NAME.004` for bank 4, written beside the `.PRG` and loaded with it.
 
 ```basic
 #DEFINE MY.GUICODE 4
@@ -1466,9 +1469,13 @@ the exit bridge, the end marker and every `GP.ASM` block in the region are part 
 so the usable payload is a little under the window. Past it the compiler stops and names the region's `GP.BANKED` line, not the line
 it happened to be on when it ran out.
 
-**Sixty-three regions, and that is the machine's limit rather than the compiler's** — banks 1 to 63
-on a 512 K X16, with 0 the KERNAL's. **No two regions may share a bank**: the second would land at
-`$A000` on top of the first.
+**Banks 2 to 255, and at most 127 regions.** Bank 0 is the KERNAL's and bank 1 is reserved for the
+runtime; the compiler refuses both. A 512 K X16 has banks up to 63 and a 2 MB one up to 255, and a
+program that names a bank the machine does not have prints `?RAM` and returns to `READY` before it
+loads anything. `GP.BANKEDSTR` banks count toward the 127: one region over it stops the compile
+with `TOO MANY GP.BANKED REGIONS`, and one text bank over it with
+`NO REGION LEFT FOR GP.BANKEDSTR TEXT`. **No two regions may share a bank**: the second would
+land at `$A000` on top of the first.
 
 ###### What a region may not contain
 
@@ -1513,11 +1520,12 @@ as the loop.
 
 ###### The overlay files
 
-Each region is written out as `NAME.Bnn`, `nn` being the bank in decimal. The file carries a
-two-byte load address like any PRG, so **the payload is the file size less two**, and the size is
-the page-padded region rather than the p-code in it.
+Each region is written out as `NAME.nnn`, `nnn` being the bank in three decimal digits, so bank 4
+is `NAME.004` and bank 122 is `NAME.122`. The file carries a two-byte load address like any PRG, so
+**the payload is the file size less two**, and the size is the page-padded region rather than the
+p-code in it.
 
-A program's `.Bnn` files ship beside its `.PRG` and must travel with it.
+A program's `.nnn` files ship beside its `.PRG` and must travel with it.
 
 ---
 
@@ -1555,9 +1563,9 @@ runtime and every `#INCLUDE` spends it; a region spends 8,192 bytes of a RAM ban
 not using. Bank what you can. A module called inside a loop goes where the loop is: a call between
 a region and anywhere outside it switches the bank twice.
 
-The banked form needs the program built SHARED. `GP.BANKED` reports `NOT IMPLEMENTED` in an
-embedded build, because the copy into the bank is the shared bootstrap's work and an embedded
-object has no bootstrap.
+The banked form needs the program built SHARED. Each region is a `.nnn` file, which the shared
+bootstrap LOADs into its bank. An embedded program is one file, so an embedded compile stops at the
+first `GP.BANKED` with `GP.BANKED NEEDS SHARED`.
 
 `samples/GPB-MODS-TESTING/PICKDEMO.BASL` is a complete program in this shape, in 99 lines.
 
@@ -1592,7 +1600,7 @@ one region to the other costs the same bank switches as a call from low memory.
 `DUPLICATE SYMBOL` where the module has no `#IFNDEF` guard. Where it has one, the module lands at
 the first `#INCLUDE` and the second produces nothing.
 
-§3.12 has the rules, what a region may not contain, and the `.Bnn` files a banked program ships.
+§3.12 has the rules, what a region may not contain, and the `.nnn` files a banked program ships.
 
 
 *See also: 3.12 Code in a bank, 4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM, 4.1 THEME.INC.BL -- named colour roles, 4.6 MENUVERT.INC.BL -- a vertical menu, 4.4 LINEINPUT.INC.BL -- a positioned entry field, 4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back, 4.12 GUI2.INC.BL -- a listbox, single or multi select*
@@ -2403,7 +2411,8 @@ allocator hands out a bank a compile-time region is already sitting in.
 between the program's own modules, and an accessor still sets its own bank on every access.
 
 **0 is not a bank.** It is the KERNAL's, reserved by `INIT`, and it is what `GET.FREE.BANK` returns
-for *none left*.
+for *none left*. `INIT` reserves bank 1 as well, for the runtime (§3.12), so `GET.FREE.BANK`
+hands out bank 2 or higher.
 
 `BANKMGR.OK` is `-1` if `CLAIM` took the bank, `0` if it was already taken or out of range.
 `BANKMGR.BANKS` is how many the machine has, 64 or 256. `BANKMGR.SPARE` is what `COUNT` found free.
@@ -2418,7 +2427,7 @@ The bitmap is 32 bytes, eight banks to the byte.
 ---
 
 
-*See also: 4.13 BANKMGR.INC.BL -- who owns which RAM bank*
+*See also: 3.12 Code in a bank, 4.13 BANKMGR.INC.BL -- who owns which RAM bank*
 
 ## 4.14 KB.INC.BL -- the keyboard buffer, emptied
 
@@ -2723,9 +2732,113 @@ at the hardware is measured, not assumed.
 
 *See also: 7. Memory, and what the compiler tells you, 4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store, 4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM*
 
-## 4.20 GPBMODS -- the harness that drives every module
+## 4.20 KV.INC.BL -- keys and values in one RAM bank
 
-##### 4.20 `GPBMODS` — the harness that drives every module
+##### 4.20 `KV.INC.BL` — keys and values in one RAM bank
+
+| Routine | in | out |
+|---|---|---|
+| `KV.INIT` | — | `KV.OK` |
+| `KV.FIND` | `KV.KEY$` | `KV.SLOT` |
+| `KV.GET` | `KV.KEY$` | `KV.VALUE$` `KV.SLOT` `KV.OK` |
+| `KV.AT` | `KV.SLOT` | `KV.KEY$` `KV.VALUE$` `KV.OK` |
+| `KV.PUT` | `KV.KEY$` `KV.VALUE$` | `KV.SLOT` `KV.OK` |
+| `KV.DEL` | `KV.KEY$` | `KV.OK` |
+| `KV.WIPE` | — | `KV.OK` |
+| `KV.SAVE` | `KV.FNAME$` | — |
+| `KV.LOAD` | `KV.FNAME$` | `KV.OK` |
+| `KV.PUTNUM` `KV.GETNUM` | — | `KV.OK`, always 0 |
+
+```basic
+#INCLUDE "KV.INC.BL"
+
+GOSUB KV.INIT
+KV.KEY$ = "COLOR"
+KV.VALUE$ = "RED"
+GOSUB KV.PUT
+KV.KEY$ = "COLOR"
+GOSUB KV.GET
+IF KV.OK THEN PRINT KV.VALUE$
+KV.FNAME$ = "SETTINGS.KV"
+GOSUB KV.SAVE
+```
+
+Strings stored by key in RAM bank 40. `KV.INIT` runs before any other routine. Every routine is a
+plain `GOSUB`, and `KV.OK` is -1 for success and 0 for failure.
+
+**Plain BASL.** No `GP.*` keyword and no `GP.ASM`, so it needs neither `GPB.INC.BL` nor a
+`#SYMFILE`, and the same source tokenises for stock BASIC.
+
+**`KV.INIT` formats the bank only when slot 0 holds no header.** A bank that already holds a store is
+kept, keys and all. A header with another version or slot count is left alone, and `KV.OK` is 0.
+`KV.WIPE` formats the bank whatever it holds.
+
+**Keys** are `A`-`Z`, `0`-`9` and `.`, cut to 8 characters. The module checks none of this. A key
+compares byte for byte, and `KV.AT` reads a key back up to its first space.
+
+`KV.PUT` refuses an empty key. It rewrites the slot of a key that exists and takes the first free slot
+for one that does not. When all 63 slots are in use, `KV.OK` and `KV.SLOT` are 0.
+
+**Values** hold up to 119 characters, and `KV.PUT` cuts a longer one. An empty value is stored and
+reads back as `""`. A missing key gives `KV.OK = 0`, `KV.SLOT = 0` and `KV.VALUE$ = ""`.
+
+`KV.FIND` sets `KV.SLOT` and nothing else. Slots never move, so a program can keep a slot number for
+the rest of the run and read it with `KV.AT`, which does not scan. A delete frees the slot. `KV.AT`
+on every slot lists the store:
+
+```basic
+FOR SLOT.NUMBER = 1 TO 63
+    KV.SLOT = SLOT.NUMBER
+    GOSUB KV.AT
+    IF KV.OK THEN PRINT KV.KEY$; " = "; KV.VALUE$
+NEXT SLOT.NUMBER
+```
+
+**`KV.PUTNUM` and `KV.GETNUM` are stubs.** Each sets `KV.OK = 0` and returns. Store a number as
+text: `STR$(N)` with `KV.PUT`, and `VAL(KV.VALUE$)` after `KV.GET`.
+
+**It selects a bank.** Every routine selects bank 40 and ends with `BANK KV.HOMEBANK`. The first
+`KV.INIT` sets `KV.HOMEBANK` to 1, the bank selected at startup, and a program that keeps another bank
+selected sets it after `KV.INIT`. A call from a `GP.BANKED` region needs nothing: it is a banked
+call, and its `RETURN` selects the region's bank again (§3.12). The module cannot go inside a region,
+because the compiler refuses `BANK` there.
+
+A program that uses `BANKMGR` (§4.13) claims the bank after `BANKMGR.INIT` and before the first
+`GET.FREE.BANK`:
+
+```basic
+BANKMGR.SET.BANK = KV.BANK
+GOSUB BANKMGR.CLAIM
+```
+
+**`KV.SAVE` writes the whole bank**, all 8,192 bytes, to `KV.FNAME$` on device 8, and replaces a file
+of that name. A disk error stops the program.
+
+**`KV.LOAD` returns `KV.OK = 0` for a missing file** and leaves the bank alone. It also returns 0 for a
+file that loads but holds no matching header, and then the bank already holds that file: run
+`KV.WIPE` before the next `KV.PUT`. It opens logical files 14 and 15 to test for the file and closes
+both, so neither may be open when it is called.
+
+The layout, for a program that reads the bank without this module:
+
+```
+slot n = $A000 + n*128, n = 0-63
++0..+7    the key, padded with spaces. $00 at +0 is a free slot
++8        the value's length, 0-119
++9..      the value
+slot 0    "*KVSTORE", 2, the version (1), the slot count (64)
+```
+
+`KV.EXP.BL`, in `samples/GPB-MODS-TESTING/GPC-BASIC/`, calls every routine.
+
+---
+
+
+*See also: 3.12 Code in a bank, 4.13 BANKMGR.INC.BL -- who owns which RAM bank, 4.20 KV.INC.BL -- keys and values in one RAM bank*
+
+## 4.21 GPBMODS -- the harness that drives every module
+
+##### 4.21 `GPBMODS` — the harness that drives every module
 
 `samples/GPB-MODS-TESTING/GPBMODS.BASL`. A menu bar of nine dropdowns whose rows reach nearly every
 public entry point in this section. It is the one program that holds all twenty modules at once, and
@@ -2776,19 +2889,19 @@ directory buffer.
 
 | | |
 |---|---|
-| bank 4, `GPBMODS.B04`, 7,938 bytes | `MENUVERT` `MENUBAR` `LINEINPUT` `GUI` `GUI2` |
-| bank 5, `GPBMODS.B05`, 7,426 bytes | literal text, pool one |
-| bank 6, `GPBMODS.B06`, 4,354 bytes | literal text, pool two |
-| bank 7, `GPBMODS.B07`, 4,354 bytes | `APPSYS` `BANKMGR` `KB` `SORT` `STASHVRAM` `STASHVRAMGC` `STRCASE` `STRINGS` `STRUSING` |
-| bank 8, `GPBMODS.B08`, 1,538 bytes | `FILEIO` `FILEDIR` |
-| bank 9, `GPBMODS.B09`, 770 bytes | `THEME` |
-| bank 10, `GPBMODS.B10`, 770 bytes | `COMBO` |
-| bank 11, `GPBMODS.B11`, 3,074 bytes | the two biggest dropdown handlers, this program's own code |
+| bank 4, `GPBMODS.004`, 7,682 bytes | `MENUVERT` `MENUBAR` `LINEINPUT` `GUI` `GUI2` |
+| bank 5, `GPBMODS.005`, 7,426 bytes | literal text, pool one |
+| bank 6, `GPBMODS.006`, 4,354 bytes | literal text, pool two |
+| bank 7, `GPBMODS.007`, 4,866 bytes | `APPSYS` `BANKMGR` `KB` `SORT` `STASHVRAM` `STASHVRAMGC` `STRCASE` `STRINGS` `STRUSING` |
+| bank 8, `GPBMODS.008`, 1,794 bytes | `FILEIO` `FILEDIR` |
+| bank 9, `GPBMODS.009`, 770 bytes | `THEME` |
+| bank 10, `GPBMODS.010`, 770 bytes | `COMBO` |
+| bank 11, `GPBMODS.011`, 3,074 bytes | the two biggest dropdown handlers, this program's own code |
 
 Six of those are `GP.BANKED` code regions (§3.12) and two are `GP.BANKEDSTR` text pools (§3.10). One
-`.Bnn` file is written per bank. Each loads to `$A000` in its own bank and carries a two-byte load
-address like any PRG, so a payload is the file size less two. The resident object is 11,619 bytes
-and the overlays are 30,224 between them.
+`.nnn` file is written per bank. Each loads to `$A000` in its own bank and carries a two-byte load
+address like any PRG, so a payload is the file size less two. The resident object is 11,087 bytes
+and the overlays are 30,736 between them.
 
 **Only what holds a `BANK` statement stays in low RAM.** `STASH` and `STASHFILE` execute `BANK`,
 which the compiler refuses inside a region; `STASHVRAM` (§4.18) is the one to reach for from inside
@@ -2971,6 +3084,7 @@ The convention is one dotted prefix per module, and nothing writes outside its o
 | `SORT.` | `SORT.INC.BL` |
 | `STRCASE.` | `STRCASE.INC.BL` |
 | `BMX.` / `BMXK.` | `BMX.INC.BL` (variables / its KERNAL constants) |
+| `KV.` | `KV.INC.BL` |
 
 Use any other prefix for your own program: `GAME.`, `MAP.`, `AIRLIFT.`. A prefix costs nothing at
 runtime — BASLOAD crunches every identifier to a short BASIC variable, so a long readable name and a
@@ -3028,6 +3142,7 @@ after a change.
 | `FILE.` | `FILEIO.INC.BL` | the drive: status, exists, delete, rename, directories |
 | `FILE.DIR.` | `FILEDIR.INC.BL` | reading a directory, kept apart from the rest of `FILE.` |
 | `SV.` | `STASHVRAM.INC.BL` | the VRAM store. `SVGC.` is `STASHVRAMGC.INC.BL`'s one constant |
+| `KV.` | `KV.INC.BL` | keys and values in one RAM bank |
 
 Pick anything else for your own program. `AIRLIFT.`, `GAME.`, `MAP.` — a prefix costs nothing at
 runtime because BASLOAD crunches every identifier down to a short BASIC variable, so a long
@@ -3243,6 +3358,20 @@ That is the difference from `STASH.INC.BL`, which cannot.
 
 **WARNING: `BMX.STASH` defaults to `$13000`, inside the default window.** A program using both
 must move one of them. There is one allocator and no collision check.
+
+##### `KV.INC.BL`
+
+Plain BASL: no `GP.*` keyword and no `GP.ASM`, so it needs neither `GPB.INC.BL` nor a `#SYMFILE`.
+
+| | |
+|---|---|
+| in | `KV.KEY$` — the key, for `FIND` `GET` `PUT` `DEL`<br>`KV.VALUE$` — the value, for `PUT`<br>`KV.SLOT` — the slot, for `AT`<br>`KV.FNAME$` — the file, for `SAVE` and `LOAD`<br>`KV.HOMEBANK` — the bank every routine selects on its way out. The first `KV.INIT` sets 1 |
+| out | `KV.OK` — −1 done, 0 refused<br>`KV.SLOT` — the slot `FIND`, `GET` and `PUT` found, 0 if none<br>`KV.VALUE$` — `GET` and `AT`<br>`KV.KEY$` — `AT`, without its padding |
+| internal | `KV.READY` `KV.CODE%()` `KV.HIT` `KV.ADDR` `KV.INDEX` `KV.PADDED$` `KV.LENGTH` `KV.BYTE` `KV.MAGIC$` `KV.ERR` `KV.MSG$` `KV.TRACK` `KV.SECTOR` |
+| constants | `KV.BANK` `KV.BASE` `KV.TOP` `KV.SLOTS` `KV.SIZE` `KV.MAXLEN` `KV.VERSION` `KV.DEFS` |
+
+`KV.SLOT` is both an input and an output, the way `FILE.N` is. `KV.AT` writes `KV.KEY$`, so a loop
+over the slots keeps its own key in a variable of its own.
 
 ##### `MENUVERT.INC.BL`
 
@@ -3643,30 +3772,29 @@ left behind rather than the file I/O.
 
 ##### What GPC prints when it finishes
 
-One item a line. `GPBMODS`, built shared with dead code removed:
+One item a line. `GPBMODS`, built shared:
 
 ```
-OK LOW CODE 11264, SHARED GPBASIC
-LOW FREE 10240, FRAME STACK 2048
-LINES 3690
-DEAD CODE:  202 LINES REMOVED, 1305 BYTES SAVED
-BANK  7 CODE  3840 USED  4352 FREE
-BANK  9 CODE   512 USED  7680 FREE
-BANK  4 CODE  7936 USED   256 FREE
-BANK 10 CODE   768 USED  7424 FREE
-BANK  8 CODE  1792 USED  6400 FREE
-BANK 11 CODE  3072 USED  5120 FREE
-BANK  5 TEXT  7424 USED   768 FREE
-BANK  6 TEXT  4352 USED  3840 FREE
-TOTAL BANKS 8, 29696 USED
+OK LOW CODE 11520, SHARED GPBASIC
+LOW FREE 12288, FRAME STACK 2048
+LINES 3795
+BANK   7 CODE  4864 USED  3328 FREE
+BANK   9 CODE   768 USED  7424 FREE
+BANK   4 CODE  7680 USED   512 FREE
+BANK  10 CODE   768 USED  7424 FREE
+BANK   8 CODE  1792 USED  6400 FREE
+BANK  11 CODE  3072 USED  5120 FREE
+BANK   5 TEXT  7424 USED   768 FREE
+BANK   6 TEXT  4352 USED  3840 FREE
+TOTAL BANKS 8, 30720 USED
 ```
 
 An embedded build prints a `RUNTIME` line second. `GPCTEST-E`:
 
 ```
 OK LOW CODE 969, EMBEDDED GPBASIC
-RUNTIME 13567
-LOW FREE 22016, FRAME STACK 2048
+RUNTIME 11519
+LOW FREE 24064, FRAME STACK 2048
 ```
 
 | | |
@@ -3690,7 +3818,7 @@ Two budgets come off `LOW FREE`:
   `PROGRAM TOO BIG`.
 
 A program can be comfortable on one and out of room on the other. `LOW FREE 4096` is 4K to run in
-and nowhere left to grow; `GPBMODS` at `LOW FREE 10240` has both.
+and nowhere left to grow; `GPBMODS` at `LOW FREE 12288` has both.
 
 ##### Removing dead code
 
@@ -3767,7 +3895,7 @@ which of your strings was asking.
 
 `LOW CODE` and `LOW FREE` describe low memory only. **P-code inside a `GP.BANKED` region (§3.12) is
 not in either figure**, and neither is a `GP.ASM` block in the region without `LOW`. The region is
-reported on its own `BANK` line and written to its own `NAME.Bnn` overlay file. Moving a module into
+reported on its own `BANK` line and written to its own `NAME.nnn` overlay file. Moving a module into
 a region takes its bytes off `LOW CODE` and gives them to `LOW FREE`.
 
 What a region costs instead:
@@ -3777,7 +3905,7 @@ What a region costs instead:
 - **A byte a call site, and two bank switches a call.** A call into the region from outside it, or
   out of it to low memory, is a `.bgosub`, one byte longer than a `GOSUB`. `RETURN` selects the
   caller's bank again.
-- **A file that has to travel.** The `.Bnn` files ship beside the `.PRG`. A program whose overlays
+- **A file that has to travel.** The `.nnn` files ship beside the `.PRG`. A program whose overlays
   are missing loads and then fails where it first calls into one.
 
 Banked text is the same bargain on the data side: a `GP.BANKEDSTR` group (§3.10) is out of the

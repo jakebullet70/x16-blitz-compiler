@@ -19,8 +19,8 @@ public-name-vs-`.BODY` rule), and `samples/GPB-MODS-TESTING/GPBMODS.BASL` (the n
 `GMX.D.FOCUS` demo panel, dropdown entry 11, `BS.CHROME` TAB line).
 
 **Still owed:** rebuild GPBMODS + GUIFRMT headlessly (last good: GUIFRMT 3,690 B /
-ALL TWENTY-FOUR PASS; GPBMODS 14,652 B, `.B04` 8,194 `.B05` 7,938 `.B06` 3,330
-`.B07` 4,098 `.B08` 1,538) — delete the stale `.SRC.PRG` first, see
+ALL TWENTY-FOUR PASS; GPBMODS 14,652 B, `.004` 8,194 `.005` 7,938 `.006` 3,330
+`.007` 4,098 `.008` 1,538) — delete the stale `.SRC.PRG` first, see
 [[headless-basl-build-recipe]]; regenerate help with `samples/GPC-HELP/MKHELP.PY`;
 mark phase 5 done in the plan (em dashes and §, the file is UTF-8); commit and push.
 

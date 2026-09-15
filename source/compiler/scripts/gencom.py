@@ -69,7 +69,7 @@ class Generator(object):
 
 class GenCompiler(object):
 	def __init__(self):
-		self.simple = "(),___#$"
+		self.simple = "(),__@#$"								# @ is a string copied low inside a GP.BANKED region
 		self.pcodeTokens = PCodeConstants()
 
 	def compileFile(self,f):

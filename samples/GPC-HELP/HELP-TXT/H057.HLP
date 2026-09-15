@@ -1,41 +1,16 @@
-@4.20 GPBMODS -- the harness that drives every module (2)
-=The text is in a bank
+@4.20 KV.INC.BL -- keys and values in one RAM bank (2)
+:+8        the value's length, 0-119
+:+9..      the value
+:slot 0    "*KVSTORE", 2, the version (1), the slot count (64)
 .
-.542 strings in 72 named groups, 11,776 bytes across two pools, none of it in
-.low RAM. Every string the shell says sits in a GP.BANKEDSTR block in front
-.of the routine that says it and is read back with GP.BSTR. Two pools,
-.because one pool is a hard 8,192 bytes and BStrPoolWrite stops the compile
-.when one fills. Which pool a group is in costs the call site nothing, so
-.moving a group is the whole of the answer to a full one.
+.KV.EXP.BL, in samples/GPB-MODS-TESTING/GPC-BASIC/, calls every routine.
 .
-.Every menu is a block of its own, index 0 the dropdown's title and 1 upwards
-.the rows. MENUVERT.COUNT comes from GP.BSTRCOUNT and a loop reads the rows,
-.so a row is added by adding a line to the block, and no other menu moves.
+=EXAMPLE PROGRAM
 .
-.The numbers under ABOUT / BANK MEMORY and ABOUT / MODULE SIZES are typed
-.into GP.BANKEDSTR blocks, so they are only true of the build they were taken
-.from.
-.
-=The room it runs in
-.
-.The workspace is what is left between the program's own p-code and the
-.resident runtime: $4000 to $6600, 9,728 bytes. The first p-code opcode is
-..varspace and its operand is what the scalars take -- 3,292 here, leaving
-.about 6,436 for the string arrays and the whole string heap.
-.
-.Moving code into a bank moves no scalars. A banked routine's variables are
-.the same workspace variables low memory sees, so .varspace grows as panels
-.are added whatever bank they run from.
-.
-.GPC-BASIC/ inside the sample folder is the library working copy and it is
-.ahead of the root copy. A module is proved here and copied whole into root.
-.GPB.INC.BL runs the other way: root is upstream for it, and the build copies
-.root's over this folder's every time.
+.  KV.EXP.BL -- runnable, in the GPC-BASIC folder
 .
 =SEE ALSO
 .
->66|4.5 BMX.INC.BL -- a BMX bitmap into VERA
->76|4.13 BANKMGR.INC.BL -- who owns which RAM bank
 >52|3.12 Code in a bank
->46|3.10 Text in a bank
->81|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+>76|4.13 BANKMGR.INC.BL -- who owns which RAM bank
+>83|4.20 KV.INC.BL -- keys and values in one RAM bank

@@ -142,20 +142,20 @@ the wrong tool for it). Only the `$` hex form needs decoding.
 
 ### How big a program can it compile?
 
-**About 1,300 BASIC lines.** The limit is on the *p-code*, not the source, and it is a hard number
+**About 1,400 BASIC lines.** The limit is on the *p-code*, not the source, and it is a hard number
 that depends on which runtime the object carries:
 
 | | max p-code |
 | --- | --- |
-| default (self-contained), no `GP.` keyword | **18,432 bytes** |
-| `shared`, no `GP.` keyword | **17,664 bytes** |
-| default (self-contained), using `GP.` | **16,384 bytes** |
-| `shared`, using `GP.` | **15,616 bytes** |
+| default (self-contained), no `GP.` keyword | **22,528 bytes** |
+| `shared`, no `GP.` keyword | **22,016 bytes** |
+| default (self-contained), using `GP.` | **20,992 bytes** |
+| `shared`, using `GP.` | **19,968 bytes**, 19,712 with a `GP.BANKED` region |
 
 P-code runs about two thirds the size of the tokenised `.PRG` and averages ~14 bytes per BASIC
-line, so a 27 KB tokenised source is roughly the ceiling. What binds is the *run* side: the object,
-a 4K FOR/GOSUB frame stack and a 4K minimum workspace all have to fit below `$9F00`, and a program
-using any `GP.` keyword carries 2,048 more bytes of runtime to leave room for.
+line, so a 30 KB tokenised source is roughly the ceiling. What binds is the *run* side: the object,
+a 2K FOR/GOSUB frame stack and a 4K minimum workspace all have to fit below `$9F00`, and a program
+using any `GP.` keyword carries 1,536 more bytes of runtime to leave room for.
 
 The compiler's own build buffer is **23,296 bytes**, comfortably above all four, so it is not what
 stops you. That was not true until the runtime moved out of the compiler's memory and into
@@ -205,9 +205,10 @@ Requirements and limits:
   runtime makefile (`make -C source/runtime gpc-rt`) and ships in `testing/`.
 - Programs mixing shared and self-contained builds are fine; a shared object simply needs the
   resident runtime present when it runs.
-- Shared mode's ceiling is slightly *lower* than the default build's — 18,176 bytes of p-code
-  against 18,432 — because the p-code and its work area both have to fit below `RTBASE` at
-  `$7000`. Either way the compiler stops with `PROGRAM TOO BIG` rather than overrunning; see
+- Shared mode's ceiling is *lower* than the default build's — 22,016 bytes of p-code against
+  22,528, or 19,968 against 20,992 using `GP.` — because the p-code and its work area both have to
+  fit below the resident runtime, at `RTBASE` (`$7700`), or `RTGPBASE` (`$6F00`) with the `GP.`
+  handlers. Either way the compiler stops with `PROGRAM TOO BIG` rather than overrunning; see
   [How big a program can it compile?](#how-big-a-program-can-it-compile).
 
 The regression test lives in `source/unit-tests/shared-runtime/` — it compiles a program shared,

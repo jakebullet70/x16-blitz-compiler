@@ -946,7 +946,7 @@ sumSkip: 									; ...and how many bytes it is stepping over
 ;
 ;		The GP.BANKED layout, carried from pass one into pass two. The tables mirror the ones in
 ;		commands/gpbank.asm they are copied from, and they are in the CODE section for the same
-;		reason: 6 bytes a region here and 11 there is 1,071 at 63 regions, and storage is a 1K
+;		reason: 6 bytes a region here and 13 there is 2,413 at 127 regions, and storage is a 1K
 ;		hole holding everything else besides. The code section is the compiler's own image and
 ;		is thrown away when the object is written, so a compiled program pays nothing for them.
 ;		The region table in commands/gpbank.asm carries the whole of the reasoning.

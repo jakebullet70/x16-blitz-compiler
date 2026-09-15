@@ -2460,7 +2460,7 @@ GMX.B.PROGRAM:
 ## **  correcting one after a rebuild costs the text bank nothing.
 ## **
 ## **  ONE OVERLAY FILE A BANK. Every GP.BANKED region and every GP.BANKEDSTR
-## **  bank is written as its own .Bnn beside the .PRG and loaded to $A000,
+## **  bank is written as its own .nnn beside the .PRG and loaded to $A000,
 ## **  so the count is the number of banks named in the source, not a
 ## **  property of the program's size. This one names eight: 4, 7, 8, 9, 10 and
 ## **  11 for code, 5 and 6 for text -- which is why the overlay list needs two
@@ -2476,8 +2476,8 @@ GP.BANKEDSTR GM.TEXTBANKB BS.B.MEM
   "  TEXT BANKS #"
   "BANK SELECTED NOW  #"
   "RESIDENT P-CODE  11619    MAP TOTAL  27624"
-  "OVERLAYS 8   .B04 7938  .B05 7426  .B06 4354  .B07 4354"
-  "             .B08 1538  .B09  770  .B10  770  .B11 3074"
+  "OVERLAYS 8   .004 7938  .005 7426  .006 4354  .007 4354"
+  "             .008 1538  .009  770  .010  770  .011 3074"
 GP.ENDBANKEDSTR
 GMX.B.MEMORY:
   GM.GRP% = 16
@@ -2517,7 +2517,7 @@ GMX.B.MEMORY:
 ## **  FOUR COLUMNS FOR THE SEVEN PLACES P-CODE CAN LIVE, which is the whole
 ## **  point of the panel. The left column is resident: it is loaded at $0801
 ## **  and it is what has to fit under the runtime. Everything right of it is a
-## **  GP.BANKED region, written to its own .Bnn and loaded to $A000 in its own
+## **  GP.BANKED region, written to its own .nnn and loaded to $A000 in its own
 ## **  bank, and none of it costs low RAM. The three banked columns are drawn in
 ## **  the title colour rather than the text colour so the split reads at a
 ## **  glance.
@@ -2546,8 +2546,8 @@ GMX.B.MEMORY:
 
 GP.BANKEDSTR GM.TEXTBANKB BS.B.SIZES
   "IN LOW RAM  $0801"
-  "IN BANK 7  .B07"
-  "IN BANK 4  .B04"
+  "IN BANK 7  .007"
+  "IN BANK 4  .004"
   "IN BANKS 8 TO 11"
   "TOTAL"
   "STASH"
@@ -2567,11 +2567,11 @@ GP.BANKEDSTR GM.TEXTBANKB BS.B.SIZES
   "LINEINPUT"
   "GUI"
   "GUI2"
-  "B08 FILEIO"
-  "B08 FILEDIR"
-  "B09 THEME"
-  "B10 COMBO"
-  "B11 GPBMODS"
+  "008 FILEIO"
+  "008 FILEDIR"
+  "009 THEME"
+  "010 COMBO"
+  "011 GPBMODS"
 GP.ENDBANKEDSTR
 
 ## ---- The same order, and the ONLY thing that changes between builds. Read off

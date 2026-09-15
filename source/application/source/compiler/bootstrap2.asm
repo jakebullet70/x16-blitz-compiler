@@ -21,7 +21,7 @@
 ;		resident runtime -- 24,063 bytes for the whole thing, regions included. Eight regions of
 ;		8K is 64K against that, so the eight the tables allow could never have been used.
 ;
-;		Now each region is a file of its own beside the program, named for its bank -- PROG.B09
+;		Now each region is a file of its own beside the program, named for its bank -- PROG.009
 ;		for GP.BANKED 9 -- with $A000 in its own two-byte header. Secondary address 1 makes the
 ;		KERNAL honour that header, so selecting the bank is the whole of the work: no address
 ;		arithmetic, no copy loop, and the region never enters low memory at all.
@@ -36,13 +36,13 @@
 ;		else.
 ;
 ;		ONCE PER LOAD, NOT PER RUN. The workspace starts where the regions were, and a second RUN
-;		would reload files it already has in the banks. Zeroing the first table entry makes a
-;		second RUN skip the lot. This page is never written over -- p-code starts at $0A00 and
-;		the frame stack is far above -- so the zero sticks.
+;		would reload files it already has in the banks. Zeroing the highest bank makes a second
+;		RUN skip the lot. This page is never written over -- p-code starts at $0A00 and the frame
+;		stack is far above -- so the zero sticks.
 ;
 ;		A MISSING OVERLAY STOPS, and that is the point of checking the carry. The bank holds
 ;		whatever the last program to use it left there, and running that is the one failure this
-;		must not have. The programmer owns the overlay files: nothing pairs a .Bnn to the .PRG
+;		must not have. The programmer owns the overlay files: nothing pairs a .nnn to the .PRG
 ;		that wants it, by decision, so a stale one is a stale one.
 ;
 ;		EVERY LABEL HERE IS GLOBAL AND PREFIXED BX. 64tass scopes a "_" label to the enclosing
@@ -51,9 +51,6 @@
 ;
 ; ************************************************************************************************
 
-BXMAXREGIONS = 63 							; GPBANK_MAXREGIONS -- the machine's bank count now. One
-											; byte a region here, and this page is what binds NEXT: the
-											; pad below had 79 spare at sixteen, so 95 is its ceiling
 BXNAMEMAX = 48 								; the overlay name the compiler bakes in below. The
 											; compiler refuses a longer one rather than truncating
 											; it -- see ObjBuildOverlayName.
@@ -73,37 +70,64 @@ BXEntry:
 		stx 	BXWS
 		sty 	BXWSEnd
 
-		ldx 	#0 							; X walks the table, one byte an entry
-BXNext:
-		lda 	BXTable,x 					; the bank this region lives in, 0 = end of the table
-		beq 	BXDone
-		stx 	BXIndex
-		sta 	$00 						; LOAD writes $A000-$BFFF through the current bank
+; ------------------------------------------------------------------------------------------------
+;		NOT ENOUGH BANKS STOPS before anything loads. MEMTOP with carry set returns the bank count
+;		in A, and 0 means 256, so DEC A is the highest bank the machine has and 0 wraps to 255.
+;		A second RUN has BXHigh zeroed and always passes.
+; ------------------------------------------------------------------------------------------------
+		sec
+		jsr 	X16_MEMTOP
+		dec 	a
+		cmp 	BXHigh
+		bcc 	BXNoRam 					; the program wants a bank above the machine's highest
 
 ; ------------------------------------------------------------------------------------------------
-;		ONE NAME, PATCHED, not one name a region. Sixteen names at sixteen characters would be
-;		256 bytes of a page with under 200 spare, so the compiler bakes the base name with "B00"
-;		on the end and the two digits are poked in from the bank byte already in hand.
-;
-;		A is the bank, 1..99 -- the compiler refuses anything higher precisely because two digits
-;		is what this template holds.
+;		THE WALK. X is the bank, counting up from 0 to BXHigh. At the first bank of each map byte
+;		the byte is copied to BXByte, and every bank shifts one bit out of the copy. The map itself
+;		is never changed, so a load that fails part way leaves every bit for the next RUN.
 ; ------------------------------------------------------------------------------------------------
-		ldx 	#'0' 						; X counts tens, A comes out as the units
-BXTens:
-		cmp 	#10
-		bcc 	BXUnits
-		sbc 	#10 						; carry is set -- the compare above put it there
-		inx
-		bra 	BXTens
-BXUnits:
-		clc
-		adc 	#'0'
-		ldy 	BXNameLen 					; the two digits are the last two characters
-		dey
-		sta 	BXName,y
-		dey
+		ldx 	#0
+BXNext:
 		txa
-		sta 	BXName,y
+		and 	#7
+		bne 	BXBit 						; still inside the byte in hand
+		txa
+		lsr 	a
+		lsr 	a
+		lsr 	a
+		tay
+		lda 	BXMap,y 					; byte bank / 8
+		sta 	BXByte
+BXBit:
+		lsr 	BXByte 						; bank X's bit into the carry
+		bcc 	BXSkip
+		stx 	BXIndex
+		stx 	$00 						; LOAD writes $A000-$BFFF through the current bank
+
+; ------------------------------------------------------------------------------------------------
+;		ONE NAME, PATCHED, not one name a region. The compiler bakes the base name with "000" on
+;		the end and the bank's three digits are poked over them: each is set to "0", then counted
+;		up once for every 100, 10 or 1 the bank still holds.
+; ------------------------------------------------------------------------------------------------
+		txa 								; A is the bank, 2..255
+		ldx 	BXNameLen 					; BXName-3,x is the hundreds digit
+		ldy 	#0 							; Y walks the powers
+BXDigit:
+		pha
+		lda 	#'0'
+		sta 	BXName-3,x
+		pla
+BXCount:
+		cmp 	BXPow10,y
+		bcc 	BXPlace
+		sbc 	BXPow10,y 					; carry is set -- the compare above put it there
+		inc 	BXName-3,x
+		bra 	BXCount
+BXPlace:
+		inx
+		iny
+		cpy 	#3
+		bne 	BXDigit
 
 		lda 	BXNameLen 					; SETNAM wants length in A, address in X/Y
 		ldx 	#<BXName
@@ -112,11 +136,12 @@ BXUnits:
 		bcs 	BXFail
 
 		ldx 	BXIndex
-		inx
-		bne 	BXNext 						; always taken -- the table is far shorter than 256
+BXSkip:
+		cpx 	BXHigh 						; carry set at the highest bank,
+		inx 								; and INX leaves the carry alone
+		bcc 	BXNext
 
-BXDone:
-		stz 	BXTable 					; a second RUN finds bank 0 and skips the lot
+		stz 	BXHigh 						; a second RUN looks at bank 0 and stops
 		;
 		;		NOTHING IS DONE HERE FOR GP.BSTR ANY MORE. Which bank each of its slots reads is a
 		;		table at the top of this very page, at the fixed address GPBSTRBANKS, and the runtime
@@ -133,11 +158,13 @@ BXDone:
 ;		address is still on the stack, exactly as it is on the bootstrap's own ?RT path.
 ;
 ;		SHORT, because a full sentence would wrap in 40 columns, and because this page is spent
-;		on the loader. "?OVL" and the bank number would be better and costs a digit routine that
-;		is right there above -- but the routine has already run and A is gone by here, so it
-;		would have to be kept, and what the programmer does next is the same either way: look at
-;		which .Bnn files are beside the program.
+;		on the loader. "?OVL" and the bank number would be better, but the page has no bytes for
+;		it, and what the programmer does next is the same either way: look at which .nnn files
+;		are beside the program. ?RAM shares the print loop, starting at its own text.
 ; ------------------------------------------------------------------------------------------------
+BXNoRam:
+		ldx 	#BXRamText - BXErrText
+		bra 	BXErr
 BXFail:
 		ldx 	#0
 BXErr:
@@ -152,20 +179,25 @@ BXErrDone:
 		rts 								; return to the SYS caller -> BASIC READY
 
 ; ------------------------------------------------------------------------------------------------
-;		The region table: ONE BYTE A REGION -- the bank it loads into -- terminated by a zero.
-;		Written by object.asm from the compiler's region list.
+;		The bank map: ONE BIT A BANK, bank n in byte n/8 at bit (n AND 7), bit 0 worth 1 -- the
+;		order BANKMGR uses. Written by object.asm from the compiler's bank list, text banks
+;		included, with the highest bank set in BXHigh.
 ;
-;		IT LOST ITS PAGE COUNTS when the regions became files. LOAD knows how long a file is, so
-;		the only thing left to say is where it goes, and bank 0 is refused everywhere else in the
-;		compiler -- it is the KERNAL's -- which is what makes it free to use as the terminator.
-;		Sixty-three regions cost 64 bytes here; eight used to cost 18, with their page counts.
+;		32 BYTES FOR ANY PROGRAM, where the table it replaced was one byte a region. LOAD knows how
+;		long a file is and the file's header says where it goes, so which banks is all the page
+;		needs. BXHigh ends the walk, and bank 0 is the KERNAL's and never in the map, which is what
+;		makes a zero there the re-run guard.
 ; ------------------------------------------------------------------------------------------------
-BXTable:
-		.fill 	BXMAXREGIONS + 1, 0
+BXMap:
+		.fill 	32, 0 						; PATCHED
+BXHigh:
+		.byte 	0 							; PATCHED -- the highest bank in the map
+BXByte:
+		.byte 	0 							; the map byte being shifted out
 
 BXNameLen:
 		.byte 	0 							; PATCHED -- the overlay name and its length, with the
-BXName: 									; bank's two digits at the end of it
+BXName: 									; bank's three digits at the end of it
 		.fill 	BXNAMEMAX, 0
 
 BXBase:
@@ -175,10 +207,14 @@ BXWS:
 BXWSEnd:
 		.byte 	0
 BXIndex:
-		.byte 	0 							; where the table walk had got to
+		.byte 	0 							; the bank being loaded
+BXPow10:
+		.byte 	100, 10, 1
 
 BXErrText:
 		.text 	"?OVL", 13, 0
+BXRamText:
+		.text 	"?RAM", 13, 0
 
 ; ------------------------------------------------------------------------------------------------
 ;		WHICH RAM BANK EACH GP.BSTR SLOT READS -- one byte a slot, written by object.asm out of the
@@ -205,7 +241,8 @@ ProgramBootExtEnd: 							; PHYSICAL end -- (End - Start) == 256 bytes
 ; ------------------------------------------------------------------------------------------------
 ;		Offsets of the bytes object.asm patches, within the streamed template.
 ; ------------------------------------------------------------------------------------------------
-BootExtTableOffset = BXTable - $0900
+BootExtMapOffset = BXMap - $0900
+BootExtHighOffset = BXHigh - $0900
 BootExtNameLenOffset = BXNameLen - $0900
 BootExtNameOffset = BXName - $0900
 BootExtBStrOffset = BXBStrBanks - $0900 	; the GP.BSTR slot -> bank table, BSTR_MAX_BANKS long

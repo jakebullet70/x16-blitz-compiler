@@ -12,7 +12,7 @@
 #
 #   quick and full compile the set again and check each compile:
 #
-#       off       against ref/off: the object, map, every .Bnn and the OK line
+#       off       against ref/off: the object, map, every .nnn and the OK line
 #       on        against ref/on: the same, and the removed-line list D.NAME
 #       stripped  the dcstrip.py identity: D.NAME's lines deleted from the source, compiled
 #                 with the option off, must give the option-on object. When D.NAME is empty

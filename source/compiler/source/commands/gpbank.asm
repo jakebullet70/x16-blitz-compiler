@@ -49,22 +49,22 @@
 ;		holds from low memory and from another region alike. A GOTO has no bank to select, so a
 ;		GOTO from one region into another is still refused, in GPBankMakeOffset.
 ;
-;		SIXTY-THREE IS THE LIMIT, AND IT IS THE MACHINE'S -- banks 1 to 63 on a 512K X16, with 0
-;		the KERNAL's. It is not a compiler table size any more, which is the point of it.
+;		BANKS 2 TO 255, every bank a 2MB X16 has less bank 0, the KERNAL's, and bank 1,
+;		HANDLER_BANK. The number a program writes is the bank its region loads into, so a program
+;		may count down from 255. A machine without that bank stops in the bootstrap with ?RAM.
 ;
-;		IT WAS THE 1K STORAGE HOLE. The tables at the foot of this file and the layout copy in
-;		main/compiler.asm come to 17 bytes a region out of $0400-$0801, so the hole capped the
-;		count at 23, and 16 was as far as it could go while leaving room for anything else. 63
-;		needs 1,071 bytes, more than the whole hole, so no amount of trimming reaches it. Both
-;		tables are in the CODE section now -- the region table below has the reasoning.
+;		THE TABLES ARE IN THE CODE SECTION, not the 1K storage hole at $0400-$0801, which once
+;		capped the count at 23. Here and in the layout copy in main/compiler.asm they come to 19
+;		bytes a region, 2,413 at the cap. The region table below has the reasoning.
 ;
-;		A SIXTY-FOURTH GP.BANKED IS REFUSED BY NAME, and what binds after that is the bootstrap
-;		extension page at 95: one byte a region there, with 79 spare at sixteen. A 512K machine
-;		has 63 banks, so the compiler has stopped capping and the machine caps.
+;		127 IS THE CAP, AND THE BANKS DO NOT SET IT. Seven of the tables are two bytes a region
+;		and are read with the region doubled into X or Y, and 127 is the most that fits doubled
+;		in a byte. A 128th region, code or text, is refused by name. Past it each of those tables
+;		would need a low half and a high half, indexed by the region itself.
 ;
 ; ************************************************************************************************
 
-GPBANK_MAXREGIONS = 63 						; every bank a 512K X16 has, bank 0 being the KERNAL's
+GPBANK_MAXREGIONS = 127 					; the most a doubled subscript reaches in a byte
 
 ; ************************************************************************************************
 ;
@@ -83,7 +83,7 @@ GPBANK_MAXREGIONS = 63 						; every bank a 512K X16 has, bank 0 being the KERNA
 CommandGPBankedCompile:
 		stz 	deferErrors 				; a block opener must never defer -- see the header
 		lda 	gpBankShared 				; an embedded object is one file, and a region is a
-		bne 	_CGBCShared 				; .Bnn file of its own
+		bne 	_CGBCShared 				; .nnn file of its own
 		jmp 	GPBankNeedsShared
 _CGBCShared:
 		lda 	gpBankState 				; 0 = never seen, 1 = open, 2 = closed
@@ -177,19 +177,13 @@ GPBankClosePassTwo:
 
 ; ************************************************************************************************
 ;
-;		Read GP.BANKED's operand: a decimal constant, 1 to 99.
+;		Read GP.BANKED's operand: a decimal constant, 2 to 255.
 ;
 ;		BANK 0 IS REFUSED. It is the KERNAL's -- its FAT32 buffers live there -- so a program
 ;		that put its code in it would work until the first file operation and then not.
 ;
-;		AND 100 UP, because of the overlay's NAME. A region is a file called <object>.Bnn, and
-;		the bootstrap holds one name template with the bank poked into its last two characters:
-;		one name rather than one a region, which is what makes it fit a page with under 200
-;		bytes spare. Bank 100 would come out as ".B:0" -- ':' is '0'+10 -- and load nothing.
-;
-;		A 512K MACHINE HAS BANKS 0..63, so this bounds nothing anyone can currently run; only a
-;		2MB machine reaches 100. Widening it is a third digit here, in the extension page's
-;		template and in ObjBuildOverlayName, and nothing else.
+;		AND BANK 1, HANDLER_BANK, where the runtime keeps its rarely used handlers. GP.BANKEDSTR
+;		reads its bank here too, so the check in GPBankCheckBankNumber refuses both.
 ;
 ; ************************************************************************************************
 
@@ -225,16 +219,16 @@ _GBRNDigit:
 		jsr 	GetNext
 		bra 	_GBRNDigit
 ;
-;		THE UPPER CHECK IS A jmp TO THE BOTTOM OF THE FILE, and it is worth knowing why rather
+;		THE BANK 1 CHECK IS A jmp TO THE BOTTOM OF THE FILE, and it is worth knowing why rather
 ;		than tidying it back inline. GPBankStructure sits above here and GPBankCheckAlone below,
 ;		and three of its branches reach BACK to it -- so anything added between the two costs
-;		branch range. The message and its test inline were 40 bytes and broke all three. Two is
+;		branch range. A test and its message inline were 40 bytes and broke all three. Two is
 ;		what a jmp costs over the rts it replaced.
 ;
 _GBRNDone:
 		lda 	gpBankNumber
 		beq 	GPBankBadNumber 			; bank 0 belongs to the KERNAL
-		jmp 	GPBankCheckBankNumber 		; ...and 100 up has no two-digit overlay name
+		jmp 	GPBankCheckBankNumber 		; ...and bank 1 is HANDLER_BANK's
 
 GPBankBadNumber:
 		.error_value
@@ -971,20 +965,13 @@ _GBFBADone:
 ;
 ; ************************************************************************************************
 
-;		THE BANK HAS TO HAVE AN OVERLAY NAME. A region is a file called <object>.Bnn beside the
-;		program, and the bootstrap holds ONE name template with the bank poked into its last two
-;		characters -- one name rather than one a region, which is what makes it fit a page with
-;		under 200 bytes spare. Bank 100 would come out as ".B:0", ':' being '0'+10, and load
-;		nothing.
+;		THE MESSAGES BELOW ARE IN COMPILER SPACE rather than errors.asm: that table links below
+;		GPBase and is copied into every compiled program, so a message there would cost bytes to
+;		every program that never writes a GP.BANKED.
 ;
-;		A 512K MACHINE HAS BANKS 0..63, so this bounds nothing anyone can currently run; only a
-;		2MB machine reaches 100. Widening it is a third digit here, in the extension page's
-;		template and in ObjBuildOverlayName, and nothing else.
-;
-;		ITS OWN MESSAGE, in compiler space rather than errors.asm: that table links below GPBase
-;		and is copied into every compiled program, so a message there would cost bytes to every
-;		program that never writes a GP.BANKED. BAD VALUE on its own would send the programmer
-;		hunting for a syntax mistake in a bank number that is perfectly well formed.
+;		EVERY BANK FROM 2 TO 255 HAS AN OVERLAY NAME, <object>.002 to <object>.255, so the bank
+;		number check refuses only HANDLER_BANK. ObjBuildOverlayName writes the three digits, and
+;		the bootstrap extension page pokes them into its one name template.
 ;
 ; ************************************************************************************************
 
@@ -1001,7 +988,7 @@ GPBankTooMany:
 		.text 	"TOO MANY GP.BANKED REGIONS", 0
 
 ;
-;		EMBEDDED IS ONE FILE. A region is LOADed into its bank from a .Bnn file of its own by the
+;		EMBEDDED IS ONE FILE. A region is LOADed into its bank from a .nnn file of its own by the
 ;		shared bootstrap, so a banked program is never one file, and an embedded compile of one
 ;		stops at the first GP.BANKED. gpBankShared comes from GPC.INPUT line 4, set by CompileCode.
 ;		In compiler space, like the message above. GP.BANKEDSTR has its own, in gpbstr.asm.
@@ -1014,12 +1001,12 @@ GPBankNeedsShared:
 
 GPBankCheckBankNumber:
 		lda 	gpBankNumber
-		cmp 	#100
-		bcs 	_GBCBNNoName
+		cmp 	#HANDLER_BANK
+		beq 	_GBCBNReserved
 		rts
-_GBCBNNoName:
+_GBCBNReserved:
 		jsr 	CallErrorHandler
-		.text 	"BANK OVER 99 HAS NO OVERLAY NAME", 0
+		.text 	"BANK 1 IS RESERVED", 0
 
 ; ************************************************************************************************
 
@@ -1581,9 +1568,9 @@ gpBankSideTo:									; which region a branch points AT, 0 for low memory
 ;		single-region version always wanted, so the pass loads them out of here and puts the
 ;		results back.
 ;
-;		IT IS IN THE CODE SECTION, NOT IN STORAGE, and that is what lets the count be 63. These
-;		are 11 bytes a region and the layout copy in main/compiler.asm is another 6, so 63 costs
-;		1,071 -- against a 1K storage hole that already holds everything else the compiler keeps
+;		IT IS IN THE CODE SECTION, NOT IN STORAGE, and that is what lets the count be 127. These
+;		are 13 bytes a region and the layout copy in main/compiler.asm is another 6, so 127 costs
+;		2,413 -- against a 1K storage hole that already holds everything else the compiler keeps
 ;		between statements. They could never have fitted there.
 ;
 ;		THE CODE SECTION IS THE COMPILER'S OWN IMAGE, above ObjectBase, and it is thrown away

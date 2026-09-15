@@ -101,10 +101,16 @@ def main():
 		#
 		h.write("RTImageFileText:\n")
 		h.write("\t\t.text\t'GPC.IMG.%03d.BIN',0\n" % build)
+		#
+		#		...and the bank code built with it, which goes after the p-code. Its name is the
+		#		image's with the third character changed, as genrtimage.py installs it.
+		#
+		h.write("RTBankFileText:\n")
+		h.write("\t\t.text\t'GP1.IMG.%03d.BIN',0\n" % build)
 		h.write("\t\t.send code\n")
 
-	print("  bumpbuild: GPC V%s, runtime build %03d (GPC.RT.%03d.BIN, GPC.IMG.%03d.BIN)"
-		  % (version, build, build, build))
+	print("  bumpbuild: GPC V%s, runtime build %03d (GPC.RT.%03d.BIN, GPC.IMG.%03d.BIN, GP1.IMG.%03d.BIN)"
+		  % (version, build, build, build, build))
 
 
 main()

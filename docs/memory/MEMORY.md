@@ -30,11 +30,12 @@ sibling project: what is kept is a fact about **X16 BASIC or the X16 itself**, n
 - [Samples build in place](samples-build-in-place.md) — never stage a sample into testing/; --drive and inplace=True, GPB.HELP first
 - [Build, report, hand it back](build-report-dont-investigate.md) — a remark about speed is not a request to profile
 - [Run builds in the background](run-builds-in-background.md) — a typed message cancels an in-flight tool
-- [Compact early, not at the end](compact-early-not-at-the-end.md) — after every step; cost is context size x turns
+- [Compact early, not at the end](compact-early-not-at-the-end.md) — remind the user to /compact at the end of EVERY turn that lands a step; cost is context size x turns
 
 ## Build and toolchain
 - **Build setup** — *(note missing)* see docs/BUILDING.md
 - [Build toolchain location](build-toolchain-location.md) — make, 64tass, python are off-PATH in C:\8bitProgramming
+- [Git Bash sed strips CRLF](git-bash-sed-strips-crlf.md) — `sed -i` writes LF and `grep -c $'\r$'` lies; count with Python bytes
 - [App make skips compiler.library](app-make-does-not-rebuild-compiler-library.md) — use `make libs`
 - [make libs does not install the runtime](make-libs-does-not-install-the-runtime.md) — `make -C source/runtime gpc-rt` is the other half
 - [Baseline compiler is the application copy](baseline-compiler-is-the-application-copy.md) — testing/GPC.BIN can be stale
@@ -42,6 +43,7 @@ sibling project: what is kept is a fact about **X16 BASIC or the X16 itself**, n
 - [A compile timeout faked success](compile-shared-timeout-fakes-success.md) — the banner is the finish line, not the file size
 - [Headless BASL build recipe](headless-basl-build-recipe.md) — the three emulator runs and their stop conditions
 - [GPC.ERR builds shared, in the main dir](gpcerr-build-shared-in-main-dir.md) — never standalone
+- [Runtime storage is the golden RAM](runtime-storage-is-golden-ram.md) — $0400-$05F4; a test routine goes at $0780
 - [Tests share the product's memory](tests-share-the-products-memory.md) — the harness costs workspace; BASLOAD does not nest #IFNDEF
 - [Paste can't drive a running program](paste-cannot-drive-a-running-program.md) — use a fixed-answer variant
 - [File I/O dies in a GP.DO key loop](file-io-error-in-gpdo-key-loop.md) — the seven shapes already ruled out
@@ -64,11 +66,13 @@ sibling project: what is kept is a fact about **X16 BASIC or the X16 itself**, n
 
 ## Compiler limits, memory and banking
 - [PROGRAM TOO BIG was the workspace](program-too-big-fires-early.md) — FIXED; a bank per table, 4,096 lines
-- [SHARED p-code cap is RTBASE](gpc-shared-pcode-cap-is-rtbase.md) — ~17,920 bytes, not $9F00
-- [GPC Blitz runtime slack and limits](gpc-blitz-runtime-slack-and-limits.md) — the run-side ceiling is FREE minus 4096
+- [SHARED p-code cap is RTBASE](gpc-shared-pcode-cap-is-rtbase.md) — 22,016 bytes, not $9F00
+- [GPC Blitz runtime slack and limits](gpc-blitz-runtime-slack-and-limits.md) — max low p-code 22,528 / 20,992 embedded, 22,016 / 19,968 shared; LOW FREE minus 4096 is the headroom
 - [Run-side workspace, read from the PRG](run-side-workspace-read-from-the-prg.md) — two bootstrap page numbers give the budget
-- [Core page cushion below GPBase](gpc-core-page-cushion-below-gpbase.md) — 4 B left in the embedded image; measure from rtimage.lbl
+- [Core page cushion below GPBase](gpc-core-page-cushion-below-gpbase.md) — 52 B left in the embedded image since build 123; measure from rtimage.lbl
 - [Compiler-emitted bank switch](compiler-emitted-bank-switch.md) — TODO item 4: .bgosub emitted, twins merged and shims deleted; built, tested and committed 2026-09-14; a GOTO into a region from outside it is refused since 2026-09-14
+- [Banks work in progress](banks-work-in-progress.md) — ALL-BANKS done (banktest3, gpctest and GPBMODS pass; banks 2-255, region cap 127); HANDLER-BANK finished at step 28; ALL-BANKS and handler steps 8-28 uncommitted
+- [Opcode numbers follow handler order](opcode-numbers-follow-handler-order.md) — moving a `;;` handler renumbers p-code; open a section per handler instead
 - [Runtime footprint](blitz-x16-runtime-footprint.md) — 10,956 B in every program, and how to shrink it
 - [String heap scavenger](string-heap-scavenger.md) — SHIPPED: dead blocks reused, +1 page RT
 - [BINPUT# caps at 255 bytes](binput-caps-at-255-bytes.md) — three caps land on one number; it is a CHRIN loop
@@ -138,9 +142,9 @@ sibling project: what is kept is a fact about **X16 BASIC or the X16 itself**, n
 - [GP.BANKEDSTR: literal text in a bank](gp-bankedstr-literal-text-in-a-bank.md) — BUILT; +3,840 B on GPBMODS
 - [Object file must fit under the runtime](object-file-must-fit-under-the-runtime.md) — regions were invisible to the fit check
 - [Wildcard scratch eats the source](wildcard-scratch-eats-the-source.md) — S0:NAME.B* matches NAME.BASL
-- [Every region gets its own .Bnn file](region-overlay-ovl-file.md) — BUILT; a .Bnn size is a PAGE COUNT unless topmost
+- [Every region gets its own .nnn file](region-overlay-ovl-file.md) — BUILT; banks 2-255, 127 regions; a .nnn size is a PAGE COUNT unless topmost
 - [Object writer: regions vs low code](object-writer-regions-vs-low-code.md) — the streamer pads forward 65,535 bytes with no check firing
-- [A second region for the utilities](second-region-for-the-utilities.md) — BUILT; a BANK statement is the ONLY disqualifier
+- [A second region for the utilities](second-region-for-the-utilities.md) — BUILT; a BANK statement is the ONLY disqualifier; regions call each other, a GOTO across is refused
 - [Banked code loses the bank on a call out](gp-banked-call-out-loses-the-bank.md) — a region may not BANK itself back; every call into a region is now .bgosub, library shims gone
 - [FILEDIR banks whole](filedir-bank-split.md) — BUILT; the switch moved into its two blobs
 - [GPBMODS resident p-code breakdown](gpbmods-resident-pcode-breakdown.md) — the shell is 79%, all eight modules 21%

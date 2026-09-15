@@ -68,9 +68,9 @@ each stage printing elapsed time and the size of the files being written.
 | `x16emu.exe`, `rom.bin` | `bin/x16emu/` | both scripts die immediately |
 | `GPC.BIN` | `testing/` | the compiler engine — `make -C source/gpc` |
 | `BASLOAD-GPC.BIN`, `BASLOAD-GPC.PRG` | `testing/` | the tokeniser; `build_basl.py` stages it from `BASLOAD-GPC/build/` if that is newer |
-| `GPB.RT.122.BIN`, `GPC.RT.122.BIN` | `testing/` | `make -C source/runtime gpc-rt` |
+| `GPB.RT.nnn.BIN`, `GPC.RT.nnn.BIN`, `GP1.RT.nnn.BIN` | `testing/` | `make -C source/runtime gpc-rt` |
 
-`121` is the **runtime** build number from `source/application/rtbuild.txt`. It is pinned
+`nnn` is the **runtime** build number from `source/application/rtbuild.txt`. It is pinned
 and does not auto-bump, and moving it strands every SHARED object built against the old one
 -- the name is baked into the object by `bootstrap.asm`, so they all need recompiling.
 It is *not* the product version, which is `buildnum.txt`.
@@ -108,9 +108,10 @@ about 12 K, and needs nothing on the drive.
 - BMXVIEW is EMBEDDED because `bmx-demo.bat` mounts `demo\`, which has never carried a
   runtime.
 - EDITOR is EMBEDDED per step 2 of `samples/editor/readme.md`.
-- **Overlays** (`.Bnn`, one per `GP.BANKED` region, `nn` in decimal up to 63) are LOADed
-  from **beside the program**, not from the drive root. `?OVL` is the failure message.
-  They must travel with the object.
+- **Overlays** (`.nnn`, one per `GP.BANKED` region or `GP.BANKEDSTR` bank, `nnn` the bank in
+  three decimal digits, `.002` to `.255`) are LOADed from **beside the program**, not from the
+  drive root. `?OVL` is the failure message, and `?RAM` means the program names a bank the
+  machine does not have. They must travel with the object.
 
 **XBASE is deliberately absent.** It builds (`xbasebuild.py`) but no database ships with
 it, so it is not in a release.
@@ -227,9 +228,10 @@ stage fails, and keep the wrapper's own log (section 5).
    misdirected. BASLOAD leaves a NUL-terminated message at `$bf00` in bank 0; the driver
    writes it to `testing/BASLDONE`. The nineteen return codes are in
    `testing/MSEDIT/BASLOAD.MD`. Reach for the `basload` agent before blaming the compiler.
-4. `?OVL` at run time means an overlay was not found beside the program.
+4. `?OVL` at run time means an overlay was not found beside the program. `?RAM` means the
+   program names a bank the machine does not have.
 5. The emulator transcript is long. Keep the last ~20 lines and the numbers — object size,
-   the `.Bnn` sizes, the PASS count. Do not echo the whole log.
+   the `.nnn` sizes, the PASS count. Do not echo the whole log.
 
 ---
 

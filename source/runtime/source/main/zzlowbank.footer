@@ -1,0 +1,41 @@
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		Name:		zzlowbank.footer
+;		Purpose:	The banked section in low RAM, for the links that run tests in the emulator.
+;		Created:	15th September 2026
+;
+; ************************************************************************************************
+; ************************************************************************************************
+;
+;		The runtime's "build" and "checkall" links and the polynomials "build" link run code.prg
+;		with nothing in bank 1, so the banked section goes inside the code section, where this
+;		file is linked. In the runtime links that is before testend.asm, whose test object
+;		follows the code.
+;
+;		64tass will not take a .dsection nested inside .section code. The .fill has no value, so
+;		it reserves the room without writing it, and the banked section is placed over that room.
+;
+;		A .footer, not .asm, so build.py leaves it out of the library.
+;
+; ************************************************************************************************
+
+		.section code
+LowBankedCode:
+		.fill 	LowBankedEnd - LowBankedCode 	; reserved, not written
+		.send code
+
+		* = LowBankedCode
+		.dsection banked
+LowBankedEnd:
+
+; ************************************************************************************************
+;
+;									Changes and Updates
+;
+; ************************************************************************************************
+;
+;		Date			Notes
+;		==== 			=====
+;
+; ************************************************************************************************

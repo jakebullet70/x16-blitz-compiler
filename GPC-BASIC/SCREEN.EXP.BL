@@ -105,7 +105,7 @@ GP.FILL 0, 20, PANEL.W, 4, ASC("X")
 ## **  screens -- and unlike the keyword, STASH.SAVE says so in STASH.OK.
 ## ***********************************************************************
 
-STASH.BANK = 1
+STASH.BANK = 2
 STASH.X = 4 : STASH.Y = 2 : STASH.W = 32 : STASH.H = 9
 GOSUB STASH.SAVE
 
@@ -117,13 +117,13 @@ GP.PRINTAT 10, 6, "A DIALOG OVER THE PANEL", 2 * 16 + 1
 
 FOR PAUSE.N = 1 TO 4000 : NEXT
 
-STASH.BANK = 1 : STASH.MOVE = 0
+STASH.BANK = 2 : STASH.MOVE = 0
 GOSUB STASH.RESTORE
 
 ## ---- STASH.MOVE = 1 with a new STASH.X and STASH.Y pastes it somewhere
 ## ---- ELSE instead, which is copy-and-paste for nothing extra.
 
-STASH.BANK = 1 : STASH.MOVE = 1
+STASH.BANK = 2 : STASH.MOVE = 1
 STASH.X = 44 : STASH.Y = 8
 GOSUB STASH.RESTORE
 

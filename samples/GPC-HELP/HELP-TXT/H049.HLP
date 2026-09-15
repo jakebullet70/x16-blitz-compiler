@@ -42,7 +42,8 @@
 .its own bank on every access.
 .
 .0 is not a bank. It is the KERNAL's, reserved by INIT, and it is what
-.GET.FREE.BANK returns for none left.
+.GET.FREE.BANK returns for none left. INIT reserves bank 1 as well, for the
+.runtime (SEC 3.12), so GET.FREE.BANK hands out bank 2 or higher.
 .
 .BANKMGR.OK is -1 if CLAIM took the bank, 0 if it was already taken or out of
 .range. BANKMGR.BANKS is how many the machine has, 64 or 256. BANKMGR.SPARE
@@ -58,4 +59,5 @@
 .
 =SEE ALSO
 .
+>52|3.12 Code in a bank
 >76|4.13 BANKMGR.INC.BL -- who owns which RAM bank

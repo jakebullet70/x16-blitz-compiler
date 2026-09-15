@@ -152,15 +152,16 @@ def install(prog, stem, drive):
     print("   installed:", os.path.join(folder, asname), flush=True)
 
     for f in sorted(os.listdir(drive)):
-        if f.startswith(stem + ".B") and f[len(stem) + 2:].isdigit():
+        if f.startswith(stem + ".") and len(f) == len(stem) + 4 and f[-3:].isdigit():
             if not same:
                 shutil.copy(os.path.join(drive, f), os.path.join(dest, f))
             print("   installed:", os.path.join(folder, f), flush=True)
 
     if "runtimes" in prog["data"]:
         #   A SHARED object asks the drive ROOT for GPB.RT.nnn.BIN when it uses a GP keyword
-        #   and GPC.RT.nnn.BIN when it does not (bootstrap.asm:285).  Both are copied: the
-        #   choice is made at compile time and flips silently.  nnn moves whenever
+        #   and GPC.RT.nnn.BIN when it does not (bootstrap.asm:285).  Both are copied, and
+        #   GP1.RT.nnn.BIN, the bank code either one loads: the choice is made at compile
+        #   time and flips silently.  nnn moves whenever
         #   rtbuild.txt does, so any older one here is cleared first rather than left to be
         #   found by a program that no longer matches it.
         for old in os.listdir(dest):
@@ -173,7 +174,7 @@ def install(prog, stem, drive):
                 print("   installed:", os.path.join(folder, f), flush=True)
                 found += 1
         if not found:
-            print("   !! no GPB/GPC.RT.nnn.BIN in testing\\ -- build it with"
+            print("   !! no GPB/GPC/GP1.RT.nnn.BIN in testing\\ -- build it with"
                   " make -C source/runtime gpc-rt", flush=True)
 
     if "bmx" in prog["data"]:
@@ -247,9 +248,9 @@ def build(prog):
     print("   compiled:", format(os.path.getsize(obj), ","), "bytes", flush=True)
 
     #   ONLY overlays this build wrote.  A failed compile used to report the PREVIOUS build's
-    #   overlays as if they were new.  The suffix is .Bnn and nn reaches 63, not .B0n.
+    #   overlays as if they were new.  The suffix is .nnn, the bank in three digits.
     for f in sorted(os.listdir(drive)):
-        if f.startswith(stem + ".B") and f[len(stem) + 2:].isdigit():
+        if f.startswith(stem + ".") and len(f) == len(stem) + 4 and f[-3:].isdigit():
             p = os.path.join(drive, f)
             fresh = os.path.getmtime(p) >= started
             print("   overlay", f, format(os.path.getsize(p), ","),

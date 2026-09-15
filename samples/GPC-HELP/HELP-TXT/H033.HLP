@@ -1,7 +1,16 @@
 @3.12 Code in a bank (2)
+=The overlay files
+.
+.Each region is written out as NAME.nnn, nnn being the bank in three decimal
+.digits, so bank 4 is NAME.004 and bank 122 is NAME.122. The file carries a
+.two-byte load address like any PRG, so the payload is the file size less
+.two, and the size is the page-padded region rather than the p-code in it.
+.
+.A program's .nnn files ship beside its .PRG and must travel with it.
+.
 =SEE ALSO
 .
->142|7. Memory, and what the compiler tells you
+>145|7. Memory, and what the compiler tells you
 >81|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
 >46|3.10 Text in a bank
 >39|3.9 Inline assembly

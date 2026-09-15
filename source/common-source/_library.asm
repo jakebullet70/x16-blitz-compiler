@@ -287,8 +287,8 @@ MemoryStorage = $400
 ;		The GPB block is now linked at the BOTTOM of the shared image and the interpreter core
 ;		above it, at a base that does not move:
 ;
-;			RTGPBASE  $6600   [ GPB handlers ..................... ][ GP magic ]
-;			RTBASE    $6E00   [ magic ][ jmp StartRuntime ][ core ... ] up to ~$9D00
+;			RTGPBASE  $6F00   [ GPB handlers ..................... ][ GP magic ]
+;			RTBASE    $7700   [ magic ][ jmp StartRuntime ][ core ... ] up to ~$9D80
 ;
 ;		ONE assembly still, and one vector table -- the two FILES rtname.py installs are slices
 ;		of the same image, so the core's bytes are identical in both and there is no second
@@ -314,8 +314,8 @@ MemoryStorage = $400
 ;		the handlers gone and reloads them.
 ;
 ; ************************************************************************************************
-RTGPBASE = $6600 							; GPB handler block + load address of the FULL file
-RTBASE = $6E00 								; interpreter core home -- the base that never moves
+RTGPBASE = $6F00 							; GPB handler block + load address of the FULL file
+RTBASE = $7700 								; interpreter core home -- the base that never moves
 RT_ENTRY = RTBASE+4 						; 4-byte magic at RTBASE, then jmp StartRuntime
 RTGPMAGIC = RTBASE-4 						; 4-byte "handlers are loaded too" magic
 
@@ -350,6 +350,7 @@ RTGPMAGIC = RTBASE-4 						; 4-byte "handlers are loaded too" magic
 ;
 BSTR_MAX_BANKS = 16 						; text banks a program may have, = the slot field's range
 GPBSTRBANKS = $0A00 - BSTR_MAX_BANKS 		; the table, at the top of the extension page ($09F0)
+HANDLER_BANK = 1							; the runtime's rarely used handlers; no region may use it
 PCODE_PAGE = $09 							; shared-mode p-code base page ($0900, page-aligned)
 MIN_WS_PAGES = 16 							; smallest workspace a shared program keeps (4K)
 ;
@@ -467,7 +468,13 @@ FrameStackPages = 8 						; 2K, ~125 frames
 ;		(.ifnext, .ifelse) were appended after .caseend on top of that. The gp.else -> gp.other
 ;		rename moved nothing: same position, same id.
 ;
-RT_ABI = 23 								; runtime ABI ordinal -> "GP23" magic (NOT the file name)
+;		23 -> 24 on 15th September 2026: rarely used handlers moved to bank 1 (HANDLER-BANK). The move
+;		renumbered ten opcodes (CHAR, PSET to RING, MOVSPR, SPRITE and SPRMEM), 40 vector entries now
+;		go to BankEnter or BankEnterShift, and the bank code carries this ordinal in a magic at $A000.
+;		The core shrank enough to move RTGPBASE and RTBASE UP nine pages, $6600 -> $6F00 and $6E00 ->
+;		$7700: 2,304 bytes more workspace for every shared program, and 379 left below $9F00.
+;
+RT_ABI = 24 								; runtime ABI ordinal -> "GP24" magic (NOT the file name)
 
 ; ************************************************************************************************
 ;
@@ -671,13 +678,13 @@ PCD_GPCMD_Y          = $a4 ; gp.y
 PCD_GPCMD_C          = $a5 ; gp.c
 PCD_GPCMD_INSTR      = $a6 ; gp.instr
 PCD_GPCMD_STRPTR     = $a7 ; gp.strptr
-PCD_PSET             = $a8 ; pset
-PCD_LINE             = $a9 ; line
-PCD_RECT             = $aa ; rect
-PCD_FRAME            = $ab ; frame
-PCD_OVAL             = $ac ; oval
-PCD_RING             = $ad ; ring
-PCD_CHAR             = $ae ; char
+PCD_CHAR             = $a8 ; char
+PCD_PSET             = $a9 ; pset
+PCD_LINE             = $aa ; line
+PCD_RECT             = $ab ; rect
+PCD_FRAME            = $ac ; frame
+PCD_OVAL             = $ad ; oval
+PCD_RING             = $ae ; ring
 PCD_HEXDOLLAR        = $af ; hex$
 PCD_INPUT            = $b0 ; input
 PCD_INPUTDOLLAR      = $b1 ; input$
@@ -785,9 +792,9 @@ PCD_MX               = $dda0 ; mx
 PCD_MY               = $dda1 ; my
 PCD_MWHEEL           = $dda2 ; mwheel
 PCD_RPTDOLLAR        = $dda3 ; rpt$
-PCD_SPRITE           = $dda4 ; sprite
-PCD_SPRMEM           = $dda5 ; sprmem
-PCD_MOVSPR           = $dda6 ; movspr
+PCD_MOVSPR           = $dda4 ; movspr
+PCD_SPRITE           = $dda5 ; sprite
+PCD_SPRMEM           = $dda6 ; sprmem
 PCD_ST               = $dda7 ; st
 PCD_STOP             = $dda8 ; stop
 PCD_SYS              = $dda9 ; sys

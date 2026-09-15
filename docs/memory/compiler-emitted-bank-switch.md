@@ -69,7 +69,7 @@ The harness is `bgosubtest.py` in the session scratchpad, **not in the repo**; t
 - `BGC` (ON into a region) and `BGD` (GOTO region to region) are refused with `NOT IMPLEMENTED`.
 - All `banktest3` pairs still match their controls, and its refusals give the same errors.
 - `gpctest.py quick`: 7 FAILED, all expected. They are the on and off compiles of the four programs
-  with regions, GPBMODS, RGL, RGN and GUIFRMT (GUIFRMT off only). Each `.Bnn` keeps its size and
+  with regions, GPBMODS, RGL, RGN and GUIFRMT (GUIFRMT off only). Each `.nnn` keeps its size and
   only the PRG grows, one byte a low-memory call into a region: GPBMODS off +75 B (CODE 43,520 to
   43,776), on +58 B, RGL +3, RGN +4, GUIFRMT +29. The shim calls account for most of it. GPBMODS'
   dead-code count goes from 1,583 to 1,600 bytes saved, and the 17 B difference is exactly the

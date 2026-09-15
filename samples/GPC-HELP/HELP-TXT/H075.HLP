@@ -1,107 +1,93 @@
-@7. Memory, and what the compiler tells you (2)
-=Removing dead code
+@8. Known bugs
 .
-.With REMOVE DEAD CODE? answered Y in GPC.PRG, or a file named on line 5 of
-.GPC.INPUT, the compiler leaves out every source line that no path from the
-.first line reaches. It writes the numbers of those lines to the file, one a
-.line. GPC.PRG names it D. and the source name. The numbers are the BASIC
-.line numbers BASLOAD gave, not lines of the .BASL file.
+=8. KNOWN BUGS
 .
-.The option adds one pass, PASS 0. With it off, the passes and the object are
-.unchanged.
+.Three, all live on 12th September 2026 and all reproducible. Each says what
+.happens, what causes it, and what to do instead. A bug leaves this list when
+.it is fixed, not when it is understood.
 .
-.A line is reached through:
+=A string never gives memory back
 .
-.  - GOTO, GOSUB, IF ... THEN a line number, ON ... GOTO, ON ... GOSUB,
-.    RESTORE a line number
-.  - FN, GP.SUB and GP.FN
-.  - the line before, unless that line's last statement is GOTO, RETURN, END
-.    or STOP. A line holding IF ... THEN and a statement always reaches the
-.    next.
+.A$ = "" frees nothing. A string variable owns its block: the assignment sets
+.the length to zero and keeps the capacity. The heap scavenger reclaims only
+.a block a string outgrew and abandoned, never one a variable still holds. A
+.working buffer that has once held a 250-character line is spoken for until
+.the program ends.
 .
-.Kept although nothing reaches them:
+.So a big temporary cannot be built and then freed. It has to not be built.
 .
-.  - a line holding DATA, DIM or GP.DEFPROC
-.  - the GP.BANKED and GP.ENDBANKED lines, and a whole GP.BANKEDSTR group
-.  - every line of a GP.IF, GP.DO, GP.SELECT or GP.ASM block when any line of
-.    it is kept
+.Measured 2026-09-02. The editor's find folded the needle and every line it
+.scanned into new strings and compared with MID$ per position: 579 bytes gone
+.for the rest of the run, from a workspace with 1,489 free, and the GUI
+.dialogs then died on what was left. Rewritten to fold in place through
+.GP.STRPTR with one GP.INSTR per line, a find costs 81 bytes, and the program
+.came out 59 bytes smaller.
 .
-.A variable that only removed lines use is not in the object. If the
-.compiler's tables fill, it prints DEAD CODE TABLE FULL, NOTHING REMOVED and
-.compiles every line.
+.Do this -- PRINT FRE(0) at eight points down the run and read the descent.
+.It is a high-water ceiling, so it only falls, and the step that falls is the
+.culprit.
 .
-.A keep region makes every line between its two marker lines reached.
+=BINPUT# stops at 255 bytes
 .
-:#REM 1
-:REM GP.KEEP
-:#REM 0
-:DEBUG.DUMP:
-:  PRINT A,B
-:  RETURN
-:#REM 1
-:REM GP.ENDKEEP
-:#REM 0
+.BINPUT# n, A$, len cannot read more than 255 bytes. Three independent caps
+.land on that one number, so there is no single constant to raise.
 .
-.  - BASLOAD drops a REM unless #REM 1 is in force. A dropped marker leaves
-.    no region and no error.
-.  - BASLOAD-GPC also takes #GPC KEEP and #GPC ENDKEEP, one line each.
-.  - The words match in either case. The marker lines are judged like any
-.    other line.
-.  - A KEEP inside a region, an ENDKEEP outside one, or a region open at the
-.    end of the source stops the compile with BLOCK MISMATCH.
-.  - With the option off, the markers are ordinary REMs.
+.  the read buffer is 255 bytes
+.      WHERE: ReadBuffer: .fill 255
 .
-.{VAR} on a removed variable. A GP.ASM {VAR} naming a variable that only
-.removed lines create stops the compile with UNKNOWN VARIABLE IN {}. With the
-.option off it compiles. Create the variable in live code or in a keep
-.region.
+.  the count argument is 8 bit, and unchecked
+.      WHERE: GetInteger8Bit takes mantissa byte 0 and returns
 .
-=OUT OF MEMORY
+.  a BASIC string is 255 characters
+.      WHERE: nowhere to put a longer record in any case
 .
-.Everything the program allocates comes out of the one LOW FREE pool:
-.scalars, arrays, and the string heap. There is no separate heap to run out
-.of.
+.The second is the trap. BINPUT# 12, A$, 256 sets the count to 0 and hands
+.back an empty string, silently. 300 gives 44 bytes.
 .
-.  - A DIM costs its full size whether the entries are used or not. DIM
-.    A$(120) is 121 string slots from the moment it runs. Five arrays
-.    dimensioned to the same 120 is 1,210 bytes gone before a single row
-.    exists.
-.  - A string block never shrinks. Assigning a shorter string to a variable
-.    that already holds a longer one reuses the block it has; assigning a
-.    longer one allocates a new block and abandons the old. The abandoned
-.    blocks are reclaimed by the heap scavenger when one of the right size is
-.    wanted again, not immediately.
-.  - What fails is therefore a high-water mark, not a total. The allocation
-.    that raises OUT OF MEMORY is rarely the large one -- it is an ordinary
-.    one that arrives after the heap has been churned. The same key on the
-.    same screen can work or not depending on what was visited first, which
-.    is what makes it read as intermittent.
+.It is also not a block read. It is a CHRIN loop, one KERNAL call per byte
+.with an EOF check on top of that. BINPUT# is one statement, not one
+.transfer, so anything costing a BINPUT# per record pays that stride per
+.record.
 .
-.The error itself comes from the runtime library and names an address in it,
-.not a line in your program: OUT OF MEMORY @ $03A5 library. It tells you the
-.allocator refused, and nothing about which of your strings was asking.
+.LINPUT# shares the same buffer and stops at 255 too, but runs on to the
+.delimiter afterwards, so the next read starts at a line boundary.
 .
-=A region does not come out of it
+.Do this -- a record cannot be one string. Make it N strings of 255, or keep
+.it in a bank and copy out the part that is needed.
 .
-.LOW CODE and LOW FREE describe low memory only. P-code inside a GP.BANKED
-.region (SEC 3.12) is not in either figure, and neither is a GP.ASM block in
-.the region without LOW. The region is reported on its own BANK line and
-.written to its own NAME.Bnn overlay file. Moving a module into a region
-.takes its bytes off LOW CODE and gives them to LOW FREE.
+=File I/O in a GP.DO key loop
 .
-.What a region costs instead:
+.A save routine reached from inside a program's own GP.DO key loop writes its
+.file completely and correctly, and then the program stops with
 .
-.  - A whole bank, and 32 pages is the ceiling. $A000-$BFFF, 8,192 bytes,
-.    with the bridges, the padding and the region's GP.ASM blocks counted in.
-.    No two regions may share a bank.
-.  - A byte a call site, and two bank switches a call. A call into the region
-.    from outside it, or out of it to low memory, is a .bgosub, one byte
-.    longer than a GOSUB. RETURN selects the caller's bank again.
-.  - A file that has to travel. The .Bnn files ship beside the .PRG. A
-.    program whose overlays are missing loads and then fails where it first
-.    calls into one.
+:INPUT/OUTPUT ERROR @ $005B
 .
-.Banked text is the same bargain on the data side: a GP.BANKEDSTR group (SEC
-.3.10) is out of the workspace, and inside a region it costs no p-code at
-.all.
+.The address is identical in every failing build, which says a clobbered
+.instruction pointer rather than a real device error.
 .
+.Seven shapes have been compiled and probed. Do not bisect them again.
+.
+.  OPEN/PRINT#/CLOSE at top level
+.      RESULT: passes
+.
+.  four consecutive PRINT#, no PRINT between
+.      RESULT: passes
+.
+.  the same inside GP.DO ... GP.EXITDO
+.      RESULT: passes
+.
+.  the same behind a GOSUB inside a GP.DO
+.      RESULT: passes
+.
+.  the same behind GP.SELECT then GOSUB inside a GP.DO
+.      RESULT: passes
+.
+.  the real routine called from the top level of the same program
+.      RESULT: passes
+.
+.  the real routine reached from the program's own GP.DO key loop
+.      RESULT: fails
+.
+.Do this -- a plain PRINT immediately after the CLOSE makes it pass. Channel
+.0 output runs CLRCHN; a non-zero channel runs CHKOUT and READST instead, so
+.the suspect is channel state left behind rather than the file I/O.

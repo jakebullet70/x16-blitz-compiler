@@ -103,7 +103,7 @@
 .
 >21|3. Command reference
 >74|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
->88|STASH.INC.BL -- save a text rectangle, and put it back.
+>90|STASH.INC.BL -- save a text rectangle, and put it back.
 >61|4.1 THEME.INC.BL -- named colour roles
 >67|4.6 MENUVERT.INC.BL -- a vertical menu
 >65|4.4 LINEINPUT.INC.BL -- a positioned entry field

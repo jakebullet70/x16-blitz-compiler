@@ -39,7 +39,7 @@ IOOpenRead:
 
 IO_IMAGE_FILE = 4
 IO_OBJECT_FILE = 6
-IO_OVL_FILE = 7 							; ...and one for the .Bnn overlays -- see below
+IO_OVL_FILE = 7 							; ...and one for the .nnn overlays -- see below
 
 IOOpenImage:
 		lda 	#IO_IMAGE_FILE

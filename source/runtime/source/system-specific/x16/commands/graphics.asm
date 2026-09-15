@@ -9,115 +9,14 @@
 ;
 ; ************************************************************************************************
 ; ************************************************************************************************
+;
+;		CHAR stays in low RAM. Its string can be a literal in a GP.BANKED region, whose bank
+;		bank 1 would hide, so the three routines it calls stay with it. The other commands run
+;		from bank 1 (HANDLER_BANK).
+;
+; ************************************************************************************************
 
 		.section 	code
-
-; ************************************************************************************************
-;
-;										PSET Command
-;
-; ************************************************************************************************
-
-Command_PSET: ;; [pset]
-		.entercmd
-		phy
-		jsr 	GetInteger8Bit 				; get the colour
-		pha
-		ldx 	#0 							; copy 0/1 to r0,r1
-		ldy 	#X16_r0
-		jsr 	GraphicsCopy2
-		jsr 	X16_FB_cursor_position 		; set position.
-		pla 								; set pixel.
-		jsr 	X16_FB_set_pixel
-		ply
-		ldx 	#$FF
-		.exitcmd
-
-; ************************************************************************************************
-;
-;										LINE Command
-;
-; ************************************************************************************************
-
-Command_LINE: ;; [line]
-		.entercmd
-		phy
-		jsr 	GraphicsColourOptional 		; LINE's colour is optional (keeps current if omitted)
-		ldx 	#0 							; copy 0/1/2/3 to r0,1,2,3
-		ldy 	#X16_r0
-		jsr 	GraphicsCopy4
-		jsr 	X16_GRAPH_draw_line
-		ply
-		ldx 	#$FF
-		.exitcmd
-
-; ************************************************************************************************
-;
-;										RECT Command
-;
-; ************************************************************************************************
-
-Command_RECT: ;; [rect]
-		.entercmd
-		phy
-		jsr 	GraphicsRectCoords
-		sec
-		jsr 	X16_GRAPH_draw_rect
-		ply
-		ldx 	#$FF
-		.exitcmd
-
-; ************************************************************************************************
-;
-;										FRAME Command
-;
-; ************************************************************************************************
-
-Command_FRAME: ;; [frame]
-		.entercmd
-		phy
-		jsr 	GraphicsRectCoords
-		clc
-		jsr 	X16_GRAPH_draw_rect
-		ply
-		ldx 	#$FF
-		.exitcmd
-
-; ************************************************************************************************
-;
-;										OVAL Command
-;
-;		OVAL and RING are RECT and FRAME with the ellipse renderer in place of the rectangle
-;		one. GRAPH_draw_oval takes its bounding box in r0..r3 and the fill flag in carry,
-;		exactly as GRAPH_draw_rect does, so GraphicsRectCoords sets up both unchanged.
-;
-; ************************************************************************************************
-
-Command_OVAL: ;; [oval]
-		.entercmd
-		phy
-		jsr 	GraphicsRectCoords
-		sec 								; carry set = filled
-		jsr 	X16_GRAPH_draw_oval
-		ply
-		ldx 	#$FF
-		.exitcmd
-
-; ************************************************************************************************
-;
-;										RING Command
-;
-; ************************************************************************************************
-
-Command_RING: ;; [ring]
-		.entercmd
-		phy
-		jsr 	GraphicsRectCoords
-		clc 								; carry clear = outline
-		jsr 	X16_GRAPH_draw_oval
-		ply
-		ldx 	#$FF
-		.exitcmd
 
 ; ************************************************************************************************
 ;
@@ -162,17 +61,6 @@ _CCExit:
 ;
 ; ************************************************************************************************
 
-GraphicsColourOptional:
-		.floatinteger 						; integer form of the colour argument.
-		lda 	NSMantissa1,x 				; high byte is non-zero only for the 256 "omitted"
-		bne 	_GCOKeep 					; marker OptionalColourCompile pushes -- so leave the
-		lda 	NSMantissa0,x 				; current draw colour. Otherwise it is a real 0..255
-		tax 								; colour (an explicit ",255" still lands here), set it.
-		ldy 	#0
-		jsr 	X16_GRAPH_set_colors
-_GCOKeep:
-		rts
-
 GraphicsColour:
 		jsr 	GetInteger8Bit
 		tax
@@ -186,8 +74,6 @@ GraphicsColour:
 ;
 ; ************************************************************************************************
 
-GraphicsCopy4:
-		jsr 	GraphicsCopy2
 GraphicsCopy2:
 		jsr 	GraphicsCopy1
 GraphicsCopy1:		
@@ -200,6 +86,144 @@ GraphicsCopy1:
 		iny
 		iny
 		rts
+
+		.send 	code
+
+		.section 	banked
+
+; ************************************************************************************************
+;
+;										PSET Command
+;
+; ************************************************************************************************
+
+Command_PSET: ;; [pset]
+		.entercmd
+		phy
+		jsr 	GetInteger8Bit 				; get the colour
+		pha
+		ldx 	#0 							; copy 0/1 to r0,r1
+		ldy 	#X16_r0
+		jsr 	GraphicsCopy2
+		jsr 	X16_FB_cursor_position 		; set position.
+		pla 								; set pixel.
+		jsr 	X16_FB_set_pixel
+		ply
+		ldx 	#$FF
+		.exitbank
+
+; ************************************************************************************************
+;
+;										LINE Command
+;
+; ************************************************************************************************
+
+Command_LINE: ;; [line]
+		.entercmd
+		phy
+		jsr 	GraphicsColourOptional 		; LINE's colour is optional (keeps current if omitted)
+		ldx 	#0 							; copy 0/1/2/3 to r0,1,2,3
+		ldy 	#X16_r0
+		jsr 	GraphicsCopy4
+		jsr 	X16_GRAPH_draw_line
+		ply
+		ldx 	#$FF
+		.exitbank
+
+; ************************************************************************************************
+;
+;										RECT Command
+;
+; ************************************************************************************************
+
+Command_RECT: ;; [rect]
+		.entercmd
+		phy
+		jsr 	GraphicsRectCoords
+		sec
+		jsr 	X16_GRAPH_draw_rect
+		ply
+		ldx 	#$FF
+		.exitbank
+
+; ************************************************************************************************
+;
+;										FRAME Command
+;
+; ************************************************************************************************
+
+Command_FRAME: ;; [frame]
+		.entercmd
+		phy
+		jsr 	GraphicsRectCoords
+		clc
+		jsr 	X16_GRAPH_draw_rect
+		ply
+		ldx 	#$FF
+		.exitbank
+
+; ************************************************************************************************
+;
+;										OVAL Command
+;
+;		OVAL and RING are RECT and FRAME with the ellipse renderer in place of the rectangle
+;		one. GRAPH_draw_oval takes its bounding box in r0..r3 and the fill flag in carry,
+;		exactly as GRAPH_draw_rect does, so GraphicsRectCoords sets up both unchanged.
+;
+; ************************************************************************************************
+
+Command_OVAL: ;; [oval]
+		.entercmd
+		phy
+		jsr 	GraphicsRectCoords
+		sec 								; carry set = filled
+		jsr 	X16_GRAPH_draw_oval
+		ply
+		ldx 	#$FF
+		.exitbank
+
+; ************************************************************************************************
+;
+;										RING Command
+;
+; ************************************************************************************************
+
+Command_RING: ;; [ring]
+		.entercmd
+		phy
+		jsr 	GraphicsRectCoords
+		clc 								; carry clear = outline
+		jsr 	X16_GRAPH_draw_oval
+		ply
+		ldx 	#$FF
+		.exitbank
+
+; ************************************************************************************************
+;
+;								Set colour to stack X
+;
+; ************************************************************************************************
+
+GraphicsColourOptional:
+		.floatinteger 						; integer form of the colour argument.
+		lda 	NSMantissa1,x 				; high byte is non-zero only for the 256 "omitted"
+		bne 	_GCOKeep 					; marker OptionalColourCompile pushes -- so leave the
+		lda 	NSMantissa0,x 				; current draw colour. Otherwise it is a real 0..255
+		tax 								; colour (an explicit ",255" still lands here), set it.
+		ldy 	#0
+		jsr 	X16_GRAPH_set_colors
+_GCOKeep:
+		rts
+
+; ************************************************************************************************
+;
+;								Copy stack X,X+n to rY,Y+n
+;
+; ************************************************************************************************
+
+GraphicsCopy4: 								; GraphicsCopy2 is in low RAM, so the second pair
+		jsr 	GraphicsCopy2 				; jumps to it rather than falling through
+		jmp 	GraphicsCopy2
 
 ; ************************************************************************************************
 ;
@@ -254,7 +278,7 @@ _GRCSwapByte:
 		pla
 		sta 	0,x
 		rts		
-		.send 	code
+		.send 	banked
 		
 ; ************************************************************************************************
 ;

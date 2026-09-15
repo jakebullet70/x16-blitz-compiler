@@ -65,7 +65,8 @@ StartRuntime:
 		;
 		;		Main Run Loop
 		;
-		bra 	NXStartLoop 				; step over the out-of-line break check below
+		ldy 	#0
+		bra 	NextCommand 				; step over the break check and the bank routines below
 		;
 		;		The Ctrl+C poll, lifted out of the dispatch path. It runs once every 16 p-code
 		;		words; the counter test in front of it runs on EVERY word, which makes it the
@@ -91,8 +92,32 @@ NXBreakCheck:
 		lda 	#16 						; re-arm the counter for the next 16 words
 		sta 	breakCount
 		bra 	NXDispatch
-NXStartLoop:
-		ldy 	#0
+		;
+		;		A handler in bank 1 (HANDLER_BANK) has BankEnter as its vector entry, or BankEnterShift in
+		;		the shifted table. It saves the program's bank, selects bank 1 and jumps through the copy of
+		;		the table in bank 1 with the X the dispatcher left (generated/vectors.asm). The handler reads
+		;		no A on entry, and its .entercmd pulls the X the dispatcher pushed.
+		;
+BankEnter:
+		lda 	SelectRAMBank
+		sta 	handlerBank
+		lda 	#HANDLER_BANK
+		sta 	SelectRAMBank
+		jmp 	(BankVectors,x)
+
+BankEnterShift:
+		lda 	SelectRAMBank
+		sta 	handlerBank
+		lda 	#HANDLER_BANK
+		sta 	SelectRAMBank
+		jmp 	(BankShiftVectors,x)
+		;
+		;		A handler in bank 1 leaves through .exitbank, which selects the program's bank again, saved
+		;		by BankEnter, before NextCommand.
+		;
+BankedExit:
+		lda 	handlerBank
+		sta 	SelectRAMBank
 NextCommand:
 		dec 	breakCount 					; only check every 16 instructions.
 		beq 	NXBreakCheck
@@ -231,6 +256,9 @@ Runtime6502SP: 								; 6502 stack on start.
 		
 breakCount: 								; counter so don't check break every instruction.
 		.fill 	1		
+
+handlerBank: 								; the program's RAM bank while a bank 1 handler runs
+		.fill 	1
 		.send storage
 
 ; ************************************************************************************************
