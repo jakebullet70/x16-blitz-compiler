@@ -1,7 +1,7 @@
 # Sample — GPB-MODS-TESTING
 
 A development harness for the GPC-BASIC library: a menu bar whose dropdowns reach nearly every
-public entry point, and the one program that holds all twenty modules at once.
+public entry point, and the one program that holds all twenty-one modules at once.
 
 `PLAN.md` is the design; this file is how to build and drive it.
 
@@ -31,7 +31,7 @@ where that shows up first, long before any actual warning.
 ## Every panel is real
 
 There are no stubs left. A chosen row makes the library call it names and shows what came back, and
-what it came back with also lands on the LAST line at the foot of the page. Three modules have no
+what it came back with also lands on the LAST line at the foot of the page. Two modules have no
 row at all yet — see *The modules* — but nothing that is on screen is pretending. The shell itself is a
 test of three modules before any row is chosen: `MENUBAR` drives the bar, `MENUVERT` every
 dropdown, and `STASH` puts the screen back under a closed one.
@@ -44,7 +44,7 @@ shallow selects rather than one nested on both coordinates.
 **Eleven banks.** Eight are named by the compiler and are CLAIMED from `BANKMGR` at startup,
 because the compiler picks them while the object is written and so the manager is told rather than
 asked: **4** the GUI, **5** and **6** the program's own literal text, **7** the utilities, **8** the
-file modules, **9** `THEME`, **10** the combo box, and **11** the two biggest dropdown handlers,
+file modules, **9** `THEME`, **10** the combo and check box, and **11** the two biggest dropdown handlers,
 which are this program's own code rather than the library's. Three more are allocated at run time —
 the cells a dropdown covers, the cells a dialog covers, and `FILEDIR`'s directory buffer.
 
@@ -101,18 +101,18 @@ about the file name.
 
 ## Where the bytes go
 
-Built 2026-09-14 with all twenty modules and every panel written. `GPBMODS.PRG` is **11,619**
-bytes and **eight overlay files** come with it, 30,224 bytes between them:
+Built 2026-09-15 with all twenty-one modules and every panel written. `GPBMODS.PRG` is **11,523**
+bytes and **eight overlay files** come with it, 32,016 bytes between them:
 
 | file | bank | what is in it | bytes |
 |---|---:|---|---:|
 | `GPBMODS.004` | 4 | the GUI — `MENUVERT` `MENUBAR` `LINEINPUT` `GUI` `GUI2` | 7,938 |
 | `GPBMODS.005` | 5 | literal text, pool one | 7,426 |
-| `GPBMODS.006` | 6 | literal text, pool two | 4,354 |
-| `GPBMODS.007` | 7 | the utilities — nine modules | 4,354 |
-| `GPBMODS.008` | 8 | the file modules — `FILEIO` `FILEDIR` | 1,538 |
+| `GPBMODS.006` | 6 | literal text, pool two | 4,610 |
+| `GPBMODS.007` | 7 | the utilities — nine modules | 4,866 |
+| `GPBMODS.008` | 8 | the file modules — `FILEIO` `FILEDIR` | 1,794 |
 | `GPBMODS.009` | 9 | `THEME` | 770 |
-| `GPBMODS.010` | 10 | `COMBO` | 770 |
+| `GPBMODS.010` | 10 | the form controls — `COMBO` `CHECK` | 1,538 |
 | `GPBMODS.011` | 11 | `GMX.STRINGS` and `GMX.FILES`, this program's own code | 3,074 |
 
 **One `.nnn` is written per bank, not per some size threshold.** Six are `GP.BANKED` code regions
@@ -155,17 +155,20 @@ memory and all six regions, which is why the total is far larger than the reside
 | `.009` | `THEME` | 502 |
 | `.009` | entry bridge and page padding | 266 |
 | | **bank 9 payload** | **768** |
-| `.010` | `COMBO` | 705 |
-| `.010` | entry bridge and page padding | 63 |
-| | **bank 10 payload** | **768** |
+| `.010` | `COMBO` | 701 |
+| `.010` | `CHECK` | 597 |
+| `.010` | entry bridge and page padding | 238 |
+| | **bank 10 payload** | **1,536** |
 | `.011` | `GMX.STRINGS`, `GMX.FILES` and what they call | 2,904 |
 | `.011` | entry bridge and page padding | 168 |
 | | **bank 11 payload** | **3,072** |
 
-Measured 2026-09-14, after the shims were deleted. Banks 5 and 6 hold no p-code at all: 7,424 and
-4,352 bytes of payload, all of it literal text.
+Measured 2026-09-14, after the shims were deleted, and bank 10 again on 2026-09-15 when `CHECK`
+went in. Banks 6, 7 and 8 have grown since the 2026-09-14 measurement, by one page, two pages and
+one page, so their rows and the low RAM total are behind the file table. Banks 5 and 6 hold no
+p-code at all: 7,424 and 4,608 bytes of payload, all of it literal text.
 
-**Two modules in low memory against eighteen in banks, and that is the point of the regions.**
+**Two modules in low memory against nineteen in banks, and that is the point of the regions.**
 What is left in low RAM is what could not go: `STASH` and `STASHFILE` hold `BANK` statements, which
 `CommandBankGuard` refuses inside a region. Nothing else disqualified anything — `FILEIO`'s `OPEN`, `INPUT#` and `CLOSE`
 leave `$00` alone (measured for `FILEDIR`, banked since 2026-09-07), a `GP.ASM` blob's body never
@@ -273,10 +276,10 @@ To lift a bank into another program, take the `.INC.BL` files between its `GP.BA
 for it, and `modsbuild.py` copies root's over this folder's on every build. Never copy this one
 outward.
 
-**Twenty are included, and seventeen are exercised.** `COMBO`, `KB` and `STASHVRAMGC` are compiled
-in, but no panel calls `COMBO.ADD`, `KB.CLEARKB` or `SV.COMPACT`, so nothing on screen drives
-them. That is 1,037 bytes of banked p-code — `COMBO` 705, `STASHVRAMGC` 304, `KB` 28 — and bank 10 exists for the first of the three alone. Rows for
-them are the next thing the shell owes.
+**Twenty-one are included, and nineteen are exercised.** `KB` and `STASHVRAMGC` are compiled in,
+but no panel calls `KB.CLEARKB` or `SV.COMPACT`, so nothing on screen drives them: 332 bytes of
+banked p-code, `STASHVRAMGC` 304 and `KB` 28. `COMBO` and `CHECK` share bank 10, and
+DIALOG > CHECK BOX + COMBO drives both.
 
 `BMX` is out: it needs a bitmap file and a screen-mode change and is not GUI, and
 `GPC-BASIC/BMXVIEW.EXP.BL` already covers it.

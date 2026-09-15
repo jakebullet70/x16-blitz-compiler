@@ -1,25 +1,16 @@
-@6. Two more naming rules that are not about collisions
+@5. TRUE IS -1
 .
-=6. TWO MORE NAMING RULES THAT ARE NOT ABOUT COLLISIONS
+=5. TRUE IS -1
 .
-.#DEFINE takes an INT16 (BASLOAD.MD:313). A constant above 65535 is ERROR:
-.INVALID PARAMETER, not a warning -- which is why BMX.PALBASE (VRAM $1FA00,
-.129536) is an ordinary variable and not a #DEFINE. Every VRAM address past
-.$FFFF has the same problem.
+.Every flag the library hands back is -1 for true and 0 for false, and
+.anything written against it should be too. GUI.OK GUI.ANSWER GUI.STASHED
+.STASH.OK SORT.OK MENUVERT.HOTHIT FILE.OK BANKMGR.OK APPSYS.IS.EMULATOR --
+.all of them.
 .
-.A dotted name whose tail is a reserved word is fine. MENUVERT.COUNT,
-.THEME.CLR, LINEINPUT.LEN and LINEINPUT.RETURN all contain keywords and all
-.work, because BASLOAD matches the whole identifier. An undotted one does
-.not: POS, MB, ST, LEN and CHAR cannot be variables at all. This is the main
-.reason the library is dotted throughout.
+:IF GUI.OK THEN <accepted>            ' yes
+:IF NOT GUI.OK THEN <cancelled>       ' yes
+:IF GUI.OK = 0 THEN <cancelled>       ' yes
+:IF GUI.OK = 1 THEN <accepted>        ' NO -- it is -1
 .
-.RETURNS joined that list on 08/09/26 -- it is GP.DEFPROC's result clause and
-.has a token of its own, so a bare RETURNS is no longer a name. RETURN is
-.untouched, and so is anything dotted.
-.
-.One rule applies only outside BASL: BASLOAD gives 64 significant characters,
-.the built-in BASIC gives two. Write the same code as a hand-typed .bas for
-.the PC-side converter and THEME.CLR and THEME.COUNT become the same
-.variable. That is a silent wrong answer -- it cost two test cycles during
-.tier 6, both times looking exactly like a compiler bug. Inside BASL you are
-.safe; in a raw .bas, give every variable a distinct first two characters.
+.A flag the CALLER sets is read as non-zero, so LINEINPUT.MASK = 1 and
+.STASH.MOVE = 1 still work. Write -1 in new code all the same.

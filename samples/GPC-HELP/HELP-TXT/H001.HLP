@@ -46,7 +46,7 @@
 =SEE ALSO
 .
 >52|3.12 Code in a bank
->90|STASH.INC.BL -- save a text rectangle, and put it back.
+>91|STASH.INC.BL -- save a text rectangle, and put it back.
 >70|4.7 SORT.INC.BL -- shell sort a string array
 >71|4.8 STRCASE.INC.BL -- case, in place
 >62|4.2 STRINGS.INC.BL -- string helpers

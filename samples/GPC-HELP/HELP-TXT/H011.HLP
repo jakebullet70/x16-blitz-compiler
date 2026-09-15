@@ -1,6 +1,10 @@
 @3. Command reference (2)
 .        4.17
 .
+.  Dialogs
+.      BASIC
+.      CHECK.INC.BL -- CHECK.ADD, a check box, [X] or [ ] - SEC 4.21
+.
 .  Code in a bank
 .      ASM
 .      GP.BANKED GP.ENDBANKED -- p-code at $A000, out of the low-memory

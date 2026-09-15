@@ -32,7 +32,7 @@
 .list too long to see at once, and is blank for one that fits.
 .
 .The scrolling list itself is not in this module. It is GUI.CT.LIST, one of
-.GUI.FORM's three control types, and lives in GUI.INC.BL beside the field;
+.GUI.FORM's five control types, and lives in GUI.INC.BL beside the field;
 .this file is the dialog around it.
 .
 .Example: GUI2TST.EXP.BL.

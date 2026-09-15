@@ -166,6 +166,7 @@ Three implementations, and what each costs:
 | **Dialogs** | BASIC | `GUI.INC.BL` — `GUI.SAY` `GUI.YN` `GUI.MENU` `GUI.INPUT` `GUI.OPEN` `GUI.CLOSE` · §4.11 |
 | **Dialogs** | BASIC | `GUI2.INC.BL` — `GUI.LISTBOX`, single or multi select · §4.12 |
 | **Dialogs** | BASIC | `COMBO.INC.BL` — `COMBO.ADD`, a drop-down that folds into one row · §4.17 |
+| **Dialogs** | BASIC | `CHECK.INC.BL` — `CHECK.ADD`, a check box, `[X]` or `[ ]` · §4.21 |
 | **Code in a bank** | ASM | `GP.BANKED` `GP.ENDBANKED` — p-code at `$A000`, out of the low-memory budget, see §3.12 |
 | **Bank ownership** | BASIC | `BANKMGR.INC.BL` — `INIT` `CLAIM` `GET.FREE.BANK` `RELEASE` `COUNT` · §4.13 |
 | **Key-value store** | BASIC | `KV.INC.BL` — `INIT` `GET` `PUT` `DEL` `FIND` `AT` `WIPE` `SAVE` `LOAD`, strings in one RAM bank · §4.20 |
@@ -1832,7 +1833,7 @@ frame glyphs, the bank the covered cells go to — is listed in full in
 box is still on screen when the call returns.
 
 **Every control has a focus, and TAB moves it.** The dialogs no longer own their key loops: each
-states its controls and `GUI.FORM` runs them. A control is a button, a field or a list; it hands
+states its controls and `GUI.FORM` runs them. A control is a button, a field, a list, a combo (§4.17) or a check box (§4.21); it hands
 back one of six verdicts — stay, next, previous, press, default, cancel — and the dispatcher stays
 one loop whatever the mix. A caller that never presses TAB sees what it always saw.
 
@@ -1895,7 +1896,7 @@ a list reopens with its marks. Any other length, `""` included, starts with none
 The bottom frame edge reads `2 SELECTED OF 20` in multi, `20 ITEMS` for a single list too long to
 see at once, and is blank for one that fits.
 
-**The scrolling list itself is not in this module.** It is `GUI.CT.LIST`, one of `GUI.FORM`'s three
+**The scrolling list itself is not in this module.** It is `GUI.CT.LIST`, one of `GUI.FORM`'s five
 control types, and lives in `GUI.INC.BL` beside the field; this file is the dialog around it.
 
 Example: [`GUI2TST.EXP.BL`](GUI2TST.EXP.BL).
@@ -2317,10 +2318,57 @@ slot 0    "*KVSTORE", 2, the version (1), the slot count (64)
 
 ---
 
-### 4.21 `GPBMODS` — the harness that drives every module
+### 4.21 `CHECK.INC.BL` — a check box, `[X]` or `[ ]`
+
+| Routine | in | out |
+|---|---|---|
+| `CHECK.ADD` | `CHECK.X` `CHECK.Y` `CHECK.TEXT$` `CHECK.ON` | `CHECK.CTRL` |
+
+```basic
+CHECK.X = GUI.INNER.LEFT : CHECK.Y = GUI.INNER.TOP
+CHECK.TEXT$ = "SHOW HIDDEN FILES" : CHECK.ON = -1
+GOSUB CHECK.ADD
+HIDDEN = CHECK.CTRL
+' ... run the form ...
+IF (GUI.CTRL.FLAGS%(HIDDEN) AND GUI.CF.CHECKED) <> 0 THEN PRINT "TICKED"
+```
+
+**Only `CHECK.ADD` is called by an application.** `CHECK.DRAW` and `CHECK.KEY` are reached by
+`GUI.FORM`, which dispatches a `GUI.CT.CHECK` control to them by name. The call goes between
+`GUI.FORM.BEGIN` and `GUI.FORM.RUN`.
+
+`CHECK.X` and `CHECK.Y` are the cell the `[` goes in, and the caption starts four cells to the
+right. `CHECK.TEXT$ = ""` draws a bare box. A non-zero `CHECK.ON` starts the box ticked.
+`CHECK.CTRL` is the control's number, and 0 when the form is already full.
+
+**The state is a flag on the control**, `GUI.CF.CHECKED` in `GUI.CTRL.FLAGS%()`, and not a variable
+of the module's. Keep `CHECK.CTRL` and test the flag after `GUI.FORM.RUN`. That is why one form
+carries several boxes where it carries only one combo.
+
+| key | does |
+|---|---|
+| `X` | ticks the box |
+| `DEL` | clears it |
+| `SPACE` | flips it |
+| `TAB` `RIGHT` `DOWN` | the next control |
+| `SHIFT+TAB` `LEFT` `UP` | the previous control |
+| `RETURN` | presses the default button |
+| `ESC` `STOP` | cancels the form |
+
+Any other key is offered to the buttons' marked letters.
+
+**It is required by `GUI.INC.BL`**, which names `CHECK.DRAW` and `CHECK.KEY`. It goes in after that
+file, as `COMBO.INC.BL` does. A program that includes the GUI and leaves this one out stops with
+`LABEL NOT FOUND`.
+
+`GPBMODS` (§4.22) runs three boxes and a combo on one form, under DIALOG > CHECK BOX + COMBO.
+
+---
+
+### 4.22 `GPBMODS` — the harness that drives every module
 
 `samples/GPB-MODS-TESTING/GPBMODS.BASL`. A menu bar of nine dropdowns whose rows reach nearly every
-public entry point in this section. It is the one program that holds all twenty modules at once, and
+public entry point in this section. It is the one program that holds all twenty-one modules at once, and
 the worked example of `GP.BANKED`, `GP.BANKEDSTR` and `BANKMGR` in one place.
 
 ```
@@ -2337,7 +2385,7 @@ one.
 
 | | |
 |---|---|
-| DIALOG — **D** | `GUI` `GUI2` |
+| DIALOG — **D** | `GUI` `GUI2` `COMBO` `CHECK` |
 | LISTS — **L** | `MENUBAR` `MENUVERT` |
 | INPUT — **I** | `LINEINPUT` |
 | SCREEN — **S** | `STASH` `STASHFILE` `STASHVRAM` |
@@ -2351,8 +2399,8 @@ one.
 has taken S: a hotkey need not be an item's initial, and `MENUVERT.HOTATTR` tints whichever letter
 it finds.
 
-**Twenty modules are included and seventeen are driven.** `COMBO`, `KB` and `STASHVRAMGC` are
-compiled in and have entry points — `COMBO.ADD`, `KB.CLEARKB`, `SV.COMPACT` — that no panel calls.
+**Twenty-one modules are included and nineteen are driven.** `KB` and `STASHVRAMGC` are compiled
+in and have entry points — `KB.CLEARKB`, `SV.COMPACT` — that no panel calls.
 `BMX` (§4.5) is not included: it wants a bitmap file and a screen mode of its own, and the
 `BMXVIEW` example in `GPC-BASIC/` covers it.
 
@@ -2368,19 +2416,19 @@ directory buffer.
 
 | | |
 |---|---|
-| bank 4, `GPBMODS.004`, 7,682 bytes | `MENUVERT` `MENUBAR` `LINEINPUT` `GUI` `GUI2` |
+| bank 4, `GPBMODS.004`, 7,938 bytes | `MENUVERT` `MENUBAR` `LINEINPUT` `GUI` `GUI2` |
 | bank 5, `GPBMODS.005`, 7,426 bytes | literal text, pool one |
-| bank 6, `GPBMODS.006`, 4,354 bytes | literal text, pool two |
+| bank 6, `GPBMODS.006`, 4,610 bytes | literal text, pool two |
 | bank 7, `GPBMODS.007`, 4,866 bytes | `APPSYS` `BANKMGR` `KB` `SORT` `STASHVRAM` `STASHVRAMGC` `STRCASE` `STRINGS` `STRUSING` |
 | bank 8, `GPBMODS.008`, 1,794 bytes | `FILEIO` `FILEDIR` |
 | bank 9, `GPBMODS.009`, 770 bytes | `THEME` |
-| bank 10, `GPBMODS.010`, 770 bytes | `COMBO` |
+| bank 10, `GPBMODS.010`, 1,538 bytes | `COMBO` `CHECK` |
 | bank 11, `GPBMODS.011`, 3,074 bytes | the two biggest dropdown handlers, this program's own code |
 
 Six of those are `GP.BANKED` code regions (§3.12) and two are `GP.BANKEDSTR` text pools (§3.10). One
 `.nnn` file is written per bank. Each loads to `$A000` in its own bank and carries a two-byte load
-address like any PRG, so a payload is the file size less two. The resident object is 11,087 bytes
-and the overlays are 30,736 between them.
+address like any PRG, so a payload is the file size less two. The resident object is 11,523 bytes
+and the overlays are 32,016 between them.
 
 **Only what holds a `BANK` statement stays in low RAM.** `STASH` and `STASHFILE` execute `BANK`,
 which the compiler refuses inside a region; `STASHVRAM` (§4.18) is the one to reach for from inside
@@ -2390,8 +2438,8 @@ one.
 A region may call another: the call selects the other bank and its `RETURN` puts the caller's back.
 
 **A nearly empty region still costs a whole page count.** Bank 9 holds 502 bytes of `THEME` in a
-768-byte overlay, and bank 10 holds 705 bytes of `COMBO` in another 768. Below about a page and a
-half of p-code, a region gives back less than it looks like.
+768-byte overlay. Below about a page and a half of p-code, a region gives back less than it looks
+like. Bank 10 held 705 bytes of `COMBO` in 768 the same way, until `CHECK` moved in beside it.
 
 #### The text is in a bank
 

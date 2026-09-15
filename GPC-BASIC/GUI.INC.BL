@@ -21,13 +21,15 @@
 ## **      MENUVERT.INC.BL   GUI.MENU
 ## **      LINEINPUT.INC.BL  GUI.INPUT
 ## **      COMBO.INC.BL      the GUI.CT.COMBO form control
-## **  All six, whichever dialog you call: BASLOAD resolves every label in the
+## **      CHECK.INC.BL      the GUI.CT.CHECK form control
+## **  All seven, whichever dialog you call: BASLOAD resolves every label in the
 ## **  file, so leaving one out is LABEL NOT FOUND.
 ## **
-## **  COMBO.INC.BL GOES IN AFTER THIS FILE, and it is the only one of the six
-## **  that does. It reads the GUI.CT and GUI.NAV constants, which BASLOAD
-## **  resolves only once it has already read them; the labels it hands back --
-## **  COMBO.DRAW and COMBO.KEY, named in GUI.FORM.PAINT and GUI.FORM.STEP --
+## **  COMBO.INC.BL AND CHECK.INC.BL GO IN AFTER THIS FILE, and they are the
+## **  only two that do. They read the GUI.CT and GUI.NAV constants, which
+## **  BASLOAD resolves only once it has already read them; the labels they
+## **  hand back -- COMBO.DRAW, COMBO.KEY, CHECK.DRAW and CHECK.KEY, named in
+## **  GUI.FORM.PAINT and GUI.FORM.STEP --
 ## **  are resolved across the whole program and do not care about order.
 ## **
 ## **      THEME.ID = 0 : GOSUB THEME.SELECT
@@ -134,8 +136,10 @@
 #DEFINE GUI.CT.FIELD 2
 #DEFINE GUI.CT.LIST 3
 #DEFINE GUI.CT.COMBO 4
+#DEFINE GUI.CT.CHECK 5
 #DEFINE GUI.CF.DEFAULT 1
 #DEFINE GUI.CF.NOFOCUS 2
+#DEFINE GUI.CF.CHECKED 4
 
 ## The six verdicts a control may return. Every control type translates its
 ## keys into these, which is what keeps the dispatcher one loop.
@@ -836,8 +840,8 @@ GUI.FORM.ADD.BUTTON:
 ## **  routine's RETURN goes back to whoever called PAINT, which is the whole
 ## **  of what is left to do.
 ## **
-## **  A COMBO IS THE ONE EXCEPTION, and it is GOSUB. Its painter is in low
-## **  memory while this file may be running from a bank, and a GOTO out of a
+## **  A COMBO AND A CHECK BOX ARE THE EXCEPTIONS, and they are GOSUB. Their
+## **  painters are in a region of their own, and a GOTO out of a
 ## **  region is not something the compiler promises; a GOSUB and the RETURN
 ## **  that comes back is. The cost is one stack frame for the length of a
 ## **  draw.
@@ -847,6 +851,7 @@ GUI.FORM.PAINT:
     IF GUI.CTRL.TYPE%(GUI.PAINT.N) = GUI.CT.FIELD THEN GOTO GUI.FIELD.DRAW
     IF GUI.CTRL.TYPE%(GUI.PAINT.N) = GUI.CT.LIST THEN GOTO GUI.LIST.DRAW
     IF GUI.CTRL.TYPE%(GUI.PAINT.N) = GUI.CT.COMBO THEN GOSUB COMBO.DRAW : RETURN
+    IF GUI.CTRL.TYPE%(GUI.PAINT.N) = GUI.CT.CHECK THEN GOSUB CHECK.DRAW : RETURN
     GUI.BTN.X = GUI.CTRL.X%(GUI.PAINT.N)
     GUI.BTN.Y = GUI.CTRL.Y%(GUI.PAINT.N)
     GUI.BTN.TEXT$ = GUI.CTRL.TEXT$(GUI.PAINT.N)
@@ -901,6 +906,7 @@ GUI.FORM.STEP:
         GP.CASE GUI.CT.FIELD : GOSUB GUI.FORM.DO.FIELD
         GP.CASE GUI.CT.LIST : GOSUB GUI.FORM.DO.LIST
         GP.CASE GUI.CT.COMBO : GOSUB COMBO.KEY
+        GP.CASE GUI.CT.CHECK : GOSUB CHECK.KEY
         GP.OTHER : GOSUB GUI.FORM.DO.BUTTON
     GP.ENDSEL
     GOSUB GUI.FORM.ACT

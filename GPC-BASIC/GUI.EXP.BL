@@ -29,6 +29,7 @@
 #INCLUDE "GUI.INC.BL"
 #INCLUDE "GUI2.INC.BL"
 #INCLUDE "COMBO.INC.BL"
+#INCLUDE "CHECK.INC.BL"
 
 ## A spare RAM bank for the saved cells. Bank 0 belongs to the KERNAL --
 ## the keyboard layout lives there -- so a program picks anything above it.

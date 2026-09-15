@@ -59,9 +59,10 @@
 .
 .Every control has a focus, and TAB moves it. The dialogs no longer own their
 .key loops: each states its controls and GUI.FORM runs them. A control is a
-.button, a field or a list; it hands back one of six verdicts -- stay, next,
-.previous, press, default, cancel -- and the dispatcher stays one loop
-.whatever the mix. A caller that never presses TAB sees what it always saw.
+.button, a field, a list, a combo (SEC 4.17) or a check box (SEC 4.21); it
+.hands back one of six verdicts -- stay, next, previous, press, default,
+.cancel -- and the dispatcher stays one loop whatever the mix. A caller that
+.never presses TAB sees what it always saw.
 .
 .The default button and the focused control are different things. The default
 .is what RETURN presses from anywhere and is drawn <<LIKE THIS>>; the focus
@@ -102,8 +103,10 @@
 =SEE ALSO
 .
 >21|3. Command reference
+>80|4.17 COMBO.INC.BL -- a drop-down list that folds into one row
+>85|4.21 CHECK.INC.BL -- a check box, [X] or [ ]
 >74|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
->90|STASH.INC.BL -- save a text rectangle, and put it back.
+>91|STASH.INC.BL -- save a text rectangle, and put it back.
 >61|4.1 THEME.INC.BL -- named colour roles
 >67|4.6 MENUVERT.INC.BL -- a vertical menu
 >65|4.4 LINEINPUT.INC.BL -- a positioned entry field

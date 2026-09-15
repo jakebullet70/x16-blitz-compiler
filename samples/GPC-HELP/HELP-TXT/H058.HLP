@@ -1,113 +1,67 @@
-@4.21 GPBMODS -- the harness that drives every module
+@4.21 CHECK.INC.BL -- a check box, [X] or [ ]
 .
-=4.21 GPBMODS -- THE HARNESS THAT DRIVES EVERY MODULE
+=4.21 CHECK.INC.BL -- A CHECK BOX, [X] OR [ ]
 .
 =DESCRIPTION
 .
-.samples/GPB-MODS-TESTING/GPBMODS.BASL. A menu bar of nine dropdowns whose
-.rows reach nearly every public entry point in this section. It is the one
-.program that holds all twenty modules at once, and the worked example of
-.GP.BANKED, GP.BANKEDSTR and BANKMGR in one place.
+.  CHECK.ADD
+.      IN: CHECK.X CHECK.Y CHECK.TEXT$ CHECK.ON
+.      OUT: CHECK.CTRL
 .
-:gpbmods-demo.bat
+:CHECK.X = GUI.INNER.LEFT : CHECK.Y = GUI.INNER.TOP
+:CHECK.TEXT$ = "SHOW HIDDEN FILES" : CHECK.ON = -1
+:GOSUB CHECK.ADD
+:HIDDEN = CHECK.CTRL
+:' ... run the form ...
+:IF (GUI.CTRL.FLAGS%(HIDDEN) AND GUI.CF.CHECKED) <> 0 THEN PRINT "TICKED"
 .
-.The drive is testing/, not the sample folder. The object is compiled SHARED
-.and loads GPB.RT.nnn.BIN from there.
+.Only CHECK.ADD is called by an application. CHECK.DRAW and CHECK.KEY are
+.reached by GUI.FORM, which dispatches a GUI.CT.CHECK control to them by
+.name. The call goes between GUI.FORM.BEGIN and GUI.FORM.RUN.
 .
-.No row is a stub. A chosen row calls the library for real and shows what
-.came back, on the panel and on the LAST line at the foot of the page. Three
-.modules are under test before any row is chosen: MENUBAR draws the bar,
-.MENUVERT every dropdown, and STASH puts the screen back under a closed one.
+.CHECK.X and CHECK.Y are the cell the [ goes in, and the caption starts four
+.cells to the right. CHECK.TEXT$ = "" draws a bare box. A non-zero CHECK.ON
+.starts the box ticked. CHECK.CTRL is the control's number, and 0 when the
+.form is already full.
 .
-.  DIALOG -- D
-.      GUI GUI2
+.The state is a flag on the control, GUI.CF.CHECKED in GUI.CTRL.FLAGS%(), and
+.not a variable of the module's. Keep CHECK.CTRL and test the flag after
+.GUI.FORM.RUN. That is why one form carries several boxes where it carries
+.only one combo.
 .
-.  LISTS -- L
-.      MENUBAR MENUVERT
+.  X
+.      DOES: ticks the box
 .
-.  INPUT -- I
-.      LINEINPUT
+.  DEL
+.      DOES: clears it
 .
-.  SCREEN -- S
-.      STASH STASHFILE STASHVRAM
+.  SPACE
+.      DOES: flips it
 .
-.  STRINGS -- G
-.      STRINGS STRCASE STRUSING
+.  TAB RIGHT DOWN
+.      DOES: the next control
 .
-.  DATA -- A
-.      SORT
+.  SHIFT+TAB LEFT UP
+.      DOES: the previous control
 .
-.  THEME -- T
-.      THEME
+.  RETURN
+.      DOES: presses the default button
 .
-.  ABOUT -- B
-.      BANKMGR
+.  ESC STOP
+.      DOES: cancels the form
 .
-.  FILES -- F
-.      FILEIO FILEDIR
+.Any other key is offered to the buttons' marked letters.
 .
-.APPSYS runs at startup and at exit rather than from a row. STRINGS answers
-.to G because SCREEN has taken S: a hotkey need not be an item's initial, and
-.MENUVERT.HOTATTR tints whichever letter it finds.
+.It is required by GUI.INC.BL, which names CHECK.DRAW and CHECK.KEY. It goes
+.in after that file, as COMBO.INC.BL does. A program that includes the GUI
+.and leaves this one out stops with LABEL NOT FOUND.
 .
-.Twenty modules are included and seventeen are driven. COMBO, KB and
-.STASHVRAMGC are compiled in and have entry points -- COMBO.ADD, KB.CLEARKB,
-.SV.COMPACT -- that no panel calls. BMX (SEC 4.5) is not included: it wants a
-.bitmap file and a screen mode of its own, and the BMXVIEW example in
-.GPC-BASIC/ covers it.
+.GPBMODS (SEC 4.22) runs three boxes and a combo on one form, under DIALOG >
+.CHECK BOX + COMBO.
 .
-.WARNING: FILES writes to the drive. Four of its rows do. Everything they
-.make is named GPBFILE.* or GPBDIR, and the row that makes each one removes
-.it.
+=SEE ALSO
 .
-=Eleven banks
-.
-.Eight are named at compile time and claimed from BANKMGR (SEC 4.13) at
-.startup, because the compiler picks them while the object is written and the
-.manager is told rather than asked. Three more are allocated at run time: the
-.cells a dropdown covers, the cells a dialog covers, and FILEDIR's directory
-.buffer.
-.
-.  bank 4, GPBMODS.004, 7,682 bytes
-.      MENUVERT MENUBAR LINEINPUT GUI GUI2
-.
-.  bank 5, GPBMODS.005, 7,426 bytes
-.      literal text, pool one
-.
-.  bank 6, GPBMODS.006, 4,354 bytes
-.      literal text, pool two
-.
-.  bank 7, GPBMODS.007, 4,866 bytes
-.      APPSYS BANKMGR KB SORT STASHVRAM STASHVRAMGC STRCASE STRINGS STRUSING
-.
-.  bank 8, GPBMODS.008, 1,794 bytes
-.      FILEIO FILEDIR
-.
-.  bank 9, GPBMODS.009, 770 bytes
-.      THEME
-.
-.  bank 10, GPBMODS.010, 770 bytes
-.      COMBO
-.
-.  bank 11, GPBMODS.011, 3,074 bytes
-.      the two biggest dropdown handlers, this program's own code
-.
-.Six of those are GP.BANKED code regions (SEC 3.12) and two are GP.BANKEDSTR
-.text pools (SEC 3.10). One .nnn file is written per bank. Each loads to
-.$A000 in its own bank and carries a two-byte load address like any PRG, so a
-.payload is the file size less two. The resident object is 11,087 bytes and
-.the overlays are 30,736 between them.
-.
-.Only what holds a BANK statement stays in low RAM. STASH and STASHFILE
-.execute BANK, which the compiler refuses inside a region; STASHVRAM (SEC
-.4.18) is the one to reach for from inside one.
-.
-.Six regions and not one, because a region holds at most 8,192 bytes and the
-.GUI fills its own. A region may call another: the call selects the other
-.bank and its RETURN puts the caller's back.
-.
-.A nearly empty region still costs a whole page count. Bank 9 holds 502 bytes
-.of THEME in a 768-byte overlay, and bank 10 holds 705 bytes of COMBO in
-.another 768. Below about a page and a half of p-code, a region gives back
-.less than it looks like.
-.
+>86|4.22 GPBMODS -- the harness that drives every module
+>85|4.21 CHECK.INC.BL -- a check box, [X] or [ ]
+>74|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
+>80|4.17 COMBO.INC.BL -- a drop-down list that folds into one row

@@ -33,3 +33,14 @@ into m. Snapshot `HELP-TXT` first, because the renames overwrite each other. Als
 `GPC-HELP-TESTING.md` was stale rather than hand-edited: it had not been regenerated after commit
 867976c. Take it whole from a render with `--mods samples/GPB-MODS-TESTING/GPC-BASIC`, then put back
 the header's command line and the CRs.
+
+**The index can refuse a patch, and then it is carried row by row** (2026-09-15, the `CHECK.INC.BL`
+entry at H058). The committed `GPB.HELP.IDX` held a row the masters no longer make (`S` "Staying
+inside it" under topic 78). It also lacked a row they do make, from another session's uncommitted
+§7 work in `GP-BASIC.md`, so the renumbering hunk failed. Instead, match each committed row to an
+old-render row by type, topic and title with the section number stripped. Write the new render's
+topic number, offset and count, each plus that row's committed-minus-old difference. A committed
+row with no match keeps its numbers and only moves its topic number. Rows for a new topic are
+inserted, and `N|` gains one per new topic. In the same session a commit had to leave that other
+session's `GP-BASIC.md` hunks unstaged: `diff -u` the pre-edit snapshot against the file, and
+`git apply --cached` the result.

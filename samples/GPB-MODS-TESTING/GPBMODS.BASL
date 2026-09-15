@@ -90,9 +90,11 @@ GP.ENDBANKED
 ## ---- and works because RETURN puts the caller's bank back.
 ## ----
 ## ---- IT COMES AFTER THE GUI REGION because it reads GUI.CT.COMBO and the
-## ---- control-table offsets, all #DEFINEs in GUI.INC.BL.
+## ---- control-table offsets, all #DEFINEs in GUI.INC.BL. The check box shares
+## ---- the region for the same reasons.
 GP.BANKED GM.COMBOCODE
 #INCLUDE "COMBO.INC.BL"
+#INCLUDE "CHECK.INC.BL"
 GP.ENDBANKED
 
 ## ---- File utils in a bank! Copy these two.
@@ -561,6 +563,7 @@ GP.BANKEDSTR GM.TEXTBANK BS.DD.DIALOG
   " BOX STYLES 0-3"
   " GUI.SHADOW"
   " TAB AND THE FOCUS"
+  " CHECK BOX + COMBO"
 GP.ENDBANKEDSTR
 
 GP.BANKEDSTR GM.TEXTBANK BS.DD.LISTS
@@ -791,7 +794,8 @@ GMX.DIALOG:
   GP.CASE 8 : GOSUB GMX.D.PANEL
   GP.CASE 9 : GOSUB GMX.D.STYLES
   GP.CASE 10 : GOSUB GMX.D.SHADOW
-  GP.OTHER  : GOSUB GMX.D.FOCUS
+  GP.CASE 11 : GOSUB GMX.D.FOCUS
+  GP.OTHER  : GOSUB GMX.D.FORM
   GP.ENDSEL
   GOSUB GMX.CHROME
   RETURN
@@ -1198,6 +1202,84 @@ GMX.D.FOCUS:
   GOSUB GUI.INPUT
   GM.NUM% = GUI.OK : GOSUB GMX.SIGNED
   GM.RESULT$ = GM.FOCUS$ + GP.BSTR(BS.D.FOCUS, 12) + GM.NUM$ + GP.BSTR(BS.D.FOCUS, 13) + GUI.TEXT$ + GP.BSTR(BS.D.FOCUS, 14)
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.D.FORM -- three check boxes and a combo on one GUI.FORM.
+## **
+## **  The controls are added in order, so the boxes are controls 1 to 3 and
+## **  their states are read back from those three flags.
+## ***********************************************************************
+
+
+GP.BANKEDSTR GM.TEXTBANKB BS.D.FORM
+  " CHECK BOX + COMBO "
+  "SPACE FLIPS A BOX, X TICKS IT, DEL CLEARS IT."
+  "RETURN ON THE STATE OPENS ITS LIST."
+  "SHOW HIDDEN FILES"
+  "SORT BY NAME"
+  "CONFIRM EVERY DELETE"
+  "STATE"
+  " TEXAS"
+  " OHIO"
+  " MAINE"
+  " IDAHO"
+  "FORM OK "
+  "  BOXES "
+  "  STATE "
+GP.ENDBANKEDSTR
+GMX.D.FORM:
+  GOSUB GMX.D.RESET
+  MENUVERT.ITEM$(1) = GP.BSTR(BS.D.FORM, 7)
+  MENUVERT.ITEM$(2) = GP.BSTR(BS.D.FORM, 8)
+  MENUVERT.ITEM$(3) = GP.BSTR(BS.D.FORM, 9)
+  MENUVERT.ITEM$(4) = GP.BSTR(BS.D.FORM, 10)
+  GUI.TITLE$ = GP.BSTR(BS.D.FORM, 0)
+  GUI.MSG$ = GP.BSTR(BS.D.FORM, 1)
+  GUI.MSG2$ = GP.BSTR(BS.D.FORM, 2)
+  GUI.BTN.ONE$ = "&OK" : GUI.BTN.TWO$ = "&CANCEL"
+  GOSUB GUI.BUTTON.SIZE
+  GUI.BODY.ROWS = 6 : GUI.BODY.WIDTH = 28
+  IF GUI.BTN.TOTAL > GUI.BODY.WIDTH THEN GUI.BODY.WIDTH = GUI.BTN.TOTAL
+  GOSUB GUI.OPEN
+  GOSUB GUI.FORM.BEGIN
+
+  CHECK.X = GUI.INNER.LEFT
+  CHECK.Y = GUI.INNER.TOP
+  CHECK.TEXT$ = GP.BSTR(BS.D.FORM, 3)
+  CHECK.ON = -1
+  GOSUB CHECK.ADD
+  CHECK.Y = CHECK.Y + 1
+  CHECK.TEXT$ = GP.BSTR(BS.D.FORM, 4)
+  CHECK.ON = 0
+  GOSUB CHECK.ADD
+  CHECK.Y = CHECK.Y + 1
+  CHECK.TEXT$ = GP.BSTR(BS.D.FORM, 5)
+  CHECK.ON = -1
+  GOSUB CHECK.ADD
+
+  GP.PRINTAT GUI.INNER.LEFT, GUI.INNER.TOP + 3, GP.BSTR(BS.D.FORM, 6), GUI.PANEL
+  COMBO.X = GUI.INNER.LEFT + 6 : COMBO.Y = GUI.INNER.TOP + 3
+  COMBO.W = 12  : COMBO.COUNT = 4 : COMBO.SEL = 1 : COMBO.BANK = 0
+  GOSUB COMBO.ADD
+
+  GUI.BTN.Y = GUI.INNER.TOP + 5
+  GOSUB GUI.BUTTON.ROW
+  GUI.FOCUS = 1
+  GOSUB GUI.FORM.RUN
+
+  GM.NUM% = 0
+  IF (GUI.CTRL.FLAGS%(GUI.FORM.HIT) AND GUI.CF.DEFAULT) <> 0 THEN GM.NUM% = -1
+  GOSUB GMX.SIGNED
+  GM.RESULT$ = GP.BSTR(BS.D.FORM, 11) + GM.NUM$ + GP.BSTR(BS.D.FORM, 12)
+  FOR GM.I = 1 TO 3
+    GM.TICK$ = "-"
+    IF (GUI.CTRL.FLAGS%(GM.I) AND GUI.CF.CHECKED) <> 0 THEN GM.TICK$ = "X"
+    GM.RESULT$ = GM.RESULT$ + GM.TICK$
+  NEXT GM.I
+  GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.D.FORM, 13) + MID$(STR$(COMBO.SEL), 2)
+  GOSUB GUI.CLOSE
   RETURN
 
 
@@ -2527,7 +2609,7 @@ GMX.B.MEMORY:
 ## **  modules apiece -- four headings over four near-empty lists. Those four
 ## **  share the last column instead, each row prefixed with its bank.
 ## **
-## **  THREE ENTRIES IN THE LEFT COLUMN AGAINST NINETEEN ACROSS THE OTHER
+## **  THREE ENTRIES IN THE LEFT COLUMN AGAINST TWENTY ACROSS THE OTHER
 ## **  THREE. What is left down there is what could not go: STASH and STASHFILE
 ## **  hold BANK statements, which the compiler refuses inside a region.
 ## **  GPBMODS ITSELF IS IN TWO COLUMNS AT ONCE -- the shell in low RAM, and its
@@ -2571,6 +2653,7 @@ GP.BANKEDSTR GM.TEXTBANKB BS.B.SIZES
   "008 FILEDIR"
   "009 THEME"
   "010 COMBO"
+  "010 CHECK"
   "011 GPBMODS"
 GP.ENDBANKEDSTR
 
@@ -2601,9 +2684,10 @@ GP.BANKEDSTR GM.TEXTBANKB BS.B.NUMS
   "1090"
   "422"
   "502"
-  "705"
+  "701"
+  "597"
   "2904"
-  "27624"
+  "28217"
 GP.ENDBANKEDSTR
 GMX.B.SIZES:
   GM.GRP% = 18
@@ -2621,7 +2705,7 @@ GMX.B.SIZES:
   GM.SX% = 4  : GM.SHEAD% = 0 : GM.SN% = 3 : GM.SATTR% = THEME.CLR(THEME.TEXT)  : GOSUB GMX.B.COL
   GM.SX% = 23 : GM.SHEAD% = 1 : GM.SN% = 9 : GM.SATTR% = THEME.CLR(THEME.TITLE) : GOSUB GMX.B.COL
   GM.SX% = 42 : GM.SHEAD% = 2 : GM.SN% = 5 : GM.SATTR% = THEME.CLR(THEME.TITLE) : GOSUB GMX.B.COL
-  GM.SX% = 61 : GM.SHEAD% = 3 : GM.SN% = 5 : GM.SATTR% = THEME.CLR(THEME.TITLE) : GOSUB GMX.B.COL
+  GM.SX% = 61 : GM.SHEAD% = 3 : GM.SN% = 6 : GM.SATTR% = THEME.CLR(THEME.TITLE) : GOSUB GMX.B.COL
 
   GM.SNAME% = 4 : GM.SX% = 4 : GM.SROW% = 23 : GM.SATTR% = THEME.CLR(THEME.WARN)
   GOSUB GMX.B.ROW

@@ -1,82 +1,93 @@
-@7. Memory, and what the compiler tells you
+@8. Known bugs
 .
-=7. MEMORY, AND WHAT THE COMPILER TELLS YOU
+=8. KNOWN BUGS
 .
-=What GPC prints when it finishes
+.Three, all live on 12th September 2026 and all reproducible. Each says what
+.happens, what causes it, and what to do instead. A bug leaves this list when
+.it is fixed, not when it is understood.
 .
-.One item a line. GPBMODS, built shared:
+=A string never gives memory back
 .
-:OK LOW CODE 11520, SHARED GPBASIC
-:LOW FREE 12288, FRAME STACK 2048
-:LINES 3795
-:BANK   7 CODE  4864 USED  3328 FREE
-:BANK   9 CODE   768 USED  7424 FREE
-:BANK   4 CODE  7680 USED   512 FREE
-:BANK  10 CODE   768 USED  7424 FREE
-:BANK   8 CODE  1792 USED  6400 FREE
-:BANK  11 CODE  3072 USED  5120 FREE
-:BANK   5 TEXT  7424 USED   768 FREE
-:BANK   6 TEXT  4352 USED  3840 FREE
-:TOTAL BANKS 8, 30720 USED
+.A$ = "" frees nothing. A string variable owns its block: the assignment sets
+.the length to zero and keeps the capacity. The heap scavenger reclaims only
+.a block a string outgrew and abandoned, never one a variable still holds. A
+.working buffer that has once held a 250-character line is spoken for until
+.the program ends.
 .
-.An embedded build prints a RUNTIME line second. GPCTEST-E:
+.So a big temporary cannot be built and then freed. It has to not be built.
 .
-:OK LOW CODE 969, EMBEDDED GPBASIC
-:RUNTIME 11519
-:LOW FREE 24064, FRAME STACK 2048
+.Measured 2026-09-02. The editor's find folded the needle and every line it
+.scanned into new strings and compared with MID$ per position: 579 bytes gone
+.for the rest of the run, from a workspace with 1,489 free, and the GUI
+.dialogs then died on what was left. Rewritten to fold in place through
+.GP.STRPTR with one GP.INSTR per line, a find costs 81 bytes, and the program
+.came out 59 bytes smaller.
 .
-.  LOW CODE
-.      the p-code in low memory, in bytes. P-code and GP.ASM blocks in a
-.        GP.BANKED region are not in it
+.Do this -- PRINT FRE(0) at eight points down the run and read the descent.
+.It is a high-water ceiling, so it only falls, and the step that falls is the
+.culprit.
 .
-.  SHARED EMBEDDED
-.      SHARED loads a resident runtime file at run time. EMBEDDED carries the
-.        runtime in the object
+=BINPUT# stops at 255 bytes
 .
-.  GPBASIC CORE
-.      GPBASIC when a GP. keyword reached the 1,024-byte handler block:
-.        shared, the program loads GPB.RT.nnn.BIN; embedded, the block is in
-.        the object. CORE when none did: shared, it loads GPC.RT.nnn.BIN;
-.        embedded, ScanGPUsage dropped the block
+.BINPUT# n, A$, len cannot read more than 255 bytes. Three independent caps
+.land on that one number, so there is no single constant to raise.
 .
-.  RUNTIME
-.      embedded only. The runtime bytes carried in the object
+.  the read buffer is 255 bytes
+.      WHERE: ReadBuffer: .fill 255
 .
-.  LOW FREE
-.      what is left in low memory for variables, strings and arrays. This is
-.        the number that runs out. It ends at $9F00 embedded, and at the
-.        resident runtime shared
+.  the count argument is 8 bit, and unchecked
+.      WHERE: GetInteger8Bit takes mantissa byte 0 and returns
 .
-.  FRAME STACK
-.      the 2,048 bytes reserved between the p-code and the workspace for
-.        GOSUB and FOR frames. LOW FREE does not include them
+.  a BASIC string is 255 characters
+.      WHERE: nowhere to put a longer record in any case
 .
-.  LINES
-.      the source lines compiled, the lines of GP.ASM and GP.BANKEDSTR blocks
-.        included. Lines left out as dead code are not counted
+.The second is the trap. BINPUT# 12, A$, 256 sets the count to 0 and hands
+.back an empty string, silently. 300 gives 44 bytes.
 .
-.  DEAD CODE
-.      printed only when dead code is removed: the source lines left out, and
-.        the p-code bytes they would have taken. LOW CODE is already without
-.        them
+.It is also not a block read. It is a CHRIN loop, one KERNAL call per byte
+.with an EOF check on top of that. BINPUT# is one statement, not one
+.transfer, so anything costing a BINPUT# per record pays that stride per
+.record.
 .
-.  BANK
-.      printed only when the program has a region or banked text. One line a
-.        bank: CODE for a GP.BANKED region, TEXT for GP.BANKEDSTR, then the
-.        bytes used and free of its 8,192. Both are whole pages, so FREE is
-.        room that is certainly there
+.LINPUT# shares the same buffer and stops at 255 too, but runs on to the
+.delimiter afterwards, so the next read starts at a line boundary.
 .
-.  TOTAL BANKS
-.      after the BANK lines: how many, and the bytes they use
+.Do this -- a record cannot be one string. Make it N strings of 255, or keep
+.it in a bank and copy out the part that is needed.
 .
-.Two budgets come off LOW FREE:
+=File I/O in a GP.DO key loop
 .
-.  - LOW FREE is the workspace the running program has for its data.
-.  - LOW FREE minus 4,096 is how much more low-memory p-code will fit.
-.    WriteObjectCode refuses to leave less than 4K of workspace, so a build
-.    reporting LOW FREE 4096 is one page from PROGRAM TOO BIG.
+.A save routine reached from inside a program's own GP.DO key loop writes its
+.file completely and correctly, and then the program stops with
 .
-.A program can be comfortable on one and out of room on the other. LOW FREE
-.4096 is 4K to run in and nowhere left to grow; GPBMODS at LOW FREE 12288 has
-.both.
+:INPUT/OUTPUT ERROR @ $005B
 .
+.The address is identical in every failing build, which says a clobbered
+.instruction pointer rather than a real device error.
+.
+.Seven shapes have been compiled and probed. Do not bisect them again.
+.
+.  OPEN/PRINT#/CLOSE at top level
+.      RESULT: passes
+.
+.  four consecutive PRINT#, no PRINT between
+.      RESULT: passes
+.
+.  the same inside GP.DO ... GP.EXITDO
+.      RESULT: passes
+.
+.  the same behind a GOSUB inside a GP.DO
+.      RESULT: passes
+.
+.  the same behind GP.SELECT then GOSUB inside a GP.DO
+.      RESULT: passes
+.
+.  the real routine called from the top level of the same program
+.      RESULT: passes
+.
+.  the real routine reached from the program's own GP.DO key loop
+.      RESULT: fails
+.
+.Do this -- a plain PRINT immediately after the CLOSE makes it pass. Channel
+.0 output runs CLRCHN; a non-zero channel runs CHKOUT and READST instead, so
+.the suspect is channel state left behind rather than the file I/O.

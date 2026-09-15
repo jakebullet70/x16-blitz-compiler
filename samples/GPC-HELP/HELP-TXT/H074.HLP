@@ -1,47 +1,25 @@
-@6. The traps, collected
+@6. Two more naming rules that are not about collisions
 .
-=6. THE TRAPS, COLLECTED
+=6. TWO MORE NAMING RULES THAT ARE NOT ABOUT COLLISIONS
 .
-.Each of these has cost a debugging session at least once.
+.#DEFINE takes an INT16 (BASLOAD.MD:313). A constant above 65535 is ERROR:
+.INVALID PARAMETER, not a warning -- which is why BMX.PALBASE (VRAM $1FA00,
+.129536) is an ordinary variable and not a #DEFINE. Every VRAM address past
+.$FFFF has the same problem.
 .
-.  P AND 255 on a heap or VRAM address
-.      WHAT HAPPENS: AND is 16-bit signed; above 32,767 it raises OUT OF
-.        RANGE instead of masking
-.      DO THIS: H = INT(P/256) : L = P - H*256
+.A dotted name whose tail is a reserved word is fine. MENUVERT.COUNT,
+.THEME.CLR, LINEINPUT.LEN and LINEINPUT.RETURN all contain keywords and all
+.work, because BASLOAD matches the whole identifier. An undotted one does
+.not: POS, MB, ST, LEN and CHAR cannot be variables at all. This is the main
+.reason the library is dotted throughout.
 .
-.  an address in an A% variable
-.      WHAT HAPPENS: % is signed 16-bit and truncates without error -- A% =
-.        49152 reads back -16,384
-.      DO THIS: untyped variable, or split into page and offset
+.RETURNS joined that list on 08/09/26 -- it is GP.DEFPROC's result clause and
+.has a token of its own, so a bare RETURNS is no longer a name. RETURN is
+.untouched, and so is anything dotted.
 .
-.  $0400 for machine code
-.      WHAT HAPPENS: stock BASIC leaves it free, a compiled GPC program does
-.        not -- runtime state lives there, and it is corrupted with no error
-.      DO THIS: banked RAM, $A000-$BFFF
-.
-.  PRINT after GP.PRINTAT
-.      WHAT HAPPENS: GP drawing never calls the KERNAL, so the cursor is
-.        wherever it was
-.      DO THIS: LOCATE first, or stay in one world
-.
-.  SORT.INC.BL with no #SYMFILE
-.      WHAT HAPPENS: {VAR} cannot resolve a crunched name -- {} NEEDS
-.        #SYMFILE
-.      DO THIS: #SYMFILE "@:PROG.SYM", before the #INCLUDEs
-.
-.  GP.BOX X,Y,W,H,,7
-.      WHAT HAPPENS: optionals cannot be skipped over
-.      DO THIS: GP.BOX X,Y,W,H,0,7
-.
-.  SCREEN after BMX.PAINT
-.      WHAT HAPPENS: reloads the default palette and throws the image's
-.        colours away
-.      DO THIS: set the mode first
-.
-.  #DEFINE X 129536
-.      WHAT HAPPENS: #DEFINE takes an INT16 -- ERROR: INVALID PARAMETER
-.      DO THIS: an ordinary variable
-.
-=SEE ALSO
-.
->70|4.7 SORT.INC.BL -- shell sort a string array
+.One rule applies only outside BASL: BASLOAD gives 64 significant characters,
+.the built-in BASIC gives two. Write the same code as a hand-typed .bas for
+.the PC-side converter and THEME.CLR and THEME.COUNT become the same
+.variable. That is a silent wrong answer -- it cost two test cycles during
+.tier 6, both times looking exactly like a compiler bug. Inside BASL you are
+.safe; in a raw .bas, give every variable a distinct first two characters.
