@@ -1,41 +1,121 @@
-@4.6 MENUVERT.INC.BL -- a vertical menu (2)
-.The caller owns the DIM. A module cannot be passed an array in BASIC, so it
-.names one; DIMming it inside the module would fix a bound and then fail for
-.a caller who wanted more rows. Leave MENUVERT.ITEM$ undimensioned and GPC's
-.implicit DIM gives 0..10, a ten-row menu. DIM it yourself for more. Do not
-.do both.
+@4.6 MENUVERT.INC.BL -- a vertical menu
 .
-=The gamepad flag
+=4.6 MENUVERT.INC.BL -- A VERTICAL MENU
 .
-.With flag 8, up and down move the highlight and B or Start chooses. Cancel
-.remains keyboard-only: ESC and STOP have no unambiguous pad equivalent, and
-.a must-select menu has no cancel.
+=DESCRIPTION
 .
-.It reads port 1, the physical pad, not port 0. Port 0 is the keyboard
-.presented as a joystick, and the menu reads the keyboard directly, so
-.reading both would move the highlight twice for one cursor key. Port 0 is
-.also unreliable, reporting absent on roughly half of all reads (measured in
-.AlienAirlift: 2,060 negative against 2,057 valid over 14 seconds).
+.  MENUVERT.RUN
+.      IN: the variables below
+.      OUT: MENUVERT.SEL MENUVERT.KEY
 .
-.One step per press, no auto-repeat. The wait loop spins as fast as the CPU
-.allows, so the pad is edge-triggered and holding a direction moves once. A
-.button still held from whatever opened the menu is not read as a fresh press
-.either, so a menu cannot answer itself on the way in.
+.  MENUVERT.DRAW
+.      IN: the same
+.      OUT: draws the menu without driving it
 .
-.With no pad connected the flag changes nothing: the pad is read only when
-.the keyboard is quiet, and an absent pad reads as nothing held. In the
-.emulator a real pad needs -joy1, which binds physical hardware and does not
-.map the keyboard.
+.  MENUVERT.ROW
+.      IN: MENUVERT.DRAWROW MENUVERT.DRAWATTR
+.      OUT: one row, in the attribute you name
 .
-.Examples: MENUDEMO.EXP.BL on its own, MENU.EXP.BL inside a whole small
-.application, and MENUTST.EXP.BL for the 21-case regression test.
+.  MENUVERT.HOTFIND
+.      IN: MENUVERT.DRAWROW MENUVERT.DRAWTEXT$
+.      OUT: MENUVERT.HOTAT -- where that row's hotkey letter sits, 1-based,
+.        or 0 for "do not tint"
 .
-=EXAMPLE PROGRAM
+.  MENUVERT.X .Y
+.      top left of the first row, not of a frame -- draw the border yourself
+.        with GP.BOX, so the menu owes nothing to one style of border
 .
-.  MENUDEMO.EXP.BL -- runnable, in the GPC-BASIC folder
-.  MENU.EXP.BL -- runnable, in the GPC-BASIC folder
-.  MENUTST.EXP.BL -- runnable, in the GPC-BASIC folder
+.  MENUVERT.WIDTH
+.      cells wide. This is the width of the highlight, so it is the width of
+.        the menu whatever the text happens to do
 .
-=SEE ALSO
+.  MENUVERT.COUNT
+.      how many rows
 .
->67|4.6 MENUVERT.INC.BL -- a vertical menu
+.  MENUVERT.ITEM$()
+.      the rows, 1..COUNT -- the caller owns the DIM, see below
+.
+.  MENUVERT.ATTR
+.      packed attribute, background * 16 + foreground
+.
+.  MENUVERT.HIATTR
+.      the same for the highlighted row. 0 means invert MENUVERT.ATTR
+.
+.  MENUVERT.HOT$
+.      one character a row, "" for none
+.
+.  MENUVERT.HOTATTR
+.      paint the hotkey letter in this attribute. 0 is off, and off is the
+.        default
+.
+.  MENUVERT.SEPATTR
+.      the separator line's attribute. 0 draws it in MENUVERT.ATTR, and 0 is
+.        the default
+.
+.  MENUVERT.SEPCHR
+.      the separator's glyph. 0 is MENUVERT.LINE, the PETSCII stroke, and is
+.        the default. On a charset where a byte is its own tile index -- ISO,
+.        CP437 -- name the code point the program's own frames use
+.
+.  MENUVERT.DIS$
+.      one character a row; a "1" disables that row. "" is the default and a
+.        short string leaves the rest live. Read once and cleared by both
+.        MENUVERT.RUN and MENUVERT.DRAW
+.
+.  MENUVERT.DISATTR
+.      the disabled rows' attribute. 0 draws them in MENUVERT.ATTR, and 0 is
+.        the default
+.
+.  MENUVERT.HINT$()
+.      one help line a row, 1..COUNT. The caller owns this DIM, and only when
+.        it uses hints
+.
+.  MENUVERT.HINTW
+.      the hint field's width in cells. 0 is off, and off is the default;
+.        with it off MENUVERT.HINT$ is never read
+.
+.  MENUVERT.HINTX .HINTY
+.      where the hint field starts
+.
+.  MENUVERT.HINTATTR
+.      the hint field's attribute, for the clear as well as the text
+.
+.  MENUVERT.FLAGS
+.      added together, below
+.
+.  MENUVERT.SEL
+.      the row to start on; 0 starts at 1
+.
+.  MENUVERT.SCROLL
+.      items hidden above row 1, so screen row R draws ITEM$(SCROLL + R). 0
+.        is none and is the default. MENUVERT.RUN does not change it
+.
+.  MENUVERT.SEL
+.      1..COUNT, or 0 if cancelled. Under KEYEXIT it is left alone --
+.        whatever row was highlighted when the key arrived
+.
+.  MENUVERT.KEY
+.      the key that ended it -- 13 chose, 27 cancelled, the hotkey itself, or
+.        the key KEYEXIT hands back
+.
+:MENUVERT.X = 8 : MENUVERT.Y = 6
+:MENUVERT.WIDTH = 24 : MENUVERT.COUNT = 4
+:MENUVERT.ITEM$(1) = " NEW GAME" : REM ... and so on
+:MENUVERT.ATTR = THEME.CLR(THEME.TEXT)
+:MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
+:MENUVERT.HOT$ = "NLOQ"
+:GOSUB MENUVERT.RUN
+:IF MENUVERT.SEL = 0 THEN GOTO CANCELLED
+.
+.  cursor up / down
+.      move
+.
+.  RETURN
+.      choose
+.
+.  ESC or STOP
+.      cancel
+.
+.  a hotkey
+.      chooses its row at once
+.

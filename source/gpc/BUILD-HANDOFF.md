@@ -108,10 +108,10 @@ about 12 K, and needs nothing on the drive.
 - BMXVIEW is EMBEDDED because `bmx-demo.bat` mounts `demo\`, which has never carried a
   runtime.
 - EDITOR is EMBEDDED per step 2 of `samples/editor/readme.md`.
-- **Overlays** (`.nnn`, one per `GP.BANKED` region or `GP.BANKEDSTR` bank, `nnn` the bank in
-  three decimal digits, `.002` to `.255`) are LOADed from **beside the program**, not from the
-  drive root. `?OVL` is the failure message, and `?RAM` means the program names a bank the
-  machine does not have. They must travel with the object.
+- **The overlay** (`NAME.OVL`, one file holding every `GP.BANKED` region and `GP.BANKEDSTR`
+  bank, each behind its own bank and page-count bytes) is read from **beside the program**, not
+  from the drive root. `?OVL` is the failure message, for a missing or a truncated file, and
+  `?RAM` means the file names a bank the machine does not have. It must travel with the object.
 
 **XBASE is deliberately absent.** It builds (`xbasebuild.py`) but no database ships with
 it, so it is not in a release.
@@ -231,7 +231,7 @@ stage fails, and keep the wrapper's own log (section 5).
 4. `?OVL` at run time means an overlay was not found beside the program. `?RAM` means the
    program names a bank the machine does not have.
 5. The emulator transcript is long. Keep the last ~20 lines and the numbers — object size,
-   the `.nnn` sizes, the PASS count. Do not echo the whole log.
+   the `.OVL` size, the PASS count. Do not echo the whole log.
 
 ---
 

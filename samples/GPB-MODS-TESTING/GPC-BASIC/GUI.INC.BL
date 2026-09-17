@@ -459,7 +459,7 @@ GUI.BTN.COLOURS:
 ## **        GUI.CTRL.TYPE%(n)   GUI.CT.BUTTON, .FIELD or .LIST
 ## **        GUI.CTRL.X%(n)      where it was drawn, and GUI.CTRL.Y%(n)
 ## **        GUI.CTRL.W%(n)      how wide
-## **        GUI.CTRL.TEXT$(n)   a button's label, its "&" included
+## **        GUI.CTRL.TEXT$(n)   a button's label, its "&" included; a field's text
 ## **        GUI.CTRL.KEY%(n)    the marked letter's code, 0 if it marked none
 ## **        GUI.CTRL.FLAGS%(n)  GUI.CF.DEFAULT, GUI.CF.NOFOCUS
 ## **        GUI.FOCUS           which control starts with it
@@ -519,6 +519,13 @@ GUI.FORM.BEGIN:
 ## **
 ## **   in   LINEINPUT.X LINEINPUT.Y LINEINPUT.LEN and the rest of the field's
 ## **        inputs, set as they would be for a bare GOSUB LINEINPUT.GET
+## **        LINEINPUT.TEXT$   the field's starting text
+## **   out  GUI.CTRL.N        the field's control number
+## **
+## **  THE TEXT BELONGS TO THE CONTROL, in GUI.CTRL.TEXT$(n). LINEINPUT has one
+## **  buffer, so a field copies its text in when it gets the focus and back out
+## **  when it leaves. Read GUI.CTRL.TEXT$(n) after GUI.FORM.RUN, which is what
+## **  lets a form carry more than one field.
 ## **
 ## **  The field is painted STATIC here, because GUI.FORM.RUN paints only the
 ## **  control that has the focus and a field that never gets it would
@@ -531,7 +538,7 @@ GUI.FORM.ADD.FIELD:
     GUI.CTRL.TYPE%(GUI.CTRL.N) = GUI.CT.FIELD
     GUI.CTRL.X%(GUI.CTRL.N) = LINEINPUT.X : GUI.CTRL.Y%(GUI.CTRL.N) = LINEINPUT.Y
     GUI.CTRL.W%(GUI.CTRL.N) = LINEINPUT.LEN
-    GUI.CTRL.TEXT$(GUI.CTRL.N) = ""
+    GUI.CTRL.TEXT$(GUI.CTRL.N) = LINEINPUT.TEXT$
     GUI.CTRL.KEY%(GUI.CTRL.N) = 0 : GUI.CTRL.FLAGS%(GUI.CTRL.N) = 0
     GUI.PAINT.N = GUI.CTRL.N
     GOSUB GUI.FIELD.DRAW
@@ -554,6 +561,7 @@ GUI.FORM.ADD.FIELD:
 
 GUI.FIELD.DRAW:
     LINEINPUT.X = GUI.CTRL.X%(GUI.PAINT.N) : LINEINPUT.Y = GUI.CTRL.Y%(GUI.PAINT.N) : LINEINPUT.LEN = GUI.CTRL.W%(GUI.PAINT.N)
+    LINEINPUT.TEXT$ = GUI.CTRL.TEXT$(GUI.PAINT.N)
     GOSUB LINEINPUT.RENDER : GP.FILL LINEINPUT.X, LINEINPUT.Y, LINEINPUT.LEN, 1, GUI.SPACE, LINEINPUT.ATTR
     IF LINEINPUT.SHOW$ <> "" THEN GP.PRINTAT LINEINPUT.X, LINEINPUT.Y, LINEINPUT.SHOW$, LINEINPUT.ATTR
     RETURN
@@ -610,11 +618,17 @@ GUI.FORM.ADD.LIST:
 
 ## ---- MENUVERT is aimed once. Nothing else moves it while a dialog is open,
 ## ---- so the paint routines below set only the row and the attribute.
+## ----
+## ---- The disable mask is taken here for the same reason MENUVERT.RUN takes it:
+## ---- it is one-shot, and a list that does not take it draws under whatever the
+## ---- last menu left behind -- grey text, and the highlight showing past it.
 
     MENUVERT.X = GUI.LIST.X : MENUVERT.Y = GUI.LIST.Y
     MENUVERT.WIDTH = GUI.LIST.W : MENUVERT.COUNT = GUI.LIST.ROWS
     MENUVERT.ATTR = GUI.PANEL : MENUVERT.SEPATTR = GUI.BORDER
     MENUVERT.HOTATTR = 0 : MENUVERT.HOT$ = "" : MENUVERT.SCROLL = 0
+    MENUVERT.DISLIST$ = MENUVERT.DIS$
+    MENUVERT.DIS$ = ""
 
     IF GUI.LIST.SEL < 1 THEN GUI.LIST.SEL = 1
     IF GUI.LIST.SEL > GUI.LIST.COUNT THEN GUI.LIST.SEL = GUI.LIST.COUNT
@@ -876,7 +890,9 @@ GUI.FORM.STEP:
 ## ***********************************************************************
 
 GUI.FORM.DO.FIELD:
+    LINEINPUT.TEXT$ = GUI.CTRL.TEXT$(GUI.FOCUS)
     GOSUB LINEINPUT.GET
+    GUI.CTRL.TEXT$(GUI.FOCUS) = LINEINPUT.TEXT$
     GUI.FORM.KEY = LINEINPUT.KEY
     GUI.FORM.NAV = GUI.NAV.STAY
     GP.SELECT GUI.FORM.KEY

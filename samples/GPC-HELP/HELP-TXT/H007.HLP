@@ -40,21 +40,21 @@
 .      a horizontal menu bar
 .
 .  GUI.INC.BL
-.      four dialogs -- ask, say, type, choose -- in a box that saves 
-.        and restores the screen
+.      four dialogs -- ask, say, type, choose -- in a box that puts the
+.        screen back
 .
 .  GUI2.INC.BL
 .      a listbox, single or multi select
 .
 .  STRINGS.INC.BL
-.      string helpers: BASIC where BASIC is enough, assembly where it is
+.      the string helpers: BASIC where BASIC is enough, assembly where it is
 .        not
 .
 .  STRCASE.INC.BL
 .      case, rewriting a string in place, in assembly
 .
 .  STRUSING.INC.BL
-.      formating numbers: PRINT USING's mask, in BASIC
+.      a number to a template: PRINT USING's mask, in BASIC
 .
 .  SORT.INC.BL
 .      shell sort a string array in place, in assembly
@@ -70,15 +70,15 @@
 .
 =SEE ALSO
 .
->61|4.1 THEME.INC.BL -- named colour roles
->64|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
->91|STASH.INC.BL -- save a text rectangle, and put it back.
->99|STASHFILE.INC.BL -- a saved text rectangle, through a file.
->81|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
->82|4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store
->65|4.4 LINEINPUT.INC.BL -- a positioned entry field
->67|4.6 MENUVERT.INC.BL -- a vertical menu
->72|4.9 MENUBAR.INC.BL -- a horizontal menu
->74|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
->75|4.12 GUI2.INC.BL -- a listbox, single or multi select
->62|4.2 STRINGS.INC.BL -- string helpers
+>65|4.1 THEME.INC.BL -- named colour roles
+>75|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>108|STASH.INC.BL -- save a text rectangle, and put it back.
+>116|STASHFILE.INC.BL -- a saved text rectangle, through a file.
+>98|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+>99|4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store
+>76|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>78|4.6 MENUVERT.INC.BL -- a vertical menu
+>87|4.9 MENUBAR.INC.BL -- a horizontal menu
+>89|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
+>92|4.12 GUI2.INC.BL -- a listbox, single or multi select
+>66|4.2 STRINGS.INC.BL -- string helpers

@@ -16,7 +16,7 @@ rem
 rem      RUN "XT"                  XFMGR, the file manager -- XT is a shim that
 rem                                LOADs /XFMGR/XFMGR.PRG
 rem      RUN "GPC.PRG"             the compiler front end
-rem      RUN "GPB.HELP.PRG"        the on-machine reference
+rem      RUN "GPC.HELP.PRG"        the on-machine reference
 rem      DOS"$                     the directory
 rem
 rem  A sample lives in its own folder, so CD into it and run it:
@@ -24,14 +24,14 @@ rem
 rem      DOS"CD:SAMPLES"           then CD:GPBMODS, then RUN "GPBMODS.PRG"
 rem
 rem  Both of the things a sample loads still resolve from down there. A region
-rem  overlay (.Bnn) is loaded from beside the program, and the shared runtime is
+rem  overlay (.nnn) is loaded from beside the program, and the shared runtime is
 rem  fetched from the drive root with a leading slash.
 rem
 rem  XFMGR AND XT ARE DEV ONLY. release.sh stages them into TMP for this bat and
 rem  leaves them out of the zip.
 rem ---------------------------------------------------------------------------
 setlocal
-set "ROOT=%~dp0"
+for %%I in ("%~dp0..") do set "ROOT=%%~fI\"
 set "DRIVE=%ROOT%release\TMP"
 set "X16EMU=%ROOT%bin\x16emu\x16emu.exe"
 set "ROM=%ROOT%bin\x16emu\rom.bin"

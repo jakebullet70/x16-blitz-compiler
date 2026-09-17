@@ -37,7 +37,7 @@ keyboard layout; the dropdown recoloured to the document's own attribute; and
 `editor-demo.bat`.
 
 **The editor now works end to end** — thin-framed dropdowns, ALT+F/S/H **and** ESC-then-
-letter, dark panel with a blue highlight bar. `editor-demo.bat` at the repo root runs it
+letter, dark panel with a blue highlight bar. `USER-RUNS\editor-demo.bat` runs it
 with `samples\editor` as the drive; `C.EDITOR.PRG` is checked in so a fresh clone needs no
 build. **File>Save overwrites the real `TEST.MD`** because that directory *is* the drive.
 

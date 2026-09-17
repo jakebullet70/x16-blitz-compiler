@@ -20,7 +20,7 @@ rem    4. copy any .BMX files you want into demo\ -- samples\BMXVIEWER\SAMPLES
 rem       has eight, one for each header shape the viewer has to handle
 rem ---------------------------------------------------------------------------
 setlocal
-set "ROOT=%~dp0"
+for %%I in ("%~dp0..") do set "ROOT=%%~fI\"
 set "DEMO=%ROOT%demo"
 
 if not exist "%DEMO%\C.BMXVIEW.PRG" (

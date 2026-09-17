@@ -1,112 +1,103 @@
-@4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
+@4.10 STRUSING.INC.BL -- a number to a template
 .
-=4.11 GUI.INC.BL -- FOUR DIALOGS, IN A BOX THAT PUTS THE SCREEN BACK
-.
-=WHAT IT COSTS
-.
-.  ASM: GP.BOX GP.FILL GP.PRINTAT
-.    ASM -- a keyword, run by machine code in the GP runtime block. A program
-.    using ANY GP keyword pays for the whole block.
-.  COMPOSITE: GP.CHAR GP.PRINTAT GP.FILL
-.    COMPOSITE -- a keyword with no machine code of its own. The compiler
-.    expands it into keywords that already exist, so it costs the runtime
-.    nothing at all.
-.    BASIC -- a .INC.BL module of ordinary BASL, called with GOSUB. Costs
-.    nothing unless you #INCLUDE it.
+=4.10 STRUSING.INC.BL -- A NUMBER TO A TEMPLATE
 .
 =DESCRIPTION
 .
-.  GUI.SAY
-.      IN: GUI.MSG$
-.      OUT: GUI.KEY -- something to say, and one way out
+.  STR.USING
+.      IN: STR.USING.NUM STR.USING.MASK$
+.      OUT: STR.USING.STR$, a field
 .
-.  GUI.YN
-.      IN: GUI.MSG$
-.      OUT: GUI.ANSWER, -1 for yes
+.  STR.USING.FIX
+.      IN: STR.USING.NUM STR.USING.DP
+.      OUT: STR.USING.STR$, digits only
 .
-.  GUI.MENU
-.      IN: GUI.COUNT GUI.SEL GUI.FLAGS, over MENUVERT.ITEM$()
-.      OUT: GUI.SEL, or 0 if cancelled
+:#INCLUDE "STRUSING.INC.BL"
+:
+:STR.USING.NUM = 1234.5 : STR.USING.MASK$ = "#,##0.00"
+:GOSUB STR.USING
+:PRINT STR.USING.STR$ : REM 1,234.50
 .
-.  GUI.INPUT
-.      IN: GUI.LEN GUI.TEXT$ GUI.MASK
-.      OUT: GUI.TEXT$ GUI.OK
+.Pure BASIC. It needs no #SYMFILE and depends on no other module, so a
+.program can take it without taking STRINGS.INC.BL (SEC 4.2) -- and the other
+.way round.
 .
-.  GUI.OPEN
-.      IN: GUI.BODY.ROWS GUI.BODY.WIDTH
-.      OUT: GUI.INNER.LEFT .TOP .WIDTH -- the box on its own, for a dialog of
-.        your own
+.  #
+.      MEANS: a digit position, space if the number does not reach it
 .
-.  GUI.CLOSE
-.      IN: --
-.      OUT: the screen as it was
+.  0
+.      MEANS: a digit position, zero if the number does not reach it
 .
-:THEME.ID = 0 : GOSUB THEME.SELECT
-:GUI.BANK = 8
-:GUI.MSG$ = "DELETE THE FILE?"
-:GOSUB GUI.YN
-:IF GUI.ANSWER THEN <yes>
+.  .
+.      MEANS: the decimal point everything aligns on
 .
-.Requires GPB.INC.BL, STASH.INC.BL, THEME.INC.BL, MENUVERT.INC.BL and
-.LINEINPUT.INC.BL, and #INCLUDEs none of them. All five, whichever dialog you
-.call -- BASLOAD resolves every label in the file, so leaving one out is
-.LABEL NOT FOUND. It wants a #SYMFILE, because STASH does.
+.  ,
+.      MEANS: anywhere in the mask, groups the integer part in threes
 .
-.Everything the box takes -- three message lines, a title, the style, the
-.placement, the shadow, the frame glyphs, the bank the covered cells go to --
-.is listed in full in GP-BASIC.GLOBALS.md SEC 3. GUI.BANK = 0 does not save
-.the cells, and then the box is still on screen when the call returns.
+.  +
+.      MEANS: first character only: a sign column, + or -
 .
-.Every control has a focus, and TAB moves it. The dialogs no longer own their
-.key loops: each states its controls and GUI.FORM runs them. A control is a
-.button, a field, a list, a combo (SEC 4.17) or a check box (SEC 4.21); it
-.hands back one of six verdicts -- stay, next, previous, press, default,
-.cancel -- and the dispatcher stays one loop whatever the mix. A caller that
-.never presses TAB sees what it always saw.
+.  -
+.      MEANS: first character only: a sign column, - or a space
 .
-.The default button and the focused control are different things. The default
-.is what RETURN presses from anywhere and is drawn <<LIKE THIS>>; the focus
-.is where TAB has got to and is drawn in THEME.FOCUS. GUI.INPUT opens with
-.the default on OK and the focus in the field -- which is the point of
-.keeping the two apart, and GUI.DEFAULT sets only the first.
+.PRINT USING's mask, from BASIC 7.0, less the four characters that earn
+.nothing here: $ floating currency, a trailing sign, ^^^^ exponential, and =
+./ > -- those last two justify a string, which is STR.PADC and STR.PADL (SEC
+.4.2).
 .
-.The answers are buttons. GUI.BTN.ONE$ and GUI.BTN.TWO$ carry them, and &
-.marks the accelerator: "&CANCEL" lights the C. An accelerator is live only
-.while the focused control does not eat printable keys, so C presses CANCEL
-.from the button row or from inside a list, and types a C in a field. That is
-.the whole rule, and GUIFRMT's T14, T15 and T22 are the three assertions that
-.hold it.
+.The result is exactly LEN(STR.USING.MASK$) characters, right justified, so a
+.column of them lines up on the point. Everything after the point prints, so
+.# and 0 do not differ there. A point with no digit positions after it is
+.ignored.
 .
-.GUI.HINT$ is gone -- the dimmed line naming two keys became the button row,
-.and it is the one interface this took away.
+:"###0.00"    12.5    ->  "  12.50"        "#,##0.00"   1234.5  ->  "1,234.50
+:"0000.00"    12.5    ->  "0012.50"        "+##0.00"      -1.5  ->  "-  1.50"
+:"##000"        42    ->  "  042"          "##0"         12345  ->  "***"
 .
-.The typing dialog and its string swapped names: it was GUI.TEXT returning
-.GUI.INPUT$, and it is GUI.INPUT returning GUI.TEXT$. BASLOAD will not have a
-.label and a variable of one name and the $ does not separate them. A program
-.written against the older library compiles clean and reads the wrong one
-.back.
+.Too wide fills the whole field with *. That is deliberate and visible;
+.overflowing the width instead would push the rest of the row along and
+.misalign every column after it. A negative value with no sign column spends
+.one digit position on its minus, and stars when there is none to spend --
+."##0" holds -12 but not -123.
 .
-.Upper case, on the default charset. GP.PRINTAT converts PETSCII and BASLOAD
-.passes literals through as source bytes, so charset 2 lands lower case on
-.the graphics half of the font. ISO mode fixes the text and breaks the frame,
-.GP.BOX's $40-$7D being letters. Upper case with a frame, mixed case without
-.one, or re-order the font and set GUI.GLYPH.
+.Rounding is half away from zero, done on the absolute value before the sign
+.goes back on. INT alone floors toward minus infinity, which rounds -1.5 and
+.1.5 in opposite directions. -0.004 to two places is "0.00", not "-0.00": a
+.signed zero in a column reads as a real negative.
 .
-.Example: GUI.EXP.BL. Regression test: samples/GPB-MODS-TESTING/GUIFRMT.BASL,
-.twenty-four assertions driven by keys pushed into the KERNAL buffer -- the
-.only way to drive a GET loop headlessly.
+.WARNING: the value must scale to under 1,000,000,000. The digits are built
+.by multiplying up by 10 ^ DP and rounding, and STR$ turns over to E notation
+.at 1e9 -- so two decimal places reach 9,999,999.99 and five reach
+.9,999.99999. Past that the field fills with * rather than printing something
+.wrong.
+.
+.STR.USING.FIX is the same digits with no field over them: STR.USING.NUM to
+.STR.USING.DP places, sign attached, no leading space. Right justify it with
+.STR.PADL if you want a column.
+.
+.The digits do not come out of STR$'s fraction, and cannot. STR$ trims
+.trailing zeros, so 12.30 comes back as "12.3"; it drops the leading zero of
+.a pure fraction, so a half is " .5"; and it takes significant digits, never
+.decimal places -- FloatToString records that a fixed-decimal mode was tried
+.and printed 12345678.9 as 12345678.8984375. So a scaled integer is the only
+.exact route, and the 1e9 ceiling above is its price.
+.
+.Cost: 726 bytes of p-code, of which STR.USING.FIX alone is 205. Its own
+.module rather than a routine in STRINGS.INC.BL for that reason -- a program
+.wanting STR.PADL and a split should not carry a mask parser.
+.
+.Example: STRUSING.EXP.BL. Regression test: USINGT.EXP.BL, thirty-nine cases
+.-- both entry points, every mask character, the rounding traps, the sign
+.column and both overflows. Text and length are compared every time: the
+.result is a field, so a right answer in the wrong number of columns still
+.breaks the table.
 .
 =EXAMPLE PROGRAM
 .
-.  GUI.EXP.BL -- runnable, in the GPC-BASIC folder
+.  STRUSING.EXP.BL -- runnable, in the GPC-BASIC folder
+.  USINGT.EXP.BL -- runnable, in the GPC-BASIC folder
 .
 =SEE ALSO
 .
->21|3. Command reference
->80|4.17 COMBO.INC.BL -- a drop-down list that folds into one row
->85|4.21 CHECK.INC.BL -- a check box, [X] or [ ]
->74|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
->91|STASH.INC.BL -- save a text rectangle, and put it back.
->61|4.1 THEME.INC.BL -- named colour roles
->67|4.6 MENUVERT.INC.BL -- a vertical menu
->65|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>66|4.2 STRINGS.INC.BL -- string helpers
+>88|4.10 STRUSING.INC.BL -- a number to a template

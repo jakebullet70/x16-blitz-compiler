@@ -1,0 +1,1028 @@
+#SAVEAS "@:GPC.GUI.SRC.PRG"
+#SYMFILE "@:GPC.GUI.SRC.SYM"
+#INCLUDE "GPC-BASIC/GPB.INC.BL"
+#INCLUDE "GPC-BASIC/STASH.INC.BL"
+
+## ***********************************************************************
+## **
+## **  GPC.GUI.BASL -- the compiler's front end, on forms.
+## **
+## **  GPC.PRG asks its questions on a scrolling screen. This keeps the same
+## **  answers in a definition file, edits them on one form, and hands off to
+## **  GPC.BIN the same way: GPC.INPUT, then LOAD.
+## **
+## **  A PROJECT IS A .MAKE FILE and it holds nothing but the names of the
+## **  programs in it, one a line:
+## **      SPRITE.PDEF
+## **      SOUND.PDEF
+## **
+## **  A PROGRAM IS A .PDEF FILE of its own, SEQ text, one KEY=VALUE a line:
+## **      SRC=DIR.PRG       the tokenised BASIC to compile
+## **      OBJ=C.DIR.PRG     the output PRG. Empty is C. plus SRC
+## **      MAP=Y             a debug map, M. plus SRC
+## **      DEAD=N            remove dead code, listed in D. plus SRC
+## **      MODE=SHARED       or EMBEDDED
+## **      BASL=N            run BASLOAD on the source before compiling
+## **      BONLY=N           tokenise this program and do not compile it
+## **  A key it does not know is skipped.
+## **
+## **  SO A SETTING BELONGS TO A PROGRAM, not to the project, and a project may
+## **  mix a program that is compiled with one that is only tokenised. Until a
+## **  project is new or open, every menu row but the project group is dead.
+## **
+## **  Compiled SHARED and built in place, from the project root:
+## **      python source\gpc\build_basl.py     --drive samples\GPC-GUI-HELPER GPC.GUI.BASL GPC.GUI.SRC.PRG
+## **      python source\gpc\compile_shared.py --drive samples\GPC-GUI-HELPER GPC.GUI.SRC.PRG GPC.GUI.PRG GPC.GUI.MAP
+## **  Run it with USER-RUNS\gpc-gui-demo.bat.
+## **
+## ***********************************************************************
+
+## ---- THE CODE BANKS are 4 to 6 and contiguous, so one loop claims them.
+#DEFINE GG.GUICODE 4
+#DEFINE GG.UTILCODE 5
+#DEFINE GG.COMBOCODE 6
+#DEFINE GG.FILECODE 7
+
+#DEFINE GG.SCREEN 1
+#DEFINE GG.DEFROWS 18
+#DEFINE GG.MAXFILES 12
+
+## ---- THE MAIN MENU is GG.MENUN rows GG.MENUW wide. Its box and the
+## ---- information box beside it fill the screen between the header box and the
+## ---- result box, so only the menu's own width is fixed here. The project
+## ---- submenu borrows that width and stands GG.POPSHIFT columns to the left of
+## ---- it, so the row it opens from stays readable beside it.
+#DEFINE GG.MENUW 20
+#DEFINE GG.MENUN 12
+#DEFINE GG.PROJN 5
+#DEFINE GG.POPSHIFT 3
+#DEFINE GG.CHARSET 7
+#DEFINE GG.ASCIIBIT 64
+
+## ---- The single line frame, as CP437 code points. GP.BOX writes its glyphs to
+## ---- VERA as tile indices and does not convert, and in CP437 a tile index IS
+## ---- the code point, so these arrive as themselves. The order is the one
+## ---- GP.BOX reads: TR TL BR BL TOP BOTTOM LEFT RIGHT.
+#DEFINE GG.GL.H 196
+#DEFINE GG.GL.V 179
+#DEFINE GG.GL.TL 218
+#DEFINE GG.GL.TR 191
+#DEFINE GG.GL.BL 192
+#DEFINE GG.GL.BR 217
+
+#DEFINE GG.BARHEIGHT 3
+#DEFINE GG.LISTROW 8
+
+## ---- The library, laid out as GPBMODS lays it out. The utility region holds
+## ---- APPSYS, BANKMGR, KB, THEME and FILEIO: together they are a quarter of a
+## ---- bank, so one region carries them all. It comes before the GUI region and
+## ---- COMBO after it, because BASLOAD resolves a #DEFINE only once it has read
+## ---- it. STASH stays in low RAM: it holds a BANK statement.
+GOTO GG.LIBEND
+GP.BANKED GG.UTILCODE
+#INCLUDE "GPC-BASIC/APPSYS.INC.BL"
+#INCLUDE "GPC-BASIC/BANKMGR.INC.BL"
+#INCLUDE "GPC-BASIC/KB.INC.BL"
+#INCLUDE "GPC-BASIC/THEME.INC.BL"
+#INCLUDE "GPC-BASIC/FILEIO.INC.BL"
+GP.ENDBANKED
+GP.BANKED GG.GUICODE
+#INCLUDE "GPC-BASIC/MENUVERT.INC.BL"
+#INCLUDE "GPC-BASIC/LINEINPUT.INC.BL"
+#INCLUDE "GPC-BASIC/GUI.INC.BL"
+GP.ENDBANKED
+GP.BANKED GG.COMBOCODE
+#INCLUDE "GPC-BASIC/COMBO.INC.BL"
+#INCLUDE "GPC-BASIC/CHECK.INC.BL"
+GP.ENDBANKED
+GP.BANKED GG.FILECODE
+#INCLUDE "GPC-BASIC/FILEDIR.INC.BL"
+#INCLUDE "GPC-BASIC/FILEPICK.INC.BL"
+GP.ENDBANKED
+GG.LIBEND:
+
+DIM MENUVERT.ITEM$(FILEPICK.MAX) : DIM MENUVERT.HINT$(20)
+DIM FILE.LINE$(GG.DEFROWS)
+DIM FILEPICK.FILE$(FILEPICK.MAX)
+
+## ---- The project: the .PDEF programs it names, and which of them is current.
+## ---- A program carries its own settings in its own .PDEF file, so only the
+## ---- current one is ever in memory. GG.PDEFNAME$ is the row GG.CURR.NDX% names
+## ---- and GG.SOURCE$, GG.OUTPUT$ and the rest are what that file said.
+DIM GG.PROJECT.FILE.LIST$(GG.MAXFILES)
+
+## ---- Row 1 of every .MAKE file. It marks the file as ours and it gives the
+## ---- user something to see when the project is opened in an editor.
+GG.MAKE.HEADER$ = "## GG MAKE FILE"
+
+GOSUB APPSYS.STARTUP  
+SCREEN GG.SCREEN
+GP.CALL APPSYS.SCRMODE, 0, 0, 0, 1
+APPSYS.COLS = GP.X : APPSYS.ROWS = GP.Y
+
+## ---- CP437 charset 
+GP.CALL APPSYS.SETCHR, GG.CHARSET, 0, 0, 0
+POKE APPSYS.CHRREG, PEEK(APPSYS.CHRREG) OR GG.ASCIIBIT
+
+## ---- Box char, Defaults are PETSCII so we supply our own
+GG.GLYPH$ = CHR$(GG.GL.TR) + CHR$(GG.GL.TL) + CHR$(GG.GL.BR) + CHR$(GG.GL.BL)
+GG.GLYPH$ = GG.GLYPH$ + CHR$(GG.GL.H) + CHR$(GG.GL.H) + CHR$(GG.GL.V) + CHR$(GG.GL.V)
+
+GOSUB GG.LAYOUT
+THEME.ID = 3 : GOSUB THEME.SELECT
+
+## ---- setup mem banks
+GOSUB BANKMGR.INIT : GG.BANKFAIL$ = ""
+FOR GG.I = GG.GUICODE TO GG.FILECODE
+  BANKMGR.SET.BANK = GG.I
+  GOSUB BANKMGR.CLAIM
+  IF BANKMGR.OK = 0 THEN GG.BANKFAIL$ = "CODE BANK" + STR$(GG.I) + " IS ALREADY TAKEN"
+NEXT GG.I
+
+GOSUB BANKMGR.GET.FREE.BANK : GG.GUIBANK% = BANKMGR.BANK
+GOSUB BANKMGR.GET.FREE.BANK : GG.DIRBANK% = BANKMGR.BANK
+## ---- end mem bank crap
+
+GOSUB FILEPICK.INIT
+GOSUB GG.RESET.DEFINITION.4.NEW
+GG.MENUSEL% = 1 : GG.PROJSEL% = 1 : GG.QUIT% = 0
+GG.RESULT$ = "New or Open a project to start"
+GOSUB GG.CHROME
+GOSUB GG.STARTUP.PICK
+
+
+
+## ---- The shell. The menu never cancels -- MUSTSEL takes ESC away -- so every
+## ---- turn of the loop comes back with a row to dispatch.
+GP.DO
+  GOSUB GG.MENU.RUN : GOSUB GG.DISPATCH
+  IF GG.QUIT% <> 0 THEN GP.EXITDO
+GP.LOOP
+GOSUB APPSYS.RESTORE
+END
+
+## --- Bank claim issues, we are out of here!
+## GG.BANKSTOP:
+##   GOSUB APPSYS.RESTORE : PRINT "GPC.GUI: "; GG.BANKFAIL$
+##  END
+
+
+
+
+## ***********************************************************************
+## **  GG.LAYOUT -- where the four boxes sit, once the screen size is known.
+## **
+## **  A header box on the top three rows, a result box on the bottom three, and
+## **  the two working boxes fill everything between. The information box ends on
+## **  the column the menu box starts on, so the two frames share one divider.
+## ***********************************************************************
+GG.LAYOUT:
+  GG.BODYTOP% = GG.BARHEIGHT
+  GG.BODYHEIGHT% = APPSYS.ROWS - GG.BARHEIGHT - GG.BARHEIGHT
+  GG.MENUBOXW% = GG.MENUW + 2
+  GG.MENUBOXX% = APPSYS.COLS - GG.MENUBOXW%
+  GG.MENUBOXY% = GG.BODYTOP%
+  GG.MENUBOXH% = GG.BODYHEIGHT%
+  GG.INFOBOXX% = 0
+  GG.INFOBOXW% = GG.MENUBOXX% + 1
+  GG.INFOBOXY% = GG.BODYTOP%
+  GG.INFOBOXH% = GG.BODYHEIGHT%
+  RETURN
+
+
+## ***********************************************************************
+## **  GG.CHROME -- the four boxes and what is written in them. The menu box is
+## **  drawn after the information box, so its frame owns the shared column.
+## ***********************************************************************
+GG.CHROME:
+  GG.BOXGLYPH = GP.STRPTR(GG.GLYPH$) + 1
+  GP.FILL 0, 0, APPSYS.COLS, APPSYS.ROWS, ASC(" "), THEME.CLR(THEME.PAGE)
+  GP.BOX 0, 0, APPSYS.COLS, GG.BARHEIGHT, GG.BOXGLYPH, THEME.CLR(THEME.BORDER)
+  GOSUB GG.HEAD.SHOW
+  GP.BOX GG.INFOBOXX%, GG.INFOBOXY%, GG.INFOBOXW%, GG.INFOBOXH%, GG.BOXGLYPH, THEME.CLR(THEME.BORDER)
+  GP.FILL GG.MENUBOXX% + 1, GG.MENUBOXY% + 1, GG.MENUBOXW% - 2, GG.MENUBOXH% - 2, ASC(" "), THEME.CLR(THEME.TEXT)
+  GP.BOX GG.MENUBOXX%, GG.MENUBOXY%, GG.MENUBOXW%, GG.MENUBOXH%, GG.BOXGLYPH, THEME.CLR(THEME.BORDER)
+  GOSUB GG.MENU.LOAD : GOSUB MENUVERT.DRAW
+  GOSUB GG.SUMMARY
+  GOSUB GG.RESULT.SHOW
+  RETURN
+
+
+## ---- Inside the left box: the two names the project is known by, then a
+## ---- blank line, then what a compile of it would do. Every label is padded
+## ---- to the same width, so the values line up in one column.
+GG.SUMMARY:
+  GOSUB GG.MAIN.GET
+  GOSUB GG.NAMES
+  GP.FILL GG.INFOBOXX% + 1, GG.INFOBOXY% + 1, GG.INFOBOXW% - 2, GG.INFOBOXH% - 2, ASC(" "), THEME.CLR(THEME.PAGE)
+  GG.TEXTX% = GG.INFOBOXX% + 3
+  GG.TEXTY% = GG.INFOBOXY% + 2
+  GG.SHOW$ = GG.DEFNAME$
+  IF GG.SHOW$ = "" THEN GG.SHOW$ = "(No Project)"
+  GP.PRINTAT GG.TEXTX%, GG.TEXTY%, "Project:         " + GG.SHOW$, THEME.CLR(THEME.TITLE)
+  GG.SHOW$ = GG.PDEFNAME$
+  IF GG.SHOW$ = "" THEN GG.SHOW$ = "(None)"
+  GP.PRINTAT GG.TEXTX%, GG.TEXTY% + 1, "Program:         " + GG.SHOW$, THEME.CLR(THEME.TITLE)
+  GG.SHOW$ = GG.SOURCE$
+  IF GG.SHOW$ = "" THEN GG.SHOW$ = "(None)"
+  GP.PRINTAT GG.TEXTX%, GG.TEXTY% + 2, "Source:          " + GG.SHOW$, THEME.CLR(THEME.TITLE)
+  GP.PRINTAT GG.TEXTX%, GG.TEXTY% + 4, "Output:          " + GG.OUTNAME$, THEME.CLR(THEME.TEXT)
+  GG.SHOW$ = "Embedded"
+  IF GG.MODE% = 2 THEN GG.SHOW$ = "Shared"
+  GP.PRINTAT GG.TEXTX%, GG.TEXTY% + 5, "Runtime:         " + GG.SHOW$, THEME.CLR(THEME.TEXT)
+  GG.SHOW$ = "No"
+  IF GG.MAP% <> 0 THEN GG.SHOW$ = "Yes"
+  GP.PRINTAT GG.TEXTX%, GG.TEXTY% + 6, "Debug Map:       " + GG.SHOW$, THEME.CLR(THEME.TEXT)
+  GG.SHOW$ = "Keep Every Line"
+  IF GG.DEAD% <> 0 THEN GG.SHOW$ = "Remove"
+  GP.PRINTAT GG.TEXTX%, GG.TEXTY% + 7, "Dead Code:       " + GG.SHOW$, THEME.CLR(THEME.TEXT)
+  GG.SHOW$ = "No"
+  IF GG.USEBASL% <> 0 THEN GG.SHOW$ = "Yes"
+  GP.PRINTAT GG.TEXTX%, GG.TEXTY% + 8, "Run BASLOAD 1st: " + GG.SHOW$, THEME.CLR(THEME.TEXT)
+  GG.SHOW$ = "No"
+  IF GG.BONLY% <> 0 THEN GG.SHOW$ = "Yes"
+  GP.PRINTAT GG.TEXTX%, GG.TEXTY% + 9, "BASLOAD Only:    " + GG.SHOW$, THEME.CLR(THEME.TEXT)
+  RETURN
+
+## ---- The header: what the program is, centred. The project name is not
+## ---- repeated here -- GG.SUMMARY already prints it in the information box.
+GG.HEAD.SHOW:
+  GP.FILL 1, 1, APPSYS.COLS - 2, 1, ASC(" "), THEME.CLR(THEME.PAGE)
+  GG.HEAD$ = "GPC.GUI -- Build Manager"
+  GP.PRINTAT INT((APPSYS.COLS - LEN(GG.HEAD$)) / 2), 1, GG.HEAD$, THEME.CLR(THEME.TITLE)
+  RETURN
+
+GG.RESULT.SHOW:
+  GG.RESULTY% = APPSYS.ROWS - GG.BARHEIGHT
+  GP.FILL 1, GG.RESULTY% + 1, APPSYS.COLS - 2, 1, ASC(" "), THEME.CLR(THEME.PAGE)
+  GP.BOX 0, GG.RESULTY%, APPSYS.COLS, GG.BARHEIGHT, GP.STRPTR(GG.GLYPH$) + 1, THEME.CLR(THEME.BORDER)
+  GP.PRINTAT INT((APPSYS.COLS - LEN(GG.RESULT$)) / 2), GG.RESULTY% + 1, GG.RESULT$, THEME.CLR(THEME.TITLE)
+  RETURN
+## ***********************************************************************
+
+
+
+
+
+## ***********************************************************************
+## **  GG.NAMES -- the five GPC.INPUT lines, from the settings.
+## **
+## **   out  GG.OUTNAME$  GG.MAPNAME$  GG.SHAREWORD$  GG.DEADNAME$
+## ***********************************************************************
+GG.NAMES:
+  GG.OUTNAME$ = GG.OUTPUT$
+  GG.MAPNAME$ = "" : GG.DEADNAME$ = "" : GG.SHAREWORD$ = ""
+  IF GG.OUTNAME$ = "" AND GG.SOURCE$ <> "" THEN GG.OUTNAME$ = "C." + GG.SOURCE$
+  IF GG.MAP% <> 0 AND GG.SOURCE$ <> "" THEN GG.MAPNAME$ = "M." + GG.SOURCE$
+  IF GG.DEAD% <> 0 AND GG.SOURCE$ <> "" THEN GG.DEADNAME$ = "D." + GG.SOURCE$
+  IF GG.MODE% = 2 THEN GG.SHAREWORD$ = "SHARED"
+  RETURN
+
+
+
+
+## ***********************************************************************
+## **  The menu: loaded, drawn and driven. It is the whole interface, so it
+## **  carries every command the program has, in three groups -- the build, the
+## **  two submenus, and the two that are neither -- and MUSTSEL keeps ESC from
+## **  closing the only way in.
+## **
+## **  THE PROJECT GROUP IS ONE ROW. The five commands that work on the project
+## **  itself live in GG.PROJECT.MENU, a popup over this menu. The program
+## **  commands are rows here, because they are what the program is used for.
+## **
+## **  A row number IS the command, so GG.DISPATCH reads as the menu reads.
+## **  Rows 3, 5 and 10 are the separators and never come back.
+## ***********************************************************************
+GG.MENU.LOAD:
+  MENUVERT.HOT$ = "EC-P-NLAD-BQ"
+  MENUVERT.COUNT = GG.MENUN
+  MENUVERT.ITEM$(1) = " Edit..."
+  MENUVERT.ITEM$(2) = " Compile Program"
+  MENUVERT.ITEM$(3) = "-"
+  MENUVERT.ITEM$(4) = " Project Menu..."
+  MENUVERT.ITEM$(5) = "-"
+  MENUVERT.ITEM$(6) = " New Program"
+  MENUVERT.ITEM$(7) = " List Programs"
+  MENUVERT.ITEM$(8) = " Save Program As..."
+  MENUVERT.ITEM$(9) = " Delete Program"
+  MENUVERT.ITEM$(10) = "-"
+  MENUVERT.ITEM$(11) = " About"
+  MENUVERT.ITEM$(12) = " Quit"
+  MENUVERT.ATTR = THEME.CLR(THEME.TEXT)
+  MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
+  GOSUB GG.MENU.GATE
+  MENUVERT.DIS$ = GG.PROGOFF$ + GG.PROGOFF$ + "000"
+  MENUVERT.DIS$ = MENUVERT.DIS$ + GG.PROJOFF$ + GG.PROJOFF$ + GG.PROGOFF$ + GG.PROGOFF$
+  MENUVERT.DIS$ = MENUVERT.DIS$ + "000"
+  MENUVERT.HOTATTR = THEME.CLR(THEME.TITLE)
+  MENUVERT.SEPATTR = THEME.CLR(THEME.BORDER)
+  MENUVERT.X = GG.MENUBOXX% + 1
+  MENUVERT.Y = GG.MENUBOXY% + INT((GG.MENUBOXH% - GG.MENUN) / 2)
+  MENUVERT.WIDTH = GG.MENUW
+  MENUVERT.HINT$(1) = "Change the settings this project holds"
+  MENUVERT.HINT$(2) = "Compile the main file with these settings"
+  MENUVERT.HINT$(3) = ""
+  MENUVERT.HINT$(4) = "New, open, save and build, for the project"
+  MENUVERT.HINT$(5) = ""
+  MENUVERT.HINT$(6) = "Name a program and put it in the project"
+  MENUVERT.HINT$(7) = "Add a program that is already on the disk"
+  MENUVERT.HINT$(8) = "Copy a row of the list under another name"
+  MENUVERT.HINT$(9) = "Take a row out. The file itself stays"
+  MENUVERT.HINT$(10) = ""
+  MENUVERT.HINT$(11) = "What this is, and what the machine has left"
+  MENUVERT.HINT$(12) = "Leave GPC.GUI"
+  MENUVERT.HINTX = 1
+  MENUVERT.HINTY = APPSYS.ROWS - GG.BARHEIGHT + 1
+  MENUVERT.HINTW = APPSYS.COLS - 2
+  MENUVERT.HINTATTR = THEME.CLR(THEME.TEXT)
+  MENUVERT.SEPCHR = GG.GL.H
+  RETURN
+
+## ---- WHAT THE MENU WILL LET YOU DO. Nothing works on a project until there is
+## ---- one, and nothing works on a program until the project names one, so the
+## ---- two answers are characters that MENUVERT.DIS$ is built out of. A project
+## ---- with no programs in it turns the program rows off as well, because the
+## ---- current program is the row GG.CURR.NDX% names and there is no row.
+GG.MENU.GATE:
+  GG.PROJOFF$ = "0"
+  IF GG.PROJ.OPEN% = 0 THEN GG.PROJOFF$ = "1"
+  GG.PROGOFF$ = "0"
+  IF GG.CURR.NDX% = 0 THEN GG.PROGOFF$ = "1"
+  IF GG.PROJ.OPEN% = 0 THEN GG.PROGOFF$ = "1"
+  MENUVERT.DISATTR = THEME.CLR(THEME.DIMMED)
+  RETURN
+
+GG.MENU.RUN:
+  GOSUB GG.MENU.LOAD
+  MENUVERT.FLAGS = MENUVERT.MUSTSEL + MENUVERT.HINTMID
+  MENUVERT.SEL = GG.MENUSEL%
+  GOSUB MENUVERT.RUN
+  IF MENUVERT.SEL > 0 THEN GG.MENUSEL% = MENUVERT.SEL
+  RETURN
+
+GG.DISPATCH:
+  GG.MENU = GG.MENUSEL%
+  GP.SELECT GG.MENU
+    GP.CASE 1 : GOSUB GG.PROGRAM.SETTINGS
+    GP.CASE 2 : GOSUB GG.COMPILE
+    GP.CASE 4 : GOSUB GG.PROJECT.MENU
+    GP.CASE 6 : GOSUB GG.FILE.NEW
+    GP.CASE 7 : GOSUB GG.FILE.OPEN
+    GP.CASE 8 : GOSUB GG.FILE.COPY
+    GP.CASE 9 : GOSUB GG.FILE.DROP
+    GP.CASE 11 : GOSUB GG.ABOUT
+    GP.OTHER  : GOSUB GG.QUIT.ASK
+  GP.ENDSEL
+  GOSUB GG.CHROME
+  RETURN
+
+
+## ***********************************************************************
+## **  GG.PROJECT.MENU -- the five project commands, in a popup over the main
+## **  menu. Its first row sits on the PROJECT MENU row itself, so the group
+## **  opens where it was named, and the box stands GG.POPSHIFT columns left of
+## **  the main menu so that row stays in sight.
+## **
+## **  THE ATTRIBUTES AND THE HINT BAR ARE NOT SET HERE. GG.MENU.RUN loads the
+## **  main menu on every turn and this runs from its dispatch, so both are
+## **  already what this wants. Only the rows, the place and the hints change.
+## **
+## **  ESC leaves MENUVERT.SEL at 0 and nothing runs. The caller's GG.CHROME
+## **  paints the popup out again either way.
+## ***********************************************************************
+GG.PROJECT.MENU:
+  GG.POPX% = GG.MENUBOXX% - GG.POPSHIFT
+  GG.POPY% = MENUVERT.Y + 2
+  GP.FILL GG.POPX% + 1, GG.POPY% + 1, GG.MENUBOXW% - 2, GG.PROJN, ASC(" "), THEME.CLR(THEME.TEXT)
+  GP.BOX GG.POPX%, GG.POPY%, GG.MENUBOXW%, GG.PROJN + 2, GG.BOXGLYPH, THEME.CLR(THEME.BORDER)
+  MENUVERT.HOT$ = "NOSAB"
+  MENUVERT.COUNT = GG.PROJN
+  MENUVERT.ITEM$(1) = " New Project"
+  MENUVERT.ITEM$(2) = " Open Project..."
+  MENUVERT.ITEM$(3) = " Save Project"
+  MENUVERT.ITEM$(4) = " Save Project As..."
+  MENUVERT.ITEM$(5) = " Build Project"
+  MENUVERT.HINT$(1) = "Start an empty project"
+  MENUVERT.HINT$(2) = "Read a project back from disk"
+  MENUVERT.HINT$(3) = "Write the project under its own name"
+  MENUVERT.HINT$(4) = "Write the project under a new name"
+  MENUVERT.HINT$(5) = "Compile the main file with these settings"
+  GOSUB GG.MENU.GATE
+  MENUVERT.DIS$ = "00" + GG.PROJOFF$ + GG.PROJOFF$ + GG.PROJOFF$
+  MENUVERT.X = GG.POPX% + 1
+  MENUVERT.Y = GG.POPY% + 1
+  MENUVERT.WIDTH = GG.MENUW
+  MENUVERT.SCROLL = 0
+  MENUVERT.FLAGS = MENUVERT.HINTMID
+  MENUVERT.SEL = GG.PROJSEL%
+  GOSUB MENUVERT.RUN
+  IF MENUVERT.SEL > 0 THEN GG.PROJSEL% = MENUVERT.SEL
+  IF MENUVERT.SEL = 1 THEN GOSUB GG.DEF.NEWASK
+  IF MENUVERT.SEL = 2 THEN GOSUB GG.DEF.OPEN
+  IF MENUVERT.SEL = 3 THEN GOSUB GG.DEF.SAVE
+  IF MENUVERT.SEL = 4 THEN GOSUB GG.DEF.SAVEAS
+  IF MENUVERT.SEL = 5 THEN GOSUB GG.COMPILE
+  RETURN
+
+
+
+
+## ***********************************************************************
+## **  GG.DIALOG.RESET.FIELDS -- a dialog starts from the same GUI settings every time.
+## ***********************************************************************
+GG.DIALOG.RESET.FIELDS:
+  GUI.BANK = GG.GUIBANK%
+  GUI.MSG$ = "" : GUI.MSG2$ = ""
+  GUI.MSG3$ = "" : GUI.TITLE$ = ""
+  GUI.BTN.ONE$ = "" : GUI.BTN.TWO$ = ""
+  GUI.STYLE = 0 : GUI.GLYPH = 1
+  GUI.GLYPH$ = ""
+  GUI.EDGE.H = GG.GL.H : GUI.EDGE.V = GG.GL.V
+  GUI.CORNER.TL = GG.GL.TL : GUI.CORNER.TR = GG.GL.TR
+  GUI.CORNER.BL = GG.GL.BL : GUI.CORNER.BR = GG.GL.BR
+  GUI.PLACE = 0 : GUI.ROW.OFFSET = 0
+  GUI.PANEL.IN = 0 : GUI.BORDER.IN = 0
+  GUI.DEFAULT = 1 : GUI.SHADOW = 1
+  GUI.LEN = 0 : GUI.MASK = 0
+  RETURN
+
+
+## ---- NOTHING TO WORK ON. The footer says so, but the footer is one line in a
+## ---- corner, so the same thing is said in a box the first time it is true.
+## ---- The caller repaints: GUI.CLOSE puts back what the box covered.
+GG.NOPROJ.SAY:
+  GOSUB GG.DIALOG.RESET.FIELDS
+  GUI.TITLE$ = " NO PROJECT "
+  GUI.MSG$ = "There is no project open."
+  GUI.MSG2$ = "New or Open one from the Project menu."
+  GOSUB GUI.SAY
+  RETURN
+
+## ---- NOTHING ON THE DRIVE EITHER, so Open is no use and the only way out of
+## ---- the empty screen is New Project. Said once, at start-up.
+GG.NEWPROJ.SAY:
+  GOSUB GG.DIALOG.RESET.FIELDS
+  GUI.TITLE$ = " NO PROJECT "
+  GUI.MSG$ = "There are no projects on the drive."
+  GUI.MSG2$ = "Create a new project from the Project menu."
+  GOSUB GUI.SAY
+  RETURN
+
+
+GG.QUIT.ASK:
+  GOSUB GG.DIALOG.RESET.FIELDS
+  GUI.TITLE$ = " QUIT " : GUI.MSG$ = "LEAVE GPC.GUI?"
+  GOSUB GUI.YN
+  GG.QUIT% = GUI.ANSWER
+  RETURN
+
+
+
+
+## ***********************************************************************
+## **  The definition: new, open, save.
+## ***********************************************************************
+## ---- START-UP. The drive is offered before the menu is ever reached, so a
+## ---- session normally begins in the project it left off in. GG.DEF.OPEN puts
+## ---- up the picker and does the whole load, and FILEPICK.COUNT afterwards
+## ---- says which of the three ways it ended: a project was opened, the picker
+## ---- was cancelled, or there was nothing to pick. The chrome is redrawn
+## ---- before the box so the box sits on the project that was opened.
+GG.STARTUP.PICK:
+  GOSUB GG.DEF.OPEN
+  GG.STARTUP.FOUND% = FILEPICK.COUNT
+  GOSUB GG.CHROME
+  IF GG.PROJ.OPEN% <> 0 THEN RETURN
+  IF GG.STARTUP.FOUND% = 0 THEN GOSUB GG.NEWPROJ.SAY
+  IF GG.STARTUP.FOUND% > 0 THEN GOSUB GG.NOPROJ.SAY
+  RETURN
+
+
+## ---- NEW PROJECT off the menu. The name is asked for first, so cancelling
+## ---- leaves the project that is open exactly as it was.
+## ---- GG.RESET.DEFINITION.4.NEW itself stays silent: start-up and GG.DEF.OPEN
+## ---- both call it to clear the state, and neither of those wants a dialog.
+## ----
+## ---- The empty project is written to the drive as soon as it is named, so the
+## ---- picker can find it before a single program is added, and a session that
+## ---- ends early leaves the project behind rather than nothing.
+GG.DEF.NEWASK:
+  GG.ASK.TITLE$ = " New Project "
+  GG.ASK.MSG$ = "Name the project"
+  GG.ASK.TEXT$ = ""
+  GOSUB GG.ASK.NAME
+  IF GUI.OK = 0 THEN RETURN
+  IF GUI.TEXT$ = "" THEN RETURN
+  GOSUB GG.RESET.DEFINITION.4.NEW
+  GG.DEFNAME$ = GUI.TEXT$
+  GOSUB GG.DEF.NAME.EXT
+  GG.PROJ.OPEN% = -1
+  GOSUB GG.DEF.WRITE
+  IF FILE.ERR < 20 THEN GG.RESULT$ = "New project " + GG.DEFNAME$
+  RETURN
+
+GG.RESET.DEFINITION.4.NEW:
+  GG.DEFNAME$ = "" : GG.PDEFNAME$ = ""
+  GG.FILECOUNT% = 0 : GG.CURR.NDX% = 0
+  GG.PROJ.OPEN% = 0
+  GOSUB GG.PDEF.DEFAULTS
+  RETURN
+
+
+## ---- The picker finds a project by its extension, so a project that is saved
+## ---- without one is invisible to OPEN PROJECT. Every typed name comes through
+## ---- here and leaves with .MAKE on the end, which makes the name on the screen
+## ---- the same name that is on the drive. A name that already ends in it is
+## ---- left alone, so saving twice does not build TEST.MAKE.MAKE.
+GG.DEF.NAME.EXT:
+  IF LEN(GG.DEFNAME$) >= 5 THEN IF RIGHT$(GG.DEFNAME$, 5) = ".MAKE" THEN RETURN
+  IF LEN(GG.DEFNAME$) >= 5 THEN IF RIGHT$(GG.DEFNAME$, 5) = ".make" THEN RETURN
+  GG.DEFNAME$ = GG.DEFNAME$ + ".MAKE"
+  RETURN
+
+
+## ---- The same for a program. LIST PROGRAMS matches a picked name against the
+## ---- rows, so a row without the extension could never match what is on the
+## ---- drive; every typed program name leaves here with .PDEF on the end.
+GG.PDEF.NAME.EXT:
+  IF LEN(GG.PDEFNAME$) >= 5 THEN IF RIGHT$(GG.PDEFNAME$, 5) = ".PDEF" THEN RETURN
+  IF LEN(GG.PDEFNAME$) >= 5 THEN IF RIGHT$(GG.PDEFNAME$, 5) = ".pdef" THEN RETURN
+  GG.PDEFNAME$ = GG.PDEFNAME$ + ".PDEF"
+  RETURN
+
+
+## ***********************************************************************
+## **  The program list. A row is the name of a .PDEF file on the drive and
+## **  GG.CURR.NDX% is the row that is current, 0 when the project has none.
+## **  GG.PDEFNAME$ is that row read out, and the settings beside it are what
+## **  GG.PDEF.LOAD read from that file. Nothing here goes to the disk: the
+## **  row changes first and the load follows it.
+## ***********************************************************************
+GG.MAIN.GET:
+  GG.PDEFNAME$ = ""
+  IF GG.CURR.NDX% >= 1 AND GG.CURR.NDX% <= GG.FILECOUNT% THEN GG.PDEFNAME$ = GG.PROJECT.FILE.LIST$(GG.CURR.NDX%)
+  RETURN
+
+## ---- GG.ADDNAME$ in, and a full list is not an error: the row is dropped and
+## ---- the caller carries on, because the alternative is a dialog nobody can
+## ---- leave.
+GG.FILE.ADD:
+  IF GG.ADDNAME$ = "" THEN RETURN
+  IF GG.FILECOUNT% >= GG.MAXFILES THEN RETURN
+  GG.FILECOUNT% = GG.FILECOUNT% + 1
+  GG.PROJECT.FILE.LIST$(GG.FILECOUNT%) = GG.ADDNAME$
+  RETURN
+
+## ---- GG.DELROW% in. The rows above it come down one, and the main row follows
+## ---- whatever it was pointing at.
+GG.FILE.DEL:
+  IF GG.DELROW% < 1 THEN RETURN
+  IF GG.DELROW% > GG.FILECOUNT% THEN RETURN
+  GP.IF GG.DELROW% < GG.FILECOUNT% THEN
+    FOR GG.I = GG.DELROW% TO GG.FILECOUNT% - 1
+      GG.PROJECT.FILE.LIST$(GG.I) = GG.PROJECT.FILE.LIST$(GG.I + 1)
+    NEXT GG.I
+  GP.ENDIF
+  GG.FILECOUNT% = GG.FILECOUNT% - 1
+  IF GG.CURR.NDX% = GG.DELROW% THEN GG.CURR.NDX% = 0
+  IF GG.CURR.NDX% > GG.DELROW% THEN GG.CURR.NDX% = GG.CURR.NDX% - 1
+  IF GG.CURR.NDX% = 0 AND GG.FILECOUNT% > 0 THEN GG.CURR.NDX% = 1
+  RETURN
+
+## ---- GG.ASK.TITLE$, GG.ASK.MSG$ and GG.ASK.TEXT$ in, GUI.TEXT$ and GUI.OK out.
+GG.ASK.NAME:
+  GOSUB GG.DIALOG.RESET.FIELDS
+  GUI.TITLE$ = GG.ASK.TITLE$ : GUI.MSG$ = GG.ASK.MSG$
+  GUI.LEN = 24
+  GUI.TEXT$ = GG.ASK.TEXT$
+  GOSUB GUI.INPUT
+  RETURN
+
+GG.DEF.OPEN:
+  GG.PICK.EXT$ = "MAKE" : GG.PICK.WHAT$ = " Open Project "
+  GOSUB GG.FILE.PICK
+  IF FILEPICK.NAME$ = "" THEN RETURN
+  FILE.NAME$ = FILEPICK.NAME$
+  FILE.MAX = GG.DEFROWS
+  GOSUB FILE.LOADARRAY
+  GP.IF FILE.ERR >= 20 THEN
+    GG.RESULT$ = "Open failed: " + FILE.MSG$
+    RETURN
+  GP.ENDIF
+  GOSUB GG.RESET.DEFINITION.4.NEW
+  GG.DEFNAME$ = FILE.NAME$
+  GG.PROJ.OPEN% = -1
+  GP.IF FILE.ROWS > 1 THEN
+    FOR GG.PARSEROW = 2 TO FILE.ROWS
+      GG.ADDNAME$ = FILE.LINE$(GG.PARSEROW)
+      GOSUB GG.FILE.ADD
+    NEXT GG.PARSEROW
+  GP.ENDIF
+  IF GG.FILECOUNT% > 0 THEN GG.CURR.NDX% = 1
+  GOSUB GG.MAIN.GET
+  GOSUB GG.PDEF.LOAD
+  GG.RESULT$ = "Opened " + GG.DEFNAME$
+  RETURN
+
+
+
+## ***********************************************************************
+## **  THE TWO FILES. A project is a .MAKE file and it holds nothing but the
+## **  names of the programs in it, one a line. A program is a .PDEF file of
+## **  its own and it holds that one program settings, one KEY=VALUE a line.
+## **
+## **  SO A SETTING BELONGS TO A PROGRAM, not to the project. A project may
+## **  mix a program that is compiled with one that is only tokenised, and
+## **  moving a program between projects moves its settings with it.
+## **
+## **  ONLY THE CURRENT PROGRAM IS IN MEMORY. GG.PDEF.LOAD reads the row
+## **  GG.CURR.NDX% names into the settings and the menu never goes back to
+## **  the drive for them, so the summary costs nothing to draw.
+## ***********************************************************************
+
+## ---- What a program is set to before a .PDEF has been read for it, and what
+## ---- a brand new program starts from. Dead code removal is on because a
+## ---- program with nothing written for it wants the smallest object it can get.
+GG.PDEF.DEFAULTS:
+  GG.SOURCE$ = "" : GG.OUTPUT$ = ""
+  GG.MAP% = 0 : GG.DEAD% = -1 : GG.MODE% = 2
+  GG.USEBASL% = 0 : GG.BONLY% = 0
+  RETURN
+
+## ---- GG.PDEFNAME$ in. A program that has never been through SETTINGS has no
+## ---- file yet, and that is not an error: the defaults stand and the result
+## ---- line says so, because the row is still a real program in the project.
+GG.PDEF.LOAD:
+  GOSUB GG.PDEF.DEFAULTS
+  IF GG.PDEFNAME$ = "" THEN RETURN
+  FILE.NAME$ = GG.PDEFNAME$
+  FILE.MAX = GG.DEFROWS
+  GOSUB FILE.LOADARRAY
+  GP.IF FILE.ERR >= 20 THEN
+    GG.RESULT$ = GG.PDEFNAME$ + " has no settings yet"
+    RETURN
+  GP.ENDIF
+  GP.IF FILE.ROWS > 0 THEN
+    FOR GG.PARSEROW = 1 TO FILE.ROWS
+      GOSUB GG.PDEF.PARSE
+    NEXT GG.PARSEROW
+  GP.ENDIF
+  RETURN
+
+## ---- One KEY=VALUE row, FILE.LINE$(GG.PARSEROW), into the settings.
+GG.PDEF.PARSE:
+  GG.LINE$ = FILE.LINE$(GG.PARSEROW)
+  GG.EQPOS = 0
+  GP.IF LEN(GG.LINE$) > 1 THEN
+    FOR GG.I = 1 TO LEN(GG.LINE$)
+      IF GG.EQPOS = 0 AND MID$(GG.LINE$, GG.I, 1) = "=" THEN GG.EQPOS = GG.I
+    NEXT GG.I
+  GP.ENDIF
+  IF GG.EQPOS < 2 THEN RETURN
+  GG.KEY$ = LEFT$(GG.LINE$, GG.EQPOS - 1)
+  GG.VALUE$ = MID$(GG.LINE$, GG.EQPOS + 1)
+  IF GG.KEY$ = "SRC" THEN GG.SOURCE$ = GG.VALUE$
+  IF GG.KEY$ = "OBJ" THEN GG.OUTPUT$ = GG.VALUE$
+  IF GG.KEY$ = "MAP" THEN GG.MAP% = (GG.VALUE$ = "Y")
+  IF GG.KEY$ = "DEAD" THEN GG.DEAD% = (GG.VALUE$ = "Y")
+  IF GG.KEY$ = "MODE" THEN GG.MODE% = 1 - (GG.VALUE$ = "SHARED")
+  IF GG.KEY$ = "BASL" THEN GG.USEBASL% = (GG.VALUE$ = "Y")
+  IF GG.KEY$ = "BONLY" THEN GG.BONLY% = (GG.VALUE$ = "Y")
+  RETURN
+
+## ---- GG.SAVENAME$ in: the settings written out as a program definition. Only
+## ---- SETTINGS and SAVE PROGRAM AS come here, so a .PDEF appears on the drive
+## ---- the first time its program is set up and not before.
+GG.PDEF.WRITE:
+  GP.IF GG.SAVENAME$ = "" THEN
+    GG.RESULT$ = "No program to save"
+    RETURN
+  GP.ENDIF
+  FILE.LINE$(1) = "SRC=" + GG.SOURCE$
+  FILE.LINE$(2) = "OBJ=" + GG.OUTPUT$
+  GG.SHOW$ = "N"
+  IF GG.MAP% <> 0 THEN GG.SHOW$ = "Y"
+  FILE.LINE$(3) = "MAP=" + GG.SHOW$
+  GG.SHOW$ = "N"
+  IF GG.DEAD% <> 0 THEN GG.SHOW$ = "Y"
+  FILE.LINE$(4) = "DEAD=" + GG.SHOW$
+  GG.SHOW$ = "EMBEDDED"
+  IF GG.MODE% = 2 THEN GG.SHOW$ = "SHARED"
+  FILE.LINE$(5) = "MODE=" + GG.SHOW$
+  GG.SHOW$ = "N"
+  IF GG.USEBASL% <> 0 THEN GG.SHOW$ = "Y"
+  FILE.LINE$(6) = "BASL=" + GG.SHOW$
+  GG.SHOW$ = "N"
+  IF GG.BONLY% <> 0 THEN GG.SHOW$ = "Y"
+  FILE.LINE$(7) = "BONLY=" + GG.SHOW$
+  FILE.NAME$ = GG.SAVENAME$
+  FILE.ROWS = 7
+  GOSUB FILE.SAVEARRAY
+  GG.RESULT$ = "Saved " + GG.SAVENAME$
+  IF FILE.ERR >= 20 THEN GG.RESULT$ = "Save failed: " + FILE.MSG$
+  RETURN
+
+
+GG.DEF.SAVE:
+  GP.IF GG.DEFNAME$ = "" THEN
+    GOSUB GG.DEF.SAVEAS
+    RETURN
+  GP.ENDIF
+  GOSUB GG.DEF.WRITE
+  RETURN
+
+GG.DEF.SAVEAS:
+  GG.ASK.TITLE$ = " Save Project As "
+  GG.ASK.MSG$ = "Project Name"
+  GG.ASK.TEXT$ = GG.DEFNAME$
+  GOSUB GG.ASK.NAME
+  IF GUI.OK = 0 THEN RETURN
+  IF GUI.TEXT$ = "" THEN RETURN
+  GG.DEFNAME$ = GUI.TEXT$
+  GOSUB GG.DEF.NAME.EXT
+  GOSUB GG.DEF.WRITE
+  RETURN
+
+
+
+## ---- The project file is written a row at a time into FILE.LINE$(), which
+## ---- belongs to FILEIO and is the array FILE.SAVEARRAY reads.
+## ---- Row 1 is always the header line and the program names start at row 2,
+## ---- one a line and nothing else on it. GG.DEF.OPEN skips row 1 to match.
+## ---- GG.SAVEROWS% counts what is filled in and becomes FILE.ROWS at the end.
+GG.DEF.WRITE:
+  GG.SAVEROWS% = 1
+  FILE.LINE$(1) = GG.MAKE.HEADER$
+  GP.IF GG.FILECOUNT% > 0 THEN
+    FOR GG.I = 1 TO GG.FILECOUNT%
+      GG.SAVEROWS% = GG.SAVEROWS% + 1
+      FILE.LINE$(GG.SAVEROWS%) = GG.PROJECT.FILE.LIST$(GG.I)
+    NEXT GG.I
+  GP.ENDIF
+  FILE.NAME$ = GG.DEFNAME$
+  FILE.ROWS = GG.SAVEROWS%
+  GOSUB FILE.SAVEARRAY
+  GG.RESULT$ = "Saved " + GG.DEFNAME$
+  IF FILE.ERR >= 20 THEN GG.RESULT$ = "Save failed: " + FILE.MSG$
+  RETURN
+
+
+
+
+#INCLUDE "GG.PROGRAM.EDIT.INC.BL"
+
+
+
+
+## ***********************************************************************
+## **  THE FILE COMMANDS -- the six menu rows that work on the project's list.
+## **
+## **  The list itself is on the screen, in the information box, so none of
+## **  these opens a panel to manage it: each asks for the one thing it needs
+## **  and comes straight back. A command that works on an existing row picks
+## **  that row with GG.PICK.RUN, and one that takes a name asks with GG.ASK.NAME.
+## **
+## **  NOTHING HERE TOUCHES THE DISK except OPEN FILE..., which only looks to
+## **  see the file is there. A row is a name in a project, and dropping one
+## **  leaves the file where it is.
+## **
+## **  ONLY THE MAIN FILE IS BUILT. Building every row in turn needs the chain
+## **  that runs BASLOAD and comes back, and that is not written yet.
+## ***********************************************************************
+
+#INCLUDE "GG.FILE.PICKER.INC.BL"
+
+## ---- NEW PROGRAM: the source is picked off the drive first, because a program
+## ---- with no source to compile is of no use, and the name it suggests is the
+## ---- source without its suffix. The name is still asked for, so one source can
+## ---- carry two programs that are built different ways.
+## ----
+## ---- It becomes the current program on its defaults; no file is written for it
+## ---- until its settings are OKed, so a program never set up leaves nothing.
+## ---- The program name a source file suggests: the source with its suffix cut
+## ---- off. .TXT.BAS is tested first, because cutting .BAS off that one would
+## ---- leave the .TXT behind.
+GG.PDEF.FROM.SRC:
+  GG.BASE$ = GG.NEWSRC$
+  GG.CUT% = 0
+  IF LEN(GG.BASE$) > 8 AND RIGHT$(GG.BASE$, 8) = ".TXT.BAS" THEN GG.CUT% = 8
+  IF GG.CUT% = 0 AND LEN(GG.BASE$) > 5 AND RIGHT$(GG.BASE$, 5) = ".BASL" THEN GG.CUT% = 5
+  IF GG.CUT% = 0 AND LEN(GG.BASE$) > 3 AND RIGHT$(GG.BASE$, 3) = ".BL" THEN GG.CUT% = 3
+  IF GG.CUT% > 0 THEN GG.BASE$ = LEFT$(GG.BASE$, LEN(GG.BASE$) - GG.CUT%)
+  GG.PDEFNAME$ = GG.BASE$
+  GOSUB GG.PDEF.NAME.EXT
+  RETURN
+
+GG.FILE.NEW:
+  GP.IF GG.FILECOUNT% >= GG.MAXFILES THEN
+    GG.RESULT$ = "The project is full"
+    RETURN
+  GP.ENDIF
+  GG.PICK.EXT$ = "BASL,BL,TXT.BAS"
+  GG.PICK.WHAT$ = " Pick the Source "
+  GOSUB GG.FILE.PICK
+  IF FILEPICK.NAME$ = "" THEN RETURN
+  GG.NEWSRC$ = FILEPICK.NAME$
+  GOSUB GG.PDEF.FROM.SRC
+  GG.ASK.TITLE$ = " New Program "
+  GG.ASK.MSG$ = "Program Name"
+  GG.ASK.TEXT$ = GG.PDEFNAME$
+  GOSUB GG.ASK.NAME
+  IF GUI.OK = 0 THEN RETURN
+  IF GUI.TEXT$ = "" THEN RETURN
+  GG.PDEFNAME$ = GUI.TEXT$
+  GOSUB GG.PDEF.NAME.EXT
+  GG.ADDNAME$ = GG.PDEFNAME$
+  GG.PREVCOUNT% = GG.FILECOUNT%
+  GOSUB GG.FILE.ADD
+  IF GG.FILECOUNT% = GG.PREVCOUNT% THEN RETURN
+  GG.CURR.NDX% = GG.FILECOUNT%
+  GOSUB GG.MAIN.GET
+  GOSUB GG.PDEF.DEFAULTS
+  GG.SOURCE$ = GG.NEWSRC$
+  GG.RESULT$ = "Added " + GG.PDEFNAME$ + " on " + GG.NEWSRC$
+  RETURN
+
+## ---- LIST PROGRAMS: the .PDEF programs on the drive, and which of them
+## ---- COMPILE FILE builds. The picker reads the drive, so the name it gives
+## ---- back is known to be there. THE PROJECT LIST IS NOT TOUCHED: a name the
+## ---- project does not carry is reported and nothing moves, because a program
+## ---- joins a project through NEW FILE, not through looking at the drive.
+GG.FILE.OPEN:
+  GG.PICK.EXT$ = "PDEF"
+  GG.PICK.WHAT$ = " List Programs "
+  GOSUB GG.FILE.PICK
+  IF FILEPICK.NAME$ = "" THEN RETURN
+  GG.PICKNAME$ = FILEPICK.NAME$
+  GG.FOUNDROW% = 0
+  GP.IF GG.FILECOUNT% > 0 THEN
+    FOR GG.I = 1 TO GG.FILECOUNT%
+      IF GG.PROJECT.FILE.LIST$(GG.I) = GG.PICKNAME$ THEN GG.FOUNDROW% = GG.I
+    NEXT GG.I
+  GP.ENDIF
+  GP.IF GG.FOUNDROW% = 0 THEN
+    GG.RESULT$ = GG.PICKNAME$ + " is not in this project"
+    RETURN
+  GP.ENDIF
+  GG.CURR.NDX% = GG.FOUNDROW%
+  GOSUB GG.MAIN.GET
+  GOSUB GG.PDEF.LOAD
+  GG.RESULT$ = "Now building " + GG.PDEFNAME$
+  RETURN
+
+## ---- SAVE FILE: the name a row holds, written back.
+GG.FILE.RENAME:
+  GG.PICK.TITLE$ = " SAVE FILE "
+  GOSUB GG.PICK.RUN
+  IF GG.PICKROW% = 0 THEN RETURN
+  GG.ASK.TITLE$ = " SAVE FILE "
+  GG.ASK.MSG$ = "NAME FOR THIS ROW"
+  GG.ASK.TEXT$ = GG.PROJECT.FILE.LIST$(GG.PICKROW%)
+  GOSUB GG.ASK.NAME
+  IF GUI.OK = 0 THEN RETURN
+  IF GUI.TEXT$ = "" THEN RETURN
+  GG.PROJECT.FILE.LIST$(GG.PICKROW%) = GUI.TEXT$
+  GOSUB GG.MAIN.GET
+  GG.RESULT$ = "The row now reads " + GUI.TEXT$
+  RETURN
+
+## ---- SAVE PROGRAM AS...: the current program written out under a second name
+## ---- and joined to the project. It is one of the two commands that write a
+## ---- .PDEF, so the copy is a real file from the moment it is made.
+GG.FILE.COPY:
+  GOSUB GG.MAIN.GET
+  GP.IF GG.PDEFNAME$ = "" THEN
+    GG.RESULT$ = "No program to save"
+    RETURN
+  GP.ENDIF
+  GP.IF GG.FILECOUNT% >= GG.MAXFILES THEN
+    GG.RESULT$ = "The project is full"
+    RETURN
+  GP.ENDIF
+  GG.ASK.TITLE$ = " Save Program As "
+  GG.ASK.MSG$ = "Program Name"
+  GG.ASK.TEXT$ = GG.PDEFNAME$
+  GOSUB GG.ASK.NAME
+  IF GUI.OK = 0 THEN RETURN
+  IF GUI.TEXT$ = "" THEN RETURN
+  GG.PDEFNAME$ = GUI.TEXT$
+  GOSUB GG.PDEF.NAME.EXT
+  GG.ADDNAME$ = GG.PDEFNAME$
+  GG.PREVCOUNT% = GG.FILECOUNT%
+  GOSUB GG.FILE.ADD
+  IF GG.FILECOUNT% = GG.PREVCOUNT% THEN RETURN
+  GG.CURR.NDX% = GG.FILECOUNT%
+  GG.SAVENAME$ = GG.PDEFNAME$
+  GOSUB GG.PDEF.WRITE
+  RETURN
+
+## ---- DELETE PROGRAM: the row goes, the .PDEF file stays on the drive.
+GG.FILE.DROP:
+  GG.PICK.TITLE$ = " Delete Program "
+  GOSUB GG.PICK.RUN
+  IF GG.PICKROW% = 0 THEN RETURN
+  GG.KEEPNAME$ = GG.PROJECT.FILE.LIST$(GG.PICKROW%)
+  GG.DELROW% = GG.PICKROW%
+  GOSUB GG.FILE.DEL
+  GOSUB GG.MAIN.GET
+  GOSUB GG.PDEF.LOAD
+  GG.RESULT$ = "Dropped " + GG.KEEPNAME$
+  RETURN
+
+
+
+
+## ***********************************************************************
+## **  GG.ABOUT -- what this is, and what the machine has left.
+## ***********************************************************************
+GG.ABOUT:
+  GOSUB BANKMGR.COUNT : GOSUB GG.MAIN.GET : GOSUB GG.DIALOG.RESET.FIELDS
+  GUI.TITLE$ = " ABOUT "
+  GUI.BTN.ONE$ = "&OK" : GUI.BTN.TWO$ = ""
+  GOSUB GUI.BUTTON.SIZE
+  GUI.BODY.ROWS = 11
+  GUI.BODY.WIDTH = 46
+  IF GUI.BTN.TOTAL > GUI.BODY.WIDTH THEN GUI.BODY.WIDTH = GUI.BTN.TOTAL
+  GOSUB GUI.OPEN
+  GOSUB GUI.FORM.BEGIN
+  GP.PRINTAT GUI.INNER.LEFT, GUI.INNER.TOP, "GPC.GUI -- BUILD MANAGER", GUI.PANEL
+  GP.PRINTAT GUI.INNER.LEFT, GUI.INNER.TOP + 1, "A FRONT END FOR THE GPC COMPILER", GUI.PANEL
+  GG.SHOW$ = GG.DEFNAME$
+  IF GG.SHOW$ = "" THEN GG.SHOW$ = "(NOT SAVED)"
+  GP.PRINTAT GUI.INNER.LEFT, GUI.INNER.TOP + 3, "PROJECT   " + GG.SHOW$, GUI.PANEL
+  GG.SHOW$ = GG.PDEFNAME$
+  IF GG.SHOW$ = "" THEN GG.SHOW$ = "(NONE)"
+  GP.PRINTAT GUI.INNER.LEFT, GUI.INNER.TOP + 4, "PROGRAM   " + GG.SHOW$, GUI.PANEL
+  GP.PRINTAT GUI.INNER.LEFT, GUI.INNER.TOP + 5, "FILES     " + MID$(STR$(GG.FILECOUNT%), 2), GUI.PANEL
+  GG.SHOW$ = MID$(STR$(BANKMGR.SPARE), 2) + " FREE OF " + MID$(STR$(BANKMGR.BANKS), 2)
+  GP.PRINTAT GUI.INNER.LEFT, GUI.INNER.TOP + 7, "RAM BANKS " + GG.SHOW$, GUI.PANEL
+  GG.SHOW$ = MID$(STR$(FRE(0)), 2)
+  GP.PRINTAT GUI.INNER.LEFT, GUI.INNER.TOP + 8, "BASIC RAM " + GG.SHOW$ + " BYTES FREE", GUI.PANEL
+  GUI.BTN.Y = GUI.INNER.TOP + 10
+  GOSUB GUI.BUTTON.ROW
+  GOSUB GUI.FORM.RUN
+  GOSUB GUI.CLOSE
+  RETURN
+
+
+## ***********************************************************************
+## **  GG.COMPILE -- GPC.INPUT, then GPC.BIN. It does not come back.
+## **
+## **  The same checks and the same five lines GPC.BASL writes. DOS will not
+## **  overwrite, so last time's output, map and list are scratched first,
+## **  which is why an output named like the source is refused.
+## ***********************************************************************
+GG.COMPILE:
+  GOSUB GG.MAIN.GET
+  GP.IF GG.SOURCE$ = "" THEN
+    GG.RESULT$ = "No source. Edit the definition first"
+    RETURN
+  GP.ENDIF
+  GOSUB GG.NAMES
+  GP.IF GG.OUTNAME$ = GG.SOURCE$ THEN
+    GG.RESULT$ = "The output would overwrite the source"
+    RETURN
+  GP.ENDIF
+  GOSUB GG.FILE.CHECK
+  GP.IF GG.EXISTS% = 0 THEN
+    GG.RESULT$ = "Source not found: " + GG.SOURCE$
+    RETURN
+  GP.ENDIF
+  GP.IF GG.ISPRG% = 0 THEN
+    GG.RESULT$ = "Not a BASIC PRG. Compile the .PRG, not the .BASL"
+    RETURN
+  GP.ENDIF
+
+  OPEN 15, 8, 15
+  PRINT#15, "S:" + GG.OUTNAME$
+  IF GG.MAPNAME$ <> "" THEN PRINT#15, "S:" + GG.MAPNAME$
+  IF GG.DEADNAME$ <> "" THEN PRINT#15, "S:" + GG.DEADNAME$
+  CLOSE 15
+
+  OPEN 1, 8, 2, "@:GPC.INPUT,S,W"
+  PRINT#1, GG.SOURCE$
+  PRINT#1, GG.OUTNAME$
+  PRINT#1, GG.MAPNAME$
+  PRINT#1, GG.SHAREWORD$
+  PRINT#1, GG.DEADNAME$
+  CLOSE 1
+
+  GOSUB APPSYS.RESTORE : GOSUB KB.CLEARKB
+  LOAD "GPC.BIN"
+  END
+
+
+## ---- GG.EXISTS% is -1 when GG.SOURCE$ opens, GG.ISPRG% when it also loads at $0801.
+## ---- Strings compared, not ASC(): GET# hands back "" on an empty file.
+GG.FILE.CHECK:
+  GG.EXISTS% = 0 : GG.ISPRG% = 0
+  OPEN 15, 8, 15
+  OPEN 2, 8, 3, GG.SOURCE$ + ",P,R"
+  GET#2, GG.LOBYTE$
+  GET#2, GG.HIBYTE$
+  INPUT#15, GG.ERRNUM, GG.ERRMSG$, GG.ERRTRACK, GG.ERRSECTOR
+  CLOSE 2 : CLOSE 15
+  IF GG.ERRNUM < 20 THEN GG.EXISTS% = -1
+  IF GG.LOBYTE$ = CHR$(1) AND GG.HIBYTE$ = CHR$(8) THEN GG.ISPRG% = -1
+  RETURN

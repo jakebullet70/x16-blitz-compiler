@@ -1,12 +1,15 @@
 ---
 name: region-overlay-ovl-file
-description: "BUILT: every GP.BANKED region goes to its own NAME.nnn file, the bank in three digits from .002 to .255, that the bootstrap LOADs straight into its bank, so region bytes never enter low RAM or the 24,063-byte file ceiling"
+description: "BUILT: every GP.BANKED region of a program goes into ONE self-describing NAME.OVL that the bootstrap reads through ACPTR, bank byte and page count ahead of each region, so region bytes never enter low RAM or the file ceiling"
 metadata:
   type: project
 ---
 
-**Designed 2026-09-08, built the same day.** GPBMODS fell from 23,553 bytes to 10,249 and GPBFILES
-went from `PROGRAM TOO BIG` to 13,538. Cost: +305 bytes of compiler, none of runtime.
+**Designed 2026-09-08, built the same day** as one `NAME.nnn` file a region. **Replaced 2026-09-17
+by one `NAME.OVL` for the whole program**, to the plan in
+[docs/blitz/OVERLAY-SINGLE-FILE.PLAN.md](../blitz/OVERLAY-SINGLE-FILE.PLAN.md). The gain that
+mattered was never the file count: GPBMODS fell from 23,553 bytes to 10,249 and GPBFILES went from
+`PROGRAM TOO BIG` to 13,538, and that is the `.nnn` work, which `.OVL` keeps whole.
 
 ## The problem it solved
 
@@ -16,42 +19,63 @@ arrive: it was compiled into the object, LOADed at `$0801` with everything else,
 copied up to `$A000`. Eight regions of 8K would have been 64K against a 24K file. **The region cap
 was never what bound; the file was.**
 
-## What was built
+## The file, as it is now
 
-**One file per region, named by its bank** — `GPBMODS.005`. Not the single `.OVL` the design
-first chose: that wanted consecutive banks and 8K of padding a region on disk, and per-region
-files want neither. The compiler writes each one at `ObjStreamClose`, after the source is finished,
-scratching it by exact name first because `"name,S,W"` refuses to open over a file that exists.
+**One `NAME.OVL` for the whole program, self-describing.** Its whole grammar:
 
-**The extension page holds a 32-byte bitmap, one bit a bank, and the highest bank.** It was one
-byte a region, terminated by 0, until `docs/blitz/ALL-BANKS.PLAN.md` (2026-09-14). The compiler
-bakes in ONE name template ending `000` and the bootstrap pokes each bank's three digits in,
-because N names at 16 characters would not fit the page. Before loading anything the page calls
-`MEMTOP`, and a machine without the highest bank prints `?RAM` and returns to READY.
+    bank byte, page count byte, pagecount * 256 bytes of region      repeated, then EOF
 
-**Secondary address 1 is the whole trick.** It makes the KERNAL honour the file's own two-byte load
-address and ignore the address in X/Y, so an overlay whose header says `$A000` lands at `$A000`.
-Selecting the bank in `$00` is then the entire bank handling, and `bootstrap2.asm`'s copy loop is
-gone. **The bytes never enter the low 40K at all.**
+No directory, no length table, no bank bitmap, no load address. Every region is padded up to a
+whole page, which is what keeps the count in one byte: the region ceiling is 8,188 bytes, 32 pages.
+Order does not matter and gaps do not matter — a program with regions in banks 4 and 200 writes
+them in that order and the reader follows.
 
-**A missing overlay prints `?OVL` and stops.** Running whatever the bank happened to hold is the one
-failure this must not have.
+**The compiler opens it at the first region and holds it open across the rest of pass two**, writing
+each region's two header bytes and then its bank, and scratching the file by exact name before the
+first write because `"name,S,W"` refuses to open over a file that exists. A program with no
+`GP.BANKED` writes no `.OVL` at all.
 
-## What was decided against, and why
+**The bootstrap extension page reads it through `ACPTR`, not `LOAD`** — `bootstrap2.asm`, 166 bytes
+at `$0900`, still one page with 7 bytes to spare before the pinned `GPBSTRBANKS` table at `$09F0`.
+It OPENs on logical file 2, secondary 2 (a data channel: the file has no load address and does not
+go to one place), then per region reads the bank byte, `READST` for EOF, checks it against `MEMTOP`,
+selects it in `$00`, reads the page count and fills that many pages through a self-modifying store.
+`READST` is checked once per page, so a truncated file stops rather than running.
 
-- **No version stamp pairing `.PRG` to `.nnn`.** The programmer owns stale overlays, by decision.
-- **No wildcard sweep of old overlays** — see [[wildcard-scratch-eats-the-source]]. `S0:NAME.B*`
-  deleted `NAME.BASL` when overlays were `.Bnn`. Exact-name scratching covers what the sweep was for.
-- **A letter in the extension.** `.Bnn` capped the bank at 99, and `GPBankCheckBankNumber` refused
-  100 up by name. Three digits and no `B` came to 1 byte more in `ObjBuildOverlayName`, and every
-  bank a 2 MB X16 has now has a name.
+**The name is baked in whole, and the page pokes nothing into it.** `ObjBuildOverlayName` builds
+`<object>.OVL` once, and 48 bytes of the page hold it with its length.
+
+**A missing or short overlay prints `?OVL` and stops; a bank above `MEMTOP` prints `?RAM`.** Both
+close the file first. Running whatever the bank happened to hold is the one failure this must not
+have.
+
+**The cost is startup time, and only startup time.** Eight `BLOAD`s of GPBMODS' `.nnn` files took
+1 jiffy; the `ACPTR` walk of its 32,016-byte `.OVL` takes **75 jiffies, 1.25 s**, under hostfs, which
+flatters the baseline and not the reader — see [[overlay-in-prg-research]] for the measurement. The
+load happens once per load, not once per RUN: `BXHigh` is the guard and a second RUN skips the lot.
+
+## What the old shape was, and why it went
+
+**One file per region, named by its bank** — `GPBMODS.005`, `.002` to `.255`. It was chosen over a
+single `.OVL` in 2026-09-08 because the design of the day wanted consecutive banks and 8K of padding
+a region on disk. Putting the bank and the page count *in* the file costs neither, which is what
+reopened it. The extension page's 32-byte bank bitmap, its three-digit name poker and its
+`BBTryLoad` calls all went with it, and paid for the reader.
+
+**Secondary address 1 was the whole trick of the old shape.** It made the KERNAL honour the file's
+own two-byte load address, so an overlay whose header said `$A000` landed at `$A000` and selecting
+the bank in `$00` was the entire bank handling. The `.OVL` has no load address per region, so this
+no longer applies — but see the fact below, which is still true.
+
+**Still decided against: no version stamp pairing `.PRG` to `.OVL`.** The programmer owns a stale
+overlay, by decision. And still **no wildcard sweep** — [[wildcard-scratch-eats-the-source]];
+`S0:NAME.B*` deleted `NAME.BASL` when overlays were `.Bnn`. One exact name is now the whole sweep.
 
 ## The fact worth keeping on its own
 
-**LOAD into banked RAM auto-increments the bank crossing `$BFFF`**, so setting the bank IS the whole
-of the bank handling — `source/runtime/_library.asm:4403` and `docs/x16/X16 Reference - 04 - BASIC.md`
-line 417. Per-region files never cross `$BFFF`, so this is not relied on here any more, but it is true
-and [[macptr-wraps-banks-itself]] is its neighbour.
+**LOAD into banked RAM auto-increments the bank crossing `$BFFF`** — `source/runtime/_library.asm:4403`
+and `docs/x16/X16 Reference - 04 - BASIC.md` line 417. Nothing here relies on it any more, but it is
+true and [[macptr-wraps-banks-itself]] is its neighbour.
 
 `$030D/$030E` hold the end address after a LOAD and `$00` the ending bank, so a caller can check a
 file arrived whole for free.
@@ -60,31 +84,30 @@ file arrived whole for free.
 
 Region bytes stopped counting against the file, which is what made raising the region count worth
 doing at all — do it the other way round and you only move where `PROGRAM TOO BIG` fires.
-`GPBANK_MAXREGIONS` is **127** now, code and text together. Seven region tables are two bytes a
-region and are read with the region doubled into X or Y, and 127 is the most a byte holds doubled.
-It does not limit the bank numbers: regions use banks 2 to 255. The 1K storage hole capped the
-count at 16 until the region tables moved into the **code section**, which is the compiler's own
-image and is thrown away when the object is written: they cost a compiled program nothing there,
-and no access site had to change. Measured: `BNK255` has code regions in banks 255, 100 and 2 and
-text in bank 254; it runs at `-ram 2048` and stops with `?RAM` at 512K. See
+`GPBANK_MAXREGIONS` is **127**, code and text together. Seven region tables are two bytes a region
+and are read with the region doubled into X or Y, and 127 is the most a byte holds doubled. It does
+not limit the bank numbers: regions use banks 2 to 255. The 1K storage hole capped the count at 16
+until the region tables moved into the **code section**, which is the compiler's own image and is
+thrown away when the object is written: they cost a compiled program nothing there, and no access
+site had to change. Measured: `BNK255` has code regions in banks 255, 100 and 2 and text in bank
+254; it runs at `-ram 2048` and stops with `?RAM` at 512K. See
 [[compiler-must-not-cap-program-size]].
 
 **Resident p-code is still capped by the workspace test** — this never touched that, and GPBMODS
 proves it: its object fell by 13K while its free-memory figure did not move.
 
-## A .nnn FILE SIZE IS A PAGE COUNT, NOT A BYTE COUNT
+## A REGION'S SIZE IS A PAGE COUNT, NOT A BYTE COUNT
 
-**Only the topmost region is unpadded.** Every other one is rounded up to a whole page, so its
-`.nnn` is always a multiple of 256 plus the 2-byte load address and says NOTHING about the bytes
-inside its last page. `GPBMODS` has five regions and its `.004` read 7,168 / 7,680 / 7,936 / 8,192
-across four phases of the GUI refactor -- four exact page counts, quoted in the plan for three
+**Every region is padded to a whole page now, the topmost one included** — the old `.nnn` shape left
+the topmost unpadded, and that exception is gone. The page count in the file says NOTHING about the
+bytes inside the last page. `GPBMODS` has five regions and its `.004` read 7,168 / 7,680 / 7,936 /
+8,192 across four phases of the GUI refactor — four exact page counts, quoted in the plan for three
 phases as if they were code sizes, with a "free of 8,192" column derived from them. They were the
-padding. The same six modules built into `GUIFRMT`, which has ONE region and no padding, measured
-7,852 and then 8,033.
+padding. The same six modules built into `GUIFRMT`, which has ONE region, measured 7,852 and 8,033.
 
-**To measure a region, build it in a program where it is the only one**, or where it is topmost.
-The ceiling is **8,188**, not 8,192: `gpbank.asm:582` refuses a 33rd page and counts four bytes of
-bridges into the length.
+**To measure a region, build it in a program where it is the only one.** The ceiling is **8,188**,
+not 8,192: `gpbank.asm:582` refuses a 33rd page and counts four bytes of bridges into the length.
 
-Related: [[gp-bankedstr-literal-text-in-a-bank]], [[object-writer-regions-vs-low-code]],
-[[load-chain-clears-memory]] (a LOAD-chained set needs its own overlays per program).
+Related: [[overlay-in-prg-research]], [[gp-bankedstr-literal-text-in-a-bank]],
+[[object-writer-regions-vs-low-code]], [[load-chain-clears-memory]] (a LOAD-chained set needs its
+own overlay per program).

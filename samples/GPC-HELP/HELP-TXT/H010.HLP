@@ -50,7 +50,7 @@
 .
 .  Addresses
 .      COMPOSITE
-.      GP.HIBYTE GP.LOBYTE -- free, see SEC 3.3
+.      GP.HIBYTE GP.LOBYTE -- free, see SEC 3.3.1
 .
 .  Arrays
 .      ASM

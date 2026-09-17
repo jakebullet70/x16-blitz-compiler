@@ -15,7 +15,7 @@ rem  its build have to sit beside the PRG on the drive. See samples\GPC-HELP\rea
 rem  for the measurements behind the three design decisions.
 rem ---------------------------------------------------------------------------
 setlocal
-set "ROOT=%~dp0"
+for %%I in ("%~dp0..") do set "ROOT=%%~fI\"
 set "DRIVE=%ROOT%samples\GPC-HELP"
 set "X16EMU=%ROOT%bin\x16emu\x16emu.exe"
 set "ROM=%ROOT%bin\x16emu\rom.bin"

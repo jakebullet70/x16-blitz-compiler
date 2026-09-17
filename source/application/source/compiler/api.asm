@@ -81,7 +81,7 @@ _CAEndPass0:
 ; ************************************************************************************************
 ;
 ;		A region is opening, and closing. One scratch bank serves them all, so it is cleared to the
-;		padding byte as each one opens and emptied to the region's own .nnn as each one closes.
+;		padding byte as each one opens and appended to the object's one .OVL as each one closes.
 ;
 ; ************************************************************************************************
 

@@ -207,7 +207,7 @@ _BBGo:
 		;		straight here from the bootstrap.
 		;
 		;		A banked program carries a second bootstrap page (bootstrap2.asm) at $0900, which
-		;		copies its regions into their banks; its p-code therefore starts at $0A00 rather
+		;		reads its regions in from a NAME.OVL file; its p-code starts at $0A00 rather
 		;		than $0900. So WriteObjectCode patches the base page to $0A and this jmp to
 		;		$0900, and the extension page does this same handover itself once it is done.
 		;		A program with no region gets $09 and RT_ENTRY -- the bytes already in the
@@ -234,8 +234,9 @@ BBRunJmp:
 ; ------------------------------------------------------------------------------------------------
 ;		LOAD a file with secondary address 1, which makes the KERNAL honour the file's own load
 ;		address -- RTGPBASE, RTBASE, or $A000 in the bank selected -- and ignore the one in X/Y.
-;		BBTryLoad takes the name as SETNAM does, length in A and address in X/Y, and bootstrap2.asm
-;		calls it for the regions; BBLoad sets those three up for the runtime's name first. Logical
+;		BBTryLoad takes the name as SETNAM does, length in A and address in X/Y, and BBLoad sets
+;		those three up for the runtime's name first. The regions used to come in this way too,
+;		one file a bank; they arrive through bootstrap2.asm's own reader now. Logical
 ;		file 0 (file 1 has been seen to hang a later OPEN). Loading high never touches $0801 or the
 ;		p-code, so this bootstrap survives its own load. Returns carry clear on success, set if the
 ;		file is not there -- so the caller can just try the next name.

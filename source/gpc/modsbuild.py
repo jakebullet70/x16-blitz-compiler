@@ -59,13 +59,13 @@ for stem in sys.argv[1:]:
     obj = os.path.join(TESTING, stem + ".PRG")
     print("   compiled:", os.path.getsize(obj) if os.path.exists(obj) else "MISSING")
 
-    # ONLY overlays this build wrote.  The old loop printed any .B0* it found, so a
+    # ONLY the overlay this build wrote.  The old loop printed any .B0* it found, so a
     # failed compile reported the PREVIOUS build's overlays as if they were new.
     #
-    # THE SUFFIX IS .nnn, the bank in three digits from 002 to 255.  Nothing else a
-    # build writes beside the program ends in three digits.
+    # THERE IS ONE FILE, stem.OVL, holding every region of the program behind its own
+    # bank and page-count bytes.  It used to be a .nnn file a bank.
     for f in sorted(os.listdir(TESTING)):
-        if f.startswith(stem + ".") and len(f) == len(stem) + 4 and f[-3:].isdigit():
+        if f == stem + ".OVL":
             p = os.path.join(TESTING, f)
             fresh = os.path.getmtime(p) >= started
             print("   overlay", f, os.path.getsize(p), "" if fresh else "<-- STALE, not from this build")

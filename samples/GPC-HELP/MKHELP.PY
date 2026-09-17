@@ -115,13 +115,12 @@ BANNER_ONLY = [
 MOD_SKIP = ["GPB.INC.BL"]
 
 TIER_NOTE = {
-    "ASM": "ASM -- a keyword, run by machine code in the GP runtime block. "
-           "A program using ANY GP keyword pays for the whole block.",
-    "BASIC": "BASIC -- a .INC.BL module of ordinary BASL, called with GOSUB. "
-             "Costs nothing unless you #INCLUDE it.",
-    "COMPOSITE": "COMPOSITE -- a keyword with no machine code of its own. The "
-                 "compiler expands it into keywords that already exist, so it "
-                 "costs the runtime nothing at all.",
+    "ASM": "ASM -- machine code in the GP runtime block. One GP keyword "
+           "pays for the whole block.",
+    "BASIC": "BASIC -- ordinary BASL in a .INC.BL, called with GOSUB. "
+             "Free unless you #INCLUDE it.",
+    "COMPOSITE": "COMPOSITE -- no machine code. The compiler expands it into "
+                 "keywords that already exist. Runtime cost is zero.",
 }
 
 TRANSLIT = [
@@ -148,8 +147,12 @@ DROPPED = {}
 #  Inline markdown -> plain ASCII
 # ---------------------------------------------------------------------------
 
+BR_RE = re.compile(r"<br\s*/?>", re.I)
+
+
 def inline(s):
     """One line of markdown body text as plain ASCII, links flattened."""
+    s = BR_RE.sub(" ", s)
     s = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", s)
     s = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", s)
     s = s.replace("**", "").replace("``", "`")
@@ -379,14 +382,16 @@ def emit_table(e, rows):
         e.blank()
         e.text(inline(cells[0]), indent="    ", first="  ")
         for j in range(1, len(cells)):
-            val = inline(cells[j])
-            if not val:
+            # A cell may hold several entries, one per <br>. They are separate
+            # names, so they get separate lines rather than running together.
+            parts = [p for p in (inline(x) for x in BR_RE.split(cells[j])) if p]
+            if not parts:
                 continue
             lab = labels[j] if j < len(labels) and labels[j] else ""
-            if lab:
-                e.text(val, indent="        ", first="      " + lab + ": ")
-            else:
-                e.text(val, indent="        ", first="      ")
+            first = "      " + lab + ": " if lab else "      "
+            for val in parts:
+                e.text(val, indent="        ", first=first)
+                first = " " * len(first)
 
 
 # ---------------------------------------------------------------------------

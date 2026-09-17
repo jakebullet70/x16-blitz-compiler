@@ -42,6 +42,11 @@
 .      BASIC
 .      STASHVRAMGC.INC.BL -- SV.COMPACT - SEC 4.19
 .
+.The rule is in SEC 1: assembly for tight loops and bulk data moves, BASIC
+.for everything else, and a composite for anything that is only a spelling of
+.keywords already present. A menu waits on a human, so MENUVERT is BASIC; as
+.a keyword it would cost every GP program 462 bytes whether or not it used a
+.menu.
 .
 .The keywords in detail. Square brackets mean optional. Optionals cannot be
 .skipped over: GP.BOX X,Y,W,H,,7 is a syntax error -- write out the default
@@ -49,15 +54,15 @@
 .
 =SEE ALSO
 .
->59|4. Module reference -- the BASL library
->38|3.8 Block IF
->39|3.9 Inline assembly
->28|3.4 Strings
->26|3.3 Machine code
->46|3.10 Text in a bank
->47|3.11 Calling a routine in one statement
->61|4.1 THEME.INC.BL -- named colour roles
->62|4.2 STRINGS.INC.BL -- string helpers
->64|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
->65|4.4 LINEINPUT.INC.BL -- a positioned entry field
->66|4.5 BMX.INC.BL -- a BMX bitmap into VERA
+>63|4. Module reference -- the BASL library
+>42|3.8 Block IF
+>43|3.9 Inline assembly
+>32|3.4 Strings
+>31|3.3.1 GP.HIBYTE / GP.LOBYTE -- split an address into two bytes
+>50|3.10 Text in a bank
+>51|3.11 Calling a routine in one statement
+>65|4.1 THEME.INC.BL -- named colour roles
+>66|4.2 STRINGS.INC.BL -- string helpers
+>75|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>76|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>77|4.5 BMX.INC.BL -- a BMX bitmap into VERA

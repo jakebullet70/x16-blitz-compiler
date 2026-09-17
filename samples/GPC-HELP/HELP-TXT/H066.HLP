@@ -1,117 +1,113 @@
-@3. The modules
+@1. The prefixes that are taken
 .
-=3. THE MODULES
+=1. THE PREFIXES THAT ARE TAKEN
 .
-.Each table is in (set before the GOSUB), out (read after it), and internal
-.(do not read, do not write, do not rely on).
+.  GP.
+.      OWNER: GPB.INC.BL
+.      WHAT IT IS: keywords, not variables -- see SEC 2, this one is
+.        different
 .
-=THEME.INC.BL
+.  STR.
+.      OWNER: STRINGS.INC.BL
+.      WHAT IT IS: string helpers
 .
-.  in
-.      THEME.ID -- 0 x16, 1 dark, 2 light, 3 gray, 4 custom, read by
-.        THEME.SELECT<br>THEME.ATTR -- a packed attribute, for THEME.SET and
-.        THEME.HI
+.  STR.USING.
+.      OWNER: STRUSING.INC.BL
+.      WHAT IT IS: a number to a template, kept apart from the rest of STR.
 .
-.  out
-.      THEME.CLR(role) -- the colour array, DIMmed to
-.        THEME.SLOTS<br>THEME.INV -- the inverse attribute, from THEME.HI
+.  THEME.
+.      OWNER: THEME.INC.BL
+.      WHAT IT IS: colour roles
 .
-.  internal
-.      THEME.READY
+.  APPSYS.
+.      OWNER: APPSYS.INC.BL
+.      WHAT IT IS: screen save/restore, panels to disk
 .
-.  constants
-.      THEME.PAGE THEME.TEXT THEME.TITLE THEME.BORDER THEME.HILITE
-.        THEME.DIMMED THEME.WARN THEME.FOCUS THEME.SLOTS THEME.COUNT
+.  LINEINPUT.
+.      OWNER: LINEINPUT.INC.BL
+.      WHAT IT IS: entry fields
 .
-.THEME.CLR is the array this module DIMs. Do not DIM it yourself -- the
-.module owns it, and DIMming an array GPC has already dimensioned is an
-.error.
+.  KB.
+.      OWNER: KB.INC.BL
+.      WHAT IT IS: the keyboard drain
 .
-.The routine is THEME.SELECT, and it used to be THEME.LOAD. The name changed
-.when the library was split into banked and low-memory files, and it stayed
-.when they were merged again; a program written against the older library
-.calls THEME.LOAD and stops with LABEL NOT FOUND, which is the good kind of
-.failure.
+.  MENUVERT.
+.      OWNER: MENUVERT.INC.BL
+.      WHAT IT IS: vertical menus
 .
-.THEME.FOCUS is the eighth role and the newest: the attribute a focused
-.control wears while GUI.FORM has the keyboard. THEME.SLOTS is 8 because of
-.it, and THEME.COUNT stays 5 -- the first is how many roles there are, the
-.second how many themes.
+.  MENUBAR.
+.      OWNER: MENUBAR.INC.BL
+.      WHAT IT IS: the other axis -- a horizontal menu bar
 .
-=APPSYS.INC.BL
+.  GUI.
+.      OWNER: GUI.INC.BL
+.      WHAT IT IS: the dialogs, the box they sit in, and the form that runs
+.        them
 .
-.  in
-.      APPSYS.FILE$ APPSYS.BANK APPSYS.X APPSYS.Y APPSYS.W APPSYS.H
-.        APPSYS.DEV -- the panel routines
+.  GUI.LISTBOX.
+.      OWNER: GUI2.INC.BL
+.      WHAT IT IS: the listbox dialog, kept apart from the rest of GUI.
 .
-.  out
-.      APPSYS.MODE APPSYS.COLS APPSYS.ROWS APPSYS.COLOUR -- set by
-.        APPSYS.STARTUP<br>APPSYS.IS.EMULATOR -- set by APPSYS.ISEMU
+.  STASH.
+.      OWNER: STASH.INC.BL
+.      WHAT IT IS: a text rectangle into a RAM bank, and back
 .
-.  internal
-.      APPSYS.LAST
+.  STASH.FILE.
+.      OWNER: STASHFILE.INC.BL
+.      WHAT IT IS: the same rectangle through a file, kept apart from the
+.        rest of STASH.
 .
-.  constants
-.      APPSYS.SCRMODE APPSYS.COLREG APPSYS.SETCHR APPSYS.CHRREG APPSYS.EMUSIG
+.  SORT.
+.      OWNER: SORT.INC.BL
+.      WHAT IT IS: shell sort a string array in place
 .
-.Lay the screen out from APPSYS.COLS and APPSYS.ROWS. Do not assume 80x60 --
-.the X16 boots there but SCREEN 0 is 40x30, and someone who prefers larger
-.text is running one.
+.  STRCASE.
+.      OWNER: STRCASE.INC.BL
+.      WHAT IT IS: case, rewriting a string in place
 .
-=STRINGS.INC.BL
+.  BMX.
+.      OWNER: BMX.INC.BL
+.      WHAT IT IS: BMX bitmap loading
 .
-.  in
-.      STR.STR$ -- the string, in and out<br>STR.WIDTH -- field width, the
-.        pad routines<br>STR.DELIM$ STR.MAX -- SPLIT (MAX 0 means
-.        10)<br>STR.FIND$ STR.REPL$ -- REPLACE<br>STR.PET -- a PETSCII code,
-.        PET2SCR<br>STR.AT STR.CUT STR.SUB$ -- SPLICE, and AT/CUT are CLAMPED
-.        in place<br>STR.PTR -- GP.STRPTR of the string, the three trims
+.  BMXK.
+.      OWNER: BMX.INC.BL
+.      WHAT IT IS: its KERNAL/VERA constants, kept apart from its variables
 .
-.  out
-.      STR.STR$ -- padded, or replaced, in place<br>STR.N -- how many fields
-.        SPLIT found, always >= 1<br>STR.FIELD$(1..N) -- the fields
-.        themselves<br>STR.SCR -- the screen code from PET2SCR<br>STR.STR$ --
-.        spliced, when it was SPLICE that was called
+.  FILE.
+.      OWNER: FILEIO.INC.BL
+.      WHAT IT IS: the drive: status, exists, delete, rename, directories
 .
-.  internal
-.      STR.GAP STR.HALF STR.REST$ STR.AT STR.LIM STR.OUT$<br>STR.ADDR%
-.        STR.OP% STR.KEEP% -- the {VAR} slots the trim blob reads
+.  FILE.DIR.
+.      OWNER: FILEDIR.INC.BL
+.      WHAT IT IS: reading a directory, kept apart from the rest of FILE.
 .
-.STR.FIELD$ is the one array the library does not DIM. Left alone, GPC's
-.implicit DIM gives 0..10. For more, DIM it before the first call and set
-.STR.MAX to match -- DIMming an array GPC has already auto-dimensioned is an
-.error, so it is one or the other. This is the opposite of THEME.CLR, which
-.the module owns outright; the two are worth keeping straight.
+.  SV.
+.      OWNER: STASHVRAM.INC.BL
+.      WHAT IT IS: the VRAM store. SVGC. is STASHVRAMGC.INC.BL's one constant
 .
-=STRUSING.INC.BL
+.  KV.
+.      OWNER: KV.INC.BL
+.      WHAT IT IS: keys and values in one RAM bank
 .
-.  in
-.      STR.USING.NUM -- the value, both routines<br>STR.USING.MASK$ -- the
-.        template, STR.USING<br>STR.USING.DP -- decimal places, STR.USING.FIX
+.Pick anything else for your own program. AIRLIFT., GAME., MAP. -- a prefix
+.costs nothing at runtime because BASLOAD crunches every identifier down to a
+.short BASIC variable, so a long readable name and a two-letter one compile
+.to exactly the same thing.
 .
-.  out
-.      STR.USING.STR$ -- the result: a field from STR.USING, digits from
-.        STR.USING.FIX<br>STR.USING.OVR -- -1 when the value scaled past 1e9
-.        and the digits are unusable<br>STR.USING.SGN -- -1 when the ROUNDED
-.        value is negative
+.Do not reuse a taken prefix for a name the module has not defined.
+.THEME.MINE looks free today; it is one library update away from not being.
 .
-.  internal
-.      STR.USING.INT$ STR.USING.FRC$ STR.USING.SIGN$ STR.USING.OUT$
-.        STR.USING.C$<br>STR.USING.IW STR.USING.ZW STR.USING.Z STR.USING.W
-.        STR.USING.F<br>STR.USING.GRP STR.USING.PT STR.USING.I STR.USING.V
+=SEE ALSO
 .
-.STR.USING.DP is an output of STR.USING and an input to STR.USING.FIX. The
-.mask carries the decimal count, so STR.USING overwrites whatever was there.
-.A program alternating the two routines must set STR.USING.DP again before
-.every FIX.
-.
-.STR.USING.INT$ and STR.USING.FRC$ survive a call and are the two halves of
-.the digits, without sign, point or field. They are listed internal because
-.their width is the routine's business, not the caller's -- read
-.STR.USING.STR$.
-.
-.The prefix is STR.USING., a sub-prefix of STRINGS.INC.BL's STR., on the same
-.footing as FILE.DIR. inside FILE.. Nothing here is written by STRINGS.INC.BL
-.and nothing there is written by this module, so either can be included
-.alone.
-.
+>7|2. Using it
+>66|4.2 STRINGS.INC.BL -- string helpers
+>88|4.10 STRUSING.INC.BL -- a number to a template
+>65|4.1 THEME.INC.BL -- named colour roles
+>75|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>76|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>94|4.14 KB.INC.BL -- the keyboard buffer, emptied
+>78|4.6 MENUVERT.INC.BL -- a vertical menu
+>87|4.9 MENUBAR.INC.BL -- a horizontal menu
+>89|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
+>92|4.12 GUI2.INC.BL -- a listbox, single or multi select
+>108|STASH.INC.BL -- save a text rectangle, and put it back.

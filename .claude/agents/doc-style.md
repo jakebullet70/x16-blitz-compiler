@@ -122,6 +122,25 @@ machine keeps its own case — `OUT OF MEMORY` is a quotation, not emphasis.
 
 ## The help system
 
+### The brief
+
+Every help topic is written to this brief, and a topic you edit is **rewritten** to it:
+
+> Document the software as it currently works. Do not discuss its history, previous behavior,
+> deprecated approaches, or background theory. Write concise, practical programmer documentation
+> with clear headings, exact details, and one or two useful examples. Include prerequisites, usage,
+> parameters, outputs, errors, defaults, and limitations when relevant. Use code blocks for code and
+> commands. Do not speculate or add filler.
+
+This is not a rule for new topics only. Touching a topic for any reason means it comes out
+conforming, and prose already there that argues, recounts or pads is cut in the same pass. Hand
+edits carry no protection, including the user's own.
+
+Read against the slots below: prerequisites and defaults belong in `Kind` and `Notes`, errors and
+limitations in `Notes` and `WARNING`, usage in `Syntax` and the example. A slot with nothing exact
+to say is omitted, not filled. Where the brief says one or two examples, an entry here gets
+**one** — the `Example` slot, and a second example is not added.
+
 ### Do not edit `.HLP`
 
 `HELP-TXT/*.HLP` and `GPB.HELP.IDX` are **generated**. `samples/GPC-HELP/MKHELP.PY` builds them,

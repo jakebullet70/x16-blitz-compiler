@@ -34,7 +34,7 @@ CompileCode:
 		;		GP.BANKED needs to know where the p-code will RUN, and it needs it INSIDE the
 		;		compile: pass two resolves the branches that cross into the bank as it writes
 		;		them. That is the shared constant PCODE_PAGE, because only a shared program can
-		;		bank: an embedded object is one file, and every region is a .nnn file of its own.
+		;		bank: an embedded object is one file, and the regions are in a .OVL beside it.
 		;		GP.BANKED and GP.BANKEDSTR refuse an embedded compile at their own line, from
 		;		gpBankShared.
 		;

@@ -10,7 +10,8 @@
 =WHAT IT COSTS
 .
 .  ASM: GP.CALL GP.A GP.X GP.Y GP.C
-.    ASM -- a keyword, run by machine code in the GP runtime block.
+.    ASM -- machine code in the GP runtime block. One GP keyword pays for the
+.    whole block.
 .
 =DESCRIPTION
 .
@@ -21,7 +22,7 @@
 .error. They share SYS's $030C-$030F, so they also read what a plain SYS left
 .behind.
 .
-:GP.CALL $FF5F, 0, 0, 0, 1          ' KERNAL screen_mode, carry set = report
+:GP.CALL $FF5F, 0, 0, 0, 1 : REM KERNAL screen_mode, carry set = report
 :COLS = GP.X : ROWS = GP.Y
 .
 .Put machine code in banked RAM, $A000-$BFFF, not at $0400. Stock X16 BASIC
@@ -29,33 +30,13 @@
 .holds runtime state (stringHighMemory, storeStartHigh, variableStartPage),
 .and code POKEd over it corrupts the program without raising an error.
 .
-=Splitting an address -- GP.HIBYTE / GP.LOBYTE
-.
-.  GP.HIBYTE(n)
-.      DOES: INT(n / 256) -- which 256-byte page. Composite
-.
-.  GP.LOBYTE(n)
-.      DOES: MOD(n, 256) -- the offset within it. Composite
-.
-.A 6502 address is sixteen bits and everything that consumes one takes eight
-.bits at a time: GP.CALL's registers, VERA's $9F20/$9F21. Every address
-.passed from BASIC to machine code is therefore split. GP.STRPTR and
-.GP.ARRPTR produce the addresses to pass:
-.
-:P = GP.STRPTR(A$)
-:GP.CALL $A000, GP.LOBYTE(P), GP.HIBYTE(P)
-.
-.Do not write P AND 255 for the low byte. AND is 16-bit signed in GPC, and
-.any address worth splitting is above 32,767 (the string heap always is), so
-.it raises OUT OF RANGE rather than masking. GP.LOBYTE is built on MOD, which
-.uses the full 32-bit divide.
-.
-.Range is 0-65,535, which covers every address on the machine. Both are
-.composite: no runtime code, compiling to INT(n/256) and MOD(n,256).
-.
 .For anything longer than a few bytes use GP.ASM (SEC 3.9) instead of GP.CALL
 .and a POKE loop. It assembles into the program: no bank to reserve, and no
 .list of numbers to keep in step with a comment.
+.
+=IN THIS SECTION
+.
+>31|3.3.1 GP.HIBYTE / GP.LOBYTE -- split an address into two bytes
 .
 =EXAMPLE PROGRAM
 .
@@ -63,4 +44,4 @@
 .
 =SEE ALSO
 .
->39|3.9 Inline assembly
+>43|3.9 Inline assembly

@@ -24,7 +24,7 @@ rem  shipped in samples\color-test\GPC-BASIC\ beside it. See that folder's
 rem  readme.md for the two-step rebuild.
 rem ---------------------------------------------------------------------------
 setlocal
-set "ROOT=%~dp0"
+for %%I in ("%~dp0..") do set "ROOT=%%~fI\"
 set "DRIVE=%ROOT%testing"
 set "X16EMU=%ROOT%bin\x16emu\x16emu.exe"
 set "ROM=%ROOT%bin\x16emu\rom.bin"

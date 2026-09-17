@@ -1,34 +1,47 @@
-@4.14 KB.INC.BL -- the keyboard buffer, emptied
+@4.12 GUI2.INC.BL -- a listbox, single or multi select
 .
-=4.14 KB.INC.BL -- THE KEYBOARD BUFFER, EMPTIED
-.
-=WHAT IT COSTS
-.
-.    BASIC -- a .INC.BL module of ordinary BASL, called with GOSUB. Costs
-.    nothing unless you #INCLUDE it.
+=4.12 GUI2.INC.BL -- A LISTBOX, SINGLE OR MULTI SELECT
 .
 =DESCRIPTION
 .
-.  KB.CLEARKB
-.      IN: --
-.      OUT: --
+.  GUI.LISTBOX
+.      IN: GUI.LISTBOX.COUNT .ROWS .MULTI .MARKS$ .SEL, over MENUVERT.ITEM$()
+.      OUT: GUI.LISTBOX.SEL .MARKS$ .MARKED GUI.KEY
 .
-:#INCLUDE "KB.INC.BL"
-:
-:GOSUB KB.CLEARKB
-:GOSUB GUI.YN
+:DIM MENUVERT.ITEM$(200)
+:GUI.LISTBOX.COUNT = N : GUI.LISTBOX.ROWS = 8 : GUI.LISTBOX.MULTI = 1
+:GUI.MSG$ = "PICK FILES" : GUI.BANK = 8
+:GOSUB GUI.LISTBOX
+:IF GUI.LISTBOX.SEL = 0 THEN <cancelled>
 .
-.Call it before opening a dialog, and after a keystroke that redraws. A
-.dialog opened with a key still queued reads it, answers itself and closes; a
-.held arrow repeats faster than a page can be drawn and scrolls on after the
-.key is let go.
+.Its own #INCLUDE on top of GUI.INC.BL, because nothing else in the library
+.wants a set of marks or a footer counting them. The caller owns the DIM of
+.MENUVERT.ITEM$().
 .
-.GUI.INC.BL carries a private copy, GUI.CLEARKB, from when code inside a
-.GP.BANKED region could not call another bank. Fix one and fix the other.
-.There are only the two, and a second #INCLUDE of this file cannot supply the
-.copy -- the #IFNDEF guard makes it produce nothing.
+.Up and down move, PgUp and PgDn page, HOME and END jump, SPACE toggles a
+.mark in multi. TAB moves to the buttons and back, RETURN takes <<OK>> from
+.anywhere, ESC and STOP cancel -- and O and C press their buttons while the
+.eye is still in the list, which a list can offer and a typing field cannot.
+.
+.In multi, GUI.LISTBOX.SEL is not the answer -- it is where the cursor was
+.left. The marks are: GUI.LISTBOX.MARKS$ is COUNT characters with "1" for
+.marked, and it goes in as well as out, so a list reopens with its marks. Any
+.other length, "" included, starts with none.
+.
+.The bottom frame edge reads 2 SELECTED OF 20 in multi, 20 ITEMS for a single
+.list too long to see at once, and is blank for one that fits.
+.
+.The scrolling list itself is not in this module. It is GUI.CT.LIST, one of
+.GUI.FORM's five control types, and lives in GUI.INC.BL beside the field;
+.this file is the dialog around it.
+.
+.Example: GUI2TST.EXP.BL.
+.
+=EXAMPLE PROGRAM
+.
+.  GUI2TST.EXP.BL -- runnable, in the GPC-BASIC folder
 .
 =SEE ALSO
 .
->77|4.14 KB.INC.BL -- the keyboard buffer, emptied
->74|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
+>92|4.12 GUI2.INC.BL -- a listbox, single or multi select
+>89|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back

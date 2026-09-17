@@ -20,17 +20,17 @@
 ;		bridge -- because nothing ever branches into text. It is data.
 ;
 ;		ONE REGION EACH AND NOT ONE BETWEEN THEM, which is the whole of Phase 3 down here: a
-;		region is a bank, so several text banks are several regions, and each one then gets its
-;		own .nnn overlay file with no further arrangement -- the region machinery does it. The
-;		loop runs in SLOT order, so the layout slots they take are contiguous and last, which is
-;		how pass two finds each of them again.
+;		region is a bank, so several text banks are several regions, and each one then goes into
+;		the object's one .OVL in its own right with no further arrangement -- the region machinery
+;		does it. The loop runs in SLOT order, so the layout slots they take are contiguous and
+;		last, which is how pass two finds each of them again.
 ;
-;		WHY IT CAN JUST BE APPENDED. The bootstrap extension page copies the regions with ONE loop
-;		that runs on from each to the next (application/compiler/bootstrap2.asm), so all it asks of
-;		a region is that it be whole pages and contiguous with the one below it, and that the
-;		(pages, bank) table be in object order. Appending above the topmost region satisfies all
-;		three: it becomes the last entry and it is the last thing in the object.
-;
+;		WHY IT CAN JUST BE APPENDED. The .OVL gives each region its own bank byte and page count
+;		ahead of its bytes, and the bootstrap extension page reads them one after another into
+;		whatever bank each one names (application/compiler/bootstrap2.asm). So all it asks of a
+;		region is that it be whole pages: it need not be contiguous with the one below it and the
+;		banks need not be in any order. Appending above the topmost region satisfies that, and it
+;		becomes the last entry and the last thing in the object.
 ;		AND IT IS A REGION TO THE OBJECT WRITER TOO, which is not a detail. Pass two streams the
 ;		low code through a buffer and each region into a bank of its own, and ObjStreamClose
 ;		writes the buffer, one gap of filler, then the regions (application/compiler/object.asm).

@@ -9502,8 +9502,8 @@ GPBANK_MAXREGIONS = 127 					; the most a doubled subscript reaches in a byte
 
 CommandGPBankedCompile:
 		stz 	deferErrors 				; a block opener must never defer -- see the header
-		lda 	gpBankShared 				; an embedded object is one file, and a region is a
-		bne 	_CGBCShared 				; .nnn file of its own
+		lda 	gpBankShared 				; an embedded object is one file, and the regions
+		bne 	_CGBCShared 				; arrive in a .OVL beside it
 		jmp 	GPBankNeedsShared
 _CGBCShared:
 		lda 	gpBankState 				; 0 = never seen, 1 = open, 2 = closed
@@ -10389,9 +10389,11 @@ _GBFBADone:
 ;		GPBase and is copied into every compiled program, so a message there would cost bytes to
 ;		every program that never writes a GP.BANKED.
 ;
-;		EVERY BANK FROM 2 TO 255 HAS AN OVERLAY NAME, <object>.002 to <object>.255, so the bank
-;		number check refuses only HANDLER_BANK. ObjBuildOverlayName writes the three digits, and
-;		the bootstrap extension page pokes them into its one name template.
+;		EVERY BANK FROM 2 TO 255 CAN HOLD A REGION, so the bank number check refuses only
+;		HANDLER_BANK. The bank is not in a file name any more: every region of the program goes
+;		into one <object>.OVL, each introduced by its own bank byte and page count, so nothing
+;		here has to spell a number out. ObjBuildOverlayName builds that one name, from the
+;		object's, and the bootstrap extension page carries it whole.
 ;
 ; ************************************************************************************************
 
@@ -10408,9 +10410,9 @@ GPBankTooMany:
 		.text 	"TOO MANY GP.BANKED REGIONS", 0
 
 ;
-;		EMBEDDED IS ONE FILE. A region is LOADed into its bank from a .nnn file of its own by the
-;		shared bootstrap, so a banked program is never one file, and an embedded compile of one
-;		stops at the first GP.BANKED. gpBankShared comes from GPC.INPUT line 4, set by CompileCode.
+;		EMBEDDED IS ONE FILE. The regions are read into their banks out of a .OVL beside the
+;		program by the shared bootstrap, so a banked program is never one file, and an embedded
+;		compile of one stops at the first GP.BANKED.
 ;		In compiler space, like the message above. GP.BANKEDSTR has its own, in gpbstr.asm.
 ;
 GPBankNeedsShared:
@@ -11129,7 +11131,7 @@ CommandGPBankedStrCompile:
 											; opener leaves its closer behind and corrupts the
 											; nesting of any block enclosing it, silently.
 		lda 	gpBankShared 				; an embedded object is one file, and text in a bank
-		bne 	_CBSShared 					; is a .nnn file of its own
+		bne 	_CBSShared 					; arrives in a .OVL beside it
 		jmp 	BStrNeedsShared
 _CBSShared:
 		lda 	bstrState
@@ -11188,7 +11190,7 @@ CommandGPEndBankedStrCompile:
 
 ;
 ;		EMBEDDED IS ONE FILE, GPBankNeedsShared's rule (gpbank.asm) for the same reason: text in
-;		a bank is LOADed from a .nnn file by the shared bootstrap. In compiler space, like
+;		a bank is read out of the .OVL by the shared bootstrap. In compiler space, like
 ;		BStrTooManyBanks.
 ;
 BStrNeedsShared:
@@ -11201,7 +11203,7 @@ BStrNeedsShared:
 ;
 ;		ANY BANK, AND AS MANY AS SIXTEEN. A block names the bank its text goes to and blocks need
 ;		not agree: each distinct bank becomes a SLOT, in first appearance order, and each slot
-;		becomes a region and an overlay file of its own. It was one bank for the whole program,
+;		becomes a region of its own in the overlay file. It was one bank for the whole program,
 ;		which capped a program's literal text at the 8K one bank holds.
 ;
 ;		THE BANK IS STILL WRITTEN ON EVERY BLOCK, and now it has to be: a block should be readable
@@ -11391,17 +11393,17 @@ BankedStrAddCompile:
 ;		bridge -- because nothing ever branches into text. It is data.
 ;
 ;		ONE REGION EACH AND NOT ONE BETWEEN THEM, which is the whole of Phase 3 down here: a
-;		region is a bank, so several text banks are several regions, and each one then gets its
-;		own .nnn overlay file with no further arrangement -- the region machinery does it. The
-;		loop runs in SLOT order, so the layout slots they take are contiguous and last, which is
-;		how pass two finds each of them again.
+;		region is a bank, so several text banks are several regions, and each one then goes into
+;		the object's one .OVL in its own right with no further arrangement -- the region machinery
+;		does it. The loop runs in SLOT order, so the layout slots they take are contiguous and
+;		last, which is how pass two finds each of them again.
 ;
-;		WHY IT CAN JUST BE APPENDED. The bootstrap extension page copies the regions with ONE loop
-;		that runs on from each to the next (application/compiler/bootstrap2.asm), so all it asks of
-;		a region is that it be whole pages and contiguous with the one below it, and that the
-;		(pages, bank) table be in object order. Appending above the topmost region satisfies all
-;		three: it becomes the last entry and it is the last thing in the object.
-;
+;		WHY IT CAN JUST BE APPENDED. The .OVL gives each region its own bank byte and page count
+;		ahead of its bytes, and the bootstrap extension page reads them one after another into
+;		whatever bank each one names (application/compiler/bootstrap2.asm). So all it asks of a
+;		region is that it be whole pages: it need not be contiguous with the one below it and the
+;		banks need not be in any order. Appending above the topmost region satisfies that, and it
+;		becomes the last entry and the last thing in the object.
 ;		AND IT IS A REGION TO THE OBJECT WRITER TOO, which is not a detail. Pass two streams the
 ;		low code through a buffer and each region into a bank of its own, and ObjStreamClose
 ;		writes the buffer, one gap of filler, then the regions (application/compiler/object.asm).

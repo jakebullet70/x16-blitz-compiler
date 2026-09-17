@@ -32,7 +32,7 @@ rem  sample so a rebuild needs nothing from GPC-BASIC\. Both objects are EMBEDDE
 rem  and checked in. See samples\cruncher\readme.md for the rebuild.
 rem ---------------------------------------------------------------------------
 setlocal
-set "ROOT=%~dp0"
+for %%I in ("%~dp0..") do set "ROOT=%%~fI\"
 set "DRIVE=%ROOT%samples\cruncher"
 set "X16EMU=%ROOT%bin\x16emu\x16emu.exe"
 set "ROM=%ROOT%bin\x16emu\rom.bin"

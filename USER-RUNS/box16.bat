@@ -3,7 +3,7 @@ setlocal
 
 rem ---------------------------------------------------------------------------
 rem  Launch Box16 with the testing/ directory as its drive, so LOAD "GPC.PRG"
-rem  and the rest just work. This .bat lives in the project root; the programs
+rem  and the rest just work. This .bat lives in USER-RUNS, under the project root; the programs
 rem  live in testing/ (the shipping release), and the emulator in bin/box16/.
 rem
 rem      box16.bat                 boot to BASIC in testing/
@@ -16,7 +16,7 @@ rem  calls the host-directory flag -hypercall_path, NOT -fsroot, and -debug
 rem  takes a break address rather than standing alone.
 rem ---------------------------------------------------------------------------
 
-set "ROOT=%~dp0"
+for %%I in ("%~dp0..") do set "ROOT=%%~fI\"
 set "ROOT=%ROOT:~0,-1%"
 set "DRIVE=%ROOT%\testing"
 set "BOX16=%ROOT%\bin\box16\Box16.exe"

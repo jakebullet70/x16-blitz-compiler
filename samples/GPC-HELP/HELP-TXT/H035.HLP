@@ -1,101 +1,91 @@
-@4.1 THEME.INC.BL -- named colour roles
+@4. Module reference -- the BASL library
 .
-=4.1 THEME.INC.BL -- NAMED COLOUR ROLES
+=4. MODULE REFERENCE -- THE BASL LIBRARY
 .
-=WHAT IT COSTS
+.Called with GOSUB. Arguments go into named variables before the call,
+.results come back in named variables after it. Every module is
+.position-independent -- each jumps over itself -- so #INCLUDE it anywhere,
+.including the top of the program.
 .
-.    BASIC -- a .INC.BL module of ordinary BASL, called with GOSUB. Costs
-.    nothing unless you #INCLUDE it.
+.Any of them can run from a RAM bank. Put its #INCLUDE between GP.BANKED and
+.GP.ENDBANKED (SEC 3.12). A call into the region selects its bank, so the
+.GOSUBs in this section read the same either way.
 .
-=DESCRIPTION
+.STASH and STASHFILE are the two that cannot: both execute BANK, and a
+.GP.BANKED region may not contain that statement. STASHVRAM (SEC 4.18) is the
+.one to reach for inside a region. See BANKED-OR-NOT.md and
+.GP-BASIC.GLOBALS.md SEC 4.
 .
-.  THEME.SELECT
-.      IN: THEME.ID
-.      OUT: fills THEME.CLR()
+=Low memory or a bank -- what differs
 .
-.  THEME.NEXT
-.      IN: THEME.ID
-.      OUT: the following theme, loaded
+.A module is one file. #INCLUDE "X.INC.BL" puts it in low memory, and the
+.same line between GP.BANKED and GP.ENDBANKED puts it in a RAM bank. The
+.GOSUB at the call site is the same either way.
 .
-.  THEME.RESET
-.      IN: THEME.ID
-.      OUT: the selected theme's shipped values, reloaded
+.Low memory is the one that runs out. A SHARED program has about 17,920 bytes
+.of p-code under the runtime and every #INCLUDE spends it; a region spends
+.8,192 bytes of a RAM bank the program was not using. Bank what you can. A
+.module called inside a loop goes where the loop is: a call between a region
+.and anywhere outside it switches the bank twice.
 .
-.  THEME.SET
-.      IN: THEME.ATTR
-.      OUT: issues COLOR -- makes it the colour PRINT uses
+.The banked form needs the program built SHARED. The regions are in one
+.NAME.OVL file, which the shared bootstrap reads into their banks. An
+.embedded program is one file, so an embedded compile stops at the first
+.GP.BANKED with GP.BANKED NEEDS SHARED.
 .
-.  THEME.HI
-.      IN: THEME.ATTR
-.      OUT: THEME.INV, the inverse attribute
+.samples/GPB-MODS-TESTING/PICKDEMO.BASL is a complete program in this shape,
+.in 99 lines.
 .
-.Five themes, THEME.COUNT of them:
+.  Include
+.      LOW MEMORY: #INCLUDE "X.INC.BL"
+.      A RAM BANK: the same, inside GP.BANKED
 .
-.  0
-.      X16
-.      blue page, white text, cyan headings. The default
+.  Entry label
+.      LOW MEMORY: THEME.SELECT
+.      A RAM BANK: THEME.SELECT
 .
-.  1
-.      DARK
-.      black page, light grey text
+.  Costs per call
+.      LOW MEMORY: one GOSUB; from a region, one byte more and two bank
+.        switches
+.      A RAM BANK: from outside the region, one byte more and two bank
+.        switches
 .
-.  2
-.      LIGHT
-.      white page, black text
+.  Low memory used
+.      LOW MEMORY: the whole module
+.      A RAM BANK: none
 .
-.  3
-.      GRAY
-.      dark grey page, light blue frames. From the XFMGR file manager
+:#DEFINE MY.GUICODE 4
+:#DEFINE MY.THEMECODE 9
+:GOTO MY.LIBEND
+:GP.BANKED MY.THEMECODE
+:#INCLUDE "THEME.INC.BL"
+:GP.ENDBANKED
+:GP.BANKED MY.GUICODE
+:#INCLUDE "MENUVERT.INC.BL"
+:#INCLUDE "LINEINPUT.INC.BL"
+:#INCLUDE "GUI.INC.BL"
+:#INCLUDE "GUI2.INC.BL"
+:GP.ENDBANKED
+:MY.LIBEND:
 .
-.  4
-.      CUSTOM
-.      whatever THEME.CLR() already holds
+.A region is 8,192 bytes, and that is the whole of the grouping. The GUI
+.modules fill one, so THEME has its own. THEME comes first because the GUI
+.modules read its #DEFINEs. A call from one region to the other costs the
+.same bank switches as a call from low memory.
 .
-.THEME.NEXT moves to the following one and wraps, which is what a program
-.binds to a key. A cached attribute does not follow it: work out anything
-.derived from THEME.CLR(), a reversed bar included, after every load.
+.Include a module once. One #INCLUDE in low memory and another in a region is
+.DUPLICATE SYMBOL where the module has no #IFNDEF guard. Where it has one,
+.the module lands at the first #INCLUDE and the second produces nothing.
 .
-.CUSTOM loads nothing. Selecting it leaves THEME.CLR() as it stands, so a
-.program that lets the user change colours carries those changes into CUSTOM
-.rather than discarding them. The one exception is a cold start -- CUSTOM
-.selected before any other theme has been loaded -- where there is nothing to
-.keep and it takes X16's values. THEME.RESET goes back to those.
-.
-.samples/color-test edits the roles against a mock of the GUI and prints the
-.THEME.CLR() lines to paste back in here. It carries its own GPC-BASIC folder
-.and is still at seven roles, so it does not yet offer THEME.FOCUS.
-.
-.Roles, for indexing THEME.CLR(): THEME.PAGE THEME.TEXT THEME.TITLE
-.THEME.BORDER THEME.HILITE THEME.DIMMED THEME.WARN THEME.FOCUS, and
-.THEME.SLOTS = 8.
-.
-.THEME.FOCUS is the eighth and newest: what a focused control wears while
-.GUI.FORM has the keyboard (SEC 4.11). It is a separate role from
-.THEME.HILITE because a dialog shows both at once -- the highlighted row of a
-.list, and the control the TAB key has landed on.
-.
-.The routine used to be THEME.LOAD. It became THEME.SELECT when the library
-.was split into banked and low-memory files, and it stayed when they were
-.merged again. A program still calling the old name stops at LABEL NOT FOUND.
-.
-:THEME.ID = 1 : GOSUB THEME.SELECT
-:GP.BOX 4,2,30,8, 2, THEME.CLR(THEME.BORDER)
-:GP.PRINTAT 6,3, "TITLE", THEME.CLR(THEME.TITLE)
-.
-.The values are packed attributes, background * 16 + foreground, which is
-.what GP.BOX, GP.FILL and GP.PRINTAT take. For COLOR, which takes the halves
-.separately, use THEME.SET.
-.
-.#DEFINE substitutes at translation time, so THEME.CLR(THEME.TITLE) compiles
-.to THEME.CLR(2). The readable name costs no variable and no lookup.
-.
-.THEME.CLR is DIMmed by the module. Do not DIM it in your own program.
-.
-.Formatting a NUMBER into a column is STRUSING.INC.BL (SEC 4.10), a separate
-.module: it needs no #SYMFILE and neither module depends on the other.
+.SEC 3.12 has the rules, what a region may not contain, and the .OVL file a
+.banked program ships.
 .
 =SEE ALSO
 .
->74|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
->73|4.10 STRUSING.INC.BL -- a number to a template
->61|4.1 THEME.INC.BL -- named colour roles
+>56|3.12 Code in a bank
+>98|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+>65|4.1 THEME.INC.BL -- named colour roles
+>78|4.6 MENUVERT.INC.BL -- a vertical menu
+>76|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>89|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
+>92|4.12 GUI2.INC.BL -- a listbox, single or multi select

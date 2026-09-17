@@ -2,34 +2,13 @@
 rem ---------------------------------------------------------------------------
 rem  gpbmods-demo.bat -- run GPB-MODS-TESTING, the library harness, in a
 rem  VISIBLE window.
-rem
-rem      <- ->      walk the menu bar
-rem      DOWN       open the dropdown under the marked item
-rem      <- ->      with a dropdown open, move to the next one
-rem      UP DOWN    walk the dropdown, RETURN chooses
-rem      ESC        closes the dropdown, then leaves the program
-rem
 rem  EVERY PANEL IS WRITTEN. A chosen row runs the library call it names and
 rem  leaves the answer on the bottom row. FILES writes to the drive -- every
 rem  file and directory it makes is removed by the row that made it.
 rem
-rem  THE DRIVE IS testing\, NOT the sample directory, and it needs more than
-rem  the PRG. GPBMODS.PRG is compiled SHARED, so it loads the resident
-rem  GPC.RT.nnn.BIN rather than carrying a copy; and it has eight overlays --
-rem  GPBMODS.004 through .011 -- which the bootstrap LOADs into their banks at
-rem  startup. A missing one stops with ?OVL. All of them live in testing\
-rem  beside the PRG.
-rem
-rem  THE BANKS: 4 the GUI, 5 and 6 the literal text, 7 the utilities, 8 the
-rem  file modules, 9 THEME, 10 the combo box, 11 this program's own STRINGS
-rem  and FILES dropdowns.
-rem
-rem  Source: samples\GPB-MODS-TESTING\GPBMODS.BASL, on the seventeen modules
-rem  shipped in samples\GPB-MODS-TESTING\GPC-BASIC\ beside it. See that
-rem  folder's readme.md for the two-step rebuild.
 rem ---------------------------------------------------------------------------
 setlocal
-set "ROOT=%~dp0"
+for %%I in ("%~dp0..") do set "ROOT=%%~fI\"
 set "DRIVE=%ROOT%testing"
 set "X16EMU=%ROOT%bin\x16emu\x16emu.exe"
 set "ROM=%ROOT%bin\x16emu\rom.bin"

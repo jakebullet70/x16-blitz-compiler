@@ -30,7 +30,7 @@ rem  samples\XBASE\GPC-BASIC\ beside them. See that folder's readme.md, and
 rem  GPC-BASIC\BANKED-OR-NOT.md for why six of those modules come in two files.
 rem ---------------------------------------------------------------------------
 setlocal
-set "ROOT=%~dp0"
+for %%I in ("%~dp0..") do set "ROOT=%%~fI\"
 set "DRIVE=%ROOT%testing"
 set "X16EMU=%ROOT%bin\x16emu\x16emu.exe"
 set "ROM=%ROOT%bin\x16emu\rom.bin"

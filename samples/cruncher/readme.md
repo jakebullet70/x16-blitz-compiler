@@ -94,7 +94,7 @@ built yet** — the engine refuses them by name rather than ignoring them.
 
 ## Running it
 
-`cruncher-demo.bat` in the repo root points the emulator's drive at this directory and runs
+`USER-RUNS\cruncher-demo.bat` points the emulator's drive at this directory and runs
 `CRUNCH.PRG`, so `DEMO.BASL` is what it can see. `DEMO.BASL` is deliberately loose — one statement
 per line — and carries every trap the engine has to survive: a colon inside a string, `THEN` inside
 a string and inside an identifier, a real `IF ... THEN`, a label, `DATA`, and three `GP.IF` blocks

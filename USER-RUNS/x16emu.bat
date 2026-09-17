@@ -3,7 +3,7 @@ setlocal
 
 rem ---------------------------------------------------------------------------
 rem  Launch x16emu with the testing/ directory as its drive, so LOAD "GPC.PRG"
-rem  and the rest just work. This .bat lives in the project root; the programs
+rem  and the rest just work. This .bat lives in USER-RUNS, under the project root; the programs
 rem  live in testing/ (the shipping release), and the emulator in bin/x16emu/.
 rem
 rem      x16emu.bat                boot to BASIC in testing/
@@ -18,7 +18,7 @@ rem  .PRG needs). Sprite collision is worth a mention: x16emu emulates VERA
 rem  sprite collisions, so games that read $9F27 behave here as on hardware.
 rem ---------------------------------------------------------------------------
 
-set "ROOT=%~dp0"
+for %%I in ("%~dp0..") do set "ROOT=%%~fI\"
 set "ROOT=%ROOT:~0,-1%"
 set "DRIVE=%ROOT%\testing"
 set "X16EMU=%ROOT%\bin\x16emu\x16emu.exe"

@@ -1,0 +1,260 @@
+## ***********************************************************************
+## **
+## **  FILEPICK.INC.BL -- a popup file picker.
+## **
+## **      FILEPICK.INIT   once, before anything else here
+## **      FILEPICK.RUN    read the drive, show the list, answer with a name
+## **      FILEPICK.SCAN   the read and the filter, without a dialog
+## **
+## **  The listing goes into a RAM bank, so a full directory costs the program
+## **  no low memory. What reaches the list is the names that match, and only
+## **  those: the drive is asked for every file and the suffix test is done
+## **  here, because a DOS pattern cannot say "BASL or BL".
+## **
+## **  Requires, and #INCLUDEs none of them, in this order:
+## **      GPB.INC.BL        GP.INSTR, GP.ISEMPTY
+## **      STASH.INC.BL      via GUI.OPEN; wants a #SYMFILE
+## **      THEME.INC.BL      GOSUB THEME.SELECT first
+## **      MENUVERT.INC.BL   the rows are drawn from MENUVERT.ITEM$
+## **      GUI.INC.BL        GUI.OPEN, GUI.FORM and the list control
+## **      FILEIO.INC.BL     FILE.DEVICE and the channel numbers
+## **      FILEDIR.INC.BL    the directory read and its parser
+## **
+## **  Usage:
+## **      DIM FILEPICK.FILE$(FILEPICK.MAX)
+## **      DIM MENUVERT.ITEM$(FILEPICK.MAX)
+## **      GOSUB FILEPICK.INIT
+## **      ...
+## **      FILEPICK.BANK = MY.DIRBANK%
+## **      FILEPICK.EXT$ = "BASL,BL"
+## **      GUI.TITLE$ = " OPEN FILE "
+## **      GOSUB FILEPICK.RUN
+## **      IF FILEPICK.NAME$ = "" THEN <cancelled, or nothing matched>
+## **
+## **   in   FILEPICK.BANK   the RAM bank the listing is read into. It must be
+## **                        claimed from BANKMGR and it must not be a code
+## **                        bank: 8,192 bytes at $A000 are overwritten
+## **        FILEPICK.EXT$   the suffixes to show, separated by commas and
+## **                        written without the dot -- "PDEF", "MAKE",
+## **                        "BASL,BL". EMPTY SHOWS EVERY FILE. The test is
+## **                        case sensitive and the drive lists in upper case
+## **        FILEPICK.ROWS   rows visible at once. 0 takes 10. It is cut to
+## **                        however many files matched, but never below
+## **                        FILEPICK.MINROWS, which pads with blank rows
+## **        plus everything GUI.OPEN reads: GUI.TITLE$, GUI.BANK, GUI.STYLE,
+## **        the frame glyphs, GUI.PLACE and the rest. Set the dialog up the
+## **        way the other dialogs are set up, then call this
+## **
+## **   out  FILEPICK.NAME$  the file chosen. EMPTY MEANS NO FILE -- cancelled,
+## **                        or the drive had nothing matching
+## **        FILEPICK.COUNT  how many names reached the list
+## **        FILEPICK.SEEN   how many matched, which is more than COUNT when
+## **                        the list filled
+## **        FILEPICK.FULL   -1 when more matched than the list holds
+## **        FILEPICK.SEL    the row the highlight was left on, or 0
+## **
+## **  internal  FILEPICK.TRY$ FILEPICK.ONE$ FILEPICK.REST$ FILEPICK.PAD$
+## **            FILEPICK.BLANKROW
+## **            FILEPICK.HIT FILEPICK.AT FILEPICK.CTRL
+## **
+## **  THE CALLER OWNS BOTH DIMS. FILEPICK.FILE$ holds the names as the drive
+## **  gave them and is what the answer is read out of; MENUVERT.ITEM$ holds
+## **  the rows as they are drawn, name padded and block count after it, and
+## **  is shared with every other menu in the program. A program that opens
+## **  this picker rebuilds its own menu rows afterwards, the same way it does
+## **  after any other list.
+## **
+## **  FILE.NAME$ IS ONE STRING, rewritten by every FILE.DIR.NEXT, so the name
+## **  is copied into the array per entry rather than kept a pointer to.
+## **
+## **  READ ONCE, WALK ONCE. Scrolling the list goes nowhere near the drive.
+## **  Changing FILEPICK.EXT$ needs another FILEPICK.RUN, which reads again.
+## **
+## **  TO RUN IT FROM A RAM BANK, put the #INCLUDE between GP.BANKED and
+## **  GP.ENDBANKED. Nothing here executes a BANK statement -- FILEDIR does
+## **  its own window switching in assembly -- so the region is legal.
+## **
+## ***********************************************************************
+#IFNDEF FILEPICK.DEFS
+#DEFINE FILEPICK.DEFS 1
+
+## The most names the picker will show. Both of the arrays the caller DIMs are
+## this long, and a directory with more matching files reports FILEPICK.FULL.
+#DEFINE FILEPICK.MAX 60
+
+## The fewest rows the list is drawn with. A picker that shrank to the one name
+## it found read as a text box rather than a list, so a short list is padded with
+## blank rows instead. FILEPICK.ROWS is still what caps a LONG list.
+#DEFINE FILEPICK.MINROWS 5
+
+## The name column in a row. A longer name is not cut -- it pushes the block
+## count right rather than losing characters -- so this is the width names are
+## padded TO, not clamped to.
+#DEFINE FILEPICK.NAMEW 22
+
+GOTO FILEPICK.MODULE.END
+
+
+## ***********************************************************************
+## **  FILEPICK.INIT -- the FILEDIR setup, and every answer cleared. Call it
+## **  once, at startup, after APPSYS and before any pick.
+## ***********************************************************************
+FILEPICK.INIT:
+  GOSUB FILE.DIR.INIT
+  FILEPICK.BANK = 0
+  FILEPICK.EXT$ = ""
+  FILEPICK.ROWS = 0
+  FILEPICK.NAME$ = ""
+  FILEPICK.COUNT = 0
+  FILEPICK.SEEN = 0
+  FILEPICK.FULL = 0
+  FILEPICK.SEL = 0
+  RETURN
+
+
+## ***********************************************************************
+## **  FILEPICK.RUN -- the whole thing: read, filter, show, answer.
+## ***********************************************************************
+FILEPICK.RUN:
+  GOSUB FILEPICK.SCAN
+  GOSUB FILEPICK.SHOW
+  RETURN
+
+
+## ***********************************************************************
+## **  FILEPICK.SCAN -- the drive into the bank, the matches into the arrays.
+## **
+## **  The drive is asked for FILES ONLY and for no pattern at all. Handing it
+## **  the suffix would be faster and would answer one extension; the list
+## **  wants two, so the filter is here.
+## **
+## **  FILE.DIR.INIT IS CALLED AGAIN ON EVERY SCAN, not once at startup.
+## **  It is what points the parser at the FILE.NAME$ block, and
+## **  FILE.NAME$ belongs to FILEIO as well: one FILE.LOADARRAY between
+## **  two picks reallocates it and leaves the parser writing into a
+## **  block the heap has given to something else.
+## ***********************************************************************
+FILEPICK.SCAN:
+  GOSUB FILE.DIR.INIT
+  FILE.DIR.BANK = FILEPICK.BANK
+  FILE.DIR.PATTERN$ = ""
+  FILE.DIR.ONLY = FILE.DIR.FILES
+  GOSUB FILE.DIR.OPEN
+  FILEPICK.COUNT = 0
+  FILEPICK.SEEN = 0
+  FILEPICK.FULL = 0
+  GP.DO
+    GOSUB FILE.DIR.NEXT
+    IF FILE.DIR.MORE = 0 THEN GP.EXITDO
+    FILEPICK.TRY$ = FILE.NAME$
+    GOSUB FILEPICK.MATCH
+    GP.IF FILEPICK.HIT <> 0 THEN
+      FILEPICK.SEEN = FILEPICK.SEEN + 1
+      IF FILEPICK.COUNT < FILEPICK.MAX THEN GOSUB FILEPICK.KEEP
+    GP.ENDIF
+  GP.LOOP
+  IF FILEPICK.SEEN > FILEPICK.COUNT THEN FILEPICK.FULL = -1
+  RETURN
+
+
+## ---- One entry into both arrays: the name as the drive gave it, and the row
+## ---- as it is drawn -- name in a column, block count after it.
+FILEPICK.KEEP:
+  FILEPICK.COUNT = FILEPICK.COUNT + 1
+  FILEPICK.FILE$(FILEPICK.COUNT) = FILEPICK.TRY$
+  FILEPICK.PAD$ = FILEPICK.TRY$ + RPT$(32, FILEPICK.NAMEW)
+  FILEPICK.PAD$ = LEFT$(FILEPICK.PAD$, FILEPICK.NAMEW)
+  MENUVERT.ITEM$(FILEPICK.COUNT) = " " + FILEPICK.PAD$ + RIGHT$("     " + STR$(FILE.BLOCKS), 5)
+  RETURN
+
+
+## ***********************************************************************
+## **  FILEPICK.MATCH -- FILEPICK.TRY$ in, FILEPICK.HIT out.
+## **
+## **  An empty FILEPICK.EXT$ takes everything. Otherwise the name must end in
+## **  a dot and one of the listed suffixes, so MENU.BL matches "BL" and
+## **  MENUBL does not.
+## **
+## **  The walk is over a copy with one comma added, so the last suffix ends
+## **  the way the others do and there is no last-item case.
+## ***********************************************************************
+FILEPICK.MATCH:
+  FILEPICK.HIT = -1
+  IF GP.ISEMPTY(FILEPICK.EXT$) THEN RETURN
+  FILEPICK.HIT = 0
+  FILEPICK.REST$ = FILEPICK.EXT$ + ","
+  GP.DO
+    FILEPICK.AT = GP.INSTR(FILEPICK.REST$, ",")
+    IF FILEPICK.AT = 0 THEN GP.EXITDO
+    FILEPICK.ONE$ = LEFT$(FILEPICK.REST$, FILEPICK.AT - 1)
+    FILEPICK.REST$ = MID$(FILEPICK.REST$, FILEPICK.AT + 1)
+    GP.IF GP.ISEMPTY(FILEPICK.ONE$) = 0 THEN
+      FILEPICK.ONE$ = "." + FILEPICK.ONE$
+      IF RIGHT$(FILEPICK.TRY$, LEN(FILEPICK.ONE$)) = FILEPICK.ONE$ THEN FILEPICK.HIT = -1
+    GP.ENDIF
+    IF FILEPICK.HIT <> 0 THEN GP.EXITDO
+  GP.LOOP
+  RETURN
+
+
+## ***********************************************************************
+## **  FILEPICK.SHOW -- the popup, over whatever FILEPICK.SCAN found.
+## **
+## **  A list, a row of <<OK>> and <CANCEL> under it, and the focus starting
+## **  in the list so the arrows work without a TAB first. RETURN takes OK
+## **  from anywhere and ESC cancels, both of them the form loop doing it.
+## **
+## **  NOTHING MATCHING IS NOT A DIALOG. An empty picker has nothing to offer
+## **  and no way to say so but a message, and the caller has a better place
+## **  to put one, so this returns an empty name and draws nothing.
+## ***********************************************************************
+FILEPICK.SHOW:
+  FILEPICK.NAME$ = ""
+  FILEPICK.SEL = 0
+  IF FILEPICK.COUNT = 0 THEN RETURN
+  IF FILEPICK.ROWS = 0 THEN FILEPICK.ROWS = 10
+  IF FILEPICK.ROWS > FILEPICK.COUNT THEN FILEPICK.ROWS = FILEPICK.COUNT
+  IF FILEPICK.ROWS < FILEPICK.MINROWS THEN FILEPICK.ROWS = FILEPICK.MINROWS
+  IF FILEPICK.ROWS > FILEPICK.MAX THEN FILEPICK.ROWS = FILEPICK.MAX
+  GOSUB FILEPICK.BLANK
+  GUI.BTN.ONE$ = "&OK"
+  GUI.BTN.TWO$ = "&CANCEL"
+  GOSUB GUI.BUTTON.SIZE
+  GUI.LIST.ROWS = FILEPICK.ROWS
+  GUI.LIST.COUNT = FILEPICK.COUNT
+  GUI.LIST.MARKP = 0
+  GUI.LIST.SEL = 1
+  GOSUB GUI.LIST.MEASURE
+  GUI.BODY.ROWS = GUI.LIST.ROWS + 2
+  GUI.BODY.WIDTH = FILEPICK.NAMEW + 12
+  IF GUI.BTN.TOTAL > GUI.BODY.WIDTH THEN GUI.BODY.WIDTH = GUI.BTN.TOTAL
+  GOSUB GUI.OPEN
+  GOSUB GUI.FORM.BEGIN
+  GUI.LIST.X = GUI.INNER.LEFT + 1
+  GUI.LIST.Y = GUI.INNER.TOP
+  GUI.LIST.W = GUI.INNER.WIDTH - 2
+  GOSUB GUI.FORM.ADD.LIST
+  FILEPICK.CTRL = GUI.CTRL.N
+  GUI.BTN.Y = GUI.INNER.TOP + GUI.LIST.ROWS + 1
+  GOSUB GUI.BUTTON.ROW
+  GUI.FOCUS = FILEPICK.CTRL
+  GOSUB GUI.FORM.RUN
+  FILEPICK.SEL = GUI.LIST.SEL
+  IF (GUI.CTRL.FLAGS%(GUI.FORM.HIT) AND GUI.CF.DEFAULT) <> 0 THEN FILEPICK.NAME$ = FILEPICK.FILE$(FILEPICK.SEL)
+  GOSUB GUI.CLOSE
+  MENUVERT.SCROLL = 0
+  RETURN
+
+## ---- The rows under the last name. MENUVERT draws every visible row out of
+## ---- MENUVERT.ITEM$, and the caller's own menu text is still in there, so the
+## ---- padding rows are emptied rather than left to show it.
+FILEPICK.BLANK:
+  IF FILEPICK.ROWS <= FILEPICK.COUNT THEN RETURN
+  FOR FILEPICK.BLANKROW = FILEPICK.COUNT + 1 TO FILEPICK.ROWS
+    MENUVERT.ITEM$(FILEPICK.BLANKROW) = ""
+  NEXT FILEPICK.BLANKROW
+  RETURN
+
+
+FILEPICK.MODULE.END:
+#ENDIF

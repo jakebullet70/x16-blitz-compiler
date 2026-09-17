@@ -82,8 +82,8 @@ GPBANK_MAXREGIONS = 127 					; the most a doubled subscript reaches in a byte
 
 CommandGPBankedCompile:
 		stz 	deferErrors 				; a block opener must never defer -- see the header
-		lda 	gpBankShared 				; an embedded object is one file, and a region is a
-		bne 	_CGBCShared 				; .nnn file of its own
+		lda 	gpBankShared 				; an embedded object is one file, and the regions
+		bne 	_CGBCShared 				; arrive in a .OVL beside it
 		jmp 	GPBankNeedsShared
 _CGBCShared:
 		lda 	gpBankState 				; 0 = never seen, 1 = open, 2 = closed
@@ -969,9 +969,11 @@ _GBFBADone:
 ;		GPBase and is copied into every compiled program, so a message there would cost bytes to
 ;		every program that never writes a GP.BANKED.
 ;
-;		EVERY BANK FROM 2 TO 255 HAS AN OVERLAY NAME, <object>.002 to <object>.255, so the bank
-;		number check refuses only HANDLER_BANK. ObjBuildOverlayName writes the three digits, and
-;		the bootstrap extension page pokes them into its one name template.
+;		EVERY BANK FROM 2 TO 255 CAN HOLD A REGION, so the bank number check refuses only
+;		HANDLER_BANK. The bank is not in a file name any more: every region of the program goes
+;		into one <object>.OVL, each introduced by its own bank byte and page count, so nothing
+;		here has to spell a number out. ObjBuildOverlayName builds that one name, from the
+;		object's, and the bootstrap extension page carries it whole.
 ;
 ; ************************************************************************************************
 
@@ -988,9 +990,9 @@ GPBankTooMany:
 		.text 	"TOO MANY GP.BANKED REGIONS", 0
 
 ;
-;		EMBEDDED IS ONE FILE. A region is LOADed into its bank from a .nnn file of its own by the
-;		shared bootstrap, so a banked program is never one file, and an embedded compile of one
-;		stops at the first GP.BANKED. gpBankShared comes from GPC.INPUT line 4, set by CompileCode.
+;		EMBEDDED IS ONE FILE. The regions are read into their banks out of a .OVL beside the
+;		program by the shared bootstrap, so a banked program is never one file, and an embedded
+;		compile of one stops at the first GP.BANKED.
 ;		In compiler space, like the message above. GP.BANKEDSTR has its own, in gpbstr.asm.
 ;
 GPBankNeedsShared:

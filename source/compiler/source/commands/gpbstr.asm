@@ -72,7 +72,7 @@ CommandGPBankedStrCompile:
 											; opener leaves its closer behind and corrupts the
 											; nesting of any block enclosing it, silently.
 		lda 	gpBankShared 				; an embedded object is one file, and text in a bank
-		bne 	_CBSShared 					; is a .nnn file of its own
+		bne 	_CBSShared 					; arrives in a .OVL beside it
 		jmp 	BStrNeedsShared
 _CBSShared:
 		lda 	bstrState
@@ -131,7 +131,7 @@ CommandGPEndBankedStrCompile:
 
 ;
 ;		EMBEDDED IS ONE FILE, GPBankNeedsShared's rule (gpbank.asm) for the same reason: text in
-;		a bank is LOADed from a .nnn file by the shared bootstrap. In compiler space, like
+;		a bank is read out of the .OVL by the shared bootstrap. In compiler space, like
 ;		BStrTooManyBanks.
 ;
 BStrNeedsShared:
@@ -144,7 +144,7 @@ BStrNeedsShared:
 ;
 ;		ANY BANK, AND AS MANY AS SIXTEEN. A block names the bank its text goes to and blocks need
 ;		not agree: each distinct bank becomes a SLOT, in first appearance order, and each slot
-;		becomes a region and an overlay file of its own. It was one bank for the whole program,
+;		becomes a region of its own in the overlay file. It was one bank for the whole program,
 ;		which capped a program's literal text at the 8K one bank holds.
 ;
 ;		THE BANK IS STILL WRITTEN ON EVERY BLOCK, and now it has to be: a block should be readable

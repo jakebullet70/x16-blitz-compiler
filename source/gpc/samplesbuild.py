@@ -152,7 +152,7 @@ def install(prog, stem, drive):
     print("   installed:", os.path.join(folder, asname), flush=True)
 
     for f in sorted(os.listdir(drive)):
-        if f.startswith(stem + ".") and len(f) == len(stem) + 4 and f[-3:].isdigit():
+        if f == stem + ".OVL":
             if not same:
                 shutil.copy(os.path.join(drive, f), os.path.join(dest, f))
             print("   installed:", os.path.join(folder, f), flush=True)
@@ -247,10 +247,11 @@ def build(prog):
         return False
     print("   compiled:", format(os.path.getsize(obj), ","), "bytes", flush=True)
 
-    #   ONLY overlays this build wrote.  A failed compile used to report the PREVIOUS build's
-    #   overlays as if they were new.  The suffix is .nnn, the bank in three digits.
+    #   ONLY the overlay this build wrote.  A failed compile used to report the PREVIOUS
+    #   build's overlays as if they were new.  There is one file, stem.OVL, holding every
+    #   region of the program.
     for f in sorted(os.listdir(drive)):
-        if f.startswith(stem + ".") and len(f) == len(stem) + 4 and f[-3:].isdigit():
+        if f == stem + ".OVL":
             p = os.path.join(drive, f)
             fresh = os.path.getmtime(p) >= started
             print("   overlay", f, format(os.path.getsize(p), ","),

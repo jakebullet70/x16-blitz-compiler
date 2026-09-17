@@ -11,8 +11,8 @@
 =WHAT IT COSTS
 .
 .  ASM: GP.DO GP.LOOP GP.EXITDO
-.    ASM -- a keyword, run by machine code in the GP runtime block. A program
-.    using ANY GP keyword pays for the whole block.
+.    ASM -- machine code in the GP runtime block. One GP keyword pays for the
+.    whole block.
 .
 =DESCRIPTION
 .
@@ -36,4 +36,4 @@
 .
 =SEE ALSO
 .
->25|3.2 Multi-way branch
+>29|3.2 Multi-way branch

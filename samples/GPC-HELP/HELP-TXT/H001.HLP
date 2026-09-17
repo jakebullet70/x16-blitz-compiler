@@ -2,51 +2,84 @@
 .
 =1. WHAT GP.BASIC IS
 .
-.Core keywords. 29 of them, compiled to p-code and handled by assembly in the
-.runtime:
+.GP.BASIC (GPB) is the keyword extension GPC compiles on top of BASL: 39 GP.*
+.keywords and a library of BASL modules built on them. #INCLUDE "GPB.INC.BL"
+.declares the keyword set; SEC 2 has the rest of the setup.
+.
+=Core keywords
+.
+.29 keywords compile to p-code and are handled by assembly in the runtime.
 .
 .GP.DO GP.LOOP GP.EXITDO GP.IF GP.ELSEIF GP.ELSE GP.ENDIF GP.SELECT GP.CASE
 .GP.OTHER GP.ENDSEL GP.INSTR GP.COMP GP.STRPTR GP.ARRPTR GP.BOX GP.FILL
 .GP.PRINTAT GP.CALL GP.A GP.X GP.Y GP.C GP.FN GP.BANKEDSTR GP.ENDBANKEDSTR
 .GP.BSTR GP.BANKED GP.ENDBANKED
 .
-.They are assembly because BASIC is slow at per-character string scans,
-.screen fills and VERA writes.
+.Their handlers are one block, GPBase $2F00 to ObjectBase $3500: 1,536 bytes,
+.page aligned, all or nothing. ScanGPUsage walks the finished p-code and
+.drops the block from the object when nothing in it is reached. The compile
+.report says GP IN or CORE.
 .
-.The handlers occupy GPBase $2F00 to ObjectBase $3500: 1,536 bytes, page
-.aligned, all or nothing. ScanGPUsage walks the finished p-code and drops the
-.whole block from the object if nothing in it is reached.
+=Composite keywords
 .
-.The block costs those 1,536 bytes. Maximum p-code is 20,992 bytes with 
-.the block and 22,528 without: ObjectBase or GPBase to $9F00, less the
-.2K frame stack and the 4K minimum workspace.
+.10 keywords expand into opcodes that already exist. They take no handler and
+.no vector slot.
 .
-.Composites. GP.ASM, GP.ENDASM, GP.CHAR, GP.CONTAINS, GP.ISEMPTY, GP.HIBYTE,
-.GP.LOBYTE, GP.BSTRCOUNT, GP.DEFPROC, GP.SUB. The compiler expands each into
-.opcodes that already exist.
+.GP.ASM GP.ENDASM GP.CHAR GP.CONTAINS GP.ISEMPTY GP.HIBYTE GP.LOBYTE
+.GP.BSTRCOUNT GP.DEFPROC GP.SUB
 .
-.The library. GPC-BASIC/: 17 .INC.BL modules, 25 .EXP.BL examples. Ordinary
-.BASL, #INCLUDEd by path, called with GOSUB. Zero runtime bytes -- a module
-.costs its own p-code, in the programs that include it. A program that has
-.run out of low memory can put a module's #INCLUDE inside a GP.BANKED region
-.and run it from a RAM bank, with no change to its callers; SEC 3.12 is where
-.that is explained. Menus vertical and bar, panels, themes, entry fields,
-.in-place case, trim and splice, shell sort, a screen rectangle to a RAM bank
-.or a file, BMX into VERA.
+.Whether the block comes in is the expansion's business. GP.CHAR runs
+.GP.FILL's handler and brings it in. GP.ASM, GP.ENDASM, GP.DEFPROC and GP.SUB
+.leave it out, and a program whose only GP.BASIC keywords are those reports
+.CORE.
 .
-.STASH.INC.BL, SORT.INC.BL, STRCASE.INC.BL and STRINGS.INC.BL are GP.ASM and
-.still modules: as keywords their bytes would sit in the block, paid by every
-.GP program. GP.ARRPTR and GP.STRPTR are what lets them out -- a BASL
-.subroutine takes an address, not an array or a string.
+=What the block costs
 .
-.The division is assembly for loops and bulk moves, BASIC for everything
-.else. LINEINPUT.GET waits on the keyboard, so speed does not apply to it;
-.writing it in BASL saved 166 runtime bytes.
+.Maximum low p-code, in bytes:
+.
+.  embedded
+.      CORE: 22,528
+.      GP IN: 20,992
+.
+.  shared
+.      CORE: 22,016
+.      GP IN: 19,968
+.
+.A shared program with a banked region loses a further 256: 19,712. LOW FREE
+.in the compile report, less 4,096, is how much more p-code will fit.
+.
+=The library
+.
+.GPC-BASIC/ holds 19 .INC.BL modules and 25 .EXP.BL examples: menus bar and
+.vertical, panels, themes, entry fields, check boxes, combo boxes, in-place
+.case, trim and splice, PRINT USING, shell sort, a screen rectangle to a RAM
+.bank or a file, BMX images into VERA.
+.
+.A module is ordinary BASL. #INCLUDE it by name and call it with GOSUB, or
+.with a GP.SUB / GP.FN verb where it offers one. It costs its own p-code in
+.the programs that include it and nothing in the GP block.
+.
+:#INCLUDE "GPB.INC.BL"
+:#INCLUDE "STRCASE.INC.BL"
+:
+:A$ = "hello"
+:GP.SUB STRCASE.APPLY, GP.STRPTR(A$), STRCASE.UPPER
+:PRINT A$
+:END
+.
+.STASH.INC.BL, SORT.INC.BL, STRCASE.INC.BL and STRINGS.INC.BL are written in
+.GP.ASM and are modules rather than keywords: their bytes land in the
+.including program, not in the block.
+.
+.A program short of low memory can put a module's #INCLUDE inside a GP.BANKED
+.region and run it from a RAM bank, with no change to its callers. SEC 3.12
+.has the rules.
 .
 =SEE ALSO
 .
->52|3.12 Code in a bank
->91|STASH.INC.BL -- save a text rectangle, and put it back.
->70|4.7 SORT.INC.BL -- shell sort a string array
->71|4.8 STRCASE.INC.BL -- case, in place
->62|4.2 STRINGS.INC.BL -- string helpers
+>7|2. Using it
+>56|3.12 Code in a bank
+>86|4.8 STRCASE.INC.BL -- case, in place
+>108|STASH.INC.BL -- save a text rectangle, and put it back.
+>85|4.7 SORT.INC.BL -- shell sort a string array
+>66|4.2 STRINGS.INC.BL -- string helpers

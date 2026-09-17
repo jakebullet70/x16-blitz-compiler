@@ -10,7 +10,7 @@
 #       2. delete L's lines from the tokenised source and relink it
 #       3. compile the stripped source with the option off, giving object B
 #
-#   A and B must be byte-identical, and so must the map and every .nnn overlay. The OK line
+#   A and B must be byte-identical, and so must the map and the .OVL overlay. The OK line
 #   must match too, bar A's DEAD figures, and DEAD's line count must be the length of L.
 #   Identical objects run identically, so neither is run.
 #

@@ -26,7 +26,7 @@
 ## **
 ## **      STR.USING.NUM = 1234.5 : STR.USING.MASK$ = "#,##0.00"
 ## **      GOSUB STR.USING
-## **      PRINT STR.USING.STR$                ' 1,234.50
+## **      PRINT STR.USING.STR$                : REM 1,234.50
 ## **
 ## **  THE MASK:
 ## **

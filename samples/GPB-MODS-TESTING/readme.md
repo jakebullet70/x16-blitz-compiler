@@ -88,7 +88,7 @@ python source\gpc\compile_shared.py GPBMODS.SRC.PRG  GPBMODS.PRG  GPBMODS.MAP
 `GPB.INC.BL` is the keyword ABI and root is upstream for it, so a copy taken from this folder
 silently downgrades the build.
 
-Then `gpbmods-demo.bat` from the project root.
+Then `USER-RUNS\gpbmods-demo.bat`.
 
 `modsbuild.py` takes a list, and two other programs live here: `GUIFRMT.BASL`, twenty-four headless
 assertions against `GUI.FORM`'s focus model, and `PICKDEMO.BASL`, `GUI.LISTBOX` in multi-select

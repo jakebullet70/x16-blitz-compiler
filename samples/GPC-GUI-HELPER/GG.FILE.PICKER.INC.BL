@@ -1,0 +1,82 @@
+## ***********************************************************************
+## **
+## **  GG.FILE.PICKER.INC.BL -- the two pickers the file commands use.
+## **
+## **      GG.FILE.PICK    a file taken off the drive
+## **      GG.PICK.RUN     a row taken out of the project
+## **      GG.FILES.SHOW   the rows GG.PICK.RUN draws
+## **
+## **  Both open on the chrome this program already uses, so both start with
+## **  GG.DIALOG.RESET.FIELDS and both leave the screen as they found it.
+## ***********************************************************************
+
+## ***********************************************************************
+## **  GG.FILE.PICK -- the popup file picker, on this program's chrome.
+## **
+## **  GG.PICK.EXT$ in, one of "MAKE", "PDEF" or "BASL,BL", and
+## **  GG.PICK.WHAT$ is the title. FILEPICK.NAME$ out, empty for
+## **  cancelled or for a drive with nothing of that kind on it.
+## **
+## **  THE PICKER FILLS MENUVERT.ITEM$ with file names, and that is the
+## **  array the menu draws itself out of. Nothing is put back here:
+## **  GG.MENU.RUN loads its rows on every turn, which is what already
+## **  makes GG.PICK.RUN safe.
+## ***********************************************************************
+GG.FILE.PICK:
+  GOSUB GG.DIALOG.RESET.FIELDS
+  GUI.TITLE$ = GG.PICK.WHAT$
+  FILEPICK.BANK = GG.DIRBANK%
+  FILEPICK.EXT$ = GG.PICK.EXT$
+  FILEPICK.ROWS = GG.LISTROW
+  GOSUB FILEPICK.RUN
+  IF FILEPICK.COUNT = 0 THEN GG.RESULT$ = "No ." + GG.PICK.EXT$ + " files on the drive"
+  RETURN
+
+## ---- GG.PICK.TITLE$ in, GG.PICKROW% out: the row, or 0 for cancelled or nothing
+## ---- to pick. GG.LISTSEL% remembers where the highlight was left.
+GG.PICK.RUN:
+  GG.PICKROW% = 0
+  GP.IF GG.FILECOUNT% = 0 THEN
+    GG.RESULT$ = "The project has no files yet"
+    RETURN
+  GP.ENDIF
+  IF GG.LISTSEL% < 1 THEN GG.LISTSEL% = 1
+  IF GG.LISTSEL% > GG.FILECOUNT% THEN GG.LISTSEL% = GG.FILECOUNT%
+  GOSUB GG.FILES.SHOW
+  GOSUB GG.DIALOG.RESET.FIELDS
+  GUI.TITLE$ = GG.PICK.TITLE$
+  GUI.BTN.ONE$ = "&OK" : GUI.BTN.TWO$ = "&CANCEL"
+  GOSUB GUI.BUTTON.SIZE
+  GUI.LIST.ROWS = 8
+  GUI.LIST.COUNT = GG.FILECOUNT%
+  GUI.LIST.MARKP = 0
+  GUI.LIST.SEL = GG.LISTSEL%
+  GOSUB GUI.LIST.MEASURE
+  GUI.BODY.ROWS = GUI.LIST.ROWS + 2
+  GUI.BODY.WIDTH = 40
+  IF GUI.BTN.TOTAL > GUI.BODY.WIDTH THEN GUI.BODY.WIDTH = GUI.BTN.TOTAL
+  GOSUB GUI.OPEN
+  GOSUB GUI.FORM.BEGIN
+  GUI.LIST.X = GUI.INNER.LEFT + 1
+  GUI.LIST.Y = GUI.INNER.TOP
+  GUI.LIST.W = GUI.INNER.WIDTH - 2
+  GOSUB GUI.FORM.ADD.LIST
+  GG.C.LIST = GUI.CTRL.N
+  GUI.BTN.Y = GUI.INNER.TOP + GUI.LIST.ROWS + 1
+  GOSUB GUI.BUTTON.ROW
+  GUI.FOCUS = GG.C.LIST
+  GOSUB GUI.FORM.RUN
+  GG.LISTSEL% = GUI.LIST.SEL
+  IF (GUI.CTRL.FLAGS%(GUI.FORM.HIT) AND GUI.CF.DEFAULT) <> 0 THEN GG.PICKROW% = GG.LISTSEL%
+  GOSUB GUI.CLOSE
+  MENUVERT.SCROLL = 0
+  RETURN
+
+## ---- The rows GG.PICK.RUN shows. A star marks the file COMPILE builds.
+GG.FILES.SHOW:
+  FOR GG.I = 1 TO GG.FILECOUNT%
+    GG.SHOW$ = "   "
+    IF GG.I = GG.CURR.NDX% THEN GG.SHOW$ = " * "
+    MENUVERT.ITEM$(GG.I) = GG.SHOW$ + GG.PROJECT.FILE.LIST$(GG.I)
+  NEXT GG.I
+  RETURN

@@ -1,7 +1,7 @@
 #!/bin/sh
 # ***************************************************************************
 #  build.sh -- full build of x16-blitz-compiler. POSIX; run from Git Bash.
-#  Invoked by build.bat, or directly:  ./build.sh [gpc|run|clean]
+#  Invoked by USER-RUNSuild.bat, or directly:  ./build.sh [gpc|run|clean]
 # ***************************************************************************
 set -e
 cd "$(dirname "$0")"
@@ -32,7 +32,7 @@ case "$1" in
         echo "== make samples  (mirror samples/ -> testing/samples) =="
         make samples
         echo "== launching x16emu with GPC.PRG =="
-        cmd //c "x16emu.bat" GPC.PRG
+        cmd //c "USER-RUNS\x16emu.bat" GPC.PRG
         exit 0
         ;;
     "")

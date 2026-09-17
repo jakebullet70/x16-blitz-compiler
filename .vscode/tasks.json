@@ -7,7 +7,7 @@
         {
             "label": "Build (libs + release)",
             "type": "shell",
-            "command": "${workspaceFolder}\\build.bat",
+            "command": "${workspaceFolder}\\USER-RUNS\\build.bat",
             "problemMatcher": [],
             "group": {
                 "kind": "build",
@@ -22,7 +22,7 @@
         {
             "label": "Build + GPC.PRG",
             "type": "shell",
-            "command": "${workspaceFolder}\\build.bat",
+            "command": "${workspaceFolder}\\USER-RUNS\\build.bat",
             "args": [ "gpc" ],
             "problemMatcher": [],
             "group": "build",
@@ -35,7 +35,7 @@
         {
             "label": "Build + Run (x16emu)",
             "type": "shell",
-            "command": "${workspaceFolder}\\build.bat",
+            "command": "${workspaceFolder}\\USER-RUNS\\build.bat",
             "args": [ "run" ],
             "problemMatcher": [],
             "group": "build",
@@ -48,7 +48,7 @@
         {
             "label": "Clean",
             "type": "shell",
-            "command": "${workspaceFolder}\\build.bat",
+            "command": "${workspaceFolder}\\USER-RUNS\\build.bat",
             "args": [ "clean" ],
             "problemMatcher": [],
             "presentation": {

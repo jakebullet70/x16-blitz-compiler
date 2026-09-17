@@ -128,8 +128,7 @@ def compile_one(entry, gpc, inputs, dead, run="run"):
 def outputs(drive, name):
     found = []
     for f in sorted(os.listdir(drive)):
-        if f in (name + ".PRG", name + ".MAP", "D." + name) or \
-                (f.startswith(name + ".") and len(f) == len(name) + 4 and f[-3:].isdigit()):
+        if f in (name + ".PRG", name + ".MAP", name + ".OVL", "D." + name):
             found.append(f)
     return found
 

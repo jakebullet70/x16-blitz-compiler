@@ -1,0 +1,159 @@
+## ***********************************************************************
+## **
+## **  GG.PROGRAM.EDIT.INC.BL -- the program settings dialog.
+## **
+## **      GG.PROGRAM.SETTINGS   edit what the project is set to build
+## **      GG.PROJECT.ASK        name a project when the drive has none to open
+## **
+## **  it reads and writes the settings of the CURRENT PROGRAM --
+## **  GG.SOURCE$, GG.OUTPUT$, GG.MAP%, GG.DEAD%, GG.USEBASL%, GG.MODE% and
+## **  GG.BONLY% -- and OK writes them out as that program .PDEF file.
+## ***********************************************************************
+
+## ***********************************************************************
+## **  GG.PROJECT.ASK -- settings belong to a project, so an unnamed project is
+## **  named before the form opens. It is the same name SAVE PROJECT would have
+## **  asked for. Cancelling leaves GG.DEFNAME$ empty and the caller gives up.
+## **
+## **  THE PICKER COMES FIRST. A drive with projects on it is far more likely to
+## **  hold the one wanted than to want a new one, so GG.DEF.OPEN is offered and
+## **  this is what is left when it finds nothing or is cancelled.
+## ***********************************************************************
+GG.PROJECT.ASK:
+  GG.ASK.TITLE$ = " Project Name "
+  GG.ASK.MSG$ = "Name the project"
+  GG.ASK.TEXT$ = ""
+  GOSUB GG.ASK.NAME
+  IF GUI.OK = 0 THEN RETURN
+  IF GUI.TEXT$ = "" THEN RETURN
+  GG.DEFNAME$ = GUI.TEXT$
+  GOSUB GG.DEF.NAME.EXT
+  RETURN
+
+
+## ***********************************************************************
+## **  GG.PROGRAM.SETTINGS -- two fields, four check boxes and the mode combo.
+## **
+## **  Nine controls with the two buttons, which is GUI.FORM.MAX exactly, so
+## **  anything else asked of this dialog has to replace something. Each field's
+## **  text comes back in GUI.CTRL.TEXT$ under its control number.
+## **
+## **  EVERY SETTING HERE BELONGS TO THE PROGRAM, the row GG.CURR.NDX% names,
+## **  and they are written to its .PDEF file when OK is taken. The project file
+## **  carries nothing but the list of programs, so a project may mix a compiled
+## **  program with one that is only tokenised.
+## **
+## **  THE FORM LOOP IS WRITTEN OUT HERE rather than left to GUI.FORM.RUN. The
+## **  two are the same three lines; what this one gains is a place between the
+## **  steps, and GG.SET.FILL uses it to offer a default output name.
+## ***********************************************************************
+GG.PROGRAM.SETTINGS:
+  GOSUB GG.MAIN.GET
+  GP.IF GG.PDEFNAME$ = "" THEN
+    GG.RESULT$ = "No program. New Program first"
+    RETURN
+  GP.ENDIF
+  GOSUB GG.DIALOG.RESET.FIELDS
+  GUI.TITLE$ = " Program Settings "
+  GUI.BTN.ONE$ = "&OK"
+  GUI.BTN.TWO$ = "&Cancel"
+  GOSUB GUI.BUTTON.SIZE
+  GUI.BODY.ROWS = 10 : GUI.BODY.WIDTH = 40
+  IF GUI.BTN.TOTAL > GUI.BODY.WIDTH THEN GUI.BODY.WIDTH = GUI.BTN.TOTAL
+  GOSUB GUI.OPEN 
+  GOSUB GUI.FORM.BEGIN
+
+  GP.PRINTAT GUI.INNER.LEFT, GUI.INNER.TOP, "Source", GUI.PANEL
+  GP.PRINTAT GUI.INNER.LEFT, GUI.INNER.TOP + 1, "Output", GUI.PANEL
+  LINEINPUT.X = GUI.INNER.LEFT + 8
+  LINEINPUT.LEN = 30
+  LINEINPUT.ATTR = THEME.CLR(THEME.HILITE)
+  LINEINPUT.MASK = 0
+  LINEINPUT.DENY$ = ",:=*?"
+  LINEINPUT.Y = GUI.INNER.TOP
+  LINEINPUT.TEXT$ = GG.SOURCE$
+  GOSUB GUI.FORM.ADD.FIELD
+  
+  GG.C.SOURCE = GUI.CTRL.N
+  LINEINPUT.Y = GUI.INNER.TOP + 1
+  LINEINPUT.TEXT$ = GG.OUTPUT$
+  GOSUB GUI.FORM.ADD.FIELD
+  GG.C.OUTPUT = GUI.CTRL.N
+
+  CHECK.X = GUI.INNER.LEFT
+  CHECK.Y = GUI.INNER.TOP + 3
+  CHECK.TEXT$ = "Make a Debug Map"
+  CHECK.ON = GG.MAP%
+  GOSUB CHECK.ADD
+
+  GG.C.MAP = CHECK.CTRL
+  CHECK.Y = GUI.INNER.TOP + 4
+  CHECK.TEXT$ = "Remove Dead Code"
+  CHECK.ON = GG.DEAD%
+  GOSUB CHECK.ADD
+  GG.C.DEAD = CHECK.CTRL
+
+  CHECK.Y = GUI.INNER.TOP + 5
+  CHECK.TEXT$ = "Run BASLOAD 1st"
+  CHECK.ON = GG.USEBASL%
+  GOSUB CHECK.ADD
+  GG.C.BASL = CHECK.CTRL
+
+  CHECK.Y = GUI.INNER.TOP + 6
+  CHECK.TEXT$ = "BASLOAD Only"
+  CHECK.ON = GG.BONLY%
+  GOSUB CHECK.ADD
+  GG.C.BONLY = CHECK.CTRL
+
+  GP.PRINTAT GUI.INNER.LEFT, GUI.INNER.TOP + 7, "Runtime", GUI.PANEL
+  MENUVERT.ITEM$(1) = " Embedded" : MENUVERT.ITEM$(2) = " Shared"
+  COMBO.X = GUI.INNER.LEFT + 8
+  COMBO.Y = GUI.INNER.TOP + 7
+  COMBO.W = 12
+  COMBO.COUNT = 2
+  COMBO.SEL = GG.MODE%
+  COMBO.BANK = 0
+  GOSUB COMBO.ADD
+
+  GUI.BTN.Y = GUI.INNER.TOP + 9
+  GOSUB GUI.BUTTON.ROW
+  GUI.FOCUS = GG.C.SOURCE
+  GOSUB GUI.FORM.INIT
+  GUI.FORM.HIT = 0
+  GUI.FORM.DONE = 0
+  GUI.PAINT.N = GUI.FOCUS
+  GOSUB GUI.FORM.PAINT
+GG.SET.LOOP:
+  GG.PREVFOCUS% = GUI.FOCUS
+  GOSUB GUI.FORM.STEP
+  GOSUB GG.SET.FILL
+  IF GUI.FORM.DONE = 0 THEN GOTO GG.SET.LOOP
+
+  GP.IF (GUI.CTRL.FLAGS%(GUI.FORM.HIT) AND GUI.CF.DEFAULT) <> 0 THEN
+    GG.SOURCE$ = GUI.CTRL.TEXT$(GG.C.SOURCE)
+    GG.OUTPUT$ = GUI.CTRL.TEXT$(GG.C.OUTPUT)
+    GG.MAP% = (GUI.CTRL.FLAGS%(GG.C.MAP) AND GUI.CF.CHECKED) <> 0
+    GG.DEAD% = (GUI.CTRL.FLAGS%(GG.C.DEAD) AND GUI.CF.CHECKED) <> 0
+    GG.MODE% = COMBO.SEL
+    GG.USEBASL% = (GUI.CTRL.FLAGS%(GG.C.BASL) AND GUI.CF.CHECKED) <> 0
+    GG.BONLY% = (GUI.CTRL.FLAGS%(GG.C.BONLY) AND GUI.CF.CHECKED) <> 0
+    GG.SAVENAME$ = GG.PDEFNAME$
+    GOSUB GG.PDEF.WRITE
+  GP.ELSE
+    GG.RESULT$ = "Settings unchanged"
+  GP.ENDIF
+  GOSUB GUI.CLOSE
+  LINEINPUT.DENY$ = ""
+  RETURN
+
+
+## ---- Leaving SOURCE with OUTPUT still empty writes the name the compile
+## ---- would have used anyway, so it is there to be seen and to be edited.
+GG.SET.FILL:
+  IF GG.PREVFOCUS% <> GG.C.SOURCE THEN RETURN
+  IF GUI.CTRL.TEXT$(GG.C.OUTPUT) <> "" THEN RETURN
+  IF GUI.CTRL.TEXT$(GG.C.SOURCE) = "" THEN RETURN
+  GUI.CTRL.TEXT$(GG.C.OUTPUT) = "C." + GUI.CTRL.TEXT$(GG.C.SOURCE)
+  GUI.PAINT.N = GG.C.OUTPUT
+  GOSUB GUI.FORM.PAINT
+  RETURN

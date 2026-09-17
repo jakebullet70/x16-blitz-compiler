@@ -1,67 +1,121 @@
-@4.21 CHECK.INC.BL -- a check box, [X] or [ ]
+@4.20 KV.INC.BL -- keys and values in one RAM bank
 .
-=4.21 CHECK.INC.BL -- A CHECK BOX, [X] OR [ ]
+=4.20 KV.INC.BL -- KEYS AND VALUES IN ONE RAM BANK
 .
 =DESCRIPTION
 .
-.  CHECK.ADD
-.      IN: CHECK.X CHECK.Y CHECK.TEXT$ CHECK.ON
-.      OUT: CHECK.CTRL
+.  KV.INIT
+.      IN: --
+.      OUT: KV.OK
 .
-:CHECK.X = GUI.INNER.LEFT : CHECK.Y = GUI.INNER.TOP
-:CHECK.TEXT$ = "SHOW HIDDEN FILES" : CHECK.ON = -1
-:GOSUB CHECK.ADD
-:HIDDEN = CHECK.CTRL
-:' ... run the form ...
-:IF (GUI.CTRL.FLAGS%(HIDDEN) AND GUI.CF.CHECKED) <> 0 THEN PRINT "TICKED"
+.  KV.FIND
+.      IN: KV.KEY$
+.      OUT: KV.SLOT
 .
-.Only CHECK.ADD is called by an application. CHECK.DRAW and CHECK.KEY are
-.reached by GUI.FORM, which dispatches a GUI.CT.CHECK control to them by
-.name. The call goes between GUI.FORM.BEGIN and GUI.FORM.RUN.
+.  KV.GET
+.      IN: KV.KEY$
+.      OUT: KV.VALUE$ KV.SLOT KV.OK
 .
-.CHECK.X and CHECK.Y are the cell the [ goes in, and the caption starts four
-.cells to the right. CHECK.TEXT$ = "" draws a bare box. A non-zero CHECK.ON
-.starts the box ticked. CHECK.CTRL is the control's number, and 0 when the
-.form is already full.
+.  KV.AT
+.      IN: KV.SLOT
+.      OUT: KV.KEY$ KV.VALUE$ KV.OK
 .
-.The state is a flag on the control, GUI.CF.CHECKED in GUI.CTRL.FLAGS%(), and
-.not a variable of the module's. Keep CHECK.CTRL and test the flag after
-.GUI.FORM.RUN. That is why one form carries several boxes where it carries
-.only one combo.
+.  KV.PUT
+.      IN: KV.KEY$ KV.VALUE$
+.      OUT: KV.SLOT KV.OK
 .
-.  X
-.      DOES: ticks the box
+.  KV.DEL
+.      IN: KV.KEY$
+.      OUT: KV.OK
 .
-.  DEL
-.      DOES: clears it
+.  KV.WIPE
+.      IN: --
+.      OUT: KV.OK
 .
-.  SPACE
-.      DOES: flips it
+.  KV.SAVE
+.      IN: KV.FNAME$
+.      OUT: --
 .
-.  TAB RIGHT DOWN
-.      DOES: the next control
+.  KV.LOAD
+.      IN: KV.FNAME$
+.      OUT: KV.OK
 .
-.  SHIFT+TAB LEFT UP
-.      DOES: the previous control
+.  KV.PUTNUM KV.GETNUM
+.      IN: --
+.      OUT: KV.OK, always 0
 .
-.  RETURN
-.      DOES: presses the default button
+:#INCLUDE "KV.INC.BL"
+:
+:GOSUB KV.INIT
+:KV.KEY$ = "COLOR"
+:KV.VALUE$ = "RED"
+:GOSUB KV.PUT
+:KV.KEY$ = "COLOR"
+:GOSUB KV.GET
+:IF KV.OK THEN PRINT KV.VALUE$
+:KV.FNAME$ = "SETTINGS.KV"
+:GOSUB KV.SAVE
 .
-.  ESC STOP
-.      DOES: cancels the form
+.Strings stored by key in RAM bank 40. KV.INIT runs before any other routine.
+.Every routine is a plain GOSUB, and KV.OK is -1 for success and 0 for
+.failure.
 .
-.Any other key is offered to the buttons' marked letters.
+.Plain BASL. No GP.* keyword and no GP.ASM, so it needs neither GPB.INC.BL
+.nor a #SYMFILE, and the same source tokenises for stock BASIC.
 .
-.It is required by GUI.INC.BL, which names CHECK.DRAW and CHECK.KEY. It goes
-.in after that file, as COMBO.INC.BL does. A program that includes the GUI
-.and leaves this one out stops with LABEL NOT FOUND.
+.KV.INIT formats the bank only when slot 0 holds no header. A bank that
+.already holds a store is kept, keys and all. A header with another version
+.or slot count is left alone, and KV.OK is 0. KV.WIPE formats the bank
+.whatever it holds.
 .
-.GPBMODS (SEC 4.22) runs three boxes and a combo on one form, under DIALOG >
-.CHECK BOX + COMBO.
+.Keys are A-Z, 0-9 and ., cut to 8 characters. The module checks none of
+.this. A key compares byte for byte, and KV.AT reads a key back up to its
+.first space.
 .
-=SEE ALSO
+.KV.PUT refuses an empty key. It rewrites the slot of a key that exists and
+.takes the first free slot for one that does not. When all 63 slots are in
+.use, KV.OK and KV.SLOT are 0.
 .
->86|4.22 GPBMODS -- the harness that drives every module
->85|4.21 CHECK.INC.BL -- a check box, [X] or [ ]
->74|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
->80|4.17 COMBO.INC.BL -- a drop-down list that folds into one row
+.Values hold up to 119 characters, and KV.PUT cuts a longer one. An empty
+.value is stored and reads back as "". A missing key gives KV.OK = 0, KV.SLOT
+.= 0 and KV.VALUE$ = "".
+.
+.KV.FIND sets KV.SLOT and nothing else. Slots never move, so a program can
+.keep a slot number for the rest of the run and read it with KV.AT, which
+.does not scan. A delete frees the slot. KV.AT on every slot lists the store:
+.
+:FOR SLOT.NUMBER = 1 TO 63
+:    KV.SLOT = SLOT.NUMBER
+:    GOSUB KV.AT
+:    IF KV.OK THEN PRINT KV.KEY$; " = "; KV.VALUE$
+:NEXT SLOT.NUMBER
+.
+.KV.PUTNUM and KV.GETNUM are stubs. Each sets KV.OK = 0 and returns. Store a
+.number as text: STR$(N) with KV.PUT, and VAL(KV.VALUE$) after KV.GET.
+.
+.It selects a bank. Every routine selects bank 40 and ends with BANK
+.KV.HOMEBANK. The first KV.INIT sets KV.HOMEBANK to 1, the bank selected at
+.startup, and a program that keeps another bank selected sets it after
+.KV.INIT. A call from a GP.BANKED region needs nothing: it is a banked call,
+.and its RETURN selects the region's bank again (SEC 3.12). The module cannot
+.go inside a region, because the compiler refuses BANK there.
+.
+.A program that uses BANKMGR (SEC 4.13) claims the bank after BANKMGR.INIT
+.and before the first GET.FREE.BANK:
+.
+:BANKMGR.SET.BANK = KV.BANK
+:GOSUB BANKMGR.CLAIM
+.
+.KV.SAVE writes the whole bank, all 8,192 bytes, to KV.FNAME$ on device 8,
+.and replaces a file of that name. A disk error stops the program.
+.
+.KV.LOAD returns KV.OK = 0 for a missing file and leaves the bank alone. It
+.also returns 0 for a file that loads but holds no matching header, and then
+.the bank already holds that file: run KV.WIPE before the next KV.PUT. It
+.opens logical files 14 and 15 to test for the file and closes both, so
+.neither may be open when it is called.
+.
+.The layout, for a program that reads the bank without this module:
+.
+:slot n = $A000 + n*128, n = 0-63
+:+0..+7    the key, padded with spaces. $00 at +0 is a free slot

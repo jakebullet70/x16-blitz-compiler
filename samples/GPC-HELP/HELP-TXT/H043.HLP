@@ -1,56 +1,115 @@
-@4.7 SORT.INC.BL -- shell sort a string array
+@4.6 MENUVERT.INC.BL -- a vertical menu (2)
+.  1
+.      must select -- ESC does not cancel
 .
-=4.7 SORT.INC.BL -- SHELL SORT A STRING ARRAY
+.  2
+.      keep mark -- leave the chosen row highlighted on the way out
 .
-=DESCRIPTION
+.  4
+.      no wrap -- stop at the ends instead of wrapping round
 .
-.  SORT.RUN
-.      IN: SORT.PTR SORT.DESCEND SORT.NOCASE
-.      OUT: SORT.OK SORT.COUNT
+.  8
+.      gamepad -- drive it from the SNES pad in port 1 as well as the
+.        keyboard
 .
-:#SYMFILE "@:MYPROG.SYM"
-:#INCLUDE "SORT.INC.BL"
-:
-:SORT.PTR = GP.ARRPTR(NAME$())
-:SORT.DESCEND = 0 : SORT.NOCASE = 0
-:GOSUB SORT.RUN
+.  64
+.      key exit -- end on a key the menu has no use for, instead of
+.        swallowing it
 .
-.Shell sort with Ciura's gap sequence -- 132, 57, 23, 10, 4, 1 -- moving the
-.2-byte element pointers rather than string data. A swap costs the same
-.whatever the strings are: no temporary, no copy, no heap traffic.
+.  128
+.      hint mid -- centre each hint in its field. Does nothing unless
+.        MENUVERT.HINTW is set
 .
-.The array is passed as an address because a BASL subroutine cannot be passed
-.an array; GP.ARRPTR is a keyword for this purpose. The empty parentheses in
-.GP.ARRPTR(A$()) are required -- A$ and A$() are different variables.
+.The constants MENUVERT.MUSTSEL, .KEEPMARK, .NOWRAP, .GAMEPAD, .KEYEXIT and
+..HINTMID are defined; add those rather than the numbers.
 .
-.SORT.OK is -1 when it sorted and 0 if the sort was refused: more than 255
-.elements, so DIM A$(254) is the largest accepted (DIM A$(255) is 256
-.elements), or an array whose elements are not strings. The element count and
-.the type are read from the array's own header, three bytes below what
-.GP.ARRPTR returns, so a wrong count cannot be passed in.
+.With KEYEXIT, a key the menu ignores -- LEFT and RIGHT -- ends it with
+.MENUVERT.KEY set and MENUVERT.SEL untouched. MENUBAR.DOWNEXIT (SEC 4.9) is
+.the same mechanism on the other axis; the two let a bar and its dropdown
+.drive each other.
 .
-.Never-assigned elements are empty strings, not garbage. A DIM A$(20) with
-.five entries filled sorts its fifteen empties to the front; a null pointer
-.reads as "", as it does elsewhere in the runtime.
+.A hotkey chooses its row rather than moving to it. MENUVERT.HOT$ is one
+.character per row in order, matched without case. It may be shorter than
+.MENUVERT.COUNT, in which case the later rows have no hotkey.
 .
-.SORT.DESCEND and SORT.NOCASE are ordinary variables rather than arguments,
-.so they are sticky. Set both on every call.
+.MENUVERT.HOTATTR paints the hotkey letter in a second attribute. The letter
+.is located in the row's own text -- the first case-insensitive match for
+.that row's MENUVERT.HOT$ character -- so nothing extra is passed in and "
+.START" with hotkey S needs no markup. A row whose text does not contain its
+.hotkey is left untinted rather than reported; the hotkey still works. Only
+.rows in the normal attribute are tinted: on the selected row the highlight
+.carries the meaning.
 .
-.The program must have a #SYMFILE, placed before the #INCLUDEs. The assembly
-.reaches BASIC's variables through {VAR}, and BASLOAD crunches every name
-.before the compiler sees it; without the mapping the compile stops with {}
-.NEEDS #SYMFILE.
+=Separators
 .
-.Example: ARRAYS.EXP.BL. Regression test: SORT.EXP.BL, eight cases including
-.a 200-element array -- element 128 is where the doubled index stops fitting
-.in a byte. Every case checks content as well as order: a sort that reads the
-.wrong element leaves the array in order with a string duplicated.
+.A row whose text is one hyphen draws as a line across the menu's width. The
+.highlight never lands on it and a hotkey cannot choose it; UP and DOWN step
+.over it in the direction they were already going. The row still counts, so
+.MENUVERT.SEL and MENUVERT.HOT$ keep one entry a row and the separator's
+.MENUVERT.HOT$ entry is a placeholder. The test is for the hyphen alone, so a
+.caller that builds rows with a leading space must leave it off this one.
+.
+.MENUVERT.SEPCHR names the glyph and MENUVERT.SEPATTR the attribute.
+.
+=Disabled rows
+.
+.MENUVERT.DIS$ is one character a row, and "1" disables that row: the cursor
+.steps over it, a hotkey will not choose it, and it draws in
+.MENUVERT.DISATTR.
+.
+:MENUVERT.DIS$ = "0010" : REM row 3 is off
+:MENUVERT.DISATTR = THEME.CLR(THEME.DIMMED)
+:GOSUB MENUVERT.RUN
+.
+.The mask is read once and cleared. MENUVERT.RUN and MENUVERT.DRAW both take
+.it and set MENUVERT.DIS$ = "", so a menu that never sets it cannot inherit
+.the last one's mask.
+.
+=Hints
+.
+.With MENUVERT.HINTW non-zero, the row's MENUVERT.HINT$() line is printed in
+.the field at MENUVERT.HINTX MENUVERT.HINTY, MENUVERT.HINTW cells wide, in
+.MENUVERT.HINTATTR. The field is cleared to that attribute first. Flag 128
+.centres the text in the field.
+.
+.A hint is drawn only when the highlight moves, not when the menu opens, so
+.whatever the status line already says survives until the user starts moving.
+.
+.The caller owns this DIM as well. With MENUVERT.HINTW at 0 the array is
+.never read, so a menu without hints needs no array at all.
+.
+=The caller owns the DIM
+.
+.A module cannot be passed an array in BASIC, so it names one; DIMming it
+.inside the module would fix a bound and then fail for a caller who wanted
+.more rows. Leave MENUVERT.ITEM$ undimensioned and GPC's implicit DIM gives
+.0..10, a ten-row menu. DIM it yourself for more. Do not do both.
+.
+=The gamepad flag
+.
+.With flag 8, up and down move the highlight and B or Start chooses. Cancel
+.is keyboard-only.
+.
+.It reads port 1, the physical pad. Port 0 is the keyboard presented as a
+.joystick and is not read.
+.
+.One step per press, with no auto-repeat: the pad is edge-triggered, so
+.holding a direction moves once, and a button still held from whatever opened
+.the menu is not read as a fresh press.
+.
+.With no pad connected the flag changes nothing. In the emulator a real pad
+.needs -joy1.
+.
+.Examples: MENUDEMO.EXP.BL on its own, MENU.EXP.BL inside a whole small
+.application, and MENUTST.EXP.BL for the 21-case regression test.
 .
 =EXAMPLE PROGRAM
 .
-.  ARRAYS.EXP.BL -- runnable, in the GPC-BASIC folder
-.  SORT.EXP.BL -- runnable, in the GPC-BASIC folder
+.  MENUDEMO.EXP.BL -- runnable, in the GPC-BASIC folder
+.  MENU.EXP.BL -- runnable, in the GPC-BASIC folder
+.  MENUTST.EXP.BL -- runnable, in the GPC-BASIC folder
 .
 =SEE ALSO
 .
->70|4.7 SORT.INC.BL -- shell sort a string array
+>87|4.9 MENUBAR.INC.BL -- a horizontal menu
+>78|4.6 MENUVERT.INC.BL -- a vertical menu

@@ -1,47 +1,47 @@
-@6. The traps, collected
+@3. The modules (8)
+=STRCASE.INC.BL -- case, in place
 .
-=6. THE TRAPS, COLLECTED
+.Routines, arguments and examples: SEC 4.8.
 .
-.Each of these has cost a debugging session at least once.
+.  in
+.      STRCASE.PTR -- GP.STRPTR of the string
+.      STRCASE.MODE -- STRCASE.UPPER or STRCASE.LOWER
 .
-.  P AND 255 on a heap or VRAM address
-.      WHAT HAPPENS: AND is 16-bit signed; above 32,767 it raises OUT OF
-.        RANGE instead of masking
-.      DO THIS: H = INT(P/256) : L = P - H*256
+.  out
+.      the string itself, rewritten in place
 .
-.  an address in an A% variable
-.      WHAT HAPPENS: % is signed 16-bit and truncates without error -- A% =
-.        49152 reads back -16,384
-.      DO THIS: untyped variable, or split into page and offset
+.  verbs
+.      STR.UCASE STR.LCASE -- a string in, a cased copy back, through
+.        STRCASE.S$
 .
-.  $0400 for machine code
-.      WHAT HAPPENS: stock BASIC leaves it free, a compiled GPC program does
-.        not -- runtime state lives there, and it is corrupted with no error
-.      DO THIS: banked RAM, $A000-$BFFF
+.  internal
+.      STRCASE.ADDR% STRCASE.OP% STRCASE.S$
 .
-.  PRINT after GP.PRINTAT
-.      WHAT HAPPENS: GP drawing never calls the KERNAL, so the cursor is
-.        wherever it was
-.      DO THIS: LOCATE first, or stay in one world
+.  constants
+.      STRCASE.UPPER STRCASE.LOWER
 .
-.  SORT.INC.BL with no #SYMFILE
-.      WHAT HAPPENS: {VAR} cannot resolve a crunched name -- {} NEEDS
-.        #SYMFILE
-.      DO THIS: #SYMFILE "@:PROG.SYM", before the #INCLUDEs
+.STR.UCASE and STR.LCASE are the two STR. names this file owns. The rest of
+.STR. is STRINGS.INC.BL's, and the two verbs are named for the module they
+.are to move into.
 .
-.  GP.BOX X,Y,W,H,,7
-.      WHAT HAPPENS: optionals cannot be skipped over
-.      DO THIS: GP.BOX X,Y,W,H,0,7
+.#SYMFILE again. Do not write #AUTONUM in a program that includes this -- it
+.sets the STEP, and only the default 1 survives.
 .
-.  SCREEN after BMX.PAINT
-.      WHAT HAPPENS: reloads the default palette and throws the image's
-.        colours away
-.      DO THIS: set the mode first
+=EXAMPLE PROGRAM
 .
-.  #DEFINE X 129536
-.      WHAT HAPPENS: #DEFINE takes an INT16 -- ERROR: INVALID PARAMETER
-.      DO THIS: an ordinary variable
+.  FORM.EXP.BL -- runnable, in the GPC-BASIC folder
 .
 =SEE ALSO
 .
->70|4.7 SORT.INC.BL -- shell sort a string array
+>65|4.1 THEME.INC.BL -- named colour roles
+>75|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>66|4.2 STRINGS.INC.BL -- string helpers
+>88|4.10 STRUSING.INC.BL -- a number to a template
+>94|4.14 KB.INC.BL -- the keyboard buffer, emptied
+>76|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>77|4.5 BMX.INC.BL -- a BMX bitmap into VERA
+>95|4.15 FILEIO.INC.BL -- the drive: status, files, directories
+>96|4.16 FILEDIR.INC.BL -- a directory, into a bank or into low RAM
+>98|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+>100|4.20 KV.INC.BL -- keys and values in one RAM bank
+>78|4.6 MENUVERT.INC.BL -- a vertical menu

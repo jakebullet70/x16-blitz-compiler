@@ -205,13 +205,13 @@ _PMREnd:
 ;		ONE LAYOUT ENTRY IS ONE BANK. GPBankCheckBankFree refuses a second GP.BANKED on a bank,
 ;		BStrRegister refuses text on a bank a GP.BANKED owns, and BStrSelectBank keeps the text
 ;		banks distinct. BStrRegister enters each text bank's number in gpBankBanks too, so that
-;		one table names every bank, as it names every .nnn file. The text entries are the last
-;		bstrBankCount of the layout, in slot order (commands/gpbstrflush.asm).
+;		one table names every bank, as it names every region in the overlay file. The text
+;		entries are the last bstrBankCount of the layout, in slot order (commands/gpbstrflush.asm).
 ;
-;		USED IS WHOLE PAGES. A region is padded to a page boundary, layoutPages is what the
-;		bootstrap copies, and the page count is what the two OVER 8K checks hold to 32 -- so FREE
-;		is room that is certainly there, and the part page at the top of USED may hold a little
-;		more.
+;		USED IS WHOLE PAGES. A region is padded to a page boundary, layoutPages is the count the
+;		object writer puts in the .OVL ahead of the region's bytes, and the page count is what the
+;		two OVER 8K checks hold to 32 -- so FREE is room that is certainly there, and the part page
+;		at the top of USED may hold a little more.
 ;
 ;		layoutCount and layoutPages are pass one's, kept for the bootstrap's table, and neither
 ;		pass two nor the object writer disturbs them. bstrBankCount is pass two's, which found

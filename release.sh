@@ -1,7 +1,7 @@
 #!/bin/sh
 # ***************************************************************************
 #  release.sh -- build, stage and package a versioned release. POSIX; run from
-#  Git Bash. Invoked by release.bat, or directly.
+#  Git Bash. Invoked by USER-RUNSelease.bat, or directly.
 #
 #     release.sh          build everything, stage release/TMP, then zip it
 #     release.sh stage    stage release/TMP from the CURRENT build -- no rebuild,
@@ -97,6 +97,7 @@ if not version:
 sys.path.insert(0, os.path.join(root, "source", "runtime", "scripts"))
 from rtname import rt_filename, rc_filename, bank_filename  # noqa: E402
 # ...and the runtime IMAGE's two names likewise, from the script that installs them.
+sys.path.insert(0, os.path.join(root, "source", "application", "scripts"))
 from genrtimage import imageName, bankImageName     # noqa: E402
 
 # ===========================================================================
@@ -106,7 +107,7 @@ from genrtimage import imageName, bankImageName     # noqa: E402
 #  release/TMP/
 #     GPC.PRG GPC.BIN GPC/GP1.IMG.nnn.BIN  the compiler
 #     GPB/GPC/GP1.RT.nnn.BIN               both shared runtimes and their bank code
-#     GPC.ERR.PRG  GPB.HELP.PRG            the two companion programs
+#     GPC.ERR.PRG  GPC.HELP.PRG            the two companion programs
 #     README.md LICENSE MANIFEST.TXT
 #     HELP-TXT/       the help viewer's index and topics
 #     GPC-BASIC/      the GP.BASIC library, whole, with its manual
@@ -128,7 +129,7 @@ from genrtimage import imageName, bankImageName     # noqa: E402
 #  GPC.INPUT (the control-file template) is deliberately NOT shipped: GPC.PRG drives the
 #  compile interactively, and the file is per-user state (git-ignored in testing/).
 
-# The root. GPC.PRG and GPB.HELP.PRG are both compiled SHARED, so they want
+# The root. GPC.PRG and GPC.HELP.PRG are both compiled SHARED, so they want
 # GPB.RT.nnn.BIN beside them -- which is this same root, two lines up.
 #
 #   GPC.PRG         the front end you launch on the X16 -- a COMPILED program, because
@@ -148,8 +149,11 @@ from genrtimage import imageName, bankImageName     # noqa: E402
 #                   its input); the release drops the prefix, because a user should not have
 #                   to know which of two spellings is the fast one. The tokenised build is
 #                   NOT shipped -- it is compile input, and could not be run in any case.
-#   GPB.HELP.PRG    the on-machine reference -- the manual, the globals register and the
-#                   file list, readable on the X16. SHARED since 12th Sep 2026.
+#   GPC.HELP.PRG    the on-machine reference -- the manual, the globals register and the
+#                   file list, readable on the X16. SHARED since 12th Sep 2026. In the
+#                   tree it is GPB.HELP.PRG; the release names it for the compiler it
+#                   ships with. The program never opens itself by name, so the rename
+#                   is safe, and it still finds HELP-TXT/GPB.HELP.IDX beside it.
 ROOTFILES = [
     ("testing/GPC.PRG",                     "GPC.PRG"),
     ("testing/GPC.BIN",                     "GPC.BIN"),
@@ -159,7 +163,7 @@ ROOTFILES = [
     ("testing/" + rc_filename(),            rc_filename()),
     ("testing/" + bank_filename(),          bank_filename()),
     ("testing/C.GPC.ERR.PRG",               "GPC.ERR.PRG"),
-    ("samples/GPC-HELP/GPB.HELP.PRG",       "GPB.HELP.PRG"),
+    ("samples/GPC-HELP/GPB.HELP.PRG",       "GPC.HELP.PRG"),
     ("README.md",                           "README.md"),
     ("LICENSE",                             "LICENSE"),
 ]

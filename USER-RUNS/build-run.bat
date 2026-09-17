@@ -24,7 +24,7 @@ if not exist "%BASH%" (
 
 rem --- build everything under bash (PATH set inside so make + 64tass resolve)-
 echo == Building (libs, release, GPC.PRG) ==
-"%BASH%" -lc "cd \"$(cygpath -u '%~dp0')\" && export PATH=\"/c/8bitProgramming/make-4.4.1/bin:/c/8bitProgramming/64tass-1.60:/c/Users/Admin/AppData/Local/Programs/Python/Python313:$PATH\" && set -e && make libs && make release && make -C source/gpc release"
+"%BASH%" -lc "cd \"$(cygpath -u '%~dp0..')\" && export PATH=\"/c/8bitProgramming/make-4.4.1/bin:/c/8bitProgramming/64tass-1.60:/c/Users/Admin/AppData/Local/Programs/Python/Python313:$PATH\" && set -e && make libs && make release && make -C source/gpc release"
 if errorlevel 1 (
     echo == BUILD FAILED -- not launching emulator ==
     exit /b %ERRORLEVEL%

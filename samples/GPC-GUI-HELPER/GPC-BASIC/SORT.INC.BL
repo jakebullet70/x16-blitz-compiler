@@ -1,0 +1,260 @@
+## ***********************************************************************
+## **
+## **  SORT.INC.BL -- shell sort a string array in place, in assembly.
+## **
+## **      SORT.RUN        sort the array SORT.PTR points at
+## **
+## **  Shell sort with Ciura's gaps -- 132, 57, 23, 10, 4, 1 -- moving 2-byte
+## **  pointers rather than string data, so a swap costs the same whatever the
+## **  strings are. The gap loop is BASIC; the assembly takes one gap a pass.
+## **
+## **      SORT.PTR = GP.ARRPTR(NAME$())
+## **      SORT.DESCEND = 0 : SORT.NOCASE = 0
+## **      GOSUB SORT.RUN
+## **
+## **   in   SORT.PTR       GP.ARRPTR of the array -- element ZERO, the
+## **                       3 byte header already skipped
+## **        SORT.DESCEND   non-zero = largest first
+## **        SORT.NOCASE    non-zero = fold case while comparing
+## **
+## **   out  SORT.OK        -1 if it sorted, 0 if it refused
+## **        SORT.COUNT     elements found in the array header
+## **
+## **  Limit 255 elements, so DIM A$(254) is the largest; beyond that SORT.OK is 0
+## **  rather than a wrong answer, because every address in the inner loop is 8-bit
+## **  indexed. String arrays only -- a float element is six bytes, not a pointer.
+## **
+## **  A null pointer is an empty string, and a never-assigned element is $0000, so
+## **  DIM A$(20) with five entries filled sorts its fifteen empties to the front.
+## **
+## **  zTemp0/1/2 -- $2C, $2E, $30 -- are the three pointers, and are free inside a
+## **  blob. codePtr, the number stack and the mantissas are not.
+## **
+## **  WARNING: CLD is the first instruction. SYS enters a blob with the status
+## **  PLP'd from SYS_Reg_S, holding whatever a previous GP.CALL left, and one stray
+## **  decimal flag makes every element address wrong.
+## **
+## **  The program needs a #SYMFILE, before the includes and named after the source
+## **  PRG. The assembly reaches BASIC's variables through {VAR} and BASLOAD
+## **  crunches every name first; without one the compile stops with "NO SYMBOL
+## **  FILE FOR {}".
+## **
+## **      #SAVEAS "@:MYPROG.PRG"
+## **      #SYMFILE "@:MYPROG.SYM"
+## **      #INCLUDE "GPB.INC.BL"
+## **      #INCLUDE "SORT.INC.BL"
+## **
+## **  #REM 1 is load bearing: without it BASLOAD strips the body and the block
+## **  reaches the compiler empty, refused as "block mismatch". #REM 0 restores the
+## **  default.
+## **
+## **  TO RUN IT FROM A RAM BANK, put the #INCLUDE between GP.BANKED and
+## **  GP.ENDBANKED. A call from outside the region selects the region's bank
+## **  and RETURN puts the caller's back, so a caller is written the same
+## **  either way. GPC-BASIC/BANKED-OR-NOT.md has the rules.
+## **
+## ***********************************************************************
+#IFNDEF SORT.DEFS
+#DEFINE SORT.DEFS 1
+
+GOTO SORT.MODULE.END
+
+## SORT.RUN -- check the array, then walk Ciura's gaps.
+##
+## The count and type are read back out of the three header bytes below SORT.PTR
+## rather than asked of the caller, so a wrong count cannot sort past the end.
+## Type is $40 for a string element, $00 for a number, bit 7 for sub-arrays.
+##
+## A gap larger than the array needs no guard: the pass starts i at the gap and
+## falls straight out.
+
+SORT.RUN:  
+    SORT.OK = 0 : SORT.COUNT = PEEK(SORT.PTR - 3) + PEEK(SORT.PTR - 2) * 256 : SORT.TYPE = PEEK(SORT.PTR - 1)
+    IF SORT.TYPE >= 128 THEN RETURN
+    IF (SORT.TYPE AND 64) = 0 THEN RETURN
+    IF SORT.COUNT > 255 THEN RETURN
+    SORT.OK = -1 : IF SORT.COUNT < 2 THEN RETURN
+
+## ---- Every {VAR} must exist before the assembly can name it. The high bytes are set
+## ---- here and never again: the counters are all bytes and the assembly writes only
+## ---- the low one.
+    SORT.I% = 0 : SORT.J% = 0 : SORT.TMP% = 0 : SORT.LL% = 0 : SORT.LR% = 0 : SORT.RN% = 0 : SORT.CHR% = 0 : SORT.BASE% = SORT.PTR : SORT.CNT% = SORT.COUNT
+    SORT.DESC% = 0 : IF SORT.DESCEND <> 0 THEN SORT.DESC% = 1
+    SORT.FOLD% = 0 : IF SORT.NOCASE <> 0 THEN SORT.FOLD% = 1
+
+## ---- Ciura's sequence, written out rather than DIMmed: a DIM in an include file is
+## ---- allocated by every program that includes it.
+    SORT.GAP% = 132 : GOSUB SORT.PASS : SORT.GAP% = 57  : GOSUB SORT.PASS : SORT.GAP% = 23  : GOSUB SORT.PASS : SORT.GAP% = 10  : GOSUB SORT.PASS : SORT.GAP% = 4   : GOSUB SORT.PASS : SORT.GAP% = 1   : GOSUB SORT.PASS
+    RETURN
+
+## SORT.PASS -- one complete insertion pass at SORT.GAP%.
+##
+##      for i = gap to count-1
+##          temp = a[i] : j = i
+##          while j >= gap and a[j-gap] sorts after temp
+##              a[j] = a[j-gap] : j = j - gap
+##          a[j] = temp
+##
+## Every loop exit is a JMP reached by skipping one branch: the inner loop body is
+## well past the 127 bytes a relative branch can reach.
+
+SORT.PASS:
+    #REM 1
+    GP.ASM
+    REM CLD                      ; SYS enters with the caller's flags -- see the header
+    REM LDA {SORT.GAP%}          ; i = gap
+    REM STA {SORT.I%}
+    REM SPOUT: LDA {SORT.I%}
+    REM CMP {SORT.CNT%}
+    REM BCC SPGO
+    REM JMP SPEND
+    REM ; ---- temp = a[i], j = i ----
+    REM SPGO: LDY {SORT.I%}
+    REM JSR SPELEM              ; zTemp0 = &a[i], and Y comes back 0
+    REM LDA ($2C),Y
+    REM STA {SORT.TMP%}
+    REM LDY #1
+    REM LDA ($2C),Y
+    REM LDX #1
+    REM STA {SORT.TMP%},X
+    REM LDA {SORT.I%}
+    REM STA {SORT.J%}
+    REM ; ---- while j >= gap and a[j-gap] sorts after temp ----
+    REM SPIN: LDA {SORT.J%}
+    REM CMP {SORT.GAP%}
+    REM BCS SPCMP
+    REM JMP SPPLACE             ; j < gap, so there is nothing below to compare
+    REM SPCMP: SEC
+    REM SBC {SORT.GAP%}
+    REM TAY                     ; Y = j - gap
+    REM JSR SPELEM
+    REM LDA ($2C),Y             ; that element -> zTemp1, the left operand
+    REM STA $2E
+    REM LDY #1
+    REM LDA ($2C),Y
+    REM STA $2F
+    REM LDA {SORT.TMP%}         ; temp -> zTemp2, the right operand
+    REM STA $30
+    REM LDX #1
+    REM LDA {SORT.TMP%},X
+    REM STA $31
+    REM JSR SPCOMP              ; A = $FF, 0 or 1
+    REM LDY {SORT.DESC%}        ; descending flips the sense of the answer. Test it in Y --
+    REM BEQ SPORD               ; A holds the result and has to survive the test
+    REM EOR #$FF                ; negate: 1 <-> $FF, 0 unchanged
+    REM INC
+    REM SPORD: CMP #1           ; "sorts after" is the only case that shifts
+    REM BEQ SPSHIFT
+    REM JMP SPPLACE
+    REM ; ---- a[j] = a[j-gap] ; j = j - gap ----
+    REM SPSHIFT: LDY {SORT.J%}
+    REM JSR SPELEM
+    REM LDA $2E
+    REM STA ($2C),Y
+    REM LDY #1
+    REM LDA $2F
+    REM STA ($2C),Y
+    REM LDA {SORT.J%}
+    REM SEC
+    REM SBC {SORT.GAP%}
+    REM STA {SORT.J%}
+    REM JMP SPIN
+    REM ; ---- a[j] = temp, and on to the next i ----
+    REM SPPLACE: LDY {SORT.J%}
+    REM JSR SPELEM
+    REM LDA {SORT.TMP%}
+    REM STA ($2C),Y
+    REM LDY #1
+    REM LDX #1
+    REM LDA {SORT.TMP%},X
+    REM STA ($2C),Y
+    REM INC {SORT.I%}
+    REM JMP SPOUT
+    REM SPEND: RTS
+    REM ; ---- zTemp0 = the address of element Y, 0..254, returning Y = 0.
+    REM ; ---- Clobbers A and X. The carry OUT of the doubling is bit 8 and
+    REM ; ---- must be kept: from element 128 up, dropping it puts the
+    REM ; ---- element 256 bytes low.
+    REM SPELEM: TYA
+    REM ASL
+    REM STA $2C
+    REM LDA #0
+    REM ROL
+    REM LDX #1
+    REM CLC
+    REM ADC {SORT.BASE%},X
+    REM STA $2D
+    REM CLC
+    REM LDA $2C
+    REM ADC {SORT.BASE%}
+    REM STA $2C
+    REM BCC SPEOK
+    REM INC $2D
+    REM SPEOK: LDY #0
+    REM RTS
+    REM ; ---- compare the blocks at zTemp1 and zTemp2, returning $FF / 0 /
+    REM ; ---- 1 in A as the runtime's CompareStrings does. A null pointer
+    REM ; ---- is an empty string. The block is [MaxLen][Ctrl][Len][Data],
+    REM ; ---- so the length is at +2 and the text starts at +3.
+    REM SPCOMP: LDA $2F          ; left length, or zero if the pointer is null
+    REM BEQ SPCLN
+    REM LDY #2
+    REM LDA ($2E),Y
+    REM BRA SPCHL
+    REM SPCLN: LDA #0
+    REM SPCHL: STA {SORT.LL%}
+    REM LDA $31                  ; right length, the same way
+    REM BEQ SPCRN
+    REM LDY #2
+    REM LDA ($30),Y
+    REM BRA SPCHR
+    REM SPCRN: LDA #0
+    REM SPCHR: STA {SORT.LR%}
+    REM CMP {SORT.LL%}           ; compare min(lenL,lenR) characters
+    REM BCS SPCUL
+    REM BRA SPCHC
+    REM SPCUL: LDA {SORT.LL%}
+    REM SPCHC: STA {SORT.RN%}
+    REM BEQ SPCLEN               ; one of them is empty, so length alone decides
+    REM LDY #2                   ; +3 is the first character, so pre-increment from 2
+    REM SPCLP: INY
+    REM LDA ($30),Y              ; right character first, so A holds the LEFT one at the
+    REM JSR SPFOLD               ; compare and the carry means what it does in CompareStrings
+    REM STA {SORT.CHR%}
+    REM LDA ($2E),Y
+    REM JSR SPFOLD
+    REM CMP {SORT.CHR%}
+    REM BNE SPCDIF
+    REM DEC {SORT.RN%}
+    REM BNE SPCLP
+    REM SPCLEN: SEC
+    REM LDA {SORT.LL%}
+    REM SBC {SORT.LR%}
+    REM BEQ SPCSAME
+    REM SPCDIF: LDA #$FF
+    REM BCC SPCX
+    REM LDA #$01
+    REM SPCX: RTS
+    REM SPCSAME: LDA #0
+    REM RTS
+    REM ; ---- A -> upper case when SORT.FOLD% says so. Y is the string
+    REM ; ---- index and must survive, so the flag is tested through A with
+    REM ; ---- the character on the stack.
+    REM SPFOLD: PHA
+    REM LDA {SORT.FOLD%}
+    REM BEQ SPFNO
+    REM PLA
+    REM CMP #97                  ; lower case a
+    REM BCC SPFOUT
+    REM CMP #123                 ; one past lower case z
+    REM BCS SPFOUT
+    REM AND #$DF
+    REM SPFOUT: RTS
+    REM SPFNO: PLA
+    REM RTS
+    GP.ENDASM
+    #REM 0
+    RETURN
+
+SORT.MODULE.END:
+#ENDIF

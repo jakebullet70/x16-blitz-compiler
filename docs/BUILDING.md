@@ -108,7 +108,7 @@ target that also handles `GPC.ERR`.
 Then try it:
 
 ```sh
-./x16emu.bat GPC.PRG            # Windows; the launcher points the emulator at testing/
+USER-RUNSemu.bat GPC.PRG    # Windows; the launcher points the emulator at testing/
 ```
 
 ### What lands where
@@ -203,8 +203,8 @@ grep -E '^(FreeMemory|ObjectBase|ObjectCeiling)' source/application/build/code.l
 
 | | Directory | Used for |
 |---|---|---|
-| **x16emu r49** | `bin/x16emu/` | all automated tests (`x16emu.bat`) |
-| **Box16** | `bin/box16/` | interactive debugging (`box16.bat`) |
+| **x16emu r49** | `bin/x16emu/` | all automated tests (`USER-RUNSemu.bat`) |
+| **Box16** | `bin/box16/` | interactive debugging (`USER-RUNSox16.bat`) |
 
 They need incompatible `SDL2.dll` versions, which is why each has its own directory. They are not
 interchangeable:

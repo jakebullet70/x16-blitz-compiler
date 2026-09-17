@@ -44,3 +44,8 @@ row with no match keeps its numbers and only moves its topic number. Rows for a 
 inserted, and `N|` gains one per new topic. In the same session a commit had to leave that other
 session's `GP-BASIC.md` hunks unstaged: `diff -u` the pre-edit snapshot against the file, and
 `git apply --cached` the result.
+
+**The carry-forward is off for a topic being rewritten** (2026-09-17). Under
+[[help-topic-writing-rules]] a topic that is edited is rewritten from its master, so its committed
+hand edits are discarded rather than patched back. Keep the diff-and-patch machinery above for the
+topics the change does not touch; those still lose their trims to a plain `MKHELP.PY` run.

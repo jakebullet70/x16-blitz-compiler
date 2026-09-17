@@ -39,7 +39,7 @@ IOOpenRead:
 
 IO_IMAGE_FILE = 4
 IO_OBJECT_FILE = 6
-IO_OVL_FILE = 7 							; ...and one for the .nnn overlays -- see below
+IO_OVL_FILE = 7 							; ...and one for the .OVL overlay file -- see below
 
 IOOpenImage:
 		lda 	#IO_IMAGE_FILE
@@ -101,15 +101,15 @@ IOObjectClose:
 
 ; ************************************************************************************************
 ;
-;		THE OVERLAYS GET A THIRD LOGICAL FILE, and they need one for the same reason the object
-;		does: they are written at the end of pass two with the object still open on 6 and the
-;		source still open on 3. One at a time -- opened, filled, closed -- so one file number
-;		serves all of them.
+;		THE OVERLAY GETS A THIRD LOGICAL FILE, and it needs one for the same reason the object
+;		does: it is written through pass two with the object still open on 6 and the source
+;		still open on 3. There is one overlay file for the whole program, opened at the first
+;		region close and closed at ObjStreamClose, so one file number serves it.
 ;
-;		SELECTING ONE IS NOT WORTH CACHING, unlike the object: an overlay is selected once and
-;		then written from end to end, so the compare would never save a CHKOUT. What it must do
-;		is tell the cache that the object is no longer the selected output, or the object writer
-;		would skip the CHKOUT it needs on the way back.
+;		SELECTING IT IS NOT WORTH CACHING, unlike the object: it is selected once per region and
+;		then written from end to end, so the compare would save a CHKOUT only for a program of
+;		one region. What the select must do is tell the cache that the object is no longer the
+;		selected output, or the object writer would skip the CHKOUT it needs on the way back.
 ;
 ; ************************************************************************************************
 

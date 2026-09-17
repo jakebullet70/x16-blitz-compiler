@@ -79,14 +79,23 @@ def tokenise(name):
     return os.path.exists(src)
 
 
-#   The banks of the .nnn overlays beside a program, as their three-digit suffixes.
+#   The banks inside NAME.OVL, as three-digit strings. The file introduces every region
+#   with its bank and its page count, so walking it is the whole of reading it -- and a file
+#   that does not end on a region boundary reports SHORT rather than passing the check.
 def overlays(name):
-    return sorted(f[-3:] for f in os.listdir(T)
-                  if f.startswith(name + ".") and len(f) == len(name) + 4 and f[-3:].isdigit())
+    p = os.path.join(T, name + ".OVL")
+    if not os.path.exists(p):
+        return []
+    b, i, banks = open(p, "rb").read(), 0, []
+    while i + 2 <= len(b):
+        banks.append(b[i])
+        i += 2 + b[i + 1] * 256
+    got = sorted("%03d" % x for x in banks)
+    return got if i == len(b) else got + ["SHORT"]
 
 
 def compile_one(name, mode="SHARED"):
-    #   SHARED, not embedded: GP.BANKED only works there. The bootstrap is what moves the
+    #   SHARED, not embedded: GP.BANKED only works there. The bootstrap is what reads the
     #   region into the bank, and an embedded program has no bootstrap -- gpbank.asm
     #   refuses a region rather than guessing.
     open(os.path.join(T, "GPC.INPUT"), "w", newline="\n").write(
@@ -94,9 +103,10 @@ def compile_one(name, mode="SHARED"):
     p = os.path.join(T, name + ".PRG")
     if os.path.exists(p):
         os.remove(p)
-    #   The overlays go too, or a failed compile leaves the last run's for the checks to find.
-    for b in overlays(name):
-        os.remove(os.path.join(T, name + "." + b))
+    #   The overlay goes too, or a failed compile leaves the last run's for the checks to find.
+    ovl = os.path.join(T, name + ".OVL")
+    if os.path.exists(ovl):
+        os.remove(ovl)
     t = emu(["-warp", "-prg", "GPC.BIN", "-run"], 90, "OK LOW CODE")
     #   The error TABLE is echoed right after the banner, so nothing before the "OUT:"
     #   line is a result.  Only look after it.
@@ -162,17 +172,19 @@ BADNAMES = [b[0] for b in BAD]
 #   No control: what the program prints is the test. BANKY calls from one region into
 #   another, which the compiler refused until .bgosub.
 #
-#   BNK255 has code in banks 255, 100 and 2 and text in 254, so the bootstrap page walks its
-#   bank map to the last byte. At 2048K it prints all four; at 512K the page stops with ?RAM
-#   before the program starts. BNKOVL is BNK255 with its .100 deleted, and stops with ?OVL.
+#   BNK255 has code in banks 255, 100 and 2 and text in 254, so the bootstrap page takes four
+#   regions out of one file, into banks that are neither contiguous nor in order. At 2048K it
+#   prints all four; at 512K the page stops with ?RAM before the program starts. BNKOVL is
+#   BNK255 with the last 100 bytes cut off its .OVL: it must stop with ?OVL rather than run a
+#   region it only half read.
 RUNS = [("BANKY", 512, ["Q1", "Q2", "Q3"]),
         ("BNK255", 2048, ["H254", "H255", "H100", "H2"]),
         ("BNK255", 512, ["?RAM"]),
         ("BNKOVL", 2048, ["?OVL"])]
 RUNNAMES = list(dict.fromkeys(r[0] for r in RUNS))
-#   The overlays a compile must leave beside the program, checked before any is deleted.
+#   The banks a compile must leave in the overlay, checked before it is cut short.
 OVERLAYS = [("BNK255", ["002", "100", "254", "255"]), ("BNKOVL", ["002", "100", "254", "255"])]
-DELETE = [("BNKOVL", "100")]
+TRUNCATE = [("BNKOVL", 100)]
 
 #   The drive keeps its own compiler and runtime, and they went stale once. Copy the
 #   current ones over them first.
@@ -220,10 +232,11 @@ for n, want in OVERLAYS:
     if not good:
         fails += 1
 
-for n, bank in DELETE:
-    p = os.path.join(T, n + "." + bank)
+for n, cut in TRUNCATE:
+    p = os.path.join(T, n + ".OVL")
     if os.path.exists(p):
-        os.remove(p)
+        with open(p, "r+b") as f:
+            f.truncate(max(0, os.path.getsize(p) - cut))
 
 for n, ram, want in RUNS:
     k, m, _ = results[n]

@@ -1,71 +1,34 @@
-@4.16 FILEDIR.INC.BL -- a directory, into a bank or into low RAM
+@4.14 KB.INC.BL -- the keyboard buffer, emptied
 .
-=4.16 FILEDIR.INC.BL -- A DIRECTORY, INTO A BANK OR INTO LOW RAM
+=4.14 KB.INC.BL -- THE KEYBOARD BUFFER, EMPTIED
+.
+=WHAT IT COSTS
+.
+.    BASIC -- ordinary BASL in a .INC.BL, called with GOSUB. Free unless you
+.    #INCLUDE it.
 .
 =DESCRIPTION
 .
-.  FILE.DIR.INIT
+.  KB.CLEARKB
 .      IN: --
 .      OUT: --
 .
-.  FILE.DIR.OPEN
-.      IN: FILE.DIR.BANK FILE.DIR.PTR FILE.DIR.CAP FILE.DIR.PATTERN$
-.        FILE.DIR.ONLY
-.      OUT: FILE.DIR.GOT FILE.DIR.FULL FILE.DIR.SLOW
-.
-.  FILE.DIR.NEXT
-.      IN: --
-.      OUT: FILE.DIR.MORE FILE.NAME$ FILE.BLOCKS FILE.TYPE$
-.
-:#SYMFILE "@:MYPROG.SYM"
-:#INCLUDE "FILEIO.INC.BL"
-:#INCLUDE "FILEDIR.INC.BL"
+:#INCLUDE "KB.INC.BL"
 :
-:GOSUB BANKMGR.GET.FREE.BANK
-:FILE.DIR.BANK = BANKMGR.BANK
-:FILE.DIR.PATTERN$ = "*.BASL" : FILE.DIR.ONLY = FILE.DIR.FILES
-:GOSUB FILE.DIR.OPEN
-:GP.DO
-:    GOSUB FILE.DIR.NEXT
-:    IF FILE.DIR.MORE = 0 THEN GP.EXITDO
-:    PRINT FILE.NAME$, FILE.BLOCKS, FILE.TYPE$
-:GP.LOOP
+:GOSUB KB.CLEARKB
+:GOSUB GUI.YN
 .
-.Requires GPB.INC.BL and FILEIO.INC.BL, and #INCLUDEs neither. The #SYMFILE
-.is required, for the same reason FILEIO needs one.
+.Call it before opening a dialog, and after a keystroke that redraws. A
+.dialog opened with a key still queued reads it, answers itself and closes; a
+.held arrow repeats faster than a page can be drawn and scrolls on after the
+.key is let go.
 .
-.FILE.DIR.ONLY takes FILE.DIR.ALL, FILE.DIR.FILES or FILE.DIR.DIRS.
-.FILE.DIR.MORE is -1 while NEXT produced an entry and 0 at the end.
-.FILE.DIR.GOT is bytes read, 0 for an empty or failed listing. FILE.DIR.FULL
-.says the buffer filled before the listing ended, and FILE.DIR.SLOW is 1 if
-.the device had no MACPTR and the read fell back to CHRIN a byte at a time.
-.
-.Two destinations, one code path: the reader takes an address and a size.
-.
-:' a bank -- 8,192 bytes at $A000, about 250 entries
-:FILE.DIR.BANK = BANKMGR.BANK
-:
-:' low RAM
-:FILE.DIR.BANK = 0
-:DIM FD.BUF%(1022)
-:FILE.DIR.PTR = GP.ARRPTR(FD.BUF%())
-:FILE.DIR.CAP = 1023 * 2
-.
-.A % array is TWO bytes an element, not six. The recipe above said six until
-.it was measured, and sized a 682-byte buffer as 2,046: a caller following it
-.handed the assembly three times the room it had, and the reader would have
-.run 1,364 bytes off the end of the array and into whatever the workspace put
-.after it. An untyped array is the six.
-.
-.FILE.DIR.BANKBASE and FILE.DIR.BANKROOM are the hardware window, not an
-.allocation -- every bank appears at $A000 and every bank is 8,192 bytes. The
-.bank number is the resource. Take it from BANKMGR.GET.FREE.BANK and put it
-.in FILE.DIR.BANK. This module claims no bank and executes no BANK statement.
-.Its two GP.ASM blocks write $00, so both are GP.ASM LOW (SEC 3.9) and stay
-.in low memory when the module is in a region.
+.GUI.INC.BL carries a private copy, GUI.CLEARKB, from when code inside a
+.GP.BANKED region could not call another bank. Fix one and fix the other.
+.There are only the two, and a second #INCLUDE of this file cannot supply the
+.copy -- the #IFNDEF guard makes it produce nothing.
 .
 =SEE ALSO
 .
->39|3.9 Inline assembly
->79|4.16 FILEDIR.INC.BL -- a directory, into a bank or into low RAM
->78|4.15 FILEIO.INC.BL -- the drive: status, files, directories
+>94|4.14 KB.INC.BL -- the keyboard buffer, emptied
+>89|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back

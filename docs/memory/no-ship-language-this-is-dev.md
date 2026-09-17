@@ -24,4 +24,11 @@ checked-in binary is a separate request. Offer it in one line, do not do it.
 
 **Nor regenerate the help text.** Corrected 2026-09-10: *"stop updating the help text, wait until the final design is done and bugs are fixed. U can ask me if I want but wait for me to tell u."* `samples/GPC-HELP/MKHELP.PY` rewrites 27 tracked files from the markdown, so running it mid-design buries the real diff under regenerated output and publishes an interface that is still moving. It is the LAST step of a design, not a step inside one -- ask, then wait for a yes.
 
+**A source edit is not a build request.** Corrected 2026-09-16, after merging
+three GP.BANKED regions in GPC.GUI.BASL and then rebuilding to check the sizes:
+*"next time, do not build until I tell you."* The rule holds even when the edit
+obviously needs a compile to be worth anything, and even when a build earlier in
+the same session was asked for. Make the edit, say what a build would tell us,
+and stop.
+
 Related: [[answer-the-question-asked]], [[user-runs-concurrent-agents-here]].

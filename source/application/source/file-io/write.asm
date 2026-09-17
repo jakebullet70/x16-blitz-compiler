@@ -82,32 +82,43 @@ _IODONoMap:
 		;		earlier run names the lines of a program that has since changed.
 		;
 		lda 	DeadListFile
-		beq 	_IODODone
+		beq 	_IODONoList
 		ldx 	#DeadListFile & $FF
 		ldy 	#DeadListFile >> 8
+		jsr 	IOScratchFile
+_IODONoList:
+		;
+		;		And the overlay. It is one file with a name that follows from the object's, so
+		;		unlike the .nnn files it replaced it can be named here, before the source has been
+		;		read and before anything knows whether this program has regions at all. A compile
+		;		with no GP.BANKED writes none, and this is what takes away the one an earlier
+		;		compile of the same source left behind.
+		;
+		jsr 	ObjBuildOverlayName
+		ldx 	#OvlFileName & $FF
+		ldy 	#OvlFileName >> 8
 		jsr 	IOScratchFile
 _IODODone:
 		rts
 
 ;
-;		AND NOT THE .nnn OVERLAYS, which is a deliberate gap and not an oversight.
+;		AND STILL NOT BY WILDCARD, which is worth writing down because the rule outlived the
+;		problem that made it necessary.
 ;
-;		The obvious sweep is a wildcard, because which banks this source asks for is not known
-;		until it has been read. While the overlays were .Bnn that was "S0:<object>.B*", and IT
-;		SCRATCHED THE SOURCE. CBM pattern matching is a prefix and a "*", so "BANKA.B*" matched
-;		BANKA.BASL as squarely as BANKA.B05, and building it destroyed seventeen test sources on
-;		08/09/26. The overlays now begin with a digit, which no other extension here does, but a
-;		wildcard still does not go through IOScratchFile: it has no undo and reads no status.
+;		While every region had a .nnn file of its own, the only sweep that could reach them all
+;		was a wildcard: which banks a source asks for is not known until it has been read. While
+;		those files were .Bnn that sweep was "S0:<object>.B*", and IT SCRATCHED THE SOURCE. CBM
+;		pattern matching is a prefix and a "*", so "BANKA.B*" matched BANKA.BASL as squarely as
+;		BANKA.B05, and building it destroyed seventeen test sources on 08/09/26.
 ;
-;		WHAT THE SWEEP WAS FOR IS DONE ELSEWHERE ANYWAY. ObjEmitOverlay scratches each overlay
-;		by its exact name immediately before writing it, which is what "name,S,W" needs -- it
-;		refuses to open over a file that exists -- and covers every overlay this compile
-;		produces. ObjStreamAbort takes away the one that was in flight if the compile stopped.
+;		ONE .OVL RETIRES THE QUESTION. Its name follows from the object's, so it is known before
+;		the source is read and it is deleted above by that exact name. There is no orphan left
+;		to chase either: a region that changes its bank or goes away changes the contents of the
+;		same file, not which files exist.
 ;
-;		WHAT IS LEFT IS AN ORPHAN: a .nnn from an earlier run whose GP.BANKED has since changed
-;		its bank number or gone. It is not part of the program any more, so nothing loads it,
-;		and the programmer owns stale overlays by decision. Deleting it would need a list of
-;		the banks the LAST compile used, which nothing keeps.
+;		THE RULE STANDS ANYWAY. A wildcard does not go through IOScratchFile: it has no undo and
+;		reads no status, so nothing here can tell what it took. See
+;		docs/memory/wildcard-scratch-eats-the-source.md.
 ;
 
 ; ************************************************************************************************

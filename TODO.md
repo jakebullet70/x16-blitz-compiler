@@ -1233,6 +1233,135 @@ image for all 12,031 bytes of the GP-BASIC OUT cut, with the only differences th
 
 ## Wanted
 
+### Dynamic arrays in a bank — `REDIM`, `UBOUND`, `ERASE` — RESEARCH, raised 2026-09-17
+
+VBA-shaped arrays whose elements live in RAM banks rather than in the workspace, so a program can
+hold more data than low memory has room for. Nothing built. This is where the reading got to.
+
+#### What is already in place
+
+- `ArrayConvert` / `ArrayConvert1` (`source/runtime/source/memory/array.asm`) turn a subscript into
+  a 16-bit offset and push it; the dereference is a separate opcode. So the index walk and the read
+  are already split, which is where a bank switch would go.
+- Array indirection opcodes pack as `$78 | type | write*4`
+  (`source/compiler/source/variables/readwrite.asm:106`). `$7B` and `$7F` are free — the
+  both-bits-set slots, the same accident the byte-type study found.
+- The array header is three bytes: count low, count high, type. Type is bits 5-6 and bit 7 is the
+  sublevel flag, so **bits 0-4 of that byte are unused** and can carry "this array is banked".
+- `BankEnter` / `BankedExit` (`source/runtime/source/main/00runtime.asm:105`) already save and
+  restore `SelectRAMBank` around a handler, for about 14 cycles.
+- Handler bodies go in bank 1 free of charge. The core pays 2 bytes of `VectorTable` per opcode
+  against 52 bytes of embedded cushion.
+- `BANKMGR` has `ALLOC`, `RELEASE` and `COUNT`. It has no contiguous-run allocator.
+
+#### Route A — a library module with its own assembly
+
+Estimate 600-1,000 bytes of p-code plus 150-250 bytes of blobs. The yardstick is `STASH`, which
+would be 329 bytes as a keyword.
+
+Per element, against the measured numbers in `bench/RESULTS.md` and
+`docs/memory/strcase-call-overhead-measured.md`:
+
+| operation | cycles |
+| --- | ---: |
+| native array read, over a scalar read | 651 |
+| bare `GP.ASM` block (`.word` + `sys` + `RTS`) | 369 |
+| one keyword statement, upper bound | 533 |
+| a `STRCASE`-shaped module call | 2,570 |
+
+A `GOSUB` per element is the `STRCASE` shape: **2,600-3,000 cycles, about four times a normal array
+read**, and the call site is three statements where BASIC wants `A(I)`.
+
+Two blockers. The module writes `$00`, so it stays in low memory and cannot go inside a
+`GP.BANKED` region; its blobs need `GP.ASM LOW` and a `#SYMFILE`. And there is no way to reach
+`A(I)` syntax from a module — BASL has no operator overloading.
+
+The library route only pays when the whole loop is in assembly, the shape `STASH` uses: BASIC works
+out a row address once and assembly moves 160 bytes. Per-element access through BASIC is the losing
+case, so build this as a throwaway probe of the bank arithmetic, not as the feature.
+
+#### Route B — compiler and runtime
+
+Declare the banking at compile time, say `GP.DIMBANK A%(n)`. The compiler already knows read from
+write when it emits (`GetSetVariable` has the direction in carry), so it can use the two free slots:
+`$7B` banked read, `$7F` banked write. Programs that do not use it pay nothing and the normal path
+gains no test.
+
+Per element: `ArrayConvert` 651, bank save and select 10, a six-byte stage copy about 60, restore 8
+— **about 730 cycles, 1.15x a low-RAM array rather than 4x.**
+
+Staging through a low-RAM scratch is not optional. P-code can run from a bank, so a handler must not
+return with the array's bank selected. Copy in, switch back, return the scratch address. That has a
+payoff the module cannot have: **a banked array works inside a `GP.BANKED` region.**
+
+The banked flag goes in header byte 2, bits 0-4, so there is **no new type code and no
+`NSSTypeMask` audit** — the roughly fifty-site audit is what makes the byte type expensive, and this
+sidesteps it. The header stays in low memory at about seven bytes an array (count, flags, bank,
+offset) and only the elements go to banks. The compiler needs one bit in the variable record at
+declare time; bits 6-7 of the name's second byte are free.
+
+Files: compiler `commands/dim.asm` (206), `variables/refterm.asm` (193),
+`variables/readwrite.asm` (113), `storage/findvar.asm` (133); runtime `commands/dim.asm` (244),
+`memory/array.asm` (210), and new banked read and write handlers. The compiler half costs a
+compiled program nothing.
+
+#### What is hard either way
+
+**Straddle.** The window is 8,192 bytes. A `%` element at 2 bytes gives 4,096 an array bank, exact.
+An untyped element at 6 bytes gives 1,365 and wastes 2 bytes a bank. Pad; do not straddle.
+
+**The element count caps at 65,536.** Subscripts arrive through `GetInteger16Bit` and the bounds
+compare is 16-bit. That is 131,072 bytes as `%`, sixteen banks, or 393,216 untyped, forty-eight.
+Going past it means 24-bit index arithmetic everywhere, which is a different and much larger job.
+
+**Strings do not bank.** A string element is a pointer into the low-memory string heap, so banking
+the pointer saves nothing. Real banked strings mean fixed-width records and a fresh low-memory
+allocation on every read, into a heap whose blocks never shrink. Refuse `$` in the first version.
+
+**Copying across banks.** `memory_copy` ($FEE7) is declared in the runtime and never called, and it
+does not step banks. `REDIM PRESERVE` across banks has to stage through low memory, two bank
+switches a chunk; an 8K move lands near 100,000 cycles. `REDIM` without `PRESERVE` is a zero fill,
+about 4 cycles a byte, so about 33,000 cycles a bank.
+
+**`ERASE` and the bank manager.** `RELEASE` exists, so `ERASE` is: give each bank back, zero the
+header. But `ALLOC` hands out the lowest free bank one at a time, so a multi-bank array needs either
+a new contiguous-run allocator or a small bank list in low memory — 2 bytes a bank, which also drops
+the contiguity requirement. The list is cheaper and harder to get wrong. Every bank has to be
+tracked or a later `ALLOC` hands the array's bank to a scratch user, and that corruption is silent.
+
+#### Ranked
+
+1. **`UBOUND` on its own, first.** The count sits three bytes below what `GP.ARRPTR` returns. It
+   needs no banking, works on every array that exists today, and is one keyword or one small blob at
+   300-500 cycles. Cheapest useful thing here by a distance.
+2. **Route B, numeric only, one dimension, `%` first.** One dimension matches the rule `GP.ARRPTR`
+   already has, and `%` packs a bank exactly and takes the 3x size win.
+3. **Route A only as a probe**, to prove the bank and stage arithmetic before the compiler is
+   touched.
+4. Budget six new opcodes at 12 bytes of core `VectorTable` against 52 bytes of cushion. Crossing
+   `$2F00` costs every embedded program 256 bytes with no warning.
+
+#### To settle before a plan
+
+- `REDIM PRESERVE` semantics. VBA allows only the last dimension to change, which is moot at one
+  dimension.
+- Does `ERASE` hand the banks back or keep them for the next `REDIM`?
+- `GP.ARRPTR` on a banked array should be a compile error. Confirm there is no caller that wants it.
+
+### Overlays appended to the `.PRG` in embedded mode — RESEARCH, raised 2026-09-15
+
+Embedded refuses `GP.BANKED` and `GP.BANKEDSTR` regions, so an embedded program ships one file but
+cannot use banks. Research whether the `.nnn` overlays can ride at the end of `NAME.PRG` instead,
+keeping the one-file build.
+
+Questions to answer:
+
+- What does a plain `LOAD` or `RUN` do with bytes past the program? Does the load run into `$9F00`?
+- How does startup reach the tail: reopen its own file and seek, or something else? Can the program
+  learn its own file name at run time?
+- What does the tail need: a count, then a bank number and size per region?
+- What does the loader cost the embedded image, which has 52 bytes of cushion left?
+
 ### Banked scratch strings — a `GP.BANKEDSTR` group used as writable storage — MAYBE, raised 2026-09-11
 
 A GUI page carries a dozen or more `LINEINPUT` fields and only one is ever being edited. Their text
@@ -3062,6 +3191,45 @@ Found so far, by grep:
 
 A review reads the text. Whether each example still tokenises and compiles is
 `### NOTHING BUILDS THE EXAMPLES` under `## Build / infrastructure`.
+
+### The help has no section on compile error messages — TODO, added 2026-09-14
+
+The help names a message only where the feature that raises it is described: `GP.BANKEDSTR NEEDS
+SHARED` and `NOT IMPLEMENTED` in §3.10 and §3.12, `OUT OF MEMORY` in §7. Nothing lists them. A
+message on the compile screen has no place to be looked up. Add a subsection to §7 of
+`GPC-BASIC/GP-BASIC.md`, "Memory, and what the compiler tells you", that gives each message, what
+raises it and what to change, then carry it into `GPB.HELP` and the
+`samples/GPC-HELP/` copy. The `.HLP` files carry hand edits, so patch the render delta rather than
+re-running `MKHELP.PY` plain.
+
+There are three sets.
+
+- **BASLOAD's 19 messages**, in `BASLOAD-GPC/src/response.inc`. They arrive before GPC runs, and
+  `ERROR: INVALID PARAMETER` or `DUPLICATE SYMBOL` reads as if the compiler raised it. A message ending
+  in `IN` is followed by the file name and the line of that file, not a BASIC line number. Nothing in
+  `BASLOAD-GPC/src` raises `BASIC RAM FULL` any more. Two causes a user will not guess are in the
+  memory notes: `#DEFINE` rejects a name holding a digit (`INVALID PARAMETER`), and a label and a
+  variable with the same name collide, `$` or not (`DUPLICATE SYMBOL`).
+- **The 19 shared messages**, listed in `source/common-scripts/errors.py`. The compiler and the
+  runtime print the same text, so the section has to say what each means at compile time, and which
+  of them a compile never raises. `SYNTAX ERROR`, `TYPE MISMATCH`, `BLOCK MISMATCH`,
+  `UNKNOWN LINE NUMBER` and `PROGRAM TOO BIG` are the ones a user meets most.
+- **The compiler's own messages**, `.text` strings in `source/compiler/source/commands/` and
+  `source/application/source/compiler/`:
+  - `gpdefproc.asm` — ten, from `GP.DEFPROC VERB IS NOT A PLAIN NAME` to `GP.FN CALLS NESTED TOO DEEPLY`;
+  - `gpbank.asm`, `gpbstr.asm`, `gpbstrflush.asm`, `gpbstrpool.asm` — six on regions and banked text,
+    `TOO MANY GP.BANKED REGIONS` among them;
+  - `GP.ASM LOW NEEDS #SYMFILE`, `ON GOSUB IN OR OUT OF GP.BANKED`,
+    `OBJECT NAME TOO LONG FOR AN OVERLAY` and `NO RUNTIME IMAGE`;
+  - seven `INTERNAL ERROR ...` strings. These are compiler bugs, and one line saying so covers them.
+
+Find the full set with:
+
+    grep -rn '\.text[[:space:]]*"[A-Z][A-Z .#$]\{5,\}"' source/compiler/source source/application/source
+
+The subsection goes last in §7, after "Staying inside it", so the memory subsections still read in
+order. For `OUT OF MEMORY` and `PROGRAM TOO BIG` it points at "`OUT OF MEMORY`" and at `LOW FREE` in
+"What GPC prints when it finishes" rather than repeating them.
 
 ### `BASLOAD-GPC` has no way to be told what to compile — DONE
 
