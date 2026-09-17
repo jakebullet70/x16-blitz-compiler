@@ -18,7 +18,13 @@ routine, and every variable each one reads and writes.
 
 ## 1. What GP.BASIC is
 
-**Core keywords.** 29 of them, compiled to p-code and handled by assembly in the runtime:
+GP.BASIC (GPB) is the keyword extension GPC compiles on top of BASL: 39 `GP.*` keywords and a
+library of BASL modules built on them. `#INCLUDE "GPB.INC.BL"` declares the keyword set; §2 has the
+rest of the setup.
+
+### Core keywords
+
+29 keywords compile to p-code and are handled by assembly in the runtime.
 
     GP.DO GP.LOOP GP.EXITDO
     GP.IF GP.ELSEIF GP.ELSE GP.ENDIF
@@ -30,37 +36,58 @@ routine, and every variable each one reads and writes.
     GP.BANKEDSTR GP.ENDBANKEDSTR GP.BSTR
     GP.BANKED GP.ENDBANKED
 
-They are assembly because BASIC is slow at per-character string scans, screen fills and VERA writes.
+Their handlers are one block, `GPBase $2F00` to `ObjectBase $3500`: 1,536 bytes, page aligned, all
+or nothing. `ScanGPUsage` walks the finished p-code and drops the block from the object when nothing
+in it is reached. The compile report says `GP IN` or `CORE`.
 
-The handlers occupy `GPBase $2F00` to `ObjectBase $3500`: 1,536 bytes, page aligned, all or nothing.
-`ScanGPUsage` walks the finished p-code and drops the whole block from the object if nothing in it
-is reached.
+### Composite keywords
 
-The block costs those 1,536 bytes once. The bytes in the object and the bytes off the workspace
-floor are the same bytes — `runtimeEndPage` is a single page number that decides how much of the
-runtime image is written out, where the p-code lands, and where the workspace starts. Maximum
-p-code is 20,992 bytes with the block and 22,528 without: `ObjectBase` or `GPBase` to `$9F00`, less
-the 2K frame stack and the 4K minimum workspace.
+10 keywords expand into opcodes that already exist. They take no handler and no vector slot.
 
-**Composites.** `GP.ASM`, `GP.ENDASM`, `GP.CHAR`, `GP.CONTAINS`, `GP.ISEMPTY`, `GP.HIBYTE`,
-`GP.LOBYTE`, `GP.BSTRCOUNT`, `GP.DEFPROC`, `GP.SUB`. The compiler expands each into opcodes that
-already exist. No handler, no vector slot, nothing in the block. Whether the block comes in is then
-the expansion's business, not the composite's: `GP.CHAR` runs `GP.FILL`'s handler and brings it in,
-while `GP.ASM`, `GP.ENDASM`, `GP.DEFPROC` and `GP.SUB` leave it out, and the report says `CORE`.
+    GP.ASM GP.ENDASM GP.CHAR GP.CONTAINS GP.ISEMPTY
+    GP.HIBYTE GP.LOBYTE GP.BSTRCOUNT GP.DEFPROC GP.SUB
 
-**The library.** `GPC-BASIC/`: 17 `.INC.BL` modules, 25 `.EXP.BL` examples. Ordinary BASL,
-`#INCLUDE`d by path, called with `GOSUB`. Zero runtime bytes — a module costs its own p-code, in the
-programs that include it. A program that has run out of low memory can put a module's `#INCLUDE`
-inside a `GP.BANKED` region and run it from a RAM bank, with no change to its callers; §3.12 is
-where that is explained. Menus vertical and bar, panels, themes, entry fields, in-place case, trim
-and splice, shell sort, a screen rectangle to a RAM bank or a file, BMX into VERA.
+Whether the block comes in is the expansion's business. `GP.CHAR` runs `GP.FILL`'s handler and
+brings it in. `GP.ASM`, `GP.ENDASM`, `GP.DEFPROC` and `GP.SUB` leave it out, and a program whose
+only GP.BASIC keywords are those reports `CORE`.
 
-`STASH.INC.BL`, `SORT.INC.BL`, `STRCASE.INC.BL` and `STRINGS.INC.BL` are `GP.ASM` and still
-modules: as keywords their bytes would sit in the block, paid by every GP program. `GP.ARRPTR` and
-`GP.STRPTR` are what lets them out — a BASL subroutine takes an address, not an array or a string.
+### What the block costs
 
-The division is assembly for loops and bulk moves, BASIC for everything else. `LINEINPUT.GET`
-waits on the keyboard, so speed does not apply to it; writing it in BASL saved 166 runtime bytes.
+Maximum low p-code, in bytes:
+
+| mode | CORE | GP IN |
+|---|---|---|
+| embedded | 22,528 | 20,992 |
+| shared | 22,016 | 19,968 |
+
+A shared program with a banked region loses a further 256: 19,712. `LOW FREE` in the compile report,
+less 4,096, is how much more p-code will fit.
+
+### The library
+
+`GPC-BASIC/` holds 19 `.INC.BL` modules and 25 `.EXP.BL` examples: menus bar and vertical, panels,
+themes, entry fields, check boxes, combo boxes, in-place case, trim and splice, `PRINT USING`, shell
+sort, a screen rectangle to a RAM bank or a file, BMX images into VERA.
+
+A module is ordinary BASL. `#INCLUDE` it by name and call it with `GOSUB`, or with a `GP.SUB` /
+`GP.FN` verb where it offers one. It costs its own p-code in the programs that include it and
+nothing in the GP block.
+
+```basic
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "STRCASE.INC.BL"
+
+A$ = "hello"
+GP.SUB STRCASE.APPLY, GP.STRPTR(A$), STRCASE.UPPER
+PRINT A$
+END
+```
+
+`STASH.INC.BL`, `SORT.INC.BL`, `STRCASE.INC.BL` and `STRINGS.INC.BL` are written in `GP.ASM` and are
+modules rather than keywords: their bytes land in the including program, not in the block.
+
+A program short of low memory can put a module's `#INCLUDE` inside a `GP.BANKED` region and run it
+from a RAM bank, with no change to its callers. §3.12 has the rules.
 
 ---
 
@@ -149,7 +176,7 @@ Three implementations, and what each costs:
 | **Inline assembly** | COMPOSITE | `GP.ASM` `GP.ENDASM` — free, and leaves the block out, see §3.9 |
 | **Strings** | ASM | `GP.INSTR` `GP.STRPTR` `GP.COMP` |
 | **Strings** | COMPOSITE | `GP.CONTAINS` `GP.ISEMPTY` — free, see §3.4 |
-| **Addresses** | COMPOSITE | `GP.HIBYTE` `GP.LOBYTE` — free, see §3.3 |
+| **Addresses** | COMPOSITE | `GP.HIBYTE` `GP.LOBYTE` — free, see §3.3.1 |
 | **Arrays** | ASM | `GP.ARRPTR` |
 | **Banked text** | ASM | `GP.BANKEDSTR` `GP.ENDBANKEDSTR` `GP.BSTR` · `GP.BSTRCOUNT` is COMPOSITE — see §3.10 |
 | **Routine calls** | COMPOSITE | `GP.DEFPROC` `GP.SUB` — free, and leaves the block out, see §3.11 |
@@ -296,7 +323,7 @@ They are keywords, not variables: `X = GP.A` reads, `GP.A = 5` is a syntax error
 `$030C`–`$030F`, so they also read what a plain `SYS` left behind.
 
 ```basic
-GP.CALL $FF5F, 0, 0, 0, 1          ' KERNAL screen_mode, carry set = report
+GP.CALL $FF5F, 0, 0, 0, 1 : REM KERNAL screen_mode, carry set = report
 COLS = GP.X : ROWS = GP.Y
 ```
 
@@ -305,34 +332,35 @@ free for the user; a compiled GPC program does not. That page holds runtime stat
 (`stringHighMemory`, `storeStartHigh`, `variableStartPage`), and code POKEd over it corrupts the
 program without raising an error.
 
-#### Splitting an address — `GP.HIBYTE` / `GP.LOBYTE`
-
-| Form | Does |
-|---|---|
-| `GP.HIBYTE(n)` | `INT(n / 256)` — which 256-byte page. **Composite** |
-| `GP.LOBYTE(n)` | `MOD(n, 256)` — the offset within it. **Composite** |
-
-A 6502 address is sixteen bits and everything that consumes one takes eight bits at a time:
-`GP.CALL`'s registers, VERA's `$9F20`/`$9F21`. Every address passed from BASIC to machine code is
-therefore split. `GP.STRPTR` and `GP.ARRPTR` produce the addresses to pass:
-
-```basic
-P = GP.STRPTR(A$)
-GP.CALL $A000, GP.LOBYTE(P), GP.HIBYTE(P)
-```
-
-Do not write `P AND 255` for the low byte. `AND` is 16-bit signed in GPC, and any address worth
-splitting is above 32,767 (the string heap always is), so it raises `OUT OF RANGE` rather than
-masking. `GP.LOBYTE` is built on `MOD`, which uses the full 32-bit divide.
-
-Range is 0–65,535, which covers every address on the machine. Both are composite: no runtime code,
-compiling to `INT(n/256)` and `MOD(n,256)`.
-
 Example: [`MLCALL.EXP.BL`](MLCALL.EXP.BL)
 
 For anything longer than a few bytes use `GP.ASM` (§3.9) instead of `GP.CALL` and a POKE loop. It
 assembles into the program: no bank to reserve, and no list of numbers to keep in step with a
 comment.
+
+#### 3.3.1 `GP.HIBYTE` / `GP.LOBYTE` — split an address into two bytes
+
+```entry
+  Syntax    GP.HIBYTE(n)   GP.LOBYTE(n)
+  Returns   GP.HIBYTE: INT(n / 256), the 256-byte page.
+            GP.LOBYTE: MOD(n, 256), the offset within that page.
+  Kind      COMPOSITE. Expands to INT(n/256) and MOD(n,256). No
+            runtime code, and neither needs the GP block.
+  Notes     n is 0-65,535, which covers every address on the machine.
+            Everything that consumes an address takes eight bits at a
+            time: GP.CALL's registers, VERA's $9F20/$9F21. The
+            addresses to split come from GP.STRPTR (§3.4.5) and
+            GP.ARRPTR (§3.5).
+  WARNING   Never write P AND 255 for the low byte. AND is 16-bit
+            signed and any address worth splitting is above 32,767,
+            so it raises OUT OF RANGE instead of masking. GP.LOBYTE
+            is built on MOD, which uses the full 32-bit divide.
+  Example
+```
+```basic
+            P = GP.STRPTR(A$)
+            GP.CALL $A000, GP.LOBYTE(P), GP.HIBYTE(P)
+```
 
 ---
 
@@ -423,9 +451,9 @@ Example: [`STRINGS.EXP.BL`](STRINGS.EXP.BL)
   Kind      ASM. Needs the GP block.
   Notes     The length byte is at the address, the first character at
             +1, the block capacity at -2.
-            With GP.CALL, machine code can fill a string in place and
-            set its length. Stock BASIC cannot do that.
-  WARNING   Split the address with GP.LOBYTE / GP.HIBYTE (§3.3),
+            With GP.CALL (§3.3), machine code can fill a string in
+            place and set its length. Stock BASIC cannot do that.
+  WARNING   Split the address with GP.LOBYTE / GP.HIBYTE (§3.3.1),
             never with P AND 255. AND is 16-bit signed and the string
             heap is above 32,767, so P AND 255 raises OUT OF RANGE.
             The longhand H = INT(P / 256) : L = P - H * 256 is what
@@ -542,7 +570,7 @@ translate to. A style value of 256 or more is instead the address of eight glyph
 tile index is a character code, so ASCII `+ - |` make a usable frame:
 
 ```
-ISO.GLYPH$ = "++++--||"                        ' TR TL BR BL TOP BOTTOM LEFT RIGHT
+ISO.GLYPH$ = "++++--||" : REM TR TL BR BL TOP BOTTOM LEFT RIGHT
 GP.BOX 50, 26, 4, 3, GP.STRPTR(ISO.GLYPH$) + 1, 1
 ```
 
@@ -570,21 +598,26 @@ GP.ELSE
 GP.ENDIF
 ```
 
-Each of the four keywords is alone on its line, and `THEN` is required. There is no one-line form:
-`GP.IF X > 5 THEN PRINT` is a syntax error. Allowing it would mean a block that swallowed every line
-down to the next `GP.ENDIF`. Stock `IF ... THEN` is unchanged and remains the one-line form.
+| Part | Rule |
+|---|---|
+| `GP.IF` | one per block, alone on its line, `THEN` required |
+| `GP.ELSEIF` | any number of them, `THEN` required |
+| `GP.ELSE` | optional, at most one |
+| `GP.ENDIF` | required; without it the compile stops on `STRUCTURE IMBALANCE` |
+| condition | a numeric expression |
 
-`GP.ELSEIF` may repeat any number of times; `GP.ELSE` is optional. The first true condition wins and
-nothing below it runs, so there is no break to omit. If nothing matches and there is no `GP.ELSE`
-the block is skipped, which is not an error. Conditions are numeric expressions.
+The first true condition runs and nothing below it does, so there is no break to omit. A block whose
+conditions are all false and which has no `GP.ELSE` is skipped, which is not an error.
 
-`GP.IF` and `GP.SELECT` cover different cases. A select fetches one value and compares it against
-each alternative — a sparse key code, a state machine. A block IF tests a different condition in
-every branch: ranges, compound conditions, a string in one arm and a number in the next.
+There is no one-line form. `GP.IF X > 5 THEN PRINT` is a syntax error. Stock `IF ... THEN` is
+unchanged and is the one-line form.
 
-`GP.ENDIF` is required, but unlike `GP.ENDSEL` it does no work: the condition is evaluated and
-consumed on the line it is written, so there is no frame to release and a `GOTO` out of a `GP.IF` is
-safe. Omitting `GP.ENDIF` stops the compile with `STRUCTURE IMBALANCE`.
+Blocks nest freely: inside each other, inside a `GP.CASE` body (§3.2) and inside a `GP.DO` loop
+(§3.1). Use `GP.SELECT` (§3.2) where one value is compared against each alternative, and a block IF
+where each branch tests a different condition.
+
+A `GOTO` out of a block is safe. The condition is evaluated and consumed on the line it is written,
+so `GP.ENDIF` releases nothing. The block costs 14 runtime bytes.
 
 ```basic
 GP.IF N < 0 THEN
@@ -595,12 +628,6 @@ GP.ELSE
     PRINT "POSITIVE"
 GP.ENDIF
 ```
-
-IFs nest freely — inside each other, inside a `GP.CASE` body, and inside a `GP.DO` loop.
-
-It costs 14 runtime bytes, none of them code. All four p-code opcodes reuse existing handlers: the
-two branches are `.goto.z` and `.goto` under different names, and the two markers share one four-byte
-no-op. See §11 of `docs/blitz/GP-BASIC.TIERS.md`.
 
 Example: [`IF.EXP.BL`](IF.EXP.BL)
 
@@ -835,9 +862,9 @@ while the object is written, so `BANKMGR` has to be told rather than asked:
 BANKMGR.WANT = GM.TEXTBANK : GOSUB BANKMGR.CLAIM
 ```
 
-**Compile SHARED.** The text is a `.nnn` file, which the shared bootstrap LOADs into its bank. An
-embedded program is one file, so an embedded compile stops at the first `GP.BANKEDSTR` with
-`GP.BANKEDSTR NEEDS SHARED`.
+**Compile SHARED.** The text goes into the program's one `NAME.OVL` file, which the shared
+bootstrap reads into its bank. An embedded program is one file, so an embedded compile stops at the
+first `GP.BANKEDSTR` with `GP.BANKEDSTR NEEDS SHARED`.
 
 **A group name is not a variable.** No `$`, no `%`, no `(` — any of those is a syntax error rather
 than something quietly ignored. A name that no block declared is a syntax error at the line that
@@ -928,8 +955,12 @@ The refusals, all at compile time:
             A formal is a plain scalar variable, numeric or string.
             Up to 12 of them.
             RETURNS names a plain scalar variable too, and it is what
-            GP.FN reads after the call. Its type is the type of the
-            call. Without it the verb is GP.SUB-only.
+            GP.FN (§3.11.3) reads after the call. Its type is the
+            type of the call. Without it the verb is callable with
+            GP.SUB (§3.11.2) only.
+            Call the verb with GP.SUB as a statement, or with GP.FN
+            inside an expression. Every call sits below the
+            GP.DEFPROC that declares it.
   WARNING   An array or an array element cannot be a formal, and it
             cannot be the RETURNS variable either. A module whose
             arguments are array elements takes the verb and no
@@ -946,6 +977,10 @@ The refusals, all at compile time:
               GP.DEFPROC AREA, A.W, A.H RETURNS A.R
               A.R = A.W * A.H
               RETURN
+
+            REM calling them, anywhere below the declarations
+              GP.SUB DBSELECT, 1
+              PRINT "AREA "; GP.FN(AREA, 3, 4)
 ```
 
 #### 3.11.2 `GP.SUB` — call a verb
@@ -956,13 +991,14 @@ The refusals, all at compile time:
             then calls the routine.
   Kind      COMPOSITE. Expands to an assignment per formal and a
             GOSUB.
-  Notes     The count and the types must match the declaration.
+  Notes     The count and the types must match the declaration. For
+            the same call inside an expression use GP.FN (§3.11.3).
             A call into a GP.BANKED region selects its bank. A call
             into or out of a region comes back with the caller's
             bank selected.
-  WARNING   The call must sit below its GP.DEFPROC. It carries an
-            address and not a line number, so a forward call is
-            refused rather than compiled.
+  WARNING   The call must sit below its GP.DEFPROC (§3.11.1). It
+            carries an address and not a line number, so a forward
+            call is refused rather than compiled.
   Example
 ```
 ```basic
@@ -994,7 +1030,8 @@ The refusals, all at compile time:
             A string result costs 3 bytes more: it is copied into a
             temporary, so two calls to one verb may share an
             expression.
-  WARNING   The call must sit below its GP.DEFPROC, as GP.SUB's does.
+  WARNING   The call must sit below its GP.DEFPROC (§3.11.1), as
+            GP.SUB's (§3.11.2) does.
             The body must not call its own verb: there is one set of
             formals and it would write over the arguments in use.
             An argument may be as deep an expression as any other,
@@ -1028,8 +1065,8 @@ and these are deliberately not spelled like it. Nothing happens at run time wher
 line is.
 
 This is how a program gets past the shared p-code ceiling. Low-memory p-code has to fit under the
-runtime — about 17,920 bytes, §7 — and a region does not count against it. Each region becomes its
-own overlay file, `NAME.004` for bank 4, written beside the `.PRG` and loaded with it.
+runtime — about 17,920 bytes, §7 — and a region does not count against it. Every region of the
+program goes into one overlay file, `NAME.OVL`, written beside the `.PRG` and read in with it.
 
 ```basic
 #DEFINE MY.GUICODE 4
@@ -1112,14 +1149,22 @@ instead. A plain `GOSUB` makes the banked call.
 a `GOSUB` with the bank after the address. Put a module called inside a tight loop in the same place
 as the loop.
 
-#### The overlay files
+#### The overlay file
 
-Each region is written out as `NAME.nnn`, `nnn` being the bank in three decimal digits, so bank 4
-is `NAME.004` and bank 122 is `NAME.122`. The file carries a two-byte load address like any PRG, so
-**the payload is the file size less two**, and the size is the page-padded region rather than the
-p-code in it.
+Every region of a program goes into one file, `NAME.OVL`, and the file says what is in it. Each
+region is introduced by two bytes — the bank it belongs in, then how many pages of it follow — and
+those pages come next. Then the next region, and so on to end of file. So **a region costs its
+padded page count plus two bytes**, the padding rather than the p-code in it, and the banks may be
+in any order with any gaps between them.
 
-A program's `.nnn` files ship beside its `.PRG` and must travel with it.
+The overlay ships beside the `.PRG`. The bootstrap reads it once per load, not once per `RUN`, and a
+missing or truncated one stops the program with `?OVL`; a region for a bank the machine does not
+have stops it with `?RAM`. Nothing pairs a `.OVL` to its `.PRG`, so a stale one is read. §7 lists
+every file a program ships.
+
+**Reading it costs time at startup.** The bootstrap reads the file a byte at a time, at roughly
+26,000 bytes a second, so a program with 32K of regions waits about a second and a quarter before
+its first line runs. Nothing else in the program pays it.
 
 ---
 
@@ -1148,9 +1193,9 @@ runtime and every `#INCLUDE` spends it; a region spends 8,192 bytes of a RAM ban
 not using. Bank what you can. A module called inside a loop goes where the loop is: a call between
 a region and anywhere outside it switches the bank twice.
 
-The banked form needs the program built SHARED. Each region is a `.nnn` file, which the shared
-bootstrap LOADs into its bank. An embedded program is one file, so an embedded compile stops at the
-first `GP.BANKED` with `GP.BANKED NEEDS SHARED`.
+The banked form needs the program built SHARED. The regions are in one `NAME.OVL` file, which the
+shared bootstrap reads into their banks. An embedded program is one file, so an embedded compile
+stops at the first `GP.BANKED` with `GP.BANKED NEEDS SHARED`.
 
 `samples/GPB-MODS-TESTING/PICKDEMO.BASL` is a complete program in this shape, in 99 lines.
 
@@ -1185,7 +1230,7 @@ one region to the other costs the same bank switches as a call from low memory.
 `DUPLICATE SYMBOL` where the module has no `#IFNDEF` guard. Where it has one, the module lands at
 the first `#INCLUDE` and the second produces nothing.
 
-§3.12 has the rules, what a region may not contain, and the `.nnn` files a banked program ships.
+§3.12 has the rules, what a region may not contain, and the `.OVL` file a banked program ships.
 
 ### 4.1 `THEME.INC.BL` — named colour roles
 
@@ -1227,9 +1272,8 @@ Roles, for indexing `THEME.CLR()`: `THEME.PAGE` `THEME.TEXT` `THEME.TITLE` `THEM
 keyboard (§4.11). It is a separate role from `THEME.HILITE` because a dialog shows both at once —
 the highlighted row of a list, and the control the TAB key has landed on.
 
-**The routine used to be `THEME.LOAD`.** It became `THEME.SELECT` when the library was split into
-banked and low-memory files, and it stayed when they were merged again. A program still calling the
-old name stops at `LABEL NOT FOUND`.
+Usage is `THEME.ID`, one `GOSUB THEME.SELECT`, then `THEME.CLR(role)` wherever an attribute is
+wanted:
 
 ```basic
 THEME.ID = 1 : GOSUB THEME.SELECT
@@ -1267,62 +1311,55 @@ module: it needs no `#SYMFILE` and neither module depends on the other.
 `#INCLUDE`s and named after the source PRG. The three trims are `GP.ASM` and reach BASIC's
 variables through `{VAR}`; without a symbol file the compile stops with `{} NEEDS #SYMFILE`.
 
-**The two halves take their argument differently, and one question decides which:** does the
-routine GROW the string. The pads and `SPLICE` do, so they are BASIC — they take the string by
-value in `STR.STR$` and hand it back there, and an assignment reallocates for free. The trims only
-ever shrink, so they are assembly — they take its ADDRESS in `STR.PTR` and rewrite the block where
-it lies, which is the only way a `GOSUB` can edit a caller's string without two allocations and two
-copies a call. Never pass a literal to those: `GP.STRPTR("hello")` is an address inside the
-p-code.
-The three pad routines leave a string that is already at or past the width unchanged. They pad and
-never truncate; use `STR.RTRIM` to shorten.
+#### How a routine takes its string
 
-`SPLIT` reads `STR.STR$` without modifying it. `STR.MAX` of 0 means 10. Empty fields are preserved:
-`"A,,C"` is three fields and `"A,"` is two. Splitting an empty string gives one empty field, never
-zero. Reaching the limit is not an error and loses nothing — the last field receives the unsplit
-remainder, delimiters included.
+The pads, `SPLIT`, `REPLACE` and `SPLICE` take the text by value in `STR.STR$` and hand the result
+back in it. The three trims take an ADDRESS in `STR.PTR`, from `GP.STRPTR` (§3.4.5), and rewrite
+the block in place.
+
+WARNING: never pass a literal to a trim. `GP.STRPTR("hello")` is an address inside the p-code.
+
+#### The pads
+
+`STR.WIDTH` is the target width. A string already at or past it is returned unchanged: the pads
+never truncate. Use `STR.RTRIM` to shorten.
+
+#### `STR.SPLIT`
+
+Reads `STR.STR$` and does not modify it. `STR.MAX` of 0 means 10. Empty fields are kept, so `"A,,C"`
+is three fields and `"A,"` is two. An empty string gives one empty field, never zero. Reaching the
+limit is not an error: the last field takes the unsplit remainder, delimiters included.
 
 `STR.FIELD$` is the one array the library does not `DIM`. Left alone, GPC's implicit `DIM` gives
 0..10. For more, `DIM` it before the first call and set `STR.MAX` to match. `DIM`ming an array GPC
-has already auto-dimensioned is an error, so it is one or the other. Note that this is the reverse
-of `THEME.CLR`, which the module `DIM`s.
+has already auto-dimensioned is an error, so it is one or the other.
 
-`REPLACE` swaps every occurrence of `STR.FIND$` for `STR.REPL$`, modifying `STR.STR$` in place. The
-replacement may be shorter, longer, or `""` to delete. It is case sensitive, because `GP.INSTR`
-compares raw bytes.
+#### `STR.REPLACE`
 
-A replacement that contains the search text is safe: `"A"` to `"AA"` terminates and doubles the As,
-where a naive in-place version would not. The routine builds a new string and never re-scans what it
-has emitted. An empty `STR.FIND$` leaves the string unchanged rather than hanging, because
-`GP.INSTR` reports not-found for a zero-length needle. Like the pad routines it is not length
-checked: a longer replacement can push the result past 255 characters.
+Swaps every occurrence of `STR.FIND$` for `STR.REPL$` in `STR.STR$`. The replacement may be shorter,
+longer, or `""` to delete. It is case sensitive: `GP.INSTR` (§3.4.1) compares raw bytes. A
+replacement that contains the search text terminates — `"A"` to `"AA"` doubles the As. An empty
+`STR.FIND$` leaves the string unchanged.
 
-`PET2SCR` converts a PETSCII code to the screen code the tile map holds, for `TILE`, `TDATA` and
-`VPOKE`. `GP.PRINTAT` and `GP.FILL` do this internally.
+#### `STR.SPLICE`
 
-The three trims are three entry labels sharing one blob, so there is no mode to forget to set. A
-zero-length string and an all-spaces string are not special cases: the walk counts down and
-reaching zero is the answer.
+Replaces `STR.CUT` characters at `STR.AT` with `STR.SUB$`, so one routine inserts, overwrites and
+deletes: `STR.CUT` of 0 inserts, `LEN(STR.SUB$)` overwrites, an empty `STR.SUB$` deletes. `STR.AT`
+is 1-based. Past the end appends, below 1 clamps to 1, and a cut running past the end takes the rest
+of the string. `STR.AT` and `STR.CUT` are clamped in place, so read them back after the call.
 
-`SPLICE` edits by POSITION where `REPLACE` edits by content: it replaces `STR.CUT` characters at
-`STR.AT` with `STR.SUB$`. One routine covers all three of insert, overwrite and delete, because
-they are the same operation with a different count — `STR.CUT` of 0 inserts, `LEN(STR.SUB$)`
-overwrites, and an empty `STR.SUB$` deletes. `STR.AT` is 1-based, matching `GP.INSTR`.
+#### `STR.PET2SCR`
 
-Past the end appends and below 1 clamps to 1, both falling out of `LEFT$` and `MID$` rather than
-being tested for; a cut running past the end takes the rest of the string. It is not length
-checked, like `REPLACE` and the pads. `SPLICE` clamps `STR.AT` and `STR.CUT` in place, so read them
-back rather than assuming what you set survived the call.
+Converts the PETSCII code in `STR.PET` to the screen code the tile map holds, in `STR.SCR`, for
+`TILE`, `TDATA` and `VPOKE`. `GP.PRINTAT` and `GP.FILL` do this conversion themselves.
 
-It was written in `GP.ASM` first and rewritten in BASIC, which is worth knowing because the reason
-generalises: the assembly could overwrite and delete but never insert, because in-place work cannot
-grow a string, and it cost about 280 bytes of p-code where the one BASIC line costs about 40.
+#### Limitation
+
+The pads, `REPLACE` and `SPLICE` are not length checked. A longer replacement can push the result
+past 255 characters.
 
 Examples: [`SPLITT.EXP.BL`](SPLITT.EXP.BL), [`STRINGS.EXP.BL`](STRINGS.EXP.BL). Regression test:
-[`STRTST.EXP.BL`](STRTST.EXP.BL), thirty-three cases — the trim edges, every splice mode, both
-clamps, appending past the end, splicing an empty string, growing a 200-character string past the
-block it was born with, and guard strings either side to catch an off-by-one write into the
-neighbouring block.
+[`STRTST.EXP.BL`](STRTST.EXP.BL), thirty-three cases.
 
 ### 4.3 `APPSYS.INC.BL` — start politely, leave it as you found it
 
@@ -1336,7 +1373,7 @@ neighbouring block.
 A screen rectangle through a file is `STASH.FILE.SAVE` / `.LOAD` / `.PUT` in `STASHFILE.INC.BL`.
 
 GOSUB APPSYS.STARTUP
-' ... the application, laid out with APPSYS.COLS / APPSYS.ROWS ...
+REM ... the application, laid out with APPSYS.COLS / APPSYS.ROWS ...
 GOSUB APPSYS.RESTORE : END
 ```
 
@@ -1453,7 +1490,7 @@ before the display is torn down:
 BMX.FILE$ = F$
 GOSUB BMX.OPEN
 IF BMX.ERROR$ <> "" THEN GOTO COMPLAIN
-' ... BMX.WIDTH, BMX.HEIGHT, BMX.PALUSED readable here ...
+REM ... BMX.WIDTH, BMX.HEIGHT, BMX.PALUSED readable here ...
 SCREEN 128
 GOSUB BMX.PAINT
 ```
@@ -1469,7 +1506,7 @@ in spare VRAM first, and `BMX.RESTORE` writes them back:
 BMX.FILE$ = "TITLE.BMX"
 SCREEN 128
 GOSUB BMX.SHOW
-' ... the title screen ...
+REM ... the title screen ...
 GOSUB BMX.RESTORE
 ```
 
@@ -1502,14 +1539,6 @@ Examples: [`BMXVIEW.EXP.BL`](BMXVIEW.EXP.BL), and [`BMXPAL.EXP.BL`](BMXPAL.EXP.B
 | `MENUVERT.ROW` | `MENUVERT.DRAWROW` `MENUVERT.DRAWATTR` | one row, in the attribute you name |
 | `MENUVERT.HOTFIND` | `MENUVERT.DRAWROW` `MENUVERT.DRAWTEXT$` | `MENUVERT.HOTAT` — where that row's hotkey letter sits, 1-based, or **0 for "do not tint"** |
 
-The menu is BASIC rather than assembly, which keeps 462 bytes of code and 11 of storage out of the
-block every GP program carries. Assembly would only be needed to move the highlight without knowing
-the text underneath it, by swapping the cell's attribute nibbles instead of redrawing. A BASIC menu
-owns the item array and can reprint the row.
-
-The difference is not visible: a nibble swap is 59 cycles a cell, `GP.FILL` 31 and `GP.PRINTAT` 94,
-so redrawing two rows costs about a millisecond against the swap's half, in a 16.7 ms frame.
-
 | in | |
 |---|---|
 | `MENUVERT.X` `.Y` | top left of the **first row**, not of a frame — draw the border yourself with `GP.BOX`, so the menu owes nothing to one style of border |
@@ -1520,18 +1549,27 @@ so redrawing two rows costs about a millisecond against the swap's half, in a 16
 | `MENUVERT.HIATTR` | the same for the highlighted row. **0 means invert `MENUVERT.ATTR`** |
 | `MENUVERT.HOT$` | one character a row, `""` for none |
 | `MENUVERT.HOTATTR` | paint the hotkey letter in this attribute. **0 is off, and off is the default** |
+| `MENUVERT.SEPATTR` | the separator line's attribute. **0 draws it in `MENUVERT.ATTR`**, and 0 is the default |
+| `MENUVERT.SEPCHR` | the separator's glyph. **0 is `MENUVERT.LINE`**, the PETSCII stroke, and is the default. On a charset where a byte is its own tile index — ISO, CP437 — name the code point the program's own frames use |
+| `MENUVERT.DIS$` | one character a row; a `"1"` disables that row. `""` is the default and a short string leaves the rest live. **Read once and cleared** by both `MENUVERT.RUN` and `MENUVERT.DRAW` |
+| `MENUVERT.DISATTR` | the disabled rows' attribute. **0 draws them in `MENUVERT.ATTR`**, and 0 is the default |
+| `MENUVERT.HINT$()` | one help line a row, `1..COUNT`. **The caller owns this `DIM`**, and only when it uses hints |
+| `MENUVERT.HINTW` | the hint field's width in cells. **0 is off, and off is the default**; with it off `MENUVERT.HINT$` is never read |
+| `MENUVERT.HINTX` `.HINTY` | where the hint field starts |
+| `MENUVERT.HINTATTR` | the hint field's attribute, for the clear as well as the text |
 | `MENUVERT.FLAGS` | added together, below |
 | `MENUVERT.SEL` | the row to start on; 0 starts at 1 |
+| `MENUVERT.SCROLL` | items hidden **above** row 1, so screen row `R` draws `ITEM$(SCROLL + R)`. 0 is none and is the default. `MENUVERT.RUN` does not change it |
 
 | out | |
 |---|---|
-| `MENUVERT.SEL` | `1..COUNT`, or **0 if cancelled** |
-| `MENUVERT.KEY` | the key that ended it — 13 chose, 27 cancelled, or the hotkey itself |
+| `MENUVERT.SEL` | `1..COUNT`, or **0 if cancelled**. Under `KEYEXIT` it is left alone — whatever row was highlighted when the key arrived |
+| `MENUVERT.KEY` | the key that ended it — 13 chose, 27 cancelled, the hotkey itself, or the key `KEYEXIT` hands back |
 
 ```basic
 MENUVERT.X = 8 : MENUVERT.Y = 6
 MENUVERT.WIDTH = 24 : MENUVERT.COUNT = 4
-MENUVERT.ITEM$(1) = " NEW GAME"           ' ... and so on
+MENUVERT.ITEM$(1) = " NEW GAME" : REM ... and so on
 MENUVERT.ATTR = THEME.CLR(THEME.TEXT)
 MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
 MENUVERT.HOT$ = "NLOQ"
@@ -1552,9 +1590,15 @@ IF MENUVERT.SEL = 0 THEN GOTO CANCELLED
 | 2 | **keep mark** — leave the chosen row highlighted on the way out |
 | 4 | **no wrap** — stop at the ends instead of wrapping round |
 | 8 | **gamepad** — drive it from the SNES pad in port 1 as well as the keyboard |
+| 64 | **key exit** — end on a key the menu has no use for, instead of swallowing it |
+| 128 | **hint mid** — centre each hint in its field. Does nothing unless `MENUVERT.HINTW` is set |
 
-The constants `MENUVERT.MUSTSEL`, `.KEEPMARK`, `.NOWRAP` and `.GAMEPAD` are defined; add those
-rather than the numbers.
+The constants `MENUVERT.MUSTSEL`, `.KEEPMARK`, `.NOWRAP`, `.GAMEPAD`, `.KEYEXIT` and `.HINTMID` are
+defined; add those rather than the numbers.
+
+With `KEYEXIT`, a key the menu ignores — LEFT and RIGHT — ends it with `MENUVERT.KEY` set and
+`MENUVERT.SEL` untouched. `MENUBAR.DOWNEXIT` (§4.9) is the same mechanism on the other axis; the two
+let a bar and its dropdown drive each other.
 
 A hotkey chooses its row rather than moving to it. `MENUVERT.HOT$` is one character per row in
 order, matched without case. It may be shorter than `MENUVERT.COUNT`, in which case the later rows
@@ -1566,29 +1610,59 @@ nothing extra is passed in and `" START"` with hotkey `S` needs no markup. A row
 contain its hotkey is left untinted rather than reported; the hotkey still works. Only rows in the
 normal attribute are tinted: on the selected row the highlight carries the meaning.
 
-The caller owns the `DIM`. A module cannot be passed an array in BASIC, so it names one; `DIM`ming
+#### Separators
+
+A row whose text is one hyphen draws as a line across the menu's width. The highlight never lands on
+it and a hotkey cannot choose it; UP and DOWN step over it in the direction they were already going.
+The row still counts, so `MENUVERT.SEL` and `MENUVERT.HOT$` keep one entry a row and the separator's
+`MENUVERT.HOT$` entry is a placeholder. The test is for the hyphen alone, so a caller that builds
+rows with a leading space must leave it off this one.
+
+`MENUVERT.SEPCHR` names the glyph and `MENUVERT.SEPATTR` the attribute.
+
+#### Disabled rows
+
+`MENUVERT.DIS$` is one character a row, and `"1"` disables that row: the cursor steps over it, a
+hotkey will not choose it, and it draws in `MENUVERT.DISATTR`.
+
+```basic
+MENUVERT.DIS$ = "0010" : REM row 3 is off
+MENUVERT.DISATTR = THEME.CLR(THEME.DIMMED)
+GOSUB MENUVERT.RUN
+```
+
+**The mask is read once and cleared.** `MENUVERT.RUN` and `MENUVERT.DRAW` both take it and set
+`MENUVERT.DIS$ = ""`, so a menu that never sets it cannot inherit the last one's mask.
+
+#### Hints
+
+With `MENUVERT.HINTW` non-zero, the row's `MENUVERT.HINT$()` line is printed in the field at
+`MENUVERT.HINTX` `MENUVERT.HINTY`, `MENUVERT.HINTW` cells wide, in `MENUVERT.HINTATTR`. The field is
+cleared to that attribute first. Flag 128 centres the text in the field.
+
+A hint is drawn **only when the highlight moves**, not when the menu opens, so whatever the status
+line already says survives until the user starts moving.
+
+The caller owns this `DIM` as well. With `MENUVERT.HINTW` at 0 the array is never read, so a menu
+without hints needs no array at all.
+
+#### The caller owns the `DIM`
+
+A module cannot be passed an array in BASIC, so it names one; `DIM`ming
 it inside the module would fix a bound and then fail for a caller who wanted more rows. Leave
 `MENUVERT.ITEM$` undimensioned and GPC's implicit `DIM` gives 0..10, a ten-row menu. `DIM` it
 yourself for more. Do not do both.
 
 #### The gamepad flag
 
-With flag 8, up and down move the highlight and B or Start chooses. Cancel remains keyboard-only:
-ESC and STOP have no unambiguous pad equivalent, and a must-select menu has no cancel.
+With flag 8, up and down move the highlight and B or Start chooses. Cancel is keyboard-only.
 
-It reads port 1, the physical pad, not port 0. Port 0 is the keyboard presented as a joystick, and
-the menu reads the keyboard directly, so reading both would move the highlight twice for one cursor
-key. Port 0 is also unreliable, reporting absent on roughly half of all reads (measured in
-AlienAirlift: 2,060 negative against 2,057 valid over 14 seconds).
+It reads port 1, the physical pad. Port 0 is the keyboard presented as a joystick and is not read.
 
-One step per press, no auto-repeat. The wait loop spins as fast as the CPU allows, so the pad is
-edge-triggered and holding a direction moves once. A button still held from whatever opened the menu
-is not read as a fresh
-press either, so a menu cannot answer itself on the way in.
+One step per press, with no auto-repeat: the pad is edge-triggered, so holding a direction moves
+once, and a button still held from whatever opened the menu is not read as a fresh press.
 
-With no pad connected the flag changes nothing: the pad is read only when the keyboard is quiet,
-and an absent pad reads as nothing held. In the emulator a real pad needs `-joy1`, which binds
-physical hardware and does not map the keyboard.
+With no pad connected the flag changes nothing. In the emulator a real pad needs `-joy1`.
 
 Examples: [`MENUDEMO.EXP.BL`](MENUDEMO.EXP.BL) on its own, [`MENU.EXP.BL`](MENU.EXP.BL) inside a
 whole small application, and [`MENUTST.EXP.BL`](MENUTST.EXP.BL) for the 21-case regression test.
@@ -1739,7 +1813,7 @@ Flags, added together: `MENUBAR.MUSTSEL` `MENUBAR.KEEPMARK` `MENUBAR.NOWRAP` `ME
 
 STR.USING.NUM = 1234.5 : STR.USING.MASK$ = "#,##0.00"
 GOSUB STR.USING
-PRINT STR.USING.STR$                    ' 1,234.50
+PRINT STR.USING.STR$ : REM 1,234.50
 ```
 
 Pure BASIC. It needs no `#SYMFILE` and depends on no other module, so a program can take it
@@ -1832,10 +1906,10 @@ frame glyphs, the bank the covered cells go to — is listed in full in
 [GP-BASIC.GLOBALS.md](GP-BASIC.GLOBALS.md) §3. `GUI.BANK = 0` does not save the cells, and then the
 box is still on screen when the call returns.
 
-**Every control has a focus, and TAB moves it.** The dialogs no longer own their key loops: each
-states its controls and `GUI.FORM` runs them. A control is a button, a field, a list, a combo (§4.17) or a check box (§4.21); it hands
-back one of six verdicts — stay, next, previous, press, default, cancel — and the dispatcher stays
-one loop whatever the mix. A caller that never presses TAB sees what it always saw.
+**Every control has a focus, and TAB moves it.** A dialog states its controls and `GUI.FORM` runs
+them. A control is a button, a field, a list, a combo (§4.17) or a check box (§4.21); it hands back
+one of six verdicts — stay, next, previous, press, default, cancel — and the dispatcher is one loop
+whatever the mix.
 
 **The default button and the focused control are different things.** The default is what RETURN
 presses from anywhere and is drawn `<<LIKE THIS>>`; the focus is where TAB has got to and is drawn
@@ -1848,13 +1922,32 @@ not eat printable keys**, so C presses CANCEL from the button row or from inside
 a C in a field. That is the whole rule, and `GUIFRMT`'s T14, T15 and T22 are the three assertions
 that hold it.
 
-`GUI.HINT$` is gone — the dimmed line naming two keys became the button row, and it is the one
-interface this took away.
+The typing dialog is `GUI.INPUT` and its string is `GUI.TEXT$`. BASLOAD will not have a label and a
+variable of one name, and the `$` does not separate them.
 
-**The typing dialog and its string swapped names**: it was `GUI.TEXT` returning `GUI.INPUT$`, and it
-is `GUI.INPUT` returning `GUI.TEXT$`. BASLOAD will not have a label and a variable of one name and
-the `$` does not separate them. A program written against the older library **compiles clean and
-reads the wrong one back**.
+#### Fields on a form
+
+| Routine | in | out |
+|---|---|---|
+| `GUI.FORM.ADD.FIELD` | `LINEINPUT.X` `.Y` `.LEN` `.TEXT$` and the rest of `LINEINPUT`'s inputs | `GUI.CTRL.N` — the field's control number |
+
+```basic
+LINEINPUT.X = GUI.INNER.LEFT : LINEINPUT.Y = GUI.INNER.TOP
+LINEINPUT.LEN = 20 : LINEINPUT.TEXT$ = "UNTITLED"
+GOSUB GUI.FORM.ADD.FIELD
+NAME.CTRL = GUI.CTRL.N
+REM ... run the form ...
+PRINT GUI.CTRL.TEXT$(NAME.CTRL)
+```
+
+**The text belongs to the control**, in `GUI.CTRL.TEXT$(n)`. `LINEINPUT` has one buffer, so a field
+copies its text in when it takes the focus and back out when it leaves. Read `GUI.CTRL.TEXT$(n)`
+after `GUI.FORM.RUN`. That is what lets one form carry several fields.
+
+The field is painted as soon as it is added, so a field that never takes the focus is still drawn.
+
+A list control takes `MENUVERT.DIS$` the same way `MENUVERT.RUN` does: set the mask before
+`GUI.FORM.ADD.LIST`, which reads it once and clears it.
 
 **Upper case, on the default charset.** `GP.PRINTAT` converts PETSCII and BASLOAD passes literals
 through as source bytes, so charset 2 lands lower case on the graphics half of the font. ISO mode
@@ -1983,7 +2076,7 @@ could not call another bank. Fix one and fix the other. There are only the two, 
 | `FILE.UP` | — | `FILE.ERR` |
 | `FILE.CURDIR` | — | `FILE.PATH$` |
 | `FILE.SAVEARRAY` | `FILE.NAME$` `FILE.ROWS` `FILE.LINE$()` | `FILE.ERR` |
-| `FILE.LOADARRAY` | `FILE.NAME$` `FILE.MAX` | `FILE.ROWS` `FILE.LINE$()` |
+| `FILE.LOADARRAY` | `FILE.NAME$` `FILE.MAX.ROWS` | `FILE.ROWS` `FILE.LINE$()` |
 
 ```basic
 #SYMFILE "@:MYPROG.SYM"
@@ -2077,10 +2170,10 @@ time.
 **Two destinations, one code path**: the reader takes an address and a size.
 
 ```basic
-' a bank -- 8,192 bytes at $A000, about 250 entries
+REM a bank -- 8,192 bytes at $A000, about 250 entries
 FILE.DIR.BANK = BANKMGR.BANK
 
-' low RAM
+REM low RAM
 FILE.DIR.BANK = 0
 DIM FD.BUF%(1022)
 FILE.DIR.PTR = GP.ARRPTR(FD.BUF%())
@@ -2112,7 +2205,7 @@ MENUVERT.ITEM$(2) = " UTAH"
 COMBO.X = GUI.INNER.LEFT : COMBO.Y = GUI.INNER.TOP
 COMBO.W = 16 : COMBO.COUNT = 2 : COMBO.SEL = 1
 GOSUB COMBO.ADD
-' ... run the form ... the answer is in COMBO.SEL
+REM ... run the form ... the answer is in COMBO.SEL
 ```
 
 **Only `COMBO.ADD` is called by an application.** `COMBO.DRAW`, `COMBO.KEY` and `COMBO.OPEN` are
@@ -2130,6 +2223,11 @@ second combo on the same form would find the first one's items there.
 **A long list belongs in `GUI.LISTBOX`** (§4.12). The dropdown shows every item at once:
 `MENUVERT.RUN` does not scroll, its own header says so, and a scrolling key loop is the listbox's
 job rather than this one's.
+
+**The dropdown is framed like the dialog behind it.** With `GUI.GLYPH` non-zero it draws from
+`GUI.EDGE.H`, `GUI.EDGE.V`, `GUI.CORNER.TL`, `.TR`, `.BL` and `.BR`, the same six a dialog frames
+with, so a re-ordered charset gets its own frame here too. With `GUI.GLYPH = 0` the frame is
+`GP.BOX` style 1.
 
 **It is required by `GUI.INC.BL`**, which names `COMBO.DRAW` and `COMBO.KEY`. BASLOAD resolves every
 label in a file, so a program that includes the GUI and leaves this one out stops with
@@ -2156,7 +2254,7 @@ SV.MAX = 16 : DIM SV.PAGE%(16), SV.PAGES%(16)
 GOSUB SV.INIT
 SV.X = 10 : SV.Y = 5 : SV.W = 40 : SV.H = 12 : GOSUB SV.SAVE
 IF SV.HND = 0 THEN <it did not fit>
-' ... draw over it ...
+REM ... draw over it ...
 GOSUB SV.RESTORE
 ```
 
@@ -2329,7 +2427,7 @@ CHECK.X = GUI.INNER.LEFT : CHECK.Y = GUI.INNER.TOP
 CHECK.TEXT$ = "SHOW HIDDEN FILES" : CHECK.ON = -1
 GOSUB CHECK.ADD
 HIDDEN = CHECK.CTRL
-' ... run the form ...
+REM ... run the form ...
 IF (GUI.CTRL.FLAGS%(HIDDEN) AND GUI.CF.CHECKED) <> 0 THEN PRINT "TICKED"
 ```
 
@@ -2341,9 +2439,8 @@ IF (GUI.CTRL.FLAGS%(HIDDEN) AND GUI.CF.CHECKED) <> 0 THEN PRINT "TICKED"
 right. `CHECK.TEXT$ = ""` draws a bare box. A non-zero `CHECK.ON` starts the box ticked.
 `CHECK.CTRL` is the control's number, and 0 when the form is already full.
 
-**The state is a flag on the control**, `GUI.CF.CHECKED` in `GUI.CTRL.FLAGS%()`, and not a variable
-of the module's. Keep `CHECK.CTRL` and test the flag after `GUI.FORM.RUN`. That is why one form
-carries several boxes where it carries only one combo.
+**The state is a flag on the control**, `GUI.CF.CHECKED` in `GUI.CTRL.FLAGS%()`. Keep `CHECK.CTRL`
+and test the flag after `GUI.FORM.RUN`. One form carries as many boxes as it has controls.
 
 | key | does |
 |---|---|
@@ -2416,19 +2513,19 @@ directory buffer.
 
 | | |
 |---|---|
-| bank 4, `GPBMODS.004`, 7,938 bytes | `MENUVERT` `MENUBAR` `LINEINPUT` `GUI` `GUI2` |
-| bank 5, `GPBMODS.005`, 7,426 bytes | literal text, pool one |
-| bank 6, `GPBMODS.006`, 4,610 bytes | literal text, pool two |
-| bank 7, `GPBMODS.007`, 4,866 bytes | `APPSYS` `BANKMGR` `KB` `SORT` `STASHVRAM` `STASHVRAMGC` `STRCASE` `STRINGS` `STRUSING` |
-| bank 8, `GPBMODS.008`, 1,794 bytes | `FILEIO` `FILEDIR` |
-| bank 9, `GPBMODS.009`, 770 bytes | `THEME` |
-| bank 10, `GPBMODS.010`, 1,538 bytes | `COMBO` `CHECK` |
-| bank 11, `GPBMODS.011`, 3,074 bytes | the two biggest dropdown handlers, this program's own code |
+| bank 4, 7,936 bytes | `MENUVERT` `MENUBAR` `LINEINPUT` `GUI` `GUI2` |
+| bank 5, 7,424 bytes | literal text, pool one |
+| bank 6, 4,608 bytes | literal text, pool two |
+| bank 7, 4,864 bytes | `APPSYS` `BANKMGR` `KB` `SORT` `STASHVRAM` `STASHVRAMGC` `STRCASE` `STRINGS` `STRUSING` |
+| bank 8, 1,792 bytes | `FILEIO` `FILEDIR` |
+| bank 9, 768 bytes | `THEME` |
+| bank 10, 1,536 bytes | `COMBO` `CHECK` |
+| bank 11, 3,072 bytes | the two biggest dropdown handlers, this program's own code |
 
-Six of those are `GP.BANKED` code regions (§3.12) and two are `GP.BANKEDSTR` text pools (§3.10). One
-`.nnn` file is written per bank. Each loads to `$A000` in its own bank and carries a two-byte load
-address like any PRG, so a payload is the file size less two. The resident object is 11,523 bytes
-and the overlays are 32,016 between them.
+Six of those are `GP.BANKED` code regions (§3.12) and two are `GP.BANKEDSTR` text pools (§3.10).
+All eight are in one `GPBMODS.OVL`, each behind its own bank and page-count bytes. The resident
+object is 11,523 bytes and the overlay is 32,016 — the eight regions come to 32,000 between them
+and the sixteen header bytes are the rest.
 
 **Only what holds a `BANK` statement stays in low RAM.** `STASH` and `STASHFILE` execute `BANK`,
 which the compiler refuses inside a region; `STASHVRAM` (§4.18) is the one to reach for from inside
@@ -2437,8 +2534,8 @@ one.
 **Six regions and not one**, because a region holds at most 8,192 bytes and the GUI fills its own.
 A region may call another: the call selects the other bank and its `RETURN` puts the caller's back.
 
-**A nearly empty region still costs a whole page count.** Bank 9 holds 502 bytes of `THEME` in a
-768-byte overlay. Below about a page and a half of p-code, a region gives back less than it looks
+**A nearly empty region still costs a whole page count.** Bank 9 holds 502 bytes of `THEME` in
+three pages. Below about a page and a half of p-code, a region gives back less than it looks
 like. Bank 10 held 705 bytes of `COMBO` in 768 the same way, until `CHECK` moved in beside it.
 
 #### The text is in a bank
@@ -2510,8 +2607,8 @@ one library update from not being.
 `GPB.INC.BL` defines no variables. It is 27 keyword declarations and nothing else.
 
 ```basic
-GP.A = 5          ' SYNTAX ERROR — GP.A is a keyword
-X = GP.A          ' correct
+GP.A = 5 : REM SYNTAX ERROR — GP.A is a keyword
+X = GP.A : REM correct
 ```
 
 The value words are `GP.A` `GP.X` `GP.Y` `GP.C`, the registers after `GP.CALL`, and that is all of
@@ -2599,6 +2696,25 @@ Two budgets come off `LOW FREE`:
 A program can be comfortable on one and out of room on the other. `LOW FREE 4096` is 4K to run in
 and nowhere left to grow; `GPBMODS` at `LOW FREE 12288` has both.
 
+### What ships with the program
+
+`nnn` in a runtime name is the compiler build, so a runtime file serves only programs from its own
+build.
+
+| mode | files |
+|---|---|
+| EMBEDDED | `NAME.PRG` only. The runtime and the bank 1 code are in the object |
+| SHARED | `NAME.PRG` |
+| | `GPB.RT.nnn.BIN` when the report says `GPBASIC`, `GPC.RT.nnn.BIN` when it says `CORE` |
+| | `GP1.RT.nnn.BIN`, always |
+| | `NAME.OVL`, holding every `BANK` line's region, beside the `.PRG` |
+
+The bootstrap looks for the runtime in the current directory, then at the root of the SD card, so
+one copy at `/` serves every program. `GP1.RT.nnn.BIN` must sit in the same place as the runtime
+that loaded. A runtime file that is not found prints `?RT`.
+
+`GPC.BIN`, `GPC.IMG.nnn.BIN` and `GP1.IMG.nnn.BIN` are the compiler and its inputs and do not ship.
+
 ### Removing dead code
 
 With `REMOVE DEAD CODE?` answered `Y` in `GPC.PRG`, or a file named on line 5 of `GPC.INPUT`, the
@@ -2674,7 +2790,7 @@ which of your strings was asking.
 
 `LOW CODE` and `LOW FREE` describe low memory only. **P-code inside a `GP.BANKED` region (§3.12) is
 not in either figure**, and neither is a `GP.ASM` block in the region without `LOW`. The region is
-reported on its own `BANK` line and written to its own `NAME.nnn` overlay file. Moving a module into
+reported on its own `BANK` line and written into the program's `NAME.OVL` overlay file. Moving a module into
 a region takes its bytes off `LOW CODE` and gives them to `LOW FREE`.
 
 What a region costs instead:
@@ -2684,8 +2800,9 @@ What a region costs instead:
 - **A byte a call site, and two bank switches a call.** A call into the region from outside it, or
   out of it to low memory, is a `.bgosub`, one byte longer than a `GOSUB`. `RETURN` selects the
   caller's bank again.
-- **A file that has to travel.** The `.nnn` files ship beside the `.PRG`. A program whose overlays
-  are missing loads and then fails where it first calls into one.
+- **A file that has to travel.** `NAME.OVL` ships beside the `.PRG`. A program without it, or
+  with a truncated one, stops with `?OVL` before it runs.
+- **A second or so of startup**, once per load, while the bootstrap reads the overlay in.
 
 Banked text is the same bargain on the data side: a `GP.BANKEDSTR` group (§3.10) is out of the
 workspace, and inside a region it costs no p-code at all.

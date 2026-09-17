@@ -3,10 +3,18 @@
 ## **  FILEIO.INC.BL -- the drive: status, files, directories.
 ## **
 ## **      FILE.STATUS     read the command channel
-## **      FILE.EXISTS     is FILE.NAME$ on the drive
-## **      FILE.SIZE       how big it is, in blocks. A VERB, not a GOSUB:
+## **      DOS.CMD         send one command, FILE.ERR back. A VERB, not a
+## **                      GOSUB. FILE.CMD is the same body by label:
+## **                          GP.SUB DOS.CMD, "S:OLD.DAT"
+## **                          E = GP.FN(DOS.CMD, "S:OLD.DAT")
+## **      FILE.EXISTS     is FILE.NAME$ on the drive. DOS.EXISTS is the
+## **                      same body as a VERB:
+## **                          GP.SUB DOS.EXISTS, "MYFILE.DAT"
+## **                          IF GP.FN(DOS.EXISTS, "MYFILE.DAT") THEN ...
+## **      FILE.SIZE       how big it is, in blocks. A VERB:
 ## **                          GP.SUB FILE.SIZE, "MYFILE.DAT"
 ## **                          N = GP.FN(FILE.SIZE, "MYFILE.DAT")
+## **                      FILE.SIZE.BODY is the label for a GOSUB.
 ## **      FILE.DELETE     scratch it, pattern allowed
 ## **      FILE.RENAME     FILE.NAME$ -> FILE.NEW$
 ## **      FILE.COPY       one drive only
@@ -14,7 +22,10 @@
 ## **      FILE.RMDIR      remove an empty one
 ## **      FILE.CHDIR      change to one
 ## **      FILE.UP         change to the parent
-## **      FILE.CURDIR     the current directory, into FILE.PATH$
+## **      FILE.CURDIR     the current directory, into FILE.PATH$. CURDIR is
+## **                      the same body as a VERB, and takes no argument:
+## **                          GP.SUB CURDIR
+## **                          P$ = GP.FN(CURDIR)
 ## **      FILE.SAVEARRAY  FILE.LINE$() out to a SEQ file
 ## **      FILE.LOADARRAY  and back
 ## **
@@ -30,8 +41,9 @@
 ## **        FILE.DEVICE       the drive. 0 means 8
 ## **        FILE.ISO       non-zero folds names to PETSCII on the way out
 ## **        FILE.ROWS      rows to write, SAVEARRAY
-## **        FILE.MAX       rows that fit, LOADARRAY. 0 means 10
+## **        FILE.MAX.ROWS  rows that fit, LOADARRAY. 0 means 10
 ## **        FILE.LINE$()   the rows. The caller owns the DIM
+## **        FILE.CMDSTR$   the command, FILE.CMD and DOS.CMD
 ## **
 ## **   out  FILE.ERR       error number. Under 20 is success
 ## **        FILE.MSG$      the drive's text
@@ -41,7 +53,7 @@
 ## **        FILE.ROWS      rows read, LOADARRAY
 ## **        FILE.PATH$     FILE.CURDIR
 ## **
-## **  internal  FILE.CMDSTR$ FILE.OUT$ FILE.RAW$ FILE.ROW$ FILE.ST FILE.KEEP
+## **  internal  FILE.OUT$ FILE.RAW$ FILE.ROW$ FILE.ST FILE.KEEP
 ## **            FILE.I FILE.PETP% FILE.CH$ FILE.BYTE FILE.LINENO FILE.QUOTED
 ## **
 ## **  FILE.ERR is DS and FILE.MSG$ is DS$. The X16 has neither.
@@ -129,8 +141,17 @@ GOTO FILEIO.MODULE.END
 FILE.STATUS:  
     FILE.CMDSTR$ = ""
 
-## FILE.CMD sends FILE.CMDSTR$ and reads the answer. 
+## FILE.CMD sends FILE.CMDSTR$ and reads the answer.
+##
+##   in    FILE.CMDSTR$  the command, and the verb's one argument
+##   out   FILE.ERR      the error, and what GP.FN gives back
+##         FILE.MSG$     FILE.TRK   FILE.SEC
+##
+##      FILE.CMDSTR$ = "S:OLD.DAT" : GOSUB FILE.CMD
+##      GP.SUB DOS.CMD, "S:OLD.DAT"
+##      E = GP.FN(DOS.CMD, "S:OLD.DAT")
 FILE.CMD:  
+    GP.DEFPROC DOS.CMD, FILE.CMDSTR$ RETURNS FILE.ERR
     IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
     OPEN 15, FILE.DEVICE, 15, FILE.CMDSTR$
     INPUT#15, FILE.ERR, FILE.MSG$, FILE.TRK, FILE.SEC
@@ -139,7 +160,16 @@ FILE.CMD:
 
 ## Channel 15 is opened first and read while the file is still open: the answer
 ## being read is the drive's answer to that open.
-FILE.EXISTS:  FILE.OK = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
+##
+##   in    FILE.NAME$    the file, and the verb's one argument
+##   out   FILE.OK       -1 found, 0 not, and what GP.FN gives back
+##         FILE.ERR      FILE.MSG$   FILE.TRK   FILE.SEC
+##
+##      FILE.NAME$ = "SCORES.DAT" : GOSUB FILE.EXISTS
+##      IF GP.FN(FEXISTS, "SCORES.DAT") THEN GOSUB LOADIT
+FILE.EXISTS:  
+    GP.DEFPROC FEXISTS, FILE.NAME$ RETURNS FILE.OK
+    FILE.OK = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
     GOSUB FILE.PETNAME : OPEN 15, FILE.DEVICE, 15
     OPEN FILE.CHAN, FILE.DEVICE, FILE.CHAN, FILE.OUT$ + ",S,R"
     INPUT#15, FILE.ERR, FILE.MSG$, FILE.TRK, FILE.SEC
@@ -162,10 +192,9 @@ FILE.EXISTS:  FILE.OK = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
 ## **  and either way FILE.OK comes back beside the count -- which is the only
 ## **  thing that tells a real 0-block file from one that is not there.
 ## **
-## **  A VERB, SO IT HAS NO LABEL. The GP.DEFPROC declaration names the
-## **  statement under it as the body, and a verb is a NAME: a label of the
-## **  same name would stop BASLOAD with DUPLICATE SYMBOL. GOSUB FILE.SIZE is
-## **  not a way to call it -- unlike every other entry in this module.
+## **  THE LABEL IS FILE.SIZE.BODY, NOT FILE.SIZE. A verb is a NAME, so a
+## **  label of the same name would stop BASLOAD with DUPLICATE SYMBOL. Set
+## **  FILE.NAME$ first and GOSUB FILE.SIZE.BODY runs the same body.
 ## **
 ## **  BLOCKS, AND THERE IS NO BYTE COUNT TO BE HAD. A directory counts blocks
 ## **  and a 254-byte block is only ever mostly full, so the last one holds
@@ -186,6 +215,7 @@ FILE.EXISTS:  FILE.OK = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
 
 ## ** Function style, FileSize
 GP.DEFPROC FILE.SIZE, FILE.NAME$ RETURNS FILE.BLOCKS
+FILE.SIZE.BODY:  
     FILE.BLOCKS = 0 : FILE.OK = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
     GOSUB FILE.PETNAME : OPEN 15, FILE.DEVICE, 15
     OPEN FILE.CHAN, FILE.DEVICE, 0, "$:" + FILE.OUT$
@@ -236,22 +266,29 @@ FILE.SIZEBYTE:
 ## ***********************************************************************
 
 ## All of these tail-call FILE.CMD, whose RETURN is the caller's.
-FILE.DELETE:  GOSUB FILE.PETNAME : FILE.CMDSTR$ = "S:" + FILE.OUT$ : GOTO FILE.CMD
+FILE.DELETE:  
+    GOSUB FILE.PETNAME : FILE.CMDSTR$ = "S:" + FILE.OUT$ : GOTO FILE.CMD
 
 ## FILE.OUT$ holds one name at a time, so the new name is taken first and kept
 ## in the part-built command.
-FILE.RENAME:  GOSUB FILE.PETNEW : FILE.CMDSTR$ = "R:" + FILE.OUT$ + "=" : GOSUB FILE.PETNAME : FILE.CMDSTR$ = FILE.CMDSTR$ + FILE.OUT$ : GOTO FILE.CMD
-FILE.COPY:  GOSUB FILE.PETNEW : FILE.CMDSTR$ = "C:" + FILE.OUT$ + "=" : GOSUB FILE.PETNAME : FILE.CMDSTR$ = FILE.CMDSTR$ + FILE.OUT$ : GOTO FILE.CMD
-FILE.MKDIR:  GOSUB FILE.PETNAME : FILE.CMDSTR$ = "MD:" + FILE.OUT$ : GOTO FILE.CMD
+FILE.RENAME:  
+    GOSUB FILE.PETNEW : FILE.CMDSTR$ = "R:" + FILE.OUT$ + "=" : GOSUB FILE.PETNAME : FILE.CMDSTR$ = FILE.CMDSTR$ + FILE.OUT$ : GOTO FILE.CMD
+FILE.COPY:  
+    GOSUB FILE.PETNEW : FILE.CMDSTR$ = "C:" + FILE.OUT$ + "=" : GOSUB FILE.PETNAME : FILE.CMDSTR$ = FILE.CMDSTR$ + FILE.OUT$ : GOTO FILE.CMD
+FILE.MKDIR:  
+    GOSUB FILE.PETNAME : FILE.CMDSTR$ = "MD:" + FILE.OUT$ : GOTO FILE.CMD
 
 ## RD only removes an EMPTY directory, and only one you are not standing in.
 ## CMDR-DOS answers 63 FILE EXISTS on a directory with anything in it.
-FILE.RMDIR:  GOSUB FILE.PETNAME : FILE.CMDSTR$ = "RD:" + FILE.OUT$ : GOTO FILE.CMD
-FILE.CHDIR:  GOSUB FILE.PETNAME : FILE.CMDSTR$ = "CD:" + FILE.OUT$ : GOTO FILE.CMD
+FILE.RMDIR:  
+    GOSUB FILE.PETNAME : FILE.CMDSTR$ = "RD:" + FILE.OUT$ : GOTO FILE.CMD
+FILE.CHDIR:  
+    GOSUB FILE.PETNAME : FILE.CMDSTR$ = "CD:" + FILE.OUT$ : GOTO FILE.CMD
 
 ## CHR$(95) is the left arrow, spelled by code so the source does not depend on
 ## its encoding.
-FILE.UP:  FILE.CMDSTR$ = "CD:" + CHR$(95) : GOTO FILE.CMD
+FILE.UP:  
+    FILE.CMDSTR$ = "CD:" + CHR$(95) : GOTO FILE.CMD
 
 
 
@@ -268,7 +305,15 @@ FILE.UP:  FILE.CMDSTR$ = "CD:" + CHR$(95) : GOTO FILE.CMD
 ##
 ## The first line is skipped and the path rebuilt from the components: it is
 ## padded to a fixed width and truncates a long path.
+##
+##   out   FILE.PATH$    the path, and what GP.FN gives back. / at worst
+##         FILE.ERR      FILE.MSG$   FILE.TRK   FILE.SEC
+##
+##      GOSUB FILE.CURDIR
+##      GP.SUB CURDIR
+##      P$ = GP.FN(CURDIR)
 FILE.CURDIR:  
+    GP.DEFPROC CURDIR RETURNS FILE.PATH$
     FILE.PATH$ = "" : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
     OPEN 15, FILE.DEVICE, 15
     OPEN FILE.CHAN, FILE.DEVICE, 0, "$=C"
@@ -310,10 +355,10 @@ FILE.WRITEROWS:
     NEXT FILE.I
     RETURN
 
-## FILE.ROWS = FILE.MAX on return means the file may hold more.
+## FILE.ROWS = FILE.MAX.ROWS on return means the file may hold more.
 FILE.LOADARRAY:  
     FILE.ROWS = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
-    IF FILE.MAX = 0 THEN FILE.MAX = 10
+    IF FILE.MAX.ROWS = 0 THEN FILE.MAX.ROWS = 10
     GOSUB FILE.PETNAME : OPEN 15, FILE.DEVICE, 15
     OPEN FILE.CHAN, FILE.DEVICE, FILE.CHAN, FILE.OUT$ + ",S,R"
     INPUT#15, FILE.ERR, FILE.MSG$, FILE.TRK, FILE.SEC
@@ -337,7 +382,7 @@ FILE.READROWS:
         FILE.ST = ST : GOSUB FILE.ROWREAL
         IF FILE.KEEP = -1 THEN GOSUB FILE.KEEPROW
         IF (FILE.ST AND 66) <> 0 THEN GP.EXITDO
-        IF FILE.ROWS >= FILE.MAX THEN GP.EXITDO
+        IF FILE.ROWS >= FILE.MAX.ROWS THEN GP.EXITDO
     GP.LOOP
     RETURN
 
@@ -355,7 +400,7 @@ FILE.ROWDROP:
     FILE.KEEP = 0 : RETURN
 
 FILE.KEEPROW:
-    IF FILE.ROWS >= FILE.MAX THEN RETURN
+    IF FILE.ROWS >= FILE.MAX.ROWS THEN RETURN
     FILE.ROWS = FILE.ROWS + 1 : FILE.LINE$(FILE.ROWS) = FILE.ROW$
     RETURN
 

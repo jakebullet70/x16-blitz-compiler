@@ -174,9 +174,10 @@ GM.LIBEND:
 ## also leave it implicit.
 DIM MENUVERT.ITEM$(32)
 
-## STR.SPLIT's fields, and STR.MAX is set to match at every call site. GPC's implicit
-## DIM is documented to give 0..10 and does not reach this one: without the DIM the
-## first STR.SPLIT writes wild and the string heap comes back as machine code.
+## STR.SPLIT's fields. Nothing here calls STR.SPLIT any more -- the panel uses
+## STR.SCAN, which DIMs its own STR.POS% -- but STRINGS.INC.BL still compiles the
+## STR.SPLIT body, and GPC's implicit DIM does not reach an array only that body
+## names. Without this DIM the first call would write wild.
 DIM STR.FIELD$(10)
 
 ## The ten words DATA sorts, and the array GP.ARRPTR is shown reading the
@@ -195,7 +196,7 @@ DIM GM.FMASK%(3)
 DIM GM.FLD$(3)
 
 ## FILE.LINE$() is the caller's DIM, like MENUVERT.ITEM$. Sixteen because
-## FILES / SAVEARRAY + LOADARRAY sets FILE.MAX to 16 to show a load coming
+## FILES / SAVEARRAY + LOADARRAY sets FILE.MAX.ROWS to 16 to show a load coming
 ## back short; the implicit DIM would only give 10.
 DIM FILE.LINE$(16)
 
@@ -601,7 +602,7 @@ GP.BANKEDSTR GM.TEXTBANK BS.DD.STRINGS
   " STR.PADR"
   " STR.PADL"
   " STR.PADC"
-  " STR.SPLIT"
+  " STR.SCAN + FIELD"
   " STR.REPLACE"
   " STRCASE  UPPER/LOWER"
   " STR.USING"
@@ -2206,13 +2207,13 @@ GMX.I.LIMITS:
 
 GP.BANKEDSTR GM.TEXTBANKB BS.G.SAY
   "STR.PADR  PAD ON THE RIGHT"
-  "STR.WIDTH IS HOW WIDE THE ANSWER IS."
+  "GP.FN(PADR, S$, W) -- W IS HOW WIDE THE ANSWER IS."
   "STR.PADL  PAD ON THE LEFT"
-  "STR.WIDTH IS HOW WIDE THE ANSWER IS."
+  "GP.FN(PADL, S$, W) -- W IS HOW WIDE THE ANSWER IS."
   "STR.PADC  PAD BOTH ENDS"
   "AN ODD GAP FAVOURS THE RIGHT."
-  "STR.SPLIT  ONE STRING INTO A FIELD ARRAY"
-  ""
+  "STR.SCAN  FIELD POSITIONS, NO COPIES"
+  "GP.FN(FIELD, N) CUTS ONE OUT WHEN ASKED."
   "STR.REPLACE  EVERY OCCURRENCE, IN ONE PASS"
   "SHORTER, LONGER, OR EMPTY. CASE SENSITIVE."
   "STRCASE.GO  CASE, IN PLACE"
@@ -2243,7 +2244,7 @@ GP.BANKEDSTR GM.TEXTBANK BS.G.DATA
   "GPC BASIC"
   "PRESS A KEY."
   "  FOUR FIELD WIDTHS"
-  "STR.SPLIT  FIELDS: "
+  "STR.SCAN  FIELDS: "
   "STR.REPLACE  THREE OCCURRENCES"
   "STRCASE.GO  DOWN AND BACK, UNCHANGED"
   "THE FONT HAS NO LOWER CASE, SO ONLY THE BYTES SHOW IT."
@@ -2737,13 +2738,10 @@ GMX.B.COL:
 ## ---- point it at the TOTAL row and call this again.
 
 GMX.B.ROW:
-  STR.STR$ = GP.BSTR(BS.B.SIZES, GM.SNAME%)
-  STR.WIDTH = 11
-  GOSUB STR.PADR
   STR.USING.NUM = VAL(GP.BSTR(BS.B.NUMS, GM.SNUM%))
   STR.USING.MASK$ = "#####"
   GOSUB STR.USING
-  GM.SLINE$ = STR.STR$ + STR.USING.STR$
+  GM.SLINE$ = GP.FN(PADR, GP.BSTR(BS.B.SIZES, GM.SNAME%), 11) + STR.USING.STR$
   GP.PRINTAT GM.SX%, GM.SROW%, GM.SLINE$, GM.SATTR%
   GM.SNAME% = GM.SNAME% + 1 : GM.SNUM% = GM.SNUM% + 1
   RETURN
@@ -2848,13 +2846,12 @@ GMX.G.PADC:
 GMX.G.PADS:
   GM.GRP% = GM.PADOP% * 2 : GOSUB GMX.G.SAY
   FOR GM.I = 1 TO 4
-    STR.STR$ = GP.BSTR(BS.G.DATA, 0)
     GM.PADW% = 6 + GM.I * 4
-    STR.WIDTH = GM.PADW%
-    IF GM.PADOP% = 0 THEN GOSUB STR.PADR
-    IF GM.PADOP% = 1 THEN GOSUB STR.PADL
-    IF GM.PADOP% = 2 THEN GOSUB STR.PADC
-    GM.PADSHOW$ = MID$(STR$(GM.PADW%), 2) + "  [" + STR.STR$ + "]"
+    GM.PADSHOW$ = GP.BSTR(BS.G.DATA, 0)
+    IF GM.PADOP% = 0 THEN GM.PADSHOW$ = GP.FN(PADR, GM.PADSHOW$, GM.PADW%)
+    IF GM.PADOP% = 1 THEN GM.PADSHOW$ = GP.FN(PADL, GM.PADSHOW$, GM.PADW%)
+    IF GM.PADOP% = 2 THEN GM.PADSHOW$ = GP.FN(PADC, GM.PADSHOW$, GM.PADW%)
+    GM.PADSHOW$ = MID$(STR$(GM.PADW%), 2) + "  [" + GM.PADSHOW$ + "]"
     GP.PRINTAT 6, 14 + GM.I, GM.PADSHOW$, THEME.CLR(THEME.TEXT)
   NEXT GM.I
   GM.TELL$ = GP.BSTR(BS.G.DATA, 6) : GOSUB GMX.TELL
@@ -2863,17 +2860,17 @@ GMX.G.PADS:
 
 
 ## ***********************************************************************
-## **  GMX.G.SPLIT -- one string into STR.FIELD$, and the count in STR.N.
+## **  GMX.G.SPLIT -- STR.SCAN finds the fields, GP.FN(FIELD, n) cuts one out.
+## **  Nothing is DIMmed here and no field is copied until it is printed.
 ## ***********************************************************************
 
 GMX.G.SPLIT:
   GM.GRP% = 6 : GOSUB GMX.G.SAY
   STR.STR$ = GP.BSTR(BS.G.DATA, 1)
-  STR.DELIM$ = "," : STR.MAX = 8
-  GOSUB STR.SPLIT
   GP.PRINTAT 4, 14, STR.STR$, THEME.CLR(THEME.WARN)
+  GP.SUB SCAN, STR.STR$, ","
   FOR GM.I = 1 TO STR.N
-    GP.PRINTAT 6, 15 + GM.I, "[" + STR.FIELD$(GM.I) + "]", THEME.CLR(THEME.TEXT)
+    GP.PRINTAT 6, 15 + GM.I, "[" + GP.FN(FIELD, GM.I) + "]", THEME.CLR(THEME.TEXT)
   NEXT GM.I
   GM.TELL$ = GP.BSTR(BS.G.DATA, 6)
   GOSUB GMX.TELL
@@ -2889,8 +2886,7 @@ GMX.G.REPLACE:
   GM.GRP% = 8 : GOSUB GMX.G.SAY
   STR.STR$ = GP.BSTR(BS.G.DATA, 2)
   GP.PRINTAT 6, 15, STR.STR$, THEME.CLR(THEME.WARN)
-  STR.FIND$ = GP.BSTR(BS.G.DATA, 3) : STR.REPL$ = GP.BSTR(BS.G.DATA, 4)
-  GOSUB STR.REPLACE
+  STR.STR$ = GP.FN(REPLACE, STR.STR$, GP.BSTR(BS.G.DATA, 3), GP.BSTR(BS.G.DATA, 4))
   GP.PRINTAT 6, 17, STR.STR$, THEME.CLR(THEME.TEXT)
   GM.TELL$ = GP.BSTR(BS.G.DATA, 6)
   GOSUB GMX.TELL : GM.RESULT$ = GP.BSTR(BS.G.DATA, 9)
@@ -3332,7 +3328,7 @@ GMX.F.EXOFF:
 ## **  GMX.F.ARRAY -- FILE.SAVEARRAY and FILE.LOADARRAY, out and back.
 ## **
 ## **  FILE.ROWS IS AN INPUT TO THE SAVE AND AN OUTPUT FROM THE LOAD, which is
-## **  the one thing about this pair worth carrying away. FILE.MAX is how many
+## **  the one thing about this pair worth carrying away. FILE.MAX.ROWS is how many
 ## **  rows the array can hold, and FILE.ROWS coming back equal to it means the
 ## **  file may have held more.
 ## **
@@ -3381,7 +3377,7 @@ GMX.F.ARRAY:
     FILE.LINE$(GM.I) = ""
   NEXT GM.I
 
-  FILE.MAX = 16
+  FILE.MAX.ROWS = 16
   GOSUB FILE.LOADARRAY
 ## ---- DIAGNOSTIC, AND IT COMES OUT AGAIN. FILE.ST is the ST the read loop
 ## ---- stopped on. Five rows on the drive coming back as one says the loop

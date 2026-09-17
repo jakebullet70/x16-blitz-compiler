@@ -1,46 +1,115 @@
-@4.17 COMBO.INC.BL -- a drop-down list that folds into one row
+@4.15 FILEIO.INC.BL -- the drive: status, files, directories
 .
-=4.17 COMBO.INC.BL -- A DROP-DOWN LIST THAT FOLDS INTO ONE ROW
+=4.15 FILEIO.INC.BL -- THE DRIVE: STATUS, FILES, DIRECTORIES
+.
+=WHAT IT COSTS
+.
+.    BASIC -- ordinary BASL in a .INC.BL, called with GOSUB. Free unless you
+.    #INCLUDE it.
 .
 =DESCRIPTION
 .
-.  COMBO.ADD
-.      IN: COMBO.X COMBO.Y COMBO.W COMBO.COUNT COMBO.SEL COMBO.BANK, over
-.        MENUVERT.ITEM$()
-.      OUT: COMBO.SEL
+.  FILE.STATUS
+.      IN: --
+.      OUT: FILE.ERR FILE.MSG$ FILE.TRK FILE.SEC
 .
-:MENUVERT.ITEM$(1) = " TEXAS"
-:MENUVERT.ITEM$(2) = " UTAH"
-:COMBO.X = GUI.INNER.LEFT : COMBO.Y = GUI.INNER.TOP
-:COMBO.W = 16 : COMBO.COUNT = 2 : COMBO.SEL = 1
-:GOSUB COMBO.ADD
-:' ... run the form ... the answer is in COMBO.SEL
+.  FILE.EXISTS
+.      IN: FILE.NAME$
+.      OUT: FILE.OK
 .
-.Only COMBO.ADD is called by an application. COMBO.DRAW, COMBO.KEY and
-.COMBO.OPEN are reached by GUI.FORM, which dispatches a GUI.CT.COMBO control
-.to them by name. The call goes between GUI.OPEN and GUI.FORM.RUN.
+.  FILE.SIZE
+.      IN: a name -- a verb, not a GOSUB
+.      OUT: FILE.OK FILE.BLOCKS
 .
-.COMBO.W is the width in cells, brackets included; 5 is the floor and
-.anything less is raised to it. COMBO.BANK is where the dropdown saves the
-.cells it covers, and 0 takes GUI.BANK -- which is what the dialog around it
-.is already using. The caller owns the DIM of MENUVERT.ITEM$().
+.  FILE.DELETE
+.      IN: FILE.NAME$, pattern allowed
+.      OUT: FILE.ERR FILE.TRK
 .
-.One combo to a dialog. The items are read out of MENUVERT.ITEM$ when the
-.dropdown opens and not when the control is added, because copying them would
-.mean a second array the same size. A second combo on the same form would
-.find the first one's items there.
+.  FILE.RENAME
+.      IN: FILE.NAME$ FILE.NEW$
+.      OUT: FILE.ERR
 .
-.A long list belongs in GUI.LISTBOX (SEC 4.12). The dropdown shows every item
-.at once: MENUVERT.RUN does not scroll, its own header says so, and a
-.scrolling key loop is the listbox's job rather than this one's.
+.  FILE.COPY
+.      IN: FILE.NAME$ FILE.NEW$
+.      OUT: FILE.ERR
 .
-.It is required by GUI.INC.BL, which names COMBO.DRAW and COMBO.KEY. BASLOAD
-.resolves every label in a file, so a program that includes the GUI and
-.leaves this one out stops with LABEL NOT FOUND whether it ever draws a combo
-.or not.
+.  FILE.MKDIR FILE.RMDIR FILE.CHDIR
+.      IN: FILE.NAME$
+.      OUT: FILE.ERR
+.
+.  FILE.UP
+.      IN: --
+.      OUT: FILE.ERR
+.
+.  FILE.CURDIR
+.      IN: --
+.      OUT: FILE.PATH$
+.
+.  FILE.SAVEARRAY
+.      IN: FILE.NAME$ FILE.ROWS FILE.LINE$()
+.      OUT: FILE.ERR
+.
+.  FILE.LOADARRAY
+.      IN: FILE.NAME$ FILE.MAX.ROWS
+.      OUT: FILE.ROWS FILE.LINE$()
+.
+:#SYMFILE "@:MYPROG.SYM"
+:#INCLUDE "FILEIO.INC.BL"
+:
+:FILE.NAME$ = "SCORES.DAT" : GOSUB FILE.EXISTS
+:IF FILE.OK THEN N = GP.FN(FILE.SIZE, "SCORES.DAT")
+.
+.The #SYMFILE is required, before the #INCLUDEs. FILE.TOPET is GP.ASM and
+.reaches FILE.PETP% through {VAR}; without a symbol file the compile stops at
+.{} NEEDS #SYMFILE.
+.
+.FILE.SIZE is declared with GP.DEFPROC, so it is called as a verb -- GP.SUB
+.FILE.SIZE, "MYFILE.DAT" or N = GP.FN(FILE.SIZE, "MYFILE.DAT") -- and not
+.with a GOSUB. Everything else in the table is a plain GOSUB.
+.
+.FILE.DEVICE is the drive and 0 means 8. FILE.ISO non-zero folds names to
+.PETSCII on the way out. FILE.LINE$() is the caller's DIM, as MENUVERT.ITEM$
+.is; left alone the implicit DIM gives 0 to 10. FILE.ROWS is an input to
+.SAVEARRAY and an output from LOADARRAY.
+.
+.FILE.ERR under 20 is success. 0 is OK. 1 is files scratched and carries the
+.count in FILE.TRK. 62 is FILE NOT FOUND, 63 FILE EXISTS, 26 WRITE PROTECT.
+.FILE.ERR is DS and FILE.MSG$ is DS$ -- the X16 has neither.
+.
+.This module takes logical file 14 and secondary address 14. Not 2 or 3:
+.those belong to the editor, GPC-HELP and the cruncher. The two are equal so
+.a later seek needs no reopen.
+.
+.ST is not a disk status. LINPUT# on a channel whose OPEN found nothing
+.returns CHR$(0) with ST = 66, and keeps doing so. ST is 64 before a
+.program's first statement, because LOAD leaves bit 6 set.
+.
+.The traps, each one measured on the drive:
+.
+.  - Read the command channel or the next OPEN misbehaves. The drive holds
+.    its error state until channel 15 is read. Every routine here ends by
+.    reading it.
+.  - FILE.RENAME onto a name that exists returns 62, not 63 -- which is what
+.    a missing source also returns. Test with FILE.EXISTS first.
+.  - FILE.COPY is one drive. C:new=old cannot cross devices. It takes a comma
+.    list, so it also concatenates.
+.  - FILE.SAVEARRAY overwrites, with @: on the open.
+.  - FILE.DELETE takes a pattern. S:*.BAK scratches every match.
+.  - The last row of a file arrives with ST already set, so a row is stored
+.    before the loop ends. A blank final line is indistinguishable from end
+.    of file and is dropped.
+.
+.CMDR-DOS has no REL files. For random access use ,M open mode with P and T
+.on channel 15:
+.
+:OPEN 1,8,2,"LEVEL.DAT,S,R"
+:OPEN 15,8,15,"P"+CHR$(2)+CHR$(0)+CHR$(1)+CHR$(0)+CHR$(0)
+.
+.T returns the position and the file size. The data channel's secondary
+.address must equal the P or T channel argument. VAL("$"+MID$(A$,10)) from
+.the manual returns 0 here -- VAL stops at the first non-numeric character,
+.so parse the eight hex digits by hand.
 .
 =SEE ALSO
 .
->75|4.12 GUI2.INC.BL -- a listbox, single or multi select
->80|4.17 COMBO.INC.BL -- a drop-down list that folds into one row
->74|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
+>95|4.15 FILEIO.INC.BL -- the drive: status, files, directories

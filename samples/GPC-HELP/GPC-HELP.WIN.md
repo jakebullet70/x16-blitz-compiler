@@ -1125,9 +1125,9 @@ while the object is written, so `BANKMGR` has to be told rather than asked:
 BANKMGR.WANT = GM.TEXTBANK : GOSUB BANKMGR.CLAIM
 ```
 
-**Compile SHARED.** The text is copied into its bank by the program's bootstrap, and an embedded
-program has none — the same rule `GP.BANKED` works to. An embedded build is refused rather than
-compiled into a program that reads an empty bank.
+**Compile SHARED.** The text goes into the program's one `NAME.OVL` file, which the shared
+bootstrap reads into its bank. An embedded program is one file, so an embedded compile stops at the
+first `GP.BANKEDSTR` with `GP.BANKEDSTR NEEDS SHARED`.
 
 **A group name is not a variable.** No `$`, no `%`, no `(` — any of those is a syntax error rather
 than something quietly ignored. A name that no block declared is a syntax error at the line that
@@ -1319,8 +1319,8 @@ and these are deliberately not spelled like it. Nothing happens at run time wher
 line is.
 
 This is how a program gets past the shared p-code ceiling. Low-memory p-code has to fit under the
-runtime — about 17,920 bytes, §7 — and a region does not count against it. Each region becomes its
-own overlay file, `NAME.004` for bank 4, written beside the `.PRG` and loaded with it.
+runtime — about 17,920 bytes, §7 — and a region does not count against it. Every region of the
+program goes into one overlay file, `NAME.OVL`, written beside the `.PRG` and read in with it.
 
 ```basic
 #DEFINE MY.GUICODE 4
@@ -1403,14 +1403,17 @@ instead. A plain `GOSUB` makes the banked call.
 a `GOSUB` with the bank after the address. Put a module called inside a tight loop in the same place
 as the loop.
 
-#### The overlay files
+#### The overlay file
 
-Each region is written out as `NAME.nnn`, `nnn` being the bank in three decimal digits, so bank 4
-is `NAME.004` and bank 122 is `NAME.122`. The file carries a two-byte load address like any PRG, so
-**the payload is the file size less two**, and the size is the page-padded region rather than the
-p-code in it.
+Every region of a program goes into one file, `NAME.OVL`, and the file says what is in it. Each
+region is introduced by two bytes — the bank it belongs in, then how many pages of it follow — and
+those pages come next. Then the next region, and so on to end of file. So **a region costs its
+padded page count plus two bytes**, the padding rather than the p-code in it, and the banks may be
+in any order with any gaps between them.
 
-A program's `.nnn` files ship beside its `.PRG` and must travel with it.
+`NAME.OVL` ships beside the `.PRG` and must travel with it. A missing or truncated one stops the
+program with `?OVL`, and a region for a bank the machine does not have stops it with `?RAM`.
+Reading it costs about a second at startup for 32K of regions, once per load.
 
 *See also: [7. Memory, and what the compiler tells you](#7-memory-and-what-the-compiler-tells-you), [4.18 `STASHVRAM.INC.BL` — rectangles and blobs, kept in VRAM](#418-stashvramincbl--rectangles-and-blobs-kept-in-vram), [3.10 Text in a bank](#310-text-in-a-bank), [3.9 Inline assembly](#39-inline-assembly), [4.6 `MENUVERT.INC.BL` — a vertical menu](#46-menuvertincbl--a-vertical-menu), [4.4 `LINEINPUT.INC.BL` — a positioned entry field](#44-lineinputincbl--a-positioned-entry-field), [4.11 `GUI.INC.BL` — four dialogs, in a box that puts the screen back](#411-guiincbl--four-dialogs-in-a-box-that-puts-the-screen-back), [4.12 `GUI2.INC.BL` — a listbox, single or multi select](#412-gui2incbl--a-listbox-single-or-multi-select)*
 
@@ -1441,9 +1444,9 @@ runtime and every `#INCLUDE` spends it; a region spends 8,192 bytes of a RAM ban
 not using. Bank what you can. A module called inside a loop goes where the loop is: a call between
 a region and anywhere outside it switches the bank twice.
 
-The banked form needs the program built SHARED. `GP.BANKED` reports `NOT IMPLEMENTED` in an
-embedded build, because the copy into the bank is the shared bootstrap's work and an embedded
-object has no bootstrap.
+The banked form needs the program built SHARED. The regions are in one `NAME.OVL` file, which the
+shared bootstrap reads into their banks. An embedded program is one file, so an embedded compile
+stops at the first `GP.BANKED` with `GP.BANKED NEEDS SHARED`.
 
 `samples/GPB-MODS-TESTING/PICKDEMO.BASL` is a complete program in this shape, in 99 lines.
 
@@ -1478,7 +1481,7 @@ one region to the other costs the same bank switches as a call from low memory.
 `DUPLICATE SYMBOL` where the module has no `#IFNDEF` guard. Where it has one, the module lands at
 the first `#INCLUDE` and the second produces nothing.
 
-§3.12 has the rules, what a region may not contain, and the `.nnn` files a banked program ships.
+§3.12 has the rules, what a region may not contain, and the `.OVL` file a banked program ships.
 
 *See also: [3.12 Code in a bank](#312-code-in-a-bank), [4.18 `STASHVRAM.INC.BL` — rectangles and blobs, kept in VRAM](#418-stashvramincbl--rectangles-and-blobs-kept-in-vram), [4.1 `THEME.INC.BL` — named colour roles](#41-themeincbl--named-colour-roles), [4.6 `MENUVERT.INC.BL` — a vertical menu](#46-menuvertincbl--a-vertical-menu), [4.4 `LINEINPUT.INC.BL` — a positioned entry field](#44-lineinputincbl--a-positioned-entry-field), [4.11 `GUI.INC.BL` — four dialogs, in a box that puts the screen back](#411-guiincbl--four-dialogs-in-a-box-that-puts-the-screen-back), [4.12 `GUI2.INC.BL` — a listbox, single or multi select](#412-gui2incbl--a-listbox-single-or-multi-select)*
 
@@ -2288,7 +2291,7 @@ could not call another bank. Fix one and fix the other. There are only the two, 
 | `FILE.UP` | — | `FILE.ERR` |
 | `FILE.CURDIR` | — | `FILE.PATH$` |
 | `FILE.SAVEARRAY` | `FILE.NAME$` `FILE.ROWS` `FILE.LINE$()` | `FILE.ERR` |
-| `FILE.LOADARRAY` | `FILE.NAME$` `FILE.MAX` | `FILE.ROWS` `FILE.LINE$()` |
+| `FILE.LOADARRAY` | `FILE.NAME$` `FILE.MAX.ROWS` | `FILE.ROWS` `FILE.LINE$()` |
 
 ```basic
 #SYMFILE "@:MYPROG.SYM"
@@ -2721,19 +2724,19 @@ directory buffer.
 
 | | |
 |---|---|
-| bank 4, `GPBMODS.004`, 7,938 bytes | `MENUVERT` `MENUBAR` `LINEINPUT` `GUI` `GUI2` |
-| bank 5, `GPBMODS.005`, 7,426 bytes | literal text, pool one |
-| bank 6, `GPBMODS.006`, 4,610 bytes | literal text, pool two |
-| bank 7, `GPBMODS.007`, 4,866 bytes | `APPSYS` `BANKMGR` `KB` `SORT` `STASHVRAM` `STASHVRAMGC` `STRCASE` `STRINGS` `STRUSING` |
-| bank 8, `GPBMODS.008`, 1,794 bytes | `FILEIO` `FILEDIR` |
-| bank 9, `GPBMODS.009`, 770 bytes | `THEME` |
-| bank 10, `GPBMODS.010`, 1,538 bytes | `COMBO` `CHECK` |
-| bank 11, `GPBMODS.011`, 3,074 bytes | the two biggest dropdown handlers, this program's own code |
+| bank 4, 7,936 bytes | `MENUVERT` `MENUBAR` `LINEINPUT` `GUI` `GUI2` |
+| bank 5, 7,424 bytes | literal text, pool one |
+| bank 6, 4,608 bytes | literal text, pool two |
+| bank 7, 4,864 bytes | `APPSYS` `BANKMGR` `KB` `SORT` `STASHVRAM` `STASHVRAMGC` `STRCASE` `STRINGS` `STRUSING` |
+| bank 8, 1,792 bytes | `FILEIO` `FILEDIR` |
+| bank 9, 768 bytes | `THEME` |
+| bank 10, 1,536 bytes | `COMBO` `CHECK` |
+| bank 11, 3,072 bytes | the two biggest dropdown handlers, this program's own code |
 
-Six of those are `GP.BANKED` code regions (§3.12) and two are `GP.BANKEDSTR` text pools (§3.10). One
-`.nnn` file is written per bank. Each loads to `$A000` in its own bank and carries a two-byte load
-address like any PRG, so a payload is the file size less two. The resident object is 11,523 bytes
-and the overlays are 32,016 between them.
+Six of those are `GP.BANKED` code regions (§3.12) and two are `GP.BANKEDSTR` text pools (§3.10).
+All eight are in one `GPBMODS.OVL`, each behind its own bank and page-count bytes. The resident
+object is 11,523 bytes and the overlay is 32,016 -- the eight regions come to 32,000 between them
+and the sixteen header bytes are the rest.
 
 **Only what holds a `BANK` statement stays in low RAM.** `STASH` and `STASHFILE` execute `BANK`,
 which the compiler refuses inside a region; `STASHVRAM` (§4.18) is the one to reach for from inside
@@ -2742,8 +2745,8 @@ one.
 **Six regions and not one**, because a region holds at most 8,192 bytes and the GUI fills its own.
 A region may call another: the call selects the other bank and its `RETURN` puts the caller's back.
 
-**A nearly empty region still costs a whole page count.** Bank 9 holds 502 bytes of `THEME` in a
-768-byte overlay. Below about a page and a half of p-code, a region gives back less than it looks
+**A nearly empty region still costs a whole page count.** Bank 9 holds 502 bytes of `THEME` in
+three pages. Below about a page and a half of p-code, a region gives back less than it looks
 like. Bank 10 held 705 bytes of `COMBO` in 768 the same way, until `CHECK` moved in beside it.
 
 #### The text is in a bank
@@ -3117,15 +3120,15 @@ Needs a `#SYMFILE` — `FILE.TOPET` is a `GP.ASM` blob.
 
 | | |
 |---|---|
-| in | `FILE.NAME$` — the file every routine acts on<br>`FILE.NEW$` — the second name, `RENAME` and `COPY`<br>`FILE.DEVICE` — the drive; 0 means 8<br>`FILE.ISO` — non-zero converts names to PETSCII on the way out<br>`FILE.N` — rows to write, `SAVEARRAY`<br>`FILE.MAX` — rows that will fit, `LOADARRAY`; 0 means 10<br>`FILE.LINE$()` — the rows; **the caller owns the `DIM`** |
-| out | `FILE.ERR` `FILE.MSG$` `FILE.TRK` `FILE.SEC` — the command channel<br>`FILE.OK` — `FILE.EXISTS`<br>`FILE.N` — rows read, `LOADARRAY`<br>`FILE.PATH$` — `FILE.CURDIR` |
+| in | `FILE.NAME$` — the file every routine acts on<br>`FILE.NEW$` — the second name, `RENAME` and `COPY`<br>`FILE.DEVICE` — the drive; 0 means 8<br>`FILE.ISO` — non-zero converts names to PETSCII on the way out<br>`FILE.ROWS` — rows to write, `SAVEARRAY`<br>`FILE.MAX.ROWS` — rows that will fit, `LOADARRAY`; 0 means 10<br>`FILE.LINE$()` — the rows; **the caller owns the `DIM`** |
+| out | `FILE.ERR` `FILE.MSG$` `FILE.TRK` `FILE.SEC` — the command channel<br>`FILE.OK` — `FILE.EXISTS`<br>`FILE.ROWS` — rows read, `LOADARRAY`<br>`FILE.PATH$` — `FILE.CURDIR` |
 | internal | `FILE.CMDSTR$` `FILE.OUT$` `FILE.RAW$` `FILE.ROW$` `FILE.ST` `FILE.KEEP` `FILE.I` `FILE.PETP%` |
 | constants | `FILE.OKMAX` `FILE.NOTFOUND` `FILE.EXISTSERR` `FILE.PROTECTED` `FILE.CHAN` |
 
 **This module is the missing `DS` and `DS$`.** `FILE.ERR` is `DS` and `FILE.MSG$` is `DS$`. `ST` is
 *not* a disk status — it is the KERNAL's serial bus status and cannot report `FILE NOT FOUND`.
 
-`FILE.N` is both an input and an output, the way `MENUVERT.SEL` is. `FILE.LINE$()` is the caller's
+`FILE.ROWS` is both an input and an output, the way `MENUVERT.SEL` is. `FILE.LINE$()` is the caller's
 `DIM`, like `MENUVERT.ITEM$` and unlike `THEME.CLR`.
 
 #### `FILEDIR.INC.BL`
@@ -3188,7 +3191,7 @@ Plain BASL: no `GP.*` keyword and no `GP.ASM`, so it needs neither `GPB.INC.BL` 
 | internal | `KV.READY` `KV.CODE%()` `KV.HIT` `KV.ADDR` `KV.INDEX` `KV.PADDED$` `KV.LENGTH` `KV.BYTE` `KV.MAGIC$` `KV.ERR` `KV.MSG$` `KV.TRACK` `KV.SECTOR` |
 | constants | `KV.BANK` `KV.BASE` `KV.TOP` `KV.SLOTS` `KV.SIZE` `KV.MAXLEN` `KV.VERSION` `KV.DEFS` |
 
-`KV.SLOT` is both an input and an output, the way `FILE.N` is. `KV.AT` writes `KV.KEY$`, so a loop
+`KV.SLOT` is both an input and an output, the way `FILE.ROWS` is. `KV.AT` writes `KV.KEY$`, so a loop
 over the slots keeps its own key in a variable of its own.
 
 #### `MENUVERT.INC.BL`
@@ -3685,7 +3688,7 @@ which of your strings was asking.
 
 `LOW CODE` and `LOW FREE` describe low memory only. **P-code inside a `GP.BANKED` region (§3.12) is
 not in either figure**, and neither is a `GP.ASM` block in the region without `LOW`. The region is
-reported on its own `BANK` line and written to its own `NAME.nnn` overlay file. Moving a module into
+reported on its own `BANK` line and written into the program's `NAME.OVL` overlay file. Moving a module into
 a region takes its bytes off `LOW CODE` and gives them to `LOW FREE`.
 
 What a region costs instead:
@@ -3695,8 +3698,9 @@ What a region costs instead:
 - **A byte a call site, and two bank switches a call.** A call into the region from outside it, or
   out of it to low memory, is a `.bgosub`, one byte longer than a `GOSUB`. `RETURN` selects the
   caller's bank again.
-- **A file that has to travel.** The `.nnn` files ship beside the `.PRG`. A program whose overlays
-  are missing loads and then fails where it first calls into one.
+- **A file that has to travel.** `NAME.OVL` ships beside the `.PRG`. A program without it, or
+  with a truncated one, stops with `?OVL` before it runs.
+- **A second or so of startup**, once per load, while the bootstrap reads the overlay in.
 
 Banked text is the same bargain on the data side: a `GP.BANKEDSTR` group (§3.10) is out of the
 workspace, and inside a region it costs no p-code at all.

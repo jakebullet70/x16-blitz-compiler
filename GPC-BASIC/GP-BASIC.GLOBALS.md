@@ -74,7 +74,9 @@ The full keyword list lives in `GPC-BASIC/GPB.INC.BL`.
 Each table is **in** (set before the `GOSUB`), **out** (read after it), and **internal** (do not
 read, do not write, do not rely on).
 
-### `THEME.INC.BL`
+### `THEME.INC.BL` — named colour roles
+
+Routines, arguments and examples: §4.1.
 
 | | |
 |---|---|
@@ -83,19 +85,25 @@ read, do not write, do not rely on).
 | internal | `THEME.READY` |
 | constants | `THEME.PAGE` `THEME.TEXT` `THEME.TITLE` `THEME.BORDER` `THEME.HILITE` `THEME.DIMMED` `THEME.WARN` `THEME.FOCUS` `THEME.SLOTS` `THEME.COUNT` |
 
+To use it: set `THEME.ID`, `GOSUB THEME.SELECT`, then index `THEME.CLR()` with a role wherever a
+drawing routine wants an attribute. §4.1 is the module's own entry, with the five themes and the
+other four routines.
+
+```basic
+THEME.ID = 1 : GOSUB THEME.SELECT
+GP.PRINTAT 2, 2, "READY", THEME.CLR(THEME.TEXT)
+```
+
 `THEME.CLR` is the array this module `DIM`s. Do not `DIM` it yourself — the module owns it, and
 `DIM`ming an array GPC has already dimensioned is an error.
-
-**The routine is `THEME.SELECT`, and it used to be `THEME.LOAD`.** The name changed when the
-library was split into banked and low-memory files, and it stayed when they were merged again; a
-program written against the older library calls `THEME.LOAD` and stops with `LABEL NOT FOUND`,
-which is the good kind of failure.
 
 `THEME.FOCUS` is the eighth role and the newest: the attribute a focused control wears while
 `GUI.FORM` has the keyboard. `THEME.SLOTS` is 8 because of it, and `THEME.COUNT` stays 5 — the
 first is how many roles there are, the second how many themes.
 
-### `APPSYS.INC.BL`
+### `APPSYS.INC.BL` — start politely, leave it as you found it
+
+Routines, arguments and examples: §4.3.
 
 | | |
 |---|---|
@@ -107,7 +115,9 @@ first is how many roles there are, the second how many themes.
 Lay the screen out from `APPSYS.COLS` and `APPSYS.ROWS`. Do not assume 80x60 —
 the X16 boots there but `SCREEN 0` is 40×30, and someone who prefers larger text is running one.
 
-### `STRINGS.INC.BL`
+### `STRINGS.INC.BL` — string helpers
+
+Routines, arguments and examples: §4.2.
 
 | | |
 |---|---|
@@ -121,7 +131,9 @@ the X16 boots there but `SCREEN 0` is 40×30, and someone who prefers larger tex
 one or the other. This is the opposite of `THEME.CLR`, which the module owns outright; the two are
 worth keeping straight.
 
-### `STRUSING.INC.BL`
+### `STRUSING.INC.BL` — a number to a template
+
+Routines, arguments and examples: §4.10.
 
 | | |
 |---|---|
@@ -141,7 +153,9 @@ The prefix is `STR.USING.`, a sub-prefix of `STRINGS.INC.BL`'s `STR.`, on the sa
 `FILE.DIR.` inside `FILE.`. Nothing here is written by `STRINGS.INC.BL` and nothing there is
 written by this module, so either can be included alone.
 
-### `KB.INC.BL`
+### `KB.INC.BL` — the keyboard buffer, emptied
+
+Routines, arguments and examples: §4.14.
 
 | | |
 |---|---|
@@ -150,7 +164,9 @@ written by this module, so either can be included alone.
 
 One routine, `KB.CLEARKB`, and one variable it drains into. Nothing else is in the prefix.
 
-### `LINEINPUT.INC.BL`
+### `LINEINPUT.INC.BL` — a positioned entry field
+
+Routines, arguments and examples: §4.4.
 
 | | |
 |---|---|
@@ -163,7 +179,9 @@ One routine, `KB.CLEARKB`, and one variable it drains into. Nothing else is in t
 *displayed*, which is what you want if you are repainting a masked field yourself. `FORM.EXP.BL`
 uses it for exactly that.
 
-### `BMX.INC.BL`
+### `BMX.INC.BL` — a BMX bitmap into VERA
+
+Routines, arguments and examples: §4.5.
 
 | | |
 |---|---|
@@ -182,24 +200,28 @@ first
 rather than `0` switches the stash off: `0` already means "never set". `BMX.KEPT` is the once-per-run
 guard that makes a slideshow restore the *machine's* palette rather than the previous picture's.
 
-### `FILEIO.INC.BL`
+### `FILEIO.INC.BL` — the drive: status, files, directories
+
+Routines, arguments and examples: §4.15.
 
 Needs a `#SYMFILE` — `FILE.TOPET` is a `GP.ASM` blob.
 
 | | |
 |---|---|
-| in | `FILE.NAME$` — the file every routine acts on<br>`FILE.NEW$` — the second name, `RENAME` and `COPY`<br>`FILE.DEVICE` — the drive; 0 means 8<br>`FILE.ISO` — non-zero converts names to PETSCII on the way out<br>`FILE.N` — rows to write, `SAVEARRAY`<br>`FILE.MAX` — rows that will fit, `LOADARRAY`; 0 means 10<br>`FILE.LINE$()` — the rows; **the caller owns the `DIM`** |
-| out | `FILE.ERR` `FILE.MSG$` `FILE.TRK` `FILE.SEC` — the command channel<br>`FILE.OK` — `FILE.EXISTS`<br>`FILE.N` — rows read, `LOADARRAY`<br>`FILE.PATH$` — `FILE.CURDIR` |
+| in | `FILE.NAME$` — the file every routine acts on<br>`FILE.NEW$` — the second name, `RENAME` and `COPY`<br>`FILE.DEVICE` — the drive; 0 means 8<br>`FILE.ISO` — non-zero converts names to PETSCII on the way out<br>`FILE.ROWS` — rows to write, `SAVEARRAY`<br>`FILE.MAX.ROWS` — rows that will fit, `LOADARRAY`; 0 means 10<br>`FILE.LINE$()` — the rows; **the caller owns the `DIM`** |
+| out | `FILE.ERR` `FILE.MSG$` `FILE.TRK` `FILE.SEC` — the command channel<br>`FILE.OK` — `FILE.EXISTS`<br>`FILE.ROWS` — rows read, `LOADARRAY`<br>`FILE.PATH$` — `FILE.CURDIR` |
 | internal | `FILE.CMDSTR$` `FILE.OUT$` `FILE.RAW$` `FILE.ROW$` `FILE.ST` `FILE.KEEP` `FILE.I` `FILE.PETP%` |
 | constants | `FILE.OKMAX` `FILE.NOTFOUND` `FILE.EXISTSERR` `FILE.PROTECTED` `FILE.CHAN` |
 
 **This module is the missing `DS` and `DS$`.** `FILE.ERR` is `DS` and `FILE.MSG$` is `DS$`. `ST` is
 *not* a disk status — it is the KERNAL's serial bus status and cannot report `FILE NOT FOUND`.
 
-`FILE.N` is both an input and an output, the way `MENUVERT.SEL` is. `FILE.LINE$()` is the caller's
+`FILE.ROWS` is both an input and an output, the way `MENUVERT.SEL` is. `FILE.LINE$()` is the caller's
 `DIM`, like `MENUVERT.ITEM$` and unlike `THEME.CLR`.
 
-### `FILEDIR.INC.BL`
+### `FILEDIR.INC.BL` — a directory, into a bank or into low RAM
+
+Routines, arguments and examples: §4.16.
 
 Needs `FILEIO.INC.BL`, and a `#SYMFILE` — it is two `GP.ASM` blobs.
 
@@ -223,7 +245,9 @@ assembly to write into, and creates every `{VAR}` slot. **Do not assign `FILE.NA
 `FILE.NAME$` is shared with `FILEIO` on purpose: the name a picker chose is the name `FILE.EXISTS`
 and `FILE.DELETE` want.
 
-### `STASHVRAM.INC.BL`
+### `STASHVRAM.INC.BL` — rectangles and blobs, kept in VRAM
+
+Routines, arguments and examples: §4.18.
 
 Needs `GPB.INC.BL`, and **no `#SYMFILE`** — there is no `GP.ASM` in it. The cells never leave
 VRAM: one data port reads, the other writes, and `memory_copy` moves between them without
@@ -248,7 +272,9 @@ That is the difference from `STASH.INC.BL`, which cannot.
 **WARNING: `BMX.STASH` defaults to `$13000`, inside the default window.** A program using both
 must move one of them. There is one allocator and no collision check.
 
-### `KV.INC.BL`
+### `KV.INC.BL` — keys and values in one RAM bank
+
+Routines, arguments and examples: §4.20.
 
 Plain BASL: no `GP.*` keyword and no `GP.ASM`, so it needs neither `GPB.INC.BL` nor a `#SYMFILE`.
 
@@ -259,10 +285,12 @@ Plain BASL: no `GP.*` keyword and no `GP.ASM`, so it needs neither `GPB.INC.BL` 
 | internal | `KV.READY` `KV.CODE%()` `KV.HIT` `KV.ADDR` `KV.INDEX` `KV.PADDED$` `KV.LENGTH` `KV.BYTE` `KV.MAGIC$` `KV.ERR` `KV.MSG$` `KV.TRACK` `KV.SECTOR` |
 | constants | `KV.BANK` `KV.BASE` `KV.TOP` `KV.SLOTS` `KV.SIZE` `KV.MAXLEN` `KV.VERSION` `KV.DEFS` |
 
-`KV.SLOT` is both an input and an output, the way `FILE.N` is. `KV.AT` writes `KV.KEY$`, so a loop
+`KV.SLOT` is both an input and an output, the way `FILE.ROWS` is. `KV.AT` writes `KV.KEY$`, so a loop
 over the slots keeps its own key in a variable of its own.
 
-### `MENUVERT.INC.BL`
+### `MENUVERT.INC.BL` — a vertical menu
+
+Routines, arguments and examples: §4.6.
 
 | | |
 |---|---|
@@ -279,7 +307,9 @@ you want; set it to 0 when it is not.
 documented arguments to `MENUVERT.ROW`, which is public: they are internal to `MENUVERT.RUN`, not to
 you. `MENUVERT.HOTFIND` reads the first two and answers in `MENUVERT.HOTAT`.
 
-### `MENUBAR.INC.BL`
+### `MENUBAR.INC.BL` — a horizontal menu
+
+Routines, arguments and examples: §4.9.
 
 | | |
 |---|---|
@@ -301,7 +331,9 @@ a vertical menu.
 than swallowing it, so the caller can open the dropdown and hand control on. `MENUVERT`'s
 `MENUHELP.KEYEXIT` is the other half of the same handshake.
 
-### `GUI.INC.BL`
+### `GUI.INC.BL` — four dialogs, in a box that puts the screen back
+
+Routines, arguments and examples: §4.11.
 
 | | |
 |---|---|
@@ -333,7 +365,9 @@ the one rename here that fails silently.
 `GUI.CTRL.*` are the seven parallel arrays that are the control block: one element a control, up to
 `GUI.FORM.MAX`. `GUI.INC.BL` `DIM`s them. Do not `DIM` them yourself.
 
-### `GUI2.INC.BL`
+### `GUI2.INC.BL` — a listbox, single or multi select
+
+Routines, arguments and examples: §4.12.
 
 | | |
 |---|---|
@@ -349,7 +383,7 @@ types, and lives in `GUI.INC.BL` beside the field. `GUI2.INC.BL` is the dialog a
 open, hand the control its geometry, add a button row, run the form, answer. That is why the
 internals here are three variables and not thirty — the `GUI.LIST.*` set does the work.
 
-### `STASH.INC.BL`
+### `STASH.INC.BL` — save a text rectangle, and put it back
 
 | | |
 |---|---|
@@ -374,14 +408,16 @@ offset into the bank, and the offset just past what was written, so one bank hol
 rectangles instead of one a level. They are in `samples/GPB-MODS-TESTING/GPC-BASIC/STASH.INC.BL`
 and have not reached the root library yet. Until they do, one rectangle a bank.
 
-### `STASHFILE.INC.BL`
+### `STASHFILE.INC.BL` — a saved text rectangle, through a file
 
 `STASH.FILE.SAVE`, `STASH.FILE.LOAD` and `STASH.FILE.PUT`, and **no variables of its own** — it sets
 `STASH.*` and calls through. The prefix exists to keep the three routine names apart from the rest
 of `STASH.`, not to hold state. Kept a separate `#INCLUDE`: unless the compile removes dead code, the
 disk half is 127 bytes a program that never writes one would still carry.
 
-### `SORT.INC.BL`
+### `SORT.INC.BL` — shell sort a string array
+
+Routines, arguments and examples: §4.7.
 
 | | |
 |---|---|
@@ -397,7 +433,9 @@ Also needs a `#SYMFILE`. **255 elements**, so `DIM A$(254)` is the largest; beyo
 is 0 rather than a wrong answer. String arrays only. It moves 2-byte pointers rather than string
 data, so a swap is cheap and the array's own storage never moves.
 
-### `STRCASE.INC.BL`
+### `STRCASE.INC.BL` — case, in place
+
+Routines, arguments and examples: §4.8.
 
 | | |
 |---|---|
@@ -492,10 +530,10 @@ which is still true. `IF` itself tests non-zero, so `IF FLAG THEN` works either 
 `IF FLAG = 1 THEN` is the spelling that breaks.
 
 ```basic
-IF GUI.OK THEN <accepted>            ' yes
-IF NOT GUI.OK THEN <cancelled>       ' yes
-IF GUI.OK = 0 THEN <cancelled>       ' yes
-IF GUI.OK = 1 THEN <accepted>        ' NO -- it is -1
+IF GUI.OK THEN <accepted> : REM yes
+IF NOT GUI.OK THEN <cancelled> : REM yes
+IF GUI.OK = 0 THEN <cancelled> : REM yes
+IF GUI.OK = 1 THEN <accepted> : REM NO -- it is -1
 ```
 
 **A flag the CALLER sets is read as non-zero**, so `LINEINPUT.MASK = 1` and `STASH.MOVE = 1`
