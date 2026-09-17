@@ -13,6 +13,7 @@ sibling project: what is kept is a fact about **X16 BASIC or the X16 itself**, n
 - [Review findings must be reachable](review-findings-must-be-reachable.md) — drop anything only invalid source or a typo triggers
 - [Measure before changing code](measure-before-changing-code.md) — probes beat edit-and-see
 - [Prose style is flat reference](prose-style-is-flat-reference.md) — the five settled rules; `doc-style` owns them
+- [Help topics: current behaviour only](help-topic-writing-rules.md) — the standing brief; a topic you edit gets rewritten to it
 - [Write readable code, user crunches](write-readable-code-user-crunches.md) — one statement a line; an unexplained SRC edit is his crunch pass
 - [Comments light, code should flow](comments-light-code-should-flow.md) — heavy REMs mean bad naming
 - [No ship language, no unasked builds](no-ship-language-this-is-dev.md) — no build, no help regen, unless asked
@@ -59,6 +60,7 @@ sibling project: what is kept is a fact about **X16 BASIC or the X16 itself**, n
 - [RETURN unwinds frames](gpc-return-unwinds-frames.md) — RETURN out of FOR/GP.DO/GP.SELECT is safe
 - [GP.ASM fixups retired by two passes](gpasm-fixups-retired-by-two-passes.md) — the 128-reference cap is gone
 - [GP.ASM implementation status](gpasm-implementation-status.md) — shipped; dotted {VAR} names, self-patching operands
+- [GP.ASM label cannot start with A](gpasm-label-cannot-start-with-a.md) — the operand parser tests for accumulator mode first; a real defect
 - [GP.ASM inline assembly research](gpasm-inline-assembly-research.md) — where the doc is, what is still open
 - [GP.ASM blobs may use zTemp0/1/2](gpasm-blob-may-use-ztemp.md) — SYS already clobbers zTemp0
 - [GP.STRPTR points at the length byte](gp-strptr-points-at-the-length-byte.md) — text starts at +1
@@ -72,6 +74,7 @@ sibling project: what is kept is a fact about **X16 BASIC or the X16 itself**, n
 - [Core page cushion below GPBase](gpc-core-page-cushion-below-gpbase.md) — 52 B left in the embedded image since build 123; measure from rtimage.lbl
 - [Compiler-emitted bank switch](compiler-emitted-bank-switch.md) — TODO item 4: .bgosub emitted, twins merged and shims deleted; built, tested and committed 2026-09-14; a GOTO into a region from outside it is refused since 2026-09-14
 - [Banks work in progress](banks-work-in-progress.md) — ALL-BANKS done (banktest3, gpctest and GPBMODS pass; banks 2-255, region cap 127); HANDLER-BANK finished at step 28; ALL-BANKS and handler steps 8-28 uncommitted
+- [GPBMODS OUT OF MEMORY $02B8](gpbmods-out-of-memory-02b8.md) — FIXED 2026-09-17: StartRuntime never set X, so the DIM prologue pushed into zero page; ldx #$FF added
 - [Opcode numbers follow handler order](opcode-numbers-follow-handler-order.md) — moving a `;;` handler renumbers p-code; open a section per handler instead
 - [Runtime footprint](blitz-x16-runtime-footprint.md) — 10,956 B in every program, and how to shrink it
 - [String heap scavenger](string-heap-scavenger.md) — SHIPPED: dead blocks reused, +1 page RT
@@ -87,6 +90,10 @@ sibling project: what is kept is a fact about **X16 BASIC or the X16 itself**, n
 - [STASH leaves its bank selected — FIXED](stash-leaves-its-bank-selected.md) — it now restores the caller's bank
 - [color-test sample state](color-test-sample-state.md) — parked 2026-09-06; four loose ends
 - [XBase engine planned](xbase-engine-planned.md) — skeleton on disk, GUI in bank 4, 255 bytes a record to find
+
+- [GPC.GUI: defs into a folder next](gpc-gui-next-defs-in-a-folder.md) — GPC-GUI-DATA, asked 2026-09-16, not started
+- [GPC.GUI size is not a constraint](gpc-gui-size-not-a-constraint.md) — do not price sample features in bytes
+- [BUILD ALL: a sixth GPC.INPUT line](gpc-input-sixth-line-chain.md) - agreed route, asm not written
 
 ## The editor sample
 - [Editor branch state, GUI next](gpc-editor-branch-and-gui-next.md) — the self-check lines to keep green
@@ -142,8 +149,9 @@ sibling project: what is kept is a fact about **X16 BASIC or the X16 itself**, n
 - [GP.BANKEDSTR: literal text in a bank](gp-bankedstr-literal-text-in-a-bank.md) — BUILT; +3,840 B on GPBMODS
 - [Object file must fit under the runtime](object-file-must-fit-under-the-runtime.md) — regions were invisible to the fit check
 - [Wildcard scratch eats the source](wildcard-scratch-eats-the-source.md) — S0:NAME.B* matches NAME.BASL
-- [Every region gets its own .nnn file](region-overlay-ovl-file.md) — BUILT; banks 2-255, 127 regions; a .nnn size is a PAGE COUNT unless topmost
+- [One NAME.OVL holds every region](region-overlay-ovl-file.md) — BUILT; banks 2-255, 127 regions; bank and page count ahead of each region, read through ACPTR
 - [Object writer: regions vs low code](object-writer-regions-vs-low-code.md) — the streamer pads forward 65,535 bytes with no check firing
+- [Overlay inside the PRG: research](overlay-in-prg-research.md) - the option C plan came out of it; a LOADed file caps at 39,679 bytes total
 - [A second region for the utilities](second-region-for-the-utilities.md) — BUILT; a BANK statement is the ONLY disqualifier; regions call each other, a GOTO across is refused
 - [Banked code loses the bank on a call out](gp-banked-call-out-loses-the-bank.md) — a region may not BANK itself back; every call into a region is now .bgosub, library shims gone
 - [FILEDIR banks whole](filedir-bank-split.md) — BUILT; the switch moved into its two blobs

@@ -640,6 +640,11 @@ StartRuntime:
 		;		Main Run Loop
 		;
 		ldy 	#0
+		ldx 	#$FF 					; empty the numeric stack. Nothing else did this: the run
+									; loop was entered with whatever X SetErrorHandler left, and
+									; only new.line ever reset it. A program whose first p-code
+									; pushes before any new.line -- the implicit DIM prologue
+									; does -- wrapped its stores round into zero page.
 		bra 	NextCommand 				; step over the break check and the bank routines below
 		;
 		;		The Ctrl+C poll, lifted out of the dispatch path. It runs once every 16 p-code
