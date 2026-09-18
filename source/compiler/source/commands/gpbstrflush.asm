@@ -51,11 +51,14 @@
 ;		THE IMAGE, all offsets from $A000, which is where the bank window is:
 ;
 ;			+0		string count, 16 bit
-;			+2		count * 16-bit offsets, each the offset of one record from $A000
-;			...		the records, [length][characters] back to back
+;			+2		count * 16-bit offsets, each the offset from $A000 of one record's LENGTH byte
+;			...		the records, [capacity][length][capacity bytes] back to back
+;
+;		AN OFFSET NAMES THE LENGTH AND NOT THE CAPACITY, so GP.BSTR finds its length where it
+;		always did, and GP.BSTRSET finds the capacity one byte below.
 ;
 ;		THE DIRECTORY IS BUILT BY WALKING THE POOL, not read out of a table beside it. Every record
-;		starts with its own length, so the offsets follow from the records -- and a record's offset
+;		starts with its own capacity, so the offsets follow from the records -- and a record's offset
 ;		from $A000 could not have been stored when it was appended anyway, because the directory it
 ;		sits behind is not sized until the last block has closed.
 ;
@@ -145,8 +148,8 @@ _BFDirLoop:
 		lda 	bstrIdx+1
 		sbc 	bstrPoolLen+1
 		bcs 	_BFDirDone
-		clc 								; the offset from $A000: past the directory
-		lda 	bstrIdx
+		sec 								; the offset from $A000: past the directory, and SEC for
+		lda 	bstrIdx 					; the capacity byte, so it lands on the length
 		adc 	bstrDirLen
 		sta 	bstrTemp
 		lda 	bstrIdx+1
@@ -157,11 +160,15 @@ _BFDirLoop:
 		lda 	bstrTemp+1
 		jsr 	WriteCodeByte
 		;
-		jsr 	BStrPoolByte 				; the record's length byte, and step over the record
+		jsr 	BStrPoolByte 				; the record's capacity, and step over the record
 		sec
-		adc 	bstrIdx 					; SEC, so this is length + 1: the length byte too
+		adc 	bstrIdx 					; SEC, so this is capacity + 1: the capacity byte too...
 		sta 	bstrIdx
-		bcc 	_BFDirLoop
+		bcc 	_BFDirLength
+		inc 	bstrIdx+1
+_BFDirLength:
+		inc 	bstrIdx 					; ...and one more for the length byte
+		bne 	_BFDirLoop
 		inc 	bstrIdx+1
 		bra 	_BFDirLoop
 _BFDirDone:
@@ -443,4 +450,5 @@ bstrStart: 									; where pass one began the region -- ClaimRegionTop
 ;		Date			Notes
 ;		==== 			=====
 ;		07/09/26		Written.
+;		18/09/26		Records carry a capacity byte; the directory still names the length.
 ;

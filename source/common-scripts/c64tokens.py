@@ -143,7 +143,7 @@ class C64TokenStore(object):
 				52826:GP.ASM|52825:GP.ENDASM|
 				52824:GP.CHAR|
 				52823:GP.BANKED|52822:GP.ENDBANKED|
-				52821:GP.BSTR|52820:GP.BSTRCOUNT|
+				52821:GP.BSTR|52820:GP.BSTRCOUNT|52813:GP.BSTRSET|
 				52819:GP.BANKEDSTR|52818:GP.ENDBANKEDSTR|
 				52817:GP.DEFPROC|52816:GP.SUB|
 				52815:GP.FN|52814:RETURNS"""
@@ -167,6 +167,10 @@ class C64TokenStore(object):
 	#		variable slot, so it could never reallocate. It is STR.PAD in BASL now
 	#		(GPC-BASIC/STRINGS.INC.BL). GP.LTRIM took the slot the same day; nothing tokenised
 	#		with GP.PAD ever left the scratchpad, so there is no stale PRG to mis-read it.
+	#
+	#		52813 GP.BSTRSET is listed beside GP.BSTR, out of id order. GP.BSTR being a prefix of it
+	#		is harmless, as it is for GP.BSTRCOUNT: BASLOAD looks up a whole dotted name, and
+	#		tokenise.py tries the longest match first.
 	#
 
 

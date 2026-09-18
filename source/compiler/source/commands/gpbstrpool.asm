@@ -33,8 +33,12 @@
 ;		reachable at a time, which is what lets every pool sit at $A000 and the routines below not
 ;		know there is more than one.
 ;
+;		A RECORD IS [capacity][length][capacity bytes], and the capacity is what GP.BSTRSET cuts a
+;		string to. A quoted line has capacity = length = its character count; SPC(n) has capacity n,
+;		length 0 and n filler bytes.
+;
 ;		THERE IS NO TABLE OF POOL OFFSETS, and there was: the pool is SELF-DESCRIBING, because
-;		every record starts with its own length, so the flush works the offsets out by walking it.
+;		every record starts with its own capacity, so the flush works the offsets out by walking it.
 ;		Keeping them in a parallel table meant the same fact written twice and two chances to
 ;		disagree -- which is exactly what happened, and cost an afternoon: every directory entry
 ;		but the first came out as zero while the records themselves were perfect.
@@ -61,9 +65,9 @@ BSTR_MAX_GROUPS  = 128
 ;
 ;		4,096 IS THE SLOT FIELD'S OWN CEILING and not a budget: a GP.BSTR call site pushes
 ;		slot<<12 + the index, so twelve bits are what is left for the index. It caps nothing --
-;		an 8K bank holds at most 2,730 strings, two directory bytes and a length byte each, so
-;		the region's 8K check always stops a bank first. It is here to keep the packing honest
-;		rather than to refuse a program anything.
+;		an 8K bank holds at most 2,047 strings, two directory bytes and a capacity and a length
+;		byte each, so the region's 8K check always stops a bank first. It is here to keep the
+;		packing honest rather than to refuse a program anything.
 ;
 BSTR_MAX_STRINGS = 4096 					; strings in ONE bank -- the index field's range
 
@@ -174,8 +178,9 @@ _BFGHit:
 ;		Append the body line's string to the pool. The opening quote is already consumed; this
 ;		reads to the closing one and requires end of line after it.
 ;
-;		THE LENGTH GOES IN FIRST AND IS PATCHED, not counted ahead: counting would mean walking
-;		the source twice, and the source pointer is the only cursor there is.
+;		THE CAPACITY AND THE LENGTH GO IN FIRST AND ARE PATCHED, not counted ahead: counting would
+;		mean walking the source twice, and the source pointer is the only cursor there is. A
+;		quoted line's capacity is its length, so both bytes get the same count.
 ;
 ;		A 255 CHARACTER LIMIT, because the record's length is one byte -- and because the runtime
 ;		hands the text to StringAllocTemp, which has the same limit. Refused here rather than
@@ -184,24 +189,9 @@ _BFGHit:
 ; ************************************************************************************************
 
 BStrAppendString:
-		lda 	bstrStringCount 			; room in the flat list ?
-		cmp 	#BSTR_MAX_STRINGS & $FF
-		lda 	bstrStringCount+1
-		sbc 	#BSTR_MAX_STRINGS >> 8
-		bcc 	_BASRoom
-		jmp 	_BASFull 					; the error exits are past a branch's reach
-_BASRoom:
-		;
-		;		Leave a byte for the length, and remember where it is.
-		;
-		lda 	bstrPoolLen 				; where the length byte itself goes, for the patch
-		sta 	bstrLenAt
-		lda 	bstrPoolLen+1
-		sta 	bstrLenAt+1
-		lda 	#0
-		jsr 	BStrPoolWrite
+		lda 	#0 							; the capacity, patched once the string is read
+		jsr 	BStrOpenRecord
 		stz 	bstrLength
-		;
 _BASLoop:
 		jsr 	LookNext 					; end of line inside an unterminated string
 		beq 	_BASSyntax
@@ -214,17 +204,70 @@ _BASLoop:
 		bra 	_BASLoop
 _BASDone:
 		jsr 	GetNext 					; consume the closing quote
+		ldx 	bstrRecordAt 				; the count goes into the capacity byte...
+		ldy 	bstrRecordAt+1
 		lda 	bstrLength
-		ldx 	bstrLenAt
-		ldy 	bstrLenAt+1
-		jsr 	BStrPoolPatch 				; ...and the length goes into the byte left for it
-		inc 	bstrStringCount
-		bne 	_BASNoCarry
-		inc 	bstrStringCount+1
-_BASNoCarry:
-		jmp 	BStrRequireEOL 				; nothing may follow the string on its line
+		jsr 	BStrPoolPatch
+		inx 								; ...and into the length byte after it
+		bne 	_BASLength
+		iny
+_BASLength:
+		lda 	bstrLength
+		jsr 	BStrPoolPatch
+		bra 	BStrCountString
+_BASTooLong:
+		.error_syntax
+_BASSyntax:
+		.error_syntax
 
-_BASFull:
+; ************************************************************************************************
+;
+;		SPC(n) in the body: a blank slot, capacity n in A. Its length is zero, so GP.BSTR reads
+;		"" until a GP.BSTRSET writes it. The filler is never read -- the length says how much of
+;		the slot is text.
+;
+; ************************************************************************************************
+
+BStrAppendBlank:
+		sta 	bstrLength 					; the capacity, and the filler bytes to write
+		jsr 	BStrOpenRecord
+		ldx 	bstrLength
+		beq 	BStrCountString 			; SPC(0) is a capacity, a length and nothing more
+_BABFill:
+		lda 	#" "
+		jsr 	BStrPoolWrite
+		dex
+		bne 	_BABFill
+		;
+		;		Both end here: one more string in the flat list, and nothing after it on its line.
+		;
+BStrCountString:
+		inc 	bstrStringCount
+		bne 	_BCSNoCarry
+		inc 	bstrStringCount+1
+_BCSNoCarry:
+		jmp 	BStrRequireEOL
+
+;
+;		Open a record: room for it in the flat list, then the capacity in A and a zero length.
+;		bstrRecordAt is left at the capacity byte, for BStrAppendString's patch.
+;
+BStrOpenRecord:
+		tax 								; the capacity, while the count is checked
+		lda 	bstrStringCount 			; room in the flat list ?
+		cmp 	#BSTR_MAX_STRINGS & $FF
+		lda 	bstrStringCount+1
+		sbc 	#BSTR_MAX_STRINGS >> 8
+		bcs 	_BORFull
+		lda 	bstrPoolLen 				; where the record starts
+		sta 	bstrRecordAt
+		lda 	bstrPoolLen+1
+		sta 	bstrRecordAt+1
+		txa
+		jsr 	BStrPoolWrite 				; the capacity...
+		lda 	#0
+		jmp 	BStrPoolWrite 				; ...and the length
+_BORFull:
 		;
 		;		IN COMPILER SPACE, not errors.asm: that table links below GPBase and is copied into
 		;		every compiled program. It said OUT OF MEMORY, which sends the programmer to look at
@@ -233,10 +276,6 @@ _BASFull:
 		;
 		jsr 	CallErrorHandler
 		.text 	"GP.BANKEDSTR BANK OVER 4096 STRINGS", 0
-_BASTooLong:
-		.error_syntax
-_BASSyntax:
-		.error_syntax
 
 ; ************************************************************************************************
 ;
@@ -459,7 +498,7 @@ bstrGroupCount: 							; named blocks closed so far
 		.fill 	1
 bstrStringCount: 							; strings in the SELECTED SLOT's flat list
 		.fill 	2
-bstrPoolLen: 								; bytes of [len][chars] records in the selected slot's pool
+bstrPoolLen: 								; bytes of [cap][len][chars] records in the selected slot's pool
 		.fill 	2
 bstrBank: 									; the bank the selected slot is, for BStrRegister
 		.fill 	1
@@ -475,9 +514,9 @@ bstrBodyLines: 								; strings in the block being read, capped at 255
 		.fill 	1
 bstrName: 									; the name being opened or looked up, compressed
 		.fill 	2
-bstrLength: 								; characters in the string being read
+bstrLength: 								; characters in the string being read, or SPC(n)'s n
 		.fill 	1
-bstrLenAt: 									; where its length byte sits in the pool
+bstrRecordAt: 								; where its record starts in the pool, at the capacity
 		.fill 	2
 bstrTemp:
 		.fill 	2
@@ -516,4 +555,5 @@ bstrBankLines: 								; the GP.BANKEDSTR line that first named each slot's bank
 ;		Date			Notes
 ;		==== 			=====
 ;		07/09/26		Written.
+;		18/09/26		A capacity byte in front of every record, and BStrAppendBlank for SPC(n).
 ;

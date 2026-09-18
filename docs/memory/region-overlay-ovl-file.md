@@ -1,6 +1,6 @@
 ---
 name: region-overlay-ovl-file
-description: "BUILT: every GP.BANKED region of a program goes into ONE self-describing NAME.OVL that the bootstrap reads through ACPTR, bank byte and page count ahead of each region, so region bytes never enter low RAM or the file ceiling"
+description: "BUILT: every GP.BANKED region of a program goes into ONE self-describing NAME.OVL that the bootstrap reads through ACPTR, bank byte and page count ahead of each region and a $01 end marker after the last, so region bytes never enter low RAM or the file ceiling"
 metadata:
   type: project
 ---
@@ -23,7 +23,11 @@ was never what bound; the file was.**
 
 **One `NAME.OVL` for the whole program, self-describing.** Its whole grammar:
 
-    bank byte, page count byte, pagecount * 256 bytes of region      repeated, then EOF
+    bank byte, page count byte, pagecount * 256 bytes of region      repeated, then $01, then EOF
+
+**The `$01` end marker went in 2026-09-18.** Bank 1 is the runtime's and `GP.BANKED 1` is refused
+(`BANK 1 IS RESERVED`), so no bank byte is ever `$01`. `ObjStreamClose` writes it after the last
+region, the `GP.BANKEDSTR` text banks included. Old `.OVL` files stop with `?OVL` until recompiled.
 
 No directory, no length table, no bank bitmap, no load address. Every region is padded up to a
 whole page, which is what keeps the count in one byte: the region ceiling is 8,188 bytes, 32 pages.
@@ -35,17 +39,27 @@ each region's two header bytes and then its bank, and scratching the file by exa
 first write because `"name,S,W"` refuses to open over a file that exists. A program with no
 `GP.BANKED` writes no `.OVL` at all.
 
-**The bootstrap extension page reads it through `ACPTR`, not `LOAD`** — `bootstrap2.asm`, 166 bytes
-at `$0900`, still one page with 7 bytes to spare before the pinned `GPBSTRBANKS` table at `$09F0`.
+**The bootstrap extension page reads it through `ACPTR`, not `LOAD`** — `bootstrap2.asm`, `$0900` to
+`$09EB` (236 bytes, 48 of them the name), one page with **4 bytes to spare** before the pinned
+`GPBSTRBANKS` table at `$09F0` (measured 2026-09-18, after the end marker).
 It OPENs on logical file 2, secondary 2 (a data channel: the file has no load address and does not
-go to one place), then per region reads the bank byte, `READST` for EOF, checks it against `MEMTOP`,
-selects it in `$00`, reads the page count and fills that many pages through a self-modifying store.
-`READST` is checked once per page, so a truncated file stops rather than running.
+go to one place). Per region it reads the bank byte and stops cleanly if it is the marker. Otherwise it
+checks `READST` (an empty file), checks the bank against `MEMTOP`, selects it in `$00`, reads the
+page count and fills that many pages through a self-modifying store. **`READST` after every page is
+an error**: a whole file hits EOF only on the marker, so a cut anywhere stops with `?OVL`.
+
+**Before the marker, a truncated file could run.** The last region's last byte was EOF, so EOF on a
+region boundary was the normal way out. A cut on a region boundary looked the same, and so did a
+cut inside a region's last page: the reader read the missing bytes past EOF, then saw EOF at the page
+end. With 1-page regions no cut was caught. banktest3's `BNKOVL` (100 bytes off `BNK255.OVL`)
+exposed it.
 
 **The name is baked in whole, and the page pokes nothing into it.** `ObjBuildOverlayName` builds
 `<object>.OVL` once, and 48 bytes of the page hold it with its length.
 
-**A missing or short overlay prints `?OVL` and stops; a bank above `MEMTOP` prints `?RAM`.** Both
+**A short overlay prints `?OVL` and stops; a bank above `MEMTOP` prints `?RAM`.** A missing one
+stops if `OPEN` or `CHKIN` fails, or if the first byte `ACPTR` returns is not `$01`. That byte has not
+been tested. Both
 close the file first. Running whatever the bank happened to hold is the one failure this must not
 have.
 

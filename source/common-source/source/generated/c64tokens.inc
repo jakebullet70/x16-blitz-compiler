@@ -78,6 +78,7 @@ C64_RIGHTDOLLAR          = $c9 ; $c9 right$
 C64_MIDDOLLAR            = $ca ; $ca mid$
 C64_GO                   = $cb ; $cb go
 C64_PI                   = $ff ; $ff pi
+C64_GPCMD_BSTRSET        = $ce4d ; $ce4d gp.bstrset
 C64_RETURNS              = $ce4e ; $ce4e returns
 C64_GPCMD_FN             = $ce4f ; $ce4f gp.fn
 C64_GPCMD_SUB            = $ce50 ; $ce50 gp.sub

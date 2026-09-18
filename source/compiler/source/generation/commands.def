@@ -123,6 +123,13 @@ GP.ENDBANKED 	X:CommandGPEndBankedCompile N
 GP.BANKEDSTR 	X:CommandGPBankedStrCompile N
 GP.ENDBANKEDSTR X:CommandGPEndBankedStrCompile N
 #
+#		GP.BSTRSET <name>, n, A$ -- write string n of a group, cut to its slot's capacity. The name
+#		and n compile exactly as GP.BSTR's do, to one flat index. "@", not "$": the handler moves
+#		$A000 to the text bank before it reads A$, so a literal in a GP.BANKED region, which sits in
+#		the region's bank, has to be copied low first.
+#
+GP.BSTRSET 		X:BankedStrGroupCompile,# X:BankedStrAddCompile,@ T N
+#
 #		GP.DEFPROC <verb> [,<formal> ...] declares the routine that FOLLOWS it; GP.SUB <verb>
 #		[,<expression> ...] fills its formals in and calls it. NO "#" on either: a verb is a NAME
 #		read by the handler, and GP.SUB's arguments are compiled one at a time against the formals

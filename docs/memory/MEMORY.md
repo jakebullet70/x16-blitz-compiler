@@ -119,7 +119,7 @@ sibling project: what is kept is a fact about **X16 BASIC or the X16 itself**, n
 - [BASIC RAM was the tokenise ceiling](basload-basic-ram-is-the-tokenise-ceiling.md) — REMOVED for build_basl.py only
 - [BASLOAD streams to a file](basload-streams-to-a-file.md) — SHIPPED; a failed run now deletes its own output
 - [BASLOAD runs from RAM unmodified](basload-runs-from-ram-unmodified.md) — the ROM source builds as a plain PRG
-- [BASLOAD #DEFINE rejects digits](basload-define-rejects-digits.md) — GUI2.DEFS is INVALID PARAMETER; no #INCLUDE is optional
+- [BASLOAD #DEFINE rejects digits and negatives](basload-define-rejects-digits.md) — INVALID PARAMETER, silent 6-byte PRG; unsigned only; no #INCLUDE is optional
 - [Labels and variables collide](basload-label-and-variable-collide.md) — DUPLICATE SYMBOL; the $ does not separate them
 - [#AUTONUM breaks STRCASE](basload-autonum-breaks-strcase.md) — do not write it
 - [TRUE is -1](gpc-basl-true-is-minus-one.md) — why NOT needs -1, and the two spellings that break
@@ -149,7 +149,7 @@ sibling project: what is kept is a fact about **X16 BASIC or the X16 itself**, n
 - [GP.BANKEDSTR: literal text in a bank](gp-bankedstr-literal-text-in-a-bank.md) — BUILT; +3,840 B on GPBMODS
 - [Object file must fit under the runtime](object-file-must-fit-under-the-runtime.md) — regions were invisible to the fit check
 - [Wildcard scratch eats the source](wildcard-scratch-eats-the-source.md) — S0:NAME.B* matches NAME.BASL
-- [One NAME.OVL holds every region](region-overlay-ovl-file.md) — BUILT; banks 2-255, 127 regions; bank and page count ahead of each region, read through ACPTR
+- [One NAME.OVL holds every region](region-overlay-ovl-file.md) — BUILT; banks 2-255, 127 regions; bank and page count ahead of each region, $01 end marker, read through ACPTR
 - [Object writer: regions vs low code](object-writer-regions-vs-low-code.md) — the streamer pads forward 65,535 bytes with no check firing
 - [Overlay inside the PRG: research](overlay-in-prg-research.md) - the option C plan came out of it; a LOADed file caps at 39,679 bytes total
 - [A second region for the utilities](second-region-for-the-utilities.md) — BUILT; a BANK statement is the ONLY disqualifier; regions call each other, a GOTO across is refused

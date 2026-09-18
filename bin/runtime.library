@@ -8789,75 +8789,76 @@ ShiftVectorTable:
 	.word	CommandEnd               ; $dd82 end
 	.word	UnaryGPArrPtr            ; $dd83 gp.arrptr
 	.word	UnaryGPBStr              ; $dd84 gp.bstr
-	.word	CommandGPCall            ; $dd85 gp.call
-	.word	CommandGPBox             ; $dd86 gp.box
-	.word	CommandGPFill            ; $dd87 gp.fill
-	.word	CommandGPPrintAt         ; $dd88 gp.printat
-	.word	UnaryGPComp              ; $dd89 gp.comp
-	.word	UnaryJoy                 ; $dd8a joy
-	.word	LinkFloatIntegerPartDown ; $dd8b int
-	.word	BankEnterShift           ; $dd8c sqr, LinkFloatSquareRoot in bank 1
-	.word	BankEnterShift           ; $dd8d log, LinkFloatLogarithm in bank 1
-	.word	BankEnterShift           ; $dd8e exp, LinkFloatExponent in bank 1
-	.word	BankEnterShift           ; $dd8f cos, LinkFloatCosine in bank 1
-	.word	BankEnterShift           ; $dd90 sin, LinkFloatSine in bank 1
-	.word	BankEnterShift           ; $dd91 tan, LinkFloatTangent in bank 1
-	.word	BankEnterShift           ; $dd92 atn, LinkFloatArcTan in bank 1
-	.word	CommandXLinput           ; $dd93 linput
-	.word	CommandXBinput           ; $dd94 binput
-	.word	Command_LOAD             ; $dd95 load
-	.word	Command_BLOAD            ; $dd96 bload
-	.word	Command_BVLOAD           ; $dd97 bvload
-	.word	Command_VLOAD            ; $dd98 vload
-	.word	Command_BSAVE            ; $dd99 bsave
-	.word	Command_BVERIFY          ; $dd9a bverify
-	.word	X16CommandPowerOff       ; $dd9b poweroff
-	.word	X16CommandReset          ; $dd9c reset
-	.word	X16CommandReboot         ; $dd9d reboot
-	.word	BankEnterShift           ; $dd9e mouse, XCommandMouse in bank 1
-	.word	BankEnterShift           ; $dd9f mb, XUnaryMB in bank 1
-	.word	BankEnterShift           ; $dda0 mx, XUnaryMX in bank 1
-	.word	BankEnterShift           ; $dda1 my, XUnaryMY in bank 1
-	.word	BankEnterShift           ; $dda2 mwheel, XUnaryMWheel in bank 1
-	.word	UnaryRPT                 ; $dda3 rpt$
-	.word	Command_MOVSPR           ; $dda4 movspr
-	.word	BankEnterShift           ; $dda5 sprite, Command_SPRITE in bank 1
-	.word	BankEnterShift           ; $dda6 sprmem, Command_SPRMEM in bank 1
-	.word	UnaryST                  ; $dda7 st
-	.word	CommandStop              ; $dda8 stop
-	.word	CommandSYS               ; $dda9 sys
-	.word	BankEnterShift           ; $ddaa tdata, UnaryTDATA in bank 1
-	.word	BankEnterShift           ; $ddab tattr, UnaryTATTR in bank 1
-	.word	BankEnterShift           ; $ddac tile, Command_TILE in bank 1
-	.word	CommandTIWriteN          ; $ddad ti.write
-	.word	CommandTIWriteS          ; $ddae ti$.write
-	.word	CommandXWAIT             ; $ddaf wait
-	.word	X16I2CPoke               ; $ddb0 i2cpoke
-	.word	X16I2CPeek               ; $ddb1 i2cpeek
-	.word	CommandBank              ; $ddb2 bank
-	.word	XCommandSleep            ; $ddb3 sleep
-	.word	BankEnterShift           ; $ddb4 fminit, X16_Audio_FMINIT in bank 1
-	.word	BankEnterShift           ; $ddb5 fmnote, X16_Audio_FMNOTE in bank 1
-	.word	BankEnterShift           ; $ddb6 fmdrum, X16_Audio_FMDRUM in bank 1
-	.word	BankEnterShift           ; $ddb7 fminst, X16_Audio_FMINST in bank 1
-	.word	BankEnterShift           ; $ddb8 fmvib, X16_Audio_FMVIB in bank 1
-	.word	BankEnterShift           ; $ddb9 fmfreq, X16_Audio_FMFREQ in bank 1
-	.word	BankEnterShift           ; $ddba fmvol, X16_Audio_FMVOL in bank 1
-	.word	BankEnterShift           ; $ddbb fmpan, X16_Audio_FMPAN in bank 1
-	.word	X16_Audio_FMPLAY         ; $ddbc fmplay
-	.word	X16_Audio_FMCHORD        ; $ddbd fmchord
-	.word	BankEnterShift           ; $ddbe fmpoke, X16_Audio_FMPOKE in bank 1
-	.word	BankEnterShift           ; $ddbf psginit, X16_Audio_PSGINIT in bank 1
-	.word	BankEnterShift           ; $ddc0 psgnote, X16_Audio_PSGNOTE in bank 1
-	.word	BankEnterShift           ; $ddc1 psgvol, X16_Audio_PSGVOL in bank 1
-	.word	BankEnterShift           ; $ddc2 psgwav, X16_Audio_PSGWAV in bank 1
-	.word	BankEnterShift           ; $ddc3 psgfreq, X16_Audio_PSGFREQ in bank 1
-	.word	BankEnterShift           ; $ddc4 psgpan, X16_Audio_PSGPAN in bank 1
-	.word	X16_Audio_PSGPLAY        ; $ddc5 psgplay
-	.word	X16_Audio_PSGCHORD       ; $ddc6 psgchord
-	.word	CommandCls               ; $ddc7 cls
-	.word	CommandLocate            ; $ddc8 locate
-	.word	CommandColor             ; $ddc9 color
+	.word	CommandGPBStrSet         ; $dd85 gp.bstrset
+	.word	CommandGPCall            ; $dd86 gp.call
+	.word	CommandGPBox             ; $dd87 gp.box
+	.word	CommandGPFill            ; $dd88 gp.fill
+	.word	CommandGPPrintAt         ; $dd89 gp.printat
+	.word	UnaryGPComp              ; $dd8a gp.comp
+	.word	UnaryJoy                 ; $dd8b joy
+	.word	LinkFloatIntegerPartDown ; $dd8c int
+	.word	BankEnterShift           ; $dd8d sqr, LinkFloatSquareRoot in bank 1
+	.word	BankEnterShift           ; $dd8e log, LinkFloatLogarithm in bank 1
+	.word	BankEnterShift           ; $dd8f exp, LinkFloatExponent in bank 1
+	.word	BankEnterShift           ; $dd90 cos, LinkFloatCosine in bank 1
+	.word	BankEnterShift           ; $dd91 sin, LinkFloatSine in bank 1
+	.word	BankEnterShift           ; $dd92 tan, LinkFloatTangent in bank 1
+	.word	BankEnterShift           ; $dd93 atn, LinkFloatArcTan in bank 1
+	.word	CommandXLinput           ; $dd94 linput
+	.word	CommandXBinput           ; $dd95 binput
+	.word	Command_LOAD             ; $dd96 load
+	.word	Command_BLOAD            ; $dd97 bload
+	.word	Command_BVLOAD           ; $dd98 bvload
+	.word	Command_VLOAD            ; $dd99 vload
+	.word	Command_BSAVE            ; $dd9a bsave
+	.word	Command_BVERIFY          ; $dd9b bverify
+	.word	X16CommandPowerOff       ; $dd9c poweroff
+	.word	X16CommandReset          ; $dd9d reset
+	.word	X16CommandReboot         ; $dd9e reboot
+	.word	BankEnterShift           ; $dd9f mouse, XCommandMouse in bank 1
+	.word	BankEnterShift           ; $dda0 mb, XUnaryMB in bank 1
+	.word	BankEnterShift           ; $dda1 mx, XUnaryMX in bank 1
+	.word	BankEnterShift           ; $dda2 my, XUnaryMY in bank 1
+	.word	BankEnterShift           ; $dda3 mwheel, XUnaryMWheel in bank 1
+	.word	UnaryRPT                 ; $dda4 rpt$
+	.word	Command_MOVSPR           ; $dda5 movspr
+	.word	BankEnterShift           ; $dda6 sprite, Command_SPRITE in bank 1
+	.word	BankEnterShift           ; $dda7 sprmem, Command_SPRMEM in bank 1
+	.word	UnaryST                  ; $dda8 st
+	.word	CommandStop              ; $dda9 stop
+	.word	CommandSYS               ; $ddaa sys
+	.word	BankEnterShift           ; $ddab tdata, UnaryTDATA in bank 1
+	.word	BankEnterShift           ; $ddac tattr, UnaryTATTR in bank 1
+	.word	BankEnterShift           ; $ddad tile, Command_TILE in bank 1
+	.word	CommandTIWriteN          ; $ddae ti.write
+	.word	CommandTIWriteS          ; $ddaf ti$.write
+	.word	CommandXWAIT             ; $ddb0 wait
+	.word	X16I2CPoke               ; $ddb1 i2cpoke
+	.word	X16I2CPeek               ; $ddb2 i2cpeek
+	.word	CommandBank              ; $ddb3 bank
+	.word	XCommandSleep            ; $ddb4 sleep
+	.word	BankEnterShift           ; $ddb5 fminit, X16_Audio_FMINIT in bank 1
+	.word	BankEnterShift           ; $ddb6 fmnote, X16_Audio_FMNOTE in bank 1
+	.word	BankEnterShift           ; $ddb7 fmdrum, X16_Audio_FMDRUM in bank 1
+	.word	BankEnterShift           ; $ddb8 fminst, X16_Audio_FMINST in bank 1
+	.word	BankEnterShift           ; $ddb9 fmvib, X16_Audio_FMVIB in bank 1
+	.word	BankEnterShift           ; $ddba fmfreq, X16_Audio_FMFREQ in bank 1
+	.word	BankEnterShift           ; $ddbb fmvol, X16_Audio_FMVOL in bank 1
+	.word	BankEnterShift           ; $ddbc fmpan, X16_Audio_FMPAN in bank 1
+	.word	X16_Audio_FMPLAY         ; $ddbd fmplay
+	.word	X16_Audio_FMCHORD        ; $ddbe fmchord
+	.word	BankEnterShift           ; $ddbf fmpoke, X16_Audio_FMPOKE in bank 1
+	.word	BankEnterShift           ; $ddc0 psginit, X16_Audio_PSGINIT in bank 1
+	.word	BankEnterShift           ; $ddc1 psgnote, X16_Audio_PSGNOTE in bank 1
+	.word	BankEnterShift           ; $ddc2 psgvol, X16_Audio_PSGVOL in bank 1
+	.word	BankEnterShift           ; $ddc3 psgwav, X16_Audio_PSGWAV in bank 1
+	.word	BankEnterShift           ; $ddc4 psgfreq, X16_Audio_PSGFREQ in bank 1
+	.word	BankEnterShift           ; $ddc5 psgpan, X16_Audio_PSGPAN in bank 1
+	.word	X16_Audio_PSGPLAY        ; $ddc6 psgplay
+	.word	X16_Audio_PSGCHORD       ; $ddc7 psgchord
+	.word	CommandCls               ; $ddc8 cls
+	.word	CommandLocate            ; $ddc9 locate
+	.word	CommandColor             ; $ddca color
 	.send code
 
 	.section banked
@@ -8925,64 +8926,64 @@ BankVectorTable:
 BankVectors = BankVectorTable - $08
 
 BankShiftVectorTable:
-	.word	LinkFloatSquareRoot      ; $dd8c sqr
-	.word	LinkFloatLogarithm       ; $dd8d log
-	.word	LinkFloatExponent        ; $dd8e exp
-	.word	LinkFloatCosine          ; $dd8f cos
-	.word	LinkFloatSine            ; $dd90 sin
-	.word	LinkFloatTangent         ; $dd91 tan
-	.word	LinkFloatArcTan          ; $dd92 atn
-	.word	Unimplemented            ; $dd93 linput
-	.word	Unimplemented            ; $dd94 binput
-	.word	Unimplemented            ; $dd95 load
-	.word	Unimplemented            ; $dd96 bload
-	.word	Unimplemented            ; $dd97 bvload
-	.word	Unimplemented            ; $dd98 vload
-	.word	Unimplemented            ; $dd99 bsave
-	.word	Unimplemented            ; $dd9a bverify
-	.word	Unimplemented            ; $dd9b poweroff
-	.word	Unimplemented            ; $dd9c reset
-	.word	Unimplemented            ; $dd9d reboot
-	.word	XCommandMouse            ; $dd9e mouse
-	.word	XUnaryMB                 ; $dd9f mb
-	.word	XUnaryMX                 ; $dda0 mx
-	.word	XUnaryMY                 ; $dda1 my
-	.word	XUnaryMWheel             ; $dda2 mwheel
-	.word	Unimplemented            ; $dda3 rpt$
-	.word	Unimplemented            ; $dda4 movspr
-	.word	Command_SPRITE           ; $dda5 sprite
-	.word	Command_SPRMEM           ; $dda6 sprmem
-	.word	Unimplemented            ; $dda7 st
-	.word	Unimplemented            ; $dda8 stop
-	.word	Unimplemented            ; $dda9 sys
-	.word	UnaryTDATA               ; $ddaa tdata
-	.word	UnaryTATTR               ; $ddab tattr
-	.word	Command_TILE             ; $ddac tile
-	.word	Unimplemented            ; $ddad ti.write
-	.word	Unimplemented            ; $ddae ti$.write
-	.word	Unimplemented            ; $ddaf wait
-	.word	Unimplemented            ; $ddb0 i2cpoke
-	.word	Unimplemented            ; $ddb1 i2cpeek
-	.word	Unimplemented            ; $ddb2 bank
-	.word	Unimplemented            ; $ddb3 sleep
-	.word	X16_Audio_FMINIT         ; $ddb4 fminit
-	.word	X16_Audio_FMNOTE         ; $ddb5 fmnote
-	.word	X16_Audio_FMDRUM         ; $ddb6 fmdrum
-	.word	X16_Audio_FMINST         ; $ddb7 fminst
-	.word	X16_Audio_FMVIB          ; $ddb8 fmvib
-	.word	X16_Audio_FMFREQ         ; $ddb9 fmfreq
-	.word	X16_Audio_FMVOL          ; $ddba fmvol
-	.word	X16_Audio_FMPAN          ; $ddbb fmpan
-	.word	Unimplemented            ; $ddbc fmplay
-	.word	Unimplemented            ; $ddbd fmchord
-	.word	X16_Audio_FMPOKE         ; $ddbe fmpoke
-	.word	X16_Audio_PSGINIT        ; $ddbf psginit
-	.word	X16_Audio_PSGNOTE        ; $ddc0 psgnote
-	.word	X16_Audio_PSGVOL         ; $ddc1 psgvol
-	.word	X16_Audio_PSGWAV         ; $ddc2 psgwav
-	.word	X16_Audio_PSGFREQ        ; $ddc3 psgfreq
-	.word	X16_Audio_PSGPAN         ; $ddc4 psgpan
-BankShiftVectors = BankShiftVectorTable - $18
+	.word	LinkFloatSquareRoot      ; $dd8d sqr
+	.word	LinkFloatLogarithm       ; $dd8e log
+	.word	LinkFloatExponent        ; $dd8f exp
+	.word	LinkFloatCosine          ; $dd90 cos
+	.word	LinkFloatSine            ; $dd91 sin
+	.word	LinkFloatTangent         ; $dd92 tan
+	.word	LinkFloatArcTan          ; $dd93 atn
+	.word	Unimplemented            ; $dd94 linput
+	.word	Unimplemented            ; $dd95 binput
+	.word	Unimplemented            ; $dd96 load
+	.word	Unimplemented            ; $dd97 bload
+	.word	Unimplemented            ; $dd98 bvload
+	.word	Unimplemented            ; $dd99 vload
+	.word	Unimplemented            ; $dd9a bsave
+	.word	Unimplemented            ; $dd9b bverify
+	.word	Unimplemented            ; $dd9c poweroff
+	.word	Unimplemented            ; $dd9d reset
+	.word	Unimplemented            ; $dd9e reboot
+	.word	XCommandMouse            ; $dd9f mouse
+	.word	XUnaryMB                 ; $dda0 mb
+	.word	XUnaryMX                 ; $dda1 mx
+	.word	XUnaryMY                 ; $dda2 my
+	.word	XUnaryMWheel             ; $dda3 mwheel
+	.word	Unimplemented            ; $dda4 rpt$
+	.word	Unimplemented            ; $dda5 movspr
+	.word	Command_SPRITE           ; $dda6 sprite
+	.word	Command_SPRMEM           ; $dda7 sprmem
+	.word	Unimplemented            ; $dda8 st
+	.word	Unimplemented            ; $dda9 stop
+	.word	Unimplemented            ; $ddaa sys
+	.word	UnaryTDATA               ; $ddab tdata
+	.word	UnaryTATTR               ; $ddac tattr
+	.word	Command_TILE             ; $ddad tile
+	.word	Unimplemented            ; $ddae ti.write
+	.word	Unimplemented            ; $ddaf ti$.write
+	.word	Unimplemented            ; $ddb0 wait
+	.word	Unimplemented            ; $ddb1 i2cpoke
+	.word	Unimplemented            ; $ddb2 i2cpeek
+	.word	Unimplemented            ; $ddb3 bank
+	.word	Unimplemented            ; $ddb4 sleep
+	.word	X16_Audio_FMINIT         ; $ddb5 fminit
+	.word	X16_Audio_FMNOTE         ; $ddb6 fmnote
+	.word	X16_Audio_FMDRUM         ; $ddb7 fmdrum
+	.word	X16_Audio_FMINST         ; $ddb8 fminst
+	.word	X16_Audio_FMVIB          ; $ddb9 fmvib
+	.word	X16_Audio_FMFREQ         ; $ddba fmfreq
+	.word	X16_Audio_FMVOL          ; $ddbb fmvol
+	.word	X16_Audio_FMPAN          ; $ddbc fmpan
+	.word	Unimplemented            ; $ddbd fmplay
+	.word	Unimplemented            ; $ddbe fmchord
+	.word	X16_Audio_FMPOKE         ; $ddbf fmpoke
+	.word	X16_Audio_PSGINIT        ; $ddc0 psginit
+	.word	X16_Audio_PSGNOTE        ; $ddc1 psgnote
+	.word	X16_Audio_PSGVOL         ; $ddc2 psgvol
+	.word	X16_Audio_PSGWAV         ; $ddc3 psgwav
+	.word	X16_Audio_PSGFREQ        ; $ddc4 psgfreq
+	.word	X16_Audio_PSGPAN         ; $ddc5 psgpan
+BankShiftVectors = BankShiftVectorTable - $1a
 	.send banked
 ; ************************************************************************************************
 ; ************************************************************************************************

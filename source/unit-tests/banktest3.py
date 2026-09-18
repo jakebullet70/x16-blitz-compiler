@@ -80,18 +80,23 @@ def tokenise(name):
 
 
 #   The banks inside NAME.OVL, as three-digit strings. The file introduces every region
-#   with its bank and its page count, so walking it is the whole of reading it -- and a file
-#   that does not end on a region boundary reports SHORT rather than passing the check.
+#   with its bank and its page count and ends on one marker byte, so walking it is the whole
+#   of reading it -- and a file that does not end on the marker reports SHORT rather than
+#   passing the check.
+OVL_END = 1
+
+
 def overlays(name):
     p = os.path.join(T, name + ".OVL")
     if not os.path.exists(p):
         return []
     b, i, banks = open(p, "rb").read(), 0, []
-    while i + 2 <= len(b):
+    while i + 2 <= len(b) and b[i] != OVL_END:
         banks.append(b[i])
         i += 2 + b[i + 1] * 256
     got = sorted("%03d" % x for x in banks)
-    return got if i == len(b) else got + ["SHORT"]
+    whole = i == len(b) - 1 and b[i] == OVL_END
+    return got if whole else got + ["SHORT"]
 
 
 def compile_one(name, mode="SHARED"):

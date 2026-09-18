@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-#   GP.BANKEDSTR / GP.BSTR / GP.BSTRCOUNT -- tokenise, compile and RUN.
+#   GP.BANKEDSTR / GP.BSTR / GP.BSTRCOUNT / GP.BSTRSET -- tokenise, compile and RUN.
 #
 #   What is being tested is that the TEXT COMES BACK, byte for byte, from a bank -- so
 #   the test compares printed output against the literals the source went in with,
@@ -10,6 +10,11 @@
 #   The named-group test is the one the flat design would fail: BSTRB inserts a line
 #   into the MIDDLE of the first group, and every string in the SECOND group must still
 #   come out where it belongs.
+#
+#   A record is [capacity][length][capacity bytes].  BSTRG writes slots and reads them
+#   back: a SPC(n) slot reads "" until written, a long string is cut to the capacity,
+#   and the record after a written one is unchanged.  BSTRH writes from inside a
+#   GP.BANKED region, where the literal sits in the region's bank and not the text's.
 #
 import os, re, subprocess, sys, time
 
@@ -150,7 +155,8 @@ BSTRD = """#SAVEAS "@:BSTRD.SRC.PRG"
     END
 """
 
-#   Two blocks naming different banks -- one region a program.
+#   Two blocks naming different banks.  This was refused while a program had one text
+#   bank; since sixteen (9a6a337) each bank is a slot of its own, and both read back.
 BSTRE = """#SAVEAS "@:BSTRE.SRC.PRG"
 #INCLUDE "GPB.INC.BL"
     GP.BANKEDSTR 6 MENU.FILE
@@ -159,7 +165,8 @@ BSTRE = """#SAVEAS "@:BSTRE.SRC.PRG"
     GP.BANKEDSTR 7 MENU.EDIT
   " Cut "
     GP.ENDBANKEDSTR
-    PRINT GP.BSTR(MENU.FILE, 0)
+    PRINT "|" + GP.BSTR(MENU.FILE, 0) + "|"
+    PRINT "|" + GP.BSTR(MENU.EDIT, 0) + "|"
     END
 """
 
@@ -172,12 +179,92 @@ BSTRF = """#SAVEAS "@:BSTRF.SRC.PRG"
     END
 """
 
+#   Writes.  Bank 6 holds four records: SPC(10), "AFTER", SPC(0) and, in the next
+#   group, "UNTOUCHED".  Index 99 is past the bank's count, and 5000 carries into slot 1,
+#   which has no bank -- neither may write anything.
+BSTRG = """#SAVEAS "@:BSTRG.SRC.PRG"
+#INCLUDE "GPB.INC.BL"
+#SYMFILE "@:BSTRG.SRC.SYM"
+    GP.BANKEDSTR 6 SLOTS.A
+    SPC(10)
+  "AFTER"
+    SPC(0)
+    GP.ENDBANKEDSTR
+    GP.BANKEDSTR 6 SLOTS.B
+  "UNTOUCHED"
+    GP.ENDBANKEDSTR
+    PRINT "|" + GP.BSTR(SLOTS.A, 0) + "|"
+    GP.BSTRSET SLOTS.A, 0, "HELLO"
+    PRINT "|" + GP.BSTR(SLOTS.A, 0) + "|"
+    GP.BSTRSET SLOTS.A, 0, "ABCDEFGHIJKLMNOP"
+    PRINT "|" + GP.BSTR(SLOTS.A, 0) + "|"
+    PRINT "|" + GP.BSTR(SLOTS.A, 1) + "|"
+    A$ = "LONGER THAN FIVE"
+    GP.BSTRSET SLOTS.A, 1, A$
+    PRINT "|" + GP.BSTR(SLOTS.A, 1) + "|"
+    GP.BSTRSET SLOTS.A, 2, "X"
+    PRINT "|" + GP.BSTR(SLOTS.A, 2) + "|"
+    PRINT "|" + GP.BSTR(SLOTS.B, 0) + "|"
+    GP.BSTRSET SLOTS.A, 0, ""
+    PRINT "|" + GP.BSTR(SLOTS.A, 0) + "|"
+    GP.BSTRSET SLOTS.A, 99, "NOWHERE"
+    GP.BSTRSET SLOTS.A, 5000, "NOWHERE"
+    FOR I = 0 TO GP.BSTRCOUNT(SLOTS.A) - 1
+      PRINT "|" + GP.BSTR(SLOTS.A, I) + "|"
+    NEXT I
+    PRINT "|" + GP.BSTR(SLOTS.B, 0) + "|"
+    END
+"""
+
+#   A write from inside a GP.BANKED region.  The literal is in bank 9 and the handler
+#   swaps $A000 to bank 6 before it reads the string, so the compiler has to copy the
+#   literal low first; read in place it would copy bank 6's own bytes.
+BSTRH = """#SAVEAS "@:BSTRH.SRC.PRG"
+#INCLUDE "GPB.INC.BL"
+#SYMFILE "@:BSTRH.SRC.SYM"
+    GP.BANKEDSTR 6 SLOTS.A
+    SPC(12)
+  "NEXT DOOR"
+    GP.ENDBANKEDSTR
+    PRINT "|" + GP.BSTR(SLOTS.A, 0) + "|"
+GP.BANKED 9
+    GP.BSTRSET SLOTS.A, 0, "FROM BANK 9"
+    PRINT "|" + GP.BSTR(SLOTS.A, 0) + "|"
+GP.ENDBANKED
+    PRINT "|" + GP.BSTR(SLOTS.A, 0) + "|"
+    PRINT "|" + GP.BSTR(SLOTS.A, 1) + "|"
+    END
+"""
+
+#   A capacity past 255.
+BSTRI = """#SAVEAS "@:BSTRI.SRC.PRG"
+#INCLUDE "GPB.INC.BL"
+    GP.BANKEDSTR 6 MENU.FILE
+    SPC(256)
+    GP.ENDBANKEDSTR
+    PRINT "X"
+    END
+"""
+
 SOURCES = {"BSTRA": BSTRA, "BSTRB": BSTRB, "BSTRC": BSTRC,
-           "BSTRD": BSTRD, "BSTRE": BSTRE, "BSTRF": BSTRF}
+           "BSTRD": BSTRD, "BSTRE": BSTRE, "BSTRF": BSTRF,
+           "BSTRG": BSTRG, "BSTRH": BSTRH, "BSTRI": BSTRI}
 
 WANT_A = [" Open ", " Save As... ", "MiXeD cAsE 123", " Cut ", " Paste "]
 WANT_B = [" Open ", " Save As... ", " INSERTED ", "MiXeD cAsE 123", " Cut ", " Paste "]
-BAD = ["BSTRC", "BSTRD", "BSTRE", "BSTRF"]
+WANT_E = [" Open ", " Cut "]
+WANT_G = ["",                       # SPC(10), never written
+          "HELLO",                  # a write, then a read
+          "ABCDEFGHIJ",             # sixteen characters into ten
+          "AFTER",                  # ...and the next record as it was
+          "LONGE",                  # a quoted slot is writable, capacity 5
+          "",                       # SPC(0) takes nothing
+          "UNTOUCHED",              # the next group, after both
+          "",                       # an empty string written
+          "", "LONGE", "",          # the group again, after the two stray writes
+          "UNTOUCHED"]
+WANT_H = ["", "FROM BANK 9", "FROM BANK 9", "NEXT DOOR"]
+BAD = ["BSTRC", "BSTRD", "BSTRF", "BSTRI"]
 
 for n, s in SOURCES.items():
     open(os.path.join(T, n + ".BASL"), "w", newline="\r\n").write(s)
@@ -193,7 +280,8 @@ for n in SOURCES:
 print()
 fails = 0
 
-for n, want in (("BSTRA", WANT_A), ("BSTRB", WANT_B)):
+for n, want in (("BSTRA", WANT_A), ("BSTRB", WANT_B), ("BSTRE", WANT_E),
+                ("BSTRG", WANT_G), ("BSTRH", WANT_H)):
     k, m, out = results[n]
     good = (k == "OK" and out == want)
     print("%-6s text back byte for byte   %s" % (n, "YES" if good else "*** NO ***"))

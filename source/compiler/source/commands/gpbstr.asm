@@ -17,9 +17,11 @@
 ;		GP.BANKEDSTR <bank> <name>
 ;		"first"
 ;		"second"
+;		SPC(40)
 ;		GP.ENDBANKEDSTR
 ;
-;		and then, anywhere:  A$ = GP.BSTR(<name>, n)   and   GP.BSTRCOUNT(<name>)
+;		and then, anywhere:  A$ = GP.BSTR(<name>, n)   GP.BSTRSET <name>, n, A$   and
+;		GP.BSTRCOUNT(<name>)
 ;
 ;		Text is the one thing in a program with no reason to be in low RAM: it is never executed,
 ;		never indexed by the interpreter, and read one item at a time. A string constant costs
@@ -36,6 +38,10 @@
 ;		program GP IN on its own -- GP.ASM's argument, for the same reason. GP.BSTR does, and
 ;		that is where the cost is.
 ;
+;		EVERY STRING IS A SLOT that GP.BSTRSET can write, cut to the slot's capacity. A quoted
+;		line's capacity is its own length. SPC(n) is an empty slot of capacity n, read at compile
+;		time: SPC( is one token, $A6, with the "(" built in, so BASLOAD takes the line as it is.
+;
 ;		NAMED GROUPS, RESOLVED AT COMPILE TIME. Several blocks a program, each named, each indexed
 ;		from ZERO within itself, all feeding one bank. Insert a line into one group and nothing
 ;		outside it moves. The name never reaches the object: BankedStrGroupCompile turns it into a
@@ -49,8 +55,8 @@
 ;		SAME routine, so the two spellings cannot diverge.
 ;
 ;		THE POOL IS IN A RAM BANK, rebuilt identically by both passes. It holds the strings back
-;		to back as [len][chars] and nothing else -- the group tables slice that flat list by
-;		index. The bank image is assembled from it at the end of the compile.
+;		to back as [cap][len][cap bytes] and nothing else -- the group tables slice that flat
+;		list by index. The bank image is assembled from it at the end of the compile.
 ;
 ;		Errors are .error_structure and .error_syntax, reusing existing messages: errors.asm links
 ;		below GPBase and is copied into EVERY compiled object, so a new message would cost its
@@ -92,6 +98,8 @@ _CBSNextLine:
 		beq 	_CBSNextLine 				; blank line inside the block, ignore it
 		cmp 	#34 						; a double quote -- a body line
 		beq 	_CBSBody
+		cmp 	#C64_SPCLB 					; SPC( -- a blank slot, and a body line too
+		beq 	_CBSBlank
 		cmp 	#$CE 						; the GP keyword prefix ?
 		bne 	_CBSStructure
 		jsr 	GetNext 					; which GP keyword
@@ -100,12 +108,35 @@ _CBSNextLine:
 _CBSStructure: 								; anything else in here is not a string
 		.error_structure
 
+;
+;		SPC(n). The token has already consumed the "(", so the constant and the ")" are what is
+;		left. ParseConstant is how GOTO reads its line number. GPBankReadNumber, which reads the
+;		header's bank, will not do: it refuses 0 and 1, and both are capacities.
+;
+_CBSBlank:
+		jsr 	GetNextNonSpace 			; the capacity, a decimal constant 0-255
+		jsr 	CharIsDigit
+		bcc 	_CBSSyntax
+		jsr 	ParseConstant 				; CS and the value in YA if it is a 16 bit integer
+		bcc 	_CBSSyntax
+		cpy 	#0 							; over 255
+		bne 	_CBSSyntax
+		pha
+		jsr 	CheckNextRParen
+		pla
+		jsr 	BStrAppendBlank 			; ...which requires the end of the line after the ")"
+		bra 	_CBSCount
+
 _CBSBody:
 		jsr 	BStrAppendString 			; the opening quote is already consumed
+_CBSCount:
 		inc 	bstrBodyLines 				; a body line -- the block is not empty
 		bne 	_CBSNextLine 				; (255 lines wraps to 0; the emptiness test only
 		dec 	bstrBodyLines 				;  cares about zero, so stick at 255)
 		bra 	_CBSNextLine
+
+_CBSSyntax:
+		.error_syntax
 
 ;
 ;		GP.ENDBANKEDSTR. An empty block is refused: a group with no strings makes GP.BSTRCOUNT
@@ -220,6 +251,10 @@ _BREBad:
 ;		(evaluate/term/gpcomposite.asm). It emits the group's count as a plain integer constant,
 ;		which is what makes FOR I = 0 TO GP.BSTRCOUNT(X)-1 free.
 ;
+;		THE STATEMENT GP.BSTRSET <name>, n, A$ USES THE SAME PAIR, with no bracket in front. The
+;		generator consumes GP.BSTR's "(" before BankedStrGroupCompile runs, so BStrReadName
+;		starts at the name either way.
+;
 ; ************************************************************************************************
 
 BankedStrGroupCompile:
@@ -233,7 +268,7 @@ BankedStrGroupCompile:
 		lda 	BStrSlots,y
 		.bstr_release
 		asl 	a 							; THE SLOT GOES IN THE TOP FOUR BITS, where the index cannot
-		asl 	a 							; reach it: an 8K bank holds at most 2,730 strings and the
+		asl 	a 							; reach it: an 8K bank holds at most 2,047 strings and the
 		asl 	a 							; twelve bits left over address 4,096, so the region's own 8K
 		asl 	a 							; check always fires first
 		ora 	bstrTemp+1
@@ -311,4 +346,5 @@ BankedStrAddCompile:
 ;		07/09/26		Written.
 ;		14/09/26		An embedded compile stops at the first GP.BANKEDSTR with GP.BANKEDSTR NEEDS
 ;						SHARED, at its own line rather than NOT IMPLEMENTED in BStrFlush.
+;		18/09/26		SPC(n) body lines, and GP.BSTRSET shares the two name helpers.
 ;

@@ -140,9 +140,9 @@ RTGPMAGIC = RTBASE-4 						; 4-byte "handlers are loaded too" magic
 ;
 ;		SIXTEEN, because the slot is the top FOUR BITS of the constant every GP.BSTR call site
 ;		already pushes -- see compiler/commands/gpbstr.asm. Four bits leaves twelve for the index,
-;		and 4,096 is above the 2,730 strings an 8K bank can physically hold (two directory bytes
-;		and a length byte each), so the region's own 8K check always fires first and the index
-;		field caps nothing.
+;		and 4,096 is above the 2,047 strings an 8K bank can physically hold (two directory bytes
+;		and a capacity and a length byte each), so the region's own 8K check always fires first
+;		and the index field caps nothing.
 ;
 BSTR_MAX_BANKS = 16 						; text banks a program may have, = the slot field's range
 GPBSTRBANKS = $0A00 - BSTR_MAX_BANKS 		; the table, at the top of the extension page ($09F0)
@@ -270,7 +270,11 @@ FrameStackPages = 8 						; 2K, ~125 frames
 ;		The core shrank enough to move RTGPBASE and RTBASE UP nine pages, $6600 -> $6F00 and $6E00 ->
 ;		$7700: 2,304 bytes more workspace for every shared program, and 379 left below $9F00.
 ;
-RT_ABI = 24 								; runtime ABI ordinal -> "GP24" magic (NOT the file name)
+;		24 -> 25 on 18th September 2026: GP.BSTRSET. Its shifted marker follows gp.bstr in
+;		gp-runtime's gpbstr.asm, so every shifted opcode from gp.call up moved by one. A text bank
+;		record gained a capacity byte in the same change.
+;
+RT_ABI = 25 								; runtime ABI ordinal -> "GP25" magic (NOT the file name)
 
 ; ************************************************************************************************
 ;

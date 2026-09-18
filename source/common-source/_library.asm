@@ -81,6 +81,7 @@ C64_RIGHTDOLLAR          = $c9 ; $c9 right$
 C64_MIDDOLLAR            = $ca ; $ca mid$
 C64_GO                   = $cb ; $cb go
 C64_PI                   = $ff ; $ff pi
+C64_GPCMD_BSTRSET        = $ce4d ; $ce4d gp.bstrset
 C64_RETURNS              = $ce4e ; $ce4e returns
 C64_GPCMD_FN             = $ce4f ; $ce4f gp.fn
 C64_GPCMD_SUB            = $ce50 ; $ce50 gp.sub
@@ -344,9 +345,9 @@ RTGPMAGIC = RTBASE-4 						; 4-byte "handlers are loaded too" magic
 ;
 ;		SIXTEEN, because the slot is the top FOUR BITS of the constant every GP.BSTR call site
 ;		already pushes -- see compiler/commands/gpbstr.asm. Four bits leaves twelve for the index,
-;		and 4,096 is above the 2,730 strings an 8K bank can physically hold (two directory bytes
-;		and a length byte each), so the region's own 8K check always fires first and the index
-;		field caps nothing.
+;		and 4,096 is above the 2,047 strings an 8K bank can physically hold (two directory bytes
+;		and a capacity and a length byte each), so the region's own 8K check always fires first
+;		and the index field caps nothing.
 ;
 BSTR_MAX_BANKS = 16 						; text banks a program may have, = the slot field's range
 GPBSTRBANKS = $0A00 - BSTR_MAX_BANKS 		; the table, at the top of the extension page ($09F0)
@@ -474,7 +475,11 @@ FrameStackPages = 8 						; 2K, ~125 frames
 ;		The core shrank enough to move RTGPBASE and RTBASE UP nine pages, $6600 -> $6F00 and $6E00 ->
 ;		$7700: 2,304 bytes more workspace for every shared program, and 379 left below $9F00.
 ;
-RT_ABI = 24 								; runtime ABI ordinal -> "GP24" magic (NOT the file name)
+;		24 -> 25 on 18th September 2026: GP.BSTRSET. Its shifted marker follows gp.bstr in
+;		gp-runtime's gpbstr.asm, so every shifted opcode from gp.call up moved by one. A text bank
+;		record gained a capacity byte in the same change.
+;
+RT_ABI = 25 								; runtime ABI ordinal -> "GP25" magic (NOT the file name)
 
 ; ************************************************************************************************
 ;
@@ -761,75 +766,76 @@ PCD_DIM              = $dd81 ; dim
 PCD_END              = $dd82 ; end
 PCD_GPCMD_ARRPTR     = $dd83 ; gp.arrptr
 PCD_GPCMD_BSTR       = $dd84 ; gp.bstr
-PCD_GPCMD_CALL       = $dd85 ; gp.call
-PCD_GPCMD_BOX        = $dd86 ; gp.box
-PCD_GPCMD_FILL       = $dd87 ; gp.fill
-PCD_GPCMD_PRINTAT    = $dd88 ; gp.printat
-PCD_GPCMD_COMP       = $dd89 ; gp.comp
-PCD_JOY              = $dd8a ; joy
-PCD_INT              = $dd8b ; int
-PCD_SQR              = $dd8c ; sqr
-PCD_LOG              = $dd8d ; log
-PCD_EXP              = $dd8e ; exp
-PCD_COS              = $dd8f ; cos
-PCD_SIN              = $dd90 ; sin
-PCD_TAN              = $dd91 ; tan
-PCD_ATN              = $dd92 ; atn
-PCD_LINPUT           = $dd93 ; linput
-PCD_BINPUT           = $dd94 ; binput
-PCD_LOAD             = $dd95 ; load
-PCD_BLOAD            = $dd96 ; bload
-PCD_BVLOAD           = $dd97 ; bvload
-PCD_VLOAD            = $dd98 ; vload
-PCD_BSAVE            = $dd99 ; bsave
-PCD_BVERIFY          = $dd9a ; bverify
-PCD_POWEROFF         = $dd9b ; poweroff
-PCD_RESET            = $dd9c ; reset
-PCD_REBOOT           = $dd9d ; reboot
-PCD_MOUSE            = $dd9e ; mouse
-PCD_MB               = $dd9f ; mb
-PCD_MX               = $dda0 ; mx
-PCD_MY               = $dda1 ; my
-PCD_MWHEEL           = $dda2 ; mwheel
-PCD_RPTDOLLAR        = $dda3 ; rpt$
-PCD_MOVSPR           = $dda4 ; movspr
-PCD_SPRITE           = $dda5 ; sprite
-PCD_SPRMEM           = $dda6 ; sprmem
-PCD_ST               = $dda7 ; st
-PCD_STOP             = $dda8 ; stop
-PCD_SYS              = $dda9 ; sys
-PCD_TDATA            = $ddaa ; tdata
-PCD_TATTR            = $ddab ; tattr
-PCD_TILE             = $ddac ; tile
-PCD_TICMD_WRITE      = $ddad ; ti.write
-PCD_TIDOLLARCMD_WRITE = $ddae ; ti$.write
-PCD_WAIT             = $ddaf ; wait
-PCD_I2CPOKE          = $ddb0 ; i2cpoke
-PCD_I2CPEEK          = $ddb1 ; i2cpeek
-PCD_BANK             = $ddb2 ; bank
-PCD_SLEEP            = $ddb3 ; sleep
-PCD_FMINIT           = $ddb4 ; fminit
-PCD_FMNOTE           = $ddb5 ; fmnote
-PCD_FMDRUM           = $ddb6 ; fmdrum
-PCD_FMINST           = $ddb7 ; fminst
-PCD_FMVIB            = $ddb8 ; fmvib
-PCD_FMFREQ           = $ddb9 ; fmfreq
-PCD_FMVOL            = $ddba ; fmvol
-PCD_FMPAN            = $ddbb ; fmpan
-PCD_FMPLAY           = $ddbc ; fmplay
-PCD_FMCHORD          = $ddbd ; fmchord
-PCD_FMPOKE           = $ddbe ; fmpoke
-PCD_PSGINIT          = $ddbf ; psginit
-PCD_PSGNOTE          = $ddc0 ; psgnote
-PCD_PSGVOL           = $ddc1 ; psgvol
-PCD_PSGWAV           = $ddc2 ; psgwav
-PCD_PSGFREQ          = $ddc3 ; psgfreq
-PCD_PSGPAN           = $ddc4 ; psgpan
-PCD_PSGPLAY          = $ddc5 ; psgplay
-PCD_PSGCHORD         = $ddc6 ; psgchord
-PCD_CLS              = $ddc7 ; cls
-PCD_LOCATE           = $ddc8 ; locate
-PCD_COLOR            = $ddc9 ; color
+PCD_GPCMD_BSTRSET    = $dd85 ; gp.bstrset
+PCD_GPCMD_CALL       = $dd86 ; gp.call
+PCD_GPCMD_BOX        = $dd87 ; gp.box
+PCD_GPCMD_FILL       = $dd88 ; gp.fill
+PCD_GPCMD_PRINTAT    = $dd89 ; gp.printat
+PCD_GPCMD_COMP       = $dd8a ; gp.comp
+PCD_JOY              = $dd8b ; joy
+PCD_INT              = $dd8c ; int
+PCD_SQR              = $dd8d ; sqr
+PCD_LOG              = $dd8e ; log
+PCD_EXP              = $dd8f ; exp
+PCD_COS              = $dd90 ; cos
+PCD_SIN              = $dd91 ; sin
+PCD_TAN              = $dd92 ; tan
+PCD_ATN              = $dd93 ; atn
+PCD_LINPUT           = $dd94 ; linput
+PCD_BINPUT           = $dd95 ; binput
+PCD_LOAD             = $dd96 ; load
+PCD_BLOAD            = $dd97 ; bload
+PCD_BVLOAD           = $dd98 ; bvload
+PCD_VLOAD            = $dd99 ; vload
+PCD_BSAVE            = $dd9a ; bsave
+PCD_BVERIFY          = $dd9b ; bverify
+PCD_POWEROFF         = $dd9c ; poweroff
+PCD_RESET            = $dd9d ; reset
+PCD_REBOOT           = $dd9e ; reboot
+PCD_MOUSE            = $dd9f ; mouse
+PCD_MB               = $dda0 ; mb
+PCD_MX               = $dda1 ; mx
+PCD_MY               = $dda2 ; my
+PCD_MWHEEL           = $dda3 ; mwheel
+PCD_RPTDOLLAR        = $dda4 ; rpt$
+PCD_MOVSPR           = $dda5 ; movspr
+PCD_SPRITE           = $dda6 ; sprite
+PCD_SPRMEM           = $dda7 ; sprmem
+PCD_ST               = $dda8 ; st
+PCD_STOP             = $dda9 ; stop
+PCD_SYS              = $ddaa ; sys
+PCD_TDATA            = $ddab ; tdata
+PCD_TATTR            = $ddac ; tattr
+PCD_TILE             = $ddad ; tile
+PCD_TICMD_WRITE      = $ddae ; ti.write
+PCD_TIDOLLARCMD_WRITE = $ddaf ; ti$.write
+PCD_WAIT             = $ddb0 ; wait
+PCD_I2CPOKE          = $ddb1 ; i2cpoke
+PCD_I2CPEEK          = $ddb2 ; i2cpeek
+PCD_BANK             = $ddb3 ; bank
+PCD_SLEEP            = $ddb4 ; sleep
+PCD_FMINIT           = $ddb5 ; fminit
+PCD_FMNOTE           = $ddb6 ; fmnote
+PCD_FMDRUM           = $ddb7 ; fmdrum
+PCD_FMINST           = $ddb8 ; fminst
+PCD_FMVIB            = $ddb9 ; fmvib
+PCD_FMFREQ           = $ddba ; fmfreq
+PCD_FMVOL            = $ddbb ; fmvol
+PCD_FMPAN            = $ddbc ; fmpan
+PCD_FMPLAY           = $ddbd ; fmplay
+PCD_FMCHORD          = $ddbe ; fmchord
+PCD_FMPOKE           = $ddbf ; fmpoke
+PCD_PSGINIT          = $ddc0 ; psginit
+PCD_PSGNOTE          = $ddc1 ; psgnote
+PCD_PSGVOL           = $ddc2 ; psgvol
+PCD_PSGWAV           = $ddc3 ; psgwav
+PCD_PSGFREQ          = $ddc4 ; psgfreq
+PCD_PSGPAN           = $ddc5 ; psgpan
+PCD_PSGPLAY          = $ddc6 ; psgplay
+PCD_PSGCHORD         = $ddc7 ; psgchord
+PCD_CLS              = $ddc8 ; cls
+PCD_LOCATE           = $ddc9 ; locate
+PCD_COLOR            = $ddca ; color
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;

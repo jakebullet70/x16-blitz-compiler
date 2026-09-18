@@ -628,11 +628,12 @@ BootRunJmpOffset = BBRunJmp+1 - $0801 		; OPERANDS -- the base page, and the jmp
 ;		eight regions the tables allowed could never have been used.
 ;
 ;		ONE FILE HOLDS ALL OF THEM, NAME.OVL, and it describes itself. Each region is a bank byte,
-;		a page count, and that many pages of data; the last of them is followed by end of file.
-;		There is no directory, no length table and no bank map, so the only thing this page is told
-;		about the regions is the name of the file to open. Read a header, select the bank, read the
-;		pages, repeat. Which banks, in what order, and with what gaps between them are the writer's
-;		business and none of this code's.
+;		a page count, and that many pages of data, and a single BXOVLEND byte follows the last of
+;		them. There is no directory, no length table and no bank map, so this page is told two
+;		things about the regions: the name of the file to open, and the bank to leave selected
+;		when it hands over (see BXRun). Read a header, select the bank, read the pages, repeat
+;		until the marker. Which banks, in what order, and with what gaps between them are the
+;		writer's business and none of this code's.
 ;
 ;		PADDING EVERY REGION UP TO A PAGE is what keeps the count in one byte. A region is capped at
 ;		8,188 bytes, so 32 pages covers the largest one that can exist.
@@ -663,11 +664,14 @@ BootRunJmpOffset = BBRunJmp+1 - $0801 		; OPERANDS -- the base page, and the jmp
 ;		finds it set goes straight to the runtime. This page is never written over -- p-code starts
 ;		at $0A00 and the frame stack is far above -- so the flag sticks.
 ;
-;		A MISSING OVERLAY STOPS, and so does a truncated one. The bank holds whatever the last
-;		program to use it left there, and running that is the one failure this must not have. End of
-;		file in the middle of a region is visible now, where a short .nnn simply loaded and ran. The
-;		programmer owns the overlay file: nothing pairs a .OVL to the .PRG that wants it, by
-;		decision, so a stale one is a stale one.
+;		A MISSING OVERLAY STOPS, and so does a truncated one, wherever it was cut. The bank holds
+;		whatever the last program to use it left there, and running that is the one failure this
+;		must not have. THE END MARKER IS WHAT MAKES EVERY CUT VISIBLE: a whole file reaches end of
+;		file only on the marker, so end of file at the end of any page means the file is short.
+;		Before the marker, the last region's last byte was the end of the file. A file cut on a
+;		region boundary, or inside a region's last page, then ended the way a whole file does,
+;		and it ran. The programmer owns the overlay file: nothing pairs a .OVL to the .PRG that
+;		wants it, by decision, so a stale one is a stale one.
 ;
 ;		EVERY LABEL HERE IS GLOBAL AND PREFIXED BX. 64tass scopes a "_" label to the enclosing
 ;		global, and this file sits in the same section as bootstrap.asm; a local here would bind
@@ -682,6 +686,10 @@ BXFILE = 2 									; logical file AND secondary address for the overlay.
 											; A DATA channel, not a LOAD: the file has no load
 											; address of its own and does not go to one place.
 											; Not 1 -- file 1 has been seen to hang a later OPEN.
+BXOVLEND = 1 								; the byte after the last region. Bank 1 is the
+											; runtime's and the compiler refuses GP.BANKED 1, so
+											; no region's bank byte is ever this. object.asm
+											; writes it at ObjStreamClose.
 
 		.section code
 
@@ -733,18 +741,23 @@ BXEntry:
 		bcs 	BXFail 						; never commanded -- a hang with nothing printed.
 
 ; ------------------------------------------------------------------------------------------------
-;		One region: a bank byte, a page count, and that many pages into $A000 in that bank.
+;		One region: a bank byte, a page count, and that many pages into $A000 in that bank. Or
+;		the end marker, and the overlay is in.
 ;
-;		THE STATUS IS READ AFTER THE BANK BYTE ONLY TO CATCH AN EMPTY FILE. A well-formed .OVL
-;		ends at BXPageEnd below, on the end of file that the last data byte of the last region
-;		sets. The read here is for a .OVL with no regions in it at all, where the byte is not a
-;		bank number and selecting bank 0 would put a page of rubbish in the KERNAL's own bank.
+;		THE MARKER IS TESTED BEFORE THE STATUS. It is the file's last byte, so reading it sets
+;		end of file, and a status test first would call a whole file short.
+;
+;		A BANK BYTE READ AT END OF FILE MEANS AN EMPTY FILE. A file cut between two regions has
+;		already failed at the page check below, so only the first read can get here. What it
+;		read is not a bank number, and selecting it would put a page of rubbish in that bank.
 ; ------------------------------------------------------------------------------------------------
 BXRegion:
-		jsr 	X16_ACPTR 					; the region's bank
+		jsr 	X16_ACPTR 					; the region's bank, or the end marker
+		cmp 	#BXOVLEND
+		beq 	BXAllDone
 		tax 								; READST leaves X alone; ACPTR is not asked to
 		jsr 	X16_READST
-		bne 	BXAllDone
+		bne 	BXFail 						; an empty file
 		;
 		;		?RAM IS PER REGION NOW, and stricter for being so: the bank actually asked for against
 		;		the highest bank actually fitted, one region at a time. It used to be a single check of
@@ -775,18 +788,15 @@ BXStore:
 		bne 	BXByteIn
 		inc 	BXStore+2
 		;
-		;		END OF FILE IS CHECKED ONCE A PAGE, which finds a truncated file to within a page and
-		;		costs nothing at all inside the byte loop. In mid region it means the file is short and
-		;		is an error; on a region boundary it is the end of the overlay and the normal way out.
+		;		END OF FILE IS CHECKED ONCE A PAGE, and at the end of any page it is an error. A
+		;		whole file reaches it only on the marker, so a cut anywhere -- inside a page, on a
+		;		page boundary, on a region boundary -- is found within a page. It costs nothing
+		;		inside the byte loop.
 		;
+		jsr 	X16_READST
+		bne 	BXFail 						; the file is short
 		dec 	BXPages
-		beq 	BXPageEnd
-		jsr 	X16_READST
-		bne 	BXFail 						; short file, in the middle of a region
-		bra 	BXPage
-BXPageEnd:
-		jsr 	X16_READST
-		bne 	BXAllDone 					; clean end of file, on a region boundary
+		bne 	BXPage
 		bra 	BXRegion
 
 ; ------------------------------------------------------------------------------------------------
@@ -802,6 +812,17 @@ BXAllDone:
 		;		it lies -- so the handover is the page arriving, and there is no code.
 		;
 BXRun:
+		;
+		;		THE BANK IS SET HERE, NOT LEFT WHERE THE LOADING LEFT IT. A program that falls into
+		;		a GP.BANKED region from the line above reaches it by a plain GOTO, which selects no
+		;		bank, so the region runs in whatever bank the program started in. That used to be
+		;		the bank of the last region read, which was the last GP.BANKED region. GP.BANKEDSTR
+		;		text banks are read after every region, so they took its place, and falling in ran
+		;		text as p-code. The compiler patches in the last GP.BANKED region's bank instead.
+		;		A second RUN, which reads nothing, now starts in the same bank as the first.
+		;
+		lda 	BXStartBank
+		sta 	$00
 		lda 	BXBase
 		ldx 	BXWS
 		ldy 	BXWSEnd
@@ -872,6 +893,8 @@ BXWS:
 		.byte 	0
 BXWSEnd:
 		.byte 	0
+BXStartBank:
+		.byte 	0 							; PATCHED -- the bank selected at the handover
 
 BXErrText:
 		.text 	"?OVL", 13, 0
@@ -906,6 +929,7 @@ ProgramBootExtEnd: 							; PHYSICAL end -- (End - Start) == 256 bytes
 BootExtNameLenOffset = BXNameLen - $0900
 BootExtNameOffset = BXName - $0900
 BootExtBStrOffset = BXBStrBanks - $0900 	; the GP.BSTR slot -> bank table, BSTR_MAX_BANKS long
+BootExtStartBankOffset = BXStartBank - $0900
 BootExtEntry = BXEntry 						; the address the bootstrap's jmp is patched to
 
 		.send 	code
@@ -2657,10 +2681,10 @@ _WOCSExtCopy:
 		;		compiler only ever emits a slot it has filled in. Copying all of it means nothing
 		;		here has to know how many there are.
 		;
-		;		AND THE NAME THE LOADER ASKS FOR, which is now the whole of what this page is told
-		;		about the regions. There is no bank map and no highest bank any more: the overlay
+		;		AND THE NAME THE LOADER ASKS FOR, which with the start bank below is all this page
+		;		is told about the regions. There is no bank map and no highest bank any more: the overlay
 		;		file names the bank each region wants, in the order they were written, and the
-		;		bootstrap reads it header by header until EOF. See ObjBuildOverlayName.
+		;		bootstrap reads it header by header until the end marker. See ObjBuildOverlayName.
 		;
 		;		BXHigh IS LEFT AT THE TEMPLATE'S ZERO, which is what it should be: it is the re-run
 		;		guard now and nothing else. The page zeroes it once it has loaded the overlay, so a
@@ -2672,6 +2696,29 @@ _WOCSExtBStr:
 		sta 	imageBuffer+BootExtBStrOffset,x
 		dex
 		bpl 	_WOCSExtBStr
+		;
+		;		THE BANK THE PROGRAM STARTS IN, which is the last GP.BANKED region's: the one a
+		;		program falling into a region from the line above expects (see BXRun). The text
+		;		banks are the last layout entries, one for each slot with a bank, so the regions
+		;		below them are the layout count less the slots in use. Not bstrBankCount, which
+		;		pass two has reset and not yet counted again. A program with text and no
+		;		GP.BANKED region starts in its last text bank, as it did before.
+		;
+		lda 	layoutCount
+		ldx 	#BSTR_MAX_BANKS-1
+_WOCSExtCount:
+		ldy 	bstrBankNums,x
+		beq 	_WOCSExtCountNext
+		dec 	a
+_WOCSExtCountNext:
+		dex
+		bpl 	_WOCSExtCount
+		tax 								; the GP.BANKED regions below the text
+		bne 	_WOCSExtStart
+		ldx 	layoutCount 				; none, so the last text bank
+_WOCSExtStart:
+		lda 	gpBankBanks-1,x
+		sta 	imageBuffer+BootExtStartBankOffset
 		;
 		jsr 	ObjBuildOverlayName 		; <object>.OVL, complete -- the page pokes nothing
 		ldx 	ovlNameLen
@@ -3133,6 +3180,15 @@ ObjStreamClose:
 		lda 	ovlStreamLive 				; and the overlay is whole: close it, if this program had
 		beq 	_OSCDone 					; any regions at all
 		stz 	ovlStreamLive
+		;
+		;		THE END MARKER GOES ON FIRST, after the GP.BANKEDSTR text banks too -- BStrFlush has
+		;		sent those out before this end-of-pass hook runs. It is what lets the loader tell a
+		;		whole file from a cut one: without it the last region's last byte is end of file,
+		;		and so is a file cut short on a region boundary. See BXOVLEND in bootstrap2.asm.
+		;
+		jsr 	IOSelectOverlay 			; the flush above left the object selected
+		lda 	#BXOVLEND
+		jsr 	IOWriteByte
 		jmp 	IOOverlayClose
 _OSCDone:
 		rts
@@ -3183,8 +3239,9 @@ _OERSpan:
 ;		Region objRgnNo, objSpan bytes of it, appended to <object>.OVL -- ONE overlay file for
 ;		the program, holding every region one after another. Each is introduced by two bytes,
 ;		the bank it loads into and how many pages of it follow, and the bootstrap walks the
-;		file header by header until it reads EOF. There is no directory and no length table:
-;		the file describes itself in the order it is written.
+;		file header by header until it reads the end marker ObjStreamClose puts after the last.
+;		There is no directory and no length table: the file describes itself in the order it
+;		is written.
 ;
 ;		PADDED UP TO THE PAGE COUNT, which is what lets the count be one byte. A region is
 ;		capped at 8,188 bytes, so 32 pages covers the largest, and the pad is zero for every

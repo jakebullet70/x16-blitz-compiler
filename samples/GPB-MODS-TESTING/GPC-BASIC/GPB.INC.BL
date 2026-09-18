@@ -265,8 +265,10 @@
 ## ---- GP.BSTR(<name>,n). GP.BSTRCOUNT(<name>) is the group's size, a compile-time
 ## ---- constant. The body lines are BARE QUOTED STRINGS, not REMs: BASLOAD upper-cases
 ## ---- REM text and would destroy the case of every string.
+## ---- GP.BSTRSET <name>,n,A$ writes one, cut to fit; a SPC(n) line is an empty slot.
 #TOKEN GP.BSTR 52821
 #TOKEN GP.BSTRCOUNT 52820
+#TOKEN GP.BSTRSET 52813
 #TOKEN GP.BANKEDSTR 52819
 #TOKEN GP.ENDBANKEDSTR 52818
 

@@ -538,10 +538,10 @@ _WOCSExtCopy:
 		;		compiler only ever emits a slot it has filled in. Copying all of it means nothing
 		;		here has to know how many there are.
 		;
-		;		AND THE NAME THE LOADER ASKS FOR, which is now the whole of what this page is told
-		;		about the regions. There is no bank map and no highest bank any more: the overlay
+		;		AND THE NAME THE LOADER ASKS FOR, which with the start bank below is all this page
+		;		is told about the regions. There is no bank map and no highest bank any more: the overlay
 		;		file names the bank each region wants, in the order they were written, and the
-		;		bootstrap reads it header by header until EOF. See ObjBuildOverlayName.
+		;		bootstrap reads it header by header until the end marker. See ObjBuildOverlayName.
 		;
 		;		BXHigh IS LEFT AT THE TEMPLATE'S ZERO, which is what it should be: it is the re-run
 		;		guard now and nothing else. The page zeroes it once it has loaded the overlay, so a
@@ -553,6 +553,29 @@ _WOCSExtBStr:
 		sta 	imageBuffer+BootExtBStrOffset,x
 		dex
 		bpl 	_WOCSExtBStr
+		;
+		;		THE BANK THE PROGRAM STARTS IN, which is the last GP.BANKED region's: the one a
+		;		program falling into a region from the line above expects (see BXRun). The text
+		;		banks are the last layout entries, one for each slot with a bank, so the regions
+		;		below them are the layout count less the slots in use. Not bstrBankCount, which
+		;		pass two has reset and not yet counted again. A program with text and no
+		;		GP.BANKED region starts in its last text bank, as it did before.
+		;
+		lda 	layoutCount
+		ldx 	#BSTR_MAX_BANKS-1
+_WOCSExtCount:
+		ldy 	bstrBankNums,x
+		beq 	_WOCSExtCountNext
+		dec 	a
+_WOCSExtCountNext:
+		dex
+		bpl 	_WOCSExtCount
+		tax 								; the GP.BANKED regions below the text
+		bne 	_WOCSExtStart
+		ldx 	layoutCount 				; none, so the last text bank
+_WOCSExtStart:
+		lda 	gpBankBanks-1,x
+		sta 	imageBuffer+BootExtStartBankOffset
 		;
 		jsr 	ObjBuildOverlayName 		; <object>.OVL, complete -- the page pokes nothing
 		ldx 	ovlNameLen
@@ -1014,6 +1037,15 @@ ObjStreamClose:
 		lda 	ovlStreamLive 				; and the overlay is whole: close it, if this program had
 		beq 	_OSCDone 					; any regions at all
 		stz 	ovlStreamLive
+		;
+		;		THE END MARKER GOES ON FIRST, after the GP.BANKEDSTR text banks too -- BStrFlush has
+		;		sent those out before this end-of-pass hook runs. It is what lets the loader tell a
+		;		whole file from a cut one: without it the last region's last byte is end of file,
+		;		and so is a file cut short on a region boundary. See BXOVLEND in bootstrap2.asm.
+		;
+		jsr 	IOSelectOverlay 			; the flush above left the object selected
+		lda 	#BXOVLEND
+		jsr 	IOWriteByte
 		jmp 	IOOverlayClose
 _OSCDone:
 		rts
@@ -1064,8 +1096,9 @@ _OERSpan:
 ;		Region objRgnNo, objSpan bytes of it, appended to <object>.OVL -- ONE overlay file for
 ;		the program, holding every region one after another. Each is introduced by two bytes,
 ;		the bank it loads into and how many pages of it follow, and the bootstrap walks the
-;		file header by header until it reads EOF. There is no directory and no length table:
-;		the file describes itself in the order it is written.
+;		file header by header until it reads the end marker ObjStreamClose puts after the last.
+;		There is no directory and no length table: the file describes itself in the order it
+;		is written.
 ;
 ;		PADDED UP TO THE PAGE COUNT, which is what lets the count be one byte. A region is
 ;		capped at 8,188 bytes, so 32 pages covers the largest, and the pad is zero for every
