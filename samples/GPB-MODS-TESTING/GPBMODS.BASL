@@ -23,6 +23,10 @@
 #DEFINE GM.THEMECODE 9
 #DEFINE GM.COMBOCODE 10
 #DEFINE GM.MODSCODE 11
+#DEFINE GM.MENUCODE 12
+
+## ---- The menu bar sits on row 0 and its first item starts here.
+#DEFINE GM.BARX 1
 
 ## ---- THE GUI RUNS FROM A RAM BANK, AND SO DO THE UTILITIES AND THE FILE
 ## ---- MODULES. Each region below is the modules' ordinary .INC.BL files
@@ -48,9 +52,11 @@
 ## ---- compiler refuses inside a region: STASH and STASHFILE. GPB.INC.BL is
 ## ---- definitions and no code.
 
+
+## ---- we skip GP.BANKED as they are compiler time statments
 GOTO GM.LIBEND
 
-## ---- THE UTILITIES. Copy these nine.
+## ---- THE UTILITIES. all utilities in 1 bank, Copy these nine.
 GP.BANKED GM.UTILCODE
 #INCLUDE "APPSYS.INC.BL"
 #INCLUDE "BANKMGR.INC.BL"
@@ -67,7 +73,8 @@ GP.ENDBANKED
 ## ---- region reached the 8K a region may hold. Moving it back would fail the
 ## ---- build with GP.BANKED REGION OVER 8K.
 ## ----
-## ---- IT COMES BEFORE THE GUI REGION because the modules down there read the
+## ---- IT COMES BEFORE THE GUI (or anything that uses it) REGION because the 
+## ---- modules down there read the
 ## ---- THEME role numbers, which are #DEFINEs, and BASLOAD resolves a #DEFINE
 ## ---- only if it has already read it. THEME.CLR itself is an ordinary array
 ## ---- and would not care.
@@ -75,10 +82,20 @@ GP.BANKED GM.THEMECODE
 #INCLUDE "THEME.INC.BL"
 GP.ENDBANKED
 
-## ----  GUI crap in a bank! Copy these five
+## ---- THE MENUS: the builder and the dropdown runner, which the bar, every
+## ---- dropdown and GUI.MENU are built with. The builder's store is text
+## ---- bank MENU.TEXTBANK, which the first MENU.BEGIN claims.
+## ----
+## ---- IT COMES BEFORE THE GUI REGION because GUI.MENU reads the MENU
+## ---- #DEFINEs. Neither reads a GUI name.
+GP.BANKED GM.MENUCODE
+#INCLUDE "MENU.INC.BANKED.BL"
+#INCLUDE "MENU.INC.BL"
+#INCLUDE "MENUPULL.INC.BL"
+GP.ENDBANKED
+
+## ----  GUI crap in a bank! Copy these four
 GP.BANKED GM.GUICODE
-#INCLUDE "MENUVERT.INC.BL"
-#INCLUDE "MENUBAR.INC.BL"
 #INCLUDE "LINEINPUT.INC.BL"
 #INCLUDE "GUI.INC.BL"
 #INCLUDE "GUI2.INC.BL"
@@ -103,19 +120,25 @@ GP.BANKED GM.FUTILCODE
 #INCLUDE "FILEDIR.INC.BL"
 GP.ENDBANKED
 
+## ---- MENUKEY RUNS THE BAR FROM THE SHELL'S KEY LOOP. It is not in a region:
+## ---- it reads the keyboard layout under BANK 0, which a region may not do.
+## ---- AFTER THE LAST REGION: its closing GOTO lands on the line after it, and a
+## ---- GOTO onto a GP.BANKED line is a GOTO into a region, which is refused.
+#INCLUDE "MENUKEY.INC.BL"
+
+## ---- Banks of any code can be put together as long as they fit.
+
 
 GP.BANKEDSTR GM.TEXTBANK BS.LIBEND
-  "CODE BANK IS ALREADY TAKEN"
   "NO SCRATCH BANK LEFT"
   "NOTHING RUN YET"
-  "TEXT BANK IS ALREADY TAKEN"
   "NO DIRECTORY BANK LEFT"
-  "UTILITY BANK IS ALREADY TAKEN"
-  "FILEDIR BANK IS ALREADY TAKEN"
-  "THEME BANK IS ALREADY TAKEN"
-  "COMBO BANK IS ALREADY TAKEN"
-  "MODULE BANK IS ALREADY TAKEN"
 GP.ENDBANKEDSTR
+
+## ---- THE SHELL'S MENUS, in a file of their own. Here, behind the GOTO, and not
+## ---- at the bottom: the THEME panel reads BS.DD.THEME, and a text group has to
+## ---- be declared before a line uses it.
+#INCLUDE "GPB-MENUS.BASL"
 GM.LIBEND:
 
 ## ***********************************************************************
@@ -132,24 +155,25 @@ GM.LIBEND:
 ## **  named GPBFILE.* or GPBDIR, and the two files are scratched by the row
 ## **  that made them. The directory is not: FILEIO has no RMDIR.
 ## **
-## **  The shell is itself a test of three modules: MENUBAR drives the bar,
-## **  MENUVERT every dropdown, and STASH puts the screen back under a closed one.
+## **  The shell is itself a test of the menu builder: every menu is built
+## **  once and MENU.KEY runs them from the shell's key loop. GPB-MENUS.BASL
+## **  holds all of it.
 ## **
 ## **  It also holds every module at once, which is what the p-code map is
 ## **  read off. See PLAN.md.
 ## **
 ## **  Keys:
-## **      LEFT RIGHT    walk the bar
-## **      DOWN RETURN   open the dropdown under the marked item
+## **      ESC           opens the first dropdown, and closes an open one
+## **      ALT+letter    opens the dropdown under that bar item
 ## **      LEFT RIGHT    with a dropdown open, move to the next one
 ## **      UP DOWN       walk the dropdown, RETURN chooses
-## **      ESC           closes the dropdown, then leaves the program
+## **      FILES / QUIT  leaves the program
 ## **
 ## **  FIVE BANKS. Two are picked while the object is written and so are named
 ## **  in the source -- 4 for the GUI and FILEDIR code, 5 and 6 for the literal
 ## **  text -- and are CLAIMED from BANKMGR so nothing else is handed them.
 ## **  Three are asked for at run time and could be any number that is free:
-## **  the cells under an open dropdown, the cells under a dialog, and the
+## **  the cells the STASH panels save, the cells under a dialog, and the
 ## **  buffer one directory listing is read into. ABOUT / BANK MAP and
 ## **  ABOUT / MEMORY read all five back.
 ## **
@@ -162,17 +186,11 @@ GM.LIBEND:
 ## The screen this is laid out for. 1 is 80x30, 0 is 80x60.
 #DEFINE GM.MODE 1
 
-## The bar sits on row 0 and the first item starts here.
-#DEFINE GM.BARX 1
 
-## PETSCII, as GET reports it -- the two keys MENUVERT.KEYEXIT hands back.
-#DEFINE GM.LEFT 157
-#DEFINE GM.RIGHT 29
-
-## The caller owns the DIM. Thirty-two covers the bar's nine, the longest
-## dropdown, and the twenty-four row list GUI.LISTBOX is shown with. Do not
-## also leave it implicit.
-DIM MENUVERT.ITEM$(32)
+## The caller owns the DIM: the twenty-four rows GUI.LISTBOX is shown with.
+## Do not also leave it implicit.
+DIM GUI.LIST.ITEM$(24)
+DIM COMBO.ITEM$(4)
 
 ## STR.SPLIT's fields. Nothing here calls STR.SPLIT any more -- the panel uses
 ## STR.SCAN, which DIMs its own STR.POS% -- but STRINGS.INC.BL still compiles the
@@ -195,7 +213,7 @@ DIM GM.FLEN%(3)
 DIM GM.FMASK%(3)
 DIM GM.FLD$(3)
 
-## FILE.LINE$() is the caller's DIM, like MENUVERT.ITEM$. Sixteen because
+## FILE.LINE$() is the caller's DIM, like GUI.LIST.ITEM$. Sixteen because
 ## FILES / SAVEARRAY + LOADARRAY sets FILE.MAX.ROWS to 16 to show a load coming
 ## back short; the implicit DIM would only give 10.
 DIM FILE.LINE$(16)
@@ -210,7 +228,7 @@ SCREEN GM.MODE
 GP.CALL APPSYS.SCRMODE, 0, 0, 0, 1
 APPSYS.COLS = GP.X : APPSYS.ROWS = GP.Y
 
-THEME.ID = 0 : GOSUB THEME.SELECT
+THEME.ID = 3 : GOSUB THEME.SELECT
 
 ## A CODE BANK IS CLAIMED AND A DATA BANK IS ALLOCATED, and the difference is
 ## not a style choice. GP.BANKED takes a decimal constant read while the object
@@ -222,96 +240,77 @@ THEME.ID = 0 : GOSUB THEME.SELECT
 ## the program runs, so nothing names them. They are whatever is free.
 GOSUB BANKMGR.INIT : GM.BANKFAIL$ = ""
 
-BANKMGR.SET.BANK = GM.GUICODE : GOSUB BANKMGR.CLAIM
-IF BANKMGR.OK = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 0)
+## A claim fails only if this program claims one bank twice, so none is checked.
+GP.SUB BANKMGR.CLAIM.BANK, GM.GUICODE
+GP.SUB BANKMGR.CLAIM.BANK, GM.TEXTBANK
+GP.SUB BANKMGR.CLAIM.BANK, GM.TEXTBANKB
+GP.SUB BANKMGR.CLAIM.BANK, GM.UTILCODE
+GP.SUB BANKMGR.CLAIM.BANK, GM.FUTILCODE
+GP.SUB BANKMGR.CLAIM.BANK, GM.THEMECODE
+GP.SUB BANKMGR.CLAIM.BANK, GM.COMBOCODE
+GP.SUB BANKMGR.CLAIM.BANK, GM.MODSCODE
+GP.SUB BANKMGR.CLAIM.BANK, GM.MENUCODE
 
-BANKMGR.SET.BANK = GM.TEXTBANK : GOSUB BANKMGR.CLAIM
-IF BANKMGR.OK = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 3)
-
-BANKMGR.SET.BANK = GM.TEXTBANKB : GOSUB BANKMGR.CLAIM
-IF BANKMGR.OK = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 3)
-
-BANKMGR.SET.BANK = GM.UTILCODE : GOSUB BANKMGR.CLAIM
-IF BANKMGR.OK = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 5)
-
-BANKMGR.SET.BANK = GM.FUTILCODE : GOSUB BANKMGR.CLAIM
-IF BANKMGR.OK = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 6)
-
-BANKMGR.SET.BANK = GM.THEMECODE : GOSUB BANKMGR.CLAIM
-IF BANKMGR.OK = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 7)
-
-BANKMGR.SET.BANK = GM.COMBOCODE : GOSUB BANKMGR.CLAIM
-IF BANKMGR.OK = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 8)
-
-BANKMGR.SET.BANK = GM.MODSCODE : GOSUB BANKMGR.CLAIM
-IF BANKMGR.OK = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 9)
+## The menus are built here and not later, because the first MENU.BEGIN is what
+## claims MENU.TEXTBANK, and that has to happen before the free banks are asked for.
+GOSUB GMX.MENU.SETUP
 
 GOSUB BANKMGR.GET.FREE.BANK : GM.DDBANK% = BANKMGR.BANK
 GOSUB BANKMGR.GET.FREE.BANK : GM.GUIBANK% = BANKMGR.BANK
-IF GM.GUIBANK% = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 1)
+IF GM.GUIBANK% = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 0)
 
 ## A whole bank for one directory listing, read in one go and then walked
 ## without going near the drive again. See FILES / FILE.DIR.OPEN.
 GOSUB BANKMGR.GET.FREE.BANK : GM.DIRBANK% = BANKMGR.BANK
-IF GM.DIRBANK% = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 4)
+IF GM.DIRBANK% = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 2)
 
 IF GM.BANKFAIL$ <> "" THEN GOTO GM.BANKSTOP
 
-## STASHVRAM KEEPS ITS HANDLE TABLE IN THE CALLER'S ARRAYS, so the caller
-## dims them, and SV.MAX has to agree with the DIM or SV.RESET walks off the
-## end. Eight is what the panel needs and the table costs 2 bytes an entry.
-SV.MAX = 8
-DIM SV.PAGE%(SV.MAX) : DIM SV.PAGES%(SV.MAX)
-GOSUB SV.INIT
-IF SV.OK = 0 THEN GM.BANKFAIL$ = SV.ERROR$
+## STASHVRAM KEEPS ITS HANDLE TABLE IN ARRAYS MENUPULL DIMS, and the dropdowns
+## and the VRAM panel share it. Eight handles is what the panel needs and the
+## table costs 2 bytes an entry. MENUPULL.SVSTART does the DIM and SV.INIT.
+SV.MAX = 8 : GOSUB MENUPULL.SVSTART
+IF SV.OK = 0 THEN GM.BANKFAIL$ = SV.ERROR$ : GOTO GM.BANKSTOP
 
 ## FILEDIR sizes FILE.NAME$ here and keeps the block's address. Nothing may
 ## assign a longer name afterwards -- see FILEDIR.INC.BL, "assign either
 ## after FILE.DIR.INIT".
 GOSUB FILE.DIR.INIT
 
-GM.SEL% = 1 : GM.OPEN% = 0
+GM.SEL% = 1
 
 ## Where a panel writes what it got back, and what stands there before one has run.
-GM.RESY% = APPSYS.ROWS - 3 : GM.RESULT$ = GP.BSTR(BS.LIBEND, 2)
+GM.RESY% = APPSYS.ROWS - 3 : GM.RESULT$ = GP.BSTR(BS.LIBEND, 1)
 
 GOSUB GMX.CHROME
 
-## ---- The shell. GM.OPEN% is set by a dropdown that ended on LEFT or RIGHT,
-## ---- and it means "the bar has already moved, go straight back down".
-## ----
-## ---- GM.DODROP% IS WHAT A REFUSED QUIT NEEDS. ESC on the bar returns SEL 0,
-## ---- and answering NO to the prompt leaves that 0 standing -- so GM.SEL% must
-## ---- not be written from it, and the dropdown must not open on it. The flag
-## ---- is the only thing that separates "chose nothing" from "chose item n".
+## ---- ALT with a bar hot key types that key from here on. MENU.KEYS.OFF puts
+## ---- the layout back, and must run before the program ends.
+GOSUB MENU.KEYS.ON
+
+## ---- The shell. Every key goes to GMX.MENU.KEY, which opens the menus and runs
+## ---- the row chosen. No key goes too, as 0: that is how it sees ALT tapped alone. FILES / QUIT sets GM.QUIT%, and a NO leaves it 0.
 
 GP.DO
-  GM.DODROP% = 1
-  GP.IF GM.OPEN% = 0 THEN
-    GOSUB GMX.BAR
-    GP.IF MENUBAR.SEL = 0 THEN
-      GOSUB GMX.QUIT
-      GP.IF GM.QUIT% <> 0 THEN
-        GP.EXITDO
-      GP.ENDIF
-      GM.DODROP% = 0
-    GP.ELSE
-      GM.SEL% = MENUBAR.SEL
-    GP.ENDIF
+  GET GM.KEY$
+  GM.KEY = 0
+  IF GM.KEY$ <> "" THEN GM.KEY = ASC(GM.KEY$)
+  GOSUB GMX.MENU.KEY
+  GP.IF GM.QUIT% <> 0 THEN
+    GP.EXITDO
   GP.ENDIF
-  GM.OPEN% = 0
-  IF GM.DODROP% = 1 THEN GOSUB GMX.DROP
 GP.LOOP
 
+GOSUB MENU.KEYS.OFF
 GOSUB APPSYS.RESTORE
 END
 
 
 ## ***********************************************************************
-## **  GMX.QUIT -- ESC on the bar asks before it leaves.
+## **  GMX.QUIT -- FILES / QUIT asks before it leaves.
 ## **
 ## **  GUI.YN PUTS THE SCREEN BACK ITSELF, so a NO needs nothing repainted:
-## **  the loop goes straight round to GMX.BAR with the bar exactly as the
+## **  the loop goes straight round to GET with the bar exactly as the
 ## **  dialog found it.
 ## **
 ## **  GUI.ANSWER IS -1 FOR YES, not 1. Tested against 0 rather than 1 for
@@ -339,13 +338,13 @@ GMX.QUIT:  GOSUB GMX.D.RESET
 ## **  IT PUTS THE BAR BACK ITSELF. The second GP.FILL blanks row 0, and a
 ## **  panel that repaints the chrome and then waits for a key -- GMX.THEME
 ## **  does exactly that, on purpose -- would sit there with an empty bar
-## **  until the next GMX.BAR redrew it.
+## **  until something else redrew it.
 ## ***********************************************************************
 
 
 GP.BANKEDSTR GM.TEXTBANK BS.CHROME
   "GPB-MODS-TESTING -- A DEVELOPMENT HARNESS FOR THE GPC-BASIC LIBRARY"
-  "<- ->  BAR   DOWN  OPEN   TAB  FOCUS   RETURN  CHOOSE   ESC  BACK / QUIT"
+  "ALT / ESC  MENU   <- ->  NEXT MENU   RETURN  CHOOSE   TAB  FOCUS"
 GP.ENDBANKEDSTR
 GP.BANKEDSTR GM.TEXTBANK BS.HEAP
   "HEAP  FRE(0) "
@@ -384,22 +383,6 @@ GMX.HEAP:
   RETURN
 
 
-## ---- GMX.BARDRAW -- every bar item, and the highlight if there is one to
-## ---- put. GM.BARWAS% is what is highlighted ON SCREEN right now, which is
-## ---- what lets GMX.DROP repaint two items instead of nine. Cleared first,
-## ---- so a GP.STOP between the two draws leaves it honest.
-## ----
-## ---- GM.SEL% is 0 before the first pass round the shell, and MENUBAR.MARK on
-## ---- item 0 would read MENUVERT.ITEM$(0), which nothing fills.
-
-GMX.BARDRAW:
-  GOSUB GMX.BAR.LOAD : GM.BARWAS% = 0 : GOSUB MENUBAR.DRAW
-  GP.IF GM.SEL% > 0 THEN
-    MENUBAR.SEL = GM.SEL% : GOSUB MENUBAR.MARK : GM.BARWAS% = GM.SEL%
-  GP.ENDIF
-  RETURN
-
-
 ## ***********************************************************************
 ## **  GMX.RESULT -- what the last panel came back with.
 ## **
@@ -417,326 +400,22 @@ GMX.RESULT:
 
 
 ## ***********************************************************************
-## **  GMX.BAR -- draw the bar and drive it.
-## **
-## **   out  MENUBAR.SEL   the item, or 0 if ESC ended it
-## **
-## **  DOWNEXIT is what makes this a bar over dropdowns: DOWN ends the call
-## **  so the caller can open the panel. KEEPMARK leaves the highlight on
-## **  while it is open.
-## ***********************************************************************
-
-GMX.BAR:
-  GOSUB GMX.BAR.LOAD : MENUBAR.FLAGS = MENUBAR.DOWNEXIT + MENUBAR.KEEPMARK
-  MENUBAR.SEL = GM.SEL% : GOSUB MENUBAR.RUN
-  GM.BARWAS% = MENUBAR.SEL
-  RETURN
-
-
-## ---- The bar's own array. MENUBAR and MENUVERT share it, so it is reloaded
-## ---- on every use of either. An item's width is its text, which is why the
-## ---- padding is in the string.
-
-
-GP.BANKEDSTR GM.TEXTBANK BS.BAR.LOAD
-  "DLISGATBF"
-  " DIALOG "
-  " LISTS "
-  " INPUT "
-  " SCREEN "
-  " STRINGS "
-  " DATA "
-  " THEME "
-  " ABOUT "
-  " FILES "
-GP.ENDBANKEDSTR
-GMX.BAR.LOAD:
-
-## The hotkey string is index 0, where a dropdown keeps its title. A hotkey need
-## not be an item's initial -- SCREEN and STRINGS both start S, so STRINGS answers
-## to G. HOTATTR tints whichever letter it finds.
-  MENUVERT.HOT$ = GP.BSTR(BS.BAR.LOAD, 0)
-  MENUVERT.COUNT = GP.BSTRCOUNT(BS.BAR.LOAD) - 1
-
-## GM.BARN% is the same number, kept. MENUVERT.COUNT is the dropdown's by the time
-## GMX.DROP walks sideways off one, so the bar's own count has to survive that.
-  GM.BARN% = MENUVERT.COUNT
-  FOR GM.I = 1 TO MENUVERT.COUNT
-    MENUVERT.ITEM$(GM.I) = GP.BSTR(BS.BAR.LOAD, GM.I)
-  NEXT GM.I
-  MENUVERT.ATTR    = THEME.CLR(THEME.TEXT)
-  MENUVERT.HIATTR  = THEME.CLR(THEME.HILITE)
-  MENUVERT.HOTATTR = THEME.CLR(THEME.TITLE)
-  MENUBAR.X = GM.BARX : MENUBAR.Y = 0 : MENUBAR.GAP = 0
-  RETURN
-
-
-## ***********************************************************************
-## **  GMX.DROP -- the dropdown under the marked bar item.
-## **
-## **  Re-marks the bar first, so this is the same whether it was reached from
-## **  MENUBAR.RUN or from a sideways exit out of another dropdown.
-## **  MENUBAR.WHERE then reports the column and width of the item.
-## **
-## **  TWO ITEMS, NOT NINE. A sideways exit comes straight back here, so this
-## **  is the walk when a dropdown is open, and redrawing the whole bar a step
-## **  makes it crawl. GM.BARWAS% says what the highlight is sitting on, so the
-## **  bar only has to be drawn whole when nothing is on it.
-## **
-## **  KEYEXIT hands LEFT and RIGHT back instead of swallowing them, which is
-## **  the other half of MENUBAR.DOWNEXIT.
-## ***********************************************************************
-
-GMX.DROP:
-  GOSUB GMX.BAR.LOAD : MENUBAR.SEL = GM.SEL%
-  GP.IF GM.BARWAS% = 0 THEN
-    GOSUB MENUBAR.DRAW
-  GP.ELSE
-    MENUBAR.DRAWN = GM.BARWAS% : MENUBAR.PAINT = MENUVERT.ATTR
-    GOSUB MENUBAR.ITEM
-  GP.ENDIF
-  GOSUB MENUBAR.MARK : GM.BARWAS% = GM.SEL% : GOSUB MENUBAR.WHERE : GOSUB GMX.DD.LOAD
-
-## ---- the highlight is one cell wider than the longest row ----
-  GM.DDW% = 0
-  FOR GM.I = 1 TO MENUVERT.COUNT
-    IF LEN(MENUVERT.ITEM$(GM.I)) > GM.DDW% THEN GM.DDW% = LEN(MENUVERT.ITEM$(GM.I))
-  NEXT GM.I
-  GM.DDW% = GM.DDW% + 1
-
-  GM.DDX% = MENUBAR.SELX : GM.DDY% = 1
-  IF GM.DDX% + GM.DDW% + 2 > APPSYS.COLS THEN GM.DDX% = APPSYS.COLS - GM.DDW% - 2
-
-## ---- what the frame and the rows will cover, saved before either is drawn ----
-  STASH.BANK = GM.DDBANK%
-  STASH.X = GM.DDX% : STASH.Y = GM.DDY%
-  STASH.W = GM.DDW% + 2 : STASH.H = MENUVERT.COUNT + 2
-  GOSUB STASH.SAVE
-
-  GP.FILL GM.DDX%, GM.DDY%, GM.DDW% + 2, MENUVERT.COUNT + 2, ASC(" "), THEME.CLR(THEME.TEXT)
-  GP.BOX GM.DDX%, GM.DDY%, GM.DDW% + 2, MENUVERT.COUNT + 2, 2, THEME.CLR(THEME.BORDER)
-
-  MENUVERT.X = GM.DDX% + 1 :MENUVERT.Y = GM.DDY% + 1
-  MENUVERT.WIDTH = GM.DDW% : MENUVERT.FLAGS = MENUVERT.KEYEXIT
-  MENUVERT.SEL = 0 : GOSUB MENUVERT.RUN
-
-## ---- the screen back, before anything else draws on it ----
-  STASH.BANK = GM.DDBANK% : STASH.MOVE = 0 : GOSUB STASH.RESTORE
-
-  GP.SELECT MENUVERT.KEY
-  GP.CASE GM.LEFT
-    GM.SEL% = GM.SEL% - 1 : IF GM.SEL% < 1 THEN GM.SEL% = GM.BARN%
-    GM.OPEN% = 1
-  GP.CASE GM.RIGHT
-    GM.SEL% = GM.SEL% + 1 : IF GM.SEL% > GM.BARN% THEN GM.SEL% = 1
-    GM.OPEN% = 1
-  GP.OTHER
-    IF MENUVERT.SEL > 0 THEN GOSUB GMX.DISPATCH
-  GP.ENDSEL
-  RETURN
-
-
-## ***********************************************************************
-## **  GMX.DD.LOAD -- one dropdown's rows, and the bar item's name.
-## **
-## **  MENUVERT.HOT$ IS EMPTIED. The bar's letters are still in it otherwise,
-## **  and MENUVERT.HOTKEY would match them against these rows.
-## ***********************************************************************
-
-
-## ---- ONE BLOCK A DROPDOWN, and index 0 is the title. The bar's own block is
-## ---- beside GMX.BAR.LOAD and has the same shape, with its hotkey string in
-## ---- place of a title.
-## ----
-## ---- ADD OR DROP A ROW BY EDITING THE BLOCK AND NOTHING ELSE. The count comes
-## ---- from GP.BSTRCOUNT, the rows are read by a loop, and no other menu moves.
-
-GP.BANKEDSTR GM.TEXTBANK BS.DD.DIALOG
-  "DIALOG"
-  " GUI.SAY"
-  " OK MESSAGE BOX"
-  " GUI.YN"
-  " GUI.MENU"
-  " GUI.INPUT"
-  " GUI.LISTBOX  ONE"
-  " GUI.LISTBOX  MANY"
-  " GUI.OPEN + GUI.CLOSE"
-  " BOX STYLES 0-3"
-  " GUI.SHADOW"
-  " TAB AND THE FOCUS"
-  " CHECK BOX + COMBO"
-GP.ENDBANKEDSTR
-
-GP.BANKEDSTR GM.TEXTBANK BS.DD.LISTS
-  "LISTS"
-  " MENUVERT.RUN"
-  " MENUVERT.DRAW"
-  " MENUVERT.ROW"
-  " MENUBAR.RUN"
-  " HOTKEYS"
-  " FLAGS"
-GP.ENDBANKEDSTR
-
-GP.BANKEDSTR GM.TEXTBANK BS.DD.INPUT
-  "INPUT"
-  " LINEINPUT.GET"
-  " LINEINPUT.ASK"
-  " THREE FIELDS"
-  " LENGTH LIMITS"
-GP.ENDBANKEDSTR
-
-GP.BANKEDSTR GM.TEXTBANK BS.DD.SCREEN
-  "SCREEN"
-  " GP.BOX"
-  " GP.FILL"
-  " GP.PRINTAT"
-  " GP.CHAR"
-  " STASH SAVE + RESTORE"
-  " STASH MOVE"
-  " STASH TO A FILE"
-  " STASHVRAM  SAVE + STAMP"
-GP.ENDBANKEDSTR
-
-GP.BANKEDSTR GM.TEXTBANK BS.DD.STRINGS
-  "STRINGS"
-  " STR.PADR"
-  " STR.PADL"
-  " STR.PADC"
-  " STR.SCAN + FIELD"
-  " STR.REPLACE"
-  " STRCASE  UPPER/LOWER"
-  " STR.USING"
-  " STR.USING.FIX"
-GP.ENDBANKEDSTR
-
-GP.BANKEDSTR GM.TEXTBANK BS.DD.DATA
-  "DATA"
-  " SORT.RUN"
-  " ARRAYS"
-GP.ENDBANKEDSTR
-
-GP.BANKEDSTR GM.TEXTBANK BS.DD.THEME
-  "THEME"
-  " X-SIXTEEN"
-  " DARK"
-  " LIGHT"
-  " GRAY"
-  " CUSTOM"
-GP.ENDBANKEDSTR
-
-GP.BANKEDSTR GM.TEXTBANK BS.DD.ABOUT
-  "ABOUT"
-  " PROGRAM"
-  " MEMORY"
-  " MODULE SIZES"
-  " BANK MAP"
-GP.ENDBANKEDSTR
-
-GP.BANKEDSTR GM.TEXTBANKB BS.DD.FILES
-  "FILES"
-  " FILE.DIR.OPEN"
-  " DIR  BY PATTERN"
-  " DIR  DIRECTORIES"
-  " FILE.STATUS"
-  " FILE.EXISTS"
-  " SAVEARRAY + LOADARRAY"
-  " RENAME + DELETE"
-  " MKDIR + CHDIR"
-GP.ENDBANKEDSTR
-GMX.DD.LOAD:
-  MENUVERT.HOT$ = "" : MENUVERT.HOTATTR = 0
-  MENUVERT.ATTR = THEME.CLR(THEME.TEXT) : MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
-
-  GP.SELECT GM.SEL%
-  GP.CASE 1
-    MENUVERT.COUNT = GP.BSTRCOUNT(BS.DD.DIALOG) - 1
-    FOR GM.I = 1 TO MENUVERT.COUNT
-      MENUVERT.ITEM$(GM.I) = GP.BSTR(BS.DD.DIALOG, GM.I)
-    NEXT GM.I
-  GP.CASE 2
-    MENUVERT.COUNT = GP.BSTRCOUNT(BS.DD.LISTS) - 1
-    FOR GM.I = 1 TO MENUVERT.COUNT
-      MENUVERT.ITEM$(GM.I) = GP.BSTR(BS.DD.LISTS, GM.I)
-    NEXT GM.I
-  GP.CASE 3
-    MENUVERT.COUNT = GP.BSTRCOUNT(BS.DD.INPUT) - 1
-    FOR GM.I = 1 TO MENUVERT.COUNT
-      MENUVERT.ITEM$(GM.I) = GP.BSTR(BS.DD.INPUT, GM.I)
-    NEXT GM.I
-  GP.CASE 4
-    MENUVERT.COUNT = GP.BSTRCOUNT(BS.DD.SCREEN) - 1
-    FOR GM.I = 1 TO MENUVERT.COUNT
-      MENUVERT.ITEM$(GM.I) = GP.BSTR(BS.DD.SCREEN, GM.I)
-    NEXT GM.I
-  GP.CASE 5
-    MENUVERT.COUNT = GP.BSTRCOUNT(BS.DD.STRINGS) - 1
-    FOR GM.I = 1 TO MENUVERT.COUNT
-      MENUVERT.ITEM$(GM.I) = GP.BSTR(BS.DD.STRINGS, GM.I)
-    NEXT GM.I
-  GP.CASE 6
-    MENUVERT.COUNT = GP.BSTRCOUNT(BS.DD.DATA) - 1
-    FOR GM.I = 1 TO MENUVERT.COUNT
-      MENUVERT.ITEM$(GM.I) = GP.BSTR(BS.DD.DATA, GM.I)
-    NEXT GM.I
-  GP.CASE 7
-    MENUVERT.COUNT = GP.BSTRCOUNT(BS.DD.THEME) - 1
-    FOR GM.I = 1 TO MENUVERT.COUNT
-      MENUVERT.ITEM$(GM.I) = GP.BSTR(BS.DD.THEME, GM.I)
-    NEXT GM.I
-  GP.CASE 8
-    MENUVERT.COUNT = GP.BSTRCOUNT(BS.DD.ABOUT) - 1
-    FOR GM.I = 1 TO MENUVERT.COUNT
-      MENUVERT.ITEM$(GM.I) = GP.BSTR(BS.DD.ABOUT, GM.I)
-    NEXT GM.I
-  GP.OTHER
-    MENUVERT.COUNT = GP.BSTRCOUNT(BS.DD.FILES) - 1
-    FOR GM.I = 1 TO MENUVERT.COUNT
-      MENUVERT.ITEM$(GM.I) = GP.BSTR(BS.DD.FILES, GM.I)
-    NEXT GM.I
-  GP.ENDSEL
-  RETURN
-
-
-## ***********************************************************************
-## **  GMX.DISPATCH -- the chosen row, to its panel.
-## **
-## **  ONE SELECT ON ONE COORDINATE. A panel is identified by BAR ITEM and
-## **  ROW, and this half only knows the item: each bar item has a router of
-## **  its own that reads MENUVERT.SEL. Two shallow selects rather than one
-## **  nested on both.
-## ***********************************************************************
-
-GMX.DISPATCH:
-  GP.SELECT GM.SEL%
-  GP.CASE 1 : GOSUB GMX.DIALOG
-  GP.CASE 2 : GOSUB GMX.LISTS
-  GP.CASE 3 : GOSUB GMX.INPUT
-  GP.CASE 4 : GOSUB GMX.SCREEN
-  GP.CASE 5 : GOSUB GMX.STRINGS
-  GP.CASE 6 : GOSUB GMX.DATA
-  GP.CASE 7 : GOSUB GMX.THEME
-  GP.CASE 8 : GOSUB GMX.ABOUT
-  GP.OTHER  : GOSUB GMX.FILES
-  GP.ENDSEL
-  RETURN
-
-
-## ***********************************************************************
 ## **  GMX.BANKMAP -- ABOUT / BANK MAP. What BANKMGR thinks it owns.
 ## **
 ## **  SEVEN BANKS ARE SPOKEN FOR AND THE PANEL SPLITS THEM BY WHO CHOSE.
 ## **
 ## **  AT RUN TIME are the three BANKMGR handed out, and each is named for what
-## **  it holds rather than only numbered: SCREEN keeps the screen under an open
-## **  dropdown, DIALOG the screen under a dialog, DIR the buffer a directory
+## **  it holds rather than only numbered: STASH is the SCREEN panels' STASH
+## **  bank, DIALOG the screen under a dialog, DIR the buffer a directory
 ## **  listing is read into. Ask on a different machine and the numbers differ.
 ## **
-## **  COMPILED IN are the eight written into the source as constants. CODE is
-## **  the six GP.BANKED regions -- GM.GUICODE carries the GUI, GM.UTILCODE
+## **  COMPILED IN are the ten written into the source as constants. CODE is
+## **  the seven GP.BANKED regions -- GM.GUICODE carries the GUI, GM.UTILCODE
 ## **  the utilities, GM.FUTILCODE the file modules, GM.THEMECODE the theme,
-## **  GM.COMBOCODE the combo box and GM.MODSCODE this program's own two
-## **  biggest dropdowns -- and TEXT the two GP.BANKEDSTR pools, GM.TEXTBANK and
-## **  GM.TEXTBANKB. Nothing chooses these: GP.BANKED takes a decimal constant,
+## **  GM.COMBOCODE the combo box, GM.MODSCODE this program's own two biggest
+## **  dropdowns and GM.MENUCODE the menu builder -- and TEXT the three
+## **  GP.BANKEDSTR pools, GM.TEXTBANK, GM.TEXTBANKB and the menu store's
+## **  MENU.TEXTBANK. Nothing chooses these: GP.BANKED takes a decimal constant,
 ## **  so they are the same numbers in every run. They still need a
 ## **  BANKMGR.CLAIM, which is what keeps the run-time three off them.
 ## **
@@ -754,7 +433,7 @@ GP.BANKEDSTR GM.TEXTBANK BS.BANKMAP
   " BANK MAP "
   "TOTAL BANKS "
   "   UNUSED "
-  "AT RUN TIME  SCREEN #"
+  "AT RUN TIME  STASH #"
   "   DIALOG #"
   "   DIR #"
   "COMPILED IN  CODE #"
@@ -769,8 +448,9 @@ GMX.BANKMAP:
   GUI.MSG2$ = GUI.MSG2$ + GP.BSTR(BS.BANKMAP, 5) + MID$(STR$(GM.DIRBANK%), 2)
   GUI.MSG3$ = GP.BSTR(BS.BANKMAP, 6) + MID$(STR$(GM.GUICODE), 2) + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(GM.UTILCODE), 2) + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(GM.FUTILCODE), 2)
   GUI.MSG3$ = GUI.MSG3$ + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(GM.THEMECODE), 2) + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(GM.COMBOCODE), 2)
-  GUI.MSG3$ = GUI.MSG3$ + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(GM.MODSCODE), 2)
+  GUI.MSG3$ = GUI.MSG3$ + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(GM.MODSCODE), 2) + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(GM.MENUCODE), 2)
   GUI.MSG3$ = GUI.MSG3$ + GP.BSTR(BS.BANKMAP, 8) + MID$(STR$(GM.TEXTBANK), 2) + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(GM.TEXTBANKB), 2)
+  GUI.MSG3$ = GUI.MSG3$ + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(MENU.TEXTBANK), 2)
   GOSUB GUI.SAY
   RETURN
 
@@ -784,7 +464,7 @@ GMX.BANKMAP:
 ## ***********************************************************************
 
 GMX.DIALOG:
-  GP.SELECT MENUVERT.SEL
+  GP.SELECT GM.ROW%
   GP.CASE 1 : GOSUB GMX.D.SAY
   GP.CASE 2 : GOSUB GMX.D.SAYOK
   GP.CASE 3 : GOSUB GMX.D.YN
@@ -851,7 +531,7 @@ GP.BANKEDSTR GM.TEXTBANK BS.D.FILL
 GP.ENDBANKEDSTR
 GMX.D.FILL:
   FOR GM.I = 1 TO 24
-    MENUVERT.ITEM$(GM.I) = GP.BSTR(BS.D.FILL, 0) + MID$(STR$(GM.I), 2)
+    GUI.LIST.ITEM$(GM.I) = GP.BSTR(BS.D.FILL, 0) + MID$(STR$(GM.I), 2)
   NEXT GM.I
   RETURN
 
@@ -935,15 +615,15 @@ GMX.D.YN:
 
 
 ## ***********************************************************************
-## **  GMX.D.MENU -- GUI.MENU. MENUVERT.RUN inside a frame.
+## **  GMX.D.MENU -- GUI.MENU. The popup slot inside a question box.
 ## ***********************************************************************
 
 
 GP.BANKEDSTR GM.TEXTBANK BS.D.MENU
-  " NEW GAME"
-  " LOAD"
-  " OPTIONS"
-  " QUIT"
+  " &NEW GAME"
+  " &LOAD"
+  " &OPTIONS"
+  " &QUIT"
   " GUI.MENU "
   "CHOOSE A ROW."
   "GUI.MENU SEL "
@@ -951,11 +631,11 @@ GP.BANKEDSTR GM.TEXTBANK BS.D.MENU
 GP.ENDBANKEDSTR
 GMX.D.MENU:
   GOSUB GMX.D.RESET
-  MENUVERT.ITEM$(1) = GP.BSTR(BS.D.MENU, 0)
-  MENUVERT.ITEM$(2) = GP.BSTR(BS.D.MENU, 1)
-  MENUVERT.ITEM$(3) = GP.BSTR(BS.D.MENU, 2)
-  MENUVERT.ITEM$(4) = GP.BSTR(BS.D.MENU, 3)
-  GUI.COUNT = 4 : GUI.TITLE$ = GP.BSTR(BS.D.MENU, 4) : GUI.MSG$ = GP.BSTR(BS.D.MENU, 5)
+  GP.SUB MENU.BEGIN, MENU.POPUP
+  FOR GM.I = 0 TO 3
+    GP.SUB MENU.ITEM, GP.BSTR(BS.D.MENU, GM.I)
+  NEXT GM.I
+  GUI.TITLE$ = GP.BSTR(BS.D.MENU, 4) : GUI.MSG$ = GP.BSTR(BS.D.MENU, 5)
   GOSUB GUI.MENU
   GM.RESULT$ = GP.BSTR(BS.D.MENU, 6) + MID$(STR$(GUI.SEL), 2)
   IF GUI.SEL = 0 THEN GM.RESULT$ = GP.BSTR(BS.D.MENU, 7)
@@ -1232,10 +912,10 @@ GP.BANKEDSTR GM.TEXTBANKB BS.D.FORM
 GP.ENDBANKEDSTR
 GMX.D.FORM:
   GOSUB GMX.D.RESET
-  MENUVERT.ITEM$(1) = GP.BSTR(BS.D.FORM, 7)
-  MENUVERT.ITEM$(2) = GP.BSTR(BS.D.FORM, 8)
-  MENUVERT.ITEM$(3) = GP.BSTR(BS.D.FORM, 9)
-  MENUVERT.ITEM$(4) = GP.BSTR(BS.D.FORM, 10)
+  COMBO.ITEM$(1) = GP.BSTR(BS.D.FORM, 7)
+  COMBO.ITEM$(2) = GP.BSTR(BS.D.FORM, 8)
+  COMBO.ITEM$(3) = GP.BSTR(BS.D.FORM, 9)
+  COMBO.ITEM$(4) = GP.BSTR(BS.D.FORM, 10)
   GUI.TITLE$ = GP.BSTR(BS.D.FORM, 0)
   GUI.MSG$ = GP.BSTR(BS.D.FORM, 1)
   GUI.MSG2$ = GP.BSTR(BS.D.FORM, 2)
@@ -1292,7 +972,7 @@ GMX.D.FORM:
 ## ***********************************************************************
 
 GMX.SCREEN:
-  GP.SELECT MENUVERT.SEL
+  GP.SELECT GM.ROW%
   GP.CASE 1 : GOSUB GMX.S.BOX
   GP.CASE 2 : GOSUB GMX.S.FILL
   GP.CASE 3 : GOSUB GMX.S.PRINTAT
@@ -1507,9 +1187,8 @@ GMX.S.CHAR:
 ## ***********************************************************************
 ## **  GMX.S.STASH -- STASH.SAVE and STASH.RESTORE, over a scribble.
 ## **
-## **  THE DROPDOWN BANK IS FREE HERE. GMX.DROP restores the screen under the
-## **  dropdown BEFORE it dispatches, so nothing in bank GM.DDBANK% is wanted
-## **  by the time a panel runs.
+## **  BANK GM.DDBANK% IS THIS PANEL'S. The dropdowns keep their screen in
+## **  VRAM, so nothing else writes the bank.
 ## **
 ## **  The bank is read back at the end because STASH selects one and used to
 ## **  leave it selected. It must report the bank this panel had, not GM.DDBANK.
@@ -1705,15 +1384,14 @@ GMX.S.VRAM:
 
 
 ## ***********************************************************************
-## **  GMX.LISTS -- the LISTS dropdown. MENUVERT, MENUBAR, and the one row
-## **  painter underneath both of them.
+## **  GMX.LISTS -- the LISTS dropdown. The menu builder and its two runners.
 ## ***********************************************************************
 
 GMX.LISTS:
-  GP.SELECT MENUVERT.SEL
-  GP.CASE 1 : GOSUB GMX.L.RUN
-  GP.CASE 2 : GOSUB GMX.L.DRAW
-  GP.CASE 3 : GOSUB GMX.L.ROW
+  GP.SELECT GM.ROW%
+  GP.CASE 1 : GOSUB GMX.L.VERT
+  GP.CASE 2 : GOSUB GMX.L.STYLES
+  GP.CASE 3 : GOSUB GMX.L.ITEMX
   GP.CASE 4 : GOSUB GMX.L.BAR
   GP.CASE 5 : GOSUB GMX.L.HOT
   GP.OTHER  : GOSUB GMX.L.FLAGS
@@ -1723,227 +1401,204 @@ GMX.LISTS:
 
 
 ## ***********************************************************************
-## **  GMX.L.LOAD -- six rows and the whole MENUVERT interface, every time.
-## **
-## **  HOT$ AND HOTATTR ARE CLEARED HERE. They are sticky, the bar leaves its
-## **  own letters in them, and MENUVERT.HOTKEY would match those against
-## **  these rows.
+## **  GMX.L.LOAD -- six rows into the popup slot, and the shell's colours.
 ## ***********************************************************************
 
 
 GP.BANKEDSTR GM.TEXTBANK BS.L.LOAD
-  " NEW GAME"
-  " LOAD"
-  " SAVE"
-  " OPTIONS"
-  " CREDITS"
-  " QUIT"
+  "NEW GAME"
+  "LOAD"
+  "SAVE"
+  "OPTIONS"
+  "CREDITS"
+  "QUIT"
 GP.ENDBANKEDSTR
 GMX.L.LOAD:
-  MENUVERT.ITEM$(1) = GP.BSTR(BS.L.LOAD, 0)
-  MENUVERT.ITEM$(2) = GP.BSTR(BS.L.LOAD, 1)
-  MENUVERT.ITEM$(3) = GP.BSTR(BS.L.LOAD, 2)
-  MENUVERT.ITEM$(4) = GP.BSTR(BS.L.LOAD, 3)
-  MENUVERT.ITEM$(5) = GP.BSTR(BS.L.LOAD, 4)
-  MENUVERT.ITEM$(6) = GP.BSTR(BS.L.LOAD, 5)
-  MENUVERT.COUNT = 6 : MENUVERT.HOT$ = "" : MENUVERT.HOTATTR = 0
-  MENUVERT.ATTR = THEME.CLR(THEME.TEXT)
-  MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
-  MENUVERT.FLAGS = 0 : MENUVERT.SEL = 0
-  MENUVERT.X = 6 : MENUVERT.Y = 10
-  MENUVERT.WIDTH = 20
-  RETURN
-
-
-## ---- The frame the demonstrations draw round the six rows. MENUVERT owns the
-## ---- rows and nothing else, which is why this is here and not in the module.
-
-GMX.L.FRAME:  GP.BOX 5, 9, 22, 8, 1, THEME.CLR(THEME.BORDER)
+  GOSUB GMX.MENU.RESET
+  GP.SUB MENU.BEGIN, MENU.POPUP
+  FOR GM.I = 0 TO 5
+    GP.SUB MENU.ITEM, GP.BSTR(BS.L.LOAD, GM.I)
+  NEXT GM.I
   RETURN
 
 
 ## ***********************************************************************
-## **  GMX.L.RUN -- MENUVERT.RUN. Draws it, drives it, returns the row.
+## **  GMX.L.VERT -- MENUTO.VERT. Frames it, runs it, returns the row.
 ## ***********************************************************************
 
 
-GP.BANKEDSTR GM.TEXTBANK BS.L.RUN
-  "DRAWS IT AND DRIVES IT."
-  "UP DOWN RETURN, ESC CANCELS."
-  "THE FRAME IS THE CALLERS."
-  "MENUVERT OWNS THE ROWS ONLY,"
-  "SO IT OWES NOTHING TO ONE"
-  "STYLE OF BORDER."
-  "MENUVERT.RUN  SEL "
+GP.BANKEDSTR GM.TEXTBANK BS.L.VERT
+  "FRAMES IT, DRAWS IT AND"
+  "DRIVES IT. UP DOWN RETURN,"
+  "ESC CANCELS."
+  "MENU.SELECTED OPENED IT ON"
+  "ROW 3. THE NEXT MENU OPENS"
+  "ON ROW 1 AGAIN."
+  "MENUTO.VERT  SEL "
   "  KEY "
-  "MENUVERT.RUN  CANCELLED"
+  "MENUTO.VERT  CANCELLED"
 GP.ENDBANKEDSTR
-GMX.L.RUN:
-  GOSUB GMX.CLEARPANEL : GOSUB GMX.L.LOAD : GOSUB GMX.L.FRAME
-  GP.PRINTAT 32, 10, GP.BSTR(BS.L.RUN, 0), THEME.CLR(THEME.TEXT)
-  GP.PRINTAT 32, 11, GP.BSTR(BS.L.RUN, 1), THEME.CLR(THEME.TEXT)
-  GP.PRINTAT 32, 13, GP.BSTR(BS.L.RUN, 2), THEME.CLR(THEME.DIMMED)
-  GP.PRINTAT 32, 14, GP.BSTR(BS.L.RUN, 3), THEME.CLR(THEME.DIMMED)
-  GP.PRINTAT 32, 15, GP.BSTR(BS.L.RUN, 4), THEME.CLR(THEME.DIMMED)
-  GP.PRINTAT 32, 16, GP.BSTR(BS.L.RUN, 5), THEME.CLR(THEME.DIMMED)
-  GOSUB MENUVERT.RUN
-  GM.RESULT$ = GP.BSTR(BS.L.RUN, 6) + MID$(STR$(MENUVERT.SEL), 2)
-  GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.L.RUN, 7) + MID$(STR$(MENUVERT.KEY), 2)
-  IF MENUVERT.SEL = 0 THEN GM.RESULT$ = GP.BSTR(BS.L.RUN, 8)
+GMX.L.VERT:
+  GOSUB GMX.CLEARPANEL : GOSUB GMX.L.LOAD
+  GP.PRINTAT 32, 10, GP.BSTR(BS.L.VERT, 0), THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 32, 11, GP.BSTR(BS.L.VERT, 1), THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 32, 12, GP.BSTR(BS.L.VERT, 2), THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 32, 14, GP.BSTR(BS.L.VERT, 3), THEME.CLR(THEME.DIMMED)
+  GP.PRINTAT 32, 15, GP.BSTR(BS.L.VERT, 4), THEME.CLR(THEME.DIMMED)
+  GP.PRINTAT 32, 16, GP.BSTR(BS.L.VERT, 5), THEME.CLR(THEME.DIMMED)
+  GP.SUB MENU.SELECTED, 3
+  GM.PICK% = GP.FN(MENUTO.VERT, 9, 5, MENU.THIN)
+  GM.RESULT$ = GP.BSTR(BS.L.VERT, 6) + MID$(STR$(GM.PICK%), 2)
+  GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.L.VERT, 7) + MID$(STR$(MENU.EXITKEY), 2)
+  IF GM.PICK% = 0 THEN GM.RESULT$ = GP.BSTR(BS.L.VERT, 8)
   RETURN
 
 
 ## ***********************************************************************
-## **  GMX.L.DRAW -- MENUVERT.DRAW. The rows, and no key loop at all.
+## **  GMX.L.STYLES -- the last argument, one menu a style, left to right.
 ## ***********************************************************************
 
 
-GP.BANKEDSTR GM.TEXTBANK BS.L.DRAW
-  "PAINTS THE ROWS AND RETURNS."
-  "NO KEYS, NO HIGHLIGHT, NO"
-  "WAIT."
-  "FOR A MENU THAT IS PART OF A"
-  "PAGE RATHER THAN A CHOICE."
-  "NOTHING IS DRIVING IT. PRESS A KEY."
-  "MENUVERT.DRAW  SIX ROWS, NO KEY LOOP"
+GP.BANKEDSTR GM.TEXTBANK BS.L.STYLES
+  "SOLID, THIN, ROUND, THICK, AND NOBOX, WHICH PUTS THE FIRST ROW"
+  "WHERE THE CORNER WOULD BE. EACH RUNS IN TURN: RETURN OR ESC"
+  "MOVES ON."
+  "BOX STYLES  SOLID THIN ROUND THICK NOBOX"
 GP.ENDBANKEDSTR
-GMX.L.DRAW:
-  GOSUB GMX.CLEARPANEL : GOSUB GMX.L.LOAD : GOSUB GMX.L.FRAME : GOSUB MENUVERT.DRAW
-  GP.PRINTAT 32, 10, GP.BSTR(BS.L.DRAW, 0), THEME.CLR(THEME.TEXT)
-  GP.PRINTAT 32, 11, GP.BSTR(BS.L.DRAW, 1), THEME.CLR(THEME.TEXT)
-  GP.PRINTAT 32, 12, GP.BSTR(BS.L.DRAW, 2), THEME.CLR(THEME.TEXT)
-  GP.PRINTAT 32, 14, GP.BSTR(BS.L.DRAW, 3), THEME.CLR(THEME.DIMMED)
-  GP.PRINTAT 32, 15, GP.BSTR(BS.L.DRAW, 4), THEME.CLR(THEME.DIMMED)
-  GM.TELL$ = GP.BSTR(BS.L.DRAW, 5)
-  GOSUB GMX.TELL
-  GM.RESULT$ = GP.BSTR(BS.L.DRAW, 6)
+GMX.L.STYLES:
+  GOSUB GMX.CLEARPANEL : GOSUB GMX.L.LOAD
+  GP.PRINTAT 2, 18, GP.BSTR(BS.L.STYLES, 0), THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 2, 19, GP.BSTR(BS.L.STYLES, 1), THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 2, 20, GP.BSTR(BS.L.STYLES, 2), THEME.CLR(THEME.TEXT)
+  FOR GM.I = 0 TO 3
+    GM.PICK% = GP.FN(MENUTO.VERT, 9, 2 + GM.I * 13, GM.I)
+  NEXT GM.I
+  GM.PICK% = GP.FN(MENUTO.VERT, 9, 54, MENU.NOBOX)
+  GM.RESULT$ = GP.BSTR(BS.L.STYLES, 3)
   RETURN
 
 
 ## ***********************************************************************
-## **  GMX.L.ROW -- MENUVERT.ROW, the one primitive under both modules.
+## **  GMX.L.ITEMX -- MENU.ITEMX. A hint a row, and a row switched off.
+## ***********************************************************************
+
+
+GP.BANKEDSTR GM.TEXTBANK BS.L.ITEMX
+  " NEW GAME"
+  "START AGAIN FROM THE FIRST LEVEL"
+  " LOAD"
+  "READ A SAVED GAME FROM THE DISK"
+  " SAVE"
+  "OFF: THERE IS NO GAME TO SAVE YET"
+  " QUIT"
+  "BACK TO THE MENU BAR"
+  "A HINT A ROW, SHOWN ON ROW 17"
+  "WHEN THE HIGHLIGHT MOVES."
+  "SAVE IS OFF. THE HIGHLIGHT"
+  "STEPS OVER IT, IN DIMMED."
+  "MENU.ITEMX  SEL "
+  "MENU.ITEMX  CANCELLED"
+GP.ENDBANKEDSTR
+GMX.L.ITEMX:
+  GOSUB GMX.CLEARPANEL : GOSUB GMX.MENU.RESET
+  GP.SUB MENU.BEGIN, MENU.POPUP
+  FOR GM.I = 0 TO 3
+    GP.SUB MENU.ITEMX, GP.BSTR(BS.L.ITEMX, GM.I * 2), GP.BSTR(BS.L.ITEMX, GM.I * 2 + 1), GM.I <> 2
+  NEXT GM.I
+  MENU.HINTX = 5 : MENU.HINTY = 17 : MENU.HINTW = 40
+  MENU.HINTATTR = THEME.CLR(THEME.TITLE)
+  GP.PRINTAT 32, 10, GP.BSTR(BS.L.ITEMX, 8), THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 32, 11, GP.BSTR(BS.L.ITEMX, 9), THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 32, 13, GP.BSTR(BS.L.ITEMX, 10), THEME.CLR(THEME.DIMMED)
+  GP.PRINTAT 32, 14, GP.BSTR(BS.L.ITEMX, 11), THEME.CLR(THEME.DIMMED)
+  GM.PICK% = GP.FN(MENUTO.VERT, 9, 5, MENU.THIN)
+  MENU.HINTW = 0
+  GM.RESULT$ = GP.BSTR(BS.L.ITEMX, 12) + MID$(STR$(GM.PICK%), 2)
+  IF GM.PICK% = 0 THEN GM.RESULT$ = GP.BSTR(BS.L.ITEMX, 13)
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.L.BAR -- MENUTO.BAR, on its own rather than as the shell's bar.
 ## **
-## **  MENUBAR aims this same routine sideways rather than repeating it, which
-## **  is why a stale MENUVERT.SCROLL once corrupted the BAR as well as the
-## **  dropdowns. Inputs are DRAWROW and DRAWATTR; everything else it reads is
-## **  the interface the menu was already set up with.
-## ***********************************************************************
-
-
-GP.BANKEDSTR GM.TEXTBANK BS.L.ROW
-  "ONE ROW, IN WHICHEVER"
-  "ATTRIBUTE YOU NAME."
-  "MENUBAR AIMS THIS SAME"
-  "ROUTINE SIDEWAYS, WHICH IS"
-  "THE WHOLE OF THAT MODULE."
-  "ROWS 2 AND 5 REPAINTED. PRESS A KEY."
-  "MENUVERT.ROW  TWO ROWS REPAINTED IN PLACE"
-GP.ENDBANKEDSTR
-GMX.L.ROW:
-  GOSUB GMX.CLEARPANEL : GOSUB GMX.L.LOAD : GOSUB GMX.L.FRAME : GOSUB MENUVERT.DRAW
-  GP.PRINTAT 32, 10, GP.BSTR(BS.L.ROW, 0), THEME.CLR(THEME.TEXT)
-  GP.PRINTAT 32, 11, GP.BSTR(BS.L.ROW, 1), THEME.CLR(THEME.TEXT)
-  GP.PRINTAT 32, 13, GP.BSTR(BS.L.ROW, 2), THEME.CLR(THEME.DIMMED)
-  GP.PRINTAT 32, 14, GP.BSTR(BS.L.ROW, 3), THEME.CLR(THEME.DIMMED)
-  GP.PRINTAT 32, 15, GP.BSTR(BS.L.ROW, 4), THEME.CLR(THEME.DIMMED)
-
-  MENUVERT.DRAWROW = 2
-  MENUVERT.DRAWATTR = THEME.CLR(THEME.WARN)
-  GOSUB MENUVERT.ROW
-  MENUVERT.DRAWROW = 5
-  MENUVERT.DRAWATTR = THEME.CLR(THEME.HILITE)
-  GOSUB MENUVERT.ROW
-
-  GM.TELL$ = GP.BSTR(BS.L.ROW, 5) : GOSUB GMX.TELL
-  GM.RESULT$ = GP.BSTR(BS.L.ROW, 6)
-  RETURN
-
-
-## ***********************************************************************
-## **  GMX.L.BAR -- MENUBAR.RUN, on its own rather than as the shell's bar.
-## **
-## **  It reports the COLUMN and WIDTH of what was chosen, which is what lets
-## **  a caller drop a panel under an item without working the layout out
-## **  again -- GMX.DROP is built on exactly that.
+## **  THE BAR SLOT IS THE SHELL'S, so this builds over it and GMX.MENU.SETUP
+## **  puts it back, dropdowns and all, with the item it had marked.
+## **  GMX.BARDRAW puts MENU.BARX and MENU.BARY back on the shell's bar.
 ## ***********************************************************************
 
 
 GP.BANKEDSTR GM.TEXTBANK BS.L.BAR
-  " FILE "
-  " EDIT "
-  " SEARCH "
-  " HELP "
+  " &FILE "
+  " &EDIT "
+  " &SEARCH "
+  " &HELP "
   "AN ITEM IS AS WIDE AS ITS TEXT. THERE IS NO"
   "COLUMN WIDTH, SO THE PADDING SPACES ARE"
   "INSIDE THE STRINGS."
-  "LEFT RIGHT MOVE, RETURN PICKS, ESC EXITS."
-  "MENUBAR.RUN  SEL "
+  "LEFT RIGHT MOVE, RETURN OR A LETTER PICKS, ESC EXITS."
+  "MENUTO.BAR  SEL "
   "  COLUMN "
   "  WIDTH "
-  "MENUBAR.RUN  CANCELLED"
+  "MENUTO.BAR  CANCELLED"
 GP.ENDBANKEDSTR
 GMX.L.BAR:
-  GOSUB GMX.CLEARPANEL
-  MENUVERT.ITEM$(1) = GP.BSTR(BS.L.BAR, 0)
-  MENUVERT.ITEM$(2) = GP.BSTR(BS.L.BAR, 1)
-  MENUVERT.ITEM$(3) = GP.BSTR(BS.L.BAR, 2)
-  MENUVERT.ITEM$(4) = GP.BSTR(BS.L.BAR, 3)
-  MENUVERT.COUNT = 4
-  MENUVERT.HOT$ = "" : MENUVERT.HOTATTR = 0
-  MENUVERT.ATTR = THEME.CLR(THEME.TITLE)
-  MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
-  MENUBAR.X = 6
-  MENUBAR.Y = 10 : MENUBAR.GAP = 0 : MENUBAR.FLAGS = 0
-  MENUBAR.SEL = 0
-
+  GOSUB GMX.CLEARPANEL : GOSUB GMX.MENU.RESET
+  GM.KEPT% = MENU.MARKED
+  GP.SUB MENU.BEGIN, MENU.BAR
+  FOR GM.I = 0 TO 3
+    GP.SUB MENU.ITEM, GP.BSTR(BS.L.BAR, GM.I)
+  NEXT GM.I
   GP.PRINTAT 6, 13, GP.BSTR(BS.L.BAR, 4), THEME.CLR(THEME.DIMMED)
   GP.PRINTAT 6, 14, GP.BSTR(BS.L.BAR, 5), THEME.CLR(THEME.DIMMED)
   GP.PRINTAT 6, 15, GP.BSTR(BS.L.BAR, 6), THEME.CLR(THEME.DIMMED)
   GP.PRINTAT 6, 17, GP.BSTR(BS.L.BAR, 7), THEME.CLR(THEME.TEXT)
-
-  GOSUB MENUBAR.RUN
-  GM.RESULT$ = GP.BSTR(BS.L.BAR, 8) + MID$(STR$(MENUBAR.SEL), 2)
-  GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.L.BAR, 9) + MID$(STR$(MENUBAR.SELX), 2)
-  GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.L.BAR, 10) + MID$(STR$(MENUBAR.SELW), 2)
-  IF MENUBAR.SEL = 0 THEN GM.RESULT$ = GP.BSTR(BS.L.BAR, 11)
+  GM.PICK% = GP.FN(MENUTO.BAR, 9, 5, MENU.THIN)
+  GM.RESULT$ = GP.BSTR(BS.L.BAR, 8) + MID$(STR$(GM.PICK%), 2)
+  GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.L.BAR, 9) + MID$(STR$(MENU.SELX), 2)
+  GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.L.BAR, 10) + MID$(STR$(MENU.SELW), 2)
+  IF GM.PICK% = 0 THEN GM.RESULT$ = GP.BSTR(BS.L.BAR, 11)
+  GOSUB GMX.MENU.SETUP : GOSUB GMX.BARDRAW
+  MENU.MARKED = GM.KEPT%
   RETURN
 
 
 ## ***********************************************************************
-## **  GMX.L.HOT -- MENUVERT.HOT$. One letter a row, matched without case.
+## **  GMX.L.HOT -- & in a row's text marks its hot key.
 ## **
-## **  The letter is found in the ROW'S OWN TEXT, so " OPTIONS" with hotkey O
-## **  needs no markup. A row not containing its hotkey is left alone, and only
-## **  rows in the normal attribute are tinted -- on the selected row the
-## **  highlight is already the message.
+## **  The column is known, so SAVE AS tints its A and not the S of SAVE, and
+## **  a separator still counts as a row.
 ## ***********************************************************************
 
 
 GP.BANKEDSTR GM.TEXTBANK BS.L.HOT
-  "NLSOCQ"
-  "ONE LETTER A ROW, TINTED"
-  "WHERE IT ALREADY SITS IN THE"
-  "ROWS OWN TEXT."
+  "&OPEN"
+  "&SAVE"
+  "SAVE &AS"
+  "-"
+  "E&XIT"
+  "& MARKS THE LETTER, SO SAVE AS"
+  "TINTS ITS A, NOT THE S OF SAVE."
   "A HOTKEY CHOOSES ITS ROW"
   "RATHER THAN MOVING TO IT, SO"
-  "N L S O C OR Q ENDS IT."
+  "O S A OR X ENDS IT."
   "HOTKEYS  SEL "
   "  KEY "
 GP.ENDBANKEDSTR
 GMX.L.HOT:
-  GOSUB GMX.CLEARPANEL : GOSUB GMX.L.LOAD
-  MENUVERT.HOT$ = GP.BSTR(BS.L.HOT, 0)
-  MENUVERT.HOTATTR = THEME.CLR(THEME.WARN)
-  GOSUB GMX.L.FRAME
-  GP.PRINTAT 32, 10, GP.BSTR(BS.L.HOT, 1), THEME.CLR(THEME.TEXT)
-  GP.PRINTAT 32, 11, GP.BSTR(BS.L.HOT, 2), THEME.CLR(THEME.TEXT)
-  GP.PRINTAT 32, 12, GP.BSTR(BS.L.HOT, 3), THEME.CLR(THEME.TEXT)
-  GP.PRINTAT 32, 14, GP.BSTR(BS.L.HOT, 4), THEME.CLR(THEME.DIMMED)
-  GP.PRINTAT 32, 15, GP.BSTR(BS.L.HOT, 5), THEME.CLR(THEME.DIMMED)
-  GP.PRINTAT 32, 16, GP.BSTR(BS.L.HOT, 6), THEME.CLR(THEME.DIMMED)
-  GOSUB MENUVERT.RUN
-  GM.RESULT$ = GP.BSTR(BS.L.HOT, 7) + MID$(STR$(MENUVERT.SEL), 2)
-  GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.L.HOT, 8) + MID$(STR$(MENUVERT.KEY), 2)
+  GOSUB GMX.CLEARPANEL : GOSUB GMX.MENU.RESET
+  GP.SUB MENU.BEGIN, MENU.POPUP
+  FOR GM.I = 0 TO 4
+    GP.SUB MENU.ITEM, GP.BSTR(BS.L.HOT, GM.I)
+  NEXT GM.I
+  MENU.HOTATTR = THEME.CLR(THEME.WARN)
+  GP.PRINTAT 32, 10, GP.BSTR(BS.L.HOT, 5), THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 32, 11, GP.BSTR(BS.L.HOT, 6), THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 32, 13, GP.BSTR(BS.L.HOT, 7), THEME.CLR(THEME.DIMMED)
+  GP.PRINTAT 32, 14, GP.BSTR(BS.L.HOT, 8), THEME.CLR(THEME.DIMMED)
+  GP.PRINTAT 32, 15, GP.BSTR(BS.L.HOT, 9), THEME.CLR(THEME.DIMMED)
+  GM.PICK% = GP.FN(MENUTO.VERT, 9, 5, MENU.THIN)
+  GM.RESULT$ = GP.BSTR(BS.L.HOT, 10) + MID$(STR$(GM.PICK%), 2)
+  GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.L.HOT, 11) + MID$(STR$(MENU.EXITKEY), 2)
   RETURN
 
 
@@ -1975,40 +1630,36 @@ GP.BANKEDSTR GM.TEXTBANK BS.L.FLAGS
 GP.ENDBANKEDSTR
 GMX.L.FLAGS:
   GOSUB GMX.CLEARPANEL : GOSUB GMX.L.LOAD
-  MENUVERT.FLAGS = MENUVERT.NOWRAP + MENUVERT.KEEPMARK
-  GOSUB GMX.L.FRAME
+  MENU.FLAGS = MENU.NOWRAP + MENU.KEEPMARK
   GP.PRINTAT 32, 9, GP.BSTR(BS.L.FLAGS, 0), THEME.CLR(THEME.TITLE)
   GP.PRINTAT 32, 11, GP.BSTR(BS.L.FLAGS, 1), THEME.CLR(THEME.TEXT)
   GP.PRINTAT 32, 12, GP.BSTR(BS.L.FLAGS, 2), THEME.CLR(THEME.TEXT)
   GP.PRINTAT 32, 14, GP.BSTR(BS.L.FLAGS, 3), THEME.CLR(THEME.TEXT)
   GP.PRINTAT 32, 15, GP.BSTR(BS.L.FLAGS, 4), THEME.CLR(THEME.TEXT)
-  GOSUB MENUVERT.RUN
-  GM.KEPT% = MENUVERT.SEL
+  GM.KEPT% = GP.FN(MENUTO.VERT, 9, 5, MENU.THIN)
 
-## ---- KEEPMARK only has something to keep if something was chosen. ESC sets
-## ---- MENUVERT.SEL to 0 and takes the highlight off with it, which is right --
-## ---- nothing was picked, so nothing should still be claiming attention. The
-## ---- prompt said STILL LIT either way, over a menu with nothing lit on it.
+## ---- KEEPMARK only has something to keep if something was chosen. ESC
+## ---- returns 0 and takes the highlight off with it, which is right --
+## ---- nothing was picked, so nothing should still be claiming attention.
   GP.IF GM.KEPT% > 0 THEN
-    GM.TELL$ = MID$(MENUVERT.ITEM$(GM.KEPT%), 2) + GP.BSTR(BS.L.FLAGS, 5)
+    GM.TELL$ = GP.BSTR(BS.L.LOAD, GM.KEPT% - 1) + GP.BSTR(BS.L.FLAGS, 5)
   GP.ELSE
     GM.TELL$ = GP.BSTR(BS.L.FLAGS, 6)
   GP.ENDIF
   GOSUB GMX.TELL
 
   GOSUB GMX.CLEARPANEL : GOSUB GMX.L.LOAD
-  MENUVERT.FLAGS = MENUVERT.MUSTSEL
-  GOSUB GMX.L.FRAME
+  MENU.FLAGS = MENU.MUSTSEL
   GP.PRINTAT 32, 9, GP.BSTR(BS.L.FLAGS, 7), THEME.CLR(THEME.TITLE)
   GP.PRINTAT 32, 11, GP.BSTR(BS.L.FLAGS, 8), THEME.CLR(THEME.TEXT)
   GP.PRINTAT 32, 12, GP.BSTR(BS.L.FLAGS, 9), THEME.CLR(THEME.TEXT)
   GP.PRINTAT 32, 13, GP.BSTR(BS.L.FLAGS, 10), THEME.CLR(THEME.TEXT)
   GP.PRINTAT 32, 15, GP.BSTR(BS.L.FLAGS, 11), THEME.CLR(THEME.WARN)
   GP.PRINTAT 32, 16, GP.BSTR(BS.L.FLAGS, 12), THEME.CLR(THEME.WARN)
-  GOSUB MENUVERT.RUN
+  GM.PICK% = GP.FN(MENUTO.VERT, 9, 5, MENU.THIN)
 
   GM.RESULT$ = GP.BSTR(BS.L.FLAGS, 13) + MID$(STR$(GM.KEPT%), 2)
-  GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.L.FLAGS, 14) + MID$(STR$(MENUVERT.SEL), 2)
+  GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.L.FLAGS, 14) + MID$(STR$(GM.PICK%), 2)
   RETURN
 
 
@@ -2017,7 +1668,7 @@ GMX.L.FLAGS:
 ## ***********************************************************************
 
 GMX.INPUT:
-  GP.SELECT MENUVERT.SEL
+  GP.SELECT GM.ROW%
   GP.CASE 1 : GOSUB GMX.I.GET
   GP.CASE 2 : GOSUB GMX.I.ASK
   GP.CASE 3 : GOSUB GMX.I.FORM
@@ -2274,7 +1925,7 @@ GMX.G.SAY:
 ## ***********************************************************************
 
 GMX.DATA:
-  GP.SELECT MENUVERT.SEL
+  GP.SELECT GM.ROW%
   GP.CASE 1
     GOSUB GMX.A.SORT
   GP.OTHER
@@ -2444,9 +2095,9 @@ GP.BANKEDSTR GM.TEXTBANK BS.THEME
   "FOCUS"
 GP.ENDBANKEDSTR
 GMX.THEME:
-  THEME.ID = MENUVERT.SEL - 1
+  THEME.ID = GM.ROW% - 1
   GOSUB THEME.SELECT
-  GM.RESULT$ = GP.BSTR(BS.THEME, 0) + GP.BSTR(BS.DD.THEME, MENUVERT.SEL)
+  GM.RESULT$ = GP.BSTR(BS.THEME, 0) + MID$(GP.BSTR(BS.DD.THEME, GM.ROW%), 2)
   GOSUB GMX.CHROME
 
   GOSUB GMX.CLEARPANEL
@@ -2469,7 +2120,7 @@ GMX.THEME:
 ## ***********************************************************************
 
 GMX.ABOUT:
-  GP.SELECT MENUVERT.SEL
+  GP.SELECT GM.ROW%
   GP.CASE 1
     GOSUB GMX.B.PROGRAM
   GP.CASE 2
@@ -2542,12 +2193,11 @@ GMX.B.PROGRAM:
 ## **  ABOUT / MODULE SIZES. Their number fields are a fixed width, so
 ## **  correcting one after a rebuild costs the text bank nothing.
 ## **
-## **  ONE OVERLAY FILE A BANK. Every GP.BANKED region and every GP.BANKEDSTR
-## **  bank is written as its own .nnn beside the .PRG and loaded to $A000,
-## **  so the count is the number of banks named in the source, not a
-## **  property of the program's size. This one names eight: 4, 7, 8, 9, 10 and
-## **  11 for code, 5 and 6 for text -- which is why the overlay list needs two
-## **  rows rather than one.
+## **  ONE OVERLAY SECTION A BANK. Every GP.BANKED region and every GP.BANKEDSTR
+## **  bank is a section of GPBMODS.OVL, loaded to $A000 in its own bank, so
+## **  the count is the number of banks named in the source, not a property
+## **  of the program's size. This one names ten: 4, 7 to 12 for code, 5, 6
+## **  and 62 for text -- which is why the overlay list needs two rows.
 ## ***********************************************************************
 
 
@@ -2559,8 +2209,8 @@ GP.BANKEDSTR GM.TEXTBANKB BS.B.MEM
   "  TEXT BANKS #"
   "BANK SELECTED NOW  #"
   "RESIDENT P-CODE  11619    MAP TOTAL  27624"
-  "OVERLAYS 8   .004 7938  .005 7426  .006 4354  .007 4354"
-  "             .008 1538  .009  770  .010  770  .011 3074"
+  "OVL BANKS 10  #4  5632  #5  7936  #6  5120  #7  5120  #8  1792"
+  "              #9   768  #10 1536  #11 3072  #12 2816  #62 4352"
 GP.ENDBANKEDSTR
 GMX.B.MEMORY:
   GM.GRP% = 16
@@ -2570,11 +2220,12 @@ GMX.B.MEMORY:
 
   GP.PRINTAT 4, 13, GP.BSTR(BS.B.MEM, 0) + MID$(STR$(FRE(0)), 2), THEME.CLR(THEME.WARN)
   GP.PRINTAT 4, 15, GP.BSTR(BS.B.MEM, 1) + MID$(STR$(BANKMGR.BANKS), 2) + GP.BSTR(BS.B.MEM, 2) + MID$(STR$(BANKMGR.SPARE), 2), THEME.CLR(THEME.TEXT)
-## Six code banks and two text ones, built in three pieces: one line naming all
-## eight runs past BASLOAD's line length.
+## Seven code banks and three text ones, built in four pieces: one line naming
+## all ten runs past BASLOAD's line length.
   GM.BMEM$ = GP.BSTR(BS.B.MEM, 3) + MID$(STR$(GM.GUICODE), 2) + " #" + MID$(STR$(GM.UTILCODE), 2) + " #" + MID$(STR$(GM.FUTILCODE), 2)
   GM.BMEM$ = GM.BMEM$ + " #" + MID$(STR$(GM.THEMECODE), 2) + " #" + MID$(STR$(GM.COMBOCODE), 2) + " #" + MID$(STR$(GM.MODSCODE), 2)
-  GM.BMEM$ = GM.BMEM$ + GP.BSTR(BS.B.MEM, 4) + MID$(STR$(GM.TEXTBANK), 2) + " #" + MID$(STR$(GM.TEXTBANKB), 2)
+  GM.BMEM$ = GM.BMEM$ + " #" + MID$(STR$(GM.MENUCODE), 2)
+  GM.BMEM$ = GM.BMEM$ + GP.BSTR(BS.B.MEM, 4) + MID$(STR$(GM.TEXTBANK), 2) + " #" + MID$(STR$(GM.TEXTBANKB), 2) + " #" + MID$(STR$(MENU.TEXTBANK), 2)
   GP.PRINTAT 4, 16, GM.BMEM$, THEME.CLR(THEME.TEXT)
   GP.PRINTAT 4, 17, GP.BSTR(BS.B.MEM, 5) + MID$(STR$(GM.BANKNOW%), 2), THEME.CLR(THEME.TEXT)
   GP.PRINTAT 4, 19, GP.BSTR(BS.B.MEM, 6), THEME.CLR(THEME.TEXT)
@@ -2597,18 +2248,18 @@ GMX.B.MEMORY:
 ## **  docs/memory/measure-pcode-per-module.md -- and they are only true of the
 ## **  build they were taken from. REMEASURE AFTER EDITING ANY OF IT.
 ## **
-## **  FOUR COLUMNS FOR THE SEVEN PLACES P-CODE CAN LIVE, which is the whole
+## **  FOUR COLUMNS FOR THE EIGHT PLACES P-CODE CAN LIVE, which is the whole
 ## **  point of the panel. The left column is resident: it is loaded at $0801
 ## **  and it is what has to fit under the runtime. Everything right of it is a
-## **  GP.BANKED region, written to its own .nnn and loaded to $A000 in its own
+## **  GP.BANKED region, a section of the .OVL loaded to $A000 in its own
 ## **  bank, and none of it costs low RAM. The three banked columns are drawn in
 ## **  the title colour rather than the text colour so the split reads at a
 ## **  glance.
 ## **
-## **  THE FOURTH COLUMN CARRIES ITS BANK IN EACH NAME. There are six regions
-## **  and only room for four columns, and four of the six hold one or two
-## **  modules apiece -- four headings over four near-empty lists. Those four
-## **  share the last column instead, each row prefixed with its bank.
+## **  THE FOURTH COLUMN CARRIES ITS BANK IN EACH NAME. There are seven regions
+## **  and only room for four columns. Banks 12 and 4 share the third, and the
+## **  four that hold one or two modules apiece share the last, each row
+## **  prefixed with its bank.
 ## **
 ## **  THREE ENTRIES IN THE LEFT COLUMN AGAINST TWENTY ACROSS THE OTHER
 ## **  THREE. What is left down there is what could not go: STASH and STASHFILE
@@ -2617,7 +2268,7 @@ GMX.B.MEMORY:
 ## **  two biggest dropdown handlers in bank 11.
 ## **
 ## **  The literal text is in no column at all. It is not p-code, so the map
-## **  cannot see it; ABOUT / MEMORY carries the eight overlay sizes instead.
+## **  cannot see it; ABOUT / MEMORY carries the ten overlay sizes instead.
 ## ***********************************************************************
 
 
@@ -2630,7 +2281,7 @@ GMX.B.MEMORY:
 GP.BANKEDSTR GM.TEXTBANKB BS.B.SIZES
   "IN LOW RAM  $0801"
   "IN BANK 7  .007"
-  "IN BANK 4  .004"
+  "IN BANKS 12, 4"
   "IN BANKS 8 TO 11"
   "TOTAL"
   "STASH"
@@ -2645,8 +2296,8 @@ GP.BANKEDSTR GM.TEXTBANKB BS.B.SIZES
   "SORT"
   "STASHVRAM"
   "STASHVRAMGC"
-  "MENUVERT"
-  "MENUBAR"
+  "MENU"
+  "MENUPULL"
   "LINEINPUT"
   "GUI"
   "GUI2"
@@ -2665,30 +2316,30 @@ GP.ENDBANKEDSTR
 ## ---- and the padding lands on whichever module came last.
 
 GP.BANKEDSTR GM.TEXTBANKB BS.B.NUMS
-  "431"
-  "174"
-  "9431"
+  "435"
+  "160"
+  "9874"
   "114"
-  "586"
-  "28"
-  "56"
-  "511"
-  "726"
+  "598"
+  "27"
+  "54"
+  "704"
+  "755"
   "189"
   "1681"
   "304"
-  "1306"
-  "826"
+  "2277"
+  "516"
   "780"
-  "4474"
-  "366"
-  "1090"
+  "4453"
+  "353"
+  "1092"
   "422"
-  "502"
-  "701"
-  "597"
-  "2904"
-  "28217"
+  "519"
+  "918"
+  "579"
+  "3016"
+  "29820"
 GP.ENDBANKEDSTR
 GMX.B.SIZES:
   GM.GRP% = 18
@@ -2794,7 +2445,7 @@ GP.BANKED GM.MODSCODE
 ## ***********************************************************************
 
 GMX.STRINGS:
-  GP.SELECT MENUVERT.SEL
+  GP.SELECT GM.ROW%
   GP.CASE 1 : GOSUB GMX.G.PADR
   GP.CASE 2 : GOSUB GMX.G.PADL
   GP.CASE 3 : GOSUB GMX.G.PADC
@@ -3021,7 +2672,7 @@ GMX.G.USINGFIX:
 ## ***********************************************************************
 
 GMX.FILES:
-  GP.SELECT MENUVERT.SEL
+  GP.SELECT GM.ROW%
   GP.CASE 1
     GOSUB GMX.F.DIR
   GP.CASE 2
@@ -3065,7 +2716,7 @@ GMX.F.DRIVE:
 
 
 ## ***********************************************************************
-## **  GMX.F.READ -- one listing, walked into MENUVERT.ITEM$ for a listbox.
+## **  GMX.F.READ -- one listing, walked into GUI.LIST.ITEM$ for a listbox.
 ## **
 ## **   in   GM.FPAT$    the drive's pattern, or empty for everything
 ## **        GM.FONLY%    FILE.DIR.ALL, FILE.DIR.FILES or FILE.DIR.DIRS
@@ -3079,7 +2730,7 @@ GMX.F.DRIVE:
 ## **  FILE.NAME$ IS ONE STRING, written in place by every FILE.DIR.NEXT, so
 ## **  the name is copied into the array here rather than kept a pointer to.
 ## **
-## **  The walk stops FILLING at 24 because MENUVERT.ITEM$ is DIMmed 32 and
+## **  The walk stops FILLING at 24 because GUI.LIST.ITEM$ is DIMmed 24 and
 ## **  GUI.LISTBOX reads that array. GM.FSEEN% keeps counting past it, so the
 ## **  panel can still say how many entries were left out.
 ## ***********************************************************************
@@ -3111,7 +2762,7 @@ GMX.F.KEEP:
   STR.WIDTH = 32
   GOSUB STR.PADR
   GM.FSHOWN% = GM.FSHOWN% + 1
-  MENUVERT.ITEM$(GM.FSHOWN%) = " " + STR.STR$ + "  " + FILE.TYPE$
+  GUI.LIST.ITEM$(GM.FSHOWN%) = " " + STR.STR$ + "  " + FILE.TYPE$
   RETURN
 
 

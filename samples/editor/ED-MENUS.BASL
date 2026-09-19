@@ -1,317 +1,61 @@
 REM ============================================================================
-REM ED-MENUS.BASL -- the editor's menu layer, with its TEXT in banked RAM.
-REM #INCLUDEd inline like ED-STORE.BASL: one global symbol table.
+REM ED-MENUS.BASL -- the editor's menu bar and its dropdowns, on MENU.INC.BL,
+REM MENUPULL.INC.BL and MENUKEY.INC.BL. #INCLUDEd inline like ED-STORE.BASL: one
+REM global symbol table.
 REM
-REM A GPC string variable owns a heap block that is never handed back and never
-REM shrinks, and that heap shares one 25,600-byte pot with the program itself. So
-REM BANKING HELPS STRINGS YOU HOLD, NOT STRINGS YOU USE: a string value is a bare
-REM pointer with no bank byte, and anything about to meet LEN, MID$ or PRINT has to
-REM be in low RAM at that moment. Menu text is written once and read only when a
-REM menu opens, which is the ideal case for the first.
-REM
-REM FIXED STRIDE, NOT AN ALLOCATOR: slot N is [len][chars] at $A000 + N * 32.
-REM ED-STORE.BASL shows the other shape and earns it; a small fixed set does not.
-REM   slots 0..31 items (menu * 8 + item), 32..35 accelerators, 36..39 titles
-REM
-REM MEASURED, AND IT BREAKS EVEN: setup's low RAM 473 -> 224, saved 249; p-code
-REM 12882 -> 13118, spent 236. THE WIN SCALES WITH LENGTH, NOT COUNT: a block is
-REM max(10, len * 1.5) + 3, so a 4-character item nets about 6 and a 30-character
-REM one about 41. Menu items are short. Point this at help text and it pays.
-REM
-REM Every accessor sets its own BANK; ED.ALTKEYS holds bank 0 for the KERNAL keymap
-REM and must not call in here mid-scan. Banks: 1-3 ED-STORE's line table, 4 lent to
-REM GUI.INC.BL, 5 here, 6+ the document arena.
+REM Every title's rows are stored once, here. MENU.KEY sees each key first: ESC or
+REM ALT+letter opens the bar, and it hands back the row chosen. Colours come from THEME.
 REM ============================================================================
 
-#DEFINE EDMNU.BANK 5
-#DEFINE EDMNU.WIN 40960
-#DEFINE EDMNU.STRIDE 32
-#DEFINE EDMNU.ITEM 0
-#DEFINE EDMNU.HOT 32
-#DEFINE EDMNU.NAME 36
-
-REM ---- write EDMNU.TEXT$ into slot EDMNU.SLOT ----
-REM GP.STRPTR gives [ActLen][Data], so characters start at +1. Never on a literal:
-REM that points into the p-code, and writing through it edits the running program.
-EDMNU.PUT:
-  EDMNU.ADDR = EDMNU.WIN + EDMNU.SLOT * EDMNU.STRIDE : EDMNU.LEN = LEN(EDMNU.TEXT$)
-  IF EDMNU.LEN > EDMNU.STRIDE - 1 THEN EDMNU.LEN = EDMNU.STRIDE - 1
-  EDMNU.PTR = GP.STRPTR(EDMNU.TEXT$)
-  BANK EDMNU.BANK : POKE EDMNU.ADDR, EDMNU.LEN
-  REM FOR 1 TO 0 runs once, so an empty string has to leave before the loop. One BANK
-  REM covers both halves of the copy: low RAM does not care which bank is selected.
-  IF EDMNU.LEN = 0 THEN RETURN
-  FOR EDMNU.I = 1 TO EDMNU.LEN
-    POKE EDMNU.ADDR + EDMNU.I, PEEK(EDMNU.PTR + EDMNU.I)
-  NEXT EDMNU.I
-  RETURN
-
-REM ---- read slot EDMNU.SLOT back into EDMNU.TEXT$ ----
-REM RPT$ sizes it in ONE allocation and the bytes are overwritten where they lie;
-REM growing a character at a time is O(n^2) and leaves a dead block at every step.
-EDMNU.GET:
-  EDMNU.ADDR = EDMNU.WIN + EDMNU.SLOT * EDMNU.STRIDE : BANK EDMNU.BANK
-  EDMNU.LEN = PEEK(EDMNU.ADDR) : EDMNU.TEXT$ = ""
-  IF EDMNU.LEN = 0 THEN RETURN
-  EDMNU.TEXT$ = RPT$(32, EDMNU.LEN) : EDMNU.PTR = GP.STRPTR(EDMNU.TEXT$)
-  FOR EDMNU.I = 1 TO EDMNU.LEN
-    POKE EDMNU.PTR + EDMNU.I, PEEK(EDMNU.ADDR + EDMNU.I)
-  NEXT EDMNU.I
-  RETURN
-
-
-REM ---- menu tables (data-driven) ----
-REM MENU.WIDTH is the DROPDOWN's width; the bar's layout is MENUBAR.WHERE's answer.
 ED.MENU.SETUP:
-  MENU.COUNT = 3
-  DIM MENU.ITEMS(3) : DIM MENU.WIDTH(3)
-
-  REM The one menu array that cannot move -- MENUVERT reads it directly.
-  DIM MENUVERT.ITEM$(8)
-
-  MENU.ITEMS(0) = 5 : MENU.ITEMS(1) = 2 : MENU.ITEMS(2) = 1
-  EDMNU.SLOT = EDMNU.NAME +  0 : EDMNU.TEXT$ = "File"         : GOSUB EDMNU.PUT
-  EDMNU.SLOT = EDMNU.ITEM +  0 : EDMNU.TEXT$ = "New"          : GOSUB EDMNU.PUT
-  EDMNU.SLOT = EDMNU.ITEM +  1 : EDMNU.TEXT$ = "Open..."      : GOSUB EDMNU.PUT
-  EDMNU.SLOT = EDMNU.ITEM +  2 : EDMNU.TEXT$ = "Save"         : GOSUB EDMNU.PUT
-  EDMNU.SLOT = EDMNU.ITEM +  3 : EDMNU.TEXT$ = "Save As..."   : GOSUB EDMNU.PUT
-  EDMNU.SLOT = EDMNU.ITEM +  4 : EDMNU.TEXT$ = "Exit"         : GOSUB EDMNU.PUT
-  EDMNU.SLOT = EDMNU.NAME +  1 : EDMNU.TEXT$ = "Search"       : GOSUB EDMNU.PUT
-  EDMNU.SLOT = EDMNU.ITEM +  8 : EDMNU.TEXT$ = "Find..."      : GOSUB EDMNU.PUT
-  EDMNU.SLOT = EDMNU.ITEM +  9 : EDMNU.TEXT$ = "Go to Line...": GOSUB EDMNU.PUT
-  EDMNU.SLOT = EDMNU.NAME +  2 : EDMNU.TEXT$ = "Help"         : GOSUB EDMNU.PUT
-  EDMNU.SLOT = EDMNU.ITEM + 16 : EDMNU.TEXT$ = "About"        : GOSUB EDMNU.PUT
-
-  REM Stays low, and earns it: ED.ALTKEYS scans this with bank 0 selected.
-  MENU.HOT$ = "FSH"
-
-  REM ONE LETTER PER ITEM, IN ITEM ORDER, and not necessarily the initial -- Save and
-  REM Save As... both start with S, so the second takes its A. A letter not in the item
-  REM still works as an accelerator; it just does not light up.
-  EDMNU.SLOT = EDMNU.HOT + 0 : EDMNU.TEXT$ = "NOSAX" : GOSUB EDMNU.PUT
-  EDMNU.SLOT = EDMNU.HOT + 1 : EDMNU.TEXT$ = "FG"    : GOSUB EDMNU.PUT
-  EDMNU.SLOT = EDMNU.HOT + 2 : EDMNU.TEXT$ = "A"     : GOSUB EDMNU.PUT
-
-  REM Widths measured from the bank once and kept as NUMBERS -- which is the trick.
-  FOR MENU.I = 0 TO MENU.COUNT - 1
-    EDMNU.SLOT = EDMNU.NAME + MENU.I : GOSUB EDMNU.GET : MENU.W = LEN(EDMNU.TEXT$)
-    FOR MENU.J = 0 TO MENU.ITEMS(MENU.I) - 1
-      EDMNU.SLOT = EDMNU.ITEM + MENU.I * 8 + MENU.J : GOSUB EDMNU.GET
-      IF LEN(EDMNU.TEXT$) > MENU.W THEN MENU.W = LEN(EDMNU.TEXT$)
-    NEXT MENU.J
-    MENU.WIDTH(MENU.I) = MENU.W + 2
-  NEXT MENU.I
+  GP.SUB MENU.SAVESCREEN, MENU.SAVE.VRAM
+  GOSUB MENU.THEME
+  GP.SUB MENU.BEGIN, MENU.BAR
+  GP.SUB MENU.ITEM, " &File "
+  GP.SUB MENU.ITEM, " &Search "
+  GP.SUB MENU.ITEM, " &Help "
+  REM A hot key need not be the initial: Save and Save As both start with S, so the
+  REM second takes its A. The leading space insets the text; the trailing one pads.
+  GP.SUB MENU.BEGIN, MENU.DROP + 1
+  GP.SUB MENU.ITEM, " &New "
+  GP.SUB MENU.ITEM, " &Open... "
+  GP.SUB MENU.ITEM, " &Save "
+  GP.SUB MENU.ITEM, " Save &As... "
+  GP.SUB MENU.ITEM, " E&xit "
+  GP.SUB MENU.BEGIN, MENU.DROP + 2
+  GP.SUB MENU.ITEM, " &Find... "
+  GP.SUB MENU.ITEM, " &Go to Line... "
+  GP.SUB MENU.BEGIN, MENU.DROP + 3
+  GP.SUB MENU.ITEM, " &About "
   RETURN
 
-
-REM ---- the bar's items, into the array MENUBAR reads ----
-REM MENUBAR and MENUVERT share MENUVERT.ITEM$, so each drawer loads its own first.
-REM AN ITEM IS " NAME " AND THE SPACES ARE THE LAYOUT: MENUBAR makes each item exactly
-REM as wide as its text, so the air around a title has to be in the title.
-ED.MENU.BAR.ITEMS:
-  FOR MENU.I = 0 TO MENU.COUNT - 1
-    EDMNU.SLOT = EDMNU.NAME + MENU.I : GOSUB EDMNU.GET
-    MENUVERT.ITEM$(MENU.I + 1) = " " + EDMNU.TEXT$ + " "
-  NEXT MENU.I
-  MENUVERT.COUNT = MENU.COUNT : MENUVERT.X = 0 : MENUVERT.Y = 0
-  MENUVERT.ATTR = THEME.CLR(THEME.TITLE) : MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
-  MENUVERT.HOT$ = MENU.HOT$ : MENUVERT.HOTATTR = THEME.CLR(THEME.BORDER)
-  MENUBAR.X = 0 : MENUBAR.Y = 0 : MENUBAR.GAP = 0
+REM ---- the titles, none lit. ED.RENDER.MENUBAR draws the band and filename around 
+REM ---- them. Just the top line
+ED.MENU.DRAW.BAR:
+  GP.SUB MENU.DRAWBAR, 0, 0, MENU.NOBOX
   RETURN
 
-
-REM ---- dropdown (VERA rows 1..) ----
-REM MENUVERT.ROW needs the ISO flag ED.INIT sets, or GP.PRINTAT case-swaps every letter.
-REM ED.MENU.BAR.ITEMS first: MENUBAR.WHERE measures MENUVERT.ITEM$ and leaves the title's
-REM column in MENUBAR.SELX, and this routine is about to overwrite that same array.
-ED.DRAW.DROPDOWN:
-  ED.DD.N = MENU.ITEMS(MENU.ACTIVE) : GOSUB ED.MENU.BAR.ITEMS
-  MENUBAR.SEL = MENU.ACTIVE + 1 : GOSUB MENUBAR.WHERE
-  ED.DD.COL = MENUBAR.SELX + 1  : ED.DD.W = MENU.WIDTH(MENU.ACTIVE)
-
-  ED.DD.BX = ED.DD.COL - 1 : IF ED.DD.BX < 0 THEN ED.DD.BX = 0
-  ED.DD.FW = ED.DD.W + 2 : ED.DD.FH = ED.DD.N + 2
-  ED.DD.TY = 1 : ED.DD.BY = ED.DD.TY + ED.DD.FH - 1
-  ED.DD.RX = ED.DD.BX + ED.DD.FW - 1 : ED.DD.FC = THEME.CLR(THEME.TEXT)
-
-  REM GUI.FRAME, so panel and dialogs share one frame drawer -- and it is the only one
-  REM that can draw a box here, GP.BOX's styles being screen codes this font has lost.
-  GUI.LEFT = ED.DD.BX : GUI.TOP = ED.DD.TY
-  GUI.WIDTH = ED.DD.FW  : GUI.HEIGHT = ED.DD.FH : GUI.BORDER = ED.DD.FC
-  GOSUB GUI.FRAME
-
-  MENUVERT.X = ED.DD.COL
-  MENUVERT.Y = 2 : REM layer 1, a screen row
-  MENUVERT.WIDTH = ED.DD.W : MENUVERT.COUNT = ED.DD.N
-
-  REM The DOCUMENT's attribute, so the panel reads as a framed hole in it, not a card
-  REM laid on it. Only the selected row breaks that, which is the point of a highlight.
-  MENUVERT.ATTR    = THEME.CLR(THEME.TEXT) : MENUVERT.HIATTR  = THEME.CLR(THEME.TITLE)
-
-  REM BEFORE the rows are drawn: MENUVERT.ROW tints from MENUVERT.HOT$ as it prints each
-  REM one, so setting these at the call to RUN is a draw too late and tints nothing.
-  EDMNU.SLOT = EDMNU.HOT + MENU.ACTIVE : GOSUB EDMNU.GET
-  MENUVERT.HOT$ = EDMNU.TEXT$
-  REM BORDER's foreground over the ROW's own background -- the whole attribute would put
-  REM a cell of the bar's blue in a black row: a gap, not a hotkey.
-  MENUVERT.HOTATTR = THEME.CLR(THEME.TEXT) - MOD(THEME.CLR(THEME.TEXT), 16) + MOD(THEME.CLR(THEME.BORDER), 16)
-
-  REM MENUVERT.ITEM$ is 1 based, MENU.SEL 0 based off the flat slots. The only place the
-  REM item text is ever fetched, and it happens on the keystroke that opens the menu.
-  FOR ED.DD.I = 1 TO ED.DD.N
-    EDMNU.SLOT = EDMNU.ITEM + MENU.ACTIVE * 8 + ED.DD.I - 1 : GOSUB EDMNU.GET
-    MENUVERT.ITEM$(ED.DD.I) = " " + EDMNU.TEXT$
-  NEXT ED.DD.I
-  GOSUB MENUVERT.DRAW : MENUVERT.DRAWROW = MENU.SEL + 1 : MENUVERT.DRAWATTR = MENUVERT.HIATTR
-  GOSUB MENUVERT.ROW
+REM ---- every key comes here first. ED.MENU.PICK is -1 when it was not a menu key.
+ED.MENU.KEY:
+  ED.MENU.PICK = GP.FN(MENU.KEY, ED.KEY)
+  IF ED.MENU.PICK < 0 THEN RETURN
+  ## 
+  GOSUB ED.PLACE.CARET
+  IF ED.MENU.PICK > 0 THEN GOSUB ED.MENU.DISPATCH
   RETURN
 
-
-REM ---- keys and dispatch: the bar and the open dropdown ----
-REM Everything above draws; everything below decides. ED.CMD.* live in EDITOR.BASL,
-REM reached through the one global symbol table an #INCLUDE gives.
-ED.ALT.MENU:
-  REM Whatever letter arrived with ALT down, folded to upper. No PETSCII Commodore code to
-  REM decode in ISO mode -- ED.READ.MODS has already asked the KERNAL about the modifier.
-  ED.ALT.CH = ED.KEY
-  IF ED.ALT.CH >= 97 AND ED.ALT.CH <= 122 THEN ED.ALT.CH = ED.ALT.CH - 32
-  FOR MENU.I = 0 TO MENU.COUNT - 1
-    GP.IF ASC(MID$(MENU.HOT$, MENU.I + 1, 1)) = ED.ALT.CH THEN 
-      MENU.ACTIVE = MENU.I 
-      GOSUB ED.OPEN.MENUBAR  
-      RETURN
-    GP.ENDIF
-  NEXT MENU.I
-  REM No menu with that initial. SAY WHAT ARRIVED: ALT+letter is the one path nothing
-  REM headless can drive (kbdbuf_put sets no modifiers), so the machine reporting its own
-  REM key and modifier bytes is the only instrument there is.
-  ED.MSG$ = "ALT: key=" + MID$(STR$(ED.KEY), 2) + " mods=" + MID$(STR$(ED.MODS), 2)
-  GOSUB ED.INFO.MSG
-  RETURN
-
-REM THE DROPDOWN'S KEY LOOP IS MENUVERT.RUN'S. What the editor needs on top of it is that
-REM this is a dropdown UNDER A BAR: LEFT and RIGHT walk the bar with the panel still open,
-REM and a letter jumps to that menu. A vertical menu rightly ignores all three, and used to
-REM swallow them.
-REM
-REM MENUVERT.KEYEXIT is the answer, and it is a library change rather than a workaround
-REM here: a key the menu has no use for ends it with MENUVERT.KEY set and MENUVERT.SEL
-REM untouched, and the caller says what it meant. It mirrors MENUBAR.DOWNEXIT, so a bar and
-REM its dropdown drive each other with neither module knowing the other is there.
-REM
-REM So the loop below is about the BAR, not about keys: one label, and every path either
-REM returns to it having moved which menu is open, or returns.
-REM
-REM MENU.ACTIVE and MENU.SEL are 0 based (the item slots are flat, MENU.ACTIVE * 8 + MENU.SEL);
-REM MENUBAR.SEL and MENUVERT.SEL are 1 based. Converted at the boundary and nowhere else.
-ED.OPEN.MENUBAR:
-  MENU.SEL = 0 : GOSUB ED.RENDER.MENUBAR
-ED.MENU.OPEN:
-  GOSUB ED.DRAW.DROPDOWN : MENUVERT.SEL = MENU.SEL + 1
-  MENUVERT.FLAGS = MENUVERT.KEYEXIT
-  REM A letter is now an ITEM's accelerator first and a MENU's second: MENUVERT gets the
-  REM open menu's letters, and only a key its hotkeys did NOT claim is handed back below
-  REM to ED.MENU.LETTER. MENUVERT.HOTHIT is how the two are told apart -- both exits leave
-  REM KEY holding the character.
-  REM ED.DRAW.DROPDOWN above set MENUVERT.HOT$ to this menu's accelerator letters.
-  GOSUB MENUVERT.RUN
-  IF MENUVERT.SEL = 0 THEN GOSUB ED.MENU.CANCEL : RETURN
-  MENU.SEL = MENUVERT.SEL - 1
-  IF MENUVERT.HOTHIT THEN GOSUB ED.MENU.SELECT : RETURN
-  IF MENUVERT.KEY = 13 THEN GOSUB ED.MENU.SELECT : RETURN
-  REM ED.RENDER.MENUBAR IS NOT IN THIS LOOP, and that is the point: it bands the whole row
-  REM and re-prints the document name, eighty cells to move a highlight two. The movers
-  REM below repaint the two titles that changed, as MENUBAR.SETTLE does.
-  IF MENUVERT.KEY = 157 THEN GOSUB ED.MENU.LEFT : GOTO ED.MENU.OPEN
-  IF MENUVERT.KEY = 29 THEN GOSUB ED.MENU.RIGHT : GOTO ED.MENU.OPEN
-  ED.KEY = MENUVERT.KEY : GOSUB ED.MENU.LETTER
-  GOTO ED.MENU.OPEN
-
-REM A letter while the bar is open jumps to that menu, folded to upper so f and F both
-REM reach File. NO REDRAW HERE -- ED.MENU.OPEN does it on the way round -- so this only
-REM erases the panel about to move, and a letter matching nothing leaves everything alone.
-ED.MENU.LETTER:
-  ED.ML.CH = ED.KEY
-  IF ED.ML.CH >= 97 AND ED.ML.CH <= 122 THEN ED.ML.CH = ED.ML.CH - 32
-  ED.ML.HIT = 0 - 1
-  FOR MENU.I = 0 TO MENU.COUNT - 1
-    IF ASC(MID$(MENU.HOT$, MENU.I + 1, 1)) = ED.ML.CH THEN ED.ML.HIT = MENU.I
-  NEXT MENU.I
-  REM Nothing to do is the common case -- every key that is not an arrow or RETURN lands
-  REM here -- so it must not repaint.
-  IF ED.ML.HIT < 0 THEN RETURN
-  IF ED.ML.HIT = MENU.ACTIVE THEN RETURN
-  GOSUB ED.ERASE.DROPDOWN : ED.MENU.WAS = MENU.ACTIVE
-  MENU.ACTIVE = ED.ML.HIT : MENU.SEL = 0
-  GOSUB ED.MENU.BAR.MOVE
-  RETURN
-
-ED.MENU.SELECT:
-  MENU.CHOICE.MENU = MENU.ACTIVE : MENU.CHOICE.ITEM = MENU.SEL
-  MENU.ACTIVE = 0 - 1 : GOSUB ED.MENU.CLOSE : GOSUB ED.MENU.DISPATCH
-  RETURN
-
-ED.MENU.CANCEL:
-  MENU.ACTIVE = 0 - 1 : GOSUB ED.MENU.CLOSE
-  RETURN
-
-REM Putting the document back is taking the panel away: it never covered anything the
-REM hardware cares about. Two rows of chrome instead of a 28-row repaint.
-ED.MENU.CLOSE:
-  GOSUB ED.ERASE.DROPDOWN : GOSUB ED.RENDER.MENUBAR : GOSUB ED.PLACE.CARET
-  RETURN
-
-REM Only the two keys that cross the panel's axis are here; moving the highlight INSIDE it
-REM is MENUVERT.RUN's job.
-REM
-REM ERASE BEFORE MOVING. ED.ERASE.DROPDOWN works from the ED.DD.* geometry the last
-REM ED.DRAW.DROPDOWN left behind -- the panel actually on screen -- so it has to run while
-REM MENU.ACTIVE still names that panel.
-ED.MENU.LEFT:
-  GOSUB ED.ERASE.DROPDOWN
-  ED.MENU.WAS = MENU.ACTIVE : MENU.ACTIVE = MENU.ACTIVE - 1
-  IF MENU.ACTIVE < 0 THEN MENU.ACTIVE = MENU.COUNT - 1
-  MENU.SEL = 0 : GOSUB ED.MENU.BAR.MOVE
-  RETURN
-
-ED.MENU.RIGHT:
-  GOSUB ED.ERASE.DROPDOWN
-  ED.MENU.WAS = MENU.ACTIVE : MENU.ACTIVE = MENU.ACTIVE + 1
-  IF MENU.ACTIVE >= MENU.COUNT THEN MENU.ACTIVE = 0
-  MENU.SEL = 0
-  GOSUB ED.MENU.BAR.MOVE
-  RETURN
-
-REM ---- the two titles that changed, and nothing else ----
-REM ED.MENU.BAR.ITEMS first, because ED.DRAW.DROPDOWN has since pointed MENUVERT.X, .Y,
-REM .WIDTH, .ATTR and .HIATTR at the PANEL -- and MENUBAR.ITEM and MENUBAR.MARK both reach
-REM MENUVERT.ROW through those.
-ED.MENU.BAR.MOVE:
-  GOSUB ED.MENU.BAR.ITEMS
-  MENUBAR.DRAWN = ED.MENU.WAS + 1 : MENUBAR.PAINT = MENUVERT.ATTR : GOSUB MENUBAR.ITEM
-  MENUBAR.SEL = MENU.ACTIVE + 1 : GOSUB MENUBAR.MARK
-  RETURN
-
-REM ---- take the panel away, which is all "putting the document back" means now ----
-REM The document is on layer 0 and was never covered, so this clears the panel's OWN
-REM rectangle on the overlay -- rows 1..ED.DD.FH at the columns it occupied -- back to
-REM transparent. Erasing by repainting document rows stopped working the moment they moved
-REM to layer 0: the panel is on the other layer, and three of them piled up on screen.
-ED.ERASE.DROPDOWN:
-  ED.DDE.LAST = ED.DD.FH
-  IF ED.DDE.LAST > ED.TEXT.BOTTOM THEN ED.DDE.LAST = ED.TEXT.BOTTOM
-  IF ED.DDE.LAST < 1 THEN RETURN
-  GP.FILL ED.DD.BX, 1, ED.DD.FW, ED.DDE.LAST, 32, 0
-  RETURN
-
+## ---- ED.CMD.* live in EDITOR.BASL, reached through the one global symbol table.
+## --- Menu bar 1st, then calls drop down menu
 ED.MENU.DISPATCH:
-  ON MENU.CHOICE.MENU + 1 GOSUB ED.DISP.FILE, ED.DISP.SEARCH, ED.CMD.ABOUT
+  ON MENU.PICKBAR GOSUB ED.DROPDOWN.FILE, ED.DROPDOWN.SEARCH, ED.CMD.ABOUT
   RETURN
 
-ED.DISP.FILE:
-  ON MENU.CHOICE.ITEM + 1 GOSUB ED.CMD.NEW, ED.CMD.OPEN, ED.CMD.SAVE, ED.CMD.SAVEAS, ED.CMD.EXIT
+## ---- File menu
+ED.DROPDOWN.FILE:
+  ON ED.MENU.PICK GOSUB ED.CMD.NEW, ED.CMD.OPEN, ED.CMD.SAVE, ED.CMD.SAVEAS, ED.CMD.EXIT
   RETURN
 
-ED.DISP.SEARCH:
-  ON MENU.CHOICE.ITEM + 1 GOSUB ED.CMD.FIND, ED.CMD.GOTO
+## --- Search menu
+ED.DROPDOWN.SEARCH:
+  ON ED.MENU.PICK GOSUB ED.CMD.FIND, ED.CMD.GOTO
   RETURN

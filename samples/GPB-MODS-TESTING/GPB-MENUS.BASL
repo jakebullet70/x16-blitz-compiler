@@ -1,0 +1,259 @@
+## ***********************************************************************
+## **
+## **  GPB-MENUS.BASL -- the shell's menu bar and its nine dropdowns, on
+## **  MENU.INC.BL, MENUPULL.INC.BL and MENUKEY.INC.BL. #INCLUDEd inline
+## **  in GPBMODS.BASL, ahead of GM.LIBEND: one global symbol table.
+## **
+## **  Every menu is built once, at startup. MENU.KEY sees each key first:
+## **  ESC or ALT+letter opens a dropdown, and it hands back the row chosen.
+## **  GMX.DISPATCH sends that row to its panel. FILES / QUIT leaves.
+## **
+## **  IT STAYS IN LOW RAM, as MENUKEY.INC.BL does: MENUKEY runs under BANK 0.
+## **
+## ***********************************************************************
+
+
+## ---- The bar. Index 0 is the title, as in a dropdown's block. An item's width
+## ---- is its text, which is why the padding is in the string. A hot key need
+## ---- not be the initial: SCREEN and STRINGS both start S, so STRINGS is G.
+
+GP.BANKEDSTR GM.TEXTBANK BS.BAR
+  "BAR"
+  " &FILES "
+  " &DIALOG "
+  " &LISTS "
+  " &INPUT "
+  " &SCREEN "
+  " STRIN&GS "
+  " D&ATA "
+  " &THEME "
+  " A&BOUT "
+GP.ENDBANKEDSTR
+
+## ---- ONE BLOCK A DROPDOWN, and index 0 is the title. Add or drop a row by
+## ---- editing the block: the count comes from GP.BSTRCOUNT. & marks a row's
+## ---- hot key, unique within its dropdown. QUIT stays the last row of FILES,
+## ---- because GMX.MENU.KEY looks for it there. A THEME row's & is its first
+## ---- character: GMX.THEME prints the name past it.
+
+GP.BANKEDSTR GM.TEXTBANK BS.DD.DIALOG
+  "DIALOG"
+  "GUI.&SAY"
+  "&OK MESSAGE BOX"
+  "GUI.&YN"
+  "GUI.&MENU"
+  "GUI.&INPUT"
+  "GUI.&LISTBOX  ONE"
+  "GUI.LISTBOX  M&ANY"
+  "GUI.O&PEN + GUI.CLOSE"
+  "&BOX STYLES 0-3"
+  "GUI.S&HADOW"
+  "&TAB AND THE FOCUS"
+  "&CHECK BOX + COMBO"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR GM.TEXTBANK BS.DD.LISTS
+  "LISTS"
+  "MENUTO.&VERT"
+  "&BOX STYLES"
+  "MENU.ITEM&X"
+  "MENUTO.B&AR"
+  "&HOTKEYS"
+  "&FLAGS"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR GM.TEXTBANK BS.DD.INPUT
+  "INPUT"
+  "LINEINPUT.&GET"
+  "LINEINPUT.&ASK"
+  "&THREE FIELDS"
+  "&LENGTH LIMITS"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR GM.TEXTBANK BS.DD.SCREEN
+  "SCREEN"
+  "GP.&BOX"
+  "GP.&FILL"
+  "GP.&PRINTAT"
+  "GP.&CHAR"
+  "&STASH SAVE + RESTORE"
+  "STASH &MOVE"
+  "STASH &TO A FILE"
+  "STASH&VRAM  SAVE + STAMP"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR GM.TEXTBANK BS.DD.STRINGS
+  "STRINGS"
+  "STR.PAD&R"
+  "STR.PAD&L"
+  "STR.PAD&C"
+  "STR.&SCAN + FIELD"
+  "STR.R&EPLACE"
+  "STRC&ASE  UPPER/LOWER"
+  "STR.&USING"
+  "STR.USING.&FIX"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR GM.TEXTBANK BS.DD.DATA
+  "DATA"
+  "&SORT.RUN"
+  "&ARRAYS"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR GM.TEXTBANK BS.DD.THEME
+  "THEME"
+  "&X-SIXTEEN"
+  "&DARK"
+  "&LIGHT"
+  "&GRAY"
+  "&CUSTOM"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR GM.TEXTBANK BS.DD.ABOUT
+  "ABOUT"
+  "&PROGRAM"
+  "&MEMORY"
+  "MO&DULE SIZES"
+  "&BANK MAP"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR GM.TEXTBANKB BS.DD.FILES
+  "FILES"
+  "FILE.&DIR.OPEN"
+  "DIR  BY &PATTERN"
+  "DIR  D&IRECTORIES"
+  "FILE.&STATUS"
+  "FILE.&EXISTS"
+  "SAVE&ARRAY + LOADARRAY"
+  "&RENAME + DELETE"
+  "&MKDIR + CHDIR"
+  "&QUIT"
+GP.ENDBANKEDSTR
+
+
+## ***********************************************************************
+## **  GMX.MENU.SETUP -- every menu, built once.
+## **
+## **  RUN IT BEFORE BANKMGR HANDS OUT A FREE BANK: the first MENU.BEGIN
+## **  claims MENU.TEXTBANK. GMX.L.BAR runs it again to put the shell's
+## **  menus back, because a bar of its own emptied every dropdown. The nine dropdowns hold 58 rows between them,
+## **  and the dropdown slots share 64.
+## **
+## **  The screen under a dropdown goes to VRAM, on the SV.INIT GPBMODS runs.
+## ***********************************************************************
+GMX.MENU.SETUP:
+  GP.SUB MENU.SAVESCREEN, MENU.SAVE.VRAM
+  MENU.DROPSTYLE = MENU.ROUND
+  MENU.SHADOW = 1
+  ## ---
+  GOSUB GMX.MENU.RESET
+  ## --- the bar first: MENU.BEGIN on the bar slot empties every dropdown.
+  GP.SUB MENU.BEGIN, MENU.BAR
+  FOR GM.I = 1 TO GP.BSTRCOUNT(BS.BAR) - 1
+    GP.SUB MENU.ITEM, GP.BSTR(BS.BAR, GM.I)
+  NEXT GM.I
+  GP.SUB MENU.BEGIN, MENU.DROP + 1
+  FOR GM.I = 1 TO GP.BSTRCOUNT(BS.DD.FILES) - 1
+    GP.SUB MENU.ITEM, GP.BSTR(BS.DD.FILES, GM.I)
+  NEXT GM.I
+  GP.SUB MENU.BEGIN, MENU.DROP + 2
+  FOR GM.I = 1 TO GP.BSTRCOUNT(BS.DD.DIALOG) - 1
+    GP.SUB MENU.ITEM, GP.BSTR(BS.DD.DIALOG, GM.I)
+  NEXT GM.I
+  GP.SUB MENU.BEGIN, MENU.DROP + 3
+  FOR GM.I = 1 TO GP.BSTRCOUNT(BS.DD.LISTS) - 1
+    GP.SUB MENU.ITEM, GP.BSTR(BS.DD.LISTS, GM.I)
+  NEXT GM.I
+  GP.SUB MENU.BEGIN, MENU.DROP + 4
+  FOR GM.I = 1 TO GP.BSTRCOUNT(BS.DD.INPUT) - 1
+    GP.SUB MENU.ITEM, GP.BSTR(BS.DD.INPUT, GM.I)
+  NEXT GM.I
+  GP.SUB MENU.BEGIN, MENU.DROP + 5
+  FOR GM.I = 1 TO GP.BSTRCOUNT(BS.DD.SCREEN) - 1
+    GP.SUB MENU.ITEM, GP.BSTR(BS.DD.SCREEN, GM.I)
+  NEXT GM.I
+  GP.SUB MENU.BEGIN, MENU.DROP + 6
+  FOR GM.I = 1 TO GP.BSTRCOUNT(BS.DD.STRINGS) - 1
+    GP.SUB MENU.ITEM, GP.BSTR(BS.DD.STRINGS, GM.I)
+  NEXT GM.I
+  GP.SUB MENU.BEGIN, MENU.DROP + 7
+  FOR GM.I = 1 TO GP.BSTRCOUNT(BS.DD.DATA) - 1
+    GP.SUB MENU.ITEM, GP.BSTR(BS.DD.DATA, GM.I)
+  NEXT GM.I
+  GP.SUB MENU.BEGIN, MENU.DROP + 8
+  FOR GM.I = 1 TO GP.BSTRCOUNT(BS.DD.THEME) - 1
+    GP.SUB MENU.ITEM, GP.BSTR(BS.DD.THEME, GM.I)
+  NEXT GM.I
+  GP.SUB MENU.BEGIN, MENU.DROP + 9
+  FOR GM.I = 1 TO GP.BSTRCOUNT(BS.DD.ABOUT) - 1
+    GP.SUB MENU.ITEM, GP.BSTR(BS.DD.ABOUT, GM.I)
+  NEXT GM.I
+  RETURN
+
+
+## ---- Every menu's colours, from the theme, which a panel may have changed.
+## ---- The LISTS panels set MENU.FLAGS, MENU.HINTW and MENU.GAP for their own
+## ---- popups, and a dropdown runs with them too, so they go back to 0 here.
+## ---- The bar is painted in the text colour, not the theme's BAR colour.
+GMX.MENU.RESET:
+  GOSUB MENU.THEME
+  MENU.BARATTR = MENU.ATTR : MENU.BARHOT = MENU.HOTATTR
+  MENU.FLAGS = 0 : MENU.HINTW = 0
+  MENU.GAP = 0 : MENU.BARFLAGS = 0
+  RETURN
+
+
+## ---- GMX.BARDRAW -- every bar item, none lit. MENU.KEY opens its dropdowns
+## ---- under the bar this drew last.
+GMX.BARDRAW:
+  GOSUB GMX.MENU.RESET
+  GP.SUB MENU.DRAWBAR, 0, GM.BARX, MENU.NOBOX
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.MENU.KEY -- every key comes here first.
+## **
+## **   in   GM.KEY    the key GET gave
+## **   out  GM.ROW%   the row chosen; -1 if it was not a menu key, 0 if a
+## **                  dropdown opened and closed with nothing chosen
+## **        GM.SEL%   the bar item the row is under
+## **
+## **  FILES / QUIT asks first, through GMX.QUIT. Any other row goes to its
+## **  panel, and the menu colours and flags are put back after, because a
+## **  panel may have changed either.
+## ***********************************************************************
+GMX.MENU.KEY:
+  GM.ROW% = GP.FN(MENU.KEY, GM.KEY)
+  IF GM.ROW% < 1 THEN RETURN
+  GM.SEL% = MENU.PICKBAR
+  GP.IF GM.SEL% = 1 AND GM.ROW% = GP.BSTRCOUNT(BS.DD.FILES) - 1 THEN
+    GOSUB GMX.QUIT
+    RETURN
+  GP.ENDIF
+  GOSUB GMX.DISPATCH
+  GOSUB GMX.MENU.RESET
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.DISPATCH -- the chosen row, to its panel.
+## **
+## **  ONE SELECT ON ONE COORDINATE. A panel is identified by BAR ITEM and
+## **  ROW, and this half only knows the item: each bar item has a router of
+## **  its own that reads GM.ROW%. Two shallow
+## **  selects rather than one nested on both.
+## ***********************************************************************
+GMX.DISPATCH:
+  GP.SELECT GM.SEL%
+  GP.CASE 1 : GOSUB GMX.FILES
+  GP.CASE 2 : GOSUB GMX.DIALOG
+  GP.CASE 3 : GOSUB GMX.LISTS
+  GP.CASE 4 : GOSUB GMX.INPUT
+  GP.CASE 5 : GOSUB GMX.SCREEN
+  GP.CASE 6 : GOSUB GMX.STRINGS
+  GP.CASE 7 : GOSUB GMX.DATA
+  GP.CASE 8 : GOSUB GMX.THEME
+  GP.OTHER  : GOSUB GMX.ABOUT
+  GP.ENDSEL
+  RETURN

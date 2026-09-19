@@ -3,16 +3,16 @@
 ## **  MENU.EXP.BL -- a whole small application, in the shape the GP set
 ## **  was designed for.
 ## **
-## **  MENUVERT.*  the menu itself, in BASIC
+## **  MENU.*      the menu itself, in BASIC, its rows kept in a RAM bank
 ## **  THEME.*     colour roles, in BASIC data
 ## **  APPSYS.*   leave the user's screen as you found it
 ## **  STASH.INC.BL  a dialog over the display, and the display back
 ## **
-## **  Build:  copy GPB.INC.BL, THEME.INC.BL, APPSYS.INC.BL,
-## **          MENUVERT.INC.BL and this file
+## **  Build:  copy GPB.INC.BL, BANKMGR.INC.BL, THEME.INC.BL, APPSYS.INC.BL,
+## **          MENU.INC.BL, MENU.INC.BANKED.BL, STASH.INC.BL and this file
 ## **          into testing/, then
 ## **            python source/gpc/build_basl.py MENU.EXP.BL MENU.PRG
-## **          and compile MENU.PRG with GPC.BIN.
+## **          and compile MENU.PRG SHARED with GPC.BIN.
 ## **
 ## **  THE SPLIT IS THE POINT, and the menu has moved across it: this is all BASIC,
 ## **  because a menu waits on a HUMAN and the speed argument that puts sorting and
@@ -27,86 +27,89 @@
 #INCLUDE "GPB.INC.BL"
 ## THE LIBRARY IN LOW MEMORY. To run a module below from a RAM bank instead,
 ## put its #INCLUDE inside a GP.BANKED region -- BANKED-OR-NOT.md has the rules.
+#INCLUDE "BANKMGR.INC.BL"
 #INCLUDE "THEME.INC.BL"
 #INCLUDE "APPSYS.INC.BL"
-#INCLUDE "MENUVERT.INC.BL"
+#INCLUDE "MENU.INC.BANKED.BL"
+#INCLUDE "MENU.INC.BL"
 #INCLUDE "STASH.INC.BL"
 #SAVEAS "@:MENU.PRG"
 
 ## #DEFINE substitutes at translation time, so these cost nothing at all --
 ## no variable, no lookup, and each compiles to a short constant.
 
-#DEFINE MENU.LEFT 8
-#DEFINE MENU.TOP 6
-#DEFINE MENU.WIDE 24
-#DEFINE MENU.COUNT 4
+#DEFINE DEMO.LEFT 7
+#DEFINE DEMO.TOP 5
+#DEFINE DEMO.COUNT 4
 
 ## ---- Remember the user's screen BEFORE changing anything, and lay out from what it
 ## ---- reports: the X16 boots 80x60 but SCREEN 0 is 40x30, so nothing below assumes.
 
 GOSUB APPSYS.STARTUP
+GOSUB BANKMGR.INIT
 
 THEME.ID = 0
 GOSUB THEME.SELECT
 
-DIM MENUVERT.ITEM$(MENU.COUNT)
-MENUVERT.ITEM$(1) = " NEW GAME"
-MENUVERT.ITEM$(2) = " LOAD"
-MENUVERT.ITEM$(3) = " OPTIONS"
-MENUVERT.ITEM$(4) = " QUIT"
+DIM DEMO.ITEM$(DEMO.COUNT)
+DEMO.ITEM$(1) = " NEW GAME"
+DEMO.ITEM$(2) = " LOAD"
+DEMO.ITEM$(3) = " OPTIONS"
+DEMO.ITEM$(4) = " QUIT"
 
-MENUVERT.X = MENU.LEFT : MENUVERT.Y = MENU.TOP
-MENUVERT.WIDTH = MENU.WIDE : MENUVERT.COUNT = MENU.COUNT
-MENUVERT.ATTR = THEME.CLR(THEME.TEXT)
-MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
-MENUVERT.HOT$ = "NLOQ"
-MENUVERT.FLAGS = MENUVERT.GAMEPAD
+## ---- & marks each row's hot key, here its first letter: N L O Q.
+GP.SUB MENU.BEGIN, MENU.POPUP
+FOR DEMO.R = 1 TO DEMO.COUNT
+    GP.SUB MENU.ITEM, " &" + MID$(DEMO.ITEM$(DEMO.R), 2)
+NEXT DEMO.R
 
-## ---- The main loop. MENUVERT.SEL is 0 when the user pressed ESC; here
+MENU.ATTR = THEME.CLR(THEME.TEXT)
+MENU.HIATTR = THEME.CLR(THEME.HILITE)
+MENU.SEPATTR = THEME.CLR(THEME.BORDER)
+MENU.FLAGS = MENU.GAMEPAD
+
+## ---- The main loop. The menu answers 0 when the user pressed ESC; here
 ## ---- there is nothing to back out to, so it just redraws.
 
-MENU.MAIN:
-    GOSUB MENU.DRAW
-    GOSUB MENUVERT.RUN
-    MENU.PICK = MENUVERT.SEL
-    IF MENU.PICK = 0 THEN GOTO MENU.MAIN
-    IF MENU.PICK = MENU.COUNT THEN GOTO MENU.QUIT
-    GOSUB MENU.DIALOG
-    GOTO MENU.MAIN
+DEMO.MAIN:
+    GOSUB DEMO.DRAW
+    DEMO.PICK = GP.FN(MENUTO.VERT, DEMO.TOP, DEMO.LEFT, MENU.THIN)
+    IF DEMO.PICK = 0 THEN GOTO DEMO.MAIN
+    IF DEMO.PICK = DEMO.COUNT THEN GOTO DEMO.QUIT
+    GOSUB DEMO.DIALOG
+    GOTO DEMO.MAIN
 
-MENU.QUIT:
+DEMO.QUIT:
     GOSUB APPSYS.RESTORE
     PRINT "BYE"
     END
 
 ## ---- Drawing. Note there is no colour arithmetic anywhere: every colour
 ## ---- is a NAMED ROLE, so re-skinning the whole application is
-## ---- THEME.ID = 1 and nothing else.
+## ---- THEME.ID = 1 and nothing else. The menu draws its own frame.
 
-MENU.DRAW:
+DEMO.DRAW:
     GP.FILL 0, 0, APPSYS.COLS, APPSYS.ROWS, ASC(" "), THEME.CLR(THEME.PAGE)
     GP.FILL 0, 0, APPSYS.COLS, 1, ASC(" "), THEME.CLR(THEME.TITLE)
     GP.PRINTAT 2, 0, "GP.BASIC DEMONSTRATION", THEME.CLR(THEME.TITLE)
-    GP.BOX MENU.LEFT - 1, MENU.TOP - 1, MENU.WIDE + 2, MENU.COUNT + 2, 1, THEME.CLR(THEME.BORDER)
     GP.PRINTAT 2, APPSYS.ROWS - 1, "CURSOR KEYS, RETURN, OR N L O Q", THEME.CLR(THEME.DIMMED)
     RETURN
 
 ## ---- A dialog over the display. STASH.SAVE copies what is underneath into a RAM bank
 ## ---- and STASH.RESTORE puts it back, so the application never redraws itself -- the
 ## ---- entire reason the pair exists. The stash carries its own w, h, x and y, so the
-## ---- restore is told nothing but the bank. This was GP.STASH / GP.RESTR until
-## ---- 2026-09-01, when they moved into GP.ASM as GPC-BASIC/STASH.INC.BL.
+## ---- restore is told nothing but the bank.
 
-MENU.DIALOG:
+DEMO.DIALOG:
     STASH.BANK = 2
     STASH.X = 20 : STASH.Y = 10 : STASH.W = 36 : STASH.H = 5
     GOSUB STASH.SAVE
     GP.FILL 20, 10, 36, 5, ASC(" "), THEME.CLR(THEME.WARN)
     GP.BOX 20, 10, 36, 5, 3, THEME.CLR(THEME.WARN)
-    GP.PRINTAT 22, 12, "CHOSE" + MENUVERT.ITEM$(MENU.PICK), THEME.CLR(THEME.WARN)
+    GP.PRINTAT 22, 12, "CHOSE" + DEMO.ITEM$(DEMO.PICK), THEME.CLR(THEME.WARN)
     GP.PRINTAT 22, 13, "PRESS ANY KEY", THEME.CLR(THEME.WARN)
-MENU.DIALOG.WAIT:
-    GET MENU.KEY$
-    IF MENU.KEY$ = "" THEN GOTO MENU.DIALOG.WAIT
+DEMO.DIALOG.WAIT:
+    GET DEMO.KEY$
+    IF DEMO.KEY$ = "" THEN GOTO DEMO.DIALOG.WAIT
     GOSUB STASH.RESTORE
     RETURN

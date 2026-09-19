@@ -1,0 +1,232 @@
+## ***********************************************************************
+## **
+## **  MENUKEY.INC.BL -- a menu bar and its dropdowns, run from the
+## **  program's own key loop.
+## **
+## **      GP.SUB MENU.BEGIN, MENU.BAR
+## **      GP.SUB MENU.ITEM, " &FILE "
+## **      GP.SUB MENU.ITEM, " &HELP "
+## **      GP.SUB MENU.BEGIN, MENU.DROP + 1
+## **      GP.SUB MENU.ITEM, " &OPEN "
+## **      GP.SUB MENU.ITEM, " E&XIT "
+## **      GP.SUB MENU.BEGIN, MENU.DROP + 2
+## **      GP.SUB MENU.ITEM, " &ABOUT "
+## **      GOSUB MENU.THEME
+## **      GP.SUB MENU.DRAWBAR, 0, 0, MENU.NOBOX
+## **      GOSUB MENU.KEYS.ON
+## **
+## **      GET K$
+## **      N = GP.FN(MENU.KEY, ASC(K$))
+## **      IF N > 0 THEN ON MENU.PICKBAR GOSUB MY.FILE, MY.HELP
+## **      IF N < 0 THEN GOSUB MY.KEY
+## **
+## **      GOSUB MENU.KEYS.OFF                  before the program ends
+## **
+## **  N = GP.FN(MENU.KEY, key)
+## **      -1  not a menu key: the program's own
+## **       0  the menu opened and was closed with nothing chosen
+## **       n  row n of the dropdown under bar item MENU.PICKBAR
+## **
+## **  ESC opens the dropdown under the first live bar item, and ALT with a
+## **  bar item's hot key the one under that item. While one is open, LEFT
+## **  and RIGHT walk the bar, a bar item's hot key that no row claims jumps
+## **  to it, and ESC closes. Call MENU.KEY straight after GET: it asks the
+## **  KERNAL whether ALT is down while the key still is.
+## **
+## **  Call it with 0 when GET gave nothing. ALT pressed and let go with no
+## **  key between then lights the first live bar item and opens no
+## **  dropdown. LEFT and RIGHT walk the bar, RETURN, DOWN or a bar hot key
+## **  opens the dropdown, and ESC or ALT again puts the bar back.
+## **
+## **  The bar is the one MENU.DRAWBAR last drew. Every bar item needs a
+## **  dropdown of one row or more. Each is framed in MENU.DROPSTYLE, a
+## **  MENUTO.VERT style, 0 until set, and the screen under it is put back as
+## **  MENU.SAVESCREEN says. The bar item is lit while its dropdown is open
+## **  and plain again after.
+## **
+## **  GOSUB MENU.THEME     the menu colours from THEME.CLR. The bar is BAR
+## **                       and a dropdown TEXT; the lit row is HILITE, a hot
+## **                       key BORDER's colour over the row's background, a
+## **                       disabled row DIMMED's the same way, and the frame
+## **                       TEXT. Run it again after a theme change, and set a
+## **                       MENU colour after it to differ.
+## **  GOSUB MENU.KEYS.ON   makes ALT with a bar hot key type that key.
+## **  GOSUB MENU.KEYS.OFF  puts the keyboard layout back.
+## **
+## **  ALT KEYS NEED THE LAYOUT. ALT with a letter arrives as a graphic in
+## **  PETSCII mode and as a symbol or nothing in ISO mode, so MENU.KEYS.ON
+## **  writes each bar hot key into both ALT keyboard tables, at the key that
+## **  types that letter. Run it once the bar's items are in: until then
+## **  ALT+letter types no letter, and GET has none to hand MENU.KEY. The
+## **  tables outlive the program: MENU.KEYS.OFF puts every byte back and
+## **  must run before it ends.
+## **
+## **  The layout is read under BANK 0, and BANK 0 is left selected for PEEK
+## **  and POKE. So this file is not for a GP.BANKED region.
+## **
+## **  Requires MENU.INC.BL, MENUPULL.INC.BL and THEME.INC.BL.
+## **
+## ***********************************************************************
+#IFNDEF MENUKEY.DEFS
+#DEFINE MENUKEY.DEFS 1
+
+## kbdbuf_get_modifiers. Below the $FF00 jump table, so KERNAL ROM is paged in.
+#DEFINE MENU.KBDMOD $FEC0
+#DEFINE MENU.MOD.ALT 2
+
+## Eleven 128-byte layout tables in RAM bank 0, byte 0 of each its ID.
+#DEFINE MENU.KEYMAP $A000
+#DEFINE MENU.MAP.PET 0
+#DEFINE MENU.MAP.PETALT 2
+#DEFINE MENU.MAP.ISO 128
+#DEFINE MENU.MAP.ISOALT 198
+
+GOTO MENUKEY.MODULE.END
+
+MENU.KEY.BODY:
+    GP.DEFPROC MENU.KEY, MENU.GOTKEY RETURNS MENU.PICKED
+    MENU.PICKED = -1 : MENU.PICKBAR = 0
+    IF MENU.READY = 0 THEN RETURN
+    IF MENU.KEYSSET = 0 THEN GOSUB MENU.KEYS.ON
+    MENU.WALKAT = 0
+    IF MENU.GOTKEY = 0 THEN GOTO MENU.IDLE
+    MENU.ALTDOWN = 0
+    IF MENU.GOTKEY = MENU.ESC THEN MENU.WALKAT = GP.INSTR(MENU.FLAG$(MENU.BAR), "0")
+    IF MENU.GOTKEY <> MENU.ESC THEN GOSUB MENU.ALTHIT
+    IF MENU.WALKAT = 0 THEN RETURN
+    MENU.PICKED = 0
+
+## ---- one dropdown open. The key it hands back says where to go next.
+MENU.WALK:
+    MENU.PULLAT = MENU.WALKAT : MENU.PULLSLOT = MENU.DROP + MENU.WALKAT
+    MENU.STYLE = MENU.DROPSTYLE
+    GOSUB MENUPULL.OPEN
+    IF MENU.CHOSEN > 0 THEN MENU.PICKED = MENU.CHOSEN : MENU.PICKBAR = MENU.WALKAT : GOTO MENU.WALKED
+    MENU.WALKTO = MENU.NEXTBAR
+    IF MENU.WALKTO = 0 THEN GOSUB MENU.WALKKEY
+    IF MENU.WALKTO > 0 THEN MENU.WALKAT = MENU.WALKTO : GOTO MENU.WALK
+MENU.WALKED:
+    GOSUB MENUPULL.UNMARK
+    RETURN
+
+## ---- ESC, or no dropdown to run, closes. A bar hot key jumps; any other key
+## ---- opens the same dropdown again.
+MENU.WALKKEY:
+    IF MENU.EXITKEY = 0 OR MENU.EXITKEY = MENU.ESC OR MENU.EXITKEY = MENU.STOP THEN RETURN
+    MENU.WALKTO = GP.FN(MENU.HOTROW, MENU.BAR, MENU.EXITKEY)
+    IF MENU.WALKTO = 0 THEN MENU.WALKTO = MENU.WALKAT
+    RETURN
+
+## ---- no key. ALT down and up again with no key between lights the bar.
+MENU.IDLE:
+    GOSUB MENU.ALTTAP
+    IF MENU.TAPPED = 0 THEN RETURN
+    MENU.WALKAT = GP.INSTR(MENU.FLAG$(MENU.BAR), "0")
+    IF MENU.WALKAT = 0 THEN RETURN
+    MENU.PICKED = 0
+
+## ---- the bar lit and no dropdown open. LEFT and RIGHT walk it; RETURN, DOWN
+## ---- or a bar hot key opens a dropdown; ESC or ALT again leaves.
+MENU.FOCUS:
+    MENU.PULLAT = MENU.WALKAT
+    MENU.RUNSLOT = MENU.BAR : GOSUB MENU.MEASURE
+    GOSUB MENUPULL.MARK
+MENU.FOCUSKEY:
+    GET MENU.INKEY$
+    IF MENU.INKEY$ <> "" THEN GOTO MENU.FOCUSGOT
+    GOSUB MENU.ALTTAP
+    IF MENU.TAPPED <> 0 THEN GOTO MENU.WALKED
+    GOTO MENU.FOCUSKEY
+MENU.FOCUSGOT:
+    MENU.ALTDOWN = 0
+    MENU.CODE = ASC(MENU.INKEY$)
+    IF MENU.CODE = MENU.ESC OR MENU.CODE = MENU.STOP THEN GOTO MENU.WALKED
+    IF MENU.CODE = MENU.LEFT THEN MENU.WALKAT = MENU.LEFTOF : GOTO MENU.FOCUS
+    IF MENU.CODE = MENU.RIGHT THEN MENU.WALKAT = MENU.RIGHTOF : GOTO MENU.FOCUS
+    IF MENU.CODE = MENU.ENTER OR MENU.CODE = MENU.DOWN THEN GOTO MENU.WALK
+    MENU.WALKTO = GP.FN(MENU.HOTROW, MENU.BAR, MENU.CODE)
+    IF MENU.WALKTO > 0 THEN MENU.WALKAT = MENU.WALKTO : GOTO MENU.WALK
+    GOTO MENU.FOCUSKEY
+
+## ---- MENU.TAPPED is -1 when ALT has come up since it was last seen down.
+MENU.ALTTAP:
+    MENU.TAPPED = 0
+    GOSUB MENU.MODSNOW
+    IF (MENU.MODS AND MENU.MOD.ALT) <> 0 THEN MENU.ALTDOWN = -1 : RETURN
+    MENU.TAPPED = MENU.ALTDOWN : MENU.ALTDOWN = 0
+    RETURN
+
+MENU.MODSNOW:
+    MENU.ROMWAS = PEEK(1)
+    POKE 1, 0 : GP.CALL MENU.KBDMOD : MENU.MODS = GP.A : POKE 1, MENU.ROMWAS
+    RETURN
+
+## ---- asked of the KERNAL while the key is still down.
+MENU.ALTHIT:
+    GOSUB MENU.MODSNOW
+    IF (MENU.MODS AND MENU.MOD.ALT) = 0 THEN RETURN
+    MENU.WALKAT = GP.FN(MENU.HOTROW, MENU.BAR, MENU.GOTKEY)
+    RETURN
+
+MENU.THEME:
+    IF THEME.READY = 0 THEN GOSUB THEME.SELECT
+    MENU.BARATTR = THEME.CLR(THEME.BAR)
+    MENU.BARHI = THEME.CLR(THEME.HILITE)
+    MENU.BARHOT = (MENU.BARATTR AND 240) + (THEME.CLR(THEME.BORDER) AND 15)
+    MENU.ATTR = THEME.CLR(THEME.TEXT)
+    MENU.HIATTR = THEME.CLR(THEME.HILITE)
+    MENU.HOTATTR = (MENU.ATTR AND 240) + (THEME.CLR(THEME.BORDER) AND 15)
+    MENU.DISATTR = (MENU.ATTR AND 240) + (THEME.CLR(THEME.DIMMED) AND 15)
+    MENU.SEPATTR = MENU.ATTR
+    RETURN
+
+## ---- the plain table finds the key that types each letter, and the ALT
+## ---- table at the same place is made to type it too, once for PETSCII and
+## ---- once for ISO. Each byte written is kept for MENU.KEYS.OFF, by its
+## ---- offset from MENU.KEYMAP.
+MENU.KEYS.ON:
+    GOSUB MENU.KEYS.OFF
+    MENU.KEYSSET = -1
+    IF MENU.KEYSDIM = 0 THEN DIM MENU.ALTAT%(2 * MENU.BAR.MAX + 1) : DIM MENU.ALTWAS%(2 * MENU.BAR.MAX + 1) : MENU.KEYSDIM = -1
+    BANK 0
+    MENU.TID = MENU.MAP.PET : MENU.TIDALT = MENU.MAP.PETALT : MENU.TCASE = 0
+    GOSUB MENU.KEYPAIR
+    MENU.TID = MENU.MAP.ISO : MENU.TIDALT = MENU.MAP.ISOALT : MENU.TCASE = 32
+    GOSUB MENU.KEYPAIR
+    RETURN
+
+## ---- PETSCII types a letter as 65-90, ISO as 97-122: MENU.TCASE is the gap.
+MENU.KEYPAIR:
+    MENU.TPLAIN = 0 : MENU.TALT = 0
+    FOR MENU.TI = 0 TO 10
+        MENU.TB = MENU.KEYMAP + 128 * MENU.TI
+        IF PEEK(MENU.TB) = MENU.TID THEN MENU.TPLAIN = MENU.TB
+        IF PEEK(MENU.TB) = MENU.TIDALT THEN MENU.TALT = MENU.TB
+    NEXT MENU.TI
+    IF MENU.TPLAIN = 0 OR MENU.TALT = 0 THEN RETURN
+    FOR MENU.KI = 1 TO 127
+        MENU.LETTER = PEEK(MENU.TPLAIN + MENU.KI) - MENU.TCASE
+        IF MENU.LETTER >= 65 AND MENU.LETTER <= 90 THEN GOSUB MENU.KEYSET
+    NEXT MENU.KI
+    RETURN
+
+MENU.KEYSET:
+    IF MENU.NALT > 2 * MENU.BAR.MAX + 1 THEN RETURN
+    IF GP.FN(MENU.HOTROW, MENU.BAR, MENU.LETTER) = 0 THEN RETURN
+    MENU.ALTAT%(MENU.NALT) = MENU.TALT - MENU.KEYMAP + MENU.KI
+    MENU.ALTWAS%(MENU.NALT) = PEEK(MENU.TALT + MENU.KI)
+    POKE MENU.TALT + MENU.KI, MENU.LETTER
+    MENU.NALT = MENU.NALT + 1
+    RETURN
+
+MENU.KEYS.OFF:
+    IF MENU.NALT = 0 THEN RETURN
+    BANK 0
+    FOR MENU.KI = 0 TO MENU.NALT - 1
+        POKE MENU.KEYMAP + MENU.ALTAT%(MENU.KI), MENU.ALTWAS%(MENU.KI)
+    NEXT MENU.KI
+    MENU.NALT = 0
+    RETURN
+
+MENUKEY.MODULE.END:
+#ENDIF

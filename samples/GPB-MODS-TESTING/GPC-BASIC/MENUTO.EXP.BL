@@ -1,0 +1,114 @@
+## ***********************************************************************
+## **  MENUTO.EXP.BL -- MENUTO.VERT and MENUTO.BAR by hand. Steps 2 to 6
+## **  of docs/blitz/GUI-MENUS.PLAN.md.
+## **
+## **  Run it and check: A and Q tinted in their words, DEL RECORD grey and
+## **  skipped, the line never highlighted, ESC gives 0. The second run opens
+## **  on SAVE AS; the third opens on row 1 again. Row 20 is blank until the
+## **  highlight moves, then shows the row's hint; QUIT clears it. The
+## **  third is framed in + - ! from a glyph table, not the rounded box.
+## **  Passes 4 and 5 are the bar across the top: F, E and H tinted, VIEW
+## **  grey and skipped by LEFT and RIGHT, V does nothing, H chooses 4;
+## **  pass 5 opens on HELP.
+## **
+## **  Pass 6 is MENUTO.PULLDOWN: DOWN or RETURN on the bar opens a dropdown
+## **  under the item, over a field of dots. LEFT and RIGHT walk the bar with
+## **  it open and skip VIEW; ESC closes it and returns to the bar, and ESC
+## **  on the bar ends the pass. The dots come back each time it closes.
+## **
+## **  Compile SHARED: the store is a GP.BANKEDSTR group in bank 62.
+## ***********************************************************************
+#SAVEAS "@:MENUTO.PRG"
+#SYMFILE "@:MENUTO.SYM"
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "BANKMGR.INC.BL"
+#INCLUDE "STASH.INC.BL"
+#INCLUDE "STASHVRAM.INC.BL"
+#INCLUDE "MENU.INC.BANKED.BL"
+#INCLUDE "MENU.INC.BL"
+#INCLUDE "MENUPULL.INC.BL"
+
+GOSUB BANKMGR.INIT
+MENU.ATTR = 6 * 16 + 1
+MENU.HOTATTR = 6 * 16 + 7
+MENU.DISATTR = 6 * 16 + 12
+MENU.HINTX = 4
+MENU.HINTY = 20
+MENU.HINTW = 30
+MENU.HINTATTR = 6 * 16 + 1
+T.GLYPH$ = "++++--!!"
+
+GP.SUB MENU.BEGIN, MENU.POPUP
+GP.SUB MENU.ITEMX, "&ADD RECORD", "APPEND A BLANK RECORD", MENU.ON
+GP.SUB MENU.ITEMX, "&DEL RECORD", "NEVER SHOWN", MENU.OFF
+GP.SUB MENU.ITEM, "-"
+GP.SUB MENU.ITEMX, "SAVE &AS", "WRITE UNDER A NEW NAME", MENU.ON
+GP.SUB MENU.ITEM, "&QUIT"
+
+FOR T.PASS = 1 TO 3
+    CLS
+    IF T.PASS = 2 THEN GP.SUB MENU.SELECTED, 4
+    T.STYLE = MENU.ROUND
+    IF T.PASS = 3 THEN T.STYLE = GP.STRPTR(T.GLYPH$) + 1
+    T.N = GP.FN(MENUTO.VERT, 4, 10, T.STYLE)
+    PRINT : PRINT "PASS"; T.PASS; " CHOSE"; T.N; " KEY"; MENU.EXITKEY
+    GOSUB T.ANYKEY
+NEXT T.PASS
+
+GP.SUB MENU.BEGIN, MENU.BAR
+GP.SUB MENU.ITEM, " &FILE "
+GP.SUB MENU.ITEM, " &EDIT "
+GP.SUB MENU.ITEMX, " &VIEW ", "", MENU.OFF
+GP.SUB MENU.ITEM, " &HELP "
+
+FOR T.PASS = 4 TO 5
+    CLS
+    IF T.PASS = 5 THEN GP.SUB MENU.SELECTED, 4
+    T.N = GP.FN(MENUTO.BAR, 0, 0, MENU.THIN)
+    PRINT : PRINT "PASS"; T.PASS; " CHOSE"; T.N; " KEY"; MENU.EXITKEY; " OF"; MENU.BARNUM
+    GOSUB T.ANYKEY
+NEXT T.PASS
+
+MENU.BARFLAGS = MENU.DOWNEXIT
+GP.DO
+    CLS
+    FOR T.I = 1 TO 12
+        PRINT "  . . . . . . . . . . . . . . . . . . ."
+    NEXT T.I
+    T.B = GP.FN(MENUTO.BAR, 0, 0, MENU.NOBOX)
+    IF T.B = 0 THEN GP.EXITDO
+    GP.DO
+        GOSUB T.FILL
+        T.N = GP.FN(MENUTO.PULLDOWN, T.B, MENU.ROUND)
+        T.WAS = T.B
+        T.B = MENU.NEXTBAR
+        IF T.B = 0 THEN GP.EXITDO
+    GP.LOOP
+    GP.PRINTAT 0, 16, "PASS 6 CHOSE" + STR$(T.N) + " UNDER" + STR$(T.WAS) + " KEY" + STR$(MENU.EXITKEY), 1
+    GP.PRINTAT 0, 17, "ANY KEY", 1
+    GOSUB T.WAIT
+GP.LOOP
+END
+
+T.FILL:
+    GP.SUB MENU.BEGIN, MENU.POPUP
+    GP.SELECT T.B
+    GP.CASE 1
+        GP.SUB MENU.ITEM, "&NEW"
+        GP.SUB MENU.ITEM, "&OPEN"
+        GP.SUB MENU.ITEM, "-"
+        GP.SUB MENU.ITEM, "E&XIT"
+    GP.CASE 2
+        GP.SUB MENU.ITEM, "CU&T"
+        GP.SUB MENU.ITEMX, "&COPY", "", MENU.OFF
+        GP.SUB MENU.ITEM, "&PASTE"
+    GP.OTHER
+        GP.SUB MENU.ITEM, "&ABOUT MENUTO"
+    GP.ENDSEL
+    RETURN
+
+T.ANYKEY:
+    PRINT "ANY KEY"
+T.WAIT:
+    GET T.K$ : IF T.K$ = "" THEN GOTO T.WAIT
+    RETURN

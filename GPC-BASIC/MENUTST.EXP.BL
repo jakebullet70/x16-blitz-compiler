@@ -1,15 +1,18 @@
-## MENUVERT regression. Keys go in through kbdbuf_put, because -bas paste
+## MENUTO.VERT regression. Keys go in through kbdbuf_put, because -bas paste
 ## cannot drive a program that sits in a GET loop -- the same harness
 ## INPTST.EXP.BL uses.
 ##
 ## What is checked here is the LOGIC -- which row a key lands on, what
-## cancels, what wraps. The drawing is not: MENUVERT.ROW does nothing but
-## call GP.FILL and GP.PRINTAT, which are shipped and verified, so reading
-## the attribute back out of VERA would be testing tier 6 all over again.
+## cancels, what wraps, what is skipped. The drawing is not, and neither is
+## the store: MENUBUILD.EXP.BL reads back what MENU.ITEM wrote.
+##
+## Compile SHARED: the rows are kept in bank 62.
 #INCLUDE "GPB.INC.BL"
 ## THE LIBRARY IN LOW MEMORY. To run a module below from a RAM bank instead,
 ## put its #INCLUDE inside a GP.BANKED region -- BANKED-OR-NOT.md has the rules.
-#INCLUDE "MENUVERT.INC.BL"
+#INCLUDE "BANKMGR.INC.BL"
+#INCLUDE "MENU.INC.BANKED.BL"
+#INCLUDE "MENU.INC.BL"
 #SAVEAS "@:MENUTST.PRG"
 
 #DEFINE KBDBUF.PUT $F09F
@@ -19,163 +22,161 @@
 
 CLS
 COLOR 1,0
+GOSUB BANKMGR.INIT
 
-DIM MENUVERT.ITEM$(4)
-MENUVERT.ITEM$(1) = " NEW GAME"
-MENUVERT.ITEM$(2) = " LOAD"
-MENUVERT.ITEM$(3) = " OPTIONS"
-MENUVERT.ITEM$(4) = " QUIT"
-
-MENUVERT.X = 8 : MENUVERT.Y = 6 : MENUVERT.WIDTH = 24 : MENUVERT.COUNT = 4
-MENUVERT.ATTR = NORMAL
-MENUVERT.HIATTR = BRIGHT
-MENUVERT.HOT$ = "NLOQ"
+MENU.ATTR = NORMAL
+MENU.HIATTR = BRIGHT
+GOSUB TEST.GAME
 
 ## ---- 1. two downs and RETURN, and the highlight is GONE afterwards
-MENUVERT.FLAGS = 0 : MENUVERT.SEL = 0
+MENU.FLAGS = 0
 KEY.CODE = 17 : GOSUB KEY.SEND
 KEY.CODE = 17 : GOSUB KEY.SEND
 KEY.CODE = 13 : GOSUB KEY.SEND
-GOSUB MENUVERT.RUN
-TEST.A = MENUVERT.SEL : TEST.AK = MENUVERT.KEY
+GOSUB TEST.RUN
+TEST.A = TEST.GOT : TEST.AK = MENU.EXITKEY
 
 ## ---- 2. hotkey, upper case. It CHOOSES, it does not merely move
-MENUVERT.SEL = 0
 KEY.CODE = 79 : GOSUB KEY.SEND
-GOSUB MENUVERT.RUN
-TEST.B = MENUVERT.SEL : TEST.BK = MENUVERT.KEY
+GOSUB TEST.RUN
+TEST.B = TEST.GOT : TEST.BK = MENU.EXITKEY
 
 ## ---- 3. hotkey, lower case -- matched without case
-MENUVERT.SEL = 0
 KEY.CODE = 113 : GOSUB KEY.SEND
-GOSUB MENUVERT.RUN
-TEST.C = MENUVERT.SEL
+GOSUB TEST.RUN
+TEST.C = TEST.GOT
 
 ## ---- 4. ESC cancels
-MENUVERT.SEL = 0
 KEY.CODE = 27 : GOSUB KEY.SEND
-GOSUB MENUVERT.RUN
-TEST.D = MENUVERT.SEL : TEST.DK = MENUVERT.KEY
+GOSUB TEST.RUN
+TEST.D = TEST.GOT : TEST.DK = MENU.EXITKEY
 
 ## ---- 5. wrap off the top, 1 -> 4
-MENUVERT.SEL = 0
 KEY.CODE = 145 : GOSUB KEY.SEND
 KEY.CODE = 13 : GOSUB KEY.SEND
-GOSUB MENUVERT.RUN
-TEST.E = MENUVERT.SEL
+GOSUB TEST.RUN
+TEST.E = TEST.GOT
 
 ## ---- 6. wrap off the bottom, 4 -> 1
-MENUVERT.SEL = 4
+GP.SUB MENU.SELECTED, 4
 KEY.CODE = 17 : GOSUB KEY.SEND
 KEY.CODE = 13 : GOSUB KEY.SEND
-GOSUB MENUVERT.RUN
-TEST.F = MENUVERT.SEL
+GOSUB TEST.RUN
+TEST.F = TEST.GOT
 
 ## ---- 7. NOWRAP holds at the top
-MENUVERT.FLAGS = MENUVERT.NOWRAP
-MENUVERT.SEL = 1
+MENU.FLAGS = MENU.NOWRAP
 KEY.CODE = 145 : GOSUB KEY.SEND
 KEY.CODE = 13 : GOSUB KEY.SEND
-GOSUB MENUVERT.RUN
-TEST.G = MENUVERT.SEL
+GOSUB TEST.RUN
+TEST.G = TEST.GOT
 
 ## ---- 8. NOWRAP holds at the bottom
-MENUVERT.SEL = 4
+GP.SUB MENU.SELECTED, 4
 KEY.CODE = 17 : GOSUB KEY.SEND
 KEY.CODE = 13 : GOSUB KEY.SEND
-GOSUB MENUVERT.RUN
-TEST.H = MENUVERT.SEL
+GOSUB TEST.RUN
+TEST.H = TEST.GOT
 
 ## ---- 9. MUSTSEL swallows ESC, so the RETURN after it is what lands
-MENUVERT.FLAGS = MENUVERT.MUSTSEL
-MENUVERT.SEL = 2
+MENU.FLAGS = MENU.MUSTSEL
+GP.SUB MENU.SELECTED, 2
 KEY.CODE = 27 : GOSUB KEY.SEND
 KEY.CODE = 13 : GOSUB KEY.SEND
-GOSUB MENUVERT.RUN
-TEST.I = MENUVERT.SEL
+GOSUB TEST.RUN
+TEST.I = TEST.GOT
 
 ## ---- 10. KEEPMARK leaves the chosen row highlighted on the way out
-MENUVERT.FLAGS = MENUVERT.KEEPMARK
-MENUVERT.SEL = 3
+MENU.FLAGS = MENU.KEEPMARK
+GP.SUB MENU.SELECTED, 3
 KEY.CODE = 13 : GOSUB KEY.SEND
-GOSUB MENUVERT.RUN
-TEST.J = MENUVERT.SEL
+GOSUB TEST.RUN
+TEST.J = TEST.GOT
 
-## ---- 11. no hotkeys at all: an unknown key must be ignored, not crash
-MENUVERT.FLAGS = 0
-MENUVERT.HOT$ = ""
-MENUVERT.SEL = 1
-KEY.CODE = 88 : GOSUB KEY.SEND
+## ---- 11. no hotkeys at all: Q must be ignored, not crash
+MENU.FLAGS = 0
+GP.SUB MENU.BEGIN, MENU.POPUP
+GP.SUB MENU.ITEM, " NEW GAME"
+GP.SUB MENU.ITEM, " LOAD"
+GP.SUB MENU.ITEM, " OPTIONS"
+GP.SUB MENU.ITEM, " QUIT"
+KEY.CODE = 81 : GOSUB KEY.SEND
 KEY.CODE = 13 : GOSUB KEY.SEND
-GOSUB MENUVERT.RUN
-TEST.K = MENUVERT.SEL
+GOSUB TEST.RUN
+TEST.K = TEST.GOT
 
 ## ---- 12. zero rows returns 0 and does NOT wait for a key
-MENUVERT.COUNT = 0
-MENUVERT.SEL = 2
-GOSUB MENUVERT.RUN
-TEST.L = MENUVERT.SEL
+GP.SUB MENU.BEGIN, MENU.POPUP
+GP.SUB MENU.SELECTED, 2
+GOSUB TEST.RUN
+TEST.L = TEST.GOT
 
 ## ---- 13. the GAMEPAD flag with no pad plugged in must not eat the
 ## ---- keyboard, and must not hang in the poll
-MENUVERT.COUNT = 4
-MENUVERT.HOT$ = "NLOQ"
-MENUVERT.FLAGS = MENUVERT.GAMEPAD
-MENUVERT.SEL = 0
+GOSUB TEST.GAME
+MENU.FLAGS = MENU.GAMEPAD
 KEY.CODE = 17 : GOSUB KEY.SEND
 KEY.CODE = 13 : GOSUB KEY.SEND
-GOSUB MENUVERT.RUN
-TEST.M = MENUVERT.SEL
+GOSUB TEST.RUN
+TEST.M = TEST.GOT
 
-## ---- 14. the default highlight: MENUVERT.HIATTR = 0 inverts MENUVERT.ATTR,
-## ---- which is what the assembly GP.MENU always did
-MENUVERT.FLAGS = MENUVERT.KEEPMARK
-MENUVERT.HIATTR = 0
-MENUVERT.SEL = 1
+## ---- 14. the default highlight: MENU.HIATTR = 0 inverts MENU.ATTR
+MENU.FLAGS = MENU.KEEPMARK
+MENU.HIATTR = 0
 KEY.CODE = 13 : GOSUB KEY.SEND
-GOSUB MENUVERT.RUN
-TEST.N = MENUVERT.SEL
+GOSUB TEST.RUN
+TEST.N = TEST.GOT
+MENU.HIATTR = BRIGHT
 
-## ---- 15..21. MENUVERT.HOTFIND -- WHERE the hotkey letter sits in a row.
-## ---- Logic, like everything else here: the position it returns, never the
-## ---- attribute it ends up painted in. MENUVERT.ROW does nothing with that
-## ---- position but call GP.PRINTAT, which is shipped and verified.
-## ----
-## ---- HOTFIND reads MENUVERT.HOT$, MENUVERT.DRAWROW and MENUVERT.DRAWTEXT$
-## ---- and answers in MENUVERT.HOTAT, so it can be driven directly without
-## ---- a menu on the screen at all.
-MENUVERT.HOT$ = "NLOQ"
+## ---- 15..20. dead rows. A separator and a disabled row sit between 1 and 4,
+## ---- and the cursor steps over both, either way.
+MENU.FLAGS = 0
+GP.SUB MENU.BEGIN, MENU.POPUP
+GP.SUB MENU.ITEM, " &NEW GAME"
+GP.SUB MENU.ITEM, "-"
+GP.SUB MENU.ITEMX, " &LOAD", "", MENU.OFF
+GP.SUB MENU.ITEM, " &OPTIONS"
+GP.SUB MENU.ITEM, " &QUIT"
 
-## the ordinary case: the letter is the first character after the lead space
-MENUVERT.DRAWROW = 1 : MENUVERT.DRAWTEXT$ = " NEW GAME" : GOSUB MENUVERT.HOTFIND
-TEST.O = MENUVERT.HOTAT
+KEY.CODE = 17 : GOSUB KEY.SEND
+KEY.CODE = 13 : GOSUB KEY.SEND
+GOSUB TEST.RUN
+TEST.O = TEST.GOT
 
-## not the first letter of the row -- O of OPTIONS is at 2, but row 3's
-## hotkey is O and the row before it has an O in "LOAD" nowhere near it
-MENUVERT.DRAWROW = 3 : MENUVERT.DRAWTEXT$ = " OPTIONS" : GOSUB MENUVERT.HOTFIND
-TEST.P = MENUVERT.HOTAT
+GP.SUB MENU.SELECTED, 4
+KEY.CODE = 145 : GOSUB KEY.SEND
+KEY.CODE = 13 : GOSUB KEY.SEND
+GOSUB TEST.RUN
+TEST.P = TEST.GOT
 
-## FIRST match wins, so a letter repeated later does not move it
-MENUVERT.DRAWROW = 2 : MENUVERT.DRAWTEXT$ = " LEVEL SELECT" : GOSUB MENUVERT.HOTFIND
-TEST.Q = MENUVERT.HOTAT
+## the hot key of a disabled row does nothing; the RETURN after it lands on 1
+KEY.CODE = 76 : GOSUB KEY.SEND
+KEY.CODE = 13 : GOSUB KEY.SEND
+GOSUB TEST.RUN
+TEST.Q = TEST.GOT
 
-## matched WITHOUT case, both ways round
-MENUVERT.DRAWROW = 4 : MENUVERT.DRAWTEXT$ = " quit" : GOSUB MENUVERT.HOTFIND
-TEST.R = MENUVERT.HOTAT
+## opening on a dead row slides forward to the next live one
+GP.SUB MENU.SELECTED, 3
+KEY.CODE = 13 : GOSUB KEY.SEND
+GOSUB TEST.RUN
+TEST.R = TEST.GOT
 
-## a row whose text does not contain its own hotkey: 0, and that is a
-## caller's choice rather than an error -- the hotkey still WORKS
-MENUVERT.DRAWROW = 1 : MENUVERT.DRAWTEXT$ = " START" : GOSUB MENUVERT.HOTFIND
-TEST.S = MENUVERT.HOTAT
+## KEYEXIT hands back a key the menu has no use for, with the row it was on
+MENU.FLAGS = MENU.KEYEXIT
+GP.SUB MENU.SELECTED, 4
+KEY.CODE = 29 : GOSUB KEY.SEND
+GOSUB TEST.RUN
+TEST.S = TEST.GOT : TEST.SK = MENU.EXITKEY
 
-## a row past the end of HOT$ has no hotkey to find
-MENUVERT.DRAWROW = 9 : MENUVERT.DRAWTEXT$ = " NEW GAME" : GOSUB MENUVERT.HOTFIND
-TEST.T = MENUVERT.HOTAT
-
-## no hotkeys at all
-MENUVERT.HOT$ = ""
-MENUVERT.DRAWROW = 1 : MENUVERT.DRAWTEXT$ = " NEW GAME" : GOSUB MENUVERT.HOTFIND
-TEST.U = MENUVERT.HOTAT
+## no live row at all: the cursor must not walk for ever, and ESC still works
+MENU.FLAGS = 0
+GP.SUB MENU.BEGIN, MENU.POPUP
+GP.SUB MENU.ITEMX, " &ONLY", "", MENU.OFF
+GP.SUB MENU.ITEM, "-"
+KEY.CODE = 13 : GOSUB KEY.SEND
+KEY.CODE = 27 : GOSUB KEY.SEND
+GOSUB TEST.RUN
+TEST.T = TEST.GOT
 
 CLS
 PRINT "A";TEST.A;TEST.AK;" EXPECT 3 13"
@@ -192,15 +193,28 @@ PRINT "K";TEST.K;" EXPECT 1"
 PRINT "L";TEST.L;" EXPECT 0"
 PRINT "M";TEST.M;" EXPECT 2"
 PRINT "N";TEST.N;" EXPECT 1"
-PRINT "O";TEST.O;" EXPECT 2"
-PRINT "P";TEST.P;" EXPECT 2"
-PRINT "Q";TEST.Q;" EXPECT 2"
-PRINT "R";TEST.R;" EXPECT 2"
-PRINT "S";TEST.S;" EXPECT 0"
+PRINT "O";TEST.O;" EXPECT 4"
+PRINT "P";TEST.P;" EXPECT 1"
+PRINT "Q";TEST.Q;" EXPECT 1"
+PRINT "R";TEST.R;" EXPECT 4"
+PRINT "S";TEST.S;TEST.SK;" EXPECT 4 29"
 PRINT "T";TEST.T;" EXPECT 0"
-PRINT "U";TEST.U;" EXPECT 0"
 PRINT "@DONE@"
 POWEROFF
+
+## ---- the four rows most cases run, N L O Q their hot keys.
+TEST.GAME:
+    GP.SUB MENU.BEGIN, MENU.POPUP
+    GP.SUB MENU.ITEM, " &NEW GAME"
+    GP.SUB MENU.ITEM, " &LOAD"
+    GP.SUB MENU.ITEM, " &OPTIONS"
+    GP.SUB MENU.ITEM, " &QUIT"
+    RETURN
+
+## ---- MENU.SELECTED lasts one run, so a case that sets none opens on row 1.
+TEST.RUN:
+    TEST.GOT = GP.FN(MENUTO.VERT, 5, 7, MENU.THIN)
+    RETURN
 
 ## ---- A key straight into the KERNAL's own buffer. kbdbuf_put lives in
 ## ---- ROM bank 0 and compiled code runs in bank 4, hence the two POKEs.
