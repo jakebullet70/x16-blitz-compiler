@@ -1,0 +1,552 @@
+## ***********************************************************************
+## **
+## **  GUI-DIALOGS.INC.BL -- every canned dialog as a one-line call.
+## **
+## **      GP.SUB DLGRESET, MYBANK%                  once, at startup
+## **      GP.SUB MSGBOX, "DISK FULL"
+## **      IF GP.FN(ASKYN, "DELETE IT?") THEN <yes>
+## **      F$ = GP.FN(ASKTEXT, "FILE NAME?", 16)
+## **
+## **  EVERY VERB STARTS CLEAN. It calls GUI.DEFAULTS before it sets anything,
+## **  so nothing a previous dialog set -- title, placement, button labels --
+## **  carries into this one. Three things are kept: the bank DLGRESET was given,
+## **  which is where the covered cells are saved, and the DLGSHADOW and
+## **  DLGGLYPH settings.
+## **
+## **  The short verb takes the message. The EX verb takes a title and three
+## **  message lines first, always in that order, then its own arguments.
+## **
+## **  DLGRESET bank                       the save bank, then GUI.DEFAULTS
+## **  DLGSHADOW on                        non-zero shadows every box after it
+## **  DLGGLYPH on                         non-zero frames every box from the
+## **                                      six GUI.EDGE.* and GUI.CORNER.*
+## **  KBCLEAR                             empty the keyboard buffer
+## **  MSGBOX msg$                         one button; GUI.KEY closed it
+## **  MSGBOXEX t$, m$, m2$, m3$, btn$     btn$ "" is "&OK"
+## **  A = GP.FN(ASKYN, msg$)              -1 yes, 0 no or ESC
+## **  A = GP.FN(ASKOK, msg$)              the same on OK and CANCEL
+## **  A = GP.FN(ASKYNEX, t$, m$, m2$, m3$, dflt, okc)
+## **                                      dflt 2 makes the second button
+## **                                      the default; okc <> 0 is OK/CANCEL
+## **  T$ = GP.FN(ASKTEXT, msg$, len)      a typed line; "" when cancelled
+## **  T$ = GP.FN(INPUTBOX, msg$, start$, len)
+## **                                      the text either way, GUI.OK says
+## **                                      which -- for where "" is an answer
+## **  T$ = GP.FN(INPUTBOXEX, t$, m$, m2$, m3$, start$, len, mask)
+## **  N = GP.FN(PICKMENU, msg$, sel)      a row of the popup slot; 1..N,
+## **                                      0 cancelled. sel 0 starts on row 1
+## **  N = GP.FN(PICKMENUEX, t$, m$, m2$, m3$, sel, flags)
+## **                                      flags are MENU.MUSTSEL, .NOWRAP,
+## **                                      .GAMEPAD
+## **  N = GP.FN(LISTBOX, msg$, count, rows)
+## **                                      one answer, 0 cancelled
+## **  N = GP.FN(LISTBOXM, msg$, count, rows)
+## **                                      multi select: how many are marked,
+## **                                      GUI.LISTBOX.MARKS$ which ones
+## **  N = GP.FN(LISTBOXEX, t$, m$, m2$, m3$, count, rows, multi)
+## **                                      GUI.LISTBOX.SEL, whichever mode
+## **  T$ = GP.FN(ASKLINE, x, y, label$, len)
+## **                                      LINEINPUT.ASK at x, y, no box;
+## **                                      LINEINPUT.KEY 27 is a cancel
+## **  PANELOPEN t$, m$, rows, width       an empty box for the caller's own
+## **                                      rows, at GUI.INNER.LEFT and .TOP
+## **  PANELCLOSE                          and the screen put back
+## **  FORM.BEGIN ... FORM.END             a box of check boxes and a combo;
+## **                                      its own section below
+## **
+## **  THE ROWS ARE FILLED FIRST, because an array cannot be an argument.
+## **  PICKMENU reads the menu builder's popup slot:
+## **
+## **      GP.SUB MENU.BEGIN, MENU.POPUP
+## **      GP.SUB MENU.ITEM, "&NEW"
+## **      GP.SUB MENU.ITEM, "&OPEN"
+## **      N = GP.FN(PICKMENU, "CHOOSE ONE", 0)
+## **
+## **  and the LISTBOX verbs read GUI.LIST.ITEM$(1..count), which the caller
+## **  DIMs.
+## **
+## **  Requires GPB.INC.BL, THEME.INC.BL, MENU.INC.BL, LINEINPUT.INC.BL,
+## **  GUI.INC.BL, COMBO.INC.BL and CHECK.INC.BL, all before this file. A verb is compiled
+## **  before any call to it, so this goes in above the program's code.
+## **
+## **  The arguments land in DLG.* and not in the GUI.* inputs themselves:
+## **  GUI.DEFAULTS runs after the arguments are stored, and would clear them.
+## **
+## **  TO RUN IT FROM A RAM BANK, put the #INCLUDE between GP.BANKED and
+## **  GP.ENDBANKED. Nothing here executes a BANK statement.
+## **
+## ***********************************************************************
+#IFNDEF DLG.DEFS
+#DEFINE DLG.DEFS 1
+
+GOTO DLG.MODULE.END
+
+## ***********************************************************************
+## **  GUI.DEFAULTS -- every GUI input back to what an unset one means.
+## ***********************************************************************
+
+GUI.DEFAULTS:
+    GUI.BANK = DLG.HOMEBANK
+    GUI.MSG$ = "" : GUI.MSG2$ = "" : GUI.MSG3$ = ""
+    GUI.TITLE$ = "" : GUI.BTN.ONE$ = "" : GUI.BTN.TWO$ = ""
+    GUI.STYLE = 0 : GUI.GLYPH = DLG.GLYPH : GUI.PLACE = 0 : GUI.X = 0 : GUI.Y = 0
+    GUI.ROW.OFFSET = 0 : GUI.PANEL.IN = 0 : GUI.BORDER.IN = 0 : GUI.OKCANCEL = 0
+    GUI.DEFAULT = 1 : GUI.SHADOW = DLG.SHADOW
+    GUI.SHADOW.ATTR = 0 : GUI.LEN = 0 : GUI.MASK = 0 : GUI.TEXT$ = ""
+    GUI.FLAGS = 0 : GUI.SEL = 0 : GUI.COUNT = 0
+    RETURN
+
+## ---- the EX verbs' title and three lines, onto a clean slate
+DLG.INTERNAL.HEADING:
+    GOSUB GUI.DEFAULTS
+    GUI.TITLE$ = DLG.TITLE$ : GUI.MSG$ = DLG.MSG$
+    GUI.MSG2$ = DLG.MSG2$ : GUI.MSG3$ = DLG.MSG3$
+    RETURN
+
+DLG.RESET:
+    GP.DEFPROC DLGRESET, DLG.HOMEBANK
+    GOSUB GUI.DEFAULTS
+    RETURN
+
+DLG.SETSHADOW:
+    GP.DEFPROC DLGSHADOW, DLG.SHADOW
+    GUI.SHADOW = DLG.SHADOW
+    RETURN
+
+DLG.SETGLYPH:
+    GP.DEFPROC DLGGLYPH, DLG.GLYPH
+    GUI.GLYPH = DLG.GLYPH
+    RETURN
+
+## ***********************************************************************
+## **  KBCLEAR -- throw away whatever is already typed.
+## **
+## **  KB.CLEARKB does the same. This one saves a region the KB.INC.BL
+## **  include and a bank switch on every call.
+## **
+## **  Call it before opening a dialog, and after a keystroke that redraws. A
+## **  dialog opened with a key still queued reads it, answers itself and
+## **  closes; a held arrow repeats faster than a page can be drawn.
+## ***********************************************************************
+
+DLG.KBCLEAR:
+    GP.DEFPROC KBCLEAR
+    GP.DO
+        GET DLG.KEY$
+        IF GP.ISEMPTY(DLG.KEY$) THEN GP.EXITDO
+    GP.LOOP
+    RETURN
+
+## ***********************************************************************
+## **  DLG.INTERNAL.SAY -- something to say, and one way out.
+## **
+## **   in   GUI.BTN.ONE$  what the way out is called. "" takes "&OK"
+## **   out  GUI.KEY       the key that closed it
+## **
+## **  RETURN, SPACE, ESC and STOP all close it, and so does the button's own
+## **  marked letter if it has one.
+## ***********************************************************************
+
+DLG.INTERNAL.SAY:
+    IF GUI.BTN.ONE$ = "" THEN GUI.BTN.ONE$ = "&OK"
+    GUI.BTN.TWO$ = ""
+    GOSUB GUI.BUTTON.SIZE
+    GUI.BODY.ROWS = 1 : GUI.BODY.WIDTH = GUI.BTN.TOTAL
+    GOSUB GUI.OPEN : GOSUB GUI.FORM.BEGIN
+    GUI.BTN.Y = GUI.INNER.TOP
+    GOSUB GUI.BUTTON.ROW : GOSUB GUI.FORM.RUN
+    GUI.KEY = GUI.FORM.KEY : GOSUB GUI.CLOSE
+    RETURN
+
+DLG.MSGBOX:
+    GP.DEFPROC MSGBOX, DLG.MSG$
+    GOSUB GUI.DEFAULTS : GUI.MSG$ = DLG.MSG$ : GOSUB DLG.INTERNAL.SAY
+    RETURN
+
+DLG.MSGBOXEX:
+    GP.DEFPROC MSGBOXEX, DLG.TITLE$, DLG.MSG$, DLG.MSG2$, DLG.MSG3$, DLG.BUTTON$
+    GOSUB DLG.INTERNAL.HEADING : GUI.BTN.ONE$ = DLG.BUTTON$ : GOSUB DLG.INTERNAL.SAY
+    RETURN
+
+## ***********************************************************************
+## **  DLG.INTERNAL.YESNO -- a question, and a Y or N answer.
+## **
+## **   in   GUI.OKCANCEL  0 asks YES/NO on Y and N. Non-zero asks OK/CANCEL
+## **                      on O and C
+## **        GUI.DEFAULT   2 starts on the second button, anything else the first
+## **
+## **   out  GUI.ANSWER    -1 for yes or OK, 0 for no or cancel
+## **        GUI.KEY       the key itself, so a caller can tell an ESC from an N
+## **
+## **  THE LABELS ARE FIXED, and GUI.BTN.ONE$ and GUI.BTN.TWO$ are overwritten
+## **  rather than read. They are the only place the answer keys are written
+## **  down -- the accelerator scan folds each label's "&" letter itself -- so
+## **  a caller's label would silently change which key answers yes.
+## **
+## **  TAB MOVES BETWEEN THE TWO. RETURN presses whichever button has the
+## **  focus, which starts on the default one. ESC and STOP always answer NO --
+## **  cancelling is not a default. A destructive question wants GUI.DEFAULT = 2.
+## ***********************************************************************
+DLG.INTERNAL.YESNO:
+    GUI.BTN.ONE$ = "&YES" : GUI.BTN.TWO$ = "&NO"
+    IF GUI.OKCANCEL <> 0 THEN GUI.BTN.ONE$ = "&OK" : GUI.BTN.TWO$ = "&CANCEL"
+    GOSUB GUI.BUTTON.SIZE
+    GUI.BODY.ROWS = 1 : GUI.BODY.WIDTH = GUI.BTN.TOTAL
+    GOSUB GUI.OPEN : GOSUB GUI.FORM.BEGIN
+    GUI.BTN.Y = GUI.INNER.TOP
+    GOSUB GUI.BUTTON.ROW : GOSUB GUI.FORM.RUN
+    GUI.KEY = GUI.FORM.KEY
+    GUI.ANSWER = 0
+
+## ---- Control 1 is the yes button. A cancel is GUI.FORM.HIT 0, and so
+## ---- answers no without ESC being named here.
+    IF GUI.FORM.HIT = 1 THEN GUI.ANSWER = -1
+    GOSUB GUI.CLOSE
+    RETURN
+
+DLG.ASKYN:
+    GP.DEFPROC ASKYN, DLG.MSG$ RETURNS GUI.ANSWER
+    GOSUB GUI.DEFAULTS : GUI.MSG$ = DLG.MSG$ : GOSUB DLG.INTERNAL.YESNO
+    RETURN
+
+DLG.ASKOK:
+    GP.DEFPROC ASKOK, DLG.MSG$ RETURNS GUI.ANSWER
+    GOSUB GUI.DEFAULTS : GUI.MSG$ = DLG.MSG$ : GUI.OKCANCEL = 1 : GOSUB DLG.INTERNAL.YESNO
+    RETURN
+
+DLG.ASKYNEX:
+    GP.DEFPROC ASKYNEX, DLG.TITLE$, DLG.MSG$, DLG.MSG2$, DLG.MSG3$, DLG.DEFAULT, DLG.OKCANCEL RETURNS GUI.ANSWER
+    GOSUB DLG.INTERNAL.HEADING : GUI.DEFAULT = DLG.DEFAULT : GUI.OKCANCEL = DLG.OKCANCEL : GOSUB DLG.INTERNAL.YESNO
+    RETURN
+
+## ***********************************************************************
+## **  DLG.INTERNAL.INPUT -- a question, and a line of typed text.
+## **
+## **   in   GUI.LEN    how many characters fit. 0 takes 20
+## **        GUI.TEXT$  the starting value, edited in place
+## **        GUI.MASK   non-zero shows asterisks, for a password
+## **
+## **   out  GUI.TEXT$  what was typed
+## **        GUI.OK     -1 if RETURN finished it, 0 if cancelled
+## **        GUI.KEY    the key itself
+## **
+## **  THREE CONTROLS AND ONE LOOP: the field, then OK, then CANCEL. TAB and
+## **  DOWN leave the field for the buttons, UP goes back, and the cycle wraps.
+## **  RETURN in the field presses OK wherever the eye is; RETURN on a button
+## **  presses that button. ESC cancels from anywhere.
+## **
+## **  An accelerator is live only while the focused control does not eat
+## **  printables, so O works on the button row and types an O in the field.
+## ***********************************************************************
+DLG.INTERNAL.INPUT:
+    IF GUI.LEN = 0 THEN GUI.LEN = 20
+    GUI.BTN.ONE$ = "&OK" : GUI.BTN.TWO$ = "&CANCEL"
+    GUI.DEFAULT = 1 : GOSUB GUI.BUTTON.SIZE
+    GUI.BODY.ROWS = 3 : GUI.BODY.WIDTH = GUI.LEN
+    IF GUI.BTN.TOTAL > GUI.BODY.WIDTH THEN GUI.BODY.WIDTH = GUI.BTN.TOTAL
+    DLG.WAS$ = GUI.TEXT$
+    GOSUB GUI.OPEN
+
+## ---- the field, centred over the inner width like the buttons under it
+    GUI.FIELD.LEFT = GUI.INNER.LEFT + INT((GUI.INNER.WIDTH - GUI.LEN) / 2)
+    IF GUI.FIELD.LEFT < GUI.INNER.LEFT THEN GUI.FIELD.LEFT = GUI.INNER.LEFT
+    LINEINPUT.X = GUI.FIELD.LEFT : LINEINPUT.Y = GUI.INNER.TOP
+    LINEINPUT.LEN = GUI.LEN : LINEINPUT.ATTR = THEME.CLR(THEME.HILITE)
+    LINEINPUT.TEXT$ = GUI.TEXT$ : LINEINPUT.MASK = GUI.MASK
+
+## ---- The field is control 1 and the buttons are 2 and 3, so BEGIN comes
+## ---- first and the row appends to it. Focus starts on the field, which is
+## ---- not where the default button is.
+    GOSUB GUI.FORM.BEGIN : GOSUB GUI.FORM.ADD.FIELD
+    GUI.BTN.Y = GUI.INNER.TOP + 2
+    GOSUB GUI.BUTTON.ROW : GUI.FOCUS = 1 : GOSUB GUI.FORM.RUN
+
+    GUI.TEXT$ = LINEINPUT.TEXT$ : GUI.KEY = GUI.FORM.KEY
+    GUI.OK = 0
+
+## ---- OK IS THE DEFAULT BUTTON, asked by its flag rather than by its index.
+## ---- A cancel is GUI.FORM.HIT 0: element 0 of the flags array is never
+## ---- written, so it answers 0 and falls through.
+    IF (GUI.CTRL.FLAGS%(GUI.FORM.HIT) AND GUI.CF.DEFAULT) <> 0 THEN GUI.OK = -1
+
+## ---- A cancel gives back what was passed IN. LINEINPUT restores to the value
+## ---- at ITS last call, which after a TAB out and back is not the same thing.
+    IF GUI.OK = 0 THEN GUI.TEXT$ = DLG.WAS$
+    GOSUB GUI.CLOSE
+    RETURN
+
+DLG.ASKTEXT:
+    GP.DEFPROC ASKTEXT, DLG.MSG$, DLG.LEN RETURNS DLG.ANSWER$
+    GOSUB GUI.DEFAULTS : GUI.MSG$ = DLG.MSG$
+    GUI.LEN = DLG.LEN : GOSUB DLG.INTERNAL.INPUT : DLG.ANSWER$ = ""
+    IF GUI.OK THEN DLG.ANSWER$ = GUI.TEXT$
+    RETURN
+
+DLG.INPUTBOX:
+    GP.DEFPROC INPUTBOX, DLG.MSG$, DLG.START$, DLG.LEN RETURNS GUI.TEXT$
+    GOSUB GUI.DEFAULTS
+    GUI.MSG$ = DLG.MSG$ : GUI.TEXT$ = DLG.START$ : GUI.LEN = DLG.LEN
+    GOSUB DLG.INTERNAL.INPUT
+    RETURN
+
+DLG.INPUTBOXEX:
+    GP.DEFPROC INPUTBOXEX, DLG.TITLE$, DLG.MSG$, DLG.MSG2$, DLG.MSG3$, DLG.START$, DLG.LEN, DLG.MASK RETURNS GUI.TEXT$
+    GOSUB DLG.INTERNAL.HEADING
+    GUI.TEXT$ = DLG.START$ : GUI.LEN = DLG.LEN : GUI.MASK = DLG.MASK
+    GOSUB DLG.INTERNAL.INPUT
+    RETURN
+
+## ***********************************************************************
+## **  DLG.INTERNAL.MENU -- a question, and a row chosen from a list.
+## **
+## **   in   the popup slot    built with MENU.BEGIN MENU.POPUP and MENU.ITEM;
+## **                          & marks a row's hot key, tinted in GUI.BORDER
+## **        MENU.SELECTED     the row to start on, else the first
+## **        GUI.FLAGS         passed to MENU.FLAGS -- MUSTSEL, NOWRAP,
+## **                          GAMEPAD. KEEPMARK means nothing here
+## **
+## **   out  GUI.SEL           1..N, or 0 if cancelled
+## **        GUI.KEY           13 chose, 27 cancelled
+## **
+## **  Items are NOT indented here: the menu prints them at the left edge of the
+## **  highlight, so a leading space in the item is what insets the bar. The
+## **  highlight is as wide as the widest row, not the box.
+## ***********************************************************************
+DLG.INTERNAL.MENU:
+    GUI.SEL = 0 : GUI.KEY = 27
+    IF MENU.READY = 0 THEN RETURN
+    MENU.RUNSLOT = MENU.POPUP : MENU.STYLE = MENU.NOBOX
+    GOSUB MENU.MEASURE
+    GUI.BODY.ROWS = MENU.COUNT : GUI.BODY.WIDTH = MENU.WIDE
+    GOSUB GUI.OPEN
+
+## ---- the panel GUI.OPEN just painted, so unselected rows are the colour of
+## ---- the box they sit in. A separator is drawn in the frame's colour, so it
+## ---- reads as part of the box rather than as a row.
+    MENU.ATTR = GUI.PANEL : MENU.HIATTR = THEME.CLR(THEME.HILITE)
+    MENU.HOTATTR = GUI.BORDER : MENU.FLAGS = GUI.FLAGS : MENU.SEPATTR = GUI.BORDER
+    GUI.SEL = GP.FN(MENUTO.VERT, GUI.INNER.TOP, GUI.INNER.LEFT, MENU.NOBOX)
+    GUI.KEY = MENU.EXITKEY
+    GOSUB GUI.CLOSE
+    RETURN
+
+DLG.PICKMENU:
+    GP.DEFPROC PICKMENU, DLG.MSG$, DLG.SEL RETURNS GUI.SEL
+    GOSUB GUI.DEFAULTS
+    GUI.MSG$ = DLG.MSG$ : GP.SUB MENU.SELECTED, DLG.SEL
+    GOSUB DLG.INTERNAL.MENU
+    RETURN
+
+DLG.PICKMENUEX:
+    GP.DEFPROC PICKMENUEX, DLG.TITLE$, DLG.MSG$, DLG.MSG2$, DLG.MSG3$, DLG.SEL, DLG.FLAGS RETURNS GUI.SEL
+    GOSUB DLG.INTERNAL.HEADING
+    GUI.FLAGS = DLG.FLAGS : GP.SUB MENU.SELECTED, DLG.SEL
+    GOSUB DLG.INTERNAL.MENU
+    RETURN
+
+## ***********************************************************************
+## **  LISTBOX -- GUI.LIST.ITEM$() is filled before the call.
+## ***********************************************************************
+DLG.LISTBOX:
+    GP.DEFPROC LISTBOX, DLG.MSG$, DLG.COUNT, DLG.ROWS RETURNS GUI.LISTBOX.SEL
+    GOSUB GUI.DEFAULTS
+    GUI.MSG$ = DLG.MSG$ : DLG.MULTI = 0
+    GOSUB DLG.INTERNAL.LIST
+    RETURN
+
+DLG.LISTBOXM:
+    GP.DEFPROC LISTBOXM, DLG.MSG$, DLG.COUNT, DLG.ROWS RETURNS GUI.LISTBOX.MARKED
+    GOSUB GUI.DEFAULTS
+    GUI.MSG$ = DLG.MSG$
+    DLG.MULTI = 1
+    GOSUB DLG.INTERNAL.LIST
+    RETURN
+
+DLG.LISTBOXEX:
+    GP.DEFPROC LISTBOXEX, DLG.TITLE$, DLG.MSG$, DLG.MSG2$, DLG.MSG3$, DLG.COUNT, DLG.ROWS, DLG.MULTI RETURNS GUI.LISTBOX.SEL
+    GOSUB DLG.INTERNAL.HEADING : GOSUB DLG.INTERNAL.LIST
+    RETURN
+
+## ---- THE LISTBOX. Marks and the start row are cleared every call, and
+## ---- MARKED with them, so a single-select run does not report the last
+## ---- multi run's count. The list is GUI.CT.LIST, one of GUI.FORM's
+## ---- controls; this is the box, the buttons and the answer around it.
+DLG.INTERNAL.LIST:
+    GUI.LISTBOX.MARKS$ = "" : GUI.LISTBOX.MARKED = 0
+    GUI.LISTBOX.SEL = 0 : GUI.KEY = 0
+    IF DLG.COUNT < 1 THEN RETURN
+
+## ---- ten rows if none were asked for, then cut to the list and to the
+## ---- screen. Eight rows go to the frame, the message, the spacer and the
+## ---- button row.
+    GUI.LIST.COUNT = DLG.COUNT : GUI.LIST.ROWS = DLG.ROWS
+    IF GUI.LIST.ROWS < 1 THEN GUI.LIST.ROWS = 10
+    IF GUI.LIST.ROWS > GUI.LIST.COUNT THEN GUI.LIST.ROWS = GUI.LIST.COUNT
+    GOSUB GUI.SCREEN
+    IF GUI.LIST.ROWS > GUI.SCREEN.ROWS - 8 THEN GUI.LIST.ROWS = GUI.SCREEN.ROWS - 8
+    IF GUI.LIST.ROWS < 1 THEN GUI.LIST.ROWS = 1
+
+## ---- measured over the whole list, not the first window: the box is
+## ---- stashed, so it cannot grow as the list scrolls.
+    DLG.TEXTW = 0
+    FOR DLG.I = 1 TO GUI.LIST.COUNT
+        IF LEN(GUI.LIST.ITEM$(DLG.I)) > DLG.TEXTW THEN DLG.TEXTW = LEN(GUI.LIST.ITEM$(DLG.I))
+    NEXT DLG.I
+
+## ---- multi select: COUNT "0"s, toggled in place through GP.STRPTR, so a
+## ---- list caps at 250 items. The pointer is what tells the control and
+## ---- GUI.LIST.MEASURE there is a mark column, two cells wide.
+    GUI.LIST.MARKP = 0 : DLG.MARKOFF = 0
+    GP.IF DLG.MULTI <> 0 THEN
+        GUI.LISTBOX.MARKS$ = RPT$(48, GUI.LIST.COUNT)
+        GUI.LIST.MARKP = GP.STRPTR(GUI.LISTBOX.MARKS$)
+        DLG.MARKOFF = 2
+    GP.ENDIF
+
+    GUI.BTN.ONE$ = "&OK" : GUI.BTN.TWO$ = "&CANCEL"
+    GUI.DEFAULT = 1
+    GOSUB GUI.BUTTON.SIZE : GOSUB GUI.LIST.MEASURE
+    GUI.BODY.WIDTH = DLG.TEXTW + DLG.MARKOFF
+    IF GUI.LIST.NOTEW + 2 > GUI.BODY.WIDTH THEN GUI.BODY.WIDTH = GUI.LIST.NOTEW + 2
+    IF GUI.BTN.TOTAL > GUI.BODY.WIDTH THEN GUI.BODY.WIDTH = GUI.BTN.TOTAL
+    GUI.BODY.ROWS = GUI.LIST.ROWS + 2
+    GOSUB GUI.OPEN
+
+## ---- the list is control 1 and the buttons 2 and 3. Focus starts on the
+## ---- list, and RETURN there still presses OK, the default.
+    GUI.LIST.X = GUI.INNER.LEFT + DLG.MARKOFF : GUI.LIST.Y = GUI.INNER.TOP
+    GUI.LIST.W = GUI.INNER.WIDTH - DLG.MARKOFF : GUI.LIST.SEL = 0
+    GOSUB GUI.FORM.BEGIN : GOSUB GUI.FORM.ADD.LIST
+    GUI.BTN.Y = GUI.INNER.TOP + GUI.LIST.ROWS + 1
+    GOSUB GUI.BUTTON.ROW : GUI.FOCUS = 1 : GOSUB GUI.FORM.RUN
+
+## ---- a cancel is GUI.FORM.HIT 0, whose flags are never set.
+    GUI.LISTBOX.SEL = GUI.LIST.SEL : GUI.LISTBOX.MARKED = GUI.LIST.MARKED
+    GUI.KEY = GUI.RETURN
+    GP.IF (GUI.CTRL.FLAGS%(GUI.FORM.HIT) AND GUI.CF.DEFAULT) = 0 THEN
+        GUI.LISTBOX.SEL = 0 : GUI.KEY = GUI.ESCAPE
+    GP.ENDIF
+    GOSUB GUI.CLOSE
+    RETURN
+
+## ***********************************************************************
+## **  LINEINPUT.ASK -- a label and a field on the page, no box.
+## ***********************************************************************
+
+DLG.ASKLINE:
+    GP.DEFPROC ASKLINE, DLG.X, DLG.Y, DLG.LABEL$, DLG.LEN RETURNS LINEINPUT.TEXT$
+    LINEINPUT.X = DLG.X : LINEINPUT.Y = DLG.Y
+    LINEINPUT.LABEL$ = DLG.LABEL$ : LINEINPUT.LEN = DLG.LEN
+    LINEINPUT.TEXT$ = "" : LINEINPUT.MASK = 0 : LINEINPUT.ALLOW$ = "" : LINEINPUT.DENY$ = ""
+    LINEINPUT.ATTR = THEME.CLR(THEME.HILITE) : LINEINPUT.LABELATTR = THEME.CLR(THEME.TEXT)
+    GOSUB LINEINPUT.ASK
+    RETURN
+
+## ***********************************************************************
+## **  PANELOPEN -- an empty box, for rows the caller draws itself.
+## **
+## **   out  GUI.INNER.LEFT GUI.INNER.TOP   where the caller's rows start
+## **        GUI.INNER.WIDTH                how wide they may be
+## **        GUI.PANEL                      the box's own colour
+## **        GUI.STASHED                    -1 if the covered cells were saved
+## **
+## **  PANELCLOSE puts the screen back, and nothing else may open a box in
+## **  between: there is one save, and a second open overwrites it.
+## ***********************************************************************
+
+DLG.PANELOPEN:
+    GP.DEFPROC PANELOPEN, DLG.TITLE$, DLG.MSG$, DLG.ROWS, DLG.WIDTH
+    GOSUB GUI.DEFAULTS
+    GUI.TITLE$ = DLG.TITLE$ : GUI.MSG$ = DLG.MSG$ : GUI.BODY.ROWS = DLG.ROWS : GUI.BODY.WIDTH = DLG.WIDTH
+    GOSUB GUI.OPEN
+    RETURN
+
+DLG.PANELCLOSE:
+    GP.DEFPROC PANELCLOSE
+    GOSUB GUI.CLOSE
+    RETURN
+
+## ***********************************************************************
+## **  FORM -- a box of controls and an OK / CANCEL row, built like a menu.
+## **
+## **      COMBO.ITEM$(1) = "TEXAS" ...                the combo's rows first
+## **      GP.SUB FORM.BEGIN, "TITLE", "MSG", "", 4, 28, "&OK", "&CANCEL"
+## **      GP.SUB FORM.CHECK, 0, "SHOW HIDDEN", -1
+## **      GP.SUB FORM.COMBO, 3, "STATE", 12, 4, 1
+## **      IF GP.FN(FORMTO.RUN) THEN <OK>
+## **      ON = GP.FN(FORM.CHECKED, 1)
+## **      SEL = GP.FN(FORM.COMBOSEL)
+## **      GP.SUB FORM.END
+## **
+## **  FORM.BEGIN t$, m$, m2$, rows, width, btn1$, btn2$
+## **                              rows the controls use; a spacer and the
+## **                              button row go under them. btn2$ "" is one
+## **                              button. width grows to fit the buttons
+## **  FORM.CHECK row, text$, on   RETURNS its control number, 1 up in the
+## **                              order added
+## **  FORM.COMBO row, label$, w, count, sel
+## **                              label$ at the left, the combo after it.
+## **                              One combo a form
+## **  FORMTO.RUN                  RETURNS -1 on the first button, 0 on the
+## **                              second or ESC
+## **  FORM.CHECKED n              RETURNS -1 if check control n is ticked
+## **  FORM.COMBOSEL               RETURNS the combo's row
+## **  FORM.END                    puts the screen back
+## **
+## **  A row counts from the first line inside the box, 0 up. The answers are
+## **  read after FORMTO.RUN and before FORM.END.
+## ***********************************************************************
+
+DLG.FORMBEGIN:
+    GP.DEFPROC FORM.BEGIN, DLG.TITLE$, DLG.MSG$, DLG.MSG2$, DLG.ROWS, DLG.WIDTH, DLG.BTN1$, DLG.BTN2$
+    GOSUB GUI.DEFAULTS
+    GUI.TITLE$ = DLG.TITLE$ : GUI.MSG$ = DLG.MSG$ : GUI.MSG2$ = DLG.MSG2$
+    GUI.BTN.ONE$ = DLG.BTN1$ : GUI.BTN.TWO$ = DLG.BTN2$
+    GOSUB GUI.BUTTON.SIZE
+    DLG.FORMROWS = DLG.ROWS : GUI.BODY.ROWS = DLG.ROWS + 2 : GUI.BODY.WIDTH = DLG.WIDTH
+    IF GUI.BTN.TOTAL > GUI.BODY.WIDTH THEN GUI.BODY.WIDTH = GUI.BTN.TOTAL
+    GOSUB GUI.OPEN : GOSUB GUI.FORM.BEGIN
+    RETURN
+
+DLG.FORMCHECK:
+    GP.DEFPROC FORM.CHECK, DLG.ROW, DLG.TEXT$, DLG.ON RETURNS CHECK.CTRL
+    CHECK.X = GUI.INNER.LEFT : CHECK.Y = GUI.INNER.TOP + DLG.ROW
+    CHECK.TEXT$ = DLG.TEXT$ : CHECK.ON = DLG.ON
+    GOSUB CHECK.ADD
+    RETURN
+
+DLG.FORMCOMBO:
+    GP.DEFPROC FORM.COMBO, DLG.ROW, DLG.LABEL$, DLG.WIDTH, DLG.COUNT, DLG.SEL
+    GP.PRINTAT GUI.INNER.LEFT, GUI.INNER.TOP + DLG.ROW, DLG.LABEL$, GUI.PANEL
+    COMBO.X = GUI.INNER.LEFT + LEN(DLG.LABEL$) + 1
+    COMBO.Y = GUI.INNER.TOP + DLG.ROW
+    COMBO.W = DLG.WIDTH : COMBO.COUNT = DLG.COUNT
+    COMBO.SEL = DLG.SEL : COMBO.BANK = 0
+    GOSUB COMBO.ADD
+    RETURN
+
+DLG.FORMRUN:
+    GP.DEFPROC FORMTO.RUN RETURNS DLG.ANSWER
+    GUI.BTN.Y = GUI.INNER.TOP + DLG.FORMROWS + 1
+    GOSUB GUI.BUTTON.ROW : GUI.FOCUS = 1 : GOSUB GUI.FORM.RUN
+    DLG.ANSWER = 0
+    IF (GUI.CTRL.FLAGS%(GUI.FORM.HIT) AND GUI.CF.DEFAULT) <> 0 THEN DLG.ANSWER = -1
+    RETURN
+
+DLG.FORMCHECKED:
+    GP.DEFPROC FORM.CHECKED, DLG.N RETURNS DLG.ON
+    DLG.ON = 0
+    IF (GUI.CTRL.FLAGS%(DLG.N) AND GUI.CF.CHECKED) <> 0 THEN DLG.ON = -1
+    RETURN
+
+DLG.FORMCOMBOSEL:
+    GP.DEFPROC FORM.COMBOSEL RETURNS COMBO.SEL
+    RETURN
+
+DLG.FORMEND:
+    GP.DEFPROC FORM.END
+    GOSUB GUI.CLOSE
+    RETURN
+
+DLG.MODULE.END:
+#ENDIF

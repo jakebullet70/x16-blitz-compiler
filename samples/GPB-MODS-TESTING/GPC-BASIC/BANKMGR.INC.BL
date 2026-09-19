@@ -15,6 +15,7 @@
 ## **      GOSUB BANKMGR.INIT
 ## **      BANKMGR.SET.BANK = 2 : GOSUB BANKMGR.CLAIM
 ## **      IF BANKMGR.OK = 0 THEN <bank 2 was already taken>
+## **      IF GP.FN(BANKMGR.CLAIM.BANK, 2) = 0 THEN <the same, in one line>
 ## **      GOSUB BANKMGR.GET.FREE.BANK
 ## **      IF BANKMGR.BANK = 0 THEN <none left>
 ## **
@@ -109,10 +110,12 @@ BANKMGR.INIT.PART:
 ## ***********************************************************************
 ## **  BANKMGR.CLAIM -- take BANKMGR.SET.BANK, if it is free and real.
 ## **
-## **   out  BANKMGR.OK   -1 took it, 0 already taken or out of range
+## **   out  BANKMGR.OK   -1 took it, 0 already taken or out of range, and
+## **                     what GP.FN(BANKMGR.CLAIM.BANK, bank) gives back
 ## ***********************************************************************
 
 BANKMGR.CLAIM:
+    GP.DEFPROC BANKMGR.CLAIM.BANK, BANKMGR.SET.BANK RETURNS BANKMGR.OK
     BANKMGR.OK = 0 : IF BANKMGR.SET.BANK < 1 THEN RETURN
     IF BANKMGR.SET.BANK >= BANKMGR.BANKS THEN RETURN
     GOSUB BANKMGR.TEST : IF BANKMGR.USED <> 0 THEN RETURN

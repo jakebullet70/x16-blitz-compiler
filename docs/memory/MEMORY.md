@@ -18,16 +18,17 @@ sibling project: what is kept is a fact about **X16 BASIC or the X16 itself**, n
 - [Comments light, code should flow](comments-light-code-should-flow.md) — heavy REMs mean bad naming
 - [No ship language, no unasked builds](no-ship-language-this-is-dev.md) — no build, no help regen, unless asked
 - [HLP files carry hand edits](hlp-files-carry-hand-edits.md) — a plain MKHELP.PY run reverts them; patch the render delta
-- [Never build PICKDEMO](never-build-pickdemo.md) — standing order; not even to verify a banked build
 - [Commit to main directly](commit-to-main-directly.md) — solo repo, no branch, no review
 - [Never commit OASIS](never-commit-oasis.md) — stage by name; OASIS/ is ignored and purged from history
 - [Compiler must not cap program size](compiler-must-not-cap-program-size.md) — a build-side wall is a bug; compiler growth now costs a program zero
-- [No backward compatibility needed](no-backward-compatibility-needed.md) — forced recompiles cost nothing
+- [No backward compatibility needed](no-backward-compatibility-needed.md) — forced recompiles cost nothing; replaced library layers get ripped out, not wrapped
 - [Ask before writing asm](ask-before-writing-asm.md) — standing order: agree GP.ASM or 64tass first
 - [The compiler is GPC](name-the-compiler-gpc.md) — "Blitz" is a heritage nod; the code is the user's own
 - [User runs concurrent agents here](user-runs-concurrent-agents-here.md) — re-read before any write
 - [Compile shared, not embedded](compile-shared-not-embedded.md) — SHARED is the p-code number
 - [Library working copy, then root](library-working-copy-then-root.md) — edit in samples/GPB-MODS-TESTING/GPC-BASIC/; drift runs BOTH ways
+- [Test in GPBMODS before spreading](test-in-gpbmods-before-spreading.md) — no copy into ANY sample's GPC-BASIC until GPBMODS builds and tests
+- [GUI only through verbs](gui-only-through-verbs.md) — no GOSUB GUI.* in a program; forms and pickers become verbs like MENU
 - [Samples build in place](samples-build-in-place.md) — never stage a sample into testing/; --drive and inplace=True, GPB.HELP first
 - [Build, report, hand it back](build-report-dont-investigate.md) — a remark about speed is not a request to profile
 - [Run builds in the background](run-builds-in-background.md) — a typed message cancels an in-flight tool

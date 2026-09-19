@@ -6,11 +6,8 @@
 ## **
 ## **  Requires GPB.INC.BL, and does not #INCLUDE it for you.
 ## **
-## **  GUI.INC.BL CARRIES A PRIVATE COPY, GUI.CLEARKB, from when code inside a
-## **  GP.BANKED region could not call another bank and survive the return.
-## **  Fix one and fix the other; there are only the two, and a second
-## **  #INCLUDE of this file cannot supply the copy -- #IFNDEF KB.DEFS makes
-## **  it produce nothing.
+## **  GUI-DIALOGS.INC.BL's KBCLEAR verb is the same drain, so a dialog
+## **  region needs no KB.INC.BL. Fix one and fix the other.
 ## **
 ## ***********************************************************************
 #IFNDEF KB.DEFS

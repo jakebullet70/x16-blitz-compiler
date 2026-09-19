@@ -249,7 +249,9 @@ SV.ALLOC:
 ## ***********************************************************************
 
 SV.GEOM:  
-    SV.MAPW = 32 * 2 ^ INT((PEEK(SV.LCONFIG) AND 48) / 16)
+    SV.MAPW = 32
+    IF (PEEK(SV.LCONFIG) AND 16) <> 0 THEN SV.MAPW = 64
+    IF (PEEK(SV.LCONFIG) AND 32) <> 0 THEN SV.MAPW = SV.MAPW * 4
     SV.MAPBASE = PEEK(SV.LMAPBASE) * 512 : SV.STRIDE = SV.MAPW * 2
     RETURN
 
@@ -268,11 +270,25 @@ SV.WALK:
 ## ---- walks its rows instead. A 128-wide map is 256 bytes a row, so that is
 ## ---- 256 rows -- reachable, because the map may be 256 rows deep.
     IF SV.X = 0 AND SV.W = SV.MAPW AND SV.BYTES * SV.H < 65536 THEN GOTO SV.WALK.ONE
+## ---- The stash side is one run, so its port is set once and memory_copy
+## ---- leaves it on the next row. Only the screen port moves, a stride a
+## ---- row, its address kept as three bytes so no row divides.
+    SV.ADR = SV.VA
+    IF SV.MODE = 0 THEN GOSUB SV.PORTB.AT : SV.SCREEN.PORT = 0
+    IF SV.MODE <> 0 THEN GOSUB SV.PORTA.AT : SV.SCREEN.PORT = 1
+    SV.ADR = SV.MAPBASE + SV.Y * SV.STRIDE + SV.X * 2 : GOSUB SV.SPLIT
+    SV.STRIDE.LO = GP.LOBYTE(SV.STRIDE) : SV.STRIDE.MID = GP.HIBYTE(SV.STRIDE)
+    SV.BYTES.LO = GP.LOBYTE(SV.BYTES) : SV.BYTES.HI = GP.HIBYTE(SV.BYTES)
     FOR SV.ROW = 0 TO SV.H - 1
-        SV.CELL = SV.MAPBASE + (SV.Y + SV.ROW) * SV.STRIDE + SV.X * 2
-        SV.N = SV.BYTES
-        GOSUB SV.MOVEIT
-        SV.VA = SV.VA + SV.BYTES
+        POKE SV.VCTRL, SV.SCREEN.PORT
+        POKE SV.VLO, SV.LO : POKE SV.VMID, SV.MID : POKE SV.VHI, SV.BNK + SV.UP
+        POKE SV.VCTRL, 0
+        POKE 2, SV.PORTLO : POKE 3, SV.PORTHI : POKE 4, SV.PORTLO.B : POKE 5, SV.PORTHI
+        POKE 6, SV.BYTES.LO : POKE 7, SV.BYTES.HI
+        GP.CALL SV.MEMCOPY
+        SV.LO = SV.LO + SV.STRIDE.LO : SV.MID = SV.MID + SV.STRIDE.MID
+        IF SV.LO > 255 THEN SV.LO = SV.LO - 256 : SV.MID = SV.MID + 1
+        IF SV.MID > 255 THEN SV.MID = SV.MID - 256 : SV.BNK = SV.BNK + 1
     NEXT SV.ROW
     RETURN
 

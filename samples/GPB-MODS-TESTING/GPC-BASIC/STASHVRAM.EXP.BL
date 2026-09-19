@@ -19,7 +19,7 @@
 #INCLUDE "STASHVRAMGC.INC.BL"
 #SAVEAS "@:STASHVRAM.PRG"
 
-## THE CALLER DIMS THE HANDLE TABLE, like MENUVERT.ITEM$ -- a module cannot be
+## THE CALLER DIMS THE HANDLE TABLE, like GUI.LIST.ITEM$ -- a module cannot be
 ## handed an array and must not guess a bound. Two % arrays, and a % array is TWO
 ## bytes an element, so this is 68 bytes of workspace.
 DIM SV.PAGE%(16) : DIM SV.PAGES%(16)

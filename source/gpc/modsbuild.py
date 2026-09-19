@@ -1,6 +1,6 @@
 #
-#   modsbuild.py -- rebuild GPBMODS and GUIFRMT headlessly from the
-#   GPB-MODS-TESTING working copy.  Usage: modsbuild.py GPBMODS [GUIFRMT ...]
+#   modsbuild.py -- rebuild GPBMODS headlessly from the
+#   GPB-MODS-TESTING working copy.  Usage: modsbuild.py GPBMODS [NAME ...]
 #
 import os, shutil, subprocess, sys, time
 
@@ -13,10 +13,14 @@ GPCDIR  = os.path.join(ROOT, "source", "gpc")
 
 # the working copy is upstream for every module...
 for f in os.listdir(WORKLIB):
-    if f.endswith(".INC.BL"):
+    if f.endswith(".BL"):          # .INC.BL and MENU.INC.BANKED.BL alike
         shutil.copy(os.path.join(WORKLIB, f), os.path.join(TESTING, f))
 # ...and the keyword file is ROOT's, always -- a sample copy silently downgrades it
 shutil.copy(os.path.join(ROOTLIB, "GPB.INC.BL"), os.path.join(TESTING, "GPB.INC.BL"))
+# the program's own #INCLUDEd parts, GPB-MENUS.BASL and the like
+for f in os.listdir(SAMPLE):
+    if f.startswith("GPB-") and f.endswith(".BASL"):
+        shutil.copy(os.path.join(SAMPLE, f), os.path.join(TESTING, f))
 
 def run(cmd):
     print("----", " ".join(cmd[1:]))

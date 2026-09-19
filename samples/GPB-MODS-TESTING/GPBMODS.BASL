@@ -24,6 +24,7 @@
 #DEFINE GM.COMBOCODE 10
 #DEFINE GM.MODSCODE 11
 #DEFINE GM.MENUCODE 12
+#DEFINE GM.DLGCODE 13
 
 ## ---- The menu bar sits on row 0 and its first item starts here.
 #DEFINE GM.BARX 1
@@ -83,10 +84,10 @@ GP.BANKED GM.THEMECODE
 GP.ENDBANKED
 
 ## ---- THE MENUS: the builder and the dropdown runner, which the bar, every
-## ---- dropdown and GUI.MENU are built with. The builder's store is text
+## ---- dropdown and PICKMENU are built with. The builder's store is text
 ## ---- bank MENU.TEXTBANK, which the first MENU.BEGIN claims.
 ## ----
-## ---- IT COMES BEFORE THE GUI REGION because GUI.MENU reads the MENU
+## ---- IT COMES BEFORE THE GUI REGION because PICKMENU reads the MENU
 ## ---- #DEFINEs. Neither reads a GUI name.
 GP.BANKED GM.MENUCODE
 #INCLUDE "MENU.INC.BANKED.BL"
@@ -98,7 +99,6 @@ GP.ENDBANKED
 GP.BANKED GM.GUICODE
 #INCLUDE "LINEINPUT.INC.BL"
 #INCLUDE "GUI.INC.BL"
-#INCLUDE "GUI2.INC.BL"
 GP.ENDBANKED
 
 ## ---- THE COMBO BOX IS A REGION OF ITS OWN, for the same reason THEME is: the
@@ -112,6 +112,12 @@ GP.ENDBANKED
 GP.BANKED GM.COMBOCODE
 #INCLUDE "COMBO.INC.BL"
 #INCLUDE "CHECK.INC.BL"
+GP.ENDBANKED
+
+## ---- THE DIALOG VERBS, one-line calls onto the GUI region. After it and after
+## ---- the menus, and above every caller: a verb is compiled before its calls.
+GP.BANKED GM.DLGCODE
+#INCLUDE "GUI-DIALOGS.INC.BL"
 GP.ENDBANKED
 
 ## ---- File utils in a bank! Copy these two.
@@ -250,6 +256,7 @@ GP.SUB BANKMGR.CLAIM.BANK, GM.THEMECODE
 GP.SUB BANKMGR.CLAIM.BANK, GM.COMBOCODE
 GP.SUB BANKMGR.CLAIM.BANK, GM.MODSCODE
 GP.SUB BANKMGR.CLAIM.BANK, GM.MENUCODE
+GP.SUB BANKMGR.CLAIM.BANK, GM.DLGCODE
 
 ## The menus are built here and not later, because the first MENU.BEGIN is what
 ## claims MENU.TEXTBANK, and that has to happen before the free banks are asked for.
@@ -258,6 +265,7 @@ GOSUB GMX.MENU.SETUP
 GOSUB BANKMGR.GET.FREE.BANK : GM.DDBANK% = BANKMGR.BANK
 GOSUB BANKMGR.GET.FREE.BANK : GM.GUIBANK% = BANKMGR.BANK
 IF GM.GUIBANK% = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 0)
+GP.SUB DLGRESET, GM.GUIBANK%
 
 ## A whole bank for one directory listing, read in one go and then walked
 ## without going near the drive again. See FILES / FILE.DIR.OPEN.
@@ -309,7 +317,7 @@ END
 ## ***********************************************************************
 ## **  GMX.QUIT -- FILES / QUIT asks before it leaves.
 ## **
-## **  GUI.YN PUTS THE SCREEN BACK ITSELF, so a NO needs nothing repainted:
+## **  ASKYN PUTS THE SCREEN BACK ITSELF, so a NO needs nothing repainted:
 ## **  the loop goes straight round to GET with the bar exactly as the
 ## **  dialog found it.
 ## **
@@ -323,9 +331,8 @@ GP.BANKEDSTR GM.TEXTBANKB BS.QUIT
   "LEAVE GPB-MODS-TESTING?"
   "ESC AND NO BOTH STAY HERE."
 GP.ENDBANKEDSTR
-GMX.QUIT:  GOSUB GMX.D.RESET
-  GUI.TITLE$ = GP.BSTR(BS.QUIT, 0) : GUI.MSG$ = GP.BSTR(BS.QUIT, 1) : GUI.MSG2$ = GP.BSTR(BS.QUIT, 2)
-  GOSUB GUI.YN : GM.QUIT% = GUI.ANSWER
+GMX.QUIT:
+  GM.QUIT% = GP.FN(ASKYNEX, GP.BSTR(BS.QUIT, 0), GP.BSTR(BS.QUIT, 1), GP.BSTR(BS.QUIT, 2), "", 1, 0)
   RETURN
 
 
@@ -419,7 +426,7 @@ GMX.RESULT:
 ## **  so they are the same numbers in every run. They still need a
 ## **  BANKMGR.CLAIM, which is what keeps the run-time three off them.
 ## **
-## **  ONE WORD EACH, not the sentences they stand for: GUI.SAY sizes the box
+## **  ONE WORD EACH, not the sentences they stand for: MSGBOX sizes the box
 ## **  to its longest line, and spelling them out ran it off the right edge.
 ## **
 ## **  MID$(STR$(N), 2) drops the leading space STR$ puts on a positive number.
@@ -441,17 +448,17 @@ GP.BANKEDSTR GM.TEXTBANK BS.BANKMAP
   "   TEXT #"
 GP.ENDBANKEDSTR
 GMX.BANKMAP:
-  GOSUB BANKMGR.COUNT : GOSUB GMX.D.RESET
-  GUI.TITLE$ = GP.BSTR(BS.BANKMAP, 0)
-  GUI.MSG$ = GP.BSTR(BS.BANKMAP, 1) + MID$(STR$(BANKMGR.BANKS), 2) + GP.BSTR(BS.BANKMAP, 2) + MID$(STR$(BANKMGR.SPARE), 2)
-  GUI.MSG2$ = GP.BSTR(BS.BANKMAP, 3) + MID$(STR$(GM.DDBANK%), 2) + GP.BSTR(BS.BANKMAP, 4) + MID$(STR$(GM.GUIBANK%), 2)
-  GUI.MSG2$ = GUI.MSG2$ + GP.BSTR(BS.BANKMAP, 5) + MID$(STR$(GM.DIRBANK%), 2)
-  GUI.MSG3$ = GP.BSTR(BS.BANKMAP, 6) + MID$(STR$(GM.GUICODE), 2) + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(GM.UTILCODE), 2) + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(GM.FUTILCODE), 2)
-  GUI.MSG3$ = GUI.MSG3$ + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(GM.THEMECODE), 2) + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(GM.COMBOCODE), 2)
-  GUI.MSG3$ = GUI.MSG3$ + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(GM.MODSCODE), 2) + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(GM.MENUCODE), 2)
-  GUI.MSG3$ = GUI.MSG3$ + GP.BSTR(BS.BANKMAP, 8) + MID$(STR$(GM.TEXTBANK), 2) + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(GM.TEXTBANKB), 2)
-  GUI.MSG3$ = GUI.MSG3$ + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(MENU.TEXTBANK), 2)
-  GOSUB GUI.SAY
+  GOSUB BANKMGR.COUNT
+  GM.LINE1$ = GP.BSTR(BS.BANKMAP, 1) + MID$(STR$(BANKMGR.BANKS), 2) + GP.BSTR(BS.BANKMAP, 2) + MID$(STR$(BANKMGR.SPARE), 2)
+  GM.LINE2$ = GP.BSTR(BS.BANKMAP, 3) + MID$(STR$(GM.DDBANK%), 2) + GP.BSTR(BS.BANKMAP, 4) + MID$(STR$(GM.GUIBANK%), 2)
+  GM.LINE2$ = GM.LINE2$ + GP.BSTR(BS.BANKMAP, 5) + MID$(STR$(GM.DIRBANK%), 2)
+  GM.LINE3$ = GP.BSTR(BS.BANKMAP, 6) + MID$(STR$(GM.GUICODE), 2) + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(GM.UTILCODE), 2) + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(GM.FUTILCODE), 2)
+  GM.LINE3$ = GM.LINE3$ + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(GM.THEMECODE), 2) + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(GM.COMBOCODE), 2)
+  GM.LINE3$ = GM.LINE3$ + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(GM.MODSCODE), 2) + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(GM.MENUCODE), 2)
+  GM.LINE3$ = GM.LINE3$ + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(GM.DLGCODE), 2)
+  GM.LINE3$ = GM.LINE3$ + GP.BSTR(BS.BANKMAP, 8) + MID$(STR$(GM.TEXTBANK), 2) + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(GM.TEXTBANKB), 2)
+  GM.LINE3$ = GM.LINE3$ + GP.BSTR(BS.BANKMAP, 7) + MID$(STR$(MENU.TEXTBANK), 2)
+  GP.SUB MSGBOXEX, GP.BSTR(BS.BANKMAP, 0), GM.LINE1$, GM.LINE2$, GM.LINE3$, ""
   RETURN
 
 
@@ -479,25 +486,6 @@ GMX.DIALOG:
   GP.OTHER  : GOSUB GMX.D.FORM
   GP.ENDSEL
   GOSUB GMX.CHROME
-  RETURN
-
-
-## ***********************************************************************
-## **  GMX.D.RESET -- the whole GUI interface, back to its defaults.
-## **
-## **  EVERY FIELD, not the three a demonstration happens to vary. The inputs
-## **  are ordinary variables and all of them are sticky, so a panel setting
-## **  only what it cares about inherits the last panel's title, hint and mask.
-## ***********************************************************************
-
-GMX.D.RESET:
-  GUI.BANK = GM.GUIBANK%
-  GUI.MSG$ = "" : GUI.MSG2$ = "" : GUI.MSG3$ = "" : GUI.TITLE$ = "" : GUI.BTN.ONE$ = "" : GUI.BTN.TWO$ = ""
-  GUI.STYLE = 0 : GUI.GLYPH = 0 : GUI.PLACE = 0 : GUI.X = 0 : GUI.Y = 0
-  GUI.ROW.OFFSET = 0 : GUI.PANEL.IN = 0 : GUI.BORDER.IN = 0 : GUI.OKCANCEL = 0
-  GUI.DEFAULT = 1
-  GUI.SHADOW = 0 : GUI.SHADOW.ATTR = 0
-  GUI.LEN = 0 : GUI.MASK = 0 : GUI.FLAGS = 0 : GUI.SEL = 0 : GUI.COUNT = 0
   RETURN
 
 
@@ -537,20 +525,18 @@ GMX.D.FILL:
 
 
 ## ***********************************************************************
-## **  GMX.D.SAY -- GUI.SAY. One message, one way out.
+## **  GMX.D.SAY -- MSGBOXEX. One message, one way out.
 ## ***********************************************************************
 
 
 GP.BANKEDSTR GM.TEXTBANK BS.D.SAY
-  " GUI.SAY "
+  " MSGBOX "
   "SOMETHING TO SAY, AND ONE WAY OUT."
   "GUI.MSG2$ IS THE SECOND LINE."
-  "GUI.SAY CLOSED ON KEY "
+  "MSGBOX CLOSED ON KEY "
 GP.ENDBANKEDSTR
 GMX.D.SAY:
-  GOSUB GMX.D.RESET
-  GUI.TITLE$ = GP.BSTR(BS.D.SAY, 0) : GUI.MSG$ = GP.BSTR(BS.D.SAY, 1) : GUI.MSG2$ = GP.BSTR(BS.D.SAY, 2)
-  GUI.BTN.ONE$ = "&OK" : GOSUB GUI.SAY
+  GP.SUB MSGBOXEX, GP.BSTR(BS.D.SAY, 0), GP.BSTR(BS.D.SAY, 1), GP.BSTR(BS.D.SAY, 2), "", "&OK"
   GM.RESULT$ = GP.BSTR(BS.D.SAY, 3) + MID$(STR$(GUI.KEY), 2)
   RETURN
 
@@ -558,8 +544,8 @@ GMX.D.SAY:
 ## ***********************************************************************
 ## **  GMX.D.SAYOK -- the smallest message box there is.
 ## **
-## **  GUI.BTN.ONE$ IS LEFT EMPTY ON PURPOSE, which is the whole point of this
-## **  one next to GMX.D.SAY above. GUI.SAY takes "&OK" when the label is "",
+## **  THE BUTTON IS LEFT EMPTY ON PURPOSE, which is the whole point of this
+## **  one next to GMX.D.SAY above. MSGBOXEX takes "&OK" when the label is "",
 ## **  so the button, its brackets, its lit letter and its key all arrive
 ## **  without being asked for -- and being the only button it is the default,
 ## **  so its brackets come out doubled too.
@@ -574,48 +560,39 @@ GP.BANKEDSTR GM.TEXTBANK BS.D.SAYOK
   "CLOSED ON KEY "
 GP.ENDBANKEDSTR
 GMX.D.SAYOK:
-  GOSUB GMX.D.RESET
-  GUI.TITLE$ = GP.BSTR(BS.D.SAYOK, 0) : GUI.MSG$ = GP.BSTR(BS.D.SAYOK, 1) : GUI.MSG2$ = GP.BSTR(BS.D.SAYOK, 2)
-  GOSUB GUI.SAY : GM.RESULT$ = GP.BSTR(BS.D.SAYOK, 3) + MID$(STR$(GUI.KEY), 2)
+  GP.SUB MSGBOXEX, GP.BSTR(BS.D.SAYOK, 0), GP.BSTR(BS.D.SAYOK, 1), GP.BSTR(BS.D.SAYOK, 2), "", ""
+  GM.RESULT$ = GP.BSTR(BS.D.SAYOK, 3) + MID$(STR$(GUI.KEY), 2)
   RETURN
 
 
 ## ***********************************************************************
-## **  GMX.D.YN -- GUI.YN, both ways round. YES/NO, then OK/CANCEL.
+## **  GMX.D.YN -- ASKYNEX, both ways round. YES/NO, then OK/CANCEL.
 ## ***********************************************************************
 
 
 GP.BANKEDSTR GM.TEXTBANK BS.D.YN
-  " GUI.YN "
+  " ASKYN "
   "DELETE THE FILE?"
   "RETURN PRESSES THE <<DOUBLED>> BUTTON."
-  " GUI.YN - OKCANCEL "
+  " ASKOK "
   "THE SAME DIALOG, ASKING OK OR CANCEL."
   "RETURN ACCEPTS, ESC AND STOP CANCEL."
-  "GUI.YN  YESNO"
+  "ASKYN  YESNO"
   "   OKCANCEL"
 GP.ENDBANKEDSTR
 GMX.D.YN:
-  GOSUB GMX.D.RESET
-  GUI.TITLE$ = GP.BSTR(BS.D.YN, 0) : GUI.MSG$ = GP.BSTR(BS.D.YN, 1) : GUI.MSG2$ = GP.BSTR(BS.D.YN, 2)
-
 ## ---- THE DESTRUCTIVE ANSWER IS NOT THE DEFAULT. RETURN on a question that
-## ---- deletes something should say no, and this is the flag that says so.
-  GUI.DEFAULT = 2
-  GOSUB GUI.YN
-  GM.YESNO% = GUI.ANSWER
-
-  GOSUB GMX.D.RESET
-  GUI.TITLE$ = GP.BSTR(BS.D.YN, 3) : GUI.MSG$ = GP.BSTR(BS.D.YN, 4) : GUI.MSG2$ = GP.BSTR(BS.D.YN, 5)
-  GUI.OKCANCEL = 1 : GOSUB GUI.YN
+## ---- deletes something should say no, and the 2 is what says so.
+  GM.YESNO% = GP.FN(ASKYNEX, GP.BSTR(BS.D.YN, 0), GP.BSTR(BS.D.YN, 1), GP.BSTR(BS.D.YN, 2), "", 2, 0)
+  GM.NUM% = GP.FN(ASKYNEX, GP.BSTR(BS.D.YN, 3), GP.BSTR(BS.D.YN, 4), GP.BSTR(BS.D.YN, 5), "", 1, 1)
 ## ---- STR$ WHOLE, not MID$(STR$(N), 2). That idiom drops the leading space STR$ puts
 ## ---- on a POSITIVE number, and a flag is -1: it would print the minus away and say 1.
-  GM.RESULT$ = GP.BSTR(BS.D.YN, 6) + STR$(GM.YESNO%) + GP.BSTR(BS.D.YN, 7) + STR$(GUI.ANSWER)
+  GM.RESULT$ = GP.BSTR(BS.D.YN, 6) + STR$(GM.YESNO%) + GP.BSTR(BS.D.YN, 7) + STR$(GM.NUM%)
   RETURN
 
 
 ## ***********************************************************************
-## **  GMX.D.MENU -- GUI.MENU. The popup slot inside a question box.
+## **  GMX.D.MENU -- PICKMENUEX. The popup slot inside a question box.
 ## ***********************************************************************
 
 
@@ -624,51 +601,38 @@ GP.BANKEDSTR GM.TEXTBANK BS.D.MENU
   " &LOAD"
   " &OPTIONS"
   " &QUIT"
-  " GUI.MENU "
+  " PICKMENU "
   "CHOOSE A ROW."
-  "GUI.MENU SEL "
-  "GUI.MENU CANCELLED"
+  "PICKMENU SEL "
+  "PICKMENU CANCELLED"
 GP.ENDBANKEDSTR
 GMX.D.MENU:
-  GOSUB GMX.D.RESET
   GP.SUB MENU.BEGIN, MENU.POPUP
   FOR GM.I = 0 TO 3
     GP.SUB MENU.ITEM, GP.BSTR(BS.D.MENU, GM.I)
   NEXT GM.I
-  GUI.TITLE$ = GP.BSTR(BS.D.MENU, 4) : GUI.MSG$ = GP.BSTR(BS.D.MENU, 5)
-  GOSUB GUI.MENU
-  GM.RESULT$ = GP.BSTR(BS.D.MENU, 6) + MID$(STR$(GUI.SEL), 2)
-  IF GUI.SEL = 0 THEN GM.RESULT$ = GP.BSTR(BS.D.MENU, 7)
+  GM.NUM% = GP.FN(PICKMENUEX, GP.BSTR(BS.D.MENU, 4), GP.BSTR(BS.D.MENU, 5), "", "", 0, 0)
+  GM.RESULT$ = GP.BSTR(BS.D.MENU, 6) + MID$(STR$(GM.NUM%), 2)
+  IF GM.NUM% = 0 THEN GM.RESULT$ = GP.BSTR(BS.D.MENU, 7)
   RETURN
 
 
 ## ***********************************************************************
-## **  GMX.D.INPUT -- GUI.INPUT, plain then masked.
-## **
-## **  The answer is GUI.TEXT$ and not GUI.INPUT$: GUI.INPUT is the routine's
-## **  own label, and BASLOAD stops with DUPLICATE SYMBOL on a string of that
-## **  name beside it -- the $ does not separate the two.
+## **  GMX.D.INPUT -- INPUTBOXEX, plain then masked.
 ## ***********************************************************************
 
 
 GP.BANKEDSTR GM.TEXTBANK BS.D.INPUT
-  " GUI.INPUT "
+  " INPUTBOX "
   "TYPE A NAME."
-  " GUI.INPUT - MASKED "
+  " INPUTBOX - MASKED "
   "AND THE SAME FIELD AS A PASSWORD."
-  "GUI.INPUT OK "
+  "INPUTBOX OK "
 GP.ENDBANKEDSTR
 GMX.D.INPUT:
-  GOSUB GMX.D.RESET
-  GUI.TITLE$ = GP.BSTR(BS.D.INPUT, 0) : GUI.MSG$ = GP.BSTR(BS.D.INPUT, 1)
-  GUI.LEN = 20 : GUI.TEXT$ = "GPC"
-  GOSUB GUI.INPUT
-  GM.TYPED$ = GUI.TEXT$ : GM.TYPED.OK = GUI.OK
-
-  GOSUB GMX.D.RESET
-  GUI.TITLE$ = GP.BSTR(BS.D.INPUT, 2) : GUI.MSG$ = GP.BSTR(BS.D.INPUT, 3)
-  GUI.LEN = 12 : GUI.TEXT$ = "" : GUI.MASK = 1
-  GOSUB GUI.INPUT
+  GM.TYPED$ = GP.FN(INPUTBOXEX, GP.BSTR(BS.D.INPUT, 0), GP.BSTR(BS.D.INPUT, 1), "", "", "GPC", 20, 0)
+  GM.TYPED.OK = GUI.OK
+  GM.SECRET$ = GP.FN(INPUTBOXEX, GP.BSTR(BS.D.INPUT, 2), GP.BSTR(BS.D.INPUT, 3), "", "", "", 12, 1)
   GM.NUM% = GM.TYPED.OK : GOSUB GMX.SIGNED
   GM.RESULT$ = GP.BSTR(BS.D.INPUT, 4) + GM.NUM$ + "  [" + GM.TYPED$ + "]"
   RETURN
@@ -686,12 +650,10 @@ GP.BANKEDSTR GM.TEXTBANK BS.D.LIST.ONE
   "LISTBOX CANCELLED"
 GP.ENDBANKEDSTR
 GMX.D.LIST.ONE:
-  GOSUB GMX.D.RESET : GOSUB GMX.D.FILL
-  GUI.TITLE$ = GP.BSTR(BS.D.LIST.ONE, 0) : GUI.MSG$ = GP.BSTR(BS.D.LIST.ONE, 1)
-  GUI.LISTBOX.COUNT = 24 : GUI.LISTBOX.ROWS = 8 : GUI.LISTBOX.MULTI = 0 : GUI.LISTBOX.SEL = 0
-  GOSUB GUI.LISTBOX
-  GM.RESULT$ = GP.BSTR(BS.D.LIST.ONE, 2) + MID$(STR$(GUI.LISTBOX.SEL), 2)
-  IF GUI.LISTBOX.SEL = 0 THEN GM.RESULT$ = GP.BSTR(BS.D.LIST.ONE, 3)
+  GOSUB GMX.D.FILL
+  GM.NUM% = GP.FN(LISTBOXEX, GP.BSTR(BS.D.LIST.ONE, 0), GP.BSTR(BS.D.LIST.ONE, 1), "", "", 24, 8, 0)
+  GM.RESULT$ = GP.BSTR(BS.D.LIST.ONE, 2) + MID$(STR$(GM.NUM%), 2)
+  IF GM.NUM% = 0 THEN GM.RESULT$ = GP.BSTR(BS.D.LIST.ONE, 3)
   RETURN
 
 
@@ -707,43 +669,38 @@ GP.BANKEDSTR GM.TEXTBANK BS.D.LIST.MANY
   " OF 24"
 GP.ENDBANKEDSTR
 GMX.D.LIST.MANY:
-  GOSUB GMX.D.RESET : GOSUB GMX.D.FILL
-  GUI.TITLE$ = GP.BSTR(BS.D.LIST.MANY, 0) : GUI.MSG$ = GP.BSTR(BS.D.LIST.MANY, 1)
-  GUI.LISTBOX.COUNT = 24 : GUI.LISTBOX.ROWS = 8
-  GUI.LISTBOX.MULTI = 1 : GUI.LISTBOX.MARKS$ = "" : GUI.LISTBOX.SEL = 0
-  GOSUB GUI.LISTBOX
+  GOSUB GMX.D.FILL
+  GM.NUM% = GP.FN(LISTBOXEX, GP.BSTR(BS.D.LIST.MANY, 0), GP.BSTR(BS.D.LIST.MANY, 1), "", "", 24, 8, 1)
   GM.RESULT$ = GP.BSTR(BS.D.LIST.MANY, 2) + MID$(STR$(GUI.LISTBOX.MARKED), 2) + GP.BSTR(BS.D.LIST.MANY, 3)
   RETURN
 
 
 ## ***********************************************************************
-## **  GMX.D.PANEL -- GUI.OPEN and GUI.CLOSE, with the caller drawing inside.
+## **  GMX.D.PANEL -- PANELOPEN and PANELCLOSE, with the caller drawing inside.
 ## **
-## **  GUI.BODY.ROWS and .WIDTH say what the caller needs under the message;
+## **  The rows and width say what the caller needs under the message;
 ## **  GUI.INNER.LEFT, .TOP and .WIDTH are where it may put it. This is the
 ## **  entry point a fifth kind of dialog is built on.
 ## ***********************************************************************
 
 
 GP.BANKEDSTR GM.TEXTBANK BS.D.PANEL
-  " GUI.OPEN "
+  " PANELOPEN "
   "THE BOX, WITH NO DIALOG INSIDE IT."
   "THE CALLER DREW THESE FOUR ROWS"
   "AT GUI.INNER.LEFT AND .TOP."
   "GUI.STASHED ="
   "PRESS A KEY."
-  "GUI.OPEN BOX "
+  "PANELOPEN BOX "
 GP.ENDBANKEDSTR
 GMX.D.PANEL:
-  GOSUB GMX.D.RESET
-  GUI.TITLE$ = GP.BSTR(BS.D.PANEL, 0) :  GUI.MSG$ = GP.BSTR(BS.D.PANEL, 1)
-  GUI.BODY.ROWS = 4 : GUI.BODY.WIDTH = 32
-  GOSUB GUI.OPEN
+  GP.SUB PANELOPEN, GP.BSTR(BS.D.PANEL, 0), GP.BSTR(BS.D.PANEL, 1), 4, 32
   GP.PRINTAT GUI.INNER.LEFT, GUI.INNER.TOP, GP.BSTR(BS.D.PANEL, 2), GUI.PANEL
   GP.PRINTAT GUI.INNER.LEFT, GUI.INNER.TOP + 1, GP.BSTR(BS.D.PANEL, 3), GUI.PANEL
   GP.PRINTAT GUI.INNER.LEFT, GUI.INNER.TOP + 2, GP.BSTR(BS.D.PANEL, 4) + STR$(GUI.STASHED), GUI.PANEL
   GP.PRINTAT GUI.INNER.LEFT, GUI.INNER.TOP + 3, GP.BSTR(BS.D.PANEL, 5), THEME.CLR(THEME.WARN)
-  GOSUB GMX.WAIT : GOSUB GUI.CLOSE
+  GOSUB GMX.WAIT
+  GP.SUB PANELCLOSE
   GM.RESULT$ = GP.BSTR(BS.D.PANEL, 6) + MID$(STR$(GUI.WIDTH), 2) + " X " + MID$(STR$(GUI.HEIGHT), 2)
   GM.RESULT$ = GM.RESULT$ + " AT " + MID$(STR$(GUI.LEFT), 2) + "," + MID$(STR$(GUI.TOP), 2)
   RETURN
@@ -777,7 +734,7 @@ GMX.D.STYLES:
 
 
 ## ***********************************************************************
-## **  GMX.D.SHADOW -- GUI.SHADOW. The same dialog twice, off and then on.
+## **  GMX.D.SHADOW -- DLGSHADOW. The same dialog twice, off and then on.
 ## **
 ## **  THE PAGE IS FILLED FIRST, and that is the whole demonstration. A shadow
 ## **  is drawn OUTSIDE the box, so it is also the one part a stash of the box
@@ -787,31 +744,24 @@ GMX.D.STYLES:
 
 
 GP.BANKEDSTR GM.TEXTBANKB BS.D.SHADOW
-  " GUI.SHADOW = 0 "
+  " DLGSHADOW 0 "
   "THE PLAIN BOX, ON SOMETHING WORTH COVERING."
   "LOOK AT ITS RIGHT EDGE AND ITS BOTTOM."
-  " GUI.SHADOW = 1 "
+  " DLGSHADOW 1 "
   "THE SAME BOX, LIFTED OFF THE PAGE."
   "ONE ROW UNDER IT AND TWO COLUMNS RIGHT."
-  "GUI.SHADOW  DRAWN, THEN PUT BACK"
+  "SHADOW DRAWN, THEN PUT BACK"
 GP.ENDBANKEDSTR
 GMX.D.SHADOW:
   GOSUB GMX.CLEARPANEL
   GP.FILL 2, GM.PANELTOP%, APPSYS.COLS - 4, GM.PANELROWS% - 2, ASC("."), THEME.CLR(THEME.DIMMED)
 
-  GOSUB GMX.D.RESET
-  GUI.TITLE$ = GP.BSTR(BS.D.SHADOW, 0) : GUI.MSG$ = GP.BSTR(BS.D.SHADOW, 1) : GUI.MSG2$ = GP.BSTR(BS.D.SHADOW, 2)
-  GUI.BTN.ONE$ = "&OK"
-  GOSUB GUI.SAY
+  GP.SUB MSGBOXEX, GP.BSTR(BS.D.SHADOW, 0), GP.BSTR(BS.D.SHADOW, 1), GP.BSTR(BS.D.SHADOW, 2), "", "&OK"
 
-## ---- The only line that differs. Everything else is set the same way twice
-## ---- so that the two boxes are the same box.
-
-  GOSUB GMX.D.RESET
-  GUI.SHADOW = 1
-  GUI.TITLE$ = GP.BSTR(BS.D.SHADOW, 3) : GUI.MSG$ = GP.BSTR(BS.D.SHADOW, 4) : GUI.MSG2$ = GP.BSTR(BS.D.SHADOW, 5)
-  GUI.BTN.ONE$ = "&OK"
-  GOSUB GUI.SAY
+## ---- the same box again, shadowed; DLGSHADOW holds until it is turned off
+  GP.SUB DLGSHADOW, 1
+  GP.SUB MSGBOXEX, GP.BSTR(BS.D.SHADOW, 3), GP.BSTR(BS.D.SHADOW, 4), GP.BSTR(BS.D.SHADOW, 5), "", "&OK"
+  GP.SUB DLGSHADOW, 0
 
   GM.RESULT$ = GP.BSTR(BS.D.SHADOW, 6)
   RETURN
@@ -825,14 +775,14 @@ GMX.D.SHADOW:
 ## **
 ## **    1  the model, in words, so the two that follow have something to be
 ## **       measured against
-## **    2  GUI.YN with GUI.DEFAULT = 2, so <<NO>> carries the double brackets
+## **    2  ASKYNEX with the default 2, so <<NO>> carries the double brackets
 ## **       and RETURN answers no. Nothing else about the call changes
-## **    3  GUI.INPUT, where the focus opens in the FIELD and the default sits
+## **    3  INPUTBOXEX, where the focus opens in the FIELD and the default sits
 ## **       on OK -- the two are not the same thing, and this is the only
 ## **       shape in the library that shows it
 ## **
-## **  GUI.INPUT WRITES GUI.DEFAULT ITSELF, to 1. That is why box 2 is a
-## **  GUI.YN: a dialog with a field always defaults to OK, so the moved
+## **  INPUTBOXEX ALWAYS DEFAULTS TO OK. That is why box 2 is an
+## **  ASKYNEX: a dialog with a field always defaults to OK, so the moved
 ## **  default and the split focus have to be two different boxes.
 ## **
 ## **  The accelerators are live in box 2 and dead in box 3 while the eye is in
@@ -847,7 +797,7 @@ GP.BANKEDSTR GM.TEXTBANKB BS.D.FOCUS
   "THE DEFAULT IS DRAWN <<LIKE THIS>>, AND RETURN"
   "PRESSES IT FROM WHEREVER THE FOCUS IS."
   " A MOVED DEFAULT "
-  "GUI.DEFAULT = 2, SO NO IS THE DEFAULT HERE."
+  "DEFAULT 2, SO NO IS THE DEFAULT HERE."
   "RETURN ANSWERS NO. Y AND N STILL WORK."
   " FOCUS IS NOT DEFAULT "
   "THE FOCUS OPENS IN THE FIELD. THE DEFAULT IS"
@@ -859,28 +809,17 @@ GP.BANKEDSTR GM.TEXTBANKB BS.D.FOCUS
   "]"
 GP.ENDBANKEDSTR
 GMX.D.FOCUS:
-  GOSUB GMX.D.RESET
-  GUI.TITLE$ = GP.BSTR(BS.D.FOCUS, 0)
-  GUI.MSG$ = GP.BSTR(BS.D.FOCUS, 1) : GUI.MSG2$ = GP.BSTR(BS.D.FOCUS, 2) : GUI.MSG3$ = GP.BSTR(BS.D.FOCUS, 3)
-  GOSUB GUI.SAY
+  GP.SUB MSGBOXEX, GP.BSTR(BS.D.FOCUS, 0), GP.BSTR(BS.D.FOCUS, 1), GP.BSTR(BS.D.FOCUS, 2), GP.BSTR(BS.D.FOCUS, 3), ""
 
 ## ---- The default moves, and nothing else does.
 
-  GOSUB GMX.D.RESET
-  GUI.TITLE$ = GP.BSTR(BS.D.FOCUS, 4)
-  GUI.MSG$ = GP.BSTR(BS.D.FOCUS, 5) : GUI.MSG2$ = GP.BSTR(BS.D.FOCUS, 6)
-  GUI.DEFAULT = 2
-  GOSUB GUI.YN
-  GM.NUM% = GUI.ANSWER : GOSUB GMX.SIGNED
+  GM.NUM% = GP.FN(ASKYNEX, GP.BSTR(BS.D.FOCUS, 4), GP.BSTR(BS.D.FOCUS, 5), GP.BSTR(BS.D.FOCUS, 6), "", 2, 0)
+  GOSUB GMX.SIGNED
   GM.FOCUS$ = GP.BSTR(BS.D.FOCUS, 11) + GM.NUM$
 
 ## ---- And the focus starts somewhere the default is not.
 
-  GOSUB GMX.D.RESET
-  GUI.TITLE$ = GP.BSTR(BS.D.FOCUS, 7)
-  GUI.MSG$ = GP.BSTR(BS.D.FOCUS, 8) : GUI.MSG2$ = GP.BSTR(BS.D.FOCUS, 9) : GUI.MSG3$ = GP.BSTR(BS.D.FOCUS, 10)
-  GUI.LEN = 16 : GUI.TEXT$ = ""
-  GOSUB GUI.INPUT
+  GM.TYPED$ = GP.FN(INPUTBOXEX, GP.BSTR(BS.D.FOCUS, 7), GP.BSTR(BS.D.FOCUS, 8), GP.BSTR(BS.D.FOCUS, 9), GP.BSTR(BS.D.FOCUS, 10), "", 16, 0)
   GM.NUM% = GUI.OK : GOSUB GMX.SIGNED
   GM.RESULT$ = GM.FOCUS$ + GP.BSTR(BS.D.FOCUS, 12) + GM.NUM$ + GP.BSTR(BS.D.FOCUS, 13) + GUI.TEXT$ + GP.BSTR(BS.D.FOCUS, 14)
   RETURN
@@ -911,56 +850,26 @@ GP.BANKEDSTR GM.TEXTBANKB BS.D.FORM
   "  STATE "
 GP.ENDBANKEDSTR
 GMX.D.FORM:
-  GOSUB GMX.D.RESET
   COMBO.ITEM$(1) = GP.BSTR(BS.D.FORM, 7)
   COMBO.ITEM$(2) = GP.BSTR(BS.D.FORM, 8)
   COMBO.ITEM$(3) = GP.BSTR(BS.D.FORM, 9)
   COMBO.ITEM$(4) = GP.BSTR(BS.D.FORM, 10)
-  GUI.TITLE$ = GP.BSTR(BS.D.FORM, 0)
-  GUI.MSG$ = GP.BSTR(BS.D.FORM, 1)
-  GUI.MSG2$ = GP.BSTR(BS.D.FORM, 2)
-  GUI.BTN.ONE$ = "&OK" : GUI.BTN.TWO$ = "&CANCEL"
-  GOSUB GUI.BUTTON.SIZE
-  GUI.BODY.ROWS = 6 : GUI.BODY.WIDTH = 28
-  IF GUI.BTN.TOTAL > GUI.BODY.WIDTH THEN GUI.BODY.WIDTH = GUI.BTN.TOTAL
-  GOSUB GUI.OPEN
-  GOSUB GUI.FORM.BEGIN
+  GP.SUB FORM.BEGIN, GP.BSTR(BS.D.FORM, 0), GP.BSTR(BS.D.FORM, 1), GP.BSTR(BS.D.FORM, 2), 4, 28, "&OK", "&CANCEL"
+  GP.SUB FORM.CHECK, 0, GP.BSTR(BS.D.FORM, 3), -1
+  GP.SUB FORM.CHECK, 1, GP.BSTR(BS.D.FORM, 4), 0
+  GP.SUB FORM.CHECK, 2, GP.BSTR(BS.D.FORM, 5), -1
+  GP.SUB FORM.COMBO, 3, GP.BSTR(BS.D.FORM, 6), 12, 4, 1
 
-  CHECK.X = GUI.INNER.LEFT
-  CHECK.Y = GUI.INNER.TOP
-  CHECK.TEXT$ = GP.BSTR(BS.D.FORM, 3)
-  CHECK.ON = -1
-  GOSUB CHECK.ADD
-  CHECK.Y = CHECK.Y + 1
-  CHECK.TEXT$ = GP.BSTR(BS.D.FORM, 4)
-  CHECK.ON = 0
-  GOSUB CHECK.ADD
-  CHECK.Y = CHECK.Y + 1
-  CHECK.TEXT$ = GP.BSTR(BS.D.FORM, 5)
-  CHECK.ON = -1
-  GOSUB CHECK.ADD
-
-  GP.PRINTAT GUI.INNER.LEFT, GUI.INNER.TOP + 3, GP.BSTR(BS.D.FORM, 6), GUI.PANEL
-  COMBO.X = GUI.INNER.LEFT + 6 : COMBO.Y = GUI.INNER.TOP + 3
-  COMBO.W = 12  : COMBO.COUNT = 4 : COMBO.SEL = 1 : COMBO.BANK = 0
-  GOSUB COMBO.ADD
-
-  GUI.BTN.Y = GUI.INNER.TOP + 5
-  GOSUB GUI.BUTTON.ROW
-  GUI.FOCUS = 1
-  GOSUB GUI.FORM.RUN
-
-  GM.NUM% = 0
-  IF (GUI.CTRL.FLAGS%(GUI.FORM.HIT) AND GUI.CF.DEFAULT) <> 0 THEN GM.NUM% = -1
+  GM.NUM% = GP.FN(FORMTO.RUN)
   GOSUB GMX.SIGNED
   GM.RESULT$ = GP.BSTR(BS.D.FORM, 11) + GM.NUM$ + GP.BSTR(BS.D.FORM, 12)
   FOR GM.I = 1 TO 3
     GM.TICK$ = "-"
-    IF (GUI.CTRL.FLAGS%(GM.I) AND GUI.CF.CHECKED) <> 0 THEN GM.TICK$ = "X"
+    IF GP.FN(FORM.CHECKED, GM.I) THEN GM.TICK$ = "X"
     GM.RESULT$ = GM.RESULT$ + GM.TICK$
   NEXT GM.I
-  GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.D.FORM, 13) + MID$(STR$(COMBO.SEL), 2)
-  GOSUB GUI.CLOSE
+  GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.D.FORM, 13) + MID$(STR$(GP.FN(FORM.COMBOSEL)), 2)
+  GP.SUB FORM.END
   RETURN
 
 
@@ -1734,12 +1643,10 @@ GP.BANKEDSTR GM.TEXTBANK BS.I.ASK
   "LINEINPUT.ASK  "
 GP.ENDBANKEDSTR
 GMX.I.ASK:
-  GOSUB GMX.CLEARPANEL : GOSUB GMX.I.RESET
+  GOSUB GMX.CLEARPANEL
   GP.PRINTAT 6, 9, GP.BSTR(BS.I.ASK, 0), THEME.CLR(THEME.DIMMED)
-  LINEINPUT.X = 6 : LINEINPUT.LEN = 16
-  LINEINPUT.LABEL$ = GP.BSTR(BS.I.ASK, 1)
-  LINEINPUT.LABELATTR = THEME.CLR(THEME.TEXT)
-  GOSUB LINEINPUT.ASK : GOSUB GMX.I.SAID
+  GM.TYPED$ = GP.FN(ASKLINE, 6, 11, GP.BSTR(BS.I.ASK, 1), 16)
+  GOSUB GMX.I.SAID
   GM.RESULT$ = GP.BSTR(BS.I.ASK, 2) + GM.SAID$
   RETURN
 
@@ -2163,15 +2070,11 @@ GP.BANKEDSTR GM.TEXTBANK BS.B.PROGRAM
   "VERSION  1.0.0"
 GP.ENDBANKEDSTR
 GMX.B.PROGRAM:
-  GOSUB GMX.D.RESET
   GM.PNAME$ = GP.BSTR(BS.B.PROGRAM, 1)
   GM.PBLK% = GP.FN(FILE.SIZE, GM.PNAME$)
-  GUI.TITLE$ = GP.BSTR(BS.B.PROGRAM, 0)
-  GUI.MSG$ = GP.BSTR(BS.B.PROGRAM, 2) + GM.PNAME$
-  GUI.MSG2$ = GP.BSTR(BS.B.PROGRAM, 3) + GP.BSTR(BS.B.PROGRAM, 5)
-  IF GM.PBLK% > 0 THEN GUI.MSG2$ = GP.BSTR(BS.B.PROGRAM, 3) + MID$(STR$(GM.PBLK%), 2) + GP.BSTR(BS.B.PROGRAM, 4)
-  GUI.MSG3$ = GP.BSTR(BS.B.PROGRAM, 6)
-  GOSUB GUI.SAY
+  GM.LINE2$ = GP.BSTR(BS.B.PROGRAM, 3) + GP.BSTR(BS.B.PROGRAM, 5)
+  IF GM.PBLK% > 0 THEN GM.LINE2$ = GP.BSTR(BS.B.PROGRAM, 3) + MID$(STR$(GM.PBLK%), 2) + GP.BSTR(BS.B.PROGRAM, 4)
+  GP.SUB MSGBOXEX, GP.BSTR(BS.B.PROGRAM, 0), GP.BSTR(BS.B.PROGRAM, 2) + GM.PNAME$, GM.LINE2$, GP.BSTR(BS.B.PROGRAM, 6), ""
   RETURN
 
 
@@ -2224,7 +2127,7 @@ GMX.B.MEMORY:
 ## all ten runs past BASLOAD's line length.
   GM.BMEM$ = GP.BSTR(BS.B.MEM, 3) + MID$(STR$(GM.GUICODE), 2) + " #" + MID$(STR$(GM.UTILCODE), 2) + " #" + MID$(STR$(GM.FUTILCODE), 2)
   GM.BMEM$ = GM.BMEM$ + " #" + MID$(STR$(GM.THEMECODE), 2) + " #" + MID$(STR$(GM.COMBOCODE), 2) + " #" + MID$(STR$(GM.MODSCODE), 2)
-  GM.BMEM$ = GM.BMEM$ + " #" + MID$(STR$(GM.MENUCODE), 2)
+  GM.BMEM$ = GM.BMEM$ + " #" + MID$(STR$(GM.MENUCODE), 2) + " #" + MID$(STR$(GM.DLGCODE), 2)
   GM.BMEM$ = GM.BMEM$ + GP.BSTR(BS.B.MEM, 4) + MID$(STR$(GM.TEXTBANK), 2) + " #" + MID$(STR$(GM.TEXTBANKB), 2) + " #" + MID$(STR$(MENU.TEXTBANK), 2)
   GP.PRINTAT 4, 16, GM.BMEM$, THEME.CLR(THEME.TEXT)
   GP.PRINTAT 4, 17, GP.BSTR(BS.B.MEM, 5) + MID$(STR$(GM.BANKNOW%), 2), THEME.CLR(THEME.TEXT)
@@ -2261,7 +2164,7 @@ GMX.B.MEMORY:
 ## **  four that hold one or two modules apiece share the last, each row
 ## **  prefixed with its bank.
 ## **
-## **  THREE ENTRIES IN THE LEFT COLUMN AGAINST TWENTY ACROSS THE OTHER
+## **  THREE ENTRIES IN THE LEFT COLUMN AGAINST NINETEEN ACROSS THE OTHER
 ## **  THREE. What is left down there is what could not go: STASH and STASHFILE
 ## **  hold BANK statements, which the compiler refuses inside a region.
 ## **  GPBMODS ITSELF IS IN TWO COLUMNS AT ONCE -- the shell in low RAM, and its
@@ -2278,7 +2181,7 @@ GMX.B.MEMORY:
 ## ---- inside each literal, so a name one character longer bent the column and a
 ## ---- figure gaining a digit pushed past it.
 
-GP.BANKEDSTR GM.TEXTBANKB BS.B.SIZES
+GP.BANKEDSTR GM.TEXTBANKB BS.B.MODULE.NAMES
   "IN LOW RAM  $0801"
   "IN BANK 7  .007"
   "IN BANKS 12, 4"
@@ -2300,7 +2203,6 @@ GP.BANKEDSTR GM.TEXTBANKB BS.B.SIZES
   "MENUPULL"
   "LINEINPUT"
   "GUI"
-  "GUI2"
   "008 FILEIO"
   "008 FILEDIR"
   "009 THEME"
@@ -2315,7 +2217,7 @@ GP.ENDBANKEDSTR
 ## ---- WITHIN one region, because an overlay file is padded up to a whole page
 ## ---- and the padding lands on whichever module came last.
 
-GP.BANKEDSTR GM.TEXTBANKB BS.B.NUMS
+GP.BANKEDSTR GM.TEXTBANKB BS.B.MODULE.BYTES
   "435"
   "160"
   "9874"
@@ -2332,7 +2234,6 @@ GP.BANKEDSTR GM.TEXTBANKB BS.B.NUMS
   "516"
   "780"
   "4453"
-  "353"
   "1092"
   "422"
   "519"
@@ -2345,39 +2246,39 @@ GMX.B.SIZES:
   GM.GRP% = 18
   GOSUB GMX.G.SAY
 
-  ## ---- THE TWO GROUPS ARE FIVE APART, NOT LEVEL. BS.B.SIZES opens with the
+  ## ---- THE TWO GROUPS ARE FIVE APART, NOT LEVEL. BS.B.MODULE.NAMES opens with the
   ## ---- four column headings and TOTAL, so the first module name is index 5
   ## ---- while its figure is index 0. Leaving both at 0 printed every name
   ## ---- against the figure five modules along, headings and all.
-  GM.SNAME% = 5 : GM.SNUM% = 0
+  GM.NAME.AT% = 5 : GM.BYTES.AT% = 0
 
   ## ---- NINETEEN COLUMNS APART, not twenty-six. A name padded to 11 and a
   ## ---- figure right justified in 5 is 16 wide, and four of those plus the
   ## ---- left margin is 76 of the 80.
-  GM.SX% = 4  : GM.SHEAD% = 0 : GM.SN% = 3 : GM.SATTR% = THEME.CLR(THEME.TEXT)  : GOSUB GMX.B.COL
-  GM.SX% = 23 : GM.SHEAD% = 1 : GM.SN% = 9 : GM.SATTR% = THEME.CLR(THEME.TITLE) : GOSUB GMX.B.COL
-  GM.SX% = 42 : GM.SHEAD% = 2 : GM.SN% = 5 : GM.SATTR% = THEME.CLR(THEME.TITLE) : GOSUB GMX.B.COL
-  GM.SX% = 61 : GM.SHEAD% = 3 : GM.SN% = 6 : GM.SATTR% = THEME.CLR(THEME.TITLE) : GOSUB GMX.B.COL
+  GM.PANEL.X% = 4  : GM.COL.HEAD% = 0 : GM.COL.ROWS% = 3 : GM.ROW.COLOR% = THEME.CLR(THEME.TEXT)  : GOSUB GMX.B.COL
+  GM.PANEL.X% = 23 : GM.COL.HEAD% = 1 : GM.COL.ROWS% = 9 : GM.ROW.COLOR% = THEME.CLR(THEME.TITLE) : GOSUB GMX.B.COL
+  GM.PANEL.X% = 42 : GM.COL.HEAD% = 2 : GM.COL.ROWS% = 4 : GM.ROW.COLOR% = THEME.CLR(THEME.TITLE) : GOSUB GMX.B.COL
+  GM.PANEL.X% = 61 : GM.COL.HEAD% = 3 : GM.COL.ROWS% = 6 : GM.ROW.COLOR% = THEME.CLR(THEME.TITLE) : GOSUB GMX.B.COL
 
-  GM.SNAME% = 4 : GM.SX% = 4 : GM.SROW% = 23 : GM.SATTR% = THEME.CLR(THEME.WARN)
+  GM.NAME.AT% = 4 : GM.PANEL.X% = 4 : GM.ROW.Y% = 23 : GM.ROW.COLOR% = THEME.CLR(THEME.WARN)
   GOSUB GMX.B.ROW
-  GM.RESULT$ = GM.SLINE$
+  GM.RESULT$ = GM.ROW.TEXT$
 
   GM.TELL$ = GP.BSTR(BS.G.DATA, 6)
   GOSUB GMX.TELL
   RETURN
 
 
-## ---- ONE COLUMN. GM.SNAME% and GM.SNUM% each walk on by one a row, so the five
+## ---- ONE COLUMN. GM.NAME.AT% and GM.BYTES.AT% each walk on by one a row, so the five
 ## ---- places between them hold across all four columns and the total falls out
-## ---- at the end, with GM.SNUM% already standing on it.
+## ---- at the end, with GM.BYTES.AT% already standing on it.
 
 GMX.B.COL:
-  GP.PRINTAT GM.SX%, 13, GP.BSTR(BS.B.SIZES, GM.SHEAD%), THEME.CLR(THEME.WARN)
-  GM.SROW% = 14
-  FOR GM.I = 1 TO GM.SN%
+  GP.PRINTAT GM.PANEL.X%, 13, GP.BSTR(BS.B.MODULE.NAMES, GM.COL.HEAD%), THEME.CLR(THEME.WARN)
+  GM.ROW.Y% = 14
+  FOR GM.I = 1 TO GM.COL.ROWS%
     GOSUB GMX.B.ROW
-    GM.SROW% = GM.SROW% + 1
+    GM.ROW.Y% = GM.ROW.Y% + 1
   NEXT GM.I
   RETURN
 
@@ -2385,16 +2286,16 @@ GMX.B.COL:
 ## ---- ONE ROW, laid out by the library this program exists to exercise:
 ## ---- STR.PADR takes the name to a fixed column and STR.USING right justifies
 ## ---- the figure in five, which is what makes the digits line up whatever the
-## ---- name beside them is. GM.SNAME% is left where it stops, so the caller can
+## ---- name beside them is. GM.NAME.AT% is left where it stops, so the caller can
 ## ---- point it at the TOTAL row and call this again.
 
 GMX.B.ROW:
-  STR.USING.NUM = VAL(GP.BSTR(BS.B.NUMS, GM.SNUM%))
+  STR.USING.NUM = VAL(GP.BSTR(BS.B.MODULE.BYTES, GM.BYTES.AT%))
   STR.USING.MASK$ = "#####"
   GOSUB STR.USING
-  GM.SLINE$ = GP.FN(PADR, GP.BSTR(BS.B.SIZES, GM.SNAME%), 11) + STR.USING.STR$
-  GP.PRINTAT GM.SX%, GM.SROW%, GM.SLINE$, GM.SATTR%
-  GM.SNAME% = GM.SNAME% + 1 : GM.SNUM% = GM.SNUM% + 1
+  GM.ROW.TEXT$ = GP.FN(PADR, GP.BSTR(BS.B.MODULE.NAMES, GM.NAME.AT%), 11) + STR.USING.STR$
+  GP.PRINTAT GM.PANEL.X%, GM.ROW.Y%, GM.ROW.TEXT$, GM.ROW.COLOR%
+  GM.NAME.AT% = GM.NAME.AT% + 1 : GM.BYTES.AT% = GM.BYTES.AT% + 1
   RETURN
 
 
@@ -2420,11 +2321,11 @@ GMX.B.ROW:
 ## **                      GMX.A.ARRAY, GMX.B.MEMORY and GMX.B.SIZES. Down
 ## **                      here each is a plain GOSUB; in the region each
 ## **                      would switch the bank twice.
-## **      GMX.CHROME      the region calls out to these five. Calling OUT is
+## **      GMX.CHROME      the region calls out to these four. Calling OUT is
 ## **      GMX.CLEARPANEL  safe: low memory is visible whatever bank is
 ## **      GMX.TELL        selected, and none of them holds a BANK statement,
-## **      GMX.D.RESET     so the region's own bank is still selected when
-## **      GMX.SIGNED      they return.
+## **      GMX.SIGNED      so the region's own bank is still selected when
+## **                      they return.
 ## **
 ## **  The text groups the region reads are not here for any such reason:
 ## **  GP.BANKEDSTR writes no p-code at all, so a block costs the region
@@ -2785,13 +2686,8 @@ GP.BANKEDSTR GM.TEXTBANKB BS.F.LIST
 GP.ENDBANKEDSTR
 GMX.F.LIST:
   IF GM.FSHOWN% = 0 THEN GOTO GMX.F.NONE
-  GOSUB GMX.D.RESET
-  GUI.TITLE$ = GM.FTITLE$
-  GUI.MSG$ = MID$(STR$(GM.FSEEN%), 2) + GP.BSTR(BS.F.LIST, 0) + MID$(STR$(GM.FSHOWN%), 2) + GP.BSTR(BS.F.LIST, 1)
-  GUI.MSG2$ = GP.BSTR(BS.F.LIST, 2)
-  GUI.LISTBOX.COUNT = GM.FSHOWN%
-  GUI.LISTBOX.ROWS = 12 : GUI.LISTBOX.MULTI = 0 : GUI.LISTBOX.SEL = 0
-  GOSUB GUI.LISTBOX
+  GM.LINE1$ = MID$(STR$(GM.FSEEN%), 2) + GP.BSTR(BS.F.LIST, 0) + MID$(STR$(GM.FSHOWN%), 2) + GP.BSTR(BS.F.LIST, 1)
+  GM.NUM% = GP.FN(LISTBOXEX, GM.FTITLE$, GM.LINE1$, GP.BSTR(BS.F.LIST, 2), "", GM.FSHOWN%, 12, 0)
   GM.RESULT$ = GP.BSTR(BS.F.LIST, 3) + MID$(STR$(GM.FSEEN%), 2) + GP.BSTR(BS.F.LIST, 4) + MID$(STR$(FILE.DIR.GOT), 2) + GP.BSTR(BS.F.LIST, 5)
   IF FILE.DIR.FULL = 1 THEN GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.F.LIST, 6)
   RETURN
@@ -2802,10 +2698,8 @@ GP.BANKEDSTR GM.TEXTBANKB BS.F.NONE
   "FILEDIR  NOTHING FOUND"
 GP.ENDBANKEDSTR
 GMX.F.NONE:
-  GOSUB GMX.D.RESET : GUI.TITLE$ = GM.FTITLE$
-  GUI.MSG$ = GP.BSTR(BS.F.NONE, 0)
-  GUI.MSG2$ = "ERR " + MID$(STR$(FILE.ERR), 2) + "  " + FILE.MSG$
-  GOSUB GUI.SAY
+  GM.LINE2$ = "ERR " + MID$(STR$(FILE.ERR), 2) + "  " + FILE.MSG$
+  GP.SUB MSGBOXEX, GM.FTITLE$, GP.BSTR(BS.F.NONE, 0), GM.LINE2$, "", ""
   GM.RESULT$ = GP.BSTR(BS.F.NONE, 1)
   RETURN
 
@@ -2842,15 +2736,8 @@ GP.BANKEDSTR GM.TEXTBANKB BS.F.PATTERN
   " PATTERN "
 GP.ENDBANKEDSTR
 GMX.F.PATTERN:
-  GOSUB GMX.D.RESET
-  GUI.TITLE$ = GP.BSTR(BS.F.PATTERN, 0)
-  GUI.MSG$ = GP.BSTR(BS.F.PATTERN, 1)
-  GUI.MSG2$ = GP.BSTR(BS.F.PATTERN, 2)
-  GUI.LEN = 20
-  GUI.TEXT$ = GP.BSTR(BS.F.PATTERN, 3)
-  GOSUB GUI.INPUT
+  GM.FPAT$ = GP.FN(INPUTBOXEX, GP.BSTR(BS.F.PATTERN, 0), GP.BSTR(BS.F.PATTERN, 1), GP.BSTR(BS.F.PATTERN, 2), "", GP.BSTR(BS.F.PATTERN, 3), 20, 0)
   IF GUI.OK = 0 THEN GOTO GMX.F.PATOFF
-  GM.FPAT$ = GUI.TEXT$
   GM.FONLY% = FILE.DIR.FILES
   GOSUB GMX.F.READ
   GM.FTITLE$ = GP.BSTR(BS.F.PATTERN, 4) + GM.FPAT$ + " "
@@ -2946,23 +2833,15 @@ GP.BANKEDSTR GM.TEXTBANKB BS.F.EXISTS
   "  OK "
 GP.ENDBANKEDSTR
 GMX.F.EXISTS:
-  GOSUB GMX.D.RESET
-  GUI.TITLE$ = GP.BSTR(BS.F.EXISTS, 0)
-  GUI.MSG$ = GP.BSTR(BS.F.EXISTS, 1)
-  GUI.LEN = 24
-  GUI.TEXT$ = GP.BSTR(BS.F.EXISTS, 2)
-  GOSUB GUI.INPUT
+  GM.FNAME$ = GP.FN(INPUTBOXEX, GP.BSTR(BS.F.EXISTS, 0), GP.BSTR(BS.F.EXISTS, 1), "", "", GP.BSTR(BS.F.EXISTS, 2), 24, 0)
   IF GUI.OK = 0 THEN GOTO GMX.F.EXOFF
-  GM.FNAME$ = GUI.TEXT$
   FILE.NAME$ = GM.FNAME$
   GOSUB FILE.EXISTS
-  GOSUB GMX.D.RESET
-  GUI.TITLE$ = GP.BSTR(BS.F.EXISTS, 0)
-  GUI.MSG$ = GM.FNAME$ + GP.BSTR(BS.F.EXISTS, 3)
-  IF FILE.OK <> 0 THEN GUI.MSG$ = GM.FNAME$ + GP.BSTR(BS.F.EXISTS, 4)
+  GM.LINE1$ = GM.FNAME$ + GP.BSTR(BS.F.EXISTS, 3)
+  IF FILE.OK <> 0 THEN GM.LINE1$ = GM.FNAME$ + GP.BSTR(BS.F.EXISTS, 4)
   GM.NUM% = FILE.OK : GOSUB GMX.SIGNED
-  GUI.MSG2$ = GP.BSTR(BS.F.EXISTS, 5) + GM.NUM$ + GP.BSTR(BS.F.EXISTS, 6) + MID$(STR$(FILE.ERR), 2) + "  " + FILE.MSG$
-  GOSUB GUI.SAY
+  GM.LINE2$ = GP.BSTR(BS.F.EXISTS, 5) + GM.NUM$ + GP.BSTR(BS.F.EXISTS, 6) + MID$(STR$(FILE.ERR), 2) + "  " + FILE.MSG$
+  GP.SUB MSGBOXEX, GP.BSTR(BS.F.EXISTS, 0), GM.LINE1$, GM.LINE2$, "", ""
   GM.RESULT$ = GP.BSTR(BS.F.EXISTS, 7) + GM.FNAME$ + GP.BSTR(BS.F.EXISTS, 8) + GM.NUM$
   RETURN
 

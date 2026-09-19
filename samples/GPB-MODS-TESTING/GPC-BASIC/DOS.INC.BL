@@ -1,0 +1,63 @@
+## ******************************************************************************
+## **** 
+## ****  USE THIS INSTEAD OF FILEIO.INC,  SMALLER, TRYING TO JUST DO X16 DOS
+## ****  
+## **** 
+## ****  SO THIS OR FILEIO.INC,    *** NOT BOTH ****
+## ****  SO THIS OR FILEIO.INC,    *** NOT BOTH ****
+## ****  SO THIS OR FILEIO.INC,    *** NOT BOTH ****
+## ****  SO THIS OR FILEIO.INC,    *** NOT BOTH ****
+## ****        
+## ******************************************************************************
+#IFNDEF DOS.DEFS
+#DEFINE DOS.DEFS 1
+
+## An error number under this is success.
+#DEFINE DOS.OKMAX 20
+
+#DEFINE DOS.CHAN 14
+
+GOTO DOS.MODULE.END
+
+
+## DOS.CMD sends DOS.CMDSTR$ and reads the answer.
+##
+##   in    DOS.CMDSTR$  the command, and the verb's one argument
+##   out   DOS.ERR      the error, and what GP.FN gives back
+##         DOS.MSG$
+##
+##      DOS.CMDSTR$ = "S:OLD.DAT" : GOSUB DOS.CMD
+##      GP.SUB DOSX, "S:OLD.DAT"
+##      OK = GP.FN(DOSX, "S:OLD.DAT")
+##
+DOS.CMD:
+    GP.DEFPROC DOSX, DOS.CMDSTR$ RETURNS DOS.ERR
+    IF DOS.DEVICE = 0 THEN DOS.DEVICE = 8
+    OPEN 15, DOS.DEVICE, 15, DOS.CMDSTR$
+    INPUT#15, DOS.ERR, DOS.MSG$, DOS.JUNK%, DOS.JUNK%
+    CLOSE 15 : DOS.CMDSTR$ = ""
+    RETURN
+
+## Channel 15 is opened first and read while the file is still open: the answer
+## being read is the drive's answer to that open.
+##
+##   in    DOS.NAME$    the file, and the verb's one argument
+##   out   DOS.OK       -1 found, 0 not, and what GP.FN gives back
+##         DOS.ERR      DOS.MSG$
+##
+##      DOS.NAME$ = "SCORES.DAT" : GOSUB DOS.DOS.EXISTS
+##      IF DOS.OK THEN...
+##      IF GP.FN(DOS.EXISTS, "SCORES.DAT") THEN GOSUB LOADIT
+##
+DOS.DOS.EXISTS:  
+    GP.DEFPROC DOS.EXISTS, DOS.NAME$ RETURNS DOS.OK
+    DOS.OK = 0 : IF DOS.DEVICE = 0 THEN DOS.DEVICE = 8
+    OPEN 15, DOS.DEVICE, 15
+    OPEN DOS.CHAN, DOS.DEVICE, DOS.CHAN, DOS.NAME$ + ",S,R"
+    INPUT#15, DOS.ERR, DOS.MSG$, DOS.JUNK%, DOS.JUNK%
+    CLOSE DOS.CHAN : CLOSE 15
+    IF DOS.ERR < DOS.OKMAX THEN DOS.OK = -1
+    RETURN
+
+DOS.MODULE.END:
+#ENDIF

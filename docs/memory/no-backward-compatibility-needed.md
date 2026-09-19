@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 5591d6bc-636d-4001-b0b0-d858156d6ec0
-  modified: 2026-09-01T10:01:30.155Z
+  modified: 2026-09-18T15:26:23.820Z
 ---
 
 **Stated 2026-09-01:** *"remember, we are the only user testing, there is 0 impact
@@ -25,5 +25,15 @@ Note the tree's own docs say some tokens are "never renumbered" and that
 `GP.MENU` (52840) / `GP.SEL` (52839) are "NOT to be reused". Treat that as house
 style worth keeping for readability of old PRGs, not as a compatibility
 requirement — ask before breaking it rather than assuming either way.
+
+**Library code too, restated 2026-09-18:** *"all old code needs to go. why refactor?
+we are the only users, rip it out!"* When a new library layer replaces an old one
+(the menu builder over `MENUVERT`/`MENUBAR`), delete the old layer and move its
+callers across. Do not keep it as an engine underneath.
+
+**Refined the same day:** *"we can rip out slowly, it just needs to go in the end. All
+prg need to get updated."* A step-by-step migration is fine, with old and new side by
+side for a while. The end state is fixed: the old layer deleted, and every program that
+used it (samples, tests, examples) moved to the new one.
 
 Related: [[compiler-must-not-cap-program-size]], [[no-ship-language-this-is-dev]].

@@ -1233,6 +1233,34 @@ image for all 12,031 bytes of the GP-BASIC OUT cut, with the only differences th
 
 ## Wanted
 
+### A label's address as a value, and a `GOSUB` through it — RESEARCH, raised 2026-09-19
+
+A program cannot take a label's address and call it at run time. The wanted shape is a callback:
+store `MY.MENU.CODE.LABEL`'s address in a variable, then `GOSUB` through the variable. Nothing
+built.
+
+Why nothing present does it:
+
+- BASLOAD turns the label into a line number, and the compiler turns that into a fixed p-code
+  target. No keyword returns the target as a value, and no `GOSUB` takes one from a variable.
+- `GP.CALL` does a JSR to machine code. A label's body is p-code, so calling its address runs p-code
+  as 6502 and crashes. It also pushes no GOSUB frame, so the label's `RETURN` has nothing to return
+  to.
+- In a `GP.BANKED` region the target needs its bank as well as its address.
+
+What works now is a handler number: `ON N GOSUB A, B, C` for a dense `1..n`, `GP.SELECT` for a
+sparse one. `ON ... GOSUB` makes no banked call, so a region caller or target needs `GP.SELECT`.
+
+A build would need:
+
+- an expression that yields a label's p-code address, and its bank when the label is in a region;
+- a computed-`GOSUB` opcode that pushes the frame and jumps to the address, as `.bgosub` does when a
+  bank is given. This opcode costs runtime bytes in every program.
+- dead-code elimination to treat a label whose address is taken as reached.
+
+To settle first: the syntax, how the value holds a bank, and whether the opcode fits the 52-byte
+embedded cushion.
+
 ### Dynamic arrays in a bank — `REDIM`, `UBOUND`, `ERASE` — RESEARCH, raised 2026-09-17
 
 VBA-shaped arrays whose elements live in RAM banks rather than in the workspace, so a program can
@@ -1362,7 +1390,7 @@ Questions to answer:
 - What does the tail need: a count, then a bank number and size per region?
 - What does the loader cost the embedded image, which has 52 bytes of cushion left?
 
-### Banked scratch strings — a `GP.BANKEDSTR` group used as writable storage — MAYBE, raised 2026-09-11
+### Banked scratch strings — a `GP.BANKEDSTR` group used as writable storage — REVIVED 2026-09-18, raised 2026-09-11
 
 A GUI page carries a dozen or more `LINEINPUT` fields and only one is ever being edited. Their text
 does not have to sit in low RAM. Declare a `GP.BANKEDSTR` group whose literals are nothing but
@@ -1438,6 +1466,56 @@ pokes the caller checks `LEN()` himself; a `GP.BSTRSET` should clamp.
 For a form where every field is fully visible, the screen already holds the text and it could be
 read back off the layer with a `VPEEK` loop — no storage at all. It breaks the moment a field
 scrolls wider than its display, and it still builds the string the expensive way.
+
+#### Revived 2026-09-18, and the second caller
+
+Wanted for the menu refactor, [`docs/blitz/GUI-MENUS.PLAN.md`](docs/blitz/GUI-MENUS.PLAN.md) § 8:
+a menu's item store is the same shape as a form page's fields and meets the one-live-string
+condition better, because the engine reads a row, draws it and drops it. Proposed spelling is
+`GP.BPUTSTR`, a **statement** and not a function — nothing comes back, and `GP.BSTR` has already
+spent the GP block's 256-byte crossing:
+
+    GP.BPUTSTR NAME, n, A$
+
+Argument order mirrors `GP.BSTR(NAME, n)`, group then index then value, so the two read as a pair.
+`NAME` stays compile-time resolved exactly as on the read side, which is also what lets the slot
+capacity be emitted as a constant beside the group base.
+
+Open, and it is the whole question: the group must be declared with space-filled literals wide
+enough for what will be written, and nothing today makes that declaration say so.
+
+#### `MENUVERT.ITEM$()` in a group — `FILEPICK` first — reviewed 2026-09-18
+
+Moved out of the menu plan: this is the shared engine array, not the new menu store. It can be done
+with `GP.BSTRSET`. The caller declares the group, as the caller owns the `DIM` today, one `SPC(n)`
+line a slot written out, row 0 included:
+
+    GP.BANKEDSTR GM.TEXTBANK MENUVERT.ITEMS
+    SPC(24)
+    SPC(24)
+    ...
+    GP.ENDBANKEDSTR
+
+The library changes at nine reads and two writes:
+
+| site | now |
+|---|---|
+| `MENUVERT.INC.BL:399`, `:455` | draw a row, test for `"-"` |
+| `MENUBAR.INC.BL:252`, `:259` | `MENUBAR.COLUMN` |
+| `GUI.INC.BL:1146`, `GUI2.INC.BL:102` | width loops |
+| `COMBO.INC.BL:133` | the chosen text |
+| `FILEPICK.INC.BL:167`, `:254` | the two writes, to `GP.BSTRSET` |
+
+Callers change mechanically: about 80 `MENUVERT.ITEM$(i) = X` sites in nine programs become
+`GP.BSTRSET MENUVERT.ITEMS, i, X`, 34 of them in `GPBMODS`.
+
+Costs: `GPBMODS` needs 33 `SPC` lines and `FILEPICK` 61 (`FILEPICK.MAX` is 60). The free ten rows
+of an undimensioned `ITEM$` go, so every program using the engine must declare the group. Overlong
+text is cut silently; 61 x (24 + 4) is about 1.7 KB of bank. Every read copies into a temporary.
+
+The saving is heap and scales with length. Short menu items net about 6-15 B each; `FILEPICK` rows
+are about 25 characters, about 2 KB for 60, and `FILEPICK.FILE$` the same again. **`FILEPICK`
+first**, because that is where the saving is.
 
 ### A shared key-value bank — strings any program can store, read and save to disk — WRITTEN, not run, raised 2026-09-15
 

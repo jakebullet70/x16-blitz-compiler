@@ -15,14 +15,13 @@
 ## **      GPB.INC.BL        GP.INSTR, GP.ISEMPTY
 ## **      STASH.INC.BL      via GUI.OPEN; wants a #SYMFILE
 ## **      THEME.INC.BL      GOSUB THEME.SELECT first
-## **      MENUVERT.INC.BL   the rows are drawn from MENUVERT.ITEM$
 ## **      GUI.INC.BL        GUI.OPEN, GUI.FORM and the list control
 ## **      FILEIO.INC.BL     FILE.DEVICE and the channel numbers
 ## **      FILEDIR.INC.BL    the directory read and its parser
 ## **
 ## **  Usage:
 ## **      DIM FILEPICK.FILE$(FILEPICK.MAX)
-## **      DIM MENUVERT.ITEM$(FILEPICK.MAX)
+## **      DIM GUI.LIST.ITEM$(FILEPICK.MAX)
 ## **      GOSUB FILEPICK.INIT
 ## **      ...
 ## **      FILEPICK.BANK = MY.DIRBANK%
@@ -54,15 +53,12 @@
 ## **        FILEPICK.SEL    the row the highlight was left on, or 0
 ## **
 ## **  internal  FILEPICK.TRY$ FILEPICK.ONE$ FILEPICK.REST$ FILEPICK.PAD$
-## **            FILEPICK.BLANKROW
 ## **            FILEPICK.HIT FILEPICK.AT FILEPICK.CTRL
 ## **
 ## **  THE CALLER OWNS BOTH DIMS. FILEPICK.FILE$ holds the names as the drive
-## **  gave them and is what the answer is read out of; MENUVERT.ITEM$ holds
+## **  gave them and is what the answer is read out of; GUI.LIST.ITEM$ holds
 ## **  the rows as they are drawn, name padded and block count after it, and
-## **  is shared with every other menu in the program. A program that opens
-## **  this picker rebuilds its own menu rows afterwards, the same way it does
-## **  after any other list.
+## **  is shared with every other list in the program.
 ## **
 ## **  FILE.NAME$ IS ONE STRING, rewritten by every FILE.DIR.NEXT, so the name
 ## **  is copied into the array per entry rather than kept a pointer to.
@@ -164,7 +160,7 @@ FILEPICK.KEEP:
   FILEPICK.FILE$(FILEPICK.COUNT) = FILEPICK.TRY$
   FILEPICK.PAD$ = FILEPICK.TRY$ + RPT$(32, FILEPICK.NAMEW)
   FILEPICK.PAD$ = LEFT$(FILEPICK.PAD$, FILEPICK.NAMEW)
-  MENUVERT.ITEM$(FILEPICK.COUNT) = " " + FILEPICK.PAD$ + RIGHT$("     " + STR$(FILE.BLOCKS), 5)
+  GUI.LIST.ITEM$(FILEPICK.COUNT) = " " + FILEPICK.PAD$ + RIGHT$("     " + STR$(FILE.BLOCKS), 5)
   RETURN
 
 
@@ -216,7 +212,6 @@ FILEPICK.SHOW:
   IF FILEPICK.ROWS > FILEPICK.COUNT THEN FILEPICK.ROWS = FILEPICK.COUNT
   IF FILEPICK.ROWS < FILEPICK.MINROWS THEN FILEPICK.ROWS = FILEPICK.MINROWS
   IF FILEPICK.ROWS > FILEPICK.MAX THEN FILEPICK.ROWS = FILEPICK.MAX
-  GOSUB FILEPICK.BLANK
   GUI.BTN.ONE$ = "&OK"
   GUI.BTN.TWO$ = "&CANCEL"
   GOSUB GUI.BUTTON.SIZE
@@ -242,17 +237,6 @@ FILEPICK.SHOW:
   FILEPICK.SEL = GUI.LIST.SEL
   IF (GUI.CTRL.FLAGS%(GUI.FORM.HIT) AND GUI.CF.DEFAULT) <> 0 THEN FILEPICK.NAME$ = FILEPICK.FILE$(FILEPICK.SEL)
   GOSUB GUI.CLOSE
-  MENUVERT.SCROLL = 0
-  RETURN
-
-## ---- The rows under the last name. MENUVERT draws every visible row out of
-## ---- MENUVERT.ITEM$, and the caller's own menu text is still in there, so the
-## ---- padding rows are emptied rather than left to show it.
-FILEPICK.BLANK:
-  IF FILEPICK.ROWS <= FILEPICK.COUNT THEN RETURN
-  FOR FILEPICK.BLANKROW = FILEPICK.COUNT + 1 TO FILEPICK.ROWS
-    MENUVERT.ITEM$(FILEPICK.BLANKROW) = ""
-  NEXT FILEPICK.BLANKROW
   RETURN
 
 

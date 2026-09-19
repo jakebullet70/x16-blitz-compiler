@@ -38,16 +38,12 @@
 #   An int16 store has no range check (memory/write_int.asm). 40,960 stores as -24,576 and
 #   no error is raised. A fraction truncates toward zero.
 #
-#   PICKDEMO is not listed. GUIFRMT includes the same modules.
-#
 import os, re, sys, collections
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 
 PROGRAMS = [
     dict(name="GPBMODS",  sym="testing/GPBMODS.SRC.SYM",  prg="testing/GPBMODS.PRG",
-         src=["samples/GPB-MODS-TESTING", "samples/GPB-MODS-TESTING/GPC-BASIC"]),
-    dict(name="GUIFRMT",  sym="testing/GUIFRMT.SRC.SYM",  prg="testing/GUIFRMT.PRG",
          src=["samples/GPB-MODS-TESTING", "samples/GPB-MODS-TESTING/GPC-BASIC"]),
     dict(name="XBASE",    sym="testing/XBASE.SRC.SYM",    prg="testing/XBASE.PRG",
          src=["samples/XBASE", "samples/XBASE/GPC-BASIC"]),

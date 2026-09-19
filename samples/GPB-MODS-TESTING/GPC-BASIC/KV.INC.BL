@@ -73,7 +73,7 @@ KV.INIT:
     ## Grabs a free bank and set it
     ## GOSUB BANKMGR.GET.FREE.BANK : KV.BANK = BANKMGR.BANK
     IF KV.READY = 0 THEN GOSUB KV.FIRST
-    IF KV.BANK = 0 THEN KB.BANK = KV.DEFBANK
+    IF KV.BANK = 0 THEN KV.BANK = KV.DEFBANK
     BANK KV.BANK : GOSUB KV.CHECK
     IF KV.HIT = 0 THEN GOSUB KV.FORMAT
     GOTO KV.EXIT
@@ -98,8 +98,7 @@ KV.AT:
 
 ## ---- a rewrite keeps the key's slot. A new key takes the first free one.
 KV.PUT:
-    KV.OK = 0 : KV.SLOT = 0
-    IF KV.KEY$ = "" THEN RETURN
+    KV.OK = 0 : KV.SLOT = 0 : IF KV.KEY$ = "" THEN RETURN
     GOSUB KV.ENCODE : BANK KV.BANK : GOSUB KV.SCAN
     IF KV.SLOT = 0 THEN GOSUB KV.FREE
     IF KV.SLOT = 0 THEN GOTO KV.EXIT

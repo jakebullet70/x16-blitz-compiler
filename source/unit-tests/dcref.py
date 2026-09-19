@@ -16,8 +16,6 @@
 #   GPC.INPUT is written with FIVE lines, the fifth empty unless --dead names a removed-line
 #   list. A four-line engine stops reading at line four, so the same file serves both.
 #
-#   PICKDEMO is not in the set and must not be added.
-#
 import os, shutil, subprocess, sys, time, glob, filecmp
 from concurrent.futures import ThreadPoolExecutor
 
@@ -31,7 +29,7 @@ ROM = os.path.join(EMUDIR, "rom.bin")
 #   NAME compiles SHARED, NAME:E compiles EMBEDDED.
 PROGRAMS = [
     "GPCTEST", "GPCTEST:E", "RGN", "GPC", "FORMEXP", "MENUDEMO",
-    "MENUTST", "COLORTST", "MENUEXP", "RGT", "GUI2TST", "GUIEXP", "GUIFRMT", "GPB.HELP",
+    "MENUTST", "COLORTST", "MENUEXP", "RGT", "GUI2TST", "GUIEXP", "GPB.HELP",
     "RGM", "RGL", "GPBMODS",
 ]
 

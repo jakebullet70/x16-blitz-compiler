@@ -17,12 +17,11 @@ ESC closes a dropdown; ESC on the bar asks whether to leave, and only YES does.
 
 Each bar item also answers to a letter: **D**IALOG, **L**ISTS, **I**NPUT, **S**CREEN,
 STRIN**G**S, D**A**TA, **T**HEME, A**B**OUT, **F**ILES. SCREEN and STRINGS both start with S, so
-STRINGS answers to G — a hotkey need not be an item's initial, and `MENUVERT.HOTATTR` tints
-whichever letter it finds.
+STRINGS answers to G — a hotkey need not be an item's initial. The `&` in the item's text marks
+it, and `MENU.HOTATTR` tints it in `THEME.TITLE`.
 
-That tint is `THEME.WARN`, which is why the GRAY theme has WARN as **light** red rather than red:
-GRAY is the only theme with a dark grey page, and plain red on it is barely legible. The hotkey is
-where that shows up first, long before any actual warning.
+The GRAY theme has WARN as **light** red rather than red: GRAY is the only theme with a dark grey
+page, and plain red on it is barely legible.
 
 **FILES writes to the drive.** Four of its rows do. Everything they make is named `GPBFILE.*` or
 `GPBDIR`, and every one of them is removed by the row that made it -- the files with
@@ -33,19 +32,20 @@ where that shows up first, long before any actual warning.
 There are no stubs left. A chosen row makes the library call it names and shows what came back, and
 what it came back with also lands on the LAST line at the foot of the page. Two modules have no
 row at all yet — see *The modules* — but nothing that is on screen is pretending. The shell itself is a
-test of three modules before any row is chosen: `MENUBAR` drives the bar, `MENUVERT` every
-dropdown, and `STASH` puts the screen back under a closed one.
+test of the menu builder before any row is chosen: `MENUTO.BAR` drives the bar,
+`MENUTO.PULLDOWN` every dropdown, and `STASH` puts the screen back under a closed one.
 
 `GMX.DISPATCH` is one `GP.SELECT` on the bar item and nothing else. Each item has a router of its
 own — `GMX.DIALOG`, `GMX.LISTS`, `GMX.INPUT`, `GMX.SCREEN`, `GMX.STRINGS`, `GMX.DATA`, `GMX.THEME`,
-`GMX.ABOUT`, `GMX.FILES` — which selects on `MENUVERT.SEL` and ends by repainting the chrome. Two
+`GMX.ABOUT`, `GMX.FILES` — which selects on the dropdown's row and ends by repainting the chrome. Two
 shallow selects rather than one nested on both coordinates.
 
-**Eleven banks.** Eight are named by the compiler and are CLAIMED from `BANKMGR` at startup,
+**Thirteen banks.** Ten are named by the compiler and are CLAIMED from `BANKMGR` at startup,
 because the compiler picks them while the object is written and so the manager is told rather than
 asked: **4** the GUI, **5** and **6** the program's own literal text, **7** the utilities, **8** the
-file modules, **9** `THEME`, **10** the combo and check box, and **11** the two biggest dropdown handlers,
-which are this program's own code rather than the library's. Three more are allocated at run time —
+file modules, **9** `THEME`, **10** the combo and check box, **11** the two biggest dropdown handlers,
+which are this program's own code rather than the library's, **12** the menu builder and **13** the
+dialog verbs. Three more are allocated at run time —
 the cells a dropdown covers, the cells a dialog covers, and `FILEDIR`'s directory buffer.
 
 **The text is in a bank.** Every string the shell says is in a `GP.BANKEDSTR` block in front of
@@ -58,8 +58,8 @@ GROUP — so the split is a budget decision and nothing else. Bank 6 holds 23 gr
 and whatever was moved out of bank 5 to make room. Bank 5 holds the other 49.
 
 **Every menu is a block of its own**, index 0 the dropdown's title (the bar's hotkey string), 1
-upwards the rows. So a menu is edited in one place and one place only: `MENUVERT.COUNT` comes
-from `GP.BSTRCOUNT` and the rows are read by a loop, so adding a row means adding a line to the
+upwards the rows. So a menu is edited in one place and one place only: the row count comes
+from `GP.BSTRCOUNT` and the rows are read by a loop into `MENU.ITEM`, so adding a row means adding a line to the
 block and nothing else — and no other menu moves.
 
 ## Build
@@ -90,9 +90,7 @@ silently downgrades the build.
 
 Then `USER-RUNS\gpbmods-demo.bat`.
 
-`modsbuild.py` takes a list, and two other programs live here: `GUIFRMT.BASL`, twenty-four headless
-assertions against `GUI.FORM`'s focus model, and `PICKDEMO.BASL`, `GUI.LISTBOX` in multi-select
-with the GUI in a bank.
+`modsbuild.py` takes a list of program names.
 
 **The SYM is named after the source PRG, not after the program.** `#SAVEAS "@:GPBMODS.SRC.PRG"`
 needs `#SYMFILE "@:GPBMODS.SRC.SYM"`. Get it wrong and the tokenise succeeds, the SYM is written,
@@ -101,72 +99,75 @@ about the file name.
 
 ## Where the bytes go
 
-Built 2026-09-15 with all twenty-one modules and every panel written. `GPBMODS.PRG` is **11,523**
-bytes and **eight overlay files** come with it, 32,016 bytes between them:
+Built 2026-09-18, after `MENUVERT` and `MENUBAR` were replaced by `MENU` and `MENUPULL`.
+`GPBMODS.PRG` is **11,542** bytes, and one `GPBMODS.OVL` of **38,165** bytes comes with it. The
+overlay holds ten sections:
 
-| file | bank | what is in it | bytes |
-|---|---:|---|---:|
-| `GPBMODS.004` | 4 | the GUI — `MENUVERT` `MENUBAR` `LINEINPUT` `GUI` `GUI2` | 7,938 |
-| `GPBMODS.005` | 5 | literal text, pool one | 7,426 |
-| `GPBMODS.006` | 6 | literal text, pool two | 4,610 |
-| `GPBMODS.007` | 7 | the utilities — nine modules | 4,866 |
-| `GPBMODS.008` | 8 | the file modules — `FILEIO` `FILEDIR` | 1,794 |
-| `GPBMODS.009` | 9 | `THEME` | 770 |
-| `GPBMODS.010` | 10 | the form controls — `COMBO` `CHECK` | 1,538 |
-| `GPBMODS.011` | 11 | `GMX.STRINGS` and `GMX.FILES`, this program's own code | 3,074 |
+| bank | what is in it | bytes |
+|---:|---|---:|
+| 7 | the utilities: nine modules | 5,120 |
+| 9 | `THEME` | 768 |
+| 12 | the menus: `MENU` `MENUPULL` | 2,816 |
+| 4 | the GUI: `LINEINPUT` `GUI` `GUI2` | 5,632 |
+| 10 | the form controls: `COMBO` `CHECK` | 1,536 |
+| 8 | the file modules: `FILEIO` `FILEDIR` | 1,792 |
+| 11 | `GMX.STRINGS` and `GMX.FILES`, this program's own code | 3,072 |
+| 62 | literal text: the menu rows and hints (`MENU.TEXTBANK`) | 4,352 |
+| 5 | literal text, pool one | 7,936 |
+| 6 | literal text, pool two | 5,120 |
 
-**One `.nnn` is written per bank, not per some size threshold.** Six are `GP.BANKED` code regions
-and two are `GP.BANKEDSTR` text pools. Each is loaded to `$A000` in its own bank, which is why none
-of it counts against low RAM or the file ceiling, and each carries a two-byte load address like any
-PRG, so **the payload is the file size less two**.
+**Each section is one bank.** Seven are `GP.BANKED` code regions and three are `GP.BANKEDSTR`
+text pools. Each section is a bank number and a page count followed by the pages, and the file
+ends with a `$01` marker. Every section loads to `$A000` in its own bank, so none of it counts
+against low RAM or the file ceiling.
 
-P-code bytes, differenced out of `testing/GPBMODS.MAP` against `testing/GPBMODS.SRC.SYM` — low
-memory and all six regions, which is why the total is far larger than the resident object:
+P-code bytes, differenced out of `testing/GPBMODS.MAP` against `testing/GPBMODS.SRC.SYM`. The
+figures cover low memory and all seven regions, so the total is far larger than the resident
+object:
 
 | where | module | p-code |
 |---|---|---:|
-| low | `GPBMODS.BASL` | 9,431 |
-| low | `STASH` | 431 |
-| low | `STASHFILE` | 174 |
-| low | the region exit bridges | 18 |
-| | **low RAM total** | **10,054** |
-| `.004` | `GUI` | 4,474 |
-| `.004` | `MENUVERT` | 1,306 |
-| `.004` | `MENUBAR` | 826 |
-| `.004` | `LINEINPUT` | 780 |
-| `.004` | `GUI2` | 366 |
-| `.004` | entry bridge and page padding | 184 |
-| | **bank 4 payload** | **7,936** |
-| `.007` | `STASHVRAM` | 1,681 |
-| `.007` | `STRUSING` | 726 |
-| `.007` | `BANKMGR` | 586 |
-| `.007` | `STRINGS` | 511 |
-| `.007` | `STASHVRAMGC` | 304 |
-| `.007` | `SORT` | 189 |
-| `.007` | `APPSYS` | 114 |
-| `.007` | `STRCASE` | 56 |
-| `.007` | `KB` | 28 |
-| `.007` | entry bridge and page padding | 157 |
-| | **bank 7 payload** | **4,352** |
-| `.008` | `FILEIO` | 1,090 |
-| `.008` | `FILEDIR` | 422 |
-| `.008` | entry bridge and page padding | 24 |
-| | **bank 8 payload** | **1,536** |
-| `.009` | `THEME` | 502 |
-| `.009` | entry bridge and page padding | 266 |
+| low | `GPBMODS.BASL` | 9,874 |
+| low | `STASH` | 435 |
+| low | `STASHFILE` | 160 |
+| | **low RAM total** | **10,469** |
+| bank 7 | `STASHVRAM` | 1,681 |
+| bank 7 | `STRUSING` | 755 |
+| bank 7 | `STRINGS` | 704 |
+| bank 7 | `BANKMGR` | 598 |
+| bank 7 | `STASHVRAMGC` | 304 |
+| bank 7 | `SORT` | 189 |
+| bank 7 | `APPSYS` | 114 |
+| bank 7 | `STRCASE` | 54 |
+| bank 7 | `KB` | 27 |
+| bank 7 | bridges and page padding | 694 |
+| | **bank 7 payload** | **5,120** |
+| bank 9 | `THEME` | 519 |
+| bank 9 | bridges and page padding | 249 |
 | | **bank 9 payload** | **768** |
-| `.010` | `COMBO` | 701 |
-| `.010` | `CHECK` | 597 |
-| `.010` | entry bridge and page padding | 238 |
+| bank 12 | `MENU` | 2,277 |
+| bank 12 | `MENUPULL` | 516 |
+| bank 12 | bridges and page padding | 23 |
+| | **bank 12 payload** | **2,816** |
+| bank 4 | `GUI` | 4,453 |
+| bank 4 | `LINEINPUT` | 780 |
+| bank 4 | `GUI2` | 353 |
+| bank 4 | bridges and page padding | 46 |
+| | **bank 4 payload** | **5,632** |
+| bank 10 | `COMBO` | 918 |
+| bank 10 | `CHECK` | 579 |
+| bank 10 | bridges and page padding | 39 |
 | | **bank 10 payload** | **1,536** |
-| `.011` | `GMX.STRINGS`, `GMX.FILES` and what they call | 2,904 |
-| `.011` | entry bridge and page padding | 168 |
+| bank 8 | `FILEIO` | 1,092 |
+| bank 8 | `FILEDIR` | 422 |
+| bank 8 | bridges and page padding | 278 |
+| | **bank 8 payload** | **1,792** |
+| bank 11 | `GMX.STRINGS`, `GMX.FILES` and what they call | 3,016 |
+| bank 11 | bridges and page padding | 56 |
 | | **bank 11 payload** | **3,072** |
 
-Measured 2026-09-14, after the shims were deleted, and bank 10 again on 2026-09-15 when `CHECK`
-went in. Banks 6, 7 and 8 have grown since the 2026-09-14 measurement, by one page, two pages and
-one page, so their rows and the low RAM total are behind the file table. Banks 5 and 6 hold no
-p-code at all: 7,424 and 4,608 bytes of payload, all of it literal text.
+Banks 5, 6 and 62 hold no p-code at all. Their payloads are 7,936, 5,120 and 4,352 bytes, all of it
+literal text.
 
 **Two modules in low memory against nineteen in banks, and that is the point of the regions.**
 What is left in low RAM is what could not go: `STASH` and `STASHFILE` hold `BANK` statements, which
@@ -174,12 +175,12 @@ What is left in low RAM is what could not go: `STASH` and `STASHFILE` hold `BANK
 leave `$00` alone (measured for `FILEDIR`, banked since 2026-09-07), a `GP.ASM` blob's body never
 occupies a region either way, and `BANKMGR` names banks without ever selecting one.
 
-**Six regions and not one**, because a region holds at most 8,192 bytes and the GUI fills its own.
+**Seven regions and not one**, because a region holds at most 8,192 bytes and the GUI fills its own.
 A call from one region into another compiles to `.bgosub`, which selects the other bank, and
 `RETURN` puts the caller's back.
 
-**A region that is nearly empty still costs a whole page count.** Bank 9 holds 502 bytes of `THEME`
-in a 768-byte overlay and bank 10 705 bytes of `COMBO` in another 768; the entry bridge, the
+**A region that is nearly empty still costs a whole page count.** Bank 9 holds 519 bytes of `THEME`
+in a 768-byte section; the entry bridge, the
 alignment padding and the exit bridge are part of what has to fit, and the region is rounded up to
 a page. Below about a page and a half of p-code a region gives back less than it looks like.
 
@@ -269,8 +270,9 @@ To lift a bank into another program, take the `.INC.BL` files between its `GP.BA
 
 **Against root, this folder is ahead.** Five modules do not exist in root at all — `BANKMGR`,
 `FILEDIR`, `FILEIO`, `STASHVRAM`, `STASHVRAMGC` — and seven more differ: `APPSYS`, `KB`, `SORT`,
-`STASH`, `STASHFILE`, `STRINGS` and `STRUSING`. Eight are identical: `COMBO`, `GUI`, `GUI2`,
-`LINEINPUT`, `MENUBAR`, `MENUVERT`, `STRCASE` and `THEME`. Port a fix by hand in either direction.
+`STASH`, `STASHFILE`, `STRINGS` and `STRUSING`. Three are identical: `LINEINPUT`, `STRCASE` and `THEME`.
+`COMBO`, `GUI` and `GUI2` differ because they moved off `MENUVERT` here and root has not. `MENU`, `MENUPULL` and
+`DOS` are new here; `MENUBAR` and `MENUVERT` are deleted here and still in root. Port a fix by hand in either direction.
 
 **`GPB.INC.BL` is the exception that runs the other way.** It is the keyword ABI, root is upstream
 for it, and `modsbuild.py` copies root's over this folder's on every build. Never copy this one

@@ -59,7 +59,7 @@
 ## **  FILE.ERR is DS and FILE.MSG$ is DS$. The X16 has neither.
 ## **
 ## **  FILE.ROWS is an input to SAVEARRAY and an output from LOADARRAY.
-## **  FILE.LINE$() is the caller's DIM, like MENUVERT.ITEM$. Left alone the
+## **  FILE.LINE$() is the caller's DIM, like GUI.LIST.ITEM$. Left alone the
 ## **  implicit DIM gives 0..10.
 ## **
 ## **  This module takes logical file 14 and secondary address 14. Not 2 or 3:

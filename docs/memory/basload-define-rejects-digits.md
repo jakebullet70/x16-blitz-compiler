@@ -43,3 +43,20 @@ without them the tokenise stops at `LABEL NOT FOUND`. Its header said "GUI.MENU 
 only"; that is true of the calls and false of the build, and has been corrected.
 
 Related: [[headless-basl-build-recipe]] (which also carries the `#SAVEAS` trap), [[no-backward-compatibility-needed]].
+
+## `#DEFINE` also takes UNSIGNED values only, and a negative one fails the same way
+
+Found 2026-09-18 while choosing a sentinel for the menu plan. `#DEFINE MENU.NOBOX -1` gives
+`ERROR: INVALID PARAMETER` and the same 6-byte PRG / passing `OK CODE 11` signature as a bad name.
+
+The chain has no sign handling anywhere: `define_val` -> `option_get_int` (`src/option.inc:379`,
+`:671`) -> `util_str_to_bcd`, which does `sbc #48` per character and branches to `invalid` on
+anything below `'0'`. `-` is 45. `option_get_int` returns a 24-bit unsigned in X/Y/A and
+`define_val` then requires the top byte be zero, so a negative could not survive even if the
+digits parsed.
+
+**So a negative constant must be a positive sentinel or a literal.** The menu plan uses
+`#DEFINE MENU.NOBOX 255` (the one gap in `GP.BOX`'s style range: 0-3 are styles, 256+ is a
+glyph-table address) and `#DEFINE MENU.ON 1` / `MENU.OFF 0` with the verb testing `<> 0`, so a
+hand-written `-1` works too. Writing `-1` inline in the source is fine -- this is the preprocessor
+only, and [[gpc-basl-true-is-minus-one]] still holds for BASIC itself.

@@ -20,7 +20,7 @@
 #       dctest    dctest.py's removed lines against hand analysis, DC1-DC12
 #       dcstrip   the identity on dcstrip.py's DC programs
 #
-#   quick runs off, on and stripped on the small programs, off alone on GUIFRMT and GPB.HELP,
+#   quick runs off, on and stripped on the small programs, off alone on GPB.HELP,
 #   off and on on GPBMODS, and the DC tests. It leaves out RGM. full runs off, on and stripped
 #   on every program, and the DC tests.
 #
@@ -42,8 +42,8 @@ WORK = os.path.join(dcref.ROOT, "work", "gpctest")
 REF = os.path.join(WORK, "ref")
 WORKERS = 7
 
-MIDDLE = {"GUIFRMT", "GPB.HELP"}
-SLOWEST = ["GPBMODS", "RGM", "GPB.HELP", "GUIFRMT"]
+MIDDLE = {"GPB.HELP"}
+SLOWEST = ["GPBMODS", "RGM", "GPB.HELP"]
 
 
 def jobs_for(mode, only):
