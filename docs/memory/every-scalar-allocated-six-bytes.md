@@ -1,12 +1,18 @@
 ---
 name: every-scalar-allocated-six-bytes
-description: "FOUND 2026-09-20 -- AllocateBytesForType sizes from A, but every caller arrives with A=0 from FindVariable, so ints and strings get 6 bytes like floats"
+description: "FIXED 2026-09-20 -- AllocateBytesForType sized every scalar as a float because callers arrived with A=0 from FindVariable; the five sites now pass the real type, GPBMODS 4,322 -> 3,482 bytes"
 metadata: 
   node_type: memory
   type: project
   originSessionId: b52e8c4f-ffdf-4b2a-89c7-8a57e0a20a41
   modified: 2026-09-20T13:38:00.677Z
 ---
+
+**FIXED 2026-09-20, commit 5cb815a.** The five call sites now pass the real type: the three
+scalar sites fetch it back with a balanced `pla`/`pha`, and the two array head slot sites pass
+`NSSIFloat+NSSIInt16` unconditionally. GPBMODS scalar space measured **4,322 -> 3,482 bytes**,
+and it compiles and runs again. The plan is `docs/blitz/SCALAR-ALLOCATION.PLAN.md`. What follows
+is the diagnosis as written before the fix.
 
 `AllocateBytesForType` (`source/compiler/source/storage/create.asm`) decides 2 bytes or 6 from
 the type bits **in A**: `and #NSSTypeMask+NSSIInt16` then `cmp #NSSIFloat`, and `NSSIFloat = $00`.
