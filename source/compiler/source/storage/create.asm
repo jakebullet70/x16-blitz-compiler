@@ -124,6 +124,21 @@ SetVariableRecordToCodePosition:
 ;
 ; ************************************************************************************************
 
+;
+;		THE SCALAR WALL. A scalar access compiles to two bytes: GetSetVariable halves the
+;		variable's offset from the workspace start and splits it over the operand byte and
+;		the low three bits of the opcode, which the runtime's .vaddress macro reads back
+;		with an and #7. Eleven bits of a halved offset reach 4,096 bytes and no further.
+;
+;		NOTHING USED TO CHECK IT. Past 4,096 the high byte of the halved offset ran on into
+;		bit 3 of the opcode, which is the WRITE flag -- so a READ of a variable up there
+;		compiled as a WRITE to the same variable minus 4,096, silently scribbling over an
+;		early one, and the compile reported success. GPBMODS crossed the line at 4,400 bytes
+;		and the damage landed on whichever early variable the source order happened to pair
+;		it with, so the symptom moved every time the program was edited.
+;
+MaxVariableSpace = 4096 				; bytes of scalars a p-code operand can address
+
 AllocateBytesForType:
 		pha
 		phx
@@ -140,9 +155,32 @@ _CVNotFloat:
 		bcc 	_CVNoCarry1
 		inc 	freeVariableMemory+1
 _CVNoCarry1:				
+		;
+		;		The variable just allocated ENDS at freeVariableMemory, so the test is
+		;		<= MaxVariableSpace: a two byte slot may start at 4,094 and finish flush
+		;		with the wall. Checked here, at the crossing, so the error names the line
+		;		where the variable that went over is first used.
+		;
+		lda 	freeVariableMemory+1
+		cmp 	#>MaxVariableSpace
+		bcc 	_CVSpaceLeft
+		bne 	_CVNoSpace
+		lda 	freeVariableMemory
+		bne 	_CVNoSpace
+_CVSpaceLeft:
 		plx
 		pla
 		rts
+_CVNoSpace:
+		;
+		;		THE MESSAGE LIVES HERE, in compiler space, not in errors.asm: that table
+		;		links below GPBase and is copied into every compiled program, so a string
+		;		there would cost bytes to every program that never comes near the limit.
+		;		Same trick as gpbank.asm's _GBRTooBig.
+		;
+		jsr 	CallErrorHandler
+		.text 	"TOO MANY VARIABLES", 0
+
 
 		.send code
 

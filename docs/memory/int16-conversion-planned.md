@@ -19,3 +19,8 @@ Handoff: `samples/GPB-MODS-TESTING/INT16-HANDOFF.md`. Tool: `source/gpc/int16sca
 **How to apply:** read the handoff before renaming a variable. A missed site compiles clean and
 splits the variable in two. See [[library-working-copy-then-root]], [[array-element-sizes-measured]],
 [[basload-label-and-variable-collide]].
+
+**2026-09-20: every byte figure here is wrong until the allocator is fixed.** A `%` saves
+nothing today -- every scalar is allocated 6 bytes whatever its type. Measured: 168 names
+converted, varspace moved by zero. See [[every-scalar-allocated-six-bytes]]. The job is
+still worth doing; it just pays after that fix, not before.

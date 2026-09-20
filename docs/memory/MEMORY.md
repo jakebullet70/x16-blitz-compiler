@@ -68,6 +68,8 @@ sibling project: what is kept is a fact about **X16 BASIC or the X16 itself**, n
 - [GP draw under a re-ordered font](gp-draw-under-a-reordered-font.md) — only GP.BOX style 0 survives
 
 ## Compiler limits, memory and banking
+- [Scalar variable space caps at 4,096 bytes](scalar-variable-space-caps-at-4096.md) — FOUND 2026-09-20: 11-bit halved operand, unchecked; GPBMODS at 4,400 is what broke the FILES menu
+- [Every scalar is allocated 6 bytes](every-scalar-allocated-six-bytes.md) — FOUND 2026-09-20: AllocateBytesForType sizes from A, every caller arrives with A=0; % and $ save nothing
 - [PROGRAM TOO BIG was the workspace](program-too-big-fires-early.md) — FIXED; a bank per table, 4,096 lines
 - [SHARED p-code cap is RTBASE](gpc-shared-pcode-cap-is-rtbase.md) — 22,016 bytes, not $9F00
 - [GPC Blitz runtime slack and limits](gpc-blitz-runtime-slack-and-limits.md) — max low p-code 22,528 / 20,992 embedded, 22,016 / 19,968 shared; LOW FREE minus 4096 is the headroom
@@ -108,6 +110,7 @@ sibling project: what is kept is a fact about **X16 BASIC or the X16 itself**, n
 - [MENUHELP: use the whole interface](menuhelp-use-the-whole-interface.md) — build the library's own example first
 
 ## The CUA GUI library
+- [LISTS and DIR plan](lists-and-dir-plan.md) — agreed 2026-09-19: lists read GP.BSTR-layout banks at run time, no compiler work; order LIST.BANK, FILEPICK, sort
 - [GUI-CUA phase 5 state](gui-cua-phase5-state.md) — written not verified; what is owed and what still drifts
 
 ## The BASL cruncher
