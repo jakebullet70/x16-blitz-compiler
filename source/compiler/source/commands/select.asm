@@ -130,6 +130,8 @@ _CSCNumeric:
 		jsr 	FindVariable 				; CS: exists, YX = its slot. CC: never mentioned yet,
 		bcs 	_CSCHave 					; which BASIC creates on the spot, as LET would
 		jsr 	CreateVariableRecord
+		pla 								; float or int16 -- SELECT rejected strings above, but
+		pha 								; the allocator still has to tell those two apart
 		jsr 	AllocateBytesForType
 _CSCHave:
 		pla

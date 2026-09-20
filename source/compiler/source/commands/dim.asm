@@ -40,6 +40,7 @@ CommandDIM:
 		.error_redefine
 _CDCreate:
 		jsr 	CreateVariableRecord 		; create the basic variable
+		lda 	#NSSIFloat+NSSIInt16 		; the head slot is a pointer, read as an int16 below
 		jsr 	AllocateBytesForType 		; allocate memory for it
 _CDDimension:
 		pla 								; restore type bits
@@ -70,6 +71,8 @@ _CDScalar:
 		jsr 	FindVariable 				; does it already exist ?
 		bcs 	_CDScalarDone 				; yes -- nothing to do.
 		jsr 	CreateVariableRecord 		; no -- create it
+		pla 								; size it by its real type, not the zero FindVariable
+		pha 								; leaves behind
 		jsr 	AllocateBytesForType 		; and give it storage.
 _CDScalarDone:
 		pla 								; discard the saved type bits.
