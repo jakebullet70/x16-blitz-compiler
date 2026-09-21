@@ -3975,6 +3975,7 @@ CommandDIM:
 		.error_redefine
 _CDCreate:
 		jsr 	CreateVariableRecord 		; create the basic variable
+		lda 	#NSSIFloat+NSSIInt16 		; the head slot is a pointer, read as an int16 below
 		jsr 	AllocateBytesForType 		; allocate memory for it
 _CDDimension:
 		pla 								; restore type bits
@@ -4005,6 +4006,8 @@ _CDScalar:
 		jsr 	FindVariable 				; does it already exist ?
 		bcs 	_CDScalarDone 				; yes -- nothing to do.
 		jsr 	CreateVariableRecord 		; no -- create it
+		pla 								; size it by its real type, not the zero FindVariable
+		pha 								; leaves behind
 		jsr 	AllocateBytesForType 		; and give it storage.
 _CDScalarDone:
 		pla 								; discard the saved type bits.
@@ -14836,6 +14839,8 @@ GetReferenceTerm:
 		jsr 	FindVariable 				; find it
 		bcs 	_GRTNoCreate 				; create if required.
 		jsr 	CreateVariableRecord 		; create a variable.
+		pla 								; the real type back: the allocator sizes from A, and
+		pha 								; A arrives from FindVariable as the zero end marker
 		jsr 	AllocateBytesForType 		; allocate memory for it
 _GRTNoCreate:		
 		pla 								; get type back, strip out type information.
@@ -14918,8 +14923,8 @@ RegisterImplicitArray:
 		jsr 	CreateVariableRecord 		; make the record (YX = name) -> YX = slot address
 		stx 	implicitDimAddr
 		sty 	implicitDimAddr+1
-		lda 	implicitDimType
-		jsr 	AllocateBytesForType 		; reserve the pointer slot
+		lda 	#NSSIFloat+NSSIInt16 		; the slot holds a pointer, and it is read back as an
+		jsr 	AllocateBytesForType 		; int16 -- two bytes whatever the element type is
 		lda 	implicitDimCount 			; append a list entry at count*4
 		asl 	a
 		asl 	a
@@ -15310,6 +15315,8 @@ _CSCNumeric:
 		jsr 	FindVariable 				; CS: exists, YX = its slot. CC: never mentioned yet,
 		bcs 	_CSCHave 					; which BASIC creates on the spot, as LET would
 		jsr 	CreateVariableRecord
+		pla 								; float or int16 -- SELECT rejected strings above, but
+		pha 								; the allocator still has to tell those two apart
 		jsr 	AllocateBytesForType
 _CSCHave:
 		pla
