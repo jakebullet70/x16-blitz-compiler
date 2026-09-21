@@ -52,7 +52,7 @@ say the object's name rather than the tokenised source's.
 | `samples/GPC-HELP/GPB.HELP.BASL` | `@:GPB.HELP.SRC.PRG` | `@:GPB.HELP.SRC.SYM` | ok |
 | `samples/color-test/COLORTST.BASL` | `@:COLORTST.SRC.PRG` | `@:COLORTST.SYM` | ok |
 | `GPC-BASIC/BMXVIEW.EXP.BL` | `@:BMXVIEW.PRG` | `@:BMXVIEW.SYM` | **wrong** |
-| `samples/editor/EDITOR.BASL` | `@:EDITOR.PRG` | `@:EDITOR.SYM` | **wrong** |
+| `samples/edit/EDITOR.BASL` | `@:EDITOR.PRG` | `@:EDITOR.SYM` | **wrong** |
 
 Those two lines are tracked source. Agree the edit before making it.
 
@@ -73,7 +73,7 @@ separate the two kinds with no ambiguity:
 | `testing/BMXVIEW.PRG` 4,182 B | `01 08 09 08 01 00 89 34` | **tokenised source** |
 | `testing/COLORTST.SRC.PRG` 4,051 B | `01 08 09 08 01 00 89 31` | **tokenised source** |
 | `testing/COLORTST.PRG` 3,039 B | `01 08 13 08 0a 00 9e 20` | line 10, token `$9e` `SYS` — **object** |
-| `samples/editor/C.EDITOR.PRG` 26,411 B | `01 08 13 08 0a 00 9e 20` | **object** |
+| `samples/edit/C.EDITOR.PRG` 26,411 B | `01 08 13 08 0a 00 9e 20` | **object** |
 
 A `.MAP` beside the file says the same thing: the compiler writes one and the tokeniser does
 not. Neither `EDITOR.MAP` nor `BMXVIEW.MAP` exists.
@@ -89,7 +89,7 @@ nothing. Searching each object for a runtime filename, after that rebuild:
 | `testing/GPBMODS.PRG` | `GPB.RT.121` | SHARED |
 | `testing/COLORTST.PRG` | `GPB.RT.121` | SHARED |
 | `testing/GPC.PRG` | `GPB.RT.121` | SHARED |
-| `samples/editor/C.EDITOR.PRG` | none | EMBEDDED, as its table entry says |
+| `samples/edit/C.EDITOR.PRG` | none | EMBEDDED, as its table entry says |
 | `samples/GPC-HELP/GPB.HELP.PRG` | `GPB.RT.121` | SHARED, matching its table entry |
 
 It had been a hand build from 08:08 that `samplesbuild.py` failed to replace, and failed to
@@ -97,7 +97,7 @@ delete either, because it deleted the stale `GPB.PRG` under the wrong stem. The 
 replaced it: the drive is SHARED now, and the `runtimes` entry in the program table copies
 `GPB.RT.121.BIN` and `GPC.RT.121.BIN` in beside the object.
 
-**`samples/editor/C.EDITOR.PRG` is a real object from 3rd September**, nine days behind its
+**`samples/edit/C.EDITOR.PRG` is a real object from 3rd September**, nine days behind its
 source. It is not a placeholder and not this build's.
 
 ---
@@ -141,7 +141,7 @@ Staged from the tree as it stands:
 |---|---|
 | GPBMODS | the real 12,885-byte object and its eight overlays |
 | COLORTST | the real 3,039-byte object |
-| EDITOR | `samples/editor/C.EDITOR.PRG` — real, and from 3rd September |
+| EDITOR | `samples/edit/C.EDITOR.PRG` — real, and from 3rd September |
 | BMXVIEW | **a placeholder** — `demo/C.BMXVIEW.PRG` does not exist |
 | GPB.HELP | the EMBEDDED 08:08 object, staged at the package root |
 

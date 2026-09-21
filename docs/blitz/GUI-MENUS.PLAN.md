@@ -508,7 +508,7 @@ carry index arithmetic. The real reduction is `GMX.DROP` collapsing into
       neither `.EXP` includes `MENUVERT` any more. Still naming `MENUBAR`:
       the GPBMODS sizes panel (a measured table, redone with the p-code
       measurement), the root `GPC-BASIC/` copy, and the private copies in
-      `samples/editor`, `XBASE` and `GPC-GUI-HELPER`.
+      `samples/edit`, `XBASE` and `GPC-GUI-HELPER`.
    3. `COMBO` keeps its rows itself and runs them through the popup slot.
       **Written 2026-09-18, not built.** The caller DIMs and fills
       `COMBO.ITEM$()`. `COMBO.OPEN` draws its own box, loads the popup slot
@@ -541,7 +541,7 @@ carry index arithmetic. The real reduction is `GMX.DROP` collapsing into
       `MENUBAR` with their 2026-09-15 figures and are re-measured together.
       Left for later: the root `GPC-BASIC/` copy, where both files and
       `MENU.EXP.BL`, `MENUDEMO.EXP.BL` and `MENUTST.EXP.BL` still use them, and
-      the private copies in `samples/editor`, `GPC-GUI-HELPER`, `GPC-HELP`
+      the private copies in `samples/edit`, `GPC-GUI-HELPER`, `GPC-HELP`
       and `XBASE`.
    6. The editor moves onto the library: a bar and every dropdown declared
       once, and one call per key.

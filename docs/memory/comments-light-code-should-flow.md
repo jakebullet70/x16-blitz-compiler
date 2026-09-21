@@ -46,7 +46,7 @@ confirm the object is unchanged. Both editor rebuilds landed on `OK CODE 15166 R
 
 **Two traps in this repo:** `EDBENCH.BASL`'s `REM`s are the **GP.ASM source itself** under `#REM 1`
 and must not be touched, and `GUI.INC.BL` exists in **two copies** (`GPC-BASIC/` and
-`samples/editor/GPC-BASIC/`) that have to stay identical.
+`samples/edit/GPC-BASIC/`) that have to stay identical.
 
 **RAISED AGAIN 2026-09-05, on `samples/GPC-HELP/GPB.HELP.BASL`** -- *"are these comments for you or
 for me? I do not need them. I do not like when I look at code and 90% of the page is a big comment
@@ -60,7 +60,7 @@ already in `readme.md`, where a reader looking for the design goes. In the sourc
 CONSTRAINT the number produced ("a KERNAL memory_copy cannot be given a bank") and drop the number.
 Written where a new file is being commented, not only where an old one is being swept.
 
-**Progress:** `samples/editor/EDITOR.BASL` (709 → 423 prose lines), `STORE.BASL` and
+**Progress:** `samples/edit/EDITOR.BASL` (709 → 423 prose lines), `STORE.BASL` and
 `GPC-BASIC/GUI.INC.BL` (372 → 256) are done. A library module cuts less than a sample — its
 parameter table and per-routine in/out blocks are what a caller opens the file to read, so `GUI`
 cut 31% against the editor's 40%. Twelve `GPC-BASIC/*.INC.BL` remain, worst first `STRCASE` 90%,

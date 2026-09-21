@@ -841,7 +841,7 @@ GP.BOX 50, 26, 4, 3, GP.STRPTR(ISO.GLYPH$) + 1, 1
 
 `GP.STRPTR` returns the address of the string block and the text starts at +1, so a string literal
 is the cheapest way to carry the eight bytes. This costs no runtime bytes; the pointer form already
-exists, and `samples/editor` uses the same mechanism to draw frames from a re-ordered font.
+exists, and `samples/edit` uses the same mechanism to draw frames from a re-ordered font.
 
 `ISO.EXP.BL` tests all of this, reading cells back with `VPEEK` rather than trusting the display.
 The ISO box corner, top edge and side read back as 43, 45 and 124.
@@ -2835,7 +2835,7 @@ upstream for it, and the build copies root's over this folder's every time.
   pointer needing zero page -- and there is none to have, because a GP.ASM blob runs
   with the interpreter live and codePtr, zTemp0, NSStatus and the mantissas must all
   survive it. The destination goes into the OPERAND of the instruction that uses it,
-  which is the idiom samples/editor's renderers are built on.
+  which is the idiom samples/edit's renderers are built on.
 
   EACH BLOCK IS WRAPPED IN #REM 1 / #REM 0. Without it BASLOAD's default strips the
   body and the block reaches the compiler EMPTY, which gpasm.asm deliberately

@@ -133,7 +133,7 @@
 ## recipe.
 #DEFINE HELP.RELEASE 1
 
-## 145 up, 17 down, 130 PgUp, 2 PgDn, 19 HOME, 4 END. samples/editor
+## 145 up, 17 down, 130 PgUp, 2 PgDn, 19 HOME, 4 END. samples/edit
 ## dispatches on exactly these, so they are tested rather than guessed.
 #DEFINE HELP.K.UP 145
 #DEFINE HELP.K.DOWN 17

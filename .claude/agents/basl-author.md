@@ -158,7 +158,7 @@ sample carries much less.
 **A comment left too long is usually also a comment left wrong, and the length is what hides it.**
 Read for staleness while trimming — that is where the value is, not in the line count. Never touch
 `REM`s inside a `#REM 1` region: they may be `GP.ASM` source. And `GUI.INC.BL` exists in **two
-copies** (`GPC-BASIC/` and `samples/editor/GPC-BASIC/`) that must stay identical.
+copies** (`GPC-BASIC/` and `samples/edit/GPC-BASIC/`) that must stay identical.
 
 ---
 
@@ -231,6 +231,6 @@ Off-PATH tools: `C:\8bitProgramming\x16emu\x16emu.exe` (r49 runs tests, Box16 de
 | the manual — keywords, modules, traps | `GPC-BASIC/GP-BASIC.md` |
 | every module's globals | `GPC-BASIC/GP-BASIC.GLOBALS.md` |
 | worked examples, one per feature | `GPC-BASIC/*.EXP.BL` |
-| a real application | `samples/editor/` |
+| a real application | `samples/edit/` |
 | X16 ROM BASIC, for behaviour questions | a clone of the ROM source — not currently on disk |
 | accumulated findings | `docs/memory/` |

@@ -96,7 +96,7 @@ which is already the drive its demo bat mounts), `data`.
 | GPB.HELP | `samples/GPC-HELP/GPB.HELP.BASL` | SHARED | `samples/GPC-HELP/` + both runtimes |
 | COLORTST | `samples/color-test/COLORTST.BASL` | SHARED | stays in `testing/` |
 | BMXVIEW | `GPC-BASIC/BMXVIEW.EXP.BL` | EMBEDDED | `demo/C.BMXVIEW.PRG` + the BMX images |
-| EDITOR | `samples/editor/EDITOR.BASL` | EMBEDDED | `samples/editor/C.EDITOR.PRG` |
+| EDITOR | `samples/edit/EDITOR.BASL` | EMBEDDED | `samples/edit/C.EDITOR.PRG` |
 
 **SHARED vs EMBEDDED is not a preference.** A SHARED object carries no runtime and asks
 the **drive root** for `GPB.RT.nnn.BIN` when the program uses a GP keyword and
@@ -107,7 +107,7 @@ about 12 K, and needs nothing on the drive.
 
 - BMXVIEW is EMBEDDED because `bmx-demo.bat` mounts `demo\`, which has never carried a
   runtime.
-- EDITOR is EMBEDDED per step 2 of `samples/editor/readme.md`.
+- EDITOR is EMBEDDED per step 2 of `samples/edit/readme.md`.
 - **The overlay** (`NAME.OVL`, one file holding every `GP.BANKED` region and `GP.BANKEDSTR`
   bank, each behind its own bank and page-count bytes) is read from **beside the program**, not
   from the drive root. `?OVL` is the failure message, for a missing or a truncated file, and
@@ -185,7 +185,7 @@ already say `.SRC.PRG` and two do not:
 | `samples/color-test/COLORTST.BASL` | `@:COLORTST.SRC.PRG` | ok |
 | `samples/GPC-HELP/GPB.HELP.BASL` | `@:GPB.HELP.SRC.PRG` | ok |
 | `GPC-BASIC/BMXVIEW.EXP.BL` | `@:BMXVIEW.PRG` | **wrong** |
-| `samples/editor/EDITOR.BASL` | `@:EDITOR.PRG` | **wrong** |
+| `samples/edit/EDITOR.BASL` | `@:EDITOR.PRG` | **wrong** |
 
 The two wrong ones left `BMXVIEW.PRG` + `BMXVIEW.SYM` and `EDITOR.PRG` + `EDITOR.SYM` in
 `testing/` and no `.SRC.PRG` at all, so `samplesbuild.py` reported a dead tokenise and

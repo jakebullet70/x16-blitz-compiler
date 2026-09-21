@@ -17,7 +17,7 @@ What BASLOAD does **not** do is put two statements on one line, and
 > **a line costs exactly one byte of p-code**, plus a four-byte entry in the compiler's
 > line-number table.
 
-That is the whole job. Measured on `samples/editor/EDITOR.BASL`:
+That is the whole job. Measured on `samples/edit/EDITOR.BASL`:
 
 | | tokenised | object | BASIC lines |
 |---|---:|---:|---:|
@@ -100,7 +100,7 @@ per line — and carries every trap the engine has to survive: a colon inside a 
 a string and inside an identifier, a real `IF ... THEN`, a label, `DATA`, and three `GP.IF` blocks
 of which only some may be collapsed.
 
-To crunch the editor instead, point the drive at `samples\editor` and drop `CRUNCH.PRG` and
+To crunch the editor instead, point the drive at `samples\edit` and drop `CRUNCH.PRG` and
 `CRUNCH.BIN` in beside `EDITOR.BASL`.
 
 ## Rebuilding

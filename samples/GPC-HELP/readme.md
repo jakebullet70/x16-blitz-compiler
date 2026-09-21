@@ -312,7 +312,7 @@ A reference wants **both cases** (90 KB of prose in capitals is unreadable) and 
 | charset | lower case | line drawing | cost |
 |---|---|---|---|
 | PET upper/graphics (2) | no | yes | none — the machine boots in it |
-| PET upper/lower (3) | yes | yes | a byte is not its own tile index, so every BASLOAD literal comes out case-swapped unless the font is re-indexed first — and the re-order buries the frame glyphs. This is what `samples/editor` does |
+| PET upper/lower (3) | yes | yes | a byte is not its own tile index, so every BASLOAD literal comes out case-swapped unless the font is re-indexed first — and the re-order buries the frame glyphs. This is what `samples/edit` does |
 | ISO-8859-15 (1) | yes | **none** | one control code; frames fall back to `+ - \|` |
 | **CP437 (7)** | yes | yes | `SETCHR 7` and one `POKE`. **R47 and later** |
 

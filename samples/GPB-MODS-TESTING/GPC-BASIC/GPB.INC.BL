@@ -146,7 +146,7 @@
 ##     GP.BOX 50, 26, 4, 3, GP.STRPTR(ISO.GLYPH$) + 1, 1
 ##
 ## See ISO.EXP.BL, which reads the cells back and asserts 43, 45, 124. A program with a
-## RE-ORDERED FONT needs the same escape, samples/editor being the one in this tree.
+## RE-ORDERED FONT needs the same escape, samples/edit being the one in this tree.
 ##
 ## WARNING -- THESE DO NOT MOVE THE CURSOR PRINT USES. Nothing here calls the KERNAL, so
 ## a PRINT after a GP.PRINTAT carries on from wherever the KERNAL still thinks the cursor

@@ -82,7 +82,7 @@ CompilerRAMBankReg	= $0000
 ;			63	the GP.BANKEDSTR pool, growing DOWN from the top bank a 512K machine has.
 ;
 ;		BANKS 2 AND 4 WERE ONE BANK, and that was the wall. The two tables shared 8K, growing
-;		towards each other, and samples/editor had used 7,981 bytes of it -- 1,461 line entries
+;		towards each other, and samples/edit had used 7,981 bytes of it -- 1,461 line entries
 ;		at 4 bytes plus 356 variable records at 6 -- leaving 211. Fifty-two more lines of source
 ;		and the tables touched, and the compiler said PROGRAM TOO BIG with 7,106 bytes of the
 ;		OBJECT budget still free. Same message, wrong limit: three sites raise it (STRMarkLine,

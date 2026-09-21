@@ -980,7 +980,7 @@ GUI.FORM.DO.LIST.KEY:
     GUI.LIST.HI = THEME.CLR(THEME.HILITE)
 
 ## ---- 145 up, 17 down, 130 PgUp, 2 PgDn, 19 HOME, 4 END -- the codes
-## ---- samples/editor dispatches on. The rest are GUI's own.
+## ---- samples/edit dispatches on. The rest are GUI's own.
 
     GP.SELECT GUI.FORM.KEY
         GP.CASE GUI.K.UP : GUI.LIST.SEL = GUI.LIST.SEL - 1

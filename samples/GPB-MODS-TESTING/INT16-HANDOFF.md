@@ -231,7 +231,7 @@ starting it.
 
 ## 7. Not part of this unless the user says so
 
-- samples/editor (APPSYS, GUI, LINEINPUT, MENUBAR, MENUVERT, STASH, STRCASE, THEME), samples/color-test
+- samples/edit (APPSYS, GUI, LINEINPUT, MENUBAR, MENUVERT, STASH, STRCASE, THEME), samples/color-test
   (APPSYS, THEME) and samples/cruncher (KB, STRCASE, STRINGS) include their own older copies.
   Converting them is the user's decision.
 - PICKDEMO: never built.

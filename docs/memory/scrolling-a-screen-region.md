@@ -25,7 +25,7 @@ rather than assuming the mode.
 **3. Hardware `VSCROLL`, masked.** Moves a whole LAYER, never a rectangle — but **attribute 0 is
 transparent in text mode**, so layer 1 with fg and bg both 0 is a hole onto layer 0. Put the
 scrolling content on layer 0 and mask the rest with layer 1. Two register writes and one newly
-exposed row: the only genuinely free option, and what `samples/editor` does (`ED.LAYERS`,
+exposed row: the only genuinely free option, and what `samples/edit` does (`ED.LAYERS`,
 `ED.HW.SCROLL.DOWN`). Costs you layer 0 program-wide, and the content must be laid out at map
 coordinates, so it pays for one big pane and not several small ones.
 

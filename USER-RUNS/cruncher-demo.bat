@@ -22,7 +22,7 @@ rem  NOTE THAT THE DRIVE IS samples\cruncher, so DEMO.CRU lands in the repo besi
 rem  the source. git clean -f samples/cruncher/DEMO.CRU tidies up.
 rem
 rem  TO CRUNCH THE EDITOR instead: copy CRUNCH.PRG and CRUNCH.BIN into
-rem  samples\editor, point this script's DRIVE at that directory, and answer
+rem  samples\edit, point this script's DRIVE at that directory, and answer
 rem  EDITOR.BASL. Measured there: 449 joins and one collapse, object 26,411 ->
 rem  26,189, and the editor's own self-check output byte-identical afterwards.
 rem

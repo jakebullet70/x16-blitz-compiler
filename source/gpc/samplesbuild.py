@@ -71,10 +71,10 @@ PROGRAMS = [
 
     #   SHARED: MENU.INC.BL uses GP.BANKEDSTR. Builds in the sample folder.
     dict(name="EDITOR",
-         src=("samples/editor", "EDITOR.BASL"),
-         lib="samples/editor/GPC-BASIC",
+         src=("samples/edit", "EDITOR.BASL"),
+         lib="samples/edit/GPC-BASIC",
          extras=["ED-MENUS.BASL", "ED-STORE.BASL"], shared=True, inplace=True,
-         install=("samples/editor", "C.EDITOR.PRG"), data=["runtimes"]),
+         install=("samples/edit", "C.EDITOR.PRG"), data=["runtimes"]),
 ]
 
 BMX_SRC = os.path.join(ROOT, "samples", "BMXVIEWER", "SAMPLES")

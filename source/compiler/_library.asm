@@ -282,7 +282,7 @@ CompilerRAMBankReg	= $0000
 ;			63	the GP.BANKEDSTR pool, growing DOWN from the top bank a 512K machine has.
 ;
 ;		BANKS 2 AND 4 WERE ONE BANK, and that was the wall. The two tables shared 8K, growing
-;		towards each other, and samples/editor had used 7,981 bytes of it -- 1,461 line entries
+;		towards each other, and samples/edit had used 7,981 bytes of it -- 1,461 line entries
 ;		at 4 bytes plus 356 variable records at 6 -- leaving 211. Fifty-two more lines of source
 ;		and the tables touched, and the compiler said PROGRAM TOO BIG with 7,106 bytes of the
 ;		OBJECT budget still free. Same message, wrong limit: three sites raise it (STRMarkLine,
@@ -7463,7 +7463,7 @@ AsmBodyLines: 								; REM lines seen in the block so far, capped at 255.
 ;		THEY WERE 96 / 16 / 32 UNTIL SORT.INC.BL, which is the first real routine written in
 ;		GP.ASM rather than a straight-line renderer: 25 labels and 31 references to them, so
 ;		it failed to assemble with OUT OF MEMORY at the label table. Sixteen labels was never
-;		a considered figure -- it was enough for the two loops in samples/editor and no more.
+;		a considered figure -- it was enough for the two loops in samples/edit and no more.
 ;
 ;		THE 416 BYTES THEY COST COME OFF THE POOL, which is the total inline assembly one
 ;		program may hold: 7,456 bytes -> 7,040. That is the right trade. The pool has never
@@ -14028,7 +14028,7 @@ STRMarkLine:
 		;
 		;		THIS USED TO TEST AGAINST variableListEnd. Both tables lived in one 8K bank and
 		;		grew towards each other, so the real limit was the SUM of the two -- and
-		;		samples/editor had reached 7,981 of 8,192 with 1,461 lines and 356 variables.
+		;		samples/edit had reached 7,981 of 8,192 with 1,461 lines and 356 variables.
 		;		Fifty-two more lines and this test fired PROGRAM TOO BIG with a THIRD of the
 		;		object budget unused. One bank each (x16_storage.inc) made the limit this table's
 		;		own window, 2,048 lines; a second bank under it makes that 4,096.

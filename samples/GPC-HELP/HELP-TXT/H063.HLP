@@ -67,7 +67,7 @@
 .  needing zero page -- and there is none to have, because a GP.ASM blob runs
 .  with the interpreter live and codePtr, zTemp0, NSStatus and the mantissas
 .  must all survive it. The destination goes into the OPERAND of the
-.  instruction that uses it, which is the idiom samples/editor's renderers
+.  instruction that uses it, which is the idiom samples/edit's renderers
 .  are built on.
 .
 =EACH BLOCK IS WRAPPED IN #REM 1 / #REM 0

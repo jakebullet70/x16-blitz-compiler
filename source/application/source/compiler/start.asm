@@ -105,7 +105,7 @@ _CCNoControlFile: 							; a compiler that guesses at what it was asked to
 ;
 ;		THEY ARE A BANK EACH, so Start..End bounds them SEPARATELY rather than jointly -- 2,048
 ;		lines and 1,365 variables, not 8K shared. Sharing one bank made the real limit the sum of
-;		the two, and samples/editor had reached 7,981 of 8,192 (1,461 lines, 356 variables): fifty
+;		the two, and samples/edit had reached 7,981 of 8,192 (1,461 lines, 356 variables): fifty
 ;		more lines of source raised PROGRAM TOO BIG with a third of the OBJECT budget unused. The
 ;		message was right, the limit behind it was the wrong one. See x16_storage.inc.
 ;

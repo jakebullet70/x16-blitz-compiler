@@ -11,14 +11,14 @@ proved here, then copied into `GPC-BASIC/` for release.
 `samples/GPB-MODS-TESTING/GPC-BASIC/` is the working copy. Root `GPC-BASIC/` is the release copy.
 Work happens here; a module goes to the root when it passes its panel.
 
-Drift is already real and is the reason to state the direction. `samples/editor/GPC-BASIC/` holds
+Drift is already real and is the reason to state the direction. `samples/edit/GPC-BASIC/` holds
 `GUI.INC.BL` at 23,339 bytes against the root's 25,663, and `MENUVERT.INC.BL` at 18,893 against
 18,843. Neither is the release copy and neither is marked.
 
 Rules:
 
 - A module is copied whole, never merged by hand.
-- The root copy is what `samples/GPC-HELP` and `samples/editor` build against. Copy to the root and
+- The root copy is what `samples/GPC-HELP` and `samples/edit` build against. Copy to the root and
   those two must still build.
 - `GPB.INC.BL` is the keyword ABI. It is not edited here.
 

@@ -1,6 +1,6 @@
 ---
 name: gpc-editor-is-ascii-inside-petscii-outside
-description: samples/editor is PETSCII on disk and ASCII everywhere above it; why the font is re-ordered in VRAM and why PETSCII order was the wrong choice
+description: samples/edit is PETSCII on disk and ASCII everywhere above it; why the font is re-ordered in VRAM and why PETSCII order was the wrong choice
 metadata: 
   node_type: memory
   type: project
@@ -8,7 +8,7 @@ metadata:
   modified: 2026-08-31T09:34:41.908Z
 ---
 
-**Built 2026-08-31.** `samples/editor/` was moved off ISO onto the **PETSCII charset 3
+**Built 2026-08-31.** `samples/edit/` was moved off ISO onto the **PETSCII charset 3
 (PET upper/lower)**, keeping both cases. The rule that makes it hang together:
 
 > **PETSCII on disk. ASCII everywhere above the disk.**
@@ -64,7 +64,7 @@ ISO-8859-15 — or nothing at all — so PETSCII Commodore accelerators stop arr
 
 Verified: all 256 glyphs re-indexed with zero mismatches; a load→save round trip is
 byte-for-byte identical to the original apart from `PRINT#` writing CR where the fixture
-had LF. `TEST.MD` is now PETSCII; `git show HEAD:samples/editor/TEST.MD` is the ASCII
+had LF. `TEST.MD` is now PETSCII; `git show HEAD:samples/edit/TEST.MD` is the ASCII
 original, and the swap is its own inverse.
 
 Related: [[gpc-basic-for-loop-runs-once]], [[gpasm-implementation-status]],

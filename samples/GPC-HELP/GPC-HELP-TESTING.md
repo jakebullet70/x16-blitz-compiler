@@ -927,7 +927,7 @@ GP.BOX 50, 26, 4, 3, GP.STRPTR(ISO.GLYPH$) + 1, 1
 
 `GP.STRPTR` returns the address of the string block and the text starts at +1, so a string literal
 is the cheapest way to carry the eight bytes. This costs no runtime bytes; the pointer form already
-exists, and `samples/editor` uses the same mechanism to draw frames from a re-ordered font.
+exists, and `samples/edit` uses the same mechanism to draw frames from a re-ordered font.
 
 `ISO.EXP.BL` tests all of this, reading cells back with `VPEEK` rather than trusting the display.
 The ISO box corner, top edge and side read back as 43, 45 and 124.

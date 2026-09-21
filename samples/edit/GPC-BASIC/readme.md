@@ -14,8 +14,8 @@ while behaving differently.
 Re-copy and check, from the repository root:
 
 ```sh
-cp -p GPC-BASIC/*.INC.BL samples/editor/GPC-BASIC/
-diff -r GPC-BASIC samples/editor/GPC-BASIC --exclude='*.EXP.BL' --exclude='*.md'
+cp -p GPC-BASIC/*.INC.BL samples/edit/GPC-BASIC/
+diff -r GPC-BASIC samples/edit/GPC-BASIC --exclude='*.EXP.BL' --exclude='*.md'
 ```
 
 The `diff` must print nothing. It is the only test that matters here, and it is worth

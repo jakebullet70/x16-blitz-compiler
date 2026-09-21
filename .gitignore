@@ -137,6 +137,8 @@ testing/M.*
 testing/*.LOG
 testing/GPC.IMG.*.BIN
 testing/GP1.IMG.*.BIN
+samples/*/GPC.IMG.*.BIN
+samples/*/GP1.IMG.*.BIN
 
 # The resident runtimes, GPC.RT.<build>.BIN (with the GPB handlers) and
 # GPC.RC.<build>.BIN (without them -- both are slices of one build, see common.inc).
@@ -327,8 +329,8 @@ samples/GPC-HELP/C.GPB.HELP.SRC.PRG
 samples/GPC-HELP/GPB.HELP.SRC.PRG
 samples/GPC-HELP/GPC.INPUT
 /testing
-samples/editor/EDITOR.MAP
-samples/editor/EDITOR.SRC.SYM
+samples/edit/EDITOR.MAP
+samples/edit/EDITOR.SRC.SYM
 samples/GPC-GUI-HELPER/GPC.GUI.MAP
 samples/GPC-GUI-HELPER/GPC.GUI.SRC.SYM
 samples/GPC-HELP/GPB.HELP.MAP

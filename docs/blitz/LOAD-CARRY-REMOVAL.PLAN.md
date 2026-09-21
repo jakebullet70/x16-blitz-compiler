@@ -235,6 +235,6 @@ What to check afterwards:
   bulk `.HLP` edit in flight. Make the `GP-BASIC.md` change, say that `MKHELP.PY` is owed,
   and stop.
 - Do not commit without asking.
-- `GPC-BASIC/BMXVIEW.EXP.BL` and `samples/editor/EDITOR.BASL` each have a `#SAVEAS`/`#SYMFILE`
+- `GPC-BASIC/BMXVIEW.EXP.BL` and `samples/edit/EDITOR.BASL` each have a `#SAVEAS`/`#SYMFILE`
   pair that is tracked source with an outstanding question against it. Not part of this work;
   do not touch them in passing.

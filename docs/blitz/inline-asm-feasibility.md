@@ -8,7 +8,7 @@
 > It costs **zero runtime bytes** — a block lowers to five bytes of p-code plus your instructions.
 >
 > The measurements below are unchanged and still the reference numbers. What they predicted has
-> been confirmed on the real thing: `samples/editor/` now renders a text row in **18.8**
+> been confirmed on the real thing: `samples/edit/` now renders a text row in **18.8**
 > jiffies/1000 against the 2320 its compiled BASIC took — past prog8's 67, and within 1.4× of the
 > hand-assembled floor of 13 recorded here. The one recommendation that did **not** survive is the
 > closing one: a dedicated native block-blit command is no longer worth building, because `GP.ASM`

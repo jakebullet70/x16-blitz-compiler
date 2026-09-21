@@ -274,7 +274,7 @@ The concept page shrinks in return. §3.4 went from 118 lines to 47, and no entr
   things worse.
 - **Never touch `REM`s inside a `#REM 1` region.** They may be `GP.ASM` source, and deleting one
   changes the program.
-- **`GUI.INC.BL` exists in two copies** — `GPC-BASIC/` and `samples/editor/GPC-BASIC/`. They must
+- **`GUI.INC.BL` exists in two copies** — `GPC-BASIC/` and `samples/edit/GPC-BASIC/`. They must
   stay identical.
 - **Rebuild the help** after touching `GP-BASIC.md`: `python samples/GPC-HELP/MKHELP.PY`, then
   check the topic renders inside 80 columns.

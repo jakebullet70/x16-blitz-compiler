@@ -36,7 +36,7 @@ go through `StackFindFrame`, which is what `.unwind` was added for — see
 containing one is fine, it cleans up on the way."*
 
 **Measured, not just read**: `GP.EXITDO` from inside a `GP.CASE` was driven 600 times
-through `kbdbuf_put` in `samples/editor`'s self-check, sized against the 4 KB frame stack
+through `kbdbuf_put` in `samples/edit`'s self-check, sized against the 4 KB frame stack
 so that even a 7-byte selector leak would overflow before finishing. It does not leak.
 
 Do not "fix" a `RETURN` inside a `FOR` in this tree — it is correct, and I asserted

@@ -86,7 +86,7 @@ Nine are in use across the tree: `#SAVEAS`, `#AUTONUM`, `#REM`, `#SYMFILE`, `#IN
 ### `#IFNDEF` / `#ENDIF`
 
 - **They do not nest.** A guard inside a guard reports `ERROR: ENDIF WITHOUT IF IN <file>:<line>`
-  and writes the 6-byte PRG. Use **flat** symbols — `samples/editor/EDITOR.BASL` uses three
+  and writes the 6-byte PRG. Use **flat** symbols — `samples/edit/EDITOR.BASL` uses three
   (`ED.RELEASE`, `ED.NOCORE`, `ED.NOOPT`), never one inside another.
 - **There is no `#IFDEF`.** Only `#IFNDEF`.
 

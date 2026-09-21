@@ -29,7 +29,7 @@ and column delta. One routine covers all five.
 
 There is no `GP.SCROLL` and no rectangle copy. `docs/memory/scrolling-a-screen-region.md` records
 three workarounds: a `STASH` saved and restored at an offset, a per-row VERA-to-VERA `memory_copy`,
-and a masked hardware `VSCROLL`. `samples/GPC-HELP` uses the first, `samples/editor` the third.
+and a masked hardware `VSCROLL`. `samples/GPC-HELP` uses the first, `samples/edit` the third.
 
 Lane: `GP.ASM` in a new module. VERA-to-VERA `memory_copy` at `$FEE7`, one call per row, source and
 destination on ADDR0 and ADDR1. `BMX.PALCOPY` in `GPC-BASIC/BMX.INC.BL` is the worked example.
@@ -74,7 +74,7 @@ Simons' writes a shape as rows of dots and reads them back as bytes. The X16 giv
 `SPRMEM`, `TILE` and `TDATA` and no way to write the data.
 
 Two places in this tree hand-roll it already: `GP.BOX`'s style-256-and-above form takes eight screen
-codes from a caller table, and `samples/editor` builds a re-ordered font.
+codes from a caller table, and `samples/edit` builds a re-ordered font.
 
 Lane: BASL, in strings of `"..XX..XX"` and out as bytes `POKE`d at an address. Zero runtime bytes.
 
@@ -98,7 +98,7 @@ loop is out for the same reason.
 | `DIV(A,B)` | `INT(A / B)` | Mechanically yes, the shape of `GP.HIBYTE`. Not worth a token: `GP.HIBYTE` earned one because `n AND 255` is a live bug, and `INT(A/B)` has no such trap. |
 | `EXOR(A,B)` | `(A OR B) - (A AND B)` | No. Both arguments appear twice. A keyword needs a real handler in the GP block, 6 B fixed before any code. X16 BASIC has `AND`, `OR`, `NOT` and no XOR, so this is the one item here that would cost runtime bytes. The expression is exact for non-negative integers. |
 | `FRAC(A)` | `A - INT(A)` | No, `A` twice. `MOD(A,1)` uses it once, but `UnaryMOD` goes through `Int32Divide` — measure before believing it returns a fraction. |
-| `MOD(A,B)` | `MOD(A,B)` | Already present. `x16_unary.def` has `MOD (#,#) T N`, the token table carries `$CEDE`, and `samples/editor` calls it. |
+| `MOD(A,B)` | `MOD(A,B)` | Already present. `x16_unary.def` has `MOD (#,#) T N`, the token table carries `$CEDE`, and `samples/edit` calls it. |
 | `DUP` | `RPT$` | Already present, and used inside `STRINGS.INC.BL`. |
 | `CENTRE` | `STR.PADC` then `GP.PRINTAT` | No. The pad is a BASL loop, not a sequence of existing keywords. |
 | `LIN` | `PEEK` the KERNAL cursor row | A zero-argument composite would fit. Not worth a token. |

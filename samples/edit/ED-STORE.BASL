@@ -21,7 +21,7 @@ REM                reclamation is at save.
 REM
 REM DOC.LAST.BANK is the caller's, set once: the editor claims the arena from BANKMGR and
 REM stops at the first bank another owner holds. 0 leaves the arena uncapped, for the
-REM bench programs that have no BANKMGR.
+REM bench programs that have no ED.BANKMGR.
 REM ============================================================================
 
 REM ---- reset the store (empty document) ----
@@ -30,9 +30,8 @@ DOC.INIT:
   DOC.WIN.END = 48896   : REM $BF00 -- $BF00..$BFFF left as a guard tail
   REM Not bank 1: the runtime keeps its rarely used handlers there.
   DOC.TABLE.PER.BANK = 2048 : DOC.TABLE.BASE.BANK = 2 : DOC.TABLE.BANKS = 3
-  REM 13: bank 5 is lent to GUI.INC.BL for the cells a dialog covers (ED.GUI.BANK), 6
-  REM holds the menu rows (MENU.TEXTBANK) and 7-12 the library's code. The arena only grows upward, so giving up the
-  REM bottom banks is the cheapest reservation there is.
+  REM 13: banks 5 to 12 are free now that no code and no menu text is banked, but the arena
+  REM only grows upward and this is the cheapest reservation there is.
   DOC.FIRST.BANK = 13     : REM content arena starts here
   DOC.CUR.BANK = DOC.FIRST.BANK  : DOC.CUR.PTR = DOC.WIN.START
   DOC.HIGH.BANK = DOC.FIRST.BANK : LINE.COUNT = 0

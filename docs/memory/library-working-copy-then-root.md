@@ -12,8 +12,8 @@ metadata:
 whole to root `GPC-BASIC/` only when it passes.** Never edit the root copy directly, and never merge
 by hand — copy the whole file.
 
-**Why:** root `GPC-BASIC/` is the release copy that `samples/GPC-HELP` and `samples/editor` build
-against. Drift between copies is already real and unmarked (`samples/editor/GPC-BASIC/GUI.INC.BL` is
+**Why:** root `GPC-BASIC/` is the release copy that `samples/GPC-HELP` and `samples/edit` build
+against. Drift between copies is already real and unmarked (`samples/edit/GPC-BASIC/GUI.INC.BL` is
 23,339 bytes against the root's 25,663), which is the reason the direction is written down at all —
 `samples/GPB-MODS-TESTING/PLAN.md` §1.
 

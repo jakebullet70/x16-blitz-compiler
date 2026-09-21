@@ -48,7 +48,7 @@ the record ceiling, and does not retire [[ask-before-writing-asm]] generally.
 
 **The admin has no function keys and no keyboard shortcuts.** DBU names its eight bar titles F1-F8
 and the skeleton followed it until 2026-09-08, when the user took them out. ESC opens the bar and
-the arrows walk it, which is what `samples/editor/EDITOR.BASL` does. A CTRL-C quit shortcut was
+the arrows walk it, which is what `samples/edit/EDITOR.BASL` does. A CTRL-C quit shortcut was
 added in the same breath and removed in the next: **leaving is File Exit and there is no second way
 to it.**
 

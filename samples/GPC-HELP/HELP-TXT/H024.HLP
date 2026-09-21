@@ -70,7 +70,7 @@
 .
 .GP.STRPTR returns the address of the string block and the text starts at +1,
 .so a string literal is the cheapest way to carry the eight bytes. This costs
-.no runtime bytes; the pointer form already exists, and samples/editor uses
+.no runtime bytes; the pointer form already exists, and samples/edit uses
 .the same mechanism to draw frames from a re-ordered font.
 .
 .ISO.EXP.BL tests all of this, reading cells back with VPEEK rather than

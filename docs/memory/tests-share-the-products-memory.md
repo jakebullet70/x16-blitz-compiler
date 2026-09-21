@@ -19,7 +19,7 @@ in the same pot.
 **BASLOAD DOES NOT NEST `#IFNDEF`.** A guard inside a guard reports `ERROR: ENDIF WITHOUT IF IN
 <file>:<line>` and writes a **6-byte PRG** -- an empty program that then "compiles" to `OK CODE 11
 ... GP-BASIC OUT`, which looks like a compiler result rather than a tokeniser failure. Read `TOK.LOG`
-when a build comes out absurdly small. `samples/editor/EDITOR.BASL` therefore uses three FLAT
+when a build comes out absurdly small. `samples/edit/EDITOR.BASL` therefore uses three FLAT
 symbols, never one inside another: `ED.RELEASE` (preamble, tail and helpers), `ED.NOCORE` and
 `ED.NOOPT` (the two halves of the harness). There is no `#IFDEF`, only `#IFNDEF`.
 

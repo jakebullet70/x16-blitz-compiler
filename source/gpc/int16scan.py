@@ -57,7 +57,7 @@ KNOWN_PAIRS = {"FILE.DIR.SLOW"}
 
 #   --spread reads these. Generated files are left out: they follow their masters.
 EDIT_ROOTS = ["GPC-BASIC", "samples/GPB-MODS-TESTING", "samples/GPC-HELP", "samples/XBASE",
-              "samples/editor", "samples/color-test", "samples/cruncher", "docs"]
+              "samples/edit", "samples/color-test", "samples/cruncher", "docs"]
 SKIP_DIRS = {"HELP-TXT", "memory", "attic", "spike"}
 SKIP_FILES = {"GPC-HELP.md", "GPC-HELP.WIN.md", "GPC-HELP-TESTING.md"}
 

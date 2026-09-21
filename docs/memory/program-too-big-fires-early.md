@@ -17,7 +17,7 @@ an object-size problem. The two with a source line print `@ nnnn`; a fourth, wri
 `WriteObjectCode` prints **`PROGRAM TOO BIG` with no `@`** — that spelling tells you which fired.
 
 **The cause: the two tables shared ONE 8K bank** at `$A000-$BFFF`, growing towards each other, so
-the real limit was their SUM. `samples/editor` had reached **7,981 of 8,192** — 1,461 line entries
+the real limit was their SUM. `samples/edit` had reached **7,981 of 8,192** — 1,461 line entries
 x 4 plus 356 variable records x 6 — leaving **211 bytes, about fifty-two more lines of source.**
 
 **The fix: a bank each** (`source/compiler/source/system-specific/x16/x16_storage.inc`). Line table
@@ -46,7 +46,7 @@ Fixed in passing, since it was in the rewritten lines: `STRFindLine`'s exact-mat
 the line number's **low byte twice** (`lda (zTemp1)` where it meant `(zTemp1),y`), so `GOTO 300`
 could report an exact match on line 556 and hand back its address.
 
-Evidence it is transparent: `samples/editor` (1,461 lines) compiles **byte-for-byte identically**
+Evidence it is transparent: `samples/edit` (1,461 lines) compiles **byte-for-byte identically**
 under the old compiler and the new one, and GPBMODS's 2,156 lines all pass the two-pass agreement
 check in `STRMarkLine`, which is an exhaustive round trip of the table across the bank boundary.
 
@@ -64,7 +64,7 @@ FrameStackPages` and rejects anything leaving under `MIN_WS_PAGES`. With `Object
 both page counts 16 (4K each), `$3b00`..`$9F00` is 25,600 bytes of object + frame stack +
 workspace, so the object may be at most **68 pages = 17,408**.
 
-Measured on `samples/editor` with filler lines worth 10 bytes of p-code each:
+Measured on `samples/edit` with filler lines worth 10 bytes of p-code each:
 
 | filler | object | `FREE` | result |
 |---:|---:|---:|---|

@@ -14,7 +14,7 @@ metadata:
   `SPRMEM`, `MOVSPR`, `BASLOAD`, `OVAL`, `RING`, `HBLOAD`, `TDATA`, `TATTR`, `MOD`.
 - `LINPUT#` / `LINPUT` are in ROM order, and both have handlers in `x16_command.def`.
 - `OVAL`, `RING`, `SPRITE`, `SPRMEM`, `MOVSPR` compile from `x16_command.def`; `MOD`, `TDATA`,
-  `TATTR` from `x16_unary.def`. `samples/editor` calls `MOD`.
+  `TATTR` from `x16_unary.def`. `samples/edit` calls `MOD`.
 
 Do not "fix the table" again, and do not write `GP.MOD` — `MOD(A,B)` is a working X16 keyword here.
 

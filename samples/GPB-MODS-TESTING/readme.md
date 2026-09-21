@@ -252,7 +252,7 @@ stock BASIC does — so loop counters stay float.
 
 `GPC-BASIC/` here is the **working copy**. Root `GPC-BASIC/` is the release copy. A module is edited
 and proved here, then copied whole into the root — never merged by hand, and the root copy is what
-`samples/GPC-HELP` and `samples/editor` build against.
+`samples/GPC-HELP` and `samples/edit` build against.
 
 **A module is one file, and the program decides where it goes.** `STRINGS.INC.BL` holds `STR.PADR`
 whether its `#INCLUDE` is in low memory or inside a `GP.BANKED` region. A call into a region

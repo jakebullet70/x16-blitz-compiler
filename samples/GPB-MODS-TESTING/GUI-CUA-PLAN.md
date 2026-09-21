@@ -260,7 +260,7 @@ which is bank-0 surgery underneath an open dialog. Not in this refactor.
 
 The wrappers keep their existing inputs and outputs. Nothing forces that —
 [`docs/memory/no-backward-compatibility-needed.md`](../../docs/memory/no-backward-compatibility-needed.md)
-says a break costs nothing — but `GPBMODS`, `samples/editor` and the two `.EXP.BL` examples all call
+says a break costs nothing — but `GPBMODS`, `samples/edit` and the two `.EXP.BL` examples all call
 these, and a refactor that also rewrites every call site cannot be bisected when it goes wrong.
 
 ## 7. Phases
