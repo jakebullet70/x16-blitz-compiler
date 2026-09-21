@@ -1,123 +1,116 @@
-REM ============================================================================
-REM ED-MENUS.BASL -- the menu library, FORKED INTO THIS SAMPLE, and the editor's own
-REM bar and dropdowns built on it.
-REM
-REM NOTHING HERE COMES FROM GPC-BASIC AT RUN TIME. MENU.INC.BL, MENUPULL.INC.BL and
-REM MENUKEY.INC.BL were copied in, re-prefixed ED.*, and taken off the banks: the row
-REM store is two string arrays rather than GP.BANKEDSTR groups, and the p-code runs in
-REM low memory rather than a GP.BANKED region. Edit it here; the library copy is no
-REM longer upstream of it.
-REM
-REM Every title's rows are stored once, in ED.MENU.SETUP below. ED.MENU.KEY sees each
-REM key first: ESC or ALT+letter opens the bar, and it hands back the row chosen.
-REM ============================================================================
+## ============================================================================
+## ED-MENUS.BASL -- the menu library, forked into this sample, and the editor's own bar and
+## dropdowns built on it.
+##
+## Nothing here reaches GPC-BASIC at run time. MENU, MENUPULL and MENUKEY were copied in,
+## re-prefixed ED.*, and taken off the banks: the row store is string arrays rather than
+## GP.BANKEDSTR groups, and the p-code runs in low memory rather than in a GP.BANKED region.
+## This file is the one to edit.
+##
+## Every title's rows are stored once, in ED.MENU.SETUP below. ED.MENUS.KEY sees each key
+## first: ESC or ALT+letter opens the bar, and it hands back the row chosen.
+## ============================================================================
 
-REM ==========================================================================
-REM MENU.INC.BL -- forked, unbanked
-REM ==========================================================================
-## ***********************************************************************
-## **
-## **  MENU.INC.BL -- the menu builder. A menu is built a row at a time into
-## **  one of two slots, and a runner draws it from there.
-## **
-## **      GP.SUB ED.MENU.BEGIN, ED.MENU.POPUP
-## **      GP.SUB ED.MENU.ITEM, "&ADD RECORD"
-## **      GP.SUB ED.MENU.ITEMX, "&DEL RECORD", ED.MENU.OFF
-## **      GP.SUB ED.MENU.ITEM, "-"
-## **      GP.SUB ED.MENU.ITEM, "&QUIT"
-## **
-## **  ED.MENU.BEGIN slot                   empties a slot and builds into it
-## **  ED.MENU.ITEM  text$                  appends a row, enabled
-## **  ED.MENU.ITEMX text$, on              appends a row with its enable flag;
-## **                                    on is tested <> 0, so -1 works too
-## **  ED.MENU.SELECTED n                   the row the next run opens on; the
-## **                                    next ED.MENU.BEGIN or run clears it
-## **  R = GP.FN(ED.MENU.HOTROW, slot, key) the live row whose hot key is key,
-## **                                    without case; 0 for none. For a
-## **                                    key a run handed back, or ALT+key
-## **  N = GP.FN(ED.MENUTO.VERT, row, col, style)
-## **                                    runs the popup slot, returns 1..N or
-## **                                    0 for ESC. ED.MENU.EXITKEY is the key
-## **  N = GP.FN(ED.MENUTO.BAR, row, col, style)
-## **                                    the same for the bar slot, laid out
-## **                                    across. ED.MENU.BARNUM is its row count,
-## **                                    ED.MENU.SELX and ED.MENU.SELW the chosen
-## **                                    item's column and width
-## **  ED.MENU.DRAWBAR row, col, style      draws the bar slot without running
-## **                                    it, with ED.MENU.MARKED lit: the item a
-## **                                    KEEPMARK bar or a dropdown left marked
-## **  ED.MENU.DRAWVERT row, col, style     draws the popup slot without running
-## **                                    it, no row lit
-## **  ED.MENUTO.PULLDOWN, the popup slot under a bar item, is in
-## **  MENUPULL.INC.BL, so a program without one does not carry ED.STASH.
-## **  ED.MENU.KEY, a bar and its dropdowns run from the program's key loop, is
-## **  in MENUKEY.INC.BL.
-## **
-## **  Both runners draw a GP.BOX of the given style with its corner at row,
-## **  col, one cell bigger all round than the rows: ED.MENU.SOLID, ED.MENU.THIN,
-## **  ED.MENU.ROUND, ED.MENU.THICK, or 256+ for a glyph table. ED.MENU.NOBOX draws
-## **  none and puts the first row there instead.
-## **
-## **  Set once by the caller, and read by every run:
-## **      ED.MENU.ATTR       rows, background * 16 + fg
-## **      ED.MENU.HIATTR     the highlighted row; 0 inverts ED.MENU.ATTR
-## **      ED.MENU.HOTATTR    the hot key letter; 0 leaves it untinted
-## **      ED.MENU.DISATTR    a disabled row; 0 is ED.MENU.ATTR
-## **      ED.MENU.SEPATTR    separator lines and the frame; 0 is ED.MENU.ATTR
-## **      ED.MENU.SEPCHR     the separator glyph; 0 is ED.MENU.LINE
-## **      ED.MENU.FLAGS      the popup's, added together, below
-## **      ED.MENU.GAP        cells between bar items; 0 is none
-## **      ED.MENU.BARFLAGS   the bar's flags
-## **      ED.MENU.BARATTR, ED.MENU.BARHI, ED.MENU.BARHOT
-## **                      the bar's own rows, highlight and hot key. BARATTR
-## **                      and BARHOT 0 take the popup's; BARHI 0 inverts
-## **                      the bar's rows
-## **
-## **  The popup flags: ED.MENU.MUSTSEL takes ESC away. ED.MENU.KEEPMARK leaves the
-## **  chosen row lit. ED.MENU.NOWRAP stops at the ends. ED.MENU.KEYEXIT ends the
-## **  run on a key the menu has no use for, LEFT and RIGHT most often, with
-## **  ED.MENU.EXITKEY that key and the row it was on returned.
-## **
-## **  The bar takes the same flags in ED.MENU.BARFLAGS, with LEFT and RIGHT
-## **  moving, and two of its own: ED.MENU.DOWNEXIT and ED.MENU.UPEXIT make DOWN or
-## **  UP choose the item, for a bar with dropdowns under it.
-## **
-## **  The slots:
-## **      ED.MENU.BAR        16 rows
-## **      ED.MENU.POPUP      32 rows, the working list
-## **      ED.MENU.DROP + n   the dropdown under bar item n, 1 to 16
-## **  The dropdowns share a pool of 64 rows, taken in the order they are
-## **  built. A ED.MENU.BEGIN on the bar empties every dropdown and the pool, so
-## **  build the bar first and then its dropdowns; building one dropdown again
-## **  on its own takes new rows and leaves its old ones used. A dropdown row
-## **  keeps no hint.
-## **  A row past the slot's size is dropped, and so is a row before any
-## **  ED.MENU.BEGIN. For more, raise the .MAX defines below and add SPC lines
-## **  to the groups in MENU.INC.BANKED.BL to match.
-## **
-## **  & marks the hot key: "SAVE &AS" is stored as "SAVE AS" with hot key A
-## **  at column 6. Only the first & counts, && is a literal &, and a trailing
-## **  & is left in the text.
-## **
-## **  A row whose text is one hyphen is a separator. It still counts.
-## **
-## **  Text and hints live in two string arrays, DIMmed by ED.MENU.CREATE on the
-## **  first ED.MENU.BEGIN. No bank, no length cap, and no SHARED compile needed
-## **  -- this is the forked store, not the library's GP.BANKEDSTR one.
-## **  ED.MENU.OK is always true; it is kept so the row path reads unchanged.
-## **
-## **  The store is private to the runners. Row R of slot S is at
-## **  I = ED.MENU.BASEAT%(S) + R; the bar starts at 0, the popup at 16 and the
-## **  pool at 48:
-## **      ED.MENU.TXT$(I)             the text, & removed
-## **      MID$(ED.MENU.FLAG$(S), R, 1)          "0" live, "1" disabled,
-## **                                         "2" a separator
-## **      MID$(ED.MENU.HOTKEY$(S), R, 1)        the hot key, CHR$(0) for none
-## **      MID$(ED.MENU.HOTCOL$(S), R, 1)        its column as CHR$(n), CHR$(0)
-## **                                         for none
-## **      LEN(ED.MENU.FLAG$(S))                 the slot's row count
-## **
-## ***********************************************************************
+## ==========================================================================
+## MENU -- the menu builder. A menu is built a row at a time into one of two slots, and a
+## runner draws it from there.
+##
+##     GP.SUB ED.MENU.BEGIN, ED.MENU.POPUP
+##     GP.SUB ED.MENU.ITEM, "&ADD RECORD"
+##     GP.SUB ED.MENU.ITEMX, "&DEL RECORD", ED.MENU.OFF
+##     GP.SUB ED.MENU.ITEM, "-"
+##     GP.SUB ED.MENU.ITEM, "&QUIT"
+##
+## Building:
+##
+##   ED.MENU.BEGIN slot        empty a slot and build into it
+##   ED.MENU.ITEM text$        append a row, enabled
+##   ED.MENU.ITEMX text$, on   append a row with its enable flag. on is tested <> 0,
+##                             so -1 works too
+##   ED.MENU.SELECTED n        the row the next run opens on. The next ED.MENU.BEGIN
+##                             or run clears it
+##
+## Running:
+##
+##   R = GP.FN(ED.MENU.HOTROW, slot, key)
+##                             the live row whose hot key is key, ignoring case, or 0
+##                             for none. For a key a run handed back, or ALT+key
+##   N = GP.FN(ED.MENUTO.VERT, row, col, style)
+##                             run the popup slot. Returns 1 to N, or 0 for ESC.
+##                             ED.MENU.EXITKEY is the key it ended on
+##   N = GP.FN(ED.MENUTO.BAR, row, col, style)
+##                             the same for the bar slot, laid out across.
+##                             ED.MENU.BARNUM is its row count, ED.MENU.SELX and
+##                             ED.MENU.SELW the chosen item's column and width
+##   ED.MENU.DRAWBAR row, col, style
+##                             draw the bar slot without running it, with
+##                             ED.MENU.MARKED lit
+##   ED.MENU.DRAWVERT row, col, style
+##                             draw the popup slot without running it, no row lit
+##
+## ED.MENUTO.PULLDOWN, the popup slot under a bar item, is in the MENUPULL section below.
+## ED.MENU.KEY, a bar and its dropdowns run from the program's key loop, is in the MENUKEY
+## section.
+##
+## Both runners draw a GP.BOX of the given style with its corner at row, col, one cell
+## bigger all round than the rows: ED.MENU.SOLID, ED.MENU.THIN, ED.MENU.ROUND,
+## ED.MENU.THICK, or 256 and up for a glyph table. ED.MENU.NOBOX draws none and puts the
+## first row there instead.
+##
+## Set once by the caller, and read by every run:
+##
+##   ED.MENU.ATTR       rows, background * 16 + foreground
+##   ED.MENU.HIATTR     the highlighted row. 0 inverts ED.MENU.ATTR
+##   ED.MENU.HOTATTR    the hot key letter. 0 leaves it untinted
+##   ED.MENU.DISATTR    a disabled row. 0 is ED.MENU.ATTR
+##   ED.MENU.SEPATTR    separator lines and the frame. 0 is ED.MENU.ATTR
+##   ED.MENU.SEPCHR     the separator glyph. 0 is ED.MENU.LINE
+##   ED.MENU.FLAGS      the popup's flags, added together
+##   ED.MENU.GAP        cells between bar items. 0 is none
+##   ED.MENU.BARFLAGS   the bar's flags
+##   ED.MENU.BARATTR    the bar's rows. 0 takes the popup's
+##   ED.MENU.BARHI      the bar's highlight. 0 inverts the bar's rows
+##   ED.MENU.BARHOT     the bar's hot key. 0 takes the popup's
+##
+## The popup flags: ED.MENU.MUSTSEL takes ESC away. ED.MENU.KEEPMARK leaves the chosen row
+## lit. ED.MENU.NOWRAP stops at the ends. ED.MENU.KEYEXIT ends the run on a key the menu has
+## no use for, LEFT and RIGHT most often, and returns it in ED.MENU.EXITKEY with the row it
+## was on.
+##
+## The bar takes the same flags in ED.MENU.BARFLAGS, with LEFT and RIGHT moving, and two of
+## its own: ED.MENU.DOWNEXIT and ED.MENU.UPEXIT make DOWN or UP choose the item, for a bar
+## with dropdowns under it.
+##
+## The slots:
+##
+##   ED.MENU.BAR        16 rows
+##   ED.MENU.POPUP      32 rows, the working list
+##   ED.MENU.DROP + n   the dropdown under bar item n, 1 to 16
+##
+## The dropdowns share a pool of 64 rows, taken in the order they are built. An
+## ED.MENU.BEGIN on the bar empties every dropdown and the pool, so build the bar first and
+## then its dropdowns. Building one dropdown again on its own takes new rows and leaves its
+## old ones used. A row past the slot's size is dropped, and so is a row before any
+## ED.MENU.BEGIN. For more rows, raise the .MAX defines below.
+##
+## An & marks the hot key: "SAVE &AS" is stored as "SAVE AS" with hot key A at column 6.
+## Only the first & counts, && is a literal &, and a trailing & is left in the text.
+##
+## A row whose text is one hyphen is a separator. It still counts as a row.
+##
+## The store is private to the runners. Text lives in ED.MENU.TXT$, DIMmed by ED.MENU.CREATE
+## on the first ED.MENU.BEGIN, with no bank, no length cap and no SHARED compile. Row R of
+## slot S is at I = ED.MENU.BASEAT%(S) + R, and the bar starts at 0, the popup at 16 and the
+## pool at 48:
+##
+##   ED.MENU.TXT$(I)                  the text, & removed
+##   MID$(ED.MENU.FLAG$(S), R, 1)     "0" live, "1" disabled, "2" a separator
+##   MID$(ED.MENU.HOTKEY$(S), R, 1)   the hot key, CHR$(0) for none
+##   MID$(ED.MENU.HOTCOL$(S), R, 1)   its column as CHR$(n), CHR$(0) for none
+##   LEN(ED.MENU.FLAG$(S))            the slot's row count
+##
+## ED.MENU.OK is always true, and is kept so a caller may test it.
+## ==========================================================================
 ## Outside ED.MENU.DEFS: BASLOAD does not nest #IFNDEF.
 
 #IFNDEF ED.MENU.DEFS
@@ -176,7 +169,7 @@ ED.MENU.BEGIN.BODY:
     ED.MENU.SEL = 0
     RETURN
 
-## ---- ED.MENU.KEYSSET 0 has MENUKEY's next ED.MENU.KEY read the new hot keys.
+## ED.MENU.KEYSSET 0 has MENUKEY's next ED.MENU.KEY read the new hot keys.
 ED.MENU.EMPTYDROPS:
     ED.MENU.POOLTOP = 0 : ED.MENU.KEYSSET = 0
     FOR ED.MENU.EACH = ED.MENU.DROP + 1 TO ED.MENU.LASTSLOT
@@ -184,13 +177,13 @@ ED.MENU.EMPTYDROPS:
     NEXT ED.MENU.EACH
     RETURN
 
-## ---- a dropdown starts at the pool's next free row and may fill the rest.
+## ED.MENU.DROPAT -- a dropdown starts at the pool's next free row and may fill the rest.
 ED.MENU.DROPAT:
     ED.MENU.BASEAT%(ED.MENU.SLOT) = ED.MENU.POOLBASE + ED.MENU.POOLTOP - 1
     ED.MENU.CAP = ED.MENU.POOL.MAX - ED.MENU.POOLTOP
     RETURN
 
-## ---- the first live row with the hot key, as ED.MENU.KEYHOT matches one.
+## ED.MENU.HOTROW.BODY -- the first live row with the hot key, as ED.MENU.KEYHOT matches one.
 ED.MENU.HOTROW.BODY:
     GP.DEFPROC ED.MENU.HOTROW, ED.MENU.FINDSLOT, ED.MENU.FINDKEY RETURNS ED.MENU.FOUND
     ED.MENU.FOUND = 0
@@ -217,8 +210,8 @@ ED.MENU.DRAWBAR.BODY:
     ED.MENU.DRAWN = ED.MENU.MARKED : ED.MENU.PAINT = ED.MENU.HILITE : GOSUB ED.MENU.DRAWROW
     RETURN
 
-## ---- the bar slot measured and framed. ED.MENU.BARX and ED.MENU.BARY stay for
-## ED.MENUTO.PULLDOWN.
+## ED.MENU.BARPLACE -- the bar slot measured and framed. ED.MENU.BARX and ED.MENU.BARY stay
+## for ED.MENUTO.PULLDOWN.
 ED.MENU.BARPLACE:
     ED.MENU.RUNSLOT = ED.MENU.BAR : GOSUB ED.MENU.MEASURE
     ED.MENU.BARNUM = ED.MENU.COUNT
@@ -229,10 +222,10 @@ ED.MENU.BARPLACE:
     ED.MENU.RUNFLAGS = ED.MENU.BARFLAGS
     RETURN
 
-## ---- ED.MENU.RUNSLOT's row count, and where its rows start in the store.
-## ED.MENU.WIDE is the widest row, ED.MENU.SPAN all of them end to end. A boxed
-## popup pads its rows one cell each side, so ED.MENU.INDENT is 1 and ED.MENU.WIDE
-## takes both cells; the bar and a NOBOX popup print from the edge.
+## ED.MENU.RUNSLOT's row count, and where its rows start in the store. ED.MENU.WIDE is the
+## widest row, ED.MENU.SPAN all of them end to end. A boxed popup pads its rows one cell
+## each side, so ED.MENU.INDENT is 1 and ED.MENU.WIDE takes both cells; the bar and a NOBOX
+## popup print from the edge.
 ED.MENU.MEASURE:
     ED.MENU.COUNT = LEN(ED.MENU.FLAG$(ED.MENU.RUNSLOT))
     ED.MENU.RUNBASE = ED.MENU.BASEAT%(ED.MENU.RUNSLOT)
@@ -247,8 +240,9 @@ ED.MENU.MEASURE:
     ED.MENU.INDENT = 1 : ED.MENU.WIDE = ED.MENU.WIDE + 2
     RETURN
 
-## ---- a frame one cell outside ED.MENU.BOXW x ED.MENU.BOXH, and ED.MENU.ATCOL, ED.MENU.ATROW
-## inside it. ED.MENU.NOBOX draws nothing and leaves them on row, col.
+## ED.MENU.FRAMEBOX -- a frame one cell outside ED.MENU.BOXW by ED.MENU.BOXH, with
+## ED.MENU.ATCOL and ED.MENU.ATROW inside it. ED.MENU.NOBOX draws nothing and leaves them on
+## row, col.
 ED.MENU.FRAMEBOX:
     ED.MENU.ATCOL = ED.MENU.RUNCOL : ED.MENU.ATROW = ED.MENU.RUNROW
     IF ED.MENU.STYLE = ED.MENU.NOBOX THEN RETURN
@@ -258,12 +252,9 @@ ED.MENU.FRAMEBOX:
     ED.MENU.ATCOL = ED.MENU.RUNCOL + 1 : ED.MENU.ATROW = ED.MENU.RUNROW + 1
     RETURN
 
-## ***********************************************************************
-## **  ED.MENU.RUN -- ED.MENU.RUNSLOT run at ED.MENU.ATCOL, ED.MENU.ATROW after
-## **  ED.MENU.MEASURE, under ED.MENU.RUNFLAGS. The popup runs down, the bar
-## **  across. Out: ED.MENU.CUR the row, 0 for ESC; ED.MENU.EXITKEY; ED.MENU.HOTHIT
-## **  -1 when a hot key chose it.
-## ***********************************************************************
+## ED.MENU.RUN -- ED.MENU.RUNSLOT run at ED.MENU.ATCOL, ED.MENU.ATROW after ED.MENU.MEASURE,
+## under ED.MENU.RUNFLAGS. The popup runs down, the bar across. Out: ED.MENU.CUR the row, 0
+## for ESC; ED.MENU.EXITKEY; ED.MENU.HOTHIT -1 when a hot key chose it.
 ED.MENU.RUN:
     ED.MENU.EXITKEY = 0 : ED.MENU.HOTHIT = 0
     ED.MENU.CUR = ED.MENU.SEL : ED.MENU.SEL = 0
@@ -307,8 +298,8 @@ ED.MENU.KEYED:
     ED.MENU.DRAWN = ED.MENU.CUR : ED.MENU.PAINT = ED.MENU.PLAIN : GOSUB ED.MENU.DRAWROW
     RETURN
 
-## ---- the bar's keys as the popup's: LEFT and RIGHT move as UP and DOWN do,
-## and DOWN or UP chooses when ED.MENU.DOWNEXIT or ED.MENU.UPEXIT says so.
+## ED.MENU.TURN -- the bar's keys as the popup's: LEFT and RIGHT move as UP and DOWN do, and
+## DOWN or UP chooses when ED.MENU.DOWNEXIT or ED.MENU.UPEXIT says so.
 ED.MENU.TURN:
     IF ED.MENU.CODE = ED.MENU.LEFT THEN ED.MENU.MOVE = ED.MENU.UP : RETURN
     IF ED.MENU.CODE = ED.MENU.RIGHT THEN ED.MENU.MOVE = ED.MENU.DOWN : RETURN
@@ -320,7 +311,7 @@ ED.MENU.TURN:
     IF (ED.MENU.RUNFLAGS AND ED.MENU.EXITBIT) <> 0 THEN ED.MENU.MOVE = ED.MENU.ENTER
     RETURN
 
-## ---- the old row back and the new one lit. ESC leaves no new row.
+## ED.MENU.MOVED -- the old row back and the new one lit. ESC leaves no new row.
 ED.MENU.MOVED:
     ED.MENU.DRAWN = ED.MENU.WAS : ED.MENU.PAINT = ED.MENU.PLAIN : GOSUB ED.MENU.DRAWROW
     IF ED.MENU.CUR < 1 THEN RETURN
@@ -342,7 +333,7 @@ ED.MENU.CANCEL:
     ED.MENU.CUR = 0 : ED.MENU.DONE = -1
     RETURN
 
-## ---- a hot key, matched without case; the first live row with it wins.
+## ED.MENU.KEYHOT -- a hot key, matched without case; the first live row with it wins.
 ## Nothing matched and KEYEXIT set hands the key back.
 ED.MENU.KEYHOT:
     ED.MENU.WANT = ED.MENU.CODE
@@ -361,7 +352,7 @@ ED.MENU.HOTTAKE:
     ED.MENU.CUR = ED.MENU.SCAN : ED.MENU.DONE = -1 : ED.MENU.HOTHIT = -1
     RETURN
 
-## ---- off a separator or a disabled row, the way the cursor was going. The
+## ED.MENU.SKIPOFF -- off a separator or a disabled row, the way the cursor was going. The
 ## counter stops a menu with no live row walking for ever.
 ED.MENU.SKIPOFF:
     ED.MENU.SKIPS = 0
@@ -374,7 +365,7 @@ ED.MENU.SKIPLOOP:
     IF ED.MENU.CUR > ED.MENU.COUNT THEN GOSUB ED.MENU.WRAPBOT
     GOTO ED.MENU.SKIPLOOP
 
-## ---- ED.MENU.RUNSLOT's colours: ED.MENU.PLAIN the rows, ED.MENU.HILITE the highlight,
+## ED.MENU.RUNSLOT's colours: ED.MENU.PLAIN the rows, ED.MENU.HILITE the highlight,
 ## ED.MENU.TINT the hot key. A HILITE of 0 inverts PLAIN.
 ED.MENU.LIGHT:
     ED.MENU.PLAIN = ED.MENU.ATTR : ED.MENU.HILITE = ED.MENU.HIATTR : ED.MENU.TINT = ED.MENU.HOTATTR
@@ -396,8 +387,8 @@ ED.MENU.DRAWALL:
     NEXT ED.MENU.DRAWN
     RETURN
 
-## ---- where row ED.MENU.DRAWN sits: ED.MENU.DRAWX, ED.MENU.DRAWY, ED.MENU.ROWW wide. A
-## bar item is as wide as its text, after the items left of it and a
+## ED.MENU.SPOT -- where row ED.MENU.DRAWN sits: ED.MENU.DRAWX, ED.MENU.DRAWY, and
+## ED.MENU.ROWW wide. A bar item is as wide as its text, after the items left of it and a
 ## ED.MENU.GAP each.
 ED.MENU.SPOT:
     ED.MENU.DRAWX = ED.MENU.ATCOL
@@ -412,8 +403,8 @@ ED.MENU.SPOT:
     NEXT ED.MENU.LEFTW
     RETURN
 
-## ---- row ED.MENU.DRAWN in ED.MENU.PAINT. The fill makes the highlight full width.
-## The hot key is tinted only on a row in the plain attribute.
+## ED.MENU.DRAWROW -- row ED.MENU.DRAWN in ED.MENU.PAINT. The fill makes the highlight full
+## width. The hot key is tinted only on a row in the plain attribute.
 ED.MENU.DRAWROW:
     GOSUB ED.MENU.SPOT
     ED.MENU.ROWIS$ = MID$(ED.MENU.FLAG$(ED.MENU.RUNSLOT), ED.MENU.DRAWN, 1)
@@ -439,7 +430,7 @@ ED.MENU.SEPROW:
     GP.FILL ED.MENU.DRAWX, ED.MENU.DRAWY, ED.MENU.ROWW, 1, ED.MENU.GLYPH, ED.MENU.USE
     RETURN
 
-## ---- ITEM falls through into ITEMX's body with the enable default set.
+## ITEM falls through into ITEMX's body with the enable default set.
 ED.MENU.ITEM.BODY:
     GP.DEFPROC ED.MENU.ITEM, ED.MENU.ROWTEXT$
     ED.MENU.ROWON = ED.MENU.ON
@@ -461,7 +452,7 @@ ED.MENU.ITEMX.BODY:
     ED.MENU.FLAG$(ED.MENU.SLOT) = ED.MENU.FLAG$(ED.MENU.SLOT) + ED.MENU.ROWFLAG$
     RETURN
 
-## ---- the hot key slides left into the &'s column, so ED.MENU.HOTAT stays right.
+## ED.MENU.STRIP -- the hot key slides left into the &'s column, so ED.MENU.HOTAT stays right.
 ED.MENU.STRIP:
     IF ED.MENU.HOTAT = LEN(ED.MENU.ROWTEXT$) THEN ED.MENU.HOTAT = 0 : RETURN
     ED.MENU.HOTCH$ = MID$(ED.MENU.ROWTEXT$, ED.MENU.HOTAT + 1, 1)
@@ -469,8 +460,8 @@ ED.MENU.STRIP:
     IF ED.MENU.HOTCH$ = "&" THEN ED.MENU.HOTCH$ = CHR$(0) : ED.MENU.HOTAT = 0
     RETURN
 
-## ---- DIMmed on first use: an array touched before its DIM is auto-DIMmed to 10,
-## and the DIM after it is an error.
+## DIMmed on first use: an array touched before its DIM is auto-DIMmed to 10, and the DIM
+## after it is an error.
 ED.MENU.CREATE:
     DIM ED.MENU.FLAG$(ED.MENU.LASTSLOT) : DIM ED.MENU.HOTKEY$(ED.MENU.LASTSLOT) : DIM ED.MENU.HOTCOL$(ED.MENU.LASTSLOT)
     DIM ED.MENU.BASEAT%(ED.MENU.LASTSLOT)
@@ -483,60 +474,52 @@ ED.MENU.CREATE:
 ED.MENU.MODULE.END:
 #ENDIF
 
-REM ==========================================================================
-REM MENUPULL.INC.BL -- forked, unbanked
-REM ==========================================================================
-## ***********************************************************************
-## **
-## **  MENUPULL.INC.BL -- a dropdown under a bar item.
-## **
-## **      B = GP.FN(ED.MENUTO.BAR, 0, 0, ED.MENU.NOBOX)
-## **      GP.DO
-## **          IF B = 0 THEN GP.EXITDO
-## **          GOSUB MY.FILL                 ED.MENU.BEGIN ED.MENU.POPUP and its rows
-## **          N = GP.FN(ED.MENUTO.PULLDOWN, B, ED.MENU.ROUND)
-## **          B = ED.MENU.NEXTBAR
-## **      GP.LOOP
-## **
-## **  N = GP.FN(ED.MENUTO.PULLDOWN, barnum, style)
-## **      marks bar item barnum, opens the popup slot under it and runs it.
-## **      Returns 1..N for RETURN or a hot key, 0 for anything else.
-## **  ED.MENU.SAVESCREEN mode
-## **      where the screen under a dropdown is kept: ED.MENU.SAVE.VRAM, the
-## **      default, or ED.MENU.SAVE.BANK.
-## **  ED.MENU.SHADOW     non-zero gives a boxed dropdown a drop shadow, solid
-## **                  cells in ED.MENU.SHADOWATTR (0 is black), trimmed at the
-## **                  screen edge. The save-under covers it.
-## **
-## **   out  ED.MENU.EXITKEY    the key that ended it
-## **        ED.MENU.NEXTBAR    the bar item LEFT or RIGHT walks to, disabled
-## **                        items stepped over as the bar does; 0 for any
-## **                        other exit
-## **        ED.MENU.BARNUM     the bar's row count
-## **        ED.MENU.SELX       the item's column, ED.MENU.SELW its width
-## **
-## **  The bar is the one ED.MENUTO.BAR or ED.MENU.DRAWBAR last drew, where that
-## **  left it, with ED.MENU.GAP and ED.MENU.BARFLAGS as they are now. The item stays marked on the way out.
-## **  The dropdown's corner is the item's column on the row under the bar,
-## **  moved left if it would run off the screen. The style and colours are
-## **  ED.MENUTO.VERT's. It runs with ED.MENU.KEYEXIT added to the caller's
-## **  ED.MENU.FLAGS.
-## **
-## **  The screen under the dropdown is saved first and put back after.
-## **  ED.MENU.SAVE.VRAM keeps it in VRAM with STASHVRAM. The first dropdown
-## **  runs ED.MENUPULL.SVSTART, which DIMs the handle table and runs ED.SV.INIT
-## **  with ED.SV.MAX handles, 1 if ED.SV.MAX is 0. A program that uses STASHVRAM
-## **  itself sets ED.SV.MAX, with a handle to spare for the menu, and runs
-## **  GOSUB ED.MENUPULL.SVSTART rather than DIM the table: the compiler takes
-## **  one DIM of an array, and it is here. ED.MENU.SAVE.BANK keeps it in bank ED.MENU.STASHBANK
-## **  with ED.STASH. Set that before the first call to choose the bank; left at
-## **  0, the first call takes one from ED.BANKMGR. If there is no room either
-## **  way the dropdown still runs and the screen is not put back.
-## **
-## **  Requires MENU.INC.BL, STASH.INC.BL and STASHVRAM.INC.BL, included by
-## **  the caller, and a #SYMFILE for ED.STASH.
-## **
-## ***********************************************************************
+## ==========================================================================
+## MENUPULL -- a dropdown under a bar item.
+##
+##     B = GP.FN(ED.MENUTO.BAR, 0, 0, ED.MENU.NOBOX)
+##     GP.DO
+##         IF B = 0 THEN GP.EXITDO
+##         GOSUB MY.FILL                 ED.MENU.BEGIN ED.MENU.POPUP and its rows
+##         N = GP.FN(ED.MENUTO.PULLDOWN, B, ED.MENU.ROUND)
+##         B = ED.MENU.NEXTBAR
+##     GP.LOOP
+##
+##   N = GP.FN(ED.MENUTO.PULLDOWN, barnum, style)
+##                        mark bar item barnum, open the popup slot under it and run
+##                        it. Returns 1 to N for RETURN or a hot key, 0 for anything
+##                        else
+##   ED.MENU.SAVESCREEN   where the screen under a dropdown is kept:
+##                        ED.MENU.SAVE.VRAM, the default, or ED.MENU.SAVE.BANK
+##   ED.MENU.SHADOW       non-zero gives a boxed dropdown a drop shadow, solid cells
+##                        in ED.MENU.SHADOWATTR, 0 for black, trimmed at the screen
+##                        edge. The save-under covers it
+##
+##   out  ED.MENU.EXITKEY   the key that ended it
+##        ED.MENU.NEXTBAR   the bar item LEFT or RIGHT walks to, disabled items
+##                          stepped over as the bar does, 0 for any other exit
+##        ED.MENU.BARNUM    the bar's row count
+##        ED.MENU.SELX      the item's column, ED.MENU.SELW its width
+##
+## The bar is the one ED.MENUTO.BAR or ED.MENU.DRAWBAR last drew, where that left it, with
+## ED.MENU.GAP and ED.MENU.BARFLAGS as they are now. The item stays marked on the way out.
+## The dropdown's corner is the item's column on the row under the bar, moved left if it
+## would run off the screen. The style and colours are ED.MENUTO.VERT's. It runs with
+## ED.MENU.KEYEXIT added to the caller's ED.MENU.FLAGS.
+##
+## The screen under the dropdown is saved first and put back after. ED.MENU.SAVE.VRAM keeps
+## it in VRAM with STASHVRAM. The first dropdown runs ED.MENUPULL.SVSTART, which DIMs the
+## handle table and runs ED.SV.INIT with ED.SV.MAX handles, 1 if ED.SV.MAX is 0. A program
+## that uses STASHVRAM itself sets ED.SV.MAX, with a handle to spare for the menu, and runs
+## GOSUB ED.MENUPULL.SVSTART rather than DIM the table: the compiler takes one DIM of an
+## array, and it is here. ED.MENU.SAVE.BANK keeps it in bank ED.MENU.STASHBANK with
+## ED.STASH. Set that before the first call to choose the bank. Left at 0, the first call
+## takes one from ED.BANKMGR. If there is no room either way the dropdown still runs and the
+## screen is not put back.
+##
+## It needs the MENU section above and the STASHVRAM section of ED-MISC.BASL, and the
+## #SYMFILE that EDITOR.BASL declares.
+## ==========================================================================
 #IFNDEF ED.MENUPULL.DEFS
 #DEFINE ED.MENUPULL.DEFS 1
 
@@ -551,8 +534,8 @@ ED.MENU.SAVESCREEN.BODY:
     GP.DEFPROC ED.MENU.SAVESCREEN, ED.MENU.SAVEMODE
     RETURN
 
-## ---- ED.MENU.PULLSLOT run under bar item ED.MENU.PULLAT. ED.MENU.KEY comes in here
-## ---- with a dropdown's slot.
+## ED.MENU.PULLSLOT run under bar item ED.MENU.PULLAT. ED.MENU.KEY comes in here with a
+## dropdown's slot.
 ED.MENUPULL.OPEN:
     ED.MENU.CHOSEN = 0 : ED.MENU.EXITKEY = 0 : ED.MENU.NEXTBAR = 0
     IF ED.MENU.READY = 0 THEN RETURN
@@ -579,8 +562,8 @@ ED.MENUPULL.OPEN:
     IF ED.MENU.EXITKEY = ED.MENU.RIGHT THEN ED.MENU.NEXTBAR = ED.MENU.RIGHTOF
     RETURN
 
-## ---- with the bar slot the one measured: the neighbours LEFT and RIGHT walk
-## ---- to, then the old mark off and this item lit.
+## ED.MENUPULL.MARK -- with the bar slot the one measured: the neighbours LEFT and RIGHT
+## walk to, then the old mark off and this item lit.
 ED.MENUPULL.MARK:
     ED.MENU.ATCOL = ED.MENU.BARX : ED.MENU.ATROW = ED.MENU.BARY
     ED.MENU.RUNFLAGS = ED.MENU.BARFLAGS
@@ -595,7 +578,7 @@ ED.MENUPULL.MARK:
     ED.MENU.SELX = ED.MENU.DRAWX : ED.MENU.SELW = ED.MENU.ROWW
     RETURN
 
-## ---- the marked bar item back in the bar's plain colours, and none marked.
+## ED.MENUPULL.UNMARK -- the marked bar item back in the bar's plain colours, and none marked.
 ED.MENUPULL.UNMARK:
     IF ED.MENU.MARKED < 1 THEN RETURN
     ED.MENU.RUNSLOT = ED.MENU.BAR : GOSUB ED.MENU.MEASURE
@@ -605,8 +588,8 @@ ED.MENUPULL.UNMARK:
     ED.MENU.MARKED = 0
     RETURN
 
-## ---- the live item beside ED.MENU.PULLAT the ED.MENU.STEP way; nowhere live to go
-## ---- stays put.
+## ED.MENUPULL.BESIDE -- the live item beside ED.MENU.PULLAT, the ED.MENU.STEP way. Nowhere
+## live to go stays put.
 ED.MENUPULL.BESIDE:
     ED.MENU.CUR = ED.MENU.PULLAT + ED.MENU.STEP
     IF ED.MENU.CUR < 1 THEN GOSUB ED.MENU.WRAPTOP
@@ -615,7 +598,8 @@ ED.MENUPULL.BESIDE:
     IF MID$(ED.MENU.FLAG$(ED.MENU.BAR), ED.MENU.CUR, 1) <> "0" THEN ED.MENU.CUR = ED.MENU.PULLAT
     RETURN
 
-## ---- under the item, and pulled left to stay on screen. ED.MENU.EDGE is the frame.
+## ED.MENUPULL.PLACE -- under the item, pulled left to stay on screen. ED.MENU.EDGE is the
+## frame.
 ED.MENUPULL.PLACE:
     ED.MENU.RUNCOL = ED.MENU.SELX : ED.MENU.RUNROW = ED.MENU.BARY + 1
     ED.MENU.EDGE = 2
@@ -630,8 +614,8 @@ ED.MENUPULL.PLACE:
     IF ED.MENU.RUNROW + ED.MENU.COUNT + ED.MENU.EDGE < ED.MENU.ROWS THEN ED.MENU.SHH = 1
     RETURN
 
-## ---- the shadow: two columns down the right from the second row, one row
-## ---- under from the third column, so the box's corners stay clear.
+## ED.MENUPULL.SHADE -- the shadow: two columns down the right from the second row, one row
+## under from the third column, so the box's corners stay clear.
 ED.MENUPULL.SHADE:
     ED.MENU.BOXR = ED.MENU.RUNCOL + ED.MENU.WIDE + ED.MENU.EDGE
     ED.MENU.BOXB = ED.MENU.RUNROW + ED.MENU.COUNT + ED.MENU.EDGE
@@ -639,8 +623,8 @@ ED.MENUPULL.SHADE:
     IF ED.MENU.SHH > 0 THEN GP.FILL ED.MENU.RUNCOL + 2, ED.MENU.BOXB, ED.MENU.WIDE + ED.MENU.EDGE + ED.MENU.SHW - 2, 1, 32, ED.MENU.SHADOWATTR
     RETURN
 
-## ---- ED.MENU.STASHED is not 0 when there is something to put back: the
-## ---- STASHVRAM handle, or -1 for the bank.
+## ED.MENU.STASHED is not 0 when there is something to put back: the STASHVRAM handle, or -1
+## for the bank.
 ED.MENUPULL.SAVE:
     ED.MENU.STASHED = 0
     IF ED.SV.READY = 0 THEN GOSUB ED.MENUPULL.SVSTART
@@ -651,8 +635,8 @@ ED.MENUPULL.SAVE:
     ED.MENU.STASHED = ED.SV.HND
     RETURN
 
-## ---- once, and only when the program has not started STASHVRAM itself. A
-## ---- refused ED.SV.INIT leaves ED.SV.READY 0 and nothing is saved from then on.
+## ED.MENUPULL.SVSTART -- once, and only when the program has not started STASHVRAM itself.
+## A refused ED.SV.INIT leaves ED.SV.READY 0 and nothing is saved from then on.
 ED.MENUPULL.SVSTART:
     IF ED.MENU.SVTRIED <> 0 THEN RETURN
     ED.MENU.SVTRIED = -1
@@ -671,78 +655,68 @@ ED.MENUPULL.RESTORE:
 ED.MENUPULL.MODULE.END:
 #ENDIF
 
-REM ==========================================================================
-REM MENUKEY.INC.BL -- forked, unbanked
-REM ==========================================================================
-## ***********************************************************************
-## **
-## **  MENUKEY.INC.BL -- a menu bar and its dropdowns, run from the
-## **  program's own key loop.
-## **
-## **      GP.SUB ED.MENU.BEGIN, ED.MENU.BAR
-## **      GP.SUB ED.MENU.ITEM, " &FILE "
-## **      GP.SUB ED.MENU.ITEM, " &HELP "
-## **      GP.SUB ED.MENU.BEGIN, ED.MENU.DROP + 1
-## **      GP.SUB ED.MENU.ITEM, " &OPEN "
-## **      GP.SUB ED.MENU.ITEM, " E&XIT "
-## **      GP.SUB ED.MENU.BEGIN, ED.MENU.DROP + 2
-## **      GP.SUB ED.MENU.ITEM, " &ABOUT "
-## **      GOSUB ED.MENU.THEME
-## **      GP.SUB ED.MENU.DRAWBAR, 0, 0, ED.MENU.NOBOX
-## **      GOSUB ED.MENU.KEYS.ON
-## **
-## **      GET K$
-## **      N = GP.FN(ED.MENU.KEY, ASC(K$))
-## **      IF N > 0 THEN ON ED.MENU.PICKBAR GOSUB MY.FILE, MY.HELP
-## **      IF N < 0 THEN GOSUB MY.KEY
-## **
-## **      GOSUB ED.MENU.KEYS.OFF                  before the program ends
-## **
-## **  N = GP.FN(ED.MENU.KEY, key)
-## **      -1  not a menu key: the program's own
-## **       0  the menu opened and was closed with nothing chosen
-## **       n  row n of the dropdown under bar item ED.MENU.PICKBAR
-## **
-## **  ESC opens the dropdown under the first live bar item, and ALT with a
-## **  bar item's hot key the one under that item. While one is open, LEFT
-## **  and RIGHT walk the bar, a bar item's hot key that no row claims jumps
-## **  to it, and ESC closes. Call ED.MENU.KEY straight after GET: it asks the
-## **  KERNAL whether ALT is down while the key still is.
-## **
-## **  Call it with 0 when GET gave nothing. ALT pressed and let go with no
-## **  key between then lights the first live bar item and opens no
-## **  dropdown. LEFT and RIGHT walk the bar, RETURN, DOWN or a bar hot key
-## **  opens the dropdown, and ESC or ALT again puts the bar back.
-## **
-## **  The bar is the one ED.MENU.DRAWBAR last drew. Every bar item needs a
-## **  dropdown of one row or more. Each is framed in ED.MENU.DROPSTYLE, a
-## **  ED.MENUTO.VERT style, 0 until set, and the screen under it is put back as
-## **  ED.MENU.SAVESCREEN says. The bar item is lit while its dropdown is open
-## **  and plain again after.
-## **
-## **  GOSUB ED.MENU.THEME     the menu colours from ED.THEME.CLR. The bar is BAR
-## **                       and a dropdown TEXT; the lit row is HILITE, a hot
-## **                       key BORDER's colour over the row's background, a
-## **                       disabled row DIMMED's the same way, and the frame
-## **                       TEXT. Run it again after a theme change, and set a
-## **                       MENU colour after it to differ.
-## **  GOSUB ED.MENU.KEYS.ON   makes ALT with a bar hot key type that key.
-## **  GOSUB ED.MENU.KEYS.OFF  puts the keyboard layout back.
-## **
-## **  ALT KEYS NEED THE LAYOUT. ALT with a letter arrives as a graphic in
-## **  PETSCII mode and as a symbol or nothing in ISO mode, so ED.MENU.KEYS.ON
-## **  writes each bar hot key into both ALT keyboard tables, at the key that
-## **  types that letter. Run it once the bar's items are in: until then
-## **  ALT+letter types no letter, and GET has none to hand ED.MENU.KEY. The
-## **  tables outlive the program: ED.MENU.KEYS.OFF puts every byte back and
-## **  must run before it ends.
-## **
-## **  The layout is read under BANK 0, and BANK 0 is left selected for PEEK
-## **  and POKE. So this file is not for a GP.BANKED region.
-## **
-## **  Requires MENU.INC.BL, MENUPULL.INC.BL and THEME.INC.BL.
-## **
-## ***********************************************************************
+## ==========================================================================
+## MENUKEY -- a menu bar and its dropdowns, run from the program's own key loop.
+##
+##     GP.SUB ED.MENU.BEGIN, ED.MENU.BAR
+##     GP.SUB ED.MENU.ITEM, " &FILE "
+##     GP.SUB ED.MENU.ITEM, " &HELP "
+##     GP.SUB ED.MENU.BEGIN, ED.MENU.DROP + 1
+##     GP.SUB ED.MENU.ITEM, " &OPEN "
+##     GP.SUB ED.MENU.ITEM, " E&XIT "
+##     GP.SUB ED.MENU.BEGIN, ED.MENU.DROP + 2
+##     GP.SUB ED.MENU.ITEM, " &ABOUT "
+##     GOSUB ED.MENU.THEME
+##     GP.SUB ED.MENU.DRAWBAR, 0, 0, ED.MENU.NOBOX
+##     GOSUB ED.MENU.KEYS.ON
+##
+##     GET K$
+##     N = GP.FN(ED.MENU.KEY, ASC(K$))
+##     IF N > 0 THEN ON ED.MENU.PICKBAR GOSUB MY.FILE, MY.HELP
+##     IF N < 0 THEN GOSUB MY.KEY
+##
+##     GOSUB ED.MENU.KEYS.OFF                  before the program ends
+##
+## N = GP.FN(ED.MENU.KEY, key)
+##     -1  not a menu key: the program's own
+##      0  the menu opened and was closed with nothing chosen
+##      n  row n of the dropdown under bar item ED.MENU.PICKBAR
+##
+## ESC opens the dropdown under the first live bar item, and ALT with a bar item's hot key
+## the one under that item. While one is open, LEFT and RIGHT walk the bar, a bar item's hot
+## key that no row claims jumps to it, and ESC closes. Call ED.MENU.KEY straight after GET:
+## it asks the KERNAL whether ALT is down while the key still is.
+##
+## Call it with 0 when GET gave nothing. ALT pressed and let go with no key between then
+## lights the first live bar item and opens no dropdown. LEFT and RIGHT walk the bar,
+## RETURN, DOWN or a bar hot key opens the dropdown, and ESC or ALT again puts the bar back.
+##
+## The bar is the one ED.MENU.DRAWBAR last drew. Every bar item needs a dropdown of one row
+## or more. Each is framed in ED.MENU.DROPSTYLE, a ED.MENUTO.VERT style, 0 until set, and
+## the screen under it is put back as ED.MENU.SAVESCREEN says. The bar item is lit while its
+## dropdown is open and plain again after.
+##
+##   GOSUB ED.MENU.THEME      the menu colours from ED.THEME.CLR. The bar is BAR and
+##                            a dropdown TEXT. The lit row is HILITE, a hot key
+##                            BORDER's colour over the row's background, a disabled
+##                            row DIMMED's the same way, and the frame TEXT. Run it
+##                            again after a theme change, and set a MENU colour after
+##                            it to differ
+##   GOSUB ED.MENU.KEYS.ON    make ALT with a bar hot key type that key
+##   GOSUB ED.MENU.KEYS.OFF   put the keyboard layout back
+##
+## WARNING: the ALT keys need the layout. ALT with a letter arrives as a graphic in PETSCII
+## mode and as a symbol or nothing in ISO mode, so ED.MENU.KEYS.ON writes each bar hot key
+## into both ALT keyboard tables, at the key that types that letter. Run it once the bar's
+## items are in: until then ALT+letter types no letter, and GET has none to hand
+## ED.MENU.KEY. The tables outlive the program: ED.MENU.KEYS.OFF puts every byte back and
+## must run before it ends.
+##
+## The layout is read under BANK 0, and BANK 0 is left selected for PEEK and POKE, so this
+## section is not one to put in a GP.BANKED region.
+##
+## It needs the MENU and MENUPULL sections above, and the THEME section of ED-MISC.BASL.
+## ==========================================================================
 #IFNDEF ED.MENUKEY.DEFS
 #DEFINE ED.MENUKEY.DEFS 1
 
@@ -772,7 +746,7 @@ ED.MENU.KEY.BODY:
     IF ED.MENU.WALKAT = 0 THEN RETURN
     ED.MENU.PICKED = 0
 
-## ---- one dropdown open. The key it hands back says where to go next.
+## ED.MENU.WALK -- one dropdown open. The key it hands back says where to go next.
 ED.MENU.WALK:
     ED.MENU.PULLAT = ED.MENU.WALKAT : ED.MENU.PULLSLOT = ED.MENU.DROP + ED.MENU.WALKAT
     ED.MENU.STYLE = ED.MENU.DROPSTYLE
@@ -785,15 +759,15 @@ ED.MENU.WALKED:
     GOSUB ED.MENUPULL.UNMARK
     RETURN
 
-## ---- ESC, or no dropdown to run, closes. A bar hot key jumps; any other key
-## ---- opens the same dropdown again.
+## ESC, or no dropdown to run, closes. A bar hot key jumps; any other key opens the same
+## dropdown again.
 ED.MENU.WALKKEY:
     IF ED.MENU.EXITKEY = 0 OR ED.MENU.EXITKEY = ED.MENU.ESC OR ED.MENU.EXITKEY = ED.MENU.STOP THEN RETURN
     ED.MENU.WALKTO = GP.FN(ED.MENU.HOTROW, ED.MENU.BAR, ED.MENU.EXITKEY)
     IF ED.MENU.WALKTO = 0 THEN ED.MENU.WALKTO = ED.MENU.WALKAT
     RETURN
 
-## ---- no key. ALT down and up again with no key between lights the bar.
+## ED.MENU.IDLE -- no key. ALT down and up again with no key between lights the bar.
 ED.MENU.IDLE:
     GOSUB ED.MENU.ALTTAP
     IF ED.MENU.TAPPED = 0 THEN RETURN
@@ -801,8 +775,8 @@ ED.MENU.IDLE:
     IF ED.MENU.WALKAT = 0 THEN RETURN
     ED.MENU.PICKED = 0
 
-## ---- the bar lit and no dropdown open. LEFT and RIGHT walk it; RETURN, DOWN
-## ---- or a bar hot key opens a dropdown; ESC or ALT again leaves.
+## ED.MENU.FOCUS -- the bar lit and no dropdown open. LEFT and RIGHT walk it; RETURN, DOWN
+## or a bar hot key opens a dropdown; ESC or ALT again leaves.
 ED.MENU.FOCUS:
     ED.MENU.PULLAT = ED.MENU.WALKAT
     ED.MENU.RUNSLOT = ED.MENU.BAR : GOSUB ED.MENU.MEASURE
@@ -824,7 +798,7 @@ ED.MENU.FOCUSGOT:
     IF ED.MENU.WALKTO > 0 THEN ED.MENU.WALKAT = ED.MENU.WALKTO : GOTO ED.MENU.WALK
     GOTO ED.MENU.FOCUSKEY
 
-## ---- ED.MENU.TAPPED is -1 when ALT has come up since it was last seen down.
+## ED.MENU.TAPPED is -1 when ALT has come up since it was last seen down.
 ED.MENU.ALTTAP:
     ED.MENU.TAPPED = 0
     GOSUB ED.MENU.MODSNOW
@@ -837,7 +811,7 @@ ED.MENU.MODSNOW:
     POKE 1, 0 : GP.CALL ED.MENU.KBDMOD : ED.MENU.MODS = GP.A : POKE 1, ED.MENU.ROMWAS
     RETURN
 
-## ---- asked of the KERNAL while the key is still down.
+## ED.MENU.ALTHIT -- asked of the KERNAL while the key is still down.
 ED.MENU.ALTHIT:
     GOSUB ED.MENU.MODSNOW
     IF (ED.MENU.MODS AND ED.MENU.MOD.ALT) = 0 THEN RETURN
@@ -856,10 +830,9 @@ ED.MENU.THEME:
     ED.MENU.SEPATTR = ED.MENU.ATTR
     RETURN
 
-## ---- the plain table finds the key that types each letter, and the ALT
-## ---- table at the same place is made to type it too, once for PETSCII and
-## ---- once for ISO. Each byte written is kept for ED.MENU.KEYS.OFF, by its
-## ---- offset from ED.MENU.KEYMAP.
+## ED.MENU.KEYS.ON -- the plain table finds the key that types each letter, and the ALT
+## table at the same place is made to type it too, once for PETSCII and once for ISO. Each
+## byte written is kept for ED.MENU.KEYS.OFF, by its offset from ED.MENU.KEYMAP.
 ED.MENU.KEYS.ON:
     GOSUB ED.MENU.KEYS.OFF
     ED.MENU.KEYSSET = -1
@@ -871,7 +844,7 @@ ED.MENU.KEYS.ON:
     GOSUB ED.MENU.KEYPAIR
     RETURN
 
-## ---- PETSCII types a letter as 65-90, ISO as 97-122: ED.MENU.TCASE is the gap.
+## PETSCII types a letter as 65-90, ISO as 97-122: ED.MENU.TCASE is the gap.
 ED.MENU.KEYPAIR:
     ED.MENU.TPLAIN = 0 : ED.MENU.TALT = 0
     FOR ED.MENU.TI = 0 TO 10
@@ -907,9 +880,16 @@ ED.MENU.KEYS.OFF:
 ED.MENUKEY.MODULE.END:
 #ENDIF
 
-
+## ==========================================================================
+## THE EDITOR'S OWN BAR AND DROPDOWNS
+##
+## Three titles, each with a dropdown, built once at startup. ED.MENUS.KEY reads every key
+## before the editor does, and ED.MENUS.DISPATCH turns a choice into an ED.CMD.* call in
+## EDITOR.BASL, which the one global symbol table makes reachable.
+## ==========================================================================
 GOTO ED.MENUS.END
 
+## ED.MENUS.SETUP -- build the bar and its three dropdowns. Called once, from ED.INIT.
 ED.MENUS.SETUP:
   GP.SUB ED.MENU.SAVESCREEN, ED.MENU.SAVE.VRAM
   GOSUB ED.MENU.THEME
@@ -917,8 +897,8 @@ ED.MENUS.SETUP:
   GP.SUB ED.MENU.ITEM, " &File "
   GP.SUB ED.MENU.ITEM, " &Search "
   GP.SUB ED.MENU.ITEM, " &Help "
-  REM A hot key need not be the initial: Save and Save As both start with S, so the
-  REM second takes its A. The leading space insets the text; the trailing one pads.
+  ## A hot key need not be the initial: Save and Save As both start with S, so the second
+  ## takes its A. The leading space insets the text; the trailing one pads.
   GP.SUB ED.MENU.BEGIN, ED.MENU.DROP + 1
   GP.SUB ED.MENU.ITEM, " &New "
   GP.SUB ED.MENU.ITEM, " &Open... "
@@ -932,41 +912,38 @@ ED.MENUS.SETUP:
   GP.SUB ED.MENU.ITEM, " &About "
   RETURN
 
-REM ---- the titles, none lit. ED.RENDER.MENUBAR draws the band and filename around 
-REM ---- them. Just the top line
+## ED.MENUS.DRAW.BAR -- draw the titles, none lit. ED.RENDER.MENUBAR draws the band and the
+## file name around them.
 ED.MENUS.DRAW.BAR:
   GP.SUB ED.MENU.DRAWBAR, 0, 0, ED.MENU.NOBOX
   RETURN
 
-REM ---- every key comes here first. ED.MENUS.PICK is -1 when it was not a menu key.
+## ED.MENUS.KEY -- every key comes here first.
+##
+##   in   ED.KEY         the key the editor read
+##   out  ED.MENUS.PICK  -1 when the menus did not take the key, 0 when a menu opened
+##                       and closed with nothing chosen, otherwise the row chosen
 ED.MENUS.KEY:
   ED.MENUS.PICK = GP.FN(ED.MENU.KEY, ED.KEY)
   IF ED.MENUS.PICK < 0 THEN RETURN
-  ## 
+  ## The dropdown painted over the caret cell on its way out.
   GOSUB ED.PLACE.CARET
   IF ED.MENUS.PICK > 0 THEN GOSUB ED.MENUS.DISPATCH
   RETURN
 
-## ---- ED.CMD.* live in EDITOR.BASL, reached through the one global symbol table.
-## --- Menu bar 1st, then calls drop down menu
+## ED.MENUS.DISPATCH -- the bar item first, then the row inside its dropdown.
 ED.MENUS.DISPATCH:
   ON ED.MENU.PICKBAR GOSUB ED.DROPDOWN.FILE, ED.DROPDOWN.SEARCH, ED.CMD.ABOUT
   RETURN
 
-## ---- File menu
+## ED.DROPDOWN.FILE -- the File menu's rows.
 ED.DROPDOWN.FILE:
   ON ED.MENUS.PICK GOSUB ED.CMD.NEW, ED.CMD.OPEN, ED.CMD.SAVE, ED.CMD.SAVEAS, ED.CMD.EXIT
   RETURN
 
-## --- Search menu
+## ED.DROPDOWN.SEARCH -- the Search menu's rows.
 ED.DROPDOWN.SEARCH:
   ON ED.MENUS.PICK GOSUB ED.CMD.FIND, ED.CMD.GOTO
   RETURN
-
-
-## -----------------------------------------------------------
-## -----------------------------------------------------------
-## -----------------------------------------------------------
-## -----------------------------------------------------------
 
 ED.MENUS.END:

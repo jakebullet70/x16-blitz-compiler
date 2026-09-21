@@ -1,36 +1,13 @@
-#SAVEAS "@:EDITOR.SRC.PRG"
-#AUTONUM 1
+#SAVEAS "@:EDIT.SRC.PRG"
 #REM 0
-#SYMFILE "@:EDITOR.SRC.SYM"
-## The single-line box, as TILE INDICES: the dropdowns draw it with GP.BOX, whose custom
-## glyphs reach the cell unconverted. ED.PETFONT is what parks them here.
-#DEFINE ED.GL.H 192
-#DEFINE ED.GL.V 193
-#DEFINE ED.GL.TL 194
-#DEFINE ED.GL.TR 195
-#DEFINE ED.GL.BL 196
-#DEFINE ED.GL.BR 197
+#SYMFILE "@:EDIT.SRC.SYM"
 
-REM The line-number gutter: ED.GUT.D digit columns, then blanks out to ED.GUT.W. Everything
-REM that turns a document position into a cell adds ED.GUT.W; the horizontal scroll already
-REM works in ED.TEXT.WIDTH, which shrinks by the same amount.
-REM
-REM ED.GUT.W MUST BE EVEN. ED.ROW.STREAM writes TWO CELLS AT A TIME through VERA's FX cache
-REM and that write is 4-BYTE ALIGNED, so an odd text column renders one cell to the left and
-REM eats the gutter. Column 0 was always aligned, which is why nothing here had to know.
 
 #DEFINE ED.GUT.D 4
 #DEFINE ED.GUT.W 6
 
-REM GPB.INC.BL IS THE ONE FILE STILL TAKEN FROM THE LIBRARY, and it is not library code:
-REM it is the #TOKEN list that makes GP.BOX, GP.ASM and the rest keywords. Everything the
-REM editor CALLS was forked into ED-MISC.BASL and ED-MENUS.BASL and re-prefixed ED.*.
-#INCLUDE "GPC-BASIC/GPB.INC.BL"
-
-REM Both forked files jump their own bodies, so they can sit here, above the editor's
-REM code, which is where their #DEFINEs have to be. The #SYMFILE at the top is for the
-REM GP.ASM in ED.SV.* and ED.STRCASE.*: {VAR} reaches BASIC's variables by name, and by
-REM then BASLOAD has crunched every one.
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "ED-FONT.BASL"
 #INCLUDE "ED-MISC.BASL"
 #INCLUDE "ED-MENUS.BASL"
 
@@ -46,21 +23,9 @@ REM IT TAKES NO LIBRARY CODE. Every module it once #INCLUDEd from GPC-BASIC was 
 REM ED-MISC.BASL and ED-MENUS.BASL, re-prefixed ED.* and taken off the banks. GPB.INC.BL is
 REM the one file still read from there, and that is the keyword list rather than code.
 REM
-REM The user interface is the menu bar, its dropdowns and the theme. The prompts are an
-REM ED.LINEINPUT field and a key wait on the status row, so no dialog box is compiled in.
-REM
 REM BANKS: 1 the runtime's, 2-4 the line table, 13 up to the top of RAM the document arena.
 REM Nothing else is claimed -- no code and no menu text is banked.
 REM
-REM THE TWO RENDERERS ARE INLINE ASSEMBLY: ED.RENDER.ROW draws text, ED.PUT.FIELD chrome,
-REM each one GP.ASM block reaching BASIC's variables through {VAR}. bench/BENCHROWS measures
-REM both against their BASIC versions. GP.ASM itself costs no runtime bytes; GP.SELECT in the
-REM key dispatch does -- one core keyword pulls in the whole 2 KB GP block, which is why this
-REM compiles GP-BASIC IN. Readability, bought knowingly.
-REM
-REM Colours are ED-MISC.BASL's theme roles, from the theme ED.THEME.ID names.
-REM ============================================================================
-
 ED.SCREEN.MODE = 1 : REM 1 = 80x30, 3 = 40x30 (see KERNAL screen_mode $FF5F)
 ED.THEME.ID = 3 : REM the colour theme, see ED-MISC.BASL
 
@@ -115,115 +80,32 @@ ED.QUIT:
   POKE 40761, 0 : POKE 40762, 0 : REM undo any hardware VSCROLL before returning to BASIC
   REM layer 0 off again
   POKE 40754, 0 : POKE 40755, 0 : POKE 40741, 0 : POKE 40745, PEEK(40745) AND 239
-  GOSUB ED.MENU.KEYS.OFF : REM and the keyboard layout, which outlives the program
-  REM ED.APPSYS.RESTORE hands back the mode, charset and colour ED.APPSYS.STARTUP found -- the
-  REM user's, not a hardcoded 3. Re-uploading the charset is also what undoes ED.PETFONT's
-  REM re-ordering, so NOTHING MAY BE PRINTED BEFORE THIS LINE.
-  GOSUB ED.APPSYS.RESTORE
+  GOSUB ED.MENU.KEYS.OFF : GOSUB ED.APPSYS.RESTORE
   PRINT CHR$(147);
   PRINT "BYE."
   END
 
 
-REM ============================================================================
-REM ASCII-ORDER CHARSET (ED.PETFONT)
-REM
-REM A tile index is a SCREEN code, and the renderers write document bytes straight into VERA.
-REM Charset 3 has the right glyphs in the wrong order, so re-order it in VRAM: glyph N becomes
-REM the glyph for code N, and both renderers stay as they are -- no table, no lookup, zero
-REM cycles a cell. Translating in the renderer would have cost 6 of a 31-cycle cell.
-REM
-REM ASCII ORDER, NOT PETSCII, and that is the whole reason it works: BASLOAD passes string
-REM literals through as the source's own bytes, so every name, prompt and message here is
-REM ASCII. PETSCII order case-swaps all of them and stops find matching its own needles.
-REM PETSCII belongs at the DISK boundary, in ED-STORE.BASL.
-REM
-REM Only 38 glyphs move -- $20-$3F and $41-$5A are already where ASCII wants them:
-REM
-REM   ASCII $40  @     <- screen $00        ASCII $60  `     <- screen $40
-REM   ASCII $5B-$5F    <- screen $1B-$1F    ASCII $61-$7A a-z <- screen $01-$1A
-REM   ASCII $7B-$7F    <- screen $5B-$5F
-REM
-REM ORDER MATTERS -- $60 before $40, $7B-$7F before $5B-$5F -- because two of those read from
-REM a run another one writes. Nothing forms a cycle, so no staging buffer is needed.
-REM ============================================================================
-REM ============================================================================
-REM DROPDOWN FRAME -- the one fact about this program the menu library cannot work out
-REM ============================================================================
-REM GP.BOX's built-in styles name the screen codes the STOCK charset uses and ED.PETFONT has
-REM moved every one of them, so style 2 would draw "p @ B". ED.MENU.DROPSTYLE points at eight
-REM bytes of our own instead, the glyphs ED.PETFONT rescued into $C0-$C5. The order MENU
-REM reads them in is TR TL BR BL H H V V. MUST RUN AFTER ED.PETFONT.
-ED.GUI.SETUP:
-  ED.STYLE$ = CHR$(ED.GL.TR) + CHR$(ED.GL.TL) + CHR$(ED.GL.BR) + CHR$(ED.GL.BL)
-  ED.STYLE$ = ED.STYLE$ + CHR$(ED.GL.H) + CHR$(ED.GL.H) + CHR$(ED.GL.V) + CHR$(ED.GL.V)
-  ED.MENU.DROPSTYLE = GP.STRPTR(ED.STYLE$) + 1
-  RETURN
 
-ED.PETFONT:
-  ED.FONT = 61440 : REM $1:F000, the KERNAL's 2 KB charset (VERA bank 1)
-  REM ---- THE SINGLE-LINE BOX, RESCUED BEFORE THE RE-ORDER RUNS OVER IT ----
-  REM Charset 3 keeps its box drawing at $40-$7D, which the re-order below buries under ASCII
-  REM letters -- no corners survive, which is why GP.BOX's own styles draw "p @ B" here. Copy
-  REM the six up into $C0-$C5 FIRST, the one region the re-order never touches.
-  ED.FS = 64  : ED.FD = ED.GL.H  : ED.FN = 1 : GOSUB ED.FCOPY : REM $40 horizontal
-  ED.FS = 93  : ED.FD = ED.GL.V  : ED.FN = 1 : GOSUB ED.FCOPY : REM $5D vertical
-  ED.FS = 112 : ED.FD = ED.GL.TL : ED.FN = 1 : GOSUB ED.FCOPY : REM $70 top left
-  ED.FS = 110 : ED.FD = ED.GL.TR : ED.FN = 1 : GOSUB ED.FCOPY : REM $6E top right
-  ED.FS = 109 : ED.FD = ED.GL.BL : ED.FN = 1 : GOSUB ED.FCOPY : REM $6D bottom left
-  ED.FS = 125 : ED.FD = ED.GL.BR : ED.FN = 1 : GOSUB ED.FCOPY : REM $7D bottom right
-  REM ---- and now the ASCII re-order itself ----
-  ED.FS = 64  : ED.FD = 96  : ED.FN = 1  : GOSUB ED.FCOPY
-  ED.FS = 91  : ED.FD = 123 : ED.FN = 5  : GOSUB ED.FCOPY
-  ED.FS = 0   : ED.FD = 64  : ED.FN = 1  : GOSUB ED.FCOPY
-  ED.FS = 27  : ED.FD = 91  : ED.FN = 5  : GOSUB ED.FCOPY
-  ED.FS = 1   : ED.FD = 97  : ED.FN = 26 : GOSUB ED.FCOPY
-  RETURN
-
-
-REM Copy ED.FN glyphs, 8 bytes each, from screen code ED.FS to code ED.FD. GP.DO takes its
-REM count once up front rather than re-evaluating a FOR's TO every pass -- but GP.DO 0
-REM loops FOREVER, so a zero count would hang here rather than do nothing.
-ED.FCOPY:
-  ED.FCOUNT = ED.FN * 8
-  ED.FI = 0
-  GP.DO ED.FCOUNT
-    VPOKE 1, ED.FONT + ED.FD * 8 + ED.FI, VPEEK(1, ED.FONT + ED.FS * 8 + ED.FI)
-    ED.FI = ED.FI + 1
-  GP.LOOP
-  RETURN
 
 REM ============================================================================
 REM SETUP
 REM ============================================================================
 ED.INIT:
-  REM FIRST, before any mode or colour of our own: ED.APPSYS.STARTUP records the state as it
-  REM FINDS it and ED.QUIT hands that back. Anything changed above this line is lost.
   GOSUB ED.APPSYS.STARTUP
-  REM Bank claims in this order: the line table's three, then the arena takes every bank
-  REM it can up to the top of RAM. No code and no menu text is banked.
   GOSUB ED.BANKMGR.INIT
   GOSUB DOC.INIT
   GOSUB ED.CLAIM.FIXED.BANKS
-  REM The colours before the menus: ED.MENUS.SETUP takes its own from ED.THEME.CLR.
   GOSUB ED.THEME.SELECT
   GOSUB ED.MENUS.SETUP
   GOSUB ED.CLAIM.ARENA.BANKS
-  REM GP.CALL, not SYS: A, X, Y and CARRY as arguments, results in GP.A / GP.X / GP.Y,
-  REM against SYS's four statements through the POKE 780..783 slots. Free here -- the GP
-  REM block is already paid for by the GP.SELECT in the key dispatch.
+  
   GP.CALL ED.APPSYS.SCRMODE, ED.SCREEN.MODE, 0, 0, 0 : REM carry CLEAR sets the mode
   GP.CALL ED.APPSYS.SETCHR, 3, 0, 0, 0 : REM charset 3, PET upper/lower
   PRINT CHR$(147);
   GOSUB ED.PETFONT : REM ...then re-index it so a VERA tile index IS a character code
-  REM ...and DECLARE it, with bit 6 of $0372: "text is ASCII", which the re-ordered font now
-  REM makes true. POKED, NOT CHR$(15) -- CHR$(15) uploads the ISO font and throws the PETSCII
-  REM glyphs away. Three things follow, all wanted: the keyboard returns ASCII, PRINT stops
-  REM translating, and GP.PRINTAT skips its PETSCII step.
   POKE 882, PEEK(882) OR 64
   GOSUB ED.GUI.SETUP : REM ...and tell MENU where the frame glyphs ended up
-  REM The same entry point with CARRY SET makes screen_mode REPORT instead: mode in A, columns
-  REM in X, rows in Y. This is the 80x30 just chosen, not the user's size ED.APPSYS.STARTUP kept.
   GP.CALL ED.APPSYS.SCRMODE, 0, 0, 0, 1
   SCREEN.COLS = GP.X : SCREEN.ROWS = GP.Y
   IF SCREEN.COLS < 20 THEN SCREEN.COLS = 80
@@ -234,11 +116,6 @@ ED.INIT:
   ED.ATTR.TEXT   = ED.THEME.CLR(ED.THEME.TEXT)
   ED.ATTR.CARET  = ED.THEME.CLR(ED.THEME.HILITE)
   ED.ASM.GATTR% = ED.THEME.CLR(ED.THEME.DIMMED) : REM the gutter, read by ED.ROW.STREAM
-  REM ---- hardware vertical scroll setup (see ED.DO.SCROLL) ----
-  REM VERA's L1_VSCROLL ($9F39/$9F3A, map pixels, 8 a text row) scrolls the layer, so a
-  REM one-line move repaints 3 rows and not the screen. Screen row R is map row R + ED.MAP.TOP,
-  REM and ED.MAP.TOP = VSCROLL/8, kept inside [0, MAP.H - SCREEN.ROWS] so the window never
-  REM crosses the map's edge -- we rewind and repaint rather than rely on VERA's wrap.
   ED.MAP.TOP = 0
   POKE 40761, 0 : POKE 40762, 0 : REM L1 never scrolls again -- see ED.LAYERS
   ED.MAP.CFG = PEEK(40756) : ED.MAP.HB = INT(ED.MAP.CFG / 64) : ED.MAP.H = 32
@@ -253,6 +130,8 @@ ED.INIT:
   ED.MB.FORCE = 1 : REM the first ED.RENDER.MENUBAR draws; the dirty guard alone would skip it
   RETURN
 
+
+
 REM ---- the fixed banks: the line table, and nothing else. No code and no menu text is
 REM banked any more, so banks 5 to 12 are the arena's to take.
 ED.CLAIM.FIXED.BANKS:
@@ -262,6 +141,8 @@ ED.CLAIM.FIXED.BANKS:
     IF ED.BANKMGR.OK = 0 THEN GOSUB ED.BANK.FAILED
   NEXT ED.BK
   RETURN
+
+
 
 REM ---- the document arena: every bank from DOC.FIRST.BANK up to the first one it cannot
 REM claim, the top of RAM when nobody else owns one.
@@ -278,10 +159,14 @@ ED.CLAIM.ARENA.BANKS:
   GP.LOOP
   RETURN
 
+
+
 REM ---- a claim failed: two owners name one bank. ED.BANKMGR.SET.BANK is the bank.
 ED.BANK.FAILED:
   PRINT "BANK"; ED.BANKMGR.SET.BANK; "FAILED"
   END
+
+
 
 REM VSCROLL moves a whole LAYER, so with one layer the bars slid with the document and had to
 REM be redrawn every line. Layer 0 takes the document and scrolls alone; layer 1 keeps the
@@ -300,6 +185,8 @@ ED.LAYERS:
   GOSUB ED.CLEAR.OVERLAY
   RETURN
 
+
+
 REM Layer 0 is switched on AFTER the first full render, and is never cleared: VRAM comes up
 REM with whatever was in it, but no row is ever visible before it is painted.
 ED.L0.ON:
@@ -315,6 +202,8 @@ ED.OPEN.DONE:
   ED.TOP.LINE = 0 : ED.LEFT.COL = 0 : ED.CUR.ROW = 0 :  ED.CUR.COL = 0 : ED.INSERT.MODE = 1 : ED.DOC.DIRTY = 0
   GOSUB ED.LOAD.LIVE
   RETURN
+
+
 
 
 REM ============================================================================
@@ -334,6 +223,8 @@ ED.COMMIT.LIVE:
 ED.CLAMP.COL:
   IF ED.CUR.COL > LEN(ED.CUR.LINE$) THEN ED.CUR.COL = LEN(ED.CUR.LINE$)
   RETURN
+
+
 
 
 REM ============================================================================
@@ -388,6 +279,8 @@ ED.MOVE.PAGEDOWN:
   IF ED.CUR.ROW > LINE.COUNT - 1 THEN ED.CUR.ROW = LINE.COUNT - 1
   GOSUB ED.LOAD.LIVE : GOSUB ED.CLAMP.COL : GOSUB ED.CARET.REFRESH
   RETURN
+
+
 
 REM ============================================================================
 REM EDITING

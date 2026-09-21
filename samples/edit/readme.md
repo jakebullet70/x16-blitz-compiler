@@ -11,20 +11,28 @@ source. That is the point of the sample, and the numbers below are what it bough
 
 | File | What it is |
 | --- | --- |
-| `EDITOR.BASL` | the editor — startup/restore, theme, render, key loop, editing, find |
+| `EDIT.BASL` | the editor â€” startup/restore, theme, render, key loop, editing, find |
+| `ED-FONT.BASL` | `#INCLUDE`d font: charset 3 re-ordered into ASCII order in VRAM, and the box glyphs rescued out of the way |
+| `ED-MISC.BASL` | `#INCLUDE`d forks of the library modules it uses: APPSYS, BANKMGR, STASHVRAM, STRCASE, THEME, LINEINPUT |
+| `ED-MENUS.BASL` | `#INCLUDE`d forks of MENU, MENUPULL and MENUKEY, plus the editor's own bar, dropdowns and dispatch |
 | `ED-STORE.BASL` | `#INCLUDE`d storage: a banked bump allocator and a 3-byte-per-line pointer table |
-| `ED-MENUS.BASL` | `#INCLUDE`d menus: the bar and dropdowns built on `MENU.INC.BL`, their keys and dispatch |
-| `EDITOR.PRG` | the tokenised program — the input you feed to the compiler |
-| `EDITOR.SYM` | **BASLOAD's symbol file, and it is not optional** — see below |
+| `GPB.INC.BL` | the library's keyword list, the one file taken from `GPC-BASIC`. It defines `#TOKEN`s, not code |
+| `EDIT.SRC.PRG` | the tokenised program â€” the input you feed to the compiler |
+| `EDIT.SRC.SYM` | **BASLOAD's symbol file, and it is not optional** â€” see below |
+| `EDIT.PRG` | the compiled program, built EMBEDDED, so it carries the runtime and writes no `.OVL` |
 | `TEST.MD` | the document the editor opens, and the fixture the self-check searches |
 | `bench/` | the four benchmarks, each holding old and new in **one** program: `BENCHROWS` renderer against renderer, `LOADBEN` loader against loader, `SLOTBEN` and `SLOTTST` for the line table |
-| `GPC-BASIC/` | the library it `#INCLUDE`s, shipped beside it: `GPB` `THEME` `APPSYS` and the rest |
 
-> **`EDITOR.SYM` ships for a reason.** `{VAR}` reaches a BASIC variable through BASLOAD's own
+The editor compiles no library code. Every module it once `#INCLUDE`d from `GPC-BASIC` was forked
+into `ED-FONT.BASL`, `ED-MISC.BASL` and `ED-MENUS.BASL`, re-prefixed `ED.*` and taken off the banks.
+Those files are the ones to edit.
+
+> **`EDIT.SRC.SYM` ships for a reason.** `{VAR}` reaches a BASIC variable through BASLOAD's own
 > `#SYMFILE` record, because BASLOAD renames every variable (`ED.ASM.VIS%` becomes something like
-> `A7%`) while storing REM text byte for byte — so the assembly says one name and the code uses
-> another. The compiler reads the mapping from `EDITOR.SYM`, which must sit beside `EDITOR.PRG`
-> under the matching name. Delete it and the compile stops with `{} NEEDS #SYMFILE`.
+> `A7%`) while storing REM text byte for byte â€” so the assembly says one name and the code uses
+> another. The compiler reads the mapping from `EDIT.SRC.SYM`, which must sit beside
+> `EDIT.SRC.PRG` under the matching name. Delete it and the compile stops with
+> `{} NEEDS #SYMFILE`.
 
 ## The speed story
 
@@ -194,73 +202,75 @@ VRAM; and a load→save round trip byte-for-byte identical to the original, apar
 
 ## Startup, restore, and theming
 
-Two things an application on somebody else's machine owes them, both from the shipped library rather
-than hand-rolled here.
+Two things an application on somebody else's machine owes them, both forked into `ED-MISC.BASL`
+rather than hand-rolled here.
 
-**Give the screen back.** `APPSYS.STARTUP` is the *first* thing `ED.INIT` does — before any screen
+**Give the screen back.** `ED.APPSYS.STARTUP` is the *first* thing `ED.INIT` does — before any screen
 mode or colour of the editor's own — because it records the state as it finds it, so anything changed
-beforehand is what the user would be left with. `ED.QUIT` calls `APPSYS.RESTORE`, which puts back the
+beforehand is what the user would be left with. `ED.QUIT` calls `ED.APPSYS.RESTORE`, which puts back the
 mode, the **charset** and the text colour. The editor runs 80x30, and someone who prefers 40x30 gets
 40x30 back.
 
-**The charset had to be taught to `APPSYS`**, and it is worth knowing why it was missing. `$FF62`
-only *sets* a charset — there is no "get" call — so it looked unrecoverable. It is not: **`$0372`
-holds the charset number outright**, reading `2` at boot and reading back exactly what was last set,
-1 to 7. That is probed, not documented. Without it `ED.QUIT` hardcoded charset 3, so anyone who
-started the editor in upper case — which is the machine's default — was dropped into lower case on
-the way out.
+**The charset is restored from `$0372`, not from a KERNAL call.** `$FF62` only *sets* a charset,
+and there is no "get" call. `$0372` holds the charset number outright, reading `2` at boot and
+reading back exactly what was last set, 1 to 7. That is probed, not documented.
 
 Restoring the charset does double duty here: it is what the user chose, *and* re-uploading it is what
 undoes `ED.PETFONT`'s re-ordering, so the `BYE.` prints in the right glyphs. Nothing may be `PRINT`ed
 before that line — see the PETSCII section above for why.
 
-**Colours are named roles, not literals.** They used to be numbers scattered through the chrome — `97`
-here, `240` there, `33` for an error — with no way to restyle short of hunting them all down. They are
-now the seven roles `THEME.INC.BL` defines, held in `THEME.CLR()`:
+**Colours are named roles, not literals.** They are the roles the `THEME` section of
+`ED-MISC.BASL` defines, held in `ED.THEME.CLR()`:
 
 | role | is | role | is |
 |---|---|---|---|
-| `PAGE` | the dropdown panel | `TITLE` | menu bar, status bar, messages |
-| `TEXT` | the document | `BORDER` | the hotkey letter in a menu title |
-| `HILITE` | caret, active title | `DIMMED` | prompts |
+| `TEXT` | the document | `TITLE` | the menu titles |
+| `BAR` | menu bar, status row, messages | `BORDER` | the hot key letter in a menu title |
+| `HILITE` | caret, active title | `DIMMED` | the line-number gutter, disabled rows |
 | `WARN` | errors | | |
 
-**The names are free.** `#DEFINE` substitutes at translation time, so `THEME.CLR(THEME.TITLE)`
-compiles to `THEME.CLR(2)` — no variable, no lookup, a one-byte constant index. An attribute is
+`PAGE` and `FOCUS` are in every palette and this editor reads neither.
+
+**The names are free.** `#DEFINE` substitutes at translation time, so
+`ED.THEME.CLR(ED.THEME.TITLE)` compiles to `ED.THEME.CLR(2)` — no variable, no lookup, a one-byte
+constant index. An attribute is
 `background * 16 + foreground`, which is what VERA's colour byte and every GP drawing command already
 take.
 
-`ED.THEME` sets the editor's *own* palette rather than using `THEME.LOAD`'s. The library default is a
-blue-page application look; this is DETOK's, which is what the sample has always drawn. **The roles
-are what is shared, not the colours** — which is the entire point of having roles. Flip `ED.DARK` at
-the top of the file for the dark variant.
+`ED.THEME.SELECT` fills the slots from one of five palettes, chosen by `ED.THEME.ID` at the top of
+`EDIT.BASL`. **The roles are what is shared, not the colours** — which is the entire point of
+having roles.
 
-One trap worth knowing: `ED.THEME` calls `THEME.LOAD` and then overwrites the slots, rather than
-doing its own `DIM`. **GPC rejects a second `DIM` of the same array even when only one of them can
-ever run** — `ARRAY REDEFINED`, at compile time.
-writing CR where the fixture had LF.
+One trap worth knowing: every palette writes the same array rather than `DIM`ming its own. **GPC
+rejects a second `DIM` of the same array even when only one of them can ever run** —
+`ARRAY REDEFINED`, at compile time.
 
 ## The menus, and the flag that makes the GP drawing commands usable
 
-The menus are `MENU.INC.BL`'s and `MENUPULL.INC.BL`'s. The bar is the bar slot, drawn by
-`MENU.DRAWBAR` and never run: ESC and ALT+letter are the editor's keys, and each opens a dropdown at
-once. A dropdown is the popup slot, rebuilt as it opens and run by `MENUTO.PULLDOWN`, which saves
-and puts back the cells under it in the dialogs' bank. LEFT and RIGHT come back as `MENU.NEXTBAR`;
-a letter no row claims is tried against the titles with `MENU.HOTROW`, so a letter is a row's hot
-key first and a title's second. `ED.ALTKEYS` asks `MENU.HOTROW` too, for the keymap.
+The menus are `ED-MENUS.BASL`'s forks of `MENU`, `MENUPULL` and `MENUKEY`. The bar is the bar slot,
+drawn by `ED.MENU.DRAWBAR` and never run: ESC and ALT+letter are the editor's keys, and each opens a
+dropdown at once. `ED.MENUS.SETUP` builds the bar and all three dropdowns once at startup, and
+`ED.MENUTO.PULLDOWN` runs the one under the chosen title, saving the cells under it in VRAM and
+putting them back after. LEFT and RIGHT come back as `ED.MENU.NEXTBAR`; a letter no row claims is
+tried against the titles with `ED.MENU.HOTROW`, so a letter is a row's hot key first and a title's
+second. `ED.MENU.KEYS.ON` asks `ED.MENU.HOTROW` too, for the keymap.
 
-`MENUTO.PULLDOWN` paints the bar item and the panel from one set of colours, and here the bar is
+`ED.MENUTO.PULLDOWN` paints the bar item and the panel from one set of colours, and here the bar is
 blue while the panel is the page. So the bar is drawn in its own colours first with the title
 already lit, and the dropdown's highlight is the bar's: the relight changes nothing.
+
+Every key goes through `ED.MENUS.KEY` before the editor sees it, and `ED.MENUS.PICK` is `-1` when
+the menus did not take it. A chosen row lands in `ED.MENUS.DISPATCH`, which turns it into an
+`ED.CMD.*` call in `EDIT.BASL`.
 
 ### The frame is the rescued glyphs
 
 `GP.BOX`'s own line styles border with screen codes `$40-$7D`, which is precisely the run
 `ED.PETFONT` overwrites with ASCII letters — a single-line box comes out as `p @ @ ... B`, measured.
 `ED.PETFONT` copies the six line glyphs up to `$C0-$C5` before the re-order, `ED.GUI.SETUP` packs
-them into `GUI.GLYPH$`, and the dialogs and the dropdowns both hand that string's address to
-`GP.BOX` as a custom style. Frame and rows are `THEME.CLR(THEME.TEXT)`, the document's own white on
-black, so the panel reads as a framed hole in the page; only the highlight breaks it.
+them into `ED.STYLE$`, and `ED.MENU.DROPSTYLE` hands that string's address to `GP.BOX` as a custom
+style. Frame and rows are `ED.THEME.CLR(ED.THEME.TEXT)`, the document's own white on black, so the
+panel reads as a framed hole in the page; only the highlight breaks it.
 
 **`GP.PRINTAT` converts PETSCII to a screen code before writing.** Against an ASCII-ordered font that
 is one conversion too many: measured, `GP.PRINTAT 0,5,"Ab"` wrote tiles `1` and `66`, which render as
@@ -277,62 +287,32 @@ output lands on the right glyphs; and the GP drawing commands work.
 
 ## Build
 
-BASLOAD resolves `#INCLUDE` off the drive, so the three sources, `TEST.MD` and every
-`GPC-BASIC/*.INC.BL` the editor includes have to sit together on it. Then:
+BASLOAD resolves `#INCLUDE` off the drive, so the five sources, `GPB.INC.BL` and `TEST.MD` have to
+sit together on it. Then:
 
-1. **Tokenise.** `BASLOAD "EDITOR.BASL"` at the ROM prompt. The source's own `#SAVEAS` and
-   `#SYMFILE` write `EDITOR.PRG` and `EDITOR.SYM`. Both are already here, so skip this unless you
-   edit the source — **and if you do edit it, re-tokenise, because a stale `.SYM` resolves `{VAR}`
-   to the wrong slot.**
+1. **Tokenise.** `BASLOAD "EDIT.BASL"` at the ROM prompt. The source's own `#SAVEAS` and
+   `#SYMFILE` write `EDIT.SRC.PRG` and `EDIT.SRC.SYM`. Both are already here, so skip this
+   unless you edit the source — **and if you do edit it, re-tokenise, because a stale `.SYM`
+   resolves `{VAR}` to the wrong slot.**
 
-2. **Compile, SHARED.** `MENU.INC.BL` keeps its rows in `GP.BANKEDSTR` text, and an embedded
-   compile stops at it with `GP.BANKEDSTR NEEDS SHARED`. Run `GPC.PRG` and answer `EDITOR.PRG` /
-   `C.EDITOR.PRG` / no map / shared, or use `source/gpc/compile_shared.py`. The object needs
-   `GPC.RT.nnn.BIN` and its `.OVL` beside it at run time.
+2. **Compile, EMBEDDED.** Nothing here needs `GP.BANKEDSTR` any more: the forked menus keep their
+   rows in ordinary string arrays, so the runtime goes inside the object and no `.OVL` is written.
+   Run `GPC.PRG` and answer `EDIT.SRC.PRG` / `EDIT.PRG` / a map / embedded.
 
-3. **Run.** `LOAD "C.EDITOR.PRG",8 : RUN`. It opens `TEST.MD`.
+3. **Run.** `LOAD "EDIT.PRG",8 : RUN`. It opens `TEST.MD`.
+
+Headless, from the repository root:
+
+```
+python source/gpc/build_basl.py --drive samples/edit EDIT.BASL EDIT.SRC.PRG
+python source/gpc/compile_shared.py --drive samples/edit --embedded EDIT.SRC.PRG EDIT.PRG EDIT.MAP
+```
+
+`build_basl.py` does not notice an edited `#INCLUDE`, so delete `EDIT.SRC.PRG` before
+re-tokenising.
 
 `bench/BENCHROWS.BASL` builds the same way and **must be run at real speed** — under `-warp` its numbers are
 nonsense.
-
-## The self-check
-
-THREE BUILD MODES, chosen by the three `#DEFINE`s at the top of `EDITOR.BASL` -- BASLOAD does
-not nest `#IFNDEF`, so they are flat symbols rather than one switch:
-
-| mode | comment out | `DEBUG.MODE` | code / workspace |
-| --- | --- | --- | --- |
-| release (as committed) | nothing | 0 | 12,882 / 8,192 |
-| core tests | `ED.RELEASE`, `ED.NOCORE` | 1 | 13,749 / 7,424 |
-| optional tests | `ED.RELEASE`, `ED.NOOPT` | 1 | 15,887 / 5,120 |
-
-**The harness is split in two because it no longer fits beside itself.** The core half keeps
-the screen geometry, the theme and ALT-key tables, the hardware VSCROLL and the end-to-end
-walk; the optional half has find, the menu bar and dropdown, the render and gutter checks,
-key dispatch, the 600-open menu stress test and the GUI dialogs. Both end in `M4 OK`, and
-`ED.TESTDOC` -- the 40-line L0..L39 fixture -- sits outside both guards because both need it.
-
-It runs headless instead of interactively,
-driving the model and the dispatch programmatically (an `ED.SIM.*` hook stands in for the
-interactive prompts) and `PRINT`ing markers a watcher can grep. It ends in `M4 OK`. It checks:
-
-- go-to-line, find, find-next, a wrapping case-insensitive find, and a miss;
-- the discard-confirm both ways — declining leaves the document alone, accepting resets it;
-- **the renderers, by reading the cells back out of VRAM**: menu bar, dropdown, message line, two
-  text rows and two mid-field cells, each verified for char *and* attribute;
-- caret place and restore;
-- **the key dispatch** — `ED.DISPATCH.KEY`'s `GP.SELECT` table driven with real key codes: cursor
-  moves, Home/End, the insert/overwrite toggle, a printable character reaching `ED.DO.INSERT`
-  through `GP.OTHER` and the 32..126 range, backspace undoing it, an unbound code changing nothing,
-  and **400 consecutive dispatches** — which is what would catch a leaked selector frame;
-- hardware VSCROLL — register writes, the map-offset render, and the rewind at the bound;
-- end to end: a 40-line document, the cursor walked down 35 lines through 8 hardware scrolls, then
-  the right document lines confirmed at the map rows VSCROLL is actually displaying.
-
-The key **dispatch** is now tested, which it was not before: the main loop is only the `GET` wait, and
-the table it calls is a routine, so the self-check can drive it directly. What is still untested is
-**menu navigation** — that has its own `GET` loop inside `ED.OPEN.MENUBAR`, and key injection into a
-running program is flaky — but the commands it dispatches to are each driven directly above.
 
 ## What is not done
 
@@ -340,12 +320,15 @@ running program is flaky — but the commands it dispatches to are each driven d
   editor.
 - **The store never frees a single record.** Deleting a line leaks its content until the next save;
   reclamation is bulk, by reloading. Fine for a sample, and it is why the allocator is 30 lines.
-- **A line is capped at 250 characters** on load, and a menu row at 30, `MENU.INC.BL`'s cut.
-- **The editor claims its banks from `BANKMGR`** in `ED.BANKS`: 2–4 the line-pointer table, 5 the
-  cells a dialog covers (`GUI.BANK`), 6 the menu rows (`MENU.TEXTBANK`, defined before the
-  `#INCLUDE`), and the document arena from 7 to the top of RAM, 7–63 on a 512K machine. Bank 1 is
-  the runtime's. When the arena is full a line is stored empty rather than written into a bank it does
-  not own, and the status line says `DOCUMENT FULL`.
+- **There is no self-check harness.** The build is verified by compiling and running it, not by a
+  test mode inside the source.
+- **A line is capped at 250 characters** on load. A menu row is not capped: the forked store is a
+  string array.
+- **The editor claims its banks from `ED.BANKMGR`**, in `ED.CLAIM.FIXED.BANKS` and
+  `ED.CLAIM.ARENA.BANKS`: 2–4 the line-pointer table, and the document arena from 13 to the top of
+  RAM. Bank 1 is the runtime's, and no code and no menu text is banked. When the arena is full a
+  line is stored empty rather than written into a bank the editor does not own, and the status row
+  says `DOCUMENT FULL`.
 - **Files are assumed to be PETSCII on disk.** Opening something authored on the host — which will be
   ASCII — shows every letter case-swapped. Detecting the encoding on load is the obvious fix, and no
   byte in `$61-$7A` is a fair PETSCII tell, since in PETSCII that run is graphics. `TEST.MD` ships

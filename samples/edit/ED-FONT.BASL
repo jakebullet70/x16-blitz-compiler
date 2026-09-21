@@ -1,0 +1,99 @@
+## ============================================================================
+## ED-FONT.BASL -- the ASCII charset re-order, and the glyphs drawn with it.
+##
+## The editor writes document bytes straight into VERA, where a tile index is a screen code.
+## This module moves charset 3 into ASCII order in VRAM, so a byte of the document is the
+## tile that shows it, and rescues the six box-drawing glyphs the re-order would otherwise
+## bury.
+##
+## #INCLUDEd above the editor's body, because the ED.GL.* #DEFINEs are read there.
+##
+##   GOSUB ED.PETFONT      re-order the charset, and rescue the box glyphs
+##   GOSUB ED.GUI.SETUP    hand the rescued glyphs to the menu library
+##   GOSUB ED.FCOPY        copy glyphs, which the two above are built on
+## ============================================================================
+#IFNDEF ED.FONT.DEFS
+#DEFINE ED.FONT.DEFS 1
+
+## ---- the single-line box, as tile indices ---- The dropdowns draw it with GP.BOX, whose
+## custom glyphs reach the cell unconverted. ED.PETFONT is what parks the glyphs here.
+#DEFINE ED.GL.H 192
+#DEFINE ED.GL.V 193
+#DEFINE ED.GL.TL 194
+#DEFINE ED.GL.TR 195
+#DEFINE ED.GL.BL 196
+#DEFINE ED.GL.BR 197
+
+GOTO ED.FONT.SKIP
+
+## ED.GUI.SETUP -- give the menu library the dropdown frame glyphs.
+##
+## GP.BOX's built-in styles name the screen codes of the stock charset, and ED.PETFONT has
+## moved every one of them, so style 2 draws "p @ B" here. ED.MENU.DROPSTYLE points at eight
+## bytes of our own instead: the glyphs ED.PETFONT rescued into $C0-$C5. MENU reads them in
+## the order TR TL BR BL H H V V.
+##
+## WARNING: this runs after ED.PETFONT.
+ED.GUI.SETUP:
+  ED.STYLE$ = CHR$(ED.GL.TR) + CHR$(ED.GL.TL) + CHR$(ED.GL.BR) + CHR$(ED.GL.BL)
+  ED.STYLE$ = ED.STYLE$ + CHR$(ED.GL.H) + CHR$(ED.GL.H) + CHR$(ED.GL.V) + CHR$(ED.GL.V)
+  ED.MENU.DROPSTYLE = GP.STRPTR(ED.STYLE$) + 1
+  RETURN
+
+## ED.PETFONT -- re-order charset 3 in VRAM into ASCII order.
+##
+## A tile index is a screen code, and the renderers write document bytes straight into VERA.
+## Charset 3 holds the right glyphs in the wrong order, so glyph N is moved to code N. Both
+## renderers then stay as they are: no table, no lookup, no cycles a cell.
+##
+## The order is ASCII, not PETSCII. BASLOAD passes string literals through as the source's
+## own bytes, so every name, prompt and message in this program is ASCII. PETSCII order
+## case-swaps all of them and stops find matching its own needles. PETSCII belongs at the
+## disk boundary, in ED-STORE.BASL.
+##
+## 38 glyphs move. $20-$3F and $41-$5A are already where ASCII wants them.
+##
+##   ASCII $40  @     <- screen $00        ASCII $60  `     <- screen $40
+##   ASCII $5B-$5F    <- screen $1B-$1F    ASCII $61-$7A a-z <- screen $01-$1A
+##   ASCII $7B-$7F    <- screen $5B-$5F
+##
+## WARNING: the copies keep this order -- $60 before $40, $7B-$7F before $5B-$5F -- because
+## two of them read from a run another one writes. Nothing forms a cycle, so no staging
+## buffer is needed.
+ED.PETFONT:
+  ED.FONT = 61440 : REM $1:F000, the KERNAL's 2 KB charset (VERA bank 1)
+  ## ---- the single-line box, rescued before the re-order runs over it ---- Charset 3 keeps
+  ## its box drawing at $40-$7D, which the re-order below buries under ASCII letters. The
+  ## six glyphs go up into $C0-$C5 first, the one region the re-order never touches.
+  ED.FS = 64  : ED.FD = ED.GL.H  : ED.FN = 1 : GOSUB ED.FCOPY : REM $40 horizontal
+  ED.FS = 93  : ED.FD = ED.GL.V  : ED.FN = 1 : GOSUB ED.FCOPY : REM $5D vertical
+  ED.FS = 112 : ED.FD = ED.GL.TL : ED.FN = 1 : GOSUB ED.FCOPY : REM $70 top left
+  ED.FS = 110 : ED.FD = ED.GL.TR : ED.FN = 1 : GOSUB ED.FCOPY : REM $6E top right
+  ED.FS = 109 : ED.FD = ED.GL.BL : ED.FN = 1 : GOSUB ED.FCOPY : REM $6D bottom left
+  ED.FS = 125 : ED.FD = ED.GL.BR : ED.FN = 1 : GOSUB ED.FCOPY : REM $7D bottom right
+  ## ---- the ASCII re-order ----
+  ED.FS = 64  : ED.FD = 96  : ED.FN = 1  : GOSUB ED.FCOPY
+  ED.FS = 91  : ED.FD = 123 : ED.FN = 5  : GOSUB ED.FCOPY
+  ED.FS = 0   : ED.FD = 64  : ED.FN = 1  : GOSUB ED.FCOPY
+  ED.FS = 27  : ED.FD = 91  : ED.FN = 5  : GOSUB ED.FCOPY
+  ED.FS = 1   : ED.FD = 97  : ED.FN = 26 : GOSUB ED.FCOPY
+  RETURN
+
+## ED.FCOPY -- copy ED.FN glyphs, 8 bytes each, from screen code ED.FS to code ED.FD.
+##
+## WARNING: ED.FN is at least 1. GP.DO 0 loops forever.
+ED.FCOPY:
+  ED.FCOUNT = ED.FN * 8
+  ED.FI = 0
+  GP.DO ED.FCOUNT
+    VPOKE 1, ED.FONT + ED.FD * 8 + ED.FI, VPEEK(1, ED.FONT + ED.FS * 8 + ED.FI)
+    ED.FI = ED.FI + 1
+  GP.LOOP
+  RETURN
+
+
+
+
+
+ED.FONT.SKIP:
+#ENDIF

@@ -1,38 +1,27 @@
-REM ============================================================================
-REM ED-MISC.BASL -- every other library module the editor uses, FORKED INTO THIS SAMPLE.
-REM
-REM APPSYS, BANKMGR, STASHVRAM (SV), STRCASE, THEME and LINEINPUT, copied from
-REM GPC-BASIC, re-prefixed ED.* and taken off the banks. BANKMGR stays because the
-REM DOCUMENT arena still claims banks; no CODE is banked any more.
-REM
-REM #INCLUDEd before the editor's body, because its #DEFINEs -- ED.THEME.BAR and the
-REM rest of the colour roles -- are read there.
-REM ============================================================================
+## ============================================================================
+## ED-MISC.BASL -- the library modules the editor uses, forked into this sample.
+##
+## APPSYS, BANKMGR, STASHVRAM, STRCASE, THEME and LINEINPUT, copied from the GPC-BASIC
+## library, re-prefixed ED.* and taken off the banks. BANKMGR stays because the document
+## arena still claims banks. No code is banked. This file is the one to edit.
+##
+## It is #INCLUDEd above the editor's body, because the colour role #DEFINEs, ED.THEME.BAR
+## and the rest, are read there.
+## ============================================================================
 
-REM ==========================================================================
-REM APPSYS.INC.BL -- forked, unbanked
-REM ==========================================================================
-## ***********************************************************************
-## **
-## **  APPSYS.INC.BL -- start an application politely, and leave it the
-## **  way you found it.
-## **
-## **      ED.APPSYS.STARTUP     remember the screen the user had
-## **      ED.APPSYS.RESTORE     put it back, on the way out
-## **      ED.APPSYS.ISEMU       am I running on the emulator?
-## **
-## **  Usage:
-## **      GOSUB ED.APPSYS.STARTUP
-## **      ... the application, laid out with ED.APPSYS.COLS / ED.APPSYS.ROWS
-## **      GOSUB ED.APPSYS.RESTORE : END
-## **
-## **  A screen rectangle through a file is ED.STASH.FILE.SAVE / .LOAD / .PUT in
-## **  STASHFILE.INC.BL. Draining the keyboard is KB.CLEARKB in KB.INC.BL.
-## **
-## **  FORKED AND UNBANKED for this editor: it runs in low memory and a call
-## **  into it is an ordinary GOSUB.
-## **
-## ***********************************************************************
+## ==========================================================================
+## APPSYS -- start an application politely, and leave it the way you found it.
+##
+##     ED.APPSYS.STARTUP     remember the screen the user had
+##     ED.APPSYS.RESTORE     put it back, on the way out
+##     ED.APPSYS.ISEMU       am I running on the emulator?
+##
+## Usage:
+##     GOSUB ED.APPSYS.STARTUP
+##     ... the application, laid out with ED.APPSYS.COLS / ED.APPSYS.ROWS
+##     GOSUB ED.APPSYS.RESTORE : END
+##
+## ==========================================================================
 #IFNDEF ED.APPSYS.DEFS
 #DEFINE ED.APPSYS.DEFS 1
 
@@ -44,8 +33,8 @@ REM ==========================================================================
 
 ## screen_set_charset, and the byte holding the charset number.
 ##
-## WARNING: $FF62 does not clear bit 6 of $0372, so restoring the charset alone
-## leaves the machine in ISO mode. The whole byte goes back.
+## WARNING: $FF62 does not clear bit 6 of $0372, so restoring the charset alone leaves the
+## machine in ISO mode. The whole byte goes back.
 #DEFINE ED.APPSYS.SETCHR $FF62
 #DEFINE ED.APPSYS.CHRREG $0372
 
@@ -54,8 +43,8 @@ REM ==========================================================================
 
 GOTO ED.APPSYS.SKIP
 
-## ED.APPSYS.STARTUP -- remember what the user had, and report the size.
-## Call it before any SCREEN or COLOR of your own.
+## ED.APPSYS.STARTUP -- remember what the user had, and report the size. Call it before any
+## SCREEN or COLOR of your own.
 ##
 ##   out  ED.APPSYS.MODE    the screen mode, for ED.APPSYS.RESTORE
 ##        ED.APPSYS.CHARSET the charset number, likewise
@@ -67,7 +56,6 @@ ED.APPSYS.STARTUP:
     ED.APPSYS.COLOUR = PEEK(ED.APPSYS.COLREG) : ED.APPSYS.CHARSET = PEEK(ED.APPSYS.CHRREG)
     RETURN
 
-
 ## ED.APPSYS.RESTORE -- the screen as it was, for whatever runs next.
 ED.APPSYS.RESTORE:  
     GP.CALL ED.APPSYS.SCRMODE, ED.APPSYS.MODE, 0, 0, 0 : GP.CALL ED.APPSYS.SETCHR, ED.APPSYS.CHARSET AND 63, 0, 0, 0
@@ -77,60 +65,51 @@ ED.APPSYS.RESTORE:
 ED.APPSYS.SKIP:
 #ENDIF
 
-REM ==========================================================================
-REM BANKMGR.INC.BL -- forked, unbanked
-REM ==========================================================================
-## ***********************************************************************
-## **  FYI: File has been semi crunched to save some bytes
-## **  BANKMGR.INC.BL -- who owns which RAM bank.
-## **
-## **      ED.BANKMGR.INIT           ask the machine how many banks it has
-## **      ED.BANKMGR.CLAIM          take a named one, or fail
-## **      ED.BANKMGR.GET.FREE.BANK  take the lowest free one
-## **      ED.BANKMGR.RELEASE        give one back
-## **      ED.BANKMGR.COUNT          how many exist, how many are free
-## **
-## **  For a program with several owners of banked RAM, none of which can see
-## **  the others' numbers. Requires GPB.INC.BL, and does not #INCLUDE it.
-## **
-## **  Usage, and the order matters:
-## **      GOSUB ED.BANKMGR.INIT
-## **      ED.BANKMGR.SET.BANK = 2 : GOSUB ED.BANKMGR.CLAIM
-## **      IF ED.BANKMGR.OK = 0 THEN <bank 2 was already taken>
-## **      IF GP.FN(ED.BANKMGR.CLAIM.BANK, 2) = 0 THEN <the same, in one line>
-## **      GOSUB ED.BANKMGR.GET.FREE.BANK
-## **      IF ED.BANKMGR.BANK = 0 THEN <none left>
-## **
-## **   in   ED.BANKMGR.SET.BANK  the bank CLAIM or RELEASE acts on
-## **
-## **   out  ED.BANKMGR.BANKS     how many the machine has, 64 or 256
-## **        ED.BANKMGR.BANK      what GET.FREE.BANK handed out. 0 MEANS NONE LEFT
-## **        ED.BANKMGR.OK        -1 if CLAIM took it, 0 if taken or out of range
-## **        ED.BANKMGR.SPARE     what COUNT found free
-## **
-## **  0 is not a bank. It is the KERNAL's, reserved by INIT, and it is what
-## **  GET.FREE.BANK returns for "none left". INIT reserves 1 as well: the
-## **  runtime keeps it, and the compiler refuses GP.BANKED 1.
-## **
-## **  WARNING: MEMTOP RETURNS $00 ON A 2MB MACHINE. The count is one byte and 256
-## **  does not fit, so 512K reads $40 = 64 and 2MB reads $00, meaning 256. INIT
-## **  reads 0 as 256. A manager that took 0 at face value would report no banks on
-## **  exactly the larger machine. Values that are not a multiple of 8 are legal --
-## **  the reference names $42 -- and mean some banked RAM is bad.
-## **
-## **  It tracks, it does not select. Nothing here executes BANK. A claim is a
-## **  promise between the program's own modules, and an accessor still sets its
-## **  own bank on every access.
-## **
-## **  FORKED AND UNBANKED for this editor: it runs in low memory and a call
-## **  into it is an ordinary GOSUB.
-## **
-## ***********************************************************************
+## ==========================================================================
+## FYI: File has been semi crunched to save some bytes BANKMGR -- who owns which RAM bank.
+##
+##     ED.BANKMGR.INIT           ask the machine how many banks it has
+##     ED.BANKMGR.CLAIM          take a named one, or fail
+##     ED.BANKMGR.GET.FREE.BANK  take the lowest free one
+##     ED.BANKMGR.RELEASE        give one back
+##     ED.BANKMGR.COUNT          how many exist, how many are free
+##
+## For a program with several owners of banked RAM, none of which can see the others'
+## numbers.
+##
+## Usage, and the order matters:
+##     GOSUB ED.BANKMGR.INIT
+##     ED.BANKMGR.SET.BANK = 2 : GOSUB ED.BANKMGR.CLAIM
+##     IF ED.BANKMGR.OK = 0 THEN <bank 2 was already taken>
+##     IF GP.FN(ED.BANKMGR.CLAIM.BANK, 2) = 0 THEN <the same, in one line>
+##     GOSUB ED.BANKMGR.GET.FREE.BANK
+##     IF ED.BANKMGR.BANK = 0 THEN <none left>
+##
+##  in   ED.BANKMGR.SET.BANK  the bank CLAIM or RELEASE acts on
+##
+##  out  ED.BANKMGR.BANKS     how many the machine has, 64 or 256
+##       ED.BANKMGR.BANK      what GET.FREE.BANK handed out. 0 means none left
+##       ED.BANKMGR.OK        -1 if CLAIM took it, 0 if taken or out of range
+##       ED.BANKMGR.SPARE     what COUNT found free
+##
+## 0 is not a bank. It is the KERNAL's, reserved by INIT, and it is what GET.FREE.BANK
+## returns for "none left". INIT reserves 1 as well: the runtime keeps it, and the compiler
+## refuses GP.BANKED 1.
+##
+## WARNING: MEMTOP returns $00 on a 2MB machine. The count is one byte and 256 does not fit,
+## so 512K reads $40 = 64 and 2MB reads $00, meaning 256. INIT reads 0 as 256. A manager
+## that took 0 at face value would report no banks on exactly the larger machine. Values
+## that are not a multiple of 8 are legal -- the reference names $42 -- and mean some banked
+## RAM is bad.
+##
+## It tracks, it does not select. Nothing here executes BANK. A claim is a promise between
+## the program's own modules, and an accessor still sets its own bank on every access.
+## ==========================================================================
 #IFNDEF ED.BANKMGR.DEFS
 #DEFINE ED.BANKMGR.DEFS 1
 
-## The KERNAL's MEMTOP. CARRY SET REPORTS -- bank count in .A, top of RAM in
-## .X and .Y; carry clear SETS them.
+## The KERNAL's MEMTOP. Carry set reports: bank count in .A, top of RAM in .X and .Y; carry
+## clear SETS them.
 #DEFINE ED.BANKMGR.MEMTOP $FF99
 
 ## 32 bytes of bitmap, eight banks to the byte.
@@ -138,14 +117,12 @@ REM ==========================================================================
 
 GOTO ED.BANKMGR.SKIP
 
-## ***********************************************************************
-## **  ED.BANKMGR.INIT -- ask the machine, then reserve what is not ours.
-## **
-## **  Call it once, before any CLAIM. Calling it again forgets every claim.
-## **
-## **  The arrays are DIMmed on the first call, behind ED.BANKMGR.READY: an implicit
-## **  array is 0..10, and DIMming one GPC auto-dimensioned is an error.
-## ***********************************************************************
+## ED.BANKMGR.INIT -- ask the machine, then reserve what is not ours.
+##
+## Call it once, before any CLAIM. Calling it again forgets every claim.
+##
+## The arrays are DIMmed on the first call, behind ED.BANKMGR.READY: an implicit array is
+## 0..10, and DIMming one GPC auto-dimensioned is an error.
 
 ED.BANKMGR.INIT: 
     GP.IF ED.BANKMGR.READY = 0 THEN 
@@ -153,7 +130,7 @@ ED.BANKMGR.INIT:
         ED.BANKMGR.READY = -1
     GP.ENDIF
 
-## ---- 1, 2, 4 .. 128. GPC has no shift.
+## 1, 2, 4 .. 128. GPC has no shift.
     ED.BANKMGR.BIT%(0) = 1
     FOR ED.BANKMGR.I = 1 TO 7
         ED.BANKMGR.BIT%(ED.BANKMGR.I) = ED.BANKMGR.BIT%(ED.BANKMGR.I - 1) * 2
@@ -162,7 +139,7 @@ ED.BANKMGR.INIT:
     GP.CALL ED.BANKMGR.MEMTOP, 0, 0, 0, 1 : ED.BANKMGR.BANKS = GP.A
     IF ED.BANKMGR.BANKS = 0 THEN ED.BANKMGR.BANKS = 256
 
-## ---- a byte at a time: a whole byte above the count is 255 outright.
+## a byte at a time: a whole byte above the count is 255 outright.
     FOR ED.BANKMGR.SCAN = 0 TO ED.BANKMGR.BYTES - 1
         ED.BANKMGR.MAP%(ED.BANKMGR.SCAN) = 0
         IF ED.BANKMGR.SCAN * 8 >= ED.BANKMGR.BANKS THEN ED.BANKMGR.MAP%(ED.BANKMGR.SCAN) = 255
@@ -176,8 +153,8 @@ ED.BANKMGR.INIT:
     ED.BANKMGR.SET.BANK = 1 : GOSUB ED.BANKMGR.SET
     RETURN
 
-## ---- Only reached when the count is not a multiple of 8. The loop cannot be empty
-## ---- here -- BANKS AND 7 is non-zero -- and FOR 1 TO 0 runs once in this BASIC.
+## Only reached when the count is not a multiple of 8. The loop cannot be empty here --
+## BANKS AND 7 is non-zero, and FOR 1 TO 0 runs once in this BASIC.
 
 ED.BANKMGR.INIT.PART:
     ED.BANKMGR.SCAN = INT(ED.BANKMGR.BANKS / 8)
@@ -186,13 +163,10 @@ ED.BANKMGR.INIT.PART:
     NEXT ED.BANKMGR.I
     RETURN
 
-
-## ***********************************************************************
-## **  ED.BANKMGR.CLAIM -- take ED.BANKMGR.SET.BANK, if it is free and real.
-## **
-## **   out  ED.BANKMGR.OK   -1 took it, 0 already taken or out of range, and
-## **                     what GP.FN(ED.BANKMGR.CLAIM.BANK, bank) gives back
-## ***********************************************************************
+## ED.BANKMGR.CLAIM -- take ED.BANKMGR.SET.BANK, if it is free and real.
+##
+##  out  ED.BANKMGR.OK   -1 took it, 0 already taken or out of range, and
+##                    what GP.FN(ED.BANKMGR.CLAIM.BANK, bank) gives back
 
 ED.BANKMGR.CLAIM:
     GP.DEFPROC ED.BANKMGR.CLAIM.BANK, ED.BANKMGR.SET.BANK RETURNS ED.BANKMGR.OK
@@ -202,19 +176,16 @@ ED.BANKMGR.CLAIM:
     GOSUB ED.BANKMGR.SET :  ED.BANKMGR.OK = -1
     RETURN
 
-
-## ***********************************************************************
-## **  The bitmap. ED.BANKMGR.SET.BANK in, and nothing else calls these.
-## **
-## **  ED.BANKMGR.SLOT is which of the 32 bytes holds the bank, ED.BANKMGR.MASK which
-## **  bit: bank 19 is byte 2 bit 3, so SLOT 2 and MASK 8. Both are LOCATE's
-## **  output and belong to these four routines -- the byte-index loops in INIT,
-## **  GET.FREE.BANK and COUNT count in ED.BANKMGR.SCAN so as not to share them.
-## **
-## **  WARNING: CLR subtracts rather than masking. Clearing a bit wants AND NOT,
-## **  and GPC's AND is 16-bit signed, so NOT 8 raises OUT OF RANGE. The bit is
-## **  known set before the subtraction, which makes it the same answer.
-## ***********************************************************************
+## The bitmap. ED.BANKMGR.SET.BANK in, and nothing else calls these.
+##
+## ED.BANKMGR.SLOT is which of the 32 bytes holds the bank, ED.BANKMGR.MASK which bit: bank
+## 19 is byte 2 bit 3, so SLOT 2 and MASK 8. Both are LOCATE's output and belong to these
+## four routines -- the byte-index loops in INIT, GET.FREE.BANK and COUNT count in
+## ED.BANKMGR.SCAN so as not to share them.
+##
+## WARNING: CLR subtracts rather than masking. Clearing a bit wants AND NOT, and GPC's AND
+## is 16-bit signed, so NOT 8 raises OUT OF RANGE. The bit is known set before the
+## subtraction, which makes it the same answer.
 
 ED.BANKMGR.LOCATE: 
     ED.BANKMGR.SLOT = INT(ED.BANKMGR.SET.BANK / 8) : ED.BANKMGR.MASK = ED.BANKMGR.BIT%(ED.BANKMGR.SET.BANK - ED.BANKMGR.SLOT * 8) 
@@ -231,68 +202,57 @@ ED.BANKMGR.TEST:
 ED.BANKMGR.SKIP:
 #ENDIF
 
-REM ==========================================================================
-REM STASHVRAM.INC.BL -- forked, unbanked
-REM ==========================================================================
-## ***********************************************************************
-## **  STASHVRAM.INC.BL -- screen rectangles and byte blobs, kept in VRAM.
-## **
-## **      ED.SV.INIT      once, before anything else here
-## **      ED.SV.SAVE      a screen rectangle -> a handle
-## **      ED.SV.RESTORE   a handle -> the screen
-## **      ED.SV.PUT       low RAM -> a handle
-## **      ED.SV.GET       a handle -> low RAM
-## **      ED.SV.FREE      give one back
-## **      ED.SV.RESET     give them all back
-## **
-## **  NO GP.ASM, AND SO NO #SYMFILE. The cells never leave VRAM: one data port
-## **  reads, the other writes, and the KERNAL's memory_copy moves between them
-## **  without stepping either. That is what STASH.INC.BL cannot do, and the
-## **  reason to reach for this one.
-## **
-## **  It also executes no BANK, so unlike STASH it may live inside a
-## **  GP.BANKED region.
-## **
-## **  Requires GPB.INC.BL, and #INCLUDEs it not.
-## **
-## **   in   ED.SV.BASE ED.SV.TOP   the VRAM window, in bytes. Rounded in to whole
-## **                         256-byte pages. Defaults $04000 and $1AFFF
-## **        ED.SV.MAX           how many handles. THE CALLER DIMS THE TWO ARRAYS
-## **                         to it: DIM ED.SV.PAGE%(n), ED.SV.PAGES%(n)
-## **        ED.SV.X ED.SV.Y ED.SV.W ED.SV.H   the rectangle, for ED.SV.SAVE
-## **        ED.SV.MOVE          ED.SV.RESTORE puts it back where it came from when
-## **                         0, at ED.SV.X ED.SV.Y when not -- as ED.STASH.MOVE
-## **        ED.SV.ADDR ED.SV.LEN   low RAM address and count, for ED.SV.PUT and ED.SV.GET
-## **        ED.SV.HND           the handle, for RESTORE, GET and FREE
-## **
-## **   out  ED.SV.HND           1..ED.SV.MAX, or 0 if it did not fit
-## **        ED.SV.OK            -1 done, 0 refused
-## **        ED.SV.ERROR$        why, when something is refused. "" otherwise
-## **
-## **  ALLOCATION IS A BUMP POINTER ON 256-BYTE PAGES, released LIFO. Panels
-## **  nest and close in reverse and a log is append-only, so a hole only
-## **  appears if a caller frees out of order -- and then STASHVRAMGC.INC.BL
-## **  closes it. Pages, rather than bytes, are what let a handle's address
-## **  live in an ordinary %: a page number reaches 511 where a VRAM address
-## **  is 17 bits and would not.
-## **
-## **  WARNING: there is one allocator and it is this one. ED.SV.BASE and ED.SV.TOP
-## **  are the caller's contract, checked only against the layer 1 map and the
-## **  charset. BMX.STASH defaults to $13000, INSIDE the default window -- a
-## **  program using both must move one of them.
-## **
-## **  A screen-mode change re-uploads the charset and can re-lay the map.
-## **  Held handles do not survive it; call ED.SV.RESET after one.
-## **  FORKED AND UNBANKED for this editor: it runs in low memory and a call
-## **  into it is an ordinary GOSUB.
-## **
-## ***********************************************************************
+## ==========================================================================
+## STASHVRAM -- screen rectangles and byte blobs, kept in VRAM.
+##
+##     ED.SV.INIT      once, before anything else here
+##     ED.SV.SAVE      a screen rectangle -> a handle
+##     ED.SV.RESTORE   a handle -> the screen
+##     ED.SV.PUT       low RAM -> a handle
+##     ED.SV.GET       a handle -> low RAM
+##     ED.SV.FREE      give one back
+##     ED.SV.RESET     give them all back
+##
+## There is no GP.ASM here, and so no #SYMFILE. The cells never leave VRAM: one data port
+## reads, the other writes, and the KERNAL's memory_copy moves between them without stepping
+## either, which is what a banked stash cannot do.
+##
+## It also executes no BANK, so it may live inside a GP.BANKED region.
+##
+##  in   ED.SV.BASE ED.SV.TOP   the VRAM window, in bytes. Rounded in to whole
+##                        256-byte pages. Defaults $04000 and $1AFFF
+##       ED.SV.MAX           how many handles. the caller DIMs the two arrays
+##                        to it: DIM ED.SV.PAGE%(n), ED.SV.PAGES%(n)
+##       ED.SV.X ED.SV.Y ED.SV.W ED.SV.H   the rectangle, for ED.SV.SAVE
+##       ED.SV.MOVE          ED.SV.RESTORE puts it back where it came from when
+##                        0, at ED.SV.X ED.SV.Y when not -- as ED.STASH.MOVE
+##       ED.SV.ADDR ED.SV.LEN   low RAM address and count, for ED.SV.PUT and ED.SV.GET
+##       ED.SV.HND           the handle, for RESTORE, GET and FREE
+##
+##  out  ED.SV.HND           1..ED.SV.MAX, or 0 if it did not fit
+##       ED.SV.OK            -1 done, 0 refused
+##       ED.SV.ERROR$        why, when something is refused. "" otherwise
+##
+## Allocation is a bump pointer over 256-byte pages, released last in first out. Panels nest
+## and close in reverse and a log is append-only, so a hole only appears if a caller frees
+## out of order, and a compacting collector is what closes it. Pages, rather than bytes, are
+## what let a handle's address live in an ordinary %: a page number reaches 511 where a VRAM
+## address is 17 bits and would not.
+##
+## WARNING: there is one allocator and it is this one. ED.SV.BASE and ED.SV.TOP are the
+## caller's contract, checked only against the layer 1 map and the charset. BMX.STASH
+## defaults to $13000, INSIDE the default window -- a program using both must move one of
+## them.
+##
+## A screen-mode change re-uploads the charset and can re-lay the map. Held handles do not
+## survive it; call ED.SV.RESET after one.
+## ==========================================================================
 #IFNDEF ED.SV.DEFS
 #DEFINE ED.SV.DEFS 1
 
-## VERA. A #DEFINE takes a signed int16, so these are written in hex; and no
-## #DEFINE name may contain a digit, which is why the second data port is
-## ED.SV.PORTLO.B rather than anything with a 1 in it.
+## VERA. A #DEFINE takes a signed int16, so these are written in hex; and no #DEFINE name
+## may contain a digit, which is why the second data port is ED.SV.PORTLO.B rather than
+## anything with a 1 in it.
 #DEFINE ED.SV.VLO $9F20
 #DEFINE ED.SV.VMID $9F21
 #DEFINE ED.SV.VHI $9F22
@@ -316,9 +276,7 @@ REM ==========================================================================
 
 GOTO ED.SV.MODULE.END
 
-## ***********************************************************************
-## **  ED.SV.INIT -- the window, and an empty table.
-## ***********************************************************************
+## ED.SV.INIT -- the window, and an empty table.
 
 ED.SV.INIT:  
     ED.SV.ERROR$ = "" : ED.SV.OK = 0
@@ -326,9 +284,9 @@ ED.SV.INIT:
     IF ED.SV.TOP = 0 THEN ED.SV.TOP = $1AFFF
     IF ED.SV.MAX < 1 THEN ED.SV.ERROR$ = "ED.SV.MAX IS NOT SET" : RETURN
 
-## ---- Checked, not trusted. A base of 0 would make page 0 a legal handle and
-## ---- 0 is what "no handle" means; the top two guards are the charset and the
-## ---- layer 1 map, which are the only fixed claims on VRAM.
+## Checked, not trusted. A base of 0 would make page 0 a legal handle and 0 is what "no
+## handle" means; the top two guards are the charset and the layer 1 map, which are the only
+## fixed claims on VRAM.
     IF ED.SV.BASE < 256 THEN ED.SV.ERROR$ = "ED.SV.BASE IS TOO LOW" : RETURN
     IF ED.SV.TOP > $1AFFF THEN ED.SV.ERROR$ = "ED.SV.TOP RUNS INTO THE LAYER 1 MAP" : RETURN
     IF ED.SV.TOP <= ED.SV.BASE THEN ED.SV.ERROR$ = "ED.SV.TOP IS NOT ABOVE ED.SV.BASE" : RETURN
@@ -339,7 +297,7 @@ ED.SV.INIT:
 
     ED.SV.READY = -1 : ED.SV.OK = -1
 
-## ---- ED.SV.RESET is the whole of the rest of INIT, so it is not written twice.
+## ED.SV.RESET is the whole of the rest of INIT, so it is not written twice.
 ED.SV.RESET:  
     IF ED.SV.READY = 0 THEN RETURN
     ED.SV.NEXT = ED.SV.BASEPG
@@ -349,9 +307,7 @@ ED.SV.RESET:
     ED.SV.OK = -1
     RETURN
 
-## ***********************************************************************
-## **  ED.SV.SAVE -- a screen rectangle into VRAM.
-## ***********************************************************************
+## ED.SV.SAVE -- a screen rectangle into VRAM.
 
 ED.SV.SAVE:  
     ED.SV.HND = 0 : ED.SV.OK = 0 : ED.SV.ERROR$ = ""
@@ -365,13 +321,11 @@ ED.SV.SAVE:
     ED.SV.MODE = 0 : GOSUB ED.SV.WALK : ED.SV.OK = -1
     RETURN
 
-## ***********************************************************************
-## **  ED.SV.RESTORE -- a handle back onto the screen.
-## **
-## **  The header carries where it came from, so a plain restore needs only
-## **  the handle. ED.SV.MOVE keeps the caller's ED.SV.X and ED.SV.Y instead, which is
-## **  how a rectangle is slid somewhere else.
-## ***********************************************************************
+## ED.SV.RESTORE -- a handle back onto the screen.
+##
+## The header carries where it came from, so a plain restore needs only the handle.
+## ED.SV.MOVE keeps the caller's ED.SV.X and ED.SV.Y instead, which is how a rectangle is
+## slid somewhere else.
 
 ED.SV.RESTORE:  
     ED.SV.OK = 0 : ED.SV.ERROR$ = "" : GOSUB ED.SV.LIVE
@@ -383,13 +337,11 @@ ED.SV.RESTORE:
     ED.SV.MODE = 1 : GOSUB ED.SV.WALK : ED.SV.OK = -1
     RETURN
 
-## ***********************************************************************
-## **  ED.SV.FREE -- one handle back.
-## **
-## **  The bump pointer is recomputed as the high-water mark of what is still
-## **  live, so freeing in reverse order reclaims every page and freeing out
-## **  of order leaves a hole that STASHVRAMGC closes.
-## ***********************************************************************
+## ED.SV.FREE -- one handle back.
+##
+## The bump pointer is recomputed as the high-water mark of what is still live, so freeing
+## in reverse order reclaims every page and freeing out of order leaves a hole that
+## STASHVRAMGC closes.
 
 ED.SV.FREE:  
     ED.SV.OK = 0 : ED.SV.ERROR$ = "" : GOSUB ED.SV.LIVE
@@ -407,9 +359,7 @@ ED.SV.HIWATER:
     IF ED.SV.PG > ED.SV.NEXT THEN ED.SV.NEXT = ED.SV.PG
     RETURN
 
-## ***********************************************************************
-## **  ED.SV.LIVE -- is ED.SV.HND a handle that is actually allocated.
-## ***********************************************************************
+## ED.SV.LIVE -- is ED.SV.HND a handle that is actually allocated.
 
 ED.SV.LIVE:  
     ED.SV.OK = 0
@@ -420,10 +370,8 @@ ED.SV.LIVE:
     ED.SV.OK = -1
     RETURN
 
-## ***********************************************************************
-## **  ED.SV.ALLOC -- ED.SV.N bytes, rounded up to whole pages. ED.SV.HND comes back
-## **  0 if the table is full or the window is.
-## ***********************************************************************
+## ED.SV.ALLOC -- ED.SV.N bytes, rounded up to whole pages. ED.SV.HND comes back 0 if the
+## table is full or the window is.
 
 ED.SV.ALLOC:  
     ED.SV.HND = 0 : ED.SV.NP = INT((ED.SV.N + 255) / 256)
@@ -435,11 +383,9 @@ ED.SV.ALLOC:
     ED.SV.PAGE%(ED.SV.HND) = ED.SV.NEXT : ED.SV.PAGES%(ED.SV.HND) = ED.SV.NP : ED.SV.NEXT = ED.SV.NEXT + ED.SV.NP
     RETURN
 
-## ***********************************************************************
-## **  ED.SV.GEOM -- the map's width and base, asked of VERA rather than
-## **  assumed, exactly as ED.STASH.SETUP does it. L1_CONFIG bits 5:4 give the
-## **  width as 32 << n; L1_MAPBASE holds bits 16:9.
-## ***********************************************************************
+## ED.SV.GEOM -- the map's width and base, asked of VERA rather than assumed, exactly as
+## ED.STASH.SETUP does it. L1_CONFIG bits 5:4 give the width as 32 << n; L1_MAPBASE holds
+## bits 16:9.
 
 ED.SV.GEOM:  
     ED.SV.MAPW = 32
@@ -448,24 +394,21 @@ ED.SV.GEOM:
     ED.SV.MAPBASE = PEEK(ED.SV.LMAPBASE) * 512 : ED.SV.STRIDE = ED.SV.MAPW * 2
     RETURN
 
-## ***********************************************************************
-## **  ED.SV.WALK -- the cells, one row a call. ED.SV.MODE 0 saves, 1 restores.
-## **
-## **  A rectangle that is the whole map width is contiguous in VRAM, so it
-## **  goes in ONE call instead of ED.SV.H of them: a full 80x60 screen is 15,360
-## **  bytes at once. Measured legal at that size, across the 64K line, in
-## **  work/stashvram/SVGATE.BASL.
-## ***********************************************************************
+## ED.SV.WALK -- the cells, one row a call. ED.SV.MODE 0 saves, 1 restores.
+##
+## A rectangle that is the whole map width is contiguous in VRAM, so it goes in ONE call
+## instead of ED.SV.H of them: a full 80x60 screen is 15,360 bytes at once. Measured legal
+## at that size, across the 64K line, in work/stashvram/SVGATE.BASL.
 
 ED.SV.WALK:  
     ED.SV.VA = ED.SV.PAGE%(ED.SV.HND) * 256 + ED.SV.HEADER
-## ---- memory_copy counts in 16 bits, so a map-width block that reaches 64K
-## ---- walks its rows instead. A 128-wide map is 256 bytes a row, so that is
-## ---- 256 rows -- reachable, because the map may be 256 rows deep.
+## memory_copy counts in 16 bits, so a map-width block that reaches 64K walks its rows
+## instead. A 128-wide map is 256 bytes a row, so that is 256 rows -- reachable, because the
+## map may be 256 rows deep.
     IF ED.SV.X = 0 AND ED.SV.W = ED.SV.MAPW AND ED.SV.BYTES * ED.SV.H < 65536 THEN GOTO ED.SV.WALK.ONE
-## ---- The stash side is one run, so its port is set once and memory_copy
-## ---- leaves it on the next row. Only the screen port moves, a stride a
-## ---- row, its address kept as three bytes so no row divides.
+## The stash side is one run, so its port is set once and memory_copy leaves it on the next
+## row. Only the screen port moves, a stride a row, its address kept as three bytes so no
+## row divides.
     ED.SV.ADR = ED.SV.VA
     IF ED.SV.MODE = 0 THEN GOSUB ED.SV.PORTB.AT : ED.SV.SCREEN.PORT = 0
     IF ED.SV.MODE <> 0 THEN GOSUB ED.SV.PORTA.AT : ED.SV.SCREEN.PORT = 1
@@ -490,16 +433,14 @@ ED.SV.WALK.ONE:
     ED.SV.N = ED.SV.BYTES * ED.SV.H : GOSUB ED.SV.MOVEIT
     RETURN
 
-## ---- One direction or the other, so the port setup is written once.
+## One direction or the other, so the port setup is written once.
 ED.SV.MOVEIT:  
     IF ED.SV.MODE = 0 THEN ED.SV.SRC = ED.SV.CELL : ED.SV.DST = ED.SV.VA
     IF ED.SV.MODE <> 0 THEN ED.SV.SRC = ED.SV.VA : ED.SV.DST = ED.SV.CELL
     GOSUB ED.SV.COPY
     RETURN
 
-## ***********************************************************************
-## **  ED.SV.COPY -- ED.SV.N bytes from ED.SV.SRC to ED.SV.DST, both in VRAM.
-## ***********************************************************************
+## ED.SV.COPY -- ED.SV.N bytes from ED.SV.SRC to ED.SV.DST, both in VRAM.
 
 ED.SV.COPY:  
     ED.SV.ADR = ED.SV.SRC : GOSUB ED.SV.PORTA.AT : ED.SV.ADR = ED.SV.DST : GOSUB ED.SV.PORTB.AT
@@ -507,9 +448,7 @@ ED.SV.COPY:
     GP.CALL ED.SV.MEMCOPY
     RETURN
 
-## ***********************************************************************
-## **  ED.SV.HDRW / ED.SV.HDRR -- the four bytes in front of a saved rectangle.
-## ***********************************************************************
+## ED.SV.HDRW / ED.SV.HDRR -- the four bytes in front of a saved rectangle.
 
 ED.SV.HDRW:  
     ED.SV.ADR = ED.SV.VA : GOSUB ED.SV.PORTA.AT
@@ -540,72 +479,58 @@ ED.SV.SPLIT:
 ED.SV.MODULE.END:
 #ENDIF
 
-REM ==========================================================================
-REM STRCASE.INC.BL -- forked, unbanked
-REM ==========================================================================
-## ***********************************************************************
-## **
-## **  STRCASE.INC.BL -- case, rewriting a string in place.
-## **
-## **      ED.STRCASE.PTR = GP.STRPTR(LINE$)
-## **      ED.STRCASE.MODE = ED.STRCASE.UPPER
-## **      GOSUB ED.STRCASE.GO
-## **
-## **   in   ED.STRCASE.PTR    GP.STRPTR of the string
-## **        ED.STRCASE.MODE   one of the two constants
-## **   out  the string itself
-## **
-## **      ED.STRCASE.UPPER   a-z -> A-Z, everything else untouched
-## **      ED.STRCASE.LOWER   A-Z -> a-z, everything else untouched
-## **
-## **  An unrecognised mode does LOWER. A zero length string is not a special case.
-## **
-## **  Trimming is ED.STR.TRIM / ED.STR.LTRIM / ED.STR.RTRIM in STRINGS.INC.BL.
-## **
-## **  ED.STRCASE.MODE is sticky: an ordinary variable, not an argument, so a call that
-## **  does not set it repeats the last one. Set both inputs every call, as with
-## **  SORT.DESCEND and ED.STASH.MOVE.
-## **
-## **  ONE-LINE CALLS. Three verbs say the same thing in one statement, and every
-## **  argument is written at the call, so the sticky mode above cannot bite:
-## **
-## **      GP.SUB ED.STRCASE.APPLY, GP.STRPTR(LINE$), ED.STRCASE.UPPER
-## **      A$ = GP.FN(UCASE, A$)
-## **      PRINT GP.FN(LCASE, N$)
-## **
-## **  GOSUB ED.STR.UCASE and GOSUB ED.STR.LCASE reach the same two bodies: set ED.STRCASE.S$
-## **  first, and read the answer back out of it.
-## **
-## **  ED.STRCASE.APPLY is ED.STRCASE.GO with both inputs as arguments. UCASE and
-## **  LCASE take a string and give back a cased COPY, which is a different
-## **  interface: they rewrite the copy, never the caller's string, so A$ = GP.FN(...)
-## **  is what changes A$. A literal is SAFE in those two -- the argument is copied
-## **  into the formal on the way in and the copy is what gets rewritten -- where it
-## **  is not safe in ED.STRCASE.APPLY, which is handed an address.
-## **
-## **  The verbs need GPB.INC.BL, and a program that has no GP block does not want
-## **  them; ED.STRCASE.GO is the whole module without them.
-## **
-## **  The module needs a #SYMFILE, before the #INCLUDEs and named after the source PRG.
-## **  Without one the compile stops with "{} NEEDS #SYMFILE", which names the cause
-## **  but not the file.
-## **
-## **      #SYMFILE "@:MYPROG.SYM"
-## **      #INCLUDE "STRCASE.INC.BL"
-## **
-## **  WARNING: pass a variable, never a literal. GP.STRPTR("hello") is an address
-## **  inside the p-code, and folding it EDITS THE PROGRAM.
-## **
-## **  #REM 1 is load bearing: without it BASLOAD strips the body and the block reaches
-## **  the compiler empty, refused as "block mismatch". #REM 0 restores the default.
-## **
-## **  The whole ED.STRCASE.* name space belongs to this file, except the two verbs
-## **  UCASE and LCASE, named for STRINGS.INC.BL, which they merge into later.
-## **
-## **  FORKED AND UNBANKED for this editor: it runs in low memory and a call
-## **  into it is an ordinary GOSUB.
-## **
-## ***********************************************************************
+## ==========================================================================
+## STRCASE -- case, rewriting a string in place.
+##
+##     ED.STRCASE.PTR = GP.STRPTR(LINE$)
+##     ED.STRCASE.MODE = ED.STRCASE.UPPER
+##     GOSUB ED.STRCASE.GO
+##
+##  in   ED.STRCASE.PTR    GP.STRPTR of the string
+##       ED.STRCASE.MODE   one of the two constants
+##  out  the string itself
+##
+##     ED.STRCASE.UPPER   a-z -> A-Z, everything else untouched
+##     ED.STRCASE.LOWER   A-Z -> a-z, everything else untouched
+##
+## An unrecognised mode does LOWER. A zero length string is not a special case.
+##
+##
+## ED.STRCASE.MODE is sticky: an ordinary variable, not an argument, so a call that does not
+## set it repeats the last one. Set both inputs every call, as with SORT.DESCEND and
+## ED.STASH.MOVE.
+##
+## ONE-LINE CALLS. Three verbs say the same thing in one statement, and every argument is
+## written at the call, so the sticky mode above cannot bite:
+##
+##     GP.SUB ED.STRCASE.APPLY, GP.STRPTR(LINE$), ED.STRCASE.UPPER
+##     A$ = GP.FN(UCASE, A$)
+##     PRINT GP.FN(LCASE, N$)
+##
+## GOSUB ED.STR.UCASE and GOSUB ED.STR.LCASE reach the same two bodies: set ED.STRCASE.S$
+## first, and read the answer back out of it.
+##
+## ED.STRCASE.APPLY is ED.STRCASE.GO with both inputs as arguments. UCASE and LCASE take a
+## string and give back a cased copy, which is a different interface: they rewrite the copy,
+## never the caller's string, so A$ = GP.FN(...) is what changes A$. A literal is safe in
+## those two, because the argument is copied into the formal on the way in and the copy is
+## what gets rewritten. It is not safe in ED.STRCASE.APPLY, which is handed an address.
+##
+## The verbs need GPB.INC.BL, and a program that has no GP block does not want them;
+## ED.STRCASE.GO is the whole module without them.
+##
+## The {VAR} references need a #SYMFILE, declared before the #INCLUDEs and named after the
+## source PRG. EDITOR.BASL declares it at the top. Without one the compile stops with "{}
+## NEEDS #SYMFILE", which names the cause but not the file.
+##
+## WARNING: pass a variable, never a literal. GP.STRPTR("hello") is an address inside the
+## p-code, and folding it edits the program.
+##
+## #REM 1 is load bearing: without it BASLOAD strips the body and the block reaches the
+## compiler empty, refused as "block mismatch". #REM 0 restores the default.
+##
+## The whole ED.STRCASE.* name space belongs to this section.
+## ==========================================================================
 #IFNDEF ED.STRCASE.DEFS
 #DEFINE ED.STRCASE.DEFS 1
 
@@ -670,55 +595,45 @@ ED.STRCASE.GO:
 ED.STRCASE.MODULE.END:
 #ENDIF
 
-REM ==========================================================================
-REM THEME.INC.BL -- forked, unbanked
-REM ==========================================================================
-## ***********************************************************************
-## **
-## **  THEME.INC.BL -- named colour roles, in five themes.
-## **
-## **  The colours are an array, read by BASIC for COLOR and the GP drawing
-## **  commands, so they save and load like any other.
-## **
-## **      ED.THEME.ID   0 X16       blue page, white text -- the default
-## **                  1 DARK      black page, light grey text
-## **                  2 LIGHT     white page, black text
-## **                  3 GRAY      dark grey page, light blue frames
-## **                  4 CUSTOM    whatever ED.THEME.CLR already holds
-## **
-## **  ED.THEME.NEXT cycles to the following one and loads it, which is what a
-## **  program binds to a key. ED.THEME.RESET reloads the one already selected.
-## **
-## **  CUSTOM loads nothing, leaving ED.THEME.CLR as it stands, so a program that lets
-## **  the user change colours carries those changes into it. Selected before any
-## **  other theme it takes X16's values.
-## **
-## **  Usage:
-## **      ED.THEME.ID = 1 : GOSUB ED.THEME.SELECT
-## **      GP.BOX 4,2,30,8, 2, ED.THEME.CLR(ED.THEME.BORDER)
-## **      GP.PRINTAT 6,3, "TITLE", ED.THEME.CLR(ED.THEME.TITLE)
-## **
-## **  The values are packed attributes, background * 16 + foreground, as the GP
-## **  drawing commands take them. For COLOR, which wants the halves separately,
-## **  use ED.THEME.SET.
-## **
-## **  FORKED AND UNBANKED for this editor: it runs in low memory and a call
-## **  into it is an ordinary GOSUB.
-## **
-## ***********************************************************************
+## ==========================================================================
+## THEME -- named colour roles, in five themes.
+##
+## The colours are an array, read by BASIC for COLOR and the GP drawing commands, so they
+## save and load like any other.
+##
+##     ED.THEME.ID   0 X16       blue page, white text -- the default
+##                 1 DARK      black page, light grey text
+##                 2 LIGHT     white page, black text
+##                 3 GRAY      dark grey page, light blue frames
+##                 4 CUSTOM    whatever ED.THEME.CLR already holds
+##
+## ED.THEME.NEXT cycles to the following one and loads it, which is what a program binds to
+## a key. ED.THEME.RESET reloads the one already selected.
+##
+## CUSTOM loads nothing, leaving ED.THEME.CLR as it stands, so a program that lets the user
+## change colours carries those changes into it. Selected before any other theme it takes
+## X16's values.
+##
+## Usage:
+##     ED.THEME.ID = 1 : GOSUB ED.THEME.SELECT
+##     GP.BOX 4,2,30,8, 2, ED.THEME.CLR(ED.THEME.BORDER)
+##     GP.PRINTAT 6,3, "TITLE", ED.THEME.CLR(ED.THEME.TITLE)
+##
+## The values are packed attributes, background * 16 + foreground, as the GP drawing
+## commands take them. For COLOR, which wants the halves separately, use ED.THEME.SET.
+## ==========================================================================
 #IFNDEF ED.THEME.DEFS
 #DEFINE ED.THEME.DEFS 1
 
-## The roles. Add one here and to ALL FIVE palettes below, and raise SLOTS.
+## The roles. Add one here and to all five palettes below, and raise SLOTS.
 ##
-## FOCUS IS NOT HILITE, and it exists because it could not be. HILITE is the
-## text colour reversed in three of the four palettes, and a GUI button is drawn
-## as the panel reversed, so a focused button came out identical to a plain one.
-## FOCUS is yellow-backed in every theme for that reason: whatever a palette
+## FOCUS is not HILITE. HILITE is the text colour reversed in three of the four palettes,
+## and a GUI button is drawn as the panel reversed, so a focused button came out identical
+## to a plain one. FOCUS is yellow-backed in every theme for that reason: whatever a palette
 ## does, nothing else in it is yellow.
 ##
-## BAR is a menu bar or status line: a background of its own, so the band
-## stands off the page. BORDER's colour marks a hot key on it.
+## BAR is a menu bar or status line: a background of its own, so the band stands off the
+## page. BORDER's colour marks a hot key on it.
 
 #DEFINE ED.THEME.PAGE 0
 #DEFINE ED.THEME.TEXT 1
@@ -743,9 +658,9 @@ GOTO ED.THEME.SKIP
 
 ## ED.THEME.SELECT -- fill ED.THEME.CLR from ED.THEME.ID.
 ##
-## ED.THEME.CLR is DIMmed here, because DIMming an array GPC has already auto-dimensioned
-## is an error. No DATA statement, because READ walks every DATA in the whole program
-## in order and a library owning one would derail the caller's READs.
+## ED.THEME.CLR is DIMmed here, because DIMming an array GPC has already auto-dimensioned is
+## an error. No DATA statement, because READ walks every DATA in the whole program in order
+## and a library owning one would derail the caller's READs.
 
 ED.THEME.SELECT:
     ED.THEME.FIRST = 0
@@ -779,8 +694,8 @@ ED.THEME.SELECT.DARK:
     ED.THEME.CLR(ED.THEME.BAR)    = 6 * 16 + 1
     RETURN
 
-## A white page. DIMMED is mid grey rather than dark grey so that reversing it
-## for a status bar still leaves the text readable on it.
+## A white page. DIMMED is mid grey rather than dark grey so that reversing it for a status
+## bar still leaves the text readable on it.
 ED.THEME.SELECT.LIGHT:
     ED.THEME.CLR(ED.THEME.PAGE)   = 1 * 16 + 1
     ED.THEME.CLR(ED.THEME.TEXT)   = 1 * 16 + 0
@@ -793,11 +708,11 @@ ED.THEME.SELECT.LIGHT:
     ED.THEME.CLR(ED.THEME.BAR)    = 15 * 16 + 0
     RETURN
 
-## From the XFMGR file manager's theme module. DIMMED and WARN are not in it.
+## DIMMED and WARN are this editor's, and are not part of the palette this one came from.
 ##
-## WARN IS LIGHT RED, NOT RED. This is the only theme with a dark grey page, and
-## plain red on it is barely legible -- which shows up on the BAR, where WARN is
-## what tints the hotkey letter, before it shows up on any warning.
+## WARN is light red, not red. This is the only theme with a dark grey page, and plain red
+## on it is barely legible -- which shows up on the BAR, where WARN is what tints the hotkey
+## letter, before it shows up on any warning.
 ED.THEME.SELECT.GRAY:
     ED.THEME.CLR(ED.THEME.PAGE)   = 11 * 16 + 11
     ED.THEME.CLR(ED.THEME.TEXT)   = 11 * 16 + 1
@@ -819,74 +734,63 @@ ED.THEME.SELECT.CUSTOM:
 ED.THEME.SKIP:
 #ENDIF
 
-REM ==========================================================================
-REM LINEINPUT.INC.BL -- forked, unbanked
-REM ==========================================================================
-## ***********************************************************************
-## **
-## **  LINEINPUT.INC.BL -- a positioned, length-limited entry field.
-## **
-## **      ED.LINEINPUT.GET     edit a string in a field at x, y
-## **      ED.LINEINPUT.ASK     a label, then a field after it
-## **
-## **  What INPUT and LINPUT cannot do: both own the whole bottom of the screen, scroll
-## **  it, echo in whatever colour is current and accept any length. A field stays where
-## **  you put it, in the colour you give it, and stops at the width you allow.
-## **
-## **  Usage:
-## **      ED.LINEINPUT.X = 10 : ED.LINEINPUT.Y = 6
-## **      ED.LINEINPUT.LEN = 20
-## **      ED.LINEINPUT.ATTR = ED.THEME.CLR(ED.THEME.TEXT)
-## **      ED.LINEINPUT.TEXT$ = ""
-## **      GOSUB ED.LINEINPUT.GET
-## **      IF ED.LINEINPUT.KEY = 27 THEN <cancelled>
-## **
-## **   in   ED.LINEINPUT.X  ED.LINEINPUT.Y     top left of the field
-## **        ED.LINEINPUT.LEN               how many characters fit
-## **        ED.LINEINPUT.ATTR              packed attribute, background * 16 + fg
-## **        ED.LINEINPUT.TEXT$             the starting value, edited in place
-## **        ED.LINEINPUT.MASK              non-zero shows asterisks
-## **        ED.LINEINPUT.ALLOW$            the only characters accepted
-## **        ED.LINEINPUT.DENY$             characters refused
-## **        ED.LINEINPUT.LABEL$            ED.LINEINPUT.ASK only
-## **        ED.LINEINPUT.LABELATTR         the label's own attribute, ASK only.
-## **                                  0 means "the field's", which is what it
-## **                                  used to do to the label whether you
-## **                                  wanted it or not
-## **
-## **   out  ED.LINEINPUT.TEXT$             what was typed. ESC restores what it
-## **                                  was when you called, so a cancelled
-## **                                  field is not a silently emptied one
-## **        ED.LINEINPUT.KEY               the key that ended it:
-## **                                     13  RETURN, finished
-## **                                     27  ESC, cancelled (3 is STOP)
-## **                                     17  cursor down / 145 up / 9 TAB
-## **                                         -- left the field, text kept
-## **
-## **  So a form is a loop: call the field, look at ED.LINEINPUT.KEY, move the focus. The
-## **  field never scrolls -- when full, further characters are refused and the cursor
-## **  sits on the last one rather than off the end.
-## **
-## **  THE FIELD CAN BE RESTRICTED to a character set. Both filters are empty by
-## **  default, which accepts what it always did. ALLOW$ lists what may be typed,
-## **  DENY$ what may not, and with both set ALLOW$ decides. They are raw bytes, so
-## **  a set of letters is charset dependent -- PETSCII shifted letters arrive as
-## **  $C1-$DA and ISO ones as $41-$5A. Digits are 48-57 in both:
-## **
-## **      ED.LINEINPUT.ALLOW$ = "0123456789.-"    a signed number
-## **      ED.LINEINPUT.DENY$  = ",:=*?"           a filename
-## **
-## **  THE CARET MOVES: LEFT and RIGHT walk it, HOME and END jump to the ends, typing
-## **  INSERTS where it stands and DEL rubs out what is before it. It starts after the
-## **  last character, so a caller that never presses an arrow sees exactly the old
-## **  append-and-rub-out field.
-## **
-## **   also out  ED.LINEINPUT.POS   where the caret ended up, 0..LEN(TEXT$)
-## **
-## **  FORKED AND UNBANKED for this editor: it runs in low memory and a call
-## **  into it is an ordinary GOSUB.
-## **
-## ***********************************************************************
+## ==========================================================================
+## LINEINPUT -- a positioned, length-limited entry field.
+##
+##     ED.LINEINPUT.GET     edit a string in a field at x, y
+##     ED.LINEINPUT.ASK     a label, then a field after it
+##
+## What INPUT and LINPUT cannot do: both own the whole bottom of the screen, scroll it, echo
+## in whatever colour is current and accept any length. A field stays where you put it, in
+## the colour you give it, and stops at the width you allow.
+##
+## Usage:
+##     ED.LINEINPUT.X = 10 : ED.LINEINPUT.Y = 6
+##     ED.LINEINPUT.LEN = 20
+##     ED.LINEINPUT.ATTR = ED.THEME.CLR(ED.THEME.TEXT)
+##     ED.LINEINPUT.TEXT$ = ""
+##     GOSUB ED.LINEINPUT.GET
+##     IF ED.LINEINPUT.KEY = 27 THEN <cancelled>
+##
+##  in   ED.LINEINPUT.X  ED.LINEINPUT.Y     top left of the field
+##       ED.LINEINPUT.LEN               how many characters fit
+##       ED.LINEINPUT.ATTR              packed attribute, background * 16 + fg
+##       ED.LINEINPUT.TEXT$             the starting value, edited in place
+##       ED.LINEINPUT.MASK              non-zero shows asterisks
+##       ED.LINEINPUT.ALLOW$            the only characters accepted
+##       ED.LINEINPUT.DENY$             characters refused
+##       ED.LINEINPUT.LABEL$            ED.LINEINPUT.ASK only
+##       ED.LINEINPUT.LABELATTR         the label's own attribute, ASK only. 0
+##                                      paints the label in the field's attribute
+##
+##  out  ED.LINEINPUT.TEXT$             what was typed. ESC restores the value the
+##                                      field started with, so a cancelled field is
+##                                      not an emptied one
+##       ED.LINEINPUT.KEY               the key that ended it:
+##                                    13  RETURN, finished
+##                                    27  ESC, cancelled (3 is STOP)
+##                                    17  cursor down / 145 up / 9 TAB
+##                                        -- left the field, text kept
+##
+## So a form is a loop: call the field, look at ED.LINEINPUT.KEY, move the focus. The field
+## never scrolls -- when full, further characters are refused and the cursor sits on the
+## last one rather than off the end.
+##
+## The field can be restricted to a character set. Both filters are empty by default, which
+## accepts what it always did. ALLOW$ lists what may be typed, DENY$ what may not, and with
+## both set ALLOW$ decides. They are raw bytes, so a set of letters is charset dependent --
+## PETSCII shifted letters arrive as $C1-$DA and ISO ones as $41-$5A. Digits are 48-57 in
+## both:
+##
+##     ED.LINEINPUT.ALLOW$ = "0123456789.-"    a signed number
+##     ED.LINEINPUT.DENY$  = ",:=*?"           a filename
+##
+## The caret moves: LEFT and RIGHT walk it, HOME and END jump to the ends, typing inserts
+## where it stands and DEL rubs out what is before it. It starts after the last character,
+## so a caller that never presses an arrow sees exactly the old append-and-rub-out field.
+##
+##  also out  ED.LINEINPUT.POS   where the caret ended up, 0..LEN(TEXT$)
+## ==========================================================================
 #IFNDEF ED.LINEINPUT.DEFS
 #DEFINE ED.LINEINPUT.DEFS 1
 
@@ -897,10 +801,10 @@ REM ==========================================================================
 #DEFINE ED.LINEINPUT.SPACE 32
 #DEFINE ED.LINEINPUT.STAR 42
 
-## The keys that LEAVE a field without cancelling it, so a form can move between
-## fields. The text is kept -- only ESC puts it back -- and ED.LINEINPUT.KEY says which way
-## to go. Without these RETURN would have to mean both "next field" and "done", and a
-## form could never go back up.
+## The keys that LEAVE a field without cancelling it, so a form can move between fields. The
+## text is kept -- only ESC puts it back -- and ED.LINEINPUT.KEY says which way to go.
+## Without these RETURN would have to mean both "next field" and "done", and a form could
+## never go back up.
 #DEFINE ED.LINEINPUT.DOWN 17
 #DEFINE ED.LINEINPUT.UP 145
 #DEFINE ED.LINEINPUT.TAB 9
@@ -916,9 +820,7 @@ REM ==========================================================================
 
 GOTO ED.LINEINPUT.MODULE.END
 
-## ***********************************************************************
-## **  ED.LINEINPUT.GET -- the field.
-## ***********************************************************************
+## ED.LINEINPUT.GET -- the field.
 
 ED.LINEINPUT.GET:
     ED.LINEINPUT.INV = (ED.LINEINPUT.ATTR AND 15) * 16 + INT(ED.LINEINPUT.ATTR / 16)
@@ -931,8 +833,8 @@ ED.LINEINPUT.REDRAW:
     IF ED.LINEINPUT.SHOW$ <> "" THEN GP.PRINTAT ED.LINEINPUT.X, ED.LINEINPUT.Y, ED.LINEINPUT.SHOW$, ED.LINEINPUT.ATTR
     GOSUB ED.LINEINPUT.CURSOR
 
-## ---- GET returns immediately with "" when nothing is pressed, so the blink runs off
-## ---- TI rather than a delay loop, which would swallow keys pressed during it.
+## GET returns immediately with "" when nothing is pressed, so the blink runs off TI rather
+## than a delay loop, which would swallow keys pressed during it.
 
 ED.LINEINPUT.WAIT:
     GET ED.LINEINPUT.K$
@@ -941,9 +843,9 @@ ED.LINEINPUT.WAIT:
     ED.LINEINPUT.TICK = TI + ED.LINEINPUT.BLINK : ED.LINEINPUT.LIT = 1 - ED.LINEINPUT.LIT
     GOSUB ED.LINEINPUT.CURSOR : GOTO ED.LINEINPUT.WAIT
 
-## ---- Seven control codes scattered across 256, which ON x GOSUB cannot index: the
-## ---- sparse selector GP.SELECT exists for. ED.LINEINPUT.DONE is tested AFTER GP.ENDSEL
-## ---- rather than jumping out of the select -- one comparison, and it cannot leak.
+## Seven control codes scattered across 256, which ON x GOSUB cannot index: the sparse
+## selector GP.SELECT exists for. ED.LINEINPUT.DONE is tested AFTER GP.ENDSEL rather than
+## jumping out of the select -- one comparison, and it cannot leak.
 
 ED.LINEINPUT.KEYED:
     ED.LINEINPUT.CODE = ASC(ED.LINEINPUT.K$)
@@ -962,25 +864,25 @@ ED.LINEINPUT.KEYED:
     GP.ENDSEL
     ED.LINEINPUT.KEY = ED.LINEINPUT.CODE : IF ED.LINEINPUT.DONE = 0 THEN GOTO ED.LINEINPUT.REDRAW
 
-## ---- Redraw once with no cursor, so a finished field is not still blinking at a user
-## ---- who has moved on.
+## Redraw once with no cursor, so a finished field is not still blinking at a user who has
+## moved on.
 
     ED.LINEINPUT.LIT = 0 : GOSUB ED.LINEINPUT.RENDER
     GP.FILL ED.LINEINPUT.X, ED.LINEINPUT.Y, ED.LINEINPUT.LEN, 1, ED.LINEINPUT.SPACE, ED.LINEINPUT.ATTR
     IF ED.LINEINPUT.SHOW$ <> "" THEN GP.PRINTAT ED.LINEINPUT.X, ED.LINEINPUT.Y, ED.LINEINPUT.SHOW$, ED.LINEINPUT.ATTR
     RETURN
 
-## ---- A label, then a field after it. ED.LINEINPUT.X is put back on the way out, so calling
-## ---- this in a loop does not walk the field across the screen.
-
-## ---- THE LABEL IS NOT PART OF THE FIELD, so it does not take the field's attribute.
-## ---- ED.LINEINPUT.ATTR is usually reversed, to make the field read as a box you type in;
-## ---- painting the label with it put "FILE NAME:" in a white block that looked like a
-## ---- second field. LABELATTR of 0 keeps the old behaviour for a caller that never set it.
-
-## ---- ED.LINEINPUT.SAVEX, NOT ED.LINEINPUT.HOME: that name is #DEFINEd as 19, so this line
-## ---- compiled as "19 = ED.LINEINPUT.X" -- a syntax error, which DEFERS. The compile said
-## ---- OK CODE and ASK would have thrown SYNTAX ERROR the first time it was called.
+## ED.LINEINPUT.ASK -- a label, then a field after it. ED.LINEINPUT.X is put back on the way
+## out, so calling this in a loop does not walk the field across the screen.
+##
+## The label is not part of the field, so it does not take the field's attribute.
+## ED.LINEINPUT.ATTR is usually reversed, which makes the field read as a box to type in,
+## and a label painted in it reads as a second field. A LABELATTR of 0 paints the label in
+## the field's attribute.
+##
+## WARNING: the saved column is ED.LINEINPUT.SAVEX, not ED.LINEINPUT.HOME. HOME is #DEFINEd
+## as 19, so the assignment compiles as "19 = ED.LINEINPUT.X", a syntax error that defers to
+## run time: the compile says OK and the call throws SYNTAX ERROR.
 ED.LINEINPUT.ASK:
     ED.LINEINPUT.LABELPAINT = ED.LINEINPUT.LABELATTR
     IF ED.LINEINPUT.LABELPAINT = 0 THEN ED.LINEINPUT.LABELPAINT = ED.LINEINPUT.ATTR
@@ -989,51 +891,40 @@ ED.LINEINPUT.ASK:
     GOSUB ED.LINEINPUT.GET : ED.LINEINPUT.X = ED.LINEINPUT.SAVEX
     RETURN
 
-## ***********************************************************************
-## **  ED.LINEINPUT.TYPED -- accept a printable character, if there is room.
-## **
-## **  Refused: below 32, DEL, and $80-$9F -- the PETSCII control codes,
-## **  colours and cursor moves and reverse on and off, which would take
-## **  effect on the way OUT if they were let into the string.
-## **
-## **  ONE RANGE TEST, NOT A FLAG. Comparisons bind TIGHTER than AND here, so
-## **  K >= 128 AND K <= 159 reads as the range it looks like -- which is why
-## **  ED.KEY >= 32 AND ED.KEY <= 126 works in the editor. Believing it the
-## **  other way round is what makes people reach for a flag they do not need.
-## **
-## **  Then the caller's filters, if it set any. ALLOW$ is asked first, so a
-## **  caller that sets both gets the allow list and DENY$ never runs.
-## ***********************************************************************
+## ED.LINEINPUT.TYPED -- accept a printable character, if there is room.
+##
+## Refused: below 32, DEL, and $80-$9F -- the PETSCII control codes, colours and cursor
+## moves and reverse on and off, which would take effect on the way OUT if they were let
+## into the string.
+##
+## A range needs no flag. Comparisons bind tighter than AND here, so K >= 128 AND K <= 159
+## is the range it looks like, and the editor's ED.KEY >= 32 AND ED.KEY <= 126 reads the
+## same way.
+##
+## Then the caller's filters, if it set any. ALLOW$ is asked first, so a caller that sets
+## both gets the allow list and DENY$ never runs.
 
 ED.LINEINPUT.TYPED:
     IF LEN(ED.LINEINPUT.TEXT$) >= ED.LINEINPUT.LEN THEN RETURN
     IF ED.LINEINPUT.CODE < 32 OR ED.LINEINPUT.CODE = 127 THEN RETURN
     IF ED.LINEINPUT.CODE > 127 AND ED.LINEINPUT.CODE < 160 THEN RETURN
 
-## ---- NESTED, not one AND: the empty test comes first on its own, so a field
-## ---- with no filter -- which is every caller in the tree today -- does not pay
-## ---- for a search of an empty string on every keystroke. A false IF skips the
-## ---- whole line, which is what makes the second test safe to write here.
+## Nested, not one AND. The empty test comes first on its own, so a field with no filter
+## does not pay for a search of an empty string on every keystroke. A false IF skips the
+## whole line, which is what makes the second test safe to write here.
     IF ED.LINEINPUT.ALLOW$ <> "" THEN IF GP.INSTR(ED.LINEINPUT.ALLOW$, ED.LINEINPUT.K$) = 0 THEN RETURN
     IF ED.LINEINPUT.ALLOW$ = "" THEN IF ED.LINEINPUT.DENY$ <> "" THEN IF GP.INSTR(ED.LINEINPUT.DENY$, ED.LINEINPUT.K$) > 0 THEN RETURN
 
-## ---- INSERTED AT THE CARET, not appended. With the caret at the end --
-## ---- where it starts, and where it stays unless someone moves it --
-## ---- LEFT$ is the whole string and MID$ past the end is "", so this is
-## ---- the old append with two joins nobody asked for. That is the price
-## ---- of the caret, and it is paid per keystroke, on a human's timescale.
+## Inserted at the caret, not appended. With the caret at the end, where it starts, LEFT$ is
+## the whole string and MID$ past the end is "", so an insert costs two joins a keystroke.
     ED.LINEINPUT.TEXT$ = LEFT$(ED.LINEINPUT.TEXT$, ED.LINEINPUT.POS) + ED.LINEINPUT.K$ + MID$(ED.LINEINPUT.TEXT$, ED.LINEINPUT.POS + 1)
     ED.LINEINPUT.POS = ED.LINEINPUT.POS + 1
     RETURN
 
-## ***********************************************************************
-## **  ED.LINEINPUT.RUBOUT -- DEL takes the character BEFORE the caret.
-## **
-## **  Which is what DEL has always meant, and what the old code did by
-## **  accident: with the caret at the end, "before the caret" IS "off the
-## **  end". At the start of the field there is nothing before it, so DEL
-## **  is ignored rather than wrapping round to eat the last character.
-## ***********************************************************************
+## ED.LINEINPUT.RUBOUT -- DEL takes the character before the caret.
+##
+## At the start of the field there is nothing before the caret, so DEL is ignored rather
+## than wrapping round to eat the last character.
 
 ED.LINEINPUT.RUBOUT:  
     IF ED.LINEINPUT.POS = 0 THEN RETURN
@@ -1041,32 +932,29 @@ ED.LINEINPUT.RUBOUT:
     ED.LINEINPUT.POS = ED.LINEINPUT.POS - 1
     RETURN
 
-## ---- What the field displays, which is not always what it holds.
-## ---- RPT$ raises an error on a count of zero, hence the guard.
+## What the field displays, which is not always what it holds. RPT$ raises an error on a
+## count of zero, hence the guard.
 
 ED.LINEINPUT.RENDER:  
     ED.LINEINPUT.SHOW$ = ED.LINEINPUT.TEXT$ : IF ED.LINEINPUT.MASK = 0 THEN RETURN
     ED.LINEINPUT.SHOW$ = "" : IF LEN(ED.LINEINPUT.TEXT$) > 0 THEN ED.LINEINPUT.SHOW$ = RPT$(ED.LINEINPUT.STAR, LEN(ED.LINEINPUT.TEXT$))
     RETURN
 
-## ***********************************************************************
-## **  ED.LINEINPUT.CURSOR -- one cell, drawn twice a blink.
-## **
-## **  With room left it is an inverse space after the text. With the field
-## **  full there is no cell after the text, so it inverts the LAST
-## **  CHARACTER instead of blanking it -- printing the character back in
-## **  the inverse attribute, which says "full" without losing anything off
-## **  the display.
-## ***********************************************************************
+## ED.LINEINPUT.CURSOR -- one cell, drawn twice a blink.
+##
+## With room left it is an inverse space after the text. With the field full there is no
+## cell after the text, so it inverts the LAST CHARACTER instead of blanking it -- printing
+## the character back in the inverse attribute, which says "full" without losing anything
+## off the display.
 
 ED.LINEINPUT.CURSOR:  
     ED.LINEINPUT.FILLED = LEN(ED.LINEINPUT.SHOW$)
     ED.LINEINPUT.CP = ED.LINEINPUT.POS : IF ED.LINEINPUT.CP > ED.LINEINPUT.FILLED THEN ED.LINEINPUT.CP = ED.LINEINPUT.FILLED
     ED.LINEINPUT.CX = ED.LINEINPUT.X + ED.LINEINPUT.CP : ED.LINEINPUT.CELL$ = " "
 
-## ---- ON a character, the cursor IS that character, drawn inverse on the
-## ---- lit half of the blink and normal on the other -- so the blink puts
-## ---- back exactly what it covered and nothing has to be remembered.
+## ON a character, the cursor IS that character, drawn inverse on the lit half of the blink
+## and normal on the other -- so the blink puts back exactly what it covered and nothing has
+## to be remembered.
     IF ED.LINEINPUT.CP < ED.LINEINPUT.FILLED THEN ED.LINEINPUT.CELL$ = MID$(ED.LINEINPUT.SHOW$, ED.LINEINPUT.CP + 1, 1)
     IF ED.LINEINPUT.CP >= ED.LINEINPUT.LEN THEN ED.LINEINPUT.CX = ED.LINEINPUT.X + ED.LINEINPUT.LEN - 1
     IF ED.LINEINPUT.CP >= ED.LINEINPUT.LEN THEN ED.LINEINPUT.CELL$ = RIGHT$(ED.LINEINPUT.SHOW$, 1)

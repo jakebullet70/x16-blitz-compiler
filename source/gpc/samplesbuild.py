@@ -2,7 +2,7 @@
 #   samplesbuild.py -- build every sample program the release ships, headlessly.
 #
 #   Usage:  samplesbuild.py                  build all of them
-#           samplesbuild.py GPBMODS EDITOR   build only the ones named
+#           samplesbuild.py GPBMODS EDIT   build only the ones named
 #           samplesbuild.py --list           print the table and stop
 #
 #   WHY IT TICKS.  build_basl.py and compile_shared.py each drive x16emu in warp and send
@@ -69,12 +69,15 @@ PROGRAMS = [
          extras=["GG.FILE.PICKER.INC.BL", "GG.PROGRAM.EDIT.INC.BL"], shared=True, inplace=True,
          install=None, data=[]),
 
-    #   SHARED: MENU.INC.BL uses GP.BANKEDSTR. Builds in the sample folder.
-    dict(name="EDITOR",
-         src=("samples/edit", "EDITOR.BASL"),
-         lib="samples/edit/GPC-BASIC",
-         extras=["ED-MENUS.BASL", "ED-STORE.BASL"], shared=True, inplace=True,
-         install=("samples/edit", "C.EDITOR.PRG"), data=["runtimes"]),
+    #   EMBEDDED: the forked menus keep their rows in ordinary string arrays, so there is
+    #   no GP.BANKEDSTR and no SHARED. It builds in the sample folder, which is the drive,
+    #   and its GPB.INC.BL is the copy sitting there.
+    dict(name="EDIT",
+         src=("samples/edit", "EDIT.BASL"),
+         lib="GPC-BASIC",
+         extras=["ED-FONT.BASL", "ED-MISC.BASL", "ED-MENUS.BASL", "ED-STORE.BASL"],
+         shared=False, inplace=True,
+         install=None, data=[]),
 ]
 
 BMX_SRC = os.path.join(ROOT, "samples", "BMXVIEWER", "SAMPLES")

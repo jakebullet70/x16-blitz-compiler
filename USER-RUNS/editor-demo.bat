@@ -1,11 +1,10 @@
 @echo off
 rem
-rem  C.EDITOR.PRG is the COMPILED object and is checked in beside the source.
-rem  To rebuild it:
-rem    1. copy the .INC.BL files up out of samples\edit\GPC-BASIC\
-rem       so they sit beside EDITOR.BASL (all eight of them)
-rem    2. python source\gpc\build_basl.py EDITOR.BASL EDITOR.PRG
-rem    3. compile EDITOR.PRG with GPC.BIN, and keep the object as C.EDITOR.PRG
+rem  EDIT.PRG is the compiled object, checked in beside the source.
+rem  To rebuild it, from the repository root:
+rem    python source\gpc\build_basl.py --drive samples\edit EDIT.BASL EDIT.SRC.PRG
+rem    python source\gpc\compile_shared.py --drive samples\edit --embedded EDIT.SRC.PRG EDIT.PRG EDIT.MAP
+rem  Delete EDIT.SRC.PRG first: build_basl.py does not notice an edited #INCLUDE.
 rem ---------------------------------------------------------------------------
 setlocal
 for %%I in ("%~dp0..") do set "ROOT=%%~fI\"
@@ -21,13 +20,13 @@ if not exist "%ROM%" (
 	echo ROM not found: "%ROM%"
 	exit /b 1
 )
-if not exist "%DRIVE%\C.EDITOR.PRG" (
+if not exist "%DRIVE%\EDIT.PRG" (
 	echo.
-	echo   samples\edit\C.EDITOR.PRG is not built.
-	echo   See the notes at the top of this file for the three steps.
+	echo   samples\edit\EDIT.PRG is not built.
+	echo   See the notes at the top of this file.
 	echo.
 	exit /b 1
 )
 
-"%X16EMU%" -rom "%ROM%" -fsroot "%DRIVE%" -scale 2 -sound none -prg "%DRIVE%\C.EDITOR.PRG" -run
+"%X16EMU%" -rom "%ROM%" -fsroot "%DRIVE%" -scale 2 -sound none -prg "%DRIVE%\EDIT.PRG" -run
 endlocal

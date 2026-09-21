@@ -329,8 +329,8 @@ samples/GPC-HELP/C.GPB.HELP.SRC.PRG
 samples/GPC-HELP/GPB.HELP.SRC.PRG
 samples/GPC-HELP/GPC.INPUT
 /testing
-samples/edit/EDITOR.MAP
-samples/edit/EDITOR.SRC.SYM
+samples/edit/EDIT.MAP
+samples/edit/EDIT.SRC.SYM
 samples/GPC-GUI-HELPER/GPC.GUI.MAP
 samples/GPC-GUI-HELPER/GPC.GUI.SRC.SYM
 samples/GPC-HELP/GPB.HELP.MAP
