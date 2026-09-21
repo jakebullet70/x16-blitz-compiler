@@ -5,11 +5,13 @@
 
 #DEFINE ED.GUT.D 4
 #DEFINE ED.GUT.W 6
+#DEFINE ED.MSG.JIFFIES 180
 
 #INCLUDE "GPB.INC.BL"
 #INCLUDE "ED-FONT.BASL"
 #INCLUDE "ED-MISC.BASL"
 #INCLUDE "ED-MENUS.BASL"
+#INCLUDE "ED-DIALOG.BASL"
 
 REM ============================================================================
 REM EDITOR.BASL -- GPC EDIT, an MS-DOS-EDIT-styled text / Markdown editor for the
@@ -77,6 +79,7 @@ ED.KEY.RANGE:
 
 
 ED.QUIT:
+  GOSUB ED.SHADOW.PALETTE.OFF
   POKE 40761, 0 : POKE 40762, 0 : REM undo any hardware VSCROLL before returning to BASIC
   REM layer 0 off again
   POKE 40754, 0 : POKE 40755, 0 : POKE 40741, 0 : POKE 40745, PEEK(40745) AND 239
@@ -97,6 +100,7 @@ ED.INIT:
   GOSUB DOC.INIT
   GOSUB ED.CLAIM.FIXED.BANKS
   GOSUB ED.THEME.SELECT
+  ED.SV.MAX = 2 : REM the dropdown's stash and the dialog's, claimed on first use
   GOSUB ED.MENUS.SETUP
   GOSUB ED.CLAIM.ARENA.BANKS
   
@@ -106,6 +110,7 @@ ED.INIT:
   GOSUB ED.PETFONT : REM ...then re-index it so a VERA tile index IS a character code
   POKE 882, PEEK(882) OR 64
   GOSUB ED.GUI.SETUP : REM ...and tell MENU where the frame glyphs ended up
+  GOSUB ED.SHADOW.PALETTE
   GP.CALL ED.APPSYS.SCRMODE, 0, 0, 0, 1
   SCREEN.COLS = GP.X : SCREEN.ROWS = GP.Y
   IF SCREEN.COLS < 20 THEN SCREEN.COLS = 80
@@ -185,6 +190,21 @@ ED.LAYERS:
   GOSUB ED.CLEAR.OVERLAY
   RETURN
 
+
+
+REM The shadow under a dropdown or a dialog is drawn on layer 1, where colour 0 is the
+REM transparent index -- a shadow in it would show the document through untouched. So the
+REM editor buys itself a black: palette entry 4 is purple, which no theme uses, and this
+REM points it at black. The themes then ask for colour 4 and get a shadow that is really
+REM black. The entry is read back first, and ED.QUIT puts it as it was.
+ED.SHADOW.PALETTE:
+  ED.PAL.LO = VPEEK(1, $FA08) : ED.PAL.HI = VPEEK(1, $FA09)
+  VPOKE 1, $FA08, 0 : VPOKE 1, $FA09, 0
+  RETURN
+
+ED.SHADOW.PALETTE.OFF:
+  VPOKE 1, $FA08, ED.PAL.LO : VPOKE 1, $FA09, ED.PAL.HI
+  RETURN
 
 
 REM Layer 0 is switched on AFTER the first full render, and is never cleared: VRAM comes up
@@ -372,7 +392,7 @@ ED.OPEN.FILE:
 ED.CMD.OPEN:
   GOSUB ED.CONFIRM.DISCARD
   IF ED.DISCARD.OK = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
-  ED.PROMPT.MSG$ = "Open file: " : GOSUB ED.PROMPT
+  ED.PROMPT.TITLE$ = "Open" : ED.PROMPT.MSG$ = "File name:" : GOSUB ED.PROMPT
   IF ED.PROMPT.OK = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
   DOC.FILE.NAME$ = ED.INPUT$
   GOSUB ED.OPEN.FILE
@@ -389,7 +409,8 @@ ED.CMD.SAVE:
   RETURN
 
 ED.CMD.SAVEAS:
-  ED.PROMPT.MSG$ = "Save as: " : GOSUB ED.PROMPT
+  ED.SAVEAS.START$ = DOC.FILE.NAME$ : IF DOC.FILE.NAME$ = "UNTITLED" THEN ED.SAVEAS.START$ = ""
+  ED.PROMPT.TITLE$ = "Save as" : ED.PROMPT.MSG$ = "File name:" : ED.PROMPT.TEXT$ = ED.SAVEAS.START$ : GOSUB ED.PROMPT
   IF ED.PROMPT.OK = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
   DOC.FILE.NAME$ = ED.INPUT$ : ED.MB.FORCE = 1
   GOSUB ED.SAVE.FILE : GOSUB ED.REFRESH.FULL
@@ -398,7 +419,7 @@ ED.CMD.SAVEAS:
 
 ED.CMD.EXIT:
   IF ED.DOC.DIRTY = 0 THEN GOTO ED.CMD.EXIT.GO
-  ED.PROMPT.MSG$ = "Discard changes?" : GOSUB ED.PROMPT.YN
+  ED.PROMPT.TITLE$ = "Exit" : ED.PROMPT.MSG$ = "Discard changes?" : GOSUB ED.PROMPT.YN
   IF ED.YN = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
 ED.CMD.EXIT.GO:
   GOTO ED.QUIT
@@ -409,18 +430,18 @@ ED.CMD.ABOUT:
 ED.CONFIRM.DISCARD:
   ED.DISCARD.OK = -1
   IF ED.DOC.DIRTY = 0 THEN RETURN
-  ED.PROMPT.MSG$ = "Discard changes?" : GOSUB ED.PROMPT.YN
+  ED.PROMPT.TITLE$ = "Discard changes" : ED.PROMPT.MSG$ = "The document has changed. Discard it?" : GOSUB ED.PROMPT.YN
   ED.DISCARD.OK = ED.YN
   RETURN
 
 ED.CMD.FIND:
-  ED.PROMPT.MSG$ = "Find: " : GOSUB ED.PROMPT
+  ED.PROMPT.TITLE$ = "Find" : ED.PROMPT.MSG$ = "Find text:" : ED.PROMPT.TEXT$ = ED.FIND$ : GOSUB ED.PROMPT
   IF ED.PROMPT.OK = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
   ED.FIND$ = ED.INPUT$ : GOSUB ED.FIND.NEXT
   RETURN
 
 ED.CMD.GOTO:
-  ED.PROMPT.MSG$ = "Go to line: " : GOSUB ED.PROMPT
+  ED.PROMPT.TITLE$ = "Go to line" : ED.PROMPT.MSG$ = "Line number:" : GOSUB ED.PROMPT
   IF ED.PROMPT.OK = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
   ED.GOTO.N = VAL(ED.INPUT$)
   IF ED.GOTO.N < 1 THEN ED.GOTO.N = 1
@@ -472,36 +493,30 @@ ED.FN.NONE:
 REM ============================================================================
 REM PROMPTS
 REM ============================================================================
-REM Both live on the status row, where the editor already owns every cell -- no box, so
-REM nothing to save and put back. The interface is ED.PROMPT.MSG$ in and ED.INPUT$ plus
-REM ED.PROMPT.OK, or ED.YN, out.
+REM Both are now the one popup box, ED-DIALOG.BASL: it saves the screen under itself and
+REM puts it back, so a prompt costs no repaint. The interface is unchanged -- ED.PROMPT.MSG$
+REM in, plus ED.PROMPT.TITLE$ for the caption and ED.PROMPT.TEXT$ for what the field starts
+REM with, and ED.INPUT$ plus ED.PROMPT.OK, or ED.YN, out.
 
 ED.PROMPT:
-  REM Clear the row first: the message left there would show through beside the field.
-  ED.PS.ROW = SCREEN.ROWS - 1 : ED.PS.COL = 0 : ED.PS.WIDTH = SCREEN.COLS
-  ED.PS$ = "" : ED.PS.ATTR = ED.THEME.CLR(ED.THEME.BAR) : GOSUB ED.PUT.FIELD
-  REM 40 wide, which takes a path, and the label sits in the bar's own colour.
-  ED.LINEINPUT.X = 1 : ED.LINEINPUT.Y = SCREEN.ROWS - 1 : ED.LINEINPUT.LEN = 40
-  ED.LINEINPUT.LABEL$ = ED.PROMPT.MSG$ : ED.LINEINPUT.LABELATTR = ED.THEME.CLR(ED.THEME.BAR)
-  ED.LINEINPUT.ATTR = ED.THEME.CLR(ED.THEME.TEXT) : ED.LINEINPUT.MASK = 0
-  ED.LINEINPUT.TEXT$ = ""
-  GOSUB ED.LINEINPUT.ASK
-  REM ESC restores what the field started as, "", so a cancel hands back nothing either way.
-  ED.INPUT$ = ED.LINEINPUT.TEXT$
-  ED.PROMPT.OK = 0 : IF ED.LINEINPUT.KEY = 13 THEN ED.PROMPT.OK = 1
+  ED.DLG.TITLE$ = ED.PROMPT.TITLE$
+  ED.DLG.PROMPT$ = ED.PROMPT.MSG$
+  ED.DLG.TEXT$ = ED.PROMPT.TEXT$
+  ED.DLG.MAX = 0 : REM the dialog's own default, wide enough for a path
+  GOSUB ED.DLG.ASK
+  ED.INPUT$ = ED.DLG.INPUT$
+  ED.PROMPT.OK = ED.DLG.OK
+  REM The starting text is per call: a Find that remembers its needle must not hand the
+  REM same one to the next Save As.
+  ED.PROMPT.TEXT$ = ""
   RETURN
 
 ED.PROMPT.YN:
-  REM Every question here is the destructive one, so ESC and RETURN both land on NO.
-  ED.MSG$ = ED.PROMPT.MSG$ + "  Y/N" : GOSUB ED.ERR.MSG
-  ED.YN = 0
-ED.PROMPT.YN.WAIT:
-  GET ED.YN.K$
-  IF ED.YN.K$ = "" THEN GOTO ED.PROMPT.YN.WAIT
-  ED.YN.C = ASC(ED.YN.K$)
-  IF ED.YN.C = 89 OR ED.YN.C = 121 THEN ED.YN = -1 : RETURN
-  IF ED.YN.C = 78 OR ED.YN.C = 110 OR ED.YN.C = 27 OR ED.YN.C = 13 THEN RETURN
-  GOTO ED.PROMPT.YN.WAIT
+  ED.DLG.TITLE$ = ED.PROMPT.TITLE$
+  ED.DLG.MSG$ = ED.PROMPT.MSG$
+  GOSUB ED.DLG.YN
+  ED.YN = ED.DLG.YES
+  RETURN
 
 
 
@@ -511,14 +526,40 @@ ED.PROMPT.YN.WAIT:
 REM ============================================================================
 REM MESSAGES
 REM ============================================================================
+REM A message takes over the status line for ED.MSG.JIFFIES and then the status line comes
+REM back, so the editor never sits showing a stale "Saved" or "Not found". Keys struck during
+REM the hold stay in the keyboard buffer and are read as usual once the status line returns.
 ED.INFO.MSG:
   ED.PS.ROW = SCREEN.ROWS - 1 : ED.PS.COL = 0 : ED.PS.WIDTH = SCREEN.COLS
   ED.PS$ = " " + ED.MSG$ : ED.PS.ATTR = ED.THEME.CLR(ED.THEME.BAR) : GOSUB ED.PUT.FIELD
+  GOSUB ED.MSG.HOLD
   RETURN
 
 ED.ERR.MSG:
   ED.PS.ROW = SCREEN.ROWS - 1 : ED.PS.COL = 0 : ED.PS.WIDTH = SCREEN.COLS
   ED.PS$ = " " + ED.MSG$ : ED.PS.ATTR = ED.THEME.CLR(ED.THEME.WARN) : GOSUB ED.PUT.FIELD
+  GOSUB ED.MSG.HOLD
+  RETURN
+
+REM ---- hold the message on screen, then put the status line back ----
+REM TI counts jiffies, 60 to the second, and it is read rather than counted down a loop so
+REM the wait is the same length whatever the machine is doing. TI rolls over to 0 at
+REM midnight: the elapsed count then goes negative, which ends the wait early rather than
+REM leaving the editor stuck for the best part of a day.
+REM
+REM The keyboard is drained on the way out. Three seconds is long enough to type into, and
+REM a held arrow repeats through the whole hold: without the drain those keys all arrive at
+REM once the moment the main loop starts reading again. GET hands back "" on an empty
+REM buffer, so the drain stops at the first empty read.
+ED.MSG.HOLD:
+  ED.MSG.T0 = TI
+ED.MSG.HOLD.WAIT:
+  ED.MSG.EL = TI - ED.MSG.T0
+  IF ED.MSG.EL >= 0 AND ED.MSG.EL < ED.MSG.JIFFIES THEN GOTO ED.MSG.HOLD.WAIT
+  GOSUB ED.RENDER.STATUS
+ED.MSG.HOLD.DRAIN:
+  GET ED.MSG.K$
+  IF ED.MSG.K$ <> "" THEN GOTO ED.MSG.HOLD.DRAIN
   RETURN
 
 

@@ -634,6 +634,13 @@ ED.STRCASE.MODULE.END:
 ##
 ## BAR is a menu bar or status line: a background of its own, so the band stands off the
 ## page. BORDER's colour marks a hot key on it.
+##
+## SHADOW is the drop shadow under a dropdown or a dialog, and is a background colour:
+## the cells are filled with spaces, so its foreground half never shows. Every theme uses
+## colour 4 for it, and colour 4 is black here: the shadow is drawn on layer 1, where
+## index 0 is the transparent one and a shadow in it would show the document through, so
+## ED.SHADOW.PALETTE points palette entry 4 -- purple, which no theme spends -- at black
+## instead. The dark theme's page is black too, so there the shadow is drawn but not seen.
 
 #DEFINE ED.THEME.PAGE 0
 #DEFINE ED.THEME.TEXT 1
@@ -644,7 +651,8 @@ ED.STRCASE.MODULE.END:
 #DEFINE ED.THEME.WARN 6
 #DEFINE ED.THEME.FOCUS 7
 #DEFINE ED.THEME.BAR 8
-#DEFINE ED.THEME.SLOTS 9
+#DEFINE ED.THEME.SHADOW 9
+#DEFINE ED.THEME.SLOTS 10
 
 ## How many themes ED.THEME.NEXT cycles through.
 #DEFINE ED.THEME.COUNT 5
@@ -680,6 +688,7 @@ ED.THEME.SELECT.X16:
     ED.THEME.CLR(ED.THEME.WARN)   = 6 * 16 + 13
     ED.THEME.CLR(ED.THEME.FOCUS)  = 7 * 16 + 6
     ED.THEME.CLR(ED.THEME.BAR)    = 12 * 16 + 1
+    ED.THEME.CLR(ED.THEME.SHADOW) = 4 * 16 + 0
     RETURN
 
 ED.THEME.SELECT.DARK:
@@ -691,7 +700,8 @@ ED.THEME.SELECT.DARK:
     ED.THEME.CLR(ED.THEME.DIMMED) = 0 * 16 + 12
     ED.THEME.CLR(ED.THEME.WARN)   = 0 * 16 + 8
     ED.THEME.CLR(ED.THEME.FOCUS)  = 7 * 16 + 0
-    ED.THEME.CLR(ED.THEME.BAR)    = 6 * 16 + 1
+    ED.THEME.CLR(ED.THEME.BAR)    = 11 * 16 + 15
+    ED.THEME.CLR(ED.THEME.SHADOW) = 4 * 16 + 0
     RETURN
 
 ## A white page. DIMMED is mid grey rather than dark grey so that reversing it for a status
@@ -706,6 +716,7 @@ ED.THEME.SELECT.LIGHT:
     ED.THEME.CLR(ED.THEME.WARN)   = 1 * 16 + 2
     ED.THEME.CLR(ED.THEME.FOCUS)  = 7 * 16 + 0
     ED.THEME.CLR(ED.THEME.BAR)    = 15 * 16 + 0
+    ED.THEME.CLR(ED.THEME.SHADOW) = 4 * 16 + 0
     RETURN
 
 ## DIMMED and WARN are this editor's, and are not part of the palette this one came from.
@@ -722,7 +733,8 @@ ED.THEME.SELECT.GRAY:
     ED.THEME.CLR(ED.THEME.DIMMED) = 11 * 16 + 12
     ED.THEME.CLR(ED.THEME.WARN)   = 11 * 16 + 10
     ED.THEME.CLR(ED.THEME.FOCUS)  = 7 * 16 + 11
-    ED.THEME.CLR(ED.THEME.BAR)    = 6 * 16 + 1
+    ED.THEME.CLR(ED.THEME.BAR)    = 12 * 16 + 1
+    ED.THEME.CLR(ED.THEME.SHADOW) = 4 * 16 + 0
     RETURN
 
 ## ED.THEME.FIRST is set only when ED.THEME.SELECT created the array, the one case with

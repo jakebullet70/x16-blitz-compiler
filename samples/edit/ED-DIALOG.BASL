@@ -1,0 +1,216 @@
+## ============================================================================
+## ED-DIALOG.BASL -- the editor's one popup box.
+##
+## Every question the editor asks is asked here: a file name, a search, a go-to line, a
+## yes/no. The box is centred, the screen under it is saved into VRAM and put back on the
+## way out, so a dialog never costs a repaint of the document.
+##
+##   GOSUB ED.DLG.ASK      a titled box with one input field      -> ED.DLG.OK, ED.DLG.INPUT$
+##   GOSUB ED.DLG.YN       a titled box with a yes/no question    -> ED.DLG.YES
+##   GOSUB ED.DLG.OPEN     the box alone, for a caller that draws its own content
+##   GOSUB ED.DLG.CLOSE    put the screen back
+##
+## The box is drawn on LAYER 1, the overlay the bars and dropdowns live on, and the document
+## is on layer 0. Restoring layer 1 to what it held -- transparent cells over the text
+## region -- is what makes the document reappear underneath with no rendering at all.
+##
+## Text goes through ED.PUT.FIELD, the editor's own raw writer, because the charset is in
+## ASCII order (see ED-FONT.BASL) and anything that converts a byte to a screen code first
+## draws the wrong glyph.
+##
+## WARNING: the screen save needs STASHVRAM running. ED.MENUPULL.SVSTART starts it on
+## demand, the same call the dropdowns use, and a refused start leaves the box drawn with
+## nothing saved -- the caller's ED.REFRESH.FULL is what covers that case.
+## ============================================================================
+#IFNDEF ED.DLG.DEFS
+#DEFINE ED.DLG.DEFS 1
+
+## The default field width: 40 takes a path and still leaves a 44-column box inside 80.
+#DEFINE ED.DLG.FIELD 40
+
+## The narrowest box worth drawing, and the margin kept clear around it.
+#DEFINE ED.DLG.MINW 20
+#DEFINE ED.DLG.EDGE 6
+
+GOTO ED.DLG.SKIP
+
+## ED.DLG.THEME -- the box's colours, taken from the theme on every open so a theme change
+## needs no second hook. The page colour is the background of everything inside the frame;
+## the rest keep that background and take their own foreground, which is what stops a
+## dialog reading as a patchwork.
+ED.DLG.THEME:
+    IF ED.THEME.READY = 0 THEN GOSUB ED.THEME.SELECT
+    ED.DLG.PAPER = ED.THEME.CLR(ED.THEME.PAGE)
+    ED.DLG.FRAMEATTR = (ED.DLG.PAPER AND 240) + (ED.THEME.CLR(ED.THEME.BORDER) AND 15)
+    ED.DLG.TEXTATTR = (ED.DLG.PAPER AND 240) + (ED.THEME.CLR(ED.THEME.TEXT) AND 15)
+    ED.DLG.TITLEATTR = (ED.DLG.PAPER AND 240) + (ED.THEME.CLR(ED.THEME.TITLE) AND 15)
+    ED.DLG.HINTATTR = (ED.DLG.PAPER AND 240) + (ED.THEME.CLR(ED.THEME.DIMMED) AND 15)
+    ED.DLG.FIELDATTR = ED.THEME.CLR(ED.THEME.FOCUS)
+    ED.DLG.SHADEATTR = ED.THEME.CLR(ED.THEME.SHADOW)
+    RETURN
+
+## ED.DLG.OPEN -- save the screen, draw the box, hand back where the inside starts.
+##
+##   in   ED.DLG.W        columns INSIDE the frame
+##        ED.DLG.H        rows inside the frame
+##        ED.DLG.TITLE$   drawn on the top border, "" for none
+##   out  ED.DLG.X        the inside's left column
+##        ED.DLG.Y        the inside's top row
+##
+## The size is clamped before it is centred, so a caller that asks for more than the screen
+## holds gets the biggest box that fits rather than a frame drawn off the edge.
+ED.DLG.OPEN:
+    GOSUB ED.DLG.THEME
+    IF ED.DLG.W > SCREEN.COLS - ED.DLG.EDGE THEN ED.DLG.W = SCREEN.COLS - ED.DLG.EDGE
+    IF ED.DLG.W < 4 THEN ED.DLG.W = 4
+    IF ED.DLG.H > SCREEN.ROWS - ED.DLG.EDGE THEN ED.DLG.H = SCREEN.ROWS - ED.DLG.EDGE
+    IF ED.DLG.H < 1 THEN ED.DLG.H = 1
+
+    ED.DLG.COL = INT((SCREEN.COLS - ED.DLG.W - 2) / 2)
+    ED.DLG.ROW = INT((SCREEN.ROWS - ED.DLG.H - 2) / 2)
+    IF ED.DLG.COL < 0 THEN ED.DLG.COL = 0
+    IF ED.DLG.ROW < 1 THEN ED.DLG.ROW = 1
+    ED.DLG.X = ED.DLG.COL + 1 : ED.DLG.Y = ED.DLG.ROW + 1
+
+## The shadow is two columns down the right and one row under, and both are trimmed to what
+## is left on the screen: they are decoration, and a box near an edge simply has less of it.
+    ED.DLG.SHW = 2
+    IF ED.DLG.COL + ED.DLG.W + 2 + ED.DLG.SHW > SCREEN.COLS THEN ED.DLG.SHW = SCREEN.COLS - ED.DLG.COL - ED.DLG.W - 2
+    IF ED.DLG.SHW < 0 THEN ED.DLG.SHW = 0
+    ED.DLG.SHH = 1
+    IF ED.DLG.ROW + ED.DLG.H + 2 + ED.DLG.SHH > SCREEN.ROWS THEN ED.DLG.SHH = 0
+
+    GOSUB ED.DLG.SAVE
+
+    IF ED.DLG.SHW > 0 THEN GP.FILL ED.DLG.COL + ED.DLG.W + 2, ED.DLG.ROW + 1, ED.DLG.SHW, ED.DLG.H + 1, 32, ED.DLG.SHADEATTR
+    IF ED.DLG.SHH > 0 THEN GP.FILL ED.DLG.COL + 2, ED.DLG.ROW + ED.DLG.H + 2, ED.DLG.W + ED.DLG.SHW, 1, 32, ED.DLG.SHADEATTR
+
+## The frame glyphs are the six ED.PETFONT rescued, the same eight bytes the dropdowns are
+## drawn with. A style under 256 is one of the runtime's own, and every one of those is
+## built from screen codes the re-order has written over, so 0 -- the solid block -- is the
+## only sane fallback.
+    ED.DLG.STYLE = ED.MENU.DROPSTYLE
+    IF ED.DLG.STYLE < 256 THEN ED.DLG.STYLE = 0
+    GP.BOX ED.DLG.COL, ED.DLG.ROW, ED.DLG.W + 2, ED.DLG.H + 2, ED.DLG.STYLE, ED.DLG.FRAMEATTR
+    GP.FILL ED.DLG.X, ED.DLG.Y, ED.DLG.W, ED.DLG.H, 32, ED.DLG.PAPER
+
+    IF ED.DLG.TITLE$ = "" THEN RETURN
+    ED.DLG.CAP$ = " " + ED.DLG.TITLE$ + " " : ED.PS.ROW = ED.DLG.ROW
+    ED.PS.COL = ED.DLG.COL + INT((ED.DLG.W + 2 - LEN(ED.DLG.CAP$)) / 2)
+    ED.PS.WIDTH = LEN(ED.DLG.CAP$)
+    ED.PS$ = ED.DLG.CAP$ : ED.PS.ATTR = ED.DLG.TITLEATTR
+    GOSUB ED.PUT.FIELD
+    RETURN
+
+## ED.DLG.SAY -- one line of text inside the box, at ED.DLG.SX, ED.DLG.SY from its top left
+## corner. The width is the text's own, so it paints over nothing it was not given.
+ED.DLG.SAY:
+    IF ED.DLG.S$ = "" THEN RETURN
+    ED.PS.ROW = ED.DLG.Y + ED.DLG.SY : ED.PS.COL = ED.DLG.X + ED.DLG.SX
+    ED.PS.WIDTH = LEN(ED.DLG.S$)
+    IF ED.PS.WIDTH > ED.DLG.W - ED.DLG.SX THEN ED.PS.WIDTH = ED.DLG.W - ED.DLG.SX
+    ED.PS$ = ED.DLG.S$ : ED.PS.ATTR = ED.DLG.SATTR
+    GOSUB ED.PUT.FIELD
+    RETURN
+
+## ED.DLG.SAVE -- the screen under the box, frame and shadow included, into VRAM.
+##
+## ED.DLG.HND is 0 when there is nothing to put back, which is also what a refused
+## STASHVRAM leaves behind.
+ED.DLG.SAVE:
+    ED.DLG.HND = 0
+    IF ED.SV.READY = 0 THEN GOSUB ED.MENUPULL.SVSTART
+    IF ED.SV.READY = 0 THEN RETURN
+    ED.SV.X = ED.DLG.COL : ED.SV.Y = ED.DLG.ROW
+    ED.SV.W = ED.DLG.W + 2 + ED.DLG.SHW : ED.SV.H = ED.DLG.H + 2 + ED.DLG.SHH
+    GOSUB ED.SV.SAVE : ED.DLG.HND = ED.SV.HND
+    RETURN
+
+## ED.DLG.CLOSE -- the screen back, and the handle with it.
+ED.DLG.CLOSE:
+    IF ED.DLG.HND = 0 THEN RETURN
+    ED.SV.HND = ED.DLG.HND : ED.SV.MOVE = 0
+    GOSUB ED.SV.RESTORE : GOSUB ED.SV.FREE
+    ED.DLG.HND = 0
+    RETURN
+
+## ED.DLG.ASK -- a box with one input field in it.
+##
+##   in   ED.DLG.TITLE$   the border caption
+##        ED.DLG.PROMPT$  the line above the field
+##        ED.DLG.TEXT$    what the field starts with, "" for empty
+##        ED.DLG.MAX      the field width, 0 for ED.DLG.FIELD
+##   out  ED.DLG.OK       1 when RETURN ended it, 0 for ESC
+##        ED.DLG.INPUT$   what was typed
+##
+## ESC puts the field back to what it started as, so a cancelled Save As hands back the old
+## name rather than an empty one -- ED.DLG.OK is the answer to look at, not the string.
+ED.DLG.ASK:
+    IF ED.DLG.MAX < 1 THEN ED.DLG.MAX = ED.DLG.FIELD
+    ED.DLG.HINT$ = "RETURN accepts, ESC cancels"
+    ED.DLG.W = ED.DLG.MAX + 2
+    IF LEN(ED.DLG.PROMPT$) + 2 > ED.DLG.W THEN ED.DLG.W = LEN(ED.DLG.PROMPT$) + 2
+    IF LEN(ED.DLG.HINT$) + 2 > ED.DLG.W THEN ED.DLG.W = LEN(ED.DLG.HINT$) + 2
+    IF LEN(ED.DLG.TITLE$) + 6 > ED.DLG.W THEN ED.DLG.W = LEN(ED.DLG.TITLE$) + 6
+    IF ED.DLG.W < ED.DLG.MINW THEN ED.DLG.W = ED.DLG.MINW
+    ED.DLG.H = 4
+    GOSUB ED.DLG.OPEN
+
+## The field cannot be wider than the box it landed in: ED.DLG.OPEN clamps a box that does
+## not fit the screen, and the field has to follow it down.
+    IF ED.DLG.MAX > ED.DLG.W - 2 THEN ED.DLG.MAX = ED.DLG.W - 2
+
+    ED.DLG.SX = 1 : ED.DLG.SY = 0 : ED.DLG.S$ = ED.DLG.PROMPT$ : ED.DLG.SATTR = ED.DLG.TEXTATTR
+    GOSUB ED.DLG.SAY
+    ED.DLG.SX = 1 : ED.DLG.SY = 3 : ED.DLG.S$ = ED.DLG.HINT$ : ED.DLG.SATTR = ED.DLG.HINTATTR
+    GOSUB ED.DLG.SAY
+
+    ED.LINEINPUT.X = ED.DLG.X + 1 : ED.LINEINPUT.Y = ED.DLG.Y + 1
+    ED.LINEINPUT.LEN = ED.DLG.MAX : ED.LINEINPUT.LABEL$ = "" : ED.LINEINPUT.LABELATTR = 0
+    ED.LINEINPUT.ATTR = ED.DLG.FIELDATTR : ED.LINEINPUT.MASK = 0 : ED.LINEINPUT.ALLOW$ = ""
+    ED.LINEINPUT.DENY$ = "" : ED.LINEINPUT.TEXT$ = ED.DLG.TEXT$
+    GOSUB ED.LINEINPUT.ASK
+
+    ED.DLG.INPUT$ = ED.LINEINPUT.TEXT$ : ED.DLG.OK = 0
+    IF ED.LINEINPUT.KEY = 13 THEN ED.DLG.OK = 1
+    GOSUB ED.DLG.CLOSE
+    RETURN
+
+
+
+
+## ED.DLG.YN -- a box with a question in it.
+##
+##   in   ED.DLG.TITLE$   the border caption
+##        ED.DLG.MSG$     the question
+##   out  ED.DLG.YES      -1 for yes, 0 for no
+##
+## Every question asked here is the destructive one, so ESC and RETURN both land on NO. A
+## key that is neither is ignored rather than taken as an answer.
+ED.DLG.YN:
+    ED.DLG.HINT$ = "Y = yes, N = no" : ED.DLG.W = LEN(ED.DLG.MSG$) + 2
+    IF LEN(ED.DLG.HINT$) + 2 > ED.DLG.W THEN ED.DLG.W = LEN(ED.DLG.HINT$) + 2
+    IF LEN(ED.DLG.TITLE$) + 6 > ED.DLG.W THEN ED.DLG.W = LEN(ED.DLG.TITLE$) + 6
+    IF ED.DLG.W < ED.DLG.MINW THEN ED.DLG.W = ED.DLG.MINW
+    ED.DLG.H = 3
+    GOSUB ED.DLG.OPEN
+
+    ED.DLG.SX = 1 : ED.DLG.SY = 0 : ED.DLG.S$ = ED.DLG.MSG$ : ED.DLG.SATTR = ED.DLG.TEXTATTR
+    GOSUB ED.DLG.SAY
+    ED.DLG.SX = 1 : ED.DLG.SY = 2 : ED.DLG.S$ = ED.DLG.HINT$ : ED.DLG.SATTR = ED.DLG.HINTATTR
+    GOSUB ED.DLG.SAY
+
+    ED.DLG.YES = 0
+ED.DLG.YN.WAIT:
+    GET ED.DLG.K$
+    IF ED.DLG.K$ = "" THEN GOTO ED.DLG.YN.WAIT
+    ED.DLG.C = ASC(ED.DLG.K$)
+    IF ED.DLG.C = 89 OR ED.DLG.C = 121 THEN ED.DLG.YES = -1 : GOTO ED.DLG.YN.DONE
+    IF ED.DLG.C = 78 OR ED.DLG.C = 110 OR ED.DLG.C = 27 OR ED.DLG.C = 13 THEN GOTO ED.DLG.YN.DONE
+    GOTO ED.DLG.YN.WAIT
+ED.DLG.YN.DONE:
+    GOSUB ED.DLG.CLOSE
+    RETURN
+
+ED.DLG.SKIP:
+#ENDIF

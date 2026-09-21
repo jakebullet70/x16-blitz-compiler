@@ -75,7 +75,7 @@ PROGRAMS = [
     dict(name="EDIT",
          src=("samples/edit", "EDIT.BASL"),
          lib="GPC-BASIC",
-         extras=["ED-FONT.BASL", "ED-MISC.BASL", "ED-MENUS.BASL", "ED-STORE.BASL"],
+         extras=["ED-FONT.BASL", "ED-MISC.BASL", "ED-MENUS.BASL", "ED-DIALOG.BASL", "ED-STORE.BASL"],
          shared=False, inplace=True,
          install=None, data=[]),
 ]

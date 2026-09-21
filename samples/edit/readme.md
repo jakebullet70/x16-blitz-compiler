@@ -15,6 +15,7 @@ source. That is the point of the sample, and the numbers below are what it bough
 | `ED-FONT.BASL` | `#INCLUDE`d font: charset 3 re-ordered into ASCII order in VRAM, and the box glyphs rescued out of the way |
 | `ED-MISC.BASL` | `#INCLUDE`d forks of the library modules it uses: APPSYS, BANKMGR, STASHVRAM, STRCASE, THEME, LINEINPUT |
 | `ED-MENUS.BASL` | `#INCLUDE`d forks of MENU, MENUPULL and MENUKEY, plus the editor's own bar, dropdowns and dispatch |
+| `ED-DIALOG.BASL` | `#INCLUDE`d dialog: the one centred popup box, saved and restored, that every prompt and Y/N question runs in |
 | `ED-STORE.BASL` | `#INCLUDE`d storage: a banked bump allocator and a 3-byte-per-line pointer table |
 | `GPB.INC.BL` | the library's keyword list, the one file taken from `GPC-BASIC`. It defines `#TOKEN`s, not code |
 | `EDIT.SRC.PRG` | the tokenised program â€” the input you feed to the compiler |
@@ -285,9 +286,40 @@ Three things follow from the flag, and all three are wanted: the **keyboard** re
 `ED.KEY.RANGE` no longer case-swaps a keystroke; `CHR$()` and `PRINT` stop translating, so KERNAL
 output lands on the right glyphs; and the GP drawing commands work.
 
+## The dialog box
+
+Every question the editor asks — a file name, a search, a line number, a Y/N — is asked in **one
+box**, `ED-DIALOG.BASL`. It is centred on the screen, it saves the cells under itself into VRAM
+through `ED.SV.SAVE` and puts them back on the way out, and the frame is `ED.MENU.DROPSTYLE`, the
+same rescued glyphs the dropdowns are drawn with.
+
+Two entry points, and `EDIT.BASL`'s `ED.PROMPT` and `ED.PROMPT.YN` are now thin covers over them:
+
+| Call | In | Out |
+| --- | --- | --- |
+| `ED.DLG.ASK` | `ED.DLG.TITLE$`, `ED.DLG.PROMPT$`, `ED.DLG.TEXT$`, `ED.DLG.MAX` | `ED.DLG.OK`, `ED.DLG.INPUT$` |
+| `ED.DLG.YN` | `ED.DLG.TITLE$`, `ED.DLG.MSG$` | `ED.DLG.YES` |
+
+`ED.DLG.OPEN` and `ED.DLG.CLOSE` are the halves underneath, for a caller that wants to draw its own
+content: `OPEN` takes the inside size in `ED.DLG.W` and `ED.DLG.H` and hands back where the inside
+starts in `ED.DLG.X` and `ED.DLG.Y`.
+
+**Restoring the box costs no repaint**, and that is the reason it is drawn where it is. The box is
+on layer 1, the overlay the bars and dropdowns live on; the document is on layer 0. Putting layer 1
+back the way it was — transparent cells over the text region — is what makes the document reappear
+underneath.
+
+The box's text goes through `ED.PUT.FIELD`, the editor's own raw cell writer, not `GP.PRINTAT`; the
+input field is `ED.LINEINPUT`'s, positioned inside the box. Colours come from the theme on every
+open, so a theme change needs no second hook: the page colour is the background of everything inside
+the frame and the rest keep that background, which is what stops a dialog reading as a patchwork.
+
+**Two stash handles, not one.** `ED.SV.MAX` is set to 2 in `ED.INIT`, because a dialog opened from a
+menu can be saved while the dropdown's own saved cells are still held.
+
 ## Build
 
-BASLOAD resolves `#INCLUDE` off the drive, so the five sources, `GPB.INC.BL` and `TEST.MD` have to
+BASLOAD resolves `#INCLUDE` off the drive, so the six sources, `GPB.INC.BL` and `TEST.MD` have to
 sit together on it. Then:
 
 1. **Tokenise.** `BASLOAD "EDIT.BASL"` at the ROM prompt. The source's own `#SAVEAS` and

@@ -492,7 +492,7 @@ ED.MENU.MODULE.END:
 ##   ED.MENU.SAVESCREEN   where the screen under a dropdown is kept:
 ##                        ED.MENU.SAVE.VRAM, the default, or ED.MENU.SAVE.BANK
 ##   ED.MENU.SHADOW       non-zero gives a boxed dropdown a drop shadow, solid cells
-##                        in ED.MENU.SHADOWATTR, 0 for black, trimmed at the screen
+##                        in ED.MENU.SHADOWATTR, trimmed at the screen
 ##                        edge. The save-under covers it
 ##
 ##   out  ED.MENU.EXITKEY   the key that ended it
@@ -828,6 +828,7 @@ ED.MENU.THEME:
     ED.MENU.HOTATTR = (ED.MENU.ATTR AND 240) + (ED.THEME.CLR(ED.THEME.BORDER) AND 15)
     ED.MENU.DISATTR = (ED.MENU.ATTR AND 240) + (ED.THEME.CLR(ED.THEME.DIMMED) AND 15)
     ED.MENU.SEPATTR = ED.MENU.ATTR
+    ED.MENU.SHADOWATTR = ED.THEME.CLR(ED.THEME.SHADOW)
     RETURN
 
 ## ED.MENU.KEYS.ON -- the plain table finds the key that types each letter, and the ALT
@@ -892,6 +893,7 @@ GOTO ED.MENUS.END
 ## ED.MENUS.SETUP -- build the bar and its three dropdowns. Called once, from ED.INIT.
 ED.MENUS.SETUP:
   GP.SUB ED.MENU.SAVESCREEN, ED.MENU.SAVE.VRAM
+  ED.MENU.SHADOW = -1
   GOSUB ED.MENU.THEME
   GP.SUB ED.MENU.BEGIN, ED.MENU.BAR
   GP.SUB ED.MENU.ITEM, " &File "
