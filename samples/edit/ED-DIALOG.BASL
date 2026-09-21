@@ -8,6 +8,7 @@
 ##   GOSUB ED.DLG.ASK      a titled box with one input field      -> ED.DLG.OK, ED.DLG.INPUT$
 ##   GOSUB ED.DLG.YN       a titled box with a yes/no question    -> ED.DLG.YES
 ##   GOSUB ED.DLG.OPEN     the box alone, for a caller that draws its own content
+##   GOSUB ED.DLG.WAITKEY  hold a told-not-asked box until a key
 ##   GOSUB ED.DLG.CLOSE    put the screen back
 ##
 ## The box is drawn on LAYER 1, the overlay the bars and dropdowns live on, and the document
@@ -210,6 +211,20 @@ ED.DLG.YN.WAIT:
     GOTO ED.DLG.YN.WAIT
 ED.DLG.YN.DONE:
     GOSUB ED.DLG.CLOSE
+    RETURN
+
+## ED.DLG.WAITKEY -- hold until a key is struck, for a box that only tells and so has
+## nothing to ask. The caller opens the box, draws its own content, calls this, and closes.
+##
+## The buffer is drained first. The keystroke that chose the menu row is long gone by the
+## time the box is drawn, but a held key repeats into the buffer while it is being drawn,
+## and without the drain the box would open and shut in the same frame.
+ED.DLG.WAITKEY:
+    GET ED.DLG.K$
+    IF ED.DLG.K$ <> "" THEN GOTO ED.DLG.WAITKEY
+ED.DLG.WAITKEY.HOLD:
+    GET ED.DLG.K$
+    IF ED.DLG.K$ = "" THEN GOTO ED.DLG.WAITKEY.HOLD
     RETURN
 
 ED.DLG.SKIP:

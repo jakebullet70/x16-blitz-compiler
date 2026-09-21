@@ -214,8 +214,18 @@ ED.L0.ON:
   RETURN
 
 REM Layer 1's text region back to transparent. Attribute 0 is the transparent one.
+REM
+REM The two bar rows are not part of that region, and they are not left alone either. The
+REM PRINT CHR$(147) up in ED.INIT clears the whole screen in the KERNAL's own white-on-blue,
+REM and layer 1 is visible from that moment -- so the top and bottom rows stayed blue right
+REM through DOC.LOADFILE, the slowest thing the editor ever does, until ED.RENDER.ALL
+REM finally painted over them. Filling them with the bar attribute here means the bars come
+REM up in the theme's colours and then fill with text, rather than changing colour under
+REM the user.
 ED.CLEAR.OVERLAY:
   GP.FILL 0, 1, SCREEN.COLS, ED.TEXT.ROWS, 32, 0
+  GP.FILL 0, 0, SCREEN.COLS, 1, 32, ED.THEME.CLR(ED.THEME.BAR)
+  GP.FILL 0, SCREEN.ROWS - 1, SCREEN.COLS, 1, 32, ED.THEME.CLR(ED.THEME.BAR)
   RETURN
 
 ED.OPEN.DONE:
@@ -423,8 +433,65 @@ ED.CMD.EXIT:
   IF ED.YN = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
 ED.CMD.EXIT.GO:
   GOTO ED.QUIT
+REM ---- Help > About: a box rather than the status line, because it now carries the
+REM editor's memory readout as well as its name. The two questions asked at this point --
+REM what is this, and how much room is left -- are the same visit.
+REM
+REM EVERY NUMBER IS READ LIVE. FRE(0) is the STRING HEAP and not much else -- the p-code,
+REM the workspace and the arrays are all fixed at compile or DIM time, so the heap is the
+REM only low memory that moves. It only ever falls: a block a string outgrows is flagged
+REM dead and re-fitted, never given back. The rest of the figures come off the bump
+REM allocator in ED-STORE.BASL -- DOC.CUR.BANK and DOC.CUR.PTR are its high-water mark,
+REM DOC.FIRST.BANK to DOC.LAST.BANK is what BANKMGR handed over.
+REM
+REM The strings are all built into ED.DLG.S$, one at a time. A separate variable per line
+REM would leave eight buffers spoken for at their peak length for the rest of the run.
 ED.CMD.ABOUT:
-  ED.MSG$ = "GPC EDIT -- a simple X16 text editor" : GOSUB ED.INFO.MSG
+  ED.AB.PER = DOC.WIN.END - DOC.WIN.START : REM usable bytes in one arena bank
+  ED.AB.BANKS = DOC.LAST.BANK - DOC.FIRST.BANK + 1
+  ED.AB.USED = (DOC.CUR.BANK - DOC.FIRST.BANK) * ED.AB.PER + DOC.CUR.PTR - DOC.WIN.START
+  ED.AB.TOT = ED.AB.BANKS * ED.AB.PER
+  ED.AB.PCT = 0 : IF ED.AB.TOT > 0 THEN ED.AB.PCT = INT(ED.AB.USED * 100 / ED.AB.TOT)
+
+  REM 46 wide because the Document line is the longest thing here: a full 240-bank arena
+  REM puts four digits on both figures, and ED.DLG.SAY truncates rather than wraps.
+  REM 12 deep because rows 0 and 11 are left empty, so the text is not up against the frame
+  REM top and bottom -- which puts the title on row 1 and the hint on row 10.
+  ED.DLG.TITLE$ = "About" : ED.DLG.W = 46 : ED.DLG.H = 12
+  GOSUB ED.DLG.OPEN
+
+  ED.DLG.SX = 1 : ED.DLG.SY = 1 : ED.DLG.SATTR = ED.DLG.TITLEATTR
+  ED.DLG.S$ = "GPC EDIT -- a text / Markdown editor" : GOSUB ED.DLG.SAY
+  ED.DLG.SY = 2 : ED.DLG.SATTR = ED.DLG.TEXTATTR
+  ED.DLG.S$ = "for the Commander X16" : GOSUB ED.DLG.SAY
+
+  ED.DLG.SY = 4
+  ED.DLG.S$ = "String heap   " + MID$(STR$(FRE(0)), 2) + " bytes free"
+  GOSUB ED.DLG.SAY
+  ED.DLG.SY = 5
+  ED.DLG.S$ = "Document      " + MID$(STR$(INT(ED.AB.USED / 1024)), 2) + "K used, " + MID$(STR$(INT((ED.AB.TOT - ED.AB.USED) / 1024)), 2) + "K free  (" + MID$(STR$(ED.AB.PCT), 2) + "%)"
+  GOSUB ED.DLG.SAY
+  ED.DLG.SY = 6
+  ED.DLG.S$ = "Lines         " + MID$(STR$(LINE.COUNT), 2)
+  IF DOC.FULL <> 0 THEN ED.DLG.S$ = ED.DLG.S$ + "   DOCUMENT FULL"
+  GOSUB ED.DLG.SAY
+
+  ED.DLG.SY = 7
+  ED.DLG.S$ = "Arena banks   " + MID$(STR$(DOC.FIRST.BANK), 2) + "-" + MID$(STR$(DOC.LAST.BANK), 2) + " (" + MID$(STR$(ED.AB.BANKS), 2) + " x 8K)"
+  GOSUB ED.DLG.SAY
+  ED.DLG.SY = 8
+  ED.DLG.S$ = "Table banks   " + MID$(STR$(DOC.TABLE.BASE.BANK), 2) + "-" + MID$(STR$(DOC.TABLE.BASE.BANK + DOC.TABLE.BANKS - 1), 2) + "    Machine has " + MID$(STR$(ED.BANKMGR.BANKS), 2)
+  GOSUB ED.DLG.SAY
+
+  REM Centred on the box rather than set at a fixed column, so it stays centred if the
+  REM width is ever changed. ED.DLG.SAY reads SX and S$, so the order of the two is free.
+  ED.DLG.SY = 10 : ED.DLG.SATTR = ED.DLG.HINTATTR
+  ED.DLG.S$ = "Press any key"
+  ED.DLG.SX = INT((ED.DLG.W - LEN(ED.DLG.S$)) / 2)
+  GOSUB ED.DLG.SAY
+
+  GOSUB ED.DLG.WAITKEY
+  GOSUB ED.DLG.CLOSE
   RETURN
 
 ED.CONFIRM.DISCARD:
