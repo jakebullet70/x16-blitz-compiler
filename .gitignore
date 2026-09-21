@@ -327,3 +327,5 @@ samples/GPC-HELP/C.GPB.HELP.SRC.PRG
 samples/GPC-HELP/GPB.HELP.SRC.PRG
 samples/GPC-HELP/GPC.INPUT
 /testing
+samples/editor/EDITOR.MAP
+samples/editor/EDITOR.SRC.SYM
