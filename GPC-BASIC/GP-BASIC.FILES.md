@@ -160,15 +160,24 @@ removes dead code, including a module costs its whole size whether or not it is 
 | `STASHVRAM.INC.BL` | rectangles and byte blobs in spare VRAM, addressed by handle. No `GP.ASM`, so no `#SYMFILE` |
 | `STASHVRAMGC.INC.BL` | closes the holes a `STASHVRAM` freed out of order. Its own file, so it costs nothing unless called |
 | `LINEINPUT.INC.BL` | a positioned, length-limited entry field |
-| `MENUVERT.INC.BL` | a vertical menu |
-| `MENUBAR.INC.BL` | a horizontal menu bar |
-| `GUI.INC.BL` | four dialogs — ask, say, type, choose — in a box that puts the screen back |
-| `GUI2.INC.BL` | a listbox, single or multi select |
+| `MENU.INC.BL` | menus built a row at a time: a popup and a bar, run with `MENUTO.VERT` and `MENUTO.BAR`. Needs `BANKMGR.INC.BL` and a SHARED compile |
+| `MENU.INC.BANKED.BL` | the menu row store. `#INCLUDE` it straight before `MENU.INC.BL` |
+| `MENUPULL.INC.BL` | a dropdown under a bar item, `MENUTO.PULLDOWN`. Needs `STASH.INC.BL` |
+| `GUI.INC.BL` | the box that puts the screen back, and the form and list controls inside it |
+| `GUI-DIALOGS.INC.BL` | every dialog as a verb: `MSGBOX`, `ASKYN`, `INPUTBOX`, `PICKMENU`, `LISTBOX`, the `LIST.` verbs and `FORM.`. `#INCLUDE` it after `GUI`, `COMBO` and `CHECK` |
+| `COMBO.INC.BL` | a drop-down list that folds into one row, a `GUI.FORM` control |
+| `CHECK.INC.BL` | a check box, a `GUI.FORM` control |
+| `FILEPICK.INC.BL` | a popup file picker, `PICKBANKS` / `PICKFILE` / `PICKSCAN`: reads the drive into a RAM bank, filters by suffix, answers with a name. Needs `GUI.INC.BL`, `GUI-DIALOGS.INC.BL`, `FILEIO.INC.BL` and `FILEDIR.INC.BL` |
 | `STRINGS.INC.BL` | the string helpers: BASIC where BASIC is enough, assembly where it is not |
 | `STRCASE.INC.BL` | case, rewriting a string in place, in assembly |
 | `STRUSING.INC.BL` | a number to a template: PRINT USING's mask, in BASIC |
 | `SORT.INC.BL` | shell sort a string array in place, in assembly |
 | `BMX.INC.BL` | load a BMX bitmap into VERA |
+| `BANKMGR.INC.BL` | which RAM bank belongs to whom: claim, allocate, release |
+| `KB.INC.BL` | empty the keyboard buffer |
+| `FILEIO.INC.BL` | the drive: status, exists, delete, rename, copy, directories, a string array to a file and back |
+| `FILEDIR.INC.BL` | read a directory, into a RAM bank or into low RAM |
+| `DOS.INC.BL` | a smaller alternative to `FILEIO.INC.BL`: `DOSX` sends a command to the drive and returns the error, `DOS.EXISTS` tests for a file. Include one of the two, not both |
 | `KV.INC.BL` | strings by key in one RAM bank, saved and loaded as one file. No `GP.ASM`, so no `#SYMFILE` |
 
 What each one costs in bytes is in the command reference, under *At a glance*.
@@ -193,7 +202,10 @@ One `.EXP.BL` per topic. Several are also the regression test for the module the
 | `MLCALL.EXP.BL` | `GP.CALL` with `GP.A` / `GP.X` / `GP.Y` / `GP.C` |
 | `ASM.EXP.BL` | `GP.ASM` / `GP.ENDASM`, inline 65C02 |
 | `MENU.EXP.BL` | a whole small application, in the shape the GP set is for |
-| `MENUDEMO.EXP.BL` | `MENUVERT` drawn the way an application would draw it |
+| `MENUDEMO.EXP.BL` | a menu drawn the way an application would draw it |
+| `MENUTO.EXP.BL` | `MENUTO.VERT`, `MENUTO.BAR` and `MENUTO.PULLDOWN` by hand: box styles, hints, hot keys, disabled rows |
+| `MENUBUILD.EXP.BL` | the menu builder, read back and checked |
+| `KV.EXP.BL` | every routine in `KV.INC.BL`, checked |
 | `GUI.EXP.BL` | the four dialogs, over a screen they have to put back |
 | `STASHVRAM.EXP.BL` | three panels nested in VRAM, a blob, and the compactor. Needs no `#SYMFILE`, which is the point |
 | `FORM.EXP.BL` | three fields you can move between, `LINEINPUT` style |
@@ -201,7 +213,7 @@ One `.EXP.BL` per topic. Several are also the regression test for the module the
 | `BMXPAL.EXP.BL` `BMXSPD.EXP.BL` | the palette question, and the speed of each path |
 | `SORT.EXP.BL` `STRCTST.EXP.BL` `STRTST.EXP.BL` `SPLITT.EXP.BL` | the regression tests for `SORT`, `STRCASE`, the `STRINGS` assembly and `STR.SPLIT` |
 | `USINGT.EXP.BL` | the regression test for `STR.USING`, thirty-nine cases |
-| `MENUTST.EXP.BL` `GUI2TST.EXP.BL` | the same for the menu and the listbox, driven through the keyboard buffer |
+| `MENUTST.EXP.BL` | the same for the menu, driven through the keyboard buffer |
 
 ---
 

@@ -24,99 +24,85 @@
 ## path can reach. Without it the tokenise stops at LABEL NOT FOUND.
 #INCLUDE "STASH.INC.BL"
 #INCLUDE "APPSYS.INC.BL"
-#INCLUDE "MENUVERT.INC.BL"
+#INCLUDE "BANKMGR.INC.BL"
+#INCLUDE "MENU.INC.BANKED.BL"
+#INCLUDE "MENU.INC.BL"
 #INCLUDE "LINEINPUT.INC.BL"
 #INCLUDE "GUI.INC.BL"
-#INCLUDE "GUI2.INC.BL"
 #INCLUDE "COMBO.INC.BL"
 #INCLUDE "CHECK.INC.BL"
+## The dialogs. It goes in LAST: a verb is compiled before any call to it,
+## and this one calls every module above.
+#INCLUDE "GUI-DIALOGS.INC.BL"
 
 ## A spare RAM bank for the saved cells. Bank 0 belongs to the KERNAL --
 ## the keyboard layout lives there -- so a program picks anything above it.
 #DEFINE DEMO.BANK 8
 
 GOSUB APPSYS.STARTUP
+GOSUB BANKMGR.INIT
 THEME.ID = 0 : GOSUB THEME.SELECT
-GUI.BANK = DEMO.BANK
+## Every dialog verb starts from a clean slate, and this is where it is told
+## which bank that slate saves the screen into.
+GP.SUB DLGRESET, DEMO.BANK
 
-DIM MENUVERT.ITEM$(20)
+DIM DEMO.MENU$(4)
+DIM GUI.LIST.ITEM$(20)
 
 GOSUB DEMO.PAGE
 
-## ---- 1. GUI.YN -- two lines and a yes/no ----------------------------
+## ---- 1. ASKYNEX -- a title, two lines and a yes/no -------------------
 
-GUI.TITLE$ = "CONFIRM"
-GUI.MSG$ = "THE DISK HAS NOT BEEN SAVED."
-GUI.MSG2$ = "CARRY ON AND LOSE THE CHANGES?"
-GOSUB GUI.YN
-DEMO.YN = GUI.ANSWER
+DEMO.YN = GP.FN(ASKYNEX, "CONFIRM", "THE DISK HAS NOT BEEN SAVED.", "CARRY ON AND LOSE THE CHANGES?", "", 1, 0)
 
-## ---- 1b. the same call, asking OK/CANCEL instead ---------------------
+## ---- 1b. the same verb, asking OK/CANCEL instead ---------------------
 ##
-## One flag. The keys become O and C, RETURN also accepts, and the answer
-## still comes back in GUI.ANSWER -- so a caller that only wants different
+## The last argument. The keys become O and C, RETURN also accepts, and the
+## answer comes back the same way -- so a caller that only wants different
 ## wording does not get a different interface with it.
 
-GUI.OKCANCEL = 1
-GUI.TITLE$ = "REBUILD"
-GUI.MSG$ = "THE INDEX WILL BE REBUILT."
-GUI.MSG2$ = ""
-GOSUB GUI.YN
-DEMO.OKC = GUI.ANSWER
-GUI.OKCANCEL = 0
+DEMO.OKC = GP.FN(ASKYNEX, "REBUILD", "THE INDEX WILL BE REBUILT.", "", "", 1, 1)
 
-## ---- 2. GUI.INPUT -- a question and a line of typing ----------------
-
-GUI.TITLE$ = "OPEN"
-GUI.MSG$ = "NAME OF THE FILE TO OPEN:"
-GUI.MSG2$ = ""
-GUI.LEN = 24
-GUI.TEXT$ = "TEST.MD"
-GOSUB GUI.INPUT
-DEMO.NAME$ = GUI.TEXT$ : DEMO.OK = GUI.OK
-
-## ---- 3. GUI.MENU -- a question and a list ---------------------------
+## ---- 2. INPUTBOXEX -- a question and a line of typing ----------------
 ##
-## The rows carry their own leading space: MENUVERT prints at the left
-## edge of the highlight, so the inset is the caller's to choose.
+## The answer is the line as it was left. GUI.OK says whether it was typed
+## or the dialog was cancelled, which an empty line on its own cannot.
 
-MENUVERT.ITEM$(1) = " SAVE AND QUIT"
-MENUVERT.ITEM$(2) = " QUIT ANYWAY"
-MENUVERT.ITEM$(3) = " BACK TO WORK"
-MENUVERT.ITEM$(4) = " ABOUT THIS DEMO"
-GUI.COUNT = 4
-GUI.TITLE$ = "WHAT NOW"
+DEMO.NAME$ = GP.FN(INPUTBOXEX, "OPEN", "NAME OF THE FILE TO OPEN:", "", "", "TEST.MD", 24, 0)
+DEMO.OK = GUI.OK
+
+## ---- 3. PICKMENUEX -- a question and a list --------------------------
+##
+## The rows are the menu's popup slot. They carry their own leading space:
+## the menu prints at the left edge of the highlight, so the inset is the
+## caller's to choose. DEMO.MENU$ keeps them for the report at the end.
+
+DEMO.MENU$(1) = " SAVE AND QUIT"
+DEMO.MENU$(2) = " QUIT ANYWAY"
+DEMO.MENU$(3) = " BACK TO WORK"
+DEMO.MENU$(4) = " ABOUT THIS DEMO"
+GP.SUB MENU.BEGIN, MENU.POPUP
+FOR DEMO.R = 1 TO 4
+    GP.SUB MENU.ITEM, DEMO.MENU$(DEMO.R)
+NEXT DEMO.R
 ## No message. A list of choices under a title that asks the question does
 ## not also need to be told it is a list of choices -- and it exercises
 ## GUI.SIZE's empty-header path, where the blank spacer row goes away too.
-## MUST be cleared explicitly: it still holds the last dialog's question.
-GUI.MSG$ = ""
-GUI.SEL = 1
-GOSUB GUI.MENU
-DEMO.SEL = GUI.SEL
+DEMO.SEL = GP.FN(PICKMENUEX, "WHAT NOW", "", "", "", 1, 0)
 
-## ---- 4. GUI.LISTBOX -- a list longer than the box it is in -----------
+## ---- 4. LISTBOXEX -- a list longer than the box it is in -------------
 ##
 ## The other three show their whole list at once and answer with one row.
 ## This one does neither: twenty items seen six at a time, as many marked
 ## as you like with SPACE, and the count in the bottom frame edge saying
-## where the window is. It lives in GUI2.INC.BL and is named GUI.LISTBOX
-## because it is a GUI dialog -- the #INCLUDE is what you leave out.
+## where the window is. Marks and the start row are cleared on every call,
+## so one run never reports the run before it.
 
 FOR DEMO.R = 1 TO 20
-    MENUVERT.ITEM$(DEMO.R) = " REPORT " + MID$(STR$(DEMO.R), 2) + ".TXT"
+    GUI.LIST.ITEM$(DEMO.R) = " REPORT " + MID$(STR$(DEMO.R), 2) + ".TXT"
 NEXT DEMO.R
-GUI.TITLE$ = "BACKUP"
-GUI.MSG$ = "SPACE MARKS THE ONES TO BACK UP."
-GUI.LISTBOX.COUNT = 20
-GUI.LISTBOX.ROWS = 6
-GUI.LISTBOX.MULTI = 1
-## Empty rather than left over: any string that is not COUNT characters
-## long starts the dialog with nothing marked, which is what we want here.
-GUI.LISTBOX.MARKS$ = ""
-GUI.LISTBOX.SEL = 1
-GOSUB GUI.LISTBOX
-DEMO.MARKED = GUI.LISTBOX.MARKED : DEMO.LSEL = GUI.LISTBOX.SEL
+DEMO.LSEL = GP.FN(LISTBOXEX, "BACKUP", "SPACE MARKS THE ONES TO BACK UP.", "", "", 20, 6, 1)
+DEMO.MARKED = GUI.LISTBOX.MARKED
 
 ## ---- what came back, on the page that survived ----------------------
 ##
@@ -132,7 +118,7 @@ IF DEMO.OK THEN DEMO.LINE$ = "TEXT GAVE " + DEMO.NAME$ + "            "
 GP.PRINTAT 4, 21, DEMO.LINE$, THEME.CLR(THEME.WARN)
 
 DEMO.LINE$ = "MENU CANCELLED                    "
-IF DEMO.SEL > 0 THEN DEMO.LINE$ = "MENU CHOSE" + MENUVERT.ITEM$(DEMO.SEL) + "          "
+IF DEMO.SEL > 0 THEN DEMO.LINE$ = "MENU CHOSE" + DEMO.MENU$(DEMO.SEL) + "          "
 GP.PRINTAT 4, 22, DEMO.LINE$, THEME.CLR(THEME.WARN)
 
 DEMO.LINE$ = "OK/CANCEL ANSWERED CANCEL"
@@ -164,7 +150,7 @@ END
 DEMO.PAGE:
     GP.FILL 0, 0, 80, 30, ASC(" "), THEME.CLR(THEME.PAGE)
     GP.FILL 0, 0, 80, 1, ASC(" "), THEME.CLR(THEME.TITLE)
-    GP.PRINTAT 2, 0, "GUI.YN, GUI.INPUT, GUI.MENU, GUI.LISTBOX", THEME.CLR(THEME.TITLE)
+    GP.PRINTAT 2, 0, "ASKYNEX, INPUTBOXEX, PICKMENUEX, LISTBOXEX", THEME.CLR(THEME.TITLE)
     FOR DEMO.R = 2 TO 18
         DEMO.LINE$ = ""
         FOR DEMO.C = 0 TO 8

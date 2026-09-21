@@ -13,7 +13,7 @@ source. That is the point of the sample, and the numbers below are what it bough
 | --- | --- |
 | `EDITOR.BASL` | the editor — startup/restore, theme, render, key loop, editing, find |
 | `ED-STORE.BASL` | `#INCLUDE`d storage: a banked bump allocator and a 3-byte-per-line pointer table |
-| `ED-MENUS.BASL` | `#INCLUDE`d menus, end to end: data, drawing, keys and dispatch — with the **text** in a bank |
+| `ED-MENUS.BASL` | `#INCLUDE`d menus: the bar and dropdowns built on `MENU.INC.BL`, their keys and dispatch |
 | `EDITOR.PRG` | the tokenised program — the input you feed to the compiler |
 | `EDITOR.SYM` | **BASLOAD's symbol file, and it is not optional** — see below |
 | `TEST.MD` | the document the editor opens, and the fixture the self-check searches |
@@ -109,12 +109,10 @@ OK CODE 8572 FREE 11776 RT 14079 GP-BASIC IN
 - **PETSCII cost 345 bytes of p-code and nothing at run time** — 7566 → **7911**. That is the charset
   re-ordering plus the two conversions at the disk boundary and the one at the keyboard. The
   renderers did not change by a single byte, so every render figure above still stands as measured.
-- **`APPSYS` and `THEME` cost 1733 bytes of p-code and no runtime bytes** — 7911 → **9644**, THEME, APPSYS and MENUVERT together. Both are
+- **`APPSYS` and `THEME` cost 1733 bytes of p-code and no runtime bytes** — 7911 → **9644**, THEME, APPSYS and the menu module of the time together. Both are
   BASIC library modules, so they are paid for in the p-code of the program that includes them and
   nowhere else. `APPSYS.STARTUP`/`RESTORE` lean on `GP.CALL`/`GP.A`/`GP.X`/`GP.Y`, which are GP block
   keywords — already bought and paid for by the `GP.SELECT` above, so they add nothing to `RT`.
-- **Driving `MENUVERT` properly gave 5 bytes back** — 9650 → **9645**. The hand-rolled loop over
-  `MENUVERT.ROW` was not only wrong, it was bigger than `GOSUB MENUVERT.DRAW`.
 - **The two new assertions cost 168 bytes** — 9645 → 9713 for `DDROWS`, and → **9813** for the 600
   menu opens. Compiled into every build because `ED.SELFCHECK` is, exactly like the rest of the
   self-check above. Worth it: between them they are the checks that would have caught a panel of
@@ -244,40 +242,25 @@ writing CR where the fixture had LF.
 
 ## The menus, and the flag that makes the GP drawing commands usable
 
-The dropdown is drawn by `MENUVERT.DRAW` — `GP.FILL` for each row, `GP.PRINTAT` for its text —
-inside a `GP.BOX` frame. Neither worked at first, for two quite separate reasons: the re-ordered
-font, below, and a caller that was not really calling the library at all.
+The menus are `MENU.INC.BL`'s and `MENUPULL.INC.BL`'s. The bar is the bar slot, drawn by
+`MENU.DRAWBAR` and never run: ESC and ALT+letter are the editor's keys, and each opens a dropdown at
+once. A dropdown is the popup slot, rebuilt as it opens and run by `MENUTO.PULLDOWN`, which saves
+and puts back the cells under it in the dialogs' bank. LEFT and RIGHT come back as `MENU.NEXTBAR`;
+a letter no row claims is tried against the titles with `MENU.HOTROW`, so a letter is a row's hot
+key first and a title's second. `ED.ALTKEYS` asks `MENU.HOTROW` too, for the keymap.
 
-### Use the whole interface, or you are guessing at it
+`MENUTO.PULLDOWN` paints the bar item and the panel from one set of colours, and here the bar is
+blue while the panel is the page. So the bar is drawn in its own colours first with the title
+already lit, and the dropdown's highlight is the bar's: the relight changes nothing.
 
-`ED.DRAW.DROPDOWN` first set `MENUVERT.X`, `.Y` and `.WIDTH` — three fields of nine — and then
-hand-rolled its own `FOR` loop poking `.DRAWROW` and `.DRAWATTR` into **`MENUVERT.ROW`, the module's
-lowest entry point**, leaving `.COUNT`, `.ATTR` and `.HIATTR` at zero. It drew a panel of the wrong
-height with rows missing, and the library got the blame for a session.
+### The frame is the rescued glyphs
 
-It was never the library. `GPC-BASIC/MENUDEMO.EXP.BL` is MENUVERT's own example; built headlessly
-with `MENUVERT.RUN` swapped for `MENUVERT.DRAW` and the tile map read back out of VERA, it renders
-five items in five rows with the frame exactly where it belongs. **The difference between MENUDEMO's
-nine assignments and this sample's three was the whole bug**, and it was visible in a side-by-side
-read of the two files long before any emulator was involved.
-
-`MENUVERT.ROW` reads `MENUVERT.ATTR` itself — it is the test at the routine's tail that decides
-whether a row gets its hotkey tinted — so a caller that never sets it is not calling the routine,
-it is guessing at it. Setting the documented inputs and calling `MENUVERT.DRAW` is also **5 bytes
-smaller** than the hand-rolled loop: `OK CODE 9650` → `9645`. The shipping build is `9713`,
-the extra 68 being the `DDROWS` assertion below.
-
-The self-check was green throughout, which is its own lesson: it asserted **one** `VPEEK` of the
-panel, and one sampled cell cannot see a wrong height or a skipped row. It now walks the whole
-shape — frame row, every item row, frame row — as `DDROWS`.
-
-### The frame colour is picked, not derived
-
-`GP.BOX` style 0 borders with `$A0`, a **reverse** space, so the cell is entirely *foreground*: only
-the low nibble of the attribute is ever seen. Deriving that nibble from `THEME.PAGE` collided twice
-— its foreground is black, on the black document; its background is the panel's own grey, on the
-panel. The frame is `THEME.CLR(THEME.TEXT)`, whose low nibble is the document's own white, and that
-reads against both.
+`GP.BOX`'s own line styles border with screen codes `$40-$7D`, which is precisely the run
+`ED.PETFONT` overwrites with ASCII letters — a single-line box comes out as `p @ @ ... B`, measured.
+`ED.PETFONT` copies the six line glyphs up to `$C0-$C5` before the re-order, `ED.GUI.SETUP` packs
+them into `GUI.GLYPH$`, and the dialogs and the dropdowns both hand that string's address to
+`GP.BOX` as a custom style. Frame and rows are `THEME.CLR(THEME.TEXT)`, the document's own white on
+black, so the panel reads as a framed hole in the page; only the highlight breaks it.
 
 **`GP.PRINTAT` converts PETSCII to a screen code before writing.** Against an ASCII-ordered font that
 is one conversion too many: measured, `GP.PRINTAT 0,5,"Ab"` wrote tiles `1` and `66`, which render as
@@ -292,58 +275,20 @@ Three things follow from the flag, and all three are wanted: the **keyboard** re
 `ED.KEY.RANGE` no longer case-swaps a keystroke; `CHR$()` and `PRINT` stop translating, so KERNAL
 output lands on the right glyphs; and the GP drawing commands work.
 
-**The box style is not a free choice.** Styles 2 to 4 border with line glyphs from screen codes
-`$40-$7F`, which is precisely the run `ED.PETFONT` overwrites with ASCII lower case — a single-line
-box comes out as `p @ @ ... B`, measured. **Style 0 borders with `$A0` alone**, which sits outside that
-run and survives untouched. `$A0` is a reverse space, so it paints in the *foreground* colour, which
-is why the frame is drawn in `THEME.PAGE`s *background* nibble: painting it in `THEME.PAGE` itself put a black frame on a black text area, present and invisible.
-
-That is the same limitation the GP-BASIC manual already records for `GP.BOX` in ISO mode, arrived at
-from the other direction.
-## The key dispatch
-
-The main loop is a bare `GP.DO` whose whole body is the `GET` wait; the table lives in
-`ED.DISPATCH.KEY` as a `GP.SELECT`.
-Three things about it are worth reading before copying the shape:
-
-- **`GP.SELECT`, not `ON x GOSUB`.** `ON` is a real skip table and stays right for a dense `1..n`
-  index. These key codes are `2, 4, 13, 17, 19, 20, 25, 27, 29, 130, 134, 137, 145, 148, 157` — a
-  skip table over that span is 158 entries holding fifteen destinations. Sparse selectors are what
-  `GP.SELECT` is for.
-- **Nothing jumps out of the select.** `GP.ENDSEL` is what releases the selector's stack frame, so a
-  `GOTO` past it leaks one — in a key loop, one per keystroke for the life of the session. Every
-  case falls through and the single `GOTO` back to the top is *after* `GP.ENDSEL`. The self-check
-  runs 400 dispatches back to back to prove it.
-- **The two ranged keys are not cases.** `GP.CASE` takes a list of expressions, not a range, and
-  Commodore+letter (161..191) and printable (32..126) cover 126 codes between them. They sit in
-  `ED.KEY.RANGE` off `GP.OTHER`. They used to be at the *front* of the `IF` ladder where order
-  mattered; it turns out it never did — no single-code case falls inside either range, so neither
-  could ever shadow the other.
-
-**Two things in the assembly are worth stealing.** There is no expression syntax in `GP.ASM` — no
-`LABEL+1` — so the source address is written **into the operand** of the instruction that reads it:
-`STA RGA,X` with `X=1` patches the low byte and `X=2` the high, and `RGA: LDA $FFFF,Y` then reads
-through it. And a BASIC string is reached by dereferencing its slot: `{A$}` is the **slot**, the slot
-holds the block address, and the text starts 3 bytes in (`[MaxLen][control][ActLen][text…]`).
-
 ## Build
 
-BASLOAD resolves `#INCLUDE` off the drive, so the sources and `GPB.INC.BL` have to sit together on
-it. From the repo, copy `EDITOR.BASL`, `ED-STORE.BASL`, `TEST.MD` and `GPC-BASIC/GPB.INC.BL` into
-`testing/` (the emulator's drive), then:
+BASLOAD resolves `#INCLUDE` off the drive, so the three sources, `TEST.MD` and every
+`GPC-BASIC/*.INC.BL` the editor includes have to sit together on it. Then:
 
 1. **Tokenise.** `BASLOAD "EDITOR.BASL"` at the ROM prompt. The source's own `#SAVEAS` and
    `#SYMFILE` write `EDITOR.PRG` and `EDITOR.SYM`. Both are already here, so skip this unless you
    edit the source — **and if you do edit it, re-tokenise, because a stale `.SYM` resolves `{VAR}`
    to the wrong slot.**
 
-2. **Compile.** Run `GPC.PRG` and answer `EDITOR.PRG` / `C.EDITOR.PRG` / no map / not shared; or
-   write a `GPC.INPUT` directly:
-
-   ```
-   EDITOR.PRG
-   C.EDITOR.PRG
-   ```
+2. **Compile, SHARED.** `MENU.INC.BL` keeps its rows in `GP.BANKEDSTR` text, and an embedded
+   compile stops at it with `GP.BANKEDSTR NEEDS SHARED`. Run `GPC.PRG` and answer `EDITOR.PRG` /
+   `C.EDITOR.PRG` / no map / shared, or use `source/gpc/compile_shared.py`. The object needs
+   `GPC.RT.nnn.BIN` and its `.OVL` beside it at run time.
 
 3. **Run.** `LOAD "C.EDITOR.PRG",8 : RUN`. It opens `TEST.MD`.
 
@@ -395,10 +340,12 @@ running program is flaky — but the commands it dispatches to are each driven d
   editor.
 - **The store never frees a single record.** Deleting a line leaks its content until the next save;
   reclamation is bulk, by reloading. Fine for a sample, and it is why the allocator is 30 lines.
-- **A line is capped at 250 characters** on load, and a banked menu string at 31.
-- **The editor owns banks 1 upward**: 1–3 the line-pointer table, 4 the cells a dialog covers
-  (`GUI.BANK`), 5 the menu text, 6 and up the document arena. Nothing else in a program using this
-  store may touch them.
+- **A line is capped at 250 characters** on load, and a menu row at 30, `MENU.INC.BL`'s cut.
+- **The editor claims its banks from `BANKMGR`** in `ED.BANKS`: 2–4 the line-pointer table, 5 the
+  cells a dialog covers (`GUI.BANK`), 6 the menu rows (`MENU.TEXTBANK`, defined before the
+  `#INCLUDE`), and the document arena from 7 to the top of RAM, 7–63 on a 512K machine. Bank 1 is
+  the runtime's. When the arena is full a line is stored empty rather than written into a bank it does
+  not own, and the status line says `DOCUMENT FULL`.
 - **Files are assumed to be PETSCII on disk.** Opening something authored on the host — which will be
   ASCII — shows every letter case-swapped. Detecting the encoding on load is the obvious fix, and no
   byte in `$61-$7A` is a fair PETSCII tell, since in PETSCII that run is graphics. `TEST.MD` ships

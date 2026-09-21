@@ -29,6 +29,8 @@
 ## **  MENU.DRAWBAR row, col, style      draws the bar slot without running
 ## **                                    it, with MENU.MARKED lit: the item a
 ## **                                    KEEPMARK bar or a dropdown left marked
+## **  MENU.DRAWVERT row, col, style     draws the popup slot without running
+## **                                    it, no row lit
 ## **  MENUTO.PULLDOWN, the popup slot under a bar item, is in
 ## **  MENUPULL.INC.BL, so a program without one does not carry STASH.
 ## **  MENU.KEY, a bar and its dropdowns run from the program's key loop, is
@@ -253,6 +255,18 @@ MENU.DRAWBAR.BODY:
     GOSUB MENU.DRAWALL
     IF MENU.MARKED < 1 THEN RETURN
     MENU.DRAWN = MENU.MARKED : MENU.PAINT = MENU.HILITE : GOSUB MENU.DRAWROW
+    RETURN
+
+MENU.DRAWVERT.BODY:
+    GP.DEFPROC MENU.DRAWVERT, MENU.RUNROW, MENU.RUNCOL, MENU.STYLE
+    IF MENU.READY = 0 THEN RETURN
+    MENU.RUNSLOT = MENU.POPUP
+    GOSUB MENU.MEASURE
+    IF MENU.COUNT = 0 THEN RETURN
+    MENU.BOXW = MENU.WIDE
+    MENU.BOXH = MENU.COUNT
+    GOSUB MENU.FRAMEBOX
+    GOSUB MENU.DRAWALL
     RETURN
 
 ## ---- the bar slot measured and framed. MENU.BARX and MENU.BARY stay for

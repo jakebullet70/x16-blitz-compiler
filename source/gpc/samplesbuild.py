@@ -60,6 +60,15 @@ PROGRAMS = [
          extras=[], shared=False,
          install=("demo", "C.BMXVIEW.PRG"), data=["bmx"]),
 
+    #   SHARED, and built in the sample folder: its #INCLUDEs name GPC-BASIC/ and the
+    #   runtime and GPC.BIN are already beside it.  install=None leaves the object on
+    #   that same drive, which is where its own bat mounts it from.
+    dict(name="GPC.GUI",
+         src=("samples/GPC-GUI-HELPER", "GPC.GUI.BASL"),
+         lib="samples/GPC-GUI-HELPER/GPC-BASIC",
+         extras=["GG.FILE.PICKER.INC.BL", "GG.PROGRAM.EDIT.INC.BL"], shared=True, inplace=True,
+         install=None, data=[]),
+
     #   SHARED: MENU.INC.BL uses GP.BANKEDSTR. Builds in the sample folder.
     dict(name="EDITOR",
          src=("samples/editor", "EDITOR.BASL"),

@@ -37,11 +37,16 @@
 ## **
 ## ***********************************************************************
 
-## ---- THE CODE BANKS are 4 to 6 and contiguous, so one loop claims them.
+## ---- THE CODE BANKS are 4 to 9 and contiguous, so one loop claims them.
+## ---- The menu text is bank MENU.TEXTBANK, 62, which the first MENU.BEGIN
+## ---- claims itself; the GUI save bank and the directory bank are the two
+## ---- lowest free, 2 and 3.
 #DEFINE GG.GUICODE 4
 #DEFINE GG.UTILCODE 5
 #DEFINE GG.COMBOCODE 6
 #DEFINE GG.FILECODE 7
+#DEFINE GG.MENUCODE 8
+#DEFINE GG.DLGCODE 9
 
 #DEFINE GG.SCREEN 1
 #DEFINE GG.DEFROWS 18
@@ -74,20 +79,23 @@
 #DEFINE GG.LISTROW 8
 
 ## ---- The library, laid out as GPBMODS lays it out. The utility region holds
-## ---- APPSYS, BANKMGR, KB, THEME and FILEIO: together they are a quarter of a
-## ---- bank, so one region carries them all. It comes before the GUI region and
-## ---- COMBO after it, because BASLOAD resolves a #DEFINE only once it has read
-## ---- it. STASH stays in low RAM: it holds a BANK statement.
+## ---- APPSYS, BANKMGR, THEME and FILEIO. Each region comes after the ones whose
+## ---- #DEFINEs it reads -- THEME, then MENU, then GUI, then COMBO and the
+## ---- dialog verbs -- because BASLOAD resolves a #DEFINE only once it has read
+## ---- it. The verbs are above every call to them. STASH stays in low RAM: it
+## ---- holds a BANK statement.
 GOTO GG.LIBEND
 GP.BANKED GG.UTILCODE
 #INCLUDE "GPC-BASIC/APPSYS.INC.BL"
 #INCLUDE "GPC-BASIC/BANKMGR.INC.BL"
-#INCLUDE "GPC-BASIC/KB.INC.BL"
 #INCLUDE "GPC-BASIC/THEME.INC.BL"
 #INCLUDE "GPC-BASIC/FILEIO.INC.BL"
 GP.ENDBANKED
+GP.BANKED GG.MENUCODE
+#INCLUDE "GPC-BASIC/MENU.INC.BANKED.BL"
+#INCLUDE "GPC-BASIC/MENU.INC.BL"
+GP.ENDBANKED
 GP.BANKED GG.GUICODE
-#INCLUDE "GPC-BASIC/MENUVERT.INC.BL"
 #INCLUDE "GPC-BASIC/LINEINPUT.INC.BL"
 #INCLUDE "GPC-BASIC/GUI.INC.BL"
 GP.ENDBANKED
@@ -95,15 +103,18 @@ GP.BANKED GG.COMBOCODE
 #INCLUDE "GPC-BASIC/COMBO.INC.BL"
 #INCLUDE "GPC-BASIC/CHECK.INC.BL"
 GP.ENDBANKED
+GP.BANKED GG.DLGCODE
+#INCLUDE "GPC-BASIC/GUI-DIALOGS.INC.BL"
+GP.ENDBANKED
 GP.BANKED GG.FILECODE
 #INCLUDE "GPC-BASIC/FILEDIR.INC.BL"
 #INCLUDE "GPC-BASIC/FILEPICK.INC.BL"
 GP.ENDBANKED
 GG.LIBEND:
 
-DIM MENUVERT.ITEM$(FILEPICK.MAX) : DIM MENUVERT.HINT$(20)
+DIM GUI.LIST.ITEM$(GG.MAXFILES)
+DIM COMBO.ITEM$(2)
 DIM FILE.LINE$(GG.DEFROWS)
-DIM FILEPICK.FILE$(FILEPICK.MAX)
 
 ## ---- The project: the .PDEF programs it names, and which of them is current.
 ## ---- A program carries its own settings in its own .PDEF file, so only the
@@ -133,7 +144,7 @@ THEME.ID = 3 : GOSUB THEME.SELECT
 
 ## ---- setup mem banks
 GOSUB BANKMGR.INIT : GG.BANKFAIL$ = ""
-FOR GG.I = GG.GUICODE TO GG.FILECODE
+FOR GG.I = GG.GUICODE TO GG.DLGCODE
   BANKMGR.SET.BANK = GG.I
   GOSUB BANKMGR.CLAIM
   IF BANKMGR.OK = 0 THEN GG.BANKFAIL$ = "CODE BANK" + STR$(GG.I) + " IS ALREADY TAKEN"
@@ -141,9 +152,14 @@ NEXT GG.I
 
 GOSUB BANKMGR.GET.FREE.BANK : GG.GUIBANK% = BANKMGR.BANK
 GOSUB BANKMGR.GET.FREE.BANK : GG.DIRBANK% = BANKMGR.BANK
+GOSUB BANKMGR.GET.FREE.BANK : GG.LISTBANK% = BANKMGR.BANK
 ## ---- end mem bank crap
 
-GOSUB FILEPICK.INIT
+GOSUB GG.GUI.SETUP
+
+## ---- the picker builds its list in one bank and reads the raw listing
+## ---- into the other, so no file name comes anywhere near low memory.
+GP.SUB PICKBANKS, GG.LISTBANK%, GG.DIRBANK%
 GOSUB GG.RESET.DEFINITION.4.NEW
 GG.MENUSEL% = 1 : GG.PROJSEL% = 1 : GG.QUIT% = 0
 GG.RESULT$ = "New or Open a project to start"
@@ -187,6 +203,26 @@ GG.LAYOUT:
   GG.INFOBOXW% = GG.MENUBOXX% + 1
   GG.INFOBOXY% = GG.BODYTOP%
   GG.INFOBOXH% = GG.BODYHEIGHT%
+  GG.MENUY% = GG.MENUBOXY% + INT((GG.MENUBOXH% - GG.MENUN) / 2)
+  GG.ROWPAD$ = ""
+  FOR GG.I = 1 TO GG.MENUW
+    GG.ROWPAD$ = GG.ROWPAD$ + " "
+  NEXT GG.I
+  RETURN
+
+
+## ---- Every dialog saves what it covers in GG.GUIBANK%, has a shadow, and is
+## ---- framed in the CP437 single line: the GUI's own styles draw PETSCII.
+GG.GUI.SETUP:
+  GP.SUB DLGRESET, GG.GUIBANK%
+  GUI.EDGE.H = GG.GL.H
+  GUI.EDGE.V = GG.GL.V
+  GUI.CORNER.TL = GG.GL.TL
+  GUI.CORNER.TR = GG.GL.TR
+  GUI.CORNER.BL = GG.GL.BL
+  GUI.CORNER.BR = GG.GL.BR
+  GP.SUB DLGSHADOW, 1
+  GP.SUB DLGGLYPH, 1
   RETURN
 
 
@@ -202,7 +238,8 @@ GG.CHROME:
   GP.BOX GG.INFOBOXX%, GG.INFOBOXY%, GG.INFOBOXW%, GG.INFOBOXH%, GG.BOXGLYPH, THEME.CLR(THEME.BORDER)
   GP.FILL GG.MENUBOXX% + 1, GG.MENUBOXY% + 1, GG.MENUBOXW% - 2, GG.MENUBOXH% - 2, ASC(" "), THEME.CLR(THEME.TEXT)
   GP.BOX GG.MENUBOXX%, GG.MENUBOXY%, GG.MENUBOXW%, GG.MENUBOXH%, GG.BOXGLYPH, THEME.CLR(THEME.BORDER)
-  GOSUB GG.MENU.LOAD : GOSUB MENUVERT.DRAW
+  GOSUB GG.MENU.LOAD
+  GOSUB GG.MENU.SHOW
   GOSUB GG.SUMMARY
   GOSUB GG.RESULT.SHOW
   RETURN
@@ -294,71 +331,63 @@ GG.NAMES:
 ## **  A row number IS the command, so GG.DISPATCH reads as the menu reads.
 ## **  Rows 3, 5 and 10 are the separators and never come back.
 ## ***********************************************************************
+## ---- The first row is padded to GG.MENUW: a NOBOX popup is as wide as its
+## ---- widest row, and this makes every row light the whole box.
 GG.MENU.LOAD:
-  MENUVERT.HOT$ = "EC-P-NLAD-BQ"
-  MENUVERT.COUNT = GG.MENUN
-  MENUVERT.ITEM$(1) = " Edit..."
-  MENUVERT.ITEM$(2) = " Compile Program"
-  MENUVERT.ITEM$(3) = "-"
-  MENUVERT.ITEM$(4) = " Project Menu..."
-  MENUVERT.ITEM$(5) = "-"
-  MENUVERT.ITEM$(6) = " New Program"
-  MENUVERT.ITEM$(7) = " List Programs"
-  MENUVERT.ITEM$(8) = " Save Program As..."
-  MENUVERT.ITEM$(9) = " Delete Program"
-  MENUVERT.ITEM$(10) = "-"
-  MENUVERT.ITEM$(11) = " About"
-  MENUVERT.ITEM$(12) = " Quit"
-  MENUVERT.ATTR = THEME.CLR(THEME.TEXT)
-  MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
   GOSUB GG.MENU.GATE
-  MENUVERT.DIS$ = GG.PROGOFF$ + GG.PROGOFF$ + "000"
-  MENUVERT.DIS$ = MENUVERT.DIS$ + GG.PROJOFF$ + GG.PROJOFF$ + GG.PROGOFF$ + GG.PROGOFF$
-  MENUVERT.DIS$ = MENUVERT.DIS$ + "000"
-  MENUVERT.HOTATTR = THEME.CLR(THEME.TITLE)
-  MENUVERT.SEPATTR = THEME.CLR(THEME.BORDER)
-  MENUVERT.X = GG.MENUBOXX% + 1
-  MENUVERT.Y = GG.MENUBOXY% + INT((GG.MENUBOXH% - GG.MENUN) / 2)
-  MENUVERT.WIDTH = GG.MENUW
-  MENUVERT.HINT$(1) = "Change the settings this project holds"
-  MENUVERT.HINT$(2) = "Compile the main file with these settings"
-  MENUVERT.HINT$(3) = ""
-  MENUVERT.HINT$(4) = "New, open, save and build, for the project"
-  MENUVERT.HINT$(5) = ""
-  MENUVERT.HINT$(6) = "Name a program and put it in the project"
-  MENUVERT.HINT$(7) = "Add a program that is already on the disk"
-  MENUVERT.HINT$(8) = "Copy a row of the list under another name"
-  MENUVERT.HINT$(9) = "Take a row out. The file itself stays"
-  MENUVERT.HINT$(10) = ""
-  MENUVERT.HINT$(11) = "What this is, and what the machine has left"
-  MENUVERT.HINT$(12) = "Leave GPC.GUI"
-  MENUVERT.HINTX = 1
-  MENUVERT.HINTY = APPSYS.ROWS - GG.BARHEIGHT + 1
-  MENUVERT.HINTW = APPSYS.COLS - 2
-  MENUVERT.HINTATTR = THEME.CLR(THEME.TEXT)
-  MENUVERT.SEPCHR = GG.GL.H
+  GP.SUB MENU.BEGIN, MENU.POPUP
+  GP.SUB MENU.ITEMX, LEFT$(" &Edit..." + GG.ROWPAD$, GG.MENUW + 1), "Change the settings this project holds", GG.PROGON
+  GP.SUB MENU.ITEMX, " &Compile Program", "Compile the main file with these settings", GG.PROGON
+  GP.SUB MENU.ITEM, "-"
+  GP.SUB MENU.ITEMX, " &Project Menu...", "New, open, save and build, for the project", MENU.ON
+  GP.SUB MENU.ITEM, "-"
+  GP.SUB MENU.ITEMX, " &New Program", "Name a program and put it in the project", GG.PROJON
+  GP.SUB MENU.ITEMX, " &List Programs", "Add a program that is already on the disk", GG.PROJON
+  GP.SUB MENU.ITEMX, " Save Program &As...", "Copy a row of the list under another name", GG.PROGON
+  GP.SUB MENU.ITEMX, " &Delete Program", "Take a row out. The file itself stays", GG.PROGON
+  GP.SUB MENU.ITEM, "-"
+  GP.SUB MENU.ITEMX, " A&bout", "What this is, and what the machine has left", MENU.ON
+  GP.SUB MENU.ITEMX, " &Quit", "Leave GPC.GUI", MENU.ON
+  GOSUB GG.MENU.STYLE
+  RETURN
+
+## ---- The colours and the hint bar, set on every load: a combo dropdown runs
+## ---- the same popup slot in the dialog's colours.
+GG.MENU.STYLE:
+  MENU.ATTR = THEME.CLR(THEME.TEXT)
+  MENU.HIATTR = THEME.CLR(THEME.HILITE)
+  MENU.HOTATTR = THEME.CLR(THEME.TITLE)
+  MENU.SEPATTR = THEME.CLR(THEME.BORDER)
+  MENU.DISATTR = THEME.CLR(THEME.DIMMED)
+  MENU.SEPCHR = GG.GL.H
+  MENU.HINTX = 1
+  MENU.HINTY = APPSYS.ROWS - GG.BARHEIGHT + 1
+  MENU.HINTW = APPSYS.COLS - 2
+  MENU.HINTATTR = THEME.CLR(THEME.TEXT)
   RETURN
 
 ## ---- WHAT THE MENU WILL LET YOU DO. Nothing works on a project until there is
-## ---- one, and nothing works on a program until the project names one, so the
-## ---- two answers are characters that MENUVERT.DIS$ is built out of. A project
-## ---- with no programs in it turns the program rows off as well, because the
-## ---- current program is the row GG.CURR.NDX% names and there is no row.
+## ---- one, and nothing works on a program until the project names one. A
+## ---- project with no programs in it turns the program rows off as well,
+## ---- because the current program is the row GG.CURR.NDX% names and there is
+## ---- no row.
 GG.MENU.GATE:
-  GG.PROJOFF$ = "0"
-  IF GG.PROJ.OPEN% = 0 THEN GG.PROJOFF$ = "1"
-  GG.PROGOFF$ = "0"
-  IF GG.CURR.NDX% = 0 THEN GG.PROGOFF$ = "1"
-  IF GG.PROJ.OPEN% = 0 THEN GG.PROGOFF$ = "1"
-  MENUVERT.DISATTR = THEME.CLR(THEME.DIMMED)
+  GG.PROJON = (GG.PROJ.OPEN% <> 0)
+  GG.PROGON = GG.PROJON AND (GG.CURR.NDX% <> 0)
+  RETURN
+
+## ---- The main menu drawn and not run, so it stands in the chrome behind a
+## ---- dialog.
+GG.MENU.SHOW:
+  GP.SUB MENU.DRAWVERT, GG.MENUY%, GG.MENUBOXX% + 1, MENU.NOBOX
   RETURN
 
 GG.MENU.RUN:
   GOSUB GG.MENU.LOAD
-  MENUVERT.FLAGS = MENUVERT.MUSTSEL + MENUVERT.HINTMID
-  MENUVERT.SEL = GG.MENUSEL%
-  GOSUB MENUVERT.RUN
-  IF MENUVERT.SEL > 0 THEN GG.MENUSEL% = MENUVERT.SEL
+  MENU.FLAGS = MENU.MUSTSEL + MENU.HINTMID
+  GP.SUB MENU.SELECTED, GG.MENUSEL%
+  GG.CHOSEN = GP.FN(MENUTO.VERT, GG.MENUY%, GG.MENUBOXX% + 1, MENU.NOBOX)
+  IF GG.CHOSEN > 0 THEN GG.MENUSEL% = GG.CHOSEN
   RETURN
 
 GG.DISPATCH:
@@ -384,97 +413,52 @@ GG.DISPATCH:
 ## **  opens where it was named, and the box stands GG.POPSHIFT columns left of
 ## **  the main menu so that row stays in sight.
 ## **
-## **  THE ATTRIBUTES AND THE HINT BAR ARE NOT SET HERE. GG.MENU.RUN loads the
-## **  main menu on every turn and this runs from its dispatch, so both are
-## **  already what this wants. Only the rows, the place and the hints change.
-## **
-## **  ESC leaves MENUVERT.SEL at 0 and nothing runs. The caller's GG.CHROME
-## **  paints the popup out again either way.
+## **  It rebuilds the popup slot the main menu lives in. The caller's
+## **  GG.CHROME loads the main menu back and paints this one out, whether a
+## **  row was chosen or ESC gave 0.
 ## ***********************************************************************
 GG.PROJECT.MENU:
   GG.POPX% = GG.MENUBOXX% - GG.POPSHIFT
-  GG.POPY% = MENUVERT.Y + 2
+  GG.POPY% = GG.MENUY% + 2
   GP.FILL GG.POPX% + 1, GG.POPY% + 1, GG.MENUBOXW% - 2, GG.PROJN, ASC(" "), THEME.CLR(THEME.TEXT)
   GP.BOX GG.POPX%, GG.POPY%, GG.MENUBOXW%, GG.PROJN + 2, GG.BOXGLYPH, THEME.CLR(THEME.BORDER)
-  MENUVERT.HOT$ = "NOSAB"
-  MENUVERT.COUNT = GG.PROJN
-  MENUVERT.ITEM$(1) = " New Project"
-  MENUVERT.ITEM$(2) = " Open Project..."
-  MENUVERT.ITEM$(3) = " Save Project"
-  MENUVERT.ITEM$(4) = " Save Project As..."
-  MENUVERT.ITEM$(5) = " Build Project"
-  MENUVERT.HINT$(1) = "Start an empty project"
-  MENUVERT.HINT$(2) = "Read a project back from disk"
-  MENUVERT.HINT$(3) = "Write the project under its own name"
-  MENUVERT.HINT$(4) = "Write the project under a new name"
-  MENUVERT.HINT$(5) = "Compile the main file with these settings"
   GOSUB GG.MENU.GATE
-  MENUVERT.DIS$ = "00" + GG.PROJOFF$ + GG.PROJOFF$ + GG.PROJOFF$
-  MENUVERT.X = GG.POPX% + 1
-  MENUVERT.Y = GG.POPY% + 1
-  MENUVERT.WIDTH = GG.MENUW
-  MENUVERT.SCROLL = 0
-  MENUVERT.FLAGS = MENUVERT.HINTMID
-  MENUVERT.SEL = GG.PROJSEL%
-  GOSUB MENUVERT.RUN
-  IF MENUVERT.SEL > 0 THEN GG.PROJSEL% = MENUVERT.SEL
-  IF MENUVERT.SEL = 1 THEN GOSUB GG.DEF.NEWASK
-  IF MENUVERT.SEL = 2 THEN GOSUB GG.DEF.OPEN
-  IF MENUVERT.SEL = 3 THEN GOSUB GG.DEF.SAVE
-  IF MENUVERT.SEL = 4 THEN GOSUB GG.DEF.SAVEAS
-  IF MENUVERT.SEL = 5 THEN GOSUB GG.COMPILE
+  GP.SUB MENU.BEGIN, MENU.POPUP
+  GP.SUB MENU.ITEMX, LEFT$(" &New Project" + GG.ROWPAD$, GG.MENUW + 1), "Start an empty project", MENU.ON
+  GP.SUB MENU.ITEMX, " &Open Project...", "Read a project back from disk", MENU.ON
+  GP.SUB MENU.ITEMX, " &Save Project", "Write the project under its own name", GG.PROJON
+  GP.SUB MENU.ITEMX, " Save Project &As...", "Write the project under a new name", GG.PROJON
+  GP.SUB MENU.ITEMX, " &Build Project", "Compile the main file with these settings", GG.PROJON
+  MENU.FLAGS = MENU.HINTMID
+  GP.SUB MENU.SELECTED, GG.PROJSEL%
+  GG.CHOSEN = GP.FN(MENUTO.VERT, GG.POPY% + 1, GG.POPX% + 1, MENU.NOBOX)
+  IF GG.CHOSEN > 0 THEN GG.PROJSEL% = GG.CHOSEN
+  IF GG.CHOSEN = 1 THEN GOSUB GG.DEF.NEWASK
+  IF GG.CHOSEN = 2 THEN GOSUB GG.DEF.OPEN
+  IF GG.CHOSEN = 3 THEN GOSUB GG.DEF.SAVE
+  IF GG.CHOSEN = 4 THEN GOSUB GG.DEF.SAVEAS
+  IF GG.CHOSEN = 5 THEN GOSUB GG.COMPILE
   RETURN
 
 
-
-
-## ***********************************************************************
-## **  GG.DIALOG.RESET.FIELDS -- a dialog starts from the same GUI settings every time.
-## ***********************************************************************
-GG.DIALOG.RESET.FIELDS:
-  GUI.BANK = GG.GUIBANK%
-  GUI.MSG$ = "" : GUI.MSG2$ = ""
-  GUI.MSG3$ = "" : GUI.TITLE$ = ""
-  GUI.BTN.ONE$ = "" : GUI.BTN.TWO$ = ""
-  GUI.STYLE = 0 : GUI.GLYPH = 1
-  GUI.GLYPH$ = ""
-  GUI.EDGE.H = GG.GL.H : GUI.EDGE.V = GG.GL.V
-  GUI.CORNER.TL = GG.GL.TL : GUI.CORNER.TR = GG.GL.TR
-  GUI.CORNER.BL = GG.GL.BL : GUI.CORNER.BR = GG.GL.BR
-  GUI.PLACE = 0 : GUI.ROW.OFFSET = 0
-  GUI.PANEL.IN = 0 : GUI.BORDER.IN = 0
-  GUI.DEFAULT = 1 : GUI.SHADOW = 1
-  GUI.LEN = 0 : GUI.MASK = 0
-  RETURN
 
 
 ## ---- NOTHING TO WORK ON. The footer says so, but the footer is one line in a
 ## ---- corner, so the same thing is said in a box the first time it is true.
 ## ---- The caller repaints: GUI.CLOSE puts back what the box covered.
 GG.NOPROJ.SAY:
-  GOSUB GG.DIALOG.RESET.FIELDS
-  GUI.TITLE$ = " NO PROJECT "
-  GUI.MSG$ = "There is no project open."
-  GUI.MSG2$ = "New or Open one from the Project menu."
-  GOSUB GUI.SAY
+  GP.SUB MSGBOXEX, " NO PROJECT ", "There is no project open.", "New or Open one from the Project menu.", "", ""
   RETURN
 
 ## ---- NOTHING ON THE DRIVE EITHER, so Open is no use and the only way out of
 ## ---- the empty screen is New Project. Said once, at start-up.
 GG.NEWPROJ.SAY:
-  GOSUB GG.DIALOG.RESET.FIELDS
-  GUI.TITLE$ = " NO PROJECT "
-  GUI.MSG$ = "There are no projects on the drive."
-  GUI.MSG2$ = "Create a new project from the Project menu."
-  GOSUB GUI.SAY
+  GP.SUB MSGBOXEX, " NO PROJECT ", "There are no projects on the drive.", "Create a new project from the Project menu.", "", ""
   RETURN
 
 
 GG.QUIT.ASK:
-  GOSUB GG.DIALOG.RESET.FIELDS
-  GUI.TITLE$ = " QUIT " : GUI.MSG$ = "LEAVE GPC.GUI?"
-  GOSUB GUI.YN
-  GG.QUIT% = GUI.ANSWER
+  GG.QUIT% = GP.FN(ASKYNEX, " QUIT ", "LEAVE GPC.GUI?", "", "", 1, 0)
   RETURN
 
 
@@ -592,11 +576,7 @@ GG.FILE.DEL:
 
 ## ---- GG.ASK.TITLE$, GG.ASK.MSG$ and GG.ASK.TEXT$ in, GUI.TEXT$ and GUI.OK out.
 GG.ASK.NAME:
-  GOSUB GG.DIALOG.RESET.FIELDS
-  GUI.TITLE$ = GG.ASK.TITLE$ : GUI.MSG$ = GG.ASK.MSG$
-  GUI.LEN = 24
-  GUI.TEXT$ = GG.ASK.TEXT$
-  GOSUB GUI.INPUT
+  GUI.TEXT$ = GP.FN(INPUTBOXEX, GG.ASK.TITLE$, GG.ASK.MSG$, "", "", GG.ASK.TEXT$, 24, 0)
   RETURN
 
 GG.DEF.OPEN:
@@ -937,7 +917,7 @@ GG.FILE.DROP:
 ## **  GG.ABOUT -- what this is, and what the machine has left.
 ## ***********************************************************************
 GG.ABOUT:
-  GOSUB BANKMGR.COUNT : GOSUB GG.MAIN.GET : GOSUB GG.DIALOG.RESET.FIELDS
+  GOSUB BANKMGR.COUNT : GOSUB GG.MAIN.GET : GOSUB GUI.DEFAULTS
   GUI.TITLE$ = " ABOUT "
   GUI.BTN.ONE$ = "&OK" : GUI.BTN.TWO$ = ""
   GOSUB GUI.BUTTON.SIZE
@@ -1008,7 +988,8 @@ GG.COMPILE:
   PRINT#1, GG.DEADNAME$
   CLOSE 1
 
-  GOSUB APPSYS.RESTORE : GOSUB KB.CLEARKB
+  GOSUB APPSYS.RESTORE
+  GP.SUB KBCLEAR
   LOAD "GPC.BIN"
   END
 

@@ -12,25 +12,35 @@ REM DOC.FILE.NAME$ (in for DOC.LOADFILE). Dotted names because BASLOAD tokenises
 REM whole A-Z0-9_. run as a keyword if that is what it spells -- FN$ and ON$ both break.
 REM
 REM LAYOUT
-REM   Line table : 3 bytes per line [bank][off_lo][off_hi], banks 1..3, 2048 per bank
+REM   Line table : 3 bytes per line [bank][off_lo][off_hi], banks 2..4, 2048 per bank
 REM                -> 6144 lines. Line I is at bank BASE+INT(I/2048), byte (I mod 2048)*3
 REM                of the window, so go-to-line is O(1).
-REM   Content    : bump allocator over $A000..$BF00 in banks 6.., each line [len][chars].
-REM                Never frees one record; "free all" is DOC.INIT, reclamation is at save.
+REM   Content    : bump allocator over $A000..$BF00 in banks 13..DOC.LAST.BANK, each line
+REM                [len][chars]. Never frees one record; "free all" is DOC.INIT,
+REM                reclamation is at save.
+REM
+REM DOC.LAST.BANK is the caller's, set once: the editor claims the arena from BANKMGR and
+REM stops at the first bank another owner holds. 0 leaves the arena uncapped, for the
+REM bench programs that have no BANKMGR.
 REM ============================================================================
 
 REM ---- reset the store (empty document) ----
 DOC.INIT:
   DOC.WIN.START = 40960 : REM $A000
   DOC.WIN.END = 48896   : REM $BF00 -- $BF00..$BFFF left as a guard tail
-  DOC.TABLE.PER.BANK = 2048 : DOC.TABLE.BASE.BANK = 1 : REM line table occupies banks 1..3
-  REM 6, NOT 4 OR 5: bank 4 is lent to GUI.INC.BL for the cells a dialog covers (see
-  REM ED.GUI.BANK in EDITOR.BASL) and bank 5 to ED-MENUS.BASL for the menu text. The
-  REM arena only grows upward, so giving up the bottom banks is the cheapest reservation
-  REM there is: 16K of document out of 250-odd.
-  DOC.FIRST.BANK = 6      : REM content arena starts here
-  DOC.CUR.BANK = DOC.FIRST.BANK  : DOC.CUR.PTR = DOC.WIN.START 
+  REM Not bank 1: the runtime keeps its rarely used handlers there.
+  DOC.TABLE.PER.BANK = 2048 : DOC.TABLE.BASE.BANK = 2 : DOC.TABLE.BANKS = 3
+  REM 13: bank 5 is lent to GUI.INC.BL for the cells a dialog covers (ED.GUI.BANK), 6
+  REM holds the menu rows (MENU.TEXTBANK) and 7-12 the library's code. The arena only grows upward, so giving up the
+  REM bottom banks is the cheapest reservation there is.
+  DOC.FIRST.BANK = 13     : REM content arena starts here
+  DOC.CUR.BANK = DOC.FIRST.BANK  : DOC.CUR.PTR = DOC.WIN.START
   DOC.HIGH.BANK = DOC.FIRST.BANK : LINE.COUNT = 0
+  REM The empty record a line gets when the arena is full: the first byte of the guard tail,
+  REM which DOC.ALLOC never hands out.
+  DOC.FULL = 0
+  BANK DOC.FIRST.BANK
+  POKE DOC.WIN.END, 0
   REM Off unless DOC.LOADFILE turns it on. Set HERE, textually above the GP.ASM block in
   REM DOC.STORE.CHARS, because {VAR} needs a slot the compiler has already made -- a
   REM variable first assigned further down the file is UNKNOWN VARIABLE IN {} at the block.
@@ -38,13 +48,24 @@ DOC.INIT:
   RETURN
 
 REM ---- reserve DOC.ALLOC.SIZE bytes -> DOC.RESULT.BANK, DOC.RESULT.OFF ----
+REM DOC.ALLOC.OK is 0 when the arena is full: the result is then the guard record, and
+REM nothing may be written past its length byte.
 DOC.ALLOC:
+  DOC.ALLOC.OK = -1
   IF DOC.CUR.PTR + DOC.ALLOC.SIZE <= DOC.WIN.END THEN GOTO DOC.ALLOC.PLACE
+  IF DOC.LAST.BANK > 0 AND DOC.CUR.BANK >= DOC.LAST.BANK THEN GOTO DOC.ALLOC.FULL
   DOC.CUR.BANK = DOC.CUR.BANK + 1 : DOC.CUR.PTR = DOC.WIN.START
   IF DOC.CUR.BANK > DOC.HIGH.BANK THEN DOC.HIGH.BANK = DOC.CUR.BANK
 DOC.ALLOC.PLACE:
   DOC.RESULT.BANK = DOC.CUR.BANK : DOC.RESULT.OFF = DOC.CUR.PTR
   DOC.CUR.PTR = DOC.CUR.PTR + DOC.ALLOC.SIZE
+  RETURN
+
+DOC.ALLOC.FULL:
+  DOC.ALLOC.OK = 0
+  DOC.FULL = -1
+  DOC.RESULT.BANK = DOC.FIRST.BANK
+  DOC.RESULT.OFF = DOC.WIN.END
   RETURN
 
 REM ---- table slot for LINE.INDEX -> DOC.SLOT.ADDR in bank DOC.SLOT.BANK ----
@@ -71,7 +92,9 @@ DOC.SLOT.READ:
 REM ---- store LINE.TEXT$ at LINE.INDEX (allocates, copies, updates the table) ----
 DOC.STORE:
   DOC.LEN = LEN(LINE.TEXT$) : DOC.ALLOC.SIZE = DOC.LEN + 1
-  GOSUB DOC.ALLOC : BANK DOC.RESULT.BANK : POKE DOC.RESULT.OFF, DOC.LEN
+  GOSUB DOC.ALLOC
+  IF DOC.ALLOC.OK = 0 THEN DOC.LEN = 0
+  BANK DOC.RESULT.BANK : POKE DOC.RESULT.OFF, DOC.LEN
   IF DOC.LEN > 0 THEN GOSUB DOC.STORE.CHARS
   DOC.PUT.BANK = DOC.RESULT.BANK : DOC.PUT.OFF = DOC.RESULT.OFF
   GOSUB DOC.SLOT.WRITE

@@ -1,12 +1,7 @@
-#SAVEAS "@:EDITOR.PRG"
+#SAVEAS "@:EDITOR.SRC.PRG"
 #AUTONUM 1
 #REM 0
-#SYMFILE "@:EDITOR.SYM"
-#DEFINE ED.KBDBUF $F09F
-## kbdbuf_get_modifiers. Bit 1 is Alt. A character code cannot carry a modifier, and in
-## ISO mode the driver sends no Commodore+letter codes at all, so this is how ALT is seen.
-#DEFINE ED.KBDMOD $FEC0
-#DEFINE ED.MOD.ALT 2
+#SYMFILE "@:EDITOR.SRC.SYM"
 ## The single-line box, as TILE INDICES: GUI.FRAME draws it with GP.BOX, whose custom
 ## glyphs reach the cell unconverted. ED.PETFONT is what parks them here.
 #DEFINE ED.GL.H 192
@@ -17,12 +12,12 @@
 #DEFINE ED.GL.BR 197
 
 ## The RAM bank GUI.INC.BL saves a dialog's cells into. Not a spare one lying around:
-## the document store gave it up and starts its own arena at 5 instead.
-#DEFINE ED.GUI.BANK 4
+## the document store gave it up and starts its own arena at 12 instead. The whole map
+## is claimed from BANKMGR in ED.INIT.
+#DEFINE ED.GUI.BANK 5
 
-REM Index 0 is transparent BY HARDWARE, and the chrome now has the document behind it. So
-REM black needs an index that is not 0. Five is free in both themes, in either nibble.
-#DEFINE ED.BLK 5
+## The menu rows, low so the document arena can run to the top of RAM.
+#DEFINE MENU.TEXTBANK 6
 
 REM The line-number gutter: ED.GUT.D digit columns, then blanks out to ED.GUT.W. Everything
 REM that turns a document position into a cell adds ED.GUT.W; the horizontal scroll already
@@ -31,43 +26,85 @@ REM
 REM ED.GUT.W MUST BE EVEN. ED.ROW.STREAM writes TWO CELLS AT A TIME through VERA's FX cache
 REM and that write is 4-BYTE ALIGNED, so an odd text column renders one cell to the left and
 REM eats the gutter. Column 0 was always aligned, which is why nothing here had to know.
-REM
-REM THREE BUILD MODES, three FLAT symbols, because BASLOAD does not nest #IFNDEF:
-REM   RELEASE         all three defined, not one byte of test code compiles
-REM   CORE tests      comment out ED.RELEASE and ED.NOCORE, DEBUG.MODE = 1
-REM   OPTIONAL tests  comment out ED.RELEASE and ED.NOOPT, DEBUG.MODE = 1
-REM ED.RELEASE guards the harness preamble, its tail and its helpers; ED.NOCORE and ED.NOOPT
-REM sit BESIDE it, never inside it.
-#DEFINE ED.RELEASE 1
-#DEFINE ED.NOCORE 1
-#DEFINE ED.NOOPT 1
 
 #DEFINE ED.GUT.D 4
 #DEFINE ED.GUT.W 6
 
-#INCLUDE "GPB.INC.BL"
-#INCLUDE "THEME.INC.BL"
-#INCLUDE "APPSYS.INC.BL"
-REM STASH.INC.BL saves the cells a dialog covers -- GP.STASH and GP.RESTR until they left
-REM the GP block on 01/09/26. The #SYMFILE above is for it: it reaches BASIC's variables
-REM from assembly through {VAR}, and by then BASLOAD has crunched every name.
-#INCLUDE "STASH.INC.BL"
-#INCLUDE "MENUVERT.INC.BL"
-#INCLUDE "MENUBAR.INC.BL"
-#INCLUDE "LINEINPUT.INC.BL"
-#INCLUDE "GUI.INC.BL"
-REM STRCASE.INC.BL is the library's in-place case work, and the find path is exactly what
-REM it is for: GP.STRPTR in, the bytes rewritten where they lie, no copy either way.
-#INCLUDE "STRCASE.INC.BL"
+## The library's code banks. ED.CLAIM.FIXED.BANKS claims them; the arena starts above.
+#DEFINE ED.UTILCODE 7
+#DEFINE ED.THEMECODE 8
+#DEFINE ED.MENUCODE 9
+#DEFINE ED.GUICODE 10
+#DEFINE ED.COMBOCODE 11
+#DEFINE ED.DLGCODE 12
+
+#INCLUDE "GPC-BASIC/GPB.INC.BL"
+REM STASH.INC.BL saves the cells a dialog covers. The #SYMFILE above is for it: it reaches
+REM BASIC's variables from assembly through {VAR}, and by then BASLOAD has crunched every name.
+REM It holds BANK statements, so it stays in low memory.
+#INCLUDE "GPC-BASIC/STASH.INC.BL"
+
+REM The rest of the library runs from RAM banks. The GOTO jumps the regions.
+GOTO ED.LIBEND
+
+REM STASHVRAM.INC.BL keeps the cells under a dropdown, in VRAM above layer 0's map.
+REM STRCASE.INC.BL is the find path's in-place case work: GP.STRPTR in, no copy either way.
+GP.BANKED ED.UTILCODE
+#INCLUDE "GPC-BASIC/APPSYS.INC.BL"
+#INCLUDE "GPC-BASIC/BANKMGR.INC.BL"
+#INCLUDE "GPC-BASIC/STASHVRAM.INC.BL"
+#INCLUDE "GPC-BASIC/STRCASE.INC.BL"
+GP.ENDBANKED
+
+REM THEME before everything that reads its role #DEFINEs.
+GP.BANKED ED.THEMECODE
+#INCLUDE "GPC-BASIC/THEME.INC.BL"
+GP.ENDBANKED
+
+REM MENU.INC.BL before GUI.INC.BL, for its #DEFINEs.
+GP.BANKED ED.MENUCODE
+#INCLUDE "GPC-BASIC/MENU.INC.BANKED.BL"
+#INCLUDE "GPC-BASIC/MENU.INC.BL"
+#INCLUDE "GPC-BASIC/MENUPULL.INC.BL"
+GP.ENDBANKED
+
+GP.BANKED ED.GUICODE
+#INCLUDE "GPC-BASIC/LINEINPUT.INC.BL"
+#INCLUDE "GPC-BASIC/GUI.INC.BL"
+GP.ENDBANKED
+
+REM COMBO and CHECK after GUI, for its #DEFINEs. GUI names both, so they come in whether a
+REM dialog uses them or not.
+GP.BANKED ED.COMBOCODE
+#INCLUDE "GPC-BASIC/COMBO.INC.BL"
+#INCLUDE "GPC-BASIC/CHECK.INC.BL"
+GP.ENDBANKED
+
+REM The dialogs as one-line verbs, above every call to them.
+GP.BANKED ED.DLGCODE
+#INCLUDE "GPC-BASIC/GUI-DIALOGS.INC.BL"
+GP.ENDBANKED
+
+ED.LIBEND:
+
+REM MENUKEY.INC.BL reads the keymap under BANK 0, so it stays in low memory.
+#INCLUDE "GPC-BASIC/MENUKEY.INC.BL"
 
 REM ============================================================================
 REM EDITOR.BASL -- GPC EDIT, an MS-DOS-EDIT-styled text / Markdown editor for the
 REM Commander X16, written in BASLOAD and compiled by GPC.
 REM
 REM NOTHING GOES THROUGH THE KERNAL: every cell, text area and chrome alike, is written
-REM straight into VERA's text map. The document and the menu text live in banked RAM behind
-REM the DOC.* and EDMNU.* layers -- ED-STORE.BASL and ED-MENUS.BASL, both #INCLUDEd at the
-REM bottom.
+REM straight into VERA's text map. The document lives in banked RAM behind the DOC.* layer,
+REM ED-STORE.BASL; the menus are MENU.INC.BL's, driven from ED-MENUS.BASL. Both are
+REM #INCLUDEd at the bottom.
+REM
+REM COMPILE IT SHARED. The library runs from GP.BANKED regions, and the menu rows are
+REM GP.BANKEDSTR text.
+REM
+REM BANKS: 1 the runtime's, 2-4 the line table, 5 GUI.INC.BL's dialog save, 6 the menu rows
+REM (MENU.TEXTBANK), 7-12 the library's code, 13 up to the top of RAM the document arena.
+REM ED.INIT claims every one.
 REM
 REM THE TWO RENDERERS ARE INLINE ASSEMBLY: ED.RENDER.ROW draws text, ED.PUT.FIELD chrome,
 REM each one GP.ASM block reaching BASIC's variables through {VAR}. bench/BENCHROWS measures
@@ -75,13 +112,11 @@ REM both against their BASIC versions. GP.ASM itself costs no runtime bytes; GP.
 REM key dispatch does -- one core keyword pulls in the whole 2 KB GP block, which is why this
 REM compiles GP-BASIC IN. Readability, bought knowingly.
 REM
-REM Colours (like DETOK): blue bars, black text area, white text, cyan prompts,
-REM white-on-red errors.
+REM Colours are THEME.INC.BL's roles, from the theme THEME.ID names.
 REM ============================================================================
 
-DEBUG.MODE = 0 : REM 1 = run the self-check to the log and stop. 0 = interactive.
 ED.SCREEN.MODE = 1 : REM 1 = 80x30, 3 = 40x30 (see KERNAL screen_mode $FF5F)
-ED.DARK = 0 : REM 0 = the DETOK light palette, 1 = the dark one (see ED.THEME)
+THEME.ID = 3 : REM the colour theme, see THEME.INC.BL
 
 GOSUB ED.INIT
 DOC.FILE.NAME$ = "TEST.MD"
@@ -90,31 +125,21 @@ GOSUB ED.OPEN.DONE
 GOSUB ED.RENDER.ALL
 GOSUB ED.L0.ON
 
-REM The self-check is COMPILED OUT of a release build: ~350 lines a user never runs, and in
-REM this compiler every byte of p-code is a byte of the workspace the program then lives in.
-REM #DEFINE ED.RELEASE 1 at the top drops both the call and the block at the end of this file.
-#IFNDEF ED.RELEASE
-IF DEBUG.MODE = 1 THEN GOSUB ED.SELFCHECK : END
-#ENDIF
-
 REM ---- main loop ----
 REM
 GP.DO
   GET ED.KEY$
   GP.IF ED.KEY$ <> "" THEN 
-    ED.KEY = ASC(ED.KEY$)  
-    GOSUB ED.READ.MODS
-    GOSUB ED.DISPATCH.KEY
+    ED.KEY = ASC(ED.KEY$) 
+    ## --- check if menu key and deal with it
+    GOSUB ED.MENU.KEY : 
+    IF ED.MENU.PICK < 0 THEN GOSUB ED.DISPATCH.EDITING.KEY
   GP.ENDIF
 GP.LOOP
 
 
-ED.DISPATCH.KEY:
-  REM ALT modifies whatever key arrived rather than being one, so it is tested before the
-  REM selector rather than sitting in it as a code.
-  IF ED.MODS.ALT <> 0 THEN GOSUB ED.ALT.MENU : RETURN
+ED.DISPATCH.EDITING.KEY:
   GP.SELECT ED.KEY
-    GP.CASE 27  : MENU.ACTIVE = 0 : GOSUB ED.OPEN.MENUBAR
     GP.CASE 157 : GOSUB ED.MOVE.LEFT
     GP.CASE 29  : GOSUB ED.MOVE.RIGHT
     GP.CASE 145 : GOSUB ED.MOVE.UP
@@ -133,14 +158,6 @@ ED.DISPATCH.KEY:
   GP.ENDSEL
   RETURN
 
-REM Asked while the key is still down. $FEC0 is below the $FF00 jump table, so it is not
-REM mirrored across ROM banks and the call needs the KERNAL paged in.
-ED.READ.MODS:
-  POKE 1, 0 : GP.CALL ED.KBDMOD : POKE 1, 4
-  ED.MODS = GP.A : ED.MODS.ALT = 0
-  IF (ED.MODS AND ED.MOD.ALT) <> 0 THEN ED.MODS.ALT = 1
-  RETURN
-
 ED.KEY.RANGE:
   REM ASCII, because ED.INIT declares ISO encoding -- see the $0372 poke there. Under
   REM PETSCII this had to case-swap every letter.
@@ -150,10 +167,9 @@ ED.KEY.RANGE:
 
 ED.QUIT:
   POKE 40761, 0 : POKE 40762, 0 : REM undo any hardware VSCROLL before returning to BASIC
-  REM layer 0 off again, and palette 5 back to whatever it was
+  REM layer 0 off again
   POKE 40754, 0 : POKE 40755, 0 : POKE 40741, 0 : POKE 40745, PEEK(40745) AND 239
-  VPOKE 1, 64010, ED.PAL5.LO : VPOKE 1, 64011, ED.PAL5.HI
-  GOSUB ED.ALTKEYS.OFF : REM and the keyboard layout, which outlives the program
+  GOSUB MENU.KEYS.OFF : REM and the keyboard layout, which outlives the program
   REM APPSYS.RESTORE hands back the mode, charset and colour APPSYS.STARTUP found -- the
   REM user's, not a hardcoded 3. Re-uploading the charset is also what undoes ED.PETFONT's
   REM re-ordering, so NOTHING MAY BE PRINTED BEFORE THIS LINE.
@@ -193,20 +209,15 @@ REM STOCK charset uses and ED.PETFONT has moved every one of them, so style 2 wo
 REM "p @ B". GUI.FRAME takes the six glyphs named here instead, the ones ED.PETFONT rescued
 REM into $C0-$C5. MUST RUN AFTER ED.PETFONT.
 ED.GUI.SETUP:
-  GUI.BANK = ED.GUI.BANK
-  GUI.ROW.OFFSET = 0
-
-  REM THE COLOURS, because ED.THEME re-points the roles the library assumes: BORDER is the
-  REM hotkey letter here and PAGE a grey it never uses. Both go to THEME.TEXT, the document's
-  REM own white on black and what the dropdown frames with, so the two match.
-  GUI.PANEL.IN = THEME.CLR(THEME.TEXT)
-  GUI.BORDER.IN = THEME.CLR(THEME.TEXT)
-
-  GUI.GLYPH = 1
+  GP.SUB DLGRESET, ED.GUI.BANK
   GUI.EDGE.H    = ED.GL.H  : GUI.EDGE.V    = ED.GL.V
   GUI.CORNER.TL = ED.GL.TL : GUI.CORNER.TR = ED.GL.TR
   GUI.CORNER.BL = ED.GL.BL : GUI.CORNER.BR = ED.GL.BR
-  GUI.ROW.OFFSET = 0 : REM layer 1 does not scroll: a screen row IS a map row
+  REM Packed once here: the dropdowns hand the same eight bytes to MENU as a box style.
+  GOSUB GUI.GLYPHS
+  MENU.DROPSTYLE = GP.STRPTR(GUI.GLYPH$) + 1
+  REM Every dialog from here on is framed in the six above.
+  GP.SUB DLGGLYPH, 1
   RETURN
 
 ED.PETFONT:
@@ -243,51 +254,22 @@ ED.FCOPY:
   RETURN
 
 REM ============================================================================
-REM THEME -- every colour in one place, as named roles
-REM
-REM The editor's own values, not THEME.LOAD's: the library's palette is a blue-page app look
-REM and this is DETOK's. The ROLES are what is shared, not the colours.
-REM
-REM   PAGE    dropdown panel        TITLE   menu bar, status bar, messages
-REM   TEXT    the document          BORDER  the hotkey letter in a menu title
-REM   HILITE  caret, active title   DIMMED  prompts        WARN  errors
-REM
-REM An attribute is background * 16 + foreground.
-REM ============================================================================
-ED.THEME:
-  REM THEME.LOAD owns the DIM: GPC rejects a second DIM of the same array even when only
-  REM one can run (ARRAY REDEFINED), so call it and then overwrite the slots.
-  THEME.ID = ED.DARK
-  GOSUB THEME.LOAD
-  IF ED.DARK <> 0 THEN GOTO ED.THEME.DARK
-  THEME.CLR(THEME.PAGE)   = 15 * 16 + ED.BLK : REM black on light grey -- unused: the dropdown is TEXT
-  THEME.CLR(THEME.TEXT)   = ED.BLK * 16 + 1 : REM white on black -- the document
-  THEME.CLR(THEME.TITLE)  =  6 * 16 + 1 : REM white on blue -- bars and messages
-  THEME.CLR(THEME.BORDER) =  6 * 16 + 7 : REM yellow on blue -- the hotkey letter
-  THEME.CLR(THEME.HILITE) =  1 * 16 + ED.BLK : REM black on white -- caret, active title
-  THEME.CLR(THEME.DIMMED) = ED.BLK * 16 + 3 : REM cyan on black -- prompts
-  THEME.CLR(THEME.WARN)   =  2 * 16 + 1 : REM white on red -- errors
-  RETURN
-
-ED.THEME.DARK:
-  THEME.CLR(THEME.PAGE)   = 11 * 16 + 15
-  THEME.CLR(THEME.TEXT)   = ED.BLK * 16 + 15
-  THEME.CLR(THEME.TITLE)  = 11 * 16 + 1
-  THEME.CLR(THEME.BORDER) = 11 * 16 + 7
-  THEME.CLR(THEME.HILITE) = 15 * 16 + ED.BLK
-  THEME.CLR(THEME.DIMMED) = ED.BLK * 16 + 12
-  THEME.CLR(THEME.WARN)   =  2 * 16 + 1
-  RETURN
-
-
-REM ============================================================================
 REM SETUP
 REM ============================================================================
 ED.INIT:
   REM FIRST, before any mode or colour of our own: APPSYS.STARTUP records the state as it
   REM FINDS it and ED.QUIT hands that back. Anything changed above this line is lost.
   GOSUB APPSYS.STARTUP
-  GOSUB ED.THEME
+  REM Bank claims in this order: the menu's MENU.BEGIN claims MENU.TEXTBANK, and the arena
+  REM then takes every bank it can up to the top of RAM.
+  GOSUB BANKMGR.INIT
+  GOSUB DOC.INIT
+  GOSUB ED.CLAIM.FIXED.BANKS
+  REM The colours before the menus: ED.MENU.SETUP takes its own from THEME.CLR.
+  GOSUB THEME.SELECT
+  GOSUB ED.MENU.SETUP
+  IF MENU.OK = 0 THEN BANKMGR.SET.BANK = MENU.TEXTBANK : GOSUB ED.BANK.FAILED
+  GOSUB ED.CLAIM.ARENA.BANKS
   REM GP.CALL, not SYS: A, X, Y and CARRY as arguments, results in GP.A / GP.X / GP.Y,
   REM against SYS's four statements through the POKE 780..783 slots. Free here -- the GP
   REM block is already paid for by the GP.SELECT in the key dispatch.
@@ -313,7 +295,6 @@ ED.INIT:
   ED.ATTR.TEXT   = THEME.CLR(THEME.TEXT)
   ED.ATTR.CARET  = THEME.CLR(THEME.HILITE)
   ED.ASM.GATTR% = THEME.CLR(THEME.DIMMED) : REM the gutter, read by ED.ROW.STREAM
-  ED.QUIET = 0 : ED.SIM.MODE = 0 : ED.EXIT.FLAG = 0 : ED.LAST.MSG$ = ""
   REM ---- hardware vertical scroll setup (see ED.DO.SCROLL) ----
   REM VERA's L1_VSCROLL ($9F39/$9F3A, map pixels, 8 a text row) scrolls the layer, so a
   REM one-line move repaints 3 rows and not the screen. Screen row R is map row R + ED.MAP.TOP,
@@ -328,9 +309,47 @@ ED.INIT:
   ED.MAP.MAXTOP = ED.MAP.H - SCREEN.ROWS
   ED.HW.OK = 0 : IF ED.MAP.MAXTOP >= 4 THEN ED.HW.OK = 1
   GOSUB ED.LAYERS
-  DIM ED.ALTK(8) : DIM ED.ALTV(8) : REM layout bytes ED.ALTKEYS overwrites, to put back
-  MENU.ACTIVE = 0 - 1 : GOSUB ED.MENU.SETUP : GOSUB ED.ALTKEYS
+  REM ALT+letter types nothing until the keymap carries the bar's hot keys.
+  GOSUB MENU.KEYS.ON
+  ED.MB.FORCE = 1 : REM the first ED.RENDER.MENUBAR draws; the dirty guard alone would skip it
   RETURN
+
+REM ---- the fixed banks: the line table, the dialog save and the library's code.
+ED.CLAIM.FIXED.BANKS:
+  FOR ED.BK = DOC.TABLE.BASE.BANK TO DOC.TABLE.BASE.BANK + DOC.TABLE.BANKS - 1
+    BANKMGR.SET.BANK = ED.BK
+    GOSUB BANKMGR.CLAIM
+    IF BANKMGR.OK = 0 THEN GOSUB ED.BANK.FAILED
+  NEXT ED.BK
+  BANKMGR.SET.BANK = ED.GUI.BANK
+  GOSUB BANKMGR.CLAIM
+  IF BANKMGR.OK = 0 THEN GOSUB ED.BANK.FAILED
+  FOR ED.BK = ED.UTILCODE TO ED.DLGCODE
+    BANKMGR.SET.BANK = ED.BK
+    GOSUB BANKMGR.CLAIM
+    IF BANKMGR.OK = 0 THEN GOSUB ED.BANK.FAILED
+  NEXT ED.BK
+  RETURN
+
+REM ---- the document arena: every bank from DOC.FIRST.BANK up to the first one it cannot
+REM claim, the top of RAM when nobody else owns one.
+ED.CLAIM.ARENA.BANKS:
+  DOC.LAST.BANK = DOC.FIRST.BANK - 1
+  BANKMGR.SET.BANK = DOC.FIRST.BANK
+  GOSUB BANKMGR.CLAIM
+  IF BANKMGR.OK = 0 THEN GOSUB ED.BANK.FAILED
+  GP.DO
+    IF BANKMGR.OK = 0 THEN GP.EXITDO
+    DOC.LAST.BANK = BANKMGR.SET.BANK
+    BANKMGR.SET.BANK = BANKMGR.SET.BANK + 1
+    GOSUB BANKMGR.CLAIM
+  GP.LOOP
+  RETURN
+
+REM ---- a claim failed: two owners name one bank. BANKMGR.SET.BANK is the bank.
+ED.BANK.FAILED:
+  PRINT "BANK"; BANKMGR.SET.BANK; "FAILED"
+  END
 
 REM VSCROLL moves a whole LAYER, so with one layer the bars slid with the document and had to
 REM be redrawn every line. Layer 0 takes the document and scrolls alone; layer 1 keeps the
@@ -338,11 +357,14 @@ REM bars, the dropdown and the dialogs at fixed SCREEN rows. The seam was alread
 REM GP command addresses layer 1 only.
 ED.LAYERS:
   POKE 40741, 0 : REM DCSEL 0, or $9F29 is an FX register instead of DC_VIDEO
-  ED.PAL5.LO = VPEEK(1, 64010) : ED.PAL5.HI = VPEEK(1, 64011)
-  VPOKE 1, 64010, 0 : VPOKE 1, 64011, 0 : REM palette 5 = $000, an opaque black
   REM L0: config and tilebase copied from L1, map at $00000, and the only scroll left.
   POKE 40749, PEEK(40756) : POKE 40750, 0 : POKE 40751, PEEK(40758)
   POKE 40754, 0 : POKE 40755, 0
+  REM The dropdowns are saved in VRAM from SV.BASE up, so that starts past this map.
+  ED.MAP.W = 32 * 2 ^ INT((PEEK(40756) AND 48) / 16)
+  ED.L0.END = ED.MAP.W * ED.MAP.H * 2
+  SV.BASE = $4000
+  IF ED.L0.END > SV.BASE THEN SV.BASE = ED.L0.END
   GOSUB ED.CLEAR.OVERLAY
   RETURN
 
@@ -355,58 +377,6 @@ ED.L0.ON:
 REM Layer 1's text region back to transparent. Attribute 0 is the transparent one.
 ED.CLEAR.OVERLAY:
   GP.FILL 0, 1, SCREEN.COLS, ED.TEXT.ROWS, 32, 0
-  RETURN
-
-REM ============================================================================
-REM ALT+letter, by making the LAYOUT produce the letter
-REM
-REM In ISO mode the ALT table does not hand back the letter. Measured: ALT+S arrives as 223
-REM and ALT+F as NOTHING AT ALL, its slot being empty. kbdbuf_get_modifiers says ALT was down
-REM but not what it was down WITH.
-REM
-REM The layout is writable, so write it. Eleven 128-byte tables live at $A000 on RAM bank 0:
-REM byte 0 an ID, bytes 1..127 the code each KEYNUM produces, ID $80 plain ISO and $C6 ISO+Alt.
-REM Find a menu's initial in the plain table -- the index IS that key's keynum -- and write the
-REM upper case letter at the same index of the ALT table. Every byte is saved and put back by
-REM ED.ALTKEYS.OFF, because the tables outlive the program.
-REM
-REM FOUND BY SEARCH, NOT A HARDCODED KEYNUM, so an accelerator follows its menu when renamed.
-REM MENU.HOT$, NOT THE TITLE'S FIRST LETTER: the titles are banked and this loop holds bank 0
-REM for the keymap -- and an accelerator need not be the initial anyway.
-REM BANK 0, NOT POKE 0: PEEK/POKE restore the bank around every access.
-REM ============================================================================
-ED.ALTKEYS:
-  ED.NALT = 0
-  BANK 0
-  ED.TPLAIN = 0 : ED.TALT = 0
-  FOR ED.TI = 0 TO 10
-    ED.TB = 40960 + 128 * ED.TI
-    IF PEEK(ED.TB) = 128 THEN ED.TPLAIN = ED.TB
-    IF PEEK(ED.TB) = 198 THEN ED.TALT = ED.TB
-  NEXT ED.TI
-  IF ED.TPLAIN = 0 THEN RETURN
-  IF ED.TALT = 0 THEN RETURN
-  FOR MENU.I = 0 TO MENU.COUNT - 1
-    ED.WANT = ASC(MID$(MENU.HOT$, MENU.I + 1, 1))
-    FOR ED.KI = 1 TO 127
-      IF PEEK(ED.TPLAIN + ED.KI) = ED.WANT + 32 THEN GOSUB ED.ALTKEY.SET
-    NEXT ED.KI
-  NEXT MENU.I
-  RETURN
-
-ED.ALTKEY.SET:
-  ED.ALTK(ED.NALT) = ED.TALT + ED.KI
-  ED.ALTV(ED.NALT) = PEEK(ED.TALT + ED.KI)
-  POKE ED.TALT + ED.KI, ED.WANT : ED.NALT = ED.NALT + 1
-  RETURN
-
-ED.ALTKEYS.OFF:
-  IF ED.NALT = 0 THEN RETURN
-  BANK 0
-  FOR ED.AI = 0 TO ED.NALT - 1
-    POKE ED.ALTK(ED.AI), ED.ALTV(ED.AI)
-  NEXT ED.AI
-  ED.NALT = 0
   RETURN
 
 ED.OPEN.DONE:
@@ -551,6 +521,10 @@ ED.TOGGLE.INSERT:
   RETURN
 
 
+
+
+
+
 REM ============================================================================
 REM COMMANDS
 REM ============================================================================
@@ -602,7 +576,6 @@ ED.CMD.EXIT:
   ED.PROMPT.MSG$ = "Discard changes?" : GOSUB ED.PROMPT.YN
   IF ED.YN = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
 ED.CMD.EXIT.GO:
-  IF ED.SIM.MODE = 1 THEN ED.EXIT.FLAG = 1 : RETURN
   GOTO ED.QUIT
 ED.CMD.ABOUT:
   ED.MSG$ = "GPC EDIT -- a simple X16 text editor" : GOSUB ED.INFO.MSG
@@ -667,60 +640,58 @@ ED.FN.NONE:
   RETURN
 
 
+
+
+
+
 REM ============================================================================
-REM PROMPTS (cyan line input; sim hook for the headless self-check)
+REM PROMPTS
 REM ============================================================================
 REM Hand-rolled on the bottom row once, now GUI.INC.BL -- a caret that moves, a field that
 REM cannot be typed past, a box that puts back what it covered. The interface did not change,
 REM ED.PROMPT.MSG$ in and ED.INPUT$ + ED.PROMPT.OK or ED.YN out, so no call site moved.
 
 ED.PROMPT:
-  IF ED.SIM.MODE = 1 THEN ED.INPUT$ = ED.SIM.INPUT$ : ED.PROMPT.OK = -1 : RETURN
-  GUI.TITLE$ = "" : GUI.MSG2$ = "" : GUI.MASK = 0
-  GUI.MSG$ = ED.PROMPT.MSG$
-  REM Wide enough for a path, and the box sizes itself around it. The old bottom-row field
-  REM ran to 60 because it had the whole screen; a centred dialog does not.
-  GUI.LEN = 40 : GUI.INPUT$ = "" : GOSUB GUI.TEXT
-  ED.INPUT$ = GUI.INPUT$ : ED.PROMPT.OK = GUI.OK
-  REM A cancel hands back "", as it always did. GUI.TEXT restores what was passed in, which
-  REM here is "" anyway, so this is belt and braces at the cost of one store.
-  IF ED.PROMPT.OK = 0 THEN ED.INPUT$ = ""
+  REM Wide enough for a path, and the box sizes itself around it. A cancel hands back "".
+  ED.INPUT$ = GP.FN(ASKTEXT, ED.PROMPT.MSG$, 40)
+  ED.PROMPT.OK = GUI.OK
   RETURN
 
 ED.PROMPT.YN:
-  IF ED.SIM.MODE = 1 THEN ED.YN = ED.SIM.YN : RETURN
-  GUI.TITLE$ = "" : GUI.MSG2$ = "" : GUI.OKCANCEL = 0 : GUI.HINT$ = ""
-  GUI.MSG$ = ED.PROMPT.MSG$
-  GOSUB GUI.YN
-  ED.YN = GUI.ANSWER
+  REM Every question here is the destructive one, so RETURN lands on NO. Y still answers yes.
+  ED.YN = GP.FN(ASKYNEX, "", ED.PROMPT.MSG$, "", "", 2, 0)
   RETURN
+
+
+
+
 
 
 REM ============================================================================
 REM MESSAGES
 REM ============================================================================
 ED.INFO.MSG:
-  ED.LAST.MSG$ = ED.MSG$ : IF ED.QUIET = 1 THEN RETURN
   ED.PS.ROW = SCREEN.ROWS - 1 : ED.PS.COL = 0 : ED.PS.WIDTH = SCREEN.COLS
-  ED.PS$ = " " + ED.MSG$ : ED.PS.ATTR = THEME.CLR(THEME.TITLE) : GOSUB ED.PUT.FIELD
+  ED.PS$ = " " + ED.MSG$ : ED.PS.ATTR = THEME.CLR(THEME.BAR) : GOSUB ED.PUT.FIELD
   RETURN
 
 ED.ERR.MSG:
-  ED.LAST.MSG$ = ED.MSG$ : IF ED.QUIET = 1 THEN RETURN
   ED.PS.ROW = SCREEN.ROWS - 1 : ED.PS.COL = 0 : ED.PS.WIDTH = SCREEN.COLS
   ED.PS$ = " " + ED.MSG$ : ED.PS.ATTR = THEME.CLR(THEME.WARN) : GOSUB ED.PUT.FIELD
   RETURN
+
+
+
+
 
 
 REM ============================================================================
 REM RENDERING
 REM ============================================================================
 ED.REFRESH.FULL:
-  IF ED.QUIET = 1 THEN RETURN
   GOSUB ED.ENSURE.VISIBLE : GOSUB ED.RENDER.ALL
   RETURN
 ED.REFRESH.INTRA:
-  IF ED.QUIET = 1 THEN RETURN
   GOSUB ED.ENSURE.VISIBLE
   IF ED.SCROLLED = 1 THEN GOSUB ED.DO.SCROLL : RETURN
   ED.SCREEN.ROW = ED.CUR.ROW - ED.TOP.LINE + 1 : ED.DOC.LINE = ED.CUR.ROW
@@ -730,7 +701,6 @@ ED.REFRESH.INTRA:
 REM Cheap cursor move: restore the old caret cell, invert the new one, repaint the status
 REM line -- about 2 cells, not a screen. Only an actual scroll falls back to a full repaint.
 ED.CARET.REFRESH:
-  IF ED.QUIET = 1 THEN RETURN
   GOSUB ED.UNCARET : GOSUB ED.ENSURE.VISIBLE
   IF ED.SCROLLED = 1 THEN GOSUB ED.DO.SCROLL : RETURN
   GOSUB ED.PLACE.CARET : GOSUB ED.RENDER.STATUS
@@ -790,6 +760,10 @@ ED.RENDER.ALL:
   NEXT ED.SCREEN.ROW
   GOSUB ED.RENDER.STATUS : GOSUB ED.PLACE.CARET
   RETURN
+
+
+
+
 
 REM Rows render through ONE inline-assembly block: VERA setup, the cell loop, teardown.
 REM
@@ -945,7 +919,7 @@ ED.UNCARET:
 
 
 REM ---- menu bar (layer 1, screen row 0). Attr = bg*16+fg. ----
-REM MENUBAR.INC.BL draws the titles; the editor's own two things are the full width band
+REM MENU.DRAWBAR draws the titles; the editor's own two things are the full width band
 REM and the document name at the right.
 REM
 REM DRAWN ONLY WHEN IT WOULD COME OUT DIFFERENT -- the body blanks the whole row and draws
@@ -955,26 +929,26 @@ REM because a string built per keystroke is an allocation per keystroke.
 ED.RENDER.MENUBAR:
   IF ED.MB.FORCE = 1 THEN GOTO ED.MB.DRAW
   IF ED.DOC.DIRTY <> ED.MB.D THEN GOTO ED.MB.DRAW
-  IF MENU.ACTIVE <> ED.MB.M THEN GOTO ED.MB.DRAW
   RETURN
 ED.MB.DRAW:
-  ED.MB.FORCE = 0 : ED.MB.D = ED.DOC.DIRTY : ED.MB.M = MENU.ACTIVE
+  ED.MB.FORCE = 0 : ED.MB.D = ED.DOC.DIRTY
   ED.PS.ROW = 0 : ED.PS.COL = 0 : ED.PS.WIDTH = SCREEN.COLS
-  ED.PS$ = "" : ED.PS.ATTR = THEME.CLR(THEME.TITLE) : GOSUB ED.PUT.FIELD
-  GOSUB ED.MENU.BAR.ITEMS : GOSUB MENUBAR.DRAW
-  IF MENU.ACTIVE >= 0 THEN MENUBAR.SEL = MENU.ACTIVE + 1 : GOSUB MENUBAR.MARK
+  ED.PS$ = "" : ED.PS.ATTR = THEME.CLR(THEME.BAR) : GOSUB ED.PUT.FIELD
+  GOSUB ED.MENU.DRAW.BAR
   ED.NAME$ = DOC.FILE.NAME$ : IF ED.DOC.DIRTY = 1 THEN ED.NAME$ = ED.NAME$ + " *"
   ED.NCOL = SCREEN.COLS - LEN(ED.NAME$) - 1
-  IF ED.NCOL > 1 THEN ED.PS.ROW = 0 : ED.PS.COL = ED.NCOL - 1 : ED.PS.WIDTH = LEN(ED.NAME$) : ED.PS$ = ED.NAME$ : ED.PS.ATTR = THEME.CLR(THEME.TITLE) : GOSUB ED.PUT.FIELD
+  IF ED.NCOL > 1 THEN ED.PS.ROW = 0 : ED.PS.COL = ED.NCOL - 1 : ED.PS.WIDTH = LEN(ED.NAME$) : ED.PS$ = ED.NAME$ : ED.PS.ATTR = (THEME.CLR(THEME.BAR) AND 240) + (THEME.CLR(THEME.TITLE) AND 15) : GOSUB ED.PUT.FIELD
   RETURN
 
 
 ED.RENDER.STATUS:
   ED.MARK$ = "   " : IF ED.DOC.DIRTY   = 1 THEN ED.MARK$ = " * "
+  REM The arena ran out and lines past that point were stored empty. See DOC.ALLOC.
+  IF DOC.FULL <> 0 THEN ED.MARK$ = " DOCUMENT FULL "
   ED.MODE$ = "INS" : IF ED.INSERT.MODE = 0 THEN ED.MODE$ = "OVR"
   ED.BAR$ = ED.MARK$ + "L" + MID$(STR$(ED.CUR.ROW + 1), 2) + " C" + MID$(STR$(ED.CUR.COL + 1), 2) + "  " + ED.MODE$ + "  LINES=" + MID$(STR$(LINE.COUNT), 2) + "   ESC=MENU (F/S/H)  F2=SAVE  F3=FIND"
   ED.PS.ROW = SCREEN.ROWS - 1 : ED.PS.COL = 0 : ED.PS.WIDTH = SCREEN.COLS
-  ED.PS$ = ED.BAR$ : ED.PS.ATTR = THEME.CLR(THEME.TITLE) : GOSUB ED.PUT.FIELD
+  ED.PS$ = ED.BAR$ : ED.PS.ATTR = THEME.CLR(THEME.BAR) : GOSUB ED.PUT.FIELD
   RETURN
 
 REM ---- write ED.PS$ into the VERA text map at 0-based (ED.PS.ROW, ED.PS.COL), attribute
@@ -1027,387 +1001,6 @@ ED.PUT.FIELD:
   GP.ENDASM
   #REM 0
   RETURN
-
-
-REM ============================================================================
-
-
-REM ============================================================================
-REM HEADLESS SELF-CHECK (DEBUG.MODE=1): drive menu dispatch + commands.
-REM Guarded by ED.RELEASE -- see the note at the call site.
-#IFNDEF ED.RELEASE
-REM ============================================================================
-ED.SELFCHECK:
-  ED.QUIET = 1
-  ED.SIM.MODE = 1
-  ED.GOFF = ED.GUT.W * 2 : REM every document cell sits this far right of the map row
-#ENDIF
-REM ---- OPTIONAL: goto, find, new/discard ----
-#IFNDEF ED.NOOPT
-  DOC.FILE.NAME$ = "TEST.MD" : GOSUB ED.OPEN.FILE
-
-  REM go to line 3 (row 2)
-  ED.SIM.INPUT$ = "3" : GOSUB ED.CMD.GOTO
-  PRINT "GOTO ROW=";ED.CUR.ROW;" COL=";ED.CUR.COL
-
-  REM find "bullet" (row 2), then find-next (row 3)
-  ED.SIM.INPUT$ = "bullet" : GOSUB ED.CMD.FIND
-  PRINT "FIND1 ROW=";ED.CUR.ROW;" COL=";ED.CUR.COL;" MSG=";ED.LAST.MSG$
-  GOSUB ED.FIND.NEXT
-  PRINT "FIND2 ROW=";ED.CUR.ROW;" COL=";ED.CUR.COL
-
-  REM find "markdown" -- must wrap around to row 0, case-insensitive
-  ED.SIM.INPUT$ = "markdown" : GOSUB ED.CMD.FIND
-  PRINT "FINDM ROW=";ED.CUR.ROW;" COL=";ED.CUR.COL
-
-  REM a miss
-  ED.SIM.INPUT$ = "zzq" : GOSUB ED.CMD.FIND
-  PRINT "FINDZ MSG=";ED.LAST.MSG$
-
-  REM discard-confirm: decline blocks New, accept resets
-  ED.DOC.DIRTY = 1 : ED.SIM.YN = 0
-  GOSUB ED.CMD.NEW
-  PRINT "DECLINE COUNT=";LINE.COUNT;" DIRTY=";ED.DOC.DIRTY
-  ED.SIM.YN = -1
-  GOSUB ED.CMD.NEW
-  PRINT "ACCEPT COUNT=";LINE.COUNT;" NAME=";DOC.FILE.NAME$
-#ENDIF
-
-#IFNDEF ED.NOCORE
-  REM ---- verify chrome (char+attr) + text render + the O(1) caret ----
-  ED.QUIET = 0
-  PRINT "DIM ";SCREEN.COLS;"x";SCREEN.ROWS
-  REM NO THEME COLOUR MAY USE INDEX 0, in either nibble: the chrome is on a layer with the
-  REM document behind it, and 0 is transparent whichever nibble it sits in. A foreground of
-  REM 0 let the document show through the letters of the active title.
-  ED.Z = 0
-  FOR ED.QR = 0 TO THEME.SLOTS - 1
-    IF MOD(THEME.CLR(ED.QR), 16) = 0 OR INT(THEME.CLR(ED.QR) / 16) = 0 THEN ED.Z = ED.Z + 1
-  NEXT ED.QR
-  PRINT "THEMEZERO";ED.Z
-  REM ---- what ED.ALTKEYS found. ALT+letter is the one path no headless test can PRESS,
-  REM ---- but everything it depends on is readable: which tables exist, which two were
-  REM ---- picked, and how many keys got rewritten.
-  PRINT "ALTKEYS N=";ED.NALT;" PLAIN=";ED.TPLAIN;" ALT=";ED.TALT
-  ED.IDS$ = ""
-  BANK 0
-  FOR ED.TI = 0 TO 10
-    ED.IDS$ = ED.IDS$ + STR$(PEEK(40960 + 128 * ED.TI))
-  NEXT ED.TI
-  PRINT "TABLE IDS";ED.IDS$
-#ENDIF
-
-REM ---- OPTIONAL: menu bar, dropdown, render, gutter, caret ----
-#IFNDEF ED.NOOPT
-  ED.QUIET = 0 : REM set by the CORE half too, and this half can run without it
-  MENU.ACTIVE = 0 - 1 : GOSUB ED.RENDER.MENUBAR
-  PRINT "MB CH=";VPEEK(1, 45058);" AT=";VPEEK(1, 45059)
-  MENU.ACTIVE = 0 : MENU.SEL = 0 : GOSUB ED.DRAW.DROPDOWN
-  PRINT "DD CH=";VPEEK(1, 45572);" AT=";VPEEK(1, 45573) : REM row 2 now: the frame took row 1
-  REM DROPDOWN GEOMETRY, and ONE SAMPLED CELL IS NOT A TEST OF IT: the panel once shipped with
-  REM the wrong height and rows missing while the line above stayed green. So walk the whole
-  REM panel, reading each item's first LETTER at column ED.DD.COL + 1. File is New Open Save
-  REM "Save As" Exit, so rows 1..7 must read 192 78 79 83 83 69 192.
-  ED.DDS$ = ""
-  FOR ED.QR = 1 TO MENU.ITEMS(0) + 2
-    ED.DDS$ = ED.DDS$ + STR$(VPEEK(1, 45056 + ED.QR * 256 + (ED.DD.COL + 1) * 2))
-  NEXT ED.QR
-  PRINT "DDROWS";ED.DDS$
-  REM THE ACCELERATOR TINT, WHICH NO CHARACTER READ CAN SEE -- it is an ATTRIBUTE. Four cells
-  REM say all of it. Row 1 is New AND the highlighted row, which MENUVERT.ROW leaves alone; row
-  REM 4 is "Save As...", hotkey A, so its S must stay plain and the A of "As" at +6 be lit.
-  ED.DDT$ = ""
-  ED.DDT$ = ED.DDT$ + STR$(VPEEK(1, 45056 + 2 * 256 + (ED.DD.COL + 1) * 2 + 1))
-  ED.DDT$ = ED.DDT$ + STR$(VPEEK(1, 45056 + 3 * 256 + (ED.DD.COL + 1) * 2 + 1))
-  ED.DDT$ = ED.DDT$ + STR$(VPEEK(1, 45056 + 5 * 256 + (ED.DD.COL + 1) * 2 + 1))
-  ED.DDT$ = ED.DDT$ + STR$(VPEEK(1, 45056 + 5 * 256 + (ED.DD.COL + 2) * 2 + 1))
-  ED.DDT$ = ED.DDT$ + STR$(VPEEK(1, 45056 + 5 * 256 + (ED.DD.COL + 6) * 2 + 1))
-  PRINT "DDTINT";ED.DDT$;" HOT=";MENUVERT.HOTATTR;" PLAIN=";MENUVERT.ATTR
-  PRINT "DDTINT W= HI HOT PL PL HOT"
-  REM WALKING THE BAR MUST TAKE THE OLD PANEL DOWN, and once it did not: erasing repainted
-  REM document rows, and those had moved to layer 0, so File, Search and Help stacked up on
-  REM screen together. A cell inside File's panel, after stepping right: 32 and 0.
-  ED.EX = ED.DD.BX + 1
-  GOSUB ED.MENU.RIGHT
-  PRINT "DDGONE";VPEEK(1, 45824 + ED.EX * 2);VPEEK(1, 45825 + ED.EX * 2)
-  GOSUB ED.CLEAR.OVERLAY
-  ED.MSG$ = "HELLO" : GOSUB ED.INFO.MSG
-  ED.SR = SCREEN.ROWS - 1
-  PRINT "MSG CH=";VPEEK(1, 45056 + ED.SR * 256 + 2);" AT=";VPEEK(1, 45056 + ED.SR * 256 + 3)
-  REM REAL repaint path: open a file, drop the caret, sample clean cells. THE DOCUMENT IS
-  REM LAYER 0 -- VPEEK bank 0, and the map starts at VRAM 0, so there is no 45056 here.
-  REM Every text cell must be char + ED.ATTR.TEXT, on content rows and blank rows alike.
-  DOC.FILE.NAME$ = "TEST.MD" : GOSUB ED.OPEN.FILE
-  GOSUB ED.UNCARET
-  PRINT "TR CH=";VPEEK(0, 256 + ED.GOFF);" AT=";VPEEK(0, 257 + ED.GOFF)
-  REM ---- the gutter. Screen row 1 is document line 1, right aligned in ED.GUT.W - 1
-  REM ---- columns with a blank separator, all of it in the DIMMED attribute. Every cell
-  REM ---- is read, not one sampled: a gutter with a digit missing looks fine in a sample.
-  PRINT "GUT";VPEEK(0, 256);VPEEK(0, 258);VPEEK(0, 260);VPEEK(0, 262);VPEEK(0, 264);VPEEK(0, 266);" (want 32 32 32 49 32 32)"
-  PRINT "A10 AT=";VPEEK(0, 10 * 256 + 41 + ED.GOFF)
-  REM ...and layer 1 over the document must be TRANSPARENT, or none of it would show: 32/0.
-  PRINT "A20 AT=";VPEEK(0, 20 * 256 + 61 + ED.GOFF);" OVL=";VPEEK(1, 47696);VPEEK(1, 47697)
-  REM caret place/restore (the O(1) cursor-move primitive)
-  ED.CUR.ROW = 0 : ED.CUR.COL = 0 : ED.TOP.LINE = 0 : ED.LEFT.COL = 0
-  GOSUB ED.PLACE.CARET : PRINT "CARET AT=";VPEEK(0, 257 + ED.GOFF)
-  GOSUB ED.UNCARET : PRINT "UNCARET AT=";VPEEK(0, 257 + ED.GOFF)
-#ENDIF
-
-#IFNDEF ED.NOCORE
-  REM The bar is redrawn HERE because the section that used to draw it before these
-  REM assertions is in the optional half now, and the KERNAL PRINTs above scroll over
-  REM layer 1 -- so without this, HWD MB reads a letter out of the test output.
-  ED.MB.FORCE = 1 : MENU.ACTIVE = 0 - 1 : GOSUB ED.RENDER.MENUBAR
-  REM ---- hardware VSCROLL: register writes + map-offset render + rewind bound ----
-  PRINT "MAPH=";ED.MAP.H;" MAXTOP=";ED.MAP.MAXTOP;" HWOK=";ED.HW.OK
-  ED.TOP.LINE = 1 : ED.LEFT.COL = 0 : ED.CUR.ROW = 1 : ED.CUR.COL = 0
-  ED.MAP.TOP = 0 : GOSUB ED.SET.VSCROLL
-  GOSUB ED.HW.SCROLL.DOWN
-  REM after +1: L0 VSCROLL = 8, MAP.TOP = 1 -- and THE BAR HAS NOT MOVED. That is the whole
-  REM point of the split, so it is asserted at the one address it must always be: layer 1,
-  REM screen row 0, where 'F' is 70. L1's own VSCROLL must read 0 forever.
-  PRINT "HWD TOP=";ED.MAP.TOP;" VSL=";PEEK(40754);" VSH=";PEEK(40755)
-  PRINT "HWD MB=";VPEEK(1, 45058);" L1VS=";PEEK(40761)
-  GOSUB ED.HW.SCROLL.UP
-  PRINT "HWU TOP=";ED.MAP.TOP;" VSL=";PEEK(40754)
-  REM at the bottom bound a +1 scroll rewinds to 0 (never crosses the map edge)
-  ED.MAP.TOP = ED.MAP.MAXTOP : GOSUB ED.SET.VSCROLL
-  GOSUB ED.HW.SCROLL.DOWN
-  PRINT "HWREW TOP=";ED.MAP.TOP;" VSL=";PEEK(40754)
-  ED.MAP.TOP = 0 : GOSUB ED.SET.VSCROLL
-
-  REM ---- end-to-end: build a tall doc, walk the cursor down through several
-  REM      hardware scrolls, then confirm the visible map window holds the right
-  REM      document lines at exactly the map rows VSCROLL is displaying. ----
-  ED.QUIET = 0
-  GOSUB ED.TESTDOC
-  FOR ED.T = 1 TO 35
-    GOSUB ED.MOVE.DOWN
-  NEXT ED.T
-  PRINT "WALK CUR=";ED.CUR.ROW;" TOP=";ED.TOP.LINE;" MAPTOP=";ED.MAP.TOP;" VSL=";PEEK(40754)
-  ED.MR = 1 + ED.MAP.TOP
-  PRINT "WTOP DOC=";ED.TOP.LINE;" MAPCH=";VPEEK(0, ED.MR * 256 + ED.GOFF);VPEEK(0, ED.MR * 256 + 2 + ED.GOFF)
-  ED.MR = ED.TEXT.BOTTOM + ED.MAP.TOP
-  ED.BL = ED.TOP.LINE + ED.TEXT.BOTTOM - 1
-  PRINT "WBOT DOC=";ED.BL;" MAPCH=";VPEEK(0, ED.MR * 256 + ED.GOFF);VPEEK(0, ED.MR * 256 + 2 + ED.GOFF)
-  ED.MAP.TOP = 0 : GOSUB ED.SET.VSCROLL
-  ED.QUIET = 1 : MENU.ACTIVE = 0 - 1
-
-#ENDIF
-
-REM ---- OPTIONAL: key dispatch, the menu loop, the GUI dialogs ----
-#IFNDEF ED.NOOPT
-  GOSUB ED.TESTDOC : ED.QUIET = 1 : REM the fixture the CORE half also builds
-  REM ---- key dispatch: drive the REAL GP.SELECT table with real key codes ----
-  REM ED.QUIET is 1, so the model runs and the render does not -- the render is checked
-  REM above. 27 and 137 are left out: one blocks on GET, the other writes a file.
-  ED.CUR.ROW = 10 : ED.CUR.COL = 0 : ED.TOP.LINE = 0 : ED.LEFT.COL = 0
-  GOSUB ED.LOAD.LIVE
-  ED.KEY = 17 : GOSUB ED.DISPATCH.KEY
-  ED.KEY = 29 : GOSUB ED.DISPATCH.KEY
-  PRINT "KEY DOWN+RIGHT ROW=";ED.CUR.ROW;" COL=";ED.CUR.COL
-  ED.KEY = 145 : GOSUB ED.DISPATCH.KEY
-  ED.KEY = 157 : GOSUB ED.DISPATCH.KEY
-  PRINT "KEY UP+LEFT ROW=";ED.CUR.ROW;" COL=";ED.CUR.COL
-  ED.KEY = 4 : GOSUB ED.DISPATCH.KEY
-  PRINT "KEY END COL=";ED.CUR.COL;" LINE=";ED.CUR.LINE$
-  ED.KEY = 19 : GOSUB ED.DISPATCH.KEY
-  PRINT "KEY HOME COL=";ED.CUR.COL
-  ED.KEY = 148 : GOSUB ED.DISPATCH.KEY
-  PRINT "KEY INS MODE=";ED.INSERT.MODE
-  ED.KEY = 148 : GOSUB ED.DISPATCH.KEY
-  REM 65 is not a case: it reaches ED.DO.INSERT through GP.OTHER and the 32..126 range
-  ED.KEY = 65 : GOSUB ED.DISPATCH.KEY
-  PRINT "KEY OTHER-RANGE LINE=";ED.CUR.LINE$;" COL=";ED.CUR.COL
-  ED.KEY = 20 : GOSUB ED.DISPATCH.KEY
-  PRINT "KEY BACKSPACE LINE=";ED.CUR.LINE$;" COL=";ED.CUR.COL
-  REM 1 matches no case and falls outside both ranges: GP.OTHER must do nothing
-  ED.KEY = 1 : GOSUB ED.DISPATCH.KEY
-  PRINT "KEY UNBOUND ROW=";ED.CUR.ROW;" COL=";ED.CUR.COL;" LINE=";ED.CUR.LINE$
-
-  REM 400 selects back to back: GP.ENDSEL releases the selector's frame, so a case that
-  REM jumped out instead of falling through would leak one a pass and show up here.
-  FOR ED.T = 1 TO 200
-    ED.KEY = 17 : GOSUB ED.DISPATCH.KEY
-    ED.KEY = 145 : GOSUB ED.DISPATCH.KEY
-  NEXT ED.T
-  PRINT "KEY 400 SELECTS ROW=";ED.CUR.ROW;" COL=";ED.CUR.COL
-
-  REM ---- the MENU's loop, 600 opens through ED.MENU.OPEN, which re-enters MENUVERT.RUN once
-  REM ---- per keystroke handed back. 600 is chosen against the 4 KB stack: a leaked GOSUB and
-  REM ---- GP.DO is 17 bytes and would blow it after ~240, so a leak CANNOT reach the PRINT
-  REM ---- below. That is the point of the count -- what leaks is invisible on screen.
-  REM ---- Keys go in through kbdbuf_put. 27 cancels; 13 chooses Help/About, a real dispatch
-  REM ---- that goes nowhere near a file.
-  ED.QUIET = 1
-  FOR ED.QI = 1 TO 600
-    MENU.ACTIVE = 2 : MENU.SEL = 0
-    ED.QK = 27
-    IF ED.QI - INT(ED.QI / 2) * 2 = 0 THEN ED.QK = 13
-    POKE 1, 0 : GP.CALL ED.KBDBUF, ED.QK : POKE 1, 4
-    GOSUB ED.OPEN.MENUBAR
-  NEXT ED.QI
-  PRINT "MENU 600 OPENS MSG=";ED.LAST.MSG$
-
-  REM ---- a LETTER opens its menu, and since ISO mode killed ALT+letter it is the only way
-  REM ---- in. Open on File, press H, press RETURN: MENU.CHOICE.MENU must be 2. If the H is
-  REM ---- swallowed, RETURN chooses File's first item and this reads 0.
-  ED.DOC.DIRTY = 0 : MENU.ACTIVE = 0 : MENU.SEL = 0
-  ED.QK = 72 : POKE 1, 0 : GP.CALL ED.KBDBUF, ED.QK : POKE 1, 4
-  ED.QK = 13 : POKE 1, 0 : GP.CALL ED.KBDBUF, ED.QK : POKE 1, 4
-  GOSUB ED.OPEN.MENUBAR
-  PRINT "MENU LETTER H -> ";MENU.CHOICE.MENU;" (want 2)"
-
-  REM ============================================================================
-  REM ---- GUI.INC.BL, driven for real ----
-  REM
-  REM Nothing above this line touches a dialog: ED.PROMPT short-circuits on ED.SIM.MODE, which
-  REM is what makes the rest fast and what makes it blind to the library. So SIM goes OFF and
-  REM the keys go in through kbdbuf_put. Four things could be wrong here and none of them is a
-  REM compile error: a frame drawn from GP.BOX's own table, a box of letters; a box centred on
-  REM the SCREEN while we draw on a SCROLLED map; the covered cells not put back; a caret that
-  REM does not move.
-  ED.QUIET = 1 : ED.SIM.MODE = 0
-  REM LONG lines, deliberately: the centred box lands around column 32, and the "L0".."L39"
-  REM used above are three characters wide -- so it would cover blank document and a
-  REM restore that did nothing would score the same sum. Fill the width instead.
-  GOSUB DOC.INIT
-  FOR ED.T = 0 TO 39
-    LINE.TEXT$ = MID$(STR$(ED.T), 2) + " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    GOSUB DOC.PUSH.LINE
-  NEXT ED.T
-  ED.TOP.LINE = 0 : ED.LEFT.COL = 0 : ED.CUR.ROW = 0 : ED.CUR.COL = 0
-  ED.MAP.TOP = 0 : GOSUB ED.SET.VSCROLL
-  ED.QUIET = 0 : GOSUB ED.LOAD.LIVE : GOSUB ED.RENDER.ALL
-
-  REM ---- the frame. ED.PETFONT parked the six line glyphs at 192..197, which is what ED.GL.x
-  REM ---- names, so those are the tiles that must come back. Anything in 64..125 means GP.BOX
-  REM ---- drew one of its built-in styles, and those glyphs are letters here.
-  REM ---- READ THE MAP BEFORE PRINTING ANYTHING: PRINT goes through the KERNAL, which SCROLLS
-  REM ---- the same map every VPEEK addresses. Repaint, draw, read, close, then speak.
-  GOSUB ED.RENDER.ALL
-  GUI.TITLE$ = "" : GUI.MSG$ = "FRAME" : GUI.MSG2$ = ""
-  GUI.BODY.ROWS = 1 : GUI.BODY.WIDTH = 10
-  GOSUB GUI.OPEN
-  ED.DDS$ = ""
-  FOR ED.GX = 0 TO GUI.WIDTH - 1
-    ED.DDS$ = ED.DDS$ + STR$(VPEEK(1, 45056 + GUI.TOP * 256 + (GUI.LEFT + ED.GX) * 2))
-  NEXT ED.GX
-  ED.DDS2$ = ""
-  FOR ED.GR = 0 TO GUI.HEIGHT - 1
-    ED.DDS2$ = ED.DDS2$ + STR$(VPEEK(1, 45056 + (GUI.TOP + ED.GR) * 256 + GUI.LEFT * 2))
-  NEXT ED.GR
-  GOSUB GUI.CLOSE
-  PRINT "GUI BOX X=";GUI.LEFT;" Y=";GUI.TOP;" W=";GUI.WIDTH;" H=";GUI.HEIGHT;" STASH=";GUI.STASHED
-  PRINT "GUI TOPROW";ED.DDS$
-  PRINT "GUI TOPWANT 194 192 x14 195"
-  PRINT "GUI LEFTCOL";ED.DDS2$
-  PRINT "GUI LEFTWANT 194 193 x5 196"
-
-  REM ---- the restore. Sum the chars over the whole rectangle, open and close a second box of
-  REM ---- the same size, sum again -- one sampled cell is not a test of a panel. The repaint
-  REM ---- first is what makes it mean anything.
-  GOSUB ED.RENDER.ALL
-  REM A KNOWN BAND UNDER THE BOX. This summed whatever the KERNAL PRINTs had left on layer 1,
-  REM so its number moved with every extra printed line and "not 3584" could pass on a blank
-  REM rectangle. Now the content is put there on purpose.
-  ED.PS.ROW = GUI.TOP + 1 : ED.PS.COL = GUI.LEFT : ED.PS.WIDTH = GUI.WIDTH
-  ED.PS$ = "RESTOREME" : ED.PS.ATTR = ED.ATTR.TEXT : GOSUB ED.PUT.FIELD
-  GOSUB ED.GUI.SUM : ED.GWAS = ED.GSUM
-  GOSUB GUI.OPEN : GOSUB GUI.CLOSE
-  GOSUB ED.GUI.SUM : ED.GNOW = ED.GSUM
-  PRINT "GUI RESTORE WAS=";ED.GWAS;" NOW=";ED.GNOW;" (want equal, and not 3584)"
-
-  REM ---- the scrolled map. VSCROLL down four rows and the box must follow: the same
-  REM ---- centred row plus ED.MAP.TOP. Without GUI.ROW.OFFSET it comes back unchanged, and
-  REM ---- the dialog is four rows off the top of what the user can see.
-  ED.GBY = GUI.TOP
-  ED.MAP.TOP = 4 : GOSUB ED.SET.VSCROLL : GOSUB ED.RENDER.ALL
-  GOSUB GUI.OPEN : GOSUB GUI.CLOSE
-  PRINT "GUI SCROLLED Y=";GUI.TOP;" WAS=";ED.GBY;" MAPTOP=";ED.MAP.TOP;" (want WAS+4)"
-  ED.MAP.TOP = 0 : GOSUB ED.SET.VSCROLL : GOSUB ED.RENDER.ALL
-
-  REM ---- GUI.YN through the editor's own wrapper, which is what every call site uses.
-  ED.PROMPT.MSG$ = "Discard changes?"
-  ED.QK = 89 : GOSUB ED.PUSHKEY
-  GOSUB ED.PROMPT.YN
-  PRINT "GUI YN Y ->";ED.YN;" (want -1)"
-  ED.QK = 27 : GOSUB ED.PUSHKEY
-  GOSUB ED.PROMPT.YN
-  PRINT "GUI YN ESC ->";ED.YN;" (want 0)"
-
-  REM ---- GUI.TEXT, and with it the caret. Type A B C, LEFT, X: the X must land BETWEEN B and
-  REM ---- C. A swallowed arrow reads ABCX, one that left the field reads ABC with OK=0. The
-  REM ---- 130 is a PETSCII CONTROL code and LINEINPUT.TYPED must refuse it.
-  ED.PROMPT.MSG$ = "Open file: "
-  ED.QK = 65 : GOSUB ED.PUSHKEY
-  ED.QK = 130 : GOSUB ED.PUSHKEY
-  ED.QK = 66 : GOSUB ED.PUSHKEY
-  ED.QK = 67 : GOSUB ED.PUSHKEY
-  ED.QK = 157 : GOSUB ED.PUSHKEY
-  ED.QK = 88 : GOSUB ED.PUSHKEY
-  REM ---- Z then DEL: RUBOUT takes the character BEFORE the caret, so the pair cancels
-  REM ---- out and the answer is still ABXC. DELETE is otherwise never driven.
-  ED.QK = 90 : GOSUB ED.PUSHKEY
-  ED.QK = 20 : GOSUB ED.PUSHKEY
-  ED.QK = 13 : GOSUB ED.PUSHKEY
-  GOSUB ED.PROMPT
-  PRINT "GUI TEXT ->";ED.INPUT$;" OK=";ED.PROMPT.OK;" (want ABXC -1)"
-
-  REM ---- and ESC still throws the typing away rather than returning it
-  ED.QK = 90 : GOSUB ED.PUSHKEY
-  ED.QK = 27 : GOSUB ED.PUSHKEY
-  GOSUB ED.PROMPT
-  PRINT "GUI TEXT ESC ->";ED.INPUT$;"/ OK=";ED.PROMPT.OK;" (want / 0)"
-
-  REM ---- GUI.MENU, over the same MENUVERT.ITEM$ the bar uses. Row 1, down, RETURN: 2, 13.
-  MENUVERT.ITEM$(1) = " ONE" : MENUVERT.ITEM$(2) = " TWO"
-  GUI.COUNT = 2 : GUI.SEL = 1 : GUI.FLAGS = 0
-  GUI.TITLE$ = "PICK" : GUI.MSG$ = "" : GUI.MSG2$ = ""
-  ED.QK = 17 : GOSUB ED.PUSHKEY
-  ED.QK = 13 : GOSUB ED.PUSHKEY
-  GOSUB GUI.MENU
-  PRINT "GUI MENU SEL=";GUI.SEL;" KEY=";GUI.KEY;" (want 2 13)"
-  ED.SIM.MODE = 1
-
-#ENDIF
-#IFNDEF ED.RELEASE
-  PRINT "M4 OK"
-  RETURN
-
-REM ---- one key into the KERNAL's buffer, so a GET loop can be driven headlessly ----
-REM ---- fixture and helpers ----
-REM ED.TESTDOC is used by BOTH halves, so it sits outside the guards.
-ED.TESTDOC:
-  GOSUB DOC.INIT
-  FOR ED.T = 0 TO 39
-    LINE.TEXT$ = "L" + MID$(STR$(ED.T), 2) : GOSUB DOC.PUSH.LINE
-  NEXT ED.T
-  ED.TOP.LINE = 0 : ED.LEFT.COL = 0 : ED.CUR.ROW = 0 : ED.CUR.COL = 0
-  ED.MAP.TOP = 0 : GOSUB ED.SET.VSCROLL
-  GOSUB ED.LOAD.LIVE : GOSUB ED.RENDER.ALL
-  RETURN
-
-REM (no guard of their own: BASLOAD does not nest #IFNDEF, and these sit inside the
-REM  ED.RELEASE block. A core-only build carries them unused, which is ~220 bytes.)
-REM POKE 1 is the ROM/RAM bank byte: 0 pages the KERNAL in for the JSR, 4 puts BASIC back.
-ED.PUSHKEY:
-  POKE 1, 0 : GP.CALL ED.KBDBUF, ED.QK : POKE 1, 4
-  RETURN
-
-REM ---- add up every character cell the dialog box covers ----
-REM Chars only: a restore that put the text back in the wrong colour is a different bug.
-REM The rectangle is whatever the last GUI.OPEN worked out.
-ED.GUI.SUM:
-  ED.GSUM = 0
-  FOR ED.GR = 0 TO GUI.HEIGHT - 1
-    FOR ED.GX = 0 TO GUI.WIDTH - 1
-      ED.GSUM = ED.GSUM + VPEEK(1, 45056 + (GUI.TOP + ED.GR) * 256 + (GUI.LEFT + ED.GX) * 2)
-    NEXT ED.GX
-  NEXT ED.GR
-  RETURN
-
-#ENDIF
 
 REM --- this read / writes BANKS (line-pointer table + banked memory)
 #INCLUDE "ED-MENUS.BASL"

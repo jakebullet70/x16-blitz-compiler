@@ -53,7 +53,7 @@ GG.PROGRAM.SETTINGS:
     GG.RESULT$ = "No program. New Program first"
     RETURN
   GP.ENDIF
-  GOSUB GG.DIALOG.RESET.FIELDS
+  GOSUB GUI.DEFAULTS
   GUI.TITLE$ = " Program Settings "
   GUI.BTN.ONE$ = "&OK"
   GUI.BTN.TWO$ = "&Cancel"
@@ -106,7 +106,8 @@ GG.PROGRAM.SETTINGS:
   GG.C.BONLY = CHECK.CTRL
 
   GP.PRINTAT GUI.INNER.LEFT, GUI.INNER.TOP + 7, "Runtime", GUI.PANEL
-  MENUVERT.ITEM$(1) = " Embedded" : MENUVERT.ITEM$(2) = " Shared"
+  COMBO.ITEM$(1) = " Embedded"
+  COMBO.ITEM$(2) = " Shared"
   COMBO.X = GUI.INNER.LEFT + 8
   COMBO.Y = GUI.INNER.TOP + 7
   COMBO.W = 12

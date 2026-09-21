@@ -27,12 +27,10 @@
 ## **  drawing commands take them. For COLOR, which wants the halves separately,
 ## **  use THEME.SET.
 ## **
-## **  THIS IS THE LOW MEMORY FORM. Every entry point is a plain name, so a
-## **  caller reaches it with one GOSUB and nothing sits in between. Use it
-## **  when the module runs in low memory, which is the ordinary case.
-## **
-## **  The banked twin is THEME.BANK.INC.BL. Include one or the other,
-## **  never both. GPC-BASIC/BANKED-OR-NOT.md says how to choose.
+## **  TO RUN IT FROM A RAM BANK, put the #INCLUDE between GP.BANKED and
+## **  GP.ENDBANKED. A call from outside the region selects the region's bank
+## **  and RETURN puts the caller's back, so a caller is written the same
+## **  either way. GPC-BASIC/BANKED-OR-NOT.md has the rules.
 ## **
 ## ***********************************************************************
 #IFNDEF THEME.DEFS
@@ -45,6 +43,9 @@
 ## as the panel reversed, so a focused button came out identical to a plain one.
 ## FOCUS is yellow-backed in every theme for that reason: whatever a palette
 ## does, nothing else in it is yellow.
+##
+## BAR is a menu bar or status line: a background of its own, so the band
+## stands off the page. BORDER's colour marks a hot key on it.
 
 #DEFINE THEME.PAGE 0
 #DEFINE THEME.TEXT 1
@@ -54,7 +55,8 @@
 #DEFINE THEME.DIMMED 5
 #DEFINE THEME.WARN 6
 #DEFINE THEME.FOCUS 7
-#DEFINE THEME.SLOTS 8
+#DEFINE THEME.BAR 8
+#DEFINE THEME.SLOTS 9
 
 ## How many themes THEME.NEXT cycles through.
 #DEFINE THEME.COUNT 5
@@ -89,6 +91,7 @@ THEME.SELECT.X16:
     THEME.CLR(THEME.DIMMED) = 6 * 16 + 12
     THEME.CLR(THEME.WARN)   = 6 * 16 + 13
     THEME.CLR(THEME.FOCUS)  = 7 * 16 + 6
+    THEME.CLR(THEME.BAR)    = 12 * 16 + 1
     RETURN
 
 THEME.SELECT.DARK:
@@ -100,6 +103,7 @@ THEME.SELECT.DARK:
     THEME.CLR(THEME.DIMMED) = 0 * 16 + 12
     THEME.CLR(THEME.WARN)   = 0 * 16 + 8
     THEME.CLR(THEME.FOCUS)  = 7 * 16 + 0
+    THEME.CLR(THEME.BAR)    = 6 * 16 + 1
     RETURN
 
 ## A white page. DIMMED is mid grey rather than dark grey so that reversing it
@@ -113,6 +117,7 @@ THEME.SELECT.LIGHT:
     THEME.CLR(THEME.DIMMED) = 1 * 16 + 12
     THEME.CLR(THEME.WARN)   = 1 * 16 + 2
     THEME.CLR(THEME.FOCUS)  = 7 * 16 + 0
+    THEME.CLR(THEME.BAR)    = 15 * 16 + 0
     RETURN
 
 ## From the XFMGR file manager's theme module. DIMMED and WARN are not in it.
@@ -129,21 +134,25 @@ THEME.SELECT.GRAY:
     THEME.CLR(THEME.DIMMED) = 11 * 16 + 12
     THEME.CLR(THEME.WARN)   = 11 * 16 + 10
     THEME.CLR(THEME.FOCUS)  = 7 * 16 + 11
+    THEME.CLR(THEME.BAR)    = 6 * 16 + 1
     RETURN
 
 ## THEME.FIRST is set only when THEME.SELECT created the array, the one case with
 ## nothing to keep.
-THEME.SELECT.CUSTOM:  IF THEME.FIRST = 0 THEN RETURN
+THEME.SELECT.CUSTOM:  
+    IF THEME.FIRST = 0 THEN RETURN
     GOTO THEME.SELECT.X16
 
 ## THEME.NEXT -- the following theme, selected. It GOTOs THEME.SELECT rather than
 ## GOSUBing it, so THEME.SELECT's RETURN is the one the caller gets.
-THEME.NEXT:  THEME.ID = THEME.ID + 1 : IF THEME.ID >= THEME.COUNT THEN THEME.ID = 0
+THEME.NEXT:  
+    THEME.ID = THEME.ID + 1 : IF THEME.ID >= THEME.COUNT THEN THEME.ID = 0
     GOTO THEME.SELECT
 
 ## THEME.RESET -- the selected theme's shipped values, throwing away any changes.
 ## CUSTOM has none of its own, so it resets to X16.
-THEME.RESET:  IF THEME.ID = 4 THEN GOTO THEME.SELECT.X16
+THEME.RESET:  
+    IF THEME.ID = 4 THEN GOTO THEME.SELECT.X16
     GOTO THEME.SELECT
 
 ## THEME.SET -- make THEME.ATTR the colour PRINT uses.
@@ -153,14 +162,18 @@ THEME.RESET:  IF THEME.ID = 4 THEN GOTO THEME.SELECT.X16
 ## WARNING: AND 15 is safe only because a packed attribute is 0..255. AND is 16-bit
 ## signed and raises OUT OF RANGE above 32767.
 
-THEME.SET:  COLOR THEME.ATTR AND 15, INT(THEME.ATTR / 16) : RETURN
+THEME.SET:  
+    COLOR THEME.ATTR AND 15, INT(THEME.ATTR / 16)
+    RETURN
 
 ## THEME.HI -- the inverse of a packed attribute, for pre-drawing a row that should
 ## already look selected.
 ##
 ##   in   THEME.ATTR   packed attribute      out  THEME.INV
 
-THEME.HI:  THEME.INV = (THEME.ATTR AND 15) * 16 + INT(THEME.ATTR / 16) : RETURN
+THEME.HI:  
+    THEME.INV = (THEME.ATTR AND 15) * 16 + INT(THEME.ATTR / 16) 
+    RETURN
 
 THEME.SKIP:
 #ENDIF

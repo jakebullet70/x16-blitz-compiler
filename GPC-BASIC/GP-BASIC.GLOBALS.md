@@ -26,10 +26,12 @@ The convention is one dotted prefix per module, and nothing writes outside its o
 | `APPSYS.` | `APPSYS.INC.BL` | screen save/restore, panels to disk |
 | `LINEINPUT.` | `LINEINPUT.INC.BL` | entry fields |
 | `KB.` | `KB.INC.BL` | the keyboard drain |
-| `MENUVERT.` | `MENUVERT.INC.BL` | vertical menus |
-| `MENUBAR.` | `MENUBAR.INC.BL` | the other axis — a horizontal menu bar |
-| `GUI.` | `GUI.INC.BL` | the dialogs, the box they sit in, and the form that runs them |
-| `GUI.LISTBOX.` | `GUI2.INC.BL` | the listbox dialog, kept apart from the rest of `GUI.` |
+| `MENU.` | `MENU.INC.BL` | menus: the row store, the popup and the bar. `MENUPULL.INC.BL`'s variables too |
+| `MENUTO.` | `MENU.INC.BL` `MENUPULL.INC.BL` | the runners, called with `GP.FN` |
+| `MENUPULL.` | `MENUPULL.INC.BL` | a dropdown under a bar item: labels and one constant |
+| `GUI.` | `GUI.INC.BL` | the box the dialogs sit in, and the form and controls inside it |
+| `GUI.LISTBOX.` | `GUI-DIALOGS.INC.BL` | the listbox dialog’s answer, kept apart from the rest of `GUI.` |
+| `DLG.` | `GUI-DIALOGS.INC.BL` | the dialog verbs: their arguments, and their internals |
 | `STASH.` | `STASH.INC.BL` | a text rectangle into a RAM bank, and back |
 | `STASH.FILE.` | `STASHFILE.INC.BL` | the same rectangle through a file, kept apart from the rest of `STASH.` |
 | `SORT.` | `SORT.INC.BL` | shell sort a string array in place |
@@ -216,8 +218,8 @@ Needs a `#SYMFILE` — `FILE.TOPET` is a `GP.ASM` blob.
 **This module is the missing `DS` and `DS$`.** `FILE.ERR` is `DS` and `FILE.MSG$` is `DS$`. `ST` is
 *not* a disk status — it is the KERNAL's serial bus status and cannot report `FILE NOT FOUND`.
 
-`FILE.ROWS` is both an input and an output, the way `MENUVERT.SEL` is. `FILE.LINE$()` is the caller's
-`DIM`, like `MENUVERT.ITEM$` and unlike `THEME.CLR`.
+`FILE.ROWS` is both an input and an output, the way `KV.SLOT` is. `FILE.LINE$()` is the caller's
+`DIM`, like `GUI.LIST.ITEM$` and unlike `THEME.CLR`.
 
 ### `FILEDIR.INC.BL` — a directory, into a bank or into low RAM
 
@@ -288,48 +290,39 @@ Plain BASL: no `GP.*` keyword and no `GP.ASM`, so it needs neither `GPB.INC.BL` 
 `KV.SLOT` is both an input and an output, the way `FILE.ROWS` is. `KV.AT` writes `KV.KEY$`, so a loop
 over the slots keeps its own key in a variable of its own.
 
-### `MENUVERT.INC.BL` — a vertical menu
+### `MENU.INC.BL` — menus built a row at a time
 
 Routines, arguments and examples: §4.6.
 
 | | |
 |---|---|
-| in | `MENUVERT.X` `MENUVERT.Y` — top left of the first row<br>`MENUVERT.WIDTH` — cells wide, which is the width of the highlight<br>`MENUVERT.COUNT` — how many rows<br>`MENUVERT.ITEM$()` — the rows, 1..COUNT; **the caller owns the `DIM`**<br>`MENUVERT.ATTR` — packed attribute<br>`MENUVERT.HIATTR` — the highlighted row; 0 inverts `MENUVERT.ATTR`<br>`MENUVERT.HOT$` — one hotkey character a row<br>`MENUVERT.HOTATTR` — tint for the hotkey letter; 0 is off<br>`MENUVERT.FLAGS` — added together<br>`MENUVERT.SEL` — the row to start on |
-| out | `MENUVERT.SEL` — 1..COUNT, or 0 if cancelled<br>`MENUVERT.KEY` — the key that ended it |
-| internal | `MENUVERT.SCAN` `MENUVERT.EACH` `MENUVERT.DONE` `MENUVERT.CODE` `MENUVERT.INCHAR$` `MENUVERT.PREVSEL` `MENUVERT.HIGHLIGHT` `MENUVERT.DRAWROW` `MENUVERT.DRAWATTR` `MENUVERT.DRAWTEXT$` `MENUVERT.DRAWY` `MENUVERT.HOTCODE` `MENUVERT.HOTLAST` `MENUVERT.WANTCODE` `MENUVERT.HOTAT` `MENUVERT.HOTWANT` `MENUVERT.HOTHERE` `MENUVERT.HOTSCAN` `MENUVERT.PADNOW` `MENUVERT.PADNEW` `MENUVERT.PADHELD` `MENUVERT.PADRAW` |
-| constants | `MENUVERT.MUSTSEL` `MENUVERT.KEEPMARK` `MENUVERT.NOWRAP` `MENUVERT.GAMEPAD` `MENUVERT.UP` `MENUVERT.DOWN` `MENUVERT.ENTER` `MENUVERT.ESCAPE` `MENUVERT.STOP` `MENUVERT.SPACE` `MENUVERT.PORT` `MENUVERT.PAD.UP` `MENUVERT.PAD.DOWN` `MENUVERT.PAD.B` `MENUVERT.PAD.START` |
+| verbs | `MENU.BEGIN` `MENU.ITEM` `MENU.ITEMX` `MENU.SELECTED` `MENU.DRAWBAR`, called with `GP.SUB`<br>`MENUTO.VERT` `MENUTO.BAR`, called with `GP.FN` |
+| in | `MENU.ATTR` — the rows, packed attribute<br>`MENU.HIATTR` — the highlighted row; 0 inverts `MENU.ATTR`<br>`MENU.HOTATTR` — the hot key letter; 0 leaves it untinted<br>`MENU.DISATTR` — a disabled row; 0 is `MENU.ATTR`<br>`MENU.SEPATTR` — separators and the frame; 0 is `MENU.ATTR`<br>`MENU.SEPCHR` — the separator glyph; 0 is `MENU.LINE`<br>`MENU.FLAGS` — the popup's flags<br>`MENU.BARFLAGS` — the bar's flags<br>`MENU.GAP` — cells between bar items<br>`MENU.HINTX` `MENU.HINTY` `MENU.HINTW` `MENU.HINTATTR` — the hint field; `MENU.HINTW` 0 is off<br>`MENU.MARKED` — the bar item `MENU.DRAWBAR` lights |
+| out | `MENU.EXITKEY` — the key that ended the run<br>`MENU.BARNUM` — the bar's row count<br>`MENU.SELX` `MENU.SELW` — the chosen bar item's column and width<br>`MENU.MARKED` — the bar item left lit<br>`MENU.OK` — 0 if bank `MENU.TEXTBANK` was already claimed |
+| formals | `MENU.SLOT` `MENU.SEL` `MENU.ROWTEXT$` `MENU.ROWHINT$` `MENU.ROWON` `MENU.RUNROW` `MENU.RUNCOL` `MENU.STYLE` `MENU.CHOSEN` |
+| arrays | `MENU.FLAG$()` `MENU.HOTKEY$()` `MENU.HOTCOL$()` — `DIM`med by the module on the first `MENU.BEGIN` |
+| banked groups | `MENU.TEXTS` `MENU.HINTS`, in `MENU.INC.BANKED.BL` |
+| internal | `MENU.ATCOL` `MENU.ATROW` `MENU.BARX` `MENU.BARY` `MENU.BASE` `MENU.BOXH` `MENU.BOXW` `MENU.CAP` `MENU.CODE` `MENU.COUNT` `MENU.CUR` `MENU.DONE` `MENU.DRAWN` `MENU.DRAWX` `MENU.DRAWY` `MENU.EACH` `MENU.EXITBIT` `MENU.FRAME` `MENU.GLYPH` `MENU.HAVE` `MENU.HILITE` `MENU.HINTAT` `MENU.HOTAT` `MENU.HOTCH$` `MENU.HOTHIT` `MENU.INKEY$` `MENU.LEFTW` `MENU.MOVE` `MENU.PADHELD` `MENU.PADNEW` `MENU.PADNOW` `MENU.PADRAW` `MENU.PAINT` `MENU.READY` `MENU.ROW` `MENU.ROWFLAG$` `MENU.ROWIS$` `MENU.ROWW` `MENU.RUNBASE` `MENU.RUNFLAGS` `MENU.RUNSLOT` `MENU.SCAN` `MENU.SHOW$` `MENU.SKIPS` `MENU.SPAN` `MENU.STEP` `MENU.TEXTW` `MENU.TINTAT` `MENU.USE` `MENU.WANT` `MENU.WAS` `MENU.WIDE` |
+| constants | `MENU.TEXTBANK` `MENU.BAR` `MENU.POPUP` `MENU.BAR.MAX` `MENU.POPUP.MAX` `MENU.ON` `MENU.OFF`<br>`MENU.SOLID` `MENU.THIN` `MENU.ROUND` `MENU.THICK` `MENU.NOBOX`<br>`MENU.MUSTSEL` `MENU.KEEPMARK` `MENU.NOWRAP` `MENU.GAMEPAD` `MENU.DOWNEXIT` `MENU.UPEXIT` `MENU.KEYEXIT` `MENU.HINTMID`<br>`MENU.DOWN` `MENU.UP` `MENU.LEFT` `MENU.RIGHT` `MENU.ENTER` `MENU.ESC` `MENU.STOP` `MENU.LINE`<br>`MENU.PORT` `MENU.PAD.UP` `MENU.PAD.DOWN` `MENU.PAD.LEFT` `MENU.PAD.RIGHT` `MENU.PAD.B` `MENU.PAD.START` |
 
-`MENUVERT.SEL` is both an input and an output: the row to start on going in, and the row
-chosen coming out, so a menu reopened without clearing it reopens where it was. That is usually what
-you want; set it to 0 when it is not.
+The formals are the verbs' arguments. `GP.DEFPROC` formals are ordinary shared variables (§3.11), so a formal holds the last value passed until the next call.
 
-`MENUVERT.DRAWROW`, `MENUVERT.DRAWATTR` and `MENUVERT.DRAWTEXT$` are listed internal but are the
-documented arguments to `MENUVERT.ROW`, which is public: they are internal to `MENUVERT.RUN`, not to
-you. `MENUVERT.HOTFIND` reads the first two and answers in `MENUVERT.HOTAT`.
+`GUI.INC.BL` sets `MENU.RUNSLOT`, reads `MENU.READY`, `MENU.COUNT` and `MENU.WIDE`, and calls
+`MENU.MEASURE`. A program of your own should not.
 
-### `MENUBAR.INC.BL` — a horizontal menu
+### `MENUPULL.INC.BL` — a dropdown under a bar item
 
-Routines, arguments and examples: §4.9.
+Routines, arguments and examples: §4.9. Its variables use the `MENU.` prefix; `MENUPULL.` is its
+labels and one constant.
 
 | | |
 |---|---|
-| in | `MENUBAR.X` `MENUBAR.Y` — where the bar starts<br>`MENUBAR.GAP` — cells BETWEEN items. 0 is the default, because the air belongs in the item text<br>`MENUBAR.FLAGS` — added together<br>`MENUBAR.SEL` — the item to start on; 0 starts at 1<br>**and `MENUVERT.COUNT`, `MENUVERT.ITEM$()`, `MENUVERT.ATTR`, `MENUVERT.HIATTR`, `MENUVERT.HOT$`, `MENUVERT.HOTATTR`** |
-| out | `MENUBAR.SEL` — 1..COUNT, or 0 if cancelled<br>`MENUBAR.KEY` — 13 chose, 27 cancelled, 17 or 145 on a cross-axis exit, or the hotkey itself<br>`MENUBAR.SELX` `MENUBAR.SELW` — the column the chosen item starts at and how wide it is, so a caller can drop a panel under it<br>`MENUBAR.AT` `MENUBAR.WIDE` — the same two for whichever item `MENUBAR.FIND` named, from `MENUBAR.WHERE` |
-| internal | `MENUBAR.CI` `MENUBAR.CODE` `MENUBAR.DRAWN` `MENUBAR.EACH` `MENUBAR.FIND` `MENUBAR.HC` `MENUBAR.HIT` `MENUBAR.HK` `MENUBAR.IN$` `MENUBAR.PAD` `MENUBAR.PAINT` `MENUBAR.WANT` `MENUBAR.WAS` |
-| constants | `MENUBAR.MUSTSEL` `MENUBAR.KEEPMARK` `MENUBAR.NOWRAP` `MENUBAR.GAMEPAD` `MENUBAR.DOWNEXIT` `MENUBAR.UPEXIT` `MENUBAR.LEFT` `MENUBAR.RIGHT` `MENUBAR.UP` `MENUBAR.DOWN` `MENUBAR.ENTER` `MENUBAR.ESCAPE` `MENUBAR.STOP` `MENUBAR.PORT` `MENUBAR.PAD.LEFT` `MENUBAR.PAD.RIGHT` `MENUBAR.PAD.B` `MENUBAR.PAD.START` |
-
-**It has no items array, no attributes and no hotkeys of its own — it reads `MENUVERT`'s.** A bar
-and a dropdown are one thing to the user, so the two modules share the whole of that half of the
-interface, and the caller refills `MENUVERT.ITEM$()` between drawing the bar and opening the menu
-under it. Nothing else in the library reaches across a prefix like this, and `MENUBAR.INC.BL`
-therefore does not build without `MENUVERT.INC.BL`.
-
-**There is no `MENUBAR.WIDTH`.** An item is as wide as its own text, which is the difference from
-a vertical menu.
-
-`MENUBAR.DOWNEXIT` and `MENUBAR.UPEXIT` are the cross-axis exits: they end the bar on a key rather
-than swallowing it, so the caller can open the dropdown and hand control on. `MENUVERT`'s
-`MENUHELP.KEYEXIT` is the other half of the same handshake.
+| verbs | `MENUTO.PULLDOWN`, called with `GP.FN` |
+| in | `MENU.STASHBANK` — the bank the covered cells go to; 0 takes one from `BANKMGR` on the first call |
+| out | `MENU.NEXTBAR` — the bar item LEFT or RIGHT walks to, or 0<br>`MENU.EXITKEY` `MENU.BARNUM` `MENU.SELX` `MENU.SELW` `MENU.MARKED`, as for `MENU.INC.BL` |
+| formals | `MENU.PULLAT` `MENU.STYLE` `MENU.CHOSEN` |
+| internal | `MENU.COLS` `MENU.EDGE` `MENU.LEFTOF` `MENU.RIGHTOF` `MENU.STASHED`, and `STASH.BANK` `STASH.SLOT` `STASH.MOVE` `STASH.X` `STASH.Y` `STASH.W` `STASH.H`, which it sets |
+| constants | `MENUPULL.SCRMODE` |
 
 ### `GUI.INC.BL` — four dialogs, in a box that puts the screen back
 
@@ -337,7 +330,7 @@ Routines, arguments and examples: §4.11.
 
 | | |
 |---|---|
-| in | `GUI.MSG$` `GUI.MSG2$` `GUI.MSG3$` — up to three message lines. `""` for none, and no gap left behind<br>`GUI.TITLE$` — a name in the top edge<br>`GUI.BANK` — a spare RAM bank for the covered cells. 0 does not save<br>`GUI.STYLE` — `GP.BOX` style 0..3<br>`GUI.PANEL.IN` `GUI.BORDER.IN` — attributes. 0 takes `THEME.TEXT` and `THEME.BORDER`<br>`GUI.GLYPH` — non-zero frames from `GUI.EDGE.H` `GUI.EDGE.V` `GUI.CORNER.TL` `.TR` `.BL` `.BR`<br>`GUI.PLACE` `GUI.X` `GUI.Y` `GUI.ROW.OFFSET` — where the box goes<br>`GUI.SHADOW` `GUI.SHADOW.ATTR` — the drop shadow<br>`GUI.BTN.ONE$` `GUI.BTN.TWO$` — the button labels, `&` marking the accelerator<br>`GUI.DEFAULT` — which button is the default. 2 is the second, anything else the first<br>`GUI.COUNT` `GUI.SEL` `GUI.FLAGS` — `GUI.MENU`, over `MENUVERT.ITEM$()`<br>`GUI.LEN` `GUI.TEXT$` `GUI.MASK` — `GUI.INPUT`<br>`GUI.BODY.ROWS` `GUI.BODY.WIDTH` — `GUI.OPEN`, when you call it yourself |
+| in | `GUI.MSG$` `GUI.MSG2$` `GUI.MSG3$` — up to three message lines. `""` for none, and no gap left behind<br>`GUI.TITLE$` — a name in the top edge<br>`GUI.BANK` — a spare RAM bank for the covered cells. 0 does not save<br>`GUI.STYLE` — `GP.BOX` style 0..3<br>`GUI.PANEL.IN` `GUI.BORDER.IN` — attributes. 0 takes `THEME.TEXT` and `THEME.BORDER`<br>`GUI.GLYPH` — non-zero frames from `GUI.EDGE.H` `GUI.EDGE.V` `GUI.CORNER.TL` `.TR` `.BL` `.BR`<br>`GUI.PLACE` `GUI.X` `GUI.Y` `GUI.ROW.OFFSET` — where the box goes<br>`GUI.SHADOW` `GUI.SHADOW.ATTR` — the drop shadow<br>`GUI.BTN.ONE$` `GUI.BTN.TWO$` — the button labels, `&` marking the accelerator<br>`GUI.DEFAULT` — which button is the default. 2 is the second, anything else the first<br>`GUI.FLAGS` — `GUI.MENU`, over the popup slot of `MENU.INC.BL`<br>`GUI.LEN` `GUI.TEXT$` `GUI.MASK` — `GUI.INPUT`<br>`GUI.BODY.ROWS` `GUI.BODY.WIDTH` — `GUI.OPEN`, when you call it yourself |
 | out | `GUI.KEY` — the key that ended it, whichever call<br>`GUI.ANSWER` — `GUI.YN`<br>`GUI.OK` — `GUI.INPUT`: -1 accepted, 0 cancelled<br>`GUI.TEXT$` — what was typed<br>`GUI.SEL` — the row chosen, or 0<br>`GUI.STASHED` — -1 if the covered cells were saved<br>`GUI.LEFT` `GUI.TOP` `GUI.WIDTH` `GUI.HEIGHT` — where the box went<br>`GUI.INNER.LEFT` `GUI.INNER.TOP` `GUI.INNER.WIDTH` — the usable area, from `GUI.OPEN`<br>`GUI.PANEL` `GUI.BORDER` — the attributes it settled on |
 | internal | `GUI.ADD.W` `GUI.BOTTOM` `GUI.BOX.STYLE` `GUI.CLR.K$` `GUI.FIELD.LEFT` `GUI.GAP.ROWS` `GUI.GLYPH$` `GUI.HEAD.ROWS` `GUI.INDEX` `GUI.MOVE.BY` `GUI.MOVE.TRIES` `GUI.MOVE.WAS` `GUI.OKCANCEL` `GUI.PAINT.N` `GUI.PRESSED$` `GUI.RIGHT` `GUI.SAVE.W` `GUI.SAVE.H` `GUI.SCAN` `GUI.SCREEN.COLS` `GUI.SCREEN.ROWS` `GUI.SH.BW` `GUI.SH.W` `GUI.SH.H` `GUI.STEP.TYPE` `GUI.TITLE.LEFT` `GUI.WAS$`<br>the button row: `GUI.BTN.AMP` `.AT` `.ATTR` `.DEF` `.FOCUSED` `.HEAD$` `.HI` `.KEY` `.KEY.ONE` `.KEY.TWO` `.LC` `.MARK$` `.OF` `.RIGHT` `.TAIL$` `.TEXT$` `.TOTAL` `.UC` `.W.ONE` `.W.TWO` `.WIDE` `.X` `.Y`<br>the form: `GUI.CTRL.TYPE%` `.X%` `.Y%` `.W%` `.FLAGS%` `.KEY%` `GUI.CTRL.TEXT$` `GUI.CTRL.N` `GUI.FOCUS` `GUI.FORM.DIMMED` `.DONE` `.HIT` `.KEY` `.NAV`<br>the list control: `GUI.LIST.ATTR` `.COUNT` `.DIGITS` `.EACH` `.EDGE$` `.HI` `.I` `.MARKED` `.MARKP` `.MARKY` `.NOTE$` `.NOTE.LEFT` `.NOTEW` `.NUM$` `.ROW` `.ROWS` `.SEL` `.W` `.WAS` `.WAS.SCROLL` `.X` `.Y` |
 | constants | `GUI.SCRMODE` `GUI.LINEBOX` `GUI.MAXCELLS` `GUI.PADX` `GUI.PADY` `GUI.ESCAPE` `GUI.STOP` `GUI.RETURN` `GUI.SPACE` `GUI.BTN.GAP` `GUI.FORM.MAX`<br>`GUI.CT.BUTTON` `GUI.CT.FIELD` `GUI.CT.LIST` — what a control is<br>`GUI.CF.DEFAULT` `GUI.CF.NOFOCUS` — what is true of it<br>`GUI.NAV.STAY` `.NEXT` `.PREV` `.PRESS` `.DEFAULT` `.CANCEL` — the six verdicts<br>`GUI.K.TAB` `GUI.K.SHTAB` `GUI.K.DOWN` `GUI.K.UP` `GUI.K.RIGHT` `GUI.K.LEFT` |
@@ -365,23 +358,32 @@ the one rename here that fails silently.
 `GUI.CTRL.*` are the seven parallel arrays that are the control block: one element a control, up to
 `GUI.FORM.MAX`. `GUI.INC.BL` `DIM`s them. Do not `DIM` them yourself.
 
-### `GUI2.INC.BL` — a listbox, single or multi select
+### `GUI-DIALOGS.INC.BL` — every dialog as a verb
 
 Routines, arguments and examples: §4.12.
 
+`MSGBOX`, `ASKYN`, `ASKOK`, `ASKTEXT`, `INPUTBOX`, `PICKMENU`, `LISTBOX` and `LISTBOXM` are the
+dialogs, each with an `EX` form that also takes the title and the second and third lines.
+`LIST.BEGIN`, `LIST.ARRAY`, `LIST.BANK`, `LISTTO.RUN`, `LIST.ITEM` and `LIST.SORT` build a list box
+a step at a time; `PANELOPEN`, `PANELCLOSE` and the `FORM.` verbs do the same for a form.
+`DLGRESET`, `DLGSHADOW` and `DLGGLYPH` set what every dialog starts from, and `KBCLEAR` throws away
+what is already typed.
+
 | | |
 |---|---|
-| in | `GUI.LISTBOX.COUNT` — how many items. 0 or less returns cancelled<br>`MENUVERT.ITEM$()` — the items, 1..COUNT, and **the caller owns the `DIM`**<br>`GUI.LISTBOX.ROWS` — rows visible at once. 0 takes 10, then cut to COUNT and to the screen<br>`GUI.LISTBOX.MULTI` — 0 chooses one row, 1 marks a set with SPACE<br>`GUI.LISTBOX.MARKS$` — multi only, **in as well as out**: COUNT characters, `"1"` marked. Any other length, `""` included, starts with none<br>`GUI.LISTBOX.SEL` — the item to start on. 0 starts at 1<br>plus everything `GUI.OPEN` reads |
-| out | `GUI.LISTBOX.SEL` — the item under the highlight, or 0 if cancelled<br>`GUI.LISTBOX.MARKS$` — multi only: which are marked<br>`GUI.LISTBOX.MARKED` — multi only: how many<br>`GUI.KEY` — 13 accepted, 27 cancelled |
-| internal | `GUI.LISTBOX.I` `GUI.LISTBOX.MARKOFF` `GUI.LISTBOX.TEXTW` |
+| in | the arguments, in the call. They land in `DLG.*` and NOT in the `GUI.*` inputs: `GUI.DEFAULTS` runs after they are stored and would clear them<br>`DLGRESET bank` — the RAM bank every dialog saves the screen into, once, before the first one<br>`GUI.LIST.ITEM$()` — the rows, 1..count, for the array-backed list verbs, and **the caller owns the `DIM`** |
+| out | `GUI.ANSWER` — `ASKYN`, `ASKOK`<br>`GUI.TEXT$` and `GUI.OK` — `INPUTBOX`<br>`GUI.SEL` — `PICKMENU`<br>`GUI.LISTBOX.SEL` `.MARKS$` `.MARKED` — the listbox verbs<br>`GUI.KEY` — 13 accepted, 27 cancelled |
+| internal | the whole of `DLG.*` |
 
-**In multi-select `GUI.LISTBOX.SEL` is not the answer** — it is where the cursor was left. The marks
-are the answer.
+**In a multi-select list `GUI.LISTBOX.SEL` is not the answer** — it is where the cursor was left.
+The marks are.
 
-**The scrolling list is not in this module.** It is `GUI.CT.LIST`, one of `GUI.FORM`'s three control
-types, and lives in `GUI.INC.BL` beside the field. `GUI2.INC.BL` is the dialog around it: measure,
-open, hand the control its geometry, add a button row, run the form, answer. That is why the
-internals here are three variables and not thirty — the `GUI.LIST.*` set does the work.
+**The scrolling list is not in this module.** It is `GUI.CT.LIST`, one of `GUI.FORM`'s control
+types, and lives in `GUI.INC.BL` beside the field. This file is the dialog around it: measure, open,
+hand the control its geometry, add a button row, run the form, answer. `GUI.LIST.FETCH`, in
+`GUI.INC.BL`, is the one place a row is read, and it reads either the array or a RAM bank holding
+the `GP.BSTR` image layout — which is how `LIST.BANK` shows a directory that was never in low
+memory.
 
 ### `STASH.INC.BL` — save a text rectangle, and put it back
 
@@ -456,14 +458,16 @@ and only the default 1 survives.
 ## 4. Labels are global too
 
 Every `NAME:` in every module is a jump target in one flat space, including the ones you were never
-meant to call. `BMX.STREAM.MORE`, `LINEINPUT.REDRAW`, `THEME.SELECT.DARK` and most of `MENUVERT.*`
+meant to call. `BMX.STREAM.MORE`, `LINEINPUT.REDRAW`, `THEME.SELECT.DARK` and most of `MENU.*`
 are internal, and a `GOSUB` to one will do something, just not something useful.
 
-`MENUVERT` is the module with the most of them, because driving a menu is mostly branching:
-**`MENUVERT.RUN`, `MENUVERT.DRAW` and `MENUVERT.ROW` are the three you may call**, and
-`MENUVERT.HOTFIND` is a fourth.
-`MENUVERT.WAIT`, `.KEYED`, `.SETTLE`, `.WRAPTOP`, `.WRAPBOT`, `.CANCEL`, `.HOTKEY`, `.PADKEY`,
-`.PADREAD` and the three `FOLD` helpers are not.
+`MENU.INC.BL` is called through its verbs, `MENU.BEGIN`, `ITEM`, `ITEMX`, `SELECTED` and `DRAWBAR`
+with `GP.SUB` and `MENUTO.VERT` and `MENUTO.BAR` with `GP.FN`, and `MENUPULL.INC.BL` through
+`MENUTO.PULLDOWN`. Every label in both files is internal: the `.BODY` labels behind the verbs,
+`MENU.RUN`, `.WAIT`, `.KEYED`, `.TURN`, `.MOVED`, `.WRAPTOP`, `.WRAPBOT`, `.CANCEL`, `.KEYHOT`,
+`.HOTTAKE`, `.SKIPOFF`, `.SKIPLOOP`, `.LIGHT`, `.DRAWALL`, `.SPOT`, `.DRAWROW`, `.SEPROW`,
+`.HINTSHOW`, `.PADKEY`, `.PADREAD`, `.STRIP`, `.CREATE`, `.MEASURE`, `.FRAMEBOX`, `.BARPLACE`, and
+`MENUPULL.MARK`, `.BESIDE`, `.PLACE` and `.SAVE`.
 
 `FILE.*` has a great many, because most of the module is one routine feeding another: **the
 callable names are `FILE.STATUS`, `EXISTS`, `DELETE`, `RENAME`, `COPY`, `MKDIR`, `CHDIR`, `UP`,
@@ -480,16 +484,11 @@ runs with whatever `STR.OP%` last held. The callable names are `STR.PADR`, `PADL
 `SPLIT`, `REPLACE`, `PET2SCR`, `TRIM`, `LTRIM`, `RTRIM` and `SPLICE`.
 
 `GUI.INC.BL` has more internal labels than anything else in the library, because `GUI.FORM` is a
-dispatcher and every arm of it is one. **The callable names are `GUI.SAY`, `GUI.YN`, `GUI.MENU`,
-`GUI.INPUT`, `GUI.OPEN` and `GUI.CLOSE`**, plus `GUI.LISTBOX` from `GUI2.INC.BL`. `GUI.FORM` and
-`GUI.CLEARKB` are usable and undocumented — they are the module's own. Everything else, the whole of `GUI.FORM.*`, `GUI.BUTTON*`, `GUI.BTN.*`,
+dispatcher and every arm of it is one. **The callable names are `GUI.OPEN` and
+`GUI.CLOSE`** — the dialogs themselves are verbs, in `GUI-DIALOGS.INC.BL`. `GUI.FORM` is usable
+and undocumented, the module's own. Everything else, the whole of `GUI.FORM.*`, `GUI.BUTTON*`, `GUI.BTN.*`,
 `GUI.LIST.*`, `GUI.FIELD.DRAW`, `GUI.FRAME`, `GUI.GLYPHS`, `GUI.SHADOW.*`, `GUI.SIZE`,
 `GUI.PLACE.BOX`, `GUI.PLACE.SCROLL` and `GUI.SCREEN`, is not.
-
-`MENUBAR` mirrors `MENUVERT` exactly: **`MENUBAR.RUN`, `MENUBAR.DRAW`, `MENUBAR.ITEM`,
-`MENUBAR.MARK` and `MENUBAR.WHERE` are the five you may call.** `MENUBAR.WAIT`, `.KEYED`,
-`.SETTLE`, `.SETTLE.GO`, `.WRAPLEFT`, `.WRAPRIGHT`, `.CANCEL`, `.CHOSE`, `.HOTKEY`, `.HOTDONE`,
-`.PADKEY`, `.PADRELEASE`, `.PADREAD` and `.COLUMN` are not.
 
 ### A module in a bank keeps its names
 
@@ -507,8 +506,8 @@ banked `.BODY` and a low-memory front door, and a program that calls a `.BODY` n
 the first `#INCLUDE` and the second produces nothing.
 
 Each module also has a skip label it jumps over itself with — `THEME.SKIP`, `APPSYS.SKIP`,
-`STR.SKIP`, `BMX.MODULE.END`, `LINEINPUT.MODULE.END`, `MENUVERT.MODULE.END`,
-`MENUBAR.MODULE.END`, `GUI.MODULE.END`, `GUI.LISTBOX.MODULE.END`, `STASH.MODULE.END`,
+`STR.SKIP`, `BMX.MODULE.END`, `LINEINPUT.MODULE.END`, `MENU.MODULE.END`,
+`MENUPULL.MODULE.END`, `GUI.MODULE.END`, `GUI.LISTBOX.MODULE.END`, `STASH.MODULE.END`,
 `STASHFILE.MODULE.END`, `SORT.MODULE.END` and `STRCASE.MODULE.END`.
 Those exist so an include can sit anywhere in the file, the top included. **Do not branch to one.**
 
@@ -522,7 +521,7 @@ be `BMX.MODULE.END` — a name is either a label or a variable, never both.
 
 **Every flag the library hands back is -1 for true and 0 for false**, and anything written
 against it should be too. `GUI.OK` `GUI.ANSWER` `GUI.STASHED` `STASH.OK` `SORT.OK`
-`MENUVERT.HOTHIT` `FILE.OK` `BANKMGR.OK` `APPSYS.IS.EMULATOR` — all of them.
+`MENU.OK` `FILE.OK` `BANKMGR.OK` `APPSYS.IS.EMULATOR` — all of them.
 
 That is what a comparison in this compiler evaluates to, so a flag and a test read the same
 way, and it is the value `NOT` wants: `NOT` is `-x-1`, so `NOT -1` is 0 while `NOT 1` is -2,
@@ -549,7 +548,7 @@ prints `1`.
 `ERROR: INVALID PARAMETER`, not a warning — which is why `BMX.PALBASE` (VRAM `$1FA00`, 129536) is an
 ordinary variable and not a `#DEFINE`. Every VRAM address past `$FFFF` has the same problem.
 
-**A dotted name whose tail is a reserved word is fine.** `MENUVERT.COUNT`, `THEME.CLR`,
+**A dotted name whose tail is a reserved word is fine.** `MENU.COUNT`, `THEME.CLR`,
 `LINEINPUT.LEN` and `LINEINPUT.RETURN` all contain keywords and all work, because BASLOAD matches the whole identifier. An
 *undotted* one does not: `POS`, `MB`, `ST`, `LEN` and `CHAR` cannot be variables at all. This is the
 main reason the library is dotted throughout.

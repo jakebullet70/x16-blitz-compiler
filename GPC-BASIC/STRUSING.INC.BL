@@ -2,18 +2,20 @@
 ## **
 ## **  STRUSING.INC.BL -- a number to a template. PRINT USING's mask, in BASIC.
 ## **
-## **      STR.USING       the value through STR.USING.MASK$
-## **      STR.USING.FIX   the value to STR.USING.DP decimal places, no mask
+## **      STR.USING       the value through STR.USING.MASK$          verb USING
+## **      STR.USING.FIX   the value to STR.USING.DP places, no mask  verb USING.FIXED
+## **      STR.USING.GROUP commas into STR.USING.INT$, every three    verb USING.GROUP
 ## **
-## **  This file holds CODE -- call the routines with GOSUB. It is position independent
-## **  (the module jumps over itself), so #INCLUDE it anywhere. Pure BASIC: it needs no
-## **  #SYMFILE and depends on no other module.
+## **  This file holds CODE -- GOSUB a label, or call the verb with GP.SUB or GP.FN and
+## **  pass the arguments in. It is position independent (the module jumps over itself),
+## **  so #INCLUDE it anywhere. Pure BASIC: it needs no #SYMFILE and depends on no other
+## **  module.
 ## **
-## **  Parameters, since a BASL subroutine takes no arguments:
+## **  The variables a GOSUB fills in, which are the verbs' formals:
 ## **
 ## **      STR.USING.NUM     the value                    both
 ## **      STR.USING.MASK$   the template                 USING
-## **      STR.USING.DP      decimal places               FIX
+## **      STR.USING.DP      decimal places               USING.FIXED
 ## **      STR.USING.STR$    the result                   both
 ## **
 ## **  Clobbered:
@@ -22,11 +24,13 @@
 ## **      STR.USING.SGN   STR.USING.OVR   -1 when the value was negative / too wide
 ## **      STR.USING.SIGN$  STR.USING.OUT$  STR.USING.C$
 ## **      STR.USING.IW  STR.USING.ZW  STR.USING.Z  STR.USING.W  STR.USING.F
-## **      STR.USING.GRP  STR.USING.PT  STR.USING.I  STR.USING.V
+## **      STR.USING.GRP  STR.USING.PT  STR.USING.I  STR.USING.V  STR.USING.DIG
 ## **
 ## **      STR.USING.NUM = 1234.5 : STR.USING.MASK$ = "#,##0.00"
 ## **      GOSUB STR.USING
-## **      PRINT STR.USING.STR$                : REM 1,234.50
+## **      PRINT STR.USING.STR$                     : REM 1,234.50
+## **
+## **      PRINT GP.FN(USING, 1234.5, "#,##0.00")   : REM the same, in one line
 ## **
 ## **  THE MASK:
 ## **
@@ -55,6 +59,11 @@
 ## **  back on. INT alone floors toward minus infinity, which rounds -1.5 and 1.5 in
 ## **  opposite directions.
 ## **
+## **  TO RUN IT FROM A RAM BANK, put the #INCLUDE between GP.BANKED and
+## **  GP.ENDBANKED. A call from outside the region selects the region's bank
+## **  and RETURN puts the caller's back, so a caller is written the same
+## **  either way. GPC-BASIC/BANKED-OR-NOT.md has the rules.
+## **
 ## ***********************************************************************
 #IFNDEF STR.USING.DEFS
 #DEFINE STR.USING.DEFS 1
@@ -63,14 +72,20 @@ GOTO STR.USING.SKIP
 
 ## STR.USING -- the value through the mask.
 ##
-##   in    STR.USING.NUM     the value
-##         STR.USING.MASK$   the template
-##   out   STR.USING.STR$    LEN(STR.USING.MASK$) characters
+##   in    STR.USING.NUM     the value, and the verb's first argument
+##         STR.USING.MASK$   the template, and the verb's second
+##   out   STR.USING.STR$    LEN(STR.USING.MASK$) characters, and what GP.FN gives back
+##
+##      STR.USING.NUM = 1234.5 : STR.USING.MASK$ = "#,##0.00" : GOSUB STR.USING
+##      GP.SUB USING, 1234.5, "#,##0.00"
+##      A$ = GP.FN(USING, 1234.5, "#,##0.00")
 ##
 ## Reads the mask, formats the digits, then fits them to the field. An empty mask gives
 ## an empty result.
 
-STR.USING:  STR.USING.W = LEN(STR.USING.MASK$) : STR.USING.STR$ = "" : IF STR.USING.W = 0 THEN RETURN
+STR.USING:  
+    GP.DEFPROC USING, STR.USING.NUM, STR.USING.MASK$ RETURNS STR.USING.STR$
+    STR.USING.W = LEN(STR.USING.MASK$) : STR.USING.STR$ = "" : IF STR.USING.W = 0 THEN RETURN
     STR.USING.DP = 0 : STR.USING.IW = 0 : STR.USING.ZW = 0 : STR.USING.GRP = 0 : STR.USING.PT = 0 : STR.USING.SIGN$ = "" : STR.USING.I = 1 : STR.USING.C$ = LEFT$(STR.USING.MASK$, 1)
     IF STR.USING.C$ = "+" THEN STR.USING.SIGN$ = "+" : STR.USING.I = 2
     IF STR.USING.C$ = "-" THEN STR.USING.SIGN$ = "-" : STR.USING.I = 2
@@ -78,22 +93,23 @@ STR.USING:  STR.USING.W = LEN(STR.USING.MASK$) : STR.USING.STR$ = "" : IF STR.US
 ## ---- one pass over the mask. STR.USING.PT flips at the point, so the same digit test
 ## ---- counts the integer width before it and the decimal places after. STR.USING.ZW
 ## ---- remembers the LEFTMOST 0, because the forced zeros run from there to the point.
+## ---- A sign column has already eaten character 1, so the count is an upper bound and
+## ---- the guard is what ends the loop.
 
-STR.USING.SCAN:
-    IF STR.USING.I > STR.USING.W THEN GOTO STR.USING.READY
-    STR.USING.C$ = MID$(STR.USING.MASK$, STR.USING.I, 1) : STR.USING.I = STR.USING.I + 1
-    IF STR.USING.C$ = "," THEN STR.USING.GRP = -1
-    IF STR.USING.C$ = "." THEN STR.USING.PT = -1
-    IF STR.USING.C$ <> "#" AND STR.USING.C$ <> "0" THEN GOTO STR.USING.SCAN
-    IF STR.USING.PT THEN STR.USING.DP = STR.USING.DP + 1 : GOTO STR.USING.SCAN
-    STR.USING.IW = STR.USING.IW + 1 : IF STR.USING.C$ = "0" AND STR.USING.ZW = 0 THEN STR.USING.ZW = STR.USING.IW
-    GOTO STR.USING.SCAN
+    GP.DO STR.USING.W
+        IF STR.USING.I > STR.USING.W THEN GP.EXITDO
+        STR.USING.C$ = MID$(STR.USING.MASK$, STR.USING.I, 1) : STR.USING.I = STR.USING.I + 1
+        IF STR.USING.C$ = "," THEN STR.USING.GRP = -1
+        IF STR.USING.C$ = "." THEN STR.USING.PT = -1
+        STR.USING.DIG = 0 : IF STR.USING.C$ = "#" OR STR.USING.C$ = "0" THEN STR.USING.DIG = -1
+        IF STR.USING.DIG AND STR.USING.PT THEN STR.USING.DP = STR.USING.DP + 1
+        IF STR.USING.DIG AND STR.USING.PT = 0 THEN STR.USING.IW = STR.USING.IW + 1 : IF STR.USING.C$ = "0" AND STR.USING.ZW = 0 THEN STR.USING.ZW = STR.USING.IW
+    GP.LOOP
 
 ## ---- the digits, then the field. Overflow is tested on the integer DIGITS against the
 ## ---- mask's digit positions, before the grouping commas are added, and again on the
 ## ---- finished string against the field -- the second catches a minus with nowhere to go.
 
-STR.USING.READY:
     GOSUB STR.USING.FIX : IF STR.USING.OVR THEN GOTO STR.USING.STAR
     IF LEN(STR.USING.INT$) > STR.USING.IW THEN GOTO STR.USING.STAR
     STR.USING.Z = 0 : IF STR.USING.ZW > 0 THEN STR.USING.Z = STR.USING.IW - STR.USING.ZW + 1
@@ -110,18 +126,24 @@ STR.USING.READY:
     STR.USING.STR$ = " " + STR.USING.STR$
     RETURN
 
-STR.USING.STAR:  STR.USING.STR$ = RPT$(42, STR.USING.W) : RETURN
+STR.USING.STAR:  
+    STR.USING.STR$ = RPT$(42, STR.USING.W) 
+    RETURN
 
 ## STR.USING.FIX -- the value to STR.USING.DP decimal places, and nothing else.
 ##
-##   in    STR.USING.NUM   the value
-##         STR.USING.DP    decimal places, 0 upwards
+##   in    STR.USING.NUM   the value, and the verb's first argument
+##         STR.USING.DP    decimal places, 0 upwards, and the verb's second
 ##   out   STR.USING.STR$  "-12.50" -- no leading space, no field, no mask
 ##         STR.USING.INT$  the digits before the point
 ##         STR.USING.FRC$  the digits after it, exactly STR.USING.DP of them
 ##         STR.USING.SGN   -1 if the ROUNDED value is negative
 ##         STR.USING.OVR   -1 if it scaled past 1e9 and the digits are unusable
 ##   clobbers  STR.USING.V
+##
+##      STR.USING.NUM = -12.495 : STR.USING.DP = 2 : GOSUB STR.USING.FIX
+##      GP.SUB USING.FIXED, -12.495, 2
+##      A$ = GP.FN(USING.FIXED, -12.495, 2)
 ##
 ## Right justify it with STR.PADL if you want a column; this routine has no field.
 ##
@@ -133,6 +155,7 @@ STR.USING.STAR:  STR.USING.STR$ = RPT$(42, STR.USING.W) : RETURN
 ## value is zero, because a signed zero in a column reads as a real negative.
 
 STR.USING.FIX:
+    GP.DEFPROC USING.FIXED, STR.USING.NUM, STR.USING.DP RETURNS STR.USING.STR$
     STR.USING.SGN = 0 : STR.USING.OVR = 0 : STR.USING.V = ABS(STR.USING.NUM)
     IF STR.USING.NUM < 0 THEN STR.USING.SGN = -1
     IF STR.USING.DP > 0 THEN STR.USING.V = STR.USING.V * 10 ^ STR.USING.DP
@@ -147,17 +170,28 @@ STR.USING.FIX:
 
 ## STR.USING.GROUP -- commas into STR.USING.INT$, every three digits from the right.
 ##
-##   in    STR.USING.INT$   digits only, no sign and no point
-##   out   STR.USING.INT$
+##   in    STR.USING.INT$   digits only, no sign and no point, and the verb's argument
+##   out   STR.USING.INT$   grouped, and what GP.FN gives back
 ##   clobbers  STR.USING.OUT$  STR.USING.I
+##
+##      STR.USING.INT$ = "1234567" : GOSUB STR.USING.GROUP
+##      GP.SUB USING.GROUP, "1234567"
+##      A$ = GP.FN(USING.GROUP, "1234567")
 ##
 ## Walked from the right, because that is the end the grouping is anchored to. Three or
 ## fewer digits are returned untouched, so it is safe on any width.
 
-STR.USING.GROUP:  STR.USING.OUT$ = "" : STR.USING.I = LEN(STR.USING.INT$)
-STR.USING.GROUP.NEXT:  IF STR.USING.I <= 3 THEN STR.USING.INT$ = LEFT$(STR.USING.INT$, STR.USING.I) + STR.USING.OUT$ : RETURN
-    STR.USING.OUT$ = "," + MID$(STR.USING.INT$, STR.USING.I - 2, 3) + STR.USING.OUT$
-    STR.USING.I = STR.USING.I - 3 : GOTO STR.USING.GROUP.NEXT
+STR.USING.GROUP:  
+    GP.DEFPROC USING.GROUP, STR.USING.INT$ RETURNS STR.USING.INT$
+    STR.USING.OUT$ = "" : STR.USING.I = LEN(STR.USING.INT$)
+    ## ---- three digits go at a time, so the length is an upper bound on the passes.
+    GP.DO STR.USING.I
+        IF STR.USING.I <= 3 THEN GP.EXITDO
+        STR.USING.OUT$ = "," + MID$(STR.USING.INT$, STR.USING.I - 2, 3) + STR.USING.OUT$
+        STR.USING.I = STR.USING.I - 3
+    GP.LOOP
+    STR.USING.INT$ = LEFT$(STR.USING.INT$, STR.USING.I) + STR.USING.OUT$
+    RETURN
 
 STR.USING.SKIP:
 #ENDIF

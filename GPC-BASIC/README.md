@@ -19,7 +19,9 @@ Keep this folder as `GPC-BASIC/` beside your own sources and `#INCLUDE` what you
 ```basic
 #INCLUDE "/GPC-BASIC/GPB.INC.BL"
 #INCLUDE "/GPC-BASIC/THEME.INC.BL"
-#INCLUDE "/GPC-BASIC/MENUVERT.INC.BL"
+#INCLUDE "/GPC-BASIC/BANKMGR.INC.BL"
+#INCLUDE "/GPC-BASIC/MENU.INC.BANKED.BL"
+#INCLUDE "/GPC-BASIC/MENU.INC.BL"
 ```
 
 BASLOAD takes a path, not just a bare filename — **verified on R49**, both `/GPC-BASIC/GPB.INC.BL`
@@ -44,9 +46,7 @@ Then it is BASLOAD and GPC as usual: `BASLOAD "MYPROG.BL"` to turn the source in
 A thing belongs in the core when it is a bulk move or a tight loop — something BASIC is genuinely
 bad at. It belongs in an extension when it waits on a human, or is layout, or is data. It is a
 composite when it is only a **rename** of something the compiler can already say — those are free,
-so use them without thinking about it. A menu is **the `MENUVERT` extension, not a core keyword**,
-because it spends all its time waiting for a keypress: assembly there buys nothing a person could
-see, and would cost every GPB program 473 bytes whether it had a menu or not.
+so use them without thinking about it. The menus are extensions: `MENU.INC.BL` and `MENUPULL.INC.BL`.
 
 Examples are `XXX.EXP.BL` — runnable programs, one subject each. Uppercase names throughout,
 because these files live on the X16's drive.
@@ -76,8 +76,8 @@ All of it needs `#INCLUDE "GPB.INC.BL"`, and nothing else.
 | `THEME.INC.BL` | named colour roles, light and dark, so re-skinning is one variable | `MENU.EXP.BL` |
 | `APPSYS.INC.BL` | leave the screen as you found it, and **panels to and from disk** | `MENU.EXP.BL` |
 | `LINEINPUT.INC.BL` | a positioned, length-limited entry field — what `INPUT` cannot do on a drawn screen | `FORM.EXP.BL` |
-| `MENUVERT.INC.BL` | a vertical menu: cursor keys, RETURN, ESC, hotkeys, SNES pad | `MENUDEMO.EXP.BL` |
-| `MENUBAR.INC.BL` | the other axis — a horizontal bar, per-item widths taken from the text | — |
+| `MENU.INC.BL` | menus built a row at a time, run as a popup or a bar: cursor keys, RETURN, ESC, `&` hot keys, disabled rows, hints, SNES pad | `MENUTO.EXP.BL` `MENUBUILD.EXP.BL` |
+| `MENUPULL.INC.BL` | a dropdown under a bar item, with the screen under it put back | `MENUTO.EXP.BL` |
 | `STASH.INC.BL` | a text rectangle to a RAM bank and back, in `GP.ASM` | — |
 | `STASHFILE.INC.BL` | the same rectangle through a **file**, so a panel outlives the program | — |
 | `SORT.INC.BL` | shell sort a string array in place, in `GP.ASM` | `ARRAYS.EXP.BL` |
@@ -104,7 +104,7 @@ restores it where it came from, and `STASH.FILE.PUT` drops it somewhere else.
 | File | Shows |
 | --- | --- |
 | `MENU.EXP.BL` | a whole small application — menu, theme, dialog over a stashed screen |
-| `MENUTST.EXP.BL` | the menu's regression test, 21 cases |
+| `MENUTST.EXP.BL` | the menu's regression test, 20 cases |
 | `BMXSPD.EXP.BL` | how long a BMX paint really takes, full width against centred |
 | `BMXPAL.EXP.BL` | that the picture's palette is borrowed and given back, not taken |
 | `ASM.EXP.BL` | inline assembly: labels, branches, and `{VAR}` reaching BASIC's own variables through `#SYMFILE` |

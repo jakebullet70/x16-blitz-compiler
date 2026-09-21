@@ -17,16 +17,16 @@
 ## **
 ## **  Build:  copy GPB.INC.BL, APPSYS.INC.BL, BMX.INC.BL, STRCASE.INC.BL
 ## **          and this file into testing/, then
-## **            python source/gpc/build_basl.py BMXVIEW.EXP.BL BMXVIEW.PRG
-## **          and compile BMXVIEW.PRG with GPC.BIN. Put some .BMX
+## **            python source/gpc/build_basl.py BMXVIEW.EXP.BL BMXVIEW.SRC.PRG
+## **          and compile BMXVIEW.SRC.PRG with GPC.BIN. Put some .BMX
 ## **          files on the same drive -- samples/BMXVIEWER/SAMPLES has 30.
 ## **
 ## ***********************************************************************
 ## STRCASE.INC.BL reaches BASIC's variables through {VAR}, so this program
 ## needs a #SYMFILE -- BASLOAD's own record of the names it crunched. Both
 ## directives go BEFORE the #INCLUDEs; a #SYMFILE after one is refused.
-#SAVEAS "@:BMXVIEW.PRG"
-#SYMFILE "@:BMXVIEW.SYM"
+#SAVEAS "@:BMXVIEW.SRC.PRG"
+#SYMFILE "@:BMXVIEW.SRC.SYM"
 #INCLUDE "GPB.INC.BL"
 #INCLUDE "STRCASE.INC.BL"
 #INCLUDE "APPSYS.INC.BL"

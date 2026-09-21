@@ -25,6 +25,10 @@
 ## **        LINEINPUT.ALLOW$            the only characters accepted
 ## **        LINEINPUT.DENY$             characters refused
 ## **        LINEINPUT.LABEL$            LINEINPUT.ASK only
+## **        LINEINPUT.LABELATTR         the label's own attribute, ASK only.
+## **                                  0 means "the field's", which is what it
+## **                                  used to do to the label whether you
+## **                                  wanted it or not
 ## **
 ## **   out  LINEINPUT.TEXT$             what was typed. ESC restores what it
 ## **                                  was when you called, so a cancelled
@@ -55,7 +59,10 @@
 ## **
 ## **   also out  LINEINPUT.POS   where the caret ended up, 0..LEN(TEXT$)
 ## **
-## **  The whole LINEINPUT.* name space belongs to this file.
+## **  TO RUN IT FROM A RAM BANK, put the #INCLUDE between GP.BANKED and
+## **  GP.ENDBANKED. A call from outside the region selects the region's bank
+## **  and RETURN puts the caller's back, so a caller is written the same
+## **  either way. GPC-BASIC/BANKED-OR-NOT.md has the rules.
 ## **
 ## ***********************************************************************
 #IFNDEF LINEINPUT.DEFS
@@ -96,7 +103,7 @@ LINEINPUT.GET:
     LINEINPUT.WAS$ = LINEINPUT.TEXT$ : LINEINPUT.POS = LEN(LINEINPUT.TEXT$)
     LINEINPUT.DONE = 0 : LINEINPUT.KEY = 0 : LINEINPUT.LIT = 1  : LINEINPUT.TICK = TI
 
-LINEINPUT.REDRAW:
+LINEINPUT.REDRAW:  
     GOSUB LINEINPUT.RENDER
     GP.FILL LINEINPUT.X, LINEINPUT.Y, LINEINPUT.LEN, 1, LINEINPUT.SPACE, LINEINPUT.ATTR
     IF LINEINPUT.SHOW$ <> "" THEN GP.PRINTAT LINEINPUT.X, LINEINPUT.Y, LINEINPUT.SHOW$, LINEINPUT.ATTR
@@ -144,12 +151,18 @@ LINEINPUT.KEYED:
 ## ---- A label, then a field after it. LINEINPUT.X is put back on the way out, so calling
 ## ---- this in a loop does not walk the field across the screen.
 
+## ---- THE LABEL IS NOT PART OF THE FIELD, so it does not take the field's attribute.
+## ---- LINEINPUT.ATTR is usually reversed, to make the field read as a box you type in;
+## ---- painting the label with it put "FILE NAME:" in a white block that looked like a
+## ---- second field. LABELATTR of 0 keeps the old behaviour for a caller that never set it.
+
 ## ---- LINEINPUT.SAVEX, NOT LINEINPUT.HOME: that name is #DEFINEd as 19, so this line
 ## ---- compiled as "19 = LINEINPUT.X" -- a syntax error, which DEFERS. The compile said
 ## ---- OK CODE and ASK would have thrown SYNTAX ERROR the first time it was called.
-## ---- Nothing in the tree calls ASK, which is the only reason it went unseen.
 LINEINPUT.ASK:
-    LINEINPUT.SAVEX = LINEINPUT.X : GP.PRINTAT LINEINPUT.X, LINEINPUT.Y, LINEINPUT.LABEL$, LINEINPUT.ATTR
+    LINEINPUT.LABELPAINT = LINEINPUT.LABELATTR
+    IF LINEINPUT.LABELPAINT = 0 THEN LINEINPUT.LABELPAINT = LINEINPUT.ATTR
+    LINEINPUT.SAVEX = LINEINPUT.X : GP.PRINTAT LINEINPUT.X, LINEINPUT.Y, LINEINPUT.LABEL$, LINEINPUT.LABELPAINT
     LINEINPUT.X = LINEINPUT.X + LEN(LINEINPUT.LABEL$)
     GOSUB LINEINPUT.GET : LINEINPUT.X = LINEINPUT.SAVEX
     RETURN
@@ -161,11 +174,10 @@ LINEINPUT.ASK:
 ## **  colours and cursor moves and reverse on and off, which would take
 ## **  effect on the way OUT if they were let into the string.
 ## **
-## **  $80-$9F used to be a flag raised by one IF and lowered by the next,
-## **  written on the belief that AND binds tighter than the comparisons
-## **  around it. It does not: comparisons bind tighter, which is why
-## **  ED.KEY >= 32 AND ED.KEY <= 126 has always worked in the editor. One
-## **  range test says what the flag was spelling out.
+## **  ONE RANGE TEST, NOT A FLAG. Comparisons bind TIGHTER than AND here, so
+## **  K >= 128 AND K <= 159 reads as the range it looks like -- which is why
+## **  ED.KEY >= 32 AND ED.KEY <= 126 works in the editor. Believing it the
+## **  other way round is what makes people reach for a flag they do not need.
 ## **
 ## **  Then the caller's filters, if it set any. ALLOW$ is asked first, so a
 ## **  caller that sets both gets the allow list and DENY$ never runs.
@@ -201,7 +213,7 @@ LINEINPUT.TYPED:
 ## **  is ignored rather than wrapping round to eat the last character.
 ## ***********************************************************************
 
-LINEINPUT.RUBOUT:
+LINEINPUT.RUBOUT:  
     IF LINEINPUT.POS = 0 THEN RETURN
     LINEINPUT.TEXT$ = LEFT$(LINEINPUT.TEXT$, LINEINPUT.POS - 1) + MID$(LINEINPUT.TEXT$, LINEINPUT.POS + 1)
     LINEINPUT.POS = LINEINPUT.POS - 1
@@ -210,7 +222,7 @@ LINEINPUT.RUBOUT:
 ## ---- What the field displays, which is not always what it holds.
 ## ---- RPT$ raises an error on a count of zero, hence the guard.
 
-LINEINPUT.RENDER:
+LINEINPUT.RENDER:  
     LINEINPUT.SHOW$ = LINEINPUT.TEXT$ : IF LINEINPUT.MASK = 0 THEN RETURN
     LINEINPUT.SHOW$ = "" : IF LEN(LINEINPUT.TEXT$) > 0 THEN LINEINPUT.SHOW$ = RPT$(LINEINPUT.STAR, LEN(LINEINPUT.TEXT$))
     RETURN
@@ -225,7 +237,7 @@ LINEINPUT.RENDER:
 ## **  the display.
 ## ***********************************************************************
 
-LINEINPUT.CURSOR:
+LINEINPUT.CURSOR:  
     LINEINPUT.FILLED = LEN(LINEINPUT.SHOW$)
     LINEINPUT.CP = LINEINPUT.POS : IF LINEINPUT.CP > LINEINPUT.FILLED THEN LINEINPUT.CP = LINEINPUT.FILLED
     LINEINPUT.CX = LINEINPUT.X + LINEINPUT.CP : LINEINPUT.CELL$ = " "

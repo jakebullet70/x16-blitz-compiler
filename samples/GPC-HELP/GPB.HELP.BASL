@@ -5,11 +5,14 @@
 #INCLUDE "GPC-BASIC/STASH.INC.BL"
 #INCLUDE "GPC-BASIC/STRCASE.INC.BL"
 #INCLUDE "GPC-BASIC/APPSYS.INC.BL"
-#INCLUDE "GPC-BASIC/KB.INC.BL"
-#INCLUDE "GPC-BASIC/MENUVERT.INC.BL"
+#INCLUDE "GPC-BASIC/BANKMGR.INC.BL"
+#INCLUDE "GPC-BASIC/MENU.INC.BANKED.BL"
+#INCLUDE "GPC-BASIC/MENU.INC.BL"
 #INCLUDE "GPC-BASIC/LINEINPUT.INC.BL"
 #INCLUDE "GPC-BASIC/GUI.INC.BL"
 #INCLUDE "GPC-BASIC/COMBO.INC.BL"
+#INCLUDE "GPC-BASIC/CHECK.INC.BL"
+#INCLUDE "GPC-BASIC/GUI-DIALOGS.INC.BL"
 
 ## ============================================================================
 ## GPB.HELP.BASL -- the GP.BASIC and BASL reference, on the machine.
@@ -53,8 +56,8 @@
 ## the keyboard layout lives there -- so anything above it will do.
 #DEFINE HELP.BANK 8
 
-## The topic bank. NOT HELP.BANK -- that is GUI.BANK, holding the cells under an
-## open dialog. Hex for the window: a #DEFINE takes a SIGNED int16.
+## The topic bank. NOT HELP.BANK -- that is the dialogs' save bank, holding the
+## cells under an open dialog. Hex for the window: a #DEFINE takes a SIGNED int16.
 #DEFINE HELP.TBANK 9
 
 ## The index bank. Records at the front, eight bytes each -- text offset lo and
@@ -171,6 +174,10 @@ HELP.BOOT:
     GOSUB APPSYS.STARTUP
     SCREEN HELP.MODE
 
+    ## Before the first MENU.BEGIN, which claims MENU.TEXTBANK (62) for the
+    ## link menu's rows.
+    GOSUB BANKMGR.INIT
+
     ## Asked, not assumed -- and asked AFTER the mode change, because
     ## APPSYS.STARTUP reported the size of the screen the user had.
     GOSUB GUI.SCREEN
@@ -192,16 +199,19 @@ HELP.BOOT:
     ## GP.BOX's four built-in styles are PETSCII screen codes and would draw
     ## letters here, so the frame is named outright. Nothing has to be rescued
     ## or re-indexed first -- CP437 already has these glyphs where it has them.
-    GUI.GLYPH = 1
-    GUI.EDGE.H = HELP.GL.H : GUI.EDGE.V = HELP.GL.V
-    GUI.CORNER.TL = HELP.GL.TL : GUI.CORNER.TR = HELP.GL.TR
-    GUI.CORNER.BL = HELP.GL.BL : GUI.CORNER.BR = HELP.GL.BR
-    GUI.BANK = HELP.BANK
+    GP.SUB DLGRESET, HELP.BANK
+    GUI.EDGE.H = HELP.GL.H
+    GUI.EDGE.V = HELP.GL.V
+    GUI.CORNER.TL = HELP.GL.TL
+    GUI.CORNER.TR = HELP.GL.TR
+    GUI.CORNER.BL = HELP.GL.BL
+    GUI.CORNER.BR = HELP.GL.BR
+    GP.SUB DLGGLYPH, 1
 
-    ## Every dialog the library opens gets a drop shadow. GUI.OPEN measures how
-    ## much of it is on screen before it stashes, so the put-back covers the
-    ## shadow as well as the box. GUI.SHADOW.ATTR stays 0, black on black.
-    GUI.SHADOW = 1
+    ## Every dialog gets a drop shadow. GUI.OPEN measures how much of it is on
+    ## screen before it stashes, so the put-back covers the shadow as well as
+    ## the box. The shadow is black on black.
+    GP.SUB DLGSHADOW, 1
 
     ## ONE ROW AT A TIME, out of the bank and into a string that is allocated
     ## here and never reallocated: HELP.IXTEXT pokes the length byte and the
@@ -213,10 +223,6 @@ HELP.BOOT:
     DIM HELP.BACK.GO%(HELP.MAXBACK)
     DIM HELP.BACK.AT%(HELP.MAXBACK)
     DIM HELP.FLD$(6)
-
-    ## GUI.MENU draws MENUVERT.ITEM$, and the caller owns the DIM because a
-    ## module cannot be handed an array.
-    DIM MENUVERT.ITEM$(HELP.MAXPICK)
 
     ## EVERYTHING THE VIEWER READS is in one folder beside the program, the
     ## index included, and this is the only place its name is written. Set
@@ -644,6 +650,8 @@ HELP.PAGE.LOAD:
     ## The text starts ABOVE the line table, which owns the front of the bank.
     HELP.HASCODE = 0
     HELP.PG.LINES = 0 : HELP.LINKN = 0 : HELP.ATTOPIC = 0
+    ## The link menu is built as the topic loads, one popup row a cross reference.
+    GP.SUB MENU.BEGIN, MENU.POPUP
     HELP.PG.P = HELP.MAXLINES * HELP.RECSIZE
     HELP.RECP = HELP.WIN
     HELP.IXR = HELP.GO : GOSUB HELP.IXREAD
@@ -685,7 +693,7 @@ HELP.LOAD.READ:
     IF HELP.MARKC = 58 THEN HELP.KIND = 2
     IF HELP.MARKC = 58 THEN HELP.HASCODE = 1
     ## A CROSS REFERENCE IS THE ONE LINE THAT STILL NEEDS A STRING, because
-    ## HELP.PAGE.REF splits it on "|" and hands the text to MENUVERT. That is
+    ## HELP.PAGE.REF splits it on "|" and adds the text to the link menu. That is
     ## 195 lines out of 6,658, so the slow path is 3% of them.
     GP.IF HELP.MARKC = 62 THEN
         HELP.BODY$ = MID$(HELP.LINE$, 2, HELP.LL - 1)
@@ -915,7 +923,7 @@ HELP.PAGE.REF:
     IF HELP.LINKN >= HELP.MAXPICK THEN RETURN
     HELP.LINKN = HELP.LINKN + 1
     HELP.PICK%(HELP.LINKN) = HELP.TREF
-    MENUVERT.ITEM$(HELP.LINKN) = HELP.BODY$
+    GP.SUB MENU.ITEM, HELP.BODY$
     RETURN
 
 ## One row, out of the bank. HELP.LN is the line and HELP.Y the screen row;
@@ -980,13 +988,11 @@ HELP.LINKS:
     ## THE FOOTER IS THE CONTRACT: it does not offer L on a topic with no cross
     ## references, so the key does nothing. Same rule as X in HELP.EXPORT.
     IF HELP.LINKN = 0 THEN RETURN
-    GUI.TITLE$ = "SEE ALSO" : GUI.MSG$ = "Follow" : GUI.MSG2$ = ""
-    GUI.COUNT = HELP.LINKN : GUI.SEL = 1 : GUI.FLAGS = 0
-    GOSUB GUI.MENU
+    HELP.LINKSEL = GP.FN(PICKMENUEX, "SEE ALSO", "Follow", "", "", 1, 0)
     HELP.REDRAW = 1
-    IF GUI.SEL < 1 THEN RETURN
+    IF HELP.LINKSEL < 1 THEN RETURN
     GOSUB HELP.BACK.PUSH
-    HELP.GO = HELP.PICK%(GUI.SEL)
+    HELP.GO = HELP.PICK%(HELP.LINKSEL)
     HELP.PG.FROM = 0
     HELP.NAV = 1
     RETURN
@@ -1017,13 +1023,9 @@ HELP.EXPORT:
     ## The footer does not offer X on a topic with no code, so the key does
     ## nothing rather than opening a dialog to say there is nothing to write.
     IF HELP.HASCODE = 0 THEN RETURN
-    GUI.TITLE$ = "EXPORT" : GUI.MSG2$ = ""
-    GUI.MSG$ = "Write this topic's code to:"
-    GUI.TEXT$ = "EXAMPLE.BL" : GUI.LEN = 24 : GUI.MASK = 0
-    GOSUB GUI.INPUT
+    HELP.OUTNAME$ = GP.FN(INPUTBOXEX, "EXPORT", "Write this topic's code to:", "", "", "EXAMPLE.BL", 24, 0)
     HELP.REDRAW = 1
     IF GUI.OK = 0 THEN RETURN
-    HELP.OUTNAME$ = GUI.TEXT$
     IF HELP.OUTNAME$ = "" THEN RETURN
 
     ## Channel 2 reads the topic and channel 3 writes the export. "@:" replaces.
@@ -1066,17 +1068,14 @@ HELP.EXPORT.WRITE:
 ## ============================================================================
 
 HELP.FIND.ASK:
-    GUI.TITLE$ = "FIND" : GUI.MSG2$ = ""
-    GUI.MSG$ = "Find in the index:"
-    GUI.TEXT$ = HELP.FIND$ : GUI.LEN = 30 : GUI.MASK = 0
-    GOSUB GUI.INPUT
+    HELP.ASKED$ = GP.FN(INPUTBOXEX, "FIND", "Find in the index:", "", "", HELP.FIND$, 30, 0)
     HELP.FULL = 1
     IF GUI.OK = 0 THEN RETURN
     ## THE "" IS WHAT MAKES IT A COPY. Assigning one string variable to another
     ## can hand over the same block, and STRCASE rewrites the bytes where they
-    ## lie -- so without the concatenation this would upper case GUI.TEXT$
-    ## itself, and the field would show it that way for ever after.
-    HELP.FIND$ = GUI.TEXT$ + ""
+    ## lie -- without the concatenation this would upper case the answer in
+    ## place, and the field would show it that way next time.
+    HELP.FIND$ = HELP.ASKED$ + ""
     IF HELP.FIND$ = "" THEN RETURN
     STRCASE.PTR = GP.STRPTR(HELP.FIND$) : STRCASE.MODE = STRCASE.UPPER
     GOSUB STRCASE.GO
@@ -1122,12 +1121,7 @@ HELP.FIND.MISS:
 ## ============================================================================
 
 HELP.SAY:
-    GUI.TITLE$ = "GPB.HELP"
-    GUI.MSG$ = HELP.MSG.ONE$ : GUI.MSG2$ = HELP.MSG.TWO$
-    ## Sticky, like every input in this library: a GUI.SAY after something that
-    ## set a hint would inherit it.
-    GUI.HINT$ = ""
-    GOSUB GUI.SAY
+    GP.SUB MSGBOXEX, "GPB.HELP", HELP.MSG.ONE$, HELP.MSG.TWO$, "", ""
     RETURN
 
 ## WHAT IT TAKES OF THE MACHINE, rather than how it was built -- a reader who
@@ -1141,11 +1135,7 @@ HELP.ABOUT:
     RETURN
 
 HELP.ASKQUIT:
-    GUI.TITLE$ = "GPB.HELP" : GUI.OKCANCEL = 0
-    GUI.MSG$ = "Leave the help viewer?" : GUI.MSG2$ = ""
-    GOSUB GUI.YN
-    HELP.DONE = 0
-    IF GUI.ANSWER THEN HELP.DONE = -1
+    HELP.DONE = GP.FN(ASKYNEX, "GPB.HELP", "Leave the help viewer?", "", "", 1, 0)
     HELP.FULL = 1
     RETURN
 
@@ -1212,10 +1202,10 @@ HELP.GETKEY.WAIT:
     GET HELP.IN$
     IF HELP.IN$ = "" THEN GOTO HELP.GETKEY.WAIT
     HELP.KEY = ASC(HELP.IN$)
-    GOSUB KB.CLEARKB
+    GP.SUB KBCLEAR
     RETURN
 
-## The drain is KB.CLEARKB now, and the reason it matters here is the second one
+## The drain is KBCLEAR, and the reason it matters here is the second one
 ## its header gives: a held arrow repeats faster than a page is drawn, so without it
 ## the queue keeps the page scrolling after the key has been let go.
 

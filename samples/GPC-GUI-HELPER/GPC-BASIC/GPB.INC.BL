@@ -169,22 +169,20 @@
 #TOKEN GP.CHAR 52824
 #TOKEN GP.PRINTAT 52841
 
-## A VERTICAL MENU IS MENUVERT.INC.BL, written in ordinary GPB commands: cursor keys,
-## RETURN, ESC, case-blind hotkeys that choose their row, must-select / keep-mark /
-## no-wrap, and the SNES pad. For no runtime bytes.
+## A MENU IS MENU.INC.BL, written in ordinary GPB commands: cursor keys, RETURN,
+## ESC, hot keys marked with &, disabled rows, a hint line and the SNES pad. It
+## builds a menu a row at a time and runs it as a popup, a bar or a dropdown.
 ##
-##      #INCLUDE "MENUVERT.INC.BL"
-##      MENUVERT.X = 8 : MENUVERT.Y = 6
-##      MENUVERT.WIDTH = 24 : MENUVERT.COUNT = 4
-##      MENUVERT.ITEM$(1) = " NEW GAME"        ... and so on
-##      MENUVERT.ATTR = THEME.CLR(THEME.TEXT)
-##      MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
-##      MENUVERT.HOT$ = "NLOQ"
-##      GOSUB MENUVERT.RUN                     answer in MENUVERT.SEL
+##      #INCLUDE "MENU.INC.BANKED.BL"
+##      #INCLUDE "MENU.INC.BL"
+##      MENU.ATTR = THEME.CLR(THEME.TEXT)
+##      MENU.HIATTR = THEME.CLR(THEME.HILITE)
+##      GP.SUB MENU.BEGIN, MENU.POPUP
+##      GP.SUB MENU.ITEM, "&NEW GAME"          ... and so on
+##      N = GP.FN(MENUTO.VERT, 6, 8, MENU.ROUND)     1..N, or 0 for ESC
 ##
-## IT PRINTS THE ROW AGAIN rather than swapping the cell's attribute nibbles, so it
-## wants a colour for the highlight. MENUVERT.HIATTR = 0 asks for a plain inversion
-## instead, for a caller that has no second colour to give it.
+## MENU.HIATTR = 0 inverts MENU.ATTR for the highlight, for a caller that has no
+## second colour to give it.
 
 ##
 ## GP.SELECT <var>             a plain numeric variable, re-read at each alternative
@@ -265,8 +263,10 @@
 ## ---- GP.BSTR(<name>,n). GP.BSTRCOUNT(<name>) is the group's size, a compile-time
 ## ---- constant. The body lines are BARE QUOTED STRINGS, not REMs: BASLOAD upper-cases
 ## ---- REM text and would destroy the case of every string.
+## ---- GP.BSTRSET <name>,n,A$ writes one, cut to fit; a SPC(n) line is an empty slot.
 #TOKEN GP.BSTR 52821
 #TOKEN GP.BSTRCOUNT 52820
+#TOKEN GP.BSTRSET 52813
 #TOKEN GP.BANKEDSTR 52819
 #TOKEN GP.ENDBANKEDSTR 52818
 

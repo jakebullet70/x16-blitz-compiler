@@ -8,21 +8,23 @@
 ## **
 ## **  Parameters, since a BASL subroutine takes no arguments:
 ## **
-## **      STR.STR$    the string, in and out
-## **      STR.WIDTH   field width          PADR PADL PADC
-## **      STR.DELIM$  the separator        SPLIT
+## **      STR.STR$    the string, in and out, and the pads' first argument
+## **      STR.WIDTH   the width padded TO  PADR PADL PADC, and their second
+## **      STR.DELIM$  the separator        SPLIT SCAN
 ## **      STR.MAX     field array size     SPLIT, 0 means 10
+## **      STR.I       field number, 1 up   FIELD
 ## **      STR.FIND$   what to look for     REPLACE
 ## **      STR.REPL$   what to put back     REPLACE
 ## **      STR.AT      1-based position     SPLICE
 ## **      STR.CUT     characters to cut    SPLICE
 ## **      STR.SUB$    what to put there    SPLICE
-## **      STR.PET     a PETSCII code       PET2SCR
+## **      STR.PET     a PETSCII code       PET2SCR, the verb's argument
 ## **      STR.PTR     GP.STRPTR(a$)        TRIM LTRIM RTRIM
 ## **
 ## **  Clobbered:
 ## **      STR.GAP  STR.HALF                the pads
 ## **      STR.REST$  STR.AT  STR.LIM       SPLIT, and STR.N is its count
+## **      STR.SRC$  STR.DLEN  STR.POS%     SCAN, and STR.N is its count too
 ## **      STR.OUT$  STR.REST$  STR.AT      REPLACE
 ## **      STR.AT  STR.CUT                  SPLICE clamps its own inputs
 ## **      STR.SCR                          the PET2SCR result
@@ -30,6 +32,12 @@
 ## **      STR.STR$ = NAME$ : STR.WIDTH = 20
 ## **      GOSUB STR.PADR
 ## **      NAME$ = STR.STR$
+## **
+## **  Every routine here is a verb as well as a label. The verb is the undotted name,
+## **  and SPLIT and the trims have no GP.FN because their answer is not one string:
+## **
+## **      GP.SUB PADR, NAME$, 20
+## **      NAME$ = GP.FN(PADR, NAME$, 20)
 ## **
 ## **  Two calling conventions. The BASIC routines take the string by value in
 ## **  STR.STR$ and hand it back there. The three trims take its address in STR.PTR and
@@ -46,34 +54,74 @@
 ## **  WARNING: pass the trims a variable, never a literal. GP.STRPTR("hello") is an
 ## **  address inside the p-code, and trimming it EDITS THE PROGRAM.
 ## **
+## **  TO RUN IT FROM A RAM BANK, put the #INCLUDE between GP.BANKED and
+## **  GP.ENDBANKED. A call from outside the region selects the region's bank
+## **  and RETURN puts the caller's back, so a caller is written the same
+## **  either way. GPC-BASIC/BANKED-OR-NOT.md has the rules.
+## **
 ## ***********************************************************************
 #IFNDEF STR.DEFS
 #DEFINE STR.DEFS 1
 
+## ---- most fields STR.SCAN finds. STR.POS% is DIMmed to it, two bytes an element.
+#DEFINE STR.SCAN.MAX 32
+
 GOTO STR.SKIP
 
 ## STR.PADR -- pad on the RIGHT to STR.WIDTH. Left justify.
-## The pads pad only: a string at or past the width is left alone, and the result is
-## not length checked.
-
-STR.PADR:  IF LEN(STR.STR$) < STR.WIDTH THEN STR.STR$ = STR.STR$ + RPT$(32, STR.WIDTH - LEN(STR.STR$))
+##
+##   in    STR.STR$    the string, and the verb's first argument
+##         STR.WIDTH   pad out to this, and the verb's second
+##   out   STR.STR$    padded in place, and what GP.FN gives back
+##
+##      STR.STR$ = NAME$ : STR.WIDTH = 20 : GOSUB STR.PADR
+##      GP.SUB PADR, NAME$, 20
+##      NAME$ = GP.FN(PADR, NAME$, 20)
+STR.PADR:
+    GP.DEFPROC PADR, STR.STR$, STR.WIDTH RETURNS STR.STR$
+    IF LEN(STR.STR$) < STR.WIDTH THEN STR.STR$ = STR.STR$ + RPT$(32, STR.WIDTH - LEN(STR.STR$))
     RETURN
+
+
+
 
 ## STR.PADL -- pad on the LEFT to STR.WIDTH. Right justify.
-
-STR.PADL:  IF LEN(STR.STR$) < STR.WIDTH THEN STR.STR$ = RPT$(32, STR.WIDTH - LEN(STR.STR$)) + STR.STR$
+##
+##   in    STR.STR$    the string, and the verb's first argument
+##         STR.WIDTH   pad out to this, and the verb's second
+##   out   STR.STR$    padded in place, and what GP.FN gives back
+##
+##      STR.STR$ = AMT$ : STR.WIDTH = 8 : GOSUB STR.PADL
+##      GP.SUB PADL, AMT$, 8
+##      AMT$ = GP.FN(PADL, AMT$, 8)
+STR.PADL:
+    GP.DEFPROC PADL, STR.STR$, STR.WIDTH RETURNS STR.STR$
+    IF LEN(STR.STR$) < STR.WIDTH THEN STR.STR$ = RPT$(32, STR.WIDTH - LEN(STR.STR$)) + STR.STR$
     RETURN
+
+
+
 
 ## STR.PADC -- pad BOTH sides to STR.WIDTH. An odd gap puts the extra space right.
 ##
-## The two guards are load bearing: RPT$ raises ILLEGAL QUANTITY on a count of zero, so
-## a gap of 1 makes STR.HALF zero and fails the left call.
-
-STR.PADC:  STR.GAP = STR.WIDTH - LEN(STR.STR$)
+##   in    STR.STR$    the string, and the verb's first argument
+##         STR.WIDTH   pad out to this, and the verb's second
+##   out   STR.STR$    padded in place, and what GP.FN gives back
+##   clobbers  STR.GAP  STR.HALF
+##
+##      STR.STR$ = TITLE$ : STR.WIDTH = 40 : GOSUB STR.PADC
+##      GP.SUB PADC, TITLE$, 40
+##      T$ = GP.FN(PADC, TITLE$, 40)
+STR.PADC:
+    GP.DEFPROC PADC, STR.STR$, STR.WIDTH RETURNS STR.STR$
+    STR.GAP = STR.WIDTH - LEN(STR.STR$)
     IF STR.GAP < 1 THEN RETURN
     STR.HALF = INT(STR.GAP / 2) : IF STR.HALF > 0 THEN STR.STR$ = RPT$(32, STR.HALF) + STR.STR$
     STR.STR$ = STR.STR$ + RPT$(32, STR.WIDTH - LEN(STR.STR$))
     RETURN
+
+
+
 
 ## STR.SPLIT -- cut STR.STR$ into fields on STR.DELIM$.
 ##
@@ -91,15 +139,74 @@ STR.PADC:  STR.GAP = STR.WIDTH - LEN(STR.STR$)
 ## Empty fields are preserved: "A,,C" is three fields and "A," is two. An empty string
 ## gives one empty field. Reaching STR.MAX loses nothing -- the last field takes the
 ## whole unsplit remainder.
-
-STR.SPLIT:  STR.N = 0 : STR.LIM = STR.MAX
+##
+##      STR.STR$ = LINE$ : STR.DELIM$ = "," : STR.MAX = 0 : GOSUB STR.SPLIT
+##      GP.SUB SPLIT, LINE$, ",", 0
+STR.SPLIT:  
+    GP.DEFPROC SPLIT, STR.STR$, STR.DELIM$, STR.MAX
+    STR.N = 0 : STR.LIM = STR.MAX
     IF STR.LIM < 1 THEN STR.LIM = 10
     STR.REST$ = STR.STR$
-STR.SPLIT.NEXT:
-    STR.N = STR.N + 1 : IF STR.N >= STR.LIM THEN STR.FIELD$(STR.N) = STR.REST$ : RETURN
-    STR.AT = GP.INSTR(STR.REST$, STR.DELIM$) : IF STR.AT = 0 THEN STR.FIELD$(STR.N) = STR.REST$ : RETURN
-    STR.FIELD$(STR.N) = LEFT$(STR.REST$, STR.AT - 1) : STR.REST$ = MID$(STR.REST$, STR.AT + LEN(STR.DELIM$))
-    GOTO STR.SPLIT.NEXT
+    ## ---- the last slot takes the whole remainder, so cut at most STR.LIM times.
+    GP.DO STR.LIM
+        STR.N = STR.N + 1
+        IF STR.N >= STR.LIM THEN STR.FIELD$(STR.N) = STR.REST$ : GP.EXITDO
+        STR.AT = GP.INSTR(STR.REST$, STR.DELIM$)
+        IF STR.AT = 0 THEN STR.FIELD$(STR.N) = STR.REST$ : GP.EXITDO
+        STR.FIELD$(STR.N) = LEFT$(STR.REST$, STR.AT - 1)
+        STR.REST$ = MID$(STR.REST$, STR.AT + LEN(STR.DELIM$))
+    GP.LOOP
+    RETURN
+
+
+
+
+
+## STR.SCAN -- find the fields of STR.STR$ without copying any of them.
+##
+##   in    STR.STR$    scanned, not modified
+##         STR.DELIM$  the separator, one character or several
+##   out   STR.N       fields found, always >= 1, at most STR.SCAN.MAX
+##   clobbers  STR.SRC$  STR.DLEN  STR.AT  STR.POS%
+##
+## Nothing to DIM. STR.POS% is DIMmed here on the first call and holds positions, two
+## bytes a field, not copies. Read a field afterwards with GP.FN(FIELD, n).
+##
+## Empty fields are preserved: "A,,C" is three fields and "A," is two. An empty string
+## gives one empty field. Reaching STR.SCAN.MAX loses nothing -- the last field takes
+## the whole unsplit remainder.
+##
+##      STR.STR$ = LINE$ : STR.DELIM$ = "," : GOSUB STR.SCAN
+##      GP.SUB SCAN, LINE$, ","
+STR.SCAN:
+    GP.DEFPROC SCAN, STR.STR$, STR.DELIM$
+    IF STR.SCAN.READY = 0 THEN DIM STR.POS%(STR.SCAN.MAX) : STR.SCAN.READY = -1
+    STR.SRC$ = STR.STR$ : STR.DLEN = LEN(STR.DELIM$)
+    STR.N = 0 : STR.POS%(0) = 1
+    ## ---- the slot past the last field holds the end marker, so stop one short.
+    GP.DO STR.SCAN.MAX - 1
+        STR.AT = GP.INSTR(STR.SRC$, STR.DELIM$, STR.POS%(STR.N))
+        IF STR.AT = 0 THEN GP.EXITDO
+        STR.N = STR.N + 1 : STR.POS%(STR.N) = STR.AT + STR.DLEN
+    GP.LOOP
+    STR.N = STR.N + 1 : STR.POS%(STR.N) = LEN(STR.SRC$) + STR.DLEN + 1
+    RETURN
+## STR.FIELD.AT -- field STR.I of the last STR.SCAN, cut out on demand.
+##
+##   in    STR.I       field number, 1 up, and the verb's argument
+##   out   STR.STR$    the field, and what GP.FN gives back. "" outside 1..STR.N
+##
+##      STR.I = 3 : GOSUB STR.FIELD.AT
+##      F$ = GP.FN(FIELD, 3)
+STR.FIELD.AT:
+    GP.DEFPROC FIELD, STR.I RETURNS STR.STR$
+    STR.STR$ = ""
+    IF STR.I < 1 OR STR.I > STR.N THEN RETURN
+    STR.STR$ = MID$(STR.SRC$, STR.POS%(STR.I - 1), STR.POS%(STR.I) - STR.POS%(STR.I - 1) - STR.DLEN)
+    RETURN
+
+
+
 
 ## STR.REPLACE -- replace every occurrence of STR.FIND$ with STR.REPL$.
 ##
@@ -108,20 +215,24 @@ STR.SPLIT.NEXT:
 ##         STR.REPL$   shorter, longer, or "" to delete
 ##   clobbers  STR.OUT$  STR.REST$  STR.AT
 ##
-## A replacement containing the needle terminates: what is emitted moves into STR.OUT$
-## and is never re-scanned, and STR.REST$ shrinks by at least LEN(STR.FIND$) a pass. An
-## empty STR.FIND$ leaves the string alone, because GP.INSTR reports not-found for a
-## zero length needle.
-##
 ## Not length checked. A result past 255 characters is the caller's problem.
-
-STR.REPLACE:  STR.OUT$ = "" : STR.REST$ = STR.STR$
+##
+##      STR.STR$ = S$ : STR.FIND$ = "A" : STR.REPL$ = "B" : GOSUB STR.REPLACE
+##      GP.SUB REPLACE, S$, "A", "B"
+##      S$ = GP.FN(REPLACE, S$, "A", "B")
+##
+STR.REPLACE:  
+    GP.DEFPROC REPLACE, STR.STR$, STR.FIND$, STR.REPL$ RETURNS STR.STR$
+    STR.OUT$ = "" : STR.REST$ = STR.STR$
 STR.REPLACE.NEXT:
     STR.AT = GP.INSTR(STR.REST$, STR.FIND$)
     IF STR.AT = 0 THEN STR.STR$ = STR.OUT$ + STR.REST$ : RETURN
     STR.OUT$ = STR.OUT$ + LEFT$(STR.REST$, STR.AT - 1) + STR.REPL$
     STR.REST$ = MID$(STR.REST$, STR.AT + LEN(STR.FIND$))
     GOTO STR.REPLACE.NEXT
+
+
+
 
 ## STR.SPLICE -- replace STR.CUT characters at STR.AT with STR.SUB$.
 ##
@@ -140,30 +251,29 @@ STR.REPLACE.NEXT:
 ##
 ## Past the end appends, below 1 clamps to 1, and a cut past the end takes the rest of
 ## the string. Not length checked.
-
+##
+##      STR.STR$ = S$ : STR.AT = 5 : STR.CUT = 0 : STR.SUB$ = "X" : GOSUB STR.SPLICE
+##      GP.SUB SPLICE, S$, 5, 0, "X"
+##      S$ = GP.FN(SPLICE, S$, 5, 0, "X")
 STR.SPLICE:
+    GP.DEFPROC SPLICE, STR.STR$, STR.AT, STR.CUT, STR.SUB$ RETURNS STR.STR$
     IF STR.AT < 1 THEN STR.AT = 1
     IF STR.CUT < 0 THEN STR.CUT = 0
     STR.STR$ = LEFT$(STR.STR$, STR.AT - 1) + STR.SUB$ + MID$(STR.STR$, STR.AT + STR.CUT)
     RETURN
 
+
+
+
 ## STR.PET2SCR -- a PETSCII code to the screen code the tile map holds.
 ##
-##   in    STR.PET     0..255, what ASC() gives you
-##   out   STR.SCR     for TILE, TDATA and VPOKE
+##   in    STR.PET     0..255, what ASC() gives you, and the verb's one argument
+##   out   STR.SCR     for TILE, TDATA and VPOKE, and what GP.FN returns
 ##
-## GP.PRINTAT and GP.FILL convert internally; this is for writing the map yourself.
-##
-## Not a GP.CALL to GPDrawPet2Scr: the runtime pins only the magic at RTBASE and the
-## entry jmp at RTBASE+4, so that address moves every build. A compare chain rather than
-## a table, because a table needs a DATA statement and READ walks every DATA in the
-## program in order.
-##
-## $FF is the one value the arithmetic gets wrong: pi is screen code 94, not 127.
-## Nothing converts to 160..191 -- PETSCII says reverse with a control code, not a
-## character. Swap the colour attribute instead.
-
+##      STR.PET = ASC(K$) : GOSUB STR.PET2SCR
+##      C = GP.FN(PET2SCR, ASC(K$))
 STR.PET2SCR:
+    GP.DEFPROC PET2SCR, STR.PET RETURNS STR.SCR
     STR.SCR = STR.PET
     IF STR.PET = 255 THEN STR.SCR = 94 : RETURN
     IF STR.PET < 32 THEN STR.SCR = STR.PET + 128 : RETURN
@@ -175,6 +285,9 @@ STR.PET2SCR:
     STR.SCR = STR.PET - 128
     RETURN
 
+
+
+
 ## ---- assembly from here down: STR.PTR, an address, not STR.STR$ ----
 
 ## STR.TRIM / STR.LTRIM / STR.RTRIM -- spaces off a string in place.
@@ -182,8 +295,8 @@ STR.PET2SCR:
 ##   in    STR.PTR   GP.STRPTR of the string
 ##   out   the string itself
 ##
-##      STR.PTR = GP.STRPTR(LINE$)
-##      GOSUB STR.RTRIM
+##      STR.PTR = GP.STRPTR(LINE$) : GOSUB STR.RTRIM
+##      GP.SUB RTRIM, GP.STRPTR(LINE$)
 ##
 ## Three entry labels over one blob, with the mode tested once at entry. An empty string
 ## and an all-spaces string are not special cases: the walks count down and reaching
@@ -197,9 +310,15 @@ STR.PET2SCR:
 ## #REM 1 is load bearing: without it BASLOAD strips the body and the block reaches the
 ## compiler empty, refused as "block mismatch". #REM 0 restores the default.
 
-STR.TRIM:   STR.OP% = 0 : GOTO STR.TRIM.GO
-STR.LTRIM:  STR.OP% = 1 : GOTO STR.TRIM.GO
-STR.RTRIM:  STR.OP% = 2
+STR.TRIM:   
+    GP.DEFPROC TRIM, STR.PTR
+    STR.OP% = 0 : GOTO STR.TRIM.GO
+STR.LTRIM:  
+    GP.DEFPROC LTRIM, STR.PTR
+    STR.OP% = 1 : GOTO STR.TRIM.GO
+STR.RTRIM:  
+    GP.DEFPROC RTRIM, STR.PTR
+    STR.OP% = 2
 STR.TRIM.GO:
     STR.ADDR% = STR.PTR
     STR.KEEP% = 0

@@ -60,6 +60,7 @@ GP.BANKEDSTR GM.TEXTBANK BS.DD.LISTS
   "MENUTO.B&AR"
   "&HOTKEYS"
   "&FLAGS"
+  "LIST.BAN&K"
 GP.ENDBANKEDSTR
 
 GP.BANKEDSTR GM.TEXTBANK BS.DD.INPUT
@@ -127,6 +128,9 @@ GP.BANKEDSTR GM.TEXTBANKB BS.DD.FILES
   "SAVE&ARRAY + LOADARRAY"
   "&RENAME + DELETE"
   "&MKDIR + CHDIR"
+  "PICKFILE  &TWO BANKS"
+  "PICKFILE  &ONE BANK"
+  "PICKFILE  SORTED &LIST"
   "&QUIT"
 GP.ENDBANKEDSTR
 
@@ -136,7 +140,7 @@ GP.ENDBANKEDSTR
 ## **
 ## **  RUN IT BEFORE BANKMGR HANDS OUT A FREE BANK: the first MENU.BEGIN
 ## **  claims MENU.TEXTBANK. GMX.L.BAR runs it again to put the shell's
-## **  menus back, because a bar of its own emptied every dropdown. The nine dropdowns hold 58 rows between them,
+## **  menus back, because a bar of its own emptied every dropdown. The nine dropdowns hold 59 rows between them,
 ## **  and the dropdown slots share 64.
 ## **
 ## **  The screen under a dropdown goes to VRAM, on the SV.INIT GPBMODS runs.

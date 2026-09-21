@@ -242,5 +242,13 @@ STASH.ROW.OUT:
     #REM 0
     RETURN
 
+## STASH.SELECT -- BANK STASH.PEEKBANK, for the PEEKs a GP.BANKED caller makes next.
+## A region may not hold a BANK statement, so it calls this one. The call out of
+## the region carries the region's bank, and RETURN selects it again.
+
+STASH.SELECT:
+    BANK STASH.PEEKBANK
+    RETURN
+
 STASH.MODULE.END:
 #ENDIF

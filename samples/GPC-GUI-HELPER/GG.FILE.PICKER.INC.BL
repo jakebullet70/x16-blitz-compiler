@@ -6,8 +6,9 @@
 ## **      GG.PICK.RUN     a row taken out of the project
 ## **      GG.FILES.SHOW   the rows GG.PICK.RUN draws
 ## **
-## **  Both open on the chrome this program already uses, so both start with
-## **  GG.DIALOG.RESET.FIELDS and both leave the screen as they found it.
+## **  Both start from GUI.DEFAULTS, which keeps the save bank, shadow and
+## **  frame GG.GUI.SETUP gave every dialog, and both leave the screen as they
+## **  found it.
 ## ***********************************************************************
 
 ## ***********************************************************************
@@ -17,18 +18,11 @@
 ## **  GG.PICK.WHAT$ is the title. FILEPICK.NAME$ out, empty for
 ## **  cancelled or for a drive with nothing of that kind on it.
 ## **
-## **  THE PICKER FILLS MENUVERT.ITEM$ with file names, and that is the
-## **  array the menu draws itself out of. Nothing is put back here:
-## **  GG.MENU.RUN loads its rows on every turn, which is what already
-## **  makes GG.PICK.RUN safe.
+## **  The picker's own list lives in the bank PICKBANKS was given, so it
+## **  never touches GUI.LIST.ITEM$ -- that array is GG.PICK.RUN's alone.
 ## ***********************************************************************
 GG.FILE.PICK:
-  GOSUB GG.DIALOG.RESET.FIELDS
-  GUI.TITLE$ = GG.PICK.WHAT$
-  FILEPICK.BANK = GG.DIRBANK%
-  FILEPICK.EXT$ = GG.PICK.EXT$
-  FILEPICK.ROWS = GG.LISTROW
-  GOSUB FILEPICK.RUN
+  FILEPICK.NAME$ = GP.FN(PICKFILE, GG.PICK.WHAT$, GG.PICK.EXT$)
   IF FILEPICK.COUNT = 0 THEN GG.RESULT$ = "No ." + GG.PICK.EXT$ + " files on the drive"
   RETURN
 
@@ -43,7 +37,7 @@ GG.PICK.RUN:
   IF GG.LISTSEL% < 1 THEN GG.LISTSEL% = 1
   IF GG.LISTSEL% > GG.FILECOUNT% THEN GG.LISTSEL% = GG.FILECOUNT%
   GOSUB GG.FILES.SHOW
-  GOSUB GG.DIALOG.RESET.FIELDS
+  GOSUB GUI.DEFAULTS
   GUI.TITLE$ = GG.PICK.TITLE$
   GUI.BTN.ONE$ = "&OK" : GUI.BTN.TWO$ = "&CANCEL"
   GOSUB GUI.BUTTON.SIZE
@@ -69,7 +63,6 @@ GG.PICK.RUN:
   GG.LISTSEL% = GUI.LIST.SEL
   IF (GUI.CTRL.FLAGS%(GUI.FORM.HIT) AND GUI.CF.DEFAULT) <> 0 THEN GG.PICKROW% = GG.LISTSEL%
   GOSUB GUI.CLOSE
-  MENUVERT.SCROLL = 0
   RETURN
 
 ## ---- The rows GG.PICK.RUN shows. A star marks the file COMPILE builds.
@@ -77,6 +70,6 @@ GG.FILES.SHOW:
   FOR GG.I = 1 TO GG.FILECOUNT%
     GG.SHOW$ = "   "
     IF GG.I = GG.CURR.NDX% THEN GG.SHOW$ = " * "
-    MENUVERT.ITEM$(GG.I) = GG.SHOW$ + GG.PROJECT.FILE.LIST$(GG.I)
+    GUI.LIST.ITEM$(GG.I) = GG.SHOW$ + GG.PROJECT.FILE.LIST$(GG.I)
   NEXT GG.I
   RETURN
