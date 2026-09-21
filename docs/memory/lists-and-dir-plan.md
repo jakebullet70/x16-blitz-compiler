@@ -41,7 +41,14 @@ nobody reads the result row at the bottom while a wait is happening.
 - Speed: BASIC PEEK fetch first; if it is slow, a small GP.ASM blob (user pre-agreed).
 - Verbs: LIST.BEGIN title$,rows / LIST.ARRAY count / LIST.BANK bank,first,last /
   N = LISTTO.RUN / GP.FN(LIST.ITEM,N) / LIST.SORT bank,first,last / GP.FN(PICKFILE, title$,ext$).
-- NEXT, and started 2026-09-21: **"update other projects"** -- root GPC-BASIC, the samples editor,
-  GPC-HELP and GPC-GUI-HELPER, and samplesbuild.py.
+- **"update other projects" is DONE 2026-09-21**, committed and pushed. Root GPC-BASIC took the
+  tested modules and the editor, GPC-HELP, GPC-GUI-HELPER and color-test took them from root.
+  GUI2.INC.BL is deleted everywhere (it was GUI.LISTBOX alone), GUI.EXP.BL is on the EX verbs, and
+  GPC-GUI-HELPER is off the old FILEPICK.RUN and onto PICKBANKS/PICKFILE with a second bank.
+  GPC.GUI is in samplesbuild.py now. All six samples COMPILE; none but GPBMODS has been RUN.
   Follows [[gui-only-through-verbs]], [[test-in-gpbmods-before-spreading]],
   [[library-working-copy-then-root]].
+- STILL OWED: run the five non-GPBMODS samples on the machine, and regenerate the GPB.HELP topics
+  from the rewritten GP-BASIC.md §4.11/§4.12 -- see [[hlp-files-carry-hand-edits]] before running
+  MKHELP.PY. GG.PICK.RUN in GPC-GUI-HELPER still GOSUBs GUI.OPEN and GUI.FORM.* directly, against
+  [[gui-only-through-verbs]].
