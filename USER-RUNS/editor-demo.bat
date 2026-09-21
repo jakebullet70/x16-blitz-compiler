@@ -1,25 +1,4 @@
 @echo off
-rem ---------------------------------------------------------------------------
-rem  editor-demo.bat -- run GPC EDIT, the sample text editor, in a VISIBLE window.
-rem
-rem      ESC             open the menu bar (lands on File)
-rem      ALT+F/S/H       open File, Search or Help directly
-rem      F/S/H           switch menus once the bar is open, as do LEFT/RIGHT
-rem      UP/DOWN         move the highlight     RETURN chooses     ESC cancels
-rem      F2              save                   F3      find next
-rem      HOME/END        start/end of line      PGUP/PGDN  a screen at a time
-rem      INS             toggle insert/overwrite
-rem
-rem  It opens TEST.MD from the drive directory on startup, so there is something
-rem  on screen to move around in. NOTE THAT SAVES LAND IN samples\editor -- the
-rem  editor's drive is that directory, so File>Save overwrites the real TEST.MD.
-rem  git restore samples/editor/TEST.MD puts it back.
-rem
-rem  Source: samples\editor\EDITOR.BASL + STORE.BASL, on GPB, THEME, APPSYS,
-rem  STASH, MENUVERT, MENUBAR, LINEINPUT and GUI -- all shipped in
-rem  samples\editor\GPC-BASIC\ beside the sample, so a rebuild needs nothing
-rem  from GPC-BASIC\. MENUBAR draws and measures the bar; MENUVERT drives the
-rem  dropdown; STASH is what GUI.OPEN saves the covered cells with.
 rem
 rem  C.EDITOR.PRG is the COMPILED object and is checked in beside the source.
 rem  To rebuild it:
