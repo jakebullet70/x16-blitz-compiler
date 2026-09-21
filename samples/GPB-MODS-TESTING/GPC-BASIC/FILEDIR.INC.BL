@@ -11,6 +11,8 @@
 ## **      #SYMFILE "@:MYPROG.SYM"   <- required, before the #INCLUDEs.
 ## **
 ## **   in   FILE.DIR.BANK     the bank to read into, or 0 for low RAM
+## **        FILE.DIR.BANKAT   where in the bank the listing starts. 0 is
+## **                          $A000, and INIT and every OPEN leave it 0
 ## **        FILE.DIR.PTR      the low RAM buffer, when BANK is 0
 ## **        FILE.DIR.CAP      how many bytes that buffer holds
 ## **        FILE.DIR.PATTERN$  a name pattern, or empty for all
@@ -140,7 +142,7 @@ FILE.DIR.INIT:
     FILE.NAME$ = RPT$(32, FILE.DIR.NAMEMAX) : FILE.TYPE$ = RPT$(32, 3)
     FILE.DIR.NAMEA% = GP.STRPTR(FILE.NAME$) : FILE.DIR.TYPEA% = GP.STRPTR(FILE.TYPE$)
     FILE.DIR.ADDR% = 0 : FILE.DIR.ROOM% = 0 : FILE.DIR.LFN% = FILE.CHAN : FILE.DIR.BYTES% = 0 : FILE.DIR.CNT% = 0 : FILE.DIR.OFF% = 0
-    FILE.DIR.WAS% = 0 : FILE.DIR.BNK% = 0 : FILE.DIR.SLOW = 0
+    FILE.DIR.WAS% = 0 : FILE.DIR.BNK% = 0 : FILE.DIR.SLOW = 0 : FILE.DIR.BANKAT = 0
     FILE.DIR.BLK% = 0 : FILE.DIR.OK% = 0 : FILE.DIR.SLOW% = 0 : FILE.DIR.AT = 0 : FILE.DIR.GOT = 0 : FILE.DIR.MORE = 0 : FILE.DIR.FULL = 0  
     RETURN
 
@@ -161,7 +163,7 @@ FILE.DIR.OPEN:
     OPEN FILE.CHAN, FILE.DEVICE, 0, FILE.DIR.ASK$
     INPUT#15, FILE.ERR, FILE.MSG$, FILE.TRK, FILE.SEC
     IF FILE.ERR < FILE.OKMAX THEN GOSUB FILE.DIR.SUCK
-    CLOSE FILE.CHAN : CLOSE 15 : FILE.DIR.AT = 4 : GOSUB FILE.DIR.SKIPDISK
+    CLOSE FILE.CHAN : CLOSE 15 : FILE.DIR.AT = 4 : FILE.DIR.BANKAT = 0 : GOSUB FILE.DIR.SKIPDISK
     RETURN
 
 
@@ -180,11 +182,11 @@ FILE.DIR.SKIPDISK:
     GOSUB FILE.DIR.NEXT : FILE.DIR.MORE = 0 : RETURN
 
 
-## Where the bytes land. A bank is always the same address and size; low RAM is
+## Where the bytes land. A bank is $A000 plus FILE.DIR.BANKAT, to its end; low RAM is
 ## whatever the caller handed over.
 FILE.DIR.WHERE:  
 IF FILE.DIR.BANK = 0 THEN GOTO FILE.DIR.LOWRAM
-    FILE.DIR.ADDR% = FILE.DIR.BANKBASE : FILE.DIR.ROOM% = FILE.DIR.BANKROOM
+    FILE.DIR.ADDR% = FILE.DIR.BANKBASE + FILE.DIR.BANKAT : FILE.DIR.ROOM% = FILE.DIR.BANKROOM - FILE.DIR.BANKAT
     RETURN
 
 

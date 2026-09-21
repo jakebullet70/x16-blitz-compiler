@@ -25,6 +25,11 @@
 #DEFINE GM.MODSCODE 11
 #DEFINE GM.MENUCODE 12
 #DEFINE GM.DLGCODE 13
+#DEFINE GM.PICKCODE 15
+
+## ---- A LIST'S TEXT BANK. LIST.BANK reads a bank by the GP.BSTR layout, so
+## ---- the list's group is the first declared in it, and here the only one.
+#DEFINE GM.LISTBANK 14
 
 ## ---- The menu bar sits on row 0 and its first item starts here.
 #DEFINE GM.BARX 1
@@ -124,6 +129,12 @@ GP.ENDBANKED
 GP.BANKED GM.FUTILCODE
 #INCLUDE "FILEIO.INC.BL"
 #INCLUDE "FILEDIR.INC.BL"
+GP.ENDBANKED
+
+## ---- THE FILE PICKER IN A REGION OF ITS OWN. After FUTIL because it reads the
+## ---- FILE.DIR #DEFINEs, and BASLOAD resolves a #DEFINE only once it has read it.
+GP.BANKED GM.PICKCODE
+#INCLUDE "FILEPICK.INC.BL"
 GP.ENDBANKED
 
 ## ---- MENUKEY RUNS THE BAR FROM THE SHELL'S KEY LOOP. It is not in a region:
@@ -257,6 +268,8 @@ GP.SUB BANKMGR.CLAIM.BANK, GM.COMBOCODE
 GP.SUB BANKMGR.CLAIM.BANK, GM.MODSCODE
 GP.SUB BANKMGR.CLAIM.BANK, GM.MENUCODE
 GP.SUB BANKMGR.CLAIM.BANK, GM.DLGCODE
+GP.SUB BANKMGR.CLAIM.BANK, GM.LISTBANK
+GP.SUB BANKMGR.CLAIM.BANK, GM.PICKCODE
 
 ## The menus are built here and not later, because the first MENU.BEGIN is what
 ## claims MENU.TEXTBANK, and that has to happen before the free banks are asked for.
@@ -271,6 +284,11 @@ GP.SUB DLGRESET, GM.GUIBANK%
 ## without going near the drive again. See FILES / FILE.DIR.OPEN.
 GOSUB BANKMGR.GET.FREE.BANK : GM.DIRBANK% = BANKMGR.BANK
 IF GM.DIRBANK% = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 2)
+
+## PICKFILE builds its list in a bank of its own, and reads the listing into
+## GM.DIRBANK% or, packed, into the top half of this one.
+GOSUB BANKMGR.GET.FREE.BANK : GM.PICKBANK% = BANKMGR.BANK
+IF GM.PICKBANK% = 0 THEN GM.BANKFAIL$ = GP.BSTR(BS.LIBEND, 2)
 
 IF GM.BANKFAIL$ <> "" THEN GOTO GM.BANKSTOP
 
@@ -289,6 +307,10 @@ GM.SEL% = 1
 
 ## Where a panel writes what it got back, and what stands there before one has run.
 GM.RESY% = APPSYS.ROWS - 3 : GM.RESULT$ = GP.BSTR(BS.LIBEND, 1)
+
+## The middle row of the work area. A wait that takes seconds says so there --
+## the result row is too far down the screen to be read while it is happening.
+GM.BUSYY% = 7 + INT((APPSYS.ROWS - 12) / 2)
 
 GOSUB GMX.CHROME
 
@@ -352,6 +374,7 @@ GMX.QUIT:
 GP.BANKEDSTR GM.TEXTBANK BS.CHROME
   "GPB-MODS-TESTING -- A DEVELOPMENT HARNESS FOR THE GPC-BASIC LIBRARY"
   "ALT / ESC  MENU   <- ->  NEXT MENU   RETURN  CHOOSE   TAB  FOCUS"
+  "BUILD 008"
 GP.ENDBANKEDSTR
 GP.BANKEDSTR GM.TEXTBANK BS.HEAP
   "HEAP  FRE(0) "
@@ -361,6 +384,8 @@ GMX.CHROME:
   GP.FILL 0, 0, APPSYS.COLS, APPSYS.ROWS, ASC(" "), THEME.CLR(THEME.PAGE)
   GP.FILL 0, 0, APPSYS.COLS, 1, ASC(" "), THEME.CLR(THEME.TITLE)
   GP.PRINTAT 2, 2, GP.BSTR(BS.CHROME, 0), THEME.CLR(THEME.TEXT)
+  GM.BUILD$ = GP.BSTR(BS.CHROME, 2)
+  GP.PRINTAT APPSYS.COLS - 2 - LEN(GM.BUILD$), 2, GM.BUILD$, THEME.CLR(THEME.DIMMED)
   GM.KEYS$ = GP.BSTR(BS.CHROME, 1)
   GP.PRINTAT 2, APPSYS.ROWS - 1, GM.KEYS$, THEME.CLR(THEME.DIMMED)
   GOSUB GMX.BARDRAW : GOSUB GMX.RESULT : GOSUB GMX.HEAP
@@ -1303,7 +1328,8 @@ GMX.LISTS:
   GP.CASE 3 : GOSUB GMX.L.ITEMX
   GP.CASE 4 : GOSUB GMX.L.BAR
   GP.CASE 5 : GOSUB GMX.L.HOT
-  GP.OTHER  : GOSUB GMX.L.FLAGS
+  GP.CASE 6 : GOSUB GMX.L.FLAGS
+  GP.OTHER  : GOSUB GMX.L.BANK
   GP.ENDSEL
   GOSUB GMX.CHROME
   RETURN
@@ -1569,6 +1595,78 @@ GMX.L.FLAGS:
 
   GM.RESULT$ = GP.BSTR(BS.L.FLAGS, 13) + MID$(STR$(GM.KEPT%), 2)
   GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.L.FLAGS, 14) + MID$(STR$(GM.PICK%), 2)
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.L.BANK -- LIST.BANK. Forty rows read out of bank GM.LISTBANK.
+## ***********************************************************************
+
+
+GP.BANKEDSTR GM.LISTBANK BS.LS.ELEMENTS
+  "HYDROGEN"
+  "HELIUM"
+  "LITHIUM"
+  "BERYLLIUM"
+  "BORON"
+  "CARBON"
+  "NITROGEN"
+  "OXYGEN"
+  "FLUORINE"
+  "NEON"
+  "SODIUM"
+  "MAGNESIUM"
+  "ALUMINIUM"
+  "SILICON"
+  "PHOSPHORUS"
+  "SULFUR"
+  "CHLORINE"
+  "ARGON"
+  "POTASSIUM"
+  "CALCIUM"
+  "SCANDIUM"
+  "TITANIUM"
+  "VANADIUM"
+  "CHROMIUM"
+  "MANGANESE"
+  "IRON"
+  "COBALT"
+  "NICKEL"
+  "COPPER"
+  "ZINC"
+  "GALLIUM"
+  "GERMANIUM"
+  "ARSENIC"
+  "SELENIUM"
+  "BROMINE"
+  "KRYPTON"
+  "RUBIDIUM"
+  "STRONTIUM"
+  "YTTRIUM"
+  "ZIRCONIUM"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR GM.TEXTBANK BS.L.BANK
+  "THE ELEMENTS"
+  "FORTY ROWS OUT OF A BANK. THE LIST HOLDS NO"
+  "STRINGS: EACH ROW IS READ FROM THE BANK AS"
+  "IT IS DRAWN."
+  "LIST.BANK  ROW "
+  "LIST.BANK  CANCELLED"
+GP.ENDBANKEDSTR
+GMX.L.BANK:
+  GOSUB GMX.CLEARPANEL
+  GP.PRINTAT 32, 9, GP.BSTR(BS.L.BANK, 1), THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 32, 10, GP.BSTR(BS.L.BANK, 2), THEME.CLR(THEME.TEXT)
+  GP.PRINTAT 32, 11, GP.BSTR(BS.L.BANK, 3), THEME.CLR(THEME.TEXT)
+  GP.SUB LIST.BEGIN, GP.BSTR(BS.L.BANK, 0), 10
+  GP.SUB LIST.BANK, GM.LISTBANK, 0, GP.BSTRCOUNT(BS.LS.ELEMENTS) - 1
+  GM.PICK% = GP.FN(LISTTO.RUN)
+  GM.RESULT$ = GP.BSTR(BS.L.BANK, 5)
+  GP.IF GM.PICK% > 0 THEN
+    GM.RESULT$ = GP.BSTR(BS.L.BANK, 4) + MID$(STR$(GM.PICK%), 2)
+    GM.RESULT$ = GM.RESULT$ + "  " + GP.FN(LIST.ITEM, GM.PICK%)
+  GP.ENDIF
   RETURN
 
 
@@ -2557,7 +2655,7 @@ GMX.G.USINGFIX:
   GM.RESULT$ = GP.BSTR(BS.G.USING, 5)
   RETURN
 ## ***********************************************************************
-## **  GMX.FILES -- the FILES dropdown. FILEIO and FILEDIR, one item each.
+## **  GMX.FILES -- the FILES dropdown. FILEIO, FILEDIR and FILEPICK.
 ## **
 ## **  THE DRIVE IS REAL, and four of these write to it. Everything they
 ## **  make is named GPBFILE.* or GPBDIR, and every one of them is removed by
@@ -2588,8 +2686,14 @@ GMX.FILES:
     GOSUB GMX.F.ARRAY
   GP.CASE 7
     GOSUB GMX.F.RENAME
-  GP.OTHER
+  GP.CASE 8
     GOSUB GMX.F.MKDIR
+  GP.CASE 9
+    GOSUB GMX.F.PICKTWO
+  GP.CASE 10
+    GOSUB GMX.F.PICKONE
+  GP.OTHER
+    GOSUB GMX.F.PICKSORT
   GP.ENDSEL
   GOSUB GMX.CHROME
   RETURN
@@ -3049,6 +3153,115 @@ GMX.F.MKDIR:
   GM.TELL$ = GP.BSTR(BS.F.MKDIR, 7)
   GOSUB GMX.TELL
   GM.RESULT$ = GP.BSTR(BS.F.MKDIR, 8) + FILE.PATH$
+  RETURN
+
+
+## ***********************************************************************
+## **  GMX.F.PICKTWO / GMX.F.PICKONE -- PICKFILE, the list in GM.PICKBANK%.
+## **
+## **  TWO reads the listing into GM.DIRBANK% and holds 255 files; ONE packs
+## **  the listing into the top half of the list's own bank and holds 127.
+## **
+## **  GMX.F.PICKSORT asks the same suffixes, then reads the drive with no
+## **  list up, sorts what came back and shows it with LIST.BANK. One box,
+## **  and it is the sorted one.
+## ***********************************************************************
+
+
+GP.BANKEDSTR GM.TEXTBANKB BS.F.PICK
+  " OPEN FILE "
+  " PICKFILE "
+  "THE SUFFIXES TO SHOW, COMMAS BETWEEN, NO DOT."
+  "EMPTY SHOWS EVERY FILE."
+  "PRG,OVL"
+  "PICKFILE  "
+  "PICKFILE  NOTHING PICKED  "
+  " FILES LISTED"
+  "  LIST FULL"
+  "PICKFILE  CANCELLED"
+GP.ENDBANKEDSTR
+GMX.F.PICKTWO:
+  GP.SUB PICKBANKS, GM.PICKBANK%, GM.DIRBANK%
+  GOSUB GMX.F.PICK
+  RETURN
+
+GMX.F.PICKONE:
+  GP.SUB PICKBANKS, GM.PICKBANK%, 0
+  GOSUB GMX.F.PICK
+  RETURN
+
+## ---- The suffix prompt, asked the same way by both pickers. GUI.OK is 0
+## ---- when it was cancelled.
+GMX.F.SUFFIX:
+  GM.FPAT$ = GP.FN(INPUTBOXEX, GP.BSTR(BS.F.PICK, 1), GP.BSTR(BS.F.PICK, 2), GP.BSTR(BS.F.PICK, 3), "", GP.BSTR(BS.F.PICK, 4), 20, 0)
+  RETURN
+
+GMX.F.PICK:
+  GOSUB GMX.F.SUFFIX
+  GP.IF GUI.OK = 0 THEN
+    GM.RESULT$ = GP.BSTR(BS.F.PICK, 9)
+    RETURN
+  GP.ENDIF
+  GM.FTXT$ = GP.FN(PICKFILE, GP.BSTR(BS.F.PICK, 0), GM.FPAT$)
+  GM.RESULT$ = GP.BSTR(BS.F.PICK, 6)
+  IF GP.ISEMPTY(GM.FTXT$) = 0 THEN GM.RESULT$ = GP.BSTR(BS.F.PICK, 5) + GM.FTXT$ + "  "
+  GM.RESULT$ = GM.RESULT$ + MID$(STR$(FILEPICK.COUNT), 2) + GP.BSTR(BS.F.PICK, 7)
+  IF FILEPICK.FULL <> 0 THEN GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.F.PICK, 8)
+  RETURN
+
+GP.BANKEDSTR GM.TEXTBANKB BS.F.SORT
+  " SORTED LIST "
+  "SORTED  "
+  "SORTED  NOTHING PICKED  "
+  " ROWS SORTED"
+  "SORTING  "
+  " FILES"
+  "READING THE DRIVE"
+  "SORTED  NOTHING MATCHED"
+GP.ENDBANKEDSTR
+GMX.F.PICKSORT:
+  GP.SUB PICKBANKS, GM.PICKBANK%, GM.DIRBANK%
+  GOSUB GMX.F.SUFFIX
+  GP.IF GUI.OK = 0 THEN
+    GM.RESULT$ = GP.BSTR(BS.F.PICK, 9)
+    RETURN
+  GP.ENDIF
+## ---- PICKSCAN reads the drive without putting a list up, so the only box
+## ---- the user sees is the sorted one. Both waits are seconds of BASIC and
+## ---- a blank screen reads as a program that has stopped, so each names
+## ---- itself in the middle of the screen first.
+  GM.RESULT$ = GP.BSTR(BS.F.SORT, 6)
+  GOSUB GMX.F.BUSYNOW
+  GP.SUB PICKSCAN, GM.FPAT$
+  GP.IF FILEPICK.COUNT = 0 THEN
+    GM.RESULT$ = GP.BSTR(BS.F.SORT, 7)
+    RETURN
+  GP.ENDIF
+  GM.RESULT$ = GP.BSTR(BS.F.SORT, 4) + MID$(STR$(FILEPICK.COUNT), 2) + GP.BSTR(BS.F.SORT, 5)
+  GOSUB GMX.F.BUSYNOW
+  GP.SUB LIST.SORT, GM.PICKBANK%, 0, FILEPICK.COUNT - 1
+  GOSUB GMX.F.BUSYOFF
+  GP.SUB LIST.BEGIN, GP.BSTR(BS.F.SORT, 0), 12
+  GP.SUB LIST.BANK, GM.PICKBANK%, 0, FILEPICK.COUNT - 1
+  GM.FSEL% = GP.FN(LISTTO.RUN)
+  GM.RESULT$ = GP.BSTR(BS.F.SORT, 2)
+  GP.IF GM.FSEL% > 0 THEN
+    GM.RESULT$ = GP.BSTR(BS.F.SORT, 1) + GP.FN(LIST.ITEM, GM.FSEL%) + "  "
+  GP.ENDIF
+  GM.RESULT$ = GM.RESULT$ + MID$(STR$(FILEPICK.COUNT), 2) + GP.BSTR(BS.F.SORT, 3)
+  RETURN
+
+## ---- GM.RESULT$ centred on the middle row, now, rather than when the panel
+## ---- hands back. GMX.RESULT is outside this region, and a GOSUB out of a
+## ---- banked region loses the bank, so the row is painted here.
+GMX.F.BUSYNOW:
+  GOSUB GMX.F.BUSYOFF
+  GP.PRINTAT INT((APPSYS.COLS - LEN(GM.RESULT$)) / 2), GM.BUSYY%, GM.RESULT$, THEME.CLR(THEME.WARN)
+  RETURN
+
+## ---- The banner off again, before anything is drawn over it.
+GMX.F.BUSYOFF:
+  GP.FILL 0, GM.BUSYY%, APPSYS.COLS, 1, ASC(" "), THEME.CLR(THEME.PAGE)
   RETURN
 
 GP.ENDBANKED

@@ -140,6 +140,7 @@ GUI.FORM.INIT:
 ## GUI.FORM.BEGIN -- empty control list; call after GUI.OPEN
 GUI.FORM.BEGIN:
     GOSUB GUI.FORM.INIT : GUI.CTRL.N = 0 : GUI.FORM.DEFN = 0 : GUI.FOCUS = 1
+    GUI.FORM.PAINTED = 0
     RETURN
 
 ## GUI.FORM.ADD.FIELD -- add and draw a field from LINEINPUT.X .Y .LEN .TEXT$
@@ -185,6 +186,8 @@ GUI.FORM.ADD.LIST:
     GUI.LIST.NOTE.LEFT = GUI.LEFT + INT((GUI.WIDTH - GUI.LIST.NOTEW) / 2)
     GOSUB GUI.LIST.COUNTMARKS : GOSUB GUI.LIST.FOOT
     GOSUB GUI.LIST.FOLLOW : GOSUB GUI.LIST.DRAW
+    ## drawn in the focus state it will start in, so GUI.FORM.RUN need not redo it
+    IF GUI.LIST.CTRL = GUI.FOCUS THEN GUI.FORM.PAINTED = GUI.LIST.CTRL
     RETURN
 
 ## GUI.LIST.DRAW -- every visible row; HILITE when focused, FOCUS when not
@@ -207,12 +210,52 @@ GUI.LIST.PAINT.ROW:
     GUI.LIST.AT = GUI.LIST.SCROLL + GUI.LIST.ROW
     GP.FILL GUI.LIST.X, GUI.LIST.DRAWY, GUI.LIST.W, 1, GUI.SPACE, GUI.LIST.ATTR
     IF GUI.LIST.AT > GUI.LIST.COUNT THEN RETURN
-    GP.PRINTAT GUI.LIST.X, GUI.LIST.DRAWY, LEFT$(GUI.LIST.ITEM$(GUI.LIST.AT), GUI.LIST.W), GUI.LIST.ATTR
+    GOSUB GUI.LIST.FETCH
+    GP.PRINTAT GUI.LIST.X, GUI.LIST.DRAWY, LEFT$(GUI.LIST.TEXT$, GUI.LIST.W), GUI.LIST.ATTR
     IF GUI.LIST.MARKP = 0 THEN RETURN
     ## mark cell: 49 is "1", 42 is "*"
     GP.FILL GUI.LIST.X - 2, GUI.LIST.DRAWY, 2, 1, GUI.SPACE, GUI.LIST.ATTR
     IF PEEK(GUI.LIST.MARKP + GUI.LIST.AT) <> 49 THEN RETURN
     GP.FILL GUI.LIST.X - 2, GUI.LIST.DRAWY, 1, 1, 42, GUI.LIST.ATTR
+    RETURN
+
+## GUI.LIST.FETCH -- row GUI.LIST.AT into GUI.LIST.TEXT$, from the list's source.
+## GUI.LIST.BANK 0 is GUI.LIST.ITEM$(); any other is a bank in the GP.BSTR image
+## layout, whose row 1 is string GUI.LIST.FIRST. The bytes are POKEd into a
+## string the right length, which is one string and no concatenation.
+GUI.LIST.FETCH:
+    GP.IF GUI.LIST.BANK = 0 THEN
+        GUI.LIST.TEXT$ = GUI.LIST.ITEM$(GUI.LIST.AT)
+        RETURN
+    GP.ENDIF
+    GOSUB GUI.LIST.RECORD
+    GUI.LIST.TEXT$ = ""
+    IF GUI.LIST.LEN = 0 THEN RETURN
+    GUI.LIST.TEXT$ = RPT$(32, GUI.LIST.LEN)
+    GUI.LIST.PTR = GP.STRPTR(GUI.LIST.TEXT$)
+    FOR GUI.LIST.C = 1 TO GUI.LIST.LEN
+        POKE GUI.LIST.PTR + GUI.LIST.C, PEEK(GUI.LIST.ADDR + GUI.LIST.C)
+    NEXT GUI.LIST.C
+    RETURN
+
+## GUI.LIST.WIDTH -- GUI.LIST.LEN, the length of row GUI.LIST.AT, without reading it
+GUI.LIST.WIDTH:
+    GP.IF GUI.LIST.BANK = 0 THEN
+        GUI.LIST.LEN = LEN(GUI.LIST.ITEM$(GUI.LIST.AT))
+        RETURN
+    GP.ENDIF
+    GOSUB GUI.LIST.RECORD
+    RETURN
+
+## GUI.LIST.RECORD -- GUI.LIST.ADDR at row GUI.LIST.AT's length byte in the bank,
+## GUI.LIST.LEN that length. $A002 holds a 16-bit offset from $A000 per string.
+## STASH.SELECT runs the BANK statement a region may not; the PEEKs honour it.
+GUI.LIST.RECORD:
+    STASH.PEEKBANK = GUI.LIST.BANK
+    GOSUB STASH.SELECT
+    GUI.LIST.ADDR = $A002 + 2 * (GUI.LIST.FIRST + GUI.LIST.AT - 1)
+    GUI.LIST.ADDR = $A000 + PEEK(GUI.LIST.ADDR) + 256 * PEEK(GUI.LIST.ADDR + 1)
+    GUI.LIST.LEN = PEEK(GUI.LIST.ADDR)
     RETURN
 
 ## GUI.LIST.FOLLOW -- scroll the least that shows GUI.LIST.SEL
@@ -288,9 +331,21 @@ GUI.FORM.RUN:
     IF GUI.FOCUS < 1 THEN GUI.FOCUS = 1
     IF GUI.FOCUS > GUI.CTRL.N THEN GUI.FOCUS = 1
     GUI.PAINT.N = GUI.FOCUS
-    GOSUB GUI.FORM.PAINT
+    ## a control already drawn in this focus state is not drawn again: a banked
+    ## list costs a PEEK a character, and the second pass is visible
+    IF GUI.FOCUS <> GUI.FORM.PAINTED THEN GOSUB GUI.FORM.PAINT
+    ## ---- drop what was queued before the box opened, and typed while it drew.
+    ## ---- A form opened on a queued RETURN answers itself and closes unseen.
+    GP.DO
+        GET GUI.PRESSED$ : IF GP.ISEMPTY(GUI.PRESSED$) THEN GP.EXITDO
+    GP.LOOP
 GUI.FORM.LOOP:
     GOSUB GUI.FORM.STEP : IF GUI.FORM.DONE = 0 THEN GOTO GUI.FORM.LOOP
+    ## ---- and drop the repeats of the key that closed it. A held ESC shuts the
+    ## ---- box and its repeat lands in the program's own key loop after it.
+    GP.DO
+        GET GUI.PRESSED$ : IF GP.ISEMPTY(GUI.PRESSED$) THEN GP.EXITDO
+    GP.LOOP
     RETURN
 
 ## GUI.FORM.STEP -- focused control reads a key, GUI.FORM.ACT acts on the verdict
@@ -330,6 +385,10 @@ GUI.FORM.DO.FIELD:
 GUI.FORM.DO.LIST:
     GUI.FORM.NAV = GUI.NAV.STAY
 GUI.FORM.DO.LIST.KEY:
+    ## ---- drop what was typed during the redraw: a held arrow outruns the paint
+    GP.DO
+        GET GUI.PRESSED$ : IF GP.ISEMPTY(GUI.PRESSED$) THEN GP.EXITDO
+    GP.LOOP
     GOSUB GUI.FORM.GETKEY : GUI.LIST.WAS = GUI.LIST.SEL
     GUI.LIST.WAS.SCROLL = GUI.LIST.SCROLL
     GUI.LIST.HI = THEME.CLR(THEME.HILITE)

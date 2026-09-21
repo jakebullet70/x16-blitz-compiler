@@ -45,6 +45,9 @@
 ## **                                      GUI.LISTBOX.MARKS$ which ones
 ## **  N = GP.FN(LISTBOXEX, t$, m$, m2$, m3$, count, rows, multi)
 ## **                                      GUI.LISTBOX.SEL, whichever mode
+## **  LIST.BEGIN ... LISTTO.RUN           a listbox from an array or a bank;
+## **                                      its own section below
+## **  LIST.SORT bank, first, last         a bank list into order, in place
 ## **  T$ = GP.FN(ASKLINE, x, y, label$, len)
 ## **                                      LINEINPUT.ASK at x, y, no box;
 ## **                                      LINEINPUT.KEY 27 is a cancel
@@ -66,14 +69,16 @@
 ## **  DIMs.
 ## **
 ## **  Requires GPB.INC.BL, THEME.INC.BL, MENU.INC.BL, LINEINPUT.INC.BL,
-## **  GUI.INC.BL, COMBO.INC.BL and CHECK.INC.BL, all before this file. A verb is compiled
+## **  GUI.INC.BL, COMBO.INC.BL, CHECK.INC.BL and, for LIST.SORT alone,
+## **  STASH.INC.BL, all before this file. A verb is compiled
 ## **  before any call to it, so this goes in above the program's code.
 ## **
 ## **  The arguments land in DLG.* and not in the GUI.* inputs themselves:
 ## **  GUI.DEFAULTS runs after the arguments are stored, and would clear them.
 ## **
 ## **  TO RUN IT FROM A RAM BANK, put the #INCLUDE between GP.BANKED and
-## **  GP.ENDBANKED. Nothing here executes a BANK statement.
+## **  GP.ENDBANKED. Nothing here executes a BANK statement: LIST.SORT reaches
+## **  its list through STASH.SELECT, which a region may call out to.
 ## **
 ## ***********************************************************************
 #IFNDEF DLG.DEFS
@@ -94,6 +99,7 @@ GUI.DEFAULTS:
     GUI.DEFAULT = 1 : GUI.SHADOW = DLG.SHADOW
     GUI.SHADOW.ATTR = 0 : GUI.LEN = 0 : GUI.MASK = 0 : GUI.TEXT$ = ""
     GUI.FLAGS = 0 : GUI.SEL = 0 : GUI.COUNT = 0
+    GUI.LIST.BANK = 0
     RETURN
 
 ## ---- the EX verbs' title and three lines, onto a clean slate
@@ -390,7 +396,9 @@ DLG.INTERNAL.LIST:
 ## ---- stashed, so it cannot grow as the list scrolls.
     DLG.TEXTW = 0
     FOR DLG.I = 1 TO GUI.LIST.COUNT
-        IF LEN(GUI.LIST.ITEM$(DLG.I)) > DLG.TEXTW THEN DLG.TEXTW = LEN(GUI.LIST.ITEM$(DLG.I))
+        GUI.LIST.AT = DLG.I
+        GOSUB GUI.LIST.WIDTH
+        IF GUI.LIST.LEN > DLG.TEXTW THEN DLG.TEXTW = GUI.LIST.LEN
     NEXT DLG.I
 
 ## ---- multi select: COUNT "0"s, toggled in place through GP.STRPTR, so a
@@ -427,6 +435,150 @@ DLG.INTERNAL.LIST:
         GUI.LISTBOX.SEL = 0 : GUI.KEY = GUI.ESCAPE
     GP.ENDIF
     GOSUB GUI.CLOSE
+    RETURN
+
+## ***********************************************************************
+## **  LIST -- a listbox built in steps, like a form: BEGIN, a source, RUN.
+## **
+## **      GP.SUB LIST.BEGIN, "PICK ONE", 12
+## **      GP.SUB LIST.BANK, MYBANK, 0, 199
+## **      N = GP.FN(LISTTO.RUN)
+## **      IF N > 0 THEN A$ = GP.FN(LIST.ITEM, N)
+## **
+## **  LIST.ARRAY count reads GUI.LIST.ITEM$(1..count), as LISTBOX does.
+## **  LIST.BANK bank, first, last reads strings first..last of a bank in the
+## **  GP.BSTR image layout, so a GP.BANKEDSTR group works if it is the FIRST
+## **  group declared in its bank: then GP.BSTR(group, n) is string n.
+## **
+## **  N is a row, 1 up, and 0 is a cancel; a bank row N is string first+N-1.
+## **  LIST.ITEM reads any row of the last list, before or after the run.
+## ***********************************************************************
+
+DLG.LIST.BEGIN:
+    GP.DEFPROC LIST.BEGIN, DLG.TITLE$, DLG.ROWS
+    GOSUB GUI.DEFAULTS
+    GUI.TITLE$ = DLG.TITLE$
+    DLG.LIST.ROWS = DLG.ROWS
+    DLG.LIST.COUNT = 0
+    RETURN
+
+DLG.LIST.ARRAY:
+    GP.DEFPROC LIST.ARRAY, DLG.COUNT
+    GUI.LIST.BANK = 0
+    DLG.LIST.COUNT = DLG.COUNT
+    RETURN
+
+DLG.LIST.BANK:
+    GP.DEFPROC LIST.BANK, DLG.BANK, DLG.FIRST, DLG.LAST
+    GUI.LIST.BANK = DLG.BANK
+    GUI.LIST.FIRST = DLG.FIRST
+    DLG.LIST.COUNT = DLG.LAST - DLG.FIRST + 1
+    RETURN
+
+DLG.LISTTO.RUN:
+    GP.DEFPROC LISTTO.RUN RETURNS GUI.LISTBOX.SEL
+    DLG.COUNT = DLG.LIST.COUNT
+    DLG.ROWS = DLG.LIST.ROWS
+    DLG.MULTI = 0
+    GOSUB DLG.INTERNAL.LIST
+    RETURN
+
+DLG.LIST.ITEM:
+    GP.DEFPROC LIST.ITEM, DLG.N RETURNS GUI.LIST.TEXT$
+    GUI.LIST.TEXT$ = ""
+    IF DLG.N < 1 THEN RETURN
+    GUI.LIST.AT = DLG.N
+    GOSUB GUI.LIST.FETCH
+    RETURN
+
+## ***********************************************************************
+## **  LIST.SORT bank, first, last -- strings first..last of a bank in the
+## **  GP.BSTR image layout into ascending order, rows compared byte for byte.
+## **
+## **  IT MOVES THE OFFSET TABLE, NOT THE RECORDS. $A002 holds one 16-bit
+## **  offset a string, so a move is two bytes and the text never travels.
+## **  A pointer a caller kept into a record stays good; a string NUMBER does
+## **  not, because that is what has just been shuffled.
+## **
+## **  first and last are the numbers LIST.BANK takes, so after a pick:
+## **
+## **      GP.SUB LIST.SORT, MYBANK, 0, FILEPICK.COUNT - 1
+## **      GP.SUB LIST.BANK, MYBANK, 0, FILEPICK.COUNT - 1
+## **
+## **  A shell sort. An insertion sort of 255 rows is a minute of BASIC; the
+## **  gaps take the same rows in seconds, on the same two-byte moves.
+## ***********************************************************************
+
+DLG.LIST.SORT:
+    GP.DEFPROC LIST.SORT, DLG.BANK, DLG.FIRST, DLG.LAST
+    DLG.SORT.N = DLG.LAST - DLG.FIRST + 1
+    IF DLG.SORT.N < 2 THEN RETURN
+    STASH.PEEKBANK = DLG.BANK
+    GOSUB STASH.SELECT
+    DLG.SORT.BASE = $A002 + 2 * DLG.FIRST
+    DLG.SORT.GAP = INT(DLG.SORT.N / 2)
+    GP.DO
+        IF DLG.SORT.GAP < 1 THEN GP.EXITDO
+        GOSUB DLG.SORT.PASS
+        DLG.SORT.GAP = INT(DLG.SORT.GAP / 2)
+    GP.LOOP
+    RETURN
+
+## ---- one pass at DLG.SORT.GAP: each entry from the gap on, walked back to
+## ---- where it belongs among the entries a gap apart from it
+DLG.SORT.PASS:
+    FOR DLG.SORT.I = DLG.SORT.GAP TO DLG.SORT.N - 1
+        DLG.SORT.AT = DLG.SORT.I
+        GOSUB DLG.SORT.READ
+        DLG.SORT.HOLD = DLG.SORT.V
+        DLG.SORT.J = DLG.SORT.I
+        GP.DO
+            IF DLG.SORT.J < DLG.SORT.GAP THEN GP.EXITDO
+            DLG.SORT.AT = DLG.SORT.J - DLG.SORT.GAP
+            GOSUB DLG.SORT.READ
+            DLG.SORT.PA = $A000 + DLG.SORT.V
+            DLG.SORT.PB = $A000 + DLG.SORT.HOLD
+            GOSUB DLG.SORT.AFTER
+            IF DLG.SORT.R = 0 THEN GP.EXITDO
+            DLG.SORT.AT = DLG.SORT.J
+            GOSUB DLG.SORT.WRITE
+            DLG.SORT.J = DLG.SORT.J - DLG.SORT.GAP
+        GP.LOOP
+        DLG.SORT.V = DLG.SORT.HOLD
+        DLG.SORT.AT = DLG.SORT.J
+        GOSUB DLG.SORT.WRITE
+    NEXT DLG.SORT.I
+    RETURN
+
+## ---- DLG.SORT.R is 1 when the record at DLG.SORT.PA sorts AFTER the one at
+## ---- DLG.SORT.PB, 0 when it does not. Both point at a length byte, text at +1.
+## ---- A row that runs out first sorts before the longer one it matched.
+DLG.SORT.AFTER:
+    DLG.SORT.LA = PEEK(DLG.SORT.PA)
+    DLG.SORT.LB = PEEK(DLG.SORT.PB)
+    DLG.SORT.R = 0
+    DLG.SORT.K = 1
+    GP.DO
+        IF DLG.SORT.K > DLG.SORT.LA THEN GP.EXITDO
+        IF DLG.SORT.K > DLG.SORT.LB THEN DLG.SORT.R = 1 : GP.EXITDO
+        DLG.SORT.CA = PEEK(DLG.SORT.PA + DLG.SORT.K)
+        DLG.SORT.CB = PEEK(DLG.SORT.PB + DLG.SORT.K)
+        IF DLG.SORT.CA > DLG.SORT.CB THEN DLG.SORT.R = 1 : GP.EXITDO
+        IF DLG.SORT.CA < DLG.SORT.CB THEN GP.EXITDO
+        DLG.SORT.K = DLG.SORT.K + 1
+    GP.LOOP
+    RETURN
+
+## ---- the offset entry at index DLG.SORT.AT, in and out of DLG.SORT.V
+DLG.SORT.READ:
+    DLG.SORT.P = DLG.SORT.BASE + 2 * DLG.SORT.AT
+    DLG.SORT.V = PEEK(DLG.SORT.P) + 256 * PEEK(DLG.SORT.P + 1)
+    RETURN
+
+DLG.SORT.WRITE:
+    DLG.SORT.P = DLG.SORT.BASE + 2 * DLG.SORT.AT
+    POKE DLG.SORT.P, DLG.SORT.V AND 255
+    POKE DLG.SORT.P + 1, INT(DLG.SORT.V / 256)
     RETURN
 
 ## ***********************************************************************

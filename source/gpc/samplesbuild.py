@@ -15,7 +15,7 @@
 #   XBASE IS DELIBERATELY ABSENT.  It has a working build script, xbasebuild.py, and is
 #   still built by hand; it is not part of a release because no database ships with it.
 #
-import os, shutil, subprocess, sys, threading, time
+import os, re, shutil, subprocess, sys, threading, time
 
 ROOT    = r"C:\dev\CmdrX16\dos_tools\x16-blitz-compiler"
 TESTING = os.path.join(ROOT, "testing")
@@ -39,7 +39,7 @@ PROGRAMS = [
     dict(name="GPBMODS",
          src=("samples/GPB-MODS-TESTING", "GPBMODS.BASL"),
          lib="samples/GPB-MODS-TESTING/GPC-BASIC",
-         extras=[], shared=True, install=None, data=[]),
+         extras=["GPB-MENUS.BASL"], shared=True, install=None, data=[]),
 
     dict(name="GPB.HELP",
          src=("samples/GPC-HELP", "GPB.HELP.BASL"),
@@ -60,12 +60,12 @@ PROGRAMS = [
          extras=[], shared=False,
          install=("demo", "C.BMXVIEW.PRG"), data=["bmx"]),
 
-    #   EMBEDDED, per step 2 of samples\editor\readme.md -- its drive is the sample folder.
+    #   SHARED: MENU.INC.BL uses GP.BANKEDSTR. Builds in the sample folder.
     dict(name="EDITOR",
          src=("samples/editor", "EDITOR.BASL"),
          lib="samples/editor/GPC-BASIC",
-         extras=["ED-MENUS.BASL", "ED-STORE.BASL"], shared=False,
-         install=("samples/editor", "C.EDITOR.PRG"), data=[]),
+         extras=["ED-MENUS.BASL", "ED-STORE.BASL"], shared=True, inplace=True,
+         install=("samples/editor", "C.EDITOR.PRG"), data=["runtimes"]),
 ]
 
 BMX_SRC = os.path.join(ROOT, "samples", "BMXVIEWER", "SAMPLES")
@@ -200,12 +200,38 @@ def stem_of(filename):
     return os.path.splitext(filename)[0]
 
 
+#   A "BUILD nnn" literal anywhere in a master, and the three digits inside it.
+BUILDNUM = re.compile(rb'("BUILD )(\d{3})(")')
+
+
+def stamp_buildnum(prog):
+    #   Bump the master's own build number, in the MASTER and not in the staged copy: a
+    #   number that only ever appears on the drive leaves the source saying 001 forever,
+    #   which is the confusion this is here to end.  Fixed at three digits so the string
+    #   never changes length and the bank table it sits in never moves.  A master with no
+    #   "BUILD nnn" literal is left alone -- this needs no entry in PROGRAMS.
+    path = os.path.join(ROOT, *prog["src"][0].split("/"), prog["src"][1])
+    text = open(path, "rb").read()
+    if not BUILDNUM.search(text):
+        return
+    nextnum = [0]
+
+    def bump(m):
+        nextnum[0] = int(m.group(2)) % 999 + 1
+        return m.group(1) + b"%03d" % nextnum[0] + m.group(3)
+
+    #   read as bytes and written back as bytes, so the master's line endings survive
+    open(path, "wb").write(BUILDNUM.sub(bump, text))
+    print("   build number:", "%03d" % nextnum[0], flush=True)
+
+
 def build(prog):
     name = prog["name"]
     stem = stem_of(prog["src"][1])
     print("=" * 70, flush=True)
     print("==", name, "(%s)" % ("SHARED" if prog["shared"] else "EMBEDDED"), flush=True)
 
+    stamp_buildnum(prog)
     if prog.get("inplace"):
         drive = os.path.join(ROOT, *prog["src"][0].split("/"))
     else:

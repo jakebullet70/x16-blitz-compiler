@@ -1233,6 +1233,23 @@ image for all 12,031 bytes of the GP-BASIC OUT cut, with the only differences th
 
 ## Wanted
 
+### `FILEDIR` reads a directory too slowly — QUEUED, raised 2026-09-20
+
+A `FILEPICK` box takes about two seconds to appear, and most of that is `FILEDIR` pulling the
+listing in. The pause was put down to HOSTFS. **That is wrong**: XFMGR reads the same host
+directory on the same machine much faster, so the cost is in our read loop.
+
+Where to start:
+
+- `samples/GPB-MODS-TESTING/GPC-BASIC/FILEDIR.INC.BL` — the loop behind `FILE.DIR.OPEN` and
+  `FILE.DIR.NEXT`, which `FILEPICK.SCAN` drives once a file.
+- A per-byte read is the first suspect. The precedent is measured: the editor's loader found
+  `LINPUT#` **10.5x** faster than a `GET#` byte loop, and `BINPUT#` is itself a `CHRIN` loop capped
+  at 255 bytes.
+- `MACPTR` wraps banks itself, and the note saying its caller is `STASH` rather than `FILEDIR` is
+  worth re-testing against a measured number.
+- Time it before touching it.
+
 ### A label's address as a value, and a `GOSUB` through it — RESEARCH, raised 2026-09-19
 
 A program cannot take a label's address and call it at run time. The wanted shape is a callback:
