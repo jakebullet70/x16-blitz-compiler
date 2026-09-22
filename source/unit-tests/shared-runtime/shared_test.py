@@ -53,20 +53,20 @@ TOKENISE = os.path.join(ROOT, "bin", "tokenise.zip")
 #		low half) and bumped the magic. The suite had been red from that commit until the 19->20
 #		menu removal, and nobody saw it for the reason written above. Three literals now, not two.
 #
-RTBASE            = 0x6E00
-RTGPBASE          = 0x6600
-RT_ABI            = 20
+RTBASE            = 0x7700
+RTGPBASE          = 0x6F00
+RT_ABI            = 25
 PCODE_PAGE        = 0x09
-FRAME_STACK_PAGES = 16
+FRAME_STACK_PAGES = 8
 MIN_WS_PAGES      = 16
 
 # The magic carries the ABI ordinal; the FILE NAME carries the engine build number, and is read
 # from the same stamp rtname.py and bootstrap.asm use -- NOT pinned here, because it changes on
 # every engine build and a literal would fail on every build rather than only on a real ABI move.
 sys.path.insert(0, os.path.join(ROOT, "source", "runtime", "scripts"))
-from rtname import rt_filename                                          # noqa: E402
+from rtname import rc_filename                                          # noqa: E402
 
-RT_NAME  = rt_filename()
+RT_NAME  = rc_filename()
 RT_MAGIC = b"GP%02d" % RT_ABI          # "GP" + TWO digits: 4 bytes, room to ABI 99
 
 # Files this test creates in testing/ (the emulator's drive). All prefixed RT_ and cleaned up.
