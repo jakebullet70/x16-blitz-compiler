@@ -9547,10 +9547,6 @@ GPBANK_MAXREGIONS = 127 					; the most a doubled subscript reaches in a byte
 
 CommandGPBankedCompile:
 		stz 	deferErrors 				; a block opener must never defer -- see the header
-		lda 	gpBankShared 				; an embedded object is one file, and the regions
-		bne 	_CGBCShared 				; arrive in a .OVL beside it
-		jmp 	GPBankNeedsShared
-_CGBCShared:
 		lda 	gpBankState 				; 0 = never seen, 1 = open, 2 = closed
 		cmp 	#1
 		beq 	GPBankStructure 			; a GP.BANKED inside a region that is still open
@@ -10102,11 +10098,10 @@ _GBRCross:
 		tay
 		clc
 		lda 	gpBankStarts+1,y 			; the page this region WOULD have run at in low memory
-		adc 	gpBankRunPage
-		inc 	a 							; ...plus one, for the BOOTSTRAP EXTENSION PAGE. Only a
-											; banked program carries it, and this routine only runs
-											; for a banked program, so the +1 is unconditional:
-											; low p-code starts at $0A00 here, not $0900.
+		adc 	gpBankRunPage 				; buffer page -> run page, the WHOLE delta: CompileCode folds
+											; the bootstrap extension page into it for a shared program,
+											; because an embedded one has no such page and this routine
+											; cannot tell the two apart
 		sta 	gpBankTemp
 		sec
 		lda 	#$A0 						; ...against the page it is actually going to -- and
@@ -10124,7 +10119,6 @@ _GBRCross:
 		clc
 		lda 	gpBankStarts+1
 		adc 	gpBankRunPage
-		inc 	a
 		sta 	gpBankRunBase
 		lda 	#1
 		sta 	gpBankActive
@@ -10453,16 +10447,6 @@ _GBFBADone:
 GPBankTooMany:
 		jsr 	CallErrorHandler
 		.text 	"TOO MANY GP.BANKED REGIONS", 0
-
-;
-;		EMBEDDED IS ONE FILE. The regions are read into their banks out of a .OVL beside the
-;		program by the shared bootstrap, so a banked program is never one file, and an embedded
-;		compile of one stops at the first GP.BANKED.
-;		In compiler space, like the message above. GP.BANKEDSTR has its own, in gpbstr.asm.
-;
-GPBankNeedsShared:
-		jsr 	CallErrorHandler
-		.text 	"GP.BANKED NEEDS SHARED", 0
 
 ; ************************************************************************************************
 
@@ -11006,9 +10990,9 @@ gpBankHigh:										; ...and one past the region once it has moved
 gpBankWalk:										; cursor into the line number table
 		.fill 	2
 gpBankShared:									; 1 in SHARED mode. Set by CompileCode before the
-		.fill 	1 								; compile: embedded refuses GP.BANKED and GP.BANKEDSTR
-gpBankRunPage:									; buffer page -> run page, the shared constant, set
-		.fill 	1 								; up front by CompileCode
+		.fill 	1 								; compile. Embedded still refuses GP.BANKEDSTR
+gpBankRunPage:									; buffer page -> run page: the WHOLE delta for this
+		.fill 	1 								; mode, set up front by CompileCode
 gpBankRunBase:									; the page the region would have run at in low memory
 		.fill 	1
 gpBankPages:									; pages for the bootstrap to move into the bank
@@ -11181,9 +11165,9 @@ CommandGPBankedStrCompile:
 		stz 	deferErrors 				; a block opener must never defer -- a rolled back
 											; opener leaves its closer behind and corrupts the
 											; nesting of any block enclosing it, silently.
-		lda 	gpBankShared 				; an embedded object is one file, and text in a bank
-		bne 	_CBSShared 					; arrives in a .OVL beside it
-		jmp 	BStrNeedsShared
+		lda 	gpBankShared 				; STILL SHARED ONLY, though GP.BANKED is not: the runtime
+		bne 	_CBSShared 					; reads the slot-to-bank table where it lies, at GPBSTRBANKS
+		jmp 	BStrNeedsShared 			; -- $09F0, in a page an embedded program does not have
 _CBSShared:
 		lda 	bstrState
 		bne 	_CBSStructure 				; a GP.BANKEDSTR inside one still open
@@ -11265,9 +11249,15 @@ CommandGPEndBankedStrCompile:
 		.error_structure
 
 ;
-;		EMBEDDED IS ONE FILE, GPBankNeedsShared's rule (gpbank.asm) for the same reason: text in
-;		a bank is read out of the .OVL by the shared bootstrap. In compiler space, like
-;		BStrTooManyBanks.
+;		SHARED ONLY, AND THE LAST THING THAT IS. GP.BANKED compiles embedded now -- its regions
+;		are appended to the object and the runtime image walks them into their banks -- but text
+;		in a bank needs one thing more: GPBSTRBANKS, the sixteen bytes that turn a slot into a
+;		RAM bank, which gp-runtime/commands/gpbstr.asm reads AT ITS ADDRESS. That address is the
+;		top of the bootstrap extension page, $09F0, and an embedded program has no such page --
+;		$09F0 is its own code. Lifting this means giving that table a home the runtime can find
+;		in both modes, which is a change to the runtime and not to the overlay.
+;
+;		In compiler space, like BStrTooManyBanks.
 ;
 BStrNeedsShared:
 		jsr 	CallErrorHandler
@@ -11801,9 +11791,8 @@ _BRBankFree:
 		bne 	_BRDone
 		clc
 		lda 	bstrRegionPage
-		adc 	gpBankRunPage 				; buffer page -> the page it loads at
-		inc 	a 							; ...plus the bootstrap EXTENSION page, which a banked
-		sta 	gpBankRunBase 				; program carries and this program now is
+		adc 	gpBankRunPage 				; buffer page -> the page it loads at, the extension page
+		sta 	gpBankRunBase 				; and all -- see CompileCode
 		;
 		;		AND gpBankStart, WHICH IS THE FIT CHECK'S IDEA OF WHERE THE P-CODE STOPS.
 		;		ObjectPrepareShared measures resident p-code as FreeMemory..gpBankStart once

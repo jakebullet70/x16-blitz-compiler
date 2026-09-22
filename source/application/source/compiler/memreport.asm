@@ -85,6 +85,11 @@ _PMRMode:
 		ldx 	#CoreText & $FF
 		ldy 	#CoreText >> 8
 		lda 	gpUsed
+		ldx 	ModeText 					; an EMBEDDED program with a region carries them whether it
+		cpx 	#'S' 						; calls one or not: the p-code run page has to be a constant
+		beq 	_PMRWhich 					; and that is what makes it one -- see PrepareObjectCode.
+		ora 	gpBankActive 				; A shared program patches its bootstrap from gpUsed alone
+_PMRWhich:
 		beq 	_PMRHandlers
 		ldx 	#GPBasicText & $FF
 		ldy 	#GPBasicText >> 8

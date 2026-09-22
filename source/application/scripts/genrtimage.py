@@ -175,6 +175,8 @@ def main():
 	codepage = need(labels, "RunCodePage") + 1				# the operand, not the opcode
 	wspage = need(labels, "RunWorkspacePage") + 1
 	bankpage = need(labels, "RunBankPage") + 1
+	ovlpage = need(labels, "RunOvlPage") + 1
+	sbank = need(labels, "RunStartBank") + 1
 	bankend = need(labels, "RTImgBankEnd")
 
 	#
@@ -188,7 +190,9 @@ def main():
 	if len(image) != objectbase - LOAD:
 		die("image is %d bytes, ObjectBase says it should be %d"
 			% (len(image), objectbase - LOAD))
-	for name, ofs in (("RunCodePage+1", codepage), ("RunWorkspacePage+1", wspage), ("RunBankPage+1", bankpage)):
+	for name, ofs in (("RunCodePage+1", codepage), ("RunWorkspacePage+1", wspage),
+					  ("RunBankPage+1", bankpage), ("RunOvlPage+1", ovlpage),
+					  ("RunStartBank+1", sbank)):
 		if not LOAD <= ofs < gpbase:
 			die("%s at $%04x is outside the part of the image that is always written" % (name, ofs))
 	if bankend - BANK != len(bank):
@@ -216,6 +220,8 @@ def main():
 		h.write("RTIMG_CODEPOFS  = $%04x\n" % (codepage - LOAD))
 		h.write("RTIMG_WSPAGEOFS = $%04x\n" % (wspage - LOAD))
 		h.write("RTIMG_BANKPOFS  = $%04x\n" % (bankpage - LOAD))
+		h.write("RTIMG_OVLPOFS   = $%04x\n" % (ovlpage - LOAD))
+		h.write("RTIMG_SBANKOFS  = $%04x\n" % (sbank - LOAD))
 		h.write("RTIMG_BANKLEN   = $%04x\n" % len(bank))
 		h.write("\t\t.cerror RTIMG_BANKLEN > (MIN_WS_PAGES << 8), "
 				"\"embedded bank code over MIN_WS_PAGES pages - its copy above the p-code has no room\"\n")

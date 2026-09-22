@@ -150,6 +150,15 @@ HANDLER_BANK = 1							; the runtime's rarely used handlers; no region may use i
 PCODE_PAGE = $09 							; shared-mode p-code base page ($0900, page-aligned)
 MIN_WS_PAGES = 16 							; smallest workspace a shared program keeps (4K)
 ;
+;		THE BYTE AFTER THE LAST REGION in an overlay, which is what tells a reader it has them
+;		all. Bank 1 is the runtime's and the compiler refuses GP.BANKED 1, so no region's bank
+;		byte is ever this. object.asm writes it at ObjStreamClose.
+;
+;		HERE, because both links read it now: bootstrap2.asm walks a .OVL for a shared program
+;		and 00rtimage.header walks the same bytes in RAM for an embedded one.
+;
+BXOVLEND = 1
+;
 ;		Pages left free between the end of the object code and the start of the workspace, for
 ;		the runtime (FOR/GOSUB) frame stack. clr.asm puts runtimeStackPtr at storeStartHigh-1:$FF
 ;		and grows it DOWNWARD, so without a gap here a deep call chain walks back into the code.

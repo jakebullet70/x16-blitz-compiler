@@ -57,9 +57,12 @@ MY.LIBEND:
   the modules across two regions.
 - **Include a module that reads another's `#DEFINE`s after it.** The GUI modules read `THEME`'s
   role numbers, so `THEME` comes first.
-- **Build shared.** The regions are in a `NAME.OVL` file and an embedded program is one file, so
-  an embedded compile stops at the first `GP.BANKED` with `GP.BANKED NEEDS SHARED`. Ship the
-  runtime file and the `.OVL` with the program.
+- **Either build.** A SHARED program keeps its regions in a `NAME.OVL` file beside it; ship
+  that and the runtime file with the program. An EMBEDDED program carries its regions inside
+  itself and copies them into their banks at startup, so it stays one file — but they have to
+  fit between the p-code and `$9F00` on the way in, and a build that leaves no room stops with
+  `EMBEDDED REGIONS LEAVE NO ROOM TO LOAD`. `GP.BANKEDSTR` is the exception and still needs a
+  shared build.
 
 `samples/GPB-MODS-TESTING/GPBMODS.BASL` banks the utilities, the file modules, `THEME`, the GUI,
 the combo box and two of its own dropdown handlers, in six regions.

@@ -79,10 +79,11 @@ BXFILE = 2 									; logical file AND secondary address for the overlay.
 											; A DATA channel, not a LOAD: the file has no load
 											; address of its own and does not go to one place.
 											; Not 1 -- file 1 has been seen to hang a later OPEN.
-BXOVLEND = 1 								; the byte after the last region. Bank 1 is the
-											; runtime's and the compiler refuses GP.BANKED 1, so
-											; no region's bank byte is ever this. object.asm
-											; writes it at ObjStreamClose.
+;
+;		BXOVLEND, the byte after the last region, is in common.inc. 00rtimage.header walks the
+;		same bytes in RAM for an EMBEDDED program, and common.inc is the one file both links
+;		read. Its reason is written there.
+;
 
 		.section code
 

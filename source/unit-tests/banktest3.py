@@ -9,7 +9,9 @@ import glob, os, re, shutil, subprocess, time, sys
 ROOT = r"C:\dev\CmdrX16\dos_tools\x16-blitz-compiler"
 T = os.path.join(ROOT, "work", "banktest3")
 E = os.path.join(ROOT, "bin", "x16emu")
-PY = r"C:\Users\Admin\AppData\Local\Programs\Python\Python313\python.exe"
+#   The interpreter running this, not a path off one machine: the hard-coded one went
+#   stale and the suite could not tokenise anything at all.
+PY = sys.executable
 #   GPC's OWN error vocabulary, read out of the generator's output so it cannot drift.
 #   Guessing at it ("the line ends with ERROR") missed BAD VALUE completely and then
 #   matched a stray line from BASIC instead, which read like a compiler crash and was not.
@@ -98,11 +100,39 @@ def overlays(name):
     whole = i == len(b) - 1 and b[i] == OVL_END
     return got if whole else got + ["SHORT"]
 
+#   ...and the same walk over the overlay an EMBEDDED object carries inside itself. There is
+#   no file to open: the compiler appended it to the object and patched the page it lands on
+#   into the runtime image, so this starts from that byte -- which is also the only thing the
+#   program itself is told. Reading it any other way would test the test.
+RTIMG = {}
+for _line in open(os.path.join(ROOT, "source", "application", "rtimage.gen.asm")):
+    if "=" in _line and _line.split()[0].startswith("RTIMG_"):
+        _k, _v = _line.split("=", 1)
+        RTIMG[_k.strip()] = int(_v.strip().lstrip("$"), 16)
+
+
+def appended(name):
+    b = open(os.path.join(T, name + ".PRG"), "rb").read()[2:]
+    page = b[RTIMG["RTIMG_OVLPOFS"]]
+    if page == 0:
+        return ["NO OVERLAY PAGE"]
+    i = (page << 8) - RTIMG["RTIMG_LOAD"]
+    if not 0 < i < len(b):
+        return ["PAGE $%02x IS NOT IN THE FILE" % page]
+    banks = []
+    while i + 2 <= len(b) and b[i] != OVL_END:
+        banks.append(b[i])
+        i += 2 + b[i + 1] * 256
+    got = sorted("%03d" % x for x in banks)
+    #   The terminator has to be the LAST byte of the object: anything after it is a region
+    #   the walk lost count of, and the runtime would stop reading at the same place.
+    return got if (i == len(b) - 1 and b[i] == OVL_END) else got + ["SHORT"]
+
 
 def compile_one(name, mode="SHARED"):
-    #   SHARED, not embedded: GP.BANKED only works there. The bootstrap is what reads the
-    #   region into the bank, and an embedded program has no bootstrap -- gpbank.asm
-    #   refuses a region rather than guessing.
+    #   SHARED by default, because every test above it is shared and that is what says the
+    #   shared path has not moved. The embedded block at the foot of the file is what asks
+    #   for the other mode.
     open(os.path.join(T, "GPC.INPUT"), "w", newline="\n").write(
         "%s.SRC.PRG\n%s.PRG\n%s.MAP\n%s\n" % (name, name, name, mode))
     p = os.path.join(T, name + ".PRG")
@@ -191,6 +221,25 @@ RUNNAMES = list(dict.fromkeys(r[0] for r in RUNS))
 OVERLAYS = [("BNK255", ["002", "100", "254", "255"]), ("BNKOVL", ["002", "100", "254", "255"])]
 TRUNCATE = [("BNKOVL", 100)]
 
+#   EVERY TEST ABOVE IS SHARED. These four are compiled a second time --embedded and run again,
+#   and must print exactly what the shared build printed. An embedded object has no .OVL beside
+#   it: the regions are appended to the program and the runtime image walks them into their
+#   banks before the runtime starts, so what is checked is that contract -- the overlay begins
+#   on the page the patched byte names, carries the same regions, and ends on the last byte.
+#
+#   NOT A BYTE COMPARE against the shared .OVL. A branch that crosses into a region is
+#   corrected by where the p-code RUNS, which is $0A00 shared and $3600 embedded, so the two
+#   overlays differ in every region that is ever entered. They are not meant to be the same
+#   bytes; they are meant to do the same thing.
+EMBEDDED = [("BANKY", 512), ("BANKZ", 512), ("BANKN", 512), ("BNK64", 2048)]
+#   ...and the one limit an embedded program has that a shared one does not: its regions travel
+#   inside it, between the bank code and $9F00, and a hundred of them do not fit.
+BADEMB = [("BNKBIG", "EMBEDDED REGIONS LEAVE NO ROOM TO LOAD"),
+          #   ...and the keyword still refused embedded on purpose. The runtime finds which
+          #   bank a text slot went to in a table at $09F0, which is in the bootstrap
+          #   extension page -- a page an embedded program does not have. BNK255 has text.
+          ("BNK255", "GP.BANKEDSTR NEEDS SHARED")]
+
 #   The drive keeps its own compiler and runtime, and they went stale once. Copy the
 #   current ones over them first.
 shutil.copy2(os.path.join(ROOT, "source", "application", "GPC.BIN"), T)
@@ -202,6 +251,14 @@ for pattern in ("GPC.IMG.*.BIN", "GP1.IMG.*.BIN",
 #   BNKOVL is BNK255 under another name, made fresh each run so the two cannot drift.
 open(os.path.join(T, "BNKOVL.BASL"), "w", newline="").write(
     open(os.path.join(T, "BNK255.BASL"), newline="").read().replace("BNK255", "BNKOVL"))
+#   BNKBIG is generated too: a hundred one-page regions, which no embedded object has room for.
+#   None of them is ever called -- the test is the refusal, and calling them would only make the
+#   low code large enough to change which limit it hits first.
+open(os.path.join(T, "BNKBIG.BASL"), "w", newline="").write(
+    '#SAVEAS "@:BNKBIG.SRC.PRG"\n#REM 0\n#INCLUDE "GPB.INC.BL"\n\nPRINT "B1"\nEND\n\n' +
+    "".join('GP.BANKED %d\nBB%d:\n    PRINT "X"\n    RETURN\nGP.ENDBANKED\n\n' % (b, b)
+            for b in range(2, 102)))
+
 
 results = {}
 for n in PAIRNAMES + RUNNAMES + BADNAMES:
@@ -248,6 +305,32 @@ for n, ram, want in RUNS:
     out = run_one(n, ram) if k == "OK" else []
     good = (out == want)
     print("%-6s runs %4dK   %s   (%s)" % (n, ram, "YES" if good else "*** NO ***", " / ".join(out) or m))
+    if not good:
+        fails += 1
+
+#   The embedded half, last: it compiles these names again and overwrites their objects.
+for n, ram in EMBEDDED:
+    tokenise(n)
+    ks, ms = compile_one(n, "SHARED")
+    want_ovl = overlays(n)
+    want_out = run_one(n, ram) if ks == "OK" else []
+    ke, me = compile_one(n, "EMBEDDED")
+    got = appended(n) if ke == "OK" else ["COMPILE " + me]
+    out = run_one(n, ram) if ke == "OK" else []
+    left = os.path.exists(os.path.join(T, n + ".OVL"))
+    good = (got == want_ovl and out == want_out and len(out) > 0 and not left)
+    print("%-6s embedded %4dK %s   (%s)"
+          % (n, ram, "YES" if good else "*** NO ***", " / ".join(out) or me))
+    if not good:
+        fails += 1
+        print("       shared   :", want_ovl, want_out)
+        print("       embedded :", got, out, "OVL LEFT" if left else "")
+
+for n, want in BADEMB:
+    ok = tokenise(n)
+    k, m = compile_one(n, "EMBEDDED") if ok else ("TOKFAIL", "")
+    good = (k == "ERR" and want in m)
+    print("%-6s embedded rejected %s   (%s)" % (n, "YES" if good else "*** NO ***", m))
     if not good:
         fails += 1
 

@@ -860,9 +860,11 @@ while the object is written, so `BANKMGR` has to be told rather than asked:
 BANKMGR.WANT = GM.TEXTBANK : GOSUB BANKMGR.CLAIM
 ```
 
-**Compile SHARED.** The text goes into the program's one `NAME.OVL` file, which the shared
-bootstrap reads into its bank. An embedded program is one file, so an embedded compile stops at the
-first `GP.BANKEDSTR` with `GP.BANKEDSTR NEEDS SHARED`.
+**Compile SHARED**, though `GP.BANKED` code regions no longer need it. The text goes into the
+program's one `NAME.OVL` file, which the shared bootstrap reads into its bank — and the
+runtime then finds which bank a slot went to in a sixteen-byte table at `$09F0`, inside the
+bootstrap extension page. An embedded program has no such page, so an embedded compile stops
+at the first `GP.BANKEDSTR` with `GP.BANKEDSTR NEEDS SHARED`.
 
 **A group name is not a variable.** No `$`, no `%`, no `(` — any of those is a syntax error rather
 than something quietly ignored. A name that no block declared is a syntax error at the line that
@@ -1194,9 +1196,17 @@ runtime and every `#INCLUDE` spends it; a region spends 8,192 bytes of a RAM ban
 not using. Bank what you can. A module called inside a loop goes where the loop is: a call between
 a region and anywhere outside it switches the bank twice.
 
-The banked form needs the program built SHARED. The regions are in one `NAME.OVL` file, which the
-shared bootstrap reads into their banks. An embedded program is one file, so an embedded compile
-stops at the first `GP.BANKED` with `GP.BANKED NEEDS SHARED`.
+The banked form works in either build. A SHARED program keeps its regions in one `NAME.OVL`
+file, which the shared bootstrap reads into their banks. An EMBEDDED program carries them
+inside itself, appended to the program, and the runtime copies them into their banks before
+the program starts — so it is still one file, and it still loads with `LOAD` and `RUN`. What
+an embedded build has to satisfy is room on the way in: the regions travel between the end of
+the p-code and `$9F00`, and a program whose regions will not fit there stops with `EMBEDDED
+REGIONS LEAVE NO ROOM TO LOAD`. A banked embedded program also carries the whole runtime
+rather than the smaller core, whether or not it calls a GP.BASIC keyword.
+
+`GP.BANKEDSTR` is the exception and still needs SHARED — see §3.10 — so a program that banks
+its text is a shared program however its code regions are built.
 
 `samples/GPB-MODS-TESTING/PICKDEMO.BASL` is a complete program in this shape, in 99 lines.
 

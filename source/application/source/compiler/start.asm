@@ -31,21 +31,39 @@ CompileCode:
 								; It has already said which of the two reasons it was.
 
 		;
-		;		GP.BANKED needs to know where the p-code will RUN, and it needs it INSIDE the
-		;		compile: pass two resolves the branches that cross into the bank as it writes
-		;		them. That is the shared constant PCODE_PAGE, because only a shared program can
-		;		bank: an embedded object is one file, and the regions are in a .OVL beside it.
-		;		GP.BANKED and GP.BANKEDSTR refuse an embedded compile at their own line, from
-		;		gpBankShared.
+		;		GP.BANKED NEEDS TO KNOW WHERE THE P-CODE WILL RUN, and it needs it INSIDE the
+		;		compile: pass two resolves the branches that cross into a bank as it writes them,
+		;		out of corrections GPBankRelocate works out at the END OF PASS ONE -- before the
+		;		application is asked anything at all. So the answer belongs here, before the
+		;		compile starts, and it has to be a constant.
 		;
-		lda 	#(PCODE_PAGE - (ObjectOrigin >> 8)) & $FF
-		sta 	gpBankRunPage
+		;		IT IS THE WHOLE BUFFER-TO-RUN PAGE DELTA. objPtr counts from ObjectOrigin and the
+		;		region tables hold buffer pages, so this is what turns one into the page it runs
+		;		at. GPBankRelocate used to add the bootstrap extension page to it itself, which is
+		;		a layout fact and no business of the region code -- and which became wrong the
+		;		moment an embedded program could have a region, because it has no such page.
+		;
+		;		SHARED: the bootstrap loads the p-code at PCODE_PAGE, and a banked program carries
+		;		the extension page below it, so $0A00 rather than $0900.
+		;
+		;		EMBEDDED: the p-code runs at runtimeEndPage, which PrepareObjectCode cuts at GPBase
+		;		or at ObjectBase depending on gpUsed -- and gpUsed is not final until pass one
+		;		ends, which is after the corrections are wanted. So a banked embedded program is
+		;		given the WHOLE runtime whatever it uses, and the delta is ObjectBase. That cut is
+		;		the other half of this bargain and PrepareObjectCode says so there.
+		;
 		stz 	gpBankShared
 		lda 	ModeText 					; GPC.INPUT line 4 -- 'S' is SHARED
 		cmp 	#'S'
 		bne 	_CCNotShared
 		inc 	gpBankShared
 _CCNotShared:
+		lda 	#((ObjectBase >> 8) - (ObjectOrigin >> 8)) & $FF
+		ldx 	gpBankShared
+		beq 	_CCRunPage
+		lda 	#(PCODE_PAGE + 1 - (ObjectOrigin >> 8)) & $FF
+_CCRunPage:
+		sta 	gpBankRunPage
 		stz 	dcEnabled
 		lda 	DeadListFile 				; GPC.INPUT line 5 -- a name turns on dead-code removal
 		beq 	_CCKeepAll

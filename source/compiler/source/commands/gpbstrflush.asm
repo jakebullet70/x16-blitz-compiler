@@ -347,9 +347,8 @@ _BRBankFree:
 		bne 	_BRDone
 		clc
 		lda 	bstrRegionPage
-		adc 	gpBankRunPage 				; buffer page -> the page it loads at
-		inc 	a 							; ...plus the bootstrap EXTENSION page, which a banked
-		sta 	gpBankRunBase 				; program carries and this program now is
+		adc 	gpBankRunPage 				; buffer page -> the page it loads at, the extension page
+		sta 	gpBankRunBase 				; and all -- see CompileCode
 		;
 		;		AND gpBankStart, WHICH IS THE FIT CHECK'S IDEA OF WHERE THE P-CODE STOPS.
 		;		ObjectPrepareShared measures resident p-code as FreeMemory..gpBankStart once

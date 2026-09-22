@@ -1393,19 +1393,45 @@ tracked or a later `ALLOC` hands the array's bank to a scratch user, and that co
 - Does `ERASE` hand the banks back or keep them for the next `REDIM`?
 - `GP.ARRPTR` on a banked array should be a compile error. Confirm there is no caller that wants it.
 
-### Overlays appended to the `.PRG` in embedded mode — RESEARCH, raised 2026-09-15
+### Overlays appended to the `.PRG` in embedded mode — DONE 2026-09-22
 
-Embedded refuses `GP.BANKED` and `GP.BANKEDSTR` regions, so an embedded program ships one file but
-cannot use banks. Research whether the `.nnn` overlays can ride at the end of `NAME.PRG` instead,
-keeping the one-file build.
+`GP.BANKED` compiles EMBEDDED. A banked embedded program is one file: its regions are appended to
+`NAME.PRG`, and the runtime image walks them into their banks before the first BASIC statement runs.
+`GP.BANKEDSTR` is still refused, for a different reason than before — see below.
 
-Questions to answer:
+The answers to the questions this entry asked:
 
-- What does a plain `LOAD` or `RUN` do with bytes past the program? Does the load run into `$9F00`?
-- How does startup reach the tail: reopen its own file and seek, or something else? Can the program
-  learn its own file name at run time?
-- What does the tail need: a count, then a bank number and size per region?
-- What does the loader cost the embedded image, which has 52 bytes of cushion left?
+- **A plain `LOAD` reads the whole file**, past the end of the program and on, at whatever addresses
+  the bytes fall at. So the fit check is a load-time one: the regions travel between the end of the
+  bank code and `$9F00`, and a build whose regions will not fit there stops with `EMBEDDED REGIONS
+  LEAVE NO ROOM TO LOAD`. Nothing has to reopen a file, and nothing has to learn its own name.
+- **The tail is the `.OVL` format unchanged** — per region a bank byte, a page count, and that many
+  pages, then a `BXOVLEND` terminator on the last byte of the object. It is self-describing, so the
+  reader needs no count. The compiler patches the page the tail lands on into the runtime image, and
+  that byte is the only thing the program is told.
+- **The loader is about 60 bytes**, but the image went 11,519 → 11,775, because `GPBase` was just
+  under a page boundary and crossed it: `$2F00` → `$3000`, with `ObjectBase` `$3500` → `$3600`
+  behind it. That is 256 bytes off the largest embedded program.
+
+A banked embedded program also carries the whole runtime rather than the smaller core, whether or
+not it calls a GP.BASIC keyword. The p-code run page has to be a compile-time constant — the region
+corrections are worked out at the end of pass one, before the application is asked anything — and
+`gpUsed` is not settled until that same moment. It costs 1,536 bytes of handlers a program that
+banks and calls no keyword will not reach.
+
+Five stages, one document each: `OVERLAY-EMBED-STAGE1.md` through `-STAGE5.md`, beside
+`OVERLAY-EMBED-PLAN.md`. `source/unit-tests/banktest3.py` grew an embedded half — four programs
+compiled and run both ways, and two embedded-only refusals — while every test it already had stays
+SHARED, which is what says the shared path did not move.
+
+Still open, and both of them runtime work rather than overlay work:
+
+- **`GP.BANKEDSTR` embedded.** `gp-runtime/source/commands/gpbstr.asm` turns a text slot into a bank
+  by reading `GPBSTRBANKS` **at its address** — `$09F0`, the top of the shared bootstrap extension
+  page. An embedded program's own code is at `$09F0`. Lifting the refusal means giving that table a
+  home both readers can find.
+- **`GP.ASM` inside a region** resolves its addresses against `AsmPageDelta`, which is the p-code
+  base and not `$A000`. That is wrong in *both* modes and predates this work.
 
 ### Banked scratch strings — a `GP.BANKEDSTR` group used as writable storage — REVIVED 2026-09-18, raised 2026-09-11
 

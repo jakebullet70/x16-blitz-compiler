@@ -90,6 +90,79 @@ _SCCopy:
 		sta 	SelectRAMBank
 		stz 	RunBankPage+1
 _SCInBank:
+		;
+		;		AND THE OVERLAY FOLLOWS THE BANK CODE, from the page after it. It describes itself --
+		;		a bank byte, a page count, that many pages, and BXOVLEND after the last region -- so
+		;		this walks it where it lies and copies each region into its bank. It is the walk
+		;		bootstrap2.asm does for a shared program, reading RAM instead of a file: an embedded
+		;		program has no .OVL beside it, because the compiler appended it to the object.
+		;
+		;		NOTHING IS CHECKED HERE, and bootstrap2.asm checks at every page. What it guards
+		;		against is a file that is missing, stale or cut, and there is no file: these bytes
+		;		came in with the p-code, and if they did not arrive neither did the program.
+		;
+		;		THE REGIONS SIT IN THE WORKSPACE -- above the bank code, below $9F00 -- which the
+		;		runtime clears the moment it starts. So the copy happens first, and the page operand
+		;		is zeroed after it, exactly as RunBankPage's is: a RUN after END finds the banks
+		;		still filled and the overlay long since overwritten.
+		;
+RunOvlPage:
+		lda 	#0 							; page of the overlay, zero once read (operand +1)
+		beq 	_SCNoOvl
+		sta 	zTemp0+1
+		stz 	zTemp0
+		lda 	SelectRAMBank 				; BASIC's bank, as the copy above
+		pha
+_SCRegion:
+		lda 	(zTemp0) 					; the region's bank, or the end marker
+		cmp 	#BXOVLEND
+		beq 	_SCOvlIn
+		sta 	SelectRAMBank
+		ldy 	#1
+		lda 	(zTemp0),y 					; and how many pages of it to copy
+		tax
+		clc 								; the data starts after those two header bytes, so the source
+		lda 	zTemp0 						; is two bytes further on for every region already read
+		adc 	#2 							; and its low byte is NOT zero
+		sta 	zTemp0
+		bcc 	_SCOvlHdr
+		inc 	zTemp0+1
+_SCOvlHdr:
+		stz 	zTemp1 						; every region starts at $A000 in its own bank
+		lda 	#$A0
+		sta 	zTemp1+1
+_SCOvlPage:
+		ldy 	#0
+_SCOvlCopy:
+		lda 	(zTemp0),y
+		sta 	(zTemp1),y
+		iny
+		bne 	_SCOvlCopy
+		inc 	zTemp0+1
+		inc 	zTemp1+1
+		dex
+		bne 	_SCOvlPage
+		bra 	_SCRegion
+_SCOvlIn:
+		pla
+		sta 	SelectRAMBank
+		stz 	RunOvlPage+1
+_SCNoOvl:
+		;
+		;		AND THE BANK THE PROGRAM STARTS IN, which is the last GP.BANKED region's. A program
+		;		that falls into a region from the line above reaches it by a plain GOTO, and a GOTO
+		;		selects no bank. bootstrap2.asm's BXRun does the same thing for the same reason.
+		;
+		;		OUTSIDE THE WALK, because a second RUN skips the walk and still starts there. Zero is
+		;		a program with no region at all: no region may use bank 0 or bank 1, so zero is free
+		;		to mean leave the bank alone.
+		;
+RunStartBank:
+		lda 	#0 							; bank selected at the handover, 0 = none (operand +1)
+		beq 	_SCNoBank
+		sta 	SelectRAMBank
+_SCNoBank:
+
 
 RunCodePage:
 		lda 	#0 							; page of the object code to run.      (operand +1)

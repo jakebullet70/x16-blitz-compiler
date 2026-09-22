@@ -135,10 +135,9 @@ _CAResetOut:
 		.set16 	objPtr,ObjectOrigin
 		rts
 
-_CACloseOut:
-		jsr 	ObjEmitBankCode 			; embedded: the bank code, after the p-code
-		stz 	objStreamLive 				; the compile worked and the object is complete, so
-		jmp 	IOObjectClose 				; there is nothing left to tidy away
+_CACloseOut: 								; the bank code, the overlay and the close, all of which
+		jmp 	ObjCloseOut 				; are object.asm's -- and every branch in the dispatch
+											; table above reaches over this file, so it stays small
 
 ; ************************************************************************************************
 ;

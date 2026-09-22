@@ -77,9 +77,9 @@ CommandGPBankedStrCompile:
 		stz 	deferErrors 				; a block opener must never defer -- a rolled back
 											; opener leaves its closer behind and corrupts the
 											; nesting of any block enclosing it, silently.
-		lda 	gpBankShared 				; an embedded object is one file, and text in a bank
-		bne 	_CBSShared 					; arrives in a .OVL beside it
-		jmp 	BStrNeedsShared
+		lda 	gpBankShared 				; STILL SHARED ONLY, though GP.BANKED is not: the runtime
+		bne 	_CBSShared 					; reads the slot-to-bank table where it lies, at GPBSTRBANKS
+		jmp 	BStrNeedsShared 			; -- $09F0, in a page an embedded program does not have
 _CBSShared:
 		lda 	bstrState
 		bne 	_CBSStructure 				; a GP.BANKEDSTR inside one still open
@@ -161,9 +161,15 @@ CommandGPEndBankedStrCompile:
 		.error_structure
 
 ;
-;		EMBEDDED IS ONE FILE, GPBankNeedsShared's rule (gpbank.asm) for the same reason: text in
-;		a bank is read out of the .OVL by the shared bootstrap. In compiler space, like
-;		BStrTooManyBanks.
+;		SHARED ONLY, AND THE LAST THING THAT IS. GP.BANKED compiles embedded now -- its regions
+;		are appended to the object and the runtime image walks them into their banks -- but text
+;		in a bank needs one thing more: GPBSTRBANKS, the sixteen bytes that turn a slot into a
+;		RAM bank, which gp-runtime/commands/gpbstr.asm reads AT ITS ADDRESS. That address is the
+;		top of the bootstrap extension page, $09F0, and an embedded program has no such page --
+;		$09F0 is its own code. Lifting this means giving that table a home the runtime can find
+;		in both modes, which is a change to the runtime and not to the overlay.
+;
+;		In compiler space, like BStrTooManyBanks.
 ;
 BStrNeedsShared:
 		jsr 	CallErrorHandler
