@@ -26,7 +26,7 @@
 ##                frees all of them, and a save reclaims the rest.
 ##
 ## The editor claims the arena from BANKMGR and sets DOC.LAST.BANK to the last bank it got.
-## The bench programs have no ED.BANKMGR and leave it 0.
+## The bench programs have no BANKMGR and leave it 0.
 ##
 ## Names are dotted because BASLOAD tokenises a whole run of A-Z, 0-9 and _ as a keyword if
 ## that is what it spells. FN$ and ON$ both break.

@@ -20,7 +20,8 @@ source. That is the point of the sample, and the numbers below are what it bough
 | `GPB.INC.BL` | the library's keyword list, the one file taken from `GPC-BASIC`. It defines `#TOKEN`s, not code |
 | `EDIT.SRC.PRG` | the tokenised program â€” the input you feed to the compiler |
 | `EDIT.SRC.SYM` | **BASLOAD's symbol file, and it is not optional** â€” see below |
-| `EDIT.PRG` | the compiled program, built EMBEDDED, so it carries the runtime and writes no `.OVL` |
+| `EDIT.PRG` | the compiled program, built EMBEDDED, so it carries the runtime |
+| `EDIT.OVL` | the menu store's banked text, read at startup. It ships with `EDIT.PRG` |
 | `TEST.MD` | the document the editor opens, and the fixture the self-check searches |
 | `bench/` | the four benchmarks, each holding old and new in **one** program: `BENCHROWS` renderer against renderer, `LOADBEN` loader against loader, `SLOTBEN` and `SLOTTST` for the line table |
 
@@ -249,8 +250,9 @@ rejects a second `DIM` of the same array even when only one of them can ever run
 ## The menus, and the flag that makes the GP drawing commands usable
 
 The menus are `ED-MENUS.BASL`'s forks of `MENU`, `MENUPULL` and `MENUKEY`. The bar is the bar slot,
-drawn by `ED.MENU.DRAWBAR` and never run: ESC and ALT+letter are the editor's keys, and each opens a
-dropdown at once. `ED.MENUS.SETUP` builds the bar and all three dropdowns once at startup, and
+drawn by `ED.MENU.DRAWBAR` and never run: ALT+letter is the editor's key and opens a dropdown at
+once, while ALT on its own lights the bar without opening one. ESC opens nothing — it only backs out
+of a dropdown that is already open. `ED.MENUS.SETUP` builds the bar and all three dropdowns once at startup, and
 `ED.MENUTO.PULLDOWN` runs the one under the chosen title, saving the cells under it in VRAM and
 putting them back after. LEFT and RIGHT come back as `ED.MENU.NEXTBAR`; a letter no row claims is
 tried against the titles with `ED.MENU.HOTROW`, so a letter is a row's hot key first and a title's
@@ -327,11 +329,12 @@ sit together on it. Then:
    unless you edit the source — **and if you do edit it, re-tokenise, because a stale `.SYM`
    resolves `{VAR}` to the wrong slot.**
 
-2. **Compile, EMBEDDED.** Nothing here needs `GP.BANKEDSTR` any more: the forked menus keep their
-   rows in ordinary string arrays, so the runtime goes inside the object and no `.OVL` is written.
-   Run `GPC.PRG` and answer `EDIT.SRC.PRG` / `EDIT.PRG` / a map / embedded.
+2. **Compile, EMBEDDED.** The runtime goes inside the object, and the menu store's banked text
+   goes into `EDIT.OVL` beside it. Run `GPC.PRG` and answer `EDIT.SRC.PRG` / `EDIT.PRG` / a map /
+   embedded.
 
-3. **Run.** `LOAD "EDIT.PRG",8 : RUN`. It opens `TEST.MD`.
+3. **Run.** `LOAD "EDIT.PRG",8 : RUN`. It opens `TEST.MD`. `EDIT.OVL` has to be on the same
+   drive, or it stops with `?OVL`.
 
 Headless, from the repository root:
 

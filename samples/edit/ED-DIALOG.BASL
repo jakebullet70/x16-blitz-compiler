@@ -1,12 +1,13 @@
 ## ============================================================================
 ## ED-DIALOG.BASL -- the editor's one popup box.
 ##
-## Every question the editor asks is asked here: a file name, a search, a go-to line, a
-## yes/no. The box is centred, the screen under it is saved into VRAM and put back on the
-## way out, so a dialog never costs a repaint of the document.
+## Every question the editor asks is asked here: a file name, a search, a go-to line, what to
+## do about unsaved changes. The box is centred, the screen under it is saved into VRAM and
+## put back on the way out, so a dialog never costs a repaint of the document.
 ##
 ##   GOSUB ED.DLG.ASK      a titled box with one input field      -> ED.DLG.OK, ED.DLG.INPUT$
-##   GOSUB ED.DLG.YN       a titled box with a yes/no question    -> ED.DLG.YES
+##   GOSUB ED.DLG.ASK2     the same with two fields and a TAB     -> ED.DLG.OK, and INPUT2$
+##   GOSUB ED.DLG.BUTTONS  a titled box with up to three buttons  -> ED.DLG.BPICK
 ##   GOSUB ED.DLG.OPEN     the box alone, for a caller that draws its own content
 ##   GOSUB ED.DLG.WAITKEY  hold a told-not-asked box until a key
 ##   GOSUB ED.DLG.CLOSE    put the screen back
@@ -19,7 +20,7 @@
 ## ASCII order (see ED-FONT.BASL) and anything that converts a byte to a screen code first
 ## draws the wrong glyph.
 ##
-## WARNING: the screen save needs STASHVRAM running. ED.MENUPULL.SVSTART starts it on
+## WARNING: the screen save needs STASHVRAM running. MENUPULL.SVSTART starts it on
 ## demand, the same call the dropdowns use, and a refused start leaves the box drawn with
 ## nothing saved -- the caller's ED.REFRESH.FULL is what covers that case.
 ## ============================================================================
@@ -40,14 +41,17 @@ GOTO ED.DLG.SKIP
 ## the rest keep that background and take their own foreground, which is what stops a
 ## dialog reading as a patchwork.
 ED.DLG.THEME:
-    IF ED.THEME.READY = 0 THEN GOSUB ED.THEME.SELECT
-    ED.DLG.PAPER = ED.THEME.CLR(ED.THEME.PAGE)
-    ED.DLG.FRAMEATTR = (ED.DLG.PAPER AND 240) + (ED.THEME.CLR(ED.THEME.BORDER) AND 15)
-    ED.DLG.TEXTATTR = (ED.DLG.PAPER AND 240) + (ED.THEME.CLR(ED.THEME.TEXT) AND 15)
-    ED.DLG.TITLEATTR = (ED.DLG.PAPER AND 240) + (ED.THEME.CLR(ED.THEME.TITLE) AND 15)
-    ED.DLG.HINTATTR = (ED.DLG.PAPER AND 240) + (ED.THEME.CLR(ED.THEME.DIMMED) AND 15)
-    ED.DLG.FIELDATTR = ED.THEME.CLR(ED.THEME.FOCUS)
-    ED.DLG.SHADEATTR = ED.THEME.CLR(ED.THEME.SHADOW)
+    IF THEME.READY = 0 THEN GOSUB THEME.SELECT
+    ED.DLG.PAPER = THEME.CLR(THEME.PAGE)
+    ED.DLG.FRAMEATTR = (ED.DLG.PAPER AND 240) + (THEME.CLR(THEME.BORDER) AND 15)
+    ED.DLG.TEXTATTR = (ED.DLG.PAPER AND 240) + (THEME.CLR(THEME.TEXT) AND 15)
+    ED.DLG.TITLEATTR = (ED.DLG.PAPER AND 240) + (THEME.CLR(THEME.TITLE) AND 15)
+    ED.DLG.HINTATTR = (ED.DLG.PAPER AND 240) + (THEME.CLR(THEME.DIMMED) AND 15)
+## The hot key letter, and BORDER is the colour for it because that is what the menus tint
+## their hot keys with -- a letter that means "press this" reads the same wherever it is.
+    ED.DLG.HOTATTR = (ED.DLG.PAPER AND 240) + (THEME.CLR(THEME.BORDER) AND 15)
+    ED.DLG.FIELDATTR = THEME.CLR(THEME.FOCUS)
+    ED.DLG.SHADEATTR = THEME.CLR(THEME.SHADOW)
     RETURN
 
 ## ED.DLG.OPEN -- save the screen, draw the box, hand back where the inside starts.
@@ -90,7 +94,7 @@ ED.DLG.OPEN:
 ## drawn with. A style under 256 is one of the runtime's own, and every one of those is
 ## built from screen codes the re-order has written over, so 0 -- the solid block -- is the
 ## only sane fallback.
-    ED.DLG.STYLE = ED.MENU.DROPSTYLE
+    ED.DLG.STYLE = MENU.DROPSTYLE
     IF ED.DLG.STYLE < 256 THEN ED.DLG.STYLE = 0
     GP.BOX ED.DLG.COL, ED.DLG.ROW, ED.DLG.W + 2, ED.DLG.H + 2, ED.DLG.STYLE, ED.DLG.FRAMEATTR
     GP.FILL ED.DLG.X, ED.DLG.Y, ED.DLG.W, ED.DLG.H, 32, ED.DLG.PAPER
@@ -114,24 +118,84 @@ ED.DLG.SAY:
     GOSUB ED.PUT.FIELD
     RETURN
 
+## ED.DLG.TINT -- ED.DLG.HOT$ written again at column ED.DLG.HOTSX of the line ED.DLG.SY,
+## in the hot colour. The two callers below have already drawn the text; this only recolours
+## it, and it clips to the box the same way ED.DLG.SAY does.
+##
+## Only the foreground comes from ED.DLG.HOTATTR: the background is whatever the line was
+## drawn on. That is what lets a hot letter sit on a focused button without punching the
+## focus colour out from under itself.
+ED.DLG.TINT:
+    IF ED.DLG.HOTSX < 0 OR ED.DLG.HOTSX > ED.DLG.W - 1 THEN RETURN
+    ED.PS.ROW = ED.DLG.Y + ED.DLG.SY : ED.PS.COL = ED.DLG.X + ED.DLG.HOTSX
+    ED.PS.WIDTH = LEN(ED.DLG.HOT$)
+    IF ED.PS.WIDTH > ED.DLG.W - ED.DLG.HOTSX THEN ED.PS.WIDTH = ED.DLG.W - ED.DLG.HOTSX
+    ED.PS$ = ED.DLG.HOT$ : ED.PS.ATTR = (ED.DLG.SATTR AND 240) + (ED.DLG.HOTATTR AND 15)
+    GOSUB ED.PUT.FIELD
+    RETURN
+
+## ED.DLG.SAYHOT -- a line with a hot key in it, marked the way a menu row marks one: the &
+## goes and the letter behind it is tinted. Placement and clipping are ED.DLG.SAY's, so the
+## only difference from a plain line is the one coloured cell.
+##
+## A string with no & in it, or one ending on the &, is just said. "&&" is the way to put a
+## literal & on a line, and the same way out the menus take.
+ED.DLG.SAYHOT:
+    ED.DLG.HOTAT = GP.INSTR(ED.DLG.S$, "&")
+    IF ED.DLG.HOTAT < 1 OR ED.DLG.HOTAT = LEN(ED.DLG.S$) THEN GOSUB ED.DLG.SAY : RETURN
+    ED.DLG.HOT$ = MID$(ED.DLG.S$, ED.DLG.HOTAT + 1, 1)
+    ED.DLG.S$ = LEFT$(ED.DLG.S$, ED.DLG.HOTAT - 1) + MID$(ED.DLG.S$, ED.DLG.HOTAT + 1)
+    ED.DLG.HOTSX = ED.DLG.SX + ED.DLG.HOTAT - 1
+    GOSUB ED.DLG.SAY
+    IF ED.DLG.HOT$ = "&" THEN RETURN
+    GOSUB ED.DLG.TINT
+    RETURN
+
+## ED.DLG.SAYKEY -- tint a whole word of the line already said, for a key whose name is a word
+## rather than a letter. ED.DLG.HOT$ is looked for in ED.DLG.S$, so the caller says the line
+## once and then names the words in it that are keys. A word that is not there is ignored.
+##
+## Case matters, GP.INSTR compares raw bytes, and the first match is the one taken.
+ED.DLG.SAYKEY:
+    ED.DLG.HOTAT = GP.INSTR(ED.DLG.S$, ED.DLG.HOT$)
+    IF ED.DLG.HOTAT < 1 THEN RETURN
+    ED.DLG.HOTSX = ED.DLG.SX + ED.DLG.HOTAT - 1
+    GOSUB ED.DLG.TINT
+    RETURN
+
+## ED.DLG.HINTSAY -- the key line along the foot of a box: ED.DLG.HINT$ centred and dimmed on
+## row ED.DLG.SY, with the key names in it brought back up in the hot colour.
+##
+## All three names are offered every time and a name the hint does not contain is skipped, so
+## the same call serves a box with TAB in its hint and one without.
+ED.DLG.HINTSAY:
+    ED.DLG.S$ = ED.DLG.HINT$ : ED.DLG.SATTR = ED.DLG.HINTATTR
+    ED.DLG.SX = INT((ED.DLG.W - LEN(ED.DLG.HINT$)) / 2)
+    IF ED.DLG.SX < 0 THEN ED.DLG.SX = 0
+    GOSUB ED.DLG.SAY
+    ED.DLG.HOT$ = "TAB" : GOSUB ED.DLG.SAYKEY
+    ED.DLG.HOT$ = "RETURN" : GOSUB ED.DLG.SAYKEY
+    ED.DLG.HOT$ = "ESC" : GOSUB ED.DLG.SAYKEY
+    RETURN
+
 ## ED.DLG.SAVE -- the screen under the box, frame and shadow included, into VRAM.
 ##
 ## ED.DLG.HND is 0 when there is nothing to put back, which is also what a refused
 ## STASHVRAM leaves behind.
 ED.DLG.SAVE:
     ED.DLG.HND = 0
-    IF ED.SV.READY = 0 THEN GOSUB ED.MENUPULL.SVSTART
-    IF ED.SV.READY = 0 THEN RETURN
-    ED.SV.X = ED.DLG.COL : ED.SV.Y = ED.DLG.ROW
-    ED.SV.W = ED.DLG.W + 2 + ED.DLG.SHW : ED.SV.H = ED.DLG.H + 2 + ED.DLG.SHH
-    GOSUB ED.SV.SAVE : ED.DLG.HND = ED.SV.HND
+    IF SV.READY = 0 THEN GOSUB MENUPULL.SVSTART
+    IF SV.READY = 0 THEN RETURN
+    SV.X = ED.DLG.COL : SV.Y = ED.DLG.ROW
+    SV.W = ED.DLG.W + 2 + ED.DLG.SHW : SV.H = ED.DLG.H + 2 + ED.DLG.SHH
+    GOSUB SV.SAVE : ED.DLG.HND = SV.HND
     RETURN
 
 ## ED.DLG.CLOSE -- the screen back, and the handle with it.
 ED.DLG.CLOSE:
     IF ED.DLG.HND = 0 THEN RETURN
-    ED.SV.HND = ED.DLG.HND : ED.SV.MOVE = 0
-    GOSUB ED.SV.RESTORE : GOSUB ED.SV.FREE
+    SV.HND = ED.DLG.HND : SV.MOVE = 0
+    GOSUB SV.RESTORE : GOSUB SV.FREE
     ED.DLG.HND = 0
     RETURN
 
@@ -154,19 +218,23 @@ ED.DLG.ASK:
     IF LEN(ED.DLG.HINT$) + 2 > ED.DLG.W THEN ED.DLG.W = LEN(ED.DLG.HINT$) + 2
     IF LEN(ED.DLG.TITLE$) + 6 > ED.DLG.W THEN ED.DLG.W = LEN(ED.DLG.TITLE$) + 6
     IF ED.DLG.W < ED.DLG.MINW THEN ED.DLG.W = ED.DLG.MINW
-    ED.DLG.H = 4
+## 6 deep for four rows of content: rows 0 and 5 are left empty so the prompt is not against
+## the frame top and the hint is not against the bottom. That puts the prompt on 1, the field
+## on 2, a gap on 3 and the hint on 4.
+    ED.DLG.H = 6
     GOSUB ED.DLG.OPEN
 
 ## The field cannot be wider than the box it landed in: ED.DLG.OPEN clamps a box that does
 ## not fit the screen, and the field has to follow it down.
     IF ED.DLG.MAX > ED.DLG.W - 2 THEN ED.DLG.MAX = ED.DLG.W - 2
 
-    ED.DLG.SX = 1 : ED.DLG.SY = 0 : ED.DLG.S$ = ED.DLG.PROMPT$ : ED.DLG.SATTR = ED.DLG.TEXTATTR
+    ED.DLG.SX = 1 : ED.DLG.SY = 1 : ED.DLG.S$ = ED.DLG.PROMPT$ : ED.DLG.SATTR = ED.DLG.TEXTATTR
     GOSUB ED.DLG.SAY
-    ED.DLG.SX = 1 : ED.DLG.SY = 3 : ED.DLG.S$ = ED.DLG.HINT$ : ED.DLG.SATTR = ED.DLG.HINTATTR
-    GOSUB ED.DLG.SAY
+## Centred on the box rather than set at a fixed column. The box is as wide as the widest of
+## the field, the prompt, the hint and the title, so the hint is rarely the thing that set it.
+    ED.DLG.SY = 4 : GOSUB ED.DLG.HINTSAY
 
-    ED.LINEINPUT.X = ED.DLG.X + 1 : ED.LINEINPUT.Y = ED.DLG.Y + 1
+    ED.LINEINPUT.X = ED.DLG.X + 1 : ED.LINEINPUT.Y = ED.DLG.Y + 2
     ED.LINEINPUT.LEN = ED.DLG.MAX : ED.LINEINPUT.LABEL$ = "" : ED.LINEINPUT.LABELATTR = 0
     ED.LINEINPUT.ATTR = ED.DLG.FIELDATTR : ED.LINEINPUT.MASK = 0 : ED.LINEINPUT.ALLOW$ = ""
     ED.LINEINPUT.DENY$ = "" : ED.LINEINPUT.TEXT$ = ED.DLG.TEXT$
@@ -177,40 +245,196 @@ ED.DLG.ASK:
     GOSUB ED.DLG.CLOSE
     RETURN
 
-
-
-
-## ED.DLG.YN -- a box with a question in it.
+## ED.DLG.ASK2 -- a box with two input fields, for a question with two halves to it.
 ##
-##   in   ED.DLG.TITLE$   the border caption
-##        ED.DLG.MSG$     the question
-##   out  ED.DLG.YES      -1 for yes, 0 for no
+##   in   ED.DLG.TITLE$    the border caption
+##        ED.DLG.PROMPT$   the line above the first field
+##        ED.DLG.PROMPT2$  the line above the second
+##        ED.DLG.TEXT$     what the first field starts with, "" for empty
+##        ED.DLG.TEXT2$    what the second starts with
+##        ED.DLG.MAX       the field width, 0 for ED.DLG.FIELD
+##   out  ED.DLG.OK        1 when RETURN ended it, 0 for ESC
+##        ED.DLG.INPUT$    the first field
+##        ED.DLG.INPUT2$   the second
 ##
-## Every question asked here is the destructive one, so ESC and RETURN both land on NO. A
-## key that is neither is ignored rather than taken as an answer.
-ED.DLG.YN:
-    ED.DLG.HINT$ = "Y = yes, N = no" : ED.DLG.W = LEN(ED.DLG.MSG$) + 2
+## TAB and the up and down arrows move between the fields: ED.LINEINPUT.GET hands those keys
+## back instead of swallowing them, which is what makes a form out of a single field. RETURN
+## accepts from either field and ESC cancels from either, so neither one is the way out.
+ED.DLG.ASK2:
+    IF ED.DLG.MAX < 1 THEN ED.DLG.MAX = ED.DLG.FIELD
+    ED.DLG.HINT$ = "TAB moves, RETURN accepts, ESC cancels"
+    ED.DLG.W = ED.DLG.MAX + 2
+    IF LEN(ED.DLG.PROMPT$) + 2 > ED.DLG.W THEN ED.DLG.W = LEN(ED.DLG.PROMPT$) + 2
+    IF LEN(ED.DLG.PROMPT2$) + 2 > ED.DLG.W THEN ED.DLG.W = LEN(ED.DLG.PROMPT2$) + 2
     IF LEN(ED.DLG.HINT$) + 2 > ED.DLG.W THEN ED.DLG.W = LEN(ED.DLG.HINT$) + 2
     IF LEN(ED.DLG.TITLE$) + 6 > ED.DLG.W THEN ED.DLG.W = LEN(ED.DLG.TITLE$) + 6
     IF ED.DLG.W < ED.DLG.MINW THEN ED.DLG.W = ED.DLG.MINW
-    ED.DLG.H = 3
+## 9 deep, the same shape as ED.DLG.ASK with a second prompt and field folded into the middle:
+## blank, prompt, field, blank, prompt, field, blank, hint, blank.
+    ED.DLG.H = 9
+    GOSUB ED.DLG.OPEN
+    IF ED.DLG.MAX > ED.DLG.W - 2 THEN ED.DLG.MAX = ED.DLG.W - 2
+
+    ED.DLG.SATTR = ED.DLG.TEXTATTR
+    ED.DLG.SX = 1 : ED.DLG.SY = 1 : ED.DLG.S$ = ED.DLG.PROMPT$ : GOSUB ED.DLG.SAY
+    ED.DLG.SX = 1 : ED.DLG.SY = 4 : ED.DLG.S$ = ED.DLG.PROMPT2$ : GOSUB ED.DLG.SAY
+    ED.DLG.SY = 7 : GOSUB ED.DLG.HINTSAY
+
+    ED.DLG.INPUT$ = ED.DLG.TEXT$ : ED.DLG.INPUT2$ = ED.DLG.TEXT2$ : ED.DLG.OK = 0
+    ED.DLG.A2 = 1
+ED.DLG.A2.LOOP:
+## The focused field is the only difference between the two passes, so one set-up serves both
+## and only the row and the starting text move.
+    ED.LINEINPUT.Y = ED.DLG.Y + 2 : ED.LINEINPUT.TEXT$ = ED.DLG.INPUT$
+    IF ED.DLG.A2 = 2 THEN ED.LINEINPUT.Y = ED.DLG.Y + 5 : ED.LINEINPUT.TEXT$ = ED.DLG.INPUT2$
+    ED.LINEINPUT.X = ED.DLG.X + 1 : ED.LINEINPUT.LEN = ED.DLG.MAX
+    ED.LINEINPUT.LABEL$ = "" : ED.LINEINPUT.LABELATTR = 0
+    ED.LINEINPUT.ATTR = ED.DLG.FIELDATTR : ED.LINEINPUT.MASK = 0 : ED.LINEINPUT.ALLOW$ = ""
+    ED.LINEINPUT.DENY$ = ""
+    GOSUB ED.LINEINPUT.ASK
+
+    IF ED.DLG.A2 = 1 THEN ED.DLG.INPUT$ = ED.LINEINPUT.TEXT$
+    IF ED.DLG.A2 = 2 THEN ED.DLG.INPUT2$ = ED.LINEINPUT.TEXT$
+    IF ED.LINEINPUT.KEY = 13 THEN ED.DLG.OK = 1 : GOTO ED.DLG.A2.DONE
+    IF ED.LINEINPUT.KEY = 27 THEN GOTO ED.DLG.A2.DONE
+## Anything else that ended the field is TAB or an arrow, and all of them mean the other one.
+    ED.DLG.A2 = 3 - ED.DLG.A2
+    GOTO ED.DLG.A2.LOOP
+ED.DLG.A2.DONE:
+    GOSUB ED.DLG.CLOSE
+    RETURN
+
+
+
+
+## ED.DLG.BUTTONS -- a box with a question and a row of buttons under it.
+##
+##   in   ED.DLG.TITLE$      the border caption
+##        ED.DLG.MSG$        the question
+##        ED.DLG.B1$ .. B3$  the button labels, & before the letter that picks one
+##        ED.DLG.BN          how many labels are set, 1 to 3
+##        ED.DLG.BAT         which button starts focused, 1-based
+##        ED.DLG.BESC        the button ESC answers with
+##   out  ED.DLG.BPICK       the button taken, 1-based
+##
+## LEFT, RIGHT and TAB move the focus, RETURN takes the focused button, and a button's own
+## letter takes it from wherever the focus is. ESC takes ED.DLG.BESC, so the way out of the
+## box is the caller's to name -- there is no answer this routine picks on its own.
+##
+## This is the yes/no box grown up: a question with more than two answers to it, like the one
+## a save prompt really asks, cannot be put as a yes and a no without one of the three going
+## missing.
+ED.DLG.BUTTONS:
+## A count out of range would walk the FOR loops below off the end of the three labels, and
+## an ESC button out of range would hand the caller an answer it has no case for.
+    IF ED.DLG.BN < 1 THEN ED.DLG.BN = 1
+    IF ED.DLG.BN > 3 THEN ED.DLG.BN = 3
+    IF ED.DLG.BESC < 1 OR ED.DLG.BESC > ED.DLG.BN THEN ED.DLG.BESC = ED.DLG.BN
+
+## The buttons sit in one row, each its label in brackets, with two columns of air between.
+## ED.DLG.BSPAN is what they come to together, and it is what the box has to be wide enough
+## to hold.
+    ED.DLG.BSPAN = 0
+    FOR ED.DLG.BI = 1 TO ED.DLG.BN
+        GOSUB ED.DLG.BGET : GOSUB ED.DLG.BMEASURE
+        ED.DLG.BSPAN = ED.DLG.BSPAN + ED.DLG.BW
+        IF ED.DLG.BI < ED.DLG.BN THEN ED.DLG.BSPAN = ED.DLG.BSPAN + 2
+    NEXT
+
+    ED.DLG.W = LEN(ED.DLG.MSG$) + 2
+    IF ED.DLG.BSPAN + 2 > ED.DLG.W THEN ED.DLG.W = ED.DLG.BSPAN + 2
+    IF LEN(ED.DLG.TITLE$) + 6 > ED.DLG.W THEN ED.DLG.W = LEN(ED.DLG.TITLE$) + 6
+    IF ED.DLG.W < ED.DLG.MINW THEN ED.DLG.W = ED.DLG.MINW
+## 5 deep, laid out like ED.DLG.ASK above it: rows 0 and 4 empty, the question on 1, a gap on
+## 2 and the buttons on 3.
+    ED.DLG.H = 5
     GOSUB ED.DLG.OPEN
 
-    ED.DLG.SX = 1 : ED.DLG.SY = 0 : ED.DLG.S$ = ED.DLG.MSG$ : ED.DLG.SATTR = ED.DLG.TEXTATTR
-    GOSUB ED.DLG.SAY
-    ED.DLG.SX = 1 : ED.DLG.SY = 2 : ED.DLG.S$ = ED.DLG.HINT$ : ED.DLG.SATTR = ED.DLG.HINTATTR
+    ED.DLG.SY = 1 : ED.DLG.S$ = ED.DLG.MSG$ : ED.DLG.SATTR = ED.DLG.TEXTATTR
+    ED.DLG.SX = INT((ED.DLG.W - LEN(ED.DLG.MSG$)) / 2)
+    IF ED.DLG.SX < 0 THEN ED.DLG.SX = 0
     GOSUB ED.DLG.SAY
 
-    ED.DLG.YES = 0
-ED.DLG.YN.WAIT:
+    ED.DLG.BLEFT = INT((ED.DLG.W - ED.DLG.BSPAN) / 2)
+    IF ED.DLG.BLEFT < 0 THEN ED.DLG.BLEFT = 0
+    IF ED.DLG.BAT < 1 OR ED.DLG.BAT > ED.DLG.BN THEN ED.DLG.BAT = 1
+    GOSUB ED.DLG.BDRAW
+
+    ED.DLG.BPICK = 0
+ED.DLG.BWAIT:
     GET ED.DLG.K$
-    IF ED.DLG.K$ = "" THEN GOTO ED.DLG.YN.WAIT
+    IF ED.DLG.K$ = "" THEN GOTO ED.DLG.BWAIT
     ED.DLG.C = ASC(ED.DLG.K$)
-    IF ED.DLG.C = 89 OR ED.DLG.C = 121 THEN ED.DLG.YES = -1 : GOTO ED.DLG.YN.DONE
-    IF ED.DLG.C = 78 OR ED.DLG.C = 110 OR ED.DLG.C = 27 OR ED.DLG.C = 13 THEN GOTO ED.DLG.YN.DONE
-    GOTO ED.DLG.YN.WAIT
-ED.DLG.YN.DONE:
+    IF ED.DLG.C = 13 THEN ED.DLG.BPICK = ED.DLG.BAT : GOTO ED.DLG.BDONE
+    IF ED.DLG.C = 27 THEN ED.DLG.BPICK = ED.DLG.BESC : GOTO ED.DLG.BDONE
+    IF ED.DLG.C = 157 THEN GOSUB ED.DLG.BBACK : GOTO ED.DLG.BWAIT
+    IF ED.DLG.C = 29 OR ED.DLG.C = 9 THEN GOSUB ED.DLG.BFWD : GOTO ED.DLG.BWAIT
+## Anything else is tried as a hot letter and dropped if it is not one, so a stray key cannot
+## answer the question for the person at the keyboard.
+    GOSUB ED.DLG.BHOT
+    IF ED.DLG.BPICK = 0 THEN GOTO ED.DLG.BWAIT
+ED.DLG.BDONE:
     GOSUB ED.DLG.CLOSE
+    RETURN
+
+## ED.DLG.BGET -- button ED.DLG.BI into ED.DLG.BTN$. Three scalars rather than an array: the
+## module has no init hook to DIM one in, and no box is ever going to want a fourth button.
+ED.DLG.BGET:
+    ED.DLG.BTN$ = ED.DLG.B1$
+    IF ED.DLG.BI = 2 THEN ED.DLG.BTN$ = ED.DLG.B2$
+    IF ED.DLG.BI = 3 THEN ED.DLG.BTN$ = ED.DLG.B3$
+    RETURN
+
+## ED.DLG.BMEASURE -- the columns ED.DLG.BTN$ takes on screen: its own length, four for the
+## brackets and the air inside them, less the & that is not drawn.
+ED.DLG.BMEASURE:
+    ED.DLG.BW = LEN(ED.DLG.BTN$) + 4
+    IF GP.INSTR(ED.DLG.BTN$, "&") > 0 THEN ED.DLG.BW = ED.DLG.BW - 1
+    RETURN
+
+## ED.DLG.BDRAW -- the whole row, every time the focus moves. Redrawing three short strings
+## is cheaper than working out which two of them changed.
+ED.DLG.BDRAW:
+    ED.DLG.SY = 3 : ED.DLG.SX = ED.DLG.BLEFT
+    FOR ED.DLG.BI = 1 TO ED.DLG.BN
+        GOSUB ED.DLG.BGET : GOSUB ED.DLG.BMEASURE
+        ED.DLG.SATTR = ED.DLG.TEXTATTR
+        IF ED.DLG.BI = ED.DLG.BAT THEN ED.DLG.SATTR = ED.DLG.FIELDATTR
+        ED.DLG.S$ = "[ " + ED.DLG.BTN$ + " ]"
+        GOSUB ED.DLG.SAYHOT
+        ED.DLG.SX = ED.DLG.SX + ED.DLG.BW + 2
+    NEXT
+    RETURN
+
+## ED.DLG.BFWD / ED.DLG.BBACK -- the focus one button on, and round the ends.
+ED.DLG.BFWD:
+    ED.DLG.BAT = ED.DLG.BAT + 1
+    IF ED.DLG.BAT > ED.DLG.BN THEN ED.DLG.BAT = 1
+    GOSUB ED.DLG.BDRAW
+    RETURN
+
+ED.DLG.BBACK:
+    ED.DLG.BAT = ED.DLG.BAT - 1
+    IF ED.DLG.BAT < 1 THEN ED.DLG.BAT = ED.DLG.BN
+    GOSUB ED.DLG.BDRAW
+    RETURN
+
+## ED.DLG.BHOT -- ED.DLG.C against every button's hot letter, without case. The first button
+## that owns the letter wins; a key no button owns leaves ED.DLG.BPICK at 0.
+ED.DLG.BHOT:
+    ED.DLG.BWANT = ED.DLG.C
+    IF ED.DLG.BWANT > 96 AND ED.DLG.BWANT < 123 THEN ED.DLG.BWANT = ED.DLG.BWANT - 32
+    FOR ED.DLG.BI = 1 TO ED.DLG.BN
+        GOSUB ED.DLG.BGET
+        ED.DLG.HOTAT = GP.INSTR(ED.DLG.BTN$, "&")
+        IF ED.DLG.HOTAT > 0 AND ED.DLG.HOTAT < LEN(ED.DLG.BTN$) THEN GOSUB ED.DLG.BTRY
+    NEXT
+    RETURN
+
+ED.DLG.BTRY:
+    ED.DLG.BHAVE = ASC(MID$(ED.DLG.BTN$, ED.DLG.HOTAT + 1, 1))
+    IF ED.DLG.BHAVE > 96 AND ED.DLG.BHAVE < 123 THEN ED.DLG.BHAVE = ED.DLG.BHAVE - 32
+    IF ED.DLG.BHAVE = ED.DLG.BWANT AND ED.DLG.BPICK = 0 THEN ED.DLG.BPICK = ED.DLG.BI
     RETURN
 
 ## ED.DLG.WAITKEY -- hold until a key is struck, for a box that only tells and so has

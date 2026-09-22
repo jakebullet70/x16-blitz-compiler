@@ -29,7 +29,7 @@ GOTO ED.FONT.SKIP
 ## ED.GUI.SETUP -- give the menu library the dropdown frame glyphs.
 ##
 ## GP.BOX's built-in styles name the screen codes of the stock charset, and ED.PETFONT has
-## moved every one of them, so style 2 draws "p @ B" here. ED.MENU.DROPSTYLE points at eight
+## moved every one of them, so style 2 draws "p @ B" here. MENU.DROPSTYLE points at eight
 ## bytes of our own instead: the glyphs ED.PETFONT rescued into $C0-$C5. MENU reads them in
 ## the order TR TL BR BL H H V V.
 ##
@@ -37,7 +37,7 @@ GOTO ED.FONT.SKIP
 ED.GUI.SETUP:
   ED.STYLE$ = CHR$(ED.GL.TR) + CHR$(ED.GL.TL) + CHR$(ED.GL.BR) + CHR$(ED.GL.BL)
   ED.STYLE$ = ED.STYLE$ + CHR$(ED.GL.H) + CHR$(ED.GL.H) + CHR$(ED.GL.V) + CHR$(ED.GL.V)
-  ED.MENU.DROPSTYLE = GP.STRPTR(ED.STYLE$) + 1
+  MENU.DROPSTYLE = GP.STRPTR(ED.STYLE$) + 1
   RETURN
 
 ## ED.PETFONT -- re-order charset 3 in VRAM into ASCII order.
