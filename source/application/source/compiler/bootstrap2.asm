@@ -72,17 +72,14 @@
 ;
 ; ************************************************************************************************
 
-BXNAMEMAX = 48 								; the overlay name the compiler bakes in below. The
-											; compiler refuses a longer one rather than truncating
-											; it -- see ObjBuildOverlayName.
-BXFILE = 2 									; logical file AND secondary address for the overlay.
-											; A DATA channel, not a LOAD: the file has no load
-											; address of its own and does not go to one place.
-											; Not 1 -- file 1 has been seen to hang a later OPEN.
 ;
-;		BXOVLEND, the byte after the last region, is in common.inc. 00rtimage.header walks the
-;		same bytes in RAM for an EMBEDDED program, and common.inc is the one file both links
-;		read. Its reason is written there.
+;		BXNAMEMAX and BXFILE are in common.inc, with BXOVLEND and for the same reason: the
+;		runtime image reads a .OVL of its own now, so both links need both numbers and neither
+;		may drift from the other. The compiler refuses a name longer than BXNAMEMAX rather than
+;		truncating it -- see ObjBuildOverlayName.
+;
+;		BXOVLEND, the byte after the last region, is there too, and is written by the same writer
+;		for both readers.
 ;
 
 		.section code
@@ -200,12 +197,24 @@ BXStore:
 BXAllDone:
 		jsr 	BXClose
 		inc 	BXHigh 						; a second RUN finds this set and skips the lot
-		;
-		;		NOTHING IS DONE HERE FOR GP.BSTR. Which bank each of its slots reads is a table at the
-		;		top of this very page, at the fixed address GPBSTRBANKS, and the runtime reads it where
-		;		it lies -- so the handover is the page arriving, and there is no code.
-		;
 BXRun:
+		;
+		;		WHICH BANK EACH GP.BSTR SLOT READS, into the place the runtime looks. The table is
+		;		patched into this page by object.asm and copied to GPBSTRBANKS, $07F0, the top of
+		;		the storage hole -- see common.inc, which has the whole of why it is there and not
+		;		here. It used to be read where it lay, at the top of this page, and that address is
+		;		the runtime image in an embedded program.
+		;
+		;		ON THE RE-RUN PATH, not inside BXAllDone, because a second RUN reaches here without
+		;		reading the overlay again. Nothing clears $07F0 between the two, so this is putting
+		;		back what is already there -- eleven bytes not to have to know that.
+		;
+		ldx 	#BSTR_MAX_BANKS-1
+BXBStrCopy:
+		lda 	BXBStrBanks,x
+		sta 	GPBSTRBANKS,x
+		dex
+		bpl 	BXBStrCopy
 		;
 		;		THE BANK IS SET HERE, NOT LEFT WHERE THE LOADING LEFT IT. A program that falls into
 		;		a GP.BANKED region from the line above reaches it by a plain GOTO, which selects no
@@ -297,22 +306,21 @@ BXRamText:
 
 ; ------------------------------------------------------------------------------------------------
 ;		WHICH RAM BANK EACH GP.BSTR SLOT READS -- one byte a slot, written by object.asm out of the
-;		compiler's text-bank list, and read by the RUNTIME where it lies. There is no copy and no
-;		code: the handover is this page arriving with the program.
+;		compiler's text-bank list, and copied to GPBSTRBANKS at BXRun.
 ;
-;		AT THE TOP OF THE PAGE AND NOT WHEREVER IT FELL, because the runtime has to know the
-;		address and cannot be told one -- it is SHARED, so one image serves every program. The
-;		address is GPBSTRBANKS in common.inc, the .cerror below is what stops the reader growing
-;		into it, and the table ending exactly at $0A00 is what keeps the p-code where it was.
+;		WHEREVER IT FALLS NOW. It was pinned to the top of this page and read where it lay, which
+;		is what made it free; the cost of that was an address an embedded program has its runtime
+;		image at, and so no GP.BANKEDSTR in an embedded program at all. The eleven bytes of copy
+;		at BXRun bought the feature in the other build. common.inc has the reasoning.
 ;
 ;		A slot with no bank stays zero and is never read: the compiler only ever emits a slot it
 ;		has filled in.
 ; ------------------------------------------------------------------------------------------------
-		.cerror * > GPBSTRBANKS, "bootstrap extension page has grown into the GP.BSTR bank table"
-		.fill 	GPBSTRBANKS - *, 0 			; pad up to the table
 BXBStrBanks:
-		.fill 	BSTR_MAX_BANKS, 0 			; PATCHED -- and it ends exactly at $0A00, where the p-code
-											; starts
+		.fill 	BSTR_MAX_BANKS, 0 			; PATCHED -- sixteen slots, most of them usually zero
+
+		.cerror * > $0A00, "bootstrap extension page has overflowed its 256 bytes"
+		.fill 	$0A00 - *, 0 				; and the page is 256 bytes whatever is in it
 
 		.here
 ProgramBootExtEnd: 							; PHYSICAL end -- (End - Start) == 256 bytes

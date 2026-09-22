@@ -100,10 +100,9 @@ def overlays(name):
     whole = i == len(b) - 1 and b[i] == OVL_END
     return got if whole else got + ["SHORT"]
 
-#   ...and the same walk over the overlay an EMBEDDED object carries inside itself. There is
-#   no file to open: the compiler appended it to the object and patched the page it lands on
-#   into the runtime image, so this starts from that byte -- which is also the only thing the
-#   program itself is told. Reading it any other way would test the test.
+#   An EMBEDDED object no longer carries its regions. It opens the same .OVL a shared one
+#   does, by a name the compiler patches into the runtime image, so overlays() above reads
+#   both builds and the only extra thing to check is that the image asks for the right file.
 RTIMG = {}
 for _line in open(os.path.join(ROOT, "source", "application", "rtimage.gen.asm")):
     if "=" in _line and _line.split()[0].startswith("RTIMG_"):
@@ -111,22 +110,16 @@ for _line in open(os.path.join(ROOT, "source", "application", "rtimage.gen.asm")
         RTIMG[_k.strip()] = int(_v.strip().lstrip("$"), 16)
 
 
-def appended(name):
+def image_overlay_name(name):
+    #   The length byte and the name itself, out of the object's own runtime image. Zero
+    #   length is a program with no region, which opens nothing and ships as one file.
     b = open(os.path.join(T, name + ".PRG"), "rb").read()[2:]
-    page = b[RTIMG["RTIMG_OVLPOFS"]]
-    if page == 0:
-        return ["NO OVERLAY PAGE"]
-    i = (page << 8) - RTIMG["RTIMG_LOAD"]
-    if not 0 < i < len(b):
-        return ["PAGE $%02x IS NOT IN THE FILE" % page]
-    banks = []
-    while i + 2 <= len(b) and b[i] != OVL_END:
-        banks.append(b[i])
-        i += 2 + b[i + 1] * 256
-    got = sorted("%03d" % x for x in banks)
-    #   The terminator has to be the LAST byte of the object: anything after it is a region
-    #   the walk lost count of, and the runtime would stop reading at the same place.
-    return got if (i == len(b) - 1 and b[i] == OVL_END) else got + ["SHORT"]
+    n = b[RTIMG["RTIMG_OVLLENOFS"]]
+    if n == 0:
+        return ""
+    o = RTIMG["RTIMG_OVLNAMOFS"]
+    return b[o:o + n].decode("latin-1")
+
 
 
 def compile_one(name, mode="SHARED"):
@@ -222,23 +215,24 @@ OVERLAYS = [("BNK255", ["002", "100", "254", "255"]), ("BNKOVL", ["002", "100", 
 TRUNCATE = [("BNKOVL", 100)]
 
 #   EVERY TEST ABOVE IS SHARED. These four are compiled a second time --embedded and run again,
-#   and must print exactly what the shared build printed. An embedded object has no .OVL beside
-#   it: the regions are appended to the program and the runtime image walks them into their
-#   banks before the runtime starts, so what is checked is that contract -- the overlay begins
-#   on the page the patched byte names, carries the same regions, and ends on the last byte.
+#   and must print exactly what the shared build printed. An embedded object keeps its .OVL
+#   beside it now and reads it at startup, so what is checked is that contract -- the file is
+#   still there, the image asks for it by name, and it carries the same regions.
 #
 #   NOT A BYTE COMPARE against the shared .OVL. A branch that crosses into a region is
 #   corrected by where the p-code RUNS, which is $0A00 shared and $3600 embedded, so the two
 #   overlays differ in every region that is ever entered. They are not meant to be the same
 #   bytes; they are meant to do the same thing.
-EMBEDDED = [("BANKY", 512), ("BANKZ", 512), ("BANKN", 512), ("BNK64", 2048)]
-#   ...and the one limit an embedded program has that a shared one does not: its regions travel
-#   inside it, between the bank code and $9F00, and a hundred of them do not fit.
-BADEMB = [("BNKBIG", "EMBEDDED REGIONS LEAVE NO ROOM TO LOAD"),
-          #   ...and the keyword still refused embedded on purpose. The runtime finds which
-          #   bank a text slot went to in a table at $09F0, which is in the bootstrap
-          #   extension page -- a page an embedded program does not have. BNK255 has text.
-          ("BNK255", "GP.BANKEDSTR NEEDS SHARED")]
+EMBEDDED = [("BANKY", 512), ("BANKZ", 512), ("BANKN", 512), ("BNK64", 2048),
+#   BNKEMB (a copy of BNK255) is here because GP.BANKEDSTR is no longer shared-only. Its text bank travels
+#   in the .OVL like any other region, and the sixteen bytes saying which
+#   bank each text slot went to ride in the runtime image, which StartCode copies to
+#   GPBSTRBANKS. So the embedded run has to print the same four lines the shared one does.
+            ("BNKEMB", 2048)]
+#   ...and the limit that is gone. A hundred one-page regions used to be refused EMBEDDED --
+#   they were appended to the object and ran past $9F00 into the I/O page. They travel in the
+#   .OVL now, which the loader never reads, so the build has to take them.
+BIGEMB = [("BNKBIG", 100)]
 
 #   The drive keeps its own compiler and runtime, and they went stale once. Copy the
 #   current ones over them first.
@@ -251,6 +245,14 @@ for pattern in ("GPC.IMG.*.BIN", "GP1.IMG.*.BIN",
 #   BNKOVL is BNK255 under another name, made fresh each run so the two cannot drift.
 open(os.path.join(T, "BNKOVL.BASL"), "w", newline="").write(
     open(os.path.join(T, "BNK255.BASL"), newline="").read().replace("BNK255", "BNKOVL"))
+#   BNKEMB is BNK255 under a third name, for the embedded pass at the foot of this file. That
+#   pass overwrites the object it compiles and takes its .OVL away -- which is right for an
+#   embedded build and wrong to leave behind, because the shared rows above run first next time
+#   and would find an embedded object where they left a shared one. A name of its own keeps the
+#   two apart, exactly as BNKOVL does.
+open(os.path.join(T, "BNKEMB.BASL"), "w", newline="").write(
+    open(os.path.join(T, "BNK255.BASL"), newline="").read().replace("BNK255", "BNKEMB"))
+
 #   BNKBIG is generated too: a hundred one-page regions, which no embedded object has room for.
 #   None of them is ever called -- the test is the refusal, and calling them would only make the
 #   low code large enough to change which limit it hits first.
@@ -315,22 +317,28 @@ for n, ram in EMBEDDED:
     want_ovl = overlays(n)
     want_out = run_one(n, ram) if ks == "OK" else []
     ke, me = compile_one(n, "EMBEDDED")
-    got = appended(n) if ke == "OK" else ["COMPILE " + me]
+    got = overlays(n) if ke == "OK" else ["COMPILE " + me]
     out = run_one(n, ram) if ke == "OK" else []
+    named = image_overlay_name(n) if ke == "OK" else ""
+    #   THE .OVL HAS TO STILL BE THERE, and the image has to be asking for it by name. Those
+    #   two are the whole of the pairing: nothing else ties the second file to the first.
     left = os.path.exists(os.path.join(T, n + ".OVL"))
-    good = (got == want_ovl and out == want_out and len(out) > 0 and not left)
+    good = (got == want_ovl and out == want_out and len(out) > 0
+            and left and named == n + ".OVL")
     print("%-6s embedded %4dK %s   (%s)"
           % (n, ram, "YES" if good else "*** NO ***", " / ".join(out) or me))
     if not good:
         fails += 1
         print("       shared   :", want_ovl, want_out)
-        print("       embedded :", got, out, "OVL LEFT" if left else "")
+        print("       embedded :", got, out, named, "" if left else "NO OVL")
 
-for n, want in BADEMB:
+for n, want in BIGEMB:
     ok = tokenise(n)
     k, m = compile_one(n, "EMBEDDED") if ok else ("TOKFAIL", "")
-    good = (k == "ERR" and want in m)
-    print("%-6s embedded rejected %s   (%s)" % (n, "YES" if good else "*** NO ***", m))
+    got = overlays(n) if k == "OK" else []
+    good = (k == "OK" and len(got) == want and "SHORT" not in got)
+    print("%-6s embedded %d regions %s   (%s)"
+          % (n, want, "YES" if good else "*** NO ***", m or "%d in the .OVL" % len(got)))
     if not good:
         fails += 1
 

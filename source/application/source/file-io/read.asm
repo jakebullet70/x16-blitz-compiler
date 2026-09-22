@@ -140,28 +140,6 @@ IOOverlayClose:
 		rts
 
 ;
-;		AND IT IS OPENED AGAIN, FOR READ, WHEN AN EMBEDDED OBJECT APPENDS IT -- see
-;		ObjAppendOverlay. The write file has been closed by then, so the same number serves, and
-;		the name is the one the writer built.
-;
-IOOpenOverlayRead:
-		lda 	#IO_OVL_FILE
-		sta 	ioFileNo
-		lda 	#'R'
-		jsr 	IOSetFileName 				; carry comes back from OPEN
-		ldy 	#3 							; put the default back for every other caller
-		sty 	ioFileNo 					; (sty leaves the carry alone)
-		rts
-
-IOOverlayIn:
-		lda 	#IO_OVL_FILE
-		sta 	ioInSel
-		lda 	#$FF 						; the object has stopped being the selected output, so the next
-		sta 	ioOutSel 					; IOSelectObject does its CHKOUT rather than skip it
-		ldx 	#IO_OVL_FILE
-		jmp 	$FFC6 						; CHKIN
-
-;
 ;		SELECTING ONE DIRECTION TAKES THE OTHER WITH IT, so each of these forgets what the
 ;		other knew. CHKIN and CHKOUT are not independent here: after the object file has been
 ;		selected for output the source is no longer selected for input, and a read that assumed

@@ -47,9 +47,10 @@
 ## **  GOSUB MENU.THEME     the menu colours from THEME.CLR. The bar is BAR
 ## **                       and a dropdown TEXT; the lit row is HILITE, a hot
 ## **                       key BORDER's colour over the row's background, a
-## **                       disabled row DIMMED's the same way, and the frame
-## **                       TEXT. Run it again after a theme change, and set a
-## **                       MENU colour after it to differ.
+## **                       disabled row DIMMED's the same way, the frame
+## **                       TEXT, and a dropdown's shadow SHADOW. Run it again
+## **                       after a theme change, and set a MENU colour after it
+## **                       to differ.
 ## **  GOSUB MENU.KEYS.ON   makes ALT with a bar hot key type that key.
 ## **  GOSUB MENU.KEYS.OFF  puts the keyboard layout back.
 ## **
@@ -73,6 +74,10 @@
 ## kbdbuf_get_modifiers. Below the $FF00 jump table, so KERNAL ROM is paged in.
 #DEFINE MENU.KBDMOD $FEC0
 #DEFINE MENU.MOD.ALT 2
+## Bit 0 of the same byte. Nothing in the menus wants it, but MENU.MODS is read on
+## every keypress on the way through here, so a program's own dispatch can test it
+## for free -- Shift+F3 for a backwards search, say.
+#DEFINE MENU.MOD.SHIFT 1
 
 ## Eleven 128-byte layout tables in RAM bank 0, byte 0 of each its ID.
 #DEFINE MENU.KEYMAP $A000
@@ -178,6 +183,7 @@ MENU.THEME:
     MENU.HOTATTR = (MENU.ATTR AND 240) + (THEME.CLR(THEME.BORDER) AND 15)
     MENU.DISATTR = (MENU.ATTR AND 240) + (THEME.CLR(THEME.DIMMED) AND 15)
     MENU.SEPATTR = MENU.ATTR
+    MENU.SHADOWATTR = THEME.CLR(THEME.SHADOW)
     RETURN
 
 ## ---- the plain table finds the key that types each letter, and the ALT

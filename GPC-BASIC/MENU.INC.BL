@@ -83,8 +83,9 @@
 ## **  on its own takes new rows and leaves its old ones used. A dropdown row
 ## **  keeps no hint.
 ## **  A row past the slot's size is dropped, and so is a row before any
-## **  MENU.BEGIN. For more, raise the .MAX defines below and add SPC lines
-## **  to the groups in MENU.INC.BANKED.BL to match.
+## **  MENU.BEGIN. The sizes are the store file's, not this one's -- see
+## **  MENU.INC.BANKED.BL, and MENU.INC.BANKED.SMALL.BL for a program with
+## **  a few short menus and no room to spare.
 ## **
 ## **  & marks the hot key: "SAVE &AS" is stored as "SAVE AS" with hot key A
 ## **  at column 6. Only the first & counts, && is a literal &, and a trailing
@@ -95,8 +96,8 @@
 ## **  Text and hints live in bank MENU.TEXTBANK, claimed from BANKMGR on the
 ## **  first MENU.BEGIN. It is 62 unless the program #DEFINEs it before the
 ## **  #INCLUDE. Text is cut to 30 characters and a hint to 50.
-## **  Requires GPB.INC.BL and BANKMGR.INC.BL, BANKMGR.INIT run first, and a
-## **  SHARED compile. #INCLUDE MENU.INC.BANKED.BL straight before this file.
+## **  Requires GPB.INC.BL and BANKMGR.INC.BL, with BANKMGR.INIT run first.
+## **  #INCLUDE MENU.INC.BANKED.BL straight before this file. Either build.
 ## **  MENU.OK is 0 if the bank was already taken; every row is then dropped.
 ## **
 ## **  The store is private to the runners. Row R of slot S is at
@@ -124,11 +125,11 @@
 #DEFINE MENU.POPUP 1
 #DEFINE MENU.DROP 1
 #DEFINE MENU.LASTSLOT 17
-#DEFINE MENU.BAR.MAX 16
-#DEFINE MENU.POPUP.MAX 32
-#DEFINE MENU.POOL.MAX 64
-## the pool's first row in the store, after the bar's and the popup's
-#DEFINE MENU.POOLBASE 48
+## MENU.BAR.MAX, MENU.POPUP.MAX, MENU.POOL.MAX and MENU.POOLBASE are not here. They
+## are in the store file, because they describe the store: a group has one SPC line
+## per row it holds, so the counts and the rows have to be written down together or
+## they drift. MENU.INC.BANKED.BL holds the stock sizes and MENU.INC.BANKED.SMALL.BL
+## a smaller set; a program includes one of them straight before this file.
 
 #DEFINE MENU.ON 1
 #DEFINE MENU.OFF 0

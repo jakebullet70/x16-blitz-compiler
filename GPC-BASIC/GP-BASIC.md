@@ -860,11 +860,12 @@ while the object is written, so `BANKMGR` has to be told rather than asked:
 BANKMGR.WANT = GM.TEXTBANK : GOSUB BANKMGR.CLAIM
 ```
 
-**Compile SHARED**, though `GP.BANKED` code regions no longer need it. The text goes into the
-program's one `NAME.OVL` file, which the shared bootstrap reads into its bank — and the
-runtime then finds which bank a slot went to in a sixteen-byte table at `$09F0`, inside the
-bootstrap extension page. An embedded program has no such page, so an embedded compile stops
-at the first `GP.BANKEDSTR` with `GP.BANKEDSTR NEEDS SHARED`.
+**Either build.** Both put the text in one `NAME.OVL` file beside the program: the bootstrap
+reads it for a shared build and `StartCode` reads it for an embedded one, so an embedded
+program with banked text is a `.PRG` and a `.OVL` together. The runtime finds which bank a slot went to in a
+sixteen-byte table at `$07F0`, in the low-memory hole both builds leave alone — the bootstrap
+extension page writes it there for a shared program, and `StartCode` copies it out of the
+image for an embedded one.
 
 **A group name is not a variable.** No `$`, no `%`, no `(` — any of those is a syntax error rather
 than something quietly ignored. A name that no block declared is a syntax error at the line that
@@ -1066,7 +1067,8 @@ line is.
 
 This is how a program gets past the shared p-code ceiling. Low-memory p-code has to fit under the
 runtime — about 17,920 bytes, §7 — and a region does not count against it. Every region of the
-program goes into one overlay file, `NAME.OVL`, written beside the `.PRG` and read in with it.
+program goes into one overlay file, `NAME.OVL`, written beside the `.PRG` and read in at startup.
+That is true of an EMBEDDED build as well, so a banked program is two files in either mode.
 
 ```basic
 #DEFINE MY.GUICODE 4
@@ -1160,8 +1162,8 @@ those pages come next. Then the next region, and so on to end of file. So **a re
 padded page count plus two bytes**, the padding rather than the p-code in it, and the banks may be
 in any order with any gaps between them.
 
-The overlay ships beside the `.PRG`. The bootstrap reads it once per load, not once per `RUN`, and a
-missing or truncated one stops the program with `?OVL`; a region for a bank the machine does not
+The overlay ships beside the `.PRG`, in both builds. The program reads it once per load, not once
+per `RUN`, and a missing or truncated one stops it with `?OVL`; a region for a bank the machine does not
 have stops it with `?RAM`. Nothing pairs a `.OVL` to its `.PRG`, so a stale one is read. §7 lists
 every file a program ships.
 
@@ -1196,19 +1198,28 @@ runtime and every `#INCLUDE` spends it; a region spends 8,192 bytes of a RAM ban
 not using. Bank what you can. A module called inside a loop goes where the loop is: a call between
 a region and anywhere outside it switches the bank twice.
 
-The banked form works in either build. A SHARED program keeps its regions in one `NAME.OVL`
-file, which the shared bootstrap reads into their banks. An EMBEDDED program carries them
-inside itself, appended to the program, and the runtime copies them into their banks before
-the program starts — so it is still one file, and it still loads with `LOAD` and `RUN`. What
-an embedded build has to satisfy is room on the way in: the regions travel between the end of
-the p-code and `$9F00`, and a program whose regions will not fit there stops with `EMBEDDED
-REGIONS LEAVE NO ROOM TO LOAD`. A banked embedded program also carries the whole runtime
-rather than the smaller core, whether or not it calls a GP.BASIC keyword.
+The banked form works in either build, and both write the same `NAME.OVL` beside the program.
+A SHARED program's bootstrap opens it; an EMBEDDED program opens it itself, at startup, before
+the runtime begins. **So the first banked module makes an EMBEDDED program two files**: ship
+the `.OVL` with the `.PRG`, and a program that cannot find it stops with `?OVL`. A program with
+no region at all has no `.OVL` and is one file as before. Either way it loads with `LOAD` and
+`RUN`.
 
-`GP.BANKEDSTR` is the exception and still needs SHARED — see §3.10 — so a program that banks
-its text is a shared program however its code regions are built.
+The regions are never in the file the loader reads, so nothing caps them but the banks the
+machine has; a region asking for a bank that is not there stops with `?RAM`. A banked embedded
+program does carry the whole runtime rather than the smaller core, whether or not it calls a
+GP.BASIC keyword.
 
 `samples/GPB-MODS-TESTING/PICKDEMO.BASL` is a complete program in this shape, in 99 lines.
+
+Banking a module does not make room in an embedded build, and it is worth being clear about
+why. The file loads from `$0801` upward in one piece, so a byte moved out of low memory into
+a region is still a byte in the file: it arrives a little higher up instead of a little lower
+down, and the last byte lands in the same place. Splitting the modules across more regions
+does not help either, and costs two header bytes a region. What lowers that last address is
+something that is not in the program at all — a smaller store for a library that reserves one,
+a module the program does not include, dead code the compiler can drop. Banking buys free low
+RAM while the program runs, which is a different problem and usually the one you have.
 
 | | low memory | a RAM bank |
 |---|---|---|
@@ -1577,7 +1588,9 @@ IF N = 0 THEN <cancelled>
 ```
 
 Requires `GPB.INC.BL` and `BANKMGR.INC.BL`, with `BANKMGR.INIT` run before the first
-`MENU.BEGIN`, and a SHARED compile. `#INCLUDE "MENU.INC.BANKED.BL"` straight before `MENU.INC.BL`.
+`MENU.BEGIN`. `#INCLUDE` a store straight before `MENU.INC.BL`: `MENU.INC.BANKED.BL` for the sizes
+below. Its groups are banked, so the program gets a `NAME.OVL` beside its `.PRG` in either
+build — ship both.
 
 A menu is built into a slot, then run from it. There are two slots, so the bar survives while its
 dropdown is built:
@@ -1587,9 +1600,11 @@ dropdown is built:
 | `MENU.BAR` | 16 |
 | `MENU.POPUP` | 32 |
 
-A row past the slot's size is dropped, and so is a row added before any `MENU.BEGIN`. For more rows,
-raise `MENU.BAR.MAX` or `MENU.POPUP.MAX` in `MENU.INC.BL` and add `SPC` lines to both groups in
-`MENU.INC.BANKED.BL` to match. Each group holds 48 now.
+A row past the slot's size is dropped, and so is a row added before any `MENU.BEGIN`. The sizes
+are the store file's, not `MENU.INC.BL`'s: `MENU.BAR.MAX`, `MENU.POPUP.MAX`, `MENU.POOL.MAX` and
+`MENU.POOLBASE` are declared beside the `SPC` lines they count, because a define that does not
+match its lines silently loses rows off the end of a menu. To change them, copy a store file and
+edit the defines and the lines together. `MENU.POOLBASE` is `MENU.BAR.MAX + MENU.POPUP.MAX`.
 
 The text and hints are kept in bank `MENU.TEXTBANK`, which the first `MENU.BEGIN` claims from
 `BANKMGR` (§4.13). It is 62 unless the program writes `#DEFINE MENU.TEXTBANK n` before the
@@ -2795,7 +2810,8 @@ build.
 
 | mode | files |
 |---|---|
-| EMBEDDED | `NAME.PRG` only. The runtime and the bank 1 code are in the object |
+| EMBEDDED | `NAME.PRG`. The runtime and the bank 1 code are in the object |
+| | `NAME.OVL`, holding every `BANK` line's region — only if the program has one |
 | SHARED | `NAME.PRG` |
 | | `GPB.RT.nnn.BIN` when the report says `GPBASIC`, `GPC.RT.nnn.BIN` when it says `CORE` |
 | | `GP1.RT.nnn.BIN`, always |
@@ -2894,7 +2910,7 @@ What a region costs instead:
   caller's bank again.
 - **A file that has to travel.** `NAME.OVL` ships beside the `.PRG`. A program without it, or
   with a truncated one, stops with `?OVL` before it runs.
-- **A second or so of startup**, once per load, while the bootstrap reads the overlay in.
+- **A second or so of startup**, once per load, while the overlay is read in.
 
 Banked text is the same bargain on the data side: a `GP.BANKEDSTR` group (§3.10) is out of the
 workspace, and inside a region it costs no p-code at all.

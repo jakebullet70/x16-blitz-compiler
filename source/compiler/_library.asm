@@ -11165,10 +11165,6 @@ CommandGPBankedStrCompile:
 		stz 	deferErrors 				; a block opener must never defer -- a rolled back
 											; opener leaves its closer behind and corrupts the
 											; nesting of any block enclosing it, silently.
-		lda 	gpBankShared 				; STILL SHARED ONLY, though GP.BANKED is not: the runtime
-		bne 	_CBSShared 					; reads the slot-to-bank table where it lies, at GPBSTRBANKS
-		jmp 	BStrNeedsShared 			; -- $09F0, in a page an embedded program does not have
-_CBSShared:
 		lda 	bstrState
 		bne 	_CBSStructure 				; a GP.BANKEDSTR inside one still open
 		stz 	bstrBodyLines
@@ -11248,20 +11244,6 @@ CommandGPEndBankedStrCompile:
 		stz 	deferErrors
 		.error_structure
 
-;
-;		SHARED ONLY, AND THE LAST THING THAT IS. GP.BANKED compiles embedded now -- its regions
-;		are appended to the object and the runtime image walks them into their banks -- but text
-;		in a bank needs one thing more: GPBSTRBANKS, the sixteen bytes that turn a slot into a
-;		RAM bank, which gp-runtime/commands/gpbstr.asm reads AT ITS ADDRESS. That address is the
-;		top of the bootstrap extension page, $09F0, and an embedded program has no such page --
-;		$09F0 is its own code. Lifting this means giving that table a home the runtime can find
-;		in both modes, which is a change to the runtime and not to the overlay.
-;
-;		In compiler space, like BStrTooManyBanks.
-;
-BStrNeedsShared:
-		jsr 	CallErrorHandler
-		.text 	"GP.BANKEDSTR NEEDS SHARED", 0
 
 ; ************************************************************************************************
 ;
@@ -11440,6 +11422,8 @@ BankedStrAddCompile:
 ;		07/09/26		Written.
 ;		14/09/26		An embedded compile stops at the first GP.BANKEDSTR with GP.BANKEDSTR NEEDS
 ;						SHARED, at its own line rather than NOT IMPLEMENTED in BStrFlush.
+;		22/09/26		That refusal is gone: GPBSTRBANKS moved to $07F0, which both builds have, and
+;						the embedded runtime image carries the table for StartCode to copy in.
 ;		18/09/26		SPC(n) body lines, and GP.BSTRSET shares the two name helpers.
 ;
 ; ************************************************************************************************
@@ -11791,8 +11775,8 @@ _BRBankFree:
 		bne 	_BRDone
 		clc
 		lda 	bstrRegionPage
-		adc 	gpBankRunPage 				; buffer page -> the page it loads at, the extension page
-		sta 	gpBankRunBase 				; and all -- see CompileCode
+		adc 	gpBankRunPage 				; buffer page -> the page it loads at. start.asm sets the
+		sta 	gpBankRunBase 				; delta per mode, so this is right in both -- see CompileCode
 		;
 		;		AND gpBankStart, WHICH IS THE FIT CHECK'S IDEA OF WHERE THE P-CODE STOPS.
 		;		ObjectPrepareShared measures resident p-code as FreeMemory..gpBankStart once

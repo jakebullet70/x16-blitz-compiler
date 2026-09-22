@@ -77,7 +77,7 @@ def report(raw):
 	return "\n".join("    " + ln for ln in kept[-8:]) or "    (no message)"
 
 
-def compile_one(source, obj, mapfile="", shared=True):
+def compile_one(source, obj, mapfile="", shared=True, deadlist=""):
 	for need in (EMU, ROM, os.path.join(TESTING, ENGINE), os.path.join(TESTING, source)):
 		if not os.path.exists(need):
 			die("missing %s" % need)
@@ -92,12 +92,21 @@ def compile_one(source, obj, mapfile="", shared=True):
 		#
 		#		Three lines, and SHARED on a fourth for a SHARED build. The engine reads a line
 		#		the file stops short of as blank, so an EMBEDDED build needs no empty fourth line
-		#		and no build here has a fifth: dead code is never removed. GPC.PRG writes all
-		#		five, blank where an option is off.
+		#		and a build without --strip has no fifth: dead code is only removed when asked
+		#		for. GPC.PRG writes all five, blank where an option is off.
+		#
+		#		--strip names the fifth line, which is what turns the option on. The compiler
+		#		WRITES that file -- the numbers of the lines it left out, one a line -- so it is
+		#		an output, not a list to supply. The fourth line has to be there to be stepped
+		#		over, blank for an EMBEDDED build.
 		#
 		control = "%s\n%s\n%s\n" % (source, obj, mapfile)
 		if shared:
 			control += "SHARED\n"
+		elif deadlist:
+			control += "\n"
+		if deadlist:
+			control += "%s\n" % deadlist
 		with open(GPC_INPUT, "w", newline="\n") as f:
 			f.write(control)
 		for stale in (obj, mapfile):
@@ -196,20 +205,26 @@ def main():
 	global TESTING, GPC_INPUT
 	args = sys.argv[1:]
 	shared = True
+	deadlist = ""
 	#		--drive DIR compiles where a sample lives rather than in testing/.
-	while args and args[0] in ("--embedded", "--drive"):
+	#		--strip FILE removes dead code and writes the lines left out to FILE. Off unless
+	#		asked for, so every build that does not pass it is compiled exactly as before.
+	while args and args[0] in ("--embedded", "--drive", "--strip"):
 		if args[0] == "--embedded":
 			shared = False
 			args = args[1:]
 		elif len(args) >= 2:
-			TESTING = os.path.abspath(args[1])
-			GPC_INPUT = os.path.join(TESTING, "GPC.INPUT")
+			if args[0] == "--strip":
+				deadlist = args[1]
+			else:
+				TESTING = os.path.abspath(args[1])
+				GPC_INPUT = os.path.join(TESTING, "GPC.INPUT")
 			args = args[2:]
 		else:
 			break
 	if len(args) not in (2, 3):
-		die("usage: compile_shared.py [--drive DIR] [--embedded] <source.prg> <object.prg> [map]")
-	compile_one(args[0], args[1], args[2] if len(args) == 3 else "", shared)
+		die("usage: compile_shared.py [--drive DIR] [--embedded] [--strip DEAD.TXT] <source.prg> <object.prg> [map]")
+	compile_one(args[0], args[1], args[2] if len(args) == 3 else "", shared, deadlist)
 
 
 main()

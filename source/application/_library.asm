@@ -678,17 +678,14 @@ BootRunJmpOffset = BBRunJmp+1 - $0801 		; OPERANDS -- the base page, and the jmp
 ;
 ; ************************************************************************************************
 
-BXNAMEMAX = 48 								; the overlay name the compiler bakes in below. The
-											; compiler refuses a longer one rather than truncating
-											; it -- see ObjBuildOverlayName.
-BXFILE = 2 									; logical file AND secondary address for the overlay.
-											; A DATA channel, not a LOAD: the file has no load
-											; address of its own and does not go to one place.
-											; Not 1 -- file 1 has been seen to hang a later OPEN.
 ;
-;		BXOVLEND, the byte after the last region, is in common.inc. 00rtimage.header walks the
-;		same bytes in RAM for an EMBEDDED program, and common.inc is the one file both links
-;		read. Its reason is written there.
+;		BXNAMEMAX and BXFILE are in common.inc, with BXOVLEND and for the same reason: the
+;		runtime image reads a .OVL of its own now, so both links need both numbers and neither
+;		may drift from the other. The compiler refuses a name longer than BXNAMEMAX rather than
+;		truncating it -- see ObjBuildOverlayName.
+;
+;		BXOVLEND, the byte after the last region, is there too, and is written by the same writer
+;		for both readers.
 ;
 
 		.section code
@@ -806,12 +803,24 @@ BXStore:
 BXAllDone:
 		jsr 	BXClose
 		inc 	BXHigh 						; a second RUN finds this set and skips the lot
-		;
-		;		NOTHING IS DONE HERE FOR GP.BSTR. Which bank each of its slots reads is a table at the
-		;		top of this very page, at the fixed address GPBSTRBANKS, and the runtime reads it where
-		;		it lies -- so the handover is the page arriving, and there is no code.
-		;
 BXRun:
+		;
+		;		WHICH BANK EACH GP.BSTR SLOT READS, into the place the runtime looks. The table is
+		;		patched into this page by object.asm and copied to GPBSTRBANKS, $07F0, the top of
+		;		the storage hole -- see common.inc, which has the whole of why it is there and not
+		;		here. It used to be read where it lay, at the top of this page, and that address is
+		;		the runtime image in an embedded program.
+		;
+		;		ON THE RE-RUN PATH, not inside BXAllDone, because a second RUN reaches here without
+		;		reading the overlay again. Nothing clears $07F0 between the two, so this is putting
+		;		back what is already there -- eleven bytes not to have to know that.
+		;
+		ldx 	#BSTR_MAX_BANKS-1
+BXBStrCopy:
+		lda 	BXBStrBanks,x
+		sta 	GPBSTRBANKS,x
+		dex
+		bpl 	BXBStrCopy
 		;
 		;		THE BANK IS SET HERE, NOT LEFT WHERE THE LOADING LEFT IT. A program that falls into
 		;		a GP.BANKED region from the line above reaches it by a plain GOTO, which selects no
@@ -903,22 +912,21 @@ BXRamText:
 
 ; ------------------------------------------------------------------------------------------------
 ;		WHICH RAM BANK EACH GP.BSTR SLOT READS -- one byte a slot, written by object.asm out of the
-;		compiler's text-bank list, and read by the RUNTIME where it lies. There is no copy and no
-;		code: the handover is this page arriving with the program.
+;		compiler's text-bank list, and copied to GPBSTRBANKS at BXRun.
 ;
-;		AT THE TOP OF THE PAGE AND NOT WHEREVER IT FELL, because the runtime has to know the
-;		address and cannot be told one -- it is SHARED, so one image serves every program. The
-;		address is GPBSTRBANKS in common.inc, the .cerror below is what stops the reader growing
-;		into it, and the table ending exactly at $0A00 is what keeps the p-code where it was.
+;		WHEREVER IT FALLS NOW. It was pinned to the top of this page and read where it lay, which
+;		is what made it free; the cost of that was an address an embedded program has its runtime
+;		image at, and so no GP.BANKEDSTR in an embedded program at all. The eleven bytes of copy
+;		at BXRun bought the feature in the other build. common.inc has the reasoning.
 ;
 ;		A slot with no bank stays zero and is never read: the compiler only ever emits a slot it
 ;		has filled in.
 ; ------------------------------------------------------------------------------------------------
-		.cerror * > GPBSTRBANKS, "bootstrap extension page has grown into the GP.BSTR bank table"
-		.fill 	GPBSTRBANKS - *, 0 			; pad up to the table
 BXBStrBanks:
-		.fill 	BSTR_MAX_BANKS, 0 			; PATCHED -- and it ends exactly at $0A00, where the p-code
-											; starts
+		.fill 	BSTR_MAX_BANKS, 0 			; PATCHED -- sixteen slots, most of them usually zero
+
+		.cerror * > $0A00, "bootstrap extension page has overflowed its 256 bytes"
+		.fill 	$0A00 - *, 0 				; and the page is 256 bytes whatever is in it
 
 		.here
 ProgramBootExtEnd: 							; PHYSICAL end -- (End - Start) == 256 bytes
@@ -2253,7 +2261,7 @@ _WOCCutSet:
 		;		zTemp1 = length of the object code -- the LOW part of it only, measured the same way
 		;		and for the same reason as ObjectPrepareShared measures it. A GP.BANKED region sits at
 		;		the top of the object, page aligned, and it is not part of the image: it is appended
-		;		to the file behind the image, and ObjCheckOverlayFits below is what counts it. Measure
+		;		to the .OVL beside the object and is no part of what the loader reads. Measure
 		;		to objPtr instead and a hundred one-page regions read as a hundred pages of low code,
 		;		which is PROGRAM TOO BIG for a program whose low code is a GOSUB and an END.
 		;
@@ -2303,96 +2311,63 @@ _WOCWholePages:
 _WOCTooBig:
 		jmp 	ObjectTooBig 					; shared with the SHARED path: prints PROGRAM TOO BIG,
 _POCFits: 									; returns carry set, caller skips the map file and OK
-		jsr 	ObjCheckOverlayFits 		; ...and whatever the regions append on top of it
+		jsr 	ObjPrepareOverlay 			; ...and the overlay's name and the bank it starts in
 		jsr 	AsmSetBases 				; as the shared path -- see AsmCloseBlock
 		jmp 	ObjStreamOpen
 
 ; ************************************************************************************************
 ;
-;		THE OVERLAY HAS TO LAND SOMEWHERE TOO.
+;		THE OVERLAY'S NAME, AND THE BANK THE PROGRAM STARTS IN.
 ;
-;		An embedded program carries its regions appended to the object: the p-code, then the bank
-;		code padded up from the page the p-code ends on, then the overlay. Startup copies both of
-;		those away before the workspace under them is cleared, so they are allowed to sit IN the
-;		workspace -- but only in the part of it MIN_WS_PAGES guarantees is there, which is exactly
-;		what rtimage.gen.asm's .cerror already says about the bank code on its own.
+;		An embedded program's regions travel in a .OVL beside it -- the same file, in the same
+;		format, that a shared program's do -- so there is no room to find for them here: they are
+;		never in the object, and the workspace test above is the only ceiling the program has. What
+;		the runtime image does need is the name to open and the bank to start in, and both are
+;		patched into it page by page as it streams out. See _WOCImgNoOvl.
 ;
-;		THE OVERLAY IS THE ONE WITH NO CEILING OF ITS OWN. The bank code is a build-time constant
-;		and is checked at build time; the overlay is as long as the program's regions make it, up
-;		to 127 of them at 8K each, and nothing else stops it running past $9F00 into the I/O page.
-;		THAT FAILURE IS SILENT. A blob written 8K past the ceiling ran to completion, having
-;		written over the VERA registers and a RAM bank on the way, and said nothing.
-;
-;		PAGES, NOT BYTES. Each region contributes layoutPages of payload plus two header bytes,
-;		and one end marker closes the file. 127 regions is 255 bytes of header and marker, so a
-;		single page covers all of them together whatever the program does.
+;		IT USED TO COUNT PAGES. An appended overlay had to fit under $9F00 together with the
+;		runtime, the p-code and the workspace, and nothing but this stopped it running on into the
+;		I/O page, which it did silently. A file the loader never reads has no such bound: StartCode
+;		checks the bank each region asks for against the banks the machine has, one region at a
+;		time, and says ?RAM.
 ;
 ;		HERE, because here is where the layout is settled and not a byte has been written yet.
-;		layoutCount and layoutPages are pass one's, and BStrFlush has already added a region per
-;		text bank to them by this point -- see SaveLayout in compiler/source/main/compiler.asm.
+;		layoutCount is pass one's, and BStrFlush has already added a region per text bank to it by
+;		this point -- see SaveLayout in compiler/source/main/compiler.asm.
 ;
-;		EMBEDDED ONLY, and it needs no test for that: the shared path left for
-;		ObjectPrepareShared long before this, and its regions travel in a .OVL of their own that
-;		is never in memory at once.
+;		EMBEDDED ONLY, and it needs no test for that: the shared path left for ObjectPrepareShared
+;		long before this, and pokes the same two facts into its bootstrap extension page instead --
+;		see _WOCSExtName.
 ;
 ; ************************************************************************************************
 
-ObjCheckOverlayFits:
-		stz 	objOvlPage 					; both of the runtime's answers about the overlay start at
+ObjPrepareOverlay:
+		stz 	objOvlNameLen 				; both of the runtime's answers about the overlay start at
 		stz 	objStartBank 				; NONE, which is what a program with no region ships with
 		lda 	layoutCount
-		beq 	_OCOFDone 					; no regions, so no overlay and nothing appended
-		;
-		;		objOvlPages = 1 + sum(layoutPages). Sixteen bits, because 127 regions of 32 pages
-		;		is 4,064 -- which a byte does not hold even though every entry in the table does.
-		;
-		lda 	#1 							; the page the headers and the end marker share
-		sta 	objOvlPages
-		stz 	objOvlPages+1
-		ldx 	#0
-_OCOFAdd:
-		clc
-		lda 	layoutPages,x
-		adc 	objOvlPages
-		sta 	objOvlPages
-		bcc 	_OCOFNoCarry
-		inc 	objOvlPages+1
-_OCOFNoCarry:
-		inx
-		cpx 	layoutCount
-		bne 	_OCOFAdd
-		lda 	objOvlPages+1 				; over 256 pages of regions is 64K and cannot fit under
-		bne 	_OCOFNoRoom 				; anything, so stop before the byte arithmetic below
-		;
-		;		The first page above everything the file carries. The image ends where the frame
-		;		stack gap begins, the bank code is padded up from there, and the overlay follows it.
-		;
-		sec
-		lda 	newWorkspacePage
-		sbc 	#FrameStackPages
-		clc
-		adc 	#(RTIMG_BANKLEN + $FF) >> 8
-		bcs 	_OCOFNoRoom
-		sta 	objOvlPage 					; WHICH IS ALSO WHERE THE OVERLAY LANDS, so keep it: it is
-											; the byte RTIMG_OVLPOFS hands the runtime, which has no way
-											; to work it out for itself. sta leaves the carry alone, and
-											; the add below needs it clear
-		adc 	objOvlPages
-		bcs 	_OCOFNoRoom
-		cmp 	#(ObjectCeiling >> 8) - MIN_WS_PAGES + 1
-		bcs 	_OCOFNoRoom 				; the same threshold, the same way round, as the test above
-		jsr 	ObjFindStartBank 			; ...and the bank to start the program in. There is at
-		sta 	objStartBank 				; least one region here, which is what that routine needs
-_OCOFDone:
+		beq 	_OPODone 					; no regions, so no overlay and nothing to open
+		jsr 	ObjBuildOverlayName 		; <object>.OVL, complete -- the image pokes nothing into it
+		ldx 	ovlNameLen
+		cpx 	#BXNAMEMAX+1
+		bcs 	_OPONameLong
+		stx 	objOvlNameLen 				; nonzero, which is also how the image knows it has an overlay
+		jsr 	ObjFindStartBank 			; ...and the bank to start the program in. There is at least
+		sta 	objStartBank 				; one region here, which is what that routine needs
+_OPODone:
 		rts
 
 ;
-;		Compiler space, not errors.asm, for the reason _WOCSExtNameLong gives below: that table
-;		is copied into every compiled program, and only a compile can ever print this.
+;		THE NAME IS BOUNDED BY THE IMAGE, as it is by the extension page in a shared build and for
+;		the same reason: BXNAMEMAX bytes were set aside for it, and a longer name has nowhere to go.
+;		GPC.INPUT allows 63 characters. It is the file NAME that is bounded and never the program,
+;		and only a program with a region ever asks.
 ;
-_OCOFNoRoom:
+;		Compiler space, not errors.asm, for the reason _WOCSExtNameLong gives below: that table is
+;		copied into every compiled program, and only a compile can ever print this.
+;
+_OPONameLong:
 		jsr 	CallErrorHandler
-		.text 	"EMBEDDED REGIONS LEAVE NO ROOM TO LOAD", 0
+		.text 	"OBJECT NAME TOO LONG FOR AN OVERLAY", 0
 
 ; ************************************************************************************************
 ;
@@ -2558,12 +2533,36 @@ _WOCImgNoWS:
 		sta 	imageBuffer,y
 _WOCImgNoBank:
 		lda 	imgPage
-		cmp 	#RTIMG_OVLPOFS >> 8
+		cmp 	#RTIMG_OVLLENOFS >> 8
 		bne 	_WOCImgNoOvl
-		ldy 	#RTIMG_OVLPOFS & $FF
-		lda 	objOvlPage 					; the page the appended overlay lands on, 0 = no regions
+		ldy 	#RTIMG_OVLLENOFS & $FF
+		lda 	objOvlNameLen 				; how long the .OVL's name is, 0 = no regions and no file
 		sta 	imageBuffer,y
 _WOCImgNoOvl:
+		;
+		;		AND THE NAME ITSELF, BXNAMEMAX bytes set aside for it and objOvlNameLen of them used.
+		;		The shared build pokes the same name into its bootstrap extension page -- see
+		;		_WOCSExtName, which is where the length is bounded for both of them.
+		;
+		;		IT CANNOT CROSS A CHUNK either, for the reason the table below gives, and
+		;		genrtimage.py emits the .cerror that fails the build if it ever does.
+		;
+		lda 	imgPage
+		cmp 	#RTIMG_OVLNAMOFS >> 8
+		bne 	_WOCImgNoOvlName
+		ldx 	objOvlNameLen
+		beq 	_WOCImgNoOvlName 			; no overlay, so the template's zeros are what ships
+		dex
+_WOCImgOvlName:
+		txa
+		clc
+		adc 	#RTIMG_OVLNAMOFS & $FF
+		tay
+		lda 	OvlFileName,x
+		sta 	imageBuffer,y
+		dex
+		bpl 	_WOCImgOvlName
+_WOCImgNoOvlName:
 		lda 	imgPage
 		cmp 	#RTIMG_SBANKOFS >> 8
 		bne 	_WOCImgNoSBank
@@ -2571,6 +2570,29 @@ _WOCImgNoOvl:
 		lda 	objStartBank 				; ...and the bank it starts in, 0 = leave it alone
 		sta 	imageBuffer,y
 _WOCImgNoSBank:
+		;
+		;		AND THE GP.BSTR SLOT-TO-BANK TABLE, sixteen bytes rather than one. The shared build
+		;		pokes the same bytes into the bootstrap extension page (see _WOCSExtBStr); here they
+		;		go into the image, and StartCode copies them to GPBSTRBANKS on the way in.
+		;
+		;		THE RUN CANNOT CROSS A CHUNK. 00rtimage.header aligns the table to sixteen and
+		;		genrtimage.py fails the build if it straddles a page anyway, so every byte of it is
+		;		in this chunk and the offset within the chunk is the low byte plus X.
+		;
+		lda	imgPage
+		cmp	#RTIMG_BSTROFS >> 8
+		bne	_WOCImgNoBStr
+		ldx	#BSTR_MAX_BANKS-1
+_WOCImgBStr:
+		txa
+		clc
+		adc	#RTIMG_BSTROFS & $FF
+		tay
+		lda	bstrBankNums,x
+		sta	imageBuffer,y
+		dex
+		bpl	_WOCImgBStr
+_WOCImgNoBStr:
 		jsr 	IOObjectOut 				; and write it out
 		ldy 	#0
 _WOCImgWrite:
@@ -3640,122 +3662,26 @@ _OEBPast:
 
 ; ************************************************************************************************
 ;
-;		BLC_CLOSEOUT, embedded only: the .OVL, appended to the object so that the program is ONE
-;		file. The separate overlay is scratched afterwards by ObjDeleteOverlay.
+;		BLC_CLOSEOUT, embedded only: the bank code, and then the object is done.
 ;
-;		WHY IT IS COPIED BACK rather than written here in the first place. Each region goes out as
-;		it CLOSES, in the middle of pass two, with the low code still streaming into the object
-;		behind it -- so the two cannot share one file while they are being written. The .OVL is
-;		what lets them, and by the time this runs it is closed and complete. It is also exactly
-;		the file a shared build of the same program leaves on disk, which is what the acceptance
-;		test rests on: the tail of an embedded object is that .OVL, byte for byte.
+;		THE .OVL IS NOT APPENDED ANY MORE, and it is not scratched either. It stays on disk beside
+;		the object, which is where the runtime image opens it -- see StartCode in 00rtimage.header.
+;		An embedded program with a GP.BANKED region or a GP.BANKEDSTR group is two files now, and a
+;		program with neither is still one, because no .OVL was ever created for it.
 ;
-;		A PAGE AT A TIME, through imageBuffer -- the same buffer and the same reason as the runtime
-;		image in ObjStreamOpen. Both files are open together and the KERNAL has one input channel
-;		and one output, so a byte at a time would be a CHKIN/CHKOUT pair per byte.
-;
-;		PADDED UP TO A PAGE FIRST, because the reader is handed a PAGE number and nothing finer.
-;		The bank code is RTIMG_BANKLEN bytes, which is not a whole number of pages, so without
-;		this the overlay would start partway through one. The file loads at $0801 in one piece,
-;		so a page boundary in the file is a page boundary in RAM.
+;		WHICH IS WHAT LIFTED THE CEILING. BASIC's LOAD reads the whole PRG into RAM before a byte of
+;		the program runs, so an appended overlay had to fit under $9F00 along with the runtime, the
+;		p-code and the workspace -- and the page above $9F00 is I/O, so overrunning it was silent. A
+;		file the loader never reads has no such bound: the regions are limited by the banks the
+;		machine has, exactly as a shared program's always were.
 ;
 ; ************************************************************************************************
 
 ObjCloseOut:
 		jsr 	ObjEmitBankCode 				; embedded: the bank code, after the p-code
-		jsr 	ObjAppendOverlay 			; ...and the overlay after that, so the program is one file
 		stz 	objStreamLive 				; the compile worked and the object is complete, so there
-		jsr 	IOObjectClose 				; is nothing left to tidy away
-		jmp 	ObjDeleteOverlay 			; ...and the .OVL goes, now the object is safely closed
+		jmp 	IOObjectClose 				; is nothing left to tidy away
 
-ObjAppendOverlay:
-		lda 	ModeText
-		cmp 	#'S'
-		beq 	_OAODone 					; shared: the .OVL stays beside the object and the bootstrap
-		lda 	ovlWritten 					; opens it by name
-		beq 	_OAODone 					; no regions in this program, so there is no overlay
-		jsr 	IOSelectObject
-		ldx 	#RTIMG_BANKLEN & $FF 		; the bank code began on a page boundary and does not end on
-		beq 	_OAOAligned 				; one, so fill out the rest of the page it stopped in
-_OAOPad:
-		lda 	#0
-		jsr 	IOWriteByte
-		inx
-		bne 	_OAOPad
-_OAOAligned:
-		jsr 	ObjBuildOverlayName 		; the writer's own name, rebuilt from the object's
-		ldx 	#OvlFileName & $FF
-		ldy 	#OvlFileName >> 8
-		jsr 	IOOpenOverlayRead
-		bcs 	_OAOLost
-_OAOPage:
-		jsr 	IOOverlayIn 				; a page in, for one CHKIN...
-		stz 	objOvlEnd
-		ldy 	#0
-_OAORead:
-		jsr 	IOReadByte
-		bcs 	_OAOShort
-		sta 	imageBuffer,y
-		iny
-		bne 	_OAORead
-		bra 	_OAOOut 					; a whole page: Y has wrapped, and 0 here means 256
-_OAOShort:
-		inc 	objOvlEnd 					; end of file, so this page is the last of it
-		cpy 	#0
-		beq 	_OAOCopied 					; ...and the file ended exactly on a page boundary
-_OAOOut:
-		sty 	objOvlCount 					; ZERO MEANS 256, as imgCount does in ObjStreamOpen
-		jsr 	IOSelectObject 				; ...and a page out, for one CHKOUT
-		ldy 	#0
-_OAOWrite:
-		lda 	imageBuffer,y
-		jsr 	IOWriteByte
-		iny
-		cpy 	objOvlCount
-		bne 	_OAOWrite
-		lda 	objOvlEnd
-		beq 	_OAOPage
-_OAOCopied:
-		dey 								; THE LAST BYTE COPIED MUST BE THE END MARKER, because a
-		lda 	imageBuffer,y 				; read that stopped early looks exactly like end of file
-		cmp 	#BXOVLEND 					; here and like a whole overlay to the loader. Y is one past
-		bne 	_OAOCut 					; the page in hand, and a file that ended ON a boundary leaves
-		jsr 	IOOverlayClose 				; the page before it in the buffer, so this reads it either
-_OAODone: 									; way. The .OVL itself goes once the object is closed -- see
-		rts 								; ObjDeleteOverlay
-;
-;		THE OVERLAY CANNOT BE REOPENED, having been written and closed a moment ago. There is
-;		nothing useful left to do: the object on disk is short of its regions, and it would load
-;		and run wrong, so this stops rather than let the OK through.
-;
-_OAOLost:
-		jsr 	CallErrorHandler
-		.text 	"INTERNAL ERROR OVERLAY REOPEN", 0
-
-_OAOCut:
-		jsr 	CallErrorHandler
-		.text 	"INTERNAL ERROR OVERLAY CUT", 0
-
-;
-;		AND THEN IT GOES, once the object is closed. An embedded program is one file, and a .OVL
-;		left beside it is the shared build's input: nothing reads it, and it is stale the moment
-;		the next compile changes the program.
-;
-;		AFTER THE CLOSE, DELIBERATELY. Scratch it before, and anything that fails in between has
-;		destroyed the only copy of the regions; after it, the worst case is a file left behind.
-;
-ObjDeleteOverlay:
-		lda 	ModeText
-		cmp 	#'S'
-		beq 	_ODODone
-		lda 	ovlWritten
-		beq 	_ODODone
-		jsr 	ObjBuildOverlayName
-		ldx 	#OvlFileName & $FF
-		ldy 	#OvlFileName >> 8
-		jmp 	IOScratchFile
-_ODODone:
-		rts
 
 ; ************************************************************************************************
 ;
@@ -3842,18 +3768,12 @@ objMoveLen: 								; ...and how many it is shuffling down afterwards
 		.fill 	2
 objSpan: 									; the region being written out
 		.fill 	2
-objOvlPages: 								; pages the whole overlay will take, appended to an embedded
-		.fill 	2 							; object -- see ObjCheckOverlayFits
 objPadTop: 									; ...and the page-rounded length it is padded up to
 		.fill 	2
 objByte: 									; the byte in hand, across the zTemp save
 		.fill 	1
-objOvlCount: 								; bytes in the overlay page being appended, 0 = 256
-		.fill 	1
-objOvlEnd: 									; nonzero once that page is the last one in the file
-		.fill 	1
-objOvlPage: 								; the page an embedded program's appended overlay is loaded
-		.fill 	1 							; to, 0 = it has no regions -- see ObjCheckOverlayFits
+objOvlNameLen: 								; how long the name of an embedded program's .OVL is, 0 = it
+		.fill 	1 							; has no regions and opens nothing -- see ObjPrepareOverlay
 objStartBank: 								; ...and the bank it starts running in, 0 = none
 		.fill 	1
 objHold: 									; nonzero while the low buffer is holding a statement
@@ -4327,28 +4247,6 @@ IOOverlayClose:
 		sta 	ioInSel
 		sta 	ioOutSel
 		rts
-
-;
-;		AND IT IS OPENED AGAIN, FOR READ, WHEN AN EMBEDDED OBJECT APPENDS IT -- see
-;		ObjAppendOverlay. The write file has been closed by then, so the same number serves, and
-;		the name is the one the writer built.
-;
-IOOpenOverlayRead:
-		lda 	#IO_OVL_FILE
-		sta 	ioFileNo
-		lda 	#'R'
-		jsr 	IOSetFileName 				; carry comes back from OPEN
-		ldy 	#3 							; put the default back for every other caller
-		sty 	ioFileNo 					; (sty leaves the carry alone)
-		rts
-
-IOOverlayIn:
-		lda 	#IO_OVL_FILE
-		sta 	ioInSel
-		lda 	#$FF 						; the object has stopped being the selected output, so the next
-		sta 	ioOutSel 					; IOSelectObject does its CHKOUT rather than skip it
-		ldx 	#IO_OVL_FILE
-		jmp 	$FFC6 						; CHKIN
 
 ;
 ;		SELECTING ONE DIRECTION TAKES THE OTHER WITH IT, so each of these forgets what the

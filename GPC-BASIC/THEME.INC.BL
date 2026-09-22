@@ -46,6 +46,10 @@
 ##
 ## BAR is a menu bar or status line: a background of its own, so the band
 ## stands off the page. BORDER's colour marks a hot key on it.
+##
+## SHADOW is the colour a drop shadow is filled with -- a menu's, a dialog's --
+## and it is black on every palette. It is a role rather than a constant so that
+## a program which changes its colours changes this one with them.
 
 #DEFINE THEME.PAGE 0
 #DEFINE THEME.TEXT 1
@@ -56,7 +60,8 @@
 #DEFINE THEME.WARN 6
 #DEFINE THEME.FOCUS 7
 #DEFINE THEME.BAR 8
-#DEFINE THEME.SLOTS 9
+#DEFINE THEME.SHADOW 9
+#DEFINE THEME.SLOTS 10
 
 ## How many themes THEME.NEXT cycles through.
 #DEFINE THEME.COUNT 5
@@ -92,6 +97,7 @@ THEME.SELECT.X16:
     THEME.CLR(THEME.WARN)   = 6 * 16 + 13
     THEME.CLR(THEME.FOCUS)  = 7 * 16 + 6
     THEME.CLR(THEME.BAR)    = 12 * 16 + 1
+    THEME.CLR(THEME.SHADOW) = 4 * 16 + 0
     RETURN
 
 THEME.SELECT.DARK:
@@ -104,6 +110,7 @@ THEME.SELECT.DARK:
     THEME.CLR(THEME.WARN)   = 0 * 16 + 8
     THEME.CLR(THEME.FOCUS)  = 7 * 16 + 0
     THEME.CLR(THEME.BAR)    = 6 * 16 + 1
+    THEME.CLR(THEME.SHADOW) = 4 * 16 + 0
     RETURN
 
 ## A white page. DIMMED is mid grey rather than dark grey so that reversing it
@@ -118,6 +125,7 @@ THEME.SELECT.LIGHT:
     THEME.CLR(THEME.WARN)   = 1 * 16 + 2
     THEME.CLR(THEME.FOCUS)  = 7 * 16 + 0
     THEME.CLR(THEME.BAR)    = 15 * 16 + 0
+    THEME.CLR(THEME.SHADOW) = 4 * 16 + 0
     RETURN
 
 ## From the XFMGR file manager's theme module. DIMMED and WARN are not in it.
@@ -135,6 +143,7 @@ THEME.SELECT.GRAY:
     THEME.CLR(THEME.WARN)   = 11 * 16 + 10
     THEME.CLR(THEME.FOCUS)  = 7 * 16 + 11
     THEME.CLR(THEME.BAR)    = 6 * 16 + 1
+    THEME.CLR(THEME.SHADOW) = 4 * 16 + 0
     RETURN
 
 ## THEME.FIRST is set only when THEME.SELECT created the array, the one case with

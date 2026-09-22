@@ -125,18 +125,28 @@ RTGPMAGIC = RTBASE-4 						; 4-byte "handlers are loaded too" magic
 ;		bootstrap was told about and reads a stale byte in the other: here it was $05E5 against
 ;		$0400, and the program ran, printed garbage, and blamed the handler.
 ;
-;		IT IS READ WHERE IT LIES AND NOT COPIED, which is what makes sixteen banks cost less than
-;		one did. The one bank was a byte in the runtime's divider padding, written on the way in
-;		by the bootstrap extension page; the table lives IN that extension page instead, at its
-;		very top, so the compiler fills it in as it builds the page and nothing at run time moves
-;		it at all. The old handover's five bytes are gone and the sixteen come out of the page's
-;		spare, which was measured at 32.
+;		IT IS IN THE STORAGE HOLE, $0400-$0801, AT THE TOP OF IT. That hole is the one piece of
+;		low RAM both builds have and neither occupies: a program's image starts at $0801 and its
+;		workspace at $0900 or higher, so nothing loads over it and the runtime never clears it.
+;		StorageEnd measures $05F0 in both runtime links, which leaves 528 bytes between the
+;		sections and this table.
 ;
-;		THE ADDRESS IS PINNED BY THIS CONSTANT AND CHECKED AT BOTH ENDS -- bootstrap2.asm pads up
-;		to it and .cerrors if its loader has grown into it. A program with NO region has no
-;		extension page at all and its p-code starts at $0900, so $09F0 is p-code there; that is
-;		correct and not a hazard, because such a program has no GP.BANKEDSTR and so nothing that
-;		can call GP.BSTR.
+;		IT USED TO BE $09F0, the top of the bootstrap extension page, where it arrived loaded and
+;		no code moved it. That address is p-code in a shared program with no region, which was
+;		harmless -- such a program has no GP.BANKEDSTR -- but it is the RUNTIME IMAGE ITSELF in
+;		an embedded one, which is not. Embedded was refused for that reason alone. The table moved
+;		down here instead, and the two loaders each copy sixteen bytes into it: bootstrap2.asm at
+;		BXRun out of the extension page it already carries, 00rtimage.header at StartCode out of
+;		the image. Eleven bytes of copy in each, and GP.BANKEDSTR compiles in both modes.
+;
+;		THE COPY IS ON THE RE-RUN PATH IN BOTH, deliberately. A second RUN reloads no region and
+;		re-reads no overlay, and this table would survive untouched anyway -- but it costs eleven
+;		bytes to put back rather than to reason about, and a program that scribbled on it gets it
+;		back.
+;
+;		THE ADDRESS IS PINNED BY THIS CONSTANT AND CHECKED AT BOTH ENDS -- common.inc .cerrors if
+;		a link's storage section has grown into it, and genrtimage.py .cerrors if the image's own
+;		copy of it straddles a page of the stream the object writer patches.
 ;
 ;		SIXTEEN, because the slot is the top FOUR BITS of the constant every GP.BSTR call site
 ;		already pushes -- see compiler/commands/gpbstr.asm. Four bits leaves twelve for the index,
@@ -145,7 +155,7 @@ RTGPMAGIC = RTBASE-4 						; 4-byte "handlers are loaded too" magic
 ;		and the index field caps nothing.
 ;
 BSTR_MAX_BANKS = 16 						; text banks a program may have, = the slot field's range
-GPBSTRBANKS = $0A00 - BSTR_MAX_BANKS 		; the table, at the top of the extension page ($09F0)
+GPBSTRBANKS = $0800 - BSTR_MAX_BANKS 		; the table, at the top of the storage hole ($07F0)
 HANDLER_BANK = 1							; the runtime's rarely used handlers; no region may use it
 PCODE_PAGE = $09 							; shared-mode p-code base page ($0900, page-aligned)
 MIN_WS_PAGES = 16 							; smallest workspace a shared program keeps (4K)
@@ -158,6 +168,21 @@ MIN_WS_PAGES = 16 							; smallest workspace a shared program keeps (4K)
 ;		and 00rtimage.header walks the same bytes in RAM for an embedded one.
 ;
 BXOVLEND = 1
+;
+;		THE OVERLAY'S LOGICAL FILE, and the longest name a reader may be handed. Both readers
+;		want both numbers: bootstrap2.asm opens a .OVL for a shared program and 00rtimage.header
+;		opens one for an embedded program that has regions, so neither may drift from the other.
+;
+;		BXFILE IS A DATA CHANNEL, not a LOAD: the file has no load address of its own and does not
+;		go to one place. Not 1 -- file 1 has been seen to hang a later OPEN.
+;
+;		BXNAMEMAX IS 32 BECAUSE THE BOOTSTRAP EXTENSION PAGE SAYS SO, and the runtime image copied
+;		the bound rather than pick its own. A CMDR-DOS file name is 16 characters, so 32 holds one
+;		with a drive prefix and a ".OVL" on it. The compiler refuses a longer one rather than
+;		truncating it -- see _WOCSExtNameLong.
+;
+BXFILE = 2
+BXNAMEMAX = 32
 ;
 ;		Pages left free between the end of the object code and the start of the workspace, for
 ;		the runtime (FOR/GOSUB) frame stack. clr.asm puts runtimeStackPtr at storeStartHigh-1:$FF
@@ -303,12 +328,16 @@ StorageEnd:
 
 ;
 ;		storage is a 1K hole -- $0400 to $0801, and no further, because the code starts there.
+;		Its top sixteen bytes are GPBSTRBANKS and are not the section's to take, so the guard is
+;		against that and not against CodeStart. StorageEnd measures $05F0 in both runtime links
+;		and $0678 in the compiler, so there is room; the message names the table because growing
+;		into it is the failure that has no symptom.
 ;		Nothing warns you when it runs out: the section simply carries on over the top of the
 ;		BASIC stub, and the program corrupts itself the first time it writes to the buffer that
 ;		spilled. It HAD run out, silently, and only survived because the one buffer hanging over
 ;		the edge was never filled past its fifteenth byte. So say so, loudly.
 ;
-		.cerror StorageEnd > CodeStart, "storage has overflowed into the code - put compiler-only buffers in the code section (see application/source/file-io/read.asm)"
+		.cerror StorageEnd > GPBSTRBANKS, "storage has overflowed into the GP.BSTR bank table at $07F0 - put compiler-only buffers in the code section (see application/source/file-io/read.asm)"
 
 ; ************************************************************************************************
 ;

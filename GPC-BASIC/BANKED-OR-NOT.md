@@ -57,12 +57,17 @@ MY.LIBEND:
   the modules across two regions.
 - **Include a module that reads another's `#DEFINE`s after it.** The GUI modules read `THEME`'s
   role numbers, so `THEME` comes first.
-- **Either build.** A SHARED program keeps its regions in a `NAME.OVL` file beside it; ship
-  that and the runtime file with the program. An EMBEDDED program carries its regions inside
-  itself and copies them into their banks at startup, so it stays one file — but they have to
-  fit between the p-code and `$9F00` on the way in, and a build that leaves no room stops with
-  `EMBEDDED REGIONS LEAVE NO ROOM TO LOAD`. `GP.BANKEDSTR` is the exception and still needs a
-  shared build.
+- **Either build ships the same `NAME.OVL`.** A SHARED program keeps its regions in that file
+  beside it, and so does an EMBEDDED one: the program opens it at startup and reads each region
+  into its bank. **So a banked module makes an EMBEDDED program two files** — the `.PRG` and the
+  `.OVL` — and both have to travel together. A program with no banked module is still one file,
+  because no `.OVL` is written for it. `GP.BANKEDSTR` counts as a banked module here.
+- **Banking a module does not make an EMBEDDED program fit.** The whole file loads from `$0801`
+  upward, so a byte moved out of low memory into a region is still a byte in the file: it
+  arrives a little higher instead of a little lower, and the last byte lands in the same
+  place. What moves that address down is code or data that is not there at all -- a smaller
+  menu store, a module the program does not include. Banking buys free low RAM at run time,
+  which is a different problem and usually the one you have.
 
 `samples/GPB-MODS-TESTING/GPBMODS.BASL` banks the utilities, the file modules, `THEME`, the GUI,
 the combo box and two of its own dropdown handlers, in six regions.

@@ -1,15 +1,31 @@
 ## ***********************************************************************
 ## **
-## **  MENU.INC.BANKED.BL -- the menu store's banked groups. #INCLUDE it
-## **  straight before MENU.INC.BL. The bar's 16 rows, then the popup's 32,
-## **  then, in the text group only, the dropdown pool's 64. Add SPC lines to
-## **  match when a .MAX define grows.
+## **  MENU.INC.BANKED.BL -- the menu store's banked groups, and the sizes
+## **  that describe them. #INCLUDE it straight before MENU.INC.BL.
+## **
+## **  The bar's 16 rows, then the popup's 32, then, in the text group only,
+## **  the dropdown pool's 64. A row is one SPC line, so a .MAX define and
+## **  its SPC lines are written here together and cannot drift apart.
+## **
+## **  #INCLUDE it and the program gets a .OVL beside its .PRG: the groups
+## **  are banked, and banked data travels in a file of its own in every
+## **  build. Ship both files together.
 ## **
 ## ***********************************************************************
 ## A group must be declared before GP.BSTR names it, so this comes first.
 #IFNDEF MENU.TEXTBANK
 #DEFINE MENU.TEXTBANK 62
 #ENDIF
+
+## How many rows each slot holds. MENU.POOLBASE is where the pool starts in the
+## text group, which is every bar row and every popup row before it, so it is
+## MENU.BAR.MAX + MENU.POPUP.MAX and nothing else. The text group is that many
+## rows plus the pool; the hint group is that many rows, because only the bar
+## and the popup keep hints.
+#DEFINE MENU.BAR.MAX 16
+#DEFINE MENU.POPUP.MAX 32
+#DEFINE MENU.POOL.MAX 64
+#DEFINE MENU.POOLBASE 48
 
 GOTO MENU.BANKED.END
 

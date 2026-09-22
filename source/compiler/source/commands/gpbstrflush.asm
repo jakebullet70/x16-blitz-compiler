@@ -347,8 +347,8 @@ _BRBankFree:
 		bne 	_BRDone
 		clc
 		lda 	bstrRegionPage
-		adc 	gpBankRunPage 				; buffer page -> the page it loads at, the extension page
-		sta 	gpBankRunBase 				; and all -- see CompileCode
+		adc 	gpBankRunPage 				; buffer page -> the page it loads at. start.asm sets the
+		sta 	gpBankRunBase 				; delta per mode, so this is right in both -- see CompileCode
 		;
 		;		AND gpBankStart, WHICH IS THE FIT CHECK'S IDEA OF WHERE THE P-CODE STOPS.
 		;		ObjectPrepareShared measures resident p-code as FreeMemory..gpBankStart once

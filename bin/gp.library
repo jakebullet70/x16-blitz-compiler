@@ -469,9 +469,10 @@ _GAPBad:
 ;		strings -- two directory bytes and a capacity and a length byte each -- so the compiler's
 ;		8K region check stops a bank long before 4,096 could.
 ;
-;		GPBSTRBANKS IS WRITTEN BY THE COMPILER AND READ WHERE IT LIES: it is the top sixteen
-;		bytes of the program's bootstrap extension page, filled in as that page is built. The
-;		runtime is SHARED, so one image serves every program and cannot know which banks any of
+;		GPBSTRBANKS IS WRITTEN BY THE COMPILER AND READ WHERE IT LIES: sixteen bytes at the top
+;		of the $0400-$0801 hole, put there by the bootstrap extension page in a shared program
+;		and by StartCode, out of the runtime image, in an embedded one. One runtime image serves
+;		every program and cannot know which banks any of
 ;		them chose -- and it is a FIXED address from common.inc, not a label in this file,
 ;		because this file is linked into two images with gp.library at opposite ends and a label
 ;		lands somewhere different in each. See the note beside GPBSTRBANKS.

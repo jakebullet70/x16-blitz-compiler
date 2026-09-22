@@ -91,62 +91,146 @@ _SCCopy:
 		stz 	RunBankPage+1
 _SCInBank:
 		;
-		;		AND THE OVERLAY FOLLOWS THE BANK CODE, from the page after it. It describes itself --
-		;		a bank byte, a page count, that many pages, and BXOVLEND after the last region -- so
-		;		this walks it where it lies and copies each region into its bank. It is the walk
-		;		bootstrap2.asm does for a shared program, reading RAM instead of a file: an embedded
-		;		program has no .OVL beside it, because the compiler appended it to the object.
+		;		AND THE REGIONS COME OFF THE DISK, out of a .OVL beside the program. They used to be
+		;		appended to the object and walked where BASIC's LOAD had already put them, and that
+		;		is the thing that capped an embedded program: LOAD reads the whole PRG into RAM from
+		;		$0801 before a byte of it runs, so every appended region had to fit under $9F00
+		;		together with the runtime, the p-code and the workspace. A program with real regions
+		;		never could, and the page past the ceiling is I/O, so the failure was silent.
 		;
-		;		NOTHING IS CHECKED HERE, and bootstrap2.asm checks at every page. What it guards
-		;		against is a file that is missing, stale or cut, and there is no file: these bytes
-		;		came in with the p-code, and if they did not arrive neither did the program.
+		;		THE .OVL IS NEVER IN THE LOADED FILE, so that ceiling does not reach it. What an
+		;		embedded program may bank is bounded by the banks the machine has, exactly as it is
+		;		for a shared one. The cost is a second file to ship, and a program that declares no
+		;		GP.BANKED region and no GP.BANKEDSTR group still ships as one.
 		;
-		;		THE REGIONS SIT IN THE WORKSPACE -- above the bank code, below $9F00 -- which the
-		;		runtime clears the moment it starts. So the copy happens first, and the page operand
-		;		is zeroed after it, exactly as RunBankPage's is: a RUN after END finds the banks
-		;		still filled and the overlay long since overwritten.
+		;		IT IS THE SAME FILE, IN THE SAME FORMAT, that bootstrap2.asm reads for a shared
+		;		program -- a bank byte, a page count, that many pages, and BXOVLEND after the last
+		;		region -- written by the same writer and read by the same loop, checking the same
+		;		things in the same order. Its notes are the reasons for all of them: the marker is
+		;		tested before the status, end of file is tested once a page, and a region asking for
+		;		a bank above the top the machine has is ?RAM.
 		;
-RunOvlPage:
-		lda 	#0 							; page of the overlay, zero once read (operand +1)
-		beq 	_SCNoOvl
-		sta 	zTemp0+1
-		stz 	zTemp0
-		lda 	SelectRAMBank 				; BASIC's bank, as the copy above
-		pha
+		;		A PROGRAM WITH NO REGION HAS NO NAME PATCHED IN, and the zero length is what says so.
+		;		Zeroing that length after a good read is then the re-run guard, exactly as
+		;		RunBankPage+1's zero is: a RUN after END finds the banks still filled.
+		;
+RunOvlNameLen:
+		lda 	#0 							; length of the .OVL name, zero once read (operand +1)
+		bne 	_SCOvlToDo
+		jmp 	_SCNoOvl 					; no regions, so no file -- and the walk is too long to branch
+_SCOvlToDo: 								; over
+		pha 								; SETNAM wants it in A, and a kernal call comes first
+		lda 	SelectRAMBank 				; BASIC's bank, put back on both ways out of here
+		sta 	_SCOvlBank
+		;
+		;		The highest bank this machine has, for the per-region check below. MEMTOP with carry
+		;		set returns the bank COUNT in A, and 0 means 256, so DEC A is the highest bank and 0
+		;		wrapping to 255 is the right answer rather than a bug.
+		;
+		sec
+		jsr 	X16_MEMTOP
+		dec 	a
+		sta 	_SCOvlTop
+		;
+		;		Open it. A PLAIN NAME, with no ",S,R" on the end of it -- BXEntry has the reason.
+		;
+		pla
+		ldx 	#<RunOvlName
+		ldy 	#>RunOvlName
+		jsr 	X16_SETNAM
+		lda 	#BXFILE
+		ldx 	#8
+		ldy 	#BXFILE
+		jsr 	X16_SETLFS
+		jsr 	X16_OPEN
+		bcs 	_SCOvlFail
+		ldx 	#BXFILE 					; CHKIN TAKES THE FILE NUMBER IN X. BXEntry says what
+		jsr 	X16_CHKIN 					; giving it in A costs.
+		bcs 	_SCOvlFail
 _SCRegion:
-		lda 	(zTemp0) 					; the region's bank, or the end marker
+		jsr 	X16_ACPTR 					; the region's bank, or the end marker
 		cmp 	#BXOVLEND
 		beq 	_SCOvlIn
-		sta 	SelectRAMBank
-		ldy 	#1
-		lda 	(zTemp0),y 					; and how many pages of it to copy
-		tax
-		clc 								; the data starts after those two header bytes, so the source
-		lda 	zTemp0 						; is two bytes further on for every region already read
-		adc 	#2 							; and its low byte is NOT zero
-		sta 	zTemp0
-		bcc 	_SCOvlHdr
-		inc 	zTemp0+1
-_SCOvlHdr:
-		stz 	zTemp1 						; every region starts at $A000 in its own bank
-		lda 	#$A0
-		sta 	zTemp1+1
+		tax 								; READST leaves X alone; ACPTR is not asked to
+		jsr 	X16_READST
+		bne 	_SCOvlFail 					; an empty file
+		cpx 	_SCOvlTop
+		beq 	_SCBankOK 					; the highest bank is a legal bank
+		bcs 	_SCNoRam
+_SCBankOK:
+		stx 	SelectRAMBank 				; the banked window is this region's from here
+		jsr 	X16_ACPTR 					; and this is how many pages of it to fill
+		sta 	_SCOvlPages
+		lda 	#$A0 						; every region starts at $A000 in its own bank
+		sta 	_SCStore+2
 _SCOvlPage:
 		ldy 	#0
-_SCOvlCopy:
-		lda 	(zTemp0),y
-		sta 	(zTemp1),y
+_SCOvlByte:
+		jsr 	X16_ACPTR
+_SCStore:
+		sta 	$A000,y 					; PATCHED, a page at a time
 		iny
-		bne 	_SCOvlCopy
-		inc 	zTemp0+1
-		inc 	zTemp1+1
-		dex
+		bne 	_SCOvlByte
+		inc 	_SCStore+2
+		jsr 	X16_READST 					; once a page: at the end of any page it is a cut file
+		bne 	_SCOvlFail
+		dec 	_SCOvlPages
 		bne 	_SCOvlPage
 		bra 	_SCRegion
 _SCOvlIn:
-		pla
+		jsr 	_SCOvlClose
+		stz 	RunOvlNameLen+1 			; and a second RUN reads nothing
+		lda 	_SCOvlBank
 		sta 	SelectRAMBank
-		stz 	RunOvlPage+1
+		bra 	_SCNoOvl
+		;
+		;		An overlay that is not beside the program, or is short, or wants a bank this machine
+		;		does not have. bootstrap2.asm prints the same two words for the same three reasons,
+		;		and what the programmer does about them is the same: look at whether the .OVL is
+		;		beside the program, and whether it is the one that program was built with. The SYS
+		;		return address is still on the stack, so the rts lands in BASIC READY.
+		;
+		;		IN THE MIDDLE OF THE WALK, which the branches above are why. Past the handover at the
+		;		foot of StartCode this block is out of range of them, and a bra over it costs three
+		;		bytes where the long jumps would cost more than that each.
+		;
+_SCNoRam:
+		ldx 	#_SCRamText - _SCErrText
+		bra 	_SCErrClose
+_SCOvlFail:
+		ldx 	#0
+_SCErrClose:
+		phx 								; CLOSE and CLRCHN have an X of their own
+		jsr 	_SCOvlClose
+		plx
+_SCErr:
+		lda 	_SCErrText,x
+		beq 	_SCErrDone
+		phx
+		jsr 	X16_CHROUT
+		plx
+		inx
+		bne 	_SCErr
+_SCErrDone:
+		lda 	_SCOvlBank 					; BASIC's own bank, selected over by the regions above
+		sta 	SelectRAMBank
+		rts 								; -> the SYS caller -> BASIC READY
+
+_SCOvlClose:
+		jsr 	X16_CLRCHN
+		lda 	#BXFILE
+		jmp 	X16_CLOSE 					; its return is this routine's return
+
+_SCOvlBank:
+		.byte 	0 							; BASIC's RAM bank, while the regions borrow the window
+_SCOvlTop:
+		.byte 	0 							; the highest bank this machine has
+_SCOvlPages:
+		.byte 	0 							; pages still to come in the region being read
+_SCErrText:
+		.text 	"?OVL", 13, 0
+_SCRamText:
+		.text 	"?RAM", 13, 0
 _SCNoOvl:
 		;
 		;		AND THE BANK THE PROGRAM STARTS IN, which is the last GP.BANKED region's. A program
@@ -162,7 +246,27 @@ RunStartBank:
 		beq 	_SCNoBank
 		sta 	SelectRAMBank
 _SCNoBank:
-
+		;
+		;		AND WHICH RAM BANK EACH GP.BSTR SLOT READS ITS TEXT OUT OF. The runtime looks this
+		;		table up at GPBSTRBANKS, a fixed address in the $0400-$0801 storage hole, so both
+		;		builds have to put it there before any text is read. A shared program's bootstrap
+		;		extension page copies it at BXRun; an embedded program has no such page, so the
+		;		sixteen bytes ride in the image at RunBStrBanks and are copied here.
+		;
+		;		UNCONDITIONALLY, and outside the walks above for the same reason RunStartBank is:
+		;		a second RUN skips the overlay copy and still needs the table. Copying it again
+		;		costs eleven bytes of work and cannot be wrong -- the source bytes are in the
+		;		program's own image and nothing writes to them.
+		;
+		;		ALL SIXTEEN, including the slots the program never used. Those are zero, and a
+		;		zero slot is one the compiler never emitted a reference to, so it is never read.
+		;
+		ldx 	#BSTR_MAX_BANKS-1
+_SCBStrCopy:
+		lda 	RunBStrBanks,x
+		sta 	GPBSTRBANKS,x
+		dex
+		bpl 	_SCBStrCopy
 
 RunCodePage:
 		lda 	#0 							; page of the object code to run.      (operand +1)
@@ -170,6 +274,37 @@ RunWorkspacePage:
 		ldx 	#0 							; first page of workspace.             (operand +1)
 		ldy 	#$9F 						; byte after the last page ($9F00 is I/O).
 		jmp 	StartRuntime 				; and go do it !
+
+;
+;		The GP.BSTR slot-to-bank table, substituted into the byte stream by object.asm the same
+;		way the immediates above are. Assembled as zeros, which is also what a program with no
+;		banked text keeps.
+;
+;		IT MUST NOT STRADDLE A PAGE OF THE STREAM. object.asm patches one page-aligned chunk at
+;		a time, so a table across a boundary would be half written. The .align below keeps it
+;		tidy, but alignment alone does not settle it -- the stream is offset from $0801, so a
+;		sixteen-byte address boundary is not a sixteen-byte stream boundary. genrtimage.py
+;		emits the .cerror that actually decides it, and that is what fails the build.
+;
+;
+;		THE NAME OF THE .OVL StartCode opens, whole and complete: object.asm builds it from the
+;		object's own name and pokes it in, and the reader adds nothing to it. BXNAMEMAX bytes, the
+;		same bound the bootstrap extension page puts on it for a shared program.
+;
+;		DOWN HERE WITH THE TABLE, and not beside the walk that uses it, because a global label
+;		between two "_SC" locals puts them in different scopes and 64tass then cannot see one from
+;		the other. bootstrap2.asm's header has the same warning.
+;
+;		IT MUST NOT STRADDLE A PAGE OF THE STREAM either, for the reason below, and genrtimage.py
+;		emits that .cerror too.
+;
+		.align 	32
+RunOvlName:
+		.fill 	BXNAMEMAX, 0 				; PATCHED -- RunOvlNameLen bytes of it are the name
+
+		.align 	16
+RunBStrBanks:
+		.fill 	BSTR_MAX_BANKS, 0 			; PATCHED -- one bank per slot, 0 for a slot not used
 
 		.send code
 
@@ -183,5 +318,7 @@ RunWorkspacePage:
 ;		==== 			=====
 ;		30/08/26		Split out of 00main.header when the runtime became a separate file.
 ;		15/09/26		StartCode copies the embedded bank code to bank 1.
+;		22/09/26		StartCode copies RunBStrBanks to GPBSTRBANKS, for GP.BANKEDSTR embedded.
+;		22/09/26		StartCode reads the regions from a .OVL beside the program, not from RAM.
 ;
 ; ************************************************************************************************
