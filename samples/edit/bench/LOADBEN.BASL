@@ -73,4 +73,6 @@ BEN.READ.CHECK:
   CLOSE 2
   RETURN
 
+## The constants ED-STORE.BASL needs read before it.
+#INCLUDE "ED-DOC-CONST.BASL"
 #INCLUDE "ED-STORE.BASL"

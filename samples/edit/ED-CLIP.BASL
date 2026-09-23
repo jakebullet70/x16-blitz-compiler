@@ -24,7 +24,7 @@
 ## CLIP.INIT -- claim the clipboard bank and empty it.
 ##
 ## Bank 11 is free: the line table holds 2 to 4, undo holds 5, the code, text and dialog-save
-## regions hold 6 to 10, and the arena starts at 13. A claim that fails leaves CLIP.ON% 0 and
+## regions hold 6 to 10, the file picker holds 13 to 15, and the arena starts at 16. A claim that fails leaves CLIP.ON% 0 and
 ## every entry point below turns into a RETURN, so the editor runs without a clipboard rather
 ## than writing records over somebody else's bank.
 CLIP.INIT:
@@ -78,6 +78,9 @@ CLIP.GET:
   IF CLIP.ON% = 0 THEN RETURN
   IF CLIP.READ >= CLIP.PTR THEN RETURN
   BANK CLIP.BANK%
+  ## DOC.GOT.BANK% is the bank DOC.LOAD.CHARS selects for itself, so it has to name the
+  ## clipboard's here and not the document bank the last load left in it.
+  DOC.GOT.BANK% = CLIP.BANK%
   DOC.GOT.OFF = CLIP.READ : DOC.LEN% = PEEK(CLIP.READ)
   IF DOC.LEN% > 0 THEN GOSUB DOC.LOAD.CHARS
   CLIP.READ = CLIP.READ + DOC.LEN% + 1

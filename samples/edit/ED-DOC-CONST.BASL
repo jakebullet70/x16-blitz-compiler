@@ -1,0 +1,48 @@
+## ============================================================================
+## ED-DOC-CONST.BASL -- the constants ED-STORE.BASL's interface is written in.
+##
+## These live apart from the store itself for one reason: BASLOAD resolves a #DEFINE only once
+## it has read it, and ED-STORE.BASL is #INCLUDEd at the BOTTOM of the program, because its
+## code has to land in low memory. A routine higher up that wants to say DOC.CS.PETSCII rather
+## than 1 therefore cannot get the name from the store.
+##
+## EVERY PROGRAM THAT #INCLUDEs ED-STORE.BASL MUST #INCLUDE THIS FILE FIRST, and near the top.
+## Leaving it out fails the tokenise with SYMBOL NOT IN SCOPE naming the first line that uses
+## one of these names, which is a clear enough error to follow back here. Include it once only.
+##
+## It emits no p-code at all, so its position costs nothing.
+## ============================================================================
+
+## How the file on disk is written, both sniffed by DOC.SNIFF.FILE before the read and both
+## used again by DOC.SAVEFILE to write it back. A text file says neither of these things
+## about itself, and an editor that guesses one on the way in and writes the other on the way
+## out rewrites every file it touches.
+#DEFINE DOC.EOL.CR   0
+#DEFINE DOC.EOL.LF   1
+#DEFINE DOC.EOL.CRLF 2
+
+## These two are also the DOC.CP.SWAP% flag the GP.ASM block in DOC.STORE.CHARS reads, which
+## is why ASCII is 0: the block tests for zero and leaves the bytes alone.
+#DEFINE DOC.CS.ASCII   0
+#DEFINE DOC.CS.PETSCII 1
+
+## Which way DOC.SWAP.REC converts a record. These are not the DOC.CS.* values and must not be
+## confused with them: see the WARNING on DOC.SET.CHARSET, where the direction is the OPPOSITE
+## of the character set being set.
+#DEFINE DOC.SW.TO.ASCII   0
+#DEFINE DOC.SW.TO.PETSCII 1
+
+## The longest line the store can hold, which is what one BASIC string holds. A line on disk
+## longer than this is SPLIT across that many document lines by DOC.LOADFILE, which keeps every
+## byte of it and changes the file's shape; the alternative, truncating, loses text silently.
+## The editor's own insert guards use the same number under the name ED.MAX.LINE.
+#DEFINE DOC.MAX.LINE.LEN 250
+
+## Bytes of the head DOC.SNIFF.FILE will read before it gives up and takes the defaults.
+##
+## GET# is a byte at a time, so this cap is what bounds the cost of a load. The scan stops
+## early once the line ending is known AND a lower-case byte has settled the character set,
+## which on an ASCII file with a word of lower case in its first line is at once. A PETSCII
+## file has no lower-case byte to find, so it reads the full count, and so does a file of
+## nothing but digits and punctuation -- and neither answer changes a byte of that file.
+#DEFINE DOC.SNIFF.MAX 512

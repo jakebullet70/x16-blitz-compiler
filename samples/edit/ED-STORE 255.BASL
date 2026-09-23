@@ -1,6 +1,16 @@
 ## ============================================================================
-## ED-STORE.BASL -- the line table, and the banked memory the document lives in.
+## ED-STORE.BASL -- the line table, and the banked memory the document lives in. line 255 line 355 here is what we want line 355 here is what we want line 355 here is what we want line 355 here is what we want line 355 here is what we wantline 355 here is what we want line 355 here is what we want line 355 here is what we want
 ##
+
+
+line 355 here is what we want
+line 355 here is what we want
+line 355 here is what we want
+
+## ED-STORE.BASL -- the line table, and the banked memory the document lives in. line 255 line 355 here is what we want line 355 here is what we want line 355 here is what we want line 355 here is what we want line 355 here is what we wantline 355 here is what we want line 355 here is what we want line 355 here is what we want
+##
+
+
 ## It is #INCLUDEd inline by the editor, so there is one global symbol table: the DOC.*
 ## labels are GOSUBbed from the main program and the variables below are visible to both.
 ##
@@ -315,91 +325,19 @@ DOC.SET.CHARSET:
 ## DOC.LOAD -- read line LINE.INDEX% into LINE.TEXT$. A line past the end reads empty.
 ##
 ## WARNING: keep the LINE.COUNT% guard, and note that line 0 of a 0-line document is past the
-## end. A never-written slot PEEKs as a length over randomised RAM, and the copy below would
-## put up to 255 bytes of that randomised RAM in LINE.TEXT$.
-##
-## The length is clamped as well, for the same reason: DOC.LOAD.CHARS writes straight into
-## LINE.TEXT$'s block, which is DOC.MAX.LINE.LEN bytes long, and a record claiming to be
-## longer than that would run off the end of it into the next thing on the heap.
+## end. A never-written slot PEEKs as a length over randomised RAM, which builds a garbage
+## string of up to 255 characters and raises OUT OF MEMORY later.
 DOC.LOAD:
-  ## Emptied with a POKE of its length byte, not with LINE.TEXT$ = "", so that the block
-  ## DOC.LINE.BUF grew stays the block LINE.TEXT$ owns. Nothing else on this path allocates.
-  GOSUB DOC.LINE.BUF : POKE DOC.LD.PTR, 0
+  LINE.TEXT$ = ""
   IF LINE.INDEX% >= LINE.COUNT% THEN RETURN
   GOSUB DOC.SLOT.READ : BANK DOC.GOT.BANK% : DOC.LEN% = PEEK(DOC.GOT.OFF)
-  IF DOC.LEN% > DOC.MAX.LINE.LEN THEN DOC.LEN% = DOC.MAX.LINE.LEN
   IF DOC.LEN% > 0 THEN GOSUB DOC.LOAD.CHARS
   RETURN
-
-## DOC.LINE.BUF -- make sure LINE.TEXT$ owns a block that can hold any line, and leave the
-## block's address in DOC.LD.PTR.
-##
-## GP.STRPTR's block is [MaxLen][control][ActLen][text]: it returns the address of the length
-## byte, the text starts one above it, and the capacity is the byte two below it. That is what
-## DOC.LOAD.CHARS writes into, so the capacity has to be there before it writes.
-##
-## The grow loop runs once in the life of the program. A string block never shrinks -- a
-## shorter string assigned to the variable reuses the block it already has -- so LINE.TEXT$
-## keeps this capacity through every LINE.TEXT$ = "" and every shorter line after it.
-##
-## WARNING: DOC.LD.PTR is UNTYPED on purpose. The string heap is above 32,767, so a % holds
-## the address as a negative number and PEEK(DOC.LD.PTR - 2) would be asked for a negative
-## address. The same reasoning as the WARNING on DOC.SLOT.WRITE.
-DOC.LINE.BUF:
-  DOC.LD.PTR = GP.STRPTR(LINE.TEXT$) : DOC.BUF.CAP% = 0
-  IF DOC.LD.PTR > 2 THEN DOC.BUF.CAP% = PEEK(DOC.LD.PTR - 2)
-  IF DOC.BUF.CAP% >= DOC.MAX.LINE.LEN THEN RETURN
-  FOR DOC.CHAR.INDEX = LEN(LINE.TEXT$) TO DOC.MAX.LINE.LEN - 1
-    LINE.TEXT$ = LINE.TEXT$ + " "
-  NEXT DOC.CHAR.INDEX
-  DOC.LD.PTR = GP.STRPTR(LINE.TEXT$)
-  RETURN
-
-## DOC.LOAD.CHARS -- copy the record's DOC.LEN% characters into LINE.TEXT$ in one machine-code
-## pass, and set the string's length to match. It REPLACES what LINE.TEXT$ held; the old
-## version appended to it, and both callers emptied it first anyway.
-##
-##   in   DOC.GOT.BANK%, DOC.GOT.OFF   the record: its length byte, then its text
-##        DOC.LEN%                     how much of it to take, no more than the block holds
-##
-## A record and a string block have the same shape -- a length byte, then the text -- so one
-## index walks both. Y counts down from the length, which leaves index 0 alone in each: the
-## record's length byte is not ours to touch and the string's is written by the POKE above.
-##
-## This is the routine a cursor key pays for: every move to another line reloads the line
-## under the cursor. Written the obvious way, LINE.TEXT$ = LINE.TEXT$ + CHR$(PEEK(...)) in a
-## loop, one 250-character line cost 250 PEEKs, 250 one-character strings, and 250
-## re-allocations of a string growing a byte at a time: about 31,000 bytes copied and 500
-## abandoned blocks for a single keystroke. That is what made scrolling crawl, and the pauses
-## on top of it were the heap scavenger sweeping up after it.
+## DOC.LOAD.CHARS -- append the record's DOC.LEN% characters to LINE.TEXT$.
 DOC.LOAD.CHARS:
-  GOSUB DOC.LINE.BUF
-  POKE DOC.LD.PTR, DOC.LEN%
-  DOC.LD.BANK% = DOC.GOT.BANK% : DOC.LD.SRC% = DOC.GOT.OFF
-  DOC.LD.DST% = DOC.LD.PTR     : DOC.LD.LEN% = DOC.LEN%
-  #REM 1
-  GP.ASM
-  REM LDA {DOC.LD.BANK%}
-  REM STA $00
-  REM LDA {DOC.LD.SRC%}
-  REM LDX #1
-  REM STA LDS,X
-  REM LDA {DOC.LD.SRC%},X
-  REM LDX #2
-  REM STA LDS,X
-  REM LDA {DOC.LD.DST%}
-  REM LDX #1
-  REM STA LDD,X
-  REM LDA {DOC.LD.DST%},X
-  REM LDX #2
-  REM STA LDD,X
-  REM LDY {DOC.LD.LEN%}
-  REM LDS: LDA $FFFF,Y
-  REM LDD: STA $FFFF,Y
-  REM DEY
-  REM BNE LDS
-  GP.ENDASM
-  #REM 0
+  FOR DOC.CHAR.INDEX = 1 TO DOC.LEN%
+    LINE.TEXT$ = LINE.TEXT$ + CHR$(PEEK(DOC.GOT.OFF + DOC.CHAR.INDEX))
+  NEXT DOC.CHAR.INDEX
   RETURN
 
 ## DOC.SNIFF.FILE -- read the head of DOC.FILE.NAME$ and answer the two things a text file

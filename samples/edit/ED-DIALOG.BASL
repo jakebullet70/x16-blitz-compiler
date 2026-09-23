@@ -1,7 +1,8 @@
 ## ============================================================================
-## ED-DIALOG.BASL -- the two boxes GUI-DIALOGS has no verb for.
+## ED-DIALOG.BASL -- the boxes GUI-DIALOGS has no verb for.
 ##
 ##   ED.DLG.OK = GP.FN(ASKTEXT2, title$, prompt1$, prompt2$, start1$, start2$, width)
+##   NAME$ = GP.FN(PICKDOC, title$, ext$, none$)
 ##   GOSUB ED.DLG.WAITKEY
 ##
 ## Every other box the editor asks for is a library verb called where it is used: ASK3 for a
@@ -34,13 +35,53 @@ ED.DLG.ASKTEXT2:
     IF ED.DLG.WIDTH < 1 THEN ED.DLG.WIDTH = ED.DLG.WIDTHDEFAULT
     ED.DLG.LABELWIDTH% = LEN(ED.DLG.PROMPT1$)
     IF LEN(ED.DLG.PROMPT2$) > ED.DLG.LABELWIDTH% THEN ED.DLG.LABELWIDTH% = LEN(ED.DLG.PROMPT2$)
+    ## -- start form
     GP.SUB FORM.BEGIN, ED.DLG.TITLE$, "", "", 3, ED.DLG.LABELWIDTH% + 1 + ED.DLG.WIDTH, "&OK", "&Cancel"
     GP.SUB FORM.FIELD, 0, ED.DLG.PROMPT1$, ED.DLG.LABELWIDTH%, ED.DLG.WIDTH, ED.DLG.START1$
     GP.SUB FORM.FIELD, 2, ED.DLG.PROMPT2$, ED.DLG.LABELWIDTH%, ED.DLG.WIDTH, ED.DLG.START2$
+    ## -- run the form
     ED.DLG.OK = GP.FN(FORMTO.RUN)
-    ED.DLG.TEXT1$ = GP.FN(FORM.TEXT, 1)
-    ED.DLG.TEXT2$ = GP.FN(FORM.TEXT, 2)
+    ## -- all good? ESC?
+    GP.IF ED.DLG.OK <> 0 THEN 
+        ## -- get the text returned
+        ED.DLG.TEXT1$ = GP.FN(FORM.TEXT, 1)
+        ED.DLG.TEXT2$ = GP.FN(FORM.TEXT, 2)
+    GP.ENDIF
+    ## -- clean up, restore screen
     GP.SUB FORM.END
+    RETURN
+
+
+## PICKDOC -- the file picker, over the two banks EDIT.BASL set aside for it.
+##
+## FILEPICK does the box. This adds the one thing it leaves to its caller: it knows which banks
+## the editor owns, so no caller has to, and it answers an empty drive rather than returning an
+## empty string that reads exactly like a cancel.
+##
+##   in   title$   the box title
+##        ext$     suffixes without the dot, comma separated: "TXT,MD,BASL". Empty takes every
+##                 file. CASE SENSITIVE, and CMDR-DOS names are upper case
+##        none$    what to say when nothing matched
+##   out  the name, or "" for a cancel
+##        ED.DLG.PICK.COUNT   files offered. 0 with an empty name is the empty drive, not a
+##                            cancel, and the caller can tell them apart by reading it
+##
+## PICKBANKS is called on every pick rather than once at startup. It assigns two variables and
+## zeroes two more, which is cheaper than a flag to remember whether startup ran, and it leaves
+## no order to get wrong.
+##
+## The strings are arguments, not GP.BSTR reads: this module runs from the ED.DLGCODE region
+## and the text is in ED.TEXTBANK, so the low-memory caller reads them and passes them in, the
+## way every other box here is called.
+##
+## WARNING: the first pick of a session pauses about two seconds while the drive is read. That
+## is FILEDIR's read loop, not the host filesystem, and it is a known open item.
+ED.DLG.PICKFILE:
+    GP.DEFPROC PICKDOC, ED.DLG.PICK.TITLE$, ED.DLG.PICK.EXT$, ED.DLG.PICK.NONE$ RETURNS ED.DLG.PICK.NAME$
+    GP.SUB PICKBANKS, ED.PICKLIST, ED.PICKDIR
+    ED.DLG.PICK.NAME$ = GP.FN(PICKFILE, ED.DLG.PICK.TITLE$, ED.DLG.PICK.EXT$)
+    ED.DLG.PICK.COUNT = FILEPICK.COUNT
+    IF ED.DLG.PICK.COUNT = 0 THEN GP.SUB MSGBOXEX, ED.DLG.PICK.TITLE$, ED.DLG.PICK.NONE$, "", "", "&OK"
     RETURN
 
 

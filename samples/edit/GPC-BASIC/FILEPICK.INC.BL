@@ -1,0 +1,208 @@
+## ***********************************************************************
+## **
+## **  FILEPICK.INC.BL -- a popup file picker whose list lives in a bank.
+## **
+## **      GP.SUB PICKBANKS, listbank, dirbank     once, before the first pick
+## **      F$ = GP.FN(PICKFILE, title$, ext$)       "" is a cancel, or no match
+## **      GP.SUB PICKSCAN, ext$                    the read without the box
+## **
+## **  Requires, and #INCLUDEs none of them:
+## **      GPB.INC.BL          GP.INSTR, GP.ISEMPTY
+## **      STASH.INC.BL        STASH.SELECT
+## **      GUI.INC.BL          the list control and GUI.LIST.FETCH
+## **      GUI-DIALOGS.INC.BL  GUI.DEFAULTS and the listbox
+## **      FILEIO.INC.BL       FILE.DEVICE
+## **      FILEDIR.INC.BL      the directory read and its parser
+## **
+## **   in   listbank   the bank the list is built in. Claimed from BANKMGR,
+## **                   never a code bank
+## **        dirbank    the bank the raw listing is read into. 0 packs both
+## **                   into listbank: the listing in its top half, the list
+## **                   in its bottom half, and half the files
+## **        ext$       suffixes without the dot, comma separated: "BASL,BL".
+## **                   Empty takes every file. Case sensitive
+## **
+## **   out  FILEPICK.COUNT   files in the list
+## **        FILEPICK.FULL    -1 when more matched than the list holds
+## **
+## **  THE LIST IS A GP.BSTR IMAGE, string 0 the first file, and it stays in
+## **  listbank after the pick. LIST.BANK listbank, 0, FILEPICK.COUNT - 1 shows
+## **  it again without going near the drive.
+## **
+## **      $A000   the file count, 16 bits
+## **      $A002   an offset a file to its record's length byte, room for MAX
+## **      then    records [cap][len][row], the row as it is drawn:
+## **              a space, the name padded to 16, blocks in 6, a space, type
+## **
+## **  A row's last FILEPICK.TAIL characters are blocks and type, so the name
+## **  is what lies between the leading space and them, trailing spaces off.
+## **  A name longer than 16 pushes the blocks right rather than being cut.
+## **
+## **  TO RUN IT FROM A RAM BANK, put the #INCLUDE between GP.BANKED and
+## **  GP.ENDBANKED. The POKEs into the list bank go through STASH.SELECT.
+## **
+## ***********************************************************************
+#IFNDEF FILEPICK.DEFS
+#DEFINE FILEPICK.DEFS 1
+
+## Files the list holds: two banks, and one bank shared with the listing.
+#DEFINE FILEPICK.MAXTWO 255
+#DEFINE FILEPICK.MAXONE 127
+
+## Packed, the listing is read in at this offset and the list stops short of it.
+#DEFINE FILEPICK.SPLIT $1000
+#DEFINE FILEPICK.BANKROOM $2000
+
+#DEFINE FILEPICK.NAMEW 16
+#DEFINE FILEPICK.TAIL 10
+
+GOTO FILEPICK.MODULE.END
+
+
+## ***********************************************************************
+## **  PICKBANKS -- where the list and the listing go.
+## ***********************************************************************
+FILEPICK.BANKS:
+    GP.DEFPROC PICKBANKS, FILEPICK.LISTBANK, FILEPICK.DIRBANK
+    IF FILEPICK.DIRBANK = FILEPICK.LISTBANK THEN FILEPICK.DIRBANK = 0
+    FILEPICK.COUNT = 0 : FILEPICK.FULL = 0
+    RETURN
+
+
+## ***********************************************************************
+## **  PICKSCAN -- the read on its own, no box.
+## **
+## **  For a caller that wants the list before anyone sees it: sort it, filter
+## **  it, then show it with LIST.BANK. FILEPICK.COUNT answers how many.
+## ***********************************************************************
+FILEPICK.SCANONLY:
+    GP.DEFPROC PICKSCAN, FILEPICK.ONLY$
+    FILEPICK.EXT$ = FILEPICK.ONLY$
+    GOSUB FILEPICK.SCAN
+    RETURN
+
+
+## ***********************************************************************
+## **  PICKFILE -- read, filter, show, answer.
+## **
+## **  NOTHING MATCHING IS NOT A DIALOG. There is nothing to offer, so the
+## **  answer is empty and FILEPICK.COUNT 0 tells the caller why.
+## ***********************************************************************
+FILEPICK.PICK:
+    GP.DEFPROC PICKFILE, FILEPICK.TITLE$, FILEPICK.EXT$ RETURNS FILEPICK.NAME$
+    FILEPICK.NAME$ = ""
+    GOSUB FILEPICK.SCAN
+    IF FILEPICK.COUNT = 0 THEN RETURN
+
+    GOSUB GUI.DEFAULTS
+    GUI.TITLE$ = FILEPICK.TITLE$
+    GUI.LIST.BANK = FILEPICK.LISTBANK : GUI.LIST.FIRST = 0
+    DLG.COUNT = FILEPICK.COUNT : DLG.ROWS = 0 : DLG.MULTI = 0
+    GOSUB DLG.INTERNAL.LIST
+    IF GUI.LISTBOX.SEL < 1 THEN RETURN
+
+    GUI.LIST.AT = GUI.LISTBOX.SEL
+    GOSUB GUI.LIST.FETCH
+    FILEPICK.NAME$ = MID$(GUI.LIST.TEXT$, 2, LEN(GUI.LIST.TEXT$) - 1 - FILEPICK.TAIL)
+    GP.DO
+        IF RIGHT$(FILEPICK.NAME$, 1) <> " " THEN GP.EXITDO
+        FILEPICK.NAME$ = LEFT$(FILEPICK.NAME$, LEN(FILEPICK.NAME$) - 1)
+    GP.LOOP
+    RETURN
+
+
+## ***********************************************************************
+## **  FILEPICK.SCAN -- the drive into the listing, the matches into the list.
+## **
+## **  The drive is asked for FILES ONLY and no pattern: a DOS pattern cannot
+## **  say "BASL or BL", so the suffix test is FILEPICK.MATCH.
+## **
+## **  FILE.DIR.INIT RUNS ON EVERY SCAN. It points the parser at FILE.NAME$,
+## **  which FILEIO shares: one FILEIO call between two picks can move it.
+## ***********************************************************************
+FILEPICK.SCAN:
+    FILEPICK.COUNT = 0 : FILEPICK.FULL = 0
+    IF FILEPICK.LISTBANK = 0 THEN RETURN
+    GOSUB FILE.DIR.INIT
+    GP.IF FILEPICK.DIRBANK = 0 THEN
+        FILE.DIR.BANK = FILEPICK.LISTBANK : FILE.DIR.BANKAT = FILEPICK.SPLIT
+        FILEPICK.MAX = FILEPICK.MAXONE : FILEPICK.LIMIT = FILEPICK.SPLIT
+    GP.ELSE
+        FILE.DIR.BANK = FILEPICK.DIRBANK
+        FILEPICK.MAX = FILEPICK.MAXTWO : FILEPICK.LIMIT = FILEPICK.BANKROOM
+    GP.ENDIF
+    FILE.DIR.PATTERN$ = "" : FILE.DIR.ONLY = FILE.DIR.FILES
+    GOSUB FILE.DIR.OPEN
+
+    FILEPICK.NEXT = 2 + 2 * FILEPICK.MAX
+    GP.DO
+        GOSUB FILE.DIR.NEXT
+        IF FILE.DIR.MORE = 0 THEN GP.EXITDO
+        FILEPICK.TRY$ = FILE.NAME$
+        GOSUB FILEPICK.MATCH
+        IF FILEPICK.HIT <> 0 THEN GOSUB FILEPICK.KEEP
+        IF FILEPICK.FULL <> 0 THEN GP.EXITDO
+    GP.LOOP
+
+    STASH.PEEKBANK = FILEPICK.LISTBANK : GOSUB STASH.SELECT
+    POKE $A000, FILEPICK.COUNT : POKE $A001, 0
+    RETURN
+
+
+## ---- One file onto the end of the list: its offset, then its record.
+FILEPICK.KEEP:
+    GP.IF FILEPICK.COUNT >= FILEPICK.MAX THEN
+        FILEPICK.FULL = -1 : RETURN
+    GP.ENDIF
+    FILEPICK.ROW$ = " " + FILEPICK.TRY$
+    IF LEN(FILEPICK.TRY$) < FILEPICK.NAMEW THEN FILEPICK.ROW$ = FILEPICK.ROW$ + RPT$(32, FILEPICK.NAMEW - LEN(FILEPICK.TRY$))
+    FILEPICK.ROW$ = FILEPICK.ROW$ + RIGHT$("      " + STR$(FILE.BLOCKS), 6) + " " + FILE.TYPE$
+    FILEPICK.LEN = LEN(FILEPICK.ROW$)
+    GP.IF FILEPICK.NEXT + 2 + FILEPICK.LEN > FILEPICK.LIMIT THEN
+        FILEPICK.FULL = -1 : RETURN
+    GP.ENDIF
+
+    STASH.PEEKBANK = FILEPICK.LISTBANK : GOSUB STASH.SELECT
+    FILEPICK.SLOT = $A002 + 2 * FILEPICK.COUNT
+    POKE FILEPICK.SLOT, (FILEPICK.NEXT + 1) AND 255
+    POKE FILEPICK.SLOT + 1, INT((FILEPICK.NEXT + 1) / 256)
+    FILEPICK.AT = $A000 + FILEPICK.NEXT
+    POKE FILEPICK.AT, FILEPICK.LEN : POKE FILEPICK.AT + 1, FILEPICK.LEN
+    FILEPICK.PTR = GP.STRPTR(FILEPICK.ROW$)
+    FOR FILEPICK.C = 1 TO FILEPICK.LEN
+        POKE FILEPICK.AT + 1 + FILEPICK.C, PEEK(FILEPICK.PTR + FILEPICK.C)
+    NEXT FILEPICK.C
+
+    FILEPICK.NEXT = FILEPICK.NEXT + 2 + FILEPICK.LEN
+    FILEPICK.COUNT = FILEPICK.COUNT + 1
+    RETURN
+
+
+## ***********************************************************************
+## **  FILEPICK.MATCH -- FILEPICK.TRY$ in, FILEPICK.HIT out.
+## **
+## **  The name must end in a dot and one of the suffixes, so MENU.BL matches
+## **  "BL" and MENUBL does not. The walk is over a copy with a comma added,
+## **  so the last suffix ends like the others.
+## ***********************************************************************
+FILEPICK.MATCH:
+    FILEPICK.HIT = -1
+    IF GP.ISEMPTY(FILEPICK.EXT$) THEN RETURN
+    FILEPICK.HIT = 0
+    FILEPICK.REST$ = FILEPICK.EXT$ + ","
+    GP.DO
+        FILEPICK.AT = GP.INSTR(FILEPICK.REST$, ",")
+        IF FILEPICK.AT = 0 THEN GP.EXITDO
+        FILEPICK.ONE$ = LEFT$(FILEPICK.REST$, FILEPICK.AT - 1)
+        FILEPICK.REST$ = MID$(FILEPICK.REST$, FILEPICK.AT + 1)
+        GP.IF GP.ISEMPTY(FILEPICK.ONE$) = 0 THEN
+            FILEPICK.ONE$ = "." + FILEPICK.ONE$
+            IF RIGHT$(FILEPICK.TRY$, LEN(FILEPICK.ONE$)) = FILEPICK.ONE$ THEN FILEPICK.HIT = -1
+        GP.ENDIF
+        IF FILEPICK.HIT <> 0 THEN GP.EXITDO
+    GP.LOOP
+    RETURN
+
+
+FILEPICK.MODULE.END:
+#ENDIF

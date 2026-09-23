@@ -91,4 +91,6 @@ BEN.OD.DONE:
   LINE.COUNT = LINE.COUNT - 1
   RETURN
 
+## The constants ED-STORE.BASL needs read before it.
+#INCLUDE "ED-DOC-CONST.BASL"
 #INCLUDE "ED-STORE.BASL"

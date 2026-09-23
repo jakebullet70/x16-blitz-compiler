@@ -17,26 +17,27 @@
 ## The separator row is not in the group. Its text is one hyphen, and a string that short is
 ## cheaper written in the line than read from the bank.
 
-#DEFINE BSTR.MENU.FILE      0
-#DEFINE BSTR.MENU.EDIT      1
-#DEFINE BSTR.MENU.SEARCH    2
-#DEFINE BSTR.MENU.HELP      3
-#DEFINE BSTR.MENU.NEW       4
-#DEFINE BSTR.MENU.OPEN      5
-#DEFINE BSTR.MENU.SAVE      6
-#DEFINE BSTR.MENU.SAVE.AS   7
-#DEFINE BSTR.MENU.EXIT      8
-#DEFINE BSTR.MENU.CUT       9
-#DEFINE BSTR.MENU.COPY      10
-#DEFINE BSTR.MENU.PASTE     11
-#DEFINE BSTR.MENU.UNDO      12
-#DEFINE BSTR.MENU.REDO      13
-#DEFINE BSTR.MENU.FIND      14
-#DEFINE BSTR.MENU.FIND.NEXT 15
-#DEFINE BSTR.MENU.FIND.PREV 16
-#DEFINE BSTR.MENU.REPLACE   17
-#DEFINE BSTR.MENU.GOTO.LINE 18
-#DEFINE BSTR.MENU.ABOUT     19
+#DEFINE BSTR.MENU.FILE        0
+#DEFINE BSTR.MENU.EDIT        1
+#DEFINE BSTR.MENU.SEARCH      2
+#DEFINE BSTR.MENU.HELP        3
+#DEFINE BSTR.MENU.NEW         4
+#DEFINE BSTR.MENU.OPEN        5
+#DEFINE BSTR.MENU.BROWSE      6
+#DEFINE BSTR.MENU.SAVE        7
+#DEFINE BSTR.MENU.SAVE.AS     8
+#DEFINE BSTR.MENU.EXIT        9
+#DEFINE BSTR.MENU.CUT         10
+#DEFINE BSTR.MENU.COPY        11
+#DEFINE BSTR.MENU.PASTE       12
+#DEFINE BSTR.MENU.UNDO        13
+#DEFINE BSTR.MENU.REDO        14
+#DEFINE BSTR.MENU.FIND        15
+#DEFINE BSTR.MENU.FIND.NEXT   16
+#DEFINE BSTR.MENU.FIND.PREV   17
+#DEFINE BSTR.MENU.REPLACE     18
+#DEFINE BSTR.MENU.GOTO.LINE   19
+#DEFINE BSTR.MENU.ABOUT       20
 
 GP.BANKEDSTR ED.TEXTBANK BS.MENU
   " &File "
@@ -45,6 +46,7 @@ GP.BANKEDSTR ED.TEXTBANK BS.MENU
   " &Help "
   " &New "
   " &Open... "
+  " &Browse... "
   " &Save "
   " Save &As... "
   " E&xit "
@@ -82,10 +84,15 @@ ED.MENUS.SETUP:
   GP.SUB MENU.ITEM, GP.BSTR(BS.MENU, BSTR.MENU.SEARCH)
   GP.SUB MENU.ITEM, GP.BSTR(BS.MENU, BSTR.MENU.HELP)
   ## A hot key need not be the initial: Save and Save As both start with S, so the second takes
-  ## its A. The leading space insets the text, the trailing one pads.
+  ## its A. Browse takes B for the same reason. The leading space insets the text, the trailing
+  ## one pads.
+  ##
+  ## Open and Browse are two ways to the same file: Open takes a name typed in, Browse shows
+  ## what is on the drive. Both end at ED.OPEN.FILE.
   GP.SUB MENU.BEGIN, MENU.DROP + 1
   GP.SUB MENU.ITEM, GP.BSTR(BS.MENU, BSTR.MENU.NEW)
   GP.SUB MENU.ITEM, GP.BSTR(BS.MENU, BSTR.MENU.OPEN)
+  GP.SUB MENU.ITEM, GP.BSTR(BS.MENU, BSTR.MENU.BROWSE)
   GP.SUB MENU.ITEM, GP.BSTR(BS.MENU, BSTR.MENU.SAVE)
   GP.SUB MENU.ITEM, GP.BSTR(BS.MENU, BSTR.MENU.SAVE.AS)
   GP.SUB MENU.ITEM, GP.BSTR(BS.MENU, BSTR.MENU.EXIT)
@@ -137,7 +144,7 @@ ED.MENUS.DISPATCH:
 
 ## ED.DROPDOWN.FILE -- the File menu's rows.
 ED.DROPDOWN.FILE:
-  ON ED.MENUS.PICK% GOSUB ED.CMD.NEW, ED.CMD.OPEN, ED.CMD.SAVE, ED.CMD.SAVEAS, ED.CMD.EXIT
+  ON ED.MENUS.PICK% GOSUB ED.CMD.NEW, ED.CMD.OPEN, ED.CMD.BROWSE, ED.CMD.SAVE, ED.CMD.SAVEAS, ED.CMD.EXIT
   RETURN
 
 ## ED.DROPDOWN.EDIT -- the Edit menu's rows. The first three are in EDIT.BASL and the last two

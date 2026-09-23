@@ -39,7 +39,7 @@
 ## UNDO.INIT -- claim the ring bank and empty the history.
 ##
 ## Bank 5 is free: the line table holds 2 to 4, the code, text and dialog-save regions hold
-## 6 to 10, the clipboard holds 11, and the arena starts at 13. A claim that fails leaves
+## 6 to 10, the clipboard holds 11, the file picker holds 13 to 15, and the arena starts at 16. A claim that fails leaves
 ## UNDO.ON% 0 and every entry point below turns into a RETURN, so the editor runs without a
 ## history rather than writing records over somebody else's bank.
 UNDO.INIT:
