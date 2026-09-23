@@ -3,10 +3,7 @@
 ##
 ## The editor writes document bytes straight into VERA, where a tile index is a screen code.
 ## This module moves charset 3 into ASCII order in VRAM, so a byte of the document is the
-## tile that shows it, and rescues the six box-drawing glyphs the re-order would otherwise
-## bury.
-##
-## #INCLUDEd above the editor's body, because the ED.GL.* #DEFINEs are read there.
+## tile that shows it, and rescues the six box-drawing glyphs the re-order would bury.
 ##
 ##   GOSUB ED.PETFONT      re-order the charset, and rescue the box glyphs
 ##   GOSUB ED.GUI.SETUP    hand the rescued glyphs to the menu library
@@ -15,8 +12,9 @@
 #IFNDEF ED.FONT.DEFS
 #DEFINE ED.FONT.DEFS 1
 
-## ---- the single-line box, as tile indices ---- The dropdowns draw it with GP.BOX, whose
-## custom glyphs reach the cell unconverted. ED.PETFONT is what parks the glyphs here.
+## ---- the single-line box, as tile indices ----
+## The dropdowns draw it with GP.BOX, whose custom glyphs reach the cell unconverted.
+## ED.PETFONT is what parks the glyphs here.
 #DEFINE ED.GL.H 192
 #DEFINE ED.GL.V 193
 #DEFINE ED.GL.TL 194
@@ -26,25 +24,37 @@
 
 GOTO ED.FONT.SKIP
 
-## ED.GUI.SETUP -- give the menu library the dropdown frame glyphs.
+## ED.GUI.SETUP -- give the menu library and the dialogs the frame glyphs, and tell the
+## dialogs where to save the cells they cover.
 ##
 ## GP.BOX's built-in styles name the screen codes of the stock charset, and ED.PETFONT has
 ## moved every one of them, so style 2 draws "p @ B" here. MENU.DROPSTYLE points at eight
-## bytes of our own instead: the glyphs ED.PETFONT rescued into $C0-$C5. MENU reads them in
-## the order TR TL BR BL H H V V.
+## bytes of our own instead: the glyphs ED.PETFONT rescued into $C0-$C5, in the order
+## TR TL BR BL H H V V. GUI.INC.BL reads the same eight bytes in the same order out of
+## GUI.GLYPH$, and draws the frame from them when DLGGLYPH is on.
 ##
-## WARNING: this runs after ED.PETFONT.
+## DLGSHADOWCLR is the shadow's colour. GUI.OPEN draws the shadow before the verb that
+## opened the box returns, so the colour has to be standing before the call. THEME.SELECT
+## has run by here; ED.INIT calls it first.
+##
+## WARNING: run ED.PETFONT before this.
 ED.GUI.SETUP:
   ED.STYLE$ = CHR$(ED.GL.TR) + CHR$(ED.GL.TL) + CHR$(ED.GL.BR) + CHR$(ED.GL.BL)
   ED.STYLE$ = ED.STYLE$ + CHR$(ED.GL.H) + CHR$(ED.GL.H) + CHR$(ED.GL.V) + CHR$(ED.GL.V)
   MENU.DROPSTYLE = GP.STRPTR(ED.STYLE$) + 1
+  GUI.GLYPH$ = ED.STYLE$
+  GP.SUB DLGRESET, ED.GUISAVE
+  GP.SUB DLGGLYPH, -1
+  GP.SUB DLGSHADOW, -1
+  ED.GUI.SHADE = THEME.CLR(THEME.SHADOW)
+  GP.SUB DLGSHADOWCLR, ED.GUI.SHADE
   RETURN
 
 ## ED.PETFONT -- re-order charset 3 in VRAM into ASCII order.
 ##
 ## A tile index is a screen code, and the renderers write document bytes straight into VERA.
-## Charset 3 holds the right glyphs in the wrong order, so glyph N is moved to code N. Both
-## renderers then stay as they are: no table, no lookup, no cycles a cell.
+## Charset 3 holds the right glyphs in the wrong order, so glyph N moves to code N. Neither
+## renderer then needs a table or a lookup.
 ##
 ## The order is ASCII, not PETSCII. BASLOAD passes string literals through as the source's
 ## own bytes, so every name, prompt and message in this program is ASCII. PETSCII order
@@ -57,14 +67,15 @@ ED.GUI.SETUP:
 ##   ASCII $5B-$5F    <- screen $1B-$1F    ASCII $61-$7A a-z <- screen $01-$1A
 ##   ASCII $7B-$7F    <- screen $5B-$5F
 ##
-## WARNING: the copies keep this order -- $60 before $40, $7B-$7F before $5B-$5F -- because
-## two of them read from a run another one writes. Nothing forms a cycle, so no staging
-## buffer is needed.
+## WARNING: keep the copies in this order. $60 before $40, and $7B-$7F before $5B-$5F,
+## because two of them read from a run another one writes. Nothing forms a cycle, so no
+## staging buffer is needed.
 ED.PETFONT:
   ED.FONT = 61440 : REM $1:F000, the KERNAL's 2 KB charset (VERA bank 1)
-  ## ---- the single-line box, rescued before the re-order runs over it ---- Charset 3 keeps
-  ## its box drawing at $40-$7D, which the re-order below buries under ASCII letters. The
-  ## six glyphs go up into $C0-$C5 first, the one region the re-order never touches.
+  ## ---- the single-line box, rescued before the re-order runs over it ----
+  ## Charset 3 keeps its box drawing at $40-$7D, which the re-order below buries under ASCII
+  ## letters. The six glyphs go up into $C0-$C5 first, the one region the re-order never
+  ## touches.
   ED.FS = 64  : ED.FD = ED.GL.H  : ED.FN = 1 : GOSUB ED.FCOPY : REM $40 horizontal
   ED.FS = 93  : ED.FD = ED.GL.V  : ED.FN = 1 : GOSUB ED.FCOPY : REM $5D vertical
   ED.FS = 112 : ED.FD = ED.GL.TL : ED.FN = 1 : GOSUB ED.FCOPY : REM $70 top left
@@ -90,10 +101,6 @@ ED.FCOPY:
     ED.FI = ED.FI + 1
   GP.LOOP
   RETURN
-
-
-
-
 
 ED.FONT.SKIP:
 #ENDIF

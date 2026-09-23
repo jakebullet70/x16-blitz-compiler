@@ -17,28 +17,42 @@
 ## GP.BANKED takes a decimal constant.
 #DEFINE ED.LIBCODE 6
 
+## The two GUI code regions, and the bank the dialogs save the cells they cover into. All
+## three are claimed beside ED.LIBCODE. The engine and the verbs over it do not fit in one
+## 8K region together, so they get one each. The save bank is a whole 8K, which is what
+## STASH wants.
+#DEFINE ED.GUICODE 8
+#DEFINE ED.DLGCODE 9
+#DEFINE ED.GUISAVE 10
+
 ## Where MENU keeps its rows. The first MENU.BEGIN claims it.
 #DEFINE MENU.TEXTBANK 7
 
+
+## ---- Declare all the GPC-BASIC routines
 #INCLUDE "GPC-BASIC/GPB.INC.BL"
 
-## ---- STASH STAYS IN LOW MEMORY. It executes BANK, which a GP.BANKED region may not,
-## ---- so it cannot go in the one below. MENUPULL needs it for MENU.SAVE.BANK; the
-## ---- editor picks MENU.SAVE.VRAM, but the module is one file and takes both paths.
+
+
+## ---- STASH stays in low memory ----
+## It executes BANK, which a GP.BANKED region may not, so it cannot go in the one below.
+## MENUPULL needs it for MENU.SAVE.BANK. The editor picks MENU.SAVE.VRAM, but the module is
+## one file and takes both paths.
 #INCLUDE "GPC-BASIC/STASH.INC.BL"
 
-## ---- THE LIBRARY MODULES RUN FROM A RAM BANK. Each is its ordinary .INC.BL file between
-## ---- GP.BANKED and GP.ENDBANKED and nothing else: a call in from outside selects the
-## ---- region's bank and RETURN puts the caller's back, so a caller reads the same either
-## ---- way. GPC-BASIC/BANKED-OR-NOT.md has the rules.
-## ----
-## ---- THE GOTO JUMPS THE REGION. A GOTO into one is refused, so the bridge GP.BANKED
-## ---- leaves is the only way to fall past it, and that works at program start only.
-## ----
-## ---- ORDER IS NOT FREE. THEME is first because everything below reads its role numbers,
-## ---- which are #DEFINEs. STASHVRAM is above MENUPULL, which stashes the cells a dropdown
-## ---- covers through it, and MENU.INC.BANKED.BL is above MENU, which is the store it
-## ---- declares.
+
+
+## ---- the library modules run from a RAM bank ----
+## Each is its ordinary .INC.BL file between GP.BANKED and GP.ENDBANKED and nothing else: a
+## call in from outside selects the region's bank and RETURN puts the caller's back, so a
+## caller reads the same either way. GPC-BASIC/BANKED-OR-NOT.md has the rules.
+##
+## The GOTO jumps the region. A GOTO into one is refused, so the bridge GP.BANKED leaves is
+## the only way to fall past it, and that works at program start only.
+##
+## Order is not free. THEME is first because everything below reads its role numbers, which
+## are #DEFINEs. STASHVRAM is above MENUPULL, which stashes the cells a dropdown covers
+## through it, and MENU.INC.BANKED.BL is above MENU, which is the store it declares.
 GOTO ED.LIBEND
 GP.BANKED ED.LIBCODE
 #INCLUDE "GPC-BASIC/THEME.INC.BL"
@@ -50,29 +64,62 @@ GP.BANKED ED.LIBCODE
 GP.ENDBANKED
 ED.LIBEND:
 
-## ---- MENUKEY RUNS THE BAR FROM THE EDITOR'S KEY LOOP, and it is not in the region: it
-## ---- reads the keyboard layout under BANK 0, which a region may not do.
-#INCLUDE "GPC-BASIC/MENUKEY.INC.BL"
 
+
+## ---- the dialogs are the library's too, and they take two more regions ----
+## A region is 8,192 bytes and these do not fit in one: GP.BANKED REGION OVER 8K is what the
+## compiler says when they are put in one anyway.
+##
+## The engine is the first region. LINEINPUT is the field, GUI.INC.BL the box and the form
+## loop over it. COMBO and CHECK are here because GUI.INC.BL names their painters whether or
+## not a form has one of them, and a name with no module behind it does not compile.
+##
+## The verbs are the second, with the editor's own adapter beside them: ED-DIALOG.BASL calls
+## both the verbs and the engine, and this is the half it calls more of.
+##
+## STASH stays where it is, above: GUI.OPEN saves the cells a box covers through it, and the
+## call out of the region to low memory is what makes that legal.
+GOTO ED.GUIEND
+GP.BANKED ED.GUICODE
+#INCLUDE "GPC-BASIC/LINEINPUT.INC.BL"
+#INCLUDE "GPC-BASIC/GUI.INC.BL"
+#INCLUDE "GPC-BASIC/COMBO.INC.BL"
+#INCLUDE "GPC-BASIC/CHECK.INC.BL"
+GP.ENDBANKED
+GP.BANKED ED.DLGCODE
+#INCLUDE "GPC-BASIC/GUI-DIALOGS.INC.BL"
+#INCLUDE "ED-DIALOG.BASL"
+GP.ENDBANKED
+ED.GUIEND:
+
+
+
+## ---- MENUKEY runs the bar from the editor's key loop, and it is not in the region ----
+## It reads the keyboard layout under BANK 0, which a region may not do.
+#INCLUDE "GPC-BASIC/MENUKEY.INC.BL"
+## ---
 #INCLUDE "ED-FONT.BASL"
 #INCLUDE "ED-MISC.BASL"
 #INCLUDE "ED-MENUS.BASL"
-#INCLUDE "ED-DIALOG.BASL"
+
+
 
 REM ============================================================================
-REM EDITOR.BASL -- GPC EDIT, an MS-DOS-EDIT-styled text / Markdown editor for the
+REM EDIT.BASL -- GPC EDIT, an MS-DOS-EDIT-styled text / Markdown editor for the
 REM Commander X16, written in BASLOAD and compiled by GPC.
 REM
-REM NOTHING GOES THROUGH THE KERNAL: every cell, text area and chrome alike, is written
+REM Nothing goes through the KERNAL: every cell, text area and chrome alike, is written
 REM straight into VERA's text map. The document lives in banked RAM behind the DOC.* layer,
-REM ED-STORE.BASL, #INCLUDEd at the bottom; the menus are ED-MENUS.BASL's, at the top.
+REM ED-STORE.BASL, #INCLUDEd at the bottom. The menus are ED-MENUS.BASL's, at the top.
 REM
-REM THE MENUS, THE THEME, THE BANK MAP AND THE VRAM STASH ARE THE LIBRARY'S, taken from
-REM GPC-BASIC/ beside this file and run from a RAM bank. The editor keeps forks of APPSYS,
-REM STRCASE and LINEINPUT in ED-MISC.BASL, which are next.
+REM The menus, the theme, the bank map, the VRAM stash and the dialogs are the library's,
+REM taken from GPC-BASIC/ beside this file and run from RAM banks. The editor keeps forks of
+REM APPSYS and STRCASE in ED-MISC.BASL, which are next, and nothing else. What it needs and
+REM cannot bank, STASH and MENUKEY, is #INCLUDEd into low memory instead.
 REM
-REM BANKS: 1 the runtime's, 2-4 the line table, 5 the undo log, 6 the library's code,
-REM 7 the menu rows, 13 up to the top of RAM the document arena. Banks 8-12 are free.
+REM Banks: 1 the runtime's, 2-4 the line table, 5 the undo log, 6 the menu and theme code,
+REM 7 the menu rows, 8 the GUI engine, 9 the dialog verbs, 10 the cells a dialog covers,
+REM 13 up to the top of RAM the document arena. Banks 11 and 12 are free.
 REM
 ED.SCREEN.MODE = 1 : REM 1 = 80x30, 3 = 40x30 (see KERNAL screen_mode $FF5F)
 THEME.ID = 3 : REM the colour theme, see GPC-BASIC/THEME.INC.BL
@@ -84,13 +131,16 @@ GOSUB ED.OPEN.DONE
 GOSUB ED.RENDER.ALL
 GOSUB ED.L0.ON
 
+
+REM ----------------------------------------------------------
 REM ---- main loop ----
-REM
+REM ----------------------------------------------------------
 GP.DO
-  GET ED.KEY$
+  REM A key struck while a message was on the status line is waiting in ED.PENDING.KEY$.
+  ED.KEY$ = ED.PENDING.KEY$ : ED.PENDING.KEY$ = ""
+  IF ED.KEY$ = "" THEN GET ED.KEY$
   GP.IF ED.KEY$ <> "" THEN 
     ED.KEY = ASC(ED.KEY$) 
-    ## --- check if menu key and deal with it
     GOSUB ED.MENUS.KEY : 
     IF ED.MENUS.PICK < 0 THEN GOSUB ED.DISPATCH.EDITING.KEY
   GP.ENDIF
@@ -111,6 +161,9 @@ ED.DISPATCH.EDITING.KEY:
     GP.CASE 20  : GOSUB ED.DO.BACKSPACE
     GP.CASE 25  : GOSUB ED.DO.DELETE
     GP.CASE 148 : GOSUB ED.TOGGLE.INSERT
+    GP.CASE 3   : GOSUB ED.CMD.COPY
+    GP.CASE 24  : GOSUB ED.CMD.CUT
+    GP.CASE 22  : GOSUB ED.CMD.PASTE
     GP.CASE 26  : GOSUB UNDO.CMD
     GP.CASE 18  : GOSUB UNDO.REDO.CMD
     GP.CASE 134 : GOSUB ED.KEY.FINDAGAIN
@@ -118,11 +171,13 @@ ED.DISPATCH.EDITING.KEY:
     GP.OTHER    : GOSUB ED.KEY.RANGE
   GP.ENDSEL
   RETURN
+  REM ----------------------------------------------------------
+
+
 
 REM ---- F3 repeats the search, and SHIFT+F3 repeats it backwards ----
-REM MENU.MODS is what MENU.ALTHIT read on the way through ED.MENUS.KEY, one call after
-REM the GET in the main loop -- so it is exactly as fresh here as it is for the ALT test that
-REM the menu bar already leans on.
+REM MENU.MODS is what MENU.ALTHIT read on the way through ED.MENUS.KEY, one call after the
+REM GET in the main loop, so it is as fresh here as it is for the bar's own ALT test.
 ED.KEY.FINDAGAIN:
   IF (MENU.MODS AND MENU.MOD.SHIFT) <> 0 THEN GOSUB ED.CMD.FINDPREV : RETURN
   GOSUB ED.CMD.FINDNEXT
@@ -156,16 +211,13 @@ ED.QUIT:
 
 
 REM ============================================================================
-REM SETUP
+REM Setup
 REM ============================================================================
 ED.INIT:
-  GOSUB ED.APPSYS.STARTUP
-  GOSUB BANKMGR.INIT
-  GOSUB DOC.INIT
-  GOSUB ED.CLAIM.FIXED.BANKS
-  GOSUB UNDO.INIT
-  GOSUB THEME.SELECT
-  SV.MAX = 2 : REM the dropdown's stash and the dialog's, claimed on first use
+  GOSUB ED.APPSYS.STARTUP : GOSUB BANKMGR.INIT
+  GOSUB DOC.INIT  : GOSUB ED.CLAIM.FIXED.BANKS
+  GOSUB UNDO.INIT : GOSUB CLIP.INIT : GOSUB THEME.SELECT
+  SV.MAX = 1 : REM the dropdown's stash, claimed on first use; the dialogs use a RAM bank
   GOSUB ED.MENUS.SETUP
   GOSUB ED.CLAIM.ARENA.BANKS
   
@@ -185,6 +237,7 @@ ED.INIT:
   ED.TEXT.ROWS   = SCREEN.ROWS - 2
   ED.ATTR.TEXT   = THEME.CLR(THEME.TEXT)
   ED.ATTR.CARET  = THEME.CLR(THEME.HILITE)
+  ED.CARET.LEN   = 1 : REM cells the caret covers; a find sets it to the length of the match
   ED.ASM.GATTR% = THEME.CLR(THEME.DIMMED) : REM the gutter, read by ED.ROW.STREAM
   ED.MAP.TOP = 0
   POKE 40761, 0 : POKE 40762, 0 : REM L1 never scrolls again -- see ED.LAYERS
@@ -209,18 +262,19 @@ REM bank before this, but the arena walk below takes every bank it can get, and 
 REM region is only code to the compiler -- to BANKMGR it is a bank like the rest.
 REM
 REM MENU.TEXTBANK is not here: MENU claims it itself, on the first MENU.BEGIN.
+REM
+REM ED.BANK.FAILED prints BANKMGR.SET.BANK, which is the verb's own argument, so the
+REM message still names the bank that would not claim.
 ED.CLAIM.FIXED.BANKS:
-  BANKMGR.SET.BANK = ED.LIBCODE
-  GOSUB BANKMGR.CLAIM
-  IF BANKMGR.OK = 0 THEN GOSUB ED.BANK.FAILED
-  FOR ED.BK = DOC.TABLE.BASE.BANK TO DOC.TABLE.BASE.BANK + DOC.TABLE.BANKS - 1
-    BANKMGR.SET.BANK = ED.BK
-    GOSUB BANKMGR.CLAIM
-    IF BANKMGR.OK = 0 THEN GOSUB ED.BANK.FAILED
-  NEXT ED.BK
+  ## -- if any of these fail we got bigger problems
+  IF GP.FN(BANKMGR.CLAIM.BANK, ED.LIBCODE) = 0 THEN GOTO ED.BANK.FAILED
+  IF GP.FN(BANKMGR.CLAIM.BANK, ED.GUICODE) = 0 THEN GOTO ED.BANK.FAILED
+  IF GP.FN(BANKMGR.CLAIM.BANK, ED.DLGCODE) = 0 THEN GOTO ED.BANK.FAILED
+  IF GP.FN(BANKMGR.CLAIM.BANK, ED.GUISAVE) = 0 THEN GOTO ED.BANK.FAILED
+  FOR ED.BANK.INDEX = DOC.TABLE.BASE.BANK TO DOC.TABLE.BASE.BANK + DOC.TABLE.BANKS - 1
+    IF GP.FN(BANKMGR.CLAIM.BANK, ED.BANK.INDEX) = 0 THEN GOTO ED.BANK.FAILED
+  NEXT ED.BANK.INDEX
   RETURN
-
-
 
 REM ---- the document arena: every bank from DOC.FIRST.BANK up to the first one it cannot
 REM claim, the top of RAM when nobody else owns one.
@@ -228,7 +282,7 @@ ED.CLAIM.ARENA.BANKS:
   DOC.LAST.BANK = DOC.FIRST.BANK - 1
   BANKMGR.SET.BANK = DOC.FIRST.BANK
   GOSUB BANKMGR.CLAIM
-  IF BANKMGR.OK = 0 THEN GOSUB ED.BANK.FAILED
+  IF BANKMGR.OK = 0 THEN GOTO ED.BANK.FAILED
   GP.DO
     IF BANKMGR.OK = 0 THEN GP.EXITDO
     DOC.LAST.BANK = BANKMGR.SET.BANK
@@ -238,7 +292,6 @@ ED.CLAIM.ARENA.BANKS:
   RETURN
 
 
-
 REM ---- a claim failed: two owners name one bank. BANKMGR.SET.BANK is the bank.
 ED.BANK.FAILED:
   PRINT "BANK"; BANKMGR.SET.BANK; "FAILED"
@@ -246,10 +299,9 @@ ED.BANK.FAILED:
 
 
 
-REM VSCROLL moves a whole LAYER, so with one layer the bars slid with the document and had to
-REM be redrawn every line. Layer 0 takes the document and scrolls alone; layer 1 keeps the
-REM bars, the dropdown and the dialogs at fixed SCREEN rows. The seam was already there: every
-REM GP command addresses layer 1 only.
+REM VSCROLL moves a whole layer. Layer 0 takes the document and scrolls alone; layer 1 keeps
+REM the bars, the dropdown and the dialogs at fixed SCREEN rows. Every GP command addresses
+REM layer 1 only.
 ED.LAYERS:
   POKE 40741, 0 : REM DCSEL 0, or $9F29 is an FX register instead of DC_VIDEO
   REM L0: config and tilebase copied from L1, map at $00000, and the only scroll left.
@@ -266,10 +318,9 @@ ED.LAYERS:
 
 
 REM The shadow under a dropdown or a dialog is drawn on layer 1, where colour 0 is the
-REM transparent index -- a shadow in it would show the document through untouched. So the
-REM editor buys itself a black: palette entry 4 is purple, which no theme uses, and this
-REM points it at black. The themes then ask for colour 4 and get a shadow that is really
-REM black. The entry is read back first, and ED.QUIT puts it as it was.
+REM transparent index and a shadow in it would show the document through untouched. Palette
+REM entry 4 is purple, which no theme uses, so this points it at black and the themes ask for
+REM colour 4. The entry is read back first, and ED.QUIT puts it as it was.
 ED.SHADOW.PALETTE:
   ED.PAL.LO = VPEEK(1, $FA08) : ED.PAL.HI = VPEEK(1, $FA09)
   VPOKE 1, $FA08, 0 : VPOKE 1, $FA09, 0
@@ -280,7 +331,7 @@ ED.SHADOW.PALETTE.OFF:
   RETURN
 
 
-REM Layer 0 is switched on AFTER the first full render, and is never cleared: VRAM comes up
+REM Layer 0 is switched on after the first full render, and is never cleared: VRAM comes up
 REM with whatever was in it, but no row is ever visible before it is painted.
 ED.L0.ON:
   POKE 40741, 0 : POKE 40745, PEEK(40745) OR 16 : REM DC_VIDEO bit 4
@@ -288,13 +339,11 @@ ED.L0.ON:
 
 REM Layer 1's text region back to transparent. Attribute 0 is the transparent one.
 REM
-REM The two bar rows are not part of that region, and they are not left alone either. The
-REM PRINT CHR$(147) up in ED.INIT clears the whole screen in the KERNAL's own white-on-blue,
-REM and layer 1 is visible from that moment -- so the top and bottom rows stayed blue right
-REM through DOC.LOADFILE, the slowest thing the editor ever does, until ED.RENDER.ALL
-REM finally painted over them. Filling them with the bar attribute here means the bars come
-REM up in the theme's colours and then fill with text, rather than changing colour under
-REM the user.
+REM The two bar rows are not part of that region, and they are filled here with the bar
+REM attribute. The PRINT CHR$(147) in ED.INIT clears the screen in the KERNAL's own
+REM white-on-blue and layer 1 is visible from that moment, so without this fill the bars stay
+REM blue until ED.RENDER.ALL paints them. Filled, they come up in the theme's colours and
+REM then fill with text.
 ED.CLEAR.OVERLAY:
   GP.FILL 0, 1, SCREEN.COLS, ED.TEXT.ROWS, 32, 0
   GP.FILL 0, 0, SCREEN.COLS, 1, 32, THEME.CLR(THEME.BAR)
@@ -305,15 +354,14 @@ ED.OPEN.DONE:
   ED.TOP.LINE = 0 : ED.LEFT.COL = 0 : ED.CUR.ROW = 0 :  ED.CUR.COL = 0 : ED.INSERT.MODE = 1 : ED.DOC.DIRTY = 0
   REM A history is about one document. New and Open both land here, and DOC.INIT has already
   REM thrown away the arena the snapshots were in.
-  GOSUB UNDO.CLEAR
-  GOSUB ED.LOAD.LIVE
+  GOSUB UNDO.CLEAR : GOSUB ED.LOAD.LIVE
   RETURN
 
 
 
 
 REM ============================================================================
-REM LIVE LINE
+REM Live line
 REM ============================================================================
 ED.LOAD.LIVE:
   LINE.INDEX = ED.CUR.ROW : GOSUB DOC.LOAD
@@ -334,7 +382,7 @@ ED.CLAMP.COL:
 
 
 REM ============================================================================
-REM CURSOR MOVEMENT
+REM Cursor movement
 REM ============================================================================
 ED.MOVE.LEFT:
   IF ED.CUR.COL > 0 THEN ED.CUR.COL = ED.CUR.COL - 1 : GOSUB ED.CARET.REFRESH : RETURN
@@ -389,7 +437,7 @@ ED.MOVE.PAGEDOWN:
 
 
 REM ============================================================================
-REM EDITING
+REM Editing
 REM ============================================================================
 ED.DO.INSERT:
   IF LEN(ED.CUR.LINE$) >= 250 THEN RETURN
@@ -472,15 +520,87 @@ ED.TOGGLE.INSERT:
   RETURN
 
 
+REM ---- Cut, Copy and Paste: one whole line ----
+REM The clipboard itself is ED-CLIP.BASL, a bank of [len][chars] records. These three
+REM routines hold one record between them; a selection will hold one a line, and they are
+REM written to walk the clipboard rather than to assume a single line.
+REM
+REM CTRL+C is code 3, which RUN/STOP also sends. The editor has no use for RUN/STOP, so
+REM the key copies a line here rather than doing nothing.
+ED.CLIP.TAKE.LINE:
+  REM The live line is written back first: DOC.LOAD reads the store record, and a line
+  REM being typed on has not been written to one yet.
+  GOSUB ED.COMMIT.LIVE
+  LINE.INDEX = ED.CUR.ROW : GOSUB DOC.LOAD
+  GOSUB CLIP.RESET : GOSUB CLIP.PUT
+  RETURN
+
+ED.CMD.COPY:
+  GOSUB ED.CLIP.TAKE.LINE
+  IF CLIP.OK = 0 THEN GOTO ED.CLIP.NOROOM
+  ED.MSG$ = "Line copied" : GOSUB ED.INFO.MSG
+  RETURN
+
+ED.CMD.CUT:
+  GOSUB ED.CLIP.TAKE.LINE
+  IF CLIP.OK = 0 THEN GOTO ED.CLIP.NOROOM
+  GOSUB ED.DELETE.LINE
+  ED.MSG$ = "Line cut" : GOSUB ED.INFO.MSG
+  RETURN
+
+REM A bank that would not claim and a clipboard with no room left say the same thing: the
+REM line is still where it was, and nothing was taken.
+ED.CLIP.NOROOM:
+  ED.MSG$ = "Clipboard full" : GOSUB ED.ERR.MSG
+  RETURN
+
+REM ---- paste the clipboard in as a new line below the cursor ----
+REM The text is moved out of LINE.TEXT$ first: DOC.INSERT.SLOT and DOC.STORE both use that
+REM string, so reading the clipboard straight into the store would lose it.
+ED.CMD.PASTE:
+  IF CLIP.COUNT = 0 THEN ED.MSG$ = "Clipboard empty" : GOSUB ED.ERR.MSG : RETURN
+  GOSUB ED.COMMIT.LIVE
+  GOSUB CLIP.REWIND : GOSUB CLIP.GET
+  ED.CLIP.LINE$ = LINE.TEXT$
+  GOSUB UNDO.BEGIN
+  UNDO.ROW = ED.CUR.ROW + 1 : GOSUB UNDO.REC.ADD
+  LINE.INDEX = ED.CUR.ROW + 1 : GOSUB DOC.INSERT.SLOT
+  LINE.TEXT$ = ED.CLIP.LINE$ : LINE.INDEX = ED.CUR.ROW + 1 : GOSUB DOC.STORE
+  ED.CUR.ROW = ED.CUR.ROW + 1 : ED.CUR.COL = 0
+  GOSUB ED.LOAD.LIVE
+  ED.DOC.DIRTY = 1 : GOSUB ED.REFRESH.FULL
+  ED.MSG$ = "Line pasted" : GOSUB ED.INFO.MSG
+  RETURN
+
+REM ---- take the cursor line out of the document ----
+REM A document always has at least one line, so the last one is emptied instead of removed.
+REM That is a REPLACE to undo, not a DELLINE, and the two want different records.
+ED.DELETE.LINE:
+  GOSUB ED.COMMIT.LIVE
+  GOSUB UNDO.BEGIN
+  IF LINE.COUNT <= 1 THEN GOTO ED.DEL.LINE.ONLY
+  UNDO.ROW = ED.CUR.ROW : GOSUB UNDO.REC.DELLINE
+  LINE.INDEX = ED.CUR.ROW : GOSUB DOC.DELETE.SLOT
+  IF ED.CUR.ROW > LINE.COUNT - 1 THEN ED.CUR.ROW = LINE.COUNT - 1
+  GOTO ED.DEL.LINE.DONE
+ED.DEL.LINE.ONLY:
+  UNDO.ROW = 0 : GOSUB UNDO.REC.REPLACE
+  LINE.TEXT$ = "" : LINE.INDEX = 0 : GOSUB DOC.STORE
+ED.DEL.LINE.DONE:
+  ED.CUR.COL = 0 : GOSUB ED.LOAD.LIVE
+  ED.DOC.DIRTY = 1 : GOSUB ED.REFRESH.FULL
+  RETURN
+
+
 
 
 
 
 REM ============================================================================
-REM COMMANDS
+REM Commands
 REM ============================================================================
 ED.CMD.NEW:
-  ED.PROMPT.TITLE$ = "New" : GOSUB ED.CONFIRM.SAVE
+  ED.CONFIRM.TITLE$ = "New" : GOSUB ED.CONFIRM.SAVE
   IF ED.PROCEED = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
   GOSUB DOC.INIT
   LINE.TEXT$ = "" : LINE.INDEX = 0 : GOSUB DOC.STORE : LINE.COUNT = 1
@@ -496,10 +616,10 @@ ED.OPEN.FILE:
   RETURN
 
 ED.CMD.OPEN:
-  ED.PROMPT.TITLE$ = "Open" : GOSUB ED.CONFIRM.SAVE
+  ED.CONFIRM.TITLE$ = "Open" : GOSUB ED.CONFIRM.SAVE
   IF ED.PROCEED = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
-  ED.PROMPT.TITLE$ = "Open" : ED.PROMPT.MSG$ = "File name:" : GOSUB ED.PROMPT
-  IF ED.PROMPT.OK = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
+  ED.INPUT$ = GP.FN(INPUTBOXEX, "Open", "File name:", "", "", "", ED.DLG.WIDTHDEFAULT, 0)
+  IF GUI.OK = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
   DOC.FILE.NAME$ = ED.INPUT$
   GOSUB ED.OPEN.FILE
   RETURN
@@ -516,30 +636,32 @@ ED.CMD.SAVE:
 
 ED.CMD.SAVEAS:
   ED.SAVEAS.START$ = DOC.FILE.NAME$ : IF DOC.FILE.NAME$ = "UNTITLED" THEN ED.SAVEAS.START$ = ""
-  ED.PROMPT.TITLE$ = "Save as" : ED.PROMPT.MSG$ = "File name:" : ED.PROMPT.TEXT$ = ED.SAVEAS.START$ : GOSUB ED.PROMPT
-  IF ED.PROMPT.OK = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
+  ED.INPUT$ = GP.FN(INPUTBOXEX, "Save as", "File name:", "", "", ED.SAVEAS.START$, ED.DLG.WIDTHDEFAULT, 0)
+  IF GUI.OK = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
   DOC.FILE.NAME$ = ED.INPUT$ : ED.MB.FORCE = 1
   GOSUB ED.SAVE.FILE : GOSUB ED.REFRESH.FULL
   ED.MSG$ = "Saved " + DOC.FILE.NAME$ : GOSUB ED.INFO.MSG
   RETURN
 
 ED.CMD.EXIT:
-  ED.PROMPT.TITLE$ = "Exit" : GOSUB ED.CONFIRM.SAVE
+  ED.CONFIRM.TITLE$ = "Exit" : GOSUB ED.CONFIRM.SAVE
   IF ED.PROCEED = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
   GOTO ED.QUIT
-REM ---- Help > About: a box rather than the status line, because it now carries the
-REM editor's memory readout as well as its name. The two questions asked at this point --
-REM what is this, and how much room is left -- are the same visit.
+REM ---- Help > About: a box rather than the status line, because it carries the editor's
+REM memory readout as well as its name.
 REM
-REM EVERY NUMBER IS READ LIVE. FRE(0) is the STRING HEAP and not much else -- the p-code,
-REM the workspace and the arrays are all fixed at compile or DIM time, so the heap is the
-REM only low memory that moves. It only ever falls: a block a string outgrows is flagged
-REM dead and re-fitted, never given back. The rest of the figures come off the bump
-REM allocator in ED-STORE.BASL -- DOC.CUR.BANK and DOC.CUR.PTR are its high-water mark,
-REM DOC.FIRST.BANK to DOC.LAST.BANK is what BANKMGR handed over.
+REM Every number is read live. FRE(0) is the string heap and not much else: the p-code, the
+REM workspace and the arrays are all fixed at compile or DIM time, so the heap is the only low
+REM memory that moves. It only ever falls, because a block a string outgrows is flagged dead
+REM and re-fitted, never given back. The rest of the figures come off the bump allocator in
+REM ED-STORE.BASL: DOC.CUR.BANK and DOC.CUR.PTR are its high-water mark, DOC.FIRST.BANK to
+REM DOC.LAST.BANK is what BANKMGR handed over.
 REM
-REM The strings are all built into ED.DLG.S$, one at a time. A separate variable per line
-REM would leave eight buffers spoken for at their peak length for the rest of the run.
+REM Build every line into ED.AB.S$, one at a time. A variable per line holds eight buffers at
+REM their peak length for the rest of the run.
+REM
+REM The box is PANELOPEN's, the standard dialogs' empty panel, and the rows below are the
+REM editor's own. No canned dialog carries eight lines of live figures.
 ED.CMD.ABOUT:
   ED.AB.PER = DOC.WIN.END - DOC.WIN.START : REM usable bytes in one arena bank
   ED.AB.BANKS = DOC.LAST.BANK - DOC.FIRST.BANK + 1
@@ -548,62 +670,54 @@ ED.CMD.ABOUT:
   ED.AB.PCT = 0 : IF ED.AB.TOT > 0 THEN ED.AB.PCT = INT(ED.AB.USED * 100 / ED.AB.TOT)
 
   REM 46 wide because the Document line is the longest thing here: a full 240-bank arena
-  REM puts four digits on both figures, and ED.DLG.SAY truncates rather than wraps.
-  REM 12 deep because rows 0 and 11 are left empty, so the text is not up against the frame
-  REM top and bottom -- which puts the title on row 1 and the hint on row 10.
-  ED.DLG.TITLE$ = "About" : ED.DLG.W = 46 : ED.DLG.H = 12
-  GOSUB ED.DLG.OPEN
+  REM puts four digits on both figures. Ten rows: the two title lines, a gap, the five
+  REM figures, a gap, and the hint on the last one. PANELOPEN pads the box around all of it,
+  REM so the hint has a blank row under it without one being asked for, no row is against the
+  REM frame, and none of these is a row number the frame has to agree with.
+  GP.SUB PANELOPEN, "About", "", 10, 46
 
-  ED.DLG.SX = 1 : ED.DLG.SY = 1 : ED.DLG.SATTR = ED.DLG.TITLEATTR
-  ED.DLG.S$ = "GPC EDIT -- a text / Markdown editor" : GOSUB ED.DLG.SAY
-  ED.DLG.SY = 2 : ED.DLG.SATTR = ED.DLG.TEXTATTR
-  ED.DLG.S$ = "for the Commander X16" : GOSUB ED.DLG.SAY
+  REM The panel's own colour is the background of every line, so only the foreground is
+  REM chosen here. A line that took its own background would read as a patch on the box.
+  ED.AB.L = GUI.INNER.LEFT : ED.AB.Y = GUI.INNER.TOP
+  ED.AB.TATTR = (GUI.PANEL AND 240) + (THEME.CLR(THEME.TITLE) AND 15)
+  ED.AB.HATTR = (GUI.PANEL AND 240) + (THEME.CLR(THEME.DIMMED) AND 15)
 
-  ED.DLG.SY = 4
-  ED.DLG.S$ = "String heap   " + MID$(STR$(FRE(0)), 2) + " bytes free"
-  GOSUB ED.DLG.SAY
-  ED.DLG.SY = 5
-  ED.DLG.S$ = "Document      " + MID$(STR$(INT(ED.AB.USED / 1024)), 2) + "K used, " + MID$(STR$(INT((ED.AB.TOT - ED.AB.USED) / 1024)), 2) + "K free  (" + MID$(STR$(ED.AB.PCT), 2) + "%)"
-  GOSUB ED.DLG.SAY
-  ED.DLG.SY = 6
-  ED.DLG.S$ = "Lines         " + MID$(STR$(LINE.COUNT), 2)
-  IF DOC.FULL <> 0 THEN ED.DLG.S$ = ED.DLG.S$ + "   DOCUMENT FULL"
-  GOSUB ED.DLG.SAY
+  GP.PRINTAT ED.AB.L, ED.AB.Y, "GPC EDIT -- text editor written in GPC-BASIC", ED.AB.TATTR
+  GP.PRINTAT ED.AB.L, ED.AB.Y + 1, "for the Commander X16", GUI.PANEL
 
-  ED.DLG.SY = 7
-  ED.DLG.S$ = "Arena banks   " + MID$(STR$(DOC.FIRST.BANK), 2) + "-" + MID$(STR$(DOC.LAST.BANK), 2) + " (" + MID$(STR$(ED.AB.BANKS), 2) + " x 8K)"
-  GOSUB ED.DLG.SAY
-  ED.DLG.SY = 8
-  ED.DLG.S$ = "Table banks   " + MID$(STR$(DOC.TABLE.BASE.BANK), 2) + "-" + MID$(STR$(DOC.TABLE.BASE.BANK + DOC.TABLE.BANKS - 1), 2) + "    Machine has " + MID$(STR$(BANKMGR.BANKS), 2)
-  GOSUB ED.DLG.SAY
+  ED.AB.S$ = "String heap   " + MID$(STR$(FRE(0)), 2) + " bytes free"
+  GP.PRINTAT ED.AB.L, ED.AB.Y + 3, ED.AB.S$, GUI.PANEL
+  ED.AB.S$ = "Document      " + MID$(STR$(INT(ED.AB.USED / 1024)), 2) + "K used, " + MID$(STR$(INT((ED.AB.TOT - ED.AB.USED) / 1024)), 2) + "K free  (" + MID$(STR$(ED.AB.PCT), 2) + "%)"
+  GP.PRINTAT ED.AB.L, ED.AB.Y + 4, ED.AB.S$, GUI.PANEL
+  ED.AB.S$ = "Lines         " + MID$(STR$(LINE.COUNT), 2)
+  IF DOC.FULL <> 0 THEN ED.AB.S$ = ED.AB.S$ + "   DOCUMENT FULL"
+  GP.PRINTAT ED.AB.L, ED.AB.Y + 5, ED.AB.S$, GUI.PANEL
 
-  REM Centred on the box rather than set at a fixed column, so it stays centred if the
-  REM width is ever changed. ED.DLG.SAY reads SX and S$, so the order of the two is free.
-  ED.DLG.SY = 10 : ED.DLG.SATTR = ED.DLG.HINTATTR
-  ED.DLG.S$ = "Press any key"
-  ED.DLG.SX = INT((ED.DLG.W - LEN(ED.DLG.S$)) / 2)
-  GOSUB ED.DLG.SAY
+  ED.AB.S$ = "Arena banks   " + MID$(STR$(DOC.FIRST.BANK), 2) + "-" + MID$(STR$(DOC.LAST.BANK), 2) + " (" + MID$(STR$(ED.AB.BANKS), 2) + " x 8K)"
+  GP.PRINTAT ED.AB.L, ED.AB.Y + 6, ED.AB.S$, GUI.PANEL
+  ED.AB.S$ = "Table banks   " + MID$(STR$(DOC.TABLE.BASE.BANK), 2) + "-" + MID$(STR$(DOC.TABLE.BASE.BANK + DOC.TABLE.BANKS - 1), 2) + "    Machine has " + MID$(STR$(BANKMGR.BANKS), 2)
+  GP.PRINTAT ED.AB.L, ED.AB.Y + 7, ED.AB.S$, GUI.PANEL
+
+  REM Centred on the panel rather than set at a fixed column, so it stays centred if the
+  REM width is ever changed.
+  ED.AB.S$ = "Press any key"
+  GP.PRINTAT ED.AB.L + INT((GUI.INNER.WIDTH - LEN(ED.AB.S$)) / 2), ED.AB.Y + 9, ED.AB.S$, ED.AB.HATTR
 
   GOSUB ED.DLG.WAITKEY
-  GOSUB ED.DLG.CLOSE
+  GP.SUB PANELCLOSE
   RETURN
 
-REM ---- The unsaved-changes question, asked the way every other editor asks it: save, throw
-REM the changes away, or go back to what you were doing. A yes/no could only ever offer two
-REM of those three, and the one it left out was the save.
+REM ---- The unsaved-changes question: save, throw the changes away, or go back to what you
+REM were doing. Three answers, so it is a button box and not a yes/no.
 REM
-REM ED.PROMPT.TITLE$ is the caption, so the box says which command is asking. ED.PROCEED is
+REM ED.CONFIRM.TITLE$ is the caption, so the box says which command is asking. ED.PROCEED is
 REM 0 when the caller must abandon what it was about to do.
 ED.CONFIRM.SAVE:
   ED.PROCEED = -1
   IF ED.DOC.DIRTY = 0 THEN RETURN
-  ED.DLG.TITLE$ = ED.PROMPT.TITLE$
-  ED.DLG.MSG$ = "Do you want to save changes to " + DOC.FILE.NAME$ + "?"
-  ED.DLG.B1$ = "&Save" : ED.DLG.B2$ = "Do&n't Save" : ED.DLG.B3$ = "&Cancel"
-  ED.DLG.BN = 3 : ED.DLG.BAT = 1 : ED.DLG.BESC = 3
-  GOSUB ED.DLG.BUTTONS
-  IF ED.DLG.BPICK = 3 THEN ED.PROCEED = 0 : RETURN
-  IF ED.DLG.BPICK = 2 THEN RETURN
+  ED.SAVE.ANSWER = GP.FN(ASK3, ED.CONFIRM.TITLE$, "Do you want to save changes to " + DOC.FILE.NAME$ + "?", "&Save", "Do&n't Save", "&Cancel", 1, 3)
+  IF ED.SAVE.ANSWER = 3 THEN ED.PROCEED = 0 : RETURN
+  IF ED.SAVE.ANSWER = 2 THEN RETURN
 REM Save goes through the ordinary command, so an untitled document gets the Save As it
 REM needs. That prompt can be cancelled in its turn, and the document is still dirty when it
 REM is -- which is the test for whether the save actually happened.
@@ -612,8 +726,8 @@ REM is -- which is the test for whether the save actually happened.
   RETURN
 
 ED.CMD.FIND:
-  ED.PROMPT.TITLE$ = "Find" : ED.PROMPT.MSG$ = "Find text:" : ED.PROMPT.TEXT$ = ED.FIND$ : GOSUB ED.PROMPT
-  IF ED.PROMPT.OK = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
+  ED.INPUT$ = GP.FN(INPUTBOXEX, "Find", "Find text:", "", "", ED.FIND$, ED.DLG.WIDTHDEFAULT, 0)
+  IF GUI.OK = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
   ED.FIND$ = ED.INPUT$ : GOSUB ED.FIND.NEXT
   RETURN
 
@@ -630,8 +744,8 @@ ED.CMD.FINDPREV:
   RETURN
 
 ED.CMD.GOTO:
-  ED.PROMPT.TITLE$ = "Go to line" : ED.PROMPT.MSG$ = "Line number:" : GOSUB ED.PROMPT
-  IF ED.PROMPT.OK = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
+  ED.INPUT$ = GP.FN(INPUTBOXEX, "Go to line", "Line number:", "", "", "", ED.DLG.WIDTHDEFAULT, 0)
+  IF GUI.OK = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
   ED.GOTO.N = VAL(ED.INPUT$)
   IF ED.GOTO.N < 1 THEN ED.GOTO.N = 1
   IF ED.GOTO.N > LINE.COUNT THEN ED.GOTO.N = LINE.COUNT
@@ -642,15 +756,14 @@ ED.CMD.GOTO:
   RETURN
 
 REM ---- forward, wrapping, case-insensitive substring search for ED.FIND$ ----
-REM A CASE-BLIND SEARCH THAT ALLOCATES NOTHING. Folding the needle and every line into new
-REM strings cost 579 measured bytes of workspace per search, owned for the rest of the run,
-REM and that is what the dialogs later ran out of. The fold now happens IN PLACE through
-REM GP.STRPTR and the search is GP.INSTR. LINE.TEXT$ is the scratch copy DOC.LOAD already
-REM makes, so upper-casing it harms nothing.
+REM The fold happens in place through GP.STRPTR and the search is GP.INSTR. LINE.TEXT$ is the
+REM scratch copy DOC.LOAD already makes, so upper-casing it harms nothing. Folding the needle
+REM and every line into new strings instead costs 579 bytes of workspace a search, owned for
+REM the rest of the run.
 ED.FIND.NEXT:
   ED.FIND.OK = 0
   IF LEN(ED.FIND$) = 0 THEN RETURN
-  REM The needle is folded on a COPY: ED.FIND$ is what both messages below print back.
+  REM The needle is folded on a copy: ED.FIND$ is what both messages below print back.
   ED.NEEDLE$ = ED.FIND$
   ED.STRCASE.PTR = GP.STRPTR(ED.NEEDLE$) : ED.STRCASE.MODE = ED.STRCASE.UPPER : GOSUB ED.STRCASE.GO
   GOSUB ED.COMMIT.LIVE
@@ -667,6 +780,7 @@ ED.FN.LOOP:
   GOTO ED.FN.LOOP
 ED.FN.HIT:
   ED.CUR.ROW = ED.FR : ED.CUR.COL = ED.FOUND.AT - 1 : ED.FIND.OK = -1
+  ED.CARET.LEN = LEN(ED.FIND$)
   GOSUB ED.LOAD.LIVE : GOSUB ED.REFRESH.FULL
   ED.MSG$ = "Found: " + ED.FIND$ : GOSUB ED.INFO.MSG
   RETURN
@@ -676,10 +790,9 @@ ED.FN.NONE:
   RETURN
 
 REM ---- backward, wrapping, case-insensitive search for ED.FIND$ ----
-REM The same fold-in-place trick as ED.FIND.NEXT, and the same wrap. What it cannot borrow is
-REM the search itself: GP.INSTR only ever looks forward, so there is no asking it for the last
-REM match in a line. ED.FP.LAST asks it for the first one over and over, each time from one
-REM past the answer before, and keeps the last that came back -- which is the same thing.
+REM The same fold in place as ED.FIND.NEXT, and the same wrap. GP.INSTR only ever looks
+REM forward, so ED.FP.LAST asks it for the first match over and over, each time from one past
+REM the answer before, and keeps the last that came back.
 ED.FIND.PREV:
   ED.FIND.OK = 0
   IF LEN(ED.FIND$) = 0 THEN RETURN
@@ -712,6 +825,7 @@ ED.FP.SCAN:
 
 ED.FP.HIT:
   ED.CUR.ROW = ED.FR : ED.CUR.COL = ED.FOUND.AT - 1 : ED.FIND.OK = -1
+  ED.CARET.LEN = LEN(ED.FIND$)
   GOSUB ED.LOAD.LIVE : GOSUB ED.REFRESH.FULL
   ED.MSG$ = "Found: " + ED.FIND$ : GOSUB ED.INFO.MSG
   RETURN
@@ -721,26 +835,20 @@ ED.FP.NONE:
   RETURN
 
 REM ============================================================================
-REM REPLACE
+REM Replace
 REM ============================================================================
 REM Two fields and then a choice: every match in the document, or just the next one. The
 REM match is case-blind like the search, but the replacement goes into the line exactly as it
 REM was typed -- there is no attempt to copy the case of what was there.
 ED.CMD.REPLACE:
-  ED.DLG.TITLE$ = "Replace"
-  ED.DLG.PROMPT$ = "Find text:" : ED.DLG.PROMPT2$ = "Replace with:"
-  ED.DLG.TEXT$ = ED.FIND$ : ED.DLG.TEXT2$ = ED.REPL$ : ED.DLG.MAX = 0
-  GOSUB ED.DLG.ASK2
+  ED.DLG.OK = GP.FN(ASKTEXT2, "Replace", "Find text:", "Replace with:", ED.FIND$, ED.REPL$, 0)
   IF ED.DLG.OK = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
-  ED.FIND$ = ED.DLG.INPUT$ : ED.REPL$ = ED.DLG.INPUT2$
+  ED.FIND$ = ED.DLG.TEXT1$ : ED.REPL$ = ED.DLG.TEXT2$
   IF LEN(ED.FIND$) = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
 
-  ED.DLG.TITLE$ = "Replace" : ED.DLG.MSG$ = "Replace every match, or just the next one?"
-  ED.DLG.B1$ = "&All" : ED.DLG.B2$ = "&Next" : ED.DLG.B3$ = "&Cancel"
-  ED.DLG.BN = 3 : ED.DLG.BAT = 2 : ED.DLG.BESC = 3
-  GOSUB ED.DLG.BUTTONS
-  IF ED.DLG.BPICK = 3 THEN GOSUB ED.REFRESH.FULL : RETURN
-  IF ED.DLG.BPICK = 2 THEN GOSUB ED.REPLACE.ONE : RETURN
+  ED.REPLACE.SCOPE = GP.FN(ASK3, "Replace", "Replace every match, or just the next one?", "&All", "&Next", "&Cancel", 2, 3)
+  IF ED.REPLACE.SCOPE = 3 THEN GOSUB ED.REFRESH.FULL : RETURN
+  IF ED.REPLACE.SCOPE = 2 THEN GOSUB ED.REPLACE.ONE : RETURN
   GOSUB ED.REPLACE.ALL
   RETURN
 
@@ -749,16 +857,13 @@ REM The search does the finding and leaves the caret on the match, so all this a
 REM splice. Note the reload: ED.FIND.NEXT upper-cased the scratch copy to search it, and what
 REM goes back into the document has to be the line as it was written.
 ED.REPLACE.ONE:
-  GOSUB ED.FIND.NEXT
-  IF ED.FIND.OK = 0 THEN RETURN
+  GOSUB ED.FIND.NEXT : IF ED.FIND.OK = 0 THEN RETURN
   GOSUB ED.COMMIT.LIVE
-  LINE.INDEX = ED.CUR.ROW : GOSUB DOC.LOAD
-  ED.RP.AT = ED.CUR.COL + 1
-  GOSUB ED.RP.SPLICE
+  LINE.INDEX = ED.CUR.ROW   : GOSUB DOC.LOAD
+  ED.RP.AT = ED.CUR.COL + 1 : GOSUB ED.RP.SPLICE
   IF ED.RP.DONE = 0 THEN GOSUB ED.RP.TOOLONG : RETURN
   LINE.INDEX = ED.CUR.ROW : GOSUB DOC.STORE
-  ED.DOC.DIRTY = -1
-  ED.CUR.COL = ED.CUR.COL + LEN(ED.REPL$)
+  ED.DOC.DIRTY = -1 : ED.CUR.COL = ED.CUR.COL + LEN(ED.REPL$)
   GOSUB ED.LOAD.LIVE : GOSUB ED.REFRESH.FULL
   ED.MSG$ = "Replaced 1" : GOSUB ED.INFO.MSG
   RETURN
@@ -783,9 +888,20 @@ ED.REPLACE.ALL:
   NEXT
   REM The caret's line may be shorter than it was, so the column goes back to the start rather
   REM than to a column that is no longer there.
-  ED.CUR.COL = 0
-  GOSUB ED.LOAD.LIVE : GOSUB ED.REFRESH.FULL
+  ED.CUR.COL = 0 : GOSUB ED.LOAD.LIVE
   IF ED.RP.TOTAL > 0 THEN ED.DOC.DIRTY = -1
+
+  REM The count goes in a box as well as on the status line. A replace-all changes lines the
+  REM caret never visits, and the one number that says what it did is worth a key press.
+  REM The box paints over the text, so the repaint comes after it rather than before.
+  ED.RP.BOX.COUNT$ = MID$(STR$(ED.RP.TOTAL), 2) + " replacements made"
+  ED.RP.BOX.LONG$ = ""
+  IF ED.RP.LONG > 0 THEN ED.RP.BOX.LONG$ = MID$(STR$(ED.RP.LONG), 2) + " lines left alone: too long"
+  ED.RP.BOX.FULL$ = ""
+  IF DOC.FULL <> 0 THEN ED.RP.BOX.FULL$ = "DOCUMENT FULL"
+  GP.SUB MSGBOXEX, "Replace All", ED.RP.BOX.COUNT$, ED.RP.BOX.LONG$, ED.RP.BOX.FULL$, "&OK"
+  GOSUB ED.REFRESH.FULL
+
   ED.MSG$ = "Replaced " + MID$(STR$(ED.RP.TOTAL), 2)
   IF ED.RP.LONG > 0 THEN ED.MSG$ = ED.MSG$ + " -- " + MID$(STR$(ED.RP.LONG), 2) + " too long"
   IF DOC.FULL <> 0 THEN ED.MSG$ = ED.MSG$ + " -- DOCUMENT FULL" : GOSUB ED.ERR.MSG : RETURN
@@ -831,28 +947,7 @@ ED.RP.SPLICE:
 
 
 
-REM ============================================================================
-REM PROMPTS
-REM ============================================================================
-REM The one popup box, ED-DIALOG.BASL: it saves the screen under itself and puts it back, so
-REM a prompt costs no repaint. ED.PROMPT.MSG$ in, plus ED.PROMPT.TITLE$ for the caption and
-REM ED.PROMPT.TEXT$ for what the field starts with, and ED.INPUT$ plus ED.PROMPT.OK out.
-REM
-REM The question with buttons on it is asked by ED.CONFIRM.SAVE, which is the only caller it
-REM has and so calls ED.DLG.BUTTONS itself rather than through a bridge like this one.
 
-ED.PROMPT:
-  ED.DLG.TITLE$ = ED.PROMPT.TITLE$
-  ED.DLG.PROMPT$ = ED.PROMPT.MSG$
-  ED.DLG.TEXT$ = ED.PROMPT.TEXT$
-  ED.DLG.MAX = 0 : REM the dialog's own default, wide enough for a path
-  GOSUB ED.DLG.ASK
-  ED.INPUT$ = ED.DLG.INPUT$
-  ED.PROMPT.OK = ED.DLG.OK
-  REM The starting text is per call: a Find that remembers its needle must not hand the
-  REM same one to the next Save As.
-  ED.PROMPT.TEXT$ = ""
-  RETURN
 
 
 
@@ -861,11 +956,11 @@ ED.PROMPT:
 
 
 REM ============================================================================
-REM MESSAGES
+REM Messages
 REM ============================================================================
 REM A message takes over the status line for ED.MSG.JIFFIES and then the status line comes
-REM back, so the editor never sits showing a stale "Saved" or "Not found". Keys struck during
-REM the hold stay in the keyboard buffer and are read as usual once the status line returns.
+REM back, so the editor never sits showing a stale "Saved" or "Not found". The first key
+REM struck ends the hold early and is handled as usual, so a message never costs a keypress.
 ED.INFO.MSG:
   ED.PS.ROW = SCREEN.ROWS - 1 : ED.PS.COL = 0 : ED.PS.WIDTH = SCREEN.COLS
   ED.PS$ = " " + ED.MSG$ : ED.PS.ATTR = THEME.CLR(THEME.BAR) : GOSUB ED.PUT.FIELD
@@ -884,19 +979,19 @@ REM the wait is the same length whatever the machine is doing. TI rolls over to 
 REM midnight: the elapsed count then goes negative, which ends the wait early rather than
 REM leaving the editor stuck for the best part of a day.
 REM
-REM The keyboard is drained on the way out. Three seconds is long enough to type into, and
-REM a held arrow repeats through the whole hold: without the drain those keys all arrive at
-REM once the moment the main loop starts reading again. GET hands back "" on an empty
-REM buffer, so the drain stops at the first empty read.
+REM The wait also ends on the first key struck, and that key is handed to the main loop in
+REM ED.PENDING.KEY$ rather than thrown away. Without this, holding F3 down to walk through
+REM a document reads as a lock-up: the editor is busy here for three seconds after every
+REM hit, and the presses made meanwhile used to be flushed.
 ED.MSG.HOLD:
   ED.MSG.T0 = TI
 ED.MSG.HOLD.WAIT:
+  GET ED.PENDING.KEY$
+  IF ED.PENDING.KEY$ <> "" THEN GOTO ED.MSG.HOLD.DONE
   ED.MSG.EL = TI - ED.MSG.T0
   IF ED.MSG.EL >= 0 AND ED.MSG.EL < ED.MSG.JIFFIES THEN GOTO ED.MSG.HOLD.WAIT
+ED.MSG.HOLD.DONE:
   GOSUB ED.RENDER.STATUS
-ED.MSG.HOLD.DRAIN:
-  GET ED.MSG.K$
-  IF ED.MSG.K$ <> "" THEN GOTO ED.MSG.HOLD.DRAIN
   RETURN
 
 
@@ -905,7 +1000,7 @@ ED.MSG.HOLD.DRAIN:
 
 
 REM ============================================================================
-REM RENDERING
+REM Rendering
 REM ============================================================================
 ED.REFRESH.FULL:
   GOSUB ED.ENSURE.VISIBLE : GOSUB ED.RENDER.ALL
@@ -918,7 +1013,7 @@ ED.REFRESH.INTRA:
   RETURN
 
 REM Cheap cursor move: restore the old caret cell, invert the new one, repaint the status
-REM line -- about 2 cells, not a screen. Only an actual scroll falls back to a full repaint.
+REM line. About 2 cells, not a screen. Only an actual scroll falls back to a full repaint.
 ED.CARET.REFRESH:
   GOSUB ED.UNCARET : GOSUB ED.ENSURE.VISIBLE
   IF ED.SCROLLED = 1 THEN GOSUB ED.DO.SCROLL : RETURN
@@ -936,9 +1031,9 @@ ED.ENSURE.VISIBLE:
   IF ED.HSCROLLED = 1 THEN ED.SCROLLED = 1
   RETURN
 
-REM A one-row move is served by VERA: bump L0_VSCROLL and paint the ONE newly-exposed row.
-REM The bars are on layer 1 and did not move. Anything else -- a multi-line jump, any
-REM horizontal scroll -- is a full repaint at the current map offset.
+REM A one-row move is served by VERA: bump L0_VSCROLL and paint the one newly-exposed row.
+REM The bars are on layer 1 and did not move. Anything else, a multi-line jump or any
+REM horizontal scroll, is a full repaint at the current map offset.
 ED.DO.SCROLL:
   IF ED.HW.OK = 0 THEN GOSUB ED.RENDER.ALL : RETURN
   IF ED.HSCROLLED = 1 THEN GOSUB ED.RENDER.ALL : RETURN
@@ -984,20 +1079,21 @@ ED.RENDER.ALL:
 
 
 
-REM Rows render through ONE inline-assembly block: VERA setup, the cell loop, teardown.
+REM Rows render through one inline-assembly block: VERA setup, the cell loop, teardown. Two
+REM POKEs a cell cost about 800 cycles through the p-code VM, against the ~20 the same
+REM compare-load-store takes native.
 REM
-REM WHY ASSEMBLY. The VERA path was already the fast one; the loop around it was the cost --
-REM two POKEs a cell, each a push / dispatch / bank-save-restore through the p-code VM, about
-REM 800 cycles a cell against the ~20 the same compare-load-store takes native.
-REM
-REM THE VERA METHOD IS UNCHANGED. FX 32-bit cache write: one DATA0 write flushes 4 VRAM bytes
-REM = 2 cells [char,attr,char,attr]. Every cell in a row shares an attribute, so the two attr
-REM slots are loaded ONCE and the loop writes only the two char slots plus a flush. Increment
-REM +4 walks two cells a flush, and ED.TEXT.WIDTH is even.
+REM FX 32-bit cache write: one DATA0 write flushes 4 VRAM bytes = 2 cells
+REM [char,attr,char,attr]. Every cell in a row shares an attribute, so the two attr slots are
+REM loaded once and the loop writes only the two char slots plus a flush. Increment +4 walks
+REM two cells a flush, and ED.TEXT.WIDTH is even.
 REM FX regs: $9F25 CTRL bits 6:1 = DCSEL; DCSEL 2 -> FX_CTRL $9F29 bit 6 cache-write-enable;
 REM DCSEL 6 -> FX_CACHE L/M/H/U $9F29-2C = [char0, attr0, char1, attr1].
 REM
-REM THE SOURCE IS ONE OF THREE THINGS, and ED.ASM.MODE% tells the block which:
+REM The source is one of three things, and ED.ASM.MODE% tells the block which:
+REM   a stored line    MODE 0, ED.ASM.SRC% is its address in the $A000 window (BANK is set)
+REM   the edited line  MODE 1, read out of ED.CUR.LINE$ past its 3-byte header
+REM   past the end     MODE 0 with ED.ASM.VIS% = 0, every cell a space, source never read
 REM   a stored line    MODE 0, ED.ASM.SRC% is its address in the $A000 window (BANK is set)
 REM   the edited line  MODE 1, read out of ED.CUR.LINE$ past its 3-byte header
 REM   past the end     MODE 0 with ED.ASM.VIS% = 0 -- every cell a space, source never read
@@ -1119,21 +1215,41 @@ ED.ROW.STREAM:
   #REM 0
   RETURN
 
-REM Caret = one inverted attribute cell, remembered so a cursor move can restore it
+REM Caret = a run of inverted attribute cells, remembered so a cursor move can restore it
 REM (ED.UNCARET) instead of repainting the screen.
+REM
+REM The run is one cell, except straight after a find: ED.FN.HIT and ED.FP.HIT set
+REM ED.CARET.LEN to the length of the match, so the whole word comes up lit rather than the
+REM one character under the caret. ED.CARET.LEN falls back to 1 the moment it is used, which
+REM is why no cursor move, edit or dialog has to remember to clear it.
+REM
+REM ED.CARET.DRAWN is what was painted after clipping at the right edge of the text area, and
+REM it is what ED.UNCARET puts back. The first cell is written outside the loop because a
+REM plain cursor move is one cell and pays for no FOR at all.
 ED.PLACE.CARET:
   ED.CARET.SROW = ED.CUR.ROW - ED.TOP.LINE + 1
   ED.CARET.SCOL = ED.CUR.COL - ED.LEFT.COL
+  ED.CARET.DRAWN = ED.CARET.LEN : ED.CARET.LEN = 1
   ED.CARET.VALID = 0
   IF ED.CARET.SROW < 1 OR ED.CARET.SROW > ED.TEXT.BOTTOM THEN RETURN
   IF ED.CARET.SCOL < 0 OR ED.CARET.SCOL >= ED.TEXT.WIDTH THEN RETURN
+  IF ED.CARET.SCOL + ED.CARET.DRAWN > ED.TEXT.WIDTH THEN ED.CARET.DRAWN = ED.TEXT.WIDTH - ED.CARET.SCOL
   ED.CARET.ADDR = (ED.CARET.SROW + ED.MAP.TOP) * 256 + (ED.CARET.SCOL + ED.GUT.W) * 2 + 1
   VPOKE 0, ED.CARET.ADDR, ED.ATTR.CARET : ED.CARET.VALID = 1
+  IF ED.CARET.DRAWN < 2 THEN RETURN
+  FOR ED.CARET.CELL = 1 TO ED.CARET.DRAWN - 1
+    VPOKE 0, ED.CARET.ADDR + ED.CARET.CELL * 2, ED.ATTR.CARET
+  NEXT ED.CARET.CELL
   RETURN
 
 ED.UNCARET:
   IF ED.CARET.VALID = 0 THEN RETURN
   VPOKE 0, ED.CARET.ADDR, ED.ATTR.TEXT : ED.CARET.VALID = 0
+  IF ED.CARET.DRAWN < 2 THEN RETURN
+  FOR ED.CARET.CELL = 1 TO ED.CARET.DRAWN - 1
+    VPOKE 0, ED.CARET.ADDR + ED.CARET.CELL * 2, ED.ATTR.TEXT
+  NEXT ED.CARET.CELL
+  ED.CARET.DRAWN = 1
   RETURN
 
 
@@ -1141,9 +1257,9 @@ REM ---- menu bar (layer 1, screen row 0). Attr = bg*16+fg. ----
 REM MENU.DRAWBAR draws the titles; the editor's own two things are the full width band
 REM and the document name at the right.
 REM
-REM DRAWN ONLY WHEN IT WOULD COME OUT DIFFERENT -- the body blanks the whole row and draws
-REM the items back over it, which flickers. The two tests are the star and which title is
-REM highlighted; the FILENAME is a string, so it uses a flag rather than a key string,
+REM Drawn only when it would come out different: the body blanks the whole row and draws the
+REM items back over it, which flickers. The two tests are the star and which title is
+REM highlighted. The file name is a string, so the test is a flag rather than a key string,
 REM because a string built per keystroke is an allocation per keystroke.
 ED.RENDER.MENUBAR:
   IF ED.MB.FORCE = 1 THEN GOTO ED.MB.DRAW
@@ -1173,13 +1289,12 @@ ED.RENDER.STATUS:
 REM ---- write ED.PS$ into the VERA text map at 0-based (ED.PS.ROW, ED.PS.COL), attribute
 REM ED.PS.ATTR, padded with spaces to ED.PS.WIDTH and truncated past it ----
 REM
-REM VERA AUTO-INCREMENT: the address and a +1 step are programmed ONCE, then
+REM VERA auto-increment: the address and a +1 step are programmed once, then
 REM char,attr,char,attr streams to DATA0. Char and attr are adjacent and cells follow each
 REM other, so +1 walks the whole field with no per-cell address arithmetic.
 REM
-REM Assembly for ED.RENDER.ROW's reason: this draws all the chrome, on every keystroke.
-REM The width guard matters because the block's test is at the BOTTOM -- without it a
-REM width of 0 would write one cell, where the FOR loop it replaced wrote none.
+REM WARNING: keep the width guard. The block's test is at the bottom, so a width of 0 writes
+REM one cell where the FOR loop it replaced wrote none.
 ED.PUT.FIELD:
   IF ED.PS.WIDTH < 1 THEN RETURN
   ED.ASM.BASE% = 45056 + ED.PS.ROW * 256 + ED.PS.COL * 2 : REM layer 1, a SCREEN row
@@ -1225,3 +1340,5 @@ REM --- this read / writes BANKS (line-pointer table + banked memory)
 #INCLUDE "ED-STORE.BASL"
 REM --- undo and redo: rings in bank 5, snapshots in the document arena
 #INCLUDE "ED-UNDO.BASL"
+REM --- the clipboard: whole-line records in bank 11
+#INCLUDE "ED-CLIP.BASL"

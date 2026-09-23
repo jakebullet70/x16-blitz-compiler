@@ -4,7 +4,7 @@
 ## It is #INCLUDEd inline like ED-STORE.BASL, so the UNDO.* labels are GOSUBbed from the
 ## editor and the variables below are shared with it.
 ##
-## THE RECORD, 8 bytes:
+## The record, 8 bytes:
 ##
 ##   +0  op          UNDO.OP.REPLACE, UNDO.OP.ADDLINE or UNDO.OP.DELLINE
 ##   +1  row lo      the line the record acts on
@@ -15,11 +15,11 @@
 ##   +6  snap off lo
 ##   +7  snap off hi
 ##
-## A SNAPSHOT IS NOT A COPY. DOC.STORE allocates a fresh record for every line it writes and
+## A snapshot is not a copy. DOC.STORE allocates a fresh record for every line it writes and
 ## never frees the one it replaces, so a line's previous text is still sitting in the arena,
 ## intact, after the line changes. This engine keeps the far pointer to it and nothing else.
-## Recording an edit is three PEEKs; undoing one is three POKEs into the line table. No arena
-## is spent, no string is built and no characters move, in either direction.
+## Recording an edit is three PEEKs, undoing one is three POKEs into the line table, and no
+## arena is spent in either direction.
 ##
 ## ============================================================================
 
@@ -35,10 +35,10 @@
 
 ## UNDO.INIT -- claim the ring bank and empty the history.
 ##
-## Banks 5 to 12 are free: the line table has 2 to 4 and the arena starts at 13. This takes
-## the lowest of them and nothing else does. A claim that fails leaves UNDO.ON 0 and every
-## entry point below turns into a RETURN, so the editor runs without a history rather than
-## writing records over somebody elses bank.
+## Bank 5 is free: the line table holds 2 to 4, the code, text and dialog-save regions hold
+## 6 to 10, and the arena starts at 13. A claim that fails leaves UNDO.ON 0 and every entry
+## point below turns into a RETURN, so the editor runs without a history rather than writing
+## records over somebody else's bank.
 UNDO.INIT:
   REM $A000
   UNDO.WIN = 40960 : UNDO.BANK = 5
@@ -58,8 +58,7 @@ UNDO.BEGIN:
   RETURN
 
 ## UNDO.SEL -- point the ring routines at one ring: UNDO.SEL.WHICH 0 is undo, 1 is redo. The
-## head and the count are copied to a scratch pair and UNDO.SEL.BACK writes them home, so
-## the push and the pop below are written once rather than twice.
+## head and the count are copied to a scratch pair, and UNDO.SEL.BACK writes them home.
 UNDO.SEL:
   IF UNDO.SEL.WHICH <> 0 THEN GOTO UNDO.SEL.REDO
   UNDO.BASE = 0 : UNDO.HEAD = UNDO.U.HEAD : UNDO.COUNT = UNDO.U.COUNT
@@ -84,9 +83,7 @@ UNDO.SLOT:
 ## UNDO.PUSH -- write UNDO.OP, UNDO.ROW and UNDO.SNAP.BANK / UNDO.SNAP.OFF onto the ring
 ## UNDO.TO.REDO names, under the current group.
 ##
-## A full ring drops its oldest record by moving the head, which is the whole cost of a
-## ring over a stack: the prog8 original shifts UNDO.DEPTH records down instead, on every
-## push once it is full.
+## A full ring drops its oldest record by moving the head.
 UNDO.PUSH:
   IF UNDO.ON = 0 THEN RETURN
   UNDO.SEL.WHICH = UNDO.TO.REDO : GOSUB UNDO.SEL : UNDO.I = UNDO.HEAD + UNDO.COUNT
@@ -148,9 +145,8 @@ UNDO.REC.ADD:
 ## UNDO.TOUCH -- the hook every in-line edit calls before it changes ED.CUR.LINE$.
 ##
 ## The ED.CUR.DIRTY 0 to 1 edge is what collapses a run of typing into one undo step: the
-## live line is clean only once per editing session on it, so the record is taken once. Clean
-## is also exactly the condition UNDO.REC.SLOT needs -- a clean live line and its store
-## record hold the same text, so no commit is needed here.
+## live line is clean only once per editing session on it, so the record is taken once. A
+## clean live line and its store record hold the same text, so no commit is needed here.
 UNDO.TOUCH:
   IF ED.CUR.DIRTY <> 0 THEN RETURN
   GOSUB UNDO.BEGIN : UNDO.ROW = ED.CUR.ROW : GOSUB UNDO.REC.REPLACE
@@ -164,8 +160,7 @@ UNDO.APPLY:
   GOTO UNDO.AP.DELLINE
 
 ## The line is there and the record it held before is in the pointer: keep the record it
-## holds now as the inverse, then point the slot back at the old one. The document changes
-## without a character moving.
+## holds now as the inverse, then point the slot back at the old one. No character moves.
 UNDO.AP.REPLACE:
   IF UNDO.ROW >= LINE.COUNT THEN RETURN
   UNDO.SRC.BANK = UNDO.SNAP.BANK : UNDO.SRC.OFF = UNDO.SNAP.OFF
@@ -203,9 +198,8 @@ UNDO.AP.DELLINE:
 
 ## UNDO.RUN -- pop the whole top group off the ring UNDO.DIR names and apply it.
 ##
-## The group is read before the loop and every record carrying it comes off. The inverses
-## all go on under the new UNDO.GROUP, so the other direction takes the group back in one
-## step as well.
+## The group is read before the loop and every record carrying it comes off. The inverses go
+## on under the new UNDO.GROUP, so the other direction takes the group back in one step.
 UNDO.RUN:
   GOSUB ED.COMMIT.LIVE : UNDO.GROUP = UNDO.GROUP + 1
   GOSUB UNDO.PEEK : UNDO.WANT = UNDO.GRP : UNDO.FOCUS = UNDO.ROW

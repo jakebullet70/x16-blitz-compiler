@@ -1,0 +1,578 @@
+## ***********************************************************************
+## **
+## **  MENU.INC.BL -- the menu builder. A menu is built a row at a time into
+## **  one of two slots, and a runner draws it from there.
+## **
+## **      GP.SUB MENU.BEGIN, MENU.POPUP
+## **      GP.SUB MENU.ITEMX, "&ADD RECORD", "ADD A NEW RECORD", MENU.ON
+## **      GP.SUB MENU.ITEMX, "&DEL RECORD", "DELETE THE ROW", MENU.OFF
+## **      GP.SUB MENU.ITEM, "-"
+## **      GP.SUB MENU.ITEM, "&QUIT"
+## **
+## **  MENU.BEGIN slot                   empties a slot and builds into it
+## **  MENU.ITEM  text$                  appends a row, no hint, enabled
+## **  MENU.ITEMX text$, hint$, on       appends a row with its hint and flag;
+## **                                    on is tested <> 0, so -1 works too
+## **  MENU.SELECTED n                   the row the next run opens on; the
+## **                                    next MENU.BEGIN or run clears it
+## **  R = GP.FN(MENU.HOTROW, slot, key) the live row whose hot key is key,
+## **                                    without case; 0 for none. For a
+## **                                    key a run handed back, or ALT+key
+## **  N = GP.FN(MENUTO.VERT, row, col, style)
+## **                                    runs the popup slot, returns 1..N or
+## **                                    0 for ESC. MENU.EXITKEY is the key
+## **  N = GP.FN(MENUTO.BAR, row, col, style)
+## **                                    the same for the bar slot, laid out
+## **                                    across. MENU.BARNUM is its row count,
+## **                                    MENU.SELX and MENU.SELW the chosen
+## **                                    item's column and width
+## **  MENU.DRAWBAR row, col, style      draws the bar slot without running
+## **                                    it, with MENU.MARKED lit: the item a
+## **                                    KEEPMARK bar or a dropdown left marked
+## **  MENU.DRAWVERT row, col, style     draws the popup slot without running
+## **                                    it, no row lit
+## **  MENUTO.PULLDOWN, the popup slot under a bar item, is in
+## **  MENUPULL.INC.BL, so a program without one does not carry STASH.
+## **  MENU.KEY, a bar and its dropdowns run from the program's key loop, is
+## **  in MENUKEY.INC.BL.
+## **
+## **  Both runners draw a GP.BOX of the given style with its corner at row,
+## **  col, one cell bigger all round than the rows: MENU.SOLID, MENU.THIN,
+## **  MENU.ROUND, MENU.THICK, or 256+ for a glyph table. MENU.NOBOX draws
+## **  none and puts the first row there instead.
+## **
+## **  Set once by the caller, and read by every run:
+## **      MENU.ATTR       rows, background * 16 + fg
+## **      MENU.HIATTR     the highlighted row; 0 inverts MENU.ATTR
+## **      MENU.HOTATTR    the hot key letter; 0 leaves it untinted
+## **      MENU.DISATTR    a disabled row; 0 is MENU.ATTR
+## **      MENU.SEPATTR    separator lines and the frame; 0 is MENU.ATTR
+## **      MENU.SEPCHR     the separator glyph; 0 is MENU.LINE
+## **      MENU.FLAGS      the popup's, added together, below
+## **      MENU.HINTX, MENU.HINTY, MENU.HINTW, MENU.HINTATTR
+## **                      the hint field. HINTW 0 is off. A hint shows only
+## **                      when the highlight moves, never on opening
+## **      MENU.GAP        cells between bar items; 0 is none
+## **      MENU.BARFLAGS   the bar's flags
+## **      MENU.BARATTR, MENU.BARHI, MENU.BARHOT
+## **                      the bar's own rows, highlight and hot key. BARATTR
+## **                      and BARHOT 0 take the popup's; BARHI 0 inverts
+## **                      the bar's rows
+## **
+## **  The popup flags: MENU.MUSTSEL takes ESC away. MENU.KEEPMARK leaves the
+## **  chosen row lit. MENU.NOWRAP stops at the ends. MENU.GAMEPAD adds the
+## **  SNES pad in port 1. MENU.KEYEXIT ends the run on a key the menu has no
+## **  use for, LEFT and RIGHT most often, with MENU.EXITKEY that key and the
+## **  row it was on returned. MENU.HINTMID centres the hint.
+## **
+## **  The bar takes the same flags in MENU.BARFLAGS, with LEFT and RIGHT
+## **  moving, and two of its own: MENU.DOWNEXIT and MENU.UPEXIT make DOWN or
+## **  UP choose the item, for a bar with dropdowns under it.
+## **
+## **  A caller keeping its rows in GP.BANKEDSTR groups puts the enable mask
+## **  at index 0 of the hint group, "1" on and "0" off a row, and passes
+## **  VAL(MID$(GP.BSTR(HH, 0), I, 1)) as on.
+## **
+## **  The slots:
+## **      MENU.BAR        16 rows
+## **      MENU.POPUP      32 rows, the working list
+## **      MENU.DROP + n   the dropdown under bar item n, 1 to 16
+## **  The dropdowns share a pool of 64 rows, taken in the order they are
+## **  built. A MENU.BEGIN on the bar empties every dropdown and the pool, so
+## **  build the bar first and then its dropdowns; building one dropdown again
+## **  on its own takes new rows and leaves its old ones used. A dropdown row
+## **  keeps no hint.
+## **  A row past the slot's size is dropped, and so is a row before any
+## **  MENU.BEGIN. The sizes are the store file's, not this one's -- see
+## **  MENU.INC.BANKED.BL, and MENU.INC.BANKED.SMALL.BL for a program with
+## **  a few short menus and no room to spare.
+## **
+## **  & marks the hot key: "SAVE &AS" is stored as "SAVE AS" with hot key A
+## **  at column 6. Only the first & counts, && is a literal &, and a trailing
+## **  & is left in the text.
+## **
+## **  A row whose text is one hyphen is a separator. It still counts.
+## **
+## **  Text and hints live in bank MENU.TEXTBANK, claimed from BANKMGR on the
+## **  first MENU.BEGIN. It is 62 unless the program #DEFINEs it before the
+## **  #INCLUDE. Text is cut to 30 characters and a hint to 50.
+## **  Requires GPB.INC.BL and BANKMGR.INC.BL, with BANKMGR.INIT run first.
+## **  #INCLUDE MENU.INC.BANKED.BL straight before this file. Either build.
+## **  MENU.OK is 0 if the bank was already taken; every row is then dropped.
+## **
+## **  The store is private to the runners. Row R of slot S is at
+## **  I = MENU.BASEAT%(S) + R; the bar starts at 0, the popup at 16 and the
+## **  pool at 48:
+## **      GP.BSTR(MENU.TEXTS, I)             the text, & removed
+## **      GP.BSTR(MENU.HINTS, I)             the hint, "" for none
+## **      MID$(MENU.FLAG$(S), R, 1)          "0" live, "1" disabled,
+## **                                         "2" a separator
+## **      MID$(MENU.HOTKEY$(S), R, 1)        the hot key, CHR$(0) for none
+## **      MID$(MENU.HOTCOL$(S), R, 1)        its column as CHR$(n), CHR$(0)
+## **                                         for none
+## **      LEN(MENU.FLAG$(S))                 the slot's row count
+## **
+## ***********************************************************************
+## Outside MENU.DEFS: BASLOAD does not nest #IFNDEF.
+#IFNDEF MENU.TEXTBANK
+#DEFINE MENU.TEXTBANK 62
+#ENDIF
+
+#IFNDEF MENU.DEFS
+#DEFINE MENU.DEFS 1
+
+#DEFINE MENU.BAR 0
+#DEFINE MENU.POPUP 1
+#DEFINE MENU.DROP 1
+#DEFINE MENU.LASTSLOT 17
+## MENU.BAR.MAX, MENU.POPUP.MAX, MENU.POOL.MAX and MENU.POOLBASE are not here. They
+## are in the store file, because they describe the store: a group has one SPC line
+## per row it holds, so the counts and the rows have to be written down together or
+## they drift. MENU.INC.BANKED.BL holds the stock sizes and MENU.INC.BANKED.SMALL.BL
+## a smaller set; a program includes one of them straight before this file.
+
+#DEFINE MENU.ON 1
+#DEFINE MENU.OFF 0
+
+#DEFINE MENU.SOLID 0
+#DEFINE MENU.THIN 1
+#DEFINE MENU.ROUND 2
+#DEFINE MENU.THICK 3
+#DEFINE MENU.NOBOX 255
+
+#DEFINE MENU.MUSTSEL 1
+#DEFINE MENU.KEEPMARK 2
+#DEFINE MENU.NOWRAP 4
+#DEFINE MENU.GAMEPAD 8
+#DEFINE MENU.DOWNEXIT 16
+#DEFINE MENU.UPEXIT 32
+#DEFINE MENU.KEYEXIT 64
+#DEFINE MENU.HINTMID 128
+
+## PETSCII, as GET reports it
+#DEFINE MENU.DOWN 17
+#DEFINE MENU.UP 145
+#DEFINE MENU.LEFT 157
+#DEFINE MENU.RIGHT 29
+#DEFINE MENU.ENTER 13
+#DEFINE MENU.ESC 27
+#DEFINE MENU.STOP 3
+
+## the stroke GP.BOX style 1 draws its edges with
+#DEFINE MENU.LINE 192
+
+## SNES port 1, and the bits of JOY's low byte, active high
+#DEFINE MENU.PORT 1
+#DEFINE MENU.PAD.UP 8
+#DEFINE MENU.PAD.DOWN 4
+#DEFINE MENU.PAD.LEFT 2
+#DEFINE MENU.PAD.RIGHT 1
+#DEFINE MENU.PAD.B 128
+#DEFINE MENU.PAD.START 16
+
+GOTO MENU.MODULE.END
+
+MENU.BEGIN.BODY:
+    GP.DEFPROC MENU.BEGIN, MENU.SLOT
+    IF MENU.READY = 0 THEN GOSUB MENU.CREATE
+    IF MENU.SLOT < MENU.BAR OR MENU.SLOT > MENU.LASTSLOT THEN MENU.SLOT = MENU.POPUP
+    MENU.CAP = MENU.BAR.MAX
+    IF MENU.SLOT = MENU.POPUP THEN MENU.CAP = MENU.POPUP.MAX
+    IF MENU.SLOT = MENU.BAR THEN GOSUB MENU.EMPTYDROPS
+    IF MENU.SLOT > MENU.POPUP THEN GOSUB MENU.DROPAT
+    MENU.BASE = MENU.BASEAT%(MENU.SLOT)
+    MENU.FLAG$(MENU.SLOT) = "" : MENU.HOTKEY$(MENU.SLOT) = "" : MENU.HOTCOL$(MENU.SLOT) = ""
+    MENU.SEL = 0
+    RETURN
+
+## ---- MENU.KEYSSET 0 has MENUKEY's next MENU.KEY read the new hot keys.
+MENU.EMPTYDROPS:
+    MENU.POOLTOP = 0 : MENU.KEYSSET = 0
+    FOR MENU.EACH = MENU.DROP + 1 TO MENU.LASTSLOT
+        MENU.FLAG$(MENU.EACH) = "" : MENU.HOTKEY$(MENU.EACH) = "" : MENU.HOTCOL$(MENU.EACH) = ""
+    NEXT MENU.EACH
+    RETURN
+
+## ---- a dropdown starts at the pool's next free row and may fill the rest.
+MENU.DROPAT:
+    MENU.BASEAT%(MENU.SLOT) = MENU.POOLBASE + MENU.POOLTOP - 1
+    MENU.CAP = MENU.POOL.MAX - MENU.POOLTOP
+    RETURN
+
+MENU.SELECTED.BODY:
+    GP.DEFPROC MENU.SELECTED, MENU.SEL
+    RETURN
+
+## ---- the first live row with the hot key, as MENU.KEYHOT matches one.
+MENU.HOTROW.BODY:
+    GP.DEFPROC MENU.HOTROW, MENU.FINDSLOT, MENU.FINDKEY RETURNS MENU.FOUND
+    MENU.FOUND = 0
+    IF MENU.READY = 0 THEN RETURN
+    IF MENU.FINDKEY = 0 THEN RETURN
+    IF MENU.FINDSLOT < MENU.BAR OR MENU.FINDSLOT > MENU.LASTSLOT THEN MENU.FINDSLOT = MENU.POPUP
+    IF MENU.FINDKEY > 96 THEN IF MENU.FINDKEY < 123 THEN MENU.FINDKEY = MENU.FINDKEY - 32
+    MENU.FINDN = LEN(MENU.FLAG$(MENU.FINDSLOT))
+    IF MENU.FINDN = 0 THEN RETURN
+    FOR MENU.SCAN = MENU.FINDN TO 1 STEP -1
+        MENU.HAVE = ASC(MID$(MENU.HOTKEY$(MENU.FINDSLOT), MENU.SCAN, 1))
+        IF MENU.HAVE > 96 THEN IF MENU.HAVE < 123 THEN MENU.HAVE = MENU.HAVE - 32
+        IF MENU.HAVE = MENU.FINDKEY THEN IF MID$(MENU.FLAG$(MENU.FINDSLOT), MENU.SCAN, 1) = "0" THEN MENU.FOUND = MENU.SCAN
+    NEXT MENU.SCAN
+    RETURN
+
+MENUTO.VERT.BODY:
+    GP.DEFPROC MENUTO.VERT, MENU.RUNROW, MENU.RUNCOL, MENU.STYLE RETURNS MENU.CHOSEN
+    MENU.CHOSEN = 0 : MENU.EXITKEY = 0
+    IF MENU.READY = 0 THEN RETURN
+    MENU.RUNSLOT = MENU.POPUP : GOSUB MENU.MEASURE
+    IF MENU.COUNT = 0 THEN MENU.SEL = 0 : RETURN
+    MENU.BOXW = MENU.WIDE : MENU.BOXH = MENU.COUNT
+    GOSUB MENU.FRAMEBOX
+    MENU.RUNFLAGS = MENU.FLAGS
+    GOSUB MENU.RUN
+    MENU.CHOSEN = MENU.CUR
+    RETURN
+
+MENUTO.BAR.BODY:
+    GP.DEFPROC MENUTO.BAR, MENU.RUNROW, MENU.RUNCOL, MENU.STYLE RETURNS MENU.CHOSEN
+    MENU.CHOSEN = 0 : MENU.EXITKEY = 0
+    IF MENU.READY = 0 THEN RETURN
+    GOSUB MENU.BARPLACE
+    IF MENU.COUNT = 0 THEN MENU.SEL = 0 : RETURN
+    GOSUB MENU.RUN
+    MENU.CHOSEN = MENU.CUR
+    MENU.MARKED = 0
+    IF MENU.CHOSEN = 0 THEN RETURN
+    IF (MENU.BARFLAGS AND MENU.KEEPMARK) <> 0 THEN MENU.MARKED = MENU.CHOSEN
+    MENU.DRAWN = MENU.CHOSEN : GOSUB MENU.SPOT
+    MENU.SELX = MENU.DRAWX : MENU.SELW = MENU.ROWW
+    RETURN
+
+MENU.DRAWBAR.BODY:
+    GP.DEFPROC MENU.DRAWBAR, MENU.RUNROW, MENU.RUNCOL, MENU.STYLE
+    IF MENU.READY = 0 THEN RETURN
+    GOSUB MENU.BARPLACE
+    IF MENU.COUNT = 0 THEN RETURN
+    GOSUB MENU.DRAWALL
+    IF MENU.MARKED < 1 THEN RETURN
+    MENU.DRAWN = MENU.MARKED : MENU.PAINT = MENU.HILITE : GOSUB MENU.DRAWROW
+    RETURN
+
+MENU.DRAWVERT.BODY:
+    GP.DEFPROC MENU.DRAWVERT, MENU.RUNROW, MENU.RUNCOL, MENU.STYLE
+    IF MENU.READY = 0 THEN RETURN
+    MENU.RUNSLOT = MENU.POPUP
+    GOSUB MENU.MEASURE
+    IF MENU.COUNT = 0 THEN RETURN
+    MENU.BOXW = MENU.WIDE
+    MENU.BOXH = MENU.COUNT
+    GOSUB MENU.FRAMEBOX
+    GOSUB MENU.DRAWALL
+    RETURN
+
+## ---- the bar slot measured and framed. MENU.BARX and MENU.BARY stay for
+## MENUTO.PULLDOWN.
+MENU.BARPLACE:
+    MENU.RUNSLOT = MENU.BAR : GOSUB MENU.MEASURE
+    MENU.BARNUM = MENU.COUNT
+    IF MENU.COUNT = 0 THEN RETURN
+    MENU.BOXW = MENU.SPAN + MENU.GAP * (MENU.COUNT - 1)
+    MENU.BOXH = 1 : GOSUB MENU.FRAMEBOX
+    MENU.BARX = MENU.ATCOL : MENU.BARY = MENU.ATROW
+    MENU.RUNFLAGS = MENU.BARFLAGS
+    RETURN
+
+## ---- MENU.RUNSLOT's row count, and where its rows start in the store.
+## MENU.WIDE is the widest row, MENU.SPAN all of them end to end. A boxed
+## popup pads its rows one cell each side, so MENU.INDENT is 1 and MENU.WIDE
+## takes both cells; the bar and a NOBOX popup print from the edge.
+MENU.MEASURE:
+    MENU.COUNT = LEN(MENU.FLAG$(MENU.RUNSLOT))
+    MENU.RUNBASE = MENU.BASEAT%(MENU.RUNSLOT)
+    MENU.WIDE = 1 : MENU.SPAN = 0 : MENU.INDENT = 0
+    IF MENU.COUNT = 0 THEN RETURN
+    FOR MENU.EACH = 1 TO MENU.COUNT
+        MENU.TEXTW = LEN(GP.BSTR(MENU.TEXTS, MENU.RUNBASE + MENU.EACH))
+        IF MENU.TEXTW > MENU.WIDE THEN MENU.WIDE = MENU.TEXTW
+        MENU.SPAN = MENU.SPAN + MENU.TEXTW
+    NEXT MENU.EACH
+    IF MENU.RUNSLOT = MENU.BAR OR MENU.STYLE = MENU.NOBOX THEN RETURN
+    MENU.INDENT = 1 : MENU.WIDE = MENU.WIDE + 2
+    RETURN
+
+## ---- a frame one cell outside MENU.BOXW x MENU.BOXH, and MENU.ATCOL, MENU.ATROW
+## inside it. MENU.NOBOX draws nothing and leaves them on row, col.
+MENU.FRAMEBOX:
+    MENU.ATCOL = MENU.RUNCOL : MENU.ATROW = MENU.RUNROW
+    IF MENU.STYLE = MENU.NOBOX THEN RETURN
+    MENU.FRAME = MENU.SEPATTR
+    IF MENU.FRAME = 0 THEN MENU.FRAME = MENU.ATTR
+    GP.BOX MENU.RUNCOL, MENU.RUNROW, MENU.BOXW + 2, MENU.BOXH + 2, MENU.STYLE, MENU.FRAME
+    MENU.ATCOL = MENU.RUNCOL + 1 : MENU.ATROW = MENU.RUNROW + 1
+    RETURN
+
+## ***********************************************************************
+## **  MENU.RUN -- MENU.RUNSLOT run at MENU.ATCOL, MENU.ATROW after
+## **  MENU.MEASURE, under MENU.RUNFLAGS. The popup runs down, the bar
+## **  across. Out: MENU.CUR the row, 0 for ESC; MENU.EXITKEY; MENU.HOTHIT
+## **  -1 when a hot key chose it.
+## ***********************************************************************
+MENU.RUN:
+    MENU.EXITKEY = 0 : MENU.HOTHIT = 0 : MENU.PADHELD = 0
+    MENU.CUR = MENU.SEL : MENU.SEL = 0
+    IF MENU.CUR < 1 THEN MENU.CUR = 1
+    IF MENU.CUR > MENU.COUNT THEN MENU.CUR = MENU.COUNT
+    MENU.STEP = 1 : GOSUB MENU.SKIPOFF
+    GOSUB MENU.DRAWALL
+    MENU.DRAWN = MENU.CUR : MENU.PAINT = MENU.HILITE : GOSUB MENU.DRAWROW
+
+## ---- the keyboard first, so a plugged-in pad never costs a keystroke.
+MENU.WAIT:
+    GET MENU.INKEY$
+    IF MENU.INKEY$ <> "" THEN MENU.CODE = ASC(MENU.INKEY$) : GOTO MENU.KEYED
+    IF (MENU.RUNFLAGS AND MENU.GAMEPAD) = 0 THEN GOTO MENU.WAIT
+    GOSUB MENU.PADKEY
+    IF MENU.CODE = 0 THEN GOTO MENU.WAIT
+
+MENU.KEYED:
+    MENU.DONE = 0 : MENU.WAS = MENU.CUR : MENU.STEP = 0
+    MENU.MOVE = MENU.CODE
+    IF MENU.RUNSLOT = MENU.BAR THEN GOSUB MENU.TURN
+    GP.SELECT MENU.MOVE
+        GP.CASE MENU.UP
+            MENU.STEP = -1
+            MENU.CUR = MENU.CUR - 1
+            IF MENU.CUR < 1 THEN GOSUB MENU.WRAPTOP
+        GP.CASE MENU.DOWN
+            MENU.STEP = 1
+            MENU.CUR = MENU.CUR + 1
+            IF MENU.CUR > MENU.COUNT THEN GOSUB MENU.WRAPBOT
+        GP.CASE MENU.ENTER
+            IF MID$(MENU.FLAG$(MENU.RUNSLOT), MENU.CUR, 1) = "0" THEN MENU.DONE = -1
+        GP.CASE MENU.ESC, MENU.STOP
+            GOSUB MENU.CANCEL
+        GP.OTHER
+            GOSUB MENU.KEYHOT
+    GP.ENDSEL
+    IF MENU.STEP <> 0 THEN GOSUB MENU.SKIPOFF
+    IF MENU.CUR <> MENU.WAS THEN GOSUB MENU.MOVED
+    IF MENU.DONE = 0 THEN GOTO MENU.WAIT
+    MENU.EXITKEY = MENU.CODE
+    IF (MENU.RUNFLAGS AND MENU.KEEPMARK) <> 0 THEN RETURN
+    IF MENU.CUR < 1 THEN RETURN
+    MENU.DRAWN = MENU.CUR : MENU.PAINT = MENU.PLAIN : GOSUB MENU.DRAWROW
+    RETURN
+
+## ---- the bar's keys as the popup's: LEFT and RIGHT move as UP and DOWN do,
+## and DOWN or UP chooses when MENU.DOWNEXIT or MENU.UPEXIT says so.
+MENU.TURN:
+    IF MENU.CODE = MENU.LEFT THEN MENU.MOVE = MENU.UP : RETURN
+    IF MENU.CODE = MENU.RIGHT THEN MENU.MOVE = MENU.DOWN : RETURN
+    MENU.EXITBIT = 0
+    IF MENU.CODE = MENU.DOWN THEN MENU.EXITBIT = MENU.DOWNEXIT
+    IF MENU.CODE = MENU.UP THEN MENU.EXITBIT = MENU.UPEXIT
+    IF MENU.EXITBIT = 0 THEN RETURN
+    MENU.MOVE = 0
+    IF (MENU.RUNFLAGS AND MENU.EXITBIT) <> 0 THEN MENU.MOVE = MENU.ENTER
+    RETURN
+
+## ---- the old row back, the new one lit, and its hint. ESC leaves no new row.
+MENU.MOVED:
+    MENU.DRAWN = MENU.WAS : MENU.PAINT = MENU.PLAIN : GOSUB MENU.DRAWROW
+    IF MENU.CUR < 1 THEN RETURN
+    MENU.DRAWN = MENU.CUR : MENU.PAINT = MENU.HILITE : GOSUB MENU.DRAWROW
+    GOSUB MENU.HINTSHOW
+    RETURN
+
+MENU.WRAPTOP:
+    MENU.CUR = MENU.COUNT
+    IF (MENU.RUNFLAGS AND MENU.NOWRAP) <> 0 THEN MENU.CUR = 1
+    RETURN
+
+MENU.WRAPBOT:
+    MENU.CUR = 1
+    IF (MENU.RUNFLAGS AND MENU.NOWRAP) <> 0 THEN MENU.CUR = MENU.COUNT
+    RETURN
+
+MENU.CANCEL:
+    IF (MENU.RUNFLAGS AND MENU.MUSTSEL) <> 0 THEN RETURN
+    MENU.CUR = 0 : MENU.DONE = -1
+    RETURN
+
+## ---- a hot key, matched without case; the first live row with it wins.
+## Nothing matched and KEYEXIT set hands the key back.
+MENU.KEYHOT:
+    MENU.WANT = MENU.CODE
+    IF MENU.WANT > 96 THEN IF MENU.WANT < 123 THEN MENU.WANT = MENU.WANT - 32
+    FOR MENU.SCAN = 1 TO MENU.COUNT
+        MENU.HAVE = ASC(MID$(MENU.HOTKEY$(MENU.RUNSLOT), MENU.SCAN, 1))
+        IF MENU.HAVE > 96 THEN IF MENU.HAVE < 123 THEN MENU.HAVE = MENU.HAVE - 32
+        IF MENU.HAVE = MENU.WANT THEN GOSUB MENU.HOTTAKE
+    NEXT MENU.SCAN
+    IF MENU.DONE = 0 THEN IF (MENU.RUNFLAGS AND MENU.KEYEXIT) <> 0 THEN MENU.DONE = -1
+    RETURN
+
+MENU.HOTTAKE:
+    IF MENU.DONE <> 0 THEN RETURN
+    IF MID$(MENU.FLAG$(MENU.RUNSLOT), MENU.SCAN, 1) <> "0" THEN RETURN
+    MENU.CUR = MENU.SCAN : MENU.DONE = -1 : MENU.HOTHIT = -1
+    RETURN
+
+## ---- off a separator or a disabled row, the way the cursor was going. The
+## counter stops a menu with no live row walking for ever.
+MENU.SKIPOFF:
+    MENU.SKIPS = 0
+MENU.SKIPLOOP:
+    IF MID$(MENU.FLAG$(MENU.RUNSLOT), MENU.CUR, 1) = "0" THEN RETURN
+    MENU.SKIPS = MENU.SKIPS + 1
+    IF MENU.SKIPS > MENU.COUNT THEN RETURN
+    MENU.CUR = MENU.CUR + MENU.STEP
+    IF MENU.CUR < 1 THEN GOSUB MENU.WRAPTOP
+    IF MENU.CUR > MENU.COUNT THEN GOSUB MENU.WRAPBOT
+    GOTO MENU.SKIPLOOP
+
+## ---- MENU.RUNSLOT's colours: MENU.PLAIN the rows, MENU.HILITE the highlight,
+## MENU.TINT the hot key. A HILITE of 0 inverts PLAIN.
+MENU.LIGHT:
+    MENU.PLAIN = MENU.ATTR : MENU.HILITE = MENU.HIATTR : MENU.TINT = MENU.HOTATTR
+    IF MENU.RUNSLOT = MENU.BAR THEN GOSUB MENU.BARLIGHT
+    IF MENU.HILITE = 0 THEN MENU.HILITE = (MENU.PLAIN AND 15) * 16 + INT(MENU.PLAIN / 16)
+    RETURN
+
+MENU.BARLIGHT:
+    IF MENU.BARATTR <> 0 THEN MENU.PLAIN = MENU.BARATTR
+    MENU.HILITE = MENU.BARHI
+    IF MENU.BARHOT <> 0 THEN MENU.TINT = MENU.BARHOT
+    RETURN
+
+MENU.DRAWALL:
+    GOSUB MENU.LIGHT
+    MENU.PAINT = MENU.PLAIN
+    FOR MENU.DRAWN = 1 TO MENU.COUNT
+        GOSUB MENU.DRAWROW
+    NEXT MENU.DRAWN
+    RETURN
+
+## ---- where row MENU.DRAWN sits: MENU.DRAWX, MENU.DRAWY, MENU.ROWW wide. A
+## bar item is as wide as its text, after the items left of it and a
+## MENU.GAP each.
+MENU.SPOT:
+    MENU.DRAWX = MENU.ATCOL
+    MENU.DRAWY = MENU.ATROW + MENU.DRAWN - 1
+    MENU.ROWW = MENU.WIDE
+    IF MENU.RUNSLOT <> MENU.BAR THEN RETURN
+    MENU.DRAWY = MENU.ATROW
+    MENU.ROWW = LEN(GP.BSTR(MENU.TEXTS, MENU.RUNBASE + MENU.DRAWN))
+    IF MENU.DRAWN < 2 THEN RETURN
+    FOR MENU.LEFTW = 1 TO MENU.DRAWN - 1
+        MENU.DRAWX = MENU.DRAWX + LEN(GP.BSTR(MENU.TEXTS, MENU.RUNBASE + MENU.LEFTW)) + MENU.GAP
+    NEXT MENU.LEFTW
+    RETURN
+
+## ---- row MENU.DRAWN in MENU.PAINT. The fill makes the highlight full width.
+## The hot key is tinted only on a row in the plain attribute.
+MENU.DRAWROW:
+    GOSUB MENU.SPOT
+    MENU.ROWIS$ = MID$(MENU.FLAG$(MENU.RUNSLOT), MENU.DRAWN, 1)
+    IF MENU.ROWIS$ = "2" THEN GOTO MENU.SEPROW
+    GP.FILL MENU.DRAWX, MENU.DRAWY, MENU.ROWW, 1, 32, MENU.PAINT
+    MENU.USE = MENU.PAINT
+    IF MENU.ROWIS$ = "1" THEN IF MENU.DISATTR <> 0 THEN MENU.USE = MENU.DISATTR
+    MENU.SHOW$ = GP.BSTR(MENU.TEXTS, MENU.RUNBASE + MENU.DRAWN)
+    GP.PRINTAT MENU.DRAWX + MENU.INDENT, MENU.DRAWY, MENU.SHOW$, MENU.USE
+    IF MENU.ROWIS$ = "1" THEN RETURN
+    IF MENU.TINT = 0 THEN RETURN
+    IF MENU.PAINT <> MENU.PLAIN THEN RETURN
+    MENU.TINTAT = ASC(MID$(MENU.HOTCOL$(MENU.RUNSLOT), MENU.DRAWN, 1))
+    IF MENU.TINTAT = 0 THEN RETURN
+    GP.PRINTAT MENU.DRAWX + MENU.INDENT + MENU.TINTAT - 1, MENU.DRAWY, MID$(MENU.SHOW$, MENU.TINTAT, 1), MENU.TINT
+    RETURN
+
+MENU.SEPROW:
+    MENU.USE = MENU.SEPATTR
+    IF MENU.USE = 0 THEN MENU.USE = MENU.PLAIN
+    MENU.GLYPH = MENU.SEPCHR
+    IF MENU.GLYPH = 0 THEN MENU.GLYPH = MENU.LINE
+    GP.FILL MENU.DRAWX, MENU.DRAWY, MENU.ROWW, 1, MENU.GLYPH, MENU.USE
+    RETURN
+
+## ---- the field cleared first, so a long hint leaves nothing of a short one.
+MENU.HINTSHOW:
+    IF MENU.HINTW < 1 THEN RETURN
+    IF MENU.RUNSLOT > MENU.POPUP THEN RETURN
+    GP.FILL MENU.HINTX, MENU.HINTY, MENU.HINTW, 1, 32, MENU.HINTATTR
+    MENU.SHOW$ = GP.BSTR(MENU.HINTS, MENU.RUNBASE + MENU.CUR)
+    IF MENU.SHOW$ = "" THEN RETURN
+    IF LEN(MENU.SHOW$) > MENU.HINTW THEN MENU.SHOW$ = LEFT$(MENU.SHOW$, MENU.HINTW)
+    MENU.HINTAT = MENU.HINTX
+    IF (MENU.RUNFLAGS AND MENU.HINTMID) <> 0 THEN MENU.HINTAT = MENU.HINTX + INT((MENU.HINTW - LEN(MENU.SHOW$)) / 2)
+    GP.PRINTAT MENU.HINTAT, MENU.HINTY, MENU.SHOW$, MENU.HINTATTR
+    RETURN
+
+## ---- only new presses act, or a held direction spins the menu. B and START
+## both choose.
+MENU.PADKEY:
+    MENU.CODE = 0
+    GOSUB MENU.PADREAD
+    MENU.PADNEW = MENU.PADNOW AND (255 - MENU.PADHELD)
+    MENU.PADHELD = MENU.PADNOW
+    IF (MENU.PADNEW AND MENU.PAD.UP) <> 0 THEN MENU.CODE = MENU.UP : RETURN
+    IF (MENU.PADNEW AND MENU.PAD.DOWN) <> 0 THEN MENU.CODE = MENU.DOWN : RETURN
+    IF (MENU.PADNEW AND MENU.PAD.LEFT) <> 0 THEN MENU.CODE = MENU.LEFT : RETURN
+    IF (MENU.PADNEW AND MENU.PAD.RIGHT) <> 0 THEN MENU.CODE = MENU.RIGHT : RETURN
+    IF (MENU.PADNEW AND MENU.PAD.B) <> 0 THEN MENU.CODE = MENU.ENTER : RETURN
+    IF (MENU.PADNEW AND MENU.PAD.START) <> 0 THEN MENU.CODE = MENU.ENTER
+    RETURN
+
+## ---- negative is no pad. The low byte by division: AND is 16-bit signed.
+MENU.PADREAD:
+    MENU.PADNOW = 0
+    MENU.PADRAW = JOY(MENU.PORT)
+    IF MENU.PADRAW < 0 THEN RETURN
+    MENU.PADNOW = MENU.PADRAW - INT(MENU.PADRAW / 256) * 256
+    RETURN
+
+## ---- ITEM falls through into ITEMX's body with the two defaults set.
+MENU.ITEM.BODY:
+    GP.DEFPROC MENU.ITEM, MENU.ROWTEXT$
+    MENU.ROWHINT$ = "" : MENU.ROWON = MENU.ON
+
+MENU.ITEMX.BODY:
+    GP.DEFPROC MENU.ITEMX, MENU.ROWTEXT$, MENU.ROWHINT$, MENU.ROWON
+    IF MENU.OK = 0 THEN RETURN
+    MENU.ROW = LEN(MENU.FLAG$(MENU.SLOT)) + 1
+    IF MENU.ROW > MENU.CAP THEN RETURN
+    MENU.HOTAT = GP.INSTR(MENU.ROWTEXT$, "&") : MENU.HOTCH$ = CHR$(0)
+    IF MENU.HOTAT > 0 THEN GOSUB MENU.STRIP
+    GP.BSTRSET MENU.TEXTS, MENU.BASE + MENU.ROW, MENU.ROWTEXT$
+    IF MENU.SLOT <= MENU.POPUP THEN GP.BSTRSET MENU.HINTS, MENU.BASE + MENU.ROW, MENU.ROWHINT$
+    IF MENU.SLOT > MENU.POPUP THEN MENU.POOLTOP = MENU.POOLTOP + 1
+    MENU.HOTKEY$(MENU.SLOT) = MENU.HOTKEY$(MENU.SLOT) + MENU.HOTCH$
+    MENU.HOTCOL$(MENU.SLOT) = MENU.HOTCOL$(MENU.SLOT) + CHR$(MENU.HOTAT)
+    MENU.ROWFLAG$ = "0"
+    IF MENU.ROWON = 0 THEN MENU.ROWFLAG$ = "1"
+    IF MENU.ROWTEXT$ = "-" THEN MENU.ROWFLAG$ = "2"
+    MENU.FLAG$(MENU.SLOT) = MENU.FLAG$(MENU.SLOT) + MENU.ROWFLAG$
+    RETURN
+
+## ---- the hot key slides left into the &'s column, so MENU.HOTAT stays right.
+MENU.STRIP:
+    IF MENU.HOTAT = LEN(MENU.ROWTEXT$) THEN MENU.HOTAT = 0 : RETURN
+    MENU.HOTCH$ = MID$(MENU.ROWTEXT$, MENU.HOTAT + 1, 1)
+    MENU.ROWTEXT$ = LEFT$(MENU.ROWTEXT$, MENU.HOTAT - 1) + MID$(MENU.ROWTEXT$, MENU.HOTAT + 1)
+    IF MENU.HOTCH$ = "&" THEN MENU.HOTCH$ = CHR$(0) : MENU.HOTAT = 0
+    RETURN
+
+## ---- DIMmed on first use: an array touched before its DIM is auto-DIMmed to 10,
+## and the DIM after it is an error.
+MENU.CREATE:
+    DIM MENU.FLAG$(MENU.LASTSLOT) : DIM MENU.HOTKEY$(MENU.LASTSLOT) : DIM MENU.HOTCOL$(MENU.LASTSLOT)
+    DIM MENU.BASEAT%(MENU.LASTSLOT)
+    MENU.BASEAT%(MENU.BAR) = -1
+    MENU.BASEAT%(MENU.POPUP) = MENU.BAR.MAX - 1
+    BANKMGR.SET.BANK = MENU.TEXTBANK : GOSUB BANKMGR.CLAIM
+    MENU.OK = BANKMGR.OK : MENU.READY = -1
+    RETURN
+
+MENU.MODULE.END:
+#ENDIF

@@ -36,8 +36,10 @@
 ## **                                      dflt 2 makes the second button
 ## **                                      the default; okc <> 0 is OK/CANCEL
 ## **  N = GP.FN(ASK3, t$, m$, b1$, b2$, b3$, dflt, esc)
-## **                                      1..3; esc is the button ESC means,
-## **                                      and b3$ "" leaves a row of two
+## **                                      three buttons, for the question that
+## **                                      two cannot ask -- save, discard, go
+## **                                      back. 1..3, and esc is the one ESC
+## **                                      means. b3$ "" leaves two buttons
 ## **  T$ = GP.FN(ASKTEXT, msg$, len)      a typed line; "" when cancelled
 ## **  T$ = GP.FN(INPUTBOX, msg$, start$, len)
 ## **                                      the text either way, GUI.OK says
@@ -224,7 +226,7 @@ DLG.MSGBOXEX:
 ## **  cancelling is not a default. A destructive question wants GUI.DEFAULT = 2.
 ## ***********************************************************************
 DLG.INTERNAL.YESNO:
-    ## a row named by the caller is left alone
+    ## ---- ASK3 has already named its buttons. Only an unnamed row is yes and no.
     IF GUI.BTN.ONE$ = "" THEN GUI.BTN.ONE$ = "&YES" : GUI.BTN.TWO$ = "&NO"
     IF GUI.OKCANCEL <> 0 THEN GUI.BTN.ONE$ = "&OK" : GUI.BTN.TWO$ = "&CANCEL"
     GOSUB GUI.BUTTON.SIZE
@@ -277,8 +279,17 @@ DLG.ASKYNEX:
 ## **  An accelerator is live only while the focused control does not eat
 ## **  printables, so O works on the button row and types an O in the field.
 ## ***********************************************************************
-## DLG.ASK3 -- a message and a row of three buttons.
-## DLG.ESCAPE is not DLG.DEFAULT: ESC returns 0 from the form and is mapped here.
+## ***********************************************************************
+## **  DLG.ASK3 -- a message and a row of three buttons.
+## **
+## **  The question two buttons cannot ask is the one every editor asks on the
+## **  way out: save, throw the changes away, or go back. A yes/no can only ever
+## **  offer two of those three.
+## **
+## **  DLG.DEFAULT is the button that starts focused and answers RETURN, 1..3.
+## **  DLG.ESCAPE is what ESC means, which is usually 3 and is not the same
+## **  thing -- ESC on its own returns 0 from the form.
+## ***********************************************************************
 DLG.ASK3:
     GP.DEFPROC ASK3, DLG.TITLE$, DLG.MSG$, DLG.BTN1$, DLG.BTN2$, DLG.BTN3$, DLG.DEFAULT, DLG.ESCAPE RETURNS GUI.PICK
     GOSUB GUI.DEFAULTS
@@ -684,9 +695,10 @@ DLG.PANELCLOSE:
 ## **                              button row go under them. btn2$ "" is one
 ## **                              button. width grows to fit the buttons
 ## **  FORM.FIELD row, label$, labw, w, text$
-## **                              label$ at the left, a field w wide after it.
-## **                              labw is the column the fields align on, 0
-## **                              to fit this label
+## **                              label$ at the left, then a field w wide.
+## **                              labw is the column the fields line up in,
+## **                              0 to fit this label. Read it back with
+## **                              FORM.TEXT
 ## **  FORM.CHECK row, text$, on   RETURNS its control number, 1 up in the
 ## **                              order added
 ## **  FORM.COMBO row, label$, w, count, sel

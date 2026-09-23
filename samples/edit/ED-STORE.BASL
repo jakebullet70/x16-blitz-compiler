@@ -38,8 +38,8 @@ DOC.INIT:
   DOC.WIN.END = 48896   : REM $BF00 -- $BF00..$BFFF left as a guard tail
   ## Not bank 1: the runtime keeps its rarely used handlers there.
   DOC.TABLE.PER.BANK = 2048 : DOC.TABLE.BASE.BANK = 2 : DOC.TABLE.BANKS = 3
-  ## Banks 5 to 12 are free, but the arena only grows upward, so it starts at 13 and leaves
-  ## them for whatever wants a fixed bank.
+  ## The arena only grows upward, so it starts at 13 and leaves banks 5 to 12 for whatever
+  ## wants a fixed bank.
   DOC.FIRST.BANK = 13     : REM content arena starts here
   DOC.CUR.BANK = DOC.FIRST.BANK  : DOC.CUR.PTR = DOC.WIN.START
   DOC.HIGH.BANK = DOC.FIRST.BANK : LINE.COUNT = 0
@@ -124,10 +124,9 @@ DOC.STORE:
 ## DOC.STORE.CHARS -- copy the line's characters from main RAM into the bank window, in one
 ## machine-code pass.
 ##
-## In BASIC this is POKE ASC(MID$(...)) a character, which allocates a string a byte on the
-## load path and on every committed keystroke. Y walks down from the length, so offset 0,
-## the length byte written by DOC.STORE, is left alone and the loop needs no counter.
-## DOC.CP.SWAP% turns on the PETSCII to ASCII conversion that only the loader wants.
+## Y walks down from the length, so offset 0, the length byte written by DOC.STORE, is left
+## alone and the loop needs no counter. DOC.CP.SWAP% turns on the PETSCII to ASCII conversion
+## that only the loader wants.
 DOC.STORE.CHARS:
   DOC.CP.BANK% = DOC.RESULT.BANK : DOC.CP.SRC% = GP.STRPTR(LINE.TEXT$)
   DOC.CP.DST% = DOC.RESULT.OFF   : DOC.CP.LEN% = DOC.LEN
@@ -194,9 +193,8 @@ DOC.LOAD.CHARS:
 ## DOC.LOADFILE -- read the text file DOC.FILE.NAME$ into the store, filling the table and
 ## setting LINE.COUNT.
 ##
-## LINPUT# reads a whole line in assembly, one string a line. GET# costs an ASC, six tests
-## and an allocation a byte. The editor writes CR; a CRLF file leaves the LF at the head of
-## the next line, which is stripped here.
+## LINPUT# reads a whole line in assembly, one string a line. The editor writes CR; a CRLF
+## file leaves the LF at the head of the next line, which is stripped here.
 ##
 ## At end of file the KERNAL sets ST while handing over the last byte, so that read still
 ## carries a real line. DOC.RAW tells the two empty results apart: 0 bytes is a CR of its
@@ -215,7 +213,7 @@ DOC.READ.LOOP:
   IF (DOC.STATUS AND 2) <> 0 THEN GOTO DOC.READ.DONE
   IF ASC(LINE.TEXT$) = 10 THEN LINE.TEXT$ = MID$(LINE.TEXT$, 2, 250)
   IF LEN(LINE.TEXT$) > 250 THEN LINE.TEXT$ = LEFT$(LINE.TEXT$, 250)
-  ## The PETSCII swap is DOC.STORE.CHARS', in the same pass as the copy.
+  ## DOC.STORE.CHARS does the PETSCII swap, in the same pass as the copy.
   IF DOC.STATUS = 0 THEN GOSUB DOC.PUSH.LINE : GOTO DOC.READ.LOOP
   IF LEN(LINE.TEXT$) > 0 THEN GOSUB DOC.PUSH.LINE : GOTO DOC.READ.DONE
   IF DOC.RAW = 0 AND LINE.COUNT > 0 THEN GOSUB DOC.PUSH.LINE
@@ -230,11 +228,10 @@ DOC.PUSH.LINE:
   RETURN
 
 ## ============================================================================
-## THE TABLE SHIFT -- a memmove in assembly, because it is 75% of a RETURN
+## The table shift -- a memmove in assembly
 ## ============================================================================
-## An insert or a delete moves every table entry above the line. In BASIC that is about
-## twenty statements to move three bytes, and ten RETURNs in a 100-line document cost 447
-## jiffies of 599. Here BASIC works out which bytes move and the assembly moves them.
+## An insert or a delete moves every table entry above the line. BASIC works out which bytes
+## move and the assembly moves them.
 ##
 ## The shift is one entry either way, so source and destination overlap. An insert copies
 ## top down, a delete bottom up, and the chunking keeps that order.
@@ -313,7 +310,7 @@ DOC.DEL.DONE:
   LINE.COUNT = LINE.COUNT - 1
   RETURN
 
-## DOC.MOVE.DOWN -- move DOC.MV.LEN% bytes, 1 to 255, inside bank DOC.MV.BANK%, highest byte
+## DOC.MV.DOWN -- move DOC.MV.LEN% bytes, 1 to 255, inside bank DOC.MV.BANK%, highest byte
 ## first.
 ##
 ##   in   DOC.MV.SRC%    source offset in the $A000 window
@@ -322,7 +319,7 @@ DOC.DEL.DONE:
 ##
 ## Source and destination overlap, so the last byte moves first. $00 is the RAM bank
 ## register, and the block owns the bank for its own accesses only. The operands are patched
-## in place rather than held in zero page, the idiom the EDITOR.BASL renderers use.
+## in place rather than held in zero page, the idiom the EDIT.BASL renderers use.
 DOC.MV.DOWN:
   #REM 1
   GP.ASM
@@ -350,7 +347,7 @@ DOC.MV.DOWN:
   #REM 0
   RETURN
 
-## DOC.MOVE.UP -- move DOC.MV.LEN% bytes, 1 to 255, inside bank DOC.MV.BANK%, lowest byte
+## DOC.MV.UP -- move DOC.MV.LEN% bytes, 1 to 255, inside bank DOC.MV.BANK%, lowest byte
 ## first. On a delete DOC.MV.SRC% is DOC.MV.DST% + 3, so the first byte moves first.
 DOC.MV.UP:
   #REM 1

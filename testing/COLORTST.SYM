@@ -7,40 +7,40 @@ LABELS
 
 FILE: APPSYS.INC.BL
 
- 000049 APPSYS.STARTUP                                      =2;
- 000055 APPSYS.RESTORE                                      =5;
- 000063 APPSYS.ISEMU                                        =8;
- 000066 APPSYS.SKIP                                         =10;
+ 000053 APPSYS.STARTUP                                      =2;
+ 000060 APPSYS.RESTORE                                      =5;
+ 000069 APPSYS.ISEMU                                        =8;
+ 000073 APPSYS.SKIP                                         =10;
 
 FILE: THEME.INC.BL
 
- 000069 THEME.LOAD                                          =11;
- 000077 THEME.LOAD.X16                                      =17;
- 000087 THEME.LOAD.DARK                                     =25;
- 000099 THEME.LOAD.LIGHT                                    =33;
- 000112 THEME.LOAD.GRAY                                     =41;
- 000125 THEME.LOAD.CUSTOM                                   =49;
- 000131 THEME.NEXT                                          =51;
- 000138 THEME.RESET                                         =54;
- 000150 THEME.SET                                           =56;
- 000159 THEME.HI                                            =58;
- 000163 THEME.SKIP                                          =60;
+ 000077 THEME.SELECT                                        =11;
+ 000085 THEME.SELECT.X16                                    =17;
+ 000097 THEME.SELECT.DARK                                   =27;
+ 000111 THEME.SELECT.LIGHT                                  =37;
+ 000128 THEME.SELECT.GRAY                                   =47;
+ 000142 THEME.SELECT.CUSTOM                                 =57;
+ 000148 THEME.NEXT                                          =59;
+ 000154 THEME.RESET                                         =61;
+ 000165 THEME.SET                                           =63;
+ 000174 THEME.HI                                            =65;
+ 000178 THEME.SKIP                                          =67;
 
 FILE: COLORTST.BASL
 
- 000124 CTX.ROLES                                           =101;
- 000144 CTX.DRAW                                            =113;
- 000176 CTX.SWATCH                                          =133;
- 000190 CTX.MENU                                            =142;
- 000205 CTX.MROW                                            =151;
- 000215 CTX.PLINE                                           =155;
- 000231 CTX.CNAME                                           =166;
- 000238 CTX.THNAME                                          =170;
- 000256 CTX.NUM                                             =183;
- 000267 CTX.KEY                                             =186;
- 000302 CTX.MOVE                                            =216;
- 000313 CTX.FROMTHEME                                       =221;
- 000324 CTX.TOTHEME                                         =229;
+ 000124 CTX.ROLES                                           =108;
+ 000144 CTX.DRAW                                            =120;
+ 000176 CTX.SWATCH                                          =140;
+ 000190 CTX.MENU                                            =149;
+ 000205 CTX.MROW                                            =158;
+ 000215 CTX.PLINE                                           =162;
+ 000231 CTX.CNAME                                           =173;
+ 000238 CTX.THNAME                                          =177;
+ 000256 CTX.NUM                                             =190;
+ 000267 CTX.KEY                                             =193;
+ 000302 CTX.MOVE                                            =223;
+ 000313 CTX.FROMTHEME                                       =228;
+ 000324 CTX.TOTHEME                                         =236;
 
 
 
@@ -49,21 +49,21 @@ VARIABLES
 
 FILE: APPSYS.INC.BL
 
- 000049 APPSYS.MODE                                         =A;
- 000049 APPSYS.COLS                                         =A0;
- 000049 APPSYS.ROWS                                         =A1;
- 000050 APPSYS.COLOUR                                       =A2;
- 000050 APPSYS.CHARSET                                      =A3;
- 000063 APPSYS.IS.EMULATOR                                  =A4;
+ 000054 APPSYS.MODE                                         =A;
+ 000054 APPSYS.COLS                                         =A0;
+ 000054 APPSYS.ROWS                                         =A1;
+ 000055 APPSYS.COLOUR                                       =A2;
+ 000055 APPSYS.CHARSET                                      =A3;
+ 000070 APPSYS.IS.EMULATOR                                  =A4;
 
 FILE: THEME.INC.BL
 
- 000070 THEME.FIRST                                         =A5;
- 000071 THEME.READY                                         =A6;
- 000071 THEME.CLR                                           =A7;
- 000072 THEME.ID                                            =A8;
- 000151 THEME.ATTR                                          =A9;
- 000160 THEME.INV                                           =AA;
+ 000078 THEME.FIRST                                         =A5;
+ 000079 THEME.READY                                         =A6;
+ 000079 THEME.CLR                                           =A7;
+ 000080 THEME.ID                                            =A8;
+ 000166 THEME.ATTR                                          =A9;
+ 000175 THEME.INV                                           =AA;
 
 FILE: COLORTST.BASL
 

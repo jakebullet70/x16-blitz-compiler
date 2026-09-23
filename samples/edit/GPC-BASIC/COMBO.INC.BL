@@ -1,0 +1,286 @@
+## ***********************************************************************
+## **
+## **  COMBO.INC.BL -- a drop-down list that folds into one row.
+## **
+## **      COMBO.ADD    record and draw a combo as a GUI.FORM control
+## **      COMBO.DRAW   the closed control, in the colours its state asks for
+## **      COMBO.KEY    its keys, translated into a GUI.FORM verdict
+## **      COMBO.OPEN   the dropdown, until a row is chosen or ESC
+## **
+## **  Only COMBO.ADD is called by an application. The other three are reached
+## **  by GUI.FORM, which dispatches a GUI.CT.COMBO control to them by name.
+## **
+## **  Usage, between GUI.OPEN and GUI.FORM.RUN:
+## **      COMBO.ITEM$(1) = " TEXAS"    ... and so on, 1..COUNT
+## **      COMBO.X = GUI.INNER.LEFT : COMBO.Y = GUI.INNER.TOP
+## **      COMBO.W = 16
+## **      COMBO.COUNT = 4
+## **      COMBO.SEL = 1
+## **      GOSUB COMBO.ADD
+## **      ... run the form ...
+## **      the answer is in COMBO.SEL
+## **
+## **   in   COMBO.X  COMBO.Y   top left of the CLOSED control, in cells
+## **        COMBO.W            how wide it is, brackets included. 5 is the
+## **                           floor and anything less is raised to it
+## **        COMBO.COUNT        how many items
+## **        COMBO.SEL          the item showing, 1..COUNT
+## **        COMBO.BANK         the RAM bank the dropdown saves the cells it
+## **                           covers in. 0 takes GUI.BANK, which is what the
+## **                           dialog around it is already using
+## **        COMBO.ITEM$()      the items, 1..COUNT. THE CALLER OWNS THE DIM
+## **
+## **   out  COMBO.SEL          what was chosen, or what went in if it was not
+## **
+## **  ONE COMBO TO A DIALOG, since there is one COMBO.ITEM$. The dropdown is
+## **  MENU.INC.BL's popup slot, loaded from COMBO.ITEM$ each time it opens, so
+## **  whatever the caller last built there is gone after. An item is a menu
+## **  row: & marks a hot key and "-" is a separator. The MENU.* colours and
+## **  flags it sets are put back.
+## **
+## **  A LONG LIST BELONGS IN GUI.LISTBOX. The dropdown shows every item at
+## **  once, 32 at most, and does not scroll.
+## **
+## **  IT IS REQUIRED BY GUI.INC.BL, which names COMBO.DRAW and COMBO.KEY.
+## **  BASLOAD resolves every label in a file, so a program that includes the
+## **  GUI and leaves this out stops with LABEL NOT FOUND whether it ever draws
+## **  a combo or not. It needs MENU.INC.BL, and what that requires, in turn.
+## **
+## **  TO RUN IT FROM A RAM BANK, put the #INCLUDE between GP.BANKED and
+## **  GP.ENDBANKED. A call from outside the region selects the region's bank
+## **  and RETURN puts the caller's back, so a caller is written the same
+## **  either way. GPC-BASIC/BANKED-OR-NOT.md has the rules.
+## **
+## ***********************************************************************
+#IFNDEF COMBO.DEFS
+#DEFINE COMBO.DEFS 1
+
+## The closed control's three fixed cells, as character codes rather than as a
+## string: GP.FILL takes a code, so drawing them costs no string at all.
+##
+## THE ARROW IS THE LETTER V. There is no down arrow anywhere in the PETSCII
+## uppercase set and nothing triangular either, so the shape has to be borrowed
+## from a letter. A program with a font of its own repoints this at whatever it
+## drew there instead; it is read in one place.
+
+#DEFINE COMBO.LBRACK 91
+#DEFINE COMBO.RBRACK 93
+#DEFINE COMBO.ARROW 86
+
+GOTO COMBO.MODULE.END
+
+## ***********************************************************************
+## **  COMBO.ADD -- record the control, and draw it closed.
+## **
+## **  AFTER GUI.OPEN AND AFTER GUI.FORM.BEGIN, like every other ADD. It reads
+## **  GUI.PANEL and GUI.BORDER, which GUI.OPEN settles, and STASH.NEXT, which
+## **  is where the dialog's own saved background ends.
+## **
+## **  THE DROPDOWN SAVES ITSELF ABOVE THE DIALOG'S OWN SAVE. GUI.OPEN stashes
+## **  the cells the box covers at offset 0 and leaves the offset just past
+## **  them in STASH.NEXT; the dropdown takes that as its own slot, so the two
+## **  rectangles share one bank and neither overwrites the other. If the
+## **  dialog saved nothing then nothing is there to protect and 0 is free.
+## ***********************************************************************
+
+COMBO.ADD:
+    IF GUI.CTRL.N >= GUI.FORM.MAX THEN RETURN
+    IF COMBO.COUNT < 1 THEN RETURN
+    IF COMBO.W < 5 THEN COMBO.W = 5
+    GUI.CTRL.N = GUI.CTRL.N + 1
+    GUI.CTRL.TYPE%(GUI.CTRL.N) = GUI.CT.COMBO
+    COMBO.CTRL = GUI.CTRL.N
+    GUI.CTRL.X%(GUI.CTRL.N) = COMBO.X
+    GUI.CTRL.Y%(GUI.CTRL.N) = COMBO.Y
+    GUI.CTRL.W%(GUI.CTRL.N) = COMBO.W
+    GUI.CTRL.TEXT$(GUI.CTRL.N) = ""
+    GUI.CTRL.KEY%(GUI.CTRL.N) = 0
+    GUI.CTRL.FLAGS%(GUI.CTRL.N) = 0
+    IF COMBO.SEL < 1 THEN COMBO.SEL = 1
+    IF COMBO.SEL > COMBO.COUNT THEN COMBO.SEL = COMBO.COUNT
+    IF COMBO.BANK = 0 THEN COMBO.BANK = GUI.BANK
+    COMBO.SLOT = STASH.NEXT
+    IF GUI.STASHED = 0 THEN COMBO.SLOT = 0
+    GOSUB COMBO.DRAW
+    RETURN
+
+
+## ***********************************************************************
+## **  COMBO.DRAW -- the closed control: brackets, the item, the arrow.
+## **
+## **   in   COMBO.CTRL   the control's own number, written when it was added
+## **
+## **  IT IS COMBO.CTRL AND NOT GUI.PAINT.N that is compared with GUI.FOCUS,
+## **  for the reason GUI.LIST.DRAW's header gives at length: the paint loop's
+## **  cursor is right while a form is painting and stale everywhere else, and
+## **  this routine is also reached from the control's own key handler.
+## **
+## **  FOCUSED IS THE WHOLE CELL RUN IN THEME.HILITE, arrow included, which is
+## **  the rule the focused list bar follows. Unfocused, the text is the
+## **  panel's colour and the arrow alone is the frame's, so the control reads
+## **  as a thing that opens rather than as a line of text.
+## ***********************************************************************
+
+COMBO.DRAW:
+    COMBO.ATTR = GUI.PANEL
+    COMBO.ARROWA = GUI.BORDER
+    GP.IF COMBO.CTRL = GUI.FOCUS THEN
+        COMBO.ATTR = THEME.CLR(THEME.HILITE)
+        COMBO.ARROWA = COMBO.ATTR
+    GP.ENDIF
+    COMBO.TEXT$ = ""
+    IF COMBO.SEL >= 1 THEN IF COMBO.SEL <= COMBO.COUNT THEN COMBO.TEXT$ = COMBO.ITEM$(COMBO.SEL)
+    GP.FILL COMBO.X, COMBO.Y, COMBO.W, 1, GUI.SPACE, COMBO.ATTR
+    IF COMBO.TEXT$ <> "" THEN GP.PRINTAT COMBO.X + 1, COMBO.Y, LEFT$(COMBO.TEXT$, COMBO.W - 3), COMBO.ATTR
+    GP.FILL COMBO.X, COMBO.Y, 1, 1, COMBO.LBRACK, COMBO.ATTR
+    GP.FILL COMBO.X + COMBO.W - 2, COMBO.Y, 1, 1, COMBO.ARROW, COMBO.ARROWA
+    GP.FILL COMBO.X + COMBO.W - 1, COMBO.Y, 1, 1, COMBO.RBRACK, COMBO.ATTR
+    RETURN
+
+
+## ***********************************************************************
+## **  COMBO.KEY -- the combo's keys, translated to a verdict.
+## **
+## **  OPENING IS NOT A VERDICT. The dropdown runs and closes inside this
+## **  routine and the form never hears about it, the same way a list's
+## **  scrolling never leaves GUI.FORM.DO.LIST. What comes out is one of the
+## **  six verdicts and GUI.FORM.ACT is still the only place one is acted on.
+## **
+## **  NO ACCELERATOR SCAN, so a letter typed at a closed combo does nothing.
+## **  GUI.FORM.ACCEL can be called from here, because a call into another
+## **  region selects that region's bank. If a letter should jump to the item
+## **  starting with it, that goes here.
+## **
+## **  RETURN OPENS IT rather than pressing the default button, which is where
+## **  a combo parts company with a field. A field has nothing to open.
+## ***********************************************************************
+
+COMBO.KEY:
+    GOSUB COMBO.GETKEY
+    GUI.FORM.NAV = GUI.NAV.STAY
+    GP.SELECT GUI.FORM.KEY
+        GP.CASE GUI.RETURN, GUI.SPACE, GUI.K.DOWN
+            GOSUB COMBO.OPEN
+        GP.CASE GUI.K.TAB
+            GUI.FORM.NAV = GUI.NAV.NEXT
+        GP.CASE GUI.K.SHTAB, GUI.K.UP
+            GUI.FORM.NAV = GUI.NAV.PREV
+        GP.CASE GUI.ESCAPE, GUI.STOP
+            GUI.FORM.NAV = GUI.NAV.CANCEL
+    GP.ENDSEL
+    RETURN
+
+
+## ***********************************************************************
+## **  COMBO.GETKEY -- block until something is typed.
+## **
+## **  GUI.FORM.GETKEY is these same three lines. It is GUI.FORM's own, and
+## **  from another region a call to it would switch the bank twice for three
+## **  lines of work.
+## ***********************************************************************
+
+COMBO.GETKEY:
+    GET GUI.PRESSED$
+    IF GP.ISEMPTY(GUI.PRESSED$) THEN GOTO COMBO.GETKEY
+    GUI.FORM.KEY = ASC(GUI.PRESSED$)
+    RETURN
+
+
+## ***********************************************************************
+## **  COMBO.OPEN -- the dropdown, from the row under the control.
+## **
+## **  IT FLIPS UP WHEN IT WILL NOT FIT DOWN. GP.FILL clips nothing, so a
+## **  dropdown running off the bottom would write past the end of the screen
+## **  map rather than be cut short -- the same trap GUI.SHADOW.FIT exists for.
+## **
+## **  NO SAVE, NO DROPDOWN. The cells underneath have to come back and there
+## **  is nothing else on the machine that knows what was on them, so a bank
+## **  that is missing or full means the control simply does not open. That is
+## **  a dropdown that ignores a keypress; the alternative is a hole left in
+## **  the dialog.
+## **
+## **  ESC KEEPS THE OLD VALUE. MENUTO.VERT returns 0 on a cancel and the
+## **  test below is what stops that 0 reaching COMBO.SEL.
+## **
+## **  THE SLOT IS PUT BACK TO 0 ON THE WAY OUT, because GUI.CLOSE restores the
+## **  dialog's own background and reads whatever STASH.SLOT is left holding.
+## ***********************************************************************
+
+COMBO.OPEN:
+    IF COMBO.BANK = 0 THEN RETURN
+    COMBO.SCRROWS = GUI.SCREEN.ROWS
+    IF COMBO.SCRROWS < 8 THEN COMBO.SCRROWS = 60
+    COMBO.BOXH = COMBO.COUNT + 2 : COMBO.BOXY = COMBO.Y + 1
+    IF COMBO.BOXY + COMBO.BOXH > COMBO.SCRROWS THEN COMBO.BOXY = COMBO.Y - COMBO.BOXH
+    IF COMBO.BOXY < 0 THEN COMBO.BOXY = 0
+
+    STASH.BANK = COMBO.BANK : STASH.SLOT = COMBO.SLOT
+    STASH.X = COMBO.X : STASH.Y = COMBO.BOXY : STASH.W = COMBO.W : STASH.H = COMBO.BOXH
+    GOSUB STASH.SAVE 
+    IF STASH.OK = 0 THEN STASH.SLOT = 0 : RETURN
+
+## ---- Fill THEN frame, the order GUI.OPEN draws a box in: the fill is what
+## ---- makes the dropdown opaque over the panel it is standing on.
+
+    GP.FILL COMBO.X, COMBO.BOXY, COMBO.W, COMBO.BOXH, GUI.SPACE, GUI.PANEL
+## ---- The dropdown is framed the way the dialog behind it is framed: a caller on a
+## ---- charset where GP.BOX's built-in styles come out as letters has already told
+## ---- GUI what its six glyphs are, and this reads the same eight bytes GUI.FRAME does.
+
+    COMBO.BOXSTYLE = 1
+    GP.IF GUI.GLYPH <> 0 THEN
+        IF LEN(GUI.GLYPH$) <> 8 THEN GOSUB GUI.GLYPHS
+        COMBO.BOXSTYLE = GP.STRPTR(GUI.GLYPH$) + 1
+    GP.ENDIF
+    GP.BOX COMBO.X, COMBO.BOXY, COMBO.W, COMBO.BOXH, COMBO.BOXSTYLE, GUI.BORDER
+
+    GOSUB COMBO.LOAD
+    GOSUB COMBO.STYLE
+    COMBO.PICK = GP.FN(MENUTO.VERT, COMBO.BOXY + 1, COMBO.X + 1, MENU.NOBOX)
+    GOSUB COMBO.UNSTYLE
+    IF COMBO.PICK <> 0 THEN COMBO.SEL = COMBO.PICK
+
+    STASH.MOVE = 0 : GOSUB STASH.RESTORE
+    STASH.SLOT = 0 : GOSUB COMBO.DRAW
+    RETURN
+
+## ---- the items into the popup slot, cut to the box. The first is padded out
+## ---- to it, so every row lights the full width.
+COMBO.LOAD:
+    GP.SUB MENU.BEGIN, MENU.POPUP
+    COMBO.TEXTW = COMBO.W - 2
+    FOR COMBO.EACH = 1 TO COMBO.COUNT
+        COMBO.TEXT$ = LEFT$(COMBO.ITEM$(COMBO.EACH), COMBO.TEXTW)
+        IF COMBO.EACH = 1 THEN GOSUB COMBO.PAD
+        GP.SUB MENU.ITEM, COMBO.TEXT$
+    NEXT COMBO.EACH
+    GP.SUB MENU.SELECTED, COMBO.SEL
+    RETURN
+
+COMBO.PAD:
+    IF LEN(COMBO.TEXT$) >= COMBO.TEXTW THEN RETURN
+    COMBO.TEXT$ = COMBO.TEXT$ + " "
+    GOTO COMBO.PAD
+
+## ---- the dialog's colours on the menu, and the caller's kept to put back.
+COMBO.STYLE:
+    COMBO.WAS.ATTR = MENU.ATTR : COMBO.WAS.HIATTR = MENU.HIATTR
+    COMBO.WAS.HOTATTR = MENU.HOTATTR : COMBO.WAS.DISATTR = MENU.DISATTR
+    COMBO.WAS.SEPATTR = MENU.SEPATTR : COMBO.WAS.FLAGS = MENU.FLAGS
+    COMBO.WAS.HINTW = MENU.HINTW
+    MENU.ATTR = GUI.PANEL
+    MENU.HIATTR = THEME.CLR(THEME.HILITE)
+    MENU.HOTATTR = GUI.BORDER : MENU.DISATTR = 0
+    MENU.SEPATTR = GUI.BORDER
+    MENU.FLAGS = MENU.NOWRAP : MENU.HINTW = 0
+    RETURN
+
+COMBO.UNSTYLE:
+    MENU.ATTR = COMBO.WAS.ATTR : MENU.HIATTR = COMBO.WAS.HIATTR
+    MENU.HOTATTR = COMBO.WAS.HOTATTR : MENU.DISATTR = COMBO.WAS.DISATTR
+    MENU.SEPATTR = COMBO.WAS.SEPATTR : MENU.FLAGS = COMBO.WAS.FLAGS
+    MENU.HINTW = COMBO.WAS.HINTW
+    RETURN
+
+COMBO.MODULE.END:
+#ENDIF

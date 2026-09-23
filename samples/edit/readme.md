@@ -13,21 +13,25 @@ source. That is the point of the sample, and the numbers below are what it bough
 | --- | --- |
 | `EDIT.BASL` | the editor â€” startup/restore, theme, render, key loop, editing, find |
 | `ED-FONT.BASL` | `#INCLUDE`d font: charset 3 re-ordered into ASCII order in VRAM, and the box glyphs rescued out of the way |
-| `ED-MISC.BASL` | `#INCLUDE`d forks of the library modules it uses: APPSYS, BANKMGR, STASHVRAM, STRCASE, THEME, LINEINPUT |
+| `ED-MISC.BASL` | `#INCLUDE`d forks of the library modules it uses: APPSYS and STRCASE |
 | `ED-MENUS.BASL` | `#INCLUDE`d forks of MENU, MENUPULL and MENUKEY, plus the editor's own bar, dropdowns and dispatch |
-| `ED-DIALOG.BASL` | `#INCLUDE`d dialog: the one centred popup box, saved and restored, that every prompt and Y/N question runs in |
+| `ED-DIALOG.BASL` | `#INCLUDE`d dialogs: the adapter between the editor's call sites and the standard GUI verbs |
 | `ED-STORE.BASL` | `#INCLUDE`d storage: a banked bump allocator and a 3-byte-per-line pointer table |
 | `GPB.INC.BL` | the library's keyword list, the one file taken from `GPC-BASIC`. It defines `#TOKEN`s, not code |
 | `EDIT.SRC.PRG` | the tokenised program â€” the input you feed to the compiler |
 | `EDIT.SRC.SYM` | **BASLOAD's symbol file, and it is not optional** â€” see below |
 | `EDIT.PRG` | the compiled program, built EMBEDDED, so it carries the runtime |
-| `EDIT.OVL` | the menu store's banked text, read at startup. It ships with `EDIT.PRG` |
+| `EDIT.OVL` | the banked code regions and the menu store's text, read at startup. It ships with `EDIT.PRG` |
 | `TEST.MD` | the document the editor opens, and the fixture the self-check searches |
 | `bench/` | the four benchmarks, each holding old and new in **one** program: `BENCHROWS` renderer against renderer, `LOADBEN` loader against loader, `SLOTBEN` and `SLOTTST` for the line table |
 
-The editor compiles no library code. Every module it once `#INCLUDE`d from `GPC-BASIC` was forked
-into `ED-FONT.BASL`, `ED-MISC.BASL` and `ED-MENUS.BASL`, re-prefixed `ED.*` and taken off the banks.
-Those files are the ones to edit.
+The editor runs the library from RAM banks. THEME, BANKMGR, STASHVRAM, MENU, MENUPULL, LINEINPUT,
+GUI, COMBO, CHECK and GUI-DIALOGS are `#INCLUDE`d unchanged inside three `GP.BANKED` regions in
+`EDIT.BASL`, so none of them is in low memory. What is still forked is what could not be banked or
+had to be changed: APPSYS and STRCASE in `ED-MISC.BASL`, the font work in `ED-FONT.BASL`, and the
+editor's own bar, dropdowns and dispatch in `ED-MENUS.BASL`. STASH stays in low memory because it
+executes `BANK`, which a region may not, and MENUKEY because it reads the keyboard layout under
+bank 0.
 
 > **`EDIT.SRC.SYM` ships for a reason.** `{VAR}` reaches a BASIC variable through BASLOAD's own
 > `#SYMFILE` record, because BASLOAD renames every variable (`ED.ASM.VIS%` becomes something like
@@ -290,34 +294,40 @@ output lands on the right glyphs; and the GP drawing commands work.
 
 ## The dialog box
 
-Every question the editor asks — a file name, a search, a line number, a Y/N — is asked in **one
-box**, `ED-DIALOG.BASL`. It is centred on the screen, it saves the cells under itself into VRAM
-through `ED.SV.SAVE` and puts them back on the way out, and the frame is `ED.MENU.DROPSTYLE`, the
-same rescued glyphs the dropdowns are drawn with.
+Every question the editor asks -- a file name, a search, a line number, a save-or-discard -- is a
+verb of `GUI-DIALOGS.INC.BL`, called where the question is asked. The editor draws none of it:
 
-Two entry points, and `EDIT.BASL`'s `ED.PROMPT` and `ED.PROMPT.YN` are now thin covers over them:
+    ED.INPUT$ = GP.FN(INPUTBOXEX, "Find", "Find text:", "", "", ED.FIND$, ED.DLG.WIDTHDEFAULT, 0)
+    ED.SAVE.ANSWER = GP.FN(ASK3, ED.CONFIRM.TITLE$, "Save changes?", "&Save", "Do&n't Save", "&Cancel", 1, 3)
+
+`ASK3` was written for this editor and added to the library, because a row of three buttons is what
+every program needs and a yes/no can only ever offer two of them. `INPUTBOXEX` answers with the
+typed text and leaves the OK or Cancel in `GUI.OK`.
+
+`ED-DIALOG.BASL` holds what the library has no verb for, and nothing else -- 56 lines where the
+editor's own dialog engine was 455:
 
 | Call | In | Out |
 | --- | --- | --- |
-| `ED.DLG.ASK` | `ED.DLG.TITLE$`, `ED.DLG.PROMPT$`, `ED.DLG.TEXT$`, `ED.DLG.MAX` | `ED.DLG.OK`, `ED.DLG.INPUT$` |
-| `ED.DLG.YN` | `ED.DLG.TITLE$`, `ED.DLG.MSG$` | `ED.DLG.YES` |
+| `GP.FN(ASKTEXT2, ...)` | title, two prompts, two starting strings, field width | non-zero on OK, and the text in `ED.DLG.TEXT1$` and `ED.DLG.TEXT2$` |
+| `GOSUB ED.DLG.WAITKEY` | | a told-not-asked box held until a key |
 
-`ED.DLG.OPEN` and `ED.DLG.CLOSE` are the halves underneath, for a caller that wants to draw its own
-content: `OPEN` takes the inside size in `ED.DLG.W` and `ED.DLG.H` and hands back where the inside
-starts in `ED.DLG.X` and `ED.DLG.Y`.
+`ASKTEXT2` is `FORM.BEGIN`, two `FORM.FIELD`s, `FORMTO.RUN` and `FORM.END`. It gives its answers
+back in two variables rather than as its result, because a verb returns one value and both fields
+have to be read before `FORM.END` takes the form down. It belongs in the library, and will move
+there once a second program wants it.
 
-**Restoring the box costs no repaint**, and that is the reason it is drawn where it is. The box is
-on layer 1, the overlay the bars and dropdowns live on; the document is on layer 0. Putting layer 1
-back the way it was — transparent cells over the text region — is what makes the document reappear
-underneath.
+**Restoring the box costs no repaint.** `GUI.OPEN` stashes the cells the box covers into the bank
+`DLGRESET` was given -- bank 10 here, named in `ED.GUI.SETUP` -- and `GUI.CLOSE` puts them back, so
+the document underneath is never redrawn.
 
-The box's text goes through `ED.PUT.FIELD`, the editor's own raw cell writer, not `GP.PRINTAT`; the
-input field is `ED.LINEINPUT`'s, positioned inside the box. Colours come from the theme on every
-open, so a theme change needs no second hook: the page colour is the background of everything inside
-the frame and the rest keep that background, which is what stops a dialog reading as a patchwork.
+The frame is the editor's own rescued glyphs: `ED.GUI.SETUP` builds `ED.STYLE$` once and hands it to
+both `MENU.DROPSTYLE` and `GUI.GLYPH$`, so a dropdown and a dialog are drawn with the same eight
+characters. Colours come from the theme on every open, the shadow included -- `DLGSHADOWCLR` takes
+`THEME.SHADOW` there.
 
-**Two stash handles, not one.** `ED.SV.MAX` is set to 2 in `ED.INIT`, because a dialog opened from a
-menu can be saved while the dropdown's own saved cells are still held.
+**One stash handle, not two.** `ED.SV.MAX` is 1 in `ED.INIT`: the dropdown still saves its cells
+through `STASH`, and a dialog opened over it saves into its own RAM bank instead.
 
 ## Build
 
@@ -329,9 +339,9 @@ sit together on it. Then:
    unless you edit the source — **and if you do edit it, re-tokenise, because a stale `.SYM`
    resolves `{VAR}` to the wrong slot.**
 
-2. **Compile, EMBEDDED.** The runtime goes inside the object, and the menu store's banked text
-   goes into `EDIT.OVL` beside it. Run `GPC.PRG` and answer `EDIT.SRC.PRG` / `EDIT.PRG` / a map /
-   embedded.
+2. **Compile, EMBEDDED.** The runtime goes inside the object, and the three code regions and the
+   menu store's text go into `EDIT.OVL` beside it. Run `GPC.PRG` and answer `EDIT.SRC.PRG` /
+   `EDIT.PRG` / a map / embedded.
 
 3. **Run.** `LOAD "EDIT.PRG",8 : RUN`. It opens `TEST.MD`. `EDIT.OVL` has to be on the same
    drive, or it stops with `?OVL`.
@@ -373,11 +383,13 @@ nonsense.
   test mode inside the source.
 - **A line is capped at 250 characters** on load. A menu row is not capped: the forked store is a
   string array.
-- **The editor claims its banks from `ED.BANKMGR`**, in `ED.CLAIM.FIXED.BANKS` and
-  `ED.CLAIM.ARENA.BANKS`: 2–4 the line-pointer table, and the document arena from 13 to the top of
-  RAM. Bank 1 is the runtime's, and no code and no menu text is banked. When the arena is full a
-  line is stored empty rather than written into a bank the editor does not own, and the status row
-  says `DOCUMENT FULL`.
+- **The editor claims its banks from `BANKMGR`**, in `ED.CLAIM.FIXED.BANKS` and
+  `ED.CLAIM.ARENA.BANKS`. Bank 1 is the runtime's. 2—4 are the line-pointer table, 5 is undo and redo,
+  6 is the first code region, 7 is the menu store's text, 8 and 9 are the two GUI code regions, 10
+  is where a dialog saves the cells it covers, and the document arena runs from 13 to the top of
+  RAM. A code region is only code to the compiler: to `BANKMGR` it is a bank like the rest, which
+  is why each one is claimed. When the arena is full a line is stored empty rather than written
+  into a bank the editor does not own, and the status row says `DOCUMENT FULL`.
 - **Files are assumed to be PETSCII on disk.** Opening something authored on the host — which will be
   ASCII — shows every letter case-swapped. Detecting the encoding on load is the obvious fix, and no
   byte in `$61-$7A` is a fair PETSCII tell, since in PETSCII that run is graphics. `TEST.MD` ships

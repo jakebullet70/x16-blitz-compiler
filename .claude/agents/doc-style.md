@@ -280,15 +280,3 @@ The concept page shrinks in return. §3.4 went from 118 lines to 47, and no entr
   check the topic renders inside 80 columns.
 - **Do not change code to suit a comment.** If the code needs changing, say so and hand it to
   `basl-author`.
-
-## What converting a section costs
-
-The index is the one thing the viewer keeps resident, so entries are not free. Measured on §3.4,
-five entries: **+38 characters of index and about +64 bytes of string heap each**. Converting the
-rest of section 3 — around 25 more keywords — is roughly +950 index characters and +1,600 heap
-bytes, against 5,380 today.
-
-That is affordable but it is not nothing. Convert a section because the group is looked up, not to
-be uniform: §3.1 Loops is four keywords a reader meets once, and it is fine as a page.
-
-The concept page shrinks in return. §3.4 went from 118 lines to 51, and no entry exceeds 29.

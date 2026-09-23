@@ -1,26 +1,17 @@
 ## ============================================================================
-## ED-MISC.BASL -- the library modules the editor uses, forked into this sample.
+## ED-MISC.BASL -- the two library modules the editor carries as forks.
 ##
-## APPSYS, BANKMGR, STASHVRAM, STRCASE, THEME and LINEINPUT, copied from the GPC-BASIC
-## library, re-prefixed ED.* and taken off the banks. BANKMGR stays because the document
-## arena still claims banks. No code is banked. This file is the one to edit.
-##
-## It is #INCLUDEd above the editor's body, because the colour role #DEFINEs, THEME.BAR
-## and the rest, are read there.
+## APPSYS and STRCASE, copied from the GPC-BASIC library, re-prefixed ED.* and taken off the
+## banks. THEME, BANKMGR, STASHVRAM and LINEINPUT are the library's own copies, #INCLUDEd into
+## the GP.BANKED regions at the top of EDIT.BASL.
 ## ============================================================================
 
 ## ==========================================================================
-## APPSYS -- start an application politely, and leave it the way you found it.
+## APPSYS -- start an application, and leave the screen the way it was found.
 ##
-##     ED.APPSYS.STARTUP     remember the screen the user had
-##     ED.APPSYS.RESTORE     put it back, on the way out
-##     ED.APPSYS.ISEMU       am I running on the emulator?
-##
-## Usage:
 ##     GOSUB ED.APPSYS.STARTUP
 ##     ... the application, laid out with ED.APPSYS.COLS / ED.APPSYS.ROWS
 ##     GOSUB ED.APPSYS.RESTORE : END
-##
 ## ==========================================================================
 #IFNDEF ED.APPSYS.DEFS
 #DEFINE ED.APPSYS.DEFS 1
@@ -73,49 +64,24 @@ ED.APPSYS.SKIP:
 ##     GOSUB ED.STRCASE.GO
 ##
 ##  in   ED.STRCASE.PTR    GP.STRPTR of the string
-##       ED.STRCASE.MODE   one of the two constants
-##  out  the string itself
+##       ED.STRCASE.MODE   ED.STRCASE.UPPER or ED.STRCASE.LOWER
+##  out  the string itself, rewritten
 ##
-##     ED.STRCASE.UPPER   a-z -> A-Z, everything else untouched
-##     ED.STRCASE.LOWER   A-Z -> a-z, everything else untouched
-##
-## An unrecognised mode does LOWER. A zero length string is not a special case.
-##
+## UPPER maps a-z to A-Z, LOWER maps A-Z to a-z. Every other byte passes through. An
+## unrecognised mode does LOWER. A zero length string is not a special case.
 ##
 ## ED.STRCASE.MODE is sticky: an ordinary variable, not an argument, so a call that does not
-## set it repeats the last one. Set both inputs every call, as with SORT.DESCEND and
-## ED.STASH.MOVE.
+## set it repeats the last one. Set both inputs on every call.
 ##
-## ONE-LINE CALLS. Three verbs say the same thing in one statement, and every argument is
-## written at the call, so the sticky mode above cannot bite:
-##
-##     GP.SUB ED.STRCASE.APPLY, GP.STRPTR(LINE$), ED.STRCASE.UPPER
-##     A$ = GP.FN(UCASE, A$)
-##     PRINT GP.FN(LCASE, N$)
-##
-## GOSUB ED.STR.UCASE and GOSUB ED.STR.LCASE reach the same two bodies: set ED.STRCASE.S$
-## first, and read the answer back out of it.
-##
-## ED.STRCASE.APPLY is ED.STRCASE.GO with both inputs as arguments. UCASE and LCASE take a
-## string and give back a cased copy, which is a different interface: they rewrite the copy,
-## never the caller's string, so A$ = GP.FN(...) is what changes A$. A literal is safe in
-## those two, because the argument is copied into the formal on the way in and the copy is
-## what gets rewritten. It is not safe in ED.STRCASE.APPLY, which is handed an address.
-##
-## The verbs need GPB.INC.BL, and a program that has no GP block does not want them;
-## ED.STRCASE.GO is the whole module without them.
-##
-## The {VAR} references need a #SYMFILE, declared before the #INCLUDEs and named after the
-## source PRG. EDITOR.BASL declares it at the top. Without one the compile stops with "{}
-## NEEDS #SYMFILE", which names the cause but not the file.
+## The {VAR} references need the #SYMFILE at the top of EDIT.BASL, which must come before the
+## #INCLUDEs. Without one the compile stops with "{} NEEDS #SYMFILE", naming the cause but not
+## the file.
 ##
 ## WARNING: pass a variable, never a literal. GP.STRPTR("hello") is an address inside the
 ## p-code, and folding it edits the program.
 ##
 ## #REM 1 is load bearing: without it BASLOAD strips the body and the block reaches the
 ## compiler empty, refused as "block mismatch". #REM 0 restores the default.
-##
-## The whole ED.STRCASE.* name space belongs to this section.
 ## ==========================================================================
 #IFNDEF ED.STRCASE.DEFS
 #DEFINE ED.STRCASE.DEFS 1
@@ -179,236 +145,4 @@ ED.STRCASE.GO:
     RETURN
 
 ED.STRCASE.MODULE.END:
-#ENDIF
-
-## ==========================================================================
-## LINEINPUT -- a positioned, length-limited entry field.
-##
-##     ED.LINEINPUT.GET     edit a string in a field at x, y
-##     ED.LINEINPUT.ASK     a label, then a field after it
-##
-## What INPUT and LINPUT cannot do: both own the whole bottom of the screen, scroll it, echo
-## in whatever colour is current and accept any length. A field stays where you put it, in
-## the colour you give it, and stops at the width you allow.
-##
-## Usage:
-##     ED.LINEINPUT.X = 10 : ED.LINEINPUT.Y = 6
-##     ED.LINEINPUT.LEN = 20
-##     ED.LINEINPUT.ATTR = THEME.CLR(THEME.TEXT)
-##     ED.LINEINPUT.TEXT$ = ""
-##     GOSUB ED.LINEINPUT.GET
-##     IF ED.LINEINPUT.KEY = 27 THEN <cancelled>
-##
-##  in   ED.LINEINPUT.X  ED.LINEINPUT.Y     top left of the field
-##       ED.LINEINPUT.LEN               how many characters fit
-##       ED.LINEINPUT.ATTR              packed attribute, background * 16 + fg
-##       ED.LINEINPUT.TEXT$             the starting value, edited in place
-##       ED.LINEINPUT.MASK              non-zero shows asterisks
-##       ED.LINEINPUT.ALLOW$            the only characters accepted
-##       ED.LINEINPUT.DENY$             characters refused
-##       ED.LINEINPUT.LABEL$            ED.LINEINPUT.ASK only
-##       ED.LINEINPUT.LABELATTR         the label's own attribute, ASK only. 0
-##                                      paints the label in the field's attribute
-##
-##  out  ED.LINEINPUT.TEXT$             what was typed. ESC restores the value the
-##                                      field started with, so a cancelled field is
-##                                      not an emptied one
-##       ED.LINEINPUT.KEY               the key that ended it:
-##                                    13  RETURN, finished
-##                                    27  ESC, cancelled (3 is STOP)
-##                                    17  cursor down / 145 up / 9 TAB
-##                                        -- left the field, text kept
-##
-## So a form is a loop: call the field, look at ED.LINEINPUT.KEY, move the focus. The field
-## never scrolls -- when full, further characters are refused and the cursor sits on the
-## last one rather than off the end.
-##
-## The field can be restricted to a character set. Both filters are empty by default, which
-## accepts what it always did. ALLOW$ lists what may be typed, DENY$ what may not, and with
-## both set ALLOW$ decides. They are raw bytes, so a set of letters is charset dependent --
-## PETSCII shifted letters arrive as $C1-$DA and ISO ones as $41-$5A. Digits are 48-57 in
-## both:
-##
-##     ED.LINEINPUT.ALLOW$ = "0123456789.-"    a signed number
-##     ED.LINEINPUT.DENY$  = ",:=*?"           a filename
-##
-## The caret moves: LEFT and RIGHT walk it, HOME and END jump to the ends, typing inserts
-## where it stands and DEL rubs out what is before it. It starts after the last character,
-## so a caller that never presses an arrow sees exactly the old append-and-rub-out field.
-##
-##  also out  ED.LINEINPUT.POS   where the caret ended up, 0..LEN(TEXT$)
-## ==========================================================================
-#IFNDEF ED.LINEINPUT.DEFS
-#DEFINE ED.LINEINPUT.DEFS 1
-
-#DEFINE ED.LINEINPUT.RETURN 13
-#DEFINE ED.LINEINPUT.DELETE 20
-#DEFINE ED.LINEINPUT.ESCAPE 27
-#DEFINE ED.LINEINPUT.STOP 3
-#DEFINE ED.LINEINPUT.SPACE 32
-#DEFINE ED.LINEINPUT.STAR 42
-
-## The keys that LEAVE a field without cancelling it, so a form can move between fields. The
-## text is kept -- only ESC puts it back -- and ED.LINEINPUT.KEY says which way to go.
-## Without these RETURN would have to mean both "next field" and "done", and a form could
-## never go back up.
-#DEFINE ED.LINEINPUT.DOWN 17
-#DEFINE ED.LINEINPUT.UP 145
-#DEFINE ED.LINEINPUT.TAB 9
-
-## The keys that move the CARET inside the field, as opposed to leaving it.
-#DEFINE ED.LINEINPUT.LEFT 157
-#DEFINE ED.LINEINPUT.RIGHT 29
-#DEFINE ED.LINEINPUT.HOME 19
-#DEFINE ED.LINEINPUT.END 4
-
-## Jiffies between cursor flips: 60 to the second, so 15 is four a second.
-#DEFINE ED.LINEINPUT.BLINK 15
-
-GOTO ED.LINEINPUT.MODULE.END
-
-## ED.LINEINPUT.GET -- the field.
-
-ED.LINEINPUT.GET:
-    ED.LINEINPUT.INV = (ED.LINEINPUT.ATTR AND 15) * 16 + INT(ED.LINEINPUT.ATTR / 16)
-    ED.LINEINPUT.WAS$ = ED.LINEINPUT.TEXT$ : ED.LINEINPUT.POS = LEN(ED.LINEINPUT.TEXT$)
-    ED.LINEINPUT.DONE = 0 : ED.LINEINPUT.KEY = 0 : ED.LINEINPUT.LIT = 1  : ED.LINEINPUT.TICK = TI
-
-ED.LINEINPUT.REDRAW:  
-    GOSUB ED.LINEINPUT.RENDER
-    GP.FILL ED.LINEINPUT.X, ED.LINEINPUT.Y, ED.LINEINPUT.LEN, 1, ED.LINEINPUT.SPACE, ED.LINEINPUT.ATTR
-    IF ED.LINEINPUT.SHOW$ <> "" THEN GP.PRINTAT ED.LINEINPUT.X, ED.LINEINPUT.Y, ED.LINEINPUT.SHOW$, ED.LINEINPUT.ATTR
-    GOSUB ED.LINEINPUT.CURSOR
-
-## GET returns immediately with "" when nothing is pressed, so the blink runs off TI rather
-## than a delay loop, which would swallow keys pressed during it.
-
-ED.LINEINPUT.WAIT:
-    GET ED.LINEINPUT.K$
-    IF ED.LINEINPUT.K$ <> "" THEN GOTO ED.LINEINPUT.KEYED
-    IF TI < ED.LINEINPUT.TICK THEN GOTO ED.LINEINPUT.WAIT
-    ED.LINEINPUT.TICK = TI + ED.LINEINPUT.BLINK : ED.LINEINPUT.LIT = 1 - ED.LINEINPUT.LIT
-    GOSUB ED.LINEINPUT.CURSOR : GOTO ED.LINEINPUT.WAIT
-
-## Seven control codes scattered across 256, which ON x GOSUB cannot index: the sparse
-## selector GP.SELECT exists for. ED.LINEINPUT.DONE is tested AFTER GP.ENDSEL rather than
-## jumping out of the select -- one comparison, and it cannot leak.
-
-ED.LINEINPUT.KEYED:
-    ED.LINEINPUT.CODE = ASC(ED.LINEINPUT.K$)
-    GP.SELECT ED.LINEINPUT.CODE
-        GP.CASE ED.LINEINPUT.RETURN : ED.LINEINPUT.DONE = -1
-        GP.CASE ED.LINEINPUT.ESCAPE, ED.LINEINPUT.STOP
-            ED.LINEINPUT.TEXT$ = ED.LINEINPUT.WAS$ : ED.LINEINPUT.POS = LEN(ED.LINEINPUT.TEXT$) : ED.LINEINPUT.DONE = -1
-        GP.CASE ED.LINEINPUT.DOWN, ED.LINEINPUT.UP, ED.LINEINPUT.TAB
-            ED.LINEINPUT.DONE = -1
-        GP.CASE ED.LINEINPUT.LEFT   : IF ED.LINEINPUT.POS > 0 THEN ED.LINEINPUT.POS = ED.LINEINPUT.POS - 1
-        GP.CASE ED.LINEINPUT.RIGHT  : IF ED.LINEINPUT.POS < LEN(ED.LINEINPUT.TEXT$) THEN ED.LINEINPUT.POS = ED.LINEINPUT.POS + 1
-        GP.CASE ED.LINEINPUT.HOME   : ED.LINEINPUT.POS = 0
-        GP.CASE ED.LINEINPUT.END    : ED.LINEINPUT.POS = LEN(ED.LINEINPUT.TEXT$)
-        GP.CASE ED.LINEINPUT.DELETE : GOSUB ED.LINEINPUT.RUBOUT
-        GP.OTHER                 : GOSUB ED.LINEINPUT.TYPED
-    GP.ENDSEL
-    ED.LINEINPUT.KEY = ED.LINEINPUT.CODE : IF ED.LINEINPUT.DONE = 0 THEN GOTO ED.LINEINPUT.REDRAW
-
-## Redraw once with no cursor, so a finished field is not still blinking at a user who has
-## moved on.
-
-    ED.LINEINPUT.LIT = 0 : GOSUB ED.LINEINPUT.RENDER
-    GP.FILL ED.LINEINPUT.X, ED.LINEINPUT.Y, ED.LINEINPUT.LEN, 1, ED.LINEINPUT.SPACE, ED.LINEINPUT.ATTR
-    IF ED.LINEINPUT.SHOW$ <> "" THEN GP.PRINTAT ED.LINEINPUT.X, ED.LINEINPUT.Y, ED.LINEINPUT.SHOW$, ED.LINEINPUT.ATTR
-    RETURN
-
-## ED.LINEINPUT.ASK -- a label, then a field after it. ED.LINEINPUT.X is put back on the way
-## out, so calling this in a loop does not walk the field across the screen.
-##
-## The label is not part of the field, so it does not take the field's attribute.
-## ED.LINEINPUT.ATTR is usually reversed, which makes the field read as a box to type in,
-## and a label painted in it reads as a second field. A LABELATTR of 0 paints the label in
-## the field's attribute.
-##
-## WARNING: the saved column is ED.LINEINPUT.SAVEX, not ED.LINEINPUT.HOME. HOME is #DEFINEd
-## as 19, so the assignment compiles as "19 = ED.LINEINPUT.X", a syntax error that defers to
-## run time: the compile says OK and the call throws SYNTAX ERROR.
-ED.LINEINPUT.ASK:
-    ED.LINEINPUT.LABELPAINT = ED.LINEINPUT.LABELATTR
-    IF ED.LINEINPUT.LABELPAINT = 0 THEN ED.LINEINPUT.LABELPAINT = ED.LINEINPUT.ATTR
-    ED.LINEINPUT.SAVEX = ED.LINEINPUT.X : GP.PRINTAT ED.LINEINPUT.X, ED.LINEINPUT.Y, ED.LINEINPUT.LABEL$, ED.LINEINPUT.LABELPAINT
-    ED.LINEINPUT.X = ED.LINEINPUT.X + LEN(ED.LINEINPUT.LABEL$)
-    GOSUB ED.LINEINPUT.GET : ED.LINEINPUT.X = ED.LINEINPUT.SAVEX
-    RETURN
-
-## ED.LINEINPUT.TYPED -- accept a printable character, if there is room.
-##
-## Refused: below 32, DEL, and $80-$9F -- the PETSCII control codes, colours and cursor
-## moves and reverse on and off, which would take effect on the way OUT if they were let
-## into the string.
-##
-## A range needs no flag. Comparisons bind tighter than AND here, so K >= 128 AND K <= 159
-## is the range it looks like, and the editor's ED.KEY >= 32 AND ED.KEY <= 126 reads the
-## same way.
-##
-## Then the caller's filters, if it set any. ALLOW$ is asked first, so a caller that sets
-## both gets the allow list and DENY$ never runs.
-
-ED.LINEINPUT.TYPED:
-    IF LEN(ED.LINEINPUT.TEXT$) >= ED.LINEINPUT.LEN THEN RETURN
-    IF ED.LINEINPUT.CODE < 32 OR ED.LINEINPUT.CODE = 127 THEN RETURN
-    IF ED.LINEINPUT.CODE > 127 AND ED.LINEINPUT.CODE < 160 THEN RETURN
-
-## Nested, not one AND. The empty test comes first on its own, so a field with no filter
-## does not pay for a search of an empty string on every keystroke. A false IF skips the
-## whole line, which is what makes the second test safe to write here.
-    IF ED.LINEINPUT.ALLOW$ <> "" THEN IF GP.INSTR(ED.LINEINPUT.ALLOW$, ED.LINEINPUT.K$) = 0 THEN RETURN
-    IF ED.LINEINPUT.ALLOW$ = "" THEN IF ED.LINEINPUT.DENY$ <> "" THEN IF GP.INSTR(ED.LINEINPUT.DENY$, ED.LINEINPUT.K$) > 0 THEN RETURN
-
-## Inserted at the caret, not appended. With the caret at the end, where it starts, LEFT$ is
-## the whole string and MID$ past the end is "", so an insert costs two joins a keystroke.
-    ED.LINEINPUT.TEXT$ = LEFT$(ED.LINEINPUT.TEXT$, ED.LINEINPUT.POS) + ED.LINEINPUT.K$ + MID$(ED.LINEINPUT.TEXT$, ED.LINEINPUT.POS + 1)
-    ED.LINEINPUT.POS = ED.LINEINPUT.POS + 1
-    RETURN
-
-## ED.LINEINPUT.RUBOUT -- DEL takes the character before the caret.
-##
-## At the start of the field there is nothing before the caret, so DEL is ignored rather
-## than wrapping round to eat the last character.
-
-ED.LINEINPUT.RUBOUT:  
-    IF ED.LINEINPUT.POS = 0 THEN RETURN
-    ED.LINEINPUT.TEXT$ = LEFT$(ED.LINEINPUT.TEXT$, ED.LINEINPUT.POS - 1) + MID$(ED.LINEINPUT.TEXT$, ED.LINEINPUT.POS + 1)
-    ED.LINEINPUT.POS = ED.LINEINPUT.POS - 1
-    RETURN
-
-## What the field displays, which is not always what it holds. RPT$ raises an error on a
-## count of zero, hence the guard.
-
-ED.LINEINPUT.RENDER:  
-    ED.LINEINPUT.SHOW$ = ED.LINEINPUT.TEXT$ : IF ED.LINEINPUT.MASK = 0 THEN RETURN
-    ED.LINEINPUT.SHOW$ = "" : IF LEN(ED.LINEINPUT.TEXT$) > 0 THEN ED.LINEINPUT.SHOW$ = RPT$(ED.LINEINPUT.STAR, LEN(ED.LINEINPUT.TEXT$))
-    RETURN
-
-## ED.LINEINPUT.CURSOR -- one cell, drawn twice a blink.
-##
-## With room left it is an inverse space after the text. With the field full there is no
-## cell after the text, so it inverts the LAST CHARACTER instead of blanking it -- printing
-## the character back in the inverse attribute, which says "full" without losing anything
-## off the display.
-
-ED.LINEINPUT.CURSOR:  
-    ED.LINEINPUT.FILLED = LEN(ED.LINEINPUT.SHOW$)
-    ED.LINEINPUT.CP = ED.LINEINPUT.POS : IF ED.LINEINPUT.CP > ED.LINEINPUT.FILLED THEN ED.LINEINPUT.CP = ED.LINEINPUT.FILLED
-    ED.LINEINPUT.CX = ED.LINEINPUT.X + ED.LINEINPUT.CP : ED.LINEINPUT.CELL$ = " "
-
-## ON a character, the cursor IS that character, drawn inverse on the lit half of the blink
-## and normal on the other -- so the blink puts back exactly what it covered and nothing has
-## to be remembered.
-    IF ED.LINEINPUT.CP < ED.LINEINPUT.FILLED THEN ED.LINEINPUT.CELL$ = MID$(ED.LINEINPUT.SHOW$, ED.LINEINPUT.CP + 1, 1)
-    IF ED.LINEINPUT.CP >= ED.LINEINPUT.LEN THEN ED.LINEINPUT.CX = ED.LINEINPUT.X + ED.LINEINPUT.LEN - 1
-    IF ED.LINEINPUT.CP >= ED.LINEINPUT.LEN THEN ED.LINEINPUT.CELL$ = RIGHT$(ED.LINEINPUT.SHOW$, 1)
-    ED.LINEINPUT.CA = ED.LINEINPUT.ATTR
-    IF ED.LINEINPUT.LIT = 1 THEN ED.LINEINPUT.CA = ED.LINEINPUT.INV
-    GP.PRINTAT ED.LINEINPUT.CX, ED.LINEINPUT.Y, ED.LINEINPUT.CELL$, ED.LINEINPUT.CA
-    RETURN
-
-ED.LINEINPUT.MODULE.END:
 #ENDIF

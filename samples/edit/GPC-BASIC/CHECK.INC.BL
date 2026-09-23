@@ -1,0 +1,151 @@
+## ***********************************************************************
+## **
+## **  CHECK.INC.BL -- a check box: [X] ticked, [ ] not, and a caption.
+## **
+## **      CHECK.ADD    record and draw a check box as a GUI.FORM control
+## **      CHECK.DRAW   one box, in the colours its focus asks for
+## **      CHECK.KEY    its keys, translated into a GUI.FORM verdict
+## **
+## **  Only CHECK.ADD is called by an application. GUI.FORM reaches the other
+## **  two by name, the way it reaches COMBO.DRAW and COMBO.KEY.
+## **
+## **  Usage, after GUI.OPEN and GUI.FORM.BEGIN, before GUI.FORM.RUN:
+## **      CHECK.X = GUI.INNER.LEFT : CHECK.Y = GUI.INNER.TOP
+## **      CHECK.TEXT$ = "SHOW HIDDEN FILES"
+## **      CHECK.ON = -1
+## **      GOSUB CHECK.ADD
+## **      HIDDEN = CHECK.CTRL
+## **      ... run the form ...
+## **      IF (GUI.CTRL.FLAGS%(HIDDEN) AND GUI.CF.CHECKED) <> 0 THEN <ticked>
+## **
+## **   in   CHECK.X  CHECK.Y   the cell the [ goes in
+## **        CHECK.TEXT$        the caption, plain text. "" for a bare box
+## **        CHECK.ON           non-zero starts it ticked
+## **
+## **   out  CHECK.CTRL         the control's number, 0 if the form was full
+## **
+## **  THE STATE IS A FLAG ON THE CONTROL, GUI.CF.CHECKED, and not a variable
+## **  of this module's. That is what lets one form carry several boxes where
+## **  it can carry only one combo.
+## **
+## **  A ONE-CHARACTER FIELD WHOSE ONLY LETTER IS X: X ticks it, DEL clears
+## **  it, and SPACE flips it. TAB, the arrows and SHIFT+TAB move the focus,
+## **  RETURN presses the default button and ESC cancels. Every other key is
+## **  offered to the buttons' marked letters.
+## **
+## **  IT IS REQUIRED BY GUI.INC.BL, which names CHECK.DRAW and CHECK.KEY, and
+## **  it goes in after that file for the reason COMBO.INC.BL does.
+## **
+## ***********************************************************************
+#IFNDEF CHECK.DEFS
+#DEFINE CHECK.DEFS 1
+
+## The box's cells, as character codes for GP.FILL.
+#DEFINE CHECK.LBRACK 91
+#DEFINE CHECK.RBRACK 93
+#DEFINE CHECK.TICK 88
+
+## X in both cases and shifted, and DEL.
+#DEFINE CHECK.K.TICK 88
+#DEFINE CHECK.K.TICKLC 120
+#DEFINE CHECK.K.TICKSH 216
+#DEFINE CHECK.K.DELETE 20
+
+GOTO CHECK.MODULE.END
+
+## ***********************************************************************
+## **  CHECK.ADD -- record the control, and draw it.
+## ***********************************************************************
+
+CHECK.ADD:
+    CHECK.CTRL = 0
+    IF GUI.CTRL.N >= GUI.FORM.MAX THEN RETURN
+    GUI.CTRL.N = GUI.CTRL.N + 1 : CHECK.CTRL = GUI.CTRL.N
+    GUI.CTRL.TYPE%(CHECK.CTRL) = GUI.CT.CHECK
+    GUI.CTRL.X%(CHECK.CTRL) = CHECK.X : GUI.CTRL.Y%(CHECK.CTRL) = CHECK.Y
+    GUI.CTRL.W%(CHECK.CTRL) = 3
+    IF CHECK.TEXT$ <> "" THEN GUI.CTRL.W%(CHECK.CTRL) = LEN(CHECK.TEXT$) + 4
+    GUI.CTRL.TEXT$(CHECK.CTRL) = CHECK.TEXT$
+    GUI.CTRL.KEY%(CHECK.CTRL) = 0 : GUI.CTRL.FLAGS%(CHECK.CTRL) = 0
+    IF CHECK.ON <> 0 THEN GUI.CTRL.FLAGS%(CHECK.CTRL) = GUI.CF.CHECKED
+    GUI.PAINT.N = CHECK.CTRL
+    GOSUB CHECK.DRAW
+    RETURN
+
+
+## ***********************************************************************
+## **  CHECK.DRAW -- brackets, the tick, and the caption.
+## **
+## **   in   GUI.PAINT.N   which control
+## **
+## **  Focused, the whole run is THEME.HILITE. Unfocused, the caption is the
+## **  panel's colour and the tick alone is the frame's, the rule the combo's
+## **  arrow follows.
+## ***********************************************************************
+
+CHECK.DRAW:
+    CHECK.N = GUI.PAINT.N : CHECK.ATTR = GUI.PANEL : CHECK.MARKA = GUI.BORDER
+    GP.IF CHECK.N = GUI.FOCUS THEN
+        CHECK.ATTR = THEME.CLR(THEME.HILITE)
+        CHECK.MARKA = CHECK.ATTR
+    GP.ENDIF
+    CHECK.MARK = GUI.SPACE
+    IF (GUI.CTRL.FLAGS%(CHECK.N) AND GUI.CF.CHECKED) <> 0 THEN CHECK.MARK = CHECK.TICK
+    CHECK.CX = GUI.CTRL.X%(CHECK.N) : CHECK.CY = GUI.CTRL.Y%(CHECK.N)
+    CHECK.SHOW$ = GUI.CTRL.TEXT$(CHECK.N)
+    GP.FILL CHECK.CX, CHECK.CY, GUI.CTRL.W%(CHECK.N), 1, GUI.SPACE, CHECK.ATTR
+    GP.FILL CHECK.CX, CHECK.CY, 1, 1, CHECK.LBRACK, CHECK.ATTR
+    GP.FILL CHECK.CX + 1, CHECK.CY, 1, 1, CHECK.MARK, CHECK.MARKA
+    GP.FILL CHECK.CX + 2, CHECK.CY, 1, 1, CHECK.RBRACK, CHECK.ATTR
+    IF CHECK.SHOW$ <> "" THEN GP.PRINTAT CHECK.CX + 4, CHECK.CY, CHECK.SHOW$, CHECK.ATTR
+    RETURN
+
+
+## ***********************************************************************
+## **  CHECK.KEY -- the box's keys, translated to a verdict.
+## **
+## **  A TICK IS NOT A VERDICT. The flag changes and the box repaints inside
+## **  this routine, and the form hears GUI.NAV.STAY.
+## ***********************************************************************
+
+CHECK.KEY:
+    GOSUB CHECK.GETKEY : GUI.FORM.NAV = GUI.NAV.STAY : CHECK.N = GUI.FOCUS
+    CHECK.WAS = GUI.CTRL.FLAGS%(CHECK.N) AND GUI.CF.CHECKED
+    CHECK.NOW = CHECK.WAS
+    GP.SELECT GUI.FORM.KEY
+        GP.CASE GUI.SPACE
+            CHECK.NOW = GUI.CF.CHECKED - CHECK.WAS
+        GP.CASE CHECK.K.TICK, CHECK.K.TICKLC, CHECK.K.TICKSH
+            CHECK.NOW = GUI.CF.CHECKED
+        GP.CASE CHECK.K.DELETE
+            CHECK.NOW = 0
+        GP.CASE GUI.K.TAB, GUI.K.RIGHT, GUI.K.DOWN
+            GUI.FORM.NAV = GUI.NAV.NEXT
+        GP.CASE GUI.K.SHTAB, GUI.K.LEFT, GUI.K.UP
+            GUI.FORM.NAV = GUI.NAV.PREV
+        GP.CASE GUI.RETURN
+            GUI.FORM.NAV = GUI.NAV.DEFAULT
+        GP.CASE GUI.ESCAPE, GUI.STOP
+            GUI.FORM.NAV = GUI.NAV.CANCEL
+        GP.OTHER : GOSUB GUI.FORM.ACCEL
+    GP.ENDSEL
+    IF CHECK.NOW = CHECK.WAS THEN RETURN
+    GUI.CTRL.FLAGS%(CHECK.N) = GUI.CTRL.FLAGS%(CHECK.N) - CHECK.WAS + CHECK.NOW
+    GUI.PAINT.N = CHECK.N
+    GOSUB CHECK.DRAW
+    RETURN
+
+
+## ***********************************************************************
+## **  CHECK.GETKEY -- block until something is typed. COMBO.GETKEY's twin,
+## **  so this file does not depend on which region the combo is in.
+## ***********************************************************************
+
+CHECK.GETKEY:
+    GET GUI.PRESSED$
+    IF GP.ISEMPTY(GUI.PRESSED$) THEN GOTO CHECK.GETKEY
+    GUI.FORM.KEY = ASC(GUI.PRESSED$)
+    RETURN
+
+CHECK.MODULE.END:
+#ENDIF

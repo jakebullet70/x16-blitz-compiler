@@ -1212,14 +1212,13 @@ GP.BASIC keyword.
 
 `samples/GPB-MODS-TESTING/PICKDEMO.BASL` is a complete program in this shape, in 99 lines.
 
-Banking a module does not make room in an embedded build, and it is worth being clear about
-why. The file loads from `$0801` upward in one piece, so a byte moved out of low memory into
-a region is still a byte in the file: it arrives a little higher up instead of a little lower
-down, and the last byte lands in the same place. Splitting the modules across more regions
-does not help either, and costs two header bytes a region. What lowers that last address is
-something that is not in the program at all — a smaller store for a library that reserves one,
-a module the program does not include, dead code the compiler can drop. Banking buys free low
-RAM while the program runs, which is a different problem and usually the one you have.
+Banking a module makes room in either build, and it used to make room in only one. An embedded
+object once carried its regions appended to the `.PRG`, so a byte moved into a region was still
+a byte in the file and the last byte landed where it always had. The regions go in the `.OVL`
+now, which the loader never reads, so a banked module leaves low memory and leaves the file
+with it. Splitting the modules across more regions costs two header bytes a region and nothing
+else. What a region does not buy is a smaller `.OVL`: the bytes are still shipped, in the file
+beside the program rather than inside it.
 
 | | low memory | a RAM bank |
 |---|---|---|
@@ -2028,9 +2027,11 @@ previous dialog set carries into the next one.
 |---|---|---|
 | `DLGRESET bank` | the RAM bank the covered cells go to | every other input back to its default |
 | `DLGSHADOW on` · `DLGGLYPH on` | non-zero | the shadow and the frame glyphs, for every box after it |
+| `DLGSHADOWCLR attr` | a packed colour | the shadow's own colour; 0, the default, is black on black |
 | `KBCLEAR` | — | the keyboard buffer emptied |
 | `MSGBOX msg$` | | `GUI.KEY` — something to say, and one way out |
 | `ASKYN msg$` · `ASKOK msg$` | | -1 for yes, or OK |
+| `ASK3 t$, m$, b1$, b2$, b3$, dflt, esc` | | the button pressed, 1..3; `esc` is the one ESC means, and `b3$` `""` leaves two |
 | `ASKTEXT msg$, len` | | the typed line, `""` when cancelled |
 | `INPUTBOX msg$, start$, len` | | the text either way; `GUI.OK` says which |
 | `PICKMENU msg$, sel` | the popup slot of `MENU.INC.BL` (§4.6) | the row, 1..N, or 0 cancelled |
