@@ -269,7 +269,7 @@ forward to it.
 A case body may take its statements on the same line, after a colon:
 
 ```basic
-GP.SELECT ED.KEY
+GP.SELECT ED.KEY%
   GP.CASE 157 : GOSUB ED.MOVE.LEFT
   GP.CASE 29  : GOSUB ED.MOVE.RIGHT
   GP.CASE 27  : MENU.ACTIVE = 0 : GOSUB ED.OPEN.MENUBAR
@@ -823,9 +823,9 @@ through byte for byte — case, leading spaces and trailing spaces included. The
 lines and must not be: BASLOAD upper-cases `REM` text.
 
 **Blocks are named, and you may write as many as you like.** Each is indexed from zero within
-itself, so inserting a line in one group moves nothing outside it. All the groups in a program
-share one bank, which is why every block names the same one — written on each block rather than
-only the first so a block can be read where it sits.
+itself, so inserting a line in one group moves nothing outside it. A block names the bank its text
+goes in, written on each block rather than only the first so a block can be read where it sits.
+Groups that name the same bank share it and fill it in the order the compiler reads them.
 
 **The name costs nothing at run time.** It is resolved while the program compiles, into the
 group's first index, and the compiler adds that to your index for you. No letter of the name
@@ -877,9 +877,18 @@ text.
 program does can produce one out of range, so an index past the end of a group reads whatever
 follows it. That is the same bargain the array fast path makes.
 
-One bank of text a program, up to 8 KB of it, up to 128 groups. `GP.BSTR` is an ordinary GP
-keyword, so it pulls in the 1 KB GP block; the two block keywords do not, and neither does
-`GP.BSTRCOUNT`.
+**A program may have more than one text bank.** Sixteen of them, which is the range of the slot
+field a group carries and the length of the table at `$07F0` — `BSTR_MAX_BANKS` in
+`source/common-source/source/common.inc`. That matters when a library already owns one: `MENU`
+keeps its rows in `MENU.TEXTBANK`, so a program using it and wanting a pool of its own names a
+second bank rather than crowding into `MENU`'s. The other limits are 8 KB a bank, 128 groups a
+program and 4,096 strings a bank.
+
+Each text bank is a region, so it counts toward the 127 regions (§3.12) and no two regions may
+share a bank.
+
+`GP.BSTR` is an ordinary GP keyword, so it pulls in the 1 KB GP block; the two block keywords do
+not, and neither does `GP.BSTRCOUNT`.
 
 Reading it from inside a `GP.BANKED` region works: the handler puts the caller's bank back before
 it returns.
@@ -1260,15 +1269,15 @@ the first `#INCLUDE` and the second produces nothing.
 
 | Routine | in | out |
 |---|---|---|
-| `THEME.SELECT` | `THEME.ID` | fills `THEME.CLR()` |
-| `THEME.NEXT` | `THEME.ID` | the following theme, loaded |
-| `THEME.RESET` | `THEME.ID` | the selected theme's shipped values, reloaded |
-| `THEME.SET` | `THEME.ATTR` | issues `COLOR` — makes it the colour `PRINT` uses |
-| `THEME.HI` | `THEME.ATTR` | `THEME.INV`, the inverse attribute |
+| `THEME.SELECT` | `THEME.ID%` | fills `THEME.CLR()` |
+| `THEME.NEXT` | `THEME.ID%` | the following theme, loaded |
+| `THEME.RESET` | `THEME.ID%` | the selected theme's shipped values, reloaded |
+| `THEME.SET` | `THEME.ATTR%` | issues `COLOR` — makes it the colour `PRINT` uses |
+| `THEME.HI` | `THEME.ATTR%` | `THEME.INV%`, the inverse attribute |
 
 Five themes, `THEME.COUNT` of them:
 
-| `THEME.ID` | | |
+| `THEME.ID%` | | |
 |---:|---|---|
 | 0 | `X16` | blue page, white text, cyan headings. The default |
 | 1 | `DARK` | black page, light grey text |
@@ -1286,21 +1295,28 @@ exception is a cold start — `CUSTOM` selected before any other theme has been 
 is nothing to keep and it takes `X16`'s values. `THEME.RESET` goes back to those.
 
 `samples/color-test` edits the roles against a mock of the GUI and prints the `THEME.CLR()` lines
-to paste back in here. **It carries its own `GPC-BASIC` folder and is still at seven roles**, so it
-does not yet offer `THEME.FOCUS`.
+to paste back in here. **It carries its own `GPC-BASIC` folder and is still at nine roles**, so it
+offers `THEME.FOCUS` and `THEME.BAR` but not `THEME.SHADOW`.
 
 Roles, for indexing `THEME.CLR()`: `THEME.PAGE` `THEME.TEXT` `THEME.TITLE` `THEME.BORDER`
-`THEME.HILITE` `THEME.DIMMED` `THEME.WARN` `THEME.FOCUS`, and `THEME.SLOTS` = 8.
+`THEME.HILITE` `THEME.DIMMED` `THEME.WARN` `THEME.FOCUS` `THEME.BAR` `THEME.SHADOW`, and
+`THEME.SLOTS` = 10.
 
-`THEME.FOCUS` is the eighth and newest: what a focused control wears while `GUI.FORM` has the
-keyboard (§4.11). It is a separate role from `THEME.HILITE` because a dialog shows both at once —
-the highlighted row of a list, and the control the TAB key has landed on.
+`THEME.FOCUS` is the eighth: what a focused control wears while `GUI.FORM` has the keyboard
+(§4.11). It is a separate role from `THEME.HILITE` because a dialog shows both at once — the
+highlighted row of a list, and the control the TAB key has landed on. `THEME.BAR` is the ninth,
+the band a menu bar or status line sits on, and `THEME.SHADOW` the tenth and newest, the colour
+a drop shadow is filled with.
 
-Usage is `THEME.ID`, one `GOSUB THEME.SELECT`, then `THEME.CLR(role)` wherever an attribute is
+The module's own scalars are int16: `THEME.ID%`, `THEME.ATTR%` and `THEME.INV%`. `THEME.CLR()`
+is not — it stays an untyped array, and it is `DIM`med to `THEME.SLOTS - 1`, which is the last
+role and no element beyond it.
+
+Usage is `THEME.ID%`, one `GOSUB THEME.SELECT`, then `THEME.CLR(role)` wherever an attribute is
 wanted:
 
 ```basic
-THEME.ID = 1 : GOSUB THEME.SELECT
+THEME.ID% = 1 : GOSUB THEME.SELECT
 GP.BOX 4,2,30,8, 2, THEME.CLR(THEME.BORDER)
 GP.PRINTAT 6,3, "TITLE", THEME.CLR(THEME.TITLE)
 ```

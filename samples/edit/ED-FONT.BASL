@@ -46,8 +46,8 @@ ED.GUI.SETUP:
   GP.SUB DLGRESET, ED.GUISAVE
   GP.SUB DLGGLYPH, -1
   GP.SUB DLGSHADOW, -1
-  ED.GUI.SHADE = THEME.CLR(THEME.SHADOW)
-  GP.SUB DLGSHADOWCLR, ED.GUI.SHADE
+  ED.GUI.SHADE% = THEME.CLR(THEME.SHADOW)
+  GP.SUB DLGSHADOWCLR, ED.GUI.SHADE%
   RETURN
 
 ## ED.PETFONT -- re-order charset 3 in VRAM into ASCII order.
@@ -76,29 +76,29 @@ ED.PETFONT:
   ## Charset 3 keeps its box drawing at $40-$7D, which the re-order below buries under ASCII
   ## letters. The six glyphs go up into $C0-$C5 first, the one region the re-order never
   ## touches.
-  ED.FS = 64  : ED.FD = ED.GL.H  : ED.FN = 1 : GOSUB ED.FCOPY : REM $40 horizontal
-  ED.FS = 93  : ED.FD = ED.GL.V  : ED.FN = 1 : GOSUB ED.FCOPY : REM $5D vertical
-  ED.FS = 112 : ED.FD = ED.GL.TL : ED.FN = 1 : GOSUB ED.FCOPY : REM $70 top left
-  ED.FS = 110 : ED.FD = ED.GL.TR : ED.FN = 1 : GOSUB ED.FCOPY : REM $6E top right
-  ED.FS = 109 : ED.FD = ED.GL.BL : ED.FN = 1 : GOSUB ED.FCOPY : REM $6D bottom left
-  ED.FS = 125 : ED.FD = ED.GL.BR : ED.FN = 1 : GOSUB ED.FCOPY : REM $7D bottom right
+  ED.FS% = 64  : ED.FD% = ED.GL.H  : ED.FN% = 1 : GOSUB ED.FCOPY : REM $40 horizontal
+  ED.FS% = 93  : ED.FD% = ED.GL.V  : ED.FN% = 1 : GOSUB ED.FCOPY : REM $5D vertical
+  ED.FS% = 112 : ED.FD% = ED.GL.TL : ED.FN% = 1 : GOSUB ED.FCOPY : REM $70 top left
+  ED.FS% = 110 : ED.FD% = ED.GL.TR : ED.FN% = 1 : GOSUB ED.FCOPY : REM $6E top right
+  ED.FS% = 109 : ED.FD% = ED.GL.BL : ED.FN% = 1 : GOSUB ED.FCOPY : REM $6D bottom left
+  ED.FS% = 125 : ED.FD% = ED.GL.BR : ED.FN% = 1 : GOSUB ED.FCOPY : REM $7D bottom right
   ## ---- the ASCII re-order ----
-  ED.FS = 64  : ED.FD = 96  : ED.FN = 1  : GOSUB ED.FCOPY
-  ED.FS = 91  : ED.FD = 123 : ED.FN = 5  : GOSUB ED.FCOPY
-  ED.FS = 0   : ED.FD = 64  : ED.FN = 1  : GOSUB ED.FCOPY
-  ED.FS = 27  : ED.FD = 91  : ED.FN = 5  : GOSUB ED.FCOPY
-  ED.FS = 1   : ED.FD = 97  : ED.FN = 26 : GOSUB ED.FCOPY
+  ED.FS% = 64  : ED.FD% = 96  : ED.FN% = 1  : GOSUB ED.FCOPY
+  ED.FS% = 91  : ED.FD% = 123 : ED.FN% = 5  : GOSUB ED.FCOPY
+  ED.FS% = 0   : ED.FD% = 64  : ED.FN% = 1  : GOSUB ED.FCOPY
+  ED.FS% = 27  : ED.FD% = 91  : ED.FN% = 5  : GOSUB ED.FCOPY
+  ED.FS% = 1   : ED.FD% = 97  : ED.FN% = 26 : GOSUB ED.FCOPY
   RETURN
 
-## ED.FCOPY -- copy ED.FN glyphs, 8 bytes each, from screen code ED.FS to code ED.FD.
+## ED.FCOPY -- copy ED.FN% glyphs, 8 bytes each, from screen code ED.FS% to code ED.FD.
 ##
-## WARNING: ED.FN is at least 1. GP.DO 0 loops forever.
+## WARNING: ED.FN% is at least 1. GP.DO 0 loops forever.
 ED.FCOPY:
-  ED.FCOUNT = ED.FN * 8
-  ED.FI = 0
-  GP.DO ED.FCOUNT
-    VPOKE 1, ED.FONT + ED.FD * 8 + ED.FI, VPEEK(1, ED.FONT + ED.FS * 8 + ED.FI)
-    ED.FI = ED.FI + 1
+  ED.FCOUNT% = ED.FN% * 8
+  ED.FI% = 0
+  GP.DO ED.FCOUNT%
+    VPOKE 1, ED.FONT + ED.FD% * 8 + ED.FI%, VPEEK(1, ED.FONT + ED.FS% * 8 + ED.FI%)
+    ED.FI% = ED.FI% + 1
   GP.LOOP
   RETURN
 

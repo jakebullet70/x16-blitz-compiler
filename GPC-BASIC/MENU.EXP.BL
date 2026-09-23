@@ -48,7 +48,7 @@
 GOSUB APPSYS.STARTUP
 GOSUB BANKMGR.INIT
 
-THEME.ID = 0
+THEME.ID% = 0
 GOSUB THEME.SELECT
 
 DIM DEMO.ITEM$(DEMO.COUNT)
@@ -86,7 +86,7 @@ DEMO.QUIT:
 
 ## ---- Drawing. Note there is no colour arithmetic anywhere: every colour
 ## ---- is a NAMED ROLE, so re-skinning the whole application is
-## ---- THEME.ID = 1 and nothing else. The menu draws its own frame.
+## ---- THEME.ID% = 1 and nothing else. The menu draws its own frame.
 
 DEMO.DRAW:
     GP.FILL 0, 0, APPSYS.COLS, APPSYS.ROWS, ASC(" "), THEME.CLR(THEME.PAGE)

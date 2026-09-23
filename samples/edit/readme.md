@@ -21,7 +21,7 @@ source. That is the point of the sample, and the numbers below are what it bough
 | `EDIT.SRC.PRG` | the tokenised program â€” the input you feed to the compiler |
 | `EDIT.SRC.SYM` | **BASLOAD's symbol file, and it is not optional** â€” see below |
 | `EDIT.PRG` | the compiled program, built EMBEDDED, so it carries the runtime |
-| `EDIT.OVL` | the banked code regions and the menu store's text, read at startup. It ships with `EDIT.PRG` |
+| `EDIT.OVL` | the banked code regions and the editor's banked text, read at startup. It ships with `EDIT.PRG` |
 | `TEST.MD` | the document the editor opens, and the fixture the self-check searches |
 | `bench/` | the four benchmarks, each holding old and new in **one** program: `BENCHROWS` renderer against renderer, `LOADBEN` loader against loader, `SLOTBEN` and `SLOTTST` for the line table |
 
@@ -32,6 +32,20 @@ had to be changed: APPSYS and STRCASE in `ED-MISC.BASL`, the font work in `ED-FO
 editor's own bar, dropdowns and dispatch in `ED-MENUS.BASL`. STASH stays in low memory because it
 executes `BANK`, which a region may not, and MENUKEY because it reads the keyboard layout under
 bank 0.
+
+**The editor's own literal text is in a bank too.** A string constant costs `2 + LEN` bytes of
+p-code wherever it is written and `GP.BSTR` costs 5, so text of five characters or more is
+cheaper read from the bank. `ED.TEXTBANK` is bank 12, and five `GP.BANKEDSTR` groups share it:
+`BS.MENU` in `ED-MENUS.BASL` for the bar and dropdown labels, and `BS.MSG`, `BS.DLG`, `BS.ABOUT`
+and `BS.BAR` at the top of `EDIT.BASL` for the status line, the dialogs and the About box. Every
+string has a `#DEFINE` for its index, because the index is positional and a line added to a group
+shifts every number after it. The `"BANK ... FAILED"` message stays a literal on purpose: it
+prints when a bank could not be claimed, which is the one moment the text bank may not be the
+editor's.
+
+The banks, in order: 1 the runtime's, 2-4 the line table, 5 the undo log, 6 the menu and theme
+code, 7 the menu rows, 8 the GUI engine, 9 the dialog verbs, 10 the cells a dialog covers, 11 the
+clipboard, 12 the editor's text, and 13 up to the top of RAM the document arena.
 
 > **`EDIT.SRC.SYM` ships for a reason.** `{VAR}` reaches a BASIC variable through BASLOAD's own
 > `#SYMFILE` record, because BASLOAD renames every variable (`ED.ASM.VIS%` becomes something like
@@ -152,9 +166,9 @@ load-bearing, and only the third is new:
 2. **Hardware vertical scroll.** A one-line scroll bumps VERA `L1_VSCROLL` (`$9F39/$9F3A`, map
    pixels, +8 a text row) and repaints **3 rows**, not 28: the menu bar (which must stay put while
    the map slides under it), the newly exposed text row, and the status bar. Every write is
-   addressed at map row `screen_row + ED.MAP.TOP`, where `ED.MAP.TOP = VSCROLL/8`. The map is 64
-   rows tall (probed from `L1_CONFIG`, so it self-adapts) and `ED.MAP.TOP` is bounded to
-   `[0, MAP.H − SCREEN.ROWS]` = `[0, 34]`, so the window never crosses the map's bottom edge — the
+   addressed at map row `screen_row + ED.MAP.TOP%`, where `ED.MAP.TOP% = VSCROLL/8`. The map is 64
+   rows tall (probed from `L1_CONFIG`, so it self-adapts) and `ED.MAP.TOP%` is bounded to
+   `[0, MAP.H − SCREEN.ROWS%]` = `[0, 34]`, so the window never crosses the map's bottom edge — the
    code **never relies on VERA's vertical wrap**; at the bound it rewinds and repaints.
 
 3. **Both renderers in `GP.ASM`.** `ED.RENDER.ROW` keeps the FX 32-bit cache write — one `DATA0`
@@ -266,7 +280,7 @@ second. `ED.MENU.KEYS.ON` asks `ED.MENU.HOTROW` too, for the keymap.
 blue while the panel is the page. So the bar is drawn in its own colours first with the title
 already lit, and the dropdown's highlight is the bar's: the relight changes nothing.
 
-Every key goes through `ED.MENUS.KEY` before the editor sees it, and `ED.MENUS.PICK` is `-1` when
+Every key goes through `ED.MENUS.KEY` before the editor sees it, and `ED.MENUS.PICK%` is `-1` when
 the menus did not take it. A chosen row lands in `ED.MENUS.DISPATCH`, which turns it into an
 `ED.CMD.*` call in `EDIT.BASL`.
 
@@ -298,7 +312,7 @@ Every question the editor asks -- a file name, a search, a line number, a save-o
 verb of `GUI-DIALOGS.INC.BL`, called where the question is asked. The editor draws none of it:
 
     ED.INPUT$ = GP.FN(INPUTBOXEX, "Find", "Find text:", "", "", ED.FIND$, ED.DLG.WIDTHDEFAULT, 0)
-    ED.SAVE.ANSWER = GP.FN(ASK3, ED.CONFIRM.TITLE$, "Save changes?", "&Save", "Do&n't Save", "&Cancel", 1, 3)
+    ED.SAVE.ANSWER% = GP.FN(ASK3, ED.CONFIRM.TITLE$, "Save changes?", "&Save", "Do&n't Save", "&Cancel", 1, 3)
 
 `ASK3` was written for this editor and added to the library, because a row of three buttons is what
 every program needs and a yes/no can only ever offer two of them. `INPUTBOXEX` answers with the

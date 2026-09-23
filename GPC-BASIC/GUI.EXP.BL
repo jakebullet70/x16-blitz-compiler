@@ -41,7 +41,7 @@
 
 GOSUB APPSYS.STARTUP
 GOSUB BANKMGR.INIT
-THEME.ID = 0 : GOSUB THEME.SELECT
+THEME.ID% = 0 : GOSUB THEME.SELECT
 ## Every dialog verb starts from a clean slate, and this is where it is told
 ## which bank that slate saves the screen into.
 GP.SUB DLGRESET, DEMO.BANK

@@ -940,6 +940,9 @@ before writing it. `KV.PUTNUM` and `KV.GETNUM` are stubs until this is done
   Method, self-check and prototype: section 5 of `source/application/COMPILER-STATUS.md`.
 - **`BASLOAD-GPC` end-of-run report in the same shape.** BEFORE RELEASE. The compiler's report it
   follows is settled. `### BASLOAD-GPC wants the same report`.
+- **The report never says how much of the 4,096-byte variable arena is gone.** Not started, and the
+  cheapest of these. The figure is already in `pass1VarSpace` when the report prints.
+  `### The report never says how much of the variable arena is gone`.
 
 **Done 2026-09-13, outside the ranking:** compiler tests in two tiers
 (`docs/blitz/COMPILER-TESTS.PLAN.md`); `GP.ASM` `{VAR}` lookup reads the symbol file once a compile,
@@ -3244,6 +3247,35 @@ Wanted, at minimum:
 
 `LOW FREE` excludes the 2K frame stack, and the report prints the frame stack beside it. See [Blitz runtime slack and limits](docs/memory/gpc-blitz-runtime-slack-and-limits.md)
 for what the ceilings actually are, and the standing rule that a build-side cap is a bug, not a spec.
+
+### The report never says how much of the variable arena is gone — OPEN, added 2026-09-23
+
+The banner prints `LOW CODE`, `LOW FREE`, `FRAME STACK`, `LINES`, `DEAD CODE` and a `BANK` line for
+each bank. It does not print the budget that stops a growing program first: the 4,096 bytes of
+scalar variables a p-code operand can address, `MaxVariableSpace` in
+`source/compiler/source/storage/create.asm`. Going over it raises `TOO MANY VARIABLES @ <line>` in
+PASS 1, and until that happens nothing tells anyone how close they were. An untyped scalar spends 6
+bytes of it, a `%` or a `$` spends 2, and an array's head slot spends 2 whatever its elements are --
+so the arena is a count of names, and it is a different budget from `LOW FREE`.
+
+The figure is already computed and already trusted at the moment the report prints. Pass one leaves
+it in `freeVariableMemory`; `source/compiler/source/main/compiler.asm` copies it into
+`pass1VarSpace` before `STRReset` zeroes the original, and pass two recomputes it and diverges to
+`_SCEDiverged` if the two disagree. One more line in `PrintMemoryReport`:
+
+    VARS 3402 OF 4096
+
+The cost is bytes of compiler, not bytes of the compiled program.
+
+The editor sample measured 3,968 of the 4,096 on 23rd September 2026 -- 128 bytes of headroom, about
+twenty more untyped names -- and typing its own 148 scalars `%` the same day brought it to 3,378,
+then to 3,402 once six of those names went back to untyped because they hold addresses. The
+only way to see either figure today is a host-side script that counts the names in the `.SYM`
+(`source/gpc/int16scan.py`), which is no use at all to someone compiling on an X16, and that is the
+whole argument for the line.
+
+Needs a compiler rebuild afterwards: `make libraries` alone leaves the shared runtimes stale and
+fakes a test failure.
 
 ### `BASLOAD-GPC` wants the same report — BEFORE RELEASE, once it is done
 

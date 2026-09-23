@@ -68,6 +68,17 @@ Including throwaway test files. BASLOAD does **not** derive the output name from
 Nine are in use across the tree: `#SAVEAS`, `#AUTONUM`, `#REM`, `#SYMFILE`, `#INCLUDE`, `#DEFINE`,
 `#IFNDEF`, `#ENDIF`, `#TOKEN`.
 
+### A source line is 250 characters
+
+Past that the run stops with `LINE TOO LONG IN <file>:<line>`, naming the line it could not read.
+The limit is `file_maxcol`, set to 250 by `file_init` in `BASLOAD-GPC/upstream/file.inc`, and
+`#MAXCOLUMN` raises it.
+
+It is easy to trip without adding anything: replacing a string literal with `GP.BSTR(GROUP, NAME)`
+makes the source line longer while making the object shorter, so a `GP.BANKEDSTR` conversion is
+exactly the change that overflows a line that used to fit. Split the statement rather than raising
+the limit — building a string in two assignments costs a line marker and a read.
+
 ### `#DEFINE` / `#IFNDEF`
 
 - **No digit anywhere in the symbol name.** `#IFNDEF GUI2.DEFS` and `#DEFINE GUI2.UP 145` both stop

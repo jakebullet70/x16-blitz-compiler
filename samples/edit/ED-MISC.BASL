@@ -10,7 +10,7 @@
 ## APPSYS -- start an application, and leave the screen the way it was found.
 ##
 ##     GOSUB ED.APPSYS.STARTUP
-##     ... the application, laid out with ED.APPSYS.COLS / ED.APPSYS.ROWS
+##     ... the application, laid out with ED.APPSYS.COLS% / ED.APPSYS.ROWS%
 ##     GOSUB ED.APPSYS.RESTORE : END
 ## ==========================================================================
 #IFNDEF ED.APPSYS.DEFS
@@ -29,6 +29,14 @@
 #DEFINE ED.APPSYS.SETCHR $FF62
 #DEFINE ED.APPSYS.CHRREG $0372
 
+## ISTOP, the KERNAL vector $FFE1 jumps through to ask whether the user pressed STOP, and the
+## three bytes of the stub that answers "no".
+##
+## The stub is LDA #$FF : RTS. It lives in the storage hole, immediately below GPBSTRBANKS at
+## $07F0 -- the piece of low RAM no runtime link occupies and nothing loads over.
+#DEFINE ED.APPSYS.ISTOPVEC $0328
+#DEFINE ED.APPSYS.STOPSTUB $07EC
+
 ## $9FBE and $9FBF read 49 and 54 -- "1" and "6" -- under x16emu.
 #DEFINE ED.APPSYS.EMUSIG $9FBE
 
@@ -37,20 +45,53 @@ GOTO ED.APPSYS.SKIP
 ## ED.APPSYS.STARTUP -- remember what the user had, and report the size. Call it before any
 ## SCREEN or COLOR of your own.
 ##
-##   out  ED.APPSYS.MODE    the screen mode, for ED.APPSYS.RESTORE
-##        ED.APPSYS.CHARSET the charset number, likewise
-##        ED.APPSYS.COLS    columns
-##        ED.APPSYS.ROWS    rows
-##        ED.APPSYS.COLOUR  the packed text colour
+##   out  ED.APPSYS.MODE%    the screen mode, for ED.APPSYS.RESTORE
+##        ED.APPSYS.CHARSET% the charset number, likewise
+##        ED.APPSYS.COLS%    columns
+##        ED.APPSYS.ROWS%    rows
+##        ED.APPSYS.COLOUR%  the packed text colour
 ED.APPSYS.STARTUP:  
-    GP.CALL ED.APPSYS.SCRMODE, 0, 0, 0, 1 : ED.APPSYS.MODE = GP.A : ED.APPSYS.COLS = GP.X : ED.APPSYS.ROWS = GP.Y
-    ED.APPSYS.COLOUR = PEEK(ED.APPSYS.COLREG) : ED.APPSYS.CHARSET = PEEK(ED.APPSYS.CHRREG)
+    GP.CALL ED.APPSYS.SCRMODE, 0, 0, 0, 1 : ED.APPSYS.MODE% = GP.A : ED.APPSYS.COLS% = GP.X : ED.APPSYS.ROWS% = GP.Y
+    ED.APPSYS.COLOUR% = PEEK(ED.APPSYS.COLREG) : ED.APPSYS.CHARSET% = PEEK(ED.APPSYS.CHRREG)
+    GOSUB ED.APPSYS.STOPOFF
     RETURN
 
 ## ED.APPSYS.RESTORE -- the screen as it was, for whatever runs next.
 ED.APPSYS.RESTORE:  
-    GP.CALL ED.APPSYS.SCRMODE, ED.APPSYS.MODE, 0, 0, 0 : GP.CALL ED.APPSYS.SETCHR, ED.APPSYS.CHARSET AND 63, 0, 0, 0
-    POKE ED.APPSYS.CHRREG, ED.APPSYS.CHARSET : COLOR ED.APPSYS.COLOUR AND 15, INT(ED.APPSYS.COLOUR / 16)
+    GP.CALL ED.APPSYS.SCRMODE, ED.APPSYS.MODE%, 0, 0, 0 : GP.CALL ED.APPSYS.SETCHR, ED.APPSYS.CHARSET% AND 63, 0, 0, 0
+    POKE ED.APPSYS.CHRREG, ED.APPSYS.CHARSET% : COLOR ED.APPSYS.COLOUR% AND 15, INT(ED.APPSYS.COLOUR% / 16)
+    GOSUB ED.APPSYS.STOPON
+    RETURN
+
+## ED.APPSYS.STOPOFF -- take CTRL+C away from the runtime, so the application can use it.
+##
+## The KERNAL sets its stop flag from the CHARACTER, not from the key: kbdbuf_put compares
+## every code it buffers against 3 and writes $FF to stkey when it matches. CTRL+C and
+## RUN/STOP both send 3, so an application that reads CTRL+C as Copy raises the flag every
+## time it is pressed. The runtime polls $FFE1 once every sixteen p-code words and stops the
+## program with BREAK PRESSED long before the key loop's GET ever runs, which is why the flag
+## cannot simply be cleared after the key is read -- there is no gap to clear it in.
+##
+## So the vector $FFE1 goes through is pointed at three bytes of our own that always answer
+## "not pressed". The old vector is kept for ED.APPSYS.STOPON.
+##
+## WHILE THIS IS IN FORCE NOTHING CAN BREAK OUT OF THE PROGRAM. That is the point, but it
+## also means a hang has to be met with a reset. The KERNAL's own STOP polls -- the ones that
+## abort a LOAD or a SAVE -- go dead with it.
+ED.APPSYS.STOPOFF:
+    POKE ED.APPSYS.STOPSTUB, 169 : REM LDA #$FF
+    POKE ED.APPSYS.STOPSTUB + 1, 255
+    POKE ED.APPSYS.STOPSTUB + 2, 96 : REM RTS, with Z clear, which is "no stop"
+    ED.APPSYS.STOPVEC.LO% = PEEK(ED.APPSYS.ISTOPVEC) : ED.APPSYS.STOPVEC.HI% = PEEK(ED.APPSYS.ISTOPVEC + 1)
+    ED.APPSYS.STOPHI% = INT(ED.APPSYS.STOPSTUB / 256)
+    POKE ED.APPSYS.ISTOPVEC, ED.APPSYS.STOPSTUB - ED.APPSYS.STOPHI% * 256
+    POKE ED.APPSYS.ISTOPVEC + 1, ED.APPSYS.STOPHI%
+    RETURN
+
+## ED.APPSYS.STOPON -- give it back, before the program ends. BASIC is unstoppable without this.
+ED.APPSYS.STOPON:
+    IF ED.APPSYS.STOPVEC.HI% = 0 THEN RETURN
+    POKE ED.APPSYS.ISTOPVEC, ED.APPSYS.STOPVEC.LO% : POKE ED.APPSYS.ISTOPVEC + 1, ED.APPSYS.STOPVEC.HI%
     RETURN
 
 ED.APPSYS.SKIP:
@@ -60,17 +101,17 @@ ED.APPSYS.SKIP:
 ## STRCASE -- case, rewriting a string in place.
 ##
 ##     ED.STRCASE.PTR = GP.STRPTR(LINE$)
-##     ED.STRCASE.MODE = ED.STRCASE.UPPER
+##     ED.STRCASE.MODE% = ED.STRCASE.UPPER
 ##     GOSUB ED.STRCASE.GO
 ##
 ##  in   ED.STRCASE.PTR    GP.STRPTR of the string
-##       ED.STRCASE.MODE   ED.STRCASE.UPPER or ED.STRCASE.LOWER
+##       ED.STRCASE.MODE%   ED.STRCASE.UPPER or ED.STRCASE.LOWER
 ##  out  the string itself, rewritten
 ##
 ## UPPER maps a-z to A-Z, LOWER maps A-Z to a-z. Every other byte passes through. An
 ## unrecognised mode does LOWER. A zero length string is not a special case.
 ##
-## ED.STRCASE.MODE is sticky: an ordinary variable, not an argument, so a call that does not
+## ED.STRCASE.MODE% is sticky: an ordinary variable, not an argument, so a call that does not
 ## set it repeats the last one. Set both inputs on every call.
 ##
 ## The {VAR} references need the #SYMFILE at the top of EDIT.BASL, which must come before the
@@ -92,12 +133,12 @@ ED.APPSYS.SKIP:
 GOTO ED.STRCASE.MODULE.END
 
 ## ED.STRCASE.ADDR% and ED.STRCASE.OP% are the 16-bit integer slots {VAR} needs, named apart
-## from ED.STRCASE.PTR / ED.STRCASE.MODE because BASLOAD's symbol file does not record the
+## from ED.STRCASE.PTR / ED.STRCASE.MODE% because BASLOAD's symbol file does not record the
 ## sigil -- X and X% would be one entry.
 
 ED.STRCASE.GO:
     ED.STRCASE.ADDR% = ED.STRCASE.PTR
-    ED.STRCASE.OP% = ED.STRCASE.MODE
+    ED.STRCASE.OP% = ED.STRCASE.MODE%
     #REM 1
     GP.ASM
     REM CLD                      ; SYS enters with the caller's flags

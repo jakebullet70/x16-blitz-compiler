@@ -1,0 +1,290 @@
+## ============================================================================
+## ED-SEL.BASL -- the selection: an anchor, the cursor, and everything between them.
+##
+## #INCLUDEd inline like ED-STORE.BASL, ED-UNDO.BASL and ED-CLIP.BASL, so these labels are
+## GOSUBbed from the editor and share its variables. It cannot be banked code either: it
+## reads the document arena and writes the clipboard, and both of those map at $A000, which
+## is the window a GP.BANKED region would be running from.
+##
+##   ED.SEL.ON%          0 when there is no selection
+##   ED.SEL.ANCHOR.ROW%  where SHIFT was first held down. The cursor is the other end, so the
+##   ED.SEL.ANCHOR.COL%  anchor is as often below and to the right of it as above and left
+##
+## ED.SEL.BOUNDS sorts those two ends into ED.SEL.TOP.ROW%/.COL% and ED.SEL.BOT.ROW%/.COL%,
+## and everything else here works from those. The columns count characters, not screen cells:
+## TOP.COL% is the first character selected, BOT.COL% the first one that is not.
+##
+## NEARLY EVERY VARIABLE HERE IS A %. A program gets 4,096 bytes of scalars, an untyped one
+## costs 6 of them and a % costs 2, and this file alone wanted thirty. They are all rows,
+## columns, counts and flags, so they fit -32,768 to 32,767 several times over. ED.SEL.ADDR
+## is untyped because it is a VRAM address and % is signed 16-bit, and the two FOR control
+## variables are untyped to match every other FOR in the editor.
+##
+## The highlight is a second pass over rows the renderer has already drawn. ED.ROW.STREAM
+## writes one attribute for a whole row in a single machine-code pass, so a span inside a
+## row cannot come out of it -- it has to be VPOKEd over the top, which is ED.SEL.PAINT.
+##
+## A FOR loop here is always entered with something to do, or guarded by the test above it.
+## This BASIC tests a loop at its NEXT, so an empty range still runs the body once.
+## ============================================================================
+
+## ED.SEL.INIT -- no selection. Called from ED.INIT.
+ED.SEL.INIT:
+  ED.SEL.ON% = 0 : ED.SEL.WAS.ON% = 0
+  RETURN
+
+## ED.SEL.KEY.PRE -- what a key does to the selection, before the key itself is handled.
+##
+## A movement key with SHIFT down extends the selection, dropping an anchor first if there
+## is not one yet. The same key without SHIFT ends it.
+##
+## MENU.MODS is what MENU.ALTHIT read on the way through ED.MENUS.KEY, one call after the
+## GET in the main loop, so it is as fresh here as it is for the menu bar's own ALT test.
+ED.SEL.KEY.PRE:
+  ED.SEL.MOVE% = 0
+  IF ED.KEY% = 157 OR ED.KEY% = 29 OR ED.KEY% = 145 OR ED.KEY% = 17 THEN ED.SEL.MOVE% = -1
+  IF ED.KEY% = 19 OR ED.KEY% = 4 OR ED.KEY% = 130 OR ED.KEY% = 2 THEN ED.SEL.MOVE% = -1
+  IF ED.SEL.MOVE% <> 0 THEN GOTO ED.SEL.KEY.MOVE
+  IF ED.SEL.ON% = 0 THEN RETURN
+  ## Cut and Copy read the selection. Paste, RETURN, BACKSPACE, DELETE and every key that
+  ## types replace it. All of those deal with it themselves, so they are left alone here.
+  IF ED.KEY% = 3 OR ED.KEY% = 24 OR ED.KEY% = 22 THEN RETURN
+  IF ED.KEY% = 13 OR ED.KEY% = 20 OR ED.KEY% = 25 THEN RETURN
+  IF ED.KEY% >= 32 AND ED.KEY% <= 126 THEN RETURN
+  ## Anything else -- undo, redo, a repeated find -- can move the rows out from under the
+  ## anchor, so the selection ends here rather than surviving into a document it no longer
+  ## describes.
+  GOSUB ED.SEL.CLEAR
+  RETURN
+
+ED.SEL.KEY.MOVE:
+  IF (MENU.MODS AND MENU.MOD.SHIFT) = 0 THEN GOSUB ED.SEL.CLEAR : RETURN
+  IF ED.SEL.ON% <> 0 THEN RETURN
+  ED.SEL.ANCHOR.ROW% = ED.CUR.ROW% : ED.SEL.ANCHOR.COL% = ED.CUR.COL% : ED.SEL.ON% = -1
+  RETURN
+
+## ED.SEL.CLEAR -- drop the selection and put the rows it lit back the way they were.
+##
+## It draws rather than leaving the next refresh to do it, because a cursor move that
+## changes nothing -- LEFT at the start of the document -- returns without refreshing at
+## all, and the highlight would stay on screen with no selection behind it.
+ED.SEL.CLEAR:
+  ED.SEL.ON% = 0
+  IF ED.SEL.WAS.ON% = 0 THEN RETURN
+  GOSUB ED.UNCARET : GOSUB ED.SEL.REDRAW : ED.SEL.WAS.ON% = 0
+  GOSUB ED.PLACE.CARET
+  RETURN
+
+## ED.SEL.BOUNDS -- sort the anchor and the cursor into TOP and BOT.
+ED.SEL.BOUNDS:
+  ED.SEL.TOP.ROW% = ED.SEL.ANCHOR.ROW% : ED.SEL.TOP.COL% = ED.SEL.ANCHOR.COL%
+  ED.SEL.BOT.ROW% = ED.CUR.ROW% : ED.SEL.BOT.COL% = ED.CUR.COL%
+  IF ED.SEL.ANCHOR.ROW% < ED.CUR.ROW% THEN RETURN
+  IF ED.SEL.ANCHOR.ROW% = ED.CUR.ROW% AND ED.SEL.ANCHOR.COL% <= ED.CUR.COL% THEN RETURN
+  ED.SEL.TOP.ROW% = ED.CUR.ROW% : ED.SEL.TOP.COL% = ED.CUR.COL%
+  ED.SEL.BOT.ROW% = ED.SEL.ANCHOR.ROW% : ED.SEL.BOT.COL% = ED.SEL.ANCHOR.COL%
+  RETURN
+
+## ED.SEL.EMPTY -- ED.SEL.NONE% is set when the two ends are the same place. SHIFT held with
+## the cursor already against an edge leaves a selection that is on and covers nothing, and
+## cutting or copying that should do nothing rather than take an empty line.
+ED.SEL.EMPTY:
+  GOSUB ED.SEL.BOUNDS
+  ED.SEL.NONE% = 0
+  IF ED.SEL.TOP.ROW% = ED.SEL.BOT.ROW% AND ED.SEL.TOP.COL% = ED.SEL.BOT.COL% THEN ED.SEL.NONE% = -1
+  RETURN
+
+
+## ============================================================================
+## Drawing it
+## ============================================================================
+
+## ED.SEL.REFRESH -- what a cursor move costs with a selection up: the rows the highlight
+## covered or now covers are drawn again, then the highlight, then the caret over the top
+## of it. ED.CARET.REFRESH comes here instead of moving its two cells.
+ED.SEL.REFRESH:
+  GOSUB ED.UNCARET : GOSUB ED.ENSURE.VISIBLE
+  IF ED.SCROLLED% = 1 THEN GOSUB ED.RENDER.ALL : GOTO ED.SEL.REFRESH.TOP
+  GOSUB ED.SEL.REDRAW
+ED.SEL.REFRESH.TOP:
+  GOSUB ED.SEL.PAINT : GOSUB ED.PLACE.CARET : GOSUB ED.RENDER.STATUS
+  RETURN
+
+## ED.SEL.REDRAW -- draw every row in the band the highlight covered last time and the band
+## it covers now. ED.RENDER.ROW writes a whole row in the text attribute, so this is what
+## rubs the old shape out; ED.SEL.PAINT then puts the new one on.
+##
+## Two bands rather than one because a selection grows and shrinks a row at a time: the row
+## the cursor just left has to lose its highlight in the same breath the new one gains it.
+ED.SEL.REDRAW:
+  ED.SEL.R0% = 0 : ED.SEL.R1% = 0 - 1
+  IF ED.SEL.WAS.ON% <> 0 THEN ED.SEL.R0% = ED.SEL.WAS.TOP% : ED.SEL.R1% = ED.SEL.WAS.BOT%
+  IF ED.SEL.ON% = 0 THEN GOTO ED.SEL.REDRAW.CLIP
+  GOSUB ED.SEL.BOUNDS
+  IF ED.SEL.WAS.ON% = 0 THEN ED.SEL.R0% = ED.SEL.TOP.ROW% : ED.SEL.R1% = ED.SEL.BOT.ROW%
+  IF ED.SEL.TOP.ROW% < ED.SEL.R0% THEN ED.SEL.R0% = ED.SEL.TOP.ROW%
+  IF ED.SEL.BOT.ROW% > ED.SEL.R1% THEN ED.SEL.R1% = ED.SEL.BOT.ROW%
+ED.SEL.REDRAW.CLIP:
+  IF ED.SEL.R0% < ED.TOP.LINE% THEN ED.SEL.R0% = ED.TOP.LINE%
+  IF ED.SEL.R1% > ED.TOP.LINE% + ED.TEXT.BOTTOM% - 1 THEN ED.SEL.R1% = ED.TOP.LINE% + ED.TEXT.BOTTOM% - 1
+  IF ED.SEL.R1% < ED.SEL.R0% THEN RETURN
+  FOR ED.SEL.ROW = ED.SEL.R0% TO ED.SEL.R1%
+    ED.SCREEN.ROW = ED.SEL.ROW - ED.TOP.LINE% + 1 : ED.DOC.LINE% = ED.SEL.ROW
+    GOSUB ED.RENDER.ROW
+  NEXT ED.SEL.ROW
+  RETURN
+
+## ED.SEL.PAINT -- lay the highlight over the rows of it that are on screen, and remember
+## which rows those were so ED.SEL.REDRAW can find them again.
+ED.SEL.PAINT:
+  ED.SEL.WAS.ON% = 0
+  IF ED.SEL.ON% = 0 THEN RETURN
+  GOSUB ED.SEL.BOUNDS
+  ED.SEL.WAS.ON% = -1 : ED.SEL.WAS.TOP% = ED.SEL.TOP.ROW% : ED.SEL.WAS.BOT% = ED.SEL.BOT.ROW%
+  FOR ED.SEL.ROW = ED.SEL.TOP.ROW% TO ED.SEL.BOT.ROW%
+    ED.SEL.SROW% = ED.SEL.ROW - ED.TOP.LINE% + 1
+    IF ED.SEL.SROW% >= 1 AND ED.SEL.SROW% <= ED.TEXT.BOTTOM% THEN GOSUB ED.SEL.ROW.PAINT
+  NEXT ED.SEL.ROW
+  RETURN
+
+## ED.SEL.ROW.PAINT -- one row of it, at screen row ED.SEL.SROW%.
+##
+## ED.SEL.C0% is the first character lit and ED.SEL.C1% the first one that is not. A row that
+## is not the last gets one cell past the end of its text as well, so the line break it
+## holds shows as part of the selection rather than the line stopping short.
+ED.SEL.ROW.PAINT:
+  ED.SEL.C0% = 0 : ED.SEL.C1% = ED.SEL.BOT.COL%
+  IF ED.SEL.ROW = ED.SEL.TOP.ROW% THEN ED.SEL.C0% = ED.SEL.TOP.COL%
+  IF ED.SEL.ROW < ED.SEL.BOT.ROW% THEN GOSUB ED.SEL.ROW.LEN : ED.SEL.C1% = ED.SEL.LEN% + 1
+  ED.SEL.S0% = ED.SEL.C0% - ED.LEFT.COL% : ED.SEL.S1% = ED.SEL.C1% - ED.LEFT.COL% - 1
+  IF ED.SEL.S0% < 0 THEN ED.SEL.S0% = 0
+  IF ED.SEL.S1% > ED.TEXT.WIDTH% - 1 THEN ED.SEL.S1% = ED.TEXT.WIDTH% - 1
+  IF ED.SEL.S1% < ED.SEL.S0% THEN RETURN
+  ED.SEL.ADDR = (ED.SEL.SROW% + ED.MAP.TOP%) * 256 + (ED.SEL.S0% + ED.GUT.W) * 2 + 1
+  FOR ED.SEL.CELL = 0 TO ED.SEL.S1% - ED.SEL.S0%
+    VPOKE 0, ED.SEL.ADDR + ED.SEL.CELL * 2, ED.ATTR.SEL%
+  NEXT ED.SEL.CELL
+  RETURN
+
+## ED.SEL.ROW.LEN -- how many characters row ED.SEL.ROW holds. The cursor's row is the live
+## line, and the store's copy of that is the version from before the typing started.
+ED.SEL.ROW.LEN:
+  ED.SEL.LEN% = LEN(ED.CUR.LINE$)
+  IF ED.SEL.ROW = ED.CUR.ROW% THEN RETURN
+  LINE.INDEX% = ED.SEL.ROW : GOSUB DOC.SLOT.READ
+  BANK DOC.GOT.BANK% : ED.SEL.LEN% = PEEK(DOC.GOT.OFF)
+  RETURN
+
+
+## ============================================================================
+## Taking it
+##
+## UNDO.MAX.GROUP% is the undo ring's depth, set in UNDO.INIT. A cut writes one record per
+## line it removes plus one for the line they join into, and a paste one per line it adds
+## plus one for the line it splits. A group bigger than the ring loses its oldest records,
+## and an undo that puts half the text back is worse than not offering the cut, so the
+## operation is refused instead.
+## ============================================================================
+
+## ED.SEL.CHECK -- is there a selection, and is it one the editor will act on?
+##
+##   out  ED.SEL.NONE%      set when the two ends are the same place: nothing to act on
+##        ED.SEL.REFUSED%   set when it spans more lines than the undo ring can hold, and
+##                         the status line has already said so
+##
+## Cut, Copy, Paste and every edit that replaces the selection ask this first, so the test
+## and its message are written once.
+ED.SEL.CHECK:
+  ED.SEL.REFUSED% = 0
+  GOSUB ED.SEL.EMPTY
+  IF ED.SEL.NONE% <> 0 THEN RETURN
+  IF (ED.SEL.BOT.ROW% - ED.SEL.TOP.ROW%) + 1 > UNDO.MAX.GROUP% THEN ED.SEL.REFUSED% = -1 : GOTO ED.SEL.TOOBIG
+  RETURN
+
+## ED.SEL.COPY -- every selected line, or the selected part of it, onto the clipboard.
+##
+##   out  CLIP.OK%  0 if the clipboard bank would not hold it
+##
+## CLIP.RESET clears CLIP.WHOLELINE%, and nothing here sets it again: what goes on the
+## clipboard is a span of text, and Paste splices a span into the line the cursor is on
+## rather than putting whole lines back as lines.
+ED.SEL.COPY:
+  GOSUB ED.COMMIT.LIVE
+  GOSUB ED.SEL.BOUNDS
+  GOSUB CLIP.RESET : CLIP.OK% = -1
+  FOR ED.SEL.ROW = ED.SEL.TOP.ROW% TO ED.SEL.BOT.ROW%
+    IF CLIP.OK% <> 0 THEN GOSUB ED.SEL.COPY.ROW
+  NEXT ED.SEL.ROW
+  RETURN
+
+ED.SEL.COPY.ROW:
+  LINE.INDEX% = ED.SEL.ROW : GOSUB DOC.LOAD
+  ED.SEL.A% = 0 : ED.SEL.B% = LEN(LINE.TEXT$)
+  IF ED.SEL.ROW = ED.SEL.TOP.ROW% THEN ED.SEL.A% = ED.SEL.TOP.COL%
+  IF ED.SEL.ROW = ED.SEL.BOT.ROW% THEN ED.SEL.B% = ED.SEL.BOT.COL%
+  IF ED.SEL.B% > ED.SEL.A% THEN LINE.TEXT$ = MID$(LINE.TEXT$, ED.SEL.A% + 1, ED.SEL.B% - ED.SEL.A%)
+  IF ED.SEL.B% <= ED.SEL.A% THEN LINE.TEXT$ = ""
+  GOSUB CLIP.PUT
+  RETURN
+
+## ED.SEL.DELETE -- take the selection out of the document, as one undo group.
+##
+##   out  ED.SEL.DID%       set when text was removed
+##        ED.SEL.REFUSED%   set when the selection was too big for the undo ring
+##
+## One row: the middle of the line goes and its two ends join. Several: the head of the
+## first row and the tail of the last join into the first, and every row after it goes.
+##
+## Every record is pushed before anything moves, so each one still points at the line it
+## describes. The DELLINE records go on backwards: UNDO.RUN pops a group off the top of the
+## ring, so the last record pushed is the first applied, and the lines have to come back top
+## down or each one lands underneath the one before it.
+ED.SEL.DELETE:
+  ED.SEL.DID% = 0
+  GOSUB ED.SEL.CHECK
+  IF ED.SEL.REFUSED% <> 0 THEN RETURN
+  IF ED.SEL.NONE% <> 0 THEN GOSUB ED.SEL.CLEAR : RETURN
+  GOSUB ED.COMMIT.LIVE
+  LINE.INDEX% = ED.SEL.TOP.ROW% : GOSUB DOC.LOAD
+  ED.SEL.HEAD$ = LEFT$(LINE.TEXT$, ED.SEL.TOP.COL%)
+  LINE.INDEX% = ED.SEL.BOT.ROW% : GOSUB DOC.LOAD
+  ED.SEL.TAIL$ = MID$(LINE.TEXT$, ED.SEL.BOT.COL% + 1, 250)
+  GOSUB UNDO.BEGIN
+  UNDO.ROW% = ED.SEL.TOP.ROW% : GOSUB UNDO.REC.REPLACE
+  IF ED.SEL.BOT.ROW% > ED.SEL.TOP.ROW% THEN GOSUB ED.SEL.REC.GONE
+  LINE.TEXT$ = LEFT$(ED.SEL.HEAD$ + ED.SEL.TAIL$, 250)
+  LINE.INDEX% = ED.SEL.TOP.ROW% : GOSUB DOC.STORE
+  IF ED.SEL.BOT.ROW% > ED.SEL.TOP.ROW% THEN GOSUB ED.SEL.CUT.GONE
+  ED.SEL.ON% = 0 : ED.SEL.WAS.ON% = 0
+  ED.CUR.ROW% = ED.SEL.TOP.ROW% : ED.CUR.COL% = ED.SEL.TOP.COL%
+  GOSUB ED.LOAD.LIVE
+  ED.SEL.DID% = -1 : ED.DOC.DIRTY% = 1 : GOSUB ED.REFRESH.FULL
+  RETURN
+
+## The rows below the first one, recorded bottom up and then removed bottom up. Removing
+## from the bottom is what keeps the rows still to go at the index they were read at.
+ED.SEL.REC.GONE:
+  FOR ED.SEL.ROW = ED.SEL.BOT.ROW% TO ED.SEL.TOP.ROW% + 1 STEP -1
+    UNDO.ROW% = ED.SEL.ROW : GOSUB UNDO.REC.DELLINE
+  NEXT ED.SEL.ROW
+  RETURN
+
+ED.SEL.CUT.GONE:
+  FOR ED.SEL.ROW = ED.SEL.BOT.ROW% TO ED.SEL.TOP.ROW% + 1 STEP -1
+    LINE.INDEX% = ED.SEL.ROW : GOSUB DOC.DELETE.SLOT
+  NEXT ED.SEL.ROW
+  RETURN
+
+ED.SEL.TOOBIG:
+  ED.MSG$ = GP.BSTR(BS.MSG, BSTR.MSG.TOO.MANY.LINES) : GOSUB ED.ERR.MSG
+  RETURN
+
+## ED.SEL.TYPEOVER -- take the selection out on the way into an edit that replaces it.
+##
+## ED.CUR.DIRTY% is left set, so UNDO.TOUCH sees a line already being typed on and does not
+## open a second group. The character that replaces the text then undoes with it, in one
+## step, which is what a reader expects of typing over a selection.
+ED.SEL.TYPEOVER:
+  GOSUB ED.SEL.DELETE
+  IF ED.SEL.DID% <> 0 THEN ED.CUR.DIRTY% = 1
+  RETURN

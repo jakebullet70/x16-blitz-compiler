@@ -12,7 +12,7 @@
 ##
 ##   CLIP.PTR     where the next record goes, and so the end of what is held
 ##   CLIP.READ    where the next CLIP.GET reads, set by CLIP.REWIND
-##   CLIP.COUNT   records held. 0 is an empty clipboard
+##   CLIP.COUNT%   records held. 0 is an empty clipboard
 ##
 ## The format is the arena's rather than a run of text with separators in it, because the two
 ## machine-code character loops in ED-STORE.BASL already read and write it. CLIP.PUT and
@@ -24,42 +24,45 @@
 ## CLIP.INIT -- claim the clipboard bank and empty it.
 ##
 ## Bank 11 is free: the line table holds 2 to 4, undo holds 5, the code, text and dialog-save
-## regions hold 6 to 10, and the arena starts at 13. A claim that fails leaves CLIP.ON 0 and
+## regions hold 6 to 10, and the arena starts at 13. A claim that fails leaves CLIP.ON% 0 and
 ## every entry point below turns into a RETURN, so the editor runs without a clipboard rather
 ## than writing records over somebody else's bank.
 CLIP.INIT:
   ## $A000 to $BF00, with $BF00..$BFFF left as a guard tail -- the arena's own layout.
   CLIP.WIN.START = 40960 : CLIP.WIN.END = 48896
-  CLIP.BANK = 11 : CLIP.ON = 0
-  IF GP.FN(BANKMGR.CLAIM.BANK, CLIP.BANK) <> 0 THEN CLIP.ON = -1
+  CLIP.BANK% = 11 : CLIP.ON% = 0
+  IF GP.FN(BANKMGR.CLAIM.BANK, CLIP.BANK%) <> 0 THEN CLIP.ON% = -1
   GOSUB CLIP.RESET
   RETURN
 
 ## CLIP.RESET -- forget what is held. A copy or a cut calls it before its first CLIP.PUT, so
 ## the new contents replace the old rather than pile up behind them.
+## CLIP.WHOLELINE% goes with the contents: set, the records are whole lines and Paste puts
+## them back as lines; clear, they are a span of text and Paste splices them into the line
+## the cursor is on. It is cleared here, so a copy that wants it says so afterwards.
 CLIP.RESET:
-  CLIP.PTR = CLIP.WIN.START : CLIP.COUNT = 0
+  CLIP.PTR = CLIP.WIN.START : CLIP.COUNT% = 0 : CLIP.WHOLELINE% = 0
   RETURN
 
 ## CLIP.PUT -- append LINE.TEXT$ as one record.
 ##
-##   out  CLIP.OK   0 when there is no clipboard bank or the record did not fit
+##   out  CLIP.OK%   0 when there is no clipboard bank or the record did not fit
 ##
 ## The ceiling is tested against the whole record, length byte included. A test that covered
 ## only the characters would let a full clipboard write its length byte into the guard tail.
 CLIP.PUT:
-  CLIP.OK = 0
-  IF CLIP.ON = 0 THEN RETURN
-  CLIP.LEN = LEN(LINE.TEXT$)
-  IF CLIP.PTR + CLIP.LEN + 1 > CLIP.WIN.END THEN RETURN
-  BANK CLIP.BANK : POKE CLIP.PTR, CLIP.LEN
+  CLIP.OK% = 0
+  IF CLIP.ON% = 0 THEN RETURN
+  CLIP.LEN% = LEN(LINE.TEXT$)
+  IF CLIP.PTR + CLIP.LEN% + 1 > CLIP.WIN.END THEN RETURN
+  BANK CLIP.BANK% : POKE CLIP.PTR, CLIP.LEN%
   ## DOC.STORE.CHARS copies LINE.TEXT$ into the bank window in one machine-code pass. It
-  ## reads DOC.RESULT.BANK, DOC.RESULT.OFF and DOC.LEN, and writes the characters at +1,
+  ## reads DOC.RESULT.BANK%, DOC.RESULT.OFF and DOC.LEN%, and writes the characters at +1,
   ## leaving the length byte alone -- which is the record this routine is building.
-  DOC.RESULT.BANK = CLIP.BANK : DOC.RESULT.OFF = CLIP.PTR : DOC.LEN = CLIP.LEN
-  IF CLIP.LEN > 0 THEN GOSUB DOC.STORE.CHARS
-  CLIP.PTR = CLIP.PTR + CLIP.LEN + 1
-  CLIP.COUNT = CLIP.COUNT + 1 : CLIP.OK = -1
+  DOC.RESULT.BANK% = CLIP.BANK% : DOC.RESULT.OFF = CLIP.PTR : DOC.LEN% = CLIP.LEN%
+  IF CLIP.LEN% > 0 THEN GOSUB DOC.STORE.CHARS
+  CLIP.PTR = CLIP.PTR + CLIP.LEN% + 1
+  CLIP.COUNT% = CLIP.COUNT% + 1 : CLIP.OK% = -1
   RETURN
 
 ## CLIP.REWIND -- point CLIP.GET at the first record.
@@ -68,14 +71,14 @@ CLIP.REWIND:
   RETURN
 
 ## CLIP.GET -- read the record at CLIP.READ into LINE.TEXT$ and step past it. Reading past
-## the last record gives an empty string, so a caller that walks CLIP.COUNT records and one
+## the last record gives an empty string, so a caller that walks CLIP.COUNT% records and one
 ## that walks until the text is empty both behave.
 CLIP.GET:
   LINE.TEXT$ = ""
-  IF CLIP.ON = 0 THEN RETURN
+  IF CLIP.ON% = 0 THEN RETURN
   IF CLIP.READ >= CLIP.PTR THEN RETURN
-  BANK CLIP.BANK
-  DOC.GOT.OFF = CLIP.READ : DOC.LEN = PEEK(CLIP.READ)
-  IF DOC.LEN > 0 THEN GOSUB DOC.LOAD.CHARS
-  CLIP.READ = CLIP.READ + DOC.LEN + 1
+  BANK CLIP.BANK%
+  DOC.GOT.OFF = CLIP.READ : DOC.LEN% = PEEK(CLIP.READ)
+  IF DOC.LEN% > 0 THEN GOSUB DOC.LOAD.CHARS
+  CLIP.READ = CLIP.READ + DOC.LEN% + 1
   RETURN

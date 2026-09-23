@@ -3,12 +3,64 @@
 ##
 ## The menus themselves are the library's: MENU, MENUPULL and MENUKEY, #INCLUDEd from
 ## GPC-BASIC/ by EDIT.BASL, with MENU and MENUPULL in a RAM bank and their rows in a
-## GP.BANKEDSTR text bank. This file is the editor's layer on top: which titles there are,
+## text bank of its own. This file is the editor's layer on top: which titles there are,
 ## what is in each dropdown, and what a chosen row calls.
 ##
 ## ED.MENUS.KEY sees each key first. ALT, or ALT+letter, opens the bar, and it hands back the
 ## row chosen.
 ## ============================================================================
+
+## ---- the bar and dropdown text, in the editor's text bank ----
+## EDIT.BASL owns ED.TEXTBANK and states the rules these blocks follow. This group is here
+## rather than there because nothing outside this file reads it.
+##
+## The separator row is not in the group. Its text is one hyphen, and a string that short is
+## cheaper written in the line than read from the bank.
+
+#DEFINE BSTR.MENU.FILE      0
+#DEFINE BSTR.MENU.EDIT      1
+#DEFINE BSTR.MENU.SEARCH    2
+#DEFINE BSTR.MENU.HELP      3
+#DEFINE BSTR.MENU.NEW       4
+#DEFINE BSTR.MENU.OPEN      5
+#DEFINE BSTR.MENU.SAVE      6
+#DEFINE BSTR.MENU.SAVE.AS   7
+#DEFINE BSTR.MENU.EXIT      8
+#DEFINE BSTR.MENU.CUT       9
+#DEFINE BSTR.MENU.COPY      10
+#DEFINE BSTR.MENU.PASTE     11
+#DEFINE BSTR.MENU.UNDO      12
+#DEFINE BSTR.MENU.REDO      13
+#DEFINE BSTR.MENU.FIND      14
+#DEFINE BSTR.MENU.FIND.NEXT 15
+#DEFINE BSTR.MENU.FIND.PREV 16
+#DEFINE BSTR.MENU.REPLACE   17
+#DEFINE BSTR.MENU.GOTO.LINE 18
+#DEFINE BSTR.MENU.ABOUT     19
+
+GP.BANKEDSTR ED.TEXTBANK BS.MENU
+  " &File "
+  " &Edit "
+  " &Search "
+  " &Help "
+  " &New "
+  " &Open... "
+  " &Save "
+  " Save &As... "
+  " E&xit "
+  " Cu&t "
+  " &Copy "
+  " &Paste "
+  " &Undo "
+  " &Redo "
+  " &Find... "
+  " Find &Next "
+  " Find &Previous "
+  " &Replace... "
+  " &Go to Line... "
+  " &About "
+GP.ENDBANKEDSTR
+
 
 ## ==========================================================================
 ## The editor's own bar and dropdowns.
@@ -25,38 +77,38 @@ ED.MENUS.SETUP:
   MENU.SHADOW = -1
   GOSUB MENU.THEME
   GP.SUB MENU.BEGIN, MENU.BAR
-  GP.SUB MENU.ITEM, " &File "
-  GP.SUB MENU.ITEM, " &Edit "
-  GP.SUB MENU.ITEM, " &Search "
-  GP.SUB MENU.ITEM, " &Help "
+  GP.SUB MENU.ITEM, GP.BSTR(BS.MENU, BSTR.MENU.FILE)
+  GP.SUB MENU.ITEM, GP.BSTR(BS.MENU, BSTR.MENU.EDIT)
+  GP.SUB MENU.ITEM, GP.BSTR(BS.MENU, BSTR.MENU.SEARCH)
+  GP.SUB MENU.ITEM, GP.BSTR(BS.MENU, BSTR.MENU.HELP)
   ## A hot key need not be the initial: Save and Save As both start with S, so the second takes
   ## its A. The leading space insets the text, the trailing one pads.
   GP.SUB MENU.BEGIN, MENU.DROP + 1
-  GP.SUB MENU.ITEM, " &New "
-  GP.SUB MENU.ITEM, " &Open... "
-  GP.SUB MENU.ITEM, " &Save "
-  GP.SUB MENU.ITEM, " Save &As... "
-  GP.SUB MENU.ITEM, " E&xit "
+  GP.SUB MENU.ITEM, GP.BSTR(BS.MENU, BSTR.MENU.NEW)
+  GP.SUB MENU.ITEM, GP.BSTR(BS.MENU, BSTR.MENU.OPEN)
+  GP.SUB MENU.ITEM, GP.BSTR(BS.MENU, BSTR.MENU.SAVE)
+  GP.SUB MENU.ITEM, GP.BSTR(BS.MENU, BSTR.MENU.SAVE.AS)
+  GP.SUB MENU.ITEM, GP.BSTR(BS.MENU, BSTR.MENU.EXIT)
   ## The dropdown numbers are the bar's own order, so a menu added in the middle moves every
   ## one above it, here and in ED.MENUS.DISPATCH, which reads the same order.
   ## Cut, Copy and Paste keep Windows' own hot keys: C is Copy's, so Cut takes its T. A row
   ## whose text is one hyphen draws as a separator line. It counts as a row and the cursor
   ## steps over it, so ED.DROPDOWN.EDIT still has to spend a branch on it.
   GP.SUB MENU.BEGIN, MENU.DROP + 2
-  GP.SUB MENU.ITEM, " Cu&t "
-  GP.SUB MENU.ITEM, " &Copy "
-  GP.SUB MENU.ITEM, " &Paste "
+  GP.SUB MENU.ITEM, GP.BSTR(BS.MENU, BSTR.MENU.CUT)
+  GP.SUB MENU.ITEM, GP.BSTR(BS.MENU, BSTR.MENU.COPY)
+  GP.SUB MENU.ITEM, GP.BSTR(BS.MENU, BSTR.MENU.PASTE)
   GP.SUB MENU.ITEM, "-"
-  GP.SUB MENU.ITEM, " &Undo "
-  GP.SUB MENU.ITEM, " &Redo "
+  GP.SUB MENU.ITEM, GP.BSTR(BS.MENU, BSTR.MENU.UNDO)
+  GP.SUB MENU.ITEM, GP.BSTR(BS.MENU, BSTR.MENU.REDO)
   GP.SUB MENU.BEGIN, MENU.DROP + 3
-  GP.SUB MENU.ITEM, " &Find... "
-  GP.SUB MENU.ITEM, " Find &Next "
-  GP.SUB MENU.ITEM, " Find &Previous "
-  GP.SUB MENU.ITEM, " &Replace... "
-  GP.SUB MENU.ITEM, " &Go to Line... "
+  GP.SUB MENU.ITEM, GP.BSTR(BS.MENU, BSTR.MENU.FIND)
+  GP.SUB MENU.ITEM, GP.BSTR(BS.MENU, BSTR.MENU.FIND.NEXT)
+  GP.SUB MENU.ITEM, GP.BSTR(BS.MENU, BSTR.MENU.FIND.PREV)
+  GP.SUB MENU.ITEM, GP.BSTR(BS.MENU, BSTR.MENU.REPLACE)
+  GP.SUB MENU.ITEM, GP.BSTR(BS.MENU, BSTR.MENU.GOTO.LINE)
   GP.SUB MENU.BEGIN, MENU.DROP + 4
-  GP.SUB MENU.ITEM, " &About "
+  GP.SUB MENU.ITEM, GP.BSTR(BS.MENU, BSTR.MENU.ABOUT)
   RETURN
 
 ## ED.MENUS.DRAW.BAR -- draw the titles, none lit. ED.RENDER.MENUBAR draws the band and the
@@ -67,15 +119,15 @@ ED.MENUS.DRAW.BAR:
 
 ## ED.MENUS.KEY -- every key comes here first.
 ##
-##   in   ED.KEY         the key the editor read
-##   out  ED.MENUS.PICK  -1 when the menus did not take the key, 0 when a menu opened
+##   in   ED.KEY%         the key the editor read
+##   out  ED.MENUS.PICK%  -1 when the menus did not take the key, 0 when a menu opened
 ##                       and closed with nothing chosen, otherwise the row chosen
 ED.MENUS.KEY:
-  ED.MENUS.PICK = GP.FN(MENU.KEY, ED.KEY)
-  IF ED.MENUS.PICK < 0 THEN RETURN
+  ED.MENUS.PICK% = GP.FN(MENU.KEY, ED.KEY%)
+  IF ED.MENUS.PICK% < 0 THEN RETURN
   ## The dropdown painted over the caret cell on its way out.
   GOSUB ED.PLACE.CARET
-  IF ED.MENUS.PICK > 0 THEN GOSUB ED.MENUS.DISPATCH
+  IF ED.MENUS.PICK% > 0 THEN GOSUB ED.MENUS.DISPATCH
   RETURN
 
 ## ED.MENUS.DISPATCH -- the bar item first, then the row inside its dropdown.
@@ -85,7 +137,7 @@ ED.MENUS.DISPATCH:
 
 ## ED.DROPDOWN.FILE -- the File menu's rows.
 ED.DROPDOWN.FILE:
-  ON ED.MENUS.PICK GOSUB ED.CMD.NEW, ED.CMD.OPEN, ED.CMD.SAVE, ED.CMD.SAVEAS, ED.CMD.EXIT
+  ON ED.MENUS.PICK% GOSUB ED.CMD.NEW, ED.CMD.OPEN, ED.CMD.SAVE, ED.CMD.SAVEAS, ED.CMD.EXIT
   RETURN
 
 ## ED.DROPDOWN.EDIT -- the Edit menu's rows. The first three are in EDIT.BASL and the last two
@@ -96,7 +148,7 @@ ED.DROPDOWN.FILE:
 ## Row 4 is the separator. The menus refuse to choose it, so ED.MENUS.NOTHING is never reached,
 ## but ON ... GOSUB counts positions and the row has to hold one.
 ED.DROPDOWN.EDIT:
-  ON ED.MENUS.PICK GOSUB ED.CMD.CUT, ED.CMD.COPY, ED.CMD.PASTE, ED.MENUS.NOTHING, UNDO.CMD, UNDO.REDO.CMD
+  ON ED.MENUS.PICK% GOSUB ED.CMD.CUT, ED.CMD.COPY, ED.CMD.PASTE, ED.MENUS.NOTHING, UNDO.CMD, UNDO.REDO.CMD
   RETURN
 
 ED.MENUS.NOTHING:
@@ -104,7 +156,7 @@ ED.MENUS.NOTHING:
 
 ## ED.DROPDOWN.SEARCH -- the Search menu's rows.
 ED.DROPDOWN.SEARCH:
-  ON ED.MENUS.PICK GOSUB ED.CMD.FIND, ED.CMD.FINDNEXT, ED.CMD.FINDPREV, ED.CMD.REPLACE, ED.CMD.GOTO
+  ON ED.MENUS.PICK% GOSUB ED.CMD.FIND, ED.CMD.FINDNEXT, ED.CMD.FINDPREV, ED.CMD.REPLACE, ED.CMD.GOTO
   RETURN
 
 ED.MENUS.END:

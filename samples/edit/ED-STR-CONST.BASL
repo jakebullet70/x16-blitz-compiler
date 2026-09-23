@@ -1,0 +1,150 @@
+## ============================================================================
+## ED-STR-CONST.BASL -- the editor's own literal text, in a RAM bank.
+##
+## Four GP.BANKEDSTR groups and a #DEFINE for every string in them. The menu labels are the
+## fifth group and live in ED-MENUS.BASL, beside the rows that name them.
+##
+## It is #INCLUDEd at the top of EDIT.BASL, before the code, and it must stay there: the
+## groups read ED.TEXTBANK, which EDIT.BASL #DEFINEs above the #INCLUDE, and BASLOAD resolves
+## a #DEFINE only once it has read it.
+## ============================================================================
+
+## A string constant costs 2 + LEN bytes of p-code wherever it is written and GP.BSTR costs 5,
+## so text of five characters or more is cheaper read from the bank than spelled out in the
+## line. None of it is executed or indexed and the editor reads one item at a time, which is
+## the bargain GP.BANKEDSTR is for. GPC-BASIC/GP-BASIC.md 3.10 has the rules.
+##
+## A program may have sixteen text banks, but the editor keeps all of its own text in one, so
+## every block here names ED.TEXTBANK -- these four and the menu labels in ED-MENUS.BASL. The
+## blocks are separate groups because each is indexed from zero within itself, so a line added
+## to one moves no index in another.
+##
+## EVERY STRING HAS A #DEFINE. The index is positional: a bare GP.BSTR(BS.MSG, 7) says nothing
+## about which string it is, and inserting a line above it shifts every number after it without
+## a word of complaint. A #DEFINE is resolved while the program compiles, so the name is free.
+
+#DEFINE BSTR.MSG.LINE.COPIED    0
+#DEFINE BSTR.MSG.COPIED         1
+#DEFINE BSTR.MSG.LINE.CUT       2
+#DEFINE BSTR.MSG.CUT            3
+#DEFINE BSTR.MSG.PASTED         4
+#DEFINE BSTR.MSG.CLIP.FULL      5
+#DEFINE BSTR.MSG.CLIP.EMPTY     6
+#DEFINE BSTR.MSG.TOO.MANY.LINES 7
+#DEFINE BSTR.MSG.NOTHING.UNDO   8
+#DEFINE BSTR.MSG.NOTHING.REDO   9
+#DEFINE BSTR.MSG.SAVED          10
+#DEFINE BSTR.MSG.LINE           11
+#DEFINE BSTR.MSG.FOUND          12
+#DEFINE BSTR.MSG.NOT.FOUND      13
+#DEFINE BSTR.MSG.REPLACED.ONE   14
+#DEFINE BSTR.MSG.REPLACED       15
+#DEFINE BSTR.MSG.LINE.TOO.LONG  16
+#DEFINE BSTR.MSG.TOO.LONG.TAIL  17
+#DEFINE BSTR.MSG.FULL.TAIL      18
+
+GP.BANKEDSTR ED.TEXTBANK BS.MSG
+  "Line copied"
+  "Copied"
+  "Line cut"
+  "Cut"
+  "Pasted"
+  "Clipboard full"
+  "Clipboard empty"
+  "Too many lines"
+  "Nothing to undo"
+  "Nothing to redo"
+  "Saved "
+  "Line "
+  "Found: "
+  "Not found: "
+  "Replaced 1"
+  "Replaced "
+  "Line would be too long"
+  " too long"
+  " -- DOCUMENT FULL"
+GP.ENDBANKEDSTR
+
+#DEFINE BSTR.DLG.START.FILE    0
+#DEFINE BSTR.DLG.UNTITLED      1
+#DEFINE BSTR.DLG.FILE.NAME     2
+#DEFINE BSTR.DLG.SAVE.AS       3
+#DEFINE BSTR.DLG.SAVE.CHANGES  4
+#DEFINE BSTR.DLG.SAVE.BTN      5
+#DEFINE BSTR.DLG.DONT.SAVE.BTN 6
+#DEFINE BSTR.DLG.CANCEL.BTN    7
+#DEFINE BSTR.DLG.FIND.TEXT     8
+#DEFINE BSTR.DLG.GO.TO.LINE    9
+#DEFINE BSTR.DLG.LINE.NUMBER   10
+#DEFINE BSTR.DLG.REPLACE       11
+#DEFINE BSTR.DLG.REPLACE.WITH  12
+#DEFINE BSTR.DLG.SCOPE.ASK     13
+#DEFINE BSTR.DLG.NEXT.BTN      14
+#DEFINE BSTR.DLG.REPLACE.ALL   15
+#DEFINE BSTR.DLG.MADE.TAIL     16
+#DEFINE BSTR.DLG.LEFT.ALONE    17
+#DEFINE BSTR.DLG.DOC.FULL      18
+
+GP.BANKEDSTR ED.TEXTBANK BS.DLG
+  "TEST.MD"
+  "UNTITLED"
+  "File name:"
+  "Save as"
+  "Do you want to save changes to "
+  "&Save"
+  "Do&n't Save"
+  "&Cancel"
+  "Find text:"
+  "Go to line"
+  "Line number:"
+  "Replace"
+  "Replace with:"
+  "Replace every match, or just the next one?"
+  "&Next"
+  "Replace All"
+  " replacements made"
+  " lines left alone: too long"
+  "DOCUMENT FULL"
+GP.ENDBANKEDSTR
+
+#DEFINE BSTR.ABOUT.TITLE       0
+#DEFINE BSTR.ABOUT.PRODUCT     1
+#DEFINE BSTR.ABOUT.MACHINE     2
+#DEFINE BSTR.ABOUT.HEAP        3
+#DEFINE BSTR.ABOUT.FREE.TAIL   4
+#DEFINE BSTR.ABOUT.DOCUMENT    5
+#DEFINE BSTR.ABOUT.K.USED      6
+#DEFINE BSTR.ABOUT.K.FREE      7
+#DEFINE BSTR.ABOUT.LINES       8
+#DEFINE BSTR.ABOUT.DOC.FULL    9
+#DEFINE BSTR.ABOUT.ARENA       10
+#DEFINE BSTR.ABOUT.BANK.SIZE   11
+#DEFINE BSTR.ABOUT.TABLE       12
+#DEFINE BSTR.ABOUT.MACHINE.HAS 13
+#DEFINE BSTR.ABOUT.PRESS.KEY   14
+
+GP.BANKEDSTR ED.TEXTBANK BS.ABOUT
+  "About"
+  "GPC EDIT -- text editor written in GPC-BASIC"
+  "for the Commander X16"
+  "String heap   "
+  " bytes free"
+  "Document      "
+  "K used, "
+  "K free  ("
+  "Lines         "
+  "   DOCUMENT FULL"
+  "Text  banks   "
+  " x 8K)"
+  "Table banks   "
+  "    Machine has "
+  "Press any key"
+GP.ENDBANKEDSTR
+
+#DEFINE BSTR.BAR.DOC.FULL 0
+#DEFINE BSTR.BAR.LINES    1
+
+GP.BANKEDSTR ED.TEXTBANK BS.BAR
+  " DOCUMENT FULL "
+  "  LINES="
+GP.ENDBANKEDSTR

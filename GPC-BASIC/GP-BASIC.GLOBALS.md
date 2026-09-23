@@ -82,26 +82,26 @@ Routines, arguments and examples: §4.1.
 
 | | |
 |---|---|
-| in | `THEME.ID` — 0 x16, 1 dark, 2 light, 3 gray, 4 custom, read by `THEME.SELECT`<br>`THEME.ATTR` — a packed attribute, for `THEME.SET` and `THEME.HI` |
-| out | `THEME.CLR(role)` — the colour array, `DIM`med to `THEME.SLOTS`<br>`THEME.INV` — the inverse attribute, from `THEME.HI` |
-| internal | `THEME.READY` |
-| constants | `THEME.PAGE` `THEME.TEXT` `THEME.TITLE` `THEME.BORDER` `THEME.HILITE` `THEME.DIMMED` `THEME.WARN` `THEME.FOCUS` `THEME.SLOTS` `THEME.COUNT` |
+| in | `THEME.ID%` — 0 x16, 1 dark, 2 light, 3 gray, 4 custom, read by `THEME.SELECT`<br>`THEME.ATTR%` — a packed attribute, for `THEME.SET` and `THEME.HI` |
+| out | `THEME.CLR(role)` — the colour array, `DIM`med to `THEME.SLOTS - 1`<br>`THEME.INV%` — the inverse attribute, from `THEME.HI` |
+| internal | `THEME.READY%` `THEME.FIRST%` |
+| constants | `THEME.PAGE` `THEME.TEXT` `THEME.TITLE` `THEME.BORDER` `THEME.HILITE` `THEME.DIMMED` `THEME.WARN` `THEME.FOCUS` `THEME.BAR` `THEME.SHADOW` `THEME.SLOTS` `THEME.COUNT` |
 
-To use it: set `THEME.ID`, `GOSUB THEME.SELECT`, then index `THEME.CLR()` with a role wherever a
+To use it: set `THEME.ID%`, `GOSUB THEME.SELECT`, then index `THEME.CLR()` with a role wherever a
 drawing routine wants an attribute. §4.1 is the module's own entry, with the five themes and the
 other four routines.
 
 ```basic
-THEME.ID = 1 : GOSUB THEME.SELECT
+THEME.ID% = 1 : GOSUB THEME.SELECT
 GP.PRINTAT 2, 2, "READY", THEME.CLR(THEME.TEXT)
 ```
 
 `THEME.CLR` is the array this module `DIM`s. Do not `DIM` it yourself — the module owns it, and
 `DIM`ming an array GPC has already dimensioned is an error.
 
-`THEME.FOCUS` is the eighth role and the newest: the attribute a focused control wears while
-`GUI.FORM` has the keyboard. `THEME.SLOTS` is 8 because of it, and `THEME.COUNT` stays 5 — the
-first is how many roles there are, the second how many themes.
+`THEME.FOCUS` is the eighth role: the attribute a focused control wears while `GUI.FORM` has the
+keyboard. `THEME.BAR` and `THEME.SHADOW` are the ninth and tenth, so `THEME.SLOTS` is 10, and
+`THEME.COUNT` stays 5 — the first is how many roles there are, the second how many themes.
 
 ### `APPSYS.INC.BL` — start politely, leave it as you found it
 

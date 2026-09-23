@@ -49,6 +49,9 @@ PROGRAMS = [
          src=["samples/XBASE", "samples/XBASE/GPC-BASIC"]),
     dict(name="GPB.HELP", sym="testing/GPB.HELP.SRC.SYM", prg="testing/GPB.HELP.PRG",
          src=["samples/GPC-HELP", "samples/GPC-HELP/GPC-BASIC"]),
+#   EDIT builds in place, so its SYM and object stay in the sample folder rather than testing/.
+    dict(name="EDIT",     sym="samples/edit/EDIT.SRC.SYM",  prg="samples/edit/EDIT.PRG",
+         src=["samples/edit", "samples/edit/GPC-BASIC"]),
 ]
 
 #   Plain and % on one name before any conversion. FILEDIR's blob writes FILE.DIR.SLOW% and

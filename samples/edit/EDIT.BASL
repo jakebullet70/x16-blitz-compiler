@@ -28,6 +28,18 @@
 ## Where MENU keeps its rows. The first MENU.BEGIN claims it.
 #DEFINE MENU.TEXTBANK 7
 
+## Where the editor's own literal text goes. The compiler fixes the bank while the object is
+## written, so BANKMGR is told rather than asked -- ED.CLAIM.FIXED.BANKS claims it with the
+## rest of the fixed banks.
+#DEFINE ED.TEXTBANK 12
+
+
+## ---- the editor's own text, in a RAM bank ----
+## The four GP.BANKEDSTR groups and the #DEFINEs that index them. They emit no p-code at all,
+## so they sit here at the top rather than beside the routines that read them, and nothing has
+## to jump over them. ED.TEXTBANK above has to be #DEFINEd before this line.
+#INCLUDE "ED-STR-CONST.BASL"
+
 
 ## ---- Declare all the GPC-BASIC routines
 #INCLUDE "GPC-BASIC/GPB.INC.BL"
@@ -119,13 +131,13 @@ REM cannot bank, STASH and MENUKEY, is #INCLUDEd into low memory instead.
 REM
 REM Banks: 1 the runtime's, 2-4 the line table, 5 the undo log, 6 the menu and theme code,
 REM 7 the menu rows, 8 the GUI engine, 9 the dialog verbs, 10 the cells a dialog covers,
-REM 13 up to the top of RAM the document arena. Banks 11 and 12 are free.
+REM 11 the clipboard, 12 the editor's own text, 13 up to the top of RAM the document arena.
 REM
-ED.SCREEN.MODE = 1 : REM 1 = 80x30, 3 = 40x30 (see KERNAL screen_mode $FF5F)
-THEME.ID = 3 : REM the colour theme, see GPC-BASIC/THEME.INC.BL
+ED.SCREEN.MODE% = 1 : REM 1 = 80x30, 3 = 40x30 (see KERNAL screen_mode $FF5F)
+THEME.ID% = 3 : REM the colour theme, see GPC-BASIC/THEME.INC.BL
 
 GOSUB ED.INIT
-DOC.FILE.NAME$ = "TEST.MD"
+DOC.FILE.NAME$ = GP.BSTR(BS.DLG, BSTR.DLG.START.FILE)
 GOSUB DOC.LOADFILE
 GOSUB ED.OPEN.DONE
 GOSUB ED.RENDER.ALL
@@ -140,15 +152,20 @@ GP.DO
   ED.KEY$ = ED.PENDING.KEY$ : ED.PENDING.KEY$ = ""
   IF ED.KEY$ = "" THEN GET ED.KEY$
   GP.IF ED.KEY$ <> "" THEN 
-    ED.KEY = ASC(ED.KEY$) 
+    ED.KEY% = ASC(ED.KEY$) 
     GOSUB ED.MENUS.KEY : 
-    IF ED.MENUS.PICK < 0 THEN GOSUB ED.DISPATCH.EDITING.KEY
+    IF ED.MENUS.PICK% < 0 THEN GOSUB ED.DISPATCH.EDITING.KEY
   GP.ENDIF
 GP.LOOP
 
 
+REM ED.SEL.KEY.PRE gets the key first: SHIFT and an arrow extend the selection, the same
+REM arrow without SHIFT ends it, and the keys that read or replace a selection are left for
+REM the routines below to handle. It runs after the menus, so a menu row acting on the
+REM selection still finds it there.
 ED.DISPATCH.EDITING.KEY:
-  GP.SELECT ED.KEY
+  GOSUB ED.SEL.KEY.PRE
+  GP.SELECT ED.KEY%
     GP.CASE 157 : GOSUB ED.MOVE.LEFT
     GP.CASE 29  : GOSUB ED.MOVE.RIGHT
     GP.CASE 145 : GOSUB ED.MOVE.UP
@@ -193,7 +210,7 @@ ED.KEY.SHIFTF3:
 ED.KEY.RANGE:
   REM ASCII, because ED.INIT declares ISO encoding -- see the $0372 poke there. Under
   REM PETSCII this had to case-swap every letter.
-  IF ED.KEY >= 32 AND ED.KEY <= 126 THEN GOSUB ED.DO.INSERT
+  IF ED.KEY% >= 32 AND ED.KEY% <= 126 THEN GOSUB ED.DO.INSERT
   RETURN
 
 
@@ -216,12 +233,12 @@ REM ============================================================================
 ED.INIT:
   GOSUB ED.APPSYS.STARTUP : GOSUB BANKMGR.INIT
   GOSUB DOC.INIT  : GOSUB ED.CLAIM.FIXED.BANKS
-  GOSUB UNDO.INIT : GOSUB CLIP.INIT : GOSUB THEME.SELECT
+  GOSUB UNDO.INIT : GOSUB CLIP.INIT : GOSUB ED.SEL.INIT : GOSUB THEME.SELECT
   SV.MAX = 1 : REM the dropdown's stash, claimed on first use; the dialogs use a RAM bank
   GOSUB ED.MENUS.SETUP
   GOSUB ED.CLAIM.ARENA.BANKS
   
-  GP.CALL ED.APPSYS.SCRMODE, ED.SCREEN.MODE, 0, 0, 0 : REM carry CLEAR sets the mode
+  GP.CALL ED.APPSYS.SCRMODE, ED.SCREEN.MODE%, 0, 0, 0 : REM carry CLEAR sets the mode
   GP.CALL ED.APPSYS.SETCHR, 3, 0, 0, 0 : REM charset 3, PET upper/lower
   PRINT CHR$(147);
   GOSUB ED.PETFONT : REM ...then re-index it so a VERA tile index IS a character code
@@ -229,28 +246,29 @@ ED.INIT:
   GOSUB ED.GUI.SETUP : REM ...and tell MENU where the frame glyphs ended up
   GOSUB ED.SHADOW.PALETTE
   GP.CALL ED.APPSYS.SCRMODE, 0, 0, 0, 1
-  SCREEN.COLS = GP.X : SCREEN.ROWS = GP.Y
-  IF SCREEN.COLS < 20 THEN SCREEN.COLS = 80
-  IF SCREEN.ROWS < 8 THEN SCREEN.ROWS = 60
-  ED.TEXT.WIDTH  = SCREEN.COLS - ED.GUT.W
-  ED.TEXT.BOTTOM = SCREEN.ROWS - 2
-  ED.TEXT.ROWS   = SCREEN.ROWS - 2
-  ED.ATTR.TEXT   = THEME.CLR(THEME.TEXT)
-  ED.ATTR.CARET  = THEME.CLR(THEME.HILITE)
-  ED.CARET.LEN   = 1 : REM cells the caret covers; a find sets it to the length of the match
+  SCREEN.COLS% = GP.X : SCREEN.ROWS% = GP.Y
+  IF SCREEN.COLS% < 20 THEN SCREEN.COLS% = 80
+  IF SCREEN.ROWS% < 8 THEN SCREEN.ROWS% = 60
+  ED.TEXT.WIDTH%  = SCREEN.COLS% - ED.GUT.W
+  ED.TEXT.BOTTOM% = SCREEN.ROWS% - 2
+  ED.TEXT.ROWS%   = SCREEN.ROWS% - 2
+  ED.ATTR.TEXT%   = THEME.CLR(THEME.TEXT)
+  ED.ATTR.CARET%  = THEME.CLR(THEME.HILITE)
+  ED.ATTR.SEL%    = THEME.CLR(THEME.BAR) : REM the selection band, distinct from the caret
+  ED.CARET.LEN%   = 1 : REM cells the caret covers; a find sets it to the length of the match
   ED.ASM.GATTR% = THEME.CLR(THEME.DIMMED) : REM the gutter, read by ED.ROW.STREAM
-  ED.MAP.TOP = 0
+  ED.MAP.TOP% = 0
   POKE 40761, 0 : POKE 40762, 0 : REM L1 never scrolls again -- see ED.LAYERS
-  ED.MAP.CFG = PEEK(40756) : ED.MAP.HB = INT(ED.MAP.CFG / 64) : ED.MAP.H = 32
-  IF ED.MAP.HB = 1 THEN ED.MAP.H = 64
-  IF ED.MAP.HB = 2 THEN ED.MAP.H = 128
-  IF ED.MAP.HB = 3 THEN ED.MAP.H = 256
-  ED.MAP.MAXTOP = ED.MAP.H - SCREEN.ROWS
-  ED.HW.OK = 0 : IF ED.MAP.MAXTOP >= 4 THEN ED.HW.OK = 1
+  ED.MAP.CFG% = PEEK(40756) : ED.MAP.HB% = INT(ED.MAP.CFG% / 64) : ED.MAP.H% = 32
+  IF ED.MAP.HB% = 1 THEN ED.MAP.H% = 64
+  IF ED.MAP.HB% = 2 THEN ED.MAP.H% = 128
+  IF ED.MAP.HB% = 3 THEN ED.MAP.H% = 256
+  ED.MAP.MAXTOP% = ED.MAP.H% - SCREEN.ROWS%
+  ED.HW.OK% = 0 : IF ED.MAP.MAXTOP% >= 4 THEN ED.HW.OK% = 1
   GOSUB ED.LAYERS
   REM ALT+letter types nothing until the keymap carries the bar's hot keys.
   GOSUB MENU.KEYS.ON
-  ED.MB.FORCE = 1 : REM the first ED.RENDER.MENUBAR draws; the dirty guard alone would skip it
+  ED.MB.FORCE% = 1 : REM the first ED.RENDER.MENUBAR draws; the dirty guard alone would skip it
   RETURN
 
 
@@ -271,23 +289,26 @@ ED.CLAIM.FIXED.BANKS:
   IF GP.FN(BANKMGR.CLAIM.BANK, ED.GUICODE) = 0 THEN GOTO ED.BANK.FAILED
   IF GP.FN(BANKMGR.CLAIM.BANK, ED.DLGCODE) = 0 THEN GOTO ED.BANK.FAILED
   IF GP.FN(BANKMGR.CLAIM.BANK, ED.GUISAVE) = 0 THEN GOTO ED.BANK.FAILED
-  FOR ED.BANK.INDEX = DOC.TABLE.BASE.BANK TO DOC.TABLE.BASE.BANK + DOC.TABLE.BANKS - 1
+  IF GP.FN(BANKMGR.CLAIM.BANK, ED.TEXTBANK) = 0 THEN GOTO ED.BANK.FAILED
+  FOR ED.BANK.INDEX = DOC.TABLE.BASE.BANK% TO DOC.TABLE.BASE.BANK% + DOC.TABLE.BANKS% - 1
     IF GP.FN(BANKMGR.CLAIM.BANK, ED.BANK.INDEX) = 0 THEN GOTO ED.BANK.FAILED
   NEXT ED.BANK.INDEX
   RETURN
 
-REM ---- the document arena: every bank from DOC.FIRST.BANK up to the first one it cannot
+REM ---- the document arena: every bank from DOC.FIRST.BANK% up to the first one it cannot
 REM claim, the top of RAM when nobody else owns one.
+REM
+REM The walk counts in ED.ARENA.BANK%, its own variable, rather than in the verb's argument.
+REM The first bank has to claim -- a document with no arena has nowhere to put a line -- and
+REM every one after it is a bonus, so the first claim is tested apart from the loop.
 ED.CLAIM.ARENA.BANKS:
-  DOC.LAST.BANK = DOC.FIRST.BANK - 1
-  BANKMGR.SET.BANK = DOC.FIRST.BANK
-  GOSUB BANKMGR.CLAIM
-  IF BANKMGR.OK = 0 THEN GOTO ED.BANK.FAILED
+  DOC.LAST.BANK% = DOC.FIRST.BANK% - 1
+  ED.ARENA.BANK% = DOC.FIRST.BANK%
+  IF GP.FN(BANKMGR.CLAIM.BANK, ED.ARENA.BANK%) = 0 THEN GOTO ED.BANK.FAILED
   GP.DO
-    IF BANKMGR.OK = 0 THEN GP.EXITDO
-    DOC.LAST.BANK = BANKMGR.SET.BANK
-    BANKMGR.SET.BANK = BANKMGR.SET.BANK + 1
-    GOSUB BANKMGR.CLAIM
+    DOC.LAST.BANK% = ED.ARENA.BANK%
+    ED.ARENA.BANK% = ED.ARENA.BANK% + 1
+    IF GP.FN(BANKMGR.CLAIM.BANK, ED.ARENA.BANK%) = 0 THEN GP.EXITDO
   GP.LOOP
   RETURN
 
@@ -295,6 +316,7 @@ ED.CLAIM.ARENA.BANKS:
 REM ---- a claim failed: two owners name one bank. BANKMGR.SET.BANK is the bank.
 ED.BANK.FAILED:
   PRINT "BANK"; BANKMGR.SET.BANK; "FAILED"
+  GOSUB ED.APPSYS.STOPON : REM this one runs after ED.APPSYS.STARTUP took the STOP key away
   END
 
 
@@ -309,7 +331,7 @@ ED.LAYERS:
   POKE 40754, 0 : POKE 40755, 0
   REM The dropdowns are saved in VRAM from SV.BASE up, so that starts past this map.
   ED.MAP.W = 32 * 2 ^ INT((PEEK(40756) AND 48) / 16)
-  ED.L0.END = ED.MAP.W * ED.MAP.H * 2
+  ED.L0.END = ED.MAP.W * ED.MAP.H% * 2
   SV.BASE = $4000
   IF ED.L0.END > SV.BASE THEN SV.BASE = ED.L0.END
   GOSUB ED.CLEAR.OVERLAY
@@ -322,12 +344,12 @@ REM transparent index and a shadow in it would show the document through untouch
 REM entry 4 is purple, which no theme uses, so this points it at black and the themes ask for
 REM colour 4. The entry is read back first, and ED.QUIT puts it as it was.
 ED.SHADOW.PALETTE:
-  ED.PAL.LO = VPEEK(1, $FA08) : ED.PAL.HI = VPEEK(1, $FA09)
+  ED.PAL.LO% = VPEEK(1, $FA08) : ED.PAL.HI% = VPEEK(1, $FA09)
   VPOKE 1, $FA08, 0 : VPOKE 1, $FA09, 0
   RETURN
 
 ED.SHADOW.PALETTE.OFF:
-  VPOKE 1, $FA08, ED.PAL.LO : VPOKE 1, $FA09, ED.PAL.HI
+  VPOKE 1, $FA08, ED.PAL.LO% : VPOKE 1, $FA09, ED.PAL.HI%
   RETURN
 
 
@@ -345,13 +367,13 @@ REM white-on-blue and layer 1 is visible from that moment, so without this fill 
 REM blue until ED.RENDER.ALL paints them. Filled, they come up in the theme's colours and
 REM then fill with text.
 ED.CLEAR.OVERLAY:
-  GP.FILL 0, 1, SCREEN.COLS, ED.TEXT.ROWS, 32, 0
-  GP.FILL 0, 0, SCREEN.COLS, 1, 32, THEME.CLR(THEME.BAR)
-  GP.FILL 0, SCREEN.ROWS - 1, SCREEN.COLS, 1, 32, THEME.CLR(THEME.BAR)
+  GP.FILL 0, 1, SCREEN.COLS%, ED.TEXT.ROWS%, 32, 0
+  GP.FILL 0, 0, SCREEN.COLS%, 1, 32, THEME.CLR(THEME.BAR)
+  GP.FILL 0, SCREEN.ROWS% - 1, SCREEN.COLS%, 1, 32, THEME.CLR(THEME.BAR)
   RETURN
 
 ED.OPEN.DONE:
-  ED.TOP.LINE = 0 : ED.LEFT.COL = 0 : ED.CUR.ROW = 0 :  ED.CUR.COL = 0 : ED.INSERT.MODE = 1 : ED.DOC.DIRTY = 0
+  ED.TOP.LINE% = 0 : ED.LEFT.COL% = 0 : ED.CUR.ROW% = 0 :  ED.CUR.COL% = 0 : ED.INSERT.MODE% = 1 : ED.DOC.DIRTY% = 0
   REM A history is about one document. New and Open both land here, and DOC.INIT has already
   REM thrown away the arena the snapshots were in.
   GOSUB UNDO.CLEAR : GOSUB ED.LOAD.LIVE
@@ -364,18 +386,18 @@ REM ============================================================================
 REM Live line
 REM ============================================================================
 ED.LOAD.LIVE:
-  LINE.INDEX = ED.CUR.ROW : GOSUB DOC.LOAD
-  ED.CUR.LINE$ = LINE.TEXT$ : ED.CUR.DIRTY = 0
+  LINE.INDEX% = ED.CUR.ROW% : GOSUB DOC.LOAD
+  ED.CUR.LINE$ = LINE.TEXT$ : ED.CUR.DIRTY% = 0
   RETURN
 
 ED.COMMIT.LIVE:
-  IF ED.CUR.DIRTY = 0 THEN RETURN
-  LINE.TEXT$ = ED.CUR.LINE$ : LINE.INDEX = ED.CUR.ROW : GOSUB DOC.STORE
-  ED.CUR.DIRTY = 0
+  IF ED.CUR.DIRTY% = 0 THEN RETURN
+  LINE.TEXT$ = ED.CUR.LINE$ : LINE.INDEX% = ED.CUR.ROW% : GOSUB DOC.STORE
+  ED.CUR.DIRTY% = 0
   RETURN
 
 ED.CLAMP.COL:
-  IF ED.CUR.COL > LEN(ED.CUR.LINE$) THEN ED.CUR.COL = LEN(ED.CUR.LINE$)
+  IF ED.CUR.COL% > LEN(ED.CUR.LINE$) THEN ED.CUR.COL% = LEN(ED.CUR.LINE$)
   RETURN
 
 
@@ -385,52 +407,52 @@ REM ============================================================================
 REM Cursor movement
 REM ============================================================================
 ED.MOVE.LEFT:
-  IF ED.CUR.COL > 0 THEN ED.CUR.COL = ED.CUR.COL - 1 : GOSUB ED.CARET.REFRESH : RETURN
-  IF ED.CUR.ROW = 0 THEN RETURN
+  IF ED.CUR.COL% > 0 THEN ED.CUR.COL% = ED.CUR.COL% - 1 : GOSUB ED.CARET.REFRESH : RETURN
+  IF ED.CUR.ROW% = 0 THEN RETURN
   GOSUB ED.COMMIT.LIVE
-  ED.CUR.ROW = ED.CUR.ROW - 1 :    GOSUB ED.LOAD.LIVE
-  ED.CUR.COL = LEN(ED.CUR.LINE$) : GOSUB ED.CARET.REFRESH
+  ED.CUR.ROW% = ED.CUR.ROW% - 1 :    GOSUB ED.LOAD.LIVE
+  ED.CUR.COL% = LEN(ED.CUR.LINE$) : GOSUB ED.CARET.REFRESH
   RETURN
 
 ED.MOVE.RIGHT:
-  IF ED.CUR.COL < LEN(ED.CUR.LINE$) THEN ED.CUR.COL = ED.CUR.COL + 1 : GOSUB ED.CARET.REFRESH : RETURN
-  IF ED.CUR.ROW >= LINE.COUNT - 1 THEN RETURN
+  IF ED.CUR.COL% < LEN(ED.CUR.LINE$) THEN ED.CUR.COL% = ED.CUR.COL% + 1 : GOSUB ED.CARET.REFRESH : RETURN
+  IF ED.CUR.ROW% >= LINE.COUNT% - 1 THEN RETURN
   GOSUB ED.COMMIT.LIVE
-  ED.CUR.ROW = ED.CUR.ROW + 1 : GOSUB ED.LOAD.LIVE
-  ED.CUR.COL = 0 : GOSUB ED.CARET.REFRESH
+  ED.CUR.ROW% = ED.CUR.ROW% + 1 : GOSUB ED.LOAD.LIVE
+  ED.CUR.COL% = 0 : GOSUB ED.CARET.REFRESH
   RETURN
 
 ED.MOVE.UP:
-  IF ED.CUR.ROW = 0 THEN RETURN
+  IF ED.CUR.ROW% = 0 THEN RETURN
   GOSUB ED.COMMIT.LIVE
-  ED.CUR.ROW = ED.CUR.ROW - 1 : GOSUB ED.LOAD.LIVE : GOSUB ED.CLAMP.COL
+  ED.CUR.ROW% = ED.CUR.ROW% - 1 : GOSUB ED.LOAD.LIVE : GOSUB ED.CLAMP.COL
   GOSUB ED.CARET.REFRESH
   RETURN
 
 ED.MOVE.DOWN:
-  IF ED.CUR.ROW >= LINE.COUNT - 1 THEN RETURN
+  IF ED.CUR.ROW% >= LINE.COUNT% - 1 THEN RETURN
   GOSUB ED.COMMIT.LIVE
-  ED.CUR.ROW = ED.CUR.ROW + 1 : GOSUB ED.LOAD.LIVE : GOSUB ED.CLAMP.COL
+  ED.CUR.ROW% = ED.CUR.ROW% + 1 : GOSUB ED.LOAD.LIVE : GOSUB ED.CLAMP.COL
   GOSUB ED.CARET.REFRESH
   RETURN
 
 ED.MOVE.HOME:
-  ED.CUR.COL = 0 : GOSUB ED.CARET.REFRESH
+  ED.CUR.COL% = 0 : GOSUB ED.CARET.REFRESH
   RETURN
 
 ED.MOVE.END:
-  ED.CUR.COL = LEN(ED.CUR.LINE$) : GOSUB ED.CARET.REFRESH
+  ED.CUR.COL% = LEN(ED.CUR.LINE$) : GOSUB ED.CARET.REFRESH
   RETURN
 
 ED.MOVE.PAGEUP:
-  GOSUB ED.COMMIT.LIVE :  ED.CUR.ROW = ED.CUR.ROW - ED.TEXT.ROWS
-  IF ED.CUR.ROW < 0 THEN ED.CUR.ROW = 0
+  GOSUB ED.COMMIT.LIVE :  ED.CUR.ROW% = ED.CUR.ROW% - ED.TEXT.ROWS%
+  IF ED.CUR.ROW% < 0 THEN ED.CUR.ROW% = 0
   GOSUB ED.LOAD.LIVE : GOSUB ED.CLAMP.COL : GOSUB ED.CARET.REFRESH
   RETURN
 
 ED.MOVE.PAGEDOWN:
-  GOSUB ED.COMMIT.LIVE : ED.CUR.ROW = ED.CUR.ROW + ED.TEXT.ROWS
-  IF ED.CUR.ROW > LINE.COUNT - 1 THEN ED.CUR.ROW = LINE.COUNT - 1
+  GOSUB ED.COMMIT.LIVE : ED.CUR.ROW% = ED.CUR.ROW% + ED.TEXT.ROWS%
+  IF ED.CUR.ROW% > LINE.COUNT% - 1 THEN ED.CUR.ROW% = LINE.COUNT% - 1
   GOSUB ED.LOAD.LIVE : GOSUB ED.CLAMP.COL : GOSUB ED.CARET.REFRESH
   RETURN
 
@@ -440,136 +462,218 @@ REM ============================================================================
 REM Editing
 REM ============================================================================
 ED.DO.INSERT:
+  IF ED.SEL.ON% <> 0 THEN GOSUB ED.SEL.TYPEOVER : IF ED.SEL.REFUSED% <> 0 THEN RETURN
   IF LEN(ED.CUR.LINE$) >= 250 THEN RETURN
   GOSUB UNDO.TOUCH
-  ED.CH$ = CHR$(ED.KEY)
-  IF ED.INSERT.MODE = 0 AND ED.CUR.COL < LEN(ED.CUR.LINE$) THEN GOTO ED.INS.OVER
-  ED.CUR.LINE$ = LEFT$(ED.CUR.LINE$, ED.CUR.COL) + ED.CH$ + MID$(ED.CUR.LINE$, ED.CUR.COL + 1, 250)
+  ED.CH$ = CHR$(ED.KEY%)
+  IF ED.INSERT.MODE% = 0 AND ED.CUR.COL% < LEN(ED.CUR.LINE$) THEN GOTO ED.INS.OVER
+  ED.CUR.LINE$ = LEFT$(ED.CUR.LINE$, ED.CUR.COL%) + ED.CH$ + MID$(ED.CUR.LINE$, ED.CUR.COL% + 1, 250)
   GOTO ED.INS.DONE
 ED.INS.OVER:
-  ED.CUR.LINE$ = LEFT$(ED.CUR.LINE$, ED.CUR.COL) + ED.CH$ + MID$(ED.CUR.LINE$, ED.CUR.COL + 2, 250)
+  ED.CUR.LINE$ = LEFT$(ED.CUR.LINE$, ED.CUR.COL%) + ED.CH$ + MID$(ED.CUR.LINE$, ED.CUR.COL% + 2, 250)
 ED.INS.DONE:
-  ED.CUR.COL = ED.CUR.COL + 1 : ED.CUR.DIRTY = 1 : ED.DOC.DIRTY = 1
+  ED.CUR.COL% = ED.CUR.COL% + 1 : ED.CUR.DIRTY% = 1 : ED.DOC.DIRTY% = 1
   GOSUB ED.REFRESH.INTRA
   RETURN
 
+REM With a selection up, BACKSPACE and DELETE are the same key: they take the selection
+REM out and stop there, rather than also eating the character next to it.
 ED.DO.BACKSPACE:
-  IF ED.CUR.COL = 0 THEN GOTO ED.BS.JOIN
+  IF ED.SEL.ON% <> 0 THEN GOSUB ED.SEL.DELETE : RETURN
+  IF ED.CUR.COL% = 0 THEN GOTO ED.BS.JOIN
   GOSUB UNDO.TOUCH
-  ED.CUR.LINE$ = LEFT$(ED.CUR.LINE$, ED.CUR.COL - 1) + MID$(ED.CUR.LINE$, ED.CUR.COL + 1, 250)
-  ED.CUR.COL = ED.CUR.COL - 1 : ED.CUR.DIRTY = 1 : ED.DOC.DIRTY = 1
+  ED.CUR.LINE$ = LEFT$(ED.CUR.LINE$, ED.CUR.COL% - 1) + MID$(ED.CUR.LINE$, ED.CUR.COL% + 1, 250)
+  ED.CUR.COL% = ED.CUR.COL% - 1 : ED.CUR.DIRTY% = 1 : ED.DOC.DIRTY% = 1
   GOSUB ED.REFRESH.INTRA
   RETURN
 
 ED.BS.JOIN:
-  IF ED.CUR.ROW = 0 THEN RETURN
+  IF ED.CUR.ROW% = 0 THEN RETURN
   REM Two records, one group: this line goes away and the one above it changes. The undo
   REM engine records a line by the store record it already has, so the live line is written
   REM back first -- an uncommitted line has no record to point at.
   GOSUB ED.COMMIT.LIVE
   GOSUB UNDO.BEGIN
-  UNDO.ROW = ED.CUR.ROW : GOSUB UNDO.REC.DELLINE
-  UNDO.ROW = ED.CUR.ROW - 1 : GOSUB UNDO.REC.REPLACE
-  LINE.INDEX = ED.CUR.ROW - 1 : GOSUB DOC.LOAD
-  ED.JOIN.COL = LEN(LINE.TEXT$) : ED.CUR.LINE$ = LEFT$(LINE.TEXT$ + ED.CUR.LINE$, 250)
-  LINE.TEXT$ = ED.CUR.LINE$ : LINE.INDEX = ED.CUR.ROW - 1 : GOSUB DOC.STORE
-  LINE.INDEX = ED.CUR.ROW : GOSUB DOC.DELETE.SLOT
-  ED.CUR.ROW = ED.CUR.ROW - 1 : ED.CUR.COL = ED.JOIN.COL
-  ED.CUR.DIRTY = 0 : ED.DOC.DIRTY = 1  : GOSUB ED.REFRESH.FULL
+  UNDO.ROW% = ED.CUR.ROW% : GOSUB UNDO.REC.DELLINE
+  UNDO.ROW% = ED.CUR.ROW% - 1 : GOSUB UNDO.REC.REPLACE
+  LINE.INDEX% = ED.CUR.ROW% - 1 : GOSUB DOC.LOAD
+  ED.JOIN.COL% = LEN(LINE.TEXT$) : ED.CUR.LINE$ = LEFT$(LINE.TEXT$ + ED.CUR.LINE$, 250)
+  LINE.TEXT$ = ED.CUR.LINE$ : LINE.INDEX% = ED.CUR.ROW% - 1 : GOSUB DOC.STORE
+  LINE.INDEX% = ED.CUR.ROW% : GOSUB DOC.DELETE.SLOT
+  ED.CUR.ROW% = ED.CUR.ROW% - 1 : ED.CUR.COL% = ED.JOIN.COL%
+  ED.CUR.DIRTY% = 0 : ED.DOC.DIRTY% = 1  : GOSUB ED.REFRESH.FULL
   RETURN
 
 ED.DO.DELETE:
-  IF ED.CUR.COL < LEN(ED.CUR.LINE$) THEN GOTO ED.DEL.CHAR
-  IF ED.CUR.ROW >= LINE.COUNT - 1 THEN RETURN
+  IF ED.SEL.ON% <> 0 THEN GOSUB ED.SEL.DELETE : RETURN
+  IF ED.CUR.COL% < LEN(ED.CUR.LINE$) THEN GOTO ED.DEL.CHAR
+  IF ED.CUR.ROW% >= LINE.COUNT% - 1 THEN RETURN
   GOSUB ED.COMMIT.LIVE
   GOSUB UNDO.BEGIN
-  UNDO.ROW = ED.CUR.ROW : GOSUB UNDO.REC.REPLACE
-  UNDO.ROW = ED.CUR.ROW + 1 : GOSUB UNDO.REC.DELLINE
-  LINE.INDEX = ED.CUR.ROW + 1 : GOSUB DOC.LOAD
+  UNDO.ROW% = ED.CUR.ROW% : GOSUB UNDO.REC.REPLACE
+  UNDO.ROW% = ED.CUR.ROW% + 1 : GOSUB UNDO.REC.DELLINE
+  LINE.INDEX% = ED.CUR.ROW% + 1 : GOSUB DOC.LOAD
   ED.CUR.LINE$ = LEFT$(ED.CUR.LINE$ + LINE.TEXT$, 250)
-  LINE.TEXT$ = ED.CUR.LINE$ : LINE.INDEX = ED.CUR.ROW : GOSUB DOC.STORE
-  LINE.INDEX = ED.CUR.ROW + 1 : GOSUB DOC.DELETE.SLOT
-  ED.CUR.DIRTY = 0 : ED.DOC.DIRTY = 1 : GOSUB ED.REFRESH.FULL
+  LINE.TEXT$ = ED.CUR.LINE$ : LINE.INDEX% = ED.CUR.ROW% : GOSUB DOC.STORE
+  LINE.INDEX% = ED.CUR.ROW% + 1 : GOSUB DOC.DELETE.SLOT
+  ED.CUR.DIRTY% = 0 : ED.DOC.DIRTY% = 1 : GOSUB ED.REFRESH.FULL
   RETURN
   
 ED.DEL.CHAR:
   GOSUB UNDO.TOUCH
-  ED.CUR.LINE$ = LEFT$(ED.CUR.LINE$, ED.CUR.COL) + MID$(ED.CUR.LINE$, ED.CUR.COL + 2, 250)
-  ED.CUR.DIRTY = 1 : ED.DOC.DIRTY = 1 : GOSUB ED.REFRESH.INTRA
+  ED.CUR.LINE$ = LEFT$(ED.CUR.LINE$, ED.CUR.COL%) + MID$(ED.CUR.LINE$, ED.CUR.COL% + 2, 250)
+  ED.CUR.DIRTY% = 1 : ED.DOC.DIRTY% = 1 : GOSUB ED.REFRESH.INTRA
   RETURN
 
 ED.DO.ENTER:
+  IF ED.SEL.ON% <> 0 THEN GOSUB ED.SEL.DELETE : IF ED.SEL.REFUSED% <> 0 THEN RETURN
   REM The whole pre-split line, then the line that is about to appear below it. The commit
   REM is what gives the pre-split line a store record for the REPLACE to point at.
   GOSUB ED.COMMIT.LIVE
   GOSUB UNDO.BEGIN
-  UNDO.ROW = ED.CUR.ROW : GOSUB UNDO.REC.REPLACE
-  UNDO.ROW = ED.CUR.ROW + 1 : GOSUB UNDO.REC.ADD
-  ED.LEFT.HALF$ = LEFT$(ED.CUR.LINE$, ED.CUR.COL)
-  ED.RIGHT.HALF$ = MID$(ED.CUR.LINE$, ED.CUR.COL + 1, 250)
-  LINE.TEXT$ = ED.LEFT.HALF$ : LINE.INDEX = ED.CUR.ROW : GOSUB DOC.STORE
-  LINE.INDEX = ED.CUR.ROW + 1 : GOSUB DOC.INSERT.SLOT
-  LINE.TEXT$ = ED.RIGHT.HALF$ : LINE.INDEX = ED.CUR.ROW + 1 : GOSUB DOC.STORE
-  ED.CUR.ROW = ED.CUR.ROW + 1 : ED.CUR.COL = 0
-  ED.CUR.LINE$ = ED.RIGHT.HALF$ : ED.CUR.DIRTY = 0 : ED.DOC.DIRTY = 1
+  UNDO.ROW% = ED.CUR.ROW% : GOSUB UNDO.REC.REPLACE
+  UNDO.ROW% = ED.CUR.ROW% + 1 : GOSUB UNDO.REC.ADD
+  ED.LEFT.HALF$ = LEFT$(ED.CUR.LINE$, ED.CUR.COL%)
+  ED.RIGHT.HALF$ = MID$(ED.CUR.LINE$, ED.CUR.COL% + 1, 250)
+  LINE.TEXT$ = ED.LEFT.HALF$ : LINE.INDEX% = ED.CUR.ROW% : GOSUB DOC.STORE
+  LINE.INDEX% = ED.CUR.ROW% + 1 : GOSUB DOC.INSERT.SLOT
+  LINE.TEXT$ = ED.RIGHT.HALF$ : LINE.INDEX% = ED.CUR.ROW% + 1 : GOSUB DOC.STORE
+  ED.CUR.ROW% = ED.CUR.ROW% + 1 : ED.CUR.COL% = 0
+  ED.CUR.LINE$ = ED.RIGHT.HALF$ : ED.CUR.DIRTY% = 0 : ED.DOC.DIRTY% = 1
   GOSUB ED.REFRESH.FULL
   RETURN
 
 ED.TOGGLE.INSERT:
-  ED.INSERT.MODE = 1 - ED.INSERT.MODE : GOSUB ED.RENDER.STATUS
+  ED.INSERT.MODE% = 1 - ED.INSERT.MODE% : GOSUB ED.RENDER.STATUS
   RETURN
 
 
-REM ---- Cut, Copy and Paste: one whole line ----
-REM The clipboard itself is ED-CLIP.BASL, a bank of [len][chars] records. These three
-REM routines hold one record between them; a selection will hold one a line, and they are
-REM written to walk the clipboard rather than to assume a single line.
+REM ---- Cut, Copy and Paste ----
+REM The clipboard itself is ED-CLIP.BASL, a bank of [len][chars] records, and the selection
+REM is ED-SEL.BASL. With no selection up these keys work on the whole cursor line; with one
+REM up they work on it, through ED.SEL.COPY and ED.SEL.DELETE.
+REM
+REM CLIP.WHOLELINE% is what separates the two on the way back out: a whole line comes back as
+REM a line, a span comes back inside the line the cursor is on.
 REM
 REM CTRL+C is code 3, which RUN/STOP also sends. The editor has no use for RUN/STOP, so
-REM the key copies a line here rather than doing nothing.
+REM the key copies here rather than doing nothing.
 ED.CLIP.TAKE.LINE:
   REM The live line is written back first: DOC.LOAD reads the store record, and a line
   REM being typed on has not been written to one yet.
   GOSUB ED.COMMIT.LIVE
-  LINE.INDEX = ED.CUR.ROW : GOSUB DOC.LOAD
-  GOSUB CLIP.RESET : GOSUB CLIP.PUT
+  LINE.INDEX% = ED.CUR.ROW% : GOSUB DOC.LOAD
+  GOSUB CLIP.RESET : GOSUB CLIP.PUT : CLIP.WHOLELINE% = -1
   RETURN
 
 ED.CMD.COPY:
+  IF ED.SEL.ON% <> 0 THEN GOTO ED.CMD.COPY.SEL
   GOSUB ED.CLIP.TAKE.LINE
-  IF CLIP.OK = 0 THEN GOTO ED.CLIP.NOROOM
-  ED.MSG$ = "Line copied" : GOSUB ED.INFO.MSG
+  IF CLIP.OK% = 0 THEN GOTO ED.CLIP.NOROOM
+  ED.MSG$ = GP.BSTR(BS.MSG, BSTR.MSG.LINE.COPIED) : GOSUB ED.INFO.MSG
+  RETURN
+
+ED.CMD.COPY.SEL:
+  GOSUB ED.SEL.CHECK
+  IF ED.SEL.NONE% <> 0 OR ED.SEL.REFUSED% <> 0 THEN RETURN
+  GOSUB ED.SEL.COPY
+  IF CLIP.OK% = 0 THEN GOTO ED.CLIP.NOROOM
+  ED.MSG$ = GP.BSTR(BS.MSG, BSTR.MSG.COPIED) : GOSUB ED.INFO.MSG
   RETURN
 
 ED.CMD.CUT:
+  IF ED.SEL.ON% <> 0 THEN GOTO ED.CMD.CUT.SEL
   GOSUB ED.CLIP.TAKE.LINE
-  IF CLIP.OK = 0 THEN GOTO ED.CLIP.NOROOM
+  IF CLIP.OK% = 0 THEN GOTO ED.CLIP.NOROOM
   GOSUB ED.DELETE.LINE
-  ED.MSG$ = "Line cut" : GOSUB ED.INFO.MSG
+  ED.MSG$ = GP.BSTR(BS.MSG, BSTR.MSG.LINE.CUT) : GOSUB ED.INFO.MSG
+  RETURN
+
+REM The copy comes first, and the delete only runs once the whole selection is on the
+REM clipboard. A cut that half filled the clipboard and then took the text out would have
+REM nowhere to put the rest of it back from.
+ED.CMD.CUT.SEL:
+  GOSUB ED.SEL.CHECK
+  IF ED.SEL.NONE% <> 0 OR ED.SEL.REFUSED% <> 0 THEN RETURN
+  GOSUB ED.SEL.COPY
+  IF CLIP.OK% = 0 THEN GOTO ED.CLIP.NOROOM
+  GOSUB ED.SEL.DELETE
+  ED.MSG$ = GP.BSTR(BS.MSG, BSTR.MSG.CUT) : GOSUB ED.INFO.MSG
   RETURN
 
 REM A bank that would not claim and a clipboard with no room left say the same thing: the
-REM line is still where it was, and nothing was taken.
+REM text is still where it was, and nothing was taken.
 ED.CLIP.NOROOM:
-  ED.MSG$ = "Clipboard full" : GOSUB ED.ERR.MSG
+  ED.MSG$ = GP.BSTR(BS.MSG, BSTR.MSG.CLIP.FULL) : GOSUB ED.ERR.MSG
   RETURN
 
-REM ---- paste the clipboard in as a new line below the cursor ----
-REM The text is moved out of LINE.TEXT$ first: DOC.INSERT.SLOT and DOC.STORE both use that
-REM string, so reading the clipboard straight into the store would lose it.
+REM ---- paste the clipboard back ----
+REM Whole lines go in below the cursor. A span splits the cursor line: its head takes the
+REM first record, its tail joins the last, and anything between becomes a line of its own.
+REM
+REM Each record is moved out of LINE.TEXT$ before the store is touched. DOC.INSERT.SLOT and
+REM DOC.STORE both use that string, so reading the clipboard straight into the store would
+REM lose what was read.
 ED.CMD.PASTE:
-  IF CLIP.COUNT = 0 THEN ED.MSG$ = "Clipboard empty" : GOSUB ED.ERR.MSG : RETURN
+  IF CLIP.COUNT% = 0 THEN ED.MSG$ = GP.BSTR(BS.MSG, BSTR.MSG.CLIP.EMPTY) : GOSUB ED.ERR.MSG : RETURN
+  IF CLIP.COUNT% > UNDO.MAX.GROUP% THEN GOTO ED.SEL.TOOBIG
+  IF ED.SEL.ON% <> 0 THEN GOSUB ED.SEL.DELETE : IF ED.SEL.REFUSED% <> 0 THEN RETURN
   GOSUB ED.COMMIT.LIVE
-  GOSUB CLIP.REWIND : GOSUB CLIP.GET
-  ED.CLIP.LINE$ = LINE.TEXT$
-  GOSUB UNDO.BEGIN
-  UNDO.ROW = ED.CUR.ROW + 1 : GOSUB UNDO.REC.ADD
-  LINE.INDEX = ED.CUR.ROW + 1 : GOSUB DOC.INSERT.SLOT
-  LINE.TEXT$ = ED.CLIP.LINE$ : LINE.INDEX = ED.CUR.ROW + 1 : GOSUB DOC.STORE
-  ED.CUR.ROW = ED.CUR.ROW + 1 : ED.CUR.COL = 0
+  GOSUB UNDO.BEGIN : GOSUB CLIP.REWIND
+  IF CLIP.WHOLELINE% <> 0 THEN GOTO ED.PASTE.LINES
+  GOTO ED.PASTE.SPLICE
+
+REM The ADDLINE records go on top down, because UNDO.RUN applies a group in reverse and the
+REM lines have to come back out bottom up or each removal moves the ones still to go.
+ED.PASTE.LINES:
+  ED.PASTE.AT% = ED.CUR.ROW% + 1 : ED.PASTE.N% = 0
+ED.PASTE.LINES.LOOP:
+  GOSUB CLIP.GET : ED.PASTE.LINE$ = LINE.TEXT$
+  UNDO.ROW% = ED.PASTE.AT% + ED.PASTE.N% : GOSUB UNDO.REC.ADD
+  LINE.INDEX% = ED.PASTE.AT% + ED.PASTE.N% : GOSUB DOC.INSERT.SLOT
+  LINE.TEXT$ = ED.PASTE.LINE$ : LINE.INDEX% = ED.PASTE.AT% + ED.PASTE.N% : GOSUB DOC.STORE
+  ED.PASTE.N% = ED.PASTE.N% + 1
+  IF ED.PASTE.N% < CLIP.COUNT% THEN GOTO ED.PASTE.LINES.LOOP
+  ED.CUR.ROW% = ED.PASTE.AT% + ED.PASTE.N% - 1 : ED.CUR.COL% = 0
+  GOTO ED.PASTE.DONE
+
+ED.PASTE.SPLICE:
+  ED.PASTE.HEAD$ = LEFT$(ED.CUR.LINE$, ED.CUR.COL%)
+  ED.PASTE.TAIL$ = MID$(ED.CUR.LINE$, ED.CUR.COL% + 1, 250)
+  UNDO.ROW% = ED.CUR.ROW% : GOSUB UNDO.REC.REPLACE
+  GOSUB CLIP.GET : ED.PASTE.LINE$ = LINE.TEXT$
+  IF CLIP.COUNT% > 1 THEN GOTO ED.PASTE.SPLICE.MANY
+  REM One record, so the line never splits: head, text and tail go back as one line and the
+  REM cursor sits at the end of what was pasted.
+  ED.PASTE.COL% = LEN(ED.PASTE.HEAD$) + LEN(ED.PASTE.LINE$)
+  LINE.TEXT$ = LEFT$(ED.PASTE.HEAD$ + ED.PASTE.LINE$ + ED.PASTE.TAIL$, 250)
+  LINE.INDEX% = ED.CUR.ROW% : GOSUB DOC.STORE
+  ED.CUR.COL% = ED.PASTE.COL%
+  GOTO ED.PASTE.DONE
+
+ED.PASTE.SPLICE.MANY:
+  LINE.TEXT$ = LEFT$(ED.PASTE.HEAD$ + ED.PASTE.LINE$, 250)
+  LINE.INDEX% = ED.CUR.ROW% : GOSUB DOC.STORE
+  ED.PASTE.N% = 1
+ED.PASTE.SPLICE.LOOP:
+  GOSUB CLIP.GET : ED.PASTE.LINE$ = LINE.TEXT$
+  REM Where the cursor ends up: the end of the pasted text on the last line, which is the
+  REM length of the record before the old tail is joined onto it.
+  ED.PASTE.COL% = LEN(ED.PASTE.LINE$)
+  IF ED.PASTE.N% = CLIP.COUNT% - 1 THEN ED.PASTE.LINE$ = LEFT$(ED.PASTE.LINE$ + ED.PASTE.TAIL$, 250)
+  UNDO.ROW% = ED.CUR.ROW% + ED.PASTE.N% : GOSUB UNDO.REC.ADD
+  LINE.INDEX% = ED.CUR.ROW% + ED.PASTE.N% : GOSUB DOC.INSERT.SLOT
+  LINE.TEXT$ = ED.PASTE.LINE$ : LINE.INDEX% = ED.CUR.ROW% + ED.PASTE.N% : GOSUB DOC.STORE
+  ED.PASTE.N% = ED.PASTE.N% + 1
+  IF ED.PASTE.N% < CLIP.COUNT% THEN GOTO ED.PASTE.SPLICE.LOOP
+  ED.CUR.ROW% = ED.CUR.ROW% + CLIP.COUNT% - 1 : ED.CUR.COL% = ED.PASTE.COL%
+  GOTO ED.PASTE.DONE
+
+ED.PASTE.DONE:
   GOSUB ED.LOAD.LIVE
-  ED.DOC.DIRTY = 1 : GOSUB ED.REFRESH.FULL
-  ED.MSG$ = "Line pasted" : GOSUB ED.INFO.MSG
+  IF ED.CUR.COL% > LEN(ED.CUR.LINE$) THEN ED.CUR.COL% = LEN(ED.CUR.LINE$)
+  ED.DOC.DIRTY% = 1 : GOSUB ED.REFRESH.FULL
+  ED.MSG$ = GP.BSTR(BS.MSG, BSTR.MSG.PASTED) : GOSUB ED.INFO.MSG
   RETURN
 
 REM ---- take the cursor line out of the document ----
@@ -578,17 +682,17 @@ REM That is a REPLACE to undo, not a DELLINE, and the two want different records
 ED.DELETE.LINE:
   GOSUB ED.COMMIT.LIVE
   GOSUB UNDO.BEGIN
-  IF LINE.COUNT <= 1 THEN GOTO ED.DEL.LINE.ONLY
-  UNDO.ROW = ED.CUR.ROW : GOSUB UNDO.REC.DELLINE
-  LINE.INDEX = ED.CUR.ROW : GOSUB DOC.DELETE.SLOT
-  IF ED.CUR.ROW > LINE.COUNT - 1 THEN ED.CUR.ROW = LINE.COUNT - 1
+  IF LINE.COUNT% <= 1 THEN GOTO ED.DEL.LINE.ONLY
+  UNDO.ROW% = ED.CUR.ROW% : GOSUB UNDO.REC.DELLINE
+  LINE.INDEX% = ED.CUR.ROW% : GOSUB DOC.DELETE.SLOT
+  IF ED.CUR.ROW% > LINE.COUNT% - 1 THEN ED.CUR.ROW% = LINE.COUNT% - 1
   GOTO ED.DEL.LINE.DONE
 ED.DEL.LINE.ONLY:
-  UNDO.ROW = 0 : GOSUB UNDO.REC.REPLACE
-  LINE.TEXT$ = "" : LINE.INDEX = 0 : GOSUB DOC.STORE
+  UNDO.ROW% = 0 : GOSUB UNDO.REC.REPLACE
+  LINE.TEXT$ = "" : LINE.INDEX% = 0 : GOSUB DOC.STORE
 ED.DEL.LINE.DONE:
-  ED.CUR.COL = 0 : GOSUB ED.LOAD.LIVE
-  ED.DOC.DIRTY = 1 : GOSUB ED.REFRESH.FULL
+  ED.CUR.COL% = 0 : GOSUB ED.LOAD.LIVE
+  ED.DOC.DIRTY% = 1 : GOSUB ED.REFRESH.FULL
   RETURN
 
 
@@ -601,51 +705,51 @@ REM Commands
 REM ============================================================================
 ED.CMD.NEW:
   ED.CONFIRM.TITLE$ = "New" : GOSUB ED.CONFIRM.SAVE
-  IF ED.PROCEED = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
+  IF ED.PROCEED% = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
   GOSUB DOC.INIT
-  LINE.TEXT$ = "" : LINE.INDEX = 0 : GOSUB DOC.STORE : LINE.COUNT = 1
-  DOC.FILE.NAME$ = "UNTITLED" : ED.MB.FORCE = 1
+  LINE.TEXT$ = "" : LINE.INDEX% = 0 : GOSUB DOC.STORE : LINE.COUNT% = 1
+  DOC.FILE.NAME$ = GP.BSTR(BS.DLG, BSTR.DLG.UNTITLED) : ED.MB.FORCE% = 1
   GOSUB ED.OPEN.DONE : GOSUB ED.REFRESH.FULL
   RETURN
 
 ED.OPEN.FILE:
-  ED.MB.FORCE = 1 : REM the bar carries the name, which the numeric guard cannot see
+  ED.MB.FORCE% = 1 : REM the bar carries the name, which the numeric guard cannot see
   GOSUB DOC.LOADFILE
-  IF LINE.COUNT = 0 THEN LINE.TEXT$ = "" : LINE.INDEX = 0 : GOSUB DOC.STORE : LINE.COUNT = 1
+  IF LINE.COUNT% = 0 THEN LINE.TEXT$ = "" : LINE.INDEX% = 0 : GOSUB DOC.STORE : LINE.COUNT% = 1
   GOSUB ED.OPEN.DONE : GOSUB ED.REFRESH.FULL
   RETURN
 
 ED.CMD.OPEN:
   ED.CONFIRM.TITLE$ = "Open" : GOSUB ED.CONFIRM.SAVE
-  IF ED.PROCEED = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
-  ED.INPUT$ = GP.FN(INPUTBOXEX, "Open", "File name:", "", "", "", ED.DLG.WIDTHDEFAULT, 0)
+  IF ED.PROCEED% = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
+  ED.INPUT$ = GP.FN(INPUTBOXEX, "Open", GP.BSTR(BS.DLG, BSTR.DLG.FILE.NAME), "", "", "", ED.DLG.WIDTHDEFAULT, 0)
   IF GUI.OK = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
   DOC.FILE.NAME$ = ED.INPUT$
   GOSUB ED.OPEN.FILE
   RETURN
 
 ED.SAVE.FILE:
-  GOSUB ED.COMMIT.LIVE : GOSUB DOC.SAVEFILE : ED.DOC.DIRTY = 0
+  GOSUB ED.COMMIT.LIVE : GOSUB DOC.SAVEFILE : ED.DOC.DIRTY% = 0
   RETURN
 
 ED.CMD.SAVE:
-  IF DOC.FILE.NAME$ = "UNTITLED" THEN GOSUB ED.CMD.SAVEAS : RETURN
+  IF DOC.FILE.NAME$ = GP.BSTR(BS.DLG, BSTR.DLG.UNTITLED) THEN GOSUB ED.CMD.SAVEAS : RETURN
   GOSUB ED.SAVE.FILE : GOSUB ED.REFRESH.FULL
-  ED.MSG$ = "Saved " + DOC.FILE.NAME$ : GOSUB ED.INFO.MSG
+  ED.MSG$ = GP.BSTR(BS.MSG, BSTR.MSG.SAVED) + DOC.FILE.NAME$ : GOSUB ED.INFO.MSG
   RETURN
 
 ED.CMD.SAVEAS:
-  ED.SAVEAS.START$ = DOC.FILE.NAME$ : IF DOC.FILE.NAME$ = "UNTITLED" THEN ED.SAVEAS.START$ = ""
-  ED.INPUT$ = GP.FN(INPUTBOXEX, "Save as", "File name:", "", "", ED.SAVEAS.START$, ED.DLG.WIDTHDEFAULT, 0)
+  ED.SAVEAS.START$ = DOC.FILE.NAME$ : IF DOC.FILE.NAME$ = GP.BSTR(BS.DLG, BSTR.DLG.UNTITLED) THEN ED.SAVEAS.START$ = ""
+  ED.INPUT$ = GP.FN(INPUTBOXEX, GP.BSTR(BS.DLG, BSTR.DLG.SAVE.AS), GP.BSTR(BS.DLG, BSTR.DLG.FILE.NAME), "", "", ED.SAVEAS.START$, ED.DLG.WIDTHDEFAULT, 0)
   IF GUI.OK = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
-  DOC.FILE.NAME$ = ED.INPUT$ : ED.MB.FORCE = 1
+  DOC.FILE.NAME$ = ED.INPUT$ : ED.MB.FORCE% = 1
   GOSUB ED.SAVE.FILE : GOSUB ED.REFRESH.FULL
-  ED.MSG$ = "Saved " + DOC.FILE.NAME$ : GOSUB ED.INFO.MSG
+  ED.MSG$ = GP.BSTR(BS.MSG, BSTR.MSG.SAVED) + DOC.FILE.NAME$ : GOSUB ED.INFO.MSG
   RETURN
 
 ED.CMD.EXIT:
   ED.CONFIRM.TITLE$ = "Exit" : GOSUB ED.CONFIRM.SAVE
-  IF ED.PROCEED = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
+  IF ED.PROCEED% = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
   GOTO ED.QUIT
 REM ---- Help > About: a box rather than the status line, because it carries the editor's
 REM memory readout as well as its name.
@@ -654,8 +758,8 @@ REM Every number is read live. FRE(0) is the string heap and not much else: the 
 REM workspace and the arrays are all fixed at compile or DIM time, so the heap is the only low
 REM memory that moves. It only ever falls, because a block a string outgrows is flagged dead
 REM and re-fitted, never given back. The rest of the figures come off the bump allocator in
-REM ED-STORE.BASL: DOC.CUR.BANK and DOC.CUR.PTR are its high-water mark, DOC.FIRST.BANK to
-REM DOC.LAST.BANK is what BANKMGR handed over.
+REM ED-STORE.BASL: DOC.CUR.BANK% and DOC.CUR.PTR are its high-water mark, DOC.FIRST.BANK% to
+REM DOC.LAST.BANK% is what BANKMGR handed over.
 REM
 REM Build every line into ED.AB.S$, one at a time. A variable per line holds eight buffers at
 REM their peak length for the rest of the run.
@@ -664,44 +768,49 @@ REM The box is PANELOPEN's, the standard dialogs' empty panel, and the rows belo
 REM editor's own. No canned dialog carries eight lines of live figures.
 ED.CMD.ABOUT:
   ED.AB.PER = DOC.WIN.END - DOC.WIN.START : REM usable bytes in one arena bank
-  ED.AB.BANKS = DOC.LAST.BANK - DOC.FIRST.BANK + 1
-  ED.AB.USED = (DOC.CUR.BANK - DOC.FIRST.BANK) * ED.AB.PER + DOC.CUR.PTR - DOC.WIN.START
-  ED.AB.TOT = ED.AB.BANKS * ED.AB.PER
-  ED.AB.PCT = 0 : IF ED.AB.TOT > 0 THEN ED.AB.PCT = INT(ED.AB.USED * 100 / ED.AB.TOT)
+  ED.AB.BANKS% = DOC.LAST.BANK% - DOC.FIRST.BANK% + 1
+  ED.AB.USED = (DOC.CUR.BANK% - DOC.FIRST.BANK%) * ED.AB.PER + DOC.CUR.PTR - DOC.WIN.START
+  ED.AB.TOT = ED.AB.BANKS% * ED.AB.PER
+  ED.AB.PCT% = 0 : IF ED.AB.TOT > 0 THEN ED.AB.PCT% = INT(ED.AB.USED * 100 / ED.AB.TOT)
 
   REM 46 wide because the Document line is the longest thing here: a full 240-bank arena
   REM puts four digits on both figures. Ten rows: the two title lines, a gap, the five
   REM figures, a gap, and the hint on the last one. PANELOPEN pads the box around all of it,
   REM so the hint has a blank row under it without one being asked for, no row is against the
   REM frame, and none of these is a row number the frame has to agree with.
-  GP.SUB PANELOPEN, "About", "", 10, 46
+  GP.SUB PANELOPEN, GP.BSTR(BS.ABOUT, BSTR.ABOUT.TITLE), "", 10, 46
 
   REM The panel's own colour is the background of every line, so only the foreground is
   REM chosen here. A line that took its own background would read as a patch on the box.
-  ED.AB.L = GUI.INNER.LEFT : ED.AB.Y = GUI.INNER.TOP
-  ED.AB.TATTR = (GUI.PANEL AND 240) + (THEME.CLR(THEME.TITLE) AND 15)
-  ED.AB.HATTR = (GUI.PANEL AND 240) + (THEME.CLR(THEME.DIMMED) AND 15)
+  ED.AB.L% = GUI.INNER.LEFT : ED.AB.Y% = GUI.INNER.TOP
+  ED.AB.TATTR% = (GUI.PANEL AND 240) + (THEME.CLR(THEME.TITLE) AND 15)
+  ED.AB.HATTR% = (GUI.PANEL AND 240) + (THEME.CLR(THEME.DIMMED) AND 15)
 
-  GP.PRINTAT ED.AB.L, ED.AB.Y, "GPC EDIT -- text editor written in GPC-BASIC", ED.AB.TATTR
-  GP.PRINTAT ED.AB.L, ED.AB.Y + 1, "for the Commander X16", GUI.PANEL
+  GP.PRINTAT ED.AB.L%, ED.AB.Y%, GP.BSTR(BS.ABOUT, BSTR.ABOUT.PRODUCT), ED.AB.TATTR%
+  GP.PRINTAT ED.AB.L%, ED.AB.Y% + 1, GP.BSTR(BS.ABOUT, BSTR.ABOUT.MACHINE), GUI.PANEL
 
-  ED.AB.S$ = "String heap   " + MID$(STR$(FRE(0)), 2) + " bytes free"
-  GP.PRINTAT ED.AB.L, ED.AB.Y + 3, ED.AB.S$, GUI.PANEL
-  ED.AB.S$ = "Document      " + MID$(STR$(INT(ED.AB.USED / 1024)), 2) + "K used, " + MID$(STR$(INT((ED.AB.TOT - ED.AB.USED) / 1024)), 2) + "K free  (" + MID$(STR$(ED.AB.PCT), 2) + "%)"
-  GP.PRINTAT ED.AB.L, ED.AB.Y + 4, ED.AB.S$, GUI.PANEL
-  ED.AB.S$ = "Lines         " + MID$(STR$(LINE.COUNT), 2)
-  IF DOC.FULL <> 0 THEN ED.AB.S$ = ED.AB.S$ + "   DOCUMENT FULL"
-  GP.PRINTAT ED.AB.L, ED.AB.Y + 5, ED.AB.S$, GUI.PANEL
+  ED.AB.S$ = GP.BSTR(BS.ABOUT, BSTR.ABOUT.HEAP) + MID$(STR$(FRE(0)), 2) + GP.BSTR(BS.ABOUT, BSTR.ABOUT.FREE.TAIL)
+  GP.PRINTAT ED.AB.L%, ED.AB.Y% + 3, ED.AB.S$, GUI.PANEL
+  ED.AB.S$ = GP.BSTR(BS.ABOUT, BSTR.ABOUT.DOCUMENT) + MID$(STR$(INT(ED.AB.USED / 1024)), 2)
+  ED.AB.S$ = ED.AB.S$ + GP.BSTR(BS.ABOUT, BSTR.ABOUT.K.USED)
+  ED.AB.S$ = ED.AB.S$ + MID$(STR$(INT((ED.AB.TOT - ED.AB.USED) / 1024)), 2)
+  ED.AB.S$ = ED.AB.S$ + GP.BSTR(BS.ABOUT, BSTR.ABOUT.K.FREE) + MID$(STR$(ED.AB.PCT%), 2) + "%)"
+  GP.PRINTAT ED.AB.L%, ED.AB.Y% + 4, ED.AB.S$, GUI.PANEL
+  ED.AB.S$ = GP.BSTR(BS.ABOUT, BSTR.ABOUT.LINES) + MID$(STR$(LINE.COUNT%), 2)
+  IF DOC.FULL% <> 0 THEN ED.AB.S$ = ED.AB.S$ + GP.BSTR(BS.ABOUT, BSTR.ABOUT.DOC.FULL)
+  GP.PRINTAT ED.AB.L%, ED.AB.Y% + 5, ED.AB.S$, GUI.PANEL
 
-  ED.AB.S$ = "Arena banks   " + MID$(STR$(DOC.FIRST.BANK), 2) + "-" + MID$(STR$(DOC.LAST.BANK), 2) + " (" + MID$(STR$(ED.AB.BANKS), 2) + " x 8K)"
-  GP.PRINTAT ED.AB.L, ED.AB.Y + 6, ED.AB.S$, GUI.PANEL
-  ED.AB.S$ = "Table banks   " + MID$(STR$(DOC.TABLE.BASE.BANK), 2) + "-" + MID$(STR$(DOC.TABLE.BASE.BANK + DOC.TABLE.BANKS - 1), 2) + "    Machine has " + MID$(STR$(BANKMGR.BANKS), 2)
-  GP.PRINTAT ED.AB.L, ED.AB.Y + 7, ED.AB.S$, GUI.PANEL
+  ED.AB.S$ = GP.BSTR(BS.ABOUT, BSTR.ABOUT.ARENA) + MID$(STR$(DOC.FIRST.BANK%), 2) + "-" + MID$(STR$(DOC.LAST.BANK%), 2) + " (" + MID$(STR$(ED.AB.BANKS%), 2) + GP.BSTR(BS.ABOUT, BSTR.ABOUT.BANK.SIZE)
+  GP.PRINTAT ED.AB.L%, ED.AB.Y% + 6, ED.AB.S$, GUI.PANEL
+  ED.AB.S$ = GP.BSTR(BS.ABOUT, BSTR.ABOUT.TABLE) + MID$(STR$(DOC.TABLE.BASE.BANK%), 2) + "-"
+  ED.AB.S$ = ED.AB.S$ + MID$(STR$(DOC.TABLE.BASE.BANK% + DOC.TABLE.BANKS% - 1), 2)
+  ED.AB.S$ = ED.AB.S$ + GP.BSTR(BS.ABOUT, BSTR.ABOUT.MACHINE.HAS) + MID$(STR$(BANKMGR.BANKS), 2)
+  GP.PRINTAT ED.AB.L%, ED.AB.Y% + 7, ED.AB.S$, GUI.PANEL
 
   REM Centred on the panel rather than set at a fixed column, so it stays centred if the
   REM width is ever changed.
-  ED.AB.S$ = "Press any key"
-  GP.PRINTAT ED.AB.L + INT((GUI.INNER.WIDTH - LEN(ED.AB.S$)) / 2), ED.AB.Y + 9, ED.AB.S$, ED.AB.HATTR
+  ED.AB.S$ = GP.BSTR(BS.ABOUT, BSTR.ABOUT.PRESS.KEY)
+  GP.PRINTAT ED.AB.L% + INT((GUI.INNER.WIDTH - LEN(ED.AB.S$)) / 2), ED.AB.Y% + 9, ED.AB.S$, ED.AB.HATTR%
 
   GOSUB ED.DLG.WAITKEY
   GP.SUB PANELCLOSE
@@ -710,23 +819,24 @@ ED.CMD.ABOUT:
 REM ---- The unsaved-changes question: save, throw the changes away, or go back to what you
 REM were doing. Three answers, so it is a button box and not a yes/no.
 REM
-REM ED.CONFIRM.TITLE$ is the caption, so the box says which command is asking. ED.PROCEED is
+REM ED.CONFIRM.TITLE$ is the caption, so the box says which command is asking. ED.PROCEED% is
 REM 0 when the caller must abandon what it was about to do.
 ED.CONFIRM.SAVE:
-  ED.PROCEED = -1
-  IF ED.DOC.DIRTY = 0 THEN RETURN
-  ED.SAVE.ANSWER = GP.FN(ASK3, ED.CONFIRM.TITLE$, "Do you want to save changes to " + DOC.FILE.NAME$ + "?", "&Save", "Do&n't Save", "&Cancel", 1, 3)
-  IF ED.SAVE.ANSWER = 3 THEN ED.PROCEED = 0 : RETURN
-  IF ED.SAVE.ANSWER = 2 THEN RETURN
+  ED.PROCEED% = -1
+  IF ED.DOC.DIRTY% = 0 THEN RETURN
+  ED.CONFIRM.QUESTION$ = GP.BSTR(BS.DLG, BSTR.DLG.SAVE.CHANGES) + DOC.FILE.NAME$ + "?"
+  ED.SAVE.ANSWER% = GP.FN(ASK3, ED.CONFIRM.TITLE$, ED.CONFIRM.QUESTION$, GP.BSTR(BS.DLG, BSTR.DLG.SAVE.BTN), GP.BSTR(BS.DLG, BSTR.DLG.DONT.SAVE.BTN), GP.BSTR(BS.DLG, BSTR.DLG.CANCEL.BTN), 1, 3)
+  IF ED.SAVE.ANSWER% = 3 THEN ED.PROCEED% = 0 : RETURN
+  IF ED.SAVE.ANSWER% = 2 THEN RETURN
 REM Save goes through the ordinary command, so an untitled document gets the Save As it
 REM needs. That prompt can be cancelled in its turn, and the document is still dirty when it
 REM is -- which is the test for whether the save actually happened.
   GOSUB ED.CMD.SAVE
-  IF ED.DOC.DIRTY <> 0 THEN ED.PROCEED = 0
+  IF ED.DOC.DIRTY% <> 0 THEN ED.PROCEED% = 0
   RETURN
 
 ED.CMD.FIND:
-  ED.INPUT$ = GP.FN(INPUTBOXEX, "Find", "Find text:", "", "", ED.FIND$, ED.DLG.WIDTHDEFAULT, 0)
+  ED.INPUT$ = GP.FN(INPUTBOXEX, "Find", GP.BSTR(BS.DLG, BSTR.DLG.FIND.TEXT), "", "", ED.FIND$, ED.DLG.WIDTHDEFAULT, 0)
   IF GUI.OK = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
   ED.FIND$ = ED.INPUT$ : GOSUB ED.FIND.NEXT
   RETURN
@@ -744,15 +854,15 @@ ED.CMD.FINDPREV:
   RETURN
 
 ED.CMD.GOTO:
-  ED.INPUT$ = GP.FN(INPUTBOXEX, "Go to line", "Line number:", "", "", "", ED.DLG.WIDTHDEFAULT, 0)
+  ED.INPUT$ = GP.FN(INPUTBOXEX, GP.BSTR(BS.DLG, BSTR.DLG.GO.TO.LINE), GP.BSTR(BS.DLG, BSTR.DLG.LINE.NUMBER), "", "", "", ED.DLG.WIDTHDEFAULT, 0)
   IF GUI.OK = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
   ED.GOTO.N = VAL(ED.INPUT$)
   IF ED.GOTO.N < 1 THEN ED.GOTO.N = 1
-  IF ED.GOTO.N > LINE.COUNT THEN ED.GOTO.N = LINE.COUNT
+  IF ED.GOTO.N > LINE.COUNT% THEN ED.GOTO.N = LINE.COUNT%
   GOSUB ED.COMMIT.LIVE
-  ED.CUR.ROW = ED.GOTO.N - 1 : ED.CUR.COL = 0
+  ED.CUR.ROW% = ED.GOTO.N - 1 : ED.CUR.COL% = 0
   GOSUB ED.LOAD.LIVE : GOSUB ED.REFRESH.FULL
-  ED.MSG$ = "Line " + MID$(STR$(ED.GOTO.N), 2) : GOSUB ED.INFO.MSG
+  ED.MSG$ = GP.BSTR(BS.MSG, BSTR.MSG.LINE) + MID$(STR$(ED.GOTO.N), 2) : GOSUB ED.INFO.MSG
   RETURN
 
 REM ---- forward, wrapping, case-insensitive substring search for ED.FIND$ ----
@@ -761,32 +871,32 @@ REM scratch copy DOC.LOAD already makes, so upper-casing it harms nothing. Foldi
 REM and every line into new strings instead costs 579 bytes of workspace a search, owned for
 REM the rest of the run.
 ED.FIND.NEXT:
-  ED.FIND.OK = 0
+  ED.FIND.OK% = 0
   IF LEN(ED.FIND$) = 0 THEN RETURN
   REM The needle is folded on a copy: ED.FIND$ is what both messages below print back.
   ED.NEEDLE$ = ED.FIND$
-  ED.STRCASE.PTR = GP.STRPTR(ED.NEEDLE$) : ED.STRCASE.MODE = ED.STRCASE.UPPER : GOSUB ED.STRCASE.GO
+  ED.STRCASE.PTR = GP.STRPTR(ED.NEEDLE$) : ED.STRCASE.MODE% = ED.STRCASE.UPPER : GOSUB ED.STRCASE.GO
   GOSUB ED.COMMIT.LIVE
-  ED.FR = ED.CUR.ROW : ED.FROM = ED.CUR.COL + 2 : ED.SCANNED = 0
+  ED.FR% = ED.CUR.ROW% : ED.FROM% = ED.CUR.COL% + 2 : ED.SCANNED% = 0
 ED.FN.LOOP:
-  IF ED.SCANNED > LINE.COUNT THEN GOTO ED.FN.NONE
-  LINE.INDEX = ED.FR : GOSUB DOC.LOAD
+  IF ED.SCANNED% > LINE.COUNT% THEN GOTO ED.FN.NONE
+  LINE.INDEX% = ED.FR% : GOSUB DOC.LOAD
   ED.STRCASE.PTR = GP.STRPTR(LINE.TEXT$) : GOSUB ED.STRCASE.GO : REM MODE is sticky, set above
-  ED.FOUND.AT = GP.INSTR(LINE.TEXT$, ED.NEEDLE$, ED.FROM)
-  IF ED.FOUND.AT > 0 THEN GOTO ED.FN.HIT
-  ED.FR = ED.FR + 1
-  IF ED.FR > LINE.COUNT - 1 THEN ED.FR = 0
-  ED.FROM = 1 : ED.SCANNED = ED.SCANNED + 1
+  ED.FOUND.AT% = GP.INSTR(LINE.TEXT$, ED.NEEDLE$, ED.FROM%)
+  IF ED.FOUND.AT% > 0 THEN GOTO ED.FN.HIT
+  ED.FR% = ED.FR% + 1
+  IF ED.FR% > LINE.COUNT% - 1 THEN ED.FR% = 0
+  ED.FROM% = 1 : ED.SCANNED% = ED.SCANNED% + 1
   GOTO ED.FN.LOOP
 ED.FN.HIT:
-  ED.CUR.ROW = ED.FR : ED.CUR.COL = ED.FOUND.AT - 1 : ED.FIND.OK = -1
-  ED.CARET.LEN = LEN(ED.FIND$)
+  ED.CUR.ROW% = ED.FR% : ED.CUR.COL% = ED.FOUND.AT% - 1 : ED.FIND.OK% = -1
+  ED.CARET.LEN% = LEN(ED.FIND$)
   GOSUB ED.LOAD.LIVE : GOSUB ED.REFRESH.FULL
-  ED.MSG$ = "Found: " + ED.FIND$ : GOSUB ED.INFO.MSG
+  ED.MSG$ = GP.BSTR(BS.MSG, BSTR.MSG.FOUND) + ED.FIND$ : GOSUB ED.INFO.MSG
   RETURN
 
 ED.FN.NONE:
-  ED.MSG$ = "Not found: " + ED.FIND$ : GOSUB ED.ERR.MSG
+  ED.MSG$ = GP.BSTR(BS.MSG, BSTR.MSG.NOT.FOUND) + ED.FIND$ : GOSUB ED.ERR.MSG
   RETURN
 
 REM ---- backward, wrapping, case-insensitive search for ED.FIND$ ----
@@ -794,44 +904,44 @@ REM The same fold in place as ED.FIND.NEXT, and the same wrap. GP.INSTR only eve
 REM forward, so ED.FP.LAST asks it for the first match over and over, each time from one past
 REM the answer before, and keeps the last that came back.
 ED.FIND.PREV:
-  ED.FIND.OK = 0
+  ED.FIND.OK% = 0
   IF LEN(ED.FIND$) = 0 THEN RETURN
   ED.NEEDLE$ = ED.FIND$
-  ED.STRCASE.PTR = GP.STRPTR(ED.NEEDLE$) : ED.STRCASE.MODE = ED.STRCASE.UPPER : GOSUB ED.STRCASE.GO
+  ED.STRCASE.PTR = GP.STRPTR(ED.NEEDLE$) : ED.STRCASE.MODE% = ED.STRCASE.UPPER : GOSUB ED.STRCASE.GO
   GOSUB ED.COMMIT.LIVE
   REM On the caret's own line only a match that starts left of the caret counts, or the search
   REM would keep finding the one the caret is already sitting on. Every other line is open to
   REM its very end, and 256 is past the longest a line can be.
-  ED.FR = ED.CUR.ROW : ED.FBEFORE = ED.CUR.COL + 1 : ED.SCANNED = 0
+  ED.FR% = ED.CUR.ROW% : ED.FBEFORE% = ED.CUR.COL% + 1 : ED.SCANNED% = 0
 ED.FP.LOOP:
-  IF ED.SCANNED > LINE.COUNT THEN GOTO ED.FP.NONE
-  LINE.INDEX = ED.FR : GOSUB DOC.LOAD
+  IF ED.SCANNED% > LINE.COUNT% THEN GOTO ED.FP.NONE
+  LINE.INDEX% = ED.FR% : GOSUB DOC.LOAD
   ED.STRCASE.PTR = GP.STRPTR(LINE.TEXT$) : GOSUB ED.STRCASE.GO : REM MODE is sticky, set above
   GOSUB ED.FP.LAST
-  IF ED.FOUND.AT > 0 THEN GOTO ED.FP.HIT
-  ED.FR = ED.FR - 1
-  IF ED.FR < 0 THEN ED.FR = LINE.COUNT - 1
-  ED.FBEFORE = 256 : ED.SCANNED = ED.SCANNED + 1
+  IF ED.FOUND.AT% > 0 THEN GOTO ED.FP.HIT
+  ED.FR% = ED.FR% - 1
+  IF ED.FR% < 0 THEN ED.FR% = LINE.COUNT% - 1
+  ED.FBEFORE% = 256 : ED.SCANNED% = ED.SCANNED% + 1
   GOTO ED.FP.LOOP
 
-REM ED.FP.LAST -- the rightmost match in LINE.TEXT$ that starts before ED.FBEFORE, 0 for none.
+REM ED.FP.LAST -- the rightmost match in LINE.TEXT$ that starts before ED.FBEFORE%, 0 for none.
 ED.FP.LAST:
-  ED.FOUND.AT = 0 : ED.FP.FROM = 1
+  ED.FOUND.AT% = 0 : ED.FP.FROM% = 1
 ED.FP.SCAN:
-  ED.FP.AT = GP.INSTR(LINE.TEXT$, ED.NEEDLE$, ED.FP.FROM)
-  IF ED.FP.AT = 0 OR ED.FP.AT >= ED.FBEFORE THEN RETURN
-  ED.FOUND.AT = ED.FP.AT : ED.FP.FROM = ED.FP.AT + 1
+  ED.FP.AT% = GP.INSTR(LINE.TEXT$, ED.NEEDLE$, ED.FP.FROM%)
+  IF ED.FP.AT% = 0 OR ED.FP.AT% >= ED.FBEFORE% THEN RETURN
+  ED.FOUND.AT% = ED.FP.AT% : ED.FP.FROM% = ED.FP.AT% + 1
   GOTO ED.FP.SCAN
 
 ED.FP.HIT:
-  ED.CUR.ROW = ED.FR : ED.CUR.COL = ED.FOUND.AT - 1 : ED.FIND.OK = -1
-  ED.CARET.LEN = LEN(ED.FIND$)
+  ED.CUR.ROW% = ED.FR% : ED.CUR.COL% = ED.FOUND.AT% - 1 : ED.FIND.OK% = -1
+  ED.CARET.LEN% = LEN(ED.FIND$)
   GOSUB ED.LOAD.LIVE : GOSUB ED.REFRESH.FULL
-  ED.MSG$ = "Found: " + ED.FIND$ : GOSUB ED.INFO.MSG
+  ED.MSG$ = GP.BSTR(BS.MSG, BSTR.MSG.FOUND) + ED.FIND$ : GOSUB ED.INFO.MSG
   RETURN
 
 ED.FP.NONE:
-  ED.MSG$ = "Not found: " + ED.FIND$ : GOSUB ED.ERR.MSG
+  ED.MSG$ = GP.BSTR(BS.MSG, BSTR.MSG.NOT.FOUND) + ED.FIND$ : GOSUB ED.ERR.MSG
   RETURN
 
 REM ============================================================================
@@ -841,14 +951,14 @@ REM Two fields and then a choice: every match in the document, or just the next 
 REM match is case-blind like the search, but the replacement goes into the line exactly as it
 REM was typed -- there is no attempt to copy the case of what was there.
 ED.CMD.REPLACE:
-  ED.DLG.OK = GP.FN(ASKTEXT2, "Replace", "Find text:", "Replace with:", ED.FIND$, ED.REPL$, 0)
+  ED.DLG.OK = GP.FN(ASKTEXT2, GP.BSTR(BS.DLG, BSTR.DLG.REPLACE), GP.BSTR(BS.DLG, BSTR.DLG.FIND.TEXT), GP.BSTR(BS.DLG, BSTR.DLG.REPLACE.WITH), ED.FIND$, ED.REPL$, 0)
   IF ED.DLG.OK = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
   ED.FIND$ = ED.DLG.TEXT1$ : ED.REPL$ = ED.DLG.TEXT2$
   IF LEN(ED.FIND$) = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
 
-  ED.REPLACE.SCOPE = GP.FN(ASK3, "Replace", "Replace every match, or just the next one?", "&All", "&Next", "&Cancel", 2, 3)
-  IF ED.REPLACE.SCOPE = 3 THEN GOSUB ED.REFRESH.FULL : RETURN
-  IF ED.REPLACE.SCOPE = 2 THEN GOSUB ED.REPLACE.ONE : RETURN
+  ED.REPLACE.SCOPE% = GP.FN(ASK3, GP.BSTR(BS.DLG, BSTR.DLG.REPLACE), GP.BSTR(BS.DLG, BSTR.DLG.SCOPE.ASK), "&All", GP.BSTR(BS.DLG, BSTR.DLG.NEXT.BTN), GP.BSTR(BS.DLG, BSTR.DLG.CANCEL.BTN), 2, 3)
+  IF ED.REPLACE.SCOPE% = 3 THEN GOSUB ED.REFRESH.FULL : RETURN
+  IF ED.REPLACE.SCOPE% = 2 THEN GOSUB ED.REPLACE.ONE : RETURN
   GOSUB ED.REPLACE.ALL
   RETURN
 
@@ -857,20 +967,20 @@ REM The search does the finding and leaves the caret on the match, so all this a
 REM splice. Note the reload: ED.FIND.NEXT upper-cased the scratch copy to search it, and what
 REM goes back into the document has to be the line as it was written.
 ED.REPLACE.ONE:
-  GOSUB ED.FIND.NEXT : IF ED.FIND.OK = 0 THEN RETURN
+  GOSUB ED.FIND.NEXT : IF ED.FIND.OK% = 0 THEN RETURN
   GOSUB ED.COMMIT.LIVE
-  LINE.INDEX = ED.CUR.ROW   : GOSUB DOC.LOAD
-  ED.RP.AT = ED.CUR.COL + 1 : GOSUB ED.RP.SPLICE
-  IF ED.RP.DONE = 0 THEN GOSUB ED.RP.TOOLONG : RETURN
-  LINE.INDEX = ED.CUR.ROW : GOSUB DOC.STORE
-  ED.DOC.DIRTY = -1 : ED.CUR.COL = ED.CUR.COL + LEN(ED.REPL$)
+  LINE.INDEX% = ED.CUR.ROW%   : GOSUB DOC.LOAD
+  ED.RP.AT% = ED.CUR.COL% + 1 : GOSUB ED.RP.SPLICE
+  IF ED.RP.DONE% = 0 THEN GOSUB ED.RP.TOOLONG : RETURN
+  LINE.INDEX% = ED.CUR.ROW% : GOSUB DOC.STORE
+  ED.DOC.DIRTY% = -1 : ED.CUR.COL% = ED.CUR.COL% + LEN(ED.REPL$)
   GOSUB ED.LOAD.LIVE : GOSUB ED.REFRESH.FULL
-  ED.MSG$ = "Replaced 1" : GOSUB ED.INFO.MSG
+  ED.MSG$ = GP.BSTR(BS.MSG, BSTR.MSG.REPLACED.ONE) : GOSUB ED.INFO.MSG
   RETURN
 
 ED.RP.TOOLONG:
   GOSUB ED.LOAD.LIVE : GOSUB ED.REFRESH.FULL
-  ED.MSG$ = "Line would be too long" : GOSUB ED.ERR.MSG
+  ED.MSG$ = GP.BSTR(BS.MSG, BSTR.MSG.LINE.TOO.LONG) : GOSUB ED.ERR.MSG
   RETURN
 
 REM ---- ED.REPLACE.ALL: every match in the document ----
@@ -880,31 +990,31 @@ REM length again and a replace-all that rewrote every line would cost the whole 
 ED.REPLACE.ALL:
   REM Its own folded needle: this one does not go through ED.FIND.NEXT, so nothing has set it.
   ED.NEEDLE$ = ED.FIND$
-  ED.STRCASE.PTR = GP.STRPTR(ED.NEEDLE$) : ED.STRCASE.MODE = ED.STRCASE.UPPER : GOSUB ED.STRCASE.GO
+  ED.STRCASE.PTR = GP.STRPTR(ED.NEEDLE$) : ED.STRCASE.MODE% = ED.STRCASE.UPPER : GOSUB ED.STRCASE.GO
   GOSUB ED.COMMIT.LIVE
-  ED.RP.TOTAL = 0 : ED.RP.LONG = 0
-  FOR ED.RP.ROW = 0 TO LINE.COUNT - 1
+  ED.RP.TOTAL% = 0 : ED.RP.LONG% = 0
+  FOR ED.RP.ROW = 0 TO LINE.COUNT% - 1
     GOSUB ED.RP.ONELINE
   NEXT
   REM The caret's line may be shorter than it was, so the column goes back to the start rather
   REM than to a column that is no longer there.
-  ED.CUR.COL = 0 : GOSUB ED.LOAD.LIVE
-  IF ED.RP.TOTAL > 0 THEN ED.DOC.DIRTY = -1
+  ED.CUR.COL% = 0 : GOSUB ED.LOAD.LIVE
+  IF ED.RP.TOTAL% > 0 THEN ED.DOC.DIRTY% = -1
 
   REM The count goes in a box as well as on the status line. A replace-all changes lines the
   REM caret never visits, and the one number that says what it did is worth a key press.
   REM The box paints over the text, so the repaint comes after it rather than before.
-  ED.RP.BOX.COUNT$ = MID$(STR$(ED.RP.TOTAL), 2) + " replacements made"
+  ED.RP.BOX.COUNT$ = MID$(STR$(ED.RP.TOTAL%), 2) + GP.BSTR(BS.DLG, BSTR.DLG.MADE.TAIL)
   ED.RP.BOX.LONG$ = ""
-  IF ED.RP.LONG > 0 THEN ED.RP.BOX.LONG$ = MID$(STR$(ED.RP.LONG), 2) + " lines left alone: too long"
+  IF ED.RP.LONG% > 0 THEN ED.RP.BOX.LONG$ = MID$(STR$(ED.RP.LONG%), 2) + GP.BSTR(BS.DLG, BSTR.DLG.LEFT.ALONE)
   ED.RP.BOX.FULL$ = ""
-  IF DOC.FULL <> 0 THEN ED.RP.BOX.FULL$ = "DOCUMENT FULL"
-  GP.SUB MSGBOXEX, "Replace All", ED.RP.BOX.COUNT$, ED.RP.BOX.LONG$, ED.RP.BOX.FULL$, "&OK"
+  IF DOC.FULL% <> 0 THEN ED.RP.BOX.FULL$ = GP.BSTR(BS.DLG, BSTR.DLG.DOC.FULL)
+  GP.SUB MSGBOXEX, GP.BSTR(BS.DLG, BSTR.DLG.REPLACE.ALL), ED.RP.BOX.COUNT$, ED.RP.BOX.LONG$, ED.RP.BOX.FULL$, "&OK"
   GOSUB ED.REFRESH.FULL
 
-  ED.MSG$ = "Replaced " + MID$(STR$(ED.RP.TOTAL), 2)
-  IF ED.RP.LONG > 0 THEN ED.MSG$ = ED.MSG$ + " -- " + MID$(STR$(ED.RP.LONG), 2) + " too long"
-  IF DOC.FULL <> 0 THEN ED.MSG$ = ED.MSG$ + " -- DOCUMENT FULL" : GOSUB ED.ERR.MSG : RETURN
+  ED.MSG$ = GP.BSTR(BS.MSG, BSTR.MSG.REPLACED) + MID$(STR$(ED.RP.TOTAL%), 2)
+  IF ED.RP.LONG% > 0 THEN ED.MSG$ = ED.MSG$ + " -- " + MID$(STR$(ED.RP.LONG%), 2) + GP.BSTR(BS.MSG, BSTR.MSG.TOO.LONG.TAIL)
+  IF DOC.FULL% <> 0 THEN ED.MSG$ = ED.MSG$ + GP.BSTR(BS.MSG, BSTR.MSG.FULL.TAIL) : GOSUB ED.ERR.MSG : RETURN
   GOSUB ED.INFO.MSG
   RETURN
 
@@ -914,32 +1024,32 @@ REM and the positions it finds are the positions in ED.RP.WORK$ because the two 
 REM length. Re-folding per match rather than once per line is what makes a replacement that
 REM itself contains the needle safe -- the scan carries on past it, not through it.
 ED.RP.ONELINE:
-  LINE.INDEX = ED.RP.ROW : GOSUB DOC.LOAD
-  ED.RP.WORK$ = LINE.TEXT$ : ED.RP.AT = 1 : ED.RP.N = 0
+  LINE.INDEX% = ED.RP.ROW : GOSUB DOC.LOAD
+  ED.RP.WORK$ = LINE.TEXT$ : ED.RP.AT% = 1 : ED.RP.N% = 0
 ED.RP.SCAN:
   LINE.TEXT$ = ED.RP.WORK$
-  ED.STRCASE.PTR = GP.STRPTR(LINE.TEXT$) : ED.STRCASE.MODE = ED.STRCASE.UPPER : GOSUB ED.STRCASE.GO
-  ED.RP.HIT = GP.INSTR(LINE.TEXT$, ED.NEEDLE$, ED.RP.AT)
-  IF ED.RP.HIT = 0 THEN GOTO ED.RP.ONELINE.DONE
-  LINE.TEXT$ = ED.RP.WORK$ : ED.RP.AT = ED.RP.HIT
+  ED.STRCASE.PTR = GP.STRPTR(LINE.TEXT$) : ED.STRCASE.MODE% = ED.STRCASE.UPPER : GOSUB ED.STRCASE.GO
+  ED.RP.HIT% = GP.INSTR(LINE.TEXT$, ED.NEEDLE$, ED.RP.AT%)
+  IF ED.RP.HIT% = 0 THEN GOTO ED.RP.ONELINE.DONE
+  LINE.TEXT$ = ED.RP.WORK$ : ED.RP.AT% = ED.RP.HIT%
   GOSUB ED.RP.SPLICE
-  IF ED.RP.DONE = 0 THEN ED.RP.LONG = ED.RP.LONG + 1 : GOTO ED.RP.ONELINE.DONE
+  IF ED.RP.DONE% = 0 THEN ED.RP.LONG% = ED.RP.LONG% + 1 : GOTO ED.RP.ONELINE.DONE
   ED.RP.WORK$ = LINE.TEXT$
-  ED.RP.AT = ED.RP.HIT + LEN(ED.REPL$) : ED.RP.N = ED.RP.N + 1
+  ED.RP.AT% = ED.RP.HIT% + LEN(ED.REPL$) : ED.RP.N% = ED.RP.N% + 1
   GOTO ED.RP.SCAN
 ED.RP.ONELINE.DONE:
-  ED.RP.TOTAL = ED.RP.TOTAL + ED.RP.N
-  IF ED.RP.N = 0 THEN RETURN
-  LINE.TEXT$ = ED.RP.WORK$ : LINE.INDEX = ED.RP.ROW : GOSUB DOC.STORE
+  ED.RP.TOTAL% = ED.RP.TOTAL% + ED.RP.N%
+  IF ED.RP.N% = 0 THEN RETURN
+  LINE.TEXT$ = ED.RP.WORK$ : LINE.INDEX% = ED.RP.ROW : GOSUB DOC.STORE
   RETURN
 
 REM ED.RP.SPLICE -- ED.REPL$ into LINE.TEXT$ over the LEN(ED.FIND$) characters at ED.RP.AT.
-REM ED.RP.DONE is 0 when the result would not fit a line, and LINE.TEXT$ is left alone.
+REM ED.RP.DONE% is 0 when the result would not fit a line, and LINE.TEXT$ is left alone.
 ED.RP.SPLICE:
-  ED.RP.DONE = 0
+  ED.RP.DONE% = 0
   IF LEN(LINE.TEXT$) - LEN(ED.FIND$) + LEN(ED.REPL$) > ED.MAX.LINE THEN RETURN
-  LINE.TEXT$ = LEFT$(LINE.TEXT$, ED.RP.AT - 1) + ED.REPL$ + MID$(LINE.TEXT$, ED.RP.AT + LEN(ED.FIND$))
-  ED.RP.DONE = -1
+  LINE.TEXT$ = LEFT$(LINE.TEXT$, ED.RP.AT% - 1) + ED.REPL$ + MID$(LINE.TEXT$, ED.RP.AT% + LEN(ED.FIND$))
+  ED.RP.DONE% = -1
   RETURN
 
 
@@ -962,14 +1072,14 @@ REM A message takes over the status line for ED.MSG.JIFFIES and then the status 
 REM back, so the editor never sits showing a stale "Saved" or "Not found". The first key
 REM struck ends the hold early and is handled as usual, so a message never costs a keypress.
 ED.INFO.MSG:
-  ED.PS.ROW = SCREEN.ROWS - 1 : ED.PS.COL = 0 : ED.PS.WIDTH = SCREEN.COLS
-  ED.PS$ = " " + ED.MSG$ : ED.PS.ATTR = THEME.CLR(THEME.BAR) : GOSUB ED.PUT.FIELD
+  ED.PS.ROW% = SCREEN.ROWS% - 1 : ED.PS.COL% = 0 : ED.PS.WIDTH% = SCREEN.COLS%
+  ED.PS$ = " " + ED.MSG$ : ED.PS.ATTR% = THEME.CLR(THEME.BAR) : GOSUB ED.PUT.FIELD
   GOSUB ED.MSG.HOLD
   RETURN
 
 ED.ERR.MSG:
-  ED.PS.ROW = SCREEN.ROWS - 1 : ED.PS.COL = 0 : ED.PS.WIDTH = SCREEN.COLS
-  ED.PS$ = " " + ED.MSG$ : ED.PS.ATTR = THEME.CLR(THEME.WARN) : GOSUB ED.PUT.FIELD
+  ED.PS.ROW% = SCREEN.ROWS% - 1 : ED.PS.COL% = 0 : ED.PS.WIDTH% = SCREEN.COLS%
+  ED.PS$ = " " + ED.MSG$ : ED.PS.ATTR% = THEME.CLR(THEME.WARN) : GOSUB ED.PUT.FIELD
   GOSUB ED.MSG.HOLD
   RETURN
 
@@ -1002,74 +1112,79 @@ ED.MSG.HOLD.DONE:
 REM ============================================================================
 REM Rendering
 REM ============================================================================
+REM Every operation big enough to repaint the screen -- an undo, a find, a file opened --
+REM is also big enough to have moved the rows the selection named, so the selection ends
+REM here. ED.SEL.REFRESH calls ED.RENDER.ALL directly for that reason.
 ED.REFRESH.FULL:
+  ED.SEL.ON% = 0 : ED.SEL.WAS.ON% = 0
   GOSUB ED.ENSURE.VISIBLE : GOSUB ED.RENDER.ALL
   RETURN
 ED.REFRESH.INTRA:
   GOSUB ED.ENSURE.VISIBLE
-  IF ED.SCROLLED = 1 THEN GOSUB ED.DO.SCROLL : RETURN
-  ED.SCREEN.ROW = ED.CUR.ROW - ED.TOP.LINE + 1 : ED.DOC.LINE = ED.CUR.ROW
+  IF ED.SCROLLED% = 1 THEN GOSUB ED.DO.SCROLL : RETURN
+  ED.SCREEN.ROW = ED.CUR.ROW% - ED.TOP.LINE% + 1 : ED.DOC.LINE% = ED.CUR.ROW%
   GOSUB ED.RENDER.ROW: GOSUB ED.PLACE.CARET : GOSUB ED.RENDER.STATUS
   RETURN
 
 REM Cheap cursor move: restore the old caret cell, invert the new one, repaint the status
 REM line. About 2 cells, not a screen. Only an actual scroll falls back to a full repaint.
 ED.CARET.REFRESH:
+  IF ED.SEL.ON% <> 0 THEN GOSUB ED.SEL.REFRESH : RETURN
   GOSUB ED.UNCARET : GOSUB ED.ENSURE.VISIBLE
-  IF ED.SCROLLED = 1 THEN GOSUB ED.DO.SCROLL : RETURN
+  IF ED.SCROLLED% = 1 THEN GOSUB ED.DO.SCROLL : RETURN
   GOSUB ED.PLACE.CARET : GOSUB ED.RENDER.STATUS
   RETURN
 
 ED.ENSURE.VISIBLE:
-  ED.SCROLLED = 0 : ED.HSCROLLED = 0 : ED.EV.OLDTOP = ED.TOP.LINE
-  IF ED.CUR.ROW < ED.TOP.LINE THEN ED.TOP.LINE = ED.CUR.ROW
-  IF ED.CUR.ROW > ED.TOP.LINE + ED.TEXT.ROWS - 1 THEN ED.TOP.LINE = ED.CUR.ROW - ED.TEXT.ROWS + 1
-  IF ED.CUR.COL < ED.LEFT.COL THEN ED.LEFT.COL = ED.CUR.COL : ED.HSCROLLED = 1
-  IF ED.CUR.COL > ED.LEFT.COL + ED.TEXT.WIDTH - 1 THEN ED.LEFT.COL = ED.CUR.COL - ED.TEXT.WIDTH + 1 : ED.HSCROLLED = 1
-  ED.VDELTA = ED.TOP.LINE - ED.EV.OLDTOP
-  IF ED.VDELTA <> 0 THEN ED.SCROLLED = 1
-  IF ED.HSCROLLED = 1 THEN ED.SCROLLED = 1
+  ED.SCROLLED% = 0 : ED.HSCROLLED% = 0 : ED.EV.OLDTOP% = ED.TOP.LINE%
+  IF ED.CUR.ROW% < ED.TOP.LINE% THEN ED.TOP.LINE% = ED.CUR.ROW%
+  IF ED.CUR.ROW% > ED.TOP.LINE% + ED.TEXT.ROWS% - 1 THEN ED.TOP.LINE% = ED.CUR.ROW% - ED.TEXT.ROWS% + 1
+  IF ED.CUR.COL% < ED.LEFT.COL% THEN ED.LEFT.COL% = ED.CUR.COL% : ED.HSCROLLED% = 1
+  IF ED.CUR.COL% > ED.LEFT.COL% + ED.TEXT.WIDTH% - 1 THEN ED.LEFT.COL% = ED.CUR.COL% - ED.TEXT.WIDTH% + 1 : ED.HSCROLLED% = 1
+  ED.VDELTA% = ED.TOP.LINE% - ED.EV.OLDTOP%
+  IF ED.VDELTA% <> 0 THEN ED.SCROLLED% = 1
+  IF ED.HSCROLLED% = 1 THEN ED.SCROLLED% = 1
   RETURN
 
 REM A one-row move is served by VERA: bump L0_VSCROLL and paint the one newly-exposed row.
 REM The bars are on layer 1 and did not move. Anything else, a multi-line jump or any
 REM horizontal scroll, is a full repaint at the current map offset.
 ED.DO.SCROLL:
-  IF ED.HW.OK = 0 THEN GOSUB ED.RENDER.ALL : RETURN
-  IF ED.HSCROLLED = 1 THEN GOSUB ED.RENDER.ALL : RETURN
-  IF ED.VDELTA = 1 THEN GOSUB ED.HW.SCROLL.DOWN : RETURN
-  IF ED.VDELTA = 0 - 1 THEN GOSUB ED.HW.SCROLL.UP : RETURN
+  IF ED.HW.OK% = 0 THEN GOSUB ED.RENDER.ALL : RETURN
+  IF ED.HSCROLLED% = 1 THEN GOSUB ED.RENDER.ALL : RETURN
+  IF ED.VDELTA% = 1 THEN GOSUB ED.HW.SCROLL.DOWN : RETURN
+  IF ED.VDELTA% = 0 - 1 THEN GOSUB ED.HW.SCROLL.UP : RETURN
   GOSUB ED.RENDER.ALL
   RETURN
 
 REM scroll down one line: content slides up, a new line appears at the bottom text row.
 ED.HW.SCROLL.DOWN:
-  ED.MAP.TOP = ED.MAP.TOP + 1
-  IF ED.MAP.TOP > ED.MAP.MAXTOP THEN ED.MAP.TOP = 0 : GOSUB ED.SET.VSCROLL : GOSUB ED.RENDER.ALL : RETURN
+  ED.MAP.TOP% = ED.MAP.TOP% + 1
+  IF ED.MAP.TOP% > ED.MAP.MAXTOP% THEN ED.MAP.TOP% = 0 : GOSUB ED.SET.VSCROLL : GOSUB ED.RENDER.ALL : RETURN
   GOSUB ED.SET.VSCROLL
-  ED.SCREEN.ROW = ED.TEXT.BOTTOM : ED.DOC.LINE = ED.TOP.LINE + ED.SCREEN.ROW - 1 : GOSUB ED.RENDER.ROW
+  ED.SCREEN.ROW = ED.TEXT.BOTTOM% : ED.DOC.LINE% = ED.TOP.LINE% + ED.SCREEN.ROW - 1 : GOSUB ED.RENDER.ROW
   GOSUB ED.RENDER.STATUS : GOSUB ED.PLACE.CARET
   RETURN
 
 REM scroll up one line: content slides down, a new line appears at the top text row (1).
 ED.HW.SCROLL.UP:
-  ED.MAP.TOP = ED.MAP.TOP - 1
-  IF ED.MAP.TOP < 0 THEN ED.MAP.TOP = ED.MAP.MAXTOP : GOSUB ED.SET.VSCROLL : GOSUB ED.RENDER.ALL : RETURN
+  ED.MAP.TOP% = ED.MAP.TOP% - 1
+  IF ED.MAP.TOP% < 0 THEN ED.MAP.TOP% = ED.MAP.MAXTOP% : GOSUB ED.SET.VSCROLL : GOSUB ED.RENDER.ALL : RETURN
   GOSUB ED.SET.VSCROLL
-  ED.SCREEN.ROW = 1 : ED.DOC.LINE = ED.TOP.LINE + ED.SCREEN.ROW - 1 : GOSUB ED.RENDER.ROW
+  ED.SCREEN.ROW = 1 : ED.DOC.LINE% = ED.TOP.LINE% + ED.SCREEN.ROW - 1 : GOSUB ED.RENDER.ROW
   GOSUB ED.RENDER.STATUS : GOSUB ED.PLACE.CARET
   RETURN
 
 ED.SET.VSCROLL:
-  ED.VSP = ED.MAP.TOP * 8
-  POKE 40754, ED.VSP - INT(ED.VSP / 256) * 256 : REM $9F32 L0 VSCROLL (7:0)
-  POKE 40755, INT(ED.VSP / 256)                : REM $9F33 L0 VSCROLL (11:8)
+  ED.VSP% = ED.MAP.TOP% * 8
+  POKE 40754, ED.VSP% - INT(ED.VSP% / 256) * 256 : REM $9F32 L0 VSCROLL (7:0)
+  POKE 40755, INT(ED.VSP% / 256)                : REM $9F33 L0 VSCROLL (11:8)
   RETURN
 
 ED.RENDER.ALL:
   GOSUB ED.RENDER.MENUBAR
-  FOR ED.SCREEN.ROW = 1 TO ED.TEXT.BOTTOM
-    ED.DOC.LINE = ED.TOP.LINE + ED.SCREEN.ROW - 1
+  FOR ED.SCREEN.ROW = 1 TO ED.TEXT.BOTTOM%
+    ED.DOC.LINE% = ED.TOP.LINE% + ED.SCREEN.ROW - 1
     GOSUB ED.RENDER.ROW
   NEXT ED.SCREEN.ROW
   GOSUB ED.RENDER.STATUS : GOSUB ED.PLACE.CARET
@@ -1086,7 +1201,7 @@ REM
 REM FX 32-bit cache write: one DATA0 write flushes 4 VRAM bytes = 2 cells
 REM [char,attr,char,attr]. Every cell in a row shares an attribute, so the two attr slots are
 REM loaded once and the loop writes only the two char slots plus a flush. Increment +4 walks
-REM two cells a flush, and ED.TEXT.WIDTH is even.
+REM two cells a flush, and ED.TEXT.WIDTH% is even.
 REM FX regs: $9F25 CTRL bits 6:1 = DCSEL; DCSEL 2 -> FX_CTRL $9F29 bit 6 cache-write-enable;
 REM DCSEL 6 -> FX_CACHE L/M/H/U $9F29-2C = [char0, attr0, char1, attr1].
 REM
@@ -1102,28 +1217,28 @@ ED.RENDER.ROW:
   REM text -- see ED.ROW.STREAM. Blank past the end of the document, and leading zeros
   REM blank because a digit that is never computed stays a space. 48 is "0".
   ED.GD0% = 32 : ED.GD1% = 32 : ED.GD2% = 32 : ED.GD3% = 32
-  IF ED.DOC.LINE >= LINE.COUNT THEN GOTO ED.ROW.GEOM
-  ED.GN = ED.DOC.LINE + 1
-  ED.GT = INT(ED.GN / 10) : ED.GD3% = 48 + ED.GN - ED.GT * 10 : ED.GN = ED.GT
-  IF ED.GN > 0 THEN ED.GT = INT(ED.GN / 10) : ED.GD2% = 48 + ED.GN - ED.GT * 10 : ED.GN = ED.GT
-  IF ED.GN > 0 THEN ED.GT = INT(ED.GN / 10) : ED.GD1% = 48 + ED.GN - ED.GT * 10 : ED.GN = ED.GT
-  IF ED.GN > 0 THEN ED.GD0% = 48 + ED.GN
+  IF ED.DOC.LINE% >= LINE.COUNT% THEN GOTO ED.ROW.GEOM
+  ED.GN% = ED.DOC.LINE% + 1
+  ED.GT% = INT(ED.GN% / 10) : ED.GD3% = 48 + ED.GN% - ED.GT% * 10 : ED.GN% = ED.GT%
+  IF ED.GN% > 0 THEN ED.GT% = INT(ED.GN% / 10) : ED.GD2% = 48 + ED.GN% - ED.GT% * 10 : ED.GN% = ED.GT%
+  IF ED.GN% > 0 THEN ED.GT% = INT(ED.GN% / 10) : ED.GD1% = 48 + ED.GN% - ED.GT% * 10 : ED.GN% = ED.GT%
+  IF ED.GN% > 0 THEN ED.GD0% = 48 + ED.GN%
 ED.ROW.GEOM:
-  ED.ASM.BASE% = (ED.SCREEN.ROW + ED.MAP.TOP) * 256 : REM layer 0, at the GUTTER: the block
+  ED.ASM.BASE% = (ED.SCREEN.ROW + ED.MAP.TOP%) * 256 : REM layer 0, at the GUTTER: the block
   REM draws that first and the VERA address walks on into the text of its own accord.
-  ED.ASM.ATTR% = ED.ATTR.TEXT : ED.ASM.WIDTH% = ED.TEXT.WIDTH : ED.ASM.MODE% = 0 : ED.ASM.VIS% = 0
-  IF ED.DOC.LINE >= LINE.COUNT THEN GOTO ED.ROW.STREAM
-  IF ED.DOC.LINE = ED.CUR.ROW THEN GOTO ED.ROW.LIVE
-  LINE.INDEX = ED.DOC.LINE : GOSUB DOC.SLOT.READ
-  BANK DOC.GOT.BANK
-  ED.VIS = PEEK(DOC.GOT.OFF) - ED.LEFT.COL : REM visible chars after horizontal scroll
-  IF ED.VIS > 0 THEN ED.ASM.VIS% = ED.VIS
-  ED.ASM.SRC% = DOC.GOT.OFF + 1 + ED.LEFT.COL
+  ED.ASM.ATTR% = ED.ATTR.TEXT% : ED.ASM.WIDTH% = ED.TEXT.WIDTH% : ED.ASM.MODE% = 0 : ED.ASM.VIS% = 0
+  IF ED.DOC.LINE% >= LINE.COUNT% THEN GOTO ED.ROW.STREAM
+  IF ED.DOC.LINE% = ED.CUR.ROW% THEN GOTO ED.ROW.LIVE
+  LINE.INDEX% = ED.DOC.LINE% : GOSUB DOC.SLOT.READ
+  BANK DOC.GOT.BANK%
+  ED.VIS% = PEEK(DOC.GOT.OFF) - ED.LEFT.COL% : REM visible chars after horizontal scroll
+  IF ED.VIS% > 0 THEN ED.ASM.VIS% = ED.VIS%
+  ED.ASM.SRC% = DOC.GOT.OFF + 1 + ED.LEFT.COL%
   GOTO ED.ROW.STREAM
 ED.ROW.LIVE:
-  ED.ASM.MODE% = 1 : ED.VIS = LEN(ED.CUR.LINE$) - ED.LEFT.COL
-  IF ED.VIS > 0 THEN ED.ASM.VIS% = ED.VIS
-  ED.ASM.OFS% = 3 + ED.LEFT.COL : REM past [MaxLen][control][ActLen] to the text
+  ED.ASM.MODE% = 1 : ED.VIS% = LEN(ED.CUR.LINE$) - ED.LEFT.COL%
+  IF ED.VIS% > 0 THEN ED.ASM.VIS% = ED.VIS%
+  ED.ASM.OFS% = 3 + ED.LEFT.COL% : REM past [MaxLen][control][ActLen] to the text
 ED.ROW.STREAM:
   #REM 1
   GP.ASM
@@ -1219,37 +1334,37 @@ REM Caret = a run of inverted attribute cells, remembered so a cursor move can r
 REM (ED.UNCARET) instead of repainting the screen.
 REM
 REM The run is one cell, except straight after a find: ED.FN.HIT and ED.FP.HIT set
-REM ED.CARET.LEN to the length of the match, so the whole word comes up lit rather than the
-REM one character under the caret. ED.CARET.LEN falls back to 1 the moment it is used, which
+REM ED.CARET.LEN% to the length of the match, so the whole word comes up lit rather than the
+REM one character under the caret. ED.CARET.LEN% falls back to 1 the moment it is used, which
 REM is why no cursor move, edit or dialog has to remember to clear it.
 REM
-REM ED.CARET.DRAWN is what was painted after clipping at the right edge of the text area, and
+REM ED.CARET.DRAWN% is what was painted after clipping at the right edge of the text area, and
 REM it is what ED.UNCARET puts back. The first cell is written outside the loop because a
 REM plain cursor move is one cell and pays for no FOR at all.
 ED.PLACE.CARET:
-  ED.CARET.SROW = ED.CUR.ROW - ED.TOP.LINE + 1
-  ED.CARET.SCOL = ED.CUR.COL - ED.LEFT.COL
-  ED.CARET.DRAWN = ED.CARET.LEN : ED.CARET.LEN = 1
-  ED.CARET.VALID = 0
-  IF ED.CARET.SROW < 1 OR ED.CARET.SROW > ED.TEXT.BOTTOM THEN RETURN
-  IF ED.CARET.SCOL < 0 OR ED.CARET.SCOL >= ED.TEXT.WIDTH THEN RETURN
-  IF ED.CARET.SCOL + ED.CARET.DRAWN > ED.TEXT.WIDTH THEN ED.CARET.DRAWN = ED.TEXT.WIDTH - ED.CARET.SCOL
-  ED.CARET.ADDR = (ED.CARET.SROW + ED.MAP.TOP) * 256 + (ED.CARET.SCOL + ED.GUT.W) * 2 + 1
-  VPOKE 0, ED.CARET.ADDR, ED.ATTR.CARET : ED.CARET.VALID = 1
-  IF ED.CARET.DRAWN < 2 THEN RETURN
-  FOR ED.CARET.CELL = 1 TO ED.CARET.DRAWN - 1
-    VPOKE 0, ED.CARET.ADDR + ED.CARET.CELL * 2, ED.ATTR.CARET
+  ED.CARET.SROW% = ED.CUR.ROW% - ED.TOP.LINE% + 1
+  ED.CARET.SCOL% = ED.CUR.COL% - ED.LEFT.COL%
+  ED.CARET.DRAWN% = ED.CARET.LEN% : ED.CARET.LEN% = 1
+  ED.CARET.VALID% = 0
+  IF ED.CARET.SROW% < 1 OR ED.CARET.SROW% > ED.TEXT.BOTTOM% THEN RETURN
+  IF ED.CARET.SCOL% < 0 OR ED.CARET.SCOL% >= ED.TEXT.WIDTH% THEN RETURN
+  IF ED.CARET.SCOL% + ED.CARET.DRAWN% > ED.TEXT.WIDTH% THEN ED.CARET.DRAWN% = ED.TEXT.WIDTH% - ED.CARET.SCOL%
+  ED.CARET.ADDR = (ED.CARET.SROW% + ED.MAP.TOP%) * 256 + (ED.CARET.SCOL% + ED.GUT.W) * 2 + 1
+  VPOKE 0, ED.CARET.ADDR, ED.ATTR.CARET% : ED.CARET.VALID% = 1
+  IF ED.CARET.DRAWN% < 2 THEN RETURN
+  FOR ED.CARET.CELL = 1 TO ED.CARET.DRAWN% - 1
+    VPOKE 0, ED.CARET.ADDR + ED.CARET.CELL * 2, ED.ATTR.CARET%
   NEXT ED.CARET.CELL
   RETURN
 
 ED.UNCARET:
-  IF ED.CARET.VALID = 0 THEN RETURN
-  VPOKE 0, ED.CARET.ADDR, ED.ATTR.TEXT : ED.CARET.VALID = 0
-  IF ED.CARET.DRAWN < 2 THEN RETURN
-  FOR ED.CARET.CELL = 1 TO ED.CARET.DRAWN - 1
-    VPOKE 0, ED.CARET.ADDR + ED.CARET.CELL * 2, ED.ATTR.TEXT
+  IF ED.CARET.VALID% = 0 THEN RETURN
+  VPOKE 0, ED.CARET.ADDR, ED.ATTR.TEXT% : ED.CARET.VALID% = 0
+  IF ED.CARET.DRAWN% < 2 THEN RETURN
+  FOR ED.CARET.CELL = 1 TO ED.CARET.DRAWN% - 1
+    VPOKE 0, ED.CARET.ADDR + ED.CARET.CELL * 2, ED.ATTR.TEXT%
   NEXT ED.CARET.CELL
-  ED.CARET.DRAWN = 1
+  ED.CARET.DRAWN% = 1
   RETURN
 
 
@@ -1262,32 +1377,32 @@ REM items back over it, which flickers. The two tests are the star and which tit
 REM highlighted. The file name is a string, so the test is a flag rather than a key string,
 REM because a string built per keystroke is an allocation per keystroke.
 ED.RENDER.MENUBAR:
-  IF ED.MB.FORCE = 1 THEN GOTO ED.MB.DRAW
-  IF ED.DOC.DIRTY <> ED.MB.D THEN GOTO ED.MB.DRAW
+  IF ED.MB.FORCE% = 1 THEN GOTO ED.MB.DRAW
+  IF ED.DOC.DIRTY% <> ED.MB.D% THEN GOTO ED.MB.DRAW
   RETURN
 ED.MB.DRAW:
-  ED.MB.FORCE = 0 : ED.MB.D = ED.DOC.DIRTY
-  ED.PS.ROW = 0 : ED.PS.COL = 0 : ED.PS.WIDTH = SCREEN.COLS
-  ED.PS$ = "" : ED.PS.ATTR = THEME.CLR(THEME.BAR) : GOSUB ED.PUT.FIELD
+  ED.MB.FORCE% = 0 : ED.MB.D% = ED.DOC.DIRTY%
+  ED.PS.ROW% = 0 : ED.PS.COL% = 0 : ED.PS.WIDTH% = SCREEN.COLS%
+  ED.PS$ = "" : ED.PS.ATTR% = THEME.CLR(THEME.BAR) : GOSUB ED.PUT.FIELD
   GOSUB ED.MENUS.DRAW.BAR
-  ED.NAME$ = DOC.FILE.NAME$ : IF ED.DOC.DIRTY = 1 THEN ED.NAME$ = ED.NAME$ + " *"
-  ED.NCOL = SCREEN.COLS - LEN(ED.NAME$) - 1
-  IF ED.NCOL > 1 THEN ED.PS.ROW = 0 : ED.PS.COL = ED.NCOL - 1 : ED.PS.WIDTH = LEN(ED.NAME$) : ED.PS$ = ED.NAME$ : ED.PS.ATTR = (THEME.CLR(THEME.BAR) AND 240) + (THEME.CLR(THEME.TITLE) AND 15) : GOSUB ED.PUT.FIELD
+  ED.NAME$ = DOC.FILE.NAME$ : IF ED.DOC.DIRTY% = 1 THEN ED.NAME$ = ED.NAME$ + " *"
+  ED.NCOL% = SCREEN.COLS% - LEN(ED.NAME$) - 1
+  IF ED.NCOL% > 1 THEN ED.PS.ROW% = 0 : ED.PS.COL% = ED.NCOL% - 1 : ED.PS.WIDTH% = LEN(ED.NAME$) : ED.PS$ = ED.NAME$ : ED.PS.ATTR% = (THEME.CLR(THEME.BAR) AND 240) + (THEME.CLR(THEME.TITLE) AND 15) : GOSUB ED.PUT.FIELD
   RETURN
 
 
 ED.RENDER.STATUS:
-  ED.MARK$ = "   " : IF ED.DOC.DIRTY   = 1 THEN ED.MARK$ = " * "
+  ED.MARK$ = "   " : IF ED.DOC.DIRTY%   = 1 THEN ED.MARK$ = " * "
   REM The arena ran out and lines past that point were stored empty. See DOC.ALLOC.
-  IF DOC.FULL <> 0 THEN ED.MARK$ = " DOCUMENT FULL "
-  ED.MODE$ = "INS" : IF ED.INSERT.MODE = 0 THEN ED.MODE$ = "OVR"
-  ED.BAR$ = ED.MARK$ + "L" + MID$(STR$(ED.CUR.ROW + 1), 2) + " C" + MID$(STR$(ED.CUR.COL + 1), 2) + "  " + ED.MODE$ + "  LINES=" + MID$(STR$(LINE.COUNT), 2)
-  ED.PS.ROW = SCREEN.ROWS - 1 : ED.PS.COL = 0 : ED.PS.WIDTH = SCREEN.COLS
-  ED.PS$ = ED.BAR$ : ED.PS.ATTR = THEME.CLR(THEME.BAR) : GOSUB ED.PUT.FIELD
+  IF DOC.FULL% <> 0 THEN ED.MARK$ = GP.BSTR(BS.BAR, BSTR.BAR.DOC.FULL)
+  ED.MODE$ = "INS" : IF ED.INSERT.MODE% = 0 THEN ED.MODE$ = "OVR"
+  ED.BAR$ = ED.MARK$ + "L" + MID$(STR$(ED.CUR.ROW% + 1), 2) + " C" + MID$(STR$(ED.CUR.COL% + 1), 2) + "  " + ED.MODE$ + GP.BSTR(BS.BAR, BSTR.BAR.LINES) + MID$(STR$(LINE.COUNT%), 2)
+  ED.PS.ROW% = SCREEN.ROWS% - 1 : ED.PS.COL% = 0 : ED.PS.WIDTH% = SCREEN.COLS%
+  ED.PS$ = ED.BAR$ : ED.PS.ATTR% = THEME.CLR(THEME.BAR) : GOSUB ED.PUT.FIELD
   RETURN
 
-REM ---- write ED.PS$ into the VERA text map at 0-based (ED.PS.ROW, ED.PS.COL), attribute
-REM ED.PS.ATTR, padded with spaces to ED.PS.WIDTH and truncated past it ----
+REM ---- write ED.PS$ into the VERA text map at 0-based (ED.PS.ROW%, ED.PS.COL%), attribute
+REM ED.PS.ATTR%, padded with spaces to ED.PS.WIDTH% and truncated past it ----
 REM
 REM VERA auto-increment: the address and a +1 step are programmed once, then
 REM char,attr,char,attr streams to DATA0. Char and attr are adjacent and cells follow each
@@ -1296,9 +1411,9 @@ REM
 REM WARNING: keep the width guard. The block's test is at the bottom, so a width of 0 writes
 REM one cell where the FOR loop it replaced wrote none.
 ED.PUT.FIELD:
-  IF ED.PS.WIDTH < 1 THEN RETURN
-  ED.ASM.BASE% = 45056 + ED.PS.ROW * 256 + ED.PS.COL * 2 : REM layer 1, a SCREEN row
-  ED.ASM.ATTR% = ED.PS.ATTR : ED.ASM.WIDTH% = ED.PS.WIDTH : ED.ASM.VIS% = LEN(ED.PS$)
+  IF ED.PS.WIDTH% < 1 THEN RETURN
+  ED.ASM.BASE% = 45056 + ED.PS.ROW% * 256 + ED.PS.COL% * 2 : REM layer 1, a SCREEN row
+  ED.ASM.ATTR% = ED.PS.ATTR% : ED.ASM.WIDTH% = ED.PS.WIDTH% : ED.ASM.VIS% = LEN(ED.PS$)
   #REM 1
   GP.ASM
   REM ; ---- VERA: address, +1 increment, ordinary (non-FX) writes ----
@@ -1340,5 +1455,7 @@ REM --- this read / writes BANKS (line-pointer table + banked memory)
 #INCLUDE "ED-STORE.BASL"
 REM --- undo and redo: rings in bank 5, snapshots in the document arena
 #INCLUDE "ED-UNDO.BASL"
-REM --- the clipboard: whole-line records in bank 11
+REM --- the clipboard: [len][chars] records in bank 11
 #INCLUDE "ED-CLIP.BASL"
+REM --- the selection: an anchor, the highlight, and what Cut and Paste do to it
+#INCLUDE "ED-SEL.BASL"
