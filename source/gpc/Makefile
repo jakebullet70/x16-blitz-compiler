@@ -82,7 +82,7 @@ build:
 #
 release: build
 	$(PYTHON) build_basl.py GPC.ERR.BASL GPC.ERR.PRG
-	$(PYTHON) compile_shared.py GPC.ERR.PRG C.GPC.ERR.PRG M.GPC.ERR
+	$(PYTHON) compile_shared.py GPC.ERR.PRG C.GPC.ERR.PRG GPC.ERR.MAP
 
 #
 #		Launch the freshly built front end. It chain-loads GPC.BIN, which must sit beside

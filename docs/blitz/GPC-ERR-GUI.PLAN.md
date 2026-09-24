@@ -1,8 +1,8 @@
 # GPC.ERR: from an address to a source line
 
-Handoff document. Phase 1, the compiler change, is built and verified. The rest is not started. It
-rewrites `source/gpc/GPC.ERR.BASL` from a two-prompt text helper into a GUI tool that answers with a
-file name, a source line and the text of the offending statement.
+Handoff document. Phases 1 and 2 are built and verified. Phases 3 to 5 are not started. It rewrites
+`testing/GPC.ERR.BASL` from a two-prompt text helper into a GUI tool that answers with a file name,
+a source line and the text of the offending statement.
 
 The name does not change. `release.sh` stages `testing/C.GPC.ERR.PRG` as `GPC.ERR.PRG` and that
 stays true.
@@ -140,8 +140,8 @@ the program and they land first, so the size measurement in section 8 comes at p
 
 ### 4.2 The map file, found not typed
 
-The current tool asks the programmer to type a map name, and rejects it silently against a naming
-convention that is not consistent in this tree:
+The map is picked off the drive. The tool used to ask for a typed name and reject it silently
+against a naming convention that was not consistent in this tree. Three spellings are on disk:
 
 | spelling | written by | example |
 |---|---|---|
@@ -149,13 +149,14 @@ convention that is not consistent in this tree:
 | `M.<source>.SRC.PRG` | the same, when the source name carries the suffix | `samples/GPC-HELP/M.GPB.HELP.SRC.PRG` |
 | `<name>.MAP` | `source/gpc/samplesbuild.py`, headless | `samples/GPC-HELP/GPB.HELP.MAP` |
 
-Settle on `<name>.MAP`. It is what every headless build already writes, it is what the samples
-carry, and it is the only one of the three spellings `FILEPICK` can filter on, because `FILEPICK`
-matches suffixes. `GPC.BASL:73-93` decides the `M.`+`SRC$` naming and is the one place that changes.
+Map naming is `<name>.MAP`, section 9. It is what every headless build already writes, it is what
+the samples carry, and it is the only one of the three spellings `FILEPICK` can filter on, because
+`FILEPICK` matches suffixes. `testing/GPC.BASL` builds the name and was the one place that changed.
+`samplesbuild.py` and `modsbuild.py` already wrote `<stem>.MAP`.
 
 A suffix filter cannot reach the `M.` spellings at all. `M.GPC.ERR` has the suffix `ERR` and
-`M.GPB.HELP.SRC.PRG` has `PRG`. An old map is reachable only by the typed name in section 9, or by
-taking decision 1.
+`M.GPB.HELP.SRC.PRG` has `PRG`. An old map is reachable only by the typed name, which GPC.ERR reads
+and turns into a symbol file name the same way.
 
 The scan is library work, not new code. `GPC-BASIC/FILEPICK.INC.BL` has three entry points:
 
@@ -332,13 +333,29 @@ Each phase leaves a tool that works.
 | phase | what lands | assembly |
 |---|---|---|
 | 1 | Done. A failed statement's BASIC line is kept and printed above the banner. Section 5 has the code. | the capture and the print |
-| 2 | The GUI shell, `FILEPICK` for the map, MAP lookup and SYM `LABELS` lookup. An address gives a BASIC line, a file name and the nearest label, shown in the window. `LINPUT#` replaces the `GET#` loops, measured. Size measured against the ceiling. | none |
+| 2 | Done. The GUI shell, `FILEPICK` for the map, the MAP lookup and the SYM `LABELS` lookup. An address or a BASIC line gives a file name, a BASIC line and the nearest label with its source line, shown in a framed window under a menu bar. `LINPUT#` replaced the `GET#` loops. | none |
 | 3 | `SRC.PRG` walk and detokenise. The statement is shown. Table generated from `#TOKEN`. | the render |
 | 4 | SYM `VARIABLES` reverse lookup. Crunched names become real names with their source lines. | none |
-| 5 | Bank loader, if phase 2's measurement says `LINPUT#` is not enough. | the loader |
+| 5 | Bank loader, if phases 3 and 4 do not fit under the ceiling. | the loader |
 
-Phase 2 gives the file and the window. Phases 3 and 4 give the statement and the real names. Phase 5
-is conditional on a number, not on taste.
+GPC.ERR compiles SHARED to 19,243 bytes against the 22,016 byte ceiling. The fifteen `#INCLUDE`s
+with no program at all measure 16,474 bytes, so the program itself is 2,769 of that total. The
+modules are GPB, THEME, STASH, STRCASE, BANKMGR, MENU.INC.BANKED, MENU, LINEINPUT, GUI, COMBO,
+CHECK, GUI-DIALOGS, FILEIO, FILEDIR and FILEPICK.
+
+`LINPUT#` reads `GPB.HELP.MAP`, 18,911 bytes and 1,976 records, in 150 jiffies. The `GET#` loop it
+replaced takes 993 on the same file, so the read is 6.6 times faster and speed is no longer a reason
+to build phase 5.
+
+WARNING: the map and the symbol file are LF only and `LINPUT#` defaults to delimiter 13. Every
+`LINPUT#` in GPC.ERR names 10.
+
+WARNING: file I/O reached from inside a `GP.DO` key loop stops the program with
+`INPUT/OUTPUT ERROR @ $005B`. Output to channel 0 clears it, so every `CLOSE` in GPC.ERR is followed
+by a space to channel 0.
+
+Phase 2 gives the file and the window. Phases 3 and 4 give the statement and the real names, and they
+have 2,773 bytes to fit inside. Phase 5's bank loader may be needed for size rather than for speed.
 
 ## 7. Testing, on this code
 
@@ -356,26 +373,33 @@ answer.
 | BASIC line `1653` entered directly | `GPB.HELP.BASL`, `HELP.BOOT`, line 147, delta 0 |
 | BASIC line `2` entered directly | `GPC-BASIC/THEME.INC.BL`, `THEME.SELECT` at line 101 |
 
+All eight rows are verified as far as phase 2 reaches: the BASIC line, the file and the nearest
+label with its source line. The statement text and the crunched name in row one wait for phases 3
+and 4.
+
+The harness is `testing/GPCERRT.BASL`. It holds GPC.ERR's own resolver routines copied unchanged
+with a different caller, compiles SHARED and runs headless. It is a throwaway in `testing/` and is
+not tracked. Its answers matched a host-side reference computed from the same three files.
+
+Two rows need a rule the chain in section 3 does not state. An address that lands on a setup record
+is reported as setup code. An address past the whole map is reported as past the map and answered on
+the last real line. `$4ABC` and `$FFFF` resolve to the same record and differ for that reason.
+
 A second fixture with one library module and a small master is worth making, so a failure in the
 `FILE:` walk is visible rather than hidden by thirteen correct boundaries.
-
-There is a host-side resolver in the session scratchpad that produces the first row of that table.
-It is not in the repo and is not part of this work. Rebuild it if a reference answer is wanted while
-the BASL version is being written.
 
 ## 8. Constraints the build has to respect
 
 - Compile SHARED, and in the main directory. `source/gpc/Makefile`'s `release` target does it:
   `build_basl.py GPC.ERR.BASL GPC.ERR.PRG` then
-  `compile_shared.py GPC.ERR.PRG C.GPC.ERR.PRG M.GPC.ERR`. A standalone build is the wrong program,
+  `compile_shared.py GPC.ERR.PRG C.GPC.ERR.PRG GPC.ERR.MAP`. A standalone build is the wrong program,
   not a worse one. `scratchpad/edbuild.py` builds standalone and its output must never overwrite the
   tracked binary.
 - It needs the GPB runtime, `GPB.RT.nnn.BIN`, not the core-only `GPC.RT.nnn.BIN`, because it uses
   the GP block handlers throughout.
-- The SHARED p-code ceiling is RTBASE, 22,016 bytes. GPC.ERR is 1,751 bytes today. `GPB.HELP`, which
-  pulls in the same GUI modules this plan adds, is 19,935. Headroom exists but it is not large, and
-  the GUI modules are most of the cost. Measure at phase 2, not after it. They land before any of
-  the resolver work, so the headroom is known before the parts that use it are written.
+- The SHARED p-code ceiling is RTBASE, 22,016 bytes. GPC.ERR is 19,243 bytes after phase 2, so 2,773
+  bytes are left. The GUI modules are most of the cost and they landed before any of the resolver
+  work, which is what put the headroom on the table before phases 3 and 4 spend it.
 - `release/TMP` currently holds no `*.RT.124.BIN`. Both PRGs staged there are SHARED and cannot
   start without the runtime beside them. Unrelated to this work, but it will bite anyone testing a
   staged build.
@@ -383,11 +407,14 @@ the BASL version is being written.
   reaches BASIC's variables through `{VAR}` and the compiler resolves those from `#SYMFILE`, which
   has to exist before the include that needs it.
 
-## 9. Decisions still open
+## 9. Decisions
 
-1. Map naming. Section 4.2 recommends `<name>.MAP` and names the one place that changes.
-2. Whether GPC.ERR keeps a typed-name fallback when `FILEPICK` finds nothing. A programmer on real
-   hardware may have the map on another drive, and the typed name is the only way to reach it.
+1. Map naming is `<name>.MAP`. `testing/GPC.BASL` builds it from the source name, cutting `.PRG` and
+   `.SRC` and adding `.MAP`, so `GPB.HELP.SRC.PRG` gives `GPB.HELP.MAP`. GPC.ERR reads the older
+   `M.<name>` shape as well, because the tree is full of maps under that name. GPC.ERR derives the
+   symbol file from the map's name: `<base>.SRC.SYM` first, `<base>.SYM` if that is absent.
+2. The typed name stays, behind the picker. `FILEPICK` answers empty both when nothing matched and
+   when the pick was cancelled, and that is when GPC.ERR asks for a name.
 
 ## 10. An exact source line without any of this
 

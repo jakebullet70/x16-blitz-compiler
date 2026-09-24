@@ -12,9 +12,13 @@ back into a BASIC line by reading a `M.<source>` debug map:
 - **Always compile it in the MAIN directory**, and copy the result out of there if it is wanted
   somewhere else.
 
-**Why shared is not a preference.** Shared leaves the runtime out of the object: ~1.6 KB instead of
-~14 KB. That is the whole point of a helper you run *beside* the program you are debugging. A
-standalone build is not a bigger version of this program, it is the wrong one.
+**Why shared is not a preference.** Shared leaves the runtime out of the object, ~12 KB that a
+standalone build would carry. That is the whole point of a helper you run *beside* the program you
+are debugging. A standalone build is not a bigger version of this program, it is the wrong one.
+
+**The object is 19,243 bytes after the phase 2 GUI rewrite (2026-09-24), against a 22,016 byte
+ceiling.** It was ~1.6 KB as a two-prompt text helper; that figure is gone, not a target. See
+`docs/blitz/GPC-ERR-GUI.PLAN.md` and [[gpc-shared-pcode-cap-is-rtbase]].
 
 **The trap this closes:** the headless harness (`scratchpad/edbuild.py`) builds STANDALONE. So do
 not let it write `testing/C.GPC.ERR.PRG` — building the source there to *check* it compiles is fine,

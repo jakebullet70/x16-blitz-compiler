@@ -1,269 +1,543 @@
-REM ---> THE DIRECTIVES COME BEFORE THE INCLUDES, AND THAT IS NOT STYLE.
-REM ---> STRCASE.INC.BL REACHES BASIC'S VARIABLES FROM INSIDE GP.ASM
-REM ---> THROUGH {VAR}, AND THE COMPILER RESOLVES THOSE OUT OF BASLOAD'S
-REM ---> #SYMFILE -- WHICH HAS TO EXIST BEFORE THE INCLUDE THAT NEEDS IT,
-REM ---> OR THE COMPILE STOPS WITH "NO SYMBOL FILE FOR {}".
+## ---------------------------------------------------------------------------
+## GPC.ERR -- a runtime error address, turned into a place in the source.
+##
+## Give it the debug map GPC wrote beside the object and an address out of a
+## runtime error, and it answers with the BASIC line, the file that line came
+## from, and the nearest label above it.
+##
+## SADLOGIC, JULY 2026
+## ---------------------------------------------------------------------------
+## HOW TO BUILD IT, AND IT IS NOT NEGOTIABLE:
+##   COMPILE IT **SHARED**, NEVER STANDALONE.
+##   COMPILE IT IN THE MAIN DIRECTORY, and copy the result out of there if it
+##   is wanted somewhere else.
+##
+## Shared leaves the runtime out of the object, which is the whole point of a
+## helper you run beside the thing you are debugging. A standalone build is not
+## a worse version of this program, it is the wrong one -- so do not let a
+## headless harness write testing/C.GPC.ERR.PRG, because those build standalone.
+##
+## It compiles against GPB.RT.nnn.BIN, the runtime WITH the GP handlers, not the
+## core-only GPC.RT.nnn.BIN.
+## ---------------------------------------------------------------------------
+## THE DIRECTIVES COME BEFORE THE INCLUDES, AND THAT IS NOT STYLE.
+## STRCASE.INC.BL reaches BASIC's variables from inside GP.ASM through {VAR},
+## and the compiler resolves those out of BASLOAD's #SYMFILE -- which has to
+## exist before the include that needs it, or the compile stops with
+## "NO SYMBOL FILE FOR {}".
+## ---------------------------------------------------------------------------
 #SAVEAS "@:GPC.ERR.PRG"
 #SYMFILE "@:GPC.ERR.SYM"
-#AUTONUM 5
 #REM 0
 #INCLUDE "GPB.INC.BL"
+#INCLUDE "THEME.INC.BL"
+#INCLUDE "STASH.INC.BL"
 #INCLUDE "STRCASE.INC.BL"
+#INCLUDE "BANKMGR.INC.BL"
+#INCLUDE "MENU.INC.BANKED.BL"
+#INCLUDE "MENU.INC.BL"
+#INCLUDE "LINEINPUT.INC.BL"
+#INCLUDE "GUI.INC.BL"
+#INCLUDE "COMBO.INC.BL"
+#INCLUDE "CHECK.INC.BL"
+#INCLUDE "GUI-DIALOGS.INC.BL"
+#INCLUDE "FILEIO.INC.BL"
+#INCLUDE "FILEDIR.INC.BL"
+#INCLUDE "FILEPICK.INC.BL"
 
-REM --------------------------------------------------------
-REM ---> GPC.ERR (BASLOAD SOURCE)
-REM ---> READS A GPC DEBUG MAP (M.<SOURCE>) AND TURNS A
-REM ---> RUNTIME ERROR  "<MSG> @ $XXXX"  INTO A BASIC LINE.
-REM ---> MAKE THE MAP BY ANSWERING "MAKE A DEBUG MAP? YES"
-REM ---> WHEN YOU COMPILE WITH GPC.
-REM ---> SADLOGIC, JULY 2026
-REM --------------------------------------------------------
-REM ---> HOW TO BUILD IT, AND IT IS NOT NEGOTIABLE:
-REM --->   COMPILE IT **SHARED**, NEVER STANDALONE.
-REM --->   COMPILE IT IN THE MAIN DIRECTORY, AND COPY THE
-REM --->   RESULT OUT OF THERE IF IT IS WANTED SOMEWHERE ELSE.
-REM --->
-REM ---> SHARED MEANS THE RUNTIME IS NOT EMBEDDED: THE OBJECT
-REM ---> IS ~1.6 KB INSTEAD OF ~14 KB, WHICH IS THE WHOLE
-REM ---> POINT OF A HELPER YOU RUN BESIDE THE THING YOU ARE
-REM ---> DEBUGGING. A STANDALONE BUILD IS NOT A WORSE VERSION
-REM ---> OF THIS PROGRAM, IT IS THE WRONG ONE -- SO DO NOT
-REM ---> LET A HEADLESS HARNESS WRITE testing/C.GPC.ERR.PRG,
-REM ---> BECAUSE THOSE BUILD STANDALONE.
-REM --------------------------------------------------------
-REM ---> GP.BASIC THROUGHOUT: GP.IF/GP.ELSEIF/GP.ELSE/GP.ENDIF
-REM ---> FOR THE BRANCHES, GP.DO/GP.LOOP/GP.EXITDO FOR THE
-REM ---> LOOPS, AND GP.INSTR PLUS STRCASE.INC.BL FOR THE HEX
-REM ---> PARSING. THERE IS NOT ONE GOTO LEFT.
-REM --------------------------------------------------------
-REM ---> UPDATED 01/09/2026. THE CASE FOLDING AND THE SPACE
-REM ---> SKIPPING WERE GP.UPPER AND GP.LTRIM, TWO OF FIVE
-REM ---> IN-PLACE STRING KEYWORDS THAT LEFT THE GP RUNTIME
-REM ---> BLOCK FOR STRCASE.INC.BL. THE BLOCK IS ALL OR
-REM ---> NOTHING -- EVERY PROGRAM USING ANY GP KEYWORD CARRIED
-REM ---> ALL 188 BYTES OF THEM, IN THE OBJECT AND AGAIN OFF
-REM ---> THE BOTTOM OF THE WORKSPACE -- SO THEY ARE A MODULE
-REM ---> NOW AND ONLY THE PROGRAMS THAT ASK FOR THEM PAY.
-REM --------------------------------------------------------
-REM ---> IT DID NOT FAIL LOUDLY WHEN THEY WENT, AND THAT IS
-REM ---> THE THING TO KNOW: BASLOAD NO LONGER HAD A #TOKEN
-REM ---> FOR "GP.UPPER", SO IT CRUNCHED IT TO AN ORDINARY
-REM ---> VARIABLE NAME AND THE COMPILER SAW A SYNTAX ERROR --
-REM ---> WHICH DEFERS. THE COMPILE SAID "OK CODE" AND THE
-REM ---> PROGRAM WOULD HAVE THROWN SYNTAX ERROR AT AN ADDRESS
-REM ---> THE FIRST TIME IT PARSED AN ADDRESS. SEE TODO.MD.
-REM ---> IT THEREFORE COMPILES SHARED AGAINST GPB.RT.NNN.BIN,
-REM ---> THE RUNTIME *WITH* THE HANDLERS -- NOT THE CORE-ONLY
-REM ---> GPC.RT.NNN.BIN IT USED BEFORE.
-REM --------------------------------------------------------
+## Both files this reads are written with LF and no CR, so every LINPUT# here
+## names 10 as its delimiter. The default is 13 and would swallow the file.
+#DEFINE ERR.LF 10
 
-REM ---- HD$, NOT HEX$: HEX$ IS A REAL X16 BASIC FUNCTION, SO BASLOAD
-REM ---- TOKENISES IT AND THE COMPILER SEES A FUNCTION CALL WHERE A
-REM ---- VARIABLE WAS MEANT -- SYNTAX ERROR, WITH NOTHING TO SAY WHY.
-HD$ = "0123456789ABCDEF"
-LF$ = CHR$(10)
-CR$ = CHR$(13)
+## The map's last records. They are the compiler's setup code, not a line
+## anyone wrote.
+#DEFINE ERR.SETUP.LINE 65024
 
-PRINT : PRINT
-PRINT "GPC ERROR LOOKUP HELPER"
-PRINT "TURN A RUNTIME ERROR @ $XXXX INTO A LINE #"
-PRINT
-GOSUB CLEAR.KB
+#DEFINE ERR.FRAME.TOP 2
+#DEFINE ERR.FRAME.ROWS 14
 
-REM ---- ASK FOR THE MAP FILE (BARE RETURN QUITS) ----
-GP.DO
-  PR$="MAP FILE (E.G. M.MYPROG): " : GOSUB READLINE
-  GP.IF GP.ISEMPTY(NM$) THEN
-    PRINT : PRINT "BYE" : END
-  GP.ENDIF
-  MP$=NM$
-  GOSUB MAP.CHECK
-  IF EX<>0 THEN GP.EXITDO
-  PRINT "  NOT FOUND, TRY AGAIN"
-GP.LOOP
+GOSUB ERR.BOOT
+GOSUB ERR.MAIN
+GOSUB ERR.SHUTDOWN
+END
 
-PRINT
-PRINT "NOW ENTER AN ERROR ADDRESS LIKE  $0030"
-PRINT "(OR THE WHOLE ERROR LINE). RETURN QUITS."
-PRINT
 
-REM ---- LOOP: READ AN ADDRESS, LOOK IT UP ----
-GP.DO
-  PR$="ERROR ADDRESS: " : GOSUB READLINE
-  GP.IF GP.ISEMPTY(NM$) THEN
-    PRINT : PRINT "BYE" : END
-  GP.ENDIF
-  GOSUB PARSE.ADDR
-  GP.IF PV<0 THEN
-    PRINT "  NO HEX ADDRESS FOUND"
-  GP.ELSE
-    TG=PV : GOSUB SCAN : GOSUB REPORT
-  GP.ENDIF
-GP.LOOP
+## ===========================================================================
+## ERR.BOOT -- banks, theme, the dialog engine and the picker, once.
+## ===========================================================================
+ERR.BOOT:
+    ## Before the first MENU.BEGIN, which claims a bank of its own for the rows.
+    GOSUB BANKMGR.INIT
+    GOSUB ERR.CLAIM.BANKS
 
-REM =====================================================================
-REM SCAN: WALK THE MAP, KEEP THE LARGEST OFFSET <= TG.
-REM   OUT: BO = BEST OFFSET (-1 IF NONE), BL = ITS BASIC LINE.
-REM   THE MAP IS A SEQ FILE, LINES "HHHH DDDDD" ENDED BY LF ($0A).
-REM   OPENED BY PLAIN NAME (PORTABLE); ADD ",S,R" ONLY IF A DOS NEEDS IT.
-REM =====================================================================
-SCAN:
-  BO=-1 : BL=-1 : L$=""
-  OPEN 2,8,2,MP$
-  GP.DO
-    GET#2,C$
-    GP.IF C$=LF$ THEN
-      GOSUB SC.LINE : L$=""
-    GP.ELSEIF C$<>CR$ AND LEN(C$)>0 THEN
-      L$=L$+C$
+    GOSUB GUI.SCREEN
+    ERR.COLS = GUI.SCREEN.COLS
+    ERR.ROWS = GUI.SCREEN.ROWS
+
+    THEME.ID% = 0
+    GOSUB THEME.SELECT
+
+    GP.SUB DLGRESET, ERR.DLG.BANK
+    GP.SUB DLGSHADOW, 1
+    GP.SUB PICKBANKS, ERR.LIST.BANK, ERR.DIR.BANK
+
+    MENU.ATTR = THEME.CLR(THEME.BAR)
+    MENU.BARATTR = THEME.CLR(THEME.BAR)
+    MENU.HOTATTR = THEME.CLR(THEME.BORDER)
+    MENU.GAP = 2
+
+    ERR.HEXDIGITS$ = "0123456789ABCDEF"
+    ERR.MAP.NAME$ = ""
+    ERR.SYM.NAME$ = ""
+    ERR.BASE.NAME$ = ""
+    GOSUB ERR.STATE.CLEAR
+    GOSUB ERR.PAINT
+    RETURN
+
+
+## ===========================================================================
+## ERR.CLAIM.BANKS -- one bank for the dialogs' saved cells, two for the
+## picker's list and the raw directory it is built from.
+##
+## GET.FREE.BANK answers 0 for none left, and with no bank to save into the
+## first dialog would write over whatever is under it.
+## ===========================================================================
+ERR.CLAIM.BANKS:
+    GOSUB BANKMGR.GET.FREE.BANK
+    ERR.DLG.BANK = BANKMGR.BANK
+    GOSUB BANKMGR.GET.FREE.BANK
+    ERR.LIST.BANK = BANKMGR.BANK
+    GOSUB BANKMGR.GET.FREE.BANK
+    ERR.DIR.BANK = BANKMGR.BANK
+    GP.IF ERR.DIR.BANK = 0 THEN
+        PRINT "GPC.ERR NEEDS THREE FREE RAM BANKS"
+        END
     GP.ENDIF
-    GP.IF ST<>0 THEN
-      GP.EXITDO
-    GP.ENDIF
-  GP.LOOP
-  GP.IF LEN(L$)>0 THEN
-    GOSUB SC.LINE
-  GP.ENDIF
-  CLOSE 2
-  RETURN
+    RETURN
 
-SC.LINE:
-  GP.IF LEN(L$)>=6 THEN
-    H$=LEFT$(L$,4) : GOSUB HEXVAL : OF=HV
-    LN=VAL(MID$(L$,6))
-    GP.IF OF<=TG AND OF>BO THEN
-      BO=OF : BL=LN
-    GP.ENDIF
-  GP.ENDIF
-  RETURN
 
-REM =====================================================================
-REM REPORT: PRINT THE ANSWER FOR ADDRESS TG USING BO/BL.
-REM   LINES 65024/65535 ARE THE COMPILER'S OWN SETUP CODE, NOT SOURCE.
-REM =====================================================================
-REPORT:
-  PH=TG : PRINT "  $"; : GOSUB PHEX4
-  GP.IF BO<0 THEN
-    PRINT " IS BEFORE THE FIRST MAPPED LINE"
-  GP.ELSEIF BL>=65024 THEN
-    PRINT " IS IN COMPILER SETUP CODE, NOT A LINE"
-  GP.ELSEIF BO=TG THEN
-    PRINT " IS ON BASIC LINE ";BL
-  GP.ELSE
-    PRINT " IS ON/NEAR BASIC LINE ";BL
-  GP.ENDIF
-  RETURN
+## ===========================================================================
+## ERR.SHUTDOWN -- the screen back to something a READY. prompt can live on.
+## ===========================================================================
+ERR.SHUTDOWN:
+    COLOR 1, 0
+    PRINT CHR$(147)
+    RETURN
 
-REM =====================================================================
-REM PARSE.ADDR: NM$ -> PV (HEX VALUE) OR -1. TAKES THE TEXT AFTER THE
-REM   LAST "$" IF PRESENT, THEN ITS LEADING HEX DIGITS.
-REM   GP.INSTR WALKS THE "$"S FORWARD, AND STRCASE DOES THE SPACE
-REM   SKIPPING AND CASE FOLDING THE OLD CHARACTER LOOP SPELLED OUT.
-REM =====================================================================
-PARSE.ADDR:
-  PV=-1 : H$="" : LP=0
-  GP.DO
-    Q=GP.INSTR(NM$,"$",LP+1)
-    IF Q=0 THEN GP.EXITDO
-    LP=Q
-  GP.LOOP
-  REM ---- MID$ WHETHER OR NOT A "$" WAS FOUND, SO S$ IS ALWAYS A FRESH
-  REM ---- STRING: STRCASE REWRITES IN PLACE, THROUGH A POINTER, AND A
-  REM ---- PLAIN S$=NM$ COULD LEAVE THE TWO SHARING BYTES -- WHICH WOULD
-  REM ---- EDIT THE CALLER'S NM$ AS A SIDE EFFECT.
-  S$=MID$(NM$,LP+1)
-  STRCASE.PTR=GP.STRPTR(S$) : STRCASE.MODE=STRCASE.LTRIM : GOSUB STRCASE.GO
-  STRCASE.PTR=GP.STRPTR(S$) : STRCASE.MODE=STRCASE.UPPER : GOSUB STRCASE.GO
-  P=1
-  GP.DO
-    IF P>LEN(S$) THEN GP.EXITDO
-    D$=MID$(S$,P,1)
-    IF GP.INSTR(HD$,D$)=0 THEN GP.EXITDO
-    H$=H$+D$ : P=P+1
-  GP.LOOP
-  GP.IF LEN(H$)>0 THEN
-    GOSUB HEXVAL : PV=HV
-  GP.ENDIF
-  RETURN
 
-REM =====================================================================
-REM HEXVAL: H$ (HEX DIGITS) -> HV. GP.INSTR TURNS A DIGIT STRAIGHT INTO
-REM   ITS VALUE, WHICH IS THE WHOLE OF THE ASC() ARITHMETIC THE OLD
-REM   VERSION SPELLED OUT. THE FOLD KEEPS THE OLD VERSION'S CONTRACT:
-REM   BOTH CALLERS HAPPEN TO PASS UPPERCASE TODAY, BUT FOLDING HERE IS ONE
-REM   CALL AND MEANS HEXVAL STILL TAKES HEX IN EITHER CASE.
-REM
-REM   THE POINTER IS TAKEN FRESH. GP.STRPTR FINDS WHERE THE STRING LIVES
-REM   RIGHT NOW, AND H$ IS REBUILT BY ITS CALLER BETWEEN CALLS -- SO A
-REM   POINTER KEPT FROM LAST TIME WOULD BE AIMED AT THE OLD BYTES.
-REM =====================================================================
-HEXVAL:
-  HV=0
-  STRCASE.PTR=GP.STRPTR(H$) : STRCASE.MODE=STRCASE.UPPER : GOSUB STRCASE.GO
-  FOR I=1 TO LEN(H$)
-    HV=HV*16+GP.INSTR(HD$,MID$(H$,I,1))-1
-  NEXT
-  RETURN
-
-REM =====================================================================
-REM PHEX4: PRINT PH (0..65535) AS 4 UPPERCASE HEX DIGITS, NO NEWLINE.
-REM =====================================================================
-PHEX4:
-  N=PH
-  A3=INT(N/4096) : N=N-A3*4096
-  A2=INT(N/256)  : N=N-A2*256
-  A1=INT(N/16)   : N=N-A1*16
-  PRINT MID$(HD$,A3+1,1);MID$(HD$,A2+1,1);MID$(HD$,A1+1,1);MID$(HD$,N+1,1);
-  RETURN
-
-REM =====================================================================
-REM MAP.CHECK: EX=1 IF MP$ EXISTS ON DEVICE 8, ELSE 0 (DOS ERR CHANNEL).
-REM =====================================================================
-MAP.CHECK:
-  EX=0
-  OPEN 15,8,15
-  OPEN 2,8,2,MP$
-  INPUT#15,EN,EM$,ET,ES
-  CLOSE 2 : CLOSE 15
-  GP.IF EN<20 THEN
-    EX=1
-  GP.ENDIF
-  RETURN
-
-REM =====================================================================
-REM READLINE / CLEAR.KB: FROM GPC.BASL. RETURN ENDS; DEL($14) ERASES;
-REM   PRINTABLE PETSCII KEPT; CONTROL IGNORED.
-REM   THE INNER GP.DO IS THE KEY WAIT; ITS GP.EXITDO LEAVES ONLY THAT
-REM   ONE, BECAUSE GP.EXITDO ALWAYS MEANS THE INNERMOST GP.DO.
-REM =====================================================================
-READLINE:
-  PRINT PR$; : NM$=""
-  GP.DO
+## ===========================================================================
+## ERR.MAIN -- the bar, and what each of its items does.
+## ===========================================================================
+ERR.MAIN:
     GP.DO
-      GET K$
-      GP.IF K$<>"" THEN
-        GP.EXITDO
-      GP.ENDIF
+        GOSUB ERR.BAR.BUILD
+        ERR.CHOICE = GP.FN(MENUTO.BAR, 0, 0, MENU.NOBOX)
+        IF ERR.CHOICE = 0 THEN GP.EXITDO
+        IF ERR.CHOICE = 4 THEN GP.EXITDO
+        IF ERR.CHOICE = 1 THEN GOSUB ERR.CHOOSE.MAP
+        IF ERR.CHOICE = 2 THEN GOSUB ERR.ASK.ADDRESS
+        IF ERR.CHOICE = 3 THEN GOSUB ERR.ASK.LINE
+        GOSUB ERR.PAINT
     GP.LOOP
-    K=ASC(K$)
-    GP.IF K=13 THEN
-      PRINT
-      GP.EXITDO
-    GP.ELSEIF K=20 THEN
-      GP.IF LEN(NM$)>0 THEN
-        NM$=LEFT$(NM$,LEN(NM$)-1) : PRINT CHR$(20);
-      GP.ENDIF
-    GP.ELSEIF K>=32 AND (K<128 OR K>=160) AND LEN(NM$)<39 THEN
-      NM$=NM$+K$ : PRINT K$;
-    GP.ENDIF
-  GP.LOOP
-  RETURN
+    RETURN
 
-CLEAR.KB:
-  GP.DO
-    GET K$
-    GP.IF GP.ISEMPTY(K$) THEN
-      GP.EXITDO
+
+ERR.BAR.BUILD:
+    GP.SUB MENU.BEGIN, MENU.BAR
+    GP.SUB MENU.ITEM, "&MAP"
+    GP.SUB MENU.ITEM, "&ADDRESS"
+    GP.SUB MENU.ITEM, "&LINE"
+    GP.SUB MENU.ITEM, "&QUIT"
+    RETURN
+
+
+## ===========================================================================
+## ERR.PAINT -- the bar, the frame and whatever the last lookup found.
+## ===========================================================================
+ERR.PAINT:
+    GP.FILL 0, 0, ERR.COLS, ERR.ROWS, 32, THEME.CLR(THEME.PAGE)
+    GOSUB ERR.BAR.BUILD
+    GP.SUB MENU.DRAWBAR, 0, 0, MENU.NOBOX
+    GP.BOX 1, ERR.FRAME.TOP, ERR.COLS - 2, ERR.FRAME.ROWS, 1, THEME.CLR(THEME.BORDER)
+    GP.PRINTAT 3, ERR.FRAME.TOP, " GPC.ERR ", THEME.CLR(THEME.TITLE)
+    GOSUB ERR.PAINT.FILES
+    GOSUB ERR.PAINT.ANSWER
+    RETURN
+
+
+ERR.PAINT.FILES:
+    ERR.TEXT$ = "NO MAP CHOSEN"
+    IF ERR.MAP.NAME$ <> "" THEN ERR.TEXT$ = ERR.MAP.NAME$
+    GP.PRINTAT 3, ERR.FRAME.TOP + 2, "MAP   " + ERR.TEXT$, THEME.CLR(THEME.TEXT)
+    ERR.TEXT$ = "-"
+    IF ERR.SYM.NAME$ <> "" THEN ERR.TEXT$ = ERR.SYM.NAME$
+    GP.PRINTAT 3, ERR.FRAME.TOP + 3, "SYM   " + ERR.TEXT$, THEME.CLR(THEME.DIMMED)
+    RETURN
+
+
+## ---------------------------------------------------------------------------
+## ERR.PAINT.ANSWER -- the rows of the answer, and the one that says why there
+## is no answer.
+##
+## The offset row is the point of the whole tool. An address ON a line's first
+## opcode is a statement that failed; an address INSIDE the line is a statement
+## that ran part way.
+## ---------------------------------------------------------------------------
+ERR.PAINT.ANSWER:
+    ERR.Y = ERR.FRAME.TOP + 5
+    GP.IF ERR.HAVE.ADDRESS <> 0 THEN
+        ERR.VALUE = ERR.TARGET
+        GOSUB ERR.MAKE.HEX4
+        ERR.TEXT$ = "$" + ERR.HEX4$
+        GP.IF ERR.MAP.OFFSET < 0 THEN
+            ERR.TEXT$ = ERR.TEXT$ + "  IS BEFORE THE FIRST MAPPED LINE"
+        GP.ELSEIF ERR.PAST.END <> 0 THEN
+            ERR.TEXT$ = ERR.TEXT$ + "  IS PAST THE LAST RECORD IN THE MAP"
+        GP.ELSEIF ERR.MAP.OFFSET = ERR.TARGET THEN
+            ERR.TEXT$ = ERR.TEXT$ + "  IS THE FIRST OPCODE OF THE LINE"
+        GP.ELSE
+            ERR.VALUE = ERR.MAP.OFFSET
+            GOSUB ERR.MAKE.HEX4
+            ERR.TEXT$ = ERR.TEXT$ + "  IS $" + ERR.HEX4$ + " +" + STR$(ERR.TARGET - ERR.MAP.OFFSET)
+        GP.ENDIF
+        GP.PRINTAT 3, ERR.Y, ERR.TEXT$, THEME.CLR(THEME.TEXT)
     GP.ENDIF
-  GP.LOOP
-  RETURN
+
+    GP.IF ERR.TARGET.LINE < 0 THEN
+        GP.PRINTAT 3, ERR.Y + 2, "NOTHING LOOKED UP YET", THEME.CLR(THEME.DIMMED)
+        RETURN
+    GP.ENDIF
+
+    GP.IF ERR.TARGET.LINE >= ERR.SETUP.LINE THEN
+        GP.PRINTAT 3, ERR.Y + 2, "THAT IS COMPILER SETUP CODE, NOT A SOURCE LINE", THEME.CLR(THEME.WARN)
+        RETURN
+    GP.ENDIF
+
+    GP.PRINTAT 3, ERR.Y + 2, "BASIC LINE " + STR$(ERR.TARGET.LINE), THEME.CLR(THEME.TEXT)
+    ERR.TEXT$ = "-"
+    IF ERR.FILE.NAME$ <> "" THEN ERR.TEXT$ = ERR.FILE.NAME$
+    GP.PRINTAT 3, ERR.Y + 3, "FILE       " + ERR.TEXT$, THEME.CLR(THEME.TEXT)
+    ERR.TEXT$ = "NO LABEL ABOVE IT"
+    GP.IF ERR.LABEL.NAME$ <> "" THEN
+        ERR.TEXT$ = ERR.LABEL.NAME$ + ", SOURCE LINE" + STR$(ERR.LABEL.SOURCE)
+    GP.ENDIF
+    GP.PRINTAT 3, ERR.Y + 4, "NEAR       " + ERR.TEXT$, THEME.CLR(THEME.TEXT)
+    RETURN
+
+
+## ===========================================================================
+## ERR.CHOOSE.MAP -- the map is found, not typed.
+##
+## The picker lists what is on the drive, so a name cannot be got wrong. It
+## answers empty when nothing matched or the pick was cancelled, and THAT is
+## when the typed name earns its place: on real hardware the map may be sitting
+## on another drive.
+## ===========================================================================
+ERR.CHOOSE.MAP:
+    ERR.TYPED$ = GP.FN(PICKFILE, "CHOOSE A DEBUG MAP", "MAP")
+    GP.IF GP.ISEMPTY(ERR.TYPED$) THEN
+        ERR.TYPED$ = GP.FN(ASKTEXT, "MAP FILE NAME", 24)
+    GP.ENDIF
+    IF GP.ISEMPTY(ERR.TYPED$) THEN RETURN
+    GP.IF GP.FN(FEXISTS, ERR.TYPED$) = 0 THEN
+        GP.SUB MSGBOX, "NO SUCH FILE"
+        RETURN
+    GP.ENDIF
+    ERR.MAP.NAME$ = ERR.TYPED$
+    GOSUB ERR.NAME.SPLIT
+    GOSUB ERR.STATE.CLEAR
+    RETURN
+
+
+## ---------------------------------------------------------------------------
+## ERR.NAME.SPLIT -- the map's name gives the symbol file's.
+##
+## NAME.MAP is the convention. M.NAME is what GPC wrote before it, and there
+## are maps of that shape all over this tree, so both are read.
+##
+## BASLOAD names the symbol file after the tokenised PRG, so a program built
+## through NAME.SRC.PRG has NAME.SRC.SYM and one built straight has NAME.SYM.
+## Try the first and fall back to the second.
+## ---------------------------------------------------------------------------
+ERR.NAME.SPLIT:
+    ERR.BASE.NAME$ = ERR.MAP.NAME$
+    GP.IF LEFT$(ERR.BASE.NAME$, 2) = "M." THEN
+        ERR.BASE.NAME$ = MID$(ERR.BASE.NAME$, 3)
+    GP.ENDIF
+    IF RIGHT$(ERR.BASE.NAME$, 4) = ".MAP" THEN ERR.BASE.NAME$ = LEFT$(ERR.BASE.NAME$, LEN(ERR.BASE.NAME$) - 4)
+    IF RIGHT$(ERR.BASE.NAME$, 4) = ".PRG" THEN ERR.BASE.NAME$ = LEFT$(ERR.BASE.NAME$, LEN(ERR.BASE.NAME$) - 4)
+    IF RIGHT$(ERR.BASE.NAME$, 4) = ".SRC" THEN ERR.BASE.NAME$ = LEFT$(ERR.BASE.NAME$, LEN(ERR.BASE.NAME$) - 4)
+    ERR.SYM.NAME$ = ERR.BASE.NAME$ + ".SRC.SYM"
+    GP.IF GP.FN(FEXISTS, ERR.SYM.NAME$) = 0 THEN
+        ERR.SYM.NAME$ = ERR.BASE.NAME$ + ".SYM"
+    GP.ENDIF
+    GP.IF GP.FN(FEXISTS, ERR.SYM.NAME$) = 0 THEN
+        ERR.SYM.NAME$ = ""
+    GP.ENDIF
+    RETURN
+
+
+## ===========================================================================
+## ERR.ASK.ADDRESS -- the first way in. An address, the whole error line, or
+## anything with a hex number in it.
+## ===========================================================================
+ERR.ASK.ADDRESS:
+    GP.IF ERR.MAP.NAME$ = "" THEN
+        GP.SUB MSGBOX, "CHOOSE A MAP FIRST"
+        RETURN
+    GP.ENDIF
+    ERR.TYPED$ = GP.FN(ASKTEXT, "ERROR ADDRESS, LIKE $34A7", 30)
+    IF GP.ISEMPTY(ERR.TYPED$) THEN RETURN
+    GOSUB ERR.PARSE.ADDRESS
+    GP.IF ERR.PARSED < 0 THEN
+        GP.SUB MSGBOX, "NO HEX ADDRESS IN THAT"
+        RETURN
+    GP.ENDIF
+    GOSUB ERR.STATE.CLEAR
+    ERR.TARGET = ERR.PARSED
+    ERR.HAVE.ADDRESS = -1
+    GOSUB ERR.MAP.SCAN
+    ERR.TARGET.LINE = ERR.MAP.LINE
+    IF ERR.PAST.END <> 0 THEN ERR.TARGET.LINE = ERR.CODE.LINE
+    ## A setup line has no symbol above it worth naming, and the whole file
+    ## would be read to find that out.
+    IF ERR.TARGET.LINE >= 0 AND ERR.TARGET.LINE < ERR.SETUP.LINE THEN GOSUB ERR.SYM.SCAN
+    RETURN
+
+
+## ===========================================================================
+## ERR.ASK.LINE -- the second way in, and the one the compiler's own
+## "N STATEMENTS NOT COMPILED" line feeds. No map is read: the number is
+## already the merged BASIC line the map would have answered with.
+## ===========================================================================
+ERR.ASK.LINE:
+    GP.IF ERR.SYM.NAME$ = "" THEN
+        GP.SUB MSGBOX, "CHOOSE A MAP FIRST, SO THE SYMBOLS CAN BE FOUND"
+        RETURN
+    GP.ENDIF
+    ERR.TYPED$ = GP.FN(ASKTEXT, "BASIC LINE", 8)
+    IF GP.ISEMPTY(ERR.TYPED$) THEN RETURN
+    ERR.PARSED = VAL(ERR.TYPED$)
+    GP.IF ERR.PARSED <= 0 THEN
+        GP.SUB MSGBOX, "THAT IS NOT A LINE NUMBER"
+        RETURN
+    GP.ENDIF
+    GOSUB ERR.STATE.CLEAR
+    ERR.TARGET.LINE = ERR.PARSED
+    GOSUB ERR.SYM.SCAN
+    RETURN
+
+
+## ===========================================================================
+## ERR.MAP.SCAN -- the largest offset at or below ERR.TARGET.
+##
+##   in   ERR.TARGET        the address asked about
+##   out  ERR.MAP.OFFSET    that offset, -1 if the target is below them all
+##        ERR.MAP.LINE      the BASIC line it belongs to, -1 with it
+##        ERR.CODE.LINE     the same, ignoring the setup records
+##        ERR.PAST.END      -1 when the target is beyond the last record
+##
+## The map is "HHHH DDDDD" a record, ascending, LF ended. Records ascend even
+## for a program with banked regions: there is one address space.
+##
+## The last two records are the compiler's own setup and their line numbers are
+## not source lines. An address that LANDS on one is setup code and is reported
+## as such. An address PAST the whole map is not: nothing was compiled there,
+## and the useful answer is the last line that was.
+## ===========================================================================
+ERR.MAP.SCAN:
+    ERR.MAP.OFFSET = -1
+    ERR.MAP.LINE = -1
+    ERR.CODE.LINE = -1
+    ERR.CODE.OFFSET = -1
+    ERR.LAST.OFFSET = -1
+    ERR.PAST.END = 0
+    OPEN 2, 8, 2, ERR.MAP.NAME$
+    GP.DO
+        LINPUT# 2, ERR.LINE$, ERR.LF
+        GP.IF LEN(ERR.LINE$) >= 6 THEN
+            ERR.HEX$ = LEFT$(ERR.LINE$, 4)
+            GOSUB ERR.HEXVAL
+            IF ERR.HEXVALUE > ERR.LAST.OFFSET THEN ERR.LAST.OFFSET = ERR.HEXVALUE
+            ERR.VALUE = VAL(MID$(ERR.LINE$, 6))
+            GP.IF ERR.HEXVALUE <= ERR.TARGET AND ERR.HEXVALUE > ERR.MAP.OFFSET THEN
+                ERR.MAP.OFFSET = ERR.HEXVALUE
+                ERR.MAP.LINE = ERR.VALUE
+            GP.ENDIF
+            GP.IF ERR.HEXVALUE <= ERR.TARGET AND ERR.HEXVALUE > ERR.CODE.OFFSET AND ERR.VALUE < ERR.SETUP.LINE THEN
+                ERR.CODE.OFFSET = ERR.HEXVALUE
+                ERR.CODE.LINE = ERR.VALUE
+            GP.ENDIF
+        GP.ENDIF
+        IF ST <> 0 THEN GP.EXITDO
+    GP.LOOP
+    CLOSE 2
+    GOSUB ERR.CHANNEL.KICK
+    IF ERR.TARGET > ERR.LAST.OFFSET THEN ERR.PAST.END = -1
+    RETURN
+
+
+## ===========================================================================
+## ERR.SYM.SCAN -- the file a BASIC line came from, and the label above it.
+##
+##   in   ERR.TARGET.LINE   the merged BASIC line
+##   out  ERR.FILE.NAME$    the source file holding it
+##        ERR.LABEL.NAME$   the nearest label at or above it, "" for none
+##        ERR.LABEL.VALUE   the BASIC line that label became
+##        ERR.LABEL.SOURCE  the label's own line in its file
+##
+## The symbol file is LABELS then VARIABLES, each a run of "FILE:" headings
+## with records under them. A record is a leading space, six digits of line in
+## that file, the symbol, then "=N;" -- the BASIC line the label became.
+##
+## The scan stops at VARIABLES: every label is above it, and that is half the
+## file left unread.
+## ===========================================================================
+ERR.SYM.SCAN:
+    ERR.FILE.NAME$ = ""
+    ERR.LABEL.NAME$ = ""
+    ERR.LABEL.VALUE = -1
+    ERR.LABEL.SOURCE = 0
+    ERR.CURRENT.FILE$ = ""
+    IF ERR.SYM.NAME$ = "" THEN RETURN
+    OPEN 2, 8, 2, ERR.SYM.NAME$
+    GP.DO
+        LINPUT# 2, ERR.LINE$, ERR.LF
+        GP.IF LEFT$(ERR.LINE$, 6) = "FILE: " THEN
+            ERR.CURRENT.FILE$ = MID$(ERR.LINE$, 7)
+        GP.ELSEIF LEFT$(ERR.LINE$, 9) = "VARIABLES" THEN
+            GP.EXITDO
+        GP.ELSEIF LEFT$(ERR.LINE$, 1) = " " THEN
+            GOSUB ERR.SYM.RECORD
+        GP.ENDIF
+        IF ST <> 0 THEN GP.EXITDO
+    GP.LOOP
+    CLOSE 2
+    GOSUB ERR.CHANNEL.KICK
+    RETURN
+
+
+ERR.SYM.RECORD:
+    ERR.EQUALS = GP.INSTR(ERR.LINE$, "=")
+    IF ERR.EQUALS < 10 THEN RETURN
+    ERR.VALUE = VAL(MID$(ERR.LINE$, ERR.EQUALS + 1))
+    IF ERR.VALUE > ERR.TARGET.LINE THEN RETURN
+    IF ERR.VALUE <= ERR.LABEL.VALUE THEN RETURN
+    ERR.LABEL.VALUE = ERR.VALUE
+    ERR.LABEL.SOURCE = VAL(MID$(ERR.LINE$, 2, 6))
+    ERR.LABEL.NAME$ = MID$(ERR.LINE$, 9, ERR.EQUALS - 9)
+    GP.DO
+        IF LEN(ERR.LABEL.NAME$) = 0 THEN GP.EXITDO
+        IF RIGHT$(ERR.LABEL.NAME$, 1) <> " " THEN GP.EXITDO
+        ERR.LABEL.NAME$ = LEFT$(ERR.LABEL.NAME$, LEN(ERR.LABEL.NAME$) - 1)
+    GP.LOOP
+    ERR.FILE.NAME$ = ERR.CURRENT.FILE$
+    RETURN
+
+
+## ===========================================================================
+## ERR.CHANNEL.KICK -- one character to channel 0 after every CLOSE.
+##
+## WARNING: file I/O reached from inside a GP.DO key loop finishes its work and
+## then stops the program with INPUT/OUTPUT ERROR @ $005B. Channel 0 output
+## runs CLRCHN and makes it go away. The menu loop IS that key loop, so every
+## CLOSE here is followed by this. The space lands wherever the cursor is and
+## ERR.PAINT draws over it.
+## ===========================================================================
+ERR.CHANNEL.KICK:
+    PRINT " ";
+    RETURN
+
+
+## ===========================================================================
+## ERR.PARSE.ADDRESS -- ERR.TYPED$ to ERR.PARSED, or -1.
+##
+## Takes the text after the last "$" if there is one, then its leading hex
+## digits, so a whole error line can be pasted in.
+## ===========================================================================
+ERR.PARSE.ADDRESS:
+    ERR.PARSED = -1
+    ERR.HEX$ = ""
+    ERR.AT = 0
+    GP.DO
+        ERR.FOUND = GP.INSTR(ERR.TYPED$, "$", ERR.AT + 1)
+        IF ERR.FOUND = 0 THEN GP.EXITDO
+        ERR.AT = ERR.FOUND
+    GP.LOOP
+    ## MID$ whether or not a "$" was found, so ERR.SCAN$ is always a fresh
+    ## string: STRCASE rewrites in place through a pointer, and a plain
+    ## assignment could leave the two sharing bytes.
+    ERR.SCAN$ = MID$(ERR.TYPED$, ERR.AT + 1)
+    STRCASE.PTR = GP.STRPTR(ERR.SCAN$)
+    STRCASE.MODE = STRCASE.LTRIM
+    GOSUB STRCASE.GO
+    STRCASE.PTR = GP.STRPTR(ERR.SCAN$)
+    STRCASE.MODE = STRCASE.UPPER
+    GOSUB STRCASE.GO
+    ERR.AT = 1
+    GP.DO
+        IF ERR.AT > LEN(ERR.SCAN$) THEN GP.EXITDO
+        ERR.DIGIT$ = MID$(ERR.SCAN$, ERR.AT, 1)
+        IF GP.INSTR(ERR.HEXDIGITS$, ERR.DIGIT$) = 0 THEN GP.EXITDO
+        ERR.HEX$ = ERR.HEX$ + ERR.DIGIT$
+        ERR.AT = ERR.AT + 1
+    GP.LOOP
+    GP.IF LEN(ERR.HEX$) > 0 THEN
+        GOSUB ERR.HEXVAL
+        ERR.PARSED = ERR.HEXVALUE
+    GP.ENDIF
+    RETURN
+
+
+## ===========================================================================
+## ERR.HEXVAL -- ERR.HEX$, hex digits, to ERR.HEXVALUE.
+##
+## The pointer is taken fresh. GP.STRPTR finds where the string lives right
+## now, and ERR.HEX$ is rebuilt between calls, so a kept pointer would be aimed
+## at the old bytes.
+## ===========================================================================
+ERR.HEXVAL:
+    ERR.HEXVALUE = 0
+    STRCASE.PTR = GP.STRPTR(ERR.HEX$)
+    STRCASE.MODE = STRCASE.UPPER
+    GOSUB STRCASE.GO
+    FOR ERR.I = 1 TO LEN(ERR.HEX$)
+        ERR.HEXVALUE = ERR.HEXVALUE * 16 + GP.INSTR(ERR.HEXDIGITS$, MID$(ERR.HEX$, ERR.I, 1)) - 1
+    NEXT
+    RETURN
+
+
+## ===========================================================================
+## ERR.MAKE.HEX4 -- ERR.VALUE, 0 to 65535, into ERR.HEX4$ as four digits.
+## ===========================================================================
+ERR.MAKE.HEX4:
+    ERR.REST = ERR.VALUE
+    ERR.NIB3 = INT(ERR.REST / 4096)
+    ERR.REST = ERR.REST - ERR.NIB3 * 4096
+    ERR.NIB2 = INT(ERR.REST / 256)
+    ERR.REST = ERR.REST - ERR.NIB2 * 256
+    ERR.NIB1 = INT(ERR.REST / 16)
+    ERR.REST = ERR.REST - ERR.NIB1 * 16
+    ERR.HEX4$ = MID$(ERR.HEXDIGITS$, ERR.NIB3 + 1, 1) + MID$(ERR.HEXDIGITS$, ERR.NIB2 + 1, 1)
+    ERR.HEX4$ = ERR.HEX4$ + MID$(ERR.HEXDIGITS$, ERR.NIB1 + 1, 1) + MID$(ERR.HEXDIGITS$, ERR.REST + 1, 1)
+    RETURN
+
+
+## ===========================================================================
+## ERR.STATE.CLEAR -- everything the last lookup found.
+## ===========================================================================
+ERR.STATE.CLEAR:
+    ERR.HAVE.ADDRESS = 0
+    ERR.TARGET = 0
+    ERR.MAP.OFFSET = -1
+    ERR.MAP.LINE = -1
+    ERR.CODE.LINE = -1
+    ERR.CODE.OFFSET = -1
+    ERR.LAST.OFFSET = -1
+    ERR.PAST.END = 0
+    ERR.TARGET.LINE = -1
+    ERR.FILE.NAME$ = ""
+    ERR.LABEL.NAME$ = ""
+    ERR.LABEL.VALUE = -1
+    ERR.LABEL.SOURCE = 0
+    RETURN
