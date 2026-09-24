@@ -340,3 +340,5 @@ testing/BMXVIEW.SYM
 testing/BMXVIEW.SYM
 testing/COLORTST.SYM
 testing/EDITOR.SYM
+
+samples/*.zip
