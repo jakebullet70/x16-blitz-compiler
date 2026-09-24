@@ -27,7 +27,7 @@ again. See [memory-is-git-tracked](memory-is-git-tracked.md).
 - [Measure p-code per module](measure-pcode-per-module.md) — map plus SYM gives bytes per include and routine
 - [Headless BASL build recipe](headless-basl-build-recipe.md) — the three emulator runs and their stop conditions; [a timeout once faked success](compile-shared-timeout-fakes-success.md), the banner is the finish line
 - [GPC.ERR builds shared, in the main dir](gpcerr-build-shared-in-main-dir.md) — never standalone
-- [Runtime storage is the golden RAM](runtime-storage-is-golden-ram.md) — $0400-$05F4, a test routine goes at $0780; [tests share the product's memory](tests-share-the-products-memory.md)
+- [Runtime storage is the golden RAM](runtime-storage-is-golden-ram.md) — $0400 to StorageEnd, which MOVES; a test routine goes at $0780; [tests share the product's memory](tests-share-the-products-memory.md)
 - [Paste can't drive a running program](paste-cannot-drive-a-running-program.md) — use a fixed-answer variant. x16emu r49 runs tests, Box16 debugs
 - [File I/O dies in a GP.DO key loop](file-io-error-in-gpdo-key-loop.md) — the seven shapes already ruled out
 - [Retired keyword defers to runtime](retired-keyword-defers-to-runtime.md) — stale callers compile clean and explode
@@ -64,6 +64,7 @@ again. See [memory-is-git-tracked](memory-is-git-tracked.md).
 
 ## The editor sample
 - [Editor branch state, GUI next](gpc-editor-branch-and-gui-next.md) — the self-check lines to keep green
+- [ED-STORE 255.BASL is test data](editor-test-fixture-files.md) — the editor opens it; not dead source, do not flag it
 - [The editor's slow RETURN](editor-return-is-the-line-table.md) — FIXED at 87x, the 2048-entry boundary is the trap; [the LINPUT# loader](gpc-editor-loader-linput-and-blob.md) — 10.5x over GET#, ST=66 on a missing file
 - [Editor: ASCII inside, PETSCII outside](gpc-editor-is-ascii-inside-petscii-outside.md) — why the font is re-ordered in VRAM; [ALT keys need the keymap](gpc-editor-alt-keys-need-the-keymap.md), in ISO mode ALT+F sends nothing
 - [VERA FX cache writes are aligned](vera-fx-cache-write-is-aligned.md) — the row renderer needs an EVEN column

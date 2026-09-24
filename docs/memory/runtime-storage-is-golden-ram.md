@@ -1,15 +1,21 @@
 ---
 name: runtime-storage-is-golden-ram
-description: "The runtime's storage section is $0400-$05F4, the X16's golden RAM -- a test routine POKEd at $0400 corrupts a compiled program; use $0780"
+description: "The runtime's storage section is $0400-StorageEnd, the X16's golden RAM -- a test routine POKEd at $0400 corrupts a compiled program; use $0780"
 metadata:
   type: reference
 ---
 
-The runtime links its `storage` section at `MemoryStorage`, `$0400`, and it ends at `StorageEnd`
-(`$05F4` at runtime 123, in both `source/application/build/rtimage.lbl` and
-`source/runtime/build/code.lbl`). The compiler's own ends at `$0678`. `storeStartHigh`,
-`stackFloorHigh`, `Runtime6502SP` and `handlerBank` live there, so the X16's usual free "golden RAM"
-is not free under a compiled program.
+The runtime links its `storage` section at `MemoryStorage`, `$0400`, and it ends at `StorageEnd`,
+in both `source/application/build/rtimage.lbl` and `source/runtime/build/code.lbl`. The compiler's
+own ends at `$0678`. `storeStartHigh`, `stackFloorHigh`, `Runtime6502SP` and `handlerBank` live in
+that section, so the X16's usual free "golden RAM" is not free under a compiled program.
+
+**`StorageEnd` MOVES, so read it and never hard-code it.** It was `$05F4` at runtime 123 and is
+`$05F0` on 2026-09-24. Anything anchored to a literal is overwritten the next time runtime storage
+grows, and the symptom is corrupted data, not a build error. Nothing in `source/runtime/source` or
+`source/gp-runtime/source` references an address above it, so `StorageEnd`-`$07FF` (528 bytes on
+2026-09-24) is genuinely free under a compiled program -- but `$0780`-`$07FF` is the test-routine
+window by convention, which leaves 400 bytes for anything that wants to stay out of its way.
 
 A 6-byte bank probe POKEd at `$0400` on 2026-09-15 overwrote `stackFloorHigh`: the next `FOR` stopped
 with `OUT OF MEMORY` at a nonsense address, in build 122 as well, and a probe called by `SYS` from direct
