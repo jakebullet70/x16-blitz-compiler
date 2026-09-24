@@ -207,7 +207,7 @@ _MCLSameLine:
 		;		TOKEN (>= $80, so the tokeniser knew the word) and no generator claimed it --
 		;		which is a fact about the program, not a typo, because a misspelling arrives as
 		;		ASCII and goes to _MCLCheckAssignment instead. Deferring it wrote a runtime
-		;		throw-stub and said OK CODE, so a source file left calling GP.STASH or GP.SORT
+		;		throw-stub and said OK LOW CODE, so a source file left calling GP.STASH or GP.SORT
 		;		after they moved to GP.ASM modules compiled clean and threw SYNTAX ERROR at an
 		;		address, whenever it was first reached. That cost two hours on 01/09/26 and it
 		;		was two separate files, one broken since 15d90eb with nobody noticing.
@@ -245,11 +245,44 @@ _MCLCheckAssignment:
 ; ************************************************************************************************
 
 DeferStatementToRuntime:
+		jsr 	RecordDeferredLine 			; which line lost a statement, for the report above OK
 		stz 	dcLastToken 				; a throw-stub falls through, whatever it replaced
 		lda 	#PCD_CMD_DEFERROR
 		jsr 	WriteCodeByte
 		jmp 	MainCompileLoop 			; drop the rest of this source line: everything after the
 										; stub is unreachable (it throws first), so read the next line.
+
+; ************************************************************************************************
+;
+;		Note the BASIC line a statement has just been dropped from, so PrintDeferredLines can say
+;		so above the OK banner (application/compiler/memreport.asm). deferLines holds the first
+;		DEFER_MAX of them; deferCount counts every one, so a longer list stops and the count does
+;		not.
+;
+;		ONE ENTRY A SOURCE LINE AT MOST. The caller drops the rest of the line and reads the next,
+;		so a line cannot arrive here twice.
+;
+;		Safe to call: the stack is already unwound to stmtRecoverSP, which is statement-dispatch
+;		level, and GetLineNumber leaves X alone (helpers/api.asm).
+;
+; ************************************************************************************************
+
+RecordDeferredLine:
+		lda 	deferCount
+		cmp 	#DEFER_MAX
+		bcs 	_RDLCount 					; table full: keep counting, stop listing
+		asl 	a 							; two bytes an entry
+		tax
+		jsr 	GetLineNumber 				; YA = currentLineNumber
+		sta 	deferLines,x
+		tya
+		sta 	deferLines+1,x
+_RDLCount:
+		inc 	deferCount
+		bne 	_RDLExit
+		dec 	deferCount 					; saturate rather than wrap back to none
+_RDLExit:
+		rts
 
 SaveCodeAndExit:
 		lda 	#13 						; end the line of dots this pass drew
@@ -489,6 +522,8 @@ ResetPassState:
 		stz 	clrCheckpoint 				; no CLR compiled yet -> no array is re-DIMmable
 		stz 	clrCheckpoint+1
 		stz 	deferErrors 				; not deferring compile errors until a statement arms it
+		stz 	deferCount 					; and the report is this pass's, because dead-code removal
+											; can leave a deferred line out of the final program
 		lda 	#$00 						; default return target $FE00 (the END marker) so an
 		sta 	implicitDimFirst 			; empty program's prologue just exits cleanly.
 		lda 	#$FE
@@ -1020,6 +1055,13 @@ stmtRecoverSP: 							; 6502 stack level to unwind to when deferring a statement
 		.fill 	1
 stmtRecoverObj: 						; object write cursor to roll back to (discards partial code)
 		.fill 	2
+
+DEFER_MAX = 16 							; line numbers the report lists; the count is not capped
+
+deferCount: 								; statements this pass lost to a deferred SYNTAX error,
+		.fill 	1 							; saturating at 255
+deferLines: 								; the BASIC line each of the first DEFER_MAX was on
+		.fill 	2*DEFER_MAX
 		.send storage
 
 ; ************************************************************************************************

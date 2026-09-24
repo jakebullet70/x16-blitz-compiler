@@ -84,6 +84,8 @@ _CCKeepAll:
 									; truncated at the branch it could not fix, and then printed OK.
 		jsr 	WriteMapFile 				; and the line#->offset map, if GPC.INPUT asked for one
 		jsr 	WriteDeadList 				; and the removed-line list, if line 5 named one
+		jsr 	PrintDeferredLines 			; the statements that failed to compile, ABOVE the banner:
+											; the compile succeeds either way and this is the notice
 		lda 	#"O" 						; the only other thing it prints, and the only way a
 		jsr 	$FFD2 						; caller can tell a compile that worked from one that
 		lda 	#"K" 						; stopped on an error, so it stays.

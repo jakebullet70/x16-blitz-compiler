@@ -1683,8 +1683,10 @@ gpScanStop: 								; nonzero once the answer is in, or the end marker seen
 ; ************************************************************************************************
 ; ************************************************************************************************
 ;
-;		Printed after OK, a line at a time:
+;		Printed after OK, a line at a time -- except the first, which comes before it because a
+;		compile missing statements still says OK:
 ;
+;			2 STATEMENTS NOT COMPILED: 1669 1702 		only when a statement failed
 ;			OK LOW CODE 11776, SHARED GPBASIC
 ;			RUNTIME 13567 									embedded only
 ;			LOW FREE 9728, FRAME STACK 2048
@@ -1715,6 +1717,8 @@ gpScanStop: 								; nonzero once the answer is in, or the end marker seen
 ;		DEAD CODE  only when GPC.INPUT line 5 turned removal on: the lines left out, then the
 ;				bytes that saved -- pass zero's length less pass one's. Four wide each.
 ;		BANK	one line per GP.BANKED region and GP.BANKEDSTR text bank -- see PrintBankReport.
+;		STATEMENTS NOT COMPILED  the merged BASIC lines that lost a statement to a deferred SYNTAX
+;				error -- see PrintDeferredLines, which start.asm calls before the banner.
 ;
 ;		All of it is computed here rather than stashed by WriteObjectCode: objPtr, gpBankStart,
 ;		newWorkspacePage and runtimeEndPage all survive it unchanged, and WriteMapFile touches
@@ -2002,6 +2006,71 @@ _PBRNoCarry:
 
 ; ************************************************************************************************
 ;
+;		The statements that did not compile, printed above the OK banner:
+;
+;			2 STATEMENTS NOT COMPILED: 1669 1702
+;
+;		Each of them failed with a SYNTAX error, was replaced by a one-byte runtime throw-stub,
+;		and took the rest of its source line with it -- see DeferStatementToRuntime in the
+;		compiler's main/compiler.asm. The compile prints OK either way, so without this line
+;		nothing says the program is missing them. Silent when none were lost.
+;
+;		The numbers are lines of the MERGED source, the same ones NAME.MAP is keyed on, so GPC.ERR
+;		resolves them back to a file and a line.
+;
+;		THE COUNT IS THE TRUTH, THE LIST IS NOT. deferLines holds DEFER_MAX of them and the count
+;		keeps rising past that, so a long list simply stops.
+;
+;		WARNING: the word ERROR must stay out of this line. compile_shared.py harvests the log
+;		between the banner and the READY. after it when a compile fails.
+;
+; ************************************************************************************************
+
+PrintDeferredLines:
+		lda 	deferCount
+		bne 	_PDFSome
+		rts
+_PDFSome:
+		sta 	reportValue
+		stz 	reportValue+1
+		jsr 	PrintDecimal
+		ldx 	#NotCompiledText & $FF
+		ldy 	#NotCompiledText >> 8
+		lda 	deferCount
+		cmp 	#1
+		bne 	_PDFPlural
+		ldx 	#NotCompiled1Text & $FF
+		ldy 	#NotCompiled1Text >> 8
+_PDFPlural:
+		jsr 	PrintMessage
+		ldx 	#0 							; X counts entries, not bytes
+_PDFNext:
+		cpx 	deferCount
+		beq 	_PDFEnd
+		cpx 	#DEFER_MAX
+		beq 	_PDFEnd
+		phx
+		lda 	#' ' 						; the space leads the number, so the line has no trailing
+		jsr 	$FFD2 						; one before the return
+		plx
+		phx
+		txa
+		asl 	a
+		tax
+		lda 	deferLines,x
+		sta 	reportValue
+		lda 	deferLines+1,x
+		sta 	reportValue+1
+		jsr 	PrintDecimal 				; it eats reportValue, so each one is loaded fresh
+		plx
+		inx
+		bra 	_PDFNext
+_PDFEnd:
+		lda 	#13
+		jmp 	$FFD2
+
+; ************************************************************************************************
+;
 ;		reportValue to the screen as decimal, leading zeros suppressed but always at least one
 ;		digit. Subtract each power of ten as many times as it goes; the count is the digit. Same
 ;		method as _WMFDecimal, which writes to the map FILE through IOWriteByte -- this one goes
@@ -2088,6 +2157,10 @@ _PDPow10B: 									; only the top two reach this far, but the loop reads it eve
 ;		Uppercase throughout: the X16 boots in PETSCII upper/graphics, where lowercase bytes
 ;		come out as graphics glyphs. Same reason bumpbuild.py emits 'V' not 'v'.
 ;
+NotCompiled1Text:
+		.text 	" STATEMENT NOT COMPILED:",0
+NotCompiledText:
+		.text 	" STATEMENTS NOT COMPILED:",0
 CodeText:
 		.text 	"LOW CODE ",0
 FreeText:
@@ -4524,6 +4597,8 @@ _CCKeepAll:
 									; truncated at the branch it could not fix, and then printed OK.
 		jsr 	WriteMapFile 				; and the line#->offset map, if GPC.INPUT asked for one
 		jsr 	WriteDeadList 				; and the removed-line list, if line 5 named one
+		jsr 	PrintDeferredLines 			; the statements that failed to compile, ABOVE the banner:
+											; the compile succeeds either way and this is the notice
 		lda 	#"O" 						; the only other thing it prints, and the only way a
 		jsr 	$FFD2 						; caller can tell a compile that worked from one that
 		lda 	#"K" 						; stopped on an error, so it stays.
@@ -5231,14 +5306,14 @@ symSavedBank: 								; the caller's RAM bank, while one of ours is selected
 ;
 ;	This file is automatically generated by scripts/bumpbuild.py
 ;
-BuildNumber = 124
+BuildNumber = 125
 		.section code
 VersionText:
 		.text	'V1.1.0',13,0
 RTImageFileText:
-		.text	'GPC.IMG.124.BIN',0
+		.text	'GPC.IMG.125.BIN',0
 RTBankFileText:
-		.text	'GP1.IMG.124.BIN',0
+		.text	'GP1.IMG.125.BIN',0
 		.send code
 ; ************************************************************************************************
 ; ************************************************************************************************
