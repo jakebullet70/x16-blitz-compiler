@@ -75,8 +75,8 @@ GOTO THEME.SKIP
 ## in order and a library owning one would derail the caller's READs.
 
 THEME.SELECT:
-    THEME.FIRST = 0
-    IF THEME.READY = 0 THEN DIM THEME.CLR(THEME.SLOTS) : THEME.READY = -1 : THEME.FIRST = -1
+    THEME.FIRST% = 0
+    IF THEME.READY = 0 THEN DIM THEME.CLR(THEME.SLOTS) : THEME.READY = -1 : THEME.FIRST% = -1
     IF THEME.ID = 1 THEN GOTO THEME.SELECT.DARK
     IF THEME.ID = 2 THEN GOTO THEME.SELECT.LIGHT
     IF THEME.ID = 3 THEN GOTO THEME.SELECT.GRAY
@@ -137,10 +137,10 @@ THEME.SELECT.GRAY:
     THEME.CLR(THEME.BAR)    = 12 * 16 + 1
     RETURN
 
-## THEME.FIRST is set only when THEME.SELECT created the array, the one case with
+## THEME.FIRST% is set only when THEME.SELECT created the array, the one case with
 ## nothing to keep.
 THEME.SELECT.CUSTOM:  
-    IF THEME.FIRST = 0 THEN RETURN
+    IF THEME.FIRST% = 0 THEN RETURN
     GOTO THEME.SELECT.X16
 
 ## THEME.NEXT -- the following theme, selected. It GOTOs THEME.SELECT rather than
@@ -169,10 +169,10 @@ THEME.SET:
 ## THEME.HI -- the inverse of a packed attribute, for pre-drawing a row that should
 ## already look selected.
 ##
-##   in   THEME.ATTR   packed attribute      out  THEME.INV
+##   in   THEME.ATTR   packed attribute      out  THEME.INV%
 
 THEME.HI:  
-    THEME.INV = (THEME.ATTR AND 15) * 16 + INT(THEME.ATTR / 16) 
+    THEME.INV% = (THEME.ATTR AND 15) * 16 + INT(THEME.ATTR / 16) 
     RETURN
 
 THEME.SKIP:
