@@ -1,0 +1,112 @@
+## ***********************************************************************
+## **  BITS.INC.BL -- packed TRUE/FALSE flags, eight to the byte.
+## **
+## **      BITS.INIT   make the store and clear every flag
+## **      BITS.SET    write one flag
+## **      BITS.GET    read one flag
+## **
+## **  Requires GPB.INC.BL, and does not #INCLUDE it.
+## **
+## **      GOSUB BITS.INIT
+## **      BITS.INDEX = 10 : BITS.VALUE = -1 : GOSUB BITS.SET
+## **      IF GP.FN(BITS.TEST, 10) <> 0 THEN <flag 10 is set>
+## **
+## **   in   BITS.INDEX     which flag, 0 to BITS.CAPACITY-1. Out of range is
+## **                       ignored.
+## **        BITS.VALUE     what SET writes. 0 clears, anything else sets.
+## **
+## **   out  BITS.VALUE     what GET read. -1 set, 0 clear.
+## **        BITS.CAPACITY  how many flags the store holds
+## **        BITS.ADDR      where the flags live. Repointable after INIT; set
+## **                       BITS.CAPACITY to match.
+## **
+## **  Flag N is bit (N AND 7) of the byte at BITS.ADDR + INT(N/8). Masking the
+## **  array elements instead cannot reach bit 15 of one: AND and OR are 16-bit
+## **  signed, so the mask 32768 raises OUT OF RANGE.
+## **
+## **  Clearing subtracts, and SET tests the bit is set first. There is no
+## **  AND NOT here. BANKMGR.INC.BL does the same.
+## **
+## **  BITS.BYTEADDR and BITS.MASK are BITS.LOCATE's output and belong to SET
+## **  and GET.
+## **
+## **  WARNING: PEEK and POKE restore the caller's RAM bank around each access.
+## **  A repointed BITS.ADDR must be low RAM, or the caller must BANK first and
+## **  hold that bank across the call.
+## **
+## **  To run it from a bank, put the #INCLUDE between GP.BANKED and
+## **  GP.ENDBANKED. GPC-BASIC/BANKED-OR-NOT.md has the rules.
+## ***********************************************************************
+#IFNDEF BITS.DEFS
+#DEFINE BITS.DEFS 1
+
+## The store's size as a DIM subscript. Change this and nothing else: INIT
+## works the byte count and the flag count out from it.
+#DEFINE BITS.MAPTOP 7
+
+GOTO BITS.SKIP
+
+## ***********************************************************************
+## **  BITS.INIT -- make the store and clear it. Again clears every flag.
+## **
+## **  The DIMs are behind BITS.READY: DIMming an array GPC auto-dimensioned
+## **  is an error.
+## ***********************************************************************
+
+BITS.INIT:
+    IF BITS.READY = 0 THEN DIM BITS.MAP%(BITS.MAPTOP) : DIM BITS.POWER%(7) : BITS.READY = -1
+
+    ## ---- 1, 2, 4 .. 128. GPC has no shift.
+    BITS.POWER%(0) = 1
+    FOR BITS.SCAN = 1 TO 7
+        BITS.POWER%(BITS.SCAN) = BITS.POWER%(BITS.SCAN - 1) * 2
+    NEXT BITS.SCAN
+
+    ## ---- a % array is two bytes an element, not the six of an untyped one ----
+    BITS.BYTES = (BITS.MAPTOP + 1) * 2 : BITS.CAPACITY = BITS.BYTES * 8 : BITS.ADDR = GP.ARRPTR(BITS.MAP%())
+
+    FOR BITS.SCAN = 0 TO BITS.MAPTOP
+        BITS.MAP%(BITS.SCAN) = 0
+    NEXT BITS.SCAN
+    RETURN
+
+
+## ***********************************************************************
+## **  BITS.LOCATE -- BITS.INDEX to a byte address and a mask.
+## **
+## **  BITS.BYTEADDR is 0 for a flag outside the store, which is how SET and
+## **  GET ignore one. No address in the store is 0.
+## ***********************************************************************
+BITS.LOCATE:
+    BITS.BYTEADDR = 0 : IF BITS.INDEX < 0 THEN RETURN
+    IF BITS.INDEX >= BITS.CAPACITY THEN RETURN
+    BITS.BYTEADDR = BITS.ADDR + INT(BITS.INDEX / 8) : BITS.MASK = BITS.POWER%(BITS.INDEX AND 7)
+    RETURN
+
+
+## ***********************************************************************
+## **  BITS.SET -- write flag BITS.INDEX from BITS.VALUE.
+## ***********************************************************************
+BITS.SET:
+    GP.DEFPROC BITS.PUT, BITS.INDEX, BITS.VALUE
+    GOSUB BITS.LOCATE
+    IF BITS.BYTEADDR = 0 THEN RETURN
+    IF BITS.VALUE <> 0 THEN POKE BITS.BYTEADDR, PEEK(BITS.BYTEADDR) OR BITS.MASK
+    IF BITS.VALUE <> 0 THEN RETURN
+    IF (PEEK(BITS.BYTEADDR) AND BITS.MASK) = 0 THEN RETURN
+    POKE BITS.BYTEADDR, PEEK(BITS.BYTEADDR) - BITS.MASK
+    RETURN
+
+
+## ***********************************************************************
+## **  BITS.GET -- read flag BITS.INDEX into BITS.VALUE.
+## ***********************************************************************
+BITS.GET:
+    GP.DEFPROC BITS.TEST, BITS.INDEX RETURNS BITS.VALUE
+    BITS.VALUE = 0 : GOSUB BITS.LOCATE
+    IF BITS.BYTEADDR = 0 THEN RETURN
+    IF (PEEK(BITS.BYTEADDR) AND BITS.MASK) <> 0 THEN BITS.VALUE = -1
+    RETURN
+
+BITS.SKIP:
+#ENDIF
