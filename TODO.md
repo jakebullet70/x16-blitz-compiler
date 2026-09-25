@@ -278,6 +278,34 @@ Two decisions to take at the keyboard:
 
 ## Bugs
 
+### `SLEEP 0` returns at once, where stock X16 BASIC waits a frame
+
+GPC does not call the ROM's `SLEEP`. `XCommandSleep`
+(`source/runtime/source/system-specific/x16/commands/x16_sleep.asm`) reads the 60 Hz jiffy clock, adds
+the argument to it, and busy-waits until the clock reaches that value. So `SLEEP n` here waits **n**
+ticks. The ROM waits **n+1** VSYNC events, and the reference says so: *"`SLEEP` with no arguments is
+equivalent to `SLEEP 0`, which waits until the beginning of the next frame"*
+(`docs/x16/X16 Reference - 04 - BASIC.md:2756`).
+
+At an argument of 1 or more the difference is one frame and nothing notices. At 0 it is the whole
+wait: the end time comes out equal to the current time, the first compare matches, and the handler
+returns without waiting. Bare `SLEEP` compiles to `SLEEP 0` (`gensupport.asm:130`), so it returns at
+once too.
+
+**The symptom is a program that runs flat out, not one that stops.** A loop ported from X16 BASIC and
+paced by a bare `SLEEP` loses its pacing with no error and no output to show for it.
+
+**`SLEEP 1` is the frame wait.** One jiffy tick is one VSYNC, so it returns on a frame boundary. That
+is prog8's `sys.waitvsync()`, already compiled into every program, and the reason there is no
+`GP.VSYNC` to add.
+
+Matching the ROM means adding one to the argument before the add, which moves every existing `SLEEP`
+in the tree along by a frame. Decide that before touching it.
+
+**Trap, unchanged either way:** `SLEEP` never returns under headless `-testbench`. The jiffy clock
+does not advance without the VERA VSYNC interrupt, and the wait is an exact-equality compare.
+
+
 ### `GP.FN` on a string-returning verb aliases — FIXED 2026-09-13, found 2026-09-08
 
 Two `GP.FN` calls on the **same** verb, with nothing between them in one expression, both read that
