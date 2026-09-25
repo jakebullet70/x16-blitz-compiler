@@ -15,9 +15,8 @@
 #		own (source/application/buildnum.txt).
 #
 #			make -C source/gpc			GPC.BASL -> GPC.SRC.PRG -> testing/GPC.PRG
-#			make -C source/gpc release	build, re-tokenise the GPC.ERR helper, build the shared
-#										runtime, and compile GPC.ERR against it (C.GPC.ERR.PRG,
-#										which release.sh ships as plain GPC.ERR.PRG)
+#			make -C source/gpc release	build, then tokenise and compile the GPC.ERR helper
+#										in samples/GPC.ERR/
 #			make -C source/gpc run		build, then launch the front end in the emulator
 #
 # *******************************************************************************************
@@ -27,6 +26,11 @@ include ..\..\documents\common.make
 else
 include ../../documents/common.make
 endif
+
+#
+#		GPC.ERR builds in its own sample folder, which is the emulator drive for it.
+#
+GPCERRDIR = $(ROOTDIR)samples$(S)GPC.ERR
 
 #
 #		All targets are commands, not files -- mark phony so they always run.
@@ -46,10 +50,9 @@ all: build
 #		need them. So gpc-rt is built HERE, before the compile: a shared front end that
 #		cannot find its runtime does not start, and `make run` would hit that first.
 #
-#		GPB.INC.BL is staged FIRST. BASLOAD resolves an #INCLUDE off the DRIVE, and both
-#		GPC.BASL and GPC.ERR.BASL now include it, so it has to be sitting in testing/
-#		before either tokenise -- not just in GPC-BASIC/. Copied rather than duplicated:
-#		GPC-BASIC/ is the master, this is a build artifact, and .gitignore says so.
+#		GPB.INC.BL is staged FIRST. BASLOAD resolves an #INCLUDE off the DRIVE, so the
+#		copy GPC.BASL includes has to be sitting in testing/ before the tokenise, not
+#		just in GPC-BASIC/. GPC-BASIC/ is the master and the staged copy is git-ignored.
 #		build_basl.py also stages GPC.BASL into testing/, so the source ships from there.
 #
 build:
@@ -59,30 +62,28 @@ build:
 	$(PYTHON) compile_shared.py GPC.SRC.PRG GPC.PRG
 
 #
-#		release = the front-end build, plus a fresh tokenise of the GPC.ERR companion tool
-#		(GPC.ERR.BASL -> GPC.ERR.PRG) so the shipped helper matches its source. build_basl.py with
-#		two args just tokenises (no mirror), and skips if the source is absent.
-#		Everything lands in testing/ (RELEASEDIR).
+#		release = the front-end build, then the GPC.ERR helper: tokenised to
+#		GPC.ERR.SRC.PRG, then compiled to GPC.ERR.PRG, both in GPCERRDIR. That folder is
+#		the emulator drive for the helper and holds its own GPC-BASIC/, GPC.BIN and
+#		runtimes, so nothing of GPC.ERR's is staged into testing/. build_basl.py with two
+#		args just tokenises, and skips when the source is absent or no newer than the PRG.
 #
-#		GPC.ERR is then COMPILED, in SHARED mode, to C.GPC.ERR.PRG -- the helper you reach for
-#		after a crash should not itself be the slowest thing on the disk. SHARED because the
-#		resident runtime is already there for compiled programs, so the tool costs ~1.6K rather
-#		than carrying its own ~12K copy. Both names exist HERE because one is the compiler's
-#		input and the other its output; the release ships only the compiled one, renamed to
-#		plain GPC.ERR.PRG (see release.sh) so a user has one name to remember, not two.
-#		If the runtime is missing, SRC/GPC.ERR.BASL rebuilds the interpreted version.
+#		The helper is compiled SHARED, against the GPB.RT.nnn.BIN in that folder: the
+#		GPB runtime, the one with the GP handlers. A standalone build of it is the wrong
+#		artifact.
 #
-#		The runtime is built by `build` above now, because the FRONT END is shared too.
-#		Nothing else in the tree builds gpc-rt, which is how its $9F00 size guard managed
-#		to fail unnoticed for weeks; a release that ships shared-mode programs must ship
-#		the runtime they need.
+#		The compile also writes GPC.ERR.OVL, the region overlay, and the program will not
+#		run without it. release.sh ships both files. The object name and the overlay name
+#		have to agree: the compiler bakes the object's own name into the object and the
+#		bootstrap reads <name>.OVL back out of it, so renaming the object renames the
+#		overlay everywhere it ships.
 #
-#
-#		GPB.INC.BL is already staged by `build` above, which both sources now need.
+#		gpc-rt is built by `build` above, because the front end is shared too. A release
+#		that ships shared-mode programs must ship the runtime they need.
 #
 release: build
-	$(PYTHON) build_basl.py GPC.ERR.BASL GPC.ERR.PRG
-	$(PYTHON) compile_shared.py GPC.ERR.PRG C.GPC.ERR.PRG GPC.ERR.MAP
+	$(PYTHON) build_basl.py --drive $(GPCERRDIR) GPC.ERR.BASL GPC.ERR.SRC.PRG
+	$(PYTHON) compile_shared.py --drive $(GPCERRDIR) GPC.ERR.SRC.PRG GPC.ERR.PRG GPC.ERR.MAP
 
 #
 #		Launch the freshly built front end. It chain-loads GPC.BIN, which must sit beside

@@ -70,10 +70,9 @@ testing/GPCBLD.LOG
 testing/BASLDONE
 testing/GPC.SRC.PRG
 testing/GPC.SRC.SYM
-testing/GPC.ERR.SYM
 
 # GPC-BASIC/GPB.INC.BL is copied into testing/ by source/gpc/Makefile, because BASLOAD
-# resolves GPC.ERR.BASL's #INCLUDE off the drive and cannot see GPC-BASIC/. GPC-BASIC/ is
+# resolves GPC.BASL's #INCLUDE off the drive and cannot see GPC-BASIC/. GPC-BASIC/ is
 # the master; this copy is a build artifact and must not be edited or tracked, or the two
 # will drift and the tokenise will quietly use the stale one.
 testing/GPB.INC.BL
@@ -121,9 +120,6 @@ testing/archive/
 # binaries that rode in with an unrelated commit -- all of them reproducible
 # from sources already in the tree, and samples/FSIM16_V1/ held the originals.
 #
-# C.GPC.ERR.PRG is the one exception and is exempted below: release.sh SHIPS it,
-# renamed to GPC.ERR.PRG.
-#
 # GPC.IMG.nnn.BIN joins the GPB/GPC.RT.nnn.BIN runtimes in being ignored rather
 # than tracked. It is build-numbered, so every engine bump orphaned the previous
 # one; make libs rebuilds it, and release.sh already says "build first" if it is
@@ -132,7 +128,6 @@ testing/archive/
 testing/OBJECT.PRG
 testing/SOURCE.PRG
 testing/C.*.PRG
-!testing/C.GPC.ERR.PRG
 testing/M.*
 testing/*.LOG
 testing/GPC.IMG.*.BIN
@@ -180,13 +175,10 @@ testing/*.EXP.BL
 testing/*.PRG
 testing/*.BASL
 !testing/BASLOAD-GPC.PRG
-!testing/C.GPC.ERR.PRG
 !testing/DIR.PRG
-!testing/GPC.ERR.PRG
 !testing/GPC.PRG
 !testing/POINTER.PRG
 !testing/GPC.BASL
-!testing/GPC.ERR.BASL
 
 #   HELP-TXT/ is the viewer's data, xcopied from samples/GPC-HELP/HELP-TXT (readme.md line
 #   106) so GPB.HELP.PRG can open //HELP-TXT/:NAME off the drive. Sixty files, byte-identical

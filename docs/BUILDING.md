@@ -73,9 +73,9 @@ PYTHON = /usr/local/bin/python3.12
 ```
 
 **Use this to cut a release.** Doing the steps by hand is easy to get half-right: the trap is
-`C.GPC.ERR.PRG`, the error-line helper, which is compiled in SHARED mode and therefore names the
+`GPC.ERR.PRG`, the error-line helper, which is compiled in SHARED mode and therefore names the
 runtime it was built against *inside itself*. Rebuild the engine without rebuilding that, and the
-shipped helper hunts for a `GPC.RT.<old>.BIN` that is no longer in the release. `release.sh` runs
+shipped helper hunts for a `GPB.RT.<old>.BIN` that is no longer in the release. `release.sh` runs
 the steps in the order that avoids it, and refuses to package if any required file is missing.
 
 ### The steps, if you want them one at a time
@@ -85,25 +85,30 @@ make libs                       # the five bin/*.library files + testing/GPC.BIN
                                 # NB: this BUMPS source/application/buildnum.txt
 make release                    # stage the engine, GPC.INPUT and the samples into testing/
 make -C source/runtime gpc-rt   # the shared runtime, testing/GPC.RT.<build>.BIN
-make -C source/gpc release      # GPC.PRG and GPC.ERR: both tokenised, then compiled SHARED
-                                # (builds gpc-rt itself -- the line above is now optional)
+make -C source/gpc release      # GPC.PRG in testing/, GPC.ERR in samples/GPC.ERR/: both
+                                # tokenised, then compiled SHARED. Builds gpc-rt itself,
+                                # so the line above is optional
 ```
 
 `testing/` **is** the build: it is what you copy to an SD card or point the emulator at. The zip
-`release.sh` writes is a *subset* of it — the four files needed to run, the two `.BASL` sources
-under `SRC/`, and the docs. Samples and scratch files stay behind.
+`release.sh` writes is smaller: the files needed to run, the two `.BASL` sources under `SRC/`,
+and the docs. Three of the shipped files come from `samples/` instead, because they build in
+their own folders: `GPC.ERR.PRG`, `GPC.ERR.OVL` and the help program. The rest of `samples/`
+and the scratch files stay behind.
 
 Two of those targets need the **emulator** rather than the assembler, and the front end needs it
 **twice**: `GPC.BASL` is written in GP.BASIC, so x16emu boots once for BASLOAD to tokenise it into
-`GPC.SRC.PRG` and again for `GPC.BIN` to compile that into `GPC.PRG`. `GPC.ERR` is built the same
-way. Neither needs Java or prog8.
+`GPC.SRC.PRG` and again for `GPC.BIN` to compile that into `GPC.PRG`. `GPC.ERR` takes the same
+two steps on a different drive: it tokenises and compiles in `samples/GPC.ERR/`, which holds its
+own `GPC-BASIC/` modules, `GPC.BIN` and runtimes. Neither needs Java or prog8.
 
 `GPC.SRC.PRG` is compile-only — nothing in BASIC sits behind the GP tokens, so the ROM can neither
 `LIST` nor `RUN` it. Only the compiled `GPC.PRG` can be launched, and being shared it needs
 `GPB.RT.<n>.BIN` (the runtime **with** the GP handlers) beside it or it prints `?RT` and stops.
 
-`make -C source/gpc` on its own builds `GPC.PRG` and the runtime it needs — it is the `release`
-target that also handles `GPC.ERR`.
+`make -C source/gpc` on its own builds `GPC.PRG` and the runtime it needs. The `release` target
+also builds `GPC.ERR` in `samples/GPC.ERR/`, where the compile writes `GPC.ERR.OVL` beside the
+object. The helper does not run without that overlay.
 
 Then try it:
 

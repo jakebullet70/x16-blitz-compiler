@@ -1,0 +1,558 @@
+## ***********************************************************************
+## **  ERRSRC.INC.BL -- the tokenised source, read back as text.
+## **
+## **      ERR.SRC.OPEN     pull NAME.SRC.PRG into RAM banks, once
+## **      ERR.SRC.WINDOW   a line and the three either side of it, rendered
+## **
+## **  Needs GPB, BANKMGR, FILEIO and ERRTOKEN.INC.BL, and #INCLUDEs none of
+## **  them. The assembly reaches BASIC variables through {VAR}, so the program
+## **  needs a #SYMFILE above its includes.
+## **
+## **  Usage:
+## **      ERR.SRC.NAME$ = "GPB.HELP.SRC.PRG"
+## **      GOSUB ERR.SRC.OPEN
+## **      IF ERR.SRC.READY = 0 THEN <ERR.SRC.WHY$ says why>
+## **      ERR.SRC.WANT = 1669
+## **      GOSUB ERR.SRC.WINDOW
+## **      FOR I = 0 TO ERR.SRC.ROWS - 1 : PRINT ERR.SRC.ROW$(I) : NEXT I
+## **
+## **   in   ERR.SRC.NAME$   the tokenised PRG. BASLOAD writes NAME.SRC.PRG
+## **        ERR.SRC.WANT    the BASIC line number wanted
+## **
+## **   out  ERR.SRC.READY   -1 loaded, 0 not
+## **        ERR.SRC.WHY$    why not
+## **        ERR.SRC.ROWS    how many rows came back, 0 to 7
+## **        ERR.SRC.ROW$()  the rendered text, row 0 first
+## **        ERR.SRC.ROWNUM()  each line number
+## **        ERR.SRC.HIT     the row ERR.SRC.WANT landed on, -1 for none
+## **        ERR.SRC.EXACT   -1 if that row IS the line asked for
+## **        ERR.SRC.WORDS$  the hit row's names, a space after each
+## **
+## **  WARNING: the names have to be cut out here and nowhere else. A keyword
+## **  renders with no space around it, so NGAND2 is the variable NG, the
+## **  keyword AND and the number 2, and a caller reading the rendered text
+## **  cannot tell where the name stops.
+## **
+## **  A PRG is two bytes of load address, then a line each: a two-byte link to
+## **  the next, a two-byte line number, the tokenised text, and a zero. Two
+## **  zero link bytes end the program.
+## **
+## **  WARNING: THE LINK IS NOT FOLLOWED, and must not be. It is an address in a
+## **  program loaded at $0801, so it wraps on a source over 63 KB: 1,304 of the
+## **  4,791 links in GPBMODS.SRC.PRG point backwards. The walk scans to each
+## **  line closing zero instead, which is what source/tools/detokenise does.
+## **
+## **  THE BANKS MUST BE CONSECUTIVE. BLOAD fills one and steps to the next, so
+## **  a gap in the run would scatter the file. ERR.SRC.OPEN takes them from
+## **  BANKMGR one at a time and gives the lot back if they do not follow on.
+## **
+## **  A position in the file is a bank and a pointer into the 8 KB window, kept
+## **  in a pair of variables. BASIC passes a pair back in but never reads one:
+## **  the pointer is $A000 to $BFFF, which is negative as a BASIC integer.
+## **
+## **  The walk and the byte copy are assembly because a lookup crosses the
+## **  whole file. The render is BASIC, because the keyword text is a
+## **  GP.BANKEDSTR group and only BASIC can read one.
+## ***********************************************************************
+#IFNDEF ERRSRC.DEFS
+#DEFINE ERRSRC.DEFS 1
+
+## A tokenised line is at most 255 bytes and the four header bytes are not
+## copied, so 250 is the most the render can ever be handed.
+#DEFINE ERR.SRC.ROOMFOR 250
+
+## Three either side.
+#DEFINE ERR.SRC.EITHERSIDE 3
+#DEFINE ERR.SRC.MOSTROWS 7
+
+## The stop test ERR.SRC.SEEK.ASM uses.
+#DEFINE ERR.SRC.BYNUMBER 0
+#DEFINE ERR.SRC.BYORDINAL 1
+
+## $CE is the one two-byte prefix, and 34 is the quote.
+#DEFINE ERR.SRC.PREFIX 206
+#DEFINE ERR.SRC.QUOTE 34
+
+## The bytes a name is made of, and the two type suffixes that end one.
+#DEFINE ERR.SRC.FIRSTLETTER 65
+#DEFINE ERR.SRC.LASTLETTER 90
+#DEFINE ERR.SRC.FIRSTDIGIT 48
+#DEFINE ERR.SRC.LASTDIGIT 57
+#DEFINE ERR.SRC.DOLLAR 36
+#DEFINE ERR.SRC.PERCENT 37
+
+## Everything after REM is comment text, and its words are not names.
+#DEFINE ERR.SRC.REMTOKEN 143
+
+GOTO ERR.SRC.SKIP
+
+
+## ***********************************************************************
+## **  ERR.SRC.OPEN -- ERR.SRC.NAME$ into a run of banks.
+## **
+## **  A second call naming the same file does nothing, so a caller may call it
+## **  before every lookup.
+## ***********************************************************************
+ERR.SRC.OPEN:
+    ERR.SRC.WHY$ = ""
+    IF ERR.SRC.NAME$ = ERR.SRC.HELD$ THEN RETURN
+    ERR.SRC.READY = 0
+    ERR.SRC.HELD$ = ""
+    GP.IF GP.FN(FEXISTS, ERR.SRC.NAME$) = 0 THEN
+        ERR.SRC.WHY$ = "NO TOKENISED SOURCE BESIDE THE MAP"
+        RETURN
+    GP.ENDIF
+
+    ERR.SRC.BLOCKS = GP.FN(FILE.SIZE, ERR.SRC.NAME$)
+    GP.IF ERR.SRC.BLOCKS < 1 THEN
+        ERR.SRC.WHY$ = "THE DIRECTORY DID NOT GIVE A SIZE"
+        RETURN
+    GP.ENDIF
+
+    ## A block is 254 bytes and a bank is 8,192. One spare covers what the
+    ## listing rounds away.
+    ERR.SRC.WANTBANKS = INT(ERR.SRC.BLOCKS * 254 / 8192) + 2
+    GOSUB ERR.SRC.CLAIM
+    GP.IF ERR.SRC.BASE = 0 THEN
+        ERR.SRC.WHY$ = "NOT ENOUGH RAM BANKS IN A ROW"
+        RETURN
+    GP.ENDIF
+
+    GOSUB ERR.SRC.SETUP
+    BLOAD ERR.SRC.NAME$, 8, ERR.SRC.BASE, $A000
+    ERR.SRC.READY = -1
+    ERR.SRC.HELD$ = ERR.SRC.NAME$
+    RETURN
+
+
+## ---- ERR.SRC.WANTBANKS banks that follow one another, or none at all.
+##
+## WARNING: taking them one at a time cannot work. BANKMGR hands out the lowest
+## free bank and the free ones are not in a row -- GPC.ERR leaves 6 free with 7
+## and 8 taken -- so this looks for a run and claims it by number.
+ERR.SRC.CLAIM:
+    GOSUB ERR.SRC.DROP
+    ERR.SRC.BASE = 0
+    ERR.SRC.TRY = 1
+    GP.DO
+        IF ERR.SRC.TRY + ERR.SRC.WANTBANKS > BANKMGR.BANKS THEN GP.EXITDO
+        GOSUB ERR.SRC.CLAIM.RUN
+        IF ERR.SRC.BASE <> 0 THEN GP.EXITDO
+        ERR.SRC.TRY = ERR.SRC.TRY + 1
+    GP.LOOP
+    RETURN
+
+
+## ---- the whole run from ERR.SRC.TRY, or every bank of it back.
+ERR.SRC.CLAIM.RUN:
+    FOR ERR.SRC.I = 0 TO ERR.SRC.WANTBANKS - 1
+        BANKMGR.SET.BANK = ERR.SRC.TRY + ERR.SRC.I
+        GOSUB BANKMGR.CLAIM
+        IF BANKMGR.OK = 0 THEN GOTO ERR.SRC.CLAIM.BACK
+        ERR.SRC.HELDBANKS = ERR.SRC.I + 1
+    NEXT ERR.SRC.I
+    ERR.SRC.BASE = ERR.SRC.TRY
+    RETURN
+
+ERR.SRC.CLAIM.BACK:
+    ERR.SRC.BASE = ERR.SRC.TRY
+    GOSUB ERR.SRC.DROP
+    ERR.SRC.BASE = 0
+    RETURN
+
+
+## ---- every bank this module holds, back to BANKMGR.
+ERR.SRC.DROP:
+    IF ERR.SRC.HELDBANKS < 1 THEN RETURN
+    FOR ERR.SRC.J = 0 TO ERR.SRC.HELDBANKS - 1
+        BANKMGR.SET.BANK = ERR.SRC.BASE + ERR.SRC.J
+        GOSUB BANKMGR.RELEASE
+    NEXT ERR.SRC.J
+    ERR.SRC.HELDBANKS = 0
+    RETURN
+
+
+## ---- the buffer and the slots the assembly reads. {VAR} never creates a
+## ---- variable, so every one of these is written from BASIC first.
+ERR.SRC.SETUP:
+    IF ERR.SRC.DIMMED <> 0 THEN GOTO ERR.SRC.SETUP.BANK
+    DIM ERR.SRC.BUFFER%(ERR.SRC.ROOMFOR / 2)
+    DIM ERR.SRC.ROW$(ERR.SRC.MOSTROWS - 1)
+    DIM ERR.SRC.ROWNUM(ERR.SRC.MOSTROWS - 1)
+    ERR.SRC.DEST% = GP.ARRPTR(ERR.SRC.BUFFER%())
+    ERR.SRC.ROOM% = ERR.SRC.ROOMFOR
+    ERR.SRC.MODE% = 0
+    ERR.SRC.WANT.LO% = 0
+    ERR.SRC.WANT.HI% = 0
+    ERR.SRC.ORDINAL% = 0
+    ERR.SRC.FOUND% = 0
+    ERR.SRC.WANTWORDS = 0
+    ERR.SRC.WORDS$ = ""
+    ERR.SRC.RUN$ = ""
+    ERR.SRC.LEN% = 0
+    ERR.SRC.NUM.LO% = 0
+    ERR.SRC.NUM.HI% = 0
+    ERR.SRC.AT.PTR% = 0
+    ERR.SRC.AT.BANK% = 0
+    ERR.SRC.NX.PTR% = 0
+    ERR.SRC.NX.BANK% = 0
+    ERR.SRC.DIMMED = -1
+
+ERR.SRC.SETUP.BANK:
+    ERR.SRC.BANK% = ERR.SRC.BASE
+    ERR.SRC.STOP.BANK% = ERR.SRC.BASE + ERR.SRC.HELDBANKS
+    RETURN
+
+
+## ***********************************************************************
+## **  ERR.SRC.WINDOW -- ERR.SRC.WANT and the lines around it.
+## **
+## **  The window starts three lines earlier, or at the first line if the
+## **  wanted one is nearer the top than that.
+## ***********************************************************************
+ERR.SRC.WINDOW:
+    ERR.SRC.ROWS = 0
+    ERR.SRC.HIT = -1
+    ERR.SRC.EXACT = 0
+    ERR.SRC.WORDS$ = ""
+    IF ERR.SRC.READY = 0 THEN RETURN
+
+    ERR.SRC.MODE% = ERR.SRC.BYNUMBER
+    ERR.SRC.SPLIT = ERR.SRC.WANT
+    GOSUB ERR.SRC.SPLITWANT
+    GOSUB ERR.SRC.SEEK.ASM
+    IF ERR.SRC.FOUND% = 0 THEN RETURN
+
+    ## The line asked for, by its place in the file rather than its number.
+    ERR.SRC.AT = ERR.SRC.ORDINAL%
+    ERR.SRC.FROM = ERR.SRC.AT - ERR.SRC.EITHERSIDE
+    IF ERR.SRC.FROM < 0 THEN ERR.SRC.FROM = 0
+
+    ERR.SRC.MODE% = ERR.SRC.BYORDINAL
+    ERR.SRC.SPLIT = ERR.SRC.FROM
+    GOSUB ERR.SRC.SPLITWANT
+    GOSUB ERR.SRC.SEEK.ASM
+    IF ERR.SRC.FOUND% = 0 THEN RETURN
+
+    FOR ERR.SRC.I = 0 TO ERR.SRC.MOSTROWS - 1
+        GOSUB ERR.SRC.FETCH.ASM
+        IF ERR.SRC.NX.BANK% = 0 THEN GOTO ERR.SRC.WINDOW.DONE
+        ERR.SRC.WANTWORDS = 0
+        IF ERR.SRC.FROM + ERR.SRC.I = ERR.SRC.AT THEN ERR.SRC.WANTWORDS = -1
+        GOSUB ERR.SRC.RENDER
+        ERR.SRC.ROW$(ERR.SRC.I) = ERR.SRC.TEXT$
+        ERR.SRC.ROWNUM(ERR.SRC.I) = ERR.SRC.NUM.HI% * 256 + ERR.SRC.NUM.LO%
+        ERR.SRC.ROWS = ERR.SRC.I + 1
+        IF ERR.SRC.FROM + ERR.SRC.I = ERR.SRC.AT THEN ERR.SRC.HIT = ERR.SRC.I
+        ERR.SRC.AT.PTR% = ERR.SRC.NX.PTR%
+        ERR.SRC.AT.BANK% = ERR.SRC.NX.BANK%
+    NEXT ERR.SRC.I
+
+ERR.SRC.WINDOW.DONE:
+    IF ERR.SRC.HIT < 0 THEN RETURN
+    IF ERR.SRC.ROWNUM(ERR.SRC.HIT) = ERR.SRC.WANT THEN ERR.SRC.EXACT = -1
+    RETURN
+
+
+## ---- ERR.SRC.SPLIT into the two bytes the assembly compares. A line number
+## ---- reaches 65024 and AND is signed above 32767, so this divides.
+ERR.SRC.SPLITWANT:
+    ERR.SRC.WANT.HI% = INT(ERR.SRC.SPLIT / 256)
+    ERR.SRC.WANT.LO% = ERR.SRC.SPLIT - ERR.SRC.WANT.HI% * 256
+    RETURN
+
+
+## ---- one buffered line into ERR.SRC.TEXT$. A byte below 128 is a character,
+## ---- $CE takes the byte after it, anything else is a keyword on its own, and
+## ---- a quote turns the rest of the string into text.
+## ----
+## ---- With ERR.SRC.WANTWORDS set it also fills ERR.SRC.WORDS$, because the
+## ---- keyword bytes that separate one name from the next are only visible
+## ---- here.
+ERR.SRC.RENDER:
+    ERR.SRC.TEXT$ = ""
+    ERR.SRC.RUN$ = ""
+    IF ERR.SRC.WANTWORDS <> 0 THEN ERR.SRC.WORDS$ = ""
+    ERR.SRC.QUOTED = 0
+    ERR.SRC.I% = 0
+    GP.DO
+        IF ERR.SRC.I% >= ERR.SRC.LEN% THEN GP.EXITDO
+        ERR.SRC.BYTE = PEEK(ERR.SRC.DEST% + ERR.SRC.I%)
+        ERR.SRC.I% = ERR.SRC.I% + 1
+        GP.IF ERR.SRC.QUOTED <> 0 THEN
+            ERR.SRC.TEXT$ = ERR.SRC.TEXT$ + CHR$(ERR.SRC.BYTE)
+            IF ERR.SRC.BYTE = ERR.SRC.QUOTE THEN ERR.SRC.QUOTED = 0
+        GP.ELSEIF ERR.SRC.BYTE < 128 THEN
+            ERR.SRC.TEXT$ = ERR.SRC.TEXT$ + CHR$(ERR.SRC.BYTE)
+            IF ERR.SRC.WANTWORDS <> 0 THEN GOSUB ERR.SRC.RUNCHAR
+            IF ERR.SRC.BYTE = ERR.SRC.QUOTE THEN ERR.SRC.QUOTED = -1
+        GP.ELSEIF ERR.SRC.BYTE = ERR.SRC.PREFIX THEN
+            IF ERR.SRC.WANTWORDS <> 0 THEN GOSUB ERR.SRC.RUNEND
+            GOSUB ERR.SRC.SHIFTED
+        GP.ELSE
+            IF ERR.SRC.WANTWORDS <> 0 THEN GOSUB ERR.SRC.RUNEND
+            IF ERR.SRC.BYTE = ERR.SRC.REMTOKEN THEN ERR.SRC.WANTWORDS = 0
+            GOSUB ERR.SRC.PLAINTOKEN
+        GP.ENDIF
+    GP.LOOP
+    IF ERR.SRC.WANTWORDS <> 0 THEN GOSUB ERR.SRC.RUNEND
+    RETURN
+
+
+## ---- one rendered character against the run of name bytes being collected.
+## ---- A digit only continues a name, so a number on its own is never one.
+ERR.SRC.RUNCHAR:
+    GP.IF ERR.SRC.BYTE >= ERR.SRC.FIRSTLETTER AND ERR.SRC.BYTE <= ERR.SRC.LASTLETTER THEN
+        ERR.SRC.RUN$ = ERR.SRC.RUN$ + CHR$(ERR.SRC.BYTE)
+        RETURN
+    GP.ENDIF
+    IF ERR.SRC.RUN$ = "" THEN RETURN
+    GP.IF ERR.SRC.BYTE >= ERR.SRC.FIRSTDIGIT AND ERR.SRC.BYTE <= ERR.SRC.LASTDIGIT THEN
+        ERR.SRC.RUN$ = ERR.SRC.RUN$ + CHR$(ERR.SRC.BYTE)
+        RETURN
+    GP.ENDIF
+    IF ERR.SRC.BYTE = ERR.SRC.DOLLAR THEN ERR.SRC.RUN$ = ERR.SRC.RUN$ + CHR$(ERR.SRC.BYTE)
+    IF ERR.SRC.BYTE = ERR.SRC.PERCENT THEN ERR.SRC.RUN$ = ERR.SRC.RUN$ + CHR$(ERR.SRC.BYTE)
+    GOSUB ERR.SRC.RUNEND
+    RETURN
+
+
+ERR.SRC.RUNEND:
+    IF ERR.SRC.RUN$ = "" THEN RETURN
+    ERR.SRC.WORDS$ = ERR.SRC.WORDS$ + ERR.SRC.RUN$ + " "
+    ERR.SRC.RUN$ = ""
+    RETURN
+
+
+ERR.SRC.PLAINTOKEN:
+    ERR.SRC.KEY$ = ""
+    IF ERR.SRC.BYTE <= ERR.PLAIN.LAST THEN ERR.SRC.KEY$ = GP.BSTR(ERR.TOKEN.PLAIN, ERR.SRC.BYTE - ERR.PLAIN.FIRST)
+    GOTO ERR.SRC.KEYOUT
+
+
+## ---- the byte after $CE picks the keyword. A token no keyword claims prints
+## ---- as its own number.
+ERR.SRC.SHIFTED:
+    ERR.SRC.KEY$ = ""
+    IF ERR.SRC.I% >= ERR.SRC.LEN% THEN GOTO ERR.SRC.KEYOUT
+    ERR.SRC.BYTE = PEEK(ERR.SRC.DEST% + ERR.SRC.I%)
+    ERR.SRC.I% = ERR.SRC.I% + 1
+    IF ERR.SRC.BYTE < ERR.SHIFTED.FIRST THEN GOTO ERR.SRC.KEYOUT
+    IF ERR.SRC.BYTE > ERR.SHIFTED.LAST THEN GOTO ERR.SRC.KEYOUT
+    ERR.SRC.KEY$ = GP.BSTR(ERR.TOKEN.SHIFTED, ERR.SRC.BYTE - ERR.SHIFTED.FIRST)
+
+ERR.SRC.KEYOUT:
+    IF ERR.SRC.KEY$ = "" THEN ERR.SRC.KEY$ = "{" + MID$(STR$(ERR.SRC.BYTE), 2) + "}"
+    ERR.SRC.TEXT$ = ERR.SRC.TEXT$ + ERR.SRC.KEY$
+    RETURN
+
+
+## ***********************************************************************
+## **  ERR.SRC.SEEK.ASM -- the walk, in assembly.
+## **
+## **   in   ERR.SRC.BANK%       the bank the file starts in
+## **        ERR.SRC.STOP.BANK%  one past the last bank it was loaded into
+## **        ERR.SRC.MODE%       0 stop at a line number, 1 stop at an ordinal
+## **        ERR.SRC.WANT.LO%    what to stop at, low byte
+## **        ERR.SRC.WANT.HI%    high byte
+## **
+## **   out  ERR.SRC.FOUND%    -1 stopped on a line, 0 ran off the end
+## **        ERR.SRC.AT.PTR%   that line position, window pointer
+## **        ERR.SRC.AT.BANK%  and bank
+## **        ERR.SRC.ORDINAL%  its place in the file, counting from zero
+## **        ERR.SRC.NUM.LO%   its line number, low byte
+## **        ERR.SRC.NUM.HI%   high byte
+## **
+## **  zTemp0 is the pointer into the window and zTemp2 the link bytes, which
+## **  are read only to find the end of the program. Both are free in a blob:
+## **  SYS clobbers zTemp0 reaching it.
+## ***********************************************************************
+ERR.SRC.SEEK.ASM:
+    #REM 1
+    GP.ASM
+    REM lda $00
+    REM pha
+    REM cld
+    REM lda {ERR.SRC.BANK%}
+    REM sta $00
+    REM lda #2
+    REM sta $2C
+    REM lda #$A0
+    REM sta $2D
+    REM stz {ERR.SRC.ORDINAL%}
+    REM ldx #1
+    REM stz {ERR.SRC.ORDINAL%},x
+    REM stz {ERR.SRC.FOUND%}
+    REM ldx #1
+    REM stz {ERR.SRC.FOUND%},x
+    REM SKLINE: lda $2C
+    REM sta {ERR.SRC.AT.PTR%}
+    REM lda $2D
+    REM ldx #1
+    REM sta {ERR.SRC.AT.PTR%},x
+    REM lda $00
+    REM sta {ERR.SRC.AT.BANK%}
+    REM ldx #1
+    REM stz {ERR.SRC.AT.BANK%},x
+    REM jsr SKBYTE
+    REM sta $30
+    REM jsr SKBYTE
+    REM sta $31
+    REM lda $30
+    REM ora $31
+    REM bne SKNUM
+    REM jmp SKOUT
+    REM SKNUM: jsr SKBYTE
+    REM sta {ERR.SRC.NUM.LO%}
+    REM jsr SKBYTE
+    REM sta {ERR.SRC.NUM.HI%}
+    REM lda {ERR.SRC.MODE%}
+    REM bne SKORD
+    REM lda {ERR.SRC.NUM.HI%}
+    REM cmp {ERR.SRC.WANT.HI%}
+    REM bcc SKSTEP
+    REM bne SKHIT
+    REM lda {ERR.SRC.NUM.LO%}
+    REM cmp {ERR.SRC.WANT.LO%}
+    REM bcc SKSTEP
+    REM bra SKHIT
+    REM SKORD: lda {ERR.SRC.ORDINAL%}
+    REM cmp {ERR.SRC.WANT.LO%}
+    REM bne SKSTEP
+    REM ldx #1
+    REM lda {ERR.SRC.ORDINAL%},x
+    REM cmp {ERR.SRC.WANT.HI%}
+    REM bne SKSTEP
+    REM SKHIT: lda #$FF
+    REM sta {ERR.SRC.FOUND%}
+    REM ldx #1
+    REM sta {ERR.SRC.FOUND%},x
+    REM jmp SKOUT
+    REM SKSTEP: jsr SKBYTE
+    REM cmp #0
+    REM bne SKSTEP
+    REM lda $00
+    REM cmp {ERR.SRC.STOP.BANK%}
+    REM bcc SKCOUNT
+    REM jmp SKOUT
+    REM SKCOUNT: inc {ERR.SRC.ORDINAL%}
+    REM bne SKGO
+    REM ldx #1
+    REM inc {ERR.SRC.ORDINAL%},x
+    REM SKGO: jmp SKLINE
+    REM SKOUT: pla
+    REM sta $00
+    REM jmp SKEND
+    REM SKBYTE: lda ($2C)
+    REM inc $2C
+    REM bne SKBYTX
+    REM inc $2D
+    REM pha
+    REM lda $2D
+    REM cmp #$C0
+    REM bne SKBYTY
+    REM lda #$A0
+    REM sta $2D
+    REM inc $00
+    REM SKBYTY: pla
+    REM SKBYTX: rts
+    REM SKEND: nop
+    GP.ENDASM
+    #REM 0
+    RETURN
+
+
+## ***********************************************************************
+## **  ERR.SRC.FETCH.ASM -- the line at ERR.SRC.AT.PTR%, into the buffer.
+## **
+## **   in   ERR.SRC.AT.PTR%   the line position, window pointer
+## **        ERR.SRC.AT.BANK%  and bank
+## **        ERR.SRC.DEST%     where the text goes
+## **        ERR.SRC.ROOM%     how many bytes fit there, 255 at most
+## **
+## **   out  ERR.SRC.LEN%     bytes written, the closing zero not among them
+## **        ERR.SRC.NX.PTR%  the next line position, window pointer
+## **        ERR.SRC.NX.BANK% and bank. 0 FOR THE END OF THE PROGRAM
+## **        ERR.SRC.NUM.LO%  this line number, low byte
+## **        ERR.SRC.NUM.HI%  high byte
+## **
+## **  A line longer than ERR.SRC.ROOM% is read to its end and stored short.
+## ***********************************************************************
+ERR.SRC.FETCH.ASM:
+    #REM 1
+    GP.ASM
+    REM lda $00
+    REM pha
+    REM cld
+    REM lda {ERR.SRC.AT.BANK%}
+    REM sta $00
+    REM lda {ERR.SRC.AT.PTR%}
+    REM sta $2C
+    REM ldx #1
+    REM lda {ERR.SRC.AT.PTR%},x
+    REM sta $2D
+    REM lda {ERR.SRC.DEST%}
+    REM sta $30
+    REM ldx #1
+    REM lda {ERR.SRC.DEST%},x
+    REM sta $31
+    REM stz {ERR.SRC.LEN%}
+    REM ldx #1
+    REM stz {ERR.SRC.LEN%},x
+    REM stz {ERR.SRC.NX.BANK%}
+    REM ldx #1
+    REM stz {ERR.SRC.NX.BANK%},x
+    REM jsr FTBYTE
+    REM sta $2E
+    REM jsr FTBYTE
+    REM sta $2F
+    REM lda $2E
+    REM ora $2F
+    REM bne FTHEAD
+    REM jmp FTOUT
+    REM FTHEAD: jsr FTBYTE
+    REM sta {ERR.SRC.NUM.LO%}
+    REM jsr FTBYTE
+    REM sta {ERR.SRC.NUM.HI%}
+    REM ldy #0
+    REM FTLOOP: jsr FTBYTE
+    REM cmp #0
+    REM beq FTDONE
+    REM cpy {ERR.SRC.ROOM%}
+    REM beq FTLOOP
+    REM sta ($30),y
+    REM iny
+    REM bra FTLOOP
+    REM FTDONE: sty {ERR.SRC.LEN%}
+    REM lda $2C
+    REM sta {ERR.SRC.NX.PTR%}
+    REM lda $2D
+    REM ldx #1
+    REM sta {ERR.SRC.NX.PTR%},x
+    REM lda $00
+    REM sta {ERR.SRC.NX.BANK%}
+    REM ldx #1
+    REM stz {ERR.SRC.NX.BANK%},x
+    REM FTOUT: pla
+    REM sta $00
+    REM jmp FTEND
+    REM FTBYTE: lda ($2C)
+    REM inc $2C
+    REM bne FTBYTX
+    REM inc $2D
+    REM pha
+    REM lda $2D
+    REM cmp #$C0
+    REM bne FTBYTY
+    REM lda #$A0
+    REM sta $2D
+    REM inc $00
+    REM FTBYTY: pla
+    REM FTBYTX: rts
+    REM FTEND: nop
+    GP.ENDASM
+    #REM 0
+    RETURN
+
+ERR.SRC.SKIP:
+#ENDIF

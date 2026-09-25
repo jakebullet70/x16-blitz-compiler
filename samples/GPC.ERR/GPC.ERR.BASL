@@ -1,0 +1,1257 @@
+## ---------------------------------------------------------------------------
+## GPC.ERR -- a runtime error address, turned into a place in the source.
+##
+## Give it the debug map GPC wrote beside the object and an address out of a
+## runtime error, and it answers with the BASIC line, the file that line came
+## from, and the nearest label above it.
+##
+## SADLOGIC, JULY 2026
+## ---------------------------------------------------------------------------
+## HOW TO BUILD IT. Both steps run from the repository root, and
+## samples/GPC.ERR is the drive.
+##
+##   python source/gpc/build_basl.py --drive samples/GPC.ERR GPC.ERR.BASL GPC.ERR.SRC.PRG
+##   python source/gpc/compile_shared.py --drive samples/GPC.ERR GPC.ERR.SRC.PRG GPC.ERR.PRG GPC.ERR.MAP
+##
+## source/gpc/samplesbuild.py GPC.ERR runs those two and installs the object
+## into samples/GPC-HELP.
+##
+## WARNING: compile it shared, never standalone. Shared leaves the runtime out
+## of the object, which is the point of a helper you run beside the program you
+## are debugging. A standalone build is the wrong artifact.
+##
+## It compiles against GPB.RT.nnn.BIN, the runtime with the GP handlers, not the
+## core-only GPC.RT.nnn.BIN.
+##
+## GPC.ERR.OVL goes wherever GPC.ERR.PRG goes, and the two names have to agree:
+## the object carries its own name and the bootstrap reads <name>.OVL from it.
+## A missing overlay prints ?OVL and stops.
+## ---------------------------------------------------------------------------
+## THE DIRECTIVES COME BEFORE THE INCLUDES, AND THAT IS NOT STYLE.
+## STRCASE.INC.BL reaches BASIC's variables from inside GP.ASM through {VAR},
+## and the compiler resolves those out of BASLOAD's #SYMFILE -- which has to
+## exist before the include that needs it, or the compile stops with
+## "NO SYMBOL FILE FOR {}".
+## ---------------------------------------------------------------------------
+#SAVEAS "@:GPC.ERR.SRC.PRG"
+#SYMFILE "@:GPC.ERR.SRC.SYM"
+#REM 0
+#INCLUDE "GPC-BASIC/GPB.INC.BL"
+#INCLUDE "GPC-BASIC/STASH.INC.BL"
+
+## ---------------------------------------------------------------------------
+## THE LIBRARY RUNS FROM RAM BANKS. Each region below is nothing but the
+## modules' own .INC.BL files between GP.BANKED and GP.ENDBANKED. A call into
+## a region selects its bank, RETURN puts the caller's back, and a region may
+## call another.
+##
+## WHAT STAYS IN LOW RAM is what holds a BANK statement, which the compiler
+## refuses inside a region: STASH. GPB.INC.BL is definitions and no code.
+##
+## Every bank here is claimed in ERR.CLAIM.BANKS, which is what keeps the
+## three run-time banks off them.
+##
+## WARNING: a region holds at most 8,192 bytes and the compile stops with
+## GP.BANKED REGION OVER 8K. Split a full one into a bank of its own.
+## ---------------------------------------------------------------------------
+#DEFINE ERR.UTILCODE 7
+#DEFINE ERR.MENUCODE 12
+#DEFINE ERR.GUICODE 4
+#DEFINE ERR.DLGCODE 10
+#DEFINE ERR.FUTILCODE 8
+#DEFINE ERR.PULLCODE 5
+
+## The GOTO jumps each region rather than falling into it through the bridge
+## GP.BANKED leaves behind.
+GOTO ERR.LIBEND
+
+GP.BANKED ERR.UTILCODE
+#INCLUDE "GPC-BASIC/APPSYS.INC.BL"
+#INCLUDE "GPC-BASIC/THEME.INC.BL"
+#INCLUDE "GPC-BASIC/STRCASE.INC.BL"
+#INCLUDE "GPC-BASIC/STRINGS.INC.BL"
+#INCLUDE "GPC-BASIC/BANKMGR.INC.BL"
+GP.ENDBANKED
+
+GP.BANKED ERR.MENUCODE
+#INCLUDE "GPC-BASIC/MENU.INC.BANKED.BL"
+#INCLUDE "GPC-BASIC/MENU.INC.BL"
+GP.ENDBANKED
+
+## MENUPULL needs MENU.INC.BL compiled already, so it follows the menu region
+## rather than joining it.
+GP.BANKED ERR.PULLCODE
+#INCLUDE "GPC-BASIC/STASHVRAM.INC.BL"
+#INCLUDE "GPC-BASIC/MENUPULL.INC.BL"
+GP.ENDBANKED
+
+GP.BANKED ERR.GUICODE
+#INCLUDE "GPC-BASIC/LINEINPUT.INC.BL"
+#INCLUDE "GPC-BASIC/GUI.INC.BL"
+GP.ENDBANKED
+
+GP.BANKED ERR.DLGCODE
+#INCLUDE "GPC-BASIC/COMBO.INC.BL"
+#INCLUDE "GPC-BASIC/CHECK.INC.BL"
+#INCLUDE "GPC-BASIC/GUI-DIALOGS.INC.BL"
+GP.ENDBANKED
+
+GP.BANKED ERR.FUTILCODE
+#INCLUDE "GPC-BASIC/FILEIO.INC.BL"
+#INCLUDE "GPC-BASIC/FILEDIR.INC.BL"
+#INCLUDE "GPC-BASIC/FILEPICK.INC.BL"
+GP.ENDBANKED
+
+## ---------------------------------------------------------------------------
+## OUT OF THE REGIONS, AND THEY HAVE TO BE. ERR.SRC.FETCH.ASM writes $00 to
+## hold a bank across a read, and a region may not. MENUKEY.INC.BL reads the
+## keyboard layout under BANK 0 and leaves that bank selected.
+## ---------------------------------------------------------------------------
+#INCLUDE "GPC-BASIC/ERRTOKEN.INC.BL"
+#INCLUDE "GPC-BASIC/ERRSRC.INC.BL"
+#INCLUDE "GPC-BASIC/MENUKEY.INC.BL"
+
+ERR.LIBEND:
+
+## Both files this reads are written with LF and no CR, so every LINPUT# here
+## names 10 as its delimiter. The default is 13 and would swallow the file.
+#DEFINE ERR.LF 10
+
+## The map's last records. They are the compiler's setup code, not a line
+## anyone wrote.
+#DEFINE ERR.SETUP.LINE 65024
+
+## The screen is three boxes. The header holds the bar, the frame holds the
+## answer, the footer holds the project. ERR.FOOT.TOP is worked out at boot,
+## off the row count the mode actually gave.
+#DEFINE ERR.HEAD.ROWS 3
+#DEFINE ERR.BAR.ROW 1
+#DEFINE ERR.BAR.COL 2
+#DEFINE ERR.FRAME.TOP 3
+#DEFINE ERR.FRAME.ROWS 24
+#DEFINE ERR.FOOT.ROWS 3
+
+## GP.BOX style 2, rounded corners. Every box on the screen draws with it, the
+## dialogs and the dropdown included.
+#DEFINE ERR.BOX.STYLE 2
+
+## Source files the profile counts separately. A project past this still gets
+## its file count; its line total is short, and the footer says so.
+#DEFINE ERR.FILES.MOST 40
+
+## The crunched names shown under the source, two to a row.
+#DEFINE ERR.NAMES.MOST 6
+#DEFINE ERR.NAMES.WIDTH 36
+
+## The working display. A dot a block of records, across a fixed run.
+#DEFINE ERR.BUSY.EVERY 24
+#DEFINE ERR.BUSY.DOTS 32
+#DEFINE ERR.BUSY.LABELWIDE 26
+
+## 80x30. Mode 0, the one the machine boots in, is 80x60.
+#DEFINE ERR.SCREEN.MODE 1
+
+GOSUB ERR.BOOT
+GOSUB ERR.MAIN
+GOSUB ERR.SHUTDOWN
+END
+
+
+## ===========================================================================
+## HEX4 -- ERR.HEX4.VALUE, 0 to 65535, into ERR.HEX4$ as four digits.
+## ===========================================================================
+ERR.MAKE.HEX4:
+    GP.DEFPROC HEX4, ERR.HEX4.VALUE RETURNS ERR.HEX4$
+    ERR.REST = ERR.HEX4.VALUE
+    ERR.NIB3 = INT(ERR.REST / 4096)
+    ERR.REST = ERR.REST - ERR.NIB3 * 4096
+    ERR.NIB2 = INT(ERR.REST / 256)
+    ERR.REST = ERR.REST - ERR.NIB2 * 256
+    ERR.NIB1 = INT(ERR.REST / 16)
+    ERR.REST = ERR.REST - ERR.NIB1 * 16
+    ERR.HEX4$ = MID$(ERR.HEXDIGITS$, ERR.NIB3 + 1, 1) + MID$(ERR.HEXDIGITS$, ERR.NIB2 + 1, 1)
+    ERR.HEX4$ = ERR.HEX4$ + MID$(ERR.HEXDIGITS$, ERR.NIB1 + 1, 1) + MID$(ERR.HEXDIGITS$, ERR.REST + 1, 1)
+    RETURN
+
+
+## ===========================================================================
+## ERR.BOOT -- banks, theme, the dialog engine and the picker, once.
+## ===========================================================================
+ERR.BOOT:
+    ## Before any SCREEN or COLOR of ours. It records the screen the user had,
+    ## which is what ERR.SHUTDOWN puts back.
+    GOSUB APPSYS.STARTUP
+
+    SCREEN ERR.SCREEN.MODE
+
+    ## Before the first MENU.BEGIN, which claims a bank of its own for the rows.
+    GOSUB BANKMGR.INIT
+    GOSUB ERR.CLAIM.BANKS
+
+    ## Asked after the mode change.
+    GOSUB GUI.SCREEN
+    ERR.COLS = GUI.SCREEN.COLS
+    ERR.ROWS = GUI.SCREEN.ROWS
+
+    THEME.ID% = 3 : GOSUB THEME.SELECT
+
+    MENU.GAP = 0
+    MENU.SHADOW = 1
+
+    GP.SUB DLGRESET, ERR.DLG.BANK
+    GP.SUB DLGSHADOW, 1
+    GP.SUB DLGSTYLE, ERR.BOX.STYLE
+    GP.SUB PICKBANKS, ERR.LIST.BANK, ERR.DIR.BANK
+
+    ## MENU.KEYS.ON reads the hot keys out of the bar's rows, so the rows have
+    ## to be in first. It rewrites the ALT half of the keyboard layout and the
+    ## layout outlives the program, so ERR.SHUTDOWN puts it back.
+    GOSUB ERR.MENU.SETUP
+    GOSUB MENU.KEYS.ON
+
+    ERR.FOOT.TOP = ERR.ROWS - ERR.FOOT.ROWS
+
+    DIM ERR.NAME.CRUNCH$(ERR.NAMES.MOST - 1)
+    DIM ERR.NAME.SUFFIX$(ERR.NAMES.MOST - 1)
+    DIM ERR.NAME.REAL$(ERR.NAMES.MOST - 1)
+    DIM ERR.NAME.LINE(ERR.NAMES.MOST - 1)
+    DIM ERR.FILE.LAST(ERR.FILES.MOST - 1)
+
+    ERR.QUIT = 0
+    ERR.TOTAL.FILES = 0
+    ERR.TOTAL.LINES = 0
+    ERR.TOTAL.CODE = 0
+    ERR.FILES.OVER = 0
+
+    ERR.BUSY.ROW = ERR.FRAME.TOP + 3
+    ERR.BUSY.DOTCOL = 0
+    ERR.BUSY.COUNT = 0
+    ERR.BUSY.TEXT$ = ""
+
+    ERR.HEXDIGITS$ = "0123456789ABCDEF"
+    ERR.MAP.NAME$ = ""
+    ERR.SYM.NAME$ = ""
+    ERR.BASE.NAME$ = ""
+    ERR.SRC.NAME$ = ""
+    GOSUB ERR.STATE.CLEAR
+    GOSUB ERR.PAINT
+    RETURN
+
+
+## ===========================================================================
+## ERR.CLAIM.BANKS -- the six code banks first, then one bank for the dialogs'
+## saved cells and two for the picker's list and the raw directory it is built
+## from.
+##
+## The code banks are claimed by number, because the regions are already in
+## them: a run-time bank handed out over a region is the region overwritten.
+##
+## GET.FREE.BANK answers 0 for none left, and with no bank to save into the
+## first dialog would write over whatever is under it.
+## ===========================================================================
+ERR.CLAIM.BANKS:
+    GP.SUB BANKMGR.CLAIM.BANK, ERR.UTILCODE
+    GP.SUB BANKMGR.CLAIM.BANK, ERR.MENUCODE
+    GP.SUB BANKMGR.CLAIM.BANK, ERR.GUICODE
+    GP.SUB BANKMGR.CLAIM.BANK, ERR.DLGCODE
+    GP.SUB BANKMGR.CLAIM.BANK, ERR.FUTILCODE
+    GP.SUB BANKMGR.CLAIM.BANK, ERR.PULLCODE
+
+    BANKMGR.SET.BANK = ERR.TOKENBANK
+    GOSUB BANKMGR.CLAIM
+
+    GOSUB BANKMGR.GET.FREE.BANK
+    ERR.DLG.BANK = BANKMGR.BANK
+    GOSUB BANKMGR.GET.FREE.BANK
+    ERR.LIST.BANK = BANKMGR.BANK
+    GOSUB BANKMGR.GET.FREE.BANK
+    ERR.DIR.BANK = BANKMGR.BANK
+    GP.IF ERR.DIR.BANK = 0 THEN
+        PRINT "GPC.ERR - RAM BANK PROBLEM"
+        END
+    GP.ENDIF
+    RETURN
+
+
+## ===========================================================================
+## ERR.SHUTDOWN -- the machine as ERR.BOOT found it, for whatever runs next.
+##
+## Mode, charset and text colour all come back from APPSYS.STARTUP, so a
+## program launched from a 40-column screen or under ISO returns to it.
+## ===========================================================================
+ERR.SHUTDOWN:
+    GOSUB MENU.KEYS.OFF
+    GOSUB APPSYS.RESTORE
+    PRINT CHR$(147)
+    RETURN
+
+
+## ===========================================================================
+## ERR.MAIN -- every key, handed to the menus.
+##
+## MENU.KEY owns the bar and the dropdowns together. ESC or ALT opens one,
+## LEFT and RIGHT walk from dropdown to dropdown with it open, and a chosen
+## row comes back with MENU.PICKBAR saying which bar item it was under.
+##
+## QUIT under FILE is the way out, and it sets ERR.QUIT.
+## ===========================================================================
+ERR.MAIN:
+    GP.DO
+        GET ERR.KEY$
+        ERR.KEY = 0
+        IF ERR.KEY$ <> "" THEN ERR.KEY = ASC(ERR.KEY$)
+        ERR.ROW = GP.FN(MENU.KEY, ERR.KEY)
+        IF ERR.ROW > 0 THEN GOSUB ERR.DISPATCH
+        IF ERR.QUIT <> 0 THEN GP.EXITDO
+    GP.LOOP
+    RETURN
+
+
+## ---------------------------------------------------------------------------
+## ERR.DISPATCH -- the chosen row, to the router under its bar item.
+##
+##   in   ERR.ROW        the row MENU.KEY returned
+##        MENU.PICKBAR   the bar item it was under
+##
+## The screen is repainted after, because the row leaves its own answer in
+## the frame.
+##
+## A DIALOG LEAVES THE MENU KNOBS AS IT WANTED THEM. The flags and the gap go
+## back to the dropdowns' own here, and THEME.RESET moves the theme under the
+## menu colours, which is what makes the library take them again.
+## ---------------------------------------------------------------------------
+ERR.DISPATCH:
+    GP.SELECT MENU.PICKBAR
+    GP.CASE 1 : GOSUB ERR.FILE.PICK
+    GP.CASE 2 : GOSUB ERR.SEARCH.PICK
+    GP.OTHER  : GOSUB ERR.HELP.PICK
+    GP.ENDSEL
+    MENU.FLAGS = 0
+    MENU.BARFLAGS = 0
+    MENU.HINTW = 0
+    MENU.GAP = 0
+    GOSUB THEME.RESET
+    IF ERR.QUIT = 0 THEN GOSUB ERR.PAINT
+    RETURN
+
+
+## ---------------------------------------------------------------------------
+## ERR.MENU.SETUP -- the bar and its three dropdowns, built once.
+##
+## THE BAR GOES IN FIRST. MENU.BEGIN on the bar slot empties every dropdown,
+## so a later rebuild of the bar would leave three empty ones behind.
+## ERR.PAINT.HEAD redraws the bar with MENU.DRAWBAR and touches no rows.
+##
+## An item is as wide as its text, so the bar's spacing is the padding inside
+## these strings and MENU.GAP is 0.
+## ---------------------------------------------------------------------------
+ERR.MENU.SETUP:
+    MENU.DROPSTYLE = ERR.BOX.STYLE
+    GP.SUB MENU.BEGIN, MENU.BAR
+    GP.SUB MENU.ITEM, " &FILE "
+    GP.SUB MENU.ITEM, " &SEARCH "
+    GP.SUB MENU.ITEM, " &HELP "
+    GP.SUB MENU.BEGIN, MENU.DROP + 1
+    GP.SUB MENU.ITEM, "&LOAD MAP"
+    GP.SUB MENU.ITEM, "&BROWSE MAP"
+    GP.SUB MENU.ITEM, "-"
+    GP.SUB MENU.ITEM, "&QUIT"
+    GP.SUB MENU.BEGIN, MENU.DROP + 2
+    GP.SUB MENU.ITEM, "BY &ADDRESS"
+    GP.SUB MENU.ITEM, "BY &LINE"
+    GP.SUB MENU.BEGIN, MENU.DROP + 3
+    GP.SUB MENU.ITEM, "&HOW TO"
+    GP.SUB MENU.ITEM, "&ABOUT"
+    RETURN
+
+
+## ---------------------------------------------------------------------------
+## ERR.FILE.PICK -- a row under FILE.
+##
+##   out  ERR.QUIT   non-zero when QUIT was chosen
+##
+## The separator is row 3 and holds its place in the numbering, so QUIT is 4.
+## ---------------------------------------------------------------------------
+ERR.FILE.PICK:
+    IF ERR.ROW = 1 THEN GOSUB ERR.LOAD.MAP
+    IF ERR.ROW = 2 THEN GOSUB ERR.BROWSE.MAP
+    IF ERR.ROW = 4 THEN ERR.QUIT = -1
+    RETURN
+
+
+## ---------------------------------------------------------------------------
+## ERR.SEARCH.PICK -- a row under SEARCH.
+## ---------------------------------------------------------------------------
+ERR.SEARCH.PICK:
+    IF ERR.ROW = 1 THEN GOSUB ERR.ASK.ADDRESS
+    IF ERR.ROW = 2 THEN GOSUB ERR.ASK.LINE
+    RETURN
+
+
+## ---------------------------------------------------------------------------
+## ERR.HELP.PICK -- a row under HELP.
+## ---------------------------------------------------------------------------
+ERR.HELP.PICK:
+    IF ERR.ROW = 1 THEN GOSUB ERR.HOWTO
+    IF ERR.ROW = 2 THEN GOSUB ERR.ABOUT
+    RETURN
+
+
+## The three lines HOW TO shows, in the bank ERRTOKEN.INC.BL already claims.
+## A line here costs five bytes of resident p-code instead of its own length.
+GP.BANKEDSTR ERR.TOKENBANK ERR.HOWTO.TEXT
+  "LOAD MAP UNDER FILE READS THE .MAP AND .SYM OF A COMPILE."
+  "SEARCH BY ADDRESS TAKES THE HEX PC A RUNTIME ERROR PRINTS."
+  "SEARCH BY LINE TAKES A LINE FROM STATEMENTS NOT COMPILED."
+GP.ENDBANKEDSTR
+
+## ===========================================================================
+## ERR.HOWTO -- the two ways in, and what each one wants typed.
+## ===========================================================================
+ERR.HOWTO:
+    ERR.HOWTO.MAP$ = GP.BSTR(ERR.HOWTO.TEXT, 0)
+    ERR.HOWTO.ADDRESS$ = GP.BSTR(ERR.HOWTO.TEXT, 1)
+    ERR.HOWTO.LINE$ = GP.BSTR(ERR.HOWTO.TEXT, 2)
+    GP.SUB MSGBOXEX, "HOW TO USE GPC.ERR", ERR.HOWTO.MAP$, ERR.HOWTO.ADDRESS$, ERR.HOWTO.LINE$, "&OK"
+    RETURN
+
+
+## ===========================================================================
+## ERR.ABOUT -- what the program is, and what the machine has left.
+## ===========================================================================
+ERR.ABOUT:
+    GOSUB BANKMGR.COUNT
+    ERR.ABOUT.WHAT$ = "ERROR ADDRESS LOOKUP HELPER"
+    ERR.ABOUT.WHO$  = "FOR THE X16 GPC-BASIC COMPILER (C)SADLOGIC - 2026"
+    ERR.ABOUT.MEM$  = "TOTAL BANKS" + STR$(BANKMGR.BANKS) + "   UNUSED" + STR$(BANKMGR.SPARE) + "   BYTES FREE" + STR$(FRE(0)) 
+    ERR.ABOUT.WIDE  = LEN(ERR.ABOUT.MEM$) + 6
+    IF LEN(ERR.ABOUT.WHO$) > ERR.ABOUT.WIDE THEN ERR.ABOUT.WIDE = LEN(ERR.ABOUT.WHO$)
+    ERR.ABOUT.WHAT$ = GP.FN(PADC, ERR.ABOUT.WHAT$, ERR.ABOUT.WIDE)
+    ERR.ABOUT.WHO$  = GP.FN(PADC, ERR.ABOUT.WHO$,  ERR.ABOUT.WIDE)
+    GP.SUB MSGBOXEX, "ABOUT GPC.ERR", ERR.ABOUT.WHAT$, ERR.ABOUT.WHO$, ERR.ABOUT.MEM$, "&OK"
+    RETURN
+
+
+
+## ===========================================================================
+## ERR.BUSY.OPEN -- the frame is emptied, and says the tool is reading.
+##
+## A lookup reads a map of two thousand records, a tokenised program and a
+## symbol file. The old answer sitting still through that reads as a program
+## that has hung, so it goes first and each reader names itself as it starts.
+## ===========================================================================
+ERR.BUSY.OPEN:
+    GP.FILL 1, ERR.FRAME.TOP + 1, ERR.COLS - 2, ERR.FRAME.ROWS - 2, 32, THEME.CLR(THEME.PAGE)
+    GP.PRINTAT 3, ERR.FRAME.TOP + 2, "WORKING", THEME.CLR(THEME.TITLE)
+    ERR.BUSY.ROW = ERR.FRAME.TOP + 3
+    ERR.BUSY.DOTCOL = 0 : ERR.BUSY.COUNT = 0
+    RETURN
+
+
+## ---------------------------------------------------------------------------
+## ERR.BUSY.STEP -- ERR.BUSY.TEXT$ on its own row, before the file is opened.
+##
+## Each reader calls it past its own guards, so a step that is skipped is never
+## named.
+## ---------------------------------------------------------------------------
+ERR.BUSY.STEP:
+    ERR.BUSY.ROW = ERR.BUSY.ROW + 1
+    GP.PRINTAT 3, ERR.BUSY.ROW, ERR.BUSY.TEXT$, THEME.CLR(THEME.TEXT)
+    ERR.BUSY.DOTCOL = 3 + ERR.BUSY.LABELWIDE
+    ERR.BUSY.COUNT = 0
+    RETURN
+
+
+## ---- a dot every ERR.BUSY.EVERY records, so a long read is seen to move.
+ERR.BUSY.TICK:
+    ERR.BUSY.COUNT = ERR.BUSY.COUNT + 1
+    IF ERR.BUSY.COUNT < ERR.BUSY.EVERY THEN RETURN
+    ERR.BUSY.COUNT = 0
+    IF ERR.BUSY.DOTCOL = 0 THEN RETURN
+    IF ERR.BUSY.DOTCOL >= 3 + ERR.BUSY.LABELWIDE + ERR.BUSY.DOTS THEN RETURN
+    GP.PRINTAT ERR.BUSY.DOTCOL, ERR.BUSY.ROW, ".", THEME.CLR(THEME.DIMMED)
+    ERR.BUSY.DOTCOL = ERR.BUSY.DOTCOL + 1
+    RETURN
+
+
+## ===========================================================================
+## ERR.PAINT -- the bar, the frame and whatever the last lookup found.
+## ===========================================================================
+ERR.PAINT:
+    GP.FILL 0, 0, ERR.COLS, ERR.ROWS, 32, THEME.CLR(THEME.PAGE)
+    GOSUB ERR.PAINT.HEAD
+    GP.BOX 0, ERR.FRAME.TOP, ERR.COLS, ERR.FRAME.ROWS, ERR.BOX.STYLE, THEME.CLR(THEME.BORDER)
+    GP.PRINTAT 3, ERR.FRAME.TOP, " GPC.ERR ", THEME.CLR(THEME.TITLE)
+    GOSUB ERR.PAINT.FILES
+    GOSUB ERR.PAINT.ANSWER
+    GOSUB ERR.PAINT.SOURCE
+    GOSUB ERR.PAINT.NAMES
+    GOSUB ERR.PAINT.FOOT
+    RETURN
+
+
+## ---------------------------------------------------------------------------
+## ERR.PAINT.HEAD -- the bar, on the middle row of its own box.
+## ---------------------------------------------------------------------------
+ERR.PAINT.HEAD:
+    GP.BOX 0, 0, ERR.COLS, ERR.HEAD.ROWS, ERR.BOX.STYLE, THEME.CLR(THEME.BORDER)
+    GP.FILL 1, ERR.BAR.ROW, ERR.COLS - 2, 1, 32, THEME.CLR(THEME.BAR)
+    GP.SUB MENU.DRAWBAR, ERR.BAR.ROW, ERR.BAR.COL, MENU.NOBOX
+    RETURN
+
+
+## ---------------------------------------------------------------------------
+## ERR.PAINT.FOOT -- the project the loaded map belongs to.
+##
+## A + on the file count says the project has more files than ERR.FILES.MOST,
+## which makes the line total short.
+## ---------------------------------------------------------------------------
+ERR.PAINT.FOOT:
+    GP.BOX 0, ERR.FOOT.TOP, ERR.COLS, ERR.FOOT.ROWS, ERR.BOX.STYLE, THEME.CLR(THEME.BORDER)
+    ERR.FOOT.WIDE = ERR.COLS - 2
+    GP.IF ERR.BASE.NAME$ = "" THEN
+        ERR.TEXT$ = GP.FN(PADC, "NO MAP LOADED", ERR.FOOT.WIDE)
+        GP.PRINTAT 1, ERR.FOOT.TOP + 1, ERR.TEXT$, THEME.CLR(THEME.DIMMED)
+        RETURN
+    GP.ENDIF
+    ERR.TEXT$ = ERR.BASE.NAME$ + "   FILES" + STR$(ERR.TOTAL.FILES)
+    IF ERR.FILES.OVER <> 0 THEN ERR.TEXT$ = ERR.TEXT$ + "+"
+    ERR.TEXT$ = ERR.TEXT$ + "   SOURCE LINES" + STR$(ERR.TOTAL.LINES)
+    ERR.TEXT$ = ERR.TEXT$ + "   COMPILED LINES" + STR$(ERR.TOTAL.CODE)
+    ERR.TEXT$ = GP.FN(PADC, LEFT$(ERR.TEXT$, ERR.COLS - 6), ERR.FOOT.WIDE)
+    GP.PRINTAT 1, ERR.FOOT.TOP + 1, ERR.TEXT$, THEME.CLR(THEME.TEXT)
+    RETURN
+
+
+ERR.PAINT.FILES:
+    ERR.TEXT$ = "NO MAP CHOSEN"
+    IF ERR.MAP.NAME$ <> "" THEN ERR.TEXT$ = ERR.MAP.NAME$
+    GP.PRINTAT 3, ERR.FRAME.TOP + 1, "MAP   " + ERR.TEXT$, THEME.CLR(THEME.TEXT)
+    ERR.TEXT$ = "-"
+    IF ERR.SYM.NAME$ <> "" THEN ERR.TEXT$ = ERR.SYM.NAME$
+    GP.PRINTAT 3, ERR.FRAME.TOP + 2, "SYM   " + ERR.TEXT$, THEME.CLR(THEME.DIMMED)
+    RETURN
+
+
+## ---------------------------------------------------------------------------
+## ERR.PAINT.ANSWER -- the rows of the answer, and the one that says why there
+## is no answer.
+##
+## The offset row is the point of the whole tool. An address ON a line's first
+## opcode is a statement that failed; an address INSIDE the line is a statement
+## that ran part way.
+## ---------------------------------------------------------------------------
+ERR.PAINT.ANSWER:
+    ERR.Y = ERR.FRAME.TOP + 4
+    GP.IF ERR.HAVE.ADDRESS <> 0 THEN
+        GP.SUB HEX4, ERR.TARGET
+        ERR.TEXT$ = "$" + ERR.HEX4$
+        GP.IF ERR.MAP.OFFSET < 0 THEN
+            ERR.TEXT$ = ERR.TEXT$ + "  IS BEFORE THE FIRST MAPPED LINE"
+        GP.ELSEIF ERR.PAST.END <> 0 THEN
+            ERR.TEXT$ = ERR.TEXT$ + "  IS PAST THE LAST RECORD IN THE MAP"
+        GP.ELSEIF ERR.MAP.OFFSET = ERR.TARGET THEN
+            ERR.TEXT$ = ERR.TEXT$ + "  IS THE FIRST OPCODE OF THE LINE"
+        GP.ELSE
+            GP.SUB HEX4, ERR.MAP.OFFSET
+            ERR.TEXT$ = ERR.TEXT$ + "  IS $" + ERR.HEX4$ + " +" + STR$(ERR.TARGET - ERR.MAP.OFFSET)
+        GP.ENDIF
+        GP.PRINTAT 3, ERR.Y, ERR.TEXT$, THEME.CLR(THEME.TEXT)
+    GP.ENDIF
+
+    GP.IF ERR.TARGET.LINE < 0 THEN
+        GP.PRINTAT 3, ERR.Y + 2, "NOTHING LOOKED UP YET", THEME.CLR(THEME.DIMMED)
+        RETURN
+    GP.ENDIF
+
+    GP.IF ERR.TARGET.LINE >= ERR.SETUP.LINE THEN
+        GP.PRINTAT 3, ERR.Y + 2, "THAT IS COMPILER SETUP CODE, NOT A SOURCE LINE", THEME.CLR(THEME.WARN)
+        RETURN
+    GP.ENDIF
+
+    GP.PRINTAT 3, ERR.Y + 2, "BASIC LINE " + STR$(ERR.TARGET.LINE), THEME.CLR(THEME.TEXT)
+    ERR.TEXT$ = "-"
+    IF ERR.FILE.NAME$ <> "" THEN ERR.TEXT$ = ERR.FILE.NAME$
+    GP.PRINTAT 3, ERR.Y + 3, "FILE       " + ERR.TEXT$, THEME.CLR(THEME.TEXT)
+    ERR.TEXT$ = "NO LABEL ABOVE IT"
+    GP.IF ERR.LABEL.NAME$ <> "" THEN
+        ERR.TEXT$ = ERR.LABEL.NAME$ + ", SOURCE LINE" + STR$(ERR.LABEL.SOURCE)
+    GP.ENDIF
+    GP.PRINTAT 3, ERR.Y + 4, "NEAR       " + ERR.TEXT$, THEME.CLR(THEME.TEXT)
+    RETURN
+
+
+## ---------------------------------------------------------------------------
+## ERR.PAINT.SOURCE -- the statement, and the three lines either side of it.
+##
+## The names are the crunched ones BASLOAD wrote. A line wider than the frame
+## is cut, not wrapped: the point is which statement it is.
+## ---------------------------------------------------------------------------
+ERR.PAINT.SOURCE:
+    ERR.Y = ERR.FRAME.TOP + 11
+    GP.IF ERR.SOURCE.SHOWN = 0 THEN
+        IF ERR.SOURCE.WHY$ <> "" THEN GP.PRINTAT 3, ERR.Y, ERR.SOURCE.WHY$, THEME.CLR(THEME.DIMMED)
+        RETURN
+    GP.ENDIF
+
+    GP.PRINTAT 3, ERR.Y, "SOURCE", THEME.CLR(THEME.TITLE)
+    FOR ERR.ROW = 0 TO ERR.SRC.ROWS - 1
+        ERR.TEXT$ = RIGHT$("      " + STR$(ERR.SRC.ROWNUM(ERR.ROW)), 6)
+        ERR.TEXT$ = " " + ERR.TEXT$ + "  " + ERR.SRC.ROW$(ERR.ROW)
+        ERR.ATTR = THEME.CLR(THEME.DIMMED)
+        GP.IF ERR.ROW = ERR.SRC.HIT THEN
+            ERR.TEXT$ = ">" + MID$(ERR.TEXT$, 2)
+            ERR.ATTR = THEME.CLR(THEME.TEXT)
+        GP.ENDIF
+        GP.PRINTAT 3, ERR.Y + 1 + ERR.ROW, LEFT$(ERR.TEXT$, ERR.COLS - 6), ERR.ATTR
+    NEXT ERR.ROW
+    RETURN
+
+
+## ---------------------------------------------------------------------------
+## ERR.PAINT.NAMES -- what the crunched names on the failing line really are.
+##
+## Two to a row. A name the symbol file does not carry still gets its row, so
+## a name is never dropped without saying why.
+## ---------------------------------------------------------------------------
+ERR.PAINT.NAMES:
+    IF ERR.NAMES.COUNT = 0 THEN RETURN
+    ERR.Y = ERR.FRAME.TOP + 19
+    ERR.TEXT$ = "NAMES"
+    IF ERR.NAMES.MORE <> 0 THEN ERR.TEXT$ = "NAMES, THE FIRST " + MID$(STR$(ERR.NAMES.MOST), 2)
+    GP.PRINTAT 3, ERR.Y, ERR.TEXT$, THEME.CLR(THEME.TITLE)
+    FOR ERR.ROW = 0 TO ERR.NAMES.COUNT - 1
+        ERR.TEXT$ = ERR.NAME.CRUNCH$(ERR.ROW) + ERR.NAME.SUFFIX$(ERR.ROW) + " = "
+        GP.IF ERR.NAME.REAL$(ERR.ROW) = "" THEN
+            ERR.TAIL$ = ""
+            ERR.TEXT$ = ERR.TEXT$ + "NOT A SYMBOL"
+            ERR.ATTR = THEME.CLR(THEME.DIMMED)
+        GP.ELSE
+            ERR.TAIL$ = ", LINE" + STR$(ERR.NAME.LINE(ERR.ROW))
+            ERR.TEXT$ = ERR.TEXT$ + ERR.NAME.REAL$(ERR.ROW)
+            ERR.ATTR = THEME.CLR(THEME.TEXT)
+        GP.ENDIF
+        ## The name is cut and the line number is not. A shortened name is
+        ## still the name; a shortened number is a different line.
+        ERR.TEXT$ = LEFT$(ERR.TEXT$, ERR.NAMES.WIDTH - LEN(ERR.TAIL$)) + ERR.TAIL$
+        ERR.NAMEROW = INT(ERR.ROW / 2)
+        ERR.NAMECOL = 3 + (ERR.ROW - ERR.NAMEROW * 2) * (ERR.NAMES.WIDTH + 2)
+        GP.PRINTAT ERR.NAMECOL, ERR.Y + 1 + ERR.NAMEROW, ERR.TEXT$, ERR.ATTR
+    NEXT ERR.ROW
+    RETURN
+
+
+## ===========================================================================
+## ERR.NAMES.WANT -- the crunched names on the failing line, ready to look up.
+##
+##   in   ERR.SRC.WORDS$      the names the render cut out, a space after each
+##   out  ERR.NAMES.COUNT     how many are wanted
+##        ERR.NAMES.MORE      -1 when a name found no slot free
+##        ERR.NAME.CRUNCH$()  the crunched name with no type suffix
+##        ERR.NAME.SUFFIX$()  that suffix, "" for none
+##        ERR.NAME.REAL$()    filled by ERR.SYM.SCAN, "" until then
+##        ERR.NAME.LINE()     the source line it was first seen on
+##
+## The suffix comes off and goes back on for the display. BASLOAD's table
+## holds HELP.ROW for a variable the source writes as HELP.ROW$, so N6$ and N6
+## look the same name up.
+## ===========================================================================
+ERR.NAMES.WANT:
+    ERR.NAMES.COUNT = 0
+    ERR.NAMES.MORE = 0
+    IF ERR.SOURCE.SHOWN = 0 THEN RETURN
+    IF ERR.SRC.HIT < 0 THEN RETURN
+    IF ERR.SYM.NAME$ = "" THEN RETURN
+    ERR.REST$ = ERR.SRC.WORDS$
+    GP.DO
+        ERR.FOUND = GP.INSTR(ERR.REST$, " ")
+        IF ERR.FOUND = 0 THEN GP.EXITDO
+        ERR.WORD$ = LEFT$(ERR.REST$, ERR.FOUND - 1)
+        ERR.REST$ = MID$(ERR.REST$, ERR.FOUND + 1)
+        GOSUB ERR.NAMES.ADD
+    GP.LOOP
+    RETURN
+
+
+ERR.NAMES.ADD:
+    IF LEN(ERR.WORD$) = 0 THEN RETURN
+    ERR.SUFFIX$ = RIGHT$(ERR.WORD$, 1)
+    ERR.HASSUFFIX = 0
+    IF ERR.SUFFIX$ = "$" THEN ERR.HASSUFFIX = -1
+    IF ERR.SUFFIX$ = "%" THEN ERR.HASSUFFIX = -1
+    ERR.BARE$ = ERR.WORD$
+    GP.IF ERR.HASSUFFIX <> 0 THEN
+        ERR.BARE$ = LEFT$(ERR.WORD$, LEN(ERR.WORD$) - 1)
+    GP.ELSE
+        ERR.SUFFIX$ = ""
+    GP.ENDIF
+    IF LEN(ERR.BARE$) = 0 THEN RETURN
+    FOR ERR.I = 0 TO ERR.NAMES.COUNT - 1
+        IF ERR.NAME.CRUNCH$(ERR.I) <> ERR.BARE$ THEN GOTO ERR.NAMES.ADD.NEXT
+        IF ERR.NAME.SUFFIX$(ERR.I) = ERR.SUFFIX$ THEN RETURN
+ERR.NAMES.ADD.NEXT:
+    NEXT ERR.I
+    ## The flag is set here and not at the split, so a line whose last words
+    ## are all repeats is not reported as cut short.
+    GP.IF ERR.NAMES.COUNT >= ERR.NAMES.MOST THEN
+        ERR.NAMES.MORE = -1
+        RETURN
+    GP.ENDIF
+    ERR.NAME.CRUNCH$(ERR.NAMES.COUNT) = ERR.BARE$
+    ERR.NAME.SUFFIX$(ERR.NAMES.COUNT) = ERR.SUFFIX$
+    ERR.NAME.REAL$(ERR.NAMES.COUNT) = ""
+    ERR.NAME.LINE(ERR.NAMES.COUNT) = 0
+    ERR.NAMES.COUNT = ERR.NAMES.COUNT + 1
+    RETURN
+
+
+## ===========================================================================
+## ERR.SOURCE.FIND -- the window of source lines the next paint will show.
+##
+## It runs once a lookup, not once a paint: a theme change repaints and must
+## not read the file again.
+##
+## A program built without a tokenised source still answers with everything
+## else, so this is never a reason to refuse a lookup.
+## ===========================================================================
+ERR.SOURCE.FIND:
+    ERR.SOURCE.SHOWN = 0
+    ERR.SOURCE.WHY$ = ""
+    IF ERR.TARGET.LINE < 0 THEN RETURN
+    IF ERR.TARGET.LINE >= ERR.SETUP.LINE THEN RETURN
+    GP.IF ERR.SRC.NAME$ = "" THEN
+        ERR.SOURCE.WHY$ = "NO TOKENISED SOURCE BESIDE THE MAP"
+        RETURN
+    GP.ENDIF
+
+    ERR.BUSY.TEXT$ = "FINDING THE SOURCE LINE"
+    GOSUB ERR.BUSY.STEP
+    GOSUB ERR.SRC.OPEN
+    GP.IF ERR.SRC.READY = 0 THEN
+        ERR.SOURCE.WHY$ = ERR.SRC.WHY$
+        RETURN
+    GP.ENDIF
+
+    ERR.SRC.WANT = ERR.TARGET.LINE
+    GOSUB ERR.SRC.WINDOW
+    GP.IF ERR.SRC.ROWS = 0 THEN
+        ERR.SOURCE.WHY$ = "THAT LINE IS NOT IN " + ERR.SRC.NAME$
+        RETURN
+    GP.ENDIF
+    ERR.SOURCE.SHOWN = -1
+    RETURN
+
+
+## ===========================================================================
+## ERR.LOAD.MAP -- the map by name, with the drive's answer already in the box
+## when the drive has only one to give.
+##
+## The scan runs whatever the count, because that is what makes the count
+## known. It leaves the list in ERR.LIST.BANK, where BROWSE would have put it.
+## ===========================================================================
+ERR.LOAD.MAP:
+    ERR.START$ = ""
+    GP.SUB PICKSCAN, "MAP"
+    GP.IF FILEPICK.COUNT = 1 THEN
+        GP.SUB LIST.BANK, ERR.LIST.BANK, 0, 0
+        ERR.START$ = GP.FN(LIST.ITEM, 1)
+        GOSUB ERR.PICK.NAME
+    GP.ENDIF
+    ERR.TYPED$ = GP.FN(INPUTBOX, "MAP FILE NAME", ERR.START$, 24)
+    IF GUI.OK = 0 THEN RETURN
+    GOSUB ERR.TAKE.MAP
+    RETURN
+
+
+## ---------------------------------------------------------------------------
+## ERR.PICK.NAME -- the file name out of a picker row.
+##
+## A row is a space, the name, then FILEPICK.TAIL characters of blocks and
+## type. What lies between is the name, padded out with spaces.
+## ---------------------------------------------------------------------------
+ERR.PICK.NAME:
+    ERR.START$ = MID$(ERR.START$, 2, LEN(ERR.START$) - 1 - FILEPICK.TAIL)
+    GP.DO
+        IF RIGHT$(ERR.START$, 1) <> " " THEN GP.EXITDO
+        ERR.START$ = LEFT$(ERR.START$, LEN(ERR.START$) - 1)
+    GP.LOOP
+    RETURN
+
+
+## ===========================================================================
+## ERR.BROWSE.MAP -- the map found rather than typed. The picker lists what is
+## on the drive, so a name cannot be got wrong.
+## ===========================================================================
+ERR.BROWSE.MAP:
+    ERR.TYPED$ = GP.FN(PICKFILE, "CHOOSE A DEBUG MAP", "MAP")
+    GOSUB ERR.TAKE.MAP
+    RETURN
+
+
+## ---------------------------------------------------------------------------
+## ERR.TAKE.MAP -- a name from either route, checked and then made current.
+##
+##   in   ERR.TYPED$   the name; empty is a cancel and changes nothing
+## ---------------------------------------------------------------------------
+ERR.TAKE.MAP:
+    IF GP.ISEMPTY(ERR.TYPED$) THEN RETURN
+    GP.IF GP.FN(FEXISTS, ERR.TYPED$) = 0 THEN
+        GP.SUB MSGBOX, "NO SUCH FILE"
+        RETURN
+    GP.ENDIF
+    ERR.MAP.NAME$ = ERR.TYPED$
+    GOSUB ERR.NAME.SPLIT
+    GOSUB ERR.STATE.CLEAR
+    GOSUB ERR.MAP.PROFILE
+    RETURN
+
+
+## ---------------------------------------------------------------------------
+## ERR.NAME.SPLIT -- the map's name gives the symbol file's.
+##
+## NAME.MAP is the convention. M.NAME is what GPC wrote before it, and there
+## are maps of that shape all over this tree, so both are read.
+##
+## BASLOAD names the symbol file after the tokenised PRG, so a program built
+## through NAME.SRC.PRG has NAME.SRC.SYM and one built straight has NAME.SYM.
+## Try the first and fall back to the second. The tokenised source is named the
+## same way and found the same way.
+## ---------------------------------------------------------------------------
+ERR.NAME.SPLIT:
+    ERR.BASE.NAME$ = ERR.MAP.NAME$
+    GP.IF LEFT$(ERR.BASE.NAME$, 2) = "M." THEN
+        ERR.BASE.NAME$ = MID$(ERR.BASE.NAME$, 3)
+    GP.ENDIF
+    IF RIGHT$(ERR.BASE.NAME$, 4) = ".MAP" THEN ERR.BASE.NAME$ = LEFT$(ERR.BASE.NAME$, LEN(ERR.BASE.NAME$) - 4)
+    IF RIGHT$(ERR.BASE.NAME$, 4) = ".PRG" THEN ERR.BASE.NAME$ = LEFT$(ERR.BASE.NAME$, LEN(ERR.BASE.NAME$) - 4)
+    IF RIGHT$(ERR.BASE.NAME$, 4) = ".SRC" THEN ERR.BASE.NAME$ = LEFT$(ERR.BASE.NAME$, LEN(ERR.BASE.NAME$) - 4)
+    ERR.SYM.NAME$ = ERR.BASE.NAME$ + ".SRC.SYM"
+    GP.IF GP.FN(FEXISTS, ERR.SYM.NAME$) = 0 THEN
+        ERR.SYM.NAME$ = ERR.BASE.NAME$ + ".SYM"
+    GP.ENDIF
+    GP.IF GP.FN(FEXISTS, ERR.SYM.NAME$) = 0 THEN
+        ERR.SYM.NAME$ = ""
+    GP.ENDIF
+
+    ERR.SRC.NAME$ = ERR.BASE.NAME$ + ".SRC.PRG"
+    GP.IF GP.FN(FEXISTS, ERR.SRC.NAME$) = 0 THEN
+        ERR.SRC.NAME$ = ERR.BASE.NAME$ + ".PRG"
+    GP.ENDIF
+    GP.IF GP.FN(FEXISTS, ERR.SRC.NAME$) = 0 THEN
+        ERR.SRC.NAME$ = ""
+    GP.ENDIF
+    RETURN
+
+
+## ===========================================================================
+## ERR.MAP.PROFILE -- the project figures the footer carries.
+##
+##   out  ERR.TOTAL.FILES  source files the symbol file names
+##        ERR.TOTAL.LINES  their source lines, the highest seen in each summed
+##        ERR.TOTAL.CODE   records in the map, one a compiled BASIC line
+##        ERR.FILES.OVER   -1 for a project past ERR.FILES.MOST files, whose
+##                         line total is then short
+##
+## WARNING: both files are read end to end. This is the whole wait in loading
+## a map, and it is longer than a lookup.
+## ===========================================================================
+ERR.MAP.PROFILE:
+    GOSUB ERR.BUSY.OPEN
+    GOSUB ERR.SYM.PROFILE
+    GOSUB ERR.CODE.PROFILE
+    RETURN
+
+
+## ---------------------------------------------------------------------------
+## ERR.SYM.PROFILE -- the file count and the line total.
+##
+## The symbol file names its files twice, LABELS then VARIABLES, in the same
+## order both times. The count comes off the first run alone. The line numbers
+## come off both, because a file's last line is as likely to hold a variable as
+## a label.
+## ---------------------------------------------------------------------------
+ERR.SYM.PROFILE:
+    ERR.TOTAL.FILES = 0
+    ERR.TOTAL.LINES = 0
+    ERR.FILES.OVER = 0
+    ERR.PROF.INVARS = 0
+    ERR.PROF.SLOT = -1
+    IF ERR.SYM.NAME$ = "" THEN RETURN
+    ERR.BUSY.TEXT$ = "COUNTING THE SOURCE"
+    GOSUB ERR.BUSY.STEP
+    FOR ERR.PROF.I = 0 TO ERR.FILES.MOST - 1
+        ERR.FILE.LAST(ERR.PROF.I) = 0
+    NEXT ERR.PROF.I
+    OPEN 2, 8, 2, ERR.SYM.NAME$
+    GP.DO
+        LINPUT# 2, ERR.LINE$, ERR.LF
+        GOSUB ERR.BUSY.TICK
+        GOSUB ERR.PROF.RECORD
+        IF ST <> 0 THEN GP.EXITDO
+    GP.LOOP
+    CLOSE 2
+    GOSUB ERR.CHANNEL.KICK
+    IF ERR.TOTAL.FILES = 0 THEN RETURN
+    FOR ERR.PROF.I = 0 TO ERR.TOTAL.FILES - 1
+        ERR.TOTAL.LINES = ERR.TOTAL.LINES + ERR.FILE.LAST(ERR.PROF.I)
+    NEXT ERR.PROF.I
+    RETURN
+
+
+## ---- one symbol file record. A heading moves to the next file, VARIABLES
+## ---- starts the second run of them, and anything else is a symbol whose
+## ---- first six digits are its line in the file above it.
+ERR.PROF.RECORD:
+    GP.IF LEFT$(ERR.LINE$, 9) = "VARIABLES" THEN
+        ERR.PROF.INVARS = -1
+        ERR.PROF.SLOT = -1
+        RETURN
+    GP.ENDIF
+    GP.IF LEFT$(ERR.LINE$, 6) = "FILE: " THEN
+        ERR.PROF.SLOT = ERR.PROF.SLOT + 1
+        IF ERR.PROF.INVARS <> 0 THEN RETURN
+        IF ERR.TOTAL.FILES >= ERR.FILES.MOST THEN ERR.FILES.OVER = -1
+        IF ERR.TOTAL.FILES < ERR.FILES.MOST THEN ERR.TOTAL.FILES = ERR.TOTAL.FILES + 1
+        RETURN
+    GP.ENDIF
+    IF ERR.PROF.SLOT < 0 THEN RETURN
+    IF ERR.PROF.SLOT >= ERR.FILES.MOST THEN RETURN
+    IF LEFT$(ERR.LINE$, 1) <> " " THEN RETURN
+    ERR.PROF.LINE = VAL(MID$(ERR.LINE$, 2, 6))
+    IF ERR.PROF.LINE > ERR.FILE.LAST(ERR.PROF.SLOT) THEN ERR.FILE.LAST(ERR.PROF.SLOT) = ERR.PROF.LINE
+    RETURN
+
+
+## ---------------------------------------------------------------------------
+## ERR.CODE.PROFILE -- records in the map, which is compiled BASIC lines.
+## ---------------------------------------------------------------------------
+ERR.CODE.PROFILE:
+    ERR.TOTAL.CODE = 0
+    IF ERR.MAP.NAME$ = "" THEN RETURN
+    ERR.BUSY.TEXT$ = "COUNTING THE MAP"
+    GOSUB ERR.BUSY.STEP
+    OPEN 2, 8, 2, ERR.MAP.NAME$
+    GP.DO
+        LINPUT# 2, ERR.LINE$, ERR.LF
+        GOSUB ERR.BUSY.TICK
+        IF LEN(ERR.LINE$) >= 6 THEN ERR.TOTAL.CODE = ERR.TOTAL.CODE + 1
+        IF ST <> 0 THEN GP.EXITDO
+    GP.LOOP
+    CLOSE 2
+    GOSUB ERR.CHANNEL.KICK
+    RETURN
+
+
+## ===========================================================================
+## ERR.ASK.ADDRESS -- the first way in. An address, the whole error line, or
+## anything with a hex number in it.
+## ===========================================================================
+ERR.ASK.ADDRESS:
+    GP.IF ERR.MAP.NAME$ = "" THEN
+        GP.SUB MSGBOX, "CHOOSE A MAP FIRST"
+        RETURN
+    GP.ENDIF
+    ERR.TYPED$ = GP.FN(ASKTEXT, "ERROR ADDRESS, LIKE $34A7", 30)
+    IF GP.ISEMPTY(ERR.TYPED$) THEN RETURN
+    GOSUB ERR.PARSE.ADDRESS
+    GP.IF ERR.PARSED < 0 THEN
+        GP.SUB MSGBOX, "NO HEX ADDRESS IN THAT"
+        RETURN
+    GP.ENDIF
+    GOSUB ERR.STATE.CLEAR
+    GOSUB ERR.BUSY.OPEN
+    ERR.TARGET = ERR.PARSED
+    ERR.HAVE.ADDRESS = -1
+    GOSUB ERR.MAP.SCAN
+    ERR.TARGET.LINE = ERR.MAP.LINE
+    IF ERR.PAST.END <> 0 THEN ERR.TARGET.LINE = ERR.CODE.LINE
+    ## The source comes first: the names it turns up are what ERR.SYM.SCAN
+    ## reads the VARIABLES half of the symbol file for.
+    GOSUB ERR.SOURCE.FIND
+    GOSUB ERR.NAMES.WANT
+    ## A setup line has no symbol above it worth naming, and the whole file
+    ## would be read to find that out.
+    IF ERR.TARGET.LINE >= 0 AND ERR.TARGET.LINE < ERR.SETUP.LINE THEN GOSUB ERR.SYM.SCAN
+    RETURN
+
+
+## ===========================================================================
+## ERR.ASK.LINE -- the second way in, and the one the compiler's own
+## "N STATEMENTS NOT COMPILED" line feeds. No map is read: the number is
+## already the merged BASIC line the map would have answered with.
+## ===========================================================================
+ERR.ASK.LINE:
+    GP.IF ERR.SYM.NAME$ = "" THEN
+        GP.SUB MSGBOX, "CHOOSE A MAP FIRST, SO THE SYMBOLS CAN BE FOUND"
+        RETURN
+    GP.ENDIF
+    ERR.TYPED$ = GP.FN(ASKTEXT, "BASIC LINE", 8)
+    IF GP.ISEMPTY(ERR.TYPED$) THEN RETURN
+    ERR.PARSED = VAL(ERR.TYPED$)
+    GP.IF ERR.PARSED <= 0 THEN
+        GP.SUB MSGBOX, "THAT IS NOT A LINE NUMBER"
+        RETURN
+    GP.ENDIF
+    GOSUB ERR.STATE.CLEAR
+    GOSUB ERR.BUSY.OPEN
+    ERR.TARGET.LINE = ERR.PARSED
+    GOSUB ERR.SOURCE.FIND
+    GOSUB ERR.NAMES.WANT
+    GOSUB ERR.SYM.SCAN
+    RETURN
+
+
+## ===========================================================================
+## ERR.MAP.SCAN -- the largest offset at or below ERR.TARGET.
+##
+##   in   ERR.TARGET        the address asked about
+##   out  ERR.MAP.OFFSET    that offset, -1 if the target is below them all
+##        ERR.MAP.LINE      the BASIC line it belongs to, -1 with it
+##        ERR.CODE.LINE     the same, ignoring the setup records
+##        ERR.PAST.END      -1 when the target is beyond the last record
+##
+## The map is "HHHH DDDDD" a record, ascending, LF ended. Records ascend even
+## for a program with banked regions: there is one address space.
+##
+## The last two records are the compiler's own setup and their line numbers are
+## not source lines. An address that LANDS on one is setup code and is reported
+## as such. An address PAST the whole map is not: nothing was compiled there,
+## and the useful answer is the last line that was.
+## ===========================================================================
+ERR.MAP.SCAN:
+    ERR.MAP.OFFSET = -1
+    ERR.MAP.LINE = -1
+    ERR.CODE.LINE = -1
+    ERR.CODE.OFFSET = -1
+    ERR.LAST.OFFSET = -1
+    ERR.PAST.END = 0
+    ERR.BUSY.TEXT$ = "READING THE MAP"
+    GOSUB ERR.BUSY.STEP
+    OPEN 2, 8, 2, ERR.MAP.NAME$
+    GP.DO
+        LINPUT# 2, ERR.LINE$, ERR.LF
+        GOSUB ERR.BUSY.TICK
+        GP.IF LEN(ERR.LINE$) >= 6 THEN
+            ERR.HEX$ = LEFT$(ERR.LINE$, 4)
+            GOSUB ERR.HEXVAL
+            IF ERR.HEXVALUE > ERR.LAST.OFFSET THEN ERR.LAST.OFFSET = ERR.HEXVALUE
+            ERR.VALUE = VAL(MID$(ERR.LINE$, 6))
+            GP.IF ERR.HEXVALUE <= ERR.TARGET AND ERR.HEXVALUE > ERR.MAP.OFFSET THEN
+                ERR.MAP.OFFSET = ERR.HEXVALUE
+                ERR.MAP.LINE = ERR.VALUE
+            GP.ENDIF
+            GP.IF ERR.HEXVALUE <= ERR.TARGET AND ERR.HEXVALUE > ERR.CODE.OFFSET AND ERR.VALUE < ERR.SETUP.LINE THEN
+                ERR.CODE.OFFSET = ERR.HEXVALUE
+                ERR.CODE.LINE = ERR.VALUE
+            GP.ENDIF
+        GP.ENDIF
+        IF ST <> 0 THEN GP.EXITDO
+    GP.LOOP
+    CLOSE 2
+    GOSUB ERR.CHANNEL.KICK
+    IF ERR.TARGET > ERR.LAST.OFFSET THEN ERR.PAST.END = -1
+    RETURN
+
+
+## ===========================================================================
+## ERR.SYM.SCAN -- the file a BASIC line came from, and the label above it.
+##
+##   in   ERR.TARGET.LINE   the merged BASIC line
+##   out  ERR.FILE.NAME$    the source file holding it
+##        ERR.LABEL.NAME$   the nearest label at or above it, "" for none
+##        ERR.LABEL.VALUE   the BASIC line that label became
+##        ERR.LABEL.SOURCE  the label's own line in its file
+##
+##   also ERR.NAME.REAL$() and ERR.NAME.LINE(), for the names ERR.NAMES.WANT
+##        left standing
+##
+## The symbol file is LABELS then VARIABLES, each a run of "FILE:" headings
+## with records under them. A record is a leading space, six digits of line in
+## that file, the symbol, then "=N;" -- the BASIC line under LABELS, the
+## crunched name under VARIABLES.
+##
+## With no name wanted the scan stops at VARIABLES: every label is above it,
+## and that is half the file left unread. With names wanted it reads on until
+## the last of them is found, which is why both halves are one pass and not
+## two opens of the same file.
+## ===========================================================================
+ERR.SYM.SCAN:
+    ERR.FILE.NAME$ = ""
+    ERR.LABEL.NAME$ = ""
+    ERR.LABEL.VALUE = -1
+    ERR.LABEL.SOURCE = 0
+    ERR.CURRENT.FILE$ = ""
+    ERR.SYM.INVARS = 0
+    ERR.NAMES.LEFT = ERR.NAMES.COUNT
+    IF ERR.SYM.NAME$ = "" THEN RETURN
+    ERR.BUSY.TEXT$ = "READING THE SYMBOLS"
+    GOSUB ERR.BUSY.STEP
+    OPEN 2, 8, 2, ERR.SYM.NAME$
+    GP.DO
+        LINPUT# 2, ERR.LINE$, ERR.LF
+        GOSUB ERR.BUSY.TICK
+        GP.IF LEFT$(ERR.LINE$, 6) = "FILE: " THEN
+            IF ERR.SYM.INVARS = 0 THEN ERR.CURRENT.FILE$ = MID$(ERR.LINE$, 7)
+        GP.ELSEIF LEFT$(ERR.LINE$, 9) = "VARIABLES" THEN
+            IF ERR.NAMES.LEFT = 0 THEN GP.EXITDO
+            ERR.SYM.INVARS = -1
+        GP.ELSEIF LEFT$(ERR.LINE$, 1) = " " THEN
+            GP.IF ERR.SYM.INVARS = 0 THEN
+                GOSUB ERR.SYM.RECORD
+            GP.ELSE
+                GOSUB ERR.SYM.VARREC
+                IF ERR.NAMES.LEFT = 0 THEN GP.EXITDO
+            GP.ENDIF
+        GP.ENDIF
+        IF ST <> 0 THEN GP.EXITDO
+    GP.LOOP
+    CLOSE 2
+    GOSUB ERR.CHANNEL.KICK
+    RETURN
+
+
+ERR.SYM.RECORD:
+    ERR.EQUALS = GP.INSTR(ERR.LINE$, "=")
+    IF ERR.EQUALS < 10 THEN RETURN
+    ERR.VALUE = VAL(MID$(ERR.LINE$, ERR.EQUALS + 1))
+    IF ERR.VALUE > ERR.TARGET.LINE THEN RETURN
+    IF ERR.VALUE <= ERR.LABEL.VALUE THEN RETURN
+    ERR.LABEL.VALUE = ERR.VALUE
+    ERR.LABEL.SOURCE = VAL(MID$(ERR.LINE$, 2, 6))
+    ERR.TRIM$ = MID$(ERR.LINE$, 9, ERR.EQUALS - 9)
+    GOSUB ERR.SYM.TRIM
+    ERR.LABEL.NAME$ = ERR.TRIM$
+    ERR.FILE.NAME$ = ERR.CURRENT.FILE$
+    RETURN
+
+
+## ---------------------------------------------------------------------------
+## ERR.SYM.VARREC -- one VARIABLES record against every name still wanted.
+##
+## The value is the crunched name, not a number, so it is taken as the text
+## between the "=" and the ";".
+## ---------------------------------------------------------------------------
+ERR.SYM.VARREC:
+    ERR.EQUALS = GP.INSTR(ERR.LINE$, "=")
+    IF ERR.EQUALS < 10 THEN RETURN
+    ERR.CRUNCH$ = MID$(ERR.LINE$, ERR.EQUALS + 1)
+    ERR.FOUND = GP.INSTR(ERR.CRUNCH$, ";")
+    IF ERR.FOUND = 0 THEN RETURN
+    ERR.CRUNCH$ = LEFT$(ERR.CRUNCH$, ERR.FOUND - 1)
+    FOR ERR.I = 0 TO ERR.NAMES.COUNT - 1
+        IF ERR.NAME.REAL$(ERR.I) <> "" THEN GOTO ERR.SYM.VARREC.NEXT
+        IF ERR.NAME.CRUNCH$(ERR.I) <> ERR.CRUNCH$ THEN GOTO ERR.SYM.VARREC.NEXT
+        ERR.TRIM$ = MID$(ERR.LINE$, 9, ERR.EQUALS - 9)
+        GOSUB ERR.SYM.TRIM
+        ERR.NAME.REAL$(ERR.I) = ERR.TRIM$ + ERR.NAME.SUFFIX$(ERR.I)
+        ERR.NAME.LINE(ERR.I) = VAL(MID$(ERR.LINE$, 2, 6))
+        ERR.NAMES.LEFT = ERR.NAMES.LEFT - 1
+ERR.SYM.VARREC.NEXT:
+    NEXT ERR.I
+    RETURN
+
+
+## ---- the symbol field is padded out to a fixed width, and this cuts it back.
+ERR.SYM.TRIM:
+    GP.DO
+        IF LEN(ERR.TRIM$) = 0 THEN GP.EXITDO
+        IF RIGHT$(ERR.TRIM$, 1) <> " " THEN GP.EXITDO
+        ERR.TRIM$ = LEFT$(ERR.TRIM$, LEN(ERR.TRIM$) - 1)
+    GP.LOOP
+    RETURN
+
+
+## ===========================================================================
+## ERR.CHANNEL.KICK -- one character to channel 0 after every CLOSE.
+##
+## WARNING: file I/O reached from inside a GP.DO key loop finishes its work and
+## then stops the program with INPUT/OUTPUT ERROR @ $005B. Channel 0 output
+## runs CLRCHN and makes it go away. The menu loop IS that key loop, so every
+## CLOSE here is followed by this. The space lands wherever the cursor is and
+## ERR.PAINT draws over it.
+## ===========================================================================
+ERR.CHANNEL.KICK:
+    PRINT " ";
+    RETURN
+
+
+## ===========================================================================
+## ERR.PARSE.ADDRESS -- ERR.TYPED$ to ERR.PARSED, or -1.
+##
+## Takes the text after the last "$" if there is one, then its leading hex
+## digits, so a whole error line can be pasted in.
+## ===========================================================================
+ERR.PARSE.ADDRESS:
+    ERR.PARSED = -1
+    ERR.HEX$ = ""
+    ERR.AT = 0
+    GP.DO
+        ERR.FOUND = GP.INSTR(ERR.TYPED$, "$", ERR.AT + 1)
+        IF ERR.FOUND = 0 THEN GP.EXITDO
+        ERR.AT = ERR.FOUND
+    GP.LOOP
+    ## MID$ whether or not a "$" was found, so ERR.SCAN$ is always a fresh
+    ## string: STRCASE rewrites in place through a pointer, and a plain
+    ## assignment could leave the two sharing bytes.
+    ERR.SCAN$ = MID$(ERR.TYPED$, ERR.AT + 1)
+    STRCASE.PTR = GP.STRPTR(ERR.SCAN$)
+    STRCASE.MODE = STRCASE.LTRIM
+    GOSUB STRCASE.GO
+    STRCASE.PTR = GP.STRPTR(ERR.SCAN$)
+    STRCASE.MODE = STRCASE.UPPER
+    GOSUB STRCASE.GO
+    ERR.AT = 1
+    GP.DO
+        IF ERR.AT > LEN(ERR.SCAN$) THEN GP.EXITDO
+        ERR.DIGIT$ = MID$(ERR.SCAN$, ERR.AT, 1)
+        IF GP.INSTR(ERR.HEXDIGITS$, ERR.DIGIT$) = 0 THEN GP.EXITDO
+        ERR.HEX$ = ERR.HEX$ + ERR.DIGIT$
+        ERR.AT = ERR.AT + 1
+    GP.LOOP
+    GP.IF LEN(ERR.HEX$) > 0 THEN
+        GOSUB ERR.HEXVAL
+        ERR.PARSED = ERR.HEXVALUE
+    GP.ENDIF
+    RETURN
+
+
+## ===========================================================================
+## ERR.HEXVAL -- ERR.HEX$, hex digits, to ERR.HEXVALUE.
+##
+## The pointer is taken fresh. GP.STRPTR finds where the string lives right
+## now, and ERR.HEX$ is rebuilt between calls, so a kept pointer would be aimed
+## at the old bytes.
+## ===========================================================================
+ERR.HEXVAL:
+    ERR.HEXVALUE = 0
+    STRCASE.PTR = GP.STRPTR(ERR.HEX$)
+    STRCASE.MODE = STRCASE.UPPER
+    GOSUB STRCASE.GO
+    FOR ERR.I = 1 TO LEN(ERR.HEX$)
+        ERR.HEXVALUE = ERR.HEXVALUE * 16 + GP.INSTR(ERR.HEXDIGITS$, MID$(ERR.HEX$, ERR.I, 1)) - 1
+    NEXT
+    RETURN
+
+
+## ===========================================================================
+## ERR.STATE.CLEAR -- everything the last lookup found.
+## ===========================================================================
+ERR.STATE.CLEAR:
+    ERR.HAVE.ADDRESS = 0
+    ERR.TARGET = 0
+    ERR.MAP.OFFSET = -1
+    ERR.MAP.LINE = -1
+    ERR.CODE.LINE = -1
+    ERR.CODE.OFFSET = -1
+    ERR.LAST.OFFSET = -1
+    ERR.PAST.END = 0
+    ERR.TARGET.LINE = -1
+    ERR.FILE.NAME$ = ""
+    ERR.LABEL.NAME$ = ""
+    ERR.LABEL.VALUE = -1
+    ERR.LABEL.SOURCE = 0
+    ERR.SOURCE.SHOWN = 0
+    ERR.SOURCE.WHY$ = ""
+    ERR.NAMES.COUNT = 0
+    ERR.NAMES.MORE = 0
+    RETURN

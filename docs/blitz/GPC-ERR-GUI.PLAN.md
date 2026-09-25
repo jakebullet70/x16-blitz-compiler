@@ -1,6 +1,6 @@
 # GPC.ERR: from an address to a source line
 
-Handoff document. Phases 1 and 2 are built and verified. Phases 3 to 5 are not started. It rewrites
+Handoff document. Phases 1 to 4 are built and verified. Phase 5 is not needed. It rewrites
 `testing/GPC.ERR.BASL` from a two-prompt text helper into a GUI tool that answers with a file name,
 a source line and the text of the offending statement.
 
@@ -96,7 +96,8 @@ The names in it are crunched. Line 1669 detokenises to:
 1669  N6$="                                                                        "
 ```
 
-Which is why section 4.4 exists.
+Which is why section 4.4 exists. The `VARIABLES` half of the symbol file turns `N6$` back into
+`HELP.ROW$`, first seen at source line 186, and section 4.7 is that lookup.
 
 ## 3. The resolution chain
 
@@ -123,7 +124,7 @@ $34A7  is $34A6 + 1, the first opcode of the line
   file        GPB.HELP.BASL
   near        HELP.BOOT, source line 147
   statement   HELP.ROW$ = "    ...    "
-  names       N6 = HELP.ROW, first seen at line 186
+  names       N6$ = HELP.ROW$, LINE 186
 ```
 
 The `+1` matters. An address at the start of a line is a statement that failed. An address inside a
@@ -193,7 +194,13 @@ The format is small enough to state completely:
   inside a string is text.
 
 Reference implementation: `source/tools/detokenise/detokenise.py:35-66`. It is thirty lines and the
-blob should match it statement for statement.
+blob should match it statement for statement. `ERR.SRC.SEEK.ASM`'s output matches that reference
+byte for byte on `GPBMODS.SRC.PRG`.
+
+WARNING: the link must not be followed. It holds the address a line had in a program loaded at
+`$0801`, so it wraps on a source over 63 KB. 1,304 of the 4,791 links in `testing/GPBMODS.SRC.PRG`
+point backwards. The walk scans to each line's closing zero instead, which is what
+`source/tools/detokenise/detokenise.py` does.
 
 The keyword table is two parts: the stock BASIC keywords, and the 41 `#TOKEN` lines in
 `GPC-BASIC/GPB.INC.BL` that name the GP.\* set, which are `$CE`-prefixed. `#TOKEN GP.BANKED 52823`
@@ -209,28 +216,190 @@ generator must sort by id, not by appearance. The note is at `source/common-scri
 
 This is `GP.ASM` inline, not a 64tass source, because the host is a BASL program. That is settled.
 
-Two candidates. Write the loader first.
+One blob is written.
 
 | blob | what it does | why |
 |---|---|---|
-| bank loader | pull `NAME.MAP` and `NAME.SRC.SYM` into banked RAM once | 76 KB across the two files. The current `SCAN` reads the map a byte at a time with `GET#` and re-reads it on every lookup. A debugging session is many lookups. |
-| line fetch | walk `NAME.SRC.PRG` to a line number and render it | The walk is a link chase and the render is the table above. Both are plain BASL work. |
+| line fetch | walk `NAME.SRC.PRG` to a line number and copy its bytes out | A lookup crosses the whole file. `ERR.SRC.SEEK.ASM` in `GPC-BASIC/ERRSRC.INC.BL` is the blob. |
+| bank loader | not written | `BLOAD` pulls the whole tokenised source into consecutive banks in one call. |
 
-The detokeniser is the part the request named, but the loader is the part the tool cannot be used
-without. A byte-at-a-time pass over 57 KB of SYM on every lookup is not a tool a programmer reaches
-for twice.
+The render is BASIC. The keyword text is a `GP.BANKEDSTR` group and only BASIC can read one, so the
+blob copies bytes and BASIC turns them into text.
 
-Cheaper first step, no assembly at all: `LINPUT#` instead of `GET#`. It is already used at
-`GPC-BASIC/FILEIO.INC.BL:330`, and it is about ten times faster than the `GET#` loop on the same
-file. Do that before deciding the loader is necessary, and measure.
+`BLOAD` fills a bank and steps to the next, so the banks have to be consecutive. Taking them one at
+a time from `BANKMGR` does not give a run: `BANKMGR` hands out the lowest free bank, and GPC.ERR
+leaves bank 6 free with 7 and 8 taken. `ERR.SRC.CLAIM` looks for a run the size of the file and
+claims it by number, handing every bank back when the run comes up short.
+
+`NAME.MAP` and `NAME.SRC.SYM` are read with `LINPUT#` on each lookup. Section 6 has the timing.
 
 `GPB.HELP` already reads a topic into a bank through a `GP.ASM` blob and paints out of it. That is
 the pattern to copy, not to invent.
 
 ### 4.6 A window, not a line
 
-Show three lines either side of the offending one, the offending one marked. A deferred SYNTAX error
-is often caused by the line above it, and the walk through `SRC.PRG` passes those lines anyway.
+The window is seven rows: the line the lookup landed on and the three either side. A deferred SYNTAX
+error is often caused by the line above it, and the walk through `SRC.PRG` passes those lines anyway.
+The frame is 24 rows: the seven source rows, and the names block under them, section 4.7.
+
+The row the lookup landed on carries a `>` in its first column and is drawn in the theme's
+`THEME.TEXT` colour. The other six are drawn in `THEME.DIMMED`.
+
+### 4.7 Crunched names to real names
+
+The names are cut out inside the renderer, in `ERR.SRC.WORDS$`. The renderer has the token bytes
+and the text it writes does not. A keyword renders with no space around it, so `NGAND2` is the
+variable `NG`, the keyword `AND` and the number 2, and nothing reading the finished text can tell
+where the name stops. Everything after a `REM` token is comment text and is not collected.
+
+`ERR.NAMES.WANT` splits that string and cuts the `$` or `%` type suffix off each name for the
+lookup, because BASLOAD's table holds `HELP.ROW` for a variable the source writes as `HELP.ROW$`.
+The suffix goes back on for the display.
+
+`ERR.SYM.SCAN` reads both halves of the symbol file in one pass and stops as soon as the last wanted
+name is found. With no name wanted it stops at `VARIABLES`.
+
+Six names show, two to a row, in a `NAMES` block under the source window. A name the symbol file
+does not carry gets its row and says `NOT A SYMBOL`. A seventh name sets a flag and the block's
+title becomes `NAMES, THE FIRST 6`. A row is 36 columns, and a name too long for one is cut while
+its line number is kept whole.
+
+BASIC line 1139 of `GPB.HELP` renders as:
+
+```
+IFI4$<>""THENI5%=GV+INT((GW-LEN(I4$)-2)/2):GP.PRINTATI5%,HE," "+I4$+" ",A1(2)
+```
+
+and the six names come back as:
+
+```
+I4$ = GUI.TITLE$, LINE 534        I5% = GUI.TITLE.LEFT%, LINE 534
+GV = GUI.LEFT, LINE 199           GW = GUI.WIDTH, LINE 199
+HE = GUI.TOP, LINE 305            A1 = THEME.CLR, LINE 103
+```
+
+WARNING: a `VARIABLES` line number is where the symbol was first seen, not where the failing line
+uses it. Section 2.2 has the rule. The six lines above are declarations, not uses of line 1139.
+
+### 4.8 A working display
+
+A lookup reads three files. `NAME.MAP` is 18,911 bytes and 1,976 records for `GPB.HELP`. The
+tokenised source comes next, through `BLOAD`. `NAME.SRC.SYM` is the third.
+
+`ERR.BUSY.OPEN` clears the frame interior and prints `WORKING` at the top of it. `ERR.ASK.ADDRESS`
+and `ERR.ASK.LINE` both call it once the input has been accepted.
+
+`ERR.BUSY.STEP` prints one step name on its own row. A lookup names three steps:
+`READING THE MAP`, `FINDING THE SOURCE LINE` and `READING THE SYMBOLS`. `ERR.MAP.SCAN`, `ERR.SOURCE.FIND` and
+`ERR.SYM.SCAN` are the callers, and each calls past its own guards, so a step that is skipped is
+never named.
+
+`ERR.BUSY.TICK` prints one dot on the current step's row, one every 24 records, up to 32 dots. The
+`LINPUT#` loops in `ERR.MAP.SCAN` and `ERR.SYM.SCAN` call it. `ERR.SRC.OPEN` is a single `BLOAD`
+with no loop, so the source step shows its name and no dots.
+
+The next `ERR.PAINT` overwrites the whole display. There is nothing to clean up.
+
+### 4.9 The GUI refactor
+
+The screen is three boxes, every one `GP.BOX` style 2 with rounded corners. All three start at
+column 0 and are `ERR.COLS` wide, so their edges line up. Rows 0 to 2 are the header, and the menu
+bar draws on row 1. Rows 3 to 26 are the answer frame, `ERR.FRAME.ROWS` 24. Rows 27 to 29 are the
+footer. The theme is fixed at 3 and the `THEME` bar item is gone.
+
+The bar is three items: `FILE`, `SEARCH`, `HELP`. It starts at column 2, `ERR.BAR.COL`. Each item
+string carries its own padding, `" &FILE "`, `" &SEARCH "` and `" &HELP "`, and `MENU.GAP` is 0, so
+an item is as wide as its text. `ESC` or `ALT` opens a dropdown. `FILE` / `QUIT` is the only way
+out, and it sets `ERR.QUIT`.
+
+`ERR.MENU.SETUP` builds every menu once at boot: the bar in slot `MENU.BAR`, then the three
+dropdowns in `MENU.DROP + 1`, `+ 2` and `+ 3`. `MENU.BEGIN` on the bar slot empties every dropdown,
+so the bar goes in first and nothing rebuilds it afterwards. `ERR.PAINT.HEAD` redraws the bar with
+`MENU.DRAWBAR` and touches no rows.
+
+`ERR.MAIN` is the program's key loop. It `GET`s a key, passes it to
+`ERR.ROW = GP.FN(MENU.KEY, ERR.KEY)` and calls `ERR.DISPATCH` when `ERR.ROW` is above 0. `MENU.KEY`
+owns the bar and the dropdowns together: with one open, `LEFT` and `RIGHT` walk from dropdown to
+dropdown, a bar hot key jumps to its own, and `ESC` closes. `ERR.DISPATCH` selects on `MENU.PICKBAR`
+and calls `ERR.FILE.PICK`, `ERR.SEARCH.PICK` or `ERR.HELP.PICK`, each of which reads `ERR.ROW`. It
+repaints the screen after, unless `ERR.QUIT` is set.
+
+`FILE` drops down `LOAD MAP`, `BROWSE MAP`, a separator and `QUIT`. `LOAD MAP` asks for the name in
+an input box, and the drive's answer is already in the box when the drive holds exactly one `.MAP`
+file. `BROWSE MAP` is the `FILEPICK` box of section 4.2. Both routes end in `ERR.TAKE.MAP`. `QUIT`
+sets `ERR.QUIT`.
+
+`SEARCH` drops down `BY ADDRESS` and `BY LINE`. `ERR.SEARCH.PICK` reads `ERR.ROW` and calls
+`ERR.ASK.ADDRESS` and `ERR.ASK.LINE`.
+
+`HELP` drops down `HOW TO` and `ABOUT`. `ERR.HELP.PICK` reads `ERR.ROW` and calls `ERR.HOWTO` and
+`ERR.ABOUT`.
+
+`ERR.HOWTO` shows three lines through `MSGBOXEX`, titled `HOW TO USE GPC.ERR`:
+
+```
+LOAD MAP UNDER FILE READS THE .MAP AND .SYM OF A COMPILE.
+SEARCH BY ADDRESS TAKES THE HEX PC A RUNTIME ERROR PRINTS.
+SEARCH BY LINE TAKES A LINE FROM STATEMENTS NOT COMPILED.
+```
+
+The three are a `GP.BANKEDSTR` group, `ERR.HOWTO.TEXT` in `ERR.TOKENBANK`, bank 61. That is the
+bank `ERRTOKEN.INC.BL` declares and `ERR.CLAIM.BANKS` claims. `ERR.HOWTO` reads the lines back with
+`GP.BSTR`.
+
+`ABOUT` is three lines: `ERROR ADDRESS LOOKUP HELPER`,
+`FOR THE X16 GPC-BASIC COMPILER (C)SADLOGIC - 2026`, and a memory line in the shape
+`TOTAL BANKS 64   UNUSED 45   BYTES FREE 6320`. The two bank counts come from `BANKMGR.COUNT` and
+the free figure from `FRE(0)`, all three read when the box opens. `ERR.ABOUT` builds the lines,
+measures the longest of the three into `ERR.ABOUT.WIDE` and runs the first two through `PADC`. The
+margin is part of the string because `MSGBOXEX` draws every line left to right from one column.
+`PADC` pads to the longest of the three, so that line still sets the box width.
+
+`MENUKEY.INC.BL` is in low RAM and not a region. It reads the keyboard layout under `BANK 0` and
+leaves that bank selected, which a `GP.BANKED` region may not do. `ERR.BOOT` runs
+`GOSUB ERR.MENU.SETUP` and then `GOSUB MENU.KEYS.ON`, which writes each bar hot key into the ALT
+half of the PETSCII and the ISO layout tables. `ERR.SHUTDOWN` runs `GOSUB MENU.KEYS.OFF` first,
+because the layout outlives the program. A headless run reports six bytes rewritten, the three hot
+keys in each of the two tables. ALT with a bar item's hot key then reaches `MENU.KEY` as that letter
+and opens that item's dropdown.
+
+Every popup is shadowed and rounded. `MENU.SHADOW` is set at boot. The dropdown's frame comes from
+`MENU.DROPSTYLE`, set to `ERR.BOX.STYLE` in `ERR.MENU.SETUP`. The shadow colour is
+`THEME.CLR(THEME.SHADOW)`, 0 in `GPC-BASIC/THEME.INC.BL` and in its copies in the tree, so every
+menu and dialog shadow is black.
+The canned dialogs take their frame from `DLGSTYLE`, a verb in `GPC-BASIC/GUI-DIALOGS.INC.BL` that
+sets the frame every dialog in that module draws with.
+
+The footer carries the project the loaded map belongs to: the map's base name, `FILES`,
+`SOURCE LINES` and `COMPILED LINES`. `ERR.PAINT.FOOT` pads the line to `ERR.COLS - 2` with `PADC`
+and prints it at column 1, which centres it on row 28. A `+` after the file count says the project
+has more files than `ERR.FILES.MOST`, which is 40, so the line total is short.
+
+Loading a map profiles it, and the profile is two full file reads. `ERR.SYM.PROFILE` reads the
+symbol file end to end: the file count comes off the `LABELS` run of `FILE:` headings, and the line
+total is the highest source line seen in each file, summed. `ERR.CODE.PROFILE` counts the records in
+the map. Both use the working display of section 4.8, and their step names are `COUNTING THE SOURCE`
+and `COUNTING THE MAP`.
+
+On the `GPB.HELP` fixture the two reads take 566 jiffies, which is 9.4 seconds, and answer 13 files,
+4,761 source lines and 1,976 compiled lines. An independent pass over the same symbol file gives the
+same three numbers.
+
+`STASHVRAM.INC.BL` and `MENUPULL.INC.BL` are a sixth region, `ERR.PULLCODE` in bank 5.
+`MENUPULL.OPEN` is what opens the dropdown, and `MENU.KEY` calls it. `STRINGS.INC.BL` joins
+`APPSYS`, `THEME`, `STRCASE` and `BANKMGR` in `ERR.UTILCODE`, bank 7, and
+`PADC` is the only verb the program calls out of it. The compiler drops the routines nothing calls,
+so its 14,817 bytes of source cost 768 bytes of overlay and no resident p-code. The regions are
+banks 4, 5, 7, 8, 10 and 12, and banks 61 and 62 still hold the keyword table and the menu rows. The
+source is twenty-two modules, seventeen of them banked.
+
+The lookup itself did not change. A map scan is still 650 jiffies, and the three fixture lookups
+answer with the same lines, files and names as before.
+
+`C.GPC.ERR.PRG` is 10,197 bytes SHARED, against 7,760 before the refactor, so the GUI work cost
+2,437 bytes of p-code. The cap is 22,016 bytes, so 11,819 are left. `C.GPC.ERR.OVL` is 28,433
+bytes, against 24,847. `testing/GPC.ERR.PRG`, the tokenised source, is 62,494 bytes, against
+51,155.
 
 ## 5. The compiler side
 
@@ -334,18 +503,24 @@ Each phase leaves a tool that works.
 |---|---|---|
 | 1 | Done. A failed statement's BASIC line is kept and printed above the banner. Section 5 has the code. | the capture and the print |
 | 2 | Done. The GUI shell, `FILEPICK` for the map, the MAP lookup and the SYM `LABELS` lookup. An address or a BASIC line gives a file name, a BASIC line and the nearest label with its source line, shown in a framed window under a menu bar. `LINPUT#` replaced the `GET#` loops. | none |
-| 3 | `SRC.PRG` walk and detokenise. The statement is shown. Table generated from `#TOKEN`. | the render |
-| 4 | SYM `VARIABLES` reverse lookup. Crunched names become real names with their source lines. | none |
-| 5 | Bank loader, if phases 3 and 4 do not fit under the ceiling. | the loader |
+| 3 | Done. `GPC-BASIC/ERRSRC.INC.BL` pulls `NAME.SRC.PRG` into a run of RAM banks with `BLOAD`, and `ERR.SRC.WINDOW` returns a line and the three either side, rendered. `GPC-BASIC/ERRTOKEN.INC.BL` holds the keyword text as two `GP.BANKEDSTR` groups in bank 61: 274 slots, 199 keywords, a slot no keyword uses being an empty string. `source/gpc/gen_err_tokens.py` generates it from the 41 `#TOKEN` lines in `GPC-BASIC/GPB.INC.BL` and the stock tables in `source/common-scripts/c64tokens.py`, and stops if the two token sources disagree. | the walk and the copy |
+| 4 | Done. `GPC-BASIC/ERRSRC.INC.BL` gained `ERR.SRC.WORDS$`, which cuts the names out of the line as it renders it, because a keyword renders with no space around it and the finished text no longer says where a name stops. `ERR.NAMES.WANT` splits them and cuts the `$` or `%` type suffix for the lookup. `ERR.SYM.SCAN` reads both halves of the symbol file in one pass and stops once the last wanted name is found. Six names show, two to a row, in a `NAMES` block under the source window. The working display landed with it, and a lookup names each step on screen as it runs. Sections 4.7 and 4.8 have the rest. | none |
+| 5 | Not needed. Phase 5 is a bank loader for the tokenised source. `BLOAD` pulls that file into consecutive banks in one call. Size is the second reason, with 12,872 bytes left under the ceiling. | none |
 
-GPC.ERR compiles SHARED to 19,243 bytes against the 22,016 byte ceiling. The fifteen `#INCLUDE`s
-with no program at all measure 16,474 bytes, so the program itself is 2,769 of that total. The
-modules are GPB, THEME, STASH, STRCASE, BANKMGR, MENU.INC.BANKED, MENU, LINEINPUT, GUI, COMBO,
-CHECK, GUI-DIALOGS, FILEIO, FILEDIR and FILEPICK.
+`C.GPC.ERR.PRG` is 9,144 bytes SHARED against the 22,016 byte ceiling, so 12,872 bytes are left.
+The library runs from banked regions, so the resident p-code is the shell and the resolvers.
+`C.GPC.ERR.OVL` is 28,433 bytes and holds the six code regions and the two text banks. It has to
+travel with the `.PRG`. `testing/GPC.ERR.PRG`, the tokenised source, is 60,710 bytes. Phase 3 cost
+1,930 bytes of p-code and 2,306 bytes of overlay, and the GUI refactor of section 4.9 cost 1,384
+bytes of p-code.
 
-`LINPUT#` reads `GPB.HELP.MAP`, 18,911 bytes and 1,976 records, in 150 jiffies. The `GET#` loop it
-replaced takes 993 on the same file, so the read is 6.6 times faster and speed is no longer a reason
-to build phase 5.
+`LINPUT#` reads `GPB.HELP.MAP`, 18,911 bytes and 1,976 records, in 615 jiffies, which is 10.3
+seconds. With `ERR.BUSY.TICK` in the loop it is 647 jiffies, so the feedback costs 5 percent. A
+second scan in the same run takes the same time, so the figure is not a cold start. The working
+display of section 4.8 covers that wait. The symbol file read is a second wait on top of it.
+
+Reading the map into a bank and scanning it in memory is the open route to a faster lookup. It is
+not decided.
 
 WARNING: the map and the symbol file are LF only and `LINPUT#` defaults to delimiter 13. Every
 `LINPUT#` in GPC.ERR names 10.
@@ -354,8 +529,8 @@ WARNING: file I/O reached from inside a `GP.DO` key loop stops the program with
 `INPUT/OUTPUT ERROR @ $005B`. Output to channel 0 clears it, so every `CLOSE` in GPC.ERR is followed
 by a space to channel 0.
 
-Phase 2 gives the file and the window. Phases 3 and 4 give the statement and the real names, and they
-have 2,773 bytes to fit inside. Phase 5's bank loader may be needed for size rather than for speed.
+Phase 4 gave the real names and took 1,410 of those bytes. It cost nothing in the overlay, because
+none of its code is in a `GP.BANKED` region. Phase 5's bank loader is not needed for size either.
 
 ## 7. Testing, on this code
 
@@ -364,7 +539,7 @@ answer.
 
 | in | out |
 |---|---|
-| `$34A7` | `GPB.HELP.BASL`, `HELP.BOOT` at line 147, BASIC line 1669, `HELP.ROW$ = "..."`, `N6 = HELP.ROW` first seen at line 186 |
+| `$34A7` | `GPB.HELP.BASL`, `HELP.BOOT` at line 147, BASIC line 1669, `HELP.ROW$ = "..."`, `N6$ = HELP.ROW$, LINE 186` |
 | `SYNTAX ERROR @ $34A7` | the same; the parser takes the text after the last `$` |
 | `$0006` | the first mapped line, BASIC line 1 |
 | `$4ABC` | compiler setup, not a source line |
@@ -373,9 +548,8 @@ answer.
 | BASIC line `1653` entered directly | `GPB.HELP.BASL`, `HELP.BOOT`, line 147, delta 0 |
 | BASIC line `2` entered directly | `GPC-BASIC/THEME.INC.BL`, `THEME.SELECT` at line 101 |
 
-All eight rows are verified as far as phase 2 reaches: the BASIC line, the file and the nearest
-label with its source line. The statement text and the crunched name in row one wait for phases 3
-and 4.
+All eight rows are verified: the BASIC line, the file, the nearest label with its source line, the
+statement text and the names.
 
 The harness is `testing/GPCERRT.BASL`. It holds GPC.ERR's own resolver routines copied unchanged
 with a different caller, compiles SHARED and runs headless. It is a throwaway in `testing/` and is
@@ -384,6 +558,18 @@ not tracked. Its answers matched a host-side reference computed from the same th
 Two rows need a rule the chain in section 3 does not state. An address that lands on a setup record
 is reported as setup code. An address past the whole map is reported as past the map and answered on
 the last real line. `$4ABC` and `$FFFF` resolve to the same record and differ for that reason.
+
+`testing/SRCTEST.BASL` prints `ERR.SRC.WORDS$` for every window it shows. The names it printed were
+checked against a host-side model of the same cut, byte for byte, on seven lines across
+`BMXVIEW.SRC.PRG` and `GPBMODS.SRC.PRG`. `GPBMODS` line 304 renders as
+`C8=GP.INSTR(CC$,C2$,CB%(C4))` and gives `C8 CC$ C2$ CB% C4`, which exercises the `$CE` two-byte
+token path.
+
+`testing/ERRSELF.BASL`, a generated fixed-answer variant of the real program, drove the whole chain
+on `GPB.HELP` and printed the right answer for three lines. 1669 gives one name,
+`N6$ = HELP.ROW$, LINE 186`. 968 gives six and sets the flag that retitles the block, because the
+line holds seven names and one had no slot. 1139 gives six and does not set it, because the words
+past the sixth are repeats.
 
 A second fixture with one library module and a small master is worth making, so a failure in the
 `FILE:` walk is visible rather than hidden by thirteen correct boundaries.
@@ -397,9 +583,9 @@ A second fixture with one library module and a small master is worth making, so 
   tracked binary.
 - It needs the GPB runtime, `GPB.RT.nnn.BIN`, not the core-only `GPC.RT.nnn.BIN`, because it uses
   the GP block handlers throughout.
-- The SHARED p-code ceiling is RTBASE, 22,016 bytes. GPC.ERR is 19,243 bytes after phase 2, so 2,773
-  bytes are left. The GUI modules are most of the cost and they landed before any of the resolver
-  work, which is what put the headroom on the table before phases 3 and 4 spend it.
+- The SHARED p-code ceiling is RTBASE, 22,016 bytes. `C.GPC.ERR.PRG` is 9,144 bytes, so 12,872
+  bytes are left. The library runs from banked regions and its 28,433 byte `C.GPC.ERR.OVL` has to
+  be beside the `.PRG` at run time.
 - `release/TMP` currently holds no `*.RT.124.BIN`. Both PRGs staged there are SHARED and cannot
   start without the runtime beside them. Unrelated to this work, but it will bite anyone testing a
   staged build.
@@ -413,8 +599,9 @@ A second fixture with one library module and a small master is worth making, so 
    `.SRC` and adding `.MAP`, so `GPB.HELP.SRC.PRG` gives `GPB.HELP.MAP`. GPC.ERR reads the older
    `M.<name>` shape as well, because the tree is full of maps under that name. GPC.ERR derives the
    symbol file from the map's name: `<base>.SRC.SYM` first, `<base>.SYM` if that is absent.
-2. The typed name stays, behind the picker. `FILEPICK` answers empty both when nothing matched and
-   when the pick was cancelled, and that is when GPC.ERR asks for a name.
+2. The typed name and the picker are separate items, `LOAD MAP` and `BROWSE MAP`, section 4.9.
+   `LOAD MAP` starts with the drive's answer in the box when exactly one `.MAP` file is there. Both
+   routes end in `ERR.TAKE.MAP`.
 
 ## 10. An exact source line without any of this
 

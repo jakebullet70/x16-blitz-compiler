@@ -38,8 +38,9 @@ saw it — a textually clean merge that was semantically broken) and `SCREEN.EXP
 
 `testing/*.INC.BL` is **gitignored**, so those are local working copies: refresh them from
 `GPC-BASIC/` rather than editing them, and remember a stale one silently changes what BASLOAD
-tokenises. `testing/GPC.ERR.PRG` and `testing/C.GPC.ERR.PRG` ARE tracked, are SHARED-runtime builds
-(~1.6 KB, no embedded runtime — `edbuild.py` only makes standalone ones), and are still stale.
+tokenises. `GPC.ERR` no longer lives there at all: its source and its modules are in
+`samples/GPC.ERR/`, and that folder is the one to grep. See
+[[gpcerr-builds-in-its-sample-folder]].
 
 **THE TOOL NOW EXISTS: `source/common-scripts/deferscan.py`.**
 

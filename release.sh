@@ -144,11 +144,12 @@ from genrtimage import imageName, bankImageName     # noqa: E402
 #   GP1.IMG.nnn.BIN the bank code built with that image, which a self-contained object carries
 #                   after its p-code and copies to bank 1 as it starts. It jumps into the
 #                   image at fixed addresses, so the two install together from one link.
-#   GPC.ERR.PRG     the error-address-to-line helper. In the tree it is C.GPC.ERR.PRG (the
-#                   "C." prefix distinguishes compiler output from the GPC.ERR.PRG that is
-#                   its input); the release drops the prefix, because a user should not have
-#                   to know which of two spellings is the fast one. The tokenised build is
-#                   NOT shipped -- it is compile input, and could not be run in any case.
+#   GPC.ERR.PRG     the error-address-to-line helper. Built in samples/GPC.ERR/, which is
+#                   its own emulator drive, and compiled SHARED, so it wants the same
+#                   runtime beside it as any other compiled program. The tokenised source
+#                   is NOT shipped -- it is compile input, and could not be run in any case.
+#   GPC.ERR.OVL     the banked half of that helper, its region overlay. It is not optional:
+#                   GPC.ERR.PRG reads it by name as it starts and stops without it.
 #   GPC.HELP.PRG    the on-machine reference -- the manual, the globals register and the
 #                   file list, readable on the X16. SHARED since 12th Sep 2026. In the
 #                   tree it is GPB.HELP.PRG; the release names it for the compiler it
@@ -162,7 +163,8 @@ ROOTFILES = [
     ("testing/" + rt_filename(),            rt_filename()),
     ("testing/" + rc_filename(),            rc_filename()),
     ("testing/" + bank_filename(),          bank_filename()),
-    ("testing/C.GPC.ERR.PRG",               "GPC.ERR.PRG"),
+    ("samples/GPC.ERR/GPC.ERR.PRG",         "GPC.ERR.PRG"),
+    ("samples/GPC.ERR/GPC.ERR.OVL",         "GPC.ERR.OVL"),
     ("samples/GPC-HELP/GPB.HELP.PRG",       "GPC.HELP.PRG"),
     ("README.md",                           "README.md"),
     ("LICENSE",                             "LICENSE"),
@@ -197,9 +199,10 @@ BASLOAD_FILES = [
 BASLOAD_SRC_DIR = "BASLOAD-GPC/src"
 BASLOAD_SRC_ZIP = "GPC-BASLOAD/BASLOAD-SRC.ZIP"
 
-# The BASLOAD source of the two tools. Reference only; SRC/README.TXT says so at length,
-# because the second BASLOAD line in it overwrites a shipped program.
-SRCBASL = ["GPC.BASL", "GPC.ERR.BASL"]
+# The BASLOAD source of the two tools. Reference only. SRC/README.TXT says so, and gives
+# the two steps that rebuild either one.
+SRCBASL = [("testing/GPC.BASL",                     "GPC.BASL"),
+           ("samples/GPC.ERR/GPC.ERR.BASL",         "GPC.ERR.BASL")]
 
 # One folder per sample. "fake" names the one file worth stubbing when it is not there --
 # the program itself. The globs cannot be listed by name because their count follows the
@@ -269,24 +272,23 @@ SRC_README = (
     "\n"
     "To compile, run GPC.PRG, with GPC.BIN, the GPC.IMG.nnn.BIN and GP1.IMG.nnn.BIN\n"
     "images and the GPB.RT.nnn.BIN and GP1.RT.nnn.BIN runtime files beside it. To\n"
-    "turn a runtime error's \"@ $XXXX\" into a source line, run GPC.ERR.PRG. The\n"
-    ".BASL sources are never loaded at run time.\n"
+    "turn a runtime error's \"@ $XXXX\" into a source line, run GPC.ERR.PRG, which\n"
+    "needs GPC.ERR.OVL beside it. The .BASL sources are never loaded at run time.\n"
     "\n"
     "BOTH TOOLS ARE WRITTEN IN GP.BASIC, so rebuilding either is a TWO step job and\n"
     "BASLOAD on its own is not enough. BASLOAD (built into every R49 ROM) does the\n"
     "first step -- its own #SAVEAS writes the tokenised program out:\n"
     "\n"
     '    BASLOAD "GPC.BASL"        writes GPC.SRC.PRG\n'
-    '    BASLOAD "GPC.ERR.BASL"    writes GPC.ERR.PRG\n'
+    '    BASLOAD "GPC.ERR.BASL"    writes GPC.ERR.SRC.PRG\n'
     "\n"
     "What it writes CANNOT BE RUN. Nothing in BASIC sits behind the GP tokens, so\n"
     "the ROM can neither LIST nor RUN those files -- they are compiler INPUT. The\n"
     "second step is to compile them, and the shipped GPC.PRG and GPC.ERR.PRG\n"
     "already are.\n"
     "\n"
-    "CAREFUL with the second line. It writes over the shipped COMPILED helper with\n"
-    "a file the ROM cannot run, so re-extract from the zip to get the tool back.\n"
-    "The first line is safe: GPC.SRC.PRG is a name nothing else uses.\n"
+    "Both lines are safe to run: GPC.SRC.PRG and GPC.ERR.SRC.PRG are names\n"
+    "nothing else in the folder uses, so neither writes over a shipped program.\n"
     "\n"
     "AND IF GPC.PRG ITSELF IS EVER THE BROKEN THING, you do not need a front end to\n"
     "compile. GPC.BIN reads a file called GPC.INPUT straight off the drive: write\n"
@@ -398,9 +400,9 @@ if do_stage:
     else:
         missing.append(BASLOAD_SRC_DIR)
 
-    for name in SRCBASL:
-        if not put("testing/" + name, "SRC/" + name):
-            missing.append("testing/" + name)
+    for src_rel, name in SRCBASL:
+        if not put(src_rel, "SRC/" + name):
+            missing.append(src_rel)
     os.makedirs(os.path.join(TMP, "SRC"), exist_ok=True)
     with open(os.path.join(TMP, "SRC", "README.TXT"), "w", newline="") as f:
         f.write(SRC_README.replace("\n", "\r\n"))

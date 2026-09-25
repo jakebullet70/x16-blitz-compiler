@@ -4,7 +4,7 @@
 program has to LOAD, OPEN or SAVE at run time has to be sitting in it. That is the whole reason
 the folder exists, and the whole reason it fills up.
 
-**Almost everything here is disposable.** Only the sixteen files listed below are worth keeping;
+**Almost everything here is disposable.** Only the seventeen entries listed below are worth keeping;
 if a file is not on this list, it is build output, a staged copy of something tracked elsewhere,
 or a probe that has served its purpose. Cleaned to this state on 2026-09-09, when it had reached
 13 MB and 300-odd files, of which four megabytes were emulator memory dumps from one debugging
@@ -32,12 +32,15 @@ them in place; `make -C source/runtime gpc-rt` does. Delete them and the next co
 
 | | |
 |---|---|
-| `GPC.ERR.BASL` `GPC.ERR.PRG` `C.GPC.ERR.PRG` | the error-line helper. It must be built SHARED and in the main directory -- `docs/memory/gpcerr-build-shared-in-main-dir.md` says why, and the source's own header repeats it |
 | `DIR.PRG` | the worked example in `README.md`: the program the compiler is demonstrated on |
 | `POINTER.PRG` | cited by `TODO.md` for the `POINTER` return-value mismatch |
 | `MD5` | the X16 wiki's MD5 program. It builds its constants in a way `altbase.asm` had to be fixed for |
 | `MSEDIT/` `XFMGR/` | two third-party X16 applications, kept to run against. `MSEDIT/BASLOAD.MD` is BASLOAD's own manual, and the `basload` agent reads it |
 | `ED` `XT` | two-line BASIC stubs that LOAD those two |
+
+**`GPC.ERR` is not here.** It builds in `samples/GPC.ERR/`, which is its own emulator drive and
+holds its own `GPC-BASIC/`, `GPC.BIN` and runtimes. Nothing of it is staged into this folder --
+see `docs/memory/gpcerr-builds-in-its-sample-folder.md`.
 
 ## What gets deleted, and what puts it back
 
