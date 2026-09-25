@@ -285,7 +285,7 @@ Sizes are from `source/runtime/build/code.lbl` at runtime 122.
     `source/application/source/main/00rtimgbank.header` opens link one and the runtime's `build` and
     `checkall` test links. Each places the `banked` section at `$A000` and opens it with its magic,
     so step 16 went in here, and a `.cerror` keeps the magic at `$A000`. The four links use
-    `$(ASMBANK)`, new in `documents/common.make`: `--output-section=code` writes `build/code.prg` and
+    `$(ASMBANK)`, new in `source/common.make`: `--output-section=code` writes `build/code.prg` and
     `--output-section=banked` writes `build/bank.prg`. With one output 64tass fills the gap up to
     `$A000`. `.gitignore` takes `source/*/build/bank.prg`. Each link was assembled into the
     scratchpad with the old command and the new: `code.prg` is byte-identical for `build` (16,161 B),

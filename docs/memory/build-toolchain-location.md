@@ -16,7 +16,7 @@ Neither Git Bash nor PowerShell has these on PATH; searching the usual places fi
   `node`, `npm` and `npx`; a shell started before that edit does not. No winget, choco or scoop here.
 
 The engine build (`make libs`, `make release`) also wants `SDLDIR = C:/sdl2` per
-`documents/common.make`. A rebuild of the compiler and the runtime image must happen TOGETHER when a
+`source/common.make`. A rebuild of the compiler and the runtime image must happen TOGETHER when a
 constant in `source/common-source/source/common.inc` changes -- `FrameStackPages` and `MIN_WS_PAGES`
 are read by both ends, and the file says so.
 

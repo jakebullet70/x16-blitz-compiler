@@ -54,7 +54,7 @@ CSOURCE =  $(SRCDIR)common-source$(S)
 #		Current applications.
 # 
 #
-#		TASS and PYTHON may be overridden per-machine in documents/local.make
+#		TASS and PYTHON may be overridden per-machine in source/local.make
 #		(untracked) if they are not on the PATH.
 #
 TASS ?= 64tass

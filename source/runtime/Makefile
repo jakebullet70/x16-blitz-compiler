@@ -10,9 +10,9 @@
 # *******************************************************************************************
 
 ifeq ($(OS),Windows_NT)
-include ..\..\documents\common.make
+include ..\common.make
 else
-include ../../documents/common.make
+include ../common.make
 endif
 
 all: build
@@ -32,7 +32,7 @@ prelim:
 #		be built -- ../Makefile enters gp-runtime before this directory.
 #
 #		gpc-rt is $(ASMBANK) and opens with a bank header, which places the banked section at
-#		$A000 (documents/common.make). The two test links run code.prg in the emulator with
+#		$A000 (source/common.make). The two test links run code.prg in the emulator with
 #		nothing in bank 1, so they are $(ASM), and zzlowbank.footer places the banked section in
 #		low RAM, ahead of testend.asm.
 #

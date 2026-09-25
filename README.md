@@ -227,6 +227,8 @@ warm start (runtime already resident, and provably reused rather than reloaded).
 
 ## Repository layout
 
+[`MAP.md`](MAP.md) is the one-page guide to where things are.
+
 | Path | What it is |
 | --- | --- |
 | `source/compiler` | the compiler front end (parsing, code generation) |
@@ -240,7 +242,6 @@ warm start (runtime already resident, and provably reused rather than reloaded).
 | `source/gpc` | the interactive front end `GPC.PRG` — BASLOAD source `GPC.BASL`, written in GP.BASIC, tokenised by `build_basl.py` and then compiled by `compile_shared.py` (no Java/Prog8) |
 | `bin/` | `x16emu/` (test emulator + ROM) and `box16/` (debugger) |
 | `testing/` | the built compiler, the shared runtime `GPC.RT.<build>.BIN`, and sample programs, ready to run (also the scratch `prg-batch/`/`archive/` test inputs) |
-| `documents/` | build include (`common.make`), notes, and reference PDFs |
 | `docs/` | [`BUILDING.md`](docs/BUILDING.md), the build-and-test walkthrough |
 | `samples/` | complete example programs with their sources and documentation |
 | `x16emu.bat` / `box16.bat` | project-root launchers that boot the emulators with `testing/` as the drive |
@@ -282,7 +283,7 @@ how a program that uses less could ship less.
 Needs **GNU make**, **[64tass](https://sourceforge.net/projects/tass64/)**, and **Python 3**.
 On Windows, build from **Git Bash** — every recipe in the tree is POSIX, and `common.make`
 forces `SHELL := sh` accordingly. Per-machine tool paths go in an untracked
-`documents/local.make`.
+`source/local.make`.
 
 ```sh
 ./release.sh     # full build, then package release/gpc-release-<n>.zip

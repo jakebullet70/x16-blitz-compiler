@@ -39,9 +39,9 @@
 # *******************************************************************************************
 
 ifeq ($(OS),Windows_NT)
-include ..\..\documents\common.make
+include ..\common.make
 else
-include ../../documents/common.make
+include ../common.make
 endif
 
 #

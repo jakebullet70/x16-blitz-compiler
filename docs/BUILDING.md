@@ -18,7 +18,7 @@ any of this — grab the contents of `testing/` and read the [README](../README.
 The emulator and ROM are already in the repo (`bin/x16emu/`, r49) — you don't install those.
 
 > **Run the build from a POSIX shell.** On Windows that means **Git Bash**, not `cmd` and not
-> PowerShell. Every recipe in the tree is POSIX, and `documents/common.make` forces `SHELL := sh`
+> PowerShell. Every recipe in the tree is POSIX, and `source/common.make` forces `SHELL := sh`
 > to make that work. From `cmd` you will get a wall of syntax errors that look like build failures
 > and are not.
 
@@ -53,7 +53,7 @@ sudo apt install make python3        # or: brew install make python
 
 ### If a machine needs different tool paths
 
-Create `documents/local.make` (untracked, `-include`d by `common.make`) and override just what
+Create `source/local.make` (untracked, `-include`d by `common.make`) and override just what
 differs:
 
 ```make
@@ -232,7 +232,7 @@ endpoint`, that is your sound hardware, not the build — add `-sound none`.
 |---|---|
 | Wall of shell syntax errors | you are in `cmd`/PowerShell — use Git Bash |
 | `python3: command not found`, or it opens the Store | Windows: it must be `python`; check `common.make` picked the Windows branch |
-| `64tass: command not found` | not on `PATH`; add it or set `TASS` in `documents/local.make` |
+| `64tass: command not found` | not on `PATH`; add it or set `TASS` in `source/local.make` |
 | A suite never finishes | give it 10 minutes (the replay is unwarped); if it still hangs, it has genuinely failed |
 | A build "succeeds" but the object is wrong | check for a stale emulator holding the file — see the kill-by-PID warning above |
 | `?RT` plus a letter and a build number when running a SHARED object | `GPC.RT.<n>.BIN` is missing or stale: `make -C source/runtime gpc-rt` |

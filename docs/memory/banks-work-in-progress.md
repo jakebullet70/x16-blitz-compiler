@@ -62,7 +62,7 @@ Step 28 is done: the manual, the help copies, README, the notes and the `.122.` 
 Uncommitted: all of ALL-BANKS, and handler steps 8 and 9 (`common.inc`, `gpbank.asm`, `bootstrap2.asm`, `banktest3.py`,
 `gencom.py`, `genx16.py`, `genexec.asm`, `gendata.asm`, `generated/x16_sound.def` and `.defc`, the
 build outputs), handler step 10 (`BANKMGR.INC.BL`, the three `.EXP.BL` samples, the manual and the
-help), handler step 11 (the two bank headers, `documents/common.make`, the runtime and application
+help), handler step 11 (the two bank headers, `source/common.make`, the runtime and application
 Makefiles), handler step 12 (the moved handler files, the polynomial sources and generators,
 `runtime.inc`, `00runtime.asm`, `zzlowbank.footer`, the runtime and polynomials Makefiles), handler steps 13 and 14 (`vectors.py`, `genmapping.py`,
 `genx16.py`, the three generated files, `00runtime.asm`, `testing/testend.asm`), handler step 15 (`errors/errorhandler.asm`), handler step 17 (`common.inc`, `rtbuild.txt`,

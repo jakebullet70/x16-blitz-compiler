@@ -1450,7 +1450,7 @@ corrections are worked out at the end of pass one, before the application is ask
 `gpUsed` is not settled until that same moment. It costs 1,536 bytes of handlers a program that
 banks and calls no keyword will not reach.
 
-Five stages, one document each: `OVERLAY-EMBED-STAGE1.md` through `-STAGE5.md`, beside
+Five stages, one document each: `OVERLAY-EMBED-STAGE1.md` through `-STAGE5.md` in `docs/blitz/overlay-embed/`, beside
 `OVERLAY-EMBED-PLAN.md`. `source/unit-tests/banktest3.py` grew an embedded half — four programs
 compiled and run both ways, and two embedded-only refusals — while every test it already had stays
 SHARED, which is what says the shared path did not move.

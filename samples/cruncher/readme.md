@@ -107,7 +107,7 @@ To crunch the editor instead, point the drive at `samples\edit` and drop `CRUNCH
 
 BASLOAD resolves `#INCLUDE` off the drive and `build_basl.py` uses `testing\` as the emulator's
 filesystem root, so both sources and the two includes stage there first. `python` and `make` are
-off-PATH; see `documents/local.make`.
+off-PATH; see `source/local.make`.
 
 ```
 copy samples\cruncher\CRUNCH.BASL             testing\
