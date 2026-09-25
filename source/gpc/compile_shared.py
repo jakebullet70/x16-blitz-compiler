@@ -46,6 +46,20 @@ EMU       = os.path.join(EMUDIR, "x16emu.exe" if os.name == "nt" else "x16emu")
 ROM       = os.path.join(EMUDIR, "rom.bin")
 GPC_INPUT = os.path.join(TESTING, "GPC.INPUT")
 ENGINE    = "GPC.BIN"
+DRIVER    = "GPCRUN.BAS"		# a sample's driver: change into its folder, run /GPC/GPC.BIN
+
+#	A drive inside GPC-BASIC-TOOLS-SRC is a sample. The emulator mounts GPC-BASIC-TOOLS-SRC as its
+#	root and changes into the sample, so the tools come from /GPC/, the tool home (make install).
+SAMPLES = os.path.join(ROOT, "GPC-BASIC-TOOLS-SRC")
+GPCHOME = os.path.join(SAMPLES, "GPC")
+
+
+def home_folder(drive):
+	"""The drive's path under GPC-BASIC-TOOLS-SRC, or None when it is not a sample."""
+	rel = os.path.relpath(drive, SAMPLES)
+	if rel == "." or rel.startswith(".."):
+		return None
+	return rel.replace(os.sep, "/")
 
 TIMEOUT = 900			# generous: the engine compiles on an emulated 8 MHz 65C02.
 						# GPBMODS at 2,200 lines and two GP.BANKED regions took about
@@ -78,7 +92,9 @@ def report(raw):
 
 
 def compile_one(source, obj, mapfile="", shared=True, deadlist=""):
-	for need in (EMU, ROM, os.path.join(TESTING, ENGINE), os.path.join(TESTING, source)):
+	home = home_folder(TESTING)
+	engine = os.path.join(TESTING if home is None else GPCHOME, ENGINE)
+	for need in (EMU, ROM, engine, os.path.join(TESTING, source)):
 		if not os.path.exists(need):
 			die("missing %s" % need)
 
@@ -122,9 +138,14 @@ def compile_one(source, obj, mapfile="", shared=True, deadlist=""):
 		env = dict(os.environ)
 		env["SDL_VIDEODRIVER"] = "dummy"
 		logpath = os.path.join(TESTING, "GPCCOMP.LOG")
+		if home is None:
+			launch = ["-fsroot", ".", "-prg", ENGINE, "-run"]
+		else:
+			with open(os.path.join(TESTING, DRIVER), "w", newline="\n") as f:
+				f.write('DOS"CD:/%s"\nLOAD"/GPC/%s"\nRUN\n' % (home, ENGINE))
+			launch = ["-fsroot", SAMPLES, "-bas", DRIVER]
 		with open(logpath, "wb") as log:
-			p = subprocess.Popen([EMU, "-rom", ROM, "-fsroot", ".", "-warp", "-sound", "none",
-								  "-echo", "raw", "-prg", ENGINE, "-run"],
+			p = subprocess.Popen([EMU, "-rom", ROM, "-warp", "-sound", "none", "-echo", "raw"] + launch,
 								 cwd=TESTING, stdout=log, stderr=subprocess.STDOUT, env=env)
 			try:
 				#
@@ -175,6 +196,8 @@ def compile_one(source, obj, mapfile="", shared=True, deadlist=""):
 				except subprocess.TimeoutExpired:
 					pass
 	finally:
+		if home is not None and os.path.exists(os.path.join(TESTING, DRIVER)):
+			os.remove(os.path.join(TESTING, DRIVER))
 		if saved is not None:
 			with open(GPC_INPUT, "wb") as f:
 				f.write(saved)

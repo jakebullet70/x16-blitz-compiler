@@ -362,12 +362,9 @@ _BBCheckGP:
 		bra 	_BBEnter 					; WARM -- handlers are up too
 _BBCold:
 		;
-		;		Cold: LOAD the runtime to its own home. Try the CURRENT DIRECTORY first, then the
-		;		ROOT of the SD card -- a program run from its own folder finds a runtime sitting
-		;		beside it, and otherwise falls back to one copy kept at the root, so every folder
-		;		on the card does not need its own 11K duplicate. A leading "/" is what addresses
-		;		the root (measured on R49 from inside a subdirectory: "GPC.RT.001.BIN" is not
-		;		found, "/GPC.RT.001.BIN" loads).
+		;		Cold: LOAD the runtime to its own home. Three places are tried in order: the
+		;		CURRENT DIRECTORY, then /GPC/ (the tool home), then the ROOT. A leading "/"
+		;		addresses the root from inside any subdirectory.
 		;
 		;		Which file: the FULL one (handlers + core, loads at RTGPBASE) if this program uses a
 		;		GPB keyword, the CORE-ONLY one (loads at RTBASE) if it does not. Loading the full one
@@ -377,7 +374,7 @@ _BBCold:
 		;		THEN THE BANK CODE, GP1.RT.nnn.BIN, into bank 1 from the SAME place. The three names
 		;		differ only in their third character, so there is one name and that character is
 		;		patched before each load. A bank code file missing beside a core that loaded is ?RT,
-		;		not a search of the root: the two files are one build.
+		;		not a further search: the two files are one build.
 		;
 		;		$A000 IS ZEROED FIRST. A core that loads beside a missing bank code file would
 		;		otherwise leave an older bank code's magic standing, and the next run would enter
@@ -394,7 +391,12 @@ _BBName:
 		sta 	BBNameLo
 		jsr 	BBLoad
 		bcc 	_BBBank 					; carry clear = loaded OK
-		dec 	BBNameLo 					; else the root form, one byte earlier with its "/"
+		lda 	#<BBNameHome 				; else the /GPC/ form
+		sta 	BBNameLo
+		jsr 	BBLoad
+		bcc 	_BBBank
+		lda 	#<BBNameRoot 				; else the root form
+		sta 	BBNameLo
 		jsr 	BBLoad
 		bcs 	_BBFail
 _BBBank:
@@ -504,9 +506,8 @@ BBRunJmp:
 ;		scope in two, leaving the earlier branches referring to an _BBEnter they can no longer see.
 ; ------------------------------------------------------------------------------------------------
 ;
-;		BBNameLo is the low byte of the name's address: BBName for the local form, one less for the
-;		root form and its "/". Both end at BBNameEnd on the same page, so the length is BBNameEnd's
-;		low byte less BBNameLo.
+;		BBNameLo is the low byte of the name's address: BBName, BBNameHome or BBNameRoot. All three
+;		end at BBNameEnd on the same page, so the length is BBNameEnd's low byte less BBNameLo.
 ;
 BBLoad:
 		ldx 	BBNameLo 					; X = name address low
@@ -557,17 +558,19 @@ BBGPMagic:
 		.byte 	(RT_ABI / 10) + '0' 		; same ordinal -- the two halves are one image and one ABI
 		.byte 	(RT_ABI - (RT_ABI / 10) * 10) + '0'
 		;
-		;		One string, every name. The root form is the local form with a "/" in front, so the
-		;		fallback costs a single byte, and the third character is patched to B, C or 1 before
-		;		each load, so the three files cost one name. The name is formatted, not spelled out,
-		;		so a build number of any width still comes out right.
+		;		One string, every name. "/GPC/GPC.RT.nnn.BIN" read from BBNameHome is the tool home
+		;		form, from BBNameRoot the root form, and from BBName the local form. The third
+		;		character of BBName is patched to B, C or 1 before each load, so the three files
+		;		cost one name.
 		;
+BBNameHome:
+		.text 	"/GPC"
 BBNameRoot:
 		.text 	"/"
 BBName:
 		.text 	format("GPC.RT.%03d.BIN", BuildNumber) 	; third character PATCHED at run time: B, C or 1
 BBNameEnd:
-		.cerror (>BBNameRoot) != (>BBNameEnd), "bootstrap runtime name crosses a page -- BBLoad subtracts low bytes"
+		.cerror (>BBNameHome) != (>BBNameEnd), "bootstrap runtime name crosses a page -- BBLoad subtracts low bytes"
 BBErrText:
 		.text 	"?RT" 						; brief -- a full line would wrap in 40 columns
 BBErrLetter:
@@ -2524,11 +2527,8 @@ _WOCImgNoneFar:
 		jmp 	ObjectNoImage
 _WOCImgBadFar:
 		jmp 	ObjectBadImage
-_WOCImgOpened:
-		jsr 	IOImageIn
-		jsr 	IOReadByte 					; the image's own two byte load address, which is
-		bcs 	_WOCImgBadFar 				; not part of the runtime and must not be copied
-		cmp 	#RTIMG_LOAD & $FF
+_WOCImgOpened: 								; A = the first byte of the image's own two byte
+		cmp 	#RTIMG_LOAD & $FF 			; load address, which is not part of the runtime
 		bne 	_WOCImgBadFar
 		jsr 	IOReadByte
 		bcs 	_WOCImgBadFar
@@ -3603,10 +3603,7 @@ ObjReadBankCode:
 		ldx 	#RTBankFileText & $FF
 		ldy 	#RTBankFileText >> 8
 		jsr 	IOOpenImage 				; the image's logical file, which opens after this closes
-		bcs 	_ORBFail
-		jsr 	IOImageIn
-		jsr 	IOReadByte 					; its own load address, not part of the bank code
-		bcs 	_ORBFail
+		bcs 	_ORBFail 					; A = the first byte of its own load address
 		cmp 	#OBJ_BANKCODE_LOAD & $FF
 		bne 	_ORBFail
 		jsr 	IOReadByte
@@ -4216,27 +4213,62 @@ IOOpenRead:
 
 ; ************************************************************************************************
 ;
-;			 Open the runtime image for read -- YX = ASCIIZ name, carry set if it failed
+;		Open the runtime image for read -- YX = ASCIIZ name, which must sit straight after
+;		"/GPC/" in memory. Carry clear: the image is open, selected for input, and its first
+;		byte is in A. Carry set: it is in neither the current directory nor /GPC/.
 ;
 ;		ON ITS OWN LOGICAL FILE, because it is read while OBJECT.PRG is open for write and
-;		everything else here uses file 3 for both. The channel is NOT selected here: the
-;		streamer alternates CHKIN/CHKOUT a page at a time, so whichever it set would be wrong
-;		by the time the first byte moved.
+;		everything else here uses file 3 for both. The streamer alternates CHKIN/CHKOUT a page
+;		at a time, so a caller selects it again with IOImageIn before each page.
+;
+;		An OPEN of a missing file succeeds. The first read is what fails, with ST nonzero, so
+;		that read is the test. An image is always longer than one byte, so a good first read
+;		leaves ST at zero.
 ;
 ; ************************************************************************************************
 
 IO_IMAGE_FILE = 4
 IO_OBJECT_FILE = 6
 IO_OVL_FILE = 7 							; ...and one for the .OVL overlay file -- see below
+IO_HOME_PREFIX = 5 							; the length of "/GPC/"
 
 IOOpenImage:
+		stx 	ioImageName
+		sty 	ioImageName+1
+		jsr 	IOTryImage 					; the current directory
+		bcc 	_IOOIExit
+		jsr 	IOCloseImage
+		lda 	ioImageName 				; else the tool home, IO_HOME_PREFIX bytes earlier
+		sec
+		sbc 	#IO_HOME_PREFIX
+		tax
+		ldy 	ioImageName+1
+		bcs 	_IOOIHome
+		dey
+_IOOIHome:
+		jsr 	IOTryImage
+_IOOIExit:
+		rts
+
+IOTryImage:
 		lda 	#IO_IMAGE_FILE
 		sta 	ioFileNo
 		lda 	#'R'
 		jsr 	IOSetFileName 				; carry comes back from OPEN
 		ldy 	#3 							; put the default back for every other caller
 		sty 	ioFileNo 					; (sty leaves the carry alone)
+		bcs 	_IOTIExit
+		jsr 	IOImageIn
+		jsr 	$FFCF 						; CHRIN: the first byte
+		pha
+		jsr 	$FFB7 						; READST
+		cmp 	#1 							; carry set if ST is nonzero
+		pla
+_IOTIExit:
 		rts
+
+ioImageName: 								; the name IOOpenImage was given
+		.word 	0
 
 ; ************************************************************************************************
 ;
@@ -5312,14 +5344,16 @@ symSavedBank: 								; the caller's RAM bank, while one of ours is selected
 ;
 ;	This file is automatically generated by scripts/bumpbuild.py
 ;
-BuildNumber = 126
+BuildNumber = 127
 		.section code
 VersionText:
 		.text	'V1.1.0',13,0
+		.text	'/GPC/'
 RTImageFileText:
-		.text	'GPC.IMG.126.BIN',0
+		.text	'GPC.IMG.127.BIN',0
+		.text	'/GPC/'
 RTBankFileText:
-		.text	'GP1.IMG.126.BIN',0
+		.text	'GP1.IMG.127.BIN',0
 		.send code
 ; ************************************************************************************************
 ; ************************************************************************************************

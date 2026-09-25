@@ -28,27 +28,62 @@ IOOpenRead:
 
 ; ************************************************************************************************
 ;
-;			 Open the runtime image for read -- YX = ASCIIZ name, carry set if it failed
+;		Open the runtime image for read -- YX = ASCIIZ name, which must sit straight after
+;		"/GPC/" in memory. Carry clear: the image is open, selected for input, and its first
+;		byte is in A. Carry set: it is in neither the current directory nor /GPC/.
 ;
 ;		ON ITS OWN LOGICAL FILE, because it is read while OBJECT.PRG is open for write and
-;		everything else here uses file 3 for both. The channel is NOT selected here: the
-;		streamer alternates CHKIN/CHKOUT a page at a time, so whichever it set would be wrong
-;		by the time the first byte moved.
+;		everything else here uses file 3 for both. The streamer alternates CHKIN/CHKOUT a page
+;		at a time, so a caller selects it again with IOImageIn before each page.
+;
+;		An OPEN of a missing file succeeds. The first read is what fails, with ST nonzero, so
+;		that read is the test. An image is always longer than one byte, so a good first read
+;		leaves ST at zero.
 ;
 ; ************************************************************************************************
 
 IO_IMAGE_FILE = 4
 IO_OBJECT_FILE = 6
 IO_OVL_FILE = 7 							; ...and one for the .OVL overlay file -- see below
+IO_HOME_PREFIX = 5 							; the length of "/GPC/"
 
 IOOpenImage:
+		stx 	ioImageName
+		sty 	ioImageName+1
+		jsr 	IOTryImage 					; the current directory
+		bcc 	_IOOIExit
+		jsr 	IOCloseImage
+		lda 	ioImageName 				; else the tool home, IO_HOME_PREFIX bytes earlier
+		sec
+		sbc 	#IO_HOME_PREFIX
+		tax
+		ldy 	ioImageName+1
+		bcs 	_IOOIHome
+		dey
+_IOOIHome:
+		jsr 	IOTryImage
+_IOOIExit:
+		rts
+
+IOTryImage:
 		lda 	#IO_IMAGE_FILE
 		sta 	ioFileNo
 		lda 	#'R'
 		jsr 	IOSetFileName 				; carry comes back from OPEN
 		ldy 	#3 							; put the default back for every other caller
 		sty 	ioFileNo 					; (sty leaves the carry alone)
+		bcs 	_IOTIExit
+		jsr 	IOImageIn
+		jsr 	$FFCF 						; CHRIN: the first byte
+		pha
+		jsr 	$FFB7 						; READST
+		cmp 	#1 							; carry set if ST is nonzero
+		pla
+_IOTIExit:
 		rts
+
+ioImageName: 								; the name IOOpenImage was given
+		.word 	0
 
 ; ************************************************************************************************
 ;

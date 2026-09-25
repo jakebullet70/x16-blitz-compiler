@@ -176,7 +176,7 @@ GP.IF HELP.OK = 0 THEN
     PRINT
     PRINT "GPB.HELP: HELP-TXT/GPB.HELP.IDX WOULD NOT LOAD."
     PRINT "RUN MKHELP.PY AND PUT THE HELP-TXT FOLDER"
-    PRINT "BESIDE GPB.HELP.PRG."
+    PRINT "BESIDE GPB.HELP.PRG OR IN /GPC/."
     END
 GP.ENDIF
 
@@ -244,12 +244,16 @@ HELP.BOOT:
     DIM HELP.PICK%(HELP.MAXPICK)    : DIM HELP.BACK.GO%(HELP.MAXBACK)
     DIM HELP.BACK.AT%(HELP.MAXBACK) : DIM HELP.FLD$(6)
 
-    ## The only place the content folder's name is written. Set before
-    ## HELP.IDXLOAD, the first thing to use it.
+    ## The content folder. Set before HELP.IDXLOAD, the first thing to use it.
     HELP.DIR$ = "//HELP-TXT/:" : HELP.FIND$ = ""
 
     PRINT "GPB-HELP. READING INDEX..."
     GOSUB HELP.IDXLOAD
+    ## Not beside the program: the copy in /GPC/, the tool home.
+    GP.IF HELP.OK = 0 THEN
+        HELP.DIR$ = "//GPC/HELP-TXT/:"
+        GOSUB HELP.IDXLOAD
+    GP.ENDIF
     RETURN
 
 

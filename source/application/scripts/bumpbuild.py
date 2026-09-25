@@ -99,12 +99,17 @@ def main():
 		#		that loads and then misbehaves. Numbered, a stale one is simply not there and
 		#		WriteObjectCode says NO RUNTIME IMAGE rather than writing a broken object.
 		#
+		#		Both names sit straight after "/GPC/": IOOpenImage steps back over it to try the
+		#		tool home when the name is not in the current directory.
+		#
+		h.write("\t\t.text\t'/GPC/'\n")
 		h.write("RTImageFileText:\n")
 		h.write("\t\t.text\t'GPC.IMG.%03d.BIN',0\n" % build)
 		#
 		#		...and the bank code built with it, which goes after the p-code. Its name is the
 		#		image's with the third character changed, as genrtimage.py installs it.
 		#
+		h.write("\t\t.text\t'/GPC/'\n")
 		h.write("RTBankFileText:\n")
 		h.write("\t\t.text\t'GP1.IMG.%03d.BIN',0\n" % build)
 		h.write("\t\t.send code\n")

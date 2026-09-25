@@ -289,11 +289,8 @@ _WOCImgNoneFar:
 		jmp 	ObjectNoImage
 _WOCImgBadFar:
 		jmp 	ObjectBadImage
-_WOCImgOpened:
-		jsr 	IOImageIn
-		jsr 	IOReadByte 					; the image's own two byte load address, which is
-		bcs 	_WOCImgBadFar 				; not part of the runtime and must not be copied
-		cmp 	#RTIMG_LOAD & $FF
+_WOCImgOpened: 								; A = the first byte of the image's own two byte
+		cmp 	#RTIMG_LOAD & $FF 			; load address, which is not part of the runtime
 		bne 	_WOCImgBadFar
 		jsr 	IOReadByte
 		bcs 	_WOCImgBadFar
@@ -1368,10 +1365,7 @@ ObjReadBankCode:
 		ldx 	#RTBankFileText & $FF
 		ldy 	#RTBankFileText >> 8
 		jsr 	IOOpenImage 				; the image's logical file, which opens after this closes
-		bcs 	_ORBFail
-		jsr 	IOImageIn
-		jsr 	IOReadByte 					; its own load address, not part of the bank code
-		bcs 	_ORBFail
+		bcs 	_ORBFail 					; A = the first byte of its own load address
 		cmp 	#OBJ_BANKCODE_LOAD & $FF
 		bne 	_ORBFail
 		jsr 	IOReadByte

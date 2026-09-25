@@ -82,6 +82,19 @@ BASLOAD_FILES = ("BASLOAD-GPC.BIN", "BASLOAD-GPC.PRG")
 BASLOAD_BUILT = os.path.join(ROOT, "BASLOAD-GPC", "build", "BASLOAD-GPC.BIN")
 BASLOAD_DRIVE = os.path.join(TESTING, "BASLOAD-GPC.BIN")
 
+#    A drive inside GPC-BASIC-TOOLS-SRC is a sample. The emulator mounts GPC-BASIC-TOOLS-SRC as its
+#    root and changes into the sample, so the tools come from /GPC/, the tool home (make install).
+SAMPLES = os.path.join(ROOT, "GPC-BASIC-TOOLS-SRC")
+GPCHOME = os.path.join(SAMPLES, "GPC")
+
+
+def home_folder(drive):
+    """The drive's path under GPC-BASIC-TOOLS-SRC, or None when it is not a sample."""
+    rel = os.path.relpath(drive, SAMPLES)
+    if rel == "." or rel.startswith(".."):
+        return None
+    return rel.replace(os.sep, "/")
+
 #
 #	The API is three inputs and one output, all in RAM bank 0 -- see BASLOAD-GPC/README.md.
 #
@@ -96,9 +109,9 @@ BASLOAD_DRIVE = os.path.join(TESTING, "BASLOAD-GPC.BIN")
 #	LOAD inside a BASIC program restarts it AND clears variables, so the re-entry guard is a POKEd
 #	byte in golden RAM rather than a variable.
 #
-DRIVER_TEXT = """10 IF PEEK(1024)=42 THEN 50
+DRIVER_TEXT = """{cd}10 IF PEEK(1024)=42 THEN 50
 20 POKE 1024,42
-30 LOAD"BASLOAD-GPC.BIN",8,1
+30 LOAD"{basload}",8,1
 50 B$="{basl}"
 60 BANK 0
 70 FOR I=1 TO LEN(B$):POKE 48896+I-1,ASC(MID$(B$,I,1)):NEXT
@@ -177,10 +190,17 @@ def tokenise(basl_name, prg_name, also_clean=()):
     #SAVEAS writes source/drive/<prg_name>. Returns the tokenised PRG's bytes; dies on failure.
     also_clean lists extra outputs (e.g. a #SYMFILE) to remove up front so a stale one can't fake
     success."""
-    stage_basload()
+    home = home_folder(TESTING)
+    if home is None:
+        stage_basload()
+        cd, basload, fsroot = "", "BASLOAD-GPC.BIN", "."
+    else:
+        cd, basload, fsroot = '5 DOS"CD:/%s"\n' % home, "/GPC/BASLOAD-GPC.BIN", SAMPLES
+        if not os.path.exists(os.path.join(GPCHOME, "BASLOAD-GPC.BIN")):
+            die("no BASLOAD-GPC.BIN in GPC-BASIC-TOOLS-SRC/GPC/ -- run: make install")
 
     with open(os.path.join(TESTING, DRIVER), "w", newline="\n") as f:
-        f.write(DRIVER_TEXT.format(basl=basl_name, done=DONE))
+        f.write(DRIVER_TEXT.format(cd=cd, basload=basload, basl=basl_name, done=DONE))
 
     #   Start from a clean slate. #SAVEAS overwrites, but a stale PRG from an earlier run must not
     #   be able to stand in for a new one -- and the sentinel especially, since it IS the verdict.
@@ -190,7 +210,7 @@ def tokenise(basl_name, prg_name, also_clean=()):
             os.remove(p)
 
     env = dict(os.environ); env["SDL_VIDEODRIVER"] = "dummy"
-    args = [EMU, "-rom", ROM, "-fsroot", ".", "-warp", "-pastewarp", "-sound", "none", "-echo", "-bas", DRIVER]
+    args = [EMU, "-rom", ROM, "-fsroot", fsroot, "-warp", "-pastewarp", "-sound", "none", "-echo", "-bas", DRIVER]
     logpath  = os.path.join(TESTING, LOG)
     donepath = os.path.join(TESTING, DONE)
     target   = os.path.join(TESTING, prg_name)

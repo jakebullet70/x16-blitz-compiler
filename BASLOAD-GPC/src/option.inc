@@ -150,21 +150,71 @@ include:
     ; Get file name
     ldx index1
     jsr option_get_string
-    
-    ; Open file & check errors
+
+    ;=== GPC begin === a file not in the current directory is looked for in /GPC/, the tool home
+    GPC_HOME_LENGTH = 5
+    GPC_INCLUDE_MAX = 64
+    jsr gpc_include_copy
+    jsr gpc_include_try
+    beq gpc_include_found
+    jsr file_close
+    ldx #<gpc_include_path
+    ldy #>gpc_include_path
+    lda gpc_include_length
+    jsr gpc_include_try
+    bne gpc_include_failed
+
+gpc_include_found:
+    lda option_index
+    rts
+
+gpc_include_failed:
+    ; File open failed, restore source file number that was reset by open
+    lda #$ff
+    rts
+
+; gpc_include_try: open X/Y, length A, as the next source file. Z set if it opened.
+gpc_include_try:
     jsr file_open
     cmp #0
     bne :+
     jsr file_status
-    bne :+
-    
-    ; No errors
-    lda option_index
+:   rts
+
+; gpc_include_copy: copy the name at X/Y, length A, to just after "/GPC/" in
+; gpc_include_path, and set gpc_include_length to the whole. X/Y/A come back
+; unchanged. file_status writes over file_buf, where the name was, so the copy
+; is taken before the first open.
+gpc_include_copy:
+    stx TEMP1
+    sty TEMP1+1
+    cmp #GPC_INCLUDE_MAX + 1
+    bcc :+
+    lda #GPC_INCLUDE_MAX
+:   pha
+    tay
+    beq :++
+:   dey
+    lda (TEMP1),y
+    sta gpc_include_path + GPC_HOME_LENGTH,y
+    cpy #0
+    bne :-
+:   pla
+    pha
+    clc
+    adc #GPC_HOME_LENGTH
+    sta gpc_include_length
+    pla
+    ldx TEMP1
+    ldy TEMP1+1
     rts
 
-:   ; File open failed, restore source file number that was reset by open
-    lda #$ff
-    rts
+gpc_include_path:
+    .byte "/GPC/"
+    .res GPC_INCLUDE_MAX
+gpc_include_length:
+    .res 1
+    ;=== GPC end ===
 
 autonum:
     ; Get step value
