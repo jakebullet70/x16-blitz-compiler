@@ -104,7 +104,7 @@ own `GPC-BASIC/` modules, `GPC.BIN` and runtimes. Neither needs Java or prog8.
 
 `GPC.SRC.PRG` is compile-only — nothing in BASIC sits behind the GP tokens, so the ROM can neither
 `LIST` nor `RUN` it. Only the compiled `GPC.PRG` can be launched, and being shared it needs
-`GPB.RT.<n>.BIN` (the runtime **with** the GP handlers) beside it or it prints `?RT` and stops.
+`GPB.RT.<n>.BIN` (the runtime **with** the GP handlers) beside it or it prints `?RTB` and the build number, such as `?RTB126`, and stops.
 
 `make -C source/gpc` on its own builds `GPC.PRG` and the runtime it needs. The `release` target
 also builds `GPC.ERR` in `samples/GPC.ERR/`, where the compile writes `GPC.ERR.OVL` beside the
@@ -235,5 +235,5 @@ endpoint`, that is your sound hardware, not the build — add `-sound none`.
 | `64tass: command not found` | not on `PATH`; add it or set `TASS` in `documents/local.make` |
 | A suite never finishes | give it 10 minutes (the replay is unwarped); if it still hangs, it has genuinely failed |
 | A build "succeeds" but the object is wrong | check for a stale emulator holding the file — see the kill-by-PID warning above |
-| `?RT` when running a SHARED object | `GPC.RT.<n>.BIN` is missing or stale: `make -C source/runtime gpc-rt` |
+| `?RT` plus a letter and a build number when running a SHARED object | `GPC.RT.<n>.BIN` is missing or stale: `make -C source/runtime gpc-rt` |
 | `PROGRAM TOO BIG` | the program genuinely exceeds the budget in §4 — it is a real limit, honestly reported |

@@ -149,9 +149,12 @@ _BBBank:
 		bcc 	_BBEnter
 _BBFail:
 		;
-		;		Not on the disk. Print a short notice and drop back to BASIC READY with BASIC's bank
-		;		selected again -- no runtime is up, so there is no runtime error path to take.
+		;		Not on the disk. Print ?RT, the patched letter and the build number, e.g. ?RTB126, then
+		;		drop back to BASIC READY with BASIC's bank selected again -- no runtime is up, so
+		;		there is no runtime error path to take.
 		;
+		lda 	BBName+2 					; B, C or 1: the file that failed
+		sta 	BBErrLetter
 		ldx 	#0
 _BBErr:
 		lda 	BBErrText,x
@@ -311,7 +314,10 @@ BBName:
 BBNameEnd:
 		.cerror (>BBNameRoot) != (>BBNameEnd), "bootstrap runtime name crosses a page -- BBLoad subtracts low bytes"
 BBErrText:
-		.text 	"?RT", 13, 0 				; brief -- a full line would wrap in 40 columns
+		.text 	"?RT" 						; brief -- a full line would wrap in 40 columns
+BBErrLetter:
+		.text 	"?" 						; PATCHED at _BBFail with the letter of the missing file
+		.text 	format("%03d", BuildNumber), 13, 0
 
 ;		The per-program bytes. DATA, not immediates -- see the note at the warm check. The first
 ;		three are written by WriteObjectCode as the template streams past; BBNameLo is working

@@ -2906,7 +2906,8 @@ build.
 
 The bootstrap looks for the runtime in the current directory, then at the root of the SD card, so
 one copy at `/` serves every program. `GP1.RT.nnn.BIN` must sit in the same place as the runtime
-that loaded. A runtime file that is not found prints `?RT`.
+that loaded. A runtime file that is not found prints `?RT`, the third letter of its name and the
+build number: `?RTB126` for `GPB.RT.126.BIN`.
 
 `GPC.BIN`, `GPC.IMG.nnn.BIN` and `GP1.IMG.nnn.BIN` are the compiler and its inputs and do not ship.
 

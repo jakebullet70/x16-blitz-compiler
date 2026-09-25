@@ -86,8 +86,8 @@ python source/gpc/samplesbuild.py GPC.ERR
 
 `samplesbuild.py` runs the same two steps and installs `GPC.ERR.PRG` and `GPC.ERR.OVL` into
 `samples/GPC-HELP/`. It copies no runtime, in either direction: `GPB.HELP` owns the `.RT.` files in
-that folder. This folder carries build 125 of the three, `GPC.RT.125.BIN`, `GPB.RT.125.BIN` and
-`GP1.RT.125.BIN`.
+that folder. This folder carries build 126 of the three, `GPC.RT.126.BIN`, `GPB.RT.126.BIN` and
+`GP1.RT.126.BIN`.
 
 The object is SHARED. It loads `GPB.RT.nnn.BIN` off the drive when it runs, the runtime with the GP
 handlers rather than the core-only `GPC.RT.nnn.BIN`. 10,197 bytes of object against a 22,016 byte
@@ -133,7 +133,7 @@ that differs.
 | `GPC.BIN` | the compiler's engine, for compiling in this folder on the machine |
 | `GPC.INPUT` | the engine's four lines for this program: source, object, map, `SHARED` |
 | `BASLOAD-GPC.PRG`, `BASLOAD-GPC.BIN` | the tokeniser's front end and engine |
-| `GPB.RT.125.BIN`, `GPC.RT.125.BIN`, `GP1.RT.125.BIN` | the runtimes a shared object loads |
+| `GPB.RT.126.BIN`, `GPC.RT.126.BIN`, `GP1.RT.126.BIN` | the runtimes a shared object loads |
 
 Build outputs: `GPC.ERR.SRC.PRG`, `GPC.ERR.SRC.SYM` and `GPC.ERR.MAP`. Nothing under `samples/` is
 git-ignored, so the object and the overlay are ordinary tracked files.

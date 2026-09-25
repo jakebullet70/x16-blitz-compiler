@@ -9,26 +9,33 @@ This page is generated into the on-machine help by `MKHELP.PY`. Correct it here,
 
 ## 1. What has to be on the drive to compile
 
-These five files are needed for the compiler to work. Put them beside each other:
+These seven files are needed for the compiler to work. Put them beside each other:
 
 | | |
 |---|---|
 | `GPC.PRG` | the front end you `RUN` |
 | `GPC.BIN` | the engine it hands the job to |
-| `GPC.IMG.nnn.BIN` | the runtime a self-contained object carries |
+| `GPC.IMG.nnn.BIN` | the runtime streamed into a self-contained object |
+| `GP1.IMG.nnn.BIN` | the bank 1 code streamed in after it |
 | `GPB.RT.nnn.BIN` | the shared runtime, with GP.BASIC included |
 | `GPC.RT.nnn.BIN` | the same runtime without it |
+| `GP1.RT.nnn.BIN` | the bank 1 code either shared runtime loads |
 
 `nnn` is the runtime build number and it is part of the name on purpose: a stale runtime under a
 fixed name would still be found, and the mismatch would not show until something ran wrong.
 
-Both shared runtimes are needed. Which one a program wants is decided when it is compiled, not when
-it runs, so a drive carrying only one works for half the programs built against it. A program that
-cannot find its runtime prints `?RT` and stops.
+Both `.IMG` files are read before the engine writes a byte of a self-contained object. When either
+one is missing the compiler prints `NO RUNTIME IMAGE` and leaves no object file at all.
 
-The front end needs `GPB.RT.nnn.BIN` for itself: `GPC.PRG` is a compiled GP.BASIC program built in
-shared mode. The compiler front end is written in the language it compiles. The engine behind it,
-`GPC.BIN`, is 100% assembly.
+Both shared runtimes are needed. Which one a program wants is decided when it is compiled, not when
+it runs, so a drive carrying only one works for half the programs built against it. Every shared
+program also loads `GP1.RT.nnn.BIN`, from the same place its runtime loaded from. A program that
+cannot find a runtime file prints `?RT`, the third letter of its name and the build number, such as
+`?RTB126` for `GPB.RT.126.BIN`, and stops.
+
+The front end needs `GPB.RT.nnn.BIN` and `GP1.RT.nnn.BIN` for itself: `GPC.PRG` is a compiled
+GP.BASIC program built in shared mode. The compiler front end is written in the language it
+compiles. The engine behind it, `GPC.BIN`, is 100% assembly.
 
 ---
 

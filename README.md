@@ -19,7 +19,7 @@ Forked from Paul Robson's original: <https://github.com/paulscottrobson/blitz-co
 `GPC.IMG.<n>.BIN` and the shared runtime `GPB.RT.<n>.BIN`, load it, and answer four questions:
 
 > The front end is itself a compiled GP.BASIC program, built in shared mode, which is why
-> `GPB.RT.<n>.BIN` has to be there — without it you get `?RT` and nothing else. The release zip
+> `GPB.RT.<n>.BIN` has to be there — without it you get `?RTB` and the build number, such as `?RTB126`, and nothing else. The release zip
 > ships all of them.
 
 ```text

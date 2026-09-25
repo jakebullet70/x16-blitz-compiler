@@ -1,18 +1,64 @@
 #SAVEAS "@:GPB.HELP.SRC.PRG"
 #SYMFILE "@:GPB.HELP.SRC.SYM"
+## The three code regions. HELP.BOOT claims each through BANKMGR. They are
+## #DEFINEd above the GP.BANKED lines because BASLOAD resolves a #DEFINE only
+## once it has read it, and GP.BANKED takes a decimal constant.
+#DEFINE HELP.LIBCODE 11
+#DEFINE HELP.GUICODE 12
+#DEFINE HELP.DLGCODE 13
+
+## ---- what stays in low memory ----
+## GPB.INC.BL is declarations. STASH executes BANK, which a region may not.
+## STRCASE is a GP.ASM blob. APPSYS runs before the regions are claimed.
 #INCLUDE "GPC-BASIC/GPB.INC.BL"
-#INCLUDE "GPC-BASIC/THEME.INC.BL"
 #INCLUDE "GPC-BASIC/STASH.INC.BL"
 #INCLUDE "GPC-BASIC/STRCASE.INC.BL"
 #INCLUDE "GPC-BASIC/APPSYS.INC.BL"
+
+## ---- the library modules run from a RAM bank ----
+## Each is its ordinary .INC.BL file between GP.BANKED and GP.ENDBANKED and
+## nothing else: a call in from outside selects the region's bank and RETURN
+## puts the caller's back. GPC-BASIC/BANKED-OR-NOT.md has the rules.
+##
+## The GOTO jumps the region. A GOTO into one is refused, so the bridge
+## GP.BANKED leaves is the only way to fall past it, and that works at program
+## start only.
+##
+## Order is not free. THEME is first because everything below reads its role
+## numbers, which are #DEFINEs. MENU.INC.BANKED.BL is above MENU, which is the
+## store it declares.
+GOTO HELP.LIBEND
+GP.BANKED HELP.LIBCODE
+#INCLUDE "GPC-BASIC/THEME.INC.BL"
 #INCLUDE "GPC-BASIC/BANKMGR.INC.BL"
 #INCLUDE "GPC-BASIC/MENU.INC.BANKED.BL"
 #INCLUDE "GPC-BASIC/MENU.INC.BL"
+GP.ENDBANKED
+HELP.LIBEND:
+
+## ---- the dialogs take two more regions ----
+## A region is 8,192 bytes and the engine and the verbs over it do not fit in
+## one. GP.BANKED REGION OVER 8K is what the compiler says when they are put in
+## one anyway.
+##
+## The engine is the first region. LINEINPUT is the field, GUI.INC.BL the box
+## and the form loop over it. COMBO and CHECK are here because GUI.INC.BL names
+## their painters whether or not a form has one of them, and a name with no
+## module behind it does not compile.
+##
+## STASH stays in low memory above: GUI.OPEN saves the cells a box covers
+## through it, and the call out of the region is what makes that legal.
+GOTO HELP.GUIEND
+GP.BANKED HELP.GUICODE
 #INCLUDE "GPC-BASIC/LINEINPUT.INC.BL"
 #INCLUDE "GPC-BASIC/GUI.INC.BL"
 #INCLUDE "GPC-BASIC/COMBO.INC.BL"
 #INCLUDE "GPC-BASIC/CHECK.INC.BL"
+GP.ENDBANKED
+GP.BANKED HELP.DLGCODE
 #INCLUDE "GPC-BASIC/GUI-DIALOGS.INC.BL"
+GP.ENDBANKED
+HELP.GUIEND:
 
 ## ============================================================================
 ## GPB.HELP.BASL -- the GP.BASIC and BASL reference, on the machine.
@@ -153,6 +199,12 @@ HELP.BOOT:
     ## link menu's rows.
     GOSUB BANKMGR.INIT
 
+    ## The three code regions, claimed so that nothing can be handed the
+    ## program's own code as scratch.
+    IF GP.FN(BANKMGR.CLAIM.BANK, HELP.LIBCODE) = 0 THEN GOTO HELP.BANK.FAILED
+    IF GP.FN(BANKMGR.CLAIM.BANK, HELP.GUICODE) = 0 THEN GOTO HELP.BANK.FAILED
+    IF GP.FN(BANKMGR.CLAIM.BANK, HELP.DLGCODE) = 0 THEN GOTO HELP.BANK.FAILED
+
     ## Asked after the mode change. APPSYS.STARTUP reported the old screen.
     GOSUB GUI.SCREEN
     HELP.COLS = GUI.SCREEN.COLS : HELP.ROWS = GUI.SCREEN.ROWS
@@ -161,7 +213,7 @@ HELP.BOOT:
     HELP.VIEW = HELP.ROWS - 2
     IF HELP.VIEW < 4 THEN HELP.VIEW = 4
 
-    THEME.ID% = 1 : GOSUB HELP.THEME.SET
+    THEME.ID% = 0 : GOSUB HELP.THEME.SET
 
     ## CP437, then declare that the text is ASCII. The order matters:
     ## screen_set_charset does not clear bit 6, so the charset goes first and the
@@ -184,6 +236,10 @@ HELP.BOOT:
     ## Never reallocated: HELP.IXTEXT pokes the length byte and the characters
     ## through GP.STRPTR, and a string block never grows.
     HELP.ROW$ = "                                                                        "
+
+    ## What HELP.CENTRE cuts its padding from. 60 covers the widest line a
+    ## dialog puts up.
+    HELP.SPACES$ = "                                                            "
     HELP.IXFREE = HELP.MAXIX * HELP.IXREC
     DIM HELP.PICK%(HELP.MAXPICK)    : DIM HELP.BACK.GO%(HELP.MAXBACK)
     DIM HELP.BACK.AT%(HELP.MAXBACK) : DIM HELP.FLD$(6)
@@ -195,6 +251,12 @@ HELP.BOOT:
     PRINT "GPB-HELP. READING INDEX..."
     GOSUB HELP.IDXLOAD
     RETURN
+
+
+HELP.BANK.FAILED:
+    PRINT "BANK"; BANKMGR.SET.BANK; "FAILED"
+    GOSUB APPSYS.RESTORE
+    END
 
 
 ## ============================================================================
@@ -1026,11 +1088,26 @@ HELP.SAY:
     GP.SUB MSGBOXEX, "GPB.HELP", HELP.MSG.ONE$, HELP.MSG.TWO$, "", ""
     RETURN
 
-## The two banks a reader has to work around when they open one of their own.
+## HELP.CENTRE -- HELP.PAD.TEXT$ padded out to HELP.PAD.WIDE with the text in
+## the middle. Text already that wide is left alone.
+HELP.CENTRE:
+    HELP.PAD.GAP = HELP.PAD.WIDE - LEN(HELP.PAD.TEXT$)
+    IF HELP.PAD.GAP < 1 THEN RETURN
+    HELP.PAD.HALF = INT(HELP.PAD.GAP / 2)
+    HELP.PAD.TEXT$ = LEFT$(HELP.SPACES$, HELP.PAD.HALF) + HELP.PAD.TEXT$ + LEFT$(HELP.SPACES$, HELP.PAD.GAP - HELP.PAD.HALF)
+    RETURN
+
+## HELP.ABOUT -- what the program is, and what the machine has left.
 HELP.ABOUT:
-    HELP.MSG.ONE$ = "GPB.HELP -- the GP.BASIC and BASL reference."
-    HELP.MSG.TWO$ = "RAM banks used: 8 for dialogs, 9 for the open topic."
-    GOSUB HELP.SAY
+    GOSUB BANKMGR.COUNT
+    HELP.ABOUT.WHAT$ = "The GP.BASIC and BASL reference"
+    HELP.ABOUT.WHO$ = "For the X16 GPC-BASIC compiler (C)SADLOGIC - 2026"
+    HELP.ABOUT.MEM$ = "Total banks" + STR$(BANKMGR.BANKS) + "   Unused" + STR$(BANKMGR.SPARE) + "   Bytes free" + STR$(FRE(0))
+    HELP.PAD.WIDE = LEN(HELP.ABOUT.MEM$) + 6
+    IF LEN(HELP.ABOUT.WHO$) > HELP.PAD.WIDE THEN HELP.PAD.WIDE = LEN(HELP.ABOUT.WHO$)
+    HELP.PAD.TEXT$ = HELP.ABOUT.WHAT$ : GOSUB HELP.CENTRE : HELP.ABOUT.WHAT$ = HELP.PAD.TEXT$
+    HELP.PAD.TEXT$ = HELP.ABOUT.WHO$ : GOSUB HELP.CENTRE : HELP.ABOUT.WHO$ = HELP.PAD.TEXT$
+    GP.SUB MSGBOXEX, "ABOUT GPB.HELP", HELP.ABOUT.WHAT$, HELP.ABOUT.WHO$, HELP.ABOUT.MEM$, "&OK"
     HELP.FULL = 1
     RETURN
 

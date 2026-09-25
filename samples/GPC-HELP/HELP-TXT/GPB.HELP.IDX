@@ -11,7 +11,7 @@ S|2|11|72|     Where the library lives
 S|2|27|72|     A program that uses GP.BASIC is compile-only
 S|2|35|72|     Numbers, and what a variable holds
 H|0|0|0|WHAT IS IN GPC
-T|3|0|34|  1. What has to be on the drive to compile
+T|3|0|46|  1. What has to be on the drive to compile
 T|4|0|23|  2. The compiler
 T|5|0|89|  3. BASLOAD -- the tokeniser, and why it is forked
 S|5|14|89|     Why

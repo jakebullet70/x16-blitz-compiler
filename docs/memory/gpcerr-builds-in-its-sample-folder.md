@@ -23,8 +23,8 @@ program, it is the wrong one. `scratchpad/edbuild.py` builds standalone, so noth
 be copied over the object.
 
 It compiles against `GPB.RT.nnn.BIN`, the runtime with the GP handlers, not the core-only
-`GPC.RT.nnn.BIN`. The folder carries build 125 of all three: `GPC.RT.125.BIN`, `GPB.RT.125.BIN` and
-`GP1.RT.125.BIN`.
+`GPC.RT.nnn.BIN`. The folder carries build 126 of all three: `GPC.RT.126.BIN`, `GPB.RT.126.BIN` and
+`GP1.RT.126.BIN`.
 
 **The names carry no prefix.** Tokenised source `GPC.ERR.SRC.PRG`, symbol file `GPC.ERR.SRC.SYM`,
 object `GPC.ERR.PRG`, overlay `GPC.ERR.OVL`, map `GPC.ERR.MAP`. The compiler bakes the object's own

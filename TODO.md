@@ -3444,6 +3444,23 @@ The record of the choice, for anyone reopening it:
 
 Still open, and small: `release.sh` does not ship BASLOAD at all yet — neither file is in the zip.
 
+### `BASLOAD-GPC` chains to `.GPC.NEXT` on exit — NOT STARTED, asked 2026-09-25
+
+When `BASLOAD-GPC.PRG` quits, it looks for a file named `.GPC.NEXT` on the current drive. If the file
+exists, the front end LOADs it as it exits. If not, it ends as it does today.
+
+The hook goes in the front end's `QUIT`, not in the engine. `BASLOAD-GPC.BIN` returns to its caller
+and knows nothing about exiting.
+
+Open before writing it:
+
+- Is `.GPC.NEXT` the program to LOAD, or a text file that names it? A name inside lets a folder
+  chain to `/GPC/GPC.PRG` without a copy.
+- Does it RUN after the LOAD? A LOAD from a running program restarts it, so a PRG runs; a `,8,1`
+  binary does not.
+- Is the file deleted after use, so a stale one cannot hijack the next session?
+- Where it is looked for: the current directory only, or the tool home as well.
+
 ## Samples
 
 A `samples/` tree of real programs that show off what the compiler buys you, one directory per sample
